@@ -1,0 +1,57 @@
+#!/bin/sh
+#
+# Usage: mkpatch [-v] [-c commentry] [--] olddir newdir
+#
+
+cmd=`exec basename "$0"`
+usage="Usage: $cmd [-c commentry] [--] olddir newdir"
+
+commentry=
+eval "set x `exec getopt -q c: $@`" ; shift
+while [ $# != 0 ]
+do
+	case "$1" in
+		-c)	commentry=$2 ; shift ;;
+		--)	shift ; break ;;
+		-*)	echo "bad flag '$1' - $usage" >&2 ; exit 2 ;;
+		*)	break ;;
+	esac
+	shift
+done
+
+[ $# = 2 ] || { echo "$usage" >&2 ; exit 2 ; }
+
+old=$1
+new=$2
+
+[ -d "$old" ] || { echo "$0: $old is not a directory" >&2 ; exit 1 ; }
+[ -d "$new" ] || { echo "$0: $new is not a directory" >&2 ; exit 1 ; }
+
+case "$commentry" in
+	-)	sed 's/^/	/'
+		;;
+	'')	;;
+	*)	[ -r "$commentry" ] ||
+			{ echo "$0: can't read commentry file $commentry" >&2 ; exit 1 ; }
+		sed 's/^/	/' < "$commentry"
+		;;
+esac
+
+tmp=/tmp/mkpatch$$
+diff -r -c "$old" "$new" |
+	fdtee "sed -e '/^Only/d' > $tmp" |
+	grep '^Only' |
+	while read only
+	do
+		file=`exec expr "x$only" : 'x[^:]*: *\(.*\)'`
+		case "$only" in
+			"Only in $old:"*)	xfile="$new/$file" ;;
+			*)			xfile="$old/$file" ;;
+		esac
+		> "$xfile"
+		diff -c "$old/$file" "$new/$file"
+		rm "$xfile"
+	done
+
+cat $tmp
+rm $tmp
