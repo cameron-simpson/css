@@ -1,0 +1,6 @@
+#!/bin/sh
+#
+
+[ $# = 1 ] && { PGPID=$1; shift; }
+
+ [ -n "$PGPID" ]
