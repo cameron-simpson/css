@@ -189,7 +189,6 @@ sub _getSearchEngineTable($$)
 { my($query,$maxhits)=@_;
 
   my $map={
-	# CISRA internal web
 	WEB =>	[ 'http://web/websearch/cgi-bin/htsearch.cgi',
 		{ 'restrict'	=> '',
 		  'exclude'	=> '',
@@ -642,15 +641,6 @@ sub _getSearchEngineTable($$)
 	YNEWS =>	[ 'http://search.main.yahoo.com/search/news',
 	  	{ 'p'		=> $query,
 		  'n'		=> $maxhits,
-		},
-		],
-	CISRA =>	[ 'http://web/~darrin/htdig/cgi-bin/htsearch.cgi',
-	  	{ 'restrict'	=> '',
-		  'exclude'	=> '',
-		  'config'	=> 'htdig',
-		  'method'	=> 'and',
-		  'format'	=> 'builtin-long',
-		  'words'	=> $query,
 		},
 		],
 	MOVIEACTORS =>
