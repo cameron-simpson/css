@@ -1,6 +1,7 @@
 #!/bin/sh
 #
 # Read hostnames or ips on stdin or from command line, recite their IPs on stdout.
+# NB: doesn't complain if there are no matches.
 #	- Cameron Simpson <cs@zip.com.au> 31jul2004
 #
 
