@@ -4,21 +4,26 @@
 #	- Cameron Simpson <cs@zip.com.au> 05jan2003
 #
 
-folder=SAVED/web
+MAILDIR=${MAILDIR:-$HOME/mail}
+export MAILDIR
+
+folder=+SAVED/web
 
 cmd=$0
-usage="Usage: $cmd -f folder [URLs...]
-	-f folder	File in specified folder (default: $folder)."
+usage="Usage: $cmd [+folder] [{-|URL}...]
+	+folder	File in specified folder (default: $folder)."
 
 badopts=
 while :
 do  case $1 in
-      -f)	folder=$2; shift ;;
+      +)	folder=+attn ;;
+      +*)	folder=$1 ;;
       --)	shift; break ;;
       -?*)	echo "$cmd: unrecognised option: $1" >&2
 		badopts=1 ;;
       *)	break ;;
     esac
+    shift
 done
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
@@ -34,11 +39,11 @@ for url
 do
   if [ "x$url" = x- ]
   then
-      "$0" -f "$folder" `cat` || xit=1
+      "$0" "$folder" `cat` || xit=1
       continue
   fi
 
-  (set -x; exec lock htsave httpget -h -o "$tmpf" "$url") \
+  lock htsave httpget -h -o "$tmpf" "$url" \
   || { xit=1; continue; }
 
   (
@@ -47,7 +52,7 @@ do
     sed -n 's/.*<[Tt][Ii][Tt][Ll][Ee]>\(.*\)<\/[Tt][Ii][Tt][Ll][Ee]>.*/Subject: \1/p' <"$tmpf"
     exec cat "$tmpf"
   ) \
-  | filemailitem "+$folder" \
+  | filemailitem "$folder" \
   || xit=1
 done
 
