@@ -1,5 +1,20 @@
 #!/usr/bin/perl
 
+($cmd=$0) =~ s:.*/::;
+$usage="Usage: $cmd [-sh] <mail-item\n";
+
+$#shmode=0;
+if (@ARGV && $ARGV[0] eq '-sh')
+{ $shmode=1;
+  shift(@ARGV);
+  eval 'use cs::Shell';
+}
+
+if (@ARGV)
+{ warn "$cmd: extra arguments: @ARGV\n";
+  die $usage;
+}
+
 HDR:
 while (<STDIN>)
 { chomp;
@@ -11,6 +26,11 @@ while (<STDIN>)
     $hdr=uc($1);
     $hdr=~s/-/_/g;
 
-    print "$hdr $body\n";
+    if ($shmode)
+    { print "$hdr=", cs::Shell::quote($body), "\n";
+    }
+    else
+    { print "$hdr $body\n";
+    }
   }
 }
