@@ -6,6 +6,8 @@
 #	- Cameron Simpson <cs@zip.com.au> 28aug2000
 #
 
+: ${LOGDIR:=$HOME/var/log}
+
 cmd=`basename "$0"`
 usage="Usage: $cmd pkgdir"
 
@@ -24,4 +26,4 @@ session=$cmd-$pkg-$ARCH-$HOST
 exec term -n "$session" \
     screen -S "$session" \
     buildenv env ps1pfx=":$ps1pfx" ps2pfx=" $ps2pfx" \
-    logscript -d "${VARLOG:-$HOME/var/log}/build" "$logbase"
+    logscript -d "$LOGDIR/build" "$logbase"
