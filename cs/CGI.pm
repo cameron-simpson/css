@@ -310,7 +310,7 @@ sub ScriptURL($)
 { shift->Env(SCRIPT_NAME);
 }
 
-=item ScriptURL()
+=item FullURL()
 
 Return the full URL of the CGI invocation:
 with the B<PathInfo> appended
@@ -761,7 +761,7 @@ sub BodyAttr
   }
 }
 
-=item SetCookie(I<name,I<value>,I<params>)
+=item SetCookie(I<name>,I<value>,I<params>)
 
 Set a cookie in the headers
 named I<name> with value I<value>
