@@ -1,0 +1,31 @@
+#!/bin/sh
+#
+# View a URL. Fetch and hand to something other than my web browser.
+# Spurred into implementation by the Liberty Meadows comics strip,
+# which is funny but too small, so XV to the rescue!
+#	- Cameron Simpson <cs@zip.com.au> 12jun2001
+#
+
+[ $# = 1 ] || { echo "Usage: $0 URL" >&2; exit 2; }
+url=$1; shift
+
+dir=`mkdirn /tmp/vurl` || exit 1
+
+xit=0
+
+if cd "$dir" \
+&& httpget -- "$url"
+then
+    set x *; shift
+    case "$1" in
+	*.gif|*.jpg)	xv -maxpect "$1" ;;
+	*)		v "$1" ;;
+    esac
+else
+    xit=1
+fi
+
+rm -rf "$dir" || xit=1
+
+exit $xit
+
