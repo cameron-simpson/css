@@ -37,6 +37,7 @@ do  ( cd "$dir" || exit 1
 	  find . ! -type l -print \
 	  | xxargs chmod g=u
       fi
-      find . -type d -exec chmod g+s {} ';'
+      find . -type d -print \
+      | xxargs chmod g+s
     )
 done
