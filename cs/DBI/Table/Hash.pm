@@ -94,7 +94,7 @@ sub FETCH($$)
   return $this->{LIVE}->{$key}
   if exists $this->{LIVE}->{$key};
 
-  my $sql = 'SELECT * from $this->{TABLE} WHERE $this->{KEY} = ?';
+  my $sql = "SELECT * from $this->{TABLE} WHERE $this->{KEY} = ?";
   $sql.=" AND $this->{WHERE}" if length $this->{WHERE};
 
   my $sth = cs::DBI::sql($this->{DBH},$sql);
