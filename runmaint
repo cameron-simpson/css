@@ -387,40 +387,40 @@ do
       runpath "$localscript" $addresses || xit=1
     done
     subj=$osubj
-
-    # run the implied scripts
-    case $target in
-      hourly)
-	$RUNMAINT -date "$datestr" $xflag hourly.$hh $addresses || xit=1
-	if [ $hh -eq 0 ]
-	then
-	    $RUNMAINT -date "$datestr" $xflag daily $addresses \
-	    || xit=$?
-	fi
-	;;
-      daily)
-	$RUNMAINT -date "$datestr" $xflag "$wday" $addresses || xit=$?
-	$RUNMAINT -date "$datestr" $xflag "daily.$wday" $addresses || xit=$?
-	if [ "x$wday" = xmon ]
-	then
-	    $RUNMAINT -date "$datestr" $xflag weekly $addresses \
-	    || xit=$?
-	fi
-	if [ $mday -eq 1 ]
-	then
-	    $RUNMAINT -date "$datestr" $xflag monthly $addresses \
-	    || xit=$?
-	fi
-        ;;
-      monthly)
-	if [ $mon = jan ]
-	then
-	    $RUNMAINT -date "$datestr" $xflag yearly $addresses \
-	    || xit=$?
-	fi
-	;;
-    esac
 done
+
+# run the implied scripts
+case $target in
+  hourly)
+    $RUNMAINT -date "$datestr" $xflag hourly.$hh $addresses || xit=1
+    if [ $hh -eq 0 ]
+    then
+	$RUNMAINT -date "$datestr" $xflag daily $addresses \
+	|| xit=$?
+    fi
+    ;;
+  daily)
+    $RUNMAINT -date "$datestr" $xflag "$wday" $addresses || xit=$?
+    $RUNMAINT -date "$datestr" $xflag "daily.$wday" $addresses || xit=$?
+    if [ "x$wday" = xmon ]
+    then
+	$RUNMAINT -date "$datestr" $xflag weekly $addresses \
+	|| xit=$?
+    fi
+    if [ $mday -eq 1 ]
+    then
+	$RUNMAINT -date "$datestr" $xflag monthly $addresses \
+	|| xit=$?
+    fi
+    ;;
+  monthly)
+    if [ $mon = jan ]
+    then
+	$RUNMAINT -date "$datestr" $xflag yearly $addresses \
+	|| xit=$?
+    fi
+    ;;
+esac
 
 exit $xit
 
