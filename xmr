@@ -9,4 +9,4 @@ export ftp_proxy gopher_proxy http_proxy news_proxy wais_proxy
 
 WWW_HOME=$HOME/private/html/index.html; export WWW_HOME
 
-$BIN/xmosaic -home "$WWW_HOME" ${1+"$@"} &
+$HOME/bin/$ARCH/xmosaic -home "$WWW_HOME" ${1+"$@"} &
