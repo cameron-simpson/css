@@ -133,7 +133,7 @@ for my $impath (@stdin)
   $n++;
 
   $impath =~ s:^\./+::;
-  out(int($n*100/$nn)."%: $impath") if $upd && $. % 10 == 0;
+  out(int($n*100/$nn)."%: $impath") if $upd && $n % 10 == 0;
 
   # skip known images
   next NEWIMAGE if exists $::IMX{$impath};
