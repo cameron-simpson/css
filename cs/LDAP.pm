@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 #
 # LDAP routines.
-#	- Cameron Simpson <cs@zip.com.au> 07jan98
+#	- Cameron Simpson <cs@zip.com.au> 07jan1998
 #
 
 use strict qw(vars);
@@ -53,7 +53,7 @@ sub Query
   $host=$this->{HOST} if ! defined $host;
 
   my($ldapcmd);
-  $ldapcmd=cs::Shell::quote('ldapsearch','-h',$host,'-z',100000000,$query);
+  $ldapcmd=cs::Shell::quote('ldapsearch','-h',$host,$query);
   my($s)=new cs::Source (PIPE,$ldapcmd);
   die "$::cmd: can't pipe from \"$ldapcmd\": $!" if ! defined $s;
 
