@@ -1,0 +1,83 @@
+#!/bin/sh
+#
+# Stash strings for later.
+# Adapted from noteurl.
+#	- Cameron Simpson <cs@zip.com.au> 15nov96
+#
+
+usage="Usage: note [-t tagpfx] [-T tagsfx] [-m tagprematch] notefile strings..."
+
+notedir=$HOME/etc/note
+notefile=
+tagpfx=
+tagsfx=
+tagprematch=
+
+badopts=
+
+while :
+do
+    case $1 in
+	-t)	tagpfx=$2; shift ;;
+	-T)	tagsfx=$2; shift ;;
+	-m)	tagprematch=$2; shift ;;
+	--)	shift; break ;;
+	-?*)	echo "$0: unrecognised option: $1" >&2
+		badopts=1
+		;;
+	*)	break ;;
+    esac
+    shift
+done
+
+[ $# = 0 ] || { notefile=$1; shift; }
+
+[ -n "$notefile" ] || { echo "$0: missing notefile" >&2; badopts=1; }
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+case $notefile in
+    /*)	;;
+    *)	notefile=$notedir/$notefile ;;
+esac
+
+case "$tagprematch" in
+    /*/);;
+    '')	tagprematch=1
+	;;
+    [0-9]|[1-9][0-9]|[1-9][0-9][0-9])
+	;;
+    *)	case $tagprematch in
+	    */*)	tagprematch=`perlstrs 's,/,\\/,g' "$tagprematch"` ;;
+	esac
+	tagprematch="/$tagprematch/"
+	;;
+esac
+
+[ -f "$notefile" ] || { echo "$0: missing notefile: $notefile" >&2
+			exit 1
+		      }
+
+tag=`( set x \`date\`; shift; echo "$1 $2 $3 $6" )`
+fulltag=$tagpfx$tag$tagsfx
+
+if grep "^$fulltag\$" "$notefile" >/dev/null
+then
+    :
+else
+    lock "$notefile" bsed "$tagprematch"'a\
+'"$fulltag" "$notefile"
+fi
+
+append=
+for string
+do  
+    string=`perlstrs 's/\\s*\\n\\s*/; /g' "$string"`
+    append="$append\\
+        $string"
+done
+
+case "$fulltag" in
+    */*)	fulltag=`perlstrs 's,/,\\/,g' "$fulltag"` ;;
+esac
+[ -z "$append" ] || lock "$notefile" bsed "/^$fulltag\$/a$append" "$notefile"
