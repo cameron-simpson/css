@@ -290,10 +290,6 @@ case $target in
     /*)	try=$target ;;
     *)	try="$RUNMAINT_ETC/$USER/$target $RUNMAINT_SCRIPTS/$target" ;;
 esac
-case $target in
-    */*)	targetbase=`basename "$target"` ;;
-    *)		targetbase=$target ;;
-esac
 
 # runscript pathname [addrs...]
 runpath()
