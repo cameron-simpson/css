@@ -3,6 +3,8 @@
 # Convert my categories file to procmail recipes.
 #	- Cameron Simpson <cs@zip.com.au> 02mar2001
 #
+# Release version: 1.2
+#
 
 =head1 NAME
 
@@ -22,18 +24,13 @@ generally of the form:
 
 	folder	tag	pattern
 
-I build my B<.procmailrc> with the following myke(1) rule:
+I build my B<.procmailrc> like this:
 
-	procmailrc:	$@.pre $(HOME)/scripts/cats2procmailrc categories
-		( cat $@.pre \
-		  echo \
-		  cats2procmailrc \\
-		  	-a 'my-alert-cmd %' \\
-		  	-t mh -m research.canon.com.au <categories \
-		) >$@
-
-Which starts with a few small manual rules from B<procmailrc.pre>
-and adds the automatic rules by converting my categories file.
+	cats2procmailrc \
+		-a 'announce-email "+%"' \
+		-t mh -L \
+		-m research.canon.com.au \
+		<categories >$HOME/.procmailrc
 
 =head1 OPTIONS
 
@@ -53,7 +50,7 @@ The character percent (B<'%'>) is replaced by the I<folder> name.
 =item B<-m> I<maildomains>
 
 Specify the default mail domain for rule addresses lacking an B<@I<domain>>.
-The default comes from the environment variable B<$SITENAME>.
+The default comes from the environment variable B<$MAILDOMAIN>.
 In fact this may be a list of domains if you have some equvalents,
 separated by commas.
 
@@ -110,20 +107,23 @@ it is considered an email address
 and the mail item is forwarded to that address instead of being dropped in a folder.
 
 If instead of a I<folder>
-a pipe (`B<|>') and a programs name are used
+a pipe (`B<|>') and a program name are used
 then the message is piped to the specified program.
-The I<tag> is supplied as the sole argument to the I<program>.
+The I<tag> is supplied as the sole command line argument to the I<program>.
 
-The I<tag> is placed at the start of the mail's B<Subject> line for ready recognition in mixed folders.
+The I<tag> is placed at the start of the mail's B<Subject> line for ready recognition in mixed folders
+unless the B<-L> option is used,
+in which case it is placed in the B<X-Label:> header line.
 The special tag dot (".") suppresses this action.
 
 The I<pattern> selects the mail items.
 
-=head2 Example Rules
+=head2 Example Patterns
 
 The usual form is simply an address (see RFC822 and RFC2822)
 to be present in the B<To>, B<CC> or B<BCC> header lines.
-If the address string lacks an at ("@") then an at and the value of the environment variable B<$SITENAME>
+If the address string lacks an at ("@") then an at ("@")
+and the value of the environment variable B<$MAILDOMAIN>
 is appended.
 So I have rules like this:
 
@@ -163,7 +163,7 @@ to accept mail aimed at B<fred@this.isp.com> and also copy it to B<fred@that.isp
 
 MAILDIR, the directory containing mail folders.
 
-SITENAME, the local mail domain (eg B<research.canon.com.au> for my current workplace).
+MAILDOMAIN, the local mail domain (eg B<research.canon.com.au> for my current workplace).
 
 =head1 SEE ALSO
 
@@ -193,7 +193,7 @@ $::Usage="Usage: $::cmd [-a alert] [-m domains] [-t {unix|mh|maildir}] <categori
 $::X_Label=0;
 $::DfltSfx="";		# unix style by default
 $::DfltType=UNIX;	# unix style by default
-@::DfltDom=$ENV{SITENAME};
+@::DfltDom=$ENV{MAILDOMAIN};
 undef $::DfltAlert;
 $::RcvStore='/usr/lib/nmh/rcvstore';	# path to MH rcvstore command
 
