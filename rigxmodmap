@@ -1,0 +1,24 @@
+#!/bin/sh
+#
+# Make the keyboard more sane.
+#	- Cameron Simpson <cs@zip.com.au> 14apr2000
+#
+
+# Shuffle the keyboard a bit.
+( echo clear lock
+  echo clear mod4
+  echo clear mod5
+
+  # happy hacker mapping
+  echo keycode 129 = Alt_R
+  echo keycode 131 = Alt_L
+
+# echo clear control
+# echo keycode 157 = Control_R
+# echo add control = Control_L
+# echo add control = Control_R
+
+  echo add control = Caps_Lock
+
+  echo add mod1 = Meta_L Meta_R Alt_L
+) | xmodmap -
