@@ -10,7 +10,7 @@ PATH=/opt/j2sdk-sun/bin:$PATH
 export PATH
 
 soinst=
-for d in /opt/openoffice /usr/lib/ooo-1.1
+for d in /usr/lib/ooo-1.1 /opt/openoffice 
 do
   [ -d "$d/." ] && { soinst=$d; break; }
 done
