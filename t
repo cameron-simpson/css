@@ -96,12 +96,12 @@ view_rpm=$toc_rpm
 toc_rrd='rrdtool fetch /dev/fd/0 MAX'
 view_rrd=$toc_rrd
 
-view_mpg='xine -A null -pf $f'
-view_avi='xine -A null -pf $f'
+view_mpg='xine -pf $f'
+view_avi='xine -pf $f'
 #view_avi='aviplay $f'
 view_mov=$view_avi
 view_asf=$view_avi
-view_vob='xine -A null -pf $f'
+view_vob='xine -pf $f'
 
 view_xanm='xanim $formopts /dev/fd/0'
 
@@ -113,6 +113,8 @@ view_image='ee $formopts /dev/fd/0'
 view_rcp='pilrcui $formopts /dev/fd/0'
 
 view_vrml='gtklookat /dev/fd/0'
+
+toc_swf='swfdump -a -t /dev/fd/0'
 
 xit=0
 
@@ -175,7 +177,7 @@ do  [ $abort ] && exit 1
 	      o|so)	format=obj ;;
 	      a)	format=ar ;;
 	      arc|lzh)	format=lzh ;;
-	      ogg|uu|pdf|jar|tar|cpio|rpm|rm|rrd|rcp)
+	      swf|ogg|uu|pdf|jar|tar|cpio|rpm|rm|rrd|rcp)
 			format=$cext ;;
 	      zip|exe)	format=zip ;;
 	      mpg|mpeg|mpe) format=mpg ;;
