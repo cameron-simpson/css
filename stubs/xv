@@ -21,4 +21,17 @@ shift
 
 set x -stdcmap +vsperfect $visual $browse ${1+"$@"}; shift
 
+# transcribe dirs into subimages
+first=1
+for arg
+do  [ $first ] && { set x; shift; first=; }
+    if [ -d "$arg/." ]
+    then
+	set x ${1+"$@"} "$arg/"*.*
+    else
+	set x ${1+"$@"} "$arg"
+    fi
+    shift
+done
+
 exec rawx "$xv" ${1+"$@"}
