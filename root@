@@ -5,13 +5,14 @@
 #
 
 cmd=$0
-usage="Usage: $cmd [-N] [+N] [-X] hostname
+usage="Usage: $cmd [-m msg] [-N] [+N] [-X] hostname
        $cmd hostname command..."
 
 badopts=
 ssh=ssho
 sshproto=
 sshopts=
+msg=
 
 newflag=-N
 
@@ -21,6 +22,7 @@ do  case $1 in
       -[xXv])	sshopts="$sshopts $1" ;;
       -N)	newflag=-N ;;
       +N)	newflag= ;;
+      -m)	msg=$2; shift ;;
       --)	shift; break ;;
       -?*)	echo "$cmd: unrecognised option: $1" >&2
 		badopts=1
@@ -35,13 +37,14 @@ then  echo "$cmd: missing hostname" >&2; badopts=1
 else  host=$1; shift
 fi
 
-case "$host" in
-    sunny|ivory)	ssh=ssho ;;
-esac
-
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
 [ $# -gt 0 ] && exec "$ssh" $sshopts "root@$host" "$*"
+
+[ -z "$BUGSYSTEMS" ] \
+|| [ -n "$msg" ] \
+|| msg=`readbugline` \
+|| { echo "$cmd: empty message rejected" >&2; exit 1; }
 
 ext=
 
@@ -50,7 +53,7 @@ session=root@$host$ext
 set -x
 exec term -n "#$session" \
 	scr -N "$session" \
-	logscript "$session" \
+	logscript -m "$msg" "$session" \
 	"$ssh" $sshproto -t $sshopts "root@$host" \
 		'. /etc/profile
 		 [ -s /opt/config/shell/rc ] && . /opt/config/shell/rc
