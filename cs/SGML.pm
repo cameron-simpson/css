@@ -33,12 +33,12 @@ $cs::SGML::_ChRange='';
 
   while (defined($code=shift @specials)
       && defined($ch  =shift @specials))
-	{ $cs::SGML::_SpecialCh{$code}=$ch;
-	  $cs::SGML::_SpecialCode{$ch}=$code;
-	  push(@cs::SGML::_ChList,$ch);
-	  $cs::SGML::_ChRange.=$ch;
-	  $cs::SGML::_CodePtn.='|'.$code;
-	}
+  { $cs::SGML::_SpecialCh{$code}=$ch;
+    $cs::SGML::_SpecialCode{$ch}=$code;
+    push(@cs::SGML::_ChList,$ch);
+    $cs::SGML::_ChRange.=$ch;
+    $cs::SGML::_CodePtn.='|'.$code;
+  }
 
   $cs::SGML::_CodePtn =~ s/^\|//;
 }
@@ -120,7 +120,7 @@ sub match	# (Data,State) -> (token,tail) or undef
   # no match
   { ## my($it)=$_;
     ## if ($it =~ /\s*[\n\r]/) { $it=$`; }
-    ## warn "no match at _=[$it]\n";
+    warn "no match at _=[$_]\n";
     return undef;
   }
 
@@ -172,14 +172,14 @@ sub matchTag
 
 	$A->{uc($at)}=$val;
       }
-      # ugly hacks to catch syntax errors and recover
-      elsif (/^">/)
-      { $_='>'.$';
-      }
-      elsif (/^"([^\r\n"]*)"[ \t\n\r]*/)
+      elsif (/^"([^"]*)"[ \t\n\r]*/)
       { $A->{$1}=undef;
 	$_=$';
 	## warn "$tag: \"$1\"\n";
+      }
+      # ugly hacks to catch syntax errors and recover
+      elsif (/^">/)
+      { $_='>'.$';
       }
       elsif (/^=[ \t\r\n]*("[^"]*"|'[^']*'|[^[ \t\n\r>]*)[ \t\n\r]*/)
       {
@@ -199,7 +199,12 @@ sub matchTag
 	## warn "skip [$1]";
 	$_=$';
       }
-      elsif (/^([\.,]+)[ \t\r\n]*/)
+      elsif (/^([.,]+)[ \t\r\n]*/)
+      {
+	## warn "skip [$1]";
+	$_=$';
+      }
+      elsif (/^([^-<>\s":\/!\w_]+)[ \t\r\n]*/)
       {
 	## warn "skip [$1]";
 	$_=$';
