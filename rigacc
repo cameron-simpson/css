@@ -28,6 +28,7 @@ do
   [ -L "$link"   ] && continue
 
 done <<X
+.mairixrc rc/mairix.$SYSTEMID
 .secret rc/secret
 .setvar rc/env
 .termenv rc/term/env
