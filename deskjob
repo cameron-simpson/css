@@ -1,17 +1,21 @@
 #!/bin/sh
-usage="Usage: $0 [-d desk] [job]"
 
-desk=.
+cmd=$0
+usage="Usage: $cmd [-d desk] [job]"
+
+badopts=
+
+desk=
 [ "x$1" = x-d ] && { desk=$2; shift; shift; }
-[ "x$desk" = x. ] && desk=`currentdesk`
+
+[ -n "$desk" ] || desk=`currentdesk`
 
 [ $# = 0 ] && exec desktop "$desk" job
 
 job=$1; shift
-[ $# = 0 ] || { echo "$cmd: extra arguments after job name: $*" >&2
-		echo "$usage" >&2
-		exit 2
-	      }
+[ $# = 0 ] || { echo "$cmd: extra arguments after job name: $*" >&2; badopts=1; }
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
 
 isjob "$job" || { echo "$cmd: unknown job \"$job\"" >&2; exit 2; }
 
