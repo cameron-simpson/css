@@ -5,7 +5,10 @@
 #
 
 cmd=$0
-usage="Usage: $cmd [-d desk] imagefile"
+usage="Usage: $cmd [-d desk] imagefile
+	Default desk is the current desk.
+	The desk \"-\" means the global default.
+	The imagefile \"\" means remove the per desk setting for this desk."
 
 desk=
 
@@ -24,11 +27,24 @@ fi
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
-thisdesk=`currentdesk`
-[ -n "$desk" ] || desk=$thisdesk
+perdesk=1
+case "$desk" in
+  ''|.)	desk=`currentdesk` || exit 1 ;;
+  -)	desk= perdesk= ;;
+esac
 
-rootbg=`mkwall "$imagefile"` || exit 1
-desktop "$desk" rootbg "$rootbg" || exit 1
+if [ -z "$imagefile" ]
+then
+    if [ $perdesk ]
+    then desktop -r "$desk" rootbg
+    else lastvalue "desk_dfltrootbg" ""
+    fi
+else
+    rootbg=`mkwall "$imagefile"` || exit 1
+    if [ $perdesk ]
+    then desktop "$desk" rootbg "$rootbg"
+    else lastvalue "desk_dfltrootbg" "$rootbg"
+    fi
+fi
 
-# show change if not for another desk
-[ "$desk" != "$thisdesk" ] || rootbg -D "$rootbg"
+exec syncrootbg
