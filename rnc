@@ -9,11 +9,13 @@ keyfile=
 remote=
 target=
 port=
+localuser=
 
 cmd=`basename "$0"`
-usage="Usage: $cmd [-l location] [-i keyfile] remote target port
+usage="Usage: $cmd [-u localuser] [-l location] [-i keyfile] remote target port
 	-i keyfile	Specify keyfile to use.
-	-l location	Don't both with remote if \$LOCATION matches this."
+	-l location	Don't both with remote if \$LOCATION matches this.
+	-u localuser	Su to the specified user."
 
 badopts=
 
@@ -22,6 +24,7 @@ do
   case $1 in
     -i)	keyfile=$2; shift ;;
     -l)	location=$2; shift ;;
+    -u)	localuser=$2; shift ;;
     --)	shift; break ;;
     -?*)echo "$cmd: unrecognised option: $1" >&2; badopts=1 ;;
     *)	break ;;
@@ -56,6 +59,12 @@ else
     [ -n "$keyfile" ] && set -- -i "$keyfile" "$@"
     set -- sshb "$@"
     [ -n "$keyfile" ] && set -- no-ssh-agent "$@"
+fi
+
+if [ -n "localuser" ]
+then
+    sucmd=`shqstr "$@"`
+    set -- su "$localuser" -c "$sucmd"
 fi
 
 set -x
