@@ -218,7 +218,8 @@ locations=`sed -n -e '/^#/d' -e 's/^\\[@\\([a-z].*\\)\\]$/\\1/p' "$cf"`
 if [ $int ]
 then
     echo "$cmd - bring up interface according to location"
-    echo -n "I know ["$locations"] Where am I [$where]? "
+    echo "I know ["$locations"]"
+    echo -n "Where am I [$where]? "
     read iwhere || { echo; exit 1; }
     [ -n "$iwhere" ] && where=$iwhere
 fi
