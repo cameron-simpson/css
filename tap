@@ -19,6 +19,7 @@ dev_=`echo "$dev" | tr -s / _`
 lock=tap$dev_
 session=$lock
 
+set -x
 exec scrif "$session" \
 	logscript "$session" \
 	cu -l $dev -s $speed --parity=$parity --nostop
