@@ -1,0 +1,3 @@
+#!/bin/sh
+desk=`currentdesk`
+exec win -c "MoveToDesk $desk; Iconify Off" ${1+"$@"}
