@@ -5,8 +5,10 @@
 #
 
 cmd=$0
+usage="Usage: $cmd [-i] [-o] sed-regexps...
+	-i	Ignore case.
+	-o	OR words instead of AND."
 
-[ $# = 0 ] && { echo "Usage: $cmd [-i] [-o] sed-regexps..." >&2; exit 2; }
 
 any=
 icase=
@@ -44,16 +46,19 @@ do
 		}
 
   case "$word" in
-    */*)	echo "$cmd: can't do slashes: $word" >&2
-		ok=
-		continue
-		;;
+    */*)  echo "$cmd: can't do slashes: $word" >&2
+	  ok=
+	  continue
+	  ;;
+    !*)   word=`expr "x$word" : 'x.\(.*\)'`
+	  set x -e "/$word/d" ${1+"$@"}; shift
+	  ;;
+    *)    if [ $any ]
+	  then set x ${1+"$@"} -e "/$word/b ok"; shift
+	  else set x ${1+"$@"} -e "/$word/!d"; shift
+	  fi
+	  ;;
   esac
-
-  if [ $any ]
-  then set x ${1+"$@"} -e "/$word/b ok"; shift
-  else set x ${1+"$@"} -e "/$word/!d"; shift
-  fi
 done
 
 [ $ok ] || exit 1
