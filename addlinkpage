@@ -26,6 +26,7 @@ case $1 in
     *)		topic=$1; shift ;;
 esac
 
+[ -n "$topic" ] || topic=`lastvalue addlinkpage`
 if [ -z "$topic" ]
 then
     echo "$cmd: missing topic and no \$LINKPAGETOPIC envvar" >&2
@@ -66,8 +67,10 @@ done
 			  exit 1
 			}
 
+lastvalue addlinkpage "$topic"
+
 [ $# = 0 ] && { [ $verbose ] && echo "Reading URLs from stdin..." >&2
-		set x `cat`; shift
+		set -- `cat`;
 	      }
 
 for url
