@@ -10,6 +10,7 @@
 : ${APPHELPER_SAVEMODE:=auto}
 : ${APPHELPER_REMAPFILE:=$HOME/rc/remap}
 : ${APPHELPER_SAVEMAP:="remap \"\$APPHELPER_REMAPFILE\" | tr '[A-Z_]' '[a-z-]'"}
+: ${APPHELPER_IDSET:=$HOME/var/apphelper}
 
 cmd=`basename "$0"`
 
