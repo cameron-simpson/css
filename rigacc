@@ -29,6 +29,7 @@ do
 
 done <<X
 .mairixrc rc/mairix.$SYSTEMID
+.screenrc rc/screen/rc
 .secret rc/secret
 .setvar rc/env
 .termenv rc/term/env
