@@ -35,4 +35,4 @@ case "$1" in
 	;;
 esac
 
-exec screen -a -A -x -r "$1"
+exec screen -a -x -r "$1"
