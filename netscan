@@ -1,0 +1,54 @@
+#!/usr/bin/perl
+#
+# netscan v1.1 - scan a network to identify its active nodes
+#
+# usage: netscan -n network_addr [-s subnet_mask] [-v]
+#
+# 20 Mar 1995: v1.0 written by Peter Couvares <pfcouvar@unix.amherst.edu>
+# 31 May 1995: v1.1 major fixes/improvements
+
+require 5.0;
+use FileHandle;
+use Getopt::Std;
+use cs::Net::Ping;
+
+STDOUT->autoflush(1);		# for unbuffered stdout
+
+# get program name (sans path) from $0 for prettier usage and error messages
+$0 =~ m/([^\/]+)$/;
+$progname = $1;
+$usage = "usage: $progname -n network_addr [-s subnet_mask] [-v]\n";
+
+# parse args
+getopts('n:s:v')  || die $usage;
+$network = $opt_n || die $usage;
+$netmask = $opt_s || "255.255.255.255";
+$verbose = $opt_v;
+
+# get class C address prefix (A.B.C.x) and class D base (x.x.x.D) from $network
+$network =~ /^(\d+\.\d+\.\d+)\.(\d+)$/
+    || die "$progname: error: invalid network address \"$network\"\n";
+$classCprefix = $1;
+$classDbase   = $2;
+
+# get class D netmask (x.x.x.D) from $netmask
+$netmask =~ /^\d+\.\d+\.\d+\.(\d+)$/
+    || die "$progname: error: invalid netmask \"$netmask\"\n";
+$classDmask = $1;
+
+# calculate the range of the scan from the network address and netmask
+$low  = $classDbase + 1;
+$high = $classDbase + ($classDbase | $classDmask) - 1;
+
+# scan away...
+for $node ($low .. $high)
+{
+    $addr = "$classCprefix.$node";
+    print "pinging $addr..." if $verbose;
+    if( pingecho($addr) )
+    {
+	print "found!" if $verbose;
+	print "$addr\n" unless $verbose;
+    }
+    print "\n" if $verbose;
+}
