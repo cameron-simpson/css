@@ -1,0 +1,680 @@
+#!/usr/bin/perl5
+#
+# Generate HTML indexing a directory full of JPEG images.
+# Use descriptions from corresponding .html files if present.
+#	- Cameron Simpson <cs@zip.com.au> 30mar95
+#
+# Convert to Perl.	- cameron, 11oct95
+#
+# new dir
+#
+
+BEGIN { use cs::DEBUG; cs::DEBUG::using(__FILE__); }
+
+use strict qw(vars);
+
+use cs::HTML;
+use cs::Pathname;
+use cs::Date;
+use cs::Misc;
+use cs::Source;
+use cs::Sink;
+use cs::Persist;
+use cs::Stat;
+use cs::Image::DB;
+require 'flush.pl';
+
+package cs::IM2HTML;
+
+END   { $cs::IM2HTML::_shellFD && close(_shellFD); }
+
+@cs::IM2HTML::ISA=(cs::HTML);
+
+$cs::IM2HTML::WebPage='http://www.cskk.ezoshosting.com/cs/im2html/';
+
+$cs::IM2HTML::Index='imindex';	# base of aux files
+$cs::IM2HTML::DoThumbs=1;	# thumbnail creation
+$cs::IM2HTML::FrameTarget='';	# TARGET for HREFs
+$cs::IM2HTML::TableWidth=4;
+$cs::IM2HTML::TableLength=3;
+$cs::IM2HTML::DoImStat=1;
+$cs::IM2HTML::Order=ASCII;	# or MTIME
+$cs::IM2HTML::ThumbMax=128;	# max edge length for thumbnails
+
+# table control variables
+$cs::IM2HTML::_intable=0;
+$cs::IM2HTML::_inrow=0;
+$cs::IM2HTML::_TDs=0;
+$cs::IM2HTML::_TRs=0;
+
+# global image db
+$cs::IM2HTML::_db={};
+
+sub useDB
+	{ my($path,$rw)=@_;
+	  $rw=0 if ! defined $rw;
+
+	  my($db);
+
+	  die "$0: can't access $path, possible error: $!"
+		if ! defined ($db=cs::Image::DB::db($path,$rw));
+
+	  $cs::IM2HTML::_db=$db;
+	}
+
+sub finish
+	{ undef $cs::IM2HTML::_db;
+	  cs::Image::DB::finish();
+	}
+
+sub new
+	{ my($class,$dir,$inherit)=@_;
+	  $inherit={} if ! defined $inherit;
+
+	  $dir=cs::Pathname::norm($dir);
+
+	  return undef if ! stat($dir) || ! -d _;
+
+	  my($this);
+
+	  $this=
+	  bless { DIR		=> $dir,
+		  DB		=> $cs::IM2HTML::_db,
+		  FILES		=> [],
+		  SUBDIRS	=> [],
+		  DIRENTS	=> [],
+		  INDEXBASE	=> $cs::IM2HTML::Index,
+		  DOTHUMBS	=> $cs::IM2HTML::DoThumbs,
+		  DOIMSTAT	=> $cs::IM2HTML::DoImStat,
+		  TABLEWIDTH	=> $cs::IM2HTML::TableWidth,
+		  TABLELENGTH	=> $cs::IM2HTML::TableLength,
+		  ORDER		=> $cs::IM2HTML::Order,
+		  THUMBMAX	=> $cs::IM2HTML::ThumbMax,
+		  DIDTHUMB	=> {},
+		}, $class;
+
+	  local($_);
+
+	  # inherit parameters
+	  for (INDEXBASE,DOTHUMBS,DOIMSTAT,TABLEWIDTH,TABLELENGTH,THUMBMAX)
+		{ $this->{$_}=$inherit->{$_} if exists $inherit->{$_};
+		}
+
+	  $this;
+	}
+
+sub Name { shift->{DIR} }
+sub Basename { cs::Pathname::basename(shift->Name()) }
+sub Pathname { my($this,$base)=@_; $this->Name().'/'.$base; }
+
+sub IndexPath{ my($this)=shift; $this->Pathname($this->IndexFile(@_)); }
+sub IndexFile
+	{ my($this,$ext)=@_;
+
+	  if ($ext !~ m:^/:)
+		{ $ext=(length $ext
+			? "$this->{INDEXBASE}-$ext"
+			: $this->{INDEXBASE}
+			);
+		  $ext.=".html" unless $ext =~ /\.html$/;
+		}
+
+	  $ext;
+	}
+
+# open a file for read
+sub Source
+	{ my($this,$ext)=@_;
+	  cs::Source::open($this->IndexPath($ext));
+	}
+# open a file for write
+sub Sink
+	{ my($this,$ext)=@_;
+	  cs::Sink::open($this->IndexPath($ext));
+	}
+
+sub Title
+	{ my($this,$tag)=@_;
+	  if (! exists $this->{TITLE})
+		{ $this->{TITLE}=$this->_Title($tag);
+		}
+
+	  $this->{TITLE};
+	}
+sub _Title
+	{ my($this,$tag)=@_;
+	  $tag=$this->Basename() if ! defined $tag;
+
+	  my($dir)=$this->Name();
+	  my($title);
+
+	  $dir=cs::Pathname::fullpath($dir);
+	  if (! length ($title=$this->FromParam("title")))
+		{ $title=$tag;
+		  if ($title =~ /[A-Z][a-z]/)
+			{ $title =~ s/_/ /g;
+			}
+
+		  if (! length $title)
+			{ $title="Index of ".$this->Name();
+			}
+		}
+	  else
+		{ my($lc1,$lc2)=($tag,$title);
+
+		  $lc1 =~ tr/-A-Z/_a-z/;
+		  $lc2 =~ tr/-A-Z/_a-z/;
+		  if ($lc1 ne $lc2)
+			{ $title="$tag - $title";
+			}
+		}
+
+	  $title;
+	}
+
+sub GroupImages
+	{ my($this)=@_;
+	  my(@groups)=();	# array of rows
+	  my(%grouped)=();
+
+	  local($_);
+	  my($s);
+
+	  if (defined ($s=$this->Source("$this->{INDEXBASE}.groups")))
+		{
+		  my($grp,@grpims);
+
+		  FIXEDGROUP:
+		    while (defined ($_=$s->GetLine()) && length)
+			{ 
+			  next FIXEDGROUP unless /\S/;
+
+			  push(@groups,[]);
+
+			  while (/\S+/)
+				{ $this->_GroupExtend(\@groups,$&);
+				  $grouped{$&}=1;
+				  $_=$';
+				}
+			}
+
+		  # close file
+		  undef $s;
+		  push(@groups,[]);
+		}
+
+	  my(@ims)=$this->OrderedImages();
+
+	  OTHERGROUP:
+	    for (@ims)
+		{ next OTHERGROUP if $grouped{$_};
+		  $grouped{$_}=1;
+		  $this->_GroupExtend(\@groups,$_);
+		}
+
+	  # get non-empty rows
+	  @groups=grep(@$_,@groups);
+
+	  # break into distinct tables
+	  my(@tables)=();
+	  my(@table)=();
+	  my($row);
+
+	  for $row (@groups)
+		{
+		  if (@table >= $this->{TABLELENGTH})
+			{ push(@tables,[ @table ]);
+			  @table=$row;
+			}
+		  else
+		  { push(@table,$row);
+		  }
+		}
+
+	  push(@tables,[ @table ]) if @table;
+
+	  @tables;
+	}
+
+sub _GroupExtend
+	{ my($this,$grps,$im)=@_;
+
+	  my($row)=(@$grps ? pop(@$grps) : []);
+
+	  if ($this->Loner($im))
+		{ push(@$grps,$row) if @$row;
+		  $row=[ $im ];
+		}
+	  elsif (@$row >= $this->{TABLEWIDTH})
+		{ push(@$grps,$row);
+		  $row=[ $im ];
+		}
+	  else
+	  { push(@$row,$im);
+	  }
+
+	  push(@$grps,$row);
+	}
+
+# HTML for thumbnail and image
+sub ImagePrecis
+	{ my($this,$im)=@_;
+
+	  $this->Thumb($im);
+	}
+
+sub Loner
+	{ my($this,$im)=@_;
+	  if (! exists $this->{ISLONER}->{$im})
+		{
+		  $this->{ISLONER}->{$im}
+			=$this->DescLines($im) > 3;
+		}
+
+	  $this->{ISLONER}->{$im};
+	}
+
+sub DescFile
+	{ my($this,$im)=@_;
+	  $im =~ s/\.(gif|jpg)$/.html/i;
+	  $im;
+	}
+
+sub Desc
+	{ my($this,$im)=@_;
+
+	  if (! exists $this->{DESCS}->{$im})
+		{ my($descfile)=$this->Pathname($this->DescFile($im));
+		  $this->{DESCS}->{$im}
+			= ( -s $descfile
+			    ? [INCLUDE,{SRC => $descfile}]
+			    : '' );
+		}
+
+	  return $this->{DESCS}->{$im};
+	}
+
+sub DescLines
+	{ my($this,$im)=@_;
+	  my($desc)=$this->Desc($im);
+	  scalar(grep(length,split(/\n/,$desc)));
+	}
+
+sub _Stat
+	{ my($this,$base)=@_;
+
+	  # warn "stat(".$this->Name()."/$base)";
+	  stat($this->Pathname($base));
+	}
+
+sub _notempty
+	{ my($this,$base)=@_;
+	  $this->_Stat($base) && -s _;
+	}
+
+sub Dirents
+	{ my($this)=@_;
+
+	  if (! @{$this->{DIRENTS}})
+		{ $this->{DIRENTS}=[ sort { $a cmp $b; }
+					    grep(/^[^.]/,
+						cs::Pathname::dirents($this->Name())
+					   )
+				     ];
+		}
+
+	  @{$this->{DIRENTS}};
+	}
+
+sub Files
+	{ my($this)=@_;
+
+	  if (! @{$this->{FILES}})
+		{ $this->{FILES}=[ grep($this->_Stat($_) && -f _,
+					  $this->Dirents()) ];
+		}
+
+	  @{$this->{FILES}};
+	}
+
+sub SubDirs
+	{ my($this)=@_;
+
+	  if (! @{$this->{SUBDIRS}})
+		{ $this->{SUBDIRS}=[ grep($this->_Stat($_) && -d _,
+					    $this->Dirents()) ];
+		}
+
+	  @{$this->{SUBDIRS}};
+	}
+
+sub Child
+	{ my($this,$subdir)=@_;
+
+	  new cs::IM2HTML $this->Name()."/$subdir";
+	}
+
+sub SubDirObjs
+	{ my($this)=@_;
+
+	  map($this->Child($_), $this->SubDirs());
+	}
+
+sub SubDirHREF
+	{ my($this,$subdir,$ext)=@_;
+
+	  "$subdir/$this->{INDEXBASE}$ext.html";
+	}
+
+sub Hrefs
+	{ my($this)=@_;
+	  grep(/\.href$/i && $this->_Stat($_) && -s _,
+		$this->Files());
+	}
+
+sub Images
+	{ my($this)=@_;
+	  grep(/\.(gif|jpg)$/i && !/-small.gif/i && $this->_Stat($_) && -s _,
+		$this->Files());
+	}
+sub OrderedImages
+	{ my($this,$ordering)=@_;
+	  $ordering=$this->{ORDER} if ! defined $ordering;
+
+	  my(@ims)=$this->Images();
+	  # warn "ims($this->{DIR})\n=[@ims]";
+
+	  $ordering eq ASCII
+	    ? sort { $a cmp $b } @ims
+	    : $ordering eq MTIME
+		? map(cs::Pathname::basename($_),
+			sort { _mtime($a) <=> _mtime($b) }
+			     map($this->{DIR}."/".$_, @ims))
+		: @ims;
+	}
+
+# caching mtime
+# should really be part of a larger caching stat() system
+sub _mtime
+	{ my($path)=@_;
+	  if (! exists $cs::IM2HTML::_MTimes{$path})
+		{ my(@s)=stat($path);
+		  $cs::IM2HTML::_MTimes{$path}
+			=(@s ? $s[9] : 0);
+		}
+
+	  $cs::IM2HTML::_MTimes{$path};
+	}
+
+sub Hrefs
+	{ my($this)=@_;
+	  grep(/\.href$/i, $this->Files());
+	}
+sub
+Credit
+	{ my($this)=shift;
+	  my($when)=@_ ? shift : time;
+	  my(@tm)=localtime($when);
+
+	  ('Index created by ',
+	   [ A, { TARGET => "_blank",
+		  HREF => $cs::IM2HTML::WebPage,
+		}, "im2html" ],
+	   ', last updated ',
+	   $cs::Date::Wday_names[$tm[6]], ' ',
+	   $cs::Date::Mon_names[$tm[4]], ' ', $tm[3], ' ', $tm[5]+1900, '.'
+	  );
+	}
+
+$cs::IM2HTML::_shellFD=0;
+sub _shell
+	{ if (! $cs::IM2HTML::_shellFD)
+		{ if (! open(_shellFD,"|exec nice /bin/sh"))
+			{ warn "can't pipe to /bin/sh: $!";
+			  return undef;
+			}
+
+		  $cs::IM2HTML::_shellFD=1;
+		}
+
+	  ## warn "@_";
+	  print _shellFD @_;
+	  &'flush(cs::IM2HTML::_shellFD);
+	}
+
+sub MakeThumbnail
+	{ my($this,$im,$force)=@_;
+	  die "no image!" if ! defined $im;
+	  $force=0 if ! defined $force;
+
+	  return if ! $force && $this->{DIDTHUMB}->{$im};
+
+	  my($th);
+
+	  $th=$this->ThumbOf($im);
+	  if (! $force)
+	    { my($ths)=new cs::Stat $this->Pathname($th);
+
+	      if (defined $ths && $ths->{SIZE} > 0)
+		{ my($impath)=$this->Pathname($im);
+		  my($ims)=new cs::Stat $impath;
+
+		  if (! defined $ims)
+			{ warn "$impath: $!";
+			  return;
+			}
+
+		  return if $ims->{MTIME} <= $ths->{MTIME};	# older
+		}
+
+	  warn "mkthumb $im\n";
+	  $this->{DIDTHUMB}->{$im}=1;
+	  _shell("thumbnail -m $this->{THUMBMAX}",
+			    ($im =~ /\.gif$/i ? ' -G' : ''),
+			    ' <'.$this->Pathname($im),
+			    ' >'.$this->Pathname($th),
+			    "\n");
+		}
+	}
+
+sub FromParam
+	{ my($this,$param)=@_;
+	  my($txt);
+	  $txt=$this->FromFile("$this->{INDEXBASE}.$param");
+	  # warn "param($param)=[$txt]";
+	  $txt;
+	}
+sub Source
+	{ my($this,$base)=@_;
+	  $base="$this->{DIR}/$base" unless $base =~ m:^/:;
+	  new cs::Source (PATH,$base);
+	}
+sub FromFile
+	{ my($this,$base)=@_;
+	  # warn "FromFile($base)";
+
+	  my($s);
+
+	  return "" if ! defined ($s=$this->Source($base));
+
+	  local($_);
+
+	  $_=$s->Get();
+
+	  s/^\s+//;
+	  s/\s+$//;
+	  s/[ \t]+\n/\n/g;
+
+	  $_;
+	}
+
+sub ImSize
+	{ my($this,$im)=@_;
+
+	  cs::Image::imsize($this->Pathname($im));
+	}
+
+sub Thumb	# im -> HTML
+	{ my($this,$im)=@_;
+
+	  my($imtag,$imthumb,@imsize,@thsize,$imattr);
+
+	  ($imtag=$im) =~ s/\.[^.]+$//;
+
+	  $imthumb=$this->ThumbOf($im);
+	  @imsize=($this->{DOIMSTAT} ? $this->ImSize($im) : ());
+
+	  @thsize=$this->ThumbSize(@imsize);
+	  @thsize=@imsize if ! @thsize;
+
+	  my($thumbSrc)=(@thsize
+			     && $thsize[0] == $imsize[0]
+			     && $thsize[1] == $imsize[1]
+			       ? $im
+			       : $imthumb
+			       );
+
+	  # we need a thumbnail
+	  $this->MakeThumbnail($im) if $thumbSrc ne $im
+				     && $this->{DOTHUMBS};
+
+	  $imattr={ SRC	    => $thumbSrc };
+	  if (@thsize)
+		{ # warn "thsize=[@thsize]\n";
+		  $imattr->{WIDTH}=$thsize[0];
+		  $imattr->{HEIGHT}=$thsize[1];
+		}
+
+	  my(@html);
+
+	  @html=([A,{ HREF => $im,
+		      TARGET => $cs::IM2HTML::FrameTarget
+		    }, cs::HTML::IMG($imattr)],
+		 [BR], "\n",
+		 [A,{ HREF => $im,
+		      TARGET => $cs::IM2HTML::FrameTarget
+		    }, $im],
+		 [BR], "\n",
+		);
+
+	  if (@imsize)
+		{ push(@html,"$imsize[0]x$imsize[1]", [BR], "\n");
+		}
+
+	  @html;
+	}
+
+sub ThumbName
+	{ my($this)=@_;
+	  my($dir)=$this->Name();
+	  my($thumbref)="$dir/$this->{INDEXBASE}.thumb";
+	  my($thumbname);
+
+	  if (length($thumbname=cs::IO::fromfile($thumbref)))
+		{ my($file)=cs::Pathname::firstfile("$dir/$thumbname",'.jpg','.gif');
+		  return cs::Pathname::basename($file) if defined $file;
+		}
+
+	  undef;
+	}
+
+# compute thumbnail size
+sub ThumbSize
+	{ my($this,$x,$y,$max)=@_;
+	  $max=$this->{THUMBMAX} if ! defined $max;
+
+	  return () if ! defined $y;
+
+	  if ($x > $max)
+		{ if ($y > $x)	{ return (int($x*$max/$y),$max); }
+				  return ($max,int($y*$max/$x));
+		}
+	  elsif ($y > $max)
+		{		  return (int($x*$max/$y),$max);
+		}
+	  else
+	  {			  return ($x,$y);
+	  }
+	}
+
+@cs::IM2HTML::_frameTargets=();
+sub pushFrameTarget
+	{ push(@cs::IM2HTML::_frameTargets,$cs::IM2HTML::FrameTarget);
+	  $cs::IM2HTML::FrameTarget=shift;
+	}
+sub popFrameTarget
+	{ $cs::IM2HTML::FrameTarget=pop(@cs::IM2HTML::_frameTargets);
+	}
+
+# count lines in some text, skipping leading and trailing blanks
+sub _wc_l
+	{ local($_)=shift;
+	  s/^\s+//;
+	  s/\s+$//;
+	  my(@l)=split(/\n/);
+	  scalar(@l);
+	}
+
+sub HTML_FrameSet
+	{ my($this,$withview,@noframes)=@_;
+	  my(@html)=();
+
+	  @html=
+	    [ FRAMESET, { ROWS => "15%,*" }, "\n",
+	      [ FRAME, { NAME => "header",
+			 SRC => $this->IndexFile("header")
+		       } ], "\n",
+	      [ FRAMESET, { COLS => "50%,*" }, "\n",
+		  [ FRAME,{ NAME => BODY,
+			    SRC => $this->{INITBODY},
+			  } ], "\n",
+		  [ FRAME,{ NAME => VIEW,
+			    SRC => $this->{INITVIEW},
+			  } ], "\n",
+	      ], "\n",
+	      [ NOFRAMES, {}, "\n",
+		[ BODY, {}, "\n",
+		  [ H1, {}, $this->Title()." (non-frames)" ], "\n",
+		  @noframes, "\n",
+		],
+	      ],
+	    ];
+
+	  @html;
+	}
+
+#########################################################
+# Routines for images.
+#
+
+sub newImage
+	{ my($class,$image,$parent)=@_;
+
+	  bless { IMAGE	=> $image,
+		  PARENT => $parent,
+		}, $class;
+	}
+
+sub ImageDir
+	{ shift->{PARENT}->Name() }
+sub ImagePath
+	{ my($this)=@_;
+	  $this->ImageDir().'/'.$this->{IMAGE};
+	}
+
+sub ThumbOf
+	{ my($this)=@_;
+
+	  local($_) = $this->{IMAGE};
+
+	  s/\.(gif|jpg)$/-small.gif/i;
+
+	  $_;
+	}
+
+sub _needDir
+	{ my($dir)=@_;
+	  cs::Pathname::makedir($dir);
+	}
+
+1;
