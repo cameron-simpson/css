@@ -8,13 +8,34 @@
 # Support multiple encodings, add -k option, switch to WAV as
 # intermediate file format.		- cameron 16mar2003
 #
+# =head1 NAME
+#
+# cdrip - extract tracks from an audio CD and encode as Ogg or MP3
+#
+# =head1 SYNOPSIS
+#
+# cdrip [-q qual] [-b bps] [-d device] [-e enclist] [-l lock] [-j jobs] [-K]
+#
+# =head1 DESCRIPTION
+#
+# I<cdrip> is a script to extract and encode audio CDs.
+# Normally it is sufficient to cd to your audio archive directory,
+# insert your audio CD in the CDROM drive and say:
+#
+#	mkcd
+#
+# I<cdrip> will consult the FreeDB database for track and album titles,
+# and extract and encode the tracks.
+#
+# Note: B<cdrip> is a wrapper. See the PREREQUISITES section below for needed software.
+#
 
 EDITOR=${EDITOR:-vi}
 
 dev=${CDRIP_DEV:-/dev/cdrom}
 enclist=${CDRIP_ENC:-ogg}
-bps=${CDRIP_BPS:-192}
-qual=${CDRIP_QUAL:-6}
+bps=${CDRIP_BPS-192}
+qual=${CDRIP_QUAL-6}
 lock=$CDRIP_LOCK
 oggencqual=
 lamequal=
@@ -23,7 +44,7 @@ jobs=1
 nice=10
 
 cmd=`basename "$0"`
-usage="Usage: $cmd [-b bps] [-d device] [-e enclist] [-l lock] [-j jobs] [-K]
+usage="Usage: $cmd [-q qual] [-b bps] [-d device] [-e enclist] [-l lock] [-j jobs] [-K]
 	-q qual		Variable bitrate quality rating.
 			Default: $qual
 	-b kbps		Fixed bitrate kilobits per second for the encoding.
@@ -39,15 +60,43 @@ usage="Usage: $cmd [-b bps] [-d device] [-e enclist] [-l lock] [-j jobs] [-K]
 
 set x -b "$bps" -q "$qual" $CDRIP_OPTS ${1+"$@"}; shift
 
+#
+# =head1 OPTIONS
+#
+# =over 4
+#
 badopts=
 while :
 do
     case $1 in
-	-b)	oggencqual="-b $2" lamequal="-b $2"
+	# =item B<-b> I<kbps>
+	#
+	# Fixed bitrate kilobits per second for the encoding.
+	# Default: variable bit rate using quality (B<-q> below).
+	#
+	-b)	[ -n "$2" ] && { oggencqual="-b $2" lamequal="-b $2"; }
 		shift ;;
-	-q)	oggencqual="-q $2" lamequal="-v -V `expr 9 - $2`"
+	# =item B<-q> I<quality>
+	#
+	# Variable bitrate quality level.
+	# Default: B<6> or the value of B<$CDRIP_QUAL>.
+	# Note: this is the oggenc(1) quality numbering (1 is bad, 9 is good).
+	# Lame(1)'s quality numbering goes the other way.
+	# The script converts as appropriate, but this should be bourne in mind if encoding to MP3.
+	#
+	-q)	[ -n "$2" ] && { oggencqual="-q $2" lamequal="-v -V `expr 9 - $2`"; }
 		shift ;;
+	# =item B<-d> I<device>
+	#
+	# The device from which to read the audio CD.
+	# Default: B</dev/cdrom> or the value of B<$CDRIP_DEV>.
+	#
 	-d)	dev=$2 ;shift ;;
+	# =item B<-e> I<encodings>
+	#
+	# Comma separated list of encoding formats to produce.
+	# Default: B<ogg>, or the value of B<$CDRIP_ENC>.
+	#
 	-e)	enclist=
 		for e in `echo "$2" | tr , ' '`
 		do
@@ -61,8 +110,34 @@ do
 		done
 		shift
 		;;
+	# =item B<-l> I<lock>
+	#
+	# Base name of the lock to use for asynchronous background decoding.
+	# You can use this if you can pull the audio data from the CD faster than
+	# your machine can encode the data to the desired format
+	# (eg a fast CDROM in a slow machine).
+	# This will background every encoder, each of which will obtain the named lock
+	# with the lock(1cs) command before running, thus not thrashing your machine
+	# to death.
+	# Use of this option may allow you to queue up many CDs by pulling the data in
+	# ahead of completion of the encoding.
+	# Default: synchronous encoding - the encoding will still run in parallel
+	# with pulling data from the CD, but encoding of each track will
+	# still wait for the previous encoding to finish, and ripping of the
+	# track after will in turn be delayed under encoding of this track can be dispatched.
+	#
 	-l)	lock=$2; shift ;;
+	# =item B<-j> I<jobs>
+	#
+	# Run I<jobs> encoders at once.
+	# This implies use of a set of locks.
+	# Useful on multi-CPU machines.
+	#
 	-j)	jobs=$2; shift ;;
+	# =item B<-K>
+	#
+	# Keep the WAV files of the raw audio from the CD around after encoding.
+	#
 	-K)	keep=1 ;;
 	--)	shift ;break ;;
 	-?*)	echo "$cmd: unrecognised option: $1" >&2
@@ -72,6 +147,9 @@ do
     esac
     shift
 done
+#
+# =back
+#
 
 case "$lock" in
   *[\ \	]*)	echo "$cmd: no whitespace in lock names! (\"$lock\")" >&2
@@ -182,12 +260,14 @@ sed -e 's;//*; -- ;g' -e 's/   */ /g' \
 	    set oggenc $oggencqual -a "$artist" -N "$track" -t "$title" -l "$album"
 	    # This fiddling is because oggenc blows up with long comments.
 	    commentf=.tmp$$c
-	    [ -n "$xtra" ] && echo "$xtra" >"$commentf"
-	    echo "$ripcomment" >>"$commentf"
-	    echo "Encoded by $NAME with `oggenc -v` [$oggencqual] on `date`" >>"$commentf"
+	    { [ -n "$xtra" ] && echo "$xtra"
+	      echo "$ripcomment"
+	      echo "Encoded by $NAME with `oggenc -v` [$oggencqual] on `date`"
+	    } >"$commentf"
+
 	    while read -r comment
 	    do  [ -n "$comment" ] && set "$@" -c "COMMENT=$comment"
-	    done <$commentf
+	    done <"$commentf"
 	    rm "$commentf"
 
 	    set "$@" -o "$out" "$in"
@@ -229,8 +309,8 @@ sed -e 's;//*; -- ;g' -e 's/   */ /g' \
 	     rm -f "$out"
 	     exit 1
 	fi &
-
 	encpid=$!
+
       done
 
       [ $keep ] \
@@ -248,3 +328,75 @@ eject "$dev"
 necho ''
 
 exit $xit
+
+#
+# =head1 PREREQUISITES
+#
+# B<cdrip> is a wrapper for the extraction and encoding programs,
+# which must also be installed.
+# You need:
+#
+# =over 4
+#
+# =item B<cdparanoia>
+#
+# The program used to pull the audio data from the CD, available here:
+#
+#	http://freshmeat.net/projects/cdparanoia/?topic_id=118%2C113
+#
+# =item B<oggenc>
+#
+# The program used to encode CD audio to Ogg Vorbis files, available here:
+#
+#	http://freshmeat.net/projects/oggenc/?topic_id=113
+#
+# =item B<lame>
+#
+# The program used to encode CD audio to MP3 files, available here:
+#
+#	http://freshmeat.net/projects/lame/?topic_id=113%2C123
+#
+# =item B<css>
+#
+# B<cdrip> uses a bunch of utility scripts from this (B<lock>, B<rmafter>, etc).
+# Fortunately, B<cdrip> itself is part of this collection
+# so the easiest thing is just to grab it and put its B<bin> directory at the end of your B<$PATH>.
+# It is available here:
+#
+#	http://freshmeat.net/projects/css-cameronsimpsonsscripts/?topic_id=45%2C137%2C253%2C861
+#
+# =back
+#
+# =head1 ENVIRONMENT
+#
+# EDITOR, the program used to edit the table of contents if desired. Default: B<vi>.
+#
+# CDRIP_OPTS, a list of default options to prepend to the command line options
+# to specify default behaviour. Alternatively the separate environment variables below may be used.
+# Options specified in B<CDRIP_OPTS> will override the defaults below if both are used.
+#
+# CDRIP_DEV, the device from which to read the audio CD. Default: B</dev/cdrom>.
+#
+# CDRIP_ENC, a comma separated list of encoding formats to produce. Default:
+# B<ogg>. Known: B<ogg> and <mp3>.
+#
+# CDRIP_LOCK, the base name for the lock to use between encoders.
+#
+# CDRIP_QUAL, the default quality to aim for. Default: B<6>.
+#
+# CDRIP_BPS, the default fixed bitrate to aim for. Default: B<192>.
+#
+# Note that quality and bits-per-second interact.
+# If specified on the command line, the later of B<-b> and B<-q> is used.
+# If you're using the environment variables, a non-empty B<CDRIP_QUAL> will always win.
+# The best way to get a fixed rate encoding from the environment variables
+# is to use B<CDRIP_OPTS> to specify a B<-b> option.
+#
+# =head1 SEE ALSO
+#
+# oggenc(1), lame(1), cdparanoia(1), mkiso(1cs), mkcd(1cs)
+#
+# =head1 AUTHOR
+#
+# Cameron Simpson <cs@zip.com.au> 12mar2001
+#
