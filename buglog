@@ -11,7 +11,7 @@ usage="Usage: $cmd logline < attachment-data"
 [ $# = 1 ] || { echo "$usage" >&2; exit 2; }
 logmsg=$1; shift
 
-[ -n "$BUGSYSTEMS" ] || exec cat >/dev/null	# no bugs to note? empty result
+[ -n "$BUGSYSTEMS" ] || BUGSYSTEMS=dlog
 
 tmpf=/tmp/bugids$$
 trap 'rm -f "$tmpf"' 0 1 15
