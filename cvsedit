@@ -36,8 +36,6 @@ fi
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
-[ $# = 0 ] && { set x "${EDITOR-vi}" "$file"; shift; }
-
 if [ ! -f "$file" ]
 then
       echo "$0: not a regular file" >&2
@@ -46,15 +44,13 @@ fi
 
 umask 2
 
-# bypass my cvs wrapper
-PATH=/opt/bin:$PATH
-export PATH
-
 [ -n "$msg" ] || { necho "Log message? "
 		   read msg
 		 } || exit $?
 
 [ $dodl ] && dl "cvsedit $file $*: $msg"
+
+[ $# = 0 ] && { set x "${EDITOR-vi}" "$file"; shift; }
 
 cvs update "$file" || exit $?
 
