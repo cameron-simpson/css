@@ -1,0 +1,199 @@
+#!/usr/bin/perl
+#
+# Parse the Netscape bookmark file (post clean by nsbmclean)
+# and do things with the structure.
+#	- Cameron Simpson <cs@zip.com.au> 13mar98
+#
+
+use strict qw(vars);
+
+use cs::Source;
+use cs::HTML;
+use cs::Misc;
+use cs::Web::Bookmarks;
+use cs::Upd;
+use cs::Hier;
+$cs::Upd::This=new cs::Upd STDERR;
+
+$::Usage="Usage: $::cmd [-o output] [-d category]... [-t topcat] [-T title]\n";
+
+$::Title="Cameron Simpson's Bookmarks";
+
+undef $::TopCat;
+$::OutPut='-';
+@::Prune=();
+
+{ my($badopts)=0;
+
+  ARGV:
+    while (@ARGV)
+    { $_=shift(@ARGV);
+      last ARGV if $_ eq '--';
+      if (! /^-./)
+      { unshift(@ARGV,$_);
+	last ARGV;
+      }
+
+      if ($_ eq '-d')
+      { push(@::Prune,shift(@ARGV));
+      }
+      elsif ($_ eq '-o')
+      { $::OutPut=shift(@ARGV);
+      }
+      elsif ($_ eq '-t')
+      { $::TopCat=shift(@ARGV);
+      }
+      elsif ($_ eq '-T')
+      { $::Title=shift(@ARGV);
+      }
+      else
+      { warn "$::cmd: unrecognised option: $_\n";
+	$badopts=1;
+      }
+    }
+
+  die $::Usage if $badopts;
+}
+
+my($parse)=new cs::HTML (new cs::Source (FILE,STDIN));
+
+my($t,$p);
+
+$::BM=new cs::Web::Bookmarks;
+$::CurrentBM=$::BM;
+@::BM=();
+
+while (defined ($t=$parse->Tok({}))) ## XXX - use the pertok hook!
+{
+  ## print PARSED cs::Hier::h2a($t,1), "\n";
+  walk($t);
+}
+
+sub pertok
+{ my($t)=@_;
+
+  if ($t->{TAG} =~ /^H\d/)
+  { warn cs::Hier::h2a($t,1);
+  }
+
+  $t;
+}
+
+for (@::Prune)
+{ $::BM->Prune($_);
+}
+
+my $bm = $::BM;
+## warn "::BM=$::BM\n";
+$bm=$bm->Find($::TopCat) if defined $::TopCat;
+## warn "$::TopCat gives $bm\n";
+die "$::cmd: no category for \"-t $::TopCat\"\n"
+	if ! defined $bm;
+
+$::Xit=0;
+
+if ($::OutPut eq '-')
+{ my $s = new Sink (FILE,STDOUT);
+  $bm->Bm2htmlSink($s,$::Title);
+}
+else
+{ $bm->Bm2htmlFile($::OutPut,$::Title);
+}
+
+exit $::Xit;
+
+# debugging routine to check HTML parse phase
+sub precis
+	{ my($t)=@_;
+	  my($p)=[];
+
+	  if (! ref $t)
+		{ push(@$p,$t);
+		}
+	  elsif (reftype($t) eq ARRAY)
+		{ push(@$p,[map(precis($_),@$t)]);
+		}
+	  else	{ push(@$p,[$t->{TAG},map(precis($_),@{$t->{TOKENS}}),"/".$t->{TAG}]);
+		}
+
+	  $p;
+	}
+
+sub walk
+	{ my($t)=@_;
+
+	  ## warn "walk($t)\n";
+	  ## out("walk($t)");
+
+	  return if ! ref $t;
+
+	  my($tok);
+
+	  if (reftype($t) ne HASH)
+		{ warn "nonHASH!";
+		  return;
+		}
+
+	  my($tag)=$t->{TAG};
+	  my(@t)=@{$t->{TOKENS}};
+
+	  ## warn "tag: $tag [@t]\n";
+	  if ($tag eq DL)
+		{
+		  local($::CurrentBM)=$::BM;
+		  for (@t)
+			{ walk($_);
+			}
+		  @t=();
+		  $::BM=$::CurrentBM;
+		}
+	  elsif ($tag eq DT)
+		{ $::BM=$::CurrentBM;
+		}
+	  elsif ($tag eq DD)
+		{ # suck up the description
+		  ## warn "SUCK(@t)\n";
+		  while (@t && (! ref $t[0]
+			     || grep($t[0]->{TAG} eq $_,BR)
+			       ))
+			{ push(@{$::LastRec->{DESC}},shift(@t));
+			}
+		  ## warn cs::Hier::h2a($::LastRec,1)."\n";
+		}
+	  elsif ($tag eq H3)
+		# subcategory
+		{ my($subtitle)=cs::HTML::tokFlat(@t);
+		  $::BM=$::LastRec=$::BM->AddCat($subtitle);
+		  @t=();
+		}
+	  elsif ($tag eq A && exists $t->{ATTRS}->{HREF})
+		{ my $mtitle = cs::HTML::tokFlat($t->{TOKENS});
+		  $::LastRec=$::BM->AddEntry($mtitle,$t->{ATTRS});
+		}
+
+	  ## warn "t=[@t]\n";
+	  for (@t)
+		{ walk($_);
+		}
+	}
+
+sub printURLs
+	{ my($t)=@_;
+	  my($url);
+
+	  URL:
+	    for (cs::HTML::grepMarkUp(($::Inline
+				      ? sub { exists $_[0]->{ATTRS}->{SRC} }
+				      : sub { exists $_[0]->{ATTRS}->{HREF} }
+				      ),
+				    $t))
+		{ $url=($::Inline
+			? $_->{ATTRS}->{SRC}
+			: $_->{ATTRS}->{HREF}
+		       );
+
+		  if (defined($url=mungeURL($url)))
+			{ print $url, "\n";
+			}
+		}
+	}
