@@ -401,7 +401,8 @@ sub out
     ::flush($F);
   }
   else
-  { ## print $F "$_\n" if length && $_ ne $cs::Upd::This->{STATE};
+  { ## silent - we only do nl() if going to a log file
+    ## print $F "$_\n" if length && $_ ne $cs::Upd::This->{STATE};
   }
 
   warn "ouch" if ! defined;
