@@ -101,20 +101,19 @@ sub loadphone
 	}
 
 sub loadyppasswd
-	{ &upd'nl('loading phonelist usings keys from yppasswd');
+{ &upd'nl('loading phonelist usings keys from yppasswd');
 
-	  for $login (sort &YP::keys('passwd'))
-		{ &upd'out("$login from YP");
-		  my($pw);
-		  if (defined ($pw=&YP::map('passwd',$login)))
-			{ my($login,$crypt,$uid,$gid,$gecos,$home,$shell)
-				=split(/:/,$pw);
-			}
-cameron:UqJzJAVmiZiv6:677:150:Cameron Simpson,B34E,7751:/home/cameron:/usr/local/bin/ae
-		}
+  for $login (sort &YP::keys('passwd'))
+  { &upd'out("$login from YP");
+    my($pw);
+    if (defined ($pw=&YP::map('passwd',$login)))
+    { my($login,$crypt,$uid,$gid,$gecos,$home,$shell)
+	    =split(/:/,$pw);
+    }
+  }
 
-	  &upd'out('');
-	}
+  &upd'out('');
+}
 
 print STDERR("YPpasswd(cameron)=[",
 		&DAP::UDB::mkYPmap('passwd','cameron'),"]\n");
