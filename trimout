@@ -1,0 +1,15 @@
+#!/usr/bin/perl
+
+$size=shift(@ARGV);
+
+die "bad size parameter" unless $size =~ /^\d+$/;
+
+$size+=0;
+
+$sofar=0;
+while (<STDIN>)
+	{ $sofar+=length;
+	  print if $sofar <= $size;
+	}
+
+exit 0;
