@@ -11,7 +11,7 @@
 cmd=$0
 usage="Usage: $cmd [-f] [url]
 	-f	Force: start browser even if already running.
-	-q	test if browser running."
+	-q	Test if browser running."
 
 url=
 mode=start
