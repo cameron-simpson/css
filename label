@@ -1,0 +1,66 @@
+#!/bin/sh
+#
+
+set -vx
+TAPE=${TAPE-dat:karri}
+TAPECMD=${TAPECMD-rtape}
+export TAPE TAPECMD
+
+cmd=`basename "$0"`
+usage="Usage: $cmd [-rw] [-t rtapedev] [--] [label_text]
+	-r		Read label, copy it to stdout (default).
+	-w		Write label (from text or stdin) to tape as file 0.
+	-t rtapedev	Use rtapedev instead of $TAPE.
+	label_text	If read mode, check label against text.
+			If write mode, write label to tape."
+
+mode=r
+badopts=
+while :
+do
+    case $1 in
+	-r)	mode=r ;;
+	-w)	mode=w ;;
+	-t)	TAPE=$2; export TAPE; shift ;;
+	--)	shift; break ;;
+	-*)	echo "$cmd: unknown option \"$1\"" >&2
+		badopts=1
+		;;
+	*)	break ;;
+    esac
+    shift
+done
+
+case $# in
+    0|1)	;;
+    *)		echo "$cmd: too many arguments" >&2
+		badopts=1
+		;;
+esac
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+tmp=/tmp/$cmd.$$
+
+case $# in
+    0)	case $mode in
+	    r)	exec "$TAPECMD" -i ;;
+	    w)	cat >"$tmp" || exit $?
+		"$TAPECMD" -L "`cat $tmp`"
+		xit=$?
+		rm -f "$tmp"
+		;;
+	esac
+	;;
+    1)	case $mode in
+	    r)	"$TAPECMD" -i "$1"
+		xit=$?
+		;;
+	    w)	"$TAPECMD" -L "$1"
+		xit=$?
+		;;
+	esac
+	;;
+esac
+
+exit $xit
