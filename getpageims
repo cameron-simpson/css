@@ -1,0 +1,3 @@
+#!/bin/sh
+set -x
+exec getpageurls -g '\.(png|jpg|gif)$' ${1+"$@"}
