@@ -8,23 +8,28 @@
 # Netscape takes multiple -remote()s!	cameron, 10nov1997
 # Jamie Zawinski's <jwz@netscape.com> netscape-remote.c used instead. - cameron, 16mar1999
 # support some meta prefixes.		cameron 28mar2000
+# Switch to mozilla-xremote-client.	cameron 26aug2002
 # 
 
-mode=netscape	# was mosaic
-## NETSCAPE=${NETSCAPE-/opt/script/netscape}
-NETSCAPE=netscape-remote
+probe()
+{ mozilla-xremote-client 'ping()'
+}
+
+popurl()
+{ popurl_ret=0
+  for url
+  do  mozilla-xremote-client "openurl($url,new-window)" || popurl_ret=1
+  done
+  return $popurl_ret
+}
 
 cmd=`basename "$0"`
 usage="Usage: $cmd [-a] [-c] [-s] [-t] [-i file] [URLs...]
 	-a	Anonymous.
 	-c	Clean.
-	-s	Same window - don't open a new browser window.
-	-t	New tab, instead of new window.
 	-i file	Read URLs from file; \"-\" means stdin."
 
 subopts=
-url=
-mode=new-window
 meta=
 badopts=
 while :
@@ -34,8 +39,6 @@ do  case "$1" in
     case $1 in
 	-a)	meta="anon $meta" ;;
 	-c)	meta="clean $meta" ;;
-	-s)	mode= ;;
-	-t)	mode=new-tab ;;
 	-i)	input=$2; shift
 		set x ${1+"$@"} "" `cat $input`; shift
 		;;
@@ -49,10 +52,6 @@ do  case "$1" in
 done
 
 [ $badopts ] && { echo "$usage" >&2; exit 1; }
-
-[ -n "$mode" ] && mode=,$mode
-
-[ -n "$url" ] && { set x "$url"; shift; }
 
 if [ $anon ]; then anonpfx=http://anon.free.anonymizer.com/
               else anonpfx=
@@ -72,7 +71,8 @@ then
     exit $?
 fi
 
-set x -noraise -iconic
+# ensure we have a browser
+probe || { ns; sleep 3; }
 
 sed -e 's/^[ 	][ 	]*//' \
     -e 's/^#.*//' \
@@ -81,47 +81,41 @@ sed -e 's/^[ 	][ 	]*//' \
     -e 's/^.*(\(.*\)).*$/\1/' \
     -e 's/^[^a-z]*\([a-z][a-z]*:\/\/.*\)/\1/' \
     -e '/^[a-z][a-z]*:\/\//b ok' \
+    -e '/^https:/b ok' \
     -e '/^file:/b ok' \
+    -e '/^ftp:/b ok' \
     -e '/^news:/b ok' \
+    -e '/^snews:/b ok' \
     -e 's/^/http:\/\//' \
     -e ':ok' \
-| { while read url
-    do  
-	[ -n "$URLLOG" ] && echo "urlshow $url" >>"$URLLOG"
+| while read url
+  do  
+      [ -n "$URLLOG" ] && echo "urlshow $url" >>"$URLLOG"
 
-	url="$meta$url"
-	metapfx=
-	while :
-	do  case "$url" in
-	      search\ *|clean\ *|anon\ *)
-		metacmd=`expr "x$url" : 'x\([^ ]*\) .*'`
-		url=`expr "x$url" : 'x[^ ]*  *\(.*\)'`
-		case $metacmd in
-		  anon)	metapfx="http://anon.free.anonymizer.com/$metapfx" ;;
-		  clean)metapfx="http://web/~cameron/cgi-bin/htclean.cgi/$metapfx" ;;
-		  search)
-			engine=`expr "x$url" : 'x\([^ ]*\) .*'`
-			url="http://web/~cameron/cgi-bin/search.cgi?engine=$engine&query="`expr "x$url" : 'x[^ ]*  *\(.*\)'`
-			;;
-		  *)	echo "$cmd: bogus meta command \"$metacmd\"" >&2
-			;;
-		esac
-		;;
-	      *)break
-		;;
-	    esac
-	done
+      url="$meta$url"
+      metapfx=
+      while :
+      do  case "$url" in
+	    search\ *|clean\ *|anon\ *)
+	      metacmd=`expr "x$url" : 'x\([^ ]*\) .*'`
+	      url=`expr "x$url" : 'x[^ ]*  *\(.*\)'`
+	      case $metacmd in
+		anon)	metapfx="http://anon.free.anonymizer.com/$metapfx" ;;
+		clean)metapfx="http://web/~cameron/cgi-bin/htclean.cgi/$metapfx" ;;
+		search)
+		      engine=`expr "x$url" : 'x\([^ ]*\) .*'`
+		      url="http://web/~cameron/cgi-bin/search.cgi?engine=$engine&query="`expr "x$url" : 'x[^ ]*  *\(.*\)'`
+		      ;;
+		*)	echo "$cmd: bogus meta command \"$metacmd\"" >&2
+		      ;;
+	      esac
+	      ;;
+	    *)break
+	      ;;
+	  esac
+      done
 
-	# escape stuff for OpenURL() call
-	url=`echo "$url" | hexify`
-	set "$@" -remote "OpenURL($metapfx$url$mode)"
-    done
-    shift	# toss x
-
-    case $DISPLAY in
-	:*)	id=$HOST$DISPLAY ;;
-	*)	id=$DISPLAY ;;
-    esac
-    "$NETSCAPE" "$@" \
-	|| { echo "FAILED request for $*" >&2; exit 1; }
-  }
+      # escape stuff for OpenURL() call
+      url=`echo "$url" | hexify`
+      popurl "$url"
+  done
