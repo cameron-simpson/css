@@ -1,0 +1,9 @@
+#!/bin/sh
+#
+# Set the background of an rxvt from an XXPM file.
+#	- Cameron Simpson <cs@zip.com.au> 20nov2000
+#
+
+[ $# = 1 ] || { echo "Usage: $0 xpmfile" >&2; exit 2; }
+[ -s "$1" ] || { echo "$0: $1: empty file!" >&2; exit 1; }
+necho "]20;$1"
