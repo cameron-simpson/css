@@ -59,6 +59,7 @@ do  case "$fwd" in
 		   -L 2401:cvs-cskk:2401 \
 		   -L 8880:amadeus:8880 \
 		   -L 3119:news-optus:119 \
+		   -L 5915:amadeus:5905 &
 		   -L 5916:amadeus:5906 &
 	    ;;
 	home2zip)
