@@ -1,0 +1,26 @@
+#!/bin/sh
+#
+# Collect a dir full of distinct mail files into a single UNIX mail file.
+#	- Cameron Simpson <cs@zip.com.au> 03feb97
+#
+
+[ $# = 1 ] || { echo "Usage: $0 directory >unixmailfile" >&2; exit 2; }
+
+dir=$1; shift
+cd "$dir/." || exit $?
+
+xit=0
+for mfile in [0-9]*
+do  if [ ! -s "$mfile" ]
+    then
+	echo "bad file, skipping $mfile" >&2
+	ls -ld "$mfile" >&2
+	continue
+    fi
+
+    echo "$mfile ..." >&2
+    sed '1s/^From_:/From/
+	 2,$s/^From />From /' <"$mfile" || xit=$?
+done
+
+exit $xit
