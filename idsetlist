@@ -24,6 +24,9 @@ if (! @ARGV)
   die $::Usage;
 }
 
+if ($::Dir !~ m:^(\.\.?)?/:)
+{ $::Dir="$ENV{HOME}/var/idsets/$::Dir";
+}
 -d "$::Dir/." || die "$::cmd: no such dir: $::Dir\n";
 
 my @ids;
