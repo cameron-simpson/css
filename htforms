@@ -1,0 +1,96 @@
+#!/usr/bin/perl
+#
+# Extract forms from HTML.
+#	- Cameron Simpson <cs@zip.com.au> 03mar99
+#
+
+use strict qw(vars);
+
+use cs::Source;
+use cs::HTML;
+use cs::Hier;
+
+$::InHTML=0;
+if (@ARGV && $ARGV[0] eq '-html')
+{ $::InHTML=1; shift(@ARGV);
+}
+
+die "Usage: $0 [-html]\n" if @ARGV;
+
+my($parse)=new cs::HTML (new cs::Source (FILE,STDIN));
+
+my $t;
+
+while (defined ($t=$parse->Tok()))
+{ pforms($t) if ref($t) eq HASH;
+}
+
+exit 0;
+
+sub pforms
+{ my($t)=@_;
+
+  my $tag = $t->{TAG};
+
+  if ($tag eq FORM)
+  { if ($::InHTML)	{ print cs::HTML::tok2a(1,$t), "\n\n"; }
+    else		{ newform($t); }
+  }
+  else
+  { 
+    if (defined $::F)
+    { my $fields = $::F->{FIELDS};
+      if ($tag eq INPUT
+       || $tag eq TEXTAREA
+       || $tag eq SELECT)
+      { push(@$fields, { TAG => $tag,
+			 ATTRS => $t->{ATTRS},
+			 TOKENS => $t->{TOKENS},
+		       });
+      }
+    }
+
+    for my $subt (@{$t->{TOKENS}})
+    { pforms($subt);
+    }
+  }
+}
+
+sub newform
+{ my($t)=@_;
+
+  local($::F)={ ATTRS => $t->{ATTRS},
+		FIELDS => [],
+	      };
+
+  for my $subt (@{$t->{TOKENS}})
+  { pforms($subt) if ref $t eq HASH;
+  }
+
+  { my $A = $::F->{ATTRS};
+    print "FORM";
+    for my $a (sort keys %$A)
+    { print " $a=\"$A->{$a}\"";
+    }
+    print "\n";
+  }
+
+  { my $fields = $::F->{FIELDS};
+    for my $f (@$fields)
+    { my $firstattr=1;
+      my $A = $f->{ATTRS};
+      for my $a (sort keys %$A)
+      { if ($firstattr)	{ $firstattr=0; }
+	else		{ print " "; }
+	print "$a=\"$A->{$a}\"";
+      }
+      print "\n";
+
+      if (@{$f->{TOKENS}})
+      { print "  ", cs::Hier::h2a($fields->{$f}->{TOKENS}, 0), "\n";
+      }
+    }
+  }
+
+  print "\n";
+}
