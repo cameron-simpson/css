@@ -5,4 +5,6 @@
 #
 needhost amadeus@home || exit 1
 set -x
-exec fetchmail --daemon 900 -f $HOME/private/fetchmailrc -a
+exec fetchmail --daemon 1800 -f $HOME/var/fetchmail/fetchmailrc -a \
+	mail.carlnfd1.nsw.optushome.com.au \
+	mail.zipworld.com.au
