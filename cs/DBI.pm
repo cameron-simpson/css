@@ -593,7 +593,7 @@ sub cleanDates
 	{ $sql.='ISNULL(END_DATE)';
 	}
 
-	cs::DBI::dosql($dbh,$sql,@sqlargs);
+	dosql($dbh,$sql,@sqlargs);
       }
       elsif (! length $end || $end ge $prev_start)
       { my $nend = cs::Day->new($prev_start)->Prev()->Code();
@@ -610,7 +610,7 @@ sub cleanDates
 	  { $sql.='ISNULL(END_DATE)';
 	  }
 
-	  cs::DBI::dosql($dbh,$sql,@sqlargs);
+	  dosql($dbh,$sql,@sqlargs);
 	}
 	else
 	{
@@ -625,13 +625,39 @@ sub cleanDates
 	  { $sql.='ISNULL(END_DATE)';
 	  }
 
-	  cs::DBI::dosql($dbh,$sql,@sqlargs);
+	  dosql($dbh,$sql,@sqlargs);
 	}
       }
 
       $prev_start=$start;
     }
   }
+}
+
+=item cropDates(I<dbh>,I<table>,I<keyfield>,I<key>,I<start>,I<end>)
+
+Crop the dates in the specified (I<dbh>,I<table>)
+where the field I<keyfield> equals I<key>
+and the date fields overlap the period I<start>-I<end>.
+Records completely overlapped by the period are dropped.
+
+BUG: records which completely overlap the period are untouched
+because I haven't decided how to deal with holes.
+
+=cut
+
+sub cropDates($$$$$$)
+{ my($dbh,$table,$keyfield,$key,$start,$end)=@_;
+
+  my $sql;
+
+  $sql = "DROP FROM $table WHERE $keyfield = ? AND START_DATE >= ? AND END_DATE <= ?";
+  dosql($dbh,$sql,$key,$start,$end);
+
+  my $prestart = (new cs::Day $start)->Prev()->Code();
+
+  $sql = "UPDATE $table SET END_DATE = ? WHERE $keyfield = ? AND START_DATE <= ? AND (ISNULL(END_DATE) OR (END_DATE >= ? AND END_DATE <= ?))";
+  dosql($dbh,$sql,$prestart,$key,$start,$start,$end);
 }
 
 =item last_id()
