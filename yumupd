@@ -1,3 +1,5 @@
 #!/bin/sh
+op=check-update
+[ $# = 0 ] || op=update
 set -x
-exec yum --exclude=MySQL\* --exclude=gkrellm\* --exclude=kernel\* update
+exec yum --exclude=MySQL\* --exclude=gkrellm\* --exclude=kernel\* "$op" ${1+"$@"}
