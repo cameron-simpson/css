@@ -105,7 +105,8 @@ view_xanm='xanim $formopts /dev/fd/0'
 
 view_rm='realplay $formopts /dev/fd/0'
 
-view_image='xv $formopts /dev/fd/0'
+#view_image='xv $formopts /dev/fd/0'
+view_image='ee $formopts /dev/fd/0'
 
 view_rcp='pilrcui $formopts /dev/fd/0'
 
