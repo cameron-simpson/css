@@ -1,0 +1,18 @@
+#!/bin/sh
+#
+# Is a path a maildir folder?
+#	- Cameron Simpson <cs@zip.com.au> 13jul2004
+#
+
+cmd=$0
+usage="Usage: $cmd dirs..."
+
+[ $# = 0 ] && { echo "$usage" >&2; exit 2; }
+
+for d
+do
+  [ -d "$d/." ] || exit 1
+  [ -d "$d/new/." -a -d "$d/cur/." -a -d "$d/tmp/." ] || exit 1
+done
+
+exit 0
