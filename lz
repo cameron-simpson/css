@@ -23,7 +23,7 @@
 # as typically they need define only "pure PostScript" printer names.
 #
 
-mpageargs=
+multipsargs=
 topsargs='-T "$arg"'
 pshufargs=
 filter=
@@ -32,7 +32,7 @@ lpqflag=
 itype=any
 
 cmd=`exec basename "$0"`
-usage="Usage: $cmd [-Pprinter[/paper]] [-f filter]... [-q] [mpage-options] [--] [files...]
+usage="Usage: $cmd [-Pprinter[/paper]] [-f filter]... [-q] [multips-options] [--] [files...]
 
 	-Pprinter[/paper] Send to specified printer.
 			Specifiable via \$PRINTER (currently \"$PRINTER\").
@@ -51,7 +51,7 @@ usage="Usage: $cmd [-Pprinter[/paper]] [-f filter]... [-q] [mpage-options] [--] 
 	-o range	Only output pages in \"range\".
 	-r		Reverse pages.
 
-    Mpage options (defaults as per mpage):
+    multips options (defaults as per multips):
 	-[1248]		1,2,4, or 8 logical pages per surface.
 	-d		Put dividers between logical pages.
 	-dh		Horizontal dividers only.
@@ -127,7 +127,7 @@ do
 		# Pretty obsolete these days;
 		# the B</I<medium>> option above is preferred.
 		#
-		-t)	mpageargs="$mpageargs $1 $2"; shift ;;
+		-t)	multipsargs="$multipsargs $1 $2"; shift ;;
 
 		# =item B<-1>, B<-2>, B<-4>, B<-8>
 		#
@@ -159,7 +159,7 @@ do
 		# Arrange logical pages in columns.
 		#
 		-[1248dDTRC] | +[dDT] | -d[hv])
-			mpageargs="$mpageargs $1" ;;
+			multipsargs="$multipsargs $1" ;;
 
 		# =item B<-L>
 		#
@@ -169,7 +169,7 @@ do
 		#
 		# Presume input data is in portrait format (the default).
 		#
-		-[LP])	mpageargs="$mpageargs $1"
+		-[LP])	multipsargs="$multipsargs $1"
 			topsargs="$topsargs $1"
 			;;
 
@@ -195,10 +195,10 @@ do
 		# B<black> tends to mean transparent in this context.
 		#
 		-[rc]|-[fb]g)
-			mpageargs="$mpageargs $1 $2"; shift ;;
+			multipsargs="$multipsargs $1 $2"; shift ;;
 
 ## UNSW only
-#		-lh)	mpageargs="$mpageargs -1"
+#		-lh)	multipsargs="$multipsargs -1"
 #			case "$2" in
 #			    -*)	aff= ;;
 #			    *)	aff="-aff '$2'"; shift ;;
@@ -304,7 +304,7 @@ esac
 		     }
 
 # multisheeting
-[ -n "$mpageargs" ] && filter="$filter mpage \$mpageargs |"
+[ -n "$multipsargs" ] && filter="$filter multips \$multipsargs |"
 
 ## UNSW lpr only
 ## case "$#,$domessage" in
@@ -455,7 +455,7 @@ exit $xit
 #
 # =head1 SEE ALSO
 #
-# mpage(1), pshuf(1), 2ps(1), a2ps(1), acroread(1)
+# multips(1), pshuf(1), 2ps(1), a2ps(1), acroread(1)
 #
 # =head1 AUTHOR
 #
