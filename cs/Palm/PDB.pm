@@ -65,12 +65,12 @@ if I<file> exists it must match the I<creator> and I<dbname> supplied.
 
 =cut
 
-sub new($$$$)
+sub new($$;$$)
 { my($class,$file,$creator,$dbname)=@_;
 
   my(@c)=caller;
   warn "creator \"$creator\" must be 4 bytes from [@c]"
-	if length($creator) != 4;
+	if defined($creator) && length($creator) != 4;
 
   my $this = bless { DBNAME => $dbname,
 		     CREATOR => $creator,
@@ -152,14 +152,15 @@ sub _Load($$$$)
 
   $this->{DBNAME} =~ s/\0+$//;
 
-  if ($creator ne $this->{CREATOR}
-   || $dbname ne $this->{DBNAME})
+  if ((defined $creator && $creator ne $this->{CREATOR})
+   || (defined $dbname && $dbname ne $this->{DBNAME})
+     )
   { warn "$::cmd: creator/dbname supplied \"$creator/$dbname\" doesn't match file \"$this->{CREATOR}/$this->{DBNAME}\n";
     return 0;
   }
 
   my $NR = $this->{NR};
-  my $RR = $this->{R};
+  my $RR = $this->{R}=[];
   my $R;
 
   for my $nr (0..$NR-1)
@@ -192,7 +193,7 @@ sub _Load($$$$)
   # do not assume record order matches storage order
 
   # nab file size - needed for last record
-  my @s = stat $F;
+  my @s = eval "stat $F";	warn "$::cmd: stat($F): $!" if ! @s;
   my $size = $s[7];
   my @posmap = sort { $a->[0] <=> $b->[0] }
 		    map( [$RR->[$_]->{OFFSET}, $_],
@@ -271,8 +272,6 @@ sub _LoadRecordData($)
       return 0;
     }
   }
-
-  ## warn "RECORDS=".cs::Hier::h2a($this->{RECORDS},1);
 
   1;
 }
