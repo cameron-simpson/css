@@ -17,6 +17,7 @@ xit=0
 if cd "$dir" \
 && httpget -- "$url"
 then
+    echo "$url" >>$HOME/var/log/xvurl
     set x *; shift
     case "$1" in
 	*.gif|*.jpg)	xv -maxpect "$1" ;;
