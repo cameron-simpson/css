@@ -182,8 +182,6 @@ I<execute-args> supplied.
 
 =cut
 
-# as above, but then perfomrs the statement handle's execute() method
-#	dosql(dbh,sql,execute-args)
 sub dosql
 { my($dbh,$sql)=(shift,shift);
 
@@ -369,10 +367,19 @@ sub unlock_tables($)
   dosql($dbh,"UNLOCK TABLES");
 }
 
-# return a statement handle with conjunctive WHERE constraints
-# returns an ARRAY
-#	empty on error
-#	(sth, @args) if ok
+=item sqlWhere(I<dbh>,I<sql>,I<where1>,I<where-arg1>,I<where2>,I<where-arg2>,...)
+
+Obtain a statement handle
+with a conjunctive WHERE constraint
+specified by ANDing together the strings I<whereB<n>>.
+Return value is an array
+which is empty on error
+and otherwise contains B<(I<sth>,I<where-args...>)>
+where I<sth> is the new statement handle
+and I<where-args> is the I<where-argB<n>> values.
+
+=cut
+
 sub sqlWhere
 { my($dbh,$sql,@w)=@_;
 
@@ -382,6 +389,18 @@ sub sqlWhere
 
   ($sth,@args);
 }
+
+=item sqlWheretext(I<sql>,I<where-arg1>,I<where2>,I<where-arg2>,...)
+
+Construct an SQL statement
+with a conjunctive WHERE constraint
+specified by ANDing together the strings I<whereB<n>>.
+Return value is an array
+containing the SQL statement (a string)
+and the arguments with which to execute it
+(the I<where-argB<n>> values).
+
+=cut
 
 sub sqlWhereText
 { my($sql,@w)=@_;
@@ -396,6 +415,57 @@ sub sqlWhereText
   }
 
   return ($sql, @args);
+}
+
+=item sqlWhere2(I<dbh>,I<sql>,I<where>,I<where-args...>)
+
+Obtain a statement handle
+with an arbitrary WHERE constraint
+specified by the string I<where> and the following arguments
+I<where-args>.
+Return value is an array
+which is empty on error
+and otherwise contains B<(I<sth>,I<where-args...>)>
+where I<sth> is the new statement handle.
+
+=cut
+
+sub sqlWhere2
+{ my($dbh,$sql,@w)=@_;
+
+  my ($fullsql,@args) = sqlWhereText($sql,@w);
+  my $sth = sql($dbh,$fullsql);
+  return () if ! defined $sth;
+
+  ($sth,@args);
+}
+
+=item delByKey(I<dbh>,I<table>,I<keyfield>,I<keys...>)
+
+Obtain a statement handle
+to DELETE records whose I<keyfield>s
+have values in the list I<keys...>.
+Note: if I<keys> is empty an expensive no-op is generated.
+
+=cut
+
+sub delByKey
+{ my($dbh,$table,$keyfield)=(shift,shift,shift);
+  
+  my $sql = 'DELETE FROM $table';
+
+  my $sep = 'WHERE';
+  for my $key (@_)
+  { $sql.=" $sep $keyfield = ?";
+    $sep='OR';
+  }
+
+  # safety net
+  if ($sep eq 'WHERE')
+  { $sql.=" WHERE FALSE";
+  }
+
+  return sqlWhere2($dbh,$sql,@_);
 }
 
 =item datedRecords(I<dbh>,I<table>,I<keyfield>,I<key>,I<when>,I<alldates>)
@@ -415,6 +485,8 @@ sub datedRecords($$$$;$$)
 { my($dbh,$table,$keyfield,$key,$when,$all)=@_;
   $when=cs::DBI::isodate() if ! defined $when;
   $all=0 if ! defined $all;
+
+  ## warn "get datedRecords(..,table=$table,keyfield=$keyfield,key=$key,when=$when,all=$all)...";
 
   my $D = cs::DBI::arraytable($dbh,$table);
 
@@ -440,28 +512,35 @@ for use in B<sort>s.
 
 sub cmpDatedRecords
 {
+  my $cmp;
+
   my $sa = $a->{START_DATE};
   my $sb = $b->{START_DATE};
 
-  return $sa cmp $sb if $sa ne $sb;
+  $cmp = defined $sa
+	 ? defined $sb
+	   ? $sa cmp $sb	# both set - compare
+	   : 1			# B->START is undef -> earlier
+	 : defined $sb
+	   ? -1			# A->START is undef -> earlier
+	   : 0
+	 ;			# both undef
+
+  return $cmp if $cmp != 0;
 
   my $ea = $a->{END_DATE};
   my $eb = $b->{END_DATE};
 
-  return 0 if defined($ea)
-	      ? defined($eb)
-		? $ea eq $eb
-		: 0
-	      : defined($eb)
-		? 0
-		: 1
-	      ;
+  $cmp = defined $ea
+	  ? defined $eb
+	    ? $ea cmp $eb	# both set - compare
+	    : -1		# B undef - A is earlier
+	  : defined $eb
+	    ? 1			# A undef - B is earlier
+	    : 0			# neither set - the same
+	  ;
 
-  # catch open ended ranges
-  return 1 if ! defined $eb || ! length $eb;
-  return -1 if ! defined $ea || ! length $ea;
-
-  $ea cmp $eb;
+  $cmp;
 }
 
 =item datedRecordsBetween(I<dbh>,I<table>,I<start>,I<end>,I<keyfield>,I<key>
@@ -496,10 +575,16 @@ sub datedRecordsBetween($$$$;$$)
 }
 
 sub addDatedRecord
-{ my($dbh,$table,$when,$rec,@delwhere)=@_;
-  if (! defined $when)
+{ my($dbh,$table,$start,$end,$rec,@delwhere)=@_;
+
+  if (! defined $start && ! defined $end)
   { my(@c)=caller;
-    die "$::cmd: cs::DBI::addDatedRecord($table): \$when undefined from [@c]";
+    die "$::cmd: cs::DBI::addDatedRecord($table): neither \$start nor \$end defined\n\tfrom [@c]\n\t";
+  }
+
+  if (defined($start) && defined($end) && $start gt $end)
+  { my(@c)=caller;
+    die "$::cmd: cs::DBI::addDatedRecord($table): start ($start) > end ($end)\n\tfrom [@c]\n\t";
   }
 
   if (@delwhere)
@@ -514,7 +599,8 @@ sub addDatedRecord
     $sth->execute(@args);
   }
 
-  $rec->{START_DATE}=$when;
+  $rec->{START_DATE}=$start if defined $start;
+  $rec->{END_DATE}=$end if defined $end;
   cs::DBI::insert($dbh,$table, keys %$rec)->ExecuteWithRec($rec);
 }
 
@@ -545,6 +631,264 @@ sub delDatedRecord
   $sth->execute($prevwhen,@args,$when);
 }
 
+=item cropDatedRecords(I<dbh>,I<table>,I<start>,I<end>,I<where>,I<where-args...>)
+
+Crop dated records which overlap the period I<start>-I<end>.
+At least one of I<start> and I<end> must be defined.
+If supplied, the optional parameters
+I<where> and I<where-args> specify
+a further constraint on the records eligible for cropping.
+Returns success.
+
+=cut
+
+sub cropDatedRecords
+{ my($dbh,$table,$start,$end,$xwhere,@xwargs)=@_;
+
+  my $context="cs::DBI::cropDatedRecords(dbh=$dbh,table=$table,start=".(defined $start ? $start : 'UNDEF').",end=".(defined $end ? $end : 'UNDEF').",xwhere=$xwhere,xwargs=[@xwargs]";
+
+  ## warn "$context\n\t";
+
+  if (!defined($start) && !defined($end))
+  { my@c=caller;
+    die "$::cmd: $context:\n\tneither \$start nor \$end is defined!\n\tfrom [@c]\n\t";
+  }
+
+  if (defined($start) && defined($end) && $start gt $end)
+  { my@c=caller;
+    die "$::cmd: $context:\n\t\$start ($start) > \$end ($end)\n\tfrom [@c]n\\t";
+  }
+
+  my $sql;
+  my $sth;
+  my $xsql=(defined $xwhere ? " AND $xwhere" : "");
+
+  my $ok = 1;
+
+  if (defined $start)
+  { my $prev_start = (new cs::Day $start)->Prev()->Code();
+
+    if (defined $end)
+    # both defined
+    {
+      my $next_end = (new cs::Day $end)->Next()->Code();
+
+      ## warn "CROP BOTH: prev_start='$prev_start', next_end='$next_end'\n";
+
+      # delete swallowed records
+      #
+      # delete where NOT(ISNULL(START_DATE)) AND START_DATE >= $start
+      #       AND NOT(ISNULL(END_DATE)) AND END_DATE <= $end
+      #       AND ...
+      $sql="DELETE FROM $table"
+	    ." WHERE NOT(ISNULL(START_DATE)) AND START_DATE >= ?"
+	    ."   AND NOT(ISNULL(END_DATE)) AND END_DATE <= ?"
+	    .$xsql
+	    ;
+
+      ## warn "DELETE SWALLOWED:\n$sql\n";
+      if (!defined($sth=dosql($dbh,$sql,$start,$end,@xwargs)))
+      { warn "$::cmd: $context:\n\tcan't dosql($sql)";
+	$ok=0;
+      }
+
+      # crop lower records
+      #
+      # update set END_DATE = prev($start)
+      #	where (ISNULL(START_DATE) OR START_DATE < $start)
+      #	  AND NOT(ISNULL(END_DATE))
+      #	  AND END_DATE >= $start
+      #	  AND END_DATE <= $end
+      #	  AND ...
+      $sql="UPDATE $table SET END_DATE = ?"
+	  ." WHERE (ISNULL(START_DATE) OR START_DATE < ?)"
+	  ."   AND NOT(ISNULL(END_DATE))"
+	  ."   AND END_DATE >= ?"
+	  ."   AND END_DATE <= ?"
+	  .$xsql
+	  ;
+
+      ## warn "CROP LOWER:\n$sql\n";
+      if (!defined($sth=dosql($dbh,$sql,$prev_start,$start,$start,$end,@xwargs)))
+      { warn "$::cmd: $context:\n\tcan't dosql($sql)";
+	$ok=0;
+      }
+
+      # crop higher records
+      #
+      # update set START_DATE = next($end)
+      # where (ISNULL(END_DATE) OR END_DATE < $end)
+      # AND NOT(ISNULL(START_DATE))
+      # AND START_DATE <= $end
+      # AND START_DATE >= $start
+      # AND ...
+      $sql="UPDATE $table SET START_DATE = ?"
+	  ." WHERE (ISNULL(END_DATE) OR END_DATE < ?)"
+	  ."   AND NOT(ISNULL(END_DATE))"
+	  ."   AND START_DATE <= ?"
+	  ."   AND START_DATE >= ?"
+	  .$xsql
+	  ;
+
+      ## warn "CROP HIGHER:\n$sql\n";
+      if (!defined($sth=dosql($dbh,$sql,$next_end,$end,$end,$start,@xwargs)))
+      { warn "$::cmd: $context:\n\tcan't dosql($sql)";
+	$ok=0;
+      }
+
+      # split spanning records
+      #
+      # locate:
+      # select WHERE (ISNULL(START_DATE) OR START_DATE < $start)
+      # AND (ISNULL(END_DATE) OR END_DATE > $end)
+      # AND ...
+      #
+      # crop:
+      # update set END_DATE=prev($start)
+      # WHERE (ISNULL(START_DATE) OR START_DATE < $start)
+      # AND (ISNULL(END_DATE) OR END_DATE > $end)
+      # AND ...
+      #
+      # insert new upper halves:
+      # for each selected
+      # { START_DATE=next($end)
+      # }
+      # insert selected
+      $sql="SELECT * FROM $table"
+	  ." WHERE (ISNULL(START_DATE) OR START_DATE < ?)"
+	  ."   AND (ISNULL(END_DATE) OR END_DATE > ?)"
+	  .$xsql
+	  ;
+
+      ## warn "SELECT SPANNING:\n$sql\n";
+      if (!defined($sth=sql($dbh,$sql)))
+      { warn "$::cmd: $context:\n\tcan't parse sql($sql)";
+	$ok=0;
+      }
+      else
+      { my @r = fetchall_hashref($sth,$start,$end,@xwargs);
+
+	if (@r)
+	{
+	  $sql="UPDATE $table SET END_DATE = ?"
+	      ." WHERE (ISNULL(START_DATE) OR START_DATE < ?)"
+	      ."   AND (ISNULL(END_DATE) OR END_DATE > ?)"
+	      .$xsql
+	      ;
+
+	  ## warn "UPDATE SPANNING:\n$sql\n";
+	  if (!defined($sth=dosql($dbh,$sql,$prev_start,$start,$end,@xwargs)))
+	  { warn "$::cmd: $context:\n\tcan't dosql($sql)";
+	    $ok=0;
+	  }
+	  else
+	  # update worked - add top halves
+	  {
+	    my $ins = insert($dbh,$table,grep($_ ne 'ID', keys %{$r[0]}));
+	    if (! defined $ins)
+	    { warn "$::cmd: $context:\n\tcan't construct insert object\n\t";
+	      $ok=0;
+	    }
+	    else
+	    {
+	      for my $r (@r)
+	      { $r->{START_DATE}=$next_end;
+		delete $r->{ID};
+	      }
+
+	      $ins->ExecuteWithRec(@r);
+	    }
+	  }
+	}
+      }
+
+
+    }
+    else
+    # only $start defined
+    {
+
+      ## warn "CROP low-: prev_start='$prev_start'\n";
+
+      # delete swallowed records
+      #
+      # delete where NOT(ISNULL(START_DATE))
+      # AND START_DATE >= $start
+      # AND ...
+      $sql="DELETE FROM $table"
+	    ." WHERE NOT(ISNULL(START_DATE)) AND START_DATE >= ?"
+	    .$xsql
+	    ;
+
+      ## warn "DELETED SWALLOWED:\n$sql\n";
+      if (!defined($sth=dosql($dbh,$sql,$start,@xwargs)))
+      { warn "$::cmd: $context:\n\tcan't dosql($sql)";
+	$ok=0;
+      }
+
+      # crop lower records
+      #
+      # update set END_DATE = prev($start)
+      # where (ISNULL(START_DATE) OR START_DATE < $start)
+      # AND NOT(ISNULL(END_DATE))
+      # AND END_DATE >= $start
+      # AND ...
+      $sql="UPDATE $table SET END_DATE = ?"
+	  ." WHERE (ISNULL(START_DATE) OR START_DATE < ?)"
+	  ."   AND NOT(ISNULL(END_DATE))"
+	  ."   AND END_DATE >= ?"
+	  .$xsql
+	  ;
+
+      ## warn "CROP LOWER:\n$sql\n";
+      if (!defined($sth=dosql($dbh,$sql,$prev_start,$start,$start,@xwargs)))
+      { warn "$::cmd: $context:\n\tcan't dosql($sql)";
+	$ok=0;
+      }
+    }
+  }
+  else
+  # only $end defined
+  {
+    my $next_end = (new cs::Day $end)->Next()->Code();
+
+    # delete swallowed records
+    #
+    # delete where NOT(ISNULL(END_DATE))
+    # AND END_DATE <= $end
+    # AND ...
+    $sql="DELETE FROM $table"
+	." WHERE NOT(ISNULL(END_DATE)) AND END_DATE <= ?"
+	.$xsql
+	;
+
+    if (!defined($sth=dosql($dbh,$sql,$end,@xwargs)))
+    { warn "$::cmd: $context:\n\tcan't dosql($sql)";
+      $ok=0;
+    }
+
+    # crop higher records
+    #
+    # update set START_DATE = next($end)
+    # where (ISNULL(END_DATE) OR END_DATE > $end
+    # AND NOT(ISNULL(START_DATE))
+    # AND START_DATE <= $end
+    # AND ...
+    $sql="UPDATE $table SET START_DATE = ?"
+	." WHERE (ISNULL(END_DATE) OR END_DATE > ?)"
+	."   AND NOT(ISNULL(START_DATE)) AND START_DATE <= ?"
+	.$xsql
+	;
+
+    if (!defined($sth=dosql($dbh,$sql,$next_end,$end,$end,@xwargs)))
+    { warn "$::cmd: $context:\n\tcan't dosql($sql)";
+      $ok=0;
+    }
+  }
+
+  return $ok;
+}
+
 =item cleanDates(I<dbh>,I<table>,I<keyfield>,I<keys...>)
 
 Edit the specified I<table>
@@ -565,6 +909,7 @@ The default behaviour is to clean the entire table.
 sub cleanDates
 { my($dbh,$table,$keyfield,@keys)=@_;
 
+  warn "cleanDates(..,table=$table,keyfield=$keyfield,keys=[@keys])...";
   if (! @keys)
   {
     my $sql = "SELECT $keyfield FROM $table";
@@ -588,6 +933,7 @@ sub cleanDates
   for my $key (@keys)
   {
     my @D = reverse cs::DBI::datedRecords($dbh,$table,$keyfield,$key,undef,1);
+    ## warn "D=".cs::Hier::h2a(\@D,1);
 
     next KEY if ! @D;
 
@@ -602,7 +948,17 @@ sub cleanDates
       if (length $end && $end lt $start)
       {
 	my @sqlargs=($key,$start);
-	my $sql = "DELETE FROM $table WHERE $keyfield = ? AND START_DATE = ? AND ";
+	my $sql = "DELETE FROM $table WHERE $keyfield = ? AND ";
+
+	if (length $start)
+	{ $sql.='START_DATE = ?';
+	  push(@sqlargs,$start);
+	}
+	else
+	{ $sql.='ISNULL(START_DATE)';
+	}
+
+	$sql.=" AND ";
 
 	if (length $end)
 	{ $sql.='END_DATE = ?';
@@ -611,6 +967,8 @@ sub cleanDates
 	else
 	{ $sql.='ISNULL(END_DATE)';
 	}
+
+	## warn "DOSQL:\n\t$sql\n\t@sqlargs\n";
 
 	dosql($dbh,$sql,@sqlargs);
       }
@@ -629,6 +987,8 @@ sub cleanDates
 	  { $sql.='ISNULL(END_DATE)';
 	  }
 
+	  ## warn "DOSQL:\n\t$sql\n\t@sqlargs\n";
+
 	  dosql($dbh,$sql,@sqlargs);
 	}
 	else
@@ -643,6 +1003,8 @@ sub cleanDates
 	  else
 	  { $sql.='ISNULL(END_DATE)';
 	  }
+
+	  ## warn "DOSQL:\n\t$sql\n\t@sqlargs\n";
 
 	  dosql($dbh,$sql,@sqlargs);
 	}
