@@ -5,7 +5,7 @@
 #
 
 case "$HOST.$SYSTEMID@$LOCATION" in
-  newt.home@cisra)
+  newt.home@cisra|kirsty.home@cisra)
     set -x
     acon lock -1 portfwd-kaper \
 	sh -c 'set -x
