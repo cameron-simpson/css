@@ -540,7 +540,7 @@ fi
   pwd | lastvalue savedir -
 )
 
-[ -s "$saveas" ] && cmp -s "$file" "$saveas" && exit 0
+[ -f "$saveas" -a -s "$saveas" ] && cmp -s "$file" "$saveas" && exit 0
 
 cp -i "$file" "$saveas"
 
@@ -550,9 +550,11 @@ cp -i "$file" "$saveas"
 #
 #	image/jpeg; apphelper %s -y xv
 #
-# which caused mutt(1) to run xv(1)
-# immediately on pressing enter on a JPEG attachment
-# and then to offer a save option.
+# which causes mutt(1),
+# on pressing enter on a JPEG attachment,
+# to hand JPEG files to apphelper
+# which runs xv(1) immediately
+# and then offers a save option.
 #
 # This mailcap line:
 #
