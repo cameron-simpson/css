@@ -8,7 +8,7 @@ file=/etc/ssh_host_key
 
 umask 022
 
-if ssh-keygen -b 1024 -f "$file" -N ''
+if ssh-keygen -b 2048 -f "$file" -N ''
 then
     ls -ld "$file" "$file.pub"
 else
