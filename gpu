@@ -7,11 +7,11 @@
 case $1 in
     ''|-*|*://*)	;;
     *)		dirpfx=$1; shift
-		if subdir=`mkdirn "$dirpfx"`
+		if subdir=`mkdirn "$dirpfx/$dirpfx"`
 		then
 		    cd "$subdir" || exit 1
 		fi
-		pwd
+		colour_echo white "`pwd`"
 		L
 		;;
 esac
