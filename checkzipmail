@@ -1,0 +1,7 @@
+#!/bin/sh
+#
+# Check my currently unforwarded email.
+#	- Cameron Simpson <cs@zip.com.au> 14dec2000
+#
+
+envssh -n zip 'set-x egrep -i "^(from|subject):" "$MAIL"'
