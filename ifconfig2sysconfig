@@ -1,0 +1,39 @@
+#!/bin/sh
+#
+# Write a static RedHat style ifcfg-eth0 file from ifconfig output.
+#	- Cameron Simpson <cs@zip.com.au> 29dec2004
+#
+
+: ${TMPDIR:=/tmp}
+
+iface=eth0
+
+cmd=$0
+usage="Usage: $cmd [interface]"
+
+if [ $# -gt 0 ]
+then
+  iface=$1; shift
+fi
+
+[ $# = 0 ] || { echo "$cmd: extra arguments after interface: $*" >&2; exit 2; }
+
+tmp=$TMPDIR/if2cfg$$
+trap 'rm -f "$tmp"' 0 1 2 13 15
+
+echo "DEVICE=$iface"
+echo "BOOTPROTO=static"
+echo "ONBOOT=no"
+
+ifconfig "$iface" \
+| sed -n "s/^$iface"' .*Link encap:\([^ ]*\) *HWaddr *\([0-9A-F][0-9A-F]:[0-9A-F][0-9A-F]:[0-9A-F][0-9A-F]:[0-9A-F][0-9A-F]:[0-9A-F][0-9A-F]:[0-9A-F][0-9A-F]\).*/TYPE=\1\
+HWADDR=\2/p
+          s/^ *inet addr:\([0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*\) *Bcast:\([0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*\)  Mask:\([0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*\).*/IPADDR=\1\
+BROADCAST=\2\
+NETMASK=\3/p' \
+>"$tmp"
+
+cat "$tmp"
+. "$tmp"
+
+ipcalc -n "$IPADDR" "$NETMASK"
