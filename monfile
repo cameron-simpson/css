@@ -5,6 +5,8 @@
 #	- Cameron Simpson <cs@zip.com.au> 04nov98
 #
 
+: ${TMPDIR:=/tmp}
+
 diff=/opt/bin/diff
 
 [ $# = 1 ] || { echo "Usage: $0 file" >&2; exit 2; }
@@ -12,7 +14,7 @@ diff=/opt/bin/diff
 file=$1
 [ -f "$file" ] || { echo "$0: $file: not a file" >&2; exit 1; }
 
-tmp=/tmp/monfile.$$
+tmp=$TMPDIR/monfile.$$
 cp "$file" $tmp || exit 1
 
 xit=0
