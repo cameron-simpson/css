@@ -123,11 +123,6 @@ MaintScripts=${MaintScripts:-$HOME/.maint}
 
 export MaintDir MaintScripts RunMaint
 
-SYSTEMID=${SYSTEMID:-localdomain}
-HOST=${HOST:-`hostname`}
-case $HOST in *.*) HOST=`expr "x$HOST" : 'x\([^.]*\)\..*'` ;; esac
-export HOST SYSTEMID
-
 usage="Usage: $0 [-d dir] [-s subj] [-date datestr] [-x] target [addresses]
     See:
 	http://www.zip.com.au/~cs/runmaint.html
@@ -148,9 +143,10 @@ noenv=
 [ "x$1" = x-E ] && { noenv=1; shift; }
 
 badopts=
+args=$*
 
 xflag= traceon=: traceoff=:
-subj="runmaint@$HOST $*"
+subj=
 datestr=
 
 #
@@ -254,6 +250,16 @@ else
 fi
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+[ $noenv ] \
+|| { [ -s "$MaintEtc/env" ] && { $traceon; . "$MaintEtc/env"; $traceoff; }; }
+
+SYSTEMID=${SYSTEMID:-localdomain}
+HOST=${HOST:-`hostname`}
+case $HOST in *.*) HOST=`expr "x$HOST" : 'x\([^.]*\)\..*'` ;; esac
+export HOST SYSTEMID
+
+[ -n "$subj" ] || subj="runmaint@$HOST $args"
 
 xit=0
 
