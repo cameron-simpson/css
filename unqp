@@ -1,0 +1,22 @@
+#!/usr/bin/perl
+#
+# Decode Quoted-Printable stuff and emit.
+#	- Cameron Simpson <cs@zip.com.au> 21may98
+#
+
+use cs::MIME::QuotedPrintable;
+use cs::Source;
+
+my $delimpfx;
+if ($ARGV[0] =~ /^--./)
+{ $delimpfx=shift(@ARGV);
+}
+
+my($in)=new cs::Source (FILE, STDIN);
+
+LINE:
+  while (defined ($_=$in->GetLine()) && length)
+	{ last LINE if defined($delimpfx)
+		    && substr($_,$[,length($delimpfx)) eq $delimpfx;
+	  print cs::MIME::QuotedPrintable::decode($_);
+	}
