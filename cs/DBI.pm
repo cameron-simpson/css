@@ -124,6 +124,34 @@ sub hashtable($$$;$$)
   $cs::DBI::_HashTables{$dbh,$table,$keyfield,$where}=$h;
 }
 
+=item arraytable(I<dbh>,I<table>,I<where>)
+
+Return a reference to an array tied to a database table,
+which may then be manipulated directly.
+The optional parameter I<where>
+may be used to supply a B<WHERE> clause to the underlying SQL query.
+
+=cut
+
+undef %cs::DBI::_ArrayTables;
+
+sub arraytable($$;$)
+{ my($dbh,$table,$where)=@_;
+  $where='' if ! defined $where;
+
+  return $cs::DBI::_ArrayTables{$dbh,$table,$where}
+  if exists $cs::DBI::_ArrayTables{$dbh,$table,$where};
+
+  my $a = [];
+
+  ::need(cs::DBI::Table::Array);
+  if (! tie @$a, cs::DBI::Table::Array, $dbh, $table, $where)
+  { return undef;
+  }
+
+  $cs::DBI::_ArrayTables{$dbh,$table,$where}=$a;
+}
+
 =item sql(I<dbh>,I<sql>)
 
 Return a statement handle for the SQL command I<sql> applied to database I<dbh>.
