@@ -1,0 +1,17 @@
+#!/bin/sh
+#
+# Run ring on the wiring data.
+#	- Cameron Simpson <cs@zip.com.au> 14jul98
+#
+
+db=/usr/local/etc/cisra/db
+
+cd "$db" || exit $?
+
+TELNOS=hosts
+for sw in floorplan wiring/phones wiring/switches/*
+do TELNOS="$TELNOS:$sw"
+done
+export TELNOS
+
+exec ring -L ${1+"$@"}
