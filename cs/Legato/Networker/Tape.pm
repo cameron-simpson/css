@@ -14,16 +14,15 @@ use cs::Legato::Networker::Tape;
 
 @labels = cs::Legato::Networker::tapes();
 
-$tape   = cs::Legato::Networker::findTape($label);
+$tape   = cs::Legato::Networker::find($label);
 
 $label = $tape->Label();
-$usage = $tape->Usage();
+$usage = $tape->Used();
 
 =head1 DESCRIPTION
 
 The B<cs::Legato::Networker::Tape> module
-talks to the Legato Networker backup system,
-permitting queries about tapes and jukeboxes.
+accesses the Legato tape database.
 
 =cut
 
@@ -32,13 +31,14 @@ use strict qw(vars);
 BEGIN { use cs::DEBUG; cs::DEBUG::using(__FILE__); }
 
 use cs::Misc;
+use cs::Object;
 use cs::Legato::Networker::Dump;
 
 package cs::Legato::Networker::Tape;
 
 require Exporter;
 
-@cs::Legato::Networker::Tape::ISA=qw();
+@cs::Legato::Networker::Tape::ISA=qw(cs::Object);
 
 =head1 GENERAL FUNCTIONS
 
@@ -57,39 +57,101 @@ sub _loadTapeInfo(;$)
 
   undef %cs::Legato::Networker::Tape::_tapeInfo;
 
-  if (! open(MMINFO, "mminfo -a -v|"))
+  local($_);
+  my($T,$D);
+
+  if (! open(MMINFO, "mminfo -a -r 'volume(15),\%used(5),pool(15),ssid(11),client(64),attrs(31),level(9),location(15),volume'|"))
   { warn "$::cmd: can't pipe from mminfo: $!";
     return 0;
   }
 
-  local($_);
-  my($T,$D);
+  # mminfo takes a while - get jukebox info while waiting
+  if (! open(JUKE,"nsrjb -C|"))
+  { warn "$::cmd: can't pipe from nsrjb: $!";
+    return 0;
+  }
 
+  while (<JUKE>)
+  {
+    chomp;
+
+    #        slot   label
+    if (/^\s*(\d+): (.{13})/)
+    {
+      my($slot,$label)=($1,$2);
+      $label =~ s/\s+$//;
+      $label =~ s/\*$//;
+
+      if ($label =~ /^\w/)
+      { if ($label !~ /^[A-Z][A-Z][A-Z]\d\d\d$/)
+	{ die "nsrjb: bad label \"$label\"\n\t$_\n";
+	}
+	else
+	{ ## warn "label=$label, slot=$slot\n";
+	  $T=get($label);
+	  $T->Slot($slot);
+	}
+      }
+    }
+    elsif (/^drive\s+(\d+).*slot (\d+):\s*(\S+)/)
+    { my($drive,$slot,$label)=($1,$2,$3);
+      $T=find($label);
+      if (! defined $T || $T->Slot() ne $slot)
+      { warn "$::cmd: bad data from nsrjb -C: $_\n";
+      }
+      else
+      { $T->Drive($drive);
+      }
+    }
+  }
+
+  close(JUKE);
+
+  # ok, now parse the mminfo data
   $_=<MMINFO>;	# skip heading
+
+  my @match;
 
   MMINFO:
   while (<MMINFO>)
   {
     chomp;
 
-    #         label        client mmddyy              hhmmss             size          units   seq    flags  level  path
-    print "[$_]\n";
-    if (! m;^([a-z]\w+)\s+(\S+)\s+(\d\d/\d\d/\d\d)\s+(\d\d:\d\d:\d\d)\s+(\d+(\.\d*)?\s*\S+)\s+(\d+)\s(\S*)\s(\S*)\s(\S.*);i)
+    #                 label  used  pool   ssid   client attrs  level location
+    if (! (@match = /^(.{15})(.{5})(.{15})(.{11})(.{64})(.{31})(.{9})(.{15})/))
     { die "$::cmd: bad data from mminfo, line $.\n[$_]\n\t";
       next MMINFO;
     }
 
-    my($label,$client,$mmddyy,$hhmmss,$size,$seq,$flags,$level,$path)
-     =
-      ($1,    $2,     $3,     $4,     $5,   $7,  $8,    $9,    $10);
-
-    if (! defined ($T=find($label)))
-    { $T = _new cs::Legato::Networker::Tape $label;
+    for (@match)
+    { s/^\s+//;
+      s/\s+$//;
     }
 
-    $D = _new cs::Legato::Networker::Dump ($seq,$client,$path,$flags,$level);
-    push(@{$T->Dumps()}, $D->Seq());
+    ## warn "match=[".join('|',@match)."]\n";
+
+    my($label,$used,$pool,$ssid,$client,$attrs,$level,$location)
+     =@match;
+
+    ::out("$label: $ssid");
+    ## warn "$label: used=$used, ssid=$ssid";
+
+    $T=get($label);
+    $T->Pool($pool);
+    $T->Used($used);
+    die "$label: no used field\n\t[$_]\n\t" if ! defined $used;
+    $T->Location($location);
+
+    $T->AddDump($ssid);
+
+    if (! defined ($D=cs::Legato::Networker::Dump::find($ssid)))
+    { $D = _new cs::Legato::Networker::Dump ($label,$ssid,$level,$client,$attrs);
+    }
+    else
+    { $D->AddTape($label);
+    }
   }
+  ::out('');
 
   if (! close(MMINFO))
   { warn "$::cmd: nonzero exit status from mminfo";
@@ -112,7 +174,7 @@ sub tapes()
 
 =back
 
-=head1 OBJECT CREATION
+=head1 OBJECT ACCESS
 
 =over 4
 
@@ -136,10 +198,11 @@ sub _new($$)
   bless $T, $class;
 }
 
-=item cs::Legato::Networker::Tape::find(I<label>)
+=item find(I<label>)
 
 Obtain a B<cs::Legato::Networker::Tape> object
 representing the tape with the specified I<label>.
+Return B<undef> if the I<label> is not known.
 
 =cut
 
@@ -150,6 +213,24 @@ sub find($)
   return undef if ! exists $cs::Legato::Networker::Tape::_tapeInfo{$label};
 
   $cs::Legato::Networker::Tape::_tapeInfo{$label};
+}
+
+=item get(I<label>)
+
+Obtain a B<cs::Legato::Networker::Tape> object
+representing the tape with the specified I<label>.
+Creates a new object if the I<label> is unknown.
+
+=cut
+
+sub get($)
+{ my($label)=@_;
+
+  my $T = find($label);
+
+  $T = _new cs::Legato::Networker::Tape $label if ! defined $T;
+
+  $T;
 }
 
 =back
@@ -176,6 +257,75 @@ Return an array ref of the dumps recorded for this tape.
 
 sub Dumps()
 { shift->{cs::Legato::Networker::Tape::DUMPS};
+}
+
+=item AddDump(I<ssid>)
+
+Add the dump with save set id I<ssid>
+the the list of dumps on this tape.
+
+=cut
+
+sub AddDump($$)
+{ my($this,$ssid)=@_;
+
+  push(@{$this->Dumps()}, $ssid);
+}
+
+=item Pool(I<pool>)
+
+Get or set the I<pool> for this tape.
+
+=cut
+
+sub Pool($;$)
+{ my($this)=shift;
+  $this->GetSet(cs::Legato::Networker::Tape::POOL,@_);
+}
+
+=item Used(I<used>)
+
+Get or set the I<used> value for this tape.
+
+=cut
+
+sub Used($;$)
+{ my($this)=shift;
+  ## warn "Used($this,@_)";
+  $this->GetSet(cs::Legato::Networker::Tape::USED,@_);
+}
+
+=item Location(I<location>)
+
+Get or set the I<location> value for this tape.
+
+=cut
+
+sub Location($;$)
+{ my($this)=shift;
+  $this->GetSet(cs::Legato::Networker::Tape::LOCATION,@_);
+}
+
+=item Slot(I<slot>)
+
+Get or set the I<slot> value for this tape.
+
+=cut
+
+sub Slot($;$)
+{ my($this)=shift;
+  $this->GetSet(cs::Legato::Networker::Tape::SLOT,@_);
+}
+
+=item Drive(I<drive>)
+
+Get or set the I<drive> value for this tape.
+
+=cut
+
+sub Drive($;$)
+{ my($this)=shift;
+  $this->GetSet(cs::Legato::Networker::Tape::DRIVE,@_);
 }
 
 =back
