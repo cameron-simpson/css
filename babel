@@ -1,0 +1,25 @@
+#!/bin/sh
+#
+# Use the babelfish translator.
+#	- Cameron Simpson <cs@zip.com.au> 19nov98
+#
+
+usage="Usage: $0 [-t dl] sl {url|text}
+	-t dl	Destination language code.
+	sl	Source language code."
+
+badopts=
+
+dl=en
+[ "x$1" = x-t ] && { shift; to=$1; shift; }
+if [ $# = 0 ]
+then  echo "$0: missing source language" >&2
+      badopts=1
+else  sl=$1; shift
+fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+txt=`hexify-GETfield "$*"`
+
+acon urlshow "http://babelfish.altavista.digital.com/cgi-bin/translate?doit=done&urltext=$txt&lp=${sl}_${dl}&Submit=Translate"
