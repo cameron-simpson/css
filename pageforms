@@ -7,6 +7,11 @@
 htmlopt=
 [ "x$1" = x-html ] && { htmlopt=$1; shift; }
 
-[ $# = 1 ] || { echo "Usage: $0 [-html] url" >&2; exit 2; }
+if [ $# = 0 ]
+then
+  [ -t 0 ] && exec withxclip "$0" $htmlopt
+  echo "$0: missing URL" >&2
+  exit 2
+fi
 
 wcat "$1" | htforms $htmlopt
