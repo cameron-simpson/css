@@ -1,0 +1,30 @@
+#!/bin/sh
+#
+# Take a log message and an attachment data on stdin
+# and log it appropriately.
+#	- Cameron Simpson <cs@zip.com.au> 
+#
+
+cmd=`basename "$0"`
+usage="Usage: $cmd logline < attachment-data"
+
+[ $# = 1 ] || { echo "$usage" >&2; exit 2; }
+logmsg=$1; shift
+
+[ -n "$BUGSYSTEMS" ] || exit 0	# no bugs to note? empty result
+
+tmpf=/tmp/bugids$$
+trap 'rm -f "$tmpf"' 0 1 15
+cat >"$tmpf" || exit 1
+
+for sys in ddts dlog
+do
+  case " $BUGSYSTEMS " in
+    *' dlog '*)	dlog "$logmsg" ;;
+    *' ddts '*)	ddtsids=`echo "$logmsg" | ddtsids`
+		[ -n "$ddtsids" ] && mailif -s "$logmsg" $ddtsids < "$tmpf"
+		;;
+  esac
+done
+
+exit 0
