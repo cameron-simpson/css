@@ -1,0 +1,15 @@
+#!/bin/sh
+#
+# Generate a list of images with their sizes.
+#	- Cameron Simpson <cs@zip.com.au> 09jan2002
+#
+
+wd=`pwd`
+
+find . \
+    \( -type d ! -name . -name '.*' -prune \) \
+ -o \( -type f -size +0 \
+		\( -name \*.png -o -name \*.jpg \) \
+       -print \) \
+| sed 's;^\./;;' \
+| imsize
