@@ -27,8 +27,9 @@ timeout=
 rsync=rsync
 
 cmd=`basename "$0"`
-usage="Usage: $cmd [-n] [-v] [-P] [-f config] [-d dir] [[server]::rootpfx...]
+usage="Usage: $cmd [-n] [-v] [-P] [-B blocksize] [-f config] [-d dir] [[server]::rootpfx...]
 	-n -v -P	Passed to rsync.
+	-B blocksize	Passed to rsync.
 	-R rsync-cmd	Rsync command. Default: $rsync
 	-f config	Read config from this file. Default: $cf
 	-d dir		Install mirrors here. Default: $where
@@ -65,6 +66,12 @@ do  case $1 in
 	-n)	trace=1 rsopts="$rsopts $1" ;;
 	-P)	trace=1 verbose=1 rsxopts="$rsxopts $1" ;;
 	-v)	trace=1 verbose=1 rsxopts="$rsxopts $1" ;;
+
+	# =item B<-B> I<blocksize>
+	#
+	# Checksum blocksize. Passwd to the rsync command.
+	#
+	-B)	rsopts="$rsopts $1 $2"; shift ;;
 
 	# =item B<-R>
 	#
