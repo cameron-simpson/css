@@ -6,27 +6,36 @@
 
 [ $# = 0 ] || { echo "Usage: $0 < vcard" >&2; exit 2; }
 
+set -x
 ( echo;exec cat ) \
 | sed -n \
-      -e '1,/^begin:vcard/d' \
-      -e '/^end:vcard$/,$d' \
-      -e '/^[a-z][a-z;]*:/!d' \
-      -e 's/^\([a-z][a-z]*\);/\1_/' \
+      -e '1,/^[Bb][Ee][Gg][Ii][Nn]:[Vv][Cc][Aa][Rr][Dd]/d' \
+      -e '/^[Ee][Nn][Dd]:[Vv][Cc][Aa][Rr][Dd]$/,$d' \
+      -e '/^[a-zA-Z][a-zA-Z;]*:/!d' \
+      -e h \
+      -e 's/^[^:]*//' \
+      -e x \
+      -e 's/:.*//' \
+      -e 'y/;ABCDEFGHIJKLMNOPQRSTUVWXYZ/_abcdefghijklmnopqrstuvwxyz/' \
+      -e G \
+      -e 's/\n//' \
       -e "s/'/'\\''/g" \
-      -e "s/:\\(.*\\)/='\\1'/" \
+      -e "s/:[ 	]*\\(.*\\)/='\\1'/" \
       -e 's/^/vcard_/p' \
+| tee /dev/tty \
 | (eval "`cat`"
     n=$vcard_fn
     [ -n "$vcard_email_internet" ] && n="$n <$vcard_email_internet>"
     echo "$n"
     echo ${vcard_org:+      "Organisation: $vcard_org"}
-    echo ${vcard_title:+    "Title:      $vcard_title"}
-    echo ${vcard_adr:+      "Address:    $vcard_title"}
-    echo ${vcard_url:+      "URL:        $vcard_url"}
-    echo ${vcard_tel_cell:+ "Ph (Cell):  $vcard_tel_cell"}
-    echo ${vcard_tel_work:+ "Ph (Work):  $vcard_tel_work"}
-    echo ${vcard_tel_home:+ "Ph (Home):  $vcard_tel_home"}
-    echo ${vcard_tel_fax:+  "Ph (Fax):   $vcard_tel_fax"}
-    echo ${vcard_tel_pager:+"Ph (pager): $vcard_tel_pager"}
+    echo ${vcard_title:+    "Title:        $vcard_title"}
+    echo ${vcard_adr:+      "Address:      $vcard_title"}
+    echo ${vcard_adr_work:+ "Work Address:  $vcard_adr_work"}
+    echo ${vcard_url:+      "URL:          $vcard_url"}
+    echo ${vcard_tel_cell:+ "Ph (Cell):    $vcard_tel_cell"}
+    echo ${vcard_tel_work:+ "Ph (Work):    $vcard_tel_work"}
+    echo ${vcard_tel_home:+ "Ph (Home):    $vcard_tel_home"}
+    echo ${vcard_tel_fax:+  "Ph (Fax):     $vcard_tel_fax"}
+    echo ${vcard_tel_pager:+"Ph (pager):   $vcard_tel_pager"}
   ) \
 | sed '/^ *$/d'
