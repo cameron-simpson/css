@@ -47,6 +47,7 @@ fi \
   do  host "$host"
   done \
 | sed -e '/^Host [^ ]* not found/d' \
+      -e 's/ is an alias for .*//' \
       -e 's/ has address / /' \
       -e 's/\.research\.canon\.com\.au//' \
 | tr -s ' ' '\012' \
@@ -60,7 +61,7 @@ do
   ssh-keyscan -f "$hlist" -t "$type" >"$keys-$type" &
 done
 wait
-cvsmsg="new ssh keys from $cvshostnames"
+cvsmsg=${CVSEDIT_MSG:-"new ssh keys from $cvshostnames"}
 
 cvsedit -1 -m "$cvsmsg" ssh_known_hosts1 mergesshkeys $LOCALDOMAINS <"$keys-rsa1"	|| exit 1
 cvsedit -1 -m "$cvsmsg" ssh_known_hosts2 mergesshkeys $LOCALDOMAINS <"$keys-rsa"	|| exit 1
