@@ -1,0 +1,72 @@
+#!/bin/sh
+#
+
+cmd=`basename "$0"`
+
+domain=orchestra
+usage="Usage: $cmd [-d domain] host:n/homedir
+	Copy /home/cs/domain/host/n/homedir to the current directory.
+	-d domain	Domain (default: $domain)."
+
+vflag=v
+badopts=
+
+if [ "x$1" = x-d ]
+then shift
+     if [ $# -lt 1 ]
+     then echo "$cmd: missing domain for -d" >&2
+	  badopts=1
+     else domain=$1
+	  shift
+     fi
+fi
+
+if [ $# -lt 1 ]
+then echo "$cmd: missing homedir specification" >&2
+     badopts=1
+else case $1 in
+	*:[0-9]/* | *:/*)
+		host=`expr "x$1" : 'x\([^:]*\):.*'`
+		nhome=`expr "x$1" : 'x[^:]*:\(.*\)'`
+		;;
+	*)	echo "$cmd: $1: bad homedir specification" >&2
+		badopts=1
+		;;
+     esac
+     shift
+fi
+
+case "$domain" in
+    orchestra|flora|spectrum)	;;
+    *)			echo "$cmd: $domain: unknown domain specification" >&2
+			badopts=1
+			;;
+esac
+
+if [ $# -gt 0 ]
+then echo "$cmd: extra arguments: $*" >&2
+     badopts=1
+fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+base=`basename "$nhome"`
+case "$nhome" in
+    /*)	pathname=$nhome ;;
+    *)	pathname=/home/cs/$domain/$host/$nhome ;;
+esac
+
+if [ -d "./$base" ]
+then echo "$cmd: $base: directory exists" >&2
+     exit 1
+fi
+
+mkdir "./$base" || exit $?
+chown "$base" "$base"
+chgrp "$base" "$base"
+
+pwd
+echo "requesting $pathname ..."
+echo "$pathname" \
+	| $HOME/scripts/pl/tcpio -P1000 "$host" fulldump \
+	| pax -ro$vflag
