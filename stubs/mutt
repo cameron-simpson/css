@@ -1,12 +1,6 @@
 #!/bin/sh
 #
 
-case $HOST in
-    ivie)	echo "DON'T RUN MUTT OR ANY EMAIL ON IVIE!" >&2
-		exit 1
-		;;
-esac
-
 [ -n "$LUSER" ] && [ "x$LUSER" != "x$USER" ] \
 	&& { echo "$0: LUSER($LUSER) != USER($USER), aborting" >&2
 	     exit 1
@@ -17,10 +11,18 @@ esac
 
 case "$TERM" in
     xterm)
-	TERM=rxvt; export TERM
-	unset TERMINFO
-	unset TERMCAP
+	if [ "x$HOST@$SYSTEMID" != xzipperii@zip ]
+	then
+	    TERM=rxvt; export TERM
+	    unset TERMINFO
+	    unset TERMCAP
+	fi
 	;;
 esac
 
-exec /opt/mutt/bin/mutt ${1+"$@"}
+for mutt in /opt/mutt/bin/mutt /usr/bin/mutt
+do  [ -f "$mutt" ] && exec "$mutt" ${1+"$@"}
+done
+
+echo "$0: can't find a mutt installation!" >&2
+exit 1
