@@ -1,0 +1,318 @@
+#!/usr/bin/perl -w
+#
+# CVS mucks file permissions about. Links, too.
+# This stub preserves file permissions.
+# Also does some extra things (ls, check, ...).
+#	- Cameron Simpson <cs@zip.com.au> 08apr97
+#
+
+require 'flush.pl';
+use cs::Pathname;
+use cs::Shell;
+
+($cmd=$0) =~ s:.*/::;
+$usage="Usage: $cmd [-D dirpath] cvs-command [-l] [-m message] [cvs-files]...\n";
+
+$RealCVS="cvs";	# since we're now called "mycvs"
+$SubCVS=$0;	# subfunctions call this one
+
+die "$0: we can't be called \"$RealCVS\" - loopback!\n"
+	if $::cmd eq $RealCVS;
+
+$PWD=`/bin/pwd`;
+die "$cmd: can't do pwd, possible error: $!\n" if ! defined $PWD;
+chomp($PWD);
+
+$badopts=0;
+
+ARGV1:
+  while (@ARGV)
+	{ $_=shift(@ARGV);
+	  if ($_ eq '-D')	{ $wantpwd=shift(@ARGV);
+				  if ($wantpwd ne $PWD)
+					{ warn "$cmd: not in $wantpwd; symlink inferred, directory ignored: $PWD\n";
+					  exit 0;
+					}
+				}
+	  elsif ($_ eq '--')	{ last ARGV1;
+				}
+	  elsif (/^-./)		{ warn "$cmd: unrecognised option: $_\n";
+				  $badopts=1;
+				}
+	  else			{ unshift(@ARGV,$_);
+				  last ARGV1;
+				}
+	}
+
+if (! @ARGV)
+	{ warn "$cmd: missing cvs-command\n";
+	  $badopts=1;
+	}
+else
+{ $cvscmd=shift(@ARGV);
+
+  if ($cvscmd eq 'really')
+	{ $really=1;
+	  if (! defined($cvscmd=shift(@ARGV)))
+		{ warn "$cmd: missing cvs-command\n";
+		  $badopts=1;
+		}
+	}
+  else	{ $really=0;
+	}
+
+  $local=0;
+  undef $message;
+
+  ARGV2:
+    while (! $really && @ARGV)
+	{ $_=shift(@ARGV);
+	  if ($_ eq '-l')	{ $local=1; }
+	  elsif ($_ eq '-m')	{ $message=shift(@ARGV); }
+	  elsif ($_ eq '--')	{ last ARGV2; }
+	  elsif (/^-./)		{ warn "$cmd: unrecognised option: $_\n";
+				  $badopts=1;
+				}
+	  else			{ unshift(@ARGV,$_);
+				  last ARGV2;
+				}
+	}
+}
+
+die $usage if $badopts;
+
+if (! $really)
+	{ $Xit=0;
+
+	  if ($cvscmd eq 'ls')	{ cvs_ls(@ARGV); }
+	  elsif ($cvscmd eq 'check'){cvs_check(@ARGV); }
+	  elsif ($cvscmd eq 'commit'){cvs_commit(@ARGV); }
+	  elsif ($cvscmd eq 'update'){cvs_update(@ARGV); }
+	  else
+	  { $really=1;
+	  }
+
+	  exit $Xit if ! $really;
+	}
+
+$savestate=($cvscmd eq 'commit' || $cvscmd eq 'update');
+
+print "$PWD: cvs $cvscmd @ARGV\n";
+
+@cvsentries=@ARGV ? @ARGV : cvs_ls_data();
+if ($savestate)
+	{ if (! @cvsentries)
+		{ # warn "$cmd: quitting - nothing to $cvscmd in $PWD\n";
+		  exit 0;
+		}
+
+	  $stashdir=".cvs.$$";
+	  mkdir($stashdir,0777) || die "mkdir($stashdir): $!\n";
+	  for (@cvsentries)
+		{ if (! link($_,"$stashdir/$_"))
+			{ warn "$cmd: link($_,$stashdir/$_): $!\n";
+			  $Xit=1;
+			}
+		}
+
+	  if ($Xit != 0)
+		{ system("rm -rf $stashdir");
+		  exit $Xit;
+		}
+	}
+
+@cvsopts=();
+push(@cvsopts,'-l') if $cvscmd eq 'commit' || $cvscmd eq 'update';
+push(@cvsopts,'-m',$message) if defined $message;
+system(scalar(cs::Shell::quote($RealCVS,$cvscmd,@cvsopts,@cvsentries)));
+$Xit=$?;
+
+if ($savestate)
+	{
+	  if ($cvscmd eq 'update')
+		{ my(@s1,@s2);
+
+		  for (@cvsentries)
+			{ if (! (@s1=stat($_)))
+				{ warn "$cmd: can't stat($_): $!\n";
+				}
+			  elsif (! (@s2=stat("$stashdir/$_")))
+				{ warn "$cmd: can't stat($stashdir/$_): $! - newer version may get trashed\n";
+				}
+			  elsif ($s1[9] > $s2[9])
+				# newer version - update stashed file
+				{ system(cs::Shell::quote('cat',$_)
+					." >".cs::Shell::quote("$stashdir/$_"));
+				  $Xit=$? if $? != 0;
+				}
+			}
+		}
+
+	  for (@cvsentries)
+		{ if (-e $_ && ! unlink($_))
+			{ warn "$cmd: can't unlink $_: $! - stashed version not restored\n";
+			  $Xit=1;
+			}
+		  elsif (! rename("$stashdir/$_",$_))
+			{ warn "$cmd: can't rename $stashdir/$_ -> $_: $! - stashed version not restored\n";
+			  $Xit=1;
+			}
+		}
+
+	  system(cs::Shell::quote('rmdir',$stashdir));
+	  if ($? != 0)
+		{ $Xit=1;
+		  system("ls -l $PWD/$stashdir");
+		}
+	}
+
+exit $Xit;
+
+sub cvs_ls
+	{ my(@ARGV)=@_;
+
+	  for (cvs_ls_data(@ARGV))
+		{ -e $_ && print "$_\n";
+		}
+	}
+
+sub cvs_ls_data
+	{ my(@ARGV)=@_;
+	  my(@ls)=();
+	  local($_);
+
+	  if (@ARGV && $ARGV[0] eq '-a')
+		{ die "$cmd: can't open CVS/Repository: $!\n"
+			unless open(R,"<CVS/Repository");
+
+		  if (defined ($_=<R>))
+			{ chomp;
+			  @ls=grep(/,v$/,cs::Pathname::dirents($_));
+			  for (@ls)
+				{ s/,v$//;
+				}
+			}
+
+		  close(R);
+		}
+	  else
+		{ die "$cmd: can't open CVS/Entries: $!\n"
+			unless open(E,"<CVS/Entries");
+
+		  while (defined ($_=<E>))
+			{ chomp;
+			  s:^/([^/]+)/.*:$1: && push(@ls,$_);
+			}
+
+		  close(E);
+		}
+
+	  grep(-e $_,@ls);
+	}
+
+sub cvs_check
+	{ my(@ARGV)=@_;
+	  my(@extant)=grep($_ ne 'CVS',cs::Pathname::dirents('.'));
+	  my(@cvs)=cvs_ls_data('-a');
+	  my(%ext,%cvs,%n);
+
+	  map($ext{$_}=1,@extant);
+	  map($cvs{$_}=1,@cvs);
+	  map($n{$_}=1,@cvs,@extant);
+
+	  for (sort keys %n)
+		{ if ($ext{$_})
+		    { if ($cvs{$_})
+			{}
+		      elsif (-d "$_/CVS")
+			{}
+		      else
+		      { print "? $_\n";
+		      }
+		    }
+		  else
+		    { print "- $_\n";
+		    }
+		}
+	}
+
+sub get_message
+	{
+	  my($message)=promptfor("Log Message? ") if ! defined $message;
+	  if (! length $message || $message =~ /^no?$/i)
+		{ $message="";
+		}
+	  elsif ($message =~ /^y(es?)?$/i)
+		{ print "Enter message, terminate with a .\n";
+		  $message="";
+		  local($_);
+		  MSG:
+		    while (1)
+			{ $_=promptfor("> ");
+			  last MSG if ! defined;
+			  chomp;
+			  last MSG if $_ eq '.';
+			  $message.="$_\n";
+			}
+		}
+
+	  $message;
+	}
+
+sub cdfork_cvs
+	{ my($cd,@ARGV)=@_;
+	  my($pid);
+
+	  if (! defined ($pid=fork))
+		{ warn "$cmd: can't fork: $!\n";
+		  $Xit=1;
+		  return 0;
+		}
+	  elsif ($pid == 0)
+		{ if (! chdir($cd))
+			{ die "$cmd: cd $PWD/$cd: $!\n";
+			}
+
+		  warn "$PWD/$cd: $cvscmd ...\n";
+		  exec($0,@ARGV);
+		  die "exec($0 @ARGV): $!\n";
+		}
+	  else
+	  { return 1;
+	  }
+	}
+
+sub cvs_commit
+	{
+	  $message=get_message() if ! defined $message;
+	  cvsRecurse($cvscmd,'-m',$message,@_);
+	  $really=1;
+	  $local=1;
+	}
+
+sub cvs_update
+	{
+	  cvsRecurse($cvscmd,@_);
+	  $really=1;
+	  $local=1;
+	}
+
+sub cvsRecurse
+	{ my($cvscmd,@ARGV)=@_;
+
+	  if (! $local)
+		{ my($e);
+
+		  for $e (cs::Pathname::dirents('.'))
+			{ if (-d "$e/CVS")
+				{ cdfork_cvs($e,'-D',"$PWD/$e",$cvscmd,@ARGV)
+					|| ($Xit=1);
+				}
+			}
+		}
+	}
+
+sub promptfor
+	{ printflush(STDOUT,@_);
+	  scalar(<STDIN>);
+	}
