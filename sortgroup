@@ -1,0 +1,24 @@
+#!/usr/bin/perl
+#
+# Read UNIX group file, emit in gid order with group members sorted.
+#	- Cameron Simpson <cs@zip.com.au> 12dec97
+#
+
+while (<>)
+	{
+	  chomp;
+	  @gf=split(/:/);
+	  $grp{$gf[0]}={ CRYPT => $gf[1],
+			 GID => $gf[2]+0,
+			 MEMBERS => [ sort grep(length, split(/[\s,]+/,$gf[3])) ],
+		       };
+	}
+
+for (sort { $grp{$a}->{GID} <=> $grp{$b}->{GID} } keys %grp)
+	{ $g=$grp{$_};
+	  print "$_:$g->{CRYPT}:$g->{GID}:",
+		join(',', @{$g->{MEMBERS}}),
+		"\n";
+	}
+
+exit 0;
