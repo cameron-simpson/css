@@ -63,7 +63,11 @@ then
 	else
 	    echo "$url"
 	fi
-    done | sed -e 's/^<\(.*\)>$/\1/' -e 's/^(\(.*\))$/\1/' | "$0"
+    done | sed -e 's/^.*<\(.*\)>.*$/\1/' \
+	       -e 's/^.*(\(.*\)).*$/\1/' \
+	       -e 's/^[^a-z]*\([a-z][a-z]*:\/\/.*\)/\1/' \
+	       -e '/^[a-z][a-z]*:\/\//!s/^/http:\/\//' \
+	 | "$0"
 else
     set x -noraise -iconic
     while read url
