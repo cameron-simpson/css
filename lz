@@ -34,6 +34,7 @@ filter=
 domessage=	# only works at UNSW CSE
 lpqflag=
 itype=
+title=
 
 cmd=`exec basename "$0"`
 usage="Usage: $cmd [-Pprinter[/paper]] [-f filter]... [-q] [multips-options] [--] [files...]
@@ -69,6 +70,7 @@ usage="Usage: $cmd [-Pprinter[/paper]] [-f filter]... [-q] [multips-options] [--
 	-bg r,g,b	Set background colour to be the RGB value (r,g,b).
 	-bg g		Set background colour to be the grey value g.
 	-t tray		Select paper tray.
+	-title string	Specify printout title.
 	-L		Landscape mode.
 	-P		Portrait mode.
 	-D		Duplex mode - use both sides of the paper.
@@ -137,6 +139,13 @@ do
 		# the B</I<medium>> option above is preferred.
 		#
 		-t)	multipsargs="$multipsargs $1 $2"; shift ;;
+
+		# =item B<-title> I<string>
+		#
+		# Specify the printout title.
+		# Some of the conversion backends make use of this value,
+		# in particular the text->PostScript one.
+		-title)	title=$2; shift ;;
 
 		# =item B<-1>, B<-2>, B<-4>, B<-8>
 		#
@@ -307,6 +316,7 @@ xit=0
 # catch paper type
 case "$PRINTER" in
     */*)	paper=`expr "x$PRINTER" : 'x.*/\(.*\)'`
+		topsargs="$topsargs -m \"\$paper\""
 		PRINTER=`expr "x$PRINTER" : 'x\(.*\)/.*'`
 		;;
     *)		paper=
@@ -351,7 +361,7 @@ fi
 
 [ $# = 0 ] && set -- -
 
-tops="2ps \$topsargs -i \"\$thisitype\" -T \"\$thistitle\""
+tops="2ps $topsargs -i \"\$thisitype\" -T \"\$thistitle\""
 
 pipeline="$filter $tops $postps"
 
@@ -359,7 +369,7 @@ didstdin=
 for arg
 do
     thisitype=$itype
-    thistitle=$arg
+    thistitle=${title:-"$arg"}
     case "$arg" in
 	-)	if [ $didstdin ]
 		then
@@ -367,7 +377,7 @@ do
 		    xit=1
 		else
 		    didstdin=1
-		    thistitle=stdin
+		    thistitle=${title:-"stdin"}
 		    eval "$pipeline"
 		fi
 		;;
@@ -379,7 +389,7 @@ do
 		| eval "$pipeline"
 		;;
 	*)	[ -n "$thisitype" ] || thisitype=`file2mime "$arg"`
-		eval "$pipeline" <"$arg"
+		eval "(set -x; $pipeline)" <"$arg"
 		;;
     esac
     ## set +x
