@@ -334,21 +334,20 @@ case "$PRINTER" in
 		;;
 esac
 
-case $SYSTEMID in
-    cisra)
-	lp=${LZPRINTCOMMAND:-'/opt/LPRng/bin/lpr "-P$PRINTER"'} ;;
-    *)
-	case "$OS" in
-	    solaris)
-		lp='lp -d "$PRINTER" -T postscript' ;;
-	    sunos|linux)
-		lp='lpr "-P$PRINTER"' ;;
-	    *)	echo "$cmd: warning: unknown \$OS \"$OS\" - assuming sysv" >&2
-		lp='lp -d "$PRINTER" -T postscript'
-		;;
-	esac
-	;;
-esac
+lp=$LZPRINTCOMMAND
+if [ -z "$lp" ]
+then
+    case "$OS" in
+	# SysVish
+	solaris)
+	    lp='lp -d "$PRINTER" -T postscript'
+	    ;;
+	# BSDish
+	*)  echo "$cmd: warning: unknown \$OS \"$OS\" - assuming bsd" >&2
+	    lp='lpr "-P$PRINTER"'
+	    ;;
+    esac
+fi
 
 if [ "x$PRINTER" = x- ]
 then  lp=cat
