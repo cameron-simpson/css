@@ -1,20 +1,12 @@
 #!/usr/bin/perl
 #
-# Encode/decode base64 data.
-#	- Cameron Simpson <cs@zip.com.au>
+# Encode data in base64 format..
+# Very quick'n'dirty. Should really stream for large input.
+#	- Cameron Simpson <cs@zip.com.au> 27aug2001
 #
 
 use strict qw(vars);
 
-use cs::Source;
 use cs::MIME::Base64;
 
-$::Mode=DECODE;	# default
-
-my($dec)=new cs::MIME::Base64 (Decode,(new cs::Source (FILE,STDIN)));
-
-local($_);
-
-while (defined ($_=$dec->Read()) && length)
-{ print;
-}
+print cs::MIME::Base64::encode(join('',<STDIN>));
