@@ -184,10 +184,16 @@ if (! defined $pid)
   $::Xit=1;
 }
 elsif ($pid == 0)
+# child - run command
 { exec @ARGV;
 }
 else
+# parent - wait for command
 {
+  # detach so that we don't hold standard descriptors
+  close(STDIN);
+  close(STDOUT);
+
   if (defined $::Lock)
   { $::Pidfile=$::Lock->Path().'/pid' if ! defined $::Pidfile;
     if (! open(PIDFILE,"> $::Pidfile\0"))
