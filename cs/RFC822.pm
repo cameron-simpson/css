@@ -28,7 +28,6 @@ BEGIN { use cs::DEBUG; cs::DEBUG::using(__FILE__); }
 
 use Time::Local;
 use cs::Misc;
-use cs::Set;
 
 package cs::RFC822;
 
@@ -114,31 +113,25 @@ sub norm
   $_;
 }
 
-sub ngSet($)	# newsgrouptext -> cs::Set
+sub ngSet($)	# newsgrouptext -> cs::Flags
 { local($_)=@_;
 
-  my $ng = new cs::Set;
-
-  for (grep(length,split(/[\s,]+/)))
-  { $ng->STORE($_,$_);
-  }
-
-  $ng;
+  new cs::Flags grep(length,split(/[\s,]+/));
 }
 
 =item addrSet(I<addresses>)
 
 Parse the string I<addresses>
-and return a B<cs::Set> mapping B<I<user>@I<host>> to full address.
+and return a hashref mapping B<I<user>@I<host>> to full address.
 
 =cut
 
-sub addrSet($)	# addrlisttext -> cs::Set
+sub addrSet($)	# addrlisttext -> hashref
 { local($_)=shift;
 
-  my $oaddrs = $_;	# waste, usually, but useful for warning
+  my $oaddrs = $_;	# waste, usually, but useful for warnings
 
-  my $addrs = new cs::Set;
+  my $addrs = {};
 
   my($text,$addr,$atext);
   my($comment,$tail);
@@ -173,7 +166,7 @@ sub addrSet($)	# addrlisttext -> cs::Set
 
       $addr =~ s/\@\([^\@]+\)$/\@\L$1/;
       if (length $addr)
-      { $addrs->STORE($addr,$text);
+      { $addrs->{$addr}=$text;
       }
 
       $addr='';
@@ -250,7 +243,7 @@ sub parse_comment($)
     { $comment.=$&; $_=$'; }
     else
     { $comment.=substr($_,0,1);
-	substr($_,0,1)='';
+      substr($_,0,1)='';
     }
   }
 
@@ -260,6 +253,17 @@ sub parse_comment($)
 
   ($comment,$_);
 }
+
+=item addr2fullname(I<address>)
+
+Extract the full name component from I<address>
+(i.e. the text outside the B<I<...>> or within the B<(I<...>)>,
+depending).
+In a scalar context, return the full name.
+In an array context return the full name and the remaining address text
+as two strings.
+
+=cut
 
 sub addr2fullname($)
 { my($addrtext)=@_;
@@ -287,7 +291,7 @@ sub addr2fullname($)
 
 =item msgid()
 
-Create a unique message-id.
+Create an unique message-id.
 
 =cut
 
@@ -396,6 +400,10 @@ sub new
   $this;
 }
 
+sub _HdrList(){ shift->{cs::RFC822::HDRLIST}; }
+sub _Hdrs(){ shift->{cs::RFC822::HDRS}; }
+sub _Synched(){ shift->{cs::RFC822::SYNCHED}; }
+
 =back
 
 =head1 OBJECT METHODS
@@ -422,12 +430,12 @@ sub Debug
 =item Hdr(I<header>,I<first>)
 
 Return an array of the bodies of the header fields named I<header>.
-If the optional parameter I<first> is ture,
+If the optional parameter I<first> is true,
 return only the first such header.
 
 =cut
 
-sub Hdr
+sub Hdr($$;$)
 { my($this,$key,$first)=@_;
   $first=0 if ! defined $first;
   # Debug($this,"Hdr($key)");
@@ -442,11 +450,11 @@ sub Hdr
   }
 
   my(@bodies)=();
-  my($hdrlist)=$this->{cs::RFC822::HDRLIST};
+  my($hdrlist)=$this->_HdrList();;
 
   for my $hdr (@$hdrlist)
   { $hdr =~ /^([^:]*):\s*/;
-    push(@bodies,$') if $key eq &hdrkey($1);
+    push(@bodies,$') if $key eq hdrkey($1);
   }
 
 #	  print STDERR "returning array [",
@@ -542,6 +550,14 @@ or a header name,
 in which last case an extra parameter I<headerbody> is expected
 before I<how>.
 
+I<headerbody>
+may also be an arrayref
+in which case the body is the concatenation of the array elements
+separated by "B<,\n\t>",
+or a hashref
+in which case the body is the concatenation of the hash values
+separated by "B<,\n\t>".
+
 I<how> is one of the strings:
 B<ADD>, to append the header to the list;
 B<PREPEND>, to prepend the header to the list;
@@ -565,12 +581,18 @@ sub Add
   my(@c);
   my($field,$body);
 
-  if (ref)
+  if (ref eq ARRAY)
   { ($field,$body)=@$_;
   }
   elsif (/^[-\w_]+$/)
   { ($field=$_) =~ tr/_/-/;
     $body=shift;
+    if (ref($body) eq ARRAY)
+    { $body=join(",\n\t", @$body);
+    }
+    elsif (ref($body) eq HASH)
+    { $body=join(",\n\t", sort map($body->{$_}, keys %$body));
+    }
   }
   elsif (! /^([^:\s]+):\s*/)
   { @c=caller;
@@ -774,7 +796,7 @@ sub Del($$;$)
 
 Extract the email addresses from the headers
 specified by the array I<headenames>
-and return a B<cs::Set>
+and return a hashref
 keyed on the B<I<user>@I<host>> component.
 
 =cut
@@ -782,13 +804,13 @@ keyed on the B<I<user>@I<host>> component.
 sub Addrs
 { my($this,@hdrlist)=@_;
 
-  my $addrs = new cs::Set;
+  my $addrs = {};
 
   HEAD:
   for my $head (@hdrlist)
   { my @h = $this->Hdr($head);
     for my $h (@h)
-    { $addrs->AddSet(addrSet($h));
+    { ::addHash($addrs,addrSet($h));
     }
   }
 
@@ -898,7 +920,7 @@ sub PickHdr	# (header-names) -> first-non-empy
   local($_);
 
   for my $hdr (@_)
-  { return $_ if defined($_=$this->Hdr($hdr));
+  { return $_ if defined($_=$this->Hdr($hdr)) && length;
   }
 
   undef;
@@ -907,18 +929,18 @@ sub PickHdr	# (header-names) -> first-non-empy
 sub GetAddrs
 { my($this,@hdrs)=@_;
 
-  return new cs::Set if ! @hdrs;
+  return {} if ! @hdrs;
 
   my $addrs = addrSet(scalar($this->Hdr(shift(@hdrs))));
 
   for my $hdr (@hdrs)
-  { $addrs->AddSet(addrSet(scalar($this->Hdr($hdr))));
+  { ::addHash($addrs,addrSet(scalar($this->Hdr($hdr))));
   }
 }
 
-sub Reply_To(\%)	{ PickHdr(shift,REPLY_TO,FROM); }
-sub Errors_To		{ PickHdr(shift,ERRORS_TO,FROM); }
-sub Followups_To	{ PickHdr(shift,FOLLOWUPS_TO,NEWSGROUPS); }
+sub Reply_To($)		{ shift->PickHdr(REPLY_TO,FROM); }
+sub Errors_To($)	{ shift->PickHdr(RETURN_PATH,ERRORS_TO,SENDER,FROM); }
+sub Followups_To($)	{ shift->PickHdr(FOLLOWUPS_TO,NEWSGROUPS); }
 
 sub Reply($;$$)
 { my($this,$how,$myaddrs)=@_;
@@ -927,24 +949,25 @@ sub Reply($;$$)
 
   my $rep = new cs::RFC822;
 
-  my $to = new cs::Set;
-  my $cc = new cs::Set;
-  my $ng = new cs::Set;
-  my $bcc= new cs::Set;
+  my $to = {};
+  my $cc = {};
+  my $ng = {};
+  my $bcc= {};
 
   for (ref $how ? @$how : $how)
   { if ($_ eq AUTHOR)
-    { $to->AddSet(addrSet($this->Reply_To()));
+    { ::addHash($to,addrSet($this->Reply_To()));
     }
     elsif ($_ eq ALL)
-    { $to->AddSet(addrSet($this->Reply_To()));
-      $cc->AddSet(addrSet($this->Hdr(TO)
-			 .", ".$this->Hdr(CC)));
+    { ::addHash($to,addrSet($this->Reply_To()));
+      ::addHash($cc,addrSet($this->Hdr(TO)
+			            .", "
+				    .$this->Hdr(CC)));
 
-      $ng->AddSet(ngSet($this->Followups_To()));
+      $ng->Set(ngSet($this->Followups_To())->Members());
     }
     elsif ($_ eq ERROR)
-    { $to->AddSet(addrSet($this->Errors_To()));
+    { ::addHash($to,addrSet($this->Errors_To()));
     }
     else
     { warn "$::cmd: unknown reply style \"$_\"";
@@ -952,17 +975,19 @@ sub Reply($;$$)
   }
 
   # clean duplicates
-  map($cc->DELETE($_),$to->KEYS());
+  map(delete $cc->{$_}, keys %$to);
 
   # clean self references
   if (length $myaddrs)
-  { map($cc->DELETE($_),addrSet($myaddrs)->KEYS());
+  { map(delete $cc->{$_}, addrSet($myaddrs)->KEYS());
   }
 
-  $rep->Add(TO,join(",\n\t",$to->Values()))	if $to->KEYS();
-  $rep->Add(CC,join(",\n\t",$cc->Values()))	if $cc->KEYS();
-  $rep->Add(BCC,join(",\n\t",$cc->Values()))	if $bcc->KEYS();
-  $rep->Add(NEWSGROUPS,join(",",$ng->Values()))	if $ng->KEYS();
+  $rep->Add(TO,$to)			if keys %$to;
+  $rep->Add(CC,$cc)			if keys %$cc;
+  $rep->Add(BCC,$bcc)			if keys %$bcc;
+  { my @ng = $ng->Members();
+    $rep->Add(NEWSGROUPS,\@ng)		if @ng;
+  }
 
   $rep->Add(SUBJECT,"Re: ".normsubject(scalar($this->Hdr(SUBJECT))));
 
