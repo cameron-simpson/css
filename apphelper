@@ -204,7 +204,6 @@ fi
 
 if [ $extract ]
 then
-  set -x
   if mtype=`file2mime "$file"` \
   && action=`mailcap -s "$file" "$mtype" unpack !gui`
   then
@@ -223,13 +222,11 @@ then
 	  sep=-o
 	done
 	shift
-	set -x
 	exec find . -type f -size +0 \( "$@" \) -print -exec "$0" {} $apphopts -A v ';'
       )
       rm -rf "$xdir"
       exit
   fi
-  set +x
 fi
 
 fbase=`basename "$file"`
