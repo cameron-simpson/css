@@ -27,7 +27,7 @@ s|^=author[ 	][	]*\(.*\)|=begin html\
 b done
 
 :nauthor
-/^=modtime/!b nmodtime
+/^=modtime/!b nmod
 s|^=modtime[ 	][	]*\(.*\)|=begin html\
 \
 <SMALL>Last modified: \1</SMALL><BR>\
@@ -35,6 +35,6 @@ s|^=modtime[ 	][	]*\(.*\)|=begin html\
 =end html|
 b done
 
-:nmodtime
+:nmod
 
 :done
