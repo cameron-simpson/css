@@ -23,8 +23,8 @@ $::Usage="Usage: $::cmd [-owt] [-x lx] [-y ly] [-n nitems] [words...] <imlist
 $::DoStat=0;
 $::AndWords=1;
 $::PickN=1;
-$::MinX=0;
-$::MinY=0;
+$::MinX=1;
+$::MinY=1;
 undef $::Aspect;
 
 { my $badopts=0;
@@ -48,6 +48,9 @@ undef $::Aspect;
   die $::Usage if $badopts;
 }
 
+$::MinX=1 if $::MinX < 1;
+$::MinY=1 if $::MinY < 1;
+
 @::IM=();	# list of image paths
 @::IMOffset=();	# list of float image offsets
 
@@ -65,18 +68,23 @@ while (<STDIN>)
 
   my ($dx,$dy,$impath)=($1,$2,$3);
 
-  next IM if $::MinX > 0 && $dx < $::MinX;
-  next IM if $::MinY > 0 && $dy < $::MinY;
+  # skip small images
+  next IM if $dx < $::MinX;
+  next IM if $dy < $::MinY;
+
+  # skip images that are the wrong shape
   next IM if defined $::Aspect
 	  && (   ( $::Aspect eq PORTRAIT && $dx > $dy )
 	      || ( $::Aspect eq LANDSCAPE && $dy > $dx )
 	     );
 
+  # skip !words
   REJECT:
   for my $re (@::NotWords)
   { next IM if $impath =~ $re;
   }
 
+  # skip if missing required words
   if ($::AndWords)
   { TRY_AND:
     for my $re (@::Words)
@@ -95,6 +103,7 @@ while (<STDIN>)
     next IM if !$ok;
   }
 
+  # image is ok, add to list
   push(@::IM,$impath);
   push(@::IMOffset,$offset);
 
