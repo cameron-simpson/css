@@ -608,6 +608,32 @@ sub Read($$)
   return @additional;
 }
 
+=item ReadField(I<fieldname>)
+
+Wrapper for the B<Read()> method
+which collects the specified I<field> from the database entry
+as a single value
+(concatenating multiple lines).
+
+=cut
+
+sub ReadField($$)
+{ my($this,$field)=@_;
+
+  my $cat = $this->Category();
+  return undef if ! defined $cat;
+
+  my @e = grep(s/^$field=//, $this->Read($cat));
+  return undef if ! @e;
+
+  my $v = join('',@e);
+
+  $v =~ s/^\s+//;
+  $v =~ s/\s+$//;
+
+  $v;
+}
+
 # stash the results of a look up
 sub _Cache
 { my($this,$category,$discid,@lines)=@_;
@@ -686,6 +712,53 @@ sub Category($)
   return $cat;
 }
 
+=item DTitle()
+
+<B>DISCOURAGED</B>
+
+Return the Artist/Title field B<DTITLE> from the CDDB record.
+This is a really fucking stupid idea;
+these should be completely separate fields
+but obviously the CDDB designer had no brain.
+
+Please use the B<Artist()> and B<Title()> methods instead;
+sadly they are mere wrappers for this method
+but at least we can pretend the db was well designed.
+
+=cut
+
+sub DTitle()
+{ my($this)=@_;
+
+  return $this->{DTITLE} if exists $this->{DTITLE};
+
+  local($_);
+
+  $_ = $this->ReadField(DTITLE);
+  return undef if ! defined;
+
+  $this->{DTITLE}=$_;
+
+  if (
+      m:(.*)\s+/\s+:
+   || m:(.*)/\s+:
+   || m:(.*)/+:
+     )
+  { $this->{ARTIST}=$1;
+    $this->{TITLE}=$';
+
+    $this->{ARTIST} =~ s:\s*/+\s*: -- :g;
+    $this->{TITLE} =~ s:\s*/+\s*: -- :g;
+  }
+  else
+  { warn "$0: bad DTITLE: $this->{DTITLE}\n\tsetting ARTIST == TITLE\n";
+    $this->{ARTIST}=$_;
+    $this->{TITLE}=$_;
+  }
+
+  $this->{DTITLE};
+}
+
 =item Artist()
 
 Return the disc's artist.
@@ -695,23 +768,9 @@ Return the disc's artist.
 sub Artist()
 { my($this)=@_;
 
-  return $this->{ARTIST} if exists $this->{ARTIST};
-
-  my $cat = $this->Category();
-  return undef if ! defined $cat;
-
-  my @e = $this->Read($cat);
-  return undef if ! @e;
-
-  for (@e)
-  { if (m:^DTITLE=\s*([^/]*[^/\s])\s*\/\s*:)
-    { $this->{ARTIST}=$1;
-      $this->{TITLE}=$';
-      return $1;
-    }
-  }
-
-  return undef;
+  my $dtitle = $this->DTitle();
+  return undef if ! defined $dtitle;
+  return $this->{ARTIST};
 }
 
 =item Title()
@@ -723,23 +782,9 @@ Return the disc's title.
 sub Title()
 { my($this)=@_;
 
-  return $this->{TITLE} if exists $this->{TITLE};
-
-  my $cat = $this->Category();
-  return undef if ! defined $cat;
-
-  my @e = $this->Read($cat);
-  return undef if ! @e;
-
-  for (@e)
-  { if (m:^DTITLE=\s([^/]*[^\s/])\s*\/\s*:)
-    { $this->{ARTIST}=$1;
-      $this->{TITLE}=$';
-      return $2;
-    }
-  }
-
-  return undef;
+  my $dtitle = $this->DTitle();
+  return undef if ! defined $dtitle;
+  return $this->{TITLE};
 }
 
 =item NTracks()
