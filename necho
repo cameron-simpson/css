@@ -10,6 +10,6 @@ case $ARCH in
 esac
 
 if [ $sysv ]
-then  echo "$*\\b"
+then  echo "$*\\c"
 else  echo -nE "$*"
 fi
