@@ -1,0 +1,48 @@
+#!/bin/sh
+#
+# hzp - print files containing regexp with regexp highlighted
+#
+
+cmd=`basename "$0"`
+usage="Usage: $cmd [-w] [-i] [-lzopt] regexp files
+	-w	Highlight full word from partial match.
+	-i	Case insensitive.
+	-lzopt	Any simple lz option."
+
+badopts=
+egflags=
+hflags=
+lzflags=
+while :
+do  case $1 in
+	-w)	hflags="$hflags $1" ;;
+	-i)	hflags="$hflags $1" egflags="$egflags $1" ;;
+	-*)	lzflags="$lzflags $1" ;;
+	*)	break ;;
+    esac
+    shift
+done
+
+if [ $# -lt 1 ]
+then	echo "$cmd: missing regexp" >&2
+	echo "$usage" >&2
+	exit 1
+fi
+
+regexp=$1; shift
+
+if [ $# -lt 1 ]
+then	echo "$cmd: no filenames"
+	echo "$usage" >&2
+	exit 1
+fi
+
+set x `egrep -l $egflags "$regexp" $*`; shift
+
+if [ $# -lt 1 ]
+then	echo "$cmd: no files contain the regexp \"$regexp\"" >&2
+	exit 1
+fi
+
+set -x
+exec lz $lzflags -f "highlight $hflags '$regexp' | aps -T \"\$arg\"" $*
