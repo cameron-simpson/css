@@ -1,0 +1,92 @@
+#!/bin/sh
+#
+# Generate a snapshot of the new files in a distribution.
+# Uses chkfiles to track state. Writes a cpio file of the new files.
+#	- Cameron Simpson <cs@zip.com.au> 01sep96
+#
+
+snapdir=$HOME/etc/snap
+
+cmd=`basename "$0"`
+usage="Usage: $cmd dist"
+
+tmp=${TMPDIR-/tmp}/$cmd.$$
+sedcmd='s/^[^ ]*  *[^ ]*  *//'
+
+badopts=
+
+if [ $# = 0 ]
+then echo "$cmd: missing distribution" >&2
+     badopts=1
+else dist=$1
+     shift
+
+     if [ $# -gt 0 ]
+     then echo "$cmd: extra arguments: $*" >&2
+	  badopts=1
+     fi
+fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+distfile=$snapdir/$dist
+
+>>"$distfile"
+
+if [ ! -f "$distfile" ]
+then
+    echo "$cmd: $distfile: not a regular file" >&2
+    exit 1
+fi
+
+flist=$tmp.f
+nflist=$tmp.nf
+ndist=$tmp.n
+cleanup="rm -f $flist $nflist $ndist"
+
+trap "$cleanup" 1 2 15
+
+sed "$sedcmd" $distfile >$flist
+
+chkfiles -u $distfile <$flist >$ndist
+
+sort -u -o $ndist $ndist
+
+sort $distfile | comm -23 $ndist - | sed "$sedcmd" >$nflist
+
+[ -s "$nflist" ] || { eval "$cleanup"; exit 0; }
+
+old=`fls '%m' "$distfile"`
+cp "$distfile" "$distfile.$old" || { echo "$cmd: can't save old distfile for \"$dist\", aborting" >&2
+				     eval "$cleanup"
+				     exit 1
+				   }
+
+cat "$ndist" >"$distfile" || { eval "$cleanup"; exit 1; }
+
+if [ -t 1 ]
+then  cpiof=cpiof
+      echo "$cmd: stdout is a tty - saving in $cpiof" >&2
+      if [ -f "$cpiof" ]
+      then
+	echo "$cmd: $cpiof exists" >&2
+	ls -ld "$cpiof" >&2
+	exit 1
+      fi
+
+      >>"$cpiof"
+      if [ ! -w "$cpiof" ]
+      then
+	echo "$cmd: can't write to $cpiof" >&2
+	exit 1
+      fi
+
+      exec >"$cpiof"
+fi
+
+cpio -ocv <$nflist
+xit=$?
+
+eval "$cleanup"
+
+exit $xit
