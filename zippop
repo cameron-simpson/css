@@ -1,2 +1,2 @@
 #!/bin/sh
-exec nphssh pop_dsa-cisra2zip zip
+exec nphssh "dsa-pop-${SYSTEMID}2zip" zip
