@@ -17,7 +17,9 @@ cd
 	  -t 900 \
 	  --logfile "$HOME/var/log/fetchmail" \
 	  --nobounce --tracepolls --warnings 86400
-  fetchmail "$@" -l 65536 $fmopts $fmhosts
-  acon fetchmail "$@" -d "$fmdelay" $fmopts $fmhosts
+  ( fetchmail "$@" -l 65536 $fmopts $fmhosts
+    sleep 60
+    acon fetchmail "$@" -d "$fmdelay" $fmopts $fmhosts
+  ) &
 )
 alog procmail lock -1 getmail-despool nice getmail-flush -p 300 spool
