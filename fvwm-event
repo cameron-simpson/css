@@ -1,0 +1,41 @@
+#!/bin/sh
+#
+# Handle events reported by FvwmEvent.
+#	- Cameron Simpson <cs@zip.com.au> 03nov2004
+#
+
+cmd=$0
+usage="Usage: $cmd {-|event [args...]}"
+
+##acon echo "$0 $*"
+
+[ $# = 0 ] && { echo "$cmd: missing event" >&2; echo "$usage" >&2; exit 2; }
+
+doevent()
+{
+  event=$1; shift
+  case "$event" in
+    enter_window|leave_window)
+	wid=$1; shift
+	winjob=`WINDOWID=$wid curjob`
+	case "$event" in
+	  enter_window)
+	    job "$winjob"
+	    ;;
+	  leave_window)
+	    ;;
+	  *)echo "$0: unhandled event \"$event\"" >&2; exit 2
+	    ;;
+	esac
+	;;
+  esac
+}
+
+if [ "x$*" = x- ]
+then
+    while read eventline
+    do  doevent $eventline
+    done
+else
+    doevent "$@"
+fi
