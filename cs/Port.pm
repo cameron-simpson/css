@@ -16,6 +16,8 @@ use cs::Hier;
 
 package cs::Port;
 
+@cs::Port::ISA=();
+
 sub new
 { my($class,$source,$sink)=@_;
 
@@ -45,10 +47,12 @@ sub new
     $sink->{FLAGS}&=~$cs::IO::F_NOCLOSE;
   }
 
-  bless { IN => $source,
-	  OUT => $sink,
+  bless { cs::Port::IN => $source,
+	  cs::Port::OUT => $sink,
 	}, $class;
 }
+
+sub DESTROY{}
 
 $cs::Port::_Handle='Handle0000';
 sub _portHandle
@@ -56,18 +60,20 @@ sub _portHandle
 }
 
 # stubs to treat a Port object as a Source or Sink
-sub Source	{ shift->{IN}; }
-sub SourceHandle{ shift->{IN}->Handle(); }
-sub Sink	{ shift->{OUT}; }
-sub SinkHandle	{ shift->{OUT}->Handle(); }
-sub Get		{ my($this)=shift; $this->{IN}->Get(@_); }
-sub GetLine	{ my($this)=shift; $this->{IN}->GetLine(@_); }
-sub GetContLine	{ my($this)=shift; $this->{IN}->GetContLine(@_); }
-sub Put		{ my($this)=shift; $this->{OUT}->Put(@_); }
-sub PutFlush	{ my($this)=shift; $this->{OUT}->Put(@_);
-				   $this->{OUT}->Flush(); }
-sub Flush	{ my($this)=shift; $this->{OUT}->Flush(@_); }
-sub Read	{ my($this)=shift; $this->{IN}->Read(@_); }
-sub NRead	{ my($this)=shift; $this->{IN}->NRead(@_); }
+sub Source	{ shift->{cs::Port::IN}; }
+sub Sink	{ shift->{cs::Port::OUT}; }
+
+sub SourceHandle{ shift->Source()->Handle(); }
+sub SinkHandle	{ shift->Sink()->Handle(); }
+
+sub Get		{ my($this)=shift; $this->Source()->Get(@_); }
+sub GetLine	{ my($this)=shift; $this->Source()->GetLine(@_); }
+sub GetContLine	{ my($this)=shift; $this->Source()->GetContLine(@_); }
+sub Put		{ my($this)=shift; $this->Sink()->Put(@_); }
+sub PutFlush	{ my($this)=shift; $this->Sink()->Put(@_);
+				   $this->Sink()->Flush(); }
+sub Flush	{ my($this)=shift; $this->Sink()->Flush(@_); }
+sub Read	{ my($this)=shift; $this->Source()->Read(@_); }
+sub NRead	{ my($this)=shift; $this->Source()->NRead(@_); }
 
 1;
