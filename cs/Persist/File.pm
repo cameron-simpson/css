@@ -28,50 +28,50 @@ $cs::Persist::File::DEBUG=0;
 $cs::Persist::File::CvsPath='/usr/local/bin/cvs';
 
 sub TIEHASH
-	{
-	  my($class,$fname,$rw,@c)=@_;
-	  $rw=0 if ! defined $rw;
-	  @c=caller if ! @c;
+{
+  my($class,$fname,$rw,@c)=@_;
+  $rw=0 if ! defined $rw;
+  @c=caller if ! @c;
 
-	  warn "empty rm from [@c]" if ! length $rw;
+  warn "empty rm from [@c]" if ! length $rw;
 
-	  my $this;
+  my $this;
 
-	  if (defined ($this=cs::Persist::_reg($fname)))
-		{ $this->SetReadWrite($rw) if $rw;
-		  return $this;
-		}
+  if (defined ($this=cs::Persist::_reg($fname)))
+  { $this->SetReadWrite($rw) if $rw;
+    return $this;
+  }
 
-	  $this    ={ LIVE	=> {},	# live copy, seen by caller
-		      META	=> {},
-		      FNAME	=> $fname,
-		      FLAGS	=> (new cs::Flags @cs::Persist::DfltFlags),
-		      DEBUG	=> 0,
-		      CALLER	=> [ @c ],
-		      CHANGELOG	=> [],
-		    };
+  $this    ={ LIVE	=> {},	# live copy, seen by caller
+	      META	=> {},
+	      FNAME	=> $fname,
+	      FLAGS	=> (new cs::Flags @cs::Persist::DfltFlags),
+	      DEBUG	=> 0,
+	      CALLER	=> [ @c ],
+	      CHANGELOG	=> [],
+	    };
 
-	  bless $this, $class;
+  bless $this, $class;
 
-	  $this->_Register($fname);
+  $this->_Register($fname);
 
-	  ## warn "TIEHASH(fname=$fname,rw=$rw)";
-	  $this->SetReadWrite($rw);
-	  $this->_Load($fname) || $this->SetReadWrite(0);
+  ## warn "TIEHASH(fname=$fname,rw=$rw)";
+  $this->SetReadWrite($rw);
+  $this->_Load($fname) || $this->SetReadWrite(0);
 
-	  $this;
-	}
+  $this;
+}
 
 sub DESTROY
-	{
-	  my($this)=@_;
+{
+  my($this)=@_;
 
-	  ## warn "DESTROY($this->{FNAME},FLAGS=@{$this->Flags()})\n";
+  ## warn "DESTROY($this->{FNAME},FLAGS=@{$this->Flags()})\n";
 
-	  return if ! $this->IsReadWrite();
-	  $this->Sync();
-	  $this->_Unregister($this->{FNAME});
-	}
+  return if ! $this->IsReadWrite();
+  $this->Sync();
+  $this->_Unregister($this->{FNAME});
+}
 
 sub Sync
 { my($this,$force)=@_;
@@ -193,10 +193,10 @@ sub WriteSelf
 	  return undef;
 	}
 
-#	  if (defined $ENV{USER} && $ENV{USER} eq 'cameron')
-#	  	{ my(@c)=caller;
-#	  	  warn "WriteSelf($fname) from [@c]";
-#		}
+#  if (defined $ENV{USER} && $ENV{USER} eq 'cameron')
+#  	{ my(@c)=caller;
+#  	  warn "WriteSelf($fname) from [@c]";
+#	}
 
   { my $s;
 
