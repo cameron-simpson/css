@@ -94,6 +94,30 @@ while (defined($_=<STDIN>))
       $im->string($font,$x,$y,$txt,$fg);
     }
   }
+  elsif ($op eq CENTRE)
+  { if (@args != 4)
+    { warn "$pfx: expected CX CY DX DY\n";
+      $ok=0;
+    }
+    else
+    { my($cx,$cy,$dx,$dy)=(xval(shift(@args)),yval(shift(@args)),
+			   xval(shift(@args)),yval(shift(@args)));
+
+      my $lx = int($cx - $dx/2 + 0.5);	$lx=0 if $lx < 0;
+      my $rx = int($cx + $dx/2 + 0.5);	$rx=$::DX-1 if $rx >= $::DX;
+
+      my $ly = int($cy - $dy/2 + 0.5);	$ly=0 if $ly < 0;
+      my $ry = int($cy + $dy/2 + 0.5);	$ry=$::DY-1 if $ry >= $::DY;
+
+      $dx = $rx-$lx+1;
+      $dy = $ry-$ly+1;
+
+      my $nim = new GD::Image($dx,$dy);
+      $nim->copy($im,0,0,$lx,$ly,$dx,$dy);
+      $im=$nim;
+      ($::DX,$::DY)=$im->getBounds();
+    }
+  }
   else
   { warn "$pfx: unknown operation\n";
     $ok=0;
