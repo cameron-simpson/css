@@ -62,6 +62,15 @@ esac
     kirsty@home) br=ff10 ;;
     *)           br=ff10 ;;	## ff08
   esac
-  exec "$br" -width "$FULLX" -height "$PIX_HIGH" ${1+"$@"}
+  bm=$HOME/.mozilla/firefox/subdir/bookmarks.html
+  rcbm=$HOME/rc/web/bookmarks.html
+  [ "$rcbm" -nt "$bm" ] && cp "$rcbm" "$bm"
+  "$br" -width "$FULLX" -height "$PIX_HIGH" ${1+"$@"}
+  if [ -s "$bm" ]
+  then
+      ( cd $HOME/rc/web || exit 1
+	LIVE_BOOKMARKS=$bm myke _bookmarks
+      )
+  fi
 ) &
 echo $! >"$pidfile"
