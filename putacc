@@ -9,7 +9,7 @@ host=$1; shift
 
 cd || exit 1
 set -x
-exec rsync -avHP --delete \
+exec rsync -avCHP --delete \
 	'--include=/.bash_logout' \
 	'--include=/.bash_profile' \
 	'--include=/.bashrc' \
