@@ -122,7 +122,8 @@ and the mail item is forwarded to that address instead of being dropped in a fol
 If instead of a I<folder>
 a pipe (`B<|>') and a program name are used
 then the message is piped to the specified program.
-The I<tag> is supplied as the sole command line argument to the I<program>.
+The I<tag> is supplied as the sole command line argument to the I<progname>,
+unless the I<tag> is "B<.>" in which case it is omitted.
 
 The I<tag> is placed at the start of the mail's B<Subject> line for ready recognition in mixed folders
 unless the B<-L> option is used,
@@ -130,6 +131,11 @@ in which case it is placed in the B<X-Label:> header line.
 The special tag dot (".") suppresses this action.
 
 The I<pattern> selects the mail items.
+
+The I<folder> or I<who@where> or I<|progname> may be enclosed in double quotes
+if desired,
+for example if the folder name or program invocation contains whitespace.
+Note that the quotes do not enclose the leading "B<+>" or "B<!>".
 
 =head2 Example Patterns
 
@@ -360,7 +366,7 @@ sub readcats($;$)
       $_=$';
 
       if (! defined $::DfltAlert || ! length $::DfltAlert)
-      { warn "$::cmd: line $.: no alert shell command defined1\n";
+      { warn "$::cmd: line $.: no alert shell command defined!\n";
 	$doalert=0;
       }
     }
@@ -403,7 +409,7 @@ sub readcats($;$)
     my $hregexp = '('.join('|',@hdrs).')';
 
     if ($folder =~ /^\|/)
-    { $deliver="$folder '$key'";
+    { $deliver=($key eq '.' ? $folder : "$folder '$key'");
       undef $lockfile;
     }
     elsif ($folder =~ /\@/)
