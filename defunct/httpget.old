@@ -1,0 +1,239 @@
+#!/usr/bin/perl
+#
+# Collect a file via HTTP.
+#	- Cameron Simpson <cs@zip.com.au>
+#
+
+use strict qw(vars);
+
+use cs::Misc;
+use cs::URL;
+use cs::Persist;
+use cs::MIME;
+use cs::HTTP;
+use cs::HTTP::Auth;
+use cs::RFC822;
+use cs::Source;
+use cs::Pathname;
+use cs::Netscape;
+
+$::Debug=0;
+$::NBase=1;
+$::Delay=0;
+
+$::Usage="Usage: $::cmd [-d] [+d] [-p proxyhost[:port]] [-o out] url \\
+		[-e exec-list]
+	-b n			Use last n components of URL (default: $::NBase).
+	-d			Emit decoded data (default).
+	+d			Emit raw data.
+	-D delay		Delay between successive fetches (default: $::Delay).
+	--debug			Turn on some debugging.
+	-h			Prepend headers to output.
+	+h 'hdr: value'		Add headers to request.
+	-p proxyhost[:port]	Proxy to do the GET.
+	-o out			Output file (default basename of url).
+	-w wait			Wait this many seconds between requests.
+	-v			Verbose.
+	url			URL to fetch (\"-\" to read stdin).
+	-e exec-list		Command to which to pipe body.
+				Headers become \$HTTP_headername in environment.
+";
+
+my($badopts)=0;
+@::Proxy=();
+@::ExecList=();
+
+undef $::proxy;
+undef $::output;
+$::decodeContent=1;
+$::printHeaders=0;
+$::CookieDB="$ENV{HOME}/private/httpcookie.db";
+$::auth=new cs::HTTP::Auth "$ENV{HOME}/private/httpauth.db";
+@::hdrLines=();
+$::Verbose=0;
+
+ARG:
+  while (@ARGV)
+  { $_=shift(@ARGV);
+    if ($_ eq '-b')	{ $::NBase=shift(@ARGV)+0; }
+    elsif ($_ eq '-d')	{ $::decodeContent=1; }
+    elsif ($_ eq '+d')	{ $::decodeContent=0; }
+    elsif ($_ eq '+D')	{ $::Delay=0; }
+    elsif ($_ eq '-D')	{ $::Delay=shift(@ARGV)+0; }
+    elsif ($_ eq '--debug'){ $::Debug=1; $cs::HTTP::Debug=1; }
+    elsif ($_ eq '-h')	{ $::printHeaders=1; }
+    elsif ($_ eq '+h')	{ push(@::hdrLines,shift(@ARGV)); }
+    elsif ($_ eq '-o')	{ $::output=shift(@ARGV); }
+    elsif ($_ eq '-p')	{ $::proxy=shift(@ARGV); }
+    elsif ($_ eq '-w')	{ $::rqddelay=shift(@ARGV)+0; }
+    elsif ($_ eq '-v')	{ $::Verbose=1; }
+    elsif ($_ eq '--')
+	  { last ARG;
+	  }
+    elsif (/^-./)
+	  { warn "$::cmd: unrecognised option: $_\n";
+	    $badopts=1;
+	  }
+    else
+    { unshift(@ARGV,$_);
+      last ARG;
+    }
+  }
+
+if (! defined $::proxy)
+{ $::proxy=$ENV{WEBPROXY} if ! defined $::proxy && defined $ENV{WEBPROXY};
+  warn "$::cmd: no proxy setting (\$WEBPROXY)\n" if ! length $::proxy;
+}
+
+if (! @ARGV)
+{ warn "$::cmd: missing url\n";
+  $badopts=1;
+}
+else
+{ @::URLs=shift(@ARGV);
+}
+
+if (@ARGV && $ARGV[0] eq '-e')
+{ shift(@ARGV);
+  if (! @ARGV)
+  { warn "$::cmd: missing exec-list\n";
+    $badopts=1;
+  }
+  else
+  { @::ExecList=@ARGV;
+    @ARGV=();
+  }
+}
+else
+{ push(@::URLs,@ARGV);
+}
+
+if (@::URLs > 1
+ && defined $::output)
+{ warn "$::cmd: can't use -o with multiple URLs\n";
+  $badopts=1;
+}
+
+if (@::ExecList && defined $::output)
+{ warn "$::cmd: can't use -o and -e\n";
+  $badopts=1;
+}
+
+if (defined $::proxy && length $::proxy)
+{ if ($::proxy =~ /:/)	{ @::Proxy=($`,$'); }
+  else			{ @::Proxy=($::proxy,80); }
+}
+
+die $::Usage if $badopts;
+
+my($Xit)=0;
+
+my $firstURL = 1;
+
+$::Now=time;
+@::Cookies=cs::Netscape::cookies();
+
+URL:
+while (@::URLs)
+{ my $url = shift(@::URLs);
+
+  # handle stdin
+  if ($url eq '-')
+  { if (defined ($url=<STDIN>))
+    { chomp($url);
+      unshift(@::URLs,$url,'-');
+    }
+
+    next URL;
+  }
+
+  if (! $firstURL) { sleep($::Delay) if $::Delay > 0; }
+  $firstURL=0;
+
+  my($U,$rversion,$rcode,$rtext,$M)=cs::URL::get($url,1);
+  if (! defined $U)
+  { $::Xit=1;
+    next URL;
+  }
+
+  # put the result somewhere
+  if (@::ExecList)
+  { my($pid);
+
+    if (! defined ($pid=open(CHILD,"|-")))
+    { warn "$::cmd: can't pipe/fork to [@::ExecList] for $url: $!\n";
+      $::Xit=1;
+      next URL;
+    }
+
+    if ($pid == 0)
+    # child - rig env and exec
+    { for my $hdr ($M->HdrNames())
+      { $ENV{'HTTP_'.cs::RFC822::hdrkey($hdr)}=$M->Hdr($hdr);
+      }
+
+      exec(@::ExecList) || die "$::cmd: exec(@::ExecList): $!";
+    }
+  }
+  else
+  { 
+    my $outfile;
+
+    if (! defined $::output || ! length $::output)
+    { my $eurl = $url;
+      if ($eurl =~ m:/$:)	{ $eurl.='index.html'; }
+
+      my($ebase)='';
+      my($nb)=$::NBase;
+      while ($nb-- > 0 && $eurl =~ m:/+[^/]+$:)
+      { $ebase=$&.$ebase;
+	$eurl=$`;
+      }
+
+      $ebase =~ s:^/+::;
+
+      my($edir)=cs::Pathname::dirname($ebase);
+      -d "$edir/."
+	    || cs::Pathname::makedir($edir,0777)
+	    || warn "$::cmd: mkdir($edir): $!\n";
+      $outfile=$ebase;
+      ## warn "save $url to \"$outfile\"...\n";
+    }
+    elsif ($::output eq '-')	
+    { undef $outfile;
+    }
+    else
+    { $outfile=$::output;
+    }
+
+    if (defined ($outfile))
+    { if (! open(CHILD,"> $outfile\0"))
+      { warn "$::cmd: can't write to $outfile: $!\n\tURL $url not saved\n";
+	$Xit=1;
+	next URL;
+      }
+    }
+    elsif (! open(CHILD,">&STDOUT"))
+    { warn "$::cmd: can't dup STDOUT: $!\n";
+      $Xit=1;
+      next URL;
+    }
+  }
+
+  if ($::printHeaders)
+  { for ($M->Hdrs())
+    { print CHILD $_, "\n";
+    }
+
+    print CHILD "\n";
+  }
+
+  print CHILD $M->Body();
+
+  if (! close(CHILD))
+  { warn "$::cmd: problem closing pipe to [@::ExecList] for $url: $!\n";
+    $Xit=1;
+  }
+}
+
+exit $Xit;
