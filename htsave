@@ -27,9 +27,13 @@ do  case $1 in
     shift
 done
 
-[ $badopts ] && { echo "$usage" >&2; exit 2; }
+if [ $# = 0 ]
+then
+    [ -n "$DISPLAY" ] && { set -- `xclip -o` || exit 1; }
+    [ $# = 0 ] && { echo "$cmd: no URLs and no default" >&2; badopts=1; }
+fi
 
-[ $# = 0 ] && { set x `cutbuffer`; shift; }
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
 
 xit=0
 
