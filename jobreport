@@ -4,11 +4,19 @@
 #	- Cameron Simpson <cs@zip.com.au> 01jul2003
 #
 
+cmd=$0
+usage="Usage: $cmd [scale]"
+
+scale=1.0
+case "$1" in
+  [0-9].[0-9])	scale=$1; shift ;;
+esac
+
 joblist name category total title \
 | sort -t'	' +2 +1 -n +0 \
 | awk -F'	' \
-      'BEGIN	{ nids=0 }
-       		{ id=$1; name=$2; cat=$3; total=$4; title=$5
+      "BEGIN	{ nids=0; scale=$scale }
+      "'	{ id=$1; name=$2; cat=$3; total=$4; title=$5
 		  if (total == "") total=0;
 		  ids[nids++]=id
 		  names[id]=name
@@ -19,11 +27,11 @@ joblist name category total title \
 		  cat_totals[cat]+=total
 		}
        END	{ for (cat in cat_totals)
-		  { print cat "\t" cat_totals[cat]
+		  { print cat "\t" int(cat_totals[cat]*scale)
 		    for (nid=0; nid<nids; nid++)
 		    { id=ids[nid]
 		      if (cats[id] == cat)
-		      { print ".\t" totals[id] "\t" names[id] ": " titles[id]
+		      { print ".\t" int(totals[id]*scale) "\t" names[id] ": " titles[id]
 		      }
 		    }
 		  }
