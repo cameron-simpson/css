@@ -33,15 +33,15 @@ fi
 if [ "x$*" = xALL ]
 then
     set -x
-    [ $dolog ] && iptables -A "$chain_in" -p tcp --destination-port "$dport" --syn -j LOGACCEPT
-    iptables -A "$chain_in" -p tcp --destination-port "$dport" -j ACCEPT
-    iptables -A "$chain_out" -p tcp --source-port "$dport" ! --syn -j ACCEPT
+    [ $dolog ] && iptables -I "$chain_in" -p tcp --destination-port "$dport" --syn -j LOGACCEPT
+    iptables -I "$chain_in" -p tcp --destination-port "$dport" -j ACCEPT
+    iptables -I "$chain_out" -p tcp --source-port "$dport" ! --syn -j ACCEPT
 else
     set -x
     for host in `hostips "$@"`
     do
-      [ $dolog ] && iptables -A "$chain_in" -p tcp -s "$host" --destination-port "$dport" --syn -j LOGACCEPT
-      iptables -A "$chain_in" -p tcp -s "$host" --destination-port "$dport" -j ACCEPT
-      iptables -A "$chain_out" -p tcp -d "$host" --source-port "$dport" ! --syn -j ACCEPT
+      [ $dolog ] && iptables -I "$chain_in" -p tcp -s "$host" --destination-port "$dport" --syn -j LOGACCEPT
+      iptables -I "$chain_in" -p tcp -s "$host" --destination-port "$dport" -j ACCEPT
+      iptables -I "$chain_out" -p tcp -d "$host" --source-port "$dport" ! --syn -j ACCEPT
     done
 fi
