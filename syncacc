@@ -44,6 +44,9 @@ exec \
 	'--include=/.zprofile' \
 	'--include=/.zshenv' \
 	'--include=/.zshrc' \
+	'--include=/man' \
+	'--include=/man/cs' \
+	'--exclude=/man/*' \
 	'--include=/rc' \
 	'--include=/rc/@' \
 	'--include=/rc/cvs' \
