@@ -34,6 +34,5 @@ lock -1 "vnc-$HOST$num@$SYSTEMID" \
 		-geometry 1600x1200 \
 		-name "$HOST$num @ $SYSTEMID" \
 		-alwaysshared \
-		-localhost \
 		-fp "$fontpath"
 
