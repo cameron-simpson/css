@@ -20,7 +20,7 @@ exec >/dev/tty 2>&1
   usage="Usage: $cmd [+mbox] [files...]
 	$cmd [-r] [-p pfx] addresses... [files...]"
 
-  cons=`logpath console`
+  cons=$CONSOLE
   exec >>"$cons" 2>&1
 
   op=maildrop
