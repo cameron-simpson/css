@@ -1,0 +1,58 @@
+#!/bin/sh
+#
+# Simple jukebox.
+# Runs a player in the background, reads keyword selections and commands
+# in the foreground.
+#	- Cameron Simpson <cs@zip.com.au> 01jun2002
+#
+
+cmd=`basename "$0"`
+
+playpid=
+
+runplayer()
+{
+  ( ok=1
+    subproc=
+    trap 'ok=; [ -n "$subproc" ] && kill $subproc; exit' 1 2 3 15
+    playlist=/tmp/$cmd.$$
+    while [ $ok ]
+    do
+	aulist -r $ptns >"$playlist"
+	exec <"$playlist"
+	rm -f "$playlist"
+	while [ $ok ] && read -r ogg
+	do  ogg123 -d oss "$ogg" &
+	    subproc=$!
+	    wait
+	    subproc=
+	done
+    done
+  ) &
+  playpid=$!
+}
+
+stopplayer()
+{ [ -n "$playpid" ] && { kill "$playpid"; playpid=; }
+}
+
+while read line
+do  
+    case "$line" in
+	'')	stopplayer
+		;;
+	.)	ptns=
+		stopplayer
+		sleep 1
+		runplayer
+		;;
+	*)
+		ptns=$line
+		stopplayer
+		sleep 1
+		runplayer
+		;;
+    esac
+done
+
+stopplayer
