@@ -1,22 +1,22 @@
 #!/bin/sh
 #
-# Check the message on stdin to see if it's tracked by a killfile.
-# Exit true if so, false if not. Add this message to the killfile if so
-# in order to kill this message's descendants too.
+# Check the message on stdin to see if it's tracked by a message-id file.
+# Exit true if so, false if not. Add this message to the message-id file if
+# so in order to track this message's descendants too.
 #	- Cameron Simpson <cs@zip.com.au> 16apr2002
 #
 
 cmd=$0
-usage="Usage: $cmd threadfile <mailitem"
+usage="Usage: $cmd idfile <mailitem"
 
 badopts=
 
 if [ $# = 0 ]
-then  echo "$cmd: missing threadfile" >&2; badopts=1
-else  threadfile=$1; shift
+then  echo "$cmd: missing idfile" >&2; badopts=1
+else  idfile=$1; shift
       if [ $# -gt 0 ]
       then
-	echo "$cmd: extra arguments after threadfile: $*" >&2
+	echo "$cmd: extra arguments after idfile: $*" >&2
 	badopts=1
       fi
 fi
@@ -33,7 +33,7 @@ re='^('`echo "$*" | tr ' ' '|'`')$'
 re=`echo "$re" | sed 's/\./\\\\./g'`
 
 ##set -x
-egrep "$re" <"$threadfile" >/dev/null || exit 1
+egrep "$re" <"$idfile" >/dev/null || exit 1
 
-echo "$HDR_MESSAGE_ID" >>"$threadfile"
+echo "$HDR_MESSAGE_ID" >>"$idfile"
 exit 0
