@@ -1,0 +1,25 @@
+#!/bin/sh
+
+doddir=$HOME/public/moto/dod
+
+rcs=
+who=
+q=
+while :
+do  case $1 in
+	-q)	q=$1; shift; continue ;;
+	[A-Z]*)	f=$doddir/mailrc.$1
+		if [ -r "$f" ]
+		then
+		    rcs="$rcs +m $f"
+		    who="$who $1DoD"
+		    shift
+		    continue
+		fi
+		;;
+    esac
+    break
+done
+
+set -x
+exec m $rcs $q $who ${1+"$@"}
