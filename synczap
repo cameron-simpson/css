@@ -28,7 +28,7 @@ commit=
 		''|\#*)	;;
 		*)	set ${1+"$@"} "$addr" ;;
 	  esac
-      done < $HOME/rc/adzap/syncusers
+      done < $dir/syncusers
     }
 
 changetmp=/tmp/change.$$
