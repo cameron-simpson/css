@@ -12,7 +12,7 @@ cats2procmailrc - generate a procmail recipe from my mail categories file
 
 =head1 SYNOPSIS
 
-cats2procmailrc [B<-L>] [B<-a> I<alert>] [B<-m> I<maildomains>] [B<-t> I<type>] E<lt>categories E<gt>procmailrc
+cats2procmailrc [B<-D>] [B<-L>] [B<-a> I<alert>] [B<-m> I<maildomains>] [B<-t> I<type>] E<lt>categories E<gt>procmailrc
 
 =head1 DESCRIPTION
 
@@ -36,7 +36,14 @@ I build my B<.procmailrc> like this:
 
 =over 4
 
-=item b<-L>
+=item B<-D>
+
+Insert a variation on the standard formail(1) recipe for deleting duplicates
+on a per-folder basis.
+For MH and Maildir folders, use a B<.msgid.cache> file within the folder,
+otherwise use the file B<MAILDIR/.msgid.cache-I<folder>>.
+
+=item B<-L>
 
 Put the tag into the B<X-Label> header field
 instead of as a prefix to the subject line.
@@ -195,6 +202,7 @@ $::Usage="Usage: $::cmd [-a alert] [-m domains] [-t {unix|mh|maildir}] <categori
 ";
 
 $::X_Label=0;
+$::FolderDups=0;
 $::DfltSfx="";		# unix style by default
 $::DfltType=UNIX;	# unix style by default
 @::DfltDom=$ENV{MAILDOMAIN};
@@ -203,9 +211,13 @@ $::RcvStore='/usr/lib/nmh/rcvstore';	# path to MH rcvstore command
 
 { my $badopts=0;
 
-  if (! getopts("a:Lm:t:"))
+  if (! getopts("a:DLm:t:"))
   { warn "$::cmd: bad options\n";
     $badopts=1;
+  }
+
+  if (defined $::opt_D)
+  { $::FolderDups=1;
   }
 
   if (defined $::opt_L)
@@ -252,6 +264,7 @@ my $type;
 my $flags;
 my $deliver;
 my $cont;
+my $lockfile;
 
 CAT:
 while (<STDIN>)
@@ -263,7 +276,7 @@ while (<STDIN>)
   next CAT if ! length;
 
   # VARIABLE=value
-  if (/^[a-z]\w*=/)
+  if (/^[a-z]\w*=/i)
   { print "$_\n";
     next CAT;
   }
@@ -284,6 +297,9 @@ while (<STDIN>)
     print "\n";
     next CAT;
   }
+
+  # implicit lockfile by default
+  $lockfile='';
 
   # leading "+" means continue after rule
   $cont='';
@@ -351,6 +367,7 @@ while (<STDIN>)
     if ($type eq MH)
     # procmail doesn't do .mh_sequences support
     { $deliver="| $::RcvStore +$folder -unseen";
+      $lockfile="$ENV{MAILDIR}/$folder/.procmail-lock";
     }
     else
     { $sfx=foldersfx($folder);
@@ -365,6 +382,20 @@ while (<STDIN>)
   { print "* ^$hregexp:.*$ptn\n";
   }
   print "{\n";
+
+  if ($::FolderDups && $deliver !~ /^\!/)
+  {
+    my $cache = ( $type eq MH || $type eq MAILDIR
+		? "$ENV{MAILDIR}/$folder/.msgid.cache"
+		: "$ENV{MAILDIR}/.msgid.cache-$folder"
+		);
+    print <<X
+
+  :0 Wh: $cache.lock
+  | formail -D 819200 $cache
+X
+;
+  }
 
   if ($doalert)
   { my $alertfn = $::DfltAlert;
@@ -383,8 +414,9 @@ X
     if ($::X_Label)
     {
       print <<X
+
   :0 whf
-  | formail -A "X-Label: $key" 
+  | formail -f -A "X-Label: $key" 
 X
       ;
     }
@@ -401,7 +433,7 @@ X
 
   print <<X
 
-  : 0$flags:
+  : 0$flags:$lockfile
   $deliver
 X
   ;
