@@ -5,6 +5,7 @@
 #
 
 : ${TMPDIR:=/tmp}
+: ${LOGDIR:=$HOME/var/log}
 : ${FVWM_MENU_IMLIST_OP:=xv}
 
 ##thsize=16x16
@@ -20,10 +21,10 @@ usage="Usage: $cmd [-N] [-d dir] [-l filelist] [XxY] menuname [filecmd [args...]
 	XxY	Thumnbail size. Default: $thsize"
 
 ##alert "#=$# $0 $*"
-##exec 2>>$HOME/var/log/alert
+##exec 2>>$LOGDIR/alert
 
 ##alert "DFLT=[$FVWM_MENU_IMLIST_OP]"
-##env|grep FVWM >>$HOME/var/log/alert
+##env|grep FVWM >>$LOGDIR/alert
 
 filelist=
 inter=
