@@ -11,8 +11,9 @@ mirror=mirror.aarnet.edu.au
 updates=redhat/linux/updates
 rsopts=
 rsvopts=
+verbose=
 rsdelopts='--delete --delete-excluded'
-[ -t 1 ] && rsvopts=-P
+[ -t 1 ] && rsvopts=-vP
 
 cmd=`basename "$0"`
 usage="Usage: $cmd [-n] [-v] [-r release] [-m mirror] [--delete] [--delete-excluded]
@@ -28,7 +29,7 @@ while :
 do
   case $1 in
     -n)	rsvopts=-vn ;;
-    -v)	rsvopts=-vP ;;
+    -v)	rsvopts=-vP verbose=1 ;;
     -m)	mirror=$2; shift ;;
     -r)	release=$2; shift ;;
     --no-delete)
@@ -62,16 +63,28 @@ trap 'rm -f "$inclist"' 0 1 2 15
   done
   echo "- /*/"
 
-  rpm -qa | sed '
+  rpm -qa \
+  | sort \
+  | if [ $all ]
+    then
+      sed '
+	s/-[^-]*-[^-]*$//
+	s/.*/+ &-[0-9]*.rpm/
+	'
+    else
+      sed '
 	h
-	s/.*/- &.*.rpm/
+	s/.*/- &.[a-z]*.rpm/
 	x
-	s/-[^-]*$//
-	s/.*/+ &-*.rpm/
+	s/-[^-]*-[^-]*$//
+	s/.*/+ &-[0-9]*.rpm/
 	x
 	G
 	'
+    fi
 ) >"$inclist"
+
+[ $verbose ] && cat "$inclist"
 
 set -x
 rsync -aH $rsvopts $rsdelopts $rsopts \
