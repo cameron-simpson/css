@@ -34,6 +34,7 @@ case "$type" in
     *': Bourne shell script'*)	mtype=application/x-sh ;;
     *': JPEG image data'*)	mtype=image/jpeg ;;
     *': PDF document'*)		mtype=application/pdf ;;
+    *': ASCII '*)		mtype=text/plain ;;
 esac
 
 # unrecognised - just recite "file"  output
