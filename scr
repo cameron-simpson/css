@@ -25,6 +25,7 @@ usage="Usage:
 
 badopts=
 
+new=
 rcfile=$HOME/.screenrc
 tmprc=
 
