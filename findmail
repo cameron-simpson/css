@@ -1,0 +1,129 @@
+#!/usr/bin/perl_gdbm
+#
+# Print Message-IDs of messages containing all specified patterns.
+#
+
+use cs::Upd;
+
+($cmd=$0) =~ s:.*/::;
+$usage="Usage: $cmd [-v] patterns
+	patterns	Regular expressions.
+";
+
+require 'cs/env.pl';
+require 'cs/mbox.pl';
+&env'load;
+
+$verbose=0;
+if ($ARGV[$[] eq '-v')
+	{ $verbose=1;
+	  shift;
+	}
+
+die $usage if $#ARGV < $[;
+
+@ptns=@ARGV;
+
+$[=0;
+
+$firstgrep='@hits=();';
+for ($i=$[; $i<=$#ptns; $i++)
+	{ $firstgrep
+	    .="\nif (/\$ptns[$i]/oi) { push(\@hits,$i); }";
+	}
+
+open(FLATKEYS,"< $MSGIDS/.keywords.keys")
+	|| die "$cmd: can't open($MSGIDS/.keywords.keys): $!\n";
+dbmopen(keywords,"$MSGIDS/.keywords",0666)
+	|| die "$cmd: can't dbmopen($MSGIDS/.keywords): $!\n";
+
+select STDERR if $verbose;	# so that status doesn't cause hassles
+
+undef %ikeys;
+$eval=<<'X'
+    undef $lowest;
+    if ($verbose)	# get file size
+	{ ($dev,$ino,$mode,$nlink,$uid,$gid,$rdev,$flatsize,@etc)=stat(FLATKEYS);
+	}
+
+    while (<FLATKEYS>)
+	{ chop;
+X
+	  .$firstgrep
+.<<'X'
+	  if ($#hits >= $[)
+	  	{ out(sprintf('searching ... %02d%% ',int(100*(tell(FLATKEYS)/$flatsize))).$_) if $verbose;
+		  for $ino (grep(length,split(/\s+/,$keywords{$_})))
+			{ $ino+=0;
+			  if (!defined($lowest) || $lowest > $ino)
+				{ $lowest=$ino;
+				}
+
+			  if (!defined($highest) || $highest < $ino)
+				{ $highest=$ino;
+				}
+
+			  for $i (@hits)
+				{ vec($hiton[$i],$ino,1)=1;
+				}
+			}
+		}
+	}
+X
+;
+
+out('searching ...') if $verbose;
+eval $eval;
+( out(''), die $@ ) if $@;
+
+dbmclose(keywords);
+close(FLATKEYS);
+
+if (!defined($lowest))
+	{ $"='/ && /';
+	  err("$cmd: no matches for /@ptns/\n");
+	  exit 1;
+	}
+
+nl('joining hits ...') if $verbose;
+
+$hits=$hiton[0];
+for ($i=1; $i<=$#ptns; $i++)
+	{ $hits&=$hiton[$i];
+	}
+
+nl("mapping inodes ($lowest..$highest) to message-ids ...");
+
+# trim leading null bytes
+$offset=($lowest-$lowest%8);
+substr($hits,$[,$offset/8)='';
+
+$bc=0;
+for (unpack("C*",$hits))	# march through bytes
+	{ if ($_)
+		{ for $i (0..7)	# then bits
+			{ if (vec($_,$i,1))
+				{ &ino($offset+$bc*8+$i);
+				}
+			}
+		}
+
+	  $bc++;
+	}
+
+out('');
+
+exit $xit;
+
+sub ino
+	{ local($ino)=shift;
+
+	  if (defined($msgid=&mbox'ino2msgid($ino)))
+		{ print STDOUT $msgid, "\n";
+		  out(sprintf("%2d%%",(($ino-$lowest)*100)/($highest-$lowest+1)));
+		  $xit=0;
+		}
+	  else
+	  { err("$cmd: can't map inode #$ino to Message-ID\n");
+	  }
+	}
