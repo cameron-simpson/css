@@ -32,7 +32,13 @@ fi
 
 [ $rmdesk ] && exec desktop -r "$deskname"
 
-desknum=`desktop "$deskname"`	|| exit 1
+case "$deskname" in
+  [0-9]|[1-9][0-9]|[1-9][0-9][0-9]|[1-9][0-9][0-9][0-9])
+    desknum=$deskname
+    ;;
+  *)desknum=`desktop "$deskname"`	|| exit 1
+    ;;
+esac
 set -x
 fvwmcmd "GotoDesk 0 $desknum" "DesktopName $desknum '$deskname'" &
 ( lastdesk=`lastvalue "desktop-$HOST"`
