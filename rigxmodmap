@@ -18,7 +18,15 @@
 # echo add control = Control_L
 # echo add control = Control_R
 
+  # Dell keyboard mapping
+  # echo keycode 146 = Mail_Button
+  # echo keycode 166 = Home_Button
+  # echo keycode 158 = Magnify_Button
+  # echo keycode 233 = Sleep_Button
+
   echo add control = Caps_Lock
 
   echo add mod1 = Meta_L Meta_R Alt_L
 ) | xmodmap -
+
+xptr132
