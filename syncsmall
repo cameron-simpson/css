@@ -8,7 +8,7 @@ then
     needhost kaper@cisra amadeus@home || exit 1
     case $HOST@$SYSTEMID in
       kaper@cisra)	set cameron@agricola cameron@agostino cameron@ivory cameron@upnp cameron@cvs.cgn @tw ;;
-      amadeus@home)	set cameron2@alpha @cerebus cameron2@janus @ezos @tw @lexx @moya ;;
+      amadeus@home)	set cameron2@alpha @cerebus cameron2@janus @ezos @tw @lexx @moya @bos-backup @sv1 @sv2 ;;
       *)	echo "$cmd: $HOST@$SYSTEMID: huh?" >&2; exit 1 ;;
     esac
     for h
