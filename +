@@ -48,6 +48,6 @@ cd || exit 1
 export mfolder
 set -x
 exec \
-	term $termopts +ip -n "mutt $mfolder" \
+	term $termopts -n "mutt $mfolder" \
+	scr "mutt_$mfolder" \
 	sh -c "set -x; exec mutt -f \"\$mfolder\" $muttopts"
-##scr "mutt_$mfolder" \
