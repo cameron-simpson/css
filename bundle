@@ -1,0 +1,70 @@
+#!/bin/sh
+#
+# Bundle up a directory as a compressed tar file.
+#	- Cameron Simpson <cs@zip.com.au>
+#
+
+cmd=`basename "$0"`
+usage="Usage: $cmd [-v] [-d bundle-dir] targets..."
+
+bundles=$HOME/bundles
+
+DIR=
+vflag=
+case $1 in
+    -v)	vflag=v ; shift ;;
+esac
+case $1 in
+    -d)	DIR=$2 shift; shift;;
+    *)	defdir=$bundles ;;
+esac
+
+case $1 in
+    --)	shift ;;
+    -*)	echo "$cmd: unrecognised options '$1'" >&2
+	echo "$usage" >&2
+	exit 2
+	;;
+esac
+
+case "$defdir" in
+	/*)	;;
+	*)	defdir="$bundles/$defdir" ;;
+esac
+case "$DIR" in
+	'' | /*) ;;
+	*)	DIR="$bundles/$DIR" ;;
+esac
+
+umask 2
+
+xit=0
+for bundle
+do
+	if [ -d "$bundle/." ]
+	then
+		if [ -n "$DIR" ]; then dir=$DIR
+		else if [ -r "$bundle/.bundle" ]; then
+			dir=`exec cat $bundle/.bundle`
+			case "$dir" in
+				/*)	;;
+				*)	dir="$bundles/$dir" ;;
+			esac
+		     else
+			dir=$defdir
+		     fi
+		fi
+		tarf="$dir/$bundle.tar.gz"	# was bz2
+		[ -s "$tarf" ] && { echo "$tarf: already exists" >&2; exit 1; }
+		[ -d "$dir/." ] || mkdir "$dir" || exit $?
+		echo "$bundle -> $tarf ..." >&2
+		{ tar c${vflag}f - "$bundle" | buffer | gz > "$tarf" \
+	       && ls -l "$tarf"
+		} || xit=$?
+	else
+		echo "$cmd: $bundle is not a directory" >&2
+		xit=1
+	fi
+done
+
+exit $xit
