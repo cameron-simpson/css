@@ -24,8 +24,8 @@ fi
 mtype=`file2mime "$file"` || { echo "$cmd: $file: no MIME type recognised" >&2; exit 1; }
 
 case "$mtype" in
-    application/x-gzip)		gunzip <"$file" | "$cmd" - ;;
-    application/x-bzip)		bunzip2 <"$file" | "$cmd" - ;;
+    application/x-gzip)		gunzip <"$file" | "$0" - ;;
+    application/x-bzip)		bunzip2 <"$file" | "$0" - ;;
     application/x-cpio)		cpio -icdv ;;
     application/x-ar)		ar xv "$file" ;;
     application/x-jar)		jar xvf - <"$file" ;;
