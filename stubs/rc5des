@@ -26,6 +26,6 @@ cp "$dir/$ini" . || exit $?
 ln -s $exe .
 pwd
 ls -la
-RC5INI=$dir/$subdir/$ini acon lock -1 "$lock" \
+RC5INI=$dir/$subdir/$ini alog "$lock" lock -1 "$lock" \
 		 tag_fd 1,2 "$lock" \
 		 ./$base
