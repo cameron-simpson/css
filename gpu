@@ -20,7 +20,7 @@ if [ "x$1" = x-s ]
 then  shift
       exec getpageurls -L download ${1+"$@"}
 else
-      [ $# = 0 ] && { set x "`xcut -p`"; shift; }
+      [ $# = 0 ] && { set x "`xclip -o`"; shift; }
 fi
 
 set -x
