@@ -1,0 +1,41 @@
+#!/bin/sh
+#
+# Return the appropriate value of the named parameter for the specified desk.
+# Exit status: zero for a per-desk value, non-zero for the default value.
+#	- Cameron Simpson <cs@zip.com.au> 12jul2004
+#
+
+cmd=$0
+usage="Usage: $cmd desk param [test-command]
+	If supplied, the test-command is run with the parameter as its last argument."
+
+badopts=
+
+if [ $# = 0 ]
+then
+  echo "$cmd: missing desk" >&2; badopts=1
+else
+  desk=$1; shift
+  [ "x$desk" = x. ] && desk=`currentdesk`
+  if [ $# = 0 ]
+  then
+    echo "$cmd: missing param" >&2; badopts=1
+  else
+    param=$1; shift
+  fi
+fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+value=`desktop "$desk" "$param"`
+if [ -n "$value" ]
+then
+  [ $# = 0 ] || "$@" "$value" || value=
+fi
+
+[ -n "$value" ] && { echo "$value"; exit 0; }
+
+lastvalue "desk_dflt$param"
+[ -z "$value" ] || [ $# = 0 ] || "$@" "$value" || value=
+
+exit 1
