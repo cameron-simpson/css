@@ -42,7 +42,7 @@ case "$type" in
 esac
 
 # unrecognised - just recite "file"  output
-[ -z "$mtype" ] && { echo "$type"; sleep 10; exit 0; }
+[ -z "$mtype" ] && { echo "$type"; exit 0; }
 
 if [ $copious ]
 then  action=`grep "^$mtype"' *;.*; *copiousoutput *$' <$HOME/.mailcap | sed 1q`
