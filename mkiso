@@ -1,12 +1,61 @@
 #!/bin/sh
 #
-# My usual incantation for constructing an ISO FS image for a CDROM.
-# Partner for mkcd.
-# Makes plain vanilla data CDs, not bootables etc. Will make the
-# default Volume Identifier from a toplevel LABEL file if present
-# (as for the md5medium script).
-# PUBL and PREP come from the .mkisofsrc file.
-#	- Cameron Simpson <cs@zip.com.au> 12jul2000
+
+# =head1 NAME
+#
+# mkiso - construct an ISO9660 CD image for burning a data CD
+#
+# =head1 SYNOPSIS
+#
+# mkiso [-l label] [-o image.iso] directory
+#
+# =head1 DESCRIPTION
+#
+# I<mkiso> embodies my usual incantation
+# for constructing an ISO9660 image for a CDROM.
+# It is partner to mkcd(1cs), a program to burn data CDs.
+# I<mkiso> makes plain vanilla data CDs, not bootable or audio CDs.
+#
+# =head1 OPTIONS
+#
+# =over 4
+#
+# =item B<-l> I<label>
+#
+# The default Volume identifier for the image
+# is normally taken from the file B<LABEL> in the top of the I<directory>.
+# (This is because I like my data sets self describing,
+# an having such a file is the simplest method not needing any metadata).
+# alternatively you may supply the Volume Identifier
+# on the command line with this option.
+#
+# =item B<-o> B<I<image>.iso>
+#
+# Specify the location of the resulting ISO9660 image.
+# By default this is a file in the current directory
+# called B<I<basename>.iso>, where I<basename> is the basename
+# of the I<directory> named on the command line.
+#
+# =back
+#
+# =head1 FILES
+#
+# The B<PUBL> (publisher) and B<PREP> (perparer) values
+# come from the B<$HOME/.mkisofsrc> file.
+# See mkisofs(1) for more information.
+#
+# =head1 SEE ALSO
+#
+# mkcd(1cs), mkisofs(1), cdrecord(1)
+#
+# =head1 CREDITS
+#
+# I<mkiso> is really just a wrapper for the mkisofs(1) command
+# by Joerg Schilling.
+#
+# =head1 AUTHOR
+#
+# Cameron Simpson <cs@zip.com.au> 12jul2000
 #
 
 cmd=`basename "$0"`
