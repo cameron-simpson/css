@@ -49,7 +49,10 @@ by a table specific module.
 sub fetch($$$$$;$$)
 { my($class,$keyvalue,$dbh,$table,$keyfield,$where,$preload)=@_;
 
-  die "$0: no keyvalue" if ! defined $keyvalue;
+  if (! defined $keyvalue)
+  { my@c=caller;
+    die "$0: no keyvalue supplied to fetch()\n\tfrom [@c]\n\t";
+  }
 
   my $H = cs::DBI::hashtable($dbh,$table,$keyfield,$where,$preload);
   die "$0: can't obtain hashtable($dbh,$table,$keyfield,$where,$preload)"
