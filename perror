@@ -1,0 +1,9 @@
+#!/bin/sh
+
+xit=0
+for err
+do
+    fgrep "$err" /usr/include/sys/errno.h || xit=$?
+done
+
+exit $xit
