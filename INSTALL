@@ -16,8 +16,13 @@ Installing my scripts:
     Add the full pathname for that directory to the END of your $PATH.
 	Also add the full path for the directory /opt/css/synonyms.
 	Eg:
-		PATH=$PATH:/opt/css:/opt/css/synonyms
+		PATH=$PATH:/opt/css/bin:/opt/css/bin/synonyms
 		export PATH
+
+    You may also want to add the manuals to your $MANPATH:
+
+		MANPATH=$MANPATH:/opt/css/man
+		export MANPATH
 
     The Perl modules are in the directory /opt/css/cs, so add
 	/opt/css to your $PERL5LIB variable, or make a symlink named "cs"
