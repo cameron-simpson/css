@@ -1,0 +1,13 @@
+#!/bin/sh
+
+prompt="Please enter the reason and bug id for this session."
+
+cmd=$0
+usage="Usage: $cmd [prompt]"
+
+[ $# = 0 ] || prompt=$*
+
+[ -t 0 ] || { echo "$cmd: stdin must be a tty" >&2; exit 1; }
+echo "$prompt"
+msg=`readline "> "` || exit 1
+[ -n "$msg" ]
