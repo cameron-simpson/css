@@ -1,0 +1,24 @@
+#!/bin/sh
+#
+# Run the boot runmaint scripts of any users with .maint directories.
+#	- Cameron Simpson <cs@zip.com.au> 22sep2002
+#
+
+# Installation prefix, typically /usr/local.
+# The /opt/runmaint path fits the syncopt scheme as described here:
+#	http://www.zip.com.au/~cs/syncopt/
+# Can be overridden by presetting this variable.
+RUNMAINT_DIR=${RUNMAINT_DIR:-/opt/runmaint}
+export RUNMAINT_DIR
+
+userlist=$RUNMAINT_DIR/bootusers
+[ -s "$userlist" ] || exit 0
+for user in `cat "$userlist"`
+do  userdir=`ksh -c "echo ~$user"`
+    if [ -d "$user/.maint/." ]
+    then
+    ( set -x
+      su "$user" -c "exec $RUNMAINT_DIR/bin/runmaint boot" </dev/null &
+    )
+    fi
+done
