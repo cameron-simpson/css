@@ -320,17 +320,14 @@ do
 	fi
     fi
 
-    if [ -r "$script.$HOST" ]
-    then
-	$RunMaint -date "$datestr" $xflag -s "$subj - perhost($HOST)" $target.$HOST $addresses \
-	|| xit=$?
-    fi
-
-    if [ -r "$script.$HOST@$SYSTEMID" ]
-    then
-	$RunMaint -date "$datestr" $xflag -s "$subj - perhost($HOST@$SYSTEMID)" $target.$HOST@$SYSTEMID $addresses \
-	|| xit=$?
-    fi
+    for localscript in "$script.$HOST" "$script.$HOST@$SYSTEMID"
+    do
+      if [ -r "$localscript" ]
+      then
+	  $RunMaint -date "$datestr" $xflag -s "$subj - perhost($HOST)" "$localscript" $addresses \
+	  || xit=$?
+      fi
+    done
 
     # run the implied scripts
     case $target in
@@ -340,9 +337,9 @@ do
 			|| xit=$?
 		    fi
 		    ;;
-	daily)	    $RunMaint -date "$datestr" $xflag $wday $addresses \
+	daily)	    $RunMaint -date "$datestr" $xflag "$wday" $addresses \
 		    || xit=$?
-		    if [ $wday = mon ]
+		    if [ "x$wday" = xmon ]
 		    then
 			$RunMaint -date "$datestr" $xflag weekly $addresses \
 			|| xit=$?
