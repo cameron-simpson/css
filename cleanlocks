@@ -1,0 +1,33 @@
+#!/bin/sh
+#
+# Remove obsolete lock directories for this host.
+#	- Cameron Simpson <cs@zip.com.au> 14jun2002
+#
+
+cmd=`basename "$0"`
+
+LOCKDIR=${LOCKDIR:-$HOME/var/locks}
+HOSTNAME=${HOSTNAME:-`hostname`}
+export LOCKDIR HOSTNAME
+
+cd "$LOCKDIR" || exit 1
+
+xit=1
+for lock in *
+do  info=$lock/info
+    [ -s "$info" ] || { echo "$cmd: no info file in $LOCKDIR/$lock/" >&2
+			xit=1
+			continue
+		      }
+    exec <"$info"
+    read pid hostname || { echo "$cmd: can't read pid and hostname from $LOCKDIR/$info" >&2
+			   xit=1
+			   continue
+			 }
+    [ "x$hostname" = "x$HOSTNAME" ] || continue
+    kill -0 "$pid" && continue
+    echo "$cmd: removing $LOCKDIR/$lock ..."
+    echo rm -rf "./$lock"
+done
+
+exit $xit
