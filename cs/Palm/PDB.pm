@@ -158,9 +158,11 @@ sub _Load($$$$)
     return 0;
   }
 
+  my $NR = $this->{NR};
+  my $RR = $this->{R};
   my $R;
 
-  for my $nr (1..$this->{NR})
+  for my $nr (0..$NR-1)
   { if (read($F,$_,8) != 8)
     { warn "$::cmd: error reading record $nr from $F";
       return 0;
@@ -183,7 +185,30 @@ sub _Load($$$$)
 	     +      ord(substr($R->{UID},$[+2,1))
 	     ;
 
-    push(@{$this->{R}}, $R);
+    push(@$RR, $R);
+  }
+
+  # sort records and compute sizes
+  # do not assume record order matches storage order
+
+  # nab file size - needed for last record
+  my @s = stat $F;
+  my $size = $s[7];
+  my @posmap = sort { $a->[0] <=> $b->[0] }
+		    map( [$RR->[$_]->{OFFSET}, $_],
+			 0..$NR-1);
+
+  for my $pr (0..$#posmap)
+  {
+    my $p = $posmap[$pr];
+    my $po = $p->[0];
+    my $nr = $p->[1];
+    my $R = $RR->[$nr];
+
+    $R->{SIZE} = ( $pr == $#posmap
+		 ? $size
+		 : $posmap[$pr+1]->[0]
+		 ) - $po;
   }
 
   ## warn cs::Hier::h2a($this,1);
@@ -222,14 +247,13 @@ sub _LoadRecords($)
     return 0;
   }
 
-  my @s = stat PDB;
-  my $fsize = $s[7];
+  my $RR = $this->{R};
+  my $RD = ($this->{RECORDS} = []);
+  my $NR = $this->NRecords();
 
-  my $RR = ($this->{RECORDS} = []);
-
-  for my $nr (1..$this->NRecords())
+  for my $nr (0..$NR-1)
   {
-    my $R = $this->{R}->[$nr-1];
+    my $R = $RR->[$nr];
 
     if (tell(PDB) != $R->{OFFSET}
      && ! seek(PDB, $R->{OFFSET}, 0))
@@ -241,13 +265,8 @@ sub _LoadRecords($)
     { ## warn "seek($R->{OFFSET}) ok";
     }
 
-    my $len = ( $nr == $this->NRecords()
-	      ? $fsize-tell(PDB)
-	      : $this->{R}->[$nr]->{OFFSET}-tell(PDB)
-	      );
-
-    if (read(PDB, $RR->[$nr-1], $len) != $len)
-    { warn "$::cmd: failed to read $len bytes for record $nr: $!";
+    if (read(PDB, $RD->[$nr], $R->{SIZE}) != $R->{SIZE})
+    { warn "$::cmd: failed to read $R->{SIZE} bytes for record $nr: $!";
       delete $this->{RECORDS};
       return 0;
     }
