@@ -131,9 +131,6 @@ case "$TERM,$DISPLAY" in
 		  export XAUTHORITY
 		}
 
-	eval "$detach"
-	eval "$closefds"
-
 	PREFTERM=${PREFTERM:-xterm}	# safe default
 
 	case "$PREFTERM" in
@@ -156,9 +153,12 @@ case "$TERM,$DISPLAY" in
 	termcmd="wsh -v $termcmd"
 	;;
     *)	async=
+	closefds=
+	detach=
 	;;
 esac
 
+set -x
 eval "$detach"
 eval "$closefds"
 if [ $async ]
