@@ -408,13 +408,13 @@ if ($::Daemon)
     {
       chomp;
       my @f = split(/\s+/);
-      if (@f != 2)
-      { warn "$::cmd: bad line - expected URL and dir: $_\n";
+      my($url,$dir,$referrer)=@f;
+      if (@f != 2 && @f != 3)
+      { warn "$::cmd: bad line - expected: URL dir [referrerURL]n\tline is: $_\n";
 	$::Xit=1;
       }
       else
       {
-	my($url,$dir)=@f;
 	if ($dir !~ m:^/:)
 	{ warn "$::cmd: dir must be absolute path, skipping URL \"$url\" for dir \"$dir\"\n";
 	  $::Xit=1;
@@ -429,7 +429,10 @@ if ($::Daemon)
 	  print "$url\n";
 	  flush(STDOUT);
 
-	  relhttpget($url) || ($::Xit=1);
+	  my $oldref = $::ENV{HTTP_REFERER};
+	  $::ENV{HTTP_REFERER}=$referrer if defined $referrer;
+	  relhttpget($url,$referrer) || ($::Xit=1);
+	  $::ENV{HTTP_REFERER}=$oldref if defined $referrer;
 	}
       }
     }
@@ -488,7 +491,7 @@ sub relhttpget($)
   httpget($rurl);
 }
 
-sub httpget($)
+sub httpget($$)
 { my($url)=@_;
 
   my $ok=1;
@@ -517,7 +520,7 @@ sub httpget($)
 	$ok=0;
       }
       else
-      { print QUEUE "$url $dir\n";
+      { print QUEUE "$url $dir $::ENV{HTTP_REFERER}\n";
 	close(QUEUE);
       }
     }
@@ -587,6 +590,9 @@ sub httpget($)
       my @urls = sort keys %suburls;
       ##warn "urls=[@urls]\n";
 
+      my $oldref = $::ENV{HTTP_REFERER};
+      $::ENV{HTTP_REFERER}=$url;
+
       for my $suburl (@urls)
       {
 	##warn "Count=$::Count: $suburl ...\n";
@@ -610,6 +616,8 @@ sub httpget($)
 	{ ##warn "skip2 $suburl\n";
 	}
       }
+
+      $::ENV{REFERER}=$oldref;
     }
 
     $::Count++;
