@@ -1,6 +1,8 @@
 #!/usr/bin/ksh
 # Solaris /bin/sh explodes on the perfectly legal remote() function :-(
 #
+# Freshmeat release number: 1.1
+#
 # =head1 NAME
 #
 # syncopt - keep per-machine /opt in sync with master copy
