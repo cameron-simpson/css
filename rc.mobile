@@ -338,13 +338,9 @@ bgsvc()
     bgrc=/etc/init.d/$bgsvc
     if [ -s "$bgrc" ]
     then
-      if [ $asyncall ]
-      then
-	$trace "$bgrc" "$mode" &
-	eval "pid_$bgsvc=$!"
-      else
-	$trace "$bgrc" "$mode"
-      fi
+      $trace "$bgrc" "$mode" &
+      eval "pid_$bgsvc=$!"
+      [ $asyncall ] || wait4pid $!
     else
       echo "$cmd: no init file named $bgrc" >&2
     fi
