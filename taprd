@@ -1,0 +1,82 @@
+#!/usr/bin/perl
+#
+
+require 'getopts.pl';
+use cs::Upd;
+
+if (!length($ENV{TAPE}))	{ $ENV{TAPE}="/dev/tape"; }
+
+$tapedev=$ENV{TAPE};
+$blocksize=32768;
+
+($cmd=$0) =~ s:.*/::;
+$usage="Usage: $cmd [-v] [-t tapedevice] [-b blocksize]
+	-t tapedevice	Device to open (default: $tapedev).
+	-b blocksize	Blocksize of reads (default: $blocksize).
+	-v		Verbose.
+";
+
+$badopts=0;
+$verbose=-t 1;
+&Getopts('vt:b:') || ($badopts=1);
+$tapedev=$opt_t if defined $opt_t;
+$blocksize=$opt_b if defined $opt_b;
+$verbose=$opt_v if defined $opt_v;
+
+if ($blocksize !~ /^\d+$/ || $blocksize < 1)
+	{ print STDERR "$cmd: $blocksize: blocksize must be a positive integer\n";
+	  $badopts=1;
+	}
+
+if ($#ARGV >= $[)
+	{ print STDERR "$cmd: extra arguments: @ARGV\n";
+	  $badopts=1;
+	}
+
+die $usage if $badopts;
+
+if ($tapedev ne '-')
+	{ if (!open(STDIN,"< $tapedev\0"))
+		{ die "$cmd: can't open $tapedev: $!\n";
+		}
+	}
+
+select(STDERR);
+
+$xit=0;
+
+$blocks=0;
+$bsize=0;
+$hadeof=0;
+BLOCK:
+  while (($n=sysread(STDIN,$_,$blocksize)) >= 0)
+	{ if ($n != $bsize)
+		{ if ($blocks > 0)
+			{ $verbose && out('');
+			  print STDOUT "$blocks x $bsize\n";
+			}
+
+		  $blocks=0;
+		  $bsize=$n;
+		}
+
+	  if ($n == 0)
+		{ $verbose && out('');
+		  print STDOUT "EOF\n";
+		  last BLOCK if $hadeof;	# EOF,EOF ==> EOM
+		  $hadeof=1;
+		}
+	  else
+	  { $blocks++;
+	    $verbose && out("$blocks x $bsize");
+	    $hadeof=0;
+	  }
+	}
+
+$verbose && out('');
+if ($n < 0)
+	{ print STDERR "$cmd: read($tapedev,$blocksize): $!\n";
+	  $xit=1;
+	}
+
+exit $xit;
