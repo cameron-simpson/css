@@ -51,7 +51,7 @@ fi \
 | if [ $clean ]; then htclean; else cat; fi \
 | sed 's|</ *[Aa] *>|&|g' | tr '\015' '\012' \
 | if [ $mangle ]
-  then sed 's|<[Aa] [^>]*[Hh][Rr][Ee][Ff]=\([^ >]*\)[^>]*> *\(.*\)</[Aa]>|\2 \&lt;\1\&gt;|g'
+  then perl -pe 's:<a\s[^>]*\bhref=("[^#"][^"]*"|'\''[^#'\''][^'\'']*'\''|[^#"'\''>\s][^\s>]*)[^>]*>\s*(.*)</a>:$2 &lt;$1&gt;:gi'
   else cat
   fi \
 | (: set -x; w3m $cols -dump -T text/html) \
