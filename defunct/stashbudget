@@ -1,0 +1,179 @@
+#!/usr/bin/perl
+#
+# Expect Megan's budget TSF file on stdin,
+# stash data in db/timesheets/projects.
+#	- Cameron Simpson <cs@zip.com.au> 09oct98
+#
+
+use cs::Misc;
+use cs::Upd;
+use cs::TSF;
+use cs::Persist;
+use CISRA::TimeSheets;
+use CISRA::UserData;
+use CISRA::Groups;
+use cs::Source;
+
+my $year = 1999;
+
+warn "running...";
+my $in = new cs::Source (FILE,STDIN);
+my @r  = cs::TSF::getTSSrc($in,",");
+
+die "no data!" if ! @r;
+
+my $db = CISRA::TimeSheets::db(['projects'],1);
+my $udb = CISRA::UserData::db(1);
+my $gdb = CISRA::Groups::db(1);
+
+undef %::pcode2prj;
+for my $prj (keys %$gdb)
+{ my $G = $gdb->{$prj};
+
+  if (exists $G->{ACCTCODE})
+  { $::pcode2prj{$G->{ACCTCODE}}=$prj;
+  }
+}
+
+# flush this year's budget data, as we'll be replacing it outright
+for my $pcode (sort keys %$db)
+{ my $p=$db->{$pcode};
+  my $b=$p->{BUDGET};
+  for my $mm (qw(01 02 03 04 05 06 07 08 09 10 11 12))
+  { delete $b->{"$year-$mm"};
+  }
+}
+
+undef %::Leaders;
+undef %::Managers;
+
+R:
+ for my $r (@r)
+	{ ## print cs::Hier::h2a($r,0), "\n";
+
+	  my $err = 0;
+
+	  my $user = $r->{'Staff'};
+	  next R if ! length $user;
+
+	  my $U;
+	  if ($user !~ /^\w+$/
+	   || ! defined ($U=CISRA::UserData::user($user))
+	     )
+		{ warn "bad user: $user\n";
+		  $err++;
+		}
+
+	  if ($err)
+		{ warn "errant record was:\n"
+		      .cs::Hier::h2a($r,1)."\n";
+		  next R;
+		}
+
+	  for my $rcode (sort keys %$r)
+	  { warn "r[$rcode]=[$r->{$rcode}]\n";
+	  }
+	  push(@{$::Leaders{$pcode}}, $r->{'TLeader'}) if length $r->{'TLeader'};
+	  push(@{$::Managers{$pcode}}, $r->{'ProjMgr'}) if length $r->{'ProjMgr'};
+
+	  my $empType = uc($r->{'Emp Status Name'});
+	  $U->{EMP_STATUS}=$empType;
+
+	  my $staffMgr = lc($r->{'StaffMgr'});
+	  $U->{MANAGER}=$staffMgr;
+
+	  my $pcode = $r->{'Account Code'};
+	  if ($pcode !~ /^\d+/)
+		{ warn "bad pcode: $pcode\n";
+		  $err++;
+		}
+	  else
+	  { my $P = exists $db->{$pcode}
+		? $db->{$pcode}
+		: { ACCTCODE => $pcode,
+		  };
+	    my $B = exists $P->{BUDGET}
+		? $P->{BUDGET}
+		: {};
+
+	    M:
+	    for my $mnum (1..12)
+	    { my $mkey = cs::Date::mnum2mon($mnum)."Proj";	# Budgeted
+	    warn "mkey=[$mkey]\n";
+
+	      my $mcode = sprintf("%04d-%02d",$year,$mnum);
+
+	      my $M = exists $B->{$mcode}
+		    ? $B->{$mcode}
+		    : {};
+	      my $uB = exists $M->{$user}
+		     ? $M->{$user}
+		     : 0;
+
+	      next M if ! $r->{$mkey};
+
+	      $uB+=$r->{$mkey};
+	      if ($r->{$mkey} > 0)
+		    { out("$pcode/$user/$mkey += $r->{$mkey}");
+		    }
+
+	      $M->{$user}=$uB;
+	      $B->{$mcode}=$M;
+	    }
+
+	    $P->{BUDGET}=$B;
+	    $db->{$pcode}=$P;
+	  }
+	}
+
+LDR:
+for my $pcode (keys %::Leaders)
+{ if (! exists $::pcode2prj{$pcode})
+  { warn "$::cmd: no project for pcode $pcode\n";
+    next LDR;
+  }
+
+  my $prj = $::pcode2prj{$pcode};
+
+  unionfield($gdb->{$prj},'leader',$::Leaders{$pcode});
+}
+
+MGR:
+for my $pcode (keys %::Managers)
+{ if (! exists $::pcode2prj{$pcode})
+  { warn "$::cmd: no project for pcode $pcode\n";
+    next MGR;
+  }
+
+  my $prj = $::pcode2prj{$pcode};
+
+  unionfield($gdb->{$prj},'manager',$::Managers{$pcode});
+}
+
+undef $db;
+undef $udb;
+undef $gdb;
+cs::Persist::finish();
+
+sub unionfield
+{ my($r,$f,$v)=@_;
+  
+  ## warn "$r->{ACCTCODE}:\n".cs::Hier::h2a($r,1)."\n";
+  if (! exists $r->{MEMBERS})
+  { $r->{MEMBERS}={};
+  }
+
+  my $m = $r->{MEMBERS};
+
+  if (! exists $m->{$f})
+  { $m->{$f}=[ @$v ];
+  }
+  elsif (! ref $m->{$f})
+  { $m->{$f}=[ ::uniq(@$v, $m->{$f}) ];
+  }
+  else
+  { $m->{$f}=[ grep(length && /^\w+$/, ::uniq(@$v, @{$m->{$f}})) ];
+  }
+
+  warn "$r->{ACCTCODE}: $f=".cs::Hier::h2a($m->{$f})."\n";
+}
