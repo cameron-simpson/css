@@ -47,7 +47,7 @@ case "$type" in
     *)	mtype=`ext2mime "$file"` || mtype= ;;
 esac
 
-# unrecognised - just recite "file"  output
+# unrecognised - just recite "file" output and fail
 [ -z "$mtype" ] && { echo "$type"; exit 1; }
 
 echo "$mtype"
