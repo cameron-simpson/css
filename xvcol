@@ -1,0 +1,6 @@
+#!/bin/sh
+#
+# xv for colour displays
+#
+
+exec xv -fg Green -bg Black -hi SlateGrey -lo SlateGrey ${1+"$@"}
