@@ -1,30 +1,87 @@
 #!/bin/sh
 #
-# Backup a directory using an incremental technique.
-# See also: histbackup-prune.
-#	- Cameron Simpson <cs@zip.com.au> 03apr2000
+# =head1 NAME
 #
-# --inplace
-#	Specify parent dir, backup parent/current to parent/datestamp.
-#	- Cameron Simpson <cs@zip.com.au> 11apr2000
+# histbackup - backup a directory using an incremental technique
 #
-# --mono
-#	Monotonic accumulation of data: just don't use --delete with rsync :-)
-#	To be used for the downloads archive.
-#	- Cameron Simpson <cs@zip.com.au> 17may2000
+# =head1 SYNOPSIS
 #
-# --linkonly
-#	Specify the parent backupdir only, and omit the rsync.
-#	Emit backupdir linktree subdir name on stdout.
-#	- Cameron Simpson <cs@zip.com.au> 28jun2001
+# histbackup [options...] [host:]source backupdir [rsyncopts...]
 #
-# --no-copy
-#	Passed to linktree.
-#	- Cameron Simpson <cs@zip.com.au> 03jul2001
+# histbackup [options...] --inplace parent [rsyncopts...]
 #
-# --rsync-path rrsync
-#	Passed to rsync.
-#	- Cameron Simpson <cs@zip.com.au> 12jul2001
+# histbackup [options...] --no-rsync parent
+#
+# =head1 DESCRIPTION
+#
+# I<histbackup>
+# makes incremental backups of a directory tree
+# in a set of directories named by dates, or date-time if the date already exists.
+# The new backup is prepopulated by hardlinks of each file from the previous backup
+# and then updates with rsync(1).
+# This arranges that the only new content of each new backup is fresh copies of the changed files.
+# In this way each backup directory is a full copy of the source directory
+# but the disc space cost is that of an incremental backup.
+# Because it uses rsync,
+# it is possibly to efficient backup remote directories in the manner.
+#
+# =head1 SETUP AND USE
+#
+# Before deployment, decide who will own and do the backups.
+# Do all the local (backup end) setup as that user.
+# If you're not a sysadmin,
+# that user is probably yourself.
+#
+# Generally, setup is as follows:
+#
+# =over 4
+#
+# =item Create the backup area.
+#
+# Decide where the backup data will be. Make an empty directory to hold it:
+#
+#	mkdir /path/to/backup/area
+#
+# =item Arrange access to the source data
+#
+# If the data to backup are local to this machine
+# you merely need read access to it.
+# If the data are remote
+# you will need ssh(1) access to the remote host as a user with read access to the data there.
+# Test it:
+#
+#	ssh user@remote ls -l /path/to/source/directory
+#
+# =item Perform a test backup
+#
+# Histbackup does the right thing when the backup area is empty
+# so just:
+#
+#	histbackup -x user@remote:/path/to/source/directory /path/to/backup/area
+#
+# =item Schedule your backups
+#
+# If these backups are to happen regularly
+# a crontab(5) entry should be made to do so.
+# Use "C<crontab -e>" to mak this.
+# Example:
+#
+#	MAILTO=backup-admin@yoursite
+#	PATH=$PATH:/opt/css/bin
+#	0 * * * * histbackup -x user@remote:/path/to/source/directory /path/to/backup/area
+#
+# That will run a I<histbackup> every day at midnight,
+# delivering the output of the run by email to B<backup-admin@yoursite>.
+#
+# Note that cron's environment is very spartan
+# (it does not source C</etc/profile> or C<~/.profile>)
+# and so you may need to arrange that the CSS package's environment is present.
+# Also,
+# because cron is a batch situation,
+# your ssh access will almost certainly require a special purpose passphraseless key
+# to access the remote host.
+#
+# =back
 #
 
 cmd=`basename "$0"`
@@ -64,28 +121,86 @@ rsopts=
 verbose=
 [ -t 1 ] && verbose=1
 
+# =head1 OPTIONS
+#
+# =over 4
+#
 while :
-do case $1 in
-    -x)		trace=set-x ;;
-    -v|--verbose) verbose=1 ;;
+do
+  case $1 in
+
+    # =item --inplace
+    #
+    # Specify the parent of the source directory;
+    # backs up B<I<parent>/current> to B<I<parent>/I<datestamp>.
+    #
     --inplace)	inplace=1 ;;
+
+    # =item --no-copy
+    #
+    # This option is passed to linktree(1).
+    # Normally I<linktree> will fall back to copying a source file if it can't hardlink it.
+    #
+    --no-copy)	ltargs="$ltargs $1" ;;
+
+    # =item --no-delete, --mono
+    #
+    # Monotonic growth.
+    # Suppresses passing the B<--delete> option to rsync.
+    #
     --no-delete|--mono)
 		mono=1 ;;
-    --no-copy)	ltargs="$ltargs $1" ;;
+
+    # =item --no-rsync, --linkonly
+    #
+    # Specify the parent backup directory only and omit the rsync.
+    # Emits the backup directory linktree subdirectory name on standard output.
+    # 
     --no-rsync|--linkonly)
 		linkonly=1
 		exec 3>&1 1>&2	# ensure clean stdout
 		;;
+
+    # =item --rsync-path rrsync
+    #
+    # Passed to rsync.
+    # Specifies the pathname to the remote rsync executable.
+    #
     --rsync-path) rrsync=$2; shift ;;
+
+    # =item --symlink name
+    #
+    # After the backup is done,
+    # make a symbolic link named I<name> pointing at the latest backup directory.
+    # This is useful so that other programs may trivially reference the latest
+    # backup without having to figure out its name.
+    # Eg: B<--symlink LATEST>.
+    #
     --symlink)	symlink=$2; shift ;;
+
+    # =item -v, --verbose
+    #
+    # Turn on verbose mode.
+    #
+    -v|--verbose) verbose=1 ;;
+
+    # =item -x
+    #
+    # Trace execution of important commands (rsync, linktree etc).
+    #
+    -x)		trace=set-x ;;
+
     --)		shift; break ;;
     -*)		echo "$cmd: unrecognised option: $1" >&2
 		badopts=1
 		;;
     *)		break ;;
-   esac
-   shift
+  esac
+  shift
 done
+#
+# =back
+#
 
 if [ $linkonly ]
 then
@@ -206,7 +321,6 @@ else
 		 [ $# = 0 ] || use_rsync=1
 		 ;;
 	esac
-	set -x
 	if [ $use_rsync ]
 	then
 	    $trace mkdir "$dest/$thisbackup" || exit 1
@@ -227,3 +341,12 @@ then
 fi
 
 exit $xit
+
+# =head1 AUTHOR
+#
+# Cameron Simpson <cs@zip.com.au> 03apr2000
+#
+# =head1 SEE ALSO
+#
+# histbackup-prune(1), linktree(1), rsync(1), ssh(1)
+#
