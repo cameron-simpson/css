@@ -1,0 +1,2 @@
+#!/bin/sh
+exec nphssh pop_dsa-cisra2zip zip
