@@ -5,6 +5,7 @@
 
 cmd=`basename "$0"`
 hi=$HOME/rc/hi
+pickn=
 
 eval `datevars`
 weekly=
@@ -12,10 +13,20 @@ mode=normal
 noop=
 
 [ "x$wdayname" = xMon ] && weekly=1
-[ "x$1" = x-html ] && { mode=html; shift; }
-[ "x$1" = x-normal ] && { mode=normal; shift; }
-[ "x$1" = x-w ] && { weekly=1; shift; }
-[ "x$1" = x-n ] && { noop=1; shift; }
+
+while :
+do
+  case $1 in
+    -html)	mode=html ;;
+    -normal)	mode=normal ;;
+    -w)		weekly=1 ;;
+    -n)		noop=1 ;;
+    -[0-9]*)	pickn=`expr "x$1" : 'x-\([0-9]*\).*'` ;;
+    --)		shift; break ;;
+    *)		break ;;
+  esac
+  shift
+done
 
 if [ $# = 0 ]
 then
@@ -50,6 +61,7 @@ do
   esac
 done 3>&1 1>&4 4>&- \
 | grep '^[^#]' \
+| if [ -n "$pickn" ]; then pickn "$pickn"; else cat; fi \
 | while read url grep
   do  if [ -z "$grep" ]
       then  echo "$url"
