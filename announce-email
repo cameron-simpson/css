@@ -1,14 +1,9 @@
 #!/bin/sh
 #
-# Read email message from stdin, announce to alert log.
+# Read an email message from stdin, announce to alert log.
 #	- Cameron Simpson <cs@zip.com.au> 28mar2002
 #
 
 folder=$1
-
-mhdrs \
-| { while read hdr body
-    do  eval "HDR_$hdr=\$body"
-    done
-    exec alert -c yellow "`timecode` $folder $HDR_FROM; $HDR_SUBJECT"
-  }
+summary=`email-summary-line`
+exec alert -c yellow `timecode` $folder "$summary"
