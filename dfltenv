@@ -9,6 +9,6 @@
 		exit 2
 	      }
 
-. /usr/local/etc/shell/dfltenv
+. /opt/shell/dfltenv
 
 exec "$@"
