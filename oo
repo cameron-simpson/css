@@ -1,2 +1,2 @@
 #!/bin/sh
-exec $HOME/there/local/OpenOffice.org1.0.1/soffice ${1+"$@"} &
+exec $HOME/there/local/OpenOffice.org1.0.2/soffice ${1+"$@"} &
