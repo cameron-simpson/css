@@ -54,48 +54,48 @@ $cs::IM2HTML::_TRs=0;
 $cs::IM2HTML::_db={};
 
 sub new
-	{ my($class,$dir,$inherit)=@_;
-	  $inherit={} if ! defined $inherit;
+{ my($class,$dir,$inherit)=@_;
+  $inherit={} if ! defined $inherit;
 
-	  ## $dir=cs::Pathname::norm($dir);
+  ## $dir=cs::Pathname::norm($dir);
 
-	  ## system("ls -ldL $dir");
-	  return undef if ! stat($dir) || ! -d _;
+  ## system("ls -ldL $dir");
+  return undef if ! stat($dir) || ! -d _;
 
-	  ## warn "new $dir...";
-	  my($this);
+  ## warn "new $dir...";
+  my($this);
 
-	  $this=
-	  bless { DIR		=> $dir,
-		  DB		=> $cs::IM2HTML::_db,
-		  FILES		=> [],
-		  SUBDIRS	=> [],
-		  DIRENTS	=> [],
-		  HTML		=> {},
-		  PFX		=> $cs::IM2HTML::Pfx,
-		  DOTDIR	=> $cs::IM2HTML::DotDir,
-		  DOTHUMBS	=> $cs::IM2HTML::DoThumbs,
-		  DOIMSTAT	=> $cs::IM2HTML::DoImStat,
-		  TABLEWIDTH	=> $cs::IM2HTML::TableWidth,
-		  TABLELENGTH	=> $cs::IM2HTML::TableLength,
-		  ORDER		=> $cs::IM2HTML::Order,
-		  THUMBMAX	=> $cs::IM2HTML::ThumbMax,
-		  THUMBTYPE	=> $cs::IM2HTML::ThumbType,
-		  DIDTHUMB	=> {},
-		  IMSIZE	=> {},
-		  THSIZE	=> {},
-		}, $class;
+  $this=
+  bless { DIR		=> $dir,
+	  DB		=> $cs::IM2HTML::_db,
+	  FILES		=> [],
+	  SUBDIRS	=> [],
+	  DIRENTS	=> [],
+	  HTML		=> {},
+	  PFX		=> $cs::IM2HTML::Pfx,
+	  DOTDIR	=> $cs::IM2HTML::DotDir,
+	  DOTHUMBS	=> $cs::IM2HTML::DoThumbs,
+	  DOIMSTAT	=> $cs::IM2HTML::DoImStat,
+	  TABLEWIDTH	=> $cs::IM2HTML::TableWidth,
+	  TABLELENGTH	=> $cs::IM2HTML::TableLength,
+	  ORDER		=> $cs::IM2HTML::Order,
+	  THUMBMAX	=> $cs::IM2HTML::ThumbMax,
+	  THUMBTYPE	=> $cs::IM2HTML::ThumbType,
+	  DIDTHUMB	=> {},
+	  IMSIZE	=> {},
+	  THSIZE	=> {},
+	}, $class;
 
-	  local($_);
+  local($_);
 
-	  # inherit particular parameters
-	  for (PFX,DOTDIR,DOTHUMBS,DOIMSTAT,TABLEWIDTH,TABLELENGTH,
-		THUMBMAX,THUMBTYPE)
-		{ $this->{$_}=$inherit->{$_} if exists $inherit->{$_};
-		}
-
-	  $this;
+  # inherit particular parameters
+  for (PFX,DOTDIR,DOTHUMBS,DOIMSTAT,TABLEWIDTH,TABLELENGTH,
+	THUMBMAX,THUMBTYPE)
+	{ $this->{$_}=$inherit->{$_} if exists $inherit->{$_};
 	}
+
+  $this;
+}
 
 # object for subdirectory
 sub SubNew($$)	{ my($this,$subdir)=@_;
@@ -138,16 +138,16 @@ sub FetchParam($$){ my($this,$part)=@_;
 		  }
 
 sub WriteHTMLFile($$;)
-		{ my($this,$rpath)=(shift,shift);
+{ my($this,$rpath)=(shift,shift);
 
-		  ## warn "writing ".$this->SubPath($rpath)."\n";
-		  my $s = $this->Sink($rpath);
+  ## warn "writing ".$this->SubPath($rpath)."\n";
+  my $s = $this->Sink($rpath);
 
-		  return 0 if ! defined $s;
+  return 0 if ! defined $s;
 
-		  cs::HTML::tok2s($s,@_);
-		  1;
-		}
+  cs::HTML::tok2s($s,@_);
+  1;
+}
 
 # hook for writing data within directory
 sub Sink($$)	{ my($this,$rpath)=@_;
@@ -224,18 +224,18 @@ sub IsFile($$)
 	}
 
 sub Dirents($)
-	{ my($this)=@_;
+{ my($this)=@_;
 
-	  if (! @{$this->{DIRENTS}})
-	  { $this->{DIRENTS}=[ sort { $a cmp $b; }
-				      grep(/^[^.]/,
-					   cs::Pathname::dirents($this->Dir())
-				     )
-			       ];
-	  }
+  if (! @{$this->{DIRENTS}})
+  { $this->{DIRENTS}=[ sort { $a cmp $b; }
+			      grep(/^[^.]/,
+				   cs::Pathname::dirents($this->Dir())
+			     )
+		       ];
+  }
 
-	  @{$this->{DIRENTS}};
-	}
+  @{$this->{DIRENTS}};
+}
 
 sub Hrefs($)
 	{ my($this)=@_;
