@@ -4,6 +4,8 @@
 #	- Cameron Simpson <cs@zip.com.au> 03jan2003
 #
 
+: ${LOGDIR:=$HOME/var/log}
+
 cmd=`basename "$0"`
 usage="Usage: $cmd [-d instdir]"
 
@@ -39,7 +41,7 @@ PERL5LIB=$LIB:$PERL5LIB
 export LIB INSTALLMAN1DIR INSTALLMAN3DIR PERL5LIB
 
 exec screen -S "cpan-local-$ARCH-$HOST" \
-    logscript -d "${VARLOG:-$HOME/var/log}/build" "cpan-local-$ARCH-$HOST" \
+    logscript -d "$LOGDIR/build" "cpan-local-$ARCH-$HOST" \
     env PERL5LIB= \
     sh -c '
 
