@@ -18,7 +18,7 @@ case "$cmdpath" in
 	HOME=/u/cameron
 	WEBPROXY=proxy:8080
 	;;
-    /home/zapff/cameron/* | /a/zapff/home/cameron/* | /a/ivie/home/cameron/* | /home/ivie/cameron/* | /a/spindler/home/*)
+    /home/zapff/cameron/* | /a/zapff/home/cameron/* )
 	ARCH=redhat.x86.linux
 	SYSTEMID=cisra
 	HOME=/u/cameron
@@ -48,7 +48,10 @@ case "$cmdpath" in
 	echo "\$0=$0"
 	echo "\$cmdpath=$cmdpath"
 	echo " *=$*"
+	echo
 	env|sort
+	echo
+	ls -la
 	exit 0
 	;;
 esac
@@ -59,7 +62,7 @@ SCRIPT_URL=${SCRIPT_URL:-$SCRIPT_NAME}
 SCRIPT_URI=${SCRIPT_URI:-"http://$HTTP_HOST$SCRIPT_URL"}
 http_proxy=$WEBPROXY
 ftp_proxy=$WEBPROXY
-PATH=$HOME/stubs:$HOME/scripts:$HOME/bin/$ARCH:$PATH:/opt/script:/opt/bin:/usr/local/bin
+PATH=$HOME/scripts/stubs:$HOME/scripts:$HOME/bin/$ARCH:$PATH:/opt/script:/opt/bin:/usr/local/bin
 PERL5LIB=$HOME/rc/perl:${PERL5LIB:-'/opt/perl/lib:/usr/lib/perl5'}
 export ARCH SYSTEMID HOME WEBPROXY http_proxy ftp_proxy PATH PERL5LIB
 export SCRIPT_URL SCRIPT_URI CS_WRAPPER
