@@ -1,0 +1,15 @@
+#!/bin/sh
+#
+# Read desk numbers and bg pathnames, incant for fvwm.
+#	- Cameron Simpson <cs@zip.com.au> 28oct2004
+#
+
+awk '{ if (length($2) > 0)
+       { print "Colorset", 1024+$1, "AspectPixmap", $2
+	 cset=1024+$1
+       }
+       else
+       { cset=1023
+       }
+       print "*FvwmBacker: Command (Desk", $1, ") colorset", cset
+     }'
