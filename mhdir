@@ -6,10 +6,8 @@
 
 xit=0
 for d
-do  if [ -d "$d/." ] || mkdir "$d"
-    then >>"$d/.mh_sequences"
-    else xit=1
-    fi
+do  [ -d "$d/." ] || mkdir "$d" || continue
+    [ -s "$d/.mh_sequences" ] || ( echo "unseen:"; echo "replied:"; echo "flagged:"; ) >>"$d/.mh_sequences"
 done
 
 exit $xit
