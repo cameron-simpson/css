@@ -413,7 +413,7 @@ do
 	 '
     ##echo "awkf=[$awkf]" >&2
     opts=`[ ! -s "$cf" ] || sed -e "$sedpreamble" "$cf" | awk "$awkf"` \
-    || { echo "$cmd: sed of config file [$cf] FAILED, skipping $thing !!" >&2
+    || { echo "$cmd: awk of config file [$cf] FAILED, skipping $thing !!" >&2
 	 xit=1
 	 continue
        }
