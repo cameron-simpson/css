@@ -4,12 +4,59 @@
 # Nothing that tohers haven't done before me. Just can't find it.
 #	- Cameron Simpson <cs@zip.com.au> 09may2002
 #
+# Add skipheaders and outputfilter. - cameron 15may2002
+#
 
+use strict qw(vars);
+
+use IO::Handle;
+use Getopt::Std;
 use cs::Misc;
 
-$hadblank=0;
+my $pipeto;
+my $skiphdrs=0;
+my $sigre;
+getopts("P:p:sS:") || die "Usage: $::cmd [-{p|P} pipeto] [{-s|-S sigre}] [filenames...]
+	-p pipeto	Pipe results to the shell command \"pipeto\".
+	-P pipeto	Pipe results to the shell command \"pipeto\", except for the mail headers.
+	-s		Cease pipe on encountering the start of the signature.
+	-S sigregexp	Cease pipe on encountering the start of the signature.
+";
+if ($::opt_p)	{ $pipeto=$::opt_p; }
+if ($::opt_P)	{ $pipeto=$::opt_P; $skiphdrs=1; }
+if ($::opt_s)	{ $sigre='^-- '; }
+if ($::opt_S)	{ $sigre=$::opt_S; }
+
+if ($skiphdrs)
+{
+  HDR:
+  while (defined($_=<>))
+  { print;
+    chomp;
+    last HDR if ! length;
+  }
+}
+
+if (defined $pipeto)
+{ flush(STDOUT);
+  open(PIPE,"| $pipeto\0") || die "$::cmd: can't pipe to: $pipeto: $!\n";
+  select(PIPE);
+}
+
+my $hadblank=0;
+
+BODY:
 while(defined($_=<>))
-{ chomp;
+{ if (/$sigre/o && defined $pipeto)
+  { close(PIPE);
+    undef $pipeto;
+    select(STDOUT);
+    print;
+    next BODY;
+  }
+
+  chomp;
+
   s/\s+$//;
   $_=detab($_);
 
@@ -25,3 +72,9 @@ while(defined($_=<>))
   { $hadblank=1;
   }
 }
+
+if (defined $pipeto)
+{ close(PIPE);
+}
+
+close(STDOUT);
