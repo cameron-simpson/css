@@ -1,0 +1,58 @@
+#!/bin/sh
+#
+# Extract manual entries from C source files.
+#	- Cameron Simpson, January 1992
+#
+# Added -h option. - Cameron Simpson, September 1992
+#
+
+cmd=`exec basename "$0"`
+usage="Usage: $cmd [-d mandir] [-I incdir]... [-h header]... [-s mansection] \\
+		[C-files...]
+	-h header	.so header at the start of completed entries."
+etc=$HOME/etc/$cmd
+
+badargv=
+mandir=
+Iflags=
+hflags=
+mansection=
+while :
+do
+    case "$1" in
+	-d)	mandir=$2; shift ;;
+	-I)	Iflags="$Iflags -I '$2'"; shift ;;
+	-h)	hflags="$hflags -h '$2'"; shift ;;
+	-s)	mansection="$1 '$2'"; shift ;;
+	--)	shift; break ;;
+	-*)	echo "$cmd: unrecognised option '$1'" >&2
+		badargv=1
+		;;
+	*)	break ;;
+    esac
+    shift
+done
+
+case "$badargv" in '') ;; *) echo "$usage" >&2; exit 2 ;; esac
+
+case $# in 0) set x *.h *.c; shift ;; esac
+
+[ -n "$mandir" ] || { mandir=.; echo "$cmd: warning: mandir=$mandir" >&2; }
+
+workdir=/tmp/$cmd.$$
+
+xit=0
+tidied=
+tidy='[ $tidied ] || { echo "tidying up ..." >&2; rm -r "$workdir"; tidied=1; }'
+trap "$tidy; xit=1; exit 1" 1 2 3 15
+
+mkdir $workdir || exit $?
+
+echo "extracting manual text ..." >&2
+eval "$etc/getman.pl -v -d \"\$workdir\" $Iflags $mansection \"\$@\""
+
+echo "collating manual text ..." >&2
+$etc/mrgman.pl "$workdir" "$mandir"
+
+eval "$tidy"
+exit $xit
