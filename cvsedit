@@ -87,7 +87,7 @@ base=`basename "$file"`
 
 ( set -x
   if [ $isfilter ]
-  then  exec filteredit -discard $arg1opts -- "$file" "$@"
+  then  exec filteredit $arg1opts -discard -- "$file" "$@"
   else  exec arg1 $arg1opts -- "$file" "$@"
   fi
 )
