@@ -7,4 +7,4 @@
 
 [ $# = 1 ] || { echo "Usage: $0 folder <mailitem" >&2; exit 2; }
 
-exec /usr/lib/nmh/rcvstore "$1" -unseen
+exec lock "filemailitem$1" /usr/lib/nmh/rcvstore "$1" -unseen
