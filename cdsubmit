@@ -218,13 +218,17 @@ done
 # anything else on the input is extended data
 # NB: this used to be a plain sed invocation:
 #	sed -n '/[^ 	]/s/^/EXTD=/p'
-#     but there's a great bug in Linux sed
+#     but there's a great bug in GNU sed
 #     where they've stuffed up mmap()ed I/O
 #     and lose the read pointer :-(
 #     Bug report and patch submitted!
+#     But a sullen silence from the maintainers :-(
+needEXTD=1
 while read -r line
 do  echo "EXTD=$line"
+    needEXTD=
 done
+[ $needEXTD ] && echo EXTD=
 
 n=0
 for offset
