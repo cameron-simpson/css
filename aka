@@ -1,0 +1,92 @@
+#!/usr/bin/perl
+#
+# Become user; bypass shell.	- Cameron Simpson, 02may94
+#
+# Bug: doesn't fiddle with secondary groups at all.
+#
+
+($cmd=$0) =~ s:.*/::;
+$usage="Usage: $cmd user [-g gid] [-s shell] [-ls|-c sh-command]
+	-g gid		Specify GID instead of consulting passwd file.
+	-s shell	Specify shell to run.
+	-ls		Run a login shell.
+	-c command	Run \"sh -c command\" (or other shell as specified).
+";
+
+$shell='/bin/sh';
+$dologin=0;
+undef $command;
+undef $withgid;
+undef $user;
+@SHELLARGS=();
+
+$badopts=0;
+ARGV:
+  while (defined($_=shift))
+	{ if (!/^-/)
+		{ if (defined $user)
+			{ unshift(@ARGV,$_);
+			  last ARGV;
+			}
+		  
+		  $user=$_;
+		  next ARGV;
+		}
+
+	  last ARGV if $_ eq '--';
+
+	  if ($_ eq '-s')	{ $shell=shift; }
+	  elsif ($_ eq '-g')	{ $withgid=shift; }
+	  elsif ($_ eq '-ls')	{ $dologin=1; }
+	  elsif ($_ eq '-c')	{ @SHELLARGS=('-c',shift); }
+	  else
+	  { print STDERR "$cmd: $_: unrecognised option\n";
+	    $badopts=1;
+	  }
+	}
+
+if ($#ARGV >= $[)
+	{ print STDERR "$cmd: extra arguments: @ARGV\n";
+	  $badopts=1;
+	}
+
+if (!defined $user)
+	{ print STDERR "$cmd: missing user name\n";
+	  $badopts=1;
+	}
+
+die $usage if $badopts;
+
+if ($user =~ /^#(\d+)$/)
+	{ ($login,$passwd,$uid,$gid,
+           $quota,$comment,$gcos,$dir,$ushell) = getpwuid($1);
+	}
+else
+{ ($login,$passwd,$uid,$gid,
+   $quota,$comment,$gcos,$dir,$ushell) = getpwnam($user);
+}
+
+die "$cmd: who is $user?\n" unless defined($login);
+
+eval '$(=$gid'; warn $@ if $@;
+$)=$gid;
+eval '$<=$uid'; warn $@ if $@;
+$>=$uid;
+($<,$()=($uid,$gid);
+($>,$))=($uid,$gid);
+
+if ($dologin)
+	{ die "$cmd: can't cd to ~$login ($dir): $!\n" unless chdir $dir;
+	  %ENV=(PATH,'/opt/bin:/usr/bin:/bin:/usr/ucb:/usr/bsd:.',
+		HOME,$dir,
+		USER,$login,
+		SHELL,$shell,
+		TERM,$ENV{TERM},
+		ARCH,$ENV{ARCH});
+	}
+
+@ARGV=($dologin ? '-' : $shell, @SHELLARGS);
+
+exec $shell @ARGV;
+print STDERR "$cmd: can't execvp($shell @ARGV): $!\n";
+exit 1;
