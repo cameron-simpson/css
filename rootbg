@@ -1,0 +1,70 @@
+#!/bin/sh
+#
+# Set the root backdrop.
+#	- Cameron Simpson <cs@zip.com.au> 20nov2000
+#
+# -xpl for xplanet support - cameron 30nov2000
+#
+
+cmd=$0
+usage="Usage: $0 [[!]/ptn/] [imagefile]
+	$0 -xpl"
+
+if [ "x$1" = x-xpl ]
+then
+
+    shift
+
+    imdir=$HOME/etc/im
+    backdrop=$imdir/places/sydney_harbour.jpg
+    clouddir=$imdir/space
+    clouds=$clouddir/clouds_1600.jpg
+    ssecclouds=$clouddir/latest_moll.gif
+    dem=$imdir/space/earth-dem-5min.gif
+    nightside=$imdir/space/earthlights_dmsp_big.jpg
+    dayside=$imdir/space/earth_2400.jpg
+
+    # pick a view on the Sydney side of the planet
+    lat=`tzcoord.pl Sydney | perl -e '$_=<STDIN>; /^([^.]+)/ || die; srand((time^$$)+getppid()); print int($1-89.5+rand(180))'`
+
+    ## -demfile "$dem" -grid
+    ## -cloud_image "$clouds" \
+    nice xplanet \
+	    -background "$backdrop" \
+	    -blend \
+	    -cloud_ssec "$ssecclouds" \
+	    -image "$dayside" \
+	    -label -labelpos -15-15 \
+	    -markers \
+	    -night_image "$nightside" \
+	    -observer "$lat,0" \
+	    -radius 40 \
+	    -root \
+	    ${1+"$@"} \
+	    &
+
+    exit 0
+fi
+
+ptn=${SETRXVTPTN:-"/./"}
+case $1 in
+    /* | !/*)	[ -s "$1" ] || { ptn=$1; shift; } ;;
+esac
+
+case $# in
+    0)	src=`bglist -n 20 -w -p "$ptn" | pickn`
+	[ -n "$src" ] \
+	|| { echo "$cmd: no images matching \"$ptn\"" >&2
+	     exit 1
+	   }
+	;;
+    1)	src=$1 ;;
+    *)	shift; echo "$cmd: extra arguments: $*" >&2; exit 2 ;;
+esac
+
+[ -n "$DISPLAY" ] || { echo "$cmd: no \$DISPLAY!" >&2; exit 1; }
+
+case "$src" in
+    *.gif|*.xpm)	2xpm -s root "$src" xpmroot & ;;
+    *)			2png -s root "$src" display -window root & ;;
+esac
