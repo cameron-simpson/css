@@ -5,22 +5,29 @@
 #
 
 use strict qw(vars);
+
 use cs::Misc;
 use cs::Source;
 use cs::RFC822;
 
-my $H = new cs::RFC822 (new cs::Source (FILE,STDIN));
-
 my %set;
 
-# collect addresses from the headers
-for my $hdr (BCC,REPLY_TO,CC,TO,FROM)	# <-- least trusted to most trusted
-{ my $body = $H->Hdr($hdr);
-  my $addrs = cs::RFC822::addrSet($body);
-
-  for my $key (keys %$addrs)
-  { $set{lc($key)}=$addrs->{$key};
+if (@ARGV)
+{ for my $file (@ARGV)
+  { if ($file eq '-')
+    { grab(STDIN,'stdin');
+    }
+    elsif (! open(FILE,"< $file\0"))
+    { warn "$::cmd: open($file): $!\n";
+    }
+    else
+    { grab(FILE,$file);
+      close(FILE);
+    }
   }
+}
+else
+{ grab(STDIN,'stdin');
 }
 
 # recite the addresses with commentry
@@ -55,3 +62,20 @@ for my $key (sort keys %set)
 }
 
 exit 0;
+
+sub grab
+{ my($F, $name)=@_;
+
+  my $S = new cs::Source(FILE,"main::$F");
+  my $H = new cs::RFC822 $S;
+
+  # collect addresses from the headers
+  for my $hdr (BCC,REPLY_TO,CC,TO,FROM)	# <-- least trusted to most trusted
+  { my $body = $H->Hdr($hdr);
+    my $addrs = cs::RFC822::addrSet($body);
+
+    for my $key (keys %$addrs)
+    { $set{lc($key)}=$addrs->{$key};
+    }
+  }
+}
