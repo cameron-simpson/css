@@ -27,6 +27,7 @@ qargs=`shqstr "$@"`
 
 exec term -n "++ $*" \
 	  -c "set -- $qargs"'
-	      res=`mrx-query "$@"` || exit 1
-	      + -f +t -R "$res"
+	      res=`mrx-query "$@"`
+	      + +t -f "$res"
+	      set -x
 	      rm -rf "$res"'
