@@ -36,6 +36,10 @@ use Getopt::Std;
 
 sub URLsavepath($);
 
+if (! exists $::ENV{TMPDIR} || !length $::ENV{TMPDIR})
+{ $::ENV{TMPDIR}='/tmp';
+}
+
 ## open(STDERR,">>/dev/pts/5");
 
 undef $::AbsBase;
@@ -409,7 +413,7 @@ then URLs are read from standard input, one per line.
 
 $::NeedSleep=0;
 
-$::TmpPfx=".$::cmd$$";
+$::TmpPfx="$::ENV{TMPDIR}/$::cmd$$";
 $::TmpCount=1;
 sub newtmp() { $::TmpPfx."-".$::TmpCount++; }
 
