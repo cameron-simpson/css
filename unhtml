@@ -4,7 +4,18 @@
 #	- Cameron Simpson <cs@zip.com.au> 17may2002
 #
 
+mangle=1
+[ "x$1" = x-a ] && { shift; mangle=; }
+
+cols=`ttysize|awk '{print$1}'`
+[ -n "$cols" ] && cols="-cols $cols"
+
 detab ${1+"$@"} \
+| htclean \
 | sed 's|</ *[Aa] *>|&|g' | tr '\015' '\012' \
-| sed 's|<[Aa] [^>]*[Hh][Rr][Ee][Ff]=\([^ >]*\)[^>]*> *\(.*\)</[Aa]>|\2 \&lt;\1\&gt;|g' \
-| w3m -dump -T text/html
+| if [ $mangle ]
+  then sed 's|<[Aa] [^>]*[Hh][Rr][Ee][Ff]=\([^ >]*\)[^>]*> *\(.*\)</[Aa]>|\2 \&lt;\1\&gt;|g'
+  else cat
+  fi \
+| (: set -x; w3m $cols -dump -T text/html) \
+| sed 's/[ 	][ 	]*$//'
