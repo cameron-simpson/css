@@ -88,6 +88,10 @@ toc_zip='pageif unzip -l $formopts /dev/fd/0'
 extract_zip='unzip -d . $formopts /dev/fd/0'
 view_zip=$toc_zip
 
+toc_exe=$toc_zip
+extract_exe=$extract_zip
+view_exe=$view_zip
+
 toc_rpm='pageif rpm $verb -q -p /dev/fd/0 -i -R --provides -l $formopts'
 extract_rpm='rpm -U $verb -h $formopts /dev/fd/0'
 view_rpm=$toc_rpm
