@@ -1,0 +1,88 @@
+#!/bin/sh
+#
+# Rsync my account from one place to another.
+# Usually I use putacc to call this, but occasionally getacc.
+#	- Cameron Simpson <cs@zip.com.au> 29jun2004
+#
+
+cmd=$0
+usage="Usage: $cmd from to"
+
+[ $# = 2 ] || { echo "$usage" >&2; exit 2; }
+from=$1 to=$2
+case "$from" in ''|*:) ;; *) from=$from: ;; esac
+case "$to" in   ''|*:) ;; *) to=$to:     ;; esac
+
+exec \
+  rsync -rlptHvP --delete --exclude=CVS/ \
+	'--include=/.bash_logout' \
+	'--include=/.bash_profile' \
+	'--include=/.bashrc' \
+	'--include=/.cvsrc' \
+	'--include=/.getnews-state' \
+	'--include=/.gtkrc' \
+	'--include=/.gtkrc-2.0' \
+	'--include=/.less' \
+	'--include=/.lesskey' \
+	'--include=/.mailcap' \
+	'--include=/.mh_profile' \
+	'--include=/.muttrc' \
+	'--include=/.profile' \
+	'--include=/.screenrc' \
+	'--include=/.secret' \
+	'--include=/.setvar' \
+	'--include=/.ssh' \
+	'--include=/.ssh/config' \
+	'--exclude=/.ssh/*' \
+	'--include=/.termenv' \
+	'--include=/.xinitrc' \
+	'--include=/.xsession' \
+	'--include=/.zprofile' \
+	'--include=/.zshenv' \
+	'--include=/.zshrc' \
+	'--include=/rc' \
+	'--include=/rc/@' \
+	'--include=/rc/cvs' \
+	'--include=/rc/env' \
+	'--include=/rc/getnews' \
+	'--include=/rc/gnupg' \
+	'--include=/rc/gnupg/options' \
+	'--include=/rc/gnupg/pubring.gpg' \
+	'--exclude=/rc/gnupg/*' \
+	'--include=/rc/gtk' \
+	'--include=/rc/less' \
+	'--include=/rc/lesskey' \
+	'--include=/rc/mail' \
+	'--include=/rc/mail/mailcap' \
+	'--include=/rc/mail/mutt*' \
+	'--include=/rc/mail/signature' \
+	'--exclude=/rc/mail/*' \
+	'--include=/rc/mh' \
+	'--include=/rc/myke' \
+	'--include=/rc/nvi' \
+	'--include=/rc/perl' \
+	'--include=/rc/rterm.ini' \
+	'--include=/rc/screen' \
+	'--include=/rc/secret' \
+	'--include=/rc/secret/keys' \
+	'--exclude=/rc/secret/keys/keys.gpg' \
+	'--exclude=/rc/secret/keys/*' \
+	'--exclude=/rc/secret/*' \
+	'--include=/rc/shell' \
+	'--include=/rc/ssh' \
+	'--include=/rc/tdl' \
+	'--include=/rc/term' \
+	'--include=/rc/vi' \
+	'--include=/rc/x11' \
+	'--exclude=/rc/*' \
+	'--include=/scripts' \
+	'--include=/scripts/cs/' \
+	'--include=/scripts/stubs/' \
+	'--include=/scripts/synonyms/' \
+	'--exclude=/scripts/*/' \
+	'--include=/var' \
+	'--include=/var/*/' \
+	'--exclude=/var/*/*' \
+	'--exclude=/var/*' \
+	'--exclude=/*' \
+	"$from." "$to."
