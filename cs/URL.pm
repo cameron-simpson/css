@@ -1505,7 +1505,7 @@ sub _Get($$;$$$)
     $context="$::cmd: GET $url";
 
     if ($cs::URL::_Getting{$url})
-    { warn "$context:\n\tredirection loop detected";
+    { warn "$context:\n\tredirection loop detected\n\tURL=$url";
       last GET;
     }
 
