@@ -1,0 +1,31 @@
+#!/bin/sh
+#
+# Expand @author tags to have home page and email HREFs.
+#	- Cameron Simpson <cs@zip.com.au> 14mar2003
+#
+
+cmd=$0
+usage="Usage: $cmd [--no-cvs] javafiles..."
+
+usecvs=1
+[ "x$1" = x--no-cvs ] && { usecvs=; shift; }
+[ $# = 0 ] && { echo "$usage" >&2; exit 2; }
+
+xit=0
+
+short="$NAME &lt;$PUBLICEMAIL&gt;"
+
+for file
+do
+  fgrep "$short" <"$file" >/dev/null || continue
+  ( set bsed "s|@author $short|@author <A HREF=\"$WWW_HOME\">$NAME</A> \&lt;<A HREF=\"mailto:$PUBLICEMAIL\">$PUBLICEMAIL</A>\&gt;|"
+    if ifcvs "$file"
+    then
+	exec cvsedit --no-diff -m "expand @author HREFs" "$file" "$@"
+    else
+	exec "$@" "$file"
+    fi
+  ) || { xit=1; break; }
+done
+
+exit $xit
