@@ -1,0 +1,6 @@
+#!/bin/sh
+
+trap 2vt 0 1 2 15
+
+2tek || exit $?
+ditroff -Tpsc ${1+"$@"} | tc
