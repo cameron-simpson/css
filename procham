@@ -3,7 +3,7 @@ exec >/dev/null 2>/dev/tty
 tmp=${TMPDIR:-/tmp}/procham$$
 cat >"$tmp" || exit 1
 exec </dev/null
-( bogofilter -N <"$tmp"
+( bogofilter -Sn <"$tmp"
   procmail <"$tmp"
   rm "$tmp"
 ) &
