@@ -1,0 +1,11 @@
+#!/bin/sh
+#
+# Run app-helper with the autoview mode on, defaulting to view-unknown.
+#	- Cameron Simpson <cs@zip.com.au> 17dec2002
+#
+
+cmd=$0
+[ $# = 0 ] && { echo "Usage: $cmd file [command [args...]]" >&2; exit 2; }
+[ $# = 1 ] && { set x "$1" view-unknown; shift; }
+file=$1; shift
+exec apphelper "$file" -y "$@"
