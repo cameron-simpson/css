@@ -1,0 +1,11 @@
+#!/bin/sh
+#
+# Sequenced cat command. See lockedoutput.
+#	- Cameron Simpson <cs@zip.com.au> 25jul2000
+#
+
+[ $# = 0 ] && { echo "Usage: $0 lockname [files...]" >&2; exit 2; }
+
+lock=$1; shift
+
+exec lockedoutput "$lock" cat ${1+"$@"}
