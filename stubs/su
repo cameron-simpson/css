@@ -6,8 +6,6 @@
 #	- Cameron Simpson, January 1992
 #
 
-login=
-
 if [ -f /usr/bin/opiesu ]
 then realsu=/usr/bin/opiesu
 else if [ -f /usr/bin/su ]
@@ -21,15 +19,30 @@ case $ARCH in
     *.*.solaris)	sush=$BIN/ae ;; # bug workaround
 esac
 
-case $1 in -) login=-; shift ;; esac
-case "$1" in
-	'')	su=root ;;
-	-*)	su=root ;;
-	*)	su=$1; shift ;;
+badopts=
+
+login=
+su=root
+suargs=
+while :
+do  case $1 in
+      -)	login=- ;;
+      -a)	suargs="-a $2"; shift ;;
+      --)	shift; break ;;
+      -*)	echo "$0: unrecognised argument: $1" >&2; badopts=1 ;;
+      *)	break ;;
+    esac
+    shift
+done
+
+[ "x$1" = x- ] && { login=-; shift; }
+case $1 in
+   ''|-*)	;;
+   *)		su=$1; shift ;;
 esac
 
 [ -n "$login" -o $# -gt 0 ] \
-	&& exec "$realsu" $login "$su" ${1+"$@"}
+	&& exec "$realsu" $suargs $login "$su" "$@"
 
 env=/tmp/env.$$.$SYSTEMID.$ARCH
 no-ssh-agent stashenv - >"$env"
@@ -63,5 +76,5 @@ SU
 
 chmod 755 $tmp
 echo exec $sush $tmp
-set-x arg0 su "$realsu" "$su" -c "exec $sush $tmp"
+set-x arg0 su "$realsu" $suargs "$su" -c "exec $sush $tmp"
 rm -f $tmp
