@@ -26,7 +26,7 @@ sub new
   
   ## {my(@c)=caller;warn "new cs::Day $ymd from [@c]";}
 
-  my $this = new cs::Date cs::Date::yyyymmdd2gmt($ymd,$givenlocaltime);
+  my $this = new cs::Date cs::Date::iso2gmt($ymd,$givenlocaltime);
 
   bless $this, $class;
 }
