@@ -1,0 +1,20 @@
+#!/bin/sh
+#
+# Pick a fresh image and update the grub splash backdrop.
+#	- Cameron Simpson <cs@zip.com.au> 13sep2003
+#
+
+splash=/boot/grub/splash.xpm.gz
+
+cmd=`basename "$0"`
+usage="Usage: $cmd [pickim-args]"
+
+if [ $# = 1 ] && [ -s "$1" ]
+then  imagefile=$1; shift
+else  imagefile=`pickim -n 1 -w -r ${1+"$@"}` || exit 1
+fi
+
+[ -s "$imagefile" ] || exit 1
+
+set -x
+exec mkgrubsplash "$imagefile" >"$splash"
