@@ -23,7 +23,7 @@ done
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
-[ $# = 0 ] && { set x `xclip -o`; shift; echo "use xclip $*" >&2; }
+[ $# = 0 ] && { set x `xclip -o`; shift; }
 
 xit=0
 
@@ -41,12 +41,15 @@ do
   (set -x; exec httpget -h -o "$tmpf" "$url") \
   || { xit=1; continue; }
 
-  ( echo "X-URL: $url"
+  (
+    echo "X-URL: $url"
     echo "X-Fetch-Date: `date`"
     sed -n 's/.*<[Tt][Ii][Tt][Ll][Ee]>\(.*\)<\/[Tt][Ii][Tt][Ll][Ee]>.*/Subject: \1/p' <"$tmpf"
     exec cat "$tmpf"
   ) \
-  | /usr/lib/nmh/rcvstore "+$folder" -unseen || xit=1
+  | ( set -x;
+      exec /usr/lib/nmh/rcvstore "+$folder" -unseen
+    ) || xit=1
 done
 
 exit $xit
