@@ -1,7 +1,9 @@
 #!/bin/sh
 #
-# Recent menu backgrounds.
+# Recent root backgrounds.
 #	- Cameron Simpson <cs@zip.com.au>
 #
 
+FVWM_MENU_IMLIST_OP=${FVWM_MENU_IMLIST_OP:-"rootbg"}
+export FVWM_MENU_IMLIST_OP
 exec fvwm-menu-recent-imlist ${1+"$@"} <"$HOME/var/log/rootbg"
