@@ -955,55 +955,59 @@ sub Tok
 
   # collect SGML tokens, assembling structure
   TOK:
-    while (defined ($rt=($this->{SGML}->Tok())))
-    { ## warn "got SGML tok $rt->{TAG}\n";
+  while (defined ($rt=($this->{SGML}->Tok())))
+  { ## warn "got SGML tok $rt->{TAG}\n";
 
-      ## warn "$rt\n" if ! ref $rt;
+    ## warn "$rt\n" if ! ref $rt;
 
-      if (! ref $rt || singular($rt->{TAG}))
-      # scalar or singular? keep
-      {
-	## warn "pushing ".cs::Hier::h2a($rt,0) if $rt->{TAG} eq DL;
-	push(@{$t->{TOKENS}},$rt);
-      }
-      elsif (! $rt->{START})
-      # closing tag
-      { if (exists $enclose->{$rt->{TAG}})
-	# closing tag for something other than this?
-	# push back, fall out
-	# this way we can parse <tag1><tag2></tag1>
-	{ $this->{SGML}->UnTok($rt) if $rt->{TAG} ne $t->{TAG};
-	  last TOK;
+    if (! ref $rt || singular($rt->{TAG}))
+    # scalar or singular? keep
+    {
+      ## warn "pushing ".cs::Hier::h2a($rt,0) if $rt->{TAG} eq DL;
+      push(@{$t->{TOKENS}},$rt);
+    }
+    elsif (! $rt->{START})
+    # closing tag
+    { if (exists $enclose->{$rt->{TAG}})
+      # closing tag for something other than this?
+      # push back, fall out
+      # this way we can parse <tag1><tag2></tag1>
+      { if ($rt->{TAG} ne $t->{TAG})
+	{ $this->{SGML}->UnTok($rt);
+	  ## warn "pushing back </$rt->{TAG}>";
 	}
-	else
-	# unexpected closing token? keep it
-	{ ## warn "pushing ".cs::Hier::h2a($rt,0) if $rt->{TAG} eq DL;
-	  push(@{$t->{TOKENS}},$rt);
-	}
-      }
-      elsif ($this->_MustClose($t->{TAG},$rt->{TAG}))
-      # oooh! a self terminating tag
-      # back out until we hit the closing parent
-      { $this->{SGML}->UnTok($rt);
-	## warn "faking /$t->{TAG} to precede $rt->{TAG}\n";
 	last TOK;
       }
       else
-      # substructure
-      { $this->{SGML}->UnTok($rt);
-	push(@{$this->{TAGSTACK}}, $t);
-	## warn "recurse into $rt->{TAG} from $t->{TAG}\n";
-	push(@{$t->{TOKENS}},$this->Tok($enclose,$pertok));
-	## warn "back to $t->{TAG}\n";
-	pop(@{$this->{TAGSTACK}});
+      # unexpected closing token? keep it
+      { ## warn "pushing ".cs::Hier::h2a($rt,0) if $rt->{TAG} eq DL;
+	push(@{$t->{TOKENS}},$rt);
       }
     }
+    elsif ($this->_MustClose($t->{TAG},$rt->{TAG}))
+    # oooh! a self terminating tag
+    # back out until we hit the closing parent
+    { $this->{SGML}->UnTok($rt);
+      ## warn "faking /$t->{TAG} to precede $rt->{TAG}\n";
+      last TOK;
+    }
+    else
+    # substructure
+    { $this->{SGML}->UnTok($rt);
+      push(@{$this->{TAGSTACK}}, $t);
+      ## warn "recurse into $rt->{TAG} from $t->{TAG}\n";
+      push(@{$t->{TOKENS}},$this->Tok($enclose,$pertok));
+      ## warn "back to $t->{TAG}\n";
+      pop(@{$this->{TAGSTACK}});
+    }
+  }
 
   ## warn "RETURN TOKEN $t->{TAG}\n";
   $this->{ACTIVE}->{$t->{TAG}}=$oldActiveState;
 
   $t=&$pertok($t) if defined $pertok;
 
+  ## warn "MATCH: ".tok2a($t);
   return $t;
 }
 
