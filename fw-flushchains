@@ -33,7 +33,7 @@ iptables -A FORWARD -j FW_FORWARD
 iptables -A LOGREJECT -j LOG
 iptables -A LOGREJECT -j JUSTREJECT
 
-iptables -A JUSTREJECT -p tcp -m tcp -j REJECT
+iptables -A JUSTREJECT -p tcp -m tcp -j REJECT --reject-with tcp-reset
 iptables -A JUSTREJECT -p udp -m udp -j REJECT
 iptables -A JUSTREJECT -j DROP
 
