@@ -14,6 +14,11 @@ safePrefixRe = re.compile('^'+safeChunkPtn)
 safeStringRe = re.compile('^'+safeChunkPtn+'$')
 integerRe    = re.compile('^-?[0-9]+$')
 
+def flavour(o):
+  if hasattr(o,'__keys__'): return 'HASH'
+  if hasattr(o,'__iter__'): return 'ARRAY'
+  return 'SCALAR'
+
 def h2a(o,i=None):
   buf=StringIO()
   io=cs.io.IndentedFile(buf,i)
