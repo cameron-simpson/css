@@ -1,0 +1,12 @@
+#!/bin/sh
+#
+# Grab the <body> of some HTML on stdin.
+# A bit simple minded but works pretty widely.
+#	- Cameron Simpson <cs@zip.com.au> 18may2004
+#
+
+sed -e '/<[Hh][Ee][Aa][Dd]>/,/<\/[Hh][Ee][Aa][Dd]>/d' \
+    -e '/<[Hh][Tt][Mm][Ll]>/d' \
+    -e '/<\/[Hh][Tt][Mm][Ll]>/d' \
+    -e '/<[Bb][Oo][Dd][Yy]>/d' \
+    -e '/<\/[Bb][Oo][Dd][Yy]>/d' ${1+"$@"}
