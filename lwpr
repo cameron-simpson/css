@@ -1,0 +1,46 @@
+#!/bin/sh
+#
+usage="Usage: $0 [-1234] [-h heading] [-l lines] [-P printer] files..."
+
+set -x
+columns=-2 width=80 lines=144 laser=laser title=
+while [ $# -gt 0 ]
+do
+      case "$1" in
+	  -1)	columns=$1 width=161 ;;
+	  -2)	columns=$1 width=80 ;;
+	  -3)	columns=$1 width=53 ;;
+	  -4)	columns=$1 width=40 ;;
+	  -h)	title=$2; shift ;;
+	  -l)	lines=$2; shift ;;
+	  -P)	laser=$2; shift
+		case "$laser" in
+			laser1)	lines=150 ;;
+			*)	;;
+		esac
+		;;
+	  *)	break ;;
+      esac
+      shift
+done
+
+case $# in
+    0)	expand |
+	sed 's/.//g' |
+	fold -$width |
+	pr "$columns" -h "$i" -w162 "-l$lines" |
+	lpscript -o1 -s5.5 |
+	hlpr "$title" "-P$laser"
+	;;
+    *)	[ -n "$title" ] && title=$title:
+	for i
+	do
+		expand <"$i" |
+		sed 's/.//g' |
+		fold -$width |
+		pr "$columns" -h "$title$i" -w162 "-l$lines" |
+		lpscript -o1 -s5.5 |
+		hlpr "$title$i" "-P$laser"
+	done
+	;;
+esac
