@@ -34,9 +34,18 @@ $::Verbose=1 if $::opt_v;
 
 if (! @ARGV)
 { undef $::Dir;
+  if (-t STDIN)
+  { warn "$::cmd: stdin may not be a terminal in filter mode\n";
+    $::badopts=1;
+  }
 }
 else
 { $::Dir=shift(@ARGV);
+  if (! -d "$::Dir/.")
+  { warn "$::cmd: $::Dir: not a directory\n";
+    $::badopts=1;
+  }
+
   if (! @ARGV)
   { warn "$::cmd: missing files\n";
     $::badopts=1;
