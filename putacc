@@ -1,29 +1,54 @@
 #!/bin/sh
 
+needhost amadeus@home || exit 1
+
+hARCH=$ARCH
+
 [ $# -ge 1 ] || { echo "Usage: $0 [login@]hostname" >&2; exit 2; }
 host=$1; shift
 
 cd || exit 1
-
-hasrsync=1
-rrsync=rsync
-
-if [ $# = 0 ]
-then
-    set .profile .zshenv .setvar \
-		  rc/ssh rc/shell rc/env rc/perl rc/vi rc/nvi rc/x11 \
-		  .less .lesskey rc/less rc/lesskey \
-		  .xinitrc .xsession \
-		  there/cameron@cskk.homeip.net/scripts \
-		  there/cameron@cskk.homeip.net/bin/$hARCH \
-		  there/home \
-		  scripts bin
-    hARCH=$ARCH
-fi
-
-for arg
-do  echo "rm -rf $arg"
-done | ssh "$host" sh -x
-
 set -x
-tar cf - "$@" | ssh "$host" tar xvf -
+exec rsync -avHP --delete \
+	'--include=/.bash_logout' \
+	'--include=/.bash_profile' \
+	'--include=/.bashrc' \
+	'--include=/.less' \
+	'--include=/.lesskey' \
+	'--include=/.profile' \
+	'--include=/.secret' \
+	'--include=/.setvar' \
+	'--include=/.xinitrc' \
+	'--include=/.xsession' \
+	'--include=/.zshenv' \
+	'--include=/bin' \
+	'--include=/rc' \
+	'--include=/rc/env' \
+	'--include=/rc/myke' \
+	'--include=/rc/nvi' \
+	'--include=/rc/perl' \
+	'--include=/rc/shell' \
+	'--include=/rc/ssh' \
+	'--include=/rc/vi' \
+	'--include=/rc/x11' \
+	'--exclude=/rc/*' \
+	'--include=/scripts' \
+	'--include=/there' \
+	'--include=/there/cameron@cskk.homeip.net' \
+	'--include=/there/cameron@cskk.homeip.net/bin' \
+	"--include=/there/cameron@cskk.homeip.net/bin/$hARCH" \
+	'--exclude=/there/cameron@cskk.homeip.net/bin/*' \
+	'--include=/there/cameron@cskk.homeip.net/scripts' \
+	'--include=/there/cameron@cskk.homeip.net/scripts/cs/' \
+	'--include=/there/cameron@cskk.homeip.net/scripts/stubs/' \
+	'--include=/there/cameron@cskk.homeip.net/scripts/synonyms/' \
+	'--exclude=/there/cameron@cskk.homeip.net/scripts/*/' \
+	'--exclude=/there/cameron@cskk.homeip.net/*' \
+	'--include=/there/home' \
+	'--exclude=/there/*' \
+	'--include=/var' \
+	'--include=/var/*/' \
+	'--exclude=/var/*/*' \
+	'--exclude=/var/*' \
+	'--exclude=/*' \
+	. "$host:."
