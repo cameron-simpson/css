@@ -1,14 +1,15 @@
 #!/usr/bin/perl
 #
 # Extract discid and track info from a CD as a preliminary to
-# constructnig a FreeDB CDDB entry. Used by cdsubmit.
+# constructing a FreeDB CDDB entry. Used by cdsubmit.
 #	- Cameron Simpson <cs@zip.com.au> 14mar2001
 # 
 
 use strict qw(vars);
 
 use FreeDB;
-## use cs::Hier;
+## use CDDB_get;
+use cs::Hier;
 
 my $dev = '/dev/cdrom';
 
@@ -20,6 +21,11 @@ if (@ARGV)
 }
 
 die $::Usage if @ARGV;
+
+## my @toc = CDDB_get::read_toc($dev);
+## my $total = @toc-1;
+## printf("discid=%08x\n",CDDB_get::cddb_discid($total,\@toc));
+## die "toc=".cs::Hier::h2a(\@toc,1)."\n";
 
 my $fdb = new FreeDB;
 die "$::cmd: can't make new FreeDB object\n" if ! defined $fdb;
