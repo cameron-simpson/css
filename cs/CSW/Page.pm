@@ -41,15 +41,14 @@ require Exporter;
 
 =over 4
 
-=item new cs::Web::CSW::Page I<widget>, I<url>
+=item new cs::Web::CSW::Page I<parent>, I<url>
 
-Establish a new B<cs::Web::CSW::Page> object showing I<url>
-using the Canvas I<widget> supplied.
+Establish a new B<cs::Web::CSW::Page> object showing I<url>.
 
 =cut
 
 sub new($$$)
-{ my($class,$w,$url)=@_;
+{ my($class,$W,$url)=@_;
 
   my $dbh = cs::Web::CSW::dbh();
 
@@ -59,6 +58,9 @@ sub new($$$)
 					   });
 
   my $wdb = cs::Web::CSW::table('WINDOWS');
+
+  my $w = $W->TopLevel();
+  my $page = new cs::Tk::WebPage ($w,$url);
 
   my $this = { REC => $wdb->{$id},
 	     };
