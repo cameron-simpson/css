@@ -47,7 +47,7 @@ if (! @ARGV)
 }
 else
 { $::Dir=shift(@ARGV);
-  if (! -d "$::Dir/.")
+  if (! $::MakeDir && ! -d "$::Dir/.")
   { warn "$::cmd: $::Dir: not a directory\n";
     $::badopts=1;
   }
