@@ -4,6 +4,8 @@
 #	- Cameron Simpson <cs@zip.com.au> 21apr1999
 #
 
+: ${TMPDIR:=/tmp}
+
 webdir=$HOME/there/adzapper.sourceforge.net/html
 script=scripts/squid_redirect
 base=http://adzapper.sourceforge.net
@@ -14,7 +16,7 @@ myke || exit 1
 
 set -u
 
-tmpf=/tmp/adzap$$
+tmpf=$TMPDIR/adzap$$
 echo "Enter release announcement." >"$tmpf"
 while :
 do
@@ -34,7 +36,7 @@ then
     set adzapper-announce@lists.sourceforge.net
 fi
 
-changetmp=/tmp/change.$$
+changetmp=$TMPDIR/change.$$
 
 saved=patterns-`datecode`.gz
 savedpl=script-`datecode`.gz
