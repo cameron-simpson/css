@@ -1,0 +1,18 @@
+#!/bin/sh
+#
+
+async=
+case $1 in
+  -a)	async=1; shift ;;
+esac
+eval "`setvar -n www`"
+# MOSAICPID=$$
+# echo $MOSAICPID
+# env|fgrep proxy
+exec >/dev/null
+if [ $async ]
+then
+    $REAL/xmosaic -home "$WWW_HOME" ${1+"$@"} &
+else
+    exec $REAL/xmosaic -home "$WWW_HOME" ${1+"$@"}
+fi
