@@ -43,7 +43,7 @@ done
 
 if [ $# = 0 ]
 then
-    echo "$cmd: missindir dir" >&2
+    echo "$cmd: missing dir" >&2
     badopts=1
 else
     dir=$1; shift
