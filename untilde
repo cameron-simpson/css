@@ -17,12 +17,13 @@ $_=$ARGV[0];
 
 if (m:^~([a-z][^/]*)?:)
 { if (length $1)
-  { my @pw = getpwnam($1);
+  { my($user,$tail)=($1,$');
+    my @pw = getpwnam($user);
     if (! @pw)
-    { warn "$::cmd: unknown user \"$1\"\n";
+    { warn "$::cmd: unknown user \"$user\"\n";
     }
     else
-    { $_=$pw[5].$';
+    { $_=$pw[7].$tail;
     }
   }
   else
