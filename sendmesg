@@ -45,13 +45,23 @@ $::Msg->WriteItem(new cs::Sink(FILE,STDOUT));
 my $msgtxt = '';
 $::Msg->WriteItem(new cs::Sink(SCALAR,\$msgtxt));
 
+$::Xit=0;
+
 if (@::Groups)
 { my $NNTP = new cs::NNTP;
-  $NNTP->PostSource(new cs::Source(SCALAR,$msgtxt))
-	|| die "$::cmd: posting via $ENV{NNTPSERVER} fails\n";
+  if (! $NNTP->PostSource(new cs::Source(SCALAR,$msgtxt)))
+  { warn "$::cmd: posting via $ENV{NNTPSERVER} fails\n";
+    $::Xit=1;
+  }
 }
 
 
-my $src = new cs::Source (SCALAR,$msgtxt);
-cs::Mail::Misc::smtpsend($src,@::Email)
-	|| die "$::cmd: mailing via $ENV{SMTPSERVER} fails\n";
+if (@::Email)
+{ my $src = new cs::Source (SCALAR,$msgtxt);
+  if (! cs::Mail::Misc::smtpsend($src,@::Email))
+  { warn "$::cmd: mailing via $ENV{SMTPSERVER} fails\n";
+    $::Xit=1;
+  }
+}
+
+exit $::Xit;
