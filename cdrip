@@ -60,7 +60,7 @@ esac
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
 cdtoc "$dev" \
-| sed 's; */ *;--;g' \
+| sed -e 's;//*; -- ;g' -e 's/   */ /g' \
 | ( read artist	|| exit 1
     read album	|| exit 1
 
