@@ -1,0 +1,120 @@
+#!/usr/bin/perl
+#
+#	- Cameron Simpson <cs@zip.com.au> 
+#
+
+use strict qw(vars);
+
+use cs::Persist;
+use cs::Date;
+use Chart::Lines;
+
+$::DBpath='/home/docs/stats/cisco/logs';
+
+$::Now=time;
+
+$::LocalNowTm=cs::Date::time2tm($::Now,1);
+$::LocalNow=cs::Date::tm2time($::LocalNowTm);
+
+$::LocalTodayTm={ %$::LocalNowTm };
+$::LocalTodayTm->{HH}=0;
+$::LocalTodayTm->{MM}=0;
+$::LocalTodayTm->{SS}=0;
+$::GmTodayStart=cs::Date::tm2time($::LocalTodayTm,1);
+
+die "Now=$::Now, LocalNow=$::LocalNow, GmTodayStart=$::GmTodayStart\n";
+$::TodayStart=tm2time(cs::Date::time2tm($::Now));
+$::HOUR=3600;
+$::DAY=24*3600;
+$::Start;
+
+exit main(@ARGV);
+
+sub main
+	{ my(@ARGV)=@_;
+	  my($Xit)=0;
+
+	  my($stats)=cs::Persist::db('/home/docs/stats/cisco/logs');
+	  my($chart)=new Chart::Lines;
+
+	  $chart->set('title' => 'A Title',
+		      # 'sort'  => ['asc',0,'num'],
+		      # 'colors'=> [[0,0,0],[0,255,0],[0,255,255],[0,0,255]],
+		      'max_val'	=> 128000,
+		     );
+
+	  my($t)=time-14*24*3600;
+	  $t-=$t%3600;
+
+	  my($i,@k,$data,$inrate,$outrate,$datum,$n,@whichTicks,$tm);
+
+	  $n=0;
+	  HOUR:
+	    for $i (0..14*24)
+		{ 
+		  if ($i % 24 == 0)
+			{ push(@whichTicks,$n)
+				if ! @whichTicks || $whichTicks[$#whichTicks] != $n;
+			}
+
+		  @k=time2statset($t);
+		  warn "t=$t, path=[@k]\n";
+		  $data=dataset($stats,@k);
+		  $t+=3600;
+		  next HOUR if ! defined $data;
+
+		  @k=sort { $a <=> $b } keys %$data;
+		  warn "t=$t, k=[@k]\n";
+		  for (@k)
+			{
+			  $datum=$data->{$_};
+			  ## warn "data=".cs::Hier::h2a($data,0)."\n";
+			  $inrate =$datum->{BRI01}->{INRATE}
+				  +$datum->{BRI02}->{INRATE};
+			  $outrate=$datum->{BRI01}->{OUTRATE}
+				  +$datum->{BRI02}->{OUTRATE};
+
+			  $tm=cs::Date::time2tm($_);
+			  $chart->add_pt(sprintf("%d %s",
+						 $tm->{MDAY},
+						 $cs::Date::Mon_names[$tm->{MON}-1]),
+			  		 $inrate,$outrate);
+			  $n++;
+			}
+
+		  ## last HOUR if $n >= 100;
+		}
+
+	  $chart->set('custom_x_ticks' => \@whichTicks);
+	  $chart->set('legend_labels'  => ['Incoming','Outgoing']);
+
+	  print $chart->raw_gif;
+
+	  return $Xit;
+	}
+
+sub dataset
+	{ my($db,@k)=@_;
+	  die "db ($db) is not a ref!" if ! ref $db;
+	  
+	  my($k);
+
+	  while (@k)
+		{ $k=shift(@k);
+		  return undef if ! exists $db->{$k};
+		  $db=$db->{$k};
+		}
+
+	  $db;
+	}
+
+# gmtime => (month,day,hour) key set
+sub time2statset
+	{ my($time)=@_;
+	  my($tm)=cs::Date::time2tm($time);
+
+	  (sprintf("%04d-%02d",$tm->{YEAR},$tm->{MON}),
+	   sprintf("%02d%3s",$tm->{MDAY},$cs::Date::wday_names[$tm->{WDAY}]),
+	   sprintf("%02d",$tm->{HH})
+	  );
+	}
