@@ -97,18 +97,23 @@ but it's very convenient.
 
 =cut
 
-sub hashtable($$$)
-{ my($dbh,$table,$keyfield)=@_;
+undef %cs::DBI::_HashTables;
+
+sub hashtable($$$;$)
+{ my($dbh,$table,$keyfield,$where)=@_;
+  $where='' if ! defined $where;
+
+  return $cs::DBI::_HashTables{$dbh,$table,$keyfield,$where}
+  if exists $cs::DBI::_HashTables{$dbh,$table,$keyfield,$where};
 
   my $h = {};
 
   ::need(cs::DBI::Table::Hash);
-
-  if (! tie %$h, cs::DBI::Table::Hash, $dbh, $table, $keyfield)
+  if (! tie %$h, cs::DBI::Table::Hash, $dbh, $table, $keyfield, $where)
   { return undef;
   }
 
-  $h;
+  $cs::DBI::_HashTables{$dbh,$table,$keyfield,$where}=$h;
 }
 
 =item sql(I<dbh>,I<sql>)
