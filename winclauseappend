@@ -1,0 +1,46 @@
+#!/bin/sh
+#
+# Append lines to a particular clause in a windows style .ini file.
+#	- Cameron Simpson <cs@zip.com.au> 13jul2004
+#
+
+cmd=$0
+usage="Usage: $cmd filename clause <extra-lines"
+
+[ $# = 2 ] || { echo "$usage" >&2; exit 2; }
+filename=$1 clause=$2; shift; shift
+
+# clause not there? just make it
+if [ ! -s "$filename" ] \
+|| not grep "^ *\\[ *$clause *\\]" <"$filename" >/dev/null
+then
+  { echo "[$clause]"
+    cat
+  } >>"$filename"
+  exit $?
+fi
+
+lines=
+while read -r line
+do
+  lines="$lines\\
+$line"
+done
+
+sedf="/^ *\[ *$clause *\]/{
+	     n
+	     :in
+	     /^ *\[/b insert
+	     \$b append
+	     n
+	     b in
+	     :append
+	     a$lines
+	     b out
+	     :insert
+	     i$lines
+	     b out
+	   }
+	   :out"
+
+exec bsed "$sedf" "$filename"
