@@ -23,7 +23,7 @@ die $::Usage if @ARGV;
 my $fdb = new FreeDB;
 die "$::cmd: can't make new FreeDB object\n" if ! defined $fdb;
 
-$fdb->{_debug}=99;
+## $fdb->{_debug}=99;
 
 $fdb->cdrom_device($dev);
 # $fdb->proxy_value("http://proxy:8080/");
