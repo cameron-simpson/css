@@ -8,7 +8,7 @@
 
 phtmp=/tmp/ph$$
 
-cat $HOME/.phone /usr/local/misc/phonedir.auto /usr/local/misc/phonedir \
+cat $HOME/.phone /home/docs/misc/phonedir.auto /home/docs/misc/phonedir \
 	>$phtmp 2>/dev/null
 
 for ptn
