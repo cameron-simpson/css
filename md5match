@@ -11,6 +11,8 @@
 #	- Cameron Simpson <cs@zip.com.au> 21jun2000
 #
 
+: ${TMPDIR:=/tmp}
+
 cmd=`basename "$0"`
 usage="Usage: $cmd md5indices... <filenames"
 
@@ -22,7 +24,7 @@ badopts=
 
 set -u
 
-tmp=/tmp/$cmd$$
+tmp=$TMPDIR/$cmd$$
 
 in=$tmp.in
 ndxdata=$tmp.ndx
