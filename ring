@@ -1,4 +1,4 @@
-#!/usr/bin/perl
+#!/usr/bin/perl -w
 #
 # Usage: ring [-a] [-f file]... patterns...
 #
@@ -62,6 +62,8 @@ if (! @phonelists)
   for (split(/:/,$telnos))
   { unshift(@phonelists,$_) if -e $_;
   }
+
+  warn "phonelists=[@phonelists]";
 }
 
 if (! @ARGV)
@@ -79,13 +81,13 @@ die $usage if $badopts;
 $ringptn=join('|',@ARGV);
 
 for (@phonelists)
-{ &phone($_);
+{ phone($_);
 }
 
 sub phone
 { local($_)=@_;
 
-  $VERBOSE && warn "$_ ...\n";
+  $verbose && warn "$_ ...\n";
 
   if ($_ eq '-')
   { phonefile($_);
@@ -107,7 +109,7 @@ sub phone
     }
   }
   else
-  { &phonefile($_);
+  { phonefile($_);
   }
 }
 
@@ -121,7 +123,8 @@ sub phonefile
 	  : $file =~ /\.pgp$/
 	    ? $usepgp
 	      && length($ENV{PGPPASS})
-	      && open(PHONES,"pgp -fd <'$file' |")
+	      ? open(PHONES,"pgp -fd <'$file' |")
+	      : open(PHONES,"< /dev/null\0")
 	    : open(PHONES,"< $file\0"))
   {}
   else
@@ -135,9 +138,10 @@ sub phonefile
   local($context,$first,$entry)=($file,1);
   undef $entry;
 
-  while (<PHONES>)
-  { if (/^\S/)
-    { &checkit($file,$entry) if defined($entry);
+  while (defined($_=<PHONES>))
+  {
+    if (/^\S/)
+    { checkit($file,$entry) if defined $entry;
       $entry=$_;
     }
     else
@@ -147,7 +151,7 @@ sub phonefile
 
   close(PHONES);
 
-  &checkit($file,$entry) if defined($entry);
+  checkit($file,$entry) if defined $entry;
 }
 
 sub checkit
