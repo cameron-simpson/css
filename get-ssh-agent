@@ -14,7 +14,7 @@ badopts=
 
 [ "x$1" = x-v ] && { verbose=1; shift; }
 
-[ $# = 0 ] || statefile=$1; shift
+[ $# = 0 ] || { statefile=$1; shift; }
 
 [ $# = 0 ] || { echo "$cmd: extra arguments: $*" >&2; badopts=1; }
 
