@@ -1,0 +1,29 @@
+#!/usr/bin/perl
+#
+# Read filenames from stdin.
+# Report basename and the directories in which it occurs on stdout.
+#	- Cameron Simpson <cs@zip.com.au> 28nov97
+#
+
+open(STDIN,"find @ARGV -type f -print |") if @ARGV;
+
+while (<STDIN>)
+	{ chomp;
+	  if (m:(.*)/:)
+		{ $dir=$1; $base=$';
+		}
+	  else	{ $dir='.'; $base=$_;
+		}
+
+	  if (! exists $db->{$base})
+		{ $db->{$base}=[];
+		}
+
+	  push(@{$db->{$base}},$dir);
+	}
+
+for (sort keys %$db)
+	{ print "$_ ",
+		join(" ",sort @{$db->{$_}}),
+		"\n";
+	}
