@@ -1,0 +1,153 @@
+#!/bin/sh
+#
+# dcmp	- Cameron Simpson, Feb 1988
+#
+# Compares the contents of the two directories.
+# A summary of the differences is produced.
+
+cmd=`exec basename "$0"`
+usage="Usage: $cmd [-n] {-x|-X} dir1 dir2
+	-n	No action - report planned actions.
+	-x	Remove files in dir1 which have identical counterparts in
+		dir2.
+		BUG: There should really be a check that dir1 and dir2 are
+		     distinct directories, lest genocide occur.
+	-X	Remove files in dir1 which have identical counterparts in
+		dir2.  Files in dir1 which do not exist in dir2 are moved to
+		appropriate positions in dir2. Dir1 is then purged of empty
+		directories.
+		This flag implies -x."
+
+me=$$
+
+badopts=
+trace=
+xflag=
+Xflag=
+while :
+do  case $1 in
+	--)	shift; break ;;
+	-n)	trace=echo ;;
+	-x)	xflag=1 ;;
+	-X)	Xflag=1 ; xflag=1 ;;
+	-?*)	echo "$cmd: $1: unrecognised option" >&2
+		badopts=1
+		;;
+	*)	break ;;
+    esac
+    shift
+done
+
+[ -n "$xflag$Xflag" ] || { echo "$cmd: one of -x or -X must be specified" >&2
+			   badopts=1
+			 }
+
+if [ $# = 2 ]
+then  dir1=$1 dir2=$2
+      shift; shift
+else  echo "$cmd: incorrect number of directory arguments" >&2
+      badopts=1
+fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+[ -n "$dir1" ] || dir1=.
+[ -n "$dir2" ] || dir2=.
+[ -d "$dir1/." ] || { echo "$dir1: not a directory" >&2 ; exit 1 ; }
+[ -d "$dir2/." ] || { echo "$dir2: not a directory" >&2 ; exit 1 ; }
+
+f=/tmp/dc$$
+trap "rm -f $f.? ; exit 3" 1 3 15
+trap "rm -f $f.?" 0
+
+dir1files=$f.1
+dir2files=$f.2
+dir1only=$f.3
+dir2only=$f.4
+dir1dir2=$f.5
+difflist=$f.6
+dir1md5=$f.7
+dir2md5=$f.8
+dir12same=$f.9
+dir12diff=$f.a
+
+echo "walking $dir1 and $dir2 ..."
+( cd "$dir1"
+  exec find . -type f -print
+) | sed 's/^\.\///' | sort >$dir1files &
+( cd "$dir2"
+  exec find . -type f -print
+) | sed 's/^\.\///' | sort >$dir2files &
+wait
+
+comm -23 $dir1files $dir2files >$dir1only	# Files only in dir1.
+comm -13 $dir1files $dir2files >$dir2only	# Files only in dir2.
+comm -12 $dir1files $dir2files >$dir1dir2	# Files in both directories.
+
+echo "checksumming common files ..."
+( cd "$dir1" || exit 1
+  exec md5index
+) <$dir1dir2 >$dir1md5 &
+( cd "$dir2" || exit 1
+  exec md5index
+) <$dir1dir2 >$dir2md5 &
+wait
+
+md5comm -12 $dir1md5 $dir2md5 >$dir12same
+md5comm -23 $dir1md5 $dir2md5 >$dir12diff
+
+if [ -s $dir12same ]
+then
+    echo "Identical files in both directories, removed from $dir1:"
+    while read file
+    do  if $trace rm "$dir1/$file"
+	then  msg="same - removed from $dir1"
+	else  msg="same - but could not be removed"
+	fi
+	echo "	$file: $msg"
+    done <$dir12same
+fi
+
+if [ -s $dir12diff ]
+then
+    echo "Differing files in both directories:"
+    fmt $dir12diff | sed 's/^/	/'
+fi
+
+if [ -s $dir2only ]
+then
+    echo "Files only in $dir2:"
+    fmt $dir2only | sed 's/^/	/'
+fi
+
+if [ $Xflag ]
+then
+    if [ -s $dir1only ]
+    then
+	echo "Files only in $dir1, moved to $dir2"
+	while read file
+	do  
+	    f2dir=`dirname "$dir2/$file"`
+	    if [ -d "$f2dir/." ] || $trace mkdir "$f2dir"
+	    then
+		$trace mv "$dir1/$file" "$dir2/$file" && msg="moved"
+	    else
+		msg="not moved: can't make $f2dir"
+	    fi
+	    echo "	$file $msg"
+	done <$dir1only
+    fi
+
+    find "$dir1/." -type d -print |
+    sort -r |
+    while read dir
+    do
+	$trace rmdir "$dir"
+    done 2>/dev/null
+else
+    if [ -s $dir1only ]
+    then
+	echo "Files only in $dir1:"
+	fmt $dir1only | sed 's/^/	/'
+    fi
+fi
