@@ -349,6 +349,17 @@ sub tokenList	# text -> ([tok,val,...],tail)
   wantarray ? ($list,$_) : $list;
 }
 
+=item rqhdr(I<url>,I<srcurl>)
+
+Return a B<cs::RFC822> header set
+to accompany a request for the B<cs::URL> I<url>,
+including cookie fields.
+The B<cs::URL> I<srcurl> is used for the B<Referer:> field,
+defaulting to the environment variable B<HTTP_REFERER>
+or failing that, I<url>.
+
+=cut
+
 sub rqhdr($;$)
 { my($U,$srcURL)=@_;
   $srcURL=defined($ENV{HTTP_REFERER}) ? $ENV{HTTP_REFERER} : $U->Text()
@@ -552,11 +563,26 @@ sub Request($$;$$$)
   ;
 }
 
-# convenience
+=item Get(I<args...>)
+
+Call the B<Request> method a B<GET> method specification.
+
+=cut
+
 sub Get
 { my($this)=shift;
   $this->Request(GET,@_);
 }
+
+=item Post(I<uri>,I<data>)
+
+Call the B<Request> method for the specified I<uri>
+with a B<POST> method specification
+and the values in the hashref I<data>
+attached as the data source.
+
+=cut
+
 sub Post
 { my($this,$uri,$data)=(shift,shift,shift);
 
