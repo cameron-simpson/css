@@ -40,7 +40,7 @@ then
     iptables -A "$chain_out" -p udp --source-port "$dport" -j "$target"
 else
     set -x
-    for host
+    for host in `hostips "$@"`
     do
       iptables -A "$chain_in" -p udp -s "$host" --destination-port "$dport" -j "$target"
       iptables -A "$chain_out" -p udp -d "$host" --source-port "$dport" -j "$target"
