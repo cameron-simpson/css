@@ -1,0 +1,15 @@
+#!/usr/bin/perl
+#
+# Convert pndx output to HTML.
+#	- Cameron Simpson <cs@zip.com.au> 06may97
+#
+
+print "<TABLE>\n";
+
+while (<STDIN>)
+	{ chomp;
+	  ($ref,$left,$key,$right)=split(/\t/);
+	  print "<TR><TD ALIGN=RIGHT>$left><TD ALIGN=left><A HREF=$ref>$key</A><TD ALIGN=LEFT>$right\n";
+	}
+
+print "<TABLE>\n";
