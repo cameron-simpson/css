@@ -2,11 +2,10 @@
 #
 # Print out the list of files `use'd by a perl program for bundling
 # things up.
-#	- Cameron Simpson <cs@zip.com.au> 05mar97
+#	- Cameron Simpson <cs@zip.com.au> 05mar1997
 #
 
-($cmd=$0) =~ s:.*/::;
-
+use cs::Misc;
 use cs::Source;
 
 $Xit=0;
