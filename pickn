@@ -4,6 +4,7 @@
 #	- Cameron Simpson <cs@zip.com.au> 19jul2000
 #
 # Pattern match for selection.	- cameron 12sep2000
+# Treat all args as regexps to AND. - cameron, 12nov2001
 #
 
 n=1
@@ -11,16 +12,6 @@ case $1 in
     [1-9]*)	n=$1; shift ;;
 esac
 
-ptn=.
-vflag=
-iflag=-i
-case "$1" in
-    /*/)	ptn=`expr "x$1" : '..\(.*\).'`; shift ;;
-    /*)		ptn=`expr "x$1" : '..\(.*\)'`; shift ;;
-    !/*/)	vflag=-v ptn=`expr "x$1" : '...\(.*\).'`; shift ;;
-    !/*)	vflag=-v ptn=`expr "x$1" : '...\(.*\)'`; shift ;;
-esac
+[ $# = 0 ] && set .
 
-[ $# = 0 ] || { echo "Usage: $0 [n] [/ptn/]" >&2; exit 2; }
-
-egrep $iflag $vflag "$ptn" | shuffle | sed "${n}q"
+ga "$@" | shuffle | sed "${n}q"
