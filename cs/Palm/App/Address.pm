@@ -19,6 +19,10 @@ accesses the database
 for the Palm Pilot Address application.
 It is a subclass of the B<cs::Palm::PDB> class.
 
+While I had made some progress decoding an address book record,
+I am greatly indebted to the documentation in p5-Palm-Address.pm
+by Andrew Arensburger, which describes most of the format in detail.
+
 =cut
 
 use strict qw(vars);
