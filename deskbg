@@ -10,7 +10,7 @@ DESKTOPSET=$DESKTOPSET_SIZED	# backgrounds are sized
 export DESKTOPSET
 
 cmd=$0
-usage="Usage: $cmd [-d desk] imagefile
+usage="Usage: $cmd [-d desk] imagefiles...
 	Default desk is the current desk.
 	The desk \"-\" means the global default.
 	The imagefile \"\" means remove the per desk setting for this desk."
@@ -25,9 +25,6 @@ if [ $# = 0 ]
 then
     echo "$cmd: missing imagefile" >&2
     badopts=1
-else
-    imagefile=$1; shift
-    [ $# = 0 ] || { echo "$cmd: extra arguments: $*" >&2; badopts=1; }
 fi
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
@@ -38,7 +35,7 @@ case "$desk" in
   -)	desk= perdesk= ;;
 esac
 
-if [ -z "$imagefile" ]
+if [ -z "$*" ]
 then
     # flush background
     bg=
@@ -48,7 +45,7 @@ then
     fi
 else
     # set new background
-    rootbg=`set-x mkwall "$imagefile"` || exit 1
+    rootbg=`set-x mkwall "$@"` || exit 1
     bg=$rootbg
     if [ $perdesk ]
     then desktop "$desk" rootbg "$rootbg"
