@@ -60,7 +60,7 @@ do
 
     folder=`basename "$srcfolder"`
     case "$folder" in
-	deleted|saved-deleted)
+	deleted|saved-deleted|spam*)
 	  continue
 	  ;;
     esac
