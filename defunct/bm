@@ -1,0 +1,79 @@
+#!/usr/bin/perl
+#
+# Bookmark something.
+#	- Cameron Simpson <cs@zip.com.au> 30sep1997
+#
+
+use strict qw(vars);
+use cs::Persist;
+
+($::cmd=$0) =~ s:.*/::;
+$::Usage="Usage: $::cmd [KEYS...] URL [title]\n";
+
+$::dbFile="$ENV{HOME}/www/hot/db";
+
+my($badopts)=0;
+
+my(@keys);
+my($url,$title);
+
+KEY:
+while (@ARGV && $ARGV[0] =~ /^[A-Z][-_A-Z]*(\/[A-Z][-_A-Z]*)*$/)
+{ $_=shift(@ARGV);
+  tr/-/_/;
+  push(@keys,$_);
+}
+
+if (@ARGV && $ARGV[0] =~ m|://|)
+{ $url=shift(@ARGV);
+}
+else
+{ warn "$::cmd: missing URL (argv=[@ARGV])\n";
+  $badopts=1;
+}
+
+die $::Usage if $badopts;
+
+$title=(@ARGV ? "@ARGV" : $url);
+
+{ my($db)=cs::Persist::db($::dbFile,1);
+  my($now)=time;
+
+  for (@keys)
+  { bm($db,$url,{ TITLE => $title, ADDED => $now}, @keys);
+  }
+}
+cs::Persist::finish();
+
+exit 0;
+
+sub bm
+{ my($db,$url,$rec,@keys)=@_;
+  @keys=UNFILED if ! @keys;
+
+  my(@k,$k,$p,$l);
+
+  my($u)=$db->{'urls'};
+  $db->{'urls'}->{$url}=$rec;
+
+  for (@keys)
+  { 
+    @k=split(/\/+/);
+    $p=$db;
+    while (@k)
+    { $k=shift(@k);
+      $p->{$k}={} if ! exists $p->{$k};
+      $p=$p->{$k};
+    }
+
+    $p->{"urls"}=entry() if ! exists $p->{"urls"};
+
+    $l=$p->{"urls"}->{URLS};
+    push(@$l,$url) unless grep($_ eq $url,@$l);
+  }
+}
+
+sub entry
+{ my($e)={ URLS => [], };
+  $e;
+}
