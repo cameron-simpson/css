@@ -67,7 +67,7 @@ do  ignargs="$ignargs -o -name $igndir"
 done
 
 filter=cat
-[ -n "$ptns" ] && filter="ga $ptns | $filter"
+[ -n "$ptns" ] && filter="grepall $ptns | $filter"
 [ $random ] && filter="$filter | shuffle"
 [ "x$n" = x0 ] || filter="$filter | sed '${n}q'"
 [ $wide ] && filter="$filter | grepwideimg"
