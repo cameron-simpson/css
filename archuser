@@ -4,9 +4,6 @@
 #	- Cameron Simpson <cs@zip.com.au> 21feb2001
 #
 
-HOST=${HOST:-`hostname|sed 's/\..*//'`}
-export HOST
-
 archhost=shot
 archhdir=/StorNext/Archive/users
 archive=/usr/local/archive/users
@@ -18,15 +15,21 @@ usage="Usage: $cmd users..."
 
 xit=0
 
-cd /home/$HOST || exit 1
-
 for user
 do  [ -d "$user" ] || { echo "$cmd: $user: not a directory" >&2
 			xit=1
 			continue
 		      }
 
-    rbase=$user-$HOST-`daycode`
+    wd=`pwd` || { xit=1; continue; }
+    case "$wd" in
+	/a/*/home)	host=`expr "$wd" : '/a/\([^/]*\)/home'` ;;
+	*)		echo "Don't know how to tag files from $wd" >&2
+			xit=1
+			continue ;;
+    esac
+
+    rbase=$user-$host-`daycode`
     rdir=$archhdir/$rbase
 
     dbuser "$user"
@@ -34,15 +37,13 @@ do  [ -d "$user" ] || { echo "$cmd: $user: not a directory" >&2
     ls -ld "$user"
     ask "archive $user to $archhost:$rdir" || continue
 
-    # move data with tar - faster
-    ( set -x; cd "$user" || exit 1; tar cf - . ) \
-    | ssh "$archhost" "mkdir '$rdir' && cd '$rdir' && (pwd; set -x; tar xf -)" \
+    ssh "$archhost" "set -x; mkdir '$rdir'" \
     || { xit=1
 	 continue
        }
 
     # then make sure it's all ok
-    set-x rsync -avH --progress "$user/." "$archhost:$rdir/."
+    set-x rsync -avHWP "$user/." "$archhost:$rdir/."
 
     echo
     echo checking "$rdir..."
