@@ -1,0 +1,57 @@
+#!/usr/bin/perl
+#
+# Update an image db.
+#	- Cameron Simpson <cs@zip.com.au> 13apr99
+#
+
+use cs::Misc;
+use cs::Image::DB;
+use Getopt::Std;
+
+$::Dir='.';
+
+$::Usage="Usage: $::cmd [-f dbfile] [images...]
+	-f dbfile	File for the database (default: dir/.imdb).
+";
+
+getopts('f:') || die $::Usage;
+$::Dir=$::opt_d if defined $::opt_d;
+$::DBFile=$::opt_f if defined $::opt_f;
+
+$::Xit=0;
+
+my $imdb = new cs::Image::DB ($::Dir,1,$::DBFile);
+
+if (@ARGV)
+{ for my $im (@ARGV)
+  { update($imdb,$im) || ($::Xit=1);
+  }
+}
+else
+{ warn "reading from stdin...\n" if -t STDIN;
+  while (defined ($_=<STDIN>))
+  { chomp;
+    update($imdb,$_) || ($::Xit=1);
+  }
+}
+
+undef $imdb;
+
+exit $::Xit;
+
+sub update($$)
+	{ my($imdb,$imfile)=@_;
+
+	  $imfile =~ s:^(\./+)+::;
+
+	  my $I;
+
+	  if (defined ($I=$imdb->ByPath($imfile)))
+	  {}
+	  elsif (! defined ($I=$imdb->AddFile($imfile)))
+	  { warn "$::cmd: can't add $imfile\n";
+	    return 0;
+	  }
+
+	  1;
+	}
