@@ -4,4 +4,12 @@
 #	- Cameron Simpson <cs@zip.com.au> 12jun2003
 #
 
-exec rsync -rptvPL --copy-unsafe-links --delete $HOME/rc/usb/. /mnt/usb/.
+dest=/mnt/usb	## $HOME/usbtest
+
+set -x
+rsync -rptvPL --copy-unsafe-links --delete $HOME/rc/usb/. "$dest/."
+cd $HOME/rc || exit 1
+tar cf - shell env | gzip -v -9 >"$dest/rc.tgz"
+cd $HOME/there/home
+tar cf - scripts | gzip -v -9 >"$dest/scripts.tgz"
+tar cf - s | gzip -v -9 >"$dest/s.tgz"
