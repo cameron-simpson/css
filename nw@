@@ -23,8 +23,8 @@ loc=$1; shift
 clausename=net-$loc
 grep "^\[ *$clausename *\]$" "$cf" >/dev/null \
 || { echo "$cmd: no clause named \"$clausename\" in $cf" >&2
-     echo "	Known clause names:" >&2
-     sed -n 's/^\[ *net-\(.*[^ ]\) *\].*/		\1/' "$cf"
+     echo "  Known clause names:" >&2
+     sed -n 's/^\[ *net-\(.*[^ ]\) *\].*/\1/p' "$cf" | sort | fmt | sed 's/^/    /'
      exit 1
    }
 
