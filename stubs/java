@@ -8,12 +8,30 @@
 
 props=au.com.zip.cs
 tty=`tty`
-CLASSPATH=`absclasspath`
-export CLASSPATH
+
+CLASSPATH=`absclasspath`; export CLASSPATH
+
+proxyhost=`expr "x$WEBPROXY" : 'x\(.*\):.*'`
+proxyport=`expr "x$WEBPROXY" : 'x.*:\(.*\)'`
+
+if [ -n "$DISPLAY" ]
+then headless=false
+else headless=true
+fi
+
 set -x
 exec ${JAVA_HOME:-"/opt/j2sdk-sun"}/bin/java \
 	-cp "$CLASSPATH" \
+	"-Djava.awt.headless=$headless" \
+	"-DproxySet=true" \
+	"-DproxyHost=$proxyhost" \
+	"-DproxyPort=$proxyport" \
+	"-DftpProxySet=true" \
+	"-DftpProxyHost=$proxyhost" \
+	"-DftpProxyPort=$proxyport" \
+	"-D$props.env.0=$1" \
 	"-D$props.env.HOME=$HOME" \
 	"-D$props.env.EDITOR=$EDITOR" \
+	"-D$props.env.LOCKDIR=$LOCKDIR" \
 	"-D$props.tty=$tty" \
 	"$@"
