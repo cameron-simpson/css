@@ -60,100 +60,116 @@ sub _loadTapeInfo(;$)
   local($_);
   my($T,$D);
 
-  if (! open(MMINFO, "mminfo -a -r 'volume(15),\%used(5),pool(15),ssid(11),client(64),attrs(31),level(9),location(15),volume'|"))
-  { warn "$::cmd: can't pipe from mminfo: $!";
+  if (! open(VOLLS, "rootenv btvolls -v|"))
+  { warn "$::cmd: can't pipe from btvolls: $!";
     return 0;
   }
 
-  # mminfo takes a while - get jukebox info while waiting
-  if (! open(JUKE,"nsrjb -C|"))
-  { warn "$::cmd: can't pipe from nsrjb: $!";
-    return 0;
-  }
+  # tape info
+  my $T;
+  my($label,$loc,$subloc,$expiry,$full,$entrydate,$owrites,$errtype);
 
-  while (<JUKE>)
-  {
-    chomp;
+  # dump info
+  my $D;
+  my($dumpid,$fno,$size,$user,$id,$class,$date,$host);
 
-    #        slot   label
-    if (/^\s*(\d+): (.{13})/)
-    {
-      my($slot,$label)=($1,$2);
-      $label =~ s/\s+$//;
-      $label =~ s/\*$//;
-
-      if ($label =~ /^\w/)
-      { if ($label !~ /^[A-Z][A-Z][A-Z]\d\d\d$/)
-	{ die "nsrjb: bad label \"$label\"\n\t$_\n";
-	}
-	else
-	{ ## warn "label=$label, slot=$slot\n";
-	  $T=get($label);
-	  $T->Slot($slot);
-	}
-      }
-    }
-    elsif (/^drive\s+(\d+).*slot (\d+):\s*(\S+)/)
-    { my($drive,$slot,$label)=($1,$2,$3);
-      $T=find($label);
-      if (! defined $T || $T->Slot() ne $slot)
-      { warn "$::cmd: bad data from nsrjb -C: $_\n";
-      }
-      else
-      { $T->Drive($drive);
-      }
-    }
-  }
-
-  close(JUKE);
-
-  # ok, now parse the mminfo data
-  $_=<MMINFO>;	# skip heading
-
+  my $state;
   my @match;
 
-  MMINFO:
-  while (<MMINFO>)
+  VOLLS:
+  while (<VOLLS>)
   {
     chomp;
+    s/\s+$//;
+    next VOLLS if ! length;
 
-    #                 label  used  pool   ssid   client attrs  level location
-    if (! (@match = /^(.{15})(.{5})(.{15})(.{11})(.{64})(.{31})(.{9})(.{15})/))
-    { die "$::cmd: bad data from mminfo, line $.\n[$_]\n\t";
-      next MMINFO;
-    }
-
-    for (@match)
-    { s/^\s+//;
+    if (/^-volume-label/)
+    # heading: new tape info
+    { last VOLLS if ! defined ($_=<VOLLS>);
+      chomp;
       s/\s+$//;
+
+      if (! /^\s+-\s+fno/)
+      { die "$::cmd: btvolls -v, line $.: expected secondary header line, got:\n\t$_\n";
+      }
+
+      # read tape label and core info
+      die "$::cmd: btvolls: EOF looking for tape label line\n"
+	if ! defined ($_=<VOLLS>);
+
+      #                  -volume-label----------------- -location------ -sublocation--- -expire-date- -full?- -entry-date-- -overwrites- -error-type-----------
+      die "$::cmd: btvolls, line $.: bad label data:\n\t$_\n"
+	if ! (@match = /^(.{30}) (.{5}) (.{15}) (.{13}) (.{7}) (.{13}) (.{12}) (.*)/);
+
+      # tidy data fields
+      for (@match)
+      { s/^\s+//;
+	s/\s+$//;
+	$_="" if $_ eq 'N/A';
+      }
+
+      ($label,$loc,$subloc,$expiry,$full,$entrydate,$owrites,$errtype)=@match;
+
+      ::out("$label");
+
+      $T=get($label);
+      $T->Location($loc) if length $loc;
+      $T->SubLocation($subloc) if length $subloc;
+      $T->Expiry(cs::BudTool::mdyyyy2gmt($expiry)) if length $expiry;
+      $T->Full(cs::BudTool::yesno($full)) if length $full;
+      $T->EntryDate(cs::BudTool::mdyyyy2gmt($entrydate)) if length $entrydate;
+      $T->OverWrites($owrites+0) if length $owrites;
+      $T->ErrorType($errtype) if length $errtype;
+
+      $state=INTAPE;
     }
-
-    ## warn "match=[".join('|',@match)."]\n";
-
-    my($label,$used,$pool,$ssid,$client,$attrs,$level,$location)
-     =@match;
-
-    ::out("$label: $ssid");
-    ## warn "$label: used=$used, ssid=$ssid";
-
-    $T=get($label);
-    $T->Pool($pool);
-    $T->Used($used);
-    die "$label: no used field\n\t[$_]\n\t" if ! defined $used;
-    $T->Location($location);
-
-    $T->AddDump($ssid);
-
-    if (! defined ($D=cs::BudTool::Dump::find($ssid)))
-    { $D = _new cs::BudTool::Dump ($label,$ssid,$level,$client,$attrs);
+    elsif ($state ne INTAPE)
+    { warn "$::cmd: btvolls, line $.: unexpected data:\n\t$_\n";
+    }
+    elsif (! (@match =~ /^(.{12}) (.{10}) (.{10}) (.{20}) (.{25}) (.{10}) (.*)/))
+    { die "$::cmd: btvolls, line $.: bad dump line:\n\t$_\n";
     }
     else
-    { $D->AddTape($label);
+    {
+      # tidy data fields
+      for (@match)
+      { s/^\s+//;
+	s/\s+$//;
+	$_="" if $_ eq 'N/A';
+      }
+
+      ($fno,$size,$user,$id,$class,$date,$host)=@match;
+
+      $dumpid = "$label:$fno";
+      ::out($dumpid);
+
+      $D = cs::BudTool::Dump::find($dumpid);
+      if (defined $D)
+      { warn "$::cmd: btvolls, line $.: rejecting multiple entries for dump \"$dumpid\":\n\t$_\n";
+      }
+      else
+      {
+        $D=_new cs::BudTool::Dump($dumpid);
+	$T->AddDump($dumpid);
+	$D->AddTape($label);
+
+	$D->Label($label);
+	$D->FileNo($fno);
+	$D->Size(cs::BudTool::nu2size($size)) if length $size;
+	$D->User($user) if length $user;
+	$D->SetId($id) if length $id;
+	$D->Class(cs::BudTool::classlevel2class($class)) if length $class;
+	$D->Level(cs::BudTool::classlevel2level($class)) if length $class;
+	$D->Date(cs::BudTool::mdyyyy2gmt($date)) if length $date;
+	$D->Host(cs::BudTool::hostpath2host($host)) if length $host;
+	$D->Path(cs::BudTool::hostpath2path($host)) if length $host;
+      }
     }
   }
+
   ::out('');
 
-  if (! close(MMINFO))
+  if (! close(VOLLS))
   { warn "$::cmd: nonzero exit status from mminfo";
   }
 
