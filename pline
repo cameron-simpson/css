@@ -1,0 +1,27 @@
+#!/bin/sh
+
+sed -n 's/^[ 	]*\([^:]*\.[^:]*\):\([1-9][0-9]*\):.*/\1 \2/p
+        s/^[ 	]*\([^:]*\.[^:]*\), *line *\([1-9][0-9]*\):.*/\1 \2/p' \
+| while read file line
+  do
+      case "$file" in
+	  /*)	File=$file ;;
+	  *)	if [ -f "$file" ]
+		then
+		    File=$file
+		else
+		    bfile=`basename "$file"`
+		    files=`find . -type f -name "$bfile" -print`
+		    case "$file" in
+		        */*)	files=`ls -d $files 2>/dev/null | fgrep "$file"`
+				;;
+		    esac
+		    File=$files
+		fi
+		;;
+      esac
+      for f in $File
+      do
+	  sed -n "${line}s|^|$f:$line: |p" "$f"
+      done
+  done
