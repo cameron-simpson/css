@@ -1,0 +1,52 @@
+#!/bin/sh
+#
+# Wrapper for the tdl to-do list app.
+#	- Cameron Simpson <cs@zip.com.au> 21jun2004
+#
+
+cmd=$0
+usage="Usage: $cmd [+item] [tdl-args...]"
+
+context=
+case $1 in
+  +*[^1-9.]* )
+  	match=`expr "x$1" : 'x.\(.*\)'`; shift
+	context=`tdl ls | grep "$match" | awk 'NR == 1 { print $1 }'`
+	[ -z "$context" ] && { echo "$cmd: can't match \"$match\"" >&2
+			       exit 1
+			     }
+	;;
+  [A-Z]* )
+	match=$1; shift
+	context=`tdl ls | grep "$match" | awk 'NR == 1 { print $1 }'`
+	[ -z "$context" ] && { echo "$cmd: can't match \"$match\"" >&2
+			       exit 1
+			     }
+	;;
+  +[1-9]* )
+  	context=`expr "x$1" : 'x.\(.*\)'`
+	shift
+	;;
+esac
+
+if [ $# = 0 ]
+then
+    tdl ls $context
+    exit 0
+fi
+
+op=$1; shift
+case "$op" in
+  *\ *)	if [ $# = 0 ]; then set -- "$op"
+		       else set -- "$op $*"
+	fi
+	op=add
+	;;
+esac
+
+datespec=
+case "$1" in
+  @* ) datespec=$1; shift
+esac
+
+exec tdl "$op" $datespec $context ${1+"$@"}
