@@ -3,5 +3,5 @@ term -n GETMAIL \
      -c 'set -x
 	 ##fetchmail -v;getnews;exec +
 	 ##getnews -d "ng2to|procmail $HOME/rc/mail/procmailrc.spool"
-	 getmail -q -v
+	 getmail -q -v $*
 	 exec + +t'
