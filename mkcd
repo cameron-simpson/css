@@ -63,7 +63,7 @@
 # =head1 ENVIRONMENT
 #
 # MKCDDEV, the B<I<bus>,I<id>,I<lun>> string used in B<dev=I<bus>,I<id>,I<lun>>.
-# For example i set this to B<0,4,0> on our work CD burning machine.
+# For example I set this to B<0,4,0> on our work CD burning machine.
 #
 # =head1 SEE ALSO
 #
