@@ -5,13 +5,9 @@
 #
 
 cmd=`basename "$0"`
-usage="Usage: $cmd [-f] [-m logmessage] file [command [args...]]
+usage="Usage: $cmd [-f] [-m logmessage] [arg1-options] [--] file [command [args...]]
 	Normally the filename will be appended as the last argument to the
-	  supplied command. The -0, -1 and -f options affect this.
-	-0		The filename will not be attached to the command,
-			which is assumed to be complete.
-	-1		The filename will be inserted as the first argument
-			to the command.
+	  supplied command. The arg1-options may be used to change this.
 	-f		Command is a filter.
 			The file will be edited with filteredit,
 			with the current content of the file available on stdin.
@@ -19,41 +15,34 @@ usage="Usage: $cmd [-f] [-m logmessage] file [command [args...]]
 	-m logmessage	Specify log message.
 			Default from \$CVSEDIT_MSG."
 
-cameron= cisra=
-[ "x$USER" = xcameron ] && cameron=1
-[ "x$SYSTEMID" = xcisra ] && cisra=1
-
 msg=$CVSEDIT_MSG
 if [ -n "$msg" ]
 then  havemsg=1
 else  havemsg=
 fi
 
-dodl=$cameron
 dodiff=1
-
-fposarg=
-filepos=end
-
-isfilter=
+arg1opts=-end
 
 badopts=
 
 while :
-do  case $1 in
-	-0)	fposarg=$1 filepos= ;;
-	-1)	fposarg=$1 filepos=first ;;
-	-f)	isfilter=1 fposarg=-0 filepos= ;;
-	-m)	havemsg=1 msg=$2; shift ;;
-	--diff)	dodiff=1 ;;
-	--no-diff) dodiff= ;;
-	--dl)	dodl=1 ;;
-	--no-dl) dodl= ;;
-	-?*)	echo "$cmd: unrecognised option: $1" >&2; badopts=1 ;;
-	--)	shift; break ;;
-	*)	break ;;
-    esac
-    shift
+do
+  case $1 in
+    -[0-9]*|-end|-discard)
+      arg1opts="$arg1opts $1"
+      ;;
+    -f)
+      arg1opts="-stdin"
+      ;;
+    -m)	havemsg=1 msg=$2; shift ;;
+    --diff)	dodiff=1 ;;
+    --no-diff) dodiff= ;;
+    -?*)	echo "$cmd: unrecognised option: $1" >&2; badopts=1 ;;
+    --)	shift; break ;;
+    *)	break ;;
+  esac
+  shift
 done
 
 if [ $# = 0 ]
@@ -71,15 +60,16 @@ then
       exit 1
 fi
 
-ifcvs "$file" || exit $?
+ifcvs "$file" || { echo "$cmd: not a CVS file: $file" >&2
+		   exit 1
+		 }
 
 umask 2
 
 dir=`dirname "$file"`
 base=`basename "$file"`
 
-editcmd=$*
-[ $# = 0 ] && { set x "${EDITOR-vi}"; shift; }
+[ $# = 0 ] && set -- "${EDITOR-vi}"
 
 ( cd "$dir" || exit 1
   cvs update "$base" || exit $?
@@ -92,18 +82,7 @@ editcmd=$*
   chmod +w "$base"
 ) || exit 1
 
-if [ $isfilter ]
-then
-  set filteredit $fposarg -- "$file" "$@"; exec <"$file"
-else
-  case "$filepos" in
-    '')		;;
-    end)	set x "$@" "$file"; shift ;;
-    first)	zero=$1; shift; set x "$zero" "$file" ${1+"$@"}; shift ;;
-    *)		echo "$cmd: unsupported \$filepos \"$filepos\"" >&2; exit 1 ;;
-  esac
-fi
-(set -x; "$@")
+(set -x; arg1 $arg1opts -- "$file" "$@")
 editxit=$?
 
 [ $dodiff ] \
