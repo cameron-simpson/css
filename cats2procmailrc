@@ -366,7 +366,7 @@ sub readcats($;$)
     }
 
     # we expect "mailbox tag rule"
-    if (! /^("[^"*"|[^\s"]\S*)\s+(\S+)\s+(\S.*)/)
+    if (! /^("[^"]*"|[^\s"]\S*)\s+(\S+)\s+(\S.*)/)
     { warn "$::cmd: stdin, line $.: bad line: $_\n";
       next CAT;
     }
