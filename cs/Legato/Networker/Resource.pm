@@ -132,8 +132,8 @@ sub loadResourceHandle($$)
 sub _addResourceNode($$)
 { my($H,$R)=@_;
 
-  if (! exists $R->{ALIASES})
-  { ##warn "$::cmd: no 'aliases' field in record:\n".cs::Hier::h2a($R,1);
+  if (! exists $R->{RESOURCE_IDENTIFIER})
+  { ##warn "$::cmd: no 'resource identifier' field in record:\n".cs::Hier::h2a($R,1);
     return;
   }
 
@@ -142,9 +142,7 @@ sub _addResourceNode($$)
   { $R->{$field}=[ grep(length,split(/[,\s]+/, $R->{$field} )) ];
   }
 
-  for my $host (@{$R->{ALIASES}})
-  { $H->{$host}=$R;
-  }
+  $H->{$R->{RESOURCE_IDENTIFIER}}=$R;
 }
 
 =item getResource()
@@ -164,14 +162,32 @@ sub getResources()
   return $cs::Legato::Networker::Resource::_Resources;
 }
 
-=item allAliases()
+=item allIDs()
+
+Return all resource identifiers in the default resource set.
+
+=cut
+
+sub allIDs()
+{ return keys %{getResources()};
+}
+
+=item allAliases
 
 Return all alias names in the default resource set.
+This list is has no repeats.
 
 =cut
 
 sub allAliases()
-{ return keys %{getResources()};
+{
+  my $RDB=getResources();
+  my @aliases=();
+  for my $id (keys %$RDB)
+  { push(@aliases,@{$RDB->{$id}->{ALIASES}});
+  }
+
+  return ::uniq(@aliases);
 }
 
 =back
@@ -180,9 +196,27 @@ sub allAliases()
 
 =over 4
 
+=item byID(I<id>)
+
+Return a B<cs::Legato::Networker::Resource> object given its resource identifier.
+
+=cut
+
+sub byID($)
+{ my($id)=@_;
+
+  my $H = getResources();
+  return undef if ! exists $H->{$id};
+
+  bless $H->{$id};
+}
+
 =item byAlias(I<alias>)
 
-Return a B<cs::Legato::Networker::Resource> object 
+Return a B<cs::Legato::Networker::Resource> object given its alias name.
+In an array context, all resources with that alias are returned.
+In a scalar context, if multiple resources have the same alias
+one is chosen arbitrarily.
 
 =cut
 
@@ -190,9 +224,19 @@ sub byAlias($)
 { my($alias)=@_;
 
   my $H = getResources();
-  return undef if ! exists $H->{$alias};
+  my @r=();
 
-  bless $H->{$alias};
+  ID:
+  for my $id (keys %$H)
+  { my $R=$H->{$id};
+    if (grep($_ eq $alias, @{$R->{ALIASES}}))
+    { $R=byId($id);
+      return $R if ! wantarray;
+      push(@r,bless $R);
+    }
+  }
+
+  return wantarray ? @r : undef;	# !wantarray ==> nothing found during loop
 }
 
 =back
