@@ -1,0 +1,21 @@
+#!/bin/sh
+#
+# Check we're on the specified host.
+#	- Cameron Simpson <cs@zip.com.au> 02dec2002
+#
+
+cmd=$0
+
+[ $# -gt 0 ] || { echo "Usage: $cmd { host | [host]@systemid }..." >&2; exit 2; }
+
+for target
+do
+  case "$target" in
+    $HOST|$HOSTNAME|$HOST@$SYSTEMID|$HOSTNAME@$SYSTEMID|@$SYSTEMID)
+	exit 0
+	;;
+  esac
+done
+
+echo "$cmd: $HOST@$SYSTEMID or its variants don't match \"$*\"" >&2
+exit 1
