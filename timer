@@ -7,7 +7,7 @@
 idset=timer
 
 cmd=$0		## `basename "$0"`
-usage="Usage: $cmd [-i idset] key [time_t]
+usage="Usage: $cmd [-i idset] [key [time_t]]
 	-i idset	Idset to use. Default: $idset
 	key		The key name for the timer.
 	time_t		UNIX seconds of event, if not right now."
@@ -16,34 +16,32 @@ badopts=
 
 [ "x$1" = x-i ] && { idset=$2; shift; shift; }
 
+last_key=`lastvalue "$idset"_what`
+
+# no key - recite current key
+[ $# = 0 ] && exec echo "$last_key"
+key=$1; shift
+
 if [ $# = 0 ]
 then
-  echo "$cmd: missing key" >&2
-  badopts=1
+  when=`now`
 else
-  key=$1; shift
-  if [ $# = 0 ]
-  then
-    when=`now`
-  else
-    when=$1; shift
-    case "$when" in
-	''|*[^0-9]*)
-	  echo "$cmd: bad time_t \"$when\"; should be UNIX seconds" >&2
-	  badopts=1
-	  ;;
-    esac
+  when=$1; shift
+  case "$when" in
+      ''|*[^0-9]*)
+	echo "$cmd: bad time_t \"$when\"; should be UNIX seconds" >&2
+	badopts=1
+	;;
+  esac
 
-    [ $# = 0 ] || { echo "$cmd: extra arguments after time_t: $*" >&2
-		    badopts=1
-		  }
-  fi
+  [ $# = 0 ] || { echo "$cmd: extra arguments after time_t: $*" >&2
+		  badopts=1
+		}
 fi
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
 # compute time from last timestamp to now (well, $when)
-last_key=`lastvalue "$idset"_what`
 if [ -n "$last_key" ]
 then
     last_when=`lastvalue "$idset"_when`
