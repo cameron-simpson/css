@@ -4,6 +4,8 @@
 #	- Cameron Simpson <cs@zip.com.au>
 #
 
+: ${OS:=`uname -s|tr '[A-Z]' '[a-z]'`}
+
 lopt=
 dfopts=
 typed=
