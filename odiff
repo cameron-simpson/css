@@ -1,0 +1,20 @@
+#!/bin/sh
+#
+# Octal diff for binary files with fixed length records.
+#	- Cameron Simpson <cs@zip.com.au> 01mar95
+#
+
+usage="Usage: $0 f1 f2"
+
+[ $# = 2 ] || { echo "$usage" >&2; exit 2; }
+f1=$1 f2=$2
+
+tmp=/tmp/odump.$$
+
+trap 'rm -f $tmp; exit 1' 1 2 15
+
+cat "$f1" | od -c > $tmp
+cat "$f2" | od -c | diff -c $tmp -
+xit=$?
+rm -f $tmp
+exit $xit
