@@ -1,0 +1,49 @@
+#!/bin/sh
+#
+# Rebuild my symlinks.
+#	- Cameron Simpson <cs@zip.com.au> 28feb99
+#
+
+linklist=${SYNCLINKS:-$HOME/rc/sync/linklist}
+dir=${SYNCLINKSDIR:=$HOME}
+
+[ "x$1" = x-d ] && { dir=$2; shift; shift; }
+[ $# = 0 ] || { linklist=$1; shift; }
+
+[ "x$linklist" = x- ] \
+|| if [ -r "$linklist" ]
+   then  exec <"$linklist"
+   else  echo "$0: $linklist: not a readable file" >&2
+	 exit 1
+   fi
+
+cd "$dir" || exit 1
+
+xit=0
+
+while read tolink fromlink etc
+do  [ -n "$etc" ] && { echo "$cmd: $linklist: bad data, bailing out" >&2
+		       xit=1
+		       break
+		     }
+    case "$tolink" in
+	/*) echo "$cmd: $linklist: skipping absolute link $tolink" >&2
+	    xit=1
+	    ;;
+	*)  lncmd="ln -s $fromlink \"\$tolink\""
+	    echo "$tolink -> $fromlink ..."
+	    if [ ! -s "$tolink" ] \
+	    && { [ -d "$tolink/." ] || >>"$tolink"
+		 rm "$tolink"
+	       } \
+	    && eval "$lncmd"
+	    then
+		:
+	    else
+		xit=1
+	    fi
+	    ;;
+    esac
+done
+
+exit $xit
