@@ -5,7 +5,6 @@
 #
 
 webdir=$HOME/there/adzapper.sourceforge.net/html
-
 script=scripts/squid_redirect
 base=http://adzapper.sourceforge.net
 
