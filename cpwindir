@@ -1,0 +1,22 @@
+#!/bin/sh
+#
+# Copy and then rsync an Windows-sourced directory.
+#	- Cameron Simpson <cs@zip.com.au> 22jun2004
+#
+
+cmd=`basename "$0"`
+usage="Usage: $cmd windir targetdir"
+
+[ $# = 2 ] || { echo "$usage" >&2; exit 2; }
+
+src=$1 dest=$2
+case "$src" in
+  -*)	src=./$src ;;
+esac
+
+[ -d "$src/." ] || { echo "$cmd: $src: not a directory" >&2; exit 1; }
+
+set -x
+cpdir "$src" "$dest" || exit 1
+winsync "$src/." "$dest/."
+winsync "$src/." "$dest/."
