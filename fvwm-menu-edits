@@ -1,0 +1,2 @@
+#!/bin/sh
+echo USERS Exec edb -s mysql@cisra SYSADMIN_DB.USERS
