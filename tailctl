@@ -1,0 +1,26 @@
+#!/bin/sh
+#
+
+cmd=`basename "$0"`
+
+case $1 in -c) TAILF=$2; shift; shift;; esac
+
+[ -f "$TAILF" ] || { echo "$cmd: \"$TAILF\" is not a file" >&2; exit 1; }
+
+if [ $# = 0 ]
+then
+    while [ -t 0 ] && necho "$cmd> "
+	  read cmdline
+    do    case $cmdline in
+	      [A-Z]*=*)	echo "$cmdline" >>$TAILF ;;
+	      *)	echo "! $cmdline" >>"$TAILF" ;;
+	  esac
+    done
+else
+    for cmdline
+    do  case $cmdline in
+	    [A-Z]*=*)	echo "$cmdline" >>$TAILF ;;
+	    *)	echo "! $cmdline" >>"$TAILF" ;;
+	esac
+    done
+fi
