@@ -299,7 +299,7 @@ sub _post
 			{ $inhdrs=0;
 			  if (! $hadfrom)
 				{ my($login)=scalar getpwuid($>);
-				  _out("From: $login\@research.canon.com.au\n");
+				  _out("From: $login\@$ENV{MAILDOMAIN}\n");
 				}
 			}
 		  elsif (/^from:/i)
