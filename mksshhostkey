@@ -1,0 +1,17 @@
+#!/bin/sh
+#
+# The magic incantation to make an ssh host key file.
+#	- Cameron Simpson <cs@zip.com.au> 12jul2000
+#
+
+file=/etc/ssh_host_key
+
+umask 022
+
+if ssh-keygen -b 1024 -f "$file" -N ''
+then
+    ls -ld "$file" "$file.pub"
+else
+    rm -f "$file" "$file.pub"
+    exit 1
+fi
