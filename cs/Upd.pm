@@ -77,7 +77,11 @@ BEGIN { use cs::DEBUG; cs::DEBUG::using(__FILE__);
 require 'flush.pl';
 
 # hard exported to main
-sub out		{ cs::Upd::out(@_); }
+sub out		{ if (@_ && ! defined $_[0])
+		  { my@c=caller;warn "\@_ && ! defined \$_[0] from [@c]";
+		  }
+		  cs::Upd::out(@_);
+		}
 sub err		{ cs::Upd::err(@_); }
 sub nl		{ cs::Upd::nl(@_); }
 sub promptfor	{ cs::Upd::promptfor(@_); }
@@ -351,9 +355,10 @@ sub current()
 
 sub Out	{ local($cs::Upd::This)=shift; &out; }
 sub out
-{ if (@_ && ! defined $_[0])
-  { my(@c)=caller;warn "hmm \@_=[@_] from [@c]";
-  }
+{
+  ## if (@_ && ! defined $_[0])
+  ## { my(@c)=caller;warn "hmm \@_=[@_] from [@c]";
+  ## }
 
   local($_)=join('',@_);
   my($F)=$cs::Upd::This->{FILE};
