@@ -18,6 +18,8 @@
 # and keeps a local mirror up to date.
 #
 
+: ${TMPDIR:=/tmp}
+
 cf=.mirror
 where=.
 verbose=
@@ -343,8 +345,8 @@ do
 
 	if [ $latest ]
 	then
-	    latelist=/tmp/$cmd-late$$
-	    latedir=/tmp/latest$$
+	    latelist=$TMPDIR/$cmd-late$$
+	    latedir=$TMPDIR/latest$$
 	    if mkdir "$latedir"
 	    then
 		eval "rsync -n -rlHt \$rsopts $opts \"\$host::\$rpath/.\" \"\$latedir/.\"" \
