@@ -1,0 +1,20 @@
+#!/bin/sh
+#
+# Test if a particular file is CVS maintained.
+#	- Cameron Simpson <cs@zip.com.au> 23feb2003
+#
+
+cmd=$0
+usage="Usage: $cmd filename"
+
+[ $# = 1 ] || { echo "$usage" >&2; exit 2; }
+file=$1; shift
+
+[ -f "$file" ] || { echo "$cmd: $file: not a file" >&2; exit 1; }
+
+dir=`dirname "$file"`
+base=`basename "$file"`
+cvsdir=$dir/CVS
+entries=$cvsdir/Entries
+
+[ -s "$entries" ] && grep "^/$base/" "$entries" >/dev/null 2>/dev/null
