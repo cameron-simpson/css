@@ -5,16 +5,19 @@
 #
 
 src=/dev/cdrom
-dest=/home/ferrari/cdroms
+dest=/home/ferrari/cdroms/iso
+remote=
 
 cmd=`basename "$0"`
 usage="Usage: $cmd [-f file] [-d dir] vendor appname version
 	-f file	Source file. Default: $src
-	-d dir	Destination directory. Default: $dest"
+	-d dir	Destination directory. Default: $dest
+	-r remote Remote host to receive the iso."
 
 badopts=
 while :
 do  case $1 in
+	-r)	remote=$2; shift ;;
 	-f)	src=$2; shift ;;
 	-d)	dest=$2; shift
 		[ -d "$dest/." ] || { echo "$cmd: no such directory: $d" >&2
@@ -46,17 +49,24 @@ fi
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
+if [ -n "$remote" ]
+then  remote="ssh $remote"
+else  remote=eval
+fi
+
 umask 2
 target=$dest/$vendor
-[ -d "$target/." ] || (set -x; mkdir "$target") || exit 1
+[ -d "$target/." ] || (set -x; $remote "umask 2; mkdir '$target'") || exit 1
 
 iso=$target/$appname-$version.iso
 [ -s "$iso" ] && { echo "$cmd: already exists: $iso" >&2
 		   exit 1
 		 }
 
-prcat "$src" >"$iso"
+prcat "$src" | $remote "umask 2; cat >'$iso'; exit $?"
 xit=$?
 
+if [ "x$src" = x/dev/cdrom ]; then eject & fi
 ls -ld "$iso"
+
 exit $xit
