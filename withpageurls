@@ -25,11 +25,14 @@ fi
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
-pageurls "$url" \
+exec 3<&0
+pageurls "$url" 3<&- \
 | { xit=0
     while read url
     do
-      set-x withurl "$url" "$@" || xit=1
+      ( exec 0<&3 3<&-
+	exec withurl "$url" "$@" || xit=1
+      )
     done
     exit $xit
   }
