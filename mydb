@@ -4,6 +4,8 @@
 #	- Cameron Simpson <cs@zip.com.au> 02jul99
 #
 
+: ${TMPDIR:=/tmp}
+
 mysqldir=/opt/mysql
 mysqld=$mysqldir/libexec/mysqld
 
@@ -25,7 +27,7 @@ fi
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
-MYSQL_UNIX_PORT=/tmp/mysqld-$USER.sock
+MYSQL_UNIX_PORT=$TMPDIR/mysqld-$USER.sock
 export MYSQL_UNIX_PORT
 echo "MYSQL_UNIX_PORT=$MYSQL_UNIX_PORT"
 
