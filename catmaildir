@@ -1,0 +1,37 @@
+#!/bin/sh
+#
+# Output all the numerically named files in the named directories
+# in UNIX mail file format.
+#	- Cameron Simpson <cs@zip.com.au> 27mar2000
+#
+
+[ $# = 0 ] && set .
+
+xit=0
+first=1
+for dir
+do
+    if [ $first ]
+    then first=
+    else echo
+    fi
+
+    ( cd "$dir" || exit 1
+      xit=0
+      for file in `ls -d [0-9]*|sort -n`
+      do  case "$file" in
+	      *.z)	pcat "$file" | maildiritem2fileitem ;;
+	      *.Z)	zcat "$file" | maildiritem2fileitem ;;
+	      *.gz)	gunzip <"$file" | maildiritem2fileitem ;;
+	      *.bz2)	bunzip2 <"$file" | maildiritem2fileitem ;;
+	      *[0-9])	maildiritem2fileitem "$file" ;;
+	      *)	echo "$0: what to do with $dir/$file?" >&2
+			xit=1
+			;;
+	  esac
+      done
+      exit $xit
+    ) || xit=1
+done
+
+exit $xit
