@@ -1,0 +1,16 @@
+#!/usr/bin/perl
+#
+# Decode Base64 stuff and emit.
+#	- Cameron Simpson <cs@zip.com.au> 21may1998
+#
+
+use cs::MIME::Base64;
+use cs::Source;
+
+my($in)=new cs::Source (FILE, STDIN);
+
+LINE:
+while (defined ($_=$in->GetLine()) && length)
+{ last LINE if /^--/;
+  print cs::MIME::Base64::decode($_);
+}
