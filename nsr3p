@@ -1,0 +1,149 @@
+#!/bin/sh
+#
+# Use a 3rd party tape with Legato Networker.
+# Specificly, we want to make a tape which isn't part of Legato's
+# indices using a Legato controlled jukebox.
+#
+# This is based on suggestions made by Janelle Filkin <janellef@dawn.com.au>.
+#	- Cameron Simpson <cs@zip.com.au> 
+#
+
+pool=${NSR3P_POOL:-'Third Party'}
+
+cmd=`basename "$0"`
+usage="Usage:	$cmd load [-n] [-p pool]
+	$cmd unload device
+		load	Load the tape in the first load bay slot.
+			-n	Don't label it!
+			-p pool	Specify the pool into which to label.
+		unload device
+			Unload the tape in the specified device
+			and return it to service. Export the tape to
+			the first load bay slot."
+
+badopts=
+if [ $# = 0 ]
+then
+  echo "$cmd: missing load/unload directive" >&2
+  badopts=1
+else
+  dir=$1; shift
+  case $dir in
+    load)
+      nolabel=
+      while :
+      do  case $1 in
+	    -n)	nolabel=1 ;;
+	    -p)	pool=$2; shift ;;
+	    --)	shift; break ;;
+	    -?*)echo "$cmd $dir: unrecognised option: $1" >&2
+		badopts=1 ;;
+	    *)	break ;;
+	  esac
+	  shift
+      done
+      ;;
+    unload)
+      if [ $# = 0 ]
+      then
+	echo "$cmd $dir: missing device" >&2
+	badopts=1
+      else
+	device=$1; shift
+      fi
+      ;;
+    *)echo "$cmd: unrecognised directive: $dir" >&2
+      badopts=1
+      ;;
+  esac
+fi
+
+[ $# = 0 ] || { echo "$cmd: extra arguments: $*' >&2
+		badopts=1
+	      }
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+xit=0
+
+case $dir in
+  load)
+	# locate an empty slot
+	slot=`nsrjb -C | sed -n '/^ *\([0-9][0-9]*\): *$/p' | sed 1q`
+	[ -n "$slot" ] || { echo "$cmd $dir: no free slots!" >&2 ;exit 1; }
+
+	# get the tape from the load bay
+	nsrjb -d -P 1 -S "$slot" || exit 1
+
+	if [ -z "$nolabel" ]
+	then
+	    [ -n "$pool" ] \
+		|| { echo "$cmd $dir: label: no pool specified" >&2
+		     nsrjb -w -S "$slot" -P 1
+		     exit 1
+		   }
+
+	    # label the tape
+	    nsrjb -L -Y -B -b "$pool" -S "$slot" \
+		|| { echo "$cmd $dir: label fails" >&2
+		     nsrjb -w -S "$slot" -P 1
+		     exit 1
+		   }
+	fi
+
+	# load the tape but don't mount it
+	nsrjb -ln -S "$slot" \
+		|| { echo "$cmd $dir: load fails" >&2
+		     nsrjb -w -S "$slot" -P 1
+		     exit 1
+		   }
+
+	# locate the device the tape was just loaded into
+	subst="s|^ *drive [0-9][0-9]* *(\\(/dev/[^)]*\\)) *slot *$slot:.*|\\1|p"
+	device=`nsrjb -C | sed -n "$subst"`
+	[ -n "$device" ] \
+		|| { echo "$cmd $dir: can't find device holding tape" >&2
+		     nsrjb -u -S "$slot"
+		     nsrjb -w -S "$slot" -P 1
+		     exit 1
+		   }
+
+	# disable the drive
+	( echo ". type:NSR device;name:$device"
+	  echo "enabled:No"
+	) | nsradmin -i -
+
+	echo "TAPE=$device; export TAPE"
+	echo ": $cmd unlaod $device"
+	;;
+
+  unload)
+	# enable the drive
+	( echo ". type:NSR device;name:$device"
+	  echo "enabled:Yes"
+	) | nsradmin -i -
+
+	subst="s|^ *drive [0-9][0-9]* *($device) *slot *\\([0-9][0-9]*\\):.*|\\1|p"
+	slot=`nsrjb -C | sed -n "$subst"`
+	[ -n "$slot" ] \
+		|| { echo "$cmd $dir: can't deduce slot # from device \"$device\"" >&2
+		     exit 1
+		   }
+
+	nsrjb -u -S "$slot" \
+		|| { echo "$cmd $dir: can't unload tape for slot $slot" >&2
+		     exit 1
+		   }
+
+	nsrjb -w -P 1 -S "$slot" \
+		|| { echo "$cmd $dir: can't export tape from slot $slot" >&2
+		     exit 1
+		   }
+	;;
+	
+  *)	echo "$cmd $dir: unimplemented" >&2
+	exit 1
+	;;
+esac
+
+exit $xit
