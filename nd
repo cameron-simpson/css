@@ -22,9 +22,9 @@ deskname=$1; shift
 		exit 2
 	      }
 
-[ $rmdesk ] && exec newdesk -r "$deskname"
+[ $rmdesk ] && exec desktop -r "$deskname"
 
-desknum=`newdesk "$deskname"`	|| exit 1
+desknum=`desktop "$deskname"`	|| exit 1
 desknum=`expr $desknum + 13`
 set -x
 exec fvwmcmd "SwitchToDesk 0 $desknum"
