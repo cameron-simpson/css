@@ -1,0 +1,18 @@
+#!/bin/sh
+#
+# Reverse an lomount. See lomount.
+#	- Cameron Simpson <cs@zip.com.au> 24nov2001
+#
+
+cmd=$0
+
+[ $# = 1 ] || echo "Usage: $cmd mountpoint" >&2
+mnt=$1
+
+escmnt=`sedstrs 's:/:\\&:g' "$mnt"`	# for sed
+
+loop=`mount | sed -n "/^\\(\\/dev\\/loop[0-9][0-9]*\\) on $escmnt type .*/\\1/p"
+
+[ -n "$loop" ] || { echo "$cmd: can't find loop mount for $mnt" >&2; exit 1; }
+
+umount "$mnt" && { rmdir "$mnt"; losetup -d "$loop"; }
