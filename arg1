@@ -71,5 +71,4 @@ esac
 
 [ $dostdin ] && exec <"$arg"
 
-set -x
 exec "$command" "$@"
