@@ -6,7 +6,8 @@
 #
 
 cmd=$0
-usage="Usage: $0 [-C] [file]"
+usage="Usage: $0 [-C] [file]
+	-C	Don't use \"copiousoutput\" entries."
 
 copious=1
 [ "x$1" = x-C ] && { copious=; shift; }
@@ -35,10 +36,13 @@ case "$type" in
     *': JPEG image data'*)	mtype=image/jpeg ;;
     *': PDF document'*)		mtype=application/pdf ;;
     *': ASCII '*)		mtype=text/plain ;;
+    *': '*'program text'*)	mtype=text/plain ;;
+    *': HTML document text'*)	mtype=text/html ;;
+    *': '*'text'*)		mtype=text/plain ;;
 esac
 
 # unrecognised - just recite "file"  output
-[ -z "$mtype" ] && { echo "$type"; exit 0; }
+[ -z "$mtype" ] && { echo "$type"; sleep 10; exit 0; }
 
 if [ $copious ]
 then  action=`grep "^$mtype"' *;.*; *copiousoutput *$' <$HOME/.mailcap | sed 1q`
@@ -48,5 +52,8 @@ fi
 [ -z "$action" ] && { echo "$type"; exit 0; }
 
 action=`echo "$action" | sed -e 's/^[^;]*; *//' -e 's/ *;[^;]*$//' -e"s%s$fileg"`
+
+## echo "mtype=[$mtype] action=[$action]" >&2; exit 0
+
 exec <"$file"
 eval "$action"
