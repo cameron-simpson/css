@@ -5,17 +5,65 @@
 #
 
 cmd=`basename "$0"`
-logdir=${VARLOG:-"$HOME/var/log"}/sessions
-[ "x$1" = x-d ] && { logdir=$2; shift; shift; }
-[ $# -ge 1 ] || { echo "Usage: $cmd [-d logdir] logbase [cmd [args...]]" >&2; exit 2; }
-logbase=$1; shift
+usage="Usage: $cmd [-d logdir] logbase [{-c shcmd | cmd [args...]}]"
 
-# adjust to full path of popSHELL because script uses execve, not execvep
-popshell=$HOME/scripts/popSHELL
+logdir=${VARLOG:-"$HOME/var/log"}/sessions
+SHELL=${SHELL:-/bin/sh}
+
+badopts=
+
+[ "x$1" = x-d ] && { logdir=$2; shift; shift; }
+
+if [ $# = 0 ]
+then
+  echo "$cmd: missing logbase" >&2
+  badopts=1
+else
+  logbase=$1; shift
+
+  if [ $# -gt 0 ]
+  then
+    if [ "x$1" = x-c ]
+    then
+	# convert -c into explicit command
+	shcmd=$2; shift; shift
+	[ $# = 0 ] || { echo "$cmd: extra arguments after \"-c shcmd\": $*" >&2
+			badopts=1
+		      }
+	set x "$SHELL" -c "$shcmd"; shift
+    fi
+  fi
+fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+# we only need popSHELL if specific command supplied
+if [ $# -gt 0 ]
+then
+  # adjust to full path of popSHELL because script uses execve, not execvep
+  popSHELL=$SHELL
+  popSHELLcmd=
+  popSHELLpath=
+  for d in `dirname "$0"` /opt/css/bin $HOME/scripts
+  do  [ -x "$d/popSHELL" ] && { popSHELLpath=$d/popSHELL; break; }
+  done
+  [ -n "$popSHELLpath" ] || { echo "$cmd: can't find popSHELL script" >&2; exit 1; }
+fi
 
 logfile=$logdir/$logbase-`datecode`
 logdir=`dirname "$logfile"`
-[ -d "$logdir/." ] || mkdir -p "$logdir" || exit 1
+needdir "$logdir" || exit 1
+
+# hideous hack to restore $SHELL inside script command
+# because script, curse its negligent author, only runs $SHELL
+# rather than an arbitrary command
+if [ $# -gt 0 ]
+then
+    popSHELL=$SHELL
+    popSHELLcmd=`shqstr "$@"`
+    SHELL=$popSHELLpath
+    export SHELL popSHELL popSHELLcmd
+fi
 
 { echo
   echo "$HOST @ $SYSTEMID"
@@ -23,15 +71,6 @@ logdir=`dirname "$logfile"`
   id
   echo
 } >>"$logfile"
-
-# hideous hack to restore $SHELL inside script command
-# because script, curse its negligent author, only runs $SHELL
-# rather than an arbitrary command
-# this hack will break quoting
-[ $# = 0 ] \
-	|| { popSHELL=$SHELL popSHELLexec=$*; export popSHELL popSHELLexec
-	     SHELL=$popshell; export SHELL
-	   }
 
 wd=`pwd|entilde`
 dlog "$HOST@$SYSTEMID: $wd: start $popSHELLexec"
