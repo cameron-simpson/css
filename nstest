@@ -1,0 +1,8 @@
+#!/bin/sh
+
+HOME=$HOME/wk/ns-test
+export HOME
+
+cd "$HOME" || exit $?
+
+exec /opt/script/netscape-4.05 ${1+"$@"}
