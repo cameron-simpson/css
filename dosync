@@ -5,6 +5,7 @@ case "$HOST@$SYSTEMID" in
 			snarfaddrs &
 			( cd $HOME/scripts && myke ) &
 			( cd $HOME/public && myke _cvslogs _tarballs ) &
+			( cd $HOME/public/adzap && myke _all ) &
 			wait
 			syncwork &
 			synczip &
