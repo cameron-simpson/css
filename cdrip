@@ -99,15 +99,31 @@ cdtoc "$dev" \
 	      wait
 	  fi
 
+	  ls -ld "$raw"
 	  ( dolock=
-	    [ -n "$lock" ] && dolock="lock $lock"
+	    [ -n "$lock" ] && { linkraw=.raw$$
+				ln "$raw" "$linkraw"	## link to conservative name
+				dolock="alog cdrip lock $lock rmafter $linkraw nice"
+			      }
 
 	    if case $enc in
 		ogg)
-		  ( set -x; exec $dolock oggenc -r -b $bps \
-			 -c "$ripcomment" -a "$artist" -N "$track" -t "$title" -l "$album" \
-			 -o "$out" "$raw"
+		  # This fiddling is because oggenc blows up with long comments.
+		  commentf=.tmp$$c
+		  [ -n "$xtra" ] && echo "$xtra" >"$commentf"
+		  echo "$ripcomment" >>"$commentf"
+
+		  echo 
+		  ( set $dolock oggenc -r -b $bps \
+			 -a "$artist" -N "$track" -t "$title" -l "$album"
+		    while read -r comment
+		    do  [ -n "$comment" ] && set "$@" -c "$comment"
+		    done <$commentf
+		    set "$@" -o "$out" "$linkraw"
+		    set -x
+		    exec "$@"
 		  )
+		  rm "$commentf"
 		  ;;
 		mp3)
 		  ( set -x; exec $dolock lame -r -b "$bps" -h -p "$raw" "$out" )
