@@ -35,7 +35,7 @@ require Exporter;
 
 =over 4
 
-=item fetch cs::DBI::Table::RowObject (I<keyvalue>,I<dbh>,I<table>,I<keyfield>,I<where>,I<preload>
+=item fetch cs::DBI::Table::RowObject (I<keyvalue>,I<dbh>,I<table>,I<keyfield>,I<where>,I<preload>)
 
 Return a B<cs::DBI::Table::RowObject> representing the row
 whose I<keyfield> matches I<keyvalue>
