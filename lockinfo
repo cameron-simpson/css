@@ -14,6 +14,7 @@ cd "$LOCKDIR" || exit 1
 xit=0
 for lock
 do  grep . "$lock"/* /dev/null || xit=1
+    [ -s "$lock/pid" ] && kill -0 `cat "$lock/pid"`
 done
 
 exit $xit
