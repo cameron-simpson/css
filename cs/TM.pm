@@ -20,7 +20,7 @@ Trivial wrapper for the struct-tm array returned by localtime() and gmtime().
 
 use strict qw(vars);
 
-BEGIN { use cs::DEBUG; cs::DEBUG::using(__FILE__); }
+##BEGIN { use cs::DEBUG; cs::DEBUG::using(__FILE__); }
 
 use Time::Local;
 use cs::Misc;
