@@ -435,12 +435,13 @@ sub getCookies()
     next COOKIELINE if !length || /^#/;
 
     my (@f) = split(/\t/);
-    if (@f != 7)
+    if (@f != 7 && @f != 6)
     { warn "$::cmd: $file, line $lineno: wrong # of fields\n";
       next COOKIELINE;
     }
 
     my($domain,$bool1,$pathpfx,$bool2,$expires,$name,$value)=@f;
+    $value="" if ! defined $value;
 
     push(@C, { DOMAIN => $domain,
 	       BOOL1 => ($bool1 eq TRUE),
