@@ -8,7 +8,7 @@
 key=in
 [ $# = 0 ] || { key=$1; shift; }
 
-base=$HOME/private/incoming/$key
+base=${MAILUNPACKDIR:-$HOME/incoming}/$key
 
 dl=`mkdirn "$base/"` || exit 1
 cd "$dl" || exit 1
