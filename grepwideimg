@@ -10,6 +10,5 @@ then
     shift
 fi
 
-imgsize ${1+"$@"} /dev/null 2>/dev/null \
-| sed -n 's/^\(.*\): width="\([0-9]*\)" height="\([0-9]*\)".*/\1 \2 \3/p' \
+imsize ${1+"$@"} /dev/null 2>/dev/null \
 | awk '$2 > $3 { print $1 }'
