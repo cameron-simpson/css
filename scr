@@ -27,8 +27,8 @@ usage="Usage:
 
 if [ "x$1" = x-A ]
 then
-    [ -n "$DISPLAY" ] || { echo "$cmd: no \$DISPLAY!" >&2; exit 1; }
     shift
+    [ -n "$DISPLAY" ] || { echo "$cmd: no \$DISPLAY!" >&2; exit 1; }
     grepfor=
     grepnot=
     for re
