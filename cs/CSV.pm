@@ -8,6 +8,9 @@ use strict qw(vars);
 
 BEGIN { use cs::DEBUG; cs::DEBUG::using(__FILE__); }
 
+use cs::Misc;
+use cs::Hier;
+
 package cs::CSV;	# cs::ALL::useAll();
 
 sub save
@@ -29,7 +32,24 @@ sub save
   $sink->Put(ary2csv(@k));
 
   for my $r (@r)
-  { $sink->Put(ary2csv(map(exists $r->{$_} ? $r->{$_} : undef, @k)));
+  { my @a=();
+    for my $k (@k)
+    { my $val = undef;
+      if (exists $r->{$k})
+      { $val=$r->{$k};
+	if (ref($val))
+	{ my $type=::reftype($val);
+	  if ($type eq ARRAY)
+	  { $val=join(" ", map(ref($_) ? cs::Hier::h2a($_,0) : $_, @$val));
+	  }
+	  else
+	  { $val=cs::Hier::h2a($val,0);
+	  }
+	}
+      }
+      push(@a,$val);
+    }
+    $sink->Put(ary2csv(@a));
   }
 }
 
