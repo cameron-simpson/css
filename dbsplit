@@ -1,0 +1,46 @@
+#!/bin/sh
+#
+# Split flat db files into db directories.
+#	- Cameron Simpson <cs@zip.com.au> 07nov97
+#
+
+xit=0
+
+for db
+do
+    [ -r "$db" ] || { echo "$0: $db is not a readable file" >&2
+		      xit=1
+		      continue
+		    }
+    newdb=.$$
+    mkdir "$newdb" || { echo "$0: can't make working db $newdb for $db" >&2
+			xit=1
+			continue
+		      }
+
+    {
+    perl -e 'use cs::Persist;
+
+	     $old=cs::Persist::db($ARGV[0]);
+	     die "$0: can'\''t attach to $ARGV[0]" if ! defined $old;
+
+	     $new=cs::Persist::db($ARGV[1],1);
+	     die "$0: can'\''t attach to $ARGV[1]" if ! defined $new;
+
+	     for (keys %$old)
+		{ $new->{$_}=$old->{$_};
+		}
+	     
+	     undef $old;
+	     undef $new;
+	     cs::Persist::finish();
+	     exit 0;
+	    ' "$db" "$newdb" \
+    && { mv -i "$db" "$db-old" && { mv "$newdb" "$db" \
+				 || { mv "$db-old" "$db"; false; }
+				  }
+       } \
+    } || xit=1
+done
+
+exit $xit
