@@ -26,9 +26,13 @@ usage="Usage: $cmd [-B bugsystems] headline < description"
 #
 # =over 4
 #
-# =back
+# =item B<-B> I<bugsystems>
+#
+# Deliver reports to the specified I<bugsystems> instead of the default.
 #
 [ "x$1" = x-B ] && { BUGSYSTEMS=$2; export BUGSYSTEMS; shift; shift; }
+#
+# =back
 
 [ $# = 1 ] || { echo "$usage" >&2; exit 2; }
 headline=$1; shift
@@ -39,9 +43,9 @@ detab | unbs | unctrl >"$attachment" || exit 1
 
 xit=0
 
-# =head2 Bug System Backends
+# =head1 BUG SYSTEM BACKENDS
 #
-# The follow subsystems are known:
+# The follow bubsystems are known:
 #
 # =over 4
 #
