@@ -13,13 +13,20 @@ use cs::MIME;
 use cs::Mail::Misc;
 use cs::NNTP;
 
-$::Usage="Usage: $::cmd addresses...\n";
+$::Usage="Usage: $::cmd [--] addresses...\n";
+
+# mutt puts a "--" before any addresses when running sendmail
+if (@ARGV && $ARGV[0] eq '--')
+{ shift(@ARGV);
+}
 
 die $::Usage if ! @ARGV;
 
+open(STDERR,">> $ENV{HOME}/sendmesg.out");
+
 $::Msg = new cs::MIME (new cs::Source (FILE,STDIN));
 
-$::DEBUG=1;
+## $::DEBUG=1;
 
 @::Groups=();
 @::Email=();
@@ -48,7 +55,8 @@ $::Msg->WriteItem(new cs::Sink(SCALAR,\$msgtxt));
 $::Xit=0;
 
 if (@::Groups)
-{ my $NNTP = new cs::NNTP;
+{ warn "sending news to [@::Groups]";
+  my $NNTP = new cs::NNTP;
   if (! $NNTP->PostSource(new cs::Source(SCALAR,$msgtxt)))
   { warn "$::cmd: posting via $ENV{NNTPSERVER} fails\n";
     $::Xit=1;
@@ -57,7 +65,8 @@ if (@::Groups)
 
 
 if (@::Email)
-{ my $src = new cs::Source (SCALAR,$msgtxt);
+{ warn "sending email to [@::Email]";
+  my $src = new cs::Source (SCALAR,$msgtxt);
   if (! cs::Mail::Misc::smtpsend($src,@::Email))
   { warn "$::cmd: mailing via $ENV{SMTPSERVER} fails\n";
     $::Xit=1;
