@@ -1,0 +1,14 @@
+#!/bin/sh
+#
+# Emit a tar archive of the named scripts and their dependent cs:: modules.
+#	- Cameron Simpson <cs@zip.com.au> 02sep98
+#
+
+cd $HOME/scripts || exit $?
+
+f=`	for f
+	do  echo "$f"
+	    perldeps "$f" | sed -n "s|^$HOME/etc/pl/||p"
+	done | sort -u`
+
+exec tar cvhf - $f
