@@ -1,0 +1,50 @@
+#!/bin/sh
+#
+# Fetch the last n lines from both proxy logs and collate.
+#	- Cameron Simpson <cs@zip.com.au> 20nov98
+#
+
+[ $# = 0 ] && set CLIENT WEBSITE PROTOCOL DATATYPE DATASIZE HITS DATATIME
+
+tmp=/tmp/log$$
+tmpall=${tmp}all
+
+cat ${1+"$@"} >$tmp
+
+echo "snarf big fetches..."
+bigsize=102400
+awk "\$3 >= $bigsize {print}" $tmp | sort -n +2 >logdata-big &
+
+for dataset in CLIENTS ## INNERHITMISS OUTERHITMISS
+do
+    case $dataset in
+      CLIENTS)	keep='$7 != "localhost"'
+		set CLIENT WEBSITE PROTOCOL DATATYPE DATASIZE DATATIME
+		;;
+      *)	echo "$0: unsupported plot \"$dataset\"" >&2
+		continue
+		;;
+    esac
+
+    for category
+    do  echo "$dataset/$category..."
+	fmt=
+	case $category in
+	    CLIENT)	field=3 fmt=ip ;;
+	    WEBSITE)	field=4 fmt=ip ;;
+	    PROTOCOL)	field=5 ;;
+	    DATATYPE)	field=1 ;;
+	    DATASIZE)	field=SIZE ;;
+	    DATATIME)	field=DURATION ;;
+	    HITS)	field=CLASS ;;
+	    *)		field=$category ;;
+	esac
+
+	set-x awk "$keep {print}" $tmp \
+	| logtally -t 65536 "$field" $fmt >"$dataset-$category.png"
+    done
+done
+
+rm $tmp*
+
+wait
