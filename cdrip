@@ -5,45 +5,65 @@
 #	- Cameron Simpson <cs@zip.com.au> 12mar2001
 #
 # Add MP3 mode, basicly for my brother.	 -cameron 25aug2001
+# Support multiple encodings, add -k option, switch to WAV as
+# intermediate file format.		- cameron 16mar2003
 #
 
 EDITOR=${EDITOR:-vi}
 
 dev=${CDRIP_DEV:-/dev/cdrom}
-enc=${CDRIP_ENC:-ogg}
-bps=${CDRIP_BPS:-}
+enclist=${CDRIP_ENC:-ogg}
+bps=${CDRIP_BPS:-192}
 qual=${CDRIP_QUAL:-6}
 lock=$CDRIP_LOCK
+oggencqual=
+lamequal=
+keep=
+jobs=1
+nice=10
 
 cmd=`basename "$0"`
-usage="Usage: $cmd [-b bps] [-d device] [-e enc] [-l lock]
+usage="Usage: $cmd [-b bps] [-d device] [-e enclist] [-l lock] [-j jobs] [-K]
 	-q qual		Variable bitrate quality rating.
 			Default: $qual
-	-b bps		Fixed bitrate bits per second for the final bitstream.
-			Default: variable bit rate.
+	-b kbps		Fixed bitrate kilobits per second for the encoding.
+			Default: variable bit rate using quality.
 	-d device	Device holding the CD. Default: $dev
-	-e enc		Select encoding. Default: $enc
-	-l lock		Do encoding completely asynchronously, using \"lock\" as the lock name."
+	-e enclist	Select encoding(s), comma separated. Default: $enclist
+	-K		Keep the WAV file around.
+	-j jobs		Use this many CPUs for the encoding phase.
+			(jobs > 1) implies \"-l $cmd\".
+	-l lock		Do encoding completely asynchronously, using \"lock\"
+			as the lock name basis.
+	-n nice		Extra niceness for the encoder. Default: $nice"
 
-set x $CDRIP_OPTS ${1+"$@"}; shift
+set x -b "$bps" -q "$qual" $CDRIP_OPTS ${1+"$@"}; shift
 
 badopts=
 while :
 do
     case $1 in
-	-b)	bps=$2 qual=; shift ;;
-	-q)	bps= qual=$2; shift ;;
+	-b)	oggencqual="-b $2" lamequal="-b $2"
+		shift ;;
+	-q)	oggencqual="-q $2" lamequal="-v -V `expr 9 - $2`"
+		shift ;;
 	-d)	dev=$2 ;shift ;;
-	-e)	case $2 in
-		    mp3|ogg)	enc=$2 ;;
-		    *)		echo "$cmd: unrecognised encoder: $2" >&2
+	-e)	enclist=
+		for e in `echo "$2" | tr , ' '`
+		do
+		  case $e in
+		    mp3|ogg)	enclist="$enclist $e" ;;
+		    *)		echo "$cmd: unrecognised encoding: $e" >&2
 				echo "	I known ogg and mp3" >&2
 				badopts=1
 				;;
-		esac
+		  esac
+		done
 		shift
 		;;
 	-l)	lock=$2; shift ;;
+	-j)	jobs=$2; shift ;;
+	-K)	keep=1 ;;
 	--)	shift ;break ;;
 	-?*)	echo "$cmd: unrecognised option: $1" >&2
 		badopts=1
@@ -65,6 +85,11 @@ esac
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
+if [ "$jobs" -gt 1 -a -z "$lock" ]
+then
+    lock=$cmd
+fi
+
 toc=/tmp/cdtoc.$$
 cdtoc "$dev" >"$toc" || { rm -f "$toc"; exit 1; }
 
@@ -74,14 +99,13 @@ ask "Edit TOC before use" && $EDITOR "$toc"
 exec <"$toc"
 rm "$toc"
 
-[ -n "$qual" -a "x$enc" = xmp3 ] && qual=`expr 9 - $qual`	## invert for mp3
-
 sed -e 's;//*; -- ;g' -e 's/   */ /g' \
 | ( read artist	|| exit 1
     read album	|| exit 1
 
     encpid=
     xit=0
+    nextjob=1
     while read track secs offset \
        && read title \
        && read xtra
@@ -93,75 +117,107 @@ sed -e 's;//*; -- ;g' -e 's/   */ /g' \
       esac
       title="$wtrack: $title"
 
-      raw=$dir/$title.raw
-      case $enc in
-	  ogg|mp3)
-		out=$dir/$title.$enc
-		;;
-	  *)	echo "$cmd: unimplemented encoding \"$enc\"!" >&2
-		xit=1
-		;;
-      esac
-	  
-      [ -s "$out" ] && { echo "$cmd: existing file $out, skipping track #$track" >&2
-			 continue
-		       }
+      echo "Ripping track #$track: $dir/$title ..."
+
+      needenc=
+      for enc in $enclist
+      do  out=$dir/$title.$enc
+	  if [ -s "$out" ]
+	  then  echo "$cmd: $out already exists" >&2
+	  else  needenc="$needenc $enc"
+	  fi
+      done
+
+      # skip if no encodings OR keep-raw mode on
+      [ -n "$needenc" -o -n "$keep" ] || continue
+
+      raw=$dir/$title.wav
 
       [ -d "$dir/." ] || mkdir -p "$dir" || { xit=1; continue; }
+      ripcomment="Ripped by $NAME with cdparanoia on `date`"
 
-      echo "Ripping track #$track: $dir/$title ..."
-      ripcomment="Ripped by $NAME with cdparanoia and oggenc on `date`"
-      if (set -x; cdparanoia -q -d "$dev" -e -r "$track" "$raw" 2>cdp.err)
-      then
-	  if [ -z "$lock" ]
-	  then
-	      [ -n "$encpid" ] && kill -0 "$encpid" 2>/dev/null \
-		&& { echo; echo "waiting for previous encoder ..."; }
-	      wait
-	  fi
+      [ -s "$raw" ] \
+      || (set -x; cdparanoia -q -d "$dev" -e -w "$track" "$raw" 2>cdp.err) \
+      || { echo "cdparanoia failed" >&2
+	   tail -20 cdp.err >&2
+	   [ $keep ] || rm -f "$raw"
+	   xit=1
+	   continue
+	 }
 
-	  ls -ld "$raw"
-	  ( if case $enc in
-		ogg)
-		  # This fiddling is because oggenc blows up with long comments.
-		  commentf=.tmp$$c
-		  [ -n "$xtra" ] && echo "$xtra" >"$commentf"
-		  echo "$ripcomment" >>"$commentf"
+      firstenc=1
+      linksgood=1
+      for enc in $needenc
+      do
+	out=$dir/$title.$enc
+	[ -s "$out" ] && { echo "$cmd: existing file $out, skipping" >&2
+			   continue
+			 }
 
-		  set oggenc -r \
-			 -a "$artist" -N "$track" -t "$title" -l "$album"
-		  if [ -n "$qual" ]; then set "$@" -q "$qual"
-				     else set "$@" -b "$bps"
-		  fi
+	if [ -z "$lock" ]
+	then
+	    [ -n "$encpid" ] && kill -0 "$encpid" 2>/dev/null \
+	      && { echo; echo "waiting for previous encoder ..."; }
+	    wait
+	fi
 
-		  while read -r comment
-		  do  [ -n "$comment" ] && set "$@" -c "$comment"
-		  done <$commentf
-		  rm "$commentf"
+	if [ $firstenc ]; then firstenc=
+			  else ls -ld "$raw"
+	fi
 
-		  set "$@" -o "$out" "$raw"
-		  ;;
-		mp3)
-		  set lame -r -b "$bps" -h -p "$raw" "$out"
-		  if [ -n "$qual" ]; then set "$@" -v -V "$qual"
-				     else set "$@" -b "$bps"
-		  fi
-		  ;;
-	      esac
-	      [ -n "$lock" ] && set alog cdrip lock "$lock" rmafter "$raw" nice "$@"
-	      ( set -x; exec "$@" )
-	    then :
-	    else echo "Encode of \"$raw\" fails." >&2
-		 rm -f "$out"; exit 1
-	    fi
-	  ) &
-	  encpid=$!
-      else
-	  echo "cdparanoia failed" >&2
-	  tail -20 cdp.err >&2
-	  rm -f "$raw"
-	  xit=1
-      fi
+	# set up command line for each encoding
+	link=$raw-4$enc
+	if ln "$raw" "$link"
+	then
+	    set rmafter $"link" "$@"
+	else
+	    echo "$cmd: can't link raw to $link" >&2
+	    linksgood=
+	    link=
+	fi
+	case $enc in
+	  ogg)
+	    set oggenc $oggencqual -a "$artist" -N "$track" -t "$title" -l "$album"
+	    # This fiddling is because oggenc blows up with long comments.
+	    commentf=.tmp$$c
+	    [ -n "$xtra" ] && echo "$xtra" >"$commentf"
+	    echo "$ripcomment" >>"$commentf"
+	    echo "Encoded by $NAME with `oggenc -v` on `date`" >>"$commentf"
+	    while read -r comment
+	    do  [ -n "$comment" ] && set "$@" -c "COMMENT=$comment"
+	    done <$commentf
+	    rm "$commentf"
+
+	    set "$@" -o "$out" "$link"
+	    ;;
+	  mp3)
+	    set lame -h $lamequal -p "$link" "$out"
+	    ;;
+	  *)
+	    echo "$cmd: unimplemented encoding \"$enc\"!" >&2
+	    xit=1
+	    continue
+	    ;;
+	esac
+
+	[ -n "$link" ] && set rmafter "$link" "$@"
+	[ -n "$lock" ] && { set alog cdrip lock "$lock@$HOST-$nextjob" "$@"
+			    nextjob=`expr \( $nextjob \) \% $jobs + 1`
+			  }
+	set nice -n "$nice" "$@"
+
+	if ( set -x; exec "$@" )
+	then :
+	else echo "Encode of \"$raw\" fails." >&2
+	     rm -f "$out"
+	     exit 1
+	fi &
+
+	encpid=$!
+      done
+
+      [ $keep ] \
+      || [ -z "$lock" -o -n "$linksgood" ] && (set -x; exec rm "$raw")
     done
 
     [ -z "$lock" ] && wait
