@@ -13,29 +13,13 @@ ftpdir=/usr/spool/ftp/pub/$USER
 
 rm -rf "$ftpdir"/*
 
-Mkdir()
+makedir()
 {
-	mode=$1
+	_mode=$1
 	shift
-	while [ $# -gt 0 ]
-	do
-		[ -d "$1" ] ||
-		case "$1" in
-			*/*)	{ Mkdir "$mode" "`exec expr x\"\$1\" : x'\(.*\)/.*'`" &&
-				  { [ -d "$1" ] || mkdir "$1" ; } &&
-				  chmod "$mode" "$1" &&
-				  echo "mkdir $1" >&2
-				} || return 1
-				;;
-			*)	{ { [ -d "$1" ] || mkdir "$1" ; } &&
-				  chmod "$mode" "$1" &&
-				  echo "mkdir $1" >&2
-			    	} || return 1
-				;;
-		esac
-		shift
+	for _dir
+	do  needdir "$_dir" && chmod $_mode "$_dir" || exit 1
 	done
-	return 0
 }
 
 exec <.ftprc
@@ -50,11 +34,11 @@ do
 			/*)	echo "can't link full paths" >&2 ;;
 			*)	if [ -d "$file" ]
 				then
-					Mkdir 755 "$file"
+					makedir 755 "$file"
 				else
 					case "$file" in
 						*/*)	dir="$ftpdir/"`exec expr x"$file" : x'\(.*\)/.*'`
-							Mkdir 755 "$dir" &&
+							makedir 755 "$dir" &&
 							{ ln "$file" "$ftpdir/$file" 2>/dev/null ||
 							  cp "$file" "$ftpdir/$file"
 							} ;;
