@@ -7,12 +7,12 @@
 #       constructed directory can be used as an NFS export.
 #       The -s option exists to make soft links if preferred,
 #	or the -c option to make copies instead of links.
-#	- Cameron Simpson <cs@zip.com.au> 16jun2003
+# - Cameron Simpson <cs@zip.com.au> 16jun2003
 #
 
 cmd=`basename "$0"`
 usage="Usage: $cmd [-a archs] [-c] [-s] rhupdatesdir
-	-a archs	Architecutre suffices, deduced from \$CPU by default.
+	-a archs	Architecture suffices, deduced from \$CPU by default.
 	-c		Make copies instead of links.
 	-s		Make soft links, not hard links."
 
@@ -53,7 +53,7 @@ then
   case $CPU in
     x86)	archs='i686 i586 i486 i386' ;;
     *)		echo "$cmd: unsupported architecture \"$CPU\" (from \$CPU - I know \"x86\")" >&2
-		echo "	perhaps you need the -a option?"
+		echo "	perhaps you need the -a option?" >&2
 		badopts=1
 		;;
   esac
