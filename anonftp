@@ -4,6 +4,8 @@
 #	- Cameron Simpson <cs@zip.com.au>
 #
 
+: ${TMPDIR:=/tmp}
+
 cmd=`basename "$0"`
 
 EMAIL=${EMAIL:-"$USER@$MAILDOMAIN"}	# cut to suit
@@ -132,7 +134,7 @@ case $# in
 	;;
 esac
 
-ftphome=/tmp/aftp$$
+ftphome=$TMPDIR/aftp$$
 mkdir "$ftphome" || exit $?
 netrc=$ftphome/.netrc
 
