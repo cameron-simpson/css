@@ -1,0 +1,43 @@
+#!/bin/sh -u
+#
+# Test that a process exists (and may be signalled).
+#	- Cameron Simpson <cs@zip.com.au> 28mar2005
+#
+
+cmd=$0
+usage="Usage: $cmd [!] {pid|pidfile}
+	!	Test that the process does not exist."
+
+badopts=
+
+yes=0 no=1
+if [ $# -gt 0 ] && [ "x$1" = "x!" ]
+then  yes=1 no=0; shift
+fi
+
+if [ $# = 0 ]
+then
+  echo "$cmd: missing pid or pidfile" >&2
+  badopts=1
+else
+  case "$1" in
+    [0-9]|[0-9][0-9]|[0-9][0-9][0-9]|[0-9][0-9][0-9][0-9]|[0-9][0-9][0-9][0-9][0-9])
+			pidfile= pid=$1 ;;
+    /*|./*|../*)	pidfile=$1 ;;
+    *)			pidfile=$HOME/var/run/$1 ;;
+  esac
+  shift
+
+  if [ -n "$pidfile" ]
+  then
+    {  [ -s "$pidfile" -a -f "$pidfile" ] \
+    && read pid etc <"$pidfile" \
+    && [ -n "$pid" ]
+    } || { echo "$cmd: can't read pid from file \"$pidfile\"" >&2; badopts=1; }
+  fi
+fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+kill -0 "$pid" && exit $yes
+exit $no
