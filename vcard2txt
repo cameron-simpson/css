@@ -6,7 +6,7 @@
 
 [ $# = 0 ] || { echo "Usage: $0 < vcard" >&2; exit 2; }
 
-( echo;cat;echo ) \
+( echo;exec cat ) \
 | sed -n \
       -e '1,/^begin:vcard/d' \
       -e '/^end:vcard$/,$d' \
@@ -15,10 +15,14 @@
       -e "s/'/'\\''/g" \
       -e "s/:\\(.*\\)/='\\1'/" \
       -e 's/^/vcard_/p' \
-| ( eval "`cat`"
+| (eval "`cat`"
     n=$vcard_fn
     [ -n "$vcard_email_internet" ] && n="$n <$vcard_email_internet>"
     echo "$n"
-    echo ${vcard_tel_cell:-"Ph: $vcard_tel_cell"}
+    echo ${vcard_org:+"Organisation: $vcard_org"}
+    echo ${vcard_tel_cell:+"Ph (Cell): $vcard_tel_cell"}
+    echo ${vcard_tel_work:+"Ph (Work): $vcard_tel_work"}
+    echo ${vcard_tel_home:+"Ph (Home): $vcard_tel_home"}
+    echo ${vcard_tel_fax:+"Ph (Fax):  $vcard_tel_fax"}
   ) \
 | sed '/^ *$/d'
