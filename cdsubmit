@@ -119,7 +119,7 @@ discid=`
 	( echo "CDDB HELLO $USER $HOSTNAME $cmd $version"
 	  echo "$discidqry"
 	  echo "QUIT"
-	) | nc "$cddbhost" "$cddbport" | sed -n 's/^200 Disc ID is \\([0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f]\\)/\\1/p'
+	) | nc "$cddbhost" "$cddbport" | tr -d '\\015' | sed -n 's/^200 Disc ID is \\([0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f]\\)/\\1/p'
        `
 case "$discid" in
     [0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f]) ;;
