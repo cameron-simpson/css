@@ -1,0 +1,12 @@
+#!/bin/sh
+#
+# Run a command, piping into a pager if stdout is a tty.
+#	- Cameron Simpson <cs@zip.com.au> 27feb2000
+#
+
+[ $# = 0 ] && { echo "Usage: $0 command [args...]" >&2; exit 2; }
+
+if [ -t 1 ]
+then  "$@" 2>&1 | ${PAGER:-less}
+else  exec "$@"
+fi
