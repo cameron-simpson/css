@@ -1,0 +1,7 @@
+#!/bin/sh
+
+finger charlie@infinet.com \
+	| sed '1,/^Updated by /d
+	       s/$//
+	       /^$/d' \
+	| tee $HOME/public/moto/dod/list.`datecode`
