@@ -1,0 +1,8 @@
+#!/bin/sh
+#
+# Collect Carl Paukstis' Mailing List Round-Up and update my HTMLised version.
+#	- Cameron Simpson <cs@zip.com.au> 05mar2002
+#
+
+cd $HOME/public/moto || exit 1
+cat >MLRU && myke mailing-lists.html
