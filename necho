@@ -1,10 +1,15 @@
 #!/bin/sh
+#
+# Portable echo without trailing newline.
+#	- Cameron Simpson <cs@zip.com.au>
+#
 
+sysv=
 case $ARCH in
-    sun.*.solaris)	/usr/bin/echo "$*\\c" ;;    # Sys5, as God intended
-    sun.*.sunos)	/usr/bin/echo -n "$*" ;;
-    linux.*.linux|sun.*.sunos)
-    			echo -n "$*" ;;	    # the thrice accursed BSD
-    *)			echo -n "$*" ;;	# BSD, since I use a lot of linux
-    *)			echo "$*\\c" ;;	# Sys5
+    sun.*.solaris)	sysv=1 ;;	# AIX too?
 esac
+
+if [ $sysv ]
+then  echo "$*\\b"
+else  echo -nE "$*"
+fi
