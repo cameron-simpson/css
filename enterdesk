@@ -11,40 +11,44 @@ if [ "x$thisdesk" != "x$lastdesk" ]
 then
     lastvalue "enterdesk-$HOST" "$thisdesk" &
 
-    # root backdrop
-    Dflag=-D
-    rootbg=`desktop "$thisdesk" rootbg`
-    if [ -z "$rootbg" -o ! -s "$rootbg" ]
+    if [ "x$XSESSIONMODE" != xvnc ]
     then
-	Dflag=
-	rootbg=`lastvalue "defaultrootbg-$HOST"`
-    fi
+	# root backdrop
+	Dflag=-D
+	rootbg=`desktop "$thisdesk" rootbg`
+	if [ -z "$rootbg" -o ! -s "$rootbg" ]
+	then
+	    Dflag=
+	    rootbg=`lastvalue "defaultrootbg-$HOST"`
+	fi
 
-    if [ -n "$rootbg" -a -s "$rootbg" ]
-    then
-      lastrootbg=`lastvalue rootbg`
-      [ "x$rootbg" != "x$lastrootbg" ] && rootbg $Dflag "$rootbg"
-    else
-      fvwm-root --dummy
-      xsetroot -solid black
-    fi
+	if [ -n "$rootbg" -a -s "$rootbg" ]
+	then
+	  lastrootbg=`lastvalue rootbg`
+	  [ "x$rootbg" != "x$lastrootbg" ] && rootbg $Dflag "$rootbg"
+	else
+	  fvwm-root --dummy
+	  xsetroot -solid black
+	fi
 
-#    # menu backdrop
-#    Dflag=-D
-#    menubg=`desktop "$thisdesk" menubg`
-#    if [ -z "$menubg" -o ! -s "$menubg" ]
-#    then
-#	Dflag=
-#	menubg=`lastvalue "defaultmenubg-$HOST"`
-#    fi
-#
-#    if [ -n "$menubg" -a -s "$menubg" ]
-#    then
-#      lastmenubg=`lastvalue menubg`
-#      [ "x$menubg" != "x$lastmenubg" ] && menubg $Dflag "$menubg"
-#    else
-#      fvwm-root --dummy
-#      xsetroot -solid black
-#    fi
+    #    # menu backdrop
+    #    Dflag=-D
+    #    menubg=`desktop "$thisdesk" menubg`
+    #    if [ -z "$menubg" -o ! -s "$menubg" ]
+    #    then
+    #	Dflag=
+    #	menubg=`lastvalue "defaultmenubg-$HOST"`
+    #    fi
+    #
+    #    if [ -n "$menubg" -a -s "$menubg" ]
+    #    then
+    #      lastmenubg=`lastvalue menubg`
+    #      [ "x$menubg" != "x$lastmenubg" ] && menubg $Dflag "$menubg"
+    #    else
+    #      fvwm-root --dummy
+    #      xsetroot -solid black
+    #    fi
+
+    fi
 
 fi
