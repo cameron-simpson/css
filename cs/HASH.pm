@@ -23,50 +23,65 @@ package cs::HASH;
 
 # locate an entry in a hash
 sub findEntry
-	{ my($db,$key,$field)=@_;
+{ my($db,$key,$field)=@_;
 
-	  if (! defined $field)
-		{ return undef if ! exists $db->{$key};
-		  return $db->{$key};
-		}
+  if (! defined $field)
+  { return undef if ! exists $db->{$key};
+    return $db->{$key};
+  }
 
-	  my($r);
+  my($r);
 
-	  for (keys %$db)
-		{ $r=$db->{$_};
-		  return $r if exists $r->{$field}
-				   && $r->{$field} eq $key;
-		}
+  for (keys %$db)
+  { $r=$db->{$_};
+    return $r if exists $r->{$field}
+		     && $r->{$field} eq $key;
+  }
 
-	  undef;
-	}
+  undef;
+}
 
 sub DESTROY	{ SUPER::DESTROY(@_); }
 
-sub FIRSTKEY
-	{ ## warn "FIRSTKEY(@_)";
-	  my($this)=@_;
-	  my($meta)=$this;
-	  my($each);
+sub CLEAR($)
+{ my($this)=@_;
 
-	  # reset counter
-	  $meta->{EACH}=$each=[0,$this->KEYS()];
+  for my $key ($this->KEYS())
+  { $this->DELETE($key);
+  }
+}
 
-	  return undef if @$each == 1;
+sub FIRSTKEY($)
+{ 
+##  { my @c = caller; warn "FIRSTKEY(@_) from [@c]";
+##    my $i = 0;
+##    while (@c=caller($i))
+##    { warn "\t@c\n";
+##      $i++;
+##    }
+##    warn "============\n";
+##  }
 
-	  $this->NEXTKEY();
-	}
+  my($this)=@_;
 
-sub NEXTKEY
-	{ ## warn "NEXTKEY(@_)";
-	  my($this,$lastkey)=@_;
-	  my($each)=$this->{EACH};
+  # reset counter
+  $this->{EACH}=[$this->KEYS()];
 
-	  # check for running out of keys
-	  return undef if $each->[0]++ >= $#$each;
+  ## warn "FIRSTKEY: keys=[".join(' ', @{$this->{EACH}})."]";
 
-	  $each->[$each->[0]];
-	}
+  $this->NEXTKEY();
+}
+
+sub NEXTKEY($$)
+{ ## warn "NEXTKEY(@_)";
+  my($this,$lastkey)=@_;
+  my($each)=$this->{EACH};
+
+  # check for running out of keys
+  return undef if ! @$each;
+
+  shift(@$each);
+}
 
 
 1;
