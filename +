@@ -18,7 +18,7 @@ do
   case $1 in
     +a)		termopts="$termopts $1" ;;
     -[nR])	muttopts="$muttopts $1" ;;
-    -m)		muttopts="$muttopts $1 $2" ;;
+    -[em])	muttopts="$muttopts $1 "`shqstr "$2"`; shift ;;
     --)		shift; break ;;
     -?*)	echo "$cmd: unrecognised option: $1" >&2; badopts=1 ;;
     *)		break ;;
@@ -31,6 +31,7 @@ then
   case $1 in
     /*)		mfolder=$1 ;;
     +*)		mfolder=$1 ;;
+    imap:*)	mfolder=$1 ;;
     *.*)	mfolder=nntp://$NNTPSERVER/$1 ;;
     *)		mfolder=+$1 ;;
   esac
@@ -42,4 +43,9 @@ fi
 
 cd || exit 1
 [ -s "$HOME/rc/mail/muttsh.$mfolder" ] && . "$HOME/rc/mail/muttsh.$mfolder"
-exec term $termopts +ip -n "mutt $mfolder" scr "mutt_$mfolder" mutt -f "$mfolder" $muttopts
+export mfolder
+set -x
+exec \
+	term $termopts +ip -n "mutt $mfolder" \
+	scr "mutt_$mfolder" \
+	sh -c "exec mutt -f \"\$mfolder\" $muttopts"
