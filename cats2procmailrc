@@ -10,7 +10,7 @@ cats2procmailrc - generate a procmail recipe from my mail categories file
 
 =head1 SYNOPSIS
 
-cats2procmailrc [B<-a> I<alert>] [B<-m> I<maildomain>] [B<-t> I<type>] E<lt>categories E<gt>procmailrc
+cats2procmailrc [B<-a> I<alert>] [B<-m> I<maildomains>] [B<-t> I<type>] E<lt>categories E<gt>procmailrc
 
 =head1 DESCRIPTION
 
@@ -41,10 +41,12 @@ and adds the automatic rules by converting my categories file.
 Specify a shell command to run as the alert function (see L<FILE FORMAT> below).
 The character percent (B<'%'>) is replaced by the I<folder> name.
 
-=item B<-m> I<maildomain>
+=item B<-m> I<maildomains>
 
 Specify the default mail domain for rule addresses lacking an B<@I<domain>>.
 The default comes from the environment variable B<$SITENAME>.
+In fact this may be a list of domains if you have some equvalents,
+separated by commas.
 
 =item B<-t> I<type>
 
@@ -149,15 +151,15 @@ use strict vars;
 use Getopt::Std;
 
 ($::cmd=$0) =~ s:.*/::;
-$::Usage="Usage: $::cmd [-a alert] [-m domain] [-t {unix|mh|maildir}] <categories >procmailrc
+$::Usage="Usage: $::cmd [-a alert] [-m domains] [-t {unix|mh|maildir}] <categories >procmailrc
 	-a alert	Command line to generate the alert.
 			The mail item is present on standard input.
-	-m domain	Select default mail domain.
+	-m domains	Select default mail domain(s).
 	-t type		Select default mailbox type.
 ";
 
 $::DfltSfx="";	# unix style by default
-$::DfltDom=$ENV{SITENAME};
+@::DfltDom=$ENV{SITENAME};
 undef $::DfltAlert;
 
 { my $badopts=0;
@@ -172,7 +174,7 @@ undef $::DfltAlert;
   }
 
   if (defined $::opt_m)
-  { $::DfltDom=$::opt_m;
+  { @::DfltDom=grep(length,split(/[\s,|]+/, $::opt_m));
   }
 
   if (defined $::opt_t)
@@ -254,7 +256,7 @@ while (<STDIN>)
   { $ptn=$1;
   }
   else
-  { $ptn.="\@.*$::DfltDom" if $ptn !~ /\@/;
+  { $ptn.="\@.*(".join('|',@::DfltDom).")" if $ptn !~ /\@/;
   }
 
   $ptn =~ s/\.[^*]/\\$&/g;
