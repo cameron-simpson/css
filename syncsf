@@ -29,7 +29,10 @@ fi
 
 set -x
 cd $zapdir/html || exit 1
-myke || exit 1
+if ask "Run myke"
+then
+    myke || exit 1
+fi
 
 rsync -avHPW --delete $HOME/there/adzapper.sourceforge.net/html/. sf:adzapper/htdocs/.
 
@@ -40,7 +43,7 @@ then
       echo New script attached.
       echo Diff since last public sync:
       echo
-      cvs diff -r SYNCSF scripts/squid_redirect
+      cvs diff -r SYNCSF squid_redirect
       [ $dotag ] && cvs tag -F SYNCSF
     ) | mfiles "$addr" squid_redirect
 fi
