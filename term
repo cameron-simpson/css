@@ -83,6 +83,9 @@ done
 # we keep fd 3 as hook for stdin
 closefds='for fd in 4 5 6 7 8 9; do eval "exec $fd>&-"; done'
 
+# suppress lock if none needed
+if [ -n "$lock" ]; then dolock="lock $lock1 $lock"; else dolock=; fi
+
 args=
 case "$TERM,$DISPLAY" in
     *,?*)
@@ -116,8 +119,8 @@ case "$TERM,$DISPLAY" in
 	[ "x$PREFTERM" = xrxvt ] && set rigrxvtbg "$@"
 
 	if [ $async ]
-	then lock $lock1 "$lock" "$PREFTERM" $opts -e "$@" &
-	else exec lock $lock1 "$lock" "$PREFTERM" $opts -e "$@"
+	then $dolock "$PREFTERM" $opts -e "$@" &
+	else exec $dolock "$PREFTERM" $opts -e "$@"
 	fi
 	;;
     iris-ansi*,*)
@@ -129,8 +132,8 @@ case "$TERM,$DISPLAY" in
 	eval "$detach"
 	eval "$closefds"
 
-	if [ $async ]; then acon lock $lock1 "$lock" wsh -v pushttylabel -exec +a "$n" "$@"
-		       else exec lock $lock1 "$lock" wsh -v pushttylabel -exec +a "$n" "$@"
+	if [ $async ]; then acon $dolock wsh -v pushttylabel -exec +a "$n" "$@"
+		       else exec $dolock wsh -v pushttylabel -exec +a "$n" "$@"
 	fi
 	;;
     *)	exec "$@"
