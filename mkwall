@@ -24,8 +24,8 @@ do
 	;;
     -g)	geom=$2; shift
 	ok=1
-	bgx=`expr "x$geom" : '\([1-9][0-9]*\)x[1-9][0-9]*$'` || ok=
-	bgy=`expr "x$geom" : '[1-9][0-9]*x\([1-9][0-9]*\)$'` || ok=
+	bgx=`expr "x$geom" : 'x\([1-9][0-9]*\)x[1-9][0-9]*$'` || ok=
+	bgy=`expr "x$geom" : 'x[1-9][0-9]*x\([1-9][0-9]*\)$'` || ok=
 	[ $ok ] \
 	    || { echo "$cmd: bad geometry for -g: expected XxY, found \"$geom\"" >&2
 		 badopts=1
