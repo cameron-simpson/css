@@ -155,7 +155,7 @@ sub _Load($$$$)
   if ((defined $creator && $creator ne $this->{CREATOR})
    || (defined $dbname && $dbname ne $this->{DBNAME})
      )
-  { warn "$::cmd: creator/dbname supplied \"$creator/$dbname\" doesn't match file \"$this->{CREATOR}/$this->{DBNAME}\n";
+  { warn "$::cmd: creator/dbname supplied \"$creator/$dbname\" doesn't match file \"$this->{CREATOR}/$this->{DBNAME}\"\n";
     return 0;
   }
 
