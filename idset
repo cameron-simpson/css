@@ -78,7 +78,7 @@ fi
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
-needdir "$idset" || exit 1
+[ -d "$idset/." ] || needdir "$idset" || exit 1
 cd "$idset" || exit 1
 
 # no id or name specified - list stuff
@@ -135,7 +135,7 @@ case "$idname" in
     *)  # must be a number
 	idnum=$idname
 	idname=
-	needdir "$idnum" || exit 1
+	[ -d "$idnum/." ] || needdir "$idnum" || exit 1
 	;;
 esac
 
