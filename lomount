@@ -1,0 +1,90 @@
+#!/bin/sh
+#
+# Do a loopback mount of a file containing a filesystem.
+# Linux specific at present.
+#	- Cameron Simpson <cs@zip.com.au> 12jul2000
+#
+
+fstype=iso9660
+mopts=ro
+
+cmd=`basename "$0"`
+usage="Usage: $cmd [-t fstype] [-o options] file [mountpoint]
+	-t fstype	Filesystem type. Default: $fstype
+	-o options	Mount options. Default: $mopts"
+
+badopts=
+while :
+do  case $1 in
+      -t)	fstype=$2; shift ;;
+      -o)	mopts=$2; shift ;;
+      --)	shift; break ;;
+      -?*)	echo "$cmd: unrecognised option: $1" >&2
+		badopts=1
+		;;
+      *)	break ;;
+    esac
+    shift
+done
+
+if [ $# = 0 ]
+then  echo "$cmd: missing file" >&2; badopts=1
+else  file=$1; shift
+fi
+
+dir=
+[ $# = 0 ] || { dir=$1; shift; }
+
+[ $# = 0 ] || { echo "$cmd: extra arguments: $*" >&2
+		badopts=1
+	      }
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+ok=1
+
+newdir=
+[ -n "$dir" ] \
+	|| if dir=`mkdirn /tmp/$cmd`
+	   then
+	       newdir=$dir
+	   else
+	       echo "$cmd: can't create mountpoint" >&2
+	       ok=
+	   fi
+
+[ -z "$dir" ] \
+	|| [ -d "$dir/." ] \
+	|| { echo "$cmd: not a directory: $dir" >&2
+	     ok=
+	   }
+
+[ -s "$file"  ] || { echo "$cmd: need nonempty file ($file)" >&2; ok=; }
+
+[ $ok ] || exit 1
+
+for n in 0 1 2 3 4 5 6 7 FAIL
+do
+  [ "x$n" = xFAIL ] && { echo "$cmd: can't grab a loop device" >&2; exit 1; }
+
+  loop=/dev/loop$n
+  losetup "$loop" "$file" && break
+done
+
+unloop="losetup -d $loop"
+
+if mount -t "$fstype" -o "$mopts" "$loop" "$dir"
+then  echo "$loop"
+      echo "$dir"
+      ( exec >&2
+	echo "Mounted $file on $dir."
+	echo "To unmount:"
+	echo "	umount $dir"
+	[ -n "$newdir" ] && echo "	rmdir $newdir"
+	echo "	$unloop"
+      )
+else
+      [ -n "$newdir" ] && rmdir $newdir
+      eval "$unloop"
+      exit 1
+fi
