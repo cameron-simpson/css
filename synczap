@@ -110,7 +110,7 @@ do  echo "$user..."
 	  echo "Cheers,"
 	  cat $HOME/rc/mail/signature
         ) | mailsubj -s 'synopsis of adzap update' "$user"
-    mpics "$user" "$script"
+    mfiles "$user" "$script" </dev/null
 done
 
 [ $commit ] && cvs tag -F LAST
