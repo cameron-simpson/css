@@ -7,9 +7,10 @@
 [ $# = 0 ] && { echo "Usage: $0 args..." >&2; exit 2; }
 
 props=au.com.zip.cs
-set -x
 tty=`tty`
+set -x
 exec ${JAVA_HOME:-"/opt/j2sdk-sun"}/bin/java \
-	"-D$props.EDITOR=$EDITOR" \
+	"-D$props.env.HOME=$HOME" \
+	"-D$props.env.EDITOR=$EDITOR" \
 	"-D$props.tty=$tty" \
 	"$@"
