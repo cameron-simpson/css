@@ -1,0 +1,48 @@
+#!/bin/sh
+#
+# Examine the named files and attach correct extensions to misnamed ones.
+#	- Cameron Simpson <cs@zip.com.au> 22feb1999
+#
+
+[ $# = 0 ] && { set x `cat`; shift; }
+
+xit=0
+
+for f
+do  ## echo "$f ..."
+
+    [ -f "$f" ] || { echo "$cmd: $f: not a regular file" >&2
+		     xit=1; continue;
+		   }
+
+    fileout=`file "$f"` || { echo "$cmd: problems with $f, skipped" >&2
+			     xit=1; continue;
+			   }
+    type=`expr "x$fileout" : "x$f"':		*\(.*\)'`
+
+    case $f in
+	*.*)	ext=`expr "x$f" : 'x.*\(\..*\)'` ;;
+	*)	ext= ;;
+    esac
+
+    addext=
+    rmext=
+    case "$ext-$type" in
+	-USTAR\ tar\ archive)	addext=.tar ;;
+	.tgz-USTAR\ tar\ archive) rmext=.tgz addext=.tar ;;
+	.gz-USTAR\ tar\ archive) rmext=.gz ;;
+	-JPEG\ file)		addext=.jpg ;;
+	.jpg-JPEG\ file)	;;
+	-GIF\ file,*)		addext=.gif ;;
+	.gif-GIF\ file,*)	;;
+    esac
+
+    newf=$f
+    [ -n "$rmext" ] && newf=`expr "x$newf" : "x\(.*\)$rmext"`
+    newf=$newf$addext
+    [ "x$f" = "x$newf" ] || { echo "$f -> $newf ..."
+			      mv -i "$f" "$newf"
+			    }
+done
+
+exit $xit
