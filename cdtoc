@@ -22,8 +22,11 @@ die $::Usage if @ARGV;
 
 my $CD = new cs::CDDB;
 die "$::cmd: can't make new cs::CDDB object\n" if ! defined $CD;
+warn "id is ".$CD->DiscId();
 
 my($artist,$title)=($CD->Artist(), $CD->Title());
+die "no artist!" if ! defined $artist;
+die "no title!" if ! defined $title;
 
 print "$artist\n$title\n";
 # print cs::Hier::h2a($CD,1),"\n";
