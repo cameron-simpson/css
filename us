@@ -5,6 +5,7 @@
 #	- Cameron Simpson <cs@zip.com.au>
 #
 # Catch "us -" and squirrel away stdin.	- cameron 25jun2001
+# Shortcuts and foo.bar -> http://foo.bar/ - cameron 09aug2002
 #
 
 force=1
@@ -30,6 +31,20 @@ esac
 
 if [ $force ] || locked "netscape-$id"
 then
+    # translate shortcuts
+    first=1
+    for arg
+    do  case "$arg" in
+	    jdk)	arg=file:///opt/j2sdk-sun-1.4.0-beta3/docs/api/overview-summary.html ;;
+	    */*)	;;
+	    *.*)	arg=http://$arg/ ;;
+	esac
+	if [ $first ]
+	then  set x "$arg"; shift
+	else  set x "$@" "$arg"; shift; first=
+	fi
+    done
+
     [ "x$*" = x- ] || exec </dev/null
     if [ $clean ]
     then
