@@ -1,0 +1,57 @@
+#!/bin/sh
+#
+# Make the root background be what it should be.
+# Pulled from enterdesk for use there and from deskbg.
+#	- Cameron Simpson <cs@zip.com.au> 
+#
+
+cmd=$0
+usage="Usage: $cmd [-d desk] [-f]
+	-d	Specify the desk whose background to use.
+	-f	Force update even if we think no change needed."
+
+desk=
+force=
+
+badopts=
+
+while :
+do
+  case $1 in
+    -d)	desk=$2; shift ;;
+    -f)	force=1 ;;
+    --)	shift; break ;;
+    -?*)echo "$cmd: unrecognised option: $1" >&2; badopts=1 ;;
+    *)	break ;;
+  esac
+  shift
+done
+
+[ $# = 0 ] || { echo "$cmd: extra arguments: $*" >&2; badopts=1; }
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+case "$desk" in
+  ''|.)	desk=`currentdesk` || exit 1 ;;
+esac
+
+# check root backdrop
+if rootbg=`deskvalue "$desk" rootbg`
+then  perdesk=1
+else  perdesk=
+fi
+
+if [ -n "$rootbg" -a -s "$rootbg" ]
+then
+  # valid background image? compare and change if necessary
+  if [ $force ]
+  then lastrootbg=
+  else lastrootbg=`lastvalue "rootbg-$HOST"`
+  fi
+  [ "x$rootbg" = "x$lastrootbg" ] || rootbg "$rootbg"
+else
+  # no background - flat backdrop
+  fvwm-root --dummy
+  xsetroot -solid darkblue
+  lastvalue "rootbg-$HOST" ""
+fi
