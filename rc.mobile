@@ -219,6 +219,20 @@ locations=`sed -n -e '/^#/d' -e 's/^\\[@\\([a-z].*\\)\\]$/\\1/p' "$cf"`
 # the clauses B<GLOBAL>, I<where> and B<FINAL> are run in that order.
 #
 
+setenv()
+{
+  setenv_var=$1
+  setenv_val=$2
+  eval "$setenv_var=\$setenv_val; export $setenv_var"
+  if [ -n "$envfile" ]
+  then
+      case "$setenv_val" in
+	  *\'*) setenv_val=`echo "$setenv_val" | sed "s/'/'\\\\\\\\''/g"` ;;
+      esac
+      echo "setenv $setenv_var '$setenv_val';" >>"$envfile"
+  fi
+}
+
 if [ $int ]
 then
     echo "$cmd - bring up interface according to location"
@@ -380,20 +394,6 @@ doops()
     # =back
     #
   done
-}
-
-setenv()
-{
-  setenv_var=$1
-  setenv_val=$2
-  eval "$setenv_var=\$setenv_val; export $setenv_var"
-  if [ -n "$envfile" ]
-  then
-      case "$setenv_val" in
-	  *\'*) setenv_val=`echo "$setenv_val" | sed "s/'/'\\\\\\\\''/g"` ;;
-      esac
-      echo "setenv $setenv_var '$setenv_val';" >>"$envfile"
-  fi
 }
 
 bgsvc()
