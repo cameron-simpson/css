@@ -109,14 +109,22 @@ sub fetchCollatedResults
 
 =over 4
 
-=item new cs::WordIndex(I<indexfile>)
+=item new cs::WordIndex(I<indexfile>,I<bigmode>)
+
+Create a new WordIndex object
+attached to the file named I<indexfile> (if specified).
+The optional parameter I<bigmode>,
+if specified and true,
+turns on deferred update mode
+where index updates are queued for application at index B<Save()> time.
 
 =cut
 
 sub new
-{ my($class,$filename)=@_;
+{ my($class,$filename,$bigmode)=@_;
+  $bigmode=0 if ! defined $bigmode;
 
-  my $this = bless { NDX => {} }, $class;
+  my $this = bless { NDX => {}, BIGMODE => $bigmode, Q => [] }, $class;
 
   if (defined $filename)
   { $this->{INDEXFILE}=$filename;
@@ -131,6 +139,12 @@ sub new
 =head1 OBJECT METHODS
 
 =over 4
+
+=cut
+
+sub _BigMode
+{ shift->{BIGMODE};
+}
 
 =item ProcessFile(I<filename>)
 
@@ -161,6 +175,7 @@ sub ProcessFile
 
   local($_);
   my $lineno = 0;
+  my @w;
 
   LINE:
   while (defined($_=<$FILE>))
@@ -169,30 +184,39 @@ sub ProcessFile
     s/^\s+//;
     next LINE if ! length;
 
+    @w=();
+
     # pure words (well, including underscores)
     for my $word (::uniq(map(lc,grep(length,split(/[^_\w]+/)))))
-    { $this->AddWord($word,$file,$lineno);
+    { push(@w,$word);
     }
 
     # compound words with dashes
     for my $word (::uniq(map(lc,grep(length,split(/[^-\w]+/)))))
     { $word =~ s/^-+//;
       $word =~ s/-+$//;
-      $this->AddWord($word,$file,$lineno) if length $word;
+      push(@w,$word);
     }
 
     # compound words with dots
     for my $word (::uniq(map(lc,grep(length,split(/[^.\w]+/)))))
     { $word =~ s/^\.+//;
       $word =~ s/\.+$//;
-      $this->AddWord($word,$file,$lineno) if length $word;
+      push(@w,$word);
     }
 
     # compound words with dashes and underscores and dots
     for my $word (::uniq(map(lc,grep(length,split(/[^-_.\w]+/)))))
     { $word =~ s/^[-.]+//;
       $word =~ s/[-.]+$//;
-      $this->AddWord($word,$file,$lineno) if length $word;
+      push(@w,$word);
+    }
+
+    WORD:
+    for my $word (::uniq(@w))
+    { next WORD if length($word) < 2 || length($word) > 32;
+      next WORD if $word =~ /^\d{1,3}$/;	# toss smaller numbers
+      $this->AddWord($word,$file,$lineno);
     }
   }
 }
@@ -205,7 +229,12 @@ Add the keyword I<word> to the index as at line I<lineno> of the file I<filename
 
 sub AddWord
 { my($this,$word,$file,$lineno)=@_;
-  _addToWordIndex($this->_WordIndex($word),$file,$lineno);
+  if ($this->_BigMode())
+  { push(@{$this->{Q}->{$word}}, $file, $lineno);
+  }
+  else
+  { _addToWordIndex($this->_WordIndex($word),$file,$lineno);
+  }
 }
 
 sub _addToWordIndex($$$)
