@@ -1,0 +1,26 @@
+#!/bin/sh
+# set up the mail/news autofiler
+
+cd $HOME/var/maildrop || exit $?
+
+sync
+
+for pre in deleted UNFILED in
+do  set x *.+$pre; shift
+    if [ -s "$1" ]
+    then  echo "+$pre..." >&2
+	  maildrop -F - -r "$@" | filemail
+    fi
+done
+
+filedata=$HOME/var/log/filemail
+[ -s "$filedata" ] && logroll +datecode "$filedata"
+
+mklog filemail "$filedata"
+[ -r "$filedata" ] || { echo "$0: no $filedata!" >&2; exit 1; }
+
+echo "main filemail..." >&2
+cmdlog -a -f -l maildrop filemail -t "$filedata"
+
+sleep 5
+cmdlog -a maildrop -r
