@@ -1,0 +1,21 @@
+#!/usr/bin/perl
+#
+# Simple program to read HTML and emit clean HTML.
+#	- Cameron Simpson <cs@zip.com.au> 31jul96
+#
+
+use cs::Hier;
+use cs::SGML;
+use cs::HTML;
+
+$s=new cs::Source FILE, STDIN;
+die "no STDIN Source" if ! defined $s;
+
+$ht=new cs::HTML $s;
+die "no HTML" if ! defined $ht;
+
+$Hier::useindent=0;
+
+while (defined ($t=$ht->Tok()))
+	{ print HTML::list($t);
+	}
