@@ -1,7 +1,8 @@
 #!/bin/sh
 #
-# Extract all components of an email message with munpack, in a distinctively named directory.
-# If the shell script autoexec.sh is present in the key directory, run that after extraction.
+# Extract all components of an email message with munpack, in a distinctively
+# named directory.  If the shell script autoexec.sh is present in the key
+# directory, run that after extraction.
 #	- Cameron Simpson <cs@zip.com.au> 03dec2001
 #
 
@@ -9,7 +10,7 @@ cmd=$0
 usage="Usage: $cmd [-d unpackdir] key [command [args...]] <mailitem
 	-d unpackdir		Specify unpack base directory.
 	command [args...]	Command to run.
-				Default: basedir/autoexec.sh if present."
+				Default: \"basedir/autoexec.sh key\" if present."
 
 [ "x$1" = x-d ] && { MAILUNPACKDIR=$2; shift; shift; }
 
@@ -21,11 +22,13 @@ base=${MAILUNPACKDIR:-$HOME/incoming}/$key
 dl=`mkdirn "$base/"` || exit 1
 cd "$dl" || exit 1
 
+pwd; set -x
 munpack || exit 1
 
 if [ $# = 0 ]
 then
-    [ ! -s "$base/autoexec.sh" ] || exec /bin/sh "$base/autoexec.sh" "$key"
+    [ ! -s "$base/autoexec.sh" ] || exit 0
+    exec /bin/sh "$base/autoexec.sh" "$key"
 fi
 
-exec "$@" "$key"
+exec "$@"
