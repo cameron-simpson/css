@@ -1,0 +1,63 @@
+#!/usr/bin/perl
+#
+# Manage an hierachical subject index.
+#	- Cameron Simpson <cs@zip.com.au>, 19jul94
+#
+
+HIER="$ENV{HOME}/etc/hsi";
+
+($cmd=$0) =~ s:.*/::;
+$usage="Usage: $cmd [-i hier]
+	-i hier	Use hier as the index file. (Default: $HIER).
+";
+
+require 'cs/attrdbm.pl';
+
+&load($HIER);
+
+
+&save($HIER) || die "$cmd: can't save database to $HIER\n";
+
+exit 0;
+
+sub load	# (file) -> ok
+	{ local($file)=shift;
+
+	  if (!open(HIER,"< $file\0"))
+		{ print STDERR "$cmd: can't read $file: $!\n";
+		  return 0;
+		}
+
+	  local($_);
+
+	  HIER:
+	    while (<HIER>)
+		{ if (!(($key,$dbm)=/^\s*(\S+)\s+(.*)/))
+			{ print STDERR "$cmd: $file, line $.: bad data: $_";
+			  next HIER;
+			}
+
+		  $HIER{$key}=$dbm;
+		}
+	  
+	  close(HIER);
+	  1;
+	}
+
+sub save	# (file)
+	{ local($file)=shift;
+
+	  if (!open(HIER,"> $file\0"))
+		{ print STDERR "$cmd: can't write to $file: $!\n";
+		  return 0;
+		}
+
+	  local($_);
+
+	  for (sort keys %HIER)
+		{ print HIER $_, ' ', $HIER{$_}, "\n";
+		}
+
+	  close(HIER);
+	  1;
+	}
