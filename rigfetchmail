@@ -5,4 +5,4 @@
 #
 needhost amadeus@home || exit 1
 set -x
-exec fetchmail --daemon 300 -f $HOME/private/fetchmailrc -a
+exec fetchmail --daemon 900 -f $HOME/private/fetchmailrc -a
