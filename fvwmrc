@@ -6,6 +6,5 @@
 
 . $HOME/rc/x11/xenv.sh
 
-exec uncurly \
-	'HOME HALFX FULLX LHFULLX RHFULLX PIX_HIGH FONT FG BG DIMFG DIMBG HILIGHT ALERT DIMALERT' \
-	$HOME/rc/x11/fvwm2/rc.curly
+uncurly $HOME/rc/x11/fvwm2/rc.curly \
+| tee $HOME/fv.rc
