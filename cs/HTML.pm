@@ -502,10 +502,10 @@ sub href	# (tag,url,$target) -> <A HREF=...>...</A>
 
 =item news2html(I<text>)
 
-Convert ``text'' into HTML text
+Convert I<text> into HTML text
 in a heuristic fashion,
 recognising markup and URLs.
-Handy for mail/news-E<gt>HTML conversion.
+Hoped to be handy for mail/news-E<gt>HTML conversion.
 
 =cut
 
@@ -797,6 +797,7 @@ sub new
   bless { SGML		=> $sg,
 	  TOKENS	=> [],
 	  ACTIVE	=> {},
+	  TAGSTACK	=> [],
 	}, $class;
 }
 
@@ -835,7 +836,7 @@ sub Tok
 
   if (! defined ($t=$this->{SGML}->Tok()))
   { ## warn "EOF from SGML, returning\n";
-    return undef;
+    return pop(@{$this->{TAGSTACK}});
   }
 
   ## warn "parse TAG=$t->{TAG}\n";
@@ -877,7 +878,7 @@ sub Tok
       { if (exists $enclose->{$rt->{TAG}})
 	# closing tag for something other than this?
 	# push back, fall out
-	# this way we can parse <tag><tag2></tag1>
+	# this way we can parse <tag1><tag2></tag1>
 	{ $this->{SGML}->UnTok($rt) if $rt->{TAG} ne $t->{TAG};
 	  last TOK;
 	}
@@ -897,9 +898,11 @@ sub Tok
       else
       # substructure
       { $this->{SGML}->UnTok($rt);
+	push(@{$this->{TAGSTACK}}, $t);
 	## warn "recurse into $rt->{TAG} from $t->{TAG}\n";
 	push(@{$t->{TOKENS}},$this->Tok($enclose,$pertok));
 	## warn "back to $t->{TAG}\n";
+	pop(@{$this->{TAGSTACK}});
       }
     }
 
