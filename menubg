@@ -4,7 +4,7 @@
 #	- Cameron Simpson <cs@zip.com.au> 18oct2002
 #
 
-cmd=$0
+cmd=`basename "$0"`
 call="$0 $*"
 
 domenu=
@@ -36,6 +36,11 @@ do
 done
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+if [ "x$*" = xnone ]
+then
+    exec fvwmcmd 'ColorSet 2 RootTransparent buffer, Tint black 30'
+fi
 
 ##set -x
 if [ $# = 1 -a -f "$1" -a -s "$1" ]
@@ -77,12 +82,23 @@ fi
 
 imagefile=$1
 
+( lastvalue menubg "$imagefile"
+  if [ $thisdesk ]
+  then  thisdesk=`lastvalue "enterdesk-$HOST"`
+	desktop "$thisdesk" menubg "$imagefile"
+  else  lastvalue "defaultmenubg-$HOST" "$imagefile"
+  fi
+) &
+
 setpix()
 { dorm=
-  [ "x$1" = x-r ] && { dorm=1; shift; rmwhat=$1; shift; }
-  set "ColorSet 2 Tint rgb:00/00/20 50, AspectPixmap \"$1\""
+  [ "x$1" = x-r ] && { dorm=1; shift; }
+  setpic=$1; shift
+  L "$setpic"
+  set "ColorSet 2 Tint rgb:00/00/20 50, TiledPixmap \"$setpic\""
+  set -x
   fvwmcmd "$@"
-  [ dorm ] && fvwmcmd "Exec rm -rf \"$rmwhat\""
+  [ $dorm ] && fvwmcmd "Exec rm -rf \"$setpic\""
 }
 
 case "$bright,$imagefile" in
@@ -93,30 +109,8 @@ case "$bright,$imagefile" in
 	;;
 esac
 
-tmpf=
-wkdir=`mkdirn "${TMPDIR:-/tmp}/menubg"` || exit 1
-cp "$imagefile" "$wkdir/." || exit 1
+tmpf=${TMPDIR:-/tmp}/$cmd$$.png
+gm convert - -geometry '200x>' png:- <"$imagefile" >"$tmpf" || exit 1
 
-echo "$imagefile" >>$HOME/var/log/menubg
-lastvalue menubg "$imagefile" &
-if [ $thisdesk ]
-then  thisdesk=`lastvalue "enterdesk-$HOST"`
-      desktop "$thisdesk" menubg "$imagefile"
-else  lastvalue "defaultmenubg-$HOST" "$imagefile"
-fi &
-
-cd "$wkdir"
-imagefile=`basename "$imagefile"`
-impng=`echo "$imagefile" | sed 's/\\(.*\\.\)[^.]*$/\\1PNG/'`
-
-##mogrify -geometry "$geom" -modulate 70 -despeckle -format PNG "$imagefile"
-if /opt/ImageMagick/bin/mogrify -format PNG "$imagefile"
-then
-    # horrible workaround for mogrify bug
-    rm -f "$imagefile"
-    mv ./* "$impng"
-    setpix -r "$wkdir" "$wkdir/$impng"
-else
-    L "$wkdir" >&2
-    exit 1
-fi
+set -x
+setpix -r "$tmpf"
