@@ -1,0 +1,40 @@
+#!/bin/sh
+#
+osz=0
+( if [ $# = 0 ]
+  then
+	ls -s
+  else
+	for file
+	do
+		if [ -d "$file" ]
+		then
+			ls -sd "$file"/*
+		else
+			ls -s "$file"
+		fi
+	done
+  fi
+) | sort -n|while read sz fn
+do
+	echo "$fn...\c"
+	if [ -f "$fn" ]
+	then
+		if [ "x$osz" = "x$sz" ]
+		then
+			if cmp "$fn" "$ofn" >/dev/null
+			then
+				echo " identical to $ofn...\c"
+				ln "$ofn" "$fn" && echo " linked"
+			else
+				echo ' '
+			fi
+		else
+			echo ' '
+		fi
+		osz=$sz
+		ofn=$fn
+	else
+		ls -ld "$fn"
+	fi
+done
