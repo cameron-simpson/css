@@ -8,9 +8,25 @@
 : ${MAILDIR:=$HOME/mail}
 
 cmd=`basename "$0"`
-usage="Usage: $cmd [folders... --] keywords..."
+usage="Usage: $cmd [+folder[,folder...] --] keywords..."
 
 badopts=
+
+folders=
+case "$1" in
+    +*)	for folder in `echo "$1" | sed -e 's/^.//' -e 'y/,/ /'`
+	do
+	  folder=$MAILDIR/$folder
+	  if ismhdir "$folder"
+	  then
+	      folders="$folders $folder"
+	  else
+	      echo "$cmd: $MAILDIR/$folder: not an MH folder" >&2
+	      badopts=1
+	  fi
+	done
+	;;
+esac
 
 if [ $# = 0 ]
 then  echo "$cmd: missing keywords" >&2
@@ -18,6 +34,8 @@ then  echo "$cmd: missing keywords" >&2
 fi
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+[ -n "$folders" ] || folders=`echo "$MAILDIR"/* "$MAILDIR/SAVED/"*`
 
 xit=0
 
@@ -29,7 +47,7 @@ subn=1
 
 # set up 
 { exec 3>&1 1>&2
-  for folder in "$MAILDIR"/*
+  for folder in $folders
   do
     [ -d "$folder" ] || continue
     ismhdir "$folder" || continue
@@ -85,6 +103,7 @@ subn=1
 
 mhdir "$res" || xit=1
 
+sleep 10
 echo "$res"
 
 exit $xit
