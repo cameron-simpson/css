@@ -4,12 +4,28 @@
 #	- Cameron Simpson <cs@zip.com.au> 28oct2004
 #
 
-awk '{ if (length($2) > 0 && $2 != ".")
-       { print "Colorset", 1024+$1, "AspectPixmap", $2
-	 cset=1024+$1
-       }
-       else
-       { cset=1023
-       }
-       print "*FvwmBacker: Command (Desk", $1, ") colorset", cset
-     }'
+directive=AspectPixmap
+csetbase=1024
+
+cmd=$0
+usage="Usage: $0 [cset-base]
+	cset-base	Start value for special ColorSets.
+			Default: $csetbase
+			Note: ColorSet csetbase-1 is used for defaults."
+
+[ $# = 0 ] || { csetbase=$1; shift; }
+[ $# = 0 ] || { echo "$cmd: extra arguments after cset-base: $*" >&2
+		echo "$usage" >&2
+		exit 2
+	      }
+
+awk "BEGIN { csetbase=$csetbase }
+    "'     { if (length($2) > 0 && $2 != ".")
+	     { print "Colorset", csetbase+$1, "AspectPixmap", $2
+	       cset=csetbase+$1
+	     }
+	     else
+	     { cset=csetbase-1
+	     }
+	     print "*FvwmBacker: Command (Desk", $1, ") colorset", cset
+	   }'
