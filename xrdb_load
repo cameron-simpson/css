@@ -1,7 +1,10 @@
 #!/bin/sh
 
+set -vx
+
+echo "DISPLAY=$DISPLAY" >&2; xdpyinfo | wc >&2
 case "$X11_DEPTH,$X11_CLASS" in
-    ,)				exec setvar 'use x11' "$0" ${1+"$@"} ;;
+    ,)				type=Colour ;;	# guess, not recurse
     1,*)			type=Mono ;;
     *,StaticGray|*,GrayScale)	type=Grey ;;
     *)				type=Colour ;;
