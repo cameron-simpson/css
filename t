@@ -4,7 +4,7 @@
 #	- Cameron Simpson <cs@zip.com.au>
 #
 # Iterative analysis of extensions; the combinations were getting too numerous.
-#	- cameron 22jan99
+#	- cameron 22jan1999
 #
 
 cmd=`basename "$0"`
