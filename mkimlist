@@ -16,8 +16,9 @@ set \
 	${1+"$@"} \
        -print \)
 
+set -x
 [ $justprint ] && exec "$@"
 
 "$@" \
 | sed 's;^\./;;' \
-| xxargs imsize
+| xxargs imsize-gm
