@@ -29,7 +29,7 @@
 
 cmd=`basename "$0"`
 usage="Usage: $cmd [-o option=value]... [-b] [-n] [-v] [@where] [targets...]
-	-b	Backup mode. Use amassbackup.
+	-b	Backup mode. Use histbackup.
 	--rsync-path exec
 		Execute \"exec\" as the remote rsync command.
 		Passed to rsync.
@@ -154,7 +154,7 @@ do
 # =item B<-b>
 #
 # Backup mode.
-# Use amassbackup(1) to make timestamped snapshots in the target.
+# Use histbackup(1) to make timestamped snapshots in the target.
 #
 	-b)	backupmode=1 ;;
 #
@@ -254,7 +254,7 @@ then
     done
     if [ $backupmode ]
     then
-	set amassbackup --rsync-path "$rrsync" "$from." "$to$tohomedir" $rsopts ${1+"$@"}
+	set histbackup --rsync-path "$rrsync" "$from." "$to$tohomedir" $rsopts ${1+"$@"}
     else
 	set rsync --rsync-path "$rrsync" $rsopts ${1+"$@"} "$from." "$to$tohomedir"
     fi
@@ -291,7 +291,7 @@ exit $xit
 #
 # =head1 SEE ALSO
 #
-# amassbackup(1), rsync(1)
+# histbackup(1), rsync(1)
 #
 # =head1 AUTHOR
 #
