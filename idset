@@ -15,7 +15,7 @@ statedir=
 cmd=$0
 usage="Usage: $cmd [-a] [-d statedir] -i idset [-l] [[-r] idname [param [value]]]
 	-a		List all ids.
-	-i idset	Default: $idset
+	-i idset	Idset within statedir.
 	-d statedir	Specify id state subdirectory.
 			Default from \$SYSTEMID or \$HOMEHOST or \$HOST or hostname.
 	-l		Long: list all attributes of ids.
