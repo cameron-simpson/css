@@ -22,7 +22,7 @@
 # and therefore require multiple configurations and combinations of services.
 # There is a little discussion of its installation here:
 #
-#	http://www.cskk.ezoshosting.com/cs/css/#rc.mobile
+#	http://www.cskk.ezoshosting.com/cs/css/rc.mobile.html
 #
 # In addition to choosing different configurations based on location or circumstance,
 # I<rc.mobile> also starts the services in parallel,
@@ -31,7 +31,7 @@
 # and for running arbitrary shell commands
 # for actions not encapsulated in standard startup files.
 # In a sense
-# the locations represent a generalisation of the idea of run levels.
+# the location clauses represent a generalisation of the idea of run levels.
 #
 
 where=${SYSTEMID:-home}
@@ -216,7 +216,7 @@ locations=`sed -n -e '/^#/d' -e 's/^\\[@\\([a-z].*\\)\\]$/\\1/p' "$cf"`
 #
 # After obtaining the current location
 # (referred to as "I<where>" below)
-# the clauses B<GLOBAL> and I<where> are in that order.
+# the clauses B<GLOBAL>, I<where> and B<FINAL> are run in that order.
 #
 
 if [ $int ]
@@ -307,18 +307,12 @@ doops()
       /*/)    to=`expr "x$op" : 'x\(.*\)/'`
 	      from=
 	      if [ -n "$etc" ]
-	      then
-		  if [ -d "$etc/." ]
-		  then
-		      from=$etc
-		  else
-		      echo "$cmd: not a directory: $etc" >&2
-		  fi
-	      else
-		  for d in $from.$where $from.DFLT
-		  do  [ -d "$d/." ] && { from=$d; break; }
-		  done
+	      then  set -- "$etc.$where" "$etc.DFLT" "$etc"
+	      else  set -- "$to.$where" "$to.DFLT"
 	      fi
+	      for d
+	      do  [ -d "$d/." ] && { from=$d; break; }
+	      done
 	      if [ -n "$from" ]
 	      then
 		$trace rsync -aH "$from/." "$to/."
@@ -341,18 +335,12 @@ doops()
       /*)     to=$op
 	      from=
 	      if [ -n "$etc" ]
-	      then
-		  if [ -f "$etc" ]
-		  then
-		      from=$etc
-		  else
-		      echo "$cmd: not a file: $etc" >&2
-		  fi
-	      else
-		  for f in $to.$where $to.DFLT
-		  do  [ -f "$f" ] && { from=$f; break; }
-		  done
+	      then  set -- "$etc.$where" "$etc.DFLT" "$etc"
+	      else  set -- "$to.$where" "$to.DFLT"
 	      fi
+	      for f
+	      do  [ -f "$f/." ] && { from=$f; break; }
+	      done
 	      if [ -n "$from" ]
 	      then
 		$trace cp -p "$from" "$to"
@@ -450,7 +438,7 @@ wait4pid()
   done
 }
 
-doclause GLOBAL "@$where" | { doops; [ $async ] || wait; }
+doclause GLOBAL "@$where" FINAL | { doops; [ $async ] || wait; }
 
 # =head1 FILES
 #
