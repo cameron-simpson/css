@@ -1,0 +1,33 @@
+#!/bin/sh
+#
+# Suck in a copy of the specified dir.
+#	- Cameron Simpson <cs@zip.com.au> 26aug2004
+#
+
+cmd=$0
+usage="Usage: $cmd srcdir"
+
+badopts=
+
+if [ $# = 0 ]
+then
+  echo "$cmd: missing srcdir" >&2
+  badopts=1
+else
+  srcdir=$1; shift
+  [ $# = 0 ] || { echo "$cmd: extra arguments after srcdir: $*" >&2
+		  badopts=1
+		}
+  [ -d "$srcdir/." ] || { echo "$cmd: srcdir not a directory: $srcdir" >&2
+			  badopts=1
+			}
+fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+srcbase=`basename "$srcdir"` || exit 1
+destdir=$srcbase-`daycode`  || exit 1
+
+set -x
+cpdir "$srcdir" "$destdir"  || exit 1
+rsync -avHP --delete "$srcdir/." "$destdir/."
