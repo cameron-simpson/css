@@ -1,0 +1,81 @@
+#!/usr/bin/perl
+#
+# Watch the FVWM Event Log and do stuff when things happen.
+# Spurred into implementation by Mozilla 0.9.3's completely fucked new window
+# placement policy.
+#	- Cameron Simpson <cs@zip.com.au> 20aug2001
+#
+
+($::cmd=$0) =~ s:.*/::;
+
+if (-t STDIN)
+{ open(STDIN,'fvwmevlog |') || die "$::cmd: can't pipe from fvwmevlog: $!\n";
+}
+
+$|=1;
+
+my %win;
+
+my($ev,$id,$info,$W);
+
+LOG:
+while (<STDIN>)
+{
+  chomp;
+  if (/^\s/)
+  { print STDERR "$_\n";
+  }
+  elsif (! /^(0x[0-9a-f]+)\s+(type)\s+(.*)/
+   &&
+      ! /^(0x[0-9a-f]+)\s+(\S...................)\s+(.*)/
+   &&
+      ! /^(0x[0-9a-f]+)\s+(\S+)\s*()$/
+     )
+  { warn "$::cmd: stdin, line $.: bad data: $_\n";
+    next LOG;
+  }
+
+  ($id,$ev,$info)=($1,$2,$3);
+
+  $ev =~ s/\s+$//;
+  $ev=uc($ev);
+
+  $info =~ s/\s+$//;
+
+  if (! exists $win{$id})
+  { $win{$id}={ ID => $id, EV => [] };
+  }
+
+  $W=$win{$id};
+  push(@{$W->{EV}}, [$ev, $info]);
+
+  if ($ev eq WINDOW)
+  { if (! exists $W->{TITLE})
+    # first title setting
+    { if ($info =~ /^Mozilla \{Build ID: /)
+      # fix up Mozilla pigheadedness
+      { wincmd($id,'Move','0','-0');
+      }
+    }
+
+    $W->{TITLE}=$info;
+  }
+  elsif ($ev eq DESTROY)
+  { delete $win{$id};
+  }
+}
+
+exit 0;
+
+sub wincmd
+{ my($id)=shift;
+  fvcmd('WindowId',$id,@_);
+}
+
+sub fvcmd
+{ my(@a)=@_;
+
+  my $fvcmd="@a";
+  $fvcmd =~  s/'/'\\''/g;
+  print "FvwmCommand '$fvcmd'\n";
+}
