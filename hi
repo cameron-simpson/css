@@ -63,11 +63,11 @@ urllist=/tmp/hi-urls.$$
       else  pageurls -i "$url" \
 	    | egrep -i "$grep" \
 	    | ( hit=
-		while read url
-		do  xvurl "$url" >/dev/null &
+		while read gurl
+		do  xvurl "$gurl" >/dev/null &
 		    hit=1
 		done
-		[ $hit ] || { echo "no hits grepping $url" >&2
+		[ $hit ] || { echo "no hits grepping $url for \"$grep\"" >&2
 			      echo "$url"
 			    }
 	      )
