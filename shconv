@@ -76,7 +76,6 @@ do  if [ "x$f" = x- ]
     (
       exec <"$f"		# abort if open fails
       exec >"$newfile"
-      set -x
       if $trace sh -c "$shellcmd"
       then
 	  rm "$f"
