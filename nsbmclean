@@ -4,7 +4,7 @@
 #	- Cameron Simpson <cs@zip.com.au> 11mar98
 #
 
-use strict (qwvars);
+use strict qw(vars);
 
 my($left,$right);
 
