@@ -1,0 +1,4 @@
+#!/bin/sh
+
+cmd=`basename "$0"`
+exec vm "+$cmd"
