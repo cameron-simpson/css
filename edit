@@ -61,6 +61,8 @@ if [ $doscr ]
 then
     dir=`dirname "$file"`
     cd "$dir" || exit 1
+    dirjob=`dirjob`
+    winjob "$dirjob" &
     wd=`pwd` || exit 1
 
     file=`basename "$file"` || exit 1
