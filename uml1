@@ -1,0 +1,3 @@
+#!/bin/sh
+set -x
+exec linux ubd0=$HOME/uml/root_fs eth0=tuntap,,,192.168.1.251 ${1+"$@"}
