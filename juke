@@ -42,8 +42,11 @@ stopplayer()
 { [ -n "$playpid" ] && { kill "$playpid"; playpid=; }
 }
 
-while read line
+line=
+while lastline=$line
+      read line
 do  
+    [ "x$line" = "x!!" ] && line=$lastline
     case "$line" in
 	'')	stopplayer
 		;;
