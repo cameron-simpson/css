@@ -10,11 +10,8 @@ uptime
 which perl
 df -k .
 df -lk
-df -k
-mount
-
-echo
-ls -la ..
+#mount
+ls -la .
 
 echo
 echo "0=$0"
