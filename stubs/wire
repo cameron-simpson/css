@@ -1,0 +1,4 @@
+#!/bin/sh
+
+dl "wire $*"
+exec $HOME/scripts/wire ${1+"$@"}
