@@ -1,0 +1,12 @@
+#!/bin/sh
+#
+# Commit changes, using commit-editor to make the log more helpful to its author.
+#	- Cameron Simpson <cs@zip.com.au> 12apr1997
+#
+
+CVS_COMMIT_FILES=$*
+CVS_COMMIT_EDITOR=$EDITOR
+EDITOR=$0-editor
+export CVS_COMMIT_FILES CVS_COMMIT_EDITOR EDITOR
+
+exec cvs commit -l ${1+"$@"}
