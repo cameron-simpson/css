@@ -1,0 +1,13 @@
+#!/bin/sh
+#
+# Send mail only if input is not empty.
+#	- Cameron Simpson <cs@zip.com.au>
+#
+# Usage: mailif [-s subject] addresses...
+#
+# Break into execif and mailsubj. - cameron, 23jun98
+#
+
+PATH=$PATH:/opt/script:/opt/bin
+export PATH
+execif mailsubj ${1+"$@"}
