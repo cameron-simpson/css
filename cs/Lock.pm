@@ -3,10 +3,14 @@
 # NFS-safe locks.
 # Adapted from my lock script, which used to use mkdir.
 # Now I use a umask current-umask+write-bits.
-#	- Cameron Simpson <cs@zip.com.au> 26jun99
+#	- Cameron Simpson <cs@zip.com.au> 26jun1999
 #
 # Seems not to work on Linux; maybe it tries to be too
-# clever. Back to mkdir().	- cameron 27jun99
+# clever. Back to mkdir().			- cameron 27jun1999
+#
+# Add some timing uncertainty (based on various prime moduli of the pid)
+# so that lots of lock calls started at once don't remain in synchrony
+# so easily. (Observed in my foreach script.)	- cameron 25aug2000
 #
 
 =head1 NAME
@@ -39,9 +43,10 @@ use Fcntl;
 package cs::Lock;
 
 # delay parameters
-$cs::Lock::Delay=5;
-$cs::Lock::Dincr=5;
-$cs::Lock::Dmax=30;
+# with a bit of uncertainty to lower racing
+$cs::Lock::Delay=1+($$%5);
+$cs::Lock::Dincr=1+($$%7);
+$cs::Lock::Dmax=25+$cs::Lock::Dincr*($$%3);
 
 $cs::Lock::Whingeafter=5;	# 5 consecutive lock failures? start saying so
 
