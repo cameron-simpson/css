@@ -34,7 +34,7 @@ case "$op" in
 esac
 
 set -x
-echo "$op"
+echo "$op"
 [ $delay ] && sleep $delay
 while read ok
 do
