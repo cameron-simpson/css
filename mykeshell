@@ -28,7 +28,7 @@ if [ -n "$DISPLAY" ]
 then
     ( [ -t 1 ] || exec >/dev/null
       [ -t 2 ] || exec 2>/dev/null
-      exec xclip <"$tmp"
+      exec xclip --no-log <"$tmp"
     )
     rm "$tmp"
 fi
