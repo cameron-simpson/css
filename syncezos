@@ -1,0 +1,6 @@
+#!/bin/sh
+#
+# Update my ezoshosting web site.
+#	- Cameron Simpson <cs@zip.com.au> 11jan2003
+set -x
+exec rsync -avHPW --delete $HOME/there/cskk.ezoshosting.com/html/. ezos:html/.
