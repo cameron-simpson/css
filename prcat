@@ -42,7 +42,7 @@ sub copyout($;$)
   }
 
   my $size = (eval "stat($FILE)")[7];
-  if ($size < 1)
+  if (! -f _ || $size < 1)
   { undef $size;
   }
 
