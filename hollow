@@ -1,0 +1,24 @@
+#!/bin/sh
+#
+# Wrapper for things which dump core.
+#	- Cameron, 29mar94
+# Pulled out the hack to run different X servers,
+# it isn't needed anymore
+#	- Aidan, 10Nov94
+#
+# Options:
+#	-c corelim	Corelimits other than zero.
+#	-d dir		Cd to dir before running the requisite program.
+#
+
+corelim=0
+while :
+do  case $1 in
+	-c)	corelim=$2; shift; shift ;;
+	-d)	cd $2 || exit $?; shift; shift ;;
+	*)	break ;;
+    esac
+done
+
+ulimit -c "$corelim"
+exec ${1+"$@"}
