@@ -1,0 +1,59 @@
+#!/bin/sh
+#
+# Edit a PGP encrypted file. Extracted from "edit".
+#	- Cameron Simpson <cs@zip.com.au>
+#
+
+cmd=`basename "$0"`
+
+[ $# = 1 ] || { echo "Usage: $cmd file.pgp" >&2; exit 2; }
+
+pgpfile=$1; shift
+
+wkdir=`mkdirn "$HOME/private/tmp/$cmd"` || exit 1
+
+xit=1
+rmf=$wkdir
+trap '[ -z "$rmf" ] || rm -rf $rmf; exit $xit' 0
+
+pgpid=${PGPID-$EMAIL}
+
+bak=$pgpfile.`datecode`
+cp "$pgpfile" "$bak" || { rm -f "$bak"; exit 1; }
+
+wk=cleartext
+echo "decrypting $pgpfile ..." >&2
+
+# require PGP pass phrase
+pgp -fd <"$pgpfile" >"$wkdir/$wk" \
+|| { echo "$cmd: decryption failed, aborting" >&2
+     exit 1
+   }
+
+# conceal the dir with the cleartext
+( cd "$wkdir" || exit $?
+  "$EDITOR" "$wk"
+  xit=$?
+  echo clear
+  exit $xit
+) || exit 1
+
+if [ ! -s "$tmpdir/$tmp" ]
+then
+    echo "$cmd: temp file is empty, leaving original untouched" >&2
+    exit 1
+fi
+
+if echo "encrypting $pgpfile ..." >&2
+   pgp -fe "$pgpid" <"$wkdir/$wk" >"$pgpfile"
+then
+    rm -f "$bak"
+    xit=0
+else
+    echo "$cmd: reencryption failed, restoring $pgpfile from snapshot" >&2
+    if cp "$bak" "$pgpfile"
+    then  rm -f "$bak"
+    else  echo "$cmd: warning: couldn't restore $pgpfile from $bak" >&2
+	  ls -ld "$pgpfile" "$bak" >&2
+    fi
+fi
