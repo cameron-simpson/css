@@ -69,7 +69,7 @@ done \
     echo "        <SMALL>- last change $modtime, author <A HREF=\"mailto:$author\">$fullname</A></SMALL>"
 
     overview_cache=.cache/overview/`basename "$podfile" .pod`.html
-    [ -s "$overview_cache" -a "$overview_cachemyke" -nt "$podfile" ] || myke "$overview_cache"
+    [ -s "$overview_cache" -a "$overview_cachemyke" -nt "$podfile" ] || myke "$overview_cache" >&2
 
     if [ -s "$overview_cache" ]
     then
