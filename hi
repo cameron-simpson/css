@@ -3,6 +3,8 @@
 # The good morning stuff.	- Cameron Simpson <cs@zip.com.au>
 #
 
+: ${TMPDIR:=/tmp}
+
 cmd=`basename "$0"`
 hi=$HOME/rc/hi
 pickn=
@@ -59,7 +61,7 @@ do
   esac \
   | grep '^[^#]' \
   | if [ -n "$pickn" ]; then pickn "$pickn"; else cat; fi \
-  | { xvlist=/tmp/xv$cmd$$
+  | { xvlist=$TMPDIR/xv$cmd$$
       exec 3>"$xvlist"
       while read url grep
       do  if [ -z "$grep" ]
