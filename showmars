@@ -1,0 +1,33 @@
+#!/bin/sh
+#
+# Show all machines on mars (meaning they're not in our VMPS table, but are plugged in).
+# Incantation from Andrew Raphael.
+#	- Cameron Simpson <cs@zip.com.au> 18oct2002
+#
+
+tmpf=${TMPDIR:-/tmp}/svl$$
+
+vlan=11	# mars
+[ $# = 0 ] || { vlan=$1; shift; }
+
+askcisco robinson show cam dynamic "$vlan" >"$tmpf" || exit 1
+[ -s "$tmpf" ] || exit 0
+
+<"$tmpf" \
+| sed 's/[ 	][ 	]*/ /g' \
+| sort +1 \
+> "$tmpf"2
+
+ypcat ethers \
+| tr ':[A-Z]' ' [a-z]' \
+| awk 'NF == 7 { for (i=1; i<=6; i++)
+		 { if (length($i) == 1)
+		   { $i="0"$i;
+		   }
+		 }
+		 print $1"-"$2"-"$3"-"$4"-"$5"-"$6" "$7
+	       }' \
+| sort \
+| join -1 1 -2 2 - "${tmpf}2"
+
+cat "${tmpf}2"
