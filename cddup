@@ -1,0 +1,25 @@
+#!/bin/sh
+#
+# Duplicate an audio CD per the recipes in cdrecord(1).
+#	- Cameron Simpson <cs@zip.com.au> 08jan2005
+#
+
+: ${TMPDIR:=/tmp}
+: ${CDDBSERVER:=au.freedb.org:8880}
+: ${CDRIP_DEV:=/dev/cdrom}
+
+trace=set-x
+
+cmd=`basename "$0"` || cmd=cddup
+usage="Usage: $cmd [-d cddev]"
+
+ripdir=`mkdirn "$TMPDIR/$cmd"`	|| exit 1
+trap 'rm -r "$ripdir"' 0 1 2 13 15
+
+cd "$ripdir"			|| exit 1
+pwd
+
+$trace cdda2wav "dev=$CDRIP_DEV" -vall cddb=0 -B -Owav || exit 1
+$trace eject "$CDRIP_DEV"
+ask "Burn audio to $CDRIP_DEV" || exit 1
+$trace cdrecord "dev=$CDRIP_DEV" -v -dao -useinfo -text *.wav
