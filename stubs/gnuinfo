@@ -1,9 +1,8 @@
 #!/bin/sh
 
-info=/usr/bin/info
-case $SYSTEMID-$ARCH in
-    *-sun.sparc.solaris|cisra-*.*.*)
-	info=/usr/gnu/bin/info ;;
-esac
+for info in /usr/bin/info /usr/gnu/bin/info
+do  [ -x "$info" ] && exec "$info" ${1+"$@"}
+done
 
-exec "$info" ${1+"$@"}
+echo "$0: no info command found" >&2
+exit 1
