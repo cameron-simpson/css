@@ -19,7 +19,7 @@ vflag=
 if [ $# = 0 ]
 then
     case "$HOST@$SYSTEMID" in
-	zapff@cisra)	set work2zip work2home nntpcached del ;;
+	zapff@cisra)	set work2zip work2home nntpcached ;;
 	amadeus@home)	set home2work home2zip ;;
 	*)		echo "$0: no forwardings to do on $HOST@$SYSTEMID" >&2
 			exit 2
@@ -54,7 +54,7 @@ do  case "$fwd" in
 	    vpnssh $vflag -t 60 -q home \
 		   -L 2111:mail-optus:110 \
 		   -L 2180:www-optus:110 \
-		   -L 2401:janus:2401 \
+		   -L 2401:cvs-cskk:2401 \
 		   -L 2888:amadeus:888 \
 		   -L 3119:news-optus:119 \
 		   -L 5916:janus:5906 &
