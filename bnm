@@ -1,0 +1,6 @@
+#!/bin/sh
+
+for lib
+do  echo "$lib ..." >&2
+    nm "$lib" | sed "s|^|$lib: |"
+done
