@@ -1,0 +1,13 @@
+#!/bin/sh
+#
+# Split up a digest and feed back to procmail.
+#	- Cameron Simpson <cs@zip.com.au> 02sep2003
+# 
+
+cmd=`basename "$0"`
+usage="Usage: $cmd [tagname]"
+
+tagname=$1; shift
+
+set -x
+exec formail +1 -ds sh -c "fixdigesthdrs | formail -A 'X-UnDigest-Tag: $tagname' | procmail"
