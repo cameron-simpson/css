@@ -6,14 +6,18 @@
 
 cmd=$0
 
-[ $# = 1 ] || { echo "Usage: $cmd hostname" >&2; exit 2; }
+newflag=-N
+[ "x$1" = x-N ] && { newflag=$1; shift; }
+[ "x$1" = x+N ] && { newflag=; shift; }
+
+[ $# = 1 ] || { echo "Usage: $cmd [-N] hostname" >&2; exit 2; }
 host=$1; shift
 
 ext=
 
 session=root@$host$ext
 
-exec term +ip -n "#$session" \
-	scrif "$session" \
+exec term -n "#$session" \
+	scrif $newflag "$session" \
 	logscript "$session" \
 	sshp1 "root@$host"
