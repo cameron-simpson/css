@@ -585,10 +585,59 @@ sub loadhash($)
 	last HASHLINE;
       }
 
-      $hash->{$a->[0]}=$a->[1];
+      if (! exists $hash->{$a->[0]})
+      { $hash->{$a->[0]}=$a->[1];
+      }
+      else
+      { $hash->{$a->[0]}=overlayrefs($hash->{$a->[0]},$a->[1]);
+      }
     }
 
   $hash;
+}
+
+sub overlayrefs($$)
+{ my($av,$bv)=@_;
+
+  $av = [$av] if ! ref $av;
+  $bv = [$bv] if ! ref $bv;
+
+  my($at,$bt)=(::reftype($av),::reftype($bv));
+  if ($at ne $bt)
+  { warn "$::cmd: type mismatch between $av and $bv";
+  }
+  elsif ($at eq ARRAY)
+  { $av=overlayARRAY($av,$bv);
+  }
+  elsif ($at eq HASH)
+  { $av=overlayHASH($av,$bv);
+  }
+  else
+  { warn "$::cmd: unsupported ref type \"$at\", keeping first\n";
+  }
+
+  return $av;
+}
+
+sub overlayARRAY($$)
+{ my($a,$b)=@_;
+  push(@$a,@$b);
+  return $a;
+}
+
+sub overlayHASH($$)
+{ my($a,$b)=@_;
+
+  for my $k (keys %$b)
+  { if (! exists $a->{$k})
+    { $a->{$k}=$b->{$k};
+    }
+    else
+    { $a->{$k}=overlayrefs($a->{$k},$b->{$k});
+    }
+  }
+
+  return $a;
 }
 
 =item savehash(I<sink>,I<hashref>)
