@@ -5,11 +5,17 @@
 #	- Cameron Simpson <cs@zip.com.au> 17mar2004
 #
 
+# catch accidental stdout
+exec 3>&1 1>&2
+
 : ${MAILDIR:=$HOME/mail}
 : ${TMPDIR:=/tmp}
 
+silent=
+trace=
+
 cmd=`basename "$0"`
-usage="Usage: $cmd [+folder[,folder...] --] keywords..."
+usage="Usage: $cmd [+folder[,folder...]] [--] keywords..."
 
 badopts=
 
@@ -22,7 +28,7 @@ case "$1" in
 	  then
 	      folders="$folders $folder"
 	  else
-	      echo "$cmd: $MAILDIR/$folder: not an MH folder" >&2
+	      echo "$cmd: $MAILDIR/$folder: not an MH or Maildir folder" >&2
 	      badopts=1
 	  fi
 	done
@@ -43,68 +49,23 @@ xit=0
 
 # create result folder
 res=`mkdirn "$TMPDIR/mrx"` || exit 1
+$trace mhdir "$res"        || exit 1
 
-# subdir
-subn=1
+for folder in $folders
+do
+  ismhdir "$folder" || ismaildir "$folder" || continue
 
-# set up 
-{ exec 3>&1 1>&2
-  for folder in $folders
-  do
-    [ -d "$folder" ] || continue
-    ismhdir "$folder" || ismaildir "$folder" || continue
-    db=$folder/.mairix.db
-    [ -f "$db" ] || { echo "$cmd: no index for $folder" >&2
-		      continue
-		    }
-    [ -s "$db" ] || continue
+  db=$folder/.mairix.db
+  [ -f "$db" ] || { echo "$cmd: no index for $folder" >&2
+		    continue
+		  }
+  [ -s "$db" ] || continue
 
-    tmpres=$res/mrx$subn
-    mrxbase=.mrx$$
-    mrxhook=$folder/$mrxbase
-    {  mkdir "$tmpres" \
-    && ln -s "$tmpres" "$mrxhook" \
-    && mrx-mkrc -r "$mrxbase" "$folder" \
-    && ( necho "$folder: "; exec mairix -f "$folder/.mairixrc" "$@" ) \
-    && ( cd "$mrxhook" || exit 1
-	 exec >&3 3>&-
-	 pwd
-	 exec ls
-       )
-    } \
-    || xit=1
+  [ $silent ] || necho "Seach $folder "
+  $trace mrx-mkrc -r "$res" -t mh "$folder" || { xit=1; continue; }
+  $trace mairix -f "$folder/.mairixrc" -a -t "$@" || xit=1
+done
 
-    subn=`expr $subn + 1`
-  done
-} \
-| MRX_CMD=$0 MRX_RESULT=$res \
-  perl -e '$n=0;
-	   while (defined($_=<STDIN>))
-	   {
-	     chomp;
-	     if (-d $_)
-	     { if (defined $tmpdir)
-	       { unlink($tmpdir)
-		 || warn "$ENV{MRX_CMD}: unlink($tmpdir): $!\n";
-	       }
-	       $tmpdir=$_;
-	     }
-	     else
-	     { ++$n;
-	       $old="$tmpdir/$_";
-	       $new="$ENV{MRX_RESULT}/$n";
-	       rename($old,$new)
-	       || warn "$ENV{MRX_CMD}: rename($old,$new): $!\n";
-	     }
-	   }
-	   if (defined $tmpdir)
-	   { unlink($tmpdir)
-	     || warn "$ENV{MRX_CMD}: unlink($tmpdir): $!\n";
-	   }
-	  '
-
-mhdir "$res" || xit=1
-
-echo "$res"
+echo "$res" >&3
 
 exit $xit
