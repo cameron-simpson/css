@@ -1,6 +1,8 @@
 #!/bin/sh
 # set up the mail/news autofiler
 
+: ${LOGDIR:=$HOME/var/log}
+
 cd $HOME/var/maildrop || exit $?
 
 sync
@@ -13,7 +15,7 @@ do  set x *.+$pre; shift
     fi
 done
 
-filedata=$HOME/var/log/filemail
+filedata=$LOGDIR/filemail
 [ -s "$filedata" ] && logroll +datecode "$filedata"
 
 mklog filemail "$filedata"
