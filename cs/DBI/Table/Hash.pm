@@ -25,6 +25,7 @@ use strict qw(vars);
 
 BEGIN { use cs::DEBUG; cs::DEBUG::using(__FILE__); }
 
+use cs::Misc;
 use cs::HASH;
 use cs::DBI;
 use cs::DBI::Table::Row;
@@ -67,11 +68,14 @@ sub KEYS($)
   { push(@keys,$r[0]);
   }
 
-  @keys;
+  ::uniq(grep(defined,@keys));
 }
 
 sub FETCH($$)
 { my($this,$key)=@_;
+
+  return $this->{LIVE}->{$key}
+  if exists $this->{LIVE}->{$key};
 
   my @rows = cs::DBI::find($this->{DBH},$this->{TABLE},$this->{KEY},$key);
 
@@ -89,7 +93,9 @@ sub FETCH($$)
 
 sub EXISTS($$)
 { my($this,$key)=@_;
-  defined $this->FETCH($key);
+  
+   exists $this->{LIVE}->{$key}
+|| defined $this->FETCH($key);
 }
 
 sub STORE($$$)
@@ -102,7 +108,7 @@ sub STORE($$$)
   cs::DBI::insert($dbh, $table, keys %$value)
   ->ExecuteWithRec($value);
 
-  $value;
+  $this->{LIVE}->{$key}=$value;
 }
 
 sub DELETE($$)
@@ -110,6 +116,8 @@ sub DELETE($$)
 
   # purge old records
   cs::DBI::dosql($this->{DBH},"DELETE FROM $this->{TABLE} WHERE $this->{KEY} = ?", $key);
+
+  delete $this->{LIVE}->{$key};
 }
 
 =head1 AUTHOR
