@@ -452,11 +452,12 @@ sub httpget($)
 	  { $::NeedSleep=1;
 	    saveMIME($endurl->Text(),$M) || ($::Xit=1);
 	  }
-
-	  $::DoHEAD
-	  || unlink($sinkfile)
-	  || warn "$::cmd: warning: unlink($sinkfile): $!";
 	}
+
+	if (! unlink($sinkfile) && $! ne &ENOENT)
+        { warn "$::cmd: warning: unlink($sinkfile): $!";
+	}
+
 	undef $M;
       }
     }
