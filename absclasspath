@@ -14,7 +14,7 @@ do
   case "$cp" in
     /*)	;;
     *)
-	for cpp in $CLASSPATHPATH
+	for cpp in `unpath "$CLASSPATHPATH"`
 	do
 	  if [ -f "$cpp/$cp" ]
 	  then
