@@ -1,12 +1,18 @@
 #!/bin/sh
 #
-# You say tomAto, I say tomRto ...
+# Check is something is a symlink.
 #	- Cameron Simpson <cs@zip.com.au> 10nov2000
+#
+# Switch from playing shell games to using readsymlink.
+#	- Cameron Simpson <cs@zip.com.au> 16oct2001
 #
 
 [ $# = 1 ] || { echo "Usage: $0 pathname" >&2; exit 2; }
 
-case ${ARCH:-"`uname -s`"} in
-    SunOS|sun.sparc.solaris)	[ -h "$1" ] ;;
-    *)				[ -L "$1" ] ;;
-esac
+exec readsymlink "$1" >/dev/null 2>&1
+
+## # You say tomAto, I say tomRto ...
+## case ${ARCH:-"`uname -s`"} in
+##     SunOS|sun.sparc.solaris)	[ -h "$1" ] ;;
+##     *)				[ -L "$1" ] ;;
+## esac
