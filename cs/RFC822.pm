@@ -1052,8 +1052,6 @@ sub WriteItem	# ($this,Sink,[1,],@text...)
     $sink=cs::Sink->new(FILE, $FILE);
   }
 
-  # warn "$this -> WriteItem(): sink=".cs::Hier::h2a($sink);
-
   if ($needFrom_)
   { ## my(@c)=caller;warn "[@c]";
     $this->ForceFrom_();
@@ -1075,7 +1073,15 @@ sub WriteItem	# ($this,Sink,[1,],@text...)
     }
   }
 
-  $sink->Put("\n", @_);
+  my $n = $sink->Put("\n", @_);
+
+  if (! defined $n)
+  { my@c=caller;
+    warn "Put() returns undef from [@c]";
+    return undef;
+  }
+
+  return $n;
 }
 
 =back
