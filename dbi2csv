@@ -60,8 +60,7 @@ while (@ARGV && $ARGV[0] ne 'WHERE')
 if ($ARGV[0] eq WHERE)
 { shift(@ARGV);
 }
-
-my $where = (@ARGV == 0 ? "TRUE" : join(' ', @ARGV));
+my $where = "@ARGV";
 
 my $dsn = "DBI:${dbd}:database=${dbname}";
 $dsn.=";host=$host" if length $host;
@@ -72,9 +71,12 @@ die "$::cmd: can't get DBI handle for \"$dsn\"\n"
 	if ! defined $dbh;
 
 my $sql = "SELECT ".(@fields ? join(", ", @fields) : '*')
-        . " FROM $dbtable"
-	. " WHERE $where"
-	;
+        . " FROM $dbtable";
+
+if (length $where)
+{ $sql.=" WHERE $where";
+}
+
 if (defined $sortfield)
 { $sql .= " ORDER BY $sortfield";
   if ($sortreverse)
