@@ -5,13 +5,15 @@
 #	- Cameron Simpson <cs@zip.com.au> 09jan2002
 #
 
+: ${TMPDIR:=/tmp}
+
 key=attn
 [ $# = 0 ] || { key=$1; shift; }
 
-tmp=/tmp/undig$$item
+tmp=$TMPDIR/undig$$item
 cat >$tmp || exit $?
 
-hdrs=/tmp/undig$$head
+hdrs=$TMPDIR/undig$$head
 formail -X Received -X Sender -X Return-Path -X To -X Reply-To -X Delivered-To -X Errors-To \
 	-X Mailing-List \
 	-X List-Help -X List-Post -X List-Id \
