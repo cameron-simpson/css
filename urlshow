@@ -62,7 +62,7 @@ then
     do
       case "$url" in
 	-)	cat ;;
-	xclip)	xunclip | tr ' \011' '\012\012' ;;
+	xclip)	cutbuffer | tr ' \011' '\012\012' ;;
 	*)	echo "$url" ;;
       esac
     done \
