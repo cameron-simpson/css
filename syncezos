@@ -2,12 +2,22 @@
 #
 # Update my ezoshosting web site.
 #	- Cameron Simpson <cs@zip.com.au> 11jan2003
+
+needhost amadeus@home
+
+ezos=$HOME/there/cskk.ezoshosting.com
+ezoscgi=$ezos/cgi-bin
+ezoshtml=$ezos/html
+ezoscss=$ezoshtml/cs/css
+
 set -x
+
+rsync -avHPL --delete $HOME/man/cs/. $ezoscss/man/.
 
 syncezos-rc
 syncezos-cgi
 
-rsync -avHPW --delete --exclude=/kath $HOME/there/cskk.ezoshosting.com/html/. ezos:public_html/.
-rsync -avHPW --delete $HOME/there/cskk.ezoshosting.com/cgi-bin/. ezos:cgi-bin/.
+rsync -avHPW --delete --exclude=/kath $ezoshtml/. ezos:public_html/.
+rsync -avHPW --delete $ezos/cgi/. ezos:cgi-bin/.
 
 syncsmall @ezos
