@@ -18,7 +18,7 @@ tie %h, cs::DBI::Table::Row, I<rowref>, I<rowkey>, I<parent>;
 
 The cs::DBI::Table::Row module provides methods to tie a hash
 to a row fetched from a B<cs::DBI::Table::Hash>
-or B<cs::DBI::Table::Array> (this latter is unimplemented).
+or B<cs::DBI::Table::Array>.
 
 I<rowref> is a hashref containing the values of the row.
 I<rowkey> is the value for the key field specifying this row.
@@ -41,16 +41,21 @@ require Exporter;
 sub TIEHASH($$$$)
 { my($class,$row,$rowkey,$parent)=@_;
 
-  bless { PARENT => $parent,
-	  KEY => $rowkey,
-	  DATA => $row,
+  ## warn "cs::DBI::Table::Row::TIEHASH(@_)";
+  bless { cs::DBI::Table::Row::PARENT => $parent,
+	  cs::DBI::Table::Row::KEY => $rowkey,
+	  cs::DBI::Table::Row::DATA => $row,
 	}, $class;
 }
+
+sub _Data   { shift->{cs::DBI::Table::Row::DATA}; }
+sub _Key    { shift->{cs::DBI::Table::Row::KEY}; }
+sub _Parent { shift->{cs::DBI::Table::Row::PARENT}; }
 
 sub KEYS($)
 { my($this)=@_;
 
-  my $data = $this->{DATA};
+  my $data = $this->_Data();
   ## warn "data=[$data]";
 
   keys %$data;
@@ -58,14 +63,14 @@ sub KEYS($)
 
 sub EXISTS($$)
 { my($this,$key)=@_;
-  exists $this->{DATA}->{$key};
+  exists $this->_Data()->{$key};
 }
 
 sub FETCH($$)
 { my($this,$key)=@_;
 
   ## warn "FETCH($key)";
-  my $row = $this->{DATA};
+  my $row = $this->_Data();
 
   return undef if ! exists $row->{$key}
 	       || ! defined $row->{$key};
@@ -81,23 +86,28 @@ sub DELETE($$)
 sub STORE($$$)
 { my($this,$key,$value)=@_;
 
-  my $parent = $this->{PARENT};
-  my $sth = cs::DBI::sql($parent->{DBH},
-			 "UPDATE $parent->{TABLE} SET $key = ? WHERE $parent->{KEY} = ?");
+  ## warn "STORE(key=$key,value=$value)";
+  my $parent = $this->_Parent();
+  my $dbh=$parent->_Dbh();
+  my $table=$parent->_Table();
+  my $keyfield=$parent->_Key();
+  my $sqltxt = "UPDATE $table SET $key = ? WHERE $keyfield = ?";
+  my $sth = cs::DBI::sql($dbh,"UPDATE $table SET $key = ? WHERE $keyfield = ?");
 
   if (! defined $sth)
-  { warn "$0: STORE($key) into table $parent->{TABLE}: SQL error!";
+  { warn "$0: STORE($key) into table $table: SQL error!";
     return undef;
   }
 
-  if (! $sth->execute($value,$this->{KEY}))
-  { warn "$0: STORE($key,$value): error doing SQL!";
+  if (! $sth->execute($value,$this->_Key()))
+  { my@c=caller;
+    warn "$0: STORE($key,$value): error doing SQL!\n\t$sqltxt\n\tfrom [@c]\n\t";
   }
   else
-  { $this->{DATA}->{$key}=$value;
+  { $this->_Data()->{$key}=$value;
   }
 
-  $this->{DATA};
+  $this->_Data();
 }
 
 =head1 AUTHOR
