@@ -57,7 +57,7 @@ tmpf=$TMPDIR/$cmd$$
 trap 'rm -f "$tmpf"' 0 1 15
 
 [ -n "$message" ] \
-|| message=`readbugline "> "` \
+|| message=`readbugline` \
 || { echo "$cmd: empty message rejected" >&2; exit 1; }
 
 case "$reportcmd" in
