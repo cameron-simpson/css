@@ -24,10 +24,18 @@ for dir
 do  ( cd "$dir" || exit 1
       pwd
       set -x
-      find . ! -type l ! -group "$group" -print | xargs set-x chgrp "$group"
+      find . ! -type l ! -group "$group" -print \
+      | xxargs set-x chgrp "$group"
       if [ $all ]
-      then  chmod -R go=u .;chmod -R o-w .
-      else  chmod -R g=u .
+      then
+	  find . ! -type l -print \
+	  | xxargs chmod go=u
+
+	  find . ! -type l -print \
+	  | xxargs chmod o-w
+      else
+	  find . ! -type l -print \
+	  | xxargs chmod g=u
       fi
       find . -type d -exec chmod g+s {} ';'
     )
