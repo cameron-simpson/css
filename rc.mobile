@@ -88,7 +88,7 @@ fi
 
 [ "x$where" = xnone ] && exit 0
 
-config=`sed -e '/^#/d' -e "/^\\[$where\\]\\$/,/^\\[/!d" -e '/^[a-zA-Z][a-zA-Z_0-9]*=/!d' -e 's/^[a-z]/x_&/' -e 's/^[A-Z]/cf_&/' "$cf"|tee /dev/tty`
+config=`sed -e '/^#/d' -e "/^\\[$where\\]\\$/,/^\\[/!d" -e '/^[a-zA-Z][a-zA-Z_0-9]*=/!d' -e 's/^[a-z]/x_&/' -e 's/^[A-Z]/cf_&/' "$cf"`
 [ -n "$config" ] || { echo "$cmd: $cf: no config for [$where]" >&2; exit 1; }
 
 # RH public config vars
