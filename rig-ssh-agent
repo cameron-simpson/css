@@ -1,0 +1,12 @@
+#!/bin/sh
+#
+# Set up an ssh-agent in daemon mode.
+#	- Cameron Simpson <cs@zip.com.au> 30jul2001
+#
+
+exec \
+  lock -1 -a "ssh-agent-$HOST" \
+  no-ssh-agent \
+  ignhup \
+  ssh-agent \
+  sh -c 'env|sed -n "s/^\\(SSH_[_A-Z]*\\)=.*/&; export \\1;/p" >"$VARRUN/ssh-agent-$HOST"; exec pause'
