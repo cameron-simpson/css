@@ -24,8 +24,8 @@ $::Usage="Usage: $::cmd srcfile [targetfiles]\n";
 
 my @s;
 
-if (! (@s=lstat($::srcfile)))
-{ die "$::cmd: lstat($::srcfile): $!\n";
+if (! (@s=stat($::srcfile)))
+{ die "$::cmd: stat($::srcfile): $!\n";
 }
 
 if (-l _)
