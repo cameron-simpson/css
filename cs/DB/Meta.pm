@@ -11,21 +11,14 @@ use cs::Misc;
 use cs::HASH;
 use cs::RemappedHash;
 use cs::FlatHash;
-use CISRA::DB;
+use cs::DB;
 
-package CISRA::Meta;
+package cs::DB::Meta;
 
-@CISRA::Meta::ISA=qw(cs::HASH);
+@cs::DB::Meta::ISA=qw(cs::HASH);
 
-%CISRA::Meta::Class
-    =(  USER		=> { TABLE	=> 'users',
-			     KEYS	=> [FULLNAME, DESK],
-			     PATHS	=> { HOST => "HOST{USER}",
-					     PORT => [ "HOST{USER}",
-						       "->PORT",
-						     ],
-					   },
-			   },
+%cs::DB::Meta::Class
+    =(
 	EXT		=> { TABLE	=> [ 'wiring', 'phones' ],
 			     PATH	=> {
 					   },
@@ -99,7 +92,7 @@ package CISRA::Meta;
 					   },
 			   },
 	SWITCH		=> { TABLE	=> sub { cs::FlatHash::flattened(
-						   CISRA::DB::db(['wiring',
+						   cs::DB::db(['wiring',
 								  'switches'],@_),
 								 2)
 					       },
@@ -117,256 +110,256 @@ package CISRA::Meta;
 					   },
 			   },
      );
-%CISRA::Meta::DBs=();
+%cs::DB::Meta::DBs=();
 
 sub toplevel
-	{
-	  my($db)={};
+{
+  my($db)={};
 
-	  tie (%$db, CISRA::Meta, TOPLEVEL, @_)
-		|| die "$::cmd: can't tie to TOPLEVEL";
+  tie (%$db, cs::DB::Meta, TOPLEVEL, @_)
+	|| die "$::cmd: can't tie to TOPLEVEL";
 
-	  $db;
-	}
+  $db;
+}
 
 sub db
-	{ my($db)=toplevel();
+{ my($db)=toplevel();
 
-	  tie (%$db, CISRA::Meta, DB, @_)
-		|| die "$::cmd: can't tie to TOPLEVEL";
+  tie (%$db, cs::DB::Meta, DB, @_)
+	|| die "$::cmd: can't tie to TOPLEVEL";
 
-	  $db;
-	}
+  $db;
+}
 
 # get key from named db
 # (convenience routine)
 sub get
-	{ my($dbname,$key,$rw)=@_;
-	  $rw=0 if ! defined $rw;
+{ my($dbname,$key,$rw)=@_;
+  $rw=0 if ! defined $rw;
 
-	  db($dbname,$rw)->{$key};
-	}
+  db($dbname,$rw)->{$key};
+}
 
 sub TIEHASH
-	{ my($class,$type)=(shift,shift);
+{ my($class,$type)=(shift,shift);
 
-	  if ($type eq DB)
-		{ return dbTIEHASH($class,@_);
-		}
-	  elsif ($type eq TOPLEVEL)
-		{ return bless { TYPE => TOPLEVEL }, $class;
-		}
-	  else
-	  { my(@c)=caller;
-	    die "TIEHASH on bogus type \"$type\" with args (@_) from [@c]";
-	  }
+  if ($type eq DB)
+	{ return dbTIEHASH($class,@_);
 	}
+  elsif ($type eq TOPLEVEL)
+	{ return bless { TYPE => TOPLEVEL }, $class;
+	}
+  else
+  { my(@c)=caller;
+    die "TIEHASH on bogus type \"$type\" with args (@_) from [@c]";
+  }
+}
 
 sub dbTIEHASH($$;$)
-	{ my($class,$odbname,$rw)=@_;
-	  $rw=0 if ! defined $rw;
+{ my($class,$odbname,$rw)=@_;
+  $rw=0 if ! defined $rw;
 
-	  return $CISRA::Meta::DBs{$odbname}
-		if exists $CISRA::Meta::DBs{$odbname};
+  return $cs::DB::Meta::DBs{$odbname}
+	if exists $cs::DB::Meta::DBs{$odbname};
 
-	  ## warn "load db $odbname ...\n";
+  ## warn "load db $odbname ...\n";
 
-	  my($dbname,$remapped);
+  my($dbname,$remapped);
 
-	  if ($odbname =~ /\{([A-Z]+)\}$/)
-		{ $remapped=$1;
-		  $dbname=$`;
-		}
-	  else	{ $dbname=$odbname;
-		}
-
-	  die "$::cmd: no MetaDB named \"$dbname\""
-		if ! exists $CISRA::Meta::Class{$dbname};
-
-	  my($cldef)=$CISRA::Meta::Class{$dbname};
-	  my($table)=$cldef->{TABLE};
-	  my($rawdb);
-
-	  if (ref $table && ::reftype($table) eq CODE)
-		{
-		  ## warn "calling $table($rw)";
-		  $rawdb=&$table($rw);
-		  ## warn "rawdb=$rawdb\n";
-		}
-	  else	{
-		  my($keychain)=$cldef->{TABLE};
-		  $keychain=[ $keychain ] if ! ref $keychain;
-
-		  $rawdb=CISRA::DB::db($keychain,$rw);
-
-		  die "$::cmd: can't attach to [@$keychain]: $!"
-			if ! defined $rawdb;
-		}
-
-	  my($this);
-
-	  $this	=$CISRA::Meta::DBs{$odbname}
-		=bless { DBTYPE	=> $odbname,
-			 TYPE	=> DB,
-			 CLDEF	=> $cldef,
-			 GOT	=> {},
-		       }, $class;
-
-	  my($isRemapped)=defined $remapped;
-
-	  if ($isRemapped)
-		{ my($remobj);
-
-		  ($rawdb,$remobj)=cs::RemappedHash::remapped($rawdb,$remapped);
-		  die "$::cmd: can't remap db by \"$remapped\""
-			if ! defined $rawdb;
-
-		  $this->{REMAPOBJ}=$remobj;
-		}
-
-	  $this->{DB}=$rawdb;
-
-	  $this;
+  if ($odbname =~ /\{([A-Z]+)\}$/)
+  { $remapped=$1;
+    $dbname=$`;
+  }
+  else	{ $dbname=$odbname;
 	}
+
+  die "$::cmd: no MetaDB named \"$dbname\""
+	if ! exists $cs::DB::Meta::Class{$dbname};
+
+  my($cldef)=$cs::DB::Meta::Class{$dbname};
+  my($table)=$cldef->{TABLE};
+  my($rawdb);
+
+  if (ref $table && ::reftype($table) eq CODE)
+  {
+    ## warn "calling $table($rw)";
+    $rawdb=&$table($rw);
+    ## warn "rawdb=$rawdb\n";
+  }
+  else	{
+	  my($keychain)=$cldef->{TABLE};
+	  $keychain=[ $keychain ] if ! ref $keychain;
+
+	  $rawdb=cs::DB::db($keychain,$rw);
+
+	  die "$::cmd: can't attach to [@$keychain]: $!"
+		if ! defined $rawdb;
+	}
+
+  my($this);
+
+  $this	=$cs::DB::Meta::DBs{$odbname}
+	=bless { DBTYPE	=> $odbname,
+		 TYPE	=> DB,
+		 CLDEF	=> $cldef,
+		 GOT	=> {},
+	       }, $class;
+
+  my($isRemapped)=defined $remapped;
+
+  if ($isRemapped)
+  { my($remobj);
+
+    ($rawdb,$remobj)=cs::RemappedHash::remapped($rawdb,$remapped);
+    die "$::cmd: can't remap db by \"$remapped\""
+	  if ! defined $rawdb;
+
+    $this->{REMAPOBJ}=$remobj;
+  }
+
+  $this->{DB}=$rawdb;
+
+  $this;
+}
 
 sub finish
-	{ CISRA::DB::finish();
-	}
+{ cs::DB::finish();
+}
 
 sub KEYS
-	{ my($this)=@_;
+{ my($this)=@_;
 
-	  my($type)=$this->{TYPE};
+  my($type)=$this->{TYPE};
 
-	  return keys %CISRA::Meta::Class if $type eq TOPLEVEL;
+  return keys %cs::DB::Meta::Class if $type eq TOPLEVEL;
 
-	  return keys %{$this->{DB}} if $type eq DB;
+  return keys %{$this->{DB}} if $type eq DB;
 
-	  die "KEYS $this where type == \"$type\"";
-	}
+  die "KEYS $this where type == \"$type\"";
+}
 
 sub EXISTS
-	{ my($this,$key)=@_;
+{ my($this,$key)=@_;
 
-	  my($type)=$this->{TYPE};
+  my($type)=$this->{TYPE};
 
-	  if ($type eq TOPLEVEL)
-		{ my($db)=db($key);
+  if ($type eq TOPLEVEL)
+  { my($db)=db($key);
 
-		  return defined $db;
-		}
+    return defined $db;
+  }
 
-	  die "EXISTS($this,\"$key\") where type == \"$type\""
-		if $type ne DB;
+  die "EXISTS($this,\"$key\") where type == \"$type\""
+	if $type ne DB;
 
-	  return exists $this->{DB}->{$key};
-	}
+  return exists $this->{DB}->{$key};
+}
 
 sub FETCH
-	{ my($this,$key)=@_;
+{ my($this,$key)=@_;
 
-	  my($type)=$this->{TYPE};
+  my($type)=$this->{TYPE};
 
-	  if ($type eq TOPLEVEL)
-		{ my($db)={};
+  if ($type eq TOPLEVEL)
+  { my($db)={};
 
-		  tie (%$db, CISRA::Meta, DB, $key)
-			|| die "$::cmd: can't tie to db \"$key\"";
+    tie (%$db, cs::DB::Meta, DB, $key)
+	  || die "$::cmd: can't tie to db \"$key\"";
 
-		  return $db;
-		}
+    return $db;
+  }
 
-	  if ($type eq DB)
-		{ return $this->{DB}->{$key};
-		}
+  if ($type eq DB)
+  { return $this->{DB}->{$key};
+  }
 
-	  die "FETCH($this,\"$key\") where type == \"$type\"";
-	}
+  die "FETCH($this,\"$key\") where type == \"$type\"";
+}
 
 sub DELETE
-	{ my($this,$key)=@_;
+{ my($this,$key)=@_;
 
-	  return undef if ! $this->EXISTS($key);
+  return undef if ! $this->EXISTS($key);
 
-	  my($type)=$this->{TYPE};
+  my($type)=$this->{TYPE};
 
-	  if ($type eq DB)
-		{ return delete $this->{DB}->{$key};
-		}
-
-	  die "DELETE($this,\"$key\") where type == \"$type\"";
+  if ($type eq DB)
+	{ return delete $this->{DB}->{$key};
 	}
+
+  die "DELETE($this,\"$key\") where type == \"$type\"";
+}
 
 sub STORE
-	{ my($this,$key,$value)=@_;
+{ my($this,$key,$value)=@_;
 
-	  my($type)=$this->{TYPE};
+  my($type)=$this->{TYPE};
 
-	  if ($type eq DB)
-		{ return $this->{DB}->{$key}=$value;
-		}
-
-	  die "STORE($this,\"$key\") where type == \"$type\"";
+  if ($type eq DB)
+	{ return $this->{DB}->{$key}=$value;
 	}
+
+  die "STORE($this,\"$key\") where type == \"$type\"";
+}
 
 sub RawKey
-	{ my($this,$key)=@_;
-	  die "$::cmd: RawKey called on type \"$this->{TYPE}\""
-		if $this->{TYPE} ne DB;
+{ my($this,$key)=@_;
+  die "$::cmd: RawKey called on type \"$this->{TYPE}\""
+	if $this->{TYPE} ne DB;
 
-	  if (! defined $key) {my(@c)=caller;warn "no key! from [@c]";}
-	  return $key if ! exists $this->{REMAPOBJ};
+  if (! defined $key) {my(@c)=caller;warn "no key! from [@c]";}
+  return $key if ! exists $this->{REMAPOBJ};
 
-	  my($rawkey)=scalar($this->{REMAPOBJ}->MapKey($key));
+  my($rawkey)=scalar($this->{REMAPOBJ}->MapKey($key));
 
-	  if (! defined $rawkey)
-		{my(@c)=caller;warn "no RawKey(@_) from [@c]";}
+  if (! defined $rawkey)
+	{my(@c)=caller;warn "no RawKey(@_) from [@c]";}
 
-	  return $rawkey;
-	}
+  return $rawkey;
+}
 
 # get wrapper object by key from db tieobj
 sub Get(\%$;$)
-	{ my($this,$key,$rw)=@_;
-	  $rw=0 if ! defined $rw;
+{ my($this,$key,$rw)=@_;
+  $rw=0 if ! defined $rw;
 
-	  die "$::cmd: Get(@_) on type \"$this->{TYPE}\""
-		if $this->{TYPE} ne DB;
+  die "$::cmd: Get(@_) on type \"$this->{TYPE}\""
+	if $this->{TYPE} ne DB;
 
-	  return $this->{GOT}->{$key} if exists $this->{GOT}->{$key};
+  return $this->{GOT}->{$key} if exists $this->{GOT}->{$key};
 
-	  my($db)=$this->{DB};
+  my($db)=$this->{DB};
 
-	  return undef if ! exists $db->{$key};
+  return undef if ! exists $db->{$key};
 
-	  my($item)=
-	  bless { DB	=> $db,
-		  TYPE	=> $this->{DBTYPE},
-		  KEY	=> $key,
-		  RAWKEY=> $this->RawKey($key),
-		  PARENT=> $this,
-		}, CISRA::Meta;
+  my($item)=
+  bless { DB	=> $db,
+	  TYPE	=> $this->{DBTYPE},
+	  KEY	=> $key,
+	  RAWKEY=> $this->RawKey($key),
+	  PARENT=> $this,
+	}, cs::DB::Meta;
 
-	  $this->{GOT}->{$key}=$item;
-	}
+  $this->{GOT}->{$key}=$item;
+}
 
 # get the db element from the wrapper object
 sub Item
-	{ my($this)=@_;
+{ my($this)=@_;
 
-	  die "$::cmd: Item(@_) on type \"$this->{TYPE}\""
-		if $this->{TYPE} eq DB;
+  die "$::cmd: Item(@_) on type \"$this->{TYPE}\""
+	if $this->{TYPE} eq DB;
 
-	  return undef if ! exists $this->{DB}->{$this->{KEY}};
+  return undef if ! exists $this->{DB}->{$this->{KEY}};
 
-	  $this->{DB}->{$this->{KEY}};
-	}
+  $this->{DB}->{$this->{KEY}};
+}
 
 sub PutItem(\%$)
-	{ my($this,$key,$value)=@_;
+{ my($this,$key,$value)=@_;
 
-	  $this->{DB}->{$key}=$value;
-	}
+  $this->{DB}->{$key}=$value;
+}
 
 sub Find
 { my($this,$rel)=@_;
@@ -385,109 +378,109 @@ sub Find
 	{ warn "$::cmd: this key \"$key\" not active any more!";
 	}
   else
-  { my($cldef)=$CISRA::Meta::Class{$this->{TYPE}};
+  { my($cldef)=$cs::DB::Meta::Class{$this->{TYPE}};
     my($paths)=$cldef->{PATHS};
     my($item)=$db->{$key};
 
     if (exists $paths->{$rel})
 	# ignore direct hook - use this to get where we need to be
+    {
+      my(@sofar)=$this;
+      my($path)=$paths->{$rel};
+      my(@path)=(ref $path ? @$path : $path);
+
+      ## warn "path($rel)=[@path]...\n";
+
+      # we start here and iterate over the path,
+      # doing a breadth-first traversal of the dbs
+      my($ndbtie,$sub,$subitem);
+
+      my(@umatches)=$key;
+      $ndbtie=$this->{PARENT};
+
+      PATHEL:
+	for my $pathel (@path)
 	{
-	  my(@sofar)=$this;
-	  my($path)=$paths->{$rel};
-	  my(@path)=(ref $path ? @$path : $path);
+	  ## warn "PATHEL=[$pathel], umatches=[@umatches]\n";
 
-	  ## warn "path($rel)=[@path]...\n";
+	  @matches=();
+	  if ($pathel =~ /^->/)
+		# just map to the field on this hop
+	  { my($field)=$';
 
-	  # we start here and iterate over the path,
-	  # doing a breadth-first traversal of the dbs
-	  my($ndbtie,$sub,$subitem);
-
-	  my(@umatches)=$key;
-	  $ndbtie=$this->{PARENT};
-
-	  PATHEL:
-	    for my $pathel (@path)
-		{
-		  ## warn "PATHEL=[$pathel], umatches=[@umatches]\n";
-
-		  @matches=();
-		  if ($pathel =~ /^->/)
-			# just map to the field on this hop
-			{ my($field)=$';
-
-			  FKEY:
-			    for my $pkey (@umatches)
-			    {
-			      ## warn "dbtie=$ndbtie, Get($pkey)\n";
-			      next FKEY if ! defined ($sub=$ndbtie->Get($pkey));
-			      
-			      $subitem=$sub->Item();
-			      if (exists $subitem->{$field})
-				{ my($f)=$subitem->{$field};
-				  if (ref $f && ::reftype($f) eq ARRAY)
-					{ push(@matches,@$f);
-					}
-				  else	{ push(@matches,"$f");
-					}
-				}
-			    }
-
-			  ## warn "matched [@matches] from $pathel\n";
-			}
-		  else
-		  # it's a db name
-		  # fetch db, look up keys in that db,
-		  # return real keys for its original db
-		  # switch to the origin db to user the real key
-		  {
-		    $ndbtie=tied %{db($pathel)};
-		    die "no such db as \"$pathel\"" if ! defined $ndbtie;
-
-		    ## warn "get [@umatches] from $pathel...\n";
-		    SUBKEY:
-		      for my $pkey (@umatches)
-			{
-			  if (defined ($subitem=$ndbtie->Get($pkey)))
-				{ 
-				  if (! exists $subitem->{RAWKEY}
-				   || ! defined $subitem->{RAWKEY})
-					{warn "no RAWKEY";
-					 cs::DEBUG::phash($subitem);
-					}
-				  push(@matches,$subitem->{RAWKEY});
-				  if ($pathel =~ /(\w+)\{\w+\}$/)
-					{ $ndbtie=tied %{db($1)};
-					}
-				}
-			}
-
-		    ## warn "matched [@matches] from $pathel";
+	    FKEY:
+	      for my $pkey (@umatches)
+	      {
+		## warn "dbtie=$ndbtie, Get($pkey)\n";
+		next FKEY if ! defined ($sub=$ndbtie->Get($pkey));
+		
+		$subitem=$sub->Item();
+		if (exists $subitem->{$field})
+		  { my($f)=$subitem->{$field};
+		    if (ref $f && ::reftype($f) eq ARRAY)
+			  { push(@matches,@$f);
+			  }
+		    else	{ push(@matches,"$f");
+			  }
 		  }
+	      }
 
-		  @umatches=(@matches ? ::uniq(@matches) : ());
+	    ## warn "matched [@matches] from $pathel\n";
+	  }
+	  else
+	  # it's a db name
+	  # fetch db, look up keys in that db,
+	  # return real keys for its original db
+	  # switch to the origin db to user the real key
+	  {
+	    $ndbtie=tied %{db($pathel)};
+	    die "no such db as \"$pathel\"" if ! defined $ndbtie;
+
+	    ## warn "get [@umatches] from $pathel...\n";
+	    SUBKEY:
+	      for my $pkey (@umatches)
+	      {
+		if (defined ($subitem=$ndbtie->Get($pkey)))
+		{ 
+		  if (! exists $subitem->{RAWKEY}
+		   || ! defined $subitem->{RAWKEY})
+		  {warn "no RAWKEY";
+		   cs::DEBUG::phash($subitem);
+		  }
+		  push(@matches,$subitem->{RAWKEY});
+		  if ($pathel =~ /(\w+)\{\w+\}$/)
+		  { $ndbtie=tied %{db($1)};
+		  }
 		}
+	      }
+
+	    ## warn "matched [@matches] from $pathel";
+	  }
+
+	  @umatches=(@matches ? ::uniq(@matches) : ());
 	}
+    }
     else
     {
       if (! exists $item->{$rel})
-	{ warn "$::cmd: not rel field \"$rel\" in item \"$key\"";
-	}
+      { warn "$::cmd: not rel field \"$rel\" in item \"$key\"";
+      }
       else
       { my($val)=$item->{$rel};
 
 	if (ref $val)
-		{ my($reftype)=::reftype($val);
+	{ my($reftype)=::reftype($val);
 
-		  if ($reftype eq ARRAY)
-			{ @matches=@$val;
-			}
-		  elsif ($reftype eq HASH)
-			{ @matches=keys %$val;
-			}
-		  else
-		  { warn "$::cmd: \"$key\"->{$rel} is odd type ($reftype)";
-		  }
+	  if ($reftype eq ARRAY)
+	  { @matches=@$val;
+	  }
+	  elsif ($reftype eq HASH)
+		{ @matches=keys %$val;
 		}
+	  else
+	  { warn "$::cmd: \"$key\"->{$rel} is odd type ($reftype)";
+	  }
+	}
 	else
 	{ @matches=$val;
 	}
