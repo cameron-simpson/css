@@ -1,0 +1,130 @@
+#!/usr/bin/perl
+#
+# tcpio - shell level TCP stream access
+#	- Cameron Simpson 04feb1994
+#
+
+require 'getopts.pl';
+use cs::Net::TCP;
+
+($cmd=$0) =~ s:.*/::;
+$usage="Usage: $cmd [-io] [-p localport | -P localport] host port
+	-i	Copy in; copy from the connection to stdout.
+	-o	Copy out; copy stdin to the connection.
+	-p	Bind local end of connection to specified port.
+	-P	Bind local end of connection to specified port,
+		or the next free one above that.
+       $cmd -a [-io1] port command [args]
+	-a	Accept connections on the given port.
+	-1	Accept only the first connection.
+";
+
+$badopts=0;
+
+$localport=0;
+$firstfree=0;
+
+Getopts('a1iop:P:') || ($badopts=1);
+$accmode=$opt_a;
+$onceonly=$opt_1;
+$copyin =($opt_i || !$opt_o);
+$copyout=($opt_o || !$opt_i);
+if ($opt_p)	{ $localport=$opt_p; $firstfree=0; }
+elsif ($opt_P)	{ $localport=$opt_P; $firstfree=1; }
+
+if ($opt_p && $opt_P)		{ warn "$cmd: can't use both -p and -P\n";
+				  $badopts=1;
+				}
+
+if ($onceonly && !$accmode)	{ warn "$cmd: can't use -1 without -a\n";
+				  $badopts=1;
+				}
+
+if (!$accmode && !defined($host=shift))
+				{ warn "$cmd: missing host name\n";
+				  $badopts=1;
+				}
+
+if (!defined($port=shift))	{ warn "$cmd: missing port name\n";
+				  $badopts=1;
+				}
+
+if ($accmode)
+{
+  if (!@ARGV)
+  { warn "$cmd: missing command\n";
+    $badopts=1;
+  }
+  else
+  { @command=@ARGV;
+  }
+}
+else
+{ if (@ARGV)
+  { warn "$cmd: extra arguments: @ARGV\n";
+    $badopts=1;
+  }
+}
+
+die $usage if $badopts;
+
+if ($accmode)
+# supply service
+{ my $this = new cs::Net::TCP $port;
+  die "$::cmd: can't bind to port $port: $!" if ! defined $this;
+  $this->Serve(($onceonly ? $cs::Net::TCP::F_ONCE
+			  : $cs::Net::TCP::F_FORK|$cs::Net::TCP::F_FORK2),
+	       SERVICE);
+  # NOTREACHED
+  exit 1;
+}
+
+# connect to service
+die "$cmd: can't connect to $host:$port: $!\n"
+	unless defined ($CONN=new cs::Net::TCP ($host,$port,$localport));
+
+if ($copyin && $copyout)
+{ die "$cmd: can't fork: $!\n" unless defined($pid=fork);
+  if ($pid)	{ $copyin=0;  }	# parent, no copyin
+  else		{ $copyout=0; } # child, no copyout
+}
+
+if ($copyout)
+# parent, read stdin
+{ COPYOUT:
+  while (defined ($_=<STDIN>))
+  { $CONN->Put($_);
+    $CONN->Flush() if -t STDIN;
+  }
+}
+else
+# child, copy to stdout
+{ print while (defined ($_=$CONN->Read()) && length);
+}
+
+exit 0;
+
+#####################################################################
+
+sub SERVICE	# (CONN,peer)
+{ local($CONN,$peer)=@_;
+  local($OUT)=select;
+
+  close($OUT) || warn "$cmd: can't close($OUT): $!\n";
+
+  if ($copyin)
+  { my $infh = $CONN->SourceHandle();
+    open(STDIN,"<&$infh")
+	  || die "$cmd: can't attach stdin to $infh\n";
+  }
+
+  if ($copyout)
+  { my $outfh = $CONN->SourceHandle();
+    open(STDOUT,">&$outfh")
+	  || die "$cmd: can't attach stdout to $outfh\n";
+  }
+
+  ## warn "exec(@command)\n";
+  exec(@command);
+  die "$cmd: exec(@command): $!\n";
+}
