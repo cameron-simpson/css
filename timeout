@@ -1,0 +1,33 @@
+#!/bin/sh
+#
+# Run a command with a real-time timeout.
+#	- Cameron Simpson <cs@zip.com.au>
+#
+
+usage="Usage: $0 seconds command [args...]"
+
+[ $# -lt 2 ] && { echo "$usage" >&2; exit 2; }
+
+timeout=$1
+shift
+
+case "$timeout" in
+	[0-9]*)	;;	# dodgy bros syntax check since [!0-9] fails
+	*)	echo "$0: timeout must be an integer" >&2
+		echo "$usage" >&2
+		exit 2
+		;;
+esac
+
+mypid=$$
+xit=1		# assume timed out
+
+"$@" &
+cmdpid=$!
+
+( { sleep $timeout; exec 2>/dev/null; kill $mypid $cmdpid; sleep 2; kill -9 $cmdpid; } & )
+
+wait
+xit=$?
+
+exit $xit
