@@ -1,0 +1,105 @@
+#!/bin/sh
+#
+# Stash strings for later.
+# Adapted from noteurl.
+#	- Cameron Simpson <cs@zip.com.au> 15nov96
+#
+# Streamlined the logic.	- cameron, 16feb98
+# Fix race condition on tag existence. - cameron, 14sep98
+#
+
+usage="Usage: note [-t tag] notefile [strings...]
+	-p pfx	Addenda prefix (default: a tab).
+	-s sfx	Addenda suffix.
+	-t tag	Tag line.
+	-H hhmm	hh:mm string."
+
+notedir=$HOME/etc/note
+notefile=
+tag=
+hhmm=
+pfx='	'
+sfx=
+locked=
+
+badopts=
+
+while :
+do
+    case $1 in
+	-p)	pfx=$2; shift ;;
+	-s)	sfx=$2; shift ;;
+	-t)	tag=$2; shift ;;
+	-H)	hhmm=$2; shift ;;
+	-l)	locked=1 ;;
+	--)	shift; break ;;
+	-?*)	echo "$0: unrecognised option: $1" >&2
+		badopts=1
+		;;
+	*)	break ;;
+    esac
+    shift
+done
+
+[ $# = 0 ] || { notefile=$1; shift; }
+
+[ -n "$notefile" ] || { echo "$0: missing notefile" >&2; badopts=1; }
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+# clean up notefile spec
+case $notefile in
+    /*)	;;
+    *)	notefile=$notedir/$notefile ;;
+esac
+
+[ -f "$notefile" ] || { echo "$0: missing notefile: $notefile" >&2
+			exit 1
+		      }
+
+# default tag if none supplied
+
+eval `( set x \`date|tr : " "\`; echo now_tag=\"$2 $3 $4 $9\" now_hhmm=$5:$6 )`
+[ -n "$tag" ] || tag=$now_tag
+[ -n "$hhmm" ] || hhmm=$now_hhmm
+
+# loopback - lock the file and rerun
+[ $locked ] \
+  || exec lock "$notefile" "$0" -l -p "$pfx" -s "$sfx" -t "$tag" -H "$hhmm" -- "$notefile" ${1+"$@"}
+
+# collect lines to add
+sedlines=
+if [ $# = 0 ]
+then
+    # use stdin
+    while read line
+    do  sedlines="$sedlines
+$pfx$hhmm $line$sfx"
+    done
+else
+    # use args
+    for line
+    do  sedlines="$sedlines
+$pfx$hhmm $line$sfx"
+    done
+fi
+[ -n "$sedlines" ] || exit 0	# nothing to add
+
+if fgrep "$tag" "$notefile" >/dev/null
+then
+    case "$tag" in */*) tagptn=`sedstrs "s|/|\\\\\\\\/|g" "$tag"` ;;
+		   *)   tagptn=$tag ;;
+    esac
+    sedlines="/^$tagptn\$/a$sedlines"
+else
+    sedlines="1i
+$tag$sedlines"
+fi
+
+sedlines=`sedstrs "s/\$/\\\\\\\\/
+		   \\$s/.\\$//" "$sedlines"`
+
+# bootup: fix silent failure with initial empty file
+[ -s "$notefile" ] || echo >>"$notefile"
+
+exec bsed -s "$sedlines" "$notefile"
