@@ -10,7 +10,7 @@ cats2procmailrc - generate a procmail recipe from my mail categories file
 
 =head1 SYNOPSIS
 
-cats2procmailrc E<lt>categories E<gt>procmailrc
+cats2procmailrc [B<-t> I<type>] E<lt>categories E<gt>procmailrc
 
 =head1 DESCRIPTION
 
@@ -42,7 +42,13 @@ For me, this means a single line summary of the mail item appears in yellow in a
 I have at the top of my screen for mail items I should read I<now>.
 
 The I<folder> names the folder in which to place the mail item.
-Normail UNIX mail files, MH style directories and Maildir style directories are autodetetected.
+Normail UNIX mail files,
+MH style directories and Maildir style directories are autodetetected.
+
+The B<-t> option
+selects the default folder type if the folder does not exist.
+The I<type> may be one of B<unix> (the default),
+B<maildir> or B<mh> for the three types above.
 
 The I<tag> is placed at the start of the mail's B<Subject> line for ready recognition in mixed folders.
 The special tag dot (".") suppresses this action.
@@ -98,7 +104,48 @@ BEGIN { use cs::DEBUG; cs::DEBUG::using(__FILE__);
       }
 
 use strict vars;
-use cs::Source;
+
+($::cmd=$0) =~ s:.*/::;
+$::Usage="Usage: $::cmd [-t {unix|mh|maildir}] <categories >procmailrc
+	-t type	Select default mailbox type.
+";
+
+$::DfltSfx="";	# unix style by default
+
+{ my $badopts=0;
+
+  if (@ARGV && $ARGV[0] eq '-t')
+  { shift(@ARGV);
+    if (! @ARGV)
+    { warn "$::cmd: -t: missing type\n";
+      $badopts=1;
+    }
+    else
+    { my $type = uc(shift(@ARGV));
+
+      if ($type eq UNIX)
+      { $::DfltSfx='';
+      }
+      elsif ($type eq MAILDIR)
+      { $::DfltSfx='/';
+      }
+      elsif ($type eq MH)
+      { $::DfltSfx='/.';
+      }
+      else
+      { warn "$::cmd: -t: bad mailbox type \"$type\"\n\tI know: UNIX MAILBOX MH.\n";
+	$badopts=1;
+      }
+    }
+  }
+
+  if (@ARGV)
+  { warn "$::cmd: extra arguments: @ARGV\n";
+    $badopts=1;
+  }
+
+  die $::Usage if $badopts;
+}
 
 my $doalert;
 my $sfx;
@@ -197,7 +244,11 @@ sub foldersfx
 { my($folder)=@_;
 
   $folder="$ENV{MAILDIR}/$folder" unless $folder =~ m:^/:;
-  if (! stat($folder) || ! -d _)
+  if (! stat($folder))
+  { return $::DfltSfx;
+  }
+
+  if (! -d _)
   { return "";
   }
 
