@@ -3,6 +3,10 @@ def index(seq,val):
     if val == seq[i]: return i
   return -1
 
+def dict2ary(d,keylist=None):
+  if keylist is None: keylist=sort(keys(d))
+  return [ [k,d[k]] for k in keylist ]
+
 # trivial wrapper for extension in subclasses
 class SeqWrapper:
   def __init__(self,seq):
@@ -25,6 +29,8 @@ class SeqWrapper:
     for i in self.seq:
       yield i
 
+""" an object with an ordered set of keys eg SQL table row
+"""
 class HasNameIndex:
   def __init__(self,names=None):
     if names is not None:
@@ -32,25 +38,25 @@ class HasNameIndex:
 
   def initNameIndex(self,names):
     # compute column name index
-    self.names=names
-    self.nameIndex={}
+    self.__names=names
+    self.__nameIndex={}
     i=0
     for name in names:
-      self.nameIndex[name]=i
+      self.__nameIndex[name]=i
       i+=1
 
   def getNameIndex(self):
-    return self.nameIndex
+    return self.__nameIndex
 
   def lookupNameIndex(self,name):
-    return self.nameIndex[name]
+    return self.__nameIndex[name]
 
   def __iterkeys__(self):
-    for k in self.nameIndex:
+    for k in self.__nameIndex:
       yield k
 
   def keys(self):
-    return self.names
+    return self.__names
 
 class IndexedSeqWrapper(HasNameIndex,SeqWrapper):
   def __init__(self,seq,names=None):
