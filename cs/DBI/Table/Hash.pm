@@ -40,25 +40,42 @@ require Exporter;
 
 =over 4
 
-=item tie I<hash>, B<cs::DBI::Table::Hash>, I<dbh>, I<table>, I<keyfield>, I<where>
+=item tie I<hash>, B<cs::DBI::Table::Hash>, I<dbh>, I<table>, I<keyfield>, I<where>, I<preload>
 
 Attach I<hash> to the I<table> in database I<dbh> with field I<keyfield>
 as the hash index.
-If I<where> is supplied is must be an SQL select...where condition
-to constrain the records to which I<hash> now applies.
+Preload the table with a single SQL call if I<preload> is true.
+I<where> must be an SQL select...where condition
+to constrain the records to which I<hash> now applies,
+or the empty string.
+I<preload> must be true or false (0)
+to cause (or not) the table to be preloaded when the hash is created.
 
 =cut
 
-sub TIEHASH($$$$;$)
-{ my($class,$dbh,$table,$keyfield,$where)=@_;
-  $where='' if ! defined $where;
+sub TIEHASH($$$$$$)
+{ my($class,$dbh,$table,$keyfield,$where,$preload)=@_;
 
+  my $this =
   bless { DBH => $dbh,
 	  TABLE => $table,
 	  LIVE => {},
 	  KEY => $keyfield,
 	  WHERE => $where,
 	}, $class;
+
+
+  if ($preload)
+  { my $sql = "SELECT * FROM $this->{TABLE}";
+    $sql.=" WHERE $this->{WHERE}" if length $this->{WHERE};
+    my $sth = cs::DBI::sql($dbh, $sql);
+    my $L = $this->{LIVE};
+    for my $row (cs::DBI::fetchall_hashref($sth))
+    { $L->{$row->{$keyfield}}=$row;
+    }
+  }
+
+  $this;
 }
 
 sub KEYS($)
