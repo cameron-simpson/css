@@ -7,33 +7,38 @@
 #
 
 cmd=$0
-usage="Usage: $cmd idfile <mailitem"
+usage="Usage: $cmd idfiles... <mailitem"
 
 badopts=
 
 if [ $# = 0 ]
-then  echo "$cmd: missing idfile" >&2; badopts=1
-else  idfile=$1; shift
-      if [ $# -gt 0 ]
-      then
-	echo "$cmd: extra arguments after idfile: $*" >&2
-	badopts=1
-      fi
+then
+  echo "$cmd: missing idfiles" >&2
+  badopts=1
 fi
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
 eval `mhdrs -sh | sed 's/^/HDR_/'`
-set -- $HDR_REFERENCES $HDR_IN_REPLY_TO
+idlist="$HDR_REFERENCES $HDR_IN_REPLY_TO"
 
-[ $# = 0 ] && exit 1	# no refs => not in a thread
+[ -z "$idlist" ] && exit 1	# no refs => not in a thread
 
 id="$HDR_MESSAGE_ID"
-re='^('`echo "$*" | tr ' ' '|'`')$'
+re='^('`echo "$idlist" | tr ' ' '|'`')$'
 re=`echo "$re" | sed 's/\./\\\\./g'`
 
 ##set -x
-egrep "$re" <"$idfile" >/dev/null || exit 1
 
-echo "$HDR_MESSAGE_ID" >>"$idfile"
-exit 0
+xit=1
+for idfile
+do
+  [ -f "$idfile" ] || continue
+  if egrep "$re" "$idfile" >/dev/null
+  then
+    echo "$HDR_MESSAGE_ID" >>"$idfile"
+    xit=0
+  fi
+done
+
+exit $xit
