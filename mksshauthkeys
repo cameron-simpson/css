@@ -73,12 +73,10 @@ do
 
       fullkey=$HOME/rc/ssh/pubkeys/$key
       if [ -d "$fullkey/." ]
-      then  set x
-	    for type in rsa1 rsa dsa
+      then  for type in rsa1 rsa dsa
 	    do  keypath=$fullkey/`ssh-keyfile -p "$purpose" "$type"`.pub
-		set "$@" "$keypath"
+		[ -s "$keypath" ] && set -- "$@" "$keypath"
 	    done
-	    shift
       else  [ -s "$fullkey.pub" ] \
 	    || { echo "$cmd: missing key file: $fullkey.pub" >&2
 		 xit=1
