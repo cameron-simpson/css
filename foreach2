@@ -1,0 +1,78 @@
+#!/bin/sh
+#
+# For line of stdin, run the supplied command with the line as argument,
+# in parallel. Serialise output so it doesn't overlap.
+#	- Cameron Simpson <cs@zip.com.au> 28jul2000
+#
+
+max=4
+
+cmd=`basename "$0"`
+usage="Usage: [-1] [-i] [-n max] cmd [args...]
+	-1	Don't break input lines into words.
+	-i	Supply line as input to cmd, not argument.
+	-n max	Max number of subcommands at once. Zero means no limit.
+		Default: $max"
+
+lock=$cmd$$
+pipe=/tmp/pipe-$lock
+pipelock=pipe-$lock
+
+oneword=
+asinput=
+
+badopts=
+while :
+do  case $1 in
+	-1)	oneword=1 ;;
+	-i)	asinput=1 ;;
+	-n)	max=$2; shift ;;
+	--)	shift; break ;;
+	-?*)	echo "$cmd: unreconised option: $1" >&2; badopts=1 ;;
+	*)	break ;;
+    esac
+    shift
+done
+
+if [ $# = 0 ]
+then
+    echo "$cmd: missing cmd" >&2
+    badopts=1
+fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+mknod "$pipe" p || exit 1
+
+exec 3<"$pipe"
+exec 4>"$pipe"
+sed 1 $max >"$pipe" &
+
+n=0
+while read line
+do
+    if [ $asinput ]
+    then
+	echo "$line" | lockedoutput "$lock" "$@" &
+    else
+	if [ $oneword ]
+	then
+	    lockedoutput "$lock" "$@" "$line" &
+	else
+	    ( set x "$@" $line; shift
+	      exec lockedoutput "$lock" "$@"
+	    ) &
+	fi
+    fi
+
+    n=`expr $n + 1`
+    if [ $max -gt 0 -a $n -ge $max ]
+    then
+	wait
+	n=0
+    fi
+done
+
+wait
+
+exit 0
