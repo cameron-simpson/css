@@ -1,0 +1,24 @@
+#!/bin/sh
+#
+# Pop up translated web page.
+#	- Cameron Simpson <cs@zip.com.au> 04jun2003
+#
+
+if [ $# = 0 ]
+then
+  if [ -t 1 ]
+  then
+    set x "`xunclip`"; shift
+  else
+    echo "Usage: $0 URLs..." >&2
+    exit 2
+  fi
+fi
+
+sl=ja
+dl=en
+
+for url
+do babel='http://babelfish.altavista.com/babelfish/urltrurl?url='`qsencode "$url"`"&lp=${sl}_${dl}&tt=url"
+   us "$babel"
+done
