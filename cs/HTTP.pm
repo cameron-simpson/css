@@ -37,7 +37,7 @@ $cs::HTTP::R_ACCEPTED	='202';	# request accepted but not complete (may
 				# never be)
 $cs::HTTP::R_PARTIAL	='203';	# response is a private metaweb, not the
 				# original
-$cs::HTTP::R_NORESPONSE='204';	# request ok, but nothing to send back -
+$cs::HTTP::R_NORESPONSE ='204';	# request ok, but nothing to send back -
 				# client's browser should stay in the
 				# same spot
 #  Redirection
