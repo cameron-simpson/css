@@ -1,0 +1,43 @@
+#!/usr/bin/perl
+#
+# Read a 48x48x1 face file and write an xbm bitmap.
+#	- Cameron Simpson <cs@zip.com.au>, 15jul94
+#
+
+print <<'X'
+#define noname_width 48
+#define noname_height 48
+static char noname_bits[] = {
+X
+;
+
+$_='';
+$n=48*48;
+@h=();
+
+while ($n)
+	{ if (/^\s*(0x[0-9a-f]{4})\s*,\s*/i)
+		{ $h=hex($1); $_=$';
+		  unshift(@h,$h);
+		  $n-=16;
+		  if ($n%48 == 0)
+			{ for $h (@h)
+				{ printf("0x%02x,0x%02x",
+					$h&0x00ff,($h&0xff00)>>8);
+				}
+			  @h=();
+			}
+
+		  if ($n == 0)		{ print "};\n"; }
+		  elsif ($n%96 == 0)	{ print ",\n"; }
+		  else			{ print ','; }
+		}
+	  elsif (!defined($in=<STDIN>))
+		{ die "$0: unexpected EOF\n";
+		}
+	  else
+	  { $_.=$in;
+	  }
+	}
+
+exit 0;
