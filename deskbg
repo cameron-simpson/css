@@ -1,0 +1,34 @@
+#!/bin/sh
+#
+# Set the root background on per-desktop basis.
+#	- Cameron Simpson <cs@zip.com.au> 02feb2004
+#
+
+cmd=$0
+usage="Usage: $cmd [-d desk] imagefile"
+
+desk=
+
+badopts=
+
+[ "x$1" = x-d ] && { desk=$2; shift; shift; }
+
+if [ $# = 0 ]
+then
+    echo "$cmd: missing imagefile" >&2
+    badopts=1
+else
+    imagefile=$1; shift
+    [ $# = 0 ] || { echo "$cmd: extra arguments: $*" >&2; badopts=1; }
+fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+thisdesk=`currentdesk`
+[ -n "$desk" ] || desk=$thisdesk
+
+rootbg=`mkwall "$imagefile"` || exit 1
+desktop "$desk" rootbg "$rootbg" || exit 1
+
+# show change if not for another desk
+[ "$desk" != "$thisdesk" ] || rootbg -D "$rootbg"
