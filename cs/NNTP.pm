@@ -1,5 +1,22 @@
 #!/usr/bin/perl
 #
+# Access an NNTP service.	- Cameron Simpson <cs@zip.com.au>
+#
+
+=head1 NAME
+
+cs::NNTP - access an NNTP service
+
+=head1 SYNOPSIS
+
+use cs::NNTP;
+
+=head1 DESCRIPTION
+
+This module contacts
+and converses with an NNTP service.
+
+=cut
 
 use strict qw(vars);
 
@@ -7,6 +24,8 @@ BEGIN { use cs::DEBUG; cs::DEBUG::using(__FILE__); }
 
 use cs::Misc;
 use cs::RFC822;
+use cs::MIME;
+use cs::Source;
 use cs::Net::TCP;
 use cs::Port;
 use cs::IO;
@@ -18,11 +37,27 @@ package cs::NNTP;
 
 $cs::NNTP::Debug=exists $ENV{DEBUG_NNTP};
 
-sub new($;$)	# server -> connectionrec or undef
+=head1 OBJECT CREATION
+
+=over 4
+
+=item new(I<server>,I<needpost>)
+
+Connect to the I<server> specified.
+If omitted,
+use the value of the B<NNTPSERVER> environment variable.
+If the optional parameter I<needpost> is true,
+return B<undef> if the server refuses posting permission.
+
+=back
+
+=cut
+
+sub new($;$$)	# server -> connectionrec or undef
 { my($class,$server,$needpost)=@_;
   if (! defined $server || ! length $server)
-	{ $server=$ENV{NNTPSERVER};
-	}
+  { $server=$ENV{NNTPSERVER};
+  }
   $needpost=0 if ! defined $needpost;
 
   my $port = '';
@@ -38,9 +73,9 @@ sub new($;$)	# server -> connectionrec or undef
     my $pid = ::open3($to,$from,'>&STDERR',$subproc);
 
     if (! defined $pid)
-	  { warn "$::cmd: can't open3($subproc): $!";
-	    return undef;
-	  }
+    { warn "$::cmd: can't open3($subproc): $!";
+      return undef;
+    }
 
     $this = new cs::Port ($from,$to);
   }
@@ -97,237 +132,185 @@ sub new($;$)	# server -> connectionrec or undef
 
 sub DESTROY
 { my($this)=@_;
-  _with($this,\&_disconnect);
+  $this->Disconnect();
   $cs::NNTP::Debug && warn "closed connection to $this->{SERVER}";
 }
 
-sub _disconnect
-{ _out("quit\n");
+sub Disconnect($)
+{ shift->Put("quit\n");
 }
 
-sub Group	# (s,groupname) -> (low,high)
-{ my($s,$group)=@_;
-  &_with($s,\&_group,$group);
+sub CanPost()
+{ shift->{CANPOST};
 }
-sub _group
-{ my($group)=@_;
 
-  _out("group $group\n");
-  my($code,$text)=_reply();
+sub Group($$)
+{ my($this,$group)=@_;
 
+  my($code,$text)=$this->Command("group $group\n");
   return undef unless defined $code;
 
   if ($code =~ /^2/ && $text =~ /^\s*\d+\s+(\d+)\s+(\d+)/)
   # it worked
-  { $cs::NNTP::This->{GROUP}=$group;
+  { $this->{GROUP}=$group;
     return ($1+0,$2+0);
   }
 
-  warn "group $group: unexpected return \"$code $text\"\n";
+  warn "$::cmd: group $group: unexpected return \"$code $text\"\n";
 
-  ();
+  return ();
 }
 
 # return list of active newsgroups
-sub List
+sub List($)
 { my($this)=@_;
-  &_with($this,\&_list);
-}
-sub _list
-{ _out("LIST\n");
-  my($code,$text)=&_reply;
+
+  my($code,$text)=$this->Command("LIST\n");
 
   return undef unless defined $code;
   return undef unless $code =~ /^2/;
 
-  _text();
+  $this->Text();
 }
 
-sub Head	# (s,article-id) -> RFC822::hdr or undef
-{ my($s,$id)=@_;
+sub Head($$)
+{ my($this,$id)=@_;
 
-  &_with($s,\&_head,$id);
-}
-sub _head
-{ my($id)=@_;
-
-  _out("head $id\n");
-  my($code,$text)=&_reply;
+  my($code,$text)=$this->Command("HEAD $id\n");
 
   return undef unless defined $code;
-  return undef unless $code =~ /^2/;
+  return undef unless $code eq '221';
 
-  my($h)=new cs::RFC822;
-  my(@head)=_text();
+  my $H = new cs::RFC822;
+  my(@head)=$this->Text();
 
-  $h->ArrayExtract(@head);
+  $H->ArrayExtract(@head);
 
-  $h;
+  $H;
 }
 
-# fetch and return a multiline response
-sub Body
-{ my($s,$id)=@_;
-  my($b)='';
-  my($sink)=new cs::Sink (SCALAR,\$b);
-  &_with($s,\&_body,$id,$sink);
-}
+sub Article($$)
+{ my($this,$id)=@_;
 
-sub CanPost
-{ shift->{CANPOST};
-}
+  my($code,$text)=$this->Command("ARTICLE $id\n");
+  return undef if ! defined $code || $code ne '220';
 
-# copy a BODY (or any multiline text response)
-# directly to a cs::Sink instead of bundling it into a string
-sub CopyBody
-{ my($this,$id,$sink)=@_;
-  &_with($this,\&_body,$id,$sink);
-}
-sub _body
-{ my($id,$sink)=@_;
-
-  _out("body $id\n");
-  my($code,$text)=&_reply;
-
-  return undef unless defined $code;
-  return undef unless $code =~ /^2/;
-
-  local($_);
-
-  BODY:
-    while (defined ($_=$cs::NNTP::This->GetLine()) && length)
-	{ last BODY if /^\.\r?\n$/;
-	  s/^\.\././;
-	  $sink->Put($_);
-	}
-
-  1;
-}
-
-sub _with	# (service, coderef, @args) => &code(server-rec, args)
-{ local($cs::NNTP::This)=shift;
-  my($code,@args)=@_;
-
-  &$code(@args);
+  my $art = $this->Text();
+  new cs::MIME (new cs::Source (SCALAR, \$art));
 }
 
 # collect reply from  server, skipping info replies
-sub Reply { _with(shift,\&_reply); }
-sub _reply
-{ local($_);
+sub Reply($)
+{ my($this)=@_;
 
-  $cs::NNTP::This->Flush();
-  # warn "getting reply\n";
+  local($_);
+
+  $this->Flush();
+
   FINDREPLY:
-  do {	$_=$cs::NNTP::This->GetLine();
+  do {	$_=$this->GetLine();
 	return undef if ! defined || ! length;
 	return ($1,$2) if /^([2345][0123489]\d)\s*(.*\S?)/;
 
 	if (/^1[0123489]\d/)	# add $verbose hook later
-		{ warn "$::cmd: $_";
-		  next FINDREPLY;
-		}
+	{ warn "$::cmd: $_";
+	  next FINDREPLY;
+	}
 
 	warn "$::cmd: ignoring unexpected response from $cs::NNTP::This->{NNTPSERVER}: $_";
      }
   while (1);	# return is inside loop
 }
 
-sub Out	{ my($s)=shift; _with($s,\&_out,@_); }
-sub _out{ $cs::NNTP::This->Put(@_);
-	  # warn "_out(@_)\n";
-	}
+sub Command($$)
+{ my($this,$command)=@_;
+  $this->Put($command);
+  $this->Reply();
+}
 
 # collect a text response from the server, stripping \r?\n
-sub Text{ _with(shift,\&_text); }
-sub _text # (void) -> @lines
-{ my(@lines);
+sub Text($)
+{ my($this)=@_;
+
+  my(@lines);
   local($_);
 
-  $cs::NNTP::This->Flush();
+  $this->Flush();
 
   @lines=();
-  while (defined ($_=$cs::NNTP::This->GetLine()) && length)
-	{ last if /^\.\r?\n$/;
-	  s/^\.\././;
-	  push(@lines,$_);
-	}
+  while (defined ($_=$this->GetLine()) && length)
+  { last if /^\.\r?\n$/;
+    s/^\.\././;
+    push(@lines,$_);
+  }
 
   wantarray ? @lines : join('',@lines);
 }
 
 # post a complete article contained in a file
-sub PostFile
+sub PostFile($$)
 { my($this,$fname)=@_;
-  my($s);
 
-  $s=new cs::Source PATH, $fname;
+  my $s = new cs::Source PATH, $fname;
   return undef if ! defined $s;
 
-  _with($this,\&_post,$s);
+  $this->PostSource($s);
 }
 
-sub Post
+sub PostSource($$)
 { my($this,$s)=@_;
 
-  _with($this,\&_post,$s);
-}
-
-sub _post
-{ my($s)=@_;
-  my($text);
-  local($_);
-
-  if (! $cs::NNTP::This->{CANPOST})
-  { warn "posting forbidden on $cs::NNTP::This->{NNTPSERVER}\n";
+  if (! $this->CanPost())
+  { warn "$::cmd: posting forbidden\n";
     return 0;
   }
 
-  _out("post\n");
-  ($_,$text)=&_reply;
+  my($code,$text)=$this->Command("POST\n");
 
-  if (! defined)
-	{ warn "unexpected EOF from $cs::NNTP::This->{NNTPSERVER} server\n";
-	  return 0;
-	}
+  if (! defined $code)
+  { warn "$::cmd: unexpected EOF\n";
+    return 0;
+  }
 
-  if ($_ eq '440')
-	{ warn "posting forbidden on $cs::NNTP::This->{NNTPSERVER}\n";
-	  return 0;
-	}
+  if ($code eq '440')
+  { warn "$::cmd: posting forbidden\n";
+    return 0;
+  }
 
   my($inhdrs,$hadfrom)=(1,0);
 
+  local($_);
+
   while (defined ($_=$s->GetLine()) && length)
-	{ if ($inhdrs)
-		{ if (/^\r?\n$/)
-			{ $inhdrs=0;
-			  if (! $hadfrom)
-				{ my($login)=scalar getpwuid($>);
-				  _out("From: $login\@research.canon.com.au\n");
-				}
-			}
-		  elsif (/^from:/i)
-			{ $hadfrom=1;
-			}
-		}
-
-	  _out('.') if /^\./;
-	  _out($_);
+  { if ($inhdrs)
+    { if (/^\r?\n$/)
+      { $inhdrs=0;
+	if (! $hadfrom)
+	{ my($login)=scalar getpwuid($>);
+	  $this->Put("From: $login\@research.canon.com.au\n");
 	}
+      }
+      elsif (/^from:/i)
+      { $hadfrom=1;
+      }
+    }
 
-  _out(".\n");
+    $this->Put(".") if /^\./;
+    $this->Put($_);
+  }
 
-  ($_,$text)=&_reply;
+  $this->Put(".\n");
 
-  if (! defined)
-	{ warn "unexpected EOF from $cs::NNTP::This->{NNTPSERVER}\n";
-	  return 0;
-	}
+  ($code,$text)=$this->Reply();
 
-  return 1 if $_ eq '240';
+  if (! defined $code)
+  { warn "$::cmd: unexpected EOF\n";
+    return 0;
+  }
 
-  warn "$cs::NNTP::This->{NNTPSERVER}: $_ $text\n";
+  return 1 if $code eq '240';
+
+  warn "$::cmd: $_ $text\n";
 
   0;
 }
