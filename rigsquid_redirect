@@ -11,15 +11,19 @@ force=
 [ "x$1" = x-f ] && { force=1; shift; }
 
 pidf=$HOME/var/run/squid.pid
-if [ -s "$pidf" ] && sqpid=`cat "$pidf"` && kill $sqpid \
+dowait=
+if [ -s "$pidf" ] && sqpid=`cat "$pidf"` && kill $sqpid && dowait=1 \
 || [ $force ]
 then
-    necho "waiting for old squid to die (30 secs)"
-    sleep 1
-    while kill -0 "$sqpid" 2>/dev/null
-    do  necho .; sleep 1
-    done
-    echo
+    if [ $dowait ]
+    then
+      necho "waiting for old squid to die (30 secs)"
+      sleep 1
+      while kill -0 "$sqpid" 2>/dev/null
+      do  necho .; sleep 1
+      done
+      echo
+    fi
     ##exec alog squid_redirect squid_redirect -P "8080:$SQUID"
     rc=$HOME/tmp/squid.conf$$
     envsub -p '\{\{([A-Z]\w*)\}\}' <$HOME/rc/squid/tplt >$rc
