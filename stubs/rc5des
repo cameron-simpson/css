@@ -6,7 +6,7 @@
 
 dir=$HOME/etc/rc5des
 base=rc5des
-exe=$BIN/$base
+exe=$HOME/bin/$ARCH/$base
 ini=$base.ini
 lock=$base@$HOST.$SYSTEMID
 
