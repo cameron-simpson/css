@@ -1,0 +1,2 @@
+#!/bin/sh
+exec bzip2 -z -v -9 --repetitive-best ${1+"$@"}
