@@ -10,7 +10,10 @@
 h
 y/ABCDEFGHIJKLMNOPQRSTUVWXYZ/abcdefghijklmnopqrstuvwxyz/
 /^newsgroups:/!b lc
-s/^newsgroups:/To:/
+g
+s/^/X-Original-/
+h
+s/^[^:]*:/To:/
 s/,/@usenet,/g
 s/$/@usenet/
 G
