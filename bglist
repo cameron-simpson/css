@@ -13,13 +13,11 @@ forcefind=
 wide=
 ignfile=.bgignore
 ignlist=
-ptn=
-ptnnot=
+gotptns=
 
 cmd=$0
-usage="Usage: $cmd [-f] [-r] [-p ptn] [-i igndirs] [-I ignfile] [-n count] [directories...]
+usage="Usage: $cmd [-f] [-r] [-i igndirs] [-I ignfile] [-n count] [ptns... [-- directories...]]
 	-f	Use find(1) even if there is an INDEX file.
-	-p ptn	Select only files matching the regexp ptn.
 	-i igndirs A space separated list of directories to ignore.
 	-I ignfile A file containing directories to ignore, one per line.
 		Default: $ignfile
@@ -31,13 +29,12 @@ badopts=
 while :
 do  case $1 in
       -f)	forcefind=1 ;;
-      -p)	ptn=$2; shift ;;
       -i)	ignlist="$ignlist $2"; shift ;;
       -I)	ignfile=$2; shift ;;
       -r)	random=1 ;;
       -n)	n=$2; shift ;;
       -w)	wide=1 ;;
-      --)	shift; break ;;
+      --)	gotptns=1; shift; break ;;
       -?*)	echo "$cmd: unrecognised option: $1" >&2
 		badopts=1
 		;;
@@ -48,17 +45,20 @@ done
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
-[ $# = 0 ] && { set x `bgdirs`; shift; }
+ptns=
 
-case $ptn in
-    !*)	ptnnot=-v
-	ptn=`expr "x$ptn" : 'x!\(.*\)'`
-	;;
-esac
-case $ptn in
-    /*/)	ptn=`expr "x$ptn" : '..\(.*\).'` ;;
-    /*)		ptn=`expr "x$ptn" : '..\(.*\)'` ;;
-esac
+if [ -z "$gotptns" ]
+then
+    while [ $# -gt 0 ]
+    do  case "$1" in
+	  --)	gotptns=1; shift; break ;;
+	  *)	ptns="$ptns '$1'"; shift ;;
+	esac
+    done
+fi
+
+# no dirs?
+[ $# = 0 ] && { set x `bgdirs`; shift; }
 
 [ -s "$ignfile" ] && ignlist="$ignlist "`cat "$ignfile"`
 ignargs=
@@ -67,7 +67,7 @@ do  ignargs="$ignargs -o -name $igndir"
 done
 
 filter=cat
-[ -n "$ptn" ] && filter="egrep $ptnnot \"\$ptn\" | $filter"
+[ -n "$ptns" ] && filter="ga $ptns | $filter"
 [ $random ] && filter="$filter | shuffle"
 [ "x$n" = x0 ] || filter="$filter | sed '${n}q'"
 [ $wide ] && filter="$filter | grepwideimg"
