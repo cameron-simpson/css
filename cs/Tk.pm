@@ -15,9 +15,11 @@ package cs::Tk;
 
 @cs::Tk::ISA=qw(MainWindow);
 
+undef $cs::Tk::_mainWin;
+
 sub mainWindow
-{ my $mw = MainWindow->new(@_);
-  bless $mw, cs::Tk;
+{ $cs::Tk::_mainWin = MainWindow->new(@_);
+  bless $cs::Tk::_mainWin, cs::Tk;
 }
 
 sub _widget
