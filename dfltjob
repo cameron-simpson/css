@@ -1,0 +1,3 @@
+#!/bin/sh
+{ job=`deskjob` && isjob "$job"; } || job=idle
+echo "$job"
