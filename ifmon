@@ -1,0 +1,64 @@
+#!/usr/bin/perl
+#
+# Monitor throughput on the named interfaces.
+# Linux specific, alas, since it uses the /proc/net/dev file.
+#	- Cameron Simpson <cs@zip.com.au> 22may2002
+#
+
+use cs::Upd;
+use cs::Units;
+
+my $interval = 5;
+my $repeats = 0;
+
+my %ifb;
+my %oifb;
+
+my $start=time;
+my $now;
+my $elapsed;
+
+my $Bps;
+
+while ($repeat == 0 || $repeat-- > 0)
+{
+  $now=time;
+  $elapsed=$now-$start;
+
+  readnet();
+  for my $if (@ARGV ? @ARGV : sort keys %ifb)
+  {
+    if ($elapsed == 0)
+    { $oifb{$if}=$ifb{$if};
+    }
+    else
+    { $Bps=cs::Units::bytes2human(($ifb{$if}-$oifb{$if})/$elapsed,1)."/s average";
+      printf("%-5s: %s\n",$if,$Bps);
+    }
+  }
+
+  sleep($interval);
+}
+
+sub readnet
+{
+  if (! open(PNDEV, "< /proc/net/dev"))
+  { die "$::cmd: can't open /proc/net/dev: $!\n";
+  }
+
+  <PNDEV> || die "$::cmd: unexpected EOF";
+  <PNDEV> || die "$::cmd: unexpected EOF";
+
+  local($_);
+  undef %ifb;
+
+  while (defined($_=<PNDEV>))
+  { chomp;
+    if (/^\s*([a-z]\w*):\s*(\d+)/)
+    { $ifb{$1}=$2;
+    }
+    else
+    { warn "$::cmd: line $.: bad format:\n\t$_";
+    }
+  }
+}
