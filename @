@@ -59,18 +59,6 @@ do
     root@*)
 	exec root@ $sshopts "$host"
 	;;
-    screen:root@*)
-	name=`expr "$host" : 'screen:\(.*\)'`
-	host=`expr "$name" : 'root@\(.*\)'`
-	exec term -e scr "$name" nox root@ $sshopts "$host"
-	;;
-    screen:*)
-	host=`expr "$host" : 'screen:\(.*\)'`
-	exec rterm "$host" -s $sshopts
-	;;
-    rita)
-	rdesktop -g "${X11_BGX}x${X11_Y}" -K -T "$host rdesktop" "$host" &
-	;;
     *)	exec rterm "$host" $sshopts
 	;;
   esac
