@@ -4,8 +4,25 @@
 #	- Cameron Simpson <cs@zip.com.au> 06jul2004
 #
 
+###########################################
+# CONDITIONS
+#
+
 # ISCURRENT(START_FIELD,END_FIELD,WHEN)
 #
 s/{{ISCURRENT}}/{{ISCURRENT(START_DATE,END_DATE)}}/g
 s/{{ISCURRENT(\([^,]*\),\([^,]*\))}}/{{ISCURRENT(START_DATE,END_DATE,CURDATE())}}/g
 s/{{ISCURRENT(\([^,]*\),\([^,]*\),\([^,]*\))}}/((ISNULL(\1) OR \1 <= \3) AND (ISNULL(\2) OR \2 > \3))/g
+
+# presence of flag in SET
+s/{{HASFLAG(\([^)]*\))}}/FIND_IN_SET("\1",FLAGS)/g
+
+# check for emptiness handling NULL and empty string
+s/{{EMPTY(\([^)]*\))}}/(ISNULL(\1) OR LENGTH(\1) = 0)/g
+
+##########################################
+# FIELD DEFINITIONS IN TABLE CREATE
+#
+s/{{DATED_FIELDS}}/START_DATE DATE, END_DATE DATE/g
+s/{{IMAGE_FIELDS}}/WIDTH INT, HEIGHT INT/g
+s/{{ID_FIELDS}}/ID INT(10) UNSIGNED AUTO_INCREMENT PRIMARY KEY/g
