@@ -1,2 +1,14 @@
 #!/bin/sh
-awk '$1 == "server" { print $2 }' /etc/ntp.conf | hostips
+#
+# Read ntp.conf, recite IP addresses of servers.
+#	- Cameron Simpson <cs@zip.com.au>
+#
+
+for name in `awk '$1 == "server" { print $2 }' /etc/ntp.conf`
+do  case "$name" in
+      *[^0-9.]* | *.*.*.*.* )
+		echo "$name" | hostips ;;
+      *.*.*.*)	echo "$name" ;;
+      *)	echo "$name" | hostips ;;
+    esac
+done
