@@ -1,0 +1,66 @@
+#!/bin/sh
+#
+# Connect to our Cyclades console server.
+#	- Cameron Simpson <cs@zip.com.au> 18dec2002
+#
+
+cychost=${CYCLADES_HOSTNAME:-hydra}
+cycuser=${USER:-`id -un`}
+
+cmd=`basename "$0"`
+usage="Usage: $cmd [-h host] [-l user] port
+	-h host	Specify Cyclades host (from \$CYCLADES_HOSTNAME, default: $cychost).
+	-l user	Specify user name (from \$USER, default $cycuser)."
+
+badopts=
+
+while :
+do  case $1 in
+        -h)	cychost=$2; shift ;;
+	-l)	cycuser=$2; shift ;;
+	--)	shift; break ;;
+	-?*)	echo "$cmd: unrecognised option: $1" >&2
+		badopts=1 ;;
+	*)	break ;;
+    esac
+    shift
+done
+
+if [ $# = 0 ]
+then
+    echo "$cmd: missing port" >&2
+    badopts=1
+else
+    cycport=$1; shift
+    [ $# = 0 ] || { echo "$cmd: extra arguments: $*" >&2
+		    badopts=1
+		  }
+fi
+
+session=$cycport
+
+portmap=/u/network/cyclades/map-$cychost
+exec 3<&0 0<$portmap
+
+session=
+while read port title
+do
+  if [ "x$port" = "x$cycport" -o "x$title" = "x$cycport" ]
+  then	cycport=`expr 7000 + $port`
+	session=$title
+	break
+  fi
+done
+exec <&3 3<&-
+
+[ -n "$session" ] || { echo "$cmd: no port mapping matching \"$cycport\" in $portmap" >&2
+		       badopts=1
+		     }
+session=cyclades-$cychost/$session
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+set -x
+exec scrif "$session" \
+	logscript "$session" \
+	ssh -l "$cycuser:$cycport" "$cychost"
