@@ -4,4 +4,4 @@
 #	- Cameron Simpson <cs@zip.com.au> 14dec2000
 #
 
-envssh -n zip 'set-x egrep -i "^(from|subject):" "$MAIL"'
+exec ssh -n zip 'exec rigrenv set-x egrep -i "^(from|subject):" "$MAIL"'
