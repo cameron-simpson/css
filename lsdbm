@@ -1,0 +1,36 @@
+#!/usr/bin/perl
+
+($cmd=$0) =~ s:.*/::;
+
+$long=0;
+if ($ARGV[$[] eq '-l')
+	{ $long=1;
+	  shift;
+	}
+
+$xit=0;
+
+DBM:
+  for (@ARGV)
+	{ if (!dbmopen(DBM,$_,0666))
+		{ print STDERR "$cmd: can't dbmopen($_): $!\n";
+		  $xit=1;
+		  next DBM;
+		}
+
+	  if ($#ARGV > $[)
+		{ print $_, ":\n";
+		}
+
+	  for $key (keys %DBM)
+		{ print $key;
+
+		  if ($long)
+			{ print ' -> ', $DBM{$key};
+			}
+
+		  print "\n";
+		}
+	}
+
+exit $xit;
