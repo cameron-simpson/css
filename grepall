@@ -4,7 +4,9 @@
 #	- Cameron Simpson <cs@zip.com.au> 12nov2001
 #
 
-[ $# = 0 ] && { echo "Usage: $0 regexps..." >&2; exit 2; }
+cmd=$0
+
+[ $# = 0 ] && { echo "Usage: $cmd regexps..." >&2; exit 2; }
 
 ok=1
 
