@@ -617,14 +617,17 @@ sub Request($$;$$$)
     }
   }
 
+  my $rquri = $uri;
+  $rquri =~ s:\s:sprintf("%%%02x",ord($&)):eg;
+
   ############################
   # Supply request and headers.
   $this->Put("$method "
 	    .($this->{cs::HTTP::ISPROXY}
-		? $uri
+		? $rquri
 		: $U->LocalPart())
 	    ." $version\r\n");
-  $cs::HTTP::Debug && warn "HTTP: $method $uri $version";
+  (1||$cs::HTTP::Debug) && warn "HTTP: $method $rquri $version";
 
   $rqhdrs->WriteItem($this->Sink());
   $cs::HTTP::Debug && warn "HTTP: ".cs::Hier::h2a($rqhdrs,1);
