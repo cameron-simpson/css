@@ -71,7 +71,8 @@ case "$saveas" in
     \~*)	saveas=`untilde "$saveas"` ;;
     *)		saveas=$savedir/$saveas ;;
 esac
-case $svaeas in
+case $saveas in
+    '')		;;
     */)		saveas=$saveas$fbase ;;
     *)		[ -d "$saveas/." ] && saveas=$saveas/$fbase ;;
 esac
