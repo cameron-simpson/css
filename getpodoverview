@@ -1,0 +1,44 @@
+#!/bin/sh
+#
+# Extract Overview paragraph from POD document, optionally HTMLise it.
+#	- Cameron Simpson <cs@zip.com.au> 01jul2003
+#
+
+cmd=$0
+usage="Usage: $cmd [-html] [file]"
+
+dohtml=
+[ "x$1" = x-html ] && { dohtml=1; shift; }
+
+if [ $# -gt 1 ]
+then
+    echo "$usage" >&2
+    exit 2
+fi
+
+overview=`sed -n -e '1,/^=head2 Overview/d; :para; n; /^$/q; p; b para' ${1+"$@"}`
+if [ -n "$overview" ]
+then
+    necho "<SPAN CLASS=\"overview-para\"><BR><SMALL>"
+    ( echo "=for html"
+      echo
+      echo "$overview"
+      echo
+    ) \
+    | if [ $dohtml ]
+      then
+	pod2html "--title=$indextitle" - \
+	| sed -n '1,/^<!-- INDEX END -->/d
+		/^<p>/b para
+		d
+		:para
+		p
+		/<\/p>$/q
+		n
+		b para' \
+	| sed -e 's/^<p>//' -e 's/<\/p>$//'
+      fi
+    echo "</SMALL></SPAN>"
+else
+    echo "$overview"
+fi
