@@ -95,7 +95,6 @@ totallen=0
 discidqry=
 while read tn len offset
 do  set ${1+"$@"} "$offset"
-    discidqry="$discidqry $offset"
     totallen=`expr $totallen + $len`
     [ $# = $tn ] || { echo "$cmd: bad track number $tn: expected $#" >&2
 		      exit 1
@@ -104,27 +103,6 @@ done
 
 # restore stdin
 exec 0<&3 3<&-
-
-# obtain discid by asking the CDDB
-cddbhost=cddb
-cddbport=888
-case "$CDDBSERVER" in
-    *:*)	cddbhost=`expr "x$CDDBSERVER" : 'x\(.*\):.*'`
-    		cddbport=`expr "x$CDDBSERVER" : 'x.*:\(.*\)'`
-		;;
-esac
-discidqry="DISCID $# $discidqry $totallen"
-odiscid=$discid
-discid=`
-	( echo "CDDB HELLO $USER $HOSTNAME $cmd $version"
-	  echo "$discidqry"
-	  echo "QUIT"
-	) | nc "$cddbhost" "$cddbport" | tr -d '\\015' | sed -n 's/^200 Disc ID is \\([0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f]\\)/\\1/p'
-       `
-case "$discid" in
-    [0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f]) ;;
-    *)	echo "$cmd: invalid discid \"$discid\"" >&2; exit 1 ;;
-esac
 
 # construct description file
 if [ $doedit ]
