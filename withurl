@@ -6,7 +6,7 @@
 
 cmd=`basename "$0"`
 usage="Usage: $cmd [-1] [-end] [-c] [-h] URL command [args...]
-	-1, -end Passed to witharg.
+	-1, -end Passed to arg1.
 	-c	Cache the fetched URL.
 	-C	Cache the fetched URL; skip fetch if already cached.
 	-h	Passed to httpget."
@@ -14,12 +14,12 @@ usage="Usage: $cmd [-1] [-end] [-c] [-h] URL command [args...]
 htopts=
 docache=
 trustcache=
-witharg=
+arg1opts=
 
 badopts=
 while :
 do  case $1 in
-      -1|-end)	witharg="$witharg $1" ;;
+      -1|-end)	arg1opts="$arg1opts $1" ;;
       -c)	docache=1 trustcache= ;;
       -C)	docache=1 trustcache=1 ;;
       -h)	htopts="$htopts $1" ;;
@@ -71,7 +71,7 @@ then  :
 else  httpget -f -o "$saveas" "$url" || exit 1
 fi
 
-env "WITHURL_URL=$url" "WITHURL_FILE=$saveas" witharg $witharg "$saveas" "$@"
+env "WITHURL_URL=$url" "WITHURL_FILE=$saveas" arg1 $arg1opts -- "$saveas" "$@"
 xit=$?
 
 exit $xit
