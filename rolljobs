@@ -1,0 +1,32 @@
+#!/bin/sh
+#
+# Roll job times over. Run a report to stdout.
+#	- Cameron Simpson <cs@zip.com.au> 29jul2003
+#
+
+cmd=`basename "$0"`
+usage="Usage: $cmd"
+
+[ $# = 0 ] || { echo "$usage" >&2; exit 2; }
+
+wkdir=$HOME/var/idsets/$SYSTEMID
+cd "$wkdir" || exit 1
+
+current=$wkdir/timer
+[ -d "$current/." ] || { echo "$cmd: no current timers! ($current)" >&2; exit 1; }
+
+saved=$current-`daycode`
+
+[ -d "$saved/." ] && { echo "$cmd: $saved: already exists" >&2; exit 1; }
+
+oldjob=`job`	|| { echo "$cmd: can't find current job" >&2; exit 1; }
+job timekeeping	|| { echo "$cmd: can't switch to \"timekeeping\"" >&2; exit 1; }
+
+cpdir "$current" "$saved" || exit 1
+
+jobreport
+for total in "$current/"*/total
+do  [ -s "$total" ] && echo 0 >"$total"
+done
+
+job "$oldjob"
