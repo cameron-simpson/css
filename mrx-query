@@ -37,7 +37,7 @@ fi
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
-[ -n "$folders" ] || folders=`echo "$MAILDIR"/* "$MAILDIR/SAVED/"*`
+[ -n "$folders" ] || folders=`echo "$MAILDIR"/* "$MAILDIR"/[A-Z]*/*`
 
 xit=0
 
