@@ -1,5 +1,7 @@
 #!/bin/sh
 
+: ${LOGDIR:=$HOME/var/log}
+
 cmd=$0
 [ $# = 1 ] || { echo "Usage: $cmd remote_host" >&2; exit 2; }
 remote=$1; shift
@@ -7,8 +9,9 @@ remote=$1; shift
 [ -n "$DISPLAY" ] || { echo "$cmd: no \$DISPLAY!" >&2; exit 1; }
 
 exec ssh -X "$remote" \
-	"[ -d \$HOME/var/log/. ] || mkdir -p \$HOME/var/log
-	 exec >>\$HOME/var/log/console 2>&1
+	"LOGDIR=\$HOME/var/log; export LOGDIR
+	"[ -d \$LOGDIR/. ] || mkdir -p \$LOGDIR
+	 exec >>\$LOGDIR/console 2>&1
 	 set -vx
 	 XSESSIONMODE=remote
 	 XSESSIONMODE_WM=no
