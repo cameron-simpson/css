@@ -1,6 +1,5 @@
 #!/bin/sh
 #
-
 # =head1 NAME
 #
 # mkiso - construct an ISO9660 CD image for burning a data CD
@@ -26,7 +25,7 @@
 # is normally taken from the file B<LABEL> in the top of the I<directory>.
 # (This is because I like my data sets self describing,
 # an having such a file is the simplest method not needing any metadata).
-# alternatively you may supply the Volume Identifier
+# Alternatively you may supply the Volume Identifier
 # on the command line with this option.
 #
 # =item B<-o> B<I<image>.iso>
