@@ -332,7 +332,7 @@ sub Drive($;$)
 
 =head1 SEE ALSO
 
-cs::Legato::Networker
+cs::Legato::Networker(3)
 
 =head1 AUTHOR
 
