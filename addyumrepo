@@ -9,12 +9,13 @@
 yumdir=/etc/yum.repos.d
 
 cmd=`basename "$0"`
-usage="Usage: $cmd reponame URL [param=value...]"
+usage="Usage: $cmd reponame baseurl [param=value...]"
 
 nl='
 '
 
 badopts=
+repo=
 repo_name=
 repo_enabled=enabled=1
 repo_gpgcheck=gpgcheck=0
@@ -27,12 +28,12 @@ else
   repo=$1; shift
   if [ $# = 0 ]
   then
-    echo "$cmd: missing URL" >&2
+    echo "$cmd: missing baseurl" >&2
     badopts=1
   else
-    url=$1; shift
+    baseurl=$1; shift
 
-    repo_params=baseurl=$url
+    repo_params=baseurl=$baseurl
     while [ $# -gt 0 ]
     do
       case "$1" in
@@ -57,25 +58,31 @@ else
   fi
 fi
 
-repofile=$yumdir/$repo
-if [ -s "$repofile" ]
+if [ -n "$repo" ]
 then
-  echo "$cmd: $repofile already exists" >&2
-  badopts=1
+  repofile=$yumdir/$repo.repo
+  if [ -s "$repofile" ]
+  then
+    echo "$cmd: $repofile already exists" >&2
+    badopts=1
+  fi
 fi
 
-if [ -z "$repo_name" ]
+if [ -z "$badopts" ]
 then
-  [ -t 0 -a -t 1 ] || { echo "$cmd: can't prompt for repo name: stdin and stdout should be terminals" >&2
-			badopts=1
-		      }
-  title=`readline "repo title> "` || exit 1
-  if [ -z "$title" ]
+  if [ -z "$repo_name" ]
   then
-    echo "$cmd: empty title rejected" >&2
-    badopts=1
-  else
-    repo_name=name=$title
+    [ -t 0 -a -t 1 ] || { echo "$cmd: can't prompt for repo name: stdin and stdout should be terminals" >&2
+			  badopts=1
+			}
+    title=`readline "repo title> "` || exit 1
+    if [ -z "$title" ]
+    then
+      echo "$cmd: empty title rejected" >&2
+      badopts=1
+    else
+      repo_name=name=$title
+    fi
   fi
 fi
 
@@ -83,7 +90,7 @@ fi
 
 tmpf=$TMPDIR/$cmd.$$
 
-echo "[$name]
+echo "[$repo]
 $repo_name
 $repo_params
 $repo_enabled
