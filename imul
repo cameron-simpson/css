@@ -115,11 +115,11 @@ while (defined($_=<STDIN>))
     else
     { my($x,$y)=(xval(shift(@args)),yval(shift(@args)));
       my $txt = "@args";
-      my $dx = length($txt)*$fwidth;
-      my $dy = $fheight;
+      my $dx = length($txt)*$fwidth+4;
+      my $dy = $fheight+4;
 
       if (! $mapmode)
-      { $im->filledRectangle($x-4,$y-4,$x+4,$y+4,$border);
+      { $im->filledRectangle($x-2,$y-2,$x+2,$y+2,$border);
       }
 
       if ($hint eq 'C')	{ $x-=$dx/2; $y-=$dy/2; }
@@ -132,10 +132,10 @@ while (defined($_=<STDIN>))
       elsif ($hint eq 'NW'){ $x-=$dx; $y-=$dy; }
       elsif ($hint eq 'SW'){ $x-=$dx; }
 
-      my $x1=$x-1;
-      my $y1=$y-1;
-      my $x2=$x+$dx+1;
-      my $y2=$y+$dy+1;
+      my $x1=$x;
+      my $y1=$y;
+      my $x2=$x+$dx;
+      my $y2=$y+$dy;
 
       if ($mapmode)
       { my $txtval = "$mapcgi?$txt";
@@ -143,9 +143,10 @@ while (defined($_=<STDIN>))
         print "<AREA ALT=\"$txt\" COORDS=\"$x1,$y1,$x2,$y2\" HREF=\"$txtval\" SHAPE=\"RECTANGLE\"></AREA>\n";
       }
       else
-      { $im->filledRectangle($x1,$y1,$x2,$y2,$bg);
-        $im->rectangle($x1-1,$y1-1,$x2+1,$y2+1,$border);
-	$im->string($font,$x1+1,$y1+1,$txt,$fg);
+      {
+	$im->rectangle($x1,$y1,$x2,$y2,$border);
+        $im->filledRectangle($x1+1,$y1+1,$x2-1,$y2-1,$bg);
+	$im->string($font,$x1+2,$y1+2,$txt,$fg);
       }
     }
   }
