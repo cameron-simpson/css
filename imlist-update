@@ -13,11 +13,15 @@ use Image::Size;
 my $upd = -t STDOUT;
 my $indexfile = "INDEX";
 my $mode = APPEND;
+my @exts = (JPG,PNG,GIF);
 
-$::Usage="Usage: $::cmd [-apu] [-f file] [{-|dirs...}]
+$::Usage="Usage: $::cmd [-apu] [-e exts] [-f file] [{-|dirs...}]
 	-a	Append mode - just append to the existing list.
 	-p	Prune mode - drop images from the list now missing or empty.
 	-u	Update mode - update the size data for existing list.
+		Default mode: $mode
+	-e exts	Comma separated list of case insensitive file extensions.
+		Default: @exts
 	-f file	Index filename. Default: $indexfile
 		\"-\" means just write the index data to stdout.
 	Saying \"-\" instead of dirs... reads paths from stdin.
@@ -26,15 +30,19 @@ $::Usage="Usage: $::cmd [-apu] [-f file] [{-|dirs...}]
 { my $badopts=0;
   my %opt;
 
-  if (! getopts('apuf:',\%opt))
+  if (! getopts('apuef:',\%opt))
   { warn "$::cmd: bad options\n";
     $badopts=1;
   }
 
-  if (defined $opt{'a'})	{ $mode=APPEND; }
-  if (defined $opt{'p'})	{ $mode=PRUNE; }
-  if (defined $opt{'u'})	{ $mode=UPDATE; }
-  if (defined $opt{'f'})	{ $indexfile=$opt{'f'}; }
+  if ($opt{'a'})	{ $mode=APPEND; }
+  if ($opt{'p'})	{ $mode=PRUNE; }
+  if ($opt{'u'})	{ $mode=UPDATE; }
+  if (defined $opt{'e'}){ @exts=map(uc,grep(length,split(/[,\s]+/,$opt{'e'})));
+			  die "$::cmd: can't have an empty extension list!"
+				if ! @exts;
+			}
+  if (defined $opt{'f'}){ $indexfile=$opt{'f'}; }
 
   if (! @ARGV)
   { @ARGV=('.');
@@ -53,12 +61,19 @@ $::Usage="Usage: $::cmd [-apu] [-f file] [{-|dirs...}]
 
 my @stdin=();
 
+nl("read new image list ...") if $upd;
+INPUT:
 while (defined($_=<STDIN>))
 {
   chomp;
+  next INPUT unless /\.([^.\/]+)$/;	# skip stuff with no extension
+  my $ext = uc($1);
+  next INPUT unless grep($_ eq $ext, @exts); # skip unsupported extensions
+  out($_) if $upd;
   push(@stdin,$_);
 }
-close(STDIN);
+##close(STDIN); # trips "STDIN reopened" warning later:-(
+out('') if $upd;
 
 if (! @stdin)
 { nl("no new files") if $upd;
@@ -96,6 +111,7 @@ if ($mode ne APPEND && $indexfile ne '-')
       $::IMY{$impath}=$y;
     }
     close(INDEX);
+    out('') if $upd;
   }
   else
   { my $err = "$!";
@@ -138,6 +154,7 @@ for my $impath (@stdin)
 }
 out('') if $upd;
 
+out("update $indexfile ...") if $upd;
 if ($indexfile eq '-')
 { if (!open(INDEX,">&STDOUT"))
   { die "$::cmd; dup(STDOUT,INDEX): $!";
