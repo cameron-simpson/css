@@ -109,8 +109,10 @@ rootbg=`mkwall "$imagefile"` || exit 1
 	    -root \
 	    ${1+"$@"}
   else
-    exec fvwm-root --retain-pixmap "$rootbg"
-  fi
+    fvwm-root --retain-pixmap "$rootbg"
+  fi \
+  && fvwmcmd 'setenv XSESSIONBG pixmap'	# make new terms be transparent
+  exit
 ) &
 
 [ $sync ] && wait
