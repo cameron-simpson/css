@@ -65,7 +65,7 @@ done
 wait
 cvsmsg=${CVSEDIT_MSG:-"new ssh keys from $cvshostnames"}
 
-cvsedit -1 -m "$cvsmsg" ssh_known_hosts1 mergesshkeys $LOCALDOMAINS <"$keys-rsa1"	|| exit 1
-cvsedit -1 -m "$cvsmsg" ssh_known_hosts2 mergesshkeys $LOCALDOMAINS <"$keys-rsa"	|| exit 1
-cvsedit -1 -m "$cvsmsg" ssh_known_hosts2 mergesshkeys $LOCALDOMAINS <"$keys-dsa"	|| exit 1
+cvsedit -0 -m "$cvsmsg" ssh_known_hosts1 mergesshkeys $LOCALDOMAINS <"$keys-rsa1"	|| exit 1
+cvsedit -0 -m "$cvsmsg" ssh_known_hosts2 mergesshkeys $LOCALDOMAINS <"$keys-rsa"	|| exit 1
+cvsedit -0 -m "$cvsmsg" ssh_known_hosts2 mergesshkeys $LOCALDOMAINS <"$keys-dsa"	|| exit 1
 cvsedit -f -m "$cvsmsg" ssh_known_hosts_all cat ssh_known_hosts1 ssh_known_hosts2	|| exit 1
