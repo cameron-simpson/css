@@ -672,12 +672,9 @@ sub _getSearchEngineTable($$)
 		  'submit4.y'	=> 1,
 		},
 		],
-	MOVIETITLES =>
-		[ 'http://us.imdb.com/Tsearch',
-	  	{ 'title'	=> $query,
-		  'restrict'	=> 'Movies and TV',
-		  'submit4.x'	=> 1,
-		  'submit4.y'	=> 1,
+	IMDB =>
+		[ 'http://us.imdb.com/find',
+		{ 'q'		=> "$query;tt=on;nm=on;mx=$maxhits",
 		},
 		],
 	EZYDVD =>	[ 'http://www.ezydvd.com.au/mech/search.zml',
