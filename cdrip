@@ -100,36 +100,30 @@ cdtoc "$dev" \
 	  fi
 
 	  ls -ld "$raw"
-	  ( dolock=
-	    [ -n "$lock" ] && { linkraw=.raw$$
-				ln "$raw" "$linkraw"	## link to conservative name
-				dolock="alog cdrip lock $lock rmafter $linkraw nice"
-			      }
-
-	    if case $enc in
+	  ( if case $enc in
 		ogg)
 		  # This fiddling is because oggenc blows up with long comments.
 		  commentf=.tmp$$c
 		  [ -n "$xtra" ] && echo "$xtra" >"$commentf"
 		  echo "$ripcomment" >>"$commentf"
 
-		  echo 
-		  ( set $dolock oggenc -r -b $bps \
+		  set oggenc -r -b $bps \
 			 -a "$artist" -N "$track" -t "$title" -l "$album"
-		    while read -r comment
-		    do  [ -n "$comment" ] && set "$@" -c "$comment"
-		    done <$commentf
-		    set "$@" -o "$out" "$linkraw"
-		    set -x
-		    exec "$@"
-		  )
+
+		  while read -r comment
+		  do  [ -n "$comment" ] && set "$@" -c "$comment"
+		  done <$commentf
 		  rm "$commentf"
+
+		  set "$@" -o "$out" "$raw"
 		  ;;
 		mp3)
-		  ( set -x; exec $dolock lame -r -b "$bps" -h -p "$raw" "$out" )
+		  set lame -r -b "$bps" -h -p "$raw" "$out"
 		  ;;
 	      esac
-	    then rm "$raw"
+	      [ -n "$lock" ] && set alog cdrip lock $lock rmafter "$raw" nice "$@"
+	      ( set -x; exec "$@" )
+	    then :
 	    else echo "Encode of \"$raw\" fails." >&2
 		 rm -f "$out"; exit 1
 	    fi
