@@ -1,0 +1,59 @@
+#!/usr/bin/perl
+#
+
+use strict qw(vars);
+
+use cs::Hier;
+use cs::Sink;
+use cs::Source;
+use cs::Persist;
+
+exit main(@ARGV);
+
+sub main
+	{ my(@ARGV)=@_;
+
+	  die "Usage: $0 dbpath\n" if @ARGV != 1;
+
+	  my($path)=@ARGV;
+	  my($db)=cs::Persist::db($path,1);
+
+	  die "can't open $path: $!" if ! defined $db;
+
+	  my($meta)=$db->{''}->Meta();
+	  my($tmpf)="/tmp/meta.$$";
+
+	  my($s);
+
+	  if (! defined ($s=new cs::Sink (PATH,$tmpf)))
+		{ die "can't make $tmpf: $!";
+		}
+
+	  $s->Put(cs::Hier::h2a($meta,1));
+	  undef $s;
+
+	  system("$ENV{EDITOR} $tmpf");
+
+	  if (! defined ($s=new cs::Source (PATH,$tmpf)))
+		{ die "can't reopen $tmpf: $!";
+		}
+
+	  my($newmeta,$tail)=cs::Hier::a2h($s->Get());
+	  undef $s;
+
+	  $tail =~ s/^\s+//;
+
+	  if (length $tail)
+		{ die "syntax error rereading $tmpf: left over data: $tail\n";
+		}
+
+	  for (keys %$newmeta)
+		{ $meta->{$_}=$newmeta->{$_};
+		}
+
+	  undef $db;
+
+	  cs::Persist::finish();
+
+	  return 0;
+	}
