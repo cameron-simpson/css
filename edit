@@ -20,7 +20,7 @@ esac
 
 if ifcvs "$file"
 then
-    exec cvsedit "$file"
+    exec cvsedit "$file" "$EDITOR"
 fi
 
 # make templates
