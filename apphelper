@@ -66,14 +66,22 @@ file "$file"; echo
 
 if [ $doview ]
 then
-    "$@" "$file"
+    "$@" "$file" \
+    || { echo "failed: $* $file"
+	 necho "View with? "
+	 read viewit || exit 0
+	 case "$viewit" in
+	    ''|n|no)	;;
+	    *)		$viewit "$file" ;;
+	 esac
+       }
 else
     necho "View [$*]? "
     read viewit || exit 0
     case "$viewit" in
 	''|y|yes)	"$@" "$file" ;;
 	n|no)	;;
-	*)		$viewit "$@" ;;
+	*)		$viewit "$file" ;;
     esac
 fi
 
