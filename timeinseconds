@@ -4,6 +4,8 @@
 # to stderr (by default).	- Cameron Simpson <cs@zip.com.au> 23apr99
 #
 
+: ${TMPDIR:=/tmp}
+
 cmd=`basename "$0"`
 usage="Usage: $cmd [-u] [-s] [-r] [-o file] command [args...]
 	-u	Report user time.
@@ -14,7 +16,7 @@ usage="Usage: $cmd [-u] [-s] [-r] [-o file] command [args...]
 		    unless through misfortune it closely resembles
 		    the output of \"time\"."
 
-timeout=/tmp/time.$$
+timeout=$TMPDIR/time.$$
 
 badopts=
 
