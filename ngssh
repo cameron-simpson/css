@@ -4,14 +4,16 @@
 #	- Cameron Simpson <cs@zip.com.au> 08feb2001
 #
 
-[ $# -lt 2 ] && { echo "Usage: $0 netgroup command" >&2; exit 2; }
+login=
+[ "x$1" = x-l ] && { login=$2; shift; shift; }
+
+[ $# -lt 2 ] && { echo "Usage: $0 [-l login] netgroup command" >&2; exit 2; }
 
 ngrs=$1; shift
 
-( for h in `ngr $ngrs | wired`
-  do  bgssh "$h" "$*"
-      sleep 1
-  done &
-) &
+for h in `ngr $ngrs | wired`
+do  [ -n "$login" ] && h=$login@$h
+    set-x pfx $h bgssh "$h" "$*"
+done
 
 exit 0
