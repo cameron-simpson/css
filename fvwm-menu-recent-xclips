@@ -1,5 +1,6 @@
 #!/bin/sh
-log=$HOME/var/log/xclip
+: ${LOGDIR:=$HOME/var/log}
+log=$LOGDIR/xclip
 tail -200 "$log" \
 | keeplast \
 | tail -40 \
