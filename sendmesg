@@ -22,7 +22,7 @@ if (@ARGV && $ARGV[0] eq '--')
 
 die $::Usage if ! @ARGV;
 
-## open(STDERR,">> $ENV{HOME}/sendmesg.out");
+open(STDERR,">> $ENV{HOME}/sendmesg.out");
 
 $::Msg = new cs::MIME (new cs::Source (FILE,STDIN));
 
@@ -43,6 +43,7 @@ for (@ARGV)
 
 if (@::Groups)
 { $::Msg->Add(NEWSGROUPS,join(',',@::Groups),SUPERCEDE);
+  $::Msg->Add(PATH,"$ENV{SITENAME}!$ENV{USER}",SUPERCEDE);
 }
 
 $::Msg->ForceMsgID();
