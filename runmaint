@@ -278,7 +278,9 @@ then
     case "$addresses" in
 	'')	logdir=`dirname "$log"`
 		if [ -d "$logdir/." ] || mkdir -p "$logdir"
-		then  sh $xflag "$script" >>"$log" 2>&1
+		then  ( date
+			exec sh $xflag "$script"
+		      ) >>"$log" 2>&1
 		else  echo "$0: can't make log dir \"$logdir\"" >&2
 		      echo "	suppressing run of \"$script\"" >&2
 		      xit=1
