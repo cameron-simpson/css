@@ -12,12 +12,14 @@ usage="Usage: $cmd filename
 [ $# = 1 ] || { echo "$usage" >&2; exit 2; }
 file=$1; shift
 
-type=`file "$file"` || exit 1
+type=`file -L "$file"` || exit 1
 
 mtype=
 case "$type" in
     *': '*'Bourne shell script'*)	mtype=application/x-sh ;;
     *': '*'JPEG image data'*)		mtype=image/jpeg ;;
+    *': '*'GIF image data'*)		mtype=image/gif ;;
+    *': '*'PNG image data'*)		mtype=image/png ;;
     *': '*'PDF document'*)		mtype=application/pdf ;;
     *': '*'RPM v'*)			mtype=application/x-redhat-package-manager ;;
     *': '*'HTML document text'*)	mtype=text/html ;;
@@ -25,10 +27,12 @@ case "$type" in
     *': '*'bzip2 compressed data'*)	mtype=application/x-bzip ;;
     *': '*'Zip archive data'*)		mtype=application/zip ;;
     *': '*'tar archive'*)		mtype=application/x-tar ;;
+    *': '*'RAR archive data'*)		mtype=application/x-rar ;;
     *': '*'ASCII cpio archive'*)	mtype=application/x-cpio-c ;;
     *': '*'Ogg-Vorbis compressed sound file'*) mtype=application/x-ogg ;;
     *': '*'MPEG system stream data'*) mtype=video/mpeg ;;
     *': '*'Microsoft Office Document'*) mtype=application/msword ;;
+    *': '*'RIFF (little-endian) data, AVI') mtype=video/avi ;;
     *': '*'PGP armored data signed message'*)
 					mtype=text/plain ;;
     *': '*'ASCII '*)			mtype=text/plain ;;
