@@ -1,0 +1,40 @@
+#!/bin/sh
+#
+# Make an autoforwarding HTML page from one spot to another.
+#	- Cameron Simpson <cs@zip.com.au> 11jan2003
+#
+
+cmd=`basename "$0"`
+usage="Usage: $cmd [-o oldbaseurl] newbaseurl file.html"
+
+delay=3
+oldbase=
+case $1 in
+  -o)	oldbase=$2; shift; shift ;;
+esac
+
+[ $# = 2 ] || { echo "$usage" >&2; exit 2; }
+newbase=$1 file=$2
+shift; shift
+
+cat <<X
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+<HEAD>
+  <TITLE>Placeholder page for $oldbase$file</TITLE>
+  <meta name="Author" lang="en" content="Cameron Simpson">
+  <meta http-equiv="Content-Type" content="text/html; charset=ISO-8859-1">
+  <meta http-equiv="Refresh" CONTENT="$delay;URL=$newbase$file">
+</HEAD>
+<BODY>
+  <H1>Placeholder page for $oldbase$file</H1>
+  This page has moved to:
+  <BLOCKQUOTE><SMALL><TT><A HREF="$newbase$file">$newbase$file</A></TT></BLOCKQUOTE>
+  Your browser should take you there automatically in $delay seconds,
+  but if it does not please follow the above link.<BR>
+  Thanks,<BR>
+  <A HREF="http://www.zip.com.au/~cs/">Cameron Simpson</A>
+  &lt;<A HREF="mailto:cs@zip.com.au">cs@zip.com.au</A>&gt;
+</BODY>
+</HTML>
+X
