@@ -172,8 +172,8 @@ sub new($$;$)
 sub DESTROY
 { my($this)=@_;
   ! exists $this->{PATH}
-      || rmdir($this->{PATH})
-      || warn "$::cmd: rmdir($this->{PATH}): $!\n";
+      || (system("/bin/rm -r '$this->{PATH}'")>>8) == 0
+      || warn "$::cmd: rm -r $this->{PATH}: $!\n";
 }
 
 sub _Take($)
@@ -193,6 +193,11 @@ sub _Take($)
   if (! mkdir($path,0777))
   { ## warn "$::cmd: mkdir($path): $!";
     return undef;
+  }
+
+  if (open(INFO, "> $path/info"))
+  { print INFO "$$ $ENV{HOSTNAME}\n";
+    close(INFO);
   }
 
   1;
