@@ -9,6 +9,27 @@
 # clever. Back to mkdir().	- cameron 27jun99
 #
 
+=head1 NAME
+
+cs::Lock - cross host NFS-safe locking
+
+=head1 SYNOPSIS
+
+use cs::Lock;
+
+=head1 DESCRIPTION
+
+This module obtains a lock on a resource
+via an agreed name and lock directory.
+
+The current implementation uses directories
+(in an agreed spot, by default B<$HOME/.locks>)
+for the lock objects.
+The B<Put> method, if used,
+then makes files in these directories.
+
+=cut
+
 use strict qw(vars);
 
 use cs::Misc;
@@ -31,6 +52,58 @@ $cs::Lock::Lockdir=(length $ENV{LOCKDIR}
 		     : "$ENV{HOME}/.locks"
 		   );
 
+=head1 GENERAL FUNCTIONS
+
+=over 4
+
+=item keypath(I<key>)
+
+Return the pathname of the lock object to be obtained from
+the I<key> supplied.
+
+=cut
+
+sub keypath($)
+{ local($_)=@_;
+  s/_/__/g;
+  s://+:/:g;
+  s:/$::;
+  s:^/::;
+  s:/:_:g;
+  "$cs::Lock::Lockdir/$_";
+}
+
+=item check(I<key>)
+
+Check if the lock specified by I<key> is taken.
+
+=cut
+
+sub check($)
+{ my($key)=@_;
+  ## warn "checking ".keypath($key);
+  -e keypath($key);
+}
+
+=back
+
+=head1 OBJECT CREATION
+
+=over 4
+
+=item new cs::Lock (I<key>,I<maxtries>)
+
+Obtain a lock on the resource specified by I<key>.
+If I<maxtries> greater than zero,
+try to take the lock that many times before failure
+(returning B<undef>).
+Successive attempts are separated by an increasing delay,
+up to a maximum.
+If not supplied,
+I<maxtries> defaults to zero.
+
+=cut
+
 sub new($$;$)
 { my($class,$key,$maxtries)=@_;
   $maxtries=0 if ! defined $maxtries;
@@ -42,7 +115,7 @@ sub new($$;$)
   { $this = bless { KEY => $key,
 		    PATH => keypath($key),
 		  }, $class;
-    return $this if $this->Take();
+    return $this if $this->_Take();
     delete $this->{PATH};
     return undef;
   }
@@ -88,6 +161,14 @@ sub new($$;$)
   while(1);
 }
 
+=back
+
+=head1 OBJECT METHODS
+
+=over 4
+
+=cut
+
 sub DESTROY
 { my($this)=@_;
   ! exists $this->{PATH}
@@ -95,20 +176,11 @@ sub DESTROY
       || warn "$::cmd: rmdir($this->{PATH}): $!\n";
 }
 
-sub keypath($)
-{ local($_)=@_;
-  s/_/__/g;
-  s://+:/:g;
-  s:/$::;
-  s:^/::;
-  s:/:_:g;
-  "$cs::Lock::Lockdir/$_";
-}
-
-sub Take($)
+sub _Take($)
 { my($this)=@_;
 
-  my $lockdir = cs::Pathname::dirname($this->{PATH});
+  my $path = $this->Path();
+  my $lockdir = cs::Pathname::dirname($path);
 
   # ensure work area exists
   if (! -d "$lockdir/."
@@ -118,18 +190,53 @@ sub Take($)
     return undef;
   }
 
-  if (! mkdir($this->{PATH},0777))
-  { ## warn "$::cmd: mkdir($this->{PATH}): $!";
+  if (! mkdir($path,0777))
+  { ## warn "$::cmd: mkdir($path): $!";
     return undef;
   }
 
   1;
 }
 
-sub check($)
-{ my($key)=@_;
-  ## warn "checking ".keypath($key);
-  -e keypath($key);
+=item Path()
+
+Return the pathname of the lock object.
+
+=cut
+
+sub Path($)
+{ shift->{PATH};
 }
+
+=item Put(I<info>,I<base>)
+
+Write the text I<info> to the record I<base>
+in the lock object, followed by a newline.
+If not specified, I<base> defaults to "B<info>".
+
+=cut
+
+sub Put($$;$)
+{ my($this,$info,$base)=@_;
+  $base='info' if ! defined $base;
+
+  my $path = $this->Path();
+  my $file = "$path/$base";
+  if (! open(INFO,"> $file\0"))
+  { warn "$::cmd: cs::Lock::Put -> $file: $!\n";
+    return 0;
+  }
+
+  print INFO $info, "\n";
+  close(INFO);
+}
+
+=back
+
+=head1 AUTHOR
+
+Cameron Simpson E<lt>cs@zip.com.auE<gt>
+
+=cut
 
 1;
