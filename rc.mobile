@@ -19,7 +19,7 @@
 cmd=$0
 trace=set-x
 
-PATH=$PATH:/sbin:/opt/css
+PATH=$PATH:/sbin:/opt/css/bin
 export PATH
 
 # See how we were called.
