@@ -1,0 +1,33 @@
+#!/usr/bin/perl
+#
+# Replace ~ or ~user with a pathname.
+#	- Cameron Simpson <cs@zip.com.au> 21nov2001
+#
+
+use strict qw(vars);
+
+($::cmd=$0) =~ s:.*/::;
+
+if (@ARGV != 1)
+{ warn "Usage: $::cmd pathname\n";
+  exit 2;
+}
+
+$_=$ARGV[0];
+
+if (m:^~([a-z][^/]*)?:)
+{ if (length $1)
+  { my @pw = getpwnam($1);
+    if (! @pw)
+    { warn "$::cmd: unknown user \"$1\"\n";
+    }
+    else
+    { $_=$pw[5].$';
+    }
+  }
+  else
+  { $_=$ENV{HOME}.$';
+  }
+}
+
+print "$_\n";
