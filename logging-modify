@@ -7,17 +7,24 @@
 : ${TMPDIR:=/tmp}
 
 cmd=`basename "$0"`
-usage="Usage: $cmd [args1-opts...] -r report-command itemname editcommand [editargs...]"
+usage="Usage: $cmd [args1-opts...] -r report-command [-m message] \
+		itemname editcommand [editargs...]
+	arg1opts	Used to control passing itemname to editcommand.
+	-r report-command Shell command to report on itemname.
+			%s within the string will be replaced by quoted itemname.
+	-m message	Supply change log line."
 
 badopts=
 
 reportcmd=
 args1opts=-end
+message=
 
 while :
 do
   case $1 in
     -r)	reportcmd=$2; shift ;;
+    -m)	message=$2; shift ;;
     -[0-9]*|-end|-discard)
       arg1opts="$arg1opts $1"
       ;;
@@ -45,14 +52,16 @@ fi
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
-[ -t 0 ] || { echo "$cmd: stdin must be a tty" >&2; exit 1; }
-
 tmpf=$TMPDIR/$cmd$$
 trap 'rm -f "$tmpf"' 0 1 15
 
-echo "Please enter the reason and bug id for this change."
-reason=`readline "> "` || exit 1
-[ -n "$reason" ] || { echo "$cmd: empty reason rejected" >&2; exit 1; }
+if [ -z "$message" ]
+then
+  [ -t 0 ] || { echo "$cmd: stdin must be a tty" >&2; exit 1; }
+  echo "Please enter the reason and bug id for this change."
+  message=`readline "> "` || exit 1
+fi
+[ -n "$message" ] || { echo "$cmd: empty message rejected" >&2; exit 1; }
 
 case "$reportcmd" in
   *'%s'*)
@@ -68,9 +77,9 @@ esac
 
 sh -c "$reportcmd" >"$tmpf" || exit 1
 
-"$@" "$itemname"
+arg1 $arg1opts "$itemname" "$@"
 xit=$?
 
-sh -c "$reportcmd" | diffu "$tmpf" - | buglog "$reason"
+sh -c "$reportcmd" | diffu "$tmpf" - | buglog "$message"
 
 exit $xit
