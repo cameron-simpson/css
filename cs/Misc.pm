@@ -11,6 +11,8 @@ BEGIN { use cs::DEBUG; cs::DEBUG::using(__FILE__); }
 require 'flush.pl';	# for ::flush()
 use cs::Math;
 
+package cs::Misc;
+
 ($::cmd=$0) =~ s:.*/::;
 
 undef %cs::Misc::_used_package;
@@ -71,15 +73,24 @@ sub ::uniq
   ## if (! @_)
   ##	{my(@c)=caller; warn "uniq(@_) from [@c]";}
 
-  my(%u,@u);
-  for my $k (@_)
+  my @u;
+
+  if (@_ < 2)
+  { @u=@_;	# optimisation
+  }
+  else
   {
-    if (! defined $k)
-    { ## my(@c)=caller;warn "undef in uniq(@_) from [@c]";
-    }
-    elsif (! exists $u{$k})
-    { $u{$k}=1;
-      push(@u,$k);
+    my %u;
+
+    for my $k (@_)
+    {
+      if (! defined $k)
+      { ## my(@c)=caller;warn "undef in uniq(@_) from [@c]";
+      }
+      elsif (! exists $u{$k})
+      { $u{$k}=1;
+	push(@u,$k);
+      }
     }
   }
 
@@ -90,7 +101,7 @@ sub ::max	{ cs::Math::max(@_) }
 sub ::min	{ cs::Math::min(@_) }
 
 # merge one hash into another
-sub addHash($$)
+sub ::addHash($$)
 { my($h1,$h2)=@_;
 
   for my $k (keys %$h2)
@@ -99,7 +110,7 @@ sub addHash($$)
 }
 
 # remove keys of one hash from another
-sub subHash($$)
+sub ::subHash($$)
 { my($h1,$h2)=@_;
 
   for my $k (keys %$h2)
@@ -107,7 +118,7 @@ sub subHash($$)
   }
 }
 
-sub detab($;$)	# (tabbed,tabsize) -> untabbed
+sub ::detab($;$)	# (tabbed,tabsize) -> untabbed
 { my($line,$tabsize)=@_;
   $tabsize=8 if ! defined $tabsize;
 
@@ -138,7 +149,7 @@ sub detab($;$)	# (tabbed,tabsize) -> untabbed
 }
 
 # code courtesy of Graham Barr <gbarr@pobox.com>.
-sub reftype
+sub ::reftype
 { my $ref = shift;
 
   return undef unless ref($ref);
@@ -150,8 +161,6 @@ sub reftype
   } 
   return undef;
 }
-
-package cs::Misc;
 
 sub tmpDir
 { defined $ENV{TMPDIR}
@@ -176,6 +185,13 @@ sub mkHandle
   my($h)="cs::Misc::".$cs::Misc::_MkHandle++;
   $h =~ s/::/'/g if $oldStyle;
   $h;
+}
+
+sub editor(;$)
+{ my($dflt)=@_;
+  $dflt='vi' if ! defined $dflt;
+
+  defined $ENV{EDITOR} ? $ENV{EDITOR} : $dflt;
 }
 
 1;
