@@ -6,7 +6,7 @@
 # Prefer PNG to GIF, handle other input types. - cameron, 26may99
 #
 
-maxx=128 maxy=128 quant=16 fromtype=jpg outflag=-P
+maxx=128 maxy=128 quant=64 fromtype=jpg outflag=-P
 
 usage="Usage: $0 [-G] [-m max] [-q quant] [-x maxx] [-y maxy] [srcimage]
 	-G		Srcimage (or input) is GIF, not JPEG.
