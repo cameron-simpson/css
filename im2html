@@ -1,5 +1,7 @@
 #!/usr/bin/perl
 #
+# Freshmeat release: 1.01
+#
 # Produce gallery indices with and without frames.
 #	- Cameron Simpson <cs@zip.com.au> 14feb96
 #
