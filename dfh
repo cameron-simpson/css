@@ -1,0 +1,35 @@
+#!/bin/sh
+#
+# df the local filesystems.
+#	- Cameron Simpson <cs@zip.com.au>
+#
+
+lopt=
+dfopts=
+typed=
+sortcol=+3
+case $OS in
+    solaris)	lopt=-l ;;
+    linux)	dfopts=-TP lopt='-x nfs' ;;
+    *)		typed=1 fstypes=4.2 lopt=  ;;
+esac
+
+dfkl="dfk $dfopts $lopt"
+
+if [ $# = 0 -a -n "$typed" ]
+then
+    first=1
+    for fst in $fstypes
+    do  if [ $first ]
+	then
+	    $dfkl -t "$fst"
+	    first=
+	else
+	    $dfkl -t "$fst" | sed 1d
+	fi
+    done
+else
+    $dfkl ${1+"$@"}
+fi | ( read hdrs; echo "$hdrs"
+       exec sort -n $sortcol
+     )
