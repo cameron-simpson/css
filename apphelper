@@ -5,6 +5,8 @@
 # apphelper - a generic wrapper for email attachments or web browser file helpers, offering both save and view choices
 #
 
+cmd=`basename "$0"`
+
 ## tty=/dev/ttyp2
 ## exec 2>"$tty" >&2 0</dev/tty
 ## set -vx
@@ -15,15 +17,18 @@ savedir=${SAVEDIR-$HOME/dl}
 savedir=$HOME/dl
 pager=${PAGER:-less}
 doview=
+termname=$cmd
 
 # =head1 SYNOPSIS
 #
-# apphelper [{-t|+t}] file [{-n|-y}]] [-d savedir] [-p pager] viewer [viewer-args...]
+# apphelper [{-t|+t|-T title}] file [{-n|-y}]] [-d savedir] [-p pager] viewer [viewer-args...]
 #
-cmd=`basename "$0"`
-usage="Usage: $cmd [-t] file [-y] [-d savedir] viewer [viewer-args...]
+usage="Usage: $cmd [{-t|+t|-T title}] file [{-n|-y}] [-d savedir] [-p pager] \\
+		viewer [viewer-args...]
 	-t		Run apphelper in a new terminal window.
 	+t		Do not run apphelper in a new terminal window.
+	-T title	Title for new terminal window. Implies -t.
+			Default: $termname
 	NB: -t or +t must preceed the file.
 	The file may be \"-\" to read it from standard input.
 	-n		Don't run the viewer at all.
@@ -53,7 +58,7 @@ badopts=
 
 # =item -t
 #
-# Open an fresh terminal window in which to run apphelper.
+# Open a fresh terminal window in which to run apphelper.
 # Generally desirable when invoking inside a GUI web browser.
 # This is default behaviour if either standard input
 # or standard output
@@ -63,8 +68,14 @@ badopts=
 #
 # Do not open a terminal window.
 # 
+# =item -T I<title>
+#
+# Specify the title of the fresh terminal in which to run apphelper.
+# Implies the B<-t> option.
+# 
 case $1 in
   -t)	shift; doterm=1 ;;
+  -T)	shift; termname=$1; shift; doterm=1 ;;
   +t)	shift; doterm= ;;
   *)	if [ -t 0 -a -t 1 ]
 	then  doterm=
@@ -104,7 +115,7 @@ else
   # fork off a terminal if need be
   if [ $doterm ]
   then
-      term +a +ip -small -e "$0" +t "$file" ${1+"$@"}
+      term -n "$termname" +a +ip -small -e "$0" +t "$file" ${1+"$@"}
       rm -f "$tmpfile"
       exit 0
   fi
