@@ -25,8 +25,6 @@ bigx=0 bigy=-0 bigw=80 bigh=61 bigf=6x13
 geometry=
 sized=
 xauthhack=
-execargs=
-rawargs=
 async=1
 lock=
 lock1=
@@ -38,12 +36,9 @@ badopts=
 # load default options first
 set x ${TERMOPTIONS} ${1+"$@"}; shift
 
-while :
+while [ $# -gt 0 ]
 do
   case "$#,$1" in
-    0,)		rawargs= execargs=1
-		set x ${SHELL-/bin/sh} ; shift
-		break ;;
     1,-[lwhxyns])
 		echo "$cmd: $1 needs an argument" >&2
 		echo "$usage" >&2
