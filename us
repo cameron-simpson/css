@@ -1,6 +1,6 @@
 #!/bin/sh
 #
-# Autostart netscape and show URLs. backgrounds so the user can get on
+# Autostart netscape and show URLs. Backgrounds so the user can get on
 # with things.
 #	- Cameron Simpson <cs@zip.com.au>
 #
@@ -20,14 +20,8 @@ do  case $1 in
     shift
 done
 
-if [ $# = 0 ]
-then
-  oIFS=$IFS
-  IFS='
-'
-  set x `xcut -p`; shift
-  IFS=$oIFS
-fi
+# grab cut/paste buffer if no args
+[ $# = 0 ] && { xclip -o | "$0" -; exit $?; }
 
 case $DISPLAY in
     :*)	id=$HOST$DISPLAY ;;
