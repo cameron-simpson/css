@@ -16,7 +16,9 @@ usage="Usage: $cmd [-B bugsystem] [severity] title-words...
 case "$1" in [1-5]) sev=$1; shift ;; esac
 [ $# = 0 ] && { echo "Usage: $0 bug [severity] title" >&2; exit 2; }
 
-( exec 3>&1
+exec 3>&1
+
+(
   if [ -t 0 ]
   then
       echo
