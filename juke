@@ -6,7 +6,12 @@
 #	- Cameron Simpson <cs@zip.com.au> 01jun2002
 #
 
+playcopy=
+
 cmd=`basename "$0"`
+usage="Usage: $cmd [-C]"
+
+[ "x$1" = x-C ] && { playcopy=1; shift; }
 
 playpid=
 
@@ -14,6 +19,7 @@ runplayer()
 {
   ( ok=1
     subproc=
+    tmpauf=
     trap 'ok=; [ -n "$subproc" ] && kill $subproc; exit' 1 2 3 15
     trap '[ -n "$subproc" ] && kill $subproc' USR1
     playlist=/tmp/$cmd.$$
@@ -23,7 +29,13 @@ runplayer()
 	exec <"$playlist"
 	rm -f "$playlist"
 	while [ $ok ] && read -r auf
-	do  case "$auf" in
+	do
+	    if [ $playcopy ]
+	    then
+		tmpauf=${TMPDIR:-/tmp}/$cmd$$`basename "$auf"`
+		(set -x; cp "$auf" "$tmpauf") && auf=$tmpauf
+	    fi
+	    case "$auf" in
 	      *.ogg)	ogg123 -d oss "$auf" & ;;
 	      *.mp3)	mpg123 -b 2048 "$auf" & ;;
 	      *)	echo "$cmd: how to play $auf ?" >&2
@@ -32,6 +44,7 @@ runplayer()
 	    esac
 	    subproc=$!
 	    wait
+	    [ $playcopy ] && rm -f "$tmpauf"
 	    [ $ok ] && sleep 2
 	    subproc=
 	done
