@@ -61,6 +61,7 @@ exec \
 	'--include=/rc/mail/cats*' \
 	'--include=/rc/mail/mailcap' \
 	'--include=/rc/mail/mutt*' \
+	'--include=/rc/mail/procmailrc*' \
 	'--include=/rc/mail/signature' \
 	'--exclude=/rc/mail/*' \
 	'--include=/rc/mh' \
