@@ -1,0 +1,15 @@
+#!/bin/sh
+#
+# Sorted tidy recursive netgroup listing.
+#	- Cameron Simpson <cs@zip.com.au>
+#
+
+if [ "x$1" = x-a ]
+then  shift
+      filt=cat
+else  filt='sed "s/\\..*//"'
+fi
+
+netgroup -r ${1+"$@"} \
+| eval "$filt" \
+| sort -u
