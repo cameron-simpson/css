@@ -22,11 +22,7 @@ If standard input is a terminal
 or some I<cvs-log-args> are supplied
 then the command:
 
-=over 4
-
-=item B<cvs log> I<cvs-log-args...>
-
-=back
+	B<cvs log> I<cvs-log-args...>
 
 is run to obtain the raw log data,
 otherwise standard input is assumed to be the output of a B<cvs log> command.
@@ -169,7 +165,7 @@ if (! $TextMode)
 { print "</UL>\n";
 }
 
-sub r2h { $TextMode ? $file : &cs::HTML::raw2html }
+sub r2h { $TextMode ? "@_" : &cs::HTML::raw2html }
 
 sub fref
 { my($file)=@_;
