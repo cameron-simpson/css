@@ -4,8 +4,8 @@
 #	- Cameron Simpson <cs@zip.com.au> 12sep2000
 #
 
-: ${VARLOG:=$HOME/var/log}
-: ${CONSOLE:=$VARLOG/console}
+: ${LOGDIR:=$HOME/var/log}
+: ${CONSOLE:=$LOGDIR/console}
 
 cmd=$0
 usage="Usage: $cmd [-s|-C] command [args...] <input
