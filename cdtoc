@@ -7,7 +7,6 @@
 use strict qw(vars);
 
 use cs::CDDB;
-use cs::Hier;
 
 my $dev;
 
@@ -32,24 +31,69 @@ if (@q < 1)
 }
 
 if (@q > 1 || @q > 0 && $q[0]->[2] ne $discid)
-{ warn "$::cmd: multiple matches for discid $discid:\n";
-  my $m;
-  for my $i (1..@q)
-  { $m = $q[$i-1];
-    warn "$i\t$m->[2]  $m->[0]\t$m->[1]\n";
-  }
+{ warn "$::cmd: multiple or differing matches for discid $discid:\n";
 
-  exit 1 if ! -t STDIN || ! -t STDERR;
+  my $showchoices=1;
 
-  print STDERR "Select? ";
-  exit 1 if ! defined($_=<STDIN>);
-  chomp;
-  exit 1 if ! length;
-  if (! /^\d+/ || $_ < 1 || $_ > @q)
-  { die "bad response: $_\n";
+  if (! -t STDIN || ! -t STDERR)
+  { die "$::cmd: STDIN and STDERR aren't terminals, aborting\n";
   }
 
   my($cat,$discid)=($q[$_-1]->[0], $q[$_-1]->[2]);
+
+  CHOICE:
+  while(1)
+  {
+    if ($showchoices)
+    {
+      for my $i (1..@q)
+      { my $m = $q[$i-1];
+	warn "$i\t$m->[2]  $m->[0]\t$m->[1]\n";
+      }
+      $showchoices=0;
+    }
+
+    print STDERR "Select? ";
+    exit 1 if ! defined($_=<STDIN>);
+    chomp;
+
+    s/^\s+//;
+
+    if (!length)
+    { $showchoices=1;
+    }
+    elsif ($_ eq '?' || lc($_) eq 'help')
+    { print STDERR "Help:\n";
+      print STDERR "\t?\tThis help.\n";
+      print STDERR "\tn\tChoose match n.\n";
+      print STDERR "\tn?\tList match n.\n";
+      print STDERR "\tblank\tList matches again.\n";
+    }
+    elsif (/^\d+$/)
+    { if ($_ < 1 || $_ > @q)
+      { warn "Choice out of range.\n";
+	$showchoices=1;
+      }
+      else
+      { ($cat,$discid)=($q[$_-1]->[0], $q[$_-1]->[2]);
+	last CHOICE;
+      }
+    }
+    elsif (/^(\d+)\?$/)
+    { $_=$1;
+      if ($_ < 1 || $_ > @q)
+      { warn "Choice out of range.\n";
+	$showchoices=1;
+      }
+      else
+      { warn "CAN'T LIST CONTENTS OF MATCH $_ YET";
+      }
+    }
+    else
+    { warn "$::cmd: unsupported response\"$_\". Type \"?\" for help.\n";
+    }
+  }
+
   $CD->SetCategory($cat);
   $CD->SetDiscId($discid);
 }
@@ -59,8 +103,6 @@ die "no artist!" if ! defined $artist;
 die "no title!" if ! defined $title;
 
 print "$artist\n$title\n";
-# print cs::Hier::h2a($CD,1),"\n";
-# exit 0;
 
 # track info
 my @T = $CD->TrackInfo();
