@@ -1,0 +1,12 @@
+#!/bin/sh
+#
+# Construct an ext2 fs on the DVD-RAM drive.
+#	- Cameron Simpson <cs@zip.com.au> 10dec2000
+#
+
+dev=/dev/scd0		# device
+bsize=2048		# block size
+spare=1			# % root-only blocks
+mnt=/dev/dvdext2	# mount point
+
+exec time mke2fs -v -b "$bsize" -m "$spare" -M "$mnt"
