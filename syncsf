@@ -1,0 +1,7 @@
+#!/bin/sh
+#
+# Update my sourceforge projects.
+#	- Cameron Simpson <cs@zip.com.au> 23oct2002
+#
+set -x
+exec rsync -avHPW --delete $HOME/there/adzapper.sourceforge.net/html/. sf:adzapper/htdocs/.
