@@ -44,6 +44,7 @@ usage="Usage: $cmd [{-t|+t|-T title}] file [{-n|-y}] [-d savedir] [-p pager] \\
 	-d savedir	Save directory (from \$SAVEDIR: $savedir).
 	-p pager	Pager (default viewer, from \$PAGER: $pager)."
 
+trap 'rm -r "$tmpdir"' 0
 tmpdir=`mkdirn ${TMPDIR:-/tmp}/$cmd` || exit 1
 tmpfile=$tmpdir/$cmd$$
 
@@ -265,7 +266,7 @@ case "$fbase" in
 esac
 export file fbase
 
-file "$file"; echo
+file "$file" | noesc; echo
 
 # =head1 OPERATION
 #
