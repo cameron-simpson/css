@@ -1,0 +1,23 @@
+#!/bin/sh
+#
+# Take a set of URL lists and generate a block for manual insertion into a
+# bookmark file.
+#	- Cameron Simpson <cs@zip.com.au> 07apr2003
+#
+
+tmpdir=`mkdirn /tmp/hi2bm` || exit 1
+
+for list
+do
+  exec <"$list" || continue
+  dir=$tmpdir/`basename "$list"`
+  needdir "$dir" || continue
+  while read url
+  do title=`echo "$url" | sed -e 's;^http://;;' -e 'y:/:_:' -e 's:_$::'`
+     echo "$url" >"$dir/$title"
+  done
+done
+
+cd "$tmpdir" || exit 1
+dir2bm .
+rm -r "$tmpdir"
