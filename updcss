@@ -5,7 +5,7 @@
 #
 
 cmd=$0
-usage="Usage: $cmd [-q] [-n]"
+usage="Usage: $cmd [-q] [-n] [pushhosts...]"
 
 xit=0
 
@@ -123,4 +123,10 @@ then
     )
 fi
 
+wait
+
+syncezos &
+for host
+do  pfx "$host:/opt/css" putcss "$host" &
+done
 wait
