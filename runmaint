@@ -25,21 +25,29 @@
 #
 # for more detailed info.
 #
-# =head1 SETUP
+# =head1 INSTALLATION
+#
+# Normally I<runmaint> is installed as a kit under a prefix
+# such as B</usr/local>,
+# with the script itself in B</usr/local/bin/runmaint>
+# and so forth.
+# The examples below presume the prefix is B</usr/local>
+# and should be adjusted to however your install is arranged.
+#
+# =head1 PERSONAL SETUP
 #
 # Create a directory B<.maint> in your home directory
-# (except for root, who uses the directory B</usr/local/etc/maint>).
-# Scripts run from cron(8) go here
-# (except for root, where the go in B</usr/local/etc/maint/scripts>).
+# (except for root, who uses the directory B</usr/local/etc/runmaint>).
+# Scripts run from cron(8) go here.
 #
 # Create a crontab file with the crontab(1) command.
 # Typically this is a single line such as
 #
-#	0 * * * * exec /opt/script/runmaint hourly
+#	0 * * * * exec /usr/local/bin/runmaint hourly
 #
 # or
 #
-#	0 0 * * * exec /opt/script/runmaint daily
+#	0 0 * * * exec /usr/local/bin/runmaint daily
 #
 # The word after the B<runmaint> command is the name of a script to run
 # from the B<~/.maint> directory.
@@ -75,17 +83,15 @@
 #
 # Before running any script
 # B<runmaint> sources the file
-# B</usr/local/etc/maint/env>.
+# B</usr/local/etc/runmaint/env>.
 # Systemwide default environment settings go in here as shell commands.
 # After this the file
-# B<~/.maint/env>
-# (or B</usr/local/etc/maint/scripts/env> for root)
-# is sourced.
+# B<~/.maint/env> is sourced.
 # Personal environment settings go in here as shell commands.
 #
 # Normally you will want the cron environment to resemble the login
-# environment as closely as possible,
-# so B</usr/local/etc/maint/env> would normally contain the line
+# environment closely
+# and so B</usr/local/etc/runmaint/env> would normally contain the line
 #
 #	. /etc/profile
 #
@@ -96,8 +102,8 @@
 # in this way sourcing the user's normal startup files.
 #
 
-prefix=/usr/local/etc/maint
-MaintDir=${prefix}
+# installation prefix - typically /usr/local
+MaintDir=/opt/runmaint
 
 USER=${USER-$LOGNAME}; export USER
 [ -n "$USER" ] || { echo "$0: no \$USER or \$LOGNAME, bailing out" >&2
@@ -106,10 +112,10 @@ USER=${USER-$LOGNAME}; export USER
 
 if [ -f "$0" ]
 then    RunMaint="$0 -E"
-else    RunMaint="$MaintDir/runmaint.sh -E"
+else    RunMaint="$MaintDir/bin/runmaint -E"
 fi
 case $USER in
-    root)	MaintScripts=${MaintScripts:-$MaintDir/scripts} ;;
+    root)	MaintScripts=${MaintScripts:-$MaintDir/etc/runmaint} ;;
     *)		MaintScripts=${MaintScripts:-$HOME/.maint} ;;
 esac
 
