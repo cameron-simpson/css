@@ -1,0 +1,47 @@
+#!/bin/sh
+#
+# Construct a passphraseless well commented and named ssh keypair.
+#	- Cameron Simpson <cs@zip.com.au> 03feb2002
+#
+
+type=
+
+cmd=$0
+usage="Usage: $cmd -t type purpose
+	-t type		RSA1, RSA or DSA.
+	purpose		Eg vpn-from2to or proto-from2to."
+
+badopts=
+
+if [ "x$1" = x-t ]
+then  type=$2; shift; shift
+else  echo "$cmd: missing -t option" >&2; badopts=1
+fi
+
+case "$type" in
+    rsa|rsa1|dsa)	;;
+    *)			echo "$cmd: bad key type \"$type\"; I wanted rsa|rsa1|dsa" >&2
+			badopts=1
+			;;
+esac
+
+if [ $# = 0 ]
+then  echo "$cmd: missing purpose" >&2; badopts=1
+else  purpose=$1; shift
+fi
+
+[ $# = 0 ] || { echo "$cmd: extra arguments: $*" >&2; badopts=1; }
+
+[ $badopts ] && { echo "$usage"; exit 2; }
+
+key=$type-$purpose
+keypub=$key.pub
+
+ok=1
+
+[ -f "$key"    ] && { echo "$cmd: file \"$key\" already exists" >&2; ok=; }
+[ -f "$keypub" ] && { echo "$cmd: file \"$keypub\" already exists" >&2; ok=; }
+
+[ $ok ] || exit 1
+
+exec ssh-keygen -b 2048 -f "$key" -t "$type" -N '' -C "$purpose (type $type)"
