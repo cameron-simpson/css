@@ -1,0 +1,43 @@
+#!/bin/sed -f
+#
+# =head1 NAME
+#
+# unhashpod - extract the pod content from a script
+#
+# =head1 SYNOPSIS
+#
+# unhashpod [files...]
+#
+# =head1 DESCRIPTION
+#
+# Extract commented perlpod(1) markup from scripts
+# for presentation to pod2man(1) et al.
+# For most UNIX scripts the pod must be hidden in comments,
+# so I've adopted the style of a leading # on pod markup.
+#
+# Formally, lines from one matching the regexp:
+#
+#	^[ \t]*# *=[a-z]
+#
+# through to the next noncomment line or a B<=cut> line
+# are emitted to stdout in pod form.
+#
+# =head1 SEE ALSO
+#
+# perlpod(1), pod2man(1)
+#
+# =head1 AUTHOR
+#
+# Cameron Simpson E<lt>cs@zip.com.auE<gt> 01mar2000
+#
+
+:top
+/^[ 	]*# *=[a-z]/b pod
+d
+:pod
+/^[ 	]*#/!d
+s/^[ 	]*#//
+s/^ //
+/^=cut/d
+n
+b pod
