@@ -6,7 +6,7 @@
 #
 # =head1 SYNOPSIS
 #
-# buglog [-B bugsystem] headline < description
+# buglog [-B bugsystem] [-n] headline < description
 #
 # =head1 DESCRIPTION
 #
@@ -19,28 +19,59 @@
 : ${USER:=`whoami`}
 : ${BUGSYSTEMS:=`bugsystems`}
 
+readstdin=1
+
 cmd=`basename "$0"`
-usage="Usage: $cmd [-B bugsystems] headline < description"
+usage="Usage: $cmd [-B bugsystems] [-n] headline < description"
+
+badopts=
 
 # =head1 OPTIONS
 #
 # =over 4
 #
-# =item B<-B> I<bugsystems>
-#
-# Deliver reports to the specified I<bugsystems> instead of the default.
-#
-[ "x$1" = x-B ] && { BUGSYSTEMS=$2; export BUGSYSTEMS; shift; shift; }
-
+while :
+do
+  case "$1" in
+    # =item B<-B> I<bugsystems>
+    #
+    # Deliver reports to the specified I<bugsystems> instead of the default.
+    #
+    -B)	BUGSYSTEMS=$2; export BUGSYSTEMS; shift ;;
+    # =item B<-n>
+    #
+    # No description.
+    #
+    -n)	readstdin= ;;
+    --)	shift; break ;;
+    -?*)echo "$cmd: unrecognised option: $1" >&2; badopts=1 ;;
+    *)	break ;;
+  esac
+  shift
+done
 # =back
 #
 
-[ $# = 1 ] || { echo "$usage" >&2; exit 2; }
-headline=$1; shift
+if [ $# = 0 ]
+then
+  echo "$cmd: missing headline" >&2
+  badopts=1
+else
+  headline=$1
+  shift
+  [ $# = 0 ] || { echo "$cmd: extra arguments after headline: $*" >&2
+		  badopts=1
+		}
+fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
 
 attachment=$TMPDIR/bugids$$
 trap 'rm -f "$attachment"' 0 1 2 13 15
-detab | unbs | unctrl >"$attachment" || exit 1
+if [ $readstdin ]
+then
+  detab | unbs | unctrl || exit 1
+fi >"$attachment"
 
 xit=0
 
