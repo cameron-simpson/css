@@ -1,0 +1,14 @@
+#!/bin/sh
+#
+# Pick some random pads from those available on the net.
+#	- Cameron Simpson <cs@zip.com.au> 24jul2000
+#
+
+n=5
+
+case $1 in
+    [1-9]*)	n=$1; shift ;;
+esac
+
+otpadlist \
+| pickn $n
