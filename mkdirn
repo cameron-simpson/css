@@ -18,7 +18,10 @@ maxtries=20
 [ $# = 1 ] || { echo "$usage" >&2; exit 2; }
 
 pfx=$1
-case "$pfx" in *[0-9]) pfx=$pfx- ;; esac
+case "$pfx" in
+  *[0-9]) pfx=$pfx- ;;
+  */)	  needdir "$pfx" || exit 1 ;;
+esac
 
 up=`dirname "$pfx"`
 needdir "$up" || exit 1
