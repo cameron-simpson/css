@@ -29,6 +29,8 @@ use cs::Source;
 
 package cs::Tk::FetchURL;
 
+$cs::Tk::FetchURL::_Loaded=1;
+
 =head1 OBJECT CREATION
 
 =over 4
