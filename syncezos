@@ -3,6 +3,7 @@
 # Update my ezoshosting web site.
 #	- Cameron Simpson <cs@zip.com.au> 11jan2003
 set -x
+syncezos-rc
 pfx html rsync -avHPW --delete $HOME/there/cskk.ezoshosting.com/html/. ezos:html/. &
 pfx acct syncsmall @ezos &
 wait
