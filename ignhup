@@ -14,7 +14,9 @@
 
 die "Usage: $cmd command [args...]\n" if !@ARGV;
 
-setsid || warn "$cmd: setsid: $!\n";
+use POSIX;
+
+setsid() || warn "$cmd: setsid: $!\n";
 $SIG{HUP}=IGNORE;
 exec {$ARGV[0]} @ARGV;
 die "$cmd: exec @ARGV: $!\n";
