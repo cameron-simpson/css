@@ -1,0 +1,55 @@
+#!/usr/bin/perl
+#
+# Monitor netstat for ESTABLISHED connections and sort on oldest.
+#	- Cameron Simpson <cs@zip.com.au> 30aug99
+#
+
+require 'flush.pl';
+
+open(STDOUT,"| vdis") || die "$0: can't pipe to vdis: $!";
+
+$pipe="netstat -a |";
+if (@ARGV)
+{ $pipe.=" @ARGV |";
+}
+
+$pause=1;
+
+while (1)
+{ if (open(NETSTAT,$pipe))
+  {
+    my @okeys = keys %live;
+    %new=();
+
+    NETSTAT:
+    while (<NETSTAT>)
+    {
+      /^localhost\.\S+\s+localhost\./ && next NETSTAT;
+      /^(\S+)\s+(\S+)\s.*\sESTABLISHED$/ || next NETSTAT;
+
+      $key="$1 $2";
+      next NETSTAT if $key =~ /^eos\.\S+ canonex\./;
+
+      $new{$key}=1;
+    }
+
+    close(NETSTAT);
+
+    for my $old (@okeys)
+    { delete $live{$old} if ! exists $new{$old};
+    }
+
+    for my $new (keys %new)
+    { $live{$new}++;
+    }
+  }
+
+  printf("%-63s %5s\n", 'Connection', 'Polls');
+  for my $conn (reverse sort { $live{$a} <=> $live{$b} } keys %live)
+  { printf("%-63s %5s\n", $conn, $live{$conn});
+  }
+
+  printflush(STDOUT,"\f");
+
+  sleep $pause;
+}
