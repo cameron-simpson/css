@@ -9,6 +9,8 @@
 #	- Cameron Simpson <cs@zip.com.au> 19dec2001
 #
 
+: ${TMPDIR:=/tmp}
+
 vflag=v
 progress=
 ssh=ssh
@@ -69,7 +71,7 @@ esac
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
-stdout=/tmp/$cmd$$
+stdout=$TMPDIR/$cmd$$
 
 $sshdest \
 	"cd '$destdir' || exit 1
