@@ -9,11 +9,11 @@ usage="Usage: $cmd [-X] [hosts...]"
 
 badopts=
 
-sshopts=
+rtopts=
 
 while :
 do  case $1 in
-      -X)	sshopts="$sshopts $1" ;;
+      -X)	rtopts="$rtopts $1" ;;
       --)	shift; break ;;
       -?*)	echo "$cmd: unrecognised option: $1" >&2
 		badopts=1
@@ -52,14 +52,14 @@ do
 			       exit 1
 			     }
 	for h in `echo "$host" | tr , ' '`
-	do  "$0" $sshopts "$h"
+	do  "$0" $rtopts "$h"
 	done
 	exit 0
 	;;
     root@*)
-	exec root@ $sshopts "$host"
+	exec root@ $rtopts "$host"
 	;;
-    *)	exec rterm "$host" $sshopts
+    *)	exec rterm "$host" $rtopts
 	;;
   esac
 done
