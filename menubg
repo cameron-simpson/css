@@ -10,32 +10,27 @@ call="$0 $*"
 domenu=
 aspect=-t
 strippfx=
-geom=300x600
 pickn=1
 
-usage="Usage: $cmd [-M] [XxY] [ imagefile | bglist-args... ]
-	-M	Popup FVWM menu to pick from choices.
-	XxY	Max XxY geometry of scaled image. Default: $geom"
+usage="Usage: $cmd [-M] [ imagefile | bglist-args... ]
+	-M	Popup FVWM menu to pick from choices."
 
 badopts=
 
 [ "x$1" = x-M ] && { pickn=20 aspect= domenu=1 strippfx=$HOME; shift; }
 
-case "$1" in
-    [1-9]*x[1-9]*)
-	geom=$1; shift ;;
-esac
-
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
 if [ $# = 1 -a -f "$1" -a -s "$1" ]
 then
+    # one argument which is a file pathname
     :
 else
+    # presume search args instead
     set x `set -x; pickim -P "$strippfx" -n $pickn -r $aspect ${1+"$@"} | sort -u` || exit 1
     shift
-    [ $# = 0 ] && exit 1
-    [ $# = 1 ] && domenu=
+    [ $# = 0 ] && { echo "$cmd: no image files chosen!" >&2; exit 1; }
+    ##[ $# = 1 ] && domenu=
 fi
 
 ##echo "*=[$*]" >&2
