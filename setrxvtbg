@@ -7,14 +7,9 @@
 # exit 0	## for a moment
 
 cmd=`basename "$0"`
-usage="Usage: $cmd [-l logfile] [{ptns...|imagefile}]"
+usage="Usage: $cmd imagefile"
 
 badopts=
-
-logf=$RXVTBGLOG
-case $1 in
-  -l)	logf=$2; shift; shift ;;
-esac
 
 if [ $# -gt 0 ]
 then
@@ -35,12 +30,5 @@ then
 		     }
 fi
 
-[ -n "$logf" ] || logf=`rxvtbglog`
-[ -s "$logf" ] || ( # some shells bail here on failure
-		    exec 2>/dev/null
-		    echo "`date` pid=$$" >>"$logf"
-		  )
-
 # dropped "-d 0.6"
 2png -s tty "$src" xpm2rxvt
-[ -n "$logf" ] && [ -w "$logf" ] && echo "$src" >>"$logf"
