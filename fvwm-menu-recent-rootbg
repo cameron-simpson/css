@@ -1,7 +1,7 @@
 #!/bin/sh
-log=$HOME/var/log/rootbg
+#
+# Recent menu backgrounds.
+#	- Cameron Simpson <cs@zip.com.au>
+#
 
-tmpf=/tmp/fvrbg$$
-tail -200 "$log" | sed 's;^$HOME/;;' | keeplast | reverse | sed 40q >$tmpf
-fvwm-menu-imlist -l $tmpf -o rootbg .
-rm $tmpf
+exec fvwm-menu-recent-imlist ${1+"$@"} <"$HOME/var/log/rootbg"
