@@ -1,0 +1,12 @@
+#!/bin/sh
+#
+# Read mail addresses, one per line, and record in raw mailrc db.
+#	- Cameron Simpson <cs@zip.com.au> 15jun98
+#
+
+rawdb=$MAILRC.rawdb
+case $1 in -f) rawdb=$2; shift; shift ;; esac
+
+[ -s "$rawdb" ] || { echo "$0: no such file: $rawdb" >&2; exit 1; }
+
+cat ${1+"$@"} | time lock "$rawdb" updrawmailrc -db "$rawdb"
