@@ -1,18 +1,8 @@
 #!/bin/sh
 #
 # Offer a list of background images.
-# Mostly used by Eterm (via et) to pick a background.
 #	- Cameron Simpson <cs@zip.com.au> 10may1999
 #
-# Use an INDEX file instead of find.	- cameron 15aug2000
-#
-
-random=
-n=0
-tall=
-wide=
-gotptns=
-anyopt=
 
 cmd=$0
 usage="Usage: $cmd [-t] [-w] [-r] [-n count] [ptns... [-- directories...]]
@@ -22,13 +12,16 @@ usage="Usage: $cmd [-t] [-w] [-r] [-n count] [ptns... [-- directories...]]
 	-t	Choose tall images (eg for tty backgrounds).
 	-w	Choose wide images (eg for wallpaper)."
 
+lfopts=
+tall=
+wide=
+gotptns=
 badopts=
 while :
 do
     case $1 in
-      -n)	n=$2; shift ;;
-      -o)	anyopt=-o ;;
-      -r)	random=1 ;;
+      -n)	lfopts="$lfopts -n $2"; shift ;;
+      -[or])	lfopts="$lfopts $1" ;;
       -t)	tall=1 ;;
       -w)	wide=1 ;;
       --)	gotptns=1; shift; break ;;
@@ -68,27 +61,4 @@ else
     fi
 fi
 
-[ -n "$ptns" ] && filter="$filter | grepall $anyopt $ptns"
-
-if [ $random ]
-then
-    filter="$filter | shuffle"
-    [ "x$n" = x0 ] || filter="$filter $n"
-else
-    [ "x$n" = x0 ] || filter="$filter | sed '${n}q'"
-fi
-
-for dir
-do
-    ndx=$dir/INDEX
-    if [ -s "$ndx" ]
-    then  sed "s;^[1-9][0-9]*  *[1-9][0-9]*  *;& $dir/;" <"$ndx"
-    else  if [ -s "$ndx.gz" ]
-	  then  gunzip < "$ndx.gz" | sed "s;^[1-9][0-9]*  *[1-9][0-9]*  *;& $dir/;"
-	  else  if [ -s "$ndx.bz2" ]
-		then  bunzip2 < "$ndx.bz2" | sed "s;^[1-9][0-9]*  *[1-9][0-9]*  *;& $dir/;"
-		fi
-	  fi
-    fi
-done \
-| ( : set -x; eval "$filter"; cat >/dev/null )
+exec listfiles -f "$filter" $lfopts $ptns -- ${1+"$@"}
