@@ -30,7 +30,7 @@ done
 
 if [ $# = 0 ]
 then
-    set space science eco comics chores "$SYSTEMID" weather
+    set space science eco chores "$SYSTEMID" weather news-au
     ## [ -n "$mode" ] || mode=html
     ## set rterm `cd "$hi" || exit 1
     ##     ls -d [a-z]*|sed -e '/^cvs$/d' -e '/^Mykefile$/d' -e 's/\.weekly$//'|sort -u`
@@ -39,51 +39,49 @@ else
     [ -n "$mode" ] || mode=normal
 fi
 
-exec 4>&1
-while [ $# -gt 0 ]
+for task
 do
-  task=$1; shift
   case "$task" in
-      /*)	task=`expr "x$task" : 'x/\(.*[^/]\)/*$'`
-	      echo "# $task" >&3
-	      ls -d "$hi/"[a-z]* \
-	      | grep -v '\.html$' \
-	      | xxargs cat \
-	      | egrep "$task" >&3
-	      ;;
-      *)	sfxs=; [ $weekly ] && sfxs="$sfxs .weekly"
-	      for sfx in '' $sfxs
-	      do  for f in "$hi/$task$sfx" "$hi/$task-"*".$sfx"
-		  do  [ -s "$f" ] && cat "$f" >&3
+    /*)	task=`expr "x$task" : 'x/\(.*[^/]\)/*$'`
+	echo "# $task"
+	ls -d "$hi/"[a-z]* \
+	| grep -v '\.html$' \
+	| xxargs cat \
+	| egrep "$task"
+	;;
+    *)	sfxs=; [ $weekly ] && sfxs="$sfxs .weekly"
+	for sfx in '' $sfxs
+	do  for f in "$hi/$task$sfx" "$hi/$task-"*".$sfx"
+	    do  [ -s "$f" ] && cat "$f"
+	    done
+	done
+	;;
+  esac \
+  | grep '^[^#]' \
+  | if [ -n "$pickn" ]; then pickn "$pickn"; else cat; fi \
+  | while read url grep
+    do  if [ -z "$grep" ]
+	then  echo "$url"
+	else  echo "$url" >&2
+	      pageurls -i "$url" \
+	      | egrep -i "$grep" \
+	      | sort -u \
+	      | ( hit=
+		  while read gurl
+		  do  ( exec >&2
+			xvurl -f "$gurl" &
+			cd $HOME/4h/im/comics || exit 1
+			exec httpget "$gurl"
+		      ) &
+		      echo "$gurl" >&2
+		      hit=1
 		  done
-	      done
-	      ;;
-  esac
-done 3>&1 1>&4 4>&- \
-| grep '^[^#]' \
-| if [ -n "$pickn" ]; then pickn "$pickn"; else cat; fi \
-| while read url grep
-  do  if [ -z "$grep" ]
-      then  echo "$url"
-      else  echo "$url" >&2
-	    pageurls -i "$url" \
-	    | egrep -i "$grep" \
-	    | sort -u \
-	    | ( exec 3>&1 1>&2
-		hit=
-		while read gurl
-		do  ( exec 3>&-
-		      xvurl -f "$gurl" &
-		      cd $HOME/4h/im/comics || exit 1
-		      exec httpget "$gurl"
-		    ) &
-		    echo "$gurl" >&2
-		    hit=1
-		done
-		[ $hit ] || { echo "no hits grepping $url for \"$grep\"" >&2
-			      echo "$url" >&3
-			    }
-	      )
-      fi &
-  done \
-| urlshow &
+		  [ $hit ] || { echo "no hits grepping $url for \"$grep\"" >&2
+				echo "$url"
+			      }
+		)
+	fi &
+    done \
+  | catthen lock hi-urls urlshow \
+  &
+done
