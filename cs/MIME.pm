@@ -180,9 +180,10 @@ The default is to ignore it.
 
 =cut
 
-sub new($;$$)
-{ my($class,$s,$usecsize)=@_;
+sub new($;$$$)
+{ my($class,$s,$usecsize,$sinkfile,$keepsink)=@_;
   $usecsize=0 if ! defined $usecsize;
+  $keepsink=0 if ! defined $keepsink;
 
   my $this = new cs::RFC822;
   $this->{cs::MIME::TYPE}=TEXT;		# text/plain by default
@@ -193,7 +194,7 @@ sub new($;$$)
   bless $this, $class;
 
   if (defined $s)
-  { $this->UseSource($s,$usecsize);
+  { $this->UseSource($s,$usecsize,$sinkfile,$keepsink);
   }
 
   $this;
@@ -292,13 +293,18 @@ sub _ReSync($)
   }
 }
 
-=item UseSource(I<source>,I<usecsize>)
+=item UseSource(I<source>,I<usecsize>,I<sinkfile>,I<keepsink>)
 
 Read headers and body from the supplied I<source>.
 The optional I<usecsize> parameter
 says to trust the B<Content-Size> header if present,
 placing a limit on the data read from the I<source>.
 The default is to ignore it.
+Supplying the optional I<sinkfile> parameter
+causes UseSource() to store the I<source> in the named file I<sinkfile>
+instead of memory.
+The optional parameter I<keepsink> specifies whether the I<sinkfile>
+is to be unlinked on object destruction.
 
 =cut
 
