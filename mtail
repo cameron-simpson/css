@@ -1,0 +1,34 @@
+#!/bin/sh
+#
+# Simple minded tail multiple files at once, with hook to add more files.
+#	- Cameron Simpson <cs@zip.com.au> 21feb2005
+#
+
+: ${TMPDIR:=/tmp}
+: ${LOGDIR:=$HOME/var/log}
+
+cmd=`basename "$0"`
+usage="Usage: $cmd files..."
+
+pids=
+
+for file
+do
+  case "$file" in
+    ./* | ../* | /* ) ;;
+    *)	file=$LOGDIR/$file ;;
+  esac
+  utail "$file" &
+  pids="$pids $!"
+done
+
+while read -r file
+do
+  if [ -n "$file" ]
+  then
+    utail "$file" &
+    pids="$pids $!"
+  fi
+done
+
+kill $pids
