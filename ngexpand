@@ -1,0 +1,40 @@
+#!/bin/sh
+#
+# Expand a host list that may contain @ng and !host and !@ng.
+# Output is sorted and unique.
+#	- Cameron Simpson <cs@zip.com.au> 12jul2004
+#
+
+: ${TMPDIR:=/tmp}
+
+cmd=$0
+usage="Usage: $cmd {host|@ng|!host|!ng}..."
+
+[ $# = 0 ] && { echo "$cmd: missing hosts" >&2
+		echo "$usage" >&2
+		exit 2
+	      }
+
+hl=$TMPDIR/nge$$
+trap 'rm -f "$hl"' 0 1 15
+
+>>"$hl"
+
+for h
+do
+  case "$h" in
+    !*)	tail=`expr "x$h" : '..\(.*\)'`
+	tmp=$TMPDIR/nget$$
+	sort -u <"$hl" >"$tmp" || exit 1
+	"$0" "$tail" | comm -23 "$tmp" - >"$hl"
+	rm "$tmp"
+	;;
+    @*)	ng=`expr "x$h" : '..\(.*\)'`
+	ngr "$ng" >>"$hl"
+	;;
+    *)	echo "$h" >>"$hl"
+	;;
+  esac
+done
+
+sort -u <"$hl"
