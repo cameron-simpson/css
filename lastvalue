@@ -4,10 +4,12 @@
 #	- Cameron Simpson <cs@zip.com.au> 02dec2002
 #
 
+##echo "[$0 $*]" >&2
+
 dir=$HOME/var/log/lastvalue
 
 cmd=$0
-Usage="Usage: $cmd [-d dir] param [value|-]"
+Usage="Usage: $cmd [-d dir] [param [value|-]]"
 
 badopts=
 
@@ -15,8 +17,8 @@ badopts=
 
 if [ $# = 0 ]
 then
-    echo "$cmd: missing param" >&2
-    badopts=1
+    cd "$dir" || exit 1
+    exec grep . /dev/null *
 else
     param=$1; shift
     case "$param" in
