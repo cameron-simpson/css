@@ -6,16 +6,23 @@
 #
 
 cmd=$0
-usage="Usage: $cmd [-t title] [podfiles...]"
+usage="Usage: $cmd [-j] [-t title] [podfiles...]
+	-j	Skip JavaScript tersify() function.
+		Useful if you're making several indices in one file.
+	-t title Set title."
 
 indextitle="Index of `pwd`"
+dotersefn=1
 
+[ "x$1" = x-j ] && { dotersefn=; shift; }
 [ "x$1" = x-t ] && { title=$2; shift; shift; }
 
 [ $# = 0 ] && { set x *.pod; shift; }
 
-# style sheet for "terse" button
-cat <<-'X'
+# javascript for "terse" button
+if [ $dotersefn ]
+then
+  cat <<-'X'
 	<SCRIPT><!--
 	var displaymode;
 	function tersify()
@@ -34,6 +41,7 @@ cat <<-'X'
 	document.write("[&nbsp;<A HREF=\"javascript:tersify()\">Terse</A>&nbsp;]<BR>\n");
 	--></SCRIPT>
 X
+fi
 
 echo "<UL>"
 for podfile
@@ -46,7 +54,7 @@ do
 
   echo "$podfile $author $title"
 done \
-| sort +1 \
+| sort +2 \
 | while read podfile author title
   do
     htfile=`basename "$podfile" .pod`.html
@@ -70,7 +78,14 @@ done \
 	echo
       ) \
       | pod2html "--title=$indextitle" - \
-      | sed -n '1,/^<!-- INDEX END -->/d; /^<p>/,/<\/p>$/p' \
+      | sed -n '1,/^<!-- INDEX END -->/d
+		/^<p>/b para
+		d
+		:para
+		p
+		/<\/p>$/q
+		n
+		b para' \
       | sed -e 's/^<p>//' -e 's/<\/p>$//'
       echo "</SMALL></SPAN>"
     fi
