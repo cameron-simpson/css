@@ -1,0 +1,21 @@
+#!/bin/sh
+#
+# Wrapper for ImageMagick's mogrify so I can pipe into it.
+#	- Cameron Simpson <cs@zip.com.au> 16oct2000
+#
+
+TMPDIR=$HOME/tmp
+export TMPDIR
+
+tmp=$TMPDIR/fm$$
+
+{ cat >$tmp && [ -s "$tmp" ]; } || { rm -f "$tmp"; exit 1; }
+
+# DISPLAY hack because sometimes mogrify seems to take it into its head to pop up a window
+DISPLAY= mogrify ${1+"$@"} $tmp
+xit=$?
+
+{ [ -s "$tmp" ] && cat $tmp; } || xit=1
+
+rm -f $tmp
+exit $xit
