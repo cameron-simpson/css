@@ -113,8 +113,8 @@ sub h2s
 
   if ($cs::Hier::_Active{$refkey})
   {
-  # warn "$::cmd: recurse structure at $refkey\n"
-  #	if ! $cs::Hier::PtrTags;
+    ## warn "$::cmd: recurse structure at $refkey\n"
+    ##	if ! $cs::Hier::PtrTags;
     $s->Put("&($refkey)");
     return;
   }
@@ -624,6 +624,36 @@ sub savehash($$)
   }
 
   scalar(@keys);
+}
+
+=item edithash(I<hashref>,I<editor>)
+
+=cut
+
+sub edithash($;$)
+{ my($h,$editor)=@_;
+  my $editor = ( defined $ENV{EDITOR} ? $ENV{EDITOR} : 'vi' );
+
+  my $tmp;
+
+  { my $s;
+
+    ::need(cs::Sink);
+    $s = cs::Sink::tmpSink();
+    return undef if ! defined $s;
+
+    savehash($s,$h);
+
+    $tmp=$s->Path();
+  }
+
+  system("$editor $tmp");
+
+  $h=loadhash($tmp);
+
+  unlink($tmp) || warn "$::cmd: warning: can't unlink $tmp: $!\n";
+
+  $h;
 }
 
 =item cleanhash(I<hashref>)
