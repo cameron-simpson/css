@@ -5,7 +5,7 @@
 #
 # =head1 NAME
 #
-# rsmirror - maintain a local mirror of portions of rsync servers
+# rsmirror - maintain a local mirror of portions of rsync/http/ftp servers
 #
 # =head1 SYNOPSIS
 #
@@ -16,6 +16,8 @@
 # I<rsmirror> reads a configuration file
 # to obtain a list of rsync servers and repository information
 # and keeps a local mirror up to date.
+# It will also handle B<http:> and B<ftp:> servers
+# although rsync(1) is much to be preferred if available.
 #
 
 : ${TMPDIR:=/tmp}
