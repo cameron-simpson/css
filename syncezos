@@ -14,7 +14,7 @@ set -x
 
 syncezos-rc
 
-rsync -avHPW --delete --exclude=CVS/ --exclude=/kath $ezoshtml/. ezos:public_html/.
+rsync -avHPW --delete --exclude=CVS/ --include=/cs --include=/fay --exclude=/* $ezoshtml/. ezos:public_html/.
 
 ##syncezos-cgi
 ##rsync -avHPW --delete --exclude=CVS/ $ezoscgi/. ezos:cgi-bin/.
