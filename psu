@@ -13,6 +13,8 @@ do  case $1 in
 done
 
 case $ARCH in
+    *bsd)
+	exec pt ww -U "$user" ${1+"$@"} ;;
     sun.*.sunos|dec.*.ultrix|apollo.*.domainos)
     	exec ps xww${1+"$@"} ;;
     *.*.linux)
