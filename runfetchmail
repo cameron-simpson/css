@@ -46,4 +46,5 @@ do
   sleep $fmdelay &
   echo $! >"$VARRUN/fetchmail_sleep.pid"
   wait
+  killpidfile getmail_flush.pid
 done
