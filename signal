@@ -1,0 +1,6 @@
+#!/bin/sh
+
+for sig
+do
+    grep -i "$sig" /usr/include/sys/signal.h
+done
