@@ -6,7 +6,6 @@
 
 [ $# = 0 ] || { echo "Usage: $0 < vcard" >&2; exit 2; }
 
-set -x
 ( echo;exec cat ) \
 | sed -n \
       -e '1,/^[Bb][Ee][Gg][Ii][Nn]:[Vv][Cc][Aa][Rr][Dd]/d' \
@@ -22,7 +21,6 @@ set -x
       -e "s/'/'\\''/g" \
       -e "s/:[ 	]*\\(.*\\)/='\\1'/" \
       -e 's/^/vcard_/p' \
-| tee /dev/tty \
 | (eval "`cat`"
     n=$vcard_fn
     [ -n "$vcard_email_internet" ] && n="$n <$vcard_email_internet>"
