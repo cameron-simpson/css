@@ -4,18 +4,13 @@
 #	- Cameron Simpson <cs@zip.com.au>
 #
 
-jobtimer -a \
-| while read id name
-  do  state=`jobtimer "$id" state`
-      [ "x$state" = xCLOSED ] && continue
+joblist name category state title \
+| awk '-F	' '$4 != "CLOSED" { print }' \
+| while read id name category state title
+  do
       label=$name
-
-      title=`jobtimer "$id" title`
       [ -n "$title" ] && label="$label: $title"
-
-      cat=`jobtimer "$id" category`
-      [ -n "$cat" ] && label="$label	$cat"
-
+      [ -n "$category" ] && label="$label	$category"
       echo "\"$label\" Exec exec job $name"
   done \
 | sort
