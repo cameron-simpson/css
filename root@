@@ -18,7 +18,7 @@ newflag=-N
 while :
 do  case $1 in
       -[12])	sshproto=$1 ;;
-      -X)	sshopts="$sshopts $1" ;;
+      -[xXv])	sshopts="$sshopts $1" ;;
       -N)	newflag=-N ;;
       +N)	newflag= ;;
       --)	shift; break ;;
