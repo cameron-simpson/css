@@ -1,0 +1,44 @@
+#!/bin/sh
+#
+# Permit outgoing traffic for a service to specified hosts (or "ALL").
+#	- Cameron Simpson <cs@zip.com.au> 18oct2003
+#
+
+cmd=$0
+usage="Usage: $cmd [-l] dest-port {ALL | hosts...}"
+
+badopts=
+
+dolog=
+[ "x$1" = x-l ] && { dolog=1; shift; }
+
+if [ $# = 0 ]
+then
+    echo "$cmd: missing dest-port" >&2
+    badopts=1
+else
+    dport=$1; shift
+    if [ $# = 0 ]
+    then
+	echo "$cmd: missing ALL or hosts" >&2
+	badopts=1
+    fi
+fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+if [ "x$*" = xALL ]
+then
+    set -x
+    [ $dolog ] && iptables -A OUTPUT -p tcp --destination-port "$dport" --syn -j LOGACCEPT
+    iptables -A OUTPUT -p tcp --destination-port "$dport" -j ACCEPT
+    iptables -A INPUT -p tcp --source-port "$dport" ! --syn -j ACCEPT
+else
+    set -x
+    for host
+    do
+      [ $dolog ] && iptables -A OUTPUT -p tcp -d "$host" --destination-port "$dport" --syn -j LOGACCEPT
+      iptables -A OUTPUT -p tcp -d "$host" --destination-port "$dport" -j ACCEPT
+      iptables -A INPUT -p tcp -s "$host" --source-port "$dport" ! --syn -j ACCEPT
+    done
+fi
