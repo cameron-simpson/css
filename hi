@@ -19,7 +19,7 @@ noop=
 
 if [ $# = 0 ]
 then
-    set space science eco weather comics wallpaper chores "$SYSTEMID"
+    set space science eco comics wallpaper chores "$SYSTEMID" weather
     ## [ -n "$mode" ] || mode=html
     ## set rterm `cd "$hi" || exit 1
     ##     ls -d [a-z]*|sed -e '/^cvs$/d' -e '/^Mykefile$/d' -e 's/\.weekly$//'|sort -u`
@@ -39,14 +39,12 @@ urllist=/tmp/hi-urls.$$
 		echo "# $task" >&3
 		cat "$hi/"[a-z]* | egrep "$task" >&3
 		;;
-	*)	if [ -f "$hi/$task" -o -f "$hi/$task.weekly" ]
-		then
-		    echo "# $task" >&3
-		    [ -s "$hi/$task" ] && cat "$hi/$task" >&3
-		    [ $weekly ] && [ -s "$hi/$task.weekly" ] && cat "$hi/$task.weekly" >&3
-		else
-		    echo "$cmd: $task: unknown task" >&2
-		fi
+	*)	sfxs=; [ $weekly ] && sfxs="$sfxs .weekly"
+		for sfx in '' $sfxs
+		do  for f in "$hi/$task$sfx" "$hi/$task-"*".$sfx"
+		    do  [ -s "$f" ] && cat "$f" >&3
+		    done
+		done
 		;;
     esac
   done 3>&1 1>&4 4>&- \
