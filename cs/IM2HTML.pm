@@ -15,7 +15,7 @@ use strict qw(vars);
 
 use cs::HTML;
 use cs::Pathname;
-use cs::Date;
+##use cs::Date;
 use cs::Misc;
 use cs::Source;
 use cs::IFMSink;
