@@ -42,4 +42,5 @@ fi
 # subshell because some shells abort if the >> fails
 ( [ -n "$logf" ] && [ -s "$logf" ] && echo "$src" >>"$logf" )
 
-2xpm -d 0.6 -s tty "$src" xpm2rxvt || set-x nbg -y "$src"
+# dropped "-d 0.6"
+2xpm -s tty "$src" xpm2rxvt || set-x nbg -y "$src"
