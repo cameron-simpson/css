@@ -39,7 +39,7 @@ $mode=oct($mode);
 $xit=0;
 $olddir='';
 
-if ($#ARGV < 0)
+if (!@ARGV)
 { while (<STDIN>)
   { chop;
     &mod($_,$mode,$verbose);
