@@ -65,4 +65,5 @@ done
 [ $any ] && { set x ${1+"$@"} -e d -e ':ok'; shift; }
 [ $icase ] && { set x ${1+"$@"} -e g; shift; }
 
+##set -x
 exec sed "$@"
