@@ -15,7 +15,7 @@ export PATH
 
 date
 
-wrapper=/opt/mailman/mail/wrapper
+wrapper=/home/sweet/mailman/mail/wrapper
 
 PATH=/bin:/usr/bin:/usr/sbin:/opt/script:$PATH
 export PATH
