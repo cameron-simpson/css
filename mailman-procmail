@@ -13,8 +13,6 @@
 PATH=$PATH:/opt/script
 export PATH
 
-date
-
 wrapper=/home/sweet/mailman/mail/wrapper
 
 PATH=/bin:/usr/bin:/usr/sbin:/opt/script:$PATH
@@ -48,6 +46,14 @@ sed -n -e '/^$/q' -e 's/@.*//' -e 's/^Delivered-To: *//p' \
 	mailman+* )
 		list=`expr "$delivery" : 'mailman+\(.*\)'`
 		wrapfor=post
+		if sed '/^$/q' $tmp | grep '^X-Spam-Status: Yes,'
+		then
+		    wrapfor=
+		    sed -e '/^$/,$b ok' \
+			-e "s/^[Ss][Uu][Bb][Jj][Ee][Cc][Tt]:/& SPAM to list \"$list\":/" \
+			$tmp \
+		    | sendmail -oi "mailman+$list-owner" 
+		fi
 		;;
 	*)	echo "$0: don't known what to do with email for \"$delivery\"" >&2
 		cat $tmp >&2
