@@ -1,0 +1,3 @@
+#!/usr/bin/perl -p
+
+s/%([\da-f][\da-f])/chr(hex($1))/egi;
