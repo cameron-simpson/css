@@ -1,0 +1,20 @@
+#!/usr/bin/perl
+#
+# Encode/decode base64 data.
+#	- Cameron Simpson <cs@zip.com.au>
+#
+
+use strict qw(vars);
+
+use cs::Source;
+use cs::MIME::Base64;
+
+$::Mode=DECODE;	# default
+
+my($dec)=new cs::MIME::Base64 (Decode,(new cs::Source (FILE,STDIN)));
+
+local($_);
+
+while (defined ($_=$dec->Read()) && length)
+{ print;
+}
