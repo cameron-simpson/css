@@ -1,0 +1,11 @@
+#!/bin/sh
+# - Cameron Simpson <cs@zip.com.au> 22mar2001
+[ $# = 0 ] && { echo "Usage: $0 command [args...]" >&2; exit 2; }
+eval `rigSOURCE_DISPLAY`
+DISPLAY=$SOURCE_DISPLAY
+case $DISPLAY in
+    $HOST:* | $HOSTNAME:*)
+	DISPLAY=`expr "x$DISPLAY" : 'x.*\(:.*\)'` ;;
+esac
+export DISPLAY
+exec "$@"
