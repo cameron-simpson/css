@@ -1,6 +1,6 @@
 #!/bin/sh
 
-log=`logpath console`
+log=$CONSOLE
 [ -n "$log" ] || log=console
 
 exec alog "$log" ${1+"$@"}
