@@ -1,3 +1,2 @@
 #!/bin/sh
-set -x
 exec pageif cvslog2html -t ${1+"$@"}
