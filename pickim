@@ -35,7 +35,7 @@ then
 		  }
     echo "$imagefile"
 else
-    [ $# = 0 ] && set !tiles !comics !funny !UNFILED
+    [ $# = 0 ] && set !tiles !comics !funny !unfiled !people
     images=`bglist $bgopts "$@"`
 
     if [ -z "$images" ]
