@@ -6,7 +6,7 @@
 
 =head1 NAME
 
-cs::Palm::PDB - read and writ Palm Pilot database files
+cs::Palm::PDB - read and write Palm Pilot database files
 
 =head1 SYNOPSIS
 
@@ -23,13 +23,14 @@ use strict qw(vars);
 BEGIN { use cs::DEBUG; cs::DEBUG::using(__FILE__); }
 
 use cs::Misc;
+use cs::Object;
 use cs::Palm;
 
 package cs::Palm::PDB;
 
 require Exporter;
 
-@cs::Palm::PDB::ISA=qw();
+@cs::Palm::PDB::ISA=qw(cs::Object);
 
 =head1 GENERAL FUNCTIONS
 
@@ -47,6 +48,7 @@ sub toc($)
   my $PDB = new cs::Palm::PDB $file;
   return if ! defined $PDB;
 
+  ::need(cs::Hier);
   print cs::Hier::h2a($PDB,1), "\n";
 }
 
@@ -54,21 +56,24 @@ sub toc($)
 
 =head1 OBJECT CREATION
 
-Preamble on creation methods.
-
 =over 4
 
-=item new cs::Palm::PDB I<file>
+=item new cs::Palm::PDB I<file>, I<creator>, I<dbname>
 
 Create a B<cs::Palm::PDB> object attached to the I<file>.
+if I<file> exists it must match the I<creator> and I<dbname> supplied.
 
 =cut
 
-sub new($$)
-{ my($class,$file,$dbname)=@_;
-  $dbname = "unknown" if ! defined $dbname;
+sub new($$$$)
+{ my($class,$file,$creator,$dbname)=@_;
+
+  my(@c)=caller;
+  warn "creator \"$creator\" must be 4 bytes from [@c]"
+	if length($creator) != 4;
 
   my $this = bless { DBNAME => $dbname,
+		     CREATOR => $creator,
 		     FILENAME => $file,
 		   }, $class;
 
@@ -78,11 +83,17 @@ sub new($$)
       return undef;
     }
 
-    $this->_Load(PDB);
+    if (! $this->_Load(PDB,$creator,$dbname))
+    { warn "errors loading \"$file\"";
+      close(PDB);
+      return undef;
+    }
+
     close(PDB);
   }
   else
-  { my $now = time;
+  { warn "\"$file\" doesn't exist";
+    my $now = time;
 
     for my $field (qw(CTIME MTIME BTIME))
     { $this->{$field}=$now;
@@ -104,8 +115,8 @@ sub new($$)
 
 =cut
 
-sub _Load($$)
-{ my($this,$F)=@_;
+sub _Load($$$$)
+{ my($this,$F,$creator,$dbname)=@_;
 
   local($_);
 
@@ -141,6 +152,12 @@ sub _Load($$)
 
   $this->{DBNAME} =~ s/\0+$//;
 
+  if ($creator ne $this->{CREATOR}
+   || $dbname ne $this->{DBNAME})
+  { warn "creator/dbname supplied \"$creator/$dbname\" doesn't match file \"$this->{CREATOR}/$this->{DBNAME}\n";
+    return 0;
+  }
+
   my $R;
 
   for my $nr (1..$this->{NR})
@@ -174,9 +191,23 @@ sub _Load($$)
   1;
 }
 
-sub FileName($)
-{ shift->{FILENAME};
+=item FileName(I<file>)
+
+Set or return the filename
+to which this object is attached.
+
+=cut
+
+sub FileName($;$)
+{ my($this)=shift;
+  $this->GetSet(FILENAME,@_);
 }
+
+=item NRecords()
+
+Return the number of records in the file.
+
+=cut
 
 sub NRecords($)
 { shift->{NR};
@@ -194,7 +225,7 @@ sub _LoadRecords($)
   my @s = stat PDB;
   my $fsize = $s[7];
 
-  my $RR = $this->{RECORDS} = [];
+  my $RR = ($this->{RECORDS} = []);
 
   for my $nr (1..$this->NRecords())
   {
@@ -205,6 +236,9 @@ sub _LoadRecords($)
     { warn "$::cmd: can't seek to $R->{OFFSET} to read record $nr: $!";
       delete $this->{RECORDS};
       return 0;
+    }
+    else
+    { ## warn "seek($R->{OFFSET}) ok";
     }
 
     my $len = ( $nr == $this->NRecords()
@@ -219,8 +253,18 @@ sub _LoadRecords($)
     }
   }
 
+  ## warn "RECORDS=".cs::Hier::h2a($this->{RECORDS},1);
+
   1;
 }
+
+=item Record(I<n>)
+
+Return the content of record I<n>
+(counting from zero)
+as a string.
+
+=cut
 
 sub Record($$)
 { my($this,$nr)=@_;
@@ -241,7 +285,7 @@ sub Record($$)
 
 =head1 SEE ALSO
 
-B<cs::Palm(3)>
+cs::Palm(3)
 
 =head1 AUTHOR
 
