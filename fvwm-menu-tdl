@@ -1,0 +1,8 @@
+#!/bin/sh
+#
+# Access TDL stuff.
+#	- Cameron Simpson <cs@zip.com.au> 21jun2004
+#
+
+tdl ls \
+| perl -pe 's/^ *(\d+(\.\d+)*).*/"$&" Exec term/'
