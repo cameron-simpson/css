@@ -147,4 +147,4 @@ exec 1>&2
     )
   done
 ) &
-renice +10 -p $! >/dev/null
+renice +10 -p $! >/dev/null 2>&1
