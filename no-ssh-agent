@@ -1,0 +1,12 @@
+#!/bin/sh
+#
+# Ssh lacks a methods to restrict what authentication mechanisms
+# it uses. Hence this hack to at least remove the ssh-agent knowledge
+# from the environment.
+#	- Cameron Simpson <cs@zip.com.au> 17mar99
+#
+
+unset SSH_AGENT_PID
+unset SSH_AUTH_SOCK
+
+exec "$@"
