@@ -1,0 +1,8 @@
+#!/bin/sh
+#
+# List recursive diff of two dirs with some noise chopped.
+#	- Cameron Simpson <cs@zip.com.au> 22nov98
+#
+
+[ -t 1 ] || PAGER=cat
+diffu -br ${1+"$@"} 2>&1 | grep -v '^Only in ' | ${PAGER:-less}
