@@ -2,7 +2,7 @@
 #
 # Take a log message and an attachment data on stdin
 # and log it appropriately.
-#	- Cameron Simpson <cs@zip.com.au> 
+#	- Cameron Simpson <cs@zip.com.au> 09jul2004
 #
 
 cmd=`basename "$0"`
