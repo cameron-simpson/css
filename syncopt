@@ -180,7 +180,7 @@ do
 	       s/^$thing \\([^ ]*\\).*/makelocal= version=\\1 nosync=/
 	       b done
 	       :vers
-	       s/^$thing /version= nosync=/
+	       s/^$thing /nosync= version=/
 	       :done"
     ## echo "$thing:"
     opts=`2>/dev/null sed -e "$sedscript" "$cf"`
