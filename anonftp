@@ -1,0 +1,159 @@
+#!/bin/sh
+#
+# Anonymous ftp to a host.
+#	- Cameron Simpson <cs@zip.com.au>
+#
+
+cmd=`basename "$0"`
+
+EMAIL=${EMAIL-"$USER@${SITENAME-research.canon.com.au}"}	# cut to suit
+AFTPLOG=${AFTPLOG-$HOME/private/aftplog}
+ALEXHOST=${ALEXHOST-archie.au}
+ALEXDIR=${ALEXDIR-/alex}
+export EMAIL ALEXHOST ALEXDIR AFTPLOG
+conv=binary
+login=anonymous
+ftp=ftp	## /opt/bin/rftp
+usealex=
+init=
+
+oargs=$*
+
+#	-A	Actually connect to an alex server ($ALEXHOST:$ALEXDIR).
+#	+A	Don't connect to an alex server.
+
+usage="Usage: $cmd [-[biv]] [-d workdir] [-l login] [-p password] \\
+	host[:target] [commands...]
+
+	-a	ASCII mode by default.
+	-b	Binary mode (default).
+	-e cmd	Run command once connected.
+	-f ftp	Specify ftp command such as rftp for firewalls (default: $ftp).
+	-g	Arguments are files to get, not ftp commands.
+	-i	Interactive after performing commands.
+	-l	Specify ftp login name (default: $login).
+	-n	No action. Just list .netrc produced.
+	-p	Specify password (default $EMAIL).
+	-v	Verbose."
+
+gflag=
+iflag=
+nflag=
+vflag=
+badopts=
+host=
+target=
+password="
+password $EMAIL"
+cmds=
+
+eval "set x $AFTPARGS "'${1+"$@"}'; shift
+while :
+do
+    case "$#,$1" in
+	*,--)	shift; break ;;
+	1,-[efl]) echo "$cmd: missing argument to $1" >&2
+		badopts=1
+		;;
+#	*,-A)	usealex=1 ;;
+#	*,+A)	usealex= ;;
+	*,-a)	conv=ascii ;;
+	*,-b)	conv=binary ;;
+	*,-e)	cmds="$cmds
+		      $2"; shift ;;
+	*,-f)	ftp=$2; shift ;;
+	*,-g)	gflag=get ;;
+	*,-l)	login=$2; shift; password= ;;
+	*,-L)	AFTPLOG=$2; shift; export AFTPLOG ;;
+	*,-n)	nflag=1 ;;
+	*,-p)	password="
+password $2"; shift ;;
+	*,-i)	iflag=1 ;;
+	*,-v)	vflag=-v ;;
+	*,-*)	echo "$cmd: bad argument \"$1\"" >&2
+		badopts=1
+		;;
+	*,*)	break ;;
+    esac
+    shift
+done
+
+if [ $# = 0 ]
+then	echo "$cmd: missing hostname" >&2
+	badopts=1
+else
+	host=$1; shift
+fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+[ -w "$AFTPLOG" ] && echo "aftp $oargs" >>"$AFTPLOG"
+
+cmds="prompt
+      hash
+      $conv
+      $cmds"
+
+: t -vx
+case "$host" in
+    ftp://*)
+	target=`exec expr "x$host" : 'x[^:]*://[^/]*\(.*\)'`
+	host=`exec expr "x$host" : 'x[^:]*://\([^/]*\).*'`
+	;;
+    *:*)target=`exec expr "x$host" : 'x[^:]*:\(.*\)'`
+	host=`exec expr "x$host" : 'x\([^:]*\):.*'`
+	;;
+    */*)target=`exec expr "x$host" : 'x[^/]*/\(.*\)'`
+	host=`exec expr "x$host" : 'x\([^/]*\)/.*'`
+	;;
+esac
+
+case "$target" in
+    */)	set x "cd \"$target\"" dir ${1+"$@"}; shift ;;
+    */*)targetdir=`exec dirname "$target"`
+	target=`exec basename "$target"`
+	set x "cd \"$targetdir\"" "get \"$target\"" ${1+"$@"}; shift
+	;;
+    ?*)	set x "get \"$target\"" ${1+"$@"}; shift ;;
+esac
+
+case $# in
+    0)	iflag=1	# no commands, interactive by default
+	case "$target" in
+	    ?*)	init="$init
+		      pwd"
+		;;
+	esac
+	;;
+    *)	for arg
+	do init="$init
+		 $gflag $arg"
+	done
+	;;
+esac
+
+ftphome=/tmp/aftp$$
+mkdir "$ftphome" || exit $?
+netrc=$ftphome/.netrc
+
+echo >"$netrc" "machine $host
+login $login $password
+macdef init
+$init
+"
+chmod 600 "$netrc"
+
+[ -n "$iflag" ] || exec </dev/null	# cancel interaction
+
+case "$nflag" in
+    ?*)	cat "$netrc" ;;
+    *)	( HOME=$ftphome; export HOME
+	  exec pushttylabel "$ftp $host" sh -c "$ftp $vflag \"$host\""
+	)
+	;;
+esac
+
+rm -f "$netrc"
+rmdir "$ftphome" 2>/dev/null
+
+[ -d "$ftphome" ] && ls -la "$ftphome"
