@@ -7,9 +7,8 @@
 #
 
 cmd=$0
-usage="Usage: $cmd [-s] [-D] [-xpl] imagefile
+usage="Usage: $cmd [-s] [-xpl] imagefile
 	-s	Synchronous.
-	-D	The background is per-desk, not global.
 	-xpl	Use xplanet for the background."
 
 [ -n "$DISPLAY" ] || { echo "$cmd: no \$DISPLAY!" >&2; exit 1; }
@@ -28,7 +27,6 @@ while :
 do  case $1 in
         -xpl)	xplanet=1 opts="$opts -xpl" ;;
 	-s)	sync=1 opts="$opts -s" ;;
-	-D)	perdesk=1 opts="$opts -D" ;;
 	--)	shift; break ;;
 	-?*)	echo "$cmd: unrecognised option: $1" >&2
 		badopts=1
@@ -70,6 +68,7 @@ then
   esac
 fi
 
+# obtain sized version of the image; may be the image itself!
 rootbg=`mkwall "$imagefile"` || exit 1
 
 (
@@ -78,7 +77,6 @@ rootbg=`mkwall "$imagefile"` || exit 1
     ##set -x
     # note backdrop if not a per-desk setting
     lastvalue "rootbg-$HOST" "$rootbg"
-    [ $perdesk ] || lastvalue "desk_dfltrootbg" "$rootbg"
   ) &
 
   if [ $xplanet ]
