@@ -1,0 +1,21 @@
+use cs::Persist;
+
+$old=cs::Persist::db('/usr/local/etc/cisra/db/projects');
+$new=cs::Persist::db('/usr/local/etc/cisra/db/projects-new',1);
+
+for (keys %$old)
+	{ $P=$old->{$_};
+	  $nkey=(exists $P->{NAME} ? $P->{NAME} : $_);
+
+	  if (exists $new->{$nkey})
+		{ warn "new{$nkey} already exists, skipping $_\n";
+		}
+	  else	{ $new->{$nkey}=$P;
+		  $new->{$nkey}->{ACCTCODE}=$_;
+		}
+	}
+
+undef $old;
+undef $new;
+
+cs::Persist::finish();
