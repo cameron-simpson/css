@@ -5,7 +5,7 @@
 #	- Cameron Simpson <cs@zip.com.au> 22jun2003
 #
 
-trace=echo
+trace=set-x
 pcnt=5
 onepass=1
 keepn=1
@@ -15,7 +15,8 @@ cmd=`basename "$0"`
 usage="Usage: $cmd [-% pcnt] [-1rfnx] [-k keep] dir
 	-1	One pass - remove at most one backup.
 	-r	Repeat - remove backups until free threshold reached.
-	-n	No action. Report proposed actions.
+	-n	No action (default). Report proposed actions.
+	-q	Don't trace execution.
 	-x	Trace execution. Show actions as dispatched.
 	-% pcnt	Desires free disc percentage. Default: $pcnt
 	-k keep	Keep at least this many backups. Default: $keepn"
@@ -33,8 +34,8 @@ do
 	shift
 	;;
     -r)	onepass= ;;
-    -f) force=1 ;;
     -n) trace=echo ;;
+    -q) trace= ;;
     -x) trace=set-x ;;
     --) shift; break ;;
     -?*)echo "$cmd: unrecognised option: $1" >&2; badopts=1 ;;
