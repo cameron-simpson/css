@@ -8,7 +8,6 @@ report=
 xclip=
 case $1 in
     -n) report=1; shift ;;
-    -x) xclip=1; shift ;;
 esac
 
 # [ -n "$tty_yellow" ] && echo "$tty_yellow$label$tty_normal"
@@ -63,10 +62,4 @@ ttylabel=
 [ -n "$_start_title" ] && ttylabel=$ttylabel$_start_title$label$_end_title
 [ -n "$_start_icon" ] && ttylabel=$ttylabel$_start_icon$label$_end_icon
 
-if [ $xclip ]
-then
-    shlabel=`shqstr "$ttylabel" | sed 's//&/g'`
-    cutbuffer "echo $shlabel"
-else
-    necho "$ttylabel"
-fi
+exec necho "$ttylabel"
