@@ -1,0 +1,36 @@
+#!/bin/sh
+#
+# Quick mount of PC share for archiving.
+#	- Cameron Simpson <cs@zip.com.au> 10jan2003
+#
+
+user=cameron
+mnt=/win
+
+cmd=`basename "$0"`
+usage="Usage: $cmd //pc/share"
+
+badopts=
+
+if [ $# = 0 ]
+then
+  echo "$cmd: missing //pc/share" >&2
+  badopts=1
+else
+  share=$1; shift
+  case "$share" in
+    //*/*) ;;
+    *)	   echo "$cmd: bad PC share \"$share\", should look like //pc/share" >&2
+	   badopts=1
+	   ;;
+  esac
+  [ $# = 0 ] || { echo "$cmd: extra arguments: $*" >&2
+		  badopts=1
+		}
+fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+set -x
+mount -t smbfs -o "username=$user,workgroup=CISRA,uid=$user,fmask=644,dmask=755" "$share" "$mnt" || exit 1
+L "$mnt"
