@@ -7,11 +7,11 @@
 #	- Cameron Simpson <cs@zip.com.au> 25aug99
 # 
 
-cmd=`basename "$0"`
+: ${LOGDIR:=$HOME/var/log}
+: ${CONSOLE:=$LOGDIR/console}
+: ${VARRUN:=$HOME/var/run}
 
-CONSOLE=${CONSOLE:-$HOME/var/log/console}
-VARRUN=${VARRUN:-$HOME/var/run}
-export CONSOLE VARRUN
+cmd=`basename "$0"`
 
 input=/dev/null
 logfile=$CONSOLE
@@ -51,7 +51,7 @@ combase=`basename "$command"`
 [ -n "$logfile" ] || logfile=$combase@$HOST
 [ -n "$pidfile" ] || pidfile=$combase@$HOST
 
-case $logfile in -|/*) ;; *) logfile=$HOME/var/log/$logfile ;; esac
+case $logfile in -|/*) ;; *) logfile=$LOGDIR/$logfile ;; esac
 case $pidfile in -|/*) ;; *) pidfile=$VARRUN/$pidfile ;; esac
 
 ## echo "logfile=$logfile, pidfile=$pidfile"
