@@ -1,0 +1,21 @@
+#!/bin/sh
+
+rrsync=rsync
+
+cmd=$0
+usage="Usage: $cmd [--rsync-path rsyncpath] host [rsync-args...]
+	--rsync-path	Specify path to rsync command.
+			Default: $rrsync"
+
+case $1 in
+    --rsync-path)	rrsync=$2; shift; shift ;;
+esac
+
+[ $# = 0 ] && { echo "$cmd: missing host ">&2
+		echo "$usage" >&2
+		exit 2
+	      }
+host=$1; shift
+
+set -x
+exec ssh "$host" "$rrsync" ${1+"$@"}
