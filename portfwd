@@ -4,12 +4,18 @@
 #	- Cameron Simpson <cs@zip.com.au> 05may2004
 #
 
-case "$HOST.$SYSTEMID@$LOCATION" in
-  newt.home@cisra|kirsty.home@cisra)
-    set -x
-    acon lock -1 portfwd-kaper \
+if [ "$HOST.$SYSTEMID@$LOCATION" = newt.home@cisra ] \
+|| [ "$HOST.$SYSTEMID@$LOCATION" = kirsty.home@cisra ]
+then
+    alog portfwd lock -1 portfwd-kaper \
 	sh -c 'set -x
 	       ssh -f -L 6009:127.0.0.1:6000 kaper exec ./bin/redhat.x86.linux/pause
 	       exec x2x -west -to localhost:9'
-    ;;
-esac
+fi
+
+if [ "$LOCATION" != home ]
+then
+    alog portfwd lock -1 portfwd-home \
+	sh -c 'set -x
+	       ssh -g -L 8081:localhost:8080 home exec ping -i 80 127.0.0.1'
+fi
