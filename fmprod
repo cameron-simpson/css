@@ -1,2 +1,3 @@
 #!/bin/sh
-exec killpidfile fetchmail_sleep.pid
+set -x
+exec killpidfile ${1+"$@"} fetchmail_sleep.pid
