@@ -6,6 +6,8 @@
 #
 
 : ${TMPDIR:=/tmp}
+: ${USER:=`id -un`}
+: ${BUGSYSTEMS:='dlog logger'}
 
 cmd=`basename "$0"`
 usage="Usage: $cmd logline < attachment-data"
@@ -26,6 +28,9 @@ case " $BUGSYSTEMS " in
   *' ddts '*)	ddtsids=`echo "$logmsg" | ddtsids`
 		[ -n "$ddtsids" ] && mailif -s "$logmsg" $ddtsids < "$tmpf"
 		;;
+esac
+case " $BUGSYSTEMS " in
+  *' logger '*)	logger -t buglog -- "$USER: $logmsg" ;;
 esac
 
 exit 0
