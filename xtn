@@ -1,4 +1,4 @@
 #!/bin/sh
 name=$1; shift
 TTYLABEL=$name; export TTYLABEL
-exec xt -n "$name" ${1+"$@"}
+exec term -n "$name" ${1+"$@"}
