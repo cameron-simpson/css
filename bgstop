@@ -1,0 +1,52 @@
+#!/bin/sh
+#
+# Kill a job started with bgproc.
+#	- Cameron Simpson <cs@zip.com.au> 25aug99
+# 
+
+cmd=`basename "$0"`
+
+VARRUN=${VARRUN:-/var/run}
+export VARRUN
+
+usage="Usage: $cmd pidfile"
+
+badopts=
+if [ $# = 0 ]
+then  echo "$cmd: missing pidfile" >&2; badopts=1
+else  pidfile=$1; shift
+      [ $# = 0 ] || { echo "$cmd: extra arguments: $*" >&2; badopts=1; }
+fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+case $pidfile in /*) ;; *) pidfile=$VARRUN/$pidfile ;; esac
+
+[ -s "$pidfile" ] || { echo "$cmd: missing pid file $pidfile" >&2; exit 1; }
+
+pids=`cat "$pidfile"`
+grep . "$pidfile" /dev/null
+
+sig=15
+sleep=1
+while [ -n "$pids" ]
+do  livepids=
+    for pid in $pids
+    do  if (set -x; kill "-$sig" "$pid" 2>/dev/null)
+	then
+	    livepids="$livepids $pid"
+	fi
+    done
+    { [ -n "$livepids" ] && echo "$livepids"; } >"$pidfile"
+
+    pids=$livepids
+    [ -z "$pids" ] || { [ $sig = 0 ] && echo "waiting for pids $pids..."
+			sleep $sleep
+			sleep=2
+		      }
+    sig=0
+done
+
+[ -s "$pidfile" ] || rm "$pidfile"
+
+exit 0
