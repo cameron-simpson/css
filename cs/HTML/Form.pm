@@ -224,6 +224,7 @@ sub PopupMU
 { my($F,$field,$map,$selected,$keylist)=@_;
   $selected=$F->Default($field) if ! defined $selected;
 
+  ## warn "PopupMU: keylist=[@$keylist]";
   $F->_Value($field,$selected);
   tagSelect($field,$map,$keylist,$selected,undef,0);
 }
@@ -240,7 +241,7 @@ sub ScrollingListMU
 }
 
 # return markup for a tag selection
-sub tagSelect
+sub tagSelect($$$$$$)
 { my($field,$map,$keylist,$selected,$size,$multiple)=@_;
   $multiple=0 if ! defined $multiple;
 
@@ -249,14 +250,14 @@ sub tagSelect
   elsif (! ref $selected)	{ $selected=[ $selected ]; }
 
   if (! defined $keylist)
-	{ $keylist=[ sort keys %$map ]; }
+  { $keylist=[ sort keys %$map ]; }
   else
-	{ $keylist=_completeKeyList([ @$keylist ], sort keys %$map); }
+  { $keylist=_completeKeyList([ @$keylist ], sort keys %$map); }
 
   # 0 means pick a size, undef means no size (popup)
   if (defined $size && $size == 0)
-	{ $size=::min(5,scalar(@$keylist));
-	}
+  { $size=::min(5,scalar(@$keylist));
+  }
 
   my(%sel);
   map($sel{$_}=1,@$selected);
@@ -285,7 +286,7 @@ sub _completeKeyList
 { my($keylist,@keys)=@_;
   my(%keys);
   map($keys{$_}=1,@$keylist);
-  push(@$keylist,grep(! defined $keys{$_},@keys));
+  push(@$keylist,grep(! defined $keys{$_},sort @keys));
   $keylist;
 }
 
