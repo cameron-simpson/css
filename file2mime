@@ -47,7 +47,7 @@ case "$type" in
     *': '*'PGP armored data signed message'*)
 					mtype=text/plain ;;
     *': '*'ASCII '*)			mtype=text/plain ;;
-    *': '*'program text'*)		mtype=text/plain ;;
+    *': '*'script'*)			mtype=text/plain ;;
     *': '*'text'*)			mtype=text/plain ;;
     *)	mtype=`ext2mime "$file"` || mtype= ;;
 esac
