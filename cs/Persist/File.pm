@@ -31,9 +31,6 @@ sub TIEHASH
 {
   my($class,$fname,$rw,@c)=@_;
   $rw=0 if ! defined $rw;
-  @c=caller if ! @c;
-
-  warn "empty rm from [@c]" if ! length $rw;
 
   my $this;
 
@@ -46,8 +43,8 @@ sub TIEHASH
 	      META	=> {},
 	      FNAME	=> $fname,
 	      FLAGS	=> (new cs::Flags @cs::Persist::DfltFlags),
+	      PID	=> $$,
 	      DEBUG	=> 0,
-	      CALLER	=> [ @c ],
 	      CHANGELOG	=> [],
 	    };
 
@@ -77,7 +74,7 @@ sub Sync
 { my($this,$force)=@_;
   $force=0 if ! defined $force;
 
-##warn "Sync($this->{FNAME})" if $this->{FNAME} =~ /\.toc\.db/;
+  ##warn "Sync($this->{FNAME})" if $this->{FNAME} =~ /\.toc\.db/;
   return if ! $this->IsReadWrite() || $this->{PID} != $$;
 
 ##warn "flushing $this->{FNAME}\n" if $this->{FNAME} =~ /\.toc\.db/;
@@ -184,19 +181,12 @@ sub WriteSelf
 { my($this,$fname)=@_;
   $fname=$this->{FNAME} if ! defined $fname;
 
-  ## warn "rewrite($fname, made at [@{$this->{CALLER}}])";
-
   die "WriteSelf($fname) when ! RW" if ! $this->IsReadWrite();
 
   if (-l $fname)
 	{ warn "$::cmd: won't rewrite symlinks ($fname)";
 	  return undef;
 	}
-
-#  if (defined $ENV{USER} && $ENV{USER} eq 'cameron')
-#  	{ my(@c)=caller;
-#  	  warn "WriteSelf($fname) from [@c]";
-#	}
 
   { my $s;
 
