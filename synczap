@@ -4,12 +4,12 @@
 #	- Cameron Simpson <cs@zip.com.au> 21apr99
 #
 
-script=$HOME/scripts/squid_redirect
-dir=$HOME/rc/adzap
 webdir=$HOME/public/adzap
+rcdir=$webdir/rc
+script=$webdir/scripts/squid_redirect
 base=http://www.zip.com.au/~cs/adzap
 
-cd "$dir" || exit 1
+cd "$rcdir" || exit 1
 pwd
 
 set -u
@@ -28,7 +28,7 @@ commit=
 		''|\#*)	;;
 		*)	set ${1+"$@"} "$addr" ;;
 	  esac
-      done < $dir/syncusers
+      done < "$rcdir/users"
     }
 
 changetmp=/tmp/change.$$
