@@ -1,0 +1,95 @@
+#!/usr/bin/perl
+
+push(@INC,$ENV{'PERLLIB'});
+require 'libcs.pl';
+require 'errno.ph';
+
+$dir='.collate';
+$defdir='misc';
+if ($#ARGV >= 0 && $ARGV[0] eq '-d')
+	{ shift;
+	  if (defined($_=shift))
+		{ if (m,^/,)
+			{ $dir=$_; $defdir='.';
+			}
+		  else
+		  { $defdir=$_;
+		  }
+		}
+	  else
+	  { print STDERR "$cmd: -d expects an argument\n";
+	    exit 2;
+	  }
+	}
+
+if ($#ARGV >= 0)
+	{ @entries=@ARGV;
+	}
+else
+{ opendir(DIR,".") || die "can't opendir(.): $!";
+  @entries=grep(!/^\./ && -f $_,readdir(DIR));
+  closedir(DIR);
+}
+
+for (@entries)
+	{ print STDERR "$_ ";
+
+	  $entry=$_;
+	  $count=1; $item=1;
+	  $fileit=0;
+
+	  if (/\.Z$/)
+		{ $_=$`;
+		}
+
+	  if (/\.(\d+)\.(\d+)$/)
+		{ $count=$1; $item=$2;
+		  $_=$`.$3;
+		  $fileit=1;
+		  $wcount=length($count);
+		  $witem=length($item);
+		}
+
+	  $subdir=$defdir;
+	  if (/^x/)
+		{ $subdir.="/x";
+		}
+
+	  while (/^(FAQ)\./)
+		{ $subdir.="/$1";
+		  $_=$';
+		  $fileit=1;
+		}
+
+	  while (/\.(uu|shar|gl|gif|jpg|zip|tar|Z)$/ || /\.?(patch\d*)$/)
+		{ if ($1 eq 'gif' || $1 eq 'jpg' || $1 eq 'gl')
+			{ $subdir=$1;
+			}
+
+		  $_=$`;
+		  $fileit=1;
+		}
+	  
+	  if ($fileit)
+		{ $fdir="$dir/$subdir";
+		  if ($count > 1)
+			{ $fdir.="/$_";
+			}
+
+		  $ffile="$fdir/$entry";
+		  if (&mkdir($fdir))
+			{ if (&rename($entry,"$ffile"))
+				{ print STDERR "-> $ffile\n";
+				}
+			  else
+			  { print STDERR "\n";
+			  }
+			}
+		  else
+		  { print STDERR "can't mkdir($fdir)\n";
+		  }
+		}
+	  else
+	  { print STDERR "skipped\n";
+	  }
+	}
