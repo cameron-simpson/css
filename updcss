@@ -4,6 +4,8 @@
 #	- Cameron Simpson <cs@zip.com.au> 09apr1997
 #
 
+cssweb=$HOME/@/ezos/html/cs/css
+
 cmd=$0
 usage="Usage: $cmd [-q] [-n] [pushhosts...]"
 
@@ -25,7 +27,7 @@ then
     ( cd $HOME/scripts || exit 1
       exec myke
     ) || exit 1
-    ( cd @/ezos/html/cs/css || exit 1
+    ( cd "$cssweb" || exit 1
       exec myke
     )
 fi
@@ -102,7 +104,6 @@ fi
 
 wait
 
-cssweb=$HOME/@/ezos/html/cs/css
 if [ -d "$cssweb" ]
 then
     ( cd $cssdir/.. || exit 1
