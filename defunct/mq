@@ -1,0 +1,12 @@
+#!/bin/sh
+
+for addr
+do
+	case $# in
+	    1)	pfx= ;;
+	    *)	pfx="$addr: " ;;
+	esac
+	necho "$pfx"
+	/usr/lib/sendmail -bv "$addr"
+	# mlalias -e "$addr"
+done
