@@ -1,0 +1,7 @@
+#!/bin/sh
+[ $# -gt 0 ] || { echo "Usage: $0 URLs..." >^2; exit 2; }
+for url
+do  wcat "$url" \
+    | sed -n 's:.*<title>\(.*\)</title>.*:\1:p' \
+    | sed 1q
+done
