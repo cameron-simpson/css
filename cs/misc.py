@@ -10,24 +10,27 @@ def dict2ary(d,keylist=None):
 # trivial wrapper for extension in subclasses
 class SeqWrapper:
   def __init__(self,seq):
-    self.seq=seq
+    self.__seq=seq
 
   def __len__(self):
-    return len(self.seq)
+    return len(self.__seq)
 
   def __getitem__(self,key):
-    return self.seq[key]
+    return self.__seq[key]
 
   def __setitem__(self,key,value):
-    print "__setitem(",key,"=",value,"): seq=", `self.seq`
-    self.seq[key]=value
+    print "__setitem(",key,"=",value,"): __seq=", `self.__seq`
+    self.__seq[key]=value
 
   def __delitem__(self,key):
-    del(self.seq[key])
+    del(self.__seq[key])
 
   def __iter__(self):
-    for i in self.seq:
+    for i in self.__seq:
       yield i
+
+  def _updateAllValues(self,newvalues):
+    self.__seq=newvalues
 
 """ an object with an ordered set of keys eg SQL table row
 """
@@ -45,6 +48,8 @@ class HasNameIndex:
       self.__nameIndex[name]=i
       i+=1
 
+  def getNames(self):
+    return self.__names
   def getNameIndex(self):
     return self.__nameIndex
 
