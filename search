@@ -5,7 +5,7 @@
 #
 
 case $SYSTEMID in
-    cisra)	serv=web
+    cisra|home)	serv=web
 		user=cameron
 		cgibin="~$user/cgi-bin/" ;;
     *)		serv=cgi.zipworld.com.au
