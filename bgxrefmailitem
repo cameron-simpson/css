@@ -1,2 +1,2 @@
 #!/bin/sh
-exec bgstdin ignhup xrefmailitem -lc
+exec bgstdin ignhup xrefmailitem
