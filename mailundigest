@@ -6,6 +6,7 @@
 #
 
 : ${TMPDIR:=/tmp}
+: ${LOGDIR:=$HOME/var/log}
 
 key=attn
 [ $# = 0 ] || { key=$1; shift; }
@@ -24,7 +25,7 @@ formail +1 -d -s sh -c "tmp=${tmp}\$\$
 			( read from_; echo "\$from_"; cat $hdrs; mail-fixhdrs ) >\$tmp
                         grabaddrs <\$tmp >>$MAILDIR/addrs.new
 			exec <\$tmp; rm \$tmp
-			exec procmail -p -m 'LOGFILE=$HOME/var/log/procmail' 'DEFAULT=$MAILDIR/$key/.' /dev/null" \
+			exec procmail -p -m 'LOGFILE=$LOGDIR/procmail' 'DEFAULT=$MAILDIR/$key/.' /dev/null" \
 			< $tmp
 xit=$?
 
