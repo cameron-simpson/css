@@ -1,0 +1,14 @@
+#!/bin/sh
+#
+# Tag a stream (or streams) with a prefix.
+#	- Cameron Simpson <cs@zip.com.au> 18may99
+#
+
+usage="Usage: $0 fd[,fd...] pfx command [args...]"
+
+[ $# -lt 3 ] && { echo "$usage" >&2; exit 2; }
+
+fds=$1 pfx=$2
+shift; shift
+
+exec filter_fd "$fds" "exec sed 's^$pfx: '" "$@"
