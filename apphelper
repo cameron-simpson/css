@@ -11,9 +11,10 @@ cmd=`basename "$0"`
 ## exec 2>"$tty" >&2 0</dev/tty
 ## set -vx
 ## set x +t "$@"; shift
-## echo "[$*]"
+##echo "[$*]" >&2
 
-savedir=${SAVEDIR-$HOME/dl}
+savedir=`lastvalue savedir 2>/dev/null`
+savedir=${savedir:-"${SAVEDIR-$HOME/dl}"}
 pager=${PAGER:-less}
 doview=
 termname=$cmd
@@ -274,12 +275,14 @@ read saveas || exit 0
 case "$saveas" in
     ''|n|no)	saveas= ;;
     y|yes)	saveas=$savedir/$fbase ;;
-    /*)		;;
-    \~*)	saveas=`untilde "$saveas"` ;;
+    [/~]*)	;;
     *)		saveas=$savedir/$saveas ;;
 esac
-
 [ -n "$saveas" ] || exit 0
+
+case "$saveas" in
+    \~*)	saveas=`untilde "$saveas"` ;;
+esac
 
 # %foo -> filefoo
 case "$saveas" in
@@ -295,10 +298,25 @@ case $saveas in
     */|*-)	saveas=$saveas$fbase ;;
 esac
 
+case `basename "$saveas"` in
+    *.*)	;;
+    */$fbase)	;;
+    *)		saveas=$saveas/$fbase ;;
+esac
+
 [ -d "$saveas/." ] && saveas=$saveas/$fbase
 
 parent=`dirname "$saveas"`
-[ -d "$parent/." ] || { ask "mkdir $parent" && mkdir -p "$parent"; } || exit 0
+[ -d "$parent/." ] \
+|| if ask -y "mkdir $parent"
+then  mkdir -p "$parent" || exit 1
+else  exit 0
+fi
+
+# stash savedir
+( cd "$parent" || exit 1
+  pwd | lastvalue savedir -
+) &
 
 [ -s "$saveas" ] && cmp -s "$file" "$saveas" && exit 0
 
