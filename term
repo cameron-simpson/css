@@ -122,13 +122,13 @@ case "$TERM,$DISPLAY" in
 
 	PREFTERM=${PREFTERM:-xterm}	# safe default
 
-	echo "PREFTERM=[$PREFTERM] termopts=[$termopts] dotrans=[$dotrans]" >&2
-	set -x
+	## echo "PREFTERM=[$PREFTERM] termopts=[$termopts] dotrans=[$dotrans]" >&2
+	## set -x
 	case "$PREFTERM" in
 	    rxvt)	[ $dotrans ] && opts="$opts -ip"
 			;;
 	    aterm)	# -fade 90
-			[ $dotrans ] && opts="$opts -tr -sh 60"
+			[ $dotrans ] && opts="$opts -tr -sh ${ATERM_SHADE:-60}"
 			;;
 	esac
 
