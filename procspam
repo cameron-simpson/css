@@ -1,6 +1,9 @@
 #!/bin/sh
-exec >/dev/null 2>/dev/tty
-tmp=${TMPDIR:-/tmp}/procspam$$
+: ${LOGDIR:=$HOME/var/log}
+: ${CONSOLE:=$LOGDIR/console}
+: ${TMPDIR:=/tmp}
+exec >>"$CONSOLE" 2>&1
+tmp=$TMPDIR/procspam$$
 cat >"$tmp" || exit 1
 exec </dev/null
 ( bogofilter -Ns <"$tmp"
