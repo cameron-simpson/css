@@ -64,13 +64,13 @@ fi
 [ -n "$message" ] || { echo "$cmd: empty message rejected" >&2; exit 1; }
 
 case "$reportcmd" in
-  *'%s'*)
+  *'%'[as]*)
     reportcmd=`reportcmd=$reportcmd q=$itemname perl -e '
 		use cs::Shell;
 		$q=cs::Shell::quote($ENV{q});
 		$a=cs::Shell::quote(@ARGV);
-		$ENV{reportcmd} =~ s/%a/$a/g;
-		$ENV{reportcmd} =~ s/%s/$q/g;
+		$ENV{reportcmd} =~ s/\%a/$a/g;
+		$ENV{reportcmd} =~ s/\%s/$q/g;
 		print $ENV{reportcmd}, "\n";
 	       ' ${1+"$@"}
 	      `
