@@ -3,7 +3,7 @@
 #
 # =head1 NAME
 #
-# syncopt - keep per-machine /opt in sync with shared one
+# syncopt - keep per-machine /opt in sync with master copy
 #
 # =head1 SYNOPSIS
 #
@@ -25,11 +25,11 @@
 # as the administrator sees fit.
 #
 # The basic scheme is that packages get built and installed as B</opt/I<package>-I<version>>
-# and then copied to a central spot such as B</usr/local/opt/I<package>-I<version>>,
+# and then copied to a central spot such as B<~syncopt/I<arch>/I<package>-I<version>>,
 # leaving a symlink from B</opt> to the central package.
 # In this way things think they
-# live in B</opt> and become local or remote by either symlinking from B</opt>
-# installing an exact copy of B</usr/local/opt/I<thing>-I<version>> in </opt>.
+# live in B</opt> and become local or remote by either symlinking from B</opt> to the central copy
+# or by installing an exact copy of B<~syncopt/I<arch>/I<thing>-I<version>> in </opt>.
 #
 # The purpose of B<syncopt> is to maintain that arrangement in a convenient and automatic fashion.
 #
@@ -37,13 +37,13 @@
 # or batch dispatched on all clients by hand via ssh after a new package install.
 #
 
-pathadd=:/usr/bin:/opt/bin:/opt/script
+# installation directory
+: ${SYNCOPT_OPT:=/opt}
+cf=$SYNCOPT_OPT/.syncopt
+
+pathadd=:/usr/bin:$SYNCOPT_OPT/bin:$SYNCOPT_OPT/script
 PATH=$PATH$pathadd
 export PATH
-
-# installation directory
-slashopt=/opt
-cf=$slashopt/.syncopt
 
 # basic "trim comments" code
 sedpreamble='y/	/ /
@@ -55,9 +55,11 @@ sedpreamble='y/	/ /
 
 # extract envvars
 sedscript="$sedpreamble
+	   /^ARCH=/b setvar
+	   /^COMMON=/b setvar
+	   /^REMOTE=/b setvar
 	   /^RSYNC=/b setvar
 	   /^SUBDIRS=/b setvar
-	   /^REMOTE=/b setvar
 	   d
 	   :setvar
 	   s/'/'\\\\''/g
@@ -65,26 +67,24 @@ sedscript="$sedpreamble
 sedvars=`sed -e "$sedscript" "$cf"`
 eval "$sedvars"
 
-rsync=${SYNCOPT_RSYNC:-rsync}
-remote=$SYNCOPT_REMOTE
-subdirs=${SYNCOPT_SUBDIRS:="."}
+: ${SYNCOPT_RSYNC:=rsync}
+: ${ARCH:=`uname -s`}
+: ${SYNCOPT_ARCH:=/u/syncopt/$ARCH}
+: ${SYNCOPT_COMMON:=/u/syncopt/common}
+: ${SYNCOPT_SUBDIRS:="."}
 
 cmd=`basename "$0"`
 usage="Usage: $cmd [-n] [-f] [l] [-R rsync-path] [-x] [-v] [items...]
 	-n	No action (default) - echo necessary actions.
 	-f	Force action.
 	-l	Localise the specified items.
-	-R rsync-path Rsync command path. Default: $rsync
+	-R rsync-path Rsync command path. Default, from \$SYNCOPT_RSYNC: $SYNCOPT_RSYNC
 	-r [user@]host Remote host with the master files.
 	-x	Force action with tracing.
 	-v	Verbose."
 
 trace=echo	# set-x	# set to nothing when debugged
 localise=
-
-archopt=/usr/local/opt
-commonopt=$archopt-common
-subdirs=${SYNCOPT_SUBDIRS:="."}
 
 vflag=
 [ -t 1 ] && vflag=-v
@@ -165,7 +165,7 @@ done
 
 # because the master repository may be remote
 # everything remote has an eval layer so it can be passed through ssh
-if [ -z "$remote" ]
+if [ -z "$SYNCOPT_REMOTE" ]
 then
     remotepfx=
     atremote=eval
@@ -173,9 +173,9 @@ then
     { eval "$*"
     }
 else
-    remotepfx=$remote:
+    remotepfx=$SYNCOPT_REMOTE:
     remote()
-    { eval "${RSYNC_RSH:-ssh} "'"$remote" "PATH=\$PATH:$pathadd; export PATH; $*"'
+    { eval "${RSYNC_RSH:-ssh} "'"$SYNCOPT_REMOTE" "PATH=\$PATH:$pathadd; export PATH; $*"'
     }
 fi
 
@@ -188,30 +188,28 @@ fi
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
 # ensure there is a real local /opt
-[ -d "$slashopt/." ] \
-	|| { $trace mkdir $slashopt && $trace chmod 755 $slashopt; } \
+[ -d "$SYNCOPT_OPT/." ] \
+	|| { $trace mkdir $SYNCOPT_OPT && $trace chmod 755 $SYNCOPT_OPT; } \
 	|| exit 1
 
-# locate the master copy for every target
-#
-# look for /usr/local/opt-$ARCH or failing that /usr/local/opt
-resolve="cmd=$cmd
-	 subdirs='$subdirs'
-	 commonopt='$commonopt'
-         if [ -d '$archopt-$ARCH/.' ]
-         then archopt='$archopt-$ARCH'
-	 else archopt='$archopt'
-	 fi"
+# set up necessary variables at remote end
+resolve="cmd=$cmd"
+for sfx in SUBDIRS ARCH COMMON
+do  eval "v=\$SYNCOPT_$sfx"
+    resolve="$resolve
+             SYNCOPT_$sfx='$v'"
+done
+
 # get target list if not specified
 if [ $# = 0 ]
 then
     resolve=$resolve'
-	    set x `for subdir in $subdirs
+	    set x `for subdir in $SYNCOPT_SUBDIRS
                     do case "$subdir" in
 			 /*) ls "$subdir/." 2>/dev/null
 			     ;;
-			 *)  ls "$archopt/$subdir/." 2>/dev/null
-                             ls "$commonopt/$subdir/." 2>/dev/null
+			 *)  ls "$SYNCOPT_ARCH/$subdir/." 2>/dev/null
+                             ls "$SYNCOPT_COMMON/$subdir/." 2>/dev/null
 			     ;;
 		       esac
 	            done | sort -u`; shift'
@@ -224,8 +222,8 @@ resolve=$resolve'
         for target
 	do  [ $first ] && { first=; set x; shift; }
 	    fullpath=
-	    for dir in $archopt $commonopt
-	    do  for subdir in $subdirs
+	    for dir in $SYNCOPT_ARCH $SYNCOPT_COMMON
+	    do  for subdir in $SYNCOPT_SUBDIRS
 		do  case "$subdir" in
 		      /*) absdir=$subdir ;;
 		      .)  absdir=$dir ;;
@@ -255,8 +253,8 @@ do
     ## echo "sync $thing ..."
     ## case "$thing" in gimp*) set -x ;; esac
 
-    # local iinstance of thing
-    ldir=$slashopt
+    # local instance of thing
+    ldir=$SYNCOPT_OPT
     l=$ldir/$thing
 
     # remote instance of thing
@@ -292,8 +290,9 @@ do
     #	I<var>=I<value>
     #
     # are read once at the start of the script to set environment parameters.
-    # I<var> may take the names B<REMOTE>, B<RSYNC> or B<SUBDIRS>
-    # to set or override the environment variables B<$SYNCOPT_REMOTE>,
+    # I<var> may take the names B<ARCH>, B<COMMON>, B<REMOTE>, B<RSYNC> or B<SUBDIRS>
+    # to set or override the environment variables
+    # B<$SYNCOPT_ARCH>, B<$SYNCOPT_COMMON>, B<$SYNCOPT_REMOTE>,
     # B<$SYNCOPT_RSYNC> or B<$SYNCOPT_SUBDIRS> respectively.
     #
     # Other lines are of the form:
@@ -376,7 +375,7 @@ do
     # files - basicly /opt/ARCH really
     if remote "test -f '$r'"
     then
-	$trace $rsync -aH $vflag "$remotepfx$r" "$l"
+	$trace $SYNCOPT_RSYNC -aH $vflag "$remotepfx$r" "$l"
 	continue
     fi
 
@@ -436,7 +435,7 @@ do
     fi
 
     [ "x$state" = xlocal ] \
-    && $trace $rsync -aHW $vflag --delete "$remotepfx$r/." "$l/." | sed "s|^|$l: |"
+    && $trace $SYNCOPT_RSYNC -aHW $vflag --delete "$remotepfx$r/." "$l/." | sed "s|^|$l: |"
 done
 
 exit $xit
@@ -445,6 +444,28 @@ exit $xit
 #
 # =over 4
 #
+# =item B<ARCH>
+#
+# The architecture name for this machine.
+# The default is the output of ``B<uname -s>'',
+# although on system I administer I arrange this to be a string of the form
+# B<I<vendor>.I<cpu>.I<os>>, for example B<redhat.x86.linux>.
+#
+# =item B<SYNCOPT_ARCH>
+#
+# This is the location of the master copies of the architecture specific packages.
+# The default is B<~syncopt/$ARCH>.
+#
+# =item B<SYNCOPT_COMMON>
+#
+# This is the location of the master copies of the architecture independent packages.
+# The default is B<~syncopt/common>.
+#
+# =item B<SYNCOPT_OPT>
+#
+# This is the installation directory.
+# The default is B</opt>.
+#
 # =item B<SYNCOPT_REMOTE>
 #
 # Use the specified remote host for the master
@@ -452,23 +473,25 @@ exit $xit
 #
 # =item B<SYNCOPT_SUBDIRS>
 #
-# expect a sub hierarchy underneath each B</usr/local/opt*> respoitory.
+# If set, expect a subhierarchy underneath each B<$SYNCOPT_{ARCH,COMMON}> repository.
 # For example, at home I set this to "B<HOME WORK>".
-# I put home built software in B</usr/local/opt/HOME/I<package>>
-# and keep a copy of much of the repository from work in B</usr/local/opt/WORK/I<package>>,
+# I put home built software in B<~syncopt/$ARCH/HOME/I<package>>
+# and keep a copy of much of the repository from work in B<~syncopt/$ARCH/WORK/I<package>>,
 # obviating any need to rebuild things already built for work.
-# The subhierachies are consulted in order so that my home installs
+# The subhierachies are consulted in order,
+# thus arranging that my home installs
 # take precedence over the work copies.
 #
 # =item B<SYNCOPT_RSYNC>
 #
 # Preferred path to the rsync(1) command
 # as though specified with the B<-R> command line option.
+# The default is "B<rsync>".
 #
 # =item B<RSYNC_RSH>
 #
 # Ssh command to use, as for rsync, if a remote host is in use.
-# The default is ssh.
+# The default is "B<ssh>".
 #
 # =back
 #
