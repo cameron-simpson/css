@@ -59,6 +59,7 @@ $code="my \$munged;
        }
       ";
 
+##warn "code=[$code]";
 eval "$code";
 die "$@" if $@;
 exit 0;
