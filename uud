@@ -1,0 +1,3 @@
+#!/bin/sh
+
+exec uudecode -p '/^Subject:/i' ${1+"$@"}
