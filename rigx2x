@@ -50,4 +50,4 @@ done
 [ -n "$to" ] && { set x ${1+"$@"} $toopt "$to"; shift; }
 
 set -x
-acon set-x "$real" $passwd $shared $buttonblock ${1+"$@"} &
+bgproc -p "x2x@$HOST-$DISPLAY" -- "$real" $passwd $shared $buttonblock ${1+"$@"} &
