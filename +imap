@@ -35,7 +35,6 @@ esac
 
 set -x
 exec + \
-	-e "set imap_force_ssl=no" \
 	-e "set imap_pass=\"$fm_pass\"" \
 	-e "set tunnel=\"$tunnel\"" \
 	imap://$fm_user@$server/INBOX
