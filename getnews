@@ -1,5 +1,8 @@
 #!/usr/bin/perl -w
 #
+# Collect USENET news articles and feed to procmail.
+#	- Cameron Simpson <cs@zip.com.au>
+#
 
 use strict qw(vars);
 
@@ -41,9 +44,9 @@ if (! @ARGV)
   { die "$::cmd: no newsgroups! catch up mode can only be used with explicit groups\n";
   }
 
-  @ARGV=grep(/\@$::Server$/, $::RC->Groups());
+  @ARGV=sort grep(/\@$::Server$/ && $::RC->Subscribe($_), $::RC->Groups());
   if (! @ARGV)
-  { warn "$::cmd: no groups known for server \"$::Server\"\n";
+  { warn "$::cmd: no subscribed groups known for server \"$::Server\"\n";
   }
   else
   { for (@ARGV)
@@ -64,12 +67,16 @@ undef $::RC;
 $::Conn->Quit();
 undef $::Conn;
 
-nl("$::Count articles retrieved");
+if ($::Count > 0)
+{ nl("$::Count article".($::Count == 1 ? '' : 's')." retrieved");
+}
 
 exit $::Xit;
 
 sub fetchgroup($)
 { my($group)=@_;
+
+  out($group);
 
   my @r = $::Conn->Group($group);
   if (@r != 2)
@@ -89,13 +96,24 @@ sub fetchgroup($)
     return;
   }
 
+  # compute list of unvisited articles
+  my($rlow,$rhigh)=$R->Bounds();
+  my $IR = $R->Invert();
+
+  if ($low < $rlow)	{ $IR->Add($low,$rlow-1); }
+  if ($rhigh < $low)	{ $rhigh=$low-1; }
+  if ($high > $rhigh)	{ $IR->Add($rhigh+1,$high); }
+
   my $M;
   my $n=0;
 
   N:
-  for my $n ($low..$high)
+  for my $n ($IR->Enum())
   { out("$group: $n/$high");
-    next N if $R->InRange($n);
+
+    ## next N if $R->InRange($n); ## we know it's not in the range
+
+    $R->Add($n);	# articles come in in sequence
 
     $M=$::Conn->Article($n);
     if (! defined $M)
@@ -105,7 +123,6 @@ sub fetchgroup($)
 
     my $out = new cs::Sink(PIPE,$::NDA);
     $M->WriteItem($out);
-    $R->Add($n);
     $::Count++;
     $n++;
   }
