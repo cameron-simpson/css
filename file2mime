@@ -19,9 +19,13 @@ case "$type" in
     *': Bourne shell script'*)	mtype=application/x-sh ;;
     *': JPEG image data'*)	mtype=image/jpeg ;;
     *': PDF document'*)		mtype=application/pdf ;;
+    *': HTML document text'*)	mtype=text/html ;;
+    *': gzip compressed data'*)	mtype=application/x-gzip ;;
+    *': Zip archive data'*)	mtype=application/zip ;;
+    *': GNU tar archive'*)	mtype=application/x-tar ;;
+    *': Ogg-Vorbis compressed sound file'*) mtype=application/x-ogg ;;
     *': ASCII '*)		mtype=text/plain ;;
     *': '*'program text'*)	mtype=text/plain ;;
-    *': HTML document text'*)	mtype=text/html ;;
     *': '*'text'*)		mtype=text/plain ;;
 esac
 
