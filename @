@@ -28,6 +28,10 @@ case "$host" in
 	host=`expr "$host" : 'screen:\(.*\)'`
 	exec rterm "$host" -s ${1+"$@"}
 	;;
+    rita)
+	set -x
+	rdesktop -g "${X11_BGX}x${X11_Y}" -K -T "$host rdesktop" "$host" &
+	;;
     *)	exec rterm "$host" ${1+"$@"}
 	;;
 esac
