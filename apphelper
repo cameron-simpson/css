@@ -14,7 +14,6 @@ cmd=`basename "$0"`
 ## echo "[$*]"
 
 savedir=${SAVEDIR-$HOME/dl}
-savedir=$HOME/dl
 pager=${PAGER:-less}
 doview=
 termname=$cmd
@@ -264,7 +263,7 @@ fi
 # then the two files are compared.
 # If they are the same
 # then no action is taken.
-# if they differ
+# If they differ
 # the then new file is copied onto the existing with via cp(1)
 # with the B<-i> option,
 # leaving it up to cp(1) to ask questions.
