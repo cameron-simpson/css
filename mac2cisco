@@ -1,0 +1,28 @@
+#!/usr/bin/perl
+#
+# Convert an ethernet address into CISCO format.
+#	- Cameron Simpson <cs@zip.com.au> 19aug99
+#
+
+if (@ARGV)
+{ for my $mac (@ARGV)
+  { print mac2cisco($mac), "\n";
+  }
+}
+else
+{ while (<STDIN>)
+  { print mac2cisco($_), "\n";
+  }
+}
+
+sub mac2cisco
+{ my($mac)=@_;
+
+  my @x = grep(length,split(/[^\d[a-f]+/i,$mac));
+  for (@x)
+  { $_=lc($_);
+    $_="0$_" if length == 1;
+  }
+  
+  join('-',@x);
+}
