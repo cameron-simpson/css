@@ -29,7 +29,7 @@ case "$cmd" in
 	eval `setvar -n -f -d /opt/shell/env STANDARD`
 	;;
    tsenv)
-	. /usr/local/misc/cisra/timesheets/bin/.env
+	. /home/docs/misc/cisra/timesheets/bin/.env
 	;;
    rawpath)
 	PATH=`env - sh -c '. /etc/profile;echo $PATH'`:$PATH
