@@ -10,47 +10,47 @@ package cs::User;
 undef %_U;
 
 sub new
-	{ my($class,$user)=@_;
-	  my(@pw);
+{ my($class,$user)=@_;
+  my(@pw);
 
-	  if (defined $_U{$user})
-		{ return $_U{$user};
-		}
+  if (defined $_U{$user})
+  { return $_U{$user};
+  }
 
-	  if ($user =~ /^\d+$/)
-		{ return undef unless (@pw=getpwuid($user));
-		}
-	  else	{ return undef unless (@pw=getpwnam($user));
-		}
-
-	  my($this);
-
-	  $this={ PW	=> [ @pw ],
-		  USER	=> $pw[0],
-		  CRYPT	=> $pw[1],
-		  UID	=> $pw[2],
-		  GID	=> $pw[3],
-		  QUOTA	=> $pw[4],
-		  COMMENT=>$pw[5],
-		  GECOS	=> $pw[6],
-		  DIR	=> $pw[7],
-		  SHELL	=> $pw[8],
-		};
-
-	  ($this->{NAME},$this->{OTHER})=parse_gecos($this->{GECOS});
-
-	  $_U{$this->{USER}}=$this;
-	  $_U{$this->{UID}}=$this;
-
-	  bless $this, $class;
+  if ($user =~ /^\d+$/)
+  { return undef unless (@pw=getpwuid($user));
+  }
+  else	{ return undef unless (@pw=getpwnam($user));
 	}
+
+  my($this);
+
+  $this={ PW	=> [ @pw ],
+	  USER	=> $pw[0],
+	  CRYPT	=> $pw[1],
+	  UID	=> $pw[2],
+	  GID	=> $pw[3],
+	  QUOTA	=> $pw[4],
+	  COMMENT=>$pw[5],
+	  GECOS	=> $pw[6],
+	  DIR	=> $pw[7],
+	  SHELL	=> $pw[8],
+	};
+
+  ($this->{NAME},$this->{OTHER})=parse_gecos($this->{GECOS});
+
+  $_U{$this->{USER}}=$this;
+  $_U{$this->{UID}}=$this;
+
+  bless $this, $class;
+}
 
 sub _ifUser
-	{ my($key)=shift;
-	  my($this)=new cs::User @_;
-	  return undef if ! defined $this || ! exists $this->{$key};
-	  $this->{$key};
-	}
+{ my($key)=shift;
+  my($this)=new cs::User @_;
+  return undef if ! defined $this || ! exists $this->{$key};
+  $this->{$key};
+}
 
 sub User{ shift->{USER}; }
 sub user{ _ifUser(USER,@_); }
@@ -74,18 +74,18 @@ sub Other{ shift->{OTHER}; }
 sub other{ _ifUser(OTHER,@_); }
 
 sub parse_gecos
-	{ local($_)=@_;
-	  my($n,$o);
+{ local($_)=@_;
+  my($n,$o);
 
-	  s/^[\s,]+//;	# strip leading and trailing junk
-	  s/[\s,]+$//;
-	  s/\s*,+\s*/,/;# tidy up first comma
+  s/^[\s,]+//;	# strip leading and trailing junk
+  s/[\s,]+$//;
+  s/\s*,+\s*/,/;# tidy up first comma
 
-	  if (/,/)
-		{ $n=$`; $o=$'; }
-	  else	{ $n=$_; $o=''; }
+  if (/,/)
+	{ $n=$`; $o=$'; }
+  else	{ $n=$_; $o=''; }
 
-	  ($n,$o);
-	}
+  ($n,$o);
+}
 
 1;
