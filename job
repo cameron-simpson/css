@@ -41,4 +41,4 @@ category=`jobtimer "$key" category`
 ##timer -i timer_sets "$category" "$when"
 
 title=`jobtimer "$key" title`
-[ "x$oldkey" = "x$key" ] || alert -c white "JOB: $key ($category - $title) $*" &
+##[ "x$oldkey" = "x$key" ] || alert -c white "JOB: $key ($category - $title) $*" &
