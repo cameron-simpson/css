@@ -52,7 +52,6 @@ then
 	--delete-excluded \
 	--exclude=CVS/ \
 	--exclude='defunct/' \
-	--exclude='/synonyms/' \
 	--include=/0README.txt \
 	--include=/CHANGELOG.txt \
 	--include=/CHANGELOG.html \
