@@ -1,0 +1,251 @@
+#!/usr/bin/perl
+#
+# Parse tcpdump logs and emit data suitable for use by logtally.
+#	- Cameron Simpson <cs@zip.com.au> 07may99
+#
+
+use strict qw(vars);
+
+use cs::Misc;
+use cs::Date;
+use cs::Net;
+
+$::Usage="Usage: $::cmd <logdata >genericlog
+	Output format:
+	    start duration size FROM TO LOGLINE
+";
+
+{ my $badopts=0;
+
+  if (@ARGV)
+	{ warn "$::cmd: extra arguments: @ARGV\n";
+	  $badopts=1;
+	}
+
+  die $::Usage if $badopts;
+}
+
+$::Xit=0;
+
+$::SiteSuffix='.'.$ENV{SITENAME};
+
+$::Now=time;
+$::Now-=$::Now%(24*3600);	# round down
+
+warn "load reverse dns cache....\n";
+load_n2host();
+
+warn "loading data ...\n";
+my @log;
+{ my $datum;
+  my $earliest;
+  my $latest;
+
+  # collate lines and compute boundaries
+  LOGENTRY:
+    while (defined ($datum=readFILEline(STDIN)))
+    { next LOGENTRY if ! ref $datum;
+
+      my $start = $datum->{COMPLETED}-$datum->{ELAPSED};
+      print $start,
+	    " ", $datum->{ELAPSED},
+	    " ", $datum->{SIZE},
+	    " ", $datum->{FROM}, "->", $datum->{TO},
+	    " ", $datum->{FROM},
+	    " ", $datum->{TO},
+	    " ", $datum->{FROMETH},
+	    " ", $datum->{TOETH},
+	    " ", $datum->{LOGLINE},
+	    "\n";
+    }
+}
+
+warn "saving reverse dns cache...\n";
+save_n2host();
+
+exit 0;
+
+sub load_n2host
+{ my($from)=@_;
+  $from=".revdns" if ! defined $from;
+
+  if (open(REVDNS,"< $from\0"))
+  { my @f;
+    while (<REVDNS>)
+    { @f=split();
+      $::_nnnn2host{$f[0]}=$f[1];
+    }
+    close(REVDNS);
+  }
+}
+
+sub save_n2host
+{ my($to)=@_;
+  $to='.revdns' if ! defined $to;
+
+  if (! open(REVDNS,"> $to\0"))
+  { warn "$::cmd: can't rewrite $to: $!\n";
+  }
+  else
+  { for my $nnnn (sort keys %::_nnnn2host)
+    { print REVDNS $nnnn, " ", $::_nnnn2host{$nnnn}, "\n";
+    }
+    close(REVDNS);
+  }
+}
+
+sub n2host
+{ my($nnnn)=@_;
+
+  return $::_nnnn2host{$nnnn} if exists $::_nnnn2host{$nnnn};
+
+  warn "new IP #: $nnnn\n";
+  my $addr = cs::Net::a2addr($nnnn);
+  my @h = cs::Net::hostnames($addr);
+  ## warn "$nnnn -> [@h]";
+  $::_nnnn2host{$nnnn}=(@h && length $h[0] ? $h[0] : $nnnn);
+}
+
+# read log lines from a file
+sub readFILE
+	{ my($FILE)=@_;
+
+	  my @data;
+	  my $datum;
+
+	  while (defined ($datum=readFILEline($FILE)))
+		{ if (ref $datum)
+			{ push(@data,$datum);
+			}
+		  else	{ $::Xit=1;
+			}
+		}
+
+	  @data;
+	}
+
+sub readFILEline
+	{ my($FILE)=@_;
+
+	  local($_)=scalar(<$FILE>);
+
+	  return undef if ! defined;
+
+	  my $datum = decodeLine($_);
+
+	  return $datum if ref $datum;
+
+	  chomp;
+	  ## warn "$::cmd: $FILE, $.: parse error on: $_\n";
+	  0;
+	}
+
+# extra info from a log line sub
+sub decodeLine
+	{ local($_)=@_;
+
+	  my $i;
+
+	  chomp;
+	  my @f = grep(length,split);
+	  return undef if @f < 8;	# when ethA ethB flags size A dir B
+
+	  my($when,$ethA,$ethB,$flags,$size,$hostA,$dir,$hostB)=@f;
+
+	  ## warn "A=$hostA, B=$hostB, dir=$dir, when=$when\n";
+	  return undef if $when !~ /^\d+:\d\d:\d\d+\.\d+$/
+		       || $hostA !~ /\./
+		       || ($dir ne '>' && $dir ne '<')
+		       || $hostB !~ /\./
+		       ;
+
+	  # compute the timestamp
+	  $when =~ /^0*(\d+):0*(\d+):0*(\d+)/;
+	  $when = $::Now+( (($1*60) +$2)*60 + $3 );
+
+	  $size=~ s/\D.*//;
+
+	  # hack the hostnames
+	  ($hostA,$hostB,$dir,$ethA,$ethB)=($hostB,$hostA,'>',$ethB,$ethA)
+		if $dir eq '<';
+
+	  $hostA=shortHost($hostA);
+	  $hostB=shortHost($hostB);
+
+	  { LOGLINE => $_,
+	    FROM => $hostA,
+	    FROMETH => $ethA,
+	    TO => $hostB,
+	    TOETH => $ethB,
+	    SIZE => $size+0,
+	    COMPLETED => $when+1,
+	    ELAPSED => 1,
+	  }
+	}
+
+sub shortHost
+{ local($_)=@_;
+
+  ## print STDERR "shortHost($_) -> ";
+
+  s/:$//;
+  s/\.([^\.]+)$/:$1/;
+
+  if (/^(\d+\.\d+\.\d+\.\d+):/)
+  { my $port = $';
+    my $name = n2host($1);
+    ## print STDERR " n2host($1)=$name";
+    if ($name =~ /$::SiteSuffix$/) { $name=$`; }
+    $_="$name:$port";
+  }
+
+  ## print STDERR "$_\n";
+
+  $_;
+}
+
+sub simpleHost
+	{ local($_)=@_;
+
+	  if ($_ eq '127.0.0.1')
+	  { $_=LOCALHOST;
+	  }
+	  elsif (/^\d+\.\d+\.\d+\.\d+$/)
+	  # numeric - convert to name
+	  { my @h = cs::Net::hostnames(cs::Net::a2addr($_));
+	    $_ = $h[0] if @h && length $h[0];
+	  }
+
+	  if (substr($_, -length($::SiteSuffix)) eq $::SiteSuffix)
+	  { substr($_, -length($::SiteSuffix))='';
+	  }
+
+	  lc;
+	}
+
+sub clientKey { simpleHost(shift->{CLIENT}) }
+sub websiteKey{ local($_)=lc(shift->{URI});
+		s/^\w+:\/\/+//;
+		s/[^-.\w].*//;
+		$_;
+	      }
+sub protocolKey{ local($_)=lc(shift->{URI});
+		 /\W/ ? $` : $_;
+	       }
+sub datatypeKey{ local($_)=@_;
+		 ## my(@c)=caller; warn "datatypeKey(@_) from [@c]";
+		 lc($_->{TYPE}.'/'.$_->{SUBTYPE});
+	       }
+
+sub suffixKey  { local($_)=lc(shift->{URI});
+
+		 s/[?#].*//;		# trim query or anchor
+		 s/^\w+:\/\/[^\/]+//;	# trim scheme://host
+
+		 m:\.([^/.]+)$:
+		 ? $1
+		 : m:/$:	# suffix
+		   ? 'html'	# infer index.html
+		   : 'NONE'
+		 ;
+	       }
