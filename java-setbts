@@ -23,7 +23,7 @@ do
   ( set bsed "s#\"[^\"]*\";\\([ 	]*// $tag\\)\$#\"$now\";\\1#"
     if ifcvs "$file"
     then
-	exec cvsedit --no-diff -m "Set build timestamp to $now." "$file" "$@"
+	exec cvsedit --no-diff -m "" "$file" "$@"
     else
 	exec "$@" "$file"
     fi
