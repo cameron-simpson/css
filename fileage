@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/usr/bin/perl
 #
 # Print file age in seconds: now-mtime(file).
 #	- Cameron Simpson <cs@zip.com.au> 18mar2005
@@ -10,5 +10,5 @@ if (@ARGV != 1)
 { die "Usage: $cmd pathname\n";
 }
 
-@s=stat($ARGV[0]) || die "$cmd: stat($ARGV[0]): $!\n";
-print now-$s[9], "\n";
+(@s=stat($ARGV[0])) || die "$cmd: stat($ARGV[0]): $!\n";
+print time-$s[9], "\n";
