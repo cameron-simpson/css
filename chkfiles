@@ -1,0 +1,139 @@
+#!/usr/bin/perl
+#
+# Examine a list of files to see which have changed.
+#	- Cameron Simpson <cs@zip.com.au> 24aug96
+#
+
+use cs::Source;
+use cs::MD5;
+use cs::Upd;
+use cs::Stat;
+use POSIX;
+use Getopt::Std;
+use File::Find;
+
+$Root=$ENV{HOME};	# top of tree for relative names
+$SnapDir=(length $ENV{SNAPDIR} ? $ENV{SNAPDIR} : "$ENV{HOME}/etc/snap");
+$UseHier=0;
+$Recurse=0;
+$Verbose=0;
+undef $UpdFile;
+
+($cmd=$0) =~ s:.*/::;
+$usage="Usage: $cmd [-r] files...
+	-d snapdir	Directory holding snapshots.
+			Default: \$SNAPDIR or $SnapDir.
+	-h		Print out in Hier.pm format.
+	-s snap 	Snapshot file with old content.
+	-v		Verbose.
+";
+
+$tty=-t STDIN;
+
+$badopts=0;
+getopts('hd:s:v') || ($badopts=1);
+
+$UseHier=$opt_h if defined $opt_h;
+$SnapFile=$opt_s if defined $opt_s;
+$SnapDir=$opt_d if defined $opt_d;
+$Verbose=$opt_v if defined $opt_v;
+
+die $usage if $badopts;
+
+if (length($SnapFile) && $SnapFile !~ m:^/:)
+	{ $SnapFile="$SnapDir/$SnapFile";
+	}
+
+$Xit=0;
+
+# load previous file
+if (length $SnapFile)
+	{ my($u);
+
+	  $Verbose && err("loading $SnapFile ...\n");
+	  if (! defined ($u=new cs::Source PATH, $SnapFile))
+		{ err("$cmd: can't read $SnapFile: $!\n");
+		  exit 1;
+		}
+
+	  { my($s);
+
+	    if (! defined ($s=new cs::Stat FILE, $u->{FILE}))
+		{ err("$cmd: can't stat $SnapFile: $!\n");
+		  exit 1;
+		}
+
+	    $UpdMTime=$s->MTime();
+	  }
+
+	  while (defined ($_=$u->GetLine()) && length)
+		{ chomp;
+		  if ($UseHier)
+			{ $f=cs::Hier::a2h($_);
+			  if (ref $f)
+				{ $State{$f->{FILE}}=$f;
+				}
+			}
+		  else
+		  { if (/^\s*size=(\d+)\s+md5=(\S+)\s+(\S.*)/i)
+			{ $State{$3}={ FILE => $3,
+				       SIZE => $1+0,
+				       MD5  => $2,
+				     };
+			}
+		  }
+		}
+	}
+
+@files=@ARGV;
+
+if (! @files)
+	{ ($tty || $Verbose) && err("reading stdin for file list ...\n");
+	  @files=<STDIN>;
+	  for (@files) { chomp; }
+	  @files=grep(length,@files);
+	}
+
+FILE:
+  for (sort @files)
+	{ if (! defined ($f=chk($_,1)))
+		{ $Xit=1;
+		  next FILE;
+		}
+
+	  if ($UseHier)	{ print cs::Hier::h2a($f,0), "\n"; }
+	  else		{ print "size=$f->{SIZE} md5=$f->{MD5} $_\n"; }
+	}
+
+exit $Xit;
+
+sub chk
+	{ local($_)=shift;
+	  my($updateMode)=shift;
+
+	  $Verbose && err("chk $_\n");
+
+	  $updateMode=0 if ! defined $updateMode;
+
+	  if (! defined($s=new cs::Stat PATH, $_, 1))
+		{ err "new cs::Stat $_: $!\n";
+		  return undef;
+		}
+
+	  if (! POSIX::S_ISREG($s->Mode()))
+		{ err "$_: not a regular file\n";
+		  return undef;
+		}
+
+	  if ($updateMode
+	   && defined $State{$_}
+	   && $s->MTime() >= $UpdMTime
+	   && $s->Size() == $State{$_}->{SIZE})
+		# not new and same size - return old version
+		{ return $State{$_};
+		}
+
+	  $md5=cs::MD5::md5file($_);
+
+	  { FILE => $_, MD5 => $md5, SIZE => $s->Size() };
+	}
