@@ -1,0 +1,48 @@
+Installing my scripts:
+
+    Unpack into a suitable directory (eg "~/scripts-cs", which I will assume
+	for the sake of example below).
+    Add the full pathname for that directory to the END of your $PATH.
+	Also add the full path for the directory ~/scripts-cs/synonyms.
+    The Perl modules are in the directory ~/scripts-cs/cs, so add
+	~/scripts-cs to your $PERL5LIB varaible, or make a symlink named "cs"
+	from your generic perl library directory to that subdir. The aim here
+	is that "use cs::blah" will find the module ~/scripts-cs/cs/blah.pm.
+
+    Several of the scripts expect the following shell environment variables:
+
+	$HOST		Your machine's short name.
+	$HOSTNAME	Your machine's fully qualified domain name.
+	$ARCH		Your architecure, in the form vendor.cpu.os,
+			eg sun.sparc.solaris or sgi.mips.irix.
+	$SYSTEMID	A name for your machines administrative domain
+			(eg: I use "cisra" for my workplace: CISRA,
+			"home" for home and "zip" for my ISP: zip.com.au).
+	$USER		Your login name.
+	$SITENAME	Your email domain (eg zip.com.au for me).
+	$EMAIL		Your email address (just "who@where", no "<>"s);
+			normally $USER@$SITENAME.
+
+    There are some others, but those cover the common stuff.
+
+Licence:
+
+    You're free to use, modify and redistribute these scripts provided that:
+
+	- you leave my code marked as mine and your modifications (if any)
+	  marked as yours
+
+	- you make recipients aware that the scripts can be obtained for
+	  free from my own web page
+
+Warrantee:
+
+    None. These scripts work for me, but any of them may have
+    bugs or be arbitrarily dependent on my own login environment.
+    While I try to make most of them usable by others (and am happy
+    to hear suggestions or bug reports), they're for my use and may
+    well not meet your needs.
+    But feel free to hack them to meet your needs.
+
+- Cameron Simpson <cs@zip.com.au>
+  http://www.zip.com.au/~cs/
