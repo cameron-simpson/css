@@ -61,4 +61,4 @@ else
     fi
 fi
 
-exec listfiles -f "$filter" $lfopts $ptns -- ${1+"$@"}
+exec listfiles -f "$filter" -M updimlist $lfopts $ptns -- ${1+"$@"}
