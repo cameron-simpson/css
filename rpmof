@@ -14,16 +14,29 @@ trap 'rm -f "$names" "$rpmout"; exit $xit' 0 1 15
 
 xit=0
 
+wd=`pwd`
+
 for dir
-do  ( cd "$dir" || exit 1
-      wd=`pwd`
-      ls -a | sed -e '/^\./d' -e '/^\.\./d' -e "s^$wd/" >"$names"
-      xxargs rpm -qf <"$names" >"$rpmout"
-      while read name <&3 && read rpm <&4
-      do  echo "$name	$rpm"
-      done 3<"$names" 4<"$rpmout"
-      exit 0
-    ) || xit=1
+do  if [ -d "$dir" ]
+    then
+	( cd "$dir" || exit 1
+	  wd=`pwd`
+	  ls -a | sed -e '/^\./d' -e '/^\.\./d' -e "s^$wd/" >"$names"
+	  xxargs rpm -qf <"$names" >"$rpmout"
+	  while read name <&3 && read rpm <&4
+	  do  echo "$name	$rpm"
+	  done 3<"$names" 4<"$rpmout"
+	  exit 0
+	) || xit=1
+    else
+	name=$wd/$dir
+	if rpm=`rpm -qf "$name"`
+	then
+	    echo "$name	$rpm"
+	else
+	    xit=1
+	fi
+    fi
 done
 
 exit $xit
