@@ -3,7 +3,7 @@
 for db
 do
     tmpdb=/tmp/gdbm.$$
-    if perl_dbm $BIN/lsdbm -l "$db" | perl_gdbm $BIN/unlsdbm "$tmpdb"
+    if perl_dbm $HOME/bin/$ARCH/lsdbm -l "$db" | perl_gdbm $HOME/bin/$ARCH/unlsdbm "$tmpdb"
     then
 	cp "$db".dir "$db".dirOLD
 	mv "$db".pag "$db".pagOLD
