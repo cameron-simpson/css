@@ -90,7 +90,7 @@ set the value of the I<field>.
 sub GetSet($$;$)
 { my($this,$field,$value)=@_;
   my $D = $this->_Data();
-  return $D->{$field} if ! defined $value;
+  return $D->{$field} if @_ <= 2;
   ## warn "GetSet: Set $field=$value";
   $D->{$field}=$value;
 }
