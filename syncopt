@@ -25,11 +25,11 @@
 # as the administrator sees fit.
 #
 # The basic scheme is that packages get built and installed as B</opt/I<package>-I<version>>
-# and then copied to a central spot such as B<~syncopt/I<arch>/I<package>-I<version>>,
+# and then copied to a central spot such as B</u/syncopt/I<arch>/I<package>-I<version>>,
 # leaving a symlink from B</opt> to the central package.
 # In this way things think they
 # live in B</opt> and become local or remote by either symlinking from B</opt> to the central copy
-# or by installing an exact copy of B<~syncopt/I<arch>/I<thing>-I<version>> in </opt>.
+# or by installing an exact copy of B</u/syncopt/I<arch>/I<thing>-I<version>> in </opt>.
 #
 # The purpose of B<syncopt> is to maintain that arrangement in a convenient and automatic fashion.
 #
@@ -37,9 +37,17 @@
 # or batch dispatched on all clients by hand via ssh after a new package install.
 #
 
+umask 2
+
 # installation directory
 : ${SYNCOPT_OPT:=/opt}
 cf=$SYNCOPT_OPT/.syncopt
+
+if [ -z "$ARCH" -a -s "$SYNCOPT_OPT/ARCH" ]
+then
+    ARCH=`cat "$SYNCOPT_OPT/ARCH"`
+    export ARCH
+fi
 
 pathadd=:/usr/bin:$SYNCOPT_OPT/bin:$SYNCOPT_OPT/script
 PATH=$PATH$pathadd
@@ -72,6 +80,10 @@ eval "$sedvars"
 : ${SYNCOPT_ARCH:=/u/syncopt/$ARCH}
 : ${SYNCOPT_COMMON:=/u/syncopt/common}
 : ${SYNCOPT_SUBDIRS:="."}
+
+# add a couple of possibilities for finding rsync and readsymlink
+PATH=$PATH:$SYNCOPT_COMMON/script:$SYNCOPT_ARCH/rsync/bin
+export PATH
 
 cmd=`basename "$0"`
 usage="Usage: $cmd [-n] [-f] [l] [-R rsync-path] [-x] [-v] [items...]
@@ -297,11 +309,11 @@ do
     #
     # Other lines are of the form:
     #
-    #	I<package> I<mode>
+    #	package mode
     #
     # or
     #
-    #	I<package> I<version> I<mode>
+    #	package version mode
     #
     # where I<package> is the name of the package
     # (eg "B<perl>" or "B<xine>"),
@@ -315,7 +327,7 @@ do
     # B<syncopt> uses that to specify the default package version
     # for the unversioned symlink:
     #
-    #	/opt/Ipackage -> /opt/package-version
+    #	/opt/package -> package-version
     #
     sedscript="$sedpreamble
 
@@ -448,18 +460,18 @@ exit $xit
 #
 # The architecture name for this machine.
 # The default is the output of ``B<uname -s>'',
-# although on system I administer I arrange this to be a string of the form
+# although on systems I administer I arrange this to be a string of the form
 # B<I<vendor>.I<cpu>.I<os>>, for example B<redhat.x86.linux>.
 #
 # =item B<SYNCOPT_ARCH>
 #
 # This is the location of the master copies of the architecture specific packages.
-# The default is B<~syncopt/$ARCH>.
+# The default is B</u/syncopt/$ARCH>.
 #
 # =item B<SYNCOPT_COMMON>
 #
 # This is the location of the master copies of the architecture independent packages.
-# The default is B<~syncopt/common>.
+# The default is B</u/syncopt/common>.
 #
 # =item B<SYNCOPT_OPT>
 #
@@ -475,8 +487,8 @@ exit $xit
 #
 # If set, expect a subhierarchy underneath each B<$SYNCOPT_{ARCH,COMMON}> repository.
 # For example, at home I set this to "B<HOME WORK>".
-# I put home built software in B<~syncopt/$ARCH/HOME/I<package>>
-# and keep a copy of much of the repository from work in B<~syncopt/$ARCH/WORK/I<package>>,
+# I put home built software in B</u/syncopt/$ARCH/HOME/I<package>>
+# and keep a copy of much of the repository from work in B</u/syncopt/$ARCH/WORK/I<package>>,
 # obviating any need to rebuild things already built for work.
 # The subhierachies are consulted in order,
 # thus arranging that my home installs
