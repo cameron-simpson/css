@@ -7,10 +7,12 @@
 # Add MP3 mode, basicly for my brother.	 -cameron 25aug2001
 #
 
+EDITOR=${EDITOR:-vi}
+
 dev=${CDRIP_DEV:-/dev/cdrom}
 bps=${CDRIP_BPS:-192}
 enc=${CDRIP_ENC:-ogg}
-lock=
+lock=$CDRIP_LOCK
 
 cmd=`basename "$0"`
 usage="Usage: $cmd [-b bps] [-d device] [-e enc] [-l lock]
@@ -59,8 +61,16 @@ esac
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
-cdtoc "$dev" \
-| sed -e 's;//*; -- ;g' -e 's/   */ /g' \
+toc=/tmp/cdtoc.$$
+cdtoc "$dev" >"$toc" || { rm -f "$toc"; exit 1; }
+
+cat "$toc"
+ask "Edit TOC before use" && $EDITOR "$toc"
+
+exec <"$toc"
+rm "$toc"
+
+sed -e 's;//*; -- ;g' -e 's/   */ /g' \
 | ( read artist	|| exit 1
     read album	|| exit 1
 
