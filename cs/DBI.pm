@@ -434,8 +434,6 @@ sub last_id()
 { $cs::DBI::_last_id;
 }
 
-=back
-
 =item addRow(I<dbh>,I<table>,I<record>)
 
 Add a row represented by the hashref I<record>
@@ -454,6 +452,8 @@ sub addRow($$$)
   ? last_id()
   : undef;
 }
+
+=back
 
 =head1 OBJECT CREATION
 
