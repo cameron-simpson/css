@@ -120,6 +120,46 @@ sub ngSet($)	# newsgrouptext -> cs::Flags
   cs::Flags->new(grep(length,split(/[\s,]+/)));
 }
 
+sub parse_comment($)
+{ local($_)=shift;
+
+  my($comment)='';
+  my($subcomment,$tail);
+
+  if (! /^\(/)
+  { warn "parse_comment on a non-comment \"$_\"";
+    return ('()',$_);
+  }
+
+  $comment=$&;
+  $_=$';
+
+  TOKEN:
+  while (length)
+  { last TOKEN if /^\)/;
+
+    if (/^\(/)
+    { ($subcomment,$tail)=parse_comment($_);
+      $comment.=$subcomment;
+      $_=$tail;
+    }
+    elsif (/^\\./)
+    { $comment.=$&; $_=$'; }
+    elsif (/^[^\(\)\\]+/)
+    { $comment.=$&; $_=$'; }
+    else
+    { $comment.=substr($_,0,1);
+      substr($_,0,1)='';
+    }
+  }
+
+  s/^\)//;		# eat closure if present
+
+  $comment.=')';	# return well-formed comment
+
+  ($comment,$_);
+}
+
 =item addrSet(I<addresses>)
 
 Parse the string I<addresses>
@@ -213,46 +253,6 @@ sub addrSet($)	# addrlisttext -> hashref
   }
 
   $addrs;
-}
-
-sub parse_comment($)
-{ local($_)=shift;
-
-  my($comment)='';
-  my($subcomment,$tail);
-
-  if (! /^\(/)
-  { warn "parse_comment on a non-comment \"$_\"";
-    return ('()',$_);
-  }
-
-  $comment=$&;
-  $_=$';
-
-  TOKEN:
-  while (length)
-  { last TOKEN if /^\)/;
-
-    if (/^\(/)
-    { ($subcomment,$tail)=parse_comment($_);
-      $comment.=$subcomment;
-      $_=$tail;
-    }
-    elsif (/^\\./)
-    { $comment.=$&; $_=$'; }
-    elsif (/^[^\(\)\\]+/)
-    { $comment.=$&; $_=$'; }
-    else
-    { $comment.=substr($_,0,1);
-      substr($_,0,1)='';
-    }
-  }
-
-  s/^\)//;		# eat closure if present
-
-  $comment.=')';	# return well-formed comment
-
-  ($comment,$_);
 }
 
 =item addr2fullname(I<address>)
@@ -1037,6 +1037,10 @@ sub WriteItem	# ($this,Sink,[1,],@text...)
   if (@_ && $_[0] eq '1')
   { $needFrom_=1;
     shift(@_);
+  }
+
+  if (! defined $sink)
+  { my@c=caller;die"\$sink undefined from [@c]";
   }
 
   if (! ref $sink)
