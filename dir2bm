@@ -1,0 +1,54 @@
+#!/bin/sh
+#
+# Walk a directory unpacked from a bookmark file with bm2dir
+# and emit a bookmark file.
+#	- Cameron Simpson <cs@zip.com.au> 07apr2003
+#
+
+cmd=$0
+
+pfx=
+[ "x$1" = x-p ] && { pfx=$2; shift; shift; }
+
+[ $# = 1 ] || { echo "Usage: $cmd [-p pfx] directory" >&2; exit 2; }
+
+cd "$1" || exit 1
+wd=`pwd` || exit 1
+title=$wd
+
+if [ -z "$pfx" ]
+then
+    cat <<-X
+	<!DOCTYPE NETSCAPE-Bookmark-file-1>
+	<!-- This is an automatically generated file.
+	     It will be read and overwritten.
+	     DO NOT EDIT! -->
+	<META HTTP-EQUIV="Content-Type" CONTENT="text/html; charset=UTF-8">
+	<TITLE>Bookmarks from $title</TITLE>
+	<H1>Bookmarks from $title</H1>
+
+X
+fi
+
+cat <<X
+$pfx<DL><p>
+$pfx    <DT><H3>$title</H3>
+$pfx    <DD>
+$pfx	<DL><p>
+X
+
+for bm in *
+do
+  if [ -d "$bm/." ]
+  then
+      echo "$pfx        <DT><H3>$bm</H3>"
+      "$0" -p "$pfx        " "$wd/$bm"
+  else
+      exec <"$bm"
+      read url || continue
+      echo "$pfx        <DT><A HREF=\"$url\">$bm</A>"
+  fi
+done
+
+echo "$pfx    </DL><p>"
+echo "$pfx</DL><p>"
