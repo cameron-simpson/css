@@ -1,5 +1,7 @@
 #!/usr/bin/perl
 #
+# Take lock, run command, release lock. - Cameron Simpson <cs@zip.com.au>
+#
 
 =head1 NAME
 
