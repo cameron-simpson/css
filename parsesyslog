@@ -1,0 +1,63 @@
+#!/usr/bin/perl
+#
+
+use strict qw(vars);
+
+use cs::Date;
+
+my $now = time;
+my $today = new cs::Date $now;
+my $thisyyyy = $today->Year();
+
+SYSLOG:
+  while (defined ($_=<>))
+	{
+	  chomp;
+	  if (! /(\w{3})\s+0*(\d+)\s+0*(\d+):0*(\d+):0*(\d+)\s+([\w.]+)\s+/)
+		{ warn "$ARGV, line $.: unparsable: $_\n";
+		  next SYSLOG;
+		}
+
+	  my($mon,$mday,$hh,$mm,$ss,$host,$entry)=($1,$2,$3,$4,$5,$6,$');
+
+	  my $logdate = new cs::Date cs::Date::dmy2gmt($mday,cs::Date::mon2mnum($mon)+1,$thisyyyy,1)+$ss+60*$mm+3600*$hh;
+
+##	  print  "IN:  $_\n";
+##	  printf("OUT: %02d:%02d:%02d %2d %s %4d \@ %s %s\n",
+##		$logdate->Hour(),
+##		$logdate->Min(),
+##		$logdate->Sec(),
+##		$logdate->MDay(),
+##		cs::Date::mnum2mon($logdate->Mon()),
+##		$logdate->Year(),
+##		$host,$entry);
+
+	  if ($entry !~ /^(\w+):\s+/)
+		{ warn "skip $entry\n";
+		  next SYSLOG;
+		}
+
+	  my $service = $1;
+	  $entry=$';
+
+	  if ($service eq 'unix' || $service eq 'syslogd')
+	  { next SYSLOG;
+	  }
+	  elsif ($service eq 'qmail')
+	  { 
+	  }
+	  else
+	  { warn "$ARGV, line $.: unsupported service \"$service\": $entry\n";
+	    next SYSLOG;
+	  }
+
+	  print "\n";
+	}
+
+package SyslogHost;
+
+sub new
+	{ my($class,$host)=@_;
+
+	  my :b cgi-bin/
+	}
