@@ -36,6 +36,7 @@ then
 	fst)	target=findsametext ;;
 	fsu)	target=findsameurl ;;
 	gim)	target=googleimagesearch ;;
+	gnews)	target=googlenews ;;
 	imdb-actor) target=movieactors ;;
 	imdb-character-female) target=moviecharfemale ;;
 	imdb-character-male) target=moviecharmale ;;
