@@ -1,0 +1,5 @@
+#!/bin/sh
+LOGDIR=${LOGDIR:-$HOME/var/log}
+exec >>"$LOGDIR/alert" 2>&1
+[ $# = 0 ] && { echo "$0: nothing to do!" >&2; exit 1; }
+exec "$@"
