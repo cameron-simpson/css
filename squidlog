@@ -4,9 +4,11 @@
 #	- Cameron Simpson <cs@zip.com.au> 20nov98
 #
 
+: ${TMPDIR:=/tmp}
+
 [ $# = 0 ] && set CLIENT WEBSITE PROTOCOL DATATYPE DATASIZE HITS DATATIME
 
-tmp=/tmp/log$$
+tmp=$TMPDIR/log$$
 tmpall=${tmp}all
 
 cat ${1+"$@"} >$tmp
