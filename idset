@@ -99,8 +99,7 @@ then
 	for f in [0-9]*/*
 	do  [ -s "$f" ] || continue
 	    necho "$f	" | tr / '	'; tail -1 "$f"
-	done \
-	| sort -n
+	done
     else
 	# list the name for every id; output is
 	#	id\tname
@@ -108,51 +107,72 @@ then
 	then  idfilter='s/^\([0-9][0-9]*	\)\./\1/'
 	else  idfilter='/^[0-9][0-9]*	\./d'
 	fi
-	idsetlist . name \
-	| sed -e '/	[^	]/!d' \
-	      -e "$idfilter" \
-	| sort -n
+
+	ls -ld *[^0-9]* 2>/dev/null \
+	| sed -e 's/^l.* \([^ ][^ ]*\) -> \([0-9][0-9]*\)$/\2	\1/' \
+	      -e 't islink' \
+	      -e 'd' \
+	      -e ':islink' \
+	      -e "$idfilter"
     fi
 
     exit 0
 fi
 
-iddir=
 case "$idname" in
     *[^0-9]*)
 	# must be a name
-	if [ -d "$idname/." ]
+	if [ ! -d "$idname/." ]
 	then
-	    iddir=`readsymlink "$idname"` || exit 1
+	    idnum=`mkdirn ''` || exit 1
+	    rm -f "$idname"
+	    ln -s "$idnum" "$idname" || exit 1
+	    echo "$idname" >"$idnum/name"
 	else
-	    iddir=`mkdirn ''` || exit 1
-	    echo "$idname" >"$iddir/name"
-	    ln -s "$iddir" "$idname"
+	    idnum=
 	fi
 	;;
     *)  # must be a number
-	iddir=$idname
-	needdir "$iddir" || exit 1
-	idname=`tail -1 "$iddir/name" 2>/dev/null`
+	idnum=$idname
+	idname=
+	needdir "$idnum" || exit 1
 	;;
 esac
 
-# remove param or whole iddir
+# remove param or whole idnum
 if [ $rmid ]
 then
   if [ -n "$param" ]
-  then rm -f "$iddir/$param" || exit 1
-  else rm -r "$iddir" || exit 1
-       [ -n "$idname" ] && rm -- "$idname" || exit 1
+  then
+      # remove parameter
+      if [ -n "$idnum" ]
+      then pfile=$idnum/$param
+      else pfile=$idname/$param
+      fi
+      rm -f "$pfile" || exit 1
+  else
+      # remove whole id
+      [ -n "$idnum" ] || idnum=`readsymlink "$idname"` || exit 1
+      [ -n "$idname" ] || idname=`tail -1 "$idnum/name" 2>/dev/null`
+      [ -n "$idname" ] && { rm -- "$idname" || exit 1; }
+      rm -r "$idnum" || exit 1
   fi
   exit 0
 fi
 
 # no param? just report id
-[ -z "$param" ] && { echo "$iddir"; exit 0; }
+if [ -z "$param" ]
+then
+    [ -n "$idnum" ] || idnum=`readsymlink "$idname"` || exit 1
+    echo "$idnum"
+    exit 0
+fi
 
 # parameter - locate the file
-pfile=$iddir/$param
+if [ -n "$idnum" ]
+then pfile=$idnum/$param
+else pfile=$idname/$param
+fi
 
 # not setting it? report current value if any
 if [ -z "$haspvalue" ]
@@ -165,6 +185,7 @@ then
   exit $?
 fi
 
+# setting the name has to redo the symlinks
 if [ "x$param" = "xname" ]
 then
     case "$pvalue" in
@@ -177,25 +198,27 @@ then
 		;;
     esac
 
-    # adjust name pointer
-    if [ "x$idname" != "x$pvalue" ]
-    then
-      rm -f "$idname"
-      idname=$pvalue
-      ln -s "$iddir" "$idname"
-    fi
+    [ -n "$idnum"  ] || idnum=`readsymlink "$idname"` || exit 1
+    [ -n "$idname" ] || idname=`tail -1 "$idnum/name" 2>/dev/null`
 
+    # adjust name pointer, even if changed
+    [ -z "$idname" ] || rm -f "$idname"
+    idname=$pvalue
+    [ -z "$idname" ] || ln -s "$idnum" "$idname"
+
+    # propagate desktop names to window manager
     if [ -n "$DISPLAY" ]
     then
-      idsetbase=`basename "$idset"`
-      if [ "x$idsetbase" = xdesktop ]
-      then
-	case "$pvalue" in
-	  .*)	name=`expr "x$pvalue" : 'x.\(.*\)'` ;;
-	  *)	name=$pvalue ;;
-	esac
-	fvwmcmd "desktopName $iddir $idname" &
-      fi
+	idsetbase=`basename "$idset"`
+	if [ "x$idsetbase" = xdesktop ]
+	then
+	    # convert private names to display names
+	    case "$pvalue" in
+	      .*)	name=`expr "x$pvalue" : 'x.\(.*\)'` ;;
+	      *)	name=$pvalue ;;
+	    esac
+	    fvwmcmd "desktopName $idnum '$idname'" &
+	fi
     fi
 fi
 
