@@ -8,9 +8,14 @@
 # Limit on number of directory tries. - cameron 05sep2000
 #
 
-[ $# = 1 ] || { echo "Usage: $0 dirpfx" >&2; exit 2; }
+cmd=$0
+usage="Usage: $cmd [-1] dirpfx"
 
+startn=
 maxtries=20
+
+[ "x$1" = x-1 ] && { startn=1 maxtries=1024; shift; }
+[ $# = 1 ] || { echo "$usage" >&2; exit 2; }
 
 pfx=$1
 case "$pfx" in *[0-9]) pfx=$pfx- ;; esac
@@ -19,23 +24,27 @@ up=`dirname "$pfx"`
 base=`basename "$pfx"`
 
 # check out existing directories
-n=`exec 2>/dev/null
-   cd "$up" || exit 1
-   ls \
-   | sed -n "/^$base"'0*[1-9][0-9]*/s/.*[^0-9]0*\([1-9][0-9]*\)$/\1/p' \
-   | sort -n \
-   | tail -1`
-
-# nothing? start at 1
-if [ -n "$n" ]
+if [ -n "$startn" ]
 then
-    n=`expr $n + 1`
+    n=$startn
 else
-    n=1
+    n=`exec 2>/dev/null
+       cd "$up" || exit 1
+       ls \
+       | sed -n "/^$base"'0*[1-9][0-9]*/s/.*[^0-9]0*\([1-9][0-9]*\)$/\1/p' \
+       | sort -n \
+       | tail -1`
+
+    # nothing? start at 1
+    if [ -n "$n" ]
+    then
+	n=`expr $n + 1`
+    else
+	n=1
+    fi
 fi
 
 # scan for a new slot
-maxtries=16
 while ndir=$pfx$n
       :
 do
