@@ -1,0 +1,14 @@
+#!/bin/sh
+
+for db
+do
+    tmpdb=/tmp/gdbm.$$
+    if perl_dbm $BIN/lsdbm -l "$db" | perl_gdbm $BIN/unlsdbm "$tmpdb"
+    then
+	cp "$db".dir "$db".dirOLD
+	mv "$db".pag "$db".pagOLD
+	cat "$tmpdb".dir >"$db".dir	# preserve permissions
+	ln "$db".dir "$db".pag
+    fi
+    rm -f "$tmpdb".dir "$tmpdb".pag
+done
