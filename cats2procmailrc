@@ -412,14 +412,14 @@ sub readcats($;$)
       { $ptn=$1;
       }
       else
-      { $ptn.="\@.*(".join('|',@::DfltDom).")" if $ptn !~ /\@/;
+      { $ptn.="\@.*".altre(@::DfltDom) if $ptn !~ /\@/;
 	$ptn="\\<$ptn\\>";
       }
 
       $ptn =~ s/\.[^*]/\\$&/g;
     }
 
-    my $hregexp = '('.join('|',@hdrs).')';
+    my $hregexp = altre(@hdrs);
 
     if ($folder =~ /^\|/)
     { $deliver=($key eq '.' ? $folder : "$folder '$key'");
@@ -563,4 +563,10 @@ sub pathdir
   return "." unless m:/:;
   s:/[^/]*$::;
   return $_;
+}
+
+sub altre
+{ die "altere() with no args" if ! @_;
+  return $_[0] if @_ == 1;
+  return '('.join('|',@_).')';
 }
