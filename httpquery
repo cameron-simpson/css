@@ -1,0 +1,55 @@
+#!/usr/bin/perl
+#
+# Make a query for a GET-style form.
+#	- Cameron Simpson <cs@zip.com.au> 11dec96
+#
+
+($cmd=$0) =~ s:.*/::;
+$usage="Usage: $cmd key=value...\n";
+
+$badopts=0;
+@Q=();
+$URL='http://web/~cameron/';
+
+ARGV:
+  for (@ARGV)
+	{ if (! /^(\w+)=/)
+		{ print STDERR "$cmd: bad query parameter: $_\n";
+		  $badopts=1;
+		  next ARGV;
+		}
+
+	  push(@Q,$1,$');
+	}
+
+die $usage if $badopts;
+
+use cs::HTML;
+use cs::Hier;
+use cs::URL;
+
+@pairs=();
+while (@Q)
+	{ $p=shift(@Q); $v=shift(@Q);
+
+	  $v=cs::HTML::encode($v);
+
+	  push(@pairs,"$p=$v");
+	}
+
+$q=join('&',@pairs);
+if (length $URL)
+	{ $q=cs::HTML::encode($URL)."?".$q;
+	}
+
+print $q, "\n";
+
+exit 0 if ! length $URL;
+
+$mime=cs::URL::get($q);
+
+die "GET fails" if ! defined $mime;
+
+# print cs::Hier::h2a($mime,1), "\n";
+
+exit 0;
