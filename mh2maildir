@@ -1,0 +1,48 @@
+#!/bin/sh
+#
+# Convert an MH folder into a Maildir folder.
+#	- Cameron Simpson <cs@zip.com.au> 07jul2004
+#
+
+: ${TMPDIR:=/tmp}
+
+cmd=`basename "$0"`
+usage="Usage: $::cmd mhdir"
+
+[ $# = 1 ] || { echo "$usage" >&2; exit 2; }
+mhdir=$1; shift
+case "$mhdir" in
+  /*)	;;
+  *)	mhdir=`cd "$mhdir" && pwd` || exit 1 ;;
+esac
+
+ismhdir "$mhdir" || { echo "$cmd: $mhdir: not an MH folder" >&2; exit 1; }
+
+tmpf=$TMPDIR/prc$$
+cat >"$tmpf" <<X
+MAILDIR=$MAILDIR
+DEFAULT=$mhdir/
+LOGFILE=$HOME/var/log/procmail
+X
+
+cat "$tmpf"
+
+mv "$mhdir" "$mhdir-mh" && mkdir "$mhdir" || exit 1
+
+cd "$mhdir-mh" || exit 1
+xit=0
+for f in [1-9]*
+do  echo "$f"
+    procmail "$tmpf" <"$f" && rm "$f" || xit=1
+done
+
+if [ "$xit" = 0 ]
+then
+    rm .m*
+    cd ..
+    set-x rmdir "$mhdir-mh" || xit=1
+fi
+
+rm "$tmpf"
+
+exit $xit
