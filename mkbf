@@ -1,0 +1,130 @@
+#!/bin/sh
+#
+# Make a ramdisk image after the fashion of mkinitrd.
+# I wanted to be able to make a ramdisk without having an installed
+# kernel, and possibly with other stuff on it. Mkinitrd seems too opinionated
+# about what you want. Based heavily on mkinitrd and the
+#	/usr/src/linux/Documentation/ramdisk.txt
+# file.
+#	- Cameron Simpson <cs@zip.com.au> 23jul2000
+#
+
+cmd=`basename "$0"`
+
+rootdev=`awk '$2 == "/" { print $1 }' /etc/fstab`
+bootb=/boot/boot.b
+kver=`uname -r`
+kpfx=/boot/vmlinuz
+ktry="$kpfx-$kver $kpfx"
+kernel=
+ramdisk=
+
+usage="Usage: $cmd [options...] floppydev
+	-b boot.b	Boot block.
+	-k kernel	Kernel image file.
+			Default: first of $ktry
+	-r ramdisk	Use specified ramdisk image instead of making one."
+
+badopts=
+while :
+do  case $1 in
+	-b)	bootb=$2; shift ;;
+	-k)	kernel=$2; shift ;;
+	-r)	ramdisk=$2; shift ;;
+	--)	shift; break ;;
+	-?*)	echo "$cmd: unrecognised option: $1" >&2; badopts=1 ;;
+	*)	break ;;
+    esac
+    shift
+done
+
+if [ $# = 0 ]
+then  echo "$cmd: missing floppydev" >&2; badopts=1
+else  rdev=$1; shift
+      [ -f "$rdev" ] && { echo "$cmd: $rdev: is a file!" >&2; badopts=1; }
+fi
+
+[ -z "$ramdisk" ] || [ -s "$ramdisk" ] \
+|| { echo "$cmd: $ramdisk: missing or empty ramdisk image" >&2
+     badopts=1
+   }
+
+[ $# = 0 ] || { echo "$cmd: extra arguments: $*" >&2; badopts=1; }
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+################################################
+# Locate kernel image.
+
+if [ -z "$kernel" ]
+then
+    for k in $ktry
+    do  [ -s "$k" ] && { kernel=$k; break; }
+    done
+    [ -n "$kernel" ] || { echo "$cmd: can't find kernel in: $ktry" >&2
+			  exit 1
+			}
+fi
+
+[ -s "$kernel" ] || { echo "$cmd: $kernel: missing or empty file" >&2
+		      exit 1
+		    }
+
+################################################
+# Construct ramdisk.
+rdi=/tmp/$cmd-rd
+if [ -n "$ramdisk" ]
+then  cp "$ramdisk" "$rdi" || exit 1
+else  mkrd "$rdi" || exit 1
+fi
+
+################################################
+# Construct filesystem.
+
+ask "Ready to mke2fs $rdev" || exit 1
+mke2fs "$rdev"
+
+mnt=`mkdirn /tmp/$cmd`
+mount -t ext2 "$rdev" "$mnt" || exit 1
+
+rmdir $mnt/lost+found
+mkdir $mnt/boot $mnt/etc $mnt/dev
+for dev in $rdev $rootdev
+do  cp -a $dev $mnt/dev
+done
+cp -a $bootb $mnt/boot
+mv "$rdi" $mnt/initrd.img
+cp "$kernel" $mnt/vmlinuz
+
+lilocf=$mnt/etc/lilo.conf
+cat >"$lilocf" <<EOF
+boot=$rdev
+compact
+message=/boot/message
+verbose=4
+prompt
+image=/vmlinuz
+        label=rescue
+	root=/dev/fd0
+	initrd=/initrd.img
+image=/vmlinuz
+        label=linux
+	root=$rootdev
+	initrd=/initrd.img
+EOF
+
+# append="load_ramdisk=2 prompt_ramdisk=1"
+
+cat >$mnt/boot/message <<EOF
+Press <return> (or wait 10 seconds) to boot from $rootdev.
+If you want to use a rescue disk, type "rescue" now.
+[ <Tab> for boot choices. ]
+
+EOF
+
+/sbin/lilo -r $mnt
+
+echo "Book disk: here is a shell:"
+( cd $mnt && pwd && exec $SHELL )
+
+umount $mnt && rmdir $mnt
