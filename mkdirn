@@ -48,7 +48,7 @@ do
   fi
 
   n=`expr $n + 1`
-  echo "[n=$n maxtries=$maxtries]" >&2
+  ## echo "[n=$n maxtries=$maxtries]" >&2
 done
 
 # report
