@@ -32,7 +32,9 @@ xit=0
 for host
 do
   pfx "$host" \
-  rsync -avHP "$dir/." "$host:$dir/." || xit=1
+  rsync -avHP "$dir/." "$host:$dir/." \
+  &
 done
+wait
 
 exit $xit
