@@ -1,11 +1,11 @@
 #!/bin/sh
 #
 # Queue mail for delivery.
-#	- Cameron Simpson <cs@zip.com.au> 26sep96
+#	- Cameron Simpson <cs@zip.com.au> 26sep1996
 #
-# Recoded in perl. - cameron, 07oct94
-# Added requeue facility. - cameron, 10oct94
-# Recoded in shell. - cameron, 26sep96
+# Recoded in perl. - cameron, 07oct1994
+# Added requeue facility. - cameron, 10oct1994
+# Recoded in shell. - cameron, 26sep1996
 #
 
 mbox=+UNFILED
