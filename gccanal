@@ -1,0 +1,20 @@
+#!/bin/sh
+#
+# Gcc with pretty much everything turned on, for maximally
+# paranoid code (well, it gets a lot of the common things).
+#	- Cameron Simpson <cs@zip.com.au> 28mar1999
+#
+# Filter out some noise. - cameron, 24may1999
+# And then the superficially bogus "In function" message. - cameron 11jun2000
+#
+
+## set -x
+exec \
+filter_fd 2 'sed "/: In function \`[^'\'']*'\'':\$/d
+		  /warning: value computed is not used/d
+		  /warning: suggest explicit braces to avoid ambiguous .else./d
+		  /discards .const. from pointer target type/d"' \
+gcc -Wall \
+	 -Wtraditional -Wshadow -Wpointer-arith \
+	 -Wcast-qual -Wwrite-strings -Wnested-externs \
+	 ${1+"$@"}
