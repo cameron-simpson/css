@@ -6,6 +6,8 @@
 # Multiple fds. - cameron, 23may99
 #
 
+: ${TMPDIR:=/tmp}
+
 cmd=$0	## `basename "$0"` ## perhaps a bit much overhead for this one
 usage="Usage: $cmd fd[,fd...] filter command [args...]"
 
@@ -63,7 +65,7 @@ fi
 
 eval "exec 9>&1 8>&$fd"
 
-xitcode=/tmp/xit.$$
+xitcode=$TMPDIR/xit.$$
 >$xitcode
 
 ( exec 8>&-	## we don't need 8 in this half
