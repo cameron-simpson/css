@@ -1,0 +1,21 @@
+#! /bin/sh
+#
+# Receive a message with an X-Face: header on stdin and display it.
+#	- John Kodis <kodis@jagunet.com>
+#
+
+if [ -z "$VIEWER" ]; then
+    if [ -z "$DISPLAY" ]; then
+	VIEWER=pbmtoascii
+    else
+	VIEWER='xv -expand 2 -smooth -'
+    fi
+fi
+
+(   echo '/* Format_version=1, Valid_bits_per_item=16,'
+    echo '   Width=48, Height=48, Depth=1 */'
+    perl -n -e '!$& && 
+	/^X-Face:/i .. !(/^X-Face:/i && print $'\'' or /^\s/ && print)' |
+    uncompface -
+) | icontopbm | $VIEWER
+
