@@ -63,7 +63,9 @@ tmpfile=$tmpdir/$cmd$$
 # Apphelper offers to view the file with the named viewer
 # and after viewing, to save the file in a location of your choice.
 #
-# =head2 OPTIONS
+# =head2 PRE-FILE OPTIONS
+#
+# The following terminal related options must preceed the filename.
 #
 # =over 4
 #
@@ -91,6 +93,17 @@ case $1 in
   *)	doterm=; [ -t 0 -a -t 1 ] || doterm=1 ;;
 esac
 
+# =back
+#
+# =head2 FILE DESIGNATION
+#
+# After the terminal related pre-file options
+# comes the file designation.
+# Usually this will be a filename,
+# however the following notations are also supported:
+#
+# =over 4
+#
 if [ $# = 0 ]
 then
   echo "$cmd: missing file" >&2
@@ -98,6 +111,11 @@ then
 else
   file=$1; shift
   case "$file" in
+    # =item B<->
+    #
+    # Read data from stdin.
+    # This will be placed in a temporary file.
+    #
     -)
       if cat >"$tmpfile"
       then
@@ -108,7 +126,12 @@ else
 	  badopts=1
       fi
       ;;
-    http://*)
+    # =item I<URL>
+    #
+    # Names commencing with B<http://> or B<ftp://>
+    # are taken to be URLs and fetched.
+    #
+    http://* | ftp://*)
       exec withurl -1 "$file" "$0" "$@"
       ;;
     *)
@@ -132,6 +155,9 @@ else
       fi
       ;;
   esac
+  #
+  # =back
+  #
 
   # fork off a terminal if need be
   if [ $doterm ]
@@ -148,6 +174,10 @@ else
   [ -t 0 ] || exec </dev/tty;	[ -t 0 ] || exit 1
   [ -t 1 ] || exec >/dev/tty;	[ -t 1 ] || exit 1
 
+  # =head2 POST-FILE OPTIONS
+  #
+  # =over 4
+  #
   set x $APPHELPER_OPTS ${1+"$@"}; shift
   apphopts=
   while :
