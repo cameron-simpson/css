@@ -368,16 +368,16 @@ sub Put
   my($data)=join('',@_);
 
   WRITE:
-    while (length $data)
-    { $n=$this->Write($data);
-      if (! defined $n)
-      { warn "$::cmd: write error (possibly $!), aborting with [$data] unwritten";
-	return undef;
-      }
-
-      $alln+=$n;
-      substr($data,$[,$n)='';
+  while (length $data)
+  { $n=$this->Write($data);
+    if (! defined $n)
+    { warn "$::cmd: write error (possibly $!), aborting with [$data] unwritten";
+      return undef;
     }
+
+    $alln+=$n;
+    substr($data,$[,$n)='';
+  }
 
   $alln;
 }
@@ -410,15 +410,15 @@ sub Write
     if (! print $io $datum)
     { undef $n;
     }
-##		  # XXX - IO module doesn't like zero sized writes
-##		  if ($n > 0 || ! $cs::Sink::_UseIO)
-##		  	{ $n=($cs::Sink::_UseIO
-##				? $io->syswrite($datum,$n)
-##				: $this->{FLAGS}&$cs::IO::F_RAWWRITES
-##					? syswrite($io,$datum,$n)
-##					: (print $io $datum)
-##						? $n : undef);
-##			}
+##	  # XXX - IO module doesn't like zero sized writes
+##	  if ($n > 0 || ! $cs::Sink::_UseIO)
+##	  	{ $n=($cs::Sink::_UseIO
+##			? $io->syswrite($datum,$n)
+##			: $this->{FLAGS}&$cs::IO::F_RAWWRITES
+##				? syswrite($io,$datum,$n)
+##				: (print $io $datum)
+##					? $n : undef);
+##		}
   }
   elsif ($type eq Sink)
   { $n=$this->{DS}->Write($datum);
@@ -449,7 +449,7 @@ sub Flush
   { $this->{DS}->Flush();
   }
   else
-  { warn "$::cmd: operation Flush not supported on Sink/$type objects";
+  { warn "$::cmd: operation Flush not supported on cs::Sink/$type objects";
   }
 }
 
@@ -513,6 +513,8 @@ sub _Blow
   { die "no unsuck op for Sink/$type";
   }
 }
+
+=back
 
 =head1 SEE ALSO
 
