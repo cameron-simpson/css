@@ -1,43 +1,54 @@
 #!/bin/sh
 #
 # Roll over a logfile; HUP daemon.
-#	- Cameron Simpson <cs@zip.com.au> 10oct97
+#	- Cameron Simpson <cs@zip.com.au> 10oct1997
 #
 
+cmd=`basename "$0"`
+
 sig=HUP
+trace=
+doit=1
 pid=
 max=
-zme=
+zme=1
 ext=
 if [ -t 1 -a -t 0 ]; then verbose=1; else verbose=; fi
 
-usage="Usage: $0 [-m max] [-p {pid|procname}] [-s signal] [-v] [-z] \\
+usage="Usage: $cmd [-m max] [-p {pid|procname}] [-s signal] [-v] [-z] \\
 		[+daycode] [+datecode] [+format] [-x exttension] \\
 		logfiles...
+	Default options supplied by \$LOGROLLOPTS.
+	-n			No action; recite planned actions.
+	-x			Trace execution.
 	-m max			Max logrolls (default: no max).
-	-p {pid|procname}	Process id or name to kill.
+	-p {pid|pidfile|procname} Process id, pid file or process name to kill.
+				WARNING: Using a process name is very dodgy.
 	-s signal		Signal to send (default $sig).
 	+daycode		Use .yyyy-mm-dd as extension.
 	+datecode		Use .yyyy-mm-dd:mm:mss as extension.
 	+format			Date-like extension for rolled log.
 				Collisions get rolled too.
-	-x extension		Arbitrary extension for rolled log.
+	-e extension		Arbitrary extension for rolled log.
 	-v			Verbose.
-	-z			Gzip rolled file."
+	-z			Gzip rolled file (default).
+	+z			Don't gzip."
 
 badopts=
 
 # use defaults
-set x $LOGROLLOPTS ${1+"$@"}; shift
+set $LOGROLLOPTS ${1+"$@"}; shift
 
 while :
 do  case $1 in
+	-n)	trace=echo doit= ;;
+	-x)	trace=set-x doit=1 ;;
 	-m)	max=$2; shift ;;
 	-p)	pid=$2; shift ;;
 	-s)	sig=$2; shift ;;
 	-z)	zme=1 ;;
 	+z)	zme= ;;
-	-x)	case $2 in
+	-e)	case $2 in
 		    .*)	ext=$2 ;;
 		    *)	ext=.$2 ;;
 		esac; shift ;;
@@ -45,7 +56,7 @@ do  case $1 in
 	+datecode) ext=.`datecode` ;;
 	+*)	fmt=`date "$1"` && [ -n "$fmt" ] && ext=$ext.$fmt ;;
 	--)	shift; break ;;
-	-?*)	echo "$0: unrecognised option: $1" >&2; badopts=1 ;;
+	-?*)	echo "$cmd: unrecognised option: $1" >&2; badopts=1 ;;
 	*)	break ;;
     esac
     shift
@@ -53,7 +64,7 @@ done
 
 if [ $# = 0 ]
 then
-    echo "$0: missing logfile" >&2
+    echo "$cmd: missing logfile" >&2
     badopts=1
 fi
 
@@ -67,8 +78,18 @@ if [ -n "$pid" ]
 then
     case $pid in
 	[0-9]*)	;;
+	/*)	if [ -f "$pid" ] \
+		&& npid=`cat "$pid"` \
+		&& [ -n "$pid" ]
+		then
+		    pid=$npid
+		else
+		    echo "$cmd: can't get pid from $pid" >&2
+		    exit 1
+		fi
+		;;
 	*)	npid=`psa | grep "[ ]$pid" | awk '{print $2}' | sed 1q`
-   	        [ -z "$npid" ] && { echo "$0: can't find pid for \"$pid\"" >&2
+   	        [ -z "$npid" ] && { echo "$cmd: can't find pid for \"$pid\"" >&2
 				    exit 1
 				  }
 		pid=$npid
@@ -87,7 +108,7 @@ do
 	-*)	logfile=./$logfile ;;
     esac
 
-    [ -f "$logfile" ] || { echo "$0: no logfile named \"$logfile\"" >&2
+    [ -f "$logfile" ] || { echo "$cmd: no logfile named \"$logfile\"" >&2
 			   xit=1
 			   continue
 			 }
@@ -111,14 +132,14 @@ do
 	done
 
 	# $n should now be the empty slot; make it so
-	rm -f "$logfile.$n" "$logfile.$n.gz"
+	$trace rm -f "$logfile.$n" "$logfile.$n.gz"
 
 	# move them all up one
 	while [ $n -gt 0 ]
 	do  n1=`expr $n - 1`
 	    ( if [ -f "$logfile.$n1.gz" ]
-	      then mv "$logfile.$n1.gz" "$logfile.$n.gz"
-	      else mv "$logfile.$n1" "$logfile.$n"
+	      then $trace mv "$logfile.$n1.gz" "$logfile.$n.gz"
+	      else $trace mv "$logfile.$n1" "$logfile.$n"
 	      fi
 	    ) || { ok=; break; }
 	    n=$n1
@@ -130,18 +151,23 @@ do
     fi
 
     # move original file
-    ($setx; mv "$logfile" "$roll") || { xit=1; continue; }
-    >>"$logfile"
-    cpmod "$roll" "$logfile"
+    $trace mv "$logfile" "$roll" || { xit=1; continue; }
+    [ $doit ] && >>"$logfile"
+    $trace cpmod "$roll" "$logfile"
 
     # compress shifted log
-    [ -z "$zme" ] || [ ! -s "$roll" ] || ( gzip -9 $dashv "$roll" & )
+    if [ $zme ] && [ -s "$roll" ]
+    then
+	$trace gzip -9 $dashv "$roll" &
+    fi
 done
 
 if [ $xit = 0 ]
 then
     # kick daemon
-    [ -n "$pid" ] && ($setx; kill -$sig $pid)
+    [ -n "$pid" ] && $trace kill "-$sig" "$pid"
 fi
+
+wait
 
 exit $xit
