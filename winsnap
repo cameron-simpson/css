@@ -1,0 +1,60 @@
+#!/bin/sh
+#
+# Grab a window and put it as a gif on my web site, return the URL.
+# Stripped out of bgfg.
+#	- Cameron Simpson <cs@zip.com.au>
+#
+# Grab a PNG.	- Cameron Simpson <cs@zip.com.au> 25may2000
+#
+
+TMPDIR=${TMPDIR-/tmp}
+
+cmd=`basename "$0"`
+usage="Usage: $cmd [xwd-args]"
+
+cd || exit 1
+
+badopts=
+
+scphost=zip
+scpuser=cs
+snapdir=etc/im/winsnap
+scpurlpfx=http://www.zip.com.au/~cs/winsnap
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+echo "Select window to include ..." >&2
+
+png=$TMPDIR/xwd.$$.png
+xwd -png -out $png ${1+"$@"} || exit 1
+
+[ -s $png ] || \
+  { echo "$cmd: failed to make $png" >&2
+    ls -ld "$png" >&2
+    exit 1
+  }
+
+imbase=
+sfx=`daycode`
+n=1
+while
+    im=$snapdir/${imbase:-"winsnap"}-$sfx-$n.png
+    [ -s "$im" ]
+do
+    n=`expr $n + 1`
+done
+
+mv "$png" "$im" || exit 1
+imname=`basename "$im"`
+
+case $SYSTEMID in
+    cisra)
+	echo "propagating to zip ..." >&2
+	synczip "$snapdir" || exit 1
+	echo "$scpurlpfx/$imname"
+	;;
+    *)	echo "ok, filed as $im"
+	echo "getting it to zip is your problem"
+	exit 0
+	;;
+esac
