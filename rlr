@@ -58,7 +58,6 @@ exec 3<&0	# save stdin
 
 [ "x$input" = x- ] || exec <"$input"
 
-set-x \
 sed -n "1,/$from/w $front
         /$to/,\$w $back" || ok=
 
