@@ -1,0 +1,4 @@
+#!/bin/sh
+[ $# = 0 ] && { echo "Usage: $0 command [args...]"; exit 2; }
+. $HOME/rc/shell/rigenv
+exec "$@"
