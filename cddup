@@ -25,4 +25,5 @@ pwd
 $trace cdda2wav "dev=$CDRIP_DEV" -vall -B -Owav -L 0 cddb=0 "cddbp-server=$cdserv" "cddbp-port=$cdport" || exit 1
 $trace eject "$CDRIP_DEV"
 ask "Burn audio to $CDRIP_DEV" || exit 1
-$trace cdrecord "dev=$CDRIP_DEV" -v -dao -useinfo -text *.wav
+$trace cdrecord "dev=$CDRIP_DEV" -v -dao -useinfo -text *.wav || exit 1
+$trace eject "$CDRIP_DEV"
