@@ -115,7 +115,7 @@ sub smtpsend
     else
     {
       ## warn "smtp obj = $smtp";
-      if (! $smtp->mail($pw[0]))
+      if (! $smtp->mail("$pw[0]\@$ENV{MAILDOMAIN}"))
       { warn "$::cmd: problem announcing sender \"$pw[0]\"\n";
 	$ok=0;
       }
