@@ -1,0 +1,67 @@
+#!/usr/bin/perl
+#
+# Grab addrs.new and incorporate it into addrs.all.
+#	- Cameron Simpson <cs@zip.com.au> 31jan2002
+#
+
+use strict qw(vars);
+
+($::cmd=$0) =~ s:.*/::;
+
+chdir($ENV{MAILDIR}) || die "$::cmd: chdir($ENV{MAILDIR}): $!\n";
+
+my $new = 'addrs.new';
+my $all = 'addrs.all';
+
+exit 0 if ! -s $new;
+
+my %addrs=();
+
+die "$::cmd: open($all): $!\n" if ! open(ALL,"< $all\0");
+while (defined($_=<ALL>))
+{ chomp;
+  if (! /\t/)
+  { die "$::cmd: $all, line $.: bad data (no tab)\n";
+  }
+
+  $addrs{$`}=$';
+}
+close(ALL);
+
+my $newnew = "$new-$$";
+
+if (-e $newnew)
+{ die "$::cmd: working file $newnew already exists\n";
+}
+
+if (! rename($new,$newnew))
+{ die "$::cmd: can't move $new to $newnew: $!\n";
+}
+
+sleep(2);	# in case in use
+
+die "$::cmd: open($newnew): $!\n" if ! open(NEW,"< $newnew\0");
+while (defined($_=<NEW>))
+{ chomp;
+  if (! /\t/)
+  { warn "$::cmd: $newnew, line $.: discarding bad data (no tab)\n";
+  }
+  elsif (! exists $addrs{$`})
+  { $addrs{$`}=$';
+  }
+}
+close($newnew);
+
+if (! open(ALL,"> $all\0"))
+{ die "$::cmd: can't rewrite $all: $!\n";
+}
+
+unlink($newnew) || warn "$::cmd: unlink($newnew): $!\n";
+
+for my $key (sort keys %addrs)
+{ print ALL "$key\t$addrs{$key}\n";
+}
+
+close(ALL);
+
+exit 0;
