@@ -15,7 +15,10 @@ safeStringRe = re.compile('^'+safeChunkPtn+'$')
 integerRe    = re.compile('^-?[0-9]+$')
 
 def flavour(o):
-  if hasattr(o,'__keys__'): return 'HASH'
+  t=type(o)
+  if t in (TupleType, ListType): return 'ARRAY'
+  if t in (DictType, DictionaryType): return 'HASH'
+  if hasattr(o,'__keys__') or hasattr(o,'keys'): return 'HASH'
   if hasattr(o,'__iter__'): return 'ARRAY'
   return 'SCALAR'
 
@@ -37,16 +40,14 @@ def h2f(fp,o):
     fp.write(int(o))
   elif t in (StringType, UnicodeType):
     stringEncode(fp,o)
-  elif t in (TupleType, ListType):
-    listEncode(fp,o)
-  elif t in (DictType, DictionaryType):
-    dictEncode(fp,o)
-  elif hasattr(o,'__keys__'):
-    dictEncode(fp,o)
-  elif hasattr(o,'__iter__'):
-    listEncode(fp,o)
   else:
-    h2f(fp,`o`)
+    fl=flavour(o)
+    if fl is 'ARRAY':
+      listEncode(fp,o)
+    elif fl is 'HASH':
+      dictEncode(fp,o)
+    else:
+      h2f(fp,`o`)
 
 def stringEncode(fp,s):
   if safeStringRe.match(s):
