@@ -7,9 +7,9 @@
 # Add MP3 mode, basicly for my brother.	 -cameron 25aug2001
 #
 
-dev=/dev/cdrom
-bps=192
-enc=ogg
+dev=${CDRIP_DEV:-/dev/cdrom}
+bps=${CDRIP_BPS:-192}
+enc=${CDRIP_ENC:-ogg}
 
 cmd=`basename "$0"`
 usage="Usage: $cmd [-b bps] [-d device] [-e enc]
@@ -53,6 +53,7 @@ cdtoc "$dev" \
 | ( read artist	|| exit 1
     read album	|| exit 1
 
+    encpid=
     xit=0
     while read track secs offset \
        && read title \
@@ -60,6 +61,7 @@ cdtoc "$dev" \
     do
       dir=$artist/$album
 
+      raw=$dir/$title.raw
       case $enc in
 	  ogg|mp3)
 		out=$dir/$title.$enc
@@ -77,22 +79,28 @@ cdtoc "$dev" \
 
       echo "Ripping track #$track: $dir/$title ..."
       set -x
-      cdparanoia -q -d "$dev" -e -r "$track" - \
-	2>>cdp.err \
-      >cdp.out
-      cat cdp.out \
-      | case $enc in
-	  ogg)
-	      time strace -f oggenc -r -b $bps \
-		     -c "Ripped by $NAME with cdparanoia and oggenc on `date`" \
-		     -a "$artist" -N "$track" -t "$title" -l "$album" \
-		     -o "$out" - 2>ogg.str
-	      ;;
-	  mp3)
-	      time lame -r -b "$bps" -h -p - "$out"
-	      ;;
-	esac
-      exit 0
+      if cdparanoia -q -d "$dev" -e -r "$track" "$raw" 2>cdp.err
+      then
+	  [ -n "$encpid" ] && kill -0 "$encpid" 2>/dev/null && echo "waiting for previous encoder ..."
+	  wait
+
+	  case $enc in
+	      ogg)
+		  time oggenc -r -b $bps \
+			 -c "Ripped by $NAME with cdparanoia and oggenc on `date`" \
+			 -a "$artist" -N "$track" -t "$title" -l "$album" \
+			 -o "$out" "$raw"
+		  ;;
+	      mp3)
+		  time lame -r -b "$bps" -h -p "$raw" "$out"
+		  ;;
+	  esac && rm "$raw" &
+	  encpid=$!
+      else
+	  echo "cdparanoia failed" >*2
+	  rm -f "$raw"
+	  xit=1
+      fi
     done
 
     exit $xit
