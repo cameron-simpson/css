@@ -12,4 +12,7 @@ esac
 	     exit 1
 	   }
 
+# flush alert window when I read my important email
+[ "x$*" = 'x-f +attn' ] && { alert ''; alert ''; alert ''; }
+
 exec /usr/bin/mutt ${1+"$@"}
