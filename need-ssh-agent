@@ -78,6 +78,6 @@ fi
 
 [ -s "$stashed" ] \
 || not ssh-add -l >/dev/null \
-|| stash-ssh "$stashed"
+|| stash-ssh-agent "$stashed"
 
 exec "$shell" ${1+"$@"}
