@@ -40,6 +40,7 @@ then
 	dict)	target=onelook ;;
 	djid)	exec us `msgid2dj ${1+"$@"}` ;;
 	dj)	target=googledj ;;
+	ev)	target=everything ;;
 	fm)	target=freshmeat ;;
 	fst)	target=findsametext ;;
 	fsu)	target=findsameurl ;;
