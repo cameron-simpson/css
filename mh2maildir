@@ -5,6 +5,7 @@
 #
 
 : ${TMPDIR:=/tmp}
+: ${LOGDIR:=$HOME/var/log}
 
 cmd=`basename "$0"`
 usage="Usage: $::cmd mhdir"
@@ -22,7 +23,7 @@ tmpf=$TMPDIR/prc$$
 cat >"$tmpf" <<X
 MAILDIR=$MAILDIR
 DEFAULT=$mhdir/
-LOGFILE=$HOME/var/log/procmail
+LOGFILE=$LOGDIR/procmail
 X
 
 cat "$tmpf"
