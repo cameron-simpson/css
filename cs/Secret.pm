@@ -11,6 +11,12 @@ use cs::Persist;
 
 package cs::Secret;
 
+if (! length $ENV{HOME})
+{ my @pw = getpwuid($>);
+  die "$0: getpwuid($>) fails: $!" if !@pw;
+  $ENV{HOME}=$pw[7];
+}
+
 $cs::Secret::DBpath = "$ENV{HOME}/private/secret/db";
 -e $cs::Secret::DBpath || ($cs::Secret::DBpath = "$ENV{HOME}/.secret");
 ##system("id >&2; env|sort >&2");
