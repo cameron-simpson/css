@@ -1079,10 +1079,12 @@ sub _openSrc
 
 =head1 SEE ALSO
 
-B<cs::Sink>(3),
-B<cs::Source>(3),
-B<cs::SGML>(3),
-B<cs::Tokenise>(3)
+cs::HTML::Form(3),
+cs::CGI(3),
+cs::SGML(3),
+cs::Sink(3),
+cs::Source(3),
+cs::Tokenise(3)
 
 =head1 AUTHOR
 
