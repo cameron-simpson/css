@@ -10,8 +10,9 @@ lock=ssh-agent-$HOST
 [ "x$1" = x-f ] && { shift; unlock -f "$lock"; }
 
 exec \
+  con \
   lock -1 -a "$lock" \
   no-ssh-agent \
-  ignhup \
   ssh-agent \
-  sh -c 'env|sed -n "s/^\\(SSH_[_A-Z]*\\)=.*/&; export \\1;/p" >"$VARRUN/ssh-agent-$HOST"; exec pause'
+  sh -c 'env|sed -n "s/^\\(SSH_[_A-Z]*\\)=.*/&; export \\1;/p" >"$VARRUN/ssh-agent-$HOST"; exec pause' \
+  </dev/null
