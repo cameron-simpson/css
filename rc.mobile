@@ -1,28 +1,21 @@
 #!/bin/sh
 #
-# mobile	Site specific network config.
+# rc.mobile	Site specific network config.
 #
-# For a roving RedHat laptop.
-# Needed: /etc/sysconfig/network-scripts/ifcfg-eth0.* with ONBOOT=no
-# and a dummy ifcfg-eth0 for picky redhat startup scripts.
-# Cameron Simpson <cs@zip.com.au> 25jun2000
-#
-# Subsume the if{up|down}@* scripts into this, move config into file.
-# - cameron 06feb2001
-#
-# chkconfig: 2345 10 90
-# description: Activates/Deactivates the network interfaces suitable to a \
-#              location as specified by the /etc/rc.mobile.conf file.
-# probe: true
+# For a roving laptop.
+# Some more doco here:
+#	http://www.cskk.ezoshosting.com/cs/css/#rc.mobile
+# - Cameron Simpson <cs@zip.com.au>
 #
 
 cmd=$0
 usage="Usage: $cmd {start|stop|restart}"
 
-trace=echo	## set-x
+trace=set-x
 
+LC_ALL=C
 PATH=$PATH:/sbin:/opt/css/bin
-export PATH
+export PATH LC_ALL
 
 # See how we were called.
 mode=$1; shift
@@ -37,7 +30,7 @@ case "$mode" in
 	$trace "$cmd" stop && $trace "$cmd" start ${1+"$@"}
 	exit $?
 	;;
-  *)	echo "usage" >&2
+  *)	echo "$usage" >&2
         exit 1
 esac
 
@@ -73,7 +66,7 @@ done
 		  }
 export HOST
 
-locations=none\ `sed -n -e '/^#/d' -e 's/^\\[\\([a-z].*\\)\\]$/\\1/p' "$cf"`
+locations=`sed -n -e '/^#/d' -e 's/^\\[\\([a-z].*\\)\\]$/\\1/p' "$cf"`
 
 # ask for info if interactive
 if [ $int ]
@@ -84,12 +77,10 @@ then
     [ -n "$iwhere" ] && where=$iwhere
 fi
 
-[ "x$where" = xnone ] && exit 0
-
 doclause()
 {
   clause=$1
-  winclause "$cf" "$clause"
+  winclause "$cf" "$clause" \
   | sed -e 'y/	/ /' \
 	-e 's/^  *//' \
 	-e '/^#/d' \
@@ -97,10 +88,11 @@ doclause()
   | while read op etc
     do
       case "$op" in
-	use)	doclause "$etc"
+	[a-zA-Z]*=*)
+		eval "$op"
 		;;
 	/*/)	from=`expr "x$from" : 'x\(.*\)/'`
-		for d in $from.$clause $from.DFLT
+		for d in $from.$where $from.DFLT
 		do  [ -d "$d/." ] && { from=$d; break; }
 		done
 		if [ -d "$from/." ]
@@ -112,27 +104,71 @@ doclause()
 		fi
 		;;
 	/*)	from=/dev/null
-		for f in $op.$clause $op.DFLT
+		for f in $op.$where $op.DFLT
 		do  [ -f "$f" ] && { from=$f; break; }
 		done
 		to=$op
 		$trace cp -p "$from" "$to"
 		;;
-	svc)	for svc in $etc
-		do
-		  rc=/etc/init.d/$etc
-		  if [ -s "$rc" ]
-		  then
-		    $trace "$rc" "$mode"
-		  else
-		    echo "$cmd: no init file named $rc" >&2
-		  fi
-		done
+	\!*)	shcmd=`expr "x$op $etc" : 'x.\(.*\)'`
+		$trace /bin/sh -c "$shcmd"
+		;;
+	use)	doclause "$etc"
+		;;
+	svc)	bgsvc $etc
+		;;
+	need)	needsvc $etc
 		;;
 	*)	echo "$cmd: unrecognised operator \"$op\": $op $etc" >&2
 		;;
       esac
     done
+}
+
+bgsvc()
+{
+  for bgsvc
+  do
+    bgrc=/etc/init.d/$bgsvc
+    if [ -s "$bgrc" ]
+    then
+      $trace "$bgrc" "$mode" &
+      eval "pid_$bgsvc=$!"
+    else
+      echo "$cmd: no init file named $bgrc" >&2
+    fi
+  done
+}
+
+needsvc()
+{
+  for needsvc
+  do
+    eval "nsvcpid=\$pid_$needsvc"
+    [ -n "$nsvcpid" ] || bgsvc "$needsvc"
+    wait4svc "$needsvc" 
+  done
+}
+  
+wait4svc()
+{
+  for waitsvc
+  do  eval "wsvcpid=\$pid_$waitsvc"
+      if [ -n "$wsvcpid" ]
+      then  echo "Wait for $waitsvc ..."
+	    wait4pid "$wsvcpid"
+      fi
+  done
+}
+
+wait4pid()
+{
+  for waitpid
+  do
+    while kill -0 "$waitpid" 2>/dev/null
+    do  sleep 1
+    done
+  done
 }
 
 doclause GLOBAL
