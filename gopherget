@@ -1,0 +1,40 @@
+#!/usr/bin/perl
+#
+# Collect a file via Gopher.
+#
+
+require 'getopts.pl';
+require 'cs/gopher.pl';
+use cs::Upd;
+
+($cmd=$0) =~ s:.*/::;
+$usage="Usage: $cmd [-v] [-p port] host file\n";
+
+$badopts=0;
+&Getopts('vp:') || ($badopts=1);
+$port=(defined($opt_p) ? $opt_p+0 : $gopher'PORT);
+$verbose=$opt_v;
+
+$badopts=1 unless defined($host=shift) && defined($file=shift);
+
+die $usage if $badopts;
+
+die "$cmd: can't connect to $host:$port\n"
+	unless defined($FILE=&gopher'request($file,$host,$port));
+
+$url="gopher://$host:$port/$file";
+
+select(STDERR) if $verbose;
+
+$sofar=0;
+while ($i=read($FILE,$_,8192))
+	{ $sofar+=$i;
+	  out("$url $sofar") if $verbose;
+	  print STDOUT $_;
+	}
+
+close($FILE);
+
+out('') if $verbose;
+
+exit 0;
