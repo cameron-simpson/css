@@ -1,0 +1,104 @@
+#!/usr/bin/perl
+#
+# Run a command with its final arguments concatenated into a single
+# that the shell will decouple into the original argument list.
+# This is intended for passing arguments lists via commands like
+# ssh and its predecessor rsh, which join their arguments with
+# spaces.
+#
+# Example:
+#	qcmd -1 ssh xo:fnt -o foo -t host command 'arg with spaces'
+#	- Cameron Simpson <cs@zip.com.au> 22apr2001
+#
+
+use strict qw(vars);
+
+use Getopt::Std;
+use cs::Misc;
+use cs::Shell;
+
+$::Usage="$::cmd [-n] cmd getopt [args...] [n-unquoted] [quotable-args...]
+	-n	Collect n unquoted arguments after the option list.
+		For example, ssh takes exactly 1 hostname before the
+		command portion, so it needs n to be 1.
+	cmd	The command to execute.
+	getopt	A getopt(3) option specification.
+	args	Options matching the getopt(3) specification.
+	n-unquoted Exactly n arguments to preserve.
+	quotable-args Arguments to shell-quote and concatenate.
+";
+
+$::N=0;
+
+{ my $badopts=1;
+
+  ## warn "$::cmd: ARGV=(".join('|',@ARGV).")\n";
+
+  ARG:
+  {
+    if (@ARGV && $ARGV[0] =~ /^-(\d+)$/)
+    { $::N=$1+0;
+      shift(@ARGV);
+    }
+
+    if (! @ARGV)
+    { warn "$::cmd: missing cmd\n";
+      last ARG;
+    }
+
+    $::Command=shift(@ARGV);
+    if (! @ARGV)
+    { warn "$::cmd: missing getopt\n";
+      last ARG;
+    }
+
+    $::Getopt=shift(@ARGV);
+    my $ok = getopts($::Getopt, \%::Opts);
+    if (! $ok)
+    { warn "$::cmd: options not conforming to getopt ($::Getopt)\n";
+      last ARG;
+    }
+
+    if (@ARGV < $::N)
+    { warn "$::cmd: insufficient n-unquoted: @ARGV\n";
+      last ARG;
+    }
+
+    @::Unquoted=@ARGV[0..$::N-1];
+    @ARGV=@ARGV[$::N..$#ARGV];
+
+    $badopts=0;
+  }
+
+  die $::Usage if $badopts;
+}
+
+my @exec = ($::Command);
+
+my $takesarg=getopt2takesarg($::Getopt);
+for my $opt (sort keys %::Opts)
+{ push(@exec,"-$opt");
+  push(@exec,$::Opts{$opt}) if $takesarg->{$opt};
+}
+
+push(@exec,@::Unquoted);
+
+push(@exec,scalar(cs::Shell::quote(@ARGV)));
+
+## warn "$::cmd: exec(".join('|',@exec).")\n";
+
+exec @exec;
+die "$::cmd: exec(@exec): $!\n";
+
+sub getopt2takesarg
+{ local($_)=@_;
+
+  my(%takesarg);
+
+  while (/^(.):?/)
+  { $takesarg{$1}=(length($&) > 1);
+    $_=$';
+  }
+
+  \%takesarg;
+}
