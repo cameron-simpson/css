@@ -63,7 +63,7 @@ tmpfile=$tmpdir/$cmd$$
 # Apphelper offers to view the file with the named viewer
 # and after viewing, to save the file in a location of your choice.
 #
-# =head2 PRE-FILE OPTIONS
+# =head2 Pre-File Options
 #
 # The following terminal related options must preceed the filename.
 #
@@ -95,7 +95,7 @@ esac
 
 # =back
 #
-# =head2 FILE DESIGNATION
+# =head2 File Designation
 #
 # After the terminal related pre-file options
 # comes the file designation.
@@ -174,7 +174,7 @@ else
   [ -t 0 ] || exec </dev/tty;	[ -t 0 ] || exit 1
   [ -t 1 ] || exec >/dev/tty;	[ -t 1 ] || exit 1
 
-  # =head2 POST-FILE OPTIONS
+  # =head2 Post-File Options
   #
   # =over 4
   #
