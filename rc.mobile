@@ -17,29 +17,27 @@
 #
 
 cmd=$0
-trace=set-x
+usage="Usage: $cmd {start|stop|restart}"
+
+trace=echo	## set-x
 
 PATH=$PATH:/sbin:/opt/css/bin
 export PATH
 
 # See how we were called.
-case "$1" in
-  start)
-	shift
-	action=up
+mode=$1; shift
+
+case "$mode" in
+  start)action=up
 	int=1
         ;;
-  stop)
-	shift
-	action=down
+  stop) action=down
         ;;
   restart)
-	shift
 	$trace "$cmd" stop && $trace "$cmd" start ${1+"$@"}
 	exit $?
 	;;
-  *)
-        echo "Usage: $cmd {start|stop|restart}" >&2
+  *)	echo "usage" >&2
         exit 1
 esac
 
@@ -49,15 +47,15 @@ cf=/etc/rc.mobile.conf
 badopts=
 while :
 do  case $1 in
-	-i)	int=1 ;;
-	-a)	action=$2; shift ;;
-	-f)	cf=$2; shift ;;
-	-h)	HOST=$2; shift ;;
-	--)	shift; break ;;
-	-?*)	echo "$cmd: unrecognised option: $1" >&2
+	-i)   int=1 ;;
+	-a)   action=$2; shift ;;
+	-f)   cf=$2; shift ;;
+	-h)   HOST=$2; shift ;;
+	--)   shift; break ;;
+	-?*)  echo "$cmd: unrecognised option: $1" >&2
 	      badopts=1
 	      ;;
-	*)	break
+	*)    break
 	      ;;
     esac
     shift
@@ -75,7 +73,7 @@ done
 		  }
 export HOST
 
-locations=none\ `sed -n -e '/^#/d' -e 's/^\\[\\(.*\\)\\]$/\\1/p' "$cf"`
+locations=none\ `sed -n -e '/^#/d' -e 's/^\\[\\([a-z].*\\)\\]$/\\1/p' "$cf"`
 
 # ask for info if interactive
 if [ $int ]
@@ -88,74 +86,54 @@ fi
 
 [ "x$where" = xnone ] && exit 0
 
-config=`sed -e '/^#/d' -e "/^\\[$where\\]\\$/,/^\\[/!d" -e '/^[a-zA-Z][a-zA-Z_0-9]*=/!d' -e 's/^[a-z]/x_&/' -e 's/^[A-Z]/cf_&/' "$cf"`
-[ -n "$config" ] || { echo "$cmd: $cf: no config for [$where]" >&2; exit 1; }
-
-# RH public config vars
-cfvars=
-for var in DEVICE BOOTPROTO IPADDR NETMASK GATEWAY
-do  cfvars="$cfvars $var"
-    eval "cf_$var="
-done
-cf_DEVICE=eth0
-cf_BOOTPROTO=static
-
-# rc.mobile private config vars
-xvars=
-for var in dns domains subsys
-do  xvars="$xvars $var"
-    eval "x_$var="
-done
-x_dns=
-x_domains=
-x_subsys=
-
-eval "$config"
-
-cfgname=$cf_DEVICE.$where
-cfg=/etc/sysconfig/network-scripts/ifcfg-$cf_DEVICE
-
-echo "cfg=[$cfg]"
-
-# write config file
-(
-  echo ONBOOT=no
-  for var in $cfvars
-  do  eval "val=\$cf_$var"
-      [ -n "$val" ] && echo "$var=$val"
-  done
-) >"$cfg"
-
-[ -s "$cfg" ] || { echo "$cmd: can't make config file $cfg" >&2; exit 1; }
-
-case "$action" in
-   up)
-    echo "Bringing up loopback interface..."; ifup ifcfg-lo
-    $trace ifdown "$cf_DEVICE"
-    $trace ifup "$cf_DEVICE" || exit 1
-    [ -n "$cf_GATEWAY" ] && $trace route add default gw "$cf_GATEWAY"
-
-    [ -n "$x_dns" ] && { echo "nameserver $x_dns"
-			 echo "search $x_domains"
-		       } >/etc/resolv.conf
-    if [ -s "/etc/exports.$where" ]
-    then  cat "/etc/exports.$where"
-    fi >/etc/exports
-    $trace exportfs -a
-
-    for subsys in portmap syslog $x_subsys
-    do  $trace /etc/init.d/$subsys restart
+doclause()
+{
+  clause=$1
+  winclause "$cf" "$clause"
+  | sed -e 'y/	/ /' \
+	-e 's/^  *//' \
+	-e '/^#/d' \
+	-e '/^$/d' \
+  | while read op etc
+    do
+      case "$op" in
+	use)	doclause "$etc"
+		;;
+	/*/)	from=`expr "x$from" : 'x\(.*\)/'`
+		for d in $from.$clause $from.DFLT
+		do  [ -d "$d/." ] && { from=$d; break; }
+		done
+		if [ -d "$from/." ]
+		then
+		  if [ -d "$to/." ] || mkdir "$to"
+		  then
+		    $trace rsync -aH "$from/." "$to/."
+		  fi
+		fi
+		;;
+	/*)	from=/dev/null
+		for f in $op.$clause $op.DFLT
+		do  [ -f "$f" ] && { from=$f; break; }
+		done
+		to=$op
+		$trace cp -p "$from" "$to"
+		;;
+	svc)	for svc in $etc
+		do
+		  rc=/etc/init.d/$etc
+		  if [ -s "$rc" ]
+		  then
+		    $trace "$rc" "$mode"
+		  else
+		    echo "$cmd: no init file named $rc" >&2
+		  fi
+		done
+		;;
+	*)	echo "$cmd: unrecognised operator \"$op\": $op $etc" >&2
+		;;
+      esac
     done
-    ;;
+}
 
-  down)
-    [ -n "$cf_GATEWAY" ] && $trace route del default
-    $trace ifdown "$cf_DEVICE" || exit 1
-    ;;
-
-  *)
-    echo "$0: unknown action \"$action\"" >&2
-    exit 2
-    ;;
-
-esac
+doclause GLOBAL
+doclause "$where"
