@@ -1,0 +1,50 @@
+#!/bin/sh
+#
+# Wait for a set of process ids to die.
+# Needs kill priviledge on the processes.
+#	- Cameron Simpson <cs@zip.com.au> 26sep2000
+#
+
+usage="Usage: $0 [-v] [-d delay] [-t timeout] pids..."
+
+verbose= vflag=
+delay=10
+timeout=
+
+badopts=
+while :
+do  case $1 in
+	-v)	verbose=1 vflag=$1 ;;
+	-d)	delay=$2; shift ;;
+	-t)	timeout=$2; shift ;;
+	--)	shift; break ;;
+	-?*)	echo "$0: unrecognised option: $1" >&2; badopts=1 ;;
+	*)	break ;;
+    esac
+    shift
+done
+
+[ $# = 0 ] || { echo "$0: missing pids" >&2; badopts=1; }
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+# implement timeout
+[ -n "$timeout" ] && exec timeout "$timeout" "$0" $vflag -d "$delay" ${1+"$@"}
+
+pids=$*
+while [ -n "$pids" ]
+do
+    npids=
+    for pid in $pids
+    do  if kill -0 "$pid" 2>/dev/null
+	then  npids="$npids $pid"
+	else  [ $verbose ] && echo "$pid finished"
+	fi
+    done
+
+    [ -n "$npids" ] || break
+    pids=$npids
+    sleep $delay
+done
+
+exit 0
