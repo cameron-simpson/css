@@ -11,39 +11,33 @@
 # Switch to mozilla-xremote-client.	cameron 26aug2002
 # 
 
-probe()
-{ mozilla-xremote-client 'ping()'
-}
-
-popurl()
-{ popurl_ret=0
-  for url
-  do
-      [ -n "$URLLOG" ] && echo "urlshow $url" >>"$URLLOG"
-      mozilla-xremote-client "openurl($url,new-window)" || popurl_ret=1
-  done
-  return $popurl_ret
-}
-
 cmd=`basename "$0"`
 usage="Usage: $cmd [-a] [-c] [-s] [-t] [-i file] [URLs...]
 	-a	Anonymous.
 	-c	Clean.
+	+c	Don't clean.
 	-p	Probe for running browser first.
+	-t	Open a new tab instead of a new window.
 	-i file	Read URLs from file; \"-\" means stdin."
 
 doprobe=
 subopts=
-meta=
+doclean=
+doanon=
+popurl_mode=new-window
+
 badopts=
+
 while :
 do  case "$1" in
 	-[acst]) subopts="$subopts $1" ;;
     esac
     case $1 in
-	-a)	meta="anon $meta" ;;
-	-c)	meta="clean $meta" ;;
+	-a)	doanon=1 ;;
+	-c)	doclean=1 ;;
+	+c)	doclean= ;;
 	-p)	doprobe=1 ;;
+	-t)	popurl_mode=new-tab ;;
 	-i)	input=$2; shift
 		set x ${1+"$@"} "" `cat $input`; shift
 		;;
@@ -65,19 +59,47 @@ fi
 if [ $# != 0 ]
 then
     for url
-    do  if [ "x$url" = x- ]
-	then
-	    cat
-	else
-	    echo "$url"
-	fi
+    do
+      case "$url" in
+	-)	cat ;;
+	xclip)	xunclip | tr ' \011' '\012\012' ;;
+	*)	echo "$url" ;;
+      esac
     done \
     | "$0" $subopts
     exit $?
 fi
 
+probe()
+{ mozilla-xremote-client 'ping()'
+}
+
+popurl()
+{ popurl_ret=0
+  for url
+  do
+      [ -n "$URLLOG" ] && echo "urlshow $url" >>"$URLLOG"
+      ## lock mozilla-xremote-client
+      if mozilla-xremote-client "openurl($url,$popurl_mode)"
+      then  popurl_mode=new-tab
+      else  popurl_ret=1
+      fi
+  done
+  return $popurl_ret
+}
+
 # ensure we have a browser
-[ -z "$doprobe" ] || probe || { ns; sleep 3; }
+if [ "$doprobe" ]
+then
+  probe \
+  || { ns
+       probed=
+       while sleep 1
+       do  probe && break
+	   [ $probed ] || { probed=1; echo "waiting for mozilla ..."; }
+       done
+     }
+fi
 
 sed -e 's/^[ 	][ 	]*//' \
     -e 's/^#.*//' \
@@ -95,30 +117,25 @@ sed -e 's/^[ 	][ 	]*//' \
     -e ':ok' \
 | while read url
   do  
-      url="$meta$url"
-      metapfx=
-      while :
-      do  case "$url" in
-	    search\ *|clean\ *|anon\ *)
-	      metacmd=`expr "x$url" : 'x\([^ ]*\) .*'`
-	      url=`expr "x$url" : 'x[^ ]*  *\(.*\)'`
-	      case $metacmd in
-		anon)	metapfx="http://anon.free.anonymizer.com/$metapfx" ;;
-		clean)metapfx="http://web/~cameron/cgi-bin/htclean.cgi/$metapfx" ;;
-		search)
-		      engine=`expr "x$url" : 'x\([^ ]*\) .*'`
-		      url="http://web/~cameron/cgi-bin/search.cgi?engine=$engine&query="`expr "x$url" : 'x[^ ]*  *\(.*\)'`
-		      ;;
-		*)	echo "$cmd: bogus meta command \"$metacmd\"" >&2
-		      ;;
-	      esac
-	      ;;
-	    *)break
-	      ;;
-	  esac
-      done
+    case "$url" in
+      search\ *)
+	metacmd=`expr "x$url" : 'x\([^ ]*\) .*'`
+	url=`expr "x$url" : 'x[^ ]*  *\(.*\)'`
+	case $metacmd in
+	  search)
+		engine=`expr "x$url" : 'x\([^ ]*\) .*'`
+		url="http://web/~cameron/cgi-bin/search.cgi?engine=$engine&query="`expr "x$url" : 'x[^ ]*  *\(.*\)'`
+		;;
+	  *)	echo "$cmd: bogus meta command \"$metacmd\"" >&2
+		;;
+	esac
+	;;
+    esac
+    [ $doclean ] && url="http://web/~cameron/cgi-bin/htclean.cgi/$url"
+    [ $doanon  ] && url="http://anon.free.anonymizer.com/$url"
 
-      # escape stuff for OpenURL() call
-      url=`echo "$url" | hexify`
-      popurl "$url"
+    # escape stuff for OpenURL() call
+    url=`echo "$url" | hexify`
+    popurl "$url"
+    popurl_mode=new-tab
   done
