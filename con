@@ -9,7 +9,7 @@ cmd=`basename "$0"`
 async=
 dashc=
 iflag=
-tty=`logpath console`
+tty=$CONSOLE
 
 usage="Usage: $cmd [-a] [-i] [-t tty] { -c shellcmd | command [args...] }
 		-a	Fork and run asynchronously.
@@ -34,7 +34,7 @@ do
 done
 
 case "$tty" in
-    '')	tty=`logpath console` ;;
+    '')	tty=$CONSOLE ;;
     /*)	;;
     *)	tty=$HOME/var/log/$tty ;;
 esac
