@@ -43,6 +43,9 @@ then
       @* ) datespec=$1; shift
     esac
 
+    # join all args for "add"
+    [ "x$op" = xadd ] && set -- "$*"
+
     (set -x; tdl "$op" $datespec $context ${1+"$@"})
 fi
 
