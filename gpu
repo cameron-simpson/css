@@ -3,6 +3,8 @@
 # Asynchronous getpageurls.	- Cameron Simpson <cs@zip.com.au>
 #
 
+cmd=$0
+
 async=1
 if [ "x$1" = x-s ]
 then  shift; async=
@@ -21,7 +23,16 @@ case $1 in
 		;;
 esac
 
-[ $# = 0 ] && { set x "`xunclip`"; shift; echo "$1"; }
+if [ $# = 0 ]
+then
+  if [ -n "$DISPLAY" ]
+  then
+      set x "`xunclip`"; shift; echo "$1"
+  else
+      echo "$cmd: no \$DISPLAY or URL" >&2
+      exit 1
+  fi
+fi
 
 ulimit -d 16384	## 16M process data limit
 
