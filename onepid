@@ -1,0 +1,40 @@
+#!/bin/sh
+#
+# Fire up just one instance of a program.
+#	- Cameron Simpson <cs@zip.com.au> 26oct2002
+#
+
+cmd=$0
+usage="Usage: $cmd [-n pidname] command [args...]
+	-n pidname	Name for .pid file."
+
+badopts=
+pidfile=
+
+while :
+do
+  case $1 in
+    -n)	pidname=$2; shift ;;
+    --)	shift; break ;;
+    -?*) echo "$cmd: unrecognised option: $1" >&2; badopts=1 ;;
+    *)	break ;;
+  esac
+  shift
+done
+
+[ $# = 0 ] && { echo "$cmd: missing command" >&2; badopts=1; }
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+# deduce pidfile
+case "$pidname" in
+  '')	pidfile=$HOME/var/run/`basename "$1"`.pid ;;
+  /*)	pidfile=$pidname ;;
+  *)	pidfile=$HOME/var/run/$pidname.pid ;;
+esac
+
+# see if already active
+pid=`cat "$pidfile"` && kill -0 "$pid" 2>/dev/null && exit 0
+
+"$@" &
+echo $! >"$pidfile"
