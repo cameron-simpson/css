@@ -4,7 +4,13 @@
 #	- Cameron Simpson <cs@zip.com.au> 23oct2001
 #
 
-[ $# = 0 ] && { echo "Usage: $0 host[@sitename][,host[@sitename]...] [rterm-args...]" >&2; exit 2; }
+[ $# = 0 ] && case $SYSTEMID in
+		cisra)	set linux,solaris,cass,sweet,ivory ;;
+		home)	set jekyll,janus,alpha ;;
+		*)	echo "$0: no default host list for SYSTEMID == \"$SYSTEMID\"" >&2
+			exit 1
+			;;
+              esac
 
 host=$1; shift
 
