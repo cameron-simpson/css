@@ -19,7 +19,9 @@ $cs::Persist::_DidFinish=0;
 
 @cs::Persist::DfltFlags=();
 
-sub END { finish(@_) }
+sub END
+{ finish(@_) }
+
 sub finish
 {
   ## warn "Persist::finish(@_)\n";
@@ -31,21 +33,21 @@ sub finish
   $cs::Persist::_DidFinish=1;
 
   SYNC:
-   for (@k)
-	{
-	  next SYNC if ! exists $cs::Persist::_Reg{$_};
+  for (@k)
+  {
+    next SYNC if ! exists $cs::Persist::_Reg{$_};
 
-	  my $o = $cs::Persist::_Reg{$_};
-	  delete $cs::Persist::_Reg{$_};
+    my $o = $cs::Persist::_Reg{$_};
+    delete $cs::Persist::_Reg{$_};
 
-##		  warn "finish: sync($o->{FNAME})..."
-##			if $o->{FNAME} =~ /toc\.db/;
+##  warn "finish: sync($o->{FNAME})..."
+##  if $o->{FNAME} =~ /toc\.db/;
 
-	  $o->Sync();
-	  $o->SetReadWrite(0);
-	  ## OLD WAY: delete $cs::Persist::_DB{$_};
-	  ## warn "unreffed [$_]\n";
-	}
+    $o->Sync();
+    $o->SetReadWrite(0);
+    ## OLD WAY: delete $cs::Persist::_DB{$_};
+    ## warn "unreffed [$_]\n";
+  }
 
   ## my(@c)=caller;
   ## @k=keys %cs::Persist::_DB;
@@ -87,115 +89,115 @@ sub db
 }
 
 sub _reg($)
-	{ my($id)=@_;
-	  return undef if ! exists $cs::Persist::_Reg{$id};
-	  $cs::Persist::_Reg{$id};
-	}
+{ my($id)=@_;
+  return undef if ! exists $cs::Persist::_Reg{$id};
+  $cs::Persist::_Reg{$id};
+}
 
 sub _Register
-	{ my($this,$id)=@_;
-	  $cs::Persist::_Reg{$id}=$this;
-	}
+{ my($this,$id)=@_;
+  $cs::Persist::_Reg{$id}=$this;
+}
 
 sub _Unregister
-	{ my($this,$id)=@_;
-	  delete $cs::Persist::_Reg{$id};
-	}
+{ my($this,$id)=@_;
+  delete $cs::Persist::_Reg{$id};
+}
 
 sub TIEHASH
-	{
-	  my($class,$path,$rw,$pref,@c)=@_;
-	  $rw=0 if ! defined $rw;
-	  @c=caller if ! @c;
+{
+  my($class,$path,$rw,$pref,@c)=@_;
+  $rw=0 if ! defined $rw;
+  @c=caller if ! @c;
 
-	  my($this);
+  my($this);
 
-	  if (stat($path)
-		? -d _
-		: (defined($pref) && $pref eq DIR)
-	     )
-		{
-		  $this=cs::Persist::Dir::TIEHASH(cs::Persist::Dir,$path,$rw);
-		}
-	  else
-		{
-		  $this=cs::Persist::File::TIEHASH(cs::Persist::File,$path,$rw,@c);
-		}
+  if (stat($path)
+	? -d _
+	: (defined($pref) && $pref eq DIR)
+     )
+  {
+    $this=cs::Persist::Dir::TIEHASH(cs::Persist::Dir,$path,$rw);
+  }
+  else
+  {
+    $this=cs::Persist::File::TIEHASH(cs::Persist::File,$path,$rw,@c);
+  }
 
-	  $this->{PID}=$$;
+  $this->{PID}=$$;
 
-	  $this;
-	}
+  $this;
+}
 
 sub Meta { shift->{META} }
 sub Schema { shift->Meta()->{SCHEMA} }
 
 sub Fields
-	{ my($this,$flist)=@_;
-	  $flist=SUMMARY if ! defined $flist;
+{ my($this,$flist)=@_;
+  $flist=SUMMARY if ! defined $flist;
 
-	  ref $flist
-		? @$flist
-		: $flist eq ALL
-		  ? $this->AllFields()
-		  : $flist eq SUMMARY
-		    ? $this->SummaryFields()
-		    : $flist;	# huh? should whinge,
-				# but we'll just return the supplied key
-	}
+  ref $flist
+	? @$flist
+	: $flist eq ALL
+	  ? $this->AllFields()
+	  : $flist eq SUMMARY
+	    ? $this->SummaryFields()
+	    : $flist;	# huh? should whinge,
+			# but we'll just return the supplied key
+}
 
 sub SummaryFields
-	{ my($this)=@_;
-	  my($meta)=$this->Meta();
-	  
-	  ## warn "called from [".join('|',caller)."]";
+{ my($this)=@_;
+  my($meta)=$this->Meta();
+  
+  ## warn "called from [".join('|',caller)."]";
 
-	  exists $meta->{SUMMARY_KEYS}
-		? @{$meta->{SUMMARY_KEYS}}
-		: sort keys %{$this->Schema()};
-	}
+  exists $meta->{SUMMARY_KEYS}
+	? @{$meta->{SUMMARY_KEYS}}
+	: sort keys %{$this->Schema()};
+}
 
 sub AllFields
-	{ my($this)=@_;
-	  my($meta)=$this->Meta();
-	  
-	  ## warn "called from [".join('|',caller)."]";
+{ my($this)=@_;
+  my($meta)=$this->Meta();
+  
+  ## warn "called from [".join('|',caller)."]";
 
-	  my(@all)=();
+  my(@all)=();
 
-	  if (! exists $meta->{ALL_KEYS})
-		{
-		  my(%all)=();
-		  my($key,$rec);
+  if (! exists $meta->{ALL_KEYS})
+  {
+    my(%all)=();
+    my($key,$rec);
 
-		  # compute key list
-		  # expensive!
-		  for $key ($this->KEYS())
-			{ 
-			  $rec=$this->FETCH($key);
-			  if (ref $rec)
-			  	{ map($all{$_}=1,keys %$rec);
-				}
-			}
+    # compute key list
+    # expensive!
+    for $key ($this->KEYS())
+    { 
+      $rec=$this->FETCH($key);
+      if (ref $rec)
+	    { map($all{$_}=1,keys %$rec);
+	    }
+    }
 
-		  @{$meta->{ALL_KEYS}}=sort keys %all;
-		}
+    @{$meta->{ALL_KEYS}}=sort keys %all;
+  }
 
-	  @{$meta->{ALL_KEYS}};
-	}
+  @{$meta->{ALL_KEYS}};
+}
 
 sub FieldDesc
-	{ my($this,$field)=@_;
-	  my($schema)=$this->Schema();
+{ my($this,$field)=@_;
+  my($schema)=$this->Schema();
 
-	  exists $schema->{$field}
-	    && exists $schema->{$field}->{DESC}
-		? $schema->{$field}->{DESC}
-		: $field;
-	}
+  exists $schema->{$field}
+    && exists $schema->{$field}->{DESC}
+	? $schema->{$field}->{DESC}
+	: $field;
+}
 
 sub IsReadWrite
-	{ shift->TestAll(RW) != 0;
-	}
+{ shift->TestAll(RW);
+}
 
 1;
