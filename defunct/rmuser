@@ -1,0 +1,66 @@
+#!/bin/sh
+#
+# Disable user account.
+# Should run on the yp master.
+#	- Cameron Simpson <cs@zip.com.au> 12nov1996
+#
+
+cmd=`basename "$0"`
+usage="Usage: $cmd username"
+
+trusted=elph
+ypMaster=eos
+mjMaster=sid
+fwdMaster=sid
+
+if [ $# -ne 1 ]
+then  echo "$usage" >&2; exit 2
+fi
+user=$1; shift
+
+home=`ypmatch "$user" passwd|awk -F: '{print $6}'`
+case "$home" in
+    /*)	;;
+    *)	echo "$cmd: no home for $username" >&2
+	exit 1
+	;;
+esac
+
+HOST=${HOST-`hostname|sed 's/\..*//'`}
+
+case $HOST in
+    $trusted)	;;
+    *)		echo "$cmd: not on central trusted host ($trusted)" >&2
+		exit 1
+		;;
+esac
+
+###############################
+# we need to disable or remove
+#	What		How
+#	home dir	copy to archive area
+#	tulp		erase name from mailing list memberships
+#	majordomo	erase name from mailing list with mj unsub
+#	aliases		remove from /etc/aliases, amend fwdmap, run updaliases
+#	crontab		crontab -l on selected hosts
+#	dial-back	edit /u/cameron/pm/locs and mama:/etc/raddb/users
+#	groups		bsed /etc/group
+#	opiekeys	remove from selected hosts
+#	passwd		bsed /etc/passwd: home->archive, shell->false, crypt->*
+#
+
+###############################
+# home directory
+case "$home" in
+    /usr/local/archive/ex/$user-*)
+	echo "home archived to $home, good"
+	;;
+    /*)	echo "you must contrive to move the user's home"
+	echo "	from $home"
+	echo "	to   /usr/local/archive/ex/$user-`daycode`"
+	;;
+esac
+
+###############################
+# majordomo
+( set -x; rsh $mjMaster /opt/script/rmmjuser $user )
