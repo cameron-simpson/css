@@ -74,6 +74,8 @@ ask "Edit TOC before use" && $EDITOR "$toc"
 exec <"$toc"
 rm "$toc"
 
+[ -n "$qual" -a "x$enc" = xmp3 ] && qual=`expr 9 - $qual`	## invert for mp3
+
 sed -e 's;//*; -- ;g' -e 's/   */ /g' \
 | ( read artist	|| exit 1
     read album	|| exit 1
