@@ -1,0 +1,29 @@
+#!/bin/sh
+#
+# Report free disc space in kilobytes or percent.
+#	- Cameron Simpson <cs@zip.com.au> 22jun2003
+#
+
+cmd=$0
+usage="Usage: $cmd [-%] [dir]"
+
+col=4	# kilobytes
+pcnt=
+dir=.
+
+badopts=
+
+[ "x$1" = 'x-%' ] && { col=5; pcnt=1; shift; }
+
+[ $# = 0 ] || { dir=$1; shift; }
+
+[ -d "$dir/." ] || { echo "$cmd: $dir: not a directory" >&2; badopts=1; }
+
+[ $# = 0 ] || { echo "$cmd: extra arguments: $*" >&2; badopts=1; }
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+n=`dfk "$dir/." | awk "NR == 2 {print \\$$col}" | sed 's/%$//'`
+[ -n "$n" ] || exit 1
+[ $pcnt ] && n=`expr 100 - $n`
+echo "$n"
