@@ -1,4 +1,4 @@
-#!/usr/bin/perl=1;
+#!/usr/bin/perl
 #
 # Do HTTP-related client stuff.
 #	- Cameron Simpson <cs@zip.com.au>
@@ -14,7 +14,7 @@ use cs::HTTP;
 
 =head1 DESCRIPTION
 
-This module implements functions and methods for dealing with HTTP connecions.
+This module implements functions and methods for dealing with HTTP connections.
 
 =cut
 
@@ -96,11 +96,7 @@ $cs::HTTP::R_NORESPONSE ='204';
 301 document has new permanent URI.
 Lines follow of the form:
 
-=over 8
-
-I<URI>: I<url> I<comment>
-
-=back
+	B<URI>: I<url> I<comment>
 
 =cut
 
@@ -111,11 +107,7 @@ $cs::HTTP::M_MOVED	='301';
 302 document is currently elsewhere.
 Lines follow of the form:
 
-=over 8
-
-B<URI:> I<url> I<comment>
-
-=back
+	B<URI:> I<url> I<comment>
 
 =cut
 
@@ -126,9 +118,8 @@ $cs::HTTP::M_FOUND	='302';
 303 document needs different method.
 Following is:
 
-B<Method:> I<method> I<url>
-
-I<body-section>
+	B<Method:> I<method> I<url>
+	I<body-section>
 
 I<body-section> is data for I<method>.
 
@@ -254,6 +245,7 @@ sub unhexify($)
 }
 
 $cs::HTTP::ptnToken='[^][\000-\037()<>@,;:\\"/?={}\s]+';
+
 sub parseAttrs
 { local($_)=shift;
   my($max)=@_;
@@ -597,7 +589,7 @@ sub RequestData
 
 =head1 SEE ALSO
 
-cs::Net::TCP(3)
+cs::Net::TCP(3), cs::Port(3)
 
 =head1 AUTHOR
 
