@@ -11,11 +11,14 @@ pager=${PAGER:-less}
 cmd=`basename "$0"`
 usage="Usage: $cmd [-t] file [-d savedir] viewer [viewer-args...]
 	-t		Run apphelper in a new terminal window.
+	+t		Do not run apphelper in a new terminal window.
 	-d savedir	Save directory (from \$SAVEDIR: $savedir).
 	-p pager	Pager (default viewer, from \$PAGER: $pager)."
 
 case $1 in
-    -t)	shift; exec term +a -small -e "$0" ${1+"$@"} ;;
+    -t)	shift; exec term +t +a -small -e "$0" ${1+"$@"} ;;
+    +t) shift ;;
+    *)  [ -t 0 -a -t 1 ] || exec term +t +a -small -e "$0" ${1+"$@"} ;;
 esac
 
 badopts=
@@ -51,11 +54,21 @@ export file fbase
 
 file "$file"; echo
 
+necho "View [$*]? "
+read viewit || exit 0
+case "$viewit" in
+    ''|y|yes)	"$@" "$file" ;;
+    n|no)	;;
+    *)		$viewit "$@" ;;
+esac
+
 necho "Save [$savedir/$fbase]? "
 read saveas || exit 0
 case "$saveas" in
     ''|n|no)	saveas= ;;
     y|yes)	saveas=$savedir/$fbase ;;
+    /*)		;;
+    \~*)	saveas=`untilde "$saveas"` ;;
     *)		saveas=$savedir/$saveas ;;
 esac
 if [ -n "$saveas" ]
@@ -63,13 +76,3 @@ then
     [ -d "$saveas/." ] && saveas=$saveas/$fbase
     cp -i "$file" "$saveas"
 fi
-
-necho "View [$*]? "
-read viewit || exit 0
-case "$viewit" in
-    ''|y|yes)	;;
-    n|no)	exit 0 ;;
-    *)		set x $viewit; shift ;;
-esac
-
-exec "$@" "$file"
