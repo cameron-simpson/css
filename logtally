@@ -457,7 +457,7 @@ sub ipKey
     $host=$::ip2n{$host};
   }
 
-  ## $host =~ s/\.research.canon.com.au$//i;
+  ## $host =~ s/\.$ENV{MAILDOMAIN}$//io;
 
 #  if ($host ne $ohost)
 #  { warn "$ohost -> $host\n";
