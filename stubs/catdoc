@@ -1,0 +1,14 @@
+#!/bin/sh
+
+opts=
+while :
+do  case $1 in
+	-?*)	opts="$opts $1" ;;
+	*)	break ;;
+    esac
+    shift
+done
+
+[ $# = 0 ] && { set x -; shift; }
+
+exec pageif catdoc-0.3 $opts "$@"
