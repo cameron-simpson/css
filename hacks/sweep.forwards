@@ -1,0 +1,18 @@
+#!/bin/sh
+
+ypcat passwd \
+	| awk -F: '{print $1 " " $6}' \
+	| while read login homedir
+	  do
+	      case $homedir in
+		  /home/elph/*|/home/kwanon/*)
+			[ -f "$homedir/.forward" ] \
+				&& sed "s/^/$login:/" $homedir/.forward
+			;;
+		  /home/*)
+			host=`expr "x$homedir" : 'x/home/\([^/]*\)/.*'`
+			rsh -n "$host" "[ -f $homedir/.forward ] && cat $homedir/.forward" \
+				| sed "s/^/$login:/"
+			;;
+	      esac
+	  done
