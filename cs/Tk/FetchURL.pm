@@ -4,24 +4,78 @@
 #	- Cameron Simpson <cs@zip.com.au> 26dec99
 #
 
+=head1 NAME
+
+cs::Tk::FetchURL - fetch a URL asynchronously
+
+=head1 SYNOPSIS
+
+use cs::Tk::FetchURL;
+
+=head1 DESCRIPTION
+
+This module implements a module
+for dealing with URLs.
+
+=cut
+
 use strict qw(vars);
 
 BEGIN { use cs::DEBUG; cs::DEBUG::using(__FILE__); }
 
 use cs::Net::TCP;
-## use cs::HTTP;
 use cs::Sink;
-use cs::RFC822;
+use cs::Source;
 
 package cs::Tk::FetchURL;
 
-sub new
-{ my($class,$w,$url,$notify,$how,$info)=@_;
-  die "$::cmd: $class::new: no notify function!" if ! defined $notify;
+=head1 OBJECT CREATION
+
+=over 4
+
+=item new(I<widget>,I<url>,I<notify>,I<how>,I<info>)
+
+Create a new B<cs::Tk::FetchURL> object
+to retrieve a URL from the web proxy.
+
+I<widget> is a B<Tk> widget
+(we use B<Tk>'s scheduler>.
+
+I<url> is an absolute URL text string
+or a B<cs::URL> object.
+
+I<notify> is a subroutine reference to call
+when various parts of the HTTP transaction take place.
+It is passed two arguments:
+this B<cs::Tk::FetchURL> object and a state string,
+one of B<RESPONSE>, B<HEADER>, B<FINAL> or B<ABORT>
+indicating that the HTTP response,
+HTTP header and complete HTTP object are available respectively.
+B<ABORT> is passed if the transfer is terminated abnormally
+via the B<Abort> method below.
+
+I<how> specifies when I<notify> is called:
+B<FINAL> means only when the entire object has been fetched,
+B<STEPPED> means to call I<notify> on each of the
+B<RESPONSE>, B<HEADER> and B<FINAL> stages.
+If omitted, I<how> defaults to B<FINAL>.
+
+I<info> is an optional arbitrary value
+for passing any needed state to I<notify>;
+it is stored as the B<INFO> field of the object.
+
+=cut
+
+sub new($$$$;$$)
+{ my($class,$widget,$url,$notify,$how,$info)=@_;
   $how=FINAL if ! defined $how;	# versus STEPPED for RESPONSE, HEADER, FINAL
+  if (! ref $url)
+  { ::need(cs::URL);
+    $url=cs::URL->new($url);
+  }
 
   bless { URL	=> $url,
-	  W	=> $w,
+	  W	=> $widget,
 	  NOTIFY=> $notify,
 	  MODE	=> $how,
 	  STATE	=> NEW,
@@ -33,6 +87,21 @@ sub DESTROY
 { my($this)=@_;
   $this->Abort() if $this->{STATE} ne ABORT && $this->{STATE} ne FINAL;
 }
+
+=back
+
+=head1 OBJECT METHODS
+
+=over 4
+
+=item Abort(I<ok>)
+
+Cancel the transfer associated with this object.
+I<ok> is an optional happiness flag; it defaults to false.
+If false,
+I<notify> will be called with the state string B<ABORT>.
+
+=cut
 
 sub Abort($;$)
 { my($this,$ok)=@_;
@@ -49,11 +118,26 @@ sub Abort($;$)
   }
 }
 
-sub Request
+=item Request(I<headers>,I<method>,I<version>)
+
+Initiate the fetch from the proxy.
+I<headers> is an optional B<cs::RFC822> object
+containing headers to accompany the request.
+I<method> is an optional specification of the request type,
+one of B<GET> or B<POST>.
+I<version> is an optional HTTP version level to claim,
+defaulting to B<1.0>.
+
+=cut
+
+sub Request($;$$$)
 { my($this,$H,$method,$vers)=@_;
-  $vers='1.0' if ! defined $vers;
-  $H=new cs::RFC822 if ! defined $H;
+  if (! defined $H)
+  { ::need(cs::RFC822);
+    $H=cs::RFC822->new();
+  }
   $method=GET if ! defined $method;
+  $vers='1.0' if ! defined $vers;
 
   my($proxy,$port)=split(/:/, $ENV{WEBPROXY});
   if ($port !~ /^\d+$/)
@@ -68,7 +152,7 @@ sub Request
   my $C = new cs::Net::TCP ($proxy,$port);
   return undef if ! defined $C;
 
-  my $rqurl = $this->{URL};
+  my $rqurl = $this->{URL}->Text(1);
   $rqurl =~ s/[ \t\r\n]/sprintf("%%%02x",ord($&))/eg;
 
   # request stuff
@@ -178,11 +262,27 @@ sub _RequestData
   }
 }
 
+=item Response()
+
+Return an array containing the RCODE and RTEXT of the HTTP
+response, or an empty array if the response is not yet available.
+Of use to the I<notify> routine.
+
+=cut
+
 sub Response($)
 { my($this)=@_;
   return () if ! exists $this->{RCODE};
   return ($this->{RCODE}, $this->{RTEXT});
 }
+
+=item ResponseHeaders()
+
+Return an B<cs::RFC822> object with the response headers,
+or B<undef> if the response is not yet available.
+Of use to the I<notify> routine.
+
+=cut
 
 sub ResponseHeaders($)
 { my($this)=@_;
@@ -190,10 +290,45 @@ sub ResponseHeaders($)
   $this->{RHEADERS};
 }
 
+=item ResponseSinkPath()
+
+Return the pathname of the temporary file
+into which the retrieved object body has been placed.
+Of use to the I<notify> routine.
+
+=cut
+
 sub ResponseSinkPath($)
 { my($this)=@_;
   return undef if ! exists $this->{SINKPATH};
   $this->{SINKPATH};
 }
+
+=back
+
+=head1 CAVEATS
+
+This is an asynchronous interface.
+Unless you return control to B<Tk::MainLoop>
+nothing will happen
+as the I/O is all done by callbacks.
+
+=head1 ENVIRONMENT
+
+B<WEBPROXY> specified the location of the web proxy
+in the form B<I<proxyhost>:I<port>>. I<port> must be numeric.
+
+=head1 SEE ALSO
+
+L<Tk>,
+L<cs::URL>,
+L<cs::HTTP>,
+L<cs::RFC822>
+
+=head1 AUTHOR
+
+Cameron Simpson E<lt>cs@zip.com.auE<gt>
+
+=cut
 
 1;
