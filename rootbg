@@ -116,15 +116,17 @@ umask 077
 
 [ $domenubg ] && menubg "$imagefile" &
 
-cp "$imagefile" "$tmp/." || exit 1
+tmpdir=`mkdirn "$tmp/rootbg"` || exit 1
+cp "$imagefile" "$tmpdir/." || exit 1
+lastvalue rootbg "$imagefile"
 
-( cd "$tmp" || exit 1
+( cd "$tmpdir" || exit 1
   img=`basename "$imagefile"`
   sfx=`expr "x$img" : 'x.*\.\([^.]*$\)'`
   base=`basename "$img" ".$sfx"`
   final=$base.PNG
   bgx=$X11_BGX bgy=$X11_Y
-  set mogrify -quality 0 -foreground black -geometry "${bgx}x${bgy}" -format PNG
+  set /opt/ImageMagick/bin/mogrify -quality 0 -background black -geometry "${bgx}x${bgy}" -format PNG
 
   # see if we need to letterbox or something
   ix= iy=
@@ -172,9 +174,14 @@ cp "$imagefile" "$tmp/." || exit 1
 
   # run mogrify on the image
   "$@" "$img"
+  # workaround for mogrify bug
+  rm -f "$img"
+  mv ./* "$final"
   ## fvwm-root -fe "$final" ## aterms don't listen to fvwm-root :-(
-  Esetroot "$final"
-  rm -f "$img" "$final"
+  ## Esetroot "$final"
+  fvwm-root --retain-pixmap "$final"
+  cd
+  rm -rf "$tmpdir"
 ) &
 [ $sync ] || exit 0
 wait
