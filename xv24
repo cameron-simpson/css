@@ -1,0 +1,3 @@
+#!/bin/sh
+
+exec xv -visual truecolor ${1+"$@"}
