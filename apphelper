@@ -16,9 +16,9 @@ usage="Usage: $cmd [-t] file [-d savedir] viewer [viewer-args...]
 	-p pager	Pager (default viewer, from \$PAGER: $pager)."
 
 case $1 in
-    -t)	shift; exec term +t +a -small -e "$0" ${1+"$@"} ;;
+    -t)	shift; exec term +t +a -small -e sane "$0" ${1+"$@"} ;;
     +t) shift ;;
-    *)  [ -t 0 -a -t 1 ] || exec term +t +a -small -e "$0" ${1+"$@"} ;;
+    *)  [ -t 0 -a -t 1 ] || exec term +t +a -small -e sane "$0" ${1+"$@"} ;;
 esac
 
 badopts=
