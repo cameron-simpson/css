@@ -1,0 +1,34 @@
+#!/bin/sh
+#
+# Create a simple index of every HTML file that should be made from the PODs
+# in the current directory.
+#	- Cameron Simpson <cs@zip.com.au> 01jul2003
+#
+
+echo "<UL>"
+for f in *.pod
+do
+  title=`sed -n 's/^=head1  *//p' "$f" | sed 1q`
+  [ -n "$title" ] || title="[$f]"
+
+  author=`awk '/^=author /{print$2}' "$f" | sed 1q`
+  [ -n "$author" ] || author=`ls -ld "$f" | awk '{print$3}'`
+
+  echo "$f $author $title"
+done \
+| sort +1 \
+| while read f author title
+  do
+    htfile=`basename "$f" .pod`.html
+
+    ## dbuser "$author" FULLNAME
+    fullname=`ypmatch "$author" passwd | awk -F: '{print$5}' | sed 's/,.*//'`
+    [ -n "$fullname" ] || fullname=author
+
+    modtime=`ls -ld "$f" | awk '{print $6, $7, $8}'`
+
+    echo "    <LI><A HREF=\"$htfile\">$title</A>"
+    echo "        - last change $modtime, author <A HREF=\"mailto:$author\">$fullname</A>"
+  done
+
+echo "</UL>"
