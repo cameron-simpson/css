@@ -1,0 +1,29 @@
+#!/bin/sh
+
+target=/u/cameron/targetdir
+
+for dir
+do  
+    [ -d "$dir/." ] || continue
+    rmdir "$dir" 2>/dev/null && continue
+
+    base=`basename "$dir"`
+    case "$base" in
+	*[0-9])	base=`expr "x$base" : 'x\(.*[^0-9]\)[0-9][0-9]*$'` ;;
+	*)	;;
+    esac
+    case "$base" in
+	*_)	base=`expr "x$base" : 'x\(.*[^_]\)__*$'` ;;
+	*)	;;
+    esac
+
+    newdir=$target/$base/$base
+    newdir=`mkdirn $newdir` || continue
+    [ -d "$newdir/." ] || { echo "$0: $newdir: not a directory" >&2; continue; }
+
+    ( set -x
+      mv "$dir/"*.* "$newdir/."
+      rmdir "$dir"
+      rmdir "$newdir" 2>/dev/null
+    )
+done
