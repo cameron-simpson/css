@@ -1,0 +1,10 @@
+#!/bin/sh
+LOGDIR=${LOGDIR:-$HOME/var/log}
+exec >>"$LOGDIR/alert"
+colour=
+case $1 in -c) colour=$2; shift; shift; ;; esac
+[ $# = 0 ] && { set x "`cat`"; shift; }
+if [ -n "$colour" ]
+then  colour_echo "$colour" "$*"
+else  echo "$*"
+fi
