@@ -18,7 +18,7 @@ case "$cmdpath" in
 	HOME=/u/cameron
 	WEBPROXY=proxy:8080
 	;;
-    /a/zapff/home/cameron/* | /a/ivie/home/cameron/* | /home/ivie/cameron/* | /a/spindler/home/*)
+    /home/zapff/cameron/* | /a/zapff/home/cameron/* | /a/ivie/home/cameron/* | /home/ivie/cameron/* | /a/spindler/home/*)
 	ARCH=redhat.x86.linux
 	SYSTEMID=cisra
 	HOME=/u/cameron
