@@ -8,7 +8,7 @@
 fifodir=$HOME/tmp
 [ -d "$fifodir/." ] || mkdir "$fifodir" || exit 1
 
-fifo=$HOME/tmp/fvwmevfifo-$$HOST-$$DISPLAY-$$
+fifo=$HOME/tmp/fvwmevfifo-$HOST-$DISPLAY-$$
 
 FvwmCommand -S "$fifo"
 sleep 5
