@@ -44,6 +44,21 @@
 #	be called from "free" data.
 #
 
+=head1 NAME
+
+cs::Sink - a data sink
+
+=head1 SYNOPSIS
+
+use cs::Sink;
+
+=head1 DESCRIPTION
+
+The cs::Sink module provides generic data sink facilities.
+B<cs::Sink>s may be created which wire to a variety of objects.
+
+=cut
+
 use strict qw(vars);
 
 BEGIN { use cs::DEBUG; cs::DEBUG::using(__FILE__); }
@@ -63,6 +78,19 @@ if ($cs::Sink::_UseIO)
   ::need(IO::Handle);
 }
 
+=head1 GENERAL FUNCTIONS
+
+=over 4
+
+=item put(I<sink-args>, I<data...>)
+
+Creates a new B<cs::Sink> using the arguments
+in the array references by I<sink-args>
+and writes the I<data> to it.
+Returns B<undef> on error.
+
+=cut
+
 sub put
 { my($args)=shift;
   my($s)=new cs::Sink @$args;
@@ -72,9 +100,30 @@ sub put
   $s->Put(@_);
 }
 
+=back
+
+=head1 OBJECT CREATION
+
+=over 4
+
+=item open(I<path>)
+
+Create a new sink attached to the file named in I<path>.
+
+=cut
+
 sub open
 { new cs::Sink (PATH,@_);
 }
+
+=item new cs::Sink (I<type>,I<args...>)
+
+Create a new sink of the specified I<type>.
+I<args...> varies according to the type:
+
+=over 6
+
+=cut
 
 sub new
 { my($class,$type)=(shift,shift);
@@ -92,6 +141,13 @@ sub new
     $type=shift;
   }
 
+=item B<FILE>, I<handle>
+
+Attach to the filehandle I<handle>.
+Flushes any pending output in I<handle> as a side-effect.
+
+=cut
+
   if ($type eq FILE)
   { my($FILE)=shift;
     ::flush($FILE);
@@ -100,6 +156,13 @@ sub new
 		  : $FILE);
     $this->{FLAGS}|=$cs::IO::F_NOCLOSE;
   }
+
+=item B<APPEND>, I<path>
+
+Attach to the file named by I<path> in append mode.
+
+=cut
+
   elsif ($type eq APPEND)
   { my($path,$complex)=@_;
     $complex=0 if ! defined $complex;
@@ -109,6 +172,13 @@ sub new
     $this->{PATH}=$Fpath;	# debugging
     $type=FILE;
   }
+
+=item B<PATH>, I<path>
+
+Attach to the file named in I<path> in rewrite mode.
+
+=cut
+
   elsif ($type eq PATH)
   { my($path,$complex)=@_;
     $complex=0 if ! defined $complex;
@@ -118,6 +188,13 @@ sub new
     $this->{PATH}=$Fpath;	# debugging
     $type=FILE;
   }
+
+=item B<PIPE>, I<shcmd>
+
+Attach to a pipe to the shell command I<shcmd>.
+
+=cut
+
   elsif ($type eq PIPE)
   { my($pipeline)="| ".shift(@_)." ";
     my($io);
@@ -129,12 +206,38 @@ sub new
     $this->{IO}=$io;
     $type=FILE;
   }
+
+=item B<ARRAY>, I<arrayref>
+
+Attach to the array referenced by I<arrayref>.
+Each B<Write()> to the sink pushes a single string
+onto the array.
+
+=cut
+
   elsif ($type eq ARRAY)
   { $this->{ARRAY}=shift;
   }
+
+=item B<SCALAR>, I<scalarref>
+
+Attach to the scalar referenced by I<scalarref>.
+Each B<Write()> appends to the scalar.
+
+=cut
+
   elsif ($type eq SCALAR)
   { $this->{SCALAR}=shift;
   }
+
+=item B<Sink>, I<sink>
+
+Attach to the B<cs::Sink> object I<sink>.
+Typically used by subclasses
+to apply a filter to data before depositing in I<sink>.
+
+=cut
+
   elsif ($type eq Sink)
   { $this->{DS}=shift;
   }
@@ -152,6 +255,21 @@ sub new
   }
 
   $this;
+}
+
+=back
+
+=item tmpSink(I<tmpnam-args>)
+
+Create a new sink object attached to a new temporary file
+allocated by B<cs::Pathname::tmpnam(I<tmpnam-args>)>.
+
+=cut
+
+sub tmpSink
+{
+  ::need(cs::Pathname);
+  new cs::Sink (PATH, cs::Pathname::tmpnam(@_));
 }
 
 $cs::Sink::_new_FILE_first=1;
@@ -194,10 +312,10 @@ sub _DESTROY
   if (! $cs::Sink::_UseIO
    && $type eq FILE
    && ! ($this->{FLAGS} & $cs::IO::F_NOCLOSE))
-	{ ## warn "CLOSE($this->{IO})";
-	  close($this->{IO})
-		|| warn "$::cmd: close($this->{IO}): $!";
-	}
+  { ## warn "CLOSE($this->{IO})";
+    close($this->{IO})
+	  || warn "$::cmd: close($this->{IO}): $!";
+  }
   else
   { ## warn "$::cmd: not try to close ".cs::Hier::h2a($this).", made from [@{$this->{CALLER}}]";
   }
@@ -205,16 +323,42 @@ sub _DESTROY
   delete $this->{TYPE};
 }
 
-sub Path
+=back
+
+=head1 OBJECT METHODS
+
+=over 4
+
+=item Path()
+
+For sinks attached to files,
+return the pathname of the file.
+
+=cut
+
+sub Path($)
 { my($this)=shift;
   return undef if ! exists $this->{PATH};
   $this->{PATH};
 }
 
-sub Handle	# return filehandle name
+=item Handle()
+
+For sinks attached to files or filehandles,
+return the filehandle.
+
+=cut
+
+sub Handle($)
 { my($this)=@_;
   exists $this->{IO} ? $this->{IO} : undef;
 }
+
+=item Put(I<data...>)
+
+Write all the I<data> to the sink.
+
+=cut
 
 sub Put
 { my($this)=shift;
@@ -227,9 +371,9 @@ sub Put
     while (length $data)
     { $n=$this->Write($data);
       if (! defined $n)
-	    { warn "$::cmd: write error (possibly $!), aborting with [$data] unwritten";
-	      return undef;
-	    }
+      { warn "$::cmd: write error (possibly $!), aborting with [$data] unwritten";
+	return undef;
+      }
 
       $alln+=$n;
       substr($data,$[,$n)='';
@@ -261,11 +405,11 @@ sub Write
   my($n)=length $datum;
 
   if ($type eq FILE)
-	{
-	  die "UseIO is back on!" if $cs::Sink::_UseIO;
-	  if (! print $io $datum)
-		{ undef $n;
-		}
+  {
+    die "UseIO is back on!" if $cs::Sink::_UseIO;
+    if (! print $io $datum)
+    { undef $n;
+    }
 ##		  # XXX - IO module doesn't like zero sized writes
 ##		  if ($n > 0 || ! $cs::Sink::_UseIO)
 ##		  	{ $n=($cs::Sink::_UseIO
@@ -275,16 +419,16 @@ sub Write
 ##					: (print $io $datum)
 ##						? $n : undef);
 ##			}
-	}
+  }
   elsif ($type eq Sink)
-	{ $n=$this->{DS}->Write($datum);
-	}
+  { $n=$this->{DS}->Write($datum);
+  }
   elsif ($type eq ARRAY)
-	{ push(@{$this->{ARRAY}},$datum);
-	}
+  { push(@{$this->{ARRAY}},$datum);
+  }
   elsif ($type eq SCALAR)
-	{ ${$this->{SCALAR}}.=$datum;
-	}
+  { ${$this->{SCALAR}}.=$datum;
+  }
 
   return undef if ! defined $n;
 
@@ -370,10 +514,14 @@ sub _Blow
   }
 }
 
-sub tmpSink
-{
-  ::need(cs::Pathname);
-  new cs::Sink (PATH, cs::Pathname::tmpnam(@_));
-}
+=head1 SEE ALSO
+
+cs::Source(3), cs::Pathname(3)
+
+=head1 AUTHOR
+
+Cameron Simpson E<lt>cs@zip.com.auE<gt>
+
+=cut
 
 1;
