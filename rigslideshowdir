@@ -1,0 +1,22 @@
+#!/bin/sh
+#
+# Make a slideshow directory - a dir full of symlinks to things to show.
+#	- Cameron Simpson <cs@zip.com.au> 01aug2003
+#
+
+cmd=`basename "$0"`
+usage="Usage: $cmd [pickim-options...] keywords...
+  Suggestion: $cmd -w -o keywords..."
+
+[ $# = 0 ] && { echo "$usage" >&2; exit 2; }
+
+ls|tr '\012' ' ';echo;echo
+
+ask "Redo links in `pwd`" || exit 1
+
+rm -f ./*
+pickim "$@" \
+| while read path
+  do  lpath=`echo "$path" | tr -s / _ | sed 's/^_//'`
+      (set -x; ln -s "$path" "./$lpath")
+  done
