@@ -1,0 +1,46 @@
+#!/bin/sh
+#
+
+cmd=`basename "$0"`
+usage="Usage: $cmd localdir ftphost:ftpdir"
+
+badopts=
+
+if [ $# = 2 ]
+then
+    localdir=$1
+    case $2 in
+	*:*)	ftphost=`expr "x$2" : 'x\([^:]*\):.*'`
+		ftpdir=`expr "x$2" : 'x[^:]*:\(.*\)'`
+		;;
+	*)	echo "$cmd: bad ftphost:ftpdir" >&2
+		badopts=1
+		;;
+    esac
+else
+    badopts=1
+fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+[ -d "$localdir/." ] || { echo "$cmd: $localdir: not a directory" >&2
+			  exit 1
+			}
+
+cd "$localdir" || exit 1
+pwd
+
+find . -type f -print \
+| sort \
+| { odir=
+    while read f
+    do  dir=`dirname "$f"`
+	base=`basename "$f"`
+	[ "x$dir" = "x$odir" ] || { echo "mkdir $ftpdir/$dir"
+				    odir=$dir
+				  }
+	ls -ld $f >&2
+	echo "put $f $ftpdir/$f"
+    done
+  } \
+| ftp "$ftphost"
