@@ -27,7 +27,11 @@ scriptmandir = $(MANDIR)/cs/man1
 scriptmans = $(scriptmandir)/$((allscripts)).1
 scriptfromman(manf) = $(manf FP)
 
-default: squid_redirect README.txt _submakes _tarballs _man
+default: squid_redirect README.txt _submakes _tarballs _man _cvslog
+
+_cvslog:
+	cvslog >CHANGELOG.txt
+	cvslog2html >CHANGELOG.html
 
 _test:
 	echo $(pmmans)
