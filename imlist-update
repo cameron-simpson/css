@@ -143,8 +143,8 @@ for $impath (@stdin)
   next NEWIMAGE if exists $::IMX{$impath};
 
   # skip missing/empty images
-  next NEWINDEX if ! (@s=stat($impath));
-  next NEWINDEX if ! -f _ || ! -s _;
+  next NEWIMAGE if ! (@s=stat($impath));
+  next NEWIMAGE if ! -f _ || ! -s _;
 
   ($x,$y,$err)=eval { imgsize($impath) };
   if ($@)
