@@ -1,0 +1,43 @@
+#!/bin/sh
+#
+
+cmd=`basename "$0"`
+usage="Usage: $cmd -u pgpid [files...]
+	-u pgpid	Whose public key to use."
+
+TMP=${TMP-/usr/tmp}
+pgpid=${PGPID-$EMAIL}
+badopts=
+while :
+do  case $1 in
+	--)	shift; break ;;
+	-u)	pgpid=$2; shift ;;
+	-u?*)	pgpid=`expr "x$1" : 'x-u\(.*\)'` ;;
+	-?*)	echo "$cmd: unrecognised option: $1" >&2
+		badopts=1
+		;;
+	*)	break ;;
+    esac
+    shift
+done
+
+[ -z "$pgpid" ] && { echo "$cmd: missing pgpid" >&2; badopts=1; }
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+if [ $# -gt 0 ]
+then
+    tmp=$TMP/$cmd.$$
+    for name
+    do  echo "$name"
+    done >"$tmp"
+
+    exec <"$tmp"
+    rm "$tmp"
+
+    exec "$cmd" -u "$pgpid"
+else
+    [ -t 0 ] && echo "Enter filenames on stdin" >&2
+fi
+
+cpio -ocv | pgp -fe "$pgpid"
