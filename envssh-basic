@@ -1,0 +1,27 @@
+#!/bin/sh
+#
+# Like envssh, but much simpler and faster.
+#	- Cameron Simpson <cs@zip.com.au> 20jan1999
+# 
+
+sshopts=
+while :
+do
+  case $1 in
+      -[oLRpecil])
+		sshopts="$sshopts '$1' '$2'"; shift ;;
+      -*)	sshopts="$sshopts '$1'" ;;
+      --)	shift; break ;;
+      *)	break ;;
+  esac
+  shift
+done
+
+[ $# = 0 ] && { echo "$0: missing host" >&2; exit 2; }
+host=$1; shift 
+
+[ $# = 0 ] && { [ -t 0 -a -t 1 ] && sshopts="-t $sshopts"
+		set 'exec $SHELL'
+	      }
+
+eval "exec ssh $sshopts \"\$host\" 'PATH=\$HOME/scripts:\$HOME/bin:/opt/bin:/usr/bin:/bin:$PATH; export PATH; $*'"
