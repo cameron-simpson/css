@@ -1,0 +1,128 @@
+#!/bin/sh
+#
+# Use buff, chkfiles and updfiles to make a cpio file of stuff to
+# copy to a remote site.
+#	- Cameron Simpson <cs@zip.com.au> 17sep96
+#
+
+snapfrom=$HOME
+snapdir=${SNAPDIR-$HOME/etc/snap}
+orig=$SITENAME
+snap=zip
+out=-
+
+if [ -t 2 ]
+then	verbose=1 vflag=-v
+else	verbose=  vflag=
+fi
+trace= xflag=
+
+cmd=`basename "$0"`
+usage="Usage: $cmd op [-vx] [-d snapdir] [-o output] [-s snap] [args...]
+	op	What to do:
+	    shot	Emit a file listing.
+	    update	Update the \"official\" listing.
+	    archive	Emit a file archive.
+	    extract	Unpack an archive.
+
+	-v		Verbose.
+	-d snapdir	Location of snapshot files.
+			Default: \$SNAPDIR or $snapdir
+	-o output	Where to write the cpio archive.
+			Default: ${TMP-$HOME/tmp}/{snap}.cpio.
+	-s snap		Snapshot file or basename.
+"
+
+badopts=
+
+if [ $# = 0 ]
+then
+  echo "$cmd: missing op" >&2
+  badopts=1
+else
+  op=$1; shift
+  case $op in
+      shot|update|archive|extract) ;;
+      *)  echo "$cmd: unrecognised operation \"$op\"" >&2
+	  badopts=1
+	  ;;
+  esac
+
+  while :
+  do  case $1 in
+	--)	shift; break ;;
+	-d)	snapdir=$2; shift ;;
+	-o)	out=$2; shift ;;
+	-s)	snap=$2; shift ;;
+	-v)	vflag=-v verbose=1 ;;
+	-x)	xflag=-x trace=1 ;;
+	-?*)	echo "$cmd: unrecognised option: $1" >&2
+		badopts=1
+		;;
+	*)	break ;;
+      esac
+      shift
+  done
+fi
+
+[ $# = 0 ] || { echo "$cmd: extra arguments: $*" >&2
+		badopts=1
+	      }
+
+case $op in
+  archive)
+    if [ -z "$snap" ]
+    then
+	echo "$cmd: no snapshot file specified" >&2
+	badopts=1
+    else
+	case $snap in
+	    /*)	snapfile=$snap ;;
+	    *)	snapfile=$snapdir/$snap ;;
+	esac
+	case $orig in
+	    /*)	origfile=$orig ;;
+	    *)	origfile=$snapdir/$orig ;;
+	esac
+	[ -r "$snapfile" ] || { echo "$cmd: no snapshot at $snapfile" >&2
+				badopts=1
+			      }
+	[ -r "$origfile" ] || { echo "$cmd: no original at $origfile" >&2
+				badopts=1
+			      }
+    fi
+    ;;
+esac
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+cd "$snapfrom" || exit $?
+
+snapname=`echo "$snap"|tr '[a-z]' '[A-Z]'`
+
+case $op in
+  archive)
+    sort -o "$snapfile" "$snapfile" \
+	|| { echo "$cmd: sort($snapfile) fails" >&2
+	     exit $?
+	   }
+
+    case $out in
+	-)	;;
+	*)	exec >"$out" ;;
+    esac
+
+    [ $trace ] && set -x
+    buff $vflag -4 "$snapname" \
+	| snap-chkfiles -s "$origfile" \
+	| tee chkfiles.out \
+	| sort \
+	| comm -23 - "$snapfile" \
+	| sed -n 's/ {.*//p' \
+	| cpio -oLc${cpiov}
+    ;;
+    *)
+      echo "$cmd: $op: operation not implemented" >&2
+      exit 1
+      ;;
+esac
