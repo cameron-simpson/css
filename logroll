@@ -37,7 +37,7 @@ usage="Usage: $cmd [-m max] [-p {pid|procname}] [-s signal] [-v] [-z] \\
 badopts=
 
 # use defaults
-set $LOGROLLOPTS ${1+"$@"}; shift
+set -- $LOGROLLOPTS ${1+"$@"}
 
 while :
 do  case $1 in
