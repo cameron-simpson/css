@@ -12,5 +12,4 @@ then  echo "mail/$1 already locked" >&2
 fi
 
 cd || exit 1
-GUI=lean term -n "mutt +$1 @ $HOST" \
-	      -e lock "mail/$1" mutt -f "+$1"
+GUI=lean rterm zapff@cisra -n "mutt +$1" lock "mail/$1" mutt -f "+$1"
