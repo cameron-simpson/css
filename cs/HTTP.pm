@@ -284,9 +284,9 @@ sub _url2hpf
 
   my($URL)=new cs::URL $url;
 
-  return undef unless $URL->{PROTO} eq HTTP;
+  return undef unless $URL->Proto() eq HTTP;
 
-  ($URL->{HOST},$URL->{PROTO},$URL->{PATH});
+  ($URL->Hopst(),$URL->Proto(),$URL->Proto());
 }
 
 #######################
@@ -357,17 +357,30 @@ sub tokenList	# text -> ([tok,val,...],tail)
   wantarray ? ($list,$_) : $list;
 }
 
-sub _rqhdr
-{ my($targetURL,$srcURL)=@_;
-  $srcURL=defined($ENV{HTTP_REFERER}) ? $ENV{HTTP_REFERER} : $targetURL
+sub rqhdr($;$)
+{ my($U,$srcURL)=@_;
+  $srcURL=defined($ENV{HTTP_REFERER}) ? $ENV{HTTP_REFERER} : $U->Text()
 	if ! defined $srcURL;
 
-  my($U)=new cs::URL $targetURL;
-  my($rqhdrs)=new cs::RFC822;
+  my $rqhdrs = new cs::RFC822;
 
   $rqhdrs->Add([ACCEPT,"*/*"]);
   $rqhdrs->Add([REFERER,$srcURL]);
-  $rqhdrs->Add([HOST,$U->{HOST}]) if exists $U->{HOST};
+  $rqhdrs->Add([HOST,$U->Host()]);
+
+  my $cookieline = "";
+  for my $C (@::Cookies)
+  { ## warn "check ".cs::Hier::h2a($C,0);
+    if ($U->MatchesCookie($C))	## $::Now
+    { $cookieline.="; " if length $cookieline;
+      $cookieline.="$C->{NAME}=$C->{VALUE}";
+    }
+  }
+
+  if (length $cookieline)
+  { $rqhdrs->Add("Cookie: $cookieline");
+    ## warn "rqhdrs=".cs::Hier::h2a($rqhdrs,1);
+  }
 
   $rqhdrs;
 }
@@ -397,8 +410,8 @@ sub findAuthority
        || length $ref->{PATH} < length $A->{PATH}
 	)
        )
-	  { $ref=$A;
-	  }
+    { $ref=$A;
+    }
   }
 
   $ref;
@@ -429,9 +442,9 @@ sub new($$;$$)
   $this=new cs::Net::TCP ($host,$port);
   return undef if ! defined $this;
 
-  $this->{HOST}=lc($host);
-  $this->{PORT}=$port;
-  $this->{ISPROXY}=$isProxy;
+  $this->{cs::HTTP::HOST}=lc($host);
+  $this->{cs::HTTP::PORT}=$port;
+  $this->{cs::HTTP::ISPROXY}=$isProxy;
 
   bless $this, $class;
 }
@@ -484,7 +497,7 @@ sub Request($$;$$$)
   $uri =~ s/\t/%09/g;
   my($U)=new cs::URL $uri;
 
-  my($rqhdrs)=_rqhdr($uri,$olduri);
+  my($rqhdrs)=rqhdr($U,$olduri);
   if (defined $hdrs)
   { for ($hdrs->Hdrs())
     { $rqhdrs->Add($_,SUPERCEDE);
@@ -494,13 +507,13 @@ sub Request($$;$$$)
   ############################
   # Supply request and headers.
   $this->Put("$method "
-	    .($this->{ISPROXY}
+	    .($this->{cs::HTTP::ISPROXY}
 		? $uri
 		: $U->LocalPart())
 	    ." $version\r\n");
   $cs::HTTP::Debug && warn "HTTP: $method $uri $version";
 
-  $rqhdrs->WriteItem($this->{OUT});
+  $rqhdrs->WriteItem($this->Sink());
   $cs::HTTP::Debug && warn "HTTP: ".cs::Hier::h2a($rqhdrs,1);
 
   local($_);
@@ -533,7 +546,7 @@ sub Request($$;$$$)
 
   my($rversion,$rcode,$rtext)=($1,$2,$');
   
-  my $M = new cs::MIME ($this->{IN},1);
+  my $M = new cs::MIME ($this->Source(),1);
 
   wantarray
   ? ($rversion,$rcode,$rtext,$M)
@@ -574,8 +587,8 @@ sub RequestData
   my($cte)=$hdrs->Hdr(CONTENT_TRANSFER_ENCODING);
 
   defined $cte && length $cte
-	? cs::MIME::decodedSource($this->{IN},$cte)
-	: $this->{IN};
+	? cs::MIME::decodedSource($this->Source(),$cte)
+	: $this->Source();
 }
 
 =back
