@@ -6,9 +6,13 @@
 
 use strict qw(vars);
 
+use cs::Misc;
 use cs::Upd;
+use cs::Shell;
 use Getopt::Std;
 use Image::Size;
+
+$ENV{TMPDIR}='/tmp' if ! exists $ENV{TMPDIR} || ! length $ENV{TMPDIR};
 
 my $upd = -t STDOUT;
 my $indexfile = "INDEX";
@@ -89,6 +93,7 @@ if ($mode ne APPEND && $indexfile ne '-')
   if (-f "$indexfile.gz"
 	  ? open(INDEX,"gunzip <'$indexfile.gz' |")
 	  : open(INDEX,"< $indexfile\0")
+     )
   {
     OLDINDEX:
     while (defined($_=<INDEX>))
@@ -121,7 +126,7 @@ if ($mode ne APPEND && $indexfile ne '-')
   }
   else
   { $err = "$!";
-    if (-e $indexfile -o -e "$indexfile.gz")
+    if (-e $indexfile || -e "$indexfile.gz")
     { die "$::cmd: can't read $indexfile: $err";
     }
   }
@@ -138,7 +143,7 @@ for $impath (@stdin)
 {
   $n++;
 
-  $impath =~ s:^\./+::;
+  $impath=normpath($impath);
   out(int($n*100/$nn)."%: $impath") if $upd && $n % 10 == 0;
 
   # skip known images
@@ -182,3 +187,14 @@ for $impath (sort keys %::IMX)
 }
 close(INDEX);
 exit 0;
+
+sub safepath
+{ local($_)=@_;
+  s:^[^/\w]:./$&:;
+  $_;
+}
+sub normpath
+{ local($_)=@_;
+  s:^(\.\/+)+::;
+  return $_;
+}
