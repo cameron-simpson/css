@@ -11,5 +11,5 @@ cd
 # fetch the small stuff first
 set -x
 runfetchmail -1 -l 65536
-alog procmail lock -1 getmail-despool nice getmail-flush -p 30 spool
+alog procmail set-x lock -1 getmail-despool nice set-x getmail-flush -p 30 spool
 acon runfetchmail
