@@ -14,7 +14,7 @@ use cs::Misc;
 package cs::Pathname;
 
 # unique ID for file
-sub pathid
+sub pathid($)
 { my($path)=@_;
 
   my @s = lstat($path);
@@ -24,7 +24,7 @@ sub pathid
   "$s[0]:$s[1]";
 }
 
-sub dirents	# dir
+sub dirents($)
 { my($dir)=@_;
   my(@e);
 
@@ -35,7 +35,7 @@ sub dirents	# dir
   @e;
 }
 
-sub dirname
+sub dirname($)
 { local($_)=@_;
 
   if (m|(.*[^/])/+|)
@@ -47,7 +47,7 @@ sub dirname
   $_;
 }
 
-sub basename
+sub basename($)
 { local($_)=@_;
 
   $_=norm($_);
@@ -55,6 +55,13 @@ sub basename
   s:.*/([^/]):$1:;
 
   $_;
+}
+
+sub catpath($$)
+{ my($dir,$path)=@_;
+
+  return $path if ! length $dir;
+  "$dir/$path";
 }
 
 # safe rename - doesn't tromp target file if present
@@ -117,93 +124,94 @@ sub saferename	# (from,to) -> success
 }
 
 sub firstfile	# (base,exts...) -> first non-empty file base.ext
-	{ my($base,@exts)=@_;
-	  my($e,$f);
+{ my($base,@exts)=@_;
+  my($e,$f);
 
-	  for $e (@exts)
-		{ return $base.$e if -s $base.$e;
-		}
-
-	  return undef;
+  for $e (@exts)
+	{ return $base.$e if -s $base.$e;
 	}
+
+  return undef;
+}
 
 # parse . and .. entries
 sub norm	# path -> norm-path
-	{ my($path)=@_;
-	  my($pfx,@pieces);
+{ my($path)=@_;
+  my($pfx,@pieces);
 
-	  $path =~ m|^/*|;
-	  $pfx=$&;
-	  $path=$';
+  $path =~ m|^/*|;
+  $pfx=$&;
+  $path=$';
 
-	  @pieces=grep(length,split(m|/+|,$path));
+  @pieces=grep(length,split(m|/+|,$path));
 
-	  my(@path);
+  my(@path);
 
-	  for (@pieces)
-		{ if ($_ eq '' || $_ eq '.')
-			{}
-		  elsif ($_ eq '..')
-			{ pop(@path);
-			}
-		  else	{ push(@path,$_);
-			}
-		}
+  for (@pieces)
+  { if ($_ eq '' || $_ eq '.')
+    {}
+    elsif ($_ eq '..')
+    { pop(@path);
+    }
+    else
+    { push(@path,$_);
+    }
+  }
 
-	  $path=$pfx.join('/',@path);
-	  $path='.' if ! length $path;
+  $path=$pfx.join('/',@path);
+  $path='.' if ! length $path;
 
-	  $path;
-	}
+  $path;
+}
 
 undef $cs::Pathname::_Pwd;
 sub pwd
-	{ if (! defined $cs::Pathname::_Pwd)
-		{ $cs::Pathname::_Pwd=`pwd`;
-		  if ($? != 0)
-			{ undef $cs::Pathname::_Pwd;
-			  return undef;
-			}
+{ if (! defined $cs::Pathname::_Pwd)
+  { $cs::Pathname::_Pwd=`pwd`;
+    if ($? != 0)
+    { undef $cs::Pathname::_Pwd;
+      return undef;
+    }
 
-		  chomp $cs::Pathname::_Pwd;
-		}
+    chomp $cs::Pathname::_Pwd;
+  }
 
-	  $cs::Pathname::_Pwd;
-	}
+  $cs::Pathname::_Pwd;
+}
 sub cd
-	{ if (! chdir(@_))
-		{ warn "chdir(@_): $!";
-		  return undef;
-		}
+{ if (! chdir(@_))
+  { warn "$::cmd: chdir(@_): $!";
+    return undef;
+  }
 
-	  undef $cs::Pathname::_Pwd;
-	  1;
-	}
+  undef $cs::Pathname::_Pwd;
+  1;
+}
 
 sub fullpath	# path -> fullpath
-	{ my($path)=@_;
+{ my($path)=@_;
 
-	  if ($path !~ m|^/|)
-		{ my($pwd)=&pwd;
-		  return $path if ! defined $pwd;
-		  chomp($pwd);
+  if ($path !~ m|^/|)
+  { my($pwd)=&pwd;
+    return $path if ! defined $pwd;
+    chomp($pwd);
 
-		  $pwd.='/' unless $pwd =~ m|/$|;
-		  $path=$pwd.$path;
-		}
+    $pwd.='/' unless $pwd =~ m|/$|;
+    $path=$pwd.$path;
+  }
 
-	  norm($path);
-	}
+  norm($path);
+}
 
 sub ident	# path or stat-array -> undef or ident
-	{ my(@s)=@_;
+{ my(@s)=@_;
 
-	  if (@s == 1)
-		{ return undef if ! (@s=stat(shift(@s)));
-		}
+  if (@s == 1)
+  { return undef if ! (@s=stat(shift(@s)));
+  }
 
-	  "$s[6]:$s[0]:$s[1]";
-	}
+  "$s[6]:$s[0]:$s[1]";
+}
 
 sub makedir($;$);
 sub makedir($;$)
@@ -225,37 +233,37 @@ sub makedir($;$)
 }
 
 sub needfiledir($;$)
-	{ my($file)=shift;
+{ my($file)=shift;
 
-	  ## warn "needfiledir($file)\n";
-	  makedir(dirname($file),$_[0]);
-	}
+  ## warn "needfiledir($file)\n";
+  makedir(dirname($file),$_[0]);
+}
 
 sub untilde
-	{ local($_)=shift;
+{ local($_)=shift;
 
-	  /^~/ || return $_;
+  /^~/ || return $_;
 
-	  length($`) ? userdir($`) : $ENV{HOME};
-	}
+  length($`) ? userdir($`) : $ENV{HOME};
+}
 
 sub userdir
-	{ my($u)=shift;
-	  my(@pw);
+{ my($u)=shift;
+  my(@pw);
 
-	  if (! defined $cs::Pathname::_PwEnts{$u})
-		{ $cs::Pathname::_PwEnts{$u}=[ getpwnam($u) ];
-		  if (! @{$cs::Pathname::_PwEnts{$u}})
-			{ warn "userdir($u): who is $u?";
-			}
-		}
+  if (! defined $cs::Pathname::_PwEnts{$u})
+  { $cs::Pathname::_PwEnts{$u}=[ getpwnam($u) ];
+    if (! @{$cs::Pathname::_PwEnts{$u}})
+    { warn "$::cmd: userdir($u): who is $u?";
+    }
+  }
 
-	  @pw=@{$cs::Pathname::_PwEnts{$u}};
+  @pw=@{$cs::Pathname::_PwEnts{$u}};
 
-	  return undef unless @pw;
+  return undef unless @pw;
 
-	  $pw[7];
-	}
+  $pw[7];
+}
 
 # rename a bunch of files in a directory
 sub vrename
@@ -275,23 +283,25 @@ sub vrename
   # normalise pathnames
   # assumes no collisions (i.e. no "a" and "dir/a")
   for (@now)
-	{ if (! m:^/:)	{ $from="$dir$_";
-			  if (exists $map->{$from})
-				{ push(@errs,
-					"both \"$_\" and \"$from\" in map, losing \"$from\" => \"$map->{$from}\"");
-				}
+  { if (! m:^/:)
+    { $from="$dir$_";
+      if (exists $map->{$from})
+      { push(@errs,
+	      "both \"$_\" and \"$from\" in map, losing \"$from\" => \"$map->{$from}\"");
+      }
 
-			  $map->{$from}=$map->{$_};
-			  delete $map->{$_};
-			}
-	  else		{ $from=$_;
-			}
+      $map->{$from}=$map->{$_};
+      delete $map->{$_};
+    }
+    else
+    { $from=$_;
+    }
 
-	  $to=$map->{$from};
-	  if ($to !~ m:^/:)
-		{ $map->{$from}="$dir$to";
-		}
-	}
+    $to=$map->{$from};
+    if ($to !~ m:^/:)
+    { $map->{$from}="$dir$to";
+    }
+  }
 
   my($err);
 
@@ -378,6 +388,49 @@ sub tmpnam
       return $tmpnam;
     }
   }
+}
+
+sub cpperm($$)
+{ my($src,$dest)=@_;
+
+  my $ok = 1;
+
+  my @s = stat($src);
+  if (! @s)
+  { warn "$::cmd: stat($src): $!\n";
+    $ok=0;
+  }
+  else
+  { my $perms = $s[2] & 07777;
+    my $setid = $s[2] & 07000;
+
+    if ($setid != 0)
+    # check ownerships
+    {
+      my @d = stat($dest);
+      if (! @d)
+      { warn "$::cmd: stat($dest): $!\n";
+	$ok=0;
+      }
+      else
+      { if (($setid & 04000) && $s[4] != $d[4]
+	 || ($setid & 02000) && $s[5] != $d[5])
+	{ if (! chown($s[4],$s[5],$dest))
+	  { warn "$::cmd: $src is set[ug]id but can't make ownership match on $dest: $!\n\tdropping set[ug]id bits\n";
+	    $perms&=~06000;
+	    $ok=0;
+	  }
+	}
+      }
+    }
+
+    if (! chmod($perms,$dest))
+    { warn "$::cmd: chmod($dest,".sprintf("0%04o",$perms)."): $!\n";
+      $ok=0;
+    }
+  }
+
+  $ok;
 }
 
 =back
