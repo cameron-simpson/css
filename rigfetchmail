@@ -5,6 +5,9 @@
 #
 needhost $HOMEHOST@home || exit 1
 set -x
-exec fetchmail --daemon 1800 -f $HOME/var/fetchmail/fetchmailrc -a \
-	mail.carlnfd1.nsw.optushome.com.au \
-	mail.zipworld.com.au
+exec acon fetchmail \
+	-f /u/cameron/.fetchmailrc \
+	-d 900 \
+	--logfile /u/cameron/var/log/fetchmail \
+	--nobounce --tracepolls --warnings 86400 \
+	127.0.0.2 127.0.0.3
