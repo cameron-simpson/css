@@ -1,0 +1,21 @@
+#!/bin/sh
+
+cmd=$0
+[ $# = 1 ] || { echo "Usage: $cmd remote_host" >&2; exit 2; }
+remote=$1; shift
+
+[ -n "$DISPLAY" ] || { echo "$cmd: no \$DISPLAY!" >&2; exit 1; }
+
+exec ssh -X "$remote" \
+	"[ -d \$HOME/var/log/. ] || mkdir -p \$HOME/var/log
+	 exec >>\$HOME/var/log/console 2>&1
+	 set -vx
+	 XSESSIONMODE=remote
+	 XSESSIONMODE_WM=no
+	 DISPLAY_SYSTEMID=${DISPLAY_SYSTEMID:-$SYSTEMID}
+	 DISPLAY_HOST=${DISPLAY_HOST:-$HOST}
+	 sshDISPLAY=\$DISPLAY
+	 DISPLAY=$HOSTNAME:0
+	 export DISPLAY_SYSTEMID DISPLAY_HOST sshDISPLAY DISPLAY XSESSIONMODE XSESSION_WM
+	 . \$HOME/rc/shell/rigenv
+	 . \$HOME/rc/x11/xsession"
