@@ -16,6 +16,8 @@
 #	- Cameron Simpson <cs@zip.com.au> 20oct2000
 #
 
+: ${TMPDIR:=/tmp}
+
 max=4
 
 cmd=`basename "$0"`
@@ -44,7 +46,7 @@ fi
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
-pipe=/tmp/$cmd$$
+pipe=$TMPDIR/$cmd$$
 mknod "$pipe" || exit 1
 
 ( exec 3<"$pipe"
