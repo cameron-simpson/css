@@ -1,0 +1,10 @@
+#!/bin/sh
+#
+# Remove a user from the majordomo lists.
+#
+
+mj=/usr/local/etc/mj/lists
+
+cd $mj || exit $?
+
+lists=`ls|fgrep -v .`
