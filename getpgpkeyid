@@ -1,0 +1,22 @@
+#!/bin/sh
+#
+# Given key ids, fetch data from Bal's Public Key Server.
+#	- Cameron Simpson <cs@zip.com.au> 01feb2000
+#
+
+xit=0
+
+for id
+do
+    case $id in
+	[0-9A-F][0-9A-F][0-9A-F][0-9A-F][0-9A-F][0-9A-F][0-9A-F][0-9A-F])
+		httpget -o - "http://pgp5.ai.mit.edu:11371/pks/lookup?op=get&search=0x$id" \
+		| sed -n '/BEGIN PGP PUBLIC KEY BLOCK/,$p'
+		;;
+	*)	echo "How to key string \"$id\"?" >&2
+		xit=1
+		;;
+    esac
+done
+
+exit $xit
