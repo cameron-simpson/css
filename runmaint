@@ -30,8 +30,8 @@
 # =head1 INSTALLATION
 #
 # Normally I<runmaint> is installed as a kit under a prefix
-# such as B</> or B</opt> or B</usr/local>,
-# with the script itself in B</bin/runmaint> or B</opt/script/runmaint> or B</usr/local/bin/runmaint>
+# such as B</usr> or B</opt/runmaint> or B</usr/local>,
+# with the script itself in B</usr/bin/runmaint> or B</opt/runmaint/bin/runmaint> or B</usr/local/bin/runmaint>
 # and so forth.
 # The examples below presume the prefix is B</>
 # and should be adjusted to your install arrangement.
