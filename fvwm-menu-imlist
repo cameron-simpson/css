@@ -5,6 +5,7 @@
 #
 
 cmd=$0
+usage="Usage: $cmd [-l filelist] [-o image-op] [XxY] dir [files/dirs...]]"
 
 ##alert "#=$# $0 $*"
 ##exec 2>>$HOME/var/log/alert
@@ -20,8 +21,6 @@ imop=${FVWM_MENU_IMLIST_OP:-"xv"}
 filelist=
 inter=
 dir=
-
-usage="Usage: $cmd [-l filelist] [-o image-op] [XxY] dir [files/dirs...]]"
 
 badopts=
 
