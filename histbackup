@@ -1,7 +1,6 @@
 #!/bin/sh
 #
-# Backup a directory to an indefinite file store using an incremental
-# technique. Also see the rab script, which is an easy to use wrapper.
+# Backup a directory using an incremental technique.
 # See also: histbackup-prune.
 #	- Cameron Simpson <cs@zip.com.au> 03apr2000
 #
