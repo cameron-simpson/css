@@ -1,32 +1,94 @@
 #!/bin/sh
 #
-# Grab a clause from a Windows-style .ini file.
+# Grab a clause from a Windows-style .ini file, or edit it.
 #	- Cameron Simpson <cs@zip.com.au> 14jul2001
 #
 
 cmd=$0
-usage="Usage: $cmd clausename [files...]"
+usage="Usage: $cmd file clausename [var=val...]"
 
-[ $# = 0 ] && { echo "$0: missing clausename" >&2
-		echo "$usage" >&2
-		exit 2
-	      }
+[ $# -lt 2 ] && { echo "$cmd: missing file or clausename" >&2
+		  echo "$usage" >&2
+		  exit 2
+		}
 
+file=$1; shift
 clause=$1; shift
 
-exec sed -n 's/^[ 	][ 	]*//
-	     /^#/d
-	     /^$/d
-	     /^\['"$clause"'\]/b begin
-	     d
-	     :begin
-	     n
-	     :loop
-	     /^\[/q
-	     s/^[ 	][ 	]*//
-	     /^#/b begin
-	     /^$/b begin
-	     p
-	     n
-	     b loop' ${1+"$@"}
-	    
+[ -s "$file" ] || { echo "$cmd: expect nonempty file: $file" >&2; exit 1; }
+
+[ $# = 0 ] \
+&& exec sed -n 's/^[ 	][ 	]*//
+		/^#/d
+		/^$/d
+		/^\['"$clause"'\]/b begin
+		d
+		:begin
+		n
+		:loop
+		/^\[/q
+		s/^[ 	][ 	]*//
+		/^#/b begin
+		/^$/b begin
+		p
+		n
+		b loop' "$file"
+
+
+badops=
+append=
+prune=
+
+# compute editing commands from "var=val" strings
+for change
+do
+  var=`expr "x$change" : 'x\([a-zA-Z_][a-zA-Z_0-9]*\)=.*'`
+  if [ -z "$var" ]
+  then
+      echo "$cmd: bad change: $change"
+      badops=1
+  else
+      val=`expr "x$change" : 'x[a-zA-Z_][a-zA-Z_0-9]*=\(.*\)'`
+      append="$append
+	      a\\
+  $change"
+      prune="$prune
+	     /^ *$var *=/{
+	       n
+	       b redo
+	     }"
+  fi
+done
+
+[ $badops ] && { echo "$cmd: bad changes, aborting" >&2
+		 echo "$usage" >&2
+		 exit 2
+	       }
+
+sedf=':top
+      s/^[ 	][ 	]*//
+      /^#/b next
+      /^$/b next
+      /^\['"$clause"'\]/b begin
+      :next
+      p
+      n
+      b top
+      :begin
+      '"$append"'
+      :loop
+      p
+      n
+      :redo
+      /^\[/b last
+      s/^[ 	][ 	]*//
+      /^#/b loop
+      /^$/b loop
+      '"$prune"'
+      b loop
+      :last
+      p
+      n
+      b top'
+
+bsed -n "$sedf" "$file"
