@@ -1,6 +1,8 @@
 #!/bin/sh
 #
 
+: ${TMPDIR:=/tmp}
+
 set -vx
 TAPE=${TAPE-dat:karri}
 TAPECMD=${TAPECMD-rtape}
@@ -40,7 +42,7 @@ esac
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
-tmp=/tmp/$cmd.$$
+tmp=$TMPDIR/$cmd.$$
 
 case $# in
     0)	case $mode in
