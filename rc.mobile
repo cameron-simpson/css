@@ -36,7 +36,7 @@
 
 where=${SYSTEMID:-home}
 cf=/etc/rc.mobile.conf
-envfile=
+envfiles=
 async=1
 asyncall=1
 trace=set-x
@@ -155,6 +155,7 @@ do  case $1 in
 	# =item B<-E> I<envfile>
 	#
 	# Save environment settings to the file I<envfile>.
+	# Multiple B<-E> options may be supplied.
 	# Configuration lines of the form "I<var>B<=>I<value>"
 	# set environment variables
 	# available to further startup actions issued by B<rc.mobile>.
@@ -183,7 +184,7 @@ do  case $1 in
 	# this allowing the raw run to override previous values,
 	# typically wanted by @nw(1cs).
 	# 
-	-E)   envfile=$2; shift ;;
+	-E)   envfiles="$envfiles $2"; shift ;;
 	--)   shift; break ;;
 	-?*)  echo "$cmd: unrecognised option: $1" >&2
 	      badopts=1
@@ -236,19 +237,23 @@ setenv()
   setenv_var=$1
   setenv_val=$2
   eval "$setenv_var=\$setenv_val; export $setenv_var"
-  if [ -n "$envfile" ]
+  if [ -n "$envfiles" ]
   then
-      # make sure the setenv function is present
+    # make sure the setenv function is present
+    for envfile in $envfiles
+    do
       [ -s "$envfile" ] \
       || echo 'setenv(){ eval "$1=\$2; export $1"; }' >>"$envfile" \
-      || { echo "$cmd: can't write to $envfile" >&2
-	   envfile=
-	 }
+      || echo "$cmd: can't write to $envfile" >&2
+    done
 
-      case "$setenv_val" in
-	  *\'*) setenv_val=`echo "$setenv_val" | sed "s/'/'\\\\\\\\''/g"` ;;
-      esac
+    case "$setenv_val" in
+	*\'*) setenv_val=`echo "$setenv_val" | sed "s/'/'\\\\\\\\''/g"` ;;
+    esac
+    for envfile in $envfiles
+    do
       echo "setenv $setenv_var '$setenv_val';" >>"$envfile"
+    done
   fi
 }
 
@@ -327,7 +332,7 @@ runqueue()
       # =item I<var>B<=>I<value>
       #
       # Set the environment variable named I<var> to the value I<value>.
-      # If the B<-E> option was used, also record the value in I<envfile>.
+      # If the B<-E> option was used, also record the value in each I<envfile>.
       #
       [a-zA-Z]*=*)
 	var=`expr "$op" : '\([^=]*\)=.*'`
@@ -559,7 +564,10 @@ else
     fi
 
     # truncate env file for fresh starts
-    [ -z "$envfile" ] || >"$envfile"
+    for envfile in $envfiles
+    do
+      >"$envfile"
+    done
 
     # make available to subprocesses and user environment
     setenv RC_MOBILE_WHERE "$where"
