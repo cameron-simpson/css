@@ -1,0 +1,192 @@
+#!/bin/sh
+#
+# Emit a DVD or CD label as PostScript.
+#	- Cameron Simpson <cs@zip.com.au> 17nov97
+#
+
+font_title=Times-Roman
+font_attrs=Helvetica
+
+cmd=`basename "$0"`
+usage="Usage: $cmd -t title [-a attrs] [-i imagefile]
+	-t title	Disc title.
+	-T title_font	Font for title. Default: $font_title.
+	-a attrs	A line of remarks.
+	-a attrs_font	Font for attrs. Default: $font_attrs.
+	-i imagefile	File containing cover image."
+
+badopts=
+title=
+attrs=
+imagefile=
+while :
+do  case $1 in
+	-t)	title=$2; shift ;;
+	-T)	font_title=$2; shift ;;
+	-a)	attrs=$2; shift ;;
+	-A)	font_attrs=$2; shift ;;
+	-i)	imagefile=$2; shift ;;
+	--)	shift; break ;;
+	-?*)	echo "$cmd: unrecognised option: $1" >&2; shift ;;
+	*)	break ;;
+    esac
+    shift
+done
+
+[ $# = 0 ] || { echo "$cmd: extra arguments: $*" >&2; badopts=1; }
+
+[ -z "$imagefile" ] \
+	|| [ -r "$imagefile" ] \
+	|| { echo "$cmd: no readable image file: $imagefile" >&2
+	     badopts=1
+	   }
+
+[ -n "$title" ] || { echo "$cmd: missing title" >&2; badopts=1; }
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+title=`sedstrs 's/[()]/\\\\&/g' "$title"`
+
+# sizes in mm
+height=121
+width_leaf=16
+width_spine=4
+width_cover=140
+
+to_mm='72 25.4 div dup scale'
+
+cat <<X
+%!PS-Abode-1.0
+
+% Get fonts
+/TitleFont /$font_title findfont def
+/AttrsFont /$font_attrs findfont def
+
+% Set to useful size.
+$to_mm
+0.1 setlinewidth
+
+% Leap to top of page.
+clippath pathbbox
+/HY exch def
+/HX exch def
+/LY exch def
+/LX exch def
+
+% up and across a bit
+LX 20 add LY 50 add translate
+
+newpath
+0 0 moveto
+0 $height rlineto
+$width_leaf $width_spine $width_cover add add 0 rlineto
+0 -$height rlineto
+closepath stroke
+
+newpath
+0 $width_leaf add 0 moveto
+0 $height rlineto
+$width_spine 0 rmoveto
+0 -$height rlineto
+stroke
+
+% Centre some text below the origin.
+%	string -> cbelow -> dy
+%
+/cbelow {   10 dict begin
+		newpath 0 0 moveto
+		dup false charpath pathbbox	% bounds:     x1 y1 x2 y2
+		/Y2 exch def /X2 exch def
+		/Y1 exch def /X1 exch def
+
+		/DY Y2 Y1 sub def
+		/DX X2 X1 sub def
+		0 DX 2 div sub 0 DY sub moveto
+		show
+		0 DY sub
+	    end
+	} def
+
+% Left align some text below the origin.
+%	string -> cbelow -> dy
+%
+/lbelow {   10 dict begin
+		newpath 0 0 moveto
+		dup false charpath pathbbox	% bounds:     x1 y1 x2 y2
+		/Y2 exch def /X2 exch def
+		/Y1 exch def /X1 exch def
+
+		/DY Y2 Y1 sub def
+		/DX X2 X1 sub def
+		0 0 DY sub moveto
+		show
+		0 DY sub
+	    end
+	} def
+
+% Right align some text below the origin.
+%	string -> cbelow -> dy
+%
+/rbelow {   10 dict begin
+		newpath 0 0 moveto
+		dup false charpath pathbbox	% bounds:     x1 y1 x2 y2
+		/Y2 exch def /X2 exch def
+		/Y1 exch def /X1 exch def
+
+		/DY Y2 Y1 sub def
+		/DX X2 X1 sub def
+		0 DX sub 0 DY sub moveto
+		show
+		0 DY sub
+	    end
+	} def
+
+% Write the leaf.
+gsave
+  $width_leaf $height 2 div translate
+  -90 rotate
+  5 5 scale
+  TitleFont setfont
+  ($title) cbelow
+  0 exch 1.2 mul translate
+  0.8 0.8 scale
+  AttrsFont setfont
+  ($attrs) cbelow
+grestore
+
+% Write the spine.
+gsave
+  $width_leaf $width_spine add $height translate
+  -90 rotate
+  gsave
+    5 5 scale
+    TitleFont setfont
+    ($title) lbelow
+  grestore
+  $height 0 translate
+  0 0 moveto
+  4 4 scale
+  AttrsFont setfont
+  ($attrs ) rbelow
+grestore
+
+% Write the cover.
+gsave
+  $width_leaf $width_spine add $width_cover 2 div $height translate
+  12 12 scale
+  TitleFont setfont
+  ($title) cbelow
+  0 exch 1.2 mul translate
+  0 0 moveto
+  0.25 0.25 scale
+  AttrsFont setfont
+  ($attrs) cbelow
+grestore
+
+X
+
+case $imagefile in
+    '')	;;
+esac
+
+echo showpage
