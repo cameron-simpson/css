@@ -1,0 +1,28 @@
+#!/bin/sh
+#
+
+a4='x=0 y=200 a=0'	# AGSM laserwriter on spinifex.
+l4='x=-600 y=600 a=90'	# AGSM laserwriter on spinifex, landscape.
+if [ $# -gt 0 ]
+then
+	case "$1" in
+		a4)	eval "$a4" ; shift ;;
+		l4)	eval "$l4" ; shift ;;
+		*)	eval "$a4" ;;
+	esac
+else
+	eval "$a4"
+fi
+
+case $# in
+	0)	;;
+	1)	a=$1 x=0 y=0 ;;
+	3)	a=$1 x=$2 y=$3 ;;
+	*)	echo "Usage: $0 [a4|l4] [degrees [dx dy]] < postscript" >&2
+		exit 2
+		;;
+esac
+
+echo clipppath pathbbox pop pop /zzy exch def /zzx exch def zzx zzy translate 90 rotate zzx neg zzy neg translate
+# echo "/avg2 {add 2 div} def clippath pathbbox 3 -1 roll avg2 /zzcy exch def avg2 /zzcx exch def zzcx zzcy translate $a rotate zzcx neg $x add zzcy neg $y add translate"
+exec cat
