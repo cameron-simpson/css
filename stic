@@ -23,6 +23,8 @@
 # conveniently.
 #
 
+: ${TMPDIR:=/tmp}
+
 cmd=`basename "$0"`
 usage="Usage:	$cmd add [files...]
 	$cmd adddir [directories...]
@@ -46,7 +48,7 @@ else
   xit=0
   badopts=
 
-  tmp=/tmp/.stic$$
+  tmp=$TMPDIR/.stic$$
 
   case "$op" in
 
