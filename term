@@ -67,7 +67,7 @@ do
     *,-f)	f=$2 ; shift ;;
     *,-big)	sized=1 x=$bigx y=$bigy w=$bigw h=$bigh f=$bigf ;;
     *,-small)	sized=1 x=$smallx y=$smally w=$smallw h=$smallh f=$smallf ;;
-    *,-keepio)	detach=: ;;
+    *,-keepio)	detach='echo KEEPIO' ;;
     *,-xauthhack)
 		xauthhack=1 ;;
     *,-geometry)
@@ -109,10 +109,10 @@ case "$TERM,$DISPLAY" in
 	[ -n "$xauthhack" -a -r "$XAUTHORITY" ] &&
 		{ # Fight with NFS/xterm brain damage.
 		  xauth=/tmp/$cmd.$$
-		  exec 3>$xauth
+		  exec 4>$xauth
 		  chmod 600 $xauth
-		  cat <"$XAUTHORITY" >&3
-		  exec 3>&-
+		  cat <"$XAUTHORITY" >&4
+		  exec 4>&-
 		  XAUTHORITY=$xauth
 		  export XAUTHORITY
 		}
