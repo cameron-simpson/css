@@ -30,42 +30,42 @@ $feedback=0;
 @Shuffles=();
 @Select=();
 ARGV:
-  while (@ARGV)
-	{ $_=$ARGV[0];
-	  if ($_ eq '-r' || /^-\d+(,\d+)*$/)
-				{ s/^-//;
-				  push(@Shuffles,$_);
-				  shift;
-				}
-	  elsif (/^-O/)		{ push(@Shuffles,shift(@ARGV)); }
-	  elsif (/^-o/)		{ shift;
+while (@ARGV)
+{ $_=$ARGV[0];
+  if ($_ eq '-r' || /^-\d+(,\d+)*$/)
+			{ s/^-//;
+			  push(@Shuffles,$_);
+			  shift;
+			}
+  elsif (/^-O/)		{ push(@Shuffles,shift(@ARGV)); }
+  elsif (/^-o/)		{ shift;
 
-				  if (/^-o(.+)/)	{ $range=$1; }
-				  else			{ $range=shift; }
+			  if (/^-o(.+)/)	{ $range=$1; }
+			  else			{ $range=shift; }
 
-				  if (! defined $range)
-					{ warn "$cmd: missing page range for -o option\n";
-					  $badargs=1;
-					}
-				  elsif (defined(@sel=&numrange($range)))
-					{ push(@Select,@sel);
-					}
-				  else
-				  { warn "$cmd: bad page range ($range) for -o option\n";
-				    $badargs=1;
-				  }
-				}
-	  elsif ($_ eq '--')	{ shift; last ARGV; }
-	  elsif (/^-/)		{ warn "$cmd: unknown option '$_'\n";
+			  if (! defined $range)
+				{ warn "$cmd: missing page range for -o option\n";
 				  $badargs=1;
-				  shift;
 				}
-	  else
-	  { last ARGV;
-	  }
-	}
+			  elsif (defined(@sel=&numrange($range)))
+				{ push(@Select,@sel);
+				}
+			  else
+			  { warn "$cmd: bad page range ($range) for -o option\n";
+			    $badargs=1;
+			  }
+			}
+  elsif ($_ eq '--')	{ shift; last ARGV; }
+  elsif (/^-/)		{ warn "$cmd: unknown option '$_'\n";
+			  $badargs=1;
+			  shift;
+			}
+  else
+  { last ARGV;
+  }
+}
 
-die $usage if $badrags;
+die $usage if $badargs;
 
 $tmp="/tmp/$cmd.$$";
 open(TMP,"+>$tmp") || die "$cmd: can't open temporary file: $!\n";
@@ -76,86 +76,86 @@ undef $theTrailer;
 @Offsets=();
 @Pages=();
 while (<>)
-	{ if (/^%%Page:\s*\S+\s+(\d+)/)
-		{ $feedback && print STDERR ".";
-		  $page=$1;
-		  push(@Offsets,tell(TMP));
-		  push(@Pages,$page);
-		}
-	  elsif (/^%%Trailer/)
-		{ $feedback && print STDERR "T";
-		  $theTrailer=$_;
-		  last;
-		}
+{ if (/^%%Page:\s*\S+\s+(\d+)/)
+  { $feedback && print STDERR ".";
+    $page=$1;
+    push(@Offsets,tell(TMP));
+    push(@Pages,$page);
+  }
+  elsif (/^%%Trailer/)
+  { $feedback && print STDERR "T";
+    $theTrailer=$_;
+    last;
+  }
 
-	  print TMP $_;
-	}
+  print TMP $_;
+}
 
 $feedback && print STDERR "\n";
 die "$cmd: no page markers found\n" if $#Offsets < 0;
 
 for (@Shuffles)
-	{ if ($_ eq 'r')
-		{ @Offsets=reverse @Offsets;
-		  @Pages=reverse @Pages;
-		}
-	  else
-	  # num,...
-	  { @nums=split(/,/);
-	    warn "nums=[@nums]\n";
-	    $max=0;
-	    for (@nums)
-		{ die "zeroes not permitted in range\n" if $_ == 0;
+{ if ($_ eq 'r')
+  { @Offsets=reverse @Offsets;
+    @Pages=reverse @Pages;
+  }
+  else
+  # num,...
+  { @nums=split(/,/);
+    warn "nums=[@nums]\n";
+    $max=0;
+    for (@nums)
+	{ die "zeroes not permitted in range\n" if $_ == 0;
 
-		  if ($_ > $max)
-			{ $max=$_; }
-		}
-
-	    # finish off the list if it's incomplete
-	    if ($#nums != $max-1)
-		{ for ($i=1; $i <= $max; $i++)
-			{ $ok=0;
-			  for (@nums)
-				{ if ($_ == $i)
-					{ $ok=1;
-					  last;
-					}
-				}
-
-			  # add missing number
-			  if (!$ok)
-				{ push(@nums,$i);
-				}
-			}
-
-	    	  warn " -> nums=@nums\n";
-		}
-
-	    # warn "max=$max\n";
-	    # pad array with dummy pages - XXX: this may be a misfeature
-	    $pad=$max - ($#Offsets+1) % $max;
-	    # warn "pad=$pad\n";
-	    if ($pad)
-		{ for ($i=0; $i < $pad; $i++)
-			{ push(@Offsets,&addpage(TMP));
-			  push(@Pages,0);
-			}
-		}
-
-	    # walk through offsets in chunks of size $max
-	    for ($i=0; $i <= $#Offsets; $i+=$max)
-		{ warn "[@Offsets[$i..($i+$max-1)]] -> ";
-		  for (@chunk=(), @pchunk=(), $j=0; $j<$max; $j++)
-			{ push(@chunk,$Offsets[$i+$nums[$j]-1]);
-			  push(@pchunk,$Pages[$i+$nums[$j]-1]);
-			}
-
-		  @Offsets[$i..($i+$max-1)]=@chunk;
-		  @Pages[$i..($i+$max-1)]=@pchunk;
-		  warn "[@Offsets[$i..($i+$max-1)]]\n";
-		}
-	  }
+	  if ($_ > $max)
+		{ $max=$_; }
 	}
+
+    # finish off the list if it's incomplete
+    if ($#nums != $max-1)
+	{ for ($i=1; $i <= $max; $i++)
+		{ $ok=0;
+		  for (@nums)
+			{ if ($_ == $i)
+				{ $ok=1;
+				  last;
+				}
+			}
+
+		  # add missing number
+		  if (!$ok)
+			{ push(@nums,$i);
+			}
+		}
+
+	  warn " -> nums=@nums\n";
+	}
+
+    # warn "max=$max\n";
+    # pad array with dummy pages - XXX: this may be a misfeature
+    $pad=$max - ($#Offsets+1) % $max;
+    # warn "pad=$pad\n";
+    if ($pad)
+	{ for ($i=0; $i < $pad; $i++)
+		{ push(@Offsets,&addpage(TMP));
+		  push(@Pages,0);
+		}
+	}
+
+    # walk through offsets in chunks of size $max
+    for ($i=0; $i <= $#Offsets; $i+=$max)
+	{ warn "[@Offsets[$i..($i+$max-1)]] -> ";
+	  for (@chunk=(), @pchunk=(), $j=0; $j<$max; $j++)
+		{ push(@chunk,$Offsets[$i+$nums[$j]-1]);
+		  push(@pchunk,$Pages[$i+$nums[$j]-1]);
+		}
+
+	  @Offsets[$i..($i+$max-1)]=@chunk;
+	  @Pages[$i..($i+$max-1)]=@pchunk;
+	  warn "[@Offsets[$i..($i+$max-1)]]\n";
+	}
+  }
+}
 
 seek(TMP,0,0) || die "$cmd: can't rewind temporary file\n";
 
