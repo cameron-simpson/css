@@ -1,0 +1,28 @@
+#!/bin/sh
+#
+# Update my web pages.
+#	- Cameron Simpson <cs@zip.com.au> 11nov97
+#
+
+cd || exit $?
+
+for d in www/moto/aus.moto/faces
+do  echo "im2html $d ..."
+    ( cd "$d" || exit $?
+      im2html -r
+      755 .
+    ) &
+done
+wait
+
+for d in www/moto/sydride
+do
+    echo "myke $d ..."
+    ( cd "$d" || exit $?
+      myke
+      755 .
+    ) &
+done
+wait
+
+exec time synczip --update
