@@ -44,8 +44,8 @@ case $FILE in
     ;;
   *.c)
     tplt=csapp.c ;;
-  *.java)
-    tplt=java
+  *.java|*.html)
+    tplt=`expr "x$FILE" : 'x.*\.\(..*\)'`
     ;;
 esac
 
