@@ -1,0 +1,13 @@
+#!/bin/sh
+#
+# Strip my LD_LIBRARY_PATH, rely on the system one.
+#	- Cameron Simpson <cs@zip.com.au> 20nov99
+#
+
+[ $# = 0 ] && { set x "$SHELL"; shift; }
+
+for var in LD_RUN_PATH LD_LIBRARY_PATH LDPATH
+do  eval "$var=; export $var"
+done
+
+exec "$@"
