@@ -1,0 +1,15 @@
+#!/bin/sh
+#
+# Open fresh shell on target machine in new window.
+#	- Cameron Simpson <cs@zip.com.au> 23oct2001
+#
+
+[ $# = 0 ] && { echo "Usage: $0 host[@sitename] [rterm-args...]" >&2; exit 2; }
+
+host=$1; shift
+case $host in
+    *@*)	;;
+    *)		host=$host@$SITENAME ;;
+esac
+
+exec rterm "$host" ${1+"$@"}
