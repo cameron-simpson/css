@@ -1,0 +1,4 @@
+#!/bin/sh
+domenu=
+[ $# = 1 -a -s "$1" ] || domenu=-M
+exec rootbg $domenu -m ${1+"$@"}
