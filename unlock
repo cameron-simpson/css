@@ -2,15 +2,25 @@
 #
 # Kill the process holding a lock.
 #	- Cameron Simpson <cs@zip.com.au> 13jul2000
+# -f: remove the lock anyway.
 #
 
 LOCKDIR=${LOCKDIR:-"$HOME/var/locks"}
 export LOCKDIR
 
+force=
+[ "x$1" = x-f ] && { shift; force=1; }
+
 sig=
 case $1 in -*) sig=$1; shift ;; esac
 
 xit=0
+
+# see if we sent any signals
+killed=
+
+# things to remove
+lockdirs=
 
 for lock
 do
@@ -34,7 +44,20 @@ do
   pid=`cat <"$pidfile"`
   [ -n "$pid" ] || { echo "$0: no pid in $pidfile" >&2; xit=1; continue; }
 
-  kill $sig "$pid"
+  kill $sig "$pid" && killed=1
+
+  lockdirs="$lockdirs $lockdir"
+
 done
+
+[ $killed ] && sleep 1
+
+if [ -n "$lockdirs" ]
+then
+    for lockdir in $lockdirs
+    do
+	[ -d "$lockdir/." ] && rm -rf "$lockdir"
+    done
+fi
 
 exit $xit
