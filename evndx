@@ -126,12 +126,12 @@ do
 	  *.html)
 	    b=`expr "$f" : '\(.*\)\.html'`
 	    t=`sed -n 's/.*<[Tt][Ii][Tt][Ll][Ee]>\(.*\)<\/[Tt][Ii][Tt][Ll][Ee]>.*/\1/p' $f|sed 1q`
-	    echo "    <LI><A NAME=$b HREF=$f>$date</A> - $t"
+	    echo "    <LI><A NAME=\"$b\" HREF=\"$f\">$date</A> - $t"
 	    ;;
 	  *.href)
 	    b=`expr "$f" : '\(.*\)\.href'`
 	    t=`sed -n 's/.*<[Tt][Ii][Tt][Ll][Ee]>\(.*\)<\/[Tt][Ii][Tt][Ll][Ee]>.*/\1/p' $f|sed 1q`
-	    echo "    <LI><A NAME=$b>$date</A> - `cat $f`"
+	    echo "    <LI><A NAME=\"$b\">$date</A> - `cat $f`"
 	    ;;
 	  *)
 	    echo "$cmd: unrecognised extension: $f" >&2
