@@ -32,7 +32,26 @@ case "$host" in
 		'--exclude=/rc/*' '--exclude=/*' \
 		"$HOME/." "$host:."
 	;;
-    *)	set -x
-	tar cf - "$@" | ssho "$host" exec tar xf -
+    *)	first=1
+	for f
+	do
+	    [ $first ] && { set x; shift; }
+	    if [ -d "$f/." ]
+	    then
+		( cd "$f" || exit 1
+		  pwd
+		  set -x
+		  tar cf - "." \
+		  | ssho "$host" "set -vx; rm -rf '$f'; [ -d '$f/.' ] || mkdir -p '$f' || exit 1; cd '$f/.' || exit 1; exec tar xf -"
+		)
+	    else
+		set x ${1+"$@"} "$f"; shift
+	    fi
+	    first=
+	done
+	if [ $# -gt 0 ]
+	then
+	    (set -x; tar cf - "$@" | ssho "$host" exec tar xf -)
+	fi
 	;;
 esac
