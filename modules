@@ -1,0 +1,37 @@
+#!/bin/sh
+#
+# 
+
+module=${1-modules}
+
+tmp=${TMP:-$HOME/tmp}
+[ -d "$tmp/." ] || tmp=/tmp
+
+cd "$tmp" || exit $?
+
+cvs co "$module" || exit $?
+
+( cd "$module" || exit $?
+
+  if [ -f "$module" ]
+  then
+      edit "$module"
+  else
+      while necho "edit what? "
+	    read file
+      do    if [ -f "$file" ]
+	    then	edit "$file"
+			echo ok
+	    else	ls -ld "$file"
+	    fi
+	    :
+      done
+  fi
+  
+  if ask "commit it"
+  then
+      cvs commit
+  fi
+)
+
+cvs release -d "$module"
