@@ -20,7 +20,7 @@ keepio=
 SHELL=${SHELL-/bin/sh}
 CONSOLE=${CONSOLE:-$HOME/var/log/console}
 n= f=
-smallx=-0 smally=103 smallw=80 smallh=24 smallf=
+smallx=0 smally=103 smallw=80 smallh=24 smallf=
 w= h=
 bigx=0 bigy=-0 bigw=80 bigh=61 bigf=6x13
 geometry=
