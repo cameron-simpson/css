@@ -7,5 +7,5 @@
 needhost $HOMEHOST@home		|| exit 1
 cd $HOME/@/adzapper.sf/html	|| exit 1
 umask 22
-cvsedit rc/patterns		|| exit 1
+withjob adzap cvsedit rc/patterns || exit 1
 myke _script
