@@ -37,14 +37,17 @@ if [ $# = 0 ]
 then
   if [ -t 0 ]
   then
-      [ -n "$DISPLAY" ] && { set x `cutbuffer`; shift; }
+      [ -n "$DISPLAY" ] && { set -- `xclip -o` || exit 1; }
+      [ $# = 0 ] && { echo "$cmd: no args and nothing from xclip" >&2
+		      badopts=1
+		    }
   else
-      set x `cat`; shift
+      set -- `cat` || exit 1
+      [ $# = 0 ] && { echo "$cmd: no args and nothing from stdin" >&2
+		      badopts=1
+		    }
   fi
 fi
-[ $# = 0 ] && { echo "$cmd: no URLs and no X clipboard" >&2
-		badopts=1
-	      }
 
 case "$topic" in
     */*)	echo "$cmd: bad topic \"$topic\"" >&2
