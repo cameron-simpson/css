@@ -3,6 +3,8 @@
 # - Cameron Simpson <cs@zip.com.au>
 #
 
+: ${TMPDIR:=/tmp}
+
 usage="Usage: $0 [-f] [-r] [files...]
 	-f	Force overwrite.
 	-r	Recurse."
@@ -47,7 +49,7 @@ fi
 		shift
 	      }
 
-tmp=/tmp/t$$
+tmp=$TMPDIR/t$$
 xit=0
 
 for i
