@@ -14,8 +14,8 @@ cmd=$0
 usage="Usage: $cmd [-a] [+a] [-c] [+c] [-m mailcap] [-s subfile] mimetype
 	-a	Just print the action portion of the mailcap entry (default).
 	+a	Print the whole mailcap entry.
-	-c	Select the \"copiusoutput\" mailcap entry (default).
-	+c	Avoid the \"copiusoutput\" mailcap entry.
+	-c	Select the \"copiousoutput\" mailcap entry (default).
+	+c	Avoid the \"copiousoutput\" mailcap entry.
 	-m mailcap Specify the mailcap file.
 	-s subfile Replace any %s with subfile, correctly quoted.
 		   Actions with no %s get the it as stdin."
