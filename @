@@ -11,7 +11,7 @@ if [ $# = 0 ]
 then
   case $HOST@$SYSTEMID in
     kaper@cisra)
-	set cage,ferrari,linux,solaris,cass,sweet,screen:ivory,screen:elph,screen:sunny ;;
+	set cage,ferrari,linux,solaris,cass,sweet,screen:root@ivory,screen:elph,screen:root@sunny ;;
     amadeus@home)
 	set jekyll,janus,alpha ;;
     newt@home)
@@ -30,6 +30,9 @@ case "$host" in
 	do  "$0" "$h" ${1+"$@"}
 	done
 	exit 0
+	;;
+    root@* | screen:root@*)
+	exec root@ "$host"
 	;;
     screen:*)
 	host=`expr "$host" : 'screen:\(.*\)'`
