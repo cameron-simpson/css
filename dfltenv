@@ -1,0 +1,14 @@
+#!/bin/sh
+#
+# Snarf system environment and then run command.
+#	- Cameron Simpson <cs@zip.com.au> 27may1997
+#
+
+[ $# = 0 ] && { echo "$0: missing command" >&2
+		echo "Usage: $0 command [args...]" >&2
+		exit 2
+	      }
+
+. /usr/local/etc/shell/dfltenv
+
+exec "$@"
