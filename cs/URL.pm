@@ -54,6 +54,30 @@ sub get($;$)
   $U->Get($follow);
 }
 
+=item urls(I<url>,I<results>,I<inline>)
+
+Return all URLs reference from the page I<url>
+via the hashref I<results>,
+which on resturn will have URLs as the hash keys
+and the title of each link as the hash value.
+If the optional argument I<inline> is true,
+return ``inline'' URLs
+(i.e. specified by B<SRC=> and B<BACKGROUND=> attributes)
+rather than references (B<HREF=>).
+
+=cut
+
+sub urls($$;$)
+{ my($url,$urls,$inline)=@_;
+  $inline=0 if ! defined $inline;
+
+  my($U)=new cs::URL $url;
+  return 0 if ! defined $U;
+
+  $U->URLs($urls,$inline);
+  1;
+}
+
 =item urlPort(I<scheme>,I<port>)
 
 Given a I<scheme> and I<port>,
@@ -74,6 +98,38 @@ sub urlPort($$)
 		  ? cs::Net::portNum($scheme)
 		  : ''
 	  : '');
+}
+
+=item undot(I<url>)
+
+Given the text of an I<url>,
+remove and B<.> or B<..> components.
+
+=cut
+
+sub undot($)
+{ local($_)=@_;
+
+  my $pfx = "";
+
+  if (m(^\w+://[^/]+))
+  { $pfx=$&; $_=$';
+  }
+
+  # strip newlines
+  s:[\r\n]+\s*::g;
+
+  # strip /dir/../
+  s:^(/*)((\.\.?/))+:/:;
+  while (s|/+[^/?#]+/+\.\./+|/|)
+  {}
+
+  $_=$pfx.$_;
+
+  s/^\s+//;
+  s/\s+$//;
+
+  $_;
 }
 
 =back
@@ -622,6 +678,7 @@ sub Get($;$)
 
 sub _Get($$)
 { my($this,$follow)=@_;
+  $follow=0 if ! defined $follow;
 
   my($url,$context);
 
@@ -727,6 +784,46 @@ sub _Get($$)
   }
 
   return ();
+}
+
+sub URLs($$;$)
+{ my($this,$urls,$inline)=@_;
+  $inline=0 if ! defined $inline;
+
+  my($endU,$rversion,$rcode,$rtext,$M)=$this->Get(1);
+  return () if ! defined $endU;	# fetch failed
+
+  my %urls;
+
+  $this->_URLsFromMIME($inline,$M,$urls);
+}
+
+sub _URLsFromMIME($$$$)
+{ my($this,$inline,$M,$urls)=@_;
+
+  my $type = $M->Type();
+  my $subtype = $M->SubType();
+
+  if ($type eq MULTIPART)
+  { my @M = $M->Parts();
+    
+    for my $subM (@M)
+    { $this->_URLsFromMIME($inline,$subM,$urls);
+    }
+
+    return;
+  }
+  
+  if ($type eq TEXT)
+  {
+    if ($subtype eq HTML)
+    { my $src = $M->BodySource(1,1);
+      cs::HTML::sourceURLs($urls,$src,$inline,$this);
+      return;
+    }
+  }
+
+  warn "$::cmd: ".$this->Text().":\n\tcan't parse [$type/$subtype]\n";
 }
 
 =item Proxy()
