@@ -336,7 +336,9 @@ sub tok2s	# ([indent,]sink,tok...)
 	  $subindent=$indent+2;
 	}
 
-	$sink->Put(_justtok2a($html));
+	my $justthetag=_justtok2a($html);
+	##warn "sink->Put($justthetag)";
+	$sink->Put($justthetag);
 	for (@{$html->{TOKENS}})
 	{ if (! defined)
 	  {
@@ -355,6 +357,7 @@ sub tok2s	# ([indent,]sink,tok...)
 	  { $sink->Put("\n".(" " x ($indent-1)));
 	  }
 
+	  ##warn "sink->Put(/uc($html->{TAG}))";
 	  $sink->Put('</'.uc($html->{TAG}).'>');
 	}
       }
