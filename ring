@@ -5,6 +5,7 @@
 #
 
 use POSIX;
+use Fcntl;
 
 ($cmd=$0) =~ s:.*/::;
 $usage="Usage: $cmd [-alLvV] [+l] [-f phonelist]... patterns...
@@ -88,7 +89,7 @@ sub phone
   if ($_ eq '-')
   { phonefile($_);
   }
-  elsif (-d $_)
+  elsif (-d "$_/.")
   { if (opendir(DIR,$_))
     { local(@entries)=readdir(DIR);
       close(DIR);
@@ -109,10 +110,74 @@ sub phone
   }
 }
 
+sub readphrase($)
+{ my($prompt)=@_;
+
+  return undef if ! -t STDIN || ! -t STDERR;
+  system("stty -echo");
+  print STDERR "$prompt: ";
+  my $phrase = <STDIN>;
+  system("stty echo");
+  return undef if ! defined $phrase;
+  print STDERR "\n";
+  chomp($phrase);
+  return undef if ! length $phrase;
+  return $phrase;
+}
+
+sub getgpgphrase()
+{ if (! $::_askedForGPG)
+  { $::_GPGPhrase=readphrase("Enter GPG pass phrase");
+    $::_askedForGPG=1;
+  }
+
+  return $::_GPGPhrase;
+}
+
+# return gpg command with fd for pass phrase
+# phrase stored in handle GPGPHRASEFD - close this after use
+sub gpgwith($)
+{ my($phrase)=@_;
+  
+  open(GPGPHRASEFD, "+>", undef) || die "$0: can't make temp file for pass phrase: $!";
+  my $oldout = select(GPGPHRASEFD); $|=1;
+  select($oldout);
+  print GPGPHRASEFD "$phrase\n" || die "$0: can't write passphrase to temp file: $!";
+  seek(GPGPHRASEFD,0,0) || die "$0: rewind of GPGPHRASEFD fails: $!";
+  sysseek(GPGPHRASEFD,0,0) || die "$0: rewind of GPGPHRASEFD fails: $!";
+  my $tmpfd = fileno(GPGPHRASEFD);
+  die "$0: fileno(GPGPHRASEFD) returns undef! \$! = $!" if ! defined $tmpfd;
+  ##fcntl(GPGPHRASEFD, Fcntl::F_SETFL(), 0) || die "$0: can't clear close-on-exec for GPGPHRASEFD: $!";
+  if ($tmpfd > $^F)
+  { warn "$cmd: raising \$^F to $tmpfd and retrying\n" if $^F > 2;
+    $^F = $tmpfd;
+    close(GPGPHRASEFD);
+    return gpgwith($phrase);
+  }
+
+  return "gpg --passphrase-fd $tmpfd";
+}
+
 sub phonefile
 { local($file)=@_;
 
-  if ($file =~ /\.pgp$/)
+  if ($file =~ /\.gpg$/)
+  { my $phr = getgpgphrase();
+    if (! defined $phr)
+    { warn "$cmd: skipping $file\n";
+      return;
+    }
+
+    my $gpgcmd = gpgwith($phr);
+    if (! open(PHONES, " set -x; exec $gpgcmd --decrypt <'$file' |"))
+    { if ($! != POSIX->EACCES)
+      { warn "$cmd: pgp -fd <$file: $!\n";
+      }
+      close(GPGPHRASEFD);
+      return;
+    }
+  }
+  elsif ($file =~ /\.pgp$/)
   { if (! $usepgp)
     { return;
     }
