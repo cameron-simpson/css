@@ -1,0 +1,12 @@
+#!/usr/bin/perl
+
+$ppid=getppid;
+srand(time^getpid^($ppid<<8)^($ppid>>8));
+
+for (1..8)
+	{ printf("%02x",rand(0xff));
+	}
+
+print "\n";
+
+exit 0;
