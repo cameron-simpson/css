@@ -436,11 +436,18 @@ sub cmpDatedRecords
   my $ea = $a->{END_DATE};
   my $eb = $b->{END_DATE};
 
-  return 0 if $ea eq $eb;
+  return 0 if defined($ea)
+	      ? defined($eb)
+		? $ea eq $eb
+		: 0
+	      : defined($eb)
+		? 0
+		: 1
+	      ;
 
   # catch open ended ranges
-  return 1 if ! length $eb;
-  return -1 if ! length $ea;
+  return 1 if ! defined $eb || ! length $eb;
+  return -1 if ! defined $ea || ! length $ea;
 
   $ea cmp $eb;
 }
