@@ -1,0 +1,3 @@
+#!/bin/sh
+# Background url mind.	- Cameron Simpson <cs@zip.com.au>
+urlmind ${1+"$@"} &
