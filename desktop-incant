@@ -8,3 +8,11 @@ idsetlist "${DESKTOPSET:-desktop}" name \
 | sed -e '/^[0-9]*	./!d' \
       -e 's/^\([0-9][0-9]*	\)\./\1/' \
       -e 's/^/DesktopName /'
+
+##echo "*FvwmBacker: Command (Desk *) colorset 1023"
+dfltbg=`rootbg` && echo "ColorSet 1023 AspectPixmap $dfltbg"
+
+( seq 0 63
+  idsetlist "${DESKTOPSET:-desktop}" rootbg
+) \
+| desktop-incant-bg
