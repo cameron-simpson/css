@@ -100,15 +100,14 @@ squid_redirect: $(noads)
 %.class-prereqs: %.java
 	javaprereqs $(@P).java >$@
 
-_tarballs: ../public/scripts.tar.gz ../public/cs.tar.gz
+_tarballs: ../public/css/scripts.tar.gz ../public/cs.tar.gz
 
-../public/scripts.tar.gz: $(allscripts)
 ../public/cs.tar.gz: $(pmset(cs))
 	:make _man
 	gnutar cf - $(pmset(cs)) -C $(MANDIR)/cs man3/$((pmsetmans(cs) G?F)) | gzip -v -9 >$@
 	chmod 644 $@
 
-../public/scripts.tar.gz: $(allscripts)
+../public/css/scripts.tar.gz: $(allscripts)
 	cd .. || exit 1 \
 	tar cvf - $(.F)/$((allscripts)) \\
 			$(.F)/synonyms $(.F)/stubs $(.F)/cs $(.F)/cgi-bin \\
