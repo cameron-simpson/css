@@ -6,6 +6,9 @@
 
 f=$VARRUN/ssh-agent-$HOST
 
+verbose=
+[ "x$1" = x-v ] && { verbose=1; shift; }
+
 [ -s "$f" ] \
 && v=`cat "$f"` \
 && [ -n "$v" ] \
@@ -13,3 +16,4 @@ f=$VARRUN/ssh-agent-$HOST
 && [ -n "$SSH_AGENT_PID" ] \
 && kill -0 "$SSH_AGENT_PID" 2>/dev/null \
 && echo "$v"
+&& { [ -z "$verbose" ] || ssh-add -l >&2; }
