@@ -1,0 +1,11 @@
+#!/bin/sh
+#
+# Pull my account form somewhere.
+#	- Cameron Simpson <cs@zip.com.au> 29jun2004
+#
+
+[ $# = 1 ] || { echo "Usage: $0 remotehost" >&2; exit 2; }
+remote=$1
+
+set -x
+exec syncacc "$remote" ''
