@@ -3,6 +3,9 @@
 # Format, newfs, chown etc to make up a filesystem on a Zip disc.
 #	- Cameron Simpson <cs@zip.com.au> 22nov96
 #
+
+: ${TMPDIR:=/tmp}
+
 FORMAT=${FORMAT-$HOME/etc/format.dat}
 export FORMAT
 
@@ -41,7 +44,7 @@ done
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
-fmtcmds=/tmp/mzfs$$
+fmtcmds=$TMPDIR/mzfs$$
 ( for cmd in partition select "$ptable" label print quit quit
   do echo "$cmd"
   done
