@@ -1,0 +1,107 @@
+#!/bin/sh
+#
+# Expects to be called from inside vm with input of the form
+#	itemnum author topic
+# - Cameron Simpson <cs@zip.com.au>
+#
+
+tmp=/tmp/vmdel.$$
+cat >$tmp || { rm -f $tmp; exit 1; }
+
+exec 3<$tmp
+rm -f $tmp
+exec >/dev/null 2>&1
+exec >/dev/tty 2>&1
+
+(
+  trap '' 1
+
+  cmd=`basename "$0"`
+  usage="Usage: $cmd [+mbox] [files...]
+	$cmd [-r] [-p pfx] addresses... [files...]"
+
+  cons=`logpath console`
+  exec >>"$cons" 2>&1
+
+  op=maildrop
+  drop=
+  case $cmd in
+      vmdel)	mbox=+deleted ;;
+      vmsav)	mbox=+saved ;;
+      vmfw)	op=fw ;;
+      vmfwr)	op=fw drop='( sed "1s/^From /From-: /" | /usr/lib/sendmail -oi $who )' ;;
+      *)	mbox=+in ;;
+  esac
+
+  badopts=
+  pfx=
+  rawopt=
+  while :
+  do
+      case $1 in
+	  +*)	mbox=$1 ;;
+	  -r)	rawopt=$1
+		[ $op = fw ] || { echo "$cmd: -r only useful with fw operation" >&2
+				  badopts=1
+				}
+		;;
+	  -p)	pfx="-p '$2'"; shift
+		[ $op = fw ] || { echo "$cmd: -p only useful with fw operation" >&2
+				  badopts=1
+				}
+		;;
+	  --)	shift; break ;;
+	  -?*)	echo "$cmd: unrecognised option: $1" >&2;
+		badopts=1
+		;;
+	  *)	break ;;
+      esac
+      shift
+  done
+
+  [ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+  who=
+  case $op in
+      fw) while :
+	  do  case $1 in
+		  *@*)	;;
+		  [0-9]*)break ;;
+		  '')	break ;;
+	      esac
+	      who="$who '$1'"
+	      shift
+	  done
+	  ;;
+  esac
+
+  if [ $# -eq 0 ]
+  then	while read num1 num2 etc
+	do  if [ -n "$num1" ]	# sh will read leading null word
+	    then num=$num1
+	    else num=$num2
+	    fi
+	    set x $* $num; shift
+	done
+  else
+	  set x `find "$@" -type f -print`; shift
+  fi
+
+  [ -z "$drop" ] && drop="fw +a $rawopt $pfx \$who"
+  for num
+  do if case "$op" in
+	  maildrop)	maildrop -s $mbox <$num ;;
+	  fw)		fwcmd="$drop <$num"
+			# echo "$fwcmd"
+			eval "(set -vx; $fwcmd)"
+			;;
+	esac
+     then
+	rm $num
+     else
+	echo "$cmd: $op $mbox fails, $num not removed" >&2
+     fi
+  done
+) <&3 3<&- &
+
+exit 0
