@@ -13,4 +13,4 @@ find . \
 	${1+"$@"} \
        -print \) \
 | sed 's;^\./;;' \
-| imsize
+| xxargs imsize
