@@ -80,6 +80,7 @@ sub conn(;$)
   my $hi = $C->GetLine();
   return () if ! defined $hi;
   chomp($hi);
+  $hi =~ s/\r$//;
   warn "<- $hi\n";
   if ($hi !~ /^20[01]/)
   { warn "$::cmd: cs::CDDB::conn: unwelcome greeting from server: $hi\n";
@@ -124,6 +125,7 @@ sub command
   $_=$C->GetLine();
   return () if ! defined || ! length;
   chomp;
+  s/\r$//;
   warn "<- $_\n";
   if (! /^(\d)(\d)(\d)\s*/)
   { warn "$::cmd: cs::CDDB::command(..,\"$command\"): bad response: $_\n";
@@ -137,6 +139,7 @@ sub command
   { ADDITIONAL:
     while (defined($_=$C->GetLine()) && length)
     { chomp;
+      s/\r$//;
       warn "<- $_\n";
       last ADDITIONAL if $_ eq ".";
       push(@additional,$_);
@@ -427,6 +430,16 @@ sub _Conn($)
   return $C;
 }
 
+=item SetDiscId(I<discid>)
+
+Set the CDDB disc id for this CD.
+
+=cut
+
+sub SetDiscId($$)
+{ $_[0]->{DISCID}=$_[1];
+}
+
 =item DiscId()
 
 Return the CDDB disc id for this CD
@@ -465,7 +478,7 @@ sub DiscId()
 =item Query()
 
 Match this disc against the database.
-Returns an array of hashrefs of the form B<[I<categ>,I<title>]>.
+Returns an array of hashrefs of the form B<[I<categ>,I<title>,I<discid>]>.
 Note that a single discid may match multiple database entries.
 
 =cut
@@ -487,13 +500,13 @@ sub Query($)
 
   my @matches;
 
-  if ($etc =~ /^close matches found/i)
+  if ($code =~ /^.1/)
   { for my $a (@additional)
-    { if ($a !~ /^(\S+)\s+$discid\s+/)
+    { if ($a !~ /^(\S+)\s+([a-f0-9]{8})\s+/)
       { warn "$::cmd: cs::CDDB: QUERY $discid: bad close match: $a\n";
       }
       else
-      { push(@matches,[$1,$']);
+      { push(@matches,[$1,$',$2]);
       }
     }
   }
@@ -502,7 +515,7 @@ sub Query($)
     { warn "$::cmd: cs::CDDB: QUERY $discid: bad exact match: $etc\n";
     }
     else
-    { push(@matches,[$1,$']);
+    { push(@matches,[$1,$',$discid]);
     }
   }
 
@@ -601,13 +614,23 @@ sub _Cache
 sub _CacheSave
 { my($this,$category,$discid,@lines)=@_;
 
-  my $file = cacheFile($category,$discid);
+  my $file = cachefile($category,$discid);
   if (! -s $file && open(CACHE,"> $file\0"))
   { for (@lines)
     { print CACHE $_, "\n";
     }
     close(CACHE);
   }
+}
+
+=item SetCategory(I<category>)
+
+Set the category of this disc.
+
+=cut
+
+sub SetCategory($$)
+{ $_[0]->{CATEGORY}=$_[1];
 }
 
 =item Category()
@@ -642,10 +665,10 @@ sub Category($)
   }
 
   if (@matches > 1)
-  { warn "$::cmd: cs::CDDB: multiple matches:\n";
-    for my $m (@matches)
-    { warn "\t$m->[0]\t$m->[1]\n";
-    }
+  { ## warn "$::cmd: cs::CDDB: multiple matches:\n";
+    ## for my $m (@matches)
+    ## { warn "\t$m->[0]\t$m->[1]\n";
+    ## }
     return undef;
   }
 
@@ -675,7 +698,7 @@ sub Artist()
   return undef if ! @e;
 
   for (@e)
-  { if (/^DTITLE=\s*(.*\S)\s+\/\s+/)
+  { if (m:^DTITLE=\s*([^/]*[^/\s])\s*\/\s*:)
     { $this->{ARTIST}=$1;
       $this->{TITLE}=$';
       return $1;
@@ -703,7 +726,7 @@ sub Title()
   return undef if ! @e;
 
   for (@e)
-  { if (/^DTITLE=\s(.*\S)\s+\/\s+/)
+  { if (m:^DTITLE=\s([^/]*[^\s/])\s*\/\s*:)
     { $this->{ARTIST}=$1;
       $this->{TITLE}=$';
       return $2;
