@@ -98,7 +98,7 @@ sub check($)
 
 =over 4
 
-=item new cs::Lock (I<key>,I<maxtries>)
+=item new cs::Lock (I<key>,I<maxtries>,I<silent>)
 
 Obtain a lock on the resource specified by I<key>.
 If I<maxtries> is greater than zero,
@@ -108,9 +108,11 @@ Successive attempts are separated by an increasing delay,
 up to a maximum.
 If I<maxtries> equals zero, try forever.
 If I<maxtries> is less than zero,
-return a lock obkject anyway (so that the current lock parameters may be queried).
+return a lock object anyway (so that the current lock parameters may be queried).
 If not supplied,
 I<maxtries> defaults to zero.
+If supplied and true, I<silent> specifies that locks delayed for a
+noticable amount of time are not reported to B<STDERR>.
 
 =cut
 
