@@ -5,4 +5,4 @@
 #	- Cameron Simpson <cs@zip.com.au> 02apr2003
 #
 
-exec idset -i screen -d "${HOST:-`hostname`}" ${1+"$@"}
+exec idset -i "screen-$HOST" ${1+"$@"}
