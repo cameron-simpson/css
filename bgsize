@@ -1,0 +1,28 @@
+#!/bin/sh
+#
+# Print out preferred root background image dimensions.
+#	- Cameron Simpson <cs@zip.com.au>
+#
+
+cmd=$0
+usage="Usage: $cmd [-v]
+	-v	Emit shell variable assignments to \$dx and \$dy."
+
+dovar=
+[ "x$1" = x-v ] && { dovar=1; shift; }
+
+[ $# = 0 ] || { echo "$usage" >&2; exit 2; }
+
+dx=${X11_BGX:-"$X11_X"}
+dy=${X11_BGY:-"$X11_Y"}
+[ -n "$dx" ] \
+|| { eval `xinfo`
+     dx=$xinfo_screen0_x
+     dy=$xinfo_screen0_y
+  }
+
+if [ $dovar ]
+then echo "dx=$dx"
+     echo "dy=$dy"
+else echo $dx $dy
+fi
