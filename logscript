@@ -11,6 +11,8 @@ usage="Usage: $cmd [-m msg] [-d logdir] logbase [{-c shcmd | cmd [args...]}]"
 : ${SHELL:=/bin/sh}
 
 logdir=$LOGDIR/sessions
+msg=
+nomsg=
 
 badopts=
 
@@ -19,6 +21,7 @@ do
   case "$1" in
     -d)	logdir=$2; shift ;;
     -m)	msg=$2; shift ;;
+    -M)	nomsg=1 ;;
     --)	shift; break ;;
     -?*)echo "$cmd: unrecognised option: $1" >&2; badopts=1 ;;
     *)	break ;;
@@ -49,7 +52,8 @@ fi
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
-[ -z "$BUGSYSTEMS" ] \
+[ $nomsg ] \
+|| [ -z "$BUGSYSTEMS" ] \
 || [ -n "$msg" ] \
 || msg=`readbugline` \
 || { echo "$cmd: empty message rejected" >&2; exit 1; }
@@ -96,7 +100,7 @@ script -a "$logfile"
 xit=$?
 [ -n "$popSHELLexec" ] && dlog "$HOST@$SYSTEMID: $wd: end   $popSHELLexec" &
 
-[ -n "$BUGSYSTEMS" ] && buglog "$msg" <"$logfile"
+[ $nomsg ] || { [ -n "$BUGSYSTEMS" ] && buglog "$msg" <"$logfile"; }
 gzip -v -9 "$logfile"
 
 exit $xit
