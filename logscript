@@ -14,7 +14,7 @@ logbase=$1; shift
 popshell=$HOME/scripts/popSHELL
 
 logfile=$logdir/$logbase-`datecode`
-
+logdir=`dirname "$logfile"`
 [ -d "$logdir/." ] || mkdir -p "$logdir" || exit 1
 
 { echo
