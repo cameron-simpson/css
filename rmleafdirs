@@ -1,0 +1,10 @@
+#!/bin/sh
+#
+# Clean out empty directories.
+#	- Cameron Simpson <cs@zip.com.au> 10apr2000
+#
+
+[ $# = 0 ] && set .
+set -x
+rmdir `find "$@" -type d -print|sort -r` 2>/dev/null
+sync
