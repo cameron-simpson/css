@@ -110,6 +110,17 @@ sub Clear
   }
 }
 
+=item Reset()
+
+Clear all the flags.
+
+=cut
+
+sub Reset($)
+{ my($this)=@_;
+  $$this=":";
+}
+
 =item Intersect(I<flags...>)
 
 Return a list of flags from I<flags>
