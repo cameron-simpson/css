@@ -6,24 +6,24 @@
 
 : ${PILOTPORT:=/dev/pilot}
 : ${USER:=`id -un`} || exit 1
-syncdir=$HOME/backup/palm
+: ${HOTSYNC_HISTBACKUP:=$HOME/backup/t5}
 export PILOTPORT USER
 
 cmd=`basename "$0"`
 
 needhost $HOMEHOST@home || exit 1
-[ -d "$syncdir/." ] || { echo "$cmd: $syncdir: not a directory" >&2; exit 1; }
+[ -d "$HOTSYNC_HISTBACKUP/." ] || { echo "$cmd: $HOTSYNC_HISTBACKUP: not a directory" >&2; exit 1; }
 [ -c "$PILOTPORT" ] || { echo "$cmd: $PILOTPORT: not a tty" >&2; exit 1; }
 id=`ls -ldL "$PILOTPORT" | awk '{print$3}'`
 [ "x$id" = "x$USER" ] || { echo "$cmd: $PILOTPORT: not owned by \"$USER\" (owner is $id)" >&2
 			   exit 1
 			 }
 
-histbackup --inplace --symlink LATEST "$syncdir" \
-|| { echo "$cmd: $syncdir: backup fails, aborting sync" >&2
+histbackup -x --inplace --symlink PREVIOUS "$HOTSYNC_HISTBACKUP" \
+|| { echo "$cmd: $HOTSYNC_HISTBACKUP: backup fails, aborting sync" >&2
      exit 1
    }
 
 echo
 set -x
-exec pilot-xfer -p "$PILOTPORT" -s "$syncdir/current"
+exec pilot-xfer -p "$PILOTPORT" -s "$HOTSYNC_HISTBACKUP/current"
