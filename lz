@@ -1,0 +1,427 @@
+#!/bin/sh
+#
+# =head1 NAME
+#
+# lz - print to postscript printers, doublesided with multiple pages to a sheet
+#
+# =head1 SYNOPSIS
+#
+# lz [options] [files...]
+#
+# =head1 DESCRIPTION
+#
+# I<lz> is a command for generating printouts for PostScript printers.
+# It accepts text, PDF or PostScript as input
+# and performs scaling and layout
+# to do things like use both sides of the paper and put multiple logical
+# pages on a surface.
+# It is intended to be used instead of the supplied
+# B<lp> or B<lpr> commands, which B<lz> itself calls to submit
+# the generated PostScript. This saves users having to switch command
+# sets when they switch platforms
+# and keeps the per-machine printer configurations very simple
+# as typically they need define only "pure PostScript" printer names.
+#
+
+printer=$PRINTER
+mpageargs=
+topsargs='-T "$arg"'
+pshufargs=
+filter=
+domessage=	# only works at UNSW CSE
+lpqflag=
+itype=any
+
+cmd=`exec basename "$0"`
+usage="Usage: $cmd [-Pprinter[/paper]] [-f filter]... [-q] [mpage-options] [--] [files...]
+
+	-Pprinter[/paper] Send to specified printer (default $printer).
+			Specifiable via \$PRINTER (currently \"$PRINTER\").
+			An optional PostScript papersize directive may be
+			included (eg a3).
+	-f filter	Run each file (or stdin) through filter, which may
+			include options. Multiple filters are connected by
+			pipes in the order supplied.
+	-q		Do an lpq of the printer after submitting the jobs.
+	+q		No lpq. (Default)
+	/pattern/	Highlight regular expression (only works for a2ps as
+			the postscript conversion).
+
+    Pshuf options:
+	-numbers	Shuffling order.
+	-o range	Only output pages in \"range\".
+	-r		Reverse pages.
+
+    Mpage options (defaults as per mpage):
+	-[1248]		1,2,4, or 8 logical pages per surface.
+	-d		Put dividers between logical pages.
+	-dh		Horizontal dividers only.
+	-dv		Vertical dividers only.
+	+d		No dividers.
+	-fg r,g,b	Set foreground colour to be the RGB value (r,g,b).
+	-fg g		Set foreground colour to be the grey value g.
+	-bg r,g,b	Set background colour to be the RGB value (r,g,b).
+	-bg g		Set background colour to be the grey value g.
+	-t tray		Select paper tray.
+	-L		Landscape mode.
+	-P		Portrait mode.
+	-D		Duplex mode - use both sides of the paper.
+	+D		No duplex mode - use only one side of the paper.
+	-T		Tumble mode - second side of page is upsidedown.
+	+T		No tumble.
+	-i type		Specify input type:
+			  ps or postscript	No text->PostScript conversion.
+			  pdf			Adobe PDF->PostScript.
+			  text			Force text->PostScript.
+			  mentor		Mentor Metafile.
+			  any			Guess from first line.
+	-C		Arrange pages in columns.
+	-R		Arrange pages in rows.
+	-r rows		Number of rows.
+	-c cols		Number of columns."
+
+#################################
+# Disabled/missing functionality.
+#
+#	-m message	Print message upon job completion. (Default)
+#	+m		No message.
+#	-lh [aff]	Produce letterhead on the first page.
+#			Use the affiliation \"aff\" if supplied.
+
+
+set x $LZOPTIONS ${1+"$@"}; shift
+
+# =head1 OPTIONS
+#
+# =over 4
+#
+
+badopts=
+while :
+do
+	case "$1" in
+
+		# =item B<-P>I<printer>[B</I<medium>>]
+		#
+		# Direct output to the specified I<printer>.
+		# The default is taken from
+		# the environment variable B<$PRINTER>.
+		# The printer named "B<->" means standard output.
+		# An optional I<medium> may be specified,
+		# in which case the corresponding PostScript paper medium
+		# directive will be inserted in the output
+		# (eg B</a4>, B</letter> etc).
+		#
+		-P?*)	printer=`expr "x$1" : 'x-P\(.*\)'` ;;
+
+		# =item B<-q>, B<+q>
+		#
+		# Display the print queue for the printer.
+		# B<+q>: don't display the queue (default).
+		#
+		-q)	lpqflag=1 ;;
+		+q)	lpqflag= ;;
+
+		# =item B<-t> I<tray>
+		#
+		# Request media from the specified I<tray> (numeric).
+		# Pretty obsolete these days;
+		# the B</I<medium>> option above is preferred.
+		#
+		-t)	mpageargs="$mpageargs $1 $2"; shift ;;
+
+		# =item B<-1>, B<-2>, B<-4>, B<-8>
+		#
+		# Generate output for 1, 2, 4 or 8 logical pages per sheet.
+		# These imply duplex mode and the appropriate tumble mode.
+		#
+		# =item B<-d>, B<-dv>, B<-dh>, B<+d>
+		#
+		# Put horizontals and vertical dividing lines
+		# between logical pages,
+		# verticals only, horizontals only, no dividers respectively.
+		#
+		# =item B<-D>, B<+D>
+		#
+		# Duplexmode: use both sides of the paper.
+		# B<+D>: don't use both sides.
+		#
+		# =item B<-T>, B<+T>
+		#
+		# Tumblemode: second sheet is upside down.
+		# B<+T>: no tumble.
+		#
+		# =item B<-R>
+		#
+		# Arrange logical pages in rows (the default).
+		#
+		# =item B<-C>
+		#
+		# Arrange logical pages in columns.
+		#
+		-[1248dDTRC] | +[dDT] | -d[hv])
+			mpageargs="$mpageargs $1" ;;
+
+		# =item B<-L>
+		#
+		# Presume input data is in landscape format.
+		#
+		# =item B<-P>
+		#
+		# Presume input data is in portrait format (the default).
+		#
+		-[LP])	mpageargs="$mpageargs $1"
+			topsargs="$topsargs $1"
+			;;
+
+		# =item B<-c> I<columns>
+		#
+		# Generate I<columns> columns of logical pages.
+		#
+		# =item B<-r> I<rows>
+		#
+		# Generate I<rows> rows of logical pages.
+		#
+		# =item B<-fg> {I<colour>|I<r>B<,>I<g>B<,>I<b>}
+		#
+		# Set the default foreground I<colour>
+		# (or I<r>ed/I<g>reen/I<b>lue tuple).
+		# Useful for printing overheads.
+		#
+		# =item B<-bg> {I<colour>|I<r>B<,>I<g>B<,>I<b>}
+		#
+		# Set the default background I<colour>
+		# (or I<r>ed/I<g>reen/I<b>lue tuple).
+		# Useful for printing overheads.
+		# B<black> tends to mean transparent in this context.
+		#
+		-[rc]|-[fb]g)
+			mpageargs="$mpageargs $1 $2"; shift ;;
+
+## UNSW only
+#		-lh)	mpageargs="$mpageargs -1"
+#			case "$2" in
+#			    -*)	aff= ;;
+#			    *)	aff="-aff '$2'"; shift ;;
+#			esac
+#			filter="$filter lh $aff |"
+#			;;
+
+## UNSW lpr only
+##		-m)	domessage=1 message=$2; shift ;;
+##		+m)	domessage= ;;
+
+
+		# =item B<-o> I<output-pages>
+		#
+		# Emit only the logical pages specified by I<output-pages>.
+		# This is a comma separated list of page numbers or ranges
+		# of page numbers
+		# (eg B<1,2,5-8>).
+		#
+		-o)	pshufargs="$pshufargs -o $2"; shift ;;
+
+		# =item B<-O> I<shuffle-pages>
+		#
+		# Accept a comma separated list of numbers.
+		# Shuffle input pages into that order.
+		# Missing numbers in the sequence are added at the end.
+		#
+		-O)	pshufargs="$pshufargs -O $2"; shift ;;
+
+		# =item B<-r> 
+		#
+		# Reverse the order of the logical pages.
+		#
+		-r)	pshuftargs="$pshufargs $1" ;;
+
+		# =item B<-f> I<filter>
+		#
+		# Insert the I<filter>, which must be a shell command,
+		# at the front of the pipeline.
+		#
+		-f)	case "$2" in
+			    '')	echo "$cmd: -f requires a filter" >&2
+				badopts=1
+				;;
+			    *)	filter="$filter $2 |"
+				shift
+				;;
+			esac
+			;;
+
+		# =item B<-i> I<type>
+		#
+		# Treat the input as being of the named I<type>.
+		# Known types are B<any>
+		# (the default: guess the type from the first line),
+		# B<ps> and B<postscript>, B<pdf>, B<mentor>, and B<text>.
+		#
+		-i)	itype=$2; shift ;;
+		-i*)	itype=`expr "x$1" : 'x-i\(.*\)'` ;;
+		--)	shift; break;;
+		-?*|+?*) echo "$cmd: unknown option '$1'" >&2; badopts=1 ;;
+		/*/)	regexp=`expr "x$1" : '^x/\(.*\)/$'`
+			filter="highlight '$regexp' | $filter" ;;
+		*)	break;;
+	esac
+	shift
+done
+
+# =back
+#
+
+# insert pshuf if required
+[ -n "$pshufargs" ] && filter="pshuf $pshufargs | $filter"
+
+# maybe add common image format conversions?
+case "$itype" in
+    any)
+	filter="2ps \$topsargs -T \"\$arg\" | $filter"
+	;;
+    ps|postscript)
+	;;
+    pdf)
+	filter="pdf2ps | $filter"
+	;;
+    text)
+	filter="2ps \$topsargs -f | $filter"
+	;;
+    mentor)
+	filter="mentor2ps | $filter"
+	;;
+    *)	echo "$cmd: unknown input type \"$itype\"" >&2
+	badopts=1
+	;;
+esac
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+# ensure env is set up
+[ -n "$SYSTEMID" ] || . /opt/shell/STANDARD
+
+[ -n "$printer" ] || { echo "$cmd: no -Pprinter and no \$PRINTER: aborting!" >&2
+		       exit 1
+		     }
+
+# multisheeting
+[ -n "$mpageargs" ] && filter="$filter mpage \$mpageargs |"
+
+## UNSW lpr only
+## case "$#,$domessage" in
+## 	0,0)	msgflag='-m"$cmd"' ;;
+## 	*,0)	msgflag='-m"$cmd: $arg"' ;;
+## 	0,1)	msgflag='-m"$message"' ;;
+## 	*,1)	msgflag='-m"$message: $arg"' ;;
+## 	*,)	msgflag= ;;
+## esac
+
+xit=0
+
+tmp=
+if [ $# = 0 ]
+then
+	tmp="/tmp/$cmd.$$"
+	cat >"$tmp"
+	set "$tmp"
+fi
+
+# catch paper type
+case "$printer" in
+    */*)	paper=`expr "x$printer" : 'x.*/\(.*\)'`
+		printer=`expr "x$printer" : 'x\(.*\)/.*'`
+		;;
+    *)		paper=
+		;;
+esac
+
+case $SYSTEMID in
+    cisra)
+	lp='/opt/LPRng/bin/lpr "-P$printer"' ;;
+    *)
+	case "$OS" in
+	    solaris)
+		lp='lp -d "$printer" -T postscript' ;;
+	    sunos|linux)
+		lp='lpr "-P$printer"' ;;
+	    *)	echo "$cmd: warning: unknown \$OS \"$OS\" - assuming sysv" >&2
+		lp='lp -d "$printer" -T postscript'
+		;;
+	esac
+	;;
+esac
+
+if [ "x$printer" = x- ]
+then  lp=cat
+fi
+
+# insert paper setting outside postscript
+[ -n "$paper" ] && lp="( echo \"\$paper\"; cat ) | $lp"
+
+for arg
+do
+    ## [ "x$itype" = xmentor ] && set -x
+    eval "$filter $lp" <"$arg" &
+    ## set +x
+done
+
+[ -z "$tmp" ] || ( sleep 2; rm "$tmp" ) || xit=$?
+
+[ -z "$lpqflag" ] || lpq "$printer" -l || xit=$?
+
+exit $xit
+
+# =head1 CAVEATS
+#
+# Command line options are processed left to right
+# (preceeded by any options in the B<$LZOPTIONS> environment variable).
+# Thus order can matter.
+# For example, the B<-4> option sets 4 pages to a sheet,
+# deactivates the landscape setting and deactivates tumblemode.
+# Thus the B<-L> and B<-T> options should succeed this option
+# if both are used.
+#
+# =head1 EXAMPLES
+#
+# =over 4
+#
+# =item lz -Psuper/a3 foo.ps
+#
+# Print the postscript file B<foo.ps> on the printer B<super> with A3 paper,
+# double sided.
+#
+# =item lz -P- foo.pdf | gv -
+#
+# Convert the PDF file B<foo.pdf> to PostScript and view with the B<gv> program.
+#
+# =item lz -i text foo.ps
+#
+# Print the PostScript file B<foo.ps> as text (i.e. you want to print the
+# PostScript itself, not render it).
+#
+# =item LZOPTIONS='-4 -C -dv'; export LZOPTIONS
+#
+# Arrange that by default, B<lz> will print 4 pages to a sheet,
+# arranged in columns (instead of the default: rows) with only
+# vertical dividers.
+# I find this handy for almost everything,
+# especially web pages.
+#
+# =item lz -o10-19 foo.pdf
+#
+# Print pages 10 through 19 of the PDF file B<foo.pdf>.
+#
+# =item wide-report | lz -L
+#
+# Print the output of B<wide-report> in landscape mode.
+# 
+# =back
+#
+# =head1 SEE ALSO
+#
+# mpage(1), pshuf(1), 2ps(1), a2ps(1), acroread(1)
+#
+# =head1 AUTHOR
+#
+# Cameron Simpson E<lt>cs@zip.com.auE<gt> January 1992
+#
