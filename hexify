@@ -1,0 +1,23 @@
+#!/usr/bin/perl
+
+use strict vars;
+
+my $nopcnt = 1;
+
+if (@ARGV && $ARGV[0] eq '-%')
+{ $nopcnt=1;
+  shift(@ARGV);
+}
+elsif (@ARGV && $ARGV[0] eq '+%')
+{ $nopcnt=0;
+  shift(@ARGV);
+}
+
+my $saferange='-=.\w:@/?~#+&';
+$saferange.='%' if $nopcnt;
+
+while (defined ($_=<STDIN>))
+{ chomp;
+  s|[^$saferange]|sprintf("%%%02x",ord($&))|ego;
+  print $_, "\n";
+}
