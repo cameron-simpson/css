@@ -22,7 +22,7 @@ cp "$script" "$old" || exit $?
 sed 's/$/ | \\/
      $s|...$|) nurl=$STUBURL ;;|
      s/^/	/' < "$patterns" \
-| replace -f '#### BEGIN AUTO ADZAP LIST' \
+| rlr -f '#### BEGIN AUTO ADZAP LIST' \
 	  -t '#### END AUTO ADZAP LIST' \
 	  -i "$script" \
 	  -o "$script" \
