@@ -8,17 +8,17 @@ use strict qw(vars);
 
 BEGIN { use cs::DEBUG; cs::DEBUG::using(__FILE__); }
 
+use cs::Misc;
+
 # in case
-$ENV{MAILDIR}="$ENV{HOME}/etc/mail" unless defined $ENV{MAILDIR};
-$ENV{MAILRCDIR}="$ENV{HOME}/etc/rc/mail" unless defined $ENV{MAILRCDIR};
+$ENV{MAILDIR}="$ENV{HOME}/private/mail" unless defined $ENV{MAILDIR};
+$ENV{MAILRCDIR}="$ENV{HOME}/rc/mail" unless defined $ENV{MAILRCDIR};
 
 package cs::Mail::Misc;
 
-use cs::Shell;
-
 # munch those [font?[QB]blah] encodings
-sub decodeFontisation
-{ local($_)=shift;
+sub decodeFontisation($)
+{ local($_)=@_;
 
   s/=\?([-\w]+)\?([QB])\?(.+)\?=/
       (lc($1) eq 'iso-8859-1' ? "" : "[$1 ")
@@ -39,17 +39,17 @@ sub decodeFontisation
 sub unFontisehdr
 { my($H,$hdr)=@_;
 
-  my $oBody = $::H->Hdr($hdr);
+  my $oBody = $H->Hdr($hdr);
   my $Body;
 
   $Body=decodeFontisation($oBody);
   if ($Body ne $oBody)
-  { $::H->Add($hdr,$Body,SUPERCEDE);
+  { $H->Add($hdr,$Body,SUPERCEDE);
     ## warn "change $hdr: line from [$oBody] to [$Body]\n";
   }
 }
 
-sub normaddr
+sub normaddr($)
 { local($_)=@_;
 
   my($oa)=$_;
@@ -84,6 +84,76 @@ sub normaddr
   }
 
   $_;
+}
+
+sub smtpsend
+{ my($src,@addrs)=@_;
+
+  ::need(Net::SMTP);
+
+  my $host = defined $ENV{SMTPSERVER} && length $ENV{SMTPSERVER}
+	   ? $ENV{SMTPSERVER}
+	   : 'smtp'	# guess
+	   ;
+
+  my $ok = 1;
+
+  my @pw = getpwuid($<);
+  if (! @pw)
+  { warn "$::cmd: can't look up passwd entry for uid $<: $!\n";
+    $ok=0;
+  }
+  else
+  { my $smtp = Net::SMTP->new($host);
+
+    if (! $smtp->mail($pw[0]))
+    { warn "$::cmd: problem announcing sender \"$pw[0]\"\n";
+      $ok=0;
+    }
+    else
+    {
+      ADDR:
+      for my $addr (@addrs)
+      {
+	if (! $smtp->to($addr))
+	{ warn "$::cmd: problems with address $addr\n";
+	  $ok=0;
+	}
+      }
+    }
+
+    if ($ok)
+    {
+      if (! $smtp->data())
+      { warn "$::cmd: can't commence sending data\n";
+	$ok=0;
+      }
+      else
+      {
+	local($_);
+
+	DATUM:
+	while (defined($_=$src->GetLine()) && length)
+	{ if (! $smtp->datasend($_))
+	  { warn "$::cmd: trouble sending data\n";
+	    $ok=0;
+	    last DATUM;
+	  }
+	}
+	if ($ok && ! $smtp->datasend())
+	{ warn "$::cmd: trouble ending data\n" if $ok;
+	  $ok=0;
+	}
+      }
+    }
+
+    if (! $smtp->quit())
+    { warn "$::cmd: tourble QUITting\n";
+      $ok=0;
+    }
+  }
+
+  return $ok;
 }
 
 1;
