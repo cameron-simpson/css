@@ -16,17 +16,17 @@ package cs::RemappedHash;
 @cs::RemappedHash::ISA=(cs::HASH);
 
 sub remapped
-	{
-	  my($thisHash)={};
+{
+  my($thisHash)={};
 
-	  my($obj)=tie (%$thisHash, cs::RemappedHash, @_);
-	  die "$::cmd: TIEHASH(..,cs::RemappedHash,@_) fails"
-		if ! defined $obj;
+  my($obj)=tie (%$thisHash, cs::RemappedHash, @_);
+  die "$::cmd: TIEHASH(..,cs::RemappedHash,@_) fails"
+	if ! defined $obj;
 
-	  wantarray
-		? ($thisHash,$obj)
-		: $thisHash;
-	}
+  wantarray
+	? ($thisHash,$obj)
+	: $thisHash;
+}
 
 # make an object to remap %$otherHash
 #
@@ -48,37 +48,37 @@ sub remapped
 #     It is mandatory for the third case for $mapping.
 #
 sub TIEHASH
-	{ my($class,$otherHash,$mapping,$keysfn,@mapArgs)=@_;
-	  die "no otherHash!" if ! defined $otherHash;
-	  die "otherHash should be a hash ref!" if ! ref $otherHash
-						|| ::reftype($otherHash) ne HASH;
-	  die "no mapping!" if ! defined $mapping;
+{ my($class,$otherHash,$mapping,$keysfn,@mapArgs)=@_;
+  die "no otherHash!" if ! defined $otherHash;
+  die "otherHash should be a hash ref!" if ! ref $otherHash
+					|| ::reftype($otherHash) ne HASH;
+  die "no mapping!" if ! defined $mapping;
 
-	  if (! ref $mapping)
-		# assume on field name
-		{ unshift(@mapArgs,$mapping);
-		  $mapping=\&_MapByField;
-		  $keysfn=\&_KeysByField if ! defined $keysfn;
-		}
-	  elsif (::reftype($mapping) eq HASH)
-		# assume key => otherKey table
-		{ unshift(@mapArgs,$mapping);
-		  $mapping=\&_MapByTable;
-		  $keysfn=\&_KeysByTable if ! defined $keysfn;
-		}
+  if (! ref $mapping)
+  # assume on field name
+  { unshift(@mapArgs,$mapping);
+    $mapping=\&_MapByField;
+    $keysfn=\&_KeysByField if ! defined $keysfn;
+  }
+  elsif (::reftype($mapping) eq HASH)
+  # assume key => otherKey table
+  { unshift(@mapArgs,$mapping);
+    $mapping=\&_MapByTable;
+    $keysfn=\&_KeysByTable if ! defined $keysfn;
+  }
 
-	  my($this);
+  my($this);
 
-	  $this=bless { OTHER	=> $otherHash,
-			MAPFN	=> $mapping,
-			KEYSFN	=> $keysfn,
-			MAPARGS	=> [ @mapArgs ],
-			CACHED	=> {},
-		      }, $class;
+  $this=bless { OTHER	=> $otherHash,
+		MAPFN	=> $mapping,
+		KEYSFN	=> $keysfn,
+		MAPARGS	=> [ @mapArgs ],
+		CACHED	=> {},
+	      }, $class;
 
-	  # warn "this=".cs::Hier::h2a($this,1);
-	  $this;
-	}
+  # warn "this=".cs::Hier::h2a($this,1);
+  $this;
+}
 
 sub EXISTS
 	{ my($this,$key)=@_;
