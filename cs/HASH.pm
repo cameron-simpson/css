@@ -19,7 +19,7 @@ use cs::BaseClass;
 
 package cs::HASH;
 
-@cs::HASH::ISA=(cs::BaseClass);
+@cs::HASH::ISA=qw(cs::BaseClass);
 
 # locate an entry in a hash
 sub findEntry
@@ -41,7 +41,10 @@ sub findEntry
   undef;
 }
 
-sub DESTROY	{ SUPER::DESTROY(@_); }
+sub DESTROY
+{ my($this)=shift;
+  $this->SUPER::DESTROY(@_);
+}
 
 sub CLEAR($)
 { my($this)=@_;
