@@ -9,6 +9,9 @@ usage="Usage: $cmd [+l] {ALL | hosts...}"
 
 badopts=
 
+chain_in=FW_INPUT
+chain_out=FW_OUTPUT
+
 dolog=1
 [ "x$1" = x+l ] && { dolog=; shift; }
 
@@ -17,17 +20,17 @@ dolog=1
 if [ "x$*" = xALL ]
 then
     set -x
-    iptables -I INPUT -j ACCEPT
-    iptables -I OUTPUT -j ACCEPT
-    [ $dolog ] && iptables -I INPUT -p tcp --syn -j LOGACCEPT
-    [ $dolog ] && iptables -I OUTPUT -p tcp --syn -j LOGACCEPT
+    iptables -I "$chain_in" -j ACCEPT
+    iptables -I "$chain_out" -j ACCEPT
+    [ $dolog ] && iptables -I "$chain_in" -p tcp --syn -j LOGACCEPT
+    [ $dolog ] && iptables -I "$chain_out" -p tcp --syn -j LOGACCEPT
 else
     set -x
     for host
     do
-      iptables -I INPUT -s "$host" -j ACCEPT
-      iptables -I OUTPUT -d "$host" -j ACCEPT
-      [ $dolog ] && iptables -I INPUT -s "$host" -p tcp --syn -j LOGACCEPT
-      [ $dolog ] && iptables -I OUTPUT -d "$host" -p tcp --syn -j LOGACCEPT
+      iptables -I "$chain_in" -s "$host" -j ACCEPT
+      iptables -I "$chain_out" -d "$host" -j ACCEPT
+      [ $dolog ] && iptables -I "$chain_in" -s "$host" -p tcp --syn -j LOGACCEPT
+      [ $dolog ] && iptables -I "$chain_out" -d "$host" -p tcp --syn -j LOGACCEPT
     done
 fi
