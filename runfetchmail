@@ -39,7 +39,7 @@ do
 	-e "$expunge" \
 	--logfile "$logfile" \
 	--nobounce --tracepolls --warnings 86400 \
-	$fmopts ${1+"$@"} $fmhosts
+	$fmopts $RUNFETCHMAIL_FMOPTS ${1+"$@"} $fmhosts
   echo `date`: fetchmail done | tee -a "$logfile" >&2
   killpidfile getmail_flush.pid
 
