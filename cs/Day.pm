@@ -23,6 +23,8 @@ package cs::Day;
 sub new
 { my($class,$ymd,$givenlocaltime)=@_;
   $givenlocaltime=1 if ! defined $givenlocaltime;
+
+  {my@c=caller;warn "OBSOLETE: new cs::Day($ymd,$givenlocaltime) from [@c]\n\tuse cs::DMY instead\n\t"};
   
   ## {my(@c)=caller;warn "new cs::Day $ymd from [@c]";}
 
@@ -34,11 +36,13 @@ sub new
 sub newgmt
 { my($class,$gmt)=@_;
   $gmt=time if ! defined $gmt;
+  {my@c=caller;warn "OBSOLETE: newgmt cs::Day($gmt) from [@c]\n\tuse cs::DMY(gmt) instead\n\t"};
   scalar(new cs::Day ((new cs::Date $gmt)->DayCode()));
 }
 
 sub Code
-{ shift->DayCode(@_);
+{ my($this)=shift;
+  $this->DayCode(@_);
 }
 
 sub Prev
