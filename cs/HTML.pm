@@ -285,15 +285,15 @@ sub tok2s	# ([indent,]sink,tok...)
 
 	## warn "INCLUDE($src)";
 	if (defined ($is=_openSrc($src)))
-	      {
-		local($_);
+	{
+	  local($_);
 
-		while (defined ($_=$is->Read()) && length)
-		      { $sink->Put($_);
-		      }
+	  while (defined ($_=$is->Read()) && length)
+	  { $sink->Put($_);
+	  }
 
-		undef $is;
-	      }
+	  undef $is;
+	}
 	else
 	{ tok2s($indent,$sink,
 		      [A, {HREF => $src},
