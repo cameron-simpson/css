@@ -1,25 +1,50 @@
 #!/usr/bin/perl
 #
 # Take a fontised string as appears in Subject: lines and attachment descriptions
-# and convert it to raw form.
+# and convert it to raw form. See RFC2047.
 #	- Cameron Simpson <cs@zip.com.au> 01feb2002
 #
 
 ($::cmd=$0) =~ s:.*/::;
+$::Usage="Usage: $::cmd [-r regexp] [strings...]
+	-r regexp	Only modify strings matching regexp (case insensitive).
+			Pass others through unchanged.
+			Intended for modifying particular header lines.
+";
+
+my $regexp;
+
+{ my $badopts = 0;
+
+  if (@ARGV && $ARGV[0] eq '-r')
+  { shift(@ARGV);
+    if (! @ARGV)
+    { warn "$::cmd: missing regexp\n";
+      $badopts=1;
+    }
+    else
+    { $regexp=shift(@ARGV);
+    }
+  }
+
+  die $::Usage if $badopts;
+}
 
 if (@ARGV)
 { for my $arg (@ARGV)
-  { $arg=unfontise($arg);
+  { $arg=unfontise($arg) if !defined($regexp) || $arg =~ /$regexp/oi;
     print "$arg\n";
   }
 }
 else
-{ my $arg = <STDIN>;
-  die "$::cmd: expected string on stdin\n" if ! defined $arg;
-  chomp($arg);
+{
+  my $arg;
 
-  $arg=unfontise($arg);
-  print "$arg\n";
+  while (defined($arg=<STDIN>))
+  { chomp($arg);
+    $arg=unfontise($arg) if !defined($regexp) || $arg =~ /$regexp/oi;
+    print "$arg\n";
+  }
 }
 
 exit 0;
