@@ -410,20 +410,20 @@ sub _a2array	# string -> (\@array,unparsed)
   my($el,$tail);
 
   while (length && ! /^\]/)
-	{ ($el,$tail)=&_a2h($_);
-	  if (! defined $el)
-		{ warn "$::cmd: _=[$_]\nsyntax error, returning undef from _a2array";
-		  return undef;
-		}
+  { ($el,$tail)=&_a2h($_);
+    if (! defined $el)
+    { warn "$::cmd: _=[$_]\nsyntax error, returning undef from _a2array";
+      return undef;
+    }
 
-	  push(@$a,$el);
-	  $_=$tail;
-	  s/^\s*,?\s*//;
-	}
+    push(@$a,$el);
+    $_=$tail;
+    s/^\s*,?\s*//;
+  }
 
   if (/^\]/)
-	{ $_=$';
-	}
+  { $_=$';
+  }
 
   ($a,$_);
 }
