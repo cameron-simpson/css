@@ -204,10 +204,11 @@ sub service	# [port] -> socket
   { $laddrpart="INADDR_ANY";
     $laddr=Socket::INADDR_ANY;
   }
-  my($local)=scalar(Socket::sockaddr_in($port,$laddr));
 
   $port=cs::Net::portNum($port,TCP);
   return undef if ! defined $port;
+
+  my($local)=scalar(Socket::sockaddr_in($port,$laddr));
 
   my($sockf)=_sockHandle();
   if (! socket($sockf,Socket::PF_INET,Socket::SOCK_STREAM,$cs::Net::TCP::TCP))
