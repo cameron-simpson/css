@@ -280,7 +280,7 @@ fi
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
 [ $noenv ] \
-|| { [ -s "$RUNMAINT_ETC/env" ] && { $traceon; . "$RUNMAINT_ETC/env"; $traceoff; }; }
+|| { [ -s "$RUNMAINT_ETC/env" ] && . "$RUNMAINT_ETC/env"; }
 
 xit=0
 
@@ -351,7 +351,7 @@ runscript()
 	  ;;
   esac
 
-  ( [ -n "$_rp_env" ] && { $traceon; . "$_rp_env"; $traceoff; }
+  ( [ -n "$_rp_env" ] && . "$_rp_env"
     [ $_rs_merge ] && exec 2>&1
     exec sh $xflag "$_rs"
   ) \
