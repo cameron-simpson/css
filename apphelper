@@ -1,7 +1,8 @@
 #!/bin/sh
 #
-# Generic wrapper for web data, offering save or view.
-#	- Cameron Simpson <cs@zip.com.au> 18jun1998
+# =head1 NAME
+#
+# apphelper - a generic wrapper for email attachments or web browser file helpers, offering both save and view choices
 #
 
 ## tty=/dev/ttyp2
@@ -12,9 +13,9 @@
 
 # short circuit the make-a-tty-window stuff
 case $1 in
-    -t)	shift; set -x; exec term +a +ip -small -e sane "$0" +t ${1+"$@"} ;;
+    -t)	shift; set -x; exec term +a +ip -small -e "$0" +t ${1+"$@"} ;;
     +t) shift ;;
-    *)  [ -t 0 -a -t 1 ] || exec term +a +ip -small -e sane "$0" +t ${1+"$@"} ;;
+    *)  [ -t 0 -a -t 1 ] || exec term +a +ip -small -e "$0" +t ${1+"$@"} ;;
 esac
 
 savedir=${SAVEDIR-$HOME/dl}
@@ -22,6 +23,10 @@ savedir=$HOME/dl
 pager=${PAGER:-less}
 doview=
 
+# =head1 SYNOPSIS
+#
+# apphelper [-t] file [-y] [-d savedir] viewer [viewer-args...]
+#
 cmd=`basename "$0"`
 usage="Usage: $cmd [-t] file [-y] [-d savedir] viewer [viewer-args...]
 	-t		Run apphelper in a new terminal window.
@@ -30,6 +35,18 @@ usage="Usage: $cmd [-t] file [-y] [-d savedir] viewer [viewer-args...]
 	-d savedir	Save directory (from \$SAVEDIR: $savedir).
 	-p pager	Pager (default viewer, from \$PAGER: $pager)."
 
+# =head1 DESCRIPTION
+#
+# Apphelper is a generic handler for a file.
+# It was originally coded for use with netscape and mozilla
+# which persist in directly opening files they have handlers for,
+# offering no handy "save as?" accompaniment.
+# This was particularly aggravating for PDF files,
+# which I often want to keep around for later perusal.
+#
+# Apphelper offers to view the file with the named viewer
+# and after viewing, to save the file in a location of your choice.
+#
 badopts=
 if [ $# = 0 ]
 then  echo "$cmd: missing file" >&2; badopts=1
@@ -41,10 +58,44 @@ else
 	badopts=1
   fi
 
+  # =head2 OPTIONS
+  #
+  # =over 4
+  #
+  # =item -t
+  #
+  # Open an fresh terminal window in which to run apphelper.
+  # Generally desirable when invoking inside a GUI web browser.
+  # This is default behaviour if either standard input
+  # or standard output
+  # is not connected to a terminal.
+  #
+  # =term +t
+  #
+  # Do not open a terminal window.
+  # 
+
   while :
   do  case $1 in
+	  # =item -d I<directory>
+	  #
+	  # Specify a default directory in which to save files.
+	  # Lacking this, use the value of the envvar B<$SAVEDIR>
+	  # or B<$HOME/dl> if that is not set.
+	  #
 	  -d)	savedir=$2; shift ;;
+	  # =item -p I<pager>
+	  #
+	  # Specify the preferred pager program.
+	  # lacking this, use the value of the envvar B<$PAGER>
+	  # or the program less(1) if that is not set.
+	  #
 	  -p)	pager=$2; shift ;;
+	  # =item -y
+	  #
+	  # Yes: always run the viewer program.
+	  # The default is to ask first.
+	  #
 	  -y)	doview=1 ;;
 	  --)	shift; break ;;
 	  -?*)	echo "$cmd: unrecognised option: $1" >&2; badopts=1 ;;
@@ -54,15 +105,46 @@ else
   done
 fi
 
+# =back
+#
+
 [ $# = 0 ] && { set x $pager; shift; }
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
 fbase=`basename "$file"`
-
 export file fbase
 
 file "$file"; echo
+
+# =head1 OPERATION
+#
+# =head2 Viewing The File
+#
+# Apphelper first asks whether to view the file,
+# offering the supplied view command in [square brackets]
+# as the default.
+# Pressing return or entering "B<y>" or "B<yes>' accepts this default and runs the viewer.
+# Entering "B<n>" or "B<no>" skips running the viewer.
+# Other answers are taken to be the name (and optional arguments) of a viewing program.
+#
+# If the viewer has a nonzero exit code (failure)
+# then this is reported and the user is prompted for an alternative viewing program.
+# Pressing return or entering "B<n>" or "B<no>" skips the second attempt.
+# Other answers are taken to be the name (and optional arguments) of a viewing program.
+#
+
+if [ ! $doview ]
+then
+    necho "View [$*]? "
+    read viewit || exit 0
+    case "$viewit" in
+	''|y|yes)	doview=1 ;;
+	n|no)		doview= ;;
+	*)		set x $viewit "$file"; shift
+			doview=1 ;;
+    esac
+fi
 
 if [ $doview ]
 then
@@ -75,16 +157,46 @@ then
 	    *)		$viewit "$file" ;;
 	 esac
        }
-else
-    necho "View [$*]? "
-    read viewit || exit 0
-    case "$viewit" in
-	''|y|yes)	"$@" "$file" ;;
-	n|no)	;;
-	*)		$viewit "$file" ;;
-    esac
 fi
 
+# =head2 Saving The File
+#
+# After the view phase
+# apphelper offers to save the file
+# with the default pathname in [square brackets].
+# Pressing return or entering "B<n>" or "B<no>" skips the save.
+# Entering "B<y>" or B"<yes>" saves the file under the supplied filename.
+# Other answers are taken to be a different filename under which to save the file.
+#
+# If the file is to be saved
+# then the save filename is examined.
+# If it starts with a tilde ("~")
+# then the leading B<~> or B<~>I<username> is replaced with the approriate
+# home directory path.
+# Relative pathnames are taken to be relative to the default save directory.
+#
+# If there is a percent ("%") present
+# then the rightmost precent is replaced with the basename of the attachment name.
+# This is useful for repairing truncated filenames on attachments.
+#
+# If the filename points at a directory
+# then the file is saved inside that directory
+# with the basename of the attachment name.
+#
+# If the filename ends in a dash ("-")
+# then the basename of the attachment name is appended.
+# This is useful for attaching a prefix to some poorly chosen
+# generic attachment name (like "10.pdf").
+#
+# If after all this the target filename already exists
+# then the two files are compared.
+# If they are the same
+# then no action is taken.
+# if they differ
+# the then new file is copied onto the existing with via cp(1)
+# with the B<-i> option,
+# leaving it up to cp(1) to ask questions.
+#
 necho "Save [$savedir/$fbase]? "
 read saveas || exit 0
 case "$saveas" in
@@ -97,6 +209,16 @@ esac
 
 [ -n "$saveas" ] || exit 0
 
+# %foo -> filefoo
+case "$saveas" in
+    *%*)	pre=`expr "x$saveas" : 'x\(.*\)%.*'`
+		post=`expr "x$saveas" : 'x.*%\(.*\)'`
+		saveas=$pre$fbase$post
+		;;
+esac
+
+# dir -> dir/file
+# foo- -> foo-file
 case $saveas in
     */|*-)	saveas=$saveas$fbase ;;
 esac
@@ -108,4 +230,26 @@ parent=`dirname "$saveas"`
 
 [ -s "$saveas" ] && cmp -s "$file" "$saveas" && exit 0
 
-cp -i "$file" "$saveas"
+exec cp -i "$file" "$saveas"
+
+# =head1 EXAMPLE
+#
+# My B<.mailcap> file contains this line for JPEG files:
+#
+#	image/jpeg; apphelper %s -y xv
+#
+# which caused mutt(1) to run xv(1)
+# immediately on pressing enter on a JPEG attachment
+# and then to offer a save option.
+#
+# This mailcap line:
+#
+#	application/pdf;apphelper %s -y xpdf
+#
+# causes mozilla to run xpdf(1) to view PDF files
+# and then to offer a save option.
+#	
+# =head1 AUTHOR
+#
+# Cameron Simpson E<lt>cs@zip.com.auE<gt> 18jun1998
+#
