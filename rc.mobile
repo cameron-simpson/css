@@ -143,7 +143,7 @@ case "$action" in
     fi >/etc/exports
     $trace exportfs -a
 
-    for subsys in $x_subsys
+    for subsys in portmap syslog $x_subsys
     do  $trace /etc/init.d/$subsys restart
     done
     ;;
