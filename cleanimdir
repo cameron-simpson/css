@@ -9,7 +9,7 @@ cmd=$0
 usage="Usage: $cmd [-f] [-n] [directories...]"
 
 doit=
-imgptn='((PNG|JPEG|GIF) image data)'
+imgptn='((PNG|JPEG|GIF) image data|MPEG video stream data)'
 docptn='((ASCII|program|English|document) text|empty)$'
 
 case $1 in
