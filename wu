@@ -1,0 +1,6 @@
+#!/bin/sh
+
+WUDir=$HOME/tmp/wusage
+PATH=$WUDir:$PATH
+export PATH WUDir
+exec "$@"
