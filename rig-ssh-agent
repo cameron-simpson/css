@@ -7,29 +7,31 @@
 cmd=$0
 usage="Usage: $cmd [-u] [statefile]"
 
-state=
+statefile=
 unlock=
 
 badopts=
 
 [ "x$1" = x-u ] && { unlock=1; shift; }
 
-[ $# = 0 ] || { state=$1; shift; }
+[ $# = 0 ] || { statefile=$1; shift; }
 
 [ $# = 0 ] || { echo "$cmd: extra arguments: $*" >&2; badopts=1; }
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
-[ -n "$state" ] || state=`ssh-agent-statefile` || exit 1
+[ -n "$statefile" ] || statefile=`ssh-agent-statefile` || exit 1
 
 # force unlock
-[ $unlock ] && { shift; set -x; unlock -f "$state"; }
+[ $unlock ] && ( set -x; unlock -f "$statefile" )
+
+export statefile
 
 exec \
-  lock -1 -a "$state" \
-  rmthen -f "$state" \
-  env "state=$state" \
+  lock -1 -a "$statefile" \
+  rmthen -f "$statefile" \
   no-ssh-agent \
+  set-x \
   ssh-agent \
-  sh -c 'stash-ssh-agent "$state"; exec pause' \
+  sh -c 'stash-ssh-agent "$statefile"; exec pause' \
   </dev/null
