@@ -1,0 +1,18 @@
+#!/bin/sh
+#
+# Imsize using "gm identify" instead of perl's Image::Size.
+#	- Cameron Simpson <cs@zip.com.au> 30jan2004
+#
+
+cmd=$0
+usage="Usage: $cmd [imagefiles...]"
+
+[ $# = 0 ] && set -- -
+
+clean=
+[ $# = 1 ] || clean='s/^\([^ ][^ ]*\)\[[0-9][0-9]*\] /\1 /'
+
+gm identify "$@" \
+| sed -n \
+      -e "$clean" \
+      -e 's/^\([^ ][^ ]*\) [^ ][^ ]* \([0-9][0-9]*\)x\([0-9][0-9]*\).*/\2 \3 \1/p'
