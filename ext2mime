@@ -1,0 +1,44 @@
+#!/bin/sh
+#
+# Infer MIME type from file extension.
+#	- Cameron Simpson <cs@zip.com.au> 2003
+#
+
+cmd=$0
+usage="Usage: $0 filename"
+
+[ $# = 1 ] || { echo "$usage" >&2; exit 2; }
+file=$1; shift
+
+case "$file" in
+  */*) fbase=`basename "$file"` ;;
+  *)   fbase=$file ;;
+esac
+
+case "$fbase" in
+  *.?*)
+    lcbase=`echo "$fbase" | tr '[A-Z]' '[a-z]'`
+    for base in "$fbase" "$lcbase"
+    do
+      if  cat "$HOME/.mime.types" "$HOME/rc/mime.types" /etc/mime.types \
+	      2>/dev/null \
+	| grep '^[ 	]*[^#]' \
+	| { while read mttype mtetc || exit 1
+	    do
+	      for ext in $mtetc
+	      do
+		case "$base" in
+		  *."$ext")	echo "$mttype"; exit 0 ;;
+		esac
+	      done
+	    done
+	    exit 1
+	  }
+      then
+	exit 0
+      fi
+    done
+    ;;
+esac
+
+exit 1
