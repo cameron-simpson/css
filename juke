@@ -15,6 +15,7 @@ runplayer()
   ( ok=1
     subproc=
     trap 'ok=; [ -n "$subproc" ] && kill $subproc; exit' 1 2 3 15
+    trap '[ -n "$subproc" ] && kill $subproc' USR1
     playlist=/tmp/$cmd.$$
     while [ $ok ]
     do
@@ -31,6 +32,7 @@ runplayer()
 	    esac
 	    subproc=$!
 	    wait
+	    [ $ok ] && sleep 2
 	    subproc=
 	done
     done
@@ -42,13 +44,19 @@ stopplayer()
 { [ -n "$playpid" ] && { kill "$playpid"; playpid=; }
 }
 
+bumpplayer()
+{ [ -n "$playpid" ] && { kill -USR1 "$playpid"; }
+}
+
 line=
 while lastline=$line
       read line
 do  
     [ "x$line" = "x!!" ] && line=$lastline
     case "$line" in
-	'')	stopplayer
+	'')	bumpplayer
+		;;
+	-)	stopplayer
 		;;
 	.)	ptns=
 		stopplayer
