@@ -1,0 +1,10 @@
+#!/bin/sh
+
+case $ARCH in
+    sun.*.solaris)	/usr/bin/echo "$*\\c" ;;    # Sys5, as God intended
+    sun.*.sunos)	/usr/bin/echo -n "$*" ;;
+    linux.*.linux|sun.*.sunos)
+    			echo -n "$*" ;;	    # the thrice accursed BSD
+    *)			echo -n "$*" ;;	# BSD, since I use a lot of linux
+    *)			echo "$*\\c" ;;	# Sys5
+esac
