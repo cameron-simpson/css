@@ -1,0 +1,24 @@
+#!/usr/bin/perl
+#
+# Courtesy of mcook@fendahl.dev.cdx.mot.com (Michael Cook).
+#
+
+if ($#ARGV < $[)
+	{ while (<STDIN>)
+		{ chop;
+		  &chkslink($_);
+		}
+	}
+else
+{ for (@ARGV)
+	{ &chkslink($_);
+	}
+}
+
+sub chkslink
+	{ next unless lstat($_[0]);
+	  next unless -l _;
+	  next if stat($_[0]);
+	  print "invalid symbolic link: $_[0] -> ",
+	        (readlink($_[0]) || "[can't readlink: $!]"), "\n";
+	}
