@@ -1,0 +1,141 @@
+#!/bin/ksh
+#
+# Load requisite portions of environment.
+# Each package has a file in /usr/local/lib/env.
+# Each line in the file is one of:
+#	var value	Set $var to value.
+#	var . file	Source Bourne script to set $var.
+#	var + string	Append string to $var.
+# All vars named get exported.
+#	- Cameron Simpson, 02dec94
+#
+# Usage: from sh:	eval "`loadenv blah...`"
+#	 from csh:	eval "`loadenv -csh blah...`"
+#
+
+envdir=/usr/local/lib/env
+
+usage="Usage: $0 [-csh] [-d dir] [-f] packages...
+	-csh	Emit code for csh.
+	-d dir	Use packages from \"dir\" instead of $envdir.
+	-f	Emit code to unconditionally set variables."
+
+force=
+forcsh=
+
+badopts=
+while :
+do  case "$1" in
+	-csh)	forcsh=1 ;;
+	-f)	force=1 ;;
+	-d)	envdir=$1; shift ;;
+	--)	shift; break ;;
+	-*)	echo "$0: $1: unrecognised option" >&2; badopts=1 ;;
+	*)	break ;;
+    esac
+    shift
+done
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+xit=0
+
+vars=
+
+loadenv()
+{
+	while [ $# -gt 0 ]
+	do  package=$1; shift
+
+	    eval "[ -n \"\$did_$package\" ] && continue
+		  did_$package=1
+		 "
+
+#	    [ "x$package" = xALL ] && { set x `ls "$envdir"` ${1+"$@"}
+#					shift
+#					continue
+#				      }
+
+	    envfile=$envdir/$package
+	    [ -r "$envfile" ] || \
+		{ echo "$0: no envfile ($envfile)" >&2
+		  xit=1
+		  continue
+		}
+
+	    while read var value
+	    do
+		case "$var" in
+		    :)	loadenv $value
+			continue
+			;;
+		esac
+		case "$value" in
+		    # source
+		    .*)	value=`expr "$value" : '.[ 	]*\(.*\)'`
+			case "$value" in
+			    /*)	;;
+			    *)	value=$envdir/$value ;;
+			esac
+			. "$value"
+			case "$var" in
+			    *,*)	var=`echo "$var"|tr , ' '` ;;
+			esac
+			eval "export $var"
+			;;
+		    # append
+		    +*)	value=`expr "$value" : '.[ 	]*\(.*\)'`
+			eval "$var=\$$var$value; export $var"
+			;;
+		    # pick file
+		    -f*) value=`expr "$value" : '-f[ 	]*\(.*\)'`
+			for f in $value
+			do  [ -f "$f" ] && eval "$var=\$f; export $var; break"
+			done
+			;;
+		    # set
+		    *)	eval "$var=$value; export $var"
+			;;
+		esac
+		vars="$vars $var"
+	    done <"$envfile"
+	done
+}
+
+loadenv ${1+"$@"}
+
+file=/tmp/loadenv.$$
+
+{ if [ $forcsh ]
+  then
+    if [ $force ]
+    then
+	for var in $vars
+	do  eval "echo \"setenv \$var '\$$var';\""
+	done
+    else
+	for var in $vars
+	do  eval "echo \"if ( ! \\\$?$var ) setenv \$var '\$$var';\""
+	done
+    fi
+  else
+    if [ $force ]
+    then
+	for var in $vars
+	do  eval "echo \"\$var='\$$var'; export $var\""
+	done
+    else
+	for var in $vars
+	do  eval "echo \"\$var=\\\${$var-'\$$var'}; export $var\""
+	done
+    fi
+  fi
+  echo rm $file
+} > $file
+chmod 755 $file
+
+if [ $forcsh ]; then	echo source $file
+else			echo . $file
+fi
+
+exit $xit
