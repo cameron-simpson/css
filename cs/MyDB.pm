@@ -79,38 +79,6 @@ sub fileByPath($)
 
 =back
 
-=head1 OBJECT CREATION
-
-=over 4
-
-=item fileByPath(I<pathname>)
-
-Creates a new blah ...
-
-=cut
-
-sub new
-{ my(,
-}
-
-=back
-
-=head1 OBJECT METHODS
-
-=over 4
-
-=item Method1(I<arg1>...
-
-Does thing ...
-
-=cut
-
-sub Method1($
-{ my($this,
-}
-
-=back
-
 =head1 AUTHOR
 
 Cameron Simpson E<lt>cs@zip.com.auE<gt>
