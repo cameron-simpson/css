@@ -24,6 +24,7 @@ exec \
 	'--include=/.getnews-state' \
 	'--include=/.gtkrc' \
 	'--include=/.gtkrc-2.0' \
+	'--include=/.inputrc' \
 	'--include=/.less' \
 	'--include=/.lesskey' \
 	'--include=/.mailcap' \
@@ -58,6 +59,7 @@ exec \
 	'--exclude=/rc/gnupg/*' \
 	'--include=/rc/gtk' \
 	'--include=/rc/hi' \
+	'--include=/rc/inputrc' \
 	'--include=/rc/less' \
 	'--include=/rc/lesskey' \
 	'--include=/rc/mail' \
