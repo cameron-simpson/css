@@ -355,7 +355,9 @@ if (defined $::BigLock)
 }
 
 if (@ARGV)
-{ for my $url (@ARGV)
+{ my @urls = @ARGV;
+  @ARGV='';
+  for my $url (@urls)
   { if ($url eq '-')
     { while (defined($_=<STDIN>))
       { chomp;
