@@ -28,12 +28,16 @@ def h2f(fp,o):
     stringEncode(fp,str(o))
   elif t is BooleanType:
     fp.write(int(o))
-  elif t in [StringType, UnicodeType]:
+  elif t in (StringType, UnicodeType):
     stringEncode(fp,o)
-  elif t in [TupleType, ListType]:
+  elif t in (TupleType, ListType):
     listEncode(fp,o)
-  elif t in [DictType, DictionaryType]:
+  elif t in (DictType, DictionaryType):
     dictEncode(fp,o)
+  elif hasattr(o,'__keys__'):
+    dictEncode(fp,o)
+  elif hasattr(o,'__iter__'):
+    listEncode(fp,o)
   else:
     h2f(fp,`o`)
 
@@ -75,7 +79,7 @@ def listEncode(fp,l):
 
   if len(l) > 0:
     fp.adjindent(1)
-    dofold = not fp.getindent() is None
+    dofold = fp.getindent() is not None
 
     sep=""
     if dofold: nsep=",\n"
@@ -96,7 +100,7 @@ def dictEncode(fp,d,i=None):
 
   if len(keys) > 0:
     fp.adjindent(1)
-    dofold = not fp.getindent() is None
+    dofold = fp.getindent() is not None
 
     sep=""
     if dofold: nsep=",\n"
