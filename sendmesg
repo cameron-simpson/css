@@ -1,0 +1,57 @@
+#!/usr/bin/perl -w
+#
+# Acts like sendmail but intercepts messages to newsgroup@usenet and
+# dispatches then via NNTP, suitably rewritten. Addresses come on the
+# command line.
+#	- Cameron Simpson <cs@zip.com.au> 08jun2002
+#
+
+use cs::Misc;
+use cs::Source;
+use cs::Sink;
+use cs::MIME;
+use cs::Mail::Misc;
+use cs::NNTP;
+
+$::Usage="Usage: $::cmd addresses...\n";
+
+die $::Usage if ! @ARGV;
+
+$::Msg = new cs::MIME (new cs::Source (FILE,STDIN));
+
+$::DEBUG=1;
+
+@::Groups=();
+@::Email=();
+
+for (@ARGV)
+{
+  if (/\@usenet$/i)
+  { push(@::Groups,$`);
+  }
+  else
+  { push(@::Email,$_);
+  }
+}
+
+if (@::Groups)
+{ $::Msg->Add(NEWSGROUPS,join(',',@::Groups),SUPERCEDE);
+}
+
+$::Msg->ForceMsgID();
+
+$::Msg->WriteItem(new cs::Sink(FILE,STDOUT));
+
+my $msgtxt = '';
+$::Msg->WriteItem(new cs::Sink(SCALAR,\$msgtxt));
+
+if (@::Groups)
+{ my $NNTP = new cs::NNTP;
+  $NNTP->PostSource(new cs::Source(SCALAR,$msgtxt))
+	|| die "$::cmd: posting via $ENV{NNTPSERVER} fails\n";
+}
+
+
+my $src = new cs::Source (SCALAR,$msgtxt);
+cs::Mail::Misc::smtpsend($src,@::Email)
+	|| die "$::cmd: mailing via $ENV{SMTPSERVER} fails\n";
