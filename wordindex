@@ -22,6 +22,11 @@ $::Xit=0;
 getopts("i:") || ($::Xit=1);
 $ndxfile=$::opt_i if defined $::opt_i;
 
+# locate compressed version
+for my $ext ('', '.gz', '.bz2', '.Z')
+{ if (-e "$ndxfile$ext") { $ndxfile="$ndxfile$ext"; last; }
+}
+
 my $op;
 
 if (@ARGV < 1)
@@ -54,9 +59,11 @@ my $ndx = new cs::WordIndex($ndxfile);
 
 if ($op eq ADD)
 {
+  use cs::Upd;
   FILE:
   for my $file (@ARGV)
-  { $ndx->ProcessFile($file);
+  { out($file);
+    $ndx->ProcessFile($file);
   }
   $ndx->Save();
 }
@@ -68,21 +75,28 @@ elsif ($op eq RM)
 }
 elsif ($op eq SEARCH)
 {
-  warn "ndx = ".cs::Hier::h2a($ndx,1)."\n";
+  ## warn "ndx = ".cs::Hier::h2a($ndx,1)."\n";
   my $coll = {};
   my @hits = ();
   my $s;
   RE:
   for my $re (@ARGV)
-  { warn "/$re/ ...\n";
+  { ## warn "/$re/ ...\n";
     $s = $ndx->SearchRE($re);
-    warn cs::Hier::h2a($s,1)."\n";
+    ## warn cs::Hier::h2a($s,1)."\n";
     $ndx->CollateResults($coll,$s);
   }
-  warn "Collate:\n", cs::Hier::h2a($coll,1), "\n";
+  ## warn "Collate:\n", cs::Hier::h2a($coll,1), "\n";
 
   my $fetch = cs::WordIndex::fetchCollatedResults($coll);
-  warn "Fetch:\n", cs::Hier::h2a($fetch,1), "\n";
+  ## warn "Fetch:\n", cs::Hier::h2a($fetch,1), "\n";
+
+  for my $res (sort { my $cmp = @$a <=> @$b; return $cmp if $cmp != 0;
+			 $cmp = $a->[0] cmp $b->[0]; return $cmp if $cmp != 0;
+			 return $a->[1] cmp $b->[1];
+		    } @$fetch)
+  { print "$res->[0]:$res->[1]: $res->[2]\n";
+  }
 }
 else
 { die "$::cmd: unsupported op \"$op\"\n";
