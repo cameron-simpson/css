@@ -116,6 +116,8 @@ toc_swf='pageif swfdump -a -t /dev/fd/0'
 
 view_html='pageif w3m -dump -T text/html /dev/fd/0'
 
+view_msword=catdoc
+
 xit=0
 
 abort=
@@ -188,6 +190,7 @@ do  [ $abort ] && exit 1
 	      asf|mov|avi)	format=$cext ;;
 	      wrl)	format=vrml ;;
 	      html|htm)	format=html ;;
+	      doc)	format=msword ;;
 	      *)	case $b in
 			    cpiof*)	format=cpio ;;
 			    tarf*)	format=tar ;;
