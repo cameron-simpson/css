@@ -151,6 +151,7 @@ sub SubType($)	{ shift->{SUBTYPE}; }
 
 =item UseHdrs(I<hdrs>)
 
+Incorporate the headers from the B<cs::RFC822> object I<hdrs>.
 
 =cut
 
@@ -187,7 +188,21 @@ sub _Source
   decodedSource($s,$cte,$isText);
 }
 
+=item RawGet()
+
+Return the body part of the object as a string.
+
+=cut
+
 sub RawGet	{ shift->_RawSource()->Get(); }
+
+=item Get()
+
+Return the body part of the object as a string
+after decoding according to any B<Content-Transfer-Encoding> header.
+
+=cut
+
 sub Get		{ shift->_Source()->Get(); }
 
 sub RawBody
