@@ -357,9 +357,11 @@ while (<STDIN>)
 
   if ($folder =~ /^\|/)
   { $deliver="$folder '$key'";
+    undef $lockfile;
   }
   elsif ($folder =~ /\@/)
   { $deliver="! $folder";
+    undef $lockfile;
   }
   else
   { $type=foldertype($folder);
@@ -431,9 +433,13 @@ X
     }
   }
 
+  if (defined $lockfile)
+  { $flags.=":$lockfile";
+  }
+
   print <<X
 
-  : 0$flags:$lockfile
+  : 0$flags
   $deliver
 X
   ;
