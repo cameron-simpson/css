@@ -282,8 +282,6 @@ HOST=${HOST:-`hostname`}
 case $HOST in *.*) HOST=`expr "x$HOST" : 'x\([^.]*\)\..*'` ;; esac
 export HOST SYSTEMID
 
-[ -n "$subj" ] || subj="runmaint@$HOST $args"
-
 xit=0
 
 case $target in
@@ -366,7 +364,10 @@ runscript()
 		      exec execif cat"
 	  ;;
       -)  exec cat ;;
-      *)  exec mailif -s "$subj" $_rs_addrs ;;
+      *)  _rs_subj=$subj
+	  [ -n "$_rs_subj" ] || _rs_subj=runmaint@$HOST
+	  _rs_subj="$_rs_subj $_rs $args"
+	  exec mailif -s "$_rs_subj" $_rs_addrs ;;
     esac
 
   return 0
@@ -382,9 +383,10 @@ do
     for ext in "$HOST" "$HOST@$SYSTEMID"
     do
       localscript=$script.$ext
-      subj="$osubj - perhost($ext)"
+      subj="$osubj - ($ext)"
       runpath "$localscript" $addresses || xit=1
     done
+    subj=$osubj
 
     # run the implied scripts
     case $target in
