@@ -1,0 +1,8 @@
+#!/bin/sh
+
+urls=
+for user
+do  urls="$urls http://web/cgi-bin/user.cgi?user=$user"
+done
+
+urlshow $urls
