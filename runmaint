@@ -376,14 +376,14 @@ for script in $try
 do
     ##echo "$script ..." >&2
     # run the script if present
-    runpath "$script" || xit=1
+    runpath "$script" $addresses || xit=1
 
     osubj=$subj
     for ext in "$HOST" "$HOST@$SYSTEMID"
     do
       localscript=$script.$ext
       subj="$osubj - perhost($ext)"
-      runpath "$localscript" || xit=1
+      runpath "$localscript" $addresses || xit=1
     done
 
     # run the implied scripts
