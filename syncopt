@@ -405,9 +405,9 @@ do
 		  useme=1
 		  print "nosync="
 		}
-	  useme && $NF == "nosync" { print "nosync=1" }
-	  useme && $NF == "local"  { print "makelocal=1" }
-	  useme && $NF == "remote" { print "makelocal=" }
+	  useme > 0 && $NF == "nosync" { print "nosync=1" }
+	  useme > 0 && $NF == "local"  { print "makelocal=1" }
+	  useme > 0 && $NF == "remote" { print "makelocal=" }
 	  $1 == thing && $2 ~ /^[0-9]/ { print "version=" $2 }
 	  thingv == "" && NF == 3 { print "makelocal=" }
 	 '
