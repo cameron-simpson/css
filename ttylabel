@@ -5,12 +5,17 @@
 #
 
 report=
-case $1 in -n) report=1; shift ;; esac
+xclip=
+case $1 in
+    -n) report=1; shift ;;
+    -x) xclip=1; shift ;;
+esac
 
 # [ -n "$tty_yellow" ] && echo "$tty_yellow$label$tty_normal"
 esc=""
 case "$TERM" in
-      xterm*)	_start_title="${esc}]0;"  _end_title=""
+      rxvt|xterm*)
+	      _start_title="${esc}]0;"  _end_title=""
 	      _start_icon="${esc}]1;"   _end_icon=""
 	      ;;
       sun*)	## openwin cmdtool only?
@@ -58,4 +63,10 @@ ttylabel=
 [ -n "$_start_title" ] && ttylabel=$ttylabel$_start_title$label$_end_title
 [ -n "$_start_icon" ] && ttylabel=$ttylabel$_start_icon$label$_end_icon
 
-exec necho "$ttylabel"
+if [ $xclip ]
+then
+    shlabel=`shqstr "$ttylabel" | sed 's//&/g'`
+    echo "echo $shlabel" | xclip
+else
+    necho "$ttylabel"
+fi
