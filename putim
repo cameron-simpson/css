@@ -1,0 +1,13 @@
+#!/bin/sh
+
+cd || exit 1
+set -x
+for host
+do
+  $trace \
+  rsync -avHP \
+	--exclude=/UNFILED \
+	--exclude=/people \
+	--exclude='**/[rxm]/' \
+	im/. "$host:im/."
+done
