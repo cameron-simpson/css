@@ -10,48 +10,32 @@
 # Subsume the if{up|down}@* scripts into this, move config into file.
 # - cameron 06feb2001
 #
-# chkconfig: 2345 11 89
+# chkconfig: 2345 10 90
 # description: Activates/Deactivates the network interfaces suitable to a \
 #              location as specified by the /etc/rc.mobile.conf file.
 # probe: true
 #
 
-# Source function library.
-. /etc/rc.d/init.d/functions
-
-if [ ! -f /etc/sysconfig/network ]; then
-    exit 0
-fi
-
-. /etc/sysconfig/network
-
-if [ -f /etc/sysconfig/pcmcia ]; then
-	. /etc/sysconfig/pcmcia
-fi
-
 cmd=$0
+trace=set-x
 
-# Check that networking is up.
-##[ ${NETWORKING} = "no" ] || { echo "$cmd: networking not up" >&2; exit 1; }
-
-[ -x /sbin/ifconfig ] || { echo "$cmd: no /sbin/ifconfig" >&2; exit 1; }
+PATH=$PATH:/sbin:/opt/css
+export PATH
 
 # See how we were called.
 case "$1" in
   start)
-	tty=`tty`
-	[ -n "$tty" ] || tty=/dev/console
+	shift
 	action=up
 	int=1
-	donfs=
-	shift
         ;;
   stop)
-	action=down
 	shift
+	action=down
         ;;
   restart)
-	"$cmd" stop && "$cmd" start
+	shift
+	$trace "$cmd" stop && $trace "$cmd" start ${1+"$@"}
 	exit $?
 	;;
   *)
@@ -59,117 +43,119 @@ case "$1" in
         exit 1
 esac
 
+where=${SYSTEMID:-home}
+cf=/etc/rc.mobile.conf
+
+badopts=
+while :
+do  case $1 in
+	-i)	int=1 ;;
+	-a)	action=$2; shift ;;
+	-f)	cf=$2; shift ;;
+	-h)	HOST=$2; shift ;;
+	--)	shift; break ;;
+	-?*)	echo "$cmd: unrecognised option: $1" >&2
+	      badopts=1
+	      ;;
+	*)	break
+	      ;;
+    esac
+    shift
+done
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+[ -s "$cf" ] || { echo "$cmd: missing config file $cf" >&2; exit 1; }
+
+# we want the short hostname
+[ -n "$HOST" ] || { HOST=${HOST:-`hostname`}
+		    case $HOST in
+			*.*) HOST=`expr "x$HOST" : 'x\([^.]*\).*'` ;;
+		    esac
+		  }
+export HOST
+
+locations=none\ `sed -n -e '/^#/d' -e 's/^\\[\\(.*\\)\\]$/\\1/p' "$cf"`
+
+# ask for info if interactive
+if [ $int ]
+then
+    echo "$cmd - bring up interface according to location"
+    echo -n "I know ["$locations"] Where am I [$where]? "
+    read iwhere || { echo; exit 1; }
+    [ -n "$iwhere" ] && where=$iwhere
+fi
+
+[ "x$where" = xnone ] && exit 0
+
+config=`sed -e '/^#/d' -e "/^\\[$where\\]\\$/,/^\\[/!d" -e '/^[a-zA-Z][a-zA-Z_0-9]*=/!d' -e 's/^[a-z]/x_&/' -e 's/^[A-Z]/cf_&/' "$cf"|tee /dev/tty`
+[ -n "$config" ] || { echo "$cmd: $cf: no config for [$where]" >&2; exit 1; }
+
+# RH public config vars
+cfvars=
+for var in DEVICE BOOTPROTO IPADDR NETMASK GATEWAY
+do  cfvars="$cfvars $var"
+    eval "cf_$var="
+done
+cf_DEVICE=eth0
+cf_BOOTPROTO=static
+
+# rc.mobile private config vars
+xvars=
+for var in dns domains subsys
+do  xvars="$xvars $var"
+    eval "x_$var="
+done
+x_dns=
+x_domains=
+x_subsys=
+
+eval "$config"
+
+cfgname=$cf_DEVICE.$where
+cfg=/etc/sysconfig/network-scripts/ifcfg-$cfgname
+
+echo "cfg=[$cfg]"
+
+# write config file
 (
-  where=${SYSTEMID:-none}
-  cf=/etc/rc.mobile.conf
-
-  badopts=
-  while :
-  do  case $1 in
-	  -i)	int=1 ;;
-	  -a)	action=$2; shift ;;
-	  -f)	cf=$2; shift ;;
-	  -h)	HOST=$2; shift ;;
-	  -N)	donfs=1 ;;
-	  --)	shift; break ;;
-	  -?*)	echo "$cmd: unrecognised option: $1" >&2
-		badopts=1
-		;;
-	  *)	break
-		;;
-      esac
-      shift
-  done
-
-  [ $badopts ] && { echo "$usage" >&2; exit 2; }
-
-  [ -s "$cf" ] || { echo "$cmd: missing config file $cf" >&2; exit 1; }
-
-  # we want the short hostname
-  [ -n "$HOST" ] || { HOST=${HOST:-`hostname`}
-		      case $HOST in
-			  *.*) HOST=`expr "x$HOST" : 'x\([^.]*\).*'` ;;
-		      esac
-		    }
-  export HOST
-
-  locations=none\ `sed -n -e '/^#/d' -e 's/^\\[\\(.*\\)\\]$/\\1/p' "$cf"`
-
-  # ask for info if interactive
-  if [ $int ]
-  then
-      echo "$cmd - bring up interface according to location"
-      echo -n "I know ["$locations"] Where am I [$where]? "
-      read iwhere || { echo; exit 1; }
-      [ -n "$iwhere" ] && where=$iwhere
-  fi
-
-  set -vx
-
-  [ "x$where" = xnone ] && exit 0
-
-  config=`sed -e '/^#/d' -e "/^\\[$where\\]\\$/,/^\\[/!d" -e '/^[a-zA-Z][a-zA-Z_0-9]*=/!d' -e 's/^/cf_/' "$cf"`
-  [ -n "$config" ] || { echo "$cmd: $cf: no config for [$where]" >&2; exit 1; }
-
-  cfvars=
-  for var in DEVICE BOOTPROTO IPADDR NETMASK GATEWAY DNS DOMAINS EXPORTS
-  do  cfvars="$cfvars $var"
-      eval "cf_$var="
-  done
-  cf_DEVICE=eth0
-  cf_BOOTPROTO=static
-
-  eval "$config"
-
-  cfgname=$cf_DEVICE.$where
-  cfg=/etc/sysconfig/network-scripts/ifcfg-$cfgname
-
-  # write config file
-  exec 3>&1 1>"$cfg"
-
-  echo ONBOOT=no >&3
-
+  echo ONBOOT=no
   for var in $cfvars
-  do  eval "val=\$$var"
+  do  eval "val=\$cf_$var"
       [ -n "$val" ] && echo "$var=$val"
   done
+) >"$cfg"
 
-  exec >&3 3>&-
+[ -s "$cfg" ] || { echo "$cmd: can't make config file $cfg" >&2; exit 1; }
 
-  [ -s "$cfg" ] || { echo "$cmd: can't make config file $cfg" >&2; exit 1; }
+case "$action" in
+   up)
+    echo "Bringing up loopback interface..."; ifup ifcfg-lo
+    $trace ifdown "$cf_DEVICE"
+    $trace ifup "$cfgname" || exit 1
+    [ -n "$cf_GATEWAY" ] && $trace route add default gw "$cf_GATEWAY"
 
-  chmod a+r "$cfg"
-
-  exit 0
-
-  case "$action" in
-     up)
-      ifup "$cfgname" || exit 1
-      [ -n "$cf_GATEWAY" ] && route add default gw "$cf_GATEWAY"
-
-      [ -n "$cf_DNS" ] && { echo "nameserver $cf_DNS"
-			 echo "search $cf_DOMAINS"
+    [ -n "$x_dns" ] && { echo "nameserver $x_dns"
+			 echo "search $x_domains"
 		       } >/etc/resolv.conf
-      if [ -s "/etc/exports.$where" ]
-      then  cat "/etc/exports.$where"
-      fi >/etc/exports
-      exportfs -a
-      ;;
+    if [ -s "/etc/exports.$where" ]
+    then  cat "/etc/exports.$where"
+    fi >/etc/exports
+    $trace exportfs -a
 
-    down)
-      [ -n "$cf_GATEWAY" ] && route del default
-      ifdown "$cfgname" || exit 1
-      ;;
+    for subsys in $x_subsys
+    do  $trace /etc/init.d/$subsys restart
+    done
+    ;;
 
-    *)
-      echo "$0: unknown action \"$action\"" >&2
-      exit 2
-      ;;
+  down)
+    [ -n "$cf_GATEWAY" ] && $trace route del default
+    $trace ifdown "$cf_DEVICE" || exit 1
+    ;;
 
-  esac
-)
+  *)
+    echo "$0: unknown action \"$action\"" >&2
+    exit 2
+    ;;
 
-if [ $? = 0 ]
-then	success "Site specific network config."
-else	failure "Site specific network config."
-fi
+esac
