@@ -1,0 +1,91 @@
+#!/bin/sh
+#
+# Offer a list of files.
+# The common code from the bglist command, extracted to do generic selection
+# to support picking audio files.
+#	- Cameron Simpson <cs@zip.com.au> 01jun2002
+#
+
+random=
+n=0
+gotptns=
+anyopt=
+filtercmd="awk '{print \$1}'"
+
+cmd=$0
+usage="Usage: $cmd [-f filter-cmd] [-r] [-n count] [ptns... [-- directories...]]
+	-f filter-cmd	Filter to pick out filenames from the INDEX.
+			Default: $filtercmd
+	-n count	Choose the first count items.
+	-o		\"or\" mode - any pattern may match, not all.
+	-r		Randomise output."
+
+badopts=
+while :
+do
+    case $1 in
+      -n)	n=$2; shift ;;
+      -o)	anyopt=-o ;;
+      -r)	random=1 ;;
+      -f)	filtercmd=$2; shift ;;
+      --)	gotptns=1; shift; break ;;
+      -?*)	echo "$cmd: unrecognised option: $1" >&2
+		badopts=1
+		;;
+      *)	break ;;
+    esac
+    shift
+done
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+ptns=
+
+if [ -z "$gotptns" ]
+then
+    while [ $# -gt 0 ]
+    do  case "$1" in
+	  --)	gotptns=1; shift; break ;;
+	  *)	ptns="$ptns '$1'"; shift ;;
+	esac
+    done
+fi
+
+# no dirs?
+[ $# = 0 ] && set .
+
+addfilter()
+{ [ -n "$filter" ] && filter="$filter |"
+  filter="$filter $*"
+}
+
+filter=
+[ -n "$ptns" ] && addfilter "grepall -i $anyopt $ptns"
+
+if [ $random ]
+then
+    shuf=shuffle
+    [ "x$n" = x0 ] || shuf="$shuf $n"
+    addfilter "$shuf"
+else
+    [ "x$n" = x0 ] || addfilter "sed '${n}q'"
+fi
+
+[ -n "$filter" ] || filter=cat
+
+for dir
+do
+    ndx=$dir/INDEX
+    if [ -s "$ndx" ]
+    then  eval "$filtercmd" <"$ndx"
+    else  if [ -s "$ndx.gz" ]
+	  then  gunzip < "$ndx.gz"
+	  else  if [ -s "$ndx.bz2" ]
+		then  bunzip2 <"$ndx.bz2"
+		else  find "$dir/." -type f -size +0 -print
+		fi
+	  fi | eval "$filtercmd"
+    fi \
+    | sed "s;^[^/];$dir/&;"
+done \
+| ( : set -x; eval "$filter"; cat >/dev/null )
