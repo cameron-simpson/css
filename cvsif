@@ -1,0 +1,24 @@
+#!/bin/sh
+#
+# Do a cvs operation if file is in CVS.
+#	- Cameron Simpson <cs@zip.com.au> 10dec2003
+#
+
+cmd=$0
+usage="Usage: $cmd filename cvs-args..."
+
+badopts=
+
+if [ $# = 0 ]
+then
+  echo "$cmd: missing filename" >&2
+  badopts=1
+else
+  filename=$1; shift
+  [ $# = 0 ] && { echo "$cmd: missing cvs-args" >&2; badopts=1; }
+fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+ifcvs "$filename" || exit 0
+exec cvs "$@"
