@@ -366,12 +366,13 @@ sub readcats($;$)
     }
 
     # we expect "mailbox tag rule"
-    if (! /^(\S+)\s+(\S+)\s+(\S.*)/)
+    if (! /^("[^"*"|[^\s"]\S*)\s+(\S+)\s+(\S.*)/)
     { warn "$::cmd: stdin, line $.: bad line: $_\n";
       next CAT;
     }
 
     my($folder,$key,$ptn)=($1,$2,$3);
+    $folder =~ s/^"(.*)"$/$1/;
     $folder='attn' if $folder eq '.';
 
     my @hdrs;
@@ -388,7 +389,7 @@ sub readcats($;$)
       { @hdrs=('to','cc','bcc');
       }
 
-      if ($ptn =~ m:^/(.*)/?$:)
+      if ($ptn =~ m:^/(.*?)/?$:)
       { $ptn=$1;
       }
       else
