@@ -7,13 +7,19 @@
 #
 
 cmd=`basename "$0"`
+
 archdir=${MAILDIR:-$HOME/private/mail}/ARCHIVED
+delay=14
+
 usage="Usage: $cmd [-d archdir] dirs...
 	-d archdir	Where to put archives. Default: $archdir."
 
-pgpext=
 case $1 in
     -d)	archdir=$2; shift; shift ;;
+esac
+
+case $1 in
+    [1-9]*)	delay=$1; shift ;;
 esac
 
 case "$archdir" in
@@ -25,21 +31,17 @@ xit=0
 for maildir
 do  (
       cd "$maildir" || exit $?
-      today=$maildir-`daycode`
+      today=`basename "$maildir"`-`daycode`
 
       pwd; set -x
 
+      # create archive
       mkdir "$today" || exit $?
-      ls | grep '^[0-9]' | xxargs mrg "$today/."
+      find . -type d -name "$today" -prune -o -type f -name '[1-9]*' -mtime "+$delay" -print \
+      | xxargs mrg "$today/."
       rmdir "$today" 2>/dev/null && exit 0
 
-##      # stash addresses
-##      ( cd "$today" || exit 1
-##	>.index
-##	lock $MAILRC.rawdb vmupdindex -db
-##      )
-
-      arch="$archdir/$today.um.gz$pgpext"
+      arch="$archdir/$today.um.gz"
       if [ -s "$arch" ]
       then
 	echo "$cmd: $arch already exists" >&2
