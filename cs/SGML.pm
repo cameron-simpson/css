@@ -120,7 +120,7 @@ sub match	# (Data,State) -> (token,tail) or undef
   # no match
   { ## my($it)=$_;
     ## if ($it =~ /\s*[\n\r]/) { $it=$`; }
-    warn "no match at _=[$_]\n";
+    ## warn "no match at _=[$_]\n";
     return undef;
   }
 
