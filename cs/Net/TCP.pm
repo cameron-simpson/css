@@ -73,7 +73,7 @@ sub new
   # set up a service
   { my($sockf)=service(@_);
     return undef if ! defined $sockf;
-    $this={ SOCKET	=> $sockf,
+    $this={ cs::Net::TCP::SOCKET	=> $sockf,
 	  };
   }
   else
@@ -177,8 +177,8 @@ sub Port
 	  my($this)=@_;
 	  my($sockaddr);
 
-	  if (exists $this->{SOCKET})
-		{ $sockaddr=getsockname($this->{SOCKET});
+	  if (exists $this->{cs::Net::TCP::SOCKET})
+		{ $sockaddr=getsockname($this->{cs::Net::TCP::SOCKET});
 		}
 	  else
 		{ $sockaddr=getsockname($this->{IN}->{FILE});
@@ -197,7 +197,7 @@ sub Port
 
 sub Accept	# service -> cs::Port
 { my($this)=@_;
-  my($sockf)=$this->{SOCKET};
+  my($sockf)=$this->{cs::Net::TCP::SOCKET};
   my($conn)=_sockHandle();
   my($peer);
 
@@ -254,8 +254,8 @@ sub Serve	# (this,flags,func,@args) -> void
 	    }
 
 	    # child or grandchild proceeds
-	    close($this->{SOCKET})
-	    	|| warn "$::cmd: child: can't close($this->{SOCKET}): $!\n";
+	    close($this->{cs::Net::TCP::SOCKET})
+	    	|| warn "$::cmd: child: can't close($this->{cs::Net::TCP::SOCKET}): $!\n";
 	  }
 	}
 	else
