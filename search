@@ -36,6 +36,7 @@ case "$cmd" in
     deja)	target=dejanews ;;
     djid)	exec us `msgid2dj ${1+"$@"}` ;;
     avim|im)	target=avimagesearcher ;;
+    fm)		target=freshmeat ;;
     gim)	target=googleimagesearch ;;
     rpmfind)	target=speakeasy-rpmfind ;;
     fsu)	target=findsameurl ;;
