@@ -268,11 +268,11 @@ hbinclude=$dest/.hbinclude
 # locate to most recent backup, if any
 lastbackup=`cd "$dest" || exit 1; ls -dr [0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]* 2>/dev/null | sed 1q`
 
-today=`daycode`
+today=`daycode` || exit 1
 thisbackup=$today
 if [ -d "$dest/$thisbackup/." ]
 then
-    now=`datecode`
+    now=`datecode` || exit 1
     thisbackup=$now
     if [ -d "$dest/$thisbackup/." ]
     then
