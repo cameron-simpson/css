@@ -1,0 +1,22 @@
+#!/bin/sh
+#
+# Code by John Rosauer <jar@rmb.com.au>
+# Widget to monitor UNIX time as Sun Sep 09 11:46:40 EST 2001
+# approaches (1000000000 epoch seconds).
+#	- Cameron Simpson <cs@zip.com.au>
+#
+# \
+exec wish "$0" "$@"
+  
+label .seconds
+pack .seconds
+  
+set font [.seconds cget -font]
+.seconds configure -font [lreplace $font 1 1 72]
+  
+proc update_seconds {} {
+    .seconds configure -text [clock seconds]
+    after 1000 update_seconds
+}
+  
+update_seconds
