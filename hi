@@ -73,6 +73,7 @@ urllist=/tmp/hi-urls.$$
 	      ) &
       fi
   done >>"$urllist"
+  wait
 )
 
 wait
