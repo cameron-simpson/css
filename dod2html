@@ -1,0 +1,67 @@
+#!/usr/bin/perl
+#
+# Produce the current DoD listing in HTML.
+#	dod | dod2html
+# Notice URLs mentioned in the urls.html file.
+#
+
+require 'cs/html.pl';
+
+undef %URL;
+if (open(URLS,"< urls.html"))
+	{ HTML:
+	   while (<URLS>)
+		{ if (/dod\s*#?\s*(\S+)/i)
+			{ $dod=$1; }
+		  else	{ undef $dod; }
+
+		  @urls=&html'urls($_);
+		  while (defined($url=shift(@urls))
+		      && defined($tag=shift(@urls)))
+			{ if (! defined $URL{$tag}
+			   && $URL{$tag} !~ /^mailto:/i)
+				{ $URL{$tag}=$url;
+			  	  $URL{"DoD#$dod"}=$url if defined $dod;
+				}
+			}
+		}
+
+	  close(URLS);
+	}
+
+DoD:
+  while (<STDIN>)
+	{ s/\r?\n$//;
+	  $_=&html'raw2html($_);
+	  next DoD unless
+		($number,$name,$where,$email)
+		=
+		/^([^:]+):([^:]+):([^:]+):([^:]+)/;
+
+	  if (defined($URL{"DoD#$number"})) { $url=$URL{"DoD#$number"}; }
+	  elsif (defined($URL{$email}))	{ $url=$URL{$email}; }
+	  elsif (defined($URL{$name}))	{ $url=$URL{$name}; }
+	  else				{ undef $url; }
+
+	  $name = "<A HREF=$url>$name</A>" if defined $url;
+	  $line="$name &lt;<A HREF=\"mailto:$email\">$email</A>&gt; ($where)";
+	  push(@dodlist,"<A NAME=\"dod$number\">DoD#$number</A> $line");
+	  push(@dodwurl,"<A NAME=\"webdod$number\">DoD#$number</A> $line")
+		if defined $url;
+	}
+
+print "Contents:\n";
+print "<UL><LI>The <A HREF=index.html>DoD page</A>.\n";
+print "    <LI>The <A HREF=#webdodlist>list of DoDs with Web pages</A>.\n";
+print "    <LI>The <A HREF=#fulldodlist>full DoD list</A>.\n";
+print "</UL>\n";
+print "<P>\n<A NAME=webdodlist>List of DoDs with Web Pages</A><P><UL>\n";
+for (@dodwurl)
+	{ print "    <LI>", $_, "\n";
+	}
+print "</UL>\n";
+print "<P>\n<A NAME=fulldodlist>Full DoD List</A><P><UL>\n";
+for (@dodlist)
+	{ print "    <LI>", $_, "\n";
+	}
+print "</UL>\n";
