@@ -1,0 +1,154 @@
+#!/usr/bin/perl -w
+#
+# Read image paths on stdin, update index file.
+#	- Cameron Simpson <cs@zip.com.au> 19jun2004
+#
+
+use strict qw(vars);
+
+use cs::Upd;
+use Getopt::Std;
+use Image::Size;
+
+my $upd = -t STDOUT;
+my $indexfile = "INDEX";
+my $mode = APPEND;
+
+$::Usage="Usage: $::cmd [-apu] [-f file] [{-|dirs...}]
+	-a	Append mode - just append to the existing list.
+	-p	Prune mode - drop images from the list now missing or empty.
+	-u	Update mode - update the size data for existing list.
+	-f file	Index filename. Default: $indexfile
+		\"-\" means just write the index data to stdout.
+	Saying \"-\" instead of dirs... reads paths from stdin.
+";
+
+{ my $badopts=0;
+  my %opt;
+
+  if (! getopts('apuf:',\%opt))
+  { warn "$::cmd: bad options\n";
+    $badopts=1;
+  }
+
+  if (defined $opt{'a'})	{ $mode=APPEND; }
+  if (defined $opt{'p'})	{ $mode=PRUNE; }
+  if (defined $opt{'u'})	{ $mode=UPDATE; }
+  if (defined $opt{'f'})	{ $indexfile=$opt{'f'}; }
+
+  if (! @ARGV)
+  { @ARGV=('.');
+  }
+
+  if ("@ARGV" ne '-')
+  { open(STDIN,'-|','set-x','find',@ARGV,'(','-type','d','-name','.?*','-prune',')','-o','(','-type','f','-size','+0','-print',')')
+	|| die "$::cmd: can't pipe from find: $!";
+  }
+
+  die $::Usage if $badopts;
+}
+
+%::IMX=();
+%::IMY=();
+
+my @stdin=();
+
+while (defined($_=<STDIN>))
+{
+  chomp;
+  push(@stdin,$_);
+}
+close(STDIN);
+
+if (! @stdin)
+{ nl("no new files") if $upd;
+  exit 0;
+}
+
+if ($mode ne APPEND && $indexfile ne '-')
+{
+  nl("loading existing list ...") if $upd;
+  if (open(INDEX,"< $indexfile"))
+  {
+    OLDINDEX:
+    while (defined($_=<INDEX>))
+    { chomp;
+      out("$indexfile, $.: $_") if $upd && $. % 10 == 0;
+
+      next OLDINDEX if !/^(\d+) (\d+) (\S.*)/;
+
+      my($x,$y,$impath)=($1,$2,$3);
+
+      # prune missing/empty files
+      next OLDINDEX if ! -f $impath || ! -s _;
+
+      if ($mode eq UPDATE)
+      {
+	my $err;
+	($x,$y,$err)=eval { imgsize($impath) };
+	if ($@)
+	{ warn "$::cmd: imsize($impath): $@\n";
+	  next NEWIMAGE;
+	}
+      }
+
+      $::IMX{$impath}=$x;
+      $::IMY{$impath}=$y;
+    }
+    close(INDEX);
+  }
+  else
+  { my $err = "$!";
+    if (-e $indexfile)
+    { die "$::cmd: can't read $indexfile: $err";
+    }
+  }
+}
+
+@stdin=sort @stdin;
+nl("update new images ...") if $upd;
+
+my $n=0;
+my $nn=@stdin;
+
+NEWIMAGE:
+for my $impath (@stdin)
+{
+  $n++;
+
+  $impath =~ s:^\./+::;
+  out(int($n*100/$nn)."%: $impath") if $upd && $. % 10 == 0;
+
+  # skip known images
+  next NEWIMAGE if exists $::IMX{$impath};
+
+  my($x,$y,$err)=eval { imgsize($impath) };
+  if ($@)
+  { warn "$::cmd: imsize($impath): $@\n";
+    next NEWIMAGE;
+  }
+
+  if (! defined $x)
+  { warn "updimlist: $impath: $err (possible errno \"$!\")\n";
+    next NEWIMAGE;
+  }
+
+  $::IMX{$impath}=$x;
+  $::IMY{$impath}=$y;
+}
+out('') if $upd;
+
+if ($indexfile eq '-')
+{ if (!open(INDEX,">&STDOUT"))
+  { die "$::cmd; dup(STDOUT,INDEX): $!";
+  }
+}
+elsif (!open(INDEX,($mode eq APPEND ? ">> $indexfile\0" : "> $indexfile\0")))
+{ die "$::cmd: open($indexfile): $!\n";
+}
+
+for my $impath (sort keys %::IMX)
+{ print INDEX "$::IMX{$impath} $::IMY{$impath} $impath\n";
+}
+close(INDEX);
+exit 0;
