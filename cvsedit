@@ -4,7 +4,8 @@
 #	- Cameron Simpson <cs@zip.com.au> 05mar1997
 #
 
-usage="Usage: $0 [-m logmessage] file [command [args...]]
+cmd=`basename "$0"`
+usage="Usage: $cmd [-m logmessage] file [command [args...]]
 	-m logmessage	Specify log message."
 
 cameron=
@@ -20,7 +21,7 @@ do  case $1 in
 	-m)	msg=$2; shift ;;
 	--no-dl)dodl= ;;
 	--dl)	dodl=1 ;;
-	-?*)	echo "$0: unrecognised option: $1" >&2; badopts=1 ;;
+	-?*)	echo "$cmd: unrecognised option: $1" >&2; badopts=1 ;;
 	--)	shift; break ;;
 	*)	break ;;
     esac
@@ -28,7 +29,7 @@ do  case $1 in
 done
 
 if [ $# = 0 ]
-then  echo "$0: missing file" >&2
+then  echo "$cmd: missing file" >&2
       badopts=1
 else  file=$1
       shift
@@ -38,7 +39,7 @@ fi
 
 if [ ! -f "$file" ]
 then
-      echo "$0: $file: not a regular file" >&2
+      echo "$cmd: $file: not a regular file" >&2
       exit 1
 fi
 
@@ -67,11 +68,17 @@ editxit=$?
 
 [ -n "$msg" ] || { necho "Log message? "
 		   read msg
-		 } || { echo "commit cancelled - file in modified state" >&2
+		 } || { echo "$cmd: commit cancelled - file in modified state" >&2
 			exit 1
 		      }
 
-[ $dodl ] && [ -n "$msg$editcmd" ] && dl "cvsedit $file $editcmd: $msg"
+if [ $dodl ] && [ -n "$msg$editcmd" ]
+then
+    case "$file" in /*) pwdpfx= ;; *) pwdpfx="`pwd`: " ;; esac
+    dl=`echo "cvsedit $pwdpfx$file $editcmd: $msg" | entilde`
+    dl "$dl"
+fi
+
 ( cd "$dir" || exit 1
   exec cvs commit -m "$msg" "$base"
 )
