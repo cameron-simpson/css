@@ -1,0 +1,83 @@
+#!/bin/sh
+#
+# Read a list of hosts and exported filesystems.
+# Make sure the mountpoints exist for the hosts not us.
+# Make sure symlinks exist for us.
+# Emit fstab lines.
+#	- Cameron Simpson <cs@zip.com.au> 14oct2000
+#
+
+nfstab=/etc/nfstab
+nfstree=/mnt/nfs
+mkstuff=1
+
+usage="Usage: $0 [-n] [nfstab]
+	-n	Don't make mount points and symlinks.
+	nfstab	File to use instead of $nfstab."
+
+[ "x$1" = x-n ] && { mkstuff=; shift; }
+
+[ $# -gt 0 ] && { nfstab=$1; shift; }
+
+if [ $# -gt 0 ]
+then
+    echo "$0: extra arguments: $*" >&2
+    echo "$usage" >&2
+    exit 2
+fi
+
+if [ "x$nfstab" != x- ]
+then
+    [ -s "$nfstab" ] || { echo "$0: $nfstab: empty or missing file" >&2
+			  exit 1
+			}
+
+    exec <"$nfstab"
+fi
+
+umask 22
+
+xit=0
+
+while read host fs mbase
+do
+  # skip comments and blanks
+  case "$host" in
+      ''|\#*)	continue ;;
+  esac
+
+  base=`basename "$fs"`
+  [ -n "$mbase" ] || mbase=$base
+  hosttree=$nfstree/$host
+  mpoint=$hosttree/$mbase
+
+  [ $mkstuff ] \
+  && { [ -d "$hosttree/." ] || mkdir -p "$hosttree" || { xit=1; continue; }
+     }
+
+  if [ "x$HOST" = "x$host" ]
+  then
+      [ $mkstuff ] \
+      && { rm -f "$mpoint"
+           ln -s "$fs" "$mpoint" || xit=1
+	 }
+  else
+      [ $mkstuff ] \
+      && { [ -d "$mpoint/." ] || mkdir -p "$mpoint" || { xit=1; continue; }
+	 }
+
+      case "$ARCH" in
+	  *.solaris)
+		echo "$host:$fs - $mpoint nfs - yes bg,vers=2"
+		;;
+	  *.linux)
+		echo "$host:$fs $mpoint nfs bg,async,noatime 0 0"
+		;;
+	  *)	echo "$0: $ARCH: unsupported \$ARCH" >&2
+		xit=1
+		;;
+      esac
+  fi
+done
+
+exit $xit
