@@ -2,28 +2,33 @@
 
 cmd=$0
 
-needhost $HOMEHOST@home || exit 1
-
 hARCH=$ARCH
 
+force=
+
+[ "x$1" = x-f ] && { force=1; shift; }
 [ $# = 0 ] && { echo "$cmd: missing login@hostname" >&2
-		echo "Usage: $cmd [login@]hostname" >&2
+		echo "Usage: $cmd [-f] [login@]hostname..." >&2
 		exit 2
 	      }
 
+[ $force ] || needhost $HOMEHOST@home || exit 1
+
 cd || exit 1
 set -x
-for h
+for host
 do
-  pfx "$h" \
-  rsync -avHP --delete --exclude=CVS/ \
+  pfx "$host" \
+  rsync -rlptHvP --delete --exclude=CVS/ \
 	'--include=/.bash_logout' \
 	'--include=/.bash_profile' \
 	'--include=/.bashrc' \
+	'--include=/.getnews-state' \
 	'--include=/.gtkrc' \
 	'--include=/.less' \
 	'--include=/.lesskey' \
 	'--include=/.mailcap' \
+	'--include=/.mh_profile' \
 	'--include=/.muttrc' \
 	'--include=/.profile' \
 	'--include=/.screenrc' \
@@ -39,11 +44,15 @@ do
 	'--include=/.zshrc' \
 	'--include=/rc' \
 	'--include=/rc/env' \
+	'--include=/rc/getnews' \
+	'--include=/rc/less' \
+	'--include=/rc/lesskey' \
 	'--include=/rc/mail' \
 	'--include=/rc/mail/mailcap' \
 	'--include=/rc/mail/mutt*' \
 	'--include=/rc/mail/signature' \
 	'--exclude=/rc/mail/*' \
+	'--include=/rc/mh' \
 	'--include=/rc/myke' \
 	'--include=/rc/nvi' \
 	'--include=/rc/perl' \
@@ -63,7 +72,7 @@ do
 	'--exclude=/var/*/*' \
 	'--exclude=/var/*' \
 	'--exclude=/*' \
-	. "$h:." \
+	. "$host:." \
 	&
 done
 wait
