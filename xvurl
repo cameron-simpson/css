@@ -6,11 +6,16 @@
 #	- Cameron Simpson <cs@zip.com.au> 12jun2001
 #
 
+cmd=$0
+usage="Usage: $cmd [-f] [URL]"
+
+force=
+[ "x$1" = x-f ] && { force=1; shift; }
 [ $# = 0 ] && { set x "`xunclip`"; shift; }
-[ $# = 1 ] || { echo "Usage: $0 [URL]" >&2; exit 2; }
+[ $# = 1 ] || { echo "$usage" >&2; exit 2; }
 url=$1; shift
 
-dir=`mkdirn /tmp/vurl` || exit 1
+dir=`mkdirn /tmp/$cmd` || exit 1
 
 xit=0
 
@@ -19,10 +24,13 @@ if cd "$dir" \
 then
     echo "$url" >>$HOME/var/log/xvurl
     set x *; shift
-    case "$1" in
-	*.gif|*.jpg)	xv -maxpect "$1" ;;
-	*)		v "$1" ;;
-    esac
+    if [ $force ]
+    then  xv -maxpect "$1"
+    else  case "$1" in
+	    *.gif|*.jpg)	xv -maxpect "$1" ;;
+	    *)			v "$1" ;;
+	  esac
+    fi
 else
     xit=1
 fi
