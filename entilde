@@ -7,8 +7,8 @@
 
 sedf=
 
-[ -n "$BIN" ] && sedf="$sedf
-		       s:$BIN/:\$BIN/:g"
+##[ -n "$BIN" ] && sedf="$sedf
+##		       s:$BIN/:\$BIN/:g"
 
 [ -n "$USER" ] && sedf="$sedf
 		        s:/u/$USER/:~/:g"
