@@ -1,0 +1,50 @@
+#!/usr/bin/perl
+#
+# Convert cs::Hier dbs into JavaScript code.
+#	- Cameron Simpson <cs@zip.com.au> 17apr98
+#
+
+use cs::Misc;
+use cs::Persist;
+use cs::JavaScript;
+
+$::Usage="Usage: $::cmd jvar dbpath\n";
+
+my($jvar,$dbpath);
+my($badopts)=0;
+
+if (@ARGV < 1)
+	{ warn "$::cmd: missing jvar\n";
+	  $badopts=1;
+	}
+else
+{ $jvar=shift(@ARGV);
+  if ($jvar !~ /^[a-z]/)
+	{ warn "$::cmd: bad jvar: \"$jvar\"\n";
+	  $badopts=1;
+	}
+
+  if (@ARGV < 1)
+	{ warn "$::cmd: missing dbpath\n";
+	  $badopts=1;
+	}
+  else
+  { $dbpath=shift(@ARGV);
+    if (@ARGV)
+	{ warn "$::cmd: extra arguments: @ARGV\n";
+	  $badopts=1;
+	}
+  }
+}
+
+die $::Usage if $badopts;
+
+my($db);
+
+if (! defined ($db=cs::Persist::db($dbpath)))
+	{ die "$::cmd: can't open db at \"$dbpath\"; possible error: $!\n";
+	}
+
+print cs::JavaScript::h2js($db,$jvar), "\n";
+
+exit 0;
