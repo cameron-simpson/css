@@ -3,13 +3,23 @@
 # Make a scratch checkout, run a command, throw the checkout away.
 # Runs:
 #	command path-to-checkout [args...]
+# so typically you'd go
+#       withco module incd command args...
+#   or  withco -f module/file incd command args...
+#   or  inco module command args...
+#   or  inco -f module/file command args...
+# to run command _in_ the checkout.
 # - Cameron Simpson <cs@zip.com.au> 04jul2003
 #
 
 cmd=`basename "$0"`
-usage="Usage: $cmd module command [args...]"
+usage="Usage: $cmd [-f] module command [args...]
+	-f	Assume \"module\" is a file and thus use its parent directory."
 
 badopts=
+
+isfile=
+[ "x$1" = x-f ] && { isfile=1; shift; }
 
 if [ $# = 0 ]
 then
@@ -38,8 +48,11 @@ trap '[ -z "$dir" ] || rm -rf "$dir"' 0 1 2 3 15
 dir=`mkdirn "${TMPDIR:-/tmp}/$cmd"` || exit 1
 
 ( cd "$dir" || exit 1
-  cvs co "$module"
+  cvs co "$module" || exit 1
 ) || exit 1
 
-"$command" "$dir/$module" ${1+"$@"}
+where=$dir/$module
+[ $isfile ] && where=`dirname "$where"`
+
+"$command" "$where" ${1+"$@"}
 exit $?
