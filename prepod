@@ -24,7 +24,7 @@ s|L<\(\./[^>]*\)>|L<http://\1>|g
 /^=image/{
 s|^=image[ 	][ 	]*\(.*\)|=begin html\
 \
-<IMG SRC="\1" ALT="\1">\
+<BR><IMG SRC="\1" ALT="\1"><BR>\
 \
 =end html|
 b done
