@@ -1,0 +1,105 @@
+#!/usr/bin/perl
+#
+# Emit xdpyinfo output in handy shell sourceable form.
+#	- Cameron Simpson <cs@zip.com.au>
+#
+
+($cmd=$0) =~ s:.*/::;
+$usage="$cmd [-d display]
+	-d display	Override \$DISPLAY (currently $ENV{DISPLAY}).
+			\"-d -\" means expect xdpyinfo in stdin.
+";
+
+$badopts=0;
+$fflag=0;
+$display=$ENV{'DISPLAY'};
+while (defined($_=shift(@ARGV)))
+{ (unshift(@ARGV,$_), last) if !/^-/;
+  if ($_ eq '--')	{ last; }
+  elsif ($_ eq '-d')	{ $display=shift(@ARGV); }
+  else
+  { warn "$cmd: $_: unrecognised option\n";
+    $badopts=1;
+  }
+}
+
+if (@ARGV)
+{ print STDERR "$cmd: extra arguments: @ARGV\n";
+  $badopts=1;
+}
+
+die $usage if $badopts;
+
+if ($display ne '-')
+{ $ENV{'DISPLAY'}=$display;
+  die "can't pipe from xdpyinfo" unless open(STDIN,"xdpyinfo|");
+}
+
+$scope=$cmd;
+$dpylines=0;
+
+XINFO:
+while (<STDIN>)
+{ $dpylines++;
+  if (/^screen #(\d+):/)
+  { $screen=$1+0;
+    local($oldscope)=$scope;
+    $scope.='_screen'.$screen;
+    
+    SCREEN:
+    while (<STDIN>)
+    { s/^  // || ( ($scope=$oldscope), redo XINFO );
+      
+      if (/^dimensions:\s*(\d+)x(\d+)/)
+      { &pr("x=$1", "y=$2");
+      }
+      elsif (/^preallocated pixels:/)
+      { while (/\s*(\w+)\s+(\d+),?/)
+	{ &pr("pixel_$1=$2");
+	  $_=$';
+	}
+      }
+      elsif (/^default visual id:\s*(0x[a-f\d]+)/)
+      { $defvis=$1;
+      }
+      elsif (/^visual:$/)
+      { { local($oldscope)=$scope;
+      
+	  VISUAL:
+	  while (<STDIN>)
+	  { s/^    // || ( ($scope=$oldscope), redo SCREEN );
+	    if (/^visual id:\s*(0x[a-f\d]+)/)
+	    { $visid=$1;
+	      $scope.="_vis$visid";
+	      &pr("id=$visid");
+	    }
+	    elsif (/^class:\s*(\w+)/)
+	    { &pr("class=$1");
+	      $defclass=$1 if $visid eq $defvis;
+	    }
+	    elsif (/^depth:\s*(\d+)/)
+	    { &pr("depth=$1");
+	      $defdepth=$1 if $visid eq $defvis;
+	    }
+	  }
+
+	  $scope=$oldscope;
+	}
+      }
+    }
+
+    &pr("visual=$defvis");
+    &pr("depth=$defdepth");
+    &pr("class=$defclass");
+
+    $scope=$oldscope;
+  }
+}
+
+exit $dpylines ? 1 : 0;
+
+sub pr
+{ for (@_)
+  { print $scope, '_', $_, "\n";
+  }
+}
