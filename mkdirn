@@ -1,0 +1,64 @@
+#!/bin/sh
+#
+# Make the next directory in a sequence.
+# Lifted from my cdfn shell function.
+#	- Cameron Simpson <cs@zip.com.au> 28jun2000
+#
+# Dash suffix if numeric prefix. - cameron 03sep2000
+# Limit on number of directory tries. - cameron 05sep2000
+#
+
+[ $# = 1 ] || { echo "Usage: $0 dirpfx" >&2; exit 2; }
+
+maxtries=20
+
+pfx=$1
+case "$pfx" in *[0-9]) pfx=$pfx- ;; esac
+
+up=`dirname "$pfx"`
+base=`basename "$pfx"`
+
+# check out existing directories
+#
+# the dev-null redirect is an ugly hack to work around an as yet
+# unlocated bug in my personal shell env :-( - cameron 18apr2001
+n=`cd "$up" >/dev/null || exit 1
+   ls \
+   | sed -n "/^$base"'0*[1-9][0-9]*/s/.*[^0-9]0*\([1-9][0-9]*\)$/\1/p' \
+   | sort -n \
+   | tail -1`
+
+# nothing? start at 1
+if [ -n "$n" ]
+then
+    n=`expr $n + 1`
+else
+    n=1
+fi
+
+# sanity check (looking for the afore mentioned bug)
+case "$n" in
+    [0-9]|[0-9][0-9]|[0-9][0-9][0-9]) ;;
+    *)	echo "$0: bad \$n: [$n]" >&2; exit 1 ;;
+esac
+
+# scan for a new slot
+maxtries=16
+while ndir=$pfx$n
+      :
+do
+  if [ -d "$ndir/." ]
+  then  :
+  else  if mkdir -p "$ndir"
+	then  break
+	else  [ "$maxtries" -gt 1 ] || exit 1
+	      maxtries=`expr $maxtries - 1`
+	fi
+  fi
+
+  n=`expr $n + 1`
+  echo "[n=$n maxtries=$maxtries]" >&2
+done
+
+# report
+echo "$ndir"
