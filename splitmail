@@ -15,7 +15,7 @@ use strict qw(vars);
 use POSIX;
 use Fcntl;
 use cs::Misc;
-use cs::Upd;
+##use cs::Upd;
 
 $::Usage="Usage: $::cmd [{ +folder | '|pipeto' }] <mailfile\n";
 
@@ -46,7 +46,7 @@ else
 }
 
 splitmail('STDIN','stdin');
-nl("$::Counter messages");
+print "$::Counter messages\n";
 exit $::Xit;
 
 sub splitmail	# (STREAM,fname)
@@ -86,7 +86,6 @@ sub splitmail	# (STREAM,fname)
 sub closepipe
 {
   close(PIPE) || warn "close(PIPE): $!";
-  print "$::Tmp\n" if ! defined $::PipeTo;
   sleep($::SleepTime) if $::SleepTime;
 }
 
@@ -108,7 +107,7 @@ sub openpipe
     { # warn "$::cmd: already exists: $::Tmp\n";
     }
 
-    out($::Tmp);
+    print "$::Tmp\n";
     if (! sysopen(PIPE,$::Tmp,O_WRONLY|O_CREAT,0666))
     { warn "$::cmd: can't write to $::Tmp: $!\n";
       $::Xit=1;
