@@ -32,11 +32,12 @@ undef $::Aspect;
 { my $badopts=0;
   my %opt;
 
-  if (! getopts('wtsx:y:n:p:',\%opt))
+  if (! getopts('owtsx:y:n:p:',\%opt))
   { warn "$::cmd: bad options\n";
     $badopts=1;
   }
 
+  if ($opt{'o'})		{ $::AndWords=0; }
   if ($opt{'p'})		{ @::IMPath=grep(length,split(/:+/,$opt{'p'})); }
   if ($opt{'t'})		{ $::Aspect=PORTRAIT; }
   if ($opt{'w'})		{ $::Aspect=LANDSCAPE; }
