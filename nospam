@@ -1,0 +1,261 @@
+#!/usr/bin/perl
+#
+# Filter spam from a mail feed.
+#	- Cameron Simpson <cs@zip.com.au> 25jul97
+#
+
+use strict qw(vars);
+
+use cs::Source;
+use cs::Sink;
+use cs::RFC822;
+use cs::Shell;
+
+($::cmd=$0) =~ s:.*/::;
+
+defined $ENV{HOME}     || ($ENV{HOME}=userdir());
+	die "$::cmd: no home!" if ! defined $ENV{HOME};
+defined $ENV{SITENAME} || ($ENV{SITENAME}='research.canon.com.au');
+$::SpammerFile="$ENV{HOME}/.spammers";
+$::NonSpamFile="$ENV{HOME}/.nonspam";
+$::SendSpam="/dev/null";
+$::SendNonspam="-";
+$::SendSuspect="$ENV{HOME}/.possiblespam";
+
+$::Usage="Usage: $::cmd [-S spammers] [-N nonspammers] \\
+		[-o nonspam] [-p perhaps] [-s spam] [filter [filter_args...]]
+	-S spammers	File containing known From: addresses of spammers.
+	-N nonspammers	File containing To: addresses used to reach the
+			recipient with legitimate email.
+	-o nonspam	File to send nonspam to (default: stdout, or a pipe
+			to the filter if supplied).
+	-p perhaps	File to send potential spam to (default: $::SendSuspect).
+	-s spam		File to send known spam to (default: $::SendSpam).
+";
+
+my($xit)=filterspam(@ARGV);
+
+exit $xit;
+
+sub userdir
+	{
+	  my($user)=@_;
+	  my(@pw);
+
+	  @pw=(defined $user ? getpwnam($user) : getpwuid($>));
+	  return undef if @pw != 9;
+	}
+
+sub filterspam
+	{ my(@ARGV)=@_;
+
+	  local($_);
+
+	  my($badopts)=0;
+
+	  ARG:
+	    while (@ARGV)
+		{
+		  $_=shift(@ARGV);
+		  if ($_ eq '-S')	{ $_=shift(@ARGV);
+					  if (! defined)
+						{ warn "$::cmd: missing argument to -S\n";
+						  $badopts=1;
+						}
+					  else
+					  { $_="$ENV{HOME}/$_" unless m|^/|;
+					    $::SpammerFile=$_;
+					  }
+					}
+		  elsif ($_ eq '-N')	{ $_=shift(@ARGV);
+					  if (! defined)
+						{ warn "$::cmd: missing argument to -S\n";
+						  $badopts=1;
+						}
+					  else
+					  { $_="$ENV{HOME}/$_" unless m|^/|;
+					    $::NonSpamFile=$_;
+					  }
+					}
+		  elsif ($_ eq '-o')	{ $_=shift(@ARGV);
+					  if (! defined)
+						{ warn "$::cmd: missing argument to -S\n";
+						  $badopts=1;
+						}
+					  else
+					  { $_="$ENV{HOME}/$_" unless $_ eq '-' || m|^/|;
+					    $::SendNonspam=$_;
+					  }
+					}
+		  elsif ($_ eq '-p')	{ $_=shift(@ARGV);
+					  if (! defined)
+						{ warn "$::cmd: missing argument to -S\n";
+						  $badopts=1;
+						}
+					  else
+					  { $_="$ENV{HOME}/$_" unless $_ eq '-' || m|^/|;
+					    $::SendSuspect=$_;
+					  }
+					}
+		  elsif ($_ eq '-s')	{ $_=shift(@ARGV);
+					  if (! defined)
+						{ warn "$::cmd: missing argument to -S\n";
+						  $badopts=1;
+						}
+					  else
+					  { $_="$ENV{HOME}/$_" unless $_ eq '-' || m|^/|;
+					    $::SendSpam=$_;
+					  }
+					}
+		  elsif ($_ eq '--')	{ last ARG; }
+		  elsif (/^-./)		{ warn "$::cmd: unrecognised option: $_\n";
+					  $badopts=1;
+					}
+		  else			{ unshift(@ARGV,$_);
+					  last ARG;
+					}
+		}
+
+	  my(@filters)=@ARGV;
+
+	  if ($badopts)
+		{ warn $::Usage;
+		  return 2;
+		}
+
+	  my($xit)=1;
+
+	  my($s)=new cs::Source (FILE,STDIN);
+
+	  if (! defined ($_=$s->GetLine()) || ! length)
+		{
+		  warn "$::cmd: empty input!\n";
+		}
+	  else
+	  {
+	    # rewrite opening From_ line if present
+	    s/^from /From-: /i;
+	    $s->_PushBuf($_);
+
+	    # get headers
+	    my($H)=new cs::RFC822 $s;
+
+	    my(%isspam,%notspam);
+	    my($lsrc);
+
+	    $lsrc=new cs::Source (PATH,$::SpammerFile);
+	    if (defined $lsrc)
+		{ while (defined($_=$lsrc->GetLine()) && length)
+			{ chomp;
+			  $isspam{$_}=1;
+			}
+		  undef $lsrc;
+		}
+
+	    $lsrc=new cs::Source (PATH,$::NonSpamFile);
+	    if (defined $lsrc)
+		{ while (defined($_=$lsrc->GetLine()) && length)
+			{ chomp;
+			  $notspam{$_}=1;
+			  /\@/ || ($notspam{"$_\@$ENV{SITENAME}"}=1);
+			}
+		  undef $lsrc;
+		}
+
+	    # dump known spam
+	    my($ndx,$type);
+
+	    $type=SUSPECT;	# probably spam
+
+	    $ndx=$H->Addrs(FROM,SENDER);
+	    CHKSPAM:
+	      for (sort keys %$ndx)
+		{ if ($isspam{$_})
+			{ $type=SPAM;
+			  last CHKSPAM;
+			}
+		}
+
+	    if ($type eq SUSPECT)
+		{
+		  $ndx=$H->Addrs(TO,CC);
+		  CHKNOTSPAM:
+		    for (sort keys %$ndx)
+			{ if ($notspam{$_})
+				{ $type=NONSPAM;
+				  last CHKNOTSPAM;
+				}
+			}
+		}
+
+	    my($sink,$unixformat);
+
+	    if ($type eq NONSPAM && @filters)
+		{ my($pid);
+
+		  $unixformat=1;
+
+		  if (! defined ($pid=open(PIPE,"-|")))
+			{ warn "$::cmd: can't pipe/fork: $!\n";
+			}
+		  elsif ($pid == 0)
+			# child - write message to STDOUT
+			{ 
+			  $sink=new cs::Sink (FILE,STDOUT);
+			  if (! defined $sink)
+				{ warn "$::cmd: child: can't make sink from STDOUT: $!\n";
+				  kill(9,getppid());
+				  exit(1);
+				}
+			}
+		  else
+		  # parent - attach PIPE to STDIN and exec filter
+		  {
+		    if (open(STDIN,"<&PIPE"))
+			{ warn "$::cmd: can't attach PIPE to STDIN: $!\n";
+			  exit(1);
+			}
+
+		    my($name)=$filters[0];
+		    exec $name @filters;
+		  }
+		}
+	    else
+	    {
+	      my($saveas)=($type eq SPAM
+			    ? $::SendSpam
+			    : $type eq NONSPAM
+			    ? $::SendNonspam
+			    : $::SendSuspect
+			  );
+
+	      $unixformat=$saveas ne '-';
+	      $sink=($saveas eq '-'
+		    ? new cs::Sink (FILE,STDOUT)
+		    : new cs::Sink (APPEND,$saveas)
+		    );
+	    }
+
+	    # ok, by now $sink and $unixformat should be set up
+	    if (! defined $sink)
+		{ warn "$::cmd: can't write; possible error: $!\n";
+		}
+	    else
+	    {
+	      my($ok)=1;
+
+	      if ($unixformat)
+		{ $sink->Put("From ",$H->Hdr(FROM_),"\n") || ($ok=0);
+		}
+
+	      $ok && $H->WriteItem($sink) || ($ok=0);
+	      while ($ok && defined ($_=$s->GetLine()) && length)
+		{ $sink->Put($_) || ($ok=0);
+		}
+
+	      $ok && ($xit=0);
+	    }
+	  }
+
+	  $xit;
+	}
