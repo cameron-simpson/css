@@ -4,6 +4,8 @@
 #	- Cameron Simpson <cs@zip.com.au> 11jan2003
 set -x
 syncezos-rc
+syncezos-cgi
 pfx html rsync -avHPW --delete $HOME/there/cskk.ezoshosting.com/html/. ezos:html/. &
+pfx cgi-bin rsync -avHPW --delete $HOME/there/cskk.ezoshosting.com/cgi-bin/. ezos:cgi-bin/. &
 pfx acct syncsmall @ezos &
 wait
