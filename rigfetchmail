@@ -6,16 +6,17 @@
 needhost $HOMEHOST@home || exit 1
 set -x
 cd
-fmopts=
-case "$LOCATION" in
-  home|sco|tw)	fmopts="$fmopts -l 65536 -d 1800" ;;
-  *)		fmopts="$fmopts -d 900" ;;
-esac
-acon fetchmail \
-	-f "$HOME/.fetchmailrc" \
-	$fmopts \
-	--logfile "$HOME/var/log/fetchmail" \
-	--nobounce --tracepolls --warnings 86400 \
-	127.0.0.2 127.0.0.3
-## have to debug with change to maildir
+( fmopts=
+  fmdelay=600
+  fmhosts='127.0.0.2 127.0.0.3'
+  case "$LOCATION" in
+    home|sco|tw)
+	fmopts="$fmopts -l 65536" fmdelay=1800 ;;
+  esac
+  set -- -f "$HOME/.fetchmailrc" \
+	  --logfile "$HOME/var/log/fetchmail" \
+	  --nobounce --tracepolls --warnings 86400
+  fetchmail "$@" -l 65536 $fmopts $fmhosts
+  acon fetchmail "$@" -d "$fmdelay" $fmopts $fmhosts
+)
 alog procmail lock -1 getmail-despool nice getmail-flush -p 300 spool
