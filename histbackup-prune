@@ -1,0 +1,84 @@
+#!/bin/sh
+#
+# Prune a tree from a histbackup directory
+# if the disc is too full.
+#	- Cameron Simpson <cs@zip.com.au> 22jun2003
+#
+
+trace=echo
+pcnt=5
+onepass=1
+keepn=1
+force=
+
+cmd=`basename "$0"`
+usage="Usage: $cmd [-% pcnt] [-1rfnx] [-k keep] dir
+	-1	One pass - remove at most one backup.
+	-r	Repeat - remove backups until free threshold reached.
+	-n	No action. Report proposed actions.
+	-x	Trace execution. Show actions as dispatched.
+	-% pcnt	Desires free disc percentage. Default: $pcnt
+	-k	Keep at least this many backups. Default: $keepn"
+
+while :
+do
+  case $1 in
+    -%)	pcnt=$2; shift ;;
+    -1) onepass=1 ;;
+    -k) if [ 0 -lt "$2" ]
+	then  keepn=$2
+	else  echo "$cmd: bad -k argument ($2): must be positive integer" >&2
+	      badopts=1
+	fi
+	shift
+	;;
+    -r)	onepass= ;;
+    -f) force=1 ;;
+    -n) trace=echo ;;
+    -x) trace=set-x ;;
+    --) shift; break ;;
+    -?*)echo "$cmd: unrecognised option: $1" >&2; badopts=1 ;;
+    *)  break ;;
+  esac
+  shift
+done
+
+if [ $# = 0 ]
+then  echo "$cmd: missing dir" >&2; badopts=1
+else
+  dir=$1; shift
+  [ -d "$dir/." ] || { echo "$cmd: $dir: not a directory" >&2
+		       badopts=1
+		     }
+  [ $# = 0 ] || { echo "$cmd: extra arguments: $*" >&2
+		  badopts=1
+		}
+fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+cd "$dir" || exit 1
+
+
+# list backup dirs, but never the last one
+ls -r \
+| grep '^[12][0-9][0-9][0-9]-[01][0-9]-[0123][0-9]' \
+| sed "1,${keepn}d" \
+| sort \
+| { xit=0
+    while read subdir
+    do
+      # check free space - abort if this fails
+      free=`dfree -% .` || exit 1
+
+      # abort if enough free space
+      [ "$free" -lt "$pcnt" ] || break
+
+      # remove a tree
+      $trace rm -r "./$subdir" || xit=1
+
+      # abort if only trying once
+      [ $onepass ] && break
+    done
+    exit $xit
+  }
