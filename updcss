@@ -9,7 +9,7 @@ usage="Usage: $cmd [-q] [-n]"
 
 xit=0
 
-needhost amadeus@home || exit 2
+needhost $HOMEHOST@home || exit 2
 
 umask 22
 
