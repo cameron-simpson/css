@@ -4,6 +4,8 @@
 #	- Cameron Simpson <cs@zip.com.au> 24aug96
 #
 
+: ${OS:=`uname -s|tr '[A-Z]' '[a-z]'`}
+
 opt=
 case $OS in
     solaris)	opt=-k;;
