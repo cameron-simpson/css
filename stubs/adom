@@ -1,6 +1,6 @@
 #!/bin/sh
 
-adom=/usr/local/bin/adom
+adom=/opt/bin/adom
 
 cd $HOME/rc/adom || exit 1
 
