@@ -9,11 +9,13 @@ hi=$HOME/rc/hi
 eval `datevars`
 weekly=
 mode=normal
+noop=
 
 [ "x$wdayname" = xMon ] && weekly=1
 [ "x$1" = x-html ] && { mode=html; shift; }
 [ "x$1" = x-normal ] && { mode=normal; shift; }
 [ "x$1" = x-w ] && { weekly=1; shift; }
+[ "x$1" = x-n ] && { noop=1; shift; }
 
 if [ $# = 0 ]
 then
@@ -33,15 +35,6 @@ urllist=/tmp/hi-urls.$$
   do
     task=$1; shift
     case "$task" in
-	rterm)	case $HOST@$SYSTEMID in
-		    zapff@cisra)	hosts='elph wanda' ;;
-		    amadeus@home)	hosts='work janus' ;;
-		    *)			hosts= ;;
-		esac
-		for h in $hosts
-		do  lock -1 rterm-$h rterm $h &
-		done
-		;;
 	/*)	task=`expr "x$task" : 'x/\(.*[^/]\)/*$'`
 		echo "# $task" >&3
 		cat "$hi/"[a-z]* | egrep "$task" >&3
@@ -65,7 +58,7 @@ urllist=/tmp/hi-urls.$$
 	      | egrep -i "$grep" \
 	      | ( hit=
 		  while read gurl
-		  do  xvurl -f "$gurl" >/dev/null &
+		  do  if [ $noop ]; then echo "$gurl"; else xvurl -f "$gurl" >/dev/null & fi
 		      echo "$gurl" >&2
 		      hit=1
 		  done
@@ -80,6 +73,8 @@ urllist=/tmp/hi-urls.$$
 )
 
 wait
+
+[ $noop ] && exec cat "$urllist"
 
 case $mode in
     normal)
