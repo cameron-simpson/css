@@ -1,2 +1,4 @@
 #!/bin/sh
 echo USERS Exec edb -s mysql@cisra SYSADMIN_DB.USERS
+echo SHEETS Exec edb -s mysql@cisra TIMESHEETS_DB.SHEETS CAL_DATE,USER_ID
+echo ENTRIES Exec edb -s mysql@cisra TIMESHEETS_DB.ENTRIES ENTRY_ID
