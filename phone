@@ -4,9 +4,11 @@
 # Moved much stuff into user db.	- cameron 20nov97
 #
 
+: ${TMPDIR:=/tmp}
+
 [ $# = 0 ] && { echo "Usage: phone name..." >&2; exit 2; }
 
-phtmp=/tmp/ph$$
+phtmp=$TMPDIR/ph$$
 
 cat $HOME/.phone /home/docs/misc/phonedir.auto /home/docs/misc/phonedir \
 	>$phtmp 2>/dev/null
