@@ -651,7 +651,7 @@ sub cropDatedRecords
 
   my $context="cs::DBI::cropDatedRecords(dbh=$dbh,table=$table,start=".(defined $start ? $start : 'UNDEF').",end=".(defined $end ? $end : 'UNDEF').",xwhere=$xwhere,xwargs=[@xwargs]";
 
-  warn "$context\n\t";
+  ## warn "$context\n\t";
 
   if (!defined($start) && !defined($end))
   { my@c=caller;
@@ -813,7 +813,7 @@ sub cropDatedRecords
     # only $start defined
     {
 
-      warn "CROP low-: prev_start='$prev_start'\n";
+      ## warn "CROP low-: prev_start='$prev_start'\n";
 
       # delete swallowed records
       #
@@ -825,7 +825,7 @@ sub cropDatedRecords
 	    .$xsql
 	    ;
 
-      warn "DELETED SWALLOWED:\n$sql\n\t";
+      ## warn "DELETED SWALLOWED:\n$sql\n\t";
       if (!defined($sth=dosql($dbh,$sql,$start,@xwargs)))
       { warn "$::cmd: $context:\n\tcan't dosql($sql)";
 	$ok=0;
@@ -843,7 +843,7 @@ sub cropDatedRecords
 	  .$xsql
 	  ;
 
-      warn "CROP LOWER:\n$sql\n\t";
+      ## warn "CROP LOWER:\n$sql\n\t";
       if (!defined($sth=dosql($dbh,$sql,$prev_start,$start,$start,@xwargs)))
       { warn "$::cmd: $context:\n\tcan't dosql($sql)";
 	$ok=0;
