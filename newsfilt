@@ -1,0 +1,205 @@
+#!/usr/bin/perl
+#
+# Autofile my news.	- Cameron Simpson <cs@zip.com.au>
+#
+
+($cmd=$0) =~ s:.*/::;
+
+require 'getopts.pl';
+require 'cs/nntp.pl';
+require 'cs/logmap.pl';
+
+$NEWSRC=$ENV{NEWSRC};	$NEWSRC="$ENV{HOME}/.newsrc" if !length($NEWSRC);
+$FILEIN="+$cmd";
+
+$tmpfname_count=0;
+sub tmpfname	{ "$HOME/tmp/$cmd/"
+		 .&timecode(time,1)
+		 ."$ENV{HOSTNAME}.$$"
+		 .$tmpfname_count++;
+		}
+
+$usage="Usage: $cmd [-f newsrc] [+mailbox] newsgroups...
+	-f newsrc	Newsrc file (default: $NEWSRC).
+	+mailbox	Where to file articles (default: $FILEIN).
+";
+
+
+$badopts=0;
+&Getopts('f:') || ($badopts=1);
+$NEWSRC=$opt_f if defined $opt_f;
+
+if ($#ARGV >= $[ && $ARGV[$[] =~ /^\+/)
+	{ $FILEIN=shift @ARGV;
+	}
+
+if ($#ARGV < $[)
+	{ print STDERR "$cmd: missing newsgroups\n";
+	  $badopts=1;
+	}
+
+die $usage if $badopts;
+
+$xit=0;
+
+open(NEWSRC,"< $NEWSRC\0") || die "$cmd: can't read $NEWSRC: $!\n";
+while (<NEWSRC>)
+	{ push(@lines,$_);
+	  if (/^([^\s:!]+)([:!])\s*/)
+		{ $grp=$1;
+		  $lineno{$grp}=$#lines;
+		  $sub{$grp}=$2;
+		  $state{$grp}=$';
+		}
+	}
+close(NEWSRC);
+
+$connected=0;
+if (!defined($canpost=&nntp'connect($ENV{NNTPSERVER})))
+	{ die "$cmd: can't connect to '$ENV{NNTPSERVER}\n";
+	}
+else	{ $connected=1;
+	}
+
+##&nntp'out("LIST\n");
+##($code,$text)=&nntp'reply;
+##&die("$cmd: unexpected EOF from '$NNTPSERVER'\n")
+##	if !defined($code);
+##&die("$cmd: unexpected response from server: $code $text\n")
+##	if $code !~ /^3/;
+##for (&nntp'text)
+##	{ if (/^(\S+)\s+0*(\d+)\s+0*(\d+)/)
+##		{ $grp=$1;
+##		  $high{$grp}=$2+0;
+##		  $low{$grp}=$3+0;
+##		}
+##	}
+
+GRP:
+  for $grp (@ARGV)
+	{ if (!(($low,$high)=&nntp'group($grp)))
+		{ print STDERR "$cmd: group '$grp' not available from '$ENV{NNTPSERVER}'\n";
+		  $xit=1;
+		  next GRP;
+		}
+
+	  if (!defined($sub{$grp}))
+		{ push(@lines,"$grp: 0\n");
+		  $lineno{$grp}=$#lines;
+		  $sub{$grp}=':';
+		  $state{$grp}="1-$low{$grp}\n";
+		}
+
+	  %seen=&list2assoc($state{$grp});
+	  ART:
+	    for $i ($low..$high)
+		{ next ART if defined($seen{$i});
+		  &out("article $i\n");
+		  ($code,$text)=&reply;
+		  &die("EOF from '$ENV{NNTPSERVER}'") if !defined($code);
+		  if ($code !~ /^3/)
+			{ print STDERR "$cmd: $grp:$i: $code $text\n";
+			  $xit=1;
+			  next ART;
+			}
+
+		  $tmp=&tmpfname;
+		  @article=&nntp'text;
+		  if (!@article)
+			{ print STDERR "$cmd: $grp:$i: can't get article body\n";
+			  next ART;
+			}
+
+		  if (!open(ARTICLE,"> $tmp\0"))
+			{ print STDERR "$cmd: $grp:$i: can't write to $tmp: $!\n";
+			  next ART;
+			}
+		  
+		  for (@article)
+			{ print ARTICLE $_, "\n";
+			}
+		  close(ARTICLE);
+
+		  print STDERR "saved $tmp\n";
+		  &logto(FILEMAIL,'filemail');
+		  print FILEMAIL "$tmp $FILEIN\n";
+		  close(FILEMAIL);
+
+		  $seen{$i}=1;
+		}
+
+	  $state{$grp}=&seen2state(%seen);
+	}
+
+&nntp'disconnect;
+
+exit $xit;
+
+sub die
+	{ &nntp'disconnect if $connected;
+	  die join('',@_);
+	}
+
+sub state2seen	# state => %seen
+	{ local($_)=@_;
+	  local(%s,$i);
+
+	  while (length)
+		{ s/^\s+//;
+		  if (/^(\d+)\s*-\s*(\d+)/)
+			{ for $i ($1..$2)
+				{ $s{$i}=1;
+				}
+			  $_=$';
+			}
+		  elsif (/^\d+/)
+			{ $s{$&}=1;
+			  $_=$';
+			}
+
+		  s/^[\D\n]+//;
+		}
+
+	  %s;
+	}
+
+sub seen2state	# %seen => $state
+	{ local(%s)=@_;
+	  local($low,$high,$i,$_);
+
+	  $_='';
+	  for $i (sort { $a <=> $b; } keys %s)
+		{ if (!defined($low))
+			{ $low=$i;
+			  $high=$i;
+			}
+		  elsif ($i == $high+1)
+			{ $high=$i;
+			}
+		  else
+		  { $_.=', ' if length;
+		    if ($low == $high)
+			{ $_.=$low;
+			}
+		    else
+			{ $_.="$low-$high";
+			}
+		    undef $low;
+		    undef $high;
+		  }
+		}
+
+	  if (defined($low))
+		{ $_.=', ' if length;
+		  if ($low == $high)
+			{ $_.=$low;
+			}
+		  else
+			{ $_.="$low-$high";
+			}
+		  undef $low;
+		  undef $high;
+		}
+
+	  $_;
+	}
