@@ -3,10 +3,10 @@
 # setperms - set permissions on files
 #
 
+use cs::Misc;
 use cs::Upd;
 
-($cmd=$0) =~ s,.*/,,;
-$usage="Usage: $cmd [-s|-v|-f] mode [files...]
+$usage="Usage: $::cmd [-s|-v|-f] mode [files...]
 	-f	Force - coerce perms to mode, otherwise just add missing modes.
 	-s	Silent.
 	-v	Verbose.
@@ -22,13 +22,13 @@ while (@ARGV && $ARGV[0] =~ /^-./)
   elsif ($_ eq '-s')	{ $verbose=0; }
   elsif ($_ eq '-f')	{ $force=1; }
   else
-  { err("$cmd: unrecognised option: $_\n");
+  { err("$::cmd: unrecognised option: $_\n");
     $badopts=1;
   }
 }
 
 if (($mode=shift) !~ /^[0-7]+$/)
-{ err("$cmd: mode should be octal\n");
+{ err("$::cmd: mode should be octal\n");
   $badopts=1;
 }
 
@@ -61,7 +61,7 @@ sub mod	# (file,mode,verbose) -> void
   $v && out("checking  $f");
 
   if (!(($dev,$ino,$fmode,@etc)=lstat($f)))
-  { $oldline=''; err("$cmd: can't stat $f: $!\n");
+  { $oldline=''; err("$::cmd: can't stat $f: $!\n");
     $xit=1;
     return;
   }
@@ -69,7 +69,7 @@ sub mod	# (file,mode,verbose) -> void
   if (-f _)	{ $m&=0666; }	# don't care about search on files
   elsif (-d _)	{ }
   elsif (-l _)	{ return; }	# ignore symlinks
-  else		{ err("$cmd: $f: odd file type\n");
+  else		{ err("$::cmd: $f: odd file type\n");
 		  $xit=1;
 		  return;
 		}
@@ -98,7 +98,7 @@ sub mod	# (file,mode,verbose) -> void
 	{ $v && nl(sprintf("chmod %03o %s",$tm&0777,$f));
 	}
   else
-  { err("$cmd: chmod($f,..): $!\n");
+  { err("$::cmd: chmod($f,..): $!\n");
     $xit=1;
   }
 }
