@@ -1,6 +1,6 @@
 #!/bin/sh
 #
-# Toss all chains, remake LOG* chains.
+# Toss all chains, remake LOG* and FW_* chains.
 #	- Cameron Simpson <cs@zip.com.au> 18oct2003
 #
 
@@ -21,6 +21,14 @@ iptables -X
 
 iptables -N LOGREJECT
 iptables -N JUSTREJECT
+iptables -N LOGACCEPT
+iptables -N FW_INPUT
+iptables -N FW_OUTPUT
+iptables -N FW_FORWARD
+
+iptables -A INPUT -j FW_INPUT
+iptables -A OUTPUT -j FW_OUTPUT
+iptables -A FORWARD -j FW_FORWARD
 
 iptables -A LOGREJECT -j LOG
 iptables -A LOGREJECT -j JUSTREJECT
@@ -29,7 +37,6 @@ iptables -A JUSTREJECT -p tcp -m tcp -j REJECT
 iptables -A JUSTREJECT -p udp -m udp -j REJECT
 iptables -A JUSTREJECT -j DROP
 
-iptables -N LOGACCEPT
 iptables -A LOGACCEPT -j LOG
 iptables -A LOGACCEPT -j ACCEPT
 iptables -A LOGACCEPT -j DROP
