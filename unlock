@@ -1,0 +1,40 @@
+#!/bin/sh
+#
+# Kill the process holding a lock.
+#	- Cameron Simpson <cs@zip.com.au> 13jul2000
+#
+
+LOCKDIR=${LOCKDIR:-"$HOME/var/locks"}
+export LOCKDIR
+
+sig=
+case $1 in -*) sig=$1; shift ;; esac
+
+xit=0
+
+for lock
+do
+
+  # convert as per cs::Lock module
+  case $lock in
+      *[/_]*)
+	name=`sedstrs 's/_/__/g
+		       s:///*:/:g
+		       s:^/::
+		       s:/$::' "$lock"`
+	;;
+      *)name=$lock ;;
+  esac
+
+  lockdir=$LOCKDIR/$name
+  pidfile=$lockdir/$pid
+
+  [ -s "$pidfile" ] || { echo "$0: no pid file for $lock"; xit=1; continue; }
+
+  pid=`cat <"$pidfile"`
+  [ -n "$pid" ] || { echo "$0: no pid in $pidfile" >&2; xit=1; continue; }
+
+  kill $sig "$pid"
+done
+
+exit $xit
