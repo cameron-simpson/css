@@ -529,7 +529,7 @@ sub MkForm($$$$;$)
     $fkey=EDIT_._encKey($_);
     @k=split(m:/+:);
     $value=cs::Hier::getSubKey($record,@k);
-    warn "value[@k]=[$value]<BR>\n";
+    ## warn "value[@k]=[$value]<BR>\n";
 
     $def=$schema->{$_};
     ($desc,$type)=($def->{DESC},$def->{TYPE});
@@ -541,29 +541,29 @@ sub MkForm($$$$;$)
     if ($type eq TEXTFIELD){ $F->TextField($fkey,$value); }
     elsif ($type eq TEXTAREA){$F->TextArea($fkey,$value); }
     elsif ($type eq STRINGS)
-	  { $F->TextArea($fkey,join("\n", sort @$value));
-	  }
+    { $F->TextArea($fkey,join("\n", sort @$value));
+    }
     elsif ($type eq KEYWORDS)
-	  { my($map,$pickone);
-	    $map=(exists $def->{MAP} ? $def->{MAP} : {});
-	    $pickone=(exists $def->{PICKONE}
-			  ? $def->{PICKONE}
-			  : 0);
+    { my($map,$pickone);
+      $map=(exists $def->{MAP} ? $def->{MAP} : {});
+      $pickone=(exists $def->{PICKONE}
+		    ? $def->{PICKONE}
+		    : 0);
 
-	    warn "fkey=$fkey, pickone=$pickone";
-	    if (! keys %$map)
-		  # newline separated list
-		  { $F->TextArea($fkey,join("\n", sort @$value));
-		  }
-	    elsif ($pickone)
-		  { warn "POPUP for $fkey";
-		  $F->Popup($fkey,$map,$value);
-		  }
-	    else
-	    { warn "SCROLLINGLIST for $fkey";
-	    $F->ScrollingList($fkey,$map,$value,[],15,1);
-	    }
-	  }
+      ## warn "fkey=$fkey, pickone=$pickone";
+      if (! keys %$map)
+      # newline separated list
+      { $F->TextArea($fkey,join("\n", sort @$value));
+      }
+      elsif ($pickone)
+      { ## warn "POPUP for $fkey";
+      $F->Popup($fkey,$map,$value);
+      }
+      else
+      { ## warn "SCROLLINGLIST for $fkey";
+      $F->ScrollingList($fkey,$map,$value,[],15,1);
+      }
+    }
     else
     { warn "unknown type \"$type\" for field \"$_\" ($desc)";
       pop(@edit);
@@ -582,7 +582,7 @@ sub MkForm($$$$;$)
   $F->Hidden('ORIGINAL_RECORD',cs::Hier::h2a($record,0));
   $F->Hidden('KEYS',join(',',@edit));
   $F->Hidden('CONTEXT',cs::Hier::h2a($context,0));
-  warn "state=".cs::Hier::h2a($context,0)."<BR>\n";
+  ## warn "state=".cs::Hier::h2a($context,0)."<BR>\n";
 
   # make table
   $F->MarkUp([TABLE,@table]);
