@@ -5,6 +5,7 @@
 #
 
 cmd=$0
+usage="Usage: $cmd [-q] [-n]"
 
 xit=0
 
@@ -17,7 +18,7 @@ quick=
 [ "x$1" = x-q ] && { quick=1; shift; }
 [ "x$1" = x-n ] && { dosync=; shift; }
 
-common=/u/syncopt/common/$SYSTEMID
+common=/u/syncopt/common/`echo "$SYSTEMID" | tr '[a-z]' '[A-Z]'`
 
 if [ -z "$quick" ]
 then
@@ -26,21 +27,21 @@ then
     ) || exit 1
 fi
 
+set -x
+
 if needdir $common/css/man
 then
-  pfx css/man \
   rsync -avH \
 	--delete \
 	--delete-excluded \
 	--include='/man[1-9]/' \
 	--exclude='/*' \
-	$HOME/man/cs/. $common/css/man/. &
+	$HOME/man/cs/. $common/css/man/.
 fi
 
 if needdir $common/css/bin
 then
-  ( pfx css/scripts \
-    rsync -aHC \
+  rsync -aHC \
 	--copy-links \
 	--copy-unsafe-links \
 	--delete \
@@ -49,31 +50,21 @@ then
 	--include=/0README.txt \
 	--include=/CHANGELOG.txt \
 	--include=/CHANGELOG.html \
-	--include='/rc.*' \
-	--include='/mk*.conf' \
-	--include='/upd*.conf' \
-	--include='/upddhcpd.conf' \
-	--include='/updamd.user' \
-	--include='/syncdhcpd.conf' \
-	--exclude='/*.*' \
 	--exclude='/*/' \
 	--include='/cs/**.pm' \
 	--include='/cs/**/' \
 	--exclude='/cs/**' \
 	$HOME/scripts/. $common/css/bin/.
 
-    pfx css/synonyms \
-    rsync -aHC \
+  rsync -aHC \
 	--copy-links \
 	--copy-unsafe-links \
 	$HOME/scripts/synonyms/. $common/css/bin/.
-  ) &
 fi
 
 if needdir $common/css/cgi-bin
 then
-  ( pfx css/cgi-bin \
-    rsync -aHC \
+  rsync -aHC \
 	--copy-links \
 	--copy-unsafe-links \
 	--delete \
@@ -82,24 +73,22 @@ then
 	--include='/*.cgi*' \
 	--exclude='/*' \
 	$HOME/scripts/cgi-bin/. $common/css/cgi-bin/.
-  ) &
 fi
 
 if needdir $common/css/cs
 then
-  pfx css/cs \
   rsync -avH \
 	--delete \
 	--delete-excluded \
 	--include='*/' \
 	--include='*.pm' \
 	--exclude='*' \
-	$HOME/scripts/cs/. $common/css/cs/. &
+	$HOME/scripts/cs/. $common/css/cs/.
 fi
 
 ##if needdir $common/css/lib
 ##then
-##  rsync -avW $HOME/rc/java/au.com.zip.cs.jar $common/css/lib/. &
+##  rsync -avW $HOME/rc/java/au.com.zip.cs.jar $common/css/lib/.
 ##fi
 
 wait
@@ -109,12 +98,11 @@ if [ -d "$cssweb" ]
 then
     ( cd $common || exit 1
       tar cf - css | gzip -v -9 >$cssweb/css.tar.gz
-    ) &
+    )
     for d in cs man bin
     do
-      pfx ezos/css/$d \
-	rsync -avH --delete $common/css/$d/. $cssweb/$d/.
-    done &
+      rsync -avH --delete $common/css/$d/. $cssweb/$d/.
+    done
 fi
 
 wait
