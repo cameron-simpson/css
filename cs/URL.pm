@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 #
 # Code to handle URLs.
-#	- Cameron Simpson <cs@zip.com.au> 11jan96
+#	- Cameron Simpson <cs@zip.com.au> 11jan1996
 #
 
 =head1 NAME
@@ -102,11 +102,11 @@ return the default port number for I<scheme>.
 
 =cut
 
-sub urlPort($$)
+sub urlPort($;$)
 { my($scheme,$port)=@_;
   $scheme=uc($scheme);
 
-  (length $port
+  (defined $port && length $port
       ? cs::Net::portNum($port)
       : length $scheme
 	  ? grep($_ eq $scheme,HTTP,FTP,GOPHER,HTTPS,NEWS,SNEWS)
@@ -610,7 +610,7 @@ sub HostPart($)
   $hp.=lc($this->{cs::URL::HOST}) if defined $this->{cs::URL::HOST};
   $hp.=":".lc($this->{cs::URL::PORT}) if defined $this->{cs::URL::PORT}
 			      && $this->{cs::URL::PORT}
-			      ne urlPort($this->{cs::URL::SCHEME},$this->{cs::URL::PORT});
+			      ne urlPort($this->{cs::URL::SCHEME});
 
   ## warn "HostPart=$hp\n";
 
