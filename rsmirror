@@ -9,7 +9,7 @@
 #
 # =head1 SYNOPSIS
 #
-# B<rsmirror> [B<-d> I<dir>] [B<-f> I<config>] [B<-n>] [B<-P>] [B<-v>] [B<-t> I<secs>] [I<server>B<::>I<root>...]
+# B<rsmirror> [B<-d> I<dir>] [B<-f> I<config>] [B<-n>] [B<-P>] [B<-v>] [B<-t> I<secs>] [[I<server>]B<::>I<root>...]
 #
 # =head1 DESCRIPTION
 #
@@ -123,9 +123,9 @@ done
 # =item [I<server>]B<::>I<rootpfx>
 #
 # If any B<I<server>::I<rootpfx>> or B<::I<rootpfx>> arguments are present,
-# act only on those lines in the file.
+# act only on those lines in the configuration file.
 # I<rootpfx> may match any complete path component prefix
-# (i.e. ::foo would match B<foo>, B<foo/bar> but not B<foobar>).
+# i.e. ::foo would match B<foo> and B<foo/bar> but not B<foobar>.
 #
 # =back
 #
@@ -155,7 +155,7 @@ timelimit=
 # are discarded.
 # Other lines are of the form:
 #
-# [I<method>] I<server> I<root> [I<localroot>] [I<options>...]
+#	[I<method>] I<server> I<root> [I<localroot>] [I<options>...]
 #
 # Presently, the only defined I<method> is the word B<rsync>.
 # If omitted, I<method> defaults to B<rsync>
@@ -267,7 +267,7 @@ do
     # There is an additional facilty for overly complex I<options>.
     # For each line a check is made for a file named:
     #
-    # I<config>-I<method>-I<server>-I<root-trans>
+    #	I<config>-I<method>-I<server>-I<root-trans>
     #
     # where I<config> is the name of the main configuration file
     # and I<root-trans> is the I<root> string with slashes (B</>)
@@ -276,7 +276,7 @@ do
     # For the I<method> B<rsync>
     # the presence of this file causes the option:
     #
-    # B<--include-from=>I<config>-I<method>-I<server>-I<root-trans>
+    #	B<--include-from=>I<config>-I<method>-I<server>-I<root-trans>
     #
     # to be prepended to the options passed to rsync.
     # This is a I<much> more succinct and readable way to pass complicated
@@ -284,7 +284,7 @@ do
     #
     # Also, the presence of the file:
     #
-    # I<config>-I<method>
+    #	I<config>-I<method>
     #
     # is sought for all lines, and used if present.
     # This is for global specifications.
@@ -333,7 +333,7 @@ exit $xit
 #
 # My nightly mirror run reads:
 #
-# B<rsmirror -v -t 3600>
+# 	rsmirror -v -t 3600
 #
 # This produces a log of the update in my email
 # and prevents a huge update or a misconfiguration at my end
