@@ -34,7 +34,7 @@ fi
 path=$cachedir/$url
 
 [ $needdir ] && { dir=`dirname "$path"`
-		  needdir "$dir" || exit 1
+		  [ -d "$dir/." ] || needdir "$dir" || exit 1
 		}
 
 echo "$path"
