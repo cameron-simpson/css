@@ -8,6 +8,8 @@
 #	- Cameron Simpson, December 1991
 #
 
+: ${TMPDIR:=/tmp}
+
 cmd=$0
 usage="Usage: $cmd [-v] [-w width] [-h height] [-x x-pos] [-y y-pos] [-l lock] [-1 lock]
 		[-f font] [-n name] [-big] [-small] [-keepio] [-xauthhack]
@@ -112,7 +114,7 @@ case "$TERM,$DISPLAY" in
 
 	[ -n "$xauthhack" -a -r "$XAUTHORITY" ] &&
 		{ # Fight with NFS/xterm brain damage.
-		  xauth=/tmp/$cmd.$$
+		  xauth=$TMPDIR/$cmd.$$
 		  exec 4>$xauth
 		  chmod 600 $xauth
 		  cat <"$XAUTHORITY" >&4
