@@ -1,47 +1,47 @@
 #!/usr/bin/perl
 #
 # Report image sizes.
-#	- Cameron Simpson <cs@zip.com.au> 01jun99
+#	- Cameron Simpson <cs@zip.com.au> 01jun1999
 #
 # Usage: imsize [filenames...]
 #
 # Output is
 #	filename x y
-# for each supplied name or
-#	x y
-# for the file on stdin if no filenames are supplied.
+# for each supplied name.
 #
 
+use strict qw(vars);
 use Image::Size;
+
+$::Xit=0;
+
+($::cmd=$0) =~ s:.*/::;
 
 my($x,$y,$err);
 
-my $xit = 0;
-
 if (@ARGV)
-{ for my $f (@ARGV)
-  { ($x,$y,$err)=imgsize($f);
-    if (defined $x)
-    { print "$f $x $y\n";
-    }
-    else
-    { warn "$0: $f: $err (maybe errno \"$!\")\n";
-      $xit=1;
-    }
+{ for (@ARGV)
+  { doimsize($_);
   }
 }
 else
-{ 
-  my $err;
-
-  ($x,$y,$err)=imgsize('/dev/fd/0');
-  if (defined $x)
-  { print "$x $y\n";
-  }
-  else
-  { warn "$0: STDIN: $err\n";
-    $xit=1;
+{ while (defined($_=<STDIN>))
+  { chomp;
+    doimsize($_);
   }
 }
 
-exit $xit;
+exit $::Xit;
+
+sub doimsize($)
+{ my($f)=@_;
+
+  my($x,$y,$err)=imgsize($f eq '-' ? '/dev/fd/0' : $f);
+  if (defined $x)
+  { print "$f $x $y\n";
+  }
+  else
+  { warn "$::cmd: $f: $err (maybe errno \"$!\")\n";
+    $::Xit=1;
+  }
+}
