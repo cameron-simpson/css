@@ -51,6 +51,11 @@ case "$cmd" in
     tv)         target=sofcomtv ;;
     movie)	exec us "http://www.cinema.pgh.pa.us/movie/reviews?$query" ;;
     pagescour)	exec us "${cgibase}htclean.cgi/$query" ;;
+    ebay)	case "$query" in
+		    *\ *)	;;
+		    [0-9]?????????) target=ebayitem ;;
+		esac
+		;;
     urlsubmit)	avsubmit ${1+"$@"} &
 		googlesubmit ${1+"$@"} &
 		wait
