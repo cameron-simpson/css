@@ -141,8 +141,8 @@ if ($::Query)
 if (length $::Key)
 { $::Lock = new cs::Lock ($::Key,($::Onceonly ? 1 : 0),$::Silent);
   if (! defined $::Lock)
-  { exit 0 if $::OnceOnly;
-    die "::cmd: can't obtain lock on \"$::Key\"\n";
+  { exit 0 if $::Onceonly;
+    die "$::cmd: can't obtain lock on \"$::Key\"\n";
   }
 }
 else
