@@ -351,27 +351,32 @@ sub tokenList	# text -> ([tok,val,...],tail)
   wantarray ? ($list,$_) : $list;
 }
 
-=item rqhdr(I<url>,I<srcurl>)
+=item rqhdr(I<url>,I<srcurl>,I<agent>)
 
 Return a B<cs::RFC822> header set
 to accompany a request for the B<cs::URL> I<url>,
 including cookie fields.
-The B<cs::URL> I<srcurl> is used for the B<Referer:> field,
+The optional B<cs::URL> I<srcurl> is used for the B<Referer:> field,
 defaulting to the environment variable B<HTTP_REFERER>
 or failing that, I<url>.
+The optional I<agent> is used for the B<User-Agent:> field,
+defaulting to the environment variable B<HTTP_USER_AGENT>
+or failing that, "B<cs/1.0>".
 
 =cut
 
-sub rqhdr($;$)
-{ my($U,$srcURL)=@_;
+sub rqhdr($;$$)
+{ my($U,$srcURL,$agent)=@_;
   $srcURL=defined($ENV{HTTP_REFERER}) ? $ENV{HTTP_REFERER} : $U->Text()
 	if ! defined $srcURL;
+  $agent=defined($ENV{HTTP_USER_AGENT} ? $ENV{HTTP_USER_AGENT} : "$::cmd/1.0");
 
   my $rqhdrs = new cs::RFC822;
 
   $rqhdrs->Add([ACCEPT,"*/*"]);
   $rqhdrs->Add([REFERER,$srcURL]);
   $rqhdrs->Add([HOST,$U->Host()]);
+  $rqhdrs->Add([USER_AGENT,$agent]);
 
   my $cookieline = "";
   for my $C (@::Cookies)
