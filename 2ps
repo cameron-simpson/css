@@ -22,7 +22,7 @@ do  case $1 in
 	-P)	aspect=-R ;;
 	-i)	mtype=$2; shift
 		case "$mtype" in
-		    any)		mtype= ;;
+		    any|'')		mtype= ;;
 		    ps|postscript)	mtype=application/postscript ;;
 		    pdf)		mtype=application/pdf ;;
 		    mentor)		mtype=application/mentor ;;
@@ -69,10 +69,10 @@ fi
 [ -n "$mtype" ] || mtype=`file2mime "$file"` || exit 1
 
 case "$mtype" in
-    application/pdf)	conv='pdf2ps /dev/fd/0' ;;
+    application/pdf)	conv='acroread2ps' ;;
     application/postscript) conv=cat ;;
     application/mentor)	conv=mentor2ps ;;
-    text/plain)		conv='a2ps -1 -o- -b "$title" -T 8 -i --borders=no -b $aspect --medium=A4 -f 10' ;;
+    text/plain)		conv='a2ps -1 -o- --stdin "$title" -T 8 -i --borders=no -b $aspect --medium=A4 -f 10' ;;
     text/html)		conv=unhtml ;;
     image/*)		conv='convert - ps:-' ;;
     *)			echo "$cmd: supported input type \"$mtype\"" >&2
