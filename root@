@@ -58,7 +58,7 @@ exec term -n "#$session" \
 		 TERM=vt100
 		 PATH=$PATH:/opt/css/bin:/u/network/bin
 		 MANPATH=$MANPATH:/opt/css/man:/u/network/man
-		 PERL5LIB=${PERL5LIB:+"$PERL5LIB:"}/u/network/lib
+		 PERL5LIB=${PERL5LIB:+"$PERL5LIB:"}/opt/css/lib:/u/network/lib
 		 export TERM PATH MANPATH PERL5LIB
 		 [ -f /bin/zsh ] && { SHELL=/bin/zsh; export SHELL; }
 		 set -x
