@@ -49,6 +49,7 @@ do
     *,-l)	lock=$2; shift ;;
     *,-1)	lock1=$1 lock=$2; shift ;;
     *,-ip|*,+ip)termopts="$termopts $1" ;;
+    *,-fg|*,-bg)termopts="$termopts $1 $2"; shift ;;
     *,-c)	shcmd=$2; shift; shift
 		set x ${1+"$@"} -e "${SHELL:-/bin/sh}" -c "$shcmd"
 		shift
