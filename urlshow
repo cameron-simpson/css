@@ -101,7 +101,7 @@ then
     case "$BROWSER_DISPLAY" in
       :* | lo:* | localhost:* | 127.0.0.1:* | "$IPADDR:"* )
 	: browser -q \
-	|| { acon set-x browser
+	|| { set-x bgproc -p - -- browser
 	     echo "waiting for browser..."
 	     while :
 	     do  browser -q && break
