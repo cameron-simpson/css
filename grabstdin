@@ -5,7 +5,7 @@
 #	- Cameron Simpson <cs@zip.com.au> 16sep98
 #
 
-cons=`logpath console`
+cons=$CONSOLE
 
 tmp=/tmp/grabstdin.$$
 
