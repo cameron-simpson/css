@@ -1,0 +1,33 @@
+#!/usr/bin/perl
+#
+# Write shell script to reload environment.
+#	- Cameron Simpson, 15may93
+#
+
+@env=(sprintf("0%o\n",umask));
+for $var (sort keys %ENV)
+{ $_=$ENV{$var};
+  s/'/'\\''/g;
+  push(@ENV,"$var='$_'; export $var;\n");
+}
+
+if (@ARGV)
+{ @envFiles=@ARGV;
+}
+else
+{ @envFiles="$ENV{HOME}/.env/$ENV{SYSTEMID}.$ENV{ARCH}";
+}
+
+ENV:
+for $env (@envFiles)
+{ if (! ( $env eq '-'
+		? open(ENV,">&STDOUT")
+		: sysopen(ENV,$env,1)
+	))
+  { warn "$cmd: can't write to $env: $!\n";
+    next ENV;
+  }
+
+  print ENV @ENV;
+  close(ENV);
+}
