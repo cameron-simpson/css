@@ -19,6 +19,8 @@ $::Usage="Usage: $::cmd [-h host] [-d dbd] [db.]table [fields...] \\
 			[WHERE condition]
 	-h host	Alternate host to contact. Default: $::DfltHost.
 	-d dbd	Alternate DBD backend to use. Default: $::DfltDBD.
+	-s field Sort on the named field (lexical).
+	-r	Sort in reverse.
 	db.	Database name. Default: $::DfltDB.
 ";
 
@@ -26,11 +28,15 @@ my $host=$::DfltHost;
 my $dbd=$::DfltDBD;
 my $dbname=$::DfltDB;
 my $dbtable;
+my $sortfield;
+my $sortreverse=0;
 
 my $badopts=0;
-getopt('d:h:') && ($badopts=1);
+getopts('rd:h:s:') || ($badopts=1);
 $host=$::opt_h if defined $::opt_h;
 $dbd=$::opt_d if defined $::opt_d;
+$sortfield=$::opt_s if defined $::opt_s;
+$sortreverse=1 if defined $::opt_r;
 
 if (! @ARGV)
 { warn "$::cmd: missing db.table\n";
@@ -42,7 +48,6 @@ else
   { $dbname=$1; $dbtable=$';
   }
 }
-## warn "dbname=$dbname, dbtable=$dbtable";
 
 die $::Usage if $badopts;
 
@@ -52,8 +57,11 @@ while (@ARGV && $ARGV[0] ne 'WHERE')
 { push(@fields, shift(@ARGV));
 }
 
-my $where = join(' ', @ARGV);
-$where=" $where" if length $where;
+if ($ARGV[0] eq WHERE)
+{ shift(@ARGV);
+}
+
+my $where = (@ARGV == 0 ? "TRUE" : join(' ', @ARGV));
 
 my $dsn = "DBI:${dbd}:database=${dbname}";
 $dsn.=";host=$host" if length $host;
@@ -63,7 +71,18 @@ my $dbh = DBI->connect($dsn,@login);
 die "$::cmd: can't get DBI handle for \"$dsn\"\n"
 	if ! defined $dbh;
 
-my $sth = cs::DBI::sql($dbh,"SELECT * FROM $dbtable$where");
+my $sql = "SELECT ".(@fields ? join(", ", @fields) : '*')
+        . " FROM $dbtable"
+	. " WHERE $where"
+	;
+if (defined $sortfield)
+{ $sql .= " ORDER BY $sortfield";
+  if ($sortreverse)
+  { $sql.=" DESC";
+  }
+}
+##warn "SQL=[$sql]";
+my $sth = cs::DBI::sql($dbh,$sql);
 die "$::cmd: can't make query for table \"$dbtable\"$where\n"
 	if ! defined $sth;
 die "$::cmd: can't run query on \"$dbtable\"\n"
