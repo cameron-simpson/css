@@ -4,6 +4,16 @@
 #	- Cameron Simpson <cs@zip.com.au> 20jun98
 #
 
+=head1 NAME
+
+cs::Range - a set of positive numeric ranges, such as found in a newsrc file
+
+=head1 SYNOPSIS
+
+use cs::Range;
+
+=cut
+
 use strict qw(vars);
 
 BEGIN { use cs::DEBUG; cs::DEBUG::using(__FILE__); }
@@ -17,6 +27,17 @@ $cs::Range::_Epsilon=1;	# integers
 # pattern for numbers - 3 subpatterns
 $cs::Range::_numptn='\\(-?\\d+(\\.\\d*)?\\)|(\\d+(\\.\\d*)?)';
 ## warn "numptn=[$cs::Range::_numptn]";
+
+=head1 OBJECT CREATION
+
+=over 4
+
+=item new cs::Range (I<irange>,I<roundfn>)
+
+Create a new B<cs::Range> with initial values form the text string I<irange>,
+which is applied with the B<AddRange()> method.
+
+=cut
 
 sub new
 { my($class,$iRange,$roundfn)=@_;
@@ -32,6 +53,18 @@ sub new
 
   $this;
 }
+
+=back
+
+=head1 OBJECT METHODS
+
+=over 4
+
+=item AddText(I<range>)
+
+Add the range in the supplied text string to this object.
+
+=cut
 
 sub AddText
 { my($this,$iRange)=@_;
@@ -62,6 +95,13 @@ sub AddText
 
 sub noRounding { wantarray ? shift : @_ }
 
+=item Add(I<low>,I<high>)
+
+Add the values from I<low> to I<high> inclusive.
+I<high> is optional, and defaults to I<low>.
+
+=cut
+
 sub Add
 { my($this,$low,$high)=@_;
   $high=$low if ! defined $high;
@@ -71,8 +111,8 @@ sub Add
   my($ranges)=$this->{RANGE};
 
   if (! @$ranges)
-	{ push(@$ranges,[$low,$high]);
-	}
+  { push(@$ranges,[$low,$high]);
+  }
   else
   { my($i,$j,$r);
 
@@ -103,6 +143,13 @@ sub Add
     $i=$j;
   }
 }
+
+=item Del(I<low>,I<high>)
+
+Delete the values from I<low> to I<high> inclusive.
+I<high> is optional, and defaults to I<low>.
+
+=cut
 
 sub Del
 { my($this,$low,$high)=@_;
@@ -177,24 +224,31 @@ sub _Coalesce
     }
 }
 
+=item SubRanges()
+
+Return an array of arrayrefs, each of the form B<[I<low>,I<high>]>.
+
+=cut
+
 sub SubRanges($;$)
-{ my($this,$noCopy)=@_;
-  $noCopy=0 if ! defined $noCopy;
+{ my($this)=@_;
 
   $this->_Coalesce();
-
-  # fast but damagable
-  return $this->{RANGE} if $noCopy;
 
   my(@sub)=();
 
   for my $r (@{$this->{RANGE}})
-  {
-    push(@sub,[$r->[0],$r->[1]]);
+  { push(@sub,[$r->[0],$r->[1]]);
   }
 
   @sub;
 }
+
+=item Text()
+
+Return the textual transcription of the object.
+
+=cut
 
 sub Text($)
 { my($this)=@_;
@@ -219,6 +273,12 @@ sub Text($)
   $_;
 }
 
+=item Enum()
+
+Return an array of every number in the range in order.
+
+=cut
+
 sub Enum($)
 { my($this)=@_;
 
@@ -233,6 +293,13 @@ sub Enum($)
   @e;
 }
 
+=item Bounds()
+
+Return the lowest and highest values in the range.
+Returns the array B<(0,0)> with an empty range.
+
+=cut
+
 sub Bounds($)
 { my($this)=@_;
 
@@ -242,6 +309,12 @@ sub Bounds($)
 
   ($range->[0]->[0],$range->[$#$range]->[1]);
 }
+
+=item InRange(I<n>)
+
+Test whether the value I<n> is in the range.
+
+=cut
 
 sub InRange($$)
 { my($this,$n)=@_;
@@ -259,6 +332,12 @@ sub InRange($$)
   0;
 }
 
+=item Invert()
+
+Return a new B<cs::Range> consisting of the gaps in this range.
+
+=cut
+
 # return a new range with all the gaps
 sub Invert($)
 { my($this)=@_;
@@ -275,17 +354,25 @@ sub Invert($)
   # the Add() method is an insertion and would be O(n^2)
   # if we walked forward
   for my $j (0..$#$range-1)
-	{ $i=$#$range-$j-1;
+  { $i=$#$range-$j-1;
 
-	  $glow =$range->[$i]->[1]+$cs::Range::_Epsilon;
-	  $ghigh=$range->[$i+1]->[0]-$cs::Range::_Epsilon;
+    $glow =$range->[$i]->[1]+$cs::Range::_Epsilon;
+    $ghigh=$range->[$i+1]->[0]-$cs::Range::_Epsilon;
 
-	  if ($glow <= $ghigh)
-		{ $gaps->Add($glow,$ghigh);
-		}
-	}
+    if ($glow <= $ghigh)
+    { $gaps->Add($glow,$ghigh);
+    }
+  }
 
   $gaps;
 }
+
+=back
+
+=head1 AUTHOR
+
+Cameron Simpson E<lt>cs@zip.com.auE<gt>
+
+=cut
 
 1;
