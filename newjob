@@ -27,3 +27,4 @@ then
 fi
 
 idset -i timer "$key" title "$*"
+[ -n "$DISPLAY" ] && fvwm-menu -1 Jobs fvwm-menu-jobs | fvwmcmd &
