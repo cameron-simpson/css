@@ -1,28 +1,29 @@
 #!/usr/bin/perl
 #
-# The CISRA database, direct access.
-# See CISRA::Meta for more flexible access.
-#	- Cameron Simpson <cs@zip.com.au> 15apr97
+# The database, direct access.
+# See cs::DB::Meta for more flexible access.
+#	- Cameron Simpson <cs@zip.com.au> 15apr1997
 #
 # External variables:
-#	$Dir	The dir containing the files.
+#	$Dir	The dir containing the files,
+#			default $ENV{DBDIR}
+#			or $ENV{HOME}/.db
 #	$DB
 #
 
 use strict qw(vars);
 
-use CISRA::Misc;
 use cs::Persist;
 
-package CISRA::DB;
+package cs::DB;
 
-$CISRA::DB::Dir="$CISRA::Dir/db";
+$cs::DB::Dir=(length $ENV{DBDIR} ? $ENV{DBDIR} : "$ENV{HOME}/.db");
 
 sub finish { cs::Persist::finish(); }
 
 sub dbpath
-	{ join('/',$CISRA::DB::Dir,@_);
-	}
+{ join('/',$cs::DB::Dir,@_);
+}
 
 # take keychain and give hash
 # XXX: make hash if missing?
@@ -38,7 +39,7 @@ sub db
 
   ## warn "keychain=[@$keychain], rw=$rw";
 
-  my($db)=cs::Persist::db($CISRA::DB::Dir,0);
+  my($db)=cs::Persist::db($cs::DB::Dir,0);
 
   for my $key (@$keychain)
   { ## warn "keychain - doing key \"$key\"";
@@ -46,7 +47,7 @@ sub db
     $db=$db->{$key};
   }
 
-  ## if ($rw) { my(@c)=caller;warn "CISRA::DB::db(rw=$rw) from [@c]" }
+  ## if ($rw) { my(@c)=caller;warn "cs::DB::db(rw=$rw) from [@c]" }
 
   (tied %$db)->SetReadWrite(1) if $rw && tied %$db;
 
