@@ -55,35 +55,35 @@ esac
 #
 case " $BUGSYSTEMS " in
   *' mailto:'*)
-		echo "$BUGSYSTEMS" \
-		| tr ' ' '\012' \
-		| sed '/^mailto:/!d
-		       s/^mailto://
-		       s/?/ /' \
-		| \
-		{
-		  # ensure no spurious envvars
-		  params=`env | sed -n 's/^\(PARAM_[A-Za-z0-9_]*\)=.*/\1/p'`
-		  eval unset $params	# no quotes to turn newlines into spaces
+    echo "$BUGSYSTEMS" \
+    | tr ' ' '\012' \
+    | sed '/^mailto:/!d
+	   s/^mailto://
+	   s/?/ /' \
+    | \
+    {
+      # ensure no spurious envvars
+      params=`env | sed -n 's/^\(PARAM_[A-Za-z0-9_]*\)=.*/\1/p'`
+      eval unset $params	# no quotes to turn newlines into spaces
 
-		  while read addr args
-		  do
-		    hdrs="To: $addr"
-		    subj=$headline
+      while read addr args
+      do
+	hdrs="To: $addr"
+	subj=$headline
 
-		    ( qsvals=`query_string2sh "$args"`
-		      eval "$qsvals"
-		      [ -n "$PARAM_subject" ] && subj="$PARAM_subject: $subj"
+	( qsvals=`query_string2sh "$args"`
+	  eval "$qsvals"
+	  [ -n "$PARAM_subject" ] && subj="$PARAM_subject: $subj"
 
-		      echo "To: $addr"
-		      echo "Subject: $subj"
-		      echo "X-Buglog-Date: `date`"
-		      echo
-		      cat "$attachment"
-		    ) | sendmail -oi "$addr"
-		  done
-		}
-		;;
+	  echo "To: $addr"
+	  echo "Subject: $subj"
+	  echo "X-Buglog-Date: `date`"
+	  echo
+	  cat "$attachment"
+	) | sendmail -oi "$addr"
+      done
+    }
+    ;;
 esac
 
 # =item B<ddts>
