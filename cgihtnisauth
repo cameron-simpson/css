@@ -1,0 +1,43 @@
+#!/bin/sh
+#
+# Script to require UNIX NIS login for a CGI script.
+#	- Cameron Simpson <cs@zip.com.au> 12feb2001
+#
+# Exit status: 0 for a match, with userid on stdout.
+#              1 for failure, with 401 response on stdout.
+#
+# Use in CGI sh script:
+#	userid=`cgihtnisauth` || { echo "$userid"; exit 0; }
+#
+# Use in CGI perl script:
+#	$userid=`cgihtnisauth`;
+#	if ($? != 0)	{ print $userid; exit 0; }
+#	chomp($userid);
+#
+# That spits out the 401 and exits cleanly on auth failure,
+# and continues with the login name in $userid on auth success.
+#
+
+authhdr=$HTTP_AUTHORIZATION
+realm="UNIX Login"
+
+[ -n "$authhdr" ] \
+|| { echo "Status: 401"
+     echo "WWW-Authenticate: Basic realm=\"$realm\""
+     echo "Content-Type: text/plain"
+     echo
+     echo "Authorisation needed for realm \"$realm\"."
+     exit 1
+   }
+
+userid=`htnisauth` \
+|| { echo "Status: 401"
+     echo "WWW-Authenticate: Basic realm=\"$realm\""
+     echo "Content-Type: text/plain"
+     echo
+     echo "Invalid authorisation for realm \"$realm\"."
+     exit 1
+   }
+
+echo "$userid"
+exit 0
