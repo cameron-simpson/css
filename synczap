@@ -11,6 +11,7 @@ base=http://adzapper.sourceforge.net
 
 cd "$webdir" || exit 1
 pwd
+myke || exit 1
 
 set -u
 
@@ -18,18 +19,12 @@ news=`readdottext`
 
 dodiff=1
 commit=
-[ $# = 0 ] && \
-    { dodiff=1
-      commit=1
-
-      while read addr
-      do  case "$addr" in
-		''|\#*)	;;
-		*)	set ${1+"$@"} "$addr" ;;
-	  esac
-      done < rc/users
-      set x "$@" adzapper-announce@lists.sourceforge.net; shift
-    }
+if [ $# = 0 ]
+then
+    dodiff=1
+    commit=1
+    set adzapper-announce@lists.sourceforge.net
+fi
 
 changetmp=/tmp/change.$$
 
@@ -65,13 +60,12 @@ then
     chmod a+r "$savedpl" "$pgpplsig"
 fi
 
-#[ $dodiff ] && { diff=$saved.diff
-#		 cvs diff -r LAST rc/patterns >"$diff"
-#		 chmod a+r "$diff"
-#		 mv "$diff" "$webdir/."
-#	       }
+[ $dodiff ] && { diff=$saved.diff
+		 cvs diff -r LAST rc/patterns >"$diff"
+		 chmod a+r "$diff"
+	       }
 
-synczip
+syncsf
 
 for user
 do  echo "$user..."
@@ -98,8 +92,7 @@ do  echo "$user..."
 	  echo
 	  echo "Cheers,"
 	  cat $HOME/rc/mail/signature
-        ) | mailsubj -s 'synopsis of adzap update' "$user"
-    mfiles "$user" "$script" </dev/null
+        ) | mutt -s 'adzap update' -a "$script" "$user"
 done
 
 [ $commit ] && cvs tag -F LAST
