@@ -1,0 +1,21 @@
+#!/usr/bin/perl
+#
+# Extract tokens from HTML.
+#	- Cameron Simpson, cs@zip.com.au, 15jun94
+#
+
+use strict qw(vars);
+
+use cs::Source;
+use cs::HTML;
+use cs::Hier;
+
+my($parse)=new cs::HTML (new cs::Source (FILE,STDIN));
+
+my($t);
+
+while (defined ($t=$parse->Tok()))
+	{ print cs::Hier::h2a($t,1), "\n";
+	}
+
+exit 0;
