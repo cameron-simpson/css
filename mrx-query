@@ -103,7 +103,6 @@ subn=1
 
 mhdir "$res" || xit=1
 
-sleep 10
 echo "$res"
 
 exit $xit
