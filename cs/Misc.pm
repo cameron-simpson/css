@@ -8,6 +8,8 @@ use strict qw(vars);
 
 BEGIN { use cs::DEBUG; cs::DEBUG::using(__FILE__); }
 
+$::DEBUG=0 if ! defined $::DEBUG;
+
 require 'flush.pl';	# for ::flush()
 use cs::Math;
 
@@ -34,8 +36,12 @@ sub ::need
 }
 
 sub ::log
-{ my(@c)=caller;
-  warn join('',@_)." at @c";;
+{ return if ! $::DEBUG;
+  local($_)=join('',@_);
+  $_.="\n" unless /\n$/;
+  warn $_;
+  ## my(@c)=caller;
+  ## warn join('',@_)." at @c";
 }
 
 ## if ($ENV{SYSTEMID} eq 'zip')
@@ -124,11 +130,11 @@ sub ::detab($;$)	# (tabbed,tabsize) -> untabbed
   $tabsize=8 if ! defined $tabsize;
 
   if (! defined $line)
-	{ ::need(cs::DEBUG);
-	  warn "\$line not defined\n";
-	  cs::DEBUG::pstack();
-	  die;
-	}
+  { ::need(cs::DEBUG);
+    warn "\$line not defined\n";
+    cs::DEBUG::pstack();
+    die;
+  }
 
   return '' if ! length $line;
 
@@ -140,9 +146,9 @@ sub ::detab($;$)	# (tabbed,tabsize) -> untabbed
   $_='';
   ## {my(@c)=caller;warn "line=[$line] from [@c]";}
   for my $chunk (split(/\t/,$line))
-	{ $_.=$chunk;
-	  $_.=(' ' x ($tabsize-(length($_) % $tabsize)));
-	}
+  { $_.=$chunk;
+    $_.=(' ' x ($tabsize-(length($_) % $tabsize)));
+  }
 
   s/[ \t]+$//;
 
