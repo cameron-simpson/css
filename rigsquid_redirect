@@ -28,7 +28,7 @@ then
     rc=$HOME/tmp/squid.conf$$
     envsub -p '\{\{([A-Z]\w*)\}\}' <$HOME/rc/squid/tplt >$rc
     case "$LOCATION" in
-	cisra)	;;
+	*|cisra)	;;
 	*)		bsed 's/^never_direct/##&/' $rc ;;
     esac
     set -x
