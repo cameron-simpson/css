@@ -1,12 +1,13 @@
 #!/bin/sh
 #
 # du in kilobytes.
-#	- Cameron Simpson <cs@zip.com.au> 24aug96
+#	- Cameron Simpson <cs@zip.com.au> 24aug1996
 #
 
 opt=
 case $OS in
-    solaris)	opt=-k ;;
+    openbsd|solaris)
+	opt=-k ;;
 esac
 
 exec du $opt ${1+"$@"}
