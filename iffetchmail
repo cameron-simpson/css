@@ -1,0 +1,11 @@
+#!/bin/sh
+#
+# Fetchmail returns several error codes, some of which are ok.
+# Transmute.
+#	- Cameron Simpson <cs@zip.com.au> 26jan2003
+#
+fetchmail ${1+"$@"}
+case $? in
+  0|1)	exit 0 ;;
+  *)	exit 1 ;;
+esac
