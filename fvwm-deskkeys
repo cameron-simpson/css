@@ -1,0 +1,14 @@
+#!/bin/sh
+#
+# Emit my FVWM desk switching key definitions.
+#	- Cameron Simpson <cs@zip.com.au> 10aug2002
+
+for fn in 1 2 3 4 5 6 7 8 9 10 11 12
+do  fn0=`expr $fn - 1`
+    fn12=`expr $fn + 11`
+    echo "KeyFn DeskOps \"SwitchToDesk $fn\" F$fn A M  \"SwitchToDesk 0 $fn0\""
+    echo "Key                                      F$fn A MS \"SwitchToDesk 0 $fn12\""
+    echo "KeyFn DeskOps \"PushToDesk $fn\"      F$fn W S  \"PushToDesk   0 $fn0\""
+    echo "Key                                      F$fn W CS   PushToDesk   0 $fn12"
+    echo "KeyFn DeskWinLists \"Desk $fn\"          F$fn R C  \"WindowList Desk $fn0, Alphabetic\""
+done
