@@ -1,0 +1,26 @@
+#!/bin/sh
+#
+# Called from pppssh to handle the remote end of the connection.
+#	- Cameron Simpson <cs@zip.com.au> 05oct2003
+#
+
+cmd=`basename "$0"`
+usage="Usage: $cmd host"
+
+: ${PPPSSH_PPPD:=/usr/sbin/pppd}	# local pppd
+: ${PPPSSH_RPPPD:=$PPPSSH_PPPD}		# remote pppd
+export PPPSSH_PPPD PPPSSH_RPPPD
+
+exec 2>>$HOME/ppp.log
+echo "[$0 $*]" >&2
+
+[ "x$1" = x-p ] && { port=$2; shift; shift; }
+
+host=$1; shift
+
+rcmd="exec '$PPPSSH_PPPD' notty local nodetach noauth"
+[ $# = 0 ] || rcmd="$*"
+
+set -x
+ssh -A -x "$host" "$rcmd"
+echo "$0: ssh exits with $?" >&2
