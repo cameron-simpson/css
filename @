@@ -7,13 +7,20 @@
 cmd=$0
 usage="Usage: $cmd [hosts...]"
 
-[ $# = 0 ] && case $SYSTEMID in
-		cisra)	set cage,ferrari,linux,solaris,cass,sweet,screen:ivory,screen:elph ;;
-		home)	set jekyll,janus,alpha ;;
-		*)	echo "$0: no default host list for SYSTEMID == \"$SYSTEMID\"" >&2
-			exit 1
-			;;
-              esac
+if [ $# = 0 ]
+then
+  case $HOST@$SYSTEMID in
+    kaper@cisra)
+	set cage,ferrari,linux,solaris,cass,sweet,screen:ivory,screen:elph ;;
+    amadeus@home)
+	set jekyll,janus,alpha ;;
+    newt@home)
+	set amadeus,janus ;;
+    *)	echo "$0: no default host list for SYSTEMID == \"$SYSTEMID\"" >&2
+	exit 1
+    ;;
+  esac
+fi
 
 host=$1; shift
 
