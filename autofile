@@ -1,0 +1,89 @@
+#!/bin/sh
+#
+# Try to file a file based on its name.
+#	- Cameron Simpson <cs@zip.com.au> 13jan2005
+#
+
+trace=set-x
+
+: ${TMPDIR:=/tmp}
+: ${AUTOFILE_REMAPFILE:=$HOME/rc/remap}
+: ${AUTOFILE_SAVEMAP:="remap \"\$AUTOFILE_REMAPFILE\""}
+
+cmd=`basename "$0"`
+usage="Usage: $cmd [-f mapfile] [filenames...]"
+
+badopts=
+
+[ "x$1" = "x-f" ] && { AUTOFILE_REMAPFILE=$2; shift; shift; }
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+[ $# = 0 ] && set -- -
+
+remaptmp=$TMPDIR/$cmd-remap$$
+
+for file
+do
+  if [ "x$file" = x- ]
+  then cat
+  else printf "%s\n" "$file"
+  fi
+done \
+| eval "set -vx; $AUTOFILE_SAVEMAP" \
+| \
+{
+  xit=0
+
+  while read -r oldname \
+  &&    read -r newname
+  do
+    [ -n "$newname" ] || continue
+    [ "x$oldname" != "x$newname" ] || continue
+    echo "$oldname -> $newname"
+
+    if [ ! -f "$oldname" ]
+    then
+      echo "$cmd: not a regular file: $oldname" >&2
+      xit=1
+      continue
+    fi
+
+    case "$newname" in
+      /* | ./* | ../* ) ;;
+      *) newname=$HOME/$newname ;;
+    esac
+    case "$newname" in
+      */)
+	if [ -d "$newname/." ] || $trace mkdir -p "$newname"
+	then
+	  $trace mrg "$newname" "$oldname" || xit=1
+	else
+	  xit=1
+	fi
+	;;
+      *)
+	if [ -f "$newname" ]
+	then
+	  if cmp -s "$oldname" "$newname"
+	  then
+	    echo "$cmd: identical files ($oldname and $newname), removing $oldname"
+	    $trace rm -- "$oldfile" || xit=1
+	  else
+	    echo "$cmd: differing file ($oldname and $newname), skipping $oldfile" >&2
+	    xit=1
+	  fi
+	else
+	  if [ -d "$newname/." ]
+	  then
+	    $trace mrg "$newname" "$oldname"
+	  else
+	    $trace mv -i -- "$oldfile" "$newfile" || xit=1
+	  fi
+	fi
+	;;
+    esac
+  done
+
+  exit $xit
+}
