@@ -1,0 +1,68 @@
+#!/bin/sh
+#
+
+usage="Usage: $0 [-a] [-v] [-x] [-xh] [-l login] [--] hosts ...
+	-a	Asynchronous rsh commands.
+	+a	Synchronous rsh commands.
+	-l login Set remote login name.
+	-v	Verbose.
+	-x	Trace execution.
+	-xh	Add hosts to xhost list."
+
+aflag=-a
+nflag=-n
+xflag=
+vflag=
+lflag=
+doxhost=
+badopts=
+while :
+do
+    case "$1" in
+	-a)	aflag=-a ;;
+	+a)	aflag= ;;
+	-v)	vflag=-v; ;;
+	-x)	xflag=-x; set -x ;;
+	-xh)	doxhost=1 ;;
+	-l)	lflag="-l $2"; shift ;;
+	--)	shift; break ;;
+	-*)	echo "$0: $1: unrecognised argument" >&2
+		badopts=1 ;;
+	*)	break ;;
+    esac
+    shift
+done
+
+case $# in
+    0)	echo "$0: missing host" >&2
+	badopts=1 ;;
+esac
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+eval "`setvar -n HOSTNAME INETADDR`"
+
+oDISPLAY=$DISPLAY
+case "$DISPLAY" in
+    '')	     DISPLAY=$INETADDR:0 ;;
+    :*)	     DISPLAY=$INETADDR$DISPLAY ;;
+esac
+export DISPLAY
+[ "x$oDISPLAY" != "x$DISPLAY" -a -n "$vflag" ] && echo "DISPLAY=$DISPLAY" >&2
+
+if [ -n "$vflag" ]; then silent=
+		    else silent='>/dev/null 2>&1'
+fi
+
+for h
+do
+    # /bin/sh so SysV sh doesn't go restricted on us
+    [ -n "$vflag" ] && echo "$h ..." >&2
+    [ $doxhost ] && xhost "+$h"
+    envrsh "$h" $aflag $nflag $xflag $vflag $lflag \
+	"DISPLAY='$DISPLAY'
+	 export DISPLAY
+	 eval \`set|sed -n 's/^\\([Xx][^=]*\\)=.*/\\1=; export \\1;/p'\`
+	 vflag=$vflag
+	 exec term -n '$h' $silent"
+done
