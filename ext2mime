@@ -5,7 +5,7 @@
 #
 
 cmd=$0
-usage="Usage: $0 filename"
+usage="Usage: $cmd filename"
 
 [ $# = 1 ] || { echo "$usage" >&2; exit 2; }
 file=$1; shift
