@@ -1,0 +1,9 @@
+#!/bin/sh
+#
+# Escape the value of a query value for URL embedding.
+#	- Cameron Simpson <cs@zip.com.au> 19nov98
+#
+
+echo "$*"|sed 's/+/%2b/g
+	       s/&/%26/g
+	       s/[       ][      ]*/+/g'`
