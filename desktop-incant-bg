@@ -4,7 +4,7 @@
 #	- Cameron Simpson <cs@zip.com.au> 28oct2004
 #
 
-awk '{ if (length($2) > 0)
+awk '{ if (length($2) > 0 && $2 != ".")
        { print "Colorset", 1024+$1, "AspectPixmap", $2
 	 cset=1024+$1
        }
