@@ -1,0 +1,123 @@
+#!/usr/bin/perl
+#
+# Read hotlists, print in canonical form, clean lists.
+#	- Cameron Simpson <cs@zip.com.au> 06sep95
+#
+
+($cmd=$0) =~ s:.*/::;
+$usage="Usage: $cmd hotlists...
+";
+
+use Getopt::Std;
+require 'cs/date.pl';
+
+$xit=0;
+
+push(@ARGV,'-') unless @ARGV;
+
+# load hotlists
+ARGV:
+  for $F (@ARGV)
+	{ @NF=();	# new file content
+	
+	  if ($F eq '-')		{ $FILE=STDIN; }
+	  elsif (open(FILE,"< $F\0"))	{ $FILE=FILE; }
+	  else
+	  { print STDERR "$cmd: can't open $F: $!\n";
+	    $xit=1;
+	    $FILE=STDIN;
+	    next ARGV;
+	  }
+
+	  $format=<$FILE>;
+	  next ARGV if ! defined $format;	# skip if empty
+	  chomp($format);
+
+	  @NF=("$format\n");
+
+	  if ($format eq 'ncsa-xmosaic-hotlist-format-1')
+		{ push(@NF,scalar(<$FILE>));
+		  &readmosaic($FILE,\@NF);
+		}
+	  elsif ($format =~ /^<\s*!--\s*ncsa-xmosaic-hotlist-format-2\s*-->/i)
+		{ &readmosaic2($FILE,\@NF);
+		}
+	  elsif ($format =~ /^<\s*!\s*DOCTYPE\s+MCOM-Bookmark-file-1\s*>/i
+	      || $format =~ /^<\s*!\s*DOCTYPE\s+NETSCAPE-Bookmark-file-1\s*>/i)
+		{ &readnetscape($FILE,\@NF);
+		}
+	  else
+	  { print STDERR "$cmd: $F: Sorry, I don't understand hotlist format \"$format\".\n";
+	    $xit=1;
+	    @NF=();
+	    next ARGV;
+	  }
+	}
+  continue
+	{ close($FILE) unless $FILE eq STDIN;
+	  if ($FILE ne STDIN && @NF)
+		{ if (! open(FILE,"> $F\0"))
+			{ print STDERR "$cmd: can't rewrite $F: $!\n";
+			  $xit=1;
+			}
+		  else
+		  { print FILE @NF;
+		    close(FILE);
+		  }
+		}
+	}
+
+exit $xit;
+
+sub readmosaic
+	{ local($FILE,$NF)=@_;
+
+	  Input:
+	    while (defined($info=<$FILE>)
+	      && defined($title=<$FILE>))
+		{ chop $title;
+
+		  ($url,$date)=($info =~ /^\s*(\S+)\s+(.*)/o);
+		  $date=&date'ctime2gm($date);
+
+		  &record($url,$date,$title);
+		}
+	}
+
+sub readmosaic2
+	{ local($FILE,$NF)=@_;
+
+	  Input:
+	    while (defined($info=<$FILE>))
+		{ if (! ($info =~ /<A\s+HREF="([^"]+)"[^>]*>\s*(.*\S)\s*<\s*\/\s*A\s*>/io))
+			{ push(@$NF,$info);
+			  next Input;
+			}
+
+		  ($href,$text)=($1,$2);
+
+		  &record($href,time,$text);
+		}
+	}
+
+sub readnetscape
+	{ local($FILE,$NF)=@_;
+
+	  Input:
+	    while (defined($info=<$FILE>))
+		{ if (! ($info =~ /<A\s+HREF="([^"]+)"\s+ADD_DATE="(\d+)"\s+LAST_VISIT="(\d+)"[^>]*>\s*(.*\S)\s*<\s*\/\s*A\s*>/io))
+			{ push(@$NF,$info);
+			  next Input;
+			}
+
+		  ($href,$add,$visit,$text)=($1,$2,$3,$4);
+
+		  &record($href,$add+0,$text);
+		}
+	}
+
+sub record
+	{ local($url,$date,$title)=@_;
+
+	  print $date, "\t", $url, "\t", $title, "\n";
+	}
