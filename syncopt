@@ -295,16 +295,17 @@ do
 
     # get unversioned name for $thing
     case "$thing" in
-	*-[0-9]*) nvthing=`expr "x$thing" : 'x\(.*\)-[0-9].*'`
-	     thingv=`expr "x$thing" : 'x.*-\([0-9].*\)'`
-	     if [ -z "$nvthing" -o -z "$thingv" ]
-	     then
-		 echo "$0: empty nvthing [$nvthing] or thingv [$thinv] !!" >&2
-		 echo "	SKIPPING $thing !!" >&2
-		 continue
-	     fi
-	     ;;
-	*)   nvthing=$thing thingv= ;;
+	*-[0-9]*)
+	    nvthing=`echo "$thing" | sed 's/-[0-9].*//'`
+	    thingv=`echo "$thing" | sed "s/^$nvthing-//"`
+	    if [ -z "$nvthing" -o -z "$thingv" ]
+	    then
+		echo "$0: empty nvthing [$nvthing] or thingv [$thinv] !!" >&2
+		echo "	SKIPPING $thing !!" >&2
+		continue
+	    fi
+	    ;;
+	*)  nvthing=$thing thingv= ;;
     esac
 
     # determine default behaviour:
