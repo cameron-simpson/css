@@ -1,0 +1,40 @@
+#!/bin/sh
+#
+# Update the mairix index for particular MH folders.
+#	- Cameron Simpson <cs@zip.com.au> 17mar2004
+#
+
+: ${MAILDIR:=$HOME/mail}
+
+vflag=
+
+cmd=`basename "$0"`
+usage="Usage: $cmd [-v] [mhdirs...]"
+
+badopts=
+
+[ "x$1" = x-v ] && { vflag=-v; shift; }
+
+# no args - update lots of stuff
+if [ $# = 0 ]
+then
+  set -- "$MAILDIR"/* "$MAILDIR/SAVED/"* "$MAILDIR/DELETED/"*
+fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+for folder
+do
+  # skip folders that are symlinks; presume finding them elsewhere
+  [ -L "$folder" ] && continue
+
+  # skip folders with readonly indices
+  db=$folder/.mairix.db
+  [ -f "$db" -a ! -w "$db" ] && continue
+
+  echo "$folder"
+  mrx-mkrc "$folder" || { xit=1; continue; }
+  mairix $vflag -f "$folder/.mairixrc" || xit=1
+done
+
+exit $xit
