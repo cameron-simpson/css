@@ -76,7 +76,7 @@ if (@ARGV == 1 && $ARGV[0] eq '-')
   }
 }
 else
-{ open(STDIN,"cvs log @ARGV |") || die "$0: can't pipe from \"cvs log @ARGV\": $!\n";
+{ open(STDIN,"cvs log $cvsopts @ARGV |") || die "$0: can't pipe from \"cvs log @ARGV\": $!\n";
 }
 
 while (defined ($_=<STDIN>))
@@ -171,13 +171,14 @@ for my $L (reverse sort cmplogs @log)
   }
 
   for my $comment (@C)
-  { if ($ObfuscateEmail)
+  {
+    if ($ObfuscateEmail)
     { $comment =~ s/(\S)\@(\S+)/$1-at-$2/g;
     }
 
     if (! defined $file || $file ne $f)
     { $file=$f;
-      print "      ".fref($file).": ";
+      print   "      ".fref($file).": ";
       $indent="      ".(' ' x length($file))."  ";
     }
     else
