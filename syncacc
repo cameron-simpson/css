@@ -83,6 +83,7 @@ exec \
 	'--exclude=/rc/secret/keys/*' \
 	'--exclude=/rc/secret/*' \
 	'--include=/rc/shell' \
+	'--include=/rc/squid' \
 	'--include=/rc/ssh' \
 	'--include=/rc/tdl' \
 	'--include=/rc/term' \
