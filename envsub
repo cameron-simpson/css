@@ -2,7 +2,7 @@
 #
 # Substitute environment parameters into text.
 # Lifted from my myke rule for installing manuals.
-#	- Cameron Simpson, 22jun93
+#	- Cameron Simpson, 22jun1993
 #
 
 use strict vars;
@@ -62,8 +62,8 @@ else
 exit $::Xit;
 
 sub envsub
-{ local($FILE,$file)=@_;
-  local($line,$val);
+{ my($FILE,$file)=@_;
+  my($line,$val);
 
   while (<$FILE>)
   { $line='';
