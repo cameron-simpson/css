@@ -17,15 +17,13 @@
 
 : ${TMPDIR:=/tmp}
 : ${USER:=`whoami`}
-: ${BUGSYSTEMS:="dlog logger mailto:$USER"}
+: ${BUGSYSTEMS:=`bugsystems`}
 
 cmd=`basename "$0"`
 usage="Usage: $cmd headline < description"
 
 [ $# = 1 ] || { echo "$usage" >&2; exit 2; }
 headline=$1; shift
-
-[ -n "$BUGSYSTEMS" ] || BUGSYSTEMS=dlog
 
 attachment=$TMPDIR/bugids$$
 trap 'rm -f "$attachment"' 0 1 2 13 15
