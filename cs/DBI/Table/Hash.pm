@@ -200,10 +200,12 @@ sub FETCH($$)
   ## warn "no hits for \"$key\"" if ! @rows;
   return undef if ! @rows;
 
-  warn "$0: FETCH($table,$key): multiple hits!"
-  if @rows > 1;
+  if (@rows > 1)
+  {
+    ::need(cs::Hier);
+    warn "$0: FETCH($table,$key): multiple hits!\n\t".join("\n\t",map(cs::Hier::h2a($_,0), @rows))."\n\t";
+  }
 
-  ## warn "rows[0]=".cs::Hier::h2a($rows[0],1);
   $this->_Stash($key,$rows[0]);
 }
 
