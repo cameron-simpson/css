@@ -1,0 +1,51 @@
+#!/bin/sh
+#
+# Return the last page (or nth-last) of lines from a log file
+# for use in things like fvwm-menu-recent-menubg and so forth.
+#	- Cameron Simpson <cs@zip.com.au> 19mar2003
+#
+
+unique=1
+start=0
+pagesize=20
+
+cmd=$0
+usage="Usage: $cmd [-u|+u] [startpage [pagesize]] <logfile
+	-u	Unique (default).
+	+u	Not unique."
+
+badopts=
+while :
+do  case $1 in
+      -u)	unique=1 ;;
+      +u)	unique= ;;
+      --)	shift; break ;;
+      -?*|+?*)	echo "$cmd: unrecognised option" >&2; badopts=1 ;;
+      *)	break ;;
+    esac
+    shift
+done
+
+case $1 in
+  [0-9]*)
+	start=$1; shift
+	case $1 in
+	  [1-9]*)
+		pagesize=$1; shift
+		;;
+	esac
+	;;
+esac
+
+[ $# = 0 ] || { echo "$cmd: extra arguments: $*" >&2; badopts=1; }
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+taillines=`expr \( $start + 1 \) \* $pagesize` || exit 1
+
+if [ $unique ]
+then  keeplast
+else  cat
+fi \
+| tail -$taillines \
+| sed "${pagesize}q"
