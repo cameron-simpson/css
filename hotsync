@@ -20,7 +20,7 @@ id=`ls -ldL "$PILOTPORT" | awk '{print$3}'`
 			   exit 1
 			 }
 
-histbackup --inplace "$syncdir" \
+histbackup --inplace --symlink LATEST "$syncdir" \
 || { echo "$cmd: $syncdir: backup fails, aborting sync" >&2
      exit 1
    }
