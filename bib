@@ -4,6 +4,8 @@
 #	- Cameron Simpson, 30nov93
 #
 
+: ${TMPDIR:=/tmp}
+
 usage="Usage: $0 [database]"
 
 badopts=
@@ -15,8 +17,8 @@ esac
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
-lastquery=/tmp/query$$
-allqueries=/tmp/queries$$
+lastquery=$TMPDIR/query$$
+allqueries=$TMPDIR/queries$$
 print='lpr'
 
 while necho '> '
