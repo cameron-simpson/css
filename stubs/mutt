@@ -15,4 +15,12 @@ esac
 # flush alert window when I read my important email
 [ "x$*" = 'x-f +attn' ] && { alert ''; alert ''; alert ''; }
 
+case "$TERM" in
+    xterm)
+	TERM=rxvt; export TERM
+	unset TERMINFO
+	unset TERMCAP
+	;;
+esac
+
 exec /usr/bin/mutt ${1+"$@"}
