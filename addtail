@@ -4,7 +4,10 @@
 #	- Cameron Simpson <cs@zip.com.au> 25may1996
 #
 
-control=${TAILF:-$HOME/.tailf}
+: ${TAILF:=$HOME/.tailf}
+: ${LOGDIR:=$HOME/var/log}
+
+control=$TAILF
 key=
 silent=
 delete=
@@ -34,7 +37,7 @@ else key=$1; shift
 fi
 
 if [ $# = 0 ]
-then file=$HOME/var/log/$key
+then file=$LOGDIR/$key
      if [ -z "$file" ]
      then echo "$cmd: no logmap for \"$key\"" >&2
 	  badopts=1
