@@ -14,5 +14,5 @@ exec \
   lock -1 -a "$lock" \
   no-ssh-agent \
   ssh-agent \
-  sh -c 'env|sed -n "s/^\\(SSH_[_A-Z]*\\)=.*/&; export \\1;/p" >"$VARRUN/ssh-agent-$HOST"; exec pause' \
+  sh -c 'env|sed -n "s/^\\(SSH_[_A-Z]*\\)=\\(.*\\)/\\1='\\2'; export \\1;/p" >"$VARRUN/ssh-agent-$HOST"; exec pause' \
   </dev/null
