@@ -48,8 +48,6 @@ if (@::Groups)
 
 $::Msg->ForceMsgID();
 
-$::Msg->WriteItem(new cs::Sink(FILE,STDOUT));
-
 my $msgtxt = '';
 $::Msg->WriteItem(new cs::Sink(SCALAR,\$msgtxt));
 
@@ -64,13 +62,31 @@ if (@::Groups)
   }
 }
 
-
 if (@::Email)
-{ warn "sending email to [@::Email]";
-  my $src = new cs::Source (SCALAR,$msgtxt);
-  if (! cs::Mail::Misc::smtpsend($src,@::Email))
-  { warn "$::cmd: mailing via $ENV{SMTPSERVER} fails\n";
-    $::Xit=1;
+# dispatch via sendmail unless $NO_LOCALSENDMAIL > 0, in which case use SMTP
+{ if ($ENV{NO_LOCALSENDMAIL} > 0)
+  { warn "sending email to [@::Email]";
+    my $src = new cs::Source (SCALAR,$msgtxt);
+    if (! cs::Mail::Misc::smtpsend($src,@::Email))
+    { warn "$::cmd: mailing via $ENV{SMTPSERVER} fails\n";
+      $::Xit=1;
+    }
+  }
+  else
+  { if (!open(SENDMAIL,"|-", "sendmail", "-oi", @::Email))
+    { warn "$::cmd: pipe to sendmail fails: $!";
+      $::Xit=1;
+    }
+    else
+    { if (! print SENDMAIL $msgtxt)
+      { warn "$::cmd: print to sendmail fails: $!";
+	$::Xit=1;
+      }
+      if (!close(SENDMAIL))
+      { warn "$::cmd: sendmail fails: $!";
+	$::Xit=1;
+      }
+    }
   }
 }
 
