@@ -1,0 +1,111 @@
+#!/bin/sh
+#
+# A spartan Interleaf->HTML by Hartmut Wilhelms <wilhelms@dfd.dlr.de> of the
+# Atmos Science Programme Office, German Remote Sensing Data Center.
+# It operates on Interleaf files saved in ASCII mode.
+#
+
+sed -e '# Script um alle Interleaf Umlaute, tabs und Newlines zu ersetzen
+	# Autor: H. Wilhelms, 8.11.93
+	s/<#e4>/d/g
+	s/<#c4>/D/g
+	s/<#f6>/v/g
+	s/<#d6>/V/g
+	s/<#fc>/|/g
+	s/<#dc>/\/g
+	s/<#df>/_/g
+	s/<Tab>/	/g
+	s/<HR>//g
+	s/<SR>//g
+	#
+	# Die inneren Texte der Graphiken entfernen
+	/^ *(T[0-9]*/,/^<End Text>)$/d
+	# Seitennummerierungen entfernen
+	s/^<|,"[0-9]*">//
+	# 
+	s/<"|:.*><F0>//g
+	#
+	s/<End Sub><F0>//g' ${1+"$@"} | \
+sed -e '# Sed script, um einen vorher mit umlaut.sed
+	# formatierten interleaf text in die Hypertext
+	# Sprache html umzuwandeln
+	# Autor: H. Wilhelms, 8.11.93
+	#
+	# Seitenummerierungen entfernen 
+	/^<|,"[0-9]*">$/d
+	s/^<|,"[0-9]*">//
+	# Komponenten mit Prefix entfernen, 
+	# der Prefix bleibt erhalten, wenn nicht leer
+	/<"|:/,/^$/{
+		N
+		s/<SR>//g
+		s/\n//g
+		P
+		D
+	}
+	# Alle Anderen Komponenten werden zu HTML Paragraphs
+	s/^<"[^",]*">/<P>/g
+	/^<"[^"]*"/,/^$/{
+		N
+		s/\n//g
+		s/<.*>/<P>/
+		$P
+	}
+	#
+	# Rahmen entfernen und entsprechend Markieren
+	/^<Frame/,/>$/{
+		/^<Frame.*$/i\
+	\
+	<Bild hier einf|gen>\
+	
+		d
+	}
+	#
+	# Automatische Numerierungen in eine Zeile Packen
+	/^<Autonum, /,/^$/{
+		N
+		s/\n//g
+		s/	/ /g
+		s/$/\
+	/
+		P
+		D
+	}' | \
+sed -e '# Sed script, um einen vorher mit umlaut.sed
+	# formatierten interleaf text in die Hypertext
+	# Sprache html umzuwandeln
+	# Autor: H. Wilhelms, 8.11.93
+	#
+	#
+	# Als HTML Dokument deklarieren
+	1i\
+	<HTML>
+	$a\
+	<\/HTML>
+	# Automatische Numerierungen in Header umwandeln
+	s/^<Autonum, .*, \([1-5]\),.*>[ 	]*\(.*\)$/<H\1>\2<\/H\1>/
+	#
+	s/<End Sub><F47@Z7@Lge>D<F0>/<LI>/g
+	s/<F47@Z7@Lge>D<F0>/<LI>/g
+	#
+	# Listenaufzdhlungen erkennen und bearbeiten
+	s/^<End Sub>\(.*\)<F0>/<DT>\
+	\1\
+	<DD>/' | \
+sed -e '# Sed script, um einen vorher mit umlaut.sed
+	# formatierten interleaf text in die Hypertext
+	# Sprache html umzuwandeln
+	# Autor: H. Wilhelms, 8.11.93
+	#
+	#
+	# Wenn am Ende der Zeile kein Blank, dann Wort zusammenbauen
+	/[^> ]$/{
+		N
+		s/\n\(.* \)/\1\
+	/g
+		P
+		D
+		b
+	}
+	#
+	s/<"[^>]*>//g'
