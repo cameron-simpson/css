@@ -5,14 +5,32 @@
 #
 
 cmd=$0
-usage="Usage: $cmd [-n] srcdir destdir [findopts...]"
+usage="Usage: $cmd [-n] [-z] srcdir destdir [findopts...]"
 
 mrgopts=
 
-[ "x$1" = x-n ] && { mrgopts="$mrgopts -n"; shift; }
+badopts=
 
-[ $# = 2 ] || { echo "$usage" >&2; exit 2; }
-src=$1 dest=$2; shift; shift
+while :
+do  case $1 in
+      -n|-z)	mrgopts="$mrgopts $1" ;;
+      --)	shift; break ;;
+      -?*)	echo "$cmd: unrecognised option: $1" >&2; badopts=1 ;;
+      *)	break ;;
+    esac
+    shift
+done
+
+if [ $# -lt 2 ]
+then
+    echo "$cmd: missing srcdir or destdir" >&2
+    badopts=1
+else
+    src=$1 dest=$2
+    shift; shift
+fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
 
 dest=`cd "$dest" || exit 1; pwd` || exit 1
 
