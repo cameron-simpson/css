@@ -34,7 +34,7 @@ case "$server" in
 esac
 
 set -x
-exec + \
+exec + +s \
 	-e "set imap_pass=\"$fm_pass\"" \
 	-e "set tunnel=\"$tunnel\"" \
 	imap://$fm_user@$server/INBOX
