@@ -1,0 +1,77 @@
+#!/bin/sh
+#
+# Wrapper for "gm montage" to try to size things easily.
+#	- Cameron Simpson <cs@zip.com.au> 25feb2005
+#
+
+: ${TMPDIR:=/tmp}
+
+cmd=`basename "$0"`
+usage="Usage: $cmd -g XxY images..."
+
+geom=
+
+badopts=
+
+while :
+do
+  case "$1" in
+    -g)	geom=$2; shift ;;
+    --)	shift; break ;;
+    -?*)echo "$cmd: unrecognised option: $1" >&2
+	badopts=1
+	;;
+    *)	break ;;
+  esac
+  shift
+done
+
+if [ -z "$geom" ]
+then
+  echo "$cmd: missing -g option" >&2
+  badopts=1
+else
+  nx=`expr "x$geom" : 'x\([1-9][0-9]*\)x.*'` \
+	  || { echo "$cmd: bad X value in -g geometry: $geom" >&2
+	       badopts=1
+	     }
+  ny=`expr "x$geom" : 'x[1-9][0-9]*x\([1-9][0-9]*\)'` \
+	  || { echo "$cmd: bad Y value in -g geometry: $geom" >&2
+	       badopts=1
+	     }
+fi
+
+nimages=`expr "$nx" '*' "$ny"` || exit 1
+if [ $# != "$nimages" ]
+then
+  echo "$cmd: number of images doesn't match geometry: expected $nimages, found $# images" >&2
+  badopts=1
+fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+dx=`expr "$X11_X" / $nx`
+dy=`expr "$X11_Y" / $ny`
+
+# convert images to real files, set up montage args
+tmpimg=$TMPDIR/$cmd.$$.png
+ok=1
+first=1
+for arg
+do
+  [ $first ] && { set --; first=; }
+  case "$arg" in
+    http://* | ftp://* )
+      arg=`set-x withurl -C "$arg" echo` || ok=
+      ;;
+    X:*)
+      set-x gm convert "$arg" "$tmpimg" || ok=
+      arg=`imagecache "$tmpimg"` || ok=
+      ;;
+    *)[ -f "$arg" ] || { echo "$cmd: $img: not a file" >&2; ok=; }
+      ;;
+  esac
+  set -- ${1+"$@"} -geometry "${dx}x${dy}" "$arg"
+done
+
+set-x gm montage +label -tile "${nx}x${ny}" "$@" "$tmpimg" && echo "$tmpimg"
