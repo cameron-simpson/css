@@ -1,0 +1,540 @@
+#!/usr/bin/perl
+#
+# Budget reporting.
+#	- Cameron Simpson <cs@zip.com.au> 05aug98
+#
+
+use strict qw(vars);
+
+use cs::Object;
+use cs::Misc;
+use cs::Persist;
+use cs::HTML;
+use cs::Web::Bookmarks;
+use cs::Upd;
+use CISRA::Misc;
+use CISRA::Web;
+use CISRA::TimeSheets::Report;
+
+$::Usage="Usage: $::cmd mcodes...\n";
+
+$::Xit=0;
+
+$::WebRoot="$CISRA::Web::Dir/rep/bud";
+$::Colours={ BGCOLOR => "white",
+	     TEXT => "black",
+	     LINK => "blue",
+	     ALINK => "red",
+	     VLINK => "black",
+	   };
+nl("loading bookmarks...");
+$::TOCdbFile="$::WebRoot/.toc.db";
+$::TOC=new cs::Web::Bookmarks ("Monthly Timesheet Reports",{},$::TOCdbFile);
+
+MONTH:
+  for my $mcode (@ARGV)
+    { 
+      my($mdir)="$::WebRoot/$mcode";
+      if (! -d "$mdir/." && ! mkdir($mdir,0777))
+	{ warn "$::cmd: mkdir($mdir): $!\n";
+	  next MONTH;
+	}
+
+      $::MTOC=new cs::Web::Bookmarks ("Monthly Timesheet Reports for $mcode",{});
+
+      nl("computing budrep($mcode)...");
+      my $brep = CISRA::TimeSheets::Report::budrep($mcode);
+
+      my $toc = $::MTOC;
+      $toc->AddEntry("Help", { HREF => '/timesheets/help_rep1.html' });
+
+      if (! defined $brep)
+	{ warn "$::cmd: no report for month \"$mcode\"\n";
+	  $::Xit=1;
+	  next MONTH;
+	}
+
+      my(@pcodes) = ::uniq($brep->ColKeys(),
+			   keys %{CISRA::Groups::liveAcctDB()});
+
+      # for every project, report users and competing projects
+      {
+	## nl("reporting users by project ...");
+	my $pptoc = $toc->Find("Per Project Reports",1);
+
+       PERPROJ:
+	for my $pcode (@pcodes)
+	{
+	  my $href = "projects/$pcode.shtml";
+	  ## out("pcode - href=$href");
+
+	  $pptoc->AddEntry("$pcode - ".projName($pcode), { HREF => $href });
+	  htmlrep("$::WebRoot/$mcode/$href",
+		  "Per Project Report for $pcode: "
+			.projName($pcode)
+			." for month $mcode"
+			,
+		  perproj($brep,$mcode,$pcode))
+	  || ($::Xit=1);
+
+	  ## last PERPROJ;
+	}
+      }
+
+      # for every leader, report projects and competing projects
+      {
+	## nl("reporting projects by leader ...");
+	my $pltoc = $toc->Find("Per Project Leader Reports",1);
+
+	my %lpcodes;
+
+	for my $pcode (@pcodes)
+	{
+	  for my $leader (grpAdmin($pcode))
+	  {
+	    ## out("$pcode/$leader");
+	    if (! exists $lpcodes{$leader})
+		{ $lpcodes{$leader}=[$pcode];
+		}
+	    else{ push(@{$lpcodes{$leader}},$pcode);
+		}
+	  }
+	}
+
+	for my $leader (sort { userName($a) cmp userName($b) } keys %lpcodes)
+	{
+	  my(@lpcodes)=@{$lpcodes{$leader}};
+
+	  my $href = "leaders/$leader.shtml";
+
+	  $pltoc->AddEntry(userName($leader)." [@lpcodes]", { HREF => $href });
+	  htmlrep("$::WebRoot/$mcode/$href",
+		  "Per Project Leader Report for "
+			.userName($leader)
+			." [@lpcodes]"
+			." for month $mcode"
+			,
+		  perldr($mcode,$brep,$leader,@lpcodes))
+	  || ($::Xit=1);
+	}
+      }
+
+      # for every manager, report projects and competing projects
+      {
+	my($mgrtoc)=$toc->Find("Per Project Manager Reports",1);
+
+	my %mpcodes;
+
+	for my $pcode (@pcodes)
+	{
+	  for my $manager (grpAdmin($pcode,'manager'))
+	  {
+	    if (! exists $mpcodes{$manager})
+		{ $mpcodes{$manager}=[$pcode];
+		}
+	    else{ push(@{$mpcodes{$manager}},$pcode);
+		}
+	  }
+	}
+
+	for my $manager (sort { userName($a) cmp userName($b) } keys %mpcodes)
+	{
+	  my(@mpcodes)=@{$mpcodes{$manager}};
+
+	  my $href = "managers/$manager.shtml";
+
+	  $mgrtoc->AddEntry(userName($manager)." [@mpcodes]", { HREF => $href });
+	  htmlrep("$::WebRoot/$mcode/$href",
+		  "Per Project Manager Report for "
+			.userName($manager)
+			." [@mpcodes]"
+			." for month $mcode"
+			,
+		  perldr($mcode,$brep,$manager,@mpcodes))
+	  || ($::Xit=1);
+	}
+      }
+
+      # for every user, report projects
+      # XXX - maybe not - maybe one big flat report?
+
+      $::MTOC->WriteMarks("$mdir/index.html");
+      undef $::MTOC;
+
+      # note month in bookmarks
+      $::TOC->AddEntry($mcode,{ HREF => "$mcode/index.html" },1);
+    }
+
+$::TOC->WriteMarks("$::WebRoot/index.html");
+undef $::TOC;
+
+nl("FINISHED");
+cs::Persist::finish();
+
+exit $::Xit;
+
+sub perproj
+	{ my($brep,$mcode,$pcode)=@_;
+
+	  # make report; ensure USER and source project come first
+	  my($this)=new CISRA::TimeSheets::Report ({},USER,$pcode);
+	  $this->Default(sub {[["&nbsp;"]]});
+
+	  # collate users
+	  my(@users)=();
+	  for my $user ($brep->RowKeys())
+		{
+		  my $bdat = $brep->Datum($pcode,$user);
+		  if ($bdat->[0] || $bdat->[1])
+			{ push(@users,$user);
+			}
+		  else	{ ## warn "skip $pcode/$user\n";
+			}
+		}
+	  @users=sort { userName($a) cmp userName($b) } ::uniq(@users);
+
+	  # collate projects implied by users
+	  my(@pcodes)=$pcode;
+	  for my $user (@users)
+	  {
+	    for my $bpcode ($brep->ColKeys())
+	    { my $bdat = $brep->Datum($bpcode,$user);
+	      if ($bdat->[0] || $bdat->[1])
+		{ push(@pcodes,$bpcode);
+		}
+	    }
+	  }
+
+	  { local(@::basePCodes)=$pcode;
+	    purep($this,$mcode,$brep,[::uniq(@pcodes)],[@users]);
+	  }
+	}
+
+sub perldr
+	{ my($mcode,$brep,$leader,@lpcodes)=@_;
+
+	  ## out("perlldr($mcode/$leader)...");
+	  # make report; ensure USER and source projects come first
+	  my($this)=new CISRA::TimeSheets::Report ({},USER,sort @lpcodes);
+	  $this->Default(sub {[["&nbsp;"]]});
+
+	  # collate users
+	  my(@users)=();
+	  for my $user ($brep->RowKeys())
+	  {
+	    for my $pcode (@lpcodes)
+		{
+		  my $bdat = $brep->Datum($pcode,$user);
+		  if ($bdat->[0] || $bdat->[1])
+			{ push(@users,$user);
+			}
+		  else	{ ## warn "skip $pcode/$user\n";
+			}
+		}
+	  }
+	  @users=sort { userName($a) cmp userName($b) } ::uniq(@users);
+
+	  # collate projects implied by users
+	  my(@pcodes)=@lpcodes;
+	  for my $user (@users)
+	  {
+	    for my $bpcode ($brep->ColKeys())
+	    { my $bdat = $brep->Datum($bpcode,$user);
+	      if ($bdat->[0] || $bdat->[1])
+		{ push(@pcodes,$bpcode);
+		}
+	    }
+	  }
+
+	  { local(@::basePCodes)=@lpcodes;
+	    purep($this,$mcode,$brep,[::uniq(@pcodes)],[@users]);
+	  }
+	}
+
+# draw up a standard budget comparison table
+# with the specified projects and users
+sub purep
+{ my($this,$mcode,$brep,$pcodes,$users)=@_;
+  my(@pcodes)=@$pcodes;
+  my(@users)=@$users;
+
+  my($tsRep)=$brep->{STATE}->{TSREP};
+
+  for my $user (@users)
+  {
+    my $U = CISRA::UserData::user($user);
+    my $isContract = $U->IsContractor();
+
+    $this->Store(USER,$user,
+		 [userSummary($user,
+			     $brep->{STATE}->{USERTIMESUMMARY}->{$user},
+			     $tsRep->Datum(TOTAL,$user))
+		 ]
+		);
+
+    for my $upcode (@pcodes)
+    {
+      my $bdat = $brep->Datum($upcode,$user);
+      if ($bdat->[0] || $bdat->[1])
+	{ my(@celhtml)=(
+			($isContract ? ([SMALL,'contractor'],[BR]) : ()),
+			sprintf("%3.2f : %3.2f",
+				$bdat->[0],
+				$bdat->[1]),
+			[BR],
+			sprintf("(%3.1f",
+				$bdat->[2]),
+			["&nbsp;"],
+			"hours)",
+		       );
+
+	  ## warn "$mcode/[@pcodes]: 0=$bdat->[0], 1=$bdat->[1]";
+	  if (abs($bdat->[0]-$bdat->[1]) > 0.1
+	   && ($upcode >= 100)
+	     )
+		{ @celhtml=[FONT,{COLOR => RED},@celhtml];
+		## warn "RED";
+		}
+	  ## else{warn "BLACK"}
+
+	  $this->Store($upcode,$user,[@celhtml]);
+	}
+      else
+      { ## warn "bdat($upcode,$user)=".cs::Hier::h2a($bdat,0);
+      }
+    }
+  }
+
+  my(@colkeys)=$this->ColKeys();
+
+  # total the budget and actual man months for the projects
+  my(%btotal,%atotal);
+  for my $rpcode (@colkeys[1..$#colkeys])
+  {
+    my $bdat;
+
+    for my $user (@users)
+    { $bdat=$brep->Datum($rpcode,$user);
+      $btotal{$rpcode}+=$bdat->[0];
+      $atotal{$rpcode}+=$bdat->[1];
+    }
+  }
+
+  # title for the projects
+  for my $rpcode (@colkeys[1..$#colkeys])
+  {
+    my $short = short($rpcode);
+    my @thtml = (projName($rpcode),
+		 [BR],
+		 ( $short eq $rpcode
+		 ? $rpcode
+		 : "$short - $rpcode"
+		 ),
+		 [BR],
+		 "budget:actual",
+		 [BR],
+		 sprintf("%3.1f:%3.1f",
+			 $btotal{$rpcode},
+			 $atotal{$rpcode}),
+		);
+
+    if (grep($_ eq $rpcode, @::basePCodes))
+	{ push(@thtml,
+		[BR],
+		["<!--#include"
+		." virtual=\"/cgi-bin/budrep-button.cgi?MCODE=$mcode&ACCTCODE=$rpcode\"-->"
+		]);
+	}
+
+    $this->ColTitle($rpcode,[@thtml]);
+  }
+
+  $this;
+}
+
+sub userSummary
+{ my($user,$userTimes,$totalHours)=@_;
+
+  my(@chtml)=( [A,{HREF => "/cgi-bin/user.cgi?user=$user"},
+		  userName($user)
+	       ],
+	       ["&nbsp;"], "(",
+	       [A,{HREF => "/db/timesheets/sheets/$user/"},
+		sprintf("%3.1f",$totalHours),
+		["&nbsp;"],
+		"hours",
+	       ], ")",
+	     );
+
+  { 
+    my(@summary)=();
+    for my $sum (@$userTimes)
+	{ push(@summary,", ") if @summary;
+	  push(@summary,
+		    sprintf("%d%%",$sum->[1]),
+		    ['&nbsp;'],
+		    short($sum->[0])
+	      );
+	}
+
+    push(@chtml,[BR],@summary) if @summary;
+  }
+
+  @chtml;
+}
+
+sub userName($)
+{ my($user)=@_;
+
+  my $u;
+  return $u->{NAME} if defined ($u=CISRA::UserData::user($user));
+
+  $user;
+}
+
+sub projName
+{ my $desc = CISRA::TimeSheets::Report::projDesc(@_);
+  $desc =~ s/\s*\(.*\)//g;
+  $desc;
+}
+
+sub short
+{ CISRA::TimeSheets::Report::short(@_);
+}
+
+sub htmlrep
+{ my($path,$title,$rep)=@_;
+
+  my(@html)=();
+
+  push(@html,[H1,$title],"\n",
+	     "[ ", [A,{HREF => '/timesheets/help_rep1.html'},"Help"],
+	     " ]",[P],
+      );
+
+  my(@colkeys)=$rep->ColKeys();
+
+  my(@tr)=([TR,
+	    map([TH,{},
+		    [A,{HREF => "../projects/$_.shtml"},
+		       @{$rep->ColTitle($_)}
+		    ],
+		], @colkeys)
+	   ], "\n");
+
+  for my $rowkey ($rep->RowKeys())
+  {
+    my(@td)=();
+    for my $colkey (@colkeys)
+    { push(@td,[TD,{ALIGN => ($colkey eq USER ? LEFT : CENTER)},
+		   @{$rep->Datum($colkey,$rowkey)}],"\n\t");
+    }
+    push(@tr,[TR,{},@td]);
+  }
+
+  push(@html,[TABLE,{BORDER => 1},@tr],"\n");
+
+  my($s);
+  if (! defined ($s=mkSink($path,1)))
+	{ warn "$::cmd: can't rewrite \"$path\": $!\n";
+	  return 0;
+	}
+
+  warn "writing $path...";
+  $s->Put(
+	cs::HTML::tok2a(
+		cs::HTML::HTML($title,
+				[],
+				$::Colours,
+				@html)));
+
+  1;
+}
+
+sub mkSink
+{ my($path,$makedirs)=@_;
+  $makedirs=0 if ! defined $makedirs;
+
+  if ($makedirs)
+	{ my($dir)=cs::Pathname::dirname($path);
+	  cs::Pathname::makedir($dir)
+		|| warn "$::cmd: makedir($dir): $!\n";
+	}
+
+  my($s)=cs::Sink::open($path);
+  warn "sink($path): $!" if ! defined $s;
+  $s;
+}
+
+sub chkmrep
+{ my($mrep)=@_;
+  my(@bugs)=();
+
+  for my $pcode (sort keys %$mrep)
+	{ my($p)=$mrep->{$pcode};
+	  for my $user (sort keys %$p)
+		{ my($u)=$p->{$user};
+		  if (! ref $u)
+			{ push(@bugs,"$pcode/$user: not ref [$u]");
+			}
+		  elsif (::reftype($u) ne ARRAY)
+			{ push(@bugs,"$pcode/$user: not ARRAY [$u]");
+			}
+		  elsif (@$u != 3)
+			{ push(@bugs,"$pcode/$user: wrong size [@$u]");
+			}
+		}
+	}
+
+  return @bugs;
+}
+
+sub audb(\%$$)
+{ my($audb,$pcode,$user)=@_;
+
+  ## ::out("audb=$audb, pcode=$pcode, user=$user");
+  if (! exists $audb->{$pcode})
+	{ # return 0 if $holeOk;
+	  my(@c)=caller;
+	  die "no audb($audb)->{$pcode} from [@c]";
+	}
+
+  my($subaudb)=$audb->{$pcode};
+  if (! exists $subaudb->{$user})
+	{ # return 0 if $holeOk;
+	  my(@c)=caller;
+	  die "no audb($audb)->{$pcode}->{$user} from [@c]";
+	}
+
+  $subaudb->{$user};
+}
+
+# return budgeted to bdb->{mcode}(pcode,user) in man-months
+sub budgeted(\%$$$)
+	{ my($bdb,$mcode,$pcode,$user)=@_;
+	  return 0 if ! exists $bdb->{$pcode};
+	  $bdb=$bdb->{$pcode};
+	  return 0 if ! exists $bdb->{BUDGET};
+	  return 0 if ! exists $bdb->{BUDGET}->{$mcode};
+	  $bdb=$bdb->{BUDGET}->{$mcode};
+	  return 0 if ! exists $bdb->{$user};
+	  $bdb->{$user};
+	}
+
+# (pcode[,role]) => @adminLogins
+sub grpAdmin
+	{ my($pcode,$role)=@_;
+	  $role='leader' if ! defined $role;
+
+	  my($GDB)=CISRA::TimeSheets::Report::db(ACCTGROUPS);
+
+	  return "NONE" if ! exists $GDB->{$pcode};
+
+	  my($G)=$GDB->{$pcode};
+	  return "NONE" if ! exists $G->{MEMBERS};
+	  return "NONE" if ! exists $G->{MEMBERS}->{$role};
+
+	  my($m)=$G->{MEMBERS}->{$role};
+
+	  return ref($m) ? @$m : $m;
+	}
