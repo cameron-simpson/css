@@ -12,7 +12,7 @@ target=
 
 
 query=$*
-[ -n "$query" ] || query=`cutbuffer`
+[ -n "$query" ] || query=`xclip -o` || exit 1
 oquery=$query
 query=`qsencode "$query"`
 
