@@ -1,0 +1,36 @@
+#!/bin/sh
+#
+# Set the cpulimit then run a command.
+# Exit status:
+#	0 - command exited with 0.
+#	1 - command exited with nonzero.
+#	2 - command exited because of cpu limit.
+# - Cameron Simpson <cs@zip.com.au> 15apr2004
+#
+
+cmd=$0
+usage="Usage: $cmd limit command [args...]"
+
+badopts=
+
+if [ $# = 0 ]
+then
+    echo "$cmd: missing limit" >&2; badopts=1
+else
+    limit=$1; shift
+    if [ $# = 0 ]
+    then
+	echo "$cmd: missing command" >&2
+	badopts=1
+    fi
+fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+ulimit -t "$limit" || exit 1
+"$@"
+case $? in
+  0)	exit 0 ;;	# normal exit
+  137)	exit 2 ;;	# SIGKILLed - presume CPU limit reached
+  *)	exit 1 ;;
+esac
