@@ -1,0 +1,121 @@
+#!/usr/bin/perl
+#
+# Strip duplicates from a UNIX-format mail file.
+# If items have a message-id, fine.
+# Items without message-ids we work on the References: line, so you
+# only get to keep one reply.
+# Items with neither do an MD5 checksum of the body.
+#	- Cameron Simpson <cs@zip.com.au> 14jul99
+#
+
+use strict qw(vars);
+
+use MD5;
+use cs::Misc;
+use cs::Sink;
+use cs::Source;
+use cs::RFC822;
+use cs::Upd;
+
+my $in = new cs::Source (FILE,STDIN);
+my $out = new cs::Sink (FILE,STDOUT);
+
+$::Xit=0;
+
+my $h;
+
+my $items = 0;
+my $bymsgid = 0;
+my $byreply = 0;
+
+MAIL:
+while (1)
+{ last MAIL if ! length ($_=$in->GetLine());
+  chomp;
+
+  if (! /^from /i)
+  { warn "$::cmd: stdin, line $.: skipping: $_\n";
+    $::Xit=1;
+    next MAIL;
+  }
+
+  $in->UnGet("$_\n");
+  $h = new cs::RFC822;
+  $h->SourceExtract($in);
+
+  $items++;
+  out(sprintf("%5d (%d uniq, %d replies): From: %s",
+	$items, $bymsgid, $byreply, scalar($h->Hdr(FROM))));
+
+  my $msgid = $h->Hdr(MESSAGE_ID);
+  my $copyout;
+  my $checkMD5 = 0;
+  my $md5;
+  my @stashedBody;
+
+  if (length $msgid)
+  { $copyout = ! $::SeenID{$msgid};
+    $::SeenID{$msgid}=1;
+    $bymsgid++ if $copyout;
+
+    if ($copyout && $msgid !~ /^<.*@.*>$/)
+    { warn "msgid: $msgid\n";
+      warn "\tFrom: ".$h->Hdr(FROM)."\n";
+      warn "\tSubject: ".$h->Hdr(SUBJECT)."\n";
+      my $mailer = $h->Hdr(X_MAILER);
+      if (length $mailer)
+      { warn "\tX-Mailer: $mailer\n";
+      }
+    }
+  }
+  else
+  { my @refs = grep(length,split(/\s+/, $h->Hdr(REFERENCES)));
+
+    if (! @refs)
+    { $copyout=0;
+      $checkMD5=1;
+    }
+    else
+    { $copyout = ! $::ReplyID{$msgid};
+      $::ReplyID{$msgid}=1;
+      $byreply++ if $copyout;
+    }
+  }
+
+  if ($copyout)
+  { $h->WriteItem($out,1);
+  }
+  elsif ($checkMD5)
+  { $md5 = new MD5;
+    @stashedBody=();
+  }
+
+  # process body
+  BODY:
+  while (length ($_=$in->GetLine()))
+  { if (/^from /i)
+    { $in->UnGet($_);
+      last BODY;
+    }
+
+    if ($copyout)
+    { $out->Put($_);
+    }
+    elsif ($checkMD5)
+    { $md5->add($_);
+      push(@stashedBody,$_);
+    }
+  }
+
+  if ($checkMD5)
+  { my $digest = $md5->hexdigest();
+    if (! $::SeenMD5{$digest})
+    { $::SeenMD5{$digest}=1;
+      $h->WriteItem($out,1);
+      $out->Put(@stashedBody);
+      $byreply++;
+    }
+  }
+}
+
+exit $::Xit;
