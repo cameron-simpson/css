@@ -80,7 +80,7 @@ sub conn(;$)
   my $hi = $C->GetLine();
   return () if ! defined $hi;
   chomp($hi);
-  # warn "<- $hi\n";
+  warn "<- $hi\n";
   if ($hi !~ /^20[01]/)
   { warn "$::cmd: cs::CDDB::conn: unwelcome greeting from server: $hi\n";
     return ();
@@ -116,7 +116,7 @@ sub command
   { @upload=@{$upload[0]};
   }
 
-  # warn "-> $command\n";
+  warn "-> $command\n";
   $C->Put("$command\n");
   $C->Flush();
 
@@ -124,7 +124,7 @@ sub command
   $_=$C->GetLine();
   return () if ! defined || ! length;
   chomp;
-  # warn "<- $_\n";
+  warn "<- $_\n";
   if (! /^(\d)(\d)(\d)\s*/)
   { warn "$::cmd: cs::CDDB::command(..,\"$command\"): bad response: $_\n";
     return ();
@@ -137,7 +137,7 @@ sub command
   { ADDITIONAL:
     while (defined($_=$C->GetLine()) && length)
     { chomp;
-      # warn "<- $_\n";
+      warn "<- $_\n";
       last ADDITIONAL if $_ eq ".";
       push(@additional,$_);
     }
@@ -459,7 +459,7 @@ sub DiscId()
     return undef;
   }
 
-  return $this->{DISCID}=$1;	## was hex($1)
+  return $this->{DISCID}="$1";	## was hex($1)
 }
 
 =item Query()
@@ -482,7 +482,7 @@ sub Query($)
   my $C = $this->_Conn();
   return if ! defined $C;
 
-  my($code,$etc,@additional)=command($C,"QUERY $discid ".$this->_TrksNSecs());
+  my($code,$etc,@additional)=command($C,"CDDB QUERY $discid ".$this->_TrksNSecs());
   return () if ! defined $code || $code !~ /^2/;
 
   my @matches;
@@ -580,7 +580,7 @@ sub Read($$)
   my $C = $this->_Conn();
   return if ! defined $C;
 
-  my($code,$etc,@additional)=command($C,"READ $category $discid");
+  my($code,$etc,@additional)=command($C,"CDDB READ $category $discid");
   return () if ! defined $code || $code ne 210;
 
   $this->_Cache($category,$discid,@additional);
@@ -637,7 +637,7 @@ sub Category($)
   @matches=$this->Query();
   
   if (! @matches)
-  { warn "$::cmd: cs::CDDB: no matches!\n";
+  { warn "$::cmd: cs::CDDB: no matches for ".$this->DiscId()."\n";
     return undef;
   }
 
