@@ -1,0 +1,27 @@
+#!/bin/sh
+#
+# Asynchronous getpageurls.	- Cameron Simpson <cs@zip.com.au>
+#
+
+# hack to permit leading subdir prefix
+case $1 in
+    ''|-*|*://*)	;;
+    *)		dirpfx=$1; shift
+		if subdir=`mkdirn "$dirpfx"`
+		then
+		    cd "$subdir" || exit 1
+		fi
+		pwd
+		L
+		;;
+esac
+
+if [ "x$1" = x-s ]
+then  shift
+      exec getpageurls -L download ${1+"$@"}
+else
+      [ $# = 0 ] && { set x "`xcut -p`"; shift; }
+fi
+
+set -x
+ignhup getpageurls -L download ${1+"$@"} &
