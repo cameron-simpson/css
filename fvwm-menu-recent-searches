@@ -1,0 +1,11 @@
+#!/bin/sh
+URLLOG=${URLLOG:-$HOME/var/log/urllog}
+export URLLOG
+sed -n 's:^search  *::p' <"$URLLOG" \
+| tail -20 \
+| sort -u \
+| awk '{ engine=$1
+	 query=$2
+         for (i=3; i<=NR; i++) { query=query " " $i }
+	 print "\"" engine ": " query "\" Exec search -t " engine " " query
+       }'
