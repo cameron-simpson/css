@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 
-xvim=`logpath xvim`
+xvim=$HOME/var/queue/xvim
 if [ ! -f "$xvim" ]
 then	echo "$0: no xv poll image (xvim=$xvim)" >&2
 	exit 1
