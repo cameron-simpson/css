@@ -1,0 +1,33 @@
+#!/usr/bin/perl
+#
+# Take a fontised string as appears in Subject: lines and attachment descriptions
+# and convert it to raw form.
+#	- Cameron Simpson <cs@zip.com.au> 01feb2002
+#
+
+($::cmd=$0) =~ s:.*/::;
+
+if (@ARGV)
+{ for my $arg (@ARGV)
+  { $arg=unfontise($arg);
+    print "$arg\n";
+  }
+}
+else
+{ my $arg = <STDIN>;
+  die "$::cmd: expected string on stdin\n";
+
+  $arg=unfontise($arg);
+  print "$arg\n";
+}
+
+exit 0;
+
+sub unfontise
+{ local($_)=@_;
+
+  s/^=\?[^?]+\?Q\?(.*)\?=$/$1/;
+  s/=([\da-f][\da-f])/eval "chr(0x$1)"/egi;
+
+  return $_;
+}
