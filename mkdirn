@@ -19,10 +19,7 @@ up=`dirname "$pfx"`
 base=`basename "$pfx"`
 
 # check out existing directories
-#
-# the dev-null redirect is an ugly hack to work around an as yet
-# unlocated bug in my personal shell env :-( - cameron 18apr2001
-n=`cd "$up" >/dev/null || exit 1
+n=`cd "$up" || exit 1
    ls \
    | sed -n "/^$base"'0*[1-9][0-9]*/s/.*[^0-9]0*\([1-9][0-9]*\)$/\1/p' \
    | sort -n \
@@ -35,12 +32,6 @@ then
 else
     n=1
 fi
-
-# sanity check (looking for the afore mentioned bug)
-case "$n" in
-    [0-9]|[0-9][0-9]|[0-9][0-9][0-9]) ;;
-    *)	echo "$0: $pfx: bad \$n: [$n]" >&2; exit 1 ;;
-esac
 
 # scan for a new slot
 maxtries=16
