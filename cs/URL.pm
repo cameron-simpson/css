@@ -28,6 +28,7 @@ use cs::Upd;
 use cs::Source;
 use cs::HTML;
 use cs::HTTP;
+use cs::HTTPS;
 
 package cs::URL;
 
@@ -712,7 +713,7 @@ sub _Get($$)
     $cs::URL::_Getting{$url}=1;
 
     my $scheme = $this->Scheme();
-    if ($scheme ne HTTP && $scheme ne FTP)
+    if (! grep($_ eq $scheme, HTTP, FTP,HTTPS))
     { warn "$context:\n\tscheme $scheme not implemented";
       last GET;
     }
@@ -721,7 +722,10 @@ sub _Get($$)
 
     my ($phost,$pport) = $this->Proxy();
 
-    my $phttp = new cs::HTTP ($phost,$pport,1);
+    my $phttp = ( $scheme eq HTTPS
+		? new cs::HTTPS ($this->Host(), $this->Port())
+		: new cs::HTTP ($phost,$pport,1)
+		);
 
     if (! defined $phttp)
     { warn "$context:\n\tcan't connect to proxy server $phost:$pport: $!";
