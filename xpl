@@ -450,15 +450,17 @@ fi
 
 ##cat $tmpconfig >&2
 [ -n "$label_string" ] || { label_string='%t'; [ -n "$origin" ] && label_string="$label_string from %o"; }
-eval "(set -x; exec xplanet -config \"\$tmpconfig\" -label_string \"\$label_string\" $xplmode $xplopts)"
+eval "(set -x; exec xplanet -tmpdir \"\$TMPDIR\" -config \"\$tmpconfig\" -label_string \"\$label_string\" $xplmode $xplopts)"
+xit=$?
 
 [ -n "$mkimage" ] && echo "$mkimage" >&3
 
-exit $?
+exit "$xit"
 
 # =head1 ENVIRONMENT
 #
-# $TMPDIR, where temp files are made
+# $TMPDIR, where temporary files are made.
+# Also handed to I<xplanet> as its B<-tmpdir> argument.
 #
 # $XPLANETDIR, where configuration files are expected.
 # Default: C<$HOME/.xplanet>.
