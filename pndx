@@ -1,0 +1,98 @@
+#!/usr/bin/perl
+#
+# Permuted index, after ptx.
+#	- Cameron Simpson <cs@zip.com.au> 05may97
+#
+# Input:
+#	ref	line of text
+# Output:
+#	ref TAB left-words TAB keyword TAB right-words
+#
+
+$IGN="$ENV{HOME}/etc/eign";
+
+undef %IGN;
+undef %IGNPTN;
+
+load_ign($IGN);
+mkignsub();
+
+LINE:
+  while (defined($_=<STDIN>))
+	{ chomp;
+	  s/^\s+//;
+	  s/\s+$//;
+
+	  next LINE unless /^(\S+)\s+/;
+	  $ref=$1;
+	  $_=$';
+
+	  @words=grep(length,split(/[^\w]+/));
+	  next LINE if ! @words;
+
+	  undef %thisline;
+	  WORD:
+	    for $i (0..$#words)
+		{ $w=$words[$i];
+		  next WORD if exists $thisline{$w};
+		  $thisline{$w}=1;
+
+		  next WORD if ign($w);
+
+		  $offset=index($_,$w);
+		  ($l=substr($_,$[,$offset)) =~ s/\s+$//;
+		  ($r=substr($_,$offset+length($w))) =~ s/^\s+//;
+
+		  $l =~ s/\s+/ /g;
+		  $r =~ s/\s+/ /g;
+
+		  print "$ref\t$l\t$w\t$r\n";
+		}
+	}
+
+exit 0;
+
+sub load_ign
+	{ my($fname)=@_;
+
+	  return if ! open(IGN," $IGN\0");
+
+	  local($_);
+
+	  while (defined($_=<IGN>))
+		{ chomp;
+		  if (/^\w+$/)
+			{ $IGN{lc($_)}=1;
+			}
+		  else	{ $IGNPTN{$_}=1;
+			}
+		}
+
+	  close(IGN);
+	}
+
+sub mkignsub
+	{ local($_);
+	  my(@ptnexprs)=();
+
+	  @Ptns=();
+
+	  for (keys %IGNPTN)
+		{ push(@Ptns,$_);
+		  push(@ptnexprs,
+			"/\$Ptns[$#Ptns]/io");
+		}
+
+	  eval "sub ignptn { "
+	      .join(' || ',@ptnexprs)
+	      ."           }";
+	}
+
+sub ign
+	{ local($_)=@_;
+	  $_=lc($_);
+
+	  return 1 if exists $IGN{$_};
+
+	  ignptn($_);
+	}
