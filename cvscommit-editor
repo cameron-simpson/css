@@ -41,7 +41,7 @@ then
     headline=`sed 1q "$report"`
     ( cat "$report"
       echo
-      egrep '^(-|\+)' "$CVS_COMMIT_DIFFS"
+      cat "$CVS_COMMIT_DIFFS"
     ) \
     | buglog "$CVS_COMMIT_FILES: $headline"
 fi
