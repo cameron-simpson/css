@@ -1,0 +1,18 @@
+#!/bin/sh
+#
+# Read columnated data, report values and counts.
+#	- Cameron Simpson <cs@zip.com.au>
+#
+
+cmd=$0
+usage="Usage: $cmd [-c col] [files...]"
+
+col=1
+
+[ "x$1" = x-c ] && { col=$2; shift; shift; }
+
+exec awk "{ n[\$$col]++ }
+	  END { for (v in n)
+		{ print n[v], v
+		}
+	      }" ${1+"$@"}
