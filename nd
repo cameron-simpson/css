@@ -18,7 +18,11 @@ then
 	 exit 2
     else deskname=`lastvalue desktop-$HOST-previous`
     fi
-else deskname=$1; shift
+else
+    deskname=$1; shift
+    case "$deskname" in
+	*[a-z]*) deskname=`echo "$deskname" | tr '[a-z]' '[A-Z]'` ;;
+    esac
 fi
 
 [ $# = 0 ] || { echo "$cmd: extra arguments: $*" >&2
