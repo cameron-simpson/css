@@ -1,0 +1,77 @@
+#!/bin/sh
+#
+# Maintain mailing-list subscriptions.
+#	- Cameron Simpson <cs@zip.com.au> 07sep95
+#
+
+cmd=`basename "$0"`
+usage="Usage: $cmd [-s [addr]] [-u [addr]] [--] [lists...]
+	-h	Get help.
+	-s addr	Subscribe using address addr (default $EMAIL).
+	-u addr	Unsubscribe using address add (default ($EMAIL)."
+
+lists=$HOME/etc/mlist
+private=$HOME/private/mlist
+
+sub=
+unsub=
+badopts=
+while :
+do  case "$1" in
+	--)	shift; break ;;
+	-s)	sub=$EMAIL; shift
+		case "$1" in
+		    *@*)	sub=$1; shift ;;
+		esac
+		;;
+	-u)	unsub=$EMAIL; shift
+		case "$1" in
+		    *@*)	unsub=$1; shift ;;
+		esac
+		;;
+	-?*)	echo "$cmd: unrecognised option: $1" >&2
+		badopts=1
+		shift
+		;;
+	*)	break ;;
+    esac
+done
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+[ $# = 0 ] && exec ls $lists
+
+xit=0
+
+for list
+do  dir=$lists/$list
+    traits=$dir/traits
+
+    if [ ! -r "$traits" ]
+    then    echo "$cmd: no traits for list \"$list\", skipped" >&2
+	    xit=1
+	    continue
+    fi
+
+    . "$traits"
+
+    case $type in
+	majordomo)	subline="subscribe $list $sub"
+			unsubline="unsubscribe $list $unsub"
+			;;
+	request)	subline=subscribe
+			unsubline=unsubscribe
+			;;
+	*)		echo "$cmd: $list: don't known how to deal with type \"$type\"" >&2
+			xit=1
+			continue
+			;;
+    esac
+
+    [ -n "$sub" ] \
+	&& { echo "$subline" | m -S -s "$subline" "$list_robot"; }
+    [ -n "$unsub" ] \
+	&& { echo "$unsubline" | m -S -s "$unsubline" "$list_robot"; }
+done
+
+exit $xit
