@@ -164,7 +164,7 @@ sub Categorise($$;$)
 
       if (! exists $addrcombos{$addrcombo})
       { $addrcombos{$addrcombo}=[ map(cs::Mail::Misc::normaddr($_),
-					$H->Addrs(@hlist)->KEYS()) ];
+					keys %{$H->Addrs(@hlist)}) ];
 	## my @a = @{$addrcombos{$addrcombo}};
 	## warn "stash [$addrcombo] = [@a]";
       }
