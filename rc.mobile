@@ -42,14 +42,14 @@ trace=set-x
 int=1
 
 cmd=$0
-usage="Usage: $cmd {start|stop|restart} [-n] [-f config] [dflt]
+usage="Usage: $cmd {start|stop|restart} [-n] [-f config] [@where]
 	-n		No action. Recite proposed actions.
 	-y		Yes: proceed with the default location without asking.
 	-s		Synchronous. Default: asynchronous.
 	-S		Really synchronous. Default: asynchronous.
 	-f config	Specify config file.
 			Default: $cf
-	dflt		Default location. Falls back to \$SYSTEMID or \"home\".
+	@where		Default location. Falls back to \$SYSTEMID or \"home\".
 			Default: $where"
 
 LC_ALL=C
@@ -256,7 +256,8 @@ doops()
       # B</path/to/dir.>I<where> or B</path/to/dir.DFLT>
       # if the former is not present.
       # If neither is present, the target directory is unchanged.
-      # Otherwise, the directory is made identical to the template with rsync(1).
+      # Otherwise, the directory is made identical to the template
+      # with rsync(1).
       #
       /*/)    to=`expr "x$op" : 'x\(.*\)/'`
 	      from=
