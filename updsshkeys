@@ -4,11 +4,13 @@
 #	- Cameron Simpson <cs@zip.com.au> 25jun2003
 #
 
+: ${TMPDIR:=/tmp}
+
 cmd=`basename "$0"`
 usage="Usage: $cmd {-a|hosts...}"
 
-hlist=/tmp/$cmd$$h
-keys=/tmp/$cmd$$k
+hlist=$TMPDIR/$cmd$$h
+keys=$TMPDIR/$cmd$$k
 
 badopts=
 all=
