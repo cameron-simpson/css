@@ -1,0 +1,32 @@
+#!/bin/sh
+#
+# Remove a file then run a command.
+#	- Cameron Simpson <cs@zip.com.au> 01feb2004
+#
+
+cmd=$0
+usage="Usage: $cmd [-f] file command [args...]"
+
+fflag=
+
+badopts=
+
+[ "x$1" = x-f ] && { fflag=-f; shift; }
+
+if [ $# = 0 ]
+then
+  echo "$cmd: missing file" >&2
+  badopts=1
+else
+  file=$1; shift
+  if [ $# = 0 ]
+  then
+    echo "$cmd: missing command" >&2
+    badopts=1
+  fi
+fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+rm $fflag "$file" || exit 1
+exec "$@"
