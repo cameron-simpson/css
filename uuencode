@@ -1,0 +1,38 @@
+#!/usr/bin/perl
+
+$umask=umask;
+if ($#ARGV < $[)
+	{ &uuencode(STDIN,0666 & $umask,'stdin');
+	}
+else
+{ for (@ARGV)
+	{ if (open(F,"< $_"))
+		{ $mode=(stat(F))[2];
+		  die "fstat($_): $!\n" if !defined($mode);
+		  &uuencode(F,$mode,$_);
+		  close(F);
+		}
+	  else
+	  { print STDERR "$0: can't open $_: $!\n";
+	  }
+	}
+}
+
+sub uuencode	# (FILE,mode,file)
+	{ local($F,$mode,$file)=@_;
+	  local($buf);
+	  local($count);
+
+	  printf("begin %03o %s\n",$mode & 0777,$file);
+	  $count=0;
+	  while (($i=read($F,$buf,45)) == 45)
+		{ print pack('u',$buf);
+		  $count+=45;
+		}
+
+	  if ($i > 0)
+		{ print pack('u',$buf);
+		}
+
+	  print " \nend\n";
+	}
