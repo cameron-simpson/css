@@ -9,13 +9,15 @@ usage="Usage: $cmd [-N] [+N] [-X] hostname
        $cmd hostname command..."
 
 badopts=
-ssh=sshop1
+ssh=ssho
+sshproto=-1
 sshopts=
 
 newflag=-N
 
 while :
 do  case $1 in
+      -[12])	sshproto=$1 ;;
       -X)	sshopts="$sshopts $1" ;;
       -N)	newflag=-N ;;
       +N)	newflag= ;;
@@ -45,10 +47,11 @@ ext=
 
 session=root@$host$ext
 
+set -x
 exec term -n "#$session" \
 	scr -N "$session" \
 	logscript "$session" \
-	"$ssh" -t $sshopts "root@$host" \
+	"$ssh" $sshproto -t $sshopts "root@$host" \
 		'. /etc/profile
 		 [ -s /opt/config/shell/env-basic ] && . /opt/config/shell/env-basic
 		 [ -f $HOME/.profile ] && . $HOME/.profile
@@ -58,4 +61,5 @@ exec term -n "#$session" \
 		 PERL5LIB=${PERL5LIB:+"$PERL5LIB:"}/u/network/lib
 		 export TERM PATH MANPATH PERL5LIB
 		 [ -f /bin/zsh ] && { SHELL=/bin/zsh; export SHELL; }
+		 set -x
 		 exec $SHELL'
