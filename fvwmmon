@@ -50,7 +50,7 @@ while ((defined($_=<STDIN>)))
   if ($ev eq WINDOW)
   { if (! exists $W->{TITLE})
     # first title setting
-    { if ($info =~ /^Mozilla \{Build ID: /)
+    { if ($info =~ /^Mozilla \{Build ID: / || $info =~ /^Compose: /)
       # fix up Mozilla pigheadedness
       { wincmd($id,'Move','0','-0');
       }
