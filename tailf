@@ -2,165 +2,63 @@
 #
 # Multifile tail -f.	- Cameron Simpson <cs@zip.com.au>
 #
+# Recode. - cameron 13feb2002
+#
+
+use strict qw(vars);
 
 require 'flush.pl';
-use cs::Upd;
+## use cs::Upd;
 use cs::Source;
+use Getopt::Std;
 
-$poll_interval=1;	## was 10
-$control_file=$ENV{TAILF};
-$debug=0;
-$verbose=0;
-$silent=0;
+$::PollInterval=1;	## was 10
+$::CtrlFile=$ENV{TAILF};
+$::CtrlFile="$ENV{HOME}/.tailf" if ! length $::CtrlFile;
 
-($cmd=$0) =~ s:.*/::;
-$usage="Usage: $cmd [-i poll] [-c control_file] [files...]
-	-i poll		Set polling interval (default: $poll_interval).
+($::cmd=$0) =~ s:.*/::;
+$::Usage="Usage: $::cmd [-i poll] [-c control_file] [files...]
+	-i poll		Set polling interval (default: $::PollInterval).
 	-c control_file	Set control file.
 ";
 
-$badopts=0;
-ARGV:
-  while (defined ($_=shift(@ARGV)))
-	{ if (! /^-./)	{ unshift(@ARGV,$_); last ARGV; }
-	  last ARGV if $_ eq '--';
-	  if ($_ eq '-i')	{ $poll_interval=shift(@ARGV)+0; }
-	  elsif ($_ eq '-c')	{ $control_file=shift(@ARGV); }
-	  elsif ($_ eq '-s')	{ $silent=1; $verbose=0; }
-	  elsif ($_ eq '-v')	{ $silent=0; $verbose=1; }
-	  elsif ($_ eq '-D')	{ $debug=1; $silent=0; $verbose=1; }
-	  else			{ err("$cmd: unrecognised option: $_\n");
-				  $badopts=1;
-				}
-	}
-
-die $usage if $badopts;
-
-%V=(	VERBOSE, $verbose,
-	SILENT,  $silent,
-	DEBUG,	 $debug,
-	POLL,	 $poll_interval,
-   );
-
-ATTACH:
-  for (@ARGV)
-  { attach($_);
-  }
-
-if (length $control_file)
-{ $silent || err("attaching to control file ($control_file) ...\n");
-  $s{''}={ NAME => 'control',
-	   DS => (new cs::Source TAIL, $control_file),
-	   ACTIVE => 1,
-	   SILENT => 1,
-	 };
+{ my $badopts=0;
+  getopts('i:c:') || ($badopts=1);
+  $::PollInterval=$::opt_i+0 if defined $::opt_i;
+  $::CtrlFile=$::opt_c if defined $::opt_c;
+  die $::Usage if $badopts;
 }
 
+my @src = ();
+
+ATTACH:
+for (@ARGV)
+{ my $s = (new cs::Source TAIL, $_);
+  if (! defined $s)
+  { warn "$::cmd: can't open $_: $!\n";
+  }
+  else
+  { push(@src,$s);
+  }
+}
+
+die "$::cmd: nothing to monitor\n" if ! @src;
+
 while (1)
-{ $busy=0;
-  KEY:
-    for my $k (keys %s)
-    { next KEY if ! defined $s{$k};	# keys deleted during loop
+{ my $busy = 0;
 
-      my $s = $s{$k};
-
-      my $silent = $s->{SILENT};
-      my $active = $s->{ACTIVE};
-
-      $V{DEBUG} && err("polling $k (silent=$silent, active=$active)\n");
-
-      DATUM:
-	while (defined ($_=$s->{DS}->GetLine()) && length)
-	{ $V{DEBUG} && err("from $k: $_\n");
-	  next DATUM if ! $active;
-
-	  chomp;
-	  if (length $k)    { if ($silent)
-				    { print "$_\n"; }
-			      else  { print "$s->{NAME}: $_\n"; }
-			    }
-	  else		    { attach_req($_); }
-
-	  $busy=1 if length;
-	}
+  for my $s (@src)
+  {
+    DATUM:
+    while (defined ($_=$s->GetLine()) && length)
+    {
+      $busy=1;
+      print;
     }
+  }
 
-  $V{DEBUG} && err("sleep($V{POLL})\n");
   flush(STDOUT);
-  sleep($busy ? 1 : $V{POLL});
+  sleep($busy ? 1 : $::PollInterval);
 }
 
 exit 0;
-
-##############################
-
-sub V
-{ my($var,$val)=@_;
-
-  $V{VERBOSE} && err("V{$var}=$val\n");
-
-  $V{$var}=$val;
-
-  if ($var eq VERBOSE)	{ $V{SILENT}  = ! $val; }
-  elsif ($var eq SILENT){ $V{VERBOSE} = ! $val; }
-  elsif ($var eq DEBUG)	{ V(VERBOSE,1); }
-}
-
-sub attach_req
-{ local($_)=shift;
-
-  chomp;
-
-  $V{VERBOSE} && err("attach_req($_)\n");
-  if (/^!\s*/)			{ &cmd($'); }
-  elsif (/^(\w[^=\s]*)=/)	{ V($1,$'); }
-  elsif (/^\+\s*/)		{ attach($'); }
-  elsif (/^-\s*\{(\w[^}\s]*)}/)	{ delete $s{$1}; }
-  elsif (/^-\s*/)		{ delete $s{"\0$'"}; }
-  else				{ attach($_); }
-}
-
-sub attach
-{ local($_)=shift;
-  my($k,$s,$name);
-  my($active,$silent)=(1,0);
-
-  if (/^\{(\w+)}/)	{ $name=$1; $k=$1; $_=$'; }
-  elsif (/^\[(\w+)]/)	{ $name=$1; $k=$1; $_=$'; $silent=1; }
-  else			{ $name=$_; $k="\0$_"; }
-
-  $s=new cs::Source TAIL, $_;
-  if (! defined $s)
-  { err("$cmd: can't attach to $_: $!\n");
-    return undef;
-  }
-
-  $s{$k}={ NAME => $name,
-	   ACTIVE => $active,
-	   SILENT => $silent,
-	   DS => $s,
-	   PATH => $_
-	 };
-}
-
-sub cmd
-	{ my($cmdline)=@_;
-	  my(@ARGV)=grep(length,split(/\s+/,$cmdline));
-	  local($_);
-
-	  return if ! defined ($_=shift(@ARGV));
-
-	  if ($_ eq 'stat')	{ if (! @ARGV)
-					{ @ARGV=sort keys %s;
-					}
-
-				  for (@ARGV)
-					{ $s=$s{$_};
-					  s/\0+//g;
-					  nl("$cmd: $_: NAME=$s->{NAME}, ACTIVE=$s->{ACTIVE}, SILENT=$s->{SILENT}, PATH=$s->{PATH}");
-					}
-				}
-	  else
-	  { err("$cmd: unrecognised command \"$_\"\n");
-	  }
-	}
