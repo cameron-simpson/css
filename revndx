@@ -1,0 +1,47 @@
+#!/bin/sh
+#
+# Recurse down a directory tree containing event data.
+# Emit an HTML listing if the tree.
+#	- Cameron Simpson <cs@zip.com.au> 05jan98
+#
+
+cmd=`basename "$0"`
+
+hlevel=2
+
+usage="Usage: $cmd [-h hlevel] [dirs...]
+	-h hlevel	Set initial heading level (default: $hlevel)."
+
+badopts=
+
+while :
+do  case $1 in
+	--)	shift; break ;;
+	-h)	hlevel=$2; shift ;;
+	-?*)	echo "$cmd: unrecognised option: $1" >&2
+		badopts=1
+		;;
+	*)	break ;;
+    esac
+    shift
+done
+
+[ $# = 0 ] && set .
+
+xit=0
+
+for dir in `find $* -type d -print | sort`
+do  ( cd "$dir" || exit $?
+      set [12][0-9][0-9][0-9][01][0-9][0-3][0-9].*
+      [ "$*" = '[12][0-9][0-9][0-9][01][0-9][0-3][0-9].*' ] && exit 0
+      if [ -s evndx.title ]; then evtitle=`cat evndx.title`
+			     else evtitle="Events in $dir"
+      fi
+      exec evndx -h "$hlevel" \
+		 -p "<A NAME=\"events-$dir-past\">$evtitle Past</A>" \
+		 -f "<A NAME=\"events-$dir-future\">$evtitle Future</A>"
+	   
+    )
+done
+
+exit $xit
