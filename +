@@ -42,4 +42,4 @@ fi
 
 cd || exit 1
 [ -s "$HOME/rc/mail/muttsh.$mfolder" ] && . "$HOME/rc/mail/muttsh.$mfolder"
-exec term $termopts +ip -n "mutt $mfolder" scr "mutt_$mfolder" withjob -f email mutt -f "$mfolder" $muttopts
+exec term $termopts +ip -n "mutt $mfolder" scr "mutt_$mfolder" mutt -f "$mfolder" $muttopts
