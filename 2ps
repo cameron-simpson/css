@@ -64,7 +64,7 @@ filetitle=$file
 if [ "x$file" = x- ]
 then
     filetitle=stdin
-    trap 'rm -f "$tmpfile"' 0 1 15
+    trap 'rm -f "$tmpfile"' 0 1 2 13 15
     cat >"$tmpfile" || exit 1
     file=$tmpfile
 fi
