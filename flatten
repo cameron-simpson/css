@@ -1,4 +1,7 @@
 #!/bin/sh
+
+: ${TMPDIR:=/tmp}
+
 usage="Usage: $0 [-ns] dir [flatdir]" \
 sflag= nflag= src= flat= tmp= \
 { while [ $# -gt 0 ]
@@ -20,7 +23,7 @@ sflag= nflag= src= flat= tmp= \
 
   [ -n "$nflag" ] || [ -d "$flat" ] || mkdir "$flat" || return $?
 
-  tmp=/tmp/flatten$$
+  tmp=$TMPDIR/flatten$$
   find "$src" -type d -print |
 	{ if [ -n "$nflag" ]
 	  then
