@@ -1,0 +1,39 @@
+#!/usr/bin/perl
+
+require 'cs/upd.pl';
+require 'cs/dir.pl';
+
+($cmd=$0) =~ s:.*/::;
+
+$flatdir='.FLAT';
+
+open(FIND,"exec find * -type f -print|")
+	|| die "$cmd: can't pipe from find: $!\n";
+
+$xit=0;
+File:
+  while (<FIND>)
+	{ chomp;
+	  next File if substr($_,$[,length($flatdir)+1) eq "$flatdir/";
+
+	  out($_);
+	  ($b=$_) =~ s:.*/::;
+	  $f="$flatdir/$b";
+
+	  next File if -e $f;
+
+	  if (! &mkdir($flatdir))
+		{ err("$cmd: mkdir($flatdir): $!\n");
+		  $xit=1;
+		  next File;
+		}
+
+	  if (! link($_,$f))
+		{ err("$cmd: link($_,$f): $!\n");
+		  $xit=1;
+		}
+	}
+
+out('');
+
+exit $xit;
