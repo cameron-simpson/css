@@ -1,0 +1,13 @@
+#!/bin/sh
+#
+# Encode a string for use in a URL's QUERY_STRING.
+#	- Cameron Simpson <cs@zip.com.au> 30apr2002
+#
+
+echo "$*" \
+| tr '\012\015' '  ' \
+| sed 's/^  *//
+       s/  *$//
+       s/+/%2b/g
+       s/&/%26/g
+       s/[ 	][ 	]*/+/g'
