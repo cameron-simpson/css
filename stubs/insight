@@ -1,0 +1,10 @@
+#!/bin/sh
+#
+# Fucking insight doesn't do much sensible with colours.
+#	- Cameron Simpson <cameron@dap.csiro.au> 03aug95
+#
+
+xrdb=`xrdb -query`
+xrdb -load - </dev/null
+$REAL/insight
+(sleep 20; echo "$xrdb" | xrdb -load - 2>/dev/null)&
