@@ -18,17 +18,21 @@ do
 
     ( cd "$dir" || exit 1
       xit=0
-      for file in `ls -d [0-9]*|sort -n`
+      for file in `ls | egrep '^[0-9].(z|Z|gz|bz2)$'`
       do  case "$file" in
-	      *.z)	pcat "$file" | maildiritem2fileitem ;;
-	      *.Z)	zcat "$file" | maildiritem2fileitem ;;
-	      *.gz)	gunzip <"$file" | maildiritem2fileitem ;;
-	      *.bz2)	bunzip2 <"$file" | maildiritem2fileitem ;;
-	      *[0-9])	maildiritem2fileitem "$file" ;;
+	      *.z)	unpack "$file" || xit=1 ;;
+	      *.Z)	uncompress "$file" || xit=1 ;;
+	      *.gz)	gunzip "$file" || xit=1 ;;
+	      *.bz2)	bunzip2 "$file" || xit=1 ;;
 	      *)	echo "$0: what to do with $dir/$file?" >&2
 			xit=1
 			;;
 	  esac
+      done
+      [ $xit = 0 ] || exit 1
+      for file in `ls | grep '^[0-9]' | sort -n`
+      do  
+	  maildiritem2fileitem "$file"
       done
       exit $xit
     ) || xit=1
