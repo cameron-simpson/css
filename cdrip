@@ -1,0 +1,47 @@
+#!/bin/sh
+#
+# Yet another audio CD ripper. Easiest way to learn the tools :-)
+#	- Cameron Simpson <cs@zip.com.au> 12mar2001
+#
+
+cmd=`basename "$0"`
+usage="Usage: $cmd {rip|enc} [cdparanoia-args]"
+
+dev=/dev/cdrom
+
+cdtoc "$dev" \
+| sed -e 's/\\/&&/g' -e 's;/;--;g' \
+| ( read artist	|| exit 1
+    read album	|| exit 1
+
+    xit=0
+    while read track secs offset \
+       && read title \
+       && read xtra
+    do
+      dir=$artist/$album
+      ogg=$dir/$title.ogg
+
+      [ -s "$ogg" ] && { echo "$cmd: existing file $ogg, skipping track #$track" >&2
+			 continue
+		       }
+
+      [ -d "$dir/." ] || mkdir -p "$dir" || { xit=1; continue; }
+
+      echo "Ripping track #$track: $dir/$title ..."
+      time cdparanoia -q -d "$dev" -e -r "$track" - \
+	2>>cdp.err \
+      | buffer -m 1M \
+      | time oggenc -r -q \
+	       -c "Ripped by $NAME with cdparanoia and oggenc at `date`" \
+	       -n "$track" -a "$xtra" -t "$title" -l "$album" - >"$ogg"
+    done
+
+    exit $xit
+  )
+
+xit=$?
+
+eject "$dev"
+
+exit $xit
