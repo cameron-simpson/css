@@ -33,8 +33,11 @@ logdir=`dirname "$logfile"`
 	     SHELL=$popshell; export SHELL
 	   }
 
+wd=`pwd|entilde`
+dlog "$HOST@$SYSTEMID: $wd: start $popSHELLexec"
 script -a "$logfile"
 xit=$?
+dlog "$HOST@$SYSTEMID: $wd: end   $popSHELLexec"
 
 gzip -v -9 "$logfile"
 
