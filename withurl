@@ -5,7 +5,8 @@
 #
 
 cmd=`basename "$0"`
-usage="Usage: $cmd [-c] [-h] URL command [args...]
+usage="Usage: $cmd [-1] [-end] [-c] [-h] URL command [args...]
+	-1, -end Passed to witharg.
 	-c	Cache the fetched URL.
 	-C	Cache the fetched URL; skip fetch if already cached.
 	-h	Passed to httpget."
@@ -13,10 +14,12 @@ usage="Usage: $cmd [-c] [-h] URL command [args...]
 htopts=
 docache=
 trustcache=
+witharg=
 
 badopts=
 while :
 do  case $1 in
+      -1|-end)	witharg="$witharg $1" ;;
       -c)	docache=1 trustcache= ;;
       -C)	docache=1 trustcache=1 ;;
       -h)	htopts="$htopts $1" ;;
@@ -50,8 +53,16 @@ if [ $docache ]
 then
     saveas=`urlcachename -p "$url"` || exit 1
 else
-    tmpf=${TMPDIR:-/tmp}/$cmd$$.$ext
-    trap 'rm -f "$tmpf"' 0 1 2 15
+    case "$url" in
+      *[#?]*) url=`expr "x$url" : 'x\([^#?]*\)[#?].*'` ;;
+    esac
+    case "$url" in
+      */)	base=index.html ;;
+      *)	base=`basename "$url"` ;;
+    esac
+    tmpdir=`mkdirn "${TMPDIR:-/tmp}/$cmd"` || exit 1
+    tmpf=$tmpdir/$base
+    trap 'rm -rf "$tmpdir"' 0 1 2 15
     saveas=$tmpf
 fi
 
@@ -60,7 +71,7 @@ then  :
 else  httpget -f -o "$saveas" "$url" || exit 1
 fi
 
-env WITHURL_URL=$url WITHURL_FILE=$saveas "$@" "$saveas"
+env "WITHURL_URL=$url" "WITHURL_FILE=$saveas" witharg $witharg "$saveas" "$@"
 xit=$?
 
 exit $xit
