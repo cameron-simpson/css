@@ -1,22 +1,36 @@
 #!/bin/sh
 #
-# Create a mairix rc file for the specified MH folder directory.
+# Create a mairix rc file for just the specified MH or Maildir folder directory.
 #	- Cameron Simpson <cs@zip.com.au> 17mar2004
 #
 
-vfolder=.mairix-result
+resfolder=.mairix-result
+restype=mh
 
 cmd=`basename "$0"`
-usage="Usage: $cmd [-r resdir] mail-folder
-	-r resdir	Specify result directory.
-			Default: $vfolder"
+usage="Usage: $cmd [-r resdir] [-t restype] mail-folder
+	-r resdir	Specify result directory.  Default: $resfolder
+	-t restype	Result directory type. Default: $restype"
 
 badopts=
 
-[ "x$1" = x-r ] && { vfolder=$2; shift; shift; }
+while [ $# -gt 0 ]
+do
+  case $1 in
+    -r)	resfolder=$2; shift ;;
+    -t)	restype=$2; shift ;;
+    --)	shift; break ;;
+    -?*)echo "$cmd: unrecognised option: $1" >&2; badopts=1 ;;
+    *)	break ;;
+  esac
+  shift
+done
 
-if [ $# = 1 ]
+if [ $# = 0 ]
 then
+    echo "$cmd: missing mail-folder" >&2
+    badopts=1
+else
     dir=$1; shift
     case "$dir" in
 	/*)	;;
@@ -24,9 +38,9 @@ then
 		badopts=1
 		;;
     esac
-else
-    echo "$cmd: missing mail-folder" >&2
-    badopts=1
+    [ $# = 0 ] || { echo "$cmd: extra arguments after mail-folder: $*" >&2
+		    badopts=1
+		  }
 fi
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
@@ -36,7 +50,7 @@ if ismhdir "$dir"
 then folder_directive=mh_folders
 else
   if ismaildir "$dir"
-  then folder_directive=folders
+  then folder_directive=maildir	## folders
   else
     echo "$dir: not an MH or Maildir folder" >&2
     exit 1
@@ -45,9 +59,14 @@ fi
 
 cd "$dir" || exit 1
 
-exec >".mairixrc"
-echo "base=$dir"
-echo "$folder_directive=."
-echo "vfolder=$vfolder"
-echo "vfolder_format=mh"
+dirdir=`dirname "$dir"` || exit 1
+dirbase=`basename "$dir"` || exit 1
+
+exec >"$dir/.mairixrc"
+echo "base=$dirdir"
+echo "$folder_directive=$dirbase"
 echo "database=$dir/.mairix.db"
+##echo "vfolder=$resfolder"
+##echo "vfolder_format=mh"
+echo "mfolder=$resfolder"
+echo "mformat=$restype"
