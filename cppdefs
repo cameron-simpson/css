@@ -1,0 +1,27 @@
+#!/bin/sh
+
+cmd=`basename "$0"`
+tmp=/tmp/$cmd.$$.c
+
+CPPBINARY=/lib/cpp
+
+{ # random symbols we known sometimes exist
+  for i in apollo sun dec mips sgi vax pdp pdp11 \
+		unix ultrix aegis \
+		BSD4_2 BSD4_3 BSD4_4 bsd4_2 bsd4_3 bsd4_4 \
+		host_mips MIPSEL MIPSEB \
+		__STDC__ __GNUC__ __TURBOC__ \
+		_POSIX_SOURCE _BSD_SOURCE _SYSV_SOURCE _XOPEN_SOURCE
+  do
+    echo $i
+  done
+  strings "$CPPBINARY" | sed 's/^[^a-zA-Z0-9_]/\012/g'
+  echo
+} |
+sort -u |
+awk '/^[_a-zA-Z][a-zA-Z0-9_]*$/ { printf "#ifdef %s\n\"%s\" %s\n#endif\n", $1, $1, $1 }' >"$tmp"
+
+cc -E ${1+"$@"} "$tmp" |
+sed -n -e '/^"[_a-zA-Z][a-zA-Z0-9_]*" /s/"\(.*\)" \(.*\)/#define \1 \2/p'
+
+# rm "$tmp"
