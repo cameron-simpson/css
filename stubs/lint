@@ -1,0 +1,6 @@
+#!/bin/sh
+#
+
+exec arg0 lint $REAL/lint \
+	'-D__attribute(x)=' '-Dconst=' '-Dvoid=int' '-U__STDC__' \
+	${1+"$@"}
