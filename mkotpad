@@ -7,7 +7,9 @@
 #	- Cameron Simpson <cs@zip.com.au> 
 #
 
-tmp=/tmp/pad$$
+: ${TMPDIR:=/tmp}
+
+tmp=$TMPDIR/pad$$
 size=128
 src=/dev/urandom	# or /dev/random for less security
 			# with probable blockage
