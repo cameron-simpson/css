@@ -235,8 +235,8 @@ sub choose	# (filename,prefs) -> (chosen-name,filters[ordered])
   }
 
   if (defined $match)
-	{ return ($match,@filters);
-	}
+  { return ($match,@filters);
+  }
 
   # missing? generate target name from preferences
   # leave create/open to caller
@@ -245,22 +245,22 @@ sub choose	# (filename,prefs) -> (chosen-name,filters[ordered])
   my(@prefs)=();
 
   if (defined $prefs)
-	{ @prefs=_a2preflist($prefs);
-	}
+  { @prefs=_a2preflist($prefs);
+  }
   else
   # use prefs from dir
   { my($dir)=cs::Pathname::dirname($basefile);
     my($prefs)="$dir/.ioprefs";
 
     if (defined $cs::IO::_DirPrefs{$dir})
-	{ @prefs=_a2preflist($cs::IO::_DirPrefs{$dir});
-	}
+    { @prefs=_a2preflist($cs::IO::_DirPrefs{$dir});
+    }
     else
     { # load special preferences
       if (open(IOP,"< $prefs\0"))
-	{ @prefs=_a2preflist(join('',<IOP>));
-	  close(IOP);
-	}
+      { @prefs=_a2preflist(join('',<IOP>));
+	close(IOP);
+      }
 
       $cs::IO::_DirPrefs{$dir}=join(',',@prefs);
     }
@@ -274,15 +274,15 @@ sub choose	# (filename,prefs) -> (chosen-name,filters[ordered])
 
   # for each filter in order
   for (@cs::IO::_Filters)
-	{ # if wanted and not already redundant
-	  if ($ispref{$_} && ! $types{$cs::IO::_Filter{$_}->{TYPE}})
-		{ push(@filters,$_);
-		  $match.=".$_";
+  { # if wanted and not already redundant
+    if ($ispref{$_} && ! $types{$cs::IO::_Filter{$_}->{TYPE}})
+    { push(@filters,$_);
+      $match.=".$_";
 
-		  # record type of filter selected
-		  $types{$cs::IO::_Filter{$_}->{TYPE}}=1;
-		}
-	}
+      # record type of filter selected
+      $types{$cs::IO::_Filter{$_}->{TYPE}}=1;
+    }
+  }
 
   ($match,@filters);
 }
