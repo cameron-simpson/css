@@ -1,0 +1,69 @@
+#!/usr/bin/perl
+#
+# Simple stub to edit preferences.js files.
+#	- Cameron Simpson <cs@zip.com.au> 25aug98
+#
+
+use strict qw(vars);
+
+use cs::Misc;
+
+$::Prefs="preferences.js";  ## "$ENV{HOME}/ns/preferences.js";
+
+if (@ARGV && $ARGV[0] eq '-f')
+	{ shift;
+	  $::Prefs=shift;
+	}
+
+
+open(PREFS,"< $::Prefs\0")
+	|| die "$::cmd: can't read $::Prefs: $!\n";
+
+my @comments;
+my %prefs;
+
+while (defined ($_=<PREFS>))
+	{
+	  #       1       2           3
+	  if (! /^(\w+)\("([^"]+)",\s*("[^"]*"|\d+|true|false)\);\s*$/)
+		{ push(@comments,$_);
+		}
+	  else	{ $prefs{$2}=[$1, $3];
+		}
+	}
+close(PREFS);
+
+my $ok = 1;
+
+for (@ARGV)
+	{ if (/^([.\w]+)=/)
+		{ my($pref,$val)=($1,$');
+
+		  if ($val !~ /^("[^"]*"|\d+|true|false)$/)
+			{ $val="\"$val\"";
+			}
+
+		  if (exists $prefs{$pref})
+			{ $prefs{$pref}->[1]=$val; }
+		  else	{ $prefs{$pref}=[ "user_pref", $val ]; }
+		}
+	  else	{ warn "$::cmd: bad pref: $_\n";
+		  $ok=0;
+		}
+	}
+
+die "$::cmd: errors, aborting\n" if ! $ok;
+
+open(PREFS,"> $::Prefs\0")
+	|| die "$::cmd: can't write to $::Prefs: $!\n";
+
+print PREFS @comments;
+
+for my $pref (sort keys %prefs)
+	{ print PREFS "$prefs{$pref}->[0](\"$pref\", $prefs{$pref}->[1]);\n";
+	}
+
+close(PREFS)
+	|| die "$::cmd: error during close($::Prefs): $!\n";
+
+exit 0;
