@@ -1,0 +1,43 @@
+#!/bin/sh
+#
+# Emit output to re-source the environment files if they've been updated.
+# Have to do them all if any are new because of ordering.
+#	- Cameron Simpson <cs@zip.com.au> 25dec2004
+#
+
+: ${ENVFILES:="/etc/rc.mobile/env.sh $HOME/var/env.sh"}
+: ${TMPDIR:=/tmp}
+
+cmd=$0
+usage="Usage: $cmd ppid"
+
+[ $# = 1 ] || { echo "$usage" >&2; exit 2; }
+refpid=$1; shift
+
+file=$TMPDIR/env$refpid
+new=
+for envfile in $ENVFILES
+do
+  if [ -s "$envfile" ]
+  then
+    if [ ! -f "$file" ] || [ "$envfile" -nt "$file" ]
+    then
+      new=1
+    fi
+  fi
+done
+if [ $new ]
+then
+  ##set -x
+  for envfile in $ENVFILES
+  do
+    if [ -s "$envfile" ]
+    then
+      echo "source $envfile" >&2
+      egrep -iv '^[a-z][a-z0-9_]*\(\)' "$envfile"
+    fi
+  done
+  touch "$file"
+  ##set +x
+  echo "PATH='$PATH'; export PATH"	# just in case
+fi
