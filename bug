@@ -5,6 +5,9 @@
 #	- Cameron Simpson <cs@zip.com.au>
 #
 
+: ${USER:=`whoami`}
+: ${BUGSYSTEMS:=`bugsystems`}
+
 sev=2
 
 cmd=$0
@@ -13,6 +16,7 @@ usage="Usage: $cmd [-B bugsystem] [severity] title-words...
 			Supported: ddts, mailto:addr.
 	severity	A number in the range 1-5. Default: $sev"
 
+[ "x$1" = x-B ] && { BUGSYSTEMS=$2; shift; }
 case "$1" in [1-5]) sev=$1; shift ;; esac
 [ $# = 0 ] && { echo "Usage: $0 bug [severity] title" >&2; exit 2; }
 
@@ -32,6 +36,20 @@ exec 3>&1
   xit=1
   for bugsystem in $BUGSYSTEMS "mailto:$USER"
   do
+
+    case "$bugsystem" in
+      /?*/?*)
+	pfxre=`expr "$bugsystem" : '/\([^/][^/]*\)/.*'` || { xit=1; continue; }
+	sfxbugsys=`expr "$bugsystem" : '/[^/][^/]*/\(.*\)'` || { xit=1; continue; }
+	if expr "x$headline" : "x$pfxre" >/dev/null
+	then
+	  bugsystem=$sfxbugsys
+	else
+	  continue
+	fi
+	;;
+    esac
+
     case "$bugsystem" in
       ddts)
 	pro=sa.maintenance
