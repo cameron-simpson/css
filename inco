@@ -5,7 +5,10 @@
 #
 
 cmd=`basename "$0"`
-usage="Usage: $cmd module command [args...]"
+usage="Usage: $cmd module [-f] command [args...]"
+
+withcoopts=
+[ "x$1" = x-f ] && { withcoopts="$withcoopts $1"; shift; }
 
 [ $# -lt 2 ] && { echo "$cmd: insufficient arguments" >&2
 		  echo "$usage" >&2
@@ -14,4 +17,4 @@ usage="Usage: $cmd module command [args...]"
 
 module=$1; shift
 
-exec withco "$module" incd "$@"
+exec withco $withcoopts "$module" incd "$@"
