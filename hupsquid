@@ -1,0 +1,4 @@
+#!/bin/sh
+pid=`cat /var/run/squid.pid`
+set -x
+kill -1 $pid
