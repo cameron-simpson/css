@@ -6,46 +6,21 @@
 #
 # Cleaner parseaddrs().	- cameron, 17mar97
 #
-# new	Ref to empty header structure.
-# Hdr(hdrname)
-#	Return line of headers in array context, string in scalar, or undef.
-# HdrNames -> @headernames
-# Hdrs -> @headers
-# Add("hdrname: body\n")
-# Addrs(@hdrnames) -> addrSet
-# Extract(@lines) -> @remaining-lines
-#	Add headers from @lines, up to blank line. Return lines _after_
-#	blank line.
-# FExtract($fname) -> @bodylines
-#	Open file, get lines, pass to Extract.
-# Del(hdrname,keep)
-#	Remove mention of header, renaming to X-Original-hdrname if $keep.
-# norm(hdrname)
-#	Field name to output form (capitalises words).
-#
-# &parseaddrs($addresslist) -> @(addr, text)
-#	Break comma separated address list into a list of (addr,full text).
-#
-# &msgid
-#	Generate a message-id for an article.
-#
-# &ForceMsgID
-#	Return message-id of article. Add one to the headers if it doesn't
-#	have one.
-#
-# &msgids(text) -> @ids
-#	Extract all strings looking like message-ids from the text.
-#	Return just the first in a scalar context.
-#
-# &from_(addr,gmtime)
-#	Generate the body of the From_ header given an address and a time.
-#
-# ForceFrom_
-#	Add From_ line if missing, guessing from From: line and current time.
-#
-# &date2gm(date-body) -> gmtime
-#	Parse Date: line and return GMT or undef on error.
-#
+
+=head1 NAME
+
+cs::RFC822 - handle RFC822 data (internet standard email headers)
+
+=head1 SYNOPSIS
+
+use cs::RFC822;
+
+=head1 DESCRIPTION
+
+This module implements methods
+for dealing with RFC822 data.
+
+=cut
 
 use strict qw(vars);
 
@@ -57,14 +32,11 @@ use cs::Set;
 
 package cs::RFC822;
 
-sub Debug { my($this)=shift;
-	    my($p,$f,$l)=caller(0);
-	    $f =~ s:.*/::;
-	    warn "$f:$l: @_ this=$this, synched=$this->{SYNCHED}, Hdrs=$this->{HDRS}, To="
-		.(defined($this->{HDRS}->{TO})
-			? "[$this->{HDRS}->{TO}]"
-			: 'UNDEF');
-	  }
+=head1 GENERAL FUNCTIONS
+
+=over 4
+
+=cut
 
 @cs::RFC822::mailhdrs=(TO,CC,BCC,FROM,SENDER,REPLY_TO,RETURN_RECEIPT_TO,ERRORS_TO);
 @cs::RFC822::newshdrs=(NEWSGROUPS,FOLLOWUP_TO);
@@ -75,8 +47,8 @@ $cs::RFC822::msgidptn='<[^@<>]+@[^@<>]+>';
 
 @cs::RFC822::listhdrs=(@cs::RFC822::mailhdrs,@cs::RFC822::newshdrs,KEYWORDS);
 for (@cs::RFC822::listhdrs)
-	{ $cs::RFC822::_IsListHdr{$_}=1;
-	}
+{ $cs::RFC822::_IsListHdr{$_}=1;
+}
 
 # timezones with GMT offsets in minutes
 %cs::RFC822::tzones=(	UT,	0,	GMT,	0,
@@ -92,89 +64,433 @@ for (@cs::RFC822::listhdrs)
 		V, 540, W, 600, X, 660, Y, 720
 	);
 
-sub tzone2minutes
-	{ local($_)=@_; tr/a-z/A-Z/;
-	  if (/^([-+]?)([01][0-9])([0-5][0-9])$/)
-			{ return ($1 eq '-' ? -1 : 1)*($3+60*$2)*60;
-			}
-	  return undef if !defined $cs::RFC822::tzones{$_};
-	  $cs::RFC822::tzones{$_};
-	}
+=item tzone2minutes(I<zone>)
 
-sub new	{ my($class,$src)=@_;
-	  my($this)={ HDRLIST => [],
-		      HDRS    => {},
-		      SYNCHED  => 1,
-		    };
+Convert the standard timezone name I<zone>
+to an offset in minutes from GMT.
 
-	  bless $this, $class;
+=cut
 
-	  if (! defined $src)
-		{}
-	  elsif (ref $src)
-		{ $this->SourceExtract($src);
+sub tzone2minutes($)
+{ local($_)=@_; tr/a-z/A-Z/;
+  if (/^([-+]?)([01][0-9])([0-5][0-9])$/)
+		{ return ($1 eq '-' ? -1 : 1)*($3+60*$2)*60;
 		}
-	  else	{ $this->FileExtract($src);
-		}
+  return undef if ! exists $cs::RFC822::tzones{$_};
+  $cs::RFC822::tzones{$_};
+}
 
-	  $this;
-	}
+=item hdrkey(I<headername>)
+
+Convert a I<headername> into a perl bareword string
+by uppercasing the letters and translating dashes into underscores.
+
+=cut
+
+sub hdrkey
+{ local($_)=shift;
+  tr/-/_/;
+  uc($_);
+}
+
+=item norm(I<hdrkey>)
+
+Convert a I<hdrkey> (or RFC822 header name)
+into a vanilla header name
+by lowercasing the letters,
+translating underscores into dashes
+and then uppercasing the first letter of any word.
+
+=cut
+
+sub norm
+{ local($_)=&hdrkey(shift);
+
+  ## warn "norm($_) -> ...\n";
+  $_=lc($_);
+  s/\b[a-z]/\u$&/g;
+  tr/_/-/;
+  ## warn "$_\n";
+  $_;
+}
+
+sub ngSet($)	# newsgrouptext -> cs::Set
+{ local($_)=@_;
+
+  my $ng = new cs::Set;
+
+  for (grep(length,split(/[\s,]+/)))
+  { $ng->STORE($_,$_);
+  }
+
+  $ng;
+}
+
+=item addrSet(I<addresses>)
+
+Parse the string I<addresses>
+and return a B<cs::Set> mapping B<I<user>@I<host>> to full address.
+
+=cut
+
+sub addrSet($)	# addrlisttext -> cs::Set
+{ local($_)=shift;
+
+  my $oaddrs = $_;	# waste, usually, but useful for warning
+
+  my $addrs = new cs::Set;
+
+  my($text,$addr,$atext);
+  my($comment,$tail);
+
+  $text='';
+  $addr='';
+  $atext='';
+
+  ## warn "addrSet($_)";
+  TOKEN:
+  while (1)
+  {
+    ## warn "parse at [$_]\n";
+    if (/^,(\s*,)*/ || !length)
+    # end of currently building address
+    { ## warn "comma - tidy up";
+      if (length)
+      { # warn "delim=$&\n";
+	$_=$';
+      }
+      else
+      { # warn "eos\n";
+      }
+
+      $text =~ s/^\s+//;
+      $text =~ s/\s+$//;
+
+      $atext =~ s/^\s+//;
+      $atext =~ s/\s+$//;
+
+      $addr=$atext if ! length $addr;
+
+      $addr =~ s/\@\([^\@]+\)$/\@\L$1/;
+      if (length $addr)
+      { $addrs->STORE($addr,$text);
+      }
+
+      $addr='';
+      $text='';
+      $atext='';
+
+      last TOKEN if ! length;
+    }
+    elsif (/^\(/)
+    # comment
+    { ## warn "comment";
+      ($comment,$tail)=parse_comment($_);
+      $text.=$comment;
+      ## warn "comment=$comment\n";
+      $_=$tail;
+    }
+    elsif (/^<([^\@>]*(\@[^>]*)?)>/)
+    { ## warn "addr=$&";
+      $text.=$&;
+      $atext.=$&;
+      $addr=$1;
+      $_=$';
+    }
+    elsif (/^\s+/)
+    { ## warn "token=$&";
+      $text.=' ';
+      $_=$';
+    }
+    elsif (/^\\./			# q-pair
+	|| /^"(\\(.|\n)|[^"\\]+)*"/	# quoted string
+	|| /^[^\\"<\(,]+/)	# plain text
+    { ## warn "token=$&\n";
+      $text.=$&;
+      $atext.=$&;
+      $_=$';
+    }
+    else
+    { warn "unknown at [$_], original text was:\n$oaddrs\n\n ";
+      $text.=substr($_,0,1);
+      $atext.=substr($_,0,1);
+      substr($_,0,1)='';
+    }
+  }
+
+  $addrs;
+}
+
+sub parse_comment($)
+{ local($_)=shift;
+
+  my($comment)='';
+  my($subcomment,$tail);
+
+  if (! /^\(/)
+  { warn "parse_comment on a non-comment \"$_\"";
+    return ('()',$_);
+  }
+
+  $comment=$&;
+  $_=$';
+
+  TOKEN:
+  while (length)
+  { last TOKEN if /^\)/;
+
+    if (/^\(/)
+    { ($subcomment,$tail)=parse_comment($_);
+      $comment.=$subcomment;
+      $_=$tail;
+    }
+    elsif (/^\\./)
+    { $comment.=$&; $_=$'; }
+    elsif (/^[^\(\)\\]+/)
+    { $comment.=$&; $_=$'; }
+    else
+    { $comment.=substr($_,0,1);
+	substr($_,0,1)='';
+    }
+  }
+
+  s/^\)//;		# eat closure if present
+
+  $comment.=')';	# return well-formed comment
+
+  ($comment,$_);
+}
+
+sub addr2fullname($)
+{ my($addrtext)=@_;
+
+  my($addr,$fullname);
+
+  if ($addrtext =~ /<\s*(\S.*\S)\s*>/)
+  { $addr=$1;
+    $fullname="$` $'";
+  }
+  elsif ($addrtext =~ /\(\s*(\S.*\S)\s*\)/)
+  { $addr="$` $'";
+    $fullname=$1;
+  }
+  else
+  { $addr=$addrtext;
+    $fullname="";
+  }
+
+  $fullname =~ s/^"\s*(.*)\s*"$/$1/;
+  $fullname =~ s/^'\s*(.*)\s*'$/$1/;
+
+  wantarray ? ($fullname,$addr) : $fullname;
+}
+
+=item msgid()
+
+Create a unique message-id.
+
+=cut
+
+$cs::RFC822::_Msgid_count=0;
+sub msgid()
+{ my($sec,$min,$hour,$mday,$mon,$year,@etc)=localtime(time);
+
+  $cs::RFC822::_MsgidCount++;
+  $year+=1900;
+  sprintf("<%04d%02d%02d%02d%02d%02d-%s-%d-%05d@%s>",
+	$year,$mon+1,$mday,$hour,$min,$sec,
+	$'ENV{'USER'},
+	$cs::RFC822::_MsgidCount,
+	$$,
+	$'ENV{'HOSTNAME'});
+}
+
+sub msgids	# text -> message-ids
+{ local($_)=shift;
+  my(@ids);
+
+  while (/$cs::RFC822::msgidptn/o)
+  { push(@ids,$&);
+    $_=$';
+  }
+  
+  wantarray ? @ids : shift(@ids);
+}
+
+=item from_(I<address>,I<time>)
+
+Create a UNIX envelope "From_" line body value
+from the I<address> and optional UNIX time_t I<time>.
+
+=cut
+
+sub from_($;$)
+{ my($addr,$time)=@_;
+  $time=time if ! defined $time;
+
+  my($sec,$min,$hr,$mday,$mon,$yr,$wday,@etc)=gmtime($time);
+
+  sprintf("%s %s %s %2d %02d:%02d:%02d GMT %4d\n",
+	  $addr,
+	  (Sun,Mon,Tue,Wed,Thu,Fri,Sat)[$[+$wday],
+	  (Jan,Feb,Mar,Apr,May,Jun,Jul,Aug,Sep,Oct,Nov,Dec)[$[+$mon],
+	  $mday,
+	  $hr,$min,$sec,
+	  1900+$yr
+	 );
+}
+
+=item normsubject(I<subject>)
+
+Clean excess whitepsace and leading "B<Re: >" prefixes from the string I<subject>.
+
+=cut
+
+sub normsubject($)	# subject -> cleaner form
+{ local($_)=@_;
+
+  s/^\s+//;
+  s/^(re\s*(\[\d+\]\s*)?:+\s*)+//i;
+  s/\s+$//;
+  s/\s+/ /g;
+
+  $_;
+}
+
+=back
+
+=head1 OBJECT CREATION
+
+=over 4
+
+=item new cs::RFC822 I<source>
+
+Create a new B<csRFC822> object.
+If the optional parameter I<source> is supplied
+then if it is an object reference
+use it as a B<cs::Source> object and extract any headers from it,
+leaving it positioned at the start of the message body.
+If I<source> is a scalar consider it a filename
+and extract headers from that file.
+
+=cut
+
+sub new
+{ my($class,$src)=@_;
+  my($this)={ cs::RFC822::HDRLIST	=> [],
+	      cs::RFC822::HDRS    	=> {},
+	      cs::RFC822::SYNCHED	=> 1,
+	    };
+
+  bless $this, $class;
+
+  if (! defined $src)
+  {}
+  elsif (ref $src)
+  { $this->SourceExtract($src);
+  }
+  else
+  { $this->FileExtract($src);
+  }
+
+  $this;
+}
+
+=back
+
+=head1 OBJECT METHODS
+
+=over 4
+
+=cut
+
+sub Debug
+{ my($this)=shift;
+    my($p,$f,$l)=caller(0);
+    $f =~ s:.*/::;
+    warn "$f:$l: @_ this=$this, synched=$this->{cs::RFC822::SYNCHED}, Hdrs=$this->{cs::RFC822::HDRS}, To="
+	.(defined($this->{cs::RFC822::HDRS}->{TO})
+		? "[$this->{cs::RFC822::HDRS}->{TO}]"
+		: 'UNDEF');
+}
 
 # for tie - XXX - how to do firstkey, next, last?
 # sub fetch { &Hdr(@_); }
 # sub store { my($this)=shift; &Add($this,$_[0].': '.$_[1]); }
 # sub delete { &Del(@_); }
 
+=item Hdr(I<header>,I<first>)
+
+Return an array of the bodies of the header fields named I<header>.
+If the optional parameter I<first> is ture,
+return only the first such header.
+
+=cut
+
 sub Hdr
-	{ my($this,$key,$first)=@_;
-	  $first=0 if ! defined $first;
-	  # Debug($this,"Hdr($key)");
+{ my($this,$key,$first)=@_;
+  $first=0 if ! defined $first;
+  # Debug($this,"Hdr($key)");
 
-	  $key=&hdrkey($key);
+  $key=&hdrkey($key);
 
-	  if (! $first && ! wantarray)
-		{ $this->Sync();
-		  my($hash)=$this->{HDRS};
-	  	  return undef unless exists $hash->{$key};
-	  	  return $hash->{$key};
-		}
+  if (! $first && ! wantarray)
+  { $this->Sync();
+    my($hash)=$this->{cs::RFC822::HDRS};
+    return undef unless exists $hash->{$key};
+    return $hash->{$key};
+  }
 
-	  my(@bodies,$hdr)=();
-	  my($hdrlist)=$this->{HDRLIST};
+  my(@bodies)=();
+  my($hdrlist)=$this->{cs::RFC822::HDRLIST};
 
-	  for $hdr (@$hdrlist)
-		{ $hdr =~ /^([^:]*):\s*/;
-		  push(@bodies,$') if $key eq &hdrkey($1);
-		}
+  for my $hdr (@$hdrlist)
+  { $hdr =~ /^([^:]*):\s*/;
+    push(@bodies,$') if $key eq &hdrkey($1);
+  }
 
 #	  print STDERR "returning array [",
 #			join('|',@bodies),
 #			"] to ", join(':',caller(0)), "\n";
 
-	  @bodies
-	    ? $first
-	      ? shift(@bodies)
-	      : @bodies
-	    : wantarray
-	      ? ()
-	      : undef;
-	}
+  @bodies
+    ? $first
+      ? shift(@bodies)
+      : @bodies
+    : wantarray
+      ? ()
+      : undef;
+}
+
+=item Hdrs()
+
+Return the arrayref storing the headers in a scalar context,
+or the array itself in a list context.
+
+=cut
 
 sub Hdrs
-	{ my($this)=shift;
-	  my($hdrlist)=$this->{HDRLIST};
-	  wantarray ? @$hdrlist : $hdrlist;
-	}
+{ my($this)=shift;
+  my($hdrlist)=$this->{cs::RFC822::HDRLIST};
+  wantarray ? @$hdrlist : $hdrlist;
+}
+
+=item HdrNames()
+
+Return the names of the fields present in the headers.
+
+=cut
 
 sub HdrNames
 { my($this)=shift;
+
   $this->Sync();
-  my($hdrhash)=$this->{HDRS};
+  my($hdrhash)=$this->{cs::RFC822::HDRS};
   my(@names);
 
   for (keys %$hdrhash)
-	{ push(@names,&norm($_));
-	}
+  { push(@names,norm($_));
+  }
 
   @names;
 }
@@ -183,12 +499,12 @@ sub Sync
 { my($this)=@_;
   # Debug($this,"Sync");
 
-  return if $this->{SYNCHED};
+  return if $this->{cs::RFC822::SYNCHED};
 
   my(%hash);
 
   my($hdr,$key,$body);
-  my($hdrlist)=$this->{HDRLIST};
+  my($hdrlist)=$this->{cs::RFC822::HDRLIST};
 
   for $hdr (@$hdrlist)
   { $hdr =~ /^([^:]*):\s*/;
@@ -206,13 +522,43 @@ sub Sync
     }
   }
 
-  $this->{HDRS}=\%hash;
-  $this->{SYNCHED}=1;
+  $this->{cs::RFC822::HDRS}=\%hash;
+  $this->{cs::RFC822::SYNCHED}=1;
 
   # Debug($this,"after Sync");
 }
 
-sub Add	# (hdr[,how])
+=item Add(I<header>,I<how>)
+
+=item Add(I<headername>,I<headerbody>,I<how>)
+
+Add the specified I<header> to the object
+in the fashion specified by the optional parameter I<how>
+(which defaults to B<ADD>).
+I<header> may be
+an arrayref to an array of the form B<(I<headername>,I<headerbody>)>,
+a complete header line ("B<I<headername>: I<headerbody>>"),
+or a header name,
+in which last case an extra parameter I<headerbody> is expected
+before I<how>.
+
+I<how> is one of the strings:
+B<ADD>, to append the header to the list;
+B<PREPEND>, to prepend the header to the list;
+B<SUPERCEDE>, to rename all existing headers named I<headername>
+to be "B<X-Original-I<headername>>" and the append the header to the list;
+B<REPLACE>, to discard all existing headers named I<headername>
+and append the header to the list.
+
+If I<how> is B<SUPERCEDE>
+an optional prefix string may be supplied after I<how>
+to use instead of "B<X-Original->" above.
+Note: a zero length prefix string makes B<SUPERCEDE> act like B<REPLACE>,
+not B<ADD>.
+
+=cut
+
+sub Add
 { my($this)=shift;
   local($_)=shift;
 
@@ -235,8 +581,20 @@ sub Add	# (hdr[,how])
   { ($field,$body)=($1,$');
   }
 
-  my($how)=@_;
+  my($how,$suppfx)=@_;
   $how=ADD if ! defined $how;
+  if ($how ne SUPERCEDE)
+  { if (defined $suppfx)
+    { my(@c)=caller;
+      warn "$::cmd: extract argument \"$suppfx\" after $how from [@c]";
+    }
+  }
+  elsif (! defined $suppfx)
+  { $suppfx="X-Original-";
+  }
+  elsif (! length $suppfx)
+  { $how=REPLACE;
+  }
 
   # clean up
   $_=$body;
@@ -247,7 +605,7 @@ sub Add	# (hdr[,how])
   $body=$_;
 
   my($htext)=norm($field).": $body";
-  my($hlist)=$this->{HDRLIST};
+  my($hlist)=$this->{cs::RFC822::HDRLIST};
   my($cfield)=hdrkey($field);
 
   if ($how eq ADD)
@@ -260,59 +618,94 @@ sub Add	# (hdr[,how])
   {
     ## warn "add header \"$htext\", mode SUPERCEDE";
     HDR_SUP:
-      for (@$hlist)
-      { if (! /^[^:]+/)
-	{ warn "$::cmd: skipping bogus header record [$_]";
-	  next HDR_SUP;
-	}
-
-	if (hdrkey($&) eq $cfield)
-	{ s/^/X-Original-/;
-	}
+    for (@$hlist)
+    { if (! /^[^:]+/)
+      { warn "$::cmd: skipping bogus header record [$_]";
+	next HDR_SUP;
       }
+
+      if (hdrkey($&) eq $cfield)
+      { $_=$suppfx.$_;
+      }
+    }
 
     push(@$hlist,$htext);
   }
   elsif ($how eq REPLACE)
   { $hlist=[ grep(! /^[^:]+/ || hdrkey($&) ne $cfield, @$hlist) ];
     push(@$hlist,$htext);
-    $this->{HDRLIST}=$hlist;
+    $this->{cs::RFC822::HDRLIST}=$hlist;
   }
   else
   { @c=caller;
     warn "don't know how to add header [$field,$body] by method \"$how\" from [@c]";
   }
 
-  $this->{SYNCHED}=0;
+  $this->{cs::RFC822::SYNCHED}=0;
 }
 
-# (this,fname,[keep]) -> keep ? handle-at-body : close-ok
-sub FileExtract
+=item FileExtract(I<file>)
+
+Extract the headers from the named I<file>.
+
+=cut
+
+sub FileExtract($$)
 { local($cs::RFC822::This)=shift;
+  my($fname)=@_;
+
   ::need(cs::Source);
-  my($fname,$keep)=@_;
   my($s)=cs::Source->new(PATH, $fname);
+
   _extract($s);
 }
-sub FILEExtract	# (this,FILE) -> hdrs,@bodylines
+
+=item FILEExtract(I<FILE>)
+
+Extract the headers from the perl filehandle I<FILE>,
+leaving the file handle positioned at the start of the body.
+
+=cut
+
+sub FILEExtract($$)
 { local($cs::RFC822::This)=shift;
-  ::need(cs::Source);
   my($FILE)=@_;
+
+  ::need(cs::Source);
   my($s)=cs::Source->new(FILE, $FILE);
+
   _extract($s);
 }
+
+=item SourceExtract(I<source>)
+
+Extract the headers from the specified I<source>,
+leaving the I<source> positioned at the start of the body.
+
+=cut
+
 sub SourceExtract
 { local($cs::RFC822::This)=shift;
   _extract(@_);
 }
+
+=item ArrayExtract(I<lines>)
+
+Extract the headers from the array of I<lines>.
+
+=cut
+
 sub ArrayExtract
 { local($cs::RFC822::This)=shift;
-  ::need(cs::Source);
   my(@a)=@_;
+
+  ::need(cs::Source);
   my($s)=cs::Source->new(ARRAY, \@a);
+
   _extract($s);
 }
-# NOTE: expects a local($this) to be in scope!
+
+# NOTE: expects a local($cs::RFC822::This) to be in scope!
 sub _extract
 { my($s,$leadingFrom_)=@_;
   $leadingFrom_=1 if ! defined $leadingFrom_;
@@ -321,27 +714,35 @@ sub _extract
 
   my $first = 1;
   HDR:
-    while (defined ($_=$s->GetContLine()) && length)
-    { chomp;
-      last HDR if ! length;
+  while (defined ($_=$s->GetContLine()) && length)
+  { chomp;
+    last HDR if ! length;
 
-      if ($first)
-      { if (/^From / && $leadingFrom_)
-	{ s/^From /From-: /;
-	}
-
-	$first=0;
+    if ($first)
+    { if (/^From / && $leadingFrom_)
+      { s/^From /From-: /;
       }
 
-      last HDR unless /^[^:\s]+:/;
-
-      $cs::RFC822::This->Add($_);
+      $first=0;
     }
+
+    last HDR unless /^[^:\s]+:/;
+
+    $cs::RFC822::This->Add($_);
+  }
 
   1;
 }
 
-sub Del
+=item Del(I<headername>,I<keep>)
+
+Delete all headers named I<headername>.
+If the optional parameter I<keep> is true,
+just rename the headers to "B<X-Deleted->I<headername>".
+
+=cut
+
+sub Del($$;$)
 { my($this,$key,$keep)=@_;
   $keep=0 if ! defined $keep;
 
@@ -349,7 +750,7 @@ sub Del
   local($_);
 
   $key=&hdrkey($key);
-  my($hdrlist)=$this->{HDRLIST};
+  my($hdrlist)=$this->{cs::RFC822::HDRLIST};
   for (@$hdrlist)
   { /^[^:]*/;
     if ($key eq &hdrkey($&))
@@ -364,43 +765,19 @@ sub Del
   if ($match)
   { # print STDERR "changed after Del($key) to [",
     # 		join("|",@nhdrs), "]\n";
-    $this->{HDRLIST}=[ @nhdrs ];
-    $this->{SYNCHED}=0;
+    $this->{cs::RFC822::HDRLIST}=[ @nhdrs ];
+    $this->{cs::RFC822::SYNCHED}=0;
   }
 }
 
-# Get key from field.
-sub hdrkey
-{ local($_)=shift;
-  tr/-/_/;
-  uc($_);
-}
+=item Addrs(I<headernames>)
 
-# Get normal form of field name.
-sub norm
-{ local($_)=&hdrkey(shift);
+Extract the email addresses from the headers
+specified by the array I<headenames>
+and return a B<cs::Set>
+keyed on the B<I<user>@I<host>> component.
 
-  ## warn "norm($_) -> ...\n";
-  $_=lc($_);
-  s/\b[a-z]/\u$&/g;
-  tr/_/-/;
-  ## warn "$_\n";
-  $_;
-}
-
-# parse an RFC822 address list returning a list of pairs
-#	(addr-without-<>, full-text, ...)
-sub ngSet($)	# newsgrouptext -> cs::Set
-{ local($_)=@_;
-
-  my $ng = new cs::Set;
-
-  for (grep(length,split(/[\s,]+/)))
-  { $ng->STORE($_,$_);
-  }
-
-  $ng;
-}
+=cut
 
 sub Addrs
 { my($this,@hdrlist)=@_;
@@ -418,216 +795,38 @@ sub Addrs
   $addrs;
 }
 
-sub addrSet($)	# addrlisttext -> cs::Set
-{ local($_)=shift;
+=item ForceMsgID()
 
-  my $oaddrs = $_;	# waste, usually, but useful for warning
+Generate and insert a B<Message-ID> field
+none is present.
 
-  my $addrs = new cs::Set;
+=cut
 
-  my($text,$addr,$atext);
-  my($comment,$tail);
+sub ForceMsgID($)
+{ my($this)=@_;
+  my($msgid);
 
-  $text='';
-  $addr='';
-  $atext='';
-
-  ## warn "addrSet($_)";
-  TOKEN:
-  while (1)
-  {
-    ## warn "parse at [$_]\n";
-    if (/^,(\s*,)*/ || !length)
-	  # end of currently building address
-	  { ## warn "comma - tidy up";
-	    if (length)
-		  { # print STDERR "delim=$&\n";
-		    $_=$';
-		  }
-	    else	{ # print STDERR "eos\n";
-		  }
-
-	    $text =~ s/^\s+//;
-	    $text =~ s/\s+$//;
-
-	    $atext =~ s/^\s+//;
-	    $atext =~ s/\s+$//;
-
-	    $addr=$atext if ! length $addr;
-
-	    $addr =~ s/\@\([^\@]+\)$/\@\L$1/;
-	    if (length $addr)
-		  { $addrs->STORE($addr,$text);
-		  }
-
-	    $addr='';
-	    $text='';
-	    $atext='';
-
-	    last TOKEN if ! length;
-	  }
-    elsif (/^\(/)
-	  # comment
-	  { ## warn "comment";
-	    ($comment,$tail)=parse_comment($_);
-	    $text.=$comment;
-	    ## warn "comment=$comment\n";
-	    $_=$tail;
-	  }
-    elsif (/^<([^\@>]*(\@[^>]*)?)>/)
-	  { ## warn "addr=$&";
-	    $text.=$&;
-	    $atext.=$&;
-	    $addr=$1;
-	    $_=$';
-	  }
-    elsif (/^\s+/)
-	  { ## warn "token=$&";
-	    $text.=' ';
-	    $_=$';
-	  }
-    elsif (/^\\./			# q-pair
-	|| /^"(\\(.|\n)|[^"\\]+)*"/	# quoted string
-	|| /^[^\\"<\(,]+/)	# plain text
-	  { ## warn "token=$&\n";
-	    $text.=$&;
-	    $atext.=$&;
-	    $_=$';
-	  }
-    else	{ warn "unknown at [$_], original text was:\n$oaddrs\n\n ";
-	    $text.=substr($_,0,1);
-	    $atext.=substr($_,0,1);
-	    substr($_,0,1)='';
-	  }
+  if (! defined ($msgid=$this->Hdr(Message_ID)))
+  { Add($this,"Message-ID: ".($msgid=msgid()));
   }
 
-  $addrs;
+  $msgid;
 }
 
-sub parse_comment
-	{ local($_)=shift;
-	  my($comment)='';
-	  my($subcomment,$tail);
+sub ForceFrom_($)
+{ my($this)=@_;
 
-	  if (! /^\(/)
-		{ warn "parse_comment on a non-comment \"$_\"";
-		  return ('()',$_);
-		}
-
-	  $comment=$&;
-	  $_=$';
-
-	  TOKEN:
-	    while (length)
-		{ last TOKEN if /^\)/;
-
-		  if (/^\(/)
-			{ ($subcomment,$tail)=parse_comment($_);
-			  $comment.=$subcomment;
-			  $_=$tail;
-			}
-		  elsif (/^\\./)
-			{ $comment.=$&; $_=$'; }
-		  elsif (/^[^\(\)\\]+/)
-			{ $comment.=$&; $_=$'; }
-		  else	{ $comment.=substr($_,0,1);
-			  substr($_,0,1)='';
-			}
-		}
-
-	  s/^\)//;		# eat closure if present
-
-	  $comment.=')';	# return well-formed comment
-
-	  ($comment,$_);
-	}
-
-sub addr2fullname
-{ my($addrtext)=@_;
-  my($addr,$fullname);
-
-  if ($addrtext =~ /<\s*(\S.*\S)\s*>/)
-	{ $addr=$1;
-	  $fullname="$` $'";
-	}
-  elsif ($addrtext =~ /\(\s*(\S.*\S)\s*\)/)
-	{ $addr="$` $'";
-	  $fullname=$1;
-	}
-  else	{ $addr=$addrtext;
-	  $fullname="";
-	}
-
-  $fullname =~ s/^"\s*(.*)\s*"$/$1/;
-  $fullname =~ s/^'\s*(.*)\s*'$/$1/;
-
-  wantarray ? ($fullname,$addr) : $fullname;
-}
-
-$cs::RFC822::_Msgid_count=0;
-sub msgid	# void -> msgid
-	{ my($sec,$min,$hour,$mday,$mon,$year,@etc)=localtime(time);
-
-	  $cs::RFC822::_MsgidCount++;
-	  $year+=1900;
-	  sprintf("<%04d%02d%02d%02d%02d%02d-%s-%d-%05d@%s>",
-		$year,$mon+1,$mday,$hour,$min,$sec,
-		$'ENV{'USER'},
-		$cs::RFC822::_MsgidCount,
-		$$,
-		$'ENV{'HOSTNAME'});
-	}
-
-sub ForceMsgID	# void -> msgid
-	{ my($this)=shift;
-	  my($msgid);
-
-	  if (! defined ($msgid=$this->Hdr(Message_ID)))
-		{ Add($this,"Message-ID: ".($msgid=msgid()));
-		}
-
-	  $msgid;
-	}
-
-sub msgids	# text -> message-ids
-	{ local($_)=shift;
-	  my(@ids);
-
-	  while (/$cs::RFC822::msgidptn/o)
-		{ push(@ids,$&);
-		  $_=$';
-		}
-	  
-	  wantarray ? @ids : shift(@ids);
-	}
-
-sub from_	# (addr,gmtime)
-{ my($addr,$time)=@_;
-  my($sec,$min,$hr,$mday,$mon,$yr,$wday,@etc)=gmtime($time);
-
-  sprintf("%s %s %s %2d %02d:%02d:%02d GMT %4d\n",
-	  $addr,
-	  (Sun,Mon,Tue,Wed,Thu,Fri,Sat)[$[+$wday],
-	  (Jan,Feb,Mar,Apr,May,Jun,Jul,Aug,Sep,Oct,Nov,Dec)[$[+$mon],
-	  $mday,
-	  $hr,$min,$sec,
-	  1900+$yr
-	 );
-}
-
-sub ForceFrom_
-{ my($this)=shift;
   local($_);
 
-  if (! defined($_=&Hdr($this,FROM_)))
+  if (! defined($_=Hdr($this,FROM_)))
   { my $addrset = $this->Addrs(FROM);
     my(@addrs) = $addrset->KEYS();
 
-    &Add($this,'From-: '.from_($addrs[0],time));
+    Add($this,'From-: '.from_($addrs[0],time));
   }
 }
 
-sub gm2date
+sub gm2date(;$)
 { my($gmt)=@_;
   $gmt=time if ! defined $gmt;
 
@@ -666,7 +865,9 @@ sub date2gm
     return undef unless defined($mnum=cs::Date::mon2mnum($mon));
 
     # catch y2k stupidities (and legit 2 digit form)
-    if (length($yr) < 4)	{ $yr+=($yr < 70 ? 2000 : 1900); }
+    if (length($yr) < 4)
+    { $yr+=($yr < 70 ? 2000 : 1900); }
+
     if ($yr < 1970)
     { warn "$::cmd: bogus date \"$_\" yields year == $yr, returning undef";
       return undef;
@@ -677,14 +878,14 @@ sub date2gm
 	-tzone2minutes($offset);
   }
   else
-  { warn "\"$_\" doesn't look like a Date: line\n";
+  { warn "$::cmd: \"$_\" doesn't look like a Date: line\n";
     return undef;
   }
 
   $gmt;
 }
 
-sub from_2gm
+sub from_2gm($)
 { local($_)=@_;
 
   ::need(cs::Date);
@@ -693,12 +894,12 @@ sub from_2gm
 
 sub PickHdr	# (header-names) -> first-non-empy
 { my($this)=shift;
-  local($_);
-  my($hdr);
 
-  for $hdr (@_)
-	{ return $_ if defined($_=$this->Hdr($hdr));
-	}
+  local($_);
+
+  for my $hdr (@_)
+  { return $_ if defined($_=$this->Hdr($hdr));
+  }
 
   undef;
 }
@@ -719,7 +920,7 @@ sub Reply_To(\%)	{ PickHdr(shift,REPLY_TO,FROM); }
 sub Errors_To		{ PickHdr(shift,ERRORS_TO,FROM); }
 sub Followups_To	{ PickHdr(shift,FOLLOWUPS_TO,NEWSGROUPS); }
 
-sub Reply
+sub Reply($;$$)
 { my($this,$how,$myaddrs)=@_;
   $how=AUTHOR if ! defined $how;
   $myaddrs='' if ! defined $myaddrs;
@@ -732,31 +933,31 @@ sub Reply
   my $bcc= new cs::Set;
 
   for (ref $how ? @$how : $how)
-	{ if ($_ eq AUTHOR)
-		{ $to->AddSet(addrSet($this->Reply_To()));
-		}
-	  elsif ($_ eq ALL)
-		{ $to->AddSet(addrSet($this->Reply_To()));
-		  $cc->AddSet(addrSet($this->Hdr(TO)
-				     .", ".$this->Hdr(CC)));
+  { if ($_ eq AUTHOR)
+    { $to->AddSet(addrSet($this->Reply_To()));
+    }
+    elsif ($_ eq ALL)
+    { $to->AddSet(addrSet($this->Reply_To()));
+      $cc->AddSet(addrSet($this->Hdr(TO)
+			 .", ".$this->Hdr(CC)));
 
-		  $ng->AddSet(ngSet($this->Followups_To()));
-		}
-	  elsif ($_ eq ERROR)
-		{ $to->AddSet(addrSet($this->Errors_To()));
-		}
-	  else
-	  { warn "$::cmd: unknown reply style \"$_\"";
-	  }
-	}
+      $ng->AddSet(ngSet($this->Followups_To()));
+    }
+    elsif ($_ eq ERROR)
+    { $to->AddSet(addrSet($this->Errors_To()));
+    }
+    else
+    { warn "$::cmd: unknown reply style \"$_\"";
+    }
+  }
 
   # clean duplicates
   map($cc->DELETE($_),$to->KEYS());
 
   # clean self references
   if (length $myaddrs)
-	{ map($cc->DELETE($_),addrSet($myaddrs)->KEYS());
-	}
+  { map($cc->DELETE($_),addrSet($myaddrs)->KEYS());
+  }
 
   $rep->Add(TO,join(",\n\t",$to->Values()))	if $to->KEYS();
   $rep->Add(CC,join(",\n\t",$cc->Values()))	if $cc->KEYS();
@@ -767,8 +968,8 @@ sub Reply
 
   { my $kw;
     if (length($kw=$this->Hdr(KEYWORDS)))
-	{ $rep->Add(KEYWORDS,$kw);
-	}
+    { $rep->Add(KEYWORDS,$kw);
+    }
   }
 
   { my $ref;
@@ -776,23 +977,23 @@ sub Reply
     my $msgid;
 
     if (length($ref=$this->Hdr(REFERENCES)))
-	{ push(@ref,
-		grep(length,
-			split(/\s+/,$ref)));
-	}
+    { push(@ref,
+	    grep(length,
+		    split(/\s+/,$ref)));
+    }
     else
     # XXX - hack to catch idiot mailers
     { my($irt);
 
       if (($irt=$this->Hdr(IN_REPLY_TO))
 	=~ /<[^@>]*@[^@]*>/)
-	{ push(@ref,$&);
-	}
+      { push(@ref,$&);
+      }
     }
 
     if (length($msgid=$this->Hdr(MESSAGE_ID)))
-	{ push(@ref,$msgid);
-	}
+    { push(@ref,$msgid);
+    }
 
     $rep->Add(REFERENCES,join("\n\t",@ref)) if @ref;
   }
@@ -800,18 +1001,7 @@ sub Reply
   $rep;
 }
 
-sub normsubject($)	# subject -> cleaner form
-	{ local($_)=shift;
-
-	  s/^\s+//;
-	  s/^(re\s*(\[\d+\]\s*)?:+\s*)+//i;
-	  s/\s+$//;
-	  s/\s+/ /g;
-
-	  $_;
-	}
-
-sub WriteItem(\%\%)	# ($this,Sink,[1,],@text...)
+sub WriteItem	# ($this,Sink,[1,],@text...)
 { my($this,$sink)=(shift,shift);
 
   # optional From_ line
@@ -838,7 +1028,7 @@ sub WriteItem(\%\%)	# ($this,Sink,[1,],@text...)
     $sink->Put("From ", $this->Hdr(From_), "\n");
   }
 
-  my(@h)=@{$this->{HDRLIST}};
+  my(@h)=@{$this->{cs::RFC822::HDRLIST}};
 
 #	  warn "XXX: WriteItem: no headers!!\n".cs::Hier::h2a($this,1)
 #		if ! @h;
@@ -855,5 +1045,19 @@ sub WriteItem(\%\%)	# ($this,Sink,[1,],@text...)
 
   $sink->Put("\n", @_);
 }
+
+=back
+
+=head1 SEE ALSO
+
+RFC822 - Standard for the Format of ARPA Internet Text Messages
+
+cs::Source(3), cs::Sink(3), cs::MIME(3)
+
+=head1 AUTHOR
+
+Cameron Simpson E<lt>cs@zip.com.auE<gt>
+
+=cut
 
 1;
