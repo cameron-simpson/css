@@ -1,0 +1,99 @@
+#!/bin/sh
+#
+# Intercept email items and deposit in the named directories.
+#	- Cameron Simpson <cs@zip.com.au> 01nov96
+#
+# Each directory contains a short shell script, viz:
+#	case "$subject" in
+#		shell-pattern)	snarf=1 ;;	# keep copies here
+#		pattern2)	snarf=1 passthru= ;; # keep and not pass thru
+#	esac
+# The variables $subject and $from are set to the first line of the respective
+# headers with leading white space removed and upper case lowered.
+# Setting $snarf to 1 will cause the item to be saved in the directory.
+# Setting $passthru to the empty string will prevent delivery via normal mail
+# (by default a copy arrives in the user's mail file, too).
+#
+
+tmp=/tmp/m$$collate
+
+USER=`basename "$HOME"`
+MAIL=/var/spool/mail/$USER
+export USER MAIL
+
+cat >"$tmp" || exit $?	# snarf file
+
+# collate headers for eval
+hdrs=`
+	tr '[A-Z]' '[a-z]' <"$tmp" \
+	  | sed -n '/^$/q
+		    /^subject:/b hdr
+		    /^from:/b hdr
+		    d
+		    :hdr
+		    s/'"'/'\\\\''"'/g
+		    s/^\([^:]*\):[ 	]*\(.*\)/\1='\''\2'\''/p'
+     `
+
+xit=0
+
+# take lock
+while :
+do  if mkdir "$HOME/.mcollate-lock"
+    then
+	break
+    else
+	sleep 5
+    fi
+done
+
+passthru=1
+for d
+do
+    case "$d" in
+	/*) ;; *) d=$HOME/$d ;;
+    esac
+
+    [ -r "$d/.file" ] || { echo "$0: no $d/.file" >&2; xit=1; continue; }
+
+    from=
+    subject=
+    eval "$hdrs"
+
+    snarf=
+    . "$d/.file"
+
+    if [ $snarf ]
+    then
+	# copy into work dir
+	dtmp="$d/.$$"
+	cp $tmp "$dtmp" || { xit=1; continue; }
+
+	# starting counter
+	n=`ls "$d" | sed '/^[0-9][0-9]*$/!d' | sort -n | sed -n '$p'`
+	[ $n ] || n=0
+
+	# find a spare number
+	while :
+	do  n=`expr $n + 1`
+	    if [ ! -f "$d/$n" ] && mv "$dtmp" "$d/$n"
+	    then
+		break
+	    fi
+	done
+    fi
+done
+
+if [ $xit = 0 ]
+then
+    [ $passthru ] && cat "$tmp" >>"$MAIL"
+fi
+
+# release lock
+rmdir "$HOME/.mcollate-lock"
+
+rm -f "$tmp"
+
+echo "xit=$xit"
+
+exit $xit
