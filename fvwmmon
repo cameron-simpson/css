@@ -17,7 +17,7 @@ my %win;
 my($ev,$id,$info,$W);
 
 LOG:
-while (<STDIN>)
+while ((defined($_=<STDIN>)))
 {
   chomp;
   if (/^\s/)
