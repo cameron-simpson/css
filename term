@@ -25,7 +25,7 @@ w= h=
 bigx=0 bigy=-0 bigw=80 bigh=61 bigf=6x13
 geometry=
 sized=
-shade=${ATERM_SHADE:-60}
+shade=${ATERM_SHADE:-30}
 xauthhack=
 async=1
 lock=
