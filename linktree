@@ -1,0 +1,152 @@
+#!/usr/bin/perl
+#
+# Used by amassbackup to construct the prototype backup.
+#	- Cameron Simpson <cs@zip.com.au> 03apr2000
+#
+
+=head1 NAME
+
+linktree - make a hardlinked copy of a directory tree
+
+=head1 SYNOPSIS
+
+linktree [--no-copy] I<srcdir> I<destdir>
+
+=head1 DESCRIPTION
+
+B<linktree> walks the I<srcdir> directory and
+constructs a copy as I<destdir>.
+Files are hardlinked across (or copied if the link fails),
+symlinks are copied
+and other objects are ignored.
+
+=cut
+
+use strict qw(vars);
+
+use cs::Misc;
+use cs::Upd;
+use cs::Pathname;
+use File::Find;
+use File::Copy;
+
+$::Verbose = -t STDOUT;
+$::Silent = 0;
+$::DoCopy = 1;
+
+exit linktree(@ARGV);
+
+sub linktree
+{ my(@ARGV)=@_;
+
+  local($::Xit)=0;
+  local($::Usage)="Usage: $::cmd srcdir destdir\n";
+
+  if (@ARGV && $ARGV[0] eq '--no-copy')
+  { $::DoCopy=0;
+    shift(@ARGV);
+  }
+
+  if (@ARGV != 2)
+  { die "$::cmd: missing srcdir or destdir\n$::Usage";
+  }
+
+  my($src,$dest)=@ARGV;
+
+  if (! -d "$src/.")
+  { die "$::cmd: $src: not a directory\n";
+  }
+
+  if ($dest !~ m:^/:)
+  { my $cwd=`pwd`;
+    die "$::cmd: can't determine current directory\n" if $? != 0;
+    chomp($cwd);
+    -d $cwd || die "$::cmd: cwd $cwd: not a directory?\n";
+    $dest="$cwd/$dest";
+  }
+
+  chdir($src) || die "$::cmd: chdir($src): $!\n";
+
+  -e "$dest" && die "$::cmd: $dest already exists!\n";
+
+  $::Dest=$dest;
+  find(\&linkit,".");
+  return $::Xit;
+}
+
+sub linkit
+{
+  ## my $o_=$_;
+  ## warn "Into linkit:\n";
+  ## warn "\t_=$_\n";
+  ## warn "\tFile::Find::name=$File::Find::name\n";
+  ## warn "\tFile::Find::dir=$File::Find::dir\n";
+
+  $::Verbose && out($File::Find::name);
+
+  my $dest = "$::Dest/$File::Find::name";
+  $dest =~ s:/+\.$::;
+
+  if (-e $dest)
+  { warn "$::cmd: $dest already exists!\n";
+    $::Xit=1;
+  }
+  elsif (! lstat)
+  { warn "$::cmd: $_: $!\n";
+    $::Xit=1;
+  }
+  elsif (-d _)
+  { ## $::Verbose && out($File::Find::name);
+    if (! cs::Pathname::makedir($dest,0777))
+    { warn "$::cmd: mkdir($dest): $!\n";
+      $::Xit=1;
+    }
+    else
+    { cs::Pathname::cpperm($_,$dest) || ($::Xit=1);
+    }
+  }
+  elsif (-f _)
+  {
+    cs::Pathname::needfiledir($dest);
+    if (! link($_,$dest))
+    {
+      if (! $::DoCopy)
+      { warn "$::cmd: link($File::Find::name,$dest): $!\n";
+	$::Xit=1;
+      }
+      elsif (! copy($_,$dest))
+      { warn "$::cmd: copy($File::Find::name,$dest): $!\n";
+	$::Xit=1;
+	! -e $dest || unlink($dest) || warn "$::cmd: can't unlink $dest: $!\n";
+      }
+      else
+      { cs::Pathname::cpperm($_,$dest) || ($::Xit=1);
+      }
+    }
+  }
+  elsif (-l _)
+  { 
+    my $sym = readlink;
+    if (! defined $sym)
+    { warn "$::cmd: readlink($File::Find::name): $!\n";
+      $::Xit=1;
+    }
+    elsif (! symlink($sym,$dest))
+    { warn "$::cmd: symlink($sym,$dest): $!\n";
+      $::Xit=1;
+    }
+  }
+  else
+  { warn "$::cmd: ignoring $File::Find::name\n";
+  }
+}
+
+=head1 SEE ALSO
+
+amassbackup(1), rab(1), rsync(1)
+
+=head1 AUTHOR
+
+Cameron Simpson E<lt>cs@zip.com.auE<gt>
+
+=cut
