@@ -2,7 +2,7 @@
 URLLOG=${URLLOG:-$HOME/var/log/urllog}
 export URLLOG
 sed -n 's:^search  *::p' <"$URLLOG" \
-| tail -20 \
+| tail -60 \
 | sort -u \
 | awk '{ engine=$1
 	 query=$2
