@@ -6,7 +6,7 @@
 
 cmd=`basename "$0"`
 
-side=-north
+side=-north	## '-geometry 200x1-0+0'	##-north
 to=
 from=
 buttonblock=-buttonblock
@@ -14,7 +14,7 @@ x2xopts=
 passwd=
 shared=
 
-real=x2x
+real=x2x		##/opt/x2x-1.30-beta-fc3/bin/x2x
 case $cmd in
     rigx2x)	toopt=-to fromopt=-from ;;
     rigx2vnc)	shared=-shared buttonblock= toopt= fromopt=-listen ;;
@@ -44,10 +44,10 @@ do  case $1 in
 done
 
 # install the chosen options
-[ -n "$side" ] && { set x ${1+"$@"} $side; shift; }
-[ -n "$x2xopts" ] && { set x ${1+"$@"} $x2xopts; shift; }
-[ -n "$from" ] && { set x ${1+"$@"} $fromopt "$from"; shift; }
-[ -n "$to" ] && { set x ${1+"$@"} $toopt "$to"; shift; }
+[ -n "$side" ]		&& set -- ${1+"$@"} $side
+[ -n "$x2xopts" ]	&& set -- ${1+"$@"} $x2xopts
+[ -n "$from" ]		&& set -- ${1+"$@"} $fromopt "$from"
+[ -n "$to" ]		&& set -- ${1+"$@"} $toopt "$to"
 
 set -x
 bgproc -p "x2x@$HOST-$DISPLAY" -- "$real" $passwd $shared $buttonblock ${1+"$@"} &
