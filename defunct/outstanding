@@ -1,0 +1,68 @@
+#!/usr/bin/perl
+#
+# Report outstanding people for a given date.
+#	- Cameron Simpson <cs@zip.com.au> 15jan97
+#
+# Recoded in Perl. - cameron 15aug97
+#
+
+use strict qw(vars);
+
+use CISRA::TimeSheets;
+use CISRA::UserData;
+use CISRA::DB;
+use cs::Day;
+use cs::Range;
+use cs::Misc;
+
+@ARGV == 1 || die "$::cmd: missing sheetcode\n";
+
+my($sheet)=@ARGV;
+
+my($mon)=new cs::Day $sheet;
+
+my(@mfenum)=$mon->Code();
+{ my $d = $mon;
+  for (1..4)
+	{ $d=$d->Next();
+	  push(@mfenum,$d->Code());
+	}
+}
+warn "mfenum=[@mfenum]\n";
+
+my $sheets = CISRA::TimeSheets::db()->{'sheets'};
+
+my($u,$live,$isAlive);
+
+USER:
+ for my $user (CISRA::UserData::users())
+  { my $u = CISRA::UserData::user($user);
+
+    if (! defined $u)
+	{ warn "$::cmd: no user entry for \"$user\"";
+	  next USER;
+	}
+
+    next USER if ! $u->NeedsTimesheet();
+    if (exists $sheets->{$user})
+    	{ my $usheets = $sheets->{$user};
+    	  next USER if exists $usheets->{$sheet};
+	}
+
+    $live = $u->Lifespan();
+
+    $isAlive=0;
+    DCODE:
+     for my $dcode (@mfenum)
+	{ if ($live->InRange($dcode))
+		{ $isAlive=1;
+		  last DCODE;
+		}
+	}
+    next USER if ! $isAlive;
+
+    print "$user\n";
+  }
+
+
+exit(0);
