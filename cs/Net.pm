@@ -35,47 +35,49 @@ $cs::Net::_ports{TCP}={
 	  HTTPS		=> 443,
 	};
 
-sub service
-	{ my($protocol,$port)=@_;
-	  $protocol=uc($protocol);
+sub service($$)
+{ my($protocol,$port)=@_;
+  $protocol=uc($protocol);
 
-	  if ($protocol eq TCP)	{ ::need(cs::Net::TCP);
-				  return new cs::Net::TCP($port);
-				}
+  if ($protocol eq TCP)	{ ::need(cs::Net::TCP);
+			  return new cs::Net::TCP($port);
+			}
 
-	  warn "service($protocol,$port): unsupported protocol";
+  warn "service($protocol,$port): unsupported protocol";
 
-	  return undef;
-	}
+  return undef;
+}
 
 sub conn	# (host,portspec[,protocol]) -> cs::Port
-	{ my($protocol,$host,$port)=@_;
-	  $protocol=uc($protocol);
+{ my($protocol,$host,$port)=@_;
+  $protocol=uc($protocol);
 
-	  if ($protocol eq TCP)	{ ::need(cs::Net::TCP);
-				  return new cs::Net::TCP ($host,$port);
-				}
+  if ($protocol eq TCP)	{ ::need(cs::Net::TCP);
+			  return new cs::Net::TCP ($host,$port);
+			}
 
-	  warn "conn($protocol,$host,$port): unsupported protocol";
+  warn "conn($protocol,$host,$port): unsupported protocol";
 
-	  return undef;
-	}
+  return undef;
+}
 
-sub portNum
+sub portNum($;$)
 { my($portspec,$proto)=@_;
-  $proto=TCP if ! defined $proto;
+  if (! defined $proto)	{ $proto=TCP; }
+  else			{ $proto=uc($proto); }
 
   return $portspec+0 if $portspec =~ /^\d+/;
+
+  $portspec=uc($portspec);
+  if (exists $cs::Net::_ports{$proto}
+   && exists $cs::Net::_ports{$proto}->{$portspec})
+  { return $$cs::Net::_ports{$proto}->{$portspec};
+  }
 
   my($servnam,$aliases,$port,$protonum)=getservbyname(lc($portspec),
 						      lc($proto));
 
   return $port if defined $port;
-
-  if (exists $cs::Net::_ports{uc($proto)}
-   && exists $cs::Net::_ports{uc($proto)}->{uc($portspec)})
-  { return $cs::Net::_ports{uc($proto)}->{uc($portspec)};
-  }
 
   warn "no service \"$portspec\" for protocol \"$proto\": $!";
   my(@c)=caller;warn "called from [@c]";
@@ -83,35 +85,35 @@ sub portNum
 }
 
 sub a2addr
-	{ local($_)=@_;
-	  my(@a);
+{ local($_)=@_;
+  my(@a);
 
-	  if (/^(\d+)\.(\d+)\.(\d+)\.(\d+)$/)
-		{ @a=pack("CCCC",$1,$2,$3,$4);
-		}
-	  else
-		{ @a=hostaddrs($_);
-		}
+  if (/^(\d+)\.(\d+)\.(\d+)\.(\d+)$/)
+  { @a=pack("CCCC",$1,$2,$3,$4);
+  }
+  else
+  { @a=hostaddrs($_);
+  }
 
-	  wantarray ? @a : shift(@a);
-	}
+  wantarray ? @a : shift(@a);
+}
 
 sub hostaddrs	# (hostname) -> @addrs
-	{ my($name,$aliases,$type,$len,@hostaddrs)=gethostbyname(shift);
-	  @hostaddrs;
-	}
+{ my($name,$aliases,$type,$len,@hostaddrs)=gethostbyname(shift);
+  @hostaddrs;
+}
 
 ###########################
 sub hostname
-	{ if (! defined $cs::Net::Hostname)
-		{ chop($cs::Net::Hostname=`hostname`);
-		  undef $cs::Net::Hostname if ! length $cs::Net::Hostname;
-		}
+{ if (! defined $cs::Net::Hostname)
+  { chop($cs::Net::Hostname=`hostname`);
+    undef $cs::Net::Hostname if ! length $cs::Net::Hostname;
+  }
 
-	  return undef if ! defined $cs::Net::Hostname;
+  return undef if ! defined $cs::Net::Hostname;
 
-	  $cs::Net::Hostname;
-	}
+  $cs::Net::Hostname;
+}
 
 sub hostnames	# (addr[,family]) -> (name,@aliases)
 { my($addr,$fam)=@_;
@@ -126,19 +128,19 @@ sub hostnames	# (addr[,family]) -> (name,@aliases)
 }
 
 sub getaddr	# (SOCK) -> (family,port,myaddr)
-	{ unpack($cs::Net::_sockaddr,getsockname(shift));
-	}
+{ unpack($cs::Net::_sockaddr,getsockname(shift));
+}
 
 sub mkaddr_in # (port,address) -> sockaddr_in
-	{ &mkaddr(Socket->AF_INET,@_);
-	}
+{ mkaddr(Socket->AF_INET,@_);
+}
 
 sub mkaddr	# (family,port,address) -> sockaddr
-	{ pack($cs::Net::_sockaddr,@_);
-	}
+{ pack($cs::Net::_sockaddr,@_);
+}
 
 sub addr2a	# address -> "x.x.x.x"
-	{ sprintf("%d.%d.%d.%d",unpack("CCCC",shift));
-	}
+{ sprintf("%d.%d.%d.%d",unpack("CCCC",shift));
+}
 
 1;
