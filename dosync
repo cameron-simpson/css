@@ -17,6 +17,7 @@ rsync -avHP --rsync-path='$HOME/scripts/rrsync zapff' /u/syncopt/redhat.x86.linu
   do ( cd "$HOME/$subdir" && myke _all ) &
   done
   wait
+  updsysscripts
 )
 
 # push
