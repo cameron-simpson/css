@@ -451,18 +451,20 @@ case "$savemode" in
 		  case "$saveas" in
 		    \!*)	repeat=1
 				shcmd=`expr "x$saveas" : 'x! *\(.*\)'`
-				case "$shcmd" in
-				  '')	${SHELL:-sh} ;;
-				  *[!%]*)
+				( [ -d "$savedir/." ] && cd "$savedir"
+				  case "$shcmd" in
+				    '')	${SHELL:-sh} ;;
+				    *[!%]*)
 					shcmd=`echo "$shcmd" | sed "s!$lastshcmdg"`
 					lastshcmd=$shcmd
 					shcmd=`echo "$shcmd" | sed "s%$fileg"`
 					"${SHELL:-sh}" -xc "$shcmd"
 					;;
-				  *)	"${SHELL:-sh}" -xc "$shcmd"
+				    *)	"${SHELL:-sh}" -xc "$shcmd"
 					;;
 
-				esac
+				  esac
+				)
 				;;
 		    ''|n|no)	saveas= ;;
 		    y|yes)	saveas=$trysave ;;
