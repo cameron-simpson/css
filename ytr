@@ -1,0 +1,3 @@
+#!/bin/sh
+
+urlshow "http://net.yahoo.com/cgi-bin/trace.sh?$*" &
