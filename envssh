@@ -69,7 +69,7 @@ rcmd="$xset
       env=\$HOME/rc/shell/rigenv
       [ -s \"\$env\" ] || env=\$HOME/.profile
       $vecho loading environment ...
-      . \"\$env\"
+      [ -s \"\$env\" ] && . \"\$env\"
       $vecho running ...
       $xset
       $*"
