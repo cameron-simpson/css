@@ -1,0 +1,8 @@
+#!/bin/sh
+#
+# Shortcut to threaded mailbox.
+#	- Cameron Simpson <cs@zip.com.au> 20jan99
+#
+
+#exec term -n "mutt +attn" -e mutt -f "$MAILDIR/attn"
+exec vm -t +attn ${1+"$@"}
