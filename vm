@@ -1,0 +1,56 @@
+#!/bin/sh
+#
+# Enter my mail folder and run vi as a user agent.
+#	- Cameron Simpson <cs@zip.com.au>
+#
+
+usage="Usage: $0 [-g] [-u] [mailbox [msgnum]]
+	-g	Run getmail first.
+	-t	Threaded listing.
+	-q	Quick: skip index build."
+
+vmuopts=
+quick=
+msgnum=
+folder=
+lfolder=
+
+badopts=
+while [ $# -gt 0 ]
+do  case "$1" in
+	-g)	getmail ;;
+	-[tT])	vmuopts="$vmuopts $1" ;;
+	-q)	quick=1 ;;
+	/*)	lfolder=$1 folder=$1 ;;
+	+*)	lfolder=$1 folder=$MAILDIR/`exec expr "$1" : '.\(.*\)'`
+		;;
+	=*)	lfolder=$1 folder=$MAILDIR/corresp/`exec expr "$1" : '=\(.*\)'` ;;
+	*)	[ -n "$folder" ] && break
+		lfolder=$1 folder=$1
+		[ -d "$folder/." ] || folder=$MAILDIR/$folder
+		;;
+	--)	shift; break ;;
+	-?*)	echo "$0: unexpected option: $1" >&2; badopts=1 ;;
+	*)	break ;;
+    esac
+    shift
+done
+
+[ -n "$folder" ] || lfolder=+attn folder=$MAILDIR/attn
+
+[ $# = 0 ] || { msgnum=$1; shift; }
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+cd "$folder" || exit $?
+rm -f .ex; ln -s "$MAILDIR/.ex" . || exit $?
+
+[ $quick ] || lock $MAILRC.rawdb vmupdindex -db $vmuopts
+
+# urlshow -n file://localhost$folder/index.html
+# last=`ls -r|sed -e '/^[0-9]/!d' -e q`
+
+open=.index
+[ -n "$msgnum" ] && open=$msgnum
+
+pushttylabel "VM $lfolder $*" nvi '+so .ex/boot' "$open"
