@@ -5,11 +5,11 @@
 #
 
 src=/dev/cdrom
-dest=/home/ferrari/cdroms/iso
+dest=/u/cdroms/iso
 remote=
 
 cmd=`basename "$0"`
-usage="Usage: $cmd [-f file] [-d dir] vendor appname version
+usage="Usage: $cmd [-f file] [-d dir] vendor appname version-parts...
 	-f file	Source file. Default: $src
 	-d dir	Destination directory. Default: $dest
 	-r remote Remote host to receive the iso."
@@ -33,21 +33,23 @@ do  case $1 in
     shift
 done
 
-if [ $# = 3 ]
+if [ $# -lt 3 ]
 then
-    vendor=$1 appname=$2 version=$3
-    shift; shift; shift
-    case "$vendor$appname$version" in
-	*/*)	echo "$cmd: no slashes permitted in vendor, appname or version" >&2
-		badopts=1
-		;;
-    esac
-else
-    echo "$cmd: missing vendor, appname or version" >&2
+    echo "$cmd: missing vendor, appname or version-parts" >&2
     badopts=1
 fi
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+echo "Access group will be \""`echo "$*"|tr ' ' -`\"
+necho "CD title (vendor excluded)? "
+read title || exit 1
+[ -n "$title" ] || { echo "No title, upload aborted." >&2; exit 1; }
+shtitle=`shqstr "$title"`
+
+mkgroup "$@" || exit 1
+
+vendor=$1 appname=$2; shift; shift; version=`echo "$*" | tr ' ' -`
 
 if [ -n "$remote" ]
 then  remote="ssh $remote"
@@ -56,17 +58,21 @@ fi
 
 umask 2
 target=$dest/$vendor
-[ -d "$target/." ] || (set -x; $remote "umask 2; mkdir '$target'") || exit 1
+shtarget=`shqstr "$target"`
+[ -d "$target/." ] || (set -x; $remote "umask 2; [ -d $shtarget/. ] || mkdir $shtarget") || exit 1
 
 iso=$target/$appname-$version.iso
 [ -s "$iso" ] && { echo "$cmd: already exists: $iso" >&2
 		   exit 1
 		 }
+shiso=`shqstr "$iso"`
+titlef=$target/$appname-$version.title
+shtitlef=`shqstr "$titlef"`
 
-prcat "$src" | $remote "umask 2; cat >'$iso'; exit $?"
+prcat "$src" | $remote "umask 2; cat >$shiso || exit 1; echo $shtitle >$shtitlef; xit=\$?; cat $shtitlef; exit \$xit"
 xit=$?
 
-if [ "x$src" = x/dev/cdrom ]; then eject & fi
+if [ "x$src" = x/dev/cdrom -o "x$src" = x/dev/dvd ]; then eject & fi
 ls -ld "$iso"
 
 exit $xit
