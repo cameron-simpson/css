@@ -1,0 +1,66 @@
+#!/usr/bin/perl_gdbm
+#
+# Update inode index from named files or stdin if none supplied.
+#
+
+$inondx='.inondx';
+
+($cmd=$0) =~ s:.*/::;
+$usage="Usage: $cmd [-v] [-i index] [filenames...]
+	-v		Verbose.
+	-i index	DBM file to use as index (default: $inondx).
+";
+
+$verbose=0;
+
+$badopts=0;
+ARGV:
+  while (defined($_=shift))
+	{ last ARGV if $_ eq '--';
+	  (unshift(@ARGV,$_), last ARGV) unless /^-./;
+
+	  if ($_ eq '-v')	{ $verbose=1; }
+	  elsif ($_ eq '-i')	{ $inondx=shift; }
+	  else			{ print STDERR "$cmd: $_: unrecognised option\n";
+				  $badopts=1;
+				}
+	}
+
+die $usage if $badopts;
+
+dbmopen(inondx,$inondx,0666) || die "$cmd: can't dbmopen($inondx): $!\n";
+
+$xit=0;
+if ($#ARGV < $[)
+	{ &readstdin;
+	}
+else
+{ for (@ARGV)
+	{ if ($_ eq '-')
+		{ &readstdin;
+		}
+	  else
+	  { &ndx;
+	  }
+	}
+}
+
+exit $xit;
+
+sub readstdin
+	{ while (<STDIN>)
+		{ chop;
+		  &ndx;
+		}
+	}
+
+sub ndx	{ ($dev,$ino,@etc)=stat($_);
+	  if (!defined($ino))
+		{ print STDERR "$cmd: can't stat($_): $!\n";
+		  return;
+		}
+	  
+	  $verbose && print $ino, ' -> ', $_, "\n";
+
+	  $inondx{$ino}=$_;
+	}
