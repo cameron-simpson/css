@@ -4,4 +4,6 @@
 #	- Cameron Simpson <cs@zip.com.au>
 #
 
-xlswins ${1+"$@"} | grep  '([^)][^)]*)'
+
+xlsclients ${1+"$@"} | grep '^[^ 	]'
+##xlswins ${1+"$@"} | grep  '([^)][^)]*)'
