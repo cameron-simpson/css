@@ -47,6 +47,7 @@ umask 2
 dir=`dirname "$file"`
 base=`basename "$file"`
 
+editcmd=$*
 [ $# = 0 ] && { set x "${EDITOR-vi}" "$file"; shift; }
 
 ( cd "$dir" || exit 1
@@ -70,7 +71,7 @@ editxit=$?
 			exit 1
 		      }
 
-[ $dodl ] && dl "cvsedit $file $*: $msg"
+[ $dodl ] && [ -n "$msg$editcmd" ] && dl "cvsedit $file $editcmd: $msg"
 ( cd "$dir" || exit 1
   exec cvs commit -m "$msg" "$base"
 )
