@@ -358,10 +358,25 @@ fi
 # insert paper setting outside postscript
 [ -n "$paper" ] && lp="( echo \"\$paper\"; cat ) | $lp"
 
+# =head2 Files
+#
+# After the options comands an optional list of filenames to print.
+# If the list is empty
+# the document to print is read from standard input.
+# If a filename commences with B<http://> or B<ftp://>
+# then the filename is considered to be an URL
+# and the w3m(1) command is called to fetch (and format) the specified web page
+# for printing.
+#
 ( for arg
   do
     ## [ "x$itype" = xmentor ] && set -x
-    eval "$filter $lp" <"$arg"
+    case "$arg" in
+	http://* | ftp://* )
+		w3m -dump -T text/html "$arg" | eval "$filter $lp" ;;
+	*)
+		eval "$filter $lp" <"$arg" ;;
+    esac
     ## set +x
   done
 
