@@ -109,7 +109,7 @@ _tarballs: ../public/css/scripts.tar.gz ../public/cs.tar.gz
 
 ../public/css/scripts.tar.gz: $(allscripts)
 	cd .. || exit 1 \
-	tar cvf - $(.F)/$((allscripts)) \\
+	tar cf - $(.F)/$((allscripts)) \\
 			$(.F)/synonyms $(.F)/stubs $(.F)/cs $(.F)/cgi-bin \\
 		| gzip -v -9 >$./$@
 	chmod 644 $@
