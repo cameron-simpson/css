@@ -7,20 +7,21 @@
 cmd=$0
 usage="Usage: $cmd [statefile]"
 
-state=
+statefile=
 
 badopts=
 
-[ $# = 0 ] || { state=$1; shift; }
+[ $# = 0 ] || { statefile=$1; shift; }
 
 [ $# = 0 ] || { echo "$cmd: extra arguments: $*" >&2; badopts=1; }
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
-[ -n "$state" ] || state=`ssh-agent-statefile` || exit 1
+[ -n "$statefile" ] || statefile=`ssh-agent-statefile` || exit 1
 
+set -x
 env \
-| sed -n 's/^\(SSH_[_A-Z]*\)=\(.*\)/\1='\''\2'\''; export \1;/p' >"$state" \
-|| exit 1
+| sed -n 's/^\(SSH_[_A-Z]*\)=\(.*\)/\1='\''\2'\''; export \1;/p' >"$statefile" \
+|| { rm -f "$statefile"; exit 1; }
 
-exec chmod a+rx "$state"
+exec chmod a+rx "$statefile"
