@@ -67,6 +67,7 @@ sedscript="$sedpreamble
 	   /^COMMON=/b setvar
 	   /^REMOTE=/b setvar
 	   /^RSYNC=/b setvar
+	   /^RSYNCOPTS=/b setvar
 	   /^SUBDIRS=/b setvar
 	   d
 	   :setvar
@@ -80,6 +81,7 @@ eval "$sedvars"
 : ${SYNCOPT_ARCH:=/u/syncopt/$ARCH}
 : ${SYNCOPT_COMMON:=/u/syncopt/common}
 : ${SYNCOPT_SUBDIRS:="."}
+: ${SYNCOPT_RSYNCOPTS:=""}
 
 # add a couple of possibilities for finding rsync and readsymlink
 PATH=$PATH:$SYNCOPT_COMMON/script:$SYNCOPT_ARCH/rsync/bin
@@ -90,6 +92,7 @@ usage="Usage: $cmd [-n] [-f] [l] [-R rsync-path] [-x] [-v] [items...]
 	-n	No action (default) - echo necessary actions.
 	-f	Force action.
 	-l	Localise the specified items.
+	-L	Rsync's --copy-links option.
 	-R rsync-path Rsync command path. Default, from \$SYNCOPT_RSYNC: $SYNCOPT_RSYNC
 	-r [user@]host Remote host with the master files.
 	-x	Force action with tracing.
@@ -132,6 +135,21 @@ do  case $1 in
 	#	* local
 	#
 	# line can be placed in the B</opt/.syncopt> configuration file.
+	#
+	-L)	SYNCOPT_RSYNCOPTS="$SYNCOPT_RSYNCOPTS $1" ;;
+	# =item B<-L>
+	#
+	# Pass the B<-L> (aka B<--copy-links>) option to rsync(1).
+	# This treats symlinks as regular files
+	# and should render local installs that include symlinks to other, nonlocal, syncopt packages
+	# robust against loss of the central server.
+	# For example, B</opt/bin> frequently has a bunch of symlinks like:
+	#
+	#	xpdf -> /opt/xpdf/bin/xpdf
+	#
+	# to make pakage executables easily available.
+	# Without B<-L>, a local B</opt/bin> would not mean a local B<xpdf> executable.
+	# There is some space bloat with use of this option.
 	#
 	-l)	localise=1 ;;
 	# =item B<-n>
@@ -311,10 +329,10 @@ do
     #	I<var>=I<value>
     #
     # are read once at the start of the script to set environment parameters.
-    # I<var> may take the names B<ARCH>, B<COMMON>, B<REMOTE>, B<RSYNC> or B<SUBDIRS>
+    # I<var> may take the names B<ARCH>, B<COMMON>, B<REMOTE>, B<RSYNC>, B<RSYNCOPTS> or B<SUBDIRS>
     # to set or override the environment variables
     # B<$SYNCOPT_ARCH>, B<$SYNCOPT_COMMON>, B<$SYNCOPT_REMOTE>,
-    # B<$SYNCOPT_RSYNC> or B<$SYNCOPT_SUBDIRS> respectively.
+    # B<$SYNCOPT_RSYNC>, B<$SYNCOPT_RSYNCOPTS> or B<$SYNCOPT_SUBDIRS> respectively.
     #
     # Other lines are of the form:
     #
@@ -404,7 +422,7 @@ do
     # files - basicly /opt/ARCH really
     if remote "test -f '$r'"
     then
-	$trace $SYNCOPT_RSYNC -aH $vflag "$remotepfx$r" "$l"
+	$trace $SYNCOPT_RSYNC -aH $vflag $SYNCOPT_RSYNCOPTS "$remotepfx$r" "$l"
 	continue
     fi
 
@@ -464,7 +482,7 @@ do
     fi
 
     [ "x$state" = xlocal ] \
-    && $trace $SYNCOPT_RSYNC -aHW $vflag --delete "$remotepfx$r/." "$l/." | sed "s|^|$l: |"
+    && $trace $SYNCOPT_RSYNC -aHW $vflag --delete $SYNCOPT_RSYNCOPTS "$remotepfx$r/." "$l/." | sed "s|^|$l: |"
 done
 
 exit $xit
@@ -516,6 +534,14 @@ exit $xit
 # Preferred path to the rsync(1) command
 # as though specified with the B<-R> command line option.
 # The default is "B<rsync>".
+#
+# =item B<SYNCOPT_RSYNCOPTS>
+#
+# Extra command line options to supply to rsync(1).
+# This was implemented primarily to allow supply of the B<--copy-links>
+# option to make link safe local copies,
+# robust against loss of a central server which my ordinarily have been supplying
+# some non-local packages.
 #
 # =item B<RSYNC_RSH>
 #
