@@ -15,7 +15,7 @@ doauto=1
 cacheroot=$HOME/var/cache/bg
 
 cmd=`basename "$0"`
-usage="Usage: $cmd [-c cachedir] [-g geom] imagefiles..."
+usage="Usage: $cmd [-c cachedir] [-g geom] [-bg bg-colour] imagefiles..."
 
 badopts=
 
@@ -23,8 +23,8 @@ while :
 do
   case "$1" in
     +a)	doauto= ;;
-    -c)	cacheroot=$2; shift
-	;;
+    -bg)BG=$2; shift ;;
+    -c)	cacheroot=$2; shift ;;
     -g)	geom=$2; shift
 	ok=1
 	bgx=`expr "x$geom" : 'x\([1-9][0-9]*\)x[1-9][0-9]*$'` || ok=
