@@ -15,4 +15,4 @@ cmd=$0
 IS_COLOURISED=1
 export IS_COLOURISED
 
-exec filter_fd 2 cyan "$@"
+exec filter_fd 2 "colour_highlight cyan '.*'" "$@"
