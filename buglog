@@ -5,6 +5,8 @@
 #	- Cameron Simpson <cs@zip.com.au> 09jul2004
 #
 
+: ${TMPDIR:=/tmp}
+
 cmd=`basename "$0"`
 usage="Usage: $cmd logline < attachment-data"
 
@@ -13,7 +15,7 @@ logmsg=$1; shift
 
 [ -n "$BUGSYSTEMS" ] || BUGSYSTEMS=dlog
 
-tmpf=/tmp/bugids$$
+tmpf=$TMPDIR/bugids$$
 trap 'rm -f "$tmpf"' 0 1 15
 cat >"$tmpf" || exit 1
 
