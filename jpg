@@ -1,0 +1,7 @@
+#!/bin/sh
+
+files=`file -- *|sed -e '/JPEG\/JFIF/!d
+			 /\.jpg:/d
+			 s/:.*//'`
+
+[ -z "$files" ] || exec rename 's/$/.jpg/ && s/\.jpg\.jpg$/.jpg/i' $files
