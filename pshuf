@@ -105,55 +105,55 @@ for (@Shuffles)
     warn "nums=[@nums]\n";
     $max=0;
     for (@nums)
-	{ die "zeroes not permitted in range\n" if $_ == 0;
+    { die "zeroes not permitted in range\n" if $_ == 0;
 
-	  if ($_ > $max)
-		{ $max=$_; }
-	}
+      if ($_ > $max)
+      { $max=$_; }
+    }
 
     # finish off the list if it's incomplete
     if ($#nums != $max-1)
-	{ for ($i=1; $i <= $max; $i++)
-		{ $ok=0;
-		  for (@nums)
-			{ if ($_ == $i)
-				{ $ok=1;
-				  last;
-				}
-			}
-
-		  # add missing number
-		  if (!$ok)
-			{ push(@nums,$i);
-			}
-		}
-
-	  warn " -> nums=@nums\n";
+    { for ($i=1; $i <= $max; $i++)
+      { $ok=0;
+	for (@nums)
+	{ if ($_ == $i)
+	  { $ok=1;
+	    last;
+	  }
 	}
+
+	# add missing number
+	if (!$ok)
+	{ push(@nums,$i);
+	}
+      }
+
+      warn " -> nums=@nums\n";
+    }
 
     # warn "max=$max\n";
     # pad array with dummy pages - XXX: this may be a misfeature
     $pad=$max - ($#Offsets+1) % $max;
     # warn "pad=$pad\n";
     if ($pad)
-	{ for ($i=0; $i < $pad; $i++)
-		{ push(@Offsets,&addpage(TMP));
-		  push(@Pages,0);
-		}
-	}
+    { for ($i=0; $i < $pad; $i++)
+      { push(@Offsets,&addpage(TMP));
+	push(@Pages,0);
+      }
+    }
 
     # walk through offsets in chunks of size $max
     for ($i=0; $i <= $#Offsets; $i+=$max)
-	{ warn "[@Offsets[$i..($i+$max-1)]] -> ";
-	  for (@chunk=(), @pchunk=(), $j=0; $j<$max; $j++)
-		{ push(@chunk,$Offsets[$i+$nums[$j]-1]);
-		  push(@pchunk,$Pages[$i+$nums[$j]-1]);
-		}
+    { warn "[@Offsets[$i..($i+$max-1)]] -> ";
+      for (@chunk=(), @pchunk=(), $j=0; $j<$max; $j++)
+      { push(@chunk,$Offsets[$i+$nums[$j]-1]);
+	push(@pchunk,$Pages[$i+$nums[$j]-1]);
+      }
 
-	  @Offsets[$i..($i+$max-1)]=@chunk;
-	  @Pages[$i..($i+$max-1)]=@pchunk;
-	  warn "[@Offsets[$i..($i+$max-1)]]\n";
-	}
+      @Offsets[$i..($i+$max-1)]=@chunk;
+      @Pages[$i..($i+$max-1)]=@pchunk;
+      warn "[@Offsets[$i..($i+$max-1)]]\n";
+    }
   }
 }
 
@@ -166,81 +166,81 @@ $feedback && print STDERR "\n";
 
 warn "\$#Pages ($#Pages) != \$#Offsets ($#Offsets)\n" if $#Pages != $#Offsets;
 for ($n=$[; $n <= $#Offsets; $n++)
-	{ next if (!&selected($Pages[$n]));
+{ next if (!&selected($Pages[$n]));
 
-	  $_=$Offsets[$n];
-	  if (!seek(TMP,$_,0))
-		{ warn "$cmd: can't seek to $_ in temporary file: $!\n";
-		}
-	  else
-	  { # warn "seek($_) ok\n";
-	    &copypage(TMP);
-	  }
-	}
+  $_=$Offsets[$n];
+  if (!seek(TMP,$_,0))
+  { warn "$cmd: can't seek to $_ in temporary file: $!\n";
+  }
+  else
+  { # warn "seek($_) ok\n";
+    &copypage(TMP);
+  }
+}
 
 if (defined($theTrailer))
-	{ $feedback && print STDERR "trailer ...";
-	  print $theTrailer;
-	  while (<>)
-		{ print;
-		}
+{ $feedback && print STDERR "trailer ...";
+  print $theTrailer;
+  while (<>)
+  { print;
+  }
 
-	  $feedback && print STDERR "\n";
-	}
+  $feedback && print STDERR "\n";
+}
 
 ####################
 
 sub copypage	# (FILE) -> void
-	{ local($FILE)=$_[0];
+{ local($FILE)=$_[0];
 
-	  if (defined($_=<$FILE>))
-		{ print;
-		  while (<$FILE>)
-			{ last if /^%%Page:\s*\d+\s+\d/;
-			  print;
-			}
-		}
-	}
+  if (defined($_=<$FILE>))
+  { print;
+    while (<$FILE>)
+    { last if /^%%Page:\s*\d+\s+\d/;
+      print;
+    }
+  }
+}
 
 # Make a dummy page as filler.
 sub addpage	# (FILE) -> offset
-	{ local($FILE)=$_[0];
-	  local($where,$oldFILE)=(tell($FILE),select($FILE));
+{ local($FILE)=$_[0];
+  local($where,$oldFILE)=(tell($FILE),select($FILE));
 
-	  print "%%Page: 9999 9999\nshowpage\n";
+  print "%%Page: 9999 9999\nshowpage\n";
 
-	  select($oldFILE);
+  select($oldFILE);
 
-	  # warn "addpage returns $where\n";
-	  $where;
-	}
+  # warn "addpage returns $where\n";
+  $where;
+}
 
 # Convert a page range to a list of numbers.
 sub numrange	# (range-string) -> @numberlist
-	{ local($_)=@_;
-	  local(@list);
-	  local($first,$last,$n);
+{ local($_)=@_;
+  local(@list);
+  local($first,$last,$n);
 
-	  s/^\s+//;
-	  while (/^(\d+)\s*/)
-		{ $first=$1;
-		  $_=$';
-		  if (/^-\s*(\d+)\s*/)
-			{ $last=$1;
-			  $_=$';
-			  for ($n=$first; $n <= $last; $n++)
-				{ push(@list,$n);
-				}
-			}
-		  else
-		  { push(@list,$first);
-		  }
+  s/^\s+//;
+  while (/^(\d+)\s*/)
+  { $first=$1;
+    $_=$';
+    if (/^-\s*(\d+)\s*/)
+    { $last=$1;
+      $_=$';
+      for ($n=$first; $n <= $last; $n++)
+      { push(@list,$n);
+      }
+    }
+    else
+    { push(@list,$first);
+    }
 
-		  s/^,\s*//;	# permit comma separators
-		}
+    s/^,\s*//;	# permit comma separators
+  }
 
-	  return length($_) ? undef : @list;
-	}
+  return length($_) ? undef : @list;
+}
 
 # Is a page a selected page? Not very fast.
 sub selected	# (pagenum) -> selected
