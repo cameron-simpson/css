@@ -10,14 +10,17 @@
 EDITOR=${EDITOR:-vi}
 
 dev=${CDRIP_DEV:-/dev/cdrom}
-bps=${CDRIP_BPS:-192}
 enc=${CDRIP_ENC:-ogg}
+bps=${CDRIP_BPS:-}
+qual=${CDRIP_QUAL:-6}
 lock=$CDRIP_LOCK
 
 cmd=`basename "$0"`
 usage="Usage: $cmd [-b bps] [-d device] [-e enc] [-l lock]
-	-b bps		Bits per second for the final bitstream.
-			Default: ${bps}bps.
+	-q qual		Variable bitrate quality rating.
+			Default: $qual
+	-b bps		Fixed bitrate bits per second for the final bitstream.
+			Default: variable bit rate.
 	-d device	Device holding the CD. Default: $dev
 	-e enc		Select encoding. Default: $enc
 	-l lock		Do encoding completely asynchronously, using \"lock\" as the lock name."
@@ -28,7 +31,8 @@ badopts=
 while :
 do
     case $1 in
-	-b)	bps=$2; shift ;;
+	-b)	bps=$2 qual=; shift ;;
+	-q)	bps= qual=$2; shift ;;
 	-d)	dev=$2 ;shift ;;
 	-e)	case $2 in
 		    mp3|ogg)	enc=$2 ;;
@@ -122,8 +126,11 @@ sed -e 's;//*; -- ;g' -e 's/   */ /g' \
 		  [ -n "$xtra" ] && echo "$xtra" >"$commentf"
 		  echo "$ripcomment" >>"$commentf"
 
-		  set oggenc -r -b $bps \
+		  set oggenc -r \
 			 -a "$artist" -N "$track" -t "$title" -l "$album"
+		  if [ -n "$qual" ]; then set "$@" -q "$qual"
+				     else set "$@" -b "$bps"
+		  fi
 
 		  while read -r comment
 		  do  [ -n "$comment" ] && set "$@" -c "$comment"
@@ -134,6 +141,9 @@ sed -e 's;//*; -- ;g' -e 's/   */ /g' \
 		  ;;
 		mp3)
 		  set lame -r -b "$bps" -h -p "$raw" "$out"
+		  if [ -n "$qual" ]; then set "$@" -v -V "$qual"
+				     else set "$@" -b "$bps"
+		  fi
 		  ;;
 	      esac
 	      [ -n "$lock" ] && set alog cdrip lock "$lock" rmafter "$raw" nice "$@"
