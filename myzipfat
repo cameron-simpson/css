@@ -1,0 +1,15 @@
+#!/bin/sh
+#
+# Format, mformat, chown etc to make up a FAT filesystem on a Zip disc.
+# Uses the mtools.
+#	- Cameron Simpson <cs@zip.com.au> 22nov96
+#
+
+echo "NOT READY YET" >&2; exit 1
+
+drive=d:	# expected at SCSI #5 by default
+label=scratch
+	 : ctlr = SCSI : ncyl = 765 : acyl = 2 : pcyl = 767 \
+	 : nhead = 2 : nsect = 128 : rpm = 2945
+
+mformat -t 767 -s 128 -l "$label" "$drive"
