@@ -1,0 +1,33 @@
+#!/bin/sh
+#
+# Add mailto: URLs to $BUGSYSTEMS and run a command.
+#	- Cameron Simpson <cs@zip.com.au> 09jan2005
+#
+
+cmd=$0
+usage="Usage: $cmd emailaddrs,... command [args...]"
+
+badopts=
+
+if [ $# = 0 ]
+then
+  echo "$cmd: missing emailaddrs" >&2
+  badopts=1
+else
+  emailaddrs=$1; shift
+  if [ $# = 0 ]
+  then
+    echo "$cmd: missing command" >&2
+    badopts=1
+  fi
+fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+: ${BUGSYSTEMS:=`bugsystems`}
+for addr in `echo "$emailaddrs" | tr , ' '`
+do  BUGSYSTEMS="$BUGSYSTEMS mailto:$addr"
+done
+export BUGSYSTEMS
+
+exec "$@"
