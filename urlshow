@@ -18,7 +18,9 @@ probe()
 popurl()
 { popurl_ret=0
   for url
-  do  mozilla-xremote-client "openurl($url,new-window)" || popurl_ret=1
+  do
+      [ -n "$URLLOG" ] && echo "urlshow $url" >>"$URLLOG"
+      mozilla-xremote-client "openurl($url,new-window)" || popurl_ret=1
   done
   return $popurl_ret
 }
@@ -27,8 +29,10 @@ cmd=`basename "$0"`
 usage="Usage: $cmd [-a] [-c] [-s] [-t] [-i file] [URLs...]
 	-a	Anonymous.
 	-c	Clean.
+	-p	Probe for running browser first.
 	-i file	Read URLs from file; \"-\" means stdin."
 
+doprobe=
 subopts=
 meta=
 badopts=
@@ -39,6 +43,7 @@ do  case "$1" in
     case $1 in
 	-a)	meta="anon $meta" ;;
 	-c)	meta="clean $meta" ;;
+	-p)	doprobe=1 ;;
 	-i)	input=$2; shift
 		set x ${1+"$@"} "" `cat $input`; shift
 		;;
@@ -72,7 +77,7 @@ then
 fi
 
 # ensure we have a browser
-probe || { ns; sleep 3; }
+[ -z "$doprobe" ] || probe || { ns; sleep 3; }
 
 sed -e 's/^[ 	][ 	]*//' \
     -e 's/^#.*//' \
@@ -90,8 +95,6 @@ sed -e 's/^[ 	][ 	]*//' \
     -e ':ok' \
 | while read url
   do  
-      [ -n "$URLLOG" ] && echo "urlshow $url" >>"$URLLOG"
-
       url="$meta$url"
       metapfx=
       while :
