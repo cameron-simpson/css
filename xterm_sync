@@ -1,0 +1,24 @@
+#!/bin/sh
+#
+# Do NOT use -e in xterm-args!
+#
+
+usage="Usage: $0 pre_sync post_sync xterm-args"
+[ $# -ge 2 ] || { echo "$usage" >&2
+		  exit 2
+		}
+
+sync=/tmp/xterm_sync$$
+
+pre=$1 post=$2
+shift; shift
+
+rm -f "$sync"
+## set -vx
+copt="$pre; >'$sync'; $post"
+xterm ${1+"$@"} -e /bin/sh -c "$copt" &
+
+await 2 -m 30 -c "[ -f '$sync' ]"
+xit=$?
+rm -f "$sync"
+exit $xit
