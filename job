@@ -5,16 +5,18 @@
 #
 
 cmd=$0
-usage="Usage: $cmd [task [coment...]]"
+usage="Usage: $cmd [task [comment...]]"
 
 setdesk=
 
+oldkey=`timer`
 # just report current job if no args
-[ $# = 0 ] && exec lastvalue timer_what
+[ $# = 0 ] && exec echo "$oldkey"
 
 badopts=
 
 key=$1; shift
+[ -n "$key" ] || key=misc
 isjob "$key" || { echo "$cmd: unknown job \"$key\"" >&2; badopts=1; }
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
@@ -39,4 +41,4 @@ category=`jobtimer "$key" category`
 ##timer -i timer_sets "$category" "$when"
 
 title=`jobtimer "$key" title`
-alert -c white "JOB: $key ($category - $title) $*" &
+[ "x$oldkey" = "x$key" ] || alert -c white "JOB: $key ($category - $title) $*" &
