@@ -29,24 +29,24 @@ case $1 in
 	;;
 esac
 
-if [ $# = 0 ]
+if [ $# -gt 0 ]
 then
-    tdl ls $context
-    exit 0
+
+    op=$1; shift
+    case "$op" in
+      *\ *)	if [ $# = 0 ]; then set -- "$op"
+			   else set -- "$op $*"
+	    fi
+	    op=add
+	    ;;
+    esac
+
+    datespec=
+    case "$1" in
+      @* ) datespec=$1; shift
+    esac
+
+    tdl "$op" $datespec $context ${1+"$@"}
 fi
 
-op=$1; shift
-case "$op" in
-  *\ *)	if [ $# = 0 ]; then set -- "$op"
-		       else set -- "$op $*"
-	fi
-	op=add
-	;;
-esac
-
-datespec=
-case "$1" in
-  @* ) datespec=$1; shift
-esac
-
-exec tdl "$op" $datespec $context ${1+"$@"}
+exec tdl ls -a $context
