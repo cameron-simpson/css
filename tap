@@ -20,6 +20,4 @@ lock=tap$dev_
 session=$lock
 
 set -x
-exec scrif "$session" \
-	logscript "$session" \
-	cu -l $dev -s $speed --parity=$parity --nostop
+exec scr "logscript-$dev" set-x logscript "$session" screen "$dev" "$speed,cs8,-ixoff"
