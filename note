@@ -88,8 +88,8 @@ case "$tag" in
   *)	tagptn=$tag ;;
 esac
 grep "^$tagptn" "$notefile" >/dev/null \
-|| bsed '1i\
-$tag' "$notefile" \
+|| bsed -s "1i\
+$tag" "$notefile" \
 || exit 1
 
 ## NB: no exec because the trap needs to run
