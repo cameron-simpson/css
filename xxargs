@@ -13,18 +13,21 @@ $::MaxLen=5120;	# conservative but workable
 $::Sep="\n";
 $::FastAbort=0;
 $::Trace=0;
+undef $::MaxArgs;
 
 ($::cmd=$0) =~ s:.*/::;
 $::Usage="Usage: $::cmd [-01x] command [command-args...]
 	-0	Expect NULs to delimit input strings instead of newlines.
 	-1	Quit on the first command failure.
+	-n maxargs At most maxargs arguments per command line.
 	-x	Trace execution.
 ";
 
-getopts("01x") || die $::Usage;
+getopts("01n:x") || die $::Usage;
 $::Sep="\0" if defined $::opt_0;
 $::FastAbort=1 if defined $::opt_1;
 $::Trace=1 if defined $::opt_x;
+$::MaxArgs=$::opt_n+0 if defined $::opt_n;
 
 if (! @ARGV)
 { warn "$::cmd: missing command\n";
@@ -51,7 +54,7 @@ while (defined ($_=<STDIN>))
   chomp;
 
   $newlen=$len+1+length;
-  if ($newlen > $::MaxLen)
+  if ((defined $::MaxArgs && @args >= $::MaxArgs) || $newlen > $::MaxLen)
   {
     if (flushCommand() != 0)
     { $::Xit=1;
