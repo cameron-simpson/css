@@ -1,0 +1,76 @@
+#!/bin/sh
+#
+# Update a file, edit it, run a commit, commit the file.
+#	- Cameron Simpson <cs@zip.com.au> 05mar1997
+#
+
+usage="Usage: $0 [-m logmessage] file [command [args...]]
+	-m logmessage	Specify log message."
+
+cameron=
+[ "x$USER" = xcameron ] && cameron=1
+
+msg=
+dodl=$cameron
+
+badopts=
+
+while :
+do  case $1 in
+	-m)	msg=$2; shift ;;
+	--no-dl)dodl= ;;
+	--dl)	dodl=1 ;;
+	-?*)	echo "$0: unrecognised option: $1" >&2; badopts=1 ;;
+	--)	shift; break ;;
+	*)	break ;;
+    esac
+    shift
+done
+
+if [ $# = 0 ]
+then  echo "$0: missing file" >&2
+      badopts=1
+else  file=$1
+      shift
+fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+[ $# = 0 ] && { set x "${EDITOR-vi}" "$file"; shift; }
+
+if [ ! -f "$file" ]
+then
+      echo "$0: not a regular file" >&2
+      exit 1
+fi
+
+umask 2
+
+# bypass my cvs wrapper
+PATH=/opt/bin:$PATH
+export PATH
+
+[ -n "$msg" ] || { necho "Log message? "
+		   read msg
+		 } || exit $?
+
+[ $dodl ] && dl "cvsedit $file $*: $msg"
+
+cvs update "$file" || exit $?
+
+[ ! -d CVS/Base ] || cvs edit "$file" || exit $?
+chmod +w "$file"
+
+if if [ $cameron ]; then pushttylabel "cvsedit $*" "$@"
+		    else "$@"
+   fi
+then :
+else if ask "$* failed - really commit the file"
+     then :
+     else [ ! -d CVS/Base ] || cvs unedit "$file"
+	  exit 1
+     fi
+fi
+
+cvs diff "$file"
+exec cvs commit -m "$msg" "$file"
