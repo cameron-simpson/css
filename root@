@@ -35,4 +35,12 @@ session=root@$host$ext
 exec term -n "#$session" \
 	scr -N "$session" \
 	logscript "$session" \
-	"$ssh" -t "root@$host" '. /etc/profile; [ -f $HOME/.profile ] && . $HOME/.profile; TERM=vt100; export TERM; [ -f /bin/zsh ] && { SHELL=/bin/zsh; export SHELL; }; exec $SHELL'
+	"$ssh" -t "root@$host" '. /etc/profile
+				[ -f $HOME/.profile ] && . $HOME/.profile
+				TERM=vt100
+				PATH=$PATH:/opt/css/bin
+				MANPATH=$MANPATH:/opt/css/man
+				PERL5LIB=${PERL5LIB:+"$PERL5LIB:"}
+				export TERM PATH MANPATH PERL5LIB
+				[ -f /bin/zsh ] && { SHELL=/bin/zsh; export SHELL; }
+				exec $SHELL'
