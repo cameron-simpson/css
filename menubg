@@ -28,7 +28,7 @@ esac
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
-if [ $# = 1 -a -s "$1" ]
+if [ $# = 1 -a -f "$1" -a -s "$1" ]
 then
     :
 else
