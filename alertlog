@@ -1,4 +1,12 @@
 #!/bin/sh
+
+LOGDIR=${LOGDIR:-$HOME/var/log}
+export LOGDIR
+
 tty=`tty`
 [ -n "$tty" ] && echo "$tty" >"$LOGDIR/alertlog-$DISPLAY@$HOST"
-exec tail -f "$LOGDIR/alert"
+
+cd "$LOGDIR"
+ctrl=tailf-fvwm-$HOST
+>$$ctrl
+exec tailf -c "$ctrl" -i 1 alert vpnlog-*
