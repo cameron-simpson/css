@@ -1,0 +1,11 @@
+#!/bin/sh
+#
+# List the known one time pad URLs.
+#	- Cameron Simpson <cs@zip.com.au> 24jul2000
+#
+
+lock=otpadlist$$
+
+otpadsets \
+| foreach -i pageurls - \
+| grep '/pad-md5-[0-9a-f]*\.dat$'
