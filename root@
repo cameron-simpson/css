@@ -56,8 +56,8 @@ exec term -n "#$session" \
 		 [ -s /opt/config/shell/env-basic ] && . /opt/config/shell/env-basic
 		 [ -f $HOME/.profile ] && . $HOME/.profile
 		 TERM=vt100
-		 PATH=$PATH:/opt/css/bin:/u/network/bin
-		 MANPATH=$MANPATH:/opt/css/man:/u/network/man
+		 PATH=$PATH:/opt/css/bin:/u/network/bin:/opt/gnu/bin
+		 MANPATH=$MANPATH:/opt/css/man:/u/network/man:/opt/gnu/man:/opt/gnu/info
 		 PERL5LIB=${PERL5LIB:+"$PERL5LIB:"}/opt/css/lib:/u/network/lib
 		 export TERM PATH MANPATH PERL5LIB
 		 [ -f /bin/zsh ] && { SHELL=/bin/zsh; export SHELL; }
