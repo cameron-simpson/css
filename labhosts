@@ -1,0 +1,11 @@
+#!/bin/ae
+#
+
+[ $# = 0 ] && set harp cello flute plum cyan tuba oboe
+
+classes=
+for lab
+do
+    classes="$classes room.$lab"
+done
+printc -r $classes | sed -n 's/^host\.//p'
