@@ -327,11 +327,15 @@ do
 	       s/^[^ ]* \\([^ ]*\\).*/makelocal= version=\\1 nosync=/
 	       b done
 	       :vers
-	       s/^$thing /nosync= version=/
+	       s/^$nvthing /nosync= version=/
 	       :done"
     ## echo "$thing:"
     opts=`2>/dev/null sed -e "$sedscript" "$cf"`
-    eval "$opts"
+    if [ -n "$opts" ]
+    then
+	## echo "opts=[$opts]"
+        eval "$opts"
+    fi
 
     # skip this?
     [ $nosync ] && { echo "NOSYNC $thing"; continue; }
