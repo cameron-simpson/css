@@ -1,0 +1,6 @@
+#!/bin/sh
+
+set -x
+for arg
+do  ssh -v -o 'stricthostkeychecking no' "$arg" uptime
+done
