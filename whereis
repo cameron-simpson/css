@@ -1,0 +1,54 @@
+#!/bin/sh
+#
+# Look up whereis.com.au.	- Cameron Simpson <cs@zip.com.au> 29oct2004
+#
+
+cmd=`basename "$0"`
+
+snum=
+sname=
+poitype=
+suburb=
+state='New South Wales'
+
+usage="Usage: $cmd street-num street-name suburb"
+
+badopts=
+
+case "$1" in
+  [0-9]*)	snum=$1; shift ;;
+  *)		echo "$cmd: missing street-num" >&2; badopts=1 ;;
+esac
+
+while [ $# -gt 0 ]
+do
+  lcw=`echo "$1" | tr '[A-Z]' '[a-z]'`
+  sname="$sname $1"
+  case "$1" in
+    av|ave|avenue \
+    | st|street \
+    | pl|place \
+    | cr|cres|crescent \
+    | ln|lane \
+    | pd|pde|parade \
+    )
+      break ;;
+  esac
+  shift
+done
+[ -n "$sname" ] || { echo "$cmd: missing street-name" >&2; badopts=1; }
+
+if [ $# = 0 ]
+then
+  echo "$cmd: missing suburb" >&2
+  badopts=1
+else
+  suburb=$*
+fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+url="http://www.whereis.com.au/whereis/mapping/geocodeAddress.do?streetNumber=$snum&streetName=$sname&poiType=$poitype&suburb=$suburb&state=$state&x=1&y=1"
+url=`echo "$url" | tr ' ' +`
+
+exec us "$url"
