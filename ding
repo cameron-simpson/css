@@ -1,34 +1,13 @@
-#!/usr/bin/perl
+#!/bin/sh
 
-($cmd=$0) =~ s:.*/::;
-$usage="Usage: $cmd [-p] [count]\n";
+[ $# = 0 ] || { set x "$HOST:`pwd`"; shift; }
 
-$count=15;
-$pause=0;
-$badopts=0;
-while (@ARGV)
-{ $_=shift;
-  if ($_ eq '-p')	{ $pause=1; }
-  elsif (/^\d+$/)	{ $count=$_+0; }
-  else			{ warn "$cmd: unrecognised option: $_\n";
-			  $badopts=1;
-			}
-}
+alert -c white "DING: $*"
 
-die $usage if $badopts;
+count=5
 
-$SIG{'INT'}='intr';
-
-$|=1;
-while (--$count != 0)
-{ print "\007";
-  sleep(2);
-}
-
-while ($pause)
-{ sleep(16384);
-}
-
-sub intr
-{ exit 0;
-}
+n=1
+while [ $n -le $count ]
+do  necho ""
+    sleep 1
+done
