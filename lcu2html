@@ -23,15 +23,19 @@ while (<STDIN>)
   if ($seq == $oseq)			{ $pseq=""; }
   else					{ $pseq=$seq; }
 
+  if ($dmy == $odmy)			{ $pdmy=""; }
+  else					{ $pdmy=$dmy; }
+
   if (uc($type) eq CONTINUATION)	{ $type=''; $amt=''; }
 
   if ($bal eq "_")			{ $bal=''; }
 
   push(@rows, [TR,
-		[TD, $seq], [TD, $dmy], [TD, $type], [TD, $amt],
+		[TD, $pseq], [TD, $pdmy], [TD, $type], [TD, $amt],
 		[TD, $desc], [TD, $bal]], "\n");
 
   $oseq=$seq;
+  $odmy=$dmy;
 }
 
 print cs::HTML::tok2a([TABLE,
