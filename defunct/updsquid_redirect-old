@@ -1,0 +1,51 @@
+#!/bin/sh
+#
+# Rewrite the squid_redirect script case statements used to match ads.
+#	- Cameron Simpson <cs@zip.com.au> 06nov98
+#
+# Notify some people of pattern updates.	- cameron, 31mar99
+# STUBURL envvar for image.			- cameron, 02apr99
+#
+
+script=$HOME/scripts/squid_redirect
+patterns=$HOME/rc/noads
+zappedad=http://web/ad-zap.gif
+them='alan@fromorbit.com jar@rmb.com.au cs@zip.com.au'
+
+[ $# = 0 ] || { script=$1; shift; }
+
+[ -s "$script" ] || { echo "$0: $script: must be non-empty file" >&2; exit 1; }
+
+old=/tmp/updsqrd.$$
+cp "$script" "$old" || exit $?
+
+sed 's/$/ | \\/
+     $s|...$|) nurl=$STUBURL ;;|
+     s/^/	/' < "$patterns" \
+| replace -f '#### BEGIN AUTO ADZAP LIST' \
+	  -t '#### END AUTO ADZAP LIST' \
+	  -i "$script" \
+	  -o "$script" \
+	  -
+
+: \
+|| cmp -s "$script" "$old" \
+|| { echo "notifying $them..."
+     mailsubj -s 'new ad zapping patterns' $them <"$patterns"
+     mailsubj -s 'new ad zapping squid script' $them <"$script"
+   }
+
+case $SYSTEMID in
+    cisra)	ssh eos 'set -x
+			 cd bin || exit 1
+			 mv squid_redirect squid_redirect.old \
+				&& cat >squid_redirect \
+				&& [ -s squid_redirect ] \
+				&& chmod 755 squid_redirect \
+				&& ls -ld squid_redirect \
+				&& echo kill -1 `ps -fusquid|fgrep "(squid) -f /opt/UCSDsquid/etc/squid-noads.conf -sY"|awk "{print \\\$2}"`' \
+		    <"$script"
+		;;
+esac
+
+rm -f "$old"
