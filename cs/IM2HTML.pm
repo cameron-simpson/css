@@ -501,7 +501,7 @@ sub MakeThumbnail($$;$)
   $this->{DIDTHUMB}->{$im}=1;
   _shell("[ -s '$impath' ] && { "
 	 .( $force ? "" : "[ -s '$thpath' ] || ")
-	 ."thumbnail"
+	 ."mkthumbnail"
 	 .($im =~ /\.gif$/i
 	   ? ' -G'
 	   : $im =~ /\.png$/i
