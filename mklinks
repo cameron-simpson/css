@@ -10,7 +10,7 @@ mklinks - walk directories, linking identical files
 
 =head1 SYNOPSIS
 
-mklinks [-name I<regexp>] [-prune I<regexp>] [-size I<smallest>] [I<directories...>]
+mklinks [-newer] [-name I<regexp>] [-prune I<regexp>] [-size I<smallest>] [I<directories...>]
 
 =head1 DESCRIPTION
 
@@ -41,6 +41,7 @@ $::SBytesRead=0;
 $::SOpens=0;
 $::SLinked=0;
 $::SLinkBytesSaved=0;
+$::KeepNewer=0;
 
 my $xit = mklinks(@ARGV);
 
@@ -58,7 +59,7 @@ sub mklinks
 
   my($xit)=0;
 
-  $::Usage="Usage: $::cmd [-n] [-name regexp] [-prune regexp] [-size smallest] [directories...]\n";
+  $::Usage="Usage: $::cmd [-n] [-name regexp] [-newer] [-prune regexp] [-size smallest] [directories...]\n";
 
   local $::FileMatch;
   local $::DirPrune;
@@ -98,7 +99,15 @@ Inpect only files matching I<regexp>.
 
 =cut
 
-	elsif ($_ eq '-name') { $::FileMatch=shift(@ARGV); }# files to keep
+	elsif ($_ eq '-name') { $::FileMatch=shift(@ARGV); }
+
+=item B<-newer>
+
+Keep the newer of two files to be linked, not the older.
+
+=cut
+
+	elsif ($_ eq '-newer') { $::KeepNewer=1; }
 
 =item B<-prune> I<regexp>
 
@@ -145,7 +154,9 @@ The default is 512 bytes.
     next SIZE if @{$::SizedFiles{$sz}} < 2;
 
     # for each group of files that size
-    my @files = sort { $::MTime{$a} <=> $::MTime{$b} }@{$::SizedFiles{$sz}};
+    my @files = sort
+		{ $::KeepNewer ? ($::MTime{$b} <=> $::MTime{$a}) : ($::MTime{$a} <=> $::MTime{$b}) }
+    		@{$::SizedFiles{$sz}};
 
     # compare files of same size
     F1:
