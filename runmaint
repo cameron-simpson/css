@@ -172,7 +172,7 @@ noenv=
 badopts=
 args=$*
 
-xflag= traceon=: traceoff=:
+trace= xflag= traceon=: traceoff=:
 subj=runmaint@$HOST
 datestr=
 
@@ -218,7 +218,7 @@ do
 #
 # Trace execution.
 #
-	-x)	xflag=-x traceon='set -x' traceoff='set +x' ;;
+	-x)	xflag=-x trace=set-x traceon='set -x' traceoff='set +x' ;;
 	-?*)	echo "$0: unrecognised option: $1" >&2
 		badopts=1
 		;;
@@ -393,31 +393,31 @@ done
 # run the implied scripts
 case $target in
   hourly)
-    $RUNMAINT -date "$datestr" $xflag hourly.$hh $addresses || xit=1
+    $trace $RUNMAINT -date "$datestr" $xflag hourly.$hh $addresses || xit=1
     if [ $hh -eq 0 ]
     then
-	$RUNMAINT -date "$datestr" $xflag daily $addresses \
+	$trace $RUNMAINT -date "$datestr" $xflag daily $addresses \
 	|| xit=$?
     fi
     ;;
   daily)
-    $RUNMAINT -date "$datestr" $xflag "$wday" $addresses || xit=$?
-    $RUNMAINT -date "$datestr" $xflag "daily.$wday" $addresses || xit=$?
+    $trace $RUNMAINT -date "$datestr" $xflag "$wday" $addresses || xit=$?
+    $trace $RUNMAINT -date "$datestr" $xflag "daily.$wday" $addresses || xit=$?
     if [ "x$wday" = xmon ]
     then
-	$RUNMAINT -date "$datestr" $xflag weekly $addresses \
+	$trace $RUNMAINT -date "$datestr" $xflag weekly $addresses \
 	|| xit=$?
     fi
     if [ $mday -eq 1 ]
     then
-	$RUNMAINT -date "$datestr" $xflag monthly $addresses \
+	$trace $RUNMAINT -date "$datestr" $xflag monthly $addresses \
 	|| xit=$?
     fi
     ;;
   monthly)
     if [ $mon = jan ]
     then
-	$RUNMAINT -date "$datestr" $xflag yearly $addresses \
+	$trace $RUNMAINT -date "$datestr" $xflag yearly $addresses \
 	|| xit=$?
     fi
     ;;
