@@ -1,0 +1,18 @@
+#!/bin/sh
+#
+# Hotsync my Palm.
+#	- Cameron Simpson <cs@zip.com.au> 03apr2000
+#
+
+case "$HOST@$SYSTEMID" in
+    janus@home)	;;
+    *)		echo "$0: I expect to be on janus@home!" >&2
+		exit 1
+		;;
+esac
+
+PILOTPORT=${PILOTPORT:-/dev/pilot}
+export PILOTPORT
+
+echo "UNIMPLEMENTED - waiting on AMASS style backup scheme"
+exit 1
