@@ -1,19 +1,38 @@
 #!/bin/sh
 
 cmd=$0
+usage="Usage: $cmd [-g grep] [-l] string [files...]"
+
 grep=fgrep
+flags=
 
-[ "x$1" = "x-g" ] && { grep=$2; shift; shift; }
+badopts=
+while :
+do
+  case $1 in
+    -g) grep=$2; shift ;;
+    -l) flags="$flags $1" ;;
+    --)	shift; break ;;
+    -?*)echo "$cmd: unrecognised option: $1" >&2; badopts=1 ;;
+    *)	break ;;
+  esac
+  shift
+done
 
-[ $# = 0 ] && { echo "Usage: $cmd [-g grep] string [files...]" >&2; exit 2; }
+if [ $# = 0 ]
+then
+    echo "$cmd: missing string" >&2
+    badopts=1
+else
+    ptn=$1; shift
+fi
 
-nflag=
-[ $# = 1 ] || nflag=-n
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
 
 # no files? read from stdin: must not be a tty
-[ $# = 1 -a -t 0 ] && { echo "$cmd: I expect filenames if stdin is a tty!" >&2
+[ $# = 0 -a -t 0 ] && { echo "$cmd: I expect filenames if stdin is a tty!" >&2
 			exit 2
 		      }
 
-[ -t 1 ] || exec "$grep" -i $nflag ${1+"$@"}
-"$grep" -i $nflag ${1+"$@"} | colour_highlight cyan "$1"
+[ -t 1 ] || exec "$grep" -in $flags "$ptn" ${1+"$@"}
+"$grep" -in $flags "$ptn" ${1+"$@"} | colour_highlight cyan "$ptn"
