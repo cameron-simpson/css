@@ -7,7 +7,7 @@
 
 unique=1
 start=0
-pagesize=20
+pagesize=40
 
 cmd=$0
 usage="Usage: $cmd [-u|+u] [startpage [pagesize]] <logfile
