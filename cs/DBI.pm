@@ -651,7 +651,7 @@ sub cropDatedRecords
 
   my $context="cs::DBI::cropDatedRecords(dbh=$dbh,table=$table,start=".(defined $start ? $start : 'UNDEF').",end=".(defined $end ? $end : 'UNDEF').",xwhere=$xwhere,xwargs=[@xwargs]";
 
-  ## warn "$context\n\t";
+  warn "$context\n\t";
 
   if (!defined($start) && !defined($end))
   { my@c=caller;
@@ -684,9 +684,9 @@ sub cropDatedRecords
       # delete where NOT(ISNULL(START_DATE)) AND START_DATE >= $start
       #       AND NOT(ISNULL(END_DATE)) AND END_DATE <= $end
       #       AND ...
-      $sql="DELETE FROM $table"
-	    ." WHERE NOT(ISNULL(START_DATE)) AND START_DATE >= ?"
-	    ."   AND NOT(ISNULL(END_DATE)) AND END_DATE <= ?"
+      $sql="DELETE FROM $table\n"
+	    ." WHERE NOT(ISNULL(START_DATE)) AND START_DATE >= ?\n"
+	    ."   AND NOT(ISNULL(END_DATE)) AND END_DATE <= ?\n"
 	    .$xsql
 	    ;
 
@@ -707,11 +707,11 @@ sub cropDatedRecords
       #	  AND END_DATE >= $start
       #	  AND END_DATE <= $end
       #	  AND ...
-      $sql="UPDATE $table SET END_DATE = ?"
-	  ." WHERE (ISNULL(START_DATE) OR START_DATE < ?)"
-	  ."   AND NOT(ISNULL(END_DATE))"
-	  ."   AND END_DATE >= ?"
-	  ."   AND END_DATE <= ?"
+      $sql="UPDATE $table SET END_DATE = ?\n"
+	  ." WHERE (ISNULL(START_DATE) OR START_DATE < ?)\n"
+	  ."   AND NOT(ISNULL(END_DATE))\n"
+	  ."   AND END_DATE >= ?\n"
+	  ."   AND END_DATE <= ?\n"
 	  .$xsql
 	  ;
 
@@ -729,11 +729,11 @@ sub cropDatedRecords
       # AND START_DATE <= $end
       # AND START_DATE >= $start
       # AND ...
-      $sql="UPDATE $table SET START_DATE = ?"
-	  ." WHERE (ISNULL(END_DATE) OR END_DATE < ?)"
-	  ."   AND NOT(ISNULL(END_DATE))"
-	  ."   AND START_DATE <= ?"
-	  ."   AND START_DATE >= ?"
+      $sql="UPDATE $table SET START_DATE = ?\n"
+	  ." WHERE (ISNULL(END_DATE) OR END_DATE < ?)\n"
+	  ."   AND NOT(ISNULL(END_DATE))\n"
+	  ."   AND START_DATE <= ?\n"
+	  ."   AND START_DATE >= ?\n"
 	  .$xsql
 	  ;
 
@@ -761,9 +761,9 @@ sub cropDatedRecords
       # { START_DATE=next($end)
       # }
       # insert selected
-      $sql="SELECT * FROM $table"
-	  ." WHERE (ISNULL(START_DATE) OR START_DATE < ?)"
-	  ."   AND (ISNULL(END_DATE) OR END_DATE > ?)"
+      $sql="SELECT * FROM $table\n"
+	  ." WHERE (ISNULL(START_DATE) OR START_DATE < ?)\n"
+	  ."   AND (ISNULL(END_DATE) OR END_DATE > ?)\n"
 	  .$xsql
 	  ;
 
@@ -777,9 +777,9 @@ sub cropDatedRecords
 
 	if (@r)
 	{
-	  $sql="UPDATE $table SET END_DATE = ?"
-	      ." WHERE (ISNULL(START_DATE) OR START_DATE < ?)"
-	      ."   AND (ISNULL(END_DATE) OR END_DATE > ?)"
+	  $sql="UPDATE $table SET END_DATE = ?\n"
+	      ." WHERE (ISNULL(START_DATE) OR START_DATE < ?)\n"
+	      ."   AND (ISNULL(END_DATE) OR END_DATE > ?)\n"
 	      .$xsql
 	      ;
 
@@ -808,26 +808,24 @@ sub cropDatedRecords
 	  }
 	}
       }
-
-
     }
     else
     # only $start defined
     {
 
-      ## warn "CROP low-: prev_start='$prev_start'\n";
+      warn "CROP low-: prev_start='$prev_start'\n";
 
       # delete swallowed records
       #
       # delete where NOT(ISNULL(START_DATE))
       # AND START_DATE >= $start
       # AND ...
-      $sql="DELETE FROM $table"
-	    ." WHERE NOT(ISNULL(START_DATE)) AND START_DATE >= ?"
+      $sql="DELETE FROM $table\n"
+	    ." WHERE NOT(ISNULL(START_DATE)) AND START_DATE >= ?\n"
 	    .$xsql
 	    ;
 
-      ## warn "DELETED SWALLOWED:\n$sql\n\t";
+      warn "DELETED SWALLOWED:\n$sql\n\t";
       if (!defined($sth=dosql($dbh,$sql,$start,@xwargs)))
       { warn "$::cmd: $context:\n\tcan't dosql($sql)";
 	$ok=0;
@@ -837,17 +835,15 @@ sub cropDatedRecords
       #
       # update set END_DATE = prev($start)
       # where (ISNULL(START_DATE) OR START_DATE < $start)
-      # AND NOT(ISNULL(END_DATE))
-      # AND END_DATE >= $start
+      # AND (ISNULL(END_DATE) OR END_DATE >= $start)
       # AND ...
-      $sql="UPDATE $table SET END_DATE = ?"
-	  ." WHERE (ISNULL(START_DATE) OR START_DATE < ?)"
-	  ."   AND NOT(ISNULL(END_DATE))"
-	  ."   AND END_DATE >= ?"
+      $sql="UPDATE $table SET END_DATE = ?\n"
+	  ." WHERE (ISNULL(START_DATE) OR START_DATE < ?)\n"
+	  ."   AND (ISNULL(END_DATE) OR END_DATE >= ?)\n"
 	  .$xsql
 	  ;
 
-      ## warn "CROP LOWER:\n$sql\n\t";
+      warn "CROP LOWER:\n$sql\n\t";
       if (!defined($sth=dosql($dbh,$sql,$prev_start,$start,$start,@xwargs)))
       { warn "$::cmd: $context:\n\tcan't dosql($sql)";
 	$ok=0;
@@ -864,8 +860,8 @@ sub cropDatedRecords
     # delete where NOT(ISNULL(END_DATE))
     # AND END_DATE <= $end
     # AND ...
-    $sql="DELETE FROM $table"
-	." WHERE NOT(ISNULL(END_DATE)) AND END_DATE <= ?"
+    $sql="DELETE FROM $table\n"
+	." WHERE NOT(ISNULL(END_DATE)) AND END_DATE <= ?\n"
 	.$xsql
 	;
 
@@ -881,9 +877,9 @@ sub cropDatedRecords
     # AND NOT(ISNULL(START_DATE))
     # AND START_DATE <= $end
     # AND ...
-    $sql="UPDATE $table SET START_DATE = ?"
-	." WHERE (ISNULL(END_DATE) OR END_DATE > ?)"
-	."   AND NOT(ISNULL(START_DATE)) AND START_DATE <= ?"
+    $sql="UPDATE $table SET START_DATE = ?\n"
+	." WHERE (ISNULL(END_DATE) OR END_DATE > ?)\n"
+	."   AND (ISNULL(START_DATE) OR START_DATE <= ?)\n"
 	.$xsql
 	;
 
