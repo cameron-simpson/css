@@ -43,6 +43,7 @@ for bundle
 do
 	if [ -d "$bundle/." ]
 	then
+		base=`basename "$bundle"`
 		if [ -n "$DIR" ]; then dir=$DIR
 		else if [ -r "$bundle/.bundle" ]; then
 			dir=`exec cat $bundle/.bundle`
@@ -54,7 +55,7 @@ do
 			dir=$defdir
 		     fi
 		fi
-		tarf="$dir/$bundle.tar.gz"	# was bz2
+		tarf="$dir/$base.tar.gz"	# was bz2
 		[ -s "$tarf" ] && { echo "$tarf: already exists" >&2; exit 1; }
 		[ -d "$dir/." ] || mkdir "$dir" || exit $?
 		echo "$bundle -> $tarf ..." >&2
