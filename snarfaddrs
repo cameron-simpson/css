@@ -23,10 +23,12 @@ my %addrs=();
 my %naddrs;
 
 die "$::cmd: open($all): $!\n" if ! open(ALL,"< $all\0");
+ALL:
 while (defined($_=<ALL>))
 { chomp;
   if (! /\t/)
-  { die "$::cmd: $all, line $.: bad data (no tab)\n";
+  { warn "$::cmd: $all, line $.: bad data (no tab), discarded\n\t$_";
+    next ALL;
   }
 
   $addrs{$`}=$';
