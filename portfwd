@@ -9,7 +9,7 @@ case "$HOST.$SYSTEMID@$LOCATION" in
     alog portfwd lock -1 portfwd-kaper \
 	sh -c 'set -x
 	       ssh -f -L 6009:127.0.0.1:6000 kaper exec ./bin/redhat.x86.linux/pause
-	       exec x2x -west -to localhost:9'
+	       exec x2x -north -to localhost:9'
     ;;
 esac
 
