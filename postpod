@@ -11,3 +11,4 @@
 # Relative HREFs:
 # we made L<./foo> into L<http://./foo> in prepod. Clean up now:
 s|<a href="http://\./\([^"]*\)">http://\.[^<]*/\([^<]*\)</a>|<code><a href="\1">\2</a></code>|g
+s|[Rr][Ff][Cc] *0*\([1-9][1-9]*\)|<a href="http://www.ietf.org/rfc/rfc\1.txt">&</a>|g
