@@ -1,0 +1,8 @@
+#!/bin/sh
+#
+
+scsiinfo=scsiinfo
+
+[ $# = 0 ] && { set x -l; shift; }
+
+exec "$scsiinfo" "$@"
