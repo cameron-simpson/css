@@ -14,10 +14,12 @@ wide=
 ignfile=.bgignore
 ignlist=
 gotptns=
+findopts=
 
 cmd=$0
 usage="Usage: $cmd [-f] [-r] [-i igndirs] [-I ignfile] [-n count] [ptns... [-- directories...]]
 	-f	Use find(1) even if there is an INDEX file.
+	-h	Follow symlinks when using find.
 	-i igndirs A space separated list of directories to ignore.
 	-I ignfile A file containing directories to ignore, one per line.
 		Default: $ignfile
@@ -29,6 +31,7 @@ badopts=
 while :
 do  case $1 in
       -f)	forcefind=1 ;;
+      -h)	findopts="$findopts -follow" ;;
       -i)	ignlist="$ignlist $2"; shift ;;
       -I)	ignfile=$2; shift ;;
       -r)	random=1 ;;
@@ -84,7 +87,8 @@ do  if [ -z "$forcefind" -a -s "$dir/INDEX" ]
 	    cat "$ndx"
 	fi | sed "s:^[^/]:$dir/&:"
     else
-	find "$dir" \( -type d ! -name . \
+	find "$dir" $findopts \
+		    \( -type d ! -name . \
 			\( -name '.*' \
 			$ignargs \
 			\) \
