@@ -49,7 +49,7 @@ then
     export ARCH
 fi
 
-pathadd=:/usr/bin:$SYNCOPT_OPT/bin:$SYNCOPT_OPT/script
+pathadd=:/usr/bin:$SYNCOPT_OPT/bin:$SYNCOPT_OPT/script:$SYNCOPT_OPT/css
 PATH=$PATH$pathadd
 export PATH
 
@@ -275,8 +275,8 @@ do
 
     # get unversioned name for $thing
     case "$thing" in
-	*-*) nvthing=`expr "x$thing" : 'x\([^\-]*\)-.*'`
-	     thingv=`expr "x$thing" : 'x[^\-]*-\(.*\)'`
+	*-[0-9]*) nvthing=`expr "x$thing" : 'x\(.*\)-[0-9].*'`
+	     thingv=`expr "x$thing" : 'x.*-\([0-9].*\)'`
 	     if [ -z "$nvthing" -o -z "$thingv" ]
 	     then
 		 echo "$0: empty nvthing [$nvthing] or thingv [$thinv] !!" >&2
