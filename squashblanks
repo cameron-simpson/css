@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 #
 # Coalesce adjacent blank lines. Detab. Strip trailing whitespace.
-# Nothing that tohers haven't done before me. Just can't find it.
+# Nothing that others haven't done before me. Just can't find it.
 #	- Cameron Simpson <cs@zip.com.au> 09may2002
 #
 # Add skipheaders and outputfilter. - cameron 15may2002
