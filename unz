@@ -1,0 +1,24 @@
+#!/bin/sh
+#
+# Uncompress a file. I'm so lazy.
+#	- Cameron Simpson <cs@zip.com.au> 10apr99
+#
+
+xit=0
+
+[ $# = 0 ] && { echo "Usage: $0 files..." >&2; exit 2; }
+
+for f
+do
+    case "$f" in
+	*.gz)	gunzip -v "$f" || xit=1 ;;
+	*.bz2)	bunzip2 -v "$f" || xit=1 ;;
+	*.Z)	uncompress -v "$f" || xit=1 ;;
+	*.z)	unpack -v "$f" || xit=1 ;;
+	*)	echo "$0: don't know how to uncompress $f" >&2
+		xit=1
+		;;
+    esac
+done
+
+exit $xit
