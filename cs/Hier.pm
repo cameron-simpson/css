@@ -628,6 +628,8 @@ sub savehash($$)
 
 =item edithash(I<hashref>,I<editor>)
 
+Transcribe the hash to a file, run an editor, return the modified hash.
+
 =cut
 
 sub edithash($;$)
