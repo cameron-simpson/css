@@ -13,40 +13,41 @@
 # unDOSify stuff
 s/$//
 
+# Relative HREFs:
+# make L<./foo> into L<http://./foo>, gets undone in postpod.
+s|L<\(\./[^>]*\)>|L<http://\1>|g
+
 # hide =keywords - handled by separate process
 /^=keywords/d
 
 # inline images
-/^=image/!b nimage
+/^=image/{
 s|^=image[ 	][ 	]*\(.*\)|=begin html\
 \
 <IMG SRC="\1" ALT="\1">\
 \
 =end html|
 b done
-
-:nimage
+}
 
 # author details
-/^=author/!b nauthor
+/^=author/{
 s|^=author[ 	][	]*\(.*\)|=begin html\
 \
 <SMALL>Author: <A HREF="mailto:\1">\1</A></SMALL><BR>\
 \
 =end html|
 b done
-
-:nauthor
+}
 
 # modtime
-/^=modtime/!b nmod
+/^=modtime/{
 s|^=modtime[ 	][	]*\(.*\)|=begin html\
 \
 <SMALL>Last modified: \1</SMALL><BR>\
 \
 =end html|
 b done
-
-:nmod
+}
 
 :done
