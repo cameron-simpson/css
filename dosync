@@ -6,6 +6,7 @@ case "$HOST@$SYSTEMID" in
 			syncwork &
 			synczip &
 			wait
+			exit
 			;;
 esac
 
