@@ -17,9 +17,9 @@ append=1
 while :
 do  case $1 in
 	-exec)	nopush=1 ;;
-	-a)		append=1 ;;
-	+a)		append= ;;
-	*)		break ;;
+	-a)	append=1 ;;
+	+a)	append= ;;
+	*)	break ;;
     esac
     shift
 done
