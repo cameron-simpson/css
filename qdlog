@@ -1,0 +1,11 @@
+#!/bin/sh
+[ $# = 1 ] || { echyo "Usage: $0 keyword" >&2; exit 2; }
+ring -f $HOME/var/log/dlog "$1" \
+| sed -n "h
+	  /^[^ 	]/b ok
+	  y/ABCDEFGHIJKLMNOPQRSTUVWXYZ/abcdefghijklmnopqrstuvwxyz/
+	  /$1/b ok
+	  d
+	  :ok
+	  g
+	  p"
