@@ -1,0 +1,15 @@
+#!/bin/sh
+#
+# Make a mailbox folder and .mh_sequences (so mutt recognises it).
+#	- Cameron Simpson <cs@zip.com.au> 11oct1999
+#
+
+xit=0
+for d
+do  if [ -d "$d/." ] || mkdir "$d"
+    then >>"$d/.mh_sequences"
+    else xit=1
+    fi
+done
+
+exit $xit
