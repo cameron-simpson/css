@@ -125,7 +125,7 @@ do
       then echo  "\"%$fthumb%$tag\" Exec $imop $f"
       else echo  "\"$tag\" Exec $imop $f"
            echo "$thfmt $f" >&3	# to the thumb maker ...
-      fi
+      fi | tee -a $HOME/imlist.out
     fi
 done
 
