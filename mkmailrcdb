@@ -1,0 +1,60 @@
+#!/opt/bin/perl
+#
+# Read rawdb from stdin, write useful db to stdout.
+#	- Cameron Simpson <cs@zip.com.au> 30jul99
+#
+
+use strict qw(vars);
+
+use cs::Misc;
+use cs::Upd;
+use cs::Source;
+use cs::Sink;
+use cs::Hier;
+
+my $in = new cs::Source (FILE,STDIN);
+
+my $db = {};
+
+nl("load input...");
+my $kvl;
+KV:
+while ( defined($kvl=cs::Hier::getKVLine($in)) && ref $kvl)
+{
+  my($k,$v)=@$kvl;
+
+  next KV if ! ref $v || ! exists $v->{EMAIL};
+  ## out($k);
+
+  my $e = $v->{EMAIL};
+  my $dfltaddr = undef;
+
+  ADDR:
+  for my $addr (keys %$e)
+  {
+    next ADDR if ! exists $e->{$addr}->{TAGS};
+
+    for my $tag (@{$e->{$addr}->{TAGS}})
+    {
+      nl("$k$tag => $addr");
+      my $txt = "$v->{FULLNAME} <$addr>";
+      $db->{"$k$tag"}=$txt;
+      $dfltaddr = $txt if ! defined $dfltaddr || $tag eq DFLT;
+    }
+  }
+
+  if (defined $dfltaddr)
+  { nl("$k => $dfltaddr");
+    $db->{$k}=$dfltaddr;
+  }
+}
+
+my $out = new cs::Sink (FILE,STDOUT);
+
+nl("write output");
+for my $alias (sort keys %$db)
+{
+  cs::Hier::putKVLine($out,$alias,$db->{$alias});
+}
+
+exit 0;
