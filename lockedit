@@ -1,0 +1,38 @@
+#!/bin/sh
+#
+# Lock a file, edit, release.
+#	- Cameron Simpson <cs@zip.com.au> 16jun99
+#
+
+cmd=`basename "$0"`
+usage="Usage: $cmd - file [editcmd [args...]]
+	-	Editcmd is a filter; pipe to tmp and rewrite."
+
+isfilt=
+if [ "x$1" = x- ]
+then
+    isfilt=1
+    shift
+fi
+
+[ $# = 0 ] && { echo "$cmd: missing file" >&2; echo "$usage" >&2; exit 2; }
+
+file=$1; shift
+
+# default to editor if no command
+[ $# = 0 ] && { if [ $isfilt ]
+		then
+		    echo "$cmd: you can't use the - option with the default editor" >&2
+		    exit 1
+		else
+		    set x "$EDITOR"
+		    shift
+		fi
+	      }
+
+if [ $isfilt ]
+then
+    lock "$file" filteredit "$file" "$@"
+else
+    lock "$file" "$@" "$file"
+fi
