@@ -390,7 +390,7 @@ do
 		| eval "$pipeline"
 		;;
 	*)	[ -n "$thisitype" ] || thisitype=`file2mime "$arg"`
-		eval "(set -x; $pipeline)" <"$arg"
+		eval "$pipeline" <"$arg"
 		;;
     esac
     ## set +x
