@@ -20,6 +20,8 @@ usage="Usage: $cmd [-a] [-c] [-s] [-t] [-i file] [URLs...]
 	-t	Open a new tab instead of a new window.
 	-i file	Read URLs from file; \"-\" means stdin."
 
+[ -n "$DISPLAY" ] || { echo "$cmd: no \$DISPLAY!" >&2; exit 1; }
+
 doprobe=
 subopts=
 doclean=
