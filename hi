@@ -60,7 +60,11 @@ urllist=/tmp/hi-urls.$$
 | while read url grep
   do  if [ -z "$grep" ]
       then  echo "$url"
-      else  pageurls -i "$url" | egrep -i "$grep"
+      else  pageurls -i "$url" \
+	    | egrep -i "$grep" \
+	    | while read url
+	      do  xvurl "$url"
+	      done >/dev/null &
       fi
   done >>"$urllist"
 )
