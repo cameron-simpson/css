@@ -1,0 +1,28 @@
+#!/bin/sh
+#
+# Invoke our window manager of choice.
+#
+
+wm=
+wmopts=
+for wm in `cat $HOME/etc/env/WM 2>/dev/null` ctwm tvtwm twm mwm none
+do
+    wmdir=$X11/$wm
+    wmrc=$wmdir/rc
+    wmexec=`which $wm`
+    [ -f "$wmexec" -a -r "$wmrc" ] && break
+done
+case "$wm" in
+    none)	exec xterm -n 'NO WM' -T 'NO WM' -e /bin/sh ;;
+esac
+
+tmpwmrc=$HOME/.${wm}rc-$DISPLAY
+[ -r $wmdir/opts ] && wmopts=`cat $wmdir/opts`
+dpp -DWM=$wm -DWMDIR=$wmdir "-DAGAIN=$again" $X11/xinfo.dpp $wmrc >$tmpwmrc
+
+"$wmexec" -f $tmpwmrc $wmopts
+xit=$?
+
+rm -f $tmpwmrc || xit=$?
+
+exit $xit
