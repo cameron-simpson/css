@@ -113,7 +113,7 @@ sub h2s
 
   if ($cs::Hier::_Active{$refkey})
   {
-    ## warn "$::cmd: recurse structure at $refkey\n"
+    ## warn "$::cmd: recursive structure at $refkey\n"
     ##	if ! $cs::Hier::PtrTags;
     $s->Put("&($refkey)");
     return;
@@ -232,18 +232,19 @@ sub _scalar2a
 { local($_)=@_;
 
   if (! defined || ! length)
-	{ return '""';
-	}
+  { return '""';
+  }
   elsif (/[^-+_\w.\/\@]/)
-	{ s/["\\]/\\$&/g;
-	  s/\n/\\n/g;
-	  s/\r/\\r/g;
-	  s/\t/\\t/g;
-	  s/[^\020-\176]/sprintf("\\x%02x",ord($&))/eg;
-	  return "\"$_\"";
-	}
-  else	{ return $_;
-	}
+  { s/["\\]/\\$&/g;
+    s/\n/\\n/g;
+    s/\r/\\r/g;
+    s/\t/\\t/g;
+    s/[^\020-\176]/sprintf("\\x%02x",ord($&))/eg;
+    return "\"$_\"";
+  }
+  else
+  { return $_;
+  }
 }
 
 sub _array2s
@@ -369,7 +370,7 @@ sub _a2scalar	# string -> (value,unparsed)
     $_=$1;
     $sofar='';
 
-    while (/\\(x..|[^x])/)
+    while (/\\(x..|u....|[^ux])/)
     { $sofar.=$`;
       $match=$1;
       $_=$';
@@ -378,7 +379,7 @@ sub _a2scalar	# string -> (value,unparsed)
       elsif ($match eq 'n')	{ $match="\n"; }
       elsif ($match eq 'r')	{ $match="\r"; }
       elsif ($match eq 't')	{ $match="\t"; }
-      elsif ($match =~ /^x/)	{ $match=chr(oct("0$match")); }
+      elsif ($match =~ /^[ux]/)	{ $match=chr(hex($match)); }
       else			{ }
 
       $sofar.=$match;
@@ -991,8 +992,8 @@ sub setSubKey
     if (! exists $p->{$key}
      || ! defined $p->{$key}
      || reftype $p->{$key} ne HASH)
-	  { $p->{$key}={};
-	  }
+    { $p->{$key}={};
+    }
 
     $p=$p->{$key}
   }
@@ -1025,10 +1026,11 @@ sub fleshOut
     # {}
     { $var->{$_}={} if ! exists $var->{$_};
       if (::reftype($var->{$_}) eq HASH)
-	    { fleshOut($tplt->{$_},$var->{$_});
-	    }
-      else	{
-	    }
+      { fleshOut($tplt->{$_},$var->{$_});
+      }
+      else
+      {
+      }
     }
     elsif ($t eq ARRAY)
 	  # []
