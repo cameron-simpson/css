@@ -15,21 +15,27 @@ mode=netscape	# was mosaic
 NETSCAPE=netscape-remote
 
 cmd=`basename "$0"`
-usage="Usage: $cmd [-a] [-c] [-s] [-i file] [URLs...]
+usage="Usage: $cmd [-a] [-c] [-s] [-t] [-i file] [URLs...]
 	-a	Anonymous.
 	-c	Clean.
 	-s	Same window - don't open a new browser window.
+	-t	New tab, instead of new window.
 	-i file	Read URLs from file; \"-\" means stdin."
 
+subopts=
 url=
-same=
+mode=new-window
 meta=
 badopts=
 while :
-do  case $1 in
+do  case "$1" in
+	-[acst]) subopts="$subopts $1" ;;
+    esac
+    case $1 in
 	-a)	meta="anon $meta" ;;
 	-c)	meta="clean $meta" ;;
-	-s)	same=1 ;;
+	-s)	mode= ;;
+	-t)	mode=new-tab ;;
 	-i)	input=$2; shift
 		set x ${1+"$@"} "" `cat $input`; shift
 		;;
@@ -44,9 +50,7 @@ done
 
 [ $badopts ] && { echo "$usage" >&2; exit 1; }
 
-if [ $same ]; then newwin=
-              else newwin=,new-window
-fi
+[ -n "$mode" ] && mode=,$mode
 
 [ -n "$url" ] && { set x "$url"; shift; }
 
@@ -64,7 +68,7 @@ then
 	    echo "$url"
 	fi
     done \
-    | "$0"
+    | "$0" $subopts
     exit $?
 fi
 
@@ -110,7 +114,7 @@ sed -e 's/^[ 	][ 	]*//' \
 
 	# escape stuff for OpenURL() call
 	url=`echo "$url" | hexify`
-	set "$@" -remote "OpenURL($metapfx$url$newwin)"
+	set "$@" -remote "OpenURL($metapfx$url$mode)"
     done
     shift	# toss x
 
