@@ -827,7 +827,7 @@ sub cropDatedRecords
 	    .$xsql
 	    ;
 
-      ## warn "DELETED SWALLOWED:\n$sql\n";
+      ## warn "DELETED SWALLOWED:\n$sql\n\t";
       if (!defined($sth=dosql($dbh,$sql,$start,@xwargs)))
       { warn "$::cmd: $context:\n\tcan't dosql($sql)";
 	$ok=0;
@@ -847,7 +847,7 @@ sub cropDatedRecords
 	  .$xsql
 	  ;
 
-      ## warn "CROP LOWER:\n$sql\n";
+      ## warn "CROP LOWER:\n$sql\n\t";
       if (!defined($sth=dosql($dbh,$sql,$prev_start,$start,$start,@xwargs)))
       { warn "$::cmd: $context:\n\tcan't dosql($sql)";
 	$ok=0;
