@@ -67,5 +67,7 @@ then
     set -- su "$localuser" -c "$sucmd"
 fi
 
+bgproc -p /dev/null buglog -n "$cmd: $*" &
+
 set -x
 exec "$@"
