@@ -5,7 +5,7 @@
 #
 
 sshdir=$HOME/there/local/rc/ssh
-[ -d "$sshdir/." ] || (set -x; mkdir -p "$sshdir") || exit1
+[ -d "$sshdir/." ] || (set -x; mkdir -p "$sshdir") || exit 1
 cd "$sshdir" || exit 1
 
 xit=0
@@ -19,39 +19,38 @@ do
 	 (set -x; ln -s "$target" "$link") || { xit=1; continue; }
        }
 done <<X
-Mykefile ../../../../rc/ssh/Mykefile
-config   ../../../../rc/ssh/config
-pubkeys  ../../../../rc/ssh/pubkeys
+config   $HOME/rc/ssh/config
 X
 
 # make key pairs
-if [ -d privkeys/. ] || mkdir -p privkeys
-then
-    for t in rsa1 rsa dsa
-    do
-      case $t in
-	  rsa1) base=identity ;;
-	  *)    base=id_$t ;;
-      esac
-      pri=privkeys/$base
-      [ -s "$pri" ] && continue
+for t in rsa1 rsa dsa
+do
+  case $t in
+      rsa1) base=identity ;;
+      *)    base=id_$t ;;
+  esac
+  pri=$base
+  [ -s "$pri" ] && continue
 
-      pub=pubkeys/$base@$HOSTNAME.pub
-      ( set -x
-	rm -f "$pub"
-	ssh-keygen -t $t -f $pri -C "$t $USER@$HOSTNAME `datecode`" \
-	&& mv "$pri.pub" "$pub"
-      ) || xit=1
-    done
-else
-    xit=1
-fi
+  pub=$HOME/rc/ssh/pubkeys/$base@$HOSTNAME.pub
+  ( set -x
+    rm -f "$pub"
+    ssh-keygen -t $t -f $pri -C "$t $USER@$HOSTNAME `datecode`" \
+    && mv "$pri.pub" "$pub"
+  ) || xit=1
+done
 
-myke _env _auth || xit=1
+myke -f $HOME/rc/ssh/Mykefile _env _auth || xit=1
 chmod 644 authorized_keys* environment
 
 cd || exit 1
 rm -f .ssh
-(set -x; ln -s there/local/rc/ssh .ssh) || xit=1
+if [ -d .ssh/. ]
+then
+    echo "$HOME/.ssh is a directory!" >&2
+    xit=1
+else
+    (set -x; ln -s there/local/rc/ssh .ssh) || xit=1
+fi
 
 exit $xit
