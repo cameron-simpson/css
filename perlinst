@@ -11,7 +11,7 @@ perl=
 while :
 do
   case $1 in
-    -[5-9].*)	vers=$ ;;
+    -[5-9].*)	vers=$1 ;;
     -f)		force=1 ;;
     -p)		perl=$2; shift ;;
     --)		shift; break ;;
