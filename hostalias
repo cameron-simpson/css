@@ -1,0 +1,14 @@
+#!/bin/sh
+#
+# Record address of host.
+# Mostly used to tell my main sites about where I just dialed in from.
+#	- Cameron Simpson <cs@zip.com.au> 25jul99
+#
+
+aliases=${HOSTALIASES:=$HOME/rc/hostaliases}
+
+[ $# = 2 ] || { echo "Usage: $0 host ip-addr" >&2; exit 2; }
+
+host=$1 addr=$2
+
+bsed -s "/^$host /d" "$aliases" && echo "$host $addr" >>"$aliases"
