@@ -10,14 +10,16 @@ dotersefn=1
 doauthinfo=1
 linkfile=
 bykeys=
+skipkeys=
 usekey=
 
 cmd=$0
-usage="Usage: $cmd [+a] [-j] [-k] [-K key] [-l linkfile] [-t title] [podfiles...]
+usage="Usage: $cmd [+a] [-j] [-k] [+k keywords,...] [-K key] [-l linkfile] [-t title] [podfiles...]
 	+a		Don't show author info.
 	-j		Skip JavaScript tersify() function.
 			Useful if you're making several indices in one file.
 	-k		By keywords.
+	+k keywords,...	By keywords, skipping the specified categories (comma separated).
 	-K key		Select POD files and links with the specified key.
 	-l linkfile	Pull plain links from linkfile.
 	-t title 	Set title."
@@ -31,6 +33,7 @@ do
     +a)	doauthinfo= subopts="$subopts $1" ;;
     -j)	dotersefn= ;;
     -k)	bykeys=1 ;;
+    +k)	bykeys=1 skipkeys="$skipkeys,$2"; shift ;;
     -K)	usekey=$2; shift ;;
     -l)	linkfile=$2 subopts="$subopts -l $2"; shift ;;
     -t)	title=$2; shift ;;
@@ -76,14 +79,32 @@ if [ $bykeys ]
 then
   xit=0
 
+  awkf="BEGIN {"
+  for skipkey in `echo "$skipkeys" | tr , ' '`
+  do awkf="$awkf
+	skipkey[\"$skipkey\"]=1"
+  done
+  awkf="$awkf
+	}
+	{
+	  for (k in keys)
+	    delete keys[k]
+	  split(\$2,keys,\",\")
+
+	  for (k in keys)
+	    if (!(key in skipkeys))
+	      print key
+	}"
+
   keys=`( podkeywords "$@"
-	  [ -n "$linkfile" ] && awk '{print$2}' "$linkfile" | tr , '\012'
+	  [ -n "$linkfile" ] && awk "$awkf" <"$linkfile"
 	) | sort -u
        `
-
   # generate TOC
   for key in $keys
   do
+    case ",$skipkeys," in *",$key,"*) continue ;; esac
+
     label=$key
     defn=`sed -n "s/^$key[ 	]//p" keywords 2>/dev/null`
     echo "<A HREF=\"#key-$key\">$key</A>"
@@ -96,6 +117,8 @@ then
   # generate per-keyword TOCs
   for key in $keys
   do
+    case ",$skipkeys," in *",$key,"*) continue ;; esac
+
     label=$key
     defn=`sed -n "s/^$key[ 	]//p" keywords 2>/dev/null`
 
