@@ -1,0 +1,352 @@
+#!/usr/bin/perl
+#
+# Filemail - squirrel mail away into folders.
+#	- Cameron Simpson <cs@zip.com.au> 04jun1997
+#
+
+use strict(vars);
+
+require 'flush.pl';
+
+use cs::Date;
+use cs::Hier;
+use cs::Mail::Folder;
+use cs::CachedFile;
+
+($::cmd=$0) =~ s:.*/::;
+$::Usage="Usage: $::cmd [-t log] [mailboxes...] <file-data
+	-t log	Tail log to get file-data.
+";
+
+$::MAILBOX=(defined $ENV{MAILBOX} && length $ENV{MAILBOX}
+		? $ENV{MAILBOX}
+		: '+today');
+
+$::ExecAfter=512;	# reexec self after this many messages
+$::Handled=0;
+@::ExecList=($0,@ARGV);
+
+exit main(@ARGV);
+
+sub execself
+{ exec(@::ExecList);
+}
+
+sub main
+{ my(@ARGV)=@_;
+
+  my($badopts)=0;
+
+  my($log);
+  local($_);
+
+  ARGV:
+  while (@ARGV)
+  { $_=shift(@ARGV);
+    if (! /^-./)
+    { unshift(@ARGV,$_); last ARGV; }
+
+    last ARGV if $_ eq '--';
+
+    if ($_ eq '-t')
+    { $log=shift(@ARGV); }
+    else
+    { warn "$::cmd: unrecognised option: $_\n";
+      $badopts=1;
+    }
+  }
+
+  die $::Usage if $badopts;
+
+  local(%::DotFile);	# subrs for .file in each mbox
+
+  my($in);
+
+  if (defined $log)
+  { if (! defined ($in=($log eq '-'
+			  ? new cs::Source (FILE,STDIN)
+			  : new cs::Source (TAIL,$log))))
+    { die "$::cmd: can't attach to $log\n";
+    }
+
+    warn "attached to $log";
+  }
+  elsif (! defined ($in=new cs::Source (FILE,STDIN)))
+  { die "can't attach cs::Source to STDIN" if ! defined $in;
+  warn "reading STDIN for directives";
+  }
+
+  @ARGV=$::MAILBOX if ! @ARGV;
+
+  # convert folder names to pathnames
+  for (@ARGV)
+  { $_=cs::Mail::Folder::fullname($_);
+  }
+
+  my($Xit)=0;
+
+  my(@words,$file,$H,@where,@shortWhere);
+
+  MAINLOOP:
+  while (defined ($_=$in->GetLine()))
+  { if (! length)
+    { last MAINLOOP if ! defined $log; # not a tailable thing
+      sleep(10);	# pause then poll the file again
+      next MAINLOOP;
+    }
+
+    chomp;
+    @words=grep(length,split(/[,\s]+/));
+    next MAINLOOP if ! @words;
+
+    ## warn "processing [$_]\n";
+
+    $file=shift(@words);
+    next MAINLOOP if ! -e $file;
+
+    @words=@ARGV if ! @words;
+
+    for my $word (@words)
+    { 
+      ## warn "doing \"$word\" of [@words]";
+
+      ($H,@where)=fileitem($file,$word);
+      if (defined $H)
+      { @shortWhere=map(cs::Mail::Folder::shortname($_), @where);
+
+	if (grep(/adzap|attn|cskk|ebay/, @shortWhere))
+	{
+	  my $tm = cs::Date::gmt2tm(time,1);
+	  my @from = keys %{$H->Addrs(FROM)};
+	  my $from   = shift @from;
+	  my $sitelen = length $ENV{SITENAME};
+	  if (length($from) > $sitelen+2
+	   && ( substr($from,-$sitelen-1)
+		  eq "\@$ENV{SITENAME}"
+	     || $from =~ /\@\w+\.$ENV{SITENAME}$/
+	      )
+	     )
+	  { $from=substr($from,0,length($from)-$sitelen-1);
+	  }
+	  else
+	  { $from=$H->Hdr(FROM);
+	  }
+
+
+	  if (! grep($from eq $_,
+			'root',
+			'majordomo',
+			'nobody',
+			'listpost',
+			'daemon')
+	   && $from !~ /^root\@elph/
+	     )
+	  { printf("%02d%s%02d, %2d:%02d:%02d: %s: %s; %s\n",
+		$tm->{MDAY},
+		$cs::Date::mon_names[$tm->{MON}-1],
+		$tm->{YY},
+		$tm->{HH},$tm->{MM},$tm->{SS},
+		join(',',@shortWhere),
+		$from,
+		$H->Hdr(SUBJECT));
+	  }
+	}
+
+	unlink($file)
+	      || warn "$::cmd: unlink($file): $!";
+      }
+      else
+      { $Xit=1;
+      }
+    }
+
+    flush(STDOUT);
+
+    # filemail leaks - re-exec every so often
+    if (++$::handled >= $::ExecAfter)
+    { execself();
+    }
+  }
+
+  return $Xit;
+}
+
+sub fileitem($$)
+{ my($orig,$folder)=@_;
+  $folder=cs::Mail::Folder::fullname($folder);
+
+  if (! wantarray) { my(@c)=caller;die "no wantarray from [@c]"; }
+
+  my(@where)=();
+
+  my $F = new cs::Mail::Folder($folder);
+  if (! defined $F)
+  { warn "$::cmd: can't open folder: $folder\n";
+    return undef;
+  }
+
+  # quick'n'dirty if no .file
+  my $filterPath = filterPath($folder);
+
+  if (! stat($filterPath) || ! -s _)
+  # no filter - quick'n'dirty file
+  {
+    my $n = (ref $orig ? $F->File($orig,1) : $F->LinkToN($orig));
+    return () if ! defined $n;
+    return ((new cs::RFC822), "$folder/$n");
+  }
+
+  # get MIME handle
+  my $M;
+
+  if (ref $orig)
+  { $M=$orig;
+  }
+  else
+  { my $s = new cs::Source (PATH,$orig);
+    if (! defined $s)
+    { warn "$::cmd: can't open $orig: $!\n";
+      return undef;
+    }
+
+    ## warn "get new MIME from $s";
+    $M=new cs::MIME $s;
+  }
+
+  ## warn "orig=$orig: M=$M";
+
+  my($H)=$M;
+
+  my($ok)=1;
+
+  my($modified,$dofile,@crossfile)=subfile($folder,$M);
+
+  my($n);
+
+  if ($dofile)
+  {
+    ## warn "M=$M, modified=$modified,orig=$orig";
+
+    $n=$F->File($M,1,($modified ? undef : $orig));
+    if (! defined $n)
+    { warn "$::cmd: can't file into $folder\n";
+      $ok=0;
+    }
+    else
+    { push(@where,"$folder/$n");
+    }
+  }
+
+  my($subH,@subwhere);
+
+  for my $crossfile (@crossfile)
+  {
+    ($subH,@subwhere)=fileitem($M,$crossfile);
+    if (defined $subH)
+    { push(@where,@subwhere);
+      ## warn "filed into @subwhere";
+    }
+    else
+    { $ok=0;
+      ## warn "problem";
+    }
+  }
+
+  $ok ? ($H,@where) : ();
+}
+
+sub filterPath($)
+{ my($folder)=@_;
+
+  my $shortName = cs::Mail::Folder::shortname($folder);
+  ## warn "shortname($folder)=\"$shortName\"";
+  my $filterPath = "$folder/.file";
+
+  # look for filter
+  if ($shortName !~ m:/:)
+  { my $centralPath="$ENV{HOME}/rc/mail/filter.$shortName";
+    ## warn "look for $centralPath";
+    if (stat($centralPath) && -f _)
+    { $filterPath=$centralPath;
+    }
+  }
+  else
+  { ## warn "look only for $filterPath";
+  }
+
+  return $filterPath;
+}
+
+sub subfile($$)
+{ local($::Folder,$::M)=@_;
+
+  ## warn "subfile(@_)";
+
+  my $shortName = cs::Mail::Folder::shortname($::Folder);
+  ## warn "shortname($::Folder)=\"$shortName\"";
+  my $filterPath = filterPath($::Folder);
+
+  my $fileObj;
+  if (! exists $::Filers{$::Folder})
+  { $::Filers{$::Folder}=new cs::CachedFile ($filterPath, \&_load_filer);
+  }
+  $fileObj = $::Filers{$::Folder};
+
+  my $fstate = $fileObj->Poll();
+
+  if (! exists $fstate->{SUBR})
+  { ## warn "no subroutine!";
+    return (0,1);
+  }
+
+  local($::H)=$::M;
+  local($::filed)=0;
+  local($::modified)=0;
+  local(@::MAILBOXES)=();
+  &{$fstate->{SUBR}}();
+
+  ($::modified, ! $::filed, @::MAILBOXES);
+}
+
+sub _load_filer($)
+{ my($this)=@_;
+
+  my $path = $this->Path();
+  my $state= $this->State();
+
+  return if ! open(SUBFILE,"< $path\0");
+
+  my $subr = eval "sub {\n# line 0 \"$path\"\n".join('',<SUBFILE>).";}";
+  if ($@)
+  # parse failed, expunge
+  { warn "$0: $path: $@";
+  }
+  else
+  { $state->{SUBR}=$subr;
+    warn "new filer recorded for $::Folder\n";
+  }
+
+  close(SUBFILE);
+}
+
+sub pickhdr
+{ my($H,@fields)=@_;
+  
+  my $body;
+
+  for (@fields)
+  { if (defined($body=$H->Hdr($_)) && length($body))
+    { return $body;
+    }
+  }
+
+  return undef;
+}
+
+sub bounce
+{ my($to,$subject)=(shift,shift);
+
+  open(M,"|m -s '$subject' $to ") || return undef;
+  print M "\n", @_;
+  close(M);
+}
