@@ -17,7 +17,7 @@ logmsg=$1; shift
 
 tmpf=$TMPDIR/bugids$$
 trap 'rm -f "$tmpf"' 0 1 15
-unctrl >"$tmpf" || exit 1
+detab | unbs | unctrl >"$tmpf" || exit 1
 
 case " $BUGSYSTEMS " in
   *' dlog '*)	dlog "$logmsg" ;;
