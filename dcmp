@@ -4,6 +4,20 @@
 #
 # Compares the contents of the two directories.
 # A summary of the differences is produced.
+#
+# =head1 NAME
+#
+# dcmp - compare or merge two directory trees
+#
+# =head1 SYNOPSIS
+#
+# dcmp [B<-n>] {B<-x>|B<-X>} I<dir1> I<dir2>
+#
+# =head1 DESCRIPTION
+#
+# I<dcmp> compares two directories trees
+# and optionally merges data from the first into the second.
+#
 
 cmd=`exec basename "$0"`
 usage="Usage: $cmd [-n] {-x|-X} dir1 dir2
@@ -20,6 +34,11 @@ usage="Usage: $cmd [-n] {-x|-X} dir1 dir2
 
 me=$$
 
+#
+# =head1 OPTIONS
+#
+# =over 4
+#
 badopts=
 trace=
 xflag=
@@ -27,8 +46,28 @@ Xflag=
 while :
 do  case $1 in
 	--)	shift; break ;;
+	#
+	# =item B<-n>
+	#
+	# No action.
+	# Report the actions which would normally have taken place.
+	#
 	-n)	trace=echo ;;
+	#
+	# =item B<-x>
+	#
+	# Remove files in I<dir1> which have identical counterparts in I<dir2>.
+	#
 	-x)	xflag=1 ;;
+	#
+	# =item B<-X>
+	#
+	# Remove files in I<dir1> which have identical counterparts in I<dir2>.
+	# Files in I<dir1> which do not exist in I<dir2>
+	# are moved to appropriate positions in I<dir2>.
+	# I<Dir1> is then purged of empty directories.
+	# This option implies the B<-x> option.
+	#
 	-X)	Xflag=1 ; xflag=1 ;;
 	-?*)	echo "$cmd: $1: unrecognised option" >&2
 		badopts=1
@@ -37,10 +76,13 @@ do  case $1 in
     esac
     shift
 done
+#
+# =back
+#
 
-[ -n "$xflag$Xflag" ] || { echo "$cmd: one of -x or -X must be specified" >&2
-			   badopts=1
-			 }
+[ "x$xflag$Xflag" = x1 ] || { echo "$cmd: exactly one of -x or -X must be specified" >&2
+			      badopts=1
+			    }
 
 if [ $# = 2 ]
 then  dir1=$1 dir2=$2
@@ -151,3 +193,20 @@ else
 	fmt $dir1only | sed 's/^/	/'
     fi
 fi
+
+#
+# =head1 BUGS
+#
+# There is no check that I<dir1> and I<dir2>
+# refer to different directories.
+# If they refer to the same directory
+# then the whole directory will be emptied.
+#
+# =head1 SEE ALSO
+#
+# diff(1), rsync(1), cmp(1)
+#
+# =head1 AUTHOR
+#
+# Cameron Simpson E<lt>cs@zip.com.auE<gt> February 1988
+#
