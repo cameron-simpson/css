@@ -63,7 +63,6 @@ then
   esac
 fi
 
-# obtain sized version of the image; may be the image itself!
 rootbg=`mkwall "$imagefile"` || exit 1
 
 (
