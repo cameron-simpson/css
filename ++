@@ -51,20 +51,20 @@ wkdir=$HOME/var/mairix
 
 mhf=
 mhfsep=
-for site in home cisra
+for srcfolder in $HOME/there/*/mail/*
 do
-  for srcfolder in $HOME/there/$site/mail/*
-  do
-    ismhdir "$srcfolder" || continue
+  ismhdir "$srcfolder" || continue
 
-    folder=`basename "$srcfolder"`
-    wkfolder=$site-$folder
+  site=`expr "x$srcfolder" : 'x.*/\([^/]*/\)/mail/[^/]*$'`
+  case "$site" in *.*) continue ;; esac
 
-    rm -f "$wkdir/$wkfolder"
-    ln -s "$srcfolder" "$wkdir/$wkfolder"
-    mhf=$mhf$mhfsep$wkfolder
-    mhfsep=:
-  done
+  folder=`basename "$srcfolder"`
+  wkfolder=$site-$folder
+
+  rm -f "$wkdir/$wkfolder"
+  ln -s "$srcfolder" "$wkdir/$wkfolder"
+  mhf=$mhf$mhfsep$wkfolder
+  mhfsep=:
 done
 
 set -x
