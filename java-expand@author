@@ -15,13 +15,16 @@ xit=0
 
 short="$NAME &lt;$PUBLICEMAIL&gt;"
 
+# bail quickly out if nothing to do
+fgrep "$short" "$@" >/dev/null || exit 0
+
 for file
 do
   fgrep "$short" <"$file" >/dev/null || continue
   ( set bsed "s|@author $short|@author <A HREF=\"$WWW_HOME\">$NAME</A> \&lt;<A HREF=\"mailto:$PUBLICEMAIL\">$PUBLICEMAIL</A>\&gt;|"
     if ifcvs "$file"
     then
-	exec cvsedit --no-diff -m "expand @author HREFs" "$file" "$@"
+	exec cvsedit --no-dl --no-diff -m "expand @author HREFs" "$file" "$@"
     else
 	exec "$@" "$file"
     fi
