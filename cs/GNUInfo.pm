@@ -34,6 +34,13 @@ require Exporter;
 
 @cs::GNUInfo::ISA=qw();
 
+$cs::GNUInfo::DoDebug=defined($ENV{DEBUG_GNUINFO}) && length($ENV{DEBUG_GNUINFO});
+sub dbg { return $cs::GNUInfo::DoDebug if ! @_;
+	  local($_)="@_";
+	  chomp;
+	  warn "$_\n" if $cs::GNUInfo::DoDebug;
+        }
+
 =head1 GENERAL FUNCTIONS
 
 =over 4
@@ -61,6 +68,8 @@ sub parseTypeLine($)
 
     $fields{$op}=$arg;
   }
+
+  dbg("parseTypeLine: type=$type, fields=[".join("|",%fields)."]");
 
   ($type,\%fields);
 }
@@ -128,7 +137,7 @@ sub RunQueue($)
   while (@$Q)
   { my $file = shift(@$Q);
 
-    ## warn "$file ...\n";
+    dbg("RunQueue $file ...\n");
     my $s = new cs::Source(PATH,$file,1);
     if (! defined $s)
     { warn "$::cmd: can't open $file: $!\n";
@@ -153,8 +162,9 @@ sub NoteFile($$)
   $file=cs::Pathname::absname($file,$this->{ROOTDIR});
 
   if (! exists $this->{FILESEEN}->{$file})
-  { push(@{$this->{FILEQUEUE}}, $file);
-    $this->{FILESEEN}=1;
+  { dbg("NoteFile($file)");
+    push(@{$this->{FILEQUEUE}}, $file);
+    $this->{FILESEEN}->{$file}=1;
   }
 }
 
@@ -178,9 +188,10 @@ sub ParseSource($$$)
     # commence block
     {
       # get header line
-      if (! defined ($_=$s->GetLine()) && length)
+      if (! defined ($_=$s->GetLine()) || ! length)
       # end of file
-      { last BLOCK;
+      { dbg("EOF");
+	last BLOCK;
       }
 
       # commence next block
@@ -194,7 +205,10 @@ sub ParseSource($$$)
       my($type,$F)=parseTypeLine($_);
       my $N = new cs::GNUInfo::Node $type;
       $N->Fields($F);
-      $N->Name($F->{NODE}) if exists $F->{NODE};
+      if (exists $F->{NODE})
+      { dbg("Nodename is \"$F->{NODE}\"");
+	$N->Name($F->{NODE})
+      }
 
       my $data = $N->Data();
 
@@ -208,23 +222,27 @@ sub ParseSource($$$)
 	}
 
 	if ($type eq FILE)
-	{ $N->AddLine($_,$s,$fname);
+	{ ## dbg("FILE: addline $_");
+	  $N->AddLine($_,$s,$fname);
 	}
 	elsif ($type eq INDIRECT)
 	{ $this->_LineINDIRECT($_,$s,$fname,$F,$data);
 	}
 	else
 	{ chomp;
+	  dbg("$type: push \"$_\"");
 	  push(@$data, $_);
 	}
       }
 
       my $nd = scalar(@$data);
+      dbg("AddNode type=$type");
       $this->AddNode($N);
     }
     else
     # lines outside structure - ignore
     {
+      dbg("SKIP: $_");
     }
   }
 
@@ -325,14 +343,13 @@ sub Pod2s($$)
   {
     my $type = $N->Type();
 
-    if ($type eq INDIRECT)
-    {}
-    elsif ($type eq FILE)
+    if ($type eq FILE)
     {
       $N->Pod2s($s);
     }
-    elsif (grep($_ eq $type, "TAG TABLE","END TAG TABLE"))
+    elsif (grep($_ eq $type, "INDIRECT", "TAG TABLE","END TAG TABLE"))
     {
+      dbg("skip node of type \"$type\"");
     }
     else
     { warn "$::cmd: Pod2s(): unhandled node type \"$type\"";
