@@ -15,6 +15,8 @@ muttopts=
 anyhost=
 use_term=1
 use_screen=
+preshcmd=
+postshcmd=
 
 badopts=
 while :
@@ -27,6 +29,8 @@ do
     -f)		anyhost=1 ;;
     -[nR])	muttopts="$muttopts $1" ;;
     -[em])	muttopts="$muttopts $1 "`shqstr "$2"`; shift ;;
+    --pre=*)	preshcmd=`expr "x$1" : 'x--pre=\(.*\)'` ;;
+    --post=*)	postshcmd=`expr "x$1" : 'x--post=\(.*\)'` ;;
     --)		shift; break ;;
     -?*|+?*)	echo "$cmd: unrecognised option: $1" >&2; badopts=1 ;;
     *)		break ;;
@@ -93,4 +97,12 @@ set sh -c "set -x; exec $muttcmd"
 [ $use_screen ] && set scr "mutt_$mfolder" "$@"
 [ $use_term   ] && set term -j email $termopts -n "mutt $mfolder" "$@"
 
-exec "$@"
+[ -z "$preshcmd" -a -z "$postshcmd" ] && exec "$@"
+
+if eval "$preshcmd"
+then
+  "$@"
+  xit=$?
+  eval "$postshcmd" || xit=1
+  exit $xit
+fi
