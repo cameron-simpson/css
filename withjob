@@ -6,9 +6,13 @@
 #
 
 cmd=$0
-usage="Usage: $cmd job command [args...]"
+usage="Usage: $cmd [-f] job command [args...]
+	-f	Force. Make the job if necessary."
 
 badopts=
+
+force=
+[ "x$1" = x-f ] && { force=1; shift; }
 
 if [ $# = 0 ]
 then
@@ -21,9 +25,13 @@ fi
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
-isjob "$thisjob" || { echo "$cmd: unknown job \"$thisjob\"" >&2; exit 2; }
+isjob "$thisjob" \
+|| if [ $force ]
+   then  newjob "$thisjob" unknown
+   else  echo "$cmd: unknown job \"$thisjob\"" >&2
+	 exit 2
+   fi
 
-set -x
 lastjob=`job`
 
 job "$thisjob"
