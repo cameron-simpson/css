@@ -1,0 +1,14 @@
+#!/bin/sh
+#
+# Report preferred extension for the supplied MIME type.
+#	- Cameron Simpson <cs@zip.com.au> 10jul2003
+#
+
+[ $# = 1 ] || { echo "Usage: $0 mime-type" >&2; exit 2; }
+type=$1; shift
+
+cat "$HOME/.mime.types" "$HOME/rc/mime.types" /etc/mime.types 2>/dev/null \
+| grep "^$type[ 	][ 	]*[^ 	]" \
+| { read mttype mtext mtetc || exit 1
+    echo "$mtext"
+  }
