@@ -1,0 +1,38 @@
+#!/bin/sh
+#
+# Random system checks.
+#
+
+cmd=`basename "$0"`
+usage="Usage: $cmd system...
+	system	udb	The user database."
+
+udb=
+udbservers="albeniz bach chopin"
+
+badopts=
+while [ $# -gt 0 ]
+do
+    case "$1" in
+	udb)	eval "$1=1" ;;
+	*)	echo "$cmd: $1: unknown subsystem" >&2; badopts=1 ;;
+    esac
+    shift
+done
+
+for check in udb
+do
+    eval "[ \$$check ]" || continue
+    echo "checking $check ..."
+    case "$check" in
+	udb)	( for udbrep in $udbservers
+		  do
+		    udb -h "$udbrep" 2>&1 | sed "s/^/$udbrep	/" &
+		  done
+		  wait
+		)
+		;;
+	*)	echo "$cmd: WARNING: no code to check \"$check\" !!!" >&2
+		;;
+    esac
+done
