@@ -1,0 +1,51 @@
+#!/bin/sh
+#
+# Compare two md5 indices and, for matching files, emit the matches from
+# one directory and the other.
+#	- Cameron Simpson <cs@zip.com.au> 20aug2003
+#
+
+cmd=`basname "$0"`
+usage="Usage: $cmd srcdir srcmd5 destdir destmd5"
+
+badopts=
+
+if [ $# -ne 4 ]
+then
+    badopts=1
+else
+    srcdir=$1 srcmd5=$2
+    destdir=$3 destmd5=$4
+
+    [ -d "$srcdir/." ] || { echo "$cmd: srcdir $srcdir: not a directory" >&2
+			    badopts=1
+			  }
+    [ -d "$destdir/." ] || { echo "$cmd: destdir $destdir: not a directory" >&2
+			     badopts=1
+			   }
+    [ -f "$srcmd5" ] || { echo "$cmd: srcmd5 $srcmd5: not a file" >&2
+			  badopts=1
+			}
+    [ -f "$destmd5" ] || { echo "$cmd: destmd5 $destmd5: not a file" >&2
+			   badopts=1
+			 }
+fi
+
+set-x sort -u -o "$srcmd5" "$srcmd5" || exit 1
+set-x sort -u -o "$destmd5" "$destmd5" || exit 1
+
+join '-t	' -1 1 -2 1 "$srcmd5" "$destmd5" \
+| awk '{print $2, $3}' \
+| while read srcf destf
+  do  srcf=$srcdir/$srcf
+      destf=$destdir/$destf
+      [ -s "$srcf" ] || continue
+      if [ -s "$destf" ]
+      then
+	  set-x cmp "$srcf" "$destf" && echo "rm '$srcf' ## $destf"
+      else
+	  destd=`dirname "$destf"`
+	  [ -d "$destd" ] || needdir "$destd" || continue
+	  echo "mv -i '$srcf' '$destf'"
+      fi
+  done
