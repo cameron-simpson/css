@@ -11,13 +11,15 @@ case "$X11_DEPTH,$X11_CLASS" in
 esac
 
 cd $HOME/rc/x11 || exit $?
+cat dflt/* \
+| uncurly \
+	'FG BG DIMFG DIMBG ALERT DIMALERT BRIGHT HILIGHT DIMHILIGHT
+	 FONT_BIG FONT_NORMAL FONT_SMALL
+	 HOME MAIL
+	 X11 FULLX HALFX
+	 TTY_HIGH TTY_WIDE FONT FONT_X FONT_Y PIX_HIGH' \
+> $HOME/.Xdefaults
 
-# set-x \
-myke -u \
-     -f Mykefile.${X11_X}x${X11_Y} \
-     -f Mykefile.$type \
-     -f Mykefile \
-     "type=$type" _dflts
 exec xrdb -nocpp -load $HOME/.Xdefaults
 
 dpp ${1+"$@"} $X11/xinfo.dpp $X11/defaults \
