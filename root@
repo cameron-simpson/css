@@ -10,7 +10,7 @@ usage="Usage: $cmd [-N] [+N] [-X] hostname
 
 badopts=
 ssh=ssho
-sshproto=-1
+sshproto=
 sshopts=
 
 newflag=-N
