@@ -1,0 +1,23 @@
+#!/bin/sh
+#
+# Set up my RC files and symlinks.
+#	- Cameron Simpson <cs@zip.com.au> 06nov2002
+#
+
+cd || exit 1
+pwd
+
+set -x
+for d in there/local/rc/ssh \
+         there/local/rc/bogofilter \
+	 there/local/log
+do
+  [ -d "$d" ] || mkdir -p "$d" || exit 1
+done
+
+while read dotfile path
+do  rm -f "$dotfile"
+    d=`dirname "$dotfile"`
+    [ -d "$d/." ] || mkdir -p "$d" || continue
+    ln -s "$path" "$dotfile"
+done <rc/sync/linklist
