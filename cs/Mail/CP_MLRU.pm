@@ -15,10 +15,12 @@ package cs::Mail::CP_MLRU;
 		DESRIPTION	=> { CANONICAL => 'description' },
 		TO_SUBSCRIBE	=> { CANONICAL => 'subscribe' },
 		SUBSCRIBE	=> { },
+		DIGEST_AVAIL	=> { CANONICAL => 'digest' },
 		DIGEST_AVAILABLE=> { CANONICAL => 'digest' },
 		ADMIN_ADDRESS	=> { CANONICAL => 'admin' },
 		OWNER		=> { },
 		LIST_OWNER	=> { CANONICAL => 'owner' },
+		LIST_OWNERS	=> { CANONICAL => 'owner' },
 		WWW_URL		=> { CANONICAL => 'url' }
 	);
 
