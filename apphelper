@@ -33,6 +33,8 @@ usage="Usage: $cmd [{-t|+t|-T title}] file [{-n|-y}] [-d savedir] [-p pager] \\
 			Default: $termname
 	NB: -t or +t must preceed the file.
 	The file may be \"-\" to read it from standard input.
+
+	-b		File basename, offered for saving.
 	-n		Don't run the viewer at all.
 	-y		Run viewer immediately.
 	-N		Don't offer to save the file.
@@ -42,7 +44,8 @@ usage="Usage: $cmd [{-t|+t|-T title}] file [{-n|-y}] [-d savedir] [-p pager] \\
 	-d savedir	Save directory (from \$SAVEDIR: $savedir).
 	-p pager	Pager (default viewer, from \$PAGER: $pager)."
 
-tmpfile=/tmp/$cmd$$
+tmpdir=`mkdirn ${TMPDIR:-/tmp}/$cmd` || exit 1
+tmpfile=$tmpdir/$cmd$$
 
 # =head1 DESCRIPTION
 #
@@ -80,6 +83,7 @@ case $1 in
   -t)	shift; doterm=1 ;;
   -T)	shift; termname=$1; shift; doterm=1 ;;
   +t)	shift; doterm= ;;
+  *)	doterm=; [ -t 0 -a -t 1 ] || doterm=1 ;;
 esac
 
 if [ $# = 0 ]
@@ -92,12 +96,14 @@ else
   then
       if cat >"$tmpfile"
       then
+	  tmpfile=`fixexts "$tmpfile"` || exit 1
 	  file=$tmpfile
       else
 	  echo "$cmd: can't cat stdin to $tmpfile, aborting" >&2
 	  badopts=1
       fi
   else
+      # handed real filename
       if [ ! -s "$file" ]
       then
 	    echo "$cmd: bad file?" >&2
@@ -106,9 +112,10 @@ else
       else
 	    if [ $doterm ]
 	    then
-		tmpfile=$tmpfile-`basename "$file"`
+		tmpfile=$tmpdir/`basename "$file"`
 		if cp "$file" "$tmpfile"
-		then  file=$tmpfile
+		then  tmpfile=`fixexts "$tmpfile"` || exit 1
+		      file=$tmpfile
 		else  echo "$cmd: can't cp $file to $tmpfile, aborting" >&2
 		      badopts=1
 		fi
@@ -119,6 +126,9 @@ else
   # fork off a terminal if need be
   if [ $doterm ]
   then
+      [ -n "$DISPLAY" ] || { echo "$cmd: can't make new terminal: no \$DISPLAY!" >&2
+			     exit 1
+			   }
       ( term -n "$termname" +a +ip -small -e "$0" +t "$file" ${1+"$@"}
 	rm -f "$tmpfile"
       ) &
