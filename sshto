@@ -70,4 +70,4 @@ do
 done
 
 ##set -x
-eval "exec $sshargv $host \"$sshcmd\""
+eval "exec $sshargv $host \"\$sshcmd\""
