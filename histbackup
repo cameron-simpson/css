@@ -1,0 +1,179 @@
+#!/bin/sh
+#
+# Backup a directory to an indefinite file store using an incremental
+# technique.
+#	- Cameron Simpson <cs@zip.com.au> 03apr2000
+#
+# --inplace
+#	Specify parent dir, backup parent/current to parent/datestamp.
+#	- Cameron Simpson <cs@zip.com.au> 11apr2000
+#
+# --mono
+#	Monotonic accumulation of data: just don't use --delete with rsync :-)
+#	To be used for the downloads archive.
+#	- Cameron Simpson <cs@zip.com.au> 17may2000
+#
+# --linkonly
+#	Specify the parent backupdir only, and omit the rsync.
+#	Emit backupdir linktree subdir name on stdout.
+#	- Cameron Simpson <cs@zip.com.au> 28jun2001
+#
+# --no-copy
+#	Passed to linktree.
+#	- Cameron Simpson <cs@zip.com.au> 03jul2001
+#
+# --rsync-path rrsync
+#	Passed to rsync.
+#	- Cameron Simpson <cs@zip.com.au> 12jul2001
+#
+
+cmd=`basename "$0"`
+usage="Usage:	$cmd [--rsync-path rrsync] [--no-copy] [--mono] [host:]source backupdir [rsyncopts...]
+	$cmd [--rsync-path rrsync] [--no-copy] [--mono] --inplace parent [rsyncopts...]
+	$cmd [--rsync-path rrsync] [--no-copy] --linkonly parent
+
+	--mono		Don't pass --delete to the rsync pass.
+			May also be specified as --no-delete.
+	--linkonly	Don't do the rsync pass - just set up the new link tree
+			and report its basename.
+	--no-copy	Passwd to linktree - don't fall back to copying the
+			source file if the link fails (eg to link count
+			overflow).
+	--rsync-path rrsync Execute the command \"rrsync\" as the remote rsync.
+			Passed to rsync."
+
+badopts=
+src=
+dest=
+mono=
+inplace=
+linkonly=
+ltargs=
+rrsync=rsync
+
+while :
+do case $1 in
+    --inplace)	inplace=1 ;;
+    --mono|--no-delete)
+		mono=1 ;;
+    --no-copy)	ltargs="$ltargs $1" ;;
+    --linkonly)	linkonly=1
+		exec 3>&1 1>&2	# ensure clean stdout
+		;;
+    --rsync-path) rrsync=$2; shift ;;
+    --)		shift; break ;;
+    -*)		echo "$cmd: unrecognised option: $1" >&2
+		badopts=1
+		;;
+    *)		break ;;
+   esac
+   shift
+done
+
+if [ $linkonly ]
+then
+    if [ $# -lt 1 ]
+    then
+	echo "$cmd: missing parent" >&2
+	badopts=1
+    else
+	dest=$1
+	shift
+    fi
+else
+    if [ $inplace ]
+    then
+	if [ $# -lt 1 ]
+	then
+	    echo "$cmd: missing parent" >&2
+	    badopts=1
+	else
+	    src=$1/current dest=$1
+	    shift
+	fi
+    else
+	if [ $# -lt 2 ]
+	then
+	    echo "$cmd: missing source or backupdir" >&2
+	    badopts=1
+	else
+	    src=$1 dest=$2
+	    shift; shift
+	fi
+    fi
+fi
+
+if [ $linkonly ] && [ $# -gt 0 ]
+then
+    echo "$cmd: --linkonly: extra arguments after parent: $*" >&2
+    badopts=1
+fi
+
+[ -d "$dest/." ] || { echo "$cmd: backupdir $dest: not a directory" >&2
+		      badopts=1
+		    }
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+lastbackup=`cd "$dest" || exit 1; ls -dr [0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]* 2>/dev/null | sed 1q`
+
+today=`daycode`
+thisbackup=$today
+if [ -d "$dest/$thisbackup/." ]
+then
+    now=`datecode`
+    thisbackup=$now
+    if [ -d "$dest/$thisbackup/." ]
+    then
+	echo "$cmd: $dest/$today and $dest/$now already exist, aborting" >&2
+	exit 1
+    fi
+fi
+
+if [ $mono ]; then delete=
+              else delete=--delete
+fi
+if [ -t 1 ];  then vflag=-v
+              else vflag=
+fi
+
+if [ -n "$lastbackup" -a -d "$dest/$lastbackup/." ]
+then
+    echo "existing backup: linking $lastbackup to $thisbackup ..."
+    if not linktree $ltargs "$dest/$lastbackup" "$dest/$thisbackup"
+    then
+	echo "$cmd: warning: linktree $dest/$lastbackup $dest/$thisbackup fails" >&2
+    fi
+
+    if [ $linkonly ]
+    then
+	echo "$thisbackup" >&3
+    else
+	echo "updating $thisbackup from $src ..."
+	exec rsync -aH $vflag $delete --rsync-path "$rrsync" ${1+"$@"} "$src/." "$dest/$thisbackup/."
+    fi
+else
+    if [ $linkonly ]
+    then
+	echo "$cmd: $dest: no subdirectory to link from" >&2
+	exit 1
+    else
+	echo "fresh backup, just copying source ..."
+	use_rsync=
+	case "$src" in
+	    *:*) # probably remote directory - use rsync
+		 use_rsync=1
+		 ;;
+	    *)   # check if they supplied rsync options
+		 [ $# = 0 ] || use_rsync=1
+		 ;;
+	esac
+	if [ $use_rsync ]
+	then
+	    mkdir "$dest/$thisbackup" || exit 1
+	    exec rsync -aH $vflag --rsync-path "$rrsync" ${1+"$@"} "$src/." "$dest/$thisbackup/."
+	else
+	    exec cpdir "$src" "$dest/$thisbackup"
+	fi
+    fi
+fi
