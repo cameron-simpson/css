@@ -66,8 +66,8 @@ INPUT:
 while (defined($_=<STDIN>))
 {
   chomp;
-  s/^\./+//;
-  next INPUT unless /\.([^.\/]+)$/;	# skip stuff with no extension
+  s:^\./+::;
+  next INPUT unless m:\.([^./]+)$:;	# skip stuff with no extension
   my $ext = uc($1);
   next INPUT unless grep($_ eq $ext, @exts); # skip unsupported extensions
   out($_) if $upd;
@@ -81,10 +81,10 @@ if (! @stdin)
   exit 0;
 }
 
+my($err,$x,$y,$impath);
+
 if ($mode ne APPEND && $indexfile ne '-')
 {
-  my($err,$x,$y,$impath);
-
   nl("loading existing list ...") if $upd;
   if (open(INDEX,"< $indexfile"))
   {
@@ -130,7 +130,7 @@ my $n=0;
 my $nn=@stdin;
 
 NEWIMAGE:
-for my $impath (@stdin)
+for $impath (@stdin)
 {
   $n++;
 
@@ -140,7 +140,7 @@ for my $impath (@stdin)
   # skip known images
   next NEWIMAGE if exists $::IMX{$impath};
 
-  my($x,$y,$err)=eval { imgsize($impath) };
+  ($x,$y,$err)=eval { imgsize($impath) };
   if ($@)
   { warn "$::cmd: imsize($impath): $@\n";
     next NEWIMAGE;
@@ -166,7 +166,7 @@ elsif (!open(INDEX,($mode eq APPEND ? ">> $indexfile\0" : "> $indexfile\0")))
 { die "$::cmd: open($indexfile): $!\n";
 }
 
-for my $impath (sort keys %::IMX)
+for $impath (sort keys %::IMX)
 { print INDEX "$::IMX{$impath} $::IMY{$impath} $impath\n";
 }
 close(INDEX);
