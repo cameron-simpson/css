@@ -21,7 +21,7 @@
 #
 # See:
 #
-#	http://www.zip.com.au/~cs/runmaint.html
+#	http://www.cskk.ezoshosting.com/cs/runmaint.html
 #
 # for more detailed info.
 #
@@ -106,7 +106,7 @@
 
 # Installation prefix, typically /usr/local or /opt/runmaint.
 # The /opt/runmaint path fits the syncopt scheme as described here:
-#	http://www.zip.com.au/~cs/syncopt/
+#	http://www.cskk.ezoshosting.com/cs/syncopt/
 # Can be overridden by presetting this variable.
 RUNMAINT_DIR=${RUNMAINT_DIR:-/opt/runmaint}
 MaintDir=$RUNMAINT_DIR
@@ -134,7 +134,7 @@ export RUNMAINT_DIR MaintDir \
 
 usage="Usage: $0 [-d dir] [-s subj] [-date datestr] [-x] target [addresses]
     See:
-	http://www.zip.com.au/~cs/runmaint.html
+	http://www.cskk.ezoshosting.com/cs/runmaint.html
     for more detailed information.
 	-d dir	Directory containing maintenance scripts.
 	-s subj	Subject for mail report.
