@@ -90,4 +90,47 @@ sub Tok	# this -> token or undef
   }
 }
 
+sub SkipToRegexp($$;$)
+{ my($this,$regexp,$igncase)=@_;
+  $igncase=0 if ! defined $igncase;
+  $igncase = ($igncase ? 'i' : '');
+
+  ## warn "skiptoregexp(/$regexp/ $igncase) ...";
+
+  local($_);
+
+  my($skip,$match);
+
+  my $loop = "LOOP:
+	      while (1)
+	      { if (\$this->{DATA} =~ /\$regexp/o$igncase)
+
+	   ".'  { ($skip,$match)=($`,$&);
+		  $this->{DATA}=$\';
+		  ## warn "skip=[$skip]\nmatch=[$match]\n";
+		  last LOOP;
+		}
+		
+		if (! defined ($_=$this->{DS}->Read())
+		 || ! length)
+		{ ## warn "NO MATCH";
+		  return undef;
+		}
+
+		$this->{DATA}.=$_;
+	      }';
+
+  ## warn "LOOP=[$loop]\n";
+
+  eval "$loop";
+  if ($@)	{ warn "$0: syntax error in loop:\n\t$loop\n$@";
+		  return ();
+		}
+
+  ## warn "SKIPPED [$skip]\n";
+  ## warn "MATCHED [$match]\n";
+
+  return ($skip,$match);
+}
+
 1;
