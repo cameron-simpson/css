@@ -49,8 +49,6 @@ use the value of the B<NNTPSERVER> environment variable.
 If the optional parameter I<needpost> is true,
 return B<undef> if the server refuses posting permission.
 
-=back
-
 =cut
 
 sub new($;$$)	# server -> connectionrec or undef
@@ -139,6 +137,8 @@ sub DESTROY
 =back
 
 =head1 OBJECT METHODS
+
+=over 4
 
 =item Quit()
 
