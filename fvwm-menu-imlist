@@ -1,0 +1,35 @@
+#!/bin/sh
+
+[ $# = 1 ] || { echo "Usage: $0 dir" >&2; exit 2; }
+
+dir=$1; shift
+cd "$dir" || exit 1
+dir=`pwd`
+
+thsize=16x16
+thdir=.thumbnails/$thsize
+
+for d in */.
+do  subd=
+done
+
+for f in *.*
+do  case "$f" in
+        *.xpm|*.gif)
+	    thfmt=xpm ;;
+	*.png|*.jpg)
+	    thfmt=png ;;
+	*)  continue ;;
+    esac
+    [ -s "$f" ] || continue
+
+
+    thbase=$f.$thfmt
+    th=$thdir/$thbase
+    [ -d "$thdir/." ] || set-x mkdir -p "$thdir" || break
+    [ -s "$th" ] || ( cd "$thdir" || exit 1
+		      set -x
+		      exec "mk$thfmt" -o "$thbase" "$thsize" "../../$f"
+		    )
+    echo "\"%$dir/$th%$f\" Exec xv '$dir/$f'"
+done
