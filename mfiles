@@ -1,0 +1,15 @@
+#!/bin/sh
+#
+# Invoke mutt to send several files.
+#	- Cameron Simpson <cs@zip.com.au> 28apr2001
+#
+
+[ $# = 0 ] && { echo "Usage: $0 filenames..." >&2; exit 2; }
+
+first=1
+for file
+do [ $first ] && { set x; shift; first=; }
+   set x ${1+"$@"} -a "$file"; shift
+done
+
+exec mutt ${1+"$@"}
