@@ -1,0 +1,243 @@
+#!/usr/bin/perl
+#
+# Produce gallery indices with and without frames.
+#	- Cameron Simpson <cs@zip.com.au> 14feb96
+#
+# Recode.	- cameron 13apr99
+#
+
+use strict qw(vars);
+
+use cs::HTML;
+use cs::IM2HTML;
+use cs::Pathname;
+use Getopt::Std;
+use File::Find;
+
+$::Silent=0;
+$::Verbose=(-t STDERR);
+$::Recurse=0;
+$::FrameMode=EXTERNAL;
+
+($::cmd=$0) =~ s:.*/::;
+$::Usage="Usage: $::cmd [-fgnqrtv] [+gt] [-i indexbase] [-T width] [directories]
+	-f	Force overwrite of existing nonempty index.html files.
+	-F mode	Frame mode: one of new, external or inline. Default: $::FrameMode.
+	-r	Recurse. Run $::cmd in subdirectories.
+	-q	Quiet.
+	-v	Verbose.
+	-C chunk Use tables with \"chunk\" rows.
+		Default: $cs::IM2HTML::TableLength, use 0 for a single table.
+		This is a hack to bypass NetScape's braindead positioning bug.
+	-T width Use tables with width columns. Default: $cs::IM2HTML::TableWidth.
+	directories
+		List if directories to process.
+		\"-\" is replaced by a list read from stdin.
+
+Options out of action at present:
+	-m	Order on mtime, not filename.
+	-n	No thumbnails. Suppress thumbnail creation.
+	+n	Thumbnails. Do thumbnail creation.
+";
+
+exit main(@ARGV);
+
+################################################################
+
+# stubs
+sub tok2a { cs::HTML::tok2a(@_) }
+
+# main program
+sub main
+{ local(@ARGV)=@_;
+  local($::Xit)=0;
+
+  getopts("frqvC:T:");
+  $::Force=1 if defined $::opt_f;
+  $::Recurse=1 if defined $::opt_r;
+  if (defined $::opt_q) { $::Silent=1; $::Verbose=0; }
+  if (defined $::opt_v) { $::Silent=0; $::Verbose=1; }
+  $cs::IM2HTML::TableLength=$::opt_C+0 if defined $::opt_C;
+  $cs::IM2HTML::TableWidth=$::opt_T+0 if defined $::opt_T;
+  if (defined $::opt_F)
+  { my($mode)=uc($::opt_F);
+
+    if ($mode eq NEW)		{ $mode='_new'; }
+    elsif ($mode eq EXTERNAL)	{ $mode='_view'; }
+    elsif ($mode eq INLINE)	{ $mode=''; }
+    else
+    { warn "$::cmd: -F $mode: illegal mode\n";
+      undef $mode;
+      $::Xit=1;
+    }
+  
+    $cs::IM2HTML::FrameTarget=$mode if defined $mode;
+  }
+
+  # bail on error
+  return $::Xit if $::Xit != 0;
+
+  @ARGV='.' if ! @ARGV;
+
+  for my $dir (@ARGV)
+  { ## warn "dir=$dir\n";
+    my $obj = new cs::IM2HTML $dir;
+    if (defined $obj)
+    { im2html($obj) || ($::Xit=1);
+    }
+    else
+    { warn "$::cmd: can't open $dir\n";
+      $::Xit=1;
+    }
+  }
+
+  return $::Xit;
+}
+
+sub im2html($)
+{ my($dir)=@_;
+
+  my $ok = 1;
+
+  ## warn "dir=$dir\n";
+  $::Verbose && warn "$::cmd ".$dir->Dir()." ...\n";
+
+  my @index=();
+  my @toc=();
+  my $title=$dir->Title();
+
+  push(@index,[HEAD,
+	       [TITLE,$title],"\n",
+	      ]);
+  push(@index,[H1,$title],"\n");
+
+  push(@toc,[A, {HREF => "../index.html"}, "Parent"]);
+
+  for my $href ($dir->Hrefs())
+  { push(@toc,[INCLUDE,{SRC => $dir->SubPath($href)}]);
+  }
+
+  my @subdirs = sort $dir->SubDirs();
+  my %subobjs = ();
+  map($subobjs{$_}=$dir->SubNew($_), @subdirs);
+
+  for my $subdir (@subdirs)
+  { my $sub = $subobjs{$subdir};
+
+    my @subtitle = ("$subdir -  ".$sub->Title());
+    { my $subimage = $sub->TitleImage();
+      if (defined $subimage)
+      { my($x,$y)=$sub->ThumbSize($subimage);
+	my $subthumb = $sub->ThumbOf($subimage);
+	unshift(@subtitle, [IMG,{SRC => "$subdir/$subthumb",
+				  WIDTH => $x,
+				  HEIGHT => $y,
+				  BORDER => 0,
+				  ALIGN => MIDDLE,
+				 }],
+			   " ");
+      }
+    }
+
+    push(@toc,[A, {HREF => "$subdir/index.html"}, @subtitle]);
+  }
+
+  my @images = $dir->Images();
+
+  my @imndx = $dir->ImageIndices();
+
+  if (@imndx > 1)
+  { for my $i (0..$#imndx)
+    { my $ndx = $imndx[$i];
+      ## warn "ndx=".cs::Hier::h2a($ndx,1);
+      push(@toc,[A, {HREF => $dir->DotDirRPath("index-$i.html")},
+		    $ndx->{LOW}, "..", $ndx->{HIGH}]);
+    }
+  }
+
+  push(@index,[UL, map([LI,$_], @toc)], "\n");
+
+  if (@imndx == 1)
+  {
+    # rewrite the relative references
+    ## warn "recode SRC and HREF to prepend \"".$dir->DotDir()."\"\n";
+    $imndx[0]->{HTML}=[ cs::HTML::tokUnfold(@{$imndx[0]->{HTML}}) ];
+    cs::HTML::editMarkUp(sub { my ($t)=@_;
+			       if (ref $t)
+			       { my $A = $t->{ATTRS};
+				 ## warn "check $t->{TAG} for HREF and SRC\n";
+				 for my $ak (HREF, SRC)
+				 { if (exists $A->{$ak}
+				    && $A->{$ak} !~ m;^(/|[a-z]+:);)
+				   { ## warn "rewrite $ak: \"$A->{$ak}\"\n";
+				     $A->{$ak}=$dir->DotDir()
+					      ."/"
+					      .$A->{$ak};
+				   }
+				 }
+			       }
+			     }, @{$imndx[0]->{HTML}});
+
+    push(@index, [BR], @{$imndx[0]->{HTML}});
+  }
+  elsif (@imndx > 1)
+  { for my $i (0..$#imndx)
+    { my $subndx=$imndx[$i];
+      my $ndxrfile="index-$i.html";
+
+      my @subtoc = [A, {HREF => "../index.html"}, "Main Index"];
+      if ($i > 0)
+      { unshift(@subtoc,
+		   [A, {HREF => "index-".($i-1).".html"},
+			"Prev",
+		   ],
+		   " | ");
+      }
+      if ($i < $#imndx)
+      { push(@subtoc,
+		   " | ",
+		   [A, {HREF => "index-".($i+1).".html"},
+			"Next",
+		   ]);
+      }
+
+      $dir->WriteHTMLFile( $dir->DotDirRPath($ndxrfile),
+			 [HEAD,
+			   [TITLE,"$title: $subndx->{LOW}..$subndx->{HIGH}"], "\n",
+			 ],
+			 [H1,"$title: $subndx->{LOW}..$subndx->{HIGH}"], "\n",
+			 "[ ", @subtoc, " ]",
+			 [BR], "\n",
+			 @{$subndx->{HTML}}, "\n" )
+      || warn "$::cmd: can't create ".$dir->DotDirPath($ndxrfile).": $!\n";
+    }
+  }
+
+  # write main index
+  my $ndxfile = $dir->SubPath("index.html");
+  if (-s $ndxfile && ! $::Force)
+  { warn "$::cmd: nonempty $ndxfile exists, refusing to overwrite - use -f to force\n";
+  }
+  else
+  { $dir->WriteHTMLFile("index.html", @index);
+  }
+
+  # queue thumbnail creation
+  for my $im (sort @images)
+  { $dir->MakeThumbnail($im);
+  }
+
+  # walk subdirectories
+  if ($::Recurse)
+  { SUBDIR:
+    for my $subdir (sort @subdirs)
+    { next SUBDIR if $subdir eq '.vxpics' || $subdir eq '.im2html';
+      my $subpath = $dir->SubPath($subdir);
+      if (lstat $subpath && -d _)	# skip symlinks
+      { im2html($subobjs{$subdir}) || ($ok=0);
+      }
+    }
+  }
+
+  $ok;
+}
