@@ -1,0 +1,17 @@
+#!/bin/sh
+#
+# Take a URL-Minder citation and return the relevant page.
+#	- Cameron Simpson <cs@zip.com.au> 10feb99
+#
+
+url=$1; shift
+
+( echo "GET $url HTTP/1.0"; echo ) \
+	| case "$HOST@$SYSTEMID" in
+	    ivie@cisra) ssh sid nc proxy 8080 ;;
+	    *)          nc proxy 8080 ;;
+	  esac \
+	| sed -n 's/\015//g
+		  /^Location:/!d
+		  s/^Location: *//p
+		  q'
