@@ -75,7 +75,7 @@ sub ::uniq
   for my $k (@_)
   {
     if (! defined $k)
-    { my(@c)=caller;warn "undef in uniq(@_) from [@c]";
+    { ## my(@c)=caller;warn "undef in uniq(@_) from [@c]";
     }
     elsif (! exists $u{$k})
     { $u{$k}=1;
