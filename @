@@ -5,52 +5,74 @@
 #
 
 cmd=$0
-usage="Usage: $cmd [hosts...]"
+usage="Usage: $cmd [-X] [hosts...]"
+
+badopts=
+
+sshopts=
+
+while :
+do  case $1 in
+      -X)	sshopts="$sshopts $1" ;;
+      --)	shift; break ;;
+      -?*)	echo "$cmd: unrecognised option: $1" >&2
+		badopts=1
+		;;
+      *)	break ;;
+    esac
+    shift
+done
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+at_dflt=
+at_target=
 
 if [ $# = 0 ]
 then
-  case $HOST@$SYSTEMID in
-    kaper@cisra)
-	set cage,ferrari,linux,solaris,cass,sweet,screen:root@ivory,screen:elph,screen:root@sunny ;;
-    amadeus@home)
-	set jekyll,janus,alpha ;;
-    newt@home)
-	set amadeus,janus ;;
-    *)	echo "$0: no default host list for SYSTEMID == \"$SYSTEMID\"" >&2
+  at_default=
+  eval `winclause "$HOME/rc/@" "$HOST@$SYSTEMID" | sed -n 's/^default=/at_&/p'`
+  if [ -n "$at_default" ]
+  then set $at_default
+  else echo "$0: no default host list for $HOST@$SYSTEMID" >&2
 	exit 1
-    ;;
-  esac
+  fi
 fi
 
-host=$1; shift
+for host
+do
+  # transmute some names
+  at_target=
+  eval `winclause "$HOME/rc/@" "$host" | sed -n 's/^target=/at_&/p'`
+  [ -n "$at_target" ] && host=$at_target
 
-case "$host" in
+  case "$host" in
     *,*)
 	[ -n "$DISPLAY" ] || { echo "$cmd: can't do multiple sessions without a \$DISPLAY" >&2
 			       exit 1
 			     }
 	for h in `echo "$host" | tr , ' '`
-	do  "$0" "$h" ${1+"$@"}
+	do  "$0" $sshopts "$h"
 	done
 	exit 0
 	;;
     root@*)
-	exec root@ "$host"
+	exec root@ $sshopts "$host"
 	;;
     screen:root@*)
 	name=`expr "$host" : 'screen:\(.*\)'`
 	host=`expr "$name" : 'root@\(.*\)'`
-	exec term -e scr "$name" nox root@ "$host"
+	exec term -e scr "$name" nox root@ $sshopts "$host"
 	;;
     screen:*)
 	host=`expr "$host" : 'screen:\(.*\)'`
-	exec rterm "$host" -s ${1+"$@"}
+	exec rterm "$host" -s $sshopts
 	;;
-    bos)exec "$0" screen:lexx,screen:moya,screen:sv1,screen:sv2,screen:sv3 ;;
     rita)
 	set -x
 	rdesktop -g "${X11_BGX}x${X11_Y}" -K -T "$host rdesktop" "$host" &
 	;;
-    *)	exec rterm "$host" ${1+"$@"}
+    *)	exec rterm "$host" $sshopts
 	;;
-esac
+  esac
+done
