@@ -1,0 +1,37 @@
+#!/usr/bin/perl
+#
+# Process a procmail log and tally delivery totals.
+#	- Cameron Simpson <cs@zip.com.au> 04aug2002
+#
+
+($::cmd=$0) =~ s:.*/::;
+
+$key='';
+
+while (<STDIN>)
+{ chomp;
+  s/\s+$//;
+  s/^\s+//;
+
+  if (/^Subject:/)
+  { if (/^Subject:\s+\[(\S+)\]\s/) { $key=$1; }
+    else			   { $key=''; }
+  }
+  elsif (/^Folder:/)
+  { if (/^Folder:\s+(\S+)\/\d+\s+(\d+)$/)
+    { $tally{length($key)?$key:"$1/"}+=$2;
+    }
+    else
+    { ## warn "$::cmd: line $.: bad Folder line: $_\n";
+    }
+
+    $key='';
+  }
+  else
+  { warn "$::cmd: line $.: unrecognised line: $_\n";
+  }
+}
+
+for my $key (sort { $tally{$a} <=> $tally{$b} } keys %tally)
+{ print "$key\t$tally{$key}\n";
+}
