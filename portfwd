@@ -1,0 +1,86 @@
+#!/bin/sh
+#
+# Arrange forwarding of the usual ports.
+#	- Cameron Simpson <cs@zip.com.au> 15apr1999
+#
+
+### make a fresh ssh-agent
+##if [ -t 0 -a -t 1 ]
+##then
+##    trap '' 1
+##    eval `ssh-agent -k -s`
+##    eval `ssh-agent -s`
+##    ssh-add
+##fi
+
+if [ $# = 0 ]
+then
+    case "$HOST@$SYSTEMID" in
+	zapff@cisra)	set work2zip work2home nntpcached del ;;
+	amadeus@home)	set home2work home2zip ;;
+	*)		echo "$0: no forwardings to do on $HOST@$SYSTEMID" >&2
+			exit 2
+			;;
+    esac
+fi
+
+DISPLAY=; export DISPLAY
+
+for fwd
+do  case "$fwd" in
+	zipnntp)
+	    echo "forward $HOST:2119 to news.zip.com.au:119"
+	    acon lock -1 fwd_zipnntp \
+		tcpio -a 2119 need-ssh-agent -f ssh -x zip 'exec nc news.zip.com.au 119'
+	    ;;
+	nntpcached)
+	    echo "setup nntpcached ..."
+	    rignntpcache
+	    ;;
+	work2zip)
+	    echo "work2zip..."
+	    vpnssh -t 60 zip \
+		   -L 8081:localhost:8081 \
+		   -L 2119:news:119 \
+		   -L 2025:mail:25 \
+		   -L 2080:proxy:8080 \
+		   -L 2110:mail:110 &
+	    ;;
+	work2home)
+	    echo "work2home..."
+	    vpnssh -t 60 -q home \
+		   -L 2111:mail-optus:110 \
+		   -L 2180:www-optus:110 \
+		   -L 2401:janus:2401 \
+		   -L 3119:news-optus:119 \
+		   -L 5916:janus:5906 &
+	    ;;
+	home2zip)
+	    echo "home2zip..."
+	    vpnssh zip \
+		   -L 8081:localhost:8081 \
+		   -L 2119:news:119 \
+		   -L 2025:mail:25 \
+		   -L 2110:mail:110 &
+	    ;;
+	home2work)
+	    echo "home2work..."
+	    vpnssh work \
+		   -L 2022:ivie:22 \
+		   -L 2080:web:80 \
+		   -L 2082:ivie:2082 \
+		   -L 2222:zapff:22 \
+		   -L 3306:ivie:3306 \
+		   -L 5905:zapff:5905 \
+		   -L 5906:zapff:5906 \
+		   -L 5907:piaf:5900 &
+	    ;;
+	del)
+	    echo "web@del ..."
+	    acon lock -1 web@del tcpio -a 2082 need-ssh-agent -f ssh del nc localhost 80
+	    ;;
+	*)  echo "$0: unknown forwarding target \"$fwd\"" >&2
+	    exit 1
+	    ;;
+    esac
+done
