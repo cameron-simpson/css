@@ -36,7 +36,7 @@ $cs::IM2HTML::WebPage='http://www.zip.com.au/~cs/im2html/';
 $cs::IM2HTML::Pfx='imindex';	# base of aux files
 $cs::IM2HTML::DotDir='.im2html';# where all the cruft goes
 $cs::IM2HTML::DoThumbs=1;	# thumbnail creation
-$cs::IM2HTML::FrameTarget='';	# TARGET for HREFs
+$cs::IM2HTML::FrameTarget='_view'; # TARGET for image HREFs
 $cs::IM2HTML::TableWidth=4;
 $cs::IM2HTML::TableLength=3;
 $cs::IM2HTML::DoImStat=1;
@@ -81,6 +81,7 @@ sub new
 	  ORDER		=> $cs::IM2HTML::Order,
 	  THUMBMAX	=> $cs::IM2HTML::ThumbMax,
 	  THUMBTYPE	=> $cs::IM2HTML::ThumbType,
+	  FRAMETARGET	=> $cs::IM2HTML::FrameTarget,
 	  DIDTHUMB	=> {},
 	  IMSIZE	=> {},
 	  THSIZE	=> {},
@@ -90,9 +91,9 @@ sub new
 
   # inherit particular parameters
   for (PFX,DOTDIR,DOTHUMBS,DOIMSTAT,TABLEWIDTH,TABLELENGTH,
-	THUMBMAX,THUMBTYPE)
-	{ $this->{$_}=$inherit->{$_} if exists $inherit->{$_};
-	}
+	THUMBMAX,THUMBTYPE,FRAMETARGET)
+  { $this->{$_}=$inherit->{$_} if exists $inherit->{$_};
+  }
 
   $this;
 }
@@ -290,93 +291,94 @@ sub Credit
 	}
 
 sub ImageIndices($)
-	{ my($this)=@_;
+{ my($this)=@_;
 
-	  my @rows=();
-	  my $row =[];
-	  my $low;
-	  my $high;
+  my @rows=();
+  my $row =[];
+  my $low;
+  my $high;
 
-	  for my $im ($this->Images())
-	  {
-	    my($ix,$iy)=$this->ImageSize($im);
-	    my($tx,$ty)=$this->ThumbSize($im);
+  for my $im ($this->Images())
+  {
+    my($ix,$iy)=$this->ImageSize($im);
+    my($tx,$ty)=$this->ThumbSize($im);
 
-	    my $desc = $im;
-	    $desc =~ s:\.[^.]+$::;
-	    $desc .= '.html';
+    my $desc = $im;
+    $desc =~ s:\.[^.]+$::;
+    $desc .= '.html';
 
-	    # table cell with thumb and markup
-	    my @imdesc
-	     = ( [TD, {ALIGN => CENTER, VALIGN => CENTER, CELLPADDING => "20%"},
-		      [A, { HREF => "../$im",
-			    TARGET => "_view",
-			  },
-	     		  $im,
-			  [BR],
-			  [IMG, { SRC => "../".$this->ThumbOf($im),
-				  BORDER => 0,
-				  WIDTH => $tx,
-				  HEIGHT => $ty }],
-			  [BR],
-			  "${ix}x${iy}",
-			  ",", ["&nbsp;"],
-			  niceSize($this->FileSize($im)),
-			  ]] );
+    # table cell with thumb and markup
+    my $imHref = { HREF => "../$im" };
+    $imHref->{TARGET}=$this->{FRAMETARGET} if length $this->{FRAMETARGET};
 
-	    ## warn "check desc [$desc]";
-	    if (! $this->IsFile($desc) || ! -s _)
-	    # no markup - simple image
-	    { $high=$im;
-	      if (! @$row)
-	      { $low=$im;
-		## warn "LOW=$im";
-	      }
-	      push(@$row, @imdesc);
-	      if (@$row >= $this->{TABLEWIDTH})
-	      { ## warn "PUSH: low=$low, high=$high\n";
-	        push(@rows,{ LOW => $low, HIGH => $high, HTML => $row});
-		$row=[];
-	      }
-	    }
-	    else
-	    # image with description
-	    { if (@$row)
-	      { ## warn "PUSH: low=$low, high=$high\n";
-	        push(@rows,{ LOW => $low, HIGH => $high, HTML => $row });
-		$row=[];
-	      }
+    my @imdesc
+     = ( [TD, {ALIGN => CENTER, VALIGN => CENTER, CELLPADDING => "20%"},
+	      [A, $imHref,
+		  $im,
+		  [BR],
+		  [IMG, { SRC => "../".$this->ThumbOf($im),
+			  BORDER => 0,
+			  WIDTH => $tx,
+			  HEIGHT => $ty }],
+		  [BR],
+		  "${ix}x${iy}",
+		  ",", ["&nbsp;"],
+		  niceSize($this->FileSize($im)),
+		  ]] );
 
-	      push(@imdesc, [TD, { VALIGN => MIDDLE, ALIGN => LEFT },
-				 [INCLUDE, {SRC => $this->SubPath($desc)}]]);
-	      ## warn "INCLUDE ".$this->SubPath($desc);
-	      push(@rows, { LOW => $im, HIGH => $im, HTML => [ @imdesc ]});
-	    }
-	  }
+    ## warn "check desc [$desc]";
+    if (! $this->IsFile($desc) || ! -s _)
+    # no markup - simple image
+    { $high=$im;
+      if (! @$row)
+      { $low=$im;
+	## warn "LOW=$im";
+      }
+      push(@$row, @imdesc);
+      if (@$row >= $this->{TABLEWIDTH})
+      { ## warn "PUSH: low=$low, high=$high\n";
+	push(@rows,{ LOW => $low, HIGH => $high, HTML => $row});
+	$row=[];
+      }
+    }
+    else
+    # image with description
+    { if (@$row)
+      { ## warn "PUSH: low=$low, high=$high\n";
+	push(@rows,{ LOW => $low, HIGH => $high, HTML => $row });
+	$row=[];
+      }
 
-	  # grab pending row, if any
-	  if (@$row)
-	  { ## warn "PUSH: low=$low, high=$high\n";
-	    push(@rows,{ LOW => $low, HIGH => $high, HTML => $row});
-	    $row=[];
-	  }
+      push(@imdesc, [TD, { VALIGN => MIDDLE, ALIGN => LEFT },
+			 [INCLUDE, {SRC => $this->SubPath($desc)}]]);
+      ## warn "INCLUDE ".$this->SubPath($desc);
+      push(@rows, { LOW => $im, HIGH => $im, HTML => [ @imdesc ]});
+    }
+  }
 
-	  # construct indices
-	  my @ndx=();
+  # grab pending row, if any
+  if (@$row)
+  { ## warn "PUSH: low=$low, high=$high\n";
+    push(@rows,{ LOW => $low, HIGH => $high, HTML => $row});
+    $row=[];
+  }
 
-	  while (@rows)
-	  { ## warn "LENGTH=$this->{TABLELENGTH}, nrows=".scalar(@rows).", [@rows]";
-	    my @front = splice(@rows,0,$this->{TABLELENGTH});
-	    push(@ndx, { LOW => $front[0]->{LOW},
-			 HIGH => $front[$#front]->{HIGH},
-			 HTML => [ [TABLE, {BORDER => 0},
-					   map([TR, @{$_->{HTML}}], @front) ]
-				 ],
-		       });
-	  }
+  # construct indices
+  my @ndx=();
 
-	  @ndx;
-	}
+  while (@rows)
+  { ## warn "LENGTH=$this->{TABLELENGTH}, nrows=".scalar(@rows).", [@rows]";
+    my @front = splice(@rows,0,$this->{TABLELENGTH});
+    push(@ndx, { LOW => $front[0]->{LOW},
+		 HIGH => $front[$#front]->{HIGH},
+		 HTML => [ [TABLE, {BORDER => 0},
+				   map([TR, @{$_->{HTML}}], @front) ]
+			 ],
+	       });
+  }
+
+  @ndx;
+}
 
 $cs::IM2HTML::_shellFD=0;
 sub _shell
