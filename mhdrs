@@ -1,36 +1,68 @@
-#!/usr/bin/perl
+#!/bin/sh
+#
+# Suck up mail item, emit header and body on one line for shell use as:
+#	read hdr body
+# Drops the colon from the header.
+#
+# The -sh option emits a bunch of shell variable settings.
+# Example use:
+#	eval "mhdrs < mailitem | sed 's/^/hdr_/'`
+# gets a bunch of values like $hdr_MESSAGE_ID for "Message-Id", etc.
+#	- Cameron Simpson <cs@zip.com.au>
+#
 
-($cmd=$0) =~ s:.*/::;
-$usage="Usage: $cmd [-sh] <mail-item\n";
+cmd=$0
+usage="Usage: $cmd [-sh] <mailitem
+	-sh	Emit sh parsable output."
 
-$#shmode=0;
-if (@ARGV && $ARGV[0] eq '-sh')
-{ $shmode=1;
-  shift(@ARGV);
-  eval 'use cs::Shell';
-}
+badopts=
 
-if (@ARGV)
-{ warn "$cmd: extra arguments: @ARGV\n";
-  die $usage;
-}
+shmode=
+if [ "x$1" = x-sh ]
+then
+    shmode=1; shift
+fi
 
-HDR:
-while (<STDIN>)
-{ chomp;
-  last HDR if /^$/;
+[ $# = 0 ] || { echo "$cmd: extra arguments: $*" >&2; badopts=1; }
 
-  if ( /^([a-z][-\w]*):[ 	]*/i )
-  {
-    $body=$';
-    $hdr=uc($1);
-    $hdr=~s/-/_/g;
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
 
-    if ($shmode)
-    { print "$hdr=", cs::Shell::quote($body), "\n";
-    }
-    else
-    { print "$hdr $body\n";
-    }
-  }
-}
+sedf='	# collate continuation lines
+	/^[ 	]/{
+	  H
+	  d
+	}
+
+	# not continuation - flush held line
+	1!{
+	  x
+	  s/\n/ /g
+	  p
+	  x
+	}
+
+	# done? quit
+	/^$/q
+
+	# start new line
+	h
+       '
+
+[ $shmode ] || exec sed -n "$sedf"
+
+sed -n "$sedf" \
+| sed '	s/:[ 	]*/\n/' \
+| sed -n \
+      '	y/abcdefghijklmnopqrstuvwxyz-/ABCDEFGHIJKLMNOPQRSTUVWXYZ_/
+	h
+	n
+	/[^-a-zA-Z0-9_@]/{
+	'"
+	  s/'/&\\\\&&/g
+	  s/.*/'&'/
+	"'
+	}
+	x
+	G
+	s/\n/=/
+	p'
