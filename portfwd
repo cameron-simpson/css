@@ -4,6 +4,9 @@
 #	- Cameron Simpson <cs@zip.com.au> 15apr1999
 #
 
+cmd=`basename "$0"`
+usage="Usage: $cmd [-v] [-x] [host=addr...] [from2to...]"
+
 ### make a fresh ssh-agent
 ##if [ -t 0 -a -t 1 ]
 ##then
@@ -13,36 +16,65 @@
 ##    ssh-add
 ##fi
 
+home=home
+zip=zip
+cisra=cisra
+
 vflag=
-[ "x$1" = x-v ] && { vflag=-v; shift; }
+trace=
+
+badopts=
+while :
+do  case "$1" in
+	-x)	trace=set-x ;;
+        -v)	vflag=-v ;;
+	--)	shift; break ;;
+	-?*)	echo "$cmd: unrecognised option: $1" >&2
+		badopts=1
+		;;
+	home=*|zip=*|cisra=*)
+		eval "$1"
+		;;
+	*=*)	echo "$cmd: unknown host=*; I know home, zip and cisra" >&2
+		badopts=1
+		;;
+	*)	break ;;
+    esac
+    shift
+done
 
 if [ $# = 0 ]
 then
     case "$HOST@$SYSTEMID" in
 	zapff@cisra)	set cisra2zip cisra2home nntpcached ;;
 	amadeus@home)	set home2cisra home2zip ;;
-	*)		echo "$0: no forwardings to do on $HOST@$SYSTEMID" >&2
-			exit 2
+	*)		echo "$cmd: no forwardings to do on $HOST@$SYSTEMID" >&2
+			badopts=1
 			;;
     esac
 fi
 
-DISPLAY=; export DISPLAY
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+DISPLAY=; export DISPLAY; unset DISPLAY
 
 for fwd
 do  case "$fwd" in
 	zipnntp)
 	    echo "forward $HOST:2119 to news.zip.com.au:119"
+	    $trace \
 	    alog zipnntp lock -1 fwd_zipnntp \
 		tcpio -a 2119 need-ssh-agent -f ssh -x zip 'exec nc news.zip.com.au 119'
 	    ;;
 	nntpcached)
 	    echo "setup nntpcached ..."
+	    $trace \
 	    rignntpcache
 	    ;;
 	cisra2zip)
 	    echo "cisra2zip..."
-	    vpnssh $vflag -t 60 -i vpn_dsa-cisra2zip zip \
+	    $trace \
+	    vpnssh $vflag -t 60 -i dsa-vpn-cisra2zip "$zip" \
 		   -L 8081:localhost:8081 \
 		   -L 9875:203.17.198.110:9875 \
 		   -L 9876:203.17.198.107:9875 \
@@ -53,7 +85,8 @@ do  case "$fwd" in
 	    ;;
 	cisra2home)
 	    echo "cisra2home..."
-	    vpnssh $vflag -t 60 -q home \
+	    $trace \
+	    vpnssh $vflag -t 60 -q -i rsa1-vpn-cisra2home "$home" \
 		   -L 2111:mail-optus:110 \
 		   -L 2180:www-optus:110 \
 		   -L 2401:cvs-cskk:2401 \
@@ -65,7 +98,8 @@ do  case "$fwd" in
 	    ;;
 	home2zip)
 	    echo "home2zip..."
-	    vpnssh $vflag -i vpn_dsa-home2zip zip \
+	    $trace \
+	    vpnssh $vflag -i vpn_dsa-home2zip "$zip" \
 		   -L 8081:localhost:8081 \
 		   -L 2119:news:119 \
 		   -L 2025:mail:25 \
@@ -73,7 +107,8 @@ do  case "$fwd" in
 	    ;;
 	home2cisra)
 	    echo "home2cisra..."
-	    vpnssh $vflag cisra \
+	    $trace \
+	    vpnssh $vflag "$cisra" \
 		   -L 2080:web:80 \
 		   -L 2222:zapff:22 \
 		   -L 3306:mysql:3306 \
@@ -86,7 +121,7 @@ do  case "$fwd" in
 ##	    echo "web@del ..."
 ##	    acon lock -1 web@del tcpio -a 2082 need-ssh-agent -f ssh del nc localhost 80
 ##	    ;;
-	*)  echo "$0: unknown forwarding target \"$fwd\"" >&2
+	*)  echo "$cmd: unknown forwarding target \"$fwd\"" >&2
 	    exit 1
 	    ;;
     esac
