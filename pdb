@@ -1,0 +1,98 @@
+#!/usr/bin/perl
+#
+# Do things to Palm Pilot PDB files.
+#	- Cameron Simpson <cs@zip.com.au> 22may2000
+#
+
+use strict vars;
+
+use Getopt::Std;
+use cs::Misc;
+use cs::Hier;
+use cs::Pathname;
+use cs::Palm;
+
+$::Usage="Usage: $::cmd {-t|-x} pdbfiles...
+	-t	Table of contents.
+	-x	Extract into subdirectory.
+";
+
+my $badopts=0;
+
+$::DoTOC=0;
+$::DoExtract=0;
+getopts("tx");
+$::DoTOC=1 if defined $::opt_t;
+$::DoExtract=1 if defined $::opt_x;
+
+if ($::DoTOC+$::DoExtract != 1)
+{ warn "$::cmd: exactly one of -x and -t must be given\n";
+  $badopts=1;
+}
+
+if (! @ARGV)
+{ warn "$::cmd: missing pdbfiles\n";
+  $badopts=1;
+}
+
+die $::Usage if $badopts;
+
+$::Xit=0;
+
+PDB:
+for my $pdb (@ARGV)
+{
+  if (! -s $pdb)
+  { warn "$::cmd: $pdb: missing or empty file\n";
+    $::Xit=1;
+    next PDB;
+  }
+
+  my $P = cs::Palm::newPDB($pdb);
+  if (! defined $P)
+  { warn "$::cmd: can't attach to $pdb\n";
+    $::Xit=1;
+    next PDB;
+  }
+
+  my $base = cs::Pathname::basename($pdb);
+  $base =~ s:\.(pdb|prc)$::;
+
+  if (! mkdir($base,0777))
+  { warn "$::cmd: mkdir($base): $!\n";
+    $::Xit=1;
+    next PDB;
+  }
+
+  RECORD:
+  for my $nr (0..$P->NRecords()-1)
+  {
+    if (! open(R,"> $base/$nr"))
+    { warn "$::cmd: $base/$nr: can't create: $!\n";
+      $::Xit=1;
+      next RECORD;
+    }
+
+    my $R = $P->Record($nr);
+    if (! defined $R)
+    { warn "$::cmd: $pdb: can't get record $nr\n";
+      $::Xit=1;
+      next RECORD;
+    }
+    elsif (! length $R)
+    { warn "$::cmd: $pdb, record $nr: empty record\n";
+    }
+
+    if (! print R $R)
+    { warn "$::cmd: print to $base/$nr fails: $!\n";
+      $::Xit=1;
+    }
+
+    if (! close(R))
+    { warn "$::cmd: close($base/$nr): $!\n";
+      $::Xit=1;
+    }
+  }
+}
+
+exit $::Xit;
