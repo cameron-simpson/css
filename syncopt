@@ -187,7 +187,8 @@ then
 else
     remotepfx=$SYNCOPT_REMOTE:
     remote()
-    { eval "${RSYNC_RSH:-ssh} "'"$SYNCOPT_REMOTE" "PATH=\$PATH:$pathadd; export PATH; $*"'
+    { echo "PATH=\$PATH:$pathadd; export PATH; $*" \
+      | eval "${RSYNC_RSH:-ssh} \"\$SYNCOPT_REMOTE\"" /bin/sh
     }
 fi
 
@@ -274,8 +275,16 @@ do
 
     # get unversioned name for $thing
     case "$thing" in
-	*-*) nvthing=`expr "x$thing" : 'x\([^\-]*\)-.*'` ;;
-	*)   nvthing=$thing ;;
+	*-*) nvthing=`expr "x$thing" : 'x\([^\-]*\)-.*'`
+	     thingv=`expr "x$thing" : 'x[^\-]*-\(.*\)'`
+	     if [ -z "$nvthing" -o -z "$thingv" ]
+	     then
+		 echo "$0: empty nvthing [$nvthing] or thingv [$thinv] !!" >&2
+		 echo "	SKIPPING $thing !!" >&2
+		 continue
+	     fi
+	     ;;
+	*)   nvthing=$thing thingv= ;;
     esac
 
     # determine default behaviour:
@@ -346,9 +355,13 @@ do
 	       /^\* remote\$/b remote
 	       /^\* nosync\$/b nosync
 
-	       # set version and mode
-	       /^$nvthing [^ ][^ ]* local\$/b vlocal
-	       /^$nvthing [^ ][^ ]* remote\$/b vremote
+	       # set version for generic link
+	       /^$thing [^ ][^ ]* local\$/b vlocal
+	       /^$thing [^ ][^ ]* remote\$/b vremote
+
+	       # set mode for particular version
+	       /^$nvthing $thingv local\$/b vlocal
+	       /^$nvthing $thingv remote\$/b vremote
 
 	       # just set version
 	       /^$nvthing [^ ][^ ]*\$/b vers
@@ -374,7 +387,11 @@ do
 	       s/^$nvthing /nosync= version=/
 	       :done"
     ## echo "$thing:"
-    opts=`2>/dev/null sed -e "$sedscript" "$cf"`
+    opts=`2>/dev/null sed -e "$sedscript" "$cf"` \
+    || { echo "$0: sed of config file [$cf] FAILED, skipping $thing !!" >&2
+	 continue
+       }
+
     if [ -n "$opts" ]
     then
 	## echo "opts=[$opts]"
@@ -541,6 +558,14 @@ exit $xit
 # to use ssh(1) to access the master machine
 # or by setting the B<SYNCOPT_REMOTE> environment variable
 # in the system environment.
+#
+# The same style of configuration would be used for a mobile machine
+# such as a laptop
+# which would not have everything local
+# but also would frequently not have NFS access either,
+# and which would not want to try
+# (eg if the NFS were automounted - you don't want stray symlinks firing
+# it up off site).
 #
 # =head1 SEE ALSO
 #
