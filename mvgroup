@@ -1,0 +1,30 @@
+#!/bin/sh
+#
+# Bulk edit the group file to rename a group.
+#	- Cameron Simpson <cs@zip.com.au> 09mar99
+#
+
+cmd=`basename "$0"`
+usage="Usage [-f file] currentgroup newgroup"
+
+groupfile=group
+dbdir=/usr/local/etc/cisra/db/groups
+
+case $1 in
+    -f)	groupfile=$2; shift; shift ;;
+esac
+
+[ -s "$groupfile" ] || { echo "$cmd: need non-empty file $groupfile" >&2
+			 exit 1
+		       }
+
+[ $# = 2 ] || { echo "$usage" >&2; exit 2; }
+old=$1
+new=$2
+
+[ -f "$dbdir/$old" ] || { echo "$cmd: no file for $old in $dbdir" >&2; exit 1; }
+
+bsed "s/^$old:/$new:/
+      s/^$old-/$new-/" "$groupfile" || exit $?
+
+echo "Now you must rename $dbdir/$old to $dbdir/$new and shuffle the NAMEs."
