@@ -1,0 +1,23 @@
+#!/bin/sh
+
+user=${USER:-`whoami`}
+ptopts=
+case "$1" in [a-zA-Z0-9_.]*) user=$1; shift ;; esac
+while :
+do  case $1 in
+      +?*)		ptopts="$ptopts $1" ;;
+      [a-zA-Z0-9_.]*)	user=$1 ;;
+      *)		break ;;
+    esac
+    shift
+done
+
+case $ARCH in
+    sun.*.sunos|dec.*.ultrix|apollo.*.domainos)
+    	exec ps xww${1+"$@"} ;;
+    *.*.linux)
+	exec pt $ptopts w x ${1+"$@"} ;;
+    # sysv
+    *)	exec pt $ptopts "-u$user" ${1+"$@"} ;;
+esac \
+| entilde
