@@ -1,0 +1,3 @@
+#!/bin/sh
+set -x
+exec env PATH=/opt/j2sdk-sun/bin:$PATH /opt/azureus/azureus ${1+"$@"}
