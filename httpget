@@ -415,7 +415,7 @@ sub httpget($)
     { $url =~ s/#.*// if $::NoAnchors;
       print "$method $url\n";
     }
-    elsif (defined($outfile=URLsaveepath($url)) && -s $outfile)
+    elsif (defined($outfile=URLsavepath($url)) && -s $outfile)
     { warn "$::cmd: file $outfile exists, skipping $url\n" if $::Verbose;
       return;
     }
