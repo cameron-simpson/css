@@ -16,7 +16,7 @@ rsdel=
 [ -t 1 ] && progress=-P
 
 cmd=`basename "$0"`
-usage="Usage: $cmd [-i identity] [--delete] srcdir [host:]destdir [rsync-options...]
+usage="Usage: $cmd [-i identity] [--delete] srcdir [[user@]host:]destdir [rsync-options...]
 	-i identity	Ssh identity file to use.
 	--include-from=file Specify an rsync include-from file to edit the backup.
 			Should be an absolute path unless you're standing in the srcdir.
