@@ -134,7 +134,7 @@ The callback function will then be called with the arguments
 
 =cut
 
-sub Report($;$)
+sub Report($$;$)
 { my($this,$sofar,$when)=@_;
   $when=time if ! defined $when;
 
