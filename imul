@@ -72,13 +72,15 @@ while (defined($_=<STDIN>))
 
   $pfx="$pfx$op: ";
 
+  warn "$pfx [$_]\n" if $op ne LABEL;
+
   if ($op eq FG)
   { if (@args != 3)
     { warn "$pfx: expected 3 arguments (R B G)\n";
       $ok=0;
     }
     else
-    { $fg=$im->colorAllocate(@args);
+    { $fg=$im->colorAllocate(map($_+0,@args));
       warn "new FG = $fg";
     }
   }
@@ -88,7 +90,7 @@ while (defined($_=<STDIN>))
       $ok=0;
     }
     else
-    { $bg=$im->colorAllocate(@args);
+    { $bg=$im->colorAllocate(map($_+0,@args));
     }
   }
   elsif ($op eq BORDER)
