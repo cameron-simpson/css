@@ -4,6 +4,10 @@
 #	- Cameron Simpson <cs@zip.com.au> 17nov2001
 #
 
+VARLOG=${VARLOG:-$HOME/var/log}
+RXVTBGLOG=$VARLOG/rxvtbg/`tty`@$HOST
+export VARLOG RXVTBGLOG
+
 ( rootbg -s ${1+"$@"}
   clear | alert
 ) &
