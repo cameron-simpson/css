@@ -1,13 +1,15 @@
 #!/bin/sh
 #
 # Fetch the last tcpdump log from del and graph usage.
-#	- Cameron Simpson <cs@zip.com.au> 07may99
+#	- Cameron Simpson <cs@zip.com.au> 07may1999
 #
+
+: ${TMPDIR:=/tmp}
 
 sniffer=del
 logdir=/var/log/sensor
 
-tmp=/tmp/tcplog.$$
+tmp=$TMPDIR/tcplog.$$
 
 nflag=-n
 count=10000000
