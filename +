@@ -53,8 +53,12 @@ if [ -z "$fpath" ]
 then
     DELETE_FOLDER=
     SAVE_FOLDER=+SAVED/misc
-    mhdir "$MAILDIR/SAVED/misc"
+    maildir "$MAILDIR/SAVED/misc"
 else
+    ismaildir "$fpath" || ismhdir "$fpath" \
+    || { echo "$cmd: $fpath: not Maildir or MH folder" >&2
+	 exit 1
+       }
     fbase=`basename "$fpath"` || exit 1
     DELETE_FOLDER=+DELETED/$fbase
     SAVE_FOLDER=+SAVED/$fbase
