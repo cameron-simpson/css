@@ -45,7 +45,7 @@ for (@k)
   $n=$w{$_};
   $n='' if $n == 1;
 
-  print "$user\t$host\t$user\t$p{$_}\t$at\t$n\n";
+  print "$user\t\t$user\t$n\t$p{$_}\t$at\n";
 }
 
 sub idle2s
