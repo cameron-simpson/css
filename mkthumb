@@ -1,6 +1,6 @@
 #!/bin/sh
 #
-# Produce thumbnails for the names image files.
+# Produce thumbnails for the named image files.
 #	- Cameron Simpson <cs@zip.com.au> 12sep2003
 #
 
