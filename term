@@ -9,6 +9,9 @@
 #
 
 : ${TMPDIR:=/tmp}
+: ${LOGDIR:=$HOME/var/log}
+: ${CONSOLE:=$LOGDIR/console}
+: ${SHELL:=/bin/sh}
 
 cmd=$0
 usage="Usage: $cmd [-v] [-w width] [-h height] [-x x-pos] [-y y-pos]
@@ -21,8 +24,6 @@ xrmopts=
 dotrans=
 detach='exec >/dev/null </dev/null'
 keepio=
-SHELL=${SHELL-/bin/sh}
-CONSOLE=${CONSOLE:-$HOME/var/log/console}
 title= f=
 smallx=0 smally=103 smallw=80 smallh=24 smallf=
 w= h=
