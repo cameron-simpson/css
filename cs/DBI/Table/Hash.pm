@@ -12,7 +12,11 @@ cs::DBI::Table::Hash - treat an indexed DBI table as a hash
 
 use cs::DBI::Table::Hash;
 
-tie %h, I<dbh>, I<table>, I<keyfield>, I<where>;
+tie %h, cs::DBI::Table::Hash, I<dbh>, I<table>, I<keyfield>, I<where>;
+
+use cs::DBI;
+
+$hashref=cs::DBI::hashtable(I<dbh>,I<table>,I<keyfield>,I<where>,I<preload>)
 
 =head1 DESCRIPTION
 
@@ -57,41 +61,52 @@ sub TIEHASH($$$$$$)
 { my($class,$dbh,$table,$keyfield,$where,$preload)=@_;
 
   my $this =
-  bless { DBH => $dbh,
-	  TABLE => $table,
-	  LIVE => {},
-	  KEY => $keyfield,
-	  WHERE => $where,
+  bless { cs::DBI::Table::Hash::DBH => $dbh,
+	  cs::DBI::Table::Hash::TABLE => $table,
+	  cs::DBI::Table::Hash::LIVE => {},
+	  cs::DBI::Table::Hash::KEY => $keyfield,
+	  cs::DBI::Table::Hash::WHERE => $where,
 	}, $class;
 
 
   if ($preload)
-  { my $sql = "SELECT * FROM $this->{TABLE}";
-    $sql.=" WHERE $this->{WHERE}" if length $this->{WHERE};
+  { my $table=$this->_Table();
+    my $where=$this->_Where();
+
+    my $sql = "SELECT * FROM $table";
+    $sql.=" WHERE $where" if length $where;
 
     my $sth = cs::DBI::sql($dbh, $sql);
 
-    my $L = $this->{LIVE};
+    my $L = $this->{cs::DBI::Table::Hash::LIVE};
     for my $row (cs::DBI::fetchall_hashref($sth))
-    { $L->{$row->{$keyfield}}=$row;
+    { $this->_Stash($row->{$keyfield}, $row);
     }
   }
 
   $this;
 }
 
+sub _Table($) { shift->{cs::DBI::Table::Hash::TABLE}; }
+sub _Dbh($)   { shift->{cs::DBI::Table::Hash::DBH}; }
+sub _Key($)   { shift->{cs::DBI::Table::Hash::KEY}; }
+sub _Live($)  { shift->{cs::DBI::Table::Hash::LIVE}; }
+sub _Where($) { shift->{cs::DBI::Table::Hash::WHERE}; }
+
 sub KEYS($)
 { my($this)=@_;
 
-  my $dbh = $this->{DBH};
+  my $dbh = $this->_Dbh();
 
-  my $sql = "SELECT $this->{KEY} FROM $this->{TABLE}";
-  $sql.=" WHERE $this->{WHERE}" if length $this->{WHERE};
+  my $table = $this->_Table();
+  my $sql = "SELECT ".$this->_Key()." FROM $table";
+  my $where = $this->_Where();
+  $sql.=" WHERE $where" if length $where;
   ## warn "SQL is [$sql]";
 
-  my $sth = cs::DBI::sql($this->{DBH},$sql);
+  my $sth = cs::DBI::sql($this->_Dbh(),$sql);
   if (! defined $sth)
-  { warn "$0: can't look up keys from $this->{TABLE}";
+  { warn "$0: can't look up keys from $table";
     return ();
   }
 
@@ -107,35 +122,44 @@ sub KEYS($)
   ::uniq(grep(defined,@keys));
 }
 
+sub _Stash($$$)
+{ my($this,$key,$rec)=@_;
+
+  my $row = {};
+
+  tie %$row, cs::DBI::Table::Row, $rec, $key, $this;
+
+  $this->_Live()->{$key}=$row;
+}
+
 sub FETCH($$)
 { my($this,$key)=@_;
 
-  return $this->{LIVE}->{$key}
-  if exists $this->{LIVE}->{$key};
+  my $live = $this->_Live();
+  return $live->{$key} if exists $live->{$key};
 
-  my $sql = "SELECT * from $this->{TABLE} WHERE $this->{KEY} = ?";
-  $sql.=" AND $this->{WHERE}" if length $this->{WHERE};
+  my $table=$this->_Table();
+  my $sql = "SELECT * from $table WHERE ".$this->_Key()." = ?";
+  my $where = $this->_Where();
+  $sql.=" AND $where" if length $where;
 
-  my $sth = cs::DBI::sql($this->{DBH},$sql);
+  my $sth = cs::DBI::sql($this->_Dbh(),$sql);
   return undef if ! defined $sth;
 
   my @rows = cs::DBI::fetchall_hashref($sth,$key);
   return undef if ! @rows;
 
-  warn "$0: FETCH($this->{TABLE},$key): multiple hits!"
+  warn "$0: FETCH($table,$key): multiple hits!"
   if @rows > 1;
 
-  my $row = {};
-
-  tie %$row, cs::DBI::Table::Row, $rows[0], $key, $this;
-
-  $row;
+  ## warn "rows[0]=".cs::Hier::h2a($rows[0],1);
+  $this->_Stash($key,$rows[0]);
 }
 
 sub EXISTS($$)
 { my($this,$key)=@_;
   
-   exists $this->{LIVE}->{$key}
+   exists $this->_Live()->{$key}
 || defined $this->FETCH($key);
 }
 
@@ -143,7 +167,7 @@ sub EXISTS($$)
 sub STORE($$$)
 { my($this,$key,$value)=@_;
 
-  my($dbh,$table)=($this->{DBH}, $this->{TABLE});
+  my($dbh,$table)=($this->_Dbh(), $this->_Table());
 
   $this->DELETE($key) if defined $key;
 
@@ -152,19 +176,21 @@ sub STORE($$$)
 
   $key=cs::DBI::last_id() if ! defined $key;
 
-  $this->{LIVE}->{$key}=$value;
+  $this->_Live()->{$key}=$value;
 }
 
 sub DELETE($$)
 { my($this,$key)=@_;
 
   # purge old records
-  my $sql = "DELETE FROM $this->{TABLE} WHERE $this->{KEY} = ?";
-  $sql.=" AND $this->{WHERE}" if length $this->{WHERE};
+  my $table = $this->_Table();
+  my $sql = "DELETE FROM $table WHERE ".$this->_Key()." = ?";
+  my $where = $this->_Where();
+  $sql.=" AND $where" if length $where;
 
-  cs::DBI::dosql($this->{DBH},$sql,$key);
+  cs::DBI::dosql($this->_Dbh(),$sql,$key);
 
-  delete $this->{LIVE}->{$key};
+  delete $this->_Live()->{$key};
 }
 
 =head1 AUTHOR
