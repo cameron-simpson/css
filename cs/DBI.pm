@@ -187,6 +187,7 @@ I<execute-args> supplied.
 sub dosql
 { my($dbh,$sql)=(shift,shift);
 
+  ##warn "dosql: sql=\n$sql\nargs = [@_]\n" if $sql !~ /^select\b/i;
   my $sth = sql($dbh,$sql);
   return undef if ! defined $sth;
 
@@ -646,6 +647,7 @@ sub datedRecordsBetween($$$$;$$)
 sub addDatedRecord
 { my($dbh,$table,$start,$end,$rec,@delwhere)=@_;
 
+  ####warn "addDatedRecord(start=$start,end=$end)...";
   if (! defined $start && ! defined $end)
   { my(@c)=caller;
     die "$::cmd: cs::DBI::addDatedRecord($table): neither \$start nor \$end defined\n\tfrom [@c]\n\t";
@@ -672,7 +674,7 @@ sub addDatedRecord
 
   $rec->{START_DATE}=$start if defined $start && length $start;
   $rec->{END_DATE}=$end if defined $end && length $end;
-  cs::DBI::insert($dbh,$table, keys %$rec)->ExecuteWithRec($rec);
+  insert($dbh,$table, keys %$rec)->ExecuteWithRec($rec);
 }
 
 sub delDatedRecord
@@ -692,6 +694,8 @@ sub delDatedRecord
 
   my ($sql, @args) = sqlWhereText("UPDATE $table SET END_DATE = ?", @delwhere);
   $sql .= " AND START_DATE <= ? AND ISNULL(END_DATE)";
+
+  warn "delDatedRecord: SQL=\n$sql\n";
 
   my $sth = sql($dbh, $sql);
   if (! defined $sth)
@@ -720,7 +724,7 @@ sub cropDatedRecords
 
   my $context="cs::DBI::cropDatedRecords(dbh=$dbh,table=$table,start=".(defined $start ? $start : 'UNDEF').",end=".(defined $end ? $end : 'UNDEF').",xwhere=$xwhere,xwargs=[@xwargs]";
 
-  ## warn "$context\n\t";
+  ##warn "$context\n\t";
 
   if (!defined($start) && !defined($end))
   { my@c=caller;
@@ -764,9 +768,6 @@ sub cropDatedRecords
       { warn "$::cmd: $context:\n\tcan't dosql($sql)";
 	$ok=0;
       }
-
-      ## system("dbuser evanh");
-      ## exit 0;
 
       # crop lower records
       #
@@ -1202,10 +1203,7 @@ sub ExecuteWithRec
 { my($isth)=shift;
 
   my($dbh,$table,$sql,$sth,$dfltok,@fields)=@$isth;
-
-  ## warn "stashing record:\n".cs::Hier::h2a($rec,1);
-  ## warn "sth=$sth, \@isth=[ @$isth ]\n";
-  ## warn "fields=[@fields]";
+  ##warn "ExecuteWithRec: sql =\n$sql\n";
 
   my $ok = 1;
 
@@ -1216,7 +1214,7 @@ sub ExecuteWithRec
   INSERT:
   while (@_)
   { my $rec = shift(@_);
-    ## warn "INSERT rec = ".cs::Hier::h2a($rec,1);
+    ##warn "INSERT rec = ".cs::Hier::h2a($rec,1);
     my @execargs=();
 
     for my $field (@fields)
@@ -1241,6 +1239,8 @@ sub ExecuteWithRec
     # for some reason, text fields can't be empty - very bogus
     ## for (@execargs) { $_=' ' if defined && ! length; }
 
+
+    ##{my@c=caller;warn "sth=[$sth] from [@c]";}
 
     if (! $sth->execute(@execargs))
     { warn "$::cmd: ERROR with insert";
