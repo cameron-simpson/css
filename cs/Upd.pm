@@ -48,14 +48,14 @@ cs::Upd - update dynamic progress line
 
 	use cs::Upd;
 
-	out(I<message>);
-	nl(I<message>);
-	err(I<message-with-B<\n>>);
+	out(message);
+	nl(message);
+	err(message-with-\n);
 
 	$U = new cs::Upd (STATUSTTY, TTY);
-	$U->Out(I<message>);
-	$U->Nl(I<message>);
-	$U->Err(I<message-with-B<\n>>);
+	$U->Out(message);
+	$U->Nl(message);
+	$U->Err(message-with-\n);
 
 =head1 DESCRIPTION
 
