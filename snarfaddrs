@@ -73,4 +73,4 @@ chdir($alldir) || die "$::cmd: can't chdir to $alldir for cvs commit: $!\n";
 
 system("cvs diff $allbase");
 
-exec('cvs','commit','-m',$::cmd,$allbase);
+exec('cvs','commit','-m','',$allbase);
