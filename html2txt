@@ -63,7 +63,7 @@ do  url=
 
     case "$out" in
 	mm)	post='' ;;
-	txt)	post='| nroff -mm $Larg -rO0 -rW78 | col $bflag' ;;
+	txt)	post='| nroff -mm $Larg | col $bflag' ;;
 	ps)	post='| troff -Tpost -mm' ;; #	post='| groff -Tps -mm' ;;
     esac
 
