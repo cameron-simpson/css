@@ -3,7 +3,7 @@
 # Update my ezoshosting web site.
 #	- Cameron Simpson <cs@zip.com.au> 11jan2003
 
-needhost amadeus@home
+needhost $HOMEHOST@home
 
 ezos=$HOME/there/cskk.ezoshosting.com
 ezoscgi=$ezos/cgi-bin
