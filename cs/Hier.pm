@@ -662,7 +662,7 @@ sub savehash($$)
   if (! ref $fname)
   { ::need(cs::Sink);
     $s = cs::Sink->new(PATH,$fname);
-    if (! deifned $s)
+    if (! defined $s)
     { warn "$::cmd: open($fname): $!";
       return undef;
     }
