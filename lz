@@ -34,7 +34,7 @@ itype=any
 cmd=`exec basename "$0"`
 usage="Usage: $cmd [-Pprinter[/paper]] [-f filter]... [-q] [mpage-options] [--] [files...]
 
-	-Pprinter[/paper] Send to specified printer (default $printer).
+	-Pprinter[/paper] Send to specified printer.
 			Specifiable via \$PRINTER (currently \"$PRINTER\").
 			An optional PostScript papersize directive may be
 			included (eg a3).
@@ -299,7 +299,7 @@ esac
 # ensure env is set up
 [ -n "$SYSTEMID" ] || . /opt/shell/STANDARD
 
-[ -n "$printer" ] || { echo "$cmd: no -Pprinter and no \$PRINTER: aborting!" >&2
+[ -n "$PRINTER" ] || { echo "$cmd: no -Pprinter and no \$PRINTER: aborting!" >&2
 		       exit 1
 		     }
 
@@ -326,7 +326,7 @@ then
 fi
 
 # catch paper type
-case "$printer" in
+case "$PRINTER" in
     */*)	paper=`expr "x$PRINTER" : 'x.*/\(.*\)'`
 		PRINTER=`expr "x$PRINTER" : 'x\(.*\)/.*'`
 		;;
