@@ -1,0 +1,14 @@
+#!/bin/sh
+#
+# Background command but keep attached to stdin.
+#	- Cameron Simpson <cs@zip.com.au> 12sep2000
+#
+
+[ $# = 0 ] && { echo "Usage: $0 command [args...] <input" >&2; exit 2; }
+
+exec 3<&0
+( exec 0<&3 3<&-
+  exec "$@"
+) &
+
+exit 0
