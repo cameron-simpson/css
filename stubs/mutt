@@ -7,4 +7,9 @@ case $HOST in
 		;;
 esac
 
+[ -n "$LUSER" ] && [ "x$LUSER" != "x$USER" ] \
+	&& { echo "$0: LUSER($LUSER) != USER($USER), aborting" >&2
+	     exit 1
+	   }
+
 exec /usr/bin/mutt ${1+"$@"}
