@@ -1,0 +1,68 @@
+#!/usr/bin/perl
+#
+# Read pattern specs from stdin and turn into perl code.
+# Patterns are shell-style patterns, except that:
+#	** matches strings including /
+#	? is not a meta character
+#	. isn't either
+#	\ doesn't work
+# - Cameron Simpson <cs@zip.com.au> 09apr99
+#
+
+use strict qw(vars);
+
+my $caction;
+my @ptns;
+
+while (defined($_=<STDIN>))
+{ chomp;
+  my(@F)=split;
+
+  my($action,$ptn)=(uc(shift(@F)), shift(@F));
+
+  if ($action ne $caction)
+  { process($caction,@ptns) if @ptns;
+    @ptns=();
+    $caction=$action;
+  }
+  push(@ptns,$ptn);
+}
+
+process($caction,@ptns) if @ptns;
+print "  elsif (\$::Verbose)\n",
+      "  { warn \"PASS \$url on no match\\n\";\n",
+      "  }\n";
+
+exit 0;
+
+sub process
+{ my($action)=shift;
+  my(@ptns)=@_;
+
+  # for debugging
+  my $ptndesc = join("\n\t\t\t", map("$action $_", @ptns));
+  $ptndesc =~ s/['\\]/\\$&/g;
+
+  local($_);
+
+  # transmute patterns into regexps
+  for (@ptns)
+  { s|[.?+{}()\\]|\\$&|g;
+    s|\*+|length($&) == 1 ? "[^/]*" : ".*"|eg;
+  }
+
+  my $bigptn = join("\n\t| ", @ptns);
+
+  print "  elsif (\$url =~ m(^($bigptn)\$)ox)\n";
+  if ($action eq PASS)
+	{ print "\t{ warn \"PASS \$url\\non:\\t\\t\\t\".\n\t\t\t'$ptndesc'.\"\\n\" if \$::Verbose;\n\t}\n";
+	}
+  else	{ print "\t{ \$nurl=\$::StubURLs{$action}\n",
+		"\t\tif exists \$::StubURLs{$action}\n",
+		"\t\t&& \$::StubURLs{$action} ne PASS;\n",
+		"\t  if (\$::Verbose)\n",
+		"\t  { warn \"\".(length \$nurl ? $action : PASS).\" \$url\\non:\\t\\t\\t\"\n\t\t\t.'$ptndesc'.\"\\n\";\n",
+		"\t  }\n",
+		"\t}\n";
+	}
+}
