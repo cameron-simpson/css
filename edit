@@ -4,15 +4,41 @@
 #	- Cameron Simpson <cs@zip.com.au> 27oct95
 #
 
-cmd=`basename "$cmd"`
-usage="Usage: $cmd [-e editor] file"
-
 EDITOR=${EDITOR:-vi}
-case "$1" in -e) EDITOR=$2; shift; shift ;; esac
 export EDITOR
 
-[ $# = 1 ] || { echo "$usage" >&2; exit 2; }
-file=$1; shift
+doscr=1
+
+cmd=`basename "$cmd"`
+usage="Usage: $cmd [+s] [-e editor] file"
+
+badopts=
+
+set -x
+while :
+do
+  case $1 in
+    +s)	doscr= ;;
+    -e) EDITOR=$2; shift ;;
+    --)	shift; break ;;
+    -?*)echo "$cmd: unrecognised option: $1" >&2
+	badopts=1
+	;;
+    *)	break ;;
+  esac
+  shift
+done
+
+if [ $# = 0 ]
+then
+    echo "$cmd: missing file" >&2
+    badopts=1
+else
+    file=$1; shift
+    [ $# = 0 ] || { echo "$cmd: extra arguments after file: $*" >&2
+		    badopts=1
+		  }
+fi
 
 case "$file" in
     *.pgp) exec pgpedit "$file" ;;
@@ -29,4 +55,21 @@ esac
 		  export EXINIT NEXINIT
 		}
 
-exec "$EDITOR" "$file"
+set -- "$EDITOR" "$file"
+
+if [ $doscr ]
+then
+    dir=`dirname "$file"`
+    cd "$dir" || exit 1
+    wd=`pwd` || exit 1
+
+    file=`basename "$file"` || exit 1
+    case "$file" in
+      -* | +* ) file=./$file ;;
+    esac
+
+    set scr "edit:$wd" "$EDITOR" "$file"
+fi
+
+set -x
+exec "$@"
