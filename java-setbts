@@ -4,7 +4,30 @@
 #	- Cameron Simpson <cs@zip.com.au> 19dec2002
 #
 
-[ $# = 0 ] && { echo "Usage: $0 Javafiles..." >&2; exit 2; }
+cmd=$0
+usage="Usage: $cmd [--no-cvs] javafiles..."
 
-set -x
-exec bsed "s#\"[^\"]*\";\\([ 	]*// AUTOBUILDTIMESTAMP\\)\$#\"`datecode`\";\\1#" "$@"
+usecvs=1
+[ "x$1" = x--no-cvs ] && { usecvs=; shift; }
+[ $# = 0 ] && { echo "$usage" >&2; exit 2; }
+
+xit=0
+
+now=`datecode` || exit 1
+
+tag=AUTOBUILDTIMESTAMP
+
+for file
+do
+  fgrep "$tag" <"$file" >/dev/null || continue
+  ( set bsed "s#\"[^\"]*\";\\([ 	]*// $tag\\)\$#\"$now\";\\1#"
+    if ifcvs "$file"
+    then
+	exec cvsedit --no-diff -m "Set build timestamp to $now." "$file" "$@"
+    else
+	exec "$@" "$file"
+    fi
+  ) || { xit=1; break; }
+done
+
+exit $xit
