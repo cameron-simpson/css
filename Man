@@ -1,0 +1,2 @@
+#!/bin/sh
+exec env GUI=lean term -n "man $*" -e man ${1+"$@"}
