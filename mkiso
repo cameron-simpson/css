@@ -61,7 +61,8 @@ cmd=`basename "$0"`
 usage="Usage: $cmd [-l label] [-o image.iso] directory
 	-l label	Label string (VOLI field, up to 32 bytes).
 			Default: the contents of the top level
-				 LABEL file.
+				 LABEL file, or the directory
+				 basename plus ISO date.
 	-o image.iso	Specify output file.
 			Default: directory.iso"
 
@@ -98,6 +99,12 @@ fi
 
 ok=1
 
+if [ ! -d "$dir/." ]
+then
+    echo "$cmd: not a directory: $dir" >&2
+    ok=
+fi
+
 if [ -z "$out" ]
 then
     out=`basename "$dir"`.iso
@@ -109,8 +116,9 @@ then
     lfile=$dir/LABEL
     if [ ! -s "$lfile" ]
     then
+	label=`basename "$dir"`" - "`date '+%Y-%m-%d'`
 	echo "$cmd: no label file: $lfile" >&2
-	ok=
+	echo "	using \"$label\""
     else
 	label=`cat <"$lfile"`
 	if [ $? != 0 ]
@@ -132,12 +140,6 @@ fi
 if [ -s "$iso" ]
 then
     echo "$cmd: existing file: $iso" >&2
-    ok=
-fi
-
-if [ ! -d "$dir/." ]
-then
-    echo "$cmd: not a directory: $dir" >&2
     ok=
 fi
 
