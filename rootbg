@@ -7,7 +7,7 @@
 : ${LOGDIR:=$HOME/var/log}
 
 cmd=$0
-usage="Usage: $cmd [-s] imagefile
+usage="Usage: $cmd [-s] [imagefile]
 	-s	Synchronous."
 
 [ -n "$DISPLAY" ] || { echo "$cmd: no \$DISPLAY!" >&2; exit 1; }
@@ -33,14 +33,14 @@ done
 
 if [ $# = 0 ]
 then
-    echo "$cmd: missing imagefile" >&2
-    badopts=1
-else
-    imagefile=$1; shift
-    [ $# = 0 ] || { echo "$cmd: extra arguments: $*" >&2
-		    badopts=1
-		  }
+  bg=`lastvalue "rootbg-$HOST"` && [ -n "$bg" ] && [ -s "$bg" ] && echo "$bg"
+  exit
 fi
+
+imagefile=$1; shift
+[ $# = 0 ] || { echo "$cmd: extra arguments: $*" >&2
+		badopts=1
+	      }
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
