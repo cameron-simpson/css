@@ -34,6 +34,9 @@ $shownames=0;
 $usepgp=0;
 @phonelists=();
 
+$::_GPG2=( length($ENV{GPG_AGENT_INFO}) && system("have-gpg-agent") == 0 );
+warn "GPG2=$::GPG2";
+
 OPTION:
 while (@ARGV)
 { $_=shift;
@@ -162,13 +165,23 @@ sub phonefile
 { local($file)=@_;
 
   if ($file =~ /\.gpg$/)
-  { my $phr = getgpgphrase();
-    if (! defined $phr)
-    { warn "$cmd: skipping $file\n";
-      return;
+  {
+    my $gpgcmd;
+
+    if ($::_GPG2)
+    { $gpgcmd = "gpg2 -q --use-agent";
+    }
+    else
+    {
+      my $phr = getgpgphrase();
+      if (! defined $phr)
+      { warn "$cmd: skipping $file\n";
+	return;
+      }
+
+      $gpgcmd = gpgwith($phr);
     }
 
-    my $gpgcmd = gpgwith($phr);
     if (! open(PHONES, " set -x; exec $gpgcmd --decrypt <'$file' |"))
     { if ($! != POSIX->EACCES)
       { warn "$cmd: pgp -fd <$file: $!\n";
