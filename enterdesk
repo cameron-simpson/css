@@ -18,7 +18,7 @@ then
     desktop "$thisdesk" shcmds | sh -x &
     desktop "$thisdesk" wmcmds | fvwmcmd &
 
-    if [ "x$XSESSIONMODE" != xvnc ]
+    if [ "x$XSESSIONBG" = xpixmap ]
     then
 	# check root backdrop
 	rootbg=`desktop "$thisdesk" rootbg`
