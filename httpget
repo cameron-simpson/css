@@ -45,6 +45,7 @@ undef $::Output;
 $::Count=0;
 $::CountBase=0;
 $::Delay=1;
+$::Force=0;
 $::NBase=1;
 $::Inline=0;
 $::Ptn=( defined $ENV{HTTPGET_PATTERN} && length $ENV{HTTPGET_PATTERN}
@@ -74,6 +75,7 @@ $::Usage="Usage: $::cmd [options...] [urls...]
 	-b n		Keep the last n components of the basename. Default: $::NBase
 	-d depth	Depth of links to search. Default $::Count
 	-D delay	Delay seconds between final fetches. Default: $::Delay
+	-f		Force. Overwrite existing files.
 	-g ptn		Get only final URLs matching the regexp ptn.
 	-h		Print headers.
 	-H		Do a HEAD request. Implies -h.
@@ -94,7 +96,7 @@ $::Usage="Usage: $::cmd [options...] [urls...]
 { my $badopts=0;
   my %opt;
 
-  if (! getopts('#a:b:d:D:g:hHiI:l:L:no:q:Q:rstvx',\%opt))
+  if (! getopts('#a:b:d:D:fg:hHiI:l:L:no:q:Q:rstvx',\%opt))
   { warn "$::cmd: unrecognised options\n";
     $badopts=1;
   }
@@ -161,6 +163,19 @@ The default is 5 seconds.
 
     elsif ($opt eq 'D')
     { $::Delay=$opt{$opt}+0;
+    }
+
+=item B<-f>
+
+Force: overwrite existing files.
+Normally httpget will skip files already present,
+an optimisation usually useful on recursive fetches.
+This options forces a fetch and overwrite even if the file exists.
+
+=cut
+
+    elsif ($opt eq 'f')
+    { $::Force=1;
     }
 
 =item B<-g> I<regexp>
@@ -509,7 +524,7 @@ sub httpget($$)
     { $url =~ s/#.*// if $::NoAnchors;
       print "$method $url\n";
     }
-    elsif (defined($outfile=URLsavepath($url)) && -s $outfile)
+    elsif (defined($outfile=URLsavepath($url)) && !$::Force && -s $outfile)
     { warn "$::cmd: file $outfile exists, skipping $url\n" if $::Verbose;
       return 1;
     }
@@ -702,7 +717,7 @@ sub saveMIME($$)
 
     if (defined ($outfile))
     {
-      if (-s $outfile)
+      if (!$::Force && -s $outfile)
       { warn "$::cmd: $outfile exists, not overwriting\n\tURL $url not saved\n";
 	return 0;
       }
