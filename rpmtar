@@ -1,0 +1,49 @@
+#!/bin/sh
+#
+# Emit a tar file on stdout containing the files supplied by
+# the named RPMs.
+#	- Cameron Simpson <cs@zip.com.au> 21oct2004
+#
+
+cmd=`basename "$0"`
+usage="Usage: $cmd rpmnames..."
+
+doprereqs=1
+vflag=
+##[ -t 2 ] && vflag=v
+sofar=' '
+
+badopts=
+
+[ $# = 0 ] && { echo "$cmd: missing rpmnames" >&2; badopts=1; }
+
+while [ $# -gt 0 ]
+do
+  rpmname=$1; shift
+  case "$sofar" in
+    *" $rpmname "*)
+      continue
+      ;;
+  esac
+  sofar="$sofar$rpmname "
+  echo "$rpmname ..." >&2
+
+  # list files to stdout
+  rpm -ql "$rpmname"
+
+  if [ $doprereqs ]
+  then
+    needrpms=` rpm -q --requires "$rpmname" | grep '^[^/][^.( ]*$'`
+    ##echo needrpms=$needrpms >&2
+
+    needfiles=`rpm -q --requires "$rpmname" | grep '^/'`
+    ##echo needfiles=$needfiles >&2
+    [ -n "$needfiles" ] && needrpms="$needrpms "`rpm -qf $needfiles`
+
+    # queue up required stuff
+    set -- ${1+"$@"} $needrpms
+  fi
+done \
+| grep '^/' \
+| sort -u \
+| tar c${vflag}fT - -
