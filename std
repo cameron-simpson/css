@@ -1,0 +1,24 @@
+#!/usr/bin/perl
+#
+# Seconds since epoch to human time.
+#	- Cameron Simpson <cs@zip.com.au>
+#
+
+@ARGV = time if ! @ARGV;
+
+for (@ARGV)
+	{ next if !/^\d+$/;
+
+	  ($sec,$min,$hr,$mday,$mon,$yr,@etc)=gmtime($_);
+	  print "$_:\tgmt: ", &dmyhms2txt($mday,$mon+1,$yr+1900,$hr,$min,$sec);
+
+	  ($sec,$min,$hr,$mday,$mon,$yr,@etc)=localtime($_);
+	  print "\tlocal: ", &dmyhms2txt($mday,$mon+1,$yr+1900,$hr,$min,$sec), "\n";
+	}
+
+sub dmyhms2txt
+	{ local($mday,$mon,$yr,$hr,$min,$sec)=@_;
+
+	  sprintf("%04d-%02d-%02d %02d:%02d:%02d",
+		$yr,$mon,$mday,$hr,$min,$sec);
+	}
