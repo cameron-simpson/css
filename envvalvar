@@ -1,0 +1,28 @@
+#!/bin/sh
+#
+# Save the supplied value as the named environment variable and run the specified command.
+# Intended as a helper for use inside commands like "withco" that place their conntext
+# as the first arg of another command. I.e. "withco module command args.." runs:
+#	command path-to-module args...
+# With this script one might go:
+#	withco module envvalvar CONTEXTVAR command args...
+# the net result is to run:
+#	command args...
+# with the environment variable $CONTEXTVAR set to path-to-module.
+# Which is useful more often that you might think.
+#	- Cameron Simpson <cs@zip.com.au>
+# 
+
+cmd=$0
+usage="Usage: $cmd value envvar command [args...]"
+
+if [ $# -lt 3 ]
+then
+    echo "$cmd: insufficient arguments" >&2
+    echo "$usage" >&2
+    exit 2
+fi
+
+eval "$2=\$1; export $2"
+shift; shift
+exec "$@"
