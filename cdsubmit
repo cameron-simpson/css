@@ -5,6 +5,8 @@
 #	- Cameron Simpson <cs@zip.com.au> 25aug2001
 #
 
+: ${TMPDIR:=/tmp}
+
 cmd=`basename "$0"`
 version=1.0
 
@@ -70,9 +72,9 @@ fi
 
 xit=0
 
-desc=/tmp/cdsub$$d
-tmp=/tmp/cdsub$$t
-cddb=/tmp/cdsub$$c
+desc=$TMPDIR/cdsub$$d
+tmp=$TMPDIR/cdsub$$t
+cddb=$TMPDIR/cdsub$$c
 trap 'rm -f $desc $cddb $tmp; exit $xit' 0
 trap 'rm -f $desc $cddb $tmp; exit 1' 1 15
 
