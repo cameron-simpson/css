@@ -1,0 +1,78 @@
+#!/usr/bin/perl
+#
+
+use strict qw(vars);
+
+use cs::Persist;
+use cs::Pathname;
+use cs::Stat;
+use cs::MD5;
+
+($::cmd=$0) =~ s:.*/::;
+$::Usage="Usage: $::cmd images...\n";
+
+$::IndexName='.imindex';
+
+$::Xit=main(@ARGV);
+
+cs::Persist::finish();
+
+exit $::Xit;
+
+sub main
+	{ my(@ARGV)=@_;
+	  my($xit)=0;
+
+	  for (@ARGV)
+		{ warn "doimg($_)\n";
+		  doimg($_);
+		}
+
+	  return $xit;
+	}
+
+sub db	{ cs::Persist::db(@_) }
+sub md5file { cs::MD5::md5file(@_) }
+
+sub doimg
+	{ my($image,$mainindex)=@_;
+
+	  my($stat)=new cs::Stat $image;
+	  if (! defined $stat)
+		{ warn "$::cmd: can't stat($image): $!\n";
+		  return undef;
+		}
+
+	  my($ndxFile)=cs::Pathname::dirname($image)."/$::IndexName";
+	  my($ndx)=db($ndxFile);
+	  my($key)=cs::Pathname::basename($image);
+
+	  $ndx->{$key}={} if ! exists $ndx->{$key};
+	  my($rec)=$ndx->{$key};
+
+	  # warn "rec =".cs::Hier::h2a($rec,0);
+	  # warn "stat=".cs::Hier::h2a($stat,0);
+
+	  my($needupdate)=0;
+	  my($size,$mtime,$md5)=($stat->Size(),$stat->MTime());
+
+	  if (! exists $rec->{MTIME}
+	   || ! exists $rec->{SIZE}
+	   || $size != $rec->{SIZE}
+	   || $mtime != $rec->{MTIME}
+	     )
+		{ $needupdate=1;
+		}
+
+	  if (! exists $rec->{MD5} || $needupdate)
+	  	{ $md5=md5file($image);
+		  if (defined $md5 && length $md5)
+			{ $rec->{MD5}=$md5;
+			}
+		}
+
+	  if ($needupdate)
+		{ $rec->{MTIME}=$mtime;
+		  $rec->{SIZE}=$size;
+		}
+	}
