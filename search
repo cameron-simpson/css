@@ -40,6 +40,7 @@ case "$cmd" in
     rpmfind)	target=speakeasy-rpmfind ;;
     fsu)	target=findsameurl ;;
     fst)	target=findsametext ;;
+    sf)		target=sourceforge ;;
     yp)		target=yellowpages ;;
     mcrawl)	target=metacrawler ;;
     w3val)	target=w3c_validate ;;
