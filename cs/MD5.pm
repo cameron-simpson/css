@@ -16,7 +16,7 @@ use cs::PipeDecode;
 
 package cs::MD5;
 
-$cs::MD5::_MD5_PATH='md5';	# executable, was /usr/local/bin/md5
+$cs::MD5::_MD5_PATH='md5';	# executable, was /opt/bin/md5
 undef $cs::MD5::_MD5proc;
 
 sub new
