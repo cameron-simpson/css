@@ -11,7 +11,11 @@ cmd=$0
 usage="Usage: $cmd [-t mimetype] {file|-} [[!]attribute...]
 	-t mimetype Supply type."
 
+##echo "$cmd: pid $$: argv=$*" >&2
+##echo "$cmd: pid $$: VIEW_UNKNOWN_FILENAME=$VIEW_UNKNOWN_FILENAME" >&2
+
 mtype=
+trace=set-x
 
 badopts=
 while :
@@ -49,15 +53,6 @@ case "$file" in
   *)  file=./$file ;;
 esac
 
-if [ -n "$VIEW_UNKNOWN_FILENAME" ] \
-&& [ "x$VIEW_UNKNOWN_FILENAME" = "x$file" ]
-then
-    echo "$cmd: recursive call on file \"$file\", aborting" >&2
-    exit 1
-fi
-VIEW_UNKNOWN_FILENAME=$file
-export VIEW_UNKNOWN_FILENAME
-
 exec 3<"$file"
 [ -t 3 ] && { echo "$cmd: won't read from a terminal" >&2
 	      exit 1
@@ -74,7 +69,14 @@ then
     mtype=`file2mime "$hdr"` || mtype=
     [ "$mtype" = application/octet-stream ] && mtype=
 
+    if [ -z "$mtype" ]
+    then
+      mtype=text/plain
+      echo "$cmd: pid $$: stdin: unrecognised MIME type, pretending $mtype" >&2
+    fi
+
     # feed block and rest of file into ourself now we know the type
+    echo "$cmd: pid $$: mtype=$mtype" >&2
     ( rm "$hdr"
       cat
       exec cat <&3
@@ -85,6 +87,15 @@ then
   # regular file - sniff directly
   mtype=`file2mime "$file"` || mtype=
 fi
+
+if [ -n "$VIEW_UNKNOWN_FILENAME" ] \
+&& [ "x$VIEW_UNKNOWN_FILENAME" = "x$file" ]
+then
+    echo "$cmd: pid $$: recursive call on file \"$file\", aborting" >&2
+    exit 1
+fi
+VIEW_UNKNOWN_FILENAME=$file
+export VIEW_UNKNOWN_FILENAME
 
 # ok, we have a type and the file on fd 3 (remember, may be a pipe)
 case "$mtype" in
@@ -103,9 +114,16 @@ for gui in `[ -n "$DISPLAY" ] && echo gui` !gui
 do action=`mailcap -s "$file" "$mtype" $gui ${1+"$@"}` && break
 done
 
-[ -n "$action" ] && exec sh -c "$action"
+[ -n "$action" ] && exec $trace sh -c "$action"
 
 action=`mailcap -s "$file" "$mtype" decode`
-[ -n "$action" ] && { eval "set -vx; $action" | "$0" - ${1+"$@"}; exit $?; }
+if [ -n "$action" ]
+then
+  ##echo "decode using \"$action\"" >&2
+  unset VIEW_UNKNOWN_FILENAME
+  eval "set -vx; $action" | "$0" - ${1+"$@"}
+  exit $?
+fi
+
 echo "$mtype"
 file "$file" | noesc
