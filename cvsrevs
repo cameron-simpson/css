@@ -1,0 +1,32 @@
+#!/bin/sh
+#
+# Report revisions for a file in a CVS checkout.
+#	- Cameron Simpson <cs@zip.com.au> 06nov2003
+#
+
+cmd=$0
+usage="Usage: $cmd filename"
+
+[ $# = 1 ] || { echo "$usage" >&2; exit 2; }
+file=$1; shift
+
+[ -f "$file" ] || { echo "$cmd: $file: not a file!" >&2; exit 1; }
+
+cvs log "$file" \
+| sed -n \
+	'/^symbolic names:/b sym
+	 d
+	 :sym
+	 n
+	 s/^	\([^ ][^ ]*\): .*/\1/p
+	 t sym
+	 :noise
+	 /^----------------------------$/b newrev
+	 n
+	 b noise
+	 :newrev
+	 /^date:/b noise
+	 s/^revision //p
+	 n
+	 t noise
+	 b newrev'
