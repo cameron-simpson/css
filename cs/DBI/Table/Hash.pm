@@ -12,7 +12,7 @@ cs::DBI::Table::Hash - treat an indexed DBI table as a hash
 
 use cs::DBI::Table::Hash;
 
-tie %h, I<dbh>, I<table>, I<keyfield>
+tie %h, I<dbh>, I<table>, I<keyfield>;
 
 =head1 DESCRIPTION
 
@@ -79,7 +79,7 @@ sub FETCH($$)
 
   my $row = $rows[0];
 
-  tie %$row, cs::DBI::Table::Row, $this;
+  tie %$row, cs::DBI::Table::Row, $row, $key, $this;
 
   $row;
 }
