@@ -14,7 +14,7 @@
 #
 # =head1 SYNOPSIS
 #
-# syncstuff [@I<where>] [B<-o> B<I<option>=I<value>>]... [B<--I<rsopt>>...] [B<-b>] [B<-n>] [B<-v>]
+# syncstuff [@I<where>] [B<-o> B<I<option>=I<value>>]... [B<--I<rsopt>>...] [B<-b>] [B<-n>] [B<-v>] [B<-L>]
 # [I<targets>...]
 #
 # =head1 DESCRIPTION
@@ -28,7 +28,7 @@
 #
 
 cmd=`basename "$0"`
-usage="Usage: $cmd [@where] [-o option=value]... [-b] [-n] [-v] [targets...]
+usage="Usage: $cmd [@where] [-o option=value]... [-b] [-n] [-v] [-L] [targets...]
 	-b	Backup mode. Use histbackup.
 	--rsync-path exec
 		Execute \"exec\" as the remote rsync command.
@@ -156,14 +156,20 @@ do
 # Remote <B>rsync</B> command to execute.
 # Passed to rsync.
 #
-	-n)	dont=: verbose=1 trace=set-x rsopts="$rsopts -n" ;;
+	--rsync-path=*)	rsopts="$rsopts $1" ;;
+#
+# =item B<-L>
+#
+# Follow symlinks. Passed to rsync.
+#
+	-L)	rsopts="$rsopts $1" ;;
 #
 # =item B<-n>
 #
 # No action.
 # Only report what would happen.
 #
-	-n)	dont=: verbose=1 trace=set-x rsopts="$rsopts -n" ;;
+	-n)	dont=: verbose=1 trace=set-x rsopts="$rsopts $1" ;;
 #
 # =item B<-P>
 #
