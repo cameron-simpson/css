@@ -8,7 +8,7 @@
 #
 
 nfstab=/etc/nfstab
-nfstree=/mnt/nfs
+nfstree=/nfs
 mkstuff=1
 
 usage="Usage: $0 [-n] [nfstab]
