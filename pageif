@@ -4,8 +4,7 @@
 #	- Cameron Simpson <cs@zip.com.au> 27feb2000
 #
 
-PAGER=${PAGER:-less}
-export PAGER
+: ${PAGER:=less}
 
 # turn on autoquit, for less anyway
 LESS="$LESS -E"
@@ -19,7 +18,7 @@ then
     fi
 else
     if [ -t 1 ]
-    then  "$@" 2>&1 | $PAGER
+    then  ( "$@" 2>&1 & ) | $PAGER
     else  exec "$@"
     fi
 fi
