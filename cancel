@@ -1,0 +1,33 @@
+#!/bin/sh
+#
+
+eval "`setvar -n mail news`"
+
+ng=
+case $1 in
+    -n)	ng=$2; shift; shift ;;
+esac
+
+[ -n "$ng" -a $# -gt 0 ] || { echo "Usage: $0 -n newsgroup msgids..." >&2; exit 2; }
+
+xit=0
+
+for msgid
+do  case "$msgid" in
+        \<*\>)	;;
+	*)	msgid="<$msgid>" ;;
+    esac
+    { echo "Newsgroups: $ng"
+      echo "Subject: cmsg cancel $msgid"
+      echo "Control: cancel $msgid"
+      echo "References: $msgid"
+      echo "Reply-To: $EMAIL"
+      echo "Followup-To: poster"
+      echo "Organization: $ORGANIZATION"
+      echo
+      echo "Cancelled by $0."
+    } | tee /dev/tty | m -h "$ng@USENET" \
+	|| xit=$?
+done
+
+exit $xit
