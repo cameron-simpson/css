@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # Backup a directory to an indefinite file store using an incremental
-# technique.
+# technique. Also see the rab script, which is an easy to use wrapper.
 #	- Cameron Simpson <cs@zip.com.au> 03apr2000
 #
 # --inplace
@@ -156,6 +156,7 @@ else
     if [ $linkonly ]
     then
 	echo "$cmd: $dest: no subdirectory to link from" >&2
+	ls -la "$dest" >&2
 	exit 1
     else
 	echo "fresh backup, just copying source ..."
