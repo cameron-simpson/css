@@ -54,7 +54,7 @@ while ((defined($_=<STDIN>)))
       # fix up Mozilla pigheadedness
       { wincmd($id,'Move','0','-0');
       }
-      elsif ($info eq 'Save File')
+      elsif ($info eq 'Save File' || $info eq 'Save As' || $info eq 'Find in the Page')
       # put Mozilla save-file dialogue somewhere intelligent
       { wincmd($id,'Move','m0','m0');
       }
