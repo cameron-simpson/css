@@ -4,4 +4,5 @@
 #	- Cameron Simpson <cs@zip.com.au> 01jul2004
 #
 
+set -x
 exec alog squid_redirect squid_redirect -P "8080:$SQUID"
