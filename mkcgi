@@ -1,0 +1,59 @@
+#!/bin/sh
+#
+# Create a CGI and the wrapper.
+#	- Cameron Simpson <cs@zip.com.au> 09jul2003
+#
+
+ext=pl
+
+cmd=`basename "$0"`
+usage="Usage: $cmd [{-sh|-pl}] basename
+	-sh	Make a shell CGI.
+	-pl	Make a Perl CGI.
+	  Default: -$ext"
+
+badopts=
+
+while :
+do
+  case "$1" in
+    -sh)	ext=sh ;;
+    -pl)	ext=pl ;;
+    --)		shift; break ;;
+    -?*)	echo "$cmd: unrecognised option: $1" >&2
+		badopts=1
+		;;
+    *)		break ;;
+  esac
+  shift
+done
+
+if [ $# = 0 ]
+then
+  echo "$cmd: missing basename" >&2
+  badopts=1
+else
+  base=$1; shift
+  cgi=$base.cgi
+  cgiext=$cgi-$ext
+  [ -f "$cgi" ] && { echo "$cmd: $cgi already exists" >&2; badopts=1; }
+  [ -f "$cgiext" ] && { echo "$cmd: $cgiext already exists" >&2; badopts=1; }
+
+  [ $# = 0 ] || { echo "$cmd: extra arguments after basename: $*" >&2
+		  badopts=1
+		}
+fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+for wrapdir in .. /opt/css/bin $HOME/scripts
+do  wrapper=$wrapdir/cgiwrap-stub
+    [ -s "$wrapper" ] && break
+    wrapper=
+done
+
+[ -n "$wrapper" ] || { echo "$cmd: can't find cgiwrap-stub" >&2; exit 1; }
+
+ln -s "$wrapper" "$cgi" || exit 1
+tplt "$cgiext" >"$cgiext" || exit 1
+chmod 755 "$cgiext"
