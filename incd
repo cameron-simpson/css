@@ -1,0 +1,10 @@
+#!/bin/sh
+#
+# Run command in another directory.
+#	- Cameron Simpson <cs@zip.com.au> 05mar2003
+#
+
+[ $# -lt 2 ] && { echo "Usage: $cmd dir command [args...]" >&2; exit 2; }
+cd "$1" || exit 1
+shift
+exec "$@"
