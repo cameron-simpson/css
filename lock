@@ -48,7 +48,7 @@ run I<command> as an asynchronous child.
 
 Query the lock named I<key>,
 returning a meaningful exit status
-(0 for lock taken ,1 for lock not taken).
+(0 for lock taken, 1 for lock not taken).
 Useful in B<if> statements.
 
 =item B<-s>
@@ -63,13 +63,19 @@ An empty key silently bypasses any locking and just runs I<command>.
 
 =back
 
+=head1 EXIT STATUS
+
+Non-zero if the lock cannot be obtained,
+or if the I<command> returns a non-zero exit status.
+
 =head1 SEE ALSO
 
 kproc(1), cs::Lock(3)
 
 =head1 AUTHOR
 
-Cameron Simpson E<lt>cs@zip.com.auE<gt> 01oct1997
+Cameron Simpson E<lt>cs@zip.com.auE<gt> 01oct1997;
+converted to perl to beat shell fork/exec load during high contention 10feb1999.
 
 =cut
 
