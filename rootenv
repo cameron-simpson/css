@@ -1,0 +1,16 @@
+#!/bin/sh
+#
+# Adopt a rootlike environment.
+#	- Cameron Simpson <cs@zip.com.au> 07nov2000
+#
+
+if [ "x$1" = x-recall ]
+then
+    shift
+    for f in /etc/profile $HOME/.profile
+    do  [ -s "$f" ] && . "$f"
+    done
+    exec "$@"
+fi
+
+exec env - USER=root HOME=/ PATH=/bin:/usr/bin "$0" -recall "$@"
