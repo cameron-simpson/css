@@ -1,0 +1,40 @@
+#!/bin/sh
+#
+# For each target, move aside and issue an async rm.
+#	- Cameron Simpson <cs@zip.com.au> 19jul98
+#
+
+rmopts=
+while :
+do  case $1 in
+	--)	shift; break ;;
+	-?*)	rmopts="$rmopts $1" ;;
+	*)	break ;;
+    esac
+    shift
+done
+
+xit=0
+
+n=0
+for arg
+do  case $arg in
+	*/*)	d=`dirname "$arg"` ;;
+	*)	d=. ;;
+    esac
+    case $arg in
+	/*)	orig=$arg ;;
+	*)	orig=./$arg ;;
+    esac
+    aside=$d/.frm.$$.$n
+
+    n=`expr $n + 1`
+    if mv -i "$orig" "$aside"
+    then
+	rm $rmopts "$aside" &
+    else
+	xit=$?
+    fi
+done
+
+exit $xit
