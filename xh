@@ -1,0 +1,3 @@
+#!/bin/sh
+
+exec xlocal xhost ${1+"$@"}
