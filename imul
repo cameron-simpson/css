@@ -12,11 +12,21 @@ use GD;
 sub xval($);
 sub yval($);
 
-$::Usage="Usage: $::cmd srcimage.png < commands\n";
+$::Usage="Usage: $::cmd [-M cgi] srcimage.png < commands
+	-M cgi	Emit HTML client-side image map data to call the specified cgi.
+";
 
 my $png;
+my $mapmode=0;
+my $mapcgi;
 
 { my $badopts = 0;
+
+  if (@ARGV && $ARGV[0] eq '-M')
+  { $mapmode=1;
+    shift(@ARGV);
+    $mapcgi=shift(@ARGV);
+  }
 
   if (! @ARGV)
   { warn "$::cmd: missing srcimage.png\n";
@@ -39,6 +49,7 @@ my $im = GD::Image->newFromPng($png);
 
 my $bg = $im->colorAllocate(255,255,255);
 my $fg = $im->colorAllocate(0,0,0);
+my $border = $im->colorAllocate(0,0,0);
 my $font = gdSmallFont();
 my $fwidth = $font->width();
 my $fheight = $font->height();
@@ -78,12 +89,27 @@ while (defined($_=<STDIN>))
     }
     else
     { $bg=$im->colorAllocate(@args);
-      warn "new BG = $bg";
+    }
+  }
+  elsif ($op eq BORDER)
+  { if (@args != 3)
+    { warn "$pfx: expected 3 arguments (R B G)\n";
+      $ok=0;
+    }
+    else
+    { $border=$im->colorAllocate(@args);
     }
   }
   elsif ($op eq LABEL)
-  { if (@args < 3)
-    { warn "$pfx: expected X Y LABELTEXT...\n";
+  { 
+    my $hint = 'C';
+    if (@args && $args[0] =~ /^-(n|s|e|w|ne|se|nw|sw|c)$/i)
+    { $hint=uc($1);
+      shift(@args);
+    }
+
+    if (@args < 3)
+    { warn "$pfx: expected [-hint] X Y LABELTEXT...\n";
       $ok=0;
     }
     else
@@ -92,8 +118,35 @@ while (defined($_=<STDIN>))
       my $dx = length($txt)*$fwidth;
       my $dy = $fheight;
 
-      ## $im->filledRectangle($x-1,$y-$dy-1,$x+$dx+1,$y+1,$bg);
-      $im->string($font,$x,$y-$dy,$txt,$fg);
+      if (! $mapmode)
+      { $im->filledRectangle($x-4,$y-4,$x+4,$y+4,$border);
+      }
+
+      if ($hint eq 'C')	{ $x-=$dx/2; $y-=$dy/2; }
+      elsif ($hint eq 'N'){ $x-=$dx/2; $y-=$dy; }
+      elsif ($hint eq 'S'){ $x-=$dx/2; }
+      elsif ($hint eq 'E'){ $y-=$dy/2; }
+      elsif ($hint eq 'W'){ $x-=$dx; $y-=$dy/2; }
+      elsif ($hint eq 'NE'){ $y-=$dy; }
+      elsif ($hint eq 'SE'){ }
+      elsif ($hint eq 'NW'){ $x-=$dx; $y-=$dy; }
+      elsif ($hint eq 'SW'){ $x-=$dx; }
+
+      my $x1=$x-1;
+      my $y1=$y-1;
+      my $x2=$x+$dx+1;
+      my $y2=$y+$dy+1;
+
+      if ($mapmode)
+      { my $txtval = "$mapcgi?$txt";
+	$txtval =~ s/[^ !-~]|"/sprintf("%%%02x",ord($&))/eg;
+        print "<AREA ALT=\"$txt\" COORDS=\"$x1,$y1,$x2,$y2\" HREF=\"$txtval\" SHAPE=\"RECTANGLE\"></AREA>\n";
+      }
+      else
+      { $im->filledRectangle($x1,$y1,$x2,$y2,$bg);
+        $im->rectangle($x1-1,$y1-1,$x2+1,$y2+1,$border);
+	$im->string($font,$x1+1,$y1+1,$txt,$fg);
+      }
     }
   }
   elsif ($op eq CENTRE)
@@ -128,7 +181,9 @@ while (defined($_=<STDIN>))
 
 die if ! $ok;
 
-print $im->png();
+if (! $mapmode)
+{ print $im->png();
+}
 
 exit 0;
 
