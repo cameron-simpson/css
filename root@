@@ -1,0 +1,19 @@
+#!/bin/sh
+#
+# Make/attach a logged screened root session on a host.
+#	- Cameron Simpson <cs@zip.com.au> 20may2002
+#
+
+cmd=$0
+
+[ $# = 1 ] || { echo "Usage: $cmd hostname" >&2; exit 2; }
+host=$1; shift
+
+ext=
+
+session=root@$host$ext
+
+exec term +ip -n "$session" \
+	scrif "$session" \
+	logscript "$session" \
+	sshp1 "root@$host"
