@@ -315,7 +315,7 @@ do
 	      exec sh $xflag "$script"
 	    ) \
 	    | case "$addresses" in
-		'') exec execif sh -c "exec >>'$log'; echo;echo '============================';echo '$script';date;exec cat" ;;
+		'') exec sh -c "exec >>'$log'; echo;echo '============================';echo '$script';date;exec execif cat" ;;
 		-)  exec cat ;;
 		*)  exec mailif -s "$subj" $addresses ;;
 	      esac
