@@ -226,7 +226,7 @@ sed -e 's;//*; -- ;g' -e 's/   */ /g' \
       ripcomment="Ripped by $NAME with cdparanoia on `date`"
 
       [ -s "$raw" ] \
-      || (set -x; cdparanoia $cdpara_noise -d "$dev" -e -w "$track" "$raw") \
+      || (set -x; cdparanoia $cdpara_noise -d "$dev" -w "$track" "$raw") \
       || { echo "cdparanoia failed" >&2
 	   tail -20 cdp.err >&2
 	   [ $keep ] || rm -f "$raw"
