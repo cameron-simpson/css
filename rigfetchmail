@@ -14,7 +14,7 @@ cd
   fmhosts='127.0.0.2 127.0.0.3'
   case "$LOCATION" in
     home|sco|tw)
-	fmopts="$fmopts -l 65536" fmdelay=1800 ;;
+	fmopts="$fmopts -l 65536" fmdelay=3600 ;;
   esac
   set -- -f "$HOME/.fetchmailrc" \
 	  -t 900 \
