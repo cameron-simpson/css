@@ -180,9 +180,11 @@ $::Usage="Usage: $::cmd [-a alert] [-m domains] [-t {unix|mh|maildir}] <categori
 	-t type		Select default mailbox type.
 ";
 
-$::DfltSfx="";	# unix style by default
+$::DfltSfx="";		# unix style by default
+$::DfltType=UNIX;	# unix style by default
 @::DfltDom=$ENV{SITENAME};
 undef $::DfltAlert;
+$::RcvStore='/usr/lib/nmh/rcvstore';	# path to MH rcvstore command
 
 { my $badopts=0;
 
@@ -200,19 +202,19 @@ undef $::DfltAlert;
   }
 
   if (defined $::opt_t)
-  { my $type = uc($::opt_t);
+  { $::DfltType = uc($::opt_t);
 
-    if ($type eq UNIX)
+    if ($::DfltType eq UNIX)
     { $::DfltSfx='';
     }
-    elsif ($type eq MAILDIR)
+    elsif ($::DfltType eq MAILDIR)
     { $::DfltSfx='/';
     }
-    elsif ($type eq MH)
+    elsif ($::DfltType eq MH)
     { $::DfltSfx='/.';
     }
     else
-    { warn "$::cmd: -t: bad mailbox type \"$type\"\n\tI know: UNIX MAILBOX MH.\n";
+    { warn "$::cmd: -t: bad mailbox type \"$::DfltType\"\n\tI know: UNIX MAILBOX MH.\n";
       $badopts=1;
     }
   }
@@ -227,6 +229,9 @@ undef $::DfltAlert;
 
 my $doalert;
 my $sfx;
+my $type;
+my $flags;
+my $deliver;
 my $cont;
 
 CAT:
@@ -291,6 +296,27 @@ while (<STDIN>)
 
   my $hregexp = '('.join('|',@hdrs).')';
 
+  if ($folder =~ /^\|/)
+  { $deliver="$folder '$key'";
+  }
+  elsif ($folder =~ /\@/)
+  { $deliver="! $folder";
+  }
+  else
+  { $type=foldertype($folder);
+    
+    if ($type eq MH)
+    # procmail doesn't do .mh_sequences support
+    { $deliver="| $::RcvStore +$folder -unseen";
+    }
+    else
+    { $sfx=foldersfx($folder);
+      $deliver="$folder$sfx";
+    }
+  }
+
+  $flags=($deliver =~ /^\|/ ? "w" : "");
+
   print <<X
 : 0$cont
 * ^$hregexp:.*$ptn
@@ -320,22 +346,12 @@ X
     ;
   }
 
-  print <<'X'
+  print <<X
 
-  : 0
+  : 0$flags
+  $deliver
 X
   ;
-
-  if ($folder =~ /^\|/)
-  { print "  $folder '$key'\n";
-  }
-  elsif ($folder =~ /\@/)
-  { print "  ! $folder\n";
-  }
-  else
-  { $sfx=foldersfx($folder);
-    print "  $folder$sfx\n";
-  }
 
   print <<X
 }
@@ -347,20 +363,29 @@ X
 exit 0;
 
 sub foldersfx
+{ my($type)=@_;
+
+  if ($type eq UNIX)	{ return ""; }
+  if ($type eq MAILDIR)	{ return "/"; }
+  if ($type eq MH)	{ return "/."; }
+  die "$0: can't determine folder suffix for type \"$type\"";
+}
+
+sub foldertype
 { my($folder)=@_;
 
   $folder="$ENV{MAILDIR}/$folder" unless $folder =~ m:^/:;
   if (! stat($folder))
-  { return $::DfltSfx;
+  { return $::DfltType;
   }
 
   if (! -d _)
-  { return "";
+  { return UNIX;
   }
 
   if (-e "$folder/.mh_sequences")
-  { return "/.";
+  { return MH;
   }
 
-  return "/";
+  return MAILDIR;
 }
