@@ -28,10 +28,6 @@ if (! (@s=stat($::srcfile)))
 { die "$::cmd: stat($::srcfile): $!\n";
 }
 
-if (-l _)
-{ die "$::cmd: $::srcfile: is a symbolic link\n";
-}
-
 my $mode = $s[2] & 07777;
 
 $::Xit=0;
