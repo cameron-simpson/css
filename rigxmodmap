@@ -10,8 +10,10 @@
   echo clear mod5
 
   # happy hacker mapping
-  echo keycode 129 = Alt_R
-  echo keycode 131 = Alt_L
+# echo keycode 129 = Alt_R
+# echo keycode 131 = Alt_L
+
+  echo keycode 115 = Alt_L
 
 # echo clear control
 # echo keycode 157 = Control_R
