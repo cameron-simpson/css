@@ -59,6 +59,7 @@ fi
 
 # no action? bail out
 action=`mailcap $mcflag -s "$file" "$mtype"`
+[ -n "$action" ] || [ $copious ] || action=`mailcap -c -s "$file" "$mtype"`
 
 # empty action in mailcap
 [ -z "$action" ] && { echo "$mtype"; file "$file"; exit 0; }
