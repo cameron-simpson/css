@@ -15,6 +15,8 @@ exec rsync -avHP --delete \
 	'--include=/.bashrc' \
 	'--include=/.less' \
 	'--include=/.lesskey' \
+	'--include=/.mailcap' \
+	'--include=/.muttrc' \
 	'--include=/.profile' \
 	'--include=/.secret' \
 	'--include=/.setvar' \
@@ -24,6 +26,11 @@ exec rsync -avHP --delete \
 	'--include=/bin' \
 	'--include=/rc' \
 	'--include=/rc/env' \
+	'--include=/rc/mail' \
+	'--include=/rc/mail/mailcap' \
+	'--include=/rc/mail/mutt*' \
+	'--include=/rc/mail/signature' \
+	'--exclude=/rc/mail/*' \
 	'--include=/rc/myke' \
 	'--include=/rc/nvi' \
 	'--include=/rc/perl' \
