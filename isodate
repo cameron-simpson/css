@@ -1,0 +1,65 @@
+#!/bin/sh
+#
+# Return today's day code.	- Cameron Simpson <cs@zip.com.au> 16jun1994
+# ISOise the returns.		- cameron 27mar1998
+# Solaris 2.6 is feeding me full day and month names!	- cameron 05apr2000
+# Believe the claims that -% works everywhere these days. - cameron 06jun2000
+#
+
+cmd=`basename "$0"`
+
+iso=${ISOTIME-1}
+case $1 in
+    -i)	iso=1; shift ;;
+    +i)	iso= ; shift ;;
+esac
+
+case "$iso,$cmd" in
+    1,daycode)	fmt='%Y-%m-%d' ;;
+    ,daycode)	fmt='%Y%m%d' ;;
+    1,timecode)	fmt='%H:%M:%S' ;;
+    ,timecode)	fmt='%H%M%S' ;;
+    1,datecode)	fmt='%Y-%m-%d-%H:%M:%S' ;;
+    ,datecode)	fmt='%Y%m%d-%H%M%S' ;;
+    *)		echo "$cmd: unrecognised function \"$cmd\": I know daycode, datecode, timecode" >&2
+		exit 2
+		;;
+esac
+
+exec date "+$fmt"
+
+# set `date|tr ':[A-Z]' ' [a-z]'`
+# day=$1 mon=$2 mday=$3 hh=$4 mm=$5 ss=$6 tzone=$7 year=$8
+# time=$hh:$mm:$ss
+# case $mon in
+#     jan*)	mnum=01;;
+#     feb*)	mnum=02;;
+#     mar*)	mnum=03;;
+#     apr*)	mnum=04;;
+#     may*)	mnum=05;;
+#     jun*)	mnum=06;;
+#     jul*)	mnum=07;;
+#     aug*)	mnum=08;;
+#     sep*)	mnum=09;;
+#     oct*)	mnum=10;;
+#     nov*)	mnum=11;;
+#     dec*)	mnum=12;;
+#     *)		echo "$0: can't convert month \"$mon\" into numeric value" >&2
+# 		exit 1
+# 		;;
+# esac
+# 
+# yy=`expr $year - 1900`
+# 
+# case $mday in [0-9]) mday=0$mday ;; esac
+# case $yy   in [0-9]) yy=0$yy     ;; esac
+# case $hh   in [0-9]) hh=0$hh     ;; esac
+# 
+# case $0 in
+#     daycode|*/daycode)		[ $iso ] && echo "$year-$mnum-$mday" \
+# 					 || echo "$year$mnum$mday" ;;
+#     timecode|*/timecode)	[ $iso ] && echo "$hh:$mm:$ss" \
+# 					 || echo "$hh$mm$ss" ;;
+#     *)				[ $iso ] && echo "$year-$mnum-$mday-$hh:$mm:$ss" \
+# 					 || echo "$year$mnum$mday$hh$mm$ss" ;;
+# esac
