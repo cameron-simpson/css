@@ -1,0 +1,4 @@
+#!/bin/sh
+mlalias ${1+"$@"} | sed 's/^  *//
+			 1,/^addrlist:/d
+			 /^ownerlist:/,$d'
