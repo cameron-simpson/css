@@ -16,19 +16,19 @@ xit=0
 short="$NAME &lt;$PUBLICEMAIL&gt;"
 
 # bail quickly out if nothing to do
-fgrep "$short" "$@" >/dev/null || exit 0
+fgrep -l "$short" "$@" \
+| { xit=0
+    while read file
+    do
+      ( set bsed "s|@author $short|@author <A HREF=\"$WWW_HOME\">$NAME</A> \&lt;<A HREF=\"mailto:$PUBLICEMAIL\">$PUBLICEMAIL</A>\&gt;|"
+	if ifcvs "$file"
+	then
+	    exec cvsedit --no-dl --no-diff -m "expand @author HREFs" "$file" "$@"
+	else
+	    exec "$@" "$file"
+	fi
+      ) || { xit=1; break; }
+    done
 
-for file
-do
-  fgrep "$short" <"$file" >/dev/null || continue
-  ( set bsed "s|@author $short|@author <A HREF=\"$WWW_HOME\">$NAME</A> \&lt;<A HREF=\"mailto:$PUBLICEMAIL\">$PUBLICEMAIL</A>\&gt;|"
-    if ifcvs "$file"
-    then
-	exec cvsedit --no-dl --no-diff -m "expand @author HREFs" "$file" "$@"
-    else
-	exec "$@" "$file"
-    fi
-  ) || { xit=1; break; }
-done
-
-exit $xit
+    exit $xit
+  }
