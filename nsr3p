@@ -69,42 +69,42 @@ xit=0
 case $dir in
   load)
 	# locate an empty slot
-	slot=`nsrjb -C | sed -n 's/^ *\([0-9][0-9]*\): *$/\1/p' | sed 1q`
+	slot=`(set -x; exec nsrjb -C) | sed -n 's/^ *\([0-9][0-9]*\): *$/\1/p' | sed 1q`
 	[ -n "$slot" ] || { echo "$cmd $dir: no free slots!" >&2 ;exit 1; }
 
 	# get the tape from the load bay
-	nsrjb -d -P 1 -S "$slot" || exit 1
+	(set -x; exec nsrjb -d -P 1 -S "$slot") || exit 1
 
 	if [ -z "$nolabel" ]
 	then
 	    [ -n "$pool" ] \
 		|| { echo "$cmd $dir: label: no pool specified" >&2
-		     nsrjb -w -S "$slot" -P 1
+		     (set -x; exec nsrjb -w -S "$slot" -P 1)
 		     exit 1
 		   }
 
 	    # label the tape
-	    nsrjb -L -Y -B -b "$pool" -S "$slot" \
+	    (set -x; exec nsrjb -L -Y -B -b "$pool" -S "$slot") \
 		|| { echo "$cmd $dir: label fails" >&2
-		     nsrjb -w -S "$slot" -P 1
+		     (set -x; exec nsrjb -w -S "$slot" -P 1)
 		     exit 1
 		   }
 	fi
 
 	# load the tape but don't mount it
-	nsrjb -ln -S "$slot" \
+	(set -x; exec nsrjb -ln -S "$slot") \
 		|| { echo "$cmd $dir: load fails" >&2
-		     nsrjb -w -S "$slot" -P 1
+		     (set -x; exec nsrjb -w -S "$slot" -P 1)
 		     exit 1
 		   }
 
 	# locate the device the tape was just loaded into
 	subst="s|^ *drive [0-9][0-9]* *(\\(/dev/[^)]*\\)) *slot *$slot:.*|\\1|p"
-	device=`nsrjb -C | sed -n "$subst"`
+	device=`(set -x; exec nsrjb -C) | sed -n "$subst"`
 	[ -n "$device" ] \
 		|| { echo "$cmd $dir: can't find device holding tape" >&2
-		     nsrjb -u -S "$slot"
-		     nsrjb -w -S "$slot" -P 1
+		     (set -x; exec nsrjb -u -S "$slot")
+		     (set -x; exec nsrjb -w -S "$slot" -P 1)
 		     exit 1
 		   }
 
@@ -114,7 +114,7 @@ case $dir in
 	) | nsradmin -i -
 
 	echo "TAPE=$device; export TAPE"
-	echo ": $cmd unlaod $device"
+	echo ": $cmd unload $device"
 	;;
 
   unload)
@@ -124,18 +124,18 @@ case $dir in
 	) | nsradmin -i -
 
 	subst="s|^ *drive [0-9][0-9]* *($device) *slot *\\([0-9][0-9]*\\):.*|\\1|p"
-	slot=`nsrjb -C | sed -n "$subst"`
+	slot=`(set -x; exec nsrjb -C) | sed -n "$subst"`
 	[ -n "$slot" ] \
 		|| { echo "$cmd $dir: can't deduce slot # from device \"$device\"" >&2
 		     exit 1
 		   }
 
-	nsrjb -u -S "$slot" \
+	(set -x; exec nsrjb -u -S "$slot") \
 		|| { echo "$cmd $dir: can't unload tape for slot $slot" >&2
 		     exit 1
 		   }
 
-	nsrjb -w -P 1 -S "$slot" \
+	(set -x; exec nsrjb -w -P 1 -S "$slot") \
 		|| { echo "$cmd $dir: can't export tape from slot $slot" >&2
 		     exit 1
 		   }
