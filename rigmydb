@@ -1,0 +1,14 @@
+#!/bin/sh
+
+case "$HOST@$SYSTEMID" in
+    ivie@cisra|skaros@home)
+	;;
+    *)
+	echo "$0: must be on ivie@cisra or skaros@home" >&2
+	exit 1
+	;;
+esac
+ignhup \
+	cmdlog -l mysql@$HOST \
+	lock mysql@$HOST \
+	mydb $HOME/there/$SYSTEMID/mysql-db &
