@@ -1,0 +1,44 @@
+#!/usr/bin/perl
+#
+# Emit shell assignments to set date related variables.
+#	- Cameron Simpson <cs@zip.com.au> 13aug99
+#
+
+use strict qw(vars);
+
+($::cmd=$0) =~ s:.*/::;
+$::Usage="Usage: $::cmd [-gmt] [time_t]\n";
+
+my $badopts = 0;
+
+my $usegmt = 0;
+if (@ARGV && $ARGV[0] eq '-gmt')
+{ $usegmt=1;
+  shift(@ARGV);
+}
+
+my $when = time;
+if (@ARGV && $ARGV[0] =~ /^\d+$/)
+{ $when=$ARGV[0]+0;
+  shift(@ARGV);
+}
+
+if (@ARGV)
+{ warn "$::cmd: extra arguments: @ARGV\n";
+  $badopts=1;
+}
+
+die $::Usage if $badopts;
+
+my @tm = ($usegmt ? gmtime($when) : localtime($when));
+
+printf("mday=%d mday2=%02d mnum=%d mnum2=%02d year=%d year4=%04d year2=%02d\n",
+	$tm[3],$tm[3],$tm[4]+1,$tm[4]+1,$tm[5]+1900,$tm[5]+1900,$tm[5]);
+
+printf("wday=%d wdayname=%s mname=%s\n",
+	$tm[6],
+	('Sun','Mon','Tue','Wed','Thu','Fri','Sat')[$tm[6]],
+	('Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec')[$tm[4]]);
+
+printf("hour=%d hour2=%02d min=%d min2=%02d sec=%d sec2=%02d\n",
+	$tm[2],$tm[2],$tm[1],$tm[1],$tm[0],$tm[0]);
