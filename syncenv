@@ -16,7 +16,7 @@ refpid=$1; shift
 
 file=$TMPDIR/env$refpid
 new=
-for envfile in $ENVFILES
+for envfile in "$0" $ENVFILES
 do
   if [ -s "$envfile" ]
   then
@@ -33,8 +33,8 @@ then
   do
     if [ -s "$envfile" ]
     then
-      echo "source $envfile" >&2
-      egrep -iv '^[a-z][a-z0-9_]*\(\)' "$envfile"
+      echo "echo \"\$0: source $envfile\" >&2"
+      cat "$envfile"
     fi
   done
   touch "$file"
