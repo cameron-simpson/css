@@ -51,6 +51,7 @@ usage="Usage: $cmd {start|stop|restart} [options...] [@where]
 	-y		Yes: proceed with the default location without asking.
 	-s		Synchronous. Default: asynchronous.
 	-S		Really synchronous. Default: asynchronous.
+	-E envfile	File in which to record environment values.
 	-f config	Specify config file.
 			Default: $cf
 	@where		Default location. Falls back to \$SYSTEMID or \"home\".
@@ -176,14 +177,13 @@ do  case $1 in
 	#
 	# suitably adjusted to match your B<-E> option setting,
 	# thus performing this function for csh(1) and tcsh(1) users.
+	#
+	# In L<Startup Mode> this file is truncated before the startup.
+	# In L<Raw Mode> this file is simply extended,
+	# this allowing the raw run to override previous values,
+	# typically wanted by @nw(1cs).
 	# 
-	-E)   envfile=$2; shift
-	      echo 'setenv(){ eval "export $1=\$2"; }' >"$envfile" \
-	      || { echo "$cmd: can't write to $envfile" >&2
-		   badopts=1
-		   envfile=
-		 }
-	      ;;
+	-E)   envfile=$2; shift ;;
 	--)   shift; break ;;
 	-?*)  echo "$cmd: unrecognised option: $1" >&2
 	      badopts=1
@@ -238,6 +238,13 @@ setenv()
   eval "$setenv_var=\$setenv_val; export $setenv_var"
   if [ -n "$envfile" ]
   then
+      # make sure the setenv function is present
+      [ -s "$envfile" ] \
+      || echo 'setenv(){ eval "export $1=\$2"; }' >>"$envfile" \
+      || { echo "$cmd: can't write to $envfile" >&2
+	   envfile=
+	 }
+
       case "$setenv_val" in
 	  *\'*) setenv_val=`echo "$setenv_val" | sed "s/'/'\\\\\\\\''/g"` ;;
       esac
@@ -549,6 +556,9 @@ else
 	done
     fi
 
+    # truncate env file for fresh starts
+    [ -z "$envfile" ] || >"$envfile"
+
     # make available to subprocesses and user environment
     setenv RC_MOBILE_WHERE "$where"
 
@@ -568,7 +578,7 @@ runqueue "$@"
 #
 # =head1 SEE ALSO
 #
-# rsync(1), cp(1), winclause(1cs)
+# nw@(1cs), rsync(1), cp(1), winclause(1cs)
 #
 # =head1 AUTHOR
 #
