@@ -9,9 +9,9 @@ then
     # don't use "cat" because I want unbuffered output
     FvwmCommand -c
 else
-    set -x
+    ##set -x
     for arg
     do  FvwmCommand "$arg"
-	sleep 1
+	##sleep 1
     done
 fi
