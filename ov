@@ -1,0 +1,19 @@
+#!/bin/sh
+#
+# Overlay one dir on another, prune first one.
+#	- Cameron Simpson <cs@zip.com.au> 22jul2004
+#
+
+cmd=$0
+usage="Usage: $cmd srcdir destdir"
+
+[ $# = 2 ] || { echo "$usage" >&2; exit 2; }
+srcdir=$1 destdir=$2
+
+[ -d "$srcdir/." ] || { echo "$cmd: not a directory: $srcdir" >&2; exit 1; }
+[ -d "$destdir/." ] || { echo "$cmd: not a directory: $destdir" >&2; exit 1; }
+
+set -x
+overlay "$srcdir" "$destdir"
+pruneleafdirs "$srcdir"
+exit 0
