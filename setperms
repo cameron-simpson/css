@@ -37,7 +37,7 @@ die $usage if $badopts;
 $mode=oct($mode);
 
 $xit=0;
-$oldline='';
+$olddir='';
 
 if ($#ARGV < 0)
 { while (<STDIN>)
@@ -59,9 +59,15 @@ sub mod	# (file,mode,verbose) -> void
   my($dev,$ino,$fmode,@etc);
 
   $v && out("checking  $f");
+  if ($f =~ m:(.*[^/])/+[^/]:)
+  { $thisdir=$1;
+  }
+  else
+  { $thisdir=$f;
+  }
 
   if (!(($dev,$ino,$fmode,@etc)=lstat($f)))
-  { $oldline=''; err("$::cmd: can't stat $f: $!\n");
+  { warn "$::cmd: can't stat $f: $!\n";
     $xit=1;
     return;
   }
@@ -69,7 +75,7 @@ sub mod	# (file,mode,verbose) -> void
   if (-f _)	{ $m&=0666; }	# don't care about search on files
   elsif (-d _)	{ }
   elsif (-l _)	{ return; }	# ignore symlinks
-  else		{ err("$::cmd: $f: odd file type\n");
+  else		{ warn "$::cmd: $f: odd file type\n";
 		  $xit=1;
 		  return;
 		}
@@ -80,25 +86,30 @@ sub mod	# (file,mode,verbose) -> void
   $tm=$fmode&~0777;	# setuid etc from file
 
   if ($force)
-	# low bits from user
-	{ $tm|=($m&0777);
-	}
+  # low bits from user
+  { $tm|=($m&0777);
+  }
   else	# low bits from both
-	{ $tm|=($fmode|$m)&0777;
-	}
+  { $tm|=($fmode|$m)&0777;
+  }
 
   if ($fmode == $tm)
-	# modes are ok
-	{ if ($v && -d _)
-		{ nl($f);
-		}
-	}
+  # modes are ok
+  {
+  }
   # adjust modes
   elsif (chmod($tm,$f))
-	{ $v && nl(sprintf("chmod %03o %s",$tm&0777,$f));
-	}
+  { if ($v)
+    { if (! -d _ && $thisdir ne $olddir)
+      { nl($thisdir);
+	$olddir=$thisdir;
+      }
+
+      nl(sprintf("chmod %03o %s",$tm&0777,$f));
+    }
+  }
   else
-  { err("$::cmd: chmod($f,..): $!\n");
+  { warn "$::cmd: chmod($f,..): $!\n";
     $xit=1;
   }
 }
