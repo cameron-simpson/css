@@ -19,55 +19,56 @@ query=`qsencode "$query"`
 if [ -z "$target" ]
 then
     target=$cmd
-    case "$cmd" in
-	aarn)	[ $# = 0 ] && exec us http://mirror.aarnet.edu.au/ ;;
-	anime)	target=tamara ;;
-	avim|im)target=avimagesearcher ;;
-	avsubmit) target=altavistasubmit ;;
-	av)	target=altavista ;;
-	babel)	target=babelfish ;;
-	de2en)	target=google_de2en ;;
-	deja)	target=dejanews ;;
-	dict)	target=onelook ;;
-	djid)	exec us `msgid2dj ${1+"$@"}` ;;
-	dj)	target=googledj ;;
-	ev)	target=everything ;;
-	fm)	target=freshmeat ;;
-	fst)	target=findsametext ;;
-	fsu)	target=findsameurl ;;
-	gim)	target=googleimagesearch ;;
-	gnews)	target=googlenews ;;
-	imdb-actor) target=movieactors ;;
-	imdb-character-female) target=moviecharfemale ;;
-	imdb-character-male) target=moviecharmale ;;
-	imdb-title) target=movietitles ;;
-	mcrawl)	target=metacrawler ;;
-	msgid)	target=googledjmsgid ;;
-	nlight)	target=northernlight ;;
-	raging)	target=avraging ;;
-	rpmfind)target=speakeasy-rpmfind ;;
-	sf)	target=sourceforge ;;
-	trans)	target=systranslinks ;;
-	tv)     target=sofcomtv ;;
-	w3val)	target=w3c_validate ;;
-	wiki)	target=wikipedia ;;
-	yp)	target=yellowpages ;;
-	www)	target='altavista yahoo dmoz google' ;;
-	yg)	target=yahoogroups ;;
-	movie)	exec us "http://www.cinema.pgh.pa.us/movie/reviews?$query" ;;
-	ebay)	case "$query" in
-		    *\ *)	;;
-		    [0-9]?????????) target=ebayitem ;;
-		esac
-		;;
-	urlsubmit)
-		avsubmit ${1+"$@"} &
-		googlesubmit ${1+"$@"} &
-		wait
-		exit 0
-		;;
-    esac
 fi
+
+case "$target" in
+    aarn)	[ $# = 0 ] && exec us http://mirror.aarnet.edu.au/ ;;
+    anime)	target=tamara ;;
+    avim|im)target=avimagesearcher ;;
+    avsubmit) target=altavistasubmit ;;
+    av)	target=altavista ;;
+    babel)	target=babelfish ;;
+    de2en)	target=google_de2en ;;
+    deja)	target=dejanews ;;
+    dict)	target=onelook ;;
+    djid)	exec us `msgid2dj ${1+"$@"}` ;;
+    dj)	target=googledj ;;
+    ev)	target=everything ;;
+    fm)	target=freshmeat ;;
+    fst)	target=findsametext ;;
+    fsu)	target=findsameurl ;;
+    gim)	target=googleimagesearch ;;
+    gnews)	target=googlenews ;;
+    imdb-actor) target=movieactors ;;
+    imdb-character-female) target=moviecharfemale ;;
+    imdb-character-male) target=moviecharmale ;;
+    imdb-title) target=movietitles ;;
+    mcrawl)	target=metacrawler ;;
+    msgid)	target=googledjmsgid ;;
+    nlight)	target=northernlight ;;
+    raging)	target=avraging ;;
+    rpmfind)target=speakeasy-rpmfind ;;
+    sf)	target=sourceforge ;;
+    trans)	target=systranslinks ;;
+    tv)     target=sofcomtv ;;
+    w3val)	target=w3c_validate ;;
+    wiki)	target=wikipedia ;;
+    yp)	target=yellowpages ;;
+    www)	target='altavista yahoo dmoz google' ;;
+    yg)	target=yahoogroups ;;
+    movie)	exec us "http://www.cinema.pgh.pa.us/movie/reviews?$query" ;;
+    ebay)	case "$query" in
+		*\ *)	;;
+		[0-9]?????????) target=ebayitem ;;
+	    esac
+	    ;;
+    urlsubmit)
+	    avsubmit ${1+"$@"} &
+	    googlesubmit ${1+"$@"} &
+	    wait
+	    exit 0
+	    ;;
+esac
 
 case "$target" in
   *\ *)	for t in $target
