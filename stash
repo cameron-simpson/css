@@ -1,0 +1,63 @@
+  #!/opt/bin/perl5
+
+  ($cmd=$0) =~ s:.*/::;
+
+  $DIR='.';
+  $filing=0;
+
+  if ($ARGV[$[] eq '-d')
+	  { shift;
+	    $DIR=shift;
+	  }
+
+  if ($#ARGV < $[)
+	  { &stash('stdin',STDIN);
+	  }
+  else
+  { for (@ARGV)
+	  { if (open(STASH,"< $_\0"))
+		  { &stash($_,STASH);
+		    close(STASH);
+		  }
+	    else
+	    { print STDERR "$cmd: can't open $_: $!\n";
+	    }
+	  }
+  }
+
+  if ($filing)
+	  { close(FILEMAIL);
+	    $filing=0;
+	  }
+
+  sub stash
+	  { local($file,$FILE)=@_;
+
+	    print STDERR "stash $file ...\n";
+
+	    FETCH:
+	      while (<$FILE>)
+		  { if (/^From / || /^Article / || /^Path:/)
+			  { if ($filing)
+				  { close(FILEMAIL);
+				    $filing=0;
+				  }
+
+			    if (open(FILEMAIL,"|exec filemail '$DIR'"))
+				  { $filing=1;
+				  }
+			    else
+			    { print STDERR "$cmd: can't pipe to filemail: $!\n";
+			    }
+
+			    if (/^Article /)
+				  { $_=<$FILE>;
+				    redo FETCH;
+				  }
+			  }
+
+		    if ($filing)
+			  { print FILEMAIL $_;
+			  }
+		  }
+	  }
