@@ -8,17 +8,17 @@
 cmd=$0
 [ $# = 0 ] && { echo "$cmd: missing arguments"; >&2; exit 2; }
 
-MYKE_STARTDIR=${MYKE_STARTDIR:-`pwd`}
-export MYKE_STARTDIR
+##MYKE_STARTDIR=${MYKE_STARTDIR:-`pwd`}
+##export MYKE_STARTDIR
 
 set /bin/sh "$@"
 
-if [ -n "$DISPLAY" ]
-then
-    TMPDIR=${TMPDIR:-/tmp}
-    tmp=$TMPDIR/err$$
-    set filter_fd 2 "tee $tmp" "$@"
-fi
+##if [ -n "$DISPLAY" ]
+##then
+##    TMPDIR=${TMPDIR:-/tmp}
+##    tmp=$TMPDIR/err$$
+##    set filter_fd 2 "tee $tmp" "$@"
+##fi
 
 [ -t 1 ] || exec "$@"
 
@@ -27,8 +27,8 @@ set colourise "$@"
 "$@"
 xit=$?
 
-[ -f "$tmp" -a -s "$tmp" ] && ( lastvalue -d "$MYKE_STARTDIR" myke_err - <"$tmp"
-				rm "$tmp"
-			      ) &
+##[ -f "$tmp" -a -s "$tmp" ] && ( lastvalue -d "$MYKE_STARTDIR" myke_err - <"$tmp"
+##				rm "$tmp"
+##			      ) &
 
 exit $xit
