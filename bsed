@@ -4,6 +4,8 @@
 #	- Cameron Simpson <cs@zip.com.au>
 #
 
+: ${TMPDIR:=/tmp}
+
 cmd=`basename "$0"`
 usage="Usage: $cmd [-v] [-i suf] {-f script|{-e sedcmd}...|sedcmd}... [--] files...
 	-v		Verbose.
@@ -76,7 +78,7 @@ fi
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
-tmp=/tmp/$cmd.$$
+tmp=$TMPDIR/$cmd.$$
 trap 'rm -f "$tmp"; exit 1' 1 2 15
 
 xit=0
