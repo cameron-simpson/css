@@ -1,21 +1,21 @@
 #!/usr/bin/perl
 #
 # The wiring database.
-#	- Cameron Simpson <cs@zip.com.au> 05jul98
+#	- Cameron Simpson <cs@zip.com.au> 05jul1998
 #
 
 use strict qw(vars);
 
-use CISRA::DB;
+use cs::DB;
 
-package CISRA::Wiring;
+package cs::DB::Wiring;
 
-@CISRA::UserData::ISA=();
+@cs::DB::Wiring::ISA=();
 
-sub finish { CISRA::DB::finish(); }
+sub finish { cs::DB::finish(); }
 
 sub db
-{ CISRA::DB::db(['wiring'],@_);
+{ cs::DB::db(['wiring'],@_);
 }
 
 sub db_switch
