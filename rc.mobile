@@ -26,7 +26,7 @@
 #
 # In addition to choosing different configurations based on location or circumstance,
 # I<rc.mobile> also starts the services in parallel,
-# yeilding significantly faster boot times.
+# yielding significantly faster boot times.
 # There are facilities for specifying that one service depends on another
 # and for running arbitrary shell commands
 # for actions not encapsulated in standard startup files.
