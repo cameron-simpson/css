@@ -27,22 +27,37 @@ while :
 do
   case $1 in
     -[12v]) sshopts="$sshopts $1" ;;
+    -c)	command=$2; shift ;;
     -d)	delay=$2; shift ;;
     -h)	hostspec="$hostspec $2"; shift ;;
     -u)	userpfx=$2@; shift ;;
     -n)	trace=echo ;;
     -x)	trace=set-x ;;
+    --)	shift; break ;;
+    -?*) echo "$cmd: unrecognised option: $1" >&2; badopts=1 ;;
+    *' '*)
+	break ;;
     [a-zA-Z]*=*)
 	sshopts="$sshopts $1"
 	;;
-    --)	shift; break ;;
-    -?*) echo "$cmd: unrecognised option: $1" >&2; badopts=1 ;;
     *)	break ;;
   esac
   shift
 done
 
-[ $# = 0 ] && { echo "$cmd: missing command" >&2; badopts=1; }
+if [ -z "$command" ]
+then
+    if [ $# = 0 ]
+    then
+	echo "$cmd: missing command" >&2
+	badopts=1
+    else
+	command=$1; shift
+    fi
+fi
+
+[ $# = 0 ] || { echo "$cmd: extra arguments: $*" >&2; badopts=1; }
+
 [ -n "$hostspec" ] || { echo "$cmd: missing hostspec" >&2; badopts=1; }
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
