@@ -28,7 +28,7 @@ then
     | if [ $dohtml ]
       then
 	prepod \
-	| pod2html "--title=Overview of $*" - \
+	| pod2html --podroot=. --podpath=. --norecurse --htmlroot=. "--title=Overview of $*" - \
 	| postpod \
 	| sed -n '1,/^<!-- INDEX END -->/d
 		/^<p>/b para
