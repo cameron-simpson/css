@@ -37,6 +37,7 @@ usage="Usage: $cmd [{-t|+t|-T title}] file [{-n|-y}] [-d savedir] [-p pager] \\
 	-y		Run viewer immediately.
 	-N		Don't offer to save the file.
 	-Y		Save the file without asking questions.
+	-A		Auto-notsave if file already present.
 	-X		Extract archive and run apphelper for each entry.
 	-d savedir	Save directory (from \$SAVEDIR: $savedir).
 	-p pager	Pager (default viewer, from \$PAGER: $pager)."
@@ -171,9 +172,9 @@ else
 	  # The default is to ask.
 	  #
 	  -Y)	savemode=yes ;;
-	  # =item -Y
+	  # =item -A
 	  #
-	  # Yes: save the file without asking.
+	  # Auto: don't ask to save the file if the file's already there.
 	  # The default is to ask.
 	  #
 	  -A)	savemode=auto ;;
