@@ -1,3 +1,4 @@
 #!/bin/sh
 cd $HOME/rc/mail || exit 1
-cvsedit "cats.$SYSTEMID" && myke
+id=${1:-$SYSTEMID}
+cvsedit "cats.$id" && myke
