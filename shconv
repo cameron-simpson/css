@@ -64,7 +64,7 @@ do  if [ "x$f" = x- ]
 		;;
     esac
 
-    newfile=`basename "$f" "$oldsfx"`$newsfx
+    newfile=`dirname "$f"`/`basename "$f" "$oldsfx"`$newsfx
     [ $force ] \
 	|| [ ! -f "$newfile" ] \
 	|| { echo "$cmd: existing file: $newfile" >&2
