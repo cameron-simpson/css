@@ -9,6 +9,7 @@ usage="Usage: $cmd host"
 
 : ${PPPSSH_PPPD:=/usr/sbin/pppd}	# local pppd
 : ${PPPSSH_RPPPD:=$PPPSSH_PPPD}		# remote pppd
+: ${PPPSSH_SSHCF:=$HOME/.ssh/config}	# ssh config file
 export PPPSSH_PPPD PPPSSH_RPPPD
 
 exec 2>>$HOME/ppp.log
@@ -22,5 +23,5 @@ rcmd="exec '$PPPSSH_PPPD' notty local nodetach noauth"
 [ $# = 0 ] || rcmd="$*"
 
 set -x
-ssh -A -x "$host" "$rcmd"
+ssh -A -x -F "$PPPSSH_SSHCF" "$host" "$rcmd"
 echo "$0: ssh exits with $?" >&2
