@@ -1,0 +1,167 @@
+#!/bin/sh
+#
+# mobile	Site specific network config.
+#
+# For a roving RedHat laptop.
+# Needed: /etc/sysconfig/network-scripts/ifcfg-eth0.* with ONBOOT=no
+# and a dummy ifcfg-eth0 for picky redhat startup scripts.
+# Cameron Simpson <cs@zip.com.au> 25jun2000
+#
+# Subsume the if{up|down}@* scripts into this, move config into file.
+# - cameron 06feb2001
+#
+# chkconfig: 2345 11 89
+# description: Activates/Deactivates the network interfaces suitable to a \
+#              location as specified by the /etc/rc.mobile.conf file.
+# probe: true
+#
+
+# Source function library.
+. /etc/rc.d/init.d/functions
+
+if [ ! -f /etc/sysconfig/network ]; then
+    exit 0
+fi
+
+. /etc/sysconfig/network
+
+if [ -f /etc/sysconfig/pcmcia ]; then
+	. /etc/sysconfig/pcmcia
+fi
+
+
+# Check that networking is up.
+[ ${NETWORKING} = "no" ] && exit 0
+
+[ -x /sbin/ifconfig ] || exit 0
+
+cmd=$0
+
+# See how we were called.
+case "$1" in
+  start)
+	tty=`tty`
+	[ -n "$tty" ] || tty=/dev/console
+	action=up
+	int=1
+	donfs=
+	shift
+        ;;
+  stop)
+	action=down
+	shift
+        ;;
+  restart)
+	"$cmd" stop && "$cmd" start
+	exit $?
+	;;
+  *)
+        echo "Usage: $cmd {start|stop|restart}" >&2
+        exit 1
+esac
+
+(
+  where=${SYSTEMID:-none}
+  cf=/etc/rc.mobile.conf
+
+  badopts=
+  while :
+  do  case $1 in
+	  -i)	int=1 ;;
+	  -a)	action=$2; shift ;;
+	  -f)	cf=$2; shift ;;
+	  -h)	HOST=$2; shift ;;
+	  -N)	donfs=1 ;;
+	  --)	shift; break ;;
+	  -?*)	echo "$cmd: unrecognised option: $1" >&2
+		  badopts=1
+		  ;;
+	  *)	break
+		  ;;
+      esac
+      shift
+  done
+
+  [ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+  [ -s "$cf" ] || { echo "$cmd: missing config file $cf" >&2; exit 1; }
+
+  # we want the short hostname
+  [ -n "$HOST" ] || { HOST=${HOST:-`hostname`}
+		      case $HOST in
+			  *.*) HOST=`expr "x$HOST" : 'x\([^.]*\).*'` ;;
+		      esac
+		    }
+  export HOST
+
+  locations=none\ `sed -n -e '/^#/d' -e 's/^\\[\\(.*\\)\\]$/\\1/p' "$cf"`
+
+  # ask for info if interactive
+  if [ $int ]
+  then
+      echo "$cmd - bring up interface according to location"
+      echo -n "I know ["$locations"] Where am I [$where]? "
+      read iwhere || { echo; exit 1; }
+      [ -n "$iwhere" ] && where=$iwhere
+  fi
+
+  [ "x$where" = xnone ] && exit 0
+
+  config=`sed -e '/^#/d' -e "/^\\[$where\\]\\$/,/^\\[/!d" -e '/^\\[/d' "$cf"`
+  [ -n "$config" ] || { echo "$cmd: $cf: no config for [$where]" >&2; exit 1; }
+
+  DEVICE=eth0
+  BOOTPROTO=static
+  IPADDR=
+  NETMASK=
+  GATEWAY=
+  DNS=
+  DOMAINS=
+
+  eval "$config"
+
+  cfgname=$DEVICE.$where
+  cfg=/etc/sysconfig/network-scripts/ifcfg-$cfgname
+
+  exec 3>&1 1>"$cfg"
+
+  echo ONBOOT=no >&3
+
+  for var in DEVICE BOOTPROTO IPADDR NETMASK
+  do  eval "val=\$$var"
+      [ -n "$val" ] && echo "$var=$val"
+  done
+
+  exec >&3 3>&-
+
+  [ -s "$cfg" ] || { echo "$cmd: can't make config file $cfg" >&2; exit 1; }
+
+  chmod a+r "$cfg"
+
+  case "$action" in
+     up)
+      ifup "$cfgname" || exit 1
+      [ -n "$GATEWAY" ] && route add default gw "$GATEWAY"
+
+      [ -n "$DNS" ] && { echo "nameserver $DNS"
+			 echo "search $DOMAINS"
+		       } >/etc/resolv.conf
+      ;;
+
+    down)
+      [ -n "$GATEWAY" ] && route del default
+      ifdown "$cfgname" || exit 1
+      ;;
+
+    *)
+      echo "$0: unknown action \"$action\"" >&2
+      exit 2
+      ;;
+
+  esac
+)
+
+if [ $? = 0 ]
+then	success "Site specific network config."
+else	failure "Site specific network config."
+fi
