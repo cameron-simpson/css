@@ -4,4 +4,4 @@
 #	- Cameron Simpson <cs@zip.com.au> 12jan2001
 #
 
-awk '{print length " " $0}' | sort -n | sed 's/^[0-9][0-9]* //'
+awk '{print length " " $0}' ${1+"$@"} | sort -n | sed 's/^[0-9][0-9]* //'
