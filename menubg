@@ -14,17 +14,20 @@ pickn=1
 thisdesk= Dflag=
 
 usage="Usage: $cmd [-M] [ imagefile | bglist-args... ]
+	-t	Choose tall images.
+	-w	Choose wider images.
 	-D	Set the menu backdrop only for this desktop.
 	-M	Popup FVWM menu to pick from choices."
 
 badopts=
-subopts=
+opts=
 
 while :
 do
   case $1 in
-    -D)	thisdesk=1 Dflag=$1 ;;
-    -M)	subopts="$subopts -M" pickn=20 aspect= domenu=1 strippfx=$HOME ;;
+    -D)	opts="$opts $1" thisdesk=1 Dflag=$1 ;;
+    -M)	opts="$opts $1" pickn=20 domenu=1 strippfx=$HOME ;;
+    -[tw]) aspect=$1 ;;
     -?*)echo "$cmd: unrecognised option: $1" >&2; badopts=1 ;;
     --)	shift; break ;;
     *)	break ;;
@@ -48,10 +51,11 @@ else
     esac
 
     # presume search args instead
-    set x `set -x; pickim -P "$strippfx" -n $pickn -r $aspect ${1+"$@"} | sort -u` || exit 1
+    set x `pickim -P "$strippfx" -n $pickn -r $aspect ${1+"$@"} | sort -u` || exit 1
     shift
     [ $# = 0 ] && { echo "$cmd: no image files chosen!" >&2; exit 1; }
-    ##[ $# = 1 ] && domenu=
+    if [ -t 1 ]; then  cd; ls -ld "$@"; fi &
+    [ $# = 1 ] && domenu=
 fi
 
 ##set +x
@@ -64,8 +68,10 @@ then
     do  echo "$arg"
     done >"$tmpf"
     fvwmcmd \
-	  "Piperead 'fvwm-menu -1 ImDirMenu \"$cmd $call\" fvwm-menu-imlist -o menubg -l $tmpf .; rm $tmpf'" \
-	  "Popup ImDirMenu"
+	  "SetEnv FVWM_MENU_IMLIST_OP \"menubg $opts\"" \
+	  "Piperead 'fvwm-menu -1 ImDirMenu \"$cmd $call\" fvwm-menu-imlist -l $tmpf .; rm $tmpf'" \
+	  "Popup ImDirMenu" \
+	  "UnSetEnv FVWM_MENU_IMLIST_OP"
     exit $?
 fi
 
