@@ -1,0 +1,19 @@
+#!/bin/sh
+#
+# Suck the screen X resources out into the filesystem. Called by rterm.
+#	- Cameron Simpson <cs@zip.com.au> 26nov2001
+#
+
+xdflts=$HOME/.Xdefaults
+[ $# = 0 ] || { xdflts=$1; shift; }
+
+[ $# = 0 ] || { echo "Usage: $0 [filename]" >&2; exit 2; }
+
+if [ -n "$DISPLAY" ]
+then
+    PATH=$PATH:/usr/openwin/bin:/usr/X11R6/bin
+    export PATH
+    tmp=.xrdb$$
+    xrdb -query >$tmp && [ -s $tmp ] && cat $tmp >"$xdflts"
+    rm -f $tmp
+fi
