@@ -4,6 +4,22 @@
 #	- Cameron Simpson <cs@zip.com.au>
 #
 
+=head1 NAME
+
+cs::Date - convenience routines date manipulation
+
+=head1 SYNOPSIS
+
+	use cs::Date;
+
+	$today = new cs::Date();
+
+=head1 DESCRIPTION
+
+Assorted routines for minuplating, parsing and printing date information.
+
+=cut
+
 use strict qw(vars);
 
 BEGIN { use cs::DEBUG; cs::DEBUG::using(__FILE__); }
@@ -13,78 +29,11 @@ use cs::Misc;
 
 package cs::Date;
 
-# new cs::Date gmt
-# new cs::Date (tm,givenlocaltime)
-sub new
-{ my($class,$gmt)=(shift,shift);
-  $gmt=time   if ! defined $gmt;
+=head1 GENERAL FUNCTIONS
 
-  if (ref $gmt)
-  # assume we were given a tm struct
-  # convert back to gmt
-  {
-    ## {my(@c)=caller;warn "new cs::Date ".cs::Hier::h2a($gmt,0)." from [@c]";}
-    $gmt=tm2gmt($gmt,@_);
-    if ($gmt == -1)
-    { ::need(cs::Hier);
-      die "range error on ".cs::Hier::h2a($gmt,0);
-    }
-  }
+=over 4
 
-  my($tm);
-
-  $tm=gmt2tm($gmt,0);
-
-  bless { GMT	=> $gmt,
-	  TM	=> { GMT	=> gmt2tm($gmt,0),
-		     LOCAL	=> gmt2tm($gmt,1),
-		   },
-	}, $class;
-}
-
-sub GMTime { shift->{GMT}; }
-
-sub Tm($$)
-{ my($this,$emitlocaltime)=@_;
-  $emitlocaltime=1 if ! defined $emitlocaltime;
-  $this->{TM}->{$emitlocaltime ? LOCAL : GMT};
-}
-
-sub TMField($$$)
-{ my($this,$field,$emitlocaltime)=@_;
-  $emitlocaltime=1 if ! defined $emitlocaltime;
-  $this->Tm($emitlocaltime)->{$field};
-}
-
-sub Sec { my($this)=shift; $this->TMField(SS,@_); }
-sub Min { my($this)=shift; $this->TMField(MM,@_); }
-sub Hour{ my($this)=shift; $this->TMField(HH,@_); }
-sub MDay{ my($this)=shift; $this->TMField(MDAY,@_); }
-sub Mon { my($this)=shift; $this->TMField(MON, @_); }
-sub WDay{ my($this)=shift; $this->TMField(WDAY,@_); }
-sub YDay{ my($this)=shift; $this->TMField(YDAY,@_); }
-sub Year{ my($this)=shift; $this->TMField(YEAR,@_); }
-sub Yy  { my($this)=shift; $this->TMField(YY,  @_); }
-
-sub DayCode
-{ my($this)=shift;
-  gmt2yyyymmdd($this->GMTime(),@_);
-}
-
-sub Hms
-{ my($this,$emitlocaltime,$spacers)=@_;
-  $emitlocaltime=1 if ! defined $emitlocaltime;
-  $spacers=1 if ! defined $spacers;
-
-  my $sep = ($spacers ? ':' : '');
-
-  sprintf("%02d%s%02d%s%02d",
-  	$this->Hour($emitlocaltime),
-	$sep,
-	$this->Min($emitlocaltime),
-	$sep,
-	$this->Sec($emitlocaltime));
-}
+=cut
 
 # cs::Date::weekday names
 @cs::Date::wday_names=('sun','mon','tue','wed','thu','fri','sat');
@@ -402,6 +351,143 @@ sub txt2gm
   }
 
   $time;
+}
+
+=back
+
+=head1 OBJECT ACCESS AND CREATION
+
+=over 4
+
+=item new cs::Date(I<gmt>), new cs::Date(I<tm>,I<givenlocaltime>)
+
+Construct a new cs::Date object
+given either a B<time_t> in GMT
+or a TM hash,
+return a cs::Date object.
+For the TM hash,
+the optional parameter I<givenlocaltime> specifies whether the TM is in the local time zone.
+
+=cut
+
+sub new
+{ my($class,$gmt)=(shift,shift);
+  $gmt=time   if ! defined $gmt;
+
+  if (ref $gmt)
+  # assume we were given a tm struct
+  # convert back to gmt
+  {
+    ## {my(@c)=caller;warn "new cs::Date ".cs::Hier::h2a($gmt,0)." from [@c]";}
+    $gmt=tm2gmt($gmt,@_);
+    if ($gmt == -1)
+    { ::need(cs::Hier);
+      die "range error on ".cs::Hier::h2a($gmt,0);
+    }
+  }
+
+  my($tm);
+
+  $tm=gmt2tm($gmt,0);
+
+  bless { GMT	=> $gmt,
+	  TM	=> { GMT	=> gmt2tm($gmt,0),
+		     LOCAL	=> gmt2tm($gmt,1),
+		   },
+	}, $class;
+}
+
+=back
+
+=head1 OBJECT METHODS
+
+=over 4
+
+=item GMTime()
+
+Return the GMT time held by this date.
+
+=cut
+
+sub GMTime { shift->{GMT}; }
+
+=item Tm(I<emitlocaltime>)
+
+Return a TM hash containing this date's human calendar fields.
+The optional parameter I<emitlocaltime> specifies whether the TM is in the local time zone.
+
+=cut
+
+sub Tm($$)
+{ my($this,$emitlocaltime)=@_;
+  $emitlocaltime=1 if ! defined $emitlocaltime;
+  $this->{TM}->{$emitlocaltime ? LOCAL : GMT};
+}
+
+=item TMField(I<fieldname>,I<emitlocaltime>)
+
+Return a particular field from this dates TM hash representation.
+The optional parameter I<emitlocaltime> specifies whether the TM is in the local time zone.
+
+=cut
+
+sub TMField($$$)
+{ my($this,$field,$emitlocaltime)=@_;
+  $emitlocaltime=1 if ! defined $emitlocaltime;
+  $this->Tm($emitlocaltime)->{$field};
+}
+
+=item Sec(I<emitlocaltime>), Min(I<emitlocaltime>), Hour(I<emitlocaltime>), MDay(I<emitlocaltime>), Mon(I<emitlocaltime>), WDay(I<emitlocaltime>), YDay(I<emitlocaltime>), Year(I<emitlocaltime>), YY(I<emitlocaltime>)
+
+Return this dates seconds, minutes, hours, day of month (1..31),
+month (1..12), day of week (Sun=0,.., Sat=6), day of year (0..365),
+year, short year (year-1900)
+from this date's TM hash, respectively.
+
+=cut
+
+sub Sec { my($this)=shift; $this->TMField(SS,@_); }
+sub Min { my($this)=shift; $this->TMField(MM,@_); }
+sub Hour{ my($this)=shift; $this->TMField(HH,@_); }
+sub MDay{ my($this)=shift; $this->TMField(MDAY,@_); }
+sub Mon { my($this)=shift; $this->TMField(MON, @_); }
+sub WDay{ my($this)=shift; $this->TMField(WDAY,@_); }
+sub YDay{ my($this)=shift; $this->TMField(YDAY,@_); }
+sub Year{ my($this)=shift; $this->TMField(YEAR,@_); }
+sub Yy  { my($this)=shift; $this->TMField(YY,  @_); }
+
+=item DayCode(I<emitlocaltime>)
+
+Return an ISO day code of the form B<I<yyyy>-I<mm>-I<dd>>.
+
+=cut
+
+sub DayCode
+{ my($this)=shift;
+  gmt2yyyymmdd($this->GMTime(),@_);
+}
+
+=item Hms(I<emitlocaltime>,I<spacers>)
+
+Return a time code of the form B<I<hh>:I<mm>:I<ss>>.
+If the optional parameter I<spacers> is supplied and false,
+omit the colons (`B<:>').
+
+=cut
+
+sub Hms
+{ my($this,$emitlocaltime,$spacers)=@_;
+  $emitlocaltime=1 if ! defined $emitlocaltime;
+  $spacers=1 if ! defined $spacers;
+
+  my $sep = ($spacers ? ':' : '');
+
+  sprintf("%02d%s%02d%s%02d",
+  	$this->Hour($emitlocaltime),
+	$sep,
+	$this->Min($emitlocaltime),
+	$sep,
+	$this->Sec($emitlocaltime));
 }
 
 1;
