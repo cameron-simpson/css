@@ -486,6 +486,12 @@ Note that a single discid may match multiple database entries.
 sub Query($)
 { my($this)=@_;
 
+  my @p = $this->_ProbeCache();
+  if (@p)
+  { $this->Read($p[0]->[0]);
+    return [$this->Category(),$this->Title(),$this->DiscId()];
+  }
+
   my $discid = $this->DiscId();
   if (! defined $discid)
   { warn "$::cmd: cs::CDDB: no discid!\n";
@@ -743,7 +749,7 @@ Return the number of tracks.
 =cut
 
 sub NTracks
-{ scalar($_[0]->Tracks())-1;
+{ scalar($_[0]->Tracks());
 }
 
 =item TrackInfo()
