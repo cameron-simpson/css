@@ -47,6 +47,8 @@ else
   then
     echo "$cmd: missing editcommand" >&2
     badopts=1
+  else
+    editcommand=$1; shift
   fi
 fi
 
@@ -55,6 +57,7 @@ fi
 tmpf=$TMPDIR/$cmd$$
 trap 'rm -f "$tmpf"' 0 1 15
 
+set -x
 if [ -z "$message" ]
 then
   [ -t 0 ] || { echo "$cmd: stdin must be a tty" >&2; exit 1; }
@@ -72,14 +75,14 @@ case "$reportcmd" in
 		$ENV{reportcmd} =~ s/\%a/$a/g;
 		$ENV{reportcmd} =~ s/\%s/$q/g;
 		print $ENV{reportcmd}, "\n";
-	       ' ${1+"$@"}
+	       ' -- ${1+"$@"}
 	      `
 		;;
 esac
 
 sh -c "$reportcmd" >"$tmpf" || exit 1
 
-arg1 $arg1opts "$itemname" "$@"
+arg1 $arg1opts "$itemname" "$editcommand" "$@"
 xit=$?
 
 sh -c "$reportcmd" | diffu "$tmpf" - | buglog "$message"
