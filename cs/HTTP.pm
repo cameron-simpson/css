@@ -443,6 +443,7 @@ sub getCookies()
     my($domain,$bool1,$pathpfx,$bool2,$expires,$name,$value)=@f;
     $value="" if ! defined $value;
 
+    setCookie(\@C,$domain,$bool1 eq TRUE,$pathpfx,$bool2 eq TRUE,$expires,$name,$value);
     push(@C, { DOMAIN => $domain,
 	       BOOL1 => ($bool1 eq TRUE),
 	       PATH => $pathpfx,
@@ -454,6 +455,44 @@ sub getCookies()
   }
 
   return @C;
+}
+
+sub setCookie($$$$$$$$)
+{ my($CA,$domain,$bool1,$pathpfx,$bool2,$expires,$name,$value)=@_;
+
+  ## warn "setCookie($domain$pathpfx: $name=$value\n";
+  push(@$CA, { DOMAIN => $domain,
+	       BOOL1 => $bool1,
+	       PATH => $pathpfx,
+	       BOOL2 => $bool2,
+	       EXPIRES => $expires,
+	       NAME => $name,
+	       VALUE => $value,
+	     });
+}
+
+sub applyCookies($$$)
+{ my($CA,$M,$U)=@_;
+
+  local($_);
+
+  for my $H ($M->Hdrs())
+  {
+    if ($H =~ /^set-cookie:\s*/i)
+    { $_=$';
+      my($domain,$bool1,$path,$bool2,$expire_spec,$name,$value);
+      $domain=$U->Host();
+      if (/^([a-z_][_\w]*)=([^;\s]*)/)
+      { ($name,$value)=($1,$2);
+	$_=$';
+	my($p);
+	($p,$_)=cs::MIME::parseTypeParams($_);
+	$domain=$p->{'domain'} if exists $p->{'domain'};
+	$path=$p->{'path'} if exists $p->{'path'};
+	setCookie(\@::Cookies,$domain,$bool1,$path,$bool2,0,$name,$value);
+      }
+    }
+  }
 }
 
 #######################
@@ -622,6 +661,8 @@ sub Request($$;$$$)
   my($rversion,$rcode,$rtext)=($1,$2,$');
   
   my $M = new cs::MIME ($this->Source(),1,$sinkfile,$keepsink);
+
+  applyCookies(\@::Cookies,$M,$U);
 
   wantarray
   ? ($rversion,$rcode,$rtext,$M)
