@@ -1,4 +1,8 @@
 #!/bin/sh
+#
+# Prompt for a change log line for a bug report.
+#	- Cameron Simpson <cs@zip.com.au> 10aug2004
+#
 
 prompt="Please enter the reason and bug id for this session."
 
