@@ -1,0 +1,26 @@
+#!/usr/bin/perl
+#
+# Read binary data from stdin. Write C data bytes of the form 0xXX to stdout,
+# suitable for inclusion in a C char array or Java byte array.
+#	- Cameron Simpson <cs@zip.com.au> 25apr2001
+#
+
+$i=0;
+
+while (($n=sysread(STDIN,$_,256)) > 0)
+{
+  for my $b (0..length($_)-1)
+  {
+    print ' ' if $i > 0;
+
+    printf("0x%02x,", ord(substr($_,$b,1)));
+
+    $i++;
+    if ($i >= 12)
+    { print "\n";
+      $i=0;
+    }
+  }
+}
+
+print "\n" if $i > 0;
