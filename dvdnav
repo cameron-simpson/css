@@ -1,0 +1,6 @@
+#!/bin/sh
+case "$1" in
+    :[0-9]*)	mrlsfx=$1; shift ;;
+    *)		mrlsfx= ;;
+esac
+exec xine ${1+"$@"} "dvdnav://`pwd`$mrlsfx"
