@@ -1,0 +1,9 @@
+#!/bin/sh
+#
+
+cmd=`basename "$0"`
+tmp=/tmp/$cmd.$$
+
+xrdb -query > $tmp
+${EDITOR-vi} $tmp
+xrdb -load $tmp
