@@ -140,7 +140,7 @@ if ($::Query)
 
 if (length $::Key)
 { $::Lock = new cs::Lock ($::Key,($::Onceonly ? 1 : 0),$::Silent);
-  die "$::cmd: can't lock \"$::Key\"\n" if ! defined $::Lock;
+  exit 0 if ! defined $::Lock;
 }
 else
 { undef $::Lock;
