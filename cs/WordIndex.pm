@@ -47,7 +47,61 @@ package cs::WordIndex;
 
 =over 4
 
+=item fetchCollatedResults(I<collatedResults>)
+
+Take some search results after collation by the B<CollateResults> method
+and fetch the lines involved,
+returning an arrayref for results,
+each an arrayref of the form B<I<file>, I<lineno>, I<line>, I<words...>]>.
+
 =cut
+
+sub fetchCollatedResults
+{ my($fmap)=@_;
+
+  my @fetched;
+
+  my $lmap;
+  my $flines;
+  my @lines;
+  my $lineno;
+
+  FILE:
+  for my $file (sort keys %$fmap)
+  {
+    if (! cs::Misc::openr(cs::WordIndex::TEXTFILE, $file))
+    { warn "$::warningContext: can't open $file: $!\n";
+      next FILE;
+    }
+
+    local($::warningContext)="$::warningContext: $file";
+
+    $flines = $fmap->{$file};
+    @lines=sort {$a<=>$b} keys %$flines;
+
+    FETCHLINE:
+    while (@lines)
+    { $lineno=shift(@lines);
+
+      LINE:
+      while ($. < $lineno)
+      { $_=<TEXTFILE>;
+	if (! defined)
+	{ warn "$::warningContext:$.: unexpected EOF\n";
+	  last FETCHLINE;
+	}
+      }
+
+      chomp;
+
+      # stash line and word hits
+      push(@fetched,[ $file, $lineno, $_, @{$flines->{$lineno}} ]);
+    }
+    close(TEXTFILE);
+  }
+
+  return \@fetched;
+}
 
 =back
 
@@ -106,37 +160,39 @@ sub ProcessFile
   }
 
   local($_);
+  my $lineno = 0;
 
   LINE:
   while (defined($_=<$FILE>))
-  { chomp;
+  { $lineno++;
+    chomp;
     s/^\s+//;
     next LINE if ! length;
 
     # pure words (well, including underscores)
     for my $word (::uniq(map(lc,grep(length,split(/[^_\w]+/)))))
-    { $this->AddWord($word,$file,$.);
+    { $this->AddWord($word,$file,$lineno);
     }
 
     # compound words with dashes
     for my $word (::uniq(map(lc,grep(length,split(/[^-\w]+/)))))
     { $word =~ s/^-+//;
       $word =~ s/-+$//;
-      $this->AddWord($word,$file,$.) if length $word;
+      $this->AddWord($word,$file,$lineno) if length $word;
     }
 
     # compound words with dots
     for my $word (::uniq(map(lc,grep(length,split(/[^.\w]+/)))))
     { $word =~ s/^\.+//;
       $word =~ s/\.+$//;
-      $this->AddWord($word,$file,$.) if length $word;
+      $this->AddWord($word,$file,$lineno) if length $word;
     }
 
     # compound words with dashes and underscores and dots
     for my $word (::uniq(map(lc,grep(length,split(/[^-_.\w]+/)))))
     { $word =~ s/^[-.]+//;
       $word =~ s/[-.]+$//;
-      $this->AddWord($word,$file,$.) if length $word;
+      $this->AddWord($word,$file,$lineno) if length $word;
     }
   }
 }
@@ -351,7 +407,7 @@ sub _decodeIndexLine
 
   FIELD:
   for my $field (split(/\s+/))
-  { if (! m:(.*)/:)
+  { if ($field !~  m:(.*)/:)
     { warn "$::warningContext: bad field \"$field\"\n\tline is \"$_\"\n";
       next FIELD;
     }
@@ -448,53 +504,6 @@ sub CollateResults
       }
     }
   }
-}
-
-sub fetchCollatedResults
-{ my($fmap)=@_;
-
-  my $fetched = {};
-
-  my $lmap;
-  my $flines;
-  my @lines;
-  my $lineno;
-
-  FILE:
-  for my $file (sort keys %$fmap)
-  {
-    if (! cs::Misc::openr(cs::WordIndex::TEXTFILE, $file))
-    { warn "$::warningContext: can't open $file: $!\n";
-      next FILE;
-    }
-
-    local($::warningContext)="$::warningContext: $file";
-
-    $flines = $fmap->{$file};
-    @lines=sort {$a<=>$b} keys %$flines;
-
-    FETCHLINE:
-    while (@lines)
-    { $lineno=shift(@lines);
-
-      LINE:
-      while ($. < $lineno)
-      { $_=<TEXTFILE>;
-	if (! defined)
-	{ warn "$::warningContext:$.: unexpected EOF\n";
-	  last FETCHLINE;
-	}
-      }
-
-      chomp;
-
-      # stash line and word hits
-      $fetched->{"$file/$lineno"}=[ $_, @{$flines->{$lineno}} ];
-    }
-    close(TEXTFILE);
-  }
-
-  return $fetched;
 }
 
 =back
