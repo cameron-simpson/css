@@ -1,0 +1,62 @@
+#!/bin/sh
+#
+# Gather ssh host keys using ssh-keyscan(1) and incorporate into system tables.
+#	- Cameron Simpson <cs@zip.com.au> 25jun2003
+#
+
+cmd=`basename "$0"`
+usage="Usage: $cmd {-a|hosts...}"
+
+hlist=/tmp/$cmd$$h
+keys=/tmp/$cmd$$k
+
+badopts=
+all=
+
+if [ "x$1" = x-a ]
+then
+  shift; all=1
+  [ $# = 0 ] || { echo "$cmd: extra arguments after -a: $*" >&2; badopts=1; }
+else
+  if [ $# = 0 ]
+  then
+    echo "$cmd: missing hosts" >&2; badopts=1
+  fi
+fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+# for CVS log
+if [ $all ]
+then  cvshostnames="all hosts"
+else  cvshostnames=$*
+fi
+
+# generate host list
+if [ $all ]
+then
+  hdbinfo ARCH \
+  | awk '{print$1}'
+else
+  for host
+  do  echo "$host"
+  done
+fi \
+| wired \
+| xxargs ns 2>/dev/null \
+| sed 's/:.*//' \
+> "$hlist"
+
+# gather keys
+for type in rsa1 rsa dsa
+do
+  ssh-keyscan -f "$hlist" -t "$type" >"$keys-$type" &
+done
+wait
+cvsmsg="new ssh keys from $cvshostnames"
+
+set -x
+ifcvs -m "$cvsmsg" ssh_known_hosts1 mergesshkeys <"$keys-rsa1"	|| exit 1
+ifcvs -m "$cvsmsg" ssh_known_hosts2 mergesshkeys <"$keys-rsa"	|| exit 1
+ifcvs -m "$cvsmsg" ssh_known_hosts2 mergesshkeys <"$keys-dsa"	|| exit 1
+ifcvs -f -m "$cvsmsg" ssh_known_hosts_all cat ssh_known_hosts1 ssh_known_hosts2 || exit 1
