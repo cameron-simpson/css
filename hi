@@ -8,7 +8,7 @@ hi=$HOME/rc/hi
 
 eval `datevars`
 weekly=
-mode=
+mode=normal
 
 [ "x$wdayname" = xMon ] && weekly=1
 [ "x$1" = x-html ] && { mode=html; shift; }
@@ -17,10 +17,11 @@ mode=
 
 if [ $# = 0 ]
 then
-    [ -n "$mode" ] || mode=html
-    set rterm `cd "$hi" || exit 1
-	       ls -d [a-z]*|sed -e '/^cvs$/d' -e '/^Mykefile$/d' -e 's/\.weekly$//'|sort -u`
-    shift
+    set space science weather cisra
+    ## [ -n "$mode" ] || mode=html
+    ## set rterm `cd "$hi" || exit 1
+    ##     ls -d [a-z]*|sed -e '/^cvs$/d' -e '/^Mykefile$/d' -e 's/\.weekly$//'|sort -u`
+    ## shift
 else
     [ -n "$mode" ] || mode=normal
 fi
