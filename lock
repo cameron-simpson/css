@@ -172,6 +172,9 @@ if ($::Async)
   { $::Lock->{TAKEN}=0;	# don't tidy up after fork
     exit 0;
   }
+
+  # rewrite info with correct pid
+  $::Lock->_SetInfo();
 }
 
 # now the for-real fork/wait
