@@ -111,6 +111,7 @@ else
       else
 	    if [ $doterm ]
 	    then
+		tmpfile=$tmpfile-`basename "$file"`
 		if cp "$file" "$tmpfile"
 		then  file=$tmpfile
 		else  echo "$cmd: can't cp $file to $tmpfile, aborting" >&2
@@ -168,7 +169,7 @@ fi
 # =back
 #
 
-[ $# = 0 ] && { set x $pager; shift; }
+[ $# = 0 ] && { set x v; shift; }
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
