@@ -9,7 +9,7 @@ prompt="Enter short update description. Terminate with lone dot."
 
 news=
 echo "$prompt" >&2
-while necho "> " >&2; read line || exit 1
+while line=`readline "> "` || exit 1
 do  [ "x$line" = x. ] && break
     if [ -z "$news" ]
     then  news=$line
