@@ -18,7 +18,7 @@ esac
 
 if [ $# -gt 0 ]
 then
-    if [ -s "$1" ]
+    if [ -f "$1" -a -s "$1" ]
     then
 	src=$1; shift
 	[ $# = 0 ] || { echo "$usage" >&2; exit 2; }
