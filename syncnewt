@@ -14,10 +14,15 @@ for d in s cvs ## mail im
 do  syncstuff @newt $d
 done
 
-syncstuff @newt -L var/slideshow
+rsync -avHPL var/slideshow/. newt:var/slideshow/.
 
 rsync -avHP --delete \
-	--include=/attn --include=/old --include=/out --include=/saved \
+	--include=/attn \
+	--include=/old \
+	--include=/out \
+	--include=/saved \
+	--include=/saved-news \
+	--include=/saved-web \
 	'--exclude=/*' \
 	$HOME/there/cameron@cskk.homeip.net/mail/. \
 	newt:there/cameron@cskk.homeip.net/mail/.
