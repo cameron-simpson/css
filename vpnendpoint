@@ -14,13 +14,11 @@ pids=
 trap 'kill -9 $pids; exit 1' 0 1 2 13 15
 
 # ensure log exists before commencing
-
 >>"$log"
-
-( : tail -f "$log" ) &
+tail -f "$log" &
 pids=$!
 
-cat >>"$log"
-echo EOF, cat finishes
+cat >&2
+echo EOF, cat finishes >&2
 set -x
 kill -9 $pids
