@@ -1,0 +1,56 @@
+#!/bin/sh
+#
+# Ssh to all systems at once and do something.
+#	- Cameron Simpson <cs@zip.com.au> 21feb2003
+#
+
+delay=2
+userpfx=
+hostspec=
+command=
+sshopts=
+trace=
+
+cmd=`basename "$0"`
+usage="Usage: $cmd [options...] command...
+	-1, -2, -v	Passed to ssh.
+	-n		No action; recite actions.
+	-x		Trace execution.
+	-d delay	Delay this many seconds between ssh invocations.
+	-h hostspec	Specify hosts: host, @netgroup and !host, !@netgroup.
+	-u asuser	Specify the user as which to connect to each host.
+	-c command	Specify the command string to run on each host.
+	command		As with ssh. specify the command to run on each host."
+
+badopts=
+while :
+do
+  case $1 in
+    -[12v]) sshopts="$sshopts $1" ;;
+    -d)	delay=$2; shift ;;
+    -h)	hostspec="$hostspec $2"; shift ;;
+    -u)	userpfx=$2@; shift ;;
+    -n)	trace=echo ;;
+    -x)	trace=set-x ;;
+    --)	shift; break ;;
+    -?*) echo "$cmd: unrecognised option: $1" >&2; badopts=1 ;;
+    *)	break ;;
+  esac
+  shift
+done
+
+[ $# = 0 ] && { echo "$cmd: missing command" >&2; badopts=1; }
+[ -n "$hostspec" ] || { echo "$cmd: missing hostspec" >&2; badopts=1; }
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+for h in `set -- $hostspec; exec ngexpand $*`
+do
+  $trace pfx "$userpfx$h" bgssh $sshopts "$userpfx$h" "$command" &
+  if [ -n "$delay" ] && [ "$delay" -gt 0 ]
+  then $trace sleep "$delay"
+  else wait
+  fi
+done
+
+wait
