@@ -4,10 +4,27 @@
 #	- Cameron Simpson <cs@zip.com.au> 28apr2001
 #
 
-[ $# -lt 2 ] && { echo "Usage: $0 address filenames..." >&2; exit 2; }
+cmd=`basename "$0"`
+usage="Usage: $cmd [-s subject] address filenames..."
 
-addr=$1; shift
-subj="files: $*"
+subj=
+
+badopts=
+
+[ "x$1" = x-s ] && { subj=$2; shift; shift; }
+
+if [ $# = 0 ]
+then
+  echo "$cmd: missing address" >&2
+  badopts=1
+else
+  addr=$1; shift
+  [ $# = 0 ] && { echo "$cmd: missing filesnames" >&2; badopts=1; }
+fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+[ -n "$subj" ] || subj="files: $*"
 
 first=1
 for file
