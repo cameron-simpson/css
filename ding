@@ -1,13 +1,22 @@
 #!/bin/sh
 
-[ $# = 0 ] || { set x "$HOST:`pwd`"; shift; }
+if [ $# = 0 ]
+then
+    set x "$HOST:`pwd|entilde`"; shift
+else
+    "$@"
+    xit=$?
+fi
 
 alert -c white "DING: $*"
 
-count=5
+count=1
 
 n=1
 while [ $n -le $count ]
 do  necho ""
-    sleep 1
+    [ $n = $count ] || sleep 1
+    n=`expr $n + 1` || break
 done
+
+exit $xit
