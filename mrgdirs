@@ -1,0 +1,31 @@
+#!/bin/sh
+#
+# Merge directories created with mkdirn into another directory
+# of such subdirs.
+#	- Cameron Simpson <cs@zip.com.au> 31jan2001
+#
+
+[ $# -gt 1 ] || { echo "$Usage: $0 targetdir dirs..." >&2; exit 2; }
+
+target=$1; shift
+[ -d "$target/." ] \
+	|| { echo "$0: target dir \"$targetdir\": not a directory" >&2
+	     exit 1
+	   }
+
+
+for dir
+do  [ -d "$dir" ] \
+	|| { echo "$0: $dir: not a directory" >&2; continue; }
+    echo "$dir"
+done \
+| sed -n 's/^\(.*[^-0-9]\)-*[0-9]*$/\1 &/p' \
+| while read pfx dir
+  do  case "$pfx" in
+	  */*)	base=`basename "$pfx"` ;;
+	  *)	base=$pfx ;;
+      esac
+      newdir=`mkdirn "$target/$base"` || continue
+      # echo "$dir -> $newdir"
+      mv -i "$dir/"* "$newdir/." && rmdir "$dir"
+  done
