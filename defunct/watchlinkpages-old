@@ -1,0 +1,87 @@
+#!/bin/sh
+#
+# Watch a set of link post pages (eg freshmeat) and report new links.
+#	- Cameron Simpson <cs@zip.com.au> 29jul2000
+#
+
+cmd=`basename "$0"`
+usage="Usage: $cmd indexfile <linkpageurls
+	-f sedf	Sed script to filter the \"url title\" stage.
+	-p perlf Perl-p script to filter the \"url title\" stage."
+
+sedf=
+perlf=
+if [ "x$1" = x-f ]
+then
+  sedf=$2; shift; shift
+  perlf=
+else
+  if [ "x$1" = x-p ]
+  then
+    perlf=$2; shift; shift
+    sedf=
+  fi
+fi
+
+[ $# = 1 ] || { echo "$usage" >&2; exit 2; }
+
+tmp=$HOME/tmp
+[ -d "$tmp/." ] || mkdir -p "$tmp" || exit 1
+
+oldposts=$1
+case $oldposts in
+    /*)	;;
+    *)	oldposts=`pwd`/$oldposts ;;
+esac
+
+nowposts=$tmp/$cmd$$now
+newposts=$tmp/$cmd$$new
+
+[ -w "$oldposts" ] \
+|| { echo "$cmd: $oldposts: indexfile must exist and be writable" >&2
+     exit 1
+   }
+
+# get all links, with titles
+sort -u \
+| pageurls -# -x -t - \
+| perl -ne 'chomp;
+	    next unless /^(http:[^\t]*)\t/;
+	    ($url,$title)=($1,$'\'');
+	    next if length $url > 96;
+	    $url.="/" if $url =~ m|^http://[^/]*$|;
+	    $title=substr($title,$[,79) if length $title > 79;
+	    $_="$url $title\n";
+	    print
+	   ' \
+| if [ -n "$sedf" ]
+  then  exec sed -f "$sedf"
+  else
+    if [ -n "$perlf" ]
+    then  exec perl -p "$perlf"
+    else  exec cat
+    fi
+  fi \
+> $nowposts
+
+# locate new URLs
+awk '{print$1}' <$nowposts \
+| sort -u \
+| comm -23 - $oldposts \
+> $newposts
+
+# merge into old list
+lock "$oldposts" sort -u -o $oldposts $oldposts $newposts &
+
+# extract new URLs with titles
+( sed 's/^/1 /' $newposts
+  sed 's/^/2 /' $nowposts
+) | perl -ane 'if ($F[0] == 1)	{ $new{$F[1]}=1; }
+	       else		{ if ($new{$F[1]})
+				  { shift(@F);
+				    print "@F\n";
+				  }
+				}'
+
+wait
+rm -f $nowposts $newposts
