@@ -1,15 +1,28 @@
 #!/bin/sh
 #
-# Pop up window list of selected windows.
+# Pop up window list of selected windows, or do things with them.
 #	- Cameron Simpson <cs@zip.com.au> 10aug2004
 #
 
-[ $# = 0 ] && { echo "Usage: $0 substr..." >&2; exit 2; }
+action=
+[ "x$1" = x-c ] && { action=$2; shift; shift; }
+
+[ $# = 0 ] && { echo "Usage: $0 [-c command] substr..." >&2; exit 2; }
 
 ptns=
 for ptn
 do
   ptns="$ptns \"*$ptn*\""
 done
+
+[ -n "$action" ] \
+&& { IFS=';' set -- $action
+     xit=0
+     set -x
+     for act
+     do  fvwmcmd "All ($ptns) $act" || xit=1
+     done
+     exit $xit
+   }
 
 exec fvwmcmd "WindowList ($ptns) Alphabetic SelectOnRelease NoGeometryWithInfo TitleForAllDesks"
