@@ -60,7 +60,7 @@ sub _loadTapeInfo(;$)
   local($_);
   my($T,$D);
 
-  if (! open(VOLLS, "rootenv btvolls -v|"))
+  if (! open(VOLLS, "rootenv /usr/budtool/bin/btvolls -v|"))
   { warn "$::cmd: can't pipe from btvolls: $!";
     return 0;
   }
@@ -94,8 +94,13 @@ sub _loadTapeInfo(;$)
       }
 
       # read tape label and core info
-      die "$::cmd: btvolls: EOF looking for tape label line\n"
-	if ! defined ($_=<VOLLS>);
+      HDR1:
+      while (defined ($_=<VOLLS>))
+      { chomp;
+	s/\s+$//;
+	last HDR1 if length;
+      }
+      die "$::cmd: btvolls: EOF looking for tape label line\n" if ! defined;
 
       #                  -volume-label----------------- -location------ -sublocation--- -expire-date- -full?- -entry-date-- -overwrites- -error-type-----------
       die "$::cmd: btvolls, line $.: bad label data:\n\t$_\n"
@@ -348,7 +353,7 @@ sub Drive($;$)
 
 =head1 SEE ALSO
 
-cs::BudTool
+cs::BudTool(3), btvolls(1)
 
 =head1 AUTHOR
 
