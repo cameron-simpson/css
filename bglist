@@ -9,7 +9,7 @@ usage="Usage: $cmd [-t] [-w] [-r] [-n count] [ptns... [-- directories...]]
 	-n count Choose the first count items.
 	-o	\"or\" mode - any pattern may match, not all.
 	-r	Randomise output.
-	-t	Choose tall images (eg for tty backgrounds).
+	-t	Choose tall images (eg for tty or menu backgrounds).
 	-w	Choose wide images (eg for wallpaper)."
 
 lfopts=
@@ -22,8 +22,8 @@ do
     case $1 in
       -n)	lfopts="$lfopts -n $2"; shift ;;
       -[or])	lfopts="$lfopts $1" ;;
-      -t)	tall=1 ;;
-      -w)	wide=1 ;;
+      -t)	wide= tall=1 ;;
+      -w)	tall= wide=1 ;;
       --)	gotptns=1; shift; break ;;
       -?*)	echo "$cmd: unrecognised option: $1" >&2
 		badopts=1
