@@ -1,0 +1,63 @@
+#!/bin/sh
+#
+# Add a log to the things being tailed.
+#	- Cameron Simpson <cs@zip.com.au> 25may96
+#
+
+control=${TAILF:-$HOME/.tailf}
+key=
+silent=
+delete=
+
+cmd=`basename "$0"`
+usage="Usage: $cmd [-c control_file] [-d] [-s] key [file]
+	-c control_file	Set control file (default: $control).
+	-d		Delete key.
+	-s		No \"key:\" prefix to log."
+
+badopts=
+while :
+do  case $1 in
+        --)	shift; break ;;
+	-c)	control=$2; shift ;;
+	-d)	delete=1 ;;
+	-s)	silent=1 ;;
+	-?*)	echo "$cmd: unrecognised option: $1" >&2
+		badopts=1
+		;;
+	*)	break ;;
+    esac
+    shift
+done
+
+if [ $# = 0 ]
+then echo "$cmd: missing key" >&2; badopts=1
+else key=$1; shift
+fi
+
+if [ $# = 0 ]
+then file=`logpath "$key"`
+     if [ -z "$file" ]
+     then echo "$cmd: no logmap for \"$key\"" >&2
+	  badopts=1
+     fi
+else file=$1; shift
+fi
+
+[ $# = 0 ] || { echo "$cmd: extra arguments: $*" >&2
+		badopts=1
+	      }
+
+[ -f "$control" ] || { echo "$cmd: not a regular file: $control" >&2
+		       badopts=1
+		     }
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+if [ $silent ]; then key="[$key]"
+		else key="{$key}"
+fi
+
+[ $delete ] && key=-$key
+
+echo "$key$file" >>$control
