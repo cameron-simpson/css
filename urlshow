@@ -100,7 +100,7 @@ then
     # start browser if needed
     case "$BROWSER_DISPLAY" in
       :* | lo:* | localhost:* | 127.0.0.1:* | "$IPADDR:"* )
-	browser -q \
+	: browser -q \
 	|| { acon set-x browser
 	     echo "waiting for browser..."
 	     while :
