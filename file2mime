@@ -28,6 +28,8 @@ case "$type" in
     *': '*'Ogg-Vorbis compressed sound file'*) mtype=application/x-ogg ;;
     *': '*'MPEG system stream data'*) mtype=video/mpeg ;;
     *': '*'Microsoft Office Document'*) mtype=application/msword ;;
+    *': '*'PGP armored data signed message'*)
+					mtype=text/plain ;;
     *': '*'ASCII '*)			mtype=text/plain ;;
     *': '*'program text'*)		mtype=text/plain ;;
     *': '*'text'*)			mtype=text/plain ;;
