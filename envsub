@@ -1,0 +1,94 @@
+#!/usr/bin/perl
+#
+# Substitute environment parameters into text.
+# Lifted from my myke rule for installing manuals.
+#	- Cameron Simpson, 22jun93
+#
+
+use strict vars;
+
+use cs::Misc;
+use Getopt::Std;
+
+$::Interactive=0;
+$::Pattern='{([A-Za-z][A-Za-z_0-9]*)}';
+$::Recurse=0;
+
+$::Usage="Usage: $::cmd [-i] [-p pattern] [-r] [--] [files...]
+	-i		Interactive; flush output after each line.
+	-p pattern	Specify pattern; \$1 must match variable name.
+			Default: $::Pattern.
+	-r		Recurse on pattern.
+";
+
+{ my $badopts=0;
+
+  getopts('ip:r');
+  while (defined($_=shift))
+  { last if $_ eq '--';
+    (unshift(@ARGV,$_), last) if !/^-/;
+
+    $::Interactive=1 if defined $::opt_i;
+    $::Recurse=1 if defined $::opt_r;
+    $::Pattern=$::opt_p if defined $::opt_p;
+  }
+
+  die $::Usage if $badopts;
+}
+
+$::Xit=0;
+
+if (! @ARGV)
+{ envsub(STDIN,'stdin');
+}
+else
+{ for (@ARGV)
+  { if ($_ eq '-')
+    { &envsub(STDIN,'stdin');
+    }
+    else
+    { if (open(FILE,"< $_\0"))
+      { &envsub(FILE,'"'.$_.'"');
+	close(FILE);
+      }
+      else
+      { warn "$::cmd: can't open $_: $!\n";
+	$::Xit=1;
+      }
+    }
+  }
+}
+
+exit $::Xit;
+
+sub envsub
+{ local($FILE,$file)=@_;
+  local($line,$val);
+
+  while (<$FILE>)
+  { $line='';
+    while (/$::Pattern/o)
+    { if (defined($ENV{$1}))
+      { $val=$ENV{$1};
+      }
+      else
+      { warn "$::cmd: $file, line $.: warning: \$$1 is undefined\n";
+	$::Xit=1;
+	$val=$&;
+      }
+
+      if ($::Recurse)
+      { $line.=$`;
+	$_=$val.$';
+      }
+      else
+      { $line.=$`.$val;
+	$_=$';
+      }
+    }
+
+    print $line, $_;
+
+    $::Interactive && &flush(STDOUT);
+  }
+}
