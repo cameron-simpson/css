@@ -16,13 +16,17 @@ cats2procmailrc [B<-a> I<alert>] [B<-m> I<maildomain>] [B<-t> I<type>] E<lt>cate
 
 I<cats2procmailrc> reads a human friendly mail category description file
 and emits a matching procmail(1) recipe to implement it.
+The intent it to have an extremely succinct file
+of easily editable rules.
 
 I build my B<.procmailrc> with the following myke(1) rule:
 
 	procmailrc:	$@.pre $(HOME)/scripts/cats2procmailrc categories
 		( cat $@.pre \
 		  echo \
-		  cats2procmailrc <categories \
+		  cats2procmailrc \\
+		  	-a 'my-alert-cmd %' \\
+		  	-t mh -m research.canon.com.au <categories \
 		) >$@
 
 Which starts with a few small manual rules from B<procmailrc.pre>
@@ -65,13 +69,15 @@ and not abort processing.
 
 A leading exclaimation mark (B<'!'>) means that mail items matching this rule
 should generate an alert.
-For me, this means a single line summary of the mail item appears in yellow in a small log window
+For me, this means a single line summary of the mail item
+appears in yellow in a small log window
 I have at the top of my screen for mail items I should read I<now>.
 
 The I<folder> names the folder in which to place the mail item.
 Normail UNIX mail files,
 MH style directories and Maildir style directories are autodetetected.
-If the I<folder> contains an "at" (B<@>) character it is considers an email address
+If the I<folder> contains an "at" (B<@>) character
+it is considered an email address
 and the mail item is forwarded to that address instead of being dropped in a folder.
 
 The I<tag> is placed at the start of the mail's B<Subject> line for ready recognition in mixed folders.
@@ -123,7 +129,7 @@ to accept mail aimed at B<fred@this.isp.com> and also copy it to B<fred@that.isp
 
 MAILDIR, the directory containing mail folders.
 
-SYSTEMID, the local mail domain (eg B<research.canon.com.au> for my current workplace).
+SITENAME, the local mail domain (eg B<research.canon.com.au> for my current workplace).
 
 =head1 SEE ALSO
 
