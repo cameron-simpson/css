@@ -72,6 +72,15 @@ fi
 
 for dir
 do
-    sed "s;^[1-9][0-9]*  *[1-9][0-9]*  *;& $dir/;" "$dir/INDEX"
+    ndx=$dir/INDEX
+    if [ -s "$ndx" ]
+    then  sed "s;^[1-9][0-9]*  *[1-9][0-9]*  *;& $dir/;" <"$ndx"
+    else  if [ -s "$ndx.gz" ]
+	  then  gunzip < "$ndx.gz" | sed "s;^[1-9][0-9]*  *[1-9][0-9]*  *;& $dir/;"
+	  else  if [ -s "$ndx.bz2" ]
+		then  bunzip2 < "$ndx.bz2" | sed "s;^[1-9][0-9]*  *[1-9][0-9]*  *;& $dir/;"
+		fi
+	  fi
+    fi
 done \
 | ( : set -x; eval "$filter"; cat >/dev/null )
