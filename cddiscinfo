@@ -7,8 +7,6 @@
 
 use strict qw(vars);
 
-## use FreeDB;
-## use CDDB_get;
 use cs::CDDB;
 
 my $dev;
@@ -25,7 +23,7 @@ die $::Usage if @ARGV;
 my $CD = new cs::CDDB;
 $CD->Device($dev) if defined $dev;
 
-printf("%08x\n", $CD->DiscId());
+print $CD->DiscId(), "\n";
 my(@t)=$CD->Tracks();
 print scalar(@t), "\n";
 
