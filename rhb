@@ -1,0 +1,71 @@
+#!/bin/sh
+#
+# rab - remote amassbackup
+#
+# Backup a directory as per amassbackup, but to a remote host.
+#	- Cameron Simpson <cs@zip.com.au> 27jun2001
+#
+
+vflag=v
+progress=
+ssh=ssh
+rsdel=
+[ -t 1 ] && progress=-P
+
+cmd=`basename "$0"`
+usage="Usage: $cmd [-i identity] [--delete] srcdir host:destdir
+	-i identity	Ssh identity file to use.
+	--delete	Passwd to rsync."
+
+badopts=
+
+while :
+do  case $1 in
+	-i)	ssh="$ssh -i $2"; shift ;;
+	--delete) rsdel=$1 ;;
+	--)	shift; break ;;
+	-?*)	echo "$cmd: $1: unrecognised option" >&2
+		badopts=1
+		;;
+	*)	break ;;
+    esac
+    shift
+done
+
+[ $# = 2 ] || { echo "$cmd: missing srcdir or host:destdir" >&2; badopts=1; }
+src=$1 dest=$2
+[ -d "$src/." ] || { echo "$cmd: src $src: not a directory" >&2; badopts=1; }
+case $dest in
+    [a-z]*:/*)	desthost=`expr "$dest" : '\([^:]*\):/.*'`
+		destdir=`expr "$dest" : '[^:]*:\(/.*\)'`
+		;;
+    *)		echo "$cmd: bad host:destdir: $dest" >&2
+		badopts=1
+		;;
+esac
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+cd "$src/." || exit 1
+
+stdout=/tmp/$cmd$$
+
+$ssh "$desthost" \
+	"cd '$destdir' || exit 1
+	 exec amassbackup --no-copy --linkonly ." \
+	 > "$stdout" \
+|| exit 1
+
+subdir=`cat "$stdout"`
+rm -f "$stdout"
+
+case "$subdir" in
+    [0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]*)
+	;;
+    *)	echo "$cmd: unexpected subdir name \"$subdir\"" >&2
+	exit 1
+	;;
+esac
+
+pwd
+exec rsync -e "$ssh" -aHW${vflag} $rsdel ${progress} . "$desthost:$destdir/$subdir/."
