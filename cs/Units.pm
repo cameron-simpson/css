@@ -18,9 +18,11 @@ $storage = cs::Units::bytes2human();
 
 $count = cs::Units::num2human(2);
 
+@dec = cs::Units::decompose($somevalue, \@unitsTbale, $count);
+
 =head1 DESCRIPTION
 
-This module implements a simple decomposition of numbers into human freindly subunits.
+This module implements a simple decomposition of numbers into human friendly subunits.
 
 =cut
 
@@ -93,6 +95,11 @@ sub decompose($$;$)
     }
   }
 
+  # always at least 1 item
+  if (! @subu)
+  { push(@subu,shift(@u),shift(@u));
+  }
+
   my @dec = ();
   my $n1;
 
@@ -123,13 +130,13 @@ sub sec2human($;$)
   return decompose($sec,\@cs::Units::TimeUnits,$count);
 }
 
-=item bytes(I<bytes>,I<count>)
+=item bytes2human(I<bytes>,I<count>)
 
 Convenience routine calling decompose(I<bytes>,\@cs::Units::StorageUnits,I<count>).
 
 =cut
 
-sub bytes($;$)
+sub bytes2human($;$)
 { my($bytes,$count)=@_;
   $count=2 if ! defined $count;
 
