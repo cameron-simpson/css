@@ -1,11 +1,11 @@
 #!/bin/sh
 
-eval `secret mysql@elph`
+eval `secret mysql@cisra`
 set /opt/mysql/bin/mysql "-h$secretHOST" "-u$secretLOGIN" "-p$secretPASSWORD" ${1+"$@"}
 
-[ "x$HOST" = xelph ] \
+[ "x$HOST" = xsweet ] \
 || { tflag=; [ -t 0 ] && tflag=-t
-     set ssh $tflag elph exec "$@"
+     set ssh $tflag sweet exec "$@"
    }
 
 set -x
