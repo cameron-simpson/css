@@ -196,7 +196,7 @@ The default is 512 bytes.
 	my($keep,$toss)=($f1,$f2);
 
 	# link keep to toss
-	$::Silent || nl("link($f1 => $f2)");
+	$::verbose && nl("link($f1 => $f2)");
 
 	if (! $::DoIt)
 	{}	# pretend ok
