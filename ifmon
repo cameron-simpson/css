@@ -11,14 +11,15 @@ use cs::Units;
 my $interval = 5;
 my $repeats = 0;
 
-my %ifb;
-my %oifb;
+my %ifb_in; my %ifb_out;
+my %oifb_in; my %oifb_out;
 
 my $start=time;
 my $now;
 my $elapsed;
 
-my $Bps;
+my $Bps_in;
+my $Bps_out;
 
 while ($repeat == 0 || $repeat-- > 0)
 {
@@ -26,15 +27,24 @@ while ($repeat == 0 || $repeat-- > 0)
   $elapsed=$now-$start;
 
   readnet();
-  for my $if (@ARGV ? @ARGV : sort keys %ifb)
+  $rpt_in="";
+  $rpt_out="";
+  for my $if (@ARGV ? @ARGV : sort keys %ifb_in)
   {
     if ($elapsed == 0)
-    { $oifb{$if}=$ifb{$if};
+    { $oifb_in{$if}=$ifb_in{$if};
+      $oifb_out{$if}=$ifb_out{$if};
     }
     else
-    { $Bps=cs::Units::bytes2human(($ifb{$if}-$oifb{$if})/$elapsed,1)."/s average";
-      printf("%-5s: %s\n",$if,$Bps);
+    { $Bps_in=cs::Units::bytes2human(($ifb_in{$if}-$oifb_in{$if})/$elapsed,1);
+      $Bps_out=cs::Units::bytes2human(($ifb_out{$if}-$oifb_out{$if})/$elapsed,1);
+      $rpt_in.=sprintf(" %5s:%-4s/s",$if,$Bps_in);
+      $rpt_out.=sprintf(" %5s:%-4s/s",$if,$Bps_out);
     }
+  }
+
+  if ($elapsed > 0)
+  { out(cs::Units::sec2human($elapsed)." IN$rpt_in, OUT$rpt_out");
   }
 
   sleep($interval);
@@ -54,11 +64,17 @@ sub readnet
 
   while (defined($_=<PNDEV>))
   { chomp;
-    if (/^\s*([a-z]\w*):\s*(\d+)/)
-    { $ifb{$1}=$2;
+    if (/^\s*([a-z]\w*):\s*(\d+)(\s+\d+){7}\s+(\d+)/)
+    { $ifb_in{$1}=$2;
+      $ifb_out{$1}=$4;
     }
     else
     { warn "$::cmd: line $.: bad format:\n\t$_";
     }
   }
 }
+
+__DATA__
+    lo:349110347  174228    0    0    0     0          0         0 349110347  174228    0    0    0     0       0          0
+  eth0:209391317  471541    0    0    0     0          0         0 73401568  428547    0    0    0     0       0          0
+vmnet8:       0       0    0    0    0     0          0         0        0       0    0    0    0     0       0          0
