@@ -1,8 +1,2 @@
 #!/bin/sh
-
-: ${CONSOLE:=$HOME/var/log/console}
-
-log=$CONSOLE
-[ -n "$log" ] || log=console
-
-exec alog "$log" ${1+"$@"}
+exec bgproc ${1+"$@"}
