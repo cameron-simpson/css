@@ -1,0 +1,15 @@
+#!/bin/sh
+#
+# List images whose width > height, eg to pick some wallpaper.
+#	- Cameron Simpson <cs@zip.com.au> 28feb2001
+#
+
+if [ $# = 0 -o "x$*" = x- ]
+then
+    set x `cat`
+    shift
+fi
+
+imgsize ${1+"$@"} /dev/null 2>/dev/null \
+| sed -n 's/^\(.*\): width="\([0-9]*\)" height="\([0-9]*\)".*/\1 \2 \3/p' \
+| awk '$2 > $3 { print $1 }'
