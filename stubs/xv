@@ -1,0 +1,24 @@
+#!/bin/sh
+#
+
+xv=/opt/bin/xv
+
+case $1 in
+    -display)	DISPLAY=$2; export DISPLAY; shift; shift ;;
+esac
+
+visual=	## "-visual $X11_CLASS"
+browse=-lbrowse
+case $X11_DEPTH,$X11_CLASS in
+    1,*)	set x -fg white -bg black -hi white -lo black ${1+"$@"} ;;
+    *,*Gr[ae]y)	visual=
+		set x -mono -quick24 -fg grey70 -bg black -hi grey70 -lo grey30 ${1+"$@"} ;;
+    *,TrueColor)set x -fg Green -bg Black -hi SlateGrey -lo SlateGrey ${1+"$@"} ;;
+    *,*Color)	set x -quick24 -fg Green -bg Black -hi SlateGrey -lo SlateGrey ${1+"$@"} ;;
+    *)		set x ${1+"$@"} ;;
+esac
+shift
+
+set x -stdcmap +vsperfect $visual $browse ${1+"$@"}; shift
+
+exec rawx "$xv" ${1+"$@"}
