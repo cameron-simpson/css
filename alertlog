@@ -9,4 +9,4 @@ tty=`tty`
 cd "$LOGDIR"
 ctrl=tailf-fvwm-$HOST
 >$$ctrl
-exec tailf -c "$ctrl" -i 1 alert vpnlog-*
+exec tailf -c "$ctrl" -i 1 alert vpnlog-*-alert
