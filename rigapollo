@@ -1,0 +1,6 @@
+#!/bin/sh
+# was tpm -r -s 10000 10000
+/usr/apollo/bin/tpm -r -s 3000 3000
+/usr/apollo/bin/kbm -L none \
+		    -A l3,l7,l8,l9,la,lc,ld,le,lf,bs,del,alpha,tab,cr \
+		    -F l3,l7,l8,l9,la,lc,ld,le,lf,bs,del,alpha,tab,cr
