@@ -11,7 +11,7 @@ use cs::Persist;
 
 package cs::Secret;
 
-if (! length $ENV{HOME})
+if (! defined $ENV{HOME} || ! length $ENV{HOME})
 { my @pw = getpwuid($>);
   die "$0: getpwuid($>) fails: $!" if !@pw;
   $ENV{HOME}=$pw[7];
