@@ -4,13 +4,16 @@
 #	- Cameron Simpson <cs@zip.com.au> 12sep2000
 #
 
+: ${VARLOG:=$HOME/var/log}
+: ${CONSOLE:=$VARLOG/console}
+
 [ $# = 0 ] && { echo "Usage: $0 [-s|-C] command [args...] <input" >&2; exit 2; }
 
 exec 3<&0
 ( exec 0<&3 3<&-
   case "$1" in
     -s) shift; exec >/dev/null 2>&1 ;;
-    -C) shift; exec >>"${VARLOG:-$HOME/var/log}/console" 2>&1 ;;
+    -C) shift; exec >>"$CONSOLE" 2>&1 ;;
   esac
   exec "$@"
 ) &
