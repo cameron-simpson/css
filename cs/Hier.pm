@@ -166,15 +166,18 @@ defaulting to 0.
 If I<noparse> is set
 then the textual representation of the value is returned as I<value>,
 otherwise the line is parsed and the actual value returned.
+If I<trace> is supplied, lines are printed to stderr as they are read;
+I<trace> defaults to 0.
 On EOF or error
 returns the string B<EOF> or B<ERROR>, respectively,
 instead of the arrayref.
 
 =cut
 
-sub getKVLine($;$)
-{ my($s,$noParse)=@_;
+sub getKVLine($;$$)
+{ my($s,$noParse,$trace)=@_;
   $noParse=0 if ! defined $noParse;
+  $trace=0 if ! defined $trace;
 
   local($_);
 
@@ -184,6 +187,7 @@ sub getKVLine($;$)
     return EOF if ! defined ($_=$s->GetContLine()) || ! length;
 
     chomp;
+    warn "[$_]" if $trace;
 
     if (! /^("(\\.|[^\\"])*"|[^"\s]\S*)\s+(\S)/)
     { warn "$::cmd: bad data \"$_\"";
