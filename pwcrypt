@@ -1,0 +1,39 @@
+#!/usr/bin/perl
+#
+# Generate a passwd-style encryption for the input.
+#	- Cameron Simpson <cs@zip.com.au> 07mar97
+#
+
+$charset='abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789./';
+@charset=split(//,$charset);
+
+$rand=$$^time;
+
+if (@ARGV)
+{ $salt=substr(shift(@ARGV),$[,2);
+}
+else
+{ $salt=$charset[$rand%@charset].$charset[int($rand/@charset)%@charset];
+}
+
+$int=(-t STDIN && -t STDERR);
+
+if ($int)
+{ require 'flush.pl';
+  system('stty -echo');
+  print STDERR "Enter password to encrypt: ";
+  &flush(STDERR);
+}
+
+$_=<STDIN>;
+$int && system('stty echo');
+
+die "unexpected EOF\n" if ! defined;
+
+if ($int)
+{ print STDERR "\n";
+}
+
+chomp;
+
+print crypt($_,$salt), "\n";
