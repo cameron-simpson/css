@@ -1,0 +1,15 @@
+#!/bin/sh
+#
+# Run GNU expr.
+# Since the fuckheads at the FSF can't write compatible tools (they
+# happily break expr, sed, etc etc and thus every script on the planet
+# which uses them), and because some unenlightened platforms (Linux)
+# come with only the GNU tools, one can't write a "realexpr", so one
+# must comprimise and use "gnuexpr".
+# All because the GNU people are arrogant scum.
+#	- Cameron Simpson <cs@zip.com.au> 20jun99
+#
+
+gnuexpr=/opt/gnu/bin/expr
+
+exec "$gnuexpr" ${1+"$@"}
