@@ -166,7 +166,7 @@ esac
 eval "$detach"
 eval "$closefds"
 if [ $async ]
-then termcmd="acon $termcmd"
+then termcmd="bgproc -p - -- $termcmd"
 else termcmd="exec $termcmd"
 fi
 eval "$termcmd"
