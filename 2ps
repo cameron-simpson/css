@@ -6,6 +6,8 @@
 # Convert to MIME basis. - cameron 29apr2004
 #
 
+: ${TMPDIR:=/tmp}
+
 me=$0
 cmd=`basename "$0"`
 usage="Usage: $cmd [-m medium] [-L] [-P] [-i itype] [-T title] [file]"
@@ -57,7 +59,7 @@ fi
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
-tmpfile=${TMPDIR:-/tmp}/$cmd$$
+tmpfile=$TMPDIR/$cmd$$
 filetitle=$file
 if [ "x$file" = x- ]
 then
@@ -91,5 +93,5 @@ esac
 
 ## echo "title=[$title], conv=[$conv]" >&2
 ## set | egrep -i '(asp|conv)' >&2
-set -v
+##set -v
 eval "exec <\"\$file\"; $conv"
