@@ -1,0 +1,52 @@
+#!/usr/bin/perl
+#
+# Extract discid and track info from a CD as a preliminary to
+# constructnig a FreeDB CDDB entry. Used by cdsubmit.
+#	- Cameron Simpson <cs@zip.com.au> 14mar2001
+# 
+
+use strict qw(vars);
+
+use FreeDB;
+## use cs::Hier;
+
+my $dev = '/dev/cdrom';
+
+($::cmd=$0) =~ s:.*/::;
+$::Usage="Usage: $::cmd [cd-device]\n";
+
+if (@ARGV)
+{ $dev=shift(@ARGV);
+}
+
+die $::Usage if @ARGV;
+
+my $fdb = new FreeDB;
+die "$::cmd: can't make new FreeDB object\n" if ! defined $fdb;
+
+## $fdb->{_debug}=99;
+
+$fdb->cdrom_device($dev);
+
+die "$::cmd: trouble getting disc details from $dev\n" if ! $fdb->create_new();
+
+## print STDERR cs::Hier::h2a($fdb,1),"\n";
+
+print $fdb->discid(), "\n";
+print $fdb->number_of_tracks(), "\n";
+
+# track info
+my($tno,$tsecs,$toffset,$tinfo,$txinfo,$tdinfo);
+my($qtinfo,$qtxinfo);
+while ($fdb->next_track())
+{  
+  ($tno,$tsecs,$toffset,$tinfo,$txinfo,$tdinfo)
+  =( $fdb->current_track_number(),
+     $fdb->current_track_time_in_seconds(),
+     $fdb->current_track_offset()
+   );
+
+  print "$tno $tsecs $toffset\n";
+}
+
+exit 0;
