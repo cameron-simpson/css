@@ -380,4 +380,12 @@ sub tmpnam
   }
 }
 
+=back
+
+=head1 AUTHOR
+
+Cameron Simpson E<lt>cs@zip.com.auE<gt>
+
+=cut
+
 1;
