@@ -11,5 +11,5 @@ f=$VARRUN/ssh-agent-$HOST
 && [ -n "$v" ] \
 && eval "$v" \
 && [ -n "$SSH_AGENT_PID" ] \
-&& kill -0 "$SSH_AGENT_PID" \
+&& kill -0 "$SSH_AGENT_PID" 2>/dev/null \
 && echo "$v"
