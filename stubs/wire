@@ -1,4 +1,4 @@
 #!/bin/sh
 
-dl "wire $*"
+dlog "wire $*" &
 exec $HOME/scripts/wire ${1+"$@"}
