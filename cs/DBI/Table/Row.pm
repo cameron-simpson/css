@@ -48,7 +48,12 @@ sub TIEHASH($$$$)
 }
 
 sub KEYS($)
-{ keys %{shift->{DATA}};
+{ my($this)=@_;
+
+  my $data = $this->{DATA};
+  ## warn "data=[$data]";
+
+  keys %$data;
 }
 
 sub EXISTS($$)
@@ -59,6 +64,7 @@ sub EXISTS($$)
 sub FETCH($$)
 { my($this,$key)=@_;
 
+  ## warn "FETCH($key)";
   my $row = $this->{DATA};
 
   return undef if ! exists $row->{$key}
