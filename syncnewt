@@ -1,0 +1,10 @@
+#!/bin/sh
+
+needhost amadeus@home || exit 1
+
+[ $# = 0 ] || exec syncstuff @newt "$@"
+
+pfx small syncsmall @newt &
+pfx im syncstuff @newt im &
+
+wait
