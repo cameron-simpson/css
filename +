@@ -4,6 +4,14 @@
 #	- Cameron Simpson <cs@zip.com.au>
 #
 
+case "$HOST@$SYSTEMID" in
+    zapff@cisra|amadeus@home)
+	;;
+    *)	echo "$0: must be on zapff@cisra or amadeus@home" >&2
+	exit 1
+	;;
+esac
+
 [ $# = 0 ] && set attn
 
 if lock -q "mail/$1"
@@ -12,4 +20,4 @@ then  echo "mail/$1 already locked" >&2
 fi
 
 cd || exit 1
-RXVTOPTS=+ip GUI=lean rterm zapff@cisra -n "mutt +$1" lock "mail/$1" mutt -f "+$1"
+RXVTOPTS=+ip GUI=lean term -n "mutt +$1" lock "mail/$1" mutt -f "+$1"
