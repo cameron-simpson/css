@@ -4,15 +4,21 @@
 #	- Cameron Simpson <cs@zip.com.au> 14nov2002
 #
 
+mailcap=$HOME/.mailcap
+
 copious=1
 action=1
+subfile=
 
 cmd=$0
-usage="Usage: $cmd [-a] [+a] [-c] [+c] type
+usage="Usage: $cmd [-a] [+a] [-c] [+c] [-m mailcap] [-s subfile] mimetype
 	-a	Just print the action portion of the mailcap entry (default).
 	+a	Print the whole mailcap entry.
 	-c	Select the \"copiusoutput\" mailcap entry (default).
-	+c	Avoid the \"copiusoutput\" mailcap entry."
+	+c	Avoid the \"copiusoutput\" mailcap entry.
+	-m mailcap Specify the mailcap file.
+	-s subfile Replace any %s with subfile, correctly quoted.
+		   Actions with no %s get the it as stdin."
 
 badopts=
 
@@ -22,6 +28,8 @@ do  case $1 in
       +a)	action= ;;
       -c)	copious=1 ;;
       +c)	copious= ;;
+      -m)	mailcap=$2; shift ;;
+      -s)	subfile=$2; shift ;;
       --)	shift; break ;;
       -?*)	echo "$cmd: unrecognised option: $1" >&2; badopts=1 ;;
       *)	break ;;
@@ -40,12 +48,28 @@ fi
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
 if [ $copious ]
-then  match=`grep "^$mtype"' *;.*; *copiousoutput *$' <$HOME/.mailcap | sed 1q`
-else  match=`grep "^$mtype"' *;' <$HOME/.mailcap | grep -v '.*; *copiousoutput *$' | sed 1q`
+then  match=`grep "^$mtype"' *;.*; *copiousoutput *$' <"$mailcap" | sed 1q`
+else  match=`grep "^$mtype"' *;' <"$mailcap" | grep -v '.*; *copiousoutput *$' | sed 1q`
 fi
 
 [ -n "$match" ] || exit 1
 
 [ $action ] || { echo "$match"; exit 0; }
 
-echo "$match" | sed -e 's/^[^;]*; *//' -e 's/ *;[^;]*$//'
+# clean up the mailcap line
+sedcmd='s/^[^;]*; *//
+        s/ *;[^;]*$//'
+
+if [ -n "$subfile" ]
+then
+    subfile=`shqstr "$subfile"`
+    match=`sedstrs "$sedcmd" "$match"`
+    case "$match" in
+	*'%s'*)	sedcmd="$sedcmd
+			s%s$subfileg" ;;
+	*)	sedcmd="$sedcmd
+			s^exec <$subfile; " ;;
+    esac
+fi
+
+echo "$match" | sed -e "$sedcmd"
