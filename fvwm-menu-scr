@@ -1,0 +1,3 @@
+#!/bin/sh
+scr \
+| awk '{ print "\"" $1 "\" Exec term +ip -n '\''Screen: " $1 "'\'' -e scr " NR "" }'
