@@ -1,0 +1,27 @@
+#!/bin/sh
+#
+# Report the size of the installed files associated with an RPM.
+#	- Cameron Simpson <cs@zip.com.au> 07apr2002
+#
+
+cmd=`basename "$0"`
+usage="Usage: $cmd [rpmnames...]"
+
+tally()
+{
+    rpm -ql "$rpm" \
+    | xxargs ls -ld \
+    | awk 'BEGIN	{ size=0 }
+	   /^-/		{ size+=$5 }
+	   END		{ print size }'
+}
+
+if [ $# = 0 ]
+then
+    exec xxargs "$0"
+fi
+
+for rpm
+do  size=`tally "$rpm"`
+    echo "$size	$rpm"
+done
