@@ -1,0 +1,31 @@
+#!/usr/bin/perl
+#
+# Simple HTTP proxy to htclean a web feed.
+#	- Cameron Simpson <cs@zip.com.au> 5jan2001
+#
+
+BEGIN { use cs::DEBUG; cs::DEBUG::using(__FILE__);
+      }
+
+use strict vars;
+
+use cs::Misc;
+use cs::Net::TCP;
+
+$::Usage="Usage: $::cmd port host:port\n";
+
+die $::Usage if @ARGV != 2;
+
+my($port,$proxy)=@ARGV;
+
+my $S = new cs::Net::TCP $port;
+die "$::cmd: can't bind to $port: $!\n" if ! defined $S;
+
+$S->Serve($cs::Net::TCP::F_FORK2,\&doit,$proxy);
+
+# NOTREACHED
+exit 1;
+
+sub doit
+{ my($C,$proxy)=@_;
+}
