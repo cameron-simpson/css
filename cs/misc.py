@@ -19,7 +19,6 @@ class SeqWrapper:
     return self.__seq[key]
 
   def __setitem__(self,key,value):
-    print "__setitem(",key,"=",value,"): __seq=", `self.__seq`
     self.__seq[key]=value
 
   def __delitem__(self,key):
@@ -31,6 +30,9 @@ class SeqWrapper:
 
   def _updateAllValues(self,newvalues):
     self.__seq=newvalues
+
+  def __repr__(self):
+    return `self.__seq`
 
 """ an object with an ordered set of keys eg SQL table row
 """
@@ -80,3 +82,10 @@ class IndexedSeqWrapper(HasNameIndex,SeqWrapper):
 
   def __keys__(self):
     return self.getNameIndex()
+
+  def __repr__(self):
+    d={}
+    keys=self.getNames()
+    for i in xrange(0,len(keys)):
+      d[keys[i]]=self[i]
+    return `d`
