@@ -4,4 +4,7 @@
 #	- Cameron Simpson <cs@zip.com.au> 17jun2002
 #
 
-exec mkcd 'cdrecord=cdrecord-prodvd -dao' ${1+"$@"}
+#cdrecord='cdrecord=cdrecord-prodvd -dao'
+cdrecord='dvdrecord -dao'
+
+exec mkcd "cdrecord=$cdrecord" ${1+"$@"}
