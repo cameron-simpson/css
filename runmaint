@@ -73,8 +73,7 @@
 # B<$HOST> and B<$SYSTEMID> respectively.
 # I normally arrange these to be the short hostname (i.e. without the domain)
 # and an identifier-like name for the local administrative domain
-# (eg B<home> for my home machines and B<cisra> for work,
-# that being Canon Information Systems Research Australia as I write this).
+# (eg B<home> for my home machines).
 # With this mechanism
 # you can place the cron line on many machines
 # and still perform specific actions on particular machines
