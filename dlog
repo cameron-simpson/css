@@ -1,4 +1,4 @@
 #!/bin/sh
 : ${LOGDIR:=$HOME/var/log}
-[ $# = 0 ] && exec pageif cat $LOGDIR/dlog
-exec note $LOGDIR/dlog "$*"
+[ $# = 0 ] && exec pageif cat "$LOGDIR/dlog"
+exec note "$LOGDIR/dlog" "$*"
