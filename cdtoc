@@ -9,7 +9,7 @@ use strict qw(vars);
 use cs::CDDB;
 use cs::Hier;
 
-my $dev = '/dev/cdrom';
+my $dev;
 
 ($::cmd=$0) =~ s:.*/::;
 $::Usage="Usage: $::cmd [cd-device]\n";
@@ -22,6 +22,7 @@ die $::Usage if @ARGV;
 
 my $CD = new cs::CDDB;
 die "$::cmd: can't make new cs::CDDB object\n" if ! defined $CD;
+$CD->Device($dev) if defined $dev;
 
 my $discid = $CD->DiscId();
 
