@@ -31,6 +31,7 @@ then
     target=$cmd
     case "$cmd" in
 	aarn)	[ $# = 0 ] && exec us http://mirror.aarnet.edu.au/ ;;
+	anime)	target=tamara ;;
 	avim|im)target=avimagesearcher ;;
 	avsubmit) target=altavistasubmit ;;
 	av)	target=altavista ;;
@@ -61,11 +62,7 @@ then
 	w3val)	target=w3c_validate ;;
 	wiki)	target=wikipedia ;;
 	yp)	target=yellowpages ;;
-	www)	for target in altavista yahoo dmoz google
-		do  search -t "$target" "$*" &
-		done
-		exit 0
-		;;
+	www)	target='altavista yahoo dmoz google' ;;
 	movie)	exec us "http://www.cinema.pgh.pa.us/movie/reviews?$query" ;;
 	pagescour) exec us "${cgibase}htclean.cgi/$query" ;;
 	ebay)	case "$query" in
@@ -81,6 +78,14 @@ then
 		;;
     esac
 fi
+
+case "$target" in
+  *\ *)	for t in $target
+	do  search -t "$t" "$*" &
+	done
+	exit 0
+	;;
+esac
 
 echo "search $target $oquery" >>"$URLLOG"
 us +c "$cgi?engine=$target&query=$query"
