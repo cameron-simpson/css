@@ -65,7 +65,7 @@ sub unfontise
 
     if ($enc eq 'Q')
     { $encwords =~ tr/_/ /;
-      $encwords =~ s/=([\da-f][\da-f])/eval "chr(0x$1)"/egi;
+      $encwords =~ s/=([\da-f][\da-f])/(($code=eval "0x$1") >= 32 && $code < 255 ? chr($code) : $&)/egi;
     }
     else
     { warn "$0: unsupported encoding: \"$enc\"";
