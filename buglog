@@ -1,12 +1,12 @@
 #!/bin/sh
 #
-# Take a log message and an attachment data on stdin
+# Take a log message and attachment data on stdin
 # and log it appropriately.
 #	- Cameron Simpson <cs@zip.com.au> 09jul2004
 #
 
 : ${TMPDIR:=/tmp}
-: ${USER:=`id -un`}
+: ${USER:=`whoami`}
 : ${BUGSYSTEMS:='dlog logger'}
 
 cmd=`basename "$0"`
