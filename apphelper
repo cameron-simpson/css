@@ -17,7 +17,7 @@ cmd=`basename "$0"`
 ## exec 2>"$tty" >&2 0</dev/tty
 ## set -vx
 ## set x +t "$@"; shift
-echo "apphelper: \$*=[$*]" >&2
+## echo "apphelper: \$*=[$*]" >&2
 
 doterm=
 savedir=
@@ -135,7 +135,8 @@ else
     # are taken to be URLs and fetched.
     #
     http://* | ftp://*)
-      exec withurl -1 "$file" "$0" "$@"
+      ##set -x
+      exec withurl -0 "$file" "$0" "$@"
       ;;
     *)
       # handed real filename
