@@ -1,0 +1,7 @@
+#!/bin/sh
+#
+# Update my USB drive kit.
+#	- Cameron Simpson <cs@zip.com.au> 12jun2003
+#
+
+exec rsync -rptvPL --copy-unsafe-links --delete $HOME/rc/usb/. /mnt/usb/.
