@@ -1,0 +1,49 @@
+#!/usr/bin/perl
+#
+# Recode of Larry Wall's rename script.
+#	- Cameron Simpson <cs@zip.com.au> 20aug2003
+#
+
+use File::Basename;
+use File::Compare;
+use File::Path;
+
+($::cmd=$0) =~ s:.*/::;
+$::Usage="Usage: $::cmd perlop files...\n";
+
+die $::Usage if @ARGV < 2;
+
+my $op = shift(@ARGV);
+
+local($_);
+
+PATH:
+for my $path (@ARGV)
+{
+  -e $path || next PATH;
+  my $base = basename($path);
+  $_=$base;
+  eval $op;
+  die $@ if $@;
+  if ($_ ne $base)
+  {
+    my $npath = dirname($path).'/'.$_;
+    my $ndir = dirname($npath);
+    -d "$ndir/." || mkpath($ndir);
+    if (-e $npath)
+    {
+      if (compare($path,$npath) == 0)
+      { print "$path -> $npath: identical, unlinking $path\n";
+	unlink($path) || warn "$::cmd: unlink($path): $!";
+      }
+      else
+      { warn "$path -> $npath: existing file differs\n";
+      }
+    }
+    else
+    { rename($path,$npath) || warn "$path -> $npath: $!";
+    }
+  }
+}
+
+exit 0;
