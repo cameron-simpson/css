@@ -1,0 +1,112 @@
+#!/usr/bin/perl
+#
+# Copy a file to stdout, with progress metering to stderr.
+#	- Cameron Simpson <cs@zip.com.au> 18sep2002
+#
+
+use cs::Misc;
+use cs::Upd;
+use cs::Units;
+
+sub copyout($;$);
+
+$::Xit=0;
+
+if (! @ARGV)
+{ @ARGV='-';
+}
+
+for my $f (@ARGV)
+{ if ($f eq '-')
+  { copyout(STDIN) || ($::Xit=1);
+  }
+  else
+  { if (! open(COPYIN, "< $f\0"))
+    { warn "$::cmd: can't read from $f: $!\n";
+      $::Xit=1;
+    }
+    else
+    { copyout(COPYIN,$f) || ($::Xit=1);
+      close(COPYIN);
+    }
+  }
+}
+
+exit $::Xit;
+
+sub copyout($;$)
+{ my($FILE,$file)=@_;
+
+  if (defined $file)
+  { out("$file:");
+  }
+
+  my $size = (eval "stat($FILE)")[7];
+  if ($size < 1)
+  { undef $size;
+  }
+
+  local($_);
+  my $n;
+  my $off;
+
+  my $start = time;
+  my $sofar = 0;
+  my $now;
+
+  my($Bps,$pcnt,$eta);
+
+  READ:
+  while (defined($n=sysread($FILE,$_,65536)) && $n > 0)
+  { 
+    $sofar+=$n;
+    if (($now=time) > $start)
+    { $elapsed=$now-$start;
+      $Bps=cs::Units::bytes2human($sofar/$elapsed,1)."/s";
+    }
+    else
+    { $Bps='';
+    }
+
+    if (defined $size && $size > 0)
+    { $pcnt=int($sofar*100/$size)."%";
+      if ($elapsed > 0)
+      { $eta=sprintf("ETA: %6s",scalar(cs::Units::sec2human(int(($size-$sofar)/($sofar/$elapsed)+0.5))));
+      }
+      else
+      { $eta='';
+      }
+    }
+    else
+    { $pcnt='';
+      $eta=sprintf("Data: %4s",scalar(cs::Units::bytes2human($sofar,1)));
+    }
+    out( (defined $file ? "$file: " : '').sprintf("%6s %4s %s",$Bps,$pcnt,$eta) );
+
+    WRITE:
+    for ($off=0; $off<length; $off+=$n)
+    { $n=syswrite(STDOUT,$_,length($_)-$off,$off);
+      if (! defined $n)
+      { warn "$::cmd: write error on stdout: $!\n";
+	return 0;
+      }
+    }
+  }
+
+  if (($now=time) > $start)
+  { $elapsed=$now-$start;
+    $Bps=cs::Units::bytes2human($sofar/$elapsed,1)."/s";
+  }
+  else
+  { $Bps='';
+  }
+  out('');
+  nl( (defined $file ? "$file: " : '').sprintf("%6s Time: %s",$Bps,scalar(cs::Units::sec2human($elapsed))) );
+
+  if (! defined $n)
+  { warn "$::cmd: read error: $!\n";
+    return 0;
+  }
+
+  return 1;
+}
