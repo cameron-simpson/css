@@ -1,0 +1,116 @@
+#!/bin/sh
+#
+# Make a set of symlinks in the current directory
+# pointing at update RPMs from an updates mirror
+# preferring i686 over i586, i586 over i386 etc.
+# Note: by default this makes hard links so that the
+#       constructed directory can be used as an NFS export.
+#       The -s option exists to make soft links if preferred,
+#	or the -c option to make copies instead of links.
+#	- Cameron Simpson <cs@zip.com.au> 16jun2003
+#
+
+cmd=`basename "$0"`
+usage="Usage: $cmd [-a archs] [-c] [-s] rhupdatesdir
+	-a archs	Architecutre suffices, deduced from \$CPU by default.
+	-c		Make copies instead of links.
+	-s		Make soft links, not hard links."
+
+archs=
+lnsymopt=
+lncmd=ln
+
+badopts=
+
+while :
+do
+  case $1 in
+    -a)	archs=$2; shift ;;
+    -c) lncmd=cp ;;
+    -s)	lnsymopt=-s ;;
+    --)	shift; break ;;
+    -?*)echo "$cmd: unrecognised option: $1" >&2; badopts=1 ;;
+    *)	break ;;
+  esac
+  shift
+done
+
+if [ $# = 0 ]
+then
+    echo "$cmd: missing rhupdatesdir" >&2
+    badopts=1
+else
+    rhdir=$1
+    shift
+    [ -d "$rhdir/." ] || { echo "$cmd: no directory at $rhdir" >&2; badopts=1; }
+    [ $# = 0 ] || { echo "$cmd: extra arguments after rhupdatesdir: $*" >&2
+		    badopts=1
+		  }
+fi
+
+if [ -z "$archs" ]
+then
+  case $CPU in
+    x86)	archs='i686 i586 i486 i386' ;;
+    *)		echo "$cmd: unsupported architecture \"$CPU\" (from \$CPU - I know \"x86\")" >&2
+		echo "	perhaps you need the -a option?"
+		badopts=1
+		;;
+  esac
+fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+echo "Removing extant RPMs ..."
+rm *.*.rpm
+
+for arch in $archs
+do
+  archdir=$rhdir/$arch
+  [ -d "$archdir/." ] || continue
+  ls "$archdir/."
+done \
+| sed -n 's/\(.*\)-.*-.*.[^.]*.rpm$/\1/p' \
+| sort -u \
+| while read pkg
+  do
+    gotone=
+    for arch in $archs
+    do
+      hit=
+      hits=
+      multihits=
+      for rpm in "$rhdir/$arch/$pkg"-*-*.$arch.rpm
+      do
+	if [ -s "$rpm" ]
+	then
+	    baserpm=`basename "$rpm"`
+	    case "$baserpm" in
+		# catch overmatches
+		"$pkg"-*-*-*.$arch.rpm)	continue ;;
+	    esac
+	    [ -s "$rpm" ] || continue
+
+	    hits="$hits $baserpm"
+	    if [ $hit ]
+	    then
+		multihits=1
+		continue
+	    fi
+	    $lncmd $lnsymopt "$rpm" . && { hit=1; echo "$rpm"; }
+	fi
+      done
+
+      if [ $multihits ]
+      then
+	  echo "$cmd: multiple hits for $pkg-*.$arch.rpm" >&2
+	  ( cd "$rhdir/$arch" || exit 1; ls -ld $hits ) | sed 's/^/	/' >&2
+      fi
+
+      [ $hit ] && { gotone=1; break; }
+    done
+    [ $gotone ] || echo "$cmd: no matches in $archs for $pkg?" >&2
+  done
+
+[ -d "$rhdir/noarch/." ] \
+&& (set -x; $lncmd $lnsymopt "$rhdir/noarch/*.noarch.rpm" .)
