@@ -117,7 +117,11 @@ sub GetSet($$;$)
   { $this->{$field}=$value;
   }
   else
-  { return undef if ! exists $this->{$field};
+  { if (! exists $this->{$field})
+    { ## my@c=caller;warn "no $field in $this\n\tfrom [@c]\n\t";
+      return undef;
+    }
+
     $this->{$field};
   }
 }
