@@ -33,6 +33,7 @@ sub new
 
 sub newgmt
 { my($class,$gmt)=@_;
+  $gmt=time if ! defined $gmt;
   scalar(new cs::Day ((new cs::Date $gmt)->DayCode()));
 }
 
