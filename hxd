@@ -1,0 +1,54 @@
+#!/usr/bin/perl
+#
+# Hex dump.	- Cameron Simpson <cs@zip.com.au>, 04jul94
+#
+
+($cmd=$0) =~ s:.*/::;
+$usage="Usage: $cmd [files...]\n";
+
+$xit=0;
+$many=($#ARGV > $[);
+
+if ($#ARGV < $[)	{ &hxd(STDIN); }
+else			{ FILE:
+			    for $FILE (@ARGV)
+	  			{ print "$FILE:\n" if $many;
+				  if ($FILE eq '-')
+					{ &hxd(STDIN);
+					}
+				  elsif (!open(FILE))
+					{ print STDERR
+						"$cmd: can't open $FILE: $!\n";
+					  $xit=1;
+					  next FILE;
+					}
+				  else
+				  { &hxd(FILE);
+				    close(FILE);
+				  }
+				}
+			}
+
+exit $xit;
+
+sub hxd	# (FILE) -> void
+	{ local($FILE)=shift;
+
+	  $offset=tell($FILE);
+	  while (sysread($FILE,$_,16))
+		{ for ($i=0, $hex='', $txt=''; length>0; $i++)
+			{ if ($i%2 == 0)
+				{ $hex.=' ';
+				}
+
+			  $hex.=sprintf("%02x",ord($_));
+			  if (/^[^\000-\037]/)	{ $txt.=$&; }
+			  else			{ $txt.='.'; }
+			  substr($_,$[,1)='';
+			}
+
+		  printf("%08x %-40s  %s\n",$offset,$hex,$txt);
+
+		  $offset=tell($FILE);
+		}
+	}
