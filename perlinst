@@ -6,7 +6,9 @@
 
 force=
 vers=${PREFPERL:+"-$PREFPERL"}
-perl=
+perl=/usr/bin/perl
+libdir=/opt/perl_local/rh9/5.8.0
+prefix=$libdir
 
 while :
 do
@@ -60,6 +62,8 @@ do
 
     echo "Entering $subdir to do install."
     cd "$subdir" || exit $?
+    pwd
+    set -x
 
     PATH=/usr/openwin/bin:/opt/bin:$PATH
     export PATH
@@ -67,9 +71,9 @@ do
     wd=`pwd`
     base=`basename "$wd"`
 
-    colourise buildenv "$perl" Makefile.PL ${1+"$@"} \
-    && colourise buildenv make \
-    && { colourise buildenv make test || { colour_echo white "Make test fails!"
+    buildenv "$perl" Makefile.PL "PREFIX=$prefix" "LIB=$libdir" \
+    && buildenv make \
+    && { buildenv make test || { colour_echo white "Make test fails!"
 					   if [ $force ] \
 					   || ask "Install $base anyway?"
 					   then :
@@ -77,7 +81,7 @@ do
 					   fi
 					 }
        } \
-    && ( umask 2; colourise buildenv lock perlinst make install ) \
+    && ( umask 2; buildenv lock perlinst make install ) \
     && dlog "$HOST/$ARCH: $perl $base"
 done
 wait
