@@ -1,7 +1,6 @@
 #!/bin/sh
 
-LOGDIR=${LOGDIR:-$HOME/var/log}
-export LOGDIR
+: ${LOGDIR:=$HOME/var/log}
 
 tty=`tty`
 [ -n "$tty" ] && echo "$tty" >"$LOGDIR/alertlog-$DISPLAY@$HOST"
