@@ -86,7 +86,8 @@ Remaining options are passed to the native ps(1) command.
 
 =cut
 
-my @args = ('ps','-o',lc("@PSUseFmts"),@ARGV);
+my @args = ('ps',@ARGV,'-o',lc("@PSUseFmts"));
+##warn "ps=[@args]";
 my $shcmd = cs::Shell::quote(@args);
 
 # collect listing
