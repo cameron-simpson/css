@@ -4,6 +4,20 @@
 #	- Cameron Simpson <cs@zip.com.au> 24oct95
 #
 
+=head1 NAME
+
+cs::Pathname - manipulate data hierachies
+
+=head1 SYNOPSIS
+
+use cs::Pathname;
+
+=head1 DESCRIPTION
+
+This module does stuff with files and filenames.
+
+=cut
+
 use strict qw(vars);
 
 ##BEGIN { use cs::DEBUG; cs::DEBUG::using(__FILE__); }
@@ -13,7 +27,17 @@ use cs::Misc;
 
 package cs::Pathname;
 
-# unique ID for file
+=head1 FUNCTIONS
+
+=over 4
+
+=item pathid(I<path>)
+
+Return a unique id string for the named file.
+Current implementation: "rdev:ino".
+
+=cut
+
 sub pathid($)
 { my($path)=@_;
 
