@@ -1,9 +1,15 @@
 #!/bin/sh
+sync=
+[ "x$1" = x-s ] && { sync=1; shift; }
+[ $# = 0 ] || { echo "Usage: $0 [-s] <mailitem" >&2; exit 2; }
+[ -t 0 ] && { echo "$0: stdin may not be a tty" >&2; exit 2; }
+
 exec >/dev/null 2>/dev/tty
 tmp=${TMPDIR:-/tmp}/procham$$
 cat >"$tmp" || exit 1
 exec </dev/null
 ( bogofilter -Sn <"$tmp"
-  procmail <"$tmp"
-  rm "$tmp"
+  procmail <"$tmp" && rm "$tmp"
 ) &
+[ $sync ] || exit 0
+wait
