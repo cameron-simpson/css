@@ -97,12 +97,12 @@ sedvars=`[ ! -s "$cf" ] || sed -e "$sedscript" "$cf"` \
 eval "$sedvars"
 
 usage="Usage: $cmd [-n] [-f] [l] [-R rsync-path] [-x] [-v] [items...]
-	-n	No action (default) - echo necessary actions.
 	-f	Force action.
 	-l	Localise the specified items.
 	-L	Rsync's --copy-links option.
 	-R rsync-path Rsync command path. Default, from \$SYNCOPT_RSYNC: $SYNCOPT_RSYNC
 	-r [user@]host Remote host with the master files.
+	-n	No action - echo necessary actions.
 	-x	Force action with tracing.
 	-v	Verbose."
 
@@ -117,6 +117,7 @@ vflag=
 # =over 4
 #
 
+hadmode=
 badopts=
 while :
 do  case $1 in
@@ -132,7 +133,7 @@ do  case $1 in
 	# Trace execution. Implies B<-f>.
 	# Report actions as they are taken.
 	#
-	-x)	trace=set-x ;;
+	-x)	hadmode=1 trace=set-x ;;
 	# =item B<-l>
 	#
 	# Default to installing all packages locally.
@@ -165,7 +166,7 @@ do  case $1 in
 	# No action. This is the default.
 	# Merely recite the actions which would be performed.
 	#
-	-n)	trace=echo ;;
+	-n)	hadmode=1 trace=echo ;;
 	# =item B<-R> I<rsync-path>
 	#
 	# Path to the rsync(1) command.
@@ -206,6 +207,10 @@ then
     echo "$cmd: -l requires specific enumeration of targets targets" >&2
     badopts=1
 fi
+
+[ $hadmode ] || { echo "$cmd: no mode supplied; one of -n or -x required" >&2
+		  badopts=1
+		}
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
