@@ -1,0 +1,97 @@
+#!/bin/sh
+#
+# The good morning stuff.	- Cameron Simpson <cs@zip.com.au>
+#
+
+cmd=`basename "$0"`
+hi=$HOME/rc/hi
+
+eval `datevars`
+weekly=
+mode=html
+
+[ "x$wdayname" = xMon ] && weekly=1
+[ "x$1" = x-html ] && { mode=html; shift; }
+[ "x$1" = x-normal ] && { mode=normal; shift; }
+[ "x$1" = x-w ] && { weekly=1; shift; }
+
+if [ $# = 0 ]
+then
+    set rterm `cd "$hi" || exit 1
+	       ls -d [a-z]*|sed 's/\.weekly$//'|sort -u`
+    shift
+fi
+
+urllist=/tmp/hi-urls.$$
+
+while [ $# -gt 0 ]
+do
+    task=$1; shift
+    case "$task" in
+	rterm)	case $SYSTEMID in
+		    cisra)
+			for h in ixus elph sid lennon ivie cass
+			do
+			  lock -1 rterm-$h@cisra rterm $h@cisra &
+			done
+			;;
+		esac
+		;;
+	/*)	task=`expr "x$task" : 'x/\(.*[^/]\)/*$'`
+		echo "# $task" >>"$urllist"
+		cat "$hi/[a-z]"* | grep '^[^#]' | egrep "$task" \
+		| while read url
+		  do eval "echo \"$url\""
+		  done >>"$urllist"
+		;;
+	*)	if [ -f "$hi/$task" -o -f "$hi/$task.weekly" ]
+		then
+		    echo "# $task" >>"$urllist"
+		    ( cat "$hi/$task"
+		      [ $weekly ] && cat "$hi/$task.weekly"
+		    ) 2>/dev/null \
+			| grep '^[^#]' \
+			| while read mod url
+			  do case "$mod" in
+			       scour)	url=http://web/htc.cgi/$url ;;
+			       *)	url=$mod ;;
+			     esac
+			     eval "echo \"$url\""
+			  done >>"$urllist"
+		else
+		    echo "$cmd: $task: unknown task" >&2
+		fi
+		;;
+    esac
+done
+
+wait
+
+case $mode in
+    normal)
+	[ -f "$urllist" ] && { grep -v '^#' <"$urllist" | us -; rm "$urllist"; }
+	;;
+    html)
+	html=$HOME/tmp/hi.html
+	{ echo "<TITLE>hi for `daycode`</TITLE>"
+	  echo "<H1>hi for `daycode`</H1>"
+	  inlist=
+	  while read url
+	  do
+	    case "$url" in
+	      \#*)
+		title=`expr "x$url" : 'x# *\(.*\)'`
+		[ $inlist ] && { echo "</UL>"; inlist=; }
+		echo "<H2>$title</H2>"
+		;;
+	      *)
+		[ $inlist ] || { echo "<UL>"; inlist=1; }
+		echo "<LI><A HREF=\"$url\">$url</A>"
+		;;
+	    esac
+	  done
+	  [ $inlist ] && { echo "</UL>"; inlist=; }
+	} <"$urllist" >"$html"
+	us "file:$html"
+	;;
+esac
