@@ -1,0 +1,13 @@
+#!/bin/sh
+#
+# Install local CSS to remote CSS.
+#	- Cameron Simpson <cs@zip.com.au> 18jan2004
+#
+
+cmd=$0
+[ $# = 0 ] && { echo "Usage: $cmd hosts..." >&2; exit 2; }
+
+for host
+do
+  (set -x; rsync -avHP --delete /opt/css/. "$host:/opt/css/.")
+done
