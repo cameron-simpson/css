@@ -9,8 +9,8 @@ cmd=`basename "$0"`
 case "$cmd" in
    buildenv)
 	exec noldpath env BSEDOPTS= \
-			  LD_LIBRARY_PATH=/opt/lib:/lib:/usr/lib:/opt/X11R6/bin:/usr/openwin/lib:/usr/X11R6/lib:/opt/X11R6/lib \
-			  PATH=/bin:/usr/bin:/usr/ccs/bin:/opt/bin:/opt/script:/usr/openwin/bin:/usr/X11R6/bin:/opt/X11R6/bin:$PATH \
+			  LD_LIBRARY_PATH=/lib:/usr/lib:/opt/X11R6/bin:/usr/openwin/lib:/usr/X11R6/lib:/opt/lib:/opt/X11R6/lib \
+			  PATH=/bin:/usr/bin:/usr/ccs/bin:/opt/bin:/opt/script:/usr/openwin/bin:/usr/X11R6/bin:/opt/X11R6/bin \
 			  ${1+"$@"}
 	;;
    stdenv)
