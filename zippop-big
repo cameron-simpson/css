@@ -5,6 +5,6 @@ set nc bigmail.zip.com.au 110
 ##    home)	;;
 ##    cisra)	set ssh upnp exec "$@" ;;
 ##esac
-set ssh zip exec "$@"
+set sshb zip exec "$@"
 set -x
 exec "$@"
