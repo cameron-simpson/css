@@ -1,0 +1,99 @@
+#!/usr/bin/perl
+#
+# Locate the references patterns and make a folder for vm.
+# Blow away the folder afterwards.
+#	- Cameron Simpson, 20nov93
+#
+
+use cs::Upd;
+
+($cmd=$0) =~ s:.*/::;
+$usage="Usage: $cmd [-v] patterns
+	-v	Verbose.
+";
+
+$verbose=0;
+if ($ARGV[$[] eq '-v')
+	{ $verbose=1;
+	  shift;
+	}
+
+die $usage if $#ARGV < $[;
+
+require 'cs/env.pl';
+
+&env'load;
+
+$xit=0;
+
+if (!defined($pid=open(FINDMAIL,"-|")))
+	{ die "$cmd: can't pipe/fork: $!\n";
+	}
+
+if ($pid == 0)
+	{ unshift(@ARGV,'-v') if $verbose;
+	  exec('findmail',@ARGV);
+	  die "$cmd: can't exec(findmail @ARGV): $!\n";
+	}
+
+@msgids=<FINDMAIL>;
+close(FINDMAIL);
+
+die "$cmd: no matches\n" if $#msgids < $[;
+
+$folder="$MAILDIR/.tmp$$";
+mkdir($folder,0777) || die "$cmd: can't mkdir($folder): $!\n";
+if (open(I,"> $folder/.index")) { close(I); }
+
+$xit=0;
+
+$n=1;
+for (@msgids)
+	{ chop;
+	  if ($verbose)
+		{ if ($n == 1)
+			{ length($upd'lastline) && out($upd'lastline);
+			}
+
+		  out($_);
+		}
+
+	  $src="$MSGIDS/$_";
+	  $dst="$folder/$n";
+	  if (link($src,$dst))
+		{}
+	  elsif (!open(MSG,"< $src\0"))
+		{ err("$cmd: can't read $dst: $!\n");
+		  $xit=1;
+		}
+	  else
+	  { if (!open(COPY,"> $dst\0"))
+		{ err("$cmd: can't write to $dst: $!\n");
+		  $xit=1;
+		}
+	    else
+	    { while (<MSG>)
+		{ print COPY $_;
+		}
+
+	      close(COPY);
+	    }
+
+	    close(MSG);
+	  }
+
+	  $n++;
+	}
+
+
+out('');
+system('vm',$folder);
+
+nl("removing $folder ...");
+system('rm','-r',$folder);
+
+if ($?>>8)
+	{ $xit=1;
+	}
+
+exit $xit;
