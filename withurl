@@ -19,7 +19,8 @@ arg1opts=
 badopts=
 while :
 do  case $1 in
-      -1|-end)	arg1opts="$arg1opts $1" ;;
+      -[0-9]*|-end|-discard)
+		arg1opts="$arg1opts $1" ;;
       -c)	docache=1 trustcache= ;;
       -C)	docache=1 trustcache=1 ;;
       -h)	htopts="$htopts $1" ;;
