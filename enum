@@ -1,0 +1,29 @@
+#!/usr/bin/perl
+#
+
+if (@ARGV == 1)
+{ for my $n (1..$ARGV[0])
+  { print "$n\n";
+  }
+}
+elsif (@ARGV == 2)
+{ my($n1,$n2)=@ARGV;
+  if ($n1 <= $n2)
+  { for my $n ($n1..$n2)
+    { print "$n\n";
+    }
+  }
+  else
+  { while ($n1 >= $n2)
+    { print "$n1\n";
+      $n1--;
+    }
+  }
+}
+else
+{ warn "Usage: $0 [n1] n2\n";
+  exit 2;
+}
+
+exit 0;
+    
