@@ -273,8 +273,8 @@ sub tagSelect($$$$$$)
   for (@$keylist)
   { $opt={ VALUE => $_ };
     if (defined $sel{$_})
-	  { $opt->{SELECTED}=undef;
-	  }
+    { $opt->{SELECTED}=undef;
+    }
 
     push(@content,[OPTION,$opt],$map->{$_});
   }
