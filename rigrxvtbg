@@ -1,26 +1,28 @@
 #!/bin/sh
 #
-# Regularly run setrxvtbg in the background, then exec command if supplied.
+# Regularly run setrxvtbg in the background.
 #	- Cameron Simpson <cs@zip.com.au> 31aug2000
 #
 
 cmd=`basename "$0"`
-usage="Usage: $cmd [-f] [-p shellpid] [-i interval] [/keywords] [cmd [args...]]"
+usage="Usage: $cmd [-q] [-p shellpid] [-i interval] [-o] [sed-regexps...]"
 
 force=
 shellpid=$$
 period=${RXVTBGINTERVAL:-60}
-keywords=
+anyopt=
 
 badopts=
 while :
 do
   case $1 in
+    -o)	anyopt=-o ;;
     -p)	shellpid=$2; shift ;;
     -i)	period=$2; shift ;;
     -e)	shift; break ;;
-    -f)	force=1 ;;
-    /?*) keywords=`expr "x$1" : 'x/\(.*\)' ` ;;
+    -q)	{ wantrxvtbg && xrdb -query | grep 'DORXVTBG:.*true' >/dev/null; } \
+	|| exit 0
+	;;
     --)	shift; break ;;
     -?*)echo "$cmd: unrecognised option: $1" >&2
 	badopts=1
@@ -35,19 +37,12 @@ done
 # notice resizes - doesn't seem to work - shell job control to blame?
 [ -n "$SIGWINCH" ] && trap '( lock -s setrxvtbg setrxvtbg & )' "$SIGWINCH"
 
-if [ $force ] \
-|| { wantrxvtbg \
-  && xrdb -query | grep 'DORXVTBG:.*true' >/dev/null
-   }
-then
-    RXVTBGLOG=`rxvtbglog`
-    export RXVTBGLOG
-    (
-      while kill -0 "$shellpid"
-      do  rawx lock "setrxvtbg@$HOST" nice setrxvtbg -l "$RXVTBGLOG" $keywords
-	  sleep "$period" || break
-      done
-    ) &
-fi
+RXVTBGLOG=`rxvtbglog`
+export RXVTBGLOG
 
-[ $# = 0 ] || exec "$@"
+(
+  while kill -0 "$shellpid"
+  do  rawx lock "setrxvtbg@$HOST" nice setrxvtbg -l "$RXVTBGLOG" $anyopt ${1+"$@"}
+      sleep "$period" || break
+  done
+) &
