@@ -1,0 +1,15 @@
+#!/usr/bin/perl
+#
+# Walk an http hierarchy.	- Cameron Simpson, 22mar94
+#
+
+require 'cs/http.pl';
+
+($cmd=$0) =~ s:.*/::;
+$usage="Usage: $cmd host file\n";
+
+die $usage unless defined($host=shift) && defined($file=shift);
+
+print &http'get($file,$host);
+
+exit 0;
