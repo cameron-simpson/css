@@ -4,6 +4,25 @@
 #	- Cameron Simpson <cs@zip.com.au>
 #
 
+: ${LOGDIR:=$HOME/var/log}
+
 FVWM_MENU_IMLIST_OP=${FVWM_MENU_IMLIST_OP:-"deskbg"}
 export FVWM_MENU_IMLIST_OP
-exec fvwm-menu-recent-imlist ${1+"$@"} <"$HOME/var/log/rootbg"
+
+cmd=$0
+usage="Usage: $cmd [-N] menuname [imageop [args...]]"
+
+fmiopts=
+
+badopts=
+
+[ "x$1" = x-N ] && { fmiopts="$fmiopts $1"; shift; }
+
+if [ $# = 0 ]
+then  echo "$cmd: missing menuname" >&2; badopts=1
+else  menuname=$1; shift
+fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+lastn <"$LOGDIR/rootbg" | set-x fvwm-menu-imlist -l - $fmiopts "$menuname"
