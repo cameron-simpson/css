@@ -4,9 +4,18 @@
 #	- Cameron Simpson <cs@zip.com.au> 27feb2000
 #
 
-[ $# = 0 ] && { echo "Usage: $0 command [args...]" >&2; exit 2; }
+PAGER=${PAGER:-less}
+export PAGER
 
-if [ -t 1 ]
-then  "$@" 2>&1 | ${PAGER:-less}
-else  exec "$@"
+if [ $# = 0 ]
+then
+    if [ -t 1 ]
+    then  exec $PAGER
+    else  exec cat
+    fi
+else
+    if [ -t 1 ]
+    then  "$@" 2>&1 | $PAGER
+    else  exec "$@"
+    fi
 fi
