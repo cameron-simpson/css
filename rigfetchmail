@@ -1,0 +1,8 @@
+#!/bin/sh
+#
+# Dispatch a daemon mode fetchmail.
+#	- Cameron Simpson <cs@zip.com.au> 14dec2003
+#
+needhost amadeus@home || exit 1
+set -x
+exec fetchmail --daemon 300 -f $HOME/private/fetchmailrc -a
