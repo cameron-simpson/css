@@ -1,0 +1,46 @@
+#!/bin/sh
+#
+# Tidy up directories.
+#	- Cameron Simpson <cs@zip.com.au>
+#
+
+usage="Usage: $0 [-r] [-x] [dirs]
+	-r	Recurse into subdriectories with tidy files.
+	-x	Trace execution.
+	dirs	Which directories to tidy (default: .)"
+
+shflags=
+recurse=
+badopts=
+while :
+do  case $1 in
+        -r)	recurse=1 ;;
+	-x)	shflags=-x ;;
+	--)	shift; break ;;
+	-?*)	echo "$0: unrecognised option: $1" >&2
+		badopts=1
+		;;
+	*)	break ;;
+    esac
+    shift
+done
+
+[ $# = 0 ] && set .
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+xit=0
+for d
+do  ( cd "$d" || exit $?
+      pwd
+      xit=0
+      [ ! -r tidy ] || exec sh $shflags tidy
+      [ $recurse ] && for d in *
+		      do  [ -r "$d/tidy" ] || continue
+			  tidy -r $shflags -- "$d" || xit=1
+		      done
+      exit $xit
+    ) || xit=1
+done
+
+exit $xit
