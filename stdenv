@@ -24,14 +24,6 @@ case "$cmd" in
 			 exec <&8 >&9 8>&- 9>&-
 			 exec $*"
 	;;
-   nostubs)
-	exec env PATH=$nostubsPATH ${1+"$@"} ;;
-   cisraenv)
-	eval `setvar -n -f -d /opt/shell/env STANDARD`
-	;;
-   tsenv)
-	. /home/docs/misc/cisra/timesheets/bin/.env
-	;;
    rawpath)
 	PATH=`env - sh -c '. /etc/profile;echo $PATH'`:$PATH
 	;;
