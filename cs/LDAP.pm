@@ -205,9 +205,8 @@ sub Diff2Modify
 }
 
 # delete a DN
-sub DelDN2Modify
-{
-  my($this,$dn)=@_;
+sub DelDN2Modify($$)
+{ my($this,$dn)=@_;
 
   ("dn: $dn\n",
    "changetype: delete\n",
