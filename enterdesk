@@ -13,7 +13,7 @@ lastdesk=`currentdesk`
 
 if [ "x$thisdesk" != "x$lastdesk" ]
 then
-    currentdesk "$thisdesk" &
+    currentdesk "$thisdesk"
 
     desktop "$thisdesk" shcmds | sh -x &
     desktop "$thisdesk" wmcmds | fvwmcmd &
@@ -58,7 +58,7 @@ then
 
     fi &
 
-    ( deskjob=`desktop "$thisdesk" job`
+    ( deskjob=`deskjob -d "$thisdesk"`
       [ -n "$deskjob" ] || { isjob idle || exit 0; deskjob=idle; }
       job "$deskjob"
     ) &
