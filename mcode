@@ -38,9 +38,20 @@ esac
 
 if [ -n "$n" ]
 then
-    echo "$mcode d 100 / 12 * r 1 - 12 % +
-          $n $op
-	  d 12 / 100 * r 12 % 1 + + p" | dc
+    echo "$mcode d	# two mcodes
+	  100 / 12 *	# convert years into months
+	  r		# save years*12, get mcode
+	  1 - 100 %	# sub 1, get remainder mod 100
+	  +		# add years*12
+          $n $op	# do arithmetic requested
+	  d		# dup
+	  12 / 100 *	# compute years*100
+	  r		# save years*100, get months
+	  12 % 1 +	# get months remainder form months, add 1
+	  +		# add years * 100
+	  p" \
+    | sed 's/#.*//' \
+    | dc
 else
     echo "$mcode"
 fi
