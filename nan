@@ -1,2 +1,2 @@
 #!/bin/sh
-exec netstat -an
+exec netstat -an ${1+"$@"}
