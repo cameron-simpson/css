@@ -1,0 +1,18 @@
+#!/bin/sh
+
+aswho=kwanon.research.canon.com.au
+conn=rtelnet
+
+if [ $# = 1 ]
+then
+    expnhost=$1
+else
+    echo "Usage: expn remotehost <addresses" >&2
+    exit 2
+fi
+
+( echo HELO $aswho
+  sed 's/^/EXPN /'
+  echo QUIT
+  sleep 10
+) | $conn "$expnhost" smtp
