@@ -4,226 +4,58 @@
 #	- Cameron Simpson <cs@zip.com.au> 08apr1997
 #
 
-logline=\$'Log'\$	# obfuscated to avoid self-substitution
+cmd=$0
 
-file=$1
-base=`basename "$1"`
-pfx=`expr "x$base" : 'x\(.*\)\..*'`
-fdir=`dirname "$file"`
-fdir=`cd "$fdir"; pwd`
+tpltdir=$HOME/rc/tplt
 
-pfx=`basename "$fdir"`
-case $fdir in
+FILE=$1
+BASE=`basename "$FILE"`
+PFX=`expr "x$BASE" : 'x\(.*\)\..*'`
+FILEDIR=`dirname "$FILE"`
+FILEDIR=`cd "$FILEDIR"; pwd`
+FILEPATH=$FILEDIR/$BASE
+
+DIRBASE=`basename "$FILEDIR"`
+case $FILE in
     /*/scripts/*)
-	pfx=`expr "x$filepath" : 'x.*/scripts/\(.*\)/.*'`
+	PFX=`expr "x$FILEPATH" : 'x.*/scripts/\(.*\)/.*'`
+	;;
+    /*/s/java/*)
+	JAVABASECLASS=au.com.zip.cs.`expr "x$FILEPATH" : 'x.*/s/java/\\(.*\\)/.*'|tr / .`
+	export JAVABASECLASS
 	;;
 esac
 
-datestr=`date|awk '{print $3 $2 $6}'|tr '[A-Z]' '[a-z]'`
+DATESTR=`date|awk '{print $3 $2 $6}'|tr '[A-Z]' '[a-z]'`
 
-case $file in
-    $pfx.h)
-	case "$MYKEtarget" in
-	    bin)echo "#include	<cs/lib.h>"
-		;;
-	    prc)echo "#include	<Pilot.h>"
-		echo "#ifdef	__GNUC__"
-		echo "#include	\"Callback.h\""
-		echo "#endif"
-		echo "#include	\"resources.h\""
-		;;
-	esac
+[ -n "$MYKEtarget" ] \
+	|| MYKEtarget=`sed -n 's/^target.*= *\([^ ]*\).*/\1/p' Mykefile`
 
-	echo "#include	\"funcs.h\""
-	;;
-    *.c)
-	cbase=`basename "$file" .c`
-	echo "#include \"$pfx.h\""
-	echo "#include \"static/$cbase.h\""
+export FILE BASE PFX FILEDIR FILEPATH DIRBASE DATESTR MYKEtarget
 
-	case "$MYKEtarget:$file" in
-	    prc:main.c)
-		echo
-		echo "DWord"
-		echo "PilotMain(Word launchCode, Ptr cmdPBP, Word launchFlags)"
-		echo "{"
-		echo "  Err	err = 0;"
-		echo
-		echo "  if (launchCode == sysAppLaunchCmdNormalLaunch)"
-		echo "  { if ((err=StartApplication()) == 0)"
-		echo "    { EventLoop();"
-		echo "      StopApplication();"
-		echo "    }"
-		echo "  }"
-		echo
-		echo "  return Err;"
-		echo "}"
-		echo
-		echo "static Err"
-		echo "StartApplication(void)"
-		echo "{"
-		echo "  return 0;"
-		echo "}"
-		echo
-		echo "static void"
-		echo "StopApplication(void)"
-		echo "{"
-		echo "}"
-		;;
-	esac
-	;;
-    *.html|*.shtml)
-	echo '<HTML>'
-	echo '<HEAD>'
-	echo "<TITLE>Title of $file</TITLE>"
-	echo "<LINK REL=Made HREF=mailto:$EMAIL>"
-	echo "<LINK REL=Home HREF=$WWW_HOME>"
-	echo '</HEAD>'
-	echo '<BODY>'
-	echo "<H1>Heading of $file</H1>"
-	echo '</BODY>'
-	echo '</HTML>'
-	;;
-    *.pl|*.cgi|*.cgi-pl)
-	echo '#!/usr/bin/perl'
-	echo "#"
-	echo "#	- $NAME <$EMAIL> $datestr"
-	echo "#"
-	echo
-	echo "BEGIN { use cs::DEBUG; cs::DEBUG::using(__FILE__);"
-      	echo "      }"
-	echo
-	echo "use strict vars;"
-	echo
-	;;
-    *.sh|*.cgi-sh)
-	echo '#!/bin/sh'
-	echo "#"
-	echo "#	- $NAME <$EMAIL> $datestr"
-	echo "#"
-	echo
-	;;
-    *.pm)
-	pmpfx=`echo "$pfx" | sed 's|/|::|g'`
-	pmmodbase=`basename "$file" .pm`
-	pmmod="$pmpfx::$pmmodbase";
-	cat <<X
-#!/usr/bin/perl
-#
-# $pmmod: a module for blah.
-#	- $NAME <$EMAIL> $datestr
-#
-
-=head1 NAME
-
-$pmmod - blah blah
-
-=head1 SYNOPSIS
-
-use $pmmod;
-
-=head1 DESCRIPTION
-
-The B<$pmmod> module provides blah blah blah.
-
-=cut
-
-use strict qw(vars);
-
-BEGIN { use cs::DEBUG; cs::DEBUG::using(__FILE__); }
-
-package $pmmod;
-
-require Exporter;
-
-@$pmmod::ISA=qw();
-
-=head1 GENERAL FUNCTIONS
-
-=over 4
-
-=item thing(I<arg1>)
-
-Blah.
-
-=cut
-
-sub thing($)
-{ my(
-}
-
-=back
-
-=head1 OBJECT CREATION
-
-Preamble on creation methods.
-
-=over 4
-
-=item new $pmmod I<arg1>
-
-Creates a new blah ...
-
-=cut
-
-sub new
-{ my(\$class,
-
-  my \$this = {
-	     };
-
-  bless \$this, \$class;
-
-  \$this;
-}
-
-=back
-
-=head1 OBJECT METHODS
-
-=over 4
-
-=item Method1(I<arg1>...
-
-Does thing ...
-
-=cut
-
-sub Method1($
-{ my(\$this,
-}
-
-=back
-
-=head1 AUTHOR
-
-$NAME E<lt>${EMAIL}E<gt>
-
-=cut
-
-1;
-X
-	;;
-    *.java)
-	jvpfx=`echo "$pfx" | sed 's|/|.|g'`
-	jvclassbase=`basename "$file" .java`
-	jvpkgbase=au.com.zip.cs;
-	jvclass=$jvpkgbase.$jvclassbase;
-	cat <<X
-//
-// $jvclass: blah
-//	- $NAME <$EMAIL> $datestr
-//
-
-package $jvpkgbase;
-
-import java.lang.*;
-import java.util.*;
-import $jvpkgbase.*;
-
-public class $jvclassbase
-{
-}
-X
-	;;
+tplt=
+case $FILE in
+  $PFX.h)
+    tplt=csapp.h
+    case "$MYKEtarget" in
+      bin)	tplt=csapp.h ;;
+      prc)	tplt=prcapp.h ;;
+    esac
+    ;;
+  *.c)
+    tplt=csapp.c ;;
+  *.java)
+    tplt=java
+    ;;
 esac
+
+[ -n "$tplt" ] || { echo "$cmd: no template for file $FILE" >&2; exit 1; }
+
+case $tplt in
+    /*)	;;
+    *)	tplt=$tpltdir/$tplt ;;
+esac
+
+[ -s "$tplt" ] || { echo "$cmd: no template: $tplt" >&2; exit 1; }
+
+exec envsub <"$tplt"
