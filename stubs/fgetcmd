@@ -1,0 +1,19 @@
+#!/bin/sh
+#
+
+verbose=
+case $1 in -v) verbose=1; shift ;; esac
+
+# glob before request
+case "$*" in
+    *[*?\[\]]*)	set x `flscmd -d ${1+"$@"}`; shift ;;
+esac
+
+state=$FSP_STATE.log
+trap '' 2
+for file
+do
+    [ $verbose ] && echo "$file ..."
+    [ -f "$state" ] && echo "$FSP_HOST $FSP_PORT $FSP_DIR $file" >>"$state"
+    arg0 fgetcmd $REAL/fgetcmd "$file"
+done
