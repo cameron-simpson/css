@@ -92,7 +92,7 @@ $(scriptmandir)/%.1: %
 0README.txt: $(allscripts) INSTALL
 	mkscriptndx `ls -d $(allscripts) | sort` >$@
 
-noads	= $(HOME)/there/adzapper.sourceforge.net/html/rc/patterns
+noads	= $(HOME)/@/adzapper.sf/html/rc/patterns
 
 squid_redirect: $(noads)
 	cd $(?D) || exit 1 \
