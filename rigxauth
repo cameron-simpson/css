@@ -1,0 +1,22 @@
+#!/bin/sh
+#
+# Set up xauth for this display, then copy it to our base homes.
+#	- Cameron Simpson, 01aug92
+#
+
+[ -f "$XAUTHORITY" ] || { echo "\$XAUTHORITY ($XAUTHORITY): not a file" >&2
+			  exit 1
+			}
+
+if [ $# = 0 ]
+then xid=`cat /var/log/syslog /usr/adm/wtmp|md5`
+else xid=$1; shift
+fi
+
+case "$DISPLAY" in '') DISPLAY=:0 ;; esac
+
+	xauth add "$DISPLAY"		. "$xid"
+case "$DISPLAY" in
+    :*)	xauth add "$HOSTNAME$DISPLAY"	. "$xid" ;;
+esac
+	xauth add "$INETADDR:0"		. "$xid"
