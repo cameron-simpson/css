@@ -164,6 +164,7 @@ sub new($;$$)
   { $cs::Upd::_U{$FILE}
    =bless { FILE	=> $FILE,
 	    STATE	=> '',
+	    ERRSTATE	=> '',
 	    TPUT	=> 0,
 	    CLIP	=> $cs::Upd::_Clip,
 	    CLREOL	=> undef,
@@ -372,7 +373,7 @@ sub out
     ::flush($F);
   }
   else
-  { print $F "$_\n" if length && $_ ne $cs::Upd::This->{STATE};
+  { ## print $F "$_\n" if length && $_ ne $cs::Upd::This->{STATE};
   }
 
   warn "ouch" if ! defined;
@@ -388,6 +389,10 @@ sub err	# (@errargs) -> void
   { my(@c)=caller;
     $msg.=" at [@c]\n";
   }
+  if ($old ne $cs::Upd::This->{ERRSTATE})
+  { nl($old);
+    $cs::Upd::This->{ERRSTATE}=$old;
+  }
   out('');
   print STDERR $msg;
   out($old);
@@ -398,10 +403,9 @@ sub nl
 { my($old)=$cs::Upd::This->{STATE};
 
   my $F = $cs::Upd::This->{FILE};
-  out(@_); print $F "\n" if $cs::Upd::This->{MODE} eq TTY;
-  $cs::Upd::This->{STATE}='';
-
-  out($old) if $cs::Upd::This->{MODE} eq TTY;
+  out('');
+  print $F join('',@_)."\n";
+  out($old);
 }
 
 sub Warn{ local($cs::Upd::This)=shift; &warn; }
