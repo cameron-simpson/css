@@ -1,0 +1,237 @@
+#!/usr/bin/perl
+#
+# Convert the DoD list to a mailrc.
+# Emit classification problems to stdout.
+#	- Cameron Simpson <cs@zip.com.au>, 09sep94
+#
+
+($cmd=$0) =~ s:.*/::;
+$usage="Usage: $cmd mailrc < dodlist\n";
+
+require 'cs/open.pl';
+
+use cs::Geog;
+
+$badopts=0;
+
+if (!defined($rc=shift))
+	{ print STDERR "$cmd: missing mailrc\n";
+	  $badopts=1;
+	}
+elsif (@ARGV)
+	{ print STDERR "$cmd: extra arguments after mailrc: @ARGV\n";
+	  $badopts=1;
+	}
+
+die $usage if $badopts;
+
+$xit=0;
+
+DOD:
+  while (<STDIN>)
+	{ s/\r?\n$//;
+	  next DOD unless length;
+
+	  while (/::/ && /:.*:.*:.*:/)
+		{ s/::/:/;
+		}
+
+	  next DOD if /:$/;
+
+	  @fields=split(/:/);
+	  if (@fields != 4)
+		{ print STDERR "$cmd: line $.: bad format: $_\n";
+		  $xit=1;
+		  next DOD;
+		}
+
+	  ($num,$name,$geog,$email)=@fields;
+
+	  # normalise address
+	  # JANET
+	  if ($email =~ /\@(uk\.ac\.)/i)
+		{ $user=$`;
+		  $tail=$1.$';
+		  $_=$user.'@'.join('.',reverse split(/\./,$tail));
+		}
+
+	  $DoDname{$num}=$name;
+	  $DoDaddr{$num}=$email;
+
+	  next DOD if $email =~ /^(deceased|offline)/i;
+
+	  ($country,$area)=Geog::locate($email,$geog);
+
+	  if (length $area)	{ $CLASS="$country:$area"; }
+	  else			{ $CLASS=$country; }
+
+	  $CLASS =~ s/\s+/_/g;
+
+	  &hier(split(/:+/,$CLASS));
+
+	  if (! defined $DoDs{$CLASS})	{ $DoDs{$CLASS}=$num; }
+	  else				{ $DoDs{$CLASS}.=','.$num; }
+
+	  $DoDname{$num}=$name;
+	  $DoDaddr{$num}=$email;
+	}
+
+undef %Done;
+
+@CLASSES=World;
+CLASS:
+  while (@CLASSES)
+	{ $CLASS=shift @CLASSES;
+	  next CLASS if $Done{$CLASS};
+
+	  if ($CLASS eq World)
+		{ $filename=$rc;
+		  $aliasname=DoD;
+		}
+	  else	{ $filename="$rc.$CLASS";
+		  $aliasname=$CLASS.DoD;
+		}
+
+	  if (!open(RC,"> $filename\0"))
+		{ print STDERR "$cmd: can't write to $filename: $!\n";
+		  next CLASS;
+		}
+
+	  select(RC);
+
+	  @alia=();
+	  @subCLASSes=sort &children($CLASS);
+	  for $child (@subCLASSes)
+		{ push(@alia,$child.DoD);
+		  push(@CLASSES,$child);
+		}
+
+	  @Denizens=sort grep(length,split(/\s*,\s*/,$DoDs{$CLASS}));
+	  for $DoD (@Denizens)
+		{ push(@alia,DoD_.$DoD);
+		}
+	  
+	  &alias($aliasname,@alia);
+
+	  if (@subCLASSes)
+		{ print "\n";
+		  for $subCLASS (@subCLASSes)
+			{ print "include $rc.$subCLASS\n";
+			}
+		}
+
+	  if (@Denizens)
+		{ print "\n";
+	  	  for $DoD (@Denizens)
+			{ &alias(DoD_.$DoD,$DoDname{$DoD}.' <'.$DoDaddr{$DoD}.'>');
+			}
+		}
+
+	  close(RC);
+	  select(STDOUT);
+
+	  $Done{$CLASS}=1;
+
+	  for $subCLASS (@subCLASSES)
+		{ push(@CLASSES,$subCLASS) unless $Done{$subCLASS};
+		}
+	}
+
+for $CLASS (sort &uniq(keys %DoDs))
+	{ if (!$Done{$CLASS})
+		{ print STDERR "$cmd: warning: haven't emitted ${CLASS}\n";
+		  $xit=1;
+		}
+	}
+
+exit $xit;
+
+sub alias
+	{ local($alias,@alias_addrs)=@_;
+
+	  printf("alias %-11s ",$alias);
+	  print join(",\n".(' ' x 18), @alias_addrs), "\n";
+	}
+
+sub pushFILE	# filename
+	{ local($file)=shift;
+	  local($FILE,$oldFILE);
+
+	  if (length $openFILE{$file})
+		{ $FILE=$openFILE{$file};
+		}
+	  elsif (! defined($FILE=&subopen($commencedFILE{$file}
+						? '>>' : '>',
+					  $file)))
+		{ print STDERR "$cmd: can't write to $file: $!\n";
+		  $xit=1;
+		  $FILE=STDERR;
+		}
+	  else{#print STDERR "open(",$commencedFILE{$file}?'>>':'>',"$file)\n";
+	      }
+
+	  $openFILE{$file}=$FILE;
+	  $filename{$FILE}=$file if $FILE ne STDERR;
+	  $opensFILE{$FILE}++;
+
+	  push(@openFILEs,select($FILE));
+
+	  #print STDERR "push $FILE ($file)\n";
+
+	  $commencedFILE{$file}=1;
+	}
+
+sub popFILE
+	{ local($oldFILE)=select(pop @openFILEs);
+	  #print STDERR "pop $oldFILE ($filename{$oldFILE})\n";
+	  if ($oldFILE ne STDERR
+	   && --$opensFILE{$oldFILE} == 0)
+		{ #print STDERR "close $oldFILE ($filename{$oldFILE})\n";
+		  if (!close($oldFILE))
+			{ print STDERR "$cmd: close/flush of $oldFILE ($filename{$oldFILE}) fails: $!\n";
+			  $xit=1;
+			}
+		}
+	}
+
+sub dodalias	# num
+	{ local($da_num)=shift;
+	  local($da_name,$da_geog,$da_email)=split(/:/,$DoD_All{$da_num});
+
+	  &alias(DoD_.$da_num,sprintf("%-19s <%s>",$da_name,$da_email));
+	}
+
+sub parent
+	{ local($child,$parent)=@_;
+
+	  if (! defined $parent{$child})
+		{ $children{$parent}.=' '.$child;
+		  $parent{$child}=$parent;
+		  #print STDERR "$child is in $parent\n";
+		}
+	}
+
+sub children
+	{ grep(length,split(/\s+/,$children{$_[0]}));
+	}
+
+sub uniq
+	{ local(%ary);
+
+	  for (@_) { $ary{$_}=1; }
+
+	  keys %ary;
+	}
+
+sub hier
+	{ local($first)=shift;
+	  local($last);
+
+	  &parent($first,World);
+
+	  while (@_)
+		{ $last=$first;
+		  $first=$first.':'.shift;
+		  &parent($first,$last);
+		}
+	}
