@@ -1,0 +1,38 @@
+#!/bin/sh
+#
+# Log job activity and time.
+#	- Cameron Simpson <cs@zip.com.au> 30jun2003
+#
+
+cmd=$0
+usage="Usage: $cmd [task [coment...]]"
+
+# just report current job if no args
+[ $# = 0 ] && exec lastvalue timer_what
+
+badopts=
+
+key=$1; shift
+isjob "$key" || { echo "$cmd: unknown job \"$key\"" >&2; badopts=1; }
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+when=`now`
+
+# per-job time computation
+timer "$key" "$when" &
+jobtimer "$key" state OPEN &
+
+if [ $# -gt 0 ]
+then
+  dlog "$key: $*" &
+fi
+
+# per category time computation
+category=`jobtimer "$key" category`
+[ -n "$category" ] || category=MISC
+## computed at report time
+##timer -i timer_sets "$category" "$when"
+
+title=`jobtimer "$key" title`
+alert -c white "JOB: $key ($category - $title) $*" &
