@@ -22,6 +22,7 @@ subopts=
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
+##set -x
 if [ $# = 1 -a -f "$1" -a -s "$1" ]
 then
     # one argument which is a file pathname
@@ -30,7 +31,7 @@ else
     case "$#,$1" in
       1,http://*)
 	# one argument which is a URL
-	exec withurl "$1" "$0"
+	exec withurl -C "$1" "$0"
 	;;
     esac
 
@@ -41,6 +42,7 @@ else
     ##[ $# = 1 ] && domenu=
 fi
 
+##set +x
 ##echo "*=[$*]" >&2
 
 if [ $domenu ]
