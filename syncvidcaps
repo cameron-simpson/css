@@ -1,0 +1,16 @@
+#!/bin/sh
+
+cd $HOME/var/vidcap || exit 1
+
+find . -type d -print \
+| while read pngdir
+  do  for png in "$pngdir/"*.png
+      do  [ -s "$png" ] || continue
+	  jpgdir=$HOME/im/vidcap/$pngdir
+	  needdir "$jpgdir" || break
+	  jpg=$jpgdir/`basename "$png" .png`.jpg
+	  [ -s "$jpg" ] && continue
+	  echo "$png -> $jpg"
+	  gm convert - <"$png" jpg:- >"$jpg" || rm "$jpg"
+      done
+  done
