@@ -30,6 +30,8 @@
 # Note: B<cdrip> is a wrapper. See the PREREQUISITES section below for needed software.
 #
 
+: ${TMPDIR:=/tmp}
+
 EDITOR=${EDITOR:-vi}
 
 dev=${CDRIP_DEV:-/dev/cdrom}
@@ -168,7 +170,7 @@ then
     lock=$cmd
 fi
 
-toc=/tmp/cdtoc.$$
+toc=$TMPDIR/cdtoc.$$
 cdtoc "$dev" >"$toc" || { rm -f "$toc"; exit 1; }
 
 grep '^[^#]' <"$toc" | grep -v '^[0-9][0-9]* '
