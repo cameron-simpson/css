@@ -1,0 +1,14 @@
+#!/bin/sh
+
+case $ARCH in
+    *.*.linux)	ps alx ;;
+    *.*.solaris)
+		case `uname -r` in
+		    5.[0-5]*)	ps -el ;;
+		    *)		ps -ely ;;
+		esac
+		;;
+    *)		echo "$0: don't know how to psl for ARCH \"$ARCH\"" >&2
+		exit 1
+		;;
+esac
