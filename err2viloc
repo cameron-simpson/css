@@ -1,0 +1,63 @@
+#!/bin/sh
+#
+# Expecting a compile error message on stdin, pull out the filename and
+# line number and emit vi commands to go there.
+# Doesn't like files with whitespace in their names.
+#	- Cameron Simpson <cs@zip.com.au> 08sep2002
+# 
+
+TMPDIR=${TMPDIR:-/tmp}
+
+cmd=$0
+usage="Usage: $cmd [-x] [-..] <error-text
+	-x	Use the X11 cut buffer instead of stdin.
+	-..	Strip ../foo sequences in the filename."
+
+badopts=
+stripdotdot=
+while :
+do  case $1 in
+        -x)	tmp=$TMPDIR/err2viloc$$
+		xclip -o >"$tmp" || exit 1
+		exec <"$tmp"
+		rm "$tmp"
+		;;
+	-..)	stripdotdot=1
+		;;
+	--)	shift; break
+		;;
+	-?*)	echo "$cmd: unrecognised option: $1" >&2
+		badopts=1
+		;;
+	*)	break
+		;;
+    esac
+    shift
+done
+
+[ $# = 0 ] || { echo "$cmd: extra arguments: $*" >&2
+		badopts=1
+	      }
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+sedf='
+	y/	/ /
+	s/^\([^ ][^ ]*\):\([1-9][0-9]*\):.*/\1 \2/
+	t found
+	s/^\([^ ][^ ]*\), *line  *\([1-9][0-9]*\):.*/\1 \2/
+	t found
+	d
+	:found'
+[ $stripdotdot ] \
+&& sedf="$sedf
+	:strip
+	s|\\(.*\\)\\.\\.//*[^/][^/]*//*|\\1|
+	t strip"
+sedf="$sedf
+	q"
+
+sed "$sedf" \
+| { read f n || exit 1
+    echo ":n $f|${n}"
+  }
