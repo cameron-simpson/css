@@ -6,7 +6,7 @@
 
 # Installation prefix, typically /usr/local.
 # The /opt/runmaint path fits the syncopt scheme as described here:
-#	http://www.zip.com.au/~cs/syncopt/
+#	http://www.cskk.ezoshosting.com/cs/syncopt/
 # Can be overridden by presetting this variable.
 RUNMAINT_DIR=${RUNMAINT_DIR:-/opt/runmaint}
 export RUNMAINT_DIR
