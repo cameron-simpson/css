@@ -1,0 +1,235 @@
+#!/bin/sh
+
+trap 'exec "$0" ${1+"$@"}' 1
+
+stuburl=${STUBURL:-http://web/ad-zap.gif}
+
+while read url client ident method
+do
+    nurl=
+    case "$url" in
+	# don't remap javascript to a GIF
+	# (we should remap it to a do-nothing javascript!)
+        http://*/*/RETURN-CODE/JS/* | \
+        http://*.flycast.com/*/js/* | \
+        http://retaildirect.realmedia.com/*/ads/adstream_jx.ads/* | \
+	http://adforce.imgis.com/*\;* )
+		;;
+	#### BEGIN AUTO ADZAP LIST
+	http://*.flycast.com/* | \
+	http://advertising.quote.com/* | \
+	http://*.doubleclick.net/* | \
+	http://www19.valueclick.com/* | \
+	http://ads.link4ads.com/* | \
+	http://ads.bfast.com/* | \
+	http://ads.fairfax.com.au/* | \
+	http://ads.hyperbanner.net/* | \
+	http://ad.linkexchange.com/* | \
+	http://banner.linkexchange.com/* | \
+	http://leader.linkexchange.com/* | \
+	http://ads.imdb.com/* | \
+	http://ads.tripod.com/* | \
+	http://ad2.jwtt3.com/* | \
+	http://ads.usatoday.com/* | \
+	http://ads.zdnet.com/* | \
+	http://ads2.zdnet.com/* | \
+	http://adserver.imaginemedia.com/* | \
+	http://adimages.criticalmass.com/* | \
+	http://205.153.208.93/\?* | \
+	http://us.yimg.com/?/*.gif | \
+	http://image1.narrative.com/news/*.gif | \
+	*\?adserv* | \
+	*/cgi-bin/centralad/getimage.cgi/* | \
+	http://adfu.blockstackers.com/servfu.pl\?* | \
+	http://sunserver1.songline.com:1971/*\? | \
+	http://adfinity*.247media.com\?adserv* | \
+	http://ad.blm.net/image\?* | \
+	http://ad1.pamedia.com.au/* | \
+	http://*:*/ad/*.gif | \
+	*:*/ads/* | \
+	*:*/bannerads/* | \
+	http://*/advertising/blipverts/*.gif | \
+	*:*/adgifs/* | \
+	*:*/Ads/* | \
+	*:*/Ad=*/* | \
+	*:*/adv/* | \
+	*:*/adverts/* | \
+	http://*/ads/adstream_lx.ads/* | \
+	http://*/images/ads_new/*.gif | \
+	*:*/adproof/* | \
+	*:*/live-ads/*.gif | \
+	http://*.the-park.com/images/*banner*.gif | \
+	*:*/gifs/banner/*.gif | \
+	http://*/*/ba_ad/*.gif | \
+	http://*/cgi-bin/banner.cgi?* | \
+	*/*-banner.gif | \
+	*/banners/*.gif | \
+	*/*/banners/*.gif | \
+	*/Banners/*.gif?* | \
+	*/sponsors/*.gif | \
+	*:*/prbanner/*.GIF | \
+	*:*/prbanner/*.gif | \
+	*:*/ad-banners/*.gif | \
+	*:*/ad-images/*.gif | \
+	http://*/centralad/getimage.exe\?AD=* | \
+	http://*/adstream.cgi/* | \
+	http://ad.preferences.com/* | \
+	http://*.sidewalk.com/ads/* | \
+	http://*/SmartBanner/nph-graphic* | \
+	http://199.172.144.25/*.gif | \
+	http://ad.blm.net/image\?* | \
+	http://www.sun.com/sunworldonline/swol-ad/* | \
+	http://207.87.27.37/news/an_*.gif | \
+	http://*/graphics/ad-banner/*.gif | \
+	http://*times*/*.*x*.gif\?* | \
+	http://*times*/TT*.*x*.gif\?* | \
+	http://199.78.52.10/*web_ani/*.gif | \
+	http://199.78.52.10/web_gif/*.gif | \
+	http://199.78.52.10/~web_ani/*.gif | \
+	http://ad.preferences.com/*.gif | \
+	http://ad.preferences.com/image.ng\;* | \
+	http://*/image.ng/* | \
+	http://adaver1.altavista.yellowpages.com.au*/ad_image\;* | \
+	http://adaver1.altavista.yellowpages.com.au/image.ng\;* | \
+	http://adbot.com/image.ng/* | \
+	http://*/adbanners/*.gif | \
+	http://adforce.imgis.com/* | \
+	http://imageserv*.imgis.com/* | \
+	http://ads.cmpnet.com/remote_ad\?* | \
+	http://ads.jwtt3.com/image.ng/* | \
+	http://ads.softbank.net/bin/wadredir\?* | \
+	http://ads.washingtonpost.com/realmedia/OAS/rm/adstream.ads\?* | \
+	http://ads1.zdnet.com/adverts/* | \
+	http://browserwatch.internet.com/ads/*.gif | \
+	http://*currents.net/ccigraph/vendors/*.gif | \
+	http://gm.preferences.com/image.ng\;* | \
+	http://guide-p.infoseek.com/images/promo/*.gif | \
+	http://headline.gamespot.com/rotations/graphics/*.gif | \
+	http://images.yahoo.com/adv/* | \
+	http://images.yahoo.com/adv/*gif | \
+	http://images.yahoo.com/promotions/*/*.gif | \
+	http://img.cmpnet.com/ads/graphics/* | \
+	http://media.preferences.com/planetdirect/*.gif | \
+	http://server*.webconnect.net/~web_ani/*.gif | \
+	http://static.wired.com/advertising/* | \
+	http://static.wired.com/advertising/*.gif | \
+	http://static.wired.com/advertising/blipverts/*.gif | \
+	http://static.wired.com/news/images/button_ads_*.gif | \
+	http://www.motorcycle.com/mo/mcads/*.gif | \
+	http://www.businessweek.com/sponsors/*/*.gif | \
+	http://www.csmonitor.com/advertising/*.gif | \
+	http://www.currents.net/ccigraph/vendors/*.gif | \
+	http://www.download.com/Banners/Images/*.banner.gif\?* | \
+	http://www.dvdresource.com/images/*banner*.gif | \
+	http://www.dvdtown.com/gfx/banners/*.gif | \
+	http://www.ednprodmag.com/images/prbanner/*.GIF | \
+	http://www.eonline.com/Banners/Images/*.gif\?* | \
+	http://www.filez.com/cgi-bin/getimage.cgi/1234\?GROUP=* | \
+	http://www.excite.com/img/ads/*.gif | \
+	http://my.excite.com/img/ads/*.gif | \
+	http://www.infoseek.com/ads/* | \
+	http://www.infoseek.com/ads/*.gif | \
+	http://www.infoseek.com/doc/sponsors/images/*.gif | \
+	http://www.latimes.com/ADS/*.gif | \
+	http://www.mcafee.com/banners/*.gif | \
+	http://www.mediacity.com.sg/cgi-bin/adopt/place_ad_cookie\?* | \
+	http://www.news.com/Banners/*.gif* | \
+	http://www.news.com/Banners/Images/* | \
+	http://www.news.com/Banners/Images/* | \
+	http://www.nrsite.com/image.ng\;* | \
+	http://ad.preferences.com/image.ng\;* | \
+	http://www.ohio.com/advertising/*.gif | \
+	http://www.pathfinder.com/sponsors*/*/*.gif | \
+	http://www.realmedia.com/OAS/desert/adstream.cgi/* | \
+	http://www.skypub.com/adjuggler/images/*.gif | \
+	http://www.smartclicks.com:81/*/smartimg | \
+	http://www.sofcom.com.au/cgi-bin/Banner/Show.cgi\?function=pic* | \
+	http://www.submit-it.com/images/animbanner_*.gif | \
+	http://www.thestar.com/images/ad/*.gif | \
+	http://www.thestar.com/images/ad/*.gif | \
+	http://www.tradingpost.com.au/gfx/advt/*.gif | \
+	http://www.uexpress.com/comics_channel/images/IE4_ANIMATED.gif | \
+	http://www.usatoday.com/marketpl/*/*.gif | \
+	http://www.usatoday.com/sponsors/1997/*.gif | \
+	http://www.verisign.com/images/banners/*.gif | \
+	http://www.yellowpages.com.au/yp/images/ll/*.gif | \
+	http://www2.pagecount.com/aa-cgi-bin/counter.gif\?* | \
+	http://www4.pagecount.com/cgia/counter.gif\?* | \
+	http://www.geocities.com//sponsor/*.gif | \
+	http://www.news.com/Banners/Images/*.gif\?* | \
+	http://www.usatoday.com/sponsors/*/*/*.gif | \
+	http://www.dvdtown.com/gfx/banners/*.gif | \
+	http://www.village.com.au:1971/*\?* | \
+	http://browserwatch.internet.com/ads/*/*/*.gif | \
+	http://www.upside.com:8001/*\?* | \
+	http://www.usatoday.com/marketpl/classads/*.gif | \
+	http://www.usatoday.com/marketpl/mocker/images/*.gif | \
+	http://www.phillynews.com/advts/images/*.gif | \
+	http://www.angelfire.com/ads/toolbar/*.gif | \
+	http://ad.gamespot.com/rotations/graphics/*.gif | \
+	http://ads.narrowline.com/fcgi-bin/newad\?* | \
+	http://www.geocities.com/sponsor/*.gif | \
+	http://w1.dejanews.com/gifs/*.gif | \
+	http://ad.gamespot.com/rotations/graphics/*.gif | \
+	http://www.idg.com.au/cgi-bin/getimage.exe/*\?* | \
+	http://www2.valueclick.com/cgi-bin/cycle\?* | \
+	http://www.thewebsubmitter.com/wsbanner3 | \
+	http://www.usatoday.com/sponsors/*/imv/*.gif | \
+	http://www.mrshowbiz.com/ad/sponsors/*.jpg | \
+	http://www.topcenter.com/\\*\\*.gif | \
+	http://www.smh.com.au/RealMedia/ads/* | \
+	http://www.usatoday.com/sponsors/1997/housead/*.gif | \
+	http://199.242.24.35/info/pics/promo/*.gif | \
+	http://images.yahoo.com/a/eg/egghead/*.gif | \
+	http://www.sofcom.com.au/cgi-bin/banserv/s\?* | \
+	http://www.feedmag.com/oas/OAS/rm/adstream.cgi/* | \
+	http://us.yimg.com/*.gif | \
+	http://www.excite.com/img/art4/home/promo/*.gif | \
+	http://www.dvdreview.com/cgi-bin/centralad/getimage.cgi\?* | \
+	http://www5.zdnet.com/graphics/pcast.gif | \
+	http://www.zdnet.com/zdtv/graphics/library/*.gif | \
+	http://208.156.39.144:80/*\? | \
+	http://www.aaa.com.au/advertising/*/*.gif | \
+	http://www.LinkAustralia.com/cgi-localbin/ads.pl\?* | \
+	http://bs7.gsanet.com/gsa_bs/gsa_bs.cmdl\?* | \
+	http://www.dvdtown.com/images/banners/*.gif | \
+	http://www.valueclick.com/cgi-bin/cycle\?* | \
+	http://www.sun.com/sunworldonline/swol-ad/* | \
+	http://www.aunz.yahoo.com/adv/* | \
+	http://www.digitaleyes.net/images/Banner*.gif | \
+	http://bannerbrokers.com/cgi-bin/banner.cgi\?* | \
+	http://www.activeie.com/images/ukchat2.jpg | \
+	http://www.chipcom.net/*ad.gif | \
+	http://www.elibrary.com/advertising/*/*.gif | \
+	http://www3.switchboard.com/home/disspbox.gif | \
+	http://www3.switchboard.com/images/disbar.gif | \
+	http://www3.switchboard.com/images/ebay54.gif | \
+	http://www3.switchboard.com/images/coupon.gif | \
+	http://www.gottsoftware.com/CGI/mln_nonssi.pl\?* | \
+	http://www.speed-links.com/cgi-local/adssl.pl\?* | \
+	http://www.hostamerica.com/images/ha_banner*.gif | \
+	http://www.infoseek.com/rimage\?* | \
+	http://echo.znet.de/banner/factumbanner.gif | \
+	http://www.bannerweb.com/click/* | \
+	http://www.ml.org/gfx/spon/*/*.gif | \
+	http://www.ohms.com/toolbar.gif | \
+	http://www.twice.com/rvanim.gif | \
+	http://www.twice.com/hbobanne.gif | \
+	http://www.abc.net.au/news/graphics/the_dial.gif | \
+	http://www.geocities.com/cgi-bin-local/GeoAD\?* | \
+	http://www.newscientist.com/houseads/*.gif | \
+	http://www.dvdresource.com/images/adventure1.gif | \
+	http://image1.narrative.com/internet/*.gif | \
+	http://www.slugburger.com/ThAlley/Graphics/banner*.gif | \
+	http://www.shopper.com/sponsors/*.gif ) nurl=$STUBURL ;;
+	#### END AUTO ADZAP LIST
+    esac
+    echo "$nurl"
+    if [ -n "$nurl" ]
+    then
+	echo "$url" >&2
+	echo "--> $nurl" >&2
+    else
+	echo "PASS $url" >&2
+    fi
+done
