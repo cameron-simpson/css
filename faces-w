@@ -29,7 +29,7 @@ while (<STDIN>)
   { $host =~ s/\..*//;
   }
 
-  $user.="\@$host" if length $host;
+  ## $user.="\@$host" if length $host;
 
   $w{$user}++;
   if ($w{$user} == 1 || $idle < $i{$user})
@@ -39,13 +39,13 @@ while (<STDIN>)
 @k=sort keys %w;
 print "Cols=".@k." Rows=1\n";
 for (@k)
-{ if (/\@/)	{ $user=$`; $host=$'; }
-  else		{ $user=$_; $host=""; }
+{ if (/\@/)	{ $user=$`; $host=$'; $at="\@$'"; }
+  else		{ $user=$_; $host=""; $at=""; }
 
   $n=$w{$_};
   $n='' if $n == 1;
 
-  print "$user\t$host\t$p{$_}\t$n\n";
+  print "$user\t$host\t$user\t$p{$_}\t$at\t$n\n";
 }
 
 sub idle2s
