@@ -17,7 +17,7 @@ mode=normal
 
 if [ $# = 0 ]
 then
-    set space science weather cisra
+    set space science weather "$SYSTEMID"
     ## [ -n "$mode" ] || mode=html
     ## set rterm `cd "$hi" || exit 1
     ##     ls -d [a-z]*|sed -e '/^cvs$/d' -e '/^Mykefile$/d' -e 's/\.weekly$//'|sort -u`
