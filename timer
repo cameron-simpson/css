@@ -5,7 +5,6 @@
 #
 
 idset=timer
-statedir=$SYSTEMID
 
 cmd=$0		## `basename "$0"`
 usage="Usage: $cmd [-i idset] key [time_t]
@@ -59,13 +58,13 @@ then
       if [ "$elapsed" -gt 0 ]
       then
 	# update total time for this key
-	sofar=`idset -d "$statedir" -i "$idset" "$last_key" total`
+	sofar=`idset -i "$idset" "$last_key" total`
 	case "$sofar" in
 	  ''|*[^0-9]*)
 	    sofar=0
 	    ;;
 	esac
-	idset -d "$statedir" -i "$idset" "$last_key" total "`expr $sofar + $elapsed`"
+	idset -i "$idset" "$last_key" total "`expr $sofar + $elapsed`"
       fi
     fi
 fi
