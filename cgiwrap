@@ -25,6 +25,7 @@ trap 'exec 2>&1
 	  fold <"$STDERR"
 	  echo "</SMALL></PRE>"
 	  echo "<P><B>Environment</B><BR><PRE><SMALL>"
+	  pwd; id; echo
 	  env | sort
 	  echo "</SMALL></PRE>"
       fi
