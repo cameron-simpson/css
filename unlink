@@ -1,0 +1,40 @@
+#!/usr/bin/perl
+#
+# Usage: unlink [-v] [files...]
+#
+
+($cmd=$0) =~ s:.*/::;
+
+$verbose=0;
+if ($#ARGV >= $[ && $ARGV[0] eq '-v')
+	{ $verbose=1;
+	  shift;
+	}
+
+$ok=1;
+
+if ($#ARGV >= $[)
+	{ for (@ARGV)
+		{ &unlink($_) || ($ok=0);
+		}
+	}
+else
+{ while (<STDIN>)
+	{ chop;
+	  &unlink($_) || ($ok=0);
+	}
+}
+
+exit $ok ? 0 : 1;
+
+sub unlink
+	{ if (!unlink($_[0]))
+		{ print STDERR "$cmd: can't unlink $_[0]: $!\n";
+		  return undef;
+		}
+	  elsif ($verbose)
+		{ print "unlinked $_[0]\n";
+		}
+
+	  1;
+	}
