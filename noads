@@ -6,5 +6,6 @@
 
 needhost amadeus@home kaper@cisra		|| exit 1
 cd $HOME/there/adzapper.sourceforge.net/html	|| exit 1
+umask 22
 cvsedit rc/patterns				|| exit 1
-myke scripts/squid_redirect
+myke _all
