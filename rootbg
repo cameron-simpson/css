@@ -3,13 +3,10 @@
 # Set the root backdrop.
 #	- Cameron Simpson <cs@zip.com.au> 20nov2000
 #
-# -xpl for xplanet support - cameron 30nov2000
-#
 
 cmd=$0
-usage="Usage: $cmd [-s] [-xpl] imagefile
-	-s	Synchronous.
-	-xpl	Use xplanet for the background."
+usage="Usage: $cmd [-s] imagefile
+	-s	Synchronous."
 
 [ -n "$DISPLAY" ] || { echo "$cmd: no \$DISPLAY!" >&2; exit 1; }
 
@@ -19,13 +16,11 @@ tmp=${TMPDIR:-/tmp}
 
 opts=
 sync=
-xplanet=
 perdesk=
 
 badopts=
 while :
 do  case $1 in
-        -xpl)	xplanet=1 opts="$opts -xpl" ;;
 	-s)	sync=1 opts="$opts -s" ;;
 	--)	shift; break ;;
 	-?*)	echo "$cmd: unrecognised option: $1" >&2
@@ -79,12 +74,7 @@ rootbg=`mkwall "$imagefile"` || exit 1
     lastvalue "rootbg-$HOST" "$rootbg"
   ) &
 
-  if [ $xplanet ]
-  then
-    xpl
-  else
-    fvwm-root --retain-pixmap "$rootbg"
-  fi \
+  fvwm-root --retain-pixmap "$rootbg" \
   && fvwmcmd 'setenv XSESSIONBG pixmap'	# make new terms be transparent
   exit
 ) &
