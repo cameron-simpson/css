@@ -16,6 +16,7 @@ file=$1; shift
 
 case "$file" in
     *.pgp) exec pgpedit "$file" ;;
+    *.gpg) exec gpgedit "$file" ;;
 esac
 
 # make templates
