@@ -6,7 +6,7 @@
 # Usage: imsize [filenames...]
 #
 # Output is
-#	filename x y
+#	x y filename
 # for each supplied name.
 #
 
@@ -38,7 +38,7 @@ sub doimsize($)
 
   my($x,$y,$err)=imgsize($f eq '-' ? '/dev/fd/0' : $f);
   if (defined $x)
-  { print "$f $x $y\n";
+  { print "$x $y $f\n";
   }
   else
   { warn "$::cmd: $f: $err (maybe errno \"$!\")\n";
