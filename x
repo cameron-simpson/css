@@ -35,21 +35,17 @@ else
     || { echo "$cmd: $file: no MIME type recognised" >&2; exit 1; }
 fi
 
-case "$mtype" in
-    application/x-gzip)		gunzip <"$file" | "$0" - ;;
-    application/x-bzip)		bunzip2 <"$file" | "$0" - ;;
-    application/x-cpio)		cpio -icdv ;;
-    application/x-ar)		ar xv "$file" ;;
-    application/x-jar)		jar xvf - <"$file" ;;
-    application/x-tar)		untar <"$file" ;;
-    application/x-cpio-c)	cpio -icvdm <"$file" ;;
-    application/x-uuencode)	uudecode /dev/fd/0 <"$file" ;;
-    application/zip|application/x-zip)
-				unzip -d . /dev/fd/0 <"$file" ;;
-    application/x-lharc)	xlharc x /dev/fd/0 <"$file" ;;
-    *)				echo "$cmd: unhandled MIME type \"$mtype\"" >&2
-				exit 1
-				;;
-esac
+set -x
+if unpack=`mailcap -s "$file" "$mtype" unpack`
+then
+    exec sh -c "$unpack"
+fi
 
-exit $?
+if decode=`mailcap -s "$file" "$mtype" decode`
+then
+    sh -c "$decode" | "$0" -
+    exit $?
+fi
+
+echo "$cmd: unhandled MIME type \"$mtype\"" >&2
+exit 1
