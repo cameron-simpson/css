@@ -13,7 +13,7 @@
 #
 # =head1 SYNOPSIS
 #
-# rc.mobile start [-n] [-y] [-f config] [@where]
+# rc.mobile {start|stop|restart} [-n] [-y] [-s] [-S] [-f config] [@where]
 #
 # =head1 DESCRIPTION
 #
@@ -30,20 +30,27 @@
 # There are facilities for specifying that one service depends on another
 # and for running arbitrary shell commands
 # for actions not encapsulated in standard startup files.
-# In a sense the locations represent a generalisation of the idea of run levels.
+# In a sense
+# the locations represent a generalisation of the idea of run levels.
 #
 
 where=${SYSTEMID:-home}
 cf=/etc/rc.mobile.conf
+async=1
+asyncall=1
 trace=set-x
 int=1
 
 cmd=$0
-usage="Usage: $cmd {start|stop} [-n] [-f config]
+usage="Usage: $cmd {start|stop|restart} [-n] [-f config] [dflt]
 	-n		No action. Recite proposed actions.
 	-y		Yes: proceed with the default location without asking.
+	-s		Synchronous. Default: asynchronous.
+	-S		Really synchronous. Default: asynchronous.
 	-f config	Specify config file.
-			Default: $cf"
+			Default: $cf
+	dflt		Default location. Falls back to \$SYSTEMID or \"home\".
+			Default: $where"
 
 LC_ALL=C
 PATH=$PATH:/sbin:/opt/css/bin
@@ -52,14 +59,30 @@ export PATH LC_ALL
 # See how we were called.
 mode=$1; shift
 
+# =head1 ACTIONS
+#
+# =over 4
+#
 case "$mode" in
+  # =item start
+  #
+  # Run the startup actions.
+  # 
   start)action=up
 	int=1
         ;;
+  # =item stop
+  #
+  # Unimplemented.
+  #
   stop) action=down
 	echo "$cmd: action $mode unsupported" >&2
 	exit 2
         ;;
+  # =item restart
+  #
+  # Run B<rc.mobile stop> and then B<rc.mobile start>.
+  #
   restart)
 	$trace "$cmd" stop && $trace "$cmd" start ${1+"$@"}
 	exit $?
@@ -68,6 +91,8 @@ case "$mode" in
         exit 1
 esac
 
+# =back
+#
 # =head1 OPTIONS
 #
 # =over 4
@@ -94,6 +119,25 @@ do  case $1 in
 	# Proceed with the default location without asking.
 	#
 	-y)   int= ;;
+	# =item B<-s>
+	#
+	# Synchronous.
+	# Wait for all dispatched actions to complete before exiting B<rc.mobile>.
+	# Normally the script will quit after everything is dispatched
+	# so as to have the system offer a login prompt as soon as possible.
+	# Some users find the completion messages appearing after the
+	# login prompt annoying, thus this option.
+	#
+	-s)   async= ;;
+	# =item B<-S>
+	#
+	# Really synchronous.
+	# In addition to waiting before exit,
+	# wait for each service script to complete.
+	# This pretty much obviates the speed advantages of B<rc.mobile>
+	# but might be useful during debugging.
+	#
+	-S)   async= asyncall= ;;
 	--)   shift; break ;;
 	-?*)  echo "$cmd: unrecognised option: $1" >&2
 	      badopts=1
@@ -106,6 +150,19 @@ done
 
 # =back
 #
+# =head1 LOCATION
+#
+# If the optional argument B<@I<where>> is supplied after the options above,
+# use that as the default location.
+#
+case "$1" in
+  @?*)
+    where=`expr "x$1" : 'x@\(.*\)'`
+    shift
+    ;;
+esac
+
+[ $# = 0 ] || { echo "$cmd: extra arguments: $*" >&2; badopts=1; }
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
@@ -280,8 +337,13 @@ bgsvc()
     bgrc=/etc/init.d/$bgsvc
     if [ -s "$bgrc" ]
     then
-      $trace "$bgrc" "$mode" &
-      eval "pid_$bgsvc=$!"
+      if [ $asyncall ]
+      then
+	$trace "$bgrc" "$mode" &
+	eval "pid_$bgsvc=$!"
+      else
+	$trace "$bgrc" "$mode"
+      fi
     else
       echo "$cmd: no init file named $bgrc" >&2
     fi
@@ -325,7 +387,7 @@ wait4pid()
   done
 }
 
-doclause GLOBAL "@$where" | doops
+doclause GLOBAL "@$where" | { doops; [ $async ] || wait; }
 
 # =head1 FILES
 #
