@@ -13,6 +13,9 @@ use File::Find;
 $::Usage="Usage: $::cmd [-npsv] [dir files...]
 	-n	No unlink of source file.
 	-p	Make directory if missing, including parents.
+	-z	Consider zero length files to be like missing files.
+	-Z	Consider a file that is a prefix of its counterpart
+		suitable for replacement.
 	-s	Silent.
 	-r	Relative.
 	-v	Verbose.
@@ -22,15 +25,18 @@ $::NoUnlink=0;
 $::MakeDir=0;
 $::Relative=0;
 $::Verbose=-t STDOUT;
+$::EmptyIsMissing=0;
 
 $::badopts=0;
-getopts("nprsv") || ($::badopts=1);
+getopts("nprsvzZ") || ($::badopts=1);
 
 $::NoUnlink=1 if $::opt_n;
 $::MakeDir=1 if $::opt_p;
 $::Relative=1 if $::opt_r;
 $::Verbose=0 if $::opt_s;
 $::Verbose=1 if $::opt_v;
+$::EmptyIsMissing=1 if $::opt_z;
+$::OverwritePrefixes=1 if $::opt_Z;
 
 if (! @ARGV)
 { undef $::Dir;
@@ -136,6 +142,7 @@ sub mrginto($$$$)
 
   out("$file => $dir") if $::Verbose;
 
+  # construct directory if missing
   if (! stat($dir))
   { if ($makedir)
     { if (! cs::Pathname::makedir($dir))
@@ -149,37 +156,84 @@ sub mrginto($$$$)
     }
   }
 
-  if (! stat($file))
+  # source file missing?
+  my @s = stat($file);
+  if (! @s)
   { warn "$::cmd: $file: $!\n";
     return 0;
   }
 
+  # source not a file?
   if (! -f _)
   { warn "$::cmd: $file: not a regular file: $!\n";
     return 0;
   }
 
-  if (! lstat($dirfile))
-  { if (link($file,$dirfile)
+  # target missing?
+  my @t = stat($dirfile);
+  if (@t && ! -f _)
+  { warn "$::cmd: $dirfile: not a regular file\n";
+    return 0;
+  }
+
+  # if target (exists and empty) or missing, replace
+  if (
+      ($::EmptyIsMissing && @t && $t[7] == 0)
+   || ! lstat($dirfile)
+     )
+  {
+    # unlink target if present
+    if (@t && !unlink($dirfile))
+    { warn "$::cmd: unlink($dirfile): $!\n";
+      return 0;
+    }
+
+    # prefer link to copy
+    if (link($file,$dirfile)
      || File::Copy::copy($file,$dirfile))
     { nl("$file => $dirfile");
       return 1;
     }
 
     warn "$::cmd: File::Copy::copy($file,$dirfile): $!\n";
+
     if (lstat($dirfile) && !unlink($dirfile))
     { warn "$::cmd: unlink($dirfile): $!\n";
     }
+
     return 0;
   }
 
-  if (! stat($dirfile) || ! -f _)
-  { warn "$::cmd: $dirfile: not a regular file\n";
+  if (! @t)
+  { warn "$::cmd: $dirfile: can lstat but not stat - bad symnlink?\n";
     return 0;
   }
 
-  if (File::Compare::compare($file,$dirfile) == 0)
+  # check for hard link - probably means merging tree with self
+  my($sdev,$sino)=@s;
+  my($tdev,$tino)=@t;
+  if ($sino == $tino && $sdev == $tdev)
+  { warn "$::cmd: $file and $dirfile "
+	.($s[3] == 1 ? "are the same file!" : "hardlinked")
+	.", not merged\n";
+    return 0;
+  }
+
+  my $cmp = cs::Pathname::compare($file,$dirfile);
+  ##warn "cmp($file,$dirfile) = $cmp\n";
+
+  if (! defined $cmp)
+  { warn "$::cmd: compare fails: $!\n";
+    return 0;
+  }
+
+  if ($cmp == 0)
   { nl("$file => $dirfile: identical");
+    return 2;
+  }
+
+  if ($cmp == -1 && $::OverwritePrefixes)
+  { nl("$file <=> $dirfile: prefix");
     return 2;
   }
 
