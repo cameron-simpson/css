@@ -18,11 +18,6 @@ case "$file" in
     *.pgp) exec pgpedit "$file" ;;
 esac
 
-if ifcvs "$file"
-then
-    exec cvsedit "$file" "$EDITOR"
-fi
-
 # make templates
 [ -s "$file" ] || { tplt "$file" >>"$file"
 		    [ -s "$file" ] || rm "$file"
