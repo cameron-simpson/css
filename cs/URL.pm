@@ -45,7 +45,7 @@ and call the B<Get> method below.
 sub get($)
 { my($url)=shift;
   my($U)=new cs::URL $url;
-  return undef if ! defined $U;
+  return () if ! defined $U;
   $U->Get();
 }
 
@@ -599,8 +599,8 @@ sub MatchesCookie($$;$)
 Fetch a URL and return a B<cs::MIME> object.
 If the optional flag I<follow> is set,
 act on B<Redirect> responses etc.
-Returns a tuple of (I<endurl>,I<rversion>,I<rcode>,I<rtext>,I<MIME-object)
-where I<endurl> if the URL whose data was eventually retrieved
+Returns a tuple of (I<endurl>,I<rversion>,I<rcode>,I<rtext>,I<MIME-object>)
+where I<endurl> is the URL object whose data was eventually retrieved
 and I<MIME-object> is a B<cs::MIME> object
 or an empty array on error.
 
@@ -623,7 +623,7 @@ sub _Get($$)
   my %triedAuth;
 
   GET:
-  do
+  while (1)
   { $url = $this->Text();
     $context="$::cmd: GET $url";
 
@@ -715,10 +715,11 @@ sub _Get($$)
     }
     else
     {
-      return ($rversion,$rcode,$rtext,$M);
+      return ($this,$rversion,$rcode,$rtext,$M);
     }
+
+    last GET if ! $follow;
   }
-  while ($follow);
 
   return ();
 }
