@@ -9,7 +9,7 @@
 # new dir
 #
 
-BEGIN { use cs::DEBUG; cs::DEBUG::using(__FILE__); }
+##BEGIN { use cs::DEBUG; cs::DEBUG::using(__FILE__); }
 
 use strict qw(vars);
 
@@ -31,7 +31,7 @@ END   { $cs::IM2HTML::_shellFD && close(_shellFD); }
 
 @cs::IM2HTML::ISA=(cs::HTML);
 
-$cs::IM2HTML::WebPage='http://www.zip.com.au/~cs/im2html/';
+$cs::IM2HTML::WebPage='http://www.cskk.ezoshosting.com/cs/im2html/';
 
 $cs::IM2HTML::Pfx='imindex';	# base of aux files
 $cs::IM2HTML::DotDir='.im2html';# where all the cruft goes
