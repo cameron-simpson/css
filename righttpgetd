@@ -3,4 +3,4 @@ log=$HOME/var/log/httpgetd
 queue=$HOME/var/queue/httpgetd
 logroll -z +datecode "$queue" "$log"
 >>"$queue"
-alog "$log" httpget -Q "$queue" -l download
+alog "$log" httpget -Q "$queue" -D 5 -l download
