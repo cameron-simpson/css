@@ -44,6 +44,8 @@ $cs::HTTP::_HTTP_VERSION='HTTP/1.0';
 
 =head2 HTTP Response Codes
 
+=over 4
+
 =cut
 
 ####################
@@ -467,7 +469,7 @@ sub DESTROY
   $this->SUPER::DESTROY($this);
 }
 
-=item Request(I<method>,I<uri>,I<hdrs>,I<data>,I<version>)
+=item Request(I<method>,I<uri>,I<hdrs>,I<data>,I<version>,I<sinkfile>)
 
 Request the I<uri> with the specified I<method>.
 If supplied, I<hdrs> are added to the headers sent with the request,
@@ -480,10 +482,12 @@ string to use instead of the default B<HTTP/1.0>.
 =cut
 
 sub Request($$;$$$)
-{ my($this,$method,$uri,$hdrs,$data,$version)=@_;
-  $version=$cs::HTTP::_HTTP_VERSION if ! defined $version;
-  die "no \$uri" if ! defined $uri;
+{ my($this,$method,$uri,$hdrs,$data,$version,$sinkfile)=@_;
   $method=uc($method);
+  die "no \$uri" if ! defined $uri;
+  $version=$cs::HTTP::_HTTP_VERSION if ! defined $version;
+
+  my $keepsink=(defined $sinkfile ? 1 : 0);
 
   my($olduri);
 
@@ -551,7 +555,7 @@ sub Request($$;$$$)
 
   my($rversion,$rcode,$rtext)=($1,$2,$');
   
-  my $M = new cs::MIME ($this->Source(),1);
+  my $M = new cs::MIME ($this->Source(),1,$sinkfile,$keepsink);
 
   wantarray
   ? ($rversion,$rcode,$rtext,$M)
