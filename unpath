@@ -1,0 +1,17 @@
+#!/usr/bin/perl
+#
+# Break up a colon separated path.
+#	- Cameron Simpson <cs@zip.com.au>
+#
+
+$reverse=0;
+if (@ARGV && $ARGV[0] eq '-r')
+{ $reverse=1;
+  shift(@ARGV);
+}
+
+@paths=split(/:/,join(':',@ARGV));
+@paths=reverse @paths if $reverse;
+for (@paths)
+{ print $_, "\n";
+}
