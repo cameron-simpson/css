@@ -1,0 +1,80 @@
+#!/usr/bin/perl -w
+#
+# Convert info file into pod, largely because
+#
+#	- info's too stupid to read stdin, so incorparating it
+#	  into other tools sucks
+#
+#	- I want my ordinary "man" command to find info files and
+#	  do the right thing.
+#
+#	- the GNU people are arrogant scum, and produce farces of
+#	  manual entries, each prefaced with "we like info,
+#	  so we don't maintain this page, and it's probably
+#	  a pack of lies - go read the info file". Of course,
+#	  the only way to do that is to fire up emacs or to
+#	  use their weird info tool, which doesn't act much
+#	  like a pager at all and violates the "use my preferred pager"
+#	  approach people should be able to expect.
+#	  
+# Accordingly, since the Perl people can get this right (pod converts handily
+# to all sorts of stuff), here is info2pod, which can be piped to pod2man
+# to make manual entries.
+#	- Cameron Simpson <cs@zip.com.au> 14nov1999
+#
+# Request from Hamish Macintyre <h.macintyre@ic.ac.uk> for this.
+# Real coding begins.	- 20sep2000
+#
+
+use strict qw(vars);
+
+use cs::Misc;
+use cs::Sink;
+use cs::GNUInfo;
+## use cs::Hier;
+
+# ugly hack because info is inherently filename based
+# my "man" script sets $_DcoFile
+@ARGV=$ENV{'_DocFile'} if ! @ARGV && defined $ENV{'_DocFile'};
+
+die "Usage: $::cmd info-file\n" if @ARGV != 1;
+
+$ARGV[0] =~ s/.(Z|gz|z)$//;
+my $I = new cs::GNUInfo $ARGV[0];
+
+## warn "I=".cs::Hier::h2a($I,1);
+
+# collect all the info files and subfiles
+$I->RunQueue();
+
+## warn "I=".cs::Hier::h2a($I,1);
+
+# attach parents to children
+for my $N ($I->Nodes())
+{ my $F = $N->Fields();
+  if (exists $F->{UP})
+  { my $supN = $I->Node($F->{UP});
+    if (! defined $supN)
+    { ## warn "$::cmd: no up node named \"$F->{UP}\"";
+    }
+    else
+    { $supN->AddSubNode($N);
+    }
+  }
+}
+
+my $N = $I->Node("Top");
+if (! defined $N)
+{ my $nl = $I->Nodes();
+  $N=$nl->[0] if @$nl;
+}
+
+if (defined $N)
+{ $N->SetLevels();
+}
+
+my $s = new cs::Sink(FILE,STDOUT);
+
+$I->Pod2s($s);
+
+exit 0;
