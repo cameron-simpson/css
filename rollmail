@@ -1,0 +1,62 @@
+#!/bin/sh
+#
+# Bundle up files in a mail spool.
+#	- Cameron Simpson <cs@zip.com.au> 11feb1998
+#
+# Use catmaildir and gzip instead of tar. - cameron 27mar2000
+#
+
+cmd=`basename "$0"`
+archdir=${MAILDIR:-$HOME/private/mail}/ARCHIVED
+usage="Usage: $cmd [-d archdir] dirs...
+	-d archdir	Where to put archives. Default: $archdir."
+
+pgpext=
+case $1 in
+    -d)	archdir=$2; shift; shift ;;
+esac
+
+case "$archdir" in
+    /*)	;;
+    *) archdir=`pwd`/$archdir || exit $? ;;
+esac
+
+xit=0
+for maildir
+do  (
+      cd "$maildir" || exit $?
+      today=$maildir-`daycode`
+
+      pwd; set -x
+
+      mkdir "$today" || exit $?
+      mv [0-9]* "$today/."
+      rmdir "$today" 2>/dev/null && exit 0
+
+      # stash addresses
+      ( cd "$today" || exit 1
+	>.index
+	lock $MAILRC.rawdb vmupdindex -db
+      )
+
+      arch="$archdir/$today.um.gz$pgpext"
+      if [ -s "$arch" ]
+      then
+	echo "$cmd: $arch already exists" >&2
+	exit 1
+      else
+	if catmaildir "$today" >"$arch" \
+	&& [ -s "$arch" ] \
+	&& filteredit "$arch" gzip -v
+	then
+	  rmr "$today"
+	  gzip -9 "$tarf" &
+	else
+	  rm -f "$arch"
+	  exit 1
+	fi
+      fi
+    ) || xit=1
+done
+
+exit $xit
