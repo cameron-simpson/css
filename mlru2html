@@ -1,0 +1,51 @@
+#!/usr/bin/perl
+#
+
+use cs::Mail::CP_MLRU;
+
+my(@list)=cs::Mail::CP_MLRU::FILE2a(STDIN);
+my(%list);
+
+local($_);
+
+for (@list)
+{ $list{$_->{Key}}=$_;
+}
+
+print "[ <A HREF=#mlru-full>Full List</A> ]\n";
+print "<P>\n<UL>\n";
+for $key (sort keys %list)
+{ $_=$list{$key};
+  print "    <LI><A HREF=\"#mlru-key-$key\">$_->{Name}</A>\n";
+  print "	- $_->{DESCRIPTION}\n";
+}
+print "</UL>\n";
+
+my($key,$field);
+
+print "<P>\n<A NAME=mlru-full>Full List</A>\n<P>\n<DL>\n";
+for $key (sort keys %list)
+{ $_=$list{$key};
+  print "    <DT><A NAME=\"mlru-key-$key\">$_->{Name}</A>\n";
+  print "	- $_->{DESCRIPTION}\n";
+
+  print "    <DD>\n";
+  FIELD:
+    for $field (sort keys %$_)
+    { next FIELD if $field eq 'Key'
+		 || $field eq 'Name'
+		 || $field eq DESCRIPTION;
+
+      print "\t<EM>$field</EM>:\n";
+      if ($field eq 'url')
+      { print "\t<A HREF=$_->{$field}>$_->{$field}</A><BR>\n";
+      }
+      elsif ($field eq 'admin' || $field eq 'owner')
+      { print "\t<A HREF=\"mailto:$_->{$field}\">$_->{$field}</A><BR>\n";
+      }
+      else
+      { print "\t", $_->{$field}, "<BR>\n";
+      }
+    }
+}
+print "</DL>\n";
