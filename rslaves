@@ -1,0 +1,23 @@
+#!/bin/sh
+
+cmd=`basename "$0"`
+usage="Usage: $cmd [-t] [user@]host..."
+
+slopts=
+[ "x$1" = x-t ] && { slopts="$slopts -t"; shift; }
+
+[ $# -ge 1 ] || { echo "$usage" >&2; exit 2; }
+
+first=1
+for remote
+do
+  [ $first ] && { set x; shift; }
+
+  slcmd="ssh '$remote' \${RSLAVES_RIGENV:-./scripts/rigenv} shell -i"
+  set x ${1+"$@"} "$slcmd"; shift
+
+  first=
+done
+
+set -x
+exec slaves $slopts "$@"
