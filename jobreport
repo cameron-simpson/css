@@ -4,23 +4,12 @@
 #	- Cameron Simpson <cs@zip.com.au> 01jul2003
 #
 
-jobtimer -a \
-| while read id name
-  do
-    cat=`jobtimer "$id" category`
-    [ -n "$cat" ] || cat=MISC
-
-    total=`jobtimer "$id" total`
-    [ -n "$total" ] || total=0
-
-    title=`jobtimer "$id" title`
-
-    echo "$id	$name	$cat	$total	$title"
-  done \
+joblist name category total title \
 | sort -t'	' +2 +1 -n +0 \
 | awk -F'	' \
       'BEGIN	{ nids=0 }
        		{ id=$1; name=$2; cat=$3; total=$4; title=$5
+		  if (total == "") total=0;
 		  ids[nids++]=id
 		  names[id]=name
 		  cats[id]=cat
