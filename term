@@ -1,0 +1,140 @@
+#!/bin/sh
+#
+# Generic open-a-window.
+#
+# Default location is tuned to my X11 setup (i.e. 103 pixels down from
+# the top of the screen).
+# The -big option is tuned to my X setup on a 1280x1024 screen.
+#	- Cameron Simpson, December 1991
+#
+
+cmd=$0
+usage="Usage: $cmd [-v] [-w width] [-h height] [-x x-pos] [-y y-pos] [-l lock] [-1 lock]
+		[-f font] [-n name] [-big] [-small] [-keepio] [-xauthhack]
+		[{-c shellcmd}/{-e exec-list}/{-- raw-args}]"
+
+detach='exec >/dev/null </dev/null'
+keepio=
+SHELL=${SHELL-/bin/sh}
+CONSOLE=${CONSOLE:-$HOME/var/log/console}
+n= f=
+smallx=-0 smally=103 smallw=80 smallh=24 smallf=
+w= h=
+bigx=0 bigy=-0 bigw=80 bigh=61 bigf=6x13
+geometry=
+sized=
+xauthhack=
+execargs=
+rawargs=
+async=1
+lock=
+lock1=
+
+badopts=
+
+while :
+do
+  case "$#,$1" in
+    0,)		rawargs= execargs=1
+		set x ${SHELL-/bin/sh} ; shift
+		break ;;
+    1,-[lwhxyn])
+		echo "$cmd: $1 needs an argument" >&2
+		echo "$usage" >&2
+		exit 2
+		;;
+    *,--)	shift; break ;;
+    *,-e)	shift; break ;;
+    *,-l)	lock=$2; shift ;;
+    *,-1)	lock1=$1 lock=$2; shift ;;
+    *,-c)	shcmd=$2; shift; shift
+		set x ${1+"$@"} -e "${SHELL:-/bin/sh}" -c "$shcmd"
+		shift
+		;;
+    *,-a)	async=1 ;;
+    *,+a)	async= ;;
+    *,-v)	set -x ;;
+    *,-w)	w=$2 ; shift ;;
+    *,-h)	h=$2 ; shift ;;
+    *,-x)	x=$2 ; shift ;;
+    *,-y)	y=$2 ; shift ;;
+    *,-n)	n=$2 ; shift ;;
+    *,-f)	f=$2 ; shift ;;
+    *,-big)	sized=1 x=$bigx y=$bigy w=$bigw h=$bigh f=$bigf ;;
+    *,-small)	sized=1 x=$smallx y=$smally w=$smallw h=$smallh f=$smallf ;;
+    *,-keepio)	detach=: ;;
+    *,-xauthhack)
+		xauthhack=1 ;;
+    *,-geometry)
+		sized=1 geometry=$2; shift ;;
+    *,-*)	echo "$cmd: unexpected argument \"$1\"" >&2
+		badopts=1
+		;;
+    *)		break ;;
+  esac
+  shift
+done
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+[ $# = 0 ] && { set x "${SHELL:-/bin/sh}"; shift; }
+## [ -n "$n" ] || n=$*
+
+# we keep fd 3 as hook for stdin
+closefds='for fd in 4 5 6 7 8 9; do eval "exec $fd>&-"; done'
+
+args=
+case "$TERM,$DISPLAY" in
+    *,?*)
+	opts=
+
+	case $x in +*|-*) ;; *) x=+$x ;; esac
+	case $y in +*|-*) ;; *) y=+$y ;; esac
+
+	[ $sized ] && { [ "x$geometry" = x ] && geometry=${w}x${h}$x$y
+			opts="$opts -geometry $geometry"
+		      }
+	[ -n "$f" ] && opts="$opts -fn $f"
+
+	[ -n "$xauthhack" -a -r "$XAUTHORITY" ] &&
+		{ # Fight with NFS/xterm brain damage.
+		  xauth=/tmp/$cmd.$$
+		  exec 3>$xauth
+		  chmod 600 $xauth
+		  cat <"$XAUTHORITY" >&3
+		  exec 3>&-
+		  XAUTHORITY=$xauth
+		  export XAUTHORITY
+		}
+
+	eval "$detach"
+	eval "$closefds"
+
+	[ -n "$n" ] && set pushttylabel -exec +a "$n" "$@"
+
+	PREFTERM=${PREFTERM:-xterm}	# safe default
+	[ "x$PREFTERM" = xrxvt ] && set rigrxvtbg "$@"
+
+	if [ $async ]
+	then lock $lock1 "$lock" "$PREFTERM" $opts -e "$@" &
+	else exec lock $lock1 "$lock" "$PREFTERM" $opts -e "$@"
+	fi
+	;;
+    iris-ansi*,*)
+	[ -n "$f" ] && { set x -f "$f" "$@"; shift; }
+	[ -n "$x$y" ] && { set x -p "$x,$y" "$@"; shift; }
+	[ -n "$w$h" ] && { set x -s "$w,$h" "$@"; shift; }
+	[ -n "$n" ] && { set x -t "$n" -n "$n" "$@"; shift; }
+
+	eval "$detach"
+	eval "$closefds"
+
+	if [ $async ]; then acon lock $lock1 "$lock" wsh -v pushttylabel -exec +a "$n" "$@"
+		       else exec lock $lock1 "$lock" wsh -v pushttylabel -exec +a "$n" "$@"
+	fi
+	;;
+    *)	exec "$@"
+	;;
+esac
+
+exit 0
