@@ -1,0 +1,29 @@
+#!/bin/sh
+#
+# Recite the named URLs map as an FVWM menu.
+#	- Cameron Simpson <cs@zip.com.au> 14feb2003
+#
+
+cd $HOME/rc/hi
+
+if [ $# = 0 ]
+then
+    for f in *
+    do
+      [ -s "$f" ] && [ ! -d "$f/." ] && echo "\"$f\" PopHiMenu $f"
+    done
+    exit 0
+fi
+
+echo "\"<-Back\" PopHiMenu"
+for hi
+do
+  [ -s "$hi" ] || continue
+
+  echo "\"\" Nop"
+  echo "\"load all $hi\" Exec hi $hi"
+  sort -u <"$hi" \
+  | while read url
+    do  echo "\"  $url\" Exec us $url"
+    done
+done
