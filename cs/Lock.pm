@@ -154,7 +154,7 @@ sub new($$;$$)
 	  { $firstwait=0; }
 	  else
 	  { if (! $saidwait && $waits >= $cs::Lock::Whingeafter)
-	    { $silent && warn "$::cmd: waiting for lock on $path ...\n";
+	    { $silent || warn "$::cmd: waiting for lock on $path ...\n";
 	      $saidwait=1;
 	    }
 	  }
