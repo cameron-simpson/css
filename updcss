@@ -57,6 +57,8 @@ then
 	--include=/CHANGELOG.html \
 	--exclude='/*/' \
 	--include='/cs/**.pm' \
+	--include='/cs/**.py' \
+	--include='/cs/**.pyc' \
 	--include='/cs/**/' \
 	--exclude='/cs/**' \
 	$HOME/scripts/. $cssdir/bin/.
