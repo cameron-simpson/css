@@ -1,12 +1,4 @@
 #!/bin/sh
 
 eval `secret mysql@cisra`
-set /opt/mysql/bin/mysql "-h$secretHOST" "-u$secretLOGIN" "-p$secretPASSWORD" ${1+"$@"}
-
-[ "x$HOST" = xsweet ] \
-|| { tflag=; [ -t 0 ] && tflag=-t
-     set ssh $tflag sweet exec "$@"
-   }
-
-set -x
-exec "$@"
+exec /opt/mysql/bin/mysql "-h$secretHOST" "-u$secretLOGIN" "-p$secretPASSWORD" ${1+"$@"}
