@@ -40,18 +40,13 @@ fi
 session=$cycport
 
 portmap=/u/network/cyclades/map-$cychost
-exec 3<&0 0<$portmap
+statedir=/u/network/cyclades
+idset=$cychost
 
-session=
-while read port title
-do
-  if [ "x$port" = "x$cycport" -o "x$title" = "x$cycport" ]
-  then	cycport=`expr 7000 + $port`
-	session=$title
-	break
-  fi
-done
-exec <&3 3<&-
+# convert 
+id=`idset -d "$statedir" -i "$cychost" "$cycport"`
+cycport=$id
+session=`idset -d "$statedir" -i "$cychost" "$id"`
 
 [ -n "$session" ] || { echo "$cmd: no port mapping matching \"$cycport\" in $portmap" >&2
 		       badopts=1
