@@ -1,0 +1,25 @@
+#!/bin/sh
+#
+# Subsidiary script to mailrepack, to unpack archive files present.
+# If arguments upplied, run that command after unpacking.
+#	- Cameron Simpson <cs@zip.com.au> 09jul2002
+#
+
+for f in *.*
+do
+    [ -s "$f" ] || continue
+    case "$f" in
+	*.tar|*.tgz|*.zip)
+		base=`expr "x$f" : 'x\(.*\)\.[^.]*$'` ;;
+	*.tar.gz|*.tar.bz2)
+		base=`expr "x$f" : 'x\(.*\)\.[^.]*\.[^.]*$'` ;;
+	*)	continue ;;
+    esac
+
+    mkdir "./$base" || continue
+    ( cd "./$base" || exit 1
+      x "../$f" && rm "../$f"
+    ) || { rm -rf "./$base"; continue; }
+done
+
+[ $# = 0 ] || exec "$@"
