@@ -1,0 +1,20 @@
+#!/usr/bin/perl
+#
+# Tired of fighting with broken echo commands which interpret -n
+# or cs@zip.com.au etc, I resort to this cumbersome wrapper for the common
+#	blah=`echo "$blah" | sed 's/this/that/g'`
+# thing.
+# Based on sedstrs, which doesn't do newlines.
+#	- Cameron Simpson <cs@zip.com.au> 25aug97
+#
+
+($cmd=$0) =~ s:.*/::;
+$usage="Usage: $cmd sed-command strings...\n";
+
+die $usage if @ARGV < 2;
+
+$sed=shift(@ARGV);
+eval 'for (@ARGV) { '.$sed.'; print $_, "\n"; }';
+die $@ if $@;
+
+exit 0;
