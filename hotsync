@@ -13,6 +13,9 @@ case "$HOST@$SYSTEMID" in
 		;;
 esac
 
+syncdir=$HOME/rc/palm/sync
+[ -d "$syncdir/." ] || { echo "$cmd: $syncdir: not a directory" >&2; exit 1; }
+
 PILOTPORT=${PILOTPORT:-/dev/pilot}
 export PILOTPORT
 
@@ -22,10 +25,7 @@ id=`ls -ldL "$PILOTPORT" | awk '{print$3}'`
 			   exit 1
 			 }
 
-syncdir=$HOME/rc/palm/sync
-[ -d "$syncdir/." ] || { echo "$cmd: $syncdir: not a directory" >&2; exit 1; }
-
-amassbackup --inplace "$syncdir" \
+histbackup --inplace "$syncdir" \
 || { echo "$cmd: $syncdir: backup fails, aborting sync" >&2
      exit 1
    }
