@@ -336,7 +336,7 @@ doops()
 	      else  set -- "$to.$where" "$to.DFLT"
 	      fi
 	      for f
-	      do  [ -f "$f/." ] && { from=$f; break; }
+	      do  [ -f "$f" ] && { from=$f; break; }
 	      done
 	      if [ -n "$from" ]
 	      then
