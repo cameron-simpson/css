@@ -373,7 +373,7 @@ fi
     ## [ "x$itype" = xmentor ] && set -x
     case "$arg" in
 	http://* | ftp://* )
-		w3m -dump -T text/html "$arg" | eval "$filter $lp" ;;
+		w3m -dump -T text/html -cols 80 -F "$arg" | eval "$filter $lp" ;;
 	*)
 		eval "$filter $lp" <"$arg" ;;
     esac
