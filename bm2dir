@@ -1,0 +1,4 @@
+#!/bin/sh
+[ $# = 1 ] || { echo "Usage: $0 bookmark-root" >&2; exit 2; }
+[ -t 0 ] && { echo "$0: stdin should be a bookmark file, not a tty" >&2; exit 1; }
+nsbmclean | nsbmparse -f DIR -t "$1"
