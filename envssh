@@ -5,12 +5,13 @@
 #
 
 cmd=`basename "$0"`
-usage="Usage: $cmd [-o sshopt] [-l login] [-a] [-n] [-v] [-x] host command [args...]
+usage="Usage: $cmd [-o sshopt] [-[xX] [-l login] [-a] [-n] [-v] [-x] host command [args...]
 	-l login	Specify remote login name.
 	-o sshopt	Pass option to ssh.
 	-a		Asynchronous.
 	-n		Input from /dev/null.
 	-t		Require a tty.
+	-x -X		Passed to ssh.
 	-v		Verbose."
 
 rsh=ssh
@@ -32,7 +33,7 @@ do
     case $1 in
 	-[lo])	sshopts="$sshopts $1 '$2'"; shift ;;
 	-n)	nflag=-n ;;
-	-[tf])	sshopts="$sshopts $1" ;;
+	-[tfxX])sshopts="$sshopts $1" ;;
 	-v)	xset='set -vx' sshopts="$sshopts -v"
 		vecho=echo
 		set -x ;;
