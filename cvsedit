@@ -12,6 +12,11 @@ cameron=
 [ "x$USER" = xcameron ] && cameron=1
 
 msg=$CVSEDIT_MSG
+if [ -n "$msg" ]
+then  havemsg=1
+else  havemsg=
+fi
+
 dodl=$cameron
 dodiff=1
 
@@ -19,7 +24,7 @@ badopts=
 
 while :
 do  case $1 in
-	-m)	msg=$2; shift ;;
+	-m)	havemsg=1 msg=$2; shift ;;
 	--diff)	dodiff=1 ;;
 	--no-diff) dodiff= ;;
 	--dl)	dodl=1 ;;
@@ -77,11 +82,11 @@ editxit=$?
 
 [ $editxit = 0 ] || ask "$* failed - really commit the file" || exit 1
 
-[ -n "$msg" ] || { necho "Log message? "
-		   read msg
-		 } || { echo "$cmd: commit cancelled - file in modified state" >&2
-			exit 1
-		      }
+[ $havemsg ] || { necho "Log message? "
+		  read msg
+		} || { echo "$cmd: commit cancelled - file in modified state" >&2
+		       exit 1
+		     }
 
 if [ $dodl ] && [ -n "$msg$editcmd" ]
 then
