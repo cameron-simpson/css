@@ -17,6 +17,19 @@ case $1 in
   -n)	doit=; shift ;;
 esac
 
+if [ $doit ]
+then  trace=set-x
+else  trace=echo
+fi
+
+# prune oversized thumbnails
+find ${1+"$@"} ${1-.} \
+	-type d -name .thumbnails -print -prune \
+| while read thdir
+  do  find "$thdir" -type f -size +20 -ls -exec $trace rm {} ';'
+  done
+
+# prune non-images
 find ${1+"$@"} ${1-.} \
 	\( \
 	  \( -name '.?*' -prune \) \
