@@ -6,10 +6,10 @@
 
 cmd=`basename "$0"`
 
-EMAIL=${EMAIL-"$USER@${SITENAME-research.canon.com.au}"}	# cut to suit
-AFTPLOG=${AFTPLOG-$HOME/private/aftplog}
-ALEXHOST=${ALEXHOST-archie.au}
-ALEXDIR=${ALEXDIR-/alex}
+EMAIL=${EMAIL:-"$USER@$MAILDOMAIN"}	# cut to suit
+AFTPLOG=${AFTPLOG:-$HOME/private/aftplog}
+ALEXHOST=${ALEXHOST:-archie.au}
+ALEXDIR=${ALEXDIR:-/alex}
 export EMAIL ALEXHOST ALEXDIR AFTPLOG
 conv=binary
 login=anonymous
