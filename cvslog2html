@@ -89,7 +89,7 @@ while (defined ($_=<STDIN>))
       )
     { $incomment=0;
       if (@comment)
-      { push(@log,[$file, $day, $time, $author, @comment]);
+      { push(@log,[$file, $rev, $day, $time, $author, [@comment]]);
       }
     }
     elsif (!@comments && /^branches:/)
@@ -114,7 +114,12 @@ while (defined ($_=<STDIN>))
     }
   }
   else
-  { if (/^date:\s+(\d\d\d\d)\/(\d\d)\/(\d\d)\s+(\d\d:\d\d:\d\d);\s+author:\s+(\w+);/)
+  {
+    if (/^revision (\d+\.\d+)$/)
+    { $rev=$1;
+    }
+
+    if (/^date:\s+(\d\d\d\d)\/(\d\d)\/(\d\d)\s+(\d\d:\d\d:\d\d);\s+author:\s+(\w+);/)
     { $incomment=1;
       $day="$1-$2-$3";
       $time=$4;
@@ -130,6 +135,7 @@ undef $day;
 undef $auhtor;
 undef $file;
 undef $time;
+undef $ortxt;	# old revision string
 
 if (! $TextMode)
 { my $pwd;
@@ -145,7 +151,7 @@ if (! $TextMode)
 
 for my $L (reverse sort cmplogs @log)
 {
-  my($f,$d,$t,$a,@C)=@$L;
+  my($f,$r,$d,$t,$a,$C)=@$L;
 
   if (! defined $day || $day ne $d)
   { if (defined $day && ! $TextMode)
@@ -154,6 +160,7 @@ for my $L (reverse sort cmplogs @log)
 
     $day=$d;
     undef $author;
+    undef $ortxt;
 
     if ($TextMode)
     { print "$day\n";
@@ -170,7 +177,7 @@ for my $L (reverse sort cmplogs @log)
     print "    $author:\n";
   }
 
-  for my $comment (@C)
+  for my $comment (@$C)
   {
     if ($ObfuscateEmail)
     { $comment =~ s/(\S)\@(\S+)/$1-at-$2/g;
