@@ -1,0 +1,21 @@
+#!/bin/sh
+#
+# Run a command with $PGPPASS set (typically "ring -p" which does multiple pgp invocations).
+#	- Cameron Simpson <cs@zip.com.au> 03may2002
+#
+
+[ $# = 0 ] && { echo "Usage: $0 command [args...]" >&2; exit 2; }
+
+[ -n "$PGPPASS" ] \
+|| { stty -echo	|| exit 1
+     necho "Enter PGP pass phrase: "
+     ok=1
+     read PGPPASS || ok=
+     stty echo
+     [ $ok ] || exit 1
+     echo
+     [ -n "$PGPPASS" ] || { echo "Empty phrase, aborting!" >&2; exit 1; }
+     export PGPPASS
+   }
+
+exec "$@"
