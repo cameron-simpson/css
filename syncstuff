@@ -28,7 +28,7 @@
 #
 
 cmd=`basename "$0"`
-usage="Usage: $cmd [-o option=value]... [-b] [-n] [-v] [@where] [targets...]
+usage="Usage: $cmd [@where] [-o option=value]... [-b] [-n] [-v] [targets...]
 	-b	Backup mode. Use histbackup.
 	--rsync-path exec
 		Execute \"exec\" as the remote rsync command.
@@ -75,6 +75,9 @@ case "$1" in
     @?*)  syncset=`expr "$1" : '@\(.*\)'`
 	  shift
 	  ;;
+    *@*)  syncset=$1
+	  shift
+	  ;;
 esac
 
 #
@@ -118,18 +121,8 @@ then
     then
 	echo "$cmd: no config for $syncset (I wanted $cf)" >&2
 	exit 1
-    else
-	. "$cf"
-	badcf=
-	[ -n "$from"     ] || { badcf=1; echo "$cmd: no from!" >&2; }
-	[ -n "$to"       ] || { badcf=1; echo "$cmd: no to!" >&2; }
-	[ -n "$needsite" ] || { badcf=1; echo "$cmd: no needsite!" >&2; }
-	if [ $badcf ]
-	then
-	    echo "$cmd: errors in $cf" >&2
-	    exit 1
-	fi
     fi
+    . "$cf"
 fi
 
 #
