@@ -7,7 +7,7 @@
 # exit 0	## for a moment
 
 cmd=`basename "$0"`
-usage="Usage: $cmd [-l logfile] { [[!]/ptn/] | imagefile }"
+usage="Usage: $cmd [-l logfile] [{ptns...|imagefile}]"
 
 badopts=
 
@@ -16,22 +16,24 @@ case $1 in
   -l)	logf=$2; shift; shift ;;
 esac
 
-ptn=${SETRXVTPTN:-"/./"}
-case $1 in
-    /* | !/*)	[ -s "$1" ] || { ptn=$1; shift; } ;;
-esac
-
-if [ $# = 0 ]
-then src=`bglist -p "$ptn" | pickn`
-     [ -n "$src" ] || { echo "$cmd: no INDEX entries matching /$ptn/" >&2
-			exit 1
-		      }
-else src=$1; shift
+if [ $# -gt 0 ]
+then
+    if [ -s "$1" ]
+    then
+	src=$1; shift
+	[ $# = 0 ] || { echo "$usage" >&2; exit 2; }
+    else
+	[ $# = 0 ] && set .
+    fi
 fi
 
-[ $# = 0 ] || { echo "$cmd: extra arguments: $*" >&2; badopts=1; }
-
-[ $badopts ] && { echo "$usage" >&2; exit 2; }
+if [ -z "$src" ]
+then
+    src=`bglist | pickn "$@"`
+    [ -n "$src" ] || { echo "$cmd: no INDEX entries matching: $*" >&2
+		       exit 1
+		     }
+fi
 
 [ -n "$logf" ] || logf=`rxvtbglog`
 [ -s "$logf" ] || ( # some shells bail here on failure
