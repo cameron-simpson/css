@@ -16,8 +16,8 @@ use Getopt::Std;
 sub fetchgroup($);
 
 $::Server=(exists $ENV{NNTPSERVER} && length $ENV{NNTPSERVER} ? $ENV{NNTPSERVER} : 'nntp');
-$::NDA='ng2to|loggingprocmail';
-$::Newsrc="$ENV{HOME}/.fetchnews-state";
+$::NDA='ng2to|procmail';
+$::Newsrc="$ENV{HOME}/.getnews-state";
 $::CatchUp=0;
 
 $::Usage="Usage: $::cmd [-s nntpserver] [-d nda] [newsgroup...]
