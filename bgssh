@@ -4,7 +4,8 @@
 #	- Cameron Simpson <cs@zip.com.au> 24may99
 #
 
-usage="Usage: $0 [+x] host [command]"
+cmd=$0
+usage="Usage: $cmd [+x] [sshoptions...] [user@]host [command]"
 
 if [ "x$1" = x+x ]
 then  shift				## use X!
@@ -13,11 +14,30 @@ else  unset DISPLAY			## no X passprase prompting
       xflag=-x				## no X forward
 fi
 
+sshopts=
+while :
+do  case "$1" in
+        -[yecmpLRo])
+		sshopts="$sshopts $1 '$2'"
+		shift
+		;;
+	[a-zA-Z]*=*)
+		param=`expr "x$1" : 'x\([^=]*\)=.*'`
+		value=`expr "x$1" : 'x[^=]*=\(.*\)'`
+		sshopts="$sshopts -o '$param $value'"
+		;;
+	--)	shift; break ;;
+	-?*)	sshopts="$sshopts $1" ;;
+	*)	break ;;
+    esac
+    shift
+done
+
 if [ $# = 0 ]
-then  echo "$0: missing host" >&2
+then  echo "$cmd: missing host" >&2
       echo "$usage" >&2
       exit 2
 else  host=$1; shift
 fi
 
-tag_fd 1,2 "$host" ssh -n $xflag "$host" ${1+"$@"} &
+eval "tag_fd 1,2 '$host' ssh -n $xflag $sshopts '$host' \${1+\"\$@\"} &"
