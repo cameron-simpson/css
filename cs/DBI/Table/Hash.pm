@@ -94,6 +94,49 @@ sub _Key($)   { shift->{cs::DBI::Table::Hash::KEY}; }
 sub _Live($)  { shift->{cs::DBI::Table::Hash::LIVE}; }
 sub _Where($) { shift->{cs::DBI::Table::Hash::WHERE}; }
 
+=back
+
+=head1 OBJECT METHODS
+
+In addition to the KEYS, FETCH, STORE etc methods
+used to implement the tie,
+some other methods are available to do table-related things.
+
+=over 4
+
+=item AutoInsert(I<hashref>)
+
+Add a new record described by I<hashref>
+to the table.
+This depends upon the key field
+being an B<AUTOINCREMENT> value.
+The new key field is returned.
+
+=cut
+
+sub AutoInsert($$)
+{ my($this,$h)=@_;
+
+  my $keyfield = $this->_Key();
+
+  if (exists $h->{$keyfield})
+  { warn "$0: AutoInsert: column \"$keyfield\" discarded";
+    delete $h->{$keyfield};
+  }
+
+  my $ins = cs::DBI::insert($this->_Dbh(),
+			    $this->_Table(),
+			    keys %$h);
+  if (! defined $ins)
+  { warn "$::cmd: can't make cs::DBI::insert()";
+    return undef;
+  }
+
+  $ins->ExecuteWithRec($h);
+
+  last_id();
+}
+
 sub KEYS($)
 { my($this)=@_;
 
@@ -193,6 +236,8 @@ sub DELETE($$)
 
   delete $this->_Live()->{$key};
 }
+
+=back
 
 =head1 AUTHOR
 
