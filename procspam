@@ -3,7 +3,7 @@ exec >/dev/null 2>/dev/tty
 tmp=${TMPDIR:-/tmp}/procspam$$
 cat >"$tmp" || exit 1
 exec </dev/null
-( bogofilter -S <"$tmp"
+( unb64bf -S <"$tmp"
   procmail <"$tmp"
   rm "$tmp"
 ) &
