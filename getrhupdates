@@ -1,0 +1,83 @@
+#!/bin/sh
+#
+# Update a mirror of the RedHat updates for just the RPMs on this machine.
+#	- Cameron Simpson <cs@zip.com.au> 07sep2003
+#
+
+release=`rhrelease`
+lang=en
+archs='athlon i386 i586 i686 noarch'
+mirror=mirror.aarnet.edu.au
+updates=redhat/linux/updates
+rsopts=
+rsvopts=
+rsdelopts='--delete --delete-excluded'
+[ -t 1 ] && rsvopts=-P
+
+cmd=`basename "$0"`
+usage="Usage: $cmd [-n] [-v] [-r release] [-m mirror] [--delete] [--delete-excluded]
+	-n		No action. Passed to rsync.
+	-v		Verbose. Passed to rsync.
+	-m mirror	Source mirror site.
+			Default: $mirror
+	-r release	Release number to sync."
+
+badopts=
+
+while :
+do
+  case $1 in
+    -n)	rsvopts=-vn ;;
+    -v)	rsvopts=-vP ;;
+    -m)	mirror=$2; shift ;;
+    -r)	release=$2; shift ;;
+    --no-delete)
+	rsdelopts=
+	;;
+    --delete|--delete-excluded)
+	rsdelopts=
+	rsopts="$rsopts $1"
+	;;
+    --)	shift; break ;;
+    -?*)echo "$cmd: unrecognised option: $1" >&2
+	badopts=1
+	;;
+    *)	break ;;
+  esac
+  shift
+done
+
+[ $# = 0 ] || { echo "$cmd: extra arguments: $*" >&2; badopts=1; }
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+updroot=$updates/$release/$lang/os
+
+inclist=/tmp/$cmd$$
+trap 'rm -f "$inclist"' 0 1 2 15
+
+(
+  for arch in $archs
+  do  echo "+ /$arch/"
+  done
+  echo "- /*/"
+
+  rpm -qa | sed '
+	h
+	s/.*/- &.*.rpm/
+	x
+	s/-[^-]*$//
+	s/.*/+ &-*.rpm/
+	x
+	G
+	'
+) >"$inclist"
+
+set -x
+rsync -aH $rsvopts $rsdelopts $rsopts \
+	'--exclude=SRPMS/' \
+	"--include-from=$inclist" \
+	'--exclude=*.rpm' \
+	'--include=*/' \
+	'--exclude=*' \
+	"$mirror::$updroot/." .
