@@ -1,0 +1,46 @@
+#!/bin/sh
+#
+# Merge the contents of one MH folder into another,
+# and link the second back to the first as synonyms.
+# Note: uses $MAILDIR instead of ~/.mh_profile.
+# Assumes they match.
+#	- Cameron Simpson <cs@zip.com.au> 25may2002
+# 
+
+cmd=`basename "$0"`
+usage="Usage: $cmd fromdir todir"
+
+badopts=
+if [ $# = 2 ]
+then
+    fromdir=$1 todir=$2; shift; shift
+    [ -d "$fromdir/." ] || { echo "$cmd: $fromdir: not a directory" >&2
+			     badopts=1
+			   }
+    [ -d "$todir/."   ] || { echo "$cmd: $todir: not a directory" >&2
+			     badopts=1
+			   }
+    case "$todir" in
+	/*) ;; *) todir=`pwd`/$todir ;;
+    esac
+else
+    echo "$cmd: wrong number of arguments" >&2
+    badopts=1
+fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+mvdir=`dirname "$fromdir"`/.$cmd-$fromdir-$$
+mv -i "$fromdir" "$mvdir" || exit 1
+ln -s "$todir" "$fromdir" || exit 1
+mhdir "$todir"
+
+toparent=`exec dirname "$todir"`
+tochild=`exec basename "$todir"`
+for f in "$mvdir/"[1-9]*
+do  [ -s "$f" ] || continue
+    filemailitem "+$tochild" <"$f" && rm "$f"
+done
+
+rm -f "$mvdir/.mh_sequences"
+rmdir "$mvdir"
