@@ -339,12 +339,12 @@ do
     #
     # =item B<-latitude> I<latitude>
     #
-    # The I<latitude> is either an ordinary latitude between -180 and 180
+    # The I<latitude> is either an ordinary latitude between -90 and 90
     # or the word "B<random>" which picks an arbitrary value in that range.
     #
     -latitude|-lat)
 		case $2 in
-		  random) lat=`seq -180 180 | pickn` ;;
+		  random) lat=`seq -90 90 | pickn` ;;
 		  *)	  lat=$2 ;;
 		esac
 		xplopts="$xplopts -latitude \"\$lat\""
@@ -352,12 +352,12 @@ do
 		;;
     # =item B<-longitude> I<longitude>
     #
-    # The I<longitude> is either an ordinary longitude between -09 and 90
+    # The I<longitude> is either an ordinary longitude between -180 and 180
     # or the word "B<random>" which picks an arbitrary value in that range.
     #
     -longitude)
 		case $2 in
-		  random) long=`seq -90 90 | pickn` ;;
+		  random) long=`seq -180 180 | pickn` ;;
 		  *)	  long=$2 ;;
 		esac
 		xplopts="$xplopts -longitude \"\$long\""
