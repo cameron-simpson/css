@@ -5,7 +5,11 @@
 #
 
 cmd=$0
-usage="Usage: $cmd srcdir destdir [findopts...]"
+usage="Usage: $cmd [-n] srcdir destdir [findopts...]"
+
+mrgopts=
+
+[ "x$1" = x-n ] && { mrgopts="$mrgopts -n"; shift; }
 
 [ $# = 2 ] || { echo "$usage" >&2; exit 2; }
 src=$1 dest=$2; shift; shift
@@ -13,4 +17,4 @@ src=$1 dest=$2; shift; shift
 dest=`cd "$dest" || exit 1; pwd` || exit 1
 
 cd "$src" || exit 1
-find . -type f ${1+"$@"} -print | xxargs mrg -rp "$dest/."
+find . -type f ${1+"$@"} -print | xxargs mrg -rp $mrgopts "$dest/."
