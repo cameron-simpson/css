@@ -14,4 +14,4 @@ esac
 
 [ $# = 0 ] && set .
 
-ga "$@" | shuffle | sed "${n}q"
+grepall "$@" | shuffle | sed "${n}q"
