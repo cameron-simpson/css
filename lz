@@ -27,12 +27,13 @@
 #### needed? #### [ -n "$SYSTEMID" ] || { [ -s /opt/shell/STANDARD ] && . /opt/shell/STANDARD; }
 
 multipsargs=
-topsargs='-T "$arg"'
+postps=
+topsargs=
 pshufargs=
 filter=
 domessage=	# only works at UNSW CSE
 lpqflag=
-itype=any
+itype=
 
 cmd=`exec basename "$0"`
 usage="Usage: $cmd [-Pprinter[/paper]] [-f filter]... [-q] [multips-options] [--] [files...]
@@ -43,8 +44,9 @@ usage="Usage: $cmd [-Pprinter[/paper]] [-f filter]... [-q] [multips-options] [--
 			included (eg a3).
 			NB: plain -P is reserved for multips' portrait flag.
 	-f filter	Run each file (or stdin) through filter, which may
-			include options. Multiple filters are connected by
-			pipes in the order supplied.
+			include options, _before_ conversion to PostScript.
+			Multiple filters are connected by pipes in the order
+			supplied.
 	-q		Do an lpq of the printer after submitting the jobs.
 	+q		No lpq. (Default)
 	/pattern/	Highlight regular expression (only works for a2ps as
@@ -53,6 +55,7 @@ usage="Usage: $cmd [-Pprinter[/paper]] [-f filter]... [-q] [multips-options] [--
     Pshuf options:
 	-numbers	Shuffling order.
 	-o range	Only output pages in \"range\".
+	-O shuffle-pages Shuffling order.
 	-r		Reverse pages.
 
     multips options (defaults as per multips):
@@ -282,15 +285,13 @@ done
 # =back
 #
 
-# insert pshuf if required
-[ -n "$pshufargs" ] && filter="pshuf $pshufargs | $filter"
-
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
-filter="2ps \$topsargs -i \"\$itype\" -T \"\$arg\" | $filter"
+# page selection and shuffling
+[ -n "$pshufargs" ] && postps="$postps | pshuf $pshufargs"
 
 # multisheeting
-[ -n "$multipsargs" ] && filter="$filter multips \$multipsargs |"
+[ -n "$multipsargs" ] && postps="$postps | multips \$multipsargs"
 
 ## UNSW lpr only
 ## case "$#,$domessage" in
@@ -302,14 +303,6 @@ filter="2ps \$topsargs -i \"\$itype\" -T \"\$arg\" | $filter"
 ## esac
 
 xit=0
-
-tmp=
-if [ $# = 0 ]
-then
-	tmp="/tmp/$cmd.$$"
-	cat >"$tmp"
-	set "$tmp"
-fi
 
 # catch paper type
 case "$PRINTER" in
@@ -333,18 +326,17 @@ then
 	    lp='lpr "-P$PRINTER"'
 	    ;;
 	# BSDish
-	*)  echo "$cmd: warning: unknown \$OS \"$OS\" - assuming bsd" >&2
+	*)  ##echo "$cmd: warning: unknown \$OS \"$OS\" - assuming bsd" >&2
 	    lp='lpr "-P$PRINTER"'
 	    ;;
     esac
 fi
 
-if [ "x$PRINTER" = x- ]
-then  lp=cat
-fi
+# use printer unless sending to stdout
+[ "x$PRINTER" = x- ] || postps="$postps | bgstdin $lp"
 
 # insert paper setting outside postscript
-[ -n "$paper" ] && lp="( echo \"\$paper\"; cat ) | $lp"
+[ -n "$paper" ] && postps="$postps | ( echo \"\$paper\"; exec cat )"
 
 # =head2 Files
 #
@@ -356,30 +348,44 @@ fi
 # and the w3m(1) command is called to fetch (and format) the specified web page
 # for printing.
 #
-( for arg
-  do
-    ## [ "x$itype" = xmentor ] && set -x
+
+[ $# = 0 ] && set -- -
+
+tops="2ps \$topsargs -i \"\$thisitype\" -T \"\$thistitle\""
+
+pipeline="$filter $tops $postps"
+
+didstdin=
+for arg
+do
+    thisitype=$itype
+    thistitle=$arg
     case "$arg" in
+	-)	if [ $didstdin ]
+		then
+		    echo "$cmd: skipping second mention of stdin (\"$arg\")" >&2
+		    xit=1
+		else
+		    didstdin=1
+		    thistitle=stdin
+		    eval "$pipeline"
+		fi
+		;;
 	http://* | ftp://* )
 		if [ -n "$URL2TXT" ]
 		then  eval "$URL2TXT \"\$arg\""
 		else  w3m -dump -T text/html -cols 80 -F "$arg"
 		fi \
-		| eval "$filter $lp"
+		| eval "$pipeline"
 		;;
-	*)
-		eval "$filter $lp" <"$arg"
+	*)	[ -n "$thisitype" ] || thisitype=`file2mime "$arg"`
+		eval "$pipeline" <"$arg"
 		;;
     esac
     ## set +x
-  done
+done
 
-  [ -z "$tmp" ] || rm "$tmp" || xit=$?
-
-  [ -z "$lpqflag" ] || lpq "$PRINTER" -l || xit=$?
-
-  exit $xit
-) &
+[ -z "$lpqflag" ] || lpq "$PRINTER" -l || xit=$?
 
 exit $xit
 
@@ -390,7 +396,7 @@ exit $xit
 # LZOPTIONS: default command line options.
 #
 # LZPRINTCOMMAND: low level printer delivery command.
-# Default:
+# Example:
 #
 #	/opt/LPRng/bin/lpr "-P$PRINTER"
 #
