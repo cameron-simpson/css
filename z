@@ -1,0 +1,78 @@
+#!/bin/sh
+#
+# Partner for t, v and x.
+#	- Cameron Simpson <cs@zip.com.au> 11mar1999
+#
+# Handle directories.	- cameron 27jun2000
+# Gzip by default because bzip2 uses much CPU. - cameron 03jul2000
+#
+
+xit=0
+
+compress=gzip
+
+[ "x$1" = 'x-c' ] && { compress=$2; shift; shift; }
+
+args=
+case $compress in
+    gzip)	ext=gz  args=-9 ;;
+    bzip2)	ext=bz2 args='-z -9 --repetitive-best' ;;
+    compress)	ext=Z   ;;
+    *)		echo "$0: $compress: unrecognised compression mode" >&2
+		echo "	I know gzip, bzip2 and compress." >&2
+		exit 2
+		;;
+esac
+
+pids=
+for f
+do
+    if [ -f "$f" ]
+    then
+	bz2 -z "$f" || xit=1
+    else
+	if [ -d "$f" ]
+	then
+	    arch=$f.tar
+	    zarch=$arch.$ext
+	    if [ -s "$arch" ]
+	    then
+		echo "$0: $arch: present and not empty" >&2
+		xit=1
+	    else
+		if [ -s "$zarch" ]
+		then
+		    echo "$0: $zarch: present and not empty" >&2
+		    xit=1
+		else
+		    if entar "$f" >"$arch"
+		    then
+			rm -rf "$f" &
+			pids="$pids $!"
+			"$compress" -v $args "$arch" || xit=1
+		    else
+			echo "$0: problems making $f" >&2
+			rm "$arch"
+			xit=1
+		    fi
+		fi
+	    fi
+	else
+	    echo "$0: $f: not a file or directory" >&2
+	    xit=1
+	fi
+    fi
+done
+
+# tidy up
+npids=
+for pid in $pids
+do  kill -0 $pid 2>/dev/null && npids="$npids $pid"
+done
+if [ -n "$npids" ]
+then
+    echo "waiting for background rm commands ..."
+    wait
+fi
+
+exit $xit
