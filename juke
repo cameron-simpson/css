@@ -11,6 +11,7 @@
 trace=set-x
 
 playcopy=
+dorandom=
 
 cmd=`basename "$0"`
 usage="Usage: $cmd [-C]"
@@ -29,7 +30,13 @@ runplayer()
     playlist=$TMPDIR/$cmd.$$
     while [ $ok ]
     do
-	$trace aulist $ptns >"$playlist"
+	if [$dorandom ]
+	then  auropt=-r
+	      echo "Selecting randomly, patterns are: $ptns"
+	else  auropt=
+	      echo "Selecting sequentially, patterns are: $ptns"
+	fi
+	$trace aulist $auropt $ptns >"$playlist"
 	if [ -s "$playlist" ]
 	then
 	  exec <"$playlist"
@@ -51,9 +58,9 @@ runplayer()
 	      esac
 	      subproc=$!
 	      wait
+	      subproc=
 	      [ $playcopy ] && rm -f "$tmpauf"
 	      [ $ok ] && sleep 2
-	      subproc=
 	  done
 	else
 	  echo "$cmd: no hits found for keywords: $ptns" >&2
@@ -82,12 +89,26 @@ do
 		echo "  ?	This help message."
 		echo "  -	Stop the player."
 		echo "  .	Select with an empty pattern (pick anything)."
-		echo "  blank line: Make a new selection using the existing criteria."
+		echo "  blank line: Skip to next selection from current criteria."
+		echo "  \"random\" Choose matching items sequentially."
+		echo "  \"seq\"	Choose matching items sequentially."
 		echo "  keyword	Select tracks using the supplied keywords."
 		;;
 	'')	bumpplayer
 		;;
 	-)	stopplayer
+		;;
+	random)	dorandom=1
+		echo "Reselecting with random play."
+		stopplayer
+		sleep 2  
+		runplayer
+		;;
+	seq)	dorandom=
+		echo "Reselecting with sequential play."
+		stopplayer
+		sleep 2  
+		runplayer
 		;;
 	.)	ptns=
 		stopplayer
