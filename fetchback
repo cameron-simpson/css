@@ -1,0 +1,11 @@
+#!/bin/sh
+#
+
+mkdir Restored && cd Restored
+tmp=/tmp/fetchback.$$
+/HOME/backups/bin/find_backup $* >$tmp
+vi $tmp
+/HOME/backups/bin/restore_backup <$tmp
+pax -r -v < /tmp/Restored
+rm /tmp/Restored
+rm $tmp
