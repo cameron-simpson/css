@@ -211,6 +211,20 @@ sub Taken($)
 { return shift->{TAKEN};
 }
 
+sub _SetInfo($)
+{ my($this)=@_;
+
+  my $info = $this->Path()."/info";
+
+  if (! open(INFO,"> $info\0"))
+  { warn "$::cmd: rewrite $info: $!\n";
+    return 0;
+  }
+
+  print INFO "$$ $ENV{HOSTNAME}\n";
+  close(INFO);
+}
+
 sub _Take($)
 { my($this)=@_;
 
@@ -230,10 +244,7 @@ sub _Take($)
     return undef;
   }
 
-  if (open(INFO, "> $path/info"))
-  { print INFO "$$ $ENV{HOSTNAME}\n";
-    close(INFO);
-  }
+  $this->_SetInfo();
 
   1;
 }
