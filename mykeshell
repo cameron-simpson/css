@@ -27,13 +27,6 @@ set colourise "$@"
 "$@"
 xit=$?
 
-if [ -n "$DISPLAY" ]
-then
-    ( [ -t 1 ] || exec >/dev/null
-      [ -t 2 ] || exec 2>/dev/null
-      exec xclip --no-log <"$tmp"
-    )
-    rm "$tmp"
-fi
+lastvalue -d "$MYKE_STARTDIR" myke_err - <"$tmp" &
 
 exit $xit
