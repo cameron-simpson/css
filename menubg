@@ -5,54 +5,62 @@
 #
 
 cmd=$0
+call="$0 $*"
 
+domenu=
+aspect=-t
+strippfx=
 geom=300x600
+pickn=1
 
-usage="Usage: $cmd [XxY] [ imagefile | bglist-args... ]
+usage="Usage: $cmd [-M] [XxY] [ imagefile | bglist-args... ]
+	-M	Popup FVWM menu to pick from choices.
 	XxY	Max XxY geometry of scaled image. Default: $geom"
 
 badopts=
+
+[ "x$1" = x-M ] && { pickn=20 aspect= domenu=1 strippfx=$HOME; shift; }
 
 case "$1" in
     [1-9]*x[1-9]*)
 	geom=$1; shift ;;
 esac
 
-if [ $# = 0 ]
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+if [ $# = 1 -a -s "$1" ]
 then
-    # random tall image
-    set x `bglist -r -n 1`; shift
-    if [ $# = 0 ]
-    then
-	echo "$cmd: nothing found by bglist" >&2
-	badopts=1
-    else
-	echo "$1"
-    fi
+    :
 else
-    if [ ! -s "$1" ]
-    then
-	# random tall image by keyword
-	args=$*
-	set x `bglist -r -n 1 "$@"`; shift
-	if [ $# = 0 ]
-	then
-	    echo "$cmd: nothing found by bglist for \"$args\"" >&2
-	    badopts=1
-	else
-	    echo "$1"
-	fi
-    else
-	[ $# = 1 ] || { shift; echo "$cmd: extra arguments: $*" >&2; badopts=1; }
-    fi
+    set x `pickim -P "$strippfx" -n $pickn -r $aspect ${1+"$@"}` || exit 1
+    shift
+    [ $# = 0 ] && exit 1
+    [ $# = 1 ] && domenu=
 fi
-imagefile=$1; shift
 
-[ -s "$imagefile" ] || { echo "$cmd: missing imagefile: $imagefile" >&2
-			 badopts=1
-		       }
+tmpf=/tmp/menubg$$
+trap 'rm -f "$tmpf"' 0 1 2 15
 
-[ $badopt ] && { echo "$usage" >&2; exit 2; }
+for arg
+do  echo "$arg"
+done >"$tmpf"
+
+if [ $domenu ]
+then
+    fvwmcmd \
+	  "Piperead 'fvwm-menu -1 ImDirMenu \"$cmd $call\" fvwm-menu-imlist -o menubg -l $tmpf ." \
+	  "Popup ImDirMenu"
+    exit $?
+fi
+
+imagefile=$1
+
+case "$imagefile" in
+    *.png|*.xpm)
+	# no format conversion needed
+	exec fvwmcmd "ColorSet 0 AspectPixmap \"$imagefile\""
+	;;
+esac
 
 wkdir=`mkdirn "${TMPDIR:-/tmp}/menubg"` || exit 1
 trap 'cd;(sleep 5; rm -rf "$wkdir")&' 0 1 2 15
@@ -63,6 +71,7 @@ cd "$wkdir"
 imagefile=`basename "$imagefile"`
 impng=`echo "$imagefile" | sed 's/\\(.*\\.\)[^.]*$/\\1PNG/'`
 
-mogrify -geometry "$geom" -modulate 70 -despeckle -format PNG "$imagefile"
-
-fvwmcmd "MenuStyle '*' MenuFace TiledPixmap \"$wkdir/$impng\""
+##mogrify -geometry "$geom" -modulate 70 -despeckle -format PNG "$imagefile"
+mogrify -format PNG "$imagefile"
+##fvwmcmd "MenuStyle '*' MenuFace AspectPixmap \"$wkdir/$impng\""
+fvwmcmd "ColorSet 0 AspectPixmap \"$wkdir/$impng\""
