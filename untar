@@ -5,6 +5,7 @@
 #
 
 use cs::Upd;
+use cs::Units;
 
 ($cmd=$0) =~ s,.*/,,;
 $usage="Usage: $cmd [-o] [-O] [-f file] [--] [targets...]
@@ -47,6 +48,9 @@ $tarflags.='f';
 push(@tarargs,$tarf);
 
 die $usage if $badopts;
+
+$start=time;
+$bytes=0;
 
 pipe(READEND,WRITEEND)	|| die "$cmd: can't make pipe: $!\n";
 my $pid = fork;
@@ -124,16 +128,26 @@ while (<STDIN>)
   { err($_,"\n");
   }
   else
-  { if (! defined($dir) || $dir ne $d)
+  {
+    if ($type eq '.')
+    { if (@s=lstat)
+      { $bytes+=$s[7];
+      }
+    }
+
+    $elapsed=time-$start;
+    $Bps=($elapsed > 0 ? cs::Units::bytes2human($bytes/$elapsed,1)."/s" : "");
+    $line=sprintf("%7s %s",$Bps,"$d/$b");
+
+    if ($_ eq 'l')	{ $line.=" == $l"; }
+    elsif ($_ eq 's')	{ $line.=" -> $l"; }
+
+    if (! defined($dir) || $dir ne $d)
     # new directory, emit
-    { nl($d);
+    { nl(sprintf("%7s %s",$Bps,$d));
       $dir=$d;
     }
 
-    if ($_ eq 'l')	{ $b.=" == $l"; }
-    elsif ($_ eq 's')	{ $b.=" -> $l"; }
-
-    $line=$d.'/'.$b;
     out($line);
   }
 }
