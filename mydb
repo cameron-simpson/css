@@ -1,0 +1,40 @@
+#!/bin/sh
+#
+# Fire up a mysqld for a particular dataset.
+#	- Cameron Simpson <cs@zip.com.au> 02jul99
+#
+
+mysqldir=/opt/mysql
+mysqld=$mysqldir/libexec/mysqld
+
+usage="Usage: $0 datadir [mysqld-options...]";
+
+badopts=
+if [ $# = 0 ]
+then
+    echo "$0: missing datadir" >&2
+    badopts=1
+else
+    datadir=$1; shift
+    if [ ! -d "$datadir/." ]
+    then
+	echo "$0: no such directory: $datadir" >&2
+	badopts=1
+    fi
+fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+MYSQL_UNIX_PORT=/tmp/mysqld-$USER.sock
+export MYSQL_UNIX_PORT
+echo "MYSQL_UNIX_PORT=$MYSQL_UNIX_PORT"
+
+set x "$mysqld" --no-defaults \
+		--basedir="$mysqldir" \
+		--datadir="$datadir" \
+		--socket=$MYSQL_UNIX_PORT \
+		${1+"$@"}
+shift
+
+set -x
+"$@" &
