@@ -34,7 +34,7 @@ if (@ARGV)
   { $::PipeTo=$';
   }
   elsif ("@ARGV" =~ /^\+/)
-  { $::PipeTo="filemail @ARGV";
+  { $::PipeTo="filemailitem @ARGV";
   }
   else
   { warn "$::cmd: unrecognised arguments: @ARGV\n";
