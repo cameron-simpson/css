@@ -1,0 +1,3 @@
+#!/bin/sh
+
+exec telnet chat.compulink.com 9000
