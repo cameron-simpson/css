@@ -125,8 +125,11 @@ case "$TERM,$DISPLAY" in
 	echo "PREFTERM=[$PREFTERM] termopts=[$termopts] dotrans=[$dotrans]" >&2
 	set -x
 	case "$PREFTERM" in
-	    rxvt)	[ $dotrans ] && opts="$opts -ip" ;;
-	    aterm)	[ $dotrans ] && opts="$opts -tr -sh 60 -fade 90" ;;
+	    rxvt)	[ $dotrans ] && opts="$opts -ip"
+			;;
+	    aterm)	# -fade 90
+			[ $dotrans ] && opts="$opts -tr -sh 60"
+			;;
 	esac
 
 	if [ $async ]
