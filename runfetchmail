@@ -7,6 +7,14 @@
 : ${LOGDIR:=$HOME/var/log}
 : ${VARRUN:=$HOME/var/run}
 
+once=
+trace=set-x
+
+cmd=$0
+usage="Usage: $cmd [-1] [fetchmail-options...]"
+
+[ "x$1" = x-1 ] && { once=1; shift; }
+
 while :
 do
   mypid=$$
@@ -20,14 +28,16 @@ do
     home)	fmopts="$fmopts -l 128000" ;;
     *)		fmopts="$fmopts -l 65536" fmdelay=900 ;;
   esac
-  date
-  set-x \
+  necho `date`': ' >&2
+  $trace \
   fetchmail \
 	-f "$HOME/.fetchmailrc" \
 	-t 1800 \
 	--logfile "$LOGDIR/fetchmail" \
 	--nobounce --tracepolls --warnings 86400 \
-	$fmopts $fmhosts
+	$fmopts ${1+"$@"} $fmhosts
+
+  [ $once ] && break
   sleep $fmdelay &
   echo $! >"$VARRUN/fetchmail_sleep.pid"
   wait
