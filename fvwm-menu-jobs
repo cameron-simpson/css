@@ -1,0 +1,21 @@
+#!/bin/sh
+#
+# List known jobs not in CLOSED state.
+#	- Cameron Simpson <cs@zip.com.au>
+#
+
+jobtimer -a \
+| while read id name
+  do  state=`jobtimer "$id" state`
+      [ "x$state" = xCLOSED ] && continue
+      label=$name
+
+      title=`jobtimer "$id" title`
+      [ -n "$title" ] && label="$label: $title"
+
+      cat=`jobtimer "$id" category`
+      [ -n "$cat" ] && label="$label	$cat"
+
+      echo "\"$label\" Exec exec job $name"
+  done \
+| sort
