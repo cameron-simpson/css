@@ -329,7 +329,7 @@ if ($do_post)	{ push(@need_hdrs,'newsgroups'); }
 if (! $gothdrs)
 { DefHdr($hdrs,From,"$ENV{NAME} <$ENV{EMAIL}>");
 
-  for (Reply_To,Errors_To,Return_Receipt_To)
+  for (Reply_To,Errors_To)	## Return_Receipt_To
   { DefHdr($hdrs,$_,$ENV{REPLY_TO});
   }
 
