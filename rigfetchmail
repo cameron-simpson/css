@@ -10,7 +10,7 @@ needhost $HOMEHOST@home || exit 1
 set -x
 cd
 ( fmopts=
-  fmdelay=600
+  fmdelay=300
   fmhosts='127.0.0.2 127.0.0.3'
   case "$LOCATION" in
     home|sco|tw)
