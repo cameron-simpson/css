@@ -1,0 +1,167 @@
+#!/usr/bin/perl
+#
+# Extract prototypes from ANSI C source.
+# Believes stringly in my formatting style.
+#	- Cameron Simpson, 27sep93
+#
+# BUGS: The CPP synchronicity goes to hell if the static and extern stuff go to
+#	the same place.
+#
+
+require 'cs/detab.pl';
+require 'cs/cpp.pl';
+
+($cmd=$0) =~ s:.*/::;
+$usage="Usage: $cmd [-e externs] [-s statics] C-files...
+	-e externs	File to receive external prototypes (stdout default).
+	-s statics	File to receive static prototypes (/dev/null default).
+";
+
+$xit=0;
+
+undef $prevline, $thisline;
+
+$extern='-';
+$static='/dev/null';
+
+while (defined($_=shift))
+	{ (unshift(@ARGV,$_), last) unless /^-./;
+
+	  if ($_ eq '--')	{ last; }
+	  elsif ($_ eq '-e')	{ $extern=shift; }
+	  elsif ($_ eq '-s')	{ $static=shift; }
+	  else			{ print STDERR "$cmd: $_: unrecognised option\n";
+				  $xit=2;
+				}
+	}
+
+die $usage if $xit != 0;
+
+if ($extern eq '-')			{ $EXTERN=STDOUT; }
+elsif (open(EXTERN,"> $extern\0"))	{ $EXTERN=EXTERN; }
+else					{ print STDERR "$cmd: can't open $extern: $!\n";
+					  $xit=1;
+					}
+if ($static eq '-')			{ $STATIC=STDOUT; }
+elsif (open(STATIC,"> $static\0"))	{ $STATIC=STATIC; }
+else					{ print STDERR "$cmd: can't open $static: $!\n";
+					  $xit=1;
+					}
+
+&cpp'initstate(extern,static);
+
+INPUT:
+  while (defined($_=&getline("'STDIN")))
+	{ $protoline=1;
+
+	  FN:
+	    while ( /^(\w+)\s*\(\s*(.*\S)\s*[,\)]\s*$/o
+		 .. /^{/
+		  )
+		{ # print STDERR "# $_\n";
+		  if ($protoline == 1)
+			{ if ($prevline =~ /^\s*(static|extern)\s*/)
+				{ $scope=$1;
+				  $prevline=$';
+				}
+			  else
+			  { $scope='extern';
+			    $prevline =~ s/^\s+//;
+			  }
+
+			  if ($prevline =~ /^$/)
+				{ $type='int';
+				}
+			  else
+			  { $type=$prevline;
+			  }
+
+			  /^(\w+)\s*\(\s*(.*\S)\s*[,\)]/ || die 'out of sync, seek help';
+			  $fn=$1;
+			  @params=($2);
+			}
+		  elsif (/^{/)
+			{ { local($")=",\n\t\t\t";
+			    local($oldf);
+
+			    $oldf=&outscope($scope);
+
+			    for (&cpp'syncstate($scope))
+				{ print $_, "\n";
+				}
+
+			    print $scope, '  ';
+			    printf("%-7s %-7s",$type,$fn);
+			    print "(@params);\n";
+
+			    select($oldf);
+			  }
+			}
+		  elsif (/^\s*(.*\S)\s*[,\)]\s*$/)
+			{ push(@params,$1);
+			}
+		  else
+		  { print STDERR "$cmd: $ARGV, line $.: unexpected parameter line: $_\n";
+		    $xit=1;
+		  }
+
+		$protoline++;
+		last FN if !defined($_=&getline("'STDIN"));
+	      }
+	}
+
+for $scope ((extern,static))
+	{ $oldf=&outscope($scope);
+
+	  for (&cpp'syncstate($scope))
+		{ print $_, "\n";
+		}
+
+	  select($oldf);
+	}
+
+exit $xit;
+
+sub getline	# (FILE) _> line or undef
+	{ local($FILE)=shift;
+	  local($_);
+
+	  $prevline=$thisline;
+
+	  return undef unless defined($_=&cpp'getline($FILE));
+
+	  s/\s+$//;
+	  $_=&detab($_,8);
+	  $thisline=$_;
+
+	  $_;
+	}
+
+sub unparam	# (type name) -> type
+	{ local($_)=@_;
+
+	  # comment out parameter names because some braindead
+	  # compilers (eg the MIPS 2.0 one) can't grok these in prototypes
+	  if (/(\w+)((\s*\[[^]]*\])*)\s*$/)
+		{ $_="$` /* $1 */ $2";
+		}
+	  elsif (/\(\s*\*\s*(\w+)\s*\)\s*((sub)?PA\s*\(\s*\(.*\)\s*\))\s*$/)
+		{ $_="$` (* /* $1 */ )$2";
+		}
+	  else
+	  { print STDERR "$cmd: can't comment out parameter name in \"$_\"\n";
+	  }
+
+	  $_;
+	}
+
+sub outscope	# (scope) -> oldselect
+	{ local($scope)=shift;
+	  local($newf);
+
+	  if ($scope eq 'extern')	{ $newf=$EXTERN; }
+	  elsif ($scope eq 'static')	{ $newf=$STATIC; }
+	  else				{ die "scope=$scope, see help"; }
+
+	  select($newf);
+	}
