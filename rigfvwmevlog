@@ -12,4 +12,4 @@ fifo=$fifodir/$DISPLAY-`datecode`-$$
 FvwmCommand -S "$fifo"
 sleep 5
 FvwmCommand -f "$fifo" -mi3 -F0 >>"$FVWMEVLOG" &
-fvwmmon | FvwmCommand -c &
+fvwmmon | fvwmcmd &
