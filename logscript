@@ -1,0 +1,40 @@
+#!/bin/sh
+#
+# Run and log a script session.
+#	- Cameron Simpson <cs@zip.com.au> 18may2002
+#
+
+cmd=`basename "$0"`
+[ $# -ge 1 ] || { echo "Usage: $cmd logbase [cmd [args...]]" >&2; exit 2; }
+logbase=$1; shift
+
+# adjust to full path of popSHELL because script uses execve, not execvep
+popshell=$HOME/scripts/popSHELL
+
+logdir=${VARLOG:-"$HOME/var/log"}
+logfile=$logdir/$logbase-`datecode`
+
+[ -d "$logdir/." ] || mkdir -p "$logdir" || exit 1
+
+{ echo
+  echo "$HOST @ $SYSTEMID"
+  date
+  id
+  echo
+} >>"$logfile"
+
+# hideous hack to restore $SHELL inside script command
+# because script, curse its negligent author, only runs $SHELL
+# rather than an arbitrary command
+# this hack will break quoting
+[ $# = 0 ] \
+	|| { popSHELL=$SHELL popSHELLexec=$*; export popSHELL popSHELLexec
+	     SHELL=$popshell; export SHELL
+	   }
+
+script -a "$logfile"
+xit=$?
+
+gzip -v -9 "$logfile"
+
+exit $xit
