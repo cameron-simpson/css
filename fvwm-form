@@ -1,0 +1,21 @@
+#!/bin/sh
+#
+# Emit a fresh FvwmForm definition and invocation.
+#	- Cameron Simpson <cs@zip.com.au> 11aug2003
+#
+
+cmd=$0
+usage="Usage: $cmd suffix"
+
+[ $# = 1 ] || { echo "$usage" >&2; exit 2; }
+
+sfx=$1; shift
+
+formname=FvwmForm-auto-$sfx
+
+echo "DestroyModuleConfig $formname: *"
+
+fvwm-form-$sfx \
+| sed "s/^/*$formname: /"
+
+echo "Module FvwmForm $formname"
