@@ -6,7 +6,9 @@
 #
 
 file=`lbg -1`
-if [ -s "$file" ] && { ls -ld "$file"; ask "rm $file"; }
+xvpid=
+if [ -s "$file" ] && { xv "$file" & xvpid=$!; ls -ld "$file"; ask "rm $file"; }
 then  rm -f "$file"
       sbg
 fi
+[ -n "$xvpid" ] && kill "$xvpid"
