@@ -1,0 +1,79 @@
+#!/bin/sh
+#
+# For each arg, run a shell command to convert data formats.
+# Diretories are walked. Support "-" as "read args from stdin".
+#	- Cameron Simpson <cs@zip.com.au> 20jul2002
+#
+
+cmd=`basename "$0"`
+usage="Usage: $cmd [-fnsx] oldsfx newsfx shellcmd {file|-}..."
+
+trace=set-x
+[ -t 1 ] && trace=set-x
+force=
+
+badopts=
+while :
+do  case "$1" in
+	-f)	force=1 ;;
+	-n)	trace=echo ;;
+	-s)	trace= ;;
+	-x)	trace=set-x ;;
+        --)	shift; break ;;
+	-?*)	echo "$cmd: unrecognised option: $1" >&2; badopts=1 ;;
+	*)	break ;;
+    esac
+    shift
+done
+
+[ $# -ge 3 ] || { echo "$cmd: missing arguments" >&2; badopts=1; }
+oldsfx=$1 newsfx=$2 shellcmd=$3; shift; shift; shift
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+xit=0
+for f
+do  if [ "x$f" = x- ]
+    then
+	xxargs $trace "$0" "$oldsfx" "$newsfx" "$shellcmd" || xit=1
+	continue
+    fi
+
+    if [ -d "$f/." ]
+    then
+	find "$f" -type f -name "*$oldsfx" -print \
+	| xxargs $trace "$0" "$oldsfx" "$newsfx" "$shellcmd" \
+	|| xit=1
+	continue
+    fi
+
+    if [ ! -f "$f" ]
+    then
+	echo "$cmd: missing file: $f" >&2
+	xit=1
+	continue
+    fi
+
+    # check for correct suffix
+    case "$f" in
+	*"$oldsfx")
+		;;
+	*)	echo "$cmd: bad suffix on \"$f\", expected \"$oldsfx\"" >&2
+		xit=1
+		continue
+		;;
+    esac
+
+    newfile=`basename "$f" "$oldsfx"`$newsfx
+    [ $force ] \
+	|| [ ! -f "$newfile" ] \
+	|| { echo "$cmd: existing file: $newfile" >&2
+	     xit=1
+	     continue
+	   }
+
+    ( exec <"$f"		# abort if open fails
+      exec >"$newfile"
+      $trace sh -c "$shellcmd" || { rm "$newfile"; exit 1; }
+    ) || xit=1
+done
