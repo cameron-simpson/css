@@ -10,13 +10,17 @@
 dev=${CDRIP_DEV:-/dev/cdrom}
 bps=${CDRIP_BPS:-192}
 enc=${CDRIP_ENC:-ogg}
+lock=
 
 cmd=`basename "$0"`
-usage="Usage: $cmd [-b bps] [-d device] [-e enc]
+usage="Usage: $cmd [-b bps] [-d device] [-e enc] [-l lock]
 	-b bps		Bits per second for the final bitstream.
 			Default: ${bps}bps.
 	-d device	Device holding the CD. Default: $dev
-	-e enc		Select encoding. Default: $enc"
+	-e enc		Select encoding. Default: $enc
+	-l lock		Do encoding completely asynchronously, using \"lock\" as the lock name."
+
+set x $CDRIP_OPTS ${1+"$@"}; shift
 
 badopts=
 while :
@@ -33,6 +37,7 @@ do
 		esac
 		shift
 		;;
+	-l)	lock=$2; shift ;;
 	--)	shift ;break ;;
 	-?*)	echo "$cmd: unrecognised option: $1" >&2
 		badopts=1
@@ -41,6 +46,12 @@ do
     esac
     shift
 done
+
+case "$lock" in
+  *[\ \	]*)	echo "$cmd: no whitespace in lock names! (\"$lock\")" >&2
+		badopts=1
+		;;
+esac
 
 [ $# = 0 ] || { echo "$cmd: extra arguments: $* ">&2
 		abdopts=1
@@ -81,23 +92,30 @@ cdtoc "$dev" \
       ripcomment="Ripped by $NAME with cdparanoia and oggenc on `date`"
       if (set -x; cdparanoia -q -d "$dev" -e -r "$track" "$raw" 2>cdp.err)
       then
-	  [ -n "$encpid" ] && kill -0 "$encpid" 2>/dev/null && { echo; echo "waiting for previous encoder ..."; }
-	  wait
+	  if [ -z "$lock" ]
+	  then
+	      [ -n "$encpid" ] && kill -0 "$encpid" 2>/dev/null \
+		&& { echo; echo "waiting for previous encoder ..."; }
+	      wait
+	  fi
 
-	  ( if case $enc in
+	  ( dolock=
+	    [ -n "$lock" ] && dolock="lock $lock"
+
+	    if case $enc in
 		ogg)
-		  ( set -x; exec oggenc -r -b $bps \
+		  ( set -x; exec $dolock oggenc -r -b $bps \
 			 -c "$ripcomment" -a "$artist" -N "$track" -t "$title" -l "$album" \
 			 -o "$out" "$raw"
 		  )
 		  ;;
 		mp3)
-		  ( set -x; exec lame -r -b "$bps" -h -p "$raw" "$out" )
+		  ( set -x; exec $dolock lame -r -b "$bps" -h -p "$raw" "$out" )
 		  ;;
 	      esac
 	    then rm "$raw"
 	    else echo "Encode of \"$raw\" fails." >&2
-		 rm "$out"; exit 1
+		 rm -f "$out"; exit 1
 	    fi
 	  ) &
 	  encpid=$!
@@ -108,7 +126,7 @@ cdtoc "$dev" \
       fi
     done
 
-    wait
+    [ -z "$lock" ] && wait
 
     exit $xit
   )
