@@ -4,6 +4,8 @@
 #	- Cameron Simpson <cs@zip.com.au> 24aug96
 #
 
+: ${TMPDIR:=/tmp}
+
 cmd=`basename "$0"`
 usage="Usage: $cmd [-r] [dir]"
 
@@ -52,7 +54,7 @@ do
 	then
 	    echo "$moddir already exists" >&2
 	else
-	    tmpdir=/tmp/cvsdir.$$
+	    tmpdir=$TMPDIR/cvsdir.$$
 	    if (  mkdir $tmpdir \
 	       && cd $tmpdir \
 	       && cvs import -m '' "$module" "$USER" Initial \
