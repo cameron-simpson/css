@@ -1,0 +1,57 @@
+#!/bin/sh
+#
+# Run a new shell inside a script command, logging to the file
+#	$HOME/var/log/build/pkg-arch-host-date.gz
+# Too often was I building things and losing the details.
+#	- Cameron Simpson <cs@zip.com.au> 28aug2000
+#
+
+cmd=`basename "$0"`
+usage="Usage: $cmd [-o logfile] pkgdir"
+
+logdir=$HOME/var/log/build
+logfile=
+
+badopts=
+
+case $1 in
+    -o)	logfile=$2; shift; shift ;;
+esac
+
+if [ $# = 0 ]
+then
+    echo "$cmd: missing pkgdir" >&2; badopts=1
+else
+    pkgdir=$1; shift
+fi
+
+[ $# = 0 ] || { echo "$cmd: extra arguments: $*" >&2; badopts=1; }
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+cd "$pkgdir" || { echo "$cmd: chdir($pkgdir) fails" >&2; exit 1; }
+
+cwd=`pwd` || exit 1
+pkg=`basename "$cwd"`
+
+[ -n "$logfile" ] || logfile=$logdir/$pkg-$ARCH-$HOST-`datecode`
+
+dl=`echo "$logfile"|entilde`
+case "$dl" in
+    \~/var/log/*)	dl=`expr "x$dl" : 'x~/var/log//*\(.*\)'` ;;
+esac
+dlog "commence $dl"
+
+{ echo
+  echo "Build in $cwd"
+  echo "$HOST@$SYSTEMID - `uname -a`"
+  date
+  echo
+} >>"$logfile"
+
+umask 2
+buildenv env ps1pfx=":$ps1pfx" ps2pfx=" $ps2pfx" script -a "$logfile"
+
+dlog "complete $dl"
+
+time gzip -v -9 "$logfile" &
