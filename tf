@@ -7,17 +7,26 @@
 : ${VARLOG:=$HOME/var/log}
 
 cmd=$0
-usage="Usage: $cmd logfile"
+usage="Usage: $cmd logfile..."
 
-[ $# = 1 ] || { echo "$usage" >&2; exit 2; }
-log=$1; shift
+[ $# = 0 ] && { echo "$usage" >&2; exit 2; }
 
-case "$log" in
-  /* | ./* | ../* ) ;;
-  *) log=$VARLOG/$log ;;
-esac
+xit=0
 
-[ -f "$log" ] || { echo "$cmd: not a file: $log" >&2; exit 1; }
+for log
+do
+  case "$log" in
+    /* | ./* | ../* ) ;;
+    *) log=$VARLOG/$log ;;
+  esac
 
-logname=`echo "$log" | entilde`
-exec term -n "TAIL $logname" -e tail -f "$log"
+  [ -f "$log" ] || { echo "$cmd: not a file: $log" >&2
+		     xit=1
+		     continue
+		   }
+
+  logname=`echo "$log" | entilde`
+  term -n "TAIL $logname" -e tail -f "$log" || xit=1
+done
+
+exit $xit
