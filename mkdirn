@@ -20,7 +20,7 @@ maxtries=20
 pfx=$1
 case "$pfx" in
   *[0-9]) pfx=$pfx- ;;
-  */)	  needdir "$pfx" || exit 1 ;;
+  */)	  [ -d "$pfx/." ] || needdir "$pfx" || exit 1 ;;
 esac
 
 up=`dirname "$pfx"`
