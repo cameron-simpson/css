@@ -1,2 +1,52 @@
 #!/bin/sh
-exec $HOME/OpenOffice/soffice ${1+"$@"} &
+#
+# Wrapper for OpenOffice to do the "workstation" install at need.
+#	- Cameron Simpson <cs@zip.com.au> 08oct2003
+#
+
+PATH=/opt/j2sdk-sun/bin:$PATH
+export PATH
+
+soinst=/opt/openoffice
+
+oobase=${OPENOFFICE:-$HOME/OpenOffice}
+
+vrc=$HOME/.sversionrc
+if [ -s "$vrc" ]
+then
+    oodir=`winclause "$vrc" Versions | tr -d '\015' | sed -n 's;OpenOffice.org[^=]*=file://\(/.*\);\1;p' | tail -1`
+    [ -n "$oodir" ] && [ -d "$oodir/." ] && oobase=$oodir
+fi
+
+if [ ! -d "$oobase/." ]
+then
+    echo "No $oobase directory!"
+    echo
+    echo "I'm assuming you haven't run OpenOffice before."
+    echo "If you have, and I'm looking for the wrong directory,"
+    echo "set the \$OPENOFFICE environment variable to the full pathname"
+    echo "of your OpenOffice directory and try again."
+    echo
+    echo "Otherwise, you should proceed with a \"Workstation\" setup."
+    echo
+
+    ask "Run OpenOffice setup" || exit 0
+
+    ( cd "$soinst/program" || exit 1
+      exec ./setup
+    ) || { echo "$soinst/program/setup fails" >&2; exit 1; }
+
+    if [ -s "$vrc" ]
+    then
+	oodir=`winclause "$vrc" Versions | sed -n 's;OpenOffice.org[^=]*=file://\(/.*\);\1;p' | tail -1`
+	[ -n "$oodir" ] && [ -d "$oodir/." ] && oobase=$oodir
+    fi
+
+    [ -d "$oobase/." ] \
+    ||  { echo "$soinst/program/setup worked, but still no $oobase, aborting" >&2
+	  exit 1
+	}
+fi
+
+set -x
+exec "$oobase/soffice" ${1+"$@"} &
