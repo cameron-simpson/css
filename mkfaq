@@ -1,0 +1,52 @@
+#!/bin/sh
+#
+# Build an HTML FAQ from pieces.
+#	- Cameron Simpson <cs@zip.com.au> 29jun98
+#
+
+open=
+
+index=index.html
+(
+  [ -n "$*" ] && echo "<TITLE>$*</TITLE>"
+  [ -s banner.txt ] && ( echo '<PRE>'; cat banner.txt; echo '</PRE>' )
+) >"$index"
+
+echo '<UL>' >>"$index"
+
+ls \
+| sort -n -t. +0 +1 -d +2 \
+| sed -n 's/^\([1-9][0-9]*\)\.\([0-9][0-9]*\)/\1 \2 /p' \
+| while read part subpart sfx
+  do
+      file=$part.$subpart$sfx
+
+      echo "$file..." >&2
+
+      if [ "x$open" != "x$part" ]
+      then
+	  # new section
+	  open=$part
+	  openbase=part$part
+	  openhtml=$openbase.html
+
+	  exec >"$openhtml"
+	  if [ -s banner.txt ]
+	  then  echo '<PRE>'
+		cat banner.txt
+		echo '</PRE>'
+	  fi
+      fi
+
+      ( read title || exit $?
+	echo "    <LI><TT><A HREF=\"$openhtml#$part.$subpart\">$part.$subpart</A> -</TT> $title" >>"$index"
+	echo "<H1><A NAME=\"$part.$subpart\">$part.$subpart $title</A></H1>"
+	sed 's/^$/<P>/
+	     s/<\([a-z][a-z][a-z][a-z]*:[^@> ]*\)  *\([^>]*[^> ]\)>/<BLOCKQUOTE><A HREF="\1">\2<BR><TT>\1<\/TT><\/A><\/BLOCKQUOTE>/g
+	     s/<\([^@> ][^@> ]*@[^@> ][^@> ]*\)>/\&lt;<A HREF="mailto:\1">\1<\/A>\&gt;/g
+	     s/ \& / \&amp; /g
+	    '
+      ) <"$file"
+  done
+
+echo '</UL>' >>"$index"
