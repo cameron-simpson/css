@@ -1,0 +1,16 @@
+#!/bin/sh
+#
+# Overlay the contents of one directory on another.
+#	- Cameron Simpson <cs@zip.com.au> 07feb2003
+#
+
+cmd=$0
+usage="Usage: $cmd srcdir destdir"
+
+[ $# = 2 ] || { echo "$usage" >&2; exit 2; }
+src=$1 dest=$2
+
+dest=`cd "$dest" || exit 1; pwd` || exit 1
+
+cd "$src" || exit 1
+find . -type f -print | xxargs mrg -rp "$dest/."
