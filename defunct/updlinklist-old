@@ -1,0 +1,63 @@
+#!/usr/bin/perl
+#
+# Read URLs and titles from stdin and update a state file.
+# Emit new URLs and titles on stdout.
+#	- Cameron Simpson <cs@zip.com.au> 25sep2000
+#
+
+use strict vars;
+
+use cs::Misc;
+use cs::Date;
+use cs::Source;
+use cs::Sink;
+
+my $nowrite=0;
+if (@ARGV && $ARGV[0] eq '-n')
+{ $nowrite=1; shift(@ARGV);
+}
+
+if (@ARGV != 1)
+{ if (@ARGV < 1)	{ warn "$::cmd: missing statefile\n"; }
+  else			{ warn "$::cmd: extra arguments: @ARGV[1..$#ARGV]\n"; }
+
+  die "Usage: $::cmd [-n] statefile < urls >new-urls\n";
+}
+
+my $old = shift(@ARGV);
+
+my $daytag = cs::Date::gmt2yyyymmdd(time,1,1);
+
+# load state file
+die "open($old): $!" if ! open(OLD,"< $old\0");
+my %old;
+my @F;
+while (defined ($_=<OLD>))
+{ chomp;
+ @F=split(/\t/,$_,2);		# daytag url
+ @F=($daytag,@F) if @F < 2;	# legacy
+ $old{$F[1]}=$F[0];		# url -> daytag
+}
+close(OLD);
+
+# load new URLs
+while (defined ($_=<STDIN>))
+{ chomp;
+ @F=split(/\s/,$_,2);		# url title
+ print "$_\n" if ! exists $old{$F[0]};
+ $old{$F[0]}=$daytag;		# update tag
+
+}
+
+# rewrite state file
+if (! $nowrite)
+{
+  my @urls = sort { my $cmp = ($old{$a} cmp $old{$b});
+		    $cmp == 0 ? $a cmp $b : $cmp;
+		  } keys %old;
+  die "open($old,W): $!" if ! open(OLD,"> $old\0");
+  for my $url (@urls)
+  { print OLD "$old{$url}\t$url\n";
+  }
+  close(OLD);
+}
