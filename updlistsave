@@ -1,0 +1,16 @@
+#!/bin/sh
+#
+# Stand in ~listsave.
+# Run output through sh to update files.
+#	- Cameron Simpson <cs@zip.com.au> 17dec97
+#
+
+ypcat -k aliases \
+    | sed -n 's/^\([^ ]*\)-save .*/\1/p' \
+    | while read list
+      do  qmfile=.qmail-$list
+	  [ -s "$qmfile" ] && continue
+	  echo "echo ./Lists/$list >$qmfile
+		chmod 644 $qmfile
+		chown listsave:listsave $qmfile"
+      done
