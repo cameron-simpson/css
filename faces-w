@@ -13,9 +13,13 @@ while (<STDIN>)
 {
   next W if $. < 3;
   chomp;
-  ($user,$tty,$host,$login,$idle,$jcpu,$pcpu,$what)=split(/\s+/,$_);
+
+  @f=unpack("A9A9A16A7A7A7A8A*",$_);
+  for (@f) { s/^\s+//; s/\s+$//; }
+  ($user,$tty,$host,$login,$idle,$jcpu,$pcpu,$what)=@f;
 
   $idle=idle2s($idle);
+  $what =~ s/\s.*//;
   $what =~ s:.*/::;
 
   if ($host eq '-')
