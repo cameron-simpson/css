@@ -53,7 +53,7 @@ fi
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
 if [ -n "$fmlog" ]; then logfilemail=$fmlog
-		    else logfilemail=`logpath filemail`
+		    else logfilemail=$LOGDIR/filemail
 fi
 
 xit=0
