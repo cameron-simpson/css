@@ -59,7 +59,7 @@ case "$cmd" in
 	export PATH LD_PATH LD_RUN_PATH LD_LIBRARY_PATH MANPATH INCPATH
 	;;
    gnu)
-	for base in /usr/local/gnu /usr/gnu /opt/gnu /usr /
+	for base in /opt/gnu /usr /
 	do  bin=$base/bin lib=$base/lib inc=$base/include
 	    [ -d "$bin/." ] || continue
 	    PATH=$bin:$PATH
