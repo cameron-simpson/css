@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 #
 # Update an image db.
-#	- Cameron Simpson <cs@zip.com.au> 13apr99
+#	- Cameron Simpson <cs@zip.com.au> 13apr1999
 #
 
 use cs::Misc;
@@ -40,18 +40,18 @@ undef $imdb;
 exit $::Xit;
 
 sub update($$)
-	{ my($imdb,$imfile)=@_;
+{ my($imdb,$imfile)=@_;
 
-	  $imfile =~ s:^(\./+)+::;
+  $imfile =~ s:^(\./+)+::;
 
-	  my $I;
+  my $I;
 
-	  if (defined ($I=$imdb->ByPath($imfile)))
-	  {}
-	  elsif (! defined ($I=$imdb->AddFile($imfile)))
-	  { warn "$::cmd: can't add $imfile\n";
-	    return 0;
-	  }
+  if (defined ($I=$imdb->ByPath($imfile)))
+  {}
+  elsif (! defined ($I=$imdb->AddFile($imfile)))
+  { warn "$::cmd: can't add $imfile\n";
+    return 0;
+  }
 
-	  1;
-	}
+  1;
+}
