@@ -76,5 +76,6 @@ then  addcmd="$addcmd >>\"\$param\""
 else  addcmd="$addcmd  >\"\$param\""
 fi
 
+##con echo "lastvalue $param=$value"
 export param value
 exec lock "lastvalue_$param" sh -c "$addcmd"
