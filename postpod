@@ -1,0 +1,13 @@
+#!/bin/sed -f
+#
+# Postprocess POD data, clean-up pass after prepod.
+#	- Cameron Simpson <cs@zip.com.au> 10apr2004
+#
+
+# Link to main index.
+/^<body[ >]/a\
+<a href="./">&lt;= back to main index<p>
+
+# Relative HREFs:
+# we made L<./foo> into L<http://./foo> in prepod. Clean up now:
+s|<a href="http://\./\([^"]*\)">http://\.[^<]*/\([^<]*\)</a>|<code><a href="\1">\2</a></code>|g
