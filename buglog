@@ -6,7 +6,7 @@
 #
 # =head1 SYNOPSIS
 #
-# buglog headline < description
+# buglog [-B bugsystem] headline < description
 #
 # =head1 DESCRIPTION
 #
@@ -20,7 +20,15 @@
 : ${BUGSYSTEMS:=`bugsystems`}
 
 cmd=`basename "$0"`
-usage="Usage: $cmd headline < description"
+usage="Usage: $cmd [-B bugsystems] headline < description"
+
+# =head1 OPTIONS
+#
+# =over 4
+#
+# =back
+#
+[ "x$1" = x-B ] && { BUGSYSTEMS=$2; export BUGSYSTEMS; shift; shift; }
 
 [ $# = 1 ] || { echo "$usage" >&2; exit 2; }
 headline=$1; shift
