@@ -1,0 +1,82 @@
+#!/usr/bin/perl
+#
+# Read fromaddrs and X-Face: data from stdin and save in face directory.
+#	- Cameron Simpson <cs@zip.com.au>, 14jul94
+#
+
+$STASHDIR=(defined($ENV{X_FACE_DIR}) ? $ENV{X_FACE_DIR}
+				     : "$ENV{HOME}/.faces");
+
+($cmd=$0) =~ s:.*/::;
+$usage="Usage: $cmd [-d xfacedir]
+	-d xfacedir	Directory to stored faces.
+			Default: $STASHDIR.
+";
+
+if ($#ARGV >= $[ && $ARGV[$[] eq '-d')
+	{ shift;
+	  $STASHDIR=shift;
+	}
+
+chdir($STASHDIR) || die "$cmd: can't chdir($STASHDIR): $!\n";
+
+$xit=0;
+
+FACE:
+  while (<STDIN>)
+	{ next FACE unless ($fromaddr,$x_face)=/^\s*(\S+)\s+(.+)/;
+	  ($user,$host)=($fromaddr =~ /(.+)@(.+)/);
+	  $host =~ tr/A-Z/a-z/;
+	  print STDERR "stashing $user\@$host: $x_face\n";
+	  @dom=reverse(grep(length,split(/\.+/,$host)));
+	  push(@dom,$user);
+
+	  # ensure the directory exists
+	  $dir=$STASHDIR;
+	  MKDIR:
+	    while (1)
+		{ # print STDERR "-d $dir\n";
+		  if (-d $dir || mkdir($dir,0777))
+			{ last MKDIR unless @dom;
+			  $dir.='/'.shift(@dom);
+			  next MKDIR;
+			}
+
+		  print STDERR "$cmd: $fromaddr: can't mkdir($dir): $!\n";
+		  print STDERR "$cmd: $fromaddr: face for $fromaddr not saved\n";
+		  $xit=1;
+		  last FACE;
+		}
+
+	  $face="$dir/48x48x1";
+	  if (!open(STDOUT,"> $face\0"))
+		{ print STDERR "$cmd: $fromaddr: can't write to $face: $!\n";
+		  $xit=1;
+		  next FACE;
+		}
+
+	  $ok=1;
+	  if (!open(UNCOMPFACE,"|uncompface"))
+		{ print STDERR "$cmd: $fromaddr: can't pipe to uncompface: $!\n";
+		  $ok=0;
+		}
+	  else
+	  { print UNCOMPFACE ' ', $x_face, "\n";
+	    close(UNCOMPFACE);
+	    if ($? != 0)
+		{ print STDERR "$cmd: $fromaddr: uncompface fails, exit code $?\n";
+		  $ok=0;
+		}
+	  }
+
+	  close(STDOUT);
+
+	  if (!$ok)
+		{ $xit=1;
+		  if (!unlink($face))
+			{ print STDERR "$cmd: $fromaddr: warning: unlink($face): $!\n";
+			}
+		}
+	}
+
+exit $xit;
