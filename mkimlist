@@ -9,6 +9,7 @@ justprint=
 
 set \
   find . \
+    -follow \
     \( -type d ! -name . -name '.*' -prune \) \
  -o \( -type f -size +0 \
 	\( -name \*.png -o -name \*.jpg \) \
