@@ -39,101 +39,109 @@ sub selAddSource
   my($type)=$s->{TYPE};
 
   if (! ($s->{FLAGS}&$cs::IO::F_ASYNC))
-	{ my(@c)=caller;
-	  die "not an asynchronous cs::Source [".cs::Hier::h2a($s)."] from [@c]";
-	}
+  { my(@c)=caller;
+    die "not an asynchronous cs::Source [".cs::Hier::h2a($s)."] from [@c]";
+  }
 
   if ($type eq FILE)
-	{ $cs::IO::_Selection->add($s->{IO});
-	  $cs::IO::_SourceSelection{$s->{IO}->fileno()}=$s;
-	}
-  else	{ $cs::IO::_SourceTable{"$s"}=$s;
+  { $cs::IO::_Selection->add($s->{IO});
+    $cs::IO::_SourceSelection{$s->{IO}->fileno()}=$s;
+  }
+  else
+  { $cs::IO::_SourceTable{"$s"}=$s;
+  }
+}
+
+sub selAddSink
+{ die "selAddSink(@_)" if ! $cs::IO::_UseIO;
+
+  my($s)=@_;
+  my($type)=$s->{TYPE};
+
+  if (! ($s->{FLAGS}&$cs::IO::F_ASYNC))
+  { my(@c)=caller;
+    die "not an asynchronous cs::Sink [".cs::Hier::h2a($s,0)."] from [@c]";
+  }
+
+  if ($type eq FILE)
+  { $cs::IO::_Selection->add($s->{IO});
+    $cs::IO::_SinkSelection{$s->{IO}->fileno()}=$s;
+  }
+  else	{ $cs::IO::_SinkTable{"$s"}=$s;
 	}
 }
-sub selAddSink
-	{ die "selAddSink(@_)" if ! $cs::IO::_UseIO;
 
-	  my($s)=@_;
-	  my($type)=$s->{TYPE};
-
-	  if (! ($s->{FLAGS}&$cs::IO::F_ASYNC))
-		{ my(@c)=caller;
-		  die "not an asynchronous cs::Sink [".cs::Hier::h2a($s,0)."] from [@c]";
-		}
-
-	  if ($type eq FILE)
-		{ $cs::IO::_Selection->add($s->{IO});
-		  $cs::IO::_SinkSelection{$s->{IO}->fileno()}=$s;
-		}
-	  else	{ $cs::IO::_SinkTable{"$s"}=$s;
-		}
-	}
 sub selDelSource
-	{ die "selDelSource(@_)" if ! $cs::IO::_UseIO;
+{ die "selDelSource(@_)" if ! $cs::IO::_UseIO;
 
-	  my($s)=@_;
-	  my($type)=$s->{TYPE};
+  my($s)=@_;
+  my($type)=$s->{TYPE};
 
-	  if ($type eq FILE)
-		{ $cs::IO::_Selection->remove($s->{IO});
-	  	  delete $cs::IO::_SourceSelection{$s->{IO}->fileno()};
-		}
-	  else	{ delete $cs::IO::_SourceTable{"$s"};
-		}
-	}
+  if ($type eq FILE)
+  { $cs::IO::_Selection->remove($s->{IO});
+    delete $cs::IO::_SourceSelection{$s->{IO}->fileno()};
+  }
+  else
+  { delete $cs::IO::_SourceTable{"$s"};
+  }
+}
+
 sub selDelSink
-	{ die "selDelSink(@_)" if ! $cs::IO::_UseIO;
+{ die "selDelSink(@_)" if ! $cs::IO::_UseIO;
 
-	  my($s)=@_;
-	  my($type)=$s->{TYPE};
+  my($s)=@_;
+  my($type)=$s->{TYPE};
 
-	  if ($type eq FILE)
-		{ $cs::IO::_Selection->remove($s->{IO});
-	  	  delete $cs::IO::_SinkSelection{$s->{IO}->fileno()};
-		}
-	  else	{ delete $cs::IO::_SinkTable{"$s"};
-		}
-	}
+  if ($type eq FILE)
+  { $cs::IO::_Selection->remove($s->{IO});
+    delete $cs::IO::_SinkSelection{$s->{IO}->fileno()};
+  }
+  else
+  { delete $cs::IO::_SinkTable{"$s"};
+  }
+}
+
 sub poll
-	{ die "poll(@_)" if ! $cs::IO::_UseIO;
+{ die "poll(@_)" if ! $cs::IO::_UseIO;
 
-	  my($rd,$wr)=([],[]);
-	  my($didio)=0;
-	  my(@f,$s);
+  my($rd,$wr)=([],[]);
+  my($didio)=0;
+  my(@f,$s);
 
-	  print STDERR "poll ...\n";
-	  # collect waiting data
-	  @f=keys %cs::IO::_SourceSelection;
-	  if (@f)
-		{ for ($cs::IO::_Selection->can_read(@f))
-			{ $s=$cs::IO::_SourceSelection->{$_};
-			  push(@$rd,$s);
-			  $s->PollIn() && $didio++;
-			}
-		}
+  print STDERR "poll ...\n";
 
-	  @f=keys %cs::IO::_SourceTable;
-	  if (@f)
-		{ for (@f)
-			{ if ($cs::IO::_SourceTable{$_}->HasData())
-				{ $cs::IO::_SourceTable{$_}->PollIn()
-				}
-			}
-		}
+  # collect waiting data
+  @f=keys %cs::IO::_SourceSelection;
+  if (@f)
+  { for ($cs::IO::_Selection->can_read(@f))
+    { $s=$cs::IO::_SourceSelection->{$_};
+      push(@$rd,$s);
+      $s->PollIn() && $didio++;
+    }
+  }
 
-	  # dispatch pending data
-	  @f=keys %cs::IO::_SinkSelection;
-	  if (@f)
-		{ for ($cs::IO::_Selection->can_write(@f))
-			{ $s=$cs::IO::_SinkSelection->{$_};
-			  push(@$wr,$s);
-			  $s->PollOut() && $didio++;
-			}
-		}
+  @f=keys %cs::IO::_SourceTable;
+  if (@f)
+  { for (@f)
+    { if ($cs::IO::_SourceTable{$_}->HasData())
+      { $cs::IO::_SourceTable{$_}->PollIn()
+      }
+    }
+  }
 
-	  # return lists or total active
-	  wantarray ? ($rd,$wr) : $didio;
-	}
+  # dispatch pending data
+  @f=keys %cs::IO::_SinkSelection;
+  if (@f)
+  { for ($cs::IO::_Selection->can_write(@f))
+    { $s=$cs::IO::_SinkSelection->{$_};
+      push(@$wr,$s);
+      $s->PollOut() && $didio++;
+    }
+  }
+
+  # return lists or total active
+  wantarray ? ($rd,$wr) : $didio;
+}
 
 undef %cs::IO::_DirPrefs;
 
@@ -142,6 +150,11 @@ undef %cs::IO::_DirPrefs;
 			     EXT	=> 'Z',
 			     TO		=> 'compress',
 			     FROM	=> 'uncompress',
+			   },
+		  'bz2'	=> { TYPE	=> COMPRESS,
+			     EXT	=> 'bz2',
+			     TO		=> 'bzip2 -9',
+			     FROM	=> 'bunzip2',
 			   },
 		  'gz'	=> { TYPE	=> COMPRESS,
 			     EXT	=> 'gz',
@@ -179,46 +192,46 @@ sub choose	# (filename,prefs) -> (chosen-name,filters[ordered])
   my(@filters);
 
   if (-e $basefile && ! -d $basefile)
-	{ $match=$basefile;
-	  @filters=();
-	}
+  { $match=$basefile;
+    @filters=();
+  }
   else
   # look for shortest basefile(.ext)+
   # where every ext is a known filter
   { my(@matches)=<$basefile.*>;
-    my($m);
     local($_);
 
     MATCH:
-      for $m (sort
-		{ length($a) <=> length ($b) } # fewest filters hack
-		@matches)
-	{ $_=$m;
-	  $_=substr($_,$[+length($basefile));
+    for my $m (sort
+	      { length($a) <=> length ($b) } # fewest filters hack
+	      @matches)
+    { $_=$m;
+      $_=substr($_,$[+length($basefile));
 
-	  next MATCH unless /^\./ && ! /\.$/;
+      next MATCH unless /^\./ && ! /\.$/;
 
-	  @filters=();
+      @filters=();
 
-	  TOKEN:
-	    while (/^(\.+|[^.]+)/)
-		{ if ($& eq '.')
-			{
-			}
-		  elsif (! defined $cs::IO::_Filter{$&})
-			{ next MATCH;
-			}
-		  else	{ push(@filters,$&);
-			}
+      TOKEN:
+	while (/^(\.+|[^.]+)/)
+	{ if ($& eq '.')
+	  {
+	  }
+	  elsif (! defined $cs::IO::_Filter{$&})
+	  { next MATCH;
+	  }
+	  else
+	  { push(@filters,$&);
+	  }
 
-		  $_=$';
-		}
-
-	  if (! length)
-		{ $match=$m;
-		  last MATCH;
-		}
+	  $_=$';
 	}
+
+      if (! length)
+      { $match=$m;
+	last MATCH;
+      }
+    }
   }
 
   if (defined $match)
