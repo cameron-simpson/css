@@ -4,30 +4,48 @@
 #	- Cameron Simpson <cs@zip.com.au> 04aug2000
 #
 
+cmd=$0
+
 LINKPAGEPATH=${LINKPAGEPATH:-$HOME/.linkpages}
 export LINKPAGEPATH
 
 verbose=
 [ -t 0 ] && verbose=1
 
-usage="Usage: $0 [-d dir] topic [urls...]"
+usage="Usage: $cmd [-d dir] [topic] [urls...]"
+
+badopts=
 
 [ "x$1" = x-d ] && { LINKPAGEPATH=$2; shift; shift
 		     export LINKPAGEPATH
 		   }
 
-[ $# = 0 ] && { echo "$0: missing topic" >&2
-		echo "$usage" >&2
-		exit 2
+topic=
+case $1 in
+    ''|*://*)	topic=$LINKPAGETOPIC ;; # URL - take default topic
+    *)		topic=$1; shift ;;
+esac
+
+if [ -z "$topic" ]
+then
+    echo "$cmd: missing topic and no \$LINKPAGETOPIC envvar" >&2
+    badopts=1
+fi
+
+if [ $# = 0 ]
+then [ -n "$DISPLAY" ] && { set x `xunclip`; shift; }
+fi
+[ $# = 0 ] && { echo "$cmd: no URLs and no X clipboard" >&2
+		badopts=1
 	      }
-topic=$1
-shift
 
 case "$topic" in
-    */*)	echo "$0: bad topic \"$topic\"" >&2
-		exit 2
+    */*)	echo "$cmd: bad topic \"$topic\"" >&2
+		badopts=1
 		;;
 esac
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
 
 topicfile=
 for dir in `unpath "$LINKPAGEPATH"`
@@ -38,7 +56,7 @@ do  for subdir in urls/ ''
     [ -f "$topicfile" ] && break
 done
 
-[ -f "$topicfile" ]  || { echo "$0: can't find topic \"$topic\" in \$LINKPAGEPATH" >&2
+[ -f "$topicfile" ]  || { echo "$cmd: can't find topic \"$topic\" in \$LINKPAGEPATH" >&2
 			  exit 1
 			}
 
