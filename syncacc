@@ -49,6 +49,7 @@ exec \
 	'--exclude=/man/*' \
 	'--include=/rc' \
 	'--include=/rc/@' \
+	'--include=/rc/bookmarks.html' \
 	'--include=/rc/cvs' \
 	'--include=/rc/env' \
 	'--include=/rc/getnews' \
@@ -75,6 +76,7 @@ exec \
 	'--include=/rc/rterm.ini' \
 	'--include=/rc/screen' \
 	'--include=/rc/secret' \
+	'--include=/rc/secret-gpg' \
 	'--include=/rc/secret/keys' \
 	'--exclude=/rc/secret/keys/keys.gpg' \
 	'--exclude=/rc/secret/keys/*' \
