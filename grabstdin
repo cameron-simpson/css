@@ -5,9 +5,11 @@
 #	- Cameron Simpson <cs@zip.com.au> 16sep98
 #
 
+: ${TMPDIR:=/tmp}
+
 cons=$CONSOLE
 
-tmp=/tmp/grabstdin.$$
+tmp=$TMPDIR/grabstdin.$$
 
 cat >"$tmp" || { rm -f "$tmp" 2>/dev/null; exit 1; }
 
