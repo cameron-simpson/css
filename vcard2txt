@@ -19,10 +19,14 @@
     n=$vcard_fn
     [ -n "$vcard_email_internet" ] && n="$n <$vcard_email_internet>"
     echo "$n"
-    echo ${vcard_org:+"Organisation: $vcard_org"}
-    echo ${vcard_tel_cell:+"Ph (Cell): $vcard_tel_cell"}
-    echo ${vcard_tel_work:+"Ph (Work): $vcard_tel_work"}
-    echo ${vcard_tel_home:+"Ph (Home): $vcard_tel_home"}
-    echo ${vcard_tel_fax:+"Ph (Fax):  $vcard_tel_fax"}
+    echo ${vcard_org:+      "Organisation: $vcard_org"}
+    echo ${vcard_title:+    "Title:      $vcard_title"}
+    echo ${vcard_adr:+      "Address:    $vcard_title"}
+    echo ${vcard_url:+      "URL:        $vcard_url"}
+    echo ${vcard_tel_cell:+ "Ph (Cell):  $vcard_tel_cell"}
+    echo ${vcard_tel_work:+ "Ph (Work):  $vcard_tel_work"}
+    echo ${vcard_tel_home:+ "Ph (Home):  $vcard_tel_home"}
+    echo ${vcard_tel_fax:+  "Ph (Fax):   $vcard_tel_fax"}
+    echo ${vcard_tel_pager:+"Ph (pager): $vcard_tel_pager"}
   ) \
 | sed '/^ *$/d'
