@@ -68,10 +68,12 @@ then
 		  }
     hx=`expr $bgx / 2` || exit 1
     bg1=`mkwall +a -c "$cacheroot" -g "${hx}x${bgy}" "$1"` || exit 1
+
     if [ "x$1" = "x$2" ]
     then  bg2=$bg1
     else  bg2=`mkwall +a -c "$cacheroot" -g "${hx}x${bgy}" "$2"` || exit 1
     fi
+
     tmpf=$TMPDIR/$cmd$$.png
     # +label
     gm montage \
@@ -102,6 +104,9 @@ case "$imagefile" in
     # and so we want space saving instead of minimum decompress cost
     gm convert "$imagefile" "png:$tmpf" || exit 1
     imagefile=$tmpf
+    ;;
+  http://* | ftp://* )
+    imagefile=`withurl -C "$imagefile" echo` || exit 1
     ;;
 esac
 
