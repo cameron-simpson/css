@@ -1,0 +1,51 @@
+#!/bin/sh
+#
+# Return the mailcap action for the supplied MIME type.
+#	- Cameron Simpson <cs@zip.com.au> 14nov2002
+#
+
+copious=1
+action=1
+
+cmd=$0
+usage="Usage: $cmd [-a] [+a] [-c] [+c] type
+	-a	Just print the action portion of the mailcap entry (default).
+	+a	Print the whole mailcap entry.
+	-c	Select the \"copiusoutput\" mailcap entry (default).
+	+c	Avoid the \"copiusoutput\" mailcap entry."
+
+badopts=
+
+while :
+do  case $1 in
+      -a)	action=1 ;;
+      +a)	action= ;;
+      -c)	copious=1 ;;
+      +c)	copious= ;;
+      --)	shift; break ;;
+      -?*)	echo "$cmd: unrecognised option: $1" >&2; badopts=1 ;;
+      *)	break ;;
+    esac
+    shift
+done
+
+if [ $# = 0 ]
+then
+  echo "$cmd: missing mime type" >&2; badopts=1
+else
+  mtype=$1; shift
+  [ $# = 0 ] || { echo "$cmd: extra arguments: $*" >&2; badopts=1; }
+fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+if [ $copious ]
+then  match=`grep "^$mtype"' *;.*; *copiousoutput *$' <$HOME/.mailcap | sed 1q`
+else  match=`grep "^$mtype"' *;' <$HOME/.mailcap | grep -v '.*; *copiousoutput *$' | sed 1q`
+fi
+
+[ -n "$match" ] || exit 1
+
+[ $action ] || { echo "$match"; exit 0; }
+
+echo "$match" | sed -e 's/^[^;]*; *//' -e 's/ *;[^;]*$//'
