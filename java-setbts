@@ -23,7 +23,7 @@ do
   ( set bsed "s#\"[^\"]*\";\\([ 	]*// $tag\\)\$#\"$now\";\\1#"
     if ifcvs "$file"
     then
-	exec cvsedit --no-dl --no-diff -m "" "$file" "$@"
+	exec cvsedit --no-log --no-diff -m "" "$file" "$@"
     else
 	exec "$@" "$file"
     fi
