@@ -24,13 +24,7 @@ case "$TERM" in
 	;;
 esac
 
-case "$HOST@$SYSTEMID" in
-  amadeus@home)	set -x
-		exec /opt/mutt-1.5.5.1/bin/mutt ${1+"$@"}
-		;;
-esac
-
-for mutt in /opt/mutt-1.5.5.1-nntp.vvv/bin/mutt /opt/mutt-1.4i-patched/bin/mutt /opt/mutt-cvs/bin/mutt /opt/mutt/bin/mutt /usr/bin/mutt
+for mutt in /opt/mutt-1.5.6i-headercache-fc2/bin/mutt /opt/mutt-1.5.6i-headercache-rh9/bin/mutt /opt/mutt-1.5.5.1-nntp.vvv/bin/mutt /opt/mutt-1.4i-patched/bin/mutt /opt/mutt-cvs/bin/mutt /opt/mutt/bin/mutt /usr/bin/mutt
 do  [ -f "$mutt" ] && { set -x; exec "$mutt" ${1+"$@"}; }
 done
 
