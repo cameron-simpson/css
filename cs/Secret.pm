@@ -12,7 +12,7 @@ use cs::Persist;
 package cs::Secret;
 
 $cs::Secret::DBpath = "$ENV{HOME}/private/secret/db";
-[ -s $cs::Secret::DBpath ] || ($cs::Secret::DBpath = "$ENV{HOME}/.secret");
+[ -e $cs::Secret::DBpath ] || ($cs::Secret::DBpath = "$ENV{HOME}/.secret");
 
 sub _db()
 { if (! defined $cs::Secret::_db)
