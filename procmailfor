@@ -1,0 +1,36 @@
+#!/bin/sh
+#
+# Insert a header line to indicate the source mailbox then hand to procmail.
+#	- Cameron Simpson <cs@zip.com.au> 01aug2002
+#
+
+cmd=`basename "$0"`
+usage="Usage: $cmd src-mbox-name [{-e mda [mda-args...] | procmail-args...}]"
+
+badopts=
+
+if [ $# = 0 ]
+then
+    echo "$cmd: missing src-mbox-name" >&2
+    badopts=1
+else
+    srcmbox=$1; shift
+    if [ "x$1" = x-e ]
+    then
+	shift
+    else
+	set procmail ${1+"$@"}
+    fi
+fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+tmpf=/tmp/$cmd$$
+
+formail -f -i "Fetchmail-Source-Mailbox: $srcmbox" >"$tmpf" \
+	|| { rm -f "$tmpf"; exit 1; }
+
+exec <"$tmpf"
+rm "$tmpf"
+
+exec "$@"
