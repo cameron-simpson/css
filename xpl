@@ -117,7 +117,7 @@ findimindir()	# imagebase dirs...
 
 set -- $XPLANETOPTS ${1+"$@"}
 
-while :
+while [ $# -gt 0 ]
 do
   case $1 in
     # =head2 Configuration File Directives
@@ -354,14 +354,20 @@ do
     -window)	xplmode=$1 winmode=1 ;;
     -vroot|-xscreensaver)
 		xplmode=$1 winmode= ;;
+    # =item B<-tr>|B<-transparency>
+    #
+    # Passes B<-transparency> to I<xplanet> and sets B<-root> mode (above).
+    #
+    -tr|-transparency)
+		xplmode= winmode= xplopts="$xplopts -transparency" ;;
     -fork|-gmtlabel|-label|-interpolate_origin_file|-light_time \
     	|-make_cloud_maps|-pango|-print_ephemeris|-random|-save_desktop_file \
-    	|-tt|-timewarp|-transparency|-utclabel|-version)
+    	|-tt|-timewarp|-utclabel|-version)
 		xplopts="$xplopts "`shqstr "$1"` ;;
     -[a-z]*)	xplopts="$xplopts "`shqstr "$1" "$2"`; shift ;;
+    *)	echo "$cmd: unrecognised argument: $1" >&2; badopts=1 ;;
     # =back
     #
-    *)		break ;;
   esac
   shift
 done
