@@ -1,2 +1,2 @@
 #!/bin/sh
-exec unpath ${1-"${BGPATH:-$HOME/etc/im}"} ${1+"$@"}
+exec unpath ${1-"${BGPATH:-$HOME/im}"} ${1+"$@"}
