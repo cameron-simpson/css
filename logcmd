@@ -1,0 +1,49 @@
+#!/bin/sh
+#
+# Log the output of a command.
+#	- Cameron Simpson <cs@zip.com.au> 26nov2004
+#
+
+: ${TMPDIR:=/tmp}
+
+cmd=`basename "$0"`
+usage="Usage: $cmd -m message cmd [args...]"
+
+msg=
+
+badopts=
+
+while :
+do
+  case "$1" in
+    -m)	msg=$2; shift ;;
+    -?*)echo "$cmd: unrecognised option: $1" >&2; badopts=1 ;;
+    --)	shift; break ;;
+    *)	break ;;
+  esac
+  shift
+done
+
+[ -n "$msg" ] || { echo "$cmd: no message!" >&2; badopts=1; }
+
+[ $# = 0 ] && { echo "$cmd: missing cmd" >&2; badopts=1; }
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+logout=$TMPDIR/$cmd$$out
+logerr=$TMPDIR/$cmd$$err
+
+"$@" >"$logout" 2>"$logerr"
+xit=$?
+
+( echo "Command: $*"
+  [ -s "$logerr" ] && { echo; echo "Errors:"; cat "$logerr"; }
+  [ -s "$logout" ] && { echo; echo "Output:"; cat "$logout"; }
+) | buglog "$msg: $cmd $*" >&2 &
+
+cat "$logout" || xit=1
+exec >/dev/null
+
+cat "$logerr" >&2 || xit=1
+
+exit $xit
