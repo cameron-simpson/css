@@ -4,6 +4,7 @@
 #
 
 cmd=$0
+usage="Usage: $cmd [-s] [dirpfx] pageurl"
 
 async=1
 if [ "x$1" = x-s ]
@@ -14,10 +15,12 @@ fi
 case $1 in
     ''|-*|*://*)	;;
     *)		dirpfx=$1; shift
-		if subdir=`mkdirn "$dirpfx/$dirpfx"`
-		then
-		    cd "$subdir" || exit 1
-		fi
+		case "$dirpfx" in
+		  */*?)	;;
+		  *)	dirpfx=$dirpfx/ ;;
+		esac
+		subdir=`mkdirn "$dirpfx"` || exit 1
+		cd "$subdir" || exit 1
 		colour_echo white "`pwd`"
 		L
 		;;
@@ -25,11 +28,12 @@ esac
 
 if [ $# = 0 ]
 then
-  if [ -n "$DISPLAY" ]
+  if false && [ -n "$DISPLAY" ]
   then
       set x "`cutbuffer`"; shift; echo "$1"
   else
-      echo "$cmd: no \$DISPLAY or URL" >&2
+      echo "$cmd: missing pageurl" >&2
+      ##echo "$cmd: no \$DISPLAY or URL" >&2
       exit 1
   fi
 fi
