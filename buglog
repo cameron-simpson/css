@@ -1,8 +1,19 @@
 #!/bin/sh
 #
-# Take a log message and attachment data on stdin
-# and log it appropriately.
-#	- Cameron Simpson <cs@zip.com.au> 09jul2004
+# =head1 NAME
+#
+# buglog - take a log message and attachment data on stdin and log it appropriately
+#
+# =head1 SYNOPSIS
+#
+# buglog logline < attachment-data
+#
+# =head1 DESCRIPTION
+#
+# I<buglog> takes a change headline on the command line and descriptive text on its input
+# and logs it to the bug systems enumerated by the environment variable B<$BUGSYSTEMS>.
+# B<$BUGSYSTEMS> is a space separated list of subsystems
+# that accept log information.
 #
 
 : ${TMPDIR:=/tmp}
@@ -13,17 +24,36 @@ cmd=`basename "$0"`
 usage="Usage: $cmd logline < attachment-data"
 
 [ $# = 1 ] || { echo "$usage" >&2; exit 2; }
-logmsg=$1; shift
+headline=$1; shift
 
 [ -n "$BUGSYSTEMS" ] || BUGSYSTEMS=dlog
 
-tmpf=$TMPDIR/bugids$$
-trap 'rm -f "$tmpf"' 0 1 2 13 15
-detab | unbs | unctrl >"$tmpf" || exit 1
+attachment=$TMPDIR/bugids$$
+trap 'rm -f "$attachment"' 0 1 2 13 15
+detab | unbs | unctrl >"$attachment" || exit 1
 
+# =head2 Bug System Backends
+#
+# The follow subsystems are known:
+#
+# =over 4
+#
+# =item B<dlog>
+#
+# The headline alone is passed to my I<dlog> command.
+#
 case " $BUGSYSTEMS " in
-  *' dlog '*)	dlog "$logmsg" ;;
+  *' dlog '*)	dlog "$headline" ;;
 esac
+
+# =item B<mailto:>I<email-address>[B<?subject=>I<prefix>]
+#
+# The I<attachment-data> is sent as the body of an email message
+# to the specified I<email-address>
+# with the B<Subject:> line "I<prefix>: I<headline>".
+# Also, the header line "B<X-Buglog-Date:> I<date>" is included
+# to assist with automatic filtering.
+#
 case " $BUGSYSTEMS " in
   *' mailto:'*)
 		echo "$BUGSYSTEMS" \
@@ -40,29 +70,62 @@ case " $BUGSYSTEMS " in
 		  while read addr args
 		  do
 		    hdrs="To: $addr"
-		    subj=$logmsg
+		    subj=$headline
 
 		    ( qsvals=`query_string2sh "$args"`
 		      eval "$qsvals"
-		      [ -n "$PARAM_subject" ] && subj="$subj: $PARAM_subject"
+		      [ -n "$PARAM_subject" ] && subj="$PARAM_subject: $subj"
 
 		      echo "To: $addr"
 		      echo "Subject: $subj"
-		      echo "X-Buglog: `date`"
+		      echo "X-Buglog-Date: `date`"
 		      echo
-		      cat "$tmpf"
+		      cat "$attachment"
 		    ) | sendmail -oi "$addr"
 		  done
 		}
 		;;
 esac
+
+# =item B<ddts>
+#
+# Submit the I<attachment-data>
+# as an enclosure text to any ClearDDTS bug identifiers
+# mentioned in the headline.
+# For example,
+# we routinely commit trivial CVS changes with headlines like:
+#
+#	moved user home dir from here to there [CISaa12345]
+#
+# which would add an enclosure to bug B<CISaa12345>.
+#
 case " $BUGSYSTEMS " in
-  *' ddts '*)	ddtsids=`echo "$logmsg" | ddtsids`
-		[ -n "$ddtsids" ] && mailif -s "$logmsg" $ddtsids < "$tmpf"
+  *' ddts '*)	ddtsids=`echo "$headline" | ddtsids`
+		[ -n "$ddtsids" ] && mailif -s "$headline" $ddtsids < "$attachment"
 		;;
 esac
+
+# =item B<logger>
+#
+# Submit the I<headline> alone
+# to syslog
+# using the I<logger> command, thus:
+#
+#	logger -t buglog -- "$USER: $headline"
+#
 case " $BUGSYSTEMS " in
-  *' logger '*)	logger -t buglog -- "$USER: $logmsg" ;;
+  *' logger '*)	logger -t buglog -- "$USER: $headline" ;;
 esac
 
 exit 0
+
+# =back
+#
+# =head1 SEE ALSO
+#
+# dlog(1), logger(1)
+#
+# =head1 AUTHOR
+#
+# Cameron Simpson <cs@zip.com.au> 09jul2004
+#
