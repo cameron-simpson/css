@@ -46,7 +46,7 @@ else
       for imagefile in $images
       do
 	if [ ! -s "$imagefile" ]
-	then  echo "$cmd: empty file: $imagefile" >&2
+	then  : echo "$cmd: empty file: $imagefile" >&2
 	else  echo "$imagefile"
 	      ok=1
 	fi
