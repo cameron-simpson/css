@@ -4,7 +4,7 @@
 #	- Cameron Simpson <cs@zip.com.au> 01jul2003
 #
 
-dir=$SYSTEMID/timer
+dir=timer
 scale=1.0
 
 cmd=$0
