@@ -4,8 +4,17 @@
 #	- Cameron Simpson <cs@zip.com.au> 29jul2003
 #
 
+scale=1.0
+dir=$SYSTEMID/timer
+
 cmd=`basename "$0"`
-usage="Usage: $cmd"
+usage="Usage: $cmd [-d dir] [scale]"
+
+[ "x$1" = x-d ] && { dir=$2; shift; shift; }
+
+case $1 in
+  [0-9]*.[0-9]*) scale=$1; shift ;;
+esac
 
 [ $# = 0 ] || { echo "$usage" >&2; exit 2; }
 
@@ -24,7 +33,7 @@ job timekeeping	|| { echo "$cmd: can't switch to \"timekeeping\"" >&2; exit 1; }
 
 cpdir "$current" "$saved" || exit 1
 
-jobreport
+jobreport -d "$dir" "$scale"
 for total in "$current/"*/total
 do  [ -s "$total" ] && echo 0 >"$total"
 done
