@@ -1,0 +1,4 @@
+#!/bin/sh
+logf=$HOME/var/log/httpgetd-queue
+>>"$logf"
+alog httpgetd httpget -Q "$logf" -l download
