@@ -85,6 +85,7 @@ fi
 [ -d "$statedir/." ] || mkdir -p "$statedir" || exit 1
 cd "$statedir" || exit 1
 
+# no id or name specified - list stuff
 if [ -z "$idname" ]
 then
     if [ $rmid ]
@@ -97,19 +98,23 @@ then
     # list ids
     if [ $long ]
     then
-	idset $aflag -i "$idset" \
-	| sed 's/ .*//' \
-	| while read id
-	  do  grep . "$id"/* /dev/null
-	  done 2>/dev/null \
-	| sed -e 's:/: :' -e 's/:/ /'
+	# list every attribute of every id; output is
+	#	id\tattr\tvalue
+	for f in [0-9]*/*
+	do  [ -s "$f" ] || continue
+	    necho "$f	" | tr / '	'; tail -1 "$f"
+	done \
+	| sort -n
     else
-	grep . [0-9]*/name /dev/null 2>/dev/null \
-	| sed 's|/name:| |' \
-	| if [ $all ]
-	  then  sed 's/^\([0-9][0-9]* \)\./\1/'
-	  else  sed '/^[0-9][0-9]* \./d'
-	  fi \
+	# list the name for every id; output is
+	#	id\tname
+	if [ $all ]
+	then  idfilter='s/^\([0-9][0-9]*	\)\./\1/'
+	else  idfilter='/^[0-9][0-9]*	\./d'
+	fi
+	idsetlist . name \
+	| sed -e '/	[^	]/!d' \
+	      -e "$idfilter" \
 	| sort -n
     fi
 
@@ -119,10 +124,10 @@ fi
 iddir=
 case "$idname" in
     *[!0-9]*)
-	for namefile in [1-9]*/name
+	for namefile in [0-9]*/name
 	do  [ -s "$namefile" ] || continue
 
-	    tryname=`cat "$namefile"` || continue
+	    tryname=`tail -1 "$namefile"` || continue
 	    if [ "x$idname" = "x$tryname" ] \
 	    || [ -n "$all" -a "x.$idname" = "x$tryname" ]
 	    then
@@ -162,7 +167,7 @@ else
     if [ $haspvalue ]
     then
       # store new parameter
-      echo "$pvalue" >"$pfile"
+      echo "$pvalue" >>"$pfile"
       # some parameters have side effects
       case "$idset,$param" in
 	desktop,name)
@@ -178,7 +183,7 @@ else
       esac
     else
       if [ -s "$pfile" ]
-      then cat "$iddir/$param"
+      then tail -1 "$pfile"
       else echo
       fi
     fi
