@@ -421,6 +421,8 @@ sub findAuthority
 
 =head1 OBJECT CREATION
 
+=over 4
+
 =item new cs::HTTP (I<host>, I<port>, I<isProxy>)
 
 Return a B<cs::Net::TCP> object
