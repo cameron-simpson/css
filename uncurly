@@ -33,10 +33,10 @@ do
   then
       first=
       # reset arg list now we've set the loop running
-      set x; shift
+      set x -e :top; shift
       for var in $varlist
       do  eval "val=\$$var"
-	  set x -e "s{$var}$valg"; shift
+	  set x -e "s{$var}$valg" -e 't top'; shift
       done
   fi
 
