@@ -1,0 +1,9 @@
+#!/bin/sh
+#
+# No-op arg0 for bootstrap stage.
+
+case $1 in
+    -*)	echo "$0: warning: can't forge login processes with this arg0" >&2 ;;
+esac
+shift
+exec "$@"
