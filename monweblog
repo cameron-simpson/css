@@ -1,0 +1,165 @@
+#!/usr/bin/perl
+
+use cs::VDis;
+
+@Ages=(60,300,900,3600);
+%Q=();
+
+
+while (<STDIN>)
+	{ $Now=time;
+
+	  chomp;
+	  s/\s+$//;
+
+	  if (/^TIMESTAMP/)
+		{
+		  timestamp();
+		}
+	  elsif (/^(\S+\.\S+)\s+\S+\s+\S+\s+\[[^]]*\]\s+"([^"]*)"\s+(\d+)\s+(-|\d+)/)
+		{
+		  my($host,$rq,$code,$size)=($1,$2,$3,$4);
+
+		  if ($size eq '-' || $size == 0)
+			{}
+		  elsif ($rq =~ m!^\s*(get|post)\s+(([a-z]+)://([^/]+)(/\S+))!i)
+			{ my($method,$url,$scheme,$hoststuff,$path)=($1,$2,$3,$5,$6);
+			  $method=uc($method);
+			  $scheme=uc($scheme);
+			  $hoststuff=uc($hoststuff);
+
+			  traffic($now,"SCHEME/$scheme",$size);
+			  traffic($now,"SRCHOST/$host",$size);
+			  traffic($now,"DESTHOST/$hoststuff",$size);
+
+			  if ($path =~ /\.(gif|jpg|xbm|png)$/i)
+				{ traffic($now,"TYPE/IMAGE",$size);
+				}
+			  elsif ($path =~ /\.html?$/i)
+				{ traffic($now,"TYPE/HTML",$size);
+				}
+			  elsif ($path =~ /\.te?xt$/i)
+				{ traffic($now,"TYPE/TEXT",$size);
+				}
+			  else
+				{ traffic($now,"TYPE/UNKNOWN",$size);
+				}
+
+			}
+		}
+	  else
+	  { warn "line $.: unrecognised data: $_\n";
+	  }
+	}
+
+exit $Xit;
+
+sub traffic
+	{ my($timestamp,$key,$size)=@_;
+
+	  my($rec)=[ $timestamp, $key, $size ];
+	  my($qage)=qage($Now,$timestamp);
+
+	  if (! defined $qage)
+		{ warn "qage($Now,$timestamp) == UNDEF";
+		  return;
+		}
+
+	  agedtraffic($key,$qage,$rec);
+	}
+
+sub agedtraffic
+	{ my($key,$qage,$rec)=@_;
+
+	  if (! exists $Q{$key})	{ $Q{$key}={}; }
+	  my($qp)=$Q{$key};
+
+	  if (! exists $qp->{$qage})	{ $qp->{$qage}=[]; }
+	  push(@{$qp->{$qage}},$rec);
+	}
+
+# what queue should a time be in?
+sub qage
+	{ my($now,$time)=@_;
+	  my(@ages)=(0,@Ages);
+
+	  return undef if ($sec=($now-$time)) < 0;
+
+	  for (@Ages)
+		{ return $_ if $sec <= $_;
+		}
+
+	  undef;
+	}
+
+sub timestamp
+	{
+	  my($key,$age,$qp,@q,$qage,$timestamp);
+
+	  for $key (keys %Q)
+	    {
+	      $qp=$Q{$key};
+
+	     AGE:
+	      for $age (@Ages)
+		{ next AGE if ! exists $qp->{$age};
+		  $qp=$qp->{$age};
+		  @q=@$qp; $qp->{$age}=[];
+
+		  for (@q)
+			{ $timestamp=$_->[0];
+			  $qage=qage($Now,$timestamp);
+			  agedtraffic($key,$qage,$_);
+			}
+		}
+	}
+
+sub report
+	{
+	  my(@subclasses,@classes);
+
+	  @subclasses=sort keys %Q;
+	  @classes=map(s/\/.*//,@subclasses);
+	  @classes=sort uniq(@classes);
+
+	  my($class);
+
+	  print "Scheme  ";
+	  for $qage (@Ages)
+		{ printf(" %5s",$qage);
+		}
+	  print "\n";
+
+	  for $subclass (sort haspfx("SCHEME/",@subclasses))
+		{ $scheme=substr($subclass,6);
+		  printf("%-7s",$scheme);
+		  for $qage (@Ages)
+			{ printf(" %5d",
+				exists $Q{$subclass}->{$qage}
+					? sum(map($_->[2],@{$Q{$subclass}->{$qage}}))
+					: 0);
+		}
+	}
+
+sub firstn
+	{ my($n)=shift;
+	  @_[0..$n-1];
+	}
+
+sub sum
+	{ my($sum)=0;
+	  map($sum+=$_,@_);
+	  $sum;
+	}
+
+sub haspfx
+	{ my($pfx)=shift;
+
+	  grep(substr($_,$[,length($pfx)) eq $pfx,@_);
+	}
+
+sub uniq
+	{ my(%u);
+	  map($u{$_}=1, @_);
+	  keys %u;
+	}
