@@ -173,9 +173,10 @@ timelimit=
 #
 #	[I<method>] I<server> I<root> [I<localroot>] [I<options>...]
 #
-# Presently, the only defined I<method> is the word B<rsync>.
 # If omitted, I<method> defaults to B<rsync>
-# (and in consequence I<server> should be a FQDN).
+# (and in consequence I<server> should be a FQDN so that it does not resemble a I<method> name).
+# The other methods known are B<http> and B<ftp>, for which the wget(1) command is used
+# in mirror mode.
 #
 # The I<server> is an IP address or hostname
 # as may be passed to the rsync(1) command.
@@ -193,8 +194,10 @@ timelimit=
 #
 # Options specific to this particular line
 # may then follow, typically I<rsync>'s B<--include=> and B<--exclude=>
-# options.
-# The special option B<--latest>
+# options
+# or wgte(1)'s B<--accept> and B<--reject> options.
+#
+# For the B<rsync> method, the special option B<--latest>
 # may be specified as the first of these options;
 # it causes the mirror to only include the latest version
 # of versioned files
@@ -306,7 +309,8 @@ do
     #
     #	B<--include-from=>I<config>-I<method>-I<server>-I<root-trans>
     #
-    # to be prepended to the options passed to rsync.
+    # to be prepended to the options passed to rsync, and so it should be an
+    # rsync(1) include/exclude file.
     # This is a I<much> more succinct and readable way to pass complicated
     # include/exclude patterns to I<rsync>.
     #
@@ -344,15 +348,19 @@ do
 	    fi
 	fi
 
-	eval \
-	  "($tracecmd; $timelimit $rsync -rlHt \$rsopts $opts \$rszopt \$rsxopts \"\$host::\$path/.\" \"\$fpath/.\")" \
-	  || xit=1
-	[ $latest ] && rm -f "$latelist"
+	synccmd="$timelimit $rsync -rlHt \$rsopts $opts \$rszopt \$rsxopts \"\$host::\$path/.\" \"\$fpath/.\""
+	;;
+      http|ftp)
+	synccmd="$timelimit echo wget --mirror -nH -P \"\$fpath\" \"\$how://\$host/\$path\""
 	;;
       *)echo "$pfx: method \"$how\" not supported" >&2
 	xit=1
+	continue
 	;;
     esac
+
+    eval "($tracecmd; $synccmd)" || xit=1
+    [ $latest ] && rm -f "$latelist"
 done
 
 exit $xit
