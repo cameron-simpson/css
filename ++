@@ -19,7 +19,7 @@ then
     ## args - search
 
     # make work area
-    mrdir=$HOME/tmp/mairix-maildir
+    mrdir=$HOME/tmp/mairix
     needdir "$mrdir" || exit 1
 
     # devise informative basename
@@ -34,7 +34,8 @@ then
     # make mairixrc in the result dir
     resrc=$res/.mairixrc
 
-    sed "s:^vfolder=.*:vfolder=mairix-result/$base:" <"$rc" >"$resrc"
+    sed "s:^vfolder=.*:vfolder=mairix-result/$base:" \
+	<"$rc" >"$resrc"
     "$mairix" -f "$resrc" "$@" || exit 1
 
     + +a -R "$res"
@@ -51,20 +52,26 @@ wkdir=$HOME/var/mairix
 
 mhf=
 mhfsep=
-for srcfolder in $HOME/there/*/mail/*
+for site in home cisra
 do
-  ismhdir "$srcfolder" || continue
+  for srcfolder in $HOME/there/$site/mail/*
+  do
+    ismhdir "$srcfolder" || continue
 
-  site=`expr "x$srcfolder" : 'x.*/\([^/]*/\)/mail/[^/]*$'`
-  case "$site" in *.*) continue ;; esac
+    folder=`basename "$srcfolder"`
+    case "$folder" in
+	deleted|saved-deleted)
+	  continue
+	  ;;
+    esac
 
-  folder=`basename "$srcfolder"`
-  wkfolder=$site-$folder
+    wkfolder=$site-$folder
 
-  rm -f "$wkdir/$wkfolder"
-  ln -s "$srcfolder" "$wkdir/$wkfolder"
-  mhf=$mhf$mhfsep$wkfolder
-  mhfsep=:
+    rm -f "$wkdir/$wkfolder"
+    (set -x; ln -s "$srcfolder" "$wkdir/$wkfolder")
+    mhf=$mhf$mhfsep$wkfolder
+    mhfsep=:
+  done
 done
 
 set -x
