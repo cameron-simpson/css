@@ -6,24 +6,42 @@
 
 cmd=$0
 
-[ $# = 0 ] && { echo "Usage: $cmd [-o] sed-regexps..." >&2; exit 2; }
+[ $# = 0 ] && { echo "Usage: $cmd [-i] [-o] sed-regexps..." >&2; exit 2; }
 
 any=
-[ "x$1" = x-o ] && { any=1; shift; }
+icase=
+
+badopts=
+while :
+do  case $1 in
+      -i)	icase=1 ;;
+      -o)	any=1 ;;
+      --)	shift; break ;;
+      -?*)	echo "$cmd: unrecognised option: $1" >&2; badopts=1 ;;
+      *)	break ;;
+    esac
+    shift
+done
 
 if [ $# = 0 ]
 then
     echo "$cmd: missing sed-regexps" >&2
-    echo "$usage" >&2
-    exit 2
+    badopts=1
 fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
 
 ok=1
 
 first=1
 for word
 do
-  [ $first ] && { set x; shift; first=; }
+  [ $first ] && { first=
+		  if [ $icase ]
+		  then  set x -e h -e 'y/ABCDEFGHIJKLMNOPQRSTUVWXYZ/abcdefghijklmnopqrstuvwxyz/'; shift
+		  else  set x; shift
+		  fi
+		}
 
   case "$word" in
     */*)	echo "$cmd: can't do slashes: $word" >&2
@@ -41,5 +59,6 @@ done
 [ $ok ] || exit 1
 
 [ $any ] && { set x ${1+"$@"} -e d -e ':ok'; shift; }
+[ $icase ] && { set x ${1+"$@"} -e g; shift; }
 
 exec sed "$@"
