@@ -1,0 +1,68 @@
+#!/bin/sh
+#
+# Added -r & -R flags.
+# Sent usage to stderr.
+# Hmm, added usage!
+#	- cameron 03jun96
+#
+
+cmd=`basename "$0"`
+usage="Usage: $cmd [-p prefix] [-s suffix] [-r] [-R] netgroups...
+	-p prefix	Prepend prefix to members returned.
+	-s suffix	Append suffix to members returned.
+	-r		Recurse. Expand members which are netgroups.
+	-R		Raw. Do not strip ( and ,,) from members."
+
+parg=
+sarg=
+recurse=
+raw=
+
+# getopts isn't a great idea anyway
+badopts=
+while :
+do  case $1 in
+	--)	shift; break ;;
+	-p)	parg=$2; shift ;;
+	-s)	sarg=$2; shift ;;
+	-r)	recurse=1 ;;
+	-R)	raw=1 ;;
+	--)	shift; break ;;
+	-?*)	echo "$cmd: unrecognised option: $1" >&2; badopts=1 ;;
+	*)	break ;;
+    esac
+    shift
+done
+
+if [ $# = 0 ]
+then
+	echo "$cmd: missing netgroups" >&2
+	badopts=1
+fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+sedf=
+[ $raw ] || sedf="$sedf
+		  s/^(//
+		  s/,,)\$//"
+sedf="$sedf
+		  s/^/$parg/
+		  s/\$/$sarg/"
+
+ypmatch "$@" netgroup |
+tr ' ' '\012' |
+if [ $recurse ]
+then  while read g
+      do  case $g in
+	    '')		;;
+	    \(*)	echo "$g" ;;
+	    *)		netgroup -r -R "$g" ;;
+	  esac
+      done
+else
+      exec sed '/^$/d'
+fi |
+sed "$sedf"
+
+exit 0
