@@ -1,0 +1,64 @@
+#!/usr/bin/perl -w
+#
+# Read lines from stdin, write line and munged line on stdout.
+#	- Cameron Simpson <cs@zip.com.au> 06jan2005
+#
+
+use strict qw(vars);
+
+($::cmd=$0) =~ s:.*/::;
+$::Usage="Usage: $::cmd mapfile\n";
+
+my $mapfile;
+
+my $badopts=0;
+
+if (!@ARGV)
+{ warn "$::cmd: missing mapfile\n";
+  $badopts=1;
+}
+else
+{ $mapfile=shift(@ARGV);
+  if (@ARGV)
+  { warn "$::cmd: extra arguments after mapfile: @ARGV\n";
+    $badopts=1;
+  }
+}
+
+die $::Usage if $badopts;
+
+die "$::cmd: $mapfile: $!\n" if !open(MAPFILE,"< $mapfile\0");
+
+my $code = "\$munged=\$_;\nif (0) {}\n";
+
+MAPLINE:
+while (defined($_=<MAPFILE>))
+{
+  chomp;
+  s/^\s+//;
+  next MAPLINE if !length || /^#/;
+
+  my @F=split;
+  if (@F != 2)
+  { warn "$::cmd: $mapfile, $.: bad line (expected 2 fields): $_\n";
+    next MAPLINE;
+  }
+
+  $code .= "elsif (m($F[0])io) { \$munged=\"\$`$F[1]\$'\"; next INPUTLINE; }\n";
+}
+close(MAPFILE);
+
+$code="my \$munged;
+       INPUTLINE:
+       while (defined(\$_=<STDIN>))
+       { chomp;
+	 $code;
+       }
+       continue
+       { print \"\$_\n\$munged\n\";
+       }
+      ";
+
+eval "$code";
+die "$@" if $@;
+exit 0;
