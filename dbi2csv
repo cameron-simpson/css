@@ -1,0 +1,99 @@
+#!/usr/bin/perl
+#
+# Dump a MySQL table (later others, since it uses DBI) in .csv format.
+#	- Cameron Simpson <cs@zip.com.au> 30sep99
+#
+
+use strict qw(vars);
+
+use cs::Misc;
+use Getopt::Std;
+use DBI;
+use cs::DBI;
+
+$::DfltHost='mysql';
+$::DfltDBD='mysql';
+$::DfltDB='REPORTS_DB';
+
+$::Usage="Usage: $::cmd [-h host] [-d dbd] [db.]table [fields...] \\
+			[WHERE condition]
+	-h host	Alternate host to contact. Default: $::DfltHost.
+	-d dbd	Alternate DBD backend to use. Default: $::DfltDBD.
+	db.	Database name. Default: $::DfltDB.
+";
+
+my $host=$::DfltHost;
+my $dbd=$::DfltDBD;
+my $dbname=$::DfltDB;
+my $dbtable;
+
+my $badopts=0;
+getopt('d:h:') && ($badopts=1);
+$host=$::opt_h if defined $::opt_h;
+$dbd=$::opt_d if defined $::opt_d;
+
+if (! @ARGV)
+{ warn "$::cmd: missing db.table\n";
+  $badopts=1;
+}
+else
+{ $dbtable=shift(@ARGV);
+  if ($dbtable =~ /^([\w_]+)\./)
+  { $dbname=$1; $dbtable=$';
+  }
+}
+## warn "dbname=$dbname, dbtable=$dbtable";
+
+die $::Usage if $badopts;
+
+my @fields = ();
+
+while (@ARGV && $ARGV[0] ne 'WHERE')
+{ push(@fields, shift(@ARGV));
+}
+
+my $where = join(' ', @ARGV);
+$where=" $where" if length $where;
+
+my $dsn = "DBI:${dbd}:database=${dbname}";
+$dsn.=";host=$host" if length $host;
+
+my @login=('anonymous','anonymous');
+my $dbh = DBI->connect($dsn);	## ,@login);
+die "$::cmd: can't get DBI handle for \"$dsn\"\n"
+	if ! defined $dbh;
+
+my $sth = cs::DBI::sql($dbh,"SELECT * FROM $dbtable$where");
+die "$::cmd: can't make query for table \"$dbtable\"$where\n"
+	if ! defined $sth;
+die "$::cmd: can't run query on \"$dbtable\"\n"
+	if ! $sth->execute();
+
+my $first = 1;
+my $rec;
+
+while (defined ($rec = $sth->fetchrow_hashref()))
+{
+  if ($first)
+  { $first=0;
+    @fields = sort keys %$rec if ! @fields;
+    print csv(@fields), "\n";
+  }
+
+  print csv(map($rec->{$_}, @fields)), "\n";
+}
+
+exit 0;
+
+sub csv
+{ my(@v)=@_;
+
+  V:
+  for (@v)
+  { next V if /^(0|[1-9]\d*)(\.\d+)?$/ || /^[a-z_][\w_]*$/;
+    s/[\\"]/\\$&/g;
+    $_="\"$_\"";
+  }
+
+  join(',', @v);
+}
