@@ -24,7 +24,7 @@ By default it reports to STDERR using the B<cs::Upd> module.
 
 use strict qw(vars);
 
-BEGIN { use cs::DEBUG; cs::DEBUG::using(__FILE__); }
+##BEGIN { use cs::DEBUG; cs::DEBUG::using(__FILE__); }
 
 use cs::Misc;
 use cs::Upd;
