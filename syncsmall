@@ -5,9 +5,9 @@ usage="Usage: $cmd [user@host [syncstuff-options...]]"
 
 if [ $# = 0 ]
 then
-    needhost zapff@cisra amadeus@home || exit 1
+    needhost kaper@cisra amadeus@home || exit 1
     case $HOST@$SYSTEMID in
-      zapff@cisra)	set cameron@agricola cameron@agostino cameron@ivory cameron@upnp cameron@cvs.cgn ;;
+      kaper@cisra)	set cameron@agricola cameron@agostino cameron@ivory cameron@upnp cameron@cvs.cgn ;;
       amadeus@home)	set cameron2@alpha cameron2@janus @ezos @tw ;;
       *)	echo "$cmd: $HOST@$SYSTEMID: huh?" >&2; exit 1 ;;
     esac
