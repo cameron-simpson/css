@@ -32,7 +32,6 @@ use strict qw(vars);
 BEGIN { use cs::DEBUG; cs::DEBUG::using(__FILE__); }
 
 use cs::ALL;
-use cs::Date;
 use cs::RFC822;
 use cs::Source;
 use cs::SubSource;
@@ -43,6 +42,118 @@ use cs::MIME::QuotedPrintable;
 package cs::MIME;	# cs::ALL::useAll();
 
 $cs::MIME::_Range_tspecials='()<>@,;:\\"\/\[\]?.=';
+
+=head1 GENERAL FUNCTIONS
+
+=over 4
+
+=item parseContentType(I<content-type>)
+
+Parse a B<Content-Type> line I<content-type>,
+returning a tuple of (I<typ>,I<subtype>,I<params>,I<unparsed>)
+being the type and subtype,
+a hashref containing any parameters on the line
+and any remaining data which could not be parsed.
+
+=cut
+
+sub parseContentType($)
+{ local($_)=@_;
+
+  my($params)={};
+  my($type,$subtype);
+
+  if (m:^\s*([-\w]+)\s*/\s*([-\w]+)\s*:)
+  { $type=uc($1);
+    $subtype=uc($2);
+    $_=$';
+
+    ($_,$params)=parseTypeParams($_);
+  }
+  else
+  { $type=TEXT;
+    $subtype=PLAIN;
+  }
+
+  ($type,$subtype,$params,$_);
+}
+
+=item parseTypeParams(I<parameter-string>)
+
+Parse a the parameters section of a B<Content-Type> line
+returning a tuple of (I<params>,I<unparsed>)
+a hashref containing any parameters on the line
+and any remaining data which could not be parsed.
+
+=cut
+
+sub parseTypeParams($)
+{ local($_)=@_;
+
+  my($params)={};
+  my($param,$value);
+
+  s/^\s*(;+\s*)+//;
+  PARAM:
+  while (length)
+  { last PARAM unless /^([-\w]+)\s*=\s*/;
+
+    $param=$1; $_=$';
+
+    $param=uc($param);
+    $param =~ s/-/_/g;
+
+    if (/^"((\\.|[^\\"])*)"\s*/)
+    { $value=$1; $_=$';
+      $value =~ s/\\(.)/$1/g;
+    }
+    else
+    { /^([^\s$cs::MIME::_Range_tspecials]*)\s*/;
+      $value=$1; $_=$';
+    }
+
+    $params->{$param}=$value;
+
+    s/^\s*(;+\s*)+//;
+  }
+
+  ($params,$_);
+}
+
+=item decodedSource(I<source>, I<cte>, I<istext>)
+
+Return a new B<cs::Source>
+containing the decoded content of the supplied B<cs::Source> I<source>
+according to the supplied B<Content-Transfer-Encoding> string I<cte>
+and optional I<istext> flag.
+I<istext> defaults to false for B<BASE64> data and true for B<QUOTED-PRINTABLE> data.
+
+=cut
+
+sub decodedSource($$$)
+{ my($s,$cte,$isText)=@_;
+  $cte=uc($cte);
+
+  if ($cte eq '8BIT' || $cte eq '7BIT' || $cte eq 'BINARY')
+  # recognised null-encodings
+  { }
+  elsif ($cte eq BASE64)
+  { $isText=0 if ! defined $isText;
+    $s=new cs::MIME::Base64 (Decode, $s, $isText);
+  }
+  elsif ($cte eq 'QUOTED-PRINTABLE')
+  { $isText=1 if ! defined $isText;
+    $s=new cs::MIME::QuotedPrintable (Decode, $s, $isText);
+  }
+  else
+  { warn "can't decode Content-Transfer-Encoding \"$cte\"";
+    return undef;
+  }
+
+  $s;
+}
+
+=back
 
 =head1 OBJECT CREATION
 
@@ -80,42 +191,10 @@ sub new($;$$)
   my $H = new cs::RFC822;
 
   if (defined $s)
-  { $s=new cs::Source (PATH, $s) if ! ref $s;
-    return undef if ! defined $s;
-    $H->SourceExtract($s);
-    $this->UseHdrs($H);
+  { $this->UseSource($s,$usecsize);
   }
 
-  if (defined $s)
-  # do stuff with stream
-  {
-    # Content-Size - push limit onto stream
-    if ($usecsize
-     && defined ($_=$H->Hdr(CONTENT_SIZE))
-     && /\d+/)
-    { my($size)=$&+0;
-      $s=new cs::SubSource ($s, $s->Tell(), $size);
-      return undef if ! defined $s;
-    }
-
-    # suck up the stream
-    # this way original stream is at a well defined spot
-    # (just past the message) regardless of whether the
-    # caller asks for the body
-    $this->{DS}=new cs::Source (SCALAR,$s->Get());
-    return undef if ! defined $this->{DS};
-
-    # Content-Transfer-Encoding
-    if (defined $s
-     && defined ($_=$H->Hdr(CONTENT_TRANSFER_ENCODING,1))
-     && length)
-    { s/^\s+//;
-      s/\s+$//;
-      $this->{CTE}=uc($_);
-    }
-  }
-
-  bless $this, $class;
+  $this;
 }
 
 =back
@@ -123,6 +202,51 @@ sub new($;$$)
 =head1 OBJECT METHODS
 
 =over 4
+
+=item UseSource(I<source>,I<usecsize>)
+
+Read headers and body from the supplied I<source>.
+The optional I<usecsize> parameter
+says to trust the B<Content-Size> header if present,
+placing a limit on the data read from the I<source>.
+The default is to ignore it.
+
+=cut
+
+sub UseSource($$;$)
+{ my($this,$s,$usecsize)=@_;
+  $usecsize=0 if ! defined $usecsize;
+
+  $s=new cs::Source (PATH, $s) if ! ref $s;
+  return undef if ! defined $s;
+
+  $H->SourceExtract($s);
+  $this->UseHdrs($H);
+
+  # Content-Size - push limit onto stream
+  if ($usecsize
+   && defined ($_=$H->Hdr(CONTENT_SIZE))
+   && /\d+/)
+  { my($size)=$&+0;
+    $s=new cs::SubSource ($s, $s->Tell(), $size);
+    return undef if ! defined $s;
+  }
+
+  # suck up the stream
+  # this way original stream is at a well defined spot
+  # (just past the message) regardless of whether the
+  # caller asks for the body
+  $this->{BODY}=$s->Get();
+
+  # Content-Transfer-Encoding
+  if (defined $s
+   && defined ($_=$H->Hdr(CONTENT_TRANSFER_ENCODING,1))
+   && length)
+  { s/^\s+//;
+    s/\s+$//;
+    $this->{CTE}=uc($_);
+  }
+}
 
 =item Hdrs()
 
@@ -173,58 +297,45 @@ sub UseHdrs($$)
 	=parseContentType($_);
 }
 
-sub _RawSource
-{ shift->{DS}; }
+=item Body(I<decoded>,I<istext>)
 
-# decoded Source - use $this->_RawSource() for raw data
-sub _Source
-{ my($this)=@_;
-  my($s)=$this->_RawSource();
-
-  # push decoder
-  my($cte)=$this->{CTE};
-  my($isText)=($this->{TYPE} eq TEXT);
-
-  decodedSource($s,$cte,$isText);
-}
-
-=item RawGet()
-
-Return the body part of the object as a string.
+Return a string
+containing the body of this object,
+decoded if I<decoded> is true (the default is false).
+The optional parameter I<istext> is used as in the B<decodedSource()> function.
 
 =cut
 
-sub RawGet	{ shift->_RawSource()->Get(); }
+sub Body($;$)
+{ my($this,$decoded)=@_;
+  $decoded=0 if ! defined $decoded;
 
-=item Get()
+  return $this->{BODY} if ! decoded;
 
-Return the body part of the object as a string
-after decoding according to any B<Content-Transfer-Encoding> header.
+  my $s = $this->BodySource($decoded);
+  return undef if ! defined $s;
+
+  $s->Get();
+}
+
+=item BodySource(I<decoded>,I<istext>)
+
+Return a new B<cs::Source>
+containing the body of this object,
+decoded if I<decoded> is true (the default is false).
+The optional parameter I<istext> is used as in the B<decodedSource()> function.
 
 =cut
 
-sub Get		{ shift->_Source()->Get(); }
+sub BodySource($;$$)
+{ my($this,$decoded)=(shift,shift);
+  $decoded=0 if ! defined $decoded;
 
-sub RawBody
-{ my($this)=@_;
-  my($body)=$this->RawGet();
-  $this->{DS}=new cs::Source (SCALAR,$body);
-  $body;
-}
-sub Body
-{ my($this)=@_;
-  my($rawbody)=$this->RawBody();
-  my($cte,$isText)=($this->{CTE},
-		    ($this->{TYPE} eq TEXT)
-		   );
+  my $s = new cs::Source (SCALAR, $this->Body());
+  return undef if ! defined $s;
+  return $s if ! $decoded;
 
-  my $ds = decodedSource((new cs::Source (SCALAR,$rawbody)),
-			  $cte,$isText);
-
-  # unknown encoding?
-  return $rawbody if ! defined $ds;
-
-  $ds->Get();
+  decodedSource($s,$this->{CTE},@_);
 }
 
 =item ContentType(I<noparams>)
@@ -261,8 +372,10 @@ sub WriteItem($$$;$$$)	# (this,sink,\@cs::MIME,pre,post,sep)
   $post='' if ! defined $post;
   $sep=$this->{ATTRS}->{BOUNDARY} if ! defined $sep;
 
-  $sep="cs::MIME::".cs::Date::timecode(time,0)."::GMT"
-	if ! length $sep;
+  if (! length $sep)
+  { ::need(cs::Date);
+    $sep="cs::MIME::".cs::Date::timecode(time,0)."::GMT"
+  }
 
   $this->Hdrs()->WriteItem($sink,$pre);
 
@@ -271,37 +384,13 @@ sub WriteItem($$$;$$$)	# (this,sink,\@cs::MIME,pre,post,sep)
     $sink->Put("\r\n--$sep\r\n");
 
     $M->Hdrs()->Del(CONTENT_LENGTH);	# just in case
-    $M->Hdrs()->WriteItem();
-    while (defined ($_=$M->_RawSource()->Read()) && length)
-	  { $sink->Put($_);
-	  }
+    $M->Hdrs()->WriteItem($sink);
+
+    $sink->Put($M->Body());
   }
 
   $sink->Put("\r\n--$sep--\r\n");
   $sink->Put($post);
-}
-
-sub decodedSource
-{ my($s,$cte,$isText)=@_;
-  $cte=uc($cte);
-
-  if ($cte eq '8BIT' || $cte eq '7BIT' || $cte eq 'BINARY')
-  # recognised null-encodings
-  { }
-  elsif ($cte eq BASE64)
-  { $isText=0 if ! defined $isText;
-    $s=new cs::MIME::Base64 (Decode, $s, $isText);
-  }
-  elsif ($cte eq 'QUOTED-PRINTABLE')
-  { $isText=1 if ! defined $isText;
-    $s=new cs::MIME::QuotedPrintable (Decode, $s, $isText);
-  }
-  else
-  { warn "can't decode Content-Transfer-Encoding \"$cte\"";
-    return undef;
-  }
-
-  $s;
 }
 
 # collect pretext, pieces, posttext
@@ -356,85 +445,6 @@ sub Pieces
     }
 
   ($slist,$pre,$post);
-}
-
-=back
-
-=head1 GENERAL FUNCTIONS
-
-=over 4
-
-=item parseContentType(I<content-type>)
-
-Parse a B<Content-Type> line I<content-type>,
-returning a tuple of (I<typ>,I<subtype>,I<params>,I<unparsed>)
-being the type and subtype,
-a hashref containing any parameters on the line
-and any remaining data which could not be parsed.
-
-=cut
-
-sub parseContentType($)
-{ local($_)=@_;
-
-  my($params)={};
-  my($type,$subtype);
-
-  if (m:^\s*([-\w]+)\s*/\s*([-\w]+)\s*:)
-  { $type=uc($1);
-    $subtype=uc($2);
-    $_=$';
-
-    ($_,$params)=parseTypeParams($_);
-  }
-  else
-  { $type=TEXT;
-    $subtype=PLAIN;
-  }
-
-  ($type,$subtype,$params,$_);
-}
-
-=item parseTypeParams(I<parameter-string>)
-
-Parse a the parameters section of a B<Content-Type> line
-returning a tuple of (I<params>,I<unparsed>)
-a hashref containing any parameters on the line
-and any remaining data which could not be parsed.
-
-=cut
-
-sub parseTypeParams($)
-{ local($_)=@_;
-
-  my($params)={};
-  my($param,$value);
-
-  s/^\s*(;+\s*)+//;
-  PARAM:
-    while (length)
-    { last PARAM unless /^([-\w]+)\s*=\s*/;
-
-      $param=$1; $_=$';
-
-      $param=uc($param);
-      $param =~ s/-/_/g;
-
-      if (/^"((\\.|[^\\"])*)"\s*/)
-      { $value=$1; $_=$';
-	$value =~ s/\\(.)/$1/g;
-      }
-      else
-      { /^([^\s$cs::MIME::_Range_tspecials]*)\s*/;
-	$value=$1; $_=$';
-      }
-
-      $params->{$param}=$value;
-
-      s/^\s*(;+\s*)+//;
-    }
-
-  ($params,$_);
 }
 
 =back
