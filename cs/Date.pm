@@ -20,17 +20,17 @@ sub new
   $gmt=time   if ! defined $gmt;
 
   if (ref $gmt)
-	# assume we were given a tm struct
-	# convert back to gmt
-	{
-	  ## {my(@c)=caller;warn "new cs::Date ".cs::Hier::h2a($gmt,0)." from [@c]";}
-	  $gmt=tm2gmt($gmt,@_);
-	  if ($gmt == -1)
-		{ ::need(cs::Hier);
-		  die "range error on "
-		     .cs::Hier::h2a($gmt,0);
-		}
-	}
+  # assume we were given a tm struct
+  # convert back to gmt
+  {
+    ## {my(@c)=caller;warn "new cs::Date ".cs::Hier::h2a($gmt,0)." from [@c]";}
+    $gmt=tm2gmt($gmt,@_);
+    if ($gmt == -1)
+	  { ::need(cs::Hier);
+	    die "range error on "
+	       .cs::Hier::h2a($gmt,0);
+	  }
+  }
 
   my($tm);
 
@@ -46,16 +46,16 @@ sub new
 sub GMTime { shift->{GMT}; }
 
 sub Tm($$)
-	{ my($this,$emitlocaltime)=@_;
-	  $emitlocaltime=1 if ! defined $emitlocaltime;
-	  $this->{TM}->{$emitlocaltime ? LOCAL : GMT};
-	}
+{ my($this,$emitlocaltime)=@_;
+  $emitlocaltime=1 if ! defined $emitlocaltime;
+  $this->{TM}->{$emitlocaltime ? LOCAL : GMT};
+}
 
 sub TMField($$$)
-	{ my($this,$field,$emitlocaltime)=@_;
-	  $emitlocaltime=1 if ! defined $emitlocaltime;
-	  $this->Tm($emitlocaltime)->{$field};
-	}
+{ my($this,$field,$emitlocaltime)=@_;
+  $emitlocaltime=1 if ! defined $emitlocaltime;
+  $this->Tm($emitlocaltime)->{$field};
+}
 
 sub Sec { my($this)=shift; $this->TMField(SS,@_); }
 sub Min { my($this)=shift; $this->TMField(MM,@_); }
@@ -218,7 +218,7 @@ sub timecode($$) # (gmtime,emitlocaltime) -> yyyymmddhhmmss
 { my($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst)
 	=($_[1] ? localtime($_[0]) : gmtime($_[0]));
 
-  sprintf("%02d%02d%02d%02d%02d%02d",$year+1900,$mon+1,$mday,$hour,$min,$sec);
+  sprintf("%04d%02d%02d%02d%02d%02d",$year+1900,$mon+1,$mday,$hour,$min,$sec);
 }
 
 sub datestr($$)	# (gmtime,emitlocaltime) -> "MMmonYY, hh:mm:ss"
