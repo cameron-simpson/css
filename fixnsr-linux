@@ -1,0 +1,25 @@
+#!/bin/sh
+
+cmd=`basename "$0"`
+
+if [ $# -gt 0 ]
+then
+    for h
+    do  ssh "$h" "'/opt/script/$cmd'"
+    done
+    exit 0
+fi
+
+echo nsr local >>/opt/.syncopt
+/opt/script/syncopt -x
+
+cd /etc/rc.d
+for f in init.d/networker \
+	 rc2.d/S98networker \
+	 rc3.d/S98networker \
+	 rc5.d/S98networker
+do  rm -f $f
+    ln -s /opt/nsr/sbin/networker.rh $f
+done
+
+/etc/rc.d/init.d/networker start
