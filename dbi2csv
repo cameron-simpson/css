@@ -10,6 +10,7 @@ use cs::Misc;
 use Getopt::Std;
 use DBI;
 use cs::DBI;
+use cs::Secret;
 
 $::DfltHost='mysql';
 $::DfltDBD='mysql';
@@ -65,7 +66,12 @@ my $where = "@ARGV";
 my $dsn = "DBI:${dbd}:database=${dbname}";
 $dsn.=";host=$host" if length $host;
 
-my @login=('root','foo');
+# shouldn't need login/password - must check mysql perms
+$ENV{SYSTEMID}='home' if ! defined $ENV{SYSTEMID};
+my $s = cs::Secret::get("$host\@$ENV{SYSTEMID}");
+##warn "secret=".cs::Hier::h2a($s,0);
+my @login=($s->{LOGIN},$s->{PASSWORD});
+
 my $dbh = DBI->connect($dsn,@login);
 die "$::cmd: can't get DBI handle for \"$dsn\"\n"
 	if ! defined $dbh;
