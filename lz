@@ -333,6 +333,7 @@ case "$PRINTER" in
     *)		paper=
 		;;
 esac
+export PRINTER
 
 lp=$LZPRINTCOMMAND
 if [ -z "$lp" ]
@@ -341,6 +342,9 @@ then
 	# SysVish
 	solaris)
 	    lp='lp -d "$PRINTER" -T postscript'
+	    ;;
+	linux|freebsd|openbsd|sunos)
+	    lp='lpr "-P$PRINTER"'
 	    ;;
 	# BSDish
 	*)  echo "$cmd: warning: unknown \$OS \"$OS\" - assuming bsd" >&2
