@@ -118,19 +118,19 @@ do
 	       /^$thing nosync\$/b nosync
 	       d
 	       :local
-	       s/.*/makelocal=1/p
-	       q
+	       s/.*/makelocal=1/
+	       b done
 	       :nosync
-	       s/.*/nosync=1/p
-	       q
+	       s/.*/nosync=1/
+	       b done
 	       :vlocal
-	       s/^$thing \\([^ ]*\\).*/makelocal=1 version=\\1/p
-	       q
+	       s/^$thing \\([^ ]*\\).*/makelocal=1 version=\\1/
+	       b done
 	       :vers
-	       s/^$thing /version=/p
-	       q"
+	       s/^$thing /version=/
+	       :done"
     ## echo "$thing:"
-    opts=`2>/dev/null sed -n -e "$sedscript" "$cf"`
+    opts=`2>/dev/null sed -e "$sedscript" "$cf"`
     eval "$opts"
 
     # skip this?
