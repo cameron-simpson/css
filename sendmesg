@@ -22,7 +22,7 @@ if (@ARGV && $ARGV[0] eq '--')
 
 die $::Usage if ! @ARGV;
 
-open(STDERR,">> $ENV{HOME}/sendmesg.out");
+## open(STDERR,">> $ENV{HOME}/sendmesg.out");
 
 $::Msg = new cs::MIME (new cs::Source (FILE,STDIN));
 
