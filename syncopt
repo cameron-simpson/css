@@ -158,11 +158,11 @@ do
 	       /^\* nosync\$/b nosync
 
 	       # set version and mode
-	       /^$thing [^ ][^ ]* local\$/b vlocal
-	       /^$thing [^ ][^ ]* remote\$/b vremote
+	       /^$nvthing [^ ][^ ]* local\$/b vlocal
+	       /^$nvthing [^ ][^ ]* remote\$/b vremote
 
 	       # just set version
-	       /^$thing [^ ][^ ]*\$/b vers
+	       /^$nvthing [^ ][^ ]*\$/b vers
 
 	       # discard unrecognised stuff
 	       d
@@ -176,10 +176,10 @@ do
 	       s/.*/nosync=1 makelocal=/
 	       b done
 	       :vlocal
-	       s/^$thing \\([^ ]*\\).*/makelocal=1 version=\\1 nosync=/
+	       s/^[^ ]* \\([^ ]*\\).*/makelocal=1 version=\\1 nosync=/
 	       b done
 	       :vremote
-	       s/^$thing \\([^ ]*\\).*/makelocal= version=\\1 nosync=/
+	       s/^[^ ]* \\([^ ]*\\).*/makelocal= version=\\1 nosync=/
 	       b done
 	       :vers
 	       s/^$thing /nosync= version=/
