@@ -148,7 +148,7 @@ do
 	then
 	    :
 	else
-	    echo "$cmd: ignore $thing" >&2
+	    echo "$cmd: can't read $r, skipping $thing" >&2
 	    xit=1
 	    continue
 	fi
