@@ -18,7 +18,7 @@ then
   oIFS=$IFS
   IFS='
 '
-  set x `cutbuffer`; shift
+  set -- `xclip -o` || exit 1
   IFS=$oIFS
 fi
 
