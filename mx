@@ -1,0 +1,13 @@
+#!/bin/sh
+## exec nslookup -query=mx ${1+"$@"}
+if [ $# = 0 ]
+then
+    while [ -t 1 ] && necho "domain> "
+	  read domain
+    do  dig "$domain" mx
+    done
+else
+    for domain
+    do  dig "$domain" mx
+    done
+fi
