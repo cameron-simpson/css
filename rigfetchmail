@@ -25,4 +25,4 @@ cd
     acon fetchmail "$@" -d "$fmdelay" $fmopts $fmhosts
   ) &
 )
-alog procmail lock -1 getmail-despool nice getmail-flush -p 300 spool
+alog procmail lock -1 getmail-despool nice getmail-flush -p 30 spool
