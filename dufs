@@ -1,0 +1,9 @@
+#!/bin/sh
+#
+
+onefs=-x
+case $SO in
+    solaris)	onefs=-d ;;
+esac
+
+exec duk $onefs ${1+"$@"}
