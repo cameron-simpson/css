@@ -24,6 +24,7 @@ An assortment of routines for doing common things with audio CDs.
 
 use strict qw(vars);
 use cs::Misc;
+use cs::Pathname;
 
 BEGIN { use cs::DEBUG; cs::DEBUG::using(__FILE__); }
 
@@ -32,6 +33,8 @@ package cs::CDDB;
 @cs::CDDB::ISA=qw();
 
 $cs::CDDB::VERSION='1.0';
+
+$cs::CDDB::CacheDir="$ENV{HOME}/.cddb";
 
 =head1 GLOBAL VARIABLES
 
@@ -50,6 +53,115 @@ $cs::CDDB::DfltDev='/dev/cdrom';
 
 =over 4
 
+=item conn(I<host:port>)
+
+Obtain a B<cs::Port> attached to the CDDB server at the specified I<host> and I<port>.
+If these are omitted, use the environment variable B<$CDDBSERVER>.
+Returns and array of B<(I<conn>,I<welcome>)>
+being the connection and the welcome message respectively,
+or an empty array on error.
+
+=cut
+
+sub conn(;$)
+{ my($hostport)=@_;
+  $hostport=$ENV{CDDBSERVER} if ! defined $hostport;
+
+  if ($hostport !~ /^([^:]+):(\d+)/)
+  { warn "$::cmd: cs::CDDB::conn: bad host:port pair \"$hostport\"\n";
+    return ();
+  }
+
+  ::need(cs::Net::TCP);
+  my $C = cs::Net::TCP->new($1,$2);
+
+  return () if ! defined $C;
+
+  my $hi = $C->GetLine();
+  return () if ! defined $hi;
+  chomp($hi);
+  # warn "<- $hi\n";
+  if ($hi !~ /^20[01]/)
+  { warn "$::cmd: cs::CDDB::conn: unwelcome greeting from server: $hi\n";
+    return ();
+  }
+
+  my($code,$etc)=command($C,"CDDB HELLO $ENV{USER} $ENV{HOSTNAME} $::cmd-cs::CDDB $cs::CDDB::VERSION");
+  if (! defined $code)
+  { warn "$::cmd: cs::CDDB::conn: no response to CDDB HELLO\n";
+    return ();
+  }
+  elsif ($code !~ /^200/)
+  { warn "$::cmd: bad response to CDDB HELLO: $code $etc\n";
+    return ();
+  }
+
+  return ($C,$hi);
+}
+
+=item command(I<conn>,I<command>,I<upload>)
+
+Send the specified CDDB I<command> to the server available on I<conn>,
+a B<cs::Port> typically obtained with B<cs::Net::TCP-E<gt>new>.
+For commands accompanied by data,
+the lines specified in the array I<upload>
+will be sent on receipt of a suitable B<32x> response to the initial command.
+Returns an array of B<(I<code>,I<etc>,@<additional>)>.
+
+=cut
+
+sub command
+{ my($C,$command,@upload)=@_;
+  if (@upload == 1 && ref $upload[0])
+  { @upload=@{$upload[0]};
+  }
+
+  # warn "-> $command\n";
+  $C->Put("$command\n");
+  $C->Flush();
+
+  local($_);
+  $_=$C->GetLine();
+  return () if ! defined || ! length;
+  chomp;
+  # warn "<- $_\n";
+  if (! /^(\d)(\d)(\d)\s*/)
+  { warn "$::cmd: cs::CDDB::command(..,\"$command\"): bad response: $_\n";
+    return ();
+  }
+
+  my($code,$etc,$mid)=("$1$2$3",$',$2);
+  my(@additional);
+
+  if ($mid eq 1)
+  { ADDITIONAL:
+    while (defined($_=$C->GetLine()) && length)
+    { chomp;
+      # warn "<- $_\n";
+      last ADDITIONAL if $_ eq ".";
+      push(@additional,$_);
+    }
+  }
+  elsif ($mid eq 2)
+  { for my $up (@upload)
+    { $C->Put($up, "\n");
+    }
+    $C->Put(".\n");
+    $C->Flush();
+  }
+
+  return ($code,$etc,@additional);
+}
+
+=item cachefile(I<category>,I<discid>)
+
+Return the pathname of the corresponding B<~/.cddb> cache file.
+
+=cut
+
+sub cachefile($$)
+{ "$cs::CDDB::CacheDir/$_[0]/$_[1]";
+}
 
 =back
 
@@ -250,8 +362,12 @@ sub _StatIf()
 =item Tracks()
 
 Return an array of track records.
-Note that the last track is the lead-out, not audio.
 Returns an empty array if there are problems obtaining information.
+
+Note that the last track is the lead-out, not audio,
+and that this is only the data directly determinable
+from the disc.
+For track names etcetera you should use B<TrackInfo()>.
 
 =cut
 
@@ -270,7 +386,7 @@ sub Tracks($)
 
 If the track number I<track> is supplied,
 return the play time of that track in seconds.
-otherwise, return the total play time of the CD in seconds
+Otherwise, return the total play time of the CD in seconds.
 
 =cut
 
@@ -299,6 +415,18 @@ sub Length($;$)
   return undef;
 }
 
+sub _Conn($)
+{ my($this)=@_;
+
+  my($C,$welcome)=conn("$this->{HOST}:$this->{PORT}");
+  if (! defined $C)
+  { warn "$::cmd: conn(host=$this->{HOST},port=$this->{PORT}): $!\n";
+    return undef;
+  }
+
+  return $C;
+}
+
 =item DiscId()
 
 Return the CDDB disc id for this CD
@@ -310,60 +438,334 @@ by consulting the CDDB daemon.
 sub DiscId()
 { my($this)=@_;
 
+  return $this->{DISCID} if exists $this->{DISCID};
+
   $this->_StatIf() || return undef;
 
-  ::need(cs::Net::TCP);
-  my $C;
+  my $C = $this->_Conn();
+  return if ! defined $C;
 
-  if (! defined ($C=cs::Net::TCP->new($this->{HOST},$this->{PORT})))
-  { warn "$::cmd: connect(host=$this->{HOST},port=$this->{PORT}): $!\n";
+  my $qry = "DISCID ".$this->_TrksNSecs();
+  my($code,$etc)=command($C,$qry);
+  if (! defined $code)
+  { warn "$::cmd: no response to: $qry\n";
+    return undef;
+  }
+  
+  if ($code !~ /^200/
+   || $etc !~ /disc\s*id\s*is\s*([\da-f]{8})/i
+     )
+  { warn "$::cmd: bad response to: $qry\n\t$code $etc\n";
     return undef;
   }
 
-  local($_);
-  my $discid;
+  return $this->{DISCID}=$1;	## was hex($1)
+}
 
-  if (! defined($_=$C->GetLine()) || ! length)
-  { warn "$::cmd: no welcome from CDDB daemon\n";
+=item Query()
+
+Match this disc against the database.
+Returns an array of hashrefs of the form B<[I<categ>,I<title>]>.
+Note that a single discid may match multiple database entries.
+
+=cut
+
+sub Query($)
+{ my($this)=@_;
+
+  my $discid = $this->DiscId();
+  if (! defined $discid)
+  { warn "$::cmd: cs::CDDB: no discid!\n";
+    return ();
   }
-  else
-  {
-    $C->Put("CDDB HELLO $ENV{USER} $ENV{HOSTNAME} $::cmd-cs::CDDB $cs::CDDB::VERSION\n");
-    $C->Flush();
-    if (! defined ($_=$C->GetLine()) || ! length)
-    { warn "$::cmd: no response to CDDB HELLO\n";
-    }
-    elsif (! /^200/)
-    { warn "$::cmd: bad response to CDDB HELLO\n\t$_";
-    }
-    else
-    {
-      my @t = $this->Tracks();
-      if (@t)
-      {
-	@t = map($_->{OFFSET}, @t);
-	my $qry = "DISCID ".scalar(@t)." @t ".$this->Length();
 
-	## warn cs::Hier::h2a($this);
-	## warn $qry;
+  my $C = $this->_Conn();
+  return if ! defined $C;
 
-	$C->Put("$qry\n");
-	$C->Flush();
-	if (! defined ($_=$C->GetLine()) || ! length)
-	{ warn "$::cmd: no response to: $qry\n";
-	}
-	elsif (! /^200\s*disc\s*id\s*is\s*([\da-f]{8})/i)
-	{ warn "$::cmd: bad response to: $qry\n\t$_";
-	}
-	else
-	{ $discid=$1;
-	}
+  my($code,$etc,@additional)=command($C,"QUERY $discid ".$this->_TrksNSecs());
+  return () if ! defined $code || $code !~ /^2/;
+
+  my @matches;
+
+  if ($etc =~ /^close matches found/i)
+  { for my $a (@additional)
+    { if ($a !~ /^(\S+)\s+$discid\s+/)
+      { warn "$::cmd: cs::CDDB: QUERY $discid: bad close match: $a\n";
+      }
+      else
+      { push(@matches,[$1,$']);
       }
     }
   }
+  else
+  { if ($etc !~ /^(\S+)\s+$discid\s+/)
+    { warn "$::cmd: cs::CDDB: QUERY $discid: bad exact match: $etc\n";
+    }
+    else
+    { push(@matches,[$1,$']);
+    }
+  }
 
-  return undef if ! defined $discid;
-  return hex($discid);
+  return @matches;
+}
+
+# return the files in the cache matching the discid, if any
+# contrain ourselves to the specified category if supplied
+sub _ProbeCache($;$)
+{ my($this,$cat)=@_;
+
+  my $discid = $this->DiscId();
+  return () if ! defined $discid;
+
+  my @cats;
+
+  if (defined $cat)
+  { @cats=$cat;
+  }
+  else
+  { @cats=cs::Pathname::dirents($cs::CDDB::CacheDir);
+  }
+
+  my @hits;
+
+  my $file;
+  for my $c (@cats)
+  { $file=cachefile($c,$discid);
+    push(@hits,[$c,$file]) if -s $file;
+  }
+
+  return @hits;
+}
+
+=item Read(I<category>)
+
+Return the xmcd database entry as an array of lines,
+comments included.
+If the caller has a cached entry in B<$HOME/.cddb/I<category>/I<discid>>
+then the contents of that will be returned instead.
+
+=cut
+
+sub Read($$)
+{ my($this,$category)=@_;
+
+  my $discid = $this->DiscId();
+  if (! defined $discid)
+  { warn "$::cmd: cs::CDDB: no discid!\n";
+    return ();
+  }
+
+  my $cachefield="READ/$category/$discid";
+  if (exists $this->{$cachefield})
+  { return @{$this->{$cachefield}};
+  }
+
+  my @caches = $this->_ProbeCache($category);
+  if (@caches && open(CACHED,"< $caches[0]->[1]\0"))
+  {
+    my @entry;
+    local($_);
+  
+    while (defined($_=<CACHED>))
+    { chomp;
+      push(@entry,$_);
+    }
+    close(CACHED);
+
+    $this->_Cache($category,$discid,@entry);
+
+    return @entry;
+  }
+
+  my $C = $this->_Conn();
+  return if ! defined $C;
+
+  my($code,$etc,@additional)=command($C,"READ $category $discid");
+  return () if ! defined $code || $code ne 210;
+
+  $this->_Cache($category,$discid,@additional);
+  $this->_CacheSave($category,$discid,@additional);
+
+  return @additional;
+}
+
+# stash the results of a look up
+sub _Cache
+{ my($this,$category,$discid,@lines)=@_;
+  
+  $this->{CATEGORY}=$category;
+  $this->{"READ/$category/$discid"}=[@lines];
+}
+
+# archive a lookup
+sub _CacheSave
+{ my($this,$category,$discid,@lines)=@_;
+
+  my $file = cacheFile($category,$discid);
+  if (! -s $file && open(CACHE,"> $file\0"))
+  { for (@lines)
+    { print CACHE $_, "\n";
+    }
+    close(CACHE);
+  }
+}
+
+=item Category()
+
+Return the category of this disc.
+
+=cut
+
+sub Category($)
+{ my($this)=@_;
+
+  return $this->{CATEGORY} if exists $this->{CATEGORY};
+
+  my @matches;
+
+  @matches=$this->_ProbeCache();
+  if (@matches > 0)
+  {
+    if (@matches > 1)
+    { warn "$::cmd: cs::CDDB: multiple matches in cache!\n";
+      return undef;
+    }
+
+    return $matches[0]->[0];
+  }
+
+  @matches=$this->Query();
+  
+  if (! @matches)
+  { warn "$::cmd: cs::CDDB: no matches!\n";
+    return undef;
+  }
+
+  if (@matches > 1)
+  { warn "$::cmd: cs::CDDB: multiple matches:\n";
+    for my $m (@matches)
+    { warn "\t$m->[0]\t$m->[1]\n";
+    }
+    return undef;
+  }
+
+  my($cat,$title)=@{$matches[0]};
+
+  $this->{CATEGORY}=$cat;
+  $this->{MATCHTITLE}=$title;
+
+  return $cat;
+}
+
+=item Artist()
+
+Return the disc's artist.
+
+=cut
+
+sub Artist()
+{ my($this)=@_;
+
+  return $this->{ARTIST} if exists $this->{ARTIST};
+
+  my $cat = $this->Category();
+  return undef if ! defined $cat;
+
+  my @e = $this->Read($cat);
+  return undef if ! @e;
+
+  for (@e)
+  { if (/^DTITLE=\s*(.*\S)\s+\/\s+/)
+    { $this->{ARTIST}=$1;
+      $this->{TITLE}=$';
+      return $1;
+    }
+  }
+
+  return undef;
+}
+
+=item Title()
+
+Return the disc's title.
+
+=cut
+
+sub Title()
+{ my($this)=@_;
+
+  return $this->{TITLE} if exists $this->{TITLE};
+
+  my $cat = $this->Category();
+  return undef if ! defined $cat;
+
+  my @e = $this->Read($cat);
+  return undef if ! @e;
+
+  for (@e)
+  { if (/^DTITLE=\s(.*\S)\s+\/\s+/)
+    { $this->{ARTIST}=$1;
+      $this->{TITLE}=$';
+      return $2;
+    }
+  }
+
+  return undef;
+}
+
+=item NTracks()
+
+Return the number of tracks.
+
+=cut
+
+sub NTracks
+{ scalar($_[0]->Tracks())-1;
+}
+
+=item TrackInfo()
+
+Return an array of hashrefs containing
+track timing and names.
+
+=cut
+
+sub TrackInfo($)
+{ my($this)=@_;
+
+  if (! exists $this->{TRACKINFO})
+  {
+    my $cat = $this->Category();
+    return () if ! defined $cat;
+
+    $this->_StatIf() || return ();
+
+    my @e = $this->Read($cat);
+    return () if ! @e;
+
+    my $T = $this->{TRACKS};
+
+    for (@e)
+    { if (/^TTITLE0*(\d+)=\s*/)
+      { $T->[$1]->{TTITLE}=$';
+      }
+      elsif (/^EXTT0*(\d+)=\s*/)
+      { $T->[$1]->{EXTT}=$';
+      }
+    }
+
+    $this->{TRACKINFO}=$this->{TRACKS};
+  }
+
+  return @{$this->{TRACKINFO}};
+}
+
+sub _TrksNSecs($)
+{ my($this)=@_;
+
+  my @t = map($_->{OFFSET}, $this->Tracks());
+
+  return scalar(@t)." @t ".$this->Length();
 }
 
 =back
@@ -374,7 +776,7 @@ CDDBSERVER, the default CDDB daemon in the form B<I<host>:I<port>>
 
 =head1 SEE ALSO
 
-CDDB_get(3), FreeDB(3), cdtoc(1cs), cdsubmit(1cs)
+CDDB_get(3), FreeDB(3), cddiscinfo(1cs), cdtoc(1cs), cdsubmit(1cs)
 
 =head1 AUTHOR
 
