@@ -1,0 +1,46 @@
+#!/bin/sh
+
+cmd=`basename "$0"`
+usage="Usage: $cmd [-t] command-strings..."
+
+useterm=
+[ "x$1" = x-t ] && { useterm=1; shift; }
+
+[ $# = 0 ] && { echo "$usage" >&2; exit 2; }
+
+wkdir=
+trap 'rm -rf "$wkdir"' 0 1 2 15
+wkdir=`mkdirn "/tmp/$cmd"` || exit 1
+
+# set up pipes
+pipefd=3
+first=1
+for pipecmd
+do
+  [ $first ] && { set x; shift; }
+
+  if [ $useterm ]
+  then
+    pipecmd='exec <"$PIPECMD_PIPENAME"; '$pipecmd
+    pipe=`TMPDIR=$wkdir pipecmd term +a -small -c "$pipecmd"` || exit 1
+  else
+
+    pipe=`TMPDIR=$wkdir pipecmd sh -c "$pipecmd"` || exit 1
+  fi
+
+  eval "exec $pipefd>\"\$pipe\""
+  set $* $pipefd	## we know they're all just numbers
+  pipefd=`expr $pipefd + 1`
+
+  first=
+done
+
+while [ -t 0 -a -t 1 ] && necho "$cmd> "
+      read -r line
+do
+  for pipefd
+  do  eval "echo \"\$line\" >&\$pipefd"
+  done
+done
+
+exit 0
