@@ -8,4 +8,4 @@ cmd=$0
 [ $# = 0 ] && { echo "Usage: $cmd mairix-search-args..." >&2; exit 2; }
 
 mairix "$@" || exit 1
-exec + mairix-result
+exec + -R mairix-result
