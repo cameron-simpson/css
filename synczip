@@ -1,2 +1,4 @@
 #!/bin/sh
-exec syncstuff @zip ${1+"$@"}
+pfx zipperii syncstuff @zip ${1+"$@"} &
+pfx wilted syncstuff @zipzap ${1+"$@"} &
+wait
