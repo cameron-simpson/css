@@ -1531,7 +1531,11 @@ sub _Get($$;$$$)
 
     my($rversion,$rcode,$rtext,$M);
 
-    warn "GET $url\n" if $::Verbose;
+    if ($::Verbose)
+    { warn "GET $url\n";
+      $rqhdrs->WriteItem(main::STDERR);
+    }
+
     ($rversion,$rcode,$rtext,$M)=$phttp->Request(GET,$url,$rqhdrs,undef,undef,$sinkfile);
 
     if (! defined $rversion)
