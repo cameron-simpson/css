@@ -138,18 +138,29 @@ do
 
     # locate remote instance of thing
     # in either opt-arch or opt-common
-    if test -d "$archopt/$thing/."
+    r=$archopt/$thing
+    if test -f "$r" || test -d "$r/."
     then
-	r=$archopt/$thing
+	:
     else
-	if test -d "$commonopt/$thing/."
+	r=$commonopt/$thing
+	if test -f "$r" || test -d "$r/."
 	then
-	    r=$commonopt/$thing
+	    :
 	else
-	    echo "$cmd: can't find $thing in $archopt or $commonopt" >&2
+	    echo "$cmd: ignore $thing" >&2
 	    xit=1
 	    continue
 	fi
+    fi
+
+    # files - basicly /opt/ARCH really
+    if test -f "$r"
+    then
+	test -f "$l" && cmp -s "$r" "$l" && continue
+	rm -rf "$l"
+	$echo cp -p "$r" "$l" || xit=1
+	continue
     fi
 
     # maintain generic links
