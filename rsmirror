@@ -358,7 +358,7 @@ do
 	;;
       http|ftp)
 	ncut=`IFS=/; set x $rpath; shift; echo $#`
-	synccmd="$timelimit wget --mirror -nH --cut-dirs=$ncut -np -P \"\$fpath\" \"\$how://\$host/\$rpath\""
+	synccmd="$timelimit wget --mirror -D \"\$host\" -nH --cut-dirs=$ncut -np -P \"\$fpath\" \"\$how://\$host/\$rpath\""
 	;;
       *)echo "$pfx: method \"$how\" not supported" >&2
 	xit=1
