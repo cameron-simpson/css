@@ -1,0 +1,119 @@
+#!/usr/bin/perl -w
+#
+# Annotate a PNG image file, writing result to stdout.
+#	- Cameron Simpson <cs@zip.com.au> 08jan2002
+#
+
+use strict qw(vars);
+
+use cs::Misc;
+use GD;
+
+sub xval($);
+sub yval($);
+
+$::Usage="Usage: $::cmd srcimage.png < commands\n";
+
+my $png;
+
+{ my $badopts = 0;
+
+  if (! @ARGV)
+  { warn "$::cmd: missing srcimage.png\n";
+    $badopts=1;
+  }
+  else
+  { $png=shift(@ARGV);
+  }
+
+  if (@ARGV)
+  { warn "$::cmd: extra arguments: @ARGV\n";
+    $badopts=1;
+  }
+
+  die $::Usage if $badopts;
+}
+
+my $im = GD::Image->newFromPng($png);
+($::DX,$::DY)=$im->getBounds();
+
+my $bg = $im->colorAllocate(255,255,255);
+my $fg = $im->colorAllocate(0,0,0);
+my $font = gdSmallFont();
+my $fwidth = $font->width();
+my $fheight = $font->height();
+
+my $ok=1;
+
+COMMAND:
+while (defined($_=<STDIN>))
+{ chomp;
+  s/^\s+//;
+  s/^#.*//;
+  next COMMAND if ! length;
+
+  my $pfx="$::cmd: stdin, line $.: ";
+
+  /^(\S+)\s*/;
+  my $op=uc($1);
+  $_=$';
+  my @args = grep(length,split(/\s+/));
+
+  $pfx="$pfx$op: ";
+
+  if ($op eq FG)
+  { if (@args != 3)
+    { warn "$pfx: expected 3 arguments (R B G)\n";
+      $ok=0;
+    }
+    else
+    { $fg=$im->colorAllocate(@args);
+    }
+  }
+  elsif ($op eq BG)
+  { if (@args != 3)
+    { warn "$pfx: expected 3 arguments (R B G)\n";
+      $ok=0;
+    }
+    else
+    { $bg=$im->colorAllocate(@args);
+    }
+  }
+  elsif ($op eq LABEL)
+  { if (@args < 3)
+    { warn "$pfx: expected X Y LABELTEXT...\n";
+      $ok=0;
+    }
+    else
+    { my($x,$y)=(xval(shift(@args)),yval(shift(@args)));
+      my $txt = "@args";
+      my $dx = length($txt)*$fwidth;
+      my $dy = $fheight;
+
+      $im->filledRectangle($x-1,$y-1,$x+$dx+1,$y+$dy+1,$bg);
+      $im->string($font,$x,$y,$txt,$fg);
+    }
+  }
+  else
+  { warn "$pfx: unknown operation\n";
+    $ok=0;
+  }
+}
+
+die if ! $ok;
+
+print $im->png();
+
+exit 0;
+
+sub xval($)
+{ my($x)=@_;
+  $x=int(0.5+$::DX*$x) if $x =~ /^0\./;
+  return $x;
+}
+
+sub yval($)
+{ my($y)=@_;
+  $y=int(0.5+$::DY*$y) if $y =~ /^0\./;
+  return $y;
+}
