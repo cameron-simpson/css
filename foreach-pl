@@ -1,0 +1,44 @@
+#!/usr/bin/perl
+#
+# For each line of input run the supplied perl code.
+# A lot like "perl -ne" but with progress reporting.
+#	- Cameron Simpson <cs@zip.com.au> 01jul2004
+#
+
+use cs::Misc;
+use cs::Upd;
+
+$::Usage="Usage: $::cmd perl-code\n";
+
+my $code;
+
+{ my $badopts=0;
+
+  if (! @ARGV)
+  { warn "$::cmd: missing perl-code\n";
+    $badopts=1;
+  }
+  else
+  { $code = shift(@ARGV);
+    if (@ARGV)
+    { warn "$::cmd: extra arguments after perl-code: @ARGV\n";
+      $badopts=1;
+    }
+
+    eval "sub doit() { $code; }";
+    if ($@)
+    { warn "$::cmd: eval perl-code: $@\n";
+      $badopts=1;
+    }
+  }
+
+  die $::Usage if $batops;
+}
+
+while (defined($_=<STDIN>))
+{ chomp;
+  out($_);
+  doit();
+}
+
+out('');
