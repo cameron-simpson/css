@@ -1,0 +1,43 @@
+#!/bin/sh
+#
+# Create a mairix rc file for the specified MH folder directory.
+#	- Cameron Simpson <cs@zip.com.au> 17mar2004
+#
+
+vfolder=.mairix-result
+
+cmd=`basename "$0"`
+usage="Usage: $cmd [-r resdir] mhdir
+	-r resdir	Specify result directory.
+			Default: $vfolder"
+
+badopts=
+
+[ "x$1" = x-r ] && { vfolder=$2; shift; shift; }
+
+if [ $# = 1 ]
+then
+    dir=$1; shift
+    case "$dir" in
+	/*)	;;
+	*)	echo "$cmd: mhdir must be a full path" >&2
+		badopts=1
+		;;
+    esac
+else
+    echo "$cmd: missing mhdir" >&2
+    badopts=1
+fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+ismhdir "$dir" || { echo "$dir: not an MH folder" >&2; exit 1; }
+
+cd "$dir" || exit 1
+
+exec >".mairixrc"
+echo "base=$dir"
+echo "mh_folders=."
+echo "vfolder=$vfolder"
+echo "vfolder_format=mh"
+echo "database=$dir/.mairix.db"
