@@ -1,0 +1,113 @@
+#!/usr/bin/perl
+#
+
+($cmd=$0) =~ s:.*/::;
+$usage="Usage: $cmd [cc-E-output-files...]\n";
+$xit=0;
+
+undef $SOURCE;
+$OPEN=0;
+$LINENO=1;
+while (<>)
+	{ if (($lineno,$file) = /^#\s+(\d+)\s+"(\S+)"/)
+		{ print;
+		  if ($#OPEN >= $[ && $file eq $OPEN[$[])
+			{ &popfile;
+			  &skipto($lineno,0);
+			}
+		  else
+		  { &pushfile($file);
+		    &skipto($lineno,0);
+		  }
+		}
+	  elsif (/^#\s+(\d+)/)
+		{ $lineno=$1+0;
+		  print;
+		  &skipto($lineno,1);
+		}
+	  else
+	  { &skipto($LINENO+1,1);
+	  }
+	}
+
+exit $xit;
+
+sub skipto	# (lineno,print)
+	{ local($lineno,$print)=@_;
+	
+	  if ($lineno < $LINENO)
+		{ print STDERR "$cmd: $SOURCE, line $LINENO: can't skip backwards to line $lineno\n";
+		  $xit=1;
+		}
+	  elsif (!defined($SOURCE))
+		{ print STDERR "$cmd: can't skip to line $lineno: no file open\n";
+		  $xit=1;
+		}
+	  else
+	  { local($_);
+
+	    while ($LINENO < $lineno)
+		{ if (!$OPEN)
+			{ print "\n" if $print;
+			  $LINENO++;
+			}
+		  elsif ($_=<SOURCE>)
+			{ print if $print;
+			  $LINENO++;
+			}
+		  else
+		  { close(SOURCE);
+		    $OPEN=0;
+		    print STDERR "$cmd: $SOURCE, line $LINENO: unexpected EOF, can't skip to line $lineno\n";
+		    print STDERR "caller=(", caller, ")\n";
+		    $xit=1;
+		    last;
+		  }
+		}
+	  }
+	}
+
+sub pushfile	# (filename)
+	{ local($file)=@_;
+
+	  if (defined($SOURCE))
+		{ push(@SOURCE,$SOURCE);
+		  push(@LINENO,$LINENO);
+		  push(@TELL,tell(SOURCE));
+		  if ($OPEN)
+			{ close($SOURCE);
+			  $OPEN=0;
+			}
+		}
+
+	  &openfile($file);
+	}
+
+sub openfile	# (filename)
+	{ local($file)=@_;
+
+	  print STDERR "$cmd: can't open $file: $!\n"
+		if ! ($OPEN=open(SOURCE,"< $file\0"));
+
+	  $SOURCE=$file;
+	  $LINENO=1;
+	}
+
+sub popfile
+	{ if ($OPEN)
+		{ close(SOURCE);
+		  $OPEN=0;
+		}
+
+	  if ($#SOURCE < $[)
+		{ print STDERR "$cmd: $SOURCE, line $LINENO: popfile: no files on stack\n";
+		  $xit=1;
+		}
+	  else
+	  { &openfile(pop @SOURCE);
+	    $LINENO=pop @LINENO;
+	    if ($OPEN)
+		{ seek(SOURCE,pop @TELL,0);
+		}
+	  }
+	}
