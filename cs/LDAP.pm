@@ -16,9 +16,7 @@ use cs::Sink;
 package cs::LDAP;
 
 $cs::LDAP::Host=defined $ENV{LDAP_HOST} ? $ENV{LDAP_HOST} : 'ldap';
-$cs::LDAP::BaseDN=defined $ENV{LDAP_BASEDN}
-			? $ENV{LDAP_BASEDN}
-			: $CISRA::RootDN;
+$cs::LDAP::BaseDN=$ENV{LDAP_BASEDN};
 $cs::LDAP::AdminDN=defined $ENV{LDAP_ADMIN}
 			? $ENV{LDAP_ADMIN}
 			: "uid=admin, $cs::LDAP::BaseDN";
