@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 #
 # Write shell script to reload environment.
-#	- Cameron Simpson, 15may93
+#	- Cameron Simpson, 15may1993
 #
 
 @env=(sprintf("0%o\n",umask));
@@ -15,7 +15,7 @@ if (@ARGV)
 { @envFiles=@ARGV;
 }
 else
-{ @envFiles="$ENV{HOME}/.env/$ENV{SYSTEMID}.$ENV{ARCH}";
+{ @envFiles="$ENV{HOME}/var/stashenv/$ENV{SYSTEMID}.$ENV{ARCH}";
 }
 
 ENV:
