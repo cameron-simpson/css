@@ -70,8 +70,13 @@ fi
 
 [ -n "$ptns" ] && filter="$filter | grepall $anyopt $ptns"
 
-[ $random ] && filter="$filter | shuffle"
-[ "x$n" = x0 ] || filter="$filter | sed '${n}q'"
+if [ $random ]
+then
+    filter="$filter | shuffle"
+    [ "x$n" = x0 ] || filter="$filter $n"
+else
+    [ "x$n" = x0 ] || filter="$filter | sed '${n}q'"
+fi
 
 for dir
 do
