@@ -36,4 +36,4 @@ fi
 [ $# = 0 ] && set .
 case " $*" in *" -"*) ;; *) set "$@" -type f -print ;; esac
 
-find "$@" | xxargs g -g "grep" "$ptn"
+find "$@" | xxargs g $flags -g "grep" "$ptn"
