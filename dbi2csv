@@ -16,9 +16,10 @@ $::DfltHost='mysql';
 $::DfltDBD='mysql';
 $::DfltDB='REPORTS_DB';
 
-$::Usage="Usage: $::cmd [-h host] [-d dbd] [db.]table [fields...] \\
+$::Usage="Usage: $::cmd [-h host] [-l login:pass] [-d dbd] [db.]table [fields...] \\
 			[WHERE condition]
 	-h host	Alternate host to contact. Default: $::DfltHost.
+	-l login:pass Login/password to use.
 	-d dbd	Alternate DBD backend to use. Default: $::DfltDBD.
 	-s field Sort on the named field (lexical).
 	-r	Sort in reverse.
@@ -26,6 +27,7 @@ $::Usage="Usage: $::cmd [-h host] [-d dbd] [db.]table [fields...] \\
 ";
 
 my $host=$::DfltHost;
+my $logpass='';
 my $dbd=$::DfltDBD;
 my $dbname=$::DfltDB;
 my $dbtable;
@@ -33,9 +35,10 @@ my $sortfield;
 my $sortreverse=0;
 
 my $badopts=0;
-getopts('rd:h:s:') || ($badopts=1);
+getopts('rd:h:l:s:') || ($badopts=1);
 $host=$::opt_h if defined $::opt_h;
 $dbd=$::opt_d if defined $::opt_d;
+$logpass=$::opt_l if defined $::opt_l;
 $sortfield=$::opt_s if defined $::opt_s;
 $sortreverse=1 if defined $::opt_r;
 
@@ -67,10 +70,20 @@ my $dsn = "DBI:${dbd}:database=${dbname}";
 $dsn.=";host=$host" if length $host;
 
 # shouldn't need login/password - must check mysql perms
-$ENV{SYSTEMID}='home' if ! defined $ENV{SYSTEMID};
-my $s = cs::Secret::get("$host\@$ENV{SYSTEMID}");
-##warn "secret=".cs::Hier::h2a($s,0);
-my @login=($s->{LOGIN},$s->{PASSWORD});
+my @login;
+if (! length $logpass)
+{
+  $ENV{SYSTEMID}='home' if ! defined $ENV{SYSTEMID};
+  my $s = cs::Secret::get("$host\@$ENV{SYSTEMID}");
+  ##warn "secret=".cs::Hier::h2a($s,0);
+  @login=($s->{LOGIN},$s->{PASSWORD});
+}
+elsif ($logpass =~ /:/)
+{ @login=($`,$');
+}
+else
+{ @login=($logpass,undef);
+}
 
 my $dbh = DBI->connect($dsn,@login);
 die "$::cmd: can't get DBI handle for \"$dsn\"\n"
