@@ -1,0 +1,19 @@
+#!/bin/sh
+#
+# Generate a self generating FVWM menu.
+#	- Cameron Simpson <cs@zip.com.au> 18may2002
+#
+
+cmd=$0
+[ $# -ge 3 ] || { echo "Usage: $cmd menu title cmd [args...]" >&2; exit 2; }
+
+menu=$1
+title=$2
+shift; shift
+
+"$@" \
+| ( echo "DestroyMenu $menu"
+    echo "AddToMenu $menu \"$title\" Title"
+    echo "AddToMenu $menu DynamicPopUpAction Piperead '$0 $menu \"$title\" $*'"
+    exec sed "s/^/AddToMenu $menu /"
+  )
