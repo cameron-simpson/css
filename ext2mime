@@ -22,7 +22,7 @@ case "$fbase" in
     do
       if  cat "$HOME/.mime.types" "$HOME/rc/mime.types" /etc/mime.types \
 	      2>/dev/null \
-	| grep '^[ 	]*[^#]' \
+	| grep '^[ 	]*[^#]' 2>/dev/null \
 	| { while read mttype mtetc || exit 1
 	    do
 	      for ext in $mtetc
