@@ -23,9 +23,9 @@ sub min	{
 	  my($min)=shift;
 	  my($n);
 	  while (@_)
-		{ $n=shift;
-		  if ($n < $min)	{ $min=$n; }
-		}
+	  { $n=shift;
+	    if ($n < $min)	{ $min=$n; }
+	  }
 	  $min;
 	}
 sub max	{ return undef unless @_;
@@ -33,9 +33,9 @@ sub max	{ return undef unless @_;
 	  my($max)=shift;
 	  my($n);
 	  while (@_)
-		{ $n=shift;
-		  if ($n > $max)	{ $max=$n; }
-		}
+	  { $n=shift;
+	    if ($n > $max)	{ $max=$n; }
+	  }
 	  ## warn "max=$max";
 	  $max;
 	}
