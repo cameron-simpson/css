@@ -43,9 +43,9 @@ sub pstack
   my($p,$f,$l,$sub);
 
   for (@s)
-	{ ($p,$f,$l,$sub)=@$_;
-	  warn "$f:$l: ${p}::$sub\n";
-	}
+  { ($p,$f,$l,$sub)=@$_;
+    warn "$f:$l: ${p}::$sub\n";
+  }
 }
 
 sub cstack
@@ -55,10 +55,10 @@ sub cstack
   $i=0 unless defined $i;
 
   CALL:
-    while (@c=caller($i))
-	{ push(@s,[ @c ]);
-	  $i++;
-	}
+  while (@c=caller($i))
+  { push(@s,[ @c ]);
+    $i++;
+  }
 
   @s;
 }
