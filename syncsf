@@ -7,7 +7,7 @@
 cmd=`basename "$0"`
 usage="Usage: $cmd [address]"
 
-zapdir=$HOME/there/adzapper.sourceforge.net
+zapdir=$HOME/@/adzapper.sf
 
 dotag=
 dopost=
@@ -31,10 +31,10 @@ set -x
 cd $zapdir/html || exit 1
 if ask "Run myke"
 then
-    myke || exit 1
+    myke _all || exit 1
 fi
 
-rsync -avHPW --delete --exclude=CVS/ $HOME/there/adzapper.sourceforge.net/html/. sf:adzapper/htdocs/.
+rsync -avHPW --delete --exclude=CVS/ $zapdir/html/. sf:adzapper/htdocs/.
 
 if [ $dopost ]
 then
