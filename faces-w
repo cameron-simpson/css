@@ -1,0 +1,54 @@
+#!/usr/bin/perl
+#
+# Emit a faces(1) input list from the w(1) command.
+#	- Cameron Simpson <cs@zip.com.au> 26apr2002
+#
+
+($cmd=$0) =~ s:.*/::;
+
+open(STDIN,"w|") || die "$cmd: can't pipe from the w command: $!\n";
+
+W:
+while (<STDIN>)
+{
+  next W if $. < 3;
+  chomp;
+  ($user,$tty,$host,$login,$idle,$jcpu,$pcpu,$what)=split(/\s+/,$_);
+
+  $idle=idle2s($idle);
+  $what =~ s:.*/::;
+
+  if ($host eq '-')
+  { $host='';
+  }
+  else
+  { $host =~ s/\..*//;
+  }
+
+  $user.="\@$host" if length $host;
+
+  $w{$user}++;
+  if ($w{$user} == 1 || $idle < $i{$user})
+  { $i{$user}=$idle; $p{$user}=$what; }
+}
+
+@k=sort keys %w;
+print "Cols=".@k." Rows=1\n";
+for (@k)
+{ if (/\@/)	{ $user=$`; $host=$'; }
+  else		{ $user=$_; $host=""; }
+
+  $n=$w{$_};
+  $n='' if $n == 1;
+
+  print "$user\t$host\t$p{$_}\t$n\n";
+}
+
+sub idle2s
+{ local($_)=@_;
+
+  if (/^(\d+)days$/)	{ return $1*24*3600; }
+  if (/^(\d+):0?(\d+)m$/){ return ($1*60+$2)*60; }
+  if (/^(\d+)(\.\d+)?s$/){ return $1; }
+  return 0;
+}
