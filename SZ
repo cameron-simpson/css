@@ -1,0 +1,13 @@
+#!/bin/sh
+#
+# ps sorted of process size or resident size.
+#	- Cameron Simpson <cs@zip.com.au>
+#
+
+case $0 in
+    *SZ)	col=VSZ ;;
+    *RSS)	col=RSS ;;
+    *)		echo "$0: who am I - I expect SZ or RSS" >&2; exit 2 ;;
+esac
+
+psa ${1+"$@"} | sortcol -n "$col"
