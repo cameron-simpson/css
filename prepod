@@ -1,0 +1,39 @@
+#!/bin/sed -f
+#
+# Preprocess POD data to enhance it.
+# So far:
+#	=image => HTML IMG tag
+#	=author 
+#
+#	- Cameron Simpson <cs@zip.com.au> 01jul2003
+#
+
+/^=image/!b nimage
+s|^=image[ 	][ 	]*\(.*\)|=begin html\
+\
+<IMG SRC="\1" ALT="\1">\
+\
+=end html|
+b done
+
+:nimage
+/^=author/!b nauthor
+s|^=author[ 	][	]*\(.*\)|=begin html\
+\
+<SMALL>Author: <A HREF="mailto:\1">\1</A></SMALL><BR>\
+\
+=end html|
+b done
+
+:nauthor
+/^=modtime/!b nmodtime
+s|^=modtime[ 	][	]*\(.*\)|=begin html\
+\
+<SMALL>Last modified: \1</SMALL><BR>\
+\
+=end html|
+b done
+
+:nmodtime
+
+:done
