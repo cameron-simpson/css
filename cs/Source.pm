@@ -697,8 +697,8 @@ sub UnGet
 { my($this)=shift;
 
   for (reverse @_)
-	{ $this->_PushBuf($_);
-	}
+  { $this->_PushBuf($_);
+  }
 }
 
 sub CopyTo
