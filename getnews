@@ -91,27 +91,19 @@ sub fetchgroup($)
   ## warn "range($group)=".$R->Text();
 
   if ($::CatchUp)
-  { $R->Add($low,$high);
+  { $R->Add(1,$high);
     $::RC->Sync();
     return;
   }
-
-  # compute list of unvisited articles
-  my($rlow,$rhigh)=$R->Bounds();
-  my $IR = $R->Invert();
-
-  if ($low < $rlow)	{ $IR->Add($low,$rlow-1); }
-  if ($rhigh < $low)	{ $rhigh=$low-1; }
-  if ($high > $rhigh)	{ $IR->Add($rhigh+1,$high); }
 
   my $M;
   my $n=0;
 
   N:
-  for my $n ($IR->Enum())
-  { out("$group: $n/$high");
-
-    ## next N if $R->InRange($n); ## we know it's not in the range
+  for my $n ($low..$high)
+  {
+    next N if $R->InRange($n); ## we know it's not in the range
+    out("$group: $n/$high");
 
     $R->Add($n);	# articles come in in sequence
 
