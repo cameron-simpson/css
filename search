@@ -4,6 +4,12 @@
 #	- Cameron Simpson <cs@zip.com.au> 10may1997
 #
 
+cmd=`basename "$0"`
+usage="Usage: $cmd [-t target] search terms ..."
+
+target=
+[ "x$1" = x-t ] && { target=$2; shift; shift; }
+
 case $SYSTEMID in
     cisra)	serv=web
 		user=cameron
@@ -15,52 +21,60 @@ esac
 cgibase="http://$serv/$cgibin"
 cgi="${cgibase}search.cgi"
 
-cmd=`basename "$0"`
-
 query=$*
 [ -n "$query" ] || query=`xunclip`
 query=`qsencode "$query"`
 
-target=$cmd
-case "$cmd" in
-    aarn)	[ $# = 0 ] && exec us http://mirror.aarnet.edu.au/ ;;
-    search)	target=$1; shift ;;
-    av)		target=altavista ;;
-    trans)	target=systranslinks ;;
-    babel)	target=babelfish ;;
-    nlight)	target=northernlight ;;
-    raging)	target=avraging ;;
-    avsubmit)	target=altavistasubmit ;;
-    dj)		target=googledj ;;
-    deja)	target=dejanews ;;
-    djid)	exec us `msgid2dj ${1+"$@"}` ;;
-    avim|im)	target=avimagesearcher ;;
-    fm)		target=freshmeat ;;
-    gim)	target=googleimagesearch ;;
-    rpmfind)	target=speakeasy-rpmfind ;;
-    fsu)	target=findsameurl ;;
-    fst)	target=findsametext ;;
-    sf)		target=sourceforge ;;
-    yp)		target=yellowpages ;;
-    mcrawl)	target=metacrawler ;;
-    w3val)	target=w3c_validate ;;
-    imdb-actor)	target=movieactors ;;
-    imdb-title)	target=movietitles ;;
-    imdb-character-male) target=moviecharmale ;;
-    imdb-character-female) target=moviecharfemale ;;
-    tv)         target=sofcomtv ;;
-    movie)	exec us "http://www.cinema.pgh.pa.us/movie/reviews?$query" ;;
-    pagescour)	exec us "${cgibase}htclean.cgi/$query" ;;
-    ebay)	case "$query" in
+if [ -z "$target" ]
+then
+    target=$cmd
+    case "$cmd" in
+	aarn)	[ $# = 0 ] && exec us http://mirror.aarnet.edu.au/ ;;
+	av)	target=altavista ;;
+	trans)	target=systranslinks ;;
+	babel)	target=babelfish ;;
+	nlight)	target=northernlight ;;
+	raging)	target=avraging ;;
+	avsubmit) target=altavistasubmit ;;
+	dj)	target=googledj ;;
+	msgid)	target=googledjmsgid ;;
+	deja)	target=dejanews ;;
+	djid)	exec us `msgid2dj ${1+"$@"}` ;;
+	avim|im)target=avimagesearcher ;;
+	fm)	target=freshmeat ;;
+	gim)	target=googleimagesearch ;;
+	rpmfind)target=speakeasy-rpmfind ;;
+	fsu)	target=findsameurl ;;
+	fst)	target=findsametext ;;
+	sf)	target=sourceforge ;;
+	yp)	target=yellowpages ;;
+	mcrawl)	target=metacrawler ;;
+	w3val)	target=w3c_validate ;;
+	imdb)	target=movietitles ;;
+	imdb-actor) target=movieactors ;;
+	imdb-title) target=movietitles ;;
+	imdb-character-male) target=moviecharmale ;;
+	imdb-character-female) target=moviecharfemale ;;
+	tv)     target=sofcomtv ;;
+	www)	for target in altavista yahoo dmoz google
+		do  search -t "$target" "$*" &
+		done
+		exit 0
+		;;
+	movie)	exec us "http://www.cinema.pgh.pa.us/movie/reviews?$query" ;;
+	pagescour) exec us "${cgibase}htclean.cgi/$query" ;;
+	ebay)	case "$query" in
 		    *\ *)	;;
 		    [0-9]?????????) target=ebayitem ;;
 		esac
 		;;
-    urlsubmit)	avsubmit ${1+"$@"} &
+	urlsubmit)
+		avsubmit ${1+"$@"} &
 		googlesubmit ${1+"$@"} &
 		wait
 		exit 0
 		;;
-esac
+    esac
+fi
 
 us +c "$cgi?engine=$target&query=$query"
