@@ -41,6 +41,8 @@ else
     [ -n "$imagefile" ] && [ -s "$imagefile" ] || exec xsetroot -solid black
 fi
 
+echo "$imagefile"
+
 if [ $xplanet ]
 then
     imdir=$HOME/etc/im
