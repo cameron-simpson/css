@@ -40,6 +40,33 @@
 #		Default: false.
 #
 
+=head1 NAME
+
+cs::Upd - update dynamic progress line
+
+=head1 SYNOPSIS
+
+use cs::Upd;
+
+out(I<message>);
+
+nl(I<message>);
+
+err(I<message-with-B<\n>>);
+
+=head1 DESCRIPTION
+
+This module provides a progress line
+for reporting actions of a script,
+on B<STDERR> by default, though any stream may be used for this purpose.
+It provides B<out> and B<nl> functions for setting the progress line
+and printing an actual scrolled line respectively,
+B<err> for printing error messages,
+and intercepts perl's B<warn> and B<die> calls
+to do the right thing.
+
+=cut
+
 use strict qw(vars);
 
 BEGIN { use cs::DEBUG; cs::DEBUG::using(__FILE__);
@@ -50,10 +77,10 @@ BEGIN { use cs::DEBUG; cs::DEBUG::using(__FILE__);
 require 'flush.pl';
 
 # hard exported to main
-sub out	{ cs::Upd::out(@_); }
-sub err	{ cs::Upd::err(@_); }
-sub nl	{ cs::Upd::nl(@_); }
-sub promptfor { cs::Upd::promptfor(@_); }
+sub out		{ cs::Upd::out(@_); }
+sub err		{ cs::Upd::err(@_); }
+sub nl		{ cs::Upd::nl(@_); }
+sub promptfor	{ cs::Upd::promptfor(@_); }
 
 package cs::Upd;
 
@@ -71,7 +98,58 @@ $SIG{__DIE__} =sub { my($curr)=current();
 		     die(@_);
 		   };
 
-sub new
+=head1 GENERAL FUNCTIONS
+
+=over 4
+
+=item out(I<message>)
+
+Display I<message> in the progress line of the default object
+(normally attached to B<STDERR>).
+
+=item nl(I<message>)
+
+Print I<message> and a newline.
+
+=item err(I<message>)
+
+Print I<message> to the B<STDERR> stream.
+
+=item promptfor(I<prompt>,I<FILE>)
+
+Issue the I<prompt> via the default object
+then read a line from the stream I<FILE>.
+If omitted, I<FILE> defaults to B<STDIN>.
+Return the input line.
+
+=cut
+
+=back
+
+=head1 OBJECT CREATION
+
+=over 4
+
+=item new cs::Upd (I<FILE>,I<mode>)
+
+Create a new B<cs::Upd> object
+attached to the stream I<FILE>
+in the mode I<mode>.
+If I<FILE> is omitted, use B<STDOUT>.
+I<mode> is one of B<TTY> or B<FILE>.
+In B<TTY> mode,
+B<cs::Upd> makes use of the B<\r> and B<\b> characters
+to do an optimal rewrite of the line
+(to use minimum bandwidth for uses openating over a low bandwidth connection)
+when the B<out> function or B<Out> method is called.
+In B<FILE> mode,
+simply prints a B<\n> and the new line.
+If I<mode> is omitted
+the stream I<FILE> is B<stat>()ed to choose a mode.
+
+=cut
+
+sub new($;$$)
 { my($class,$FILE,$mode)=@_;
 
   $FILE=main::STDOUT if ! defined $FILE;
@@ -96,7 +174,7 @@ sub new
 sub DESTROY
 { my($this)=shift;
   $this->Out('');
-  delete $cs::Upd::_U{$$this->{FILE}};
+  delete $cs::Upd::_U{$this->{FILE}};
 }
 
 sub END
@@ -105,17 +183,36 @@ sub END
   }
 }
 
-sub SetMode
+=back
+
+=head1 OBJECT METHODS
+
+=over 4
+
+=item SetMode(I<mode>)
+
+Set the mode of the object to I<mode>.
+If omitted, B<stat>() the stream to choose a mode.
+
+=cut
+
+sub SetMode($;$)
 { my($this,$mode)=@_;
   
   my($FILE)=$this->{FILE};
-
   $mode=(-t $FILE ? TTY : FILE) if ! defined $mode;
 
   $this->{MODE}=$mode;
 }
 
-sub Select
+=item Select()
+
+Make this object the default one
+for use by the B<out> and B<nl> functions.
+
+=cut
+
+sub Select($)
 { my($U)=@_;
   $U=new cs::Upd $U if ! ref $U;
   $cs::Upd::This=$U;
@@ -202,7 +299,15 @@ sub _diff($$)	 # (oldline,newline) -> updstr
   $_;
 }
 
-sub PromptFor{ local($cs::Upd::This)=shift; &promptfor; }
+=item PromptFor(I<prompt>,I<FILE>)
+
+Issue the I<prompt> and then read a line from the stream I<FILE>.
+If omitted, I<FILE> defaults to B<STDIN>.
+Return the input line.
+
+=cut
+
+sub PromptFor($$;$){ local($cs::Upd::This)=shift; &promptfor; }
 sub promptfor($;$)
 { my($prompt,$FILE)=@_;
   local($_);
@@ -211,24 +316,46 @@ sub promptfor($;$)
 
   out($prompt);
   if (! defined ($_=<$FILE>))
-	{ return undef;
-	}
+  { return undef;
+  }
 
   $cs::Upd::This->{STATE}='';
 
   $_;
 }
 
-sub Current
-{ local($cs::Upd::This)=shift; &current; }
-sub current
-{ if (@_)	{ $cs::Upd::This->{STATE}=$_[0]; }
+=item Current()
+
+Return the current content of the progress line.
+
+=cut
+
+sub Current($)
+{
+  local($cs::Upd::This)=shift;
+  &current;
+}
+sub current()
+{ if (@_)
+  { if (! defined $_[0])
+    { my(@c)=caller;warn "hmm2: \@_=[@_] from [@c]";
+    }
+    $cs::Upd::This->{STATE}=$_[0];
+  }
+
+  if (! defined $cs::Upd::This->{STATE})
+  { my@c=caller;warn "undef STATE from [@c]";
+  }
   $cs::Upd::This->{STATE};
 }
 
 sub Out	{ local($cs::Upd::This)=shift; &out; }
 sub out
-{ local($_)=join('',@_);
+{ if (@_ && ! defined $_[0])
+  { my(@c)=caller;warn "hmm \@_=[@_] from [@c]";
+  }
+
+  local($_)=join('',@_);
   my($F)=$cs::Upd::This->{FILE};
 
   # s/\s+$//;	# XXX - broke prompting
@@ -243,6 +370,7 @@ sub out
   { print $F "$_\n" if length && $_ ne $cs::Upd::This->{STATE};
   }
 
+  warn "ouch" if ! defined;
   $cs::Upd::This->{STATE}=$_;
 }
 
@@ -252,9 +380,9 @@ sub err	# (@errargs) -> void
   my($msg)=join('',@_);
   return if ! length $msg;
   if ($msg !~ /\n$/)
-	{ my(@c)=caller;
-	  $msg.=" at [@c]\n";
-	}
+  { my(@c)=caller;
+    $msg.=" at [@c]\n";
+  }
   out('');
   print STDERR $msg;
   out($old);
@@ -275,5 +403,13 @@ sub Warn{ local($cs::Upd::This)=shift; &warn; }
 sub warn{ err(@_); }
 sub Die { local($cs::Upd::This)=shift; &die; }
 sub die { err(@_); }
+
+=back
+
+=head1 AUTHOR
+
+Cameron Simpson E<lt>cs@zip.com.auE<gt>
+
+=cut
 
 1;
