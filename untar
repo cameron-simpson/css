@@ -168,5 +168,17 @@ while (<STDIN>)
 
 waitpid($pid,0);
 $::Xit=1 if $? != 0;
+if (defined $lastfile)
+# restat preceeding file to see how big it ended up
+{ if (@s=lstat($lastfile))
+  { $bytes+=$s[7]-$lastsize;
+  }
+}
+
+$elapsed=time-$start;
+$Bps=($elapsed > 0 ? cs::Units::bytes2human($bytes/$elapsed,1)."/s average, " : "");
+
+out('');
+nl($Bps.cs::Units::bytes2human($bytes,1)." bytes total in ".cs::Units::sec2human($elapsed));
 
 exit $::Xit;
