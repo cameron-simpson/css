@@ -66,6 +66,7 @@ INPUT:
 while (defined($_=<STDIN>))
 {
   chomp;
+  s/^\./+//;
   next INPUT unless /\.([^.\/]+)$/;	# skip stuff with no extension
   my $ext = uc($1);
   next INPUT unless grep($_ eq $ext, @exts); # skip unsupported extensions
@@ -82,6 +83,8 @@ if (! @stdin)
 
 if ($mode ne APPEND && $indexfile ne '-')
 {
+  my($err,$x,$y,$impath);
+
   nl("loading existing list ...") if $upd;
   if (open(INDEX,"< $indexfile"))
   {
@@ -92,14 +95,13 @@ if ($mode ne APPEND && $indexfile ne '-')
 
       next OLDINDEX if !/^(\d+) (\d+) (\S.*)/;
 
-      my($x,$y,$impath)=($1,$2,$3);
+      ($x,$y,$impath)=($1,$2,$3);
 
       # prune missing/empty files
       next OLDINDEX if ! -f $impath || ! -s _;
 
       if ($mode eq UPDATE)
       {
-	my $err;
 	($x,$y,$err)=eval { imgsize($impath) };
 	if ($@)
 	{ warn "$::cmd: imsize($impath): $@\n";
@@ -114,7 +116,7 @@ if ($mode ne APPEND && $indexfile ne '-')
     out('') if $upd;
   }
   else
-  { my $err = "$!";
+  { $err = "$!";
     if (-e $indexfile)
     { die "$::cmd: can't read $indexfile: $err";
     }
