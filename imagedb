@@ -1,0 +1,14 @@
+#!/usr/bin/perl
+#
+
+use cs::Image::DB;
+
+my($idb)=new cs::Image::DB ('im.db',1);
+
+for (@ARGV)
+	{ $im=$idb->Get($_);
+	}
+
+warn "idb=".cs::Hier::h2a($idb,1);
+undef $idb;
+	  
