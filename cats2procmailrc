@@ -523,6 +523,7 @@ sub foldertype
 
 sub pathdir
 { local($_)=@_;
-  if (m:(.*/)[^/].*:) { return $&; }
-  return ".";
+  return "." unless m:/:;
+  s:/[^/]*$::;
+  return $_;
 }
