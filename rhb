@@ -13,7 +13,7 @@ rsdel=
 [ -t 1 ] && progress=-P
 
 cmd=`basename "$0"`
-usage="Usage: $cmd [-i identity] [--delete] srcdir host:destdir
+usage="Usage: $cmd [-i identity] [--delete] srcdir host:destdir [rsync-options...]
 	-i identity	Ssh identity file to use.
 	--delete	Passwd to rsync."
 
@@ -32,8 +32,10 @@ do  case $1 in
     shift
 done
 
-[ $# = 2 ] || { echo "$cmd: missing srcdir or host:destdir" >&2; badopts=1; }
+[ $# == 2 ] || { echo "$cmd: missing srcdir or host:destdir" >&2; badopts=1; }
 src=$1 dest=$2
+shift; shift
+
 [ -d "$src/." ] || { echo "$cmd: src $src: not a directory" >&2; badopts=1; }
 case $dest in
     [a-z]*:/*)	desthost=`expr "$dest" : '\([^:]*\):/.*'`
@@ -49,6 +51,8 @@ esac
 cd "$src/." || exit 1
 
 stdout=/tmp/$cmd$$
+rabinc=
+[ -s .rab-include ] && rabinc=--include-from=.rab-include
 
 $ssh "$desthost" \
 	"cd '$destdir' || exit 1
@@ -68,4 +72,5 @@ case "$subdir" in
 esac
 
 pwd
-exec rsync -e "$ssh" -aHW${vflag} $rsdel ${progress} . "$desthost:$destdir/$subdir/."
+set -x
+exec rsync -e "$ssh" -aHW${vflag} $rsdel ${progress} $rabinc . "$desthost:$destdir/$subdir/."
