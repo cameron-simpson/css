@@ -115,8 +115,8 @@ do
       thumb=$thdir/$fbase.png
       fthumb=$d/$thumb
       if [ -s "$fthumb" ]
-      then echo  "\"%$fthumb%$tag\" Exec $imop $f"
-      else echo  "\"$tag\" Exec $imop $f"
+      then echo  "\"%$fthumb%$tag\" Exec $imop '$f'"
+      else echo  "\"$tag\" Exec $imop '$f'"
            echo "$f" >&3	# to the thumb maker ...
       fi ## | tee -a $HOME/imlist.out
     fi
