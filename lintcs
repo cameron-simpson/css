@@ -1,0 +1,6 @@
+#!/bin/sh
+
+exec lint -DEBUG \
+	  -I$HOME/s/cs/include/cs/config/site/$SYSTEMID.$ARCH \
+	  -I$HOME/s/cs/include -I/usr/local/include \
+	  ${1+"$@"}
