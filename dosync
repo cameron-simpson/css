@@ -20,7 +20,7 @@ rsync -avHP --rsync-path='$HOME/scripts/rrsync zapff' /u/syncopt/redhat.x86.linu
 )
 
 # push real accounts
-for w in @work @zip @newt @jekyll @sf
+for w in @work @newt @jekyll @sf
 do  syncstuff "$w" &
 done
 
@@ -31,5 +31,6 @@ done
 
 pfx sf syncsf &
 pfx ezos syncezos &
+pfx zip synczip &
 
 wait
