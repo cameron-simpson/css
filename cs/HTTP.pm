@@ -375,7 +375,7 @@ sub rqhdr($;$$)
 
   my $rqhdrs = new cs::RFC822;
 
-  $rqhdrs->Add([ACCEPT,"*/*"]);
+  $rqhdrs->Add([ACCEPT_ENCODING,(defined($ENV{HTTP_ACCEPT}) ? $ENV{HTTP_ACCEPT} : "identity")]);
   $rqhdrs->Add([REFERER,$srcURL]);
   $rqhdrs->Add([HOST,$U->Host()]);
   $rqhdrs->Add([USER_AGENT,$agent]);
