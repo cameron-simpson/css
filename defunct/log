@@ -1,0 +1,79 @@
+#!/bin/sh
+#
+# Pull out a change log from a CVS archive, reformat it nicely.
+#	- Cameron Simpson <cs@zip.com.au> 12apr1997
+#
+
+sortargs=
+cvsargs=
+
+while :
+do  case $1 in
+	-l)	cvsargs="$cvsargs $1"; shift ;;
+	-r)	sortargs="$sortargs $1"; shift ;;
+	*)	break ;;
+    esac
+done
+
+cvs log $cvsargs ${1+"$@"} \
+    | perl -ne '
+	chomp;
+	if (/^Working file:\s+(.*)/)
+		{ $file=$1;
+		  # print STDERR "found file=$file\n";
+		}
+	elsif ($inmsg)
+		{ if (/^=============================================================================/
+		   || /^----------------------------$/)
+			{ $inmsg=0;
+			  if (@msg)
+				{ print "$date\t$file\t$author\t",
+					join("\\n",@msg), "\n";
+				  @msg=();
+				}
+			}
+		  elsif (/^\*\*\* empty log message \*\*\*/)
+			{}
+		  else	{ s/\\/\\\\/g;
+			  # print STDERR "push [$_]\n";
+			  push(@msg,$_);
+			}
+		}
+	elsif (/^date:\s+([^;]+);\s+author:\s+([^;]+);/)
+		{ $date=$1; $author=$2;
+		  $inmsg=1;
+		  @msg=();
+		  # print STDERR "found date=$date, author=$author\n";
+		}
+      ' \
+    | sort $sortargs \
+    | { lastline=
+	lastauthor=
+	lastdate=
+	lasttime=
+	files=
+	while read date time file author line
+	do  [ -n "$line" ] || continue
+	    if [ "x$line" = "x$lastline" -a "x$author" = "x$lastauthor" ]
+	    then
+		files="$files $file"
+	    else
+		if [ -n "$files" ]
+		then  echo "$lastdate $lasttime $files"
+		      echo "  $lastline"
+		      echo "  - $lastauthor"
+		fi
+
+		files=$file
+		lastline=$line
+		lastauthor=$author
+		lastdate=$date
+		lasttime=$time
+	    fi
+	done
+	[ -n "$files" ] \
+	  && { echo "$lastdate $lasttime $files"
+	       echo "  $lastline"
+	       echo "  - $lastauthor"
+	     }
+      }
