@@ -263,14 +263,14 @@ do
     # run the script if present
     if [ -r "$script" ]
     then
-	[ $noenv ] \
-	|| { [ -r "$scriptdir/env" ] && . "$scriptdir/env"; }
+	( 
+	  [ -s "$scriptdir/env" ] && . "$scriptdir/env"
 
-	# if no addresses
-	# then write a log if there's a log dir
-	# otherwise email the user
-	if [ "x$addresses" = x ]
-	then
+	  # if no addresses
+	  # then write a log if there's a log dir
+	  # otherwise email the user
+	  if [ "x$addresses" = x ]
+	  then
 	    logdir=$scriptdir/log
 	    if [ -d "$logdir/." ]
 	    then
@@ -282,9 +282,9 @@ do
 	    else
 		addresses=${EMAIL:-$USER}
 	    fi
-	fi
+	  fi
 
-	case "$addresses" in
+	  case "$addresses" in
 	    '')	logdir=`dirname "$log"`
 		if [ -d "$logdir/." ] || mkdir -p "$logdir"
 		then
@@ -298,7 +298,8 @@ do
 		;;
 	    -)	sh $xflag "$script" ;;
 	    *)	sh $xflag "$script" 2>&1 | mailif -s "$subj" $addresses ;;
-	esac
+	  esac
+	)
     fi
 
     if [ -r "$script.$HOST" ]
