@@ -1,0 +1,28 @@
+#!/bin/sh
+#
+# New spam is coming in base64 encoded, and bogofilter doesn't decode
+# before measuring keywords. This script makes a crude decode before
+# handing to bogofilter.
+#	- Cameron Simpson <cs@zip.com.au> 27oct2002
+#
+
+tmp=${TMPDIR:-/tmp}/unb64bf$$
+
+trap 'rm -f "$tmp"*; exit 1' 1 2 15
+trap 'rm -f "$tmp"*' 0
+
+cat >"$tmp" || exit 1
+
+sed '/^$/q' <"$tmp" >"$tmp-h" || exit 1
+
+if grep -i '^content-transfer-encoding: *base64' <"$tmp" >/dev/null
+then
+    sed '1,/^$/d' <"$tmp" >"$tmp-b" || exit 1
+    cat "$tmp-h" >"$tmp"
+    unb64 <"$tmp-b" >>"$tmp"
+fi
+
+# not exec because we want the trap to work later
+bogofilter ${1+"$@"} <"$tmp"
+
+exit $?
