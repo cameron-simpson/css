@@ -52,16 +52,19 @@ sub splitmail	# (STREAM,fname)
 { my($F,$f)=@_;
   my($hot);
 
+  local($_);
+
   $hot=0;	# is our pipe hot?
-  while (<$F>)
-  { if (/^From /o)	## || /^Article \d+ of \S+:$/o
+  while (defined($_=<$F>))
+  {
+    if (/^From /o)	## || /^Article \d+ of \S+:$/o
     { ++$::Counter;
       # warn "\n";
       if ($hot)
-      { &closepipe;
+      { closepipe();
 	$hot=0;
       }
-      $hot=&openpipe;
+      $hot=openpipe();
     }
 
     if ($hot)
@@ -76,7 +79,7 @@ sub splitmail	# (STREAM,fname)
     }
   }
 
-  &closepipe if $hot;
+  closepipe() if $hot;
 }
 
 sub closepipe
