@@ -12,6 +12,9 @@ class SeqWrapper:
   def __init__(self,seq):
     self.__seq=seq
 
+  def getSeq(self):
+    return self.__seq
+
   def __len__(self):
     return len(self.__seq)
 
@@ -36,56 +39,55 @@ class SeqWrapper:
 
 """ an object with an ordered set of keys eg SQL table row
 """
-class HasNameIndex:
+class OrderedKeys:
   def __init__(self,names=None):
     if names is not None:
-      self.initNameIndex(names)
+      self.setKeyOrder(names)
 
-  def initNameIndex(self,names):
+  def setKeyOrder(self,names):
     # compute column name index
-    self.__names=names
-    self.__nameIndex={}
+    ##print "SETKEYORDER: ",`names`
+    self.__keys=names
+    self.__keyIndex={}
     i=0
     for name in names:
-      self.__nameIndex[name]=i
+      self.__keyIndex[name]=i
       i+=1
 
-  def getNames(self):
-    return self.__names
-  def getNameIndex(self):
-    return self.__nameIndex
-
-  def lookupNameIndex(self,name):
-    return self.__nameIndex[name]
-
-  def __iterkeys__(self):
-    for k in self.__nameIndex:
-      yield k
+  def keyIndex(self,key=None):
+    if key is None:
+      return self.__keyIndex
+    return self.__keyIndex[key]
 
   def keys(self):
-    return self.__names
+    ##print "ORDEREDKEYS.keys()=",`self.__keys`
+    return self.__keys
 
-class IndexedSeqWrapper(HasNameIndex,SeqWrapper):
+  def __iterkeys__(self):
+    for k in self.keys():
+      yield k
+
+class IndexedSeqWrapper(OrderedKeys,SeqWrapper):
   def __init__(self,seq,names=None):
+    ##print "init IndexedSeqWrapper"
+    ##print "  seq=",`seq`
+    ##print "  keys=",`names`
     SeqWrapper.__init__(self,seq)
-    HasNameIndex.__init__(self,names)
+    OrderedKeys.__init__(self,names)
 
   def __getitem__(self,key):
     if type(key) is not int:
-      key=self.lookupNameIndex(key)
+      key=self.keyIndex(key)
     return SeqWrapper.__getitem__(self,key)
 
   def __setitem__(self,key,value):
     if type(key) is not int:
-      key=self.lookupNameIndex(key)
+      key=self.keyIndex(key)
     return SeqWrapper.__setitem__(self,key,value)
-
-  def __keys__(self):
-    return self.getNameIndex()
 
   def __repr__(self):
     d={}
-    keys=self.getNames()
-    for i in xrange(0,len(keys)):
-      d[keys[i]]=self[i]
+    okeys=self.keys()
+    for i in xrange(0,len(okeys)):
+      d[okeys[i]]=self[i]
     return `d`
