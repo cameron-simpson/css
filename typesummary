@@ -1,0 +1,31 @@
+#!/usr/bin/perl
+#
+# Report file types, counts and sizes.
+# Expects input from "find .... -print" or if stdin is a tty
+# runs "find . -type f -print" to get the list.
+#	- Cameron Simpson <cs@zip.com.au> 25mar2003
+# 
+
+if (-t STDIN)
+{ open(STDIN,"find . -type f -print|") || die "$0: pipe from find: $!";
+}
+
+FILE:
+while (defined($_=<STDIN>))
+{ chomp;
+  if (m:[^/]\.([a-z]\w*)(,v)?$:i)
+  { $ext = uc($1);
+  }
+  else
+  { $ext = NONE;
+  }
+
+  (@s=lstat($_)) || next FILE;
+  -f _ || next FILE;
+  $sizes{$ext}+=$s[7];
+  $count{$ext}++;
+}
+
+for my $ext (sort keys %sizes)
+{ print "$ext\t$count{$ext}\t$sizes{$ext}\n";
+}
