@@ -11,13 +11,6 @@
 ## set x +t "$@"; shift
 ## echo "[$*]"
 
-# short circuit the make-a-tty-window stuff
-case $1 in
-    -t)	shift; set -x; exec term +a +ip -small -e "$0" +t ${1+"$@"} ;;
-    +t) shift ;;
-    *)  [ -t 0 -a -t 1 ] || exec term +a +ip -small -e "$0" +t ${1+"$@"} ;;
-esac
-
 savedir=${SAVEDIR-$HOME/dl}
 savedir=$HOME/dl
 pager=${PAGER:-less}
@@ -25,15 +18,20 @@ doview=
 
 # =head1 SYNOPSIS
 #
-# apphelper [-t] file [-y] [-d savedir] viewer [viewer-args...]
+# apphelper [{-t|+t}] file [{-n|-y}]] [-d savedir] [-p pager] viewer [viewer-args...]
 #
 cmd=`basename "$0"`
 usage="Usage: $cmd [-t] file [-y] [-d savedir] viewer [viewer-args...]
 	-t		Run apphelper in a new terminal window.
 	+t		Do not run apphelper in a new terminal window.
+	NB: -t or +t must preceed the file.
+	The file may be \"-\" to read it from standard input.
+	-n		Don't run the viewer at all.
 	-y		Run viewer immediately.
 	-d savedir	Save directory (from \$SAVEDIR: $savedir).
 	-p pager	Pager (default viewer, from \$PAGER: $pager)."
+
+tmpfile=/tmp/$cmd$$
 
 # =head1 DESCRIPTION
 #
@@ -47,39 +45,69 @@ usage="Usage: $cmd [-t] file [-y] [-d savedir] viewer [viewer-args...]
 # Apphelper offers to view the file with the named viewer
 # and after viewing, to save the file in a location of your choice.
 #
+# =head2 OPTIONS
+#
+# =over 4
+#
 badopts=
+
+# =item -t
+#
+# Open an fresh terminal window in which to run apphelper.
+# Generally desirable when invoking inside a GUI web browser.
+# This is default behaviour if either standard input
+# or standard output
+# is not connected to a terminal.
+#
+# =term +t
+#
+# Do not open a terminal window.
+# 
+case $1 in
+  -t)	shift; doterm=1 ;;
+  +t)	shift; doterm= ;;
+  *)	if [ -t 0 -a -t 1 ]
+	then  doterm=
+	else  doterm=1
+	fi
+	;;
+esac
+
 if [ $# = 0 ]
-then  echo "$cmd: missing file" >&2; badopts=1
+then
+  echo "$cmd: missing file" >&2
+  badopts=1
 else
   file=$1; shift
   if [ "x$file" = x- ]
   then
-      echo "$0: stdin mode not implemented yet" >&2
-      badopts=1
+      if [ -t 0 ]
+      then
+	  echo "$cmd: stdin can't be a tty if the file is \"-\"" >&2
+	  badopts=1
+      else
+	  if cat >"$tmpfile"
+	  then	file=$tmpfile
+	  else	echo "$cmd: can't cat stdin to $tmpfile, aborting" >&2
+		badopts=1
+	  fi
+      fi
   else
       if [ ! -s "$file" ]
-      then	echo "$cmd: bad file?" >&2
+      then
+	    echo "$cmd: bad file?" >&2
 	    ls -ld "$file" >&2
 	    badopts=1
       fi
   fi
 
-  # =head2 OPTIONS
-  #
-  # =over 4
-  #
-  # =item -t
-  #
-  # Open an fresh terminal window in which to run apphelper.
-  # Generally desirable when invoking inside a GUI web browser.
-  # This is default behaviour if either standard input
-  # or standard output
-  # is not connected to a terminal.
-  #
-  # =term +t
-  #
-  # Do not open a terminal window.
-  # 
+  # fork off a terminal if need be
+  if [ $doterm ]
+  then
+      term +a +ip -small -e "$0" +t "$file" ${1+"$@"}
+      rm -f "$tmpfile"
+      exit 0
+  fi
 
   while :
   do  case $1 in
@@ -97,6 +125,12 @@ else
 	  # or the program less(1) if that is not set.
 	  #
 	  -p)	pager=$2; shift ;;
+	  # =item -n
+	  #
+	  # No: do not run the viewer program.
+	  # The default is to ask first.
+	  #
+	  -n)	doview=0 ;;
 	  # =item -y
 	  #
 	  # Yes: always run the viewer program.
@@ -140,19 +174,19 @@ file "$file"; echo
 # Other answers are taken to be the name (and optional arguments) of a viewing program.
 #
 
-if [ ! $doview ]
+if [ -z "$doview" ]
 then
     necho "View [$*]? "
     read viewit || exit 0
     case "$viewit" in
 	''|y|yes)	doview=1 ;;
-	n|no)		doview= ;;
+	n|no)		doview=0 ;;
 	*)		set x $viewit "$file"; shift
 			doview=1 ;;
     esac
 fi
 
-if [ $doview ]
+if [ "$doview" = 1 ]
 then
     "$@" "$file" \
     || { echo "failed: $* $file"
