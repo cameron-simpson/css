@@ -7,6 +7,9 @@
 # Treat all args as regexps to AND. - cameron, 12nov2001
 #
 
+cmd=$0
+usage="Usage: $cmd [n] [[-o] sedregexps...]"
+
 n=1
 case $1 in
     [1-9]*)	n=$1; shift ;;
