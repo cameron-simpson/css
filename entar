@@ -1,0 +1,78 @@
+#!/usr/bin/perl
+#
+# Run tar create with tidier verbose mode.
+#	- Cameron Simpson <cs@zip.com.au> 27jun2000
+#
+
+use strict vars;
+
+use cs::Misc;
+use cs::Upd;
+
+$::Usage="Usage: $::cmd [targets...]
+";
+
+my $tar = 'gnutar';
+
+@ARGV='.' if ! @ARGV;
+
+pipe(READEND,WRITEEND)	|| die "$::cmd: can't make pipe: $!\n";
+
+my $pid = fork;
+die "$::cmd: fork fails: $!\n" if ! defined $pid;
+
+if ($pid == 0)
+# parent, redirect then exec tar
+{ close(READEND);
+
+  open(STDERR,'>&WRITEEND')
+	  || die "$::cmd: child: can't dup write end of pipe to STDERR: $!\n";
+  close(WRITEEND);
+
+  my @e = ($tar,'cvf','-',@ARGV);
+  exec(@e);
+  die "$::cmd: child: exec(@e): $!";
+}
+
+# child, monitor tar output
+close(WRITEEND);
+open(STDIN,'<&READEND')
+      || die "$::cmd: can't dup read end of pipe: $!\n";
+close(READEND);
+
+my $out = new cs::Upd main::STDERR;
+$out->Select();
+
+$::Xit=0;
+
+while (<STDIN>)
+{ chomp;
+
+  # unslosh stuff
+  s/\\([\\\?]|[0-7]{3})/$1 eq '?'
+			? "\177"
+			: length($1) == 1
+			  ? $1
+			  : chr(oct($1))/eg;
+
+  if (lstat)
+  { if (-d _)
+    { nl($_);
+    }
+    else
+    { out($_);
+    }
+  }
+  else
+  { err("$::cmd: lstat($_): $!\n");
+    $::Xit=1;
+  }
+}
+
+waitpid($pid,0);
+if ($? != 0)
+{ warn "$::cmd: $tar exit code: $?\n";
+  $::Xit=1;
+}
+
+exit $::Xit;
