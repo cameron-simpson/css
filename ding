@@ -1,0 +1,34 @@
+#!/usr/bin/perl
+
+($cmd=$0) =~ s:.*/::;
+$usage="Usage: $cmd [-p] [count]\n";
+
+$count=15;
+$pause=0;
+$badopts=0;
+while (@ARGV)
+{ $_=shift;
+  if ($_ eq '-p')	{ $pause=1; }
+  elsif (/^\d+$/)	{ $count=$_+0; }
+  else			{ warn "$cmd: unrecognised option: $_\n";
+			  $badopts=1;
+			}
+}
+
+die $usage if $badopts;
+
+$SIG{'INT'}='intr';
+
+$|=1;
+while (--$count != 0)
+{ print "\007";
+  sleep(2);
+}
+
+while ($pause)
+{ sleep(16384);
+}
+
+sub intr
+{ exit 0;
+}
