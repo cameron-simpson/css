@@ -27,7 +27,7 @@ ext=
 
 session=root@$host$ext
 
-##scrif $newflag "$session"
 exec term -n "#$session" \
+	scr -N "$session" \
 	logscript "$session" \
 	sshop1 "root@$host"
