@@ -1,2 +1,3 @@
 #!/bin/sh
-urlshow file:/u/mirror/ldp/ &
+subtree=${1:-index.html}
+urlshow "file:/u/mirror/ldp/$subtree" &
