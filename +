@@ -5,7 +5,7 @@
 #
 
 cmd=$0
-usage="Usage: $0 [some-mutt-options...] [mutt-folder]"
+usage="Usage: $0 [-f] [+a] [some-mutt-options...] [mutt-folder]"
 
 mfolder=+attn
 muttopts=
@@ -16,6 +16,7 @@ while :
 do
   case $1 in
     +a)		termopts="$termopts $1" ;;
+    -f)		anyhost=1 ;;
     -[nR])	muttopts="$muttopts $1" ;;
     -[em])	muttopts="$muttopts $1 "`shqstr "$2"`; shift ;;
     --)		shift; break ;;
