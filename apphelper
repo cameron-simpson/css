@@ -404,8 +404,8 @@ case "$savemode" in
 			    trysave=$trysave2
 		      fi
 		  fi
-		  necho "Save [$trysave]? "
-		  read saveas || exit 0
+		  prompt="Save [$trysave]? "
+		  saveas=`{ [ -d "$savedir/." ] && cd "$savedir"; } || pwd >&2; readline -p "$prompt"` || exit 0
 		  case "$saveas" in
 		    \!*)	repeat=1
 				shcmd=`expr "x$saveas" : 'x! *\(.*\)'`
