@@ -1,0 +1,223 @@
+#!/bin/sh
+#
+# Keep per-machine /opt in sync with shared one.
+#
+# Homepage:
+#	http://www.zip.com.au/~cs/syncopt/index.html
+#
+# The scheme is that things get built and installed as /opt/thing-version,
+# then copied to /usr/local/opt/thing-version in the central spot, with a
+# symlink from there to /usr/local/opt/thing. That way things think they
+# live in /opt and become local or remote by either symlinking from /opt
+# to /usr/local/opt or installing an exact copy of
+# /usr/local/opt/thing-version in /opt.
+#	- Cameron Simpson <cs@zip.com.au> 13feb1999
+#
+# Use /usr/local/opt-common as a secondary source.
+#	- cameron 18jun1999
+#
+# /opt/.syncopt config file.
+#	- cameron 14feb2001
+#
+# "nosync" in .syncopt.
+#	- cameron 31may2001
+# 
+
+PATH=$PATH:/usr/bin:/opt/bin:/opt/script
+export PATH
+
+cmd=`basename "$0"`
+usage="Usage: $cmd [-n] [-f]
+	-n	No action (default) - echo necessary actions.
+	-f	Force action.
+	-l	Localise the specified items.
+	-x	Force action with tracing.
+	-v	Verbose."
+
+echo=echo	# set-x	# set to nothing when debugged
+localise=
+
+slashopt=/opt
+archopt=/usr/local/opt
+commonopt=$archopt-common
+
+cf=$slashopt/.syncopt
+
+# look for /usr/local/opt-$ARCH or failing that /usr/local/opt
+aopt=$archopt-$ARCH
+[ -d "$aopt/." ] && archopt=$aopt
+
+vflag=
+[ -t 1 ] && vflag=-v
+
+badopts=
+while :
+do  case $1 in
+	-f)	echo= ;;
+	-x)	echo=set-x ;;
+	-l)	localise=1 ;;
+	-n)	echo=echo ;;
+	-v)	verbose=1 vflag=-v ;;
+	--)	shift; break ;;
+	-?*)	echo "$cmd: unrecognised option: $1" >&2; badopts=1 ;;
+	*)	break ;;
+    esac
+    shift
+done
+
+if [ $# = 0 ]
+then
+    [ $localise ] && { echo "$cmd: -l requires specific targets" >&2; badopts=1; }
+    set x `( ls "$archopt/."; ls "$commonopt/." ) | sort -u`; shift
+fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+# go to the central opt dir
+cd "$archopt" || exit 1
+
+# ensure there is a real local /opt
+
+[ -d "$slashopt" ] \
+	|| { $echo mkdir $slashopt && $echo chmod 755 $slashopt; } \
+	|| exit 1
+
+xit=0
+
+# for everything in the central opt dirs
+for thing
+do
+    ## echo "sync $thing ..."
+    ## case "$thing" in gimp*) set -x ;; esac
+
+    # local thing
+    ldir=$slashopt
+    l=$ldir/$thing
+
+    # default behaviour:
+    # whether to localise by default
+    makelocal=$localise
+    issymlink "$l" || [ ! -d "$l" ] || makelocal=1
+    # what version to make the default for this host
+    version=
+    # leave this item alone
+    nosync=
+
+    # check config file
+    sedscript="y/	/ /
+	       s/^  *//
+	       /^#/d
+	       s/  *\$//
+	       s/   */ /g
+	       /^$thing local\$/b local
+	       /^$thing nosync\$/b nosync
+	       /^$thing [^ ][^ ]* local\$/b vlocal
+	       /^$thing [^ ][^ ]*\$/b vers
+	       s/ /-/
+	       /^$thing local\$/b local
+	       /^$thing nosync\$/b nosync
+	       d
+	       :local
+	       s/.*/makelocal=1/p
+	       q
+	       :nosync
+	       s/.*/nosync=1/p
+	       q
+	       :vlocal
+	       s/^$thing \\([^ ]*\\).*/makelocal=1 version=\\1/p
+	       q
+	       :vers
+	       s/^$thing /version=/p
+	       q"
+    ## echo "$thing:"
+    opts=`2>/dev/null sed -n -e "$sedscript" "$cf"`
+    eval "$opts"
+
+    # skip this?
+    [ $nosync ] && { $echo echo "SKIP $thing"; continue; }
+
+    # locate remote instance of thing
+    # in either opt-arch or opt-common
+    if test -d "$archopt/$thing/."
+    then
+	r=$archopt/$thing
+    else
+	if test -d "$commonopt/$thing/."
+	then
+	    r=$commonopt/$thing
+	else
+	    echo "$cmd: can't find $thing in $archopt or $commonopt" >&2
+	    xit=1
+	    continue
+	fi
+    fi
+
+    # maintain generic links
+    if issymlink "$r"
+    then
+	# remote end is symlink - must be the "DEFAULT" link
+	if rlink=`readlink "$r"` && [ -n "$rlink" ]
+	then
+
+#	    # make thing-DEFAULT symlink to default version
+#	    dflt="$l-DEFAULT"
+#	    if llink=`readlink "$dflt"` \
+#	    && [ "x$rlink" = "x$llink" ]
+#	    then
+#		: generic link matches - leave it alone
+#	    else
+#		# adjust local "default" link
+#		$echo rm "$dflt"
+#		$echo ln -s "$rlink" "$dflt" || xit=1
+#	    fi
+
+	    # make thing into symlink to right version
+	    if [ -n "$version" ]
+	    then  sym=$thing-$version
+	    else  sym=$rlink
+	    fi
+
+	    if llink=`readlink "$l"` \
+	    && [ "x$sym" = "x$llink" ]
+	    then
+		:
+	    else
+		$echo rm -rf "$l"
+		$echo ln -s "$sym" "$l" || xit=1
+	    fi
+
+	    # ensure appropriate version is local
+	    if [ $makelocal ] && issymlink "$ldir/$sym"
+	    then
+		$echo rm "$ldir/$sym"
+		$echo mkdir "$ldir/$sym"
+	    fi
+	else
+	    echo "$cmd: can't readlink \"$r\"" >&2
+	    xit=1
+	fi
+    else
+	# remote end is real - must be the versioned thing
+	if [ $makelocal ]
+	then
+	    issymlink "$l" && rm "$l"
+	    [ -d "$l/." ] || $echo mkdir "$l" || xit=1
+	else
+	    if [ -d "$l/." ]
+	    then
+		:
+	    else
+		# link to remote
+		$echo rm -f "$l"
+		$echo ln -s "$r" "$ldir/." || xit=$?
+	    fi
+	fi
+    fi
+
+    issymlink "$l" \
+    || $echo rsync -a $vflag --delete "$r/." "$l/." | sed "s|^|$l: |"
+
+    set +x
+done
+
+exit $xit
