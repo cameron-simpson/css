@@ -7,7 +7,7 @@
 cmd=$0
 usage="Usage: $0 [some-mutt-options...] [mutt-folder]"
 
-needhost zapff@cisra amadeus@home || exit 1
+needhost "$HOMEHOST@$SYSTEMID" || exit 1
 
 mfolder=+attn
 muttopts=
