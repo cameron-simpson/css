@@ -4,6 +4,8 @@
 #	- Cameron Simpson <cs@zip.com.au> 30jun1997
 #
 
+: ${TMPDIR:=/tmp}
+
 cmd=`basename "$0"`
 usage="Usage: $cmd aliases... <message
 	$cmd -q"
@@ -43,7 +45,7 @@ fi
 
 exec 0<&4 4<&-
 
-tmp=/tmp/$cmd.$$
+tmp=$TMPDIR/$cmd.$$
 
 [ -t 0 ] && echo "reading SMS message from stdin ..."
 cat >"$tmp" || exit $?
