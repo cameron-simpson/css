@@ -1,0 +1,826 @@
+#!/bin/sh
+#
+# Wrapper for multi.ps.
+# Also adds duplexmode and tumble to control doublesiding of paper.
+#	- Cameron Simpson, January 1992
+#
+# Made operator replacement conditional upon operator existence.
+# Added -fg and -bg for colour control. - Cameron, 11may93
+# Added papertray selection. - Cameron, 15mar94
+#
+# Multi.ps is a groovy piece of PostScript written by:
+#
+#	Ross Cartlidge
+#	Information Technology Services
+#	Building H08, Sydney University
+#	NSW, 2006, Australia
+#
+#	R.Cartlidge@isu.usyd.edu.au     Email
+#	+61 2 9351 5506                 Phone
+#	+61 2 9351 5001                 Fax
+#
+
+landscape=false
+incolumns=false
+nrows=1
+ncols=1
+hdividers=true
+vdividers=true
+duplexmode=true
+tumble=false
+papertray=
+fgcolour=
+bgcolour=
+X11RGB=${X11RGB-'/usr/local/X11/lib/rgb.txt:/usr/X11/lib/rgb.txt:/usr/lib/X11/rgb.txt'}
+export X11RGB
+
+cmd=`exec basename "$0"`
+usage="Usage: $0 [-1248dLPDT] [+DT] [-r rows] [-c cols] \\
+		[-fg {r,g,b|g}] [-bg {r,g,b|g}] [--] [files...]
+	-[1248]	1,2,4, or 8 logical pages per surface (default -2).
+	-d	Put dividers between logical pages (default $dividers).
+	-dv	Only vertical dividers.
+	-dh	Only horizontal dividers.
+	+d	No dividers.
+	-fg colour Set foreground colour to be the colour specified.
+	-bg colour Set background colour to be the colour specified.
+		Colours come in three forms:
+		  - A number from 0.0 to 1.0 indicating a grey level.
+		  - Three comma separated numbers in that range indicating
+		    red, green, and blue components respectively.
+		  - A colour name from $X11RGB.
+		    Specifiable via the \$X11RGB variable.
+	-t tray	Select papertray (1,2,3).
+	-L	Landscape mode (default $landscape).
+	-P	Portrait mode.
+	-D	Duplex mode - use both sides of the paper (default $duplexmode).
+	+D	No duplex mode - use only one side of the paper.
+	-T	Tumble mode - second side of page is upsidedown (default $tumble).
+	+T	No tumble.
+	-C	Arrange pages in columns.
+	-R	Arrange pages in rows (default).
+	-r	Number of rows (default $nrows).
+	-c	Number of columns (default $ncols)."
+
+badopts=
+while :
+do
+	case "$1" in
+		-1)	landscape=false nrows=1 ncols=1 tumble=false ;;
+		-2)	landscape=true nrows=1 ncols=2 tumble=true ;;
+		-4)	landscape=false nrows=2 ncols=2 tumble=false ;;
+		-8)	landscape=true nrows=2 ncols=4 tumble=true ;;
+		-d)	hdividers=true vdividers=true ;;
+		-dh)	hdividers=true vdividers=false ;;
+		-dv)	hdividers=false vdividers=true ;;
+		+d)	hdividers=false vdividers=false ;;
+		-fg)	fgcolour=$2; shift ;;
+		-bg)	bgcolour=$2; shift ;;
+		-t)	papertray=$2; shift
+			case "$papertray" in
+			    [123])	;;
+			    *)		echo "$cmd: $papertray: bad papertray setting (1,2,3)" >&2
+					badopts=1
+					;;
+			esac
+			;;
+		-R)	incolumns=false ;;
+		-C)	incolumns=true ;;
+		-r)	nrows=$2; shift;;
+		-c)	ncols=$2; shift;;
+		-L)	landscape=true ;;
+		-P)	landscape=false ;;
+		-D)	duplexmode=true ;;
+		+D)	duplexmode=false ;;
+		-T)	tumble=true ;;
+		+T)	tumble=false ;;
+		--)	shift; break;;
+		-*|+*)	echo "$cmd: bad option '$1'" >&2; badopts=1 ;;
+		*)	break;;
+	esac
+	shift
+done
+
+case "$badopts" in
+    1)	echo "$usage" >&2; exit 2 ;;
+esac
+
+# setduplexmode and settumble
+sed 's/^	//' <<HEADER
+	%!PS-Adobe-1.0
+	%%Creator: Cameron Simpson <cs@zip.com.au>
+	%%Title: Duplexmode and tumblemode.
+	%%CreationDate: Thursday January  9 13:00:00 1992
+	%%Pages: 0
+	%%DocumentFonts:
+	%%BoundingBox: 0 0 0 0
+	%%EndComments
+
+	(mpage job for $NAME begins at `date`\n) print
+	% XXX - test for old operator instead of new since
+	%       IVsi has a bug - cameron, 24may94
+	statusdict begin
+	% /setpagedevice where
+	/setduplexmode where
+	  % Level 1 PostScript
+	  { % (possibly Level 1\n) print
+	    pop
+	      /setduplexmode where
+	      { pop $duplexmode setduplexmode } if
+	      /settumble where
+	      { pop $tumble settumble } if
+	    % (After setup.\n) print
+	    % pstack
+	  }
+	  % Level 2 PostScript
+	  { % pop % toss dict
+	    % (Level 2\n) print
+%	    globaldict begin
+%	      /pagedev$HOST$$ currentpagedevice def
+%	    end
+	    /setpagedevice where
+	    { pop
+	      1 dict
+	      /Duplex $duplexmode def
+	      %% what about tumble? - check red book
+	      setpagedevice
+	    } if
+	  }
+	  ifelse
+	end
+	  % pstack
+HEADER
+
+# colours
+case "$fgcolour,$bgcolour" in
+    ,)	needcolour= ;;
+    *)	needcolour=1 ;;
+esac
+
+colour2ps='$_=shift;
+	   if (/^(\d+\.?\d*),(\d+\.?\d*),(\d+\.?\d*)$/)
+	 	{ print $1, " ", $2, " ", $3, " setrgbcolor";
+		}
+	   elsif (/^\d+\.?\d*$/)
+		{ print $_, " setgray";
+		}
+	   elsif (/^[\w\s]+$/)
+		{ undef $r, $g, $b;
+		  ($c=$_) =~ s/\s+//g;
+		  $c =~ tr/A-Z/a-z/;
+
+		  for (split(/:/,$ENV{"X11RGB"}))
+			{ next unless open(RGB,"< $_\0");
+			  RGB:
+			    while (<RGB>)
+				{ next unless
+					($fr,$fg,$fb,$fc) = /^\s*(\d+)\s+(\d+)\s+(\d+)\s+(.*\S)/;
+				  $fc =~ s/\s+//g;
+				  $fc =~ tr/A-Z/a-z/;
+				  if ($c eq $fc)
+					{ ($r,$g,$b)=($fr,$fg,$fb);
+					  last RGB;
+					}
+				}
+			  close(RGB);
+			  last if defined($r);
+			}
+		  
+		  if (defined($r))
+			{ print $r/255, " ", $g/255, " ", $b/255, " setrgbcolor";
+			}
+		  else
+		  { print STDERR "$c: unknown colour\n";
+		  }
+		}
+	  ';
+
+case "$fgcolour" in
+    '')	fgps='0 setgray' ;;
+    *)	fgps=`perl -e "$colour2ps" "$fgcolour"` ;;
+esac
+case "$bgcolour" in
+    '')	bgps='1 setgray' ;;
+    *)	bgps=`perl -e "$colour2ps" "$bgcolour"` ;;
+esac
+
+[ -n "$needcolour" ] && sed 's/^	//' <<COLOUR
+	/foreground { $fgps } def
+	/background { $bgps } def
+	/showpage { copypage initgraphics erasepage } def
+	/initgraphics
+	  mark
+	    /initgraphics
+	      dup load type /operatortype eq
+	      { mark exch load ] cvx pstack }
+	      { load }
+	      ifelse
+	    /exec cvx
+	    /foreground cvx
+	  ] cvx
+	  pstack
+	def
+	/erasepage
+	  mark
+	    /background cvx
+	    /clippath cvx /fill cvx
+	    /foreground cvx
+	  ] cvx bind
+	def
+	erasepage
+COLOUR
+
+[ -n "$papertray" ] && sed 's/^	//' <<PAPERTRAY
+	statusdict begin
+	    /setpapertray where
+	    { pop $papertray setpapertray } if
+	end
+PAPERTRAY
+
+# psmulti
+case "$nrows,$ncols" in
+	1,1)	needmulti= ;;
+	*)	needmulti=1 ;;
+esac
+
+[ -n "$needmulti" ] && sed 's/^	//' <<'PSMULTI'
+	%!PS-Adobe-1.0
+	%%Creator: Ross Cartlidge <rossc@extro.ucc.su.oz>
+	%%Title: Multiple pages on one page
+	%%CreationDate: Tuesday July 25 18:00:00 1989
+	%%Pages: 0
+	%%DocumentFonts:
+	%%BoundingBox: 0 0 0 0
+	%%EndComments
+	%
+	% Uncomment the next line if you wish to load multi into the "exitserver"
+	% state of the PostScript device
+	% serverdict begin 0 exitserver
+	%
+	%
+	%	make each operator to overlay a procedure so a bind in 
+	%	a prolog will not stop the overlaying by "multi"
+	%
+	
+	[
+		/gsave
+		/grestore
+		/grestoreall
+		/initgraphics
+		/initmatrix
+		/currentmatrix
+		/setmatrix
+		/setpagedevice
+		% Path construction operators
+		/initclip
+		% Virtual memory operators
+		/save
+		% ones which needed special overloading
+		/showpage
+		/erasepage
+		/copypage
+		/restore
+		% ignore these
+		/letter
+		/legal
+		/a4
+		/b5
+		/lettersmall
+		/note
+	]
+	{
+	%   if present try to replace
+	    dup where
+	    {
+		pop	% turf dict from where
+	% 	If operator then make into procedure
+		dup load type /operatortype eq
+		{
+			1 array cvx dup
+			0
+			3 index cvx		% /n -> n
+			put			% {}[0] -> n
+			bind
+			def
+		}
+		{
+			pop
+		}
+		ifelse
+	    } if
+	}
+	forall
+	
+	%
+	%	Initialise endmulti to execute an error
+	%
+	/endmulti
+	{
+		count array astore /ostack exch def
+		250 array execstack /estack exch def
+		20 array dictstack /dstack exch def
+		$error /newerror true put
+		$error /errorname (No matching multi) cvn put
+		$error /command (endmulti) put
+		$error /ostack ostack put
+		$error /estack estack put
+		$error /dstack dstack put
+		stop
+	}
+	bind
+	def
+	
+	%
+	%	Put multiple logical pages on one physical page
+	%	until "endmulti" called
+	%	
+	%	landscape incolumns nrows ncols hdividers vdividers multi -
+	%
+	%	landscape	boolean, if true divide page in landscape orientation
+	%	incolumns	boolean, if true columnate pages else arrange in rows
+	%	nrows		integer, number of logical pages down physical page
+	%	ncols		integer, number of logical pages across physical page
+	%	hdividers	boolean, if true divide logical pages by horizontal lines
+	%	vdividers	boolean, if true divide logical pages by vertical lines
+	%
+	/multi
+	{
+		currentdict
+		64 dict begin
+		/initdict exch def	% store initial dict for backward reference
+		/vdividers exch def
+		/hdividers exch def
+		/cols exch def
+		/rows exch def
+		/incolumns exch def
+
+	%
+	%	get size of current page
+	%
+		initgraphics clippath pathbbox
+		/Y exch def	% Max Y
+		/X exch def	% Max X
+		/y exch def	% Min Y
+		/x exch def	% Min X
+		/W X x add def	% Width of Page
+		/H Y y add def	% Height of page
+	
+	%	if landscape
+		{
+	%
+	%		Note: x and y are reversed
+	%
+			/w Y y sub def	% Width of imageable region
+			/h X x sub def	% Height of imageable region
+			/L		% Map to landscape
+				-90 matrix rotate
+				0 H matrix translate
+				matrix concatmatrix
+			def
+			/O y x matrix translate def	% Move to origin
+		}
+		{
+			/w X x sub def
+			/h Y y sub def
+			/L matrix def
+			/O x y matrix translate def
+		}
+		ifelse
+	
+	%
+	%	CTM (multi) = C x T x M x L x I
+	%	CTM (normal) = C x I
+	%	CTM (normal) = CTM (multi) x (T x M x L x I)-1 x I
+	%	M = (Scale rows/cols) x (Scale logical to physical) x
+	%		(Translate to physical clip origin
+	%	T = (Convert logical page to spot and physical)
+	%	L = (Convert to landscape)
+	%	I = Initial Physical CTM
+	%	C = Random transform on logical page
+		/I
+			matrix currentmatrix
+		def
+		/I_inv
+			I matrix invertmatrix
+		def
+	
+		/M
+				w W div cols div
+				h H div rows div
+			matrix scale			%TMP
+			O
+			matrix concatmatrix
+		def
+	
+	%	matrix T <current T>
+		/T
+		{
+	%	    if incolumns
+		    incolumns
+		    {
+			rows page# rows mod sub 1 sub H mul
+			page# rows idiv W mul
+			exch
+		    }
+		    {
+			page# cols mod W mul
+			rows page# cols idiv sub 1 sub H mul
+		    }
+		    ifelse
+		    3 -1 roll translate
+		}
+		def
+	
+	%
+	%	Utility functions
+	%	NB: *_t1 are temporary variables
+	%
+	
+	%	matrix fromcanon <I-1 x T x M x L x I>
+		/From_t1 matrix def
+		/From_t2 matrix def
+		/From_t3 matrix def
+		/From_t4 matrix def
+		/fromcanon
+		{
+			I_inv
+			From_t1 T
+			M
+			L
+			I
+			From_t2 concatmatrix	
+			From_t3 concatmatrix
+			From_t4 concatmatrix
+			3 -1 roll concatmatrix
+		}
+		def
+	
+	%	/n {} mkmulti -
+	%	makes a new function called "n" in previous dict with:-
+	%		{}[0] = /n
+	%		{}[1] = currentdict
+	%		currentdict.n = prevdict.n
+	%
+		/mkmulti
+		{
+			1 index dup load def	%define old val in current dict
+			5 array cvx
+			dup 3 4 -1 roll put	% A[3] = {}
+			dup 0 3 index put	% A[0] = /n
+			dup 1 currentdict put	% A[1] = currentdict
+			dup 2 /begin cvx put	% A[2] = begin
+			dup 4 /exec cvx put	% A[4] = exec
+			initdict 3 1 roll
+			put			% define initdict.n to multi function
+		}
+		def
+	
+	%
+	%	path_to_proc {}
+	%		make proc represenation of current path
+	%
+		/path_to_proc
+		{
+			{
+				[
+					/newpath cvx
+					{ /moveto cvx}
+					{ /lineto cvx}
+					{ /curveto  cvx}
+					{ /closepath cvx }
+					pathforall
+				]
+				cvx
+				exch pop
+			}
+			stopped
+			{
+				$error /errorname get /invalidaccess eq
+				{
+					cleartomark
+					$error /newerror false put
+					(%%Warning%% charpath in path - path nulled) =
+					cvx exec
+				}
+				{
+					stop
+				}
+				ifelse
+			}
+			if
+		}
+		def
+		/path_def
+		{
+			{ currentpoint } stopped
+			{
+				$error /newerror false put
+				{ newpath }
+			}
+			{
+				/moveto cvx 3 array astore cvx
+			}
+			ifelse
+		}
+		cvlit def
+	
+	%
+	%	Draw lines round logical pages
+	%
+		/draw_dividers
+		{
+			initgraphics
+			L concat
+			M concat
+			vdividers
+			{
+			    1 1 cols 1 sub
+			    {
+				W mul
+				dup
+				0 moveto
+				rows H mul lineto
+			    }
+			    for
+			}
+			if
+			hdividers
+			{
+			    1 1 rows 1 sub
+			    {
+				H mul
+				dup
+				0 exch moveto
+				cols W mul exch lineto
+			    }
+			    for
+			}
+			if
+			stroke
+		}
+		def
+	
+	%
+	%	for each graphics operator which affects absolute state
+	%
+		/M1 matrix def
+		/M3 matrix def
+		/M2 matrix def
+		[
+			/gsave
+			/grestore
+			/grestoreall
+			/initgraphics
+			/initmatrix
+			/currentmatrix
+			/setmatrix
+			% Path construction operators
+			/initclip
+			% Virtual memory operators
+			/save
+		]
+		{
+			{
+	%			Save paths
+				path_def path_to_proc
+				clippath  { {} } path_to_proc
+	
+	%
+	%			CTM <- CTM x Tocano (canon mode)
+	%
+				M1 currentmatrix
+				Tocanon
+				M2
+				concatmatrix
+				setmatrix
+	
+	%			Restore paths
+				initclip exec clip
+				exec
+	
+				load exec
+	
+	%			Save paths
+				path_def path_to_proc
+				clippath  { {} } path_to_proc
+	
+	%
+	%			CTM <- CTM x Fromcanon (Non canon mode)
+	%
+				M1 currentmatrix
+				Fromcanon
+				M2
+				concatmatrix
+				setmatrix
+	
+	%			Restore paths
+				initclip exec clip
+				exec
+				end
+			}
+			mkmulti
+		}
+		forall
+	
+	%
+	%	Define the operators which can't use the standard template
+	%
+		/showpage
+		{
+			/page# page# 1 add def
+	
+	%		Update the transform matrices
+			page# npages eq
+			{
+				hdividers vdividers or
+				{
+					draw_dividers
+				}
+				if
+				load exec	% the previous showpage
+				/page# 0 def
+			}
+			{
+				pop
+			}
+			ifelse
+			/Fromcanon Fromcanon fromcanon def
+			/Tocanon Fromcanon Tocanon invertmatrix def
+			end
+			initgraphics	% the new initgraphics
+		}
+		mkmulti
+	
+		/copypage
+		{
+			pop
+			end
+			gsave
+			showpage
+			grestore
+		}
+		mkmulti
+	
+		/erasepage
+		{
+			pop
+			end
+			gsave
+			initclip
+			clippath
+			1 setgray fill
+			grestore
+		}
+		mkmulti
+		[
+			/letter
+			/legal
+			/a4
+			% /b5
+			% /lettersmall
+			% /note
+		]
+		{
+			{
+				pop end
+				(%%Warning%% Device change ignored) =
+			}
+			mkmulti
+		}
+		forall
+	
+	%
+	%	Define restore separately as it affects the value of page#, etc
+	%
+		/restore
+		{
+			pop
+	%		Push the values to restore after restore
+			mark exch 	% put mark under -save-
+			page#
+			Fromcanon aload pop
+			Tocanon aload pop
+	
+			counttomark -1 roll	% get -save- to the top
+			restore
+	
+	%		Restore popped values
+			Tocanon astore pop
+			Fromcanon astore pop
+			/page# exch def
+			pop	% mark
+	
+	%		Save paths
+			path_def path_to_proc
+			clippath  { { } } path_to_proc
+	
+	%
+	%		CTM <- CTM x Fromcanon (Non canon mode)
+	%
+			M1 currentmatrix
+			Fromcanon
+			M2
+			concatmatrix
+			setmatrix
+	
+	%		Restore paths
+			initclip exec clip
+			exec
+			end
+		}
+		mkmulti
+	%
+	%	procedure to undo the effect of multi
+	%
+		/endmulti
+		{
+			pop	% don't need /endmulti
+			[
+				/gsave
+				/grestore
+				/grestoreall
+				/initgraphics
+				/initmatrix
+				/currentmatrix
+				/setmatrix
+				% Path construction operators
+				/initclip
+				% Virtual memory operators
+				/save
+				% ones which needed special overloading
+				/showpage
+				/erasepage
+				/copypage
+				/restore
+				% ignore these
+				/letter
+				/legal
+				/a4
+				% /b5
+				% /lettersmall
+				% /note
+				%
+				/endmulti
+			]
+			{
+				initdict exch
+				dup load 		% get old value
+				put			% restore old value
+			}
+			forall
+			page# 0 ne	% if not at new page show uncomplete page
+			{
+				hdividers vdividers or
+				{
+					draw_dividers
+				}
+				if
+				showpage
+			}
+			if
+			end
+		}
+		mkmulti
+	
+	%
+	%	Set up in multi(non canon) mode
+	%
+		/page# 0 def
+		/npages rows cols mul def
+		/Fromcanon matrix fromcanon def
+		/Tocanon Fromcanon matrix invertmatrix def
+		end
+		initgraphics
+	}
+	bind
+	def
+PSMULTI
+[ -n "$needmulti" ] && echo "$landscape $incolumns $nrows $ncols $hdividers $vdividers multi"
+
+cat ${1+"$@"}
+xit=$?
+
+[ -n "$needmulti" ] && echo endmulti
+
+# undo setduplexmode and settumble
+sed 's/^	//' <<HEADER
+	/setduplexmode where
+	  % Level 1 PostScript - turn off duplex and tumble
+	  { statusdict begin
+	      /setduplexmode where
+	      { pop false setduplexmode } if
+	      /settumble where
+	      { pop false settumble } if
+	    end
+	  }
+	  % Level 2 PostScript - restore old values
+	  { 
+%	    globaldict begin
+%	      pagedev$HOST$$ setpagedevice
+%	      globaldict /pagedev$HOST$$ undef
+%	    end
+	  }
+	  ifelse
+HEADER
+
+exit $xit
