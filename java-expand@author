@@ -23,7 +23,7 @@ fgrep -l "$short" "$@" \
       ( set bsed "s|@author[ 	]$short|@author <A HREF=\"$WWW_HOME\">$NAME</A> \&lt;<A HREF=\"mailto:$PUBLICEMAIL\">$PUBLICEMAIL</A>\&gt;|"
 	if ifcvs "$file"
 	then
-	    exec cvsedit --no-dl --no-diff -m "" "$file" "$@"
+	    exec cvsedit --no-log --no-diff -m "" "$file" "$@"
 	else
 	    exec "$@" "$file"
 	fi
