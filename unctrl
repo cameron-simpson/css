@@ -4,6 +4,10 @@
 #	- Cameron Simpson <cs@zip.com.au>
 #
 
+# trim ANSI escape sequences
+s/\033\[[0-9;]*[a-zA-Z]//g;
+
+# printify control characters
 s/[\000-\010\013\015-\037\177-\377]/
 	($sub=''),
 	($c=unpack('C',$&)),
