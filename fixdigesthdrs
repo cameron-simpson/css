@@ -1,0 +1,15 @@
+#!/bin/sed -f
+#
+# Take the sad imitation of a digest message that Yahoo makes
+# and unindent the headers.
+#	- Cameron Simpson <cs@zip.com.au> 02sep2003
+#
+
+:hdr
+/^$/b end
+s/^  *\([A-Z][A-Za-z\-]*: \) */\1/
+n
+b hdr
+:end
+n
+b end
