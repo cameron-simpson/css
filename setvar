@@ -51,8 +51,8 @@ $::Usage="Usage:\t$::cmd [-f] varnames command [args...]
 	varnames	Space separated list of environment variables needed.
 ";
 
+$::Force=0;
 my $noexec=0;
-my $force=0;
 my $trace=0;
 my $verbose = -t STDOUT;
 my $silent  = ! $verbose;
@@ -68,7 +68,7 @@ ARGV:
 
     if ($_ eq '-n')	{ $noexec=1; $outfile="/tmp/$::cmd.$$"; }
     elsif ($_ eq '-N')	{ $noexec=1; $outfile=shift(@ARGV); $keepOutfile=1; }
-    elsif ($_ eq '-f')	{ $force=1; }
+    elsif ($_ eq '-f')	{ $::Force=1; }
     elsif ($_ eq '-d')	{ unshift(@::ENVPATH,shift(@ARGV)); }
     elsif ($_ eq '-s')	{ $silent=1; $verbose=0; }
     elsif ($_ eq '-v')	{ $silent=0; $verbose=1; }
@@ -251,16 +251,18 @@ sub envstuff
   }
 }
 
+# first arg numeric => OR( [0,1] => missok, [0,2] => noforce )
 sub setvar
 {
   my(@vars)=@_;
 
-  my $missok;
+  my $force=$::Force;
+  my $missok=0;
+
   if (@vars && $vars[0] =~ /^\d/)
-  { $missok=shift(@vars)+0;
-  }
-  else
-  { $missok=0;
+  { my $mask=shift(@vars)+0;
+    $missok=($mask&0x01);
+    $force=0 if $mask&0x02;
   }
 
   return undef if ! @vars;
@@ -547,6 +549,12 @@ sub useline($)
 		split(/\s+/,
 		      estring($_,0))));
   }
+  elsif (/^dflt\s+/)
+  { $_=$';
+    setvar(2,grep(length,
+		split(/\s+/,
+		      estring($_,0))));
+  }
   elsif (/^tryvar\s+/)
   { $_=$';
     setvar(1,grep(length,
@@ -634,5 +642,5 @@ sub putvars
 
   ##for my $v (@vars) { warn "putvar($v [$::ENV{$v}]"; }
 
-  cs::Shell::putvars($force,$CshMode ? CSH : SH,@vars);
+  cs::Shell::putvars($::Force,$CshMode ? CSH : SH,@vars);
 }
