@@ -44,7 +44,5 @@ do
   killpidfile getmail_flush.pid
 
   [ $once ] && break
-  sleep $fmdelay &
-  echo $! >"$VARRUN/fetchmail_sleep.pid"
-  wait
+  bgproc -s -p fetchmail_sleep.pid sleep $fmdelay
 done
