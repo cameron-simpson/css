@@ -20,17 +20,20 @@ $aflag=0;
 $uflag=0;
 $GOODSIG='length';
 
-if ($ARGV[0] eq '-a')		{ $aflag=1; shift; }
-elsif ($ARGV[0] eq '-u')	{ $uflag=1; shift; }
+if (@ARGV)
+{
+  if ($ARGV[0] eq '-a')		{ $aflag=1; shift; }
+  elsif ($ARGV[0] eq '-u')	{ $uflag=1; shift; }
 
-if ($ARGV[0] eq '-g')		{ shift; $GOODSIG=shift; }
-elsif ($ARGV[0] =~ m;^/;)
+  if ($ARGV[0] eq '-g')		{ shift; $GOODSIG=shift; }
+  elsif ($ARGV[0] =~ m;^/;)
 				{ if ( ! -f $ARGV[0] )
 				  { $GOODSIG=shift(@ARGV);
 				    $GOODSIG.='/' unless $GOODSIG =~ m:/$:;
 				    $GOODSIG.='i';
 				  }
 				}
+}
 
 # how to stash a sig
 eval '
@@ -42,12 +45,13 @@ eval '
 
 die $@ if $@;
 
-if (! @ARGV)	{ if (!length($ENV{SIGS}))
-			{ $ENV{SIGS}=$ENV{HOME}.'/.sigs';
-			}
+if (! @ARGV)	
+{ if (!length($ENV{SIGS}))
+  { $ENV{SIGS}=$ENV{HOME}.'/.sigs';
+  }
 
-		  @ARGV=$ENV{SIGS};
-		}
+  @ARGV=$ENV{SIGS};
+}
 
 @sigs=();
 SIGFILE:
