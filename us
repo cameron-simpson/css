@@ -8,11 +8,9 @@
 # Shortcuts and foo.bar -> http://foo.bar/ - cameron 09aug2002
 #
 
-force=1
 clean=
 while :
 do  case $1 in
-      -f)	force=1 ;;
       +c)	clean= ;;
       -c)	clean=1 ;;
       --)	shift; break ;;
@@ -29,34 +27,27 @@ case $DISPLAY in
     *)	id=$DISPLAY ;;
 esac
 
-if [ $force ] || locked "netscape-$id"
-then
-    # translate shortcuts
-    first=1
-    for arg
-    do  case "$arg" in
-	    jdk)	arg=file:///opt/j2sdk-sun-1.4.0-beta3/docs/api/overview-summary.html ;;
-	    */*)	;;
-	    *.*)	arg=http://$arg/ ;;
-	esac
-	if [ $first ]
-	then  set x "$arg"; shift
-	else  set x "$@" "$arg"; shift; first=
-	fi
-    done
-
-    [ "x$*" = x- ] || exec </dev/null
-    if [ $clean ]
-    then
-	for url
-	do  htc "$url"
-	done
-    else
-	## set -x
-	bgstdin urlshow ${1+"$@"}
+# translate shortcuts
+first=1
+for arg
+do  case "$arg" in
+	jdk)	arg=file:///opt/j2sdk-sun-1.4.0-beta3/docs/api/overview-summary.html ;;
+	*/*)	;;
+	*.*)	arg=http://$arg/ ;;
+    esac
+    if [ $first ]
+    then  set x "$arg"; shift
+    else  set x "$@" "$arg"; shift; first=
     fi
+done
+
+[ "x$*" = x- ] || exec </dev/null
+if [ $clean ]
+then
+    for url
+    do  htc "$url"
+    done
 else
-    echo "$0: no netscape lock active" >&2
-    echo "	please retry when netscape is up, or use -f" >&2
-    exit 1
+    ## set -x
+    bgstdin urlshow ${1+"$@"}
 fi
