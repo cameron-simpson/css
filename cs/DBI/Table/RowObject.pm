@@ -35,20 +35,29 @@ require Exporter;
 
 =over 4
 
-=item new cs::DBI::Table::RowObject $rowhashref
+=item fetch cs::DBI::Table::RowObject (I<keyvalue>,I<dbh>,I<table>,I<keyfield>,I<where>,I<preload>
 
-Return an object attached to the table specified.
-Note: multiple calls to B<new> with the same arguments
-obtain multiple references to the same B<cs::DBI::hashtable>
-(though you shou;dn't consider this guarenteed
-- this is more a warning that B<new> doesn't always make a new object).
+Return a B<cs::DBI::Table::RowObject> representing the row
+whose I<keyfield> matches I<keyvalue>
+from the table specified by I<dbh>, I<table> and I<where>
+as for the B<cs::DBI::hashtable> function.
+This object is suitable for subclassing
+by a table specific module.
 
 =cut
 
-sub new($$)
-{ my($class,$rowhash)=@_;
+sub fetch($$$$$;$$)
+{ my($class,$keyvalue,$dbh,$table,$keyfield,$where,$preload)=@_;
 
-  bless { cs::DBI::Table::RowObject::DATA => $rowhash }, $class;
+  die "$0: no keyvalue" if ! defined $keyvalue;
+
+  my $H = cs::DBI::hashtable($dbh,$table,$keyfield,$where,$preload);
+  die "$0: can't obtain hashtable($dbh,$table,$keyfield,$where,$preload)"
+  if ! defined $H;
+
+  return undef if ! exists $H->{$keyvalue};
+
+  bless { cs::DBI::Table::RowObject::DATA => $H->{$keyvalue} }, $class;
 }
 
 =back
@@ -57,9 +66,14 @@ sub new($$)
 
 =over 4
 
+=item _Data()
+
+Return the hashref to the actual row data
+(tied to a B<cs::DBI::Table::Row> object).
+
 =cut
 
-sub _Data { shift->{cs::DBI::Table::RowObject::DATA}; }
+sub _Data($) { shift->{cs::DBI::Table::RowObject::DATA}; }
 
 =item GetSet(I<field>,I<value>)
 
@@ -74,7 +88,7 @@ sub GetSet($$;$)
 { my($this,$field,$value)=@_;
   my $D = $this->_Data();
   return $D->{$field} if ! defined $value;
-  warn "GetSet: Set $field=$value";
+  ## warn "GetSet: Set $field=$value";
   $D->{$field}=$value;
 }
 
