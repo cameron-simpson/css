@@ -1,0 +1,66 @@
+#!/usr/bin/perl
+#
+# Read
+#	size	path
+# from stdin, write stats to stdout.
+#	- Cameron Simpson <cs@zip.com.au> 07jun99
+#
+
+use strict qw(vars);
+
+while (defined ($_=<STDIN>))
+{
+  my($size,$path)=/^\s*(\d+)\s+(\S+)/;
+  next FILE if ! defined $size;
+
+  my $base = ($path =~ /.*\// ? $' : $path);
+  ## warn "base=$base, size=$size, path=$path\n";
+
+  if ($base =~ /~$/)
+  { note('EMACSOLD','',$size);
+  }
+  elsif ($base =~ /^\./)
+  { note('RCFILE','',$size);
+  }
+  elsif ($base eq 'core')
+  { note('CORE','',$size);
+  }
+  else
+  { my $comp = '';
+    my $type = 'MISC';
+
+    if ($base =~ /\.(Z|z|gz)$/)
+    { $comp=$1; $base=$`;
+    }
+
+    if ($base =~ /.\.([^.]+)$/)
+    { $type=lc($1);
+    }
+
+    note($type,$comp,$size);
+  }
+}
+
+printf(STDERR "%-15s %6s %12s\n","Compression","Count","Bytes");
+for my $comp (sort keys %::NCompressed)
+{ printf(STDERR "%-15s %6d %12d\n",
+	(length $comp ? $comp : 'NONE'),
+	$::NCompressed{$comp},
+	$::DCompressed{$comp});
+}
+
+for my $type (sort keys %::NType)
+{ print "$::NType{$type} 1 $::DType{$type} $type\n";
+}
+
+exit 0;
+
+sub note($$$)
+{ my($type,$comp,$size)=@_;
+
+  $::NCompressed{$comp}++;
+  $::DCompressed{$comp}+=$size;
+
+  $::NType{$type}++;
+  $::DType{$type}+=$size;
+}
