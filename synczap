@@ -1,0 +1,118 @@
+#!/bin/sh
+#
+# Propagate the adzap script and pattern file.
+#	- Cameron Simpson <cs@zip.com.au> 21apr99
+#
+
+script=$HOME/scripts/squid_redirect
+dir=$HOME/rc/adzap
+webdir=$HOME/public/adzap
+base=http://www.zip.com.au/~cs/adzap
+
+cd "$dir" || exit 1
+pwd
+
+set -u
+
+news=`readdottext`
+chamgelog=changelog
+
+dodiff=1
+commit=
+[ $# = 0 ] && \
+    { dodiff=1
+      commit=1
+
+      while read addr
+      do  case "$addr" in
+		''|\#*)	;;
+		*)	set ${1+"$@"} "$addr" ;;
+	  esac
+      done < $HOME/rc/adzap/syncusers
+    }
+
+changetmp=/tmp/change.$$
+
+saved=patterns-`datecode`.gz
+savedpl=script-`datecode`.gz
+if [ $commit ]
+then
+    if gzip -v -9 <patterns >"$saved" \
+    && gzip -v -9 <"$script" >"$savedpl"
+    then 
+	  PGPPASS=${PGPPASS-""}
+	  [ -n "$PGPPASS" ] \
+	  || { PGPPASS=`nread 'Enter PGP passphrase'` \
+	    && [ -n "$PGPPASS" ]
+	     } \
+	  || { echo "$0: can't get \$PGPPASS" >&2; exit 1; }
+	  export PGPPASS
+	  if pgp -bsa "$saved" \
+	  && pgp -bsa "$savedpl"
+	  then  pgpsig=$saved.sig
+		pgpplsig=$savedpl.sig
+		mv "$saved.asc" "$pgpsig"
+		mv "$savedpl.asc" "$pgpplsig"
+	  else  echo "Signature fails, aborting." >&2
+		rm -f "$saved"
+		exit 1
+	  fi
+    else  echo "Release snapshot fails, aborting." >&2
+	  exit 1
+    fi
+    chmod a+r "$saved" "$pgpsig"
+    mv "$saved" "$pgpsig" "$webdir/."
+    chmod a+r "$savedpl" "$pgpplsig"
+    mv "$savedpl" "$pgpplsig" "$webdir/."
+fi
+
+[ $dodiff ] && { diff=$saved.diff
+		 cvs diff -r LAST patterns >"$diff"
+		 chmod a+r "$diff"
+		 mv "$diff" "$webdir/."
+	       }
+cvs diff -r LAST changelog \
+| sed -n '/^+++/d
+	  s/^+//p' >"$changetmp"
+
+synczip
+
+for user
+do  echo "$user..."
+    [ -n "$news" ] && \
+	( echo "Update Synopsis:"
+	  echo "$news"
+	  echo
+	  if [ $commit ]
+	  then
+	      echo "The source patterns for this relase may be found here, along with a PGP signature:"
+	      echo "	$base/$saved"
+	      echo "	$base/$pgpsig"
+	      echo
+	      echo "The script for this relase may be found here, along with a PGP signature:"
+	      echo "	$base/$savedpl"
+	      echo "	$base/$pgpplsig"
+	      echo
+	  fi
+	  if [ $dodiff ]
+	  then
+	      echo "A diff between the last release and this one may be found here:"
+	      echo "	$base/$diff"
+	      echo
+	  fi
+	  cat $HOME/public/adzap/update-instructions.txt
+	  [ -s "$changetmp" ] && \
+	      { echo
+		echo "Changelog since the last public update:"
+		cat "$changetmp"
+	      }
+	  echo
+	  echo "Cheers,"
+	  cat $HOME/rc/mail/signature
+        ) | mailsubj -s 'synopsis of adzap update' "$user"
+    mpics "$user" "$script"
+done
+
+[ $commit ] && cvs tag -F LAST
+
+rm -f "$changetmp"
