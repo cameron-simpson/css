@@ -75,7 +75,6 @@ do  case "$fwd" in
 	    echo "cisra2zip..."
 	    $trace \
 	    vpnssh $vflag -t 60 "$zip" \
-		   -L 8081:localhost:8081 \
 		   -L 9875:203.17.198.110:9875 \
 		   -L 9876:203.17.198.107:9875 \
 		   -L 2119:news:119 \
@@ -100,7 +99,6 @@ do  case "$fwd" in
 	    echo "home2zip..."
 	    $trace \
 	    vpnssh $vflag "$zip" \
-		   -L 8081:localhost:8081 \
 		   -L 2119:news:119 \
 		   -L 2025:mail:25 \
 		   -L 2110:mail:110 &
