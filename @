@@ -69,7 +69,6 @@ do
 	exec rterm "$host" -s $sshopts
 	;;
     rita)
-	set -x
 	rdesktop -g "${X11_BGX}x${X11_Y}" -K -T "$host rdesktop" "$host" &
 	;;
     *)	exec rterm "$host" $sshopts
