@@ -86,7 +86,7 @@ sub isodate
   sprintf("%d-%02d-%02d", $tm[5]+1900, $tm[4]+1, $tm[3]);
 }
 
-=item hashtable(I<dbh>,I<table>,I<keyfield>)
+=item hashtable(I<dbh>,I<table>,I<keyfield>,I<where>,I<preload>)
 
 Return a reference to a hash tied to a database table,
 which may then be manipulated directly.
@@ -94,14 +94,22 @@ This is not as efficient as doing bulk changes via SQL
 (because every manipulation of the table
 does the matching SQL, incurring much latency)
 but it's very convenient.
+The optional parameter I<where>
+may be used to supply a B<WHERE> clause to the underlying SQL query.
+If the optional parameter I<preload> is true
+the entire table is fetched at instantiation time
+with a single SQL call,
+thus bypassing the latency
+(a win if memory is plentiful and the table is not too large).
 
 =cut
 
 undef %cs::DBI::_HashTables;
 
-sub hashtable($$$;$)
-{ my($dbh,$table,$keyfield,$where)=@_;
+sub hashtable($$$;$$)
+{ my($dbh,$table,$keyfield,$where,$preload)=@_;
   $where='' if ! defined $where;
+  $preload=0 if ! defined $preload;
 
   return $cs::DBI::_HashTables{$dbh,$table,$keyfield,$where}
   if exists $cs::DBI::_HashTables{$dbh,$table,$keyfield,$where};
@@ -109,7 +117,7 @@ sub hashtable($$$;$)
   my $h = {};
 
   ::need(cs::DBI::Table::Hash);
-  if (! tie %$h, cs::DBI::Table::Hash, $dbh, $table, $keyfield, $where)
+  if (! tie %$h, cs::DBI::Table::Hash, $dbh, $table, $keyfield, $where, $preload)
   { return undef;
   }
 
