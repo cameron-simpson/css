@@ -1,0 +1,3 @@
+#!/bin/sh
+
+urls ${1+"$@"} | sed -n 's/^mailto://p'
