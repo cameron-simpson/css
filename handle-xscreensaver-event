@@ -1,0 +1,20 @@
+#!/bin/sh
+#
+# Handle a single xscreensaver event.
+# Called from watchxscreensaver.
+#	- Cameron Simpson <cs@zip.com.au> 28jul2003
+#
+
+cmd=$0
+[ $# = 0 ] && { echo "$cmd: missing event" >&2; exit 2; }
+event=$1; shift
+
+case "$event" in
+  BLANK|RUN|LOCK)
+	;;
+  UNBLANK)
+	lastjob=`popvalue oldjob_xscreensaver` || lastjob=untracked
+	job "$lastjob" "xscreensaver $event $etc" ;;
+  *)	alert -c magenta "$cmd: unrecognised xscreensaver event: $event $*"
+	;;
+esac
