@@ -7,6 +7,8 @@
 cmd=$0
 usage="Usage: $cmd [task [coment...]]"
 
+setdesk=1
+
 # just report current job if no args
 [ $# = 0 ] && exec lastvalue timer_what
 
@@ -16,6 +18,8 @@ key=$1; shift
 isjob "$key" || { echo "$cmd: unknown job \"$key\"" >&2; badopts=1; }
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+[ $setdesk ] && deskjob . "$key"
 
 when=`now`
 
