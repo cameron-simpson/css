@@ -1,0 +1,43 @@
+#!/usr/bin/perl -p
+#
+# Read POD from stdin, recognise numbered lists by first =item,
+# enforce numbering.
+#	- Cameron Simpson <cs@zip.com.au> 24aug2004
+#
+
+if (/^=over\b/)
+{ $inlist=1;
+  $nitems=0;
+  warn "inlist\n";
+}
+elsif ($inlist && /^=item\b\s*/)
+{
+  $itxt=$';
+  $nitems++;
+  if ($nitems == 1)
+  { if ($itxt =~ /^(\d+)([^\s\w]*)/)
+    { $counter=$1+0;
+      $sep=$2;
+      $numeric=1;
+    }
+    else
+    { $numeric=0;
+    }
+  }
+  else
+  {
+    if ($numeric)
+    {
+      if ($itxt =~ /^\d+/)
+      { $counter=$&+0;
+      }
+      else
+      { $counter++;
+	$_="=item $counter$sep $itxt\n";
+      }
+    }
+  }
+}
+elsif (/^=back\b/)
+{ $inlist=0;
+}
