@@ -29,15 +29,15 @@ do  ( cd "$dir" || exit 1
       if [ $all ]
       then
 	  find . ! -type l -print \
-	  | xxargs chmod go=u
+	  | xxargs set-x chmod go=u
 
 	  find . ! -type l -print \
-	  | xxargs chmod o-w
+	  | xxargs set-x chmod o-w
       else
 	  find . ! -type l -print \
-	  | xxargs chmod g=u
+	  | xxargs set-x chmod g=u
       fi
       find . -type d -print \
-      | xxargs chmod g+s
+      | xxargs set-x chmod g+s
     )
 done
