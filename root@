@@ -9,6 +9,7 @@ usage="Usage: $cmd [-N] hostname
        $cmd hostname command..."
 
 badopts=
+ssh=sshop1
 
 newflag=-N
 [ "x$1" = x-N ] && { newflag=$1; shift; }
@@ -19,9 +20,13 @@ then  echo "$cmd: missing hostname" >&2; badopts=1
 else  host=$1; shift
 fi
 
+case "$host" in
+    sunny|ivory)	ssh=ssho ;;
+esac
+
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
-[ $# -gt 0 ] && exec sshp1 "root@$host" "$*"
+[ $# -gt 0 ] && exec "$ssh" "root@$host" "$*"
 
 ext=
 
@@ -30,4 +35,4 @@ session=root@$host$ext
 exec term -n "#$session" \
 	scr -N "$session" \
 	logscript "$session" \
-	sshop1 "root@$host"
+	"$ssh" -t "root@$host" '. /etc/profile; [ -f $HOME/.profile ] && . $HOME/.profile; TERM=vt100; export TERM; [ -f /bin/zsh ] && { SHELL=/bin/zsh; export SHELL; }; exec $SHELL'
