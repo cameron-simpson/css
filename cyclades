@@ -4,19 +4,16 @@
 #	- Cameron Simpson <cs@zip.com.au> 18dec2002
 #
 
-cychost=${CYCLADES_HOSTNAME:-hydra}
 cycuser=${USER:-`id -un`}
 
 cmd=`basename "$0"`
-usage="Usage: $cmd [-h host] [-l user] port
-	-h host	Specify Cyclades host (from \$CYCLADES_HOSTNAME, default: $cychost).
+usage="Usage: $cmd [-l user] console-name
 	-l user	Specify user name (from \$USER, default $cycuser)."
 
 badopts=
 
 while :
 do  case $1 in
-        -h)	cychost=$2; shift ;;
 	-l)	cycuser=$2; shift ;;
 	--)	shift; break ;;
 	-?*)	echo "$cmd: unrecognised option: $1" >&2
@@ -31,31 +28,24 @@ then
     echo "$cmd: missing port" >&2
     badopts=1
 else
-    cycport=$1; shift
+    console=$1; shift
     [ $# = 0 ] || { echo "$cmd: extra arguments: $*" >&2
 		    badopts=1
 		  }
 fi
 
-session=$cycport
+mapfile=/u/network/cyclades/map
+cychost=`awk "\\\$1 == \"$console\" { print \\\$2 }" "$mapfile"`
+cycport=`awk "\\\$1 == \"$console\" { print \\\$3 }" "$mapfile"`
+session=$cychost-$console
 
-portmap=/u/network/cyclades/map-$cychost
-statedir=/u/network/cyclades
-idset=$cychost
-
-# convert 
-id=`idset -d "$statedir" -i "$cychost" "$cycport"`
-cycport=$id
-session=`idset -d "$statedir" -i "$cychost" "$id"`
-
-[ -n "$session" ] || { echo "$cmd: no port mapping matching \"$cycport\" in $portmap" >&2
+[ -n "$cychost" ] || { echo "$cmd: no console named \"$console\" in $mapfile" >&2
 		       badopts=1
 		     }
-session=cyclades-$cychost/$session
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
 set -x
-##exec scrif "$session" \
+exec scr "$session" \
 	logscript "$session" \
-	ssh -l "$cycuser:$cycport" "$cychost"
+	ssh -t -l "$cycuser:$cycport" "$cychost"
