@@ -133,7 +133,7 @@ case "$TERM,$DISPLAY" in
 	esac
 
 	if [ $async ]
-	then $dolock "$PREFTERM" -title "$n" $opts -e "$@" &
+	then acon $dolock "$PREFTERM" -title "$n" $opts -e "$@" &
 	else exec $dolock "$PREFTERM" -title "$n" $opts -e "$@"
 	fi
 	;;
