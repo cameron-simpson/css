@@ -9,7 +9,7 @@ subclasses=$((subjava P)).class
 html	= $('*.html' G)
 
 htmandir = $(HOME)/there/cskk.ezoshosting.com/html/cs/man
-pmsets	= cs MSQ CISRA
+pmsets	= cs
 pmset(set) = $('$(set)/*.pm' EG?) \
 	     $('$(set)/*/*.pm' EG?) \
 	     $('$(set)/*/*/*.pm' EG?)
@@ -32,10 +32,10 @@ _all: squid_redirect 0README.txt _submakes _man _cvslog
 _cvslog: CHANGELOG.txt CHANGELOG.html
 
 CHANGELOG.txt:	_always
-	cvslog -O . >$@
+	cvslog -O . | sed 's/[Cc][Ii][Ss][Rr][Aa]/work/g' >$@
 
 CHANGELOG.html:	_always
-	cvslog2html -O . >$@
+	cvslog2html -O . | sed 's/[Cc][Ii][Ss][Rr][Aa]/work/g' >$@
 
 _test:
 	echo $(pmmans)
