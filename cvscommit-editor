@@ -32,6 +32,12 @@ $EDITOR "$report"
 xit=$?
 
 # toss blank lines
-bsed -s '/^[ 	]*$/d' "$report"
+bsed -s -e '/^CVS:/d' -e '/^[ 	]*$/d' "$report"
+
+if [ -s "$report" ]
+then
+    headline=`sed 1q "$report"`
+    buglog "$headline" <"$report"
+fi
 
 exit $xit
