@@ -1,0 +1,3 @@
+#!/usr/bin/perl -p
+
+tr/a-mn-zA-MN-Z/n-za-mN-ZA-M/;
