@@ -2,5 +2,5 @@
 [ $# = 0 ] && { echo "Usage: $0 command [args...]" >&2; exit 2; }
 DISPLAY=
 export DISPLAY
-unset DISPLAYe
+unset DISPLAY
 exec "$@"
