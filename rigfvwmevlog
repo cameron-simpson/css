@@ -1,0 +1,15 @@
+#!/bin/sh
+
+[ $# = 0 ] || { echo "Usage: $0" >&2; exit 2; }
+
+[ -n "$FVWMEVLOG" ] || { echo "$0: no \$FVWMEVLOG envvar" >&2; exit 1; }
+[ -f "$FVWMEVLOG" ] || { echo "$0: no \$FVWMEVLOG log file" >&2; exit 1; }
+
+fifodir=$HOME/tmp
+[ -d "$fifodir/." ] || mkdir "$fifodir" || exit 1
+
+fifo=$HOME/tmp/fvwmevfifo-$$HOST-$$DISPLAY-$$
+
+FvwmCommand -S "$fifo"
+sleep 5
+FvwmCommand -f "$fifo" -mi3 -F0 >>"$FVWMEVLOG" &
