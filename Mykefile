@@ -32,11 +32,9 @@ _all: squid_redirect 0README.txt _submakes _man _cvslog
 _cvslog: CHANGELOG.txt CHANGELOG.html
 
 CHANGELOG.txt:	_always
-	[ "$$HOST@$$SYSTEMID" = amadeus@home ]
 	cvslog -O . >$@
 
 CHANGELOG.html:	_always
-	[ "$$HOST@$$SYSTEMID" = amadeus@home ]
 	cvslog2html -O . >$@
 
 _test:
