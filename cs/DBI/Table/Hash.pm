@@ -10,6 +10,7 @@ cs::DBI::Table::Hash - treat an indexed DBI table as a hash
 
 =head1 SYNOPSIS
 
+use DBI;
 use cs::DBI::Table::Hash;
 
 tie %h, cs::DBI::Table::Hash, I<dbh>, I<table>, I<keyfield>, I<where>;
@@ -20,7 +21,7 @@ $hashref=cs::DBI::hashtable(I<dbh>,I<table>,I<keyfield>,I<where>,I<preload>)
 
 =head1 DESCRIPTION
 
-The cs::DBI::Table::Hash module permits you to tie a database
+The cs::DBI::Table::Hash module permits you to tie a I<DBI(3)> database
 table to a hash.
 
 =cut
