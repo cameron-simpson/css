@@ -90,7 +90,7 @@ for gui in `[ -n "$DISPLAY" ] && echo gui` !gui
 do action=`mailcap -s "$file" "$mtype" $gui ${1+"$@"}` && break
 done
 
-[ -n "$action" ] && { eval "$action"; exit $?; }
+[ -n "$action" ] && exec sh -c "$action"
 
 action=`mailcap -s "$file" "$mtype" decode`
 [ -n "$action" ] && { eval "set -vx; $action" | "$0" - ${1+"$@"}; exit $?; }
