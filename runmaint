@@ -28,8 +28,8 @@
 # =head1 INSTALLATION
 #
 # Normally I<runmaint> is installed as a kit under a prefix
-# such as B</> or B</usr/local>,
-# with the script itself in B</bin/runmaint> or B</usr/local/bin/runmaint>
+# such as B</> or B</opt> or B</usr/local>,
+# with the script itself in B</bin/runmaint> or B</opt/script/runmaint> or B</usr/local/bin/runmaint>
 # and so forth.
 # The examples below presume the prefix is B</>
 # and should be adjusted to match how your install is arranged.
@@ -104,10 +104,12 @@
 # in this way sourcing the user's normal startup files.
 #
 
-# installation prefix - typically /usr/local
+# Installation prefix, typically /usr/local or /opt/runmaint.
 # The /opt/runmaint path fits the syncopt scheme as described here:
 #	http://www.zip.com.au/~cs/syncopt/
-MaintDir=/opt/runmaint
+# Can be overridden by presetting this variable.
+RUNMAINT_DIR=${RUNMAINT_DIR:-/opt/runmaint}
+MaintDir=$RUNMAINT_DIR
 
 USER=${USER-$LOGNAME}; export USER
 [ -n "$USER" ] || { echo "$0: no \$USER or \$LOGNAME, bailing out" >&2
@@ -117,13 +119,18 @@ USER=${USER-$LOGNAME}; export USER
 case "$USER" in [0-9]*) echo "WARNING @ `hostname`: USER=\"$USER\", LOGNAME=\"$LOGNAME\", id=`id`" >&2 ;; esac
 
 if [ -f "$0" ]
-then    RunMaint="$0 -E"
-else    RunMaint="$MaintDir/bin/runmaint -E"
+then    RUNMAINT="$0 -E"
+else    RUNMAINT="$RUNMAINT_DIR/bin/runmaint -E"
 fi
-MaintEtc=$MaintDir/etc/runmaint
-MaintScripts=${MaintScripts:-$HOME/.maint}
+RunMaint=$RUNMAINT
+RUNMAINT_ETC=$RUNMAINT_DIR/etc/runmaint
+MaintEtc=$RUNMAINT_ETC
+RUNMAINT_SCRIPTS=${RUNMAINT_SCRIPTS:-$HOME/.maint}
+MaintScripts=$RUNMAINT_SCRIPTS
 
-export MaintDir MaintScripts RunMaint
+export RUNMAINT_DIR MaintDir \
+       RUNMAINT_SCRIPTS MaintScripts \
+       RUNMAINT RunMaint
 
 usage="Usage: $0 [-d dir] [-s subj] [-date datestr] [-x] target [addresses]
     See:
@@ -139,6 +146,9 @@ usage="Usage: $0 [-d dir] [-s subj] [-date datestr] [-x] target [addresses]
 			monthly	After daily/weekly, on first of month.
 			yearly	After monthly, on 1 January.
 	    host	Stuff for a specific host."
+
+# save invocation for logging
+invocation="$0 $*"
 
 # special case noenv as first arg
 noenv=
@@ -166,11 +176,12 @@ do
 #
 # Specify the directory containing maintenance scripts.
 #
-	-d)	MaintScripts=$2; shift
-		case "$MaintScripts" in
-		    /*) ;; *) MaintScripts=`pwd`/$MaintScripts ;;
+	-d)	RUNMAINT_SCRIPTS=$2; shift
+		case "$RUNMAINT_SCRIPTS" in
+		    /*) ;; *) RUNMAINT_SCRIPTS=`pwd`/$RUNMAINT_SCRIPTS ;;
 		esac
-		export MaintScripts
+		MaintScripts=$RUNMAINT_SCRIPTS
+		export RUNMAINT_SCRIPTS MaintScripts
 		;;
 #
 # =item B<-s> I<subject>
@@ -254,7 +265,7 @@ fi
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
 [ $noenv ] \
-|| { [ -s "$MaintEtc/env" ] && { $traceon; . "$MaintEtc/env"; $traceoff; }; }
+|| { [ -s "$RUNMAINT_ETC/env" ] && { $traceon; . "$RUNMAINT_ETC/env"; $traceoff; }; }
 
 SYSTEMID=${SYSTEMID:-localdomain}
 HOST=${HOST:-`hostname`}
@@ -267,7 +278,7 @@ xit=0
 
 case $target in
     /*)	try=$target ;;
-    *)	try="$MaintEtc/$USER/$target $MaintScripts/$target" ;;
+    *)	try="$RUNMAINT_ETC/$USER/$target $RUNMAINT_SCRIPTS/$target" ;;
 esac
 
 for script in $try
@@ -315,7 +326,14 @@ do
 	      exec sh $xflag "$script"
 	    ) \
 	    | case "$addresses" in
-		'') exec sh -c "exec >>'$log'; echo;echo '============================';echo '$script';date;exec execif cat" ;;
+		'') exec sh -c "exec >>'$log'
+				echo
+				echo '============================'
+				echo 'command=$invocation'
+				echo 'script=$script'
+				date
+				exec execif cat"
+		    ;;
 		-)  exec cat ;;
 		*)  exec mailif -s "$subj" $addresses ;;
 	      esac
@@ -326,7 +344,7 @@ do
     do
       if [ -r "$localscript" ]
       then
-	  $RunMaint -date "$datestr" $xflag -s "$subj - perhost($HOST)" "$localscript" $addresses \
+	  $RUNMAINT -date "$datestr" $xflag -s "$subj - perhost($HOST)" "$localscript" $addresses \
 	  || xit=$?
       fi
     done
@@ -335,26 +353,26 @@ do
     case $target in
 	hourly)	    if [ $hh -eq 0 ]
 		    then
-			$RunMaint -date "$datestr" $xflag daily $addresses \
+			$RUNMAINT -date "$datestr" $xflag daily $addresses \
 			|| xit=$?
 		    fi
 		    ;;
-	daily)	    $RunMaint -date "$datestr" $xflag "$wday" $addresses \
+	daily)	    $RUNMAINT -date "$datestr" $xflag "$wday" $addresses \
 		    || xit=$?
 		    if [ "x$wday" = xmon ]
 		    then
-			$RunMaint -date "$datestr" $xflag weekly $addresses \
+			$RUNMAINT -date "$datestr" $xflag weekly $addresses \
 			|| xit=$?
 		    fi
 		    if [ $mday -eq 1 ]
 		    then
-			$RunMaint -date "$datestr" $xflag monthly $addresses \
+			$RUNMAINT -date "$datestr" $xflag monthly $addresses \
 			|| xit=$?
 		    fi
 		    ;;
 	monthly)    if [ $mon = jan ]
 		    then
-			$RunMaint -date "$datestr" $xflag yearly $addresses \
+			$RUNMAINT -date "$datestr" $xflag yearly $addresses \
 			|| xit=$?
 		    fi
 		    ;;
