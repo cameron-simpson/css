@@ -33,6 +33,11 @@ sedf='	# collate continuation lines
 	  d
 	}
 
+	# Make "From " look like a header
+	1{
+	  s/^From /From_: /
+	}
+
 	# not continuation - flush held line
 	1!{
 	  x
@@ -51,7 +56,7 @@ sedf='	# collate continuation lines
 [ $shmode ] || exec sed -n "$sedf"
 
 sed -n "$sedf" \
-| sed '	s/:[ 	]*/\n/' \
+| sed '	s/:*[ 	][ 	]*/\n/' \
 | sed -n \
       '	y/abcdefghijklmnopqrstuvwxyz-/ABCDEFGHIJKLMNOPQRSTUVWXYZ_/
 	h
