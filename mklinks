@@ -175,6 +175,7 @@ The default is 512 bytes.
 	$::SOpens+=2;
 	$::SBytesRead+=2*$sz;
 
+	# different, leave it alone
 	next F2 if compare($f1,$f2) != 0;
 
 	# the same - keep one, toss other, link kept to tossed
