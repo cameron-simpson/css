@@ -1,0 +1,36 @@
+#!/bin/sh
+#
+
+exec 3>&1 1>>/u/cameron/etc/logs/maildrop 2>&1
+HOME=${HOME-/home/sid/cameron}; export HOME
+
+mbox=+UNFILED
+logit=1
+echoit=
+
+case $1 in -n)	logit=;          shift ;; esac
+case $1 in -e)	logit= echoit=1; shift ;; esac
+case $1 in +*)	mbox=$1;         shift ;; esac
+
+drop=$HOME/tmp/maildrop
+
+n=1
+
+while  f=$drop/$$.$n.$mbox
+       [ -f "$f" ]
+do     n=`expr $n + 1`
+done
+
+{ cat >>"$f" && [ -s "$f" ]; } \
+	|| { rm -f "$f"; exit 75; }	# bail on disc full etc
+					# 75 is EX_TEMPFAIL
+# ls -ld "$f"
+[ -n "$echoit" ] && echo "$f" >&3
+[ -n "$logit" ] || exit 0
+
+( PATH=$HOME/scripts:$PATH:/opt/script:/opt/bin
+  log=`logpath filemail`
+  [ -s "$log" ] && echo "$f $mbox" >>"$log"
+) </dev/null >/dev/null 2>&1 &
+
+exit 0
