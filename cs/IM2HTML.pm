@@ -42,7 +42,7 @@ $cs::IM2HTML::TableLength=3;
 $cs::IM2HTML::DoImStat=1;
 $cs::IM2HTML::Order=ASCII;	# or MTIME
 $cs::IM2HTML::ThumbMax=80;	# max edge length for thumbnails
-$cs::IM2HTML::ThumbType=PNG;	# preferred thumbnail type - PNG or GIF
+$cs::IM2HTML::ThumbType=JPG;	# preferred thumbnail type - JPG, PNG or GIF
 
 # table control variables
 $cs::IM2HTML::_intable=0;
@@ -507,19 +507,21 @@ sub MakeThumbnail($$;$)
   $this->{DIDTHUMB}->{$im}=1;
   _shell("[ -s '$impath' ] && { "
 	 .( $force ? "" : "[ -s '$thpath' ] || ")
-	 ."mkthumbnail"
-	 .($im =~ /\.gif$/i
-	   ? ' -G'
-	   : $im =~ /\.png$/i
-	     ? ' -P'
-	     : $im =~ /\.jpg$/i
-	       ? ' -J'
-	       : ''
-	  )
-	 ." -m $this->{THUMBMAX}"
+	 ."gm convert - -geometry $this->{THUMBMAX}x$this->{THUMBMAX} -"
+##	 ."mkthumbnail"
+##	 .($im =~ /\.gif$/i
+##	   ? ' -G'
+##	   : $im =~ /\.png$/i
+##	     ? ' -P'
+##	     : $im =~ /\.jpg$/i
+##	       ? ' -J'
+##	       : ''
+##	  )
+##	 ." -m $this->{THUMBMAX}"
 	 ." <'$impath'"
 	 ." >'$thpath'"
-	 ."; }\n");
+	 ."; }\n")
+	 ;
 }
 
 sub FromParam
