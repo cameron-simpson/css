@@ -120,7 +120,7 @@ sub ngSet($)	# newsgrouptext -> cs::Flags
   cs::Flags->new(grep(length,split(/[\s,]+/)));
 }
 
-sub parse_comment($)
+sub parse_comment
 { local($_)=shift;
 
   my($comment)='';
