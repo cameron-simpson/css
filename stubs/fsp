@@ -1,5 +1,5 @@
-#!/usr/local/bin/perl
-#!/usr/local/bin/perl_dbm
+#!/usr/bin/perl
+#!/opt/bin/perl_dbm
 #
 
 ($cmd=$0) =~ s:.*/::;
