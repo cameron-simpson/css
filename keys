@@ -1,2 +1,2 @@
 #!/bin/sh
-exec e $HOME/rc/secret/keys/keys.gpg
+exec e $HOME/rc/secret-gpg/keys.gpg
