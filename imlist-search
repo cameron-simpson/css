@@ -1,6 +1,7 @@
 #!/usr/bin/perl -w
 #
 # Read an imlist (x y pathname) from stdin, choose images from it as specified.
+# See also: pickim.
 #	- Cameron Simpson <cs@zip.com.au> 16jun2004
 #
 
@@ -13,11 +14,13 @@ $::Usage="Usage: $::cmd [-owt] [-x lx] [-y ly] [-n nitems] [words...] <imlist
 	-o	OR words instead of ANDing them.
 	-w	Choose wide (landscape) pictures.
 	-t	Choose tall (portrait) pictures.
+	-s	Check that the file exists and is not empty.
 	-n n	Choose n items. Default: 1
 	-x lx	Choose pictures lx pixels or more wide.
 	-y ly	Choose pictures ly pixels or more high.
 ";
 
+$::DoStat=0;
 $::AndWords=1;
 $::PickN=1;
 $::MinX=0;
@@ -27,18 +30,20 @@ undef $::Aspect;
 { my $badopts=0;
   my %opt;
 
-  if (! getopts('wtx:y:n:',\%opt))
+  if (! getopts('wtsx:y:n:',\%opt))
   { warn "$::cmd: bad options\n";
     $badopts=1;
   }
 
   if ($opt{'t'})		{ $::Aspect=PORTRAIT; }
   if ($opt{'w'})		{ $::Aspect=LANDSCAPE; }
+  if ($opt{'s'})		{ $::DoStat=1; }
   if (defined $opt{'x'})	{ $::MinX=$opt{'x'}+0; }
   if (defined $opt{'y'})	{ $::MinY=$opt{'y'}+0; }
   if (defined $opt{'n'})	{ $::PickN=$opt{'n'}+0; }
 
-  @::Words=map(qr($_)i,@ARGV);
+  @::NotWords=map(qr($_)i,grep(defined,map(/^!/ ? $' : undef, @ARGV)));
+  @::Words=map(qr($_)i,grep(defined,map(/^[^!]/ ? $_ : undef, @ARGV)));
 
   die $::Usage if $badopts;
 }
@@ -66,6 +71,11 @@ while (<STDIN>)
 	  && (   ( $::Aspect eq PORTRAIT && $dx > $dy )
 	      || ( $::Aspect eq LANDSCAPE && $dy > $dx )
 	     );
+
+  REJECT:
+  for my $re (@::NotWords)
+  { next IM if $impath =~ $re;
+  }
 
   if ($::AndWords)
   { TRY_AND:
@@ -102,14 +112,31 @@ if (@::IM <= $::PickN)
   exit 0;
 }
 
+my $nitems = @::IM;
+my @s;
 PICK:
-while ($::PickN > 0)
+while ($::PickN > 0 && $nitems > 0)
 {
   my $poff = rand($offset);
   my $pndx = offset2index($poff);
-  next PICK if ! length $::IM[$pndx];
-  print "$::IM[$pndx]\n";
+  my $impath = $::IM[$pndx];
   $::IM[$pndx]='';
+  $nitems--;
+
+  next PICK if ! length $impath;
+
+  if ($::DoStat)
+  { if (! stat($impath))
+    { warn "$::cmd: $impath: stat: $!, skipping\n";
+      next PICK;
+    }
+    if (! -f _ || ! -s _)
+    { warn "$::cmd: $impath: not non-empty file\n";
+      next PICK;
+    }
+  }
+
+  print "$impath\n";
   $::PickN--;
 }
 
