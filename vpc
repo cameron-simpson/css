@@ -4,10 +4,10 @@
 #	- Cameron Simpson <cs@zip.com.au> 04dec2000
 #
 
-[ $# -ge 1 ] || { echo "Usage: $0 [-f passext] pcname [vncopts...]" >&2; exit 2; }
+[ $# -ge 1 ] || { echo "Usage: $0 [-x passext] pcname [vncopts...]" >&2; exit 2; }
 
 passext=
-[ "x$1" = x-f ] && { shift; passext=$1; shift; }
+[ "x$1" = x-x ] && { shift; passext=$1; shift; }
 
 host=$1; shift
 
