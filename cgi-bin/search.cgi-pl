@@ -184,6 +184,15 @@ my %E=(
 		  'chooseSearch'	=> 0,
 		},
 		],
+	JAVABUG,[ 'http://search.java.sun.com/search/java/index.jsp',
+		{
+		  'qt'		=> $query,
+		  'col'		=> 'obug',
+		  'category'	=> '',
+		  'state'	=> '',
+		   'query'	=> $query,
+		},
+		],
 	LYCOS,	[ 'http://web/~cameron/scripts/cgi-bin/htclean.cgi?http://lycospro.lycos.com/cgi-bin/pursuit',
 	  	{ 
 		  'mtemp'	=> 'nojava',
