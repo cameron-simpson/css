@@ -612,8 +612,8 @@ sub GetEdits
 { my($this,$query,$schema)=@_;
   $query=$this->Query() if ! defined $query;
 
-  warn "GetEdits: schema:\n".cs::Hier::h2a($schema,1)
-	if defined $schema;
+  ## warn "GetEdits: schema:\n".cs::Hier::h2a($schema,1)
+  ##	if defined $schema;
 
   $schema={} if ! defined $schema;
 
@@ -631,7 +631,7 @@ sub GetEdits
       $type=(exists $schema->{$_}
 		    ? $schema->{$_}->{TYPE}
 		    : TEXTFIELD);
-      warn "_=[$_], type=$type";
+      ## warn "_=[$_], type=$type";
 
       @k=split(m:/+:);
       $value=cs::Hier::getSubKey($original,@k);
@@ -644,7 +644,7 @@ sub GetEdits
 			  split(/\s*\n(\s*\n)*\s*/, $query->{$fkey})) ]
 		 : $query->{$fkey});
 
-      warn "nvalue[$_]=".cs::Hier::h2a($nvalue) if $type eq KEYWORDS;
+      ## warn "nvalue[$_]=".cs::Hier::h2a($nvalue) if $type eq KEYWORDS;
 
       if (! defined $value
        || cs::Hier::hcmp($query->{$fkey},$value) != 0)
