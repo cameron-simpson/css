@@ -38,7 +38,8 @@ and adds the automatic rules by converting my categories file.
 
 =item B<-a> I<alert>
 
-Specify a shell command to run as the alert function (see L<FILE FORMAT> below).
+Specify a shell command to run as the alert function (see L<FILE FORMAT> below),
+such as mailblink(1).
 The character percent (B<'%'>) is replaced by the I<folder> name.
 
 =item B<-m> I<maildomains>
@@ -60,7 +61,11 @@ The default is B<unix>.
 
 =head1 FILE FORMAT
 
-The categories file consists of single line entries of the form:
+=head2 LINE FORMAT
+
+Blank lines and lines beginning with an octothorpe ('#') are ignored.
+
+Other lines are of the form:
 
 	[+][!]folder tag pattern
 
@@ -68,14 +73,13 @@ or
 
 	[+][!]|progname tag pattern
 
-Blank lines and lines beginning with an octothorpe ('#') are ignored.
-
 A leading plus sign (B<'+'>) means that this rule should be a continue rule,
 and not abort processing.
 
 A leading exclaimation mark (B<'!'>) means that mail items matching this rule
 should generate an alert.
-The alert can be any action you desire; see the B<-a> option.
+The alert can be any action you desire, such as the mailblink(1) command;
+see the B<-a> option.
 For me, this means a single line summary of the mail item
 appears in yellow in a small log window
 I have at the top of my screen for mail items I should read I<now>.
@@ -291,11 +295,12 @@ X
   }
 
   if ($key ne '.')
+  # note that we strip the typical mailing list [tag] stuff if using our own key
   {
     print <<X
 
   : 0hf
-  | sed 's/^Subject:/& [$key]/'
+  | sed -e 's/^Subject: *\\[[^ ]*\\] */Subject: /' -e 's/^Subject: *[Rr][Ee] *: *\\[[^ ]*\\] */Subject: Re: /' -e 's/^Subject:/& [$key]/'
 X
     ;
   }
