@@ -24,7 +24,7 @@ def h2f(fp,o):
   t=type(o)
   if t in [IntType, LongType]:
     fp.write(str(o))
-  if t is FloatType:
+  elif t is FloatType:
     stringEncode(fp,str(o))
   elif t is BooleanType:
     fp.write(int(o))
