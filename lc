@@ -1,12 +1,5 @@
 #!/bin/sh
 
-case $# in
-    0)	set *[A-Z]* ;;
-esac
-
-# convoluted hack to only lc the basenames
-# exec rename 's|[^/]+$|((($x=$&) =~ tr/_&A-Z/-+a-z/) ? $x : $x)|e' ${1+"$@"}
-
 exec rename 'if (m:[^/]+$:)
 		{ $lhs=$`; $rhs=$&;
 		  $rhs =~ tr/_&A-Z/-+a-z/;
