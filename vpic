@@ -1,0 +1,3 @@
+#!/bin/sh
+
+pic ${1+"$@"} | vtroff
