@@ -1,0 +1,69 @@
+#!/bin/sh
+#
+# Bang style ssh for hopping through firewalls etc.
+# Sshes from host to host to reach destination.
+#	- Cameron Simpson <cs@zip.com.au> 28may2004
+#
+
+cmd=`basename "$0"`
+usage="Usage: $cmd [ssh-options...] [sshcfg=value...] [user@]host[![user2@]host2...] [command ...]
+	ssh-options...	Passed to all ssh commands.
+	sshcfg=value	Transmuted to -o 'sshcfg value' and added to ssh-option."
+
+sshopts=
+topt=
+
+badopts=
+
+first=1
+while :
+do
+  case $1 in
+    -t)	topt=-t ;;
+    +t)	topt= ;;
+    -o)	sshopts="$sshopts $1 "`shqstr "$2"`
+	shift
+	;;
+    [a-zA-Z]*=?*)
+	cfg=`expr "$1" : '\([^=]*\)=.*'`
+	val=`expr "$1" : '[^=]*=\(.*\)'`
+	sshopts="$sshopts -o "`shqstr "$cfg $val"`
+	;;
+    --)	shift; break ;;
+    -?*)echo "$cmd: unrecongised option: $1" >&2; badopts=1 ;;
+    *)	break ;;
+  esac
+  shift
+done
+
+if [ $# = 0 ]
+then
+    echo "$cmd: missing host" >&2
+    badopts=1
+else
+    host=$1; shift
+fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+sshargv="ssh $sshopts"
+sshcmd=$*
+
+while :
+do
+  case "$host" in
+      *!*)	rhost=`expr "x$host" : 'x.*!\(.*\)'`
+		host=` expr "x$host" : 'x\(.*\)!.*'`
+		osshcmd=$sshcmd
+		sshcmd="exec $sshargv "`shqstr "$rhost" "$sshcmd"`
+		##echo "[$osshcmd] -> [$sshcmd]" >&2
+		;;
+      *)	break
+		;;
+  esac
+done
+
+[ -t 0 -a -t 1 ] && topt=-t
+
+##set -x
+eval "exec $sshargv $host \"$sshcmd\""
