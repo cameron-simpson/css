@@ -1,0 +1,22 @@
+#!/bin/sh
+#
+# Quick vmware fire up. - Cameron Simpson <cs@zip.com.au> 29nov2002
+#
+
+cmd=$0
+usage="Usage: $cmd [config]"
+
+case $# in
+    0)	vmw=`lastvalue vmw` || exit 1 ;;
+    1)	vmw=$1 ;;
+    *)	echo "Usage: $cmd config" >&2; exit 2 ;;
+esac
+
+cfg=
+for f in "$vmw" "$vmw.cfg" "$HOME/vmware/$vmw" "$HOME/vmware/$vmw/$vmw.cfg"
+do  [ -f "$f" ] && { cfg=$f; break; }
+done
+[ -n "$cfg" ] || { echo "$cmd: no config found for \"$vmw\"" >&2; exit 1; }
+
+vmware -x -q "$cfg" &
+lastvalue vmw "$vmw"
