@@ -1,0 +1,32 @@
+#!/bin/sh
+#
+# Deduce MIME type from file(1) output.
+#	- Cameron Simpson <cs@zip.com.au> 14nov2002
+#
+
+cmd=$0
+usage="Usage: $cmd filename
+	Exit status 0 => Output is MIME type.
+	Exit status 1 => Output is file(1) output."
+
+[ $# = 1 ] || { echo "$usage" >&2; exit 2; }
+file=$1; shift
+
+type=`file "$file"` || exit 1
+
+mtype=
+case "$type" in
+    *': Bourne shell script'*)	mtype=application/x-sh ;;
+    *': JPEG image data'*)	mtype=image/jpeg ;;
+    *': PDF document'*)		mtype=application/pdf ;;
+    *': ASCII '*)		mtype=text/plain ;;
+    *': '*'program text'*)	mtype=text/plain ;;
+    *': HTML document text'*)	mtype=text/html ;;
+    *': '*'text'*)		mtype=text/plain ;;
+esac
+
+# unrecognised - just recite "file"  output
+[ -z "$mtype" ] && { echo "$type"; exit 1; }
+
+echo "$mtype"
+exit 0
