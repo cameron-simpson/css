@@ -18,7 +18,7 @@ stripdotdot=
 while :
 do  case $1 in
         -x)	tmp=$TMPDIR/err2viloc$$
-		cutbuffer >"$tmp" || exit 1
+		xclip -o >"$tmp" || exit 1
 		exec <"$tmp"
 		rm "$tmp"
 		;;
