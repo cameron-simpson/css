@@ -25,7 +25,6 @@ case $ARCH in
 	;;
     *)	( cd "$from/." && $tar -cf - .
 	) \
-	| $buffer \
 	| ( mkdir "$to" && cd "$to" && untar )
 	;;
 esac
