@@ -1,0 +1,427 @@
+#!/usr/bin/perl
+#
+#	- Cameron Simpson <cs@zip.com.au> 
+#
+
+BEGIN { unshift(@INC,"/u/cameron/etc/pl"); }
+
+use strict qw(vars);
+
+use cs::MD5;
+use cs::OTP;
+use cs::HTTP;
+use cs::HTTPD;
+use cs::HTML;
+use cs::HTML::Form;
+use cs::Hier;
+use cs::Persist;
+use CISRA::DB;
+
+$::Port=8081;
+
+($::cmd=$0) =~ s:.*/::;
+$::Usage="Usage: $::cmd [port]\n";
+$::Port=shift(@ARGV) if @ARGV;
+die $::Usage if @ARGV;
+
+my($serv)=new cs::HTTPD ($::Port,{ CGI => { '' => { HANDLER => \&do_cgi} },
+				 },{});
+die "$::cmd: can't attach to $::Port: $!\n" if ! defined $serv;
+
+$::DBdir=$CISRA::DB::Dir;
+$::DBotp="$::DBdir/auth/otp";
+$::DBperms="$::DBdir/auth/perms";
+$::DBbase=$CISRA::DB::Dir;
+%::DBlist=( USERS,	{ DESC => "Users", DBNAME => "users" },
+	    ALIASES,	{ DESC => "Email Aliases", DBNAME => "email/aliases" },
+	  );
+
+## warn "serving now ...\n";
+$serv->Serve($cs::Net::TCP::F_FORK|$cs::Net::TCP::F_SYNC);
+
+exit 0;
+
+sub do_cgi
+	{ open(STDERR,"|/opt/script/mailif -s edb.err cameron");
+	  my($httpd,$rq,$CGI)=@_;
+	  ## warn "do_cgi(@_)";
+	  $CGI->Print([ edb($CGI) ]);
+	}
+
+sub edb
+	{ my($CGI)=@_;
+	
+	  ## warn "edb(@_)";
+
+	  my($auth);
+	  { my($ok,@ret)=$CGI->ChkOTP();
+	    return @ret if ! $ok;
+	    $auth=$ret[0];
+	  }
+	  
+	  ## warn "auth=".cs::Hier::h2a($auth,0);
+
+	  my($permdb)=cs::Persist::db($::DBperms);
+	  die "can't access permissions table ($::DBperms): $!"
+		if ! defined $permdb;
+
+	  my($q)=$CGI->Query();
+	  my(@html);
+
+	  if (exists $q->{SUBMIT})
+		{ @html=op_submit($CGI,$auth);
+		}
+	  else	{ @html=op_noform($CGI,$auth);
+		}
+
+	  undef $permdb;
+	  cs::Persist::finish();
+
+	  return @html;
+	}
+
+sub has_perm
+	{ my($login,$perm,$db)=@_;
+	  $db=cs::Persist::db($::DBperms);
+
+	  return 0 if ! exists $db->{$perm};
+	  grep($_ eq $login,@{$db->{$perm}});
+	}
+
+# handle all the cases up to editing a record
+sub op_noform
+	{ my($CGI,$auth)=@_;
+	  ## warn "CGI=".cs::Hier::h2a($CGI,0);
+	  my($q)=$CGI->Query();
+
+	  my(@html);
+
+	  if (! exists $q->{DB})
+		{ return ([H1,"Please choose a database"],"\n",
+			   [UL,
+			    map([LI,
+				 [A,{HREF=>$CGI->SelfQuery({DB => $_})},
+				    $::DBlist{$_}->{DESC}
+				 ],"\n",
+				], sort { lc($::DBlist{$a}->{DESC})
+				      cmp lc($::DBlist{$b}->{DESC})
+					}
+					keys %::DBlist)
+			   ],"\n",
+			  );
+		}
+
+	  my($dbname)=$q->{DB};
+
+	  if (! exists $::DBlist{$dbname})
+		{ delete $q->{DB};
+		  return ([B,"Sorry, \"$dbname\" is not a valid database denotation."], "\n",
+			  op_noform($CGI),
+			 );
+		}
+
+	  my($dbi)=$::DBlist{$dbname};
+	  ## warn "dbname=\"$dbname\", dbi=".cs::Hier::h2a($dbi,0);
+
+	  if (! exists $q->{KEY})
+		{ return ([H1,"View of \"$dbname\": $dbi->{DESC}"],"\n",
+			  viewdb($CGI,$dbname),"\n",
+			 );
+		}
+
+	  my($db)=db($dbname);
+
+	  if (! defined $db)
+		{ return ([H1,"Can't access \"$dbname\": $dbi->{DESC}"],"\n",
+			  "Possible error: $!.",[BR],"\n",
+			 );
+		}
+
+	  my($keyname)=$q->{KEY};
+
+	  if (! exists $db->{$keyname})
+		{ return ([H1,"No key \"$keyname\" in \"$dbname\": $dbi->{DESC}"],"\n",
+			  "Please go back and try a different key.",[BR],"\n",
+			 );
+		}
+
+	  my($schema)=$db->{''}->Schema();
+
+	  if (has_perm($auth->{LOGIN},"EDIT_DB_$dbname"))
+		{ return ([H1,"Edit record \"$keyname\""], "\n",
+			   $CGI->MkForm($CGI->FullURL(),
+					$schema,
+					$db->{$keyname},
+					{ DB => $dbname, KEY => $keyname }),"\n",
+			 );
+		}
+
+	  # read only - just view record
+	  return ([H1,"Record \"$keyname\""], "\n",
+		  viewrec($CGI,$dbname,$keyname,ALL),"\n",
+		 );
+	}
+
+# this should always be a record submission
+sub op_submit
+	{ my($CGI,$auth)=@_;
+	  my($q)=$CGI->Query();
+
+	  if (! exists $q->{SUBMIT}
+	   || ! exists $q->{CONTEXT})
+		{ return ([H1,"Bad form data"],"\n",
+			  "I got:\n",
+			  [PRE,
+			   cs::Hier::h2a($q,1),
+			  ],"\n",
+			 );
+		}
+
+	  my($context)=cs::Hier::a2h($q->{CONTEXT});
+	  my($dbname,$keyname);
+
+	  if (ref $context)
+	    	{ $dbname=$context->{DB};
+	    	  $keyname=$context->{KEY};
+		}
+
+	  if (! defined $dbname)
+		{ return ([H1,"Missing DB field"],"\n",
+			  "Form error?\n",
+			 );
+		}
+
+	  if (! has_perm($auth->{LOGIN},"EDIT_DB_$dbname"))
+		{ return ([H1,"Sorry, you don't have permission to edit the \"$dbname\" database"], "\n",
+			 );
+		}
+
+	  if (! defined $keyname)
+		{ return ([H1,"Missing KEY field"],"\n",
+			  "Form error?\n",
+			 );
+		}
+
+	  my($db);
+
+	  if (! defined ($db=db($dbname,1)))
+		{ return ([H1,"Can't access database denoted by \"$dbname\""],"\n",
+			  "Possible error: $!.",[BR],"\n",
+			 );
+		}
+
+	  my($obj)=$db->{''};
+	  my($schema)=$obj->Schema();
+	  my(@html);
+
+	  if (! exists $db->{$keyname})
+		{ return ([H1,"No record with key \"$keyname\""],"\n",
+			  "Form error?\n",
+			 );
+		}
+
+	  my($diff);
+
+	  ($diff,$context)=$CGI->GetEdits(undef,$schema);
+	  ## warn "diff=".cs::Hier::h2a($diff,0)."<BR>\n";
+	  ## warn "context=".cs::Hier::h2a($context,0)."<BR>\n";
+
+	  if (! exists $db->{$keyname}
+	   || keys %$diff)
+		{
+		  $db->{$keyname}={} if ! exists $db->{$keyname};
+		  cs::Hier::apply($db->{$keyname},$diff,0);
+		  $db->{''}->LogChange(join("\n\t",
+						"change key \"$keyname\":",
+						map("$_=$diff->{$_}",
+							sort keys %$diff)));
+
+		  push(@html,[H1,"Updated record \"$keyname\""],"\n",
+			     "The following fields were changed:",[BR],"\n",
+			     [TABLE,{BORDER => 1},
+			      [TR,[TH,"Field"],[TH,"New Value"]],"\n",
+			      map([TR,[TD,{VALIGN => TOP},[TT,$_]],
+				      [TD,fieldMarkUp($schema,$db->{$keyname},$_)]],
+				  grep(defined $diff->{$_},sort keys %$diff)),
+			     ],"\n",
+		      );
+		}
+	  else	{ push(@html,
+			[H1,"Nothing changed for record \"$keyname\""],"\n",
+		      );
+		}
+
+	  push(@html,[P],"\n",
+		     viewrec($CGI,$dbname,$keyname,ALL),"\n",
+		     [P],"\n",
+		     viewdb($CGI,$dbname,SUMMARY),
+	      );
+
+	  @html;
+	}
+
+# return TABLE holding a single record
+sub viewrec
+	{ my($CGI,$dbname,$keyname,$usekeys)=@_;
+	  my($db)=db($dbname);
+
+	  # no access?
+	  if (! defined $db)
+		{ return
+		      [TABLE,
+			[TR,[TH,"Can't access database denoted by \"$dbname\""]],"\n",
+			[TR,[TD,"Possible error: $!."]],"\n",
+		      ];
+		}
+
+	  if (! exists $db->{$keyname})
+		{ return
+			[TABLE,
+			  [TR,[TH,"No key \"$keyname\" in database denoted by \"$dbname\""]],"\n",
+			];
+		}
+
+	  my($rec)=$db->{$keyname};
+
+	  my($obj)=$db->{''};
+	  my($schema)=$obj->Schema();
+
+	  my(@usekeys);
+
+	  if (ref $usekeys)		{ @usekeys=@$usekeys; }
+	  elsif (! defined $usekeys
+	      || $usekeys eq SUMMARY)	{ @usekeys=$obj->SummaryFields(); }
+	  elsif ($usekeys eq ALL)	{ @usekeys=$obj->AllFields(); }
+	  else				{ warn "don't grok \$usekeys=\"$usekeys\" - using SUMMARY";
+					  @usekeys=$obj->SummaryFields();
+					}
+
+	  [TABLE,{BORDER => 1},
+	   [CAPTION,{ALIGN => TOP},"Record for key \"$keyname\""],"\n",
+	   [TR,[TH,{ALIGN => LEFT},"Field"],[TH,{ALIGN => LEFT},"Value"]],"\n",
+	   map([TR,[TD,{VALIGN => TOP},[B,[TT,$obj->FieldDesc($_)]]],"\n",
+		   [TD,                fieldMarkUp($schema,$rec,$_)],"\n",
+	       ], @usekeys),"\n",
+	  ];
+	}
+
+sub fieldMarkUp
+	{ my($schema,$rec,$keyname)=@_;
+	  
+	  return () if ! exists $rec->{$keyname};
+
+	  my($value)=$rec->{$keyname};
+
+	  my($sc)=(exists $schema->{$keyname}
+			? $schema->{$keyname}
+			: {});
+
+	  valueMarkUp($rec->{$keyname},$sc);
+	}
+
+sub valueMarkUp
+	{ my($value,$sc)=@_;
+	  return () if ! defined $value;
+	  $sc={} if ! defined $sc;
+
+	  my($type);
+
+	  $type=(ref $sc && exists $sc->{TYPE}
+		? $sc->{TYPE}
+		: ref $value && cs::Hier::reftype($value) eq ARRAY
+		  ? KEYWORDS
+		  : $value =~ /\n/
+		    ? TEXTAREA
+		    : TEXTFIELD);
+
+	  my(@html);
+
+	  if ($type eq TEXTFIELD)	{ @html=[TT,$value]; }
+	  elsif ($type eq TEXTAREA)	{ @html=[PRE,$value]; }
+	  elsif ($type eq STRINGS)	{ @html=[PRE,$value]; }
+	  elsif ($type eq KEYWORDS)	{ my($map)=(exists $sc->{MAP}
+							? $sc->{MAP}
+							: {});
+
+					  ## my(@c)=caller;
+					  ## warn "type=KEYWORDS, value=[".cs::Hier::h2a($value,0)."], called from [@c]";
+
+					  @html=[PRE,
+						join("\n",
+						     map($_.(exists $map->{$_}
+							    ? " - $map->{$_}"
+							    : ""),@$value)),
+						];
+					}
+	  else				{ warn "can't markup fields of type \"$type\"";
+					  @html=("Raw data: ",[TT,$value]);
+					}
+
+	  @html;
+	}
+
+# return TABLE holding the db, with HREFs to record edit forms
+sub viewdb
+	{
+	  my($CGI,$dbname,$usekeys)=@_;
+	  my($db)=db($dbname);
+
+	  # no access?
+	  if (! defined $db)
+		{ return
+		      [TABLE,
+			[TR,[TH,"Can't access database denoted by \"$dbname\""]],"\n",
+			[TR,[TD,"Possible error: $!."]],"\n",
+		      ];
+		}
+
+	  my($obj)=$db->{''};
+	  my($schema)=$obj->Schema();
+	  my(@usekeys)=$obj->Fields($usekeys);
+
+	  my(@html);
+
+	  @html=(
+		 [TR,[TH,"Key"],
+		     map([TH,$obj->FieldDesc($_)],@usekeys),
+		 ],"\n",
+		);
+
+	  my($rec,$keyname);
+
+	  for $keyname (sort keys %$db)
+		{
+		  $rec=$db->{$keyname};
+
+		  push(@html,
+			[TR,
+			  [TD,{VALIGN => TOP},
+			      [TT,[B,{},
+				   [A,{NAME => "key-$keyname",
+				       HREF => $CGI->SelfQuery(
+							{ DB	=> $dbname,
+							  KEY	=> $keyname,
+							}),
+				      },$keyname]]]],
+			  map([TD,{VALIGN => TOP},
+				  fieldMarkUp($schema,$rec,$_),
+			      ],
+			      @usekeys),
+			],"\n");
+		}
+
+	  [TABLE,{ BORDER => 1},@html];
+	}
+
+# attach to named db
+sub db
+	{ my($dbname,$rw)=@_;
+	  $rw=0 if ! defined $rw;
+
+	  return undef if ! exists $::DBlist{$dbname};
+
+	  my($dbi)=$::DBlist{$dbname};
+	  cs::Persist::db("$::DBbase/$dbi->{DBNAME}",$rw);
+	}
+
+sub tok2a { cs::HTML::tok2a(@_) }
