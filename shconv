@@ -8,8 +8,8 @@
 cmd=`basename "$0"`
 usage="Usage: $cmd [-fnsx] oldsfx newsfx shellcmd {file|-}..."
 
-trace=set-x
-[ -t 1 ] && trace=set-x
+trace= report=:
+[ -t 1 ] && { trace=set-x; report=echo; }
 force=
 
 badopts=
@@ -65,6 +65,7 @@ do  if [ "x$f" = x- ]
     esac
 
     newfile=`dirname "$f"`/`basename "$f" "$oldsfx"`$newsfx
+    $report "$f -> $newfile"
     [ $force ] \
 	|| [ ! -f "$newfile" ] \
 	|| { echo "$cmd: existing file: $newfile" >&2
@@ -72,8 +73,10 @@ do  if [ "x$f" = x- ]
 	     continue
 	   }
 
-    ( exec <"$f"		# abort if open fails
+    (
+      exec <"$f"		# abort if open fails
       exec >"$newfile"
+      set -x
       if $trace sh -c "$shellcmd"
       then
 	  rm "$f"
