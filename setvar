@@ -12,6 +12,8 @@
 # Generalisation. - cameron, 02dec98
 #
 
+use strict qw(vars);
+
 use Cwd;
 use cs::Glob;
 use cs::Misc;
@@ -27,19 +29,19 @@ undef %::did;
 # bootstrap some values
 chomp($_=`pwd`);			setenv(PWD,$_);
 chomp($_=`hostname`);			setenv(HOSTNAME,$_);
-($_=$ENV{HOSTNAME}) =~ s/\..*//;	setenv(HOST,$_);
-($_=$ENV{HOSTNAME}) =~ s/^[^.]*\.//;	setenv(HOSTDOMAIN,$_);
-$_=(length($ENV{HOME}) ? $ENV{HOME} : userdir('cameron')); setenv(HOME,$_);
+($_=$::ENV{HOSTNAME}) =~ s/\..*//;	setenv(HOST,$_);
+($_=$::ENV{HOSTNAME}) =~ s/^[^.]*\.//;	setenv(HOSTDOMAIN,$_);
+$_=(length($::ENV{HOME}) ? $::ENV{HOME} : userdir('cameron')); setenv(HOME,$_);
 
-@ENVPATH=( length $ENV{ENVPATH}
-	 ? grep(length,split(/:+/,$ENV{ENVPATH}))
-	 : ("$ENV{HOME}/.setvar", "/opt/shell/env")
+@::ENVPATH=( length $::ENV{::ENVPATH}
+	 ? grep(length,split(/:+/,$::ENV{::ENVPATH}))
+	 : ("$::ENV{HOME}/.setvar", "/opt/shell/env")
 	 );
 
-$usage="Usage:\t$::cmd [-f] varnames command [args...]
+$::Usage="Usage:\t$::cmd [-f] varnames command [args...]
 	$::cmd [-f] -n varnames...
 	-c		Emit assignments in csh syntax.
-	-d dir		Env dir (default: $ENVDIR).
+	-d dir		Env dir (default: $::ENV{ENVPATH}).
 	-f		Force. Rebuild variables even if set.
 	-n		No exec, print shell assignments suitable for eval.
 	-N file		No exec, print shell assignments suitable for eval to named file.
@@ -49,15 +51,15 @@ $usage="Usage:\t$::cmd [-f] varnames command [args...]
 	varnames	Space separated list of environment variables needed.
 ";
 
-$noexec=0;
-$force=0;
-$trace=0;
-$verbose = -t STDOUT;
-$silent  = ! $verbose;
-$CshMode=0;
-$badopts=0;
-undef $outfile;
-$keepOutfile=0;
+my $noexec=0;
+my $force=0;
+my $trace=0;
+my $verbose = -t STDOUT;
+my $silent  = ! $verbose;
+my $CshMode=0;
+my $badopts=0;
+my $outfile;
+my $keepOutfile=0;
 ARGV:
   while (@ARGV)
   { $_=shift(@ARGV);
@@ -67,7 +69,7 @@ ARGV:
     if ($_ eq '-n')	{ $noexec=1; $outfile="/tmp/$::cmd.$$"; }
     elsif ($_ eq '-N')	{ $noexec=1; $outfile=shift(@ARGV); $keepOutfile=1; }
     elsif ($_ eq '-f')	{ $force=1; }
-    elsif ($_ eq '-d')	{ unshift(@ENVPATH,shift(@ARGV)); }
+    elsif ($_ eq '-d')	{ unshift(@::ENVPATH,shift(@ARGV)); }
     elsif ($_ eq '-s')	{ $silent=1; $verbose=0; }
     elsif ($_ eq '-v')	{ $silent=0; $verbose=1; }
     elsif ($_ eq '-x')	{ $trace=1; }
@@ -78,6 +80,7 @@ ARGV:
     }
   }
 
+my(@vars)=();
 if ($noexec)			{ @vars=@ARGV;
 				}
 elsif (!defined($_=shift))	{ err "$::cmd: missing varnames\n";
@@ -89,7 +92,7 @@ elsif (!/^\s*[_\w]+(\s+[_\w]+)*\s*$/) { err "$::cmd: $_: bad varname list\n";
 else				{ @vars=grep(length,split(/,+/));
 				}
 
-die $usage if $badopts;
+die $::Usage if $badopts;
 
 $::UseExtant=0;
 
@@ -147,23 +150,24 @@ exit $::Xit;
 
 sub envstuff
 {
-  my %env=();
+  my %envpath=();
 
   sub loadenvpath()
   {
-    for my $dir (@ENVPATH)
+    for my $dir (@::ENVPATH)
     { my $vardir="$dir/var";
 
       if (-d "$vardir/.")
       # get files from dir
       {
 	for my $f (cs::Pathname::dirents($vardir))
-	{ $env{$f}="<$vardir/$f" if ! exists $env{$f};
+	{ $envpath{$f}="<$vardir/$f" if ! exists $::ENV{$f};
 	}
       }
       else
       # load file
-      { if (open(LOADENV,"< $vardir\0"))
+      { ##warn "open($vardir)";
+	if (open(LOADENV,"< $vardir\0"))
 	{ local($_);
 
 	  ENVLINE:
@@ -177,9 +181,9 @@ sub envstuff
 	    { warn "$::cmd: $vardir, line $.: bad format: $_\n";
 	    }
 	    else
-	    { if (! exists $env{$1})
-	      { $env{$1}="\"$'";
-		## warn "loadenv: $1=\"$'";
+	    { if (! exists $envpath{$1})
+	      { $envpath{$1}=$';
+		##warn "preloadenv: $1=\"$'";
 	      }
 	    }
 	  }
@@ -192,7 +196,7 @@ sub envstuff
 
   sub needenv($)
   { my($var)=@_;
-    return if defined($ENV{$var}) && length($ENV{$var});
+    return if defined($::ENV{$var}) && length($::ENV{$var});
     setvar(1,$var);
   }
 
@@ -203,14 +207,14 @@ sub envstuff
     my @extlist=
 	 grep(length,
 	 (
-	  "$ENV{HOST}\@$ENV{SYSTEMID}",
-	  "$ENV{ARCH}\@$ENV{SYSTEMID}",
-	  $ENV{HOSTNAME},
-	  $ENV{HOST},
-	  $ENV{SYSTEMID},
-	  $ENV{HOSTDOMAIN},
-	  $ENV{OS},
-	  $ENV{ARCH},
+	  "$::ENV{HOST}\@$::ENV{SYSTEMID}",
+	  "$::ENV{ARCH}\@$::ENV{SYSTEMID}",
+	  $::ENV{HOSTNAME},
+	  $::ENV{HOST},
+	  $::ENV{SYSTEMID},
+	  $::ENV{HOSTDOMAIN},
+	  $::ENV{OS},
+	  $::ENV{ARCH},
 	 ))
 	 ;
 
@@ -218,16 +222,14 @@ sub envstuff
     {
       my $key = length($ext) ? "$var.$ext" : $var;
 
-      ## warn "key=[$key]";
-      if (exists $env{$key})
+      if (exists $envpath{$key})
       {
-	my $val = $env{$key};
-	## warn "hit on $key [$val]";
+	my $val = $envpath{$key};
+	##warn "hit on $key [$val]";
 	my $type = substr($val,$[,1);
-	substr($val,$[,1)='';
 
 	if ($type eq '<')
-	{ $val=efromfile($val);
+	{ $val=efromfile(substr($val,1));
 	}
 	else
 	{ $val=estring($val,$missok);
@@ -290,9 +292,10 @@ sub setvar
     next VAR if $::did{$_};
     $::did{$_}=1;
 
-    if (!$force && defined($ENV{$_}) && length($ENV{$_}))
+    if (!$force && defined($::ENV{$_}) && length($::ENV{$_}))
     # already set
-    { next VAR;
+    { ##warn "skip $_ because already set and !force";
+      next VAR;
     }
 
     $trace && out "$_=";
@@ -303,7 +306,7 @@ sub setvar
     }
   }
 
-  return $ENV{$lastvar};
+  return $::ENV{$lastvar};
 }
 
 sub fromfile
@@ -327,7 +330,7 @@ sub untilde($)
 { local($_)=@_;
 
   s;\~(\w*);(! length($`) || substr($`,-1,1) eq ':')
-		? (length($1) ? userdir($1) : $ENV{HOME})
+		? (length($1) ? userdir($1) : $::ENV{HOME})
 		: $&;eg;
 
   $_;
@@ -345,7 +348,7 @@ sub estring($$)
 }
 
 sub varval($$)
-{ local($var,$missok)=@_;
+{ my($var,$missok)=@_;
 
   return '$' if $var eq '$';
 
@@ -358,8 +361,10 @@ sub varval($$)
 }
 
 sub shfile
-{ if (!open(SHFILE,"< $_[0]\0"))
-  { warn "$::cmd: can't open $_[0] for read: $!\n";
+{ my($shfile)=@_;
+
+  if (!open(SHFILE,"< $shfile\0"))
+  { warn "$::cmd: can't open $shfile for read: $!\n";
     return undef;
   }
 
@@ -370,10 +375,11 @@ sub shfile
       if (/^\s*([a-zA-Z_][_\w]*)='([^']*)'/
        || /^\s*([a-zA-Z_][_\w]*)=(\S*)/
 	 )
-      { eval "\$$1=\$2";
+      { warn "\$::ENV{$1}=$2";
+        $::ENV{$1}=$2;
       }
       else
-      { warn "$::cmd: $SHFILE, line $.: can't parse: $_\n";
+      { warn "$::cmd: $shfile, line $.: can't parse: $_\n";
       }
     }
 
@@ -381,10 +387,10 @@ sub shfile
 }
 
 sub forget
-{ ## warn "\nforget [@_]\n";
+{ warn "\nforget [@_]\n";
   for (@_)
   { $::did{$_}=$_;
-    eval "\$$_=''";
+    $::ENV{$_}='';
   }
 }
 
@@ -406,10 +412,13 @@ sub paths
 
 sub strippaths
 { my(@vars)=@_;
-  @vars=grep(/PATH$/, keys %ENV) if ! @vars;
+  @vars=grep(/PATH$/, keys %::ENV) if ! @vars;
 
   for my $var (@vars)
-  { $ENV{$var}=cs::Shell::statpath(paths($ENV{$var}));
+  { my $stripped = cs::Shell::statpath(paths($::ENV{$var}));
+    if ($stripped ne $::ENV{$var})
+    { setenv($var,$stripped);
+    }
   }
 }
 
@@ -417,15 +426,15 @@ sub userdir
 { my($u)=shift;
   my(@pw);
 
-  if (! defined $_pw{$u})
-  { $_pw{$u}=[ getpwnam($u) ];
-    if (! @{$_pw{$u}})
+  if (! defined $::_PW{$u})
+  { $::_PW{$u}=[ getpwnam($u) ];
+    if (! @{$::_PW{$u}})
     { ## warn "$::cmd: userdir($u): who is $u?\n";
       return undef;
     }
   }
 
-  @pw=@{$_pw{$u}};
+  @pw=@{$::_PW{$u}};
 
   return undef unless @pw;
 
@@ -442,16 +451,16 @@ sub usefile($;$)
   { my $found = 0;
 
    FINDIT:
-    for my $udir (@ENVPATH)
+    for my $udir (@::ENVPATH)
     { if (stat "$udir/$ufile" && -f _ && -r _)
       { $ufile="$udir/$ufile";
-	$ufile="$ENV{PWD}/$ufile" if substr($ufile,0,1) ne '/';
+	$ufile="$::ENV{PWD}/$ufile" if substr($ufile,0,1) ne '/';
 	$found=1;
 	last FINDIT;
       }
       elsif (stat "$udir/$ufile/STANDARD" && -f _ && -r _)
       { $ufile="$udir/$ufile/STANDARD";
-	$ufile="$ENV{PWD}/$ufile" if substr($ufile,0,1) ne '/';
+	$ufile="$::ENV{PWD}/$ufile" if substr($ufile,0,1) ne '/';
 	$found=1;
 	last FINDIT;
       }
@@ -459,7 +468,7 @@ sub usefile($;$)
 
     if (! $found)
     { if (! $missok)
-      { warn "$::cmd: can't find file for \"use $ufile\" in @ENVPATH\n";
+      { warn "$::cmd: can't find file for \"use $ufile\" in @::ENVPATH\n";
       }
       return;
     }
@@ -483,7 +492,7 @@ sub usefile($;$)
       local($::cmd)="$::cmd: use($ufile)";
 
       # hack to make local paths work
-      local @ENVPATH = (cs::Pathname::dirname($ufile), @ENVPATH);
+      local @::ENVPATH = (cs::Pathname::dirname($ufile), @::ENVPATH);
 
       while (defined ($_=$s->GetContLine()) && length)
       { chomp;
@@ -571,7 +580,7 @@ sub useline($)
     }
   }
   elsif (/^([_\w]+)(\??)=/)
-  { (! length $2 || ! length $ENV{$1}) && setenv($1,estring($',1));
+  { (! length $2 || ! length $::ENV{$1}) && setenv($1,estring($',1));
   }
   else
   { return 0;
@@ -582,10 +591,14 @@ sub useline($)
 
 sub setenv($$)
 { my($var,$val)=@_;
-  $ENV{$var}=$val;
+
+  ##warn "setenv($var,$val)";
+  $::ENV{$var}=$val;
   $::did{$var}=1;
   $trace && nl("setenv $var=$val");
-  $val;
+  ##warn "post setenv($var,$val): ENV{$var}=$::ENV{$var}";
+
+  return $val;
 }
 
 sub finalvars
@@ -600,6 +613,8 @@ sub putvars
   @vars=keys %::did if ! @vars;
 
   @vars=grep($_ ne PWD, @vars);	# a r/o variable in some shells :-(
+
+  ##for my $v (@vars) { warn "putvar($v [$::ENV{$v}]"; }
 
   cs::Shell::putvars($force,$CshMode ? CSH : SH,@vars);
 }
