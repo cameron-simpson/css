@@ -1,6 +1,6 @@
 #!/bin/sh
 #
-# rab - remote histbackup
+# rhb - remote histbackup
 #
 # Backup a directory as per histbackup, but to a remote host.
 #	- Cameron Simpson <cs@zip.com.au> 27jun2001
@@ -20,19 +20,19 @@ usage="Usage: $cmd [-i identity] [--delete] srcdir [[user@]host:]destdir [rsync-
 	-i identity	Ssh identity file to use.
 	--include-from=file Specify an rsync include-from file to edit the backup.
 			Should be an absolute path unless you're standing in the srcdir.
-			Default: .rab-include in the srcdir.
+			Default: .rhb-include in the srcdir.
 	--delete	Passwd to rsync."
 
 badopts=
 
-rabinc=
+rhbinc=
 
 while :
 do  case $1 in
 	-i)	ssh="$ssh -i $2"; shift ;;
 	--delete) rsdel=$1 ;;
 	--include-from=?*)
-		rabinc=$1 ;;
+		rhbinc=$1 ;;
 	--)	shift; break ;;
 	-?*)	echo "$cmd: $1: unrecognised option" >&2
 		badopts=1
@@ -88,7 +88,7 @@ case "$subdir" in
 	;;
 esac
 
-[ -z "$rabinc" -a -s "$src/.rab-include" ] && rabinc=--include-from=$src/.rab-include
+[ -z "$rhbinc" -a -s "$src/.rhb-include" ] && rhbinc=--include-from=$src/.rhb-include
 
 set -x
-exec rsync -e "$ssh" -aHW${vflag} $rsdel ${progress} $rabinc ${1+"$@"} "$src/." "$rsyncdest$destdir/$subdir/."
+exec rsync -e "$ssh" -aHW${vflag} $rsdel ${progress} $rhbinc ${1+"$@"} "$src/." "$rsyncdest$destdir/$subdir/."
