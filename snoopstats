@@ -1,0 +1,47 @@
+#!/bin/sh
+#
+# Simple wrapper for snoop to parse the packet info.
+# Originally written to measure X11 or ssh traffic for a cable modem
+# feasibility estimate.
+#	- Cameron Simpson <cs@zip.com.au> 14jan99
+#
+
+snoop -V ${1+"$@"} \
+	| ( trap '' INT
+	    buffer \
+	    | perl -e '
+		require "flush.pl";
+		$SIG{HUP}=\&quitfn;
+		$SIG{INT}=\&quitfn;
+		$SIG{TERM}=\&quitfn;
+		undef $pksize;
+		while (<STDIN>)
+		{
+		  if (/^__/)
+		  { ppkt() if defined $pksize; undef $pksize;
+		    $pktime=time;
+		  }
+		  elsif (/^([\w.]+)\s+->\s+([\w.]+)\s+ETHER\s+Type=0800.*\ssize\s*=\s*(\d+)\s*bytes/)
+		  { $pkfrom=$1;
+		    $pkto=$2;
+		    $pksize=$3;
+		  }
+		  elsif (/^([\w.]+)\s+->\s+([\w.]+)\s+TCP\s+D=(\d+)\s+S=(\d+)/)
+		  { $pksrcport=$4;
+		    $pkdestport=$3;
+		  }
+		}
+		ppkt() if defined $pksize;
+
+		sub ppkt
+		{ print STDERR ".";
+		  print "$pktime 0.1 $pksize $pkfrom:$pksrcport $pkto:$pkdestport\n";
+		}
+
+		sub quitfn
+		{
+		  flush(STDOUT);
+		  exit 1;
+		}
+	      '
+	  )
