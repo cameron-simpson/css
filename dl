@@ -3,4 +3,4 @@
 # Log an action via buglog.
 #	- Cameron Simpson <cs@zip.com.au> 06sep2004
 #
-exec bgproc -p - buglog "$*"
+exec bgproc -p /dev/null buglog "$*"
