@@ -5,6 +5,6 @@
 #
 
 exec \
-env TERMOPTIONS="$TERMOPTIONS +ip" \
-term -n "E [$dirname]@$HOST $*" \
+term +ip \
+     -n "E [$dirname]@$HOST $*" \
      -e edit ${1+"$@"}
