@@ -1,0 +1,37 @@
+#!/bin/sh
+#
+# Stash or report the last value of some parameter.
+#	- Cameron Simpson <cs@zip.com.au> 02dec2002
+#
+
+cmd=$0
+Usage="Usage: $cmd param [value|-]"
+
+badopts=
+
+if [ $# = 0 ]
+then
+    echo "$cmd: missing param" >&2
+    badopts=1
+else
+    param=$1; shift
+    case "$param" in
+	''|*/*)	echo "$cmd: bad param \"$param\"" >&2
+		badopts=1
+		;;
+    esac
+    [ $# -gt 1 ] && { echo "$cmd: extra arguments after value" >&2; badopts=1; }
+fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+[ $# = 0 ] && exec cat "$HOME/var/log/last-$param"
+
+[ -d "$HOME/var/log/." ] || mkdir -p "$HOME/var/log" || exit 1
+
+if [ "x$1" = x- ]
+then
+    cat
+else
+    echo "$1"
+fi >"$HOME/var/log/last-$param"
