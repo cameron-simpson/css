@@ -1,0 +1,98 @@
+#!/opt/bin/perl
+#
+# Update mailrc.rawdb.
+#	- Cameron Simpson <cs@zip.com.au> 22may98
+#
+
+use strict qw(vars);
+
+use cs::Misc;
+use cs::Hier;
+use cs::Persist;
+use cs::Mail::DB;
+use cs::Upd;
+
+$::dbpath=cs::Mail::DB::dfltDB();
+
+$::Usage="Usage: $::cmd [-db mailrc.rawdb]\n";
+
+if (@ARGV && $ARGV[0] eq '-db')
+	{ shift(@ARGV);
+	  $::dbpath=shift(@ARGV);
+	}
+
+die $::Usage if @ARGV;
+
+$::tty = -t STDERR;
+$::verbose = $::tty;
+$::silent = 0;
+
+nl("loading $::dbpath ...");
+$::rcdb=cs::Mail::DB::db($::dbpath,1);
+die "$::cmd: can't load $::dbpath\n" if ! defined $::rcdb;
+
+nl("inverting map ...");
+# make inverse map
+INV:
+  for my $key (sort keys %$::rcdb)
+  {
+    $::verbose && out("invert $key");
+
+    my $v = $::rcdb->{$key};
+
+    for my $addr ($v->Addrs())
+    { if (exists $::_addr2fullname{$addr})
+      { my($oldfn)=$::_addr2fullname{$addr};
+	my($ov)=$::rcdb->{$oldfn};
+
+	nl("push $addr from $oldfn to $key");
+	# propagate tags
+	push(@{$v->{EMAIL}->{$addr}->{TAGS}},
+	      @{$ov->{EMAIL}->{$addr}->{TAGS}});
+
+	delete $::rcdb->{$oldfn}->{EMAIL}->{$addr};
+      }
+      $::_addr2fullname{$addr}=$key;
+    }
+  }
+
+my($addrtext);
+
+nl("reading input ...");
+while (defined ($_=<STDIN>))
+{ 
+  chomp;
+  nl($_) if ! $::silent;
+
+  $::rcdb->NoteAddr($_,\%::_addr2fullname);
+}
+
+$::silent || out("cleaning $::dbpath ...");
+{ my($r);
+  for my $key (sort keys %$::rcdb)
+  { $r=$::rcdb->{$key};
+    delete $r->{KEY};
+    cs::Hier::emaciate($r);
+    for my $sublist (EMAIL, PHONE)
+    { delete $r->{$sublist}
+	    if ! keys %{$r->{$sublist}};
+    }
+
+    # delete entire record if empty, or FULLNAME is the only key left
+    if (keys %$r == 0
+     || ( keys %$r == 1
+       && exists $r->{FULLNAME}
+	)
+       )
+    { warn "delete $key: ".cs::Hier::h2a($::rcdb->{$key},1)."\n";
+      delete $::rcdb->{$key};
+    }
+  }
+}
+
+$::silent || out("updating $::dbpath ...");
+undef $::rcdb;
+cs::Persist::finish();
+
+out('');
+exit 0;
