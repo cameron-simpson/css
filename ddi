@@ -1,0 +1,3 @@
+#!/bin/sh
+conv=${conv-notrunc}
+exec dd conv=$conv bs=${bs:-1024} if=$TAPE ${1+"$@"}
