@@ -1,5 +1,6 @@
 #!/bin/sh
-pidf=$HOME/.fetchmail.pid
+: ${VARRUN:=$HOME/var/run}
+pidf=$$VARRUN/fetchmail_sleep.pid
 [ -s "$pidf" ] \
 && { echo >>"$pidf"; read pid etc <"$pidf"; } \
 && [ -n "$pid" ] \
