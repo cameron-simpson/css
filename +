@@ -4,13 +4,7 @@
 #	- Cameron Simpson <cs@zip.com.au>
 #
 
-case "$HOST@$SYSTEMID" in
-    zapff@cisra|amadeus@home)
-	;;
-    *)	echo "$0: must be on zapff@cisra or amadeus@home" >&2
-	exit 1
-	;;
-esac
+needhost zapff@cisra amadeus@home || exit 1
 
 [ $# = 0 ] && set attn
 [ $# = 1 ] || { echo "Usage: $0 [mutt-folder]" >&2; exit 2; }
