@@ -1,0 +1,108 @@
+#!/bin/sh
+#
+# Locate ISO images in a directory tree and make available
+# for loopback mount in the local tree.
+#	- Cameron Simpson <cs@zip.com.au> 09mar2004
+#
+
+trace=set-x
+localdir=.
+
+cmd=`basename "$0"`
+usage="Usage: $cmd [-d localdir] [-{n|q|x}] srcdir
+	-d localdir	Specify local ISO tree. Default: $localdir
+	-n,-q,-x	Tracing: no action (echo), quiet (no echo), execute."
+
+badopts=
+
+while :
+do
+  case $1 in
+    -d)	localdir=$2; shift ;;
+    -n)	trace=echo ;;
+    -q)	trace= ;;
+    -x)	trace=set-x ;;
+    --)	shift; break ;;
+    -?*)echo "$cmd: unrecognised option: $1" >&2; badopts=1 ;;
+    *)	break ;;
+  esac
+  shift
+done
+
+if [ $# = 0 ]
+then
+  echo "$cmd: missing srcdir" >&2
+  badopts=1
+else
+  srcdir=$1; shift
+  [ $# = 0 ] || { echo "$cmd: extra arguments after srcdir: $*" >&2
+		  badopts=1
+		}
+fi
+
+[ -d "$localdir/." ] || { echo "$cmd: localdir $localdir: not a directory!" >&2
+			  badopts=1
+			}
+
+[ -d "$srcdir/." ] || { echo "$cmd: srcdir $srcdir: not a directory!" >&2
+			badopts=1
+		      }
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+# compute symlink path prefix
+case "$srcdir" in
+  /*)	rsubsrcdir=$srcdir ;;
+  *)	rsubsrcdir=../$srcdir ;;
+esac
+
+( cd "$srcdir" || exit 1
+  exec find . -type f -size +0 -name '*.iso' -print
+) \
+| sed -n 's;^\./\([^/][^/]*\)/;\1 ;p' \
+| { xit=0
+    while read topdir subpath
+    do
+      srciso=$srcdir/$topdir/$subpath
+      [ -s "$srciso" ] || { echo "$cmd: src iso $srciso: not a file" >&2
+			    xit=1
+			    continue
+			  }
+
+      # remap top dir
+      localtopdir=`[ -s "$localdir/.isocatmap" ] && grep "^$topdir[ 	]" <"$localdir/.isocatmap" | sed -e 's/^[^ 	][^ 	]*[ 	]*//' -e 1q`
+      [ -n "$localtopdir" ] || localtopdir=$topdir
+
+      localsubpath=`echo "$subpath" | tr / -` || { xit=1; break; }
+      localiso=$localdir/$localtopdir/$localsubpath
+
+      needdir "$localdir/$localtopdir" || { xit=1; continue; }
+
+      if [ -s "$localiso" ] \
+      && cmp -s "$localiso" "$srciso"
+      then
+	  : they match
+      else
+	  if [ -s "$localiso" ]
+	  then
+	      echo "$cmd: conflicting ISOs" >&2
+	      echo "	local:  $localiso" >&2
+	      echo "	source: $srciso" >&2
+	      continue
+	  fi
+
+	  # test symlink path
+	  ( cd "$localdir/$localtopdir" || exit 1
+	    rsrciso=$rsubsrcdir/$topdir/$subpath
+	    [ -s "$rsrciso" ]
+	  ) || { echo "$cmd: can't resolve symlink path for $srciso: $rsrciso" >&2
+		 xit=1
+		 continue
+	       }
+
+	  $trace rm -f "$localiso"
+	  $trace ln "$srciso" "$localiso" || $trace ln -s "$rsubsrcdir/$topdir/$subpath" "$localiso"
+      fi
+    done
+    exit $xit
+  }
