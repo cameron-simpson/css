@@ -91,6 +91,8 @@ sub reTIEHASH
 
 =back
 
+=cut
+
 sub DESTROY
 {}
 
