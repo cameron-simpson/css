@@ -1,0 +1,138 @@
+#!/usr/bin/perl
+#
+# Examine a list of files to see which have changed.
+#	- Cameron Simpson <cs@zip.com.au> 24aug96
+#
+
+use cs::Source;
+use cs::MD5;
+use cs::Upd;
+use cs::Stat;
+use POSIX;
+use Getopt::Std;
+use File::Find;
+
+new cs::Upd main::STDERR;
+
+$Verbose=0;
+
+($cmd=$0) =~ s:.*/::;
+$usage="Usage: $cmd [-s snapshot] files...
+	-s snapshot 	Snapshot file with old content.
+	-v		Verbose.
+";
+
+$tty=-t STDERR;
+
+$badopts=0;
+getopts('hd:s:v') || ($badopts=1);
+
+$SnapFile=$opt_s if defined $opt_s;
+$Verbose=$opt_v if defined $opt_v;
+
+die $usage if $badopts;
+
+$Xit=0;
+
+# load previous file
+if (length $SnapFile)
+	{ my($u);
+
+	  $tty && out "loading $SnapFile ...";
+	  if (! defined ($u=new cs::Source PATH, $SnapFile))
+		{ err("$cmd: can't read $SnapFile: $!\n");
+		  exit 1;
+		}
+
+	  { my($s);
+
+	    if (! defined ($s=new cs::Stat FILE, $u->{FILE}))
+		{ err("$cmd: can't stat $SnapFile: $!\n");
+		  exit 1;
+		}
+
+	    $UpdMTime=$s->MTime();
+	  }
+
+	  $lineno=0;
+	  SNAP:
+	    while (defined ($_=$u->GetLine()) && length)
+		{ $lineno++;
+		  chomp;
+
+		  if (! /(^([^{]*\S)\s+\{/)
+			{ err("$SnapFile, line $lineno: bad data: $_\n");
+			  $Xit=1;
+			}
+		  else
+		  { $file=$1; $_='{'.$';
+		    $f=cs::Hier::a2h($_);
+		    if (! ref $f)
+			{ err("$SnapFile, line $lineno: $file: bad parameters: $_\n");
+			  $Xit=1;
+			}
+		    else
+		    { $State{$file}=$f;
+		    }
+		  }
+		}
+	}
+
+@files=@ARGV;
+
+if (@files)
+	{ for (sort @files)
+		{ dochk($_) || ($Xit=1);         
+		}
+	}
+else
+{ $tty && out("reading stdin for file list ...");
+  while (defined ($_=<STDIN>))
+	{ chomp;
+	  dochk($_) || ($Xit=1);
+	}
+}
+
+exit $Xit;
+
+sub dochk
+	{ my($file)=shift;
+	  my($f);
+	  return undef if ! defined ($f=chk($file,1));
+	  print $file, " ", cs::Hier::h2a($f,0), "\n";
+	  $f;
+	}
+
+sub chk
+	{ local($_)=shift;
+	  my($updateMode)=shift;
+
+	  $tty && out("chk $_");
+
+	  $updateMode=0 if ! defined $updateMode;
+
+	  if (! defined($s=new cs::Stat PATH, $_, 1))
+		{ err "new cs::Stat $_: $!\n";
+		  return undef;
+		}
+
+	  if (! POSIX::S_ISREG($s->Mode()))
+		{ err "$_: not a regular file\n";
+		  return undef;
+		}
+
+	  my($size)=$s->Size();
+
+	  if ($updateMode
+	   && defined $State{$_}
+	   && $s->MTime() < $UpdMTime
+	   && $size == $State{$_}->{SIZE})
+		# not new and same size - return old version
+		{ return $State{$_};
+		}
+
+	  $tty && out("md5 $_");
+	  $md5=cs::MD5::md5file($_);
+
+	  { MD5 => $md5, SIZE => $size };
+	}
