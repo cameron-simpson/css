@@ -1,0 +1,8 @@
+#!/bin/sh
+ptn=$1; shift
+args=
+for arg
+do
+    args="$args '$1'/*"
+done
+eval "exec grep -i \"\$ptn\" $args /dev/null"
