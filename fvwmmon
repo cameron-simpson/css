@@ -77,7 +77,11 @@ sub wincmd
 sub fvcmd
 { my(@a)=@_;
 
-  my $fvcmd="@a";
-  $fvcmd =~  s/'/'\\''/g;
-  print "FvwmCommand '$fvcmd'\n";
+  for (@a)
+  { if (s/'/'\\''/g)
+    { $_="'$_'";
+    }
+  }
+
+  print "@a\n";
 }
