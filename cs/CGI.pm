@@ -273,42 +273,105 @@ Return the HTTP method used to call this CGI
 
 =cut
 
-sub Method	{ shift->Env(REQUEST_METHOD) }
-sub Keywords	{ keys %{shift->{QUERY}} }
-sub Query_String{ unhexify(shift->Env(QUERY_STRING)) }
-sub ScriptURL	{ shift->Env(SCRIPT_NAME); }
-# URL for script, with PATH_INFO, without query
-sub FullURL	{ my($this)=@_;
-		  my($E)=scalar $this->Env();
+sub Method($)
+{ shift->Env(REQUEST_METHOD)
+}
 
-		  ## warn "FullURL: E=".cs::Hier::h2a($E,0);
+=item Keywords()
 
-		  my($url)="http://".$E->{SERVER_NAME};
+Return the parameter names from the query.
 
-		  $url.=":$E->{SERVER_PORT}" if defined $E->{SERVER_POR}
-					     && length $E->{SERVER_PORT};
+=cut
 
-		  $url.=$E->{SCRIPT_NAME};
-		  $url.=$E->{PATH_INFO} if exists $E->{PATH_INFO};
+sub Keywords($)
+{ keys %{shift->{QUERY}}
+}
 
-		  $url;
-		}
-# URL to repeat this query
+=item Query_String()
+
+Return the B<QUERY_STRING> environment value,
+unhexified.
+
+=cut
+
+sub Query_String($)
+{ unhexify(shift->Env(QUERY_STRING))
+}
+
+=item ScriptURL()
+
+Return the URL of the script
+with respect to the server root
+from the B<SCRIPT_NAME> environment value.
+
+=cut
+
+sub ScriptURL($)
+{ shift->Env(SCRIPT_NAME);
+}
+
+=item ScriptURL()
+
+Return the full URL of the CGI invocation:
+with the B<PathInfo> appended
+but without the ?B<Query_String>.
+
+=cut
+
+sub FullURL($)
+{ my($this)=@_;
+  my($E)=scalar $this->Env();
+
+  ## warn "FullURL: E=".cs::Hier::h2a($E,0);
+
+  my($url)="http://".$E->{SERVER_NAME};
+
+  $url.=":$E->{SERVER_PORT}" if defined $E->{SERVER_POR}
+			     && length $E->{SERVER_PORT};
+
+  $url.=$E->{SCRIPT_NAME};
+  $url.=$E->{PATH_INFO} if exists $E->{PATH_INFO};
+
+  $url;
+}
+
+=item SelfURL()
+
+Returns the full URL needed to repeat this query via a B<GET> method.
+
+=cut
+
 sub SelfURL
 { my($this)=shift;
   $this->SelfQuery($this->Query());
 }
 
-sub SelfQuery
-{ my($this,$q)=@_;
+=item SelfQuery(I<query-hashref>)
 
-  ## warn "q=".cs::Hier::h2a($q,0)."<BR>\n";
+Returns the full URL needed to call this CGI
+with an arbitrary query via a B<GET> method.
+Omits the "B<?>I<query_string>" if the I<query-hashref> is omitted.
+
+=cut
+
+sub SelfQuery($;$)
+{ my($this,$q)=@_;
 
   defined $q && ref $q && keys %$q
   ? $this->FullURL()."?"._qsEncode($q)
   : $this->FullURL();
 }
 # return PATH_INFO string, or components if in array context
+
+=item PathInfo($)
+
+Returns the B<PATH_INFO> environment value
+(the URL path components past the CGI script itself).
+Returns a string in a scalar context
+or the components split on slashes in an array context.
+
+=cut
+
 sub PathInfo
 { my($this)=shift;
   my($path);
@@ -317,6 +380,7 @@ sub PathInfo
   grep(length,split(m:/+:,$path));
 }
 
+# Left over cruft from the wrapper days.
 #sub _getCGIParams
 #	{ my($_Q,@p)=shift;
 #	  @p=$_Q->param() if ! @p;
@@ -334,19 +398,40 @@ sub PathInfo
 #	  for (@p) { $_Q->delete($_); }
 #	}
 
-sub Param
-{ my($F,$p,@v)=@_;
-  die "Param(\$p=\"$p\") - not a word!" unless $p =~ /^\w+/;
-  my($Q)=$F->{Q};
+# maybe crap from the wrapper days? check it out by commenting out and
+# seeing what breaks - cameron 19feb2000
+## sub Param
+## { my($F,$p,@v)=@_;
+##   die "Param(\$p=\"$p\") - not a word!" unless $p =~ /^\w+/;
+##   my($Q)=$F->{Q};
+## 
+##   if (! @v)
+##   { return undef if ! exists $Q->{$p};
+##     return @{$Q->{$p}} if wantarray;
+##     return "@{$Q->{$p}}";
+##   }
+## 
+##   $Q->{$p}=[ @v ];
+## }
 
-  if (! @v)
-	{ return undef if ! exists $Q->{$p};
-	  return @{$Q->{$p}} if wantarray;
-	  return "@{$Q->{$p}}";
-	}
+=item Form(I<action>,I<method>)
 
-  $Q->{$p}=[ @v ];
-}
+Return a new B<cs::HTML::Form> object
+for the specified I<action> and I<method>.
+If omitted, I<action> defaults to B<ScriptURL>
+and I<method> defaults to B<GET>.
+
+This B<cs::HTML::Form> object can then be used to construct
+form markup, and added to the CGI's markup token list as usual
+via the B<cs::HTML::Form::Close> method:
+
+C<$F=$Q-E<gt>Form();>
+
+... do form construction here ...
+
+C<push(@html, $F-E<gt>Close());>
+
+=cut
 
 sub Form
 { my($this,$action)=(shift,shift);
@@ -369,9 +454,60 @@ sub _decKey
   $_;
 }
 
-# take request record, a scheme and a record and emit a form for
+=item MkForm(I<action>,I<schema>,I<record>,I<context>)
+
+This method takes:
+
+=over 4
+
+=item I<action>
+
+an URL to call a CGI script, such as B<SelfQuery>()
+
+=item I<schema>
+
+a hashref pointing at a table of fields and data types
+
+=item I<record>
+
+a hashref pointing at a record
+with fields matching the I<schema>
+
+=item I<context>
+
+a hashref containing arbirary state information
+to be passed through the form as a hidden field
+(this parameter may be omitted)
+
+=back
+
+and returns an HTML token list for a form to edit the fields
+named in the I<schema>.
+Quick and dirty, not pretty.
+
+The I<action> CGI script can the used the B<GetEdits> method below
+to extract the altered fields in the form for use.
+(The original record contents are passed through
+as hidden parameters for comparison).
+
+The purpose to returning only the changed fields
+is to previde a degree of robustness
+against parallel editing of a record.
+Supposing person A loads the record up for editing
+and then gets delayed.
+Meanwhile, person B loads up the same record
+and edits a different field.
+Later, person A returns and submits his/her edits.
+Were the whole record rewritten to the backend database
+B's changes would be lost.
+This technique keeps both changes
+provided they don't overlap.
+
+=cut
+
+# take request record, a schema and a record and emit a form for
 # adjusting the record, controlling only the fields in the scheme
-sub MkForm
+sub MkForm($$$$;$)
 { my($this,$action,$schema,$record,$context)=@_;
   die "no action!" if ! defined $action;
   die "no scheme!" if ! defined $schema;
@@ -455,6 +591,21 @@ sub MkForm
   $F->Close();
 }
 
+=item GetEdits(I<query>,I<schema>)
+
+Take a I<query> hashref
+(by default the query supplied to this CGI)
+and a describing I<schema>
+(which may be omitted)
+and return a 2-tuple
+containing
+a hashref with the modified fields
+and the I<context> hashref supplied in B<MkForm> above.
+Fields not described in the I<schema>
+are assumed to be B<TEXTFIELD>s.
+
+=cut
+
 # take the submission from a form created with the above method
 # and return an Hier::diff() difference structure for application
 # to a record
@@ -498,31 +649,71 @@ sub GetEdits
 
       if (! defined $value
        || cs::Hier::hcmp($query->{$fkey},$value) != 0)
-	    { $diff->{$_}=$nvalue;
-	    }
+      { $diff->{$_}=$nvalue;
+      }
     }
 
   ($diff,$context);
 }
 
+=item HdrAdd(I<hdr>,I<how>)
+
+Add the header I<hdr>
+to the CGI scripts return headers
+in the fashion designated by I<how>.
+This calls the B<cs::RFC822::Add> method.
+
+=cut
+
 sub HdrAdd
 { my($this)=shift;
   $this->{HDRS}->Add(@_);
 }
-sub HdrSet { HdrAdd(@_,REPLACE); }
+
+=item HdrSet(I<hdr>)
+
+Replace a header
+with the supplied I<hdr>.
+Calls the B<cs::RFC822::Add> method with I<how> set to B<REPLACE>.
+
+=cut
+
+sub HdrSet($$)
+{ HdrAdd(@_,REPLACE);
+}
+
+=item ContentType(I<type>,I<params>)
+
+Set the B<Content-Type> header to I<type>
+(by default B<text/html>)
+with optional parameters
+specified in the hashref I<params>.
+
+=cut
 
 sub ContentType
 { my($this,$type,$params)=@_;
   $params={} if ! defined $params;
 
   if (keys %$params)
-	{ $type=join('; ',
-		     $type,map("$_=$params->{$_}",
-			       sort keys %$params));
-	}
+  { $type=join('; ',
+	       $type,map("$_=$params->{$_}",
+			 sort keys %$params));
+  }
 
   $this->HdrSet([CONTENT_TYPE,$type]);
 }
+
+=item HeadInfo(I<tag>,I<attrs>,I<markup...>)
+
+Set the E<lt>I<tag>E<gt> field (eg B<TITLE>)
+of the B<HEAD> section of the output HTML
+to the token
+E<lt>I<tag> I<attrs>E<gt>I<markup>E<lt>/I<tag>E<gt>.
+The I<attrs> is an optional hashref containing tag attributes.
+The I<markups> may also be omitted.
+
+=cut
 
 # save singular <HEAD> attribute
 sub HeadInfo
@@ -531,27 +722,55 @@ sub HeadInfo
   $this->{HEAD}->{uc($mark->{TAG})}=$mark;
 }
 
+=item HeadMarkUp(I<tokens...>)
+
+Append arbirary HTML markup to the B<HEAD> section of the output HTML.
+
+=cut
+
 # append markup to <HEAD>
 sub HeadMarkUp
 { my($this)=shift;
   push(@{$this->{HEAD_MARKUP}},@_);
 }
 
+=item HeadAttr(I<key>,I<value>,...)
+
+Set the attributes named by each I<key> to the corresponding I<value>
+in the E<lt>B<HEAD>E<gt> tag of the output HTML.
+
+=cut
+
 sub HeadAttr
 { my($this,%a)=@_;
   for my $a (keys %a)
-  { $this->{HEAD_ATTRS}->{$a}=$a{$a};
+  { $this->{HEAD_ATTRS}->{uc($a)}=$a{$a};
   }
 }
+
+=item BodyAttr(I<key>,I<value>,...)
+
+Set the attributes named by each I<key> to the corresponding I<value>
+in the E<lt>B<BODY>E<gt> tag of the output HTML.
+
+=cut
 
 sub BodyAttr
 { my($this,%a)=@_;
   for my $a (keys %a)
-  { $this->{BODY_ATTRS}->{$a}=$a{$a};
+  { $this->{BODY_ATTRS}->{uc($a)}=$a{$a};
   }
 }
 
-sub SetCookie
+=item SetCookie(I<name,I<value>,I<params>)
+
+Set a cookie in the headers
+named I<name> with value I<value>
+and the parameters specified by the optional hashref I<param>.
+
+=cut
+
+sub SetCookie($$$;$)
 { my($this,$name,$value,$params)=@_;
   $params={} if ! defined $params;
 
@@ -566,14 +785,35 @@ sub SetCookie
 		       map(lc($_)."=$params->{$_}",sort keys %$params))
 		]);
 }
-sub Cookies
+
+=item Cookies()
+
+Return the hashref describing the cookies supplied to this CGI script.
+
+=cut
+
+sub Cookies()
 {
   my($this)=@_;
 
   $this->{COOKIES};
 }
 
-sub Print	# (sink,\@html,need_tok2a) -> void
+=item Print(I<html>,I<need_tok2a>,I<sink>)
+
+Emit the CGI's MIME headers and HTML to the output specified by I<sink>.
+The HTML is a reference to an array of tokens.
+The tokens are converted to an array of strings for output
+if I<need_tok2a> is true (its default value).
+If omitted, the I<sink> defaults to the sink supplied
+in the B<new> call (which itself defaults to B<STDOUT>).
+
+Thus, the final act of a CGI script using this module
+will be a $CGI-E<gt>Print(\@html) call.
+
+=cut
+
+sub Print($;$$)
 {
   my($this,$html,$need_tok2a,$sink)=@_;
   $need_tok2a=1 if ! defined $need_tok2a;
@@ -640,6 +880,15 @@ sub Print	# (sink,\@html,need_tok2a) -> void
   { $sink->Put(@$html);
   }
 }
+
+=back
+
+=head1 SEE ALSO
+
+B<cs::RFC822>(3),
+B<cs::HTTP>(3),
+B<cs::HTML>(3),
+B<cs::HTML::Form>(3).
 
 =head1 AUTHOR
 
