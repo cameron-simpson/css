@@ -74,7 +74,7 @@ fi
 
 conv_mentor='mentor2ps -m "$medium"'
 conv_pdf=acroread2ps
-conv_text='a2ps -1 -o- --stdin "$title" -T 8 -i --borders=no -b $a2ps_aspect --medium=$medium -f 10'
+conv_text='a2ps -q -1 -o- --stdin "$title" -T 8 -i --borders=no -b $a2ps_aspect --medium=$medium -f 10'
 conv_html=unhtml
 conv_image='convert - ps:-'
 case "$mtype" in
