@@ -1,0 +1,16 @@
+#!/bin/sh
+#
+# Extract all components of an email message with munpack, in a distinctively named directory.
+# If the shell script autoexec.sh is present in the key directory, run that after extraction.
+#	- Cameron Simpson <cs@zip.com.au> 03dec2001
+#
+
+key=in
+[ $# = 0 ] || { key=$1; shift; }
+
+base=$HOME/private/incoming/$key
+
+dl=`mkdirn "$base/"` || exit 1
+cd "$dl" || exit 1
+munpack || exit 1
+[ ! -s "$base/autoexec.sh" ] || exec /bin/sh "$base/autoexec.sh" "$key"
