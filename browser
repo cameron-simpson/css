@@ -1,0 +1,63 @@
+#!/bin/sh
+#
+# Dispatch my preferred browser.
+# Compare to $BROWSER, which is for opening a fresh window in the browser.
+#	- Cameron Simpson <cs@zip.com.au> 08aug2004
+#
+
+: ${BROWSER:="urlshow %s"}
+: ${VARRUN:="$HOME/var/run"}
+
+cmd=$0
+usage="Usage: $cmd [-f] [url]
+	-f	Force: start browser even if already running.
+	-q	test if browser running."
+
+url=
+mode=start
+
+badopts=
+
+while :
+do
+  case "$1" in
+    -f)	mode=force ;;
+    -q)	mode=query ;;
+    --)	shift; break ;;
+    -?*)echo "$cmd: unrecognised option: $1" >&2; badopts=1 ;;
+    *)	break ;;
+  esac
+  shift
+done
+
+[ $# = 0 ] || { url=$1; shift; }
+
+[ $# = 0 ] || { echo "$cmd: extra argments after URL: $*" >&2; badopts=1; }
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+pidfile=$VARRUN/browser.pid
+
+case "$mode" in
+  force)
+      ;;
+  *)  [ -s "$pidfile" ] && pid=`cat "$pidfile"` && kill -0 "$pid" 2>/dev/null
+      testcode=$?
+      case "$mode" in
+	query)
+	  exit $testcode ;;
+      esac
+      if [ $testcode = 0 ]
+      then
+        echo "$cmd: browser already running with pid $pid" >&2
+        echo "	(from $pidfile)" >&2
+        exit 1
+      fi
+      ;;
+esac
+
+[ -n "$url" ] && set -- "$url"
+( set -x
+  exec ff08 -width "$FULLX" -height "$PIX_HIGH" ${1+"$@"}
+) &
+echo $! >"$pidfile"
