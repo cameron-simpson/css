@@ -28,7 +28,7 @@ case $cmd in
 			|| { echo "$0: must be on amadeus@home" >&2; exit 1; }
 		zapdir=$HOME/there/adzapper.sourceforge.net/html
 		file=$zapdir/rc/patterns
-		post='cd $zapdir && myke scripts/squid_redirect && syncsf'
+		post='cd $zapdir && myke scripts/squid_redirect'
 		cvsedit="cvsedit $file"
 		dodiff=1
 		;;
