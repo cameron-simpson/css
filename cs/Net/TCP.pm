@@ -1,0 +1,276 @@
+#!/usr/bin/perl
+#
+# Open and manipulate TCP stream connections.
+#	- Cameron Simpson <cameron@dap.csiro.au> 21sep95
+#
+# Generally, ports may be named or numeric.
+# Likewise, hostnames may be named or x.x.x.x numeric quadrets.
+#
+# new host,port -> cs::Port
+#	Attach a cs::Port to a stream connection to (host,port).
+# new [port] -> service
+#	Set up a service (on the port if specified).
+#
+# Accept() -> cs::Port
+#	accept an incoming connection.
+#	In a scalar context returns the next connection stream.
+#	In an array context returns the new stream and the address of
+#	the connecting host.
+# Serve(service,flags,func,@args) -> void
+#	A simple single threaded server loop.
+#	Binds to the specified port and services incoming connections.
+#	For each connection it calls
+#		func(CONN,$peer,@args)
+#	where CONN is the newly connected stream, $peer is the peer address
+#	and @args are those passed as context to TCP::Serve.
+#	Flags is a bitmask of
+#		$cs::Net::TCP::TCP::F_FORK	Fork a subprocess to handle the connection.
+#		$cs::Net::TCP::TCP::F_ONCE	Return after servicing a single connection.
+#		$cs::Net::TCP::TCP::F_BOUND	Port is not a port name but the filehandle
+#				of an already bound socket. This can be
+#				used in conjunction with F_ONCE to call
+#				TCP::Serve from another main loop as
+#				connections come in, allowing intermixing
+#				with other functions or I/O.
+#
+
+use strict qw(vars);
+
+use Socket;
+use cs::Misc;
+use cs::Net;
+use cs::Port;
+
+package cs::Net::TCP;
+
+@cs::Net::TCP::ISA=qw(cs::Port);
+
+$cs::Net::TCP::F_FORK=0x01;	# TCP::serv: fork on connection
+$cs::Net::TCP::F_ONCE=0x02;	# TCP::serv: service a single connection
+$cs::Net::TCP::F_SYNC=0x04;	# TCP::serv: wait for forked child
+$cs::Net::TCP::F_FORK2=0x08;	# TCP::serv: fork twice to orphan children
+
+{ my($name,$aliases);
+
+  if (!( ($name,$aliases,$cs::Net::TCP::TCP)=getprotobyname('tcp') ))
+	{ die "$::cmd: can't look up tcp protocol: $!";
+	}
+}
+
+sub new
+{ my($class)=shift;
+  my($this);
+
+  if (@_ == 2 || @_ == 3)
+  # connect to remote host/port
+  { my($conn)=conn(@_);
+    return undef if ! defined $conn;
+
+    $this=new cs::Port $conn;
+    return undef if ! defined $this;
+  }
+  elsif (@_ == 0 || @_ == 1)
+  # set up a service
+  { my($sockf)=service(@_);
+    return undef if ! defined $sockf;
+    $this={ SOCKET	=> $sockf,
+	  };
+  }
+  else
+  { my(@c)=caller;
+    warn "bad arguments to new $class (@_) called from [@c]:\n"
+	."   new $class (host,port[,localport]) -> connection\n"
+	."or new $class [port] -> service";
+
+    return undef;
+  }
+
+  bless $this, $class;
+}
+
+$cs::Net::TCP::_SOCK='TCPSOCK0000';
+sub _sockHandle
+{ "cs::Net::TCP::".$cs::Net::TCP::_SOCK++;
+}
+
+sub conn	# (host,port[,localport]) -> (FILE)
+{ my($rhost,$rport,$localport)=@_;
+
+  $rport=cs::Net::portNum($rport,TCP);
+  return undef if ! defined $rport;
+
+  # get IP address of remote host
+  my(@ra)=cs::Net::a2addr($rhost);
+  return undef if ! @ra;
+
+  my($sockf);
+  my($local,$remote);
+
+  my($laddr)=Socket::INADDR_ANY;
+  if (defined $localport)
+  { $local=Socket::sockaddr_in($localport,$laddr);
+  }
+
+
+  CONNECT:
+  for my $raddr (@ra)
+  { $sockf=_sockHandle();
+    if (! socket($sockf,Socket::AF_INET,Socket::SOCK_STREAM,$cs::Net::TCP::TCP))
+    { warn "socket(AF_INET,SOCK_STREAM,TCP): $!";
+      next CONNECT;
+    }
+
+    if (defined $localport)
+    # use particular local port
+    { if (! bind($sockf,$local))
+      { warn "bind($sockf,$localport,INADDR_ANY): $!";
+	close($sockf);
+	next CONNECT;
+      }
+    }
+
+    $remote=Socket::sockaddr_in($rport,$raddr);
+    if (! connect($sockf, $remote))
+    { warn "connect($sockf,sockaddr_in($rport,"
+	  .cs::Net::addr2a($raddr)
+	  .")): $!";
+      close($sockf);
+      next CONNECT;
+    }
+
+    return $sockf;
+    last CONNECT;
+  }
+
+  return undef;
+}
+
+sub service	# [port] -> socket
+{ my($port)=@_;
+  $port=0 if ! defined $port;
+
+  $port=cs::Net::portNum($port,TCP);
+  return undef if ! defined $port;
+
+  my($sockf)=_sockHandle();
+  if (! socket($sockf,Socket::PF_INET,Socket::SOCK_STREAM,$cs::Net::TCP::TCP))
+	{ warn "socket($sockf,PF_INET,SOCK_STREAM,TCP): $!";
+	  return undef;
+	}
+
+  my($laddr)=Socket::INADDR_ANY;
+  my($local)=scalar(Socket::sockaddr_in($port,$laddr));
+
+  if (! bind($sockf,$local))
+	{ warn "bind($sockf,sockaddr_in($port,INADDR_ANY)): $!";
+	  close($sockf);
+	  return undef;
+	}
+
+  listen($sockf,10) || warn "listen($sockf,10): $!";
+
+  $sockf;
+}
+
+sub Port
+	{
+	  my($this)=@_;
+	  my($sockaddr);
+
+	  if (exists $this->{SOCKET})
+		{ $sockaddr=getsockname($this->{SOCKET});
+		}
+	  else
+		{ $sockaddr=getsockname($this->{IN}->{FILE});
+		}
+
+	  if (! defined $sockaddr)
+		{ warn "getsockname: $!";
+		  return undef;
+		}
+
+	  warn "sockaddr=".cs::Hier::h2a($sockaddr,0);
+	  my($port,$addr)=Socket::sockaddr_in($sockaddr);
+
+	  $port;
+	}
+
+sub Accept	# service -> cs::Port
+{ my($this)=@_;
+  my($sockf)=$this->{SOCKET};
+  my($conn)=_sockHandle();
+  my($peer);
+
+  if (! ($peer=accept($conn,$sockf)))
+  { warn "$::cmd: accept($sockf): $!";
+    return undef;
+  }
+
+  new cs::Port $conn;
+}
+
+# collect incoming connections and call func(conn,@args),
+# forking first if flags&F_FORK
+# don't loop if flags&F_ONCE
+# wait for child if flags&F_SYNC
+sub Serve	# (this,flags,func,@args) -> void
+{ my($this,$flags,$func,@args)=@_;
+
+  ## warn "Serve(@_)";
+
+  my($dofork,$dofork2,$onceonly,$sync);
+  $dofork	=($flags & $cs::Net::TCP::F_FORK);
+  $dofork2	=($flags & $cs::Net::TCP::F_FORK2);
+  $onceonly	=($flags & $cs::Net::TCP::F_ONCE);
+  $sync		=($flags & $cs::Net::TCP::F_SYNC);
+
+  warn "$::cmd: can't use F_SYNC and F_FORK2" if $sync && $dofork2;
+
+  if (! ref $func && $func !~ /'|::/)
+	{ my($caller,@etc)=caller;
+	  $func=$caller."::".$func;
+	}
+
+  my($conn,$pid);
+
+  CONN:
+    while (defined ($conn=$this->Accept()))
+    { if ($dofork || $dofork2)
+      { if (defined($pid=fork))
+	{ if ($pid)
+	  # parent
+	  { undef $conn;
+	    waitpid($pid,0) if $sync || $dofork2;
+	    last CONN if $onceonly;
+	    next CONN;
+	  }
+	  elsif ($dofork2)
+	  # child - make grandchild
+	  { if (! defined ($pid=fork))
+	    { warn "subfork fails(): $!; a zombie will result";
+	    }
+	    else
+	    { exit 0 if $pid;
+	    }
+
+	    # child or grandchild proceeds
+	    close($this->{SOCKET})
+	    	|| warn "$::cmd: child: can't close($this->{SOCKET}): $!\n";
+	  }
+	}
+	else
+	{ warn "fork(): $!";
+	  next CONN;
+	}
+      }
+
+      &$func($conn,@args);
+      undef $conn;	# flush, close, etc
+
+      exit 0 if $dofork;
+
+      last CONN if $onceonly;
+    }
+}
+
+1;
