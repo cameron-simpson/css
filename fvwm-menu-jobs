@@ -5,12 +5,5 @@
 #
 
 joblist name category state title \
-| awk '-F	' '$4 != "CLOSED" { print }' \
-| while read id name category state title
-  do
-      label=$name
-      [ -n "$title" ] && label="$label: $title"
-      [ -n "$category" ] && label="$label	$category"
-      echo "\"$label\" Exec exec job $name"
-  done \
+| awk '-F	' '$4 != "CLOSED" { print "\"" $2 ": " $5 "\t" $3 "\" Exec exec job " $2 }' \
 | sort
