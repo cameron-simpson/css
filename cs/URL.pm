@@ -649,7 +649,7 @@ sub LocalPart($;$)
 =item MatchesCookie(I<cookie>,I<when>)
 
 Given a I<cookie>
-as a hasref with B<HOST>, B<DOMAIN>, B<PATH> and B<EXPIRES> fields
+as a hashref with B<DOMAIN>, B<PATH> and B<EXPIRES> fields
 and a time I<when> (which defaults to now),
 return whether the cookie should be associated with this URL.
 
