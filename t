@@ -1,2 +1,2 @@
 #!/bin/sh
-exec pageif view-unknown -c ${1+"$@"}
+exec pageif view-unknown ${1+"$@"} copiousoutput
