@@ -1,0 +1,106 @@
+#!/bin/sh
+#
+# Collect together the appropriate public keys for this site.
+#	- Cameron Simpson <cs@zip.com.au> 14jul2001
+#
+
+site=$SYSTEMID
+sshdir=$HOME/.ssh
+verbose=
+
+cmd=$0
+usage="Usage: $cmd [-s site] [-d sshdir]
+	-v		Verbose.
+	-d sshdir	Specify ssh directory.
+			Default: $sshdir
+	-s site		Specify site.
+			Default from \$SYSTEMID: $site"
+
+badopts=
+
+while :
+do
+  case $1 in
+    -v)	verbose=1 ;;
+    -d)	sshdir=$2; shift ;;
+    -s)	site=$2; shift ;;
+    --)	shift; break ;;
+    -?*)echo "$cmd: unrecognised option: $1" >&2
+	badopts=1
+	;;
+    *)	break ;;
+  esac
+  shift
+done
+
+[ $# = 0 ] || { echo "$cmd: extra arguments: $*" >&2
+		badopts=1
+	      }
+
+[ -d "$sshdir/." ] || { echo "$cmd: $sshdir: not a directory" >&2
+			badopts=1
+		      }
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+vpncmd="exec ./scripts/vpnendpoint"
+
+xit=0
+
+for ext in ALL "$site"
+do
+    list=$HOME/rc/ssh/auth-$ext
+    [ -r "$list" ] || { echo "$cmd: can't read file \"$list\"" >&2
+			xit=1
+			continue
+		      }
+
+    exec <"$list"
+    while read -r key purpose shcmd
+    do
+      # skip comments
+      case "$key" in
+	  ''|\#*)	continue ;;
+      esac
+
+      # default purpose
+      [ -n "$purpose" ] || purpose=identity
+
+      [ $verbose ] && echo "$list: $key $purpose $shcmd" >&2
+
+      # default shell command - unused if purpose=identity
+      [ -n "$shcmd" ] || shcmd=$vpncmd
+
+      fullkey=$HOME/rc/ssh/pubkeys/$key
+      if [ -d "$fullkey/." ]
+      then  set x
+	    for type in rsa1 rsa dsa
+	    do  keypath=$fullkey/`ssh-keyfile -p "$purpose" "$type"`.pub
+		set "$@" "$keypath"
+	    done
+	    shift
+      else  [ -s "$fullkey.pub" ] \
+	    || { echo "$cmd: missing key file: $fullkey.pub" >&2
+		 xit=1
+		 continue
+	       }
+	    set "$fullkey.pub"
+      fi
+
+      for keyf
+      do
+	[ -s "$keyf" -a -f "$keyf" -a -r "$keyf" ] \
+	|| { echo "$cmd: bad key file: $keyf" >&2
+	     xit=1
+	     continue
+	   }
+
+	[ "x$purpose" = xidentity ] \
+	|| necho "command=\"$shcmd\",no-X11-forwarding,no-pty,no-agent-forwarding "
+
+	(set -x; cat "$keyf") || xit=1
+      done
+    done
+done
+
+exit $xit
