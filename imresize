@@ -1,0 +1,61 @@
+#!/bin/sh
+#
+# Squirrel away XbyY-sized versions of images.
+#	- Cameron Simpson <cs@zip.com.au> 12feb98
+#
+
+cmd=`basename "$0"`
+usage="Usage: $cmd [-G] maxx maxy jpgfiles...
+	-G	Make XbyY versions in GIF format."
+
+makegif=
+Gflag=
+
+badopts=
+
+while :
+do  case $1 in
+	-G)	Gflag=-G makegif=1 ;;
+	--)	shift; break ;;
+	-?*)	echo "$cmd: unrecognised option: $1" >&2; badopts=1 ;;
+	*)	break ;;
+    esac
+    shift
+done
+
+case $# in
+    0|1)	echo "$cmd: missing maxx or maxy" >&2; badopts=1 ;;
+    2)		echo "$cmd: missing jpgfiles" >&2; badopts=1 ;;
+esac
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+maxx=$1 maxy=$2
+shift; shift
+
+dir=${maxx}x${maxy}
+[ -d "$dir/." ] || mkdir "$dir" || exit $?
+
+xit=0
+
+for jpg
+do
+    case "$jpg" in
+	*.jpg)	;;
+	*)	echo "$cmd: $jpg: expected .jpg extension, skipped" >&2
+		xit=1
+		continue
+		;;
+    esac
+
+    base=`basename "$jpg" .jpg`
+
+    if [ $makegif ]
+    then  out=$dir/$base.gif
+    else  out=$dir/$base.jpg
+    fi
+
+    jpgscale $Gflag $maxx $maxy <"$jpg" >"$out" || xit=$?
+done
+
+exit $xit
