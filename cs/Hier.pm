@@ -634,7 +634,7 @@ Transcribe the hash to a file, run an editor, return the modified hash.
 
 sub edithash($;$)
 { my($h,$editor)=@_;
-  $editor = ( defined $ENV{EDITOR} ? $ENV{EDITOR} : 'vi' ) if ! defined $editor;
+  $editor = cs::Misc::editor() if ! defined $editor;
 
   my $tmp;
 
@@ -652,6 +652,9 @@ sub edithash($;$)
   system("$editor $tmp");
 
   $h=loadhash($tmp);
+
+  # clumsy catch for disc full :-)
+  return undef if ! keys %$h;
 
   unlink($tmp) || warn "$::cmd: warning: can't unlink $tmp: $!\n";
 
