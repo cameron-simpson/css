@@ -1,0 +1,19 @@
+#!/bin/sh
+
+[ $# = 0 ] || { echo "Usage: $0" >&2; exit 2; }
+
+[ -n "$FVWMEVLOG" ] || { echo "$0: no \$FVWMEVLOG envvar" >&2; exit 1; }
+[ -f "$FVWMEVLOG" ] || { echo "$0: no \$FVWMEVLOG log file" >&2; exit 1; }
+
+[ -n "$FVWMCMDLOG" ] || { echo "$0: no \$FVWMCMDLOG envvar" >&2; exit 1; }
+[ -f "$FVWMCMDLOG" ] || { echo "$0: no \$FVWMCMDLOG log file" >&2; exit 1; }
+
+fifo=$FVWMEVFIFO
+FvwmCommand -S "$fifo"
+( sleep 3
+  FvwmCommand -f "$fifo" -mi3 -F0 >>"$FVWMEVLOG" &
+  sleep 1
+  utail "$FVWMCMDLOG" | FvwmCommand -c &
+)
+
+fvwmmon | fvwmcmd &
