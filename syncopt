@@ -152,9 +152,8 @@ then
     }
 else
     remotepfx=$remote:
-    atremote="ssh $remote"
     remote()
-    { ssh "$remote" "PATH=\$PATH:$pathadd; export PATH; $*"
+    { eval "${RSYNC_RSH:-ssh} "'"$remote" "PATH=\$PATH:$pathadd; export PATH; $*"'
     }
 fi
 
@@ -418,6 +417,11 @@ exit $xit
 #
 # Preferred path to the rsync(1) command
 # as though specified with the B<-R> command line option.
+#
+# =item B<RSYNC_RSH>
+#
+# Ssh command to use, as for rsync, if a remote host is in use.
+# The default is ssh.
 #
 # =back
 #
