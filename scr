@@ -10,7 +10,7 @@ usage="Usage:	$cmd				List sessions.
 	$cmd -options... [args...]]	Exec screen with supplied arguments."
 
 # nothing? list active sessions
-[ $# = 0 ] && exec screen -ls
+[ $# = 0 ] && { screen -ls | sed -n 's/^	//p'; exit 0; }
 
 # options - run screen directly
 case "$1" in
