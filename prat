@@ -1,0 +1,70 @@
+#!/bin/sh
+#
+# Invoke munpack with some default options for easy invocation.
+#	- Cameron Simpson <cs@zip.com.au> 24dec96
+#
+
+usage="Usage: $0 [-fqt] [-i] [-C working-dir] [files...]
+	-fqt	Passed to munpack.
+	-i	Open a shell in the extract directory after unpacking.
+		(Default is to print the extract files' full pathnames
+		on stdout.)
+	-C working-dir
+		Directory in which to unpack."
+
+d=$HOME/tmp/prat
+subd=`daycode`-$$
+
+xdir=$d/$subd
+
+iflag=
+munargs=
+
+badopts=
+while :
+do  case $1 in
+	-[fqt])	munargs="$munargs $1" ;;
+	-i)	iflag=1 ;;
+	-C)	xdir=$2; shift ;;
+	--)	shift; break ;;
+	-?*)	echo "$0: unrecognised option: $1" >&2; badopts=1 ;;
+	*)	break ;;
+    esac
+    shift
+done
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+[ -d "$xdir" ] || mkdir -p "$xdir" || exit $?
+
+[ $# = 0 ] && { set x -; shift; }
+
+xit=0
+
+for file
+do  fbase=`basename "$file"`
+    if mkdir "$xdir/$fbase"
+    then
+	case $file in
+	    -)	munpack $margs -C "$xdir/$fbase"          >&2 ;;
+	    *)	munpack $margs -C "$xdir/$fbase" <"$file" >&2 ;;
+	esac
+	xcode=$?
+	[ $xcode = 0 ] || xit=$xcode
+    else
+	xit=$?
+    fi
+done
+
+if [ $iflag ]
+then
+    ( cd "$xdir" || exit $?
+      pwd
+      ls -l ./*
+      exec term
+    )
+else
+    ls -d "$xdir"/*/*
+fi
+
+exit $xit
