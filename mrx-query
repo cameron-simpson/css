@@ -6,6 +6,7 @@
 #
 
 : ${MAILDIR:=$HOME/mail}
+: ${TMPDIR:=/tmp}
 
 cmd=`basename "$0"`
 usage="Usage: $cmd [+folder[,folder...] --] keywords..."
@@ -17,7 +18,7 @@ case "$1" in
     +*)	for folder in `echo "$1" | sed -e 's/^.//' -e 'y/,/ /'`
 	do
 	  folder=$MAILDIR/$folder
-	  if ismhdir "$folder"
+	  if ismhdir "$folder" || ismaildir "$folder"
 	  then
 	      folders="$folders $folder"
 	  else
@@ -25,6 +26,7 @@ case "$1" in
 	      badopts=1
 	  fi
 	done
+	shift
 	;;
 esac
 
@@ -40,7 +42,7 @@ fi
 xit=0
 
 # create result folder
-res=`mkdirn "${TMPDIR:-/tmp}/mrx"` || exit 1
+res=`mkdirn "$TMPDIR/mrx"` || exit 1
 
 # subdir
 subn=1
@@ -50,7 +52,7 @@ subn=1
   for folder in $folders
   do
     [ -d "$folder" ] || continue
-    ismhdir "$folder" || continue
+    ismhdir "$folder" || ismaildir "$folder" || continue
     db=$folder/.mairix.db
     [ -f "$db" ] || { echo "$cmd: no index for $folder" >&2
 		      continue
