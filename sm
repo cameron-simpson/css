@@ -1,0 +1,13 @@
+#!/bin/sh
+#
+# Short message.
+#	- Cameron Simpson <cs@zip.com.au> 16aug96
+#
+
+[ $# = 0 ] && { echo "Usage: $0 addresses..." >&2; exit 2; }
+
+echo "To: $*"
+necho "Message? "
+read msg || exit $?
+
+exec m -S -s "$msg" "$@" </dev/null &
