@@ -110,7 +110,7 @@ sub decompose($$;$)
     ($size,$ab)=(pop(@subu),pop(@subu));
 
     $n1 = int($num/$size);
-    if ($n1 < 10)	# get u.d if only u (i.e. 1/10th precision)
+    if ($n1 < 10 && $count == 1) # get u.d if only u (i.e. 1/10th precision)
     { $n1 = int($num*10/$size)/10;
     }
     push(@dec, $n1, $ab);
