@@ -92,7 +92,7 @@ if [ $dodl ] && [ -n "$msg$editcmd" ]
 then
     case "$file" in /*) pwdpfx= ;; *) pwdpfx="`pwd`: " ;; esac
     dl=`echo "cvsedit $pwdpfx$file $editcmd: $msg" | entilde`
-    dl "$dl"
+    dlog "$dl"
 fi
 
 ( cd "$dir" || exit 1
