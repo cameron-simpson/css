@@ -4,12 +4,12 @@ needhost $HOMEHOST@home || exit 1
 
 hARCH=$ARCH
 
-[ $# -ge 1 ] || { echo "Usage: $0 [login@]hostname" >&2; exit 2; }
+[ $# = 1 ] || { echo "Usage: $0 [login@]hostname" >&2; exit 2; }
 host=$1; shift
 
 cd || exit 1
 set -x
-exec rsync -avCHP --delete \
+exec rsync -avHP --delete --exclude=CVS/ \
 	'--include=/.bash_logout' \
 	'--include=/.bash_profile' \
 	'--include=/.bashrc' \
@@ -20,10 +20,16 @@ exec rsync -avCHP --delete \
 	'--include=/.profile' \
 	'--include=/.secret' \
 	'--include=/.setvar' \
+	'--include=/.ssh' \
+	'--include=/.ssh/config' \
+	'--exclude=/.ssh/*' \
 	'--include=/.xinitrc' \
 	'--include=/.xsession' \
 	'--include=/.zshenv' \
+	'--include=/.zprofile' \
 	'--include=/bin' \
+	"--include=/bin/$hARCH" \
+	'--exclude=/bin/*' \
 	'--include=/rc' \
 	'--include=/rc/env' \
 	'--include=/rc/mail' \
@@ -40,19 +46,10 @@ exec rsync -avCHP --delete \
 	'--include=/rc/x11' \
 	'--exclude=/rc/*' \
 	'--include=/scripts' \
-	'--include=/there' \
-	'--include=/there/cameron@cskk.homeip.net' \
-	'--include=/there/cameron@cskk.homeip.net/bin' \
-	"--include=/there/cameron@cskk.homeip.net/bin/$hARCH" \
-	'--exclude=/there/cameron@cskk.homeip.net/bin/*' \
-	'--include=/there/cameron@cskk.homeip.net/scripts' \
-	'--include=/there/cameron@cskk.homeip.net/scripts/cs/' \
-	'--include=/there/cameron@cskk.homeip.net/scripts/stubs/' \
-	'--include=/there/cameron@cskk.homeip.net/scripts/synonyms/' \
-	'--exclude=/there/cameron@cskk.homeip.net/scripts/*/' \
-	'--exclude=/there/cameron@cskk.homeip.net/*' \
-	'--include=/there/home' \
-	'--exclude=/there/*' \
+	'--include=/scripts/cs/' \
+	'--include=/scripts/stubs/' \
+	'--include=/scripts/synonyms/' \
+	'--exclude=/scripts/*/' \
 	'--include=/var' \
 	'--include=/var/*/' \
 	'--exclude=/var/*/*' \
