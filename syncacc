@@ -54,6 +54,8 @@ exec \
 	'--include=/rc/less' \
 	'--include=/rc/lesskey' \
 	'--include=/rc/mail' \
+	'--include=/rc/mail/Mykefile' \
+	'--include=/rc/mail/cats*' \
 	'--include=/rc/mail/mailcap' \
 	'--include=/rc/mail/mutt*' \
 	'--include=/rc/mail/signature' \
