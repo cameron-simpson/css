@@ -1,0 +1,46 @@
+#!/bin/sh
+#
+
+INDEX=${INDEX-imindex}
+dflttarget="$INDEX.html"
+
+case "$1" in
+    -t)	dflttarget=$2; shift; shift ;;
+esac
+
+case $# in
+    0)	echo "Usage: $0 href [title]" >&2; exit 2 ;;
+    1)	href=$1 title=$1
+	base=`echo "$title" | sed -e 's://*$::' -e 's:.*/::' -e 's:_: :g'`
+	case "$base" in
+	    *\ *|[A-Z][a-z]*)	title=$base ;;
+	esac
+	;;
+    *)	href=$1; shift; title=$* ;;
+esac
+
+case "$href" in
+    file://localhost/*)	local=1 path=`expr "$href" : 'file:://localhost\(.*\)'` ;;
+    *://*)		local= ;;
+    *)			local=1 path=$href ;;
+esac
+
+if [ $local ]
+then
+    if [ -d "$path/." ]
+    then
+	if [ -s "$path/$INDEX.html" ]
+	then	target=$INDEX.html
+	else if [ -s "$path/$dflttarget" ]
+	     then   target=$dflttarget
+	     else   target=
+	     fi
+	fi
+	case "$href" in
+	    */)	href=$href$target ;;
+	    *)	href=$href/$target ;;
+	esac
+    fi
+fi
+
+echo "<A HREF=$href>$title</A>"
