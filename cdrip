@@ -84,17 +84,21 @@ cdtoc "$dev" \
 	  [ -n "$encpid" ] && kill -0 "$encpid" 2>/dev/null && echo "waiting for previous encoder ..."
 	  wait
 
-	  case $enc in
-	      ogg)
+	  ( if case $enc in
+		ogg)
 		  time oggenc -r -b $bps \
 			 -c "Ripped by $NAME with cdparanoia and oggenc on `date`" \
 			 -a "$artist" -N "$track" -t "$title" -l "$album" \
 			 -o "$out" "$raw"
 		  ;;
-	      mp3)
+		mp3)
 		  time lame -r -b "$bps" -h -p "$raw" "$out"
 		  ;;
-	  esac && rm "$raw" &
+	      esac
+	    then rm "$raw"
+	    else rm "$out"; exit 1
+	    fi
+	  ) &
 	  encpid=$!
       else
 	  echo "cdparanoia failed" >*2
