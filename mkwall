@@ -57,7 +57,7 @@ original=1
 case "$imagefile" in
   X:*|-|*:-|\|*)
     tmpf=${TMPDIR:-/tmp}/$cmd$$.png
-    trap 'rm -f "$tmpf"' 0 1 2 15
+    trap 'rm -f "$tmpf"' 0 1 2 13 15
     gm convert "$imagefile" -quality 0 "png:$tmpf" || exit 1
     imagefile=$tmpf
     ;;
