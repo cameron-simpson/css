@@ -5,20 +5,24 @@
 #
 
 cmd=$0
-usage="Usage: $cmd [-a] [-c] [files...]
+usage="Usage: $cmd [-a] [-c] [-cols] [files...]
 	-a	No anchors - don't mangle HTML to show URLs.
-	-c	Clean: run code through htclean."
+	-c	Clean: run code through htclean.
+	-cols	Use \"cols\" columns."
 
 mangle=1
 cols=
-clean=
+clean=1
 
 badopts=
 while :
 do
   case "$1" in
     -a)  mangle= ;;
+    +a)	 mangle= ;;
     -c)  clean=1 ;;
+    +c)	 clean= ;;
+    -[1-9]*) cols=`expr "x$1" : 'x-\(.*\)'` ;;
     --)  shift; break ;;
     -?*) echo "$cmd: unrecognised option: $1" >&2; badopts=1 ;;
     *)   break ;;
@@ -28,10 +32,19 @@ done
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
-cols=`ttysize|awk '{print$1}'`
+[ -n "$cols" ] || cols=`ttysize|awk '{print$1}'`
 [ -n "$cols" ] && cols="-cols $cols"
 
-detab ${1+"$@"} \
+if [ $# = 0 ]
+then  detab
+else  for file
+      do  case "$file" in
+	    -)				cat ;;
+	    http://* | ftp://* )	wcat "$file" ;;
+	    *)				cat "$file" ;;
+	  esac
+      done
+fi \
 | if [ $clean ]; then htclean; else cat; fi \
 | sed 's|</ *[Aa] *>|&|g' | tr '\015' '\012' \
 | if [ $mangle ]
