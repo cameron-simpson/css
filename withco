@@ -13,13 +13,27 @@
 #
 
 cmd=`basename "$0"`
-usage="Usage: $cmd [-f] module command [args...]
-	-f	Assume \"module\" is a file and thus use its parent directory."
+usage="Usage: $cmd [-f] [-r rev] module command [args...]
+	-f	Assume \"module\" is a file and thus use its parent directory.
+	-r rev	Checkout the specified revision."
 
 badopts=
 
 isfile=
-[ "x$1" = x-f ] && { isfile=1; shift; }
+coopts=
+
+while :
+do  case $1 in
+      -f) isfile=1 ;;
+      -r) coopts="$coopts $1 $2"; shift ;;
+      --) shift; break ;;
+      -?*)echo "$cmd: unrecognised option: $1" >&2
+	  badopts=1
+	  ;;
+      *)  break ;;
+    esac
+    shift
+done
 
 if [ $# = 0 ]
 then
@@ -48,11 +62,13 @@ trap '[ -z "$dir" ] || rm -rf "$dir"' 0 1 2 3 15
 dir=`mkdirn "${TMPDIR:-/tmp}/$cmd"` || exit 1
 
 ( cd "$dir" || exit 1
-  cvs co "$module" || exit 1
+  cvs -q co $coopts "$module" >&2 || exit 1
 ) || exit 1
 
 where=$dir/$module
 [ $isfile ] && where=`dirname "$where"`
 
+# we don't exec because the trap needs to run for tidy up
 "$command" "$where" ${1+"$@"}
+
 exit $?
