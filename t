@@ -109,6 +109,8 @@ view_image='xv $formopts /dev/fd/0'
 
 view_rcp='pilrcui $formopts /dev/fd/0'
 
+view_vrml='gtklookat /dev/fd/0'
+
 xit=0
 
 abort=
@@ -175,9 +177,10 @@ do  [ $abort ] && exit 1
 	      zip|exe)	format=zip ;;
 	      mpg|mpeg|mpe) format=mpg ;;
 	      vob)	format=vob ;;
-	      asf|mov|avi)	format=$cext ;;
 	      jpg|jpeg|png|gif|xbm|xpm)
 			format=image ;;
+	      asf|mov|avi)	format=$cext ;;
+	      wrl)	format=vrml ;;
 	      *)	case $b in
 			    cpiof*)	format=cpio ;;
 			    tarf*)	format=tar ;;
