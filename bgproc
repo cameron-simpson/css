@@ -1,0 +1,71 @@
+#!/bin/sh
+#
+# Background a command.
+# Copy output to a log.
+# Record the pid in a file.
+# NoHUP it.
+#	- Cameron Simpson <cs@zip.com.au> 25aug99
+# 
+
+cmd=`basename "$0"`
+
+CONSOLE=${CONSOLE:-$HOME/var/log/console}
+VARRUN=${VARRUN:-$HOME/var/run}
+export CONSOLE VARRUN
+
+input=/dev/null
+logfile=$CONSOLE
+pidfile=
+ignhup=1
+async=1
+
+usage="Usage: $cmd [-i input] [-l logfile] [-p pidfile] [-s] command [args...]"
+
+badopts=
+while :
+do  case $1 in
+      -i)	input=$2; shift ;;
+      -l)	logfile=$2; shift ;;
+      -p)	pidfile=$2; shift ;;
+      -s)	async= ;;
+      --)	shift; break ;;
+      -?*)	echo "$cmd: unrecognised option: $1" >&2
+		badopts=1
+		;;
+      *)	break ;;
+    esac
+    shift
+done
+
+if [ $# = 0 ]
+then
+    echo "$cmd: missing command" >&2
+    badopts=1
+fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+command=$1
+combase=`basename "$command"`
+
+[ -n "$logfile" ] || logfile=$combase@$HOST
+[ -n "$pidfile" ] || pidfile=$combase@$HOST
+
+case $logfile in -|/*) ;; *) logfile=$HOME/var/log/$logfile ;; esac
+case $pidfile in -|/*) ;; *) pidfile=$VARRUN/$pidfile ;; esac
+
+## echo "logfile=$logfile, pidfile=$pidfile"
+
+( [ "x$input" = x- ] || exec <"$input"
+  [ "x$logfile" = x- ] || exec >>"$logfile" 2>&1
+  [ $ignhup ] && trap '' 1
+  [ $async ] && trap '' 2
+  exec "$@"
+) &
+pid=$!
+
+( [ "x$pidfile" = x- ] || exec >>"$pidfile"
+  echo "$pid"
+)
+
+[ $async ] || wait
