@@ -144,5 +144,6 @@ cdtoc "$dev" \
 xit=$?
 
 eject "$dev"
+necho ''
 
 exit $xit
