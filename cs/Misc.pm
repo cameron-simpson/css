@@ -14,6 +14,7 @@ use cs::Math;
 package cs::Misc;
 
 ($::cmd=$0) =~ s:.*/::;
+$::warningContext=$::cmd;
 
 undef %cs::Misc::_used_package;
 sub ::need
@@ -192,6 +193,36 @@ sub editor(;$)
   $dflt='vi' if ! defined $dflt;
 
   defined $ENV{EDITOR} ? $ENV{EDITOR} : $dflt;
+}
+
+sub openr
+{ my($FILE,$path)=@_;
+
+  open( $FILE,
+	      ( $path =~ /\.gz$/
+		? "gunzip <'$path' |"
+		: $path =~ /\.Z$/
+		  ? "uncompress <'$path' |"
+		  : $path =~ /\.bz2$/
+		    ? "bunzip2 <'$path' |"
+		    : "< $path\0"
+	      )
+      );
+}
+
+sub openw
+{ my($FILE,$path)=@_;
+
+  open( $FILE,
+	      ( $path =~ /\.gz$/
+		? "| gzip -9 >'$path'"
+		: $path =~ /\.Z$/
+		  ? "| compress >'$path'"
+		  : $path =~ /\.bz2$/
+		    ? "| bzip2 -9 >'$path'"
+		    : "> $path\0"
+	      )
+      );
 }
 
 1;
