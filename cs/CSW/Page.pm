@@ -14,7 +14,7 @@ use cs::Web::CSW::Page;
 
 =head1 DESCRIPTION
 
-The cs::Web::CSW::Page module tracks the state of an active web page
+The cs::Web::CSW::Page module tracks the state of an active web page.
 
 =cut
 
@@ -82,6 +82,46 @@ Return the WINDOW_ID of this window.
 
 sub Id($)
 { shift->{REC}->{WINDOW_ID};
+}
+
+=item HistoryId()
+
+Return the HISTORY_ID of this window.
+
+=cut
+
+sub HistoryId($)
+{ shift{REC}->{HISTORY_ID};
+}
+
+=item HistoryObj()
+
+Return the B<cs::Web::CSW::History> object for this page.
+
+=cut
+
+sub HistoryObj($)
+{ cs::Web::CSW::History::byId(shift->Id());
+}
+
+=item UrlId()
+
+Return the URL_ID for this page.
+
+=cut
+
+sub UrlId($)
+{ shift->HistoryObj()->UrlId();
+}
+
+=item UrlObj()
+
+Return the B<cs::Web::CSW::Url> object for this page.
+
+=cut
+
+sub UrlObj($)
+{ shift->HistoryObj()->UrlObj();
 }
 
 =back
