@@ -19,21 +19,21 @@ case "$cmdpath" in
 	WEBPROXY=proxy:8080
 	;;
     /a/zapff/home/cameron/* | /a/ivie/home/cameron/* | /home/ivie/cameron/* | /a/spindler/home/*)
-	ARCH=linux.x86.linux
+	ARCH=redhat.x86.linux
 	SYSTEMID=cisra
 	HOME=/u/cameron
 	WEBPROXY=proxy:8080
 	PERL5LIB=/opt/perl/lib
 	;;
     /home/docs/www/web/*|/usr/local/misc/htdocs/*)
-	ARCH=linux.x86.linux
+	ARCH=redhat.x86.linux
 	SYSTEMID=cisra
 	HOME=/home/ivie/cameron
 	WEBPROXY=proxy:8080
 	PERL5LIB=/opt/perl/lib
 	;;
     /home[13]/cs/*)
-	ARCH=linux.x86.linux
+	ARCH=redhat.x86.linux
 	SYSTEMID=zip
 	HOME=/home1/cs
 	WEBPROXY=proxy:8080
