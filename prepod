@@ -5,10 +5,18 @@
 #	=image => HTML IMG tag
 #	=author 
 #	=modtime
+#	=keywords => discarded
 #
 #	- Cameron Simpson <cs@zip.com.au> 01jul2003
 #
 
+# unDOSify stuff
+s/$//
+
+# hide =keywords - handled by separate process
+/^=keywords/d
+
+# inline images
 /^=image/!b nimage
 s|^=image[ 	][ 	]*\(.*\)|=begin html\
 \
@@ -18,6 +26,8 @@ s|^=image[ 	][ 	]*\(.*\)|=begin html\
 b done
 
 :nimage
+
+# author details
 /^=author/!b nauthor
 s|^=author[ 	][	]*\(.*\)|=begin html\
 \
@@ -27,6 +37,8 @@ s|^=author[ 	][	]*\(.*\)|=begin html\
 b done
 
 :nauthor
+
+# modtime
 /^=modtime/!b nmod
 s|^=modtime[ 	][	]*\(.*\)|=begin html\
 \
