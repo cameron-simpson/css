@@ -1,0 +1,90 @@
+#!/bin/sh
+#
+# Look up the mairix indices of the specified folders,
+# report mairix-result folder path.
+#	- Cameron Simpson <cs@zip.com.au> 17mar2004
+#
+
+: ${MAILDIR:=$HOME/mail}
+
+cmd=`basename "$0"`
+usage="Usage: $cmd [folders... --] keywords..."
+
+badopts=
+
+if [ $# = 0 ]
+then  echo "$cmd: missing keywords" >&2
+      badopts=1
+fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+xit=0
+
+# create result folder
+res=`mkdirn "${TMPDIR:-/tmp}/mrx"` || exit 1
+
+# subdir
+subn=1
+
+# set up 
+{ exec 3>&1 1>&2
+  for folder in "$MAILDIR"/*
+  do
+    [ -d "$folder" ] || continue
+    ismhdir "$folder" || continue
+    db=$folder/.mairix.db
+    [ -f "$db" ] || { echo "$cmd: no index for $folder" >&2
+		      continue
+		    }
+    [ -s "$db" ] || continue
+
+    tmpres=$res/mrx$subn
+    mrxbase=.mrx$$
+    mrxhook=$folder/$mrxbase
+    {  mkdir "$tmpres" \
+    && ln -s "$tmpres" "$mrxhook" \
+    && mrx-mkrc -r "$mrxbase" "$folder" \
+    && ( necho "$folder: "; exec mairix -f "$folder/.mairixrc" "$@" ) \
+    && ( cd "$mrxhook" || exit 1
+	 exec >&3 3>&-
+	 pwd
+	 exec ls
+       )
+    } \
+    || xit=1
+
+    subn=`expr $subn + 1`
+  done
+} \
+| MRX_CMD=$0 MRX_RESULT=$res \
+  perl -e '$n=0;
+	   while (defined($_=<STDIN>))
+	   {
+	     chomp;
+	     if (-d $_)
+	     { if (defined $tmpdir)
+	       { unlink($tmpdir)
+		 || warn "$ENV{MRX_CMD}: unlink($tmpdir): $!\n";
+	       }
+	       $tmpdir=$_;
+	     }
+	     else
+	     { ++$n;
+	       $old="$tmpdir/$_";
+	       $new="$ENV{MRX_RESULT}/$n";
+	       rename($old,$new)
+	       || warn "$ENV{MRX_CMD}: rename($old,$new): $!\n";
+	     }
+	   }
+	   if (defined $tmpdir)
+	   { unlink($tmpdir)
+	     || warn "$ENV{MRX_CMD}: unlink($tmpdir): $!\n";
+	   }
+	  '
+
+mhdir "$res" || xit=1
+
+echo "$res"
+
+exit $xit
