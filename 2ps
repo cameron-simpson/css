@@ -12,7 +12,7 @@ me=$0
 cmd=`basename "$0"`
 usage="Usage: $cmd [-m medium] [-L] [-P] [-i itype] [-T title] [file]"
 
-a2ps_aspect=-R
+a2ps_aspect="-R --columns=1"
 
 title=
 badopts=
@@ -21,8 +21,8 @@ medium=A4
 while :
 do  case $1 in
 	-T)	title=$2; shift ;;
-	-L)	a2ps_aspect=-r ;;
-	-P)	a2ps_aspect=-R ;;
+	-L)	a2ps_aspect="-r --columns=1" ;;
+	-P)	a2ps_aspect="-R --columns=1" ;;
 	-m)	medium=$2; shift ;;
 	-i)	mtype=$2; shift
 		case "$mtype" in
