@@ -56,7 +56,7 @@ sub _new($$$$$$$)
     die "$0: dump with save set number \"$ssid\" already exists\n\tfrom @c\n\t";
   }
 
-  $D = $cs::Legato::Networker::Dump::_dumpInfo[$ssid]
+  $D = $cs::Legato::Networker::Dump::_dumpInfo{$ssid}
      = { cs::Legato::Networker::Dump::TAPES	=> [],
          cs::Legato::Networker::Dump::SSID	=> $ssid,
          cs::Legato::Networker::Dump::CLIENT	=> $client,
@@ -87,8 +87,8 @@ sub find($)
 
   ## my@c=caller;die"Dump::find(ssid=$ssid)\n\tfrom [@c]\n\t";
 
-  return undef if ! defined $cs::Legato::Networker::Dump::_dumpInfo[$ssid];
-  $cs::Legato::Networker::Dump::_dumpInfo[$ssid];
+  return undef if ! exists $cs::Legato::Networker::Dump::_dumpInfo{$ssid};
+  $cs::Legato::Networker::Dump::_dumpInfo{$ssid};
 }
 
 =back
