@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/usr/bin/perl -w
 #
 # Read permuted index, emit HTML table of citations.
 # The permuted index should be like that produced from htmlptx:
@@ -7,9 +7,49 @@
 #	- Cameron Simpson <cs@zip.com.au> 01dec2004
 #
 
-cmd=$0
-usage="Usage: $cmd <ptx >html"
+use strict qw(vars);
 
-echo "<TABLE>"
-awk '-F	' '{ print "<TR><TD ALIGN=LEFT>" $1 "<TD ALIGN=RIGHT>" $2 "<TD ALIGN=LEFT><A HREF=\"" $1 "#" $5 "\">" $3 "</A> " $4 }'
-echo "</TABLE>"
+use cs::Hier;
+use cs::HTML;
+
+my %byfile=();
+
+while (<>)
+{ chomp;
+  my($file,$left,$key,$right,$lineno)=split(/\t/);
+  $byfile{$file}={} if ! exists $byfile{$file};
+  my $F = $byfile{$file};
+
+  $F->{HITCOUNT}++;
+  push(@{$F->{HITS}},[$file,$left,$key,$right,$lineno]);
+}
+
+my @rows=();
+
+for my $file (reverse sort { $byfile{$a}->{HITCOUNT} <=> $byfile{$b}->{HITCOUNT} } keys %byfile)
+{
+  if (@rows) { push(@rows,[TR,[TD,{COLSPAN=>3},[HR]]]); }
+
+  my $F = $byfile{$file};
+  my @hits = @{$F->{HITS}};
+
+  my $first=1;
+  for my $hit (sort { $a->[4] <=> $b->[4] } @hits)
+  {
+    my @td=();
+    if ($first)
+    { push(@td,[TD,{ALIGN=>LEFT, VALIGN=>TOP, ROWSPAN=>scalar(@hits)},$hit->[0]]);
+    }
+    push(@td,[TD,{ALIGN=>RIGHT},$hit->[1]],
+	     [TD,{ALIGN=>LEFT},[A,{HREF=>"$hit->[0]#$hit->[4]"},$hit->[2]]," ",$hit->[3]],"\n");
+
+    ##my $tr = [TR,@td];
+    ##warn "row=".cs::Hier::h2a($tr,1);
+    push(@rows,[TR,@td]);
+    $first=0;
+  }
+}
+
+##warn "ALL ROWS:\n", cs::Hier::h2a(\@rows,1);
+
+print cs::HTML::tok2a([TABLE,@rows],"\n");
