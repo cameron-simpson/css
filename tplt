@@ -9,6 +9,8 @@ cmd=$0
 tpltdir=$HOME/rc/tplt
 
 FILE=$1
+case $FILE in /*) ;; *) FILE=`pwd`/$FILE ;; esac
+
 BASE=`basename "$FILE"`
 PFX=`expr "x$BASE" : 'x\(.*\)\..*'`
 FILEDIR=`dirname "$FILE"`
@@ -24,7 +26,9 @@ case $FILE in
 	PFX=`expr "x$FILEPATH" : 'x.*/scripts/\(.*\)/.*'`
 	;;
     /*/s/java/*)
-	JAVABASECLASS=au.com.zip.cs.`expr "x$FILEPATH" : 'x.*/s/java/\\(.*\\)/.*'|tr / .`
+	classtail=`expr "x$FILEPATH" : 'x.*/s/java/\\(.*\\)/.*'|tr / .`
+	JAVABASECLASS=au.com.zip.cs
+	[ -n "$classtail" ] && JAVABASECLASS=$JAVABASECLASS.$classtail
 	export JAVABASECLASS
 	;;
 esac
