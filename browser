@@ -60,7 +60,7 @@ esac
 ( set -x
   case "$HOST@$SYSTEMID" in
     kirsty@home) br=ff10 ;;
-    *)           br=ff08 ;;
+    *)           br=ff10 ;;	## ff08
   esac
   exec "$br" -width "$FULLX" -height "$PIX_HIGH" ${1+"$@"}
 ) &
