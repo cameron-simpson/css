@@ -5,25 +5,31 @@
 #	- Cameron Simpson <cs@zip.com.au> 16jun99
 #
 
-filepos=
+: ${TMPDIR:=/tmp}
 
 cmd=$0
-usage="Usage: $cmd [-0] [-1] [-end] file filter [filterargs...]
-	-0	Don't add the filename to the filter command (default).
-	-1	Add the filename as the first argument to the filter command.
-	-end	Add the filename as the last argument to the filter command."
+usage="Usage: $cmd [-v] [-s] [arg1-options...] [--] file filter [filterargs...]
+	arg1-options are as for the arg1 command."
+
+silent=
+[ -t 1 ] || silent=1
 
 badopts=
+
+diff=diff
+arg1opts=
 
 while :
 do
   case "$1" in
-    -0)		filepos= ;;
-    -1)		filepos=first ;;
-    -end)	filepos=end ;;
-    --)		shift; break ;;
-    -?*)	echo "$cmd: unrecognised option: $1" >&2; badopts=1 ;;
-    *)		break ;;
+    -v)	silent= ;;
+    -s)	silent=1 ;;
+    -[0-9]*|-end|-discard)
+	arg1opts="$arg1opts $1"
+	;;
+    --)	shift; break ;;
+    -?*)echo "$cmd: unrecognised option: $1" >&2; badopts=1 ;;
+    *)	break ;;
   esac
   shift
 done
@@ -36,58 +42,50 @@ else
     file=$1; shift
     if [ $# = 0 ]
     then
-	echo "$cmd: missing filter" >&2
+      echo "$cmd: missing filter" >&2
+      badopts=1
     fi
 fi
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
-tmp=/tmp/filter$$
-bak=/tmp/bak$$
+tmp=$TMPDIR/filter$$
+bak=$TMPDIR/bak$$
+trap 'rm -f "$tmp" "$bak"' 0 1 15
 
-case "$filepos" in
-    '')		;;
-    end)	set x "$@" "$file"; shift ;;
-    first)	zero=$1; shift; set x "$zero" "$file" ${1+"$@"}; shift ;;
-    *)		echo "$cmd: unsupported \$filepos \"$filepos\"" >&2; exit 1 ;;
-esac
-
-"$@" <"$file" >"$tmp" || { rm -f "$tmp"; exit $?; }
+arg1 $arg1opts -- "$file" "$@" <"$file" >"$tmp" || exit 1
 
 [ -s "$tmp" ] || { echo "$cmd: empty result, aborting" >&2
-		   rm -f "$tmp"
 		   exit 1
 		 }
 
 xit=0
 if cmp -s "$tmp" "$file"
 then
-    :
+  :
 else
-    if cp "$file" "$bak"
+  # changed; backup then overwrite
+  [ $silent ] || $diff "$file" "$tmp"
+  if cp "$file" "$bak"
+  then
+    if cat <"$tmp" >"$file"
     then
-	if cat <"$tmp" >"$file"
-	then
-	    rm "$bak"
-	else
-	    echo "$cmd: couldn't copy new content back onto $file" >&2
-	    if cat <"$bak" >"$file"
-	    then
-		echo "$cmd: restored original content from backup" >&2
-		rm "$bak"
-		exit 1
-	    else
-		echo "$cmd: can't restore content from backup; original content left in $bak" >&2
-		exit 1
-	    fi
-	fi
+	rm "$bak"
     else
-	echo "$cmd: can't backup $file, aborting" >&2
-	rm -f "$bak"
-	xit=1
+      echo "$cmd: couldn't copy new content back onto $file" >&2
+      if cat <"$bak" >"$file"
+      then
+	echo "$cmd: restored original content from backup" >&2
+	exit 1
+      else
+	echo "$cmd: can't restore content from backup; original content left in $bak" >&2
+	exit 1
+      fi
     fi
+  else
+    echo "$cmd: can't backup $file, aborting" >&2
+    xit=1
+  fi
 fi
-
-rm -f "$tmp"
 
 exit $xit
