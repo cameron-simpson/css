@@ -1,0 +1,42 @@
+#!/bin/sh
+#
+# Label the tty for the duration of a command, then restore.
+#	- Cameron Simpson <cs@zip.com.au> 25dec1999
+#
+# Add -a to append to existing label. - cameron 23mar2000
+# Make -a the default.	- cameron 12apr2000
+#
+
+usage="Usage: $0 [-exec] [{+|-}a] label command [args...]
+	-exec	Exec the subprocess, don't restore old label.
+	-a	Append the label to the current label (default).
+	+a	No append - use the label as is."
+
+nopush=
+[ "x$1" = x-exec ] && { nopush=1; shift; }
+
+append=1
+[ "x$1" = "x-a" ] && { append=1; shift; }
+[ "x$1" = "x+a" ] && { append=; shift; }
+
+[ $# -gt 1 ] || { echo "$usage" >&2; exit 2; }
+newlabel=$1; shift
+
+oldTTYLABEL=$TTYLABEL
+[ $append ] && newlabel=${TTYLABEL:-"${USER}/`tty`@$HOST ${PWD:-`pwd|entilde`}"}" $newlabel"
+
+ttylabel "$newlabel"
+
+if [ $nopush ]
+then
+    TTYLABEL=$newlabel
+    export TTYLABEL
+    exec "$@"
+fi
+
+TTYLABEL=$newlabel "$@"
+xit=$?
+
+ttylabel "$oldTTYLABEL"
+
+exit $xit
