@@ -1,0 +1,2 @@
+#!/bin/sh
+exec sundgadoom -3 ${1+"$@"}
