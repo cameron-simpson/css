@@ -212,21 +212,30 @@ sub Body
   $ds->Get();
 }
 
-sub ContentType
+=item ContentType(I<noparams>)
+
+Return the body for the B<Content-Type> header.
+If the optional I<noparams> is true,
+suppress the "B<;I<param>=I<value>>" suffices.
+
+
+=cut
+
+sub ContentType($;$)
 { my($this,$noParams)=@_;
   $noParams=0 if ! defined $noParams;
 
   my($cte)=$this->{TYPE}.'/'.$this->{SUBTYPE};
   if (! $noParams)
-	{ my($value);
-	  for my $param (sort keys %{$this->{TYPEPARAMS}})
-		{ $value=$this->{TYPEPARAMS}->{$param};
-		  $param=lc($param);
-		  $param =~ s/_/-/g;
+  { my($value);
+    for my $param (sort keys %{$this->{TYPEPARAMS}})
+    { $value=$this->{TYPEPARAMS}->{$param};
+      $param=lc($param);
+      $param =~ s/_/-/g;
 
-		  $cte.="; $param=\"$value\"";
-		}
-	}
+      $cte.="; $param=\"$value\"";
+    }
+  }
 
   $cte;
 }
