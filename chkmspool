@@ -1,0 +1,17 @@
+#!/bin/sh
+#
+# Locate mail files not starting with "From ". Used after a crash.
+#	- Cameron Simpson <cs@zip.com.au> 15jan98
+#
+
+mspool=/var/spool/mail
+
+cd "$mspool" || exit $?
+
+for f in [a-z]*
+do if [ -s "$f" ]
+   then  gotfrom=`grep -n '^From ' "$f" | grep '^1:' | wc -l`
+   else  gotfrom=1
+   fi
+   [ $gotfrom = 1 ] || echo "Problem with $f"
+done
