@@ -1,0 +1,32 @@
+#!/bin/sh
+#
+# Grab a clause from a Windows-style .ini file.
+#	- Cameron Simpson <cs@zip.com.au> 14jul2001
+#
+
+cmd=$0
+usage="Usage: $cmd clausename [files...]"
+
+[ $# = 0 ] && { echo "$0: missing clausename" >&2
+		echo "$usage" >&2
+		exit 2
+	      }
+
+clause=$1; shift
+
+exec sed -n 's/^[ 	][ 	]*//
+	     /^#/d
+	     /^$/d
+	     /^\['"$clause"'\]/b begin
+	     d
+	     :begin
+	     n
+	     :loop
+	     /^\[/q
+	     s/^[ 	][ 	]*//
+	     /^#/b begin
+	     /^$/b begin
+	     p
+	     n
+	     b loop' ${1+"$@"}
+	    
