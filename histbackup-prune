@@ -5,6 +5,8 @@
 #	- Cameron Simpson <cs@zip.com.au> 22jun2003
 #
 
+set -u
+
 trace=set-x
 pcnt=5
 onepass=1
@@ -77,7 +79,7 @@ ls -r \
 
       # remove a tree
       [ -n "$myperms" ] \
-	&& find "./$sudir" -type d ! -perm -700 -exec $trace chmod "$myperms+rwx" {} ';'
+	&& find "./$subdir" -type d ! -perm -700 -exec $trace chmod "$myperms+rwx" {} ';'
       $trace rm -r "./$subdir" || xit=1
 
       # abort if only trying once
