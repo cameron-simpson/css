@@ -99,11 +99,14 @@ sub check($)
 =item new cs::Lock (I<key>,I<maxtries>)
 
 Obtain a lock on the resource specified by I<key>.
-If I<maxtries> greater than zero,
+If I<maxtries> is greater than zero,
 try to take the lock that many times before failure
 (returning B<undef>).
 Successive attempts are separated by an increasing delay,
 up to a maximum.
+If I<maxtries> equals zero, try forever.
+If I<maxtries> is less than zero,
+return a lock obkject anyway (so that the current lock parameters may be queried).
 If not supplied,
 I<maxtries> defaults to zero.
 
@@ -116,14 +119,20 @@ sub new($$;$$)
 
   my $this;
 
-  if ($maxtries == 1)
+  if ($maxtries == 1 || $maxtries < 0)
   # the real work
   { $this = bless { KEY => $key,
 		    PATH => keypath($key),
 		    SILENT => $silent,
+		    TAKEN => 0,
 		  }, $class;
-    return $this if $this->_Take();
-    delete $this->{PATH};
+    if ($this->_Take())
+    { $this->{TAKEN}=1;
+      return $this;
+    }
+
+    return $this if $maxtries < 0;
+
     return undef;
   }
 
@@ -178,9 +187,26 @@ sub new($$;$$)
 
 sub DESTROY
 { my($this)=@_;
-  ! exists $this->{PATH}
-      || (system("/bin/rm -r '$this->{PATH}'")>>8) == 0
+
+  if ($this->Taken())
+  {
+    (system("/bin/rm -r '$this->{PATH}'")>>8) == 0
       || warn "$::cmd: rm -r $this->{PATH}: $!\n";
+
+    $this->{TAKEN}=0;
+  }
+}
+
+=item Taken()
+
+Return whether the lock was successfully obtained.
+This can only return false if the object was acquired
+with I<maxtries> less than zero and the lock already taken by someone else.
+
+=cut
+
+sub Taken($)
+{ return shift->{TAKEN};
 }
 
 sub _Take($)
@@ -241,6 +267,33 @@ sub Put($$;$)
 
   print INFO $info, "\n";
   close(INFO);
+}
+
+=item Get(I<base>)
+
+Retrieve the text stored in the record I<base>
+in the lock object.
+If not specified, I<base> defaults to "B<info>".
+
+=cut
+
+sub Get($;$)
+{ my($this,$base)=@_;
+  $base='info' if ! defined $base;
+
+  my $path = $this->Path();
+  my $file = "$path/$base";
+  if (! open(INFO,"< $file\0"))
+  { warn "$::cmd: cs::Lock::Get <- $file: $!\n";
+    return undef;
+  }
+
+  local($_);
+  $_=join('',<INFO>);
+  close(INFO);
+  chomp;
+
+  return $_;
 }
 
 =back
