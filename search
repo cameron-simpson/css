@@ -1,0 +1,63 @@
+#!/bin/sh
+#
+# Search a web index via my multiway CGI script.
+#	- Cameron Simpson <cs@zip.com.au> 10may1997
+#
+
+case $SYSTEMID in
+    cisra)	serv=web
+		user=cameron
+		cgibin="~$user/cgi-bin/" ;;
+    *)		serv=cgi.zipworld.com.au
+    		user=cs
+    		cgibin="$user/" ;;
+esac
+cgibase="http://$serv/$cgibin"
+cgi="${cgibase}search.cgi"
+
+cmd=`basename "$0"`
+
+query=`echo "$*"|sed 's/+/%2b/g
+		      s/&/%26/g
+		      s/[ 	][ 	]*/+/g'`
+[ -n "$query" ] || query=`xcut -p`
+
+target=$cmd
+case "$cmd" in
+    aarn)	[ $# = 0 ] && exec us http://mirror.aarnet.edu.au/ ;;
+    search)	target=$1; shift ;;
+    av)		target=altavista ;;
+    trans)	target=systranslinks ;;
+    babel)	target=babelfish ;;
+    nlight)	target=northernlight ;;
+    raging)	target=avraging ;;
+    avsubmit)	target=altavistasubmit ;;
+    dj)		target=googledj ;;
+    deja)	target=dejanews ;;
+    djid)	exec us `msgid2dj ${1+"$@"}` ;;
+    avim|im)	target=avimagesearcher ;;
+    gim)	target=googleimagesearch ;;
+    rpmfind)	target=speakeasy-rpmfind ;;
+    fsu)	target=findsameurl ;;
+    fst)	target=findsametext ;;
+    yp)		target=yellowpages ;;
+    mcrawl)	target=metacrawler ;;
+    imdb-actor)	target=movieactors ;;
+    imdb-title)	target=movietitles ;;
+    imdb-character-male) target=moviecharmale ;;
+    imdb-character-female) target=moviecharfemale ;;
+    tv)         target=sofcomtv ;;
+    movie)	exec us "http://www.cinema.pgh.pa.us/movie/reviews?$query" ;;
+    pagescour)	exec us "${cgibase}htclean.cgi/$query" ;;
+    urlsubmit)	avsubmit ${1+"$@"} &
+		googlesubmit ${1+"$@"} &
+		wait
+		exit 0
+		;;
+esac
+
+query=`echo "$*"|sed 's/+/%2b/g
+		      s/&/%26/g
+		      s/[ 	][ 	]*/+/g'`
+
+us +c "$cgi?engine=$target&query=$query"
