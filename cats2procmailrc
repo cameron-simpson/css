@@ -385,7 +385,7 @@ while (<STDIN>)
   }
   print "{\n";
 
-  if ($::FolderDups && $deliver !~ /^\!/)
+  if ($::FolderDups && defined($lockfile) && $deliver !~ /^\!/)
   {
     my $cache = ( $type eq MH || $type eq MAILDIR
 		? "$ENV{MAILDIR}/$folder/.msgid.cache"
