@@ -1,0 +1,52 @@
+#!/bin/sh
+#
+# Fetch the last tcpdump log from del and graph usage.
+#	- Cameron Simpson <cs@zip.com.au> 07may99
+#
+
+sniffer=del
+logdir=/var/log/sensor
+
+tmp=/tmp/tcplog.$$
+
+nflag=-n
+count=10000000
+
+case $1 in [0-9]*) count=$1; shift;; esac
+
+if [ -t 0 ]
+then
+    echo "fetching data from $sniffer..."
+    ssh -o 'compression no' "$sniffer" \
+	   " set -vx;cd $logdir
+	  "' lastlog=`ls -dt tcp.*.gz|sed 1q`
+	     cat "$lastlog"' \
+    | gunzip \
+    | tcpdump $nflag -e -r - \
+    | gzip -v -9 > logdata.gz
+
+    ls -ld logdata.gz
+    exec <logdata.gz
+fi
+
+[ $# = 0 ] && set FROMTO TO FROM TOETH FROMETH SIZE
+
+echo "decompressing data..."
+gunzip | tcplog2generic | sed "${count}q" >$tmp
+
+for category
+do  echo "$category..."
+    case $category in
+	FROM)		field=1 ;;
+	TO)		field=2 ;;
+	FROMTO)		field=CLASS ;;
+	FROMETH)	field=3 ;;
+	TOETH)		field=4 ;;
+	*)		field=$category ;;
+    esac
+    logtally "$field" <"$tmp" >"$category.gif"
+done
+
+rm $tmp
+
+wait
