@@ -1,0 +1,46 @@
+#!/bin/sh
+#
+# Run command with output redirected to self-named log file.
+#	- Cameron Simpson <cs@zip.com.au> 15dec2000
+#
+
+usage="Usage: $0 [-a] command [args...]"
+
+log=
+async=
+fresh=
+
+badopts=
+while :
+do  case $1 in
+        -a)	async=1 ;;
+	-f)	fresh=1 ;;
+	-l)	log=$2; shift ;;
+	--)	shift; break ;;
+	-?*)	echo "$0: $1: unrecognised option" >&2; badopts=1 ;;
+	*)	break ;;
+    esac
+    shift
+done
+
+if [ $# = 0 ]
+then
+    echo "$0: missing command" >&2
+    badopts=1
+else
+    log=${log:-`basename "$1"`}
+fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+# full path to log file
+case "$log" in /*) ;; *) log=$HOME/var/log/$log ;; esac
+
+[ -s "$log" -a -n "$fresh" ] && logroll +datecode "$log"
+
+if [ $async ]
+then
+    "$@" </dev/null >>"$log" 2>&1 &
+else
+    exec "$@" >>"$log" 2>&1
+fi
