@@ -8,13 +8,13 @@ require 'getopts.pl';
 use cs::Net::TCP;
 
 ($cmd=$0) =~ s:.*/::;
-$usage="Usage: $cmd [-io] [-p localport | -P localport] host port
+$usage="Usage: $cmd [-io] [-p localport | -P localport] [-l logbase] host port
 	-i	Copy in; copy from the connection to stdout.
 	-o	Copy out; copy stdin to the connection.
 	-p	Bind local end of connection to specified port.
 	-P	Bind local end of connection to specified port,
 		or the next free one above that.
-       $cmd -a [-io1] port command [args]
+       $cmd -a [-io1] [-l logbase] port command [args]
 	-a	Accept connections on the given port.
 	-1	Accept only the first connection.
 ";
@@ -23,12 +23,14 @@ $badopts=0;
 
 $localport=0;
 $firstfree=0;
+undef $logto;
 
-Getopts('a1iop:P:') || ($badopts=1);
+Getopts('a1iop:P:l:') || ($badopts=1);
 $accmode=$opt_a;
 $onceonly=$opt_1;
 $copyin =($opt_i || !$opt_o);
 $copyout=($opt_o || !$opt_i);
+$logto=$::opt_l if defined $::opt_l;
 if ($opt_p)	{ $localport=$opt_p; $firstfree=0; }
 elsif ($opt_P)	{ $localport=$opt_P; $firstfree=1; }
 
@@ -68,6 +70,11 @@ else
 
 die $usage if $badopts;
 
+if (defined $logto)
+{ open(LOGOUT,"> $logto.out") || die "$::cmd: can't write to $logto.out: $!\n";
+  open(LOGIN ,"> $logto.in" ) || die "$::cmd: can't write to $logto.in: $!\n";
+}
+
 if ($accmode)
 # supply service
 { my $this = new cs::Net::TCP $port;
@@ -93,13 +100,18 @@ if ($copyout)
 # parent, read stdin
 { COPYOUT:
   while (defined ($_=<STDIN>))
-  { $CONN->Put($_);
+  { print LOGOUT $_ if defined $logto;
+    $CONN->Put($_);
     $CONN->Flush() if -t STDIN;
   }
 }
 else
 # child, copy to stdout
-{ print while (defined ($_=$CONN->Read()) && length);
+{ while (defined ($_=$CONN->Read()) && length)
+  {
+    print LOGIN $_ if defined $logto;
+    print;
+  }
 }
 
 exit 0;
