@@ -60,7 +60,7 @@ perlfunc='$_=shift;
           s/\s+/ /g;
           $_=substr($_,$[,79) if length > 79;
           print'
-label=`perl -e "$perlfunc" "$*"`
+label=`perl -e "$perlfunc" -- "$*"`
 
 ttylabel=
 [ -n "$_start_title" ] && ttylabel=$ttylabel$_start_title$label$_end_title
