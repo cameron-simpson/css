@@ -10,7 +10,7 @@ cvslog2html - transcribe CVS logs to HTML or plain text
 
 =head1 SYNOPSIS
 
-cvslog2html [-t] [-O] [{cvs-log-args...|-}]
+cvslog2html [{-D date|-r rev}] [-t] [-O] [{cvs-log-args...|-}]
 
 =head1 DESCRIPTION
 
@@ -44,6 +44,11 @@ Obfuscate email addresses.
 Intended for things which are to be published on the web
 as a defense against address harvesting spiders.
 
+=item B<-r> I<rev>
+
+Passed to I<cvs>.
+Produce the log since revision I<rev>.
+
 =item B<-t>
 
 Text mode - write plain text instead of HTML.
@@ -54,9 +59,11 @@ Text mode - write plain text instead of HTML.
 
 $TextMode=0;
 $ObfuscateEmail=0;
-getopts("tO") || die "$::cmd: bad options\n";
+$cvsopts='';
+getopts("r:tO") || die "$::cmd: bad options\n";
 $TextMode=1 if defined $::opt_t;
 $ObfuscateEmail=1 if defined $::opt_O;
+$cvsopts="$cvsopt -r$::opt_r" if defined $::opt_r;
 
 =back
 
