@@ -4,6 +4,8 @@
 #	- Cameron Simpson <cs@zip.com.au> 23jun98
 #
 
+sendmail=/usr/sbin/sendmail
+
 cmd=$0
 usage="Usage: $cmd [-s subject] addresses..."
 
@@ -25,4 +27,4 @@ case $1 in -s)	subject="Subject: $2"; shift; shift ;; esac
   [ -n "$subject" ] && echo "$subject"
   echo
   exec cat
-) | smtpsend "$@"
+) | $sendmail -oi "$@"
