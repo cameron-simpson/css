@@ -1,0 +1,2 @@
+#!/bin/sh
+urlshow "http://dev.perl.org/rfc/$1.html" &
