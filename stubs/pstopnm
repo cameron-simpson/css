@@ -1,0 +1,59 @@
+#!/bin/sh
+#
+# Wrapper for pstopnm which has the courtesy to act as a pipe.
+#	- Cameron Simpson <cs@zip.com.au> 07may97
+#
+
+opts=
+while :
+do
+    case $1 in
+	--)	shift; break ;;
+	-forceplain|-help|-nocrop|-pbm|-pgm|-ppm|-verbose|-portrait|-landscape)
+		opts="$opts $1" ;;
+	-llx|-lly|-urx|-ury|-xborder|=xmax|-xsize|-yborder|-ymax|-ysize)
+		opts="$opts $1 $2"; shift ;;
+	-?*)	opts="$opts $1" ;;
+	*)	break ;;
+    esac
+    shift
+done
+
+[ $# = 0 ] && { set x -; shift; }
+psfile=$1; shift
+
+tmp=
+case $psfile in
+    -)	tmpbase=/tmp/pstopnm.$$
+	tmp=$tmpbase.ps
+	cat >$tmp || { rm -f $tmp
+		       echo "$0: can't save stdin to $tmp" >&2
+		       exit 1
+		     }
+	psfile=$tmp
+	;;
+    *)	[ ! -r "$psfile" -a -r "$psfile.ps" ] && psfile=$psfile.ps
+	;;
+esac
+
+$REAL/pstopnm $opts "$psfile" ${1+"$@"}
+xit=$?
+
+# read from stdin ==> write to stdout
+[ -n "$tmp" ] && { if [ -s "${tmpbase}001.ppm" ]
+		   then
+		       cat "${tmpbase}001.ppm" || xit=$?
+		       if [ -s "${tmpbase}002.ppm" ]
+		       then
+			   echo "$0: warning: extra pages" >&2
+			   ls -ld $tmpbase[0-9][0-9][0-9].ppm >&2
+		       else
+			   rm -f ${tmpbase}001.ppm
+		       fi
+		   else
+		       xit=1
+		   fi
+		   rm -f "$tmp"
+		 }
+
+exit $xit
