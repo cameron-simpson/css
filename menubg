@@ -4,6 +4,8 @@
 #	- Cameron Simpson <cs@zip.com.au> 18oct2002
 #
 
+: ${TMPDIR:=/tmp}
+
 cmd=`basename "$0"`
 call="$0 $*"
 
@@ -68,7 +70,7 @@ fi
 
 if [ $domenu ]
 then
-    tmpf=/tmp/menubg$$
+    tmpf=$TMPDIR/menubg$$
     for arg
     do  echo "$arg"
     done >"$tmpf"
@@ -109,7 +111,7 @@ case "$bright,$imagefile" in
 	;;
 esac
 
-tmpf=${TMPDIR:-/tmp}/$cmd$$.png
+tmpf=$TMPDIR/$cmd$$.png
 gm convert - -geometry '200x>' png:- <"$imagefile" >"$tmpf" || exit 1
 
 set -x
