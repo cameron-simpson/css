@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 #
 # Process MIME base64 encoded data.
-#	- Cameron Simpson <cameron@research.canon.com.au> 25jul1996
+#	- Cameron Simpson <cs@zip.com.au> 25jul1996
 #
 # Bugs: Needs text-mode to make CR-LF <=> LF. Ugh!
 #
