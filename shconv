@@ -74,6 +74,12 @@ do  if [ "x$f" = x- ]
 
     ( exec <"$f"		# abort if open fails
       exec >"$newfile"
-      $trace sh -c "$shellcmd" || { rm "$newfile"; exit 1; }
+      if $trace sh -c "$shellcmd"
+      then
+	  rm "$f"
+      else
+	  rm "$newfile"
+	  exit 1
+      fi
     ) || xit=1
 done
