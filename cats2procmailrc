@@ -120,6 +120,10 @@ The I<pattern> selects the mail items.
 
 =head2 Example Patterns
 
+Firstly, the special pattern "B<.>" always matches.
+It's intended as a placeholder for ``continue'' rules that should always fire,
+typically to feed every mail item to a program.
+
 The usual form is simply an address (see RFC822 and RFC2822)
 to be present in the B<To>, B<CC> or B<BCC> header lines.
 If the address string lacks an at ("@") then an at ("@")
@@ -255,6 +259,7 @@ while (<STDIN>)
   chomp;
   s/^\s+//;
   s/^#.*//;
+  s/\s+$//;
   next CAT if ! length;
 
   # VARIABLE=value
@@ -300,7 +305,7 @@ while (<STDIN>)
   }
 
   # we expect "mailbox tag rule"
-  if (! /^(\S+)\s+(\S+)\s+(\S.*\S)/)
+  if (! /^(\S+)\s+(\S+)\s+(\S.*)/)
   { warn "$::cmd: stdin, line $.: bad line: $_\n";
     next CAT;
   }
@@ -309,22 +314,28 @@ while (<STDIN>)
   $folder='attn' if $folder eq '.';
 
   my @hdrs;
-  if ($ptn =~ /^(\w[-,\w]*):/)
-  { $ptn=$';
-    @hdrs=split(/,+/, $1);
+  if ($ptn eq '.')
+  { undef $ptn;
   }
   else
-  { @hdrs=('to','cc','bcc');
-  }
+  {
+    if ($ptn =~ /^(\w[-,\w]*):/)
+    { $ptn=$';
+      @hdrs=split(/,+/, $1);
+    }
+    else
+    { @hdrs=('to','cc','bcc');
+    }
 
-  if ($ptn =~ m:^/(.*)/?$:)
-  { $ptn=$1;
-  }
-  else
-  { $ptn.="\@.*(".join('|',@::DfltDom).")" if $ptn !~ /\@/;
-  }
+    if ($ptn =~ m:^/(.*)/?$:)
+    { $ptn=$1;
+    }
+    else
+    { $ptn.="\@.*(".join('|',@::DfltDom).")" if $ptn !~ /\@/;
+    }
 
-  $ptn =~ s/\.[^*]/\\$&/g;
+    $ptn =~ s/\.[^*]/\\$&/g;
+  }
 
   my $hregexp = '('.join('|',@hdrs).')';
 
@@ -349,12 +360,11 @@ while (<STDIN>)
 
   $flags=($deliver =~ /^\|/ ? "w" : "");
 
-  print <<X
-: 0$cont
-* ^$hregexp:.*$ptn
-{
-X
-  ;
+  print ": 0$cont\n";
+  if (defined($ptn))
+  { print "* ^$hregexp:.*$ptn\n";
+  }
+  print "{\n";
 
   if ($doalert)
   { my $alertfn = $::DfltAlert;
