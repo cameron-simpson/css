@@ -22,8 +22,9 @@
 : ${XPLANETDIR:=$HOME/.xplanet}
 : ${XPLANETIMPATH:=$XPLANETDIR/images}
 : ${XPLANETOPTS:=-window}	# vs -transparency
+: ${XPLANETCONFIG:=$XPLANETDIR/config}
 
-config=$XPLANETDIR/config
+config=$XPLANETCONFIG
 stars=sun
 planets='mercury venus earth mars jupiter saturn uranus neptune pluto'
 moons='moon
@@ -38,8 +39,8 @@ cmd=`basename "$0"`
 usage="Usage: $cmd [xplanet-options...] [config=value...]
 	xplanet-options	Passed to xplanet.
 	config=value	Config options as for an xplanet config file.
-			Added to the clause named by the most recent -body
-			or -target. Prior, to the [default] clause."
+			Added to the clause named by the most recent -body,
+			-target or -clause. Initially, to the [default] clause."
 
 trap 'rm -f "$TMPDIR/$cmd$$".*' 0 15
 
@@ -119,6 +120,8 @@ do
     # =head2 Configuration File Directives
     #
     # I<xpl> takes a copy of your configuration file
+    # (specified by the environment variable B<$XPLANETCONFIG>,
+    # defaulting to B<$XPLANETDIR/config>)
     # and applies command line settings to it,
     # then runs I<xplanet> with this amended copy.
     # Generally, any command line argument of the form:
@@ -206,16 +209,37 @@ do
     #
     -o|-output)	xplopts="$xplopts -output "`shqstr "$2"`
 		winmode=1
+		xplmode=
 		shift
 		;;
     -transpng)	xplopts="$xplopts -transpng "`shqstr "$2"`
 		winmode=1
 		shift
 		;;
+    # =item B<-g> I<geom>
+    #
+    # Converted into "B<-geometry> I<geom>" and passed to I<xplanet> 
+    # with the same extended functionality as B<-geometry>, below.
+    #
+    # =item B<-geometry> I<geom>
+    #
+    # Passed to I<xplanet>.
+    # Additionally the value "B<screen>" for I<geom>
+    # will use the preferred screen backdrop size
+    # as returned by the I<bgsize> script.
+    # This is handy when using I<xpl> to make screen backdrop images.
+    #
     -g|-geometry)
-		dx=`expr "x$2" : 'x\([1-9][0-9]*\)x.*'`
-		dy=`expr "x$2" : 'x[1-9][0-9]*x\([1-9][0-9]*\).*'`
-		xplopts="$xplopts -geometry "`shqstr "$2"`
+		case "$2" in
+		  screen)
+		    eval `bgsize -v`
+		    ;;
+		  *)		
+		    dx=`expr "x$2" : 'x\([1-9][0-9]*\)x.*'`
+		    dy=`expr "x$2" : 'x[1-9][0-9]*x\([1-9][0-9]*\).*'`
+		    ;;
+		esac
+		xplopts="$xplopts -geometry "`shqstr "${dx}x${dy}"`
 		shift
 		;;
     # =item B<-bg> I<image>
@@ -292,14 +316,19 @@ do
 		xplopts="$xplopts "`shqstr "$1" "$2"`
 		shift
 		;;
+    # =item B<-root>
+    #
+    # Don't use the B<-vroot>|B<-xscreensaver>, B<-window> or B<-output> modes;
+    # handy if you've put such a mode in your B<$XPLANETOPTS> variable
+    # (which I do to avoid damaging my root backdrop by accident).
+    #
     -root)	xplmode= winmode= ;;
     -window)	xplmode=$1 winmode=1 ;;
     -vroot|-xscreensaver)
 		xplmode=$1 winmode= ;;
     -fork|-gmtlabel|-label|-interpolate_origin_file|-light_time \
     	|-make_cloud_maps|-pango|-print_ephemeris|-random|-save_desktop_file \
-    	|-tt|-timewarp|-transparency|-utclabel|-version|-vroot|-window \
-    	|-xscreensaver)
+    	|-tt|-timewarp|-transparency|-utclabel|-version)
 		xplopts="$xplopts "`shqstr "$1"` ;;
     -[a-z]*)	xplopts="$xplopts "`shqstr "$1" "$2"`; shift ;;
     # =back
@@ -317,21 +346,15 @@ then
   then
     if [ $winmode ]
     then dx=512 dy=512
-    else dx=${X11_BGX:-"$X11_X"}
-	 dy=${X11_BGY:-"$X11_Y"}
-	 [ -n "$dx" ] \
-	 || { eval `xinfo`
-	      dx=$xinfo_screen0_x
-	      dy=$xinfo_screen0_y
-	    }
+    else eval `bgsize -v`
     fi
   fi
-  bgim=`mkwall -g "${dx}x${dy}" "$bgim"` \
+  bgim=`set -x; mkwall -g "${dx}x${dy}" "$bgim"` \
   && lastvalue xplanetbg "$bgim"
 fi
 
 ##cat $tmpconfig
-eval "set -x; xplanet -config \"\$tmpconfig\" $xplmode $xplopts"
+eval "(set -x; exec xplanet -config \"\$tmpconfig\" $xplmode $xplopts)"
 
 exit $?
 
@@ -341,6 +364,9 @@ exit $?
 #
 # $XPLANETDIR, where configuration files are expected.
 # Default: C<$HOME/.xplanet>.
+#
+# $XPLANETCONFIG, the default base configuration.
+# Default: C<$XPLANETDIR/config>.
 #
 # $XPLANETOPTS, default I<xpl> options prefixed to the command line.
 #
