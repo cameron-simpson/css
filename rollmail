@@ -11,8 +11,9 @@ cmd=`basename "$0"`
 archdir=${MAILDIR:-$HOME/private/mail}/ARCHIVED
 delay=14
 
-usage="Usage: $cmd [-d archdir] dirs...
-	-d archdir	Where to put archives. Default: $archdir."
+usage="Usage: $cmd [-d archdir] [delay] dirs...
+	-d archdir	Where to put archives. Default: $archdir
+	delay		Age of items to archive in days. Default: $delay"
 
 case $1 in
     -d)	archdir=$2; shift; shift ;;
