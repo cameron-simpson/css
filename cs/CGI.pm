@@ -361,7 +361,6 @@ sub SelfQuery($;$)
   ? $this->FullURL()."?"._qsEncode($q)
   : $this->FullURL();
 }
-# return PATH_INFO string, or components if in array context
 
 =item PathInfo($)
 
