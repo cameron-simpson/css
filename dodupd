@@ -1,0 +1,30 @@
+#!/bin/sh
+
+eval "`setvar -n DoD`"
+
+cd $DoD || exit $?
+
+fix=$DoD/fix.sed
+list=$DoD/list
+new=$list.`daycode`
+raw=$new.raw
+fixes=$new.fixes
+old=$new-pre
+
+>>$list	# ensure it exists
+cp $list $old || exit $?
+
+dod | tee $raw | sed -f fix.sed > $new
+diff -c $raw $new > $fixes
+
+lines=`wc -l < $new | sed 's/^ *//'`
+if [ "$lines" -lt 100 ]
+then
+	echo "$new too short (only $lines lines)" >&2
+	ls -ld $new
+else
+	cat $new > $list && rm $new $raw
+	{ diff -c $old $list && rm $old; } \
+		| grep -v '^No differences encountered$' \
+		| mailif -s '$list diffs' cameron
+fi
