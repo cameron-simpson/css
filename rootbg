@@ -36,7 +36,8 @@ if [ $# -gt 0 ] && [ -s "$1" ] && [ ! -d "$1/." ]
 then
     imagefile=$1; shift
 else
-    imagefile=`BGPATH=$WALLPAPER bglist -r -n 1 -w ${1+"$@"}`
+    # used to use BGPATH=$WALLPAPER - possibly redundant
+    imagefile=`bglist -r -n 1 -w ${1+"$@"}`
     [ -n "$imagefile" ] && [ -s "$imagefile" ] || exec xsetroot -solid black
 fi
 
