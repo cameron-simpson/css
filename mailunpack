@@ -5,6 +5,14 @@
 #	- Cameron Simpson <cs@zip.com.au> 03dec2001
 #
 
+cmd=$0
+usage="Usage: $cmd [-d unpackdir] key [command [args...]] <mailitem
+	-d unpackdir		Specify unpack base directory.
+	command [args...]	Command to run.
+				Default: basedir/autoexec.sh if present."
+
+[ "x$1" = x-d ] && { MAILUNPACKDIR=$2; shift; shift; }
+
 key=in
 [ $# = 0 ] || { key=$1; shift; }
 
@@ -12,5 +20,12 @@ base=${MAILUNPACKDIR:-$HOME/incoming}/$key
 
 dl=`mkdirn "$base/"` || exit 1
 cd "$dl" || exit 1
+
 munpack || exit 1
-[ ! -s "$base/autoexec.sh" ] || exec /bin/sh "$base/autoexec.sh" "$key"
+
+if [ $# = 0 ]
+then
+    [ ! -s "$base/autoexec.sh" ] || exec /bin/sh "$base/autoexec.sh" "$key"
+fi
+
+exec "$@" "$key"
