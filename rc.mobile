@@ -9,9 +9,10 @@
 #
 
 cmd=$0
-usage="Usage: $cmd {start|stop|restart}"
+usage="Usage: $cmd [-n] {start|stop|restart}"
 
 trace=set-x
+[ "x$1" = x-n ] && { trace=echo; shift; }
 
 LC_ALL=C
 PATH=$PATH:/sbin:/opt/css/bin
@@ -79,50 +80,68 @@ fi
 
 doclause()
 {
-  clause=$1
-  winclause "$cf" "$clause" \
-  | sed -e 'y/	/ /' \
-	-e 's/^  *//' \
-	-e '/^#/d' \
-	-e '/^$/d' \
-  | while read op etc
-    do
-      case "$op" in
-	[a-zA-Z]*=*)
-		eval "$op"
-		;;
-	/*/)	from=`expr "x$from" : 'x\(.*\)/'`
-		for d in $from.$where $from.DFLT
-		do  [ -d "$d/." ] && { from=$d; break; }
-		done
-		if [ -d "$from/." ]
-		then
-		  if [ -d "$to/." ] || mkdir "$to"
-		  then
-		    $trace rsync -aH "$from/." "$to/."
-		  fi
-		fi
-		;;
-	/*)	from=/dev/null
-		for f in $op.$where $op.DFLT
-		do  [ -f "$f" ] && { from=$f; break; }
-		done
-		to=$op
+  for clause
+  do
+    winclause "$cf" "$clause" \
+    | sed -e 'y/	/ /' \
+	  -e 's/^  *//' \
+	  -e '/^#/d' \
+	  -e '/^$/d' \
+    | while read op etc
+      do
+	if [ "x$op" = xuse ]
+	then
+	  doclause $etc
+	else
+	  echo "$op $etc"
+	fi
+      done
+  done
+}
+
+doops()
+{
+  while read op etc
+  do
+    case "$op" in
+      [a-zA-Z]*=*)
+	      eval "$op"
+	      ;;
+      /*/)    to=`expr "x$op" : 'x\(.*\)/'`
+	      from=
+	      for d in $from.$where $from.DFLT
+	      do  [ -d "$d/." ] && { from=$d; break; }
+	      done
+	      if [ -n "$from" ]
+	      then
+		$trace rsync -aH "$from/." "$to/."
+	      else
+		echo "no master dir @$where for $to" >&2
+	      fi
+	      ;;
+      /*)     to=$op
+	      from=
+	      for f in $to.$where $to.DFLT
+	      do  [ -f "$f" ] && { from=$f; break; }
+	      done
+	      if [ -n "$from" ]
+	      then
 		$trace cp -p "$from" "$to"
-		;;
-	\!*)	shcmd=`expr "x$op $etc" : 'x.\(.*\)'`
-		$trace /bin/sh -c "$shcmd"
-		;;
-	use)	doclause "$etc"
-		;;
-	svc)	bgsvc $etc
-		;;
-	need)	needsvc $etc
-		;;
-	*)	echo "$cmd: unrecognised operator \"$op\": $op $etc" >&2
-		;;
-      esac
-    done
+	      else
+		echo "no master file @$where for $to" >&2
+	      fi
+	      ;;
+      \!*)	shcmd=`expr "x$op $etc" : 'x.\(.*\)'`
+	      $trace /bin/sh -c "$shcmd"
+	      ;;
+      svc)    bgsvc $etc
+	      ;;
+      need)   needsvc $etc
+	      ;;
+      *)      echo "$cmd: unrecognised operator \"$op\": $op $etc" >&2
+	      ;;
+    esac
+  done
 }
 
 bgsvc()
@@ -171,5 +190,4 @@ wait4pid()
   done
 }
 
-doclause GLOBAL
-doclause "$where"
+doclause GLOBAL "$where" | doops
