@@ -17,7 +17,7 @@ cats2procmailrc [B<-a> I<alert>] [B<-m> I<maildomain>] [B<-t> I<type>] E<lt>cate
 I<cats2procmailrc> reads a human friendly mail category description file
 and emits a matching procmail(1) recipe to implement it.
 The intent it to have an extremely succinct file
-of easily editable rules.
+of easily editable one line rules.
 
 I build my B<.procmailrc> with the following myke(1) rule:
 
@@ -69,6 +69,7 @@ and not abort processing.
 
 A leading exclaimation mark (B<'!'>) means that mail items matching this rule
 should generate an alert.
+The alert can be any action you desire; see the B<-a> option.
 For me, this means a single line summary of the mail item
 appears in yellow in a small log window
 I have at the top of my screen for mail items I should read I<now>.
