@@ -12,10 +12,12 @@ if (!@ARGV)
 
 $xit=0;
 
+$now=time;
+
 for my $file (@ARGV)
 {
   if (@s=stat($file))
-  { print time-$s[9];
+  { print $now-$s[9];
     if (@ARGV > 1) { print "\t$file"; }
     print "\n";
   }
