@@ -27,5 +27,5 @@ seq=`seq $wopt "$lown" "$highn"` || badopts=1
 xit=0
 for n in $seq
 do  eval "nurl=$url"
-    set-x gpu $dirpfx "$nurl" || xit=1
+    set-x gpu -s $dirpfx "$nurl" || xit=1
 done &
