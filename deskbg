@@ -35,16 +35,28 @@ esac
 
 if [ -z "$imagefile" ]
 then
+    # flush background
+    bg=
     if [ $perdesk ]
     then desktop -r "$desk" rootbg
     else lastvalue "desk_dfltrootbg" ""
     fi
 else
-    rootbg=`mkwall "$imagefile"` || exit 1
+    # set new background
+    rootbg=`set-x mkwall "$imagefile"` || exit 1
+    bg=$rootbg
     if [ $perdesk ]
     then desktop "$desk" rootbg "$rootbg"
     else lastvalue "desk_dfltrootbg" "$rootbg"
     fi
 fi
 
-exec syncrootbg
+if [ $perdesk ]
+then
+    # apply new background, set desktop to use it
+    echo "$desk" $bg | desktop-incant-bg
+else
+    # apply new default background
+    [ -n "$bg" ] && echo "Colorset 1023 AspectPixmap $bg"
+fi \
+| fvwmcmd
