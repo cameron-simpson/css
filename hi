@@ -13,6 +13,7 @@ eval `datevars`
 weekly=
 mode=normal
 noop=
+nogrep=
 
 [ "x$wdayname" = xMon ] && weekly=1
 
@@ -23,6 +24,7 @@ do
     -normal)	mode=normal ;;
     -w)		weekly=1 ;;
     -n)		noop=1 ;;
+    -q)		nogrep=1 ;;
     -[0-9]*)	pickn=`expr "x$1" : 'x-\([0-9]*\).*'` ;;
     --)		shift; break ;;
     *)		break ;;
@@ -64,7 +66,7 @@ do
   | { xvlist=$TMPDIR/xv$cmd$$
       exec 3>"$xvlist"
       while read url grep
-      do  if [ -z "$grep" ]
+      do  if [ -n "$nogrep" -o -z "$grep" ]
 	  then  echo "$url"
 	  else  echo "$url" >&2
 		pageurls -i "$url" \
