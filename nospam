@@ -15,7 +15,7 @@ use cs::Shell;
 
 defined $ENV{HOME}     || ($ENV{HOME}=userdir());
 	die "$::cmd: no home!" if ! defined $ENV{HOME};
-defined $ENV{SITENAME} || ($ENV{SITENAME}='research.canon.com.au');
+defined $ENV{MAILDOMAIN} || die "$::cmd: \$MAILDOMAIN not set";
 $::SpammerFile="$ENV{HOME}/.spammers";
 $::NonSpamFile="$ENV{HOME}/.nonspam";
 $::SendSpam="/dev/null";
@@ -157,7 +157,7 @@ sub filterspam
 		{ while (defined($_=$lsrc->GetLine()) && length)
 			{ chomp;
 			  $notspam{$_}=1;
-			  /\@/ || ($notspam{"$_\@$ENV{SITENAME}"}=1);
+			  /\@/ || ($notspam{"$_\@$ENV{MAILDOMAIN}"}=1);
 			}
 		  undef $lsrc;
 		}
