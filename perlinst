@@ -78,7 +78,7 @@ do
 					 }
        } \
     && ( umask 2; colourise buildenv lock perlinst make install ) \
-    && dl "$HOST/$ARCH: $perl $base"
+    && dlog "$HOST/$ARCH: $perl $base"
 done
 wait
 
