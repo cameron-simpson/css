@@ -4,46 +4,43 @@
 # list of "foo".
 #	- Cameron Simpson <cs@zip.com.au> 27may2001
 #
+# Deduce list by inspecting the input. - cameron 09sep2002
+#
 
-cmd=$0
-usage="Usage: $cmd varlist [files...]
-	varlist	A single argument with a space separated list of
-		environment variables to insert."
+cmd=`basename "$0"`
+usage="Usage: $cmd [-v varlist] [files...]
+	-v varlist
+		A space separated list of environment variables to
+		insert. By default, all {foo} constructs are replaced."
 
-badopts=
+varlist=
+[ "x$1" = x-v ] && { varlist=$2; shift; shift; }
 
-if [ $# = 0 ]
-then
-  echo "$cmd: missing varlist" >&2
-  badopts=1
-else
-  varlist=$1; shift
-fi
+tmpdir=${TMPDIR:-/tmp}
 
-[ $badopts ] && { echo "$usage" >&2; exit 2; }
+cat ${1+"$@"} \
+| ( if [ -z "$varlist" ]
+    then
+	# suck in the data and scan for {foo}
+	tmp=$TMPDIR/$cmd$$
+	cat >$tmp
+	varlist=`sed 's/}[^{]*{/}\\
+	                {/g' <"$tmp" \\
+	       | sed -n 's/.*{\\([a-zA-Z_][a-zA-Z_0-9]*\\)}.*/\\1/p' \\
+	       | sort -u`
+	exec <"$tmp"
+	rm "$tmp"
+    fi
 
-[ $# = 0 ] && { set x -; shift; }
+    # construct replacement sed script
+    sedf=:top
+    for var in $varlist
+    do  eval "val=\$$var"
+	sedf="$sedf
+	      s{$var}${val}g
+	      t top"
+    done
+    ##echo "$sedf" >&2
 
-xit=0
-
-first=1
-for file
-do  
-  if [ $first ]
-  then
-      first=
-      # reset arg list now we've set the loop running
-      set x -e :top; shift
-      for var in $varlist
-      do  eval "val=\$$var"
-	  set x "$@" -e "s{$var}$valg" -e 't top'; shift
-      done
-  fi
-
-  if [ "x$file" = x- ]
-  then  sed ${1+"$@"}		|| xit=1
-  else  sed ${1+"$@"} "$file"	|| xit=1
-  fi
-done
-
-exit $xit
+    exec sed "$sedf"
+  )
