@@ -105,8 +105,11 @@ sub Flags($)
 
   if (! exists $this->{cs::DBI::Table::RowObject::FLAGS})
   { ::need(cs::Flags);
+    my $flags = $this->GetSet(FLAGS);
     $this->{cs::DBI::Table::RowObject::FLAGS}
-    = cs::Flags->new(grep(length, split(/[,\s]+/, $this->GetSet(FLAGS))));
+    = cs::Flags->new(defined($flags)
+		     ? grep(length, split(/[,\s]+/, $flags))
+		     : ());
   }
 
   my $flags = $this->{cs::DBI::Table::RowObject::FLAGS};
