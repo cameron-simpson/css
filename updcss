@@ -106,7 +106,7 @@ cssweb=$HOME/@/ezos/html/cs/css
 if [ -d "$cssweb" ]
 then
     ( cd $cssdir/.. || exit 1
-      tar cf - css | gzip -v -9 >$cssweb/css.tar.gz
+      tar chf - css | gzip -v -9 >$cssweb/css.tar.gz
     )
     for d in man bin lib
     do
