@@ -25,7 +25,7 @@ use cs::Pathname;
 use cs::Extractor;
 
 # in case
-$ENV{MAILDIR}="$ENV{HOME}/etc/mail" unless defined $ENV{MAILDIR};
+$ENV{MAILDIR}="$ENV{HOME}/private/mail" unless defined $ENV{MAILDIR};
 
 package cs::Mail::Folder;
 
@@ -101,16 +101,17 @@ sub File($$;$$)	# cs::MIME -> n or undef
 
   ## {my(@c)=caller;warn "...File(@_) from [@c]";}
 
-  my($H,$dir)=($M->Hdrs(),$this->{DIR});
+  my($H,$dir)=($M,$this->{DIR});
+  ## warn "get body...";
   my($rawbody)=$M->Body();
+  ## warn "got body";
 
   if (defined $orig && ! ref $orig)
   { ## warn "LinkToN($this->{DIR},$M,$nodissect,$orig)";
     return $this->LinkToN($orig);
   }
-  else
-  { ## my(@c)=caller;warn "File($this->{DIR}) with no \$orig from [@c]";
-  }
+
+  ## my(@c)=caller;warn "File($this->{DIR}) with no \$orig from [@c]";
 
   # make a copy and link that
   my $tmp = "$dir/.$::cmd.$$";
@@ -119,21 +120,23 @@ sub File($$;$$)	# cs::MIME -> n or undef
   my($realtmp,$tmpext);
 
   # plain file
+  ## warn "make sink $tmp";
   $E=new cs::Sink PATH, $tmp;
   if (! defined $E)
   { warn "$::cmd: can't create \"$tmp\": $!";
     return undef;
   }
 
-  $realtmp=$E->{PATH};	# note new pathname
+  $realtmp=$E->Path();	# note new pathname
+  ## warn "realtmp=$realtmp";
 
   # check out any extensions
   $realtmp =~ /(\.pgp)?(\.gz)?$/;
   $tmpext=$&;
 
-  $H->WriteItem($E);
-  $E->Put($rawbody);
+  $M->WriteItem($E);
 
+  ## warn "LinkToN...";
   my $n = $this->LinkToN($realtmp);
 
   return undef if ! defined $n;
@@ -149,6 +152,8 @@ sub File($$;$$)	# cs::MIME -> n or undef
 sub LinkToN
 { my($this,$orig,$ext)=@_;
   $ext='' if ! defined $ext;
+
+  ## warn "LinkToN(@_)";
 
   my $n;
 
