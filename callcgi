@@ -1,0 +1,88 @@
+#!/bin/sh
+#
+# Run a script locally as if it's a CGI, and display the results.
+#	- Cameron Simpson <cs@zip.com.au> 19jan2003
+# 
+
+umask 077	# results should be private
+
+cmd=`basename "$0"`
+usage="Usage: $cmd cgi-script { param=value... | <form-data }"
+
+badopts=
+
+if [ $# = 0 ]
+then
+  echo "$cmd: missing cgi-script" >&2
+  badopts=1
+else
+  cgi=$1
+  shift
+fi
+
+if [ $# = 0 ]
+then
+  [ -t 0 ] && { echo "$cmd: form-data (stdin) may not be a terminal" >&2
+		badopts=1
+	      }
+fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+case "$cgi" in
+  /* | ./* | ../* )
+      wcgi=$cgi ;;
+  *)  wcgi=`which "$cgi"` || exit 1 ;;
+esac
+cgibase=`basename "$wcgi"`
+cgidir=`dirname "$wcgi"`
+
+cd "$cgidir" || exit 1
+
+if [ $# = 0 ]
+then
+  REQUEST_METHOD=POST
+  export REQUEST_METHOD
+else
+  REQUEST_METHOD=GET
+  export REQUEST_METHOD
+  qs=
+  qssep=
+  for param
+  do  qs=$qs$qssep`qsencode "$param"`
+      qssep='&'
+  done
+  QUERY_STRING=$qs
+  export QUERY_STRING
+  exec </dev/null
+fi
+
+tmpf=${TMPDIR:-/tmp}/$cmd$$
+
+trap 'rm -f "$tmpf"' 0 1 15
+
+set -x
+"./$cgibase" >"$tmpf" || exit 1
+
+type=`sed -n -e 's/^[Cc][Oo][Nn][Tt][Ee][Nn][Tt]-[Tt][Yy][Pp][Ee]: *\\([^; ]*\\).*/\\1/p' -e '/^$/q' <"$tmpf" | sed 1q`
+
+case "$type" in
+  text/html)
+      final=$tmpf.html
+      sed -e '
+	      /^$/q
+	      /^[^ 	]*:/!d
+	      s/\([^:]*\): *\(.*\)/<meta http-equiv="\1" content="\2">/
+	     ' <"$tmpf" >"$final"
+      unhdr <"$tmpf" >>"$final"
+      ;;
+  text/*)
+      final=$tmpf.txt
+      unhdr <"$tmpf" >"$final" || exit 1
+      ;;
+  *)  final=$tmpf.txt
+      cp "$tmpf" "$final" || exit 1
+      ;;
+esac
+
+exec urlshow "file://$final"
