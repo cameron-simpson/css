@@ -34,7 +34,7 @@ else key=$1; shift
 fi
 
 if [ $# = 0 ]
-then file=`logpath "$key"`
+then file=$HOME/var/log/$key
      if [ -z "$file" ]
      then echo "$cmd: no logmap for \"$key\"" >&2
 	  badopts=1
