@@ -1,0 +1,25 @@
+#!/bin/sh
+#
+# Rewrite the named file if the input differs.
+#	- Cameron Simpson <cs@zip.com.au> 19may2000
+#
+
+[ $# = 1 ] || { echo "Usage: $0 filename" >&2; exit 2; }
+file=$1; shift
+
+[ -f "$file" ] || { echo "$0: $file: not a regular file" >&2; exit 1; }
+
+tmp=/tmp/rwi$$
+cat >"$tmp" || exit 1
+
+cmp -s "$tmp" "$file" && exit 0
+
+if cat "$tmp" >"$file"
+then
+    rm -f "$tmp"
+    exit 0
+else
+    echo "$0: rewrite of $file fails, probably damaged" >&2
+    echo "	rewrite content left in $tmp" >&2
+    exit 1
+fi
