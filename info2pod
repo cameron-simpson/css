@@ -34,7 +34,7 @@ use cs::GNUInfo;
 ## use cs::Hier;
 
 # ugly hack because info is inherently filename based
-# my "man" script sets $_DcoFile
+# my "man" script sets $_DocFile
 @ARGV=$ENV{'_DocFile'} if ! @ARGV && defined $ENV{'_DocFile'};
 
 die "Usage: $::cmd info-file\n" if @ARGV != 1;
