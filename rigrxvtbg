@@ -1,15 +1,16 @@
 #!/bin/sh
 #
-# Regularly run setrxvtbg in the background, then exec command.
+# Regularly run setrxvtbg in the background, then exec command if supplied.
 #	- Cameron Simpson <cs@zip.com.au> 31aug2000
 #
 
 cmd=`basename "$0"`
-usage="Usage: $cmd [-f] [-p shellpid] [-i interval] [cmd [args...]]"
+usage="Usage: $cmd [-f] [-p shellpid] [-i interval] [/keywords] [cmd [args...]]"
 
 force=
 shellpid=$$
 period=${RXVTBGINTERVAL:-60}
+keywords=
 
 badopts=
 while :
@@ -19,6 +20,7 @@ do
     -i)	period=$2; shift ;;
     -e)	shift; break ;;
     -f)	force=1 ;;
+    /?*) keywords=`expr "x$1" : 'x/\(.*\)' ` ;;
     --)	shift; break ;;
     -?*)echo "$cmd: unrecognised option: $1" >&2
 	badopts=1
@@ -29,8 +31,6 @@ do
 done
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
-
-[ $# = 0 ] && { set x "${SHELL:-/bin/sh}"; shift; }
 
 # notice resizes - doesn't seem to work - shell job control to blame?
 [ -n "$SIGWINCH" ] && trap '( lock -s setrxvtbg setrxvtbg & )' "$SIGWINCH"
@@ -44,10 +44,10 @@ then
     export RXVTBGLOG
     (
       while kill -0 "$shellpid"
-      do  rawx lock "setrxvtbg@$HOST" nice setrxvtbg -l "$RXVTBGLOG"
+      do  rawx lock "setrxvtbg@$HOST" nice setrxvtbg -l "$RXVTBGLOG" $keywords
 	  sleep "$period" || break
       done
     ) &
 fi
 
-exec "$@"
+[ $# = 0 ] || exec "$@"
