@@ -95,12 +95,12 @@ view_rpm=$toc_rpm
 toc_rrd='rrdtool fetch /dev/fd/0 MAX'
 view_rrd=$toc_rrd
 
-view_mpg='xine -pf $f'
-view_avi='xine -pf $f'
+view_mpg='xine -p $f'
+view_avi='xine -p $f'
 #view_avi='aviplay $f'
 view_mov=$view_avi
 view_asf=$view_avi
-view_vob='xine -pf $f'
+view_vob='xine -p $f'
 view_ram='realplay $f'
 
 view_xanm='xanim $formopts /dev/fd/0'
@@ -234,8 +234,8 @@ do  [ $abort ] && exit 1
 
       if [ -z "$format" ]
       then
-	  echo "$cmd: $f: unrecognised format, using pageif" >&2
-	  formatfilter=pageif
+	  echo "$cmd: $f: unrecognised format, using view-unknown" >&2
+	  formatfilter='view-unknown -C'
       else
 	  eval "formatfilter=\$${mode}_$format"
 	  if [ -z "$formatfilter" ]
