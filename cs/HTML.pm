@@ -180,7 +180,16 @@ sub tokFlat
     { $text.=tokFlat(@$t);
     }
     else
-    { $text.=tokFlat(@{$t->{TOKENS}});
+    { my $tag = $t->{TAG};
+
+      if ($tag eq 'BR' || $tag eq 'LI')
+      { $text.="\n";
+      }
+      elsif ($tag eq 'P')
+      { $text.="\n\n";
+      }
+
+      $text.=tokFlat(@{$t->{TOKENS}});
     }
   }
 
@@ -984,7 +993,8 @@ sub Tok
     }
     elsif (! $rt->{START})
     # closing tag
-    { if (exists $enclose->{$rt->{TAG}})
+    { if (exists $cs::HTML::_Structures{$rt->{TAG}}
+       && exists $enclose->{$rt->{TAG}})
       # closing tag for something other than this?
       # push back, fall out
       # this way we can parse <tag1><tag2></tag1>
