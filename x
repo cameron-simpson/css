@@ -22,7 +22,7 @@ then
 	file=/dev/fd/0
     else
 	tmpf=${TMPDIR:-/tmp}/$cmd$$
-	trap 'rm -f "$tmpf"' 0 1 15
+	trap 'rm -f "$tmpf"' 0 1 2 13 15
 	dd bs=1024 count=1 >"$tmpf" || exit 1
     	mtype=`file2mime "$tmpf"` \
 	|| { echo "$cmd: stdin: no MIME type recognised" >&2
