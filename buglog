@@ -11,20 +11,19 @@ usage="Usage: $cmd logline < attachment-data"
 [ $# = 1 ] || { echo "$usage" >&2; exit 2; }
 logmsg=$1; shift
 
-[ -n "$BUGSYSTEMS" ] || exit 0	# no bugs to note? empty result
+[ -n "$BUGSYSTEMS" ] || exec cat >/dev/null	# no bugs to note? empty result
 
 tmpf=/tmp/bugids$$
 trap 'rm -f "$tmpf"' 0 1 15
 cat >"$tmpf" || exit 1
 
-for sys in ddts dlog
-do
-  case " $BUGSYSTEMS " in
-    *' dlog '*)	dlog "$logmsg" ;;
-    *' ddts '*)	ddtsids=`echo "$logmsg" | ddtsids`
+case " $BUGSYSTEMS " in
+  *' dlog '*)	dlog "$logmsg" ;;
+esac
+case " $BUGSYSTEMS " in
+  *' ddts '*)	ddtsids=`echo "$logmsg" | ddtsids`
 		[ -n "$ddtsids" ] && mailif -s "$logmsg" $ddtsids < "$tmpf"
 		;;
-  esac
-done
+esac
 
 exit 0
