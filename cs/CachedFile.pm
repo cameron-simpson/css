@@ -14,45 +14,45 @@ package cs::CachedFile;
 @cs::CachedFile::ISA=qw();
 
 sub new($$$)
-	{ my($class,$path,$reloadfn,$state)=@_;
-	  $state={} if ! defined $state;
+{ my($class,$path,$reloadfn,$state)=@_;
+  $state={} if ! defined $state;
 
-	  bless { PATH	=> $path,
-		  RELOAD=> $reloadfn,
-		  MTIME => undef,
-		  STATE	=> $state,
-		}, $class;
-	}
+  bless { PATH	=> $path,
+	  RELOAD=> $reloadfn,
+	  MTIME => undef,
+	  STATE	=> $state,
+	}, $class;
+}
 
 sub State { shift->{STATE}; }
 sub Path  { shift->{PATH}; }
 
 sub Reset
-	{ my($this)=@_;
+{ my($this)=@_;
 
-	  undef $this->{MTIME};
-	  $this->{STATE}={};
-	}
+  undef $this->{MTIME};
+  $this->{STATE}={};
+}
 
 sub Poll
-	{ my($this)=@_;
+{ my($this)=@_;
 
-	  my $path = $this->Path();
+  my $path = $this->Path();
 
-	  my(@s);
+  my(@s);
 
-	  if (! (@s=stat $path))
-		{ $this->Reset();
-		}
-	  elsif (! defined $this->{MTIME}
-	      || $s[9] > $this->{MTIME}
-		)
-		{ $this->Reset();
-		  $this->{MTIME}=$s[9];
-		  &{$this->{RELOAD}}($this);
-		}
+  if (! (@s=stat $path))
+  { $this->Reset();
+  }
+  elsif (! defined $this->{MTIME}
+      || $s[9] > $this->{MTIME}
+	)
+  { $this->Reset();
+    $this->{MTIME}=$s[9];
+    &{$this->{RELOAD}}($this);
+  }
 
-	  $this->State();
-	}
+  $this->State();
+}
 
 1;
