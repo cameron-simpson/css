@@ -18,5 +18,5 @@ usage="Usage: $cmd imagefile >splash.xpm.gz"
 file=$1; shift
 
 set -x
-gm convert - <"$file" -geometry 640x800 -colors 14 xpm:- \
+gm convert - <"$file" -geometry 640x480 -colors 14 xpm:- \
 | gzip -v -9
