@@ -3,6 +3,8 @@
 # Examine the named files and attach correct extensions to misnamed ones.
 #	- Cameron Simpson <cs@zip.com.au> 22feb1999
 #
+# Base entirely on file2mime and mimeext now. - cameron 24jul2003
+#
 
 [ $# = 0 ] && { set x `cat`; shift; }
 
@@ -14,35 +16,39 @@ do  ## echo "$f ..."
     [ -f "$f" ] || { echo "$cmd: $f: not a regular file" >&2
 		     xit=1; continue;
 		   }
+    [ -s "$f" ] || { echo "$cmd: $f: empty file!" >&2
+		     xit=1; continue;
+		   }
 
-    fileout=`file "$f"` || { echo "$cmd: problems with $f, skipped" >&2
-			     xit=1; continue;
-			   }
-    type=`expr "x$fileout" : "x$f"':		*\(.*\)'`
+    type=`file2mime "$f"` || { echo "$cmd: can't deduce MIME type of \"$f\"" >&2
+			       xit=1
+			       continue
+			     }
+
+    prefext=`mimeext "$type"` || { echo "$cmd: no preferred extension for $type" >&2
+				   xit=1
+				   continue
+				 }
+
+    # see if ext is ok already
+    fbase=`basename "$f"`
+    case "$fbase" in
+      *".$prefext")	continue ;;
+    esac
+
+    fdir=`dirname "$f"`
+    case "$fdir" in
+	.)	fdir= ;;
+	*)	fdir=$fdir/ ;;
+    esac
 
     case $f in
-	*.*)	ext=`expr "x$f" : 'x.*\(\..*\)'` ;;
-	*)	ext= ;;
+	*.*)	newf=$fdir`expr "x$fbase" : 'x\(.*\)\..*'`.$prefext ;;
+	*)	newf=$fdir$fbase.$prefext ;;
     esac
 
-    addext=
-    rmext=
-    case "$ext-$type" in
-	-USTAR\ tar\ archive)	addext=.tar ;;
-	.tgz-USTAR\ tar\ archive) rmext=.tgz addext=.tar ;;
-	.gz-USTAR\ tar\ archive) rmext=.gz ;;
-	-JPEG\ file)		addext=.jpg ;;
-	.jpg-JPEG\ file)	;;
-	-GIF\ file,*)		addext=.gif ;;
-	.gif-GIF\ file,*)	;;
-    esac
-
-    newf=$f
-    [ -n "$rmext" ] && newf=`expr "x$newf" : "x\(.*\)$rmext"`
-    newf=$newf$addext
-    [ "x$f" = "x$newf" ] || { echo "$f -> $newf ..."
-			      mv -i "$f" "$newf"
-			    }
+    echo "$f -> $newf"
+    mv -i -- "$f" "$newf" || xit=1
 done
 
 exit $xit
