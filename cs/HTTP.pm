@@ -126,12 +126,9 @@ $cs::HTTP::M_FOUND	='302';
 303 document needs different method.
 Following is:
 
-=over 8
-
 B<Method:> I<method> I<url>
-I<body-section>
 
-=back
+I<body-section>
 
 I<body-section> is data for I<method>.
 
