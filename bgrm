@@ -31,7 +31,8 @@ do  case $arg in
     n=`expr $n + 1`
     if mv -i "$orig" "$aside"
     then
-	lock bgrm rm $rmopts "$aside" &
+	# removed "lock bgrm" - fails if no access to lockdir
+	rm $rmopts "$aside" &
     else
 	xit=$?
     fi
