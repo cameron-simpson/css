@@ -57,7 +57,7 @@ my @dirents = grep(/^[^.]/, readdir(DIR));
 
 for my $dirent (sort @dirents)
 {
-  my $rm = "rm -rf '$dirent'";
+  my $rm = "rm -f '$dirent'";
 
   if (exists $links{$dirent}
    && -l $dirent)
