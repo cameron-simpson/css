@@ -1,0 +1,81 @@
+#!/usr/bin/perl
+#
+# Read global history file from stdin and emit HTML equivalent.
+#	- Cameron Simpson, cs@zip.com.au, 10jun94
+#
+
+$format1='ncsa-mosaic-history-format-1';
+
+chop($format=<STDIN>);
+$dummy=<STDIN>;
+
+die "Sorry, I only understand history format \"$format1\"; you have \"$format\".\n"
+	if $format ne $format1;
+
+require 'cs/date.pl';
+require 'cs/html.pl';
+
+@ndx=();
+@title=();
+@url=();
+@date=();
+undef %last;
+
+while (<STDIN>)
+	{ ($url,$date)=/^(\w+:\S+)\s+(.*)/;
+	  $date=&date'ctime2gm($date);
+	  $title=$url;
+
+	  $n=(defined($last{$url}) ? $last{$url} : $#url+1);
+
+	  $title[$n]=&html'unquote($title);
+	  $url[$n]=$url;
+	  $date[$n]=$date;
+	  $ndx[$n]=$n;
+	  $last{$url}=$n;
+	}
+
+print "<TITLE>$ENV{NAME}'s Global History</TITLE>\n";
+print "<H1>$ENV{NAME}'s Global History</H1>\n";
+print "Last updated: ", &date'datestr(time), ".\n<P>\n";
+print "<UL><LI><A HREF=\"#byname\">by name</A><LI><A HREF=\"#bydate\">by date</A></UL>\n";
+print "<H2><A NAME=\"bydate\">History By Date</A></H2><UL>\n";
+for $ndx (reverse sort bydate @ndx)
+	{ ($title,$url,$date)=($title[$ndx],$url[$ndx],$date[$ndx]);
+	  print '<LI> <CODE>', &date'gm2ldmy($date), '</CODE> ',
+		"<A HREF=\"$url\">$title</A>\n";
+	}
+print "</UL>\n";
+print "<H2><A NAME=\"byname\">History By Name</A></H2><UL>\n";
+for $ndx (sort byname @ndx)
+	{ ($title,$url)=($title[$ndx],$url[$ndx]);
+	  print "<LI><A HREF=\"$url\">$title</A>\n";
+	}
+print "</UL>\n";
+
+exit 0;
+
+sub byname
+	{ local($n1,$n2)=($title[$a],$title[$b]);
+
+	  for (($n1,$n2))
+		{ s/\s+/ /g;
+		  tr/-A-Z/_a-z/;
+		}
+
+	  $n1 cmp $n2;
+	}
+
+sub bydate
+	{ $date[$a] <=> $date[$b];
+	}
+
+sub index	# (val,@array) -> index or $[-1
+	{ local($val)=shift;
+	  local($_,$i);
+
+	  for ($i=$[; defined($_=shift @_); $i++)
+		{ return $i if $val eq $_; }
+
+	  return $[-1;
+	}
