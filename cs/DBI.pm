@@ -418,6 +418,25 @@ sub last_id()
 
 =back
 
+=item addRow(I<dbh>,I<table>,I<record>)
+
+Add a row represented by the hashref I<record>
+to I<table> in database I<dbh>.
+Returns the B<last_id> value.
+
+=cut
+
+sub addRow($$$)
+{ my($dbh,$table,$r)=@_;
+
+  my $ins = insert($dbh,$table,keys %$r);
+  return undef if ! defined $ins;
+
+  $ins->ExecuteWithRec($r)
+  ? last_id()
+  : undef;
+}
+
 =head1 OBJECT CREATION
 
 =over 4
@@ -470,8 +489,6 @@ into the appropriate table.
 
 =cut
 
-# takes an "insert" sql query and inserts some records
-# return is undef on failure or last insertid()
 sub ExecuteWithRec
 { my($isth)=shift;
 
