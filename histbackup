@@ -338,7 +338,7 @@ else
     fi
 fi
 
-if [ "$xit" = 0 -a -z "$linkonly" -a -n "$symlink" ]
+if [ -d "$dest/$thisbackup/." -a -z "$linkonly" -a -n "$symlink" ]
 then
     ( cd "$dest" || exit 1
       rm -f "$symlink"
