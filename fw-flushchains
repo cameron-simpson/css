@@ -1,0 +1,30 @@
+#!/bin/sh
+#
+# Toss all chains, remake LOG* chains.
+#	- Cameron Simpson <cs@zip.com.au> 18oct2003
+#
+
+cmd=$0
+usage="Usage: $cmd"
+
+[ $# = 0 ] || { echo "$usage" >&2; exit 2; }
+
+iptables -L -n \
+| awk '/^Chain [A-Z]/ {print $2}' \
+| ( set -x
+    while read chain
+    do  iptables -F "$chain"
+    done
+  )
+set -x
+iptables -X
+
+iptables -N LOGREJECT
+iptables -A LOGREJECT -j LOG
+iptables -A LOGREJECT -j REJECT
+iptables -A LOGREJECT -j DROP
+
+iptables -N LOGACCEPT
+iptables -A LOGACCEPT -j LOG
+iptables -A LOGACCEPT -j ACCEPT
+iptables -A LOGACCEPT -j DROP
