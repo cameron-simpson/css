@@ -1,0 +1,54 @@
+#!/usr/bin/perl
+#
+# Report the specified fields from all jobs.
+# This is really a speed thing for scripts wanting several attributes from several jobs.
+# See fvwm-menu-jobs for example use.
+#	- Cameron Simpson <cs@zip.com.au> 14jul2003
+#
+
+use strict qw(vars);
+
+($::cmd=$0) =~ s:.*/::;
+$::Usage="Usage: $::cmd [-d idsetdir] fields...
+	-d idsetdir	Specify the directory holding the idset.
+";
+
+$::Dir="$ENV{HOME}/var/idsets/$ENV{SYSTEMID}/timer";
+if (@ARGV && $ARGV[0] eq '-d')
+{ shift(@ARGV);
+  $::Dir=shift(@ARGV);
+}
+
+-d "$::Dir/." || die "$::cmd: no such dir: $::Dir\n";
+
+my @ids;
+die "$::cmd: opendir($::Dir): $!\n" if !opendir(DIR,$::Dir);
+@ids=sort { $a <=> $b } grep(/^\d+$/, readdir(DIR));
+closedir(DIR);
+
+ID:
+for my $id (@ids)
+{
+  print $id;
+
+  for my $field (@ARGV)
+  { my $file = "$::Dir/$id/$field";
+    if (! -e $file)
+    { $_='';
+    }
+    elsif (open(FILE, "< $::Dir/$id/$field\0"))
+    { $_=join('',<FILE>);
+      chomp;
+      s/\t/\\t/g;
+      s/\r?\n/\\n/g;
+    }
+    else
+    { warn "$::cmd: open($file): $!\n";
+      $_='?';
+    }
+
+    print "\t", $_;
+  }
+
+  print "\n";
+}
