@@ -8,18 +8,21 @@
 
 : ${BG:=black}
 : ${TMPDIR:=/tmp}
+# set $bgx and $bgy
 eval `bgsize -v | sed 's/^d/bg/'`
 
+doauto=1
 cacheroot=$HOME/var/cache/bg
 
 cmd=`basename "$0"`
-usage="Usage: $cmd [-c cachedir] [-g geom] imagefile"
+usage="Usage: $cmd [-c cachedir] [-g geom] imagefiles..."
 
 badopts=
 
 while :
 do
   case "$1" in
+    +a)	doauto= ;;
     -c)	cacheroot=$2; shift
 	;;
     -g)	geom=$2; shift
@@ -43,13 +46,49 @@ then
   echo "$cmd: missing imagefile" >&2
   badopts=1
 else
-  imagefile=$1; shift
-  [ $# = 0 ] || { echo "$cmd: extra arguments after imagefile: $*" >&2
-		  badopts=1
-		}
+  if [ $doauto ] && [ $# -eq 1 ] && [ $XINERAMA ]
+  then  set -- "$1" "$1"
+	bgx=`expr "$bgx" '*' "$XINERAMA_NX"` || exit 1
+  fi
+  if [ $# -eq 1 ]
+  then montage=
+  else montage=1
+  fi
 fi
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+##########################################
+# Multiple images - assemble into montage.
+if [ $montage ]
+then
+    xit=0
+    [ $# = 2 ] || { echo "$cmd: only two images supported at present" >&2
+		    exit 2
+		  }
+    hx=`expr $bgx / 2` || exit 1
+    bg1=`mkwall +a -c "$cacheroot" -g "${hx}x${bgy}" "$1"` || exit 1
+    if [ "x$1" = "x$2" ]
+    then  bg2=$bg1
+    else  bg2=`mkwall +a -c "$cacheroot" -g "${hx}x${bgy}" "$2"` || exit 1
+    fi
+    tmpf=$TMPDIR/$cmd$$.png
+    # +label
+    gm montage \
+		+label \
+		-resize "${bgx}x${bgy}" \
+		-geometry "${hx}x${bgy}+0+0" "$bg1" \
+		-geometry "${hx}x${bgy}+0+0" "$bg2" \
+		"png:$tmpf" || exit 1
+    montage=`imagecache "$tmpf"` || exit 1
+    rm "$tmpf"
+    echo "$montage"
+    exit $xit
+fi
+
+##########################################
+# Single image - scale to fit.
+imagefile=$1; shift
 
 tmpf=
 original=1
