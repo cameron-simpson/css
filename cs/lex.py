@@ -6,6 +6,8 @@ def skipwhite(s,start=0):
     start+=1
   return start
 
-""" length of text after last newline in string """
+""" length of text after last newline in string
+    initially used by cs.hier to compute effective text width
+"""
 def lastlinelen(s):
   return len(s)-string.rfind(s,'\n')-1
