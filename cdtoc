@@ -22,7 +22,36 @@ die $::Usage if @ARGV;
 
 my $CD = new cs::CDDB;
 die "$::cmd: can't make new cs::CDDB object\n" if ! defined $CD;
-warn "id is ".$CD->DiscId();
+
+my $discid = $CD->DiscId();
+
+my @q = $CD->Query();
+if (@q < 1)
+{ die "$::cmd: no matches for $discid\n";
+}
+
+if (@q > 1)
+{ warn "$::cmd: multiple matches for discid $discid:\n";
+  my $m;
+  for my $i (1..@q)
+  { $m = $q[$i-1];
+    warn "$i\t$m->[2]  $m->[0]\t$m->[1]\n";
+  }
+
+  exit 1 if ! -t STDIN || ! -t STDERR;
+
+  print STDERR "Select? ";
+  exit 1 if ! defined($_=<STDIN>);
+  chomp;
+  exit 1 if ! length;
+  if (! /^\d+/ || $_ < 1 || $_ > @q)
+  { die "bad response: $_\n";
+  }
+
+  my($cat,$discid)=($q[$_-1]->[0], $q[$_-1]->[2]);
+  $CD->SetCategory($cat);
+  $CD->SetDiscId($discid);
+}
 
 my($artist,$title)=($CD->Artist(), $CD->Title());
 die "no artist!" if ! defined $artist;
