@@ -1,31 +1,31 @@
 #!/usr/bin/perl
 #
 # Read arp -a output and emit /etc/ethers format.
-#	- Cameron Simpson <cs@zip.com.au> 01sep95
+#	- Cameron Simpson <cs@zip.com.au> 01sep1995
 #
 
 ($cmd=$0) =~ s:.*/::;
 
 $xit=0;
 ARP:
-  while (<>)
-	{ chomp;
-	  #     if     host     ether
-	  if (/^\w+\s+([-\w]+)\s.*([\da-f]{2}(:[\da-f]{2}){5})$/)
-		{ ($host,$ether)=($1,$2);
-		}
-	  #         host                                    ether
-	  elsif (/^([-\w]+)\.research.canon.com.au\s.*at\s+([\da-f]{2}(:[\da-f]{2}){5})$/)
-		{ ($host,$ether)=($1,$2);
-		}
-	  else
-		{ warn "$cmd: warning: $ARGV, line $.: bad format: $_\n";
-		  $xit=1;
-		  next ARP;
-		}
+while (<>)
+{ chomp;
+  #     if     host     ether
+  if (/^\w+\s+([-\w]+)\s.*([\da-f]{2}(:[\da-f]{2}){5})$/)
+  { ($host,$ether)=($1,$2);
+  }
+  #         host                                    ether
+  elsif (/^([-\w]+)\.$ENV{MAILDOMAIN}\s.*at\s+([\da-f]{2}(:[\da-f]{2}){5})$/o)
+  { ($host,$ether)=($1,$2);
+  }
+  else
+  { warn "$cmd: warning: $ARGV, line $.: bad format: $_\n";
+    $xit=1;
+    next ARP;
+  }
 
-	  ## $ether =~ s/\b0+([\da-f]+)/$1/g;
-	  print "$ether\t$host\n";
-	}
+  ## $ether =~ s/\b0+([\da-f]+)/$1/g;
+  print "$ether\t$host\n";
+}
 
 exit $xit;
