@@ -1,0 +1,143 @@
+#!/bin/sh
+#
+# Construct a wallpaper image by resizing a source image and padding.
+# Pulled from rootbg and updates to use GraphicsMagick.
+# Writes new image to a persistent cache in PNG format and prints the pathname.
+#	- Cameron Simpson <cs@zip.com.au> 11sep2003
+#
+
+bg=${BG:-black}
+bgx=${X11_BGX:-1280}
+bgy=${X11_Y:-1024}
+
+cacheroot=$HOME/var/cache/bg
+
+cmd=`basename "$0"`
+usage="Usage: $cmd [-c cachedir] [-g geom] imagefile"
+
+badopts=
+
+while :
+do
+  case "$1" in
+    -c)	cacheroot=$2; shift
+	;;
+    -g)	geom=$2; shift
+	ok=1
+	bgx=`expr "x$geom" : '\([1-9][0-9]*\)x[1-9][0-9]*$'` || ok=
+	bgy=`expr "x$geom" : '[1-9][0-9]*x\([1-9][0-9]*\)$'` || ok=
+	[ $ok ] \
+	    || { echo "$cmd: bad geometry for -g: expected XxY, found \"$geom\"" >&2
+		 badopts=1
+	       }
+	;;
+    --)	shift; break ;;
+    -?*)echo "$cmd: unrecognised option: $1" >&2; badopts=1 ;;
+    *)	break ;;
+  esac
+  shift
+done
+
+if [ $# = 0 ]
+then
+  echo "$cmd: missing imagefile" >&2
+  badopts=1
+else
+  imagefile=$1; shift
+  [ $# = 0 ] || { echo "$cmd: extra arguments after imagefile: $*" >&2
+		  badopts=1
+		}
+fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+tmpf=
+original=1
+
+# if stdin-ish name, suck it into a temp file
+case "$imagefile" in
+  X:*|-|*:-|\|*)
+    tmpf=${TMPDIR:-/tmp}/$cmd$$.png
+    trap 'rm -f "$tmpf"' 0 1 2 15
+    gm convert "$imagefile" -quality 0 "png:$tmpf" || exit 1
+    imagefile=$tmpf
+    ;;
+esac
+
+# get image size
+ix= iy=
+eval `imsize "$imagefile" | awk '{print "ix="$1 " iy="$2}'`
+[ -n "$ix" -a -n "$iy" ] \
+	|| { echo "$cmd: can't deduce source image size" >&2; exit 1; }
+
+# see if by chance the image is the right size and format
+if [ $original ]
+then
+    # get image suffix
+    sfx=`expr "x$imagefile" : 'x.*\.\([^/.]*$\)'`
+    case "$ix,$iy,$sfx" in
+      $bgx,$bgy,png)
+	echo "$imagefile"
+	exit 0
+	;;
+    esac
+fi
+
+# see if we've cached this image's conversion yet
+md5pfx=`md5sum "$imagefile" | sed 's;\(..\)\([^ ]*\)  .*;\1/\2;'`
+[ -n "$md5pfx" ] || { echo "$cmd: can't checksum $imagefile" >&2; exit 1; }
+cachefile=$cacheroot/${bgx}x${bgy}/$md5pfx.png
+if [ -s "$cachefile" ]
+then
+    echo "$cachefile"
+    exit 0
+fi
+
+# have to convert; commence arg list
+set convert -
+
+if [ "x${bgx}x${bgy}" != "x${ix}x${iy}" ]
+then
+  # must rescale
+
+  # compute width of borders
+  awkf="BEGIN { ix=$ix; iy=$iy; bgx=$bgx; bgy=$bgy
+       "'       w=bgx; h=bgy
+	      }
+	END   { if (ix > bgx || iy > bgy)
+		  # too big - shrink
+		  if (ix/bgx > iy/bgy)
+		    # shrink X more than Y
+		    h=int(iy * (bgx/ix))
+		  else
+		    # shrink Y more than X
+		    w=int(ix * (bgy/iy))
+		else
+		# smaller image - scale up
+		if (bgx/ix < bgy/iy)
+		  # scale X less - use that
+		  h=iy*bgx/ix
+		else
+		  # scale Y less
+		  w=ix*bgy/iy
+
+		w+=w%2
+		h+=h%2
+		bx=int((bgx-w)/2)
+		by=int((bgy-h)/2)
+		print "bx="bx " by="by
+	      }'
+
+  eval `awk "$awkf" </dev/null`
+
+  set "$@" -geometry "${bgx}x${bgy}"
+  if [ "$bx" -gt 0 -o "$by" -gt 0 ]
+  then
+      set "$@" -bordercolor "$bg" -border "${bx}x${by}"
+  fi
+fi
+
+cachedir=`dirname "$cachefile"`
+[ -d "$cachedir/." ] || mkdir -p "$cachedir" || exit 1
+gm "$@" -quality 100 png:- <"$imagefile" >"$cachefile" || exit 1
+echo "$cachefile"
