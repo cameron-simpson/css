@@ -1,6 +1,6 @@
 #!/bin/sh
 #
-# Copy a directory tree - refuse it target exists as safety measure.
+# Copy a directory tree - refuse if target exists as safety measure.
 # Faster, safer, more accurate and more informative than "cp -rp".
 #	- Cameron Simpson <cs@zip.com.au>
 #
@@ -12,18 +12,18 @@ buffer="buffer -m 1M"	# just use "cat" if you lack buffer
 		exit 2
 	      }
 
+from=$1
+to=$2
+
 case $ARCH in
     *.*.domainos) # preserve ACLs
-	exec /com/cpt "$1" "$2" -pdt -sacl -ld
+	exec /com/cpt "$from" "$to" -pdt -sacl -ld
 	;;
-    *)	[ -d "$2/." ] && { echo "$0: $2 already exists" >&2
-			   exit 1
-			 }
-
-	( cd "$1/." && $tar -cf - .
+    *)	set -x
+	( cd "$from/." && $tar -cf - .
 	) \
-	| $cat \
-	| ( mkdir "$2" && cd "$2" && untar )
+	| $buffer \
+	| ( mkdir "$to" && cd "$to" && untar )
 	;;
 esac
 
