@@ -1,3 +1,2 @@
 #!/bin/sh
-##exec envssh-basic -o 'forwardx11 no' ${1+"$@"}
-exec ssho -o 'forwardx11 no' ${1+"$@"}
+exec sshto stricthostkeychecking=no forwardx11=no ${1+"$@"}
