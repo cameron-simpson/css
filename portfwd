@@ -33,7 +33,7 @@ for fwd
 do  case "$fwd" in
 	zipnntp)
 	    echo "forward $HOST:2119 to news.zip.com.au:119"
-	    acon lock -1 fwd_zipnntp \
+	    alog zipnntp lock -1 fwd_zipnntp \
 		tcpio -a 2119 need-ssh-agent -f ssh -x zip 'exec nc news.zip.com.au 119'
 	    ;;
 	nntpcached)
@@ -59,7 +59,7 @@ do  case "$fwd" in
 		   -L 2401:cvs-cskk:2401 \
 		   -L 8880:amadeus:8880 \
 		   -L 3119:news-optus:119 \
-		   -L 5915:amadeus:5905 &
+		   -L 5915:amadeus:5905 \
 		   -L 5916:amadeus:5906 &
 	    ;;
 	home2zip)
@@ -79,9 +79,9 @@ do  case "$fwd" in
 		   -L 5916:zapff:5906 \
 		   -L 5917:piaf:5900 &
 	    ;;
-	del)
-	    echo "web@del ..."
-	    acon lock -1 web@del tcpio -a 2082 need-ssh-agent -f ssh del nc localhost 80
+##	del)
+##	    echo "web@del ..."
+##	    acon lock -1 web@del tcpio -a 2082 need-ssh-agent -f ssh del nc localhost 80
 	    ;;
 	*)  echo "$0: unknown forwarding target \"$fwd\"" >&2
 	    exit 1
