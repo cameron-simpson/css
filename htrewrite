@@ -1,0 +1,20 @@
+#!/usr/bin/perl
+#
+# Read loose HTML, emit clean HTML.
+#	- Cameron Simpson <cs@zip.com.au> 19dec97
+#
+
+
+use strict qw(vars);
+
+use cs::HTML;
+
+my($parse)=new cs::HTML (FILE,STDIN);
+
+my($t);
+
+while (defined ($t=$parse->Tok()))
+	{ print cs::HTML::tok2a($t);
+	}
+
+exit 0;
