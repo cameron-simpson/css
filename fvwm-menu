@@ -5,13 +5,18 @@
 #
 
 cmd=$0
-[ $# -ge 3 ] || { echo "Usage: $cmd menu title cmd [args...]" >&2; exit 2; }
+usage="Usage: $cmd [-n] menu title cmd [args...]"
+
+noentries=
+[ "x$1" = x-n ] && { noentries=1; shift; }
+
+[ $# -ge 3 ] || { echo "$usage" >&2; exit 2; }
 
 menu=$1
 title=$2
 shift; shift
 
-"$@" \
+( [ $noentries ] || exec "$@" ) \
 | ( echo "DestroyMenu $menu"
     echo "AddToMenu $menu \"$title\" Title"
     echo "AddToMenu $menu DynamicPopUpAction Piperead '$0 $menu \"$title\" $*'"
