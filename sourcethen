@@ -1,0 +1,29 @@
+#!/bin/sh
+#
+# Source a shell file the run a command.
+#	- Cameron Simpson <cs@zip.com.au> 24dec2004
+#
+
+cmd=$0
+usage="Usage: $cmd envfile command [args...]"
+
+badopts=
+
+if [ $# = 0 ]
+then
+  echo "$cmd: missing envfile" >&2
+  badopts=1
+else
+  envfile=$1; shift
+  if [ $# = 0 ]
+  then
+    echo "$cmd: missing command" >&2
+    badopts=1
+  fi
+fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+. "$envfile"
+
+exec "$@"
