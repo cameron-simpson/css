@@ -36,8 +36,15 @@ exit $::Xit;
 sub doimsize($)
 { my($f)=@_;
 
-  my($x,$y,$err)=imgsize($f eq '-' ? '/dev/fd/0' : $f);
-  if (defined $x)
+  local($::imf)=($f eq '-' ? '/dev/fd/0' : $f);
+
+  my($x,$y,$err);
+  ($x,$y,$err)=eval { imgsize($::imf) };
+
+  if ($@)
+  { warn "$::cmd: $f: $@\n";
+  }
+  elsif (defined $x)
   { print "$x $y $f\n";
   }
   else
