@@ -10,7 +10,7 @@ cvslog2html - transcribe CVS logs to HTML or plain text
 
 =head1 SYNOPSIS
 
-cvslog2html [{-D date|-r rev}] [-t] [-O] [{cvs-log-args...|-}]
+cvslog2html [{-D date|-r rev}] [-t] [-O] [{-|cvs-log-args...}]
 
 =head1 DESCRIPTION
 
