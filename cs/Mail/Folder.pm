@@ -85,11 +85,10 @@ sub FileItem	# folder->(srcpath,{LINK|COPY|MOVE})
   my(@c)=caller;die "INCOMPLETE from [@c]";
 
   if (ref $orig)
-	# presumably a cs::MIME object
-	# just hand it off to the MIME filer
-	{ return $this->File($orig);
-	}
-
+  # presumably a cs::MIME object
+  # just hand it off to the MIME filer
+  { return $this->File($orig);
+  }
   
 }
 
@@ -103,7 +102,7 @@ sub File($$;$$)	# cs::MIME -> n or undef
   ## {my(@c)=caller;warn "...File(@_) from [@c]";}
 
   my($H,$dir)=($M->Hdrs(),$this->{DIR});
-  my($rawbody)=$M->RawBody();
+  my($rawbody)=$M->Body();
 
   if (defined $orig && ! ref $orig)
   { ## warn "LinkToN($this->{DIR},$M,$nodissect,$orig)";
