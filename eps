@@ -1,0 +1,58 @@
+#!/usr/bin/perl
+#
+# Suck in an EPS file and emits PS to print it at a given point at a
+# given size.
+# Default point: 0,0
+# Default size: natural size.
+#	- Cameron Simpson <cs@zip.com.au> 21oct94
+#
+
+($cmd=$0) =~ s:.*/::;
+$usage="Usage: $cmd [-x maxx] [-y maxy] [-xy maxxy] [-p x y] [file]
+	-p x y		Bottom left is (x,y).
+	-x maxx		Specify maximum width.
+	-y maxy		Specify maximum height.
+	-xy maxxy	Constrain both.
+";
+
+use cs::EPS;
+
+$badopts=0;
+
+undef $maxx;
+undef $maxy;
+$px=0; $py=0;
+
+ARGV:
+  while (@ARGV)
+	{ $_=shift;
+	  if ($_ !~ /^-./)	{ unshift(@ARGV,$_);
+				  last ARGV;
+				}
+	  elsif ($_ eq '-x')	{ $maxx=shift(@ARGV)+0; }
+	  elsif ($_ eq '-y')	{ $maxy=shift(@ARGV)+0; }
+	  elsif ($_ eq '-xy')	{ $maxx=$maxy=shift(@ARGV)+0; }
+	  elsif ($_ eq '-p')	{ $px=shift(@ARGV)+0;
+				  $py=shift(@ARGV)+0;
+				}
+	  else			{ print STDERR
+					"$cmd: $_: unrecognised option\n";
+				  $badopts=1;
+				}
+	}
+
+die $usage if $badopts;
+
+$eps=new cs::EPS <>;
+
+$maxx=$eps->DX() unless defined $maxx;
+$maxy=$eps->DY() unless defined $maxy;
+
+$xscale=$maxx/$eps->DX();
+$yscale=$maxy/$eps->DY();
+
+$eps->Scale(&min($xscale,$yscale));
+
+print $eps->PS();
+
+sub min { $_[0] < $_[1] ? $_[0] : $_[1]; }
