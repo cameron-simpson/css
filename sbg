@@ -1,0 +1,2 @@
+#!/bin/sh
+rawx setrxvtbg ${1+"$@"} &
