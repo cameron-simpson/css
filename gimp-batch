@@ -1,0 +1,32 @@
+#!/bin/sh
+#
+# Run the gimp in batch mode with less pain.
+#	- Cameron Simpson <cs@zip.com.au> 10nov2003
+#
+
+cmd=`basename "$0"`
+usage="Usage: $cmd var=value... [gimp-scheme-files...]"
+
+letvars=
+
+while :
+do  case $1 in
+      [a-z]*=*)
+	var=`expr "$1" : '\([a-z][^=]*\)=.*'`
+	val=`expr "$1" : '[a-z][^=]*=\(.*\)'`
+	letvars="$letvars ($var $val)"
+	;;
+      *)break ;;
+    esac
+    shift
+done
+
+scheme=`exec cat ${1+"$@"}` || exit 1
+
+set -x
+exec gimp -i -d -b \
+	'(gimp-message-set-handler 2)' \
+	"(let* ($letvars)
+	  $scheme
+	 )" \
+	'(gimp-quit 0)'
