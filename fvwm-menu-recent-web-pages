@@ -1,6 +1,6 @@
 #!/bin/sh
-URLLOG=${URLLOG:-$HOME/var/log/urllog}
-export URLLOG
+: ${LOGDIR:=$HOME/var/log}
+: ${URLLOG:=$LOGDIR/urllog}
 sed -n 's;^urlshow  *http://;;p' <"$URLLOG" \
 | keeplast \
 | tail -400 \
