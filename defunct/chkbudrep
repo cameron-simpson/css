@@ -1,0 +1,66 @@
+#!/usr/bin/perl
+#
+# Report approval status of budget summary reports.
+#	- Cameron Simpson <cs@zip.com.au> 09mar99
+#
+
+use strict qw(vars);
+
+use CISRA::Groups;
+use CISRA::TimeSheets;
+use cs::Persist;
+use cs::Misc;
+
+$::Usage="Usage: $::cmd mcode\n";
+
+$::Xit=0;
+
+$::StateDir="$CISRA::TimeSheets::Dir/db/rep/bud/state";
+
+die $::Usage if @ARGV != 1;
+
+my $mcode=$ARGV[0];
+
+my $mdb = "$::StateDir/$mcode";
+my $db = cs::Persist::db($mdb);
+
+die "$::cmd: no state information for $mdb\n" if ! ref $db;
+
+my $pdb = CISRA::Groups::db();
+
+my @pcodes;
+my %a2g;
+for my $shortname (keys %$pdb)
+{ my $P = $pdb->{$shortname};
+  bless $P, CISRA::Misc;
+  if (exists $P->{MEMBERS}
+   && exists $P->{ACCTCODE} && length $P->{ACCTCODE}
+   && $P->IsCurrent()
+     )
+  { my $acode = $P->{ACCTCODE};
+    push(@pcodes,$acode);
+    $a2g{$acode}=$shortname;
+  }
+}
+
+{ my $budstate;
+  for my $pcode (sort { $a2g{$a} cmp $a2g{$b} } @pcodes)
+  { undef $budstate;
+    if (exists $db->{$pcode})
+    { my $subdb = $db->{$pcode};
+      if (exists $subdb->{APPROVAL})
+      { $budstate = $subdb->{APPROVAL};
+      }
+    }
+
+    print "$pcode $a2g{$pcode}";
+    if (ref $budstate)
+    { for my $app (sort keys %$budstate)
+      { print " $app:$budstate->{$app}";
+      }
+    }
+    print "\n";
+  }
+}
+
+exit 0;
