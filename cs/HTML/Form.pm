@@ -521,15 +521,15 @@ sub ScrollingListMU
 sub _tagSelect($$$$$$)
 { my($field,$map,$keylist,$selected,$size,$multiple)=@_;
   $multiple=0 if ! defined $multiple;
+  $keylist=[] if ! defined $keylist;
 
   ## warn "selected=[".cs::Hier::h2a($selected,0)."]";
   if (! defined $selected)	{ $selected=[]; }
   elsif (! ref $selected)	{ $selected=[ $selected ]; }
 
-  if (! defined $keylist)
-  { $keylist=[ sort keys %$map ]; }
-  else
-  { $keylist=_completeKeyList([ @$keylist ], sort keys %$map); }
+  ## warn "_tagSelect: orig keylist=[@$keylist]";
+  $keylist=::uniq(@$keylist, sort keys %$map);
+  ## warn "_tagSelect: new keylist=[@$keylist]";
 
   # 0 means pick a size, undef means no size (popup)
   if (defined $size && $size == 0)
@@ -557,14 +557,6 @@ sub _tagSelect($$$$$$)
   }
 
   [SELECT, $args, @content];
-}
-
-sub _completeKeyList
-{ my($keylist,@keys)=@_;
-  my(%keys);
-  map($keys{$_}=1,@$keylist);
-  push(@$keylist,grep(! defined $keys{$_},sort @keys));
-  $keylist;
 }
 
 =back
