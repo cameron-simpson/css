@@ -4,5 +4,5 @@
 
 if [ "x$*" = x- ]
 then urls -x
-else pageurls ${1+"$@"}
+else pageurls ${1+"$@"} | grep '^http:'
 fi | urlshow
