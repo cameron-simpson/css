@@ -34,9 +34,9 @@ Installing my scripts:
 	$HOSTNAME	Your machine's fully qualified domain name.
 	$ARCH		Your architecure, in the form vendor.cpu.os,
 			eg sun.sparc.solaris or sgi.mips.irix.
-	$SYSTEMID	A name for your machines administrative domain
-			(eg: I use "cisra" for my workplace: CISRA,
-			"home" for home and "zip" for my ISP: zip.com.au).
+	$SYSTEMID	A name for your machines' administrative domain
+			(eg: I use "home" for my home LAN
+			and "zip" for my ISP: zip.com.au).
 	$USER		Your login name.
 	$SITENAME	Your email domain (eg zip.com.au for me).
 	$EMAIL		Your email address (just "who@where", no "<>"s);
