@@ -1,0 +1,10 @@
+#!/bin/sh
+#
+# Usage: smail addresses... < complete-message
+#
+# Dispatch complete message to addresses.
+#
+
+[ $# = 0 ] && { echo "Usage: $0 addresses..." >&2; exit 2; }
+
+exec smtpsend "$@"
