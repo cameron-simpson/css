@@ -5,14 +5,20 @@
 #
 
 cmd=`basename "$0"`
-usage="Usage: $cmd [-h] URL command [args...]
+usage="Usage: $cmd [-c] [-h] URL command [args...]
+	-c	Cache the fetched URL.
+	-C	Cache the fetched URL; skip fetch if already cached.
 	-h	Passed to httpget."
 
 htopts=
+docache=
+trustcache=
 
 badopts=
 while :
 do  case $1 in
+      -c)	docache=1 trustcache= ;;
+      -C)	docache=1 trustcache=1 ;;
       -h)	htopts="$htopts $1" ;;
       --)	shift; break ;;
       -?*)	echo "$cmd: unrecognised option: $1" >&2; badopts=1 ;;
@@ -40,14 +46,21 @@ esac
 ext=`expr "x$url" : '.*\.\(..*\)'`
 [ -n "$ext" ] || ext=bin
 
-tmpf=${TMPDIR:-/tmp}/$cmd$$.$ext
-trap 'rm -f "$tmpf"' 0 1 2 15
+if [ $docache ]
+then
+    saveas=`urlcachename -p "$url"` || exit 1
+else
+    tmpf=${TMPDIR:-/tmp}/$cmd$$.$ext
+    trap 'rm -f "$tmpf"' 0 1 2 15
+    saveas=$tmpf
+fi
 
-httpget -o "$tmpf" "$url" || exit 1
+if [ $trustcache ] && [ -f "$saveas" -a -s "$saveas" ]
+then  :
+else  httpget -f -o "$saveas" "$url" || exit 1
+fi
 
-env WITHURL_URL=$url WITHURL_FILE=$tmpf "$@" "$tmpf"
+env WITHURL_URL=$url WITHURL_FILE=$saveas "$@" "$saveas"
 xit=$?
-
-rm -f "$tmpf"
 
 exit $xit
