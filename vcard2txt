@@ -1,0 +1,24 @@
+#!/bin/sh
+#
+# Read a vcard from stdin, write it out prettily.
+#	- Cameron Simpson <cs@zip.com.au> 14apr2001
+#
+
+[ $# = 0 ] || { echo "Usage: $0 < vcard" >&2; exit 2; }
+
+( echo;cat;echo ) \
+| sed -n \
+      -e '1,/^begin:vcard/d' \
+      -e '/^end:vcard$/,$d' \
+      -e '/^[a-z][a-z;]*:/!d' \
+      -e 's/^\([a-z][a-z]*\);/\1_/' \
+      -e "s/'/'\\''/g" \
+      -e "s/:\\(.*\\)/='\\1'/" \
+      -e 's/^/vcard_/p' \
+| ( eval "`cat`"
+    n=$vcard_fn
+    [ -n "$vcard_email_internet" ] && n="$n <$vcard_email_internet>"
+    echo "$n"
+    echo ${vcard_tel_cell:-"Ph: $vcard_tel_cell"}
+  ) \
+| sed '/^ *$/d'
