@@ -122,34 +122,45 @@ do
 		     continue
 		   }
 
+    case "$thing" in *-*) nvthing=`expr "x$thing" : 'x\([^\-]*\)-.*'` ;; *) nvthing=$thing ;; esac
     # determine default behaviour:
     # whether to localise by default
     makelocal=$localise
     issymlink "$l" || [ ! -d "$l" ] || makelocal=1
     # what version to make the default for this host
     version=
-    # leave this item alone
+    # leave this item alone?
     nosync=
 
     # check config file
     sedscript="y/	/ /
 	       s/^  *//
-	       /^#/d
+	       s/^#.*//
+	       /^$/d
 	       s/  *\$//
 	       s/   */ /g
+
+	       # outright mode settings
 	       /^$thing local\$/b local
 	       /^$thing remote\$/b remote
 	       /^$thing nosync\$/b nosync
+
+	       # unversioned mode settings
+	       /^$nvthing local\$/b local
+	       /^$nvthing remote\$/b remote
+	       /^$nvthing nosync\$/b nosync
+
+	       # wildcard mode settings
 	       /^\* local\$/b local
 	       /^\* remote\$/b remote
 	       /^\* nosync\$/b nosync
+
+	       # set version and mode
 	       /^$thing [^ ][^ ]* local\$/b vlocal
 	       /^$thing [^ ][^ ]* remote\$/b vremote
+
+	       # just set version
 	       /^$thing [^ ][^ ]*\$/b vers
-	       s/ /-/
-	       /^$thing local\$/b local
-	       /^$thing remote\$/b remote
-	       /^$thing nosync\$/b nosync
 	       d
 	       :local
 	       s/.*/makelocal=1 nosync=/
@@ -191,18 +202,6 @@ do
 	# remote end is symlink - must be the "DEFAULT" link
 	if rlink=`readsymlink "$r"` && [ -n "$rlink" ]
 	then
-
-#	    # make thing-DEFAULT symlink to default version
-#	    dflt="$l-DEFAULT"
-#	    if llink=`readsymlink "$dflt"` \
-#	    && [ "x$rlink" = "x$llink" ]
-#	    then
-#		: generic link matches - leave it alone
-#	    else
-#		# adjust local "default" link
-#		$trace rm "$dflt"
-#		$trace ln -s "$rlink" "$dflt" || xit=1
-#	    fi
 
 	    # make thing into symlink to right version
 	    if [ -n "$version" ]
