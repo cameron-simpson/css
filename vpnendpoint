@@ -4,11 +4,11 @@
 # Tails my console file (which is handy for watching the remote host)
 # and copy input to the log (keeps link alive, detects link down).
 # See the portfwd script for use.
-#	- Cameron Simpson <cs@zip.com.au> 07oct99
+#	- Cameron Simpson <cs@zip.com.au> 07oct1999
 #
 
 # one day I'll make these tunable
-log=var/log/console
+log=var/log/alert
 pids=
 
 trap 'kill -9 $pids; exit 1' 0 1 2 13 15
