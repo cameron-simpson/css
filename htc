@@ -1,0 +1,34 @@
+#!/bin/sh
+#
+# Scour a web page with htclean.
+#	- Cameron Simpson <cs@zip.com.au> 02feb2001
+#
+
+mode=once
+[ "x$1" = x-a ] && { mode=all; shift; }
+[ "x$1" = x-1 ] && { mode=once; shift; }
+
+if [ $mode = all ]
+then  htcpfx=http://web/htc-all.cgi/
+else  htcpfx=http://web/htc.cgi/
+fi
+
+if [ $# = 0 ]
+then
+  oIFS=$IFS
+  IFS='
+'
+  set x `xcut -p`; shift
+  IFS=$oIFS
+fi
+
+for url
+do  if [ "x$url" = x- ]
+    then  sed -e '/^[a-z][a-z]*:\/\//!s|^|http://|' -e "s;^;$htcpfx;"
+    else  case "$url" in
+	      http://* | ftp://* ) ;;
+	      *)	url=http://$url ;;
+	  esac
+	  echo "$htcpfx$url"
+    fi
+done | us +c -
