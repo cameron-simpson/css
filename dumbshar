@@ -1,0 +1,32 @@
+#!/bin/sh
+# Dumbshar - shar up simple files.
+#
+
+xit=0
+
+cat <<'X'
+#!/bin/sh
+#
+# Cut here and feed through /bin/sh to extract:
+X
+for f
+do  echo "#	$f"
+done
+echo '#'
+
+for f
+do
+	[ -r "$f" ] || { echo "$0: not a readable regular file" >&2
+			 xit=1
+			 continue
+		       }
+
+	echo ''
+	echo "sed 's/^X//' > '$f' <<'EOF-$f'"
+	sed 's/^/X/' "$f"
+	echo "EOF-$f"
+done
+
+echo exit 0
+
+exit $xit
