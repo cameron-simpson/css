@@ -44,7 +44,7 @@ do
     0,)		rawargs= execargs=1
 		set x ${SHELL-/bin/sh} ; shift
 		break ;;
-    1,-[lwhxyn])
+    1,-[lwhxyns])
 		echo "$cmd: $1 needs an argument" >&2
 		echo "$usage" >&2
 		exit 2
