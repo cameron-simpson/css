@@ -1,0 +1,46 @@
+#!/bin/sh
+#
+# Crudely report a period of seconds in human friendly units.
+# Pulled code from xlo.
+#	- Cameron Simpson <cs@zip.com.au> 
+#
+
+cmd=$0
+usage="Usage: $cmd seconds"
+
+badopts=
+
+if [ $# = 0 ]
+then
+  echo "$cmd: missing seconds" >&2
+  badopts=1
+else
+  elapsed=$1; shift
+  [ $# = 0 ] || { echo "$cmd: extra arguments after seconds: $*" >&2
+		  badopts=1
+		}
+fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+delay=
+units=s
+[ $elapsed -ge 60 ] && \
+{ rem=`expr $elapsed % 60`
+  elapsed=`expr $elapsed / 60`
+  [ $rem = 0 ] || delay=$rem$units
+  units=m
+
+  [ $elapsed -ge 60 ] && \
+  { rem=`expr $elapsed % 60`
+    elapsed=`expr $elapsed / 60`
+    [ $rem = 0 ] || { [ -z "$delay" ] || delay=" $delay"
+		      delay=$rem$units
+		    }
+    units=h
+  }
+}
+[ -z "$delay" ] || delay=" $delay"
+delay=$elapsed$units$delay
+
+echo "$delay"
