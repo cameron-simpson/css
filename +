@@ -5,7 +5,7 @@
 #
 
 cmd=$0
-usage="Usage: $0 [-f] [+a] [some-mutt-options...] [mutt-folder]"
+usage="Usage: $0 [+a] [+s] [+t] [-f] [some-mutt-options...] [mutt-folder]"
 
 mfolder=+attn
 muttopts=
