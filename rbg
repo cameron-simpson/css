@@ -1,0 +1,9 @@
+#!/bin/sh
+#
+# Run rootbg then clear my alert window.
+#	- Cameron Simpson <cs@zip.com.au> 17nov2001
+#
+
+rootbg ${1+"$@"}
+( sleep 10 && clear | alert ) &
+exit 0
