@@ -70,7 +70,7 @@ urllist=/tmp/hi-urls.$$
 		[ $hit ] || { echo "no hits grepping $url for \"$grep\"" >&2
 			      echo "$url"
 			    }
-	      )
+	      ) &
       fi
   done >>"$urllist"
 )
