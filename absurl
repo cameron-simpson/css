@@ -1,0 +1,54 @@
+#!/usr/bin/perl
+#
+# Read URLs, convert to absolute ones w.r.t to supplied base.
+#	- Cameron Simpson, cs@zip.com.au, 24aug97
+#
+# -h to restrict results to origin page's host.	- cameron, 17apr98
+#
+
+use strict qw(vars);
+
+use cs::URL;
+
+($::cmd=$0) =~ s:.*/::;
+$::Usage="Usage: $::cmd [-h] baseurl\n";
+
+my($base,$hostOnly)=('',0);
+
+if (@ARGV && $ARGV[0] eq '-h')
+{ $hostOnly=1;
+  shift(@ARGV);
+}
+
+if (@ARGV == 1)
+{ $base=shift(@ARGV);
+}
+else
+{ die $::Usage;
+}
+
+$base=new cs::URL $base;
+
+my $u; my $e;
+
+while (defined($_=<STDIN>))
+{ chomp;
+
+  if (/\s+/)
+  { $u=$`; $e=$'; }
+  else
+  { $u=$_; $e=''; }
+
+  ## warn "Abs(".$base->Text().")";
+  $_=$base->Abs($u);
+  ## warn "abs=".$_->Text();
+
+  if (! $hostOnly
+   || (1 ## $_->{SCHEME} eq $base->{SCHEME}
+    && $_->{HOST} eq $base->{HOST}
+    && 1 ## $_->{PORT} eq $base->{PORT}
+      )
+     )
+  { print $_->Text(), (length $e ? "\t$e" : ""), "\n";
+  }
+}
