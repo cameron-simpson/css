@@ -714,7 +714,7 @@ sub Category($)
 
 =item DTitle()
 
-<B>DISCOURAGED</B>
+B<DISCOURAGED>
 
 Return the Artist/Title field B<DTITLE> from the CDDB record.
 This is a really fucking stupid idea;
