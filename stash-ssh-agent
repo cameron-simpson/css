@@ -5,7 +5,7 @@
 #
 
 cmd=$0
-usage="Usage: $cmd [statefile]"
+usage="Usage: $cmd [{-|statefile}]"
 
 statefile=
 
@@ -19,9 +19,11 @@ badopts=
 
 [ -n "$statefile" ] || statefile=`ssh-agent-statefile` || exit 1
 
-set -x
-env \
-| sed -n 's/^\(SSH_[_A-Z]*\)=\(.*\)/\1='\''\2'\''; export \1;/p' >"$statefile" \
-|| { rm -f "$statefile"; exit 1; }
+[ "x$statefile" = x- ] || exec >"$statefile"
 
+env \
+| sed -n 's/^\(SSH_[_A-Z]*\)=\(.*\)/\1='\''\2'\''; export \1;/p' \
+|| { [ "x$statefile" = x- ] || rm -f "$statefile"; exit 1; }
+
+[ "x$statefile" = x- ] && exit 0
 exec chmod a+rx "$statefile"
