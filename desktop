@@ -4,5 +4,5 @@
 # Allocate (or reuse) a named desk, returning its number.
 #	- Cameron Simpson <cs@zip.com.au> 18jul2002
 #
-idset=${DESKTOPSET:-desktop}
-exec idset -i "$idset" ${1+"$@"}
+: ${DESKTOPSET:=desktop}
+exec idset -i "$DESKTOPSET" ${1+"$@"}
