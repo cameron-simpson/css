@@ -4,9 +4,6 @@
 #	- Cameron Simpson <cs@zip.com.au> 01jul2004
 #
 
-envfile=/etc/rc.mobile/envfile
-[ -s "$envfile" ] && . "$envfile"
-
 cmd=$0
 usage="Usage: $cmd [-f]"
 
@@ -27,12 +24,17 @@ then
       done
       echo
     fi
+
+    ## old proxy-mode redirector
     ##exec alog squid_redirect squid_redirect -P "8080:$SQUID"
+
     rc=$HOME/tmp/squid.conf$$
-    envsub -p '\{\{([A-Z]\w*)\}\}' <$HOME/rc/squid/tplt >$rc
+    envsub -p '\{\{([A-Z]\w*)\}\}' <"$HOME/rc/squid/tplt" >"$rc"
+    mksquidpeers $SQUID_PEERS \
+    | rlr -f '^##MKSQUIDPEERS OUTPUT BEGIN' -t '##MKSQUIDPEERS OUTPUT END' -i "$rc" -o "$rc" -
     case "$LOCATION" in
 	sco)		bsed -e 's/^never_direct/##&/' \
-			     -e 's/^cache_peer/##&/' $rc
+			     -e 's/^cache_peer/##&/' "$rc"
 			;;
 	*)		;;
     esac
