@@ -23,6 +23,9 @@
 # as typically they need define only "pure PostScript" printer names.
 #
 
+#### needed? #### # ensure env is set up
+#### needed? #### [ -n "$SYSTEMID" ] || { [ -s /opt/shell/STANDARD ] && . /opt/shell/STANDARD; }
+
 multipsargs=
 topsargs='-T "$arg"'
 pshufargs=
@@ -255,13 +258,15 @@ do
 		# =item B<-i> I<type>
 		#
 		# Treat the input as being of the named I<type>.
-		# Known types are B<any>
-		# (the default: guess the type from the first line),
+		# The types are as for the 2ps(1) command
+		# and include
+		# B<any> (the default: guess the type from the content),
 		# B<ps> and B<postscript>, B<pdf>, B<mentor>, and B<text>.
+		# MIME types are also accepted.
 		#
-		-i)	itype=$2; shift ;;
-		-i*)	itype=`expr "x$1" : 'x-i\(.*\)'` ;;
-		--)	shift; break;;
+		-i)	itype=$2; shift;                  [ "x$itype" = xany ] && itype= ;;
+		-i*)	itype=`expr "x$1" : 'x-i\(.*\)'`; [ "x$itype" = xany ] && itype= ;;
+		--)	shift; break ;;
 		-?*|+?*) echo "$cmd: unknown option '$1'" >&2; badopts=1 ;;
 		/*/)	regexp=`expr "x$1" : '^x/\(.*\)/$'`
 			filter="highlight '$regexp' | $filter" ;;
@@ -270,41 +275,19 @@ do
 	shift
 done
 
+[ -n "$PRINTER" ] || { echo "$cmd: no -Pprinter and no \$PRINTER" >&2
+		       badopts=1
+		     }
+
 # =back
 #
 
 # insert pshuf if required
 [ -n "$pshufargs" ] && filter="pshuf $pshufargs | $filter"
 
-# maybe add common image format conversions?
-case "$itype" in
-    any)
-	filter="2ps \$topsargs -T \"\$arg\" | $filter"
-	;;
-    ps|postscript)
-	;;
-    pdf)
-	filter="pdf2ps | $filter"
-	;;
-    text)
-	filter="2ps \$topsargs -f | $filter"
-	;;
-    mentor)
-	filter="mentor2ps | $filter"
-	;;
-    *)	echo "$cmd: unknown input type \"$itype\"" >&2
-	badopts=1
-	;;
-esac
-
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
-# ensure env is set up
-[ -n "$SYSTEMID" ] || . /opt/shell/STANDARD
-
-[ -n "$PRINTER" ] || { echo "$cmd: no -Pprinter and no \$PRINTER: aborting!" >&2
-		       exit 1
-		     }
+filter="2ps \$topsargs -i \"\$itype\" -T \"\$arg\" | $filter"
 
 # multisheeting
 [ -n "$multipsargs" ] && filter="$filter multips \$multipsargs |"
@@ -381,9 +364,12 @@ fi
 		if [ -n "$URL2TXT" ]
 		then  eval "$URL2TXT \"\$arg\""
 		else  w3m -dump -T text/html -cols 80 -F "$arg"
-		fi | eval "$filter $lp" ;;
+		fi \
+		| eval "$filter $lp"
+		;;
 	*)
-		eval "$filter $lp" <"$arg" ;;
+		eval "$filter $lp" <"$arg"
+		;;
     esac
     ## set +x
   done
