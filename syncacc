@@ -16,6 +16,7 @@ case "$to" in   ''|*:) ;; *) to=$to:     ;; esac
 set -x
 exec \
   rsync -rlptHvP --delete --exclude=CVS/ \
+	'--include=/.bash_history' \
 	'--include=/.bash_logout' \
 	'--include=/.bash_profile' \
 	'--include=/.bashrc' \
