@@ -6,6 +6,9 @@
 #
 
 : ${TMPDIR:=/tmp}
+: ${SAVEDIR:=$HOME/dl}
+: ${APPHELPER_SAVEMODE:=auto}
+: ${APPHELPER_REMAPFILE:=$HOME/rc/remap}
 
 cmd=`basename "$0"`
 
@@ -17,9 +20,8 @@ echo "apphelper: \$*=[$*]" >&2
 
 doterm=
 savedir=
-pager=${PAGER:-less}
 doview=$APPHELPER_DOVIEW
-savemode=${APPHELPER_SAVEMODE:-auto}
+savemode=$APPHELPER_SAVEMODE
 extract=
 extract_globs=$APPHELPER_EXTRACT_GLOBS
 termname=$cmd
@@ -138,20 +140,20 @@ else
       # handed real filename
       if [ ! -s "$file" ]
       then
-	    echo "$cmd: bad file?" >&2
-	    ls -ld "$file" >&2
-	    badopts=1
+	echo "$cmd: bad file?" >&2
+	ls -ld "$file" >&2
+	badopts=1
       else
-	    if [ $doterm ]
-	    then
-		tmpfile=$tmpdir/`basename "$file"`
-		if cp "$file" "$tmpfile"
-		then  tmpfile=`fixexts "$tmpfile"` || exit 1
-		      file=$tmpfile
-		else  echo "$cmd: can't cp $file to $tmpfile, aborting" >&2
-		      badopts=1
-		fi
-	    fi
+	if [ $doterm ]
+	then
+	  tmpfile=$tmpdir/`basename "$file"`
+	  if cp "$file" "$tmpfile"
+	  then  tmpfile=`fixexts "$tmpfile"` || exit 1
+		file=$tmpfile
+	  else  echo "$cmd: can't cp $file to $tmpfile, aborting" >&2
+		badopts=1
+	  fi
+	fi
       fi
       ;;
   esac
@@ -192,13 +194,6 @@ else
 	  # or B<$HOME/dl> if that is not set.
 	  #
 	  -d)	apphopt2=$2 savedir=$2; shift ;;
-	  # =item -p I<pager>
-	  #
-	  # Specify the preferred pager program.
-	  # lacking this, use the value of the envvar B<$PAGER>
-	  # or the program less(1) if that is not set.
-	  #
-	  -p)	apphopt2=$2 pager=$2; shift ;;
 	  # =item -n
 	  #
 	  # No: do not run the viewer program.
@@ -396,11 +391,42 @@ fi
 # with the B<-i> option,
 # leaving it up to cp(1) to ask questions.
 #
+
 if [ -z "$savedir" ]
 then
     savedir=`lastvalue savedir 2>/dev/null`
-    savedir=${savedir:-"${SAVEDIR-$HOME/dl}"}
+    : ${savedir:=$SAVEDIR}
 fi
+
+# offer remapped name if one exists
+if [ -n "$APPHELPER_REMAPFILE" ] && [ -s "$APPHELPER_REMAPFILE" ]
+then
+  remaptmp=$TMPDIR/$cmd-remap$$
+  if printf "%s\n" "$fbase" | remap "$APPHELPER_REMAPFILE" >"$remaptmp"
+  then
+    exec 3<&0 0<"$remaptmp"
+    if read -r oldname \
+    && read -r newname \
+    && [ -n "$newname" ] \
+    && [ "x$oldname" != "x$newname" ]
+    then
+      case "$newname" in
+	*/*)
+	  savedir=`expr "x$newname" : 'x\(.*\)/.*'`
+	  newname=`expr "x$newname" : 'x.*/\(.*\)'`
+	  case "$savedir" in /*) ;; *) savedir=$SAVEDIR/$savedir ;; esac
+	  [ -n "$newname" ] && fbase=$newname
+	  ;;
+	?*)
+	  fbase=$newname
+	  ;;
+      esac
+    fi
+    exec 0<&3 3<&-
+  fi
+  rm -f "$remaptmp"
+fi
+
 if [ "x$savemode" = xauto ]
 then
   trysave=$savedir/$fbase
