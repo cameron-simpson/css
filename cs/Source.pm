@@ -108,9 +108,10 @@ sub new
   elsif ($type eq PATH)
   { my($path)=shift;
     if (! defined $path)
-	  { my(@c)=caller;
-	    die "\$path not set from [@c]";
-	  }
+    { my(@c)=caller;
+      die "\$path not set from [@c]";
+    }
+
     my($io,$file)=_new_FILE($path,1);
     return undef if ! defined $io;
     $this->{IO}=$io;
@@ -158,10 +159,11 @@ sub new
     $type=ARRAY;
   }
   elsif ($type eq Source)
-	{ $this->{DS}=shift;
-	}
+  { $this->{DS}=shift;
+  }
   else
   { warn "$::cmd: Source::new: unknown type \"$type\"";
+    my@c=caller;warn "\tfrom[@c]";
     return undef;
   }
 
