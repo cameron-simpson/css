@@ -1,0 +1,19 @@
+#!/bin/sh
+#
+# To Answer The Call.
+#
+
+eval "`setvar -n DoD`"
+faq=$DoD/WitDoDFAQ
+superfaq=$DoD/SuperFAQ
+
+case "$1" in
+    -s)	faq=$superfaq ; shift ;;
+esac
+case $# in
+    0)	echo "Usage: $0 addresses" >&2; exit 2;;
+esac
+
+[ -r "$faq" ] || { echo "$0: can't read $faq" >&2; exit 1; }
+
+exec m -s 'gang FAQed by the DoD' "$@" < "$faq"
