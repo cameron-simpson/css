@@ -28,7 +28,7 @@ then
     [ $dolog ] && iptables -I "$chain_out" -p tcp --syn -j LOGACCEPT
 else
     set -x
-    for host
+    for host in `hostips "$@"`
     do
       iptables -I "$chain_in" -s "$host" -j ACCEPT
       iptables -I "$chain_out" -d "$host" -j ACCEPT
