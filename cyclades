@@ -56,6 +56,6 @@ session=cyclades-$cychost/$session
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
 set -x
-exec scrif "$session" \
+##exec scrif "$session" \
 	logscript "$session" \
 	ssh -l "$cycuser:$cycport" "$cychost"
