@@ -1,0 +1,7 @@
+#!/bin/sh
+#
+# Read barcode values from stdin, write DLT labels to stdin in PostScript.
+#	- Cameron Simpson <cs@zip.com.au> 03sep2004
+#
+
+exec barcode -u mm -p 210x297 -e 128b -c -t 3x10 -g 55x20 -m 2,2
