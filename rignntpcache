@@ -9,4 +9,4 @@ then
     exit 1
 fi
 
-acon lock nntpcached nntpcached -n -c $HOME/rc/nntpcache/etc/nntpcache.config
+acon lock nntpcached nntpcached -n -c $HOME/rc/nntpcache/nntpcache.config
