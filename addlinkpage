@@ -6,8 +6,7 @@
 
 cmd=$0
 
-LINKPAGEPATH=${LINKPAGEPATH:-$HOME/.linkpages}
-export LINKPAGEPATH
+: ${LINKPAGEPATH:=$HOME/.linkpages}
 
 verbose=1
 ##[ -t 0 ] && verbose=1
@@ -35,18 +34,10 @@ fi
 
 if [ $# = 0 ]
 then
-  if [ -t 0 ]
-  then
-      [ -n "$DISPLAY" ] && { set -- `xclip -o` || exit 1; }
-      [ $# = 0 ] && { echo "$cmd: no args and nothing from xclip" >&2
-		      badopts=1
-		    }
-  else
-      set -- `cat` || exit 1
-      [ $# = 0 ] && { echo "$cmd: no args and nothing from stdin" >&2
-		      badopts=1
-		    }
-  fi
+  [ -n "$DISPLAY" ] && { set -- `xclip -o` || exit 1; }
+  [ $# = 0 ] && { echo "$cmd: no args and nothing from xclip" >&2
+		  badopts=1
+		}
 fi
 
 case "$topic" in
@@ -72,11 +63,10 @@ done
 
 lastvalue addlinkpage "$topic"
 
-[ $# = 0 ] && { [ $verbose ] && echo "Reading URLs from stdin..." >&2
-		set -- `cat`;
-	      }
-
 for url
 do  [ $verbose ] && echo "$url >> $topicfile" >&2
-    echo "$url" >>"$topicfile"
+    if [ "x$url" = x- ]
+    then  cat
+    else  echo "$url"
+    fi >>"$topicfile"
 done
