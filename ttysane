@@ -2,6 +2,7 @@
 # - Cameron Simpson <cs@zip.com.au>
 stty sane
 stty intr '^?' erase '^h' kill '^x'
-stty werase '^w'
-stty susp '^z' dsusp '^y'
+stty werase '^w' 2>/dev/null
+stty susp '^z' 2>/dev/null
+stty dsusp '^y' 2>/dev/null
 exec "$@"
