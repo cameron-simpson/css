@@ -79,50 +79,50 @@ sub saferename	# (from,to) -> success
   my $ok = 0;
 
   if (link($from,$to))
-	{ $ok=1;
-	  if (!$noremove && !unlink($from))
-		{ warn "unlink($from): $!, $from still linked to $to\n";
-		}
-	}
+  { $ok=1;
+    if (!$noremove && !unlink($from))
+    { warn "unlink($from): $!, $from still linked to $to\n";
+    }
+  }
   elsif ($! == &POSIX::EXDEV)
-	# cross device link
-	{ if (lstat($to))
-		{ warn "$main::cmd: $to exists\n";
-		}
+  # cross device link
+  { if (lstat($to))
+    { warn "$main::cmd: $to exists\n";
+    }
+    else
+    { if (!open(RENAME_FROM,"<$from"))
+      { warn "$main::cmd: can't open $from for read: $!\n";
+      }
+      else
+      { if (!open(RENAME_TO,">$to"))
+	{ warn "$main::cmd: can't open $to for write: $!\n";
+	}
+	else
+	{ $ok=1;
+	  while (<RENAME_FROM>)
+	  { if (! print RENAME_TO)
+	    { warn "$::cmd: cs::Pathname::saferename($from,$to): $!";
+	      $ok=0;
+	    }
+	  }
+
+	  close(RENAME_TO);
+
+	  if ($ok && ($noremove || unlink($from)))
+	  { }
 	  else
-	  { if (!open(RENAME_FROM,"<$from"))
-		{ warn "$main::cmd: can't open $from for read: $!\n";
-		}
-	    else
-	    { if (!open(RENAME_TO,">$to"))
-		{ warn "$main::cmd: can't open $to for write: $!\n";
-		}
-	      else
-	      { $ok=1;
-		while (<RENAME_FROM>)
-			{ if (! print RENAME_TO)
-				{ warn "$::cmd: cs::Pathname::saferename($from,$to): $!";
-				  $ok=0;
-				}
-			}
-
-		close(RENAME_TO);
-
-		if ($ok && ($noremove || unlink($from)))
-			{ }
-		else
-		{ $ok=0;
-		  warn "$main::cmd: can't unlink $from ($!), unlinking $to\n";
-		  if (!unlink($to))
-			{ warn "$main::cmd: can't unlink $to: $!\n\tboth $from and $to now exist\n";
-			}
-		}
-	      }
-
-	      close(RENAME_FROM);
+	  { $ok=0;
+	    warn "$main::cmd: can't unlink $from ($!), unlinking $to\n";
+	    if (!unlink($to))
+	    { warn "$main::cmd: can't unlink $to: $!\n\tboth $from and $to now exist\n";
 	    }
 	  }
 	}
+
+	close(RENAME_FROM);
+      }
+    }
+  }
   else
   { warn "$main::cmd: link($from,$to): $!\n";
   }
@@ -220,21 +220,22 @@ sub ident	# path or stat-array -> undef or ident
   "$s[6]:$s[0]:$s[1]";
 }
 
-sub makedir($;$);
-sub makedir($;$)
-{ my($dir,$perms)=@_;
+sub makedir($;$$);
+sub makedir($;$$)
+{ my($dir,$perms,$verbose)=@_;
   $perms=0777 if ! defined $perms;
+  $verbose=0 if ! defined $verbose;
 
   return 1 if -d "$dir/.";
 
   my($super)=cs::Pathname::dirname($dir);
   makedir($super,$perms) || return 0;
 
-  warn "mkdir $dir\n";
+  warn "mkdir $dir\n" if $verbose;
   if (! mkdir($dir,$perms))
-	{ warn "$::cmd: mkdir($dir): $!\n";
-	  return 0;
-	}
+  { warn "$::cmd: mkdir($dir): $!\n";
+    return 0;
+  }
 
   1;
 }
