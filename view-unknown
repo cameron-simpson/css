@@ -45,9 +45,18 @@ case "$file" in
       exit $?
       ;;
   -)  file=/dev/fd/0 ;;
-  /*) ;;
+  /*|./*|../*) ;;
   *)  file=./$file ;;
 esac
+
+if [ -n "$VIEW_UNKNOWN_FILENAME" ] \
+&& [ "x$VIEW_UNKNOWN_FILENAME" = "x$file" ]
+then
+    echo "$cmd: recursive call on file \"$file\", aborting" >&2
+    exit 1
+fi
+VIEW_UNKNOWN_FILENAME=$file
+export VIEW_UNKNOWN_FILENAME
 
 exec 3<"$file"
 [ -t 3 ] && { echo "$cmd: won't read from a terminal" >&2
