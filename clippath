@@ -1,0 +1,4 @@
+#!/bin/sh
+
+echo '%!PS-Adobe-1.0'
+echo clippath pathbbox stroke showpage
