@@ -5,7 +5,9 @@
 # - Cameron Simpson <cs@zip.com.au>
 #
 
-tmp=/tmp/vmdel.$$
+: ${TMPDIR:=/tmp}
+
+tmp=$TMPDIR/vmdel.$$
 cat >$tmp || { rm -f $tmp; exit 1; }
 
 exec 3<$tmp
