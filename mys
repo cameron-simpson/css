@@ -5,7 +5,7 @@
 #
 
 cmd=$0
-usage="Usage: $cmd [db]"
+usage="Usage: $cmd"
 
 pfx=root
 db=
@@ -13,5 +13,5 @@ db=
 [ $# = 0 ] || { db=$1 pfx=$1; shift; }
 [ $# = 0 ] || { echo "$usage" >&2; exit 2; }
 
-eval `secret "$pfx-mysql@$SYSTEMID"` || exit 1
+eval `secret "${pfx}-mysql@$SYSTEMID"` || exit 1
 exec mysql "-h$secretHOST" "-u$secretLOGIN" "-p$secretPASSWORD" $db
