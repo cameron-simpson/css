@@ -125,4 +125,4 @@ do
     | eval "$filtercmd" \
     | sed "s;^[^/];$dir/&;"
 done \
-| ( set -x; eval "$filter"; cat >/dev/null )
+| ( eval "$filter"; exec cat >/dev/null )
