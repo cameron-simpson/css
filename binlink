@@ -1,0 +1,15 @@
+#!/bin/sh
+#
+# Link something into my bins, usually a script.
+# Obsolete these days; I'm back to using a long PATH
+# instead of doing it The Plan 9 Way.
+#	- Cameron Simpson <cs@zip.com.au>
+#
+
+for d in $HOME/bin/*.*.*/.
+do  for f do necho "$f -> $d" >&2
+	     b=`basename "$f"`
+	     rm -f "$d/$b"
+	     ln "$f" "$d" && echo >&2
+    done
+done
