@@ -65,8 +65,7 @@ PERL5LIB=$HOME/rc/perl:$PERL5LIB:/opt/perl/lib
 export USER EMAIL DISPLAY PERL5LIB
 [ -n "\$DISPLAY" ] || unset DISPLAY
 rm -f $tmp $env
-exec $SHELL
-##exec term -n '$su@$HOST'
+exec term -n '$su@$HOST'
 ##exec pushttylabel -exec '$su@$HOST' term -n '$su@$HOST'
 SU
 
