@@ -41,10 +41,10 @@ do
 	--nobounce --tracepolls --warnings 86400 \
 	$fmopts ${1+"$@"} $fmhosts
   echo `date`: fetchmail done | tee -a "$logfile" >&2
+  killpidfile getmail_flush.pid
 
   [ $once ] && break
   sleep $fmdelay &
   echo $! >"$VARRUN/fetchmail_sleep.pid"
   wait
-  killpidfile getmail_flush.pid
 done
