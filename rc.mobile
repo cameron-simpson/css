@@ -13,7 +13,7 @@
 #
 # =head1 SYNOPSIS
 #
-# rc.mobile start [-n] [-f config] [@where]
+# rc.mobile start [-n] [-y] [-f config] [@where]
 #
 # =head1 DESCRIPTION
 #
@@ -28,17 +28,20 @@
 # I<rc.mobile> also starts the services in parallel,
 # yeilding significantly faster boot times.
 # There are facilities for specifying that one service depends on another
-# and for running arbitrary shell commands for actions not encapsulated in standard startup files.
+# and for running arbitrary shell commands
+# for actions not encapsulated in standard startup files.
 # In a sense the locations represent a generalisation of the idea of run levels.
 #
 
 where=${SYSTEMID:-home}
 cf=/etc/rc.mobile.conf
 trace=set-x
+int=1
 
 cmd=$0
 usage="Usage: $cmd {start|stop} [-n] [-f config]
 	-n		No action. Recite proposed actions.
+	-y		Yes: proceed with the default location without asking.
 	-f config	Specify config file.
 			Default: $cf"
 
@@ -54,6 +57,8 @@ case "$mode" in
 	int=1
         ;;
   stop) action=down
+	echo "$cmd: action $mode unsupported" >&2
+	exit 2
         ;;
   restart)
 	$trace "$cmd" stop && $trace "$cmd" start ${1+"$@"}
@@ -71,8 +76,6 @@ esac
 badopts=
 while :
 do  case $1 in
-	-i)   int=1 ;;
-
 	# =item B<-f> I<config>
 	#
 	# Specify a configuration file to use instead of B</etc/rc.mobile.conf>.
@@ -85,6 +88,12 @@ do  case $1 in
 	# handy for debugging configuration file changes.
 	#
 	-n)   trace=echo ;;
+	# =item B<-y>
+	#
+	# Yes.
+	# Proceed with the default location without asking.
+	#
+	-y)   int= ;;
 	--)   shift; break ;;
 	-?*)  echo "$cmd: unrecognised option: $1" >&2
 	      badopts=1
@@ -106,7 +115,8 @@ locations=`sed -n -e '/^#/d' -e 's/^\\[@\\([a-z].*\\)\\]$/\\1/p' "$cf"`
 
 # =head1 OPERATION
 #
-# B<rc.mobile> asks the user where it it running.
+# B<rc.mobile> asks the user where it it running
+# (unless the B<-y> option is supplied).
 # The locations offered are taken from the clauses whose names commence with an "@",
 # discarding the "@".
 # The default location comes from the environment variable B<$SYSTEMID>,
@@ -114,7 +124,7 @@ locations=`sed -n -e '/^#/d' -e 's/^\\[@\\([a-z].*\\)\\]$/\\1/p' "$cf"`
 #
 # After obtaining the current location
 # (referring to as "I<where>" below)
-# the clauses B<GLOBAL> and I<where> are run respectively.
+# the clauses B<GLOBAL> and I<where> are in that order.
 #
 
 if [ $int ]
@@ -177,7 +187,9 @@ doops()
       # Set the environment variable named I<var> to the value I<value>.
       #
       [a-zA-Z]*=*)
+	      var=`expr "$op" : '\([^=]*\)=.*'`
 	      eval "$op"
+	      export $var
 	      ;;
       # =item /path/to/dir/
       #
@@ -186,7 +198,7 @@ doops()
       # The template is the directory named
       # B</path/to/dir.>I<where> or B</path/to/dir.DFLT>
       # if the former is not present.
-      # If neither is present, the target direct is unchanged.
+      # If neither is present, the target directory is unchanged.
       # Otherwise, the directory is made identical to the template with rsync(1).
       #
       /*/)    to=`expr "x$op" : 'x\(.*\)/'`
@@ -205,7 +217,8 @@ doops()
       #
       # Prepare the spacified file
       # from a template.
-      # You'll notice that files and directories are distinguished by the directory's trailing slash (`/').
+      # Files and directories are distinguished
+      # by the directory's trailing slash (`/').
       # The template is the file named
       # B</path/to/file.>I<where> or B</path/to/file.DFLT>
       # if the former is not present.
@@ -244,7 +257,8 @@ doops()
 	      ;;
       # =item need I<services...>
       #
-      # Require the names services' startup scripts to have completed before proceeding.
+      # Require the named services' startup scripts
+      # to have completed before proceeding.
       # If any of the services have not been dispatched,
       # dispatch them as for the B<svc> directive
       # and then wait for them.
