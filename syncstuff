@@ -272,16 +272,20 @@ else
     # do targets individually
     for dir
     do
-	$trace rsync --rsync-path "$rrsync" $rsopts "$from$dir/." "$to$dir/." || xit=1
+	$trace pfx "$dir" rsync --rsync-path "$rrsync" $rsopts "$from$dir/." "$to$dir/." &
     done
+    wait
 fi
 
 # post sync action
-if [ $xit = 0 ]
+if [ -n "$postsync" ]
 then
-    $dont $trace sh -c "$postsync" || xit=1
-else
-    echo "Failures, suppressing postsync: $postsync" >&2
+    if [ $xit = 0 ]
+    then
+	$dont $trace sh -c "$postsync" || xit=1
+    else
+	echo "Failures, suppressing postsync: $postsync" >&2
+    fi
 fi
 
 exit $xit
