@@ -1,0 +1,88 @@
+#!/bin/sh
+#
+# Consult bibliographic database, print results.
+#	- Cameron Simpson, 30nov93
+#
+
+usage="Usage: $0 [database]"
+
+badopts=
+case $# in
+    0)	necho "database ? "; read database || exit $? ;;
+    1)	database=$1; shift ;;
+    *)	badopts=1 ;;
+esac
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+lastquery=/tmp/query$$
+allqueries=/tmp/queries$$
+print='lpr'
+
+while necho '> '
+      read cmd args
+do
+    case "$cmd" in
+	'')	;;
+	\?|help)
+		cat <<'X'
+
+help		- this summary
+look keywords...
+keys keywords...- locate references containing all keywords
+keep		- keep the most recent query
+display [-x]	- format and display the queries kept so far
+		  the -x option suppresses abstracts
+lpr [-x]	- format and print the queries kept so far
+		  the -x option suppresses abstracts
+save filename	- save kept references in filename
+flush		- clear the kept queries
+quit		- leave bib
+
+X
+		;;
+	look|keys|key)
+		echo "$args" \
+			| lookbib "$database" 2>/dev/null \
+			| tee "$lastquery"
+		;;
+	keep)	if [ -f "$lastquery" ]
+		then
+			cat "$lastquery" >>"$allqueries"
+			rm -f "$lastquery"
+		else
+			echo "no active query" >&2
+		fi
+		;;
+	display)if [ -s "$allqueries" ]
+		then
+			roffbib $args < "$allqueries"
+		else
+			echo "no saved queries" >&2
+		fi
+		;;
+	lpr)	if [ -s "$allqueries" ]
+		then
+			roffbib $args < "$allqueries" | eval "$print"
+		else
+			echo "no saved queries" >&2
+		fi
+		;;
+	flush)	if [ -s "$allqueries" ] && ask "really forget everything"
+		then
+			> "$allqueries"
+		fi
+		;;
+	save)	if [ -s "$allqueries" ]
+		then
+			cat "$allqueries" >>"$args"
+		else
+			echo "no saved queries" >&2
+		fi
+		;;
+	quit)	break
+		;;
+	*)	echo "unknown command \`$cmd'" >&2
+		;;
+    esac
+done
