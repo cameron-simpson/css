@@ -85,7 +85,7 @@ sub Set
   FLAG:
   for my $flag (@_)
   { my $str = ":${flag}:";
-    $$this.="$flag:" unless substr($$this,$str) >= $[;
+    $$this.="$flag:" unless index($$this,$str) >= $[;
   }
 
   ## warn "flags=[$$this]";
@@ -149,6 +149,7 @@ Test that all the specified I<flags> are set.
 
 sub TestAll
 { my($this)=shift;
+  ## warn "TestAll(@_) against \"$$this\"";
   $this->Intersect(@_) == @_;
 }
 
