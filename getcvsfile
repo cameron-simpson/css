@@ -1,0 +1,48 @@
+#!/bin/sh
+#
+# Pull a file or directory from CVS and put it in the current directory.
+#	- Cameron Simpson <cs@zip.com.au> 06nov2003
+#
+
+cmd=`basename "$0"`
+usage="Usage: $cmd [-f] [-r rev] cvs-file
+	-f	Overwrite existing file in current directory if present.
+	-r rev	CVS revision."
+
+badopts=
+
+force=
+cvsopts=
+while :
+do
+  case $1 in
+    -f)	force=1 ;;
+    -r)	cvsopts="$cvsopts $1 $2"; shift ;;
+    --)	shift; break ;;
+    -?*)echo "$cmd: unrecognised option: $1" >&2; badopts=1 ;;
+    *)	break ;;
+  esac
+  shift
+done
+
+if [ $# = 0 ]
+then  echo "$cmd: missing cvs-file" >&2; badopts=1
+else
+    file=$1; shift
+    [ $# = 0 ] || { echo "$cmd: extra arguments after cvs-file: $*" >&2
+		    badopts=1
+		  }
+fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+base=`basename "$file"`
+
+if [ -z "$force" ] && [ -f "$base" -o -d "$base/." ]
+then
+    echo "$cmd: $base exists, aborting" >&2
+    exit 1
+fi
+
+local=`pwd` || exit 1
+exec inco $cvsopts -- "$file" mv "./$base" "$local"
