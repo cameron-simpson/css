@@ -7,37 +7,60 @@
 # - Cameron Simpson <cs@zip.com.au> 27sep2000
 #
 
+cmd=`basename "$0"`
+usage="Usage: $cmd [-a] group dir"
+
+badopts=
+
 all=
 [ "x$1" = x-a ] && { all=1; shift; }
 
-[ $# = 0 ] && { echo "Usage: $0 [-a] group [dirs...]" >&2; exit 2; }
+if [ $# = 0 ]
+then
+  echo "$cmd: missing group" >&2
+  badopts=1
+else
+  group=$1; shift
+  if [ $# = 0 ]
+  then
+    echo "$cmd: missing dir" >&2
+    badopts=1
+  else
+    dir=$1; shift
+    [ $# = 0 ] || { echo "$cmd: extra arguments after dir: $*" >&2
+		    badopts=1
+		  }
+  fi
+fi
 
-group=$1; shift
-grep "^$group:" /etc/group || ypmatch "$group" group || ask "Can't look up group \"$group\", proceed anyway" || exit 1
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
 
-[ $# = 0 ] && set .
+grep "^$group:" /etc/group \
+|| ypmatch "$group" group \
+|| ask "Can't look up group \"$group\", proceed anyway" \
+|| exit 1
 
-pwd
-ask "Proceed with groupshare on $*" || exit 1
+cd "$dir" || exit 1
 
-for dir
-do  ( cd "$dir" || exit 1
-      pwd
-      set -x
-      find . ! -type l ! -group "$group" -print \
-      | xxargs set-x chgrp "$group"
-      if [ $all ]
-      then
-	  find . ! -type l -print \
-	  | xxargs set-x chmod go=u
+wd=`pwd` || exit 1
+ask "Proceed with groupshare on $wd" || exit 1
 
-	  find . ! -type l -print \
-	  | xxargs set-x chmod o-w
-      else
-	  find . ! -type l -print \
-	  | xxargs set-x chmod g=u
-      fi
-      find . -type d -print \
-      | xxargs set-x chmod g+s
-    )
-done
+set -x
+
+find . ! -type l ! -group "$group" -print \
+| xxargs set-x chgrp "$group"
+
+if [ $all ]
+then
+    find . ! -type l -print \
+    | xxargs set-x chmod go=u
+
+    find . ! -type l -print \
+    | xxargs set-x chmod o-w
+else
+    find . ! -type l -print \
+    | xxargs set-x chmod g=u
+fi
+
+find . -type d -print \
+| xxargs set-x chmod g+s
