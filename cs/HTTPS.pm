@@ -23,7 +23,7 @@ via the s_client(1) command.
 
 use strict qw(vars);
 
-BEGIN { use cs::DEBUG; cs::DEBUG::using(__FILE__); }
+##BEGIN { use cs::DEBUG; cs::DEBUG::using(__FILE__); }
 
 use cs::HTTP;
 use cs::SystemPort;
