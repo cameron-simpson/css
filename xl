@@ -1,0 +1,27 @@
+#!/usr/bin/perl
+#
+# Wrapper for xload.
+#
+
+$usage="Usage: $0 [dx [dy xload-args]]\n";
+$sx=50; $sy=50;
+$dx=0; $dy=0;
+if (defined($_=shift))
+	{ /^-?\d+$/ || die $usage;
+	  $dx=$_;
+
+	  if (defined($_=shift))
+		{ /^-?\d+$/ || die $usage;
+		  $dy=$_;
+		}
+	}
+
+$h=$ENV{HOST};
+$x=150+$dx*$sx;
+$y=3+$dy*$sy;
+
+@exec=('xload','-geometry',"${sx}x${sy}-${x}+${y}",
+	     '-label',$h,
+	     '-name',"xload@$h",@ARGV);
+
+exec @exec;
