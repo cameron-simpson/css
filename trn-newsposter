@@ -1,8 +1,10 @@
 #!/bin/sh
 
+: ${TMPDIR:=/tmp}
+
 article=$1; shift
 
-tmp=/tmp/trnrep.$$
+tmp=$TMPDIR/trnrep.$$
 cp "$article" "$tmp" && ( vmrep "$tmp" & )
 
 m ${1+"$@"} -R "$article"
