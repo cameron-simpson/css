@@ -1,15 +1,15 @@
 Overview documentation for some of these scripts may be found here:
 
-	http://www.zip.com.au/~cs/css/
+	http://www.cskk.ezoshosting.com/cs/css/
 
 and manual entries in HTML format here:
 
-	http://www.zip.com.au/~cs/man/
+	http://www.cskk.ezoshosting.com/cs/man/
 
 Installing my scripts:
 
     Unpack the tarball:
-	    http://www.zip.com.au/~cs/css/css.tar.gz
+	    http://www.cskk.ezoshosting.com/css/css.tar.gz
 	into a suitable directory (eg "/opt/css", which I will assume
 	for the sake of example below).
 
