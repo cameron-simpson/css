@@ -1,0 +1,91 @@
+#!/usr/bin/perl -w
+#
+# Manipulate a keyword index of a bunch of text files.
+#	- Cameron Simpson <cs@zip.com.au> 22apr2002
+#
+
+use strict qw(vars);
+use Getopt::Std;
+use cs::Misc;
+use cs::WordIndex;
+use cs::Hier;
+
+my $ndxfile = '.wordindex';
+
+$::Usage="Usage:\t$::cmd [-i indexfile] add textfiles...
+\t$::cmd [-i indexfile] rm textfiles...
+\t$::cmd [-i indexfile] search regexps
+";
+
+$::Xit=0;
+
+getopts("i:") || ($::Xit=1);
+$ndxfile=$::opt_i if defined $::opt_i;
+
+my $op;
+
+if (@ARGV < 1)
+{ warn "$::cmd: missing op (add, rm or search)\n";
+  $::Xit=1;
+}
+else
+{ $op=uc(shift(@ARGV));
+  if ($op eq ADD || $op eq RM)
+  { if (@ARGV < 1)
+    { warn "$::cmd: $op: missing textfiles\n";
+      $::Xit=1;
+    }
+  }
+  elsif ($op eq SEARCH)
+  { if (@ARGV < 1)
+    { warn "$::cmd: $op: missing regexps\n";
+      $::Xit=1;
+    }
+  }
+  else
+  { warn "$::cmd: unsupported op \"$op\"\n";
+    $::Xit=1;
+  }
+}
+
+die $::Usage if $::Xit != 0;
+
+my $ndx = new cs::WordIndex($ndxfile);
+
+if ($op eq ADD)
+{
+  FILE:
+  for my $file (@ARGV)
+  { $ndx->ProcessFile($file);
+  }
+  $ndx->Save();
+}
+elsif ($op eq RM)
+{ for my $file (@ARGV)
+  { $ndx->RemoveFile($file);
+  }
+  $ndx->Save();
+}
+elsif ($op eq SEARCH)
+{
+  warn "ndx = ".cs::Hier::h2a($ndx,1)."\n";
+  my $coll = {};
+  my @hits = ();
+  my $s;
+  RE:
+  for my $re (@ARGV)
+  { warn "/$re/ ...\n";
+    $s = $ndx->SearchRE($re);
+    warn cs::Hier::h2a($s,1)."\n";
+    $ndx->CollateResults($coll,$s);
+  }
+  warn "Collate:\n", cs::Hier::h2a($coll,1), "\n";
+
+  my $fetch = cs::WordIndex::fetchCollatedResults($coll);
+  warn "Fetch:\n", cs::Hier::h2a($fetch,1), "\n";
+}
+else
+{ die "$::cmd: unsupported op \"$op\"\n";
+}
+
+exit $::Xit;
