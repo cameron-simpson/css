@@ -68,26 +68,12 @@ done \
     echo "    <LI><A HREF=\"$htfile\">$title</A>"
     echo "        <SMALL>- last change $modtime, author <A HREF=\"mailto:$author\">$fullname</A></SMALL>"
 
-    overview=`sed -n -e '1,/^=head2 Overview/d; :para; n; /^$/q; p; b para' <"$podfile"`
-    if [ -n "$overview" ]
+    overview_cache=.cache/overview/`basename "$podfile" .pod`.html
+    [ -s "$overview_cache" -a "$overview_cachemyke" -nt "$podfile" ] || myke "$overview_cache"
+
+    if [ -s "$overview_cache" ]
     then
-      necho "	<SPAN CLASS=\"overview-para\"><BR><SMALL>"
-      ( echo "=for html"
-	echo
-	echo "$overview"
-	echo
-      ) \
-      | pod2html "--title=$indextitle" - \
-      | sed -n '1,/^<!-- INDEX END -->/d
-		/^<p>/b para
-		d
-		:para
-		p
-		/<\/p>$/q
-		n
-		b para' \
-      | sed -e 's/^<p>//' -e 's/<\/p>$//'
-      echo "</SMALL></SPAN>"
+      cat "$overview_cache"
     fi
   done
 
