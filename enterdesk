@@ -11,7 +11,7 @@ exec >>$LOGDIR/console
 exec 2>&1
 
 thisdesk=$1
-lastdesk=`currentdesk`
+lastdesk=`currentdesk` || exit 1
 
 if [ "x$thisdesk" != "x$lastdesk" ]
 then
@@ -19,32 +19,6 @@ then
 
     desktop "$thisdesk" shcmds | sh -x &
     desktop "$thisdesk" wmcmds | fvwmcmd &
-
-    # moving backdrops into FvwmBacker
-    if false && [ "x$XSESSIONBG" = xpixmap ]
-    then
-	# check root backdrop
-	syncrootbg -d "$thisdesk" &
-
-    #    # menu backdrop
-    #    Dflag=-D
-    #    menubg=`desktop "$thisdesk" menubg`
-    #    if [ -z "$menubg" -o ! -s "$menubg" ]
-    #    then
-    #	Dflag=
-    #	menubg=`lastvalue "defaultmenubg-$HOST"`
-    #    fi
-    #
-    #    if [ -n "$menubg" -a -s "$menubg" ]
-    #    then
-    #      lastmenubg=`lastvalue menubg`
-    #      [ "x$menubg" != "x$lastmenubg" ] && menubg $Dflag "$menubg"
-    #    else
-    #      fvwm-root --dummy
-    #      xsetroot -solid black
-    #    fi
-
-    fi &
 
     ( deskjob=`deskjob -d "$thisdesk"`
       case "$deskjob" in
