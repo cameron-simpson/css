@@ -1,0 +1,11 @@
+#!/bin/sh
+
+case $HOST@$SYSTEMID in
+    zapff@cisra|amadeus@home)
+		;;
+    *)		echo "$0: nothing to rig for $HOST@$SYSTEMID" >&2
+		exit 1
+		;;
+esac
+
+lock -1 "vnc-$HOST@$SYSTEMID" vnc :6 -depth 24 -geometry 1600x1200
