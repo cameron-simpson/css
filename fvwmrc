@@ -1,0 +1,11 @@
+#!/bin/sh
+#
+# Emit my FVWM RC file.
+#	- Cameron Simpson <cs@zip.com.au> 19aug2002
+#
+
+. $HOME/rc/x11/xenv.sh
+
+exec uncurly \
+	'HALFX FULLX LHFULLX RHFULLX PIX_HIGH FONT FG BG DIMFG DIMBG HILIGHT ALERT DIMALERT ' \
+	$HOME/rc/x11/fvwm2/rc.curly
