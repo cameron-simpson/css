@@ -134,7 +134,7 @@ umask 077
 [ $domenubg ] && menubg "$imagefile" &
 
 echo "$imagefile" >>$HOME/var/log/rootbg
-lastvalue rootbg "$imagefile" &
+lastvalue -a rootbg "$imagefile" &
 if [ $thisdesk ]
 then  thisdesk=`lastvalue "enterdesk-$HOST"`
       desktop "$thisdesk" rootbg "$imagefile"
