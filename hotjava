@@ -1,0 +1,2 @@
+#!/bin/sh
+exec $HOME/HotJava1.0/bin/hotjava ${1+"$@"}
