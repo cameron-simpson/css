@@ -68,7 +68,7 @@ do  case $1 in
 	# I<Dir1> is then purged of empty directories.
 	# This option implies the B<-x> option.
 	#
-	-X)	Xflag=1 ; xflag=1 ;;
+	-X)	Xflag=1 ;;
 	-?*)	echo "$cmd: $1: unrecognised option" >&2
 		badopts=1
 		;;
@@ -83,6 +83,7 @@ done
 [ "x$xflag$Xflag" = x1 ] || { echo "$cmd: exactly one of -x or -X must be specified" >&2
 			      badopts=1
 			    }
+[ -n "$Xflag" ] && xflag=1
 
 if [ $# = 2 ]
 then  dir1=$1 dir2=$2
