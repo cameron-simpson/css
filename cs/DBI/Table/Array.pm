@@ -109,6 +109,8 @@ sub PUSH($$)
 	->ExecuteWithRec($value);
 }
 
+=back
+
 =head1 AUTHOR
 
 Cameron Simpson E<lt>cs@zip.com.au<gt>
