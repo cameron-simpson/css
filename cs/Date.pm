@@ -94,9 +94,19 @@ sub tm2gmt($$)
 	  $tm->{MDAY},$tm->{MON}-1,$tm->{YEAR}-1900);
 
   ## warn "p=[@p]";
-  $givenlocaltime
+  my $t
+  =
+  eval
+  { $givenlocaltime
 	? Time::Local::timelocal(@p)
 	: Time::Local::timegm(@p);
+  };
+  if ($@)
+  { my @c=caller;warn "$0: time{local/gm}(@p) fails: $@\n\tfrom [@c]";
+    return undef;
+  }
+
+  return $t;
 }
 
 sub gmt2tm($$)
@@ -285,7 +295,8 @@ sub iso2gmt($$)
   my($year,$mon,$mday)=($1+0,$2+0,$3+0);
   if ($year < 1970)
   { my@c=caller;
-    warn "$0: \$year=$year from iso date \"$_\"\n\tfrom [@c]\n\t";
+    die "$0: \$year=$year from iso date \"$_\"\n\tfrom [@c]";
+    return undef;
   }
 
   $_=$5;
@@ -489,6 +500,80 @@ sub Hms
 	$this->Min($emitlocaltime),
 	$sep,
 	$this->Sec($emitlocaltime));
+}
+
+=item a2mcode(I<text>)
+
+Convert the string I<text> to a month code.
+Valid strings take the form I<YYYYMM> for raw month codes,
+or the special words B<THIS>, B<PREV> and B<NEXT>
+for the current month, next month and the previous month respectively.
+Returns B<undef> for an invalid string.
+
+=cut
+
+sub a2mcode($)
+{ my($text)=@_;
+
+  my $mcode;
+
+  if ($text =~ /^(\d{4})(0[1-9]|10|11|12)$/)
+  { $mcode=$text+0;
+  }
+  else
+  { $text=uc($text);
+    my $D = new cs::Date();
+    $mcode=$D->Year()*100+$D->Mon();
+    if ($text eq THIS)
+    {}
+    elsif ($text eq PREV)
+    { $mcode=mcodeCount($mcode,-1);
+    }
+    elsif ($text eq NEXT)
+    { $mcode=mcodeCount($mcode,1);
+    }
+    else
+    { return undef;
+    }
+  }
+
+  return $mcode;
+}
+
+=item mcodeCount(I<mcode>,I<offset>)
+
+Count forwards or backwards from the supplied month code I<mcode>
+as specified by offset (an integer), and return the corresponding month code.
+
+=cut
+
+sub mcodeCount($$)
+{ my($mcode,$count)=@_;
+
+  # convert to pure month count
+  my $n = int($mcode/100)*12 + $mcode%100-1;
+
+  $n += $count;
+
+  # convert back to stylised month code
+  $mcode = 100*int($n/12) + $n%12+1;
+
+  return $mcode;
+}
+
+=item mcode2human(I<mcode>)
+
+Slightly more human friendly version of a month code.
+
+=cut
+
+sub mcode2human($)
+{ my($mcode)=@_;
+
+  my $year = int($mcode/100);
+  my $mon  = $mcode % 100;
+
+  return "$year-".cs::Date::mnum2mon($mon);
 }
 
 1;
