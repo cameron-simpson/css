@@ -1,0 +1,20 @@
+#!/bin/sed -f
+#
+# Clean up an input stream supposedly containing URLs.
+# Code lifted from urlshow cleaning pass.
+#	- Cameron Simpson <cs@zip.com.au> 23jul2003
+
+s/^[ 	][ 	]*//
+s/^#.*//
+/^$/d
+s/^.*<\(.*\)>.*$/\1/
+s/^.*(\(.*\)).*$/\1/
+s/^[^a-z]*\([a-z][a-z]*:\/\/.*\)/\1/
+/^[a-z][a-z]*:\/\//b ok
+/^https:/b ok
+/^file:/b ok
+/^ftp:/b ok
+/^news:/b ok
+/^snews:/b ok
+s/^/http:\/\//
+:ok
