@@ -91,6 +91,8 @@ exec \
 	'--include=/rc/vi' \
 	'--include=/rc/x11' \
 	'--include=/rc/web' \
+	'--include=/rc/web/bookmarks.html' \
+	'--exclude=/rc/web/*' \
 	'--include=/rc/xplanet' \
 	'--exclude=/rc/*' \
 	'--include=/scripts' \
