@@ -49,6 +49,7 @@ sub doimsize($)
   }
   else
   { warn "$::cmd: $f: $err (maybe errno \"$!\")\n";
+    print STDERR "    "; system("file '$f' >&2"); ## FIXME - security hole!
     $::Xit=1;
   }
 }
