@@ -1,0 +1,26 @@
+#!/bin/sh
+#
+# Read windows .ini file clause, emit values as safe shell assignments.
+#	- Cameron Simpson <cs@zip.com.au> 08oct2003
+#
+
+cmd=$0
+usage="Usage: $cmd file clausename prefix"
+
+[ $# = 3 ] || { echo "$usage" >&2; exit 2; }
+file=$1
+clause=$2
+prefix=$3
+
+case "$prefix" in
+  ''|*[^a-z]*)
+    echo "$cmd: bad prefix \"$prefix\" - must be [a-z]+" >&2
+    exit 2
+    ;;
+esac
+
+safechars='/=@:{}.a-zA-Z0-9_'
+
+winclause "$file" "$clause" \
+| sed -n "s/^[a-zA-Z][a-zA-Z0-9_]*=/${prefix}_&/p" \
+| sed "s;[^$safechars][^$safechars]*;'&';g"
