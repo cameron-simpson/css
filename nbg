@@ -1,0 +1,33 @@
+#!/bin/sh
+#
+# Add a file to the not-a-background reject list.
+#	- Cameron Simpson <cs@zip.com.au> 20nov2000
+#
+
+yes=
+[ "x$1" = x-y ] && { shift; yes=1; }
+
+if [ $# = 0 ]
+then  file=`lbg -1`
+else  file=$1; shift
+fi
+
+if [ -s "$file" ] && { ls -ld "$file"; [ $yes ] || ask "reject $file"; }
+then
+    dir=`dirname "$file"`
+    while [ ! -s "$dir/INDEX" ]
+    do
+	dir=`dirname "$dir"`
+	case "$dir" in
+	    /*/*)	;;
+	    *)		echo "$0: no INDEX file found for $file" >&2
+			exit 1
+			;;
+	esac
+    done
+    rfile=`echo "$file" | sed "s^$dir//*"`
+    notbg=$dir/INDEX-notbg
+    echo "$rfile" >>"$notbg"
+    sort -u -o "$notbg" "$notbg"
+    sbg
+fi
