@@ -116,7 +116,7 @@ case "$TERM,$DISPLAY" in
 	[ -n "$n" ] && set pushttylabel -exec +a "$n" "$@"
 
 	PREFTERM=${PREFTERM:-xterm}	# safe default
-	[ "x$PREFTERM" = xrxvt ] && set rigrxvtbg "$@"
+	## [ "x$PREFTERM" = xrxvt ] && set rigrxvtbg "$@"
 
 	if [ $async ]
 	then $dolock "$PREFTERM" $opts -e "$@" &
