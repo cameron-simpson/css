@@ -19,8 +19,7 @@ case $ARCH in
     *.*.domainos) # preserve ACLs
 	exec /com/cpt "$from" "$to" -pdt -sacl -ld
 	;;
-    *)	set -x
-	( cd "$from/." && $tar -cf - .
+    *)	( cd "$from/." && $tar -cf - .
 	) \
 	| $buffer \
 	| ( mkdir "$to" && cd "$to" && untar )
