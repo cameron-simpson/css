@@ -73,6 +73,7 @@ then
     echo "AddTomenu   $menuname \"$menutitle\" Title"
 fi
 
+set -x
 if [ -n "$filelist" ]
 then
     cat "$filelist"
@@ -86,15 +87,15 @@ fi \
 { tmpf=$TMPDIR/$cmd.$$ims
   exec 4>"$tmpf"
 
-  # now stdout is original stdout and &4 is pipe to needthumbs
+  # now stdout is original stdout and &4 is a file listing
   while read -r entry
   do
     if [ -d "$entry/." ]
     then
-      acon nice lock needthumbs set-x mkthumbs "$entry/."
+      echo "$entry" >&4
 
       # directory pathname
-      path=`cd "$entry" || exit 1; pwd` || continue
+      path=`cd "$entry" || exit 1; exec pwd` || continue
 
       # menu entry tag
       case "$entry" in
@@ -140,7 +141,10 @@ fi \
 
   exec >/dev/null
 
-  acon set-x mkthumbs `sed -e 's:/[^/]*$::' -e 's:^$:.:' <"$tmpf" | sort -u`
-  needthumbsfor <"$tmpf"
-  rm "$tmpf"
+  ( ( sort -u "$tmpf"
+      sed -e 's:/[^/]*$::' -e 's:^$:.:' "$tmpf" | sort -u
+    ) \
+    | bgstdin con lock mkthumb set-x xxargs mkthumb
+    rm "$tmpf"
+  ) &
 }
