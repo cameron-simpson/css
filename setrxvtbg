@@ -1,0 +1,45 @@
+#!/bin/sh
+#
+# Create a temporary xpm file and set the background of an rxvt.
+#	- Cameron Simpson <cs@zip.com.au> 31aug2000
+#
+
+# exit 0	## for a moment
+
+cmd=`basename "$0"`
+usage="Usage: $cmd [-l logfile] { [[!]/ptn/] | imagefile }"
+
+badopts=
+
+logf=$RXVTBGLOG
+case $1 in
+  -l)	logf=$2; shift; shift ;;
+esac
+
+ptn=${SETRXVTPTN:-"/./"}
+case $1 in
+    /* | !/*)	[ -s "$1" ] || { ptn=$1; shift; } ;;
+esac
+
+if [ $# = 0 ]
+then src=`bglist -p "$ptn" | pickn`
+     [ -n "$src" ] || { echo "$cmd: no INDEX entries matching /$ptn/" >&2
+			exit 1
+		      }
+else src=$1; shift
+fi
+
+[ $# = 0 ] || { echo "$cmd: extra arguments: $*" >&2; badopts=1; }
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+[ -n "$logf" ] || logf=`rxvtbglog`
+[ -s "$logf" ] || ( # some shells bail here on failure
+		    exec 2>/dev/null
+		    echo "`date` pid=$$" >>"$logf"
+		  )
+
+# subshell because some shells abort if the >> fails
+( [ -n "$logf" ] && [ -s "$logf" ] && echo "$src" >>"$logf" )
+
+2xpm -d 0.6 -s tty "$src" xpm2rxvt || set-x nbg -y "$src"
