@@ -18,7 +18,7 @@ if [ $# -gt 0 ] && [ -s "$1" ]
 then
     imagefile=$1; shift
 else
-    imagefile=`bglist -n 20 -w ${1+"$@"} | pickn`
+    imagefile=`bglist -r -n 20 -w ${1+"$@"} | pickn`
 fi
 
 if [ $xplanet ]
