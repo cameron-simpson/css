@@ -1,0 +1,9 @@
+#!/bin/sh
+#
+# Detab and strip trailing whitespace.
+# Used to clean up copy/paste from a curses window.
+#	- Cameron Simpson <cs@zip.com.au> 19mar2003
+#
+
+detab ${1+"$@"} \
+| sed 's/  *$//'
