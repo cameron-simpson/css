@@ -1,0 +1,122 @@
+#!/usr/bin/perl
+#
+# Queue my mail for delivery.	- Cameron Simpson <cs@zip.com.au>
+# Recoded in perl. - cameron, 07oct94
+# Added requeue facility. - cameron, 10oct94
+#
+
+
+($cmd=$0) =~ s:.*/::;
+$usage="Usage: $cmd [-s] [-v] [-f inputfile] [mailboxes...]
+	-s		Synchronous.
+	-v		Verbose.
+	-f inputfile	Specify input file (default stdin).
+	mailboxes	Where to file mail (default +in).
+       $cmd [-v] -r [queued-files...]
+	-r		Requeue.
+";
+
+use cs::Log;
+use cs::Date;
+
+$sync=0;
+$badopts=0;
+$requeue=0;
+$verbose=0;
+
+ARGV:
+  while (defined($_=shift))
+	{ if ($_ eq '-s')	{ $sync=1; }
+	  elsif ($_ eq '-r')	{ $requeue=1; }
+	  elsif ($_ eq '-v')	{ $verbose=1; }
+	  elsif ($_ eq '-f')	{ $_=shift;
+				  open(STDIN,"< $_\0")
+					|| die "$cmd: can't open $_: $!\n";
+				}
+	  elsif (/^-/)		{ print STDERR "$cmd: $_: unrecognised option\n";
+				  $badopts=1;
+				}
+	  else
+	  { unshift(@ARGV,$_); last ARGV; }
+	}
+
+die $usage if $badopts;
+
+$tmpdir="$ENV{HOME}/tmp/maildrop";
+
+-d "$tmpdir/." || mkdir($tmpdir,0777) || die "$cmd: can't mkdir $tmpdir: $!\n";
+
+if ($requeue)
+	{ if (! @ARGV)
+		{ opendir(D,$tmpdir) || die "$cmd: can't opendir $tmpdir: $!\n";
+		  @d=readdir(D);
+		  closedir(D);
+
+		  for (@d)
+			{ $f="$tmpdir/$_";
+			  push(@ARGV,$f) if -f $f;
+			}
+		}
+
+	  for (@ARGV)
+		{ if (m:\.(\+[^/]+)$:)
+			{ $boxlist=$1;
+			  &logfile($_,split(/,+/,$boxlist));
+			}
+		  else
+		  { &logfile($_,'+in');
+		  }
+		}
+
+	  exit 0;
+	}
+
+if (! $sync)
+	{ if (! defined($_=fork))
+		{ print STDERR "$cmd: warning: can't fork: $!\n";
+		}
+	  elsif ($_ > 0)
+		# parent, leave child do it
+		{ exit 0;
+		}
+	}
+
+# default to my inbox
+push(@ARGV,'+in') if !@ARGV;
+
+($boxen=join(',',@ARGV)) =~ s/\s+/-/g;
+$datecode=cs::Date::timecode(time,1);
+
+$tmp="$tmpdir/$datecode.$ENV{HOSTNAME}.$$.$boxen";
+
+open(STDOUT,"> $tmp\0") || die "$cmd: can't write to $tmp: $!\n";
+while (<STDIN>)
+	{ print	|| die "$cmd: write($tmp): $!\n";
+	}
+close(STDOUT)	|| die "$cmd: close($tmp): $!\n";
+
+&logfile($tmp,@ARGV);
+
+exit 0;
+
+sub logfile	# (file,@boxen)
+	{ local($tofile,@where)=@_;
+
+	  $verbose && print STDERR "filemail $tofile => @where\n";
+
+	  if ($tofile !~ m:^/:)
+		{ length($currentdir) || chop($currentdir=`pwd`);
+		  $tofile="$currentdir/$tofile";
+		}
+
+	  my($s);
+
+	  if (defined ($s=(new cs::Log 'filemail')))
+		{ $line="$tofile @where\n";
+		  $verbose && (print STDERR $line);
+		  $s->Put($line);
+		}
+	  else
+	  { die "$cmd: can't append to filemail log\n";
+	  }
+	}
