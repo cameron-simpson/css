@@ -32,7 +32,7 @@ do
     | ln|lane \
     | pd|pde|parade \
     )
-      break ;;
+      shift; break ;;
   esac
   shift
 done
