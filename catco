@@ -1,0 +1,19 @@
+#!/bin/sh
+#
+# Cat individual files from a CVS repository.
+#	- Cameron Simpson <cs@zip.com.au> 20may2004
+#
+cmd=$0
+usage="Usage: $cmd cvs-filenames..."
+
+[ $# = 0 ] && { echo "$cmd: missing cvs-filenames" >&2; echo "$usage" >&2; exit 2; }
+
+xit=0
+
+for file
+do
+  fbase=`basename "$file"`
+  inco -f "$file" cat "$fbase" || xit=1
+done
+
+exit $xit
