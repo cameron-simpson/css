@@ -1,0 +1,29 @@
+#!/bin/sh
+#
+# Manipulate FVWM named desktops from command line.
+#	- Cameron Simpson <cs@zip.com.au> 18jul2002
+#
+
+cmd=$0
+usage="Usage: $cmd [-r] desktop"
+
+rmdesk=
+[ "x$1" = x-r ] && { rmdesk=1; shift; }
+
+[ $# = 0 ] && { echo "$cmd: missing deskname" >&2
+	        echo "$usage" >&2
+	        exit 2
+	      }
+
+deskname=$1; shift
+
+[ $# = 0 ] || { echo "$cmd: extra arguments: $*" >&2
+		echo "$usage" >&2
+		exit 2
+	      }
+
+[ $rmdesk ] && exec newdesk -r "$deskname"
+
+desknum=`newdesk "$deskname"`	|| exit 1
+desknum=`expr $desknum - 1`
+exec FvwmCommand "SwitchToDesk 1 $desknum"
