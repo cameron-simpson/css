@@ -1,0 +1,13 @@
+#!/bin/sh
+
+case "$1" in
+    at)	shift ;;
+    *)	echo "Usage: $0 at time < message" >&2; exit 2 ;;
+esac
+
+( echo "# kickme at $*"
+  echo 'exec >/dev/console 2>&1'
+  echo 'echo "`date`"'
+  sed "s/'/'\\\\''/g
+       s:.*:echo '&' >/dev/console:"
+) | at ${1+"$@"} on fuligin
