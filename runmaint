@@ -1,5 +1,7 @@
 #!/bin/sh
 #
+# Freshmeat release: 1.01
+#
 # =head1 NAME
 #
 # runmaint - run a maintenance script
@@ -287,6 +289,9 @@ do
     if [ -r "$script" ]
     then
 	scriptdir=`dirname "$script"`
+
+	# log every run here as single line
+	echo "`date` `hostname` $script [$invocation]" >>"$scriptdir/.runlog"
 
 	# if no addresses
 	# then write a log if there's a log dir
