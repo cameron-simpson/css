@@ -9,7 +9,7 @@
 host=$1; shift
 case $host in
     *@*)	;;
-    *)		host=$host@$SITENAME ;;
+    *)		host=$host@$SYSTEMID ;;
 esac
 
 exec rterm "$host" ${1+"$@"}
