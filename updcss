@@ -48,6 +48,7 @@ then
 	--delete \
 	--delete-excluded \
 	--exclude=CVS/ \
+	--exclude='defunct/' \
 	--exclude='/synonyms/' \
 	--include=/0README.txt \
 	--include=/CHANGELOG.txt \
@@ -62,6 +63,7 @@ then
 	--copy-links \
 	--copy-unsafe-links \
 	--exclude=CVS/ \
+	--exclude='defunct/' \
 	$HOME/scripts/synonyms/. $cssdir/bin/.
 fi
 
@@ -73,6 +75,7 @@ then
 	--delete \
 	--delete-excluded \
 	--exclude=CVS/ \
+	--exclude='defunct/' \
 	--include='/.cgienv.sh' \
 	--include='/*.cgi*' \
 	--exclude='/*' \
