@@ -1,2 +1,2 @@
 #!/bin/sh
-exec env GUI=lean term -n "man $*" -e man ${1+"$@"}
+exec env GUI=lean term +ip -n "man $*" -e man ${1+"$@"}
