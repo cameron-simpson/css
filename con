@@ -1,0 +1,58 @@
+#!/bin/sh
+#
+# Run a command with its output attached to the console.
+#	- Cameron Simpson <cs@zip.com.au>
+#
+
+cmd=`basename "$0"`
+
+async=
+dashc=
+iflag=
+tty=`logpath console`
+
+usage="Usage: $cmd [-a] [-i] [-t tty] { -c shellcmd | command [args...] }
+		-a	Fork and run asynchronously.
+		-c	Invoke shell with -c option.
+		-t tty	Terminal to use instead of $tty."
+
+badopts=
+while :
+do
+    case $1 in
+	--)	shift; break ;;
+	-a)	async=1 ;;
+	-c)	dashc=1; copt=$2; shift ;;
+	-i)	iflag=1 ;;
+	-t)	tty=$2; shift ;;
+	-*)	echo "$cmd: unknown option \"$1\"" >&2
+		badopts=1
+		;;
+	*)	break ;;
+    esac
+    shift
+done
+
+case "$tty" in
+    '')	tty=`logpath console` ;;
+    /*)	;;
+    *)	tty=$HOME/var/log/$tty ;;
+esac
+
+case $#,$dashc in
+    0,1)    set x ${SHELL-sh} -c "$copt"; shift ;;
+    0,)     echo "$cmd: missing -c or command" >&2
+	    badopts=1 ;;
+    *,1)    echo "$cmd: can't use -c and also a command" >&2
+	    badopts=1 ;;
+esac
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+exec >>"$tty" 2>&1
+[ $iflag ] && exec </dev/null ## "$tty"
+
+case $async in
+    '')	exec ignhup "$@" ;;
+    *)	ignhup "$@" & ;;
+esac
