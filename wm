@@ -26,7 +26,7 @@ done
 
 [ -f "$fvwm" ] || { echo "$0: no fvwm!" >&2; exit 1; }
 
-PATH=$fvbin:$PATH
+PATH=$PATH:$fvbin
 export PATH
 
 exec >>$HOME/var/log/wm.out 2>>$HOME/var/log/wm.err
