@@ -19,8 +19,8 @@ vflag=
 if [ $# = 0 ]
 then
     case "$HOST@$SYSTEMID" in
-	zapff@cisra)	set work2zip work2home nntpcached ;;
-	amadeus@home)	set home2work home2zip ;;
+	zapff@cisra)	set cisra2zip cisra2home nntpcached ;;
+	amadeus@home)	set home2cisra home2zip ;;
 	*)		echo "$0: no forwardings to do on $HOST@$SYSTEMID" >&2
 			exit 2
 			;;
@@ -40,8 +40,8 @@ do  case "$fwd" in
 	    echo "setup nntpcached ..."
 	    rignntpcache
 	    ;;
-	work2zip)
-	    echo "work2zip..."
+	cisra2zip)
+	    echo "cisra2zip..."
 	    vpnssh $vflag -t 60 -i vpn_dsa-cisra2zip zip \
 		   -L 8081:localhost:8081 \
 		   -L 9875:203.17.198.110:9875 \
@@ -51,8 +51,8 @@ do  case "$fwd" in
 		   -L 2080:proxy:8080 \
 		   -L 2110:mail:110 &
 	    ;;
-	work2home)
-	    echo "work2home..."
+	cisra2home)
+	    echo "cisra2home..."
 	    vpnssh $vflag -t 60 -q home \
 		   -L 2111:mail-optus:110 \
 		   -L 2180:www-optus:110 \
@@ -69,9 +69,9 @@ do  case "$fwd" in
 		   -L 2025:mail:25 \
 		   -L 2110:mail:110 &
 	    ;;
-	home2work)
-	    echo "home2work..."
-	    vpnssh $vflag work \
+	home2cisra)
+	    echo "home2cisra..."
+	    vpnssh $vflag cisra \
 		   -L 2080:web:80 \
 		   -L 2222:zapff:22 \
 		   -L 5915:zapff:5905 \
