@@ -58,6 +58,7 @@ exec \
 	'--include=/rc/gnupg/pubring.gpg' \
 	'--exclude=/rc/gnupg/*' \
 	'--include=/rc/gtk' \
+	'--include=/rc/hi' \
 	'--include=/rc/less' \
 	'--include=/rc/lesskey' \
 	'--include=/rc/mail' \
