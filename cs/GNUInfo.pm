@@ -140,7 +140,7 @@ sub RunQueue($)
     dbg("RunQueue $file ...\n");
     my $s = new cs::Source(PATH,$file,1);
     if (! defined $s)
-    { warn "$::cmd: can't open $file: $!\n";
+    { warn "$::cmd: can't open $file: $!";
       next FILE;
     }
 
