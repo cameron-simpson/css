@@ -4,7 +4,10 @@
 #	- Cameron Simpson <cs@zip.com.au> 28apr2001
 #
 
-[ $# = 0 ] && { echo "Usage: $0 filenames..." >&2; exit 2; }
+[ $# -lt 2 ] && { echo "Usage: $0 address filenames..." >&2; exit 2; }
+
+addr=$1; shift
+subj="files: $*"
 
 first=1
 for file
@@ -12,4 +15,4 @@ do [ $first ] && { set x; shift; first=; }
    set x ${1+"$@"} -a "$file"; shift
 done
 
-exec mutt ${1+"$@"}
+exec mutt -s "$subj" ${1+"$@"} "$addr"
