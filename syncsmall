@@ -19,7 +19,7 @@ then
 fi
 
 case $1 in
-    @?*)	who=$USER$1; shift ;;
+    @?*)	who=`expr "x$1" : 'x@\(.*\)'`; shift ;;
     ?*@?*)	who=$1; shift ;;
     *)		echo "$cmd: missing user@host" >&2; exit 2 ;;
 esac
