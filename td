@@ -34,22 +34,16 @@ esac
 
 if [ $# -gt 0 ]
 then
-
-    op=$1; shift
-    case "$op" in
-      *\ *)	if [ $# = 0 ]; then set -- "$op"
-			   else set -- "$op $*"
-	    fi
-	    op=add
-	    ;;
+    case "$1" in
+      --?*)	op=`expr "x$1" : 'x--\(.*\)'`; shift ;;
+      *)	op=add ;;
     esac
-
     datespec=
     case "$1" in
       @* ) datespec=$1; shift
     esac
 
-    tdl "$op" $datespec $context ${1+"$@"}
+    (set -x; tdl "$op" $datespec $context ${1+"$@"})
 fi
 
 exec tdl ls $finalopts $context
