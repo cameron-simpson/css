@@ -1,0 +1,3 @@
+#!/bin/sh
+newdesk \
+| awk '{ print "\"" $2 "\" SwitchToDesk 1 " ($1-1) }'
