@@ -7,7 +7,11 @@
 #
 
 cmd=$0
-usage="Usage: $0 [-s] [-d dim] [-xpl] [{imagefile|ptns...}]"
+usage="Usage: $0 [-m] [-s] [-d dim] [-xpl] [{imagefile|ptns...}]
+	-m	Set the menu background as well.
+	-s	Synchronous.
+	-d dim	Set dimming factor.
+	-xpl	Use xplanet for the background."
 
 [ -n "$DISPLAY" ] || { echo "$cmd: no \$DISPLAY!" >&2; exit 1; }
 
@@ -16,11 +20,13 @@ tmp=${TMPDIR:-/tmp}
 sync=
 xplanet=
 convopts='-d 0.6'
+domenubg=
 
 badopts=
 while :
 do  case $1 in
         -xpl)	xplanet=1 ;;
+	-m)	domenubg=1 ;;
 	-s)	sync=1 ;;
 	-d)	convopts="$convopts -d $2"; shift ;;
 	--)	shift; break ;;
@@ -91,6 +97,9 @@ fi
 
 ##set -vx
 umask 077
+
+[ $domenubg ] && menubg "$imagefile" &
+
 cp "$imagefile" "$tmp/." || exit 1
 
 ( cd "$tmp" || exit 1
