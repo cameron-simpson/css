@@ -1,0 +1,29 @@
+#!/bin/sh
+#
+# Generate a permuted index of the specified HTML files.
+# It is presumed that each physical source line number "n" of the HTML has an:
+#	<A NAME="n"></A>
+# at the start to use as an anchor. See html-line-anchors.
+#	- Cameron Simpson <cs@zip.com.au> 11nov2003
+#
+
+[ $# = 0 ] && { echo "Usage: $0 [-i ignlist] html-files..." >&2; exit 2; }
+
+ptxopts=
+[ "x$1" = x-i ] && { ptxopts="$1 $2"; shift; shift; }
+
+for htmlf
+do
+  htmluntag < "$htmlf" \
+  | sed -e 's/"/ /g' -e 's/   */ /g' \
+  | ptx -A -r -f -O $ptxopts \
+  | sed -n \
+	-e 's/^.xx "[^"]*" "\([^"]*\)" "\([^ "][^ "]*\) *\([^"]*\)" "[^"]*" ":\([1-9][0-9]*\)".*/\1	\2	\3	\4/' \
+	-e "s/^/$htmlf	/p"
+done \
+| sort -d -f '-t	' +2 \
+| { echo "<TABLE>"
+    awk '-F	' "BEGIN	{ ref=\"$htmlf\" }
+		  "'$3 ~ /^[a-zA-Z][a-zA-Z0-9_][a-zA-Z0-9_]*[a-zA-Z0-9]$/ { print "<TR><TD ALIGN=RIGHT>" $2 "<TD ALIGN=LEFT><A HREF=\"" $1 "#" $5 "\">" $3 "</A> " $4 }'
+    echo "</TABLE>"
+  }
