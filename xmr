@@ -1,0 +1,12 @@
+#!/bin/sh
+
+cd $HOME/tmp
+
+eval "`setvar -n www`"
+
+unset ftp_proxy gopher_proxy http_proxy news_proxy wais_proxy
+export ftp_proxy gopher_proxy http_proxy news_proxy wais_proxy
+
+WWW_HOME=$HOME/private/html/index.html; export WWW_HOME
+
+$BIN/xmosaic -home "$WWW_HOME" ${1+"$@"} &
