@@ -1,0 +1,467 @@
+#!/usr/bin/perl
+#
+# Parse generic logs and graph. Generalised from squidlogtally.
+#	- Cameron Simpson <cs@zip.com.au> 14jan99
+#
+# Input format:
+#	start duration size class other-fields
+# Output:
+#	PNG image
+#
+
+use strict qw(vars);
+
+use cs::Net;
+use cs::Misc;
+use cs::Date;
+use cs::Hier;
+use cs::Upd;
+use cs::Stats::Slots;
+use GD::Graph::bars;
+use Getopt::Std;
+
+$::CatField=CLASS;
+$::CatFormat=STRING;
+$::GX=800;
+$::GY=600;
+$::Numeric=0;
+undef $::Threshold;
+undef $::SkipPtn;
+
+$::Usage="Usage: $::cmd [/skipptn/] [-t threshold] [-x x] [-y y] [XxY] categorisation [type] \\
+		<logdata >file.png
+	-n		Start times just numbers, not time_t.
+	-x x		Set graph width in pixels.
+	-x y		Set graph height in pixels.
+	XxY		Set width(X) and height(Y) in pixels.
+			Default: ${::GX}x${::GY}.
+	-t threshold	Maximum count per unit time.
+	categorisation	One of class, size, duration, n.
+			n is a field position from other-fields.
+			Default: ".lc($::CatField)."
+	type		One of string, ip, seconds, size.
+			Default: ".lc($::CatFormat)."
+";
+
+-t STDOUT && die "$::cmd: stdout should not be a terminal!\n";
+
+if (@ARGV && $ARGV[0] =~ m:^/(.*)/$:)
+{ $::SkipPtn=$1;
+  shift(@ARGV);
+}
+
+{ my $badopts = 0;
+
+  getopts("nx:y:t:") || ($badopts=1);
+  $::GX=$::opt_x if defined $::opt_x;
+  $::GY=$::opt_y if defined $::opt_y;
+  $::Numeric=1 if defined $::opt_n;
+  $::Threshold=$::opt_t if defined $::opt_t;
+
+  if (@ARGV && $ARGV[0] =~ /^([1-9]\d*)x([1-9]\d*)$/)
+  { $::GX=$1+0;
+    $::GY=$2+0;
+  }
+
+  if (! @ARGV)
+  { warn "$::cmd: missing categorisation\n";
+    $badopts=1;
+  }
+  else
+  { $::CatField=uc(shift(@ARGV));
+    # set known defaults
+    if ($::CatField eq CLASS)	{ $::CatFormat=STRING; }
+    elsif ($::CatField eq SIZE)	{ $::CatFormat=SIZE; }
+    elsif ($::CatField eq DURATION)
+				{ $::CatFormat=SECONDS;
+				  $::CatField=ELAPSED;
+				}
+
+    if (@ARGV)
+    { $::CatFormat=uc(shift(@ARGV));
+    }
+  }
+
+  if (@ARGV)
+  { warn "$::cmd: extra arguments: @ARGV\n";
+    $badopts=1;
+  }
+
+  if (! grep($::CatFormat eq $_,STRING,SIZE,SECONDS,IP))
+  { warn "$::cmd: bad categorisation type: $::CatFormat\n";
+    $badopts=1;
+  }
+
+  die $::Usage if $badopts;
+}
+
+## warn "format=$::CatFormat";
+
+$::Xit=0;
+
+$::SiteSuffix='.'.$ENV{SITENAME};
+
+warn "$::cmd: loading data ...\n";
+# tally data per host
+undef %::RawTotals;
+$::AllTotal=0;
+my @log;
+my $nlines=0;
+{ my $datum;
+  my $earliest;
+  my $latest;
+
+  LOGENTRY:
+    while (defined ($datum=readFILEline(STDIN)))
+    {
+      ## XXX ## push(@log,$datum);
+      $nlines++;
+
+      if (! defined $earliest
+       || $datum->{START} < $earliest)
+      { $earliest=$datum->{START};
+      }
+
+      if (! defined $latest || $datum->{START}+$datum->{ELAPSED} > $latest)
+      { $latest=$datum->{START}+$datum->{ELAPSED};
+      }
+
+      my $key = datumKey($datum,$::CatField,$::CatFormat);
+      { my $matched = (defined $::SkipPtn && $key =~ /$::SkipPtn/oi);
+	next LOGENTRY if $matched;
+      }
+
+      $::RawTotals{$key}+=$datum->{SIZE};
+
+      push(@log,$key,$datum->{START},$datum->{ELAPSED},$datum->{SIZE});
+    }
+
+  die "no log entries!" if ! @log;
+  ## warn "latest=$latest\n";
+  ## warn "earliest=$earliest\n";
+  $latest=$earliest+1 if $latest <= $earliest;
+
+  $::Epoch = $earliest;
+  $::Slotsize = ($latest-$earliest)/100;
+}
+
+warn "$::cmd: $nlines lines loaded\n";
+
+map( ($::AllTotal+=$::RawTotals{$_}), keys %::RawTotals);
+
+# index totals so we can get the top n
+{ my @keys = sort { $::RawTotals{$b} <=> $::RawTotals{$a} } keys %::RawTotals;
+  for my $i (0..$#keys)
+  { $::TotalNdx{$keys[$i]}=$i;
+  }
+}
+
+my $nlog = @log;
+my $opcnt = 0;
+my $n;
+
+warn "$::cmd: distribute data...\n";
+{ my $datum;
+  my ($key,$start,$length,$size);
+
+  DATUM:
+  while (@log)
+  {
+    ($key,$start,$length,$size)=(shift(@log),shift(@log),shift(@log),shift(@log));
+
+    # report progress
+    $n++;
+    my $pcnt = int(100*$n/$nlog);
+    if ($pcnt != $opcnt)
+    { out("completed $pcnt%");
+      $opcnt=$pcnt;
+    }
+
+    if ($::TotalNdx{$key} >= 6)	## $::RawTotals{$key}/$::AllTotal < 0.05
+    { $key=MISC;
+    }
+    ## warn "key=$key" if $key ne MISC;
+
+    my $S = slotSet($key);
+
+    $::Totals{$key}+=$size;
+
+    my $comp  = $start+$length;
+
+    if ($start > $comp) { warn "HUH? datum=[ key=$key, start=$start, length=$length, size=$size"; }
+    elsif ($start == $comp) { $start=$comp-1; } # fake it
+
+    $S->Distribute({ SIZE => $size, KEY => $key },$start,$comp);
+    $::KeyTotals{$key}+=$datum->{SIZE};
+  }
+}
+out('');
+
+## print "\nS=", cs::Hier::h2a($S,1), "\n";
+
+warn "generate graph...\n";
+
+my $maxslot = ::max(map(slotSet($_)->MaxSlotNdx(), keys %::S));
+my $minslot = ::min(map(slotSet($_)->MinSlotNdx(), keys %::S));
+
+## warn "lowndx=$minslot, high=$maxslot";
+
+my @keys = reverse sort { $::Totals{$a} <=> $::Totals{$b} } keys %::Totals;
+
+my @data = ();
+my @slotTotals = ();
+
+{ my $S = slotSet($keys[0]);
+  warn "push labels...";
+  push(@data, [ map( ( $::Numeric
+		     ? int($S->NdxLowOffset($_)+0.5)
+		     : shortTime($S->NdxLowOffset($_)
+		     ) ), $minslot..$maxslot) ]);
+}
+
+for my $key (@keys)
+{ my $S = slotSet($key);
+
+  warn "push data for $key ...\n";
+  push(@data,
+	[ map($S->Slot($_)->{TOTAL}, $minslot..$maxslot)
+	]);
+
+  # tally slot totals
+  map($slotTotals[$_]+=$S->Slot($_)->{TOTAL}, $minslot..$maxslot);
+}
+
+warn "plot graph...\n";
+
+# set upper limit on graph
+if (! defined $::Threshold)
+{ my $max;
+  for my $slot ($minslot..$maxslot)
+  { $max = $slotTotals[$slot] if ! defined $max || $max < $slotTotals[$slot];
+  }
+}
+else
+{ $::Threshold *= $::Slotsize;
+}
+
+my $G = new GD::Graph::bars($::GX,$::GY);
+$G->set( 'x_label_skip' => int($maxslot)/10,
+	 'y_min_value'  => 0,
+	 'y_max_value'  => $::Threshold,
+	 'y_number_format' => \&byteCount,
+	 't_margin'     => 5,
+	 'b_margin'     => 5,
+	 'l_margin'     => 5,
+	 'r_margin'     => 5,
+	 'interlaced'	=> 0,
+       'title'	=> ( $::Numeric
+			 ? 'Slots of '.$::Slotsize
+			   : 'Timeslots of '.secondCount($::Slotsize)
+			   ),
+	 'overwrite'    => 2,
+	 'transparent'	=> 0,
+       );
+$G->set_legend( map(legend($_), @keys) );
+my $GD = $G->plot( \@data );
+print $GD->png;
+
+exit $::Xit;
+
+sub slotSet
+	{ my($key)=@_;
+
+	  $::S{$key}=new cs::Stats::Slots ($::Epoch, $::Slotsize, SIZE, $::Threshold)
+		if ! exists $::S{$key};
+
+	  $::S{$key};
+	}
+
+# read log lines from a file
+sub readFILE
+	{ my($FILE)=@_;
+
+	  my @data;
+	  my $datum;
+
+	  while (defined ($datum=readFILEline($FILE)))
+		{ if (ref $datum)
+			{ push(@data,$datum);
+			}
+		  else	{ $::Xit=1;
+			}
+		}
+
+	  @data;
+	}
+
+sub readFILEline
+	{ my($FILE)=@_;
+
+	  local($_)=scalar(<$FILE>);
+
+	  return undef if ! defined;
+
+	  my $datum = decodeLine($_);
+
+	  return $datum if ref $datum;
+
+	  chomp;
+	  warn "$::cmd: $FILE, $.: parse error on: $_\n";
+	  0;
+	}
+
+# extra info from a log line sub
+#
+# Input format:
+#	start duration size class other-fields
+#
+sub decodeLine
+{ local($_)=@_;
+
+    chomp;
+    my @f = grep(length,split);
+    return undef if @f < 4;
+
+    ## warn "f=[@f]";
+
+    my($start,$elapsed,$size,$class,@etc)=@f;
+
+    return undef if $start !~ /^\d+(\.\d+)?$/
+		 || $elapsed !~ /^\d+(\.\d+)?$/
+		 || $size !~ /^\d+$/
+		 ;
+
+    { START => $start+0,		# seconds, to ms resolution
+      ELAPSED => $elapsed+0,	# duration in seconds
+      CLASS => $class,		# class
+      SIZE => $size+0,		# fetched data in bytes
+      OTHER => [ @etc ],		# other fields
+    }
+  }
+
+sub shortTime
+{ my($gmt)=@_;
+
+  my $tm = cs::Date::gmt2tm($gmt,1);
+
+  sprintf("%2d:%02d%2s",
+	($tm->{HH}-1)%12+1, $tm->{MM},
+	( $tm->{HH} > 12 || ($tm->{HH} == 12 && $tm->{MM} > 0)
+	? 'pm'
+	: 'am'
+	));
+}
+
+sub byteCount
+{ my($n)=@_;
+
+  my $fmt;
+
+  if ($n < 1024)	{ $fmt="%d"; }
+  elsif ($n < 1024*1024){ $fmt="%1.1fK"; $n/=1024; }
+  elsif ($n < 1024*1024*1024){ $fmt="%1.1fM"; $n/=1024*1024; }
+  else { $fmt="%1.1fG"; $n/=1024*1024*1024; }
+
+  sprintf($fmt,$n);
+}
+
+sub secondCount
+	{ cs::Date::timestr(@_);
+	}
+
+sub legend
+{ my($key)=@_;
+
+  my $pcnt = 100*$::KeyTotals{$key}/$::AllTotal;
+
+  $pcnt >= 1 ? sprintf("%s - %d%%",$key,$pcnt) : $key;
+}
+
+sub datumKey($$$)
+{ my($datum,$field,$format)=@_;
+
+  my $value;
+  if ($field =~ /^\d+$/)
+  { $value=$datum->{OTHER}->[$field-1];
+  }
+  else
+  { $value=$datum->{$field};
+  }
+
+  if ($format eq STRING)	{ return $value; }
+  elsif ($format eq SIZE)	{ return sizeKey($value); }
+  elsif ($format eq SECONDS)	{ return durationKey($value);}
+  elsif ($format eq IP)		{ return ipKey($value); }
+  else
+  { die "$0: bad format spec \"$format\"";
+  }
+}
+
+sub durationKey	{ countKey(shift,0,
+			     60,		"< 1min",
+			     600,		"< 10min",
+			     3600,		"< 1hr",
+			     10800,		"< 3hr",
+			     21600,		"< 6hr",
+			     43200,		"< 12hr",
+			     96400,		"< 1day",
+			     192800,		"< 2days",
+			     674800,		"< 1week",
+			     2892000,		"< 30days",
+			     35186000,		"< 1year",
+			    );
+		}
+sub sizeKey	{ countKey(shift,1024,
+			     10,		"< 10",
+			     100,		"< 100",
+			     1024,		"sub 1k",
+			     10240,		"sub 10k",
+			     102400,		"sub 100k",
+			     1024*1024,		"sub 1M",
+			     10*1024*1024,	"sub 10M",
+			     100*1024*1024,	"sub 100M",
+			     1024*1024*1024,	"sub 1G",
+			    );
+		}
+
+sub countKey
+{ my($count,$lowest,@sizes)=@_;
+
+  my($size,$class);
+
+  while (($size,$class)=(shift(@sizes),shift(@sizes)))
+  { if ($size >= $lowest && $count < $size)
+    { return $class;
+    }
+  }
+
+  "1G+";
+}
+
+sub ipKey
+{ my($host)=@_;
+
+  my $ohost=$host;
+
+  if ($host =~ /^\d+\.\d+\.\d+\.\d+$/)
+  { if (! exists $::ip2n{$host})
+    { my @n = cs::Net::hostnames(cs::Net::a2addr($host));
+      if (! @n || ! length $n[0])
+      { @n=$host;
+      }
+
+      warn "ip2n($host)=$n[0]\n";
+      $::ip2n{$host}=lc($n[0]);
+    }
+
+    $host=$::ip2n{$host};
+  }
+
+  ## $host =~ s/\.research.canon.com.au$//i;
+
+#  if ($host ne $ohost)
+#  { warn "$ohost -> $host\n";
+#  }
+
+  return $host;
+}
