@@ -6,7 +6,7 @@
 
 : ${TMPDIR:=/tmp}
 
-webdir=$HOME/there/adzapper.sourceforge.net/html
+webdir=$HOME/@/adzapper.sf/html
 script=scripts/squid_redirect
 base=http://adzapper.sourceforge.net
 
