@@ -4,7 +4,7 @@
 #	- Cameron Simpson <cs@zip.com.au> 24mar2003
 #
 
-idsetlist "$SYSTEMID/${DESKTOPSET:-desktop}" name \
+idsetlist "${DESKTOPSET:-desktop}" name \
 | sed -e '/^[0-9]*	./!d' \
       -e 's/^\([0-9][0-9]*	\)\./\1/' \
       -e 's/^/DesktopName /'
