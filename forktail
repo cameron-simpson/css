@@ -1,0 +1,14 @@
+#!/bin/sh
+#
+
+xit=0
+for file
+do >>"$file"
+   if [ -f "$file" ]
+   then tail -f "$file" &
+   else echo "$0: $file does not exist" >&2
+	xit=1
+   fi
+done
+
+exit $xit
