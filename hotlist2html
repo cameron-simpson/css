@@ -1,0 +1,312 @@
+#!/usr/bin/perl
+#
+# Read hotlist data from stdin and emit HTML equivalent.
+#	- Cameron Simpson, cs@zip.com.au, 10jun94
+#
+
+
+($cmd=$0) =~ s:.*/::;
+$usage="Usage: $cmd [-o output] [-p] [hotlists...]
+	-o output	Write multiple files named output*.
+	-p		Select private entries rather than public.
+";
+
+use Getopt::Std;
+use cs::Hier;
+require 'cs/date.pl';
+
+# see &record().
+$R_URL=0; $R_DATE=1; $R_TITLE=2; $R_KEYWORD=3;
+
+$xit=0;
+$Top={};
+
+$private=0;
+undef $output;
+&Getopt::Std::getopts('po:') || die $usage;
+$private=1 if $opt_p;
+$output=$opt_o if defined $opt_o;
+if (defined $output)
+	{ ($out=$output) =~ s:.*/::;
+	}
+
+
+push(@ARGV,'-') unless @ARGV;
+
+# load hotlists
+print STDERR "loading hotlists ...\n";
+while (<>)
+	{ ($date,$url,$title)=split(/\t/,$_,3);
+	  &record($url,$date,$title);
+	}
+
+# locate link groups
+print STDERR "processing URLs ...\n";
+for $url (keys %record)
+	{ $r=$record{$url};
+
+	  $keyword=$r->[$R_KEYWORD];
+	  $group=substr($keyword,$[,1);
+	  $group{$group}=1;
+	  if (!defined($low{$group}) || $keyword lt $low{$group})
+		{ $low{$group}=$keyword; }
+	  if (!defined($high{$group}) || $keyword gt $high{$group})
+		{ $high{$group}=$keyword; }
+
+	  if (defined $output)
+		{ &enlist($r,'group',$group);
+		}
+	}
+
+$Title="$ENV{NAME}'s Hotlist";
+
+print "<TITLE>$Title</TITLE>\n";
+print "<H1>$Title</H1>\n";
+print "Last updated: ", &date'datestr(time), ".\n<P>\n";
+print "<UL>\n";
+
+print "    <LI><A HREF=\"#bydate\">what's new</A> - hotlist additions by date\n";
+
+if (defined $output)	{ print "    <LI>by name\n";
+			  print "	[ <A HREF=\"$out-flat.html\">Complete Listing</A> ]\n";
+			}
+else			{ print "    <LI><A HREF=\"#byname\">by name</A>\n"; }
+print "        <BR>\n";
+print "        ";
+$first=1;
+for $group (sort keys %{$Top->{'group'}})
+	{ if ($first)	{ $first=0; }
+	  else		{ print ", "; }
+
+	  $low=$low{$group};
+	  $high=$high{$group};
+
+	  $file = (defined $output ? "$out-group-$group.html" : '');
+	  print "<A HREF=$file#$low>$low</A>";
+	  if ($low ne $high)
+		{ print "..<A HREF=$file#$high>$high</A>";
+		}
+	}
+
+print "</UL>\n";
+
+print "<H2><A NAME=\"bydate\">Hotlist Additions By Date</A></H2><UL>\n";
+$first=1;
+for $url (sort { $record{$b}->[$R_DATE]
+	     <=> $record{$a}->[$R_DATE]
+	       } keys %record)
+	{ $r=$record{$url};
+	  $adate=&date'gm2ldmy($r->[$R_DATE]);
+	  $ref="<A HREF=\"$url\">$r->[$R_TITLE]</A>\n";
+	  if (defined $output)
+		{ &enlist($ref,'date',$adate);
+		  if (! defined $daterefs{$adate})
+			{ if ($first)	{ $first=0; }
+			  else		{ print ", "; }
+
+			  print "<A HREF=$out-date-$adate.html>$adate</A>\n";
+			  $daterefs{$adate}=1;
+			}
+		}
+	  else
+	  { print "<LI> <CODE>$adate</CODE> $ref\n";
+	  }
+	}
+print "</UL>\n";
+
+if (defined $output)
+	{ if (! open(FLAT,"> $output-flat.html"))
+		{ print STDERR "$cmd: can't write to $output-flat.html: $!\n";
+		}
+	  else
+	  { print FLAT "<TITLE>$Title - Complete Listing</TITLE>\n";
+	    print FLAT "<H1>$Title - Complete Listing</H1>\n";
+	    print FLAT "See also the <A HREF=\"$out-flat.html\">undivided listing</A>.<BR>\n";
+	  }
+	}
+else	{ if (! open(FLAT,">&STDOUT"))
+		{ print STDERR "$cmd: can't dup stdout: $!\n";
+		}
+	  else
+	  { print FLAT "<H2><A NAME=\"byname\">Hotlist By Name</A></H2><UL>\n";
+	  }
+	}
+
+print FLAT "<H2><A NAME=\"byname\">Hotlist By Name</A></H2><UL>\n";
+@sndx=sort byname @ndx;
+undef %hadkey;
+for $url (sort { &lcname($record{$a}->[$R_TITLE])
+	     cmp &lcname($record{$b}->[$R_TITLE])
+	       } keys %record)
+	{ print FLAT "<LI><A HREF=\"$url\"";
+	  $keyword=&keyword($title);
+	  if (! defined $hadkey{$keyword})
+		{ print FLAT " NAME=$keyword";
+		  $hadkey{$keyword}=1;
+		}
+	  print FLAT ">$record{$url}->[$R_TITLE]</A>\n";
+	}
+
+print FLAT "</UL>\n";
+
+# make files
+if (defined $output)
+	{ # per-date files
+	  ADATE:
+	    for $adate (keys %{$Top->{'date'}})
+		{ $file="$output-date-$adate.html";
+		  if (!open(ADATE,"> $file\0"))
+			{ print STDERR "$cmd: can't write to $file: $!\n";
+			  next ADATE;
+			}
+
+		  print ADATE "<TITLE>$Title - Additions for $adate</TITLE>\n";
+		  print ADATE "<H1>$Title - Additions for $adate</H1>\n";
+		  print ADATE "<UL>\n";
+		  for $ref (sort { &lcname($record{$a}->[$R_TITLE])
+			       cmp &lcname($record{$b}->[$R_TITLE])
+				 } &delist('date',$adate))
+			{ print ADATE "    <LI>$ref\n";
+			}
+		  print ADATE "</UL>\n";
+		  close(ADATE);
+		}
+
+	  # group files
+	  GROUP:
+	    for $group (keys %{$Top->{'group'}})
+		{ $file="$output-group-$group.html";
+		  if (!open(GROUP,"> $file\0"))
+			{ print STDERR "$cmd: can't write to $file: $!\n";
+			  next GROUP;
+			}
+
+		  print GROUP "<TITLE>$Title - Group $group</TITLE>\n";
+		  print GROUP "<H1>$Title - Group $group</H1>\n";
+		  print GROUP "<UL>\n";
+
+		  undef %hadkey;
+		  for $r (sort { &lcname($a->[$R_TITLE])
+			     cmp &lcname($b->[$R_TITLE])
+			       } &delist('group',$group))
+			{ print GROUP "    <LI> <A";
+			  $keyword=$r->[$R_KEYWORD];
+			  if (! defined $hadkey{$keyword})
+				{ print GROUP " NAME=\"$keyword\"";
+				  $hadkey{$keyword}=1;
+				}
+
+			  print GROUP " HREF=\"$r->[$R_URL]\">$r->[$R_TITLE]</A>\n";
+			}
+		  print GROUP "</UL>\n";
+		  close(GROUP);
+		}
+	}
+
+exit $xit;
+
+sub record
+	{ my($url,$date,$title)=@_;
+
+	  return if $private
+			? ($title !~ /^\./)
+			: ($title =~ /^\./);
+
+	  if (! defined $record{$url}
+	   || $record{$url}->[$R_DATE] < $date)
+		# stash more recent record
+		{ $private && ($title =~ s/^\.\s*//);
+	  	  $title=&mungetitle($title,$url);
+	  	  $record{$url}=[$url,$date,
+				 $title,&keyword($title)];
+		}
+
+	  $record{$url};
+	}
+
+sub mungetitle
+	{ local($_,$URL)=@_;
+
+	  s/^\s+//;
+	  s/\s+$//;
+
+	  if ($URL =~ m|^http://www\.yahoo\.com/[A-Z]|i && /^(.*):(\S.*\S)$/)
+		{ $_="$2 @ Yahoo:$1"; }
+	  elsif (m:^Untitled,\s+URL\s+(.*/):)
+		{ $_="$' <$1$'>"; }
+
+	  $_;
+	}
+
+sub byname
+	{ local($cmp);
+
+	  $cmp=&lcname($title[$a]) cmp &lcname($title[$b]);
+
+	  return $cmp;
+	}
+
+sub lcname	{ my($title)=@_;
+		  local($_)=$title;
+
+		  # XXX perl5 bug
+		  return $lcname{$title} if defined $lcname{$title};
+
+		  s/\s+/ /g;
+		  tr/A-Z/a-z/;
+		  # tr/-/_/;
+		  while (s/^[\W_\d]+//
+		      || s/^(report|consortium)\s+(on\s+)?//
+		      || s/^faq(\s+|[^\s\w]+)\W*//
+		      || s/^(the|a|l[ae]|une?)\s+//
+		      || s/^general\s+//
+		      || s/^(introduction|welcome|guide|gate(way)?)\s+(to\s+)?//
+		      || s/^(dictionary|glossary|list|home(\s+page)?)\s+(of\s+)?//
+			)
+				{}
+
+		  $lcname{$title}=$_;
+
+		  $_;
+		}
+
+sub keyword	# title
+	{ return $keyword{$_[0]} if defined $keyword{$_[0]};
+
+	  local($_)=&lcname($_[0]);
+	  /\w+/ || print STDERR "no keyword for $_[0]\n";
+
+	  $keyword{$_[0]}=$&;
+	}
+
+sub enlist	# (line,keys...) -> ref to list
+	{ my($datum,@keys)=@_;
+	  my($node)=$Top;
+
+	  for $key (@keys)
+		{ if (! defined $node->{$key})
+			{ $node->{$key}={};
+			}
+
+		  $node=$node->{$key};
+		}
+
+	  if (! defined $node->{''})
+		{ # print STDERR "new node {", join('|',@keys), "}, initially ", &Hier::h2a($datum), "\n";
+		  $node->{''}=[];
+		}
+
+	  push(@{$node->{''}},$datum);
+
+	  $node->{''};
+	}
+
+sub delist	# (keys...) -> @list
+	{ my($node)=$Top;
+
+	  for $key (@_)
+		{ $node=$node->{$key};
+		}
+
+	  @{$node->{''}};
+	}
