@@ -25,6 +25,7 @@ case "$type" in
     *': '*'bzip2 compressed data'*)	mtype=application/x-bzip ;;
     *': '*'Zip archive data'*)		mtype=application/zip ;;
     *': '*'tar archive'*)		mtype=application/x-tar ;;
+    *': '*'ASCII cpio archive'*)	mtype=application/x-cpio-c ;;
     *': '*'Ogg-Vorbis compressed sound file'*) mtype=application/x-ogg ;;
     *': '*'MPEG system stream data'*) mtype=video/mpeg ;;
     *': '*'Microsoft Office Document'*) mtype=application/msword ;;
