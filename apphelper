@@ -153,6 +153,17 @@ fi
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
 fbase=`basename "$file"`
+case "$fbase" in
+    =\?*\?Q\?*\?= )
+	# deuglify the font spec
+	fdir=`dirname "$file"`
+	nfbase=`unfontise "$fbase"`
+	nfile=$fdir/$nfbase
+	ln "$file" "$nfile" || exit 1
+	fbase=$nfbase
+	file=$nfile
+	;;
+esac
 export file fbase
 
 file "$file"; echo
