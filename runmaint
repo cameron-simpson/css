@@ -113,6 +113,8 @@ USER=${USER-$LOGNAME}; export USER
 [ -n "$USER" ] || { echo "$0: no \$USER or \$LOGNAME, bailing out" >&2
 		    exit 1
 		  }
+# debugging check
+case "$USER" in [0-9]*) echo "WARNING @ `hostname`: USER=\"$USER\", LOGNAME=\"$LOGNAME\", id=`id`" >&2 ;; esac
 
 if [ -f "$0" ]
 then    RunMaint="$0 -E"
