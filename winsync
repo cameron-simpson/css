@@ -1,0 +1,3 @@
+#!/bin/sh
+set -x
+exec rsync -avHP --modify-window=2 ${1+"$@"}
