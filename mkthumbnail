@@ -1,0 +1,52 @@
+#!/bin/sh
+#
+# Make thumbnail GIFs for inclusion in Web pages.
+#	- Cameron Simpson <cs@zip.com.au> 19feb95
+#
+# Prefer PNG to GIF, handle other input types. - cameron, 26may99
+#
+
+maxx=128 maxy=128 quant=16 fromtype=jpg outflag=-P
+
+usage="Usage: $0 [-G] [-m max] [-q quant] [-x maxx] [-y maxy] [srcimage]
+	-G		Srcimage (or input) is GIF, not JPEG.
+	-m max		Set max X and Y (default: $maxx, $maxy).
+	-q quant	Quantise to quant colours (default $quant).
+	-o gif		Output GIF instead of PNG.
+	-o png		Output PNG (default).
+	-x maxx		Max X (default: $maxx).
+	-y maxy		Max Y (default: $maxy).
+	srcimage	Input image (default stdin)."
+
+badopts=
+while :
+do  case $1 in
+	-G)	fromtype=gif ;;
+	-J)	fromtype=jpg ;;
+	-P)	fromtype=png ;;
+	-m)	maxx=$2 maxy=$2; shift ;;
+	-q)	quant=$2; shift ;;
+	-x)	maxx=$2; shift ;;
+	-y)	maxy=$2; shift ;;
+	-o)	outtype=$2; shift
+		case "$outtype" in
+		    png)	outflag=-P ;;
+		    gif)	outflag=-G ;;
+		    *)		echo "$0: unrecognised output type \"$outtype\"; I understand png or gif" >&2
+				badopts=1
+				;;
+		esac
+		;;
+	--)	shift; break ;;
+	-?*)	echo "$0: unrecognised option: $1" >&2; badopts=1 ;;
+	*)	break ;;
+    esac
+    shift
+done
+
+[ $# = 0 ] || { exec <"$1"; shift; }
+[ $# = 0 ] || { echo "$0: extra arguments: $*" >&2; badopts=1; }
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+exec jpgscale "-$fromtype" "$outflag" -q $quant $maxx $maxy
