@@ -17,7 +17,7 @@ then
 fi
 
 overview=`sed -n -e '1,/^=head2 Overview/d; :para; n; /^$/q; p; b para' ${1+"$@"}`
-if [ -n "$overview" ]
+if [ $dohtml ]
 then
     necho "<SPAN CLASS=\"overview-para\"><BR><SMALL>"
     ( echo "=for html"
@@ -27,7 +27,8 @@ then
     ) \
     | if [ $dohtml ]
       then
-	pod2html "--title=$indextitle" - \
+	set -x
+	pod2html "--title=Overview of $*" - \
 	| sed -n '1,/^<!-- INDEX END -->/d
 		/^<p>/b para
 		d
