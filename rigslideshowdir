@@ -1,13 +1,17 @@
 #!/bin/sh
 #
 # Make a slideshow directory - a dir full of symlinks to things to show.
-# Emits shell; pipe through "sh -x"to actually do stuff.
+# Emits shell; pipe through "sh -x" to actually do stuff.
 #	- Cameron Simpson <cs@zip.com.au> 01aug2003
 #
 
 cmd=`basename "$0"`
-usage="Usage: $cmd [pickim-options...] keywords...
-  Suggestion: $cmd -w -o keywords..."
+usage="Usage: $cmd [-x] [pickim-options...] [keywords...]
+  Suggestion: $cmd -x -w -o keywords...
+  The file .slideshow may contain default keywords and pickim options."
+
+doit=
+[ "x$1" = x-x ] && { doit=1; shift; }
 
 if [ $# = 0 ]
 then
@@ -17,9 +21,18 @@ then
     [ $# = 0 ] && { echo "$usage" >&2; exit 2; }
 fi
 
-set-x pickim -o "$@" \
+BGPATH=$HOME/im set-x pickim -o "$@" \
 | while read path
   do  lpath=`echo "$path" | tr -s / _ | sed 's/^_//'`
       echo "$lpath $path"
   done \
-| updlinkforest
+| ( [ $doit ] || exec updlinkforest
+
+    tmpf=.$cmd$$index
+    [ -s INDEX ] && mv INDEX "$tmpf"
+
+    updlinkforest | sh
+
+    [ -s "$tmpf" ] && mv "$tmpf" INDEX
+    updimlist
+  )
