@@ -4,15 +4,14 @@
 #	- Cameron Simpson <cs@zip.com.au> 28feb2002
 #
 
-VARLOG=${VARLOG:-$HOME/var/log}
-export VARLOG
+: ${LOGDIR:=$HOME/var/log}
 
 len=16
 
 pw=`exec 2>/dev/null
     ( dd if=/dev/urandom bs=1024 count=1
       date
-      tail -100 $VARLOG/procmail
+      tail -100 $LOGDIR/procmail
     ) | md5sum | dd bs=$len count=1`
 
 [ -n "$DISPLAY" ] && { necho "$pw" | xcut; }
