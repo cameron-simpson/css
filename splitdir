@@ -1,0 +1,102 @@
+#!/bin/sh
+#
+# Split up a directory into chunks no larger than a certain size
+# eg to span some CDROMs.
+#	- Cameron Simpson <cs@zip.com.au> 27aug2003
+#
+
+size=630000000	# 630MB - the size of a standard CDROM is 650MB
+		# we trim this because we count bytes and bloat a bit
+		# from block roundoff
+copyonly=
+
+cmd=`basename "$0"`
+usage="Usage: $cmd [-s size] [-c] srcdir
+	-c	Copy instead of hard linking.
+	-s size	Specify size limit in bytes. Default: $size"
+
+badopts=
+
+while :
+do
+  case $1 in
+    -c)	copyonly=1 ;;
+    -s)	size=$2; shift
+	[ 0 -lt "$size" ] \
+		|| { echo "$cmd: -s size: expected positive number, found \"$size\"" >&2
+		     badopts=1
+		   }
+	;;
+    --)	shift; break ;;
+    -?*)echo "$cmd: unrecognised option: $1" >&2
+	badopts=1
+	;;
+    *)	break ;;
+  esac
+  shift
+done
+
+if [ $# = 0 ]
+then
+    echo "$cmd: missing srcdir" >&2
+    badopts=1
+else
+    srcdir=$1; shift
+    [ -d "$srcdir/." ] || { echo "$cmd: $srcdir: not a directory" >&2; badopts=1; }
+    [ $# = 0 ] || { echo "$cmd: extra arguments: $*" >&2; badopts=1; }
+fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+( cd "$srcdir" || exit 1
+  find . -type f -print \
+  | perl -e  "\$sizelimit=$size;
+	      \$dirnum=1;
+	    "'
+	      while (defined($_=<STDIN>))
+	      {
+		chomp;
+	        if (@s=stat)
+		{ if (-f _)
+		  { $size=$s[7];
+
+		    if ($sofar+$size > $sizelimit)
+		    { $dirnum++;
+		      $sofar=0;
+		      if ($size > $sizelimit)
+		      { warn "$_: warning: $size bytes exceeds size limit of $sizelimit\n";
+		      }
+		    }
+
+		    print "$dirnum $_\n";
+		    $sofar+=$size;
+		  }
+		  else
+		  { warn "$_: not a file\n";
+		  }
+		}
+		else
+		{ warn "$_: stat fails: $!\n";
+		}
+	      }
+	     '
+) \
+| while read dirnum filename
+  do
+    # recite construction of top level dirs
+    [ -d "$dirnum/." ] \
+    || ( set -x; mkdir "$dirnum" ) \
+    || exit 1
+
+    target=$dirnum/$filename
+
+    targetdir=`dirname "$target"`
+    [ -d "$targetdir/." ] \
+    || mkdir -p "$targetdir" \
+    || { echo "$cmd: mkdir $targetdir fails" >&2
+	 exit 1
+       }
+
+    { [ ! "$copyonly" ] && ln "$srcdir/$filename" "$target" 2>/dev/null; } \
+    || cp -p "$srcdir/$filename" "$target"
+  done
