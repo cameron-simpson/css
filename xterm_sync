@@ -3,12 +3,14 @@
 # Do NOT use -e in xterm-args!
 #
 
+: ${TMPDIR:=/tmp}
+
 usage="Usage: $0 pre_sync post_sync xterm-args"
 [ $# -ge 2 ] || { echo "$usage" >&2
 		  exit 2
 		}
 
-sync=/tmp/xterm_sync$$
+sync=$TMPDIR/xterm_sync$$
 
 pre=$1 post=$2
 shift; shift
