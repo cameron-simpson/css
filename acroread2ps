@@ -12,10 +12,12 @@
 # Yes, there's something odd about the halftoning, not sure what yet.
 #
 
+: ${TMPDIR:=/tmp}
+
 acrorc=$HOME/.acrorc
 oldacrorc=
 [ -f "$acrorc" ] \
-   && { oldacrorc=/tmp/pdf2ps.$$a
+   && { oldacrorc=$TMPDIR/pdf2ps.$$a
 	cp "$acrorc" "$oldacrorc" \
 		|| { echo "$0: can't save old $acrorc, bailing out" >&2
 		     rm -f "$oldacrorc"
