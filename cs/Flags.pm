@@ -7,11 +7,39 @@
 # Reimplement as :-sep string.	- cameron 30jul98
 #
 
+=head1 NAME
+
+cs::Flags - a set of string values
+
+=head1 SYNOPSIS
+
+use cs::Flags;
+
+=head1 DESCRIPTION
+
+This module
+represents a set of flags
+as string values,
+typically uppercase basewords.
+
+=cut
+
 use strict qw(vars);
 
 use cs::Misc;
 
 package cs::Flags;
+
+=head1 OBJECT CREATION
+
+=over 4
+
+=item new I<flags...>
+
+Create a new B<cs::Flags> object
+with the specified I<flags> already set.
+
+=cut
 
 sub new
 { my($class)=shift;
@@ -24,70 +52,116 @@ sub new
   $this;
 }
 
-sub Members
+=back
+
+=head1 OBJECT METHODS
+
+=over 4
+
+=item Members()
+
+Return an array of strings
+for each flag present in the set.
+
+=cut
+
+sub Members($)
 { my($this)=@_;
  
   grep(length,split(/:/,$$this));
 }
 
-# set the specified flags
+=item Set(I<flags...>)
+
+Set the specified flags.
+
+=cut
+
 sub Set
 { my($this)=shift;
-
-  return if ! @_;
 
   ## warn "Set(@_)";
 
   FLAG:
-    for my $flag (@_)
-    { if ($flag =~ /\W/)
-      { warn "$::cmd: bad flag \"$flag\"";
-	next FLAG;
-      }
-
-      $$this.="$flag:" unless $$this =~ /:$flag:/;
-    }
+  for my $flag (@_)
+  { my $str = ":${flag}:";
+    $$this.="$flag:" unless substr($$this,$str) >= $[;
+  }
 
   ## warn "flags=[$$this]";
 }
 
-# clear the specified flags
+=item Clear(I<flags...>)
+
+Clear the specified I<flags>.
+
+=cut
+
 sub Clear
 { my($this)=shift;
 
+  my $i;
+
   for my $flag (@_)
-  { $$this =~ s/:$flag:/:/;
+  { my $str = ":${flag}:";
+    while (($i=index($$this,$str)) >= $[)
+    { substr($$this,$i,length $str)=':';
+    }
   }
 }
 
-# which of specified flags are set?
+=item Intersect(I<flags...>)
+
+Return a list of flags from I<flags>
+which are currently set.
+
+==cut
+
 sub Intersect
 { my($this)=shift;
 
   my(@f)=();
 
-  ## {my(@c)=caller;warn "this=$this, f=[@f] from [@c]"}
-
   for my $flag (@_)
-  { push(@f,$flag) if $$this =~ /:$flag:/;
+  { my $str = ":${flag}:";
+    push(@f,$flag) if substr($$this,$str) >= $[;
   }
 
   @f;
 }
 
-# test for presence of a single flag
-sub Test($$)
-{ my($this,$f)=@_;
+=item Test(I<flag>)
 
-  $$this =~ /:$f:/;
+Test if the specified I<flag> is set.
+
+=cut
+
+sub Test($$)
+{ my($this,$flag)=@_;
+  substr($$this,":${flag}:") >= $[;
 }
 
-# test for presence of all flags supplied
+=item TestAll(I<flags...>)
+
+Test that all the specified I<flags> are set.
+
+=cut
+
 sub TestAll
 { my($this)=shift;
-
-  ## warn "TestAll($$this vs [@_])";
   $this->Intersect(@_) == @_;
 }
+
+=head1 CAVEATS
+
+Flag strings must not contain colon ("B<:>") characters.
+This is not enforced by the code for efficiency reasons,
+and will cause quiet dysfunction.
+
+=head1 AUTHOR
+
+Cameron Simpson <cs@zip.com.au>
+
+=cut
 
 1;
