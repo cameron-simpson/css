@@ -92,6 +92,8 @@ if [ -n "$lock" ]; then dolock="lock $lock1 $lock"; else dolock=; fi
 args=
 case "$TERM,$DISPLAY" in
     *,?*)
+	set ttysane "$@"
+
 	opts=$termopts
 
 	case $x in +*|-*) ;; *) x=+$x ;; esac
@@ -126,7 +128,10 @@ case "$TERM,$DISPLAY" in
 	else exec $dolock "$PREFTERM" $opts -e "$@"
 	fi
 	;;
+
     iris-ansi*,*)
+	set ttysane "$@"
+
 	[ -n "$f" ] && { set x -f "$f" "$@"; shift; }
 	[ -n "$x$y" ] && { set x -p "$x,$y" "$@"; shift; }
 	[ -n "$w$h" ] && { set x -s "$w,$h" "$@"; shift; }
