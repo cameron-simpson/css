@@ -9,7 +9,9 @@ and manual entries in HTML format here:
 Installing my scripts:
 
     Unpack the tarball:
-	    http://www.cskk.ezoshosting.com/css/css.tar.gz
+
+	http://www.cskk.ezoshosting.com/cs/css/css.tar.gz
+
     into a suitable directory (eg "/opt/css", which I will assume for the
     sake of example below).
 
