@@ -4,12 +4,14 @@
 #	- Cameron Simpson <cs@zip.com.au> 03jul99
 #
 
+: ${TMPDIR:=/tmp}
+
 mysqldir=/opt/mysql
 inst=$mysqldir/bin/mysql_install_db
 
 usage="Usage: $0 datadir [mysql_install_db-options...]";
 
-dummyhome=/tmp/home.$$
+dummyhome=$TMPDIR/home.$$
 mkdir "$dummyhome" || exit 1
 
 badopts=
