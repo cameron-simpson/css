@@ -124,19 +124,35 @@ do
 
     [ $verbose ] && echo "$file ..."
 
-    if eval "$sedf <\"\$file\" >\$tmp"
+    # This is a defense against files without newlines:
+    # we append a newline and then toss the last line if it's empty.
+    # This because sed discards newlineless trailing lines.
+    # - Cameron Simpson <cs@zip.com.au> 09nov2001
+    #
+    if ( cat <"$file"; echo ) \
+       | sed -e '$!b notlast' -e '/^$/d' -e ':notlast' \
+       | eval "$sedf >\$tmp"
     then
 	# check for changes
 	if cmp -s "$file" "$tmp"
 	then
 	    ok=1		# no change
 	    continue
-	else
-	    if [ ! -s "$tmp" ]
-	    then
-		echo "$cmd: warning: tmpfile empty! skipping $file" >&2
-		continue
-	    fi
+
+# Theoretically the sed should fail if the disc fills.
+# Therefore dropping this test, which is a hack and breaks things
+# when we really do end up with empty files.
+# - Cameron Simpson <cs@zip.com.au> 09nov2001
+#
+#	else
+#	    if [ ! -s "$tmp" ]
+#	    then
+#		echo "$cmd: warning: tmpfile empty! skipping $file" >&2
+#		continue
+#	    fi
+#
+
+
 	fi
 	[ $silent ] || $diff "$file" "$tmp"
 
@@ -155,7 +171,7 @@ do
 	    fi
 	fi
 
-	# copy change version in
+	# copy changed version in
 	if cat "$tmp" > "$file" && cmp -s "$tmp" "$file"
 	then
 	    ok=1	# backup & update ok
