@@ -1,0 +1,10 @@
+#!/bin/sh
+
+realman=/usr/bin/man
+
+# catch -k
+[ "x$1" = x-k ] && exec "$realman" "$@"
+
+PAGER='less "-PM$MANFILE, line %bt:"'
+export PAGER
+exec $HOME/scripts/man ${1+"$@"}
