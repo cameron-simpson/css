@@ -16,8 +16,9 @@ cmd=`basename "$0"`
 savedir=`lastvalue savedir 2>/dev/null`
 savedir=${savedir:-"${SAVEDIR-$HOME/dl}"}
 pager=${PAGER:-less}
-doview=
-savemode=
+doview=$APPHELPER_DOVIEW
+savemode=$APPHELPER_SAVEMODE
+extract=
 termname=$cmd
 
 # =head1 SYNOPSIS
@@ -36,6 +37,7 @@ usage="Usage: $cmd [{-t|+t|-T title}] file [{-n|-y}] [-d savedir] [-p pager] \\
 	-y		Run viewer immediately.
 	-N		Don't offer to save the file.
 	-Y		Save the file without asking questions.
+	-X		Extract archive and run apphelper for each entry.
 	-d savedir	Save directory (from \$SAVEDIR: $savedir).
 	-p pager	Pager (default viewer, from \$PAGER: $pager)."
 
@@ -82,7 +84,10 @@ case $1 in
   +t)	shift; doterm= ;;
   *)	if [ -t 0 -a -t 1 ]
 	then  doterm=
-	else  doterm=1
+	else  [ -t 0 ] || echo STDIN not a tty
+	      [ -t 1 ] || echo STDOUT not a tty
+	      doterm=1
+	      pt
 	fi
 	;;
 esac
@@ -134,22 +139,26 @@ else
       exit 0
   fi
 
+  apphopts=
   while :
-  do  case $1 in
+  do
+      apphopt=$1
+      apphopt2=
+      case $1 in
 	  # =item -d I<directory>
 	  #
 	  # Specify a default directory in which to save files.
 	  # Lacking this, use the value of the envvar B<$SAVEDIR>
 	  # or B<$HOME/dl> if that is not set.
 	  #
-	  -d)	savedir=$2; shift ;;
+	  -d)	apphopt2=$2 savedir=$2; shift ;;
 	  # =item -p I<pager>
 	  #
 	  # Specify the preferred pager program.
 	  # lacking this, use the value of the envvar B<$PAGER>
 	  # or the program less(1) if that is not set.
 	  #
-	  -p)	pager=$2; shift ;;
+	  -p)	apphopt2=$2 pager=$2; shift ;;
 	  # =item -n
 	  #
 	  # No: do not run the viewer program.
@@ -174,20 +183,45 @@ else
 	  # The default is to ask.
 	  #
 	  -Y)	savemode=yes ;;
+	  # =item -X
+	  #
+	  # Extract the file (presumed to be an archive)
+	  # with the x(1) command
+	  # and run apphelper on each component.
+	  #
+	  -X)	extract=1 apphopt= ;;
 	  --)	shift; break ;;
 	  -?*)	echo "$cmd: unrecognised option: $1" >&2; badopts=1 ;;
 	  *)	break ;;
       esac
       shift
+      apphopts="$apphopts $apphopt $apphopt2"
   done
 fi
 
 # =back
 #
 
-[ $# = 0 ] && { set x v; shift; }
+# default to "v" for the command
+[ $# = 0 ] && set v
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+if [ $extract ]
+then
+    case "$file" in
+	/*) absfile=$file ;;
+	*)  absfile=`pwd`/$file ;;
+    esac
+    xdir=`mkdirn "${TMPDIR:-/tmp}/$cmd"` || exit 1
+    ( cd "$xdir" || exit 1
+      x "$absfile"
+      set -x
+      exec find . -type f -size +0 -print -exec "$0" {} $apphopts ';'
+    )
+    rm -rf "$xdir"
+    exit
+fi
 
 fbase=`basename "$file"`
 case "$fbase" in
