@@ -89,7 +89,9 @@ export mfolder
 muttcmd="mutt -f \"\$mfolder\" -e \"fcc-hook . \$mfolder\" $muttopts"
 if [ -n "$fpath" ]
 then
-  muttcmd="$muttcmd -e 'set maildir_cache=$fpath/.mutt-hcache'"
+  ##muttcmd="$muttcmd -e 'set maildir_cache=$fpath/.mutt-hcache'"
+  mutthcache=$HOME/var/mutt/header-cache
+  needdir "$mutthcache" && muttcmd="$muttcmd -e 'set header_cache=$mutthcache'"
   [ -s "$fpath/.muttrc" ] && muttcmd="$muttcmd -e 'source $fpath/.muttrc'"
 fi
 set sh -c "set -x; exec $muttcmd"
