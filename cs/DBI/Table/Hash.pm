@@ -38,16 +38,11 @@ require Exporter;
 sub TIEHASH($$$$)
 { my($class,$dbh,$table,$keyfield)=@_;
 
-  my $this =
   bless { DBH => $dbh,
 	  TABLE => $table,
 	  LIVE => {},
 	  KEY => $keyfield,
 	}, $class;
-
-  warn "this=".cs::Hier::h2a($this,1);
-
-  $this;
 }
 
 sub KEYS($)
