@@ -7,6 +7,9 @@
 cmd=$0
 usage="Usage: $0 [+a] [+s] [+t] [-f] [some-mutt-options...] [mutt-folder]"
 
+# hack to clear my alert window when I view my default folder
+( [ $# = 0 ] && alert "`clear`" ) &
+
 mfolder=+attn
 muttopts=
 anyhost=
@@ -86,5 +89,4 @@ set sh -c "set -x; exec $muttcmd"
 [ $use_screen ] && set scr "mutt_$mfolder" "$@"
 [ $use_term   ] && set term $termopts -n "mutt $mfolder" "$@"
 
-set -x
 exec "$@"
