@@ -7,6 +7,27 @@
 # Error recovery.				  - cameron, 11may97
 #
 
+=head1 NAME
+
+cs::HTML - support for parsing and generating HTML markup
+
+=head1 SYNOPSIS
+
+use cs::HTML;
+
+=head1 DESCRIPTION
+
+This module supplies methods for decomposing HTML text
+into a data structure
+and also methods for converting a perl-friendly data structure
+into HTML text.
+
+A B<cs::HTML> object does not represent a tag
+but a token source from which HTML tokens
+may be read. See L</OBJECT CREATION> below.
+
+=cut
+
 use strict qw(vars);
 
 BEGIN { use cs::DEBUG; cs::DEBUG::using(__FILE__); }
@@ -21,6 +42,10 @@ require Exporter;
 @cs::HTML::ISA=qw(Exporter);
 @cs::HTML::EXPORT_OK=qw(TABLE TD TR IMG HREF);
 
+# hack to prevent Netscape 4
+# inserting gratuitous whitespace into tables
+# and to keep A tags on one line
+# and to keep PRE sections pristine
 %cs::HTML::NoIndent=(	TABLE	=> 1,
 			A	=> 1,
 			PRE	=> 1,
@@ -31,13 +56,6 @@ $cs::HTML::ImStat=1;
 # these expect no closing tag
 map($cs::HTML::_Singular{uc($_)}=1,
 	BASE,META,INCLUDE,OPTION,INPUT,ISINDEX,INC,P,IMG,HR,BR,'!--');
-
-sub singular
-	{ my($tag)=@_;
-	  $tag=uc($tag);
-	  $tag =~ /^!/ || (exists $cs::HTML::_Singular{$tag}
-			&& $cs::HTML::_Singular{$tag});
-	}
 
 # these define what nests in what
 %cs::HTML::_Structures
@@ -60,140 +78,39 @@ for my $enclose (keys %cs::HTML::_Structures)
   }
 }
 
-# If the parent if a tag is active, we must back out until
-# that tag is at the top of the parse stack before accepting it.
-# 
-sub MustClose
-{ my($this,$topTag,$nextTag)=@_;
+=head1 GENERAL FUNCTIONS
 
-  my(@ptags)=(exists $cs::HTML::_ParentTags{$nextTag}
-	    ? @{$cs::HTML::_ParentTags{$nextTag}}
-	    : ()
-	     );
-  
-  # are we at the top already?
-  for my $ptag (@ptags)
-  { return 0 if $topTag eq $ptag;	# good tag at the top
-  }
+=over 4
 
-  my($active)=$this->{ACTIVE};
+=item singular(I<tag>)
 
-  # is there an outer tag to pop back to?
-  for my $ptag (@ptags)
-  { return 1 if $active->{$ptag};
-  }
+Test whether a tag needs a closing E<lt>/I<tag>E<gt> partner.
 
-  return 0;
+=cut
+
+sub singular($)
+{ my($tag)=@_;
+  $tag=uc($tag);
+  $tag =~ /^!/ || (exists $cs::HTML::_Singular{$tag}
+		&& $cs::HTML::_Singular{$tag});
 }
 
-# new cs::HTML <cs::Source>
-sub new
-{ my($class,$s)=(shift,shift);
-  if (! ref $s)
-  { ::need(cs::Source);
-    $s=new cs::Source ($s,@_);
-  }
+=item mkTok(I<tag>,I<attrs>,I<subtokens...>)
 
-  my($sg)=new cs::SGML $s;
+Compose the arguments into a hashref of the form:
 
-  return undef if ! defined $sg;
+S<{ TAG =E<gt> I<tag>, ATTRS =E<gt> I<attrs>, TOKENS =E<gt> [ I<subtokens...> ] }>
 
-  bless { SGML		=> $sg,
-	  TOKENS	=> [],
-	  ACTIVE	=> {},
-	}, $class;
-}
+If omitted, I<attrs> defaults to C<{}>.
 
-sub Tok
-{ ## warn "HTML::Tok()\n";
-  my($this,$close,$pertok)=@_;
-  $close={} if ! defined $close;
-
-  my($t);
-
-  if (! defined ($t=$this->{SGML}->Tok()))
-  { ## warn "EOF from SGML, returning\n";
-    return undef;
-  }
-
-  ## warn "parse TAG=$t->{TAG}\n";
-  # scalar or simple tag? return it
-  if (! ref $t || singular($t->{TAG}) || ! $t->{START})
-  { ## warn "single token ".cs::Hier::h2a($t,0) if ref($t) && $t->{TAG} eq DL;
-    $t=&$pertok($t) if defined $pertok;
-    return $t;
-  }
-
-  my($oldActiveState)=$this->{ACTIVE}->{$t->{TAG}};
-  $this->{ACTIVE}->{$t->{TAG}}=1;
-
-  # nesting tag - collect contents
-
-  $t->{TOKENS}=[];
-
-  my($rt);	# raw token
-
-  # update set of closing tokens
-  my($enclose)={ %$close };
-  $enclose->{$t->{TAG}}=1;
-
-  # collect SGML tokens, assembling structure
-  TOK:
-    while (defined ($rt=($this->{SGML}->Tok())))
-    { ## warn "got SGML tok $rt->{TAG}\n";
-
-      ## warn "$rt\n" if ! ref $rt;
-
-      if (! ref $rt || singular($rt->{TAG}))
-      # scalar or singular? keep
-      {
-	## warn "pushing ".cs::Hier::h2a($rt,0) if $rt->{TAG} eq DL;
-	push(@{$t->{TOKENS}},$rt);
-      }
-      elsif (! $rt->{START})
-      # closing tag
-      { if (exists $enclose->{$rt->{TAG}})
-	# closing tag for something other than this?
-	# push back, fall out
-	# this way we can parse <tag><tag2></tag1>
-	{ $this->{SGML}->UnTok($rt) if $rt->{TAG} ne $t->{TAG};
-	  last TOK;
-	}
-	else
-	# unexpected closing token? keep it
-	{ ## warn "pushing ".cs::Hier::h2a($rt,0) if $rt->{TAG} eq DL;
-	  push(@{$t->{TOKENS}},$rt);
-	}
-      }
-      elsif ($this->MustClose($t->{TAG},$rt->{TAG}))
-      # oooh! a self terminating tag
-      # back out until we hit the closing parent
-      { $this->{SGML}->UnTok($rt);
-	## warn "faking /$t->{TAG} to precede $rt->{TAG}\n";
-	last TOK;
-      }
-      else
-      # substructure
-      { $this->{SGML}->UnTok($rt);
-	## warn "recurse into $rt->{TAG} from $t->{TAG}\n";
-	push(@{$t->{TOKENS}},$this->Tok($enclose,$pertok));
-	## warn "back to $t->{TAG}\n";
-      }
-    }
-
-  ## warn "RETURN TOKEN $t->{TAG}\n";
-  $this->{ACTIVE}->{$t->{TAG}}=$oldActiveState;
-
-  $t=&$pertok($t) if defined $pertok;
-
-  return $t;
-}
+=cut
 
 # make a token
 # return token structure in scalar context
 # or array of text strings in array context
 sub mkTok
 { my($tag,@subtoks)=@_;
+
   my($attrs)=(@subtoks
 	   && ref $subtoks[0]
 	   && ::reftype($subtoks[0]) eq HASH
@@ -208,10 +125,27 @@ sub mkTok
   wantarray ? tok2a($tok) : $tok;
 }
 
-sub tokUnfold
-{ my(@tok)=();
+=item tokUnfold(I<tokens...>)
 
-  my($tok);
+Take a hand constructed array of HTML tokens,
+which may contain a mix of tokens in the form
+
+S<{ TAG =E<gt> I<tag>, ATTRS =E<gt> I<attrs>, TOKENS =E<gt> [ I<subtokens...> ] }>
+
+and the form
+
+S<[ I<tag>, I<attrs>, I<subtokens...> ]>
+
+and return a list of these tokens converted into the first form,
+suitable for analysis.
+
+=cut
+
+sub tokUnfold
+{
+  my(@tok)=();
+
+  my $tok;
 
   for (@_)
   { $tok=$_;
@@ -225,6 +159,13 @@ sub tokUnfold
 
   @tok;
 }
+
+=item tokFlat(I<tokens...>)
+
+Take some HTML tokens and return a string containing
+the textual component, with all markup discarded.
+
+=cut
 
 # get plain text of tok list - discard markup
 sub tokFlat
@@ -246,27 +187,49 @@ sub tokFlat
   $text;
 }
 
+=item tok2a(I<doindent>,I<tokens...>)
+
+Take a list of HTML tokens and return the HTML text,
+nicely indented if I<doindent> = 1.
+If omitted, I<doindent> defaults to 0.
+In a scalar context returns a single string with the HTML in it.
+In an array context returns an array of strings, each an HTML token.
+
+=cut
+
 sub tok2a
-{ my(@html)=();
+{
+  my(@html)=();
 
   my $indent=0;
   if (@_ && $_[0] =~ /^[01]$/)
   { $indent=shift(@_);
   }
-  ::need(cs::Sink);
-  my($sink)=cs::Sink->new(ARRAY,\@html);
-  tok2s($indent,$sink,@_);
+
+  { ::need(cs::Sink);
+    my $sink = cs::Sink->new(ARRAY,\@html);
+    tok2s($indent,$sink,@_);
+  }
 
   wantarray ? @html : join('',@html);
 }
+
+=item tok2s(I<doindent>,I<sink>,I<tokens...>)
+
+Take a list of HTML tokens and write the HTML text to I<sink> (a B<cs::Sink>),
+nicely indented if I<doindent> = 1.
+If omitted, I<doindent> defaults to 0.
+
+=cut
 
 # convert tokens to array of text strings
 sub tok2s	# ([indent,]sink,tok...)
 {
   my($sink)=shift;
+
   my $indent=0;
   if (! ref $sink)
-	{ $indent=$sink; $sink=shift; }
+  { $indent=$sink; $sink=shift; }
 
   my(@html)=();
 
@@ -384,23 +347,20 @@ sub tok2s	# ([indent,]sink,tok...)
   }
 }
 
-sub doesTagIndent
+=item doesTagIndent(I<tag>,I<currentindent>)
+
+If I<tag> is one of the special ones we don't indent, return 0.
+Otherwise, return I<currentindent>.
+
+=cut
+
+sub doesTagIndent($$)
 { my($tag,$oldindent)=@_;
 
-  if (exists $cs::HTML::NoIndent{$tag}
-   && $cs::HTML::NoIndent{$tag})
-	{ return 0;
-	}
+  return 0 if exists $cs::HTML::NoIndent{$tag}
+	   && $cs::HTML::NoIndent{$tag};
 
   $oldindent;
-}
-
-sub _openSrc
-{ my($src)=@_;
-  my($s);
-
-  ::need(cs::Source);
-  cs::Source->new(PATH,$src);
 }
 
 # convert token only, not subtokens
@@ -450,20 +410,41 @@ sub _justtok2a
 	  TILDE,	'~',
 	 );
 
-sub unamp
-	{ local($_)=uc(shift);
+=item unamp(I<entity>)
 
-	  if (defined $cs::HTML::_AmpEsc{$_})	{ $_=$cs::HTML::_AmpEsc{$_}; }
-	  elsif (/^#(\d+)$/)		{ $_=chr($1); }
-	  else				{ }
+Convert a character entity name I<entity>
+(as is found inside B<&>I<entity>B<;> in HTML text)
+or number (of the form B<#n>)
+into the corresponding character.
+Returns the character,
+of the entity name unchanged if unrecognised.
 
-	  $_;
-	}
+=cut
+
+sub unamp($)
+{
+  local($_)=uc(shift);
+
+  if (defined $cs::HTML::_AmpEsc{$_})	{ $_=$cs::HTML::_AmpEsc{$_}; }
+  elsif (/^#(\d+)$/)		{ $_=chr($1); }
+  else				{ }
+
+  $_;
+}
 
 # pattern to match an RFC822 Message-ID
 $cs::HTML::_MsgIDPtn='<[^>@]*@[^>@]*>';
 
-sub raw2html	# rawline -> escaped line
+=item raw2html(I<text>)
+
+Convert plaintext to HTML,
+converting special characters like E<lt> into character entities.
+Also recognised is nroff-style bold and underline
+(cB<BS>c and _<BS>c respectively).
+
+=cut
+
+sub raw2html($)	# rawline -> escaped line
 { local($_)=@_;
 
   if (! defined)
@@ -474,6 +455,7 @@ sub raw2html	# rawline -> escaped line
   # convert special characters
   s:(_)+([&<>]):$2:g;	# clear underlines from specials
   s:(([&<>]))+\2:$2:g;# clear bold from specials
+
   s:&:&amp;:g;		# replace with SGML escapes
   s:<:&lt;:g;
   s:>:&gt;:g;
@@ -489,46 +471,85 @@ sub raw2html	# rawline -> escaped line
   $_;
 }
 
-sub quoteQueryField
+=item quoteQueryField
+
+Replace saces with B<+>.
+Replace special characters with B<%xx> escapes.
+Used to massage a string for use with a B<GET> HTML query.
+
+=cut
+
+sub quoteQueryField($)
 { local($_)=shift;
   s/[&#=%?]/sprintf("%%%02x",ord($&))/eg;
   s/ /+/g;
   $_;
 }
 
+=item href(I<tagline>,I<url>,I<target>)
+
+B<OBSOLETE>.
+Emit HTML text for an S<E<lt>A HREF=> anchor.
+
+=cut
+
 sub href	# (tag,url,$target) -> <A HREF=...>...</A>
 { my($tag,$url,$target)=@_;
 
-  '<A HREF="'.&quote($url).'">'.&raw2html($tag).'</A>';
+  '<A HREF="'.quote($url).'">'.raw2html($tag).'</A>';
 }
 
 
-sub news2html
-	{ local($_)=@_;
-	  my($sofar);
+=item news2html(I<text>)
 
-	  while (length)
-		{ if (/^$cs::SGML::AnnoPtn/o
-		   || /^\&\w+;/)	{ $sofar.=$&; $_=$'; }
-		  elsif (/^$cs::HTML::_MsgIDPtn/o)	{ $sofar.=&msgid2html($&); $_=$'; }
-		  elsif (m;^\w+\://[^"\s]+;){ $sofar.=&HREF($&,$&); $_=$'; }
-		  elsif (/^[^<\w&]+/)	{ $sofar.=$&; $_=$'; }
-		  else
-		  { $sofar.=substr($_,$[,1);
-		    substr($_,$[,1)='';
-		  }
-		}
+Convert ``text'' into HTML text
+in a heuristic fashion,
+recognising markup and URLs.
+Handy for mail/news-E<gt>HTML conversion.
 
-	  $sofar;
-	}
+=cut
 
-sub msgid2html
-	{ my($id)=shift;
-	  my($shortid)=$id;
+sub news2html($)
+{ local($_)=@_;
 
-	  $shortid =~ s/^<(.*)>$/$1/;
-	  &href($id,"news:$shortid");
-	}
+  my $sofar = '';
+
+  while (length)
+  { if (/^$cs::SGML::AnnoPtn/o
+     || /^\&\w+;/)	{ $sofar.=$&; $_=$'; }
+    elsif (/^$cs::HTML::_MsgIDPtn/o)	{ $sofar.=&msgid2html($&); $_=$'; }
+    elsif (m;^\w+\://[^"\s]+;){ $sofar.=&HREF($&,$&); $_=$'; }
+    elsif (/^[^<\w&]+/)	{ $sofar.=$&; $_=$'; }
+    else
+    { $sofar.=substr($_,$[,1);
+      substr($_,$[,1)='';
+    }
+  }
+
+  $sofar;
+}
+
+=item msgid2html(I<message-id>)
+
+Emit HTML text with a S<E<lt>A HREF=news:I<message-id>> anchor.
+
+=cut
+
+sub msgid2html($)
+{ my($id)=shift;
+
+  my($shortid)=$id;
+
+  $shortid =~ s/^<(.*)>$/$1/;
+  &href($id,"news:$shortid");
+}
+
+=item editMarkUp(I<editsub>,I<tokens...>)
+
+Walk the I<tokens>,
+handing each to the subroutine I<editsub> for manipulation.
+
+=cut
 
 # hack on some markup
 sub editMarkUp
@@ -562,9 +583,16 @@ sub editMarkUp
   }
 }
 
+=item grepMarkUp(I<grep>,I<tokens...>)
+
+Seach the I<tokens>,
+returning an array of items matching I<grep>.
+I<grep> is either a subroutine expecting a token as argument
+or a string naming a tag to match.
+
+=cut
+
 # we expect structured markup
-# $grep is either subroutine expecting a token as argument,
-# or a string naming a tag to match
 sub grepMarkUp	# (grep,@html) -> @grepped
 { my($grep)=shift;
 
@@ -598,6 +626,19 @@ sub _grepMarkUpForTag($)
 	   ) eq $cs::HTML::_grepTag;
 }
 
+=item nbstr(I<string>,I<keepWide>)
+
+Return an array of HTML tokens
+with the white space in I<string>
+replaced with B<&nbsp;>.
+
+UNIMPLEMENTED:
+if the optional flag I<keepWide> is supplied,
+uses as many B<&nbsp;>s as spaces in the original text,
+otherwise uses just one between words.
+
+=cut
+
 sub nbstr
 { my($text,$keepWide)=@_;
   $keepWide=0 if ! defined $keepWide;
@@ -615,8 +656,18 @@ sub nbstr
   @tok;
 }
 
-sub URLs	# html -> (url,tag,...)
+=item URLs(I<string>)
+
+
+OBSOLETE.
+Return all the URls referenced by B<HREF=> attributes
+from the I<string>.
+
+=cut
+
+sub URLs($)	# html -> (url,tag,...)
 { local($_)=@_;
+
   my(@URLs,$anno,$url,$tag,$noslash,%attrs);
 
   while (m|$cs::SGML::AnnoPtn|oi)
@@ -711,5 +762,202 @@ sub HTML
 		[BODY,$bodyattrs,@_]
   ];
 }
+
+=back
+
+=head1 OBJECT CREATION
+
+=over 4
+
+=item new cs::HTML I<source>
+
+Attach to the B<cs::Source> object I<source>,
+ready to return HTML tokens via the B<Tok> method, below.
+
+=item new cs::HTML I<SourceType>,I<SourceArgs...>
+
+Call S<new B<cs::Source> I<SourceType>,I<SourceArgs...>>
+to open a B<cs::Source> object and attach,
+ready to return HTML tokens via the B<Tok> method, below.
+
+=cut
+
+# new cs::HTML <cs::Source>
+sub new
+{ my($class,$s)=(shift,shift);
+  if (! ref $s)
+  { ::need(cs::Source);
+    $s=cs::Source->new($s,@_);
+  }
+
+  my($sg)=new cs::SGML $s;
+
+  return undef if ! defined $sg;
+
+  bless { SGML		=> $sg,
+	  TOKENS	=> [],
+	  ACTIVE	=> {},
+	}, $class;
+}
+
+=back
+
+=head1 OBJECT METHODS
+
+=over 4
+
+=item Tok(I<close>,I<pertok>)
+
+Fetch the next HTML token from the source.
+
+I<close> is an optional hashref whose keys name tags
+which imply a close of an active (``open'') tag
+(for example, an opening E<lt>B<TR>E<gt> tag
+implicitly closes any active E<lt>B<TD>E<gt> tag).
+
+I<pertok> is an optional subroutine to manipulate a tag
+before it is returned from B<Tok>. It takes the token as argument.
+
+B<Tok> returns completed tags,
+with nested structure embedded in the B<TOKENS> field
+of the returned token.
+Per-markup element parsing should use the B<cs::SGML> module,
+on which B<cs::HTML> is built.
+
+=cut
+
+sub Tok
+{ ## warn "HTML::Tok()\n";
+  my($this,$close,$pertok)=@_;
+  $close={} if ! defined $close;
+
+  my($t);
+
+  if (! defined ($t=$this->{SGML}->Tok()))
+  { ## warn "EOF from SGML, returning\n";
+    return undef;
+  }
+
+  ## warn "parse TAG=$t->{TAG}\n";
+  # scalar or simple tag? return it
+  if (! ref $t || singular($t->{TAG}) || ! $t->{START})
+  { ## warn "single token ".cs::Hier::h2a($t,0) if ref($t) && $t->{TAG} eq DL;
+    $t=&$pertok($t) if defined $pertok;
+    return $t;
+  }
+
+  my($oldActiveState)=$this->{ACTIVE}->{$t->{TAG}};
+  $this->{ACTIVE}->{$t->{TAG}}=1;
+
+  # nesting tag - collect contents
+
+  $t->{TOKENS}=[];
+
+  my($rt);	# raw token
+
+  # update set of closing tokens
+  my($enclose)={ %$close };
+  $enclose->{$t->{TAG}}=1;
+
+  # collect SGML tokens, assembling structure
+  TOK:
+    while (defined ($rt=($this->{SGML}->Tok())))
+    { ## warn "got SGML tok $rt->{TAG}\n";
+
+      ## warn "$rt\n" if ! ref $rt;
+
+      if (! ref $rt || singular($rt->{TAG}))
+      # scalar or singular? keep
+      {
+	## warn "pushing ".cs::Hier::h2a($rt,0) if $rt->{TAG} eq DL;
+	push(@{$t->{TOKENS}},$rt);
+      }
+      elsif (! $rt->{START})
+      # closing tag
+      { if (exists $enclose->{$rt->{TAG}})
+	# closing tag for something other than this?
+	# push back, fall out
+	# this way we can parse <tag><tag2></tag1>
+	{ $this->{SGML}->UnTok($rt) if $rt->{TAG} ne $t->{TAG};
+	  last TOK;
+	}
+	else
+	# unexpected closing token? keep it
+	{ ## warn "pushing ".cs::Hier::h2a($rt,0) if $rt->{TAG} eq DL;
+	  push(@{$t->{TOKENS}},$rt);
+	}
+      }
+      elsif ($this->_MustClose($t->{TAG},$rt->{TAG}))
+      # oooh! a self terminating tag
+      # back out until we hit the closing parent
+      { $this->{SGML}->UnTok($rt);
+	## warn "faking /$t->{TAG} to precede $rt->{TAG}\n";
+	last TOK;
+      }
+      else
+      # substructure
+      { $this->{SGML}->UnTok($rt);
+	## warn "recurse into $rt->{TAG} from $t->{TAG}\n";
+	push(@{$t->{TOKENS}},$this->Tok($enclose,$pertok));
+	## warn "back to $t->{TAG}\n";
+      }
+    }
+
+  ## warn "RETURN TOKEN $t->{TAG}\n";
+  $this->{ACTIVE}->{$t->{TAG}}=$oldActiveState;
+
+  $t=&$pertok($t) if defined $pertok;
+
+  return $t;
+}
+
+# If the parent if a tag is active, we must back out until
+# that tag is at the top of the parse stack before accepting it.
+# 
+sub _MustClose
+{ my($this,$topTag,$nextTag)=@_;
+
+  my(@ptags)=(exists $cs::HTML::_ParentTags{$nextTag}
+	    ? @{$cs::HTML::_ParentTags{$nextTag}}
+	    : ()
+	     );
+  
+  # are we at the top already?
+  for my $ptag (@ptags)
+  { return 0 if $topTag eq $ptag;	# good tag at the top
+  }
+
+  my($active)=$this->{ACTIVE};
+
+  # is there an outer tag to pop back to?
+  for my $ptag (@ptags)
+  { return 1 if $active->{$ptag};
+  }
+
+  return 0;
+}
+
+sub _openSrc
+{ my($src)=@_;
+  my($s);
+
+  ::need(cs::Source);
+  cs::Source->new(PATH,$src);
+}
+
+=back
+
+=head1 SEE ALSO
+
+B<cs::Sink>(3),
+B<cs::Source>(3),
+B<cs::SGML>(3),
+B<cs::Tokenise>(3)
+
+=head1 AUTHOR
+
+Cameron Simpson E<lt>cs@zip.com.auE<gt>
+
+=cut
 
 1;
