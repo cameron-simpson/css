@@ -1,0 +1,8 @@
+#!/bin/sh
+#
+# "vm all" - shortcut to my mixed inbox.
+#	- Cameron Simpson <cs@zip.com.au> 19jan99
+#
+
+exec vm -T ${1+"$@"} +in
+exec term -n "mutt +in" -e mutt -f "$MAILDIR/in"
