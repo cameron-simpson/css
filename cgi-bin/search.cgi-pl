@@ -19,7 +19,7 @@ my $engine=uc($::Q->Value(ENGINE));
    $engine =~ s/\s+//g;
    $engine =~ s/-/_/g;
 my $method=GET;
-my $me='http://cgi.zip.com.au/~cs/cgi-bin/search.cgi';
+my $me='http://www.cskk.ezoshosting.com/cgi-bin/search.cgi';
 
 my %E=(
 	# CISRA internal web
