@@ -5,4 +5,12 @@
 #
 
 cd $HOME/motion || exit 1
-ignhup motion >>$LOGDIR/motion 2>&1 </dev/null &
+alog motion motion
+
+echo 'Video references from ~/.motion/motion.conf:'
+echo
+grep video $HOME/.motion/motion.conf
+echo
+echo Monitor the device 1 up from each to watch it, eg:
+echo '  xawtv -d /dev/video3'
+echo
