@@ -4,7 +4,7 @@
 # Simple but not very efficient in either space or time.
 #	- Cameron Simpson <cs@zip.com.au> 26aug97
 #
-# Reimplement as :-sep string.	- cameron 30jul98
+# Reimplement as \0-sep string.	- cameron 30jul98
 #
 
 =head1 NAME
@@ -44,7 +44,7 @@ with the specified I<flags> already set.
 sub new
 { my($class)=shift;
 
-  my($f)=":";
+  my($f)="\0";
   my($this)=(bless \$f, $class);
 
   $this->Set(@_);
@@ -68,7 +68,7 @@ for each flag present in the set.
 sub Members($)
 { my($this)=@_;
  
-  grep(length,split(/:/,$$this));
+  grep(length,split(/\0/,$$this));
 }
 
 =item Set(I<flags...>)
@@ -84,8 +84,8 @@ sub Set
 
   FLAG:
   for my $flag (@_)
-  { my $str = ":${flag}:";
-    $$this.="$flag:" unless index($$this,$str) >= $[;
+  { my $str = "\0${flag}\0";
+    $$this.="$flag\0" unless index($$this,$str) >= $[;
   }
 
   ## warn "flags=[$$this]";
@@ -103,9 +103,9 @@ sub Clear
   my $i;
 
   for my $flag (@_)
-  { my $str = ":${flag}:";
+  { my $str = "\0${flag}\0";
     while (($i=index($$this,$str)) >= $[)
-    { substr($$this,$i,length $str)=':';
+    { substr($$this,$i,length $str)='\0';
     }
   }
 }
@@ -118,7 +118,7 @@ Clear all the flags.
 
 sub Reset($)
 { my($this)=@_;
-  $$this=":";
+  $$this="\0";
 }
 
 =item Intersect(I<flags...>)
@@ -134,7 +134,7 @@ sub Intersect
   my(@f)=();
 
   for my $flag (@_)
-  { my $str = ":${flag}:";
+  { my $str = "\0${flag}\0";
     push(@f,$flag) if index($$this,$str) >= $[;
   }
 
@@ -149,7 +149,7 @@ Test if the specified I<flag> is set.
 
 sub Test($$)
 { my($this,$flag)=@_;
-  index($$this,":${flag}:") >= $[;
+  index($$this,"\0${flag}\0") >= $[;
 }
 
 =item TestAll(I<flags...>)
@@ -166,7 +166,7 @@ sub TestAll
 
 =head1 CAVEATS
 
-Flag strings must not contain colon ("B<:>") characters.
+Flag strings must not contain NULs ("B<\0>").
 This is not enforced by the code for efficiency reasons,
 and will cause quiet dysfunction.
 
