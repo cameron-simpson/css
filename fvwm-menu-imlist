@@ -1,35 +1,85 @@
 #!/bin/sh
+#
+# Generate menu for an image directory, with thumbnails.
+#	- Cameron Simpson <cs@zip.com.au> 19oct2002
+#
 
-[ $# = 1 ] || { echo "Usage: $0 dir" >&2; exit 2; }
+##alert "$0 $*"
 
-dir=$1; shift
+##thsize=16x16
+thsize=32x32
+imop="Exec xv"
+
+cmd=$0
+usage="Usage: $cmd dir [image-op]"
+
+badopts=
+
+if [ $# = 0 ]
+then
+    echo "$cmd: missing dir" >&2
+    badopts=1
+else
+    dir=$1; shift
+    [ $# = 0 ] || imop=$*
+fi
+
+[ $badopts ] && { echo "Usage: $0 dir" >&2; exit 2; }
+
+# FVWM doesn't like slashes (probably nonalphanumerics)
+# so I use _ for /, and must undo this.
+case "$dir" in *_*) dir=`echo "$dir" | tr _ /` ;; esac
+
 cd "$dir" || exit 1
 dir=`pwd`
 
-thsize=16x16
+parent=`dirname "$dir"`
+parent_=`echo "$parent" | tr / _`
+echo "\"..\" PopImDir $parent_"
+
 thdir=.thumbnails/$thsize
 
 for d in */.
-do  subd=
+do  [ -d "$d" ] || continue
+    subb=`dirname "$d"`
+    subd=$dir/$subb
+    subdnam=`echo "$subd" | tr / _`
+    ##alert "\"$subb\" PopImDir $subdnam $imop"
+    echo "\"$subb\" PopImDir $subdnam $imop"
 done
 
+exec 3>&1 1>&2
+
 for f in *.*
-do  case "$f" in
-        *.xpm|*.gif)
+do
+    [ -s "$f" ] || continue
+
+    case "$f" in
+	*.xpm|*.gif)
 	    thfmt=xpm ;;
 	*.png|*.jpg)
 	    thfmt=png ;;
 	*)  continue ;;
     esac
-    [ -s "$f" ] || continue
-
+    echo "$thfmt $f"	# to the thumb maker ...
 
     thbase=$f.$thfmt
     th=$thdir/$thbase
-    [ -d "$thdir/." ] || set-x mkdir -p "$thdir" || break
-    [ -s "$th" ] || ( cd "$thdir" || exit 1
-		      set -x
-		      exec "mk$thfmt" -o "$thbase" "$thsize" "../../$f"
-		    )
-    echo "\"%$dir/$th%$f\" Exec xv '$dir/$f'"
-done
+    ##alert "\"%$dir/$th%$f\" $imop '$dir/$f'"
+    echo "\"%$dir/$th%$f\" $imop '$dir/$f'" >&3
+done \
+| ( exec 3>&-
+    [ -d "$thdir/." ] || set-x mkdir -p "$thdir" || exit 1
+    cd "$thdir" || exit 1
+
+    while read thfmt f
+    do
+      thbase=$f.$thfmt
+      th=$thdir/$thbase
+      [ -s "$thbase" ] && continue
+
+      ( set -x
+	exec "mk$thfmt" -o "$thbase" "$thsize" "../../$f"
+      )
+    done
+  ) &
