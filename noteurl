@@ -1,0 +1,75 @@
+#!/bin/sh
+#
+# Stash a URL for later browsing.
+#	- Cameron Simpson <cs@zip.com.au> 15nov96
+#
+
+urlfile=$HOME/there/$SYSTEMID/noteurl.html
+
+usage="Usage: $0 [-f urlfile] [-t title] [-p prefix] URLs...
+	-f urlfile	Where to record URLs.
+			Default: $urlfile
+	-t title	Title for URL (default the URL itself).
+	-p prefix	Prefix for note line."
+
+title=
+pfx=
+logfile=
+
+badopts=
+
+while :
+do
+    case $1 in
+	-l)	logfile=$URLLOG ;;
+	-f)	urlfile=$2; shift ;;
+	-t)	title=$2; shift ;;
+	-p)	pfx=$2; shift ;;
+	--)	shift; break ;;
+	-?*)	echo "$0: unrecognised option: $1" >&2; badopts=1 ;;
+	*)	break ;;
+    esac
+    shift
+done
+
+[ $# = 0 ] && { echo "$0: missing URLs" >&2; badopts=1; }
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+# escape quotes for shell
+case $title in
+    *\'*)	title=`echo "$title" | sed "s/'/'\\\\\\\\''/g"` ;;
+esac
+case $pfx in
+    *\'*)	pfx=`echo "$pfx" | sed "s/'/'\\\\\\\\''/g"` ;;
+esac
+
+urls=
+for url
+do  
+    case $url in
+	file:/*)	;;
+	*://*/*)	;;
+	*://*)	url=$url/ ;;
+	//*/*)	url=http:$url ;;
+	//*)	url=http:$url/ ;;
+	/*)	url=http://localhost$url ;;
+	*/*)	url="http://$url";;
+	*)	url="http://$url/";;
+    esac
+
+    # escape quotes for shell
+    case $url in
+	*\'*)	url=`echo "$url" | sed "s/'/'\\\\\\\\''/g"` ;;
+    esac
+
+    if [ -n "$title" ]; then utitle=$title
+			else utitle=$url
+    fi
+
+    urls="$urls '$pfx<A HREF=$url>$utitle</A><BR>'"
+    [ -n "$URLLOG" ] && echo "noteurl $pfx $url" >>"$URLLOG"
+done
+
+[ -n "$tag" ] || tag=`( set x \`date\`; shift; echo "$1 $2 $3 $6" )`
+eval "note -t \"<H1>\$tag</H1>\" \"\$urlfile\" $urls </dev/null"
