@@ -1,0 +1,9 @@
+#!/bin/sh
+
+case $ARCH in
+    sun.sparc.solaris)	CPU=SUN5_GNU ;;
+    *)			echo "$0: no CPU type for arch \"$ARCH\"" >&2; exit 1 ;;
+esac
+export CPU
+
+exec ${VRWAVE_HOME?}/vrwave ${1+"$@"}
