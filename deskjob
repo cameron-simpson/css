@@ -1,16 +1,17 @@
 #!/bin/sh
-usage="Usage: $0 [desk [job]]"
+usage="Usage: $0 [-d desk] [job]"
 
-job=
-if [ $# = 0 ]
-then  desk=`currentdesk`
-else  desk=$1; shift
-      [ "x$desk" = x. ] && desk=`currentdesk`
-      if [ $# -gt 0 ]
-      then  newjob=$1; shift
-	    [ $# = 0 ] || { echo "$usage" >&2; exit 2; }
-	    exec desktop "$desk" job "$newjob"
-      fi
-fi
+desk=.
+[ "x$1" = x-d ] && { desk=$2; shift; shift; }
+[ "x$desk" = x. ] && desk=`currentdesk`
 
-exec desktop "$desk" job
+[ $# = 0 ] && exec desktop "$desk" job
+
+job=$1; shift
+isjob "$job" || { echo "$cmd: unknown job \"$job\"" >&2; exit 2; }
+[ $# = 0 ] || { echo "$cmd: extra arguments after job name: $*" >&2
+		echo "$usage" >&2
+		exit 2
+	      }
+
+exec desktop "$desk" job "$job"
