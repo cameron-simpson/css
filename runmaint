@@ -32,16 +32,15 @@
 # with the script itself in B</usr/local/bin/runmaint>
 # and so forth.
 # The examples below presume the prefix is B</usr/local>
-# and should be adjusted to however your install is arranged.
+# and should be adjusted to match how your install is arranged.
 #
 # =head1 PERSONAL SETUP
 #
-# Create a directory B<.maint> in your home directory
-# (except for root, who uses the directory B</usr/local/etc/runmaint>).
+# Create a directory B<.maint> in your home directory.
 # Scripts run from cron(8) go here.
 #
 # Create a crontab file with the crontab(1) command.
-# Typically this is a single line such as
+# Typically this is a single line such as:
 #
 #	0 * * * * exec /usr/local/bin/runmaint hourly
 #
@@ -103,6 +102,8 @@
 #
 
 # installation prefix - typically /usr/local
+# The /opt/runmaint path fits the syncopt scheme as described here:
+#	http://www.zip.com.au/~cs/syncopt/
 MaintDir=/opt/runmaint
 
 USER=${USER-$LOGNAME}; export USER
@@ -114,10 +115,8 @@ if [ -f "$0" ]
 then    RunMaint="$0 -E"
 else    RunMaint="$MaintDir/bin/runmaint -E"
 fi
-case $USER in
-    root)	MaintScripts=${MaintScripts:-$MaintDir/etc/runmaint} ;;
-    *)		MaintScripts=${MaintScripts:-$HOME/.maint} ;;
-esac
+MaintEtc=$MaintDir/etc/runmaint
+MaintScripts=${MaintScripts:-$HOME/.maint}
 
 export MaintDir MaintScripts RunMaint
 
@@ -232,9 +231,7 @@ addresses=$*
 #
 
 [ $noenv ] \
-|| { [ -s "$MaintDir/env" ] && . "$MaintDir/env"
-     [ -s "$MaintScripts/env" ] && . "$MaintScripts/env"
-   }
+|| { [ -s "$MaintEtc/env" ] && . "$MaintEtc/env"; }
 
 # note starting time
 if [ -n "$datestr" ]
@@ -256,33 +253,39 @@ fi
 xit=0
 
 case $target in
-    /*)	script=$target ;;
-    *)	script=$MaintScripts/$target ;;
+    /*)	try=$target ;;
+    *)	try="$MaintEtc/$USER/$target $MaintScripts/$target" ;;
 esac
 
-# run the script if present
-if [ -r "$script" ]
-then
-    # if no addresses
-    # then write a log if there's a log dir
-    # otherwise email the user
-    if [ "x$addresses" = x ]
+for script in $try
+do
+    scriptdir=`dirname "$script"`
+    # run the script if present
+    if [ -r "$script" ]
     then
-	logdir=$MaintScripts/log
-	if [ -d "$logdir/." ]
-	then
-	    log=$logdir/$target@$HOST
-	    if [ -d "$log/." ]
-	    then
-		log=$log/`datecode`
-	    fi
-	else
-	    addresses=${EMAIL:-$USER}
-	fi
-    fi
+	[ $noenv ] \
+	|| { [ -r "$scriptdir/env" ] && . "$scriptdir/env"; }
 
-    case "$addresses" in
-	'')	logdir=`dirname "$log"`
+	# if no addresses
+	# then write a log if there's a log dir
+	# otherwise email the user
+	if [ "x$addresses" = x ]
+	then
+	    logdir=$scriptdir/log
+	    if [ -d "$logdir/." ]
+	    then
+		log=$logdir/$target@$HOST
+		if [ -d "$log/." ]
+		then
+		    log=$log/`datecode`
+		fi
+	    else
+		addresses=${EMAIL:-$USER}
+	    fi
+	fi
+
+	case "$addresses" in
+	    '')	logdir=`dirname "$log"`
 		if [ -d "$logdir/." ] || mkdir -p "$logdir"
 		then
 		    sh $xflag "$script" 2>&1 \
@@ -293,51 +296,52 @@ then
 		    xit=1
 		fi
 		;;
-	-)	sh $xflag "$script" ;;
-	*)	sh $xflag "$script" 2>&1 | mailif -s "$subj" $addresses ;;
+	    -)	sh $xflag "$script" ;;
+	    *)	sh $xflag "$script" 2>&1 | mailif -s "$subj" $addresses ;;
+	esac
+    fi
+
+    if [ -r "$script.$HOST" ]
+    then
+	$RunMaint -date "$datestr" $xflag -s "$subj - perhost($HOST)" $target.$HOST $addresses \
+	|| xit=$?
+    fi
+
+    if [ -r "$script.$HOST@$SYSTEMID" ]
+    then
+	$RunMaint -date "$datestr" $xflag -s "$subj - perhost($HOST@$SYSTEMID)" $target.$HOST@$SYSTEMID $addresses \
+	|| xit=$?
+    fi
+
+    # run the implied scripts
+    case $target in
+	hourly)	if [ $hh -eq 0 ]
+		    then
+			$RunMaint -date "$datestr" $xflag -s "$subj" daily $addresses \
+			|| xit=$?
+		    fi
+		    ;;
+	daily)	$RunMaint -date "$datestr" $xflag -s "$subj - $wday" $wday $addresses \
+		    || xit=$?
+		    if [ $wday = mon ]
+		    then
+			$RunMaint -date "$datestr" $xflag -s "$subj" weekly $addresses \
+			|| xit=$?
+		    fi
+		    if [ $mday -eq 1 ]
+		    then
+			$RunMaint -date "$datestr" $xflag -s "$subj - monthly" monthly $addresses \
+			|| xit=$?
+		    fi
+		    ;;
+	monthly)	if [ $mon = jan ]
+		    then
+			$RunMaint -date "$datestr" $xflag -s "$subj - yearly" yearly $addresses \
+			|| xit=$?
+		    fi
+		    ;;
     esac
-fi
-
-if [ -r "$script.$HOST" ]
-then
-    $RunMaint -date "$datestr" $xflag -s "$subj - perhost($HOST)" $target.$HOST $addresses \
-    || xit=$?
-fi
-
-if [ -r "$script.$HOST@$SYSTEMID" ]
-then
-    $RunMaint -date "$datestr" $xflag -s "$subj - perhost($HOST@$SYSTEMID)" $target.$HOST@$SYSTEMID $addresses \
-    || xit=$?
-fi
-
-# run the implied scripts
-case $target in
-    hourly)	if [ $hh -eq 0 ]
-		then
-		    $RunMaint -date "$datestr" $xflag -s "$subj" daily $addresses \
-		    || xit=$?
-		fi
-		;;
-    daily)	$RunMaint -date "$datestr" $xflag -s "$subj - $wday" $wday $addresses \
-		|| xit=$?
-		if [ $wday = mon ]
-		then
-		    $RunMaint -date "$datestr" $xflag -s "$subj" weekly $addresses \
-		    || xit=$?
-		fi
-		if [ $mday -eq 1 ]
-		then
-		    $RunMaint -date "$datestr" $xflag -s "$subj - monthly" monthly $addresses \
-		    || xit=$?
-		fi
-		;;
-    monthly)	if [ $mon = jan ]
-		then
-		    $RunMaint -date "$datestr" $xflag -s "$subj - yearly" yearly $addresses \
-		    || xit=$?
-		fi
-		;;
-esac
+done
 
 exit $xit
 
