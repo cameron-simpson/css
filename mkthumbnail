@@ -49,4 +49,5 @@ done
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
+set -x
 exec jpgscale "-$fromtype" "$outflag" -q $quant $maxx $maxy
