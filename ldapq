@@ -1,0 +1,6 @@
+#!/bin/sh
+
+LDAP_HOST=${LDAP_HOST:-ldap}
+export LDAP_HOST
+
+exec ldapsearch -h "$LDAP_HOST" ${1+"$@"}
