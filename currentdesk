@@ -1,0 +1,2 @@
+#!/bin/sh
+exec lastvalue "enterdesk-$HOST" ${1+"$@"}
