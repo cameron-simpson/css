@@ -10,7 +10,8 @@ cmd=$0
 ##exec 2>>$HOME/var/log/alert
 
 ##thsize=16x16
-thsize=32x32
+##thsize=32x32
+thsize=48x48
 
 ##alert "DFLT=[$FVWM_MENU_IMLIST_OP]"
 ##env|grep FVWM >>$HOME/var/log/alert
@@ -20,7 +21,7 @@ filelist=
 inter=
 dir=
 
-usage="Usage: $cmd [-l filelist] [-o image-op] dir [files/dirs...]]"
+usage="Usage: $cmd [-l filelist] [-o image-op] [XxY] dir [files/dirs...]]"
 
 badopts=
 
@@ -29,6 +30,8 @@ do
   case $1 in
     -o) imop=$2; shift ;;
     -l)	filelist=$2; shift ;;
+    [1-9]|[1-9][0-9]|[1-9][0-9][0-9]) thsize=${1}x${1} ;;
+    [1-9]*x[1-9]*) thsize=$1 ;;
     --) shift; break ;;
     -?*)echo "$cmd: unrecognised option: $1">&2
 	badopts=1
