@@ -58,7 +58,9 @@ sedf='	# collate continuation lines
 sed -n "$sedf" \
 | sed '	s/:*[ 	][ 	]*/\n/' \
 | sed -n \
-      '	y/abcdefghijklmnopqrstuvwxyz-/ABCDEFGHIJKLMNOPQRSTUVWXYZ_/
+      '	y/abcdefghijklmnopqrstuvwxyz/ABCDEFGHIJKLMNOPQRSTUVWXYZ/
+	s/[^0-9ABCDEFGHIJKLMNOPQRSTUVWXYZ__]/_/g
+	s/^[^ABCDEFGHIJKLMNOPQRSTUVWXYZ_]/_&/
 	h
 	n
 	/[^-a-zA-Z0-9_@]/{
