@@ -1,4 +1,7 @@
 #!/bin/sh
 newdesk \
-| awk '{ desks++; print "\"" $2 "\" SwitchToDesk 0 " ($1+13) }
+| awk '{ desks++
+         print "\"" $2 "	switch to\" SwitchToDesk 0 " ($1+13)
+         print "\"	push\" PushToDesk 0 " ($1+13)
+       }
        END { if (desks == 0) print "\"no named desktops\" Nop" }'
