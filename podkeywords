@@ -1,0 +1,14 @@
+#!/bin/sh
+#
+# Extract all the keywords names by an =keywords POD line.
+#	- Cameron Simpson <cs@zip.com.au> 02apr2004
+#
+
+[ $# = 0 ] && set -- *.pod
+
+sed -e '/^=keywords[ 	]/!d' \
+    -e 's/^=keywords//' \
+    "$@" \
+| tr ' 	' '\012\012' \
+| grep . \
+| sort -u
