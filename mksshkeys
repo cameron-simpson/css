@@ -1,0 +1,88 @@
+#!/bin/sh
+#
+# Generate a set of ssh keys.
+# Private keys go in ~/.ssh and public keys go in ~/rc/ssh/pubkeys/host@site.
+#	- Cameron Simpson <cs@zip.com.au> 31aug2003
+#
+
+site=$SYSTEMID
+purpose=
+
+cmd=`basename "$0"`
+usage="Usage: $cmd [-s site] [-p purpose] [comment...]
+	-s site		Specify site. Default from \$SYSTEMID: $SYSTEMID.
+	-p purpose	Purpose. Eg vpn-site2site."
+
+badopts=
+
+while :
+do  case $1 in
+      -s)	site=$2; shift ;;
+      -p)	purpose=$2; shift ;;
+      --)	shift; break ;;
+      -?*)	echo "$cmd: unrecognised option: $1" >&2
+		badopts=1
+		;;
+      *)	break ;;
+    esac
+    shift
+done
+
+[ -t 0 ] || { echo "$cmd: stdin must be a tty" >&2
+	      badopts=1
+	    }
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+[ -z "$purpose" ] && purpose=identity
+
+# comment separator
+csep=
+[ $# = 0 ] || csep=' '
+
+pubdir=$HOME/rc/ssh/pubkeys/$HOST.$site
+[ -d "$pubdir/." ] || (set -x; mkdir -p "$pubdir") || exit 1
+
+xit=0
+
+echo "If your system is secure (nobody snooping the ps listing) you may enter"
+echo "a passphrase now. Otherwise you will be prompted for a phrase per key."
+echo "A passphrase should be several words."
+stty -echo
+read passphrase || exit 1
+if [ -n "$passphrase" ]
+then  echo "Re-enter the phrase as a check."
+      read phrase2 || exit 1
+      [ "x$passphrase" = "x$phrase2" ] \
+      || { echo "$cmd: passphrase mismatch, aborting" >&2
+	   exit 1
+	 }
+fi
+stty echo
+
+umask 077
+for type in rsa1 rsa dsa
+do
+  f=`ssh-keyfile -p "$purpose" "$type"` || exit 1
+  pubf=$pubdir/$f.pub
+  f=$HOME/.ssh/$f
+
+  comment="$*${csep}[$purpose-$type `hostname` `date`]" \
+
+  if [ -f "$f" ]
+  then
+      echo "$cmd: $f already exists!" >&2
+      xit=1
+      continue
+  fi
+
+  if [ -n "$passphrase" ]
+  then  echo "Making $f ..."
+	ssh-keygen -t "$type" -f "$f" -C "$comment" -N "$passphrase"
+  else  ssh-keygen -t "$type" -f "$f" -C "$comment"
+  fi \
+  && (set -x; cp "$f.pub" "$pubf") \
+  || xit=1
+done
+
+exit $xit
