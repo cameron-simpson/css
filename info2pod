@@ -2,7 +2,7 @@
 #
 # Convert info file into pod, largely because
 #
-#	- info's too stupid to read stdin, so incorparating it
+#	- info's too stupid to read stdin, so incorporating it
 #	  into other tools sucks
 #
 #	- I want my ordinary "man" command to find info files and
