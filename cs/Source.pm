@@ -211,6 +211,8 @@ sub _new_FILE($;$$)
     return wantarray ? ($io,$f) : $io;
   }
 
+  ##warn "openR($f,[@f]) failed";
+
   undef;
 }
 
