@@ -4,8 +4,10 @@
 #	- Cameron Simpson <cs@zip.com.au> 01nov2000
 #
 
+: ${TMPDIR:=/tmp}
+
 xit=0
-tmp=/tmp/i2m$$
+tmp=$TMPDIR/i2m$$
 info2pod ${1+"$@"} >$tmp || xit=1
 # stderr tossed because of overzealous warnings
 pod2man --lax --center='GNU Info' $tmp 2>/dev/null || xit=1
