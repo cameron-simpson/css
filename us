@@ -8,6 +8,8 @@
 # Shortcuts and foo.bar -> http://foo.bar/ - cameron 09aug2002
 #
 
+[ -n "$DISPLAY" ] || { echo "$0: no \$DISPLAY!" >&2; exit 1; }
+
 urlshowopts=
 
 while :
