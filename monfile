@@ -1,0 +1,23 @@
+#!/bin/sh
+#
+# Replace a file with stdin.
+# Output differences.
+#	- Cameron Simpson <cs@zip.com.au> 04nov98
+#
+
+diff=/opt/bin/diff
+
+[ $# = 1 ] || { echo "Usage: $0 file" >&2; exit 2; }
+
+file=$1
+[ -f "$file" ] || { echo "$0: $file: not a file" >&2; exit 1; }
+
+tmp=/tmp/monfile.$$
+cp "$file" $tmp || exit 1
+
+xit=0
+cat >"$file" || xit=1
+$diff -u $tmp "$file"
+rm $tmp
+
+exit $xit
