@@ -2,7 +2,7 @@
 #
 
 case $ARCH in
-    linux.*.*)	trn=/usr/bin/trn ;;
+    *.*.linux)	trn=/usr/bin/trn ;;
     *)		trn=/opt/bin/trn ;;
 esac
 
