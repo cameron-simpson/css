@@ -50,7 +50,6 @@ ext=
 
 session=root@$host$ext
 
-set -x
 exec term -n "#$session" \
 	scr -N "$session" \
 	logscript -m "root@$host: $msg" "$session" \
@@ -58,6 +57,7 @@ exec term -n "#$session" \
 		'. /etc/profile
 		 [ -s /opt/config/shell/rc ] && . /opt/config/shell/rc
 		 [ -f $HOME/.profile ] && . $HOME/.profile
+		 : ${SHELL:=/bin/sh}
 		 TERM=vt100
 		 PATH=$PATH:/opt/css/bin:/u/network/bin:/opt/gnu/bin
 		 MANPATH=$MANPATH:/opt/css/man:/u/network/man:/opt/gnu/man:/opt/gnu/info
