@@ -33,6 +33,29 @@ sub save
   }
 }
 
+sub savehash($$$)
+{ my($sink,$hashref,$keyname)=@_;
+
+  my @r = ();
+  my $h;
+  my $H;
+
+  for my $key (sort keys %$hashref)
+  {
+    $H = $hashref->{$key};
+    $h = {};
+    for my $hkey (keys %$H)
+    { $h->{$hkey}=$H->{$hkey};
+    }
+
+    $h->{$keyname}=$key;
+
+    push(@r, $h);
+  }
+
+  save($sink, @r);
+}
+
 sub ary2csv
 { my(@a)=@_;
 
