@@ -13,20 +13,27 @@ Installing my scripts:
 	into a suitable directory (eg "/opt/css", which I will assume
 	for the sake of example below).
 
-    Add the full pathname for that directory to the END of your $PATH.
+    Add the full pathname for the bin directory to the END of your $PATH.
 	Eg:
 		PATH=$PATH:/opt/css/bin
 		export PATH
 
-    You may also want to add the manuals to your $MANPATH:
+    Add the full pathname of the lib directory to the END of your $PERL5LIB:
+
+		PERL5LIB=$PERL5LIB:/opt/css/lib
+		export PERL5LIB
+
+    The aim here is that "use cs::blah" will find the module
+    /opt/css/lib/cs/blah.pm. Alternatively you could just symlink
+    from your site_perl dir:
+
+		cd /usr/lib/perl5/site_perl
+		ln -s /opt/css/lib/cs .
+
+    You probably also want to add the manuals to your $MANPATH:
 
 		MANPATH=$MANPATH:/opt/css/man
 		export MANPATH
-
-    The Perl modules are in the directory /opt/css/cs, so add
-	/opt/css to your $PERL5LIB variable, or make a symlink named "cs"
-	from your generic perl library directory to /opt/css/cs. The aim here
-	is that "use cs::blah" will find the module /opt/css/cs/blah.pm.
 
     Several of the scripts expect the following shell environment variables:
 
