@@ -1,0 +1,21 @@
+#!/bin/sh
+
+cmd=$0
+usage="Usage: $cmd mh-mail-files..."
+
+xit=0
+
+for file
+do
+  [ -f "$file" ] || { echo "$cmd: $file: not a file" >&2; xit=1; continue; }
+  [ -s "$file" ] || { echo "$cmd: $file: empty" >&2; xit=1; continue; }
+  ed - "$file" <<'X'
+	$
+	?^X-Prefetchmail-?
+	/^[^ 	]/
+	-
+	1,.d
+	w
+	q
+X
+done
