@@ -5,7 +5,7 @@
 #
 
 cmd=`basename "$0"`
-usage="Usage: $cmd [-d logdir] logbase [{-c shcmd | cmd [args...]}]"
+usage="Usage: $cmd [-m msg] [-d logdir] logbase [{-c shcmd | cmd [args...]}]"
 
 : ${LOGDIR:=$HOME/var/log}
 : ${SHELL:=/bin/sh}
@@ -14,7 +14,17 @@ logdir=$LOGDIR/sessions
 
 badopts=
 
-[ "x$1" = x-d ] && { logdir=$2; shift; shift; }
+while :
+do
+  case "$1" in
+    -d)	logdir=$2; shift ;;
+    -m)	msg=$2; shift ;;
+    --)	shift; break ;;
+    -?*)echo "$cmd: unrecognised option: $1" >&2; badopts=1 ;;
+    *)	break ;;
+  esac
+  shift
+done
 
 if [ $# = 0 ]
 then
@@ -32,12 +42,18 @@ else
 	[ $# = 0 ] || { echo "$cmd: extra arguments after \"-c shcmd\": $*" >&2
 			badopts=1
 		      }
-	set x "$SHELL" -c "$shcmd"; shift
+	set -- "$SHELL" -c "$shcmd"
     fi
   fi
 fi
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+[ -z "$BUGSYSTEMS" ] \
+|| [ -n "$msg" ] \
+|| msg=`readbugline` \
+|| { echo "$cmd: empty message rejected" >&2; exit 1; }
+echo "msg=[$msg]" >&2
 
 # we only need popSHELL if specific command supplied
 if [ $# -gt 0 ]
@@ -80,6 +96,7 @@ script -a "$logfile"
 xit=$?
 [ -n "$popSHELLexec" ] && dlog "$HOST@$SYSTEMID: $wd: end   $popSHELLexec" &
 
+[ -n "$BUGSYSTEMS" ] && buglog "$msg" <"$logfile"
 gzip -v -9 "$logfile"
 
 exit $xit
