@@ -43,8 +43,9 @@ else
   done
 fi \
 | wired \
-| xxargs ns 2>/dev/null \
-| sed 's/:.*//' \
+| xxargs ns localhost 2>/dev/null \
+| sed -e '/^localhost:/d' -e 's/://' \
+| tr -s ' ' '\012' \
 > "$hlist"
 
 # gather keys
