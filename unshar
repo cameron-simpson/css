@@ -1,0 +1,16 @@
+#!/bin/sh
+#
+
+xflag=
+case "$1" in
+	-x)	xflag=$1 ; shift ;;
+esac
+case $# in
+	0)	[ -n "$xflag" ] && echo "stdin..." >&2
+		sed '1,/^[:#]/d' | /bin/sh $xflag ;;
+	*)	for file
+		do
+			[ -n "$xflag" ] && echo "$file..." >&2
+			sed '1,/^[:#]/d' <"$file" | /bin/sh $xflag
+		done ;;
+esac
