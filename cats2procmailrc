@@ -129,7 +129,7 @@ and optionally ends in a slash, viz:
 which matches mail items with subjects regarding my adzap program.
 
 A typical use of the "at" sign is in conjunction with the plus sign above
-to copy particular mail items to other account while still delivering locally.
+to copy particular mail items to another account while still delivering locally.
 For example:
 
 	+fred@that.isp.com . fred@this.isp.com
@@ -153,8 +153,8 @@ Cameron Simpson E<lt>cs@zip.com.auE<gt>
 
 =cut
 
-BEGIN { use cs::DEBUG; cs::DEBUG::using(__FILE__);
-      }
+##BEGIN { use cs::DEBUG; cs::DEBUG::using(__FILE__);
+##      }
 
 use strict vars;
 use Getopt::Std;
