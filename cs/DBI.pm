@@ -128,7 +128,9 @@ sub sql($$)
 
   my $stkey="$dbh $sql";
 
-  ## warn "sql($dbh,\"$sql\")";
+  ## my @c = caller;
+  ## warn "sql($dbh,\"$sql\") from [@c]";
+
   return $cs::DBI::_cachedQuery{$stkey}
 	if defined $cs::DBI::_cachedQuery{$stkey};
 
@@ -178,6 +180,8 @@ sub query
     $sep=" AND ";
   }
 
+  ## warn "query: SQL=[$query]";
+
   sql($dbh, $query);
 }
 
@@ -220,6 +224,7 @@ sub find($$$$)
 { my($dbh,$table,$field,$key)=@_;
 
   ## warn "find $table.$field = $key";
+
   if (! wantarray)
   { my(@c)=caller;
     die "$0: cs::DBI::find not in array context from [@c]"; 
