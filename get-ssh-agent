@@ -4,16 +4,27 @@
 #	- Cameron Simpson <cs@zip.com.au> 30jul2001
 #
 
-f=${VARRUN:-$HOME/var/run}/ssh-agent-$HOST
+cmd=$0
+usage="Usage: $cmd [-v] [statefile]"
 
+state=
 verbose=
+
+badopts=
+
 [ "x$1" = x-v ] && { verbose=1; shift; }
 
-[ -s "$f" ] \
-&& v=`cat "$f"` \
-&& [ -n "$v" ] \
-&& eval "$v" \
+[ $# = 0 ] || state=$1; shift
+
+[ $# = 0 ] || { echo "$cmd: extra arguments: $*" >&2; badopts=1; }
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+[ -n "$state" ] || state=`ssh-agent-statefile` || exit 1
+
+[ -s "$state" ] \
+&& . "$state" \
 && [ -n "$SSH_AGENT_PID" ] \
 && kill -0 "$SSH_AGENT_PID" 2>/dev/null \
-&& echo "$v" \
+&& echo ". '$state'" \
 && { [ -z "$verbose" ] || ssh-add -l >&2; }
