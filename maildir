@@ -1,0 +1,25 @@
+#!/bin/sh
+#
+# Make a mailbox folder and tmp,new,cur (so mutt recognises it).
+#	- Cameron Simpson <cs@zip.com.au> 08jul2004
+#
+
+cmd=`basename "$0"`
+usage="Usage: $cmd maildirs..."
+
+[ $# = 0 ] && { echo "$usage" >&2; exit 2; }
+
+xit=0
+for d
+do
+    if ismhdir "$d"
+    then
+	echo "$cmd: $d: is an MH folder!" >&2
+	xit=1
+	continue
+    fi
+
+    needdir "$d/new" "$d/cur" "$d/tmp" || { xit=1; continue; }
+done
+
+exit $xit
