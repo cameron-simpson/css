@@ -25,8 +25,12 @@ case "$type" in
     *': '*'GIF image data'*)		mtype=image/gif ;;
     *': '*'PNG image data'*)		mtype=image/png ;;
     *': '*'PDF document'*)		mtype=application/pdf ;;
+    *': '*'Adobe Portable Document Format'*)
+					mtype=application/pdf ;;
     *': '*'RPM v'*)			mtype=application/x-redhat-package-manager ;;
     *': '*'HTML document text'*)	mtype=text/html ;;
+    *': '*'PostScript document text'*)	mtype=application/postscript ;;
+    *': '*'PDF document'*)		mtype=application/pdf ;;
     *': '*'gzip compressed data'*)	mtype=application/x-gzip ;;
     *': '*'bzip2 compressed data'*)	mtype=application/x-bzip ;;
     *': '*'compressed data block compressed') mtype=application/x-compress ;;
