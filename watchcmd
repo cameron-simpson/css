@@ -1,0 +1,17 @@
+#!/bin/sh
+#
+# Repeatedly run a command and pipe through vdis.
+#	- Cameron Simpson <cs@zip.com.au> 15aug2000
+#
+
+sleep=5
+
+[ $# = 0 ] && { echo "Usage: $0 command [args...]" >&2; exit 2; }
+
+( date; "$@"
+  necho ""
+  while sleep $sleep
+  do  date; "$@"
+      necho ""
+  done
+) | vdis
