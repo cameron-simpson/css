@@ -1,0 +1,12 @@
+#!/bin/sh
+#
+# You say tomAto, I say tomRto ...
+#	- Cameron Simpson <cs@zip.com.au> 10nov2000
+#
+
+[ $# = 1 ] || { echo "Usage: $0 pathname" >&2; exit 2; }
+
+case ${ARCH:-"`uname -s`"} in
+    SunOS|sun.sparc.solaris)	[ -h "$1" ] ;;
+    *)				[ -L "$1" ] ;;
+esac
