@@ -1,0 +1,111 @@
+#!/bin/sh
+#
+# Import a directory into cvs.
+#	- Cameron Simpson <cs@zip.com.au> 24aug96
+#
+
+cmd=`basename "$0"`
+usage="Usage: $cmd [-r] [dir]"
+
+dir=
+recurse=
+
+badopts=
+
+[ "x$1" = x-r ] && { recurse=1; shift; }
+[ $# = 0 ] || { dir=$1; shift; }
+[ $# = 0 ] || { echo "$cmd: extra arguments: $*" >&2; badopts=1; }
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+[ -z "$dir" ] || cd "$dir" || exit $?
+
+dir=`pwd`
+
+if [ ! -d CVS ]
+then
+    if [ -d ../CVS ]
+    then
+	( cd .. || exit $?
+	  bdir=`basename "$dir"`
+	  cvs add "$bdir" && commit -m "new subdir \"$bdir\"" "$bdir"
+	) || exit $?
+    else
+	if [ -t 0 ]
+	then
+	    echo "no CVS subdir in $dir"
+	    echo "CVSROOT=$CVSROOT"
+	else
+	    echo "$cmd: $dir: no CVS subdir, aborting" >&2
+	    exit 1
+	fi
+    fi
+fi
+
+while [ ! -d CVS ]
+do
+    if necho "new module name? "
+       read module || exit $?
+    then
+	moddir=$CVSROOT/$module
+    	if [ -d "$moddir" ]
+	then
+	    echo "$moddir already exists" >&2
+	else
+	    tmpdir=/tmp/cvsdir.$$
+	    if (  mkdir $tmpdir \
+	       && cd $tmpdir \
+	       && cvs import -m '' "$module" "$USER" Initial \
+	       && cvs co "$module"
+	       )
+	    then
+		if cpdir "$tmpdir/$module/CVS" CVS
+		then
+		    rm -rf $tmpdir
+		    break
+		else
+		    rm -rf CVS
+		    echo "$cmd: couldn't copy $tmpdir/CVS, bailing" >&2
+		    rm -rf $tmpdir
+		    exit 1
+		fi
+	    else
+		echo "$cmd: can't make stubs CVS directory, bailing" >&2
+		rm -rf $tmpdir
+		exit 1
+	    fi
+	fi
+    fi
+done
+
+add=`ls|grep -v '^CVS$'|egrep -vi '\.(png|xbm|tiff?|bmp|pcx|exe|obj|o|gif|rgb|jpg|zip|mpg|mov|avi|gz|z|Z|tgz|tar|pgp|cpio)$'`
+
+files=
+dirs=
+for name in $add
+do  if [ -f $name ]
+    then  files="$files $name"
+    else  [ $recurse ] && dirs="$dirs $name"
+    fi
+done
+
+# trim empty files, symlinks et al
+[ -n "$files" ] && files=`find $files -type f ! -size 0 -print`
+[ -n "$dirs" ] && dirs=`find $dirs -type d -print|fgrep -v /`
+
+xit=0
+
+if [ -n "$add" ]
+then
+    [ -z "$files" ] || (set -x;cvs add $files) || xit=$?
+    [ -z "$dirs"  ] || (set -x;cvs add $dirs) || xit=$?
+
+    if [ -n "$recurse" -a -n "$dirs" ]
+    then
+	for dir in $dirs
+	do  (set -x;cvsdir $dir) || xit=$?
+	done
+    fi
+fi
+
+exit $xit
