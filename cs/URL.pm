@@ -54,6 +54,21 @@ sub get($;$)
   $U->Get($follow);
 }
 
+=item head(I<url>)
+
+Create a B<cs::URL> object from the I<url> supplied
+and call the B<Head> method below.
+
+=cut
+
+sub head($)
+{ my($url)=@_;
+
+  my($U)=new cs::URL $url;
+  return () if ! defined $U;
+  $U->Head();
+}
+
 =item urls(I<url>,I<results>,I<inline>)
 
 Return all URLs reference from the page I<url>
@@ -686,7 +701,7 @@ sub _Get($$)
 
   GET:
   while (1)
-  { $url = $this->Text();
+  { $url = $this->Text(1);
     $context="$::cmd: GET $url";
 
     if ($cs::URL::_Getting{$url})
@@ -786,6 +801,71 @@ sub _Get($$)
   return ();
 }
 
+=item Head()
+
+Fetch a URL and return a B<cs::MIME> object.
+Returns a tuple of (I<endurl>,I<rversion>,I<rcode>,I<rtext>,I<MIME-object>)
+where I<endurl> is the URL object whose data was retrieved
+and I<MIME-object> is a B<cs::MIME> object
+or an empty array on error.
+
+=cut
+
+sub Head($)
+{ my($this)=@_;
+
+  my($url,$context);
+
+  HEAD:
+  while (1)
+  { $url = $this->Text();
+    $context="$::cmd: HEAD $url";
+
+    my $scheme = $this->Scheme();
+    if ($scheme ne HTTP && $scheme ne FTP)
+    { warn "$context:\n\tscheme $scheme not implemented";
+      return ();
+    }
+
+    my $rqhdrs = cs::HTTP::rqhdr($this);
+
+    my ($phost,$pport) = $this->Proxy();
+
+    my $phttp = new cs::HTTP ($phost,$pport,1);
+
+    if (! defined $phttp)
+    { warn "$context:\n\tcan't connect to proxy server $phost:$pport: $!";
+      return ();
+    }
+
+    my($rversion,$rcode,$rtext,$M);
+
+    warn "HEAD $url\n" if $::Verbose;
+    ($rversion,$rcode,$rtext,$M)=$phttp->Request(HEAD,$url,$rqhdrs);
+
+    if (! defined $rversion)
+    { warn "$context: nothing from proxy";
+      return ();
+    }
+
+    return ($this,$rversion,$rcode,$rtext,$M);
+  }
+
+  return ();
+}
+
+=item URLs(I<hashref>,I<inline>)
+
+Return the URLs references by the page associated with the current URL.
+The hash referenced by I<hashref> will be filled with URLs and titles
+(from the source document - not the taregt URL's B<TITLE> tag),
+using the URL for the key and the title for the value.
+See the B<cs::HTML::sourceURLs> method for detail.
+If the optional parameter I<inline> is true,
+return the URLs of inlined components such as images.
+
+=cut
+
 sub URLs($$;$)
 { my($this,$urls,$inline)=@_;
   $inline=0 if ! defined $inline;
@@ -862,6 +942,11 @@ sub AuthDB($)
 }
 
 =back
+
+=head1 ENVIRONMENT
+
+B<WEBPROXY> - the HTTP proxy service to use for requests,
+of the form B<I<host>:I<port>>.
 
 =head1 AUTHOR
 
