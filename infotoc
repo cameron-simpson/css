@@ -1,0 +1,12 @@
+#!/bin/sh
+#
+# Grep the node information from a GNU info file.
+#	- Cameron Simpson <cs@zip.com.au> 08sep99
+#
+
+exec sed -n -e ':top
+		/^/!d
+		n
+		p
+		n
+		b top' ${1+"$@"}
