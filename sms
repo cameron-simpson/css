@@ -1,0 +1,69 @@
+#!/bin/sh
+#
+# Dispatch stdin to the named phone numbers.
+#	- Cameron Simpson <cs@zip.com.au> 30jun1997
+#
+
+cmd=`basename "$0"`
+usage="Usage: $cmd aliases... <message
+	$cmd -q"
+
+password=${SMSPASSWD:-$HOME/private/redrock.passwd.sms}
+smssite=redrock.com.au
+
+badopts=
+query=
+
+case "$1" in
+    -q)	query=1; shift
+	[ $# = 0 ] || { echo "$cmd: unrecognised arguments: $*" >&2
+			badopts=1
+		      }
+	;;
+    *)	[ $# = 0 ] && { echo "$cmd: missing aliases" >&2; badopts=1; }
+	;;
+esac
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+[ -r "$password" -a -s "$password" ] \
+	|| { echo "$cmd: missing password file ($password)" >&2
+	     exit 2
+	   }
+
+exec 4<&0 0<"$password"
+read acct passwd || { echo "$cmd: read from $password fails" >&2; exit 1; }
+[ -n "$passwd" ] || { echo "$cmd: no password for account \"$acct\" in $password" >&2; exit 1; }
+
+if [ $query ]
+then
+    echo "$cmd: query mode not implemented" >&2
+    exit 1
+fi
+
+exec 0<&4 4<&-
+
+tmp=/tmp/$cmd.$$
+
+[ -t 0 ] && echo "reading SMS message from stdin ..."
+cat >"$tmp" || exit $?
+
+m -q "$@" | for alias
+	    do
+		read addrs || echo "huh? no read?" >&2
+		for addr in $addrs
+		do
+		    case "$addr" in
+			*@SMS)	case "$addr" in
+				    +*)	addr=`expr "$addr" : '.\(.*\)@SMS'` ;;
+				    *)	addr=`expr "$addr" : '\(.*\)@SMS'` ;;
+				esac
+				m -S -s "$passwd" "$addr@$smssite" <"$tmp"
+				;;
+			*)	echo "$cmd: non-SMS address discarded: $addr" >&2
+				;;
+		    esac
+		done
+	    done
+
+rm "$tmp"
