@@ -22,7 +22,7 @@ xit=0
 for file
 do
   thdir=`dirname "$file"`/.thumbnails/$thsize
-  th=$thdir/`basename "$0"`.png
+  th=$thdir/`basename "$file"`.png
   [ $verbose ] && echo "$f -> $th"
 
   [ -d "$thdir/." ] || needdir "$thdir" || { xit=1; continue; }
