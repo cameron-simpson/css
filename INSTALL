@@ -14,9 +14,8 @@ Installing my scripts:
 	for the sake of example below).
 
     Add the full pathname for that directory to the END of your $PATH.
-	Also add the full path for the directory /opt/css/synonyms.
 	Eg:
-		PATH=$PATH:/opt/css/bin:/opt/css/bin/synonyms
+		PATH=$PATH:/opt/css/bin
 		export PATH
 
     You may also want to add the manuals to your $MANPATH:
