@@ -1,0 +1,34 @@
+#!/bin/sh
+#
+# Query a permuted index, output matching lines.
+# The permuted index should be like that produced from htmlptx:
+#	file	left-context	keyword	right-context	line-number
+# tab separated.
+#	- Cameron Simpson <cs@zip.com.au> 03dec2004
+#
+
+cmd=`basename "$0"`
+usage="Usage: $cmd regex <ptx"
+
+badopts=
+
+if [ $# = 0 ]
+then
+  echo "$cmd: missing regex" >&2
+  badopts=1
+else
+  re=$1; shift
+  [ $# = 0 ] || { echo "$cmd: extra arguments after regex: $*" >&2
+		  badopts=1
+		}
+fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+case "$re" in
+  */*)	qre=`sedstrs 's:/:\\\\&:g' "$re"` ;;
+  *)	qre=$re ;;
+esac
+
+##set -x
+exec awk '-F	' "tolower(\$3) ~ /$qre/ {print}"
