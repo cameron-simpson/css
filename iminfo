@@ -13,7 +13,9 @@ xit=0
 for im
 do  file "$im"			|| xit=1
     gm identify "$im"		|| xit=1
-    jhead "$im"
+    case `file2mime "$im" 2>/dev/null` in
+      image/jpeg)	jhead "$im" ;;
+    esac
 done
 
 exit $xit
