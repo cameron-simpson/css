@@ -1,32 +1,37 @@
 #!/bin/sh
 #
-# Create a suitable (480x480) JPEG for use as a Tungsten T5 background image.
+# Create a suitable (480x320) JPEG for use as a Tungsten T5 background image.
 #	- Cameron Simpson <cs@zip.com.au> 14feb2005
 #
 
 geom=480x320
+bgout=png:-
+bg=gray80
 
 cmd=`basename "$0"`
-usage="Usage: $cmd [-P] -o bgout.jpg imagefile"
+usage="Usage: $cmd [-P] [-o bgout.jpg] [-bg bg-colour] imagefile"
 
 badopts=
 
-if [ "x$1" = x-P ]
-then
-    geom=320x480
-    shift
-fi
+while [ $# -gt 0 ]
+do
+  case $1 in
+    -g)		geom=$2; shift ;;
+    -bg)	bg=$2; shift ;;
+    -P)		geom=320x480 ;;
+    -o)		bgout=$2; shift ;;
+    --)		shift; break ;;
+    -?*)	echo "$cmd: unrecognised option: $1" >&2
+		badopts=1 ;;
+    *)		break ;;
+  esac
+  shift
+done
 
-if [ "x$1" = x-o ]
+if [ "x$bgout" != x- ] && [ -s "$bgout" ]
 then
-    bgout=$2; shift; shift
-
-    [ -s "$bgout" ] && { echo "$cmd: bgout $bgout already exists" >&2
-			 badopts=1
-		       }
-else
-    echo "$cmd: missing -o option" >&2
-    badopts=1
+  echo "$cmd: bgout $bgout already exists" >&2
+  badopts=1
 fi
 
 if [ $# = 0 ]
@@ -41,10 +46,10 @@ else
 			   }
 fi
 
-[ $# = 0 ] || { echo "$cmd: extra arguments after imagefile: $*" >&2; badopts=1; }
+[ $# = 0 ] || { echo "$cmd: extra arguments after imagefile \"$imagefile\": $*" >&2; badopts=1; }
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
 set -x
-cached=`mkwall -g 480x480 "$imagefile"` \
+cached=`mkwall -g "$geom" -bg "$bg" "$imagefile"` \
 && gm convert "$cached" "$bgout"
