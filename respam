@@ -1,0 +1,55 @@
+#!/bin/sh
+#
+# Forward the input n times to the given addresses.
+# Used to send spam back to the orginator.
+# To be used _only_ when completely sure of the originator's email address.
+#	- Cameron Simpson <cs@zip.com.au>
+#
+
+tmp=/tmp/$$
+cat >$tmp || exit $?
+
+spamcount=100	# 100 copies by default
+sleeprate=10	# sleep every 10 fws
+sleeptime=120	# for 120 seconds
+
+case $1 in
+    -n)	spamcount=$2; shift; shift ;;
+esac
+
+xit=0
+
+sleepcnt=$sleeprate
+for addr
+do  case $addr in
+	*@*)	;;
+	*)	echo "$0: bad address \"$addr\"" >&2
+		xit=1
+		continue
+		;;
+    esac
+
+    i=0
+    while [ $i -lt $spamcount ]
+    do
+	fw -p '' -- \
+		-D sender -D return-path -D errors-to -D X-FW-Args \
+		-D return-receipt-to \
+		+H "Sender: $addr" \
+		+H "Return-Path: $addr" \
+		+H "Errors-To: $addr" \
+		+H "Return-Receipt-To: $addr" \
+		"$addr" <$tmp
+	i=`expr $i + 1`
+	sleepcnt=`expr $sleepcnt - 1`
+	case $sleepcnt in
+	    0)	sleepcnt=$sleeprate
+		sleep $sleeptime
+		;;
+	esac
+    done
+done
+
+rm $tmp || xit=$?
+
+exit $xit
