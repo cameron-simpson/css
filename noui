@@ -1,0 +1,4 @@
+#!/bin/sh
+[ $# = 0 ] && { echo "Usage: $0 command [args...]" >&2; exit 2; }
+[ -t 0 ] && exec </dev/null
+exec nox "$@"
