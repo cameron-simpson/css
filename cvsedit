@@ -23,13 +23,18 @@ fi
 dodl=$cameron
 dodiff=1
 
+fposarg=
+filepos=end
+
 isfilter=
 
 badopts=
 
 while :
 do  case $1 in
-	-f)	isfilter=1 ;;
+	-0)	fposarg=$1 filepos= ;;
+	-1)	fposarg=$1 filepos=first ;;
+	-f)	isfilter=1 fposarg=-0 filepos= ;;
 	-m)	havemsg=1 msg=$2; shift ;;
 	--diff)	dodiff=1 ;;
 	--no-diff) dodiff= ;;
@@ -79,8 +84,15 @@ editcmd=$*
 ) || exit 1
 
 if [ $isfilter ]
-then set filteredit "$file" "$@"; exec <"$file"
-else set x "$@" "$file"; shift
+then
+  set filteredit $fposarg -- "$file" "$@"; exec <"$file"
+else
+  case "$filepos" in
+    '')		;;
+    end)	set x "$@" "$file"; shift ;;
+    first)	zero=$1; shift; set x "$zero" "$file" ${1+"$@"}; shift ;;
+    *)		echo "$cmd: unsupported \$filepos \"$filepos\"" >&2; exit 1 ;;
+  esac
 fi
 (set -x; "$@")
 editxit=$?
