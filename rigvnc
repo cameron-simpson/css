@@ -1,38 +1,33 @@
 #!/bin/sh
 
-num=:6
+cmd=$0
+
+[ $# = 0 ] || { echo "Usage: $cmd" >&2; exit 2; }
+
 case $HOST@$SYSTEMID in
     zapff@cisra|amadeus@home)
+		set ":5 -name vnc:5@$HOST -depth 16 -geometry 1024x768" \
+		    ":6 -name vnc:6@$HOST -depth 24 -geometry 1600x1200"
 		;;
-    *)		echo "$0: nothing to rig for $HOST@$SYSTEMID" >&2
+    *)		echo "$cmd: nothing to rig for $HOST@$SYSTEMID" >&2
 		exit 1
 		;;
 esac
 
-case $1 in
-    :*)	num=$1; shift ;;
-esac
-
-fontpath=
-sep=
+fontpath=unix/:7100
 for fonttop in /usr/X11R6/lib/X11/fonts
 do  for fontdir in $fonttop/*
     do
 	if [ -f "$fontdir/fonts.dir" ]
 	then
-	    fontpath=$fontpath$sep$fontdir
-	    sep=,
+	    fontpath=$fontpath,$fontdir
 	fi
     done
 done
 
 set -x
 
-lock -1 "vnc-$HOST$num@$SYSTEMID" \
-	vnc "$num" \
-		-depth 16 \
-		-geometry 1600x1200 \
-		-name "$HOST$num @ $SYSTEMID" \
-		-alwaysshared \
-		-fp "$fontpath"
-
+for args
+do
+    ignhup vncserver $args -alwaysshared -fp "$fontpath"
+done
