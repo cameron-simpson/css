@@ -1,11 +1,12 @@
 #!/bin/sh
 #
-# $# > 0	==> run cmd with this type of stock path
-# $# = 0	==> run a shell
+# Run a command with a specific environment setup.
+#	- Cameron Simpson <cs@zip.com.au>
 #
 
-cmd=`basename "$0"`
+[ $# = 0 ] && { echo "Usage: $0 command [args...]" >&2; exit 2; }
 
+cmd=`basename "$0"`
 case "$cmd" in
    buildenv)
 	exec noldpath env BSEDOPTS= \
