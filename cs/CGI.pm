@@ -157,20 +157,20 @@ sub new
     ## warn "env=".cs::Hier::h2a($env,0);
 
     if ($env->{CONTENT_TYPE} eq 'application/x-www-form-urlencoded')
-	{
-	  my(@getargs);
-	  push(@getargs,$env->{HTTP_CONTENT_LENGTH}+0)
-		if exists $env->{HTTP_CONTENT_LENGTH};
+    {
+      my(@getargs);
+      push(@getargs,$env->{HTTP_CONTENT_LENGTH}+0)
+	    if exists $env->{HTTP_CONTENT_LENGTH};
 
-	  my($input)=scalar($src->Get(@getargs));
-	  ## warn "CGI POST got [$input]";
-	  $input =~ s/\s+$//;
-	  $Q->{QUERY}=_qsDecode($input);
-	}
+      my($input)=scalar($src->Get(@getargs));
+      ## warn "CGI POST got [$input]";
+      $input =~ s/\s+$//;
+      $Q->{QUERY}=_qsDecode($input);
+    }
     else
-	{ warn "can't handle POSTs of type \"$env->{CONTENT_TYPE}\"";
-	  $Q->{QUERY}={};
-	}
+    { warn "can't handle POSTs of type \"$env->{CONTENT_TYPE}\"";
+      $Q->{QUERY}={};
+    }
   }
 
   # cookies
