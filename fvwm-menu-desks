@@ -1,5 +1,6 @@
 #!/bin/sh
 newdesk \
+| sort +1 \
 | awk '{ desks++
          print "\"" $2 "	switch to\" SwitchToDesk 0 " ($1+13)
          print "\"	push\" PushToDesk 0 " ($1+13)
