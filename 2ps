@@ -8,18 +8,20 @@
 
 me=$0
 cmd=`basename "$0"`
-usage="Usage: $cmd [-i itype] [-T title] [file]"
+usage="Usage: $cmd [-m medium] [-L] [-P] [-i itype] [-T title] [file]"
 
-aspect=-R
+a2ps_aspect=-R
 
 title=
 badopts=
 mtype=
+medium=A4
 while :
 do  case $1 in
 	-T)	title=$2; shift ;;
-	-L)	aspect=-r ;;
-	-P)	aspect=-R ;;
+	-L)	a2ps_aspect=-r ;;
+	-P)	a2ps_aspect=-R ;;
+	-m)	medium=$2; shift ;;
 	-i)	mtype=$2; shift
 		case "$mtype" in
 		    any|'')		mtype= ;;
@@ -71,8 +73,8 @@ fi
 case "$mtype" in
     application/pdf)	conv='acroread2ps' ;;
     application/postscript) conv=cat ;;
-    application/mentor)	conv=mentor2ps ;;
-    text/plain)		conv='a2ps -1 -o- --stdin "$title" -T 8 -i --borders=no -b $aspect --medium=A4 -f 10' ;;
+    application/mentor)	conv='mentor2ps -m "$medium"' ;;
+    text/plain)		conv='a2ps -1 -o- --stdin "$title" -T 8 -i --borders=no -b $a2ps_aspect --medium=$medium -f 10' ;;
     text/html)		conv=unhtml ;;
     image/*)		conv='convert - ps:-' ;;
     *)			echo "$cmd: supported input type \"$mtype\"" >&2
@@ -82,5 +84,5 @@ esac
 
 ## echo "title=[$title], conv=[$conv]" >&2
 ## set | egrep -i '(asp|conv)' >&2
-##set -vx
+set -v
 eval "exec <\"\$file\"; $conv"
