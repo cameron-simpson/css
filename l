@@ -1,3 +1,2 @@
 #!/bin/sh
-
-ls -CF $*
+exec ls -CF ${1+"$@"}
