@@ -36,7 +36,7 @@ else
 fi
 
 # no idea? run plain file and bail out
-mtype=`file2mime "$file"` || { ls-ld "$file"
+mtype=`file2mime "$file"` || { ls -ld "$file"
 			       file "$file"
 			       exit 0
 			     }
