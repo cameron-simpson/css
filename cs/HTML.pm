@@ -836,7 +836,12 @@ sub Tok
 
   if (! defined ($t=$this->{SGML}->Tok()))
   { ## warn "EOF from SGML, returning\n";
-    return pop(@{$this->{TAGSTACK}});
+    my $ts = $this->{TAGSTACK};
+    return undef if ! @$ts;
+
+    # fake up a closing tag
+    my $tsv = $ts->[$#$ts];
+    $t={ TAG => $tsv->{TAG}, START => 0, };
   }
 
   ## warn "parse TAG=$t->{TAG}\n";
