@@ -5,7 +5,7 @@
 #
 
 cmd=$0
-usage="Usage: $cmd [statefile]"
+usage="Usage: $cmd [{-|statefile}]"
 
 [ -n "$GPG_AGENT_INFO" ] || { echo "$cmd: no \$GPG_AGENT_INFO" >&2; exit 1; }
 
@@ -21,8 +21,9 @@ badopts=
 
 [ -n "$statefile" ] || statefile=`gpg-agent-statefile` || exit 1
 
-set -x
-echo "GPG_AGENT_INFO='$GPG_AGENT_INFO'; export GPG_AGENT_INFO;" >"$statefile" \
-|| { rm -f "$statefile"; exit 1; }
+[ "x$statefile" = x- ] || exec >"$statefile"
+echo "GPG_AGENT_INFO='$GPG_AGENT_INFO'; export GPG_AGENT_INFO;" \
+|| { [ "x$statefile" = x- ] || rm -f "$statefile"; exit 1; }
 
+[ "x$statefile" = x- ] && exit 0
 exec chmod a+rx "$statefile"
