@@ -1,0 +1,27 @@
+#!/bin/sh
+#
+# Emit an LPRng printcap for our printers.
+#	- Cameron Simpson <cs@zip.com.au> 12oct2000
+#
+
+plist=/usr/local/etc/printers
+
+[ $# = 0 ] || { echo "$0: extra arguments: $*" >&2
+		echo "Usage: $0" >&2
+		exit 2
+	      }
+
+exec <"$plist"
+
+echo '*:force_localhost@:client:rm=%P'
+
+while read printer desc
+do
+  echo
+  echo "m_$printer|Mentor hook for $desc\\"
+  echo "	:sd=/var/spool/LPRng/mgc/m_$printer:\\"
+  echo "	:if=/m/cae/madmin/mgc_spool/fis/m_$printer.fis:\\"
+  echo "	:lp=/dev/null:"
+done
+
+exit 0
