@@ -57,23 +57,25 @@ urllist=/tmp/hi-urls.$$
     esac
   done 3>&1 1>&4 4>&- \
 | grep '^[^#]' \
-| while read url grep
-  do  if [ -z "$grep" ]
-      then  echo "$url"
-      else  pageurls -i "$url" \
-	    | egrep -i "$grep" \
-	    | ( hit=
-		while read gurl
-		do  xvurl "$gurl" >/dev/null &
-		    hit=1
-		done
-		[ $hit ] || { echo "no hits grepping $url for \"$grep\"" >&2
-			      echo "$url"
-			    }
-	      ) &
-      fi
-  done >>"$urllist"
-  wait
+| ( while read url grep
+    do  if [ -z "$grep" ]
+	then  echo "$url"
+	else  pageurls -i "$url" \
+	      | egrep -i "$grep" \
+	      | ( hit=
+		  while read gurl
+		  do  xvurl "$gurl" >/dev/null &
+		      echo "$gurl" >&2
+		      hit=1
+		  done
+		  [ $hit ] || { echo "no hits grepping $url for \"$grep\"" >&2
+				echo "$url"
+			      }
+		) &
+	fi
+    done >>"$urllist"
+    wait
+  )
 )
 
 wait
