@@ -1,0 +1,106 @@
+#!/usr/bin/perl
+#
+# Return the last N lines of the input.
+# Stock tail commands seem to have buffer limitations.
+#	- Cameron Simpson <cs@zip.com.au> 20nov98
+#
+
+use strict qw(vars);
+
+use Getopt::Std;
+
+$::NLines=100;
+$::Reverse=0;
+
+getopts('r');
+$::Reverse=1 if defined $::opt_r;
+
+if (@ARGV && $ARGV[0] =~ /^\d+$/)	{ $::NLines=shift(@ARGV)+0; }
+
+$::Xit=0;
+
+if (-f STDIN)	{ seekabletail(STDIN,$::NLines,$::Reverse); }
+else		{ streamingtail(STDIN,$::NLines,$::Reverse); }
+
+exit $::Xit;
+
+sub seekabletail($$$)
+	{ my($F,$nlines,$rev)=@_;
+
+	  my $BSIZE = 8192;
+
+	  die "$0: seek($F,SEEK_END) fails: $!\n" unless seek($F,0,2);
+
+	  my $pos = tell($F);
+	  my $inhand = '';
+	  my $nl = 0;
+	  my @lines;
+
+	  LOOP:
+	  while ($nl < $nlines)
+	  {
+	    my $n1;
+	    my $n2;
+
+	    if ( ($n1=rindex($inhand,"\n")) > 0
+	      && ($n2=rindex($inhand,"\n",$n1-1)) >= 0 )
+		{ my $line = substr($inhand,$n2+1,$n1-$n2);
+
+		  $nl++;
+		  if ($rev)	{ print $line; }
+		  else		{ unshift(@lines,$line); }
+
+		  substr($inhand,$n2+1)='';
+		}
+	    else
+	    # need more data
+	    { my $npos = $pos-$BSIZE;
+	      $npos = 0 if $npos < 0;
+
+	      last LOOP if $npos >= $pos;
+
+	      seek($F,$npos,0) || die "$0: seek($F,$npos,0): $!\n";
+
+	      my $readsize = $pos-$npos;
+	      my $data;
+	      read($F,$data,$readsize) || die "$0: read@$npos($F,$readsize): $!\n";
+	      die "$0: read@$npos($F,$readsize): short read: ".length($data)." bytes\n"
+		if length($data) != $readsize;
+
+	      $pos=$npos;
+	      $inhand=$data.$inhand;
+	    }
+	  }
+
+	  if ($nl < $nlines)
+	  { $nl++;
+	  warn "nl=$nl - print inhand...";
+	    if ($rev)	{ print $inhand; }
+	    else	{ unshift(@lines,$inhand); }
+	  }
+
+	  if (! $rev)
+	  { warn "print lines...";
+	  print @lines;
+	  }
+	}
+
+sub streamingtail($$$)
+	{ my($F,$nlines,$rev)=@_;
+
+	  my @lines;
+
+	  local $_;
+
+	  while (defined($_=<$F>))
+	  {
+	    while (@lines >= $nlines)
+	    { shift(@lines);
+	    }
+
+	    push(@lines,$_);
+	  }
+
+	  for ($rev ? reverse @lines : @lines)
+	  { print; }
+	}
