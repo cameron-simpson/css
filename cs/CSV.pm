@@ -79,7 +79,7 @@ sub savehash($$$)
 sub ary2csv
 { my(@a)=@_;
 
-  local($_);
+  local($_)='';
 
   my $first=1;
 
