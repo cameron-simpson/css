@@ -7,5 +7,6 @@
 cmd=`basename "$0"`
 
 [ -n "$S10PORT" ] || { S10PORT=/dev/ttyS1; export S10PORT; }
+[ -n "$S10SPEED" ] || { S10SPEED=115200; export S10PORT; }
 
-exec s10sh -d "$S10PORT" -s 115200 -g -L ${1+"$@"}
+exec set-x s10sh -d "$S10PORT" -s "$S10SPEED" -g -L ${1+"$@"}
