@@ -5,26 +5,32 @@
 #
 
 cmd=`basename "$cmd"`
-usage="Usage: $cmd files..."
-
-[ $# = 0 ] && { echo "$usage" >&2; exit 2; }
+usage="Usage: $cmd [-e editor] file"
 
 EDITOR=${EDITOR:-vi}
 case "$1" in -e) EDITOR=$2; shift; shift ;; esac
 export EDITOR
 
-case "$#,$1" in 1,*.pgp) exec pgpedit "$1" ;; esac
+[ $# = 1 ] || { echo "$usage" >&2; exit 2; }
+file=$1; shift
+
+case "$file" in
+    *.pgp) exec pgpedit "$file" ;;
+esac
+
+if ifcvs "$file"
+then
+    exec cvsedit "$file"
+fi
 
 # make templates
-for arg
-do  [ -s "$arg" ] || { tplt "$arg" >>"$arg"
-		       [ -s "$arg" ] || rm "$arg"
-		     }
-done
+[ -s "$file" ] || { tplt "$file" >>"$file"
+		    [ -s "$file" ] || rm "$file"
+		  }
 
 [ -s .exrc ] && { EXINIT="$EXINIT|source .exrc"
 		  NEXINIT="$NEXINIT|source .exrc"
 		  export EXINIT NEXINIT
 		}
 
-exec "$EDITOR" ${1+"$@"}
+exec "$EDITOR" "$file"
