@@ -9,8 +9,9 @@ cmd=`basename "$0"`
 
 : ${PPPSSH_PPPD:=/usr/sbin/pppd}	# local pppd
 : ${PPPSSH_RPPPD:=$PPPSSH_PPPD}		# remote pppd
+: ${PPPSSH_SSHCF:=$HOME/.ssh/config}	# ssh config file
 : ${PPPSSH_LOGFILE:=$HOME/var/log/$cmd.log}
-export PPPSSH_PPPD PPPSSH_RPPPD PPPSSH_LOGFILE
+export PPPSSH_PPPD PPPSSH_RPPPD PPPSSH_SSHCF PPPSSH_LOGFILE
 
 usage="Usage: $cmd [-r rpppd] remote [pppd-args...]"
 
