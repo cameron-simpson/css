@@ -154,7 +154,7 @@ sub _Load($$$$)
 
   if ($creator ne $this->{CREATOR}
    || $dbname ne $this->{DBNAME})
-  { warn "creator/dbname supplied \"$creator/$dbname\" doesn't match file \"$this->{CREATOR}/$this->{DBNAME}\n";
+  { warn "$::cmd: creator/dbname supplied \"$creator/$dbname\" doesn't match file \"$this->{CREATOR}/$this->{DBNAME}\n";
     return 0;
   }
 
@@ -238,7 +238,7 @@ sub NRecords($)
 { shift->{NR};
 }
 
-sub _LoadRecords($)
+sub _LoadRecordData($)
 { my($this)=@_;
 
   my $file = $this->FileName();
@@ -294,7 +294,7 @@ sub Record($$)
   }
 
   if (! exists $this->{RECORDS})
-  { return undef if ! $this->_LoadRecords();
+  { return undef if ! $this->_LoadRecordData();
   }
 
   $this->{RECORDS}->[$nr];
