@@ -7,7 +7,11 @@
 xit=0
 for d
 do  [ -d "$d/." ] || mkdir "$d" || continue
-    [ -s "$d/.mh_sequences" ] || ( echo "unseen:"; echo "replied:"; echo "flagged:"; ) >>"$d/.mh_sequences"
+    mh=$d/.mh_sequences
+    >>"$mh"
+    for seq in unseen replied flagged
+    do  grep "^$seq:" <"$mh" >/dev/null || echo "$seq:" >>"$mh"
+    done
 done
 
 exit $xit
