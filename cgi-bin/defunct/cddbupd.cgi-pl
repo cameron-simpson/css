@@ -1,0 +1,93 @@
+#!/usr/bin/perl
+#
+# Update a FreeDB entry.
+# 
+
+use strict qw(vars);
+
+use FreeDB;
+use cs::CGI;
+use cs::HTML;
+
+my $Q = new cs::CGI;
+
+
+my @html;
+
+# ensure we have a disc id
+my $discid  =$Q->Value(DISCID);
+if (! defined $discid)
+{ push(@html,"Missing required DISCID field.");
+}
+elsif ($discid !~ /^[\da-f]{8}$/)
+{ push(@html,"Bad DISCID field: \"$discid\".");
+}
+else
+{
+  my $fdb = new FreeDB;
+  $fdb->discid($discid);
+
+  if (! $fdb->fetch())
+  { push(@html,"Can't look up DISCID \"$discid\" ni the FreeDB.",[BR]);
+    undef $fdb;
+  }
+
+  my $submit = $Q->Value(SUBMIT);
+  if (defined $submit && length $submit)
+  { @html=submit($Q,$fdb);
+  }
+  else
+  { @html=edit($Q,$fdb);
+  }
+}
+
+$Q->Print([ [HEAD, [TITLE, "Cameron Simpson's FreeDB CD Update Form"]],
+	    [BODY, [H1, "FreeDB CD Update Form"],
+		   @html,
+	    ],
+	  ]);
+
+exit 0;
+
+sub submit($$)
+{ my($Q,$fdb)=@_;
+
+  my @html;
+
+  my $discid = $Q->value(DISCID);
+  my 
+  if (
+
+  return @html;
+}
+
+sub edit($$)
+{ my($Q,$fdb)=@_;
+
+  my @html;
+
+  my $F = new cs::HTML::Form;
+  $F->Submit(SUBMIT,"Submit new CD");
+  $F->MarkUp([BR]);
+
+  $F->StackMarkUp();
+
+  $F->MarkUp([TR,
+		[TD, "Artist:"],
+		[TD, $F->TextFieldMU(ARTIST,40)]]);
+  $F->MarkUp([TR,
+		[TD, "Album:"],
+		[TD, $F->TextFieldMU(ALBUM,40)]]);
+
+  for my $n (0..40)
+  { $F->MarkUp([TR,
+		[TD, {ROWSPAN=>2}, "Track ".$n.":"],
+		[TD, $F->TextFieldMU(TITLE.$n,40)]],
+	       [TR,
+		[TD, $F->TextFieldMU(EXTT.$n,40)]]);
+  }
+
+  $F->MarkUp([TABLE, $F->StackedMarkUp()]);
+
+  return @html;
+}
