@@ -154,7 +154,7 @@ for my $L (reverse sort cmplogs @log)
   for my $comment (@C)
   { if (! defined $file || $file ne $f)
     { $file=$f;
-      print "      ".r2h($file).": ";
+      print "      ".fref($file).": ";
       $indent="      ".(' ' x length($file))."  ";
     }
     else
@@ -169,7 +169,12 @@ if (! $TextMode)
 { print "</UL>\n";
 }
 
-sub r2h { $TextMode ? $_[0] : &cs::HTML::raw2html }
+sub r2h { $TextMode ? $file : &cs::HTML::raw2html }
+
+sub fref
+{ my($file)=@_;
+  $TextMode ? $file : cs::HTML::tok2a([A,{HREF=>$file},$file]);
+}
 
 sub cmplogs
 {
