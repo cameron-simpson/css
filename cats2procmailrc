@@ -3,7 +3,7 @@
 # Convert my categories file to procmail recipes.
 #	- Cameron Simpson <cs@zip.com.au> 02mar2001
 #
-# Release version: 1.2
+# Release version: 1.3
 #
 
 =head1 NAME
@@ -88,6 +88,12 @@ Lines of the form:
 	< filename
 
 interpolate raw procmailrc files.
+
+Lines of the form:
+
+	<< filename
+
+interpolate category files.
 
 Other lines are of the form:
 
@@ -192,14 +198,7 @@ Cameron Simpson E<lt>cs@zip.com.auE<gt>
 use strict vars;
 use Getopt::Std;
 
-($::cmd=$0) =~ s:.*/::;
-$::Usage="Usage: $::cmd [-a alert] [-m domains] [-t {unix|mh|maildir}] <categories >procmailrc
-	-L		Use X-Label: header instead of Subject: for tag.
-	-a alert	Command line to generate the alert.
-			The mail item is present on standard input.
-	-m domains	Select default mail domain(s).
-	-t type		Select default mailbox type.
-";
+sub readcats($;$);
 
 $::X_Label=0;
 $::FolderDups=0;
@@ -208,6 +207,17 @@ $::DfltType=UNIX;	# unix style by default
 @::DfltDom=$ENV{MAILDOMAIN};
 undef $::DfltAlert;
 $::RcvStore='/usr/lib/nmh/rcvstore';	# path to MH rcvstore command
+
+($::cmd=$0) =~ s:.*/::;
+$::Usage="Usage: $::cmd [-a alert] [-m domains] [-t {unix|mh|maildir}] <categories >procmailrc
+	-L		Use X-Label: header instead of Subject: for tag.
+	-a alert	Command line to generate the alert.
+			The mail item is present on standard input.
+	-m domains	Select default mail domain(s).
+			Default from \$MAILDOMAIN: @::DfltDom
+	-t type		Select default mailbox type.
+			Default: $::DfltType
+";
 
 { my $badopts=0;
 
@@ -258,6 +268,8 @@ $::RcvStore='/usr/lib/nmh/rcvstore';	# path to MH rcvstore command
   die $::Usage if $badopts;
 }
 
+$::_INCHANDLE="INCLUDE0";
+
 my $doalert;
 my $sfx;
 my $type;
@@ -266,194 +278,222 @@ my $deliver;
 my $cont;
 my $lockfile;
 
-CAT:
-while (<STDIN>)
-{
-  chomp;
-  s/^\s+//;
-  s/^#.*//;
-  s/\s+$//;
-  next CAT if ! length;
+readcats(STDIN);
 
-  # VARIABLE=value
-  if (/^[a-z]\w*=/i)
-  { print "$_\n";
-    next CAT;
-  }
+exit 0;
 
-  # < filename
-  if (/^<\s*/)
-  { $_=$';
-    s/\s+$//;
-    if (! open(INCLUDE, "< $_\0"))
-    { warn "$::cmd: line $.: can't open \"$_\": $!\n";
+sub readcats($;$)
+{ my($FILE,$fname)=@_;
+
+  local($_);
+
+  CAT:
+  while (<$FILE>)
+  {
+    chomp;
+    s/^\s+//;
+
+    # pass blanks and comments through almost unchanged
+    if (!length || /^#/)
+    { print "$_\n";
       next CAT;
     }
-    print "\n";
-    while (defined($_=<INCLUDE>))
-    { print;
-    }
-    close(INCLUDE);
-    print "\n";
-    next CAT;
-  }
 
-  # implicit lockfile by default
-  $lockfile='';
+    s/\s+$//;
 
-  # leading "+" means continue after rule
-  $cont='';
-  if (/^\+\s*/)
-  { $cont='c';
-    $_=$';
-  }
-
-  # leading "!" means alert this message
-  $doalert=0;
-  if (/^\!\s*/)
-  { $doalert=1;
-    $_=$';
-
-    if (! defined $::DfltAlert || ! length $::DfltAlert)
-    { warn "$::cmd: line $.: no alert shell command defined1\n";
-      $doalert=0;
-    }
-  }
-
-  # we expect "mailbox tag rule"
-  if (! /^(\S+)\s+(\S+)\s+(\S.*)/)
-  { warn "$::cmd: stdin, line $.: bad line: $_\n";
-    next CAT;
-  }
-
-  my($folder,$key,$ptn)=($1,$2,$3);
-  $folder='attn' if $folder eq '.';
-
-  my @hdrs;
-  if ($ptn eq '.')
-  { undef $ptn;
-  }
-  else
-  {
-    if ($ptn =~ /^(\w[-,\w]*):/)
-    { $ptn=$';
-      @hdrs=split(/,+/, $1);
-    }
-    else
-    { @hdrs=('to','cc','bcc');
+    # VARIABLE=value
+    if (/^[a-z]\w*=/i)
+    { print "$_\n";
+      next CAT;
     }
 
-    if ($ptn =~ m:^/(.*)/?$:)
-    { $ptn=$1;
+    # << filename
+    if (/^<<\s*/)
+    { $_=$';
+      s/\s+$//;
+      my $incfh = ++$::_INCHANDLE;
+      my $path = ( m:^/: ? $_ : defined($fname) ? pathdir($fname)."/$_" : $_ );
+      if (! open($incfh, "< $path\0"))
+      { warn "$::cmd: line $.: can't open \"$path\": $!\n";
+	next CAT;
+      }
+      readcats($incfh,$_);
+      close($incfh);
+      next CAT;
     }
-    else
-    { $ptn.="\@.*(".join('|',@::DfltDom).")" if $ptn !~ /\@/;
+
+    # < filename
+    if (/^<\s*/)
+    { $_=$';
+      s/\s+$//;
+      if (! open(INCLUDE, "< $_\0"))
+      { warn "$::cmd: line $.: can't open \"$_\": $!\n";
+	next CAT;
+      }
+      print "\n";
+      while (defined($_=<INCLUDE>))
+      { print;
+      }
+      close(INCLUDE);
+      print "\n";
+      next CAT;
     }
 
-    $ptn =~ s/\.[^*]/\\$&/g;
-  }
+    # implicit lockfile by default
+    $lockfile='';
 
-  my $hregexp = '('.join('|',@hdrs).')';
+    # leading "+" means continue after rule
+    $cont='';
+    if (/^\+\s*/)
+    { $cont='c';
+      $_=$';
+    }
 
-  if ($folder =~ /^\|/)
-  { $deliver="$folder '$key'";
-    undef $lockfile;
-  }
-  elsif ($folder =~ /\@/)
-  { $deliver="! $folder";
-    undef $lockfile;
-  }
-  else
-  { $type=foldertype($folder);
-    
-    if ($type eq MH)
-    # procmail doesn't do .mh_sequences support
-    { $deliver="| $::RcvStore +$folder -unseen";
-      $lockfile="$ENV{MAILDIR}/$folder/.procmail-lock";
+    # leading "!" means alert this message
+    $doalert=0;
+    if (/^\!\s*/)
+    { $doalert=1;
+      $_=$';
+
+      if (! defined $::DfltAlert || ! length $::DfltAlert)
+      { warn "$::cmd: line $.: no alert shell command defined1\n";
+	$doalert=0;
+      }
+    }
+
+    # we expect "mailbox tag rule"
+    if (! /^(\S+)\s+(\S+)\s+(\S.*)/)
+    { warn "$::cmd: stdin, line $.: bad line: $_\n";
+      next CAT;
+    }
+
+    my($folder,$key,$ptn)=($1,$2,$3);
+    $folder='attn' if $folder eq '.';
+
+    my @hdrs;
+    if ($ptn eq '.')
+    { undef $ptn;
     }
     else
-    { $sfx=foldersfx($folder);
-      $deliver="$folder$sfx";
+    {
+      if ($ptn =~ /^(\w[-,\w]*):/)
+      { $ptn=$';
+	@hdrs=split(/,+/, $1);
+      }
+      else
+      { @hdrs=('to','cc','bcc');
+      }
+
+      if ($ptn =~ m:^/(.*)/?$:)
+      { $ptn=$1;
+      }
+      else
+      { $ptn.="\@.*(".join('|',@::DfltDom).")" if $ptn !~ /\@/;
+      }
+
+      $ptn =~ s/\.[^*]/\\$&/g;
     }
-  }
 
-  $flags=($deliver =~ /^\|/ ? "w" : "");
+    my $hregexp = '('.join('|',@hdrs).')';
 
-  print ": 0$cont\n";
-  if (defined($ptn))
-  { print "* ^$hregexp:.*$ptn\n";
-  }
-  print "{\n";
+    if ($folder =~ /^\|/)
+    { $deliver="$folder '$key'";
+      undef $lockfile;
+    }
+    elsif ($folder =~ /\@/)
+    { $deliver="! $folder";
+      undef $lockfile;
+    }
+    else
+    { $type=foldertype($folder);
+      
+      if ($type eq MH)
+      # procmail doesn't do .mh_sequences support
+      { $deliver="| $::RcvStore +$folder -unseen";
+	undef $lockfile; ## $lockfile="$ENV{MAILDIR}/$folder/.procmail-lock";
+      }
+      else
+      { $sfx=typesfx($type);
+	$deliver="$folder$sfx";
+      }
+    }
 
-  if ($::FolderDups && defined($lockfile) && $deliver !~ /^\!/)
-  {
-    my $cache = ( $type eq MH || $type eq MAILDIR
-		? "$ENV{MAILDIR}/$folder/.msgid.cache"
-		: "$ENV{MAILDIR}/.msgid.cache-$folder"
-		);
-    print <<X
+    $flags=($deliver =~ /^\|/ ? "w" : "");
+
+    print ": 0$cont\n";
+    if (defined($ptn))
+    { print "* ^$hregexp:.*$ptn\n";
+    }
+    print "{\n";
+
+    if ($::FolderDups && defined($lockfile) && $deliver !~ /^\!/)
+    {
+      my $cache = ( $type eq MH || $type eq MAILDIR
+		  ? "$ENV{MAILDIR}/$folder/.msgid.cache"
+		  : "$ENV{MAILDIR}/.msgid.cache-$folder"
+		  );
+      print <<X
 
   :0 Wh: $cache.lock
   | formail -D 819200 $cache
 X
-;
-  }
+      ;
+    }
 
-  if ($doalert)
-  { my $alertfn = $::DfltAlert;
-    $alertfn =~ s/\%/$folder/g;
-    print <<X
+    if ($doalert)
+    { my $alertfn = $::DfltAlert;
+      $alertfn =~ s/\%/$folder/g;
+      print <<X
 
   : 0hc
   | $alertfn
 X
-    ;
-  }
+      ;
+    }
 
-  if ($key ne '.')
-  # note that we strip the typical mailing list [tag] stuff if using our own key
-  {
-    if ($::X_Label)
+    if ($key ne '.')
+    # note that we strip the typical mailing list [tag] stuff if using our own key
     {
-      print <<X
+      if ($::X_Label)
+      {
+	print <<X
 
   :0 whf
   | formail -f -A "X-Label: $key" 
 X
-      ;
-    }
-    else
-    {
-      print <<X
+	;
+      }
+      else
+      {
+	print <<X
 
   : 0whf
   | sed -e 's/^Subject: *\\[[^ ]*\\] */Subject: /' -e 's/^Subject: *[Rr][Ee] *: *\\[[^ ]*\\] */Subject: Re: /' -e 's/^Subject:/& [$key]/'
 X
-      ;
+	;
+      }
     }
-  }
 
-  if (defined $lockfile)
-  { $flags.=":$lockfile";
-  }
+    if (defined $lockfile)
+    { $flags.=":$lockfile";
+    }
 
-  print <<X
+    print <<X
 
   : 0$flags
   $deliver
 X
-  ;
+    ;
 
-  print <<X
+    print <<X
 }
 
 X
-  ;
+    ;
+  }
 }
 
-exit 0;
-
-sub foldersfx
+sub typesfx
 { my($type)=@_;
 
   if ($type eq UNIX)	{ return ""; }
@@ -479,4 +519,10 @@ sub foldertype
   }
 
   return MAILDIR;
+}
+
+sub pathdir
+{ local($_)=@_;
+  if (m:(.*/)[^/].*:) { return $&; }
+  return ".";
 }
