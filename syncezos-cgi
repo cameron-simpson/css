@@ -1,5 +1,7 @@
 #!/bin/sh
 set -x
-exec rsync -avHP --delete --delete-excluded \
+rsync -avHP --delete --delete-excluded \
+	$HOME/there/home/scripts/cgi-bin/. $HOME/there/ezos/html/cs/cgi-bin/.
+rsync -avHP --delete --delete-excluded \
 	--include-from $HOME/rc/sync/list.ezos-cgi \
 	$HOME/there/ezos/html/cs/cgi-bin/. $HOME/there/ezos/cgi-bin/.
