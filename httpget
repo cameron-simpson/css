@@ -32,6 +32,8 @@ use cs::URL;
 use cs::Lock;
 use Getopt::Std;
 
+sub URLsavepath($);
+
 ## open(STDERR,">>/dev/pts/5");
 
 undef $::AbsBase;
@@ -403,7 +405,8 @@ sub httpget($)
   ## warn "pid $$: GET $url\n\tCount=$::Count, Inline=$::Inline\n";
 
   if ($::Count < 1)
-  { my $method=($::DoHEAD ? HEAD : GET);
+  { my $outfile;
+    my $method=($::DoHEAD ? HEAD : GET);
 
     if ($url !~ /$::Ptn/oi)
     {
@@ -411,6 +414,10 @@ sub httpget($)
     elsif ($::NoAction)
     { $url =~ s/#.*// if $::NoAnchors;
       print "$method $url\n";
+    }
+    elsif (defined($outfile=URLsaveepath($url)) && -s $outfile)
+    { warn "$::cmd: file $outfile exists, skipping $url\n" if $::Verbose;
+      return;
     }
     else
     {
@@ -499,12 +506,43 @@ sub httpget($)
   }
 }
 
-sub hexify
+sub hexify($)
 { local($_)=@_;
   my $old=$_;
   $_=cs::HTTP::hexify($_,HTML);
   ## if ($old ne $_) { warn "$old -> $_\n"; }
   $_;
+}
+
+sub URLsavepath($)
+{ my($url)=@_;
+
+  return undef if @::ExecList;
+
+  my $outfile;
+
+  if (! defined $::Output || ! length $::Output)
+  {
+    my $eurl = $url;
+    if ($eurl =~ m:/$:)	{ $eurl.='index.html'; }
+
+    my($ebase)='';
+    my($nb)=$::NBase;
+    ## warn "nb=$nb, eurl=[$eurl]";
+    while ($nb-- > 0 && $eurl =~ m:/+[^/]+$:)
+    { $ebase=$&.$ebase;
+      $eurl=$`;
+    }
+
+    $ebase =~ s:^/+::;
+    $outfile=$ebase;
+  }
+  elsif ($::Output eq '-')	
+  { undef $outfile;
+  }
+  else
+  { $outfile=$::Output;
+  }
 }
 
 sub saveMIME($$)
@@ -532,36 +570,14 @@ sub saveMIME($$)
   }
   else
   { 
-    my $outfile;
+    my $outfile = URLsavepath($url);
 
-    # where to put it?
-    if (! defined $::Output || ! length $::Output)
+    if (defined $outfile)
     {
-      my $eurl = $url;
-      if ($eurl =~ m:/$:)	{ $eurl.='index.html'; }
-
-      my($ebase)='';
-      my($nb)=$::NBase;
-      ## warn "nb=$nb, eurl=[$eurl]";
-      while ($nb-- > 0 && $eurl =~ m:/+[^/]+$:)
-      { $ebase=$&.$ebase;
-	$eurl=$`;
-      }
-
-      $ebase =~ s:^/+::;
-
-      my $edir = cs::Pathname::dirname($ebase);
+      my $edir = cs::Pathname::dirname($outfile);
       -d "$edir/."
-	    || cs::Pathname::makedir($edir,0777)
-	    || warn "$::cmd: mkdir($edir): $!\n";
-      $outfile=$ebase;
-      ## warn "save $url to \"$outfile\"...\n";
-    }
-    elsif ($::Output eq '-')	
-    { undef $outfile;
-    }
-    else
-    { $outfile=$::Output;
+	  || cs::Pathname::makedir($edir,0777)
+	  || warn "$::cmd: mkdir($edir): $!\n";
     }
 
     if (defined ($outfile))
