@@ -1,0 +1,116 @@
+#!/usr/bin/perl
+#
+# Split up an ordinary mailbox (From_ separated).
+# If a mailbox is specified, uses filemail to deposit the mail, so the
+# .file refiler works. Otherwise it unpacks into the current directory.
+#	- Cameron Simpson, February 1992
+#
+# Support "| command" in place of mailbox.
+#	- Cameron Simpson <cs@zip.com.au> 12jun2001
+#
+
+use strict qw(vars);
+
+use POSIX;
+use Fcntl;
+use cs::Misc;
+use cs::Upd;
+
+$::Usage="Usage: $::cmd [+mbox] < mailfile\n";
+
+$::SleepTime=0;
+
+$::TmpDir=defined $ENV{TMPDIR} ? $ENV{TMPDIR} : '/tmp';
+$::TmpDir.="/$::cmd.$$";
+
+$::Xit=0;
+$::Counter=0;
+
+undef $::PipeTo;
+
+if (@ARGV)
+{ if ("@ARGV" =~ /^\|/)
+  { $::PipeTo=$';
+  }
+  else
+  { mkdir($::TmpDir,0777) || warn "$::cmd: mkdir($::TmpDir): $!\n";
+    chdir($::TmpDir)      || die "$::cmd: chdir($::TmpDir): $!\n";
+    warn "$::cmd: piping to \"vmin @ARGV\" ...\n";
+    open(STDOUT,"| vmin @ARGV ") || die "$::cmd: can't pipe to vmin: $!";
+  }
+}
+else
+{
+  warn "$::cmd: just splitting, not filing\n";
+}
+
+splitmail('STDIN','stdin');
+nl("$::Counter messages");
+exit $::Xit;
+
+sub splitmail	# (STREAM,fname)
+{ my($F,$f)=@_;
+  my($hot);
+
+  $hot=0;	# is our pipe hot?
+  while (<$F>)
+  { if (/^From /o)	## || /^Article \d+ of \S+:$/o
+    { ++$::Counter;
+      # warn "\n";
+      if ($hot)
+      { &closepipe;
+	$hot=0;
+      }
+      $hot=&openpipe;
+    }
+
+    if ($hot)
+    { if (! print PIPE $_)
+      { warn "$::cmd: print(PIPE): $!\n";
+	$hot=0;
+      }
+    }
+    else
+    { die "$::cmd: discarding: $_";
+      $::Xit=1;
+    }
+  }
+
+  &closepipe if $hot;
+}
+
+sub closepipe
+{
+  close(PIPE) || warn "close(PIPE): $!";
+  print "$::Tmp\n" if ! defined $::PipeTo;
+  sleep($::SleepTime) if $::SleepTime;
+}
+
+$::Inc=0;
+
+sub openpipe
+{ my($ok)=1;
+
+  if (defined $::PipeTo)
+  {
+    if (! open(PIPE, "| $::PipeTo "))
+    { warn "$::cmd: can't pipe to \"$::PipeTo\": $!\n";
+      $ok=0;
+    }
+  }
+  else
+  {
+    while (-e ($::Tmp=++$::Inc))
+    { # warn "$::cmd: already exists: $::Tmp\n";
+    }
+
+    out($::Tmp);
+    if (! sysopen(PIPE,$::Tmp,O_WRONLY|O_CREAT,0666))
+    { warn "$::cmd: can't write to $::Tmp: $!\n";
+      $::Xit=1;
+      $ok=0;
+    }
+  }
+
+  $ok;
+}
