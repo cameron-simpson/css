@@ -1,0 +1,36 @@
+#!/bin/sh
+#
+# Trim whitespace.
+# Strip leading and trailing whitespace and turn [ \t]+ into
+# a single space.
+#	- Cameron Simpson <cs@zip.com.au> 23jul2000
+#
+
+usage="Usage: $0 [-123] [files...]
+	-1	Don't trim the front.
+	-2	Don't collapse intermediate whitespace.
+	-3	Don't trim the back."
+
+trimfront='s/^[ 	][ 	]*//'
+trimback='s/[ 	][ 	]*$//'
+trimwhite='s/[ 	][ 	]*/ /g'
+
+badopts=
+while :
+do  case $1 in
+	-1)	trimfront= ;;
+	-2)	trimwhite= ;;
+	-3)	trimback= ;;
+	-?*)	echo "$0: unrecognised option: $1" >&2
+		badopts=1
+		;;
+	*)	break ;;
+    esac
+    shift
+done
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+exec sed "$trimfront
+	  $trimback
+	  $trimwhite" ${1+"$@"}
