@@ -50,8 +50,8 @@ dlog "commence $dl"
 } >>"$logfile"
 
 umask 2
-buildenv env ps1pfx=":$ps1pfx" ps2pfx=" $ps2pfx" script -a "$logfile"
+time buildenv env ps1pfx=":$ps1pfx" ps2pfx=" $ps2pfx" script -a "$logfile"
 
 dlog "complete $dl"
 
-time gzip -v -9 "$logfile" &
+gzip -v -9 "$logfile" &
