@@ -1,0 +1,22 @@
+#!/bin/sed -f
+#
+# Tidy up Subject: lines.
+# Strip multiple Re: stuff and [list] tags.
+#	- Cameron Simpson <cs@zip.com.au> 14feb2002
+#
+
+:top
+s/^[Ss][Uu][Bb][Jj][Ee][Cc][Tt]:[ 	]*//
+t subject
+:done
+n
+b top
+:subject
+s/^\[[^\] 	]*\][ 	]*//
+t subject
+:re
+s/^[Rr][Ee]:[ 	]*//
+t re
+s/^\[[^\] 	]*\][ 	]*//
+t re
+b done
