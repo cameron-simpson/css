@@ -4,6 +4,8 @@
 #	- Cameron Simpson <cs@zip.com.au> 06sep95
 #
 
+: ${TMPDIR:=/tmp}
+
 usage="Usage: $0 hotlistfiles..."
 
 stash=$HOME/public/private/hotlists
@@ -14,7 +16,7 @@ monthly=$stash/monthly/$moncode
 
 [ $# = 0 ] && { echo "$usage" >&2; exit 2; }
 
-tmp=/tmp/hotlist.$$
+tmp=$TMPDIR/hotlist.$$
 
 trap "rm -f \$tmp; exit 0" 0
 trap "rm -f \$tmp; exit 1" 1 2 15
