@@ -1,0 +1,10 @@
+#!/bin/sh
+#
+# Recite the named URLs map as an FVWM menu.
+#	- Cameron Simpson <cs@zip.com.au> 14feb2003
+#
+
+while read key url
+do
+  echo "\"$key\" Exec us $url"
+done <$HOME/rc/urlmap
