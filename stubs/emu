@@ -1,0 +1,8 @@
+#!/bin/sh
+
+[ -n "$INFERNO" -a -n "$X11_X" -a -n "$X11_Y" ] \
+	|| { echo "$0: need \$INFERNO, \$X11_X and \$X11_Y" >&2; exit 1; }
+
+ht=`expr "$X11_Y" - 110`
+
+exec term -e $REAL/emu -r"$INFERNO" -g"${X11_X}x$ht" ${1+"$@"}
