@@ -44,6 +44,6 @@ exec <"$tmp"
 cat "$tmp"
 rm "$tmp"
 set -x
-set getpageurls -q $HOME/var/log/httpgetd-queue
+set getpageurls -q $HOME/var/queue/httpgetd
 [ $async ] || exec "$@"
 exec bgstdin "$@"
