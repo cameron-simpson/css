@@ -15,6 +15,9 @@ FILEDIR=`dirname "$FILE"`
 FILEDIR=`cd "$FILEDIR"; pwd`
 FILEPATH=$FILEDIR/$BASE
 
+tpltenv=$FILEDIR/.tplt
+[ -s "$tpltenv" ] && eval `sed -n 's/^\([A-Z][A-Z_0-9]*\)=.*/&; export \1;/p' "$tpltenv"`
+
 DIRBASE=`basename "$FILEDIR"`
 case $FILE in
     /*/scripts/*)
