@@ -1,0 +1,37 @@
+#!/bin/sh
+#
+# Add the current background to the list of backgrounds to suppress
+# and load a new one.
+#	- Cameron Simpson <cs@zip.com.au> 06oct2000
+#
+
+lastrxvtbg \
+| tail -1 \
+| if read bg
+  then
+    if [ ! -s "$bg" ]
+    then
+      echo "$0: can't locate $bg" >&2
+    else
+      for dir in `bgdirs`
+      do
+	case "$bg" in
+	  "$dir/"*)
+	    dirptn=`echo "$dir" | sed 's/././g'`
+	    tail=`expr "x$bg" : "x$dirptn/\\(.*\\)"`
+	    ndx=$dir/INDEX
+	    ndxpurge=$ndx-bright
+	    if fgrep -sx "$tail" "$ndx"
+	    then
+	      (set -vx
+	      echo "$tail" >>$ndxpurge
+	      )
+	      break
+	    fi
+	    ;;
+	esac
+      done
+    fi
+  fi
+
+sbg
