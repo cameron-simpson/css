@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # Add a log to the things being tailed.
-#	- Cameron Simpson <cs@zip.com.au> 25may96
+#	- Cameron Simpson <cs@zip.com.au> 25may1996
 #
 
 control=${TAILF:-$HOME/.tailf}
@@ -11,9 +11,7 @@ delete=
 
 cmd=`basename "$0"`
 usage="Usage: $cmd [-c control_file] [-d] [-s] key [file]
-	-c control_file	Set control file (default: $control).
-	-d		Delete key.
-	-s		No \"key:\" prefix to log."
+	-c control_file	Set control file (default: $control)."
 
 badopts=
 while :
