@@ -1,0 +1,29 @@
+#!/bin/sh
+#
+# Recite the source RPMs for everything in the named directories.
+#	- Cameron Simpson <cs@zip.com.au> 17sep2002
+#
+
+tmpf=${TMPDIR:-/tmp}/rpmof$$
+names=${tmpf}n
+rpmout=${tmpf}r
+
+trap 'rm -f "$names" "$rpmout"; exit $xit' 0 1 15
+
+[ $# = 0 ] && set .
+
+xit=0
+
+for dir
+do  ( cd "$dir" || exit 1
+      wd=`pwd`
+      ls -a | sed -e '/^\./d' -e '/^\.\./d' -e "s^$wd/" >"$names"
+      xxargs rpm -qf <"$names" >"$rpmout"
+      while read name <&3 && read rpm <&4
+      do  echo "$name	$rpm"
+      done 3<"$names" 4<"$rpmout"
+      exit 0
+    ) || xit=1
+done
+
+exit $xit
