@@ -1,11 +1,10 @@
 #!/bin/sh
 #
-# Read my desktop names and incant them back at FVWM.
+# Read my desktop names and produce incantations for FVWM's startup.
 #	- Cameron Simpson <cs@zip.com.au> 24mar2003
 #
 
-set -x
-desktop -a \
-| while read desk name
-  do  desktop $desk name "`desktop $desk name`"
-  done
+idsetlist "$SYSTEMID/${DESKTOPSET:-desktop}" name \
+| sed -e '/^[0-9]*	./!d' \
+      -e 's/^\([0-9][0-9]*	\)\./\1/' \
+      -e 's/^/DesktopName /'
