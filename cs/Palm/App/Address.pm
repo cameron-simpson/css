@@ -80,8 +80,8 @@ sub Record($$)
   return undef if ! defined $raw;
 
   my $R = {};
-  my @f = unpack("CCCCCCC",$raw);
-  $raw=substr($raw,7);
+  my @f = unpack("CCCCCCCCC",$raw);
+  $raw=substr($raw,9);
 
   my @s = ();
   while ($raw =~ /^([^\0]*)\0/)
