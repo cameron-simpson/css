@@ -99,7 +99,7 @@ sub match	# (Data,State) -> (token,tail) or undef
   # comments
   elsif (/^<!--/)
   { $tail=$';
-    if ($tail !~ /-->/)
+    if ($tail !~ /--!?>/)	# "!?" from brainfucked RealPay coders
     { warn "\"<--\" with no close yet at:\n[$tail]";
       return undef;
     }
