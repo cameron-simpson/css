@@ -4,19 +4,18 @@
 #	- Cameron Simpson <cs@zip.com.au> 03apr2000
 #
 
+: ${PILOTPORT:=/dev/pilot}
+: ${USER:=`id -un`} || exit 1
+syncdir=$HOME/backup/palm
+export PILOTPORT USER
+
 cmd=`basename "$0"`
 
-needhost janus@home || exit 1
-
-syncdir=$HOME/rc/palm/sync
+needhost $HOMEHOST@home || exit 1
 [ -d "$syncdir/." ] || { echo "$cmd: $syncdir: not a directory" >&2; exit 1; }
-
-PILOTPORT=${PILOTPORT:-/dev/pilot}
-export PILOTPORT
-
 [ -c "$PILOTPORT" ] || { echo "$cmd: $PILOTPORT: not a tty" >&2; exit 1; }
 id=`ls -ldL "$PILOTPORT" | awk '{print$3}'`
-[ "x$id" = "x$USER" ] || { echo "$cmd: $PILOTPORT: not owned by \"$USER\"" >&2
+[ "x$id" = "x$USER" ] || { echo "$cmd: $PILOTPORT: not owned by \"$USER\" (owner is $id)" >&2
 			   exit 1
 			 }
 
@@ -26,4 +25,5 @@ histbackup --inplace --symlink LATEST "$syncdir" \
    }
 
 echo
-pilot-xfer -s "$syncdir/current"
+set -x
+exec pilot-xfer -s "$syncdir/current"
