@@ -304,7 +304,10 @@ sub tm2ctime
 }
 
 # time,givenlocaltime -> gmt
-sub yyyymmdd2gmt($$) { iso2gmt(@_) }
+sub yyyymmdd2gmt($$)
+{ my@c=caller; warn "$0: DEPRECIATED yyyymmdd2gmt(@_)\n\tfrom [@c][\n\t";
+  iso2gmt(@_);
+}
 sub iso2gmt($$)
 { local($_)=shift;
   my($givenlocaltime)=shift;
@@ -316,6 +319,10 @@ sub iso2gmt($$)
   }
 
   my($year,$mon,$mday)=($1+0,$2+0,$3+0);
+  if ($year < 1970)
+  { my@c=caller;
+    warn "$0: \$year=$year from iso date \"$_\"\n\tfrom [@c]\n\t";
+  }
 
   $_=$5;
 
