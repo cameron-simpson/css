@@ -4,6 +4,8 @@
 #	- Cameron Simpson <cs@zip.com.au> 18may2002
 #
 
+##alert "$0 $*"
+
 cmd=$0
 usage="Usage: $cmd [-n] menu title cmd [args...]"
 
