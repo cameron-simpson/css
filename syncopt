@@ -401,7 +401,7 @@ do
 		{ useme=0 }
 	  $1 == "*" { useme=1 }
 	  NF == 1 && $1 == nvthing { print "nosync=" }
-	  $1 == thing || ( $1 == nvthing && $2 == thingv ) {
+	  $1 == thing || ( $1 == nvthing && ( $2 == thingv || $2 ~ /^[^0-9]/ ) ) {
 		  useme=1
 		  print "nosync="
 		}
