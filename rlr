@@ -4,6 +4,8 @@
 #	- Cameron Simpson <cs@zip.com.au> 20sep95
 #
 
+: ${TMPDIR:=/tmp}
+
 cmd=`basename "$0"`
 usage="Usage: $cmd -f from -t to [-i input] [-o output] replacement-files...
 	-f from	Start line marked specified by regexp \"from\".
@@ -37,7 +39,7 @@ done
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
-tmp=/tmp/$cmd.$$
+tmp=$TMPDIR/$cmd.$$
 front=$tmp.a
 back=$tmp.b
 
