@@ -22,7 +22,14 @@ use cs::Source;
 use cs::Pathname;
 use cs::Hier;
 
-chomp($ENV{PWD}=`pwd`);
+undef %::did;
+
+# bootstrap some values
+chomp($_=`pwd`);			setenv(PWD,$_);
+chomp($_=`hostname`);			setenv(HOSTNAME,$_);
+($_=$ENV{HOSTNAME}) =~ s/\..*//;	setenv(HOST,$_);
+($_=$ENV{HOSTNAME}) =~ s/^[^.]*\.//;	setenv(HOSTDOMAIN,$_);
+$_=(length($ENV{HOME}) ? $ENV{HOME} : userdir('cameron')); setenv(HOME,$_);
 
 @ENVPATH=( length $ENV{ENVPATH}
 	 ? grep(length,split(/:+/,$ENV{ENVPATH}))
@@ -84,12 +91,6 @@ else				{ @vars=grep(length,split(/,+/));
 
 die $usage if $badopts;
 
-undef %::did;
-if (! length $ENV{HOME})
-{ $ENV{HOME}=userdir('cameron');
-}
-$::did{HOME}=1;
-
 $::UseExtant=0;
 
 envstuff();
@@ -108,7 +109,7 @@ if ($noexec)	{ if (defined($outfile))
 		  # XXX - csh mode for -vx if ever restored
 		  # print "set -vx\n" if $trace;
 
-		  setvar(@vars);
+		  setvar(0,@vars);
 		  # print "set +vx\n" if $trace;
 		  finalvars();
 		  strippaths();
@@ -136,7 +137,7 @@ if ($noexec)	{ if (defined($outfile))
 		  }
 		}
 else		{
-	          setvar(@vars);
+	          setvar(0,@vars);
 		  finalvars();
 		  strippaths();
 		  exec @ARGV;
@@ -166,7 +167,7 @@ sub envstuff
 	{ local($_);
 
 	  ENVLINE:
-	  while (<LOADENV>)
+	  while (defined($_=<LOADENV>))
 	  { chomp;
 	    s/^\s+//;
 	    s/^#.*//;
@@ -176,7 +177,10 @@ sub envstuff
 	    { warn "$::cmd: $vardir, line $.: bad format: $_\n";
 	    }
 	    else
-	    { $env{$1}="\"$'" if ! exists $env{$1};
+	    { if (! exists $env{$1})
+	      { $env{$1}="\"$'";
+		## warn "loadenv: $1=\"$'";
+	      }
 	    }
 	  }
 
@@ -186,8 +190,15 @@ sub envstuff
     }
   }
 
-  sub fetchenv($)
+  sub needenv($)
   { my($var)=@_;
+    return if defined($ENV{$var}) && length($ENV{$var});
+    setvar(1,$var);
+  }
+
+  sub fetchenv($;$)
+  { my($var,$missok)=@_;
+    $missok=0 if ! defined $missok;
 
     my @extlist=
 	 grep(length,
@@ -197,6 +208,7 @@ sub envstuff
 	  $ENV{HOSTNAME},
 	  $ENV{HOST},
 	  $ENV{SYSTEMID},
+	  $ENV{HOSTDOMAIN},
 	  $ENV{OS},
 	  $ENV{ARCH},
 	 ))
@@ -206,10 +218,11 @@ sub envstuff
     {
       my $key = length($ext) ? "$var.$ext" : $var;
 
+      ## warn "key=[$key]";
       if (exists $env{$key})
       {
 	my $val = $env{$key};
-
+	## warn "hit on $key [$val]";
 	my $type = substr($val,$[,1);
 	substr($val,$[,1)='';
 
@@ -217,27 +230,43 @@ sub envstuff
 	{ $val=efromfile($val);
 	}
 	else
-	{ $val=estring($val);
+	{ $val=estring($val,$missok);
 	}
 
 	return $val;
       }
     }
 
+    if (! $missok)
+    { warn "$::cmd: can't fetchenv(\$$var)\n";
+    }
     return undef;
   }
 
   loadenvpath();
+  for my $needvar (OS,ARCH,SYSTEMID)
+  { needenv($needvar);
+  }
 }
 
 sub setvar
 {
   my(@vars)=@_;
 
+  my $missok;
+  if (@vars && $vars[0] =~ /^\d/)
+  { $missok=shift(@vars)+0;
+  }
+  else
+  { $missok=0;
+  }
+
   return undef if ! @vars;
+
   my $lastvar = $vars[$#vars];
 
   local($_);
+  local($::cmd)="$::cmd: setvar(@vars)";
 
   VAR:
   while (@vars)
@@ -248,7 +277,13 @@ sub setvar
 
     if (/^use\s+/)
     { $_=$';
-      map(usefile($_),grep(length,split(/\s+/)));
+      map(usefile($_,0),grep(length,split(/\s+/)));
+      next VAR;
+    }
+
+    if (/^try\s+/)
+    { $_=$';
+      map(usefile($_,1),grep(length,split(/\s+/)));
       next VAR;
     }
 
@@ -256,13 +291,13 @@ sub setvar
     $::did{$_}=1;
 
     if (!$force && defined($ENV{$_}) && length($ENV{$_}))
-    {
-      next VAR;
+    # already set
+    { next VAR;
     }
 
     $trace && out "$_=";
 
-    my $val = fetchenv($_);
+    my $val = fetchenv($_,$missok);
     if (defined $val)
     { setenv($_,$val);
     }
@@ -288,7 +323,7 @@ sub fromfile
   $_;
 }
 
-sub untilde
+sub untilde($)
 { local($_)=@_;
 
   s;\~(\w*);(! length($`) || substr($tmp,-1,1) eq ':')
@@ -298,31 +333,27 @@ sub untilde
   $_;
 }
 
-sub efromfile
-{ 
-  estring(fromfile(@_));
+sub efromfile($$)
+{ my($file,$missok)=@_;
+  estring(fromfile($file),$missok);
 }
 
-sub estring
-{ local($_)=@_;
-
-  my($tmp,$u);
-
-  s;\$(\$|[_\w]+|\{[_\w]+\});varval($1);eg;
-
-  untilde($_);
+sub estring($$)
+{ my($str,$missok)=@_;
+  $str =~ s;\$(\$|[_\w]+|\{[_\w]+\});varval($1,$missok);eg;
+  return untilde($str);
 }
 
-sub varval
-{ local($_)=@_;
+sub varval($$)
+{ local($var,$missok)=@_;
 
-  return '$' if $_ eq '$';
+  return '$' if $var eq '$';
 
   local($::UseExtant)=1;
   
   /^\{(.*)\}$/
-  ? setvar($1)
-  : setvar($_)
+  ? setvar($missok,$1)
+  : setvar($missok,$var)
   ;
 }
 
@@ -378,8 +409,7 @@ sub strippaths
   @vars=grep(/PATH$/, keys %ENV) if ! @vars;
 
   for my $var (@vars)
-  {
-    $ENV{$var}=cs::Shell::statpath(paths($ENV{$var}));
+  { $ENV{$var}=cs::Shell::statpath(paths($ENV{$var}));
   }
 }
 
@@ -402,9 +432,9 @@ sub userdir
   $pw[7];
 }
 
-sub usefile
-{
-  my($ufile)=@_;
+sub usefile($;$)
+{ my($ufile,$missok)=@_;
+  $missok=0 if ! defined $missok;
 
   $trace && out("use $ufile");
 
@@ -427,7 +457,12 @@ sub usefile
       }
     }
 
-    return if ! $found;
+    if (! $found)
+    { if (! $missok)
+      { warn "$::cmd: can't find file for \"use $ufile\" in @ENVPATH\n";
+      }
+      return;
+    }
   }
 
   $trace && out("use $ufile");
@@ -445,10 +480,10 @@ sub usefile
     else
     {
       local $_;
+      local($::cmd)="$::cmd: use($ufile)";
 
       # hack to make local paths work
       local @ENVPATH = (cs::Pathname::dirname($ufile), @ENVPATH);
-
 
       while (defined ($_=$s->GetContLine()) && length)
       { chomp;
@@ -464,8 +499,9 @@ sub usefile
   }
 }
 
-sub useline
+sub useline($)
 { local($_)=@_;
+  local($::cmd)="$::cmd:\n  $_:\n  ";
 
   if (/^eval\s+/)
   { $_=$';
@@ -474,16 +510,29 @@ sub useline
   }
   elsif (/^use\s+/)
   { $_=$';
-    map(usefile($_),
+    map(usefile($_,0),
 	grep(length,
 	     split(/\s+/,
-		   estring($_))));
+		   estring($_,0))));
+  }
+  elsif (/^try\s+/)
+  { $_=$';
+    map(usefile($_,1),
+	grep(length,
+	     split(/\s+/,
+		   estring($_,1))));
   }
   elsif (/^var\s+/)
   { $_=$';
-    setvar(grep(length,
+    setvar(0,grep(length,
 		split(/\s+/,
-		      estring($_))));
+		      estring($_,0))));
+  }
+  elsif (/^tryvar\s+/)
+  { $_=$';
+    setvar(1,grep(length,
+		split(/\s+/,
+		      estring($_,0))));
   }
   elsif (/^final\s+/)
   { push(@::final,$');
@@ -522,7 +571,7 @@ sub useline
     }
   }
   elsif (/^([_\w]+)(\??)=/)
-  { (! length $2 || ! length $ENV{$1}) && setenv($1,estring($'));
+  { (! length $2 || ! length $ENV{$1}) && setenv($1,estring($',1));
   }
   else
   { return 0;
@@ -531,7 +580,7 @@ sub useline
   1;
 }
 
-sub setenv
+sub setenv($$)
 { my($var,$val)=@_;
   $ENV{$var}=$val;
   $::did{$var}=1;
@@ -549,6 +598,8 @@ sub finalvars
 sub putvars
 { my(@vars)=@_;
   @vars=keys %::did if ! @vars;
+
+  @vars=grep($_ ne PWD, @vars);	# a r/o variable in some shells :-(
 
   cs::Shell::putvars($force,$CshMode ? CSH : SH,@vars);
 }
