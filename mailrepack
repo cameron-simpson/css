@@ -1,0 +1,28 @@
+#!/bin/sh
+#
+# Unpack a mail message from stdin and repack, then hand to delivery tool.
+#	- Cameron Simpson <cs@zip.com.au> 09jul2002
+#
+
+cmd=`basename "$0"`
+usage="Usage: $cmd <mailitem"
+
+set -vx
+
+TMPDIR=${TMPDIR:-/tmp}
+
+msg=$TMPDIR/$cmd$$m
+draft=$TMPDIR/$cmd$$h
+trap 'rm -f "$msg" "$draft"' 0 1 15
+
+# grab message, stripping leading "From ", if any
+unfrom_ >"$msg" || exit 1
+
+sed '/^$/,$d' <"$msg" \
+| formail -R Message-ID X-Old-Message-ID \
+          -R MIME-Version X-Old-MIME-version \
+          -R Content-Type X-Old-Content-Type \
+          -R Content-Length X-Old-Content-Length \
+| unfrom_ > "$draft"
+
+mailunpack unpack-archives mailrepack-inunpack "$draft" <"$msg"
