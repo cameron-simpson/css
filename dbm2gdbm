@@ -1,8 +1,10 @@
 #!/bin/sh
 
+: ${TMPDIR:=/tmp}
+
 for db
 do
-    tmpdb=/tmp/gdbm.$$
+    tmpdb=$TMPDIR/gdbm.$$
     if perl_dbm $HOME/bin/$ARCH/lsdbm -l "$db" | perl_gdbm $HOME/bin/$ARCH/unlsdbm "$tmpdb"
     then
 	cp "$db".dir "$db".dirOLD
