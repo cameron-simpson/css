@@ -4,6 +4,20 @@
 #	- Cameron Simpson <cs@zip.com.au> 27jun99
 #
 
+=head1 NAME
+
+cs::DBI - convenience routines for working with B<DBI>
+
+=head1 SYNOPSIS
+
+use cs::DBI;
+
+=head1 DESCRIPTION
+
+An assortment of routines for doing common things with B<DBI>.
+
+=cut
+
 use strict qw(vars);
 
 BEGIN { use cs::DEBUG; cs::DEBUG::using(__FILE__); }
@@ -17,7 +31,16 @@ package cs::DBI;
 
 $cs::DBI::_now=time;
 
-# Obtain filehandle for my personal mysql db.
+=head1 GENERAL FUNCTIONS
+
+=over 4
+
+=item mydb()
+
+Return a database handle for my personal mysql installation.
+
+=cut
+
 sub mydb()
 { if (! defined $cs::DBI::_mydb)
   { ::need(cs::Secret);
@@ -33,6 +56,14 @@ sub mydb()
   $cs::DBI::_mydb;
 }
 
+=item isodate(I<gmt>)
+
+Return an ISO date string (B<I<yyyy>-I<mm>-I<dd>>)
+for the supplied UNIX B<time_t> I<gmt>.
+If not supplied, I<gmt> defaults to now.
+
+=cut
+
 # ISO date from GMT
 sub isodate
 { my($gmt)=@_;
@@ -42,6 +73,13 @@ sub isodate
 
   sprintf("%d-%02d-%02d", $tm[5]+1900, $tm[4]+1, $tm[3]);
 }
+
+=item sql(I<dbh>,I<sql>)
+
+Return a statement handle for the SQL command I<sql> applied to database I<dbh>.
+This handle is cached for later reuse.
+
+=cut
 
 # return a statement handle for some sql
 # it is cached for speed, since most SQL gets reused
@@ -60,6 +98,13 @@ sub sql($$)
   $cs::DBI::_cachedQuery{$stkey} = $dbh->prepare($sql);
 }
 
+=item dosql(I<dbh>,I<sql>,I<execute-args...>)
+
+Perform the SQL command I<sql> on database I<dbh> with the
+I<execute-args> supplied.
+
+=cut
+
 # as above, but then perfomrs the statement handle's execute() method
 #	dosql(dbh,sql,execute-args)
 sub dosql
@@ -71,6 +116,14 @@ sub dosql
   $sth->execute(@_)
   ? $sth : undef;
 }
+
+=item query(I<dbh>,I<table>,I<fields...>)
+
+Return a statement handle to query I<table> in database I<dbh>
+where all the specified I<fields> have specific values
+(values to be supplied when the statement handle is executed).
+
+=cut
 
 # exact select on multiple fields
 # returned statement handle for query to fetch specified records
@@ -90,6 +143,13 @@ sub query
 
   sql($dbh, $query);
 }
+
+=item fetchall_hashref(I<sth>,I<execute-args...>)
+
+Execute the statement handle I<sth> with the supplied I<execute-args>,
+returning an array of hashrefs representing matching rows.
+
+=cut
 
 # execute statement handle and return all results as array of records
 sub fetchall_hashref
@@ -111,6 +171,13 @@ sub fetchall_hashref
   @rows;
 }
 
+=item find(I<dbh>,I<table>,I<field>,I<value>)
+
+Return an array of matching row hashrefs from I<table> in I<dbh>
+where I<field> = I<value>.
+
+=cut
+
 # return records WHERE $field == $key
 sub find($$$$)
 { my($dbh,$table,$field,$key)=@_;
@@ -129,6 +196,15 @@ sub find($$$$)
   fetchall_hashref($sth,$key);
 }
 
+=item findWhen(I<dbh>,I<table>,I<field>,I<value>,I<when>)
+
+Return an array of matching row hashrefs from I<table> in I<dbh>
+where I<field> = I<value>
+and the columns START_DATE and END_DATE span the time I<when>.
+The argument I<when> is optional and defaults to today.
+
+=cut
+
 # return records WHERE $field == $key and the START/END_DATEs overlap $when
 sub findWhen($$$$;$)
 { my($dbh,$table,$field,$key,$when)=@_;
@@ -139,6 +215,14 @@ sub findWhen($$$$;$)
 
   fetchall_hashref($sth,$key,$when,$when);
 }
+
+=item when(I<dbh>,I<table>,I<when>)
+
+Return an array of matching row hashrefs from I<table> in I<dbh>
+ehere the columns START_DATE and END_DATE span the time I<when>.
+The argument I<when> is optional and defaults to today.
+
+=cut
 
 # return records WHERE the START/END_DATEs overlap $when
 sub when($$;$)
@@ -151,91 +235,13 @@ sub when($$;$)
   fetchall_hashref($sth,$when,$when);
 }
 
-# return a cs::DBI object which accepts the ExecuteWithRec method,
-# used to insert records
-sub insert	# dbh,table[,dfltok],fields...
-{ my($dbh,$table)=(shift,shift);
-  my $dfltok=0;
-  if (@_ && $_[0] =~ /^[01]$/)
-  { $dfltok=shift(@_)+0;
-  }
-  my @fields = @_;
+=item updateField(I<dbh>,I<table>,I<field>,I<value>,I<where-field,where-value,...>)
 
-  my $sql = "INSERT INTO $table ("
-	  . join(',',@fields)
-	  . ") VALUES ("
-	  . join(',',map('?',@fields))
-	  . ")";
+Set the I<field> to I<value> in the I<table> in database I<dbh>
+for records where the specified I<where-field> = I<where-value> pairs
+all match.
 
-  ## warn "SQL is [$sql]";
-  bless [ $dbh, $table, $sql, sql($dbh,$sql), $dfltok, @fields ];
-}
-
-# takes an "insert" sql query and inserts some records
-# return is undef on failure or last insertid()
-sub ExecuteWithRec
-{ my($isth)=shift;
-
-  my($dbh,$table,$sql,$sth,$dfltok,@fields)=@$isth;
-
-  ## warn "stashing record:\n".cs::Hier::h2a($rec,1);
-  ## warn "sth=$sth, \@isth=[ @$isth ]\n";
-  ## warn "fields=[@fields]";
-
-  my $ok = 1;
-
-  # hack - lock the table if we're inserting 5 or more records,
-  # for speed
-  my $locked = (@_ > 5 && lock_table($dbh,$table));
-
-  INSERT:
-  while (@_)
-  { my $rec = shift(@_);
-    ## warn "INSERT rec = ".cs::Hier::h2a($rec,1);
-    my @execargs=();
-
-    for my $field (@fields)
-    { if (! exists $rec->{$field})
-      { if ($dfltok)
-	{ $rec->{$field}=undef;
-	}
-	else
-	{ ::need(cs::Hier);
-	  die "$::cmd: ExecuteWithRec(): no field \"$field\": rec="
-	      .cs::Hier::h2a($rec,1);
-	}
-      }
-      elsif (! defined $rec->{$field})
-      { ## warn "$field = UNDEF!";
-	## $rec->{$field}='';
-      }
-
-      push(@execargs, $rec->{$field});
-    }
-
-    # for some reason, text fields can't be empty - very bogus
-    ## for (@execargs) { $_=' ' if defined && ! length; }
-
-
-    if (! $sth->execute(@execargs))
-    { warn "$::cmd: ERROR with insert";
-      my @c = caller;
-      warn "called from [@c]\n";
-      warn "execargs=".cs::Hier::h2a(\@execargs,0)."\n";
-      $ok=0;
-      last INSERT;
-    }
-    else
-    { ## warn "INSERT OK, noting insertid";
-      ## XXX: was 'insertid'; may break if we ever leave mysql
-      $cs::DBI::_last_id=$sth->{'mysql_insertid'};
-    }
-  }
-
-  unlock_tables($dbh) if $locked;
-
-  $ok;
-}
+=cut
 
 # update fields in a table
 # extra values are (f,v) for conjunctive "WHERE f = v" pairs
@@ -259,48 +265,26 @@ sub updateField
   dosql($dbh,$sql,@args);
 }
 
-# return the id if the last record inserted by ExecuteWithRec
-undef $cs::DBI::_last_id;
-sub last_id()
-{ $cs::DBI::_last_id;
-}
+=item lock_table(I<dbh>,I<table>)
+
+Lock the specified I<table> in database I<dbh>.
+
+=cut
 
 sub lock_table($$)
 { my($dbh,$table)=@_;
   dosql($dbh,"LOCK TABLES $table WRITE");
 }
 
+=item unlock_tables(I<dbh>)
+
+Release all locks held in database I<dbh>.
+
+=cut
+
 sub unlock_tables($)
 { my($dbh)=@_;
   dosql($dbh,"UNLOCK TABLES");
-}
-
-# given a date (ISO form) select the entries from the given table
-# which contain the date
-sub SelectDateRanges($$$;$)
-{ my($this,$table,$constraint,$when)=@_;
-  $constraint=( defined $constraint && length $constraint
-	     ? "$constraint AND "
-	     : ''
-	     );
-  $when=isodate() if ! defined $when;
-
-  my $dbh = $this->{DBH};
-
-  $when=$dbh->quote($when);
-
-  my $statement = "SELECT * FROM $table WHERE $constraint START_DATE <= $when AND ( ISNULL(END_DATE) OR END_DATE >= $when )";
-  ## warn "statement=[$statement]";
-  dosql($dbh,$statement);
-}
-
-# as above, but return the data
-sub GetDateRanges
-{ my($this)=shift;
-
-  my $sth = $this->SelectDateRanges(@_);
-  return () if ! defined $sth;
-  fetchall_hashref($sth);
 }
 
 # return a statement handle with conjunctive WHERE constraints
@@ -380,5 +364,177 @@ sub delDatedRecord
 
   $sth->execute($prevwhen,@args,$when);
 }
+
+=item last_id()
+
+Return the id of the last item inserted with B<ExecuteWithRec> below.
+
+=cut
+
+# return the id if the last record inserted by ExecuteWithRec
+undef $cs::DBI::_last_id;
+sub last_id()
+{ $cs::DBI::_last_id;
+}
+
+=back
+
+=head1 OBJECT CREATION
+
+=over 4
+
+=item insert(I<dbh>,I<table>,I<dfltok>,I<fields...>)
+
+Create a new B<cs::DBI> object
+for insertion of rows into I<table> in database I<dbh>.
+If the parameter I<dfltok> is supplied as 0 or 1
+it governs whether it is permissible for the inserted rows
+to lack values for the I<fields> named;
+the default is for all named I<fields> to be required.
+Once created,
+this object may be used with the
+B<ExecuteWithRec> method below.
+
+=cut
+
+# return a cs::DBI object which accepts the ExecuteWithRec method,
+# used to insert records
+sub insert	# dbh,table[,dfltok],fields...
+{ my($dbh,$table)=(shift,shift);
+  my $dfltok=0;
+  if (@_ && $_[0] =~ /^[01]$/)
+  { $dfltok=shift(@_)+0;
+  }
+  my @fields = @_;
+
+  my $sql = "INSERT INTO $table ("
+	  . join(',',@fields)
+	  . ") VALUES ("
+	  . join(',',map('?',@fields))
+	  . ")";
+
+  ## warn "SQL is [$sql]";
+  bless [ $dbh, $table, $sql, sql($dbh,$sql), $dfltok, @fields ];
+}
+
+=back
+
+=head1 OBJECT METHODS
+
+=over 4
+
+=item ExecuteWithRec(I<record-hashrefs...>)
+
+Insert the records
+described by the I<record-hashrefs>
+into the appropriate table.
+
+=cut
+
+# takes an "insert" sql query and inserts some records
+# return is undef on failure or last insertid()
+sub ExecuteWithRec
+{ my($isth)=shift;
+
+  my($dbh,$table,$sql,$sth,$dfltok,@fields)=@$isth;
+
+  ## warn "stashing record:\n".cs::Hier::h2a($rec,1);
+  ## warn "sth=$sth, \@isth=[ @$isth ]\n";
+  ## warn "fields=[@fields]";
+
+  my $ok = 1;
+
+  # hack - lock the table if we're inserting 5 or more records,
+  # for speed
+  my $locked = (@_ > 5 && lock_table($dbh,$table));
+
+  INSERT:
+  while (@_)
+  { my $rec = shift(@_);
+    ## warn "INSERT rec = ".cs::Hier::h2a($rec,1);
+    my @execargs=();
+
+    for my $field (@fields)
+    { if (! exists $rec->{$field})
+      { if ($dfltok)
+	{ $rec->{$field}=undef;
+	}
+	else
+	{ ::need(cs::Hier);
+	  die "$::cmd: ExecuteWithRec(): no field \"$field\": rec="
+	      .cs::Hier::h2a($rec,1);
+	}
+      }
+      elsif (! defined $rec->{$field})
+      { ## warn "$field = UNDEF!";
+	## $rec->{$field}='';
+      }
+
+      push(@execargs, $rec->{$field});
+    }
+
+    # for some reason, text fields can't be empty - very bogus
+    ## for (@execargs) { $_=' ' if defined && ! length; }
+
+
+    if (! $sth->execute(@execargs))
+    { warn "$::cmd: ERROR with insert";
+      my @c = caller;
+      warn "called from [@c]\n";
+      warn "execargs=".cs::Hier::h2a(\@execargs,0)."\n";
+      $ok=0;
+      last INSERT;
+    }
+    else
+    { ## warn "INSERT OK, noting insertid";
+      ## XXX: was 'insertid'; may break if we ever leave mysql
+      $cs::DBI::_last_id=$sth->{'mysql_insertid'};
+    }
+  }
+
+  unlock_tables($dbh) if $locked;
+
+  $ok;
+}
+
+# given a date (ISO form) select the entries from the given table
+# which contain the date
+sub SelectDateRanges($$$;$)
+{ my($this,$table,$constraint,$when)=@_;
+  $constraint=( defined $constraint && length $constraint
+	     ? "$constraint AND "
+	     : ''
+	     );
+  $when=isodate() if ! defined $when;
+
+  my $dbh = $this->{DBH};
+
+  $when=$dbh->quote($when);
+
+  my $statement = "SELECT * FROM $table WHERE $constraint START_DATE <= $when AND ( ISNULL(END_DATE) OR END_DATE >= $when )";
+  ## warn "statement=[$statement]";
+  dosql($dbh,$statement);
+}
+
+# as above, but return the data
+sub GetDateRanges
+{ my($this)=shift;
+
+  my $sth = $this->SelectDateRanges(@_);
+  return () if ! defined $sth;
+  fetchall_hashref($sth);
+}
+
+=back
+
+=head1 SEE ALSO
+
+L<DBI>
+
+=head1 AUTHOR
+
+Cameron Simpson <cs@zip.com.au>
+
+=cut
 
 1;
