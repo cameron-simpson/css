@@ -1,33 +1,41 @@
 #!/bin/sh
 #
-# Generate menu for an image directory, with thumbnails.
+# Generate actions for an image directory menu, with thumbnails.
 #	- Cameron Simpson <cs@zip.com.au> 19oct2002
 #
 
-cmd=$0
-usage="Usage: $cmd [-l filelist] [-o image-op] [XxY] dir [files/dirs...]]"
-
-##alert "#=$# $0 $*"
-##exec 2>>$HOME/var/log/alert
+: ${TMPDIR:=/tmp}
+: ${FVWM_MENU_IMLIST_OP:=xv}
 
 ##thsize=16x16
 ##thsize=32x32
 thsize=48x48
+newmenu=
+
+cmd=$0
+usage="Usage: $cmd [-N] [-d dir] [-l filelist] [XxY] menuname [filecmd [args...]]
+	-N	New menu. Destroy and recreate this menu.
+	-d dir	Context directory. Default: current directory.
+	-l filelist Read image filenames from this file.
+	XxY	Thumnbail size. Default: $thsize"
+
+##alert "#=$# $0 $*"
+##exec 2>>$HOME/var/log/alert
 
 ##alert "DFLT=[$FVWM_MENU_IMLIST_OP]"
 ##env|grep FVWM >>$HOME/var/log/alert
-imop=${FVWM_MENU_IMLIST_OP:-"xv"}
 
 filelist=
 inter=
-dir=
+dir=.
 
 badopts=
 
 while :
 do
   case $1 in
-    -o) imop=$2; shift ;;
+    -N)	newmenu=1 ;;
+    -d)	dir=$2; shift ;;
     -l)	filelist=$2; shift ;;
     [1-9]|[1-9][0-9]|[1-9][0-9][0-9]) thsize=${1}x${1} ;;
     [1-9]*x[1-9]*) thsize=$1 ;;
@@ -42,93 +50,89 @@ done
 
 if [ $# = 0 ]
 then
-    echo "$cmd: missing dir" >&2
+    echo "$cmd: missing menuname" >&2
     badopts=1
 else
-    dir=$1; shift
-    cd "$dir" || exit 1
+    menuname=$1; shift
 fi
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
-if [ -n "$filelist" ]
+[ $# = 0 ] && set -- $FVWM_MENU_IMLIST_OP
+
+[ -n "$menutitle" ] || menutitle="$menuname: $*"
+
+cd "$dir" || exit 1
+wd=`pwd`  || exit 1
+thsubdir=.thumbnails/$thsize
+
+if [ $newmenu ]
 then
-    set x ${1+"$@"} `cat "$filelist"` || exit 1
-    shift
-else
-    # no args? pick parent, subdirs, *.* (image files)
-    [ $# = 0 ] && set .. */. *.*
+    echo "DestroyMenu $menuname"
+    echo "AddTomenu   $menuname \"$menutitle\" Title"
 fi
 
-wd=`pwd`
-thdir=.thumbnails/$thsize
+if [ -n "$filelist" ]
+then
+    cat "$filelist"
+else
+    for path in .. */. *.*
+    do
+      echo "$path"
+    done
+fi \
+| { exec 3>&1	# svae stdout for use after eaten by pipe
 
-thumblist=${TMPDIR:-/tmp}/imlist$$th
+    { exec 4>&1 1>&3 3>&-
+      # now stdout is original stdout and &4 is pipe to needthumbs
+      while read -r entry
+      do
+	if [ -d "$entry/." ]
+	then
+	  # directory pathname
+	  path=`cd "$entry" || exit 1; pwd` || continue
 
-exec 3>"$thumblist"
+	  # menu entry tag
+	  case "$entry" in
+	      .|*/*)tag=`basename "$path"` ;;
+	      *)	tag=$entry ;;
+	  esac
 
-##echo "entries=[$*]" >&2
-for entry
-do
-    if [ -d "$entry/." ]
-    then
-      # directory pathname
-      path=`cd "$entry" || exit 1; pwd` || continue
+	  ##alert "\"$tag\" PopImDir $path"
+	  echo "AddToMenu $menuname \"$tag\" PopImDir $path"
+	else
+	  f=$entry
+	  [ -s "$f" ] || continue;
 
-      # menu entry tag
-      case "$entry" in
-	  .|*/*)tag=`basename "$path"` ;;
-	  *)	tag=$entry ;;
-      esac
+	  case "$entry" in
+	      $HOME/*)	tag='~/'`expr "x$entry" : "x$HOME/\\(.*\\)"` ;;
+	      *)		tag=$entry ;;
+	  esac
 
-      ##alert "\"$tag\" PopImDir $path $imop"
-      echo "\"$tag\" PopImDir $path $imop"
-    else
-      f=$entry
-      [ -s "$f" ] || continue;
+	  d=`dirname "$f"`
+	  case "$d" in
+	      /*)		;;
+	      *)		d=$wd/$d ;;
+	  esac
+	  case "$f" in
+	      */*)	fbase=`basename "$f"` ;;
+	      *)		fbase=$f ;;
+	  esac
+	  case "$f" in
+	      /*)	;;
+	      *)	f=$d/$fbase ;;
+	  esac
 
-      case "$entry" in
-	  $HOME/*)	tag='~/'`expr "x$entry" : "x$HOME/\\(.*\\)"` ;;
-	  *)		tag=$entry ;;
-      esac
+	  thumb=$thsubdir/$fbase.png
+	  fthumb=$d/$thumb
+	  if [ -s "$fthumb" ]
+	  then tag="%$fthumb%$tag"
+	  else echo "$f" >&4
+	  fi
 
-      d=`dirname "$f"`
-      case "$d" in
-	  /*)	;;
-	  *)	d=$wd/$d ;;
-      esac
-      case "$f" in
-	  */*)	fbase=`basename "$f"` ;;
-	  *)	fbase=$f ;;
-      esac
-      case "$f" in
-	  /*)	;;
-	  *)	f=$d/$fbase ;;
-      esac
-
-      case "$f" in
-	  *[A-Z]*) lcf=`echo "$f" | tr '[A-Z]' '[a-z]'` ;;
-	  *)	   lcf=$f ;;
-      esac
-
-      thumb=$thdir/$fbase.png
-      fthumb=$d/$thumb
-      if [ -s "$fthumb" ]
-      then echo  "\"%$fthumb%$tag\" Exec $imop '$f'"
-      else echo  "\"$tag\" Exec $imop '$f'"
-           echo "$f" >&3	# to the thumb maker ...
-      fi ## | tee -a $HOME/imlist.out
-    fi
-done
-
-exec 1>&2
-
-(
-  exec <"$thumblist"
-  rm -f "$thumblist"
-  while read f
-  do
-    mkthumb "$f"
-  done
-) &
-renice +10 -p $! >/dev/null 2>&1
+	  echo "AddToMenu $menuname \"$tag\" Exec "`shqstr "$@" "$f"`
+	fi
+      done
+    } \
+    | needthumbsfor
+  }
