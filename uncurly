@@ -22,7 +22,7 @@ fi
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
-[ $# = 0 ] && set x -; shift
+[ $# = 0 ] && { set x -; shift; }
 
 xit=0
 
@@ -36,13 +36,13 @@ do
       set x -e :top; shift
       for var in $varlist
       do  eval "val=\$$var"
-	  set x -e "s{$var}$valg" -e 't top'; shift
+	  set x "$@" -e "s{$var}$valg" -e 't top'; shift
       done
   fi
 
   if [ "x$file" = x- ]
   then  sed ${1+"$@"}		|| xit=1
-  else  bsed ${1+"$@"} "$file"	|| xit=1
+  else  sed ${1+"$@"} "$file"	|| xit=1
   fi
 done
 
