@@ -4,15 +4,28 @@
 #	- Cameron Simpson <cs@zip.com.au> 23oct2002
 #
 
+cmd=`basename "$0"`
+usage="Usage: $cmd [address]"
+
 zapdir=$HOME/there/adzapper.sourceforge.net
 
 dotag=
-[ $# = 0 ] && { set adzapper-everyupdate@lists.sourceforge.net
-		ask "Sure you want to post to everyupdate" || exit 1
-		dotag=1
-	      }
-[ $# = 1 ] || { echo "Usage: $0 [address]" >&2; exit 2; }
-addr=$1; shift
+dopost=
+if [ $# = 0 ]
+then
+    if ask "Post to everyupdate"
+    then
+	set adzapper-everyupdate@lists.sourceforge.net
+	dotag=1
+	dopost=1
+    fi
+else
+    addr=$1; shift
+    dopost=1
+    [ $# = 0 ] || { echo "$cmd: extra arguments after address: $*" >&2
+		    exit 2
+		  }
+fi
 
 set -x
 cd $zapdir/html || exit 1
@@ -20,9 +33,14 @@ myke || exit 1
 
 rsync -avHPW --delete $HOME/there/adzapper.sourceforge.net/html/. sf:adzapper/htdocs/.
 
-cd $zapdir/html/scripts || exit 1
-( cd .. || exit 1
-  echo Diff since last sync:
-  cvs diff -r SYNCSF scripts/squid_redirect
-  [ $dotag ] && cvs tag -F SYNCSF
-) | mfiles "$addr" squid_redirect
+if $dopost
+then
+    cd $zapdir/html/scripts || exit 1
+    ( cd .. || exit 1
+      echo New script attached.
+      echo Diff since last public sync:
+      echo
+      cvs diff -r SYNCSF scripts/squid_redirect
+      [ $dotag ] && cvs tag -F SYNCSF
+    ) | mfiles "$addr" squid_redirect
+fi
