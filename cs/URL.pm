@@ -136,31 +136,44 @@ sub new($$;$)
 
   return undef if ! $ok;
 
-  /^[^#?]*/;
-  $path=$&;
-  $_=$';
-
-  if (substr($path,$[,1) ne '/')
-  # relative path, insert base's path
-  { if (defined $base)
-    { my $dirpart = $base->{PATH};
-      $dirpart =~ s:[^/]*$::;
-      $dirpart="/" if ! length $dirpart;
-
-      $path="$dirpart$path";
-
-      # trim /.
-      while ($path =~ s:/+\./:/:)
-      {}
-
-      # trim leading /..
-      while ($path =~ s:^/+\.\./:/:)
-      {}
-
-      # trim /foo/..
-      while ($path =~ s:/+([^/]+)/+\.\./:/:)
-      {}
+  if ($scheme eq HTTP || $scheme eq FILE || $scheme eq FTP)
+  {
+    if ($scheme eq HTTP)
+    { /^[^#?]*/;
+      $path=$&;
+      $_=$';
     }
+    else
+    { $path=$_;
+      $_='';
+    }
+
+    if (substr($path,$[,1) ne '/')
+    # relative path, insert base's path
+    { if (defined $base)
+      { my $dirpart = $base->{PATH};
+	$dirpart =~ s:[^/]*$::;
+	$dirpart="/" if ! length $dirpart;
+
+	$path="$dirpart$path";
+
+	# trim /.
+	while ($path =~ s:/+\./:/:)
+	{}
+
+	# trim leading /..
+	while ($path =~ s:^/+\.\./:/:)
+	{}
+
+	# trim /foo/..
+	while ($path =~ s:/+([^/]+)/+\.\./:/:)
+	{}
+      }
+    }
+  }
+  else
+  { $path=$_;
+    $_='';
   }
 
   if (/^\?([^#]*)/)
@@ -439,8 +452,11 @@ sub Text($;$)
   my $url;
 
   ## warn "computing TEXT for ".cs::Hier::h2a($this,1);
-  $url=lc($this->{SCHEME}).":" if defined $this->{SCHEME};
-  $url.='//'.$this->HostPart() if defined $this->{HOST};
+  my $SC=$this->{SCHEME};
+  $url=lc($SC).":" if length $SC;
+  if ($SC eq FILE || $SC eq HTTP || $SC eq HTTPS || $SC eq FTP)
+  { $url.='//'.$this->HostPart() if defined $this->{HOST};
+  }
   $url.=$this->LocalPart($noanchor);
 
   ## warn "text=$url\n";
