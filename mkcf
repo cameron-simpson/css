@@ -1,0 +1,12 @@
+#!/bin/sh
+#
+# Usage: mkcf dirs...
+#
+
+for dir
+do
+    conform -~f "$dir" |
+	sed -e "s:^>::
+		s:\\([^ ]*\\)  *copy  *\\*unknown\\*source\\*:\\1 copy SOURCE\\1:
+		s:^:$dir:"
+done
