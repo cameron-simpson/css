@@ -324,7 +324,7 @@ do
 	fi
 
 	eval \
-	  "($tracecmd; $timelimit $rsync -rlHt \$rszopt \$rsxopts \$rsopts $opts \"\$host::\$path/.\" \"\$fpath/.\")" \
+	  "($tracecmd; $timelimit $rsync -rlHt \$rsopts $opts \$rszopt \$rsxopts \"\$host::\$path/.\" \"\$fpath/.\")" \
 	  || xit=1
 	[ $latest ] && rm -f "$latelist"
 	;;
