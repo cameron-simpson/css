@@ -17,7 +17,7 @@ eval "txtconv=\$conv$dfltconv"
 
 aspect=-R
 txtconv='a2ps -1 -o- -B -T 8 -i --borders=no -b $aspect --medium=A4 -f 10'
-pdfconv='pdftops /dev/fd/0' ## pdf2ps
+pdfconv='pdf2ps /dev/fd/0' ## pdf2ps
 psconv=cat
 
 force=
