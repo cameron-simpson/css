@@ -117,6 +117,8 @@ view_vrml='gtklookat /dev/fd/0'
 
 toc_swf='swfdump -a -t /dev/fd/0'
 
+view_html='w3m -dump -T text/html /dev/fd/0'
+
 xit=0
 
 abort=
@@ -188,6 +190,7 @@ do  [ $abort ] && exit 1
 			format=image ;;
 	      asf|mov|avi)	format=$cext ;;
 	      wrl)	format=vrml ;;
+	      html|htm)	format=html ;;
 	      *)	case $b in
 			    cpiof*)	format=cpio ;;
 			    tarf*)	format=tar ;;
