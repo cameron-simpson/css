@@ -13,6 +13,8 @@ usage="Usage: $cmd [ssh-options...] [sshcfg=value...] [user@]host[![user2@]host2
 sshopts=
 topt=
 
+set -- $SSHTO_OPTS ${1+"$@"}
+
 badopts=
 
 first=1
@@ -34,7 +36,7 @@ do
 	sshopts="$sshopts -o "`shqstr "$cfg $val"`
 	;;
     --)	shift; break ;;
-    -?*)echo "$cmd: unrecongised option: $1" >&2; badopts=1 ;;
+    -?*)echo "$cmd: unrecognised option: $1" >&2; badopts=1 ;;
     *)	break ;;
   esac
   shift
