@@ -67,16 +67,14 @@ sub TIEARRAY($$$$$)
   my $sth = cs::DBI::sql($dbh, $sql);
   $this->{LIVE}=[ cs::DBI::fetchall_hashref($sth) ];
 
+  ## warn "after TIEARRAY, LIVE=".cs::Hier::h2a($this->{LIVE},1);
+
   $this;
 }
 
 sub FETCHSIZE($)
 { my($this)=@_;
-  $#{$this->{LIVE}};
-}
-
-sub STORESIZE($)
-{ shift->FETCHSIZE()+1;
+  scalar(@{$this->{LIVE}});
 }
 
 sub FETCH($$)
@@ -93,14 +91,14 @@ sub STORE($$$)
 { my($this,$ndx,$value)=@_;
 
   my@c=caller;
-  warn "$::cmd: STORE unsupported on DBI table from [@c]\n\tndx=$ndx,value=$value\n\t";
+  warn "$::cmd: STORE unsupported on DBI table\n\tfrom [@c]\n\tndx=$ndx,value=$value\n\t";
 }
 
 sub DELETE($$)
 { my($this,$ndx)=@_;
 
   my@c=caller;
-  warn "$::cmd: DELETE unsupported on DBI table from [@c]\n\tndx=$ndx\n\t";
+  warn "$::cmd: DELETE unsupported on DBI table\n\tfrom [@c]\n\tndx=$ndx\n\t";
 }
 
 sub PUSH($$)
