@@ -25,6 +25,9 @@ then
     ( cd $HOME/scripts || exit 1
       exec myke
     ) || exit 1
+    ( cd @/ezos/html/cs/css || exit 1
+      exec myke
+    )
 fi
 
 set -x
