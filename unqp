@@ -15,8 +15,8 @@ if ($ARGV[0] =~ /^--./)
 my($in)=new cs::Source (FILE, STDIN);
 
 LINE:
-  while (defined ($_=$in->GetLine()) && length)
-	{ last LINE if defined($delimpfx)
-		    && substr($_,$[,length($delimpfx)) eq $delimpfx;
-	  print cs::MIME::QuotedPrintable::decode($_);
-	}
+while (defined ($_=$in->GetLine()) && length)
+{ last LINE if defined($delimpfx)
+	    && substr($_,$[,length($delimpfx)) eq $delimpfx;
+  print cs::MIME::QuotedPrintable::decode($_,1);
+}
