@@ -6,6 +6,8 @@
 #	- Cameron Simpson <cs@zip.com.au> 12jun2001
 #
 
+exec </dev/null
+
 cmd=$0
 usage="Usage: $cmd [-f] [URL]"
 
