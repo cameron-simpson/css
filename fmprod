@@ -10,7 +10,7 @@ usage="Usage: $cmd [signal]"
 [ $# = 0 ] || { sig=$1; shift; }
 [ $# = 0 ] || { echo "$usage" >&2; exit 2; }
 
-pidf=$$VARRUN/fetchmail_sleep.pid
+pidf=$VARRUN/fetchmail_sleep.pid
 [ -s "$pidf" ] \
 && { echo >>"$pidf"; read pid etc <"$pidf"; } \
 && [ -n "$pid" ] \
