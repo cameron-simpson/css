@@ -1,0 +1,19 @@
+#!/usr/bin/perl
+#
+# Usage: detab [-tabsize] [files...]
+
+$tabsize=8;	# default
+if ($#ARGV >= 0 && $ARGV[0] =~ /^-(\d+)$/)
+	{ $tabsize=$1;
+	  shift;
+
+	  die "tabsize should be > 0" if $tabsize < 1;
+	}
+
+while (<>)
+	{ while (/\t/)
+		{ $_=$`.(' ' x ($tabsize-length($`)%$tabsize)).$';
+		}
+
+	  print;
+	}
