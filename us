@@ -29,13 +29,12 @@ first=1
 for arg
 do  case "$arg" in
 	xclip)	set x `xunclip`; shift; first=; arg= ;;
-	home)	arg=http://www.zip.com.au/~cs/ ;;
-	ezos)	arg=http://www.cskk.ezoshosting.com/cs/ ;;
-	jdk)	arg=file:///opt/j2sdk-sun-1.4.0-beta3/docs/api/overview-summary.html ;;
-	netstats) arg=https://myaccount.optusnet.com.au/mydatamonitor/ ;;
-	rfcs)	arg=http://www.faqs.org/rfcs/rfc-titles.html ;;
 	*/*)	;;
 	*.*)	arg=http://$arg/ ;;
+	*)	while read key map
+		do  [ "x$key" = "x$arg" ] && { arg=$map; break; }
+		done < $HOME/rc/urlmap
+		;;
     esac
     [ -n "$arg" ] || continue
     if [ $first ]
