@@ -1,0 +1,170 @@
+#!/usr/bin/perl
+#
+# Remind/memo replacement. - Cameron 10mar94
+#
+
+require 'timelocal.pl';
+use cs::Upd;
+
+($cmd=$0) =~ s:.*/::;
+$usage="Usage: $cmd\n";
+
+$now=&timelocal(localtime(time));
+($sec,$min,$hour,$nowdd,$nowmm,$nowyy)=gmtime($now);
+$nowmm++;
+
+length($ENV{DIARY}) || ($ENV{DIARY}="$ENV{HOME}/.diary");
+
+$days=6;	# gives us names
+
+if ($#ARGV >= $[ && $ARGV[$[] =~ /^-(\d+)$/)
+	{ $days=$1+0;
+	  shift;
+	}
+
+$threshold=$now+$days*24*3600;
+$DIARY=$ENV{DIARY};
+
+if (open(DIARY,"< $DIARY\0"))
+	{ while (<DIARY>)
+		{ s/^\s+//;
+		  s/\s*\n$//;
+		  push(@events,$_);
+		}
+	  close(DIARY);
+	}
+
+EVENT:
+  for $event (@events)
+	{ $_=$event;
+	  ($d,$m,$y)=(0,0,0);
+	  $constraints='';
+	  if (/^\s*(\d+)\s+(\d+)\s+(\d+)\s+/)
+		{ ($d,$m,$y)=($1,$2,$3);
+		  $_=$';
+
+		  if ($y >= 100)	{ $y-=1900; }
+		  next EVENT if $y >= 138;
+		  # print STDERR "[$d/$m/$y] $_\n";
+
+		  if (/^\[\s*([^]]*)\]\s*/)
+			{ $constraints=$1;
+			  $_=$';
+			}
+
+		  $when=&dmy2time($d,$m,$y,$constraints);
+		  if ($when && $when >= $now)
+			{ push(@coming,"$when:$_");
+			}
+		}
+	  else
+	  { print STDERR "$cmd: can't handle event: $_\n";
+	  }
+	}
+
+@coming = sort { $a <=> $b; } @coming;
+REPORT:
+  for (@coming)
+	{ /^(\d+):/ || die "$cmd: format error: $_\n";
+
+	  ($when,$what)=($1,$');
+
+	  last REPORT if $when > $threshold;
+
+	  print &prettytime($when), ' -> ', $what, "\n";
+	}
+
+sub prettytime	# (when) -> nice report
+	{ local($when)=@_;
+	  local($diff)=$when-$now;
+	  local($days)=int($diff/(24*3600));
+
+	  if ($days < 0) 	{ &date($when); }
+	  elsif ($days == 0)	{ 'today'; }
+	  elsif ($days == 1)	{ 'tomorrow'; }
+	  elsif ($days > 6)	{ &date($when); }
+	  else
+	  { local($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst)
+		=gmtime($when);
+
+	    (sunday,monday,tuesday,wednesday,thursday,friday,saturday)[$wday];
+	  }
+	}
+
+sub date	# ($when) -> "dd-mon-yy"
+	{ local($when)=@_;
+	  local($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst)
+		=gmtime($when);
+
+	  sprintf("%2d-%s-%02d",
+		$mday,
+		('jan','feb','mar','apr','may','jun',
+		 'jul','aug','sep','oct','nov','dec')[$mon],
+		$year%100);
+	}
+
+sub dmy2time	# (d,m,y) -> earliest instance
+	{ local($d,$m,$y,$constraints)=@_;
+	  local($dd,$mm,$yy);
+	  local($ld,$hd,$lm,$hm,$ly,$hy);
+	  local($ok)=0;
+
+	  if ($y == 0)	{ $ly=$nowyy; $hy=99; }
+	  else		{ $ly=$y; $hy=$y; }
+
+	  YY:
+	   for $yy ($ly..$hy)
+	    { if ($m == 0)
+		{ if ($yy > $nowyy)	{ $lm=1; }
+		  else			{ $lm=$nowmm; }
+
+		  $hm=12;
+		}
+	      else
+		{ $lm=$m; $hm=$m; }
+	      
+	      MM:
+	       for $mm ($lm..$hm)
+		{ if ($d == 0)
+		    { if ($yy > $nowyy || $mm > $nowmm)	{ $ld=1; }
+		      else				{ $ld=$nowdd; }
+
+		      if ($mm == 2)
+			{ if ($yy%4 != 0)	# ok until 2100
+				{ $hd=28; }	else { $hd=29; }
+			}
+		      elsif ($mm == 1 || $mm == 3  || $mm == 5
+			  || $mm == 8 || $mm == 10 || $mm == 12)
+				{ $hd=31; }
+		      else	{ $hd=30; }
+		    }
+		  else
+		    { $ld=$d; $hd=$d; }
+
+		  DD:
+		   for $dd ($ld..$hd)
+		    { $ok=&constrain($dd,$mm,$yy,$constraints);
+		      if ($ok)
+			{ $d=$dd; $m=$mm; $y=$yy;
+			  last YY;
+			}
+		    }
+		}
+	    }
+
+	  $ok ? &timegm(0,0,0,$d,$m-1,$y) : 0;
+	}
+
+sub constrain
+	{ local($dd,$mm,$yy,$constraints)=@_;
+	  local($ok);
+
+	  $ok=1;
+	  if (length($constraints))
+		{ local($when,$sec,$min,$hour);
+		  $when=&timegm(0,0,0,$dd,$mm,$yy);
+		  ($sec,$min,$hour,$dd,$mm,$yy,$wday,$yday)=gmtime($when);
+		}
+
+	  $ok;
+	}
