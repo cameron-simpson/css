@@ -1,0 +1,7 @@
+#!/bin/sh
+
+from=$1 to=$2
+
+cpdir "$from" "$to" \
+	&& ask "Remove $from" \
+	&& rm -rf "$from"
