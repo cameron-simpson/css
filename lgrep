@@ -1,0 +1,19 @@
+#!/bin/sh
+#
+# Locate symbols in libraries.
+#	- Cameron Simpson <cs@zip.com.au> 10dec96
+#
+
+lpath=${LDPATH-$LIB:/opt/lib:/usr/lib:/lib}
+
+xit=1
+
+ptn=`echo "$*"|tr ' ' '|'`
+for d in `unpath $lpath`
+do  for lib in $d/lib*.*
+    do  nm=`nm $lib 2>/dev/null | egrep "($ptn)"`
+	[ -n "$nm" ] && { echo "$lib:"; echo "$nm"; xit=0; }
+    done
+done
+
+exit $xit
