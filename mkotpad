@@ -1,0 +1,36 @@
+#!/bin/sh
+#
+# Generate a pad of random bytes and save under its MD5 hash.
+# Coded on the basis of David Madore's paper:
+#	http://www.eleves.ens.fr:8080/home/madore/misc/freespeech.html
+# A damn fine idea.
+#	- Cameron Simpson <cs@zip.com.au> 
+#
+
+tmp=/tmp/pad$$
+size=128
+src=/dev/urandom	# or /dev/random for less security
+			# with probable blockage
+
+# use real randomness (this will take a LONG time)
+[ "x$1" = x-r ] && { src=/dev/random; shift; }
+
+time=
+[ -t 2 ] && time=time
+
+xit=1
+trap 'rm -f $tmp; exit $xit' 0 15
+
+( umask 077
+  set -x
+  exec $time dd "if=$src" bs=1024 count=$size >$tmp
+) || exit 1
+
+echo $tmp \
+| md5index \
+| { read sizehash file || exit 1
+    hash=`expr "x$sizehash" : 'x[0-9]*:\(.*\)'`
+    mv -i $tmp pad-md5-$hash.dat
+  }
+
+xit=$?
