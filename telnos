@@ -15,23 +15,11 @@ cvsedit=
 badopts=
 
 case $cmd in
-    dl|dlog)	file=$HOME/var/log/dlog usenote=1 ;;
-    bill|gpx|zzr|fj) file=$HOME/etc/info/$cmd usenote=1 ;;
-    ramgate)	file=$HOME/private/contracts/ramgate/log usenote=1 ;;
     mailrc)	file=$MAILRC ;;
     telnos)	file=$telnos/main ;;
     telno)	file=$telnos/adhoc ;;
     sigs)	file=$HOME/.sigs ;;
     dvds|vids|books) file=$HOME/private/$cmd ;;
-    raul)	file=$HOME/private/contracts/raul ;;
-    noads)	[ "x$HOST@$SYSTEMID" = xamadeus@home ] \
-			|| { echo "$0: must be on amadeus@home" >&2; exit 1; }
-		zapdir=$HOME/there/adzapper.sourceforge.net/html
-		file=$zapdir/rc/patterns
-		post='cd $zapdir && myke scripts/squid_redirect'
-		cvsedit="cvsedit $file"
-		dodiff=1
-		;;
     *)		if [ -f $HOME/rc/keys/$cmd.pgp ]
 		then
 		    file=$HOME/rc/keys/$cmd.pgp
