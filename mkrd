@@ -1,0 +1,151 @@
+#!/bin/sh
+#
+# Make a ramdisk image after the fashion of mkinitrd.
+# I wanted to be able to make a ramdisk without having an installed
+# kernel, and possibly with other stuff on it. Mkinitrd seems too opinionated
+# about what you want. Based heavily on mkinitrd and the
+#	/usr/src/linux/Documentation/ramdisk.txt
+# file.
+#	- Cameron Simpson <cs@zip.com.au> 23jul2000
+#
+
+cmd=`basename "$0"`
+
+rdsize=1500
+
+kver=`uname -r`
+moddir=/lib/modules/$kver
+modconf=/etc/conf.modules
+
+premods=
+scsimods='scsi_mod sd_mod'
+othermods=
+dfltmods=
+
+devs='console null zero ram systty tty1 tty2 tty3 tty4'
+
+progs=
+
+usage="Usage: $cmd [options...] imagefile
+	-c conf		Set modules config file. Default: $modconf
+	-m moddir	Set module directory. Default: $moddir
+	+m moddir	Set module directory. Add all modules to list.
+	-p prog		Add prog to the files in /bin.
+	-s size		Set image size in kilobytes. Default: $rdsize
+	-M module	Add module to list of module names to load.
+	+M module	Prepend modules to list of module names to load.
+	-D dev		Add device to list of devices to make.
+	--omit-scsi-modules Omit the default scsi modules: $scsimods"
+
+badopts=
+while :
+do  case $1 in
+	-c)	modconf=$2; shift ;;
+	-m)	moddir=$2; shift ;;
+	+m)	moddir=$2; shift
+		othermods="$othermods "`find $moddir/. -type f -name \*.o -print| sed -e 's:.*/::' -e 's:\.o$::'`
+		;;
+	-p)	progs="$progs $2"; shift ;;
+	-s)	rdsize=$2; shift ;;
+	-D)	devs="$devs $2"; shift ;;
+	-M)	othermods="$othermods $2"; shift ;;
+	+M)	premods="$premods $2"; shift ;;
+	--)	shift; break ;;
+	--omit-scsi-modules) scsimods= ;;
+	-?*)	echo "$cmd: unrecognised option: $1" >&2; badopts=1 ;;
+	*)	break ;;
+    esac
+    shift
+done
+
+if [ $# = 0 ]
+then  echo "$cmd: missing imagefile" >&2; badopts=1
+else  imagefile=$1; shift
+fi
+
+[ $# = 0 ] || { echo "$cmd: extra arguments: $*" >&2; badopts=1; }
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+[ -s "$imagefile" ] && { echo "$cmd: $imagefile already exists!" >&2; exit 1; }
+
+# if we have the core scsi modules, also get the configured host adapter
+if [ -n "$scsimods" ]
+then  set -x
+      scsimods="$scsimods
+		  "`tws "$modconf" | sed -n 's/^alias scsi_hostadapter \\([^ ][^ ]*\\)/\\1/p'`
+    set +x
+fi
+
+xit=1
+tidy='[ $xit = 0 ] || rm -f "$imagefile"'
+trap 'eval "$tidy"; exit $xit' 0 1 15
+
+################################################
+# Construct filesystem.
+
+# construct partition
+dd if=/dev/zero "of=$imagefile" bs=1k count=$rdsize	|| exit 1
+echo y | mke2fs "$imagefile" "$rdsize" >/dev/null	|| exit 1
+
+mnt=`mkdirn /tmp/$cmd`
+loinfo=`lomount -o rw -t ext2 "$imagefile" "$mnt"`		|| exit 1
+
+lodev=`echo $loinfo | awk '{print$1}'`
+tidy="[ -d \"\$mnt/.\" ] && { umount $mnt; rmdir $mnt; losetup -d $lodev; }; $tidy"
+
+rc=$mnt/linuxrc
+echo "#!/bin/sh -x" >$rc
+chmod 755 $rc
+
+rmdir $mnt/lost+found
+mkdir $mnt/lib $mnt/bin $mnt/etc $mnt/dev
+cp -a /bin/ash.static $mnt/bin/sh
+cp -a /sbin/insmod.static $mnt/bin/insmod
+for dev in $devs
+do  cp -a /dev/$dev $mnt/dev
+done
+for prog in $progs
+do  cp -a "$prog" $mnt/bin
+done
+
+#################################################
+# Load modules.
+
+modules="$premods $scsimods $dfltmods $othermods"
+
+for mod in $modules
+do  hits=`ls -d $moddir/$mod.o $moddir/*/$mod.o 2>/dev/null`
+
+    case $hits in
+	'')	echo "$cmd: warning: can't find module \"$mod\"" >&2
+		continue
+		;;
+	*\ *)	echo "$cmd: multiple hits for \"$mod\", keeping first one:" >&2
+		echo "$hits" | sed 's/^/	/' >&2
+		hits=`set x $hist; shift; echo $1`
+		;;
+    esac
+
+    bhit=`basename "$hits"`
+    ohit=`tws "$modconf" | sed -n "s/^options $mod //p"`
+    if cp -p $hits $mnt/lib
+    then
+	echo "/bin/insmod /lib/$bhit $ohit" >>$rc
+    fi
+done
+
+echo "/bin/sh -i </dev/console >/dev/console 2>&1"
+
+#################################################
+# Examine the result.
+
+echo "Here is a shell, check it out:"
+( cd $mnt && pwd && exec $SHELL
+)
+
+umount $mnt
+losetup -d $lodev
+rmdir $mnt
+
+gzip -v -9 "$imagefile" && (set -x; mv "$imagefile.gz" "$imagefile") && xit=0
