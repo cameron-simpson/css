@@ -4,7 +4,9 @@
 #	- Cameron Simpson <cs@zip.com.au> 12apr1997
 #
 
-diffs=/tmp/cvd$$
+: ${TMPDIR:=/tmp}
+
+diffs=$TMPDIR/cvd$$
 CVS_COMMIT_DIFFS=$diffs
 CVS_COMMIT_FILES=$*
 CVS_COMMIT_EDITOR=$EDITOR
