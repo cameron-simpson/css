@@ -11,12 +11,19 @@
 [ -n "$CVS_COMMIT_EDITOR" ] || { echo "$0: \$CVS_COMMIT_EDITOR not set!" >&2
 				 exit 1
 			       }
+[ -n "$CVS_COMMIT_DIFFS" ] || { echo "$0: \$CVS_COMMIT_DIFFS not set!" >&2
+				 exit 1
+			       }
+[ -f "$CVS_COMMIT_DIFFS" ] || { echo "$0: \$CVS_COMMIT_DIFFS ($CVS_COMMIT_DIFFS) missing!" >&2
+				 exit 1
+			       }
+[ $# = 1 ] || { echo "Usage: $0 filename (argv=[$*])" >&2; exit 2; }
 
 report=$1
+sed 's/^/CVS: /' "$CVS_COMMIT_DIFFS" >>"$report"
+
 EDITOR=$CVS_COMMIT_EDITOR
 export EDITOR
-
-cvs -q diff $CVS_COMMIT_FILES 2>&1 </dev/null | sed 's/^/CVS: /' >>"$report"
 
 $EDITOR "$report"
 xit=$?
