@@ -1,37 +1,38 @@
 #!/bin/sh
 #
 # Convert input to PostScript.
-# Expects PostScript's first line to start with
-#	%!PS-Adobe
-# PDF to start with
-#	%PDF
-# and plain text to start with something else.
-#	- Cameron Simpson <cs@zip.com.au> 12dec96
+#	- Cameron Simpson <cs@zip.com.au> 12dec1996
+#
+# Convert to MIME basis. - cameron 29apr2004
 #
 
 me=$0
 cmd=`basename "$0"`
-usage="Usage: $cmd [-f] [-i itype] [-T title] [files...]"
-
-eval "txtconv=\$conv$dfltconv"
+usage="Usage: $cmd [-i itype] [-T title] [file]"
 
 aspect=-R
-txtconv='a2ps -1 -o- -B -T 8 -i --borders=no -b $aspect --medium=A4 -f 10'
-pdfconv='pdf2ps /dev/fd/0' ## pdf2ps
-psconv=cat
 
-force=
-fflag=
 title=
 badopts=
-itype=
+mtype=
 while :
 do  case $1 in
-	-f)	force=1 fflag=$1 ;;
 	-T)	title=$2; shift ;;
 	-L)	aspect=-r ;;
 	-P)	aspect=-R ;;
-	-i)	itype=$2; shift ;;
+	-i)	mtype=$2; shift
+		case "$mtype" in
+		    any)		mtype= ;;
+		    ps|postscript)	mtype=application/postscript ;;
+		    pdf)		mtype=application/pdf ;;
+		    mentor)		mtype=application/mentor ;;
+		    text)		mtype=text/plain ;;
+		    */*)		;;
+		    *)			echo "$cmd: unrecognised file type \"$mtype\"" >&2
+					badopts=1
+					;;
+		esac
+		;;
 	--)	shift; break ;;
 	-*)	echo "$cmd: unrecognised option: $1" >&2
 		badopts=1
@@ -44,49 +45,42 @@ done
 txtconv="$txtconv $aspect"
 [ -n "$title" ] && txtxconv="$txtconv \"--footer=\$title\""
 
-case "$itype" in
-    ps|postscript)	conv=$psconv ;;
-    pdf)		conv=$pdfconv ;;
-    text)		conv=$txtconv ;;
-    '')			conv= ;;
-    *)			echo "$cmd: unknown input type \"$itype\"" >&2
-			badopts=1
-			;;
-esac
+if [ $# = 0 ]
+then
+  file=-
+else
+  file=$1; shift
+  [ $# = 0 ] || { echo "$cmd: extra arguments after file: $*" >&2; badopts=1; }
+fi
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
+tmpfile=${TMPDIR:-/tmp}/$cmd$$
+filetitle=$file
+if [ "x$file" = x- ]
+then
+    filetitle=stdin
+    trap 'rm -f "$tmpfile"' 0 1 15
+    cat >"$tmpfile" || exit 1
+    file=$tmpfile
+fi
+
+[ -n "$title" ] || title=$filetitle
+[ -n "$mtype" ] || mtype=`file2mime "$file"` || exit 1
+
+case "$mtype" in
+    application/pdf)	conv='pdf2ps /dev/fd/0' ;;
+    application/postscript) conv=cat ;;
+    application/mentor)	conv=mentor2ps ;;
+    text/plain)		conv='a2ps -1 -o- -b "$title" -T 8 -i --borders=no -b $aspect --medium=A4 -f 10' ;;
+    text/html)		conv=unhtml ;;
+    image/*)		conv='convert - ps:-' ;;
+    *)			echo "$cmd: supported input type \"$mtype\"" >&2
+			exit 1
+			;;
+esac
+
 ## echo "title=[$title], conv=[$conv]" >&2
 ## set | egrep -i '(asp|conv)' >&2
-
-cat ${1+"$@"} \
-    | if [ -n "$conv" ]
-      then
-	eval "$conv"
-      else
-	title=$title \
-	pdfconv=$pdfconv txtconv=$txtconv psconv=cat \
-	    perl -e '$start="";
-		     while (sysread(STDIN,$_,1) == 1
-		         && !/^[\n\r]/)
-				{ $start.=$_;
-				}
-
-		     if ($start =~ /^%!/)	# was %!PS-Adobe once
-			{ $conv=$ENV{"psconv"};
-			}
-		     elsif ($start =~ /^%PDF/)
-			{ $conv=$ENV{"pdfconv"};
-			}
-		     else
-		     { $conv=$ENV{"txtconv"};
-		     }
-
-		     open(STDOUT,"| $conv\0");
-		     print $start, $_;
-		     while (defined($_=<STDIN>))
-			{ print;
-			}
-		     close(STDOUT);
-		    '
-      fi
+##set -vx
+eval "exec <\"\$file\"; $conv"
