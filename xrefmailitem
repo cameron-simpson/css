@@ -4,6 +4,8 @@
 #	- Cameron Simpson <cs@zip.com.au> 24may2002
 #
 
+: ${TMPDIR:=/tmp}
+
 cmd=`basename "$0"`
 usage="Usage: $cmd [hdrs...] <mailitem"
 
@@ -12,7 +14,7 @@ usage="Usage: $cmd [hdrs...] <mailitem"
 MAILDIR=${MAILDIR:-$HOME/Mail}
 export MAILDIR
 
-tmp=/tmp/$cmd.$$
+tmp=$TMPDIR/$cmd.$$
 
 trap 'rm -f "$tmp"' 0
 trap 'rm -f "$tmp"; exit 1' 1 15
