@@ -1,0 +1,23 @@
+#!/usr/bin/perl
+#
+# ISO date ==> UNIX time.
+#	- Cameron Simpson <cs@zip.com.au> 27oct2000
+#
+
+use cs::Date;
+
+$::Xit=0;
+
+for (@ARGV)
+{ my $gmt = cs::Date::iso2gmt($_,1);
+
+  if (! defined)
+  { warn "$0: not an ISO date? \"$_\"\n";
+    $::Xit=1;
+  }
+
+  print "$_\t" if @ARGV;
+  print "$gmt\n";
+}
+
+exit $::Xit;
