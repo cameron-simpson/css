@@ -1,0 +1,4 @@
+#!/bin/sh
+exec 2>/dev/null
+xmodmap -e 'pointer = 1 2 3'
+xmodmap -e 'pointer = 1 2 3 4 5'
