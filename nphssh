@@ -19,4 +19,4 @@ esac
 
 [ -s "$key" ] || { echo "$0: no key stored in file \"$key\"" >&2; exit 1; }
 
-exec no-ssh-agent ssh -i "$key" -o 'ForwardX11 no' "$@"
+exec no-ssh-agent sshb -i "$key" "$@"
