@@ -6,7 +6,7 @@
 
 use strict qw(vars);
 
-use MSQ::User;
+##use MSQ::User;
 
 ($::cmd=$0) =~ s:.*/::;
 $::Usage="Usage: $::cmd [directory]\n";
