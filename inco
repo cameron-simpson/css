@@ -1,0 +1,17 @@
+#!/bin/sh
+#
+# Run command in a temporary checkout.
+#	- Cameron Simpson <cs@zip.com.au> 04jul2003
+#
+
+cmd=`basename "$0"`
+usage="Usage: $cmd module command [args...]"
+
+[ $# -lt 2 ] && { echo "$cmd: insufficient arguments" >&2
+		  echo "$usage" >&2
+		  exit 2
+		}
+
+module=$1; shift
+
+exec withco "$module" incd "$@"
