@@ -1,0 +1,44 @@
+#!/bin/sh
+#
+# Do a CPAN install with the right options.
+#	- Cameron Simpson <cs@zip.com.au> 03jan2003
+#
+
+cmd=`basename "$0"`
+usage="Usage: $cmd [-d instdir]"
+
+badopts=
+
+while :
+do
+  case $1 in
+    -d)	perl_local=$2; export perl_local; shift ;;
+    --)	shift; break ;;
+    -?*)echo "$cmd: unrecognised option: $1" >&2
+	badopts=1
+	;;
+    *)	break ;;
+  esac
+  shift
+done
+
+[ $# = 0 ] || { echo "$cmd: extra arguments: $*" >&2; badopts=1; }
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+[ -n "$perl_local" ] || perl_local=`perl_local` || exit 1
+
+[ -d "$perl_local/." ] || { echo "$cmd: $perl_local: not a directory" >&2
+                            exit 2
+			  }
+
+set -x
+LIB=$perl_local
+INSTALLMAN1DIR=$perl_local/man/man1
+INSTALLMAN3DIR=$perl_local/man/man3
+PERL5LIB=$LIB:$PERL5LIB
+export LIB INSTALLMAN1DIR INSTALLMAN3DIR PERL5LIB
+
+which perl || exit 1
+perl -v
+exec perl -MCPAN -e shell
