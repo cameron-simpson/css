@@ -96,12 +96,14 @@
 # in this way sourcing the user's normal startup files.
 #
 
+prefix=/usr/local/etc/maint
+MaintDir=${prefix}
+
 USER=${USER-$LOGNAME}; export USER
 [ -n "$USER" ] || { echo "$0: no \$USER or \$LOGNAME, bailing out" >&2
 		    exit 1
 		  }
 
-MaintDir=/usr/local/etc/maint
 if [ -f "$0" ]
 then    RunMaint="$0 -E"
 else    RunMaint="$MaintDir/runmaint.sh -E"
@@ -131,11 +133,6 @@ usage="Usage: $0 [-d dir] [-s subj] [-date datestr] [-x] target [addresses]
 # special case noenv as first arg
 noenv=
 [ "x$1" = x-E ] && { noenv=1; shift; }
-
-[ $noenv ] \
-|| { [ -s "$MaintDir/env" ] && . "$MaintDir/env"
-     [ -s "$MaintScripts/env" ] && . "$MaintScripts/env"
-   }
 
 badopts=
 
@@ -227,6 +224,11 @@ addresses=$*
 #
 # =back
 #
+
+[ $noenv ] \
+|| { [ -s "$MaintDir/env" ] && . "$MaintDir/env"
+     [ -s "$MaintScripts/env" ] && . "$MaintScripts/env"
+   }
 
 # note starting time
 if [ -n "$datestr" ]
