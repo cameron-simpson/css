@@ -1,0 +1,25 @@
+#!/bin/sh
+#
+# Set or report the job for the current directory.
+#	- Cameron Simpson <cs@zip.com.au> 04nov2004
+#
+
+cmd=$0
+
+if [ $# = 0 ]
+then
+    job=
+    for d in . .. ../.. ../../..
+    do
+      [ -f "$d/.job" -a -s "$d/.job" -a -r "$d/.job" ] \
+      && job=`cat "$d/.job"` \
+      && break
+    done
+    [ -n "$job" ] || job=misc
+    echo "$job"
+    exit 0
+fi
+
+job=$1; shift
+isjob "$job" || { echo "$cmd: $job: not a known job" >&2; exit 1; }
+echo "$job" >.job
