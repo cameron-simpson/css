@@ -58,6 +58,10 @@ esac
 
 [ -n "$url" ] && set -- "$url"
 ( set -x
-  exec ff08 -width "$FULLX" -height "$PIX_HIGH" ${1+"$@"}
+  case "$HOST@$SYSTEMID" in
+    kirsty@home) br=ff10 ;;
+    *)           br=ff08 ;;
+  esac
+  exec "$br" -width "$FULLX" -height "$PIX_HIGH" ${1+"$@"}
 ) &
 echo $! >"$pidfile"
