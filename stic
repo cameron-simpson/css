@@ -1,0 +1,138 @@
+#!/bin/sh
+#
+# Wrapper for the stic tools.
+#	- Cameron Simpson <cs@zip.com.au> 04jul2001
+#
+# =head1 NAME
+#
+# stic - convenient wrapper for the stic tools (Set of Tools for Image Collectors)
+#
+# =head1 SYNOPSIS
+#
+#	stic add [files...]
+#	stic adddir [directories...]
+#	stic list
+#	stic new [files...]
+#
+# =head1 DESCRIPTION
+#
+# The stic tools,
+# while very useful,
+# are rather cumbersome.
+# This script performs a number of the more common operations
+# conveniently.
+#
+
+cmd=`basename "$0"`
+usage="Usage:	$cmd add [files...]
+	$cmd adddir [directories...]
+	$cmd list
+	$cmd new [files...]"
+
+#
+# =head1 DIRECTIVES
+#
+# =over 4
+#
+
+if [ $# = 0 ]
+then
+  echo "$cmd: missing directive" >&2
+  badopts=1
+else
+
+  op=$1; shift
+
+  xit=0
+  badopts=
+
+  tmp=/tmp/.stic$$
+
+  case "$op" in
+
+    # =item add [I<files...>]
+    #
+    # Append the named I<files> to the image database.
+    # Files already named in the database are skipped.
+    # If no I<files> are named, read filenames from standard input.
+    #
+    add)
+	$cmd new ${1+"$@"} >$tmp \
+	&& similar -append_list:$tmp
+	xit=$?
+	;;
+
+    # =item adddir [I<directories...>]
+    #
+    # Append all files in the named directories
+    # matching the pattern B<*.*>
+    # to the image database.
+    # Files already named in the database are skipped.
+    # If no I<directories> are named, use the current directory.
+    #
+    adddir)
+	[ $# = 0 ] && set .
+	find "$@" -type f -name '*.*' -print \
+	| stic add
+	xit=$?
+	;;
+
+    # =item list
+    #
+    # List all the files in the image database.
+    #
+    list)
+	similar -list_all_files
+	xit=$?
+	;;
+
+    # =item new [I<files...>]
+    #
+    # List those of the named I<files>
+    # which are not in the image database yet.
+    # If no I<files> are named, read filenames from standard input.
+    #
+    new)
+	if [ $# -gt 0 ]
+	then
+	    # put filenames onto stdin
+	    for f
+	    do  echo "$f"
+	    done >$tmp
+	    exec <$tmp
+	    rm $tmp
+	fi
+
+	$cmd list | sort -u >$tmp
+	sed "s^[^/]$HOME/&" | sort -u | comm -23 - $tmp
+	;;
+    *)
+	echo "$cmd: unrecognised directive \"$1\"" >&2
+	badopts=1
+	;;
+  esac
+fi
+
+#
+# =back
+#
+
+rm -f $tmp
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+exit $xit
+
+#
+# =head1 SEE ALSO
+#
+# ImageMagick,
+# stic (the Set of Tools for Image Collectors)
+#
+# similar(1), convert(1)
+#
+#
+# =head1 AUTHOR
+#
+# Cameron Simpson E<lt>cs@zip.com.auE<gt> July 2001
+#
