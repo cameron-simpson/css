@@ -13,29 +13,5 @@ force=
 [ "x$1" = x-f ] && { force=1; shift; }
 [ $# = 0 ] && { set x "`xunclip`"; shift; }
 [ $# = 1 ] || { echo "$usage" >&2; exit 2; }
-url=$1; shift
 
-dir=`mkdirn /tmp/$cmd` || exit 1
-
-xit=0
-
-if cd "$dir" \
-&& httpget -- "$url"
-then
-    echo "$url" >>$HOME/var/log/xvurl
-    set x *; shift
-    if [ $force ]
-    then  xv -maxpect "$1"
-    else  case "$1" in
-	    *.gif|*.jpg)	xv -maxpect "$1" ;;
-	    *)			v "$1" ;;
-	  esac
-    fi
-else
-    xit=1
-fi
-
-rm -rf "$dir" || xit=1
-
-exit $xit
-
+exec withurl "$1" xv
