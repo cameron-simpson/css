@@ -28,4 +28,6 @@ for who in cameron2@alpha cameron2@janus
 do  pfx "$who" syncsmall "$who" &
 done
 
+syncsf &
+
 wait
