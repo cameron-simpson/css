@@ -27,7 +27,6 @@ exec 3>&1 1>/dev/null
 
 [ -s "$statefile" ] \
 && . "$statefile" \
-&& [ -n "$SSH_AGENT_PID" ] \
-&& kill -0 "$SSH_AGENT_PID" 2>/dev/null \
+&& have-ssh-agent \
 && echo ". '$statefile'" >&3 \
 && { [ -z "$verbose" ] || ssh-add -l >&2; }
