@@ -4,15 +4,32 @@
 #	- Cameron Simpson <cs@zip.com.au> 30jul2001
 #
 
-lock=ssh-agent-$HOST
+cmd=$0
+usage="Usage: $cmd [-u] [statefile]"
+
+state=
+unlock=
+
+badopts=
+
+[ "x$1" = x-u ] && { unlock=1; shift; }
+
+[ $# = 0 ] || { state=$1; shift; }
+
+[ $# = 0 ] || { echo "$cmd: extra arguments: $*" >&2; badopts=1; }
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+[ -n "$state" ] || state=`ssh-agent-statefile` || exit 1
 
 # force unlock
-[ "x$1" = x-f ] && { shift; unlock -f "$lock"; }
+[ $unlock ] && { shift; set -x; unlock -f "$state"; }
 
 exec \
-  con \
-  lock -1 -a "$lock" \
+  lock -1 -a "$state" \
+  rmthen -f "$state" \
+  env "state=$state" \
   no-ssh-agent \
   ssh-agent \
-  sh -c 'env|sed -n "s/^\\(SSH_[_A-Z]*\\)=\\(.*\\)/\\1='\\2'; export \\1;/p" >"$VARRUN/ssh-agent-$HOST"; exec pause' \
+  sh -c 'stash-ssh-agent "$state"; exec pause' \
   </dev/null
