@@ -27,6 +27,8 @@ set colourise "$@"
 "$@"
 xit=$?
 
-lastvalue -d "$MYKE_STARTDIR" myke_err - <"$tmp" &
+[ -f "$tmp" -a -s "$tmp" ] && ( lastvalue -d "$MYKE_STARTDIR" myke_err - <"$tmp"
+				rm "$tmp"
+			      ) &
 
 exit $xit
