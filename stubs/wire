@@ -1,4 +1,4 @@
 #!/bin/sh
 
 dlog "wire $*" &
-exec $HOME/scripts/wire ${1+"$@"}
+exec /u/network/bin/wire ${1+"$@"}
