@@ -15,7 +15,8 @@ if (@ARGV)
 }
 else
 { my $arg = <STDIN>;
-  die "$::cmd: expected string on stdin\n";
+  die "$::cmd: expected string on stdin\n" if ! defined $arg;
+  chomp($arg);
 
   $arg=unfontise($arg);
   print "$arg\n";
@@ -26,8 +27,27 @@ exit 0;
 sub unfontise
 { local($_)=@_;
 
-  s/^=\?[^?]+\?Q\?(.*)\?=$/$1/;
-  s/=([\da-f][\da-f])/eval "chr(0x$1)"/egi;
+  my $dec = '';
+  my $charset;
+  my $enc;
+  my $encwords;
 
-  return $_;
+  while (/=\?([^?]+)\?([QB])\?([^?]*)\?=/i)
+  {
+    ($charset,$enc,$encwords)=(uc($1),uc($2),$3);
+    $dec.=$`;
+    $_=$';
+
+    if ($enc eq 'Q')
+    { $encwords =~ tr/_/ /;
+      $encwords =~ s/=([\da-f][\da-f])/eval "chr(0x$1)"/egi;
+    }
+    else
+    { warn "$0: unsupported encoding: \"$enc\"";
+    }
+
+    $dec.=$encwords;
+  }
+
+  return $dec.$_;
 }
