@@ -47,44 +47,48 @@ require Exporter;
 =cut
 
 sub _new($$$$$$$)
-{ my($class,$label,$seq,$client,$path,$flags,$level)=@_;
+{ my($class,$label,$ssid,$level,$client,$attrs)=@_;
 
-  my $D = find($label);
+  my $D = find($ssid);
 
   if (defined $D)
   { my @c=caller;
-    die "$0: dump with sequence number \"$seq\" already exists\n\tfrom @c\n\t";
+    die "$0: dump with save set number \"$ssid\" already exists\n\tfrom @c\n\t";
   }
 
-  $D = $cs::Legato::Networker::Dump::_dumpInfo[$seq]
-     = { cs::Legato::Networker::Dump::TAPE => $label,
-         cs::Legato::Networker::Dump::SEQ  => $seq,
-         cs::Legato::Networker::Dump::CLIENT => $client,
-         cs::Legato::Networker::Dump::PATH => $path,
-         cs::Legato::Networker::Dump::FLAGS => $flags,
-         cs::Legato::Networker::Dump::LEVEL => $level,
+  $D = $cs::Legato::Networker::Dump::_dumpInfo[$ssid]
+     = { cs::Legato::Networker::Dump::TAPES	=> [],
+         cs::Legato::Networker::Dump::SSID	=> $ssid,
+         cs::Legato::Networker::Dump::CLIENT	=> $client,
+         cs::Legato::Networker::Dump::ATTRS	=> $attrs,
+         cs::Legato::Networker::Dump::LEVEL	=> $level,
        };
 
   bless $D, $class;
 
   # cross reference
   ::need(cs::Legato::Networker::Client);
-  cs::Legato::Networker::Client::get($client)->_AddDump($seq);
+  cs::Legato::Networker::Client::get($client)->_AddDump($ssid);
+
+  $D->AddTape($label);
 
   $D;
 }
 
-=item cs::Legato::Networker::Dump::find(I<seq>)
+=item cs::Legato::Networker::Dump::find(I<ssid>)
 
 Obtain a extant B<cs::Legato::Networker::Dump> object
-representing the dump with sequence number I<seq>.
+representing the dump with save set number I<ssid>.
 
 =cut
 
 sub find($)
-{ my($seq)=@_;
-  return undef if ! defined $cs::Legato::Networker::Dump::_dumpInfo[$seq];
-  $cs::Legato::Networker::Dump::_dumpInfo[$seq];
+{ my($ssid)=@_;
+
+  ## my@c=caller;die"Dump::find(ssid=$ssid)\n\tfrom [@c]\n\t";
+
+  return undef if ! defined $cs::Legato::Networker::Dump::_dumpInfo[$ssid];
+  $cs::Legato::Networker::Dump::_dumpInfo[$ssid];
 }
 
 =back
@@ -93,35 +97,41 @@ sub find($)
 
 =over 4
 
-=item Seq()
+=item SSid()
 
-Return the sequence number for this dump.
+Return the save set number for this dump.
 
 =cut
 
-sub Seq($)
-{ shift->{cs::Legato::Networker::Dump::SEQ};
+sub SSid($)
+{ shift->{cs::Legato::Networker::Dump::SSID};
 }
 
-=item TapeLabel()
-
-Return the tape label for this dump.
-
-=cut
-
-sub TapeLabel($)
-{ shift->{cs::Legato::Networker::Dump::TAPE};
+sub _Tapes($)
+{ shift->{cs::Legato::Networker::Dump::TAPES};
 }
 
-=item Tape()
+=item TapeLabels()
 
-Return the B<cs::Legato::Networker::Tape> object for this dump.
+Return the tape labels for this dump.
 
 =cut
 
-sub Tape($)
-{ ::need(cs::Legato::Networker::Tape);
-  cs::Legato::Networker::Tape::find(shift->TapeLabel());
+sub TapeLabels($)
+{ @{shift->_Tapes()};
+}
+
+=item AddTape(I<label>)
+
+Add the tape with the specified I<label>
+the the list of tapes spanned by this dump.
+
+=cut
+
+sub AddTape($$)
+{ my($this,$label)=@_;
+
+  push(@{$this->_Tapes()}, $label);
 }
 
 =item ClientName()
