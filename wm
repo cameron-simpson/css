@@ -1,5 +1,7 @@
 #!/bin/sh
 
+: ${LOGDIR:=$HOME/var/log}
+
 cd
 
 . $HOME/rc/x11/xenv.sh
@@ -30,7 +32,7 @@ done
 PATH=$PATH:$fvbin
 export PATH
 
-exec >>$HOME/var/log/wm.out 2>>$HOME/var/log/wm.err
+exec >>$LOGDIR/wm.out 2>>$LOGDIR/wm.err
 exec "$fvwm" -cmd "PipeRead fvwmrc" ${1+"$@"}
 
 ### set up FVWM log/fifo vars
