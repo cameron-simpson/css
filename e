@@ -1,2 +1,2 @@
 #!/bin/sh
-exec env GUI=lean term -n "E [$dirname]@$HOST $*" -e edit ${1+"$@"}
+exec env RXVTOPTS= GUI=lean term -n "E [$dirname]@$HOST $*" -e edit ${1+"$@"}
