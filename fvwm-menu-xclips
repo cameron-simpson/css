@@ -9,7 +9,7 @@ use cs::Shell;
 while (defined($_=<STDIN>))
 { chomp;
   ($dqclip=$_) =~ s/["\\]/\\$&/g;
-  $setclipcmd="setxclip \"$dqclip\"";
+  $setclipcmd="cutbuffer \"$dqclip\"";
   $setclipcmd =~ s/["\\]/\\$&/g;
   print "\"$dqclip\" Exec \"$setclipcmd\"\n";
 }
