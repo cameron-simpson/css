@@ -213,6 +213,7 @@ sub _hash2s
   $s->Put('{');
 
   my(@k)=sort keys %$h;
+  ## warn "HIER: keys=[@k]";
   if (@k)
 	{ my($key)=shift(@k);
 	  my($akey)=_scalar2a($key);
