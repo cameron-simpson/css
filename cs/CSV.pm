@@ -82,14 +82,4 @@ sub load($;$)
   return @r;
 }
 
-sub fields($)
-{ local($_)=@_;
-
-  chomp;
-
-  my @f = ();
-
-  while (
-}
-
 1;
