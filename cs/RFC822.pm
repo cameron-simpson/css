@@ -224,7 +224,7 @@ sub addrSet($)	# addrlisttext -> hashref
       ## warn "comment=$comment\n";
       $_=$tail;
     }
-    elsif (/^<([^\@>]*(\@[^>]*)?)>/)
+    elsif (/^<(("[^']*"|[^"\@>])*(\@("[^']*"|[^>])*)?)>/)
     { ## warn "addr=$&";
       $text.=$&;
       $atext.=$&;
