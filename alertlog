@@ -1,0 +1,4 @@
+#!/bin/sh
+tty=`tty`
+[ -n "$tty" ] && echo "$tty" >"$LOGDIR/alertlog-$DISPLAY@$HOST"
+exec tail -f "$LOGDIR/alert"
