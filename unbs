@@ -1,0 +1,8 @@
+#!/bin/sh
+#
+# Remove nroff-style underlining and overstriking.
+# Works for other stuff, too.
+#	- Cameron Simpson <cs@zip.com.au>
+#
+
+exec sed 's/.//g' ${1+"$@"}
