@@ -1,0 +1,118 @@
+#!/bin/sh
+#
+# Dispatch a contrast bug report.
+#	- Cameron Simpson <cs@zip.com.au>
+#
+
+TMPDIR=${TMPDIR-/tmp}
+
+cmd=`basename "$0"`
+usage="Usage: $cmd -u URL addresses"
+
+cd
+
+badopts=
+nomail=
+url=
+while :
+do  case $1 in
+	-u)	url=$2; shift ;;
+	--)	shift; break ;;
+	-?*)	echo "$cmd: unrecognised option: $1" >&2; badopts=1 ;;
+	*)	break ;;
+    esac
+    shift
+done
+
+[ -n "$url" ] || { echo "$cmd: missing URL" >&2; badopts=1; }
+
+if [ $# -eq 0 ]
+then	if [ $nomail ]
+	then :
+	else echo "$cmd: missing addresses" >&2
+	     badopts=1
+	fi
+else
+	if [ $nomail ]
+	then echo "$cmd: warning: ignoring email addresses: $*" >&2
+	else
+	     case "$*" in
+		*@*)	;;
+		*)	echo "$cmd: bad email address: $*" >&2
+			badopts=1
+			;;
+	     esac
+	fi
+fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+snapurl=`winsnap`
+[ $? = 0 -a -n "$snapurl" ] \
+   || { echo "$cmd: winsnap fails" >&2
+	exit 1
+      }
+
+(
+
+tmp=$TMPDIR/$cmd.$$
+
+exec 3>&1 >$tmp
+
+cat <<X
+This is a semiautomatic message.
+
+You seem to be the contact address for the page:
+    $url
+If you're not, please forward this to whoever may be.
+
+The page <$url> is unreadable on some browsers.
+This is easy to fix.
+It is likely that other pages on your site are similarly affected.
+
+X
+
+echo "An image of the page as it is rendered here is available at:"
+echo
+echo "    $snapurl"
+
+cat <<X
+
+If you set a background colour or supply a background image for your page,
+please ensure that you also set foreground colours for the text and links so
+that people who don't happen to use _your_ text colour are guaranteed a
+useful contrasting colour.
+
+Remember, there are folks out there (like me) whose default environment
+uses light text on a dark background. If you override only one of these
+in your document, the other setting comes from the reader's default.
+This mix is unpredictable, and usually bad if the reader and the
+author come from differing light-on-dark and dark-on-light environments.
+Thus, if you override the one you should override the other, too. A
+useful colour is probably your own default colour, since you will have
+checked the page's appearance using it.
+
+This is not a fault with light background or light text, just their
+combination. When a reader visits your page, if you set neither the
+text colour nor the background they will get readable text since they
+will have a usable set of defaults. If you set both, they should get
+readable text because you will have selected a contrasting pair of
+colours. HOWEVER, if you set just one (many authors set a background
+and forget the foreground) there is no guarantee of contrast because
+you have selected one of the colours, and the reader has selected the
+other, entirely independently. As a consequence, if you set one you
+incur a responsibility to set the other to maintain contrast.
+
+Details may be found at:
+	http://home.netscape.com/assist/net_sites/bg/index.html
+Note in particular the bit on "HOW TO CONTROL THE DOCUMENT'S FOREGROUND".
+The attributes you need to set in the <BODY...> tag are TEXT, LINK, VLINK,
+and ALINK.
+X
+
+exec >&3 3>&-
+
+m -s "a technical remark about your WWW page <$url> ..." "$@" <$tmp
+rm $tmp
+
+) &
