@@ -42,5 +42,5 @@ fi
 		  )
 
 # dropped "-d 0.6"
-2xpm -s tty "$src" xpm2rxvt
+2png -s tty "$src" xpm2rxvt
 [ -n "$logf" ] && [ -w "$logf" ] && echo "$src" >>"$logf"
