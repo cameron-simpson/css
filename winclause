@@ -17,6 +17,7 @@ clause=$1; shift
 
 [ -s "$file" ] || { echo "$cmd: expect nonempty file: $file" >&2; exit 1; }
 
+# no args? just recite clause form file
 [ $# = 0 ] \
 && exec sed -n 's/^[ 	][ 	]*//
 		/^#/d
@@ -91,4 +92,4 @@ sedf=':top
       n
       b top'
 
-bsed -n "$sedf" "$file"
+exec bsed -n "$sedf" "$file"
