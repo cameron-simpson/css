@@ -1,0 +1,11 @@
+#!/bin/sh
+#
+# Quick'n'dirty upload from Canon digital camera.
+#	- Cameron Simpson <cs@zip.com.au> 12aug2001
+#
+
+cmd=`basename "$0"`
+
+[ -n "$S10PORT" ] || { S10PORT=/dev/ttyS1; export S10PORT; }
+
+exec s10sh -d "$S10PORT" -s 115200 -g -L ${1+"$@"}
