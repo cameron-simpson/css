@@ -146,7 +146,7 @@ sub WriteHTMLFile($$;)
 
   return 0 if ! defined $s;
 
-  cs::HTML::tok2s($s,@_);
+  cs::HTML::tok2s(2,$s,[HTML,[HEAD],[BODY,@_]],"\n");
   1;
 }
 
