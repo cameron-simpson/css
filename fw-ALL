@@ -1,0 +1,33 @@
+#!/bin/sh
+#
+# Permit ALL traffic to/from specified hosts (or "ALL").
+#	- Cameron Simpson <cs@zip.com.au> 14jun2004
+#
+
+cmd=$0
+usage="Usage: $cmd [+l] {ALL | hosts...}"
+
+badopts=
+
+dolog=1
+[ "x$1" = x+l ] && { dolog=; shift; }
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+if [ "x$*" = xALL ]
+then
+    set -x
+    iptables -I INPUT -j ACCEPT
+    iptables -I OUTPUT -j ACCEPT
+    [ $dolog ] && iptables -I INPUT -p tcp --syn -j LOGACCEPT
+    [ $dolog ] && iptables -I OUTPUT -p tcp --syn -j LOGACCEPT
+else
+    set -x
+    for host
+    do
+      iptables -I INPUT -s "$host" -j ACCEPT
+      iptables -I OUTPUT -d "$host" -j ACCEPT
+      [ $dolog ] && iptables -I INPUT -s "$host" -p tcp --syn -j LOGACCEPT
+      [ $dolog ] && iptables -I OUTPUT -d "$host" -p tcp --syn -j LOGACCEPT
+    done
+fi
