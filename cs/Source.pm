@@ -71,7 +71,7 @@ sub new
   if ($type eq FILE)
   { my($FILE)=shift;
     # align real fd with FILE
-    stat($FILE) && -f _ && sysseek($FILE,tell($FILE),0);
+    eval "stat $FILE" && -f _ && sysseek($FILE,tell($FILE),0);
 
     if ($cs::Source::_UseIO)
     {
