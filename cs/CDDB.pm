@@ -49,6 +49,8 @@ Default: the envvar B<$CDDBDEVICE> or B</dev/cdrom>
 
 $cs::CDDB::DfltDev=(length($ENV{CDDBDEVICE}) ? $ENV{CDDBDEVICE} : '/dev/cdrom');
 
+=back
+
 =head1 GENERAL FUNCTIONS
 
 =over 4
