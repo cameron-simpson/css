@@ -1,0 +1,9 @@
+#!/bin/bash
+#
+# Install date of all RPMs most recent first.
+# Script courtesy of Aaron Konstam <akonstam@trinity.edu>
+#
+
+rpm -qa --queryformat '%{installtime} %{name}-%{version}-%{release} %{installtime:date}\n' \
+| sort -nr \
+| sed 's/^[^ ]* //'
