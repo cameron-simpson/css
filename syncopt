@@ -131,7 +131,7 @@ resolve=$resolve'
 	    fullpath=
 	    for dir in $archopt $commonopt
 	    do  for subdir in $subdirs
-		do  if [ -d "$dir/$subdir/$target/." ]
+		do  if [ -d "$dir/$subdir/$target/." -o -f "$dir/$subdir/$target" ]
 		    then  if [ "x$subdir" = x. ]
 			  then  fullpath=$dir/$target
 			  else  fullpath=$dir/$subdir/$target
