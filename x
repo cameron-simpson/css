@@ -23,11 +23,13 @@ then
     else
 	tmpf=${TMPDIR:-/tmp}/$cmd$$
 	trap 'rm -f "$tmpf"' 0 1 15
-	cat >"$tmpf" || exit 1
-    	mtype=`file2mime "$tmpf"` || { echo "$cmd: stdin: no MIME type recognised" >&2; exit 1; }
-	exec <"$tmpf"
-	rm "$tmpf" && trap '' 0 1 15
-	file=/dev/fd/0
+	dd bs=1024 count=1 >"$tmpf" || exit 1
+    	mtype=`file2mime "$tmpf"` \
+	|| { echo "$cmd: stdin: no MIME type recognised" >&2
+	     exit 1
+	   }
+	cat "$tmpf" - | "$0" -t "$mtype" -
+	exit $?
     fi
 else
     [ -n "$mtype" ] \
