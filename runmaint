@@ -1,0 +1,329 @@
+#!/bin/sh
+#
+# =head1 NAME
+#
+# runmaint - run a maintenance script
+#
+# =head1 SYNOPSIS
+#
+# runmaint [B<-s> I<subj>] [B<-date> I<datestr>] [B<-x>] I<target> [I<addresses...>]
+#
+# =head1 DESCRIPTION
+#
+# B<runmaint> is a wrapper for cron(8) jobs which
+# lets the user keep their crontab static and simple,
+# moves all the shell complexity into scripts,
+# supplies a standard, configurable, environment to the scripts,
+# cascades regular scripts through a simple naming scheme
+# and delivers the output of scripts as email with a useful subject line.
+# Optionally, it will deliver to a log file
+# or standard output and standard error.
+#
+# See:
+#
+#	http://www.zip.com.au/~cs/runmaint.html
+#
+# for more detailed info.
+#
+# =head1 SETUP
+#
+# Create a directory B<.maint> in your home directory
+# (except for root, who uses the directory B</usr/local/etc/maint>).
+# Scripts run from cron(8) go here
+# (except for root, where the go in B</usr/local/etc/maint/scripts>).
+#
+# Create a crontab file with the crontab(1) command.
+# Typically this is a single line such as
+#
+#	0 * * * * exec /opt/script/runmaint hourly
+#
+# or
+#
+#	0 0 * * * exec /opt/script/runmaint daily
+#
+# The word after the B<runmaint> command is the name of a script to run
+# from the B<~/.maint> directory.
+#
+# The words B<hourly>, B<daily>, B<weekly>, B<monthly> and B<yearly>
+# are special.
+# If a script with this name is run and happens to fall on the
+# due time for the less frequent script
+# then that script is also run on completion of the more frequent script.
+# In this way the hourly cron line above also causes the B<daily>, B<weekly>,
+# B<monthly> and B<yearly> scripts to be run as appropriate.
+# Further, unlike multiple cron lines of different frequency,
+# the timing is guarrenteed not to overlap nor is there undue delay
+# between the termination of the more frequent script
+# and commencement of the subsequent less frequent script.
+#
+# Also, whenever any script B<foo> is requested
+# B<runmaint> also looks for scripts named B<foo.I<host>>
+# and B<foo.I<host>@I<systemid>>
+# and runs them if they are present.
+# I<host> and I<systemid> take their names from the environment variables
+# B<$HOST> and B<$SYSTEMID> respectively.
+# I normally arrange these to be the short hostname (i.e. without the domain)
+# and an identifier-like name for the local administrative domain
+# (eg B<home> for my home machines and B<cisra> for work,
+# that being Canon Information Systems Research Australia as I write this).
+# With this mechanism
+# you can place the cron line on many machines
+# and still perform specific actions on particular machines
+# simply by adding suitably named scripts.
+#
+# =head1 ENVIRONMENT
+#
+# Before running any script
+# B<runmaint> sources the file
+# B</usr/local/etc/maint/env>.
+# Systemwide default environment settings go in here as shell commands.
+# After this the file
+# B<~/.maint/env>
+# (or B</usr/local/etc/maint/scripts/env> for root)
+# is sourced.
+# Personal environment settings go in here as shell commands.
+#
+# Normally you will want the cron environment to resemble the login
+# environment as closely as possible,
+# so B</usr/local/etc/maint/env> would normally contain the line
+#
+#	. /etc/profile
+#
+# and the B<~/.maint/env> file would normally contain the line
+#
+#	. $HOME/.profile
+#
+# in this way sourcing the user's normal startup files.
+#
+
+USER=${USER-$LOGNAME}; export USER
+[ -n "$USER" ] || { echo "$0: no \$USER or \$LOGNAME, bailing out" >&2
+		    exit 1
+		  }
+
+MaintDir=/usr/local/etc/maint
+if [ -f "$0" ]
+then    RunMaint="$0 -E"
+else    RunMaint="$MaintDir/runmaint.sh -E"
+fi
+case $USER in
+    root)	MaintScripts=$MaintDir/scripts ;;
+    *)		MaintScripts=$HOME/.maint ;;
+esac
+
+export MaintDir MaintScripts RunMaint
+
+usage="Usage: $0 [-s subj] [-date datestr] [-x] target [addresses]
+    See:
+	http://www.zip.com.au/~cs/runmaint.html
+    for more detailed information.
+	-s subj	Subject for mail report.
+	-date datestr Use this instead of the date command output.
+	-x	Trace execution.
+	target	frequency[.host] or an ad hoc name
+	    frequency	daily	Soon after 12am.
+			dow	After daily, each day of the week \"dow\".
+			monthly	After daily/weekly, on first of month.
+			yearly	After monthly, on 1 January.
+	    host	Stuff for a specific host."
+
+# special case noenv as first arg
+noenv=
+[ "x$1" = x-E ] && { noenv=1; shift; }
+
+[ $noenv ] \
+|| { [ -s "$MaintDir/env" ] && . "$MaintDir/env"
+     [ -s "$MaintScripts/env" ] && . "$MaintScripts/env"
+   }
+
+badopts=
+
+xflag=
+subj="runmaint@$HOST $*"
+datestr=
+
+#
+# =head1 OPTIONS
+#
+# =over 4
+#
+
+while :
+do
+    case $1 in
+	--)	shift; break ;;
+#
+# =item B<-s> I<subject>
+#
+# Set the subject line for the notification email.
+#
+	-s)	subj=$2; shift ;;
+#
+# =item B<-date> I<datestr>
+#
+# Use I<datestr> instead of the date command output.
+# This is really a I<runmaint> internal option
+# for passing the ancestors runmaint start date forward
+# to subsequent scripts in the same run.
+#
+	-date)	datestr=$2; shift ;;
+#
+# =item B<-x>
+#
+# Trace execution.
+#
+	-x)	xflag=-x ;;
+	-?*)	echo "$0: unrecognised option: $1" >&2
+		badopts=1
+		;;
+	*)	break ;;
+    esac
+    shift
+done
+
+if [ $# = 0 ]; then echo "$0: missing target" >&2; badopts=1
+	       else target=$1; shift
+fi
+
+#
+# =item I<addresses>
+#
+# A set of email addresses to which to deliver the output, if any.
+# These should be the core addresses such as I<login> or I<loginB<@>domain>
+# rather than full RFC822 addresses like "B<Fred Nerk E<lt>fred@nerk.comE<gt>>"
+# as they are used unquoted, and are thus subject to whitespace separation etc.
+#
+# If I<addresses> is simple "B<->"
+# then the output is delivered to standard output and standard error
+# rather than being redirected to email,
+# sometimes useful for running from the command line or for special purposes.
+#
+# If no I<addresses> are present
+# then the default is to email the user
+# as defined by the B<$EMAIL> environment variable
+# or failing that the B<$USER> environment variable.
+# However,
+# if the directory B<~/.maint/log> is present
+# then the absense of I<addresses> causes output to be delivered
+# to the log file B<~/.maint/log/I<target>@I<host>>.
+# Further, if that is a directory then output is delivered to the log file
+# B<~/.maint/log/I<target>@I<host>/I<datecode>>
+# where I<datecode> is the result of the datecode(1) command.
+#
+addresses=$*
+
+#
+# =back
+#
+
+# note starting time
+if [ -n "$datestr" ]
+then  set x $datestr
+else  set x `date|tr '[A-Z]:' '[a-z] '`
+fi
+if [ $# = 9 ]
+then
+      wday=$2 mon=$3 mday=$4 hh=$5 mm=$6 ss=$7 tz=$8 year=$9
+      shift; datestr=$*
+      export wday mon mday hh mm ss tz year datestr
+else
+      echo "$0: bad date arguments: $*" >&2
+      badopts=1
+fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+xit=0
+
+case $target in
+    /*)	script=$target ;;
+    *)	script=$MaintScripts/$target ;;
+esac
+
+# run the script if present
+if [ -r "$script" ]
+then
+    # if no addresses
+    # then write a log if there's a log dir
+    # otherwise email the user
+    if [ "x$addresses" = x ]
+    then
+	logdir=$MaintScripts/log
+	if [ -d "$logdir/." ]
+	then
+	    log=$logdir/$target@$HOST
+	    if [ -d "$log/." ]
+	    then
+		log=$log/`datecode`
+	    fi
+	else
+	    addresses=${EMAIL:-$USER}
+	fi
+    fi
+
+    case "$addresses" in
+	'')	logdir=`dirname "$log"`
+		if [ -d "$logdir/." ] || mkdir -p "$logdir"
+		then  sh $xflag "$script" >>"$log" 2>&1
+		else  echo "$0: can't make log dir \"$logdir\"" >&2
+		      echo "	suppressing run of \"$script\"" >&2
+		      xit=1
+		fi
+		;;
+	-)	sh $xflag "$script" ;;
+	*)	sh $xflag "$script" 2>&1 | mailif -s "$subj" $addresses ;;
+    esac
+fi
+
+if [ -r "$script.$HOST" ]
+then
+    $RunMaint -date "$datestr" $xflag -s "$subj - perhost($HOST)" $target.$HOST $addresses \
+    || xit=$?
+fi
+
+if [ -r "$script.$HOST@$SYSTEMID" ]
+then
+    $RunMaint -date "$datestr" $xflag -s "$subj - perhost($HOST@$SYSTEMID)" $target.$HOST@$SYSTEMID $addresses \
+    || xit=$?
+fi
+
+# run the implied scripts
+case $target in
+    hourly)	if [ $hh -eq 0 ]
+		then
+		    $RunMaint -date "$datestr" $xflag -s "$subj" daily $addresses \
+		    || xit=$?
+		fi
+		;;
+    daily)	$RunMaint -date "$datestr" $xflag -s "$subj - $wday" $wday $addresses \
+		|| xit=$?
+		if [ $wday = mon ]
+		then
+		    $RunMaint -date "$datestr" $xflag -s "$subj" weekly $addresses \
+		    || xit=$?
+		fi
+		if [ $mday -eq 1 ]
+		then
+		    $RunMaint -date "$datestr" $xflag -s "$subj - monthly" monthly $addresses \
+		    || xit=$?
+		fi
+		;;
+    monthly)	if [ $mon = jan ]
+		then
+		    $RunMaint -date "$datestr" $xflag -s "$subj - yearly" yearly $addresses \
+		    || xit=$?
+		fi
+		;;
+esac
+
+exit $xit
+
+#
+# =head1 SEE ALSO
+#
+# crontab(1), cron(8), datecode(1), mailif(1)
+#
+# =head1 AUTHOR
+#
+# Cameron Simpson E<lt>cs@zip.com.auE<gt> 15oct1996
+#
