@@ -34,6 +34,7 @@ case "$type" in
     *': '*'gzip compressed data'*)	mtype=application/x-gzip ;;
     *': '*'bzip2 compressed data'*)	mtype=application/x-bzip ;;
     *': '*'compressed data block compressed') mtype=application/x-compress ;;
+    *': '*"compress'd data 16 bits")	mtype=application/x-compress ;;
     *': '*'Zip archive data'*)		mtype=application/zip ;;
     *': '*'ZIP archive')		mtype=application/zip ;;
     *': '*'tar archive'*)		mtype=application/x-tar ;;
