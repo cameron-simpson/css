@@ -37,6 +37,7 @@ then
 	do  htc "$url"
 	done
     else
+	## set -x
 	bgstdin urlshow ${1+"$@"}
     fi
 else
