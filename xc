@@ -1,2 +1,3 @@
 #!/bin/sh
-exec xsetroot -solid black
+[ $# = 0 ] && set black
+exec xsetroot -solid "$@"
