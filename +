@@ -48,14 +48,7 @@ fi
 
 [ $anyhost ] || needhost "$HOMEHOST@$SYSTEMID" || exit 1
 
-case "$mfolder" in
-  /*)	fpath=$mfolder ;;
-  +*)	fpath=$MAILDIR/`expr "x$mfolder" : '..\(.*\)'` ;;
-  imap:*) fpath= ;;
-  *.*)	fpath= ;;
-  ?*)	fpath=$MAILDIR/$mfolder ;;
-  *)	fpath= ;;
-esac
+fpath=`mailfolderpath "$mfolder"` || exit 1
 if [ -z "$fpath" ]
 then
     DELETE_FOLDER=
@@ -65,7 +58,12 @@ else
     fbase=`basename "$fpath"` || exit 1
     DELETE_FOLDER=+DELETED/$fbase
     SAVE_FOLDER=+SAVED/$fbase
-    mhdir "$MAILDIR/DELETED/$fbase" "$MAILDIR/SAVED/$fbase"
+    if ismhdir "$fpath"
+    then
+	mhdir "$MAILDIR/DELETED/$fbase" "$MAILDIR/SAVED/$fbase"
+    else
+	maildir "$MAILDIR/DELETED/$fbase" "$MAILDIR/SAVED/$fbase"
+    fi
 fi
 export DELETE_FOLDER SAVE_FOLDER
 
