@@ -1,0 +1,6 @@
+#!/bin/sh
+
+case "$TERM" in
+	apollo*)	xdmc 'cp /usr/apollo/bin/vt100 -std telnet libprime.libsys' ;;
+	*)		exec telnet libprime.libsys ;;
+esac
