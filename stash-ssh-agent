@@ -1,0 +1,26 @@
+#!/bin/sh
+#
+# Stash the SSH environment state variables.
+#	- Cameron Simpson <cs@zip.com.au> 01feb2004
+#
+
+cmd=$0
+usage="Usage: $cmd [statefile]"
+
+state=
+
+badopts=
+
+[ $# = 0 ] || { state=$1; shift; }
+
+[ $# = 0 ] || { echo "$cmd: extra arguments: $*" >&2; badopts=1; }
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+[ -n "$state" ] || state=`ssh-agent-statefile` || exit 1
+
+env \
+| sed -n 's/^\(SSH_[_A-Z]*\)=\(.*\)/\1='\''\2'\''; export \1;/p' >"$state" \
+|| exit 1
+
+exec chmod a+rx "$state"
