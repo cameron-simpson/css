@@ -3,6 +3,8 @@
 # Fetch and optionally display a weather map.
 #
 
+: ${TMPDIR:=/tmp}
+
 cmd=`exec basename "$0"`
 
 mapsite=marlin.jcu.edu.au 
@@ -51,7 +53,7 @@ esac
 
 [ $badopts ] && { echo "$usage" >&2 ; exit 2 ; }
 
-tmp=/tmp/wmap.$$
+tmp=$TMPDIR/wmap.$$
 aftp +A "$mapsite" "cd \"$mapdir\"" "get \"$map\" $tmp.ilbm" quit
 [ -s $tmp.ilbm ] || { rm -f $tmp.ilbm; exit 1; }
 ilbmtogif $tmp.ilbm > $tmp.gif
