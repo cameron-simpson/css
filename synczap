@@ -4,10 +4,10 @@
 #	- Cameron Simpson <cs@zip.com.au> 21apr1999
 #
 
-webdir=$HOME/public/adzap
+webdir=$HOME/there/adzapper.sourceforge.net/html
 
 script=scripts/squid_redirect
-base=http://www.zip.com.au/~cs/adzap
+base=http://adzapper.sourceforge.net
 
 cd "$webdir" || exit 1
 pwd
@@ -28,6 +28,7 @@ commit=
 		*)	set ${1+"$@"} "$addr" ;;
 	  esac
       done < rc/users
+      set x "$@" adzapper-announce@lists.sourceforge.net; shift
     }
 
 changetmp=/tmp/change.$$
