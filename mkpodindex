@@ -191,7 +191,7 @@ echo "<UL>"
 	  fullname=$fullname$fn
 	done
 
-	modtime=`awk "\\$2 == \\"$podfile\\" { print \\$4 }" CVS/Entries`
+	modtime=`awk -F / "\\$2 == \\"$podfile\\" { print \\$4 }" CVS/Entries`
 	[ -n "$modtime" ] || modtime=`ls -ld "$podfile" | awk '{print $6, $7, $8}'`
 
 	echo "    <LI><A HREF=\"$htfile\">$title</A>"
