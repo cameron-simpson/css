@@ -10,7 +10,7 @@ cats2procmailrc - generate a procmail recipe from my mail categories file
 
 =head1 SYNOPSIS
 
-cats2procmailrc [B<-m> I<maildomain>] [B<-t> I<type>] E<lt>categories E<gt>procmailrc
+cats2procmailrc [B<-a> I<alert>] [B<-m> I<maildomain>] [B<-t> I<type>] E<lt>categories E<gt>procmailrc
 
 =head1 DESCRIPTION
 
@@ -32,6 +32,11 @@ and adds the automatic rules by converting my categories file.
 
 =over 4
 
+=item B<-a> I<alert>
+
+Specify a shell command to run as the alert function (see L<FILE FORMAT> below).
+The character percent (B<'%'>) is replaced by the I<folder> name.
+
 =item B<-m> I<maildomain>
 
 Specify the default mail domain for rule addresses lacking an B<@I<domain>>.
@@ -51,11 +56,14 @@ The default is B<unix>.
 
 The categories file consists of single line entries of the form:
 
-	[!]folder tag pattern
+	[+][!]folder tag pattern
 
 Blank lines and lines beginning with an octothorpe ('#') are ignored.
 
-A leading exclaimation mark ('!') means that mail items matching this rule
+A leading plus sign (B<'+'>) means that this rule should be a continue rule,
+and not abort processing.
+
+A leading exclaimation mark (B<'!'>) means that mail items matching this rule
 should generate an alert.
 For me, this means a single line summary of the mail item appears in yellow in a small log window
 I have at the top of my screen for mail items I should read I<now>.
@@ -63,11 +71,15 @@ I have at the top of my screen for mail items I should read I<now>.
 The I<folder> names the folder in which to place the mail item.
 Normail UNIX mail files,
 MH style directories and Maildir style directories are autodetetected.
+If the I<folder> contains an "at" (B<@>) character it is considers an email address
+and the mail item is forwarded to that address instead of being dropped in a folder.
 
 The I<tag> is placed at the start of the mail's B<Subject> line for ready recognition in mixed folders.
 The special tag dot (".") suppresses this action.
 
 The I<pattern> selects the mail items.
+
+=head2 Example Rules
 
 The usual form is simply an address (see RFC822 and RFC2822)
 to be present in the B<To>, B<CC> or B<BCC> header lines.
@@ -98,6 +110,15 @@ and optionally ends in a slash, viz:
 
 which matches mail items with subjects regarding my adzap program.
 
+A typical use of the "at" sign is in conjunction with the plus sign above
+to copy particular mail items to other account while still delivering locally.
+For example:
+
+	+fred@that.isp.com . fred@this.isp.com
+	fredmail Fred fred@this.isp.com
+
+to accept mail aimed at B<fred@this.isp.com> and also copy it to B<fred@that.isp.com>.
+
 =head1 ENVIRONMENT
 
 MAILDIR, the directory containing mail folders.
@@ -121,19 +142,26 @@ use strict vars;
 use Getopt::Std;
 
 ($::cmd=$0) =~ s:.*/::;
-$::Usage="Usage: $::cmd [-t {unix|mh|maildir}] <categories >procmailrc
-	-m type	Select default mail domain.
-	-t type	Select default mailbox type.
+$::Usage="Usage: $::cmd [-a alert] [-m domain] [-t {unix|mh|maildir}] <categories >procmailrc
+	-a alert	Command line to generate the alert.
+			The mail item is present on standard input.
+	-m domain	Select default mail domain.
+	-t type		Select default mailbox type.
 ";
 
 $::DfltSfx="";	# unix style by default
 $::DfltDom=$ENV{SITENAME};
+undef $::DfltAlert;
 
 { my $badopts=0;
 
-  if (! getopts("m:t:"))
+  if (! getopts("a:m:t:"))
   { warn "$::cmd: bad options\n";
     $badopts=1;
+  }
+
+  if (defined $::opt_a)
+  { $::DfltAlert=$::opt_a;
   }
 
   if (defined $::opt_m)
@@ -168,6 +196,7 @@ $::DfltDom=$ENV{SITENAME};
 
 my $doalert;
 my $sfx;
+my $cont;
 
 CAT:
 while (<STDIN>)
@@ -177,11 +206,23 @@ while (<STDIN>)
   s/^#.*//;
   next CAT if ! length;
 
+  # leading + means continue after rule
+  $cont='';
+  if (/^\+\s*/)
+  { $cont='c';
+    $_=$';
+  }
+
   # leading ! means alert this message
   $doalert=0;
   if (/^\!\s*/)
   { $doalert=1;
     $_=$';
+
+    if (! defined $::DfltAlert || ! length $::DfltAlert)
+    { warn "$::cmd: line $.: no alert shell command defined1\n";
+      $doalert=0;
+    }
   }
 
   # we expect "mailbox tag rule"
@@ -214,17 +255,19 @@ while (<STDIN>)
   my $hregexp = '('.join('|',@hdrs).')';
 
   print <<X
-: 0
+: 0$cont
 * ^$hregexp:.*$ptn
 {
 X
   ;
 
   if ($doalert)
-  { print <<X
+  { my $alertfn = $::DfltAlert;
+    $alertfn =~ s/\%/$folder/g;
+    print <<X
 
   : 0hc
-  | mhdrs | { while read hdr body; do eval "HDR_\$hdr=\\\$body"; done; alert -c yellow "`timecode` +$folder \$HDR_FROM; \$HDR_SUBJECT"; }
+  | $alertfn
 X
     ;
   }
@@ -239,23 +282,26 @@ X
     ;
   }
 
-  $sfx=foldersfx($folder);
-  print <<X
+  print <<'X'
 
   : 0
-  $folder$sfx
+X
+  ;
+
+  if ($folder =~ /\@/)
+  { print "  ! $folder\n";
+  }
+  else
+  { $sfx=foldersfx($folder);
+    print "  $folder$sfx\n";
+  }
+
+  print <<X
 }
 
 X
   ;
 }
-
-print <<X
-: 0
-spam/.
-
-X
-;
 
 exit 0;
 
