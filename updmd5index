@@ -1,0 +1,18 @@
+#!/bin/sh
+#
+# Update the .md5index file with newer files.
+#	- Cameron Simpson <cs@zip.com.au> 04dec98
+#
+
+tmp=/tmp/umd5.$$
+
+newer='-newer .md5index'
+[ -f .md5index ] || newer=
+
+find ${1-.} ${1+"$@"} -type f $newer -print | md5index >$tmp
+if [ -s $tmp ] 
+then
+    cat $tmp >>.md5index
+fi
+
+rm $tmp
