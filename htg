@@ -1,2 +1,2 @@
 #!/bin/sh
-acon httpget ${1+"$@"}
+alog httpget httpget ${1+"$@"}
