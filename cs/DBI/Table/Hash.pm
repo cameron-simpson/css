@@ -68,7 +68,9 @@ sub TIEHASH($$$$$$)
   if ($preload)
   { my $sql = "SELECT * FROM $this->{TABLE}";
     $sql.=" WHERE $this->{WHERE}" if length $this->{WHERE};
+
     my $sth = cs::DBI::sql($dbh, $sql);
+
     my $L = $this->{LIVE};
     for my $row (cs::DBI::fetchall_hashref($sth))
     { $L->{$row->{$keyfield}}=$row;
