@@ -1,0 +1,44 @@
+#!/bin/sh
+#
+# Sum numbered columns on data.
+#	- Cameron Simpson <cs@zip.com.au> 19jan97
+#
+
+usage="Usage: $0 -Fc columns... [--] [files...]
+	-Fc	Separate columns with character c."
+
+dosum=
+printsum=
+
+ncol=0
+
+badopts=
+while :
+do
+    case $1 in
+	[1-9]|[1-9][0-9])
+		dosum="$dosum
+			col[$ncol]+=\$$1"
+		case $ncol in
+		    0)	printsum="col[$ncol]" ;;
+		    *)	printsum="$printsum, col[$ncol]" ;;
+		esac
+		ncol=`expr $ncol + 1`
+		;;
+	--)	shift; break ;;
+	-F)	Fopt="-F$2"; shift ;;
+	-F*)	Fopt=$1 ;;
+	-?)	echo "$0: unrecognised option: $1" >&2
+		badopts=1
+		;;
+	*)	break ;;
+    esac
+    shift
+done
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+exec awk $Fopt "	{ $dosum
+			}
+		END	{ print $printsum
+			}" ${1+"$@"}
