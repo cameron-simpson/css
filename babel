@@ -22,4 +22,4 @@ fi
 
 txt=`hexify-GETfield "$*"`
 
-acon urlshow "http://babelfish.altavista.digital.com/cgi-bin/translate?doit=done&urltext=$txt&lp=${sl}_${dl}&Submit=Translate"
+exec us "http://babelfish.altavista.digital.com/cgi-bin/translate?doit=done&urltext=$txt&lp=${sl}_${dl}&Submit=Translate"
