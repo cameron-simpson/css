@@ -1,0 +1,28 @@
+#!/bin/sh
+#
+# Add trailing REJECT rules to the specified chains.
+#	- Cameron Simpson <cs@zip.com.au>
+#
+
+cmd=$0
+usage="Usage: $cmd [+l] [chains...]"
+
+badopts=
+
+dolog=1
+[ "x$1" = x+l ] && { dolog=; shift; }
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+[ $# = 0 ] && set INPUT OUTPUT FORWARD
+
+if [ $dolog ]
+then rej=LOGREJECT
+else rej=JUSTREJECT
+fi
+
+set -x
+for chain
+do
+  iptables -A "$chain" -j $rej
+done
