@@ -1,0 +1,167 @@
+#!/usr/bin/perl
+#
+# Replacement for Sun's mknetid because our group table has blown its mind.
+#	- Cameron Simpson <cs@zip.com.au> 18dec2001
+#
+
+use strict qw(vars);
+
+use cs::Misc;
+use Getopt::Std;
+
+($::cmd=$0) =~ s:.*/::;
+$::Usage="Usage: $::cmd [-q] [-p passwd] [-g group] [-h hosts] [-m m???]\n";
+
+my $domain = `domainname`;	chomp $domain;
+my $passwd = '/etc/passwd';
+my $group  = '/etc/group';
+my $hosts  = '/etc/hosts';
+
+getopts('qp:g:h:m:') || die $::Usage;
+
+$passwd = $::opt_p if defined $::opt_p;
+$group  = $::opt_g if defined $::opt_g;
+$hosts  = $::opt_h if defined $::opt_h;
+
+my $xit = 0;
+
+my @uidgid;
+my %useruid;
+my @uiduser;
+my %hostfqdn;
+
+if (!open(PASSWD,"< $passwd\0"))
+{ warn "$::cmd: $passwd: $!\n";
+  $xit=1;
+}
+else
+{
+  my @f;
+  my $login;
+  my $uid;
+  my $gid;
+
+  while (defined($_=<PASSWD>))
+  { chomp;
+    @f = split(/:/);
+    ($login,$uid,$gid)=($f[0],$f[2]+0,$f[3]+0);
+
+    useruid($login,$uid);
+    $uidgid[$uid] = [ $gid ];
+  }
+
+  close(PASSWD);
+}
+
+if (!open(GROUP,"< $group\0"))
+{ warn "$::cmd: $group: $!\n";
+  $xit=1;
+}
+else
+{ 
+  my @f;
+  my @g;
+  my $gid;
+  my @logins;
+  my $uid;
+
+  while (defined($_=<GROUP>))
+  { chomp;
+    @f=split(/:/);
+    $gid=$f[2]+0;
+    @logins=split(/,/, $f[3]);
+
+    GROUPUSER:
+    for my $login (@logins)
+    { $uid = useruid($login);
+      next GROUPUSER if ! defined $uid || $uid < 0;
+      if (! defined $uidgid[$uid])
+      { $uidgid[$uid]=[];
+      }
+      push(@{$uidgid[$uid]}, $gid);
+    }
+  }
+
+  close(GROUP);
+}
+
+if (!open(HOSTS,"< $hosts\0"))
+{ warn "$::cmd: $hosts: $!\n";
+  $xit=1;
+}
+else
+{
+  my @f;
+
+  HOSTS:
+  while (defined($_=<HOSTS>))
+  { chomp;
+    s/^#.*//;
+    next HOSTS if ! length;
+
+    @f = grep(length, split(/\s+/));
+    if (@f > 1)
+    { shift(@f);
+      for my $h (@f)
+      { if ($h eq 'localhost')
+	{ $hostfqdn{$h}=$h;
+	}
+	elsif ($h =~ /\./)
+	{ $hostfqdn{$`}=$h;
+	}
+      }
+    }
+  }
+
+  close(HOSTS);
+}
+
+UID:
+for my $uid (0..$#uidgid)
+{ next UID if ! defined $uidgid[$uid];
+  my @gids = ::uniq(@{$uidgid[$uid]});
+  print STDOUT
+	(uiduser($uid) eq 'nobody'
+	? 'nobody'
+	: "unix.$uid\@$domain"
+	)
+	." $uid:"
+	.join(",", $gids[0], sort { $a <=> $b } @gids[1..$#gids])
+	."\n";
+}
+
+HOST:
+for my $h (sort keys %hostfqdn)
+{ print "unix.$h\@$domain 0:$hostfqdn{$h}\n";
+}
+
+exit $xit;
+
+sub useruid($;$)
+{ my($login,$uid)=@_;
+
+  if (defined $uid)
+  { if (exists $useruid{$login} && $useruid{$login} != $uid)
+    { warn "$::cmd: reject second uid ($uid) for user $login, keeping old uid: $useruid{$login}\n";
+      return;
+    }
+
+    $useruid{$login}=$uid;
+    $uiduser[$uid]=$login;
+    return;
+  }
+
+  if (! exists $useruid{$login})
+  { warn "$::cmd: no uid for user $login\n";
+    $useruid{$login} = -1;	# return neg val next time, not undef
+    return undef;
+  }
+
+  return $useruid{$login};
+}
+
+sub uiduser($)
+{ my($uid)=@_;
+  return undef if ! exists $uiduser[$uid];
+  return $uiduser[$uid];
+}
