@@ -4,9 +4,9 @@
 #	- Cameron Simpson <cs@zip.com.au> 10may99
 #
 
-CONSOLE=${CONSOLE:-$HOME/var/log/console}
-PREFTERM=${PREFTERM:-et}
-export CONSOLE PREFTERM
+: ${LOGDIR:=$HOME/var/log}
+: ${CONSOLE:=$LOGDIR/console}
+: ${PREFTERM:=et}
 
 opts=
 theme=${ETERMTHEME:-Eterm}
@@ -53,14 +53,10 @@ shift
 # Eterm is really fucking stupid about options
 case "$title" in -*) title=" $title" ;; esac
 
-(
-
-exec >>$CONSOLE 2>&1
-
+exec acon \
 Eterm --name "$title" \
       --path "$ETERMPATH" \
       -t bgpic \
       -N "300 `bglist -r -n 32`" \
       --menubar off --select-line \
-      "$@" &
-)
+      "$@"
