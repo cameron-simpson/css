@@ -38,29 +38,30 @@ else
     [ $# = 1 ] && domenu=
 fi
 
-tmpf=/tmp/menubg$$
-trap 'rm -f "$tmpf"' 0 1 2 15
-
-for arg
-do  echo "$arg"
-done >"$tmpf"
+##echo "*=[$*]" >&2
 
 if [ $domenu ]
 then
+    tmpf=/tmp/menubg$$
+    for arg
+    do  echo "$arg"
+    done >"$tmpf"
     fvwmcmd \
-	  "Piperead 'fvwm-menu -1 ImDirMenu \"$cmd $call\" fvwm-menu-imlist -o menubg -l $tmpf ." \
+	  "Piperead 'fvwm-menu -1 ImDirMenu \"$cmd $call\" fvwm-menu-imlist -o menubg -l $tmpf .; rm $tmpf'" \
 	  "Popup ImDirMenu"
     exit $?
 fi
 
 imagefile=$1
+## alert "APPLY $imagefile"
+echo "$imagefile" >>$HOME/var/log/menubg
 
-case "$imagefile" in
-    *.png|*.xpm)
-	# no format conversion needed
-	exec fvwmcmd "ColorSet 0 AspectPixmap \"$imagefile\""
-	;;
-esac
+##case "$bright,$imagefile" in
+##    *.png|*.xpm)
+##	# no format conversion needed
+##	exec fvwmcmd "ColorSet 0 AspectPixmap \"$imagefile\""
+##	;;
+##esac
 
 wkdir=`mkdirn "${TMPDIR:-/tmp}/menubg"` || exit 1
 trap 'cd;(sleep 5; rm -rf "$wkdir")&' 0 1 2 15
@@ -72,6 +73,6 @@ imagefile=`basename "$imagefile"`
 impng=`echo "$imagefile" | sed 's/\\(.*\\.\)[^.]*$/\\1PNG/'`
 
 ##mogrify -geometry "$geom" -modulate 70 -despeckle -format PNG "$imagefile"
-mogrify -format PNG "$imagefile"
+mogrify -modulate 70 -format PNG "$imagefile"
 ##fvwmcmd "MenuStyle '*' MenuFace AspectPixmap \"$wkdir/$impng\""
 fvwmcmd "ColorSet 0 AspectPixmap \"$wkdir/$impng\""
