@@ -14,7 +14,7 @@ rc=$HOME/rc/mairix.$SYSTEMID
 # help?
 [ "x$*" = x-h -o "x$1" = 'x-?' ] && { echo "$usage"; exit 0; }
 
-[ $# = 0 ] && exec mrx-update "$MAILDIR/"*
+[ $# = 0 ] && exec mrx-update "$MAILDIR/"* "$MAILDIR/"[A-Z]*/*
 
 qargs=`shqstr "$@"`
 
