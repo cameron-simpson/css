@@ -9,6 +9,9 @@
 
 once=
 trace=set-x
+idledelay=1800
+expunge=512
+logfile=$LOGDIR/fetchmail
 
 cmd=$0
 usage="Usage: $cmd [-1] [fetchmail-options...]"
@@ -32,11 +35,12 @@ do
   $trace \
   fetchmail \
 	-f "$HOME/.fetchmailrc" \
-	-t 1800 \
-	--logfile "$LOGDIR/fetchmail" \
+	-t "$idledelay" \
+	-e "$expunge" \
+	--logfile "$logfile" \
 	--nobounce --tracepolls --warnings 86400 \
 	$fmopts ${1+"$@"} $fmhosts
-  echo `date`: fetchmail done >&2
+  echo `date`: fetchmail done | tee -a "$logfile" >&2
 
   [ $once ] && break
   sleep $fmdelay &
