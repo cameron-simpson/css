@@ -5,11 +5,11 @@
 #	- Cameron Simpson <cs@zip.com.au> 24jul2002
 #
 
+: ${TMPDIR:=/tmp}
+
 cmd=$0
 usage="Usage: $cmd [-t mimetype] {file|-} [[!]attribute...]
 	-t mimetype Supply type."
-
-TMPDIR=${TMPDIR:=/tmp}
 
 mtype=
 
