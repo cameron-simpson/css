@@ -3,7 +3,7 @@
 import re
 from types import *
 from cStringIO import StringIO
-from cs.lex import skipwhite
+from cs.lex import skipwhite, lastlinelen
 import cs.io
 
 safeChunkPtn = r'[\-+_a-zA-Z0-9./@]+'
@@ -12,11 +12,12 @@ safePrefixRe = re.compile('^'+safeChunkPtn)
 safeStringRe = re.compile('^'+safeChunkPtn+'$')
 integerRe    = re.compile('^-?[0-9]+$')
 
-def h2a(o):
-  io=StringIO()
+def h2a(o,i=None):
+  buf=StringIO()
+  io=cs.io.IndentedFile(buf,i)
   h2f(io,o)
-  e=io.getvalue()
-  io.close()
+  e=buf.getvalue()
+  buf.close()
   return e
 
 def h2f(fp,o):
@@ -62,43 +63,60 @@ def unsafeSubstringEncode(fp,s):
     if c == '\t':			enc='\\t'
     elif c == '\n':			enc='\\n'
     elif c == '\r':			enc='\\r'
-    elif c >= ' ' and ord(c) < 0x7f:	enc=c
-    else:				enc="\\x%02x" % ord(c)
+    elif c >= ' ' and c <= '~':		enc=c
+    else:
+      oc=ord(c)
+      if oc <= 0xff:			enc="\\x%02x" % oc
+      else:				enc="\\u%04x" % oc
     fp.write(enc)
 
 def listEncode(fp,l):
   fp.write("[")
-  if not(i is None): i+=1
 
-  sep=""
-  for o in l:
-    fp.write(sep)
-    h2f(fp,o,i)
-    if i is None: sep=", "
-    else:         sep=",\n"+' '*i
+  if len(l) > 0:
+    fp.adjindent(1)
+    dofold = not fp.getindent() is None
 
-  if not(i is None):
-    i-=1
-    fp.write("\n")
-    fp.write(' '*i)
+    sep=""
+    if dofold: nsep=",\n"
+    else:      nsep=", "
+
+    for o in l:
+      fp.write(sep)
+      sep=nsep
+      h2f(fp,o)
+
+    fp.popindent()
+
   fp.write("]")
-  fp.write("\n")
-  fp.write(' '*i)
 
 def dictEncode(fp,d,i=None):
   fp.write("{")
-  if not(i is None): i+=1
-
-  sep=""
   keys=d.keys()
-  keys.sort()
-  for k in keys:
-    fp.write(sep)
-    h2f(fp,k)
-    fp.write(" => ")
-    h2f(fp,d[k])
-    sep=", "
-  fp.write(" }")
+
+  if len(keys) > 0:
+    fp.adjindent(1)
+    dofold = not fp.getindent() is None
+
+    sep=""
+    if dofold: nsep=",\n"
+    else:      nsep=", "
+
+    keys.sort()
+    for k in keys:
+      fp.write(sep)
+      sep=nsep
+      keytxt=h2a(k,0)
+      fp.write(keytxt)
+      fp.write(" => ")
+
+      fp.adjindent(lastlinelen(keytxt)+4)	# key width + " => "
+      h2f(fp,d[k])
+      fp.popindent()
+
+    fp.popindent()
+
+  fp.write("}")
 
 def loadfile(filename):
   "Read hier data from a file"
@@ -113,10 +131,21 @@ def loadfile(filename):
 def savefile(dict,filename):
   "Write dictionary to a file."
   fp=file(filename,"w")
+  ifp=cs.io.IndentedFile(fp,0)
   keys=dict.keys()
   keys.sort()
   for key in keys:
-    print >>fp, "%-15s " % h2a(key), h2a(dict[key])
+    keytxt=h2a(key)
+    ifp.write(keytxt)
+    if len(keytxt) < 16:
+      ifp.write(' '*(16-len(keytxt)))
+      ifp.pushindent(16)
+    else:
+      ifp.write(' ')
+      ifp.pushindent(len(keytxt)+1)
+    h2f(ifp,dict[key])
+    ifp.popindent()
+    ifp.write('\n')
   fp.close()
 
 def kvline(line):
