@@ -19,9 +19,4 @@ esac
 #
 flags="$stdflags $colourflags"
 
-xanim=/usr/X11R6/bin/xanim
-case $SYSTEMID-$ARCH in
-    *-sun.sparc.solaris)	xanim=/opt/xanim/bin/xanim ;;
-esac
-set -x
-exec $xanim $flags ${1+"$@"}
+exec nostubs xanim $flags ${1+"$@"}
