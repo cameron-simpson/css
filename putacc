@@ -5,15 +5,24 @@ cd || exit 1
 [ $# -ge 1 ] || { echo "Usage: $0 [login@]hostname" >&2; exit 2; }
 host=$1; shift
 
-[ $# = 0 ] && set scripts .profile .zprofile .zshrc .setvar \
-		  rc/shell rc/env rc/perl rc/vi rc/nvi \
-		  .less .lesskey rc/less rc/lesskey
+[ $# = 0 ] && set scripts .profile .zprofile .zshrc .zshenv .setvar \
+		  rc/shell rc/env rc/perl rc/vi rc/nvi rc/x11 \
+		  .less .lesskey rc/less rc/lesskey \
+		  .xinitrc .xsession
 
-set -x
 case "$host" in
     agricola|tw|barstool)
-	rsync -avHPC --delete --rsh=ssho "$@" "$host":
+	first=1
+	for arg
+	do  [ $first ] && { set rsync -avHPC --rsh=ssho --include=rc
+			    first=
+			  }
+	    set "$@" "--include=/$arg"
+	done
+	set -x
+	"$@" '--exclude=/rc/*' '--exclude=/*' "$HOME/." "$host:."
 	;;
-    *)	tar cf - "$@" | ssho "$host" exec tar xf -
+    *)	set -x
+	tar cf - "$@" | ssho "$host" exec tar xf -
 	;;
 esac
