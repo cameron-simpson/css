@@ -4,4 +4,4 @@
 # Allocate (or reuse) a named desk, returning its number.
 #	- Cameron Simpson <cs@zip.com.au> 18jul2002
 #
-exec idset -i desktop -d "${DESKTOPSET:-${SYSTEMID:-${HOMEHOST:-${HOST:-`hostname`}}}}" ${1+"$@"}
+exec idset -d desktop -i "${DESKTOPSET:-${SYSTEMID:-${HOMEHOST:-${HOST:-`hostname`}}}}" ${1+"$@"}
