@@ -1,0 +1,21 @@
+#!/usr/bin/perl
+#
+# Extract tokens from SGML.
+#	- Cameron Simpson <cs@zip.com.au> 26oct99
+#
+
+use strict qw(vars);
+
+use cs::Source;
+use cs::SGML;
+use cs::Hier;
+
+my($parse)=new cs::SGML (new cs::Source (FILE,STDIN));
+
+my($t);
+
+while (defined ($t=$parse->Tok()))
+{ print cs::Hier::h2a($t,1), "\n";
+}
+
+exit 0;
