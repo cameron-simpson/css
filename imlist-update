@@ -86,7 +86,9 @@ my($err,$x,$y,$impath,@s);
 if ($mode ne APPEND && $indexfile ne '-')
 {
   nl("loading existing list ...") if $upd;
-  if (open(INDEX,"< $indexfile"))
+  if (-f "$indexfile.gz"
+	  ? open(INDEX,"gunzip <'$indexfile.gz' |")
+	  : open(INDEX,"< $indexfile\0")
   {
     OLDINDEX:
     while (defined($_=<INDEX>))
@@ -119,7 +121,7 @@ if ($mode ne APPEND && $indexfile ne '-')
   }
   else
   { $err = "$!";
-    if (-e $indexfile)
+    if (-e $indexfile -o -e "$indexfile.gz")
     { die "$::cmd: can't read $indexfile: $err";
     }
   }
@@ -168,7 +170,10 @@ if ($indexfile eq '-')
   { die "$::cmd; dup(STDOUT,INDEX): $!";
   }
 }
-elsif (!open(INDEX,($mode eq APPEND ? ">> $indexfile\0" : "> $indexfile\0")))
+elsif (!open(INDEX,
+		( -f "$indexfile.gz" ? "| gzip -9 " : "")
+	       .($mode eq APPEND ? ">>" : ">")
+	       ." $indexfile\0"))
 { die "$::cmd: open($indexfile): $!\n";
 }
 
