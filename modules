@@ -1,13 +1,10 @@
 #!/bin/sh
-#
-# 
+
+: ${TMPDIR:=/tmp}
 
 module=${1-modules}
 
-tmp=${TMP:-$HOME/tmp}
-[ -d "$tmp/." ] || tmp=/tmp
-
-cd "$tmp" || exit $?
+cd "$TMPDIR" || exit $?
 
 cvs co "$module" || exit $?
 
