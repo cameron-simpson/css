@@ -1,0 +1,10 @@
+#!/bin/sh
+#
+# Run command if named file is empty or missing.
+#	- Cameron Simpson <cs@zip.com.au> 06nov2003
+#
+[ $# -lt 2 ] && { echo "Usage: $0 filename command [args...]" >&2; exit 2; }
+file=$1; shift
+set -x
+[ -s "$file" ] && exit 0
+exec "$@"
