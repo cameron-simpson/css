@@ -5,7 +5,7 @@ cmd=$0
 [ $# = 0 ] || { echo "Usage: $cmd" >&2; exit 2; }
 
 case $HOST@$SYSTEMID in
-    zapff@cisra|amadeus@home)
+    kaper@cisra|amadeus@home)
 		set ":5 -name vnc:5@$HOST -depth 16 -geometry 1024x768"
 		    ## ":6 -name vnc:6@$HOST -depth 24 -geometry 1600x1200"
 		;;
