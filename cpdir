@@ -5,15 +5,19 @@
 #	- Cameron Simpson <cs@zip.com.au>
 #
 
+cmd=`basename "$0"`
 tar=gnutar
 buffer="buffer -m 1M"	# just use "cat" if you lack buffer
 
-[ $# = 2 ] || { echo "Usage: $0 fromdir todir" >&2
+[ $# = 2 ] || { echo "Usage: $cmd fromdir todir" >&2
 		exit 2
 	      }
 
 from=$1
 to=$2
+
+[ -d "$to/." ] && { echo "$cmd: $to already exists!" >&2; exit 1; }
+[ -d "$from/." ] || { echo "$cmd: $from missing!" >&2; exit 1; }
 
 case $ARCH in
     *.*.domainos) # preserve ACLs
