@@ -34,6 +34,20 @@
 #				with other functions or I/O.
 #
 
+=head1 NAME
+
+cs::Net::TCP - handle TCP network connections
+
+=head1 SYNOPSIS
+
+use cs::Net::TCP;
+
+=head1 DESCRIPTION
+
+This module supplied facilities for dealing with TCP stream connections.
+
+=cut
+
 use strict qw(vars);
 
 use Socket;
@@ -45,10 +59,50 @@ package cs::Net::TCP;
 
 @cs::Net::TCP::ISA=qw(cs::Port);
 
+=head1 CONSTANTS
+
+The follow flag constants should be ORed together
+to select the mode for the B<Serve> method.
+
+=over 4
+
+=item B<F_FORK>
+
+Fork a subprocess to handle connections.
+
+=cut
+
 $cs::Net::TCP::F_FORK=0x01;	# TCP::serv: fork on connection
+
+=item B<F_ONCE>
+
+Return after handling a single connection.
+
+=cut
+
 $cs::Net::TCP::F_ONCE=0x02;	# TCP::serv: service a single connection
+
+=item B<F_SYNC>
+
+Wait for the forked child.
+
+=cut
+
 $cs::Net::TCP::F_SYNC=0x04;	# TCP::serv: wait for forked child
+
+=item B<F_FORK2>
+
+Fork twice so children are orphans
+to avoid zombies when children need not be waited for.
+This flag implies B<F_FORK>.
+
+=cut
+
 $cs::Net::TCP::F_FORK2=0x08;	# TCP::serv: fork twice to orphan children
+
+=back
+
+=cut
 
 { my($name,$aliases);
 
@@ -57,44 +111,24 @@ $cs::Net::TCP::F_FORK2=0x08;	# TCP::serv: fork twice to orphan children
 	}
 }
 
-sub new
-{ my($class)=shift;
-  my($this);
+=head1 GENERAL FUNCTIONS
 
-  if (@_ == 2 || @_ == 3)
-  # connect to remote host/port
-  { my($conn)=conn(@_);
-    return undef if ! defined $conn;
+=over 4
 
-    $this=new cs::Port $conn;
-    return undef if ! defined $this;
-  }
-  elsif (@_ == 0 || @_ == 1)
-  # set up a service
-  { my($sockf)=service(@_);
-    return undef if ! defined $sockf;
-    $this={ cs::Net::TCP::SOCKET	=> $sockf,
-	  };
-  }
-  else
-  { my(@c)=caller;
-    warn "bad arguments to new $class (@_) called from [@c]:\n"
-	."   new $class (host,port[,localport]) -> connection\n"
-	."or new $class [port] -> service";
+=item conn(I<host>, I<port>, I<localport>)
 
-    return undef;
-  }
+Connect to the specified I<port>
+on the specified I<host>
+using the specified I<localport> at this end.
+Normally I<localport> is omitted
+an an arbitrary free local port is chosen.
+Returns the filehandle of the new socket.
 
-  bless $this, $class;
-}
-
-$cs::Net::TCP::_SOCK='TCPSOCK0000';
-sub _sockHandle
-{ "cs::Net::TCP::".$cs::Net::TCP::_SOCK++;
-}
+=cut
 
 sub conn	# (host,port[,localport]) -> (FILE)
 { my($rhost,$rport,$localport)=@_;
+  die "conn(\$\$;\$) with [@_]" if @_ != 2 && @_ != 3;
 
   $rport=cs::Net::portNum($rport,TCP);
   return undef if ! defined $rport;
@@ -145,6 +179,15 @@ sub conn	# (host,port[,localport]) -> (FILE)
   return undef;
 }
 
+=item service(I<port>)
+
+Listen for connection on the specified I<port>.
+If omitted, I<port> defaults to B<0>
+and an arbitrary free port is chosen to listen on.
+Returns the file handle of the new socket.
+
+=cut
+
 sub service	# [port] -> socket
 { my($port)=@_;
   $port=0 if ! defined $port;
@@ -154,9 +197,9 @@ sub service	# [port] -> socket
 
   my($sockf)=_sockHandle();
   if (! socket($sockf,Socket::PF_INET,Socket::SOCK_STREAM,$cs::Net::TCP::TCP))
-	{ warn "socket($sockf,PF_INET,SOCK_STREAM,TCP): $!";
-	  return undef;
-	}
+  { warn "$::cmd: socket($sockf,PF_INET,SOCK_STREAM,TCP): $!";
+    return undef;
+  }
 
   my($laddr)=Socket::INADDR_ANY;
   my($local)=scalar(Socket::sockaddr_in($port,$laddr));
@@ -172,28 +215,94 @@ sub service	# [port] -> socket
   $sockf;
 }
 
+=back
+
+=head1 OBJECT CREATION
+
+=over 4
+
+=item new B<cs::Net::TCP> I<port>
+
+Listen on the named I<port>.
+If omitted, I<port> defaults to B<0>, which should choose a free port.
+
+=item new B<cs::Net::TCP> I<host>, I<port>, I<localport>
+
+Connect to the I<port> on the specified host
+using the local I<localport> at this end.
+Normally I<localport> is omitted,
+and an arbitrary free local port number is allocated.
+
+=cut
+
+sub new
+{ my($class)=shift;
+  my($this);
+
+  if (@_ == 2 || @_ == 3)
+  # connect to remote host/port
+  { my($conn)=conn(@_);
+    return undef if ! defined $conn;
+
+    $this=new cs::Port $conn;
+    return undef if ! defined $this;
+  }
+  elsif (@_ == 0 || @_ == 1)
+  # set up a service
+  { my($sockf)=service(@_);
+    return undef if ! defined $sockf;
+    $this={ cs::Net::TCP::SOCKET	=> $sockf,
+	  };
+  }
+  else
+  { my(@c)=caller;
+    warn "bad arguments to new $class (@_) called from [@c]:\n"
+	."   new $class (host,port[,localport]) -> connection\n"
+	."or new $class [port] -> service";
+
+    return undef;
+  }
+
+  bless $this, $class;
+}
+
+=back
+
+=cut
+
+$cs::Net::TCP::_SOCK='TCPSOCK0000';
+sub _sockHandle
+{ "cs::Net::TCP::".$cs::Net::TCP::_SOCK++;
+}
+
+=item Port()
+
+Return the local port number of this socket.
+
+=cut
+
 sub Port
-	{
-	  my($this)=@_;
-	  my($sockaddr);
+{
+  my($this)=@_;
+  my($sockaddr);
 
-	  if (exists $this->{cs::Net::TCP::SOCKET})
-		{ $sockaddr=getsockname($this->{cs::Net::TCP::SOCKET});
-		}
-	  else
-		{ $sockaddr=getsockname($this->{IN}->{FILE});
-		}
+  if (exists $this->{cs::Net::TCP::SOCKET})
+  { $sockaddr=getsockname($this->{cs::Net::TCP::SOCKET});
+  }
+  else
+  { $sockaddr=getsockname($this->{IN}->{FILE});
+  }
 
-	  if (! defined $sockaddr)
-		{ warn "getsockname: $!";
-		  return undef;
-		}
+  if (! defined $sockaddr)
+  { warn "$::cmd: getsockname: $!";
+    return undef;
+  }
 
-	  warn "sockaddr=".cs::Hier::h2a($sockaddr,0);
-	  my($port,$addr)=Socket::sockaddr_in($sockaddr);
+  ## warn "sockaddr=".cs::Hier::h2a($sockaddr,0);
+  my($port,$addr)=Socket::sockaddr_in($sockaddr);
 
-	  $port;
-	}
+  $port;
+}
 
 sub Accept	# service -> cs::Port
 { my($this)=@_;
@@ -272,5 +381,11 @@ sub Serve	# (this,flags,func,@args) -> void
       last CONN if $onceonly;
     }
 }
+
+=head1 AUTHOR
+
+Cameron Simpson E<lt>cs@zip.com.auE<gt>
+
+=cut
 
 1;
