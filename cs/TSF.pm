@@ -10,7 +10,7 @@ BEGIN { use cs::DEBUG; cs::DEBUG::using(__FILE__); }
 
 package cs::TSF;	# cs::ALL::useAll();
 
-sub getTSSrc	# source -> @{record}
+sub getTSSrc($;$$)	# source -> @{record}
 { my($s,$sep,$botch)=@_;
   $sep="\t" if ! defined $sep;
   $botch=0 if ! defined $botch;
