@@ -1,0 +1,22 @@
+#!/bin/sh
+
+necho=/opt/script/necho
+opieop=/opt/bin/opieop
+
+while read cmd key etc
+do  case $cmd in
+	*[a-z]*)	cmd=`echo "$cmd"|tr '[a-z]' '[A-Z]'` ;;
+    esac
+    case $cmd in
+	GET)	echo 200 `$opieop "$key"` ;;
+	TRY)	if $opieop "$key" "$etc"
+		then	echo "200 OK: $key $etc"
+		else	echo "300 FAILED: $key $etc"
+		fi
+		;;
+	*)	echo "300 Unknown command \"$cmd\""
+		;;
+    esac
+done
+
+exit 0
