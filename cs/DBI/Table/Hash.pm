@@ -179,8 +179,11 @@ sub _Stash($$$)
 sub FETCH($$)
 { my($this,$key)=@_;
 
+  ## warn "FETCH($key)";
+
   my $live = $this->_Live();
   return $live->{$key} if exists $live->{$key};
+  ## warn "key \"$key\" not in _Live";
 
   my $table=$this->_Table();
   my $sql = "SELECT * from $table WHERE ".$this->_Key()." = ?";
@@ -188,9 +191,11 @@ sub FETCH($$)
   $sql.=" AND $where" if length $where;
 
   my $sth = cs::DBI::sql($this->_Dbh(),$sql);
+  ## warn "failed to make sth from \"$sql\"" if ! defined $sth;
   return undef if ! defined $sth;
 
   my @rows = cs::DBI::fetchall_hashref($sth,$key);
+  ## warn "no hits for \"$key\"" if ! @rows;
   return undef if ! @rows;
 
   warn "$0: FETCH($table,$key): multiple hits!"
@@ -211,16 +216,22 @@ sub EXISTS($$)
 sub STORE($$$)
 { my($this,$key,$value)=@_;
 
+  my $tkey = $this->_Key();
+  $value->{$tkey}=$key if ! exists $value->{$tkey};
+
+  ## warn "STORE($key)=".cs::Hier::h2a($value,0);
   my($dbh,$table)=($this->_Dbh(), $this->_Table());
 
   $this->DELETE($key) if defined $key;
+
+  ## warn "insert gives ".
 
   cs::DBI::insert($dbh, $table, keys %$value)
   ->ExecuteWithRec($value);
 
   $key=cs::DBI::last_id() if ! defined $key;
 
-  $this->_Live()->{$key}=$value;
+  $value;
 }
 
 sub DELETE($$)
