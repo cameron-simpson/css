@@ -26,6 +26,7 @@ do
 	'--include=/.mailcap' \
 	'--include=/.muttrc' \
 	'--include=/.profile' \
+	'--include=/.screenrc' \
 	'--include=/.secret' \
 	'--include=/.setvar' \
 	'--include=/.ssh' \
@@ -36,9 +37,6 @@ do
 	'--include=/.zprofile' \
 	'--include=/.zshenv' \
 	'--include=/.zshrc' \
-	'--include=/bin' \
-	"--include=/bin/$hARCH" \
-	'--exclude=/bin/*' \
 	'--include=/rc' \
 	'--include=/rc/env' \
 	'--include=/rc/mail' \
@@ -49,6 +47,7 @@ do
 	'--include=/rc/myke' \
 	'--include=/rc/nvi' \
 	'--include=/rc/perl' \
+	'--include=/rc/screen' \
 	'--include=/rc/shell' \
 	'--include=/rc/ssh' \
 	'--include=/rc/vi' \
