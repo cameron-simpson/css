@@ -1,0 +1,274 @@
+#!/usr/bin/perl
+#
+# My manual command, having given up on the bogosities of the others.
+#	- Cameron Simpson <cs@zip.com.au> 11may1997
+#
+
+require 'flush.pl';
+use Getopt::Std;
+use cs::Pathname;
+use cs::Shell;
+
+($cmd=$0) =~ s:.*/::;
+$usage="Usage: $cmd [-1ap] [-M manpath] [[-s] section] manual\n";
+
+$ManMacros=($ENV{OS} eq 'linux' ? '-mandoc' : '-man');
+$MyMacros="";	## "$ENV{HOME}/rc/header/man";
+$Roff=($ENV{OS} eq 'linux' ? 'groff -Tlatin1' : 'nroff');
+$ManProcess="soelim | neqn | tbl | $Roff $ManMacros $MyMacros -";
+# GNU col is a busted piece of crap
+if ($ENV{OS} ne 'linux') { $ManProcess.=" | col -x"; }
+$InfoProcess="info2man | $ManProcess";
+$Section="";
+$UseFirst=1;
+$UsePager= -t STDOUT;
+$Prefix=0;
+$PAGER=(length $ENV{PAGER} ? $ENV{PAGER} : "less");
+
+$badopts=0;
+
+if (! getopts('1apM:rs:'))
+{ warn "$cmd: unrecognised options\n";
+  $badopts=1;
+}
+
+$Section=$opt_s if defined $opt_s;
+$ENV{MANPATH}=$opt_M if defined $opt_M;
+$UseFirst=1 if defined $opt_1;
+$UseFirst=0 if defined $opt_a;
+$Prefix=1 if defined $opt_p;
+
+if (! length $Section && @ARGV > 1)
+{ $Section=lc(shift(@ARGV));
+}
+
+if (@ARGV)
+{ $Manual=shift(@ARGV);
+  if (@ARGV)
+  { warn "$cmd: extra arguments: @ARGV\n";
+    $badopts=1;
+  }
+}
+else
+{ warn "$cmd: missing manual\n";
+  $badopts=1;
+}
+
+die $usage if $badopts;
+
+$MANPATH=(defined $ENV{MANPATH}
+		? $ENV{MANPATH}
+		: "$ENV{HOME}/man:/usr/local/man:/usr/local/info:/usr/man");
+
+@MANPATH=split(/:/,$MANPATH);
+for (@MANPATH)
+{ $_='.' if ! length;
+}
+
+# step 1 - locate manual entries
+$ptn=($Prefix
+	? "$Manual.*\\.$Section"
+	: "^$Manual\\.$Section"
+     );
+undef %found;
+MANDIR:
+  for my $dir (@MANPATH)
+  {
+    next MANDIR if ! -d "$dir/.";
+
+    my @entries = cs::Pathname::dirents($dir);
+    ## if ($dir =~ /info/)
+    ## { warn "$dir:\n\t[@entries]\n";
+    ## }
+
+    # look for info files
+    for my $info (grep(/^$Manual\b(.*\.info.*)?$/, @entries))
+    { my $file = "$dir/$info";
+      my $key = $file;
+      $key =~ s/(\.(gz|Z|z))+$//;
+      $found{$key}=[INFO,$file];
+      push(@found,$key);
+      ## warn "found $key (INFO)\n";
+    }
+
+    my @subdirs = grep(/^(s?man|cat)$Section/oi,@entries);
+
+    SUBDIR:
+    for (sort
+	   { $a =~ /^s?man/
+	       ? $b =~ /^s?man/
+		 ? $a cmp $b
+		 : -1
+	       : $b =~ /^s?man/
+		 ? 1
+		 : $a cmp $b
+		 ;
+	   }
+	   @subdirs)
+    { if (/^s?man/)	{ $type=MAN; }
+      else		{ $type=CAT; }
+
+      $subdir="$dir/$_";
+      next SUBDIR if ! -d "$subdir/.";
+
+      @entries=cs::Pathname::dirents($subdir);
+      for $man (grep(/$ptn/oi,@entries))
+      { $file="$subdir/$man";
+	($key=$file) =~ s/(\.(gz|Z|z))+$//;
+	$found{$key}=[$type,$file];
+	push(@found,$key);
+	## warn "found $key ($type)\n";
+      }
+    }
+  }
+
+die "$cmd: no manual entry for $Manual"
+   .(length $Section ? " in section $Section\n" : "\n")
+	if ! keys %found;
+
+# toss cats for which there are mans
+CAT:
+  for $cat (keys %found)
+  { $type=$found{$cat}[0];
+    next CAT if $type ne CAT;
+    ($man=$cat) =~ s:/man(${Section}[^/]*/[^/]+)$:/cat$1:oi;
+    delete $found{$cat} if exists $found{$man};
+  }
+
+# keep only the keys which survived
+@found=grep(exists $found{$_},@found);
+
+# toss duplicates
+if (@found > 1)
+{ my(%dup);
+  my(@keep)=();
+  my(@s,$id);
+
+  STAT:
+  for my $f (@found)
+  { my $path = $found{$f}[1];
+    if (! (@s=stat ($path)))
+    { warn "stat($path): $!";
+      next STAT;
+    }
+    $id="$s[0]:$s[1]";
+    next STAT if exists $dup{$id};
+    $dup{$id}=1;
+    push(@keep,$f);
+  }
+
+  @found=@keep;
+}
+
+@found=sort { lc(basename($a)) cmp lc(basename($b)) } @found
+	if @found > 1;
+
+@found=$found[0] if $UseFirst;
+$Repeat=(@found > 1);
+
+my($first)=1;
+
+PROMPT:
+  while ($Repeat || $first)
+  {
+    if (@found > 1)
+    {
+      for ($i=0; $i <= $#found; $i++)
+      { printf("%-3s %s\n",
+	      ($i+1).":",
+	      $found{$found[$i]}[1]);
+      }
+      necho("which entry? ");
+      exit 0 if ! defined ($_=<STDIN>);
+      chomp;
+
+      if (! length)
+      { $i=0;
+      }
+      elsif ($_ eq 'q')
+      {
+	exit 0;
+      }
+      else
+      { if (! /^\d+$/)
+	{ die "$cmd: don't understand \"$_\"\n";
+	}
+
+	$i=$_-1;
+	if ($i < 0 || $i > $#found)
+	{ warn "$cmd: out of range\n";
+	  redo PROMPT;
+	}
+
+	# pick desired element
+	$found=$found[$i];
+      }
+    }
+    else
+    { $found=$found[0];
+    }
+
+    ($type,$file)=@{$found{$found}};
+
+    { my $efile = $file;
+      @exts=();
+      while ($efile =~ /\.(z|Z|gz|bz2)$/)
+      { push(@exts,$1); $efile=$`; }
+    }
+
+    $qfile=cs::Shell::quote($file);
+
+    # do the simple case
+    if ($type eq CAT && ! @exts)
+    { $command=$UsePager ? $PAGER : 'cat';
+    }
+    else
+    {
+      if ($type eq MAN)
+      { $command=$ManProcess;
+      }
+      elsif ($type eq INFO)
+      { $command=$InfoProcess;
+      }
+
+      if ($UsePager)
+      { $command.=" | $PAGER";
+      }
+
+      for (@exts)
+      { if ($_ eq 'gz')		{ $preprocess="gunzip"; }
+	elsif ($_ eq 'bz2')	{ $preprocess="bunzip2"; }
+	elsif ($_ eq 'Z')	{ $preprocess="zcat"; }
+	elsif ($_ eq 'z')	{ $preprocess="pcat"; }
+	else
+	{ die "$cmd: unsupported extension \"$_\"";
+	}
+
+	$command="$preprocess | $command";
+      }
+    }
+
+    my $qdir = cs::Shell::quote(cs::Pathname::dirname($file));
+    $command="_DocFile=$qfile; export _DocFile; cd $qdir; <$qfile $command";
+
+    $wd=cs::Pathname::dirname($file);
+    chdir($wd) || die "$cmd: chdir($wd): $!\n";
+    $ENV{PWD}=$wd;
+    $ENV{MANFILE}=$file;
+
+    warn "using $file\n";
+    warn "command=$command\n";
+    system("set -vx; $command");
+
+    $first=0;
+  }
+
+exit $?;
+
+sub necho
+{ printflush(STDOUT,@_);
+}
+
+sub basename
+{ cs::Pathname::basename(@_);
+}
