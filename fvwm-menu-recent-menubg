@@ -2,6 +2,6 @@
 log=$HOME/var/log/menubg
 
 tmpf=/tmp/fvmbg$$
-tail -60 "$log" | sed 's;^$HOME/;;' | keeplast >$tmpf
+tail -200 "$log" | sed 's;^$HOME/;;' | keeplast | reverse | sed 40q >$tmpf
 fvwm-menu-imlist -l $tmpf -o menubg .
 rm $tmpf
