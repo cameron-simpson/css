@@ -1,0 +1,68 @@
+#!/usr/bin/perl
+#
+# Simple dbm file querier.
+#
+
+($cmd=$0) =~ s:.*/::;
+
+if ($#ARGV != $[)
+	{ die "Usage: $0 dbmfile\n";
+	}
+
+require 'cs/pathname.pl';
+require 'flush.pl';
+
+$dbm=shift;
+$dbmname=&basename($dbm);
+
+dbmopen(DBM,$dbm,0666) || die "$cmd: can't dbmopen($dbm): $!\n";
+
+PROMPT:
+  while (&printflush(STDOUT,"$cmd:$dbmname> "),
+	  defined($_=<STDIN>)
+	)
+	{ chop;
+	  s/^\s+//;
+	  next PROMPT if length == 0;
+
+	  if (/^!\s*/)
+		{ system($');
+		}
+	  else
+	  { @words=grep(length,split(/\s+/));
+
+	    $_=shift(@words);
+	    if ($_ eq 'quit')
+		{ last PROMPT;
+		}
+	    elsif ($_ eq 'del')
+		{ for (@words)
+			{ delete $DBM{$_};
+			}
+		}
+	    elsif ($_ eq 'add')
+		{ $key=shift @words;
+		  $DBM{$key}=join(' ',@words);
+		}
+	    elsif ($_ eq 'show')
+		{ for (@words)
+			{ print $_;
+			  if (defined($DBM{$_}))
+				{ print ' -> [', $DBM{$_}, ']';
+				}
+			  else
+			  { print ' UNDEF';
+			  }
+
+			  print "\n";
+			}
+		}
+	    else
+	    { print STDERR "$cmd: $_: unknown command\n";
+	    }
+	  }
+	}
+
+dbmclose(DBM);
+
+exit 0;
