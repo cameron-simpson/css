@@ -26,13 +26,21 @@ host=$1; shift
 
 case "$host" in
     *,*)
+	[ -n "$DISPLAY" ] || { echo "$cmd: can't do multiple sessions without a \$DISPLAY" >&2
+			       exit 1
+			     }
 	for h in `echo "$host" | tr , ' '`
 	do  "$0" "$h" ${1+"$@"}
 	done
 	exit 0
 	;;
-    root@* | screen:root@*)
+    root@*)
 	exec root@ "$host"
+	;;
+    screen:root@*)
+	name=`expr "$host" : 'screen:\(.*\)'`
+	host=`expr "$name" : 'root@\(.*\)'`
+	exec term -e scr "$name" nox root@ "$host"
 	;;
     screen:*)
 	host=`expr "$host" : 'screen:\(.*\)'`
