@@ -4,7 +4,8 @@
 #	- Cameron Simpson <cs@zip.com.au> 80jul2004
 #
 
-: ${VARLOG:=$HOME/var/log}
+: ${LOGDIR:=$HOME/var/log}
+
 termopts=
 
 cmd=$0
@@ -20,7 +21,7 @@ for log
 do
   case "$log" in
     /* | ./* | ../* ) ;;
-    *) log=$VARLOG/$log ;;
+    *) log=$LOGDIR/$log ;;
   esac
 
   [ -f "$log" ] || { echo "$cmd: not a file: $log" >&2
