@@ -14,10 +14,11 @@ case $shell-$SYSTEMID-$ARCH in
     shell-*)		exec "$SHELL" ${1+"$@"} ;;
     sh-*)		shell=/bin/sh ;;
     bash-*-sun.*.solaris) shell=/opt/bin/bash ;;
+    bash-cisra-freebsd.x86.freebsd) shell=/usr/local/bin/bash ;;
     bash-*)		shell=/bin/bash ;;
     ae-*)		shell=$HOME/bin/$ARCH/ae ;;
     ksh-*)		shell=/bin/ksh ;;
-    *)			echo "$shell: no knowledge for $SYSTEMID-$ARCH" >&2
+    *)			echo "$shell: no knowledge for $shell-$SYSTEMID-$ARCH" >&2
 			exit 1
 			;;
 esac
