@@ -25,7 +25,7 @@ use cs::Misc;
 use cs::Port;
 use IPC::Open2;
 
-BEGIN { use cs::DEBUG; cs::DEBUG::using(__FILE__); }
+##BEGIN { use cs::DEBUG; cs::DEBUG::using(__FILE__); }
 
 package cs::SystemPort;
 
