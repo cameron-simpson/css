@@ -7,16 +7,24 @@
 #
 
 cmd=$0
-usage="Usage: $0 [[!]/ptn/] [imagefile]
-	$0 -xpl"
+usage="Usage: $0 [-xpl] [{imagefile|ptns...}]"
 
-if [ "x$1" = x-xpl ]
+[ -n "$DISPLAY" ] || { echo "$cmd: no \$DISPLAY!" >&2; exit 1; }
+
+xplanet=
+[ "x$1" = x-xpl ] && { xplanet=1; shift; }
+
+if [ $# -gt 0 ] && [ -s "$1" ]
 then
+    imagefile=$1; shift
+else
+    imagefile=`bglist -n 20 -w ${1+"$@"} | pickn`
+fi
 
-    shift
-
+if [ $xplanet ]
+then
     imdir=$HOME/etc/im
-    backdrop=$imdir/places/sydney_harbour.jpg
+    backdrop=$imagefile
     clouddir=$imdir/space
     clouds=$clouddir/clouds_1600.jpg
     ssecclouds=$clouddir/latest_moll.gif
@@ -46,25 +54,7 @@ then
     exit 0
 fi
 
-ptn=${SETRXVTPTN:-"/./"}
-case $1 in
-    /* | !/*)	[ -s "$1" ] || { ptn=$1; shift; } ;;
-esac
-
-case $# in
-    0)	src=`bglist -n 20 -w -p "$ptn" | pickn`
-	[ -n "$src" ] \
-	|| { echo "$cmd: no images matching \"$ptn\"" >&2
-	     exit 1
-	   }
-	;;
-    1)	src=$1 ;;
-    *)	shift; echo "$cmd: extra arguments: $*" >&2; exit 2 ;;
-esac
-
-[ -n "$DISPLAY" ] || { echo "$cmd: no \$DISPLAY!" >&2; exit 1; }
-
-case "$src" in
-    *.gif|*.xpm)	2xpm -s root "$src" xpmroot & ;;
-    *)			2png -s root "$src" display -window root & ;;
+case "$imagefile" in
+    *.gif|*.xpm)	2xpm -s root "$imagefile" xpmroot & ;;
+    *)			2png -s root "$imagefile" display -window root & ;;
 esac
