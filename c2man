@@ -6,6 +6,8 @@
 # Added -h option. - Cameron Simpson, September 1992
 #
 
+: ${TMPDIR:=/tmp}
+
 cmd=`exec basename "$0"`
 usage="Usage: $cmd [-d mandir] [-I incdir]... [-h header]... [-s mansection] \\
 		[C-files...]
@@ -39,7 +41,7 @@ case $# in 0) set x *.h *.c; shift ;; esac
 
 [ -n "$mandir" ] || { mandir=.; echo "$cmd: warning: mandir=$mandir" >&2; }
 
-workdir=/tmp/$cmd.$$
+workdir=$TMPDIR/$cmd.$$
 
 xit=0
 tidied=
