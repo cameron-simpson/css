@@ -1,0 +1,78 @@
+#!/bin/sh
+#
+# Monitor web logs as specified in the dirs on the input.
+#	- Cameron Simpson <cs@zip.com.au> 31jul2000
+#
+
+cmd=`basename "$0"`
+usage="Usage: $cmd [-f sedf] [-p perlf] [{-|reldir}...]
+	-f sedf	Sed script to filter the \"url title\" stage.
+	-p perlf Perl-p script to filter the \"url title\" stage."
+
+cd || exit 1
+
+sedf=
+homepfx=file:/u/${USER:-cameron}
+
+wlpopts=
+case $1 in
+    -[fp])	wlpopts="$wlpopts $1 $2"; shift; shift ;;
+esac
+
+[ $# = 0 ] && { set x -; shift; }
+
+while [ $# -gt 0 ]
+do
+  reldir=$1; shift
+
+  case $reldir in
+    -)	
+      set x `cat` ${1+"$@"}
+      shift
+      continue
+      ;;
+    /*)
+      echo "$0: non-~-relative directory: $reldir" >&2
+      continue
+      ;;
+  esac
+
+  ( urldir=$reldir/urls
+    state=$reldir/state
+    updates=$reldir/updates
+    notefile=$HOME/$reldir/updates.html
+
+    for logset in ${1+"$@"} ${1-`ls "$urldir/."`}
+    do
+	logstate=$state/$logset
+	>>"$logstate"
+
+	loglist=$urldir/$logset
+	[ -s "$loglist" ] || { echo "$cmd: nothing in $loglist" >&2
+			       continue
+			     }
+
+	linkfile=`mkdatedfile -s .html "$updates/$logset"` \
+	|| { echo "$cmd: can't make update for $logset, skipping" >&2
+	     continue
+	   }
+
+	sort -u -o "$loglist" "$loglist"
+	watchweblogs $wlpopts "$logstate" <"$loglist" \
+	| sed -n 's|^[a-z]*://\([^/][^/]*\)|\1 &|p' \
+	| while read host url title
+	  do  [ -n "$host" ] || continue
+	      [ "x$title" != x ] && echo "<A HREF=\"$url\">$title</A> @ $host</BR>"
+	  done >"$linkfile"
+
+	# nothing new
+	[ -s "$linkfile" ] || { rm "$linkfile"; continue; }
+
+	when=`date`
+	noteurl -f "$notefile" -t "$logset - $when" "$homepfx/$linkfile" &
+    done
+    wait
+  ) &
+done
+
+wait
