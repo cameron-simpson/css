@@ -88,4 +88,4 @@ do
     fi \
     | sed "s;^[^/];$dir/&;"
 done \
-| ( : set -x; eval "$filter"; cat >/dev/null )
+| ( set -x; eval "$filter"; cat >/dev/null )
