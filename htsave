@@ -38,7 +38,7 @@ do
       continue
   fi
 
-  (set -x; exec httpget -h -o "$tmpf" "$url") \
+  (set -x; exec lock htsave httpget -h -o "$tmpf" "$url") \
   || { xit=1; continue; }
 
   (
