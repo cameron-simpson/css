@@ -1,70 +1,29 @@
 #!/bin/sh
 
-cd || exit 1
-
 [ $# -ge 1 ] || { echo "Usage: $0 [login@]hostname" >&2; exit 2; }
 host=$1; shift
+
+cd || exit 1
 
 hasrsync=1
 rrsync=rsync
 
 if [ $# = 0 ]
 then
-    set .profile .zprofile .zshrc .zshenv .setvar \
-		  rc/shh rc/shell rc/env rc/perl rc/vi rc/nvi rc/x11 \
+    set .profile .zshenv .setvar \
+		  rc/ssh rc/shell rc/env rc/perl rc/vi rc/nvi rc/x11 \
 		  .less .lesskey rc/less rc/lesskey \
 		  .xinitrc .xsession \
+		  there/cameron@cskk.homeip.net/scripts \
+		  there/cameron@cskk.homeip.net/bin/$hARCH \
+		  there/home \
 		  scripts bin
     hARCH=$ARCH
 fi
 
-case "$host" in
-    ivory|[ab].squid)
-	hasrsync=
-	;;
-esac
-
-rsinc=/tmp/putacc$$
-
-files=
-targs=
 for arg
-do
-  case "$arg" in
-      scripts)
-	targ="$arg there/home/$arg"
-	;;
-      bin)
-	targ="$arg there/home/$arg/$hARCH"
-	;;
-      *)targ=$arg ;;
-  esac
-  for target in $targ
-  do
-    if [ $hasrsync ]
-    then
-	if [ -d "$target" ]
-	then
-	    ( set -x
-	      ssh "$host" "[ -d '$target/.' ] || mkdir -p '$target'" || exit 1
-	      exec rsync -avH --delete "$target/." "$host:$target/."
-	    )
-	else
-	    ( set -x
-	      exec rsync -avH "$target" "$host:$target"
-	    )
-	fi
-    else
-	targs="$targs $target"
-    fi
-  done
-done
+do  echo "rm -rf $arg"
+done | ssh "$host" sh -x
 
-if [ $hasrsync ]
-then
-    : rsync -avH --delete "--rsync-path=$rrsync" 
-else
-    (set -x; tar cf - $targs | ssho "$host" "rm -f $targs; exec tar xf -")&
-fi
-
-wait
+set -x
+tar cf - "$@" | ssh "$host" tar xvf -
