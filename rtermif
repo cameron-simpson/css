@@ -1,0 +1,12 @@
+#!/bin/sh
+#
+# Open fresh shell on target machine in new window.
+#	- Cameron Simpson <cs@zip.com.au> 23oct2001
+#
+
+[ $# = 0 ] || { echo "Usage: $0"; exit 2; }
+
+if [ -n "$REMOTE_XSESSION_HOST" ]
+then  @ "$REMOTE_XSESSION_HOST"
+else  term
+fi
