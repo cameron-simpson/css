@@ -64,23 +64,29 @@ fi
 eval "exec 9>&1 8>&$fd"
 
 xitcode=/tmp/xit.$$
+>$xitcode
 
 ( exec 8>&-	## we don't need 8 in this half
   [ $fd != 1 ] && eval "exec $fd>&1 1>&9"
   exec 9>&-
   "$@"
   echo $? >$xitcode
-) | ( exec 9>&-	## we don't need 9 in this half
-      exec 1>&8 8>&-
-      case "$filter" in
+) | ( exec 3<&0		# save stdin to protect from bg disconnect
+      ( exec <&3 3<&-	# reconnect stdin
+	exec 9>&-	## we don't need 9 in this half
+	exec 1>&8 8>&-
+	case "$filter" in
 	  *\ *)	eval "$filter" ;;
 	  *)	exec "$filter" ;;
-      esac
+	esac
+      ) &
     )
 
 # collect exit status
+while [ ! -s $xitcode ]; do sleep 1; done
 xit=`cat $xitcode`
 rm -f $xitcode
+
 [ -n "$xit" ] || { echo "$cmd: can't get exit code for $*" >&2
 		   xit=1
 		 }
