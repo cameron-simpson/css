@@ -73,7 +73,7 @@ $(scriptmandir)/%.1: %
 	    '#!/usr/bin/perl'*) \
 		grep '^=head1 NAME' <$? >/dev/null || exit 0 \
 		echo "pod2man $?" \
-		pod2man --section=1cs --center="Cameron Simpson's Scripts" $? >$@ \
+		pod2man --release=CSS --section=1cs --center="Cameron Simpson's Scripts" $? >$@ \
 		echo "pod2html $?" \
 		pod2html --title="Cameron Simpson's Scripts: $?" $? >$$htman \
 		;; \
