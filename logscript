@@ -1,11 +1,11 @@
-#!/bin/sh
+#!/bin/sh -u
 #
 # Run and log a script session.
 #	- Cameron Simpson <cs@zip.com.au> 18may2002
 #
 
 cmd=`basename "$0"`
-usage="Usage: $cmd [-m msg] [-d logdir] logbase [{-c shcmd | cmd [args...]}]"
+usage="Usage: $cmd [{-M | -m msg}] [-d logdir] logbase [{-c shcmd | cmd [args...]}]"
 
 : ${LOGDIR:=$HOME/var/log}
 : ${SHELL:=/bin/sh}
@@ -13,6 +13,7 @@ usage="Usage: $cmd [-m msg] [-d logdir] logbase [{-c shcmd | cmd [args...]}]"
 logdir=$LOGDIR/sessions
 msg=
 nomsg=
+dozip=1
 
 badopts=
 
@@ -20,8 +21,9 @@ while :
 do
   case "$1" in
     -d)	logdir=$2; shift ;;
-    -m)	msg=$2; shift ;;
+    -m)	nomsg= msg=$2; shift ;;
     -M)	nomsg=1 ;;
+    +z)	dozip= ;;
     --)	shift; break ;;
     -?*)echo "$cmd: unrecognised option: $1" >&2; badopts=1 ;;
     *)	break ;;
@@ -34,7 +36,7 @@ then
   echo "$cmd: missing logbase" >&2
   badopts=1
 else
-  logbase=$1; shift
+  logfile=$1; shift
 
   if [ $# -gt 0 ]
   then
@@ -57,7 +59,7 @@ fi
 || [ -n "$msg" ] \
 || msg=`readbugline` \
 || { echo "$cmd: empty message rejected" >&2; exit 1; }
-echo "msg=[$msg]" >&2
+##echo "msg=[$msg]" >&2
 
 # we only need popSHELL if specific command supplied
 if [ $# -gt 0 ]
@@ -72,8 +74,17 @@ then
   [ -n "$popSHELLpath" ] || { echo "$cmd: can't find popSHELL script" >&2; exit 1; }
 fi
 
-logfile=$logdir/$logbase-`datecode`
-logdir=`dirname "$logfile"`
+case "$logfile" in
+  .)	wd=`pwd` || exit 1
+	logfile=`basename "$wd"` || exit 1
+	;;
+esac
+case "$logfile" in
+  /* | ./* | ../* ) ;;
+  *) logfile=$logdir/$logfile-`datecode` || exit 1 ;;
+esac
+
+logdir=`dirname "$logfile"` || exit 1
 needdir "$logdir" || exit 1
 
 # hideous hack to restore $SHELL inside script command
@@ -87,20 +98,22 @@ then
     export SHELL popSHELL popSHELLcmd
 fi
 
-{ echo
-  echo "$HOST @ $SYSTEMID"
+{ echo "$HOST @ $SYSTEMID"
   date
   id
+  pwd
   echo
 } >>"$logfile"
 
-wd=`pwd|entilde`
-[ -n "$popSHELLexec" ] && dlog "$HOST@$SYSTEMID: $wd: start $popSHELLexec" &
+##wd=`pwd|entilde`
+##dl "$HOST@$SYSTEMID: $wd: start $popSHELLcmd"
+
 script -a "$logfile"
 xit=$?
-[ -n "$popSHELLexec" ] && dlog "$HOST@$SYSTEMID: $wd: end   $popSHELLexec" &
 
-[ $nomsg ] || { [ -n "$BUGSYSTEMS" ] && buglog "$msg" <"$logfile"; }
-gzip -v -9 "$logfile"
+##dl "$HOST@$SYSTEMID: $wd: end   $popSHELLcmd"
+
+[ $nomsg ] || { [ -n "$BUGSYSTEMS" ] && bgstdin buglog "$msg" <"$logfile"; }
+[ $dozip ] && gzip -v -9 "$logfile"
 
 exit $xit
