@@ -12,11 +12,13 @@ n=0
 tall=
 wide=
 gotptns=
+anyopt=
 
 cmd=$0
 usage="Usage: $cmd [-t] [-w] [-r] [-n count] [ptns... [-- directories...]]
-	-r	Randomise output.
 	-n count Choose the first count items.
+	-o	\"or\" mode - any pattern may match, not all.
+	-r	Randomise output.
 	-t	Choose tall images (eg for tty backgrounds).
 	-w	Choose wide images (eg for wallpaper)."
 
@@ -25,6 +27,7 @@ while :
 do
     case $1 in
       -n)	n=$2; shift ;;
+      -o)	anyopt=-o ;;
       -r)	random=1 ;;
       -t)	tall=1 ;;
       -w)	wide=1 ;;
@@ -65,7 +68,7 @@ else
     fi
 fi
 
-[ -n "$ptns" ] && filter="$filter | grepall $ptns"
+[ -n "$ptns" ] && filter="$filter | grepall $anyopt $ptns"
 
 [ $random ] && filter="$filter | shuffle"
 [ "x$n" = x0 ] || filter="$filter | sed '${n}q'"
