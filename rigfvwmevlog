@@ -13,4 +13,4 @@ fifo=$HOME/tmp/fvwmevfifo-$HOST-$DISPLAY-$$
 FvwmCommand -S "$fifo"
 sleep 5
 FvwmCommand -f "$fifo" -mi3 -F0 >>"$FVWMEVLOG" &
-fvwmmon | sh &
+fvwmmon | FvwmCommand -c &
