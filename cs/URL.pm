@@ -28,6 +28,7 @@ use cs::Upd;
 use cs::Source;
 use cs::HTML;
 use cs::HTTP;
+use cs::HTTP::Auth;
 use cs::HTTPS;
 
 package cs::URL;
@@ -700,6 +701,8 @@ sub _Get($$;$)
 
   my %triedAuth;
 
+  my $rqhdrs = cs::HTTP::rqhdr($this);
+
   GET:
   while (1)
   { $url = $this->Text(1);
@@ -717,8 +720,6 @@ sub _Get($$;$)
     { warn "$context:\n\tscheme $scheme not implemented";
       last GET;
     }
-
-    my $rqhdrs = cs::HTTP::rqhdr($this);
 
     my ($phost,$pport) = $this->Proxy();
 
@@ -758,22 +759,29 @@ sub _Get($$;$)
 	last GET;
       }
     }
-    elsif ($rcode eq $cs::HTTP::E_UNAUTH && ! $triedAuth{$url})
+    elsif ($rcode eq $cs::HTTP::E_UNAUTH)
     {
-      my $auth = $this->AuthDB();
-      if (! defined $auth)
-      { warn "$context:\n\tauthentication challenge but no auth db";
-	last GET;
-      }
-
       # get challenge info from hdrs
-      my ($scheme,$label)=$auth->ParseWWW_AUTHENTICATE($M);
+      my ($scheme,$label)=cs::HTTP::Auth::parseWWW_AUTHENTICATE($M);
       if (! defined $scheme)
       { warn "$context:\n\tcan't parse WWW_AUTHENTICATE";
 	last GET;
       }
 
       my $host = $this->Host();
+
+      warn "GETAUTH($rcode): scheme=$scheme, host=$host, label=$label\n" if $::Verbose;
+
+      if ($triedAuth{$url})
+      { warn "already tried auth for $url\n";
+	last GET;
+      }
+
+      my $auth = $this->AuthDB();
+      if (! defined $auth)
+      { warn "$context:\n\tauthentication challenge but no auth db";
+	last GET;
+      }
 
       # get response info
       my $resp = $auth->GetAuth($scheme,$host,$label);
@@ -782,13 +790,13 @@ sub _Get($$;$)
 	last GET;
       }
 
-      if ($::Verbose || $::Debug)
+      if ($::Debug)
       { warn "$context:\n\ttrying auth $resp->{USERID}:$resp->{PASSWORD}\n";
       }
 
-      $rqhdrs=cs::HTTP::rqhdr($this);
       $auth->HdrsAddAuth($rqhdrs,$scheme,$resp);
       $triedAuth{$url}=1;
+      $cs::URL::_Getting{$url}=0;
     }
     elsif ($rcode ne $cs::HTTP::R_OK)
     { warn "$context:\n\tunexpected response: $rversion $rcode $rtext\n";
@@ -939,10 +947,8 @@ containing the authentication tokens we possess.
 =cut
 
 sub AuthDB($)
-{ my($this)=@_;
-
-  ::need(cs::HTTP::Auth);
-  cs::HTTP::Auth->new("$ENV{HOME}/private/httpauth.db");
+{ shift;
+  return new cs::HTTP::Auth(@_);
 }
 
 =back
