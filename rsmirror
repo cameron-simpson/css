@@ -262,6 +262,18 @@ do
     # This is a I<much> more succinct and readable way to pass complicated
     # include/exclude patterns to I<rsync>.
     #
+    # Also, the presence of the file:
+    #
+    # I<config>-I<method>
+    #
+    # is sought for all lines, and used if present.
+    # This is for global specifications.
+    # Mine says:
+    #
+    #	- .nfs*
+    #
+    # to ignore NFS transient files, which are always noise.
+    #
     allcf=$cf-$how
     extracf=$cf-$how-$host-`echo $path|tr / :`
     case $how in
