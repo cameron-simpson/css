@@ -1,0 +1,35 @@
+#!/usr/bin/perl
+#
+# Usage: mrgtags [-d supposed-pwd] [tagfiles]
+#
+# Merges the tags provided, giving precedence to earlier tags.
+#
+
+($cmd=$0) =~ s:.*/::;
+
+undef $pwd;
+if ($#ARGV > $[ && $ARGV[$[] eq '-d')
+	{ shift; $pwd=shift; }
+
+undef %file, %ptn;
+while (<>)
+	{ if (!/^\s*(\S+)\s+(\S+)\s+(.*)/)
+		{ print STDERR "$cmd: $ARGV, line $.: rejecting bad line: $_";
+		  next;
+		}
+
+	  $k=$1; $f=$2; $p=$3;
+
+	  if (defined($pwd) && length($pwd) && $f !~ /^\.?\.?\//)
+		{ $f="$pwd/$f";
+		}
+
+	  next if defined($file{$k});
+
+	  $file{$k}=$f;
+	  $ptn{$k}=$p;
+	}
+
+for (sort keys %file)
+	{ print "$_ $file{$_} $ptn{$_}\n";
+	}
