@@ -5,9 +5,7 @@
 #
 # Usage: mailif [-s subject] addresses...
 #
-# Break into execif and mailsubj. - cameron, 23jun98
+# Break into execif and mailsubj. - cameron, 23jun1998
 #
 
-PATH=$PATH:/opt/script:/opt/bin
-export PATH
 execif mailsubj ${1+"$@"}
