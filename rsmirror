@@ -24,13 +24,17 @@ verbose=
 trace=
 [ -t 1 ] && verbose=1
 timeout=
+rsync=rsync
 
 cmd=`basename "$0"`
-usage="Usage: $cmd [-n] [-v] [-P] [-f config] [-d dir] [[server]::root...]
+usage="Usage: $cmd [-n] [-v] [-P] [-f config] [-d dir] [[server]::rootpfx...]
 	-n -v -P	Passed to rsync.
+	-R rsync-cmd	Rsync command. Default: $rsync
 	-f config	Read config from this file. Default: $cf
 	-d dir		Install mirrors here. Default: $where
-	-t secs		Timeout each update after secs seconds."
+	-t secs		Timeout each update after secs seconds.
+	-z		Use compression.
+	+z		Don't use compression."
 
 rsopts=
 rszopt=-z
@@ -61,6 +65,12 @@ do  case $1 in
 	-n)	trace=1 rsopts="$rsopts $1" ;;
 	-P)	trace=1 verbose=1 rsxopts="$rsxopts $1" ;;
 	-v)	trace=1 verbose=1 rsxopts="$rsxopts $1" ;;
+
+	# =item B<-R>
+	#
+	# Specify the rsync command to use.
+	#
+	-R)	rsync=$2; shift ;;
 
 	# =item B<-z>
 	#
@@ -110,10 +120,12 @@ do  case $1 in
     shift
 done
 
-# =item [I<server>]B<::>I<root>
+# =item [I<server>]B<::>I<rootpfx>
 #
-# If any B<I<server>::I<root>> or B<::I<root>> arguments are present,
+# If any B<I<server>::I<rootpfx>> or B<::I<rootpfx>> arguments are present,
 # act only on those lines in the file.
+# I<rootpfx> may match any complete path component prefix
+# (i.e. ::foo would match B<foo>, B<foo/bar> but not B<foobar>).
 #
 # =back
 #
@@ -222,14 +234,22 @@ do
     # check if only doing some mirrors
     if [ $# -gt 0 ]
     then
-      case " $* " in
-	*" $host::$path "*|*" ::$path "*)
-	  ;;
-	*)
+      yep=
+      for arg
+      do  case "$host::$path" in
+	      "$arg" | "$arg"/* )
+		yep=1; break ;;
+	  esac
+	  case "::$path" in
+	      "$arg" | "$arg"/* )
+		yep=1; break ;;
+	  esac
+      done
+      if [ -z "$yep" ]
+      then
 	  [ $verbose ] && echo "$pfx: skipping $host::$path"
 	  continue
-	  ;;
-      esac
+      fi
     fi
 
     # compute full path
@@ -297,7 +317,7 @@ do
 	fi
 
 	eval \
-	  "($tracecmd; $timelimit rsync -rlHt \$rszopt \$rsxopts \$rsopts $opts \"\$host::\$path/.\" \"\$fpath/.\")" \
+	  "($tracecmd; $timelimit $rsync -rlHt \$rszopt \$rsxopts \$rsopts $opts \"\$host::\$path/.\" \"\$fpath/.\")" \
 	  || xit=1
 	[ $latest ] && rm -f "$latelist"
 	;;
