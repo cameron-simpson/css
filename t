@@ -73,6 +73,8 @@ extract_jar='jar x${vlet}f /dev/fd/0'
 view_jar=$toc_jar
 
 toc_ogg='pageif ogginfo /dev/fd/0'
+extract_ogg='pageif ogginfo /dev/fd/0'
+view_ogg='pageif ogginfo /dev/fd/0'
 
 toc_uu="egrep $formopts '^(begin|end) '"
 extract_uu='uudecode $formopts /dev/fd/0'
