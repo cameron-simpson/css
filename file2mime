@@ -12,7 +12,11 @@ usage="Usage: $cmd filename
 [ $# = 1 ] || { echo "$usage" >&2; exit 2; }
 file=$1; shift
 
-type=`file -L "$file"` || exit 1
+case $ARCH in
+  *.*.solaris)	lopt= ;;	# standard file(1)
+  *)		lopt=-L ;;	# GNUish file(1)
+esac
+type=`file $lopt "$file" | tr '	' ' '` || exit 1
 
 mtype=
 case "$type" in
