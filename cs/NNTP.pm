@@ -257,19 +257,21 @@ sub _text # (void) -> @lines
 }
 
 # post a complete article contained in a file
-sub PostFile{ my($this,$fname)=@_;
-	      my($s);
+sub PostFile
+{ my($this,$fname)=@_;
+  my($s);
 
-	      $s=new cs::Source PATH, $fname;
-	      return undef if ! defined $s;
+  $s=new cs::Source PATH, $fname;
+  return undef if ! defined $s;
 
-	      _with($this,\&_post,$s);
-	    }
+  _with($this,\&_post,$s);
+}
 
-sub Post{ my($this,$s)=@_;
+sub Post
+{ my($this,$s)=@_;
 
-	  _with($this,\&_post,$s);
-	}
+  _with($this,\&_post,$s);
+}
 
 sub _post
 { my($s)=@_;
@@ -277,9 +279,9 @@ sub _post
   local($_);
 
   if (! $cs::NNTP::This->{CANPOST})
-	{ warn "posting forbidden on $cs::NNTP::This->{NNTPSERVER}\n";
-	  return 0;
-	}
+  { warn "posting forbidden on $cs::NNTP::This->{NNTPSERVER}\n";
+    return 0;
+  }
 
   _out("post\n");
   ($_,$text)=&_reply;
