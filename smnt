@@ -4,13 +4,37 @@
 #	- Cameron Simpson <cs@zip.com.au> 10jan2003
 #
 
-user=cameron
 mnt=/win
+user=`who am i | awk '{print$1}'`
+[ -n "$user" ] || user=${LOGNAME:-$USER}
+: ${WORKGROUP:=$SYSTEMID}
 
 cmd=`basename "$0"`
-usage="Usage: $cmd //pc/share"
+usage="Usage: $cmd [-d dir] [-u user] [-w workgroup] //pc/share"
 
 badopts=
+
+while :
+do
+  case $1 in
+    -d)	mnt=$2; shift ;;
+    -u)	user=$2; shift ;;
+    -u)	WORKGROUP=$2; shift ;;
+    --)	shift; break ;;
+    -?*)echo "$cmd: unrecognised option: $1" >&2; badopts=1 ;;
+    *)	break ;;
+  esac
+  shift
+done
+
+[ -n "$user" ] \
+	|| { echo "$cmd: can't guess user and no -u option" >&2
+	     badopts=1
+	   }
+[ -n "$WORKGROUP" ] \
+	|| { echo "$cmd: can't guess workgroup and no -w option" >&2
+	     badopts=1
+	   }
 
 if [ $# = 0 ]
 then
@@ -30,8 +54,6 @@ else
 fi
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
-
-: ${WORKGROUP:=$SYSTEMID}
 
 set -x
 mount -t smbfs -o "username=$user,workgroup=$WORKGROUP,uid=$user,fmask=644,dmask=755" "$share" "$mnt" || exit 1
