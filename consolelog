@@ -1,0 +1,13 @@
+#!/bin/sh
+#
+
+tailf -c $HOME/.tailf &
+
+sleep 5	# hack to wait for the tailf to start listening
+
+addtail -s console
+addtail -s x11
+# addtail filemail
+addtail maildrop
+
+wait
