@@ -1,4 +1,4 @@
-#!/usr/bin/perl
+#!/usr/bin/perl -w
 #
 # Read ssh host keys from stdin and rewrite the named known_host file
 # with the new keys.
@@ -9,9 +9,7 @@ use strict qw(vars);
 
 use cs::Misc;
 
-sub keyline($);
-
-$::Usage="Usage: $::cmd known_hosts_file\n";
+$::Usage="Usage: $::cmd known_hosts_file localdomains...\n";
 
 my $badopts=0;
 
@@ -21,69 +19,76 @@ if (! @ARGV)
 }
 else
 { $::KnownHosts=shift(@ARGV);
-  if (@ARGV)
-  { warn "$::cmd: extra arguments: @ARGV\n";
+  if (! @ARGV)
+  { warn "$::cmd: missing localdomains\n";
     $badopts=1;
+  }
+  else
+  { @::Domains=@ARGV;
   }
 }
 
 die $::Usage if $badopts;
 
+my %keysets;
+
+# load old keys first
 if (! open(KNOWN, "< $::KnownHosts\0"))
-{ die "$::cmd: open $::KnwonHosts: $!\n";
+{ die "$::cmd: open $::KnownHosts: $!\n";
 }
 
 my $pretext='';
 OLDKEY:
 while (defined($_=<KNOWN>))
-{ keyline($_);
+{ keyline($_,@::Domains);
 }
 close(KNOWN);
 
+# overwrite old keys with new keys
 $pretext='';
 NEWKEY:
 while (defined($_=<STDIN>))
-{ keyline($_);
+{ keyline($_,@::Domains);
 }
-close(STDIN);
+##close(STDIN);
 
-if (! open(KNOWN, "> $::KnownHosts\0"))
-{ die "$::cmd: rewrite $::KnownHosts: $!\n";
-}
+# collate ids by key value
 
+my %keypart2id = ();
 KEYTYPE:
-for my $keytype (sort keys %::KeySets)
+for my $keytype (keys %keysets)
 {
-  my $keys = $::KeySets{$keytype};
-
-  my %didkey;
+  my $keys = $keysets{$keytype};
 
   ID:
-  for my $id (sort keys %$keys)
+  for my $id (keys %$keys)
   {
-    next ID if $didkey{$id};
-
-    my $K = $keys->{$id};
-
-    my @ids = sort(::uniq(grep(!$didkey{$_}, @{$K->{IDS}})));
-    next ID if ! @ids;
-
-    if (! print KNOWN $K->{PRETEXT}, join(',',@ids), " ", $K->{KEYTAIL})
-    { die "$::cmd: write $::KnownHosts: $!";
+    warn "collate $keytype $id\n";
+    my $keypart = $keys->{$id};
+    if (! exists $keypart2id{$keypart})
+    { $keypart2id{$keypart}=[];
     }
-
-    for (@ids)
-    { $didkey{$_}=1;
-    }
+    push(@{$keypart2id{$keypart}},$id);
   }
+}
+
+if (! open(KNOWN, "> $::KnownHosts\0"))
+{ die "$::cmd: open $::KnownHosts: $!\n";
+}
+for my $keypart (sort keys %keypart2id)
+{
+  print KNOWN join(',',sort @{$keypart2id{$keypart}}), " $keypart\n";
 }
 close(KNOWN) || die "$::cmd: close $::KnownHosts: $!";
 
 exit 0;
 
-sub keyline($)
-{
-  local($_)=@_;
+sub keyline
+{ my($line,@domains)=@_;
+
+  local($_)=$line;
+  chomp;
+  s/\s+$//;
 
   if (! /^([^#\s]\S+)\s+(\S+)\s+/)
   { warn "$::cmd: bad key line: $_";
@@ -91,18 +96,29 @@ sub keyline($)
   }
 
   my $ids=$1;
-  my $typefield=$2;
-  my $keytail=$';
+  my $keytype=$2;
+  my $keypart="$2 $'";
 
-  my $K = { PRETEXT => $pretext, KEYTAIL => "$typefield $keytail", IDS => [] };
-  $pretext='';
-
-  if ($typefield =~ /^\d+$/)
-  { $typefield='RSA1';
+  if ($keytype =~ /^\d+$/)
+  { $keytype='RSA1';
   }
 
   for my $id (grep(length,split(/,+/, $ids)))
-  { $::KeySets{$typefield}->{$id}=$K;
-    push(@{$K->{IDS}}, $id);
+  { warn "note $keytype $id\n";
+    $keysets{$keytype}->{$id}=$keypart;
+    if ($id =~ /\./)
+    { my $iddom=$';
+      my $idshort=$`;
+      if (grep($_ eq $iddom, @domains))
+      { warn "note $keytype $idshort\n";
+	$keysets{$keytype}->{$idshort}=$keypart;
+      }
+    }
+    else
+    { for my $dom (@domains)
+      { warn "note $keytype $id.$dom\n";
+	$keysets{$keytype}->{"$id.$dom"}=$keypart;
+      }
+    }
   }
 }
