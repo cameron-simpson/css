@@ -42,6 +42,7 @@
 # =item B<dev=I<bus>,I<id>,I<lun>>
 #
 # Specifiy the location of the CD burner on the SCSI bus.
+# Recent cdrecord(1)s can also support IDE as B<dev=/dev/hd>I<x>.
 #
 # =item B<speed=I<n>>
 #
