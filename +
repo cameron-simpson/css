@@ -41,4 +41,5 @@ fi
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
 cd || exit 1
+[ -s "$HOME/rc/mail/muttsh.$mfolder" ] && { set -vx; . "$HOME/rc/mail/muttsh.$mfolder"; set +vx; }
 exec term $termopts +ip -n "mutt $mfolder" scrif "mutt_$mfolder" mutt -f "$mfolder" $muttopts
