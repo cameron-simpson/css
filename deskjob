@@ -1,4 +1,16 @@
 #!/bin/sh
-[ $# = 0 ] || { echo "Usage: $0" >&2; exit 2; }
-desk=`currentdesk` || exit 1
+usage="Usage: $0 [desk [job]]"
+
+job=
+if [ $# = 0 ]
+then  desk=`currentdesk`
+else  desk=$1; shift
+      [ "x$desk" = x. ] && desk=`currentdesk`
+      if [ $# -gt 0 ]
+      then  newjob=$1; shift
+	    [ $# = 0 ] || { echo "$usage" >&2; exit 2; }
+	    exec desktop "$desk" job "$newjob"
+      fi
+fi
+
 exec desktop "$desk" job
