@@ -1,12 +1,14 @@
 #!/bin/sh
 
-cd $HOME/rc/x11 || exit $?
-
 case "$X11_DEPTH,$X11_CLASS" in
+    ,)				exec setvar 'use x11' "$0" ${1+"$@"} ;;
     1,*)			type=Mono ;;
     *,StaticGray|*,GrayScale)	type=Grey ;;
     *)				type=Colour ;;
 esac
+
+cd $HOME/rc/x11 || exit $?
+
 # set-x \
 myke -u \
      -f Mykefile.${X11_X}x${X11_Y} \
