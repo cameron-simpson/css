@@ -50,7 +50,7 @@ NEWKEY:
 while (defined($_=<STDIN>))
 { keyline($_,@::Domains);
 }
-##close(STDIN);
+close(STDIN);
 
 # collate ids by key value
 
@@ -63,7 +63,7 @@ for my $keytype (keys %keysets)
   ID:
   for my $id (keys %$keys)
   {
-    warn "collate $keytype $id\n";
+    ##warn "collate $keytype $id\n";
     my $keypart = $keys->{$id};
     if (! exists $keypart2id{$keypart})
     { $keypart2id{$keypart}=[];
@@ -72,12 +72,16 @@ for my $keytype (keys %keysets)
   }
 }
 
+my @list=();
+for my $keypart (keys %keypart2id)
+{ push(@list, join(',',sort @{$keypart2id{$keypart}})." $keypart");
+}
 if (! open(KNOWN, "> $::KnownHosts\0"))
 { die "$::cmd: open $::KnownHosts: $!\n";
 }
-for my $keypart (sort keys %keypart2id)
-{
-  print KNOWN join(',',sort @{$keypart2id{$keypart}}), " $keypart\n";
+warn "REWRITING $::KnownHosts";
+for my $keyline (sort {$a cmp $b} @list)
+{ print KNOWN $keyline, "\n";
 }
 close(KNOWN) || die "$::cmd: close $::KnownHosts: $!";
 
@@ -104,19 +108,19 @@ sub keyline
   }
 
   for my $id (grep(length,split(/,+/, $ids)))
-  { warn "note $keytype $id\n";
+  { ##warn "note $keytype $id\n";
     $keysets{$keytype}->{$id}=$keypart;
     if ($id =~ /\./)
     { my $iddom=$';
       my $idshort=$`;
       if (grep($_ eq $iddom, @domains))
-      { warn "note $keytype $idshort\n";
+      { ##warn "note $keytype $idshort\n";
 	$keysets{$keytype}->{$idshort}=$keypart;
       }
     }
     else
     { for my $dom (@domains)
-      { warn "note $keytype $id.$dom\n";
+      { ##warn "note $keytype $id.$dom\n";
 	$keysets{$keytype}->{"$id.$dom"}=$keypart;
       }
     }
