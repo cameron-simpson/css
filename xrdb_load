@@ -1,7 +1,5 @@
 #!/bin/sh
 
-set -vx
-
 . $HOME/rc/x11/xenv.sh
 
 case "$X11_DEPTH,$X11_CLASS" in
@@ -12,7 +10,7 @@ case "$X11_DEPTH,$X11_CLASS" in
 esac
 
 cd $HOME/rc/x11 || exit $?
-uncurly dflt/* > $HOME/.Xdefaults
+uncurly `ls -d dflt/* | grep -v '^dflt/CVS$'` >$HOME/.Xdefaults
 
 exec xrdb -nocpp -load $HOME/.Xdefaults
 
