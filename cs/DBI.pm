@@ -582,7 +582,9 @@ sub addDatedRecord
     die "$::cmd: cs::DBI::addDatedRecord($table): neither \$start nor \$end defined\n\tfrom [@c]\n\t";
   }
 
-  if (defined($start) && defined($end) && $start gt $end)
+  if (defined($start) && length($start)
+   && defined($end) && length($end)
+   && $start gt $end)
   { my(@c)=caller;
     die "$::cmd: cs::DBI::addDatedRecord($table): start ($start) > end ($end)\n\tfrom [@c]\n\t";
   }
@@ -599,8 +601,8 @@ sub addDatedRecord
     $sth->execute(@args);
   }
 
-  $rec->{START_DATE}=$start if defined $start;
-  $rec->{END_DATE}=$end if defined $end;
+  $rec->{START_DATE}=$start if defined $start && length $start;
+  $rec->{END_DATE}=$end if defined $end && length $end;
   cs::DBI::insert($dbh,$table, keys %$rec)->ExecuteWithRec($rec);
 }
 
@@ -644,6 +646,8 @@ Returns success.
 
 sub cropDatedRecords
 { my($dbh,$table,$start,$end,$xwhere,@xwargs)=@_;
+  undef $start if defined $start && ! length $start;
+  undef $end   if defined $end   && ! length $end;
 
   my $context="cs::DBI::cropDatedRecords(dbh=$dbh,table=$table,start=".(defined $start ? $start : 'UNDEF').",end=".(defined $end ? $end : 'UNDEF').",xwhere=$xwhere,xwargs=[@xwargs]";
 
@@ -686,11 +690,14 @@ sub cropDatedRecords
 	    .$xsql
 	    ;
 
-      ## warn "DELETE SWALLOWED:\n$sql\n";
+      ## warn "DELETE SWALLOWED:\n$sql\n[$start $end @xwargs]\n";
       if (!defined($sth=dosql($dbh,$sql,$start,$end,@xwargs)))
       { warn "$::cmd: $context:\n\tcan't dosql($sql)";
 	$ok=0;
       }
+
+      ## system("dbuser evanh");
+      ## exit 0;
 
       # crop lower records
       #
