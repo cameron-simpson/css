@@ -9,7 +9,7 @@ ls | sed -n -f subfile.sed | \
     [ -s "$old" ] || continue
     [ "x$old" = "x$new" ] && continue
     dir=`dirname "$new"`
-    [ -d "$dir/." ] || sh-x mkdir -p "$dir" || continue
+    [ -d "$dir/." ] || (set -x; mkdir -p "$dir") || continue
     if [ -s "$new" ]
     then
 	if cmp -s "$old" "$new"
@@ -21,7 +21,7 @@ ls | sed -n -f subfile.sed | \
 	    xit=1
 	fi
     else
-	sh-x mv "$old" "$new"
+	(set -x; mv "$old" "$new")
     fi
     [ -s "$dir/subfile.sed" ] && ( cd "$dir" && exec subfile )
   done
