@@ -25,6 +25,7 @@ w= h=
 bigx=0 bigy=-0 bigw=80 bigh=61 bigf=6x13
 geometry=
 sized=
+shade=${ATERM_SHADE:-60}
 xauthhack=
 async=1
 lock=
@@ -51,6 +52,7 @@ do
     *,-1)	lock1=$1 lock=$2; shift ;;
     *,-ip)	dotrans=1 ;;
     *,+ip)	dotrans= ;;
+    *,-sh)	shade=$2; shift ;;
     *,-fg|*,-bg)termopts="$termopts $1 $2"; shift ;;
     *,-c)	shcmd=$2; shift; shift
 		set x ${1+"$@"} -e "${SHELL:-/bin/sh}" -c "$shcmd"
@@ -128,7 +130,7 @@ case "$TERM,$DISPLAY" in
 	    rxvt)	[ $dotrans ] && opts="$opts -ip"
 			;;
 	    aterm)	# -fade 90
-			[ $dotrans ] && opts="$opts -tr -sh ${ATERM_SHADE:-60}"
+			[ $dotrans ] && opts="$opts -tr -sh $shade"
 			;;
 	esac
 
