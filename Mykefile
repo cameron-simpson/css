@@ -21,13 +21,13 @@ pmFromMan(manf) = $(manf FP s:|::|/|).pm
 pmFromHtml(html) = $(html FPP s:|::|/|).pm
 
 subdirs = $('*/.' GD)
-allscripts = $('*' G !/\./ - subdirs - "README.txt" + "synonyms")
+allscripts = $('*' G !/\./ - subdirs - "0README.txt" - "INSTALL" + "synonyms")
 
 scriptmandir = $(MANDIR)/cs/man1
 scriptmans = $(scriptmandir)/$((allscripts)).1
 scriptfromman(manf) = $(manf FP)
 
-default: squid_redirect README.txt _submakes _tarballs _man _cvslog
+default: squid_redirect 0README.txt _submakes _tarballs _man _cvslog
 
 _cvslog:
 	cvslog >CHANGELOG.txt
@@ -84,8 +84,8 @@ $(scriptmandir)/%.1: %
 	 esac \
 	 chmod 644 $@ $$htman
 
-README.txt: $(allscripts)
-	mkscriptndx `ls -d $< | sort` >$@
+0README.txt: $(allscripts) INSTALL
+	mkscriptndx `ls -d $(allscripts) | sort` >$@
 
 noads	= $(HOME)/rc/adzap/patterns
 
