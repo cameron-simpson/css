@@ -13,7 +13,7 @@
 #
 # =head1 SYNOPSIS
 #
-# rc.mobile {start|stop|restart} [-n] [-y] [-s] [-S] [-f config] [@where]
+# rc.mobile {start|stop|restart} [-n] [-y] [-s] [-S] [-f config] [-E envfile] [@where]
 #
 # =head1 DESCRIPTION
 #
@@ -36,6 +36,7 @@
 
 where=${SYSTEMID:-home}
 cf=/etc/rc.mobile.conf
+envfile=
 async=1
 asyncall=1
 trace=set-x
@@ -138,6 +139,36 @@ do  case $1 in
 	# but might be useful during debugging.
 	#
 	-S)   async= asyncall= ;;
+	# =item B<-E> I<envfile>
+	#
+	# Save environment settings to the file I<envfile>.
+	# Configuration lines of the form "I<var>B<=>I<value>"
+	# set environment variables
+	# available to further startup actions issued by B<rc.mobile>.
+	# If the B<-E> option is supplied
+	# a shell script named I<envfile> is created containing
+	# these settings.
+	# For example, the option "C<-E /etc/profile.d/rc.mobile.sh>"
+	# might be used to stash these settings where (on RedHat machines)
+	# login shells will automatically use them.
+	# Further, the first line of the file defines a shell function called
+	# B<setenv> that acts like the csh directive of that name,
+	# and the settings are then perfomred with that function.
+	# Therefore, the C</etc/login> file may obtain the same
+	# startup settings with the simple incantation:
+	#
+	#	eval `sed 1d /etc/profile.d/rc.mobile.sh`
+	#
+	# suitably adjusted to match your B<-E> option setting,
+	# thus performing this function for csh(1) and tcsh(1) users.
+	# 
+	-E)   envfile=$2; shift
+	      echo 'setenv(){ eval "export $1=\$2"; }' >"$envfile" \
+	      || { echo "$cmd: can't write to $envfile" >&2
+		   badopts=1
+		   envfile=
+		 }
+	      ;;
 	--)   shift; break ;;
 	-?*)  echo "$cmd: unrecognised option: $1" >&2
 	      badopts=1
@@ -242,11 +273,20 @@ doops()
       # =item I<var>B<=>I<value>
       #
       # Set the environment variable named I<var> to the value I<value>.
+      # If the B<-E> option was used, also record the value in I<envfile>.
       #
       [a-zA-Z]*=*)
 	      var=`expr "$op" : '\([^=]*\)=.*'`
 	      eval "$op"
 	      export $var
+	      if [ -n "$envfile" ]
+	      then
+		  eval "val=\$$var"
+		  case "$val" in
+		      *\'*) val=`echo "$val" | sed "s/'/'\\\\\\\\''/g"` ;;
+		  esac
+		  echo "setenv $var '$val';" >>"$envfile"
+	      fi
 	      ;;
       # =item /path/to/dir/
       #
@@ -273,7 +313,7 @@ doops()
 	      ;;
       # =item /path/to/file
       #
-      # Prepare the spacified file
+      # Prepare the specified file
       # from a template.
       # Files and directories are distinguished
       # by the directory's trailing slash (`/').
