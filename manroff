@@ -1,0 +1,38 @@
+#!/bin/sh
+#
+
+roffargs=
+ppargs=
+roff=troff
+eqn=eqn
+col=
+macros=-man
+
+cmd=`basename "$0"`
+usage="Usage: $cmd [-n] [-rR=V] [-macro] [-Ddef] [--] files...
+	-n	Use nroff instead of troff.
+	-rR=V	Set register (passed to roff).
+	-macro	Macro set (default: $macros).
+	-Ddef	Definition (passed to dpp).
+"
+
+badopts=
+while :
+do
+    case $1 in
+	-n)	roff=nroff eqn=neqn col='| col' ;;
+	-r*)	roffargs="$roffargs '$1'" ;;
+	-m*)	macros=$1 ;;
+	-D*)	ppargs="$ppargs '$1'" ;;
+	--)	shift; break ;;
+	-?*)	echo "$cmd: $1: unrecognised argument" >&2
+		badopts=1
+		;;
+	*)	break ;;
+    esac
+    shift
+done
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+eval "manpp $ppargs \${1+\"\$@\"} | soelim | $eqn | tbl | $roff $roffargs $macros $col"
