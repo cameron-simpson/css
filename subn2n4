@@ -1,0 +1,53 @@
+#!/usr/bin/perl
+#
+# Convert a subnet list of the form
+#	nnnn/n
+# to the form
+#	nnnn/nnnn
+# for squid acl lists.
+#	- Cameron Simpson <cs@zip.com.au> 30apr2000
+#
+
+use strict vars;
+
+($::cmd=$0) =~ s:.*/::;
+
+$::Xit=0;
+
+LINE:
+while (defined ($_=<STDIN>))
+{ chomp;
+  s/^\s+//;
+  s/\s+$//;
+  next if ! length;
+
+  if (! m:^(\d+\.\d+\.\d+\.\d+)/(\d+)$:)
+  { warn "$::cmd: line $.: malformed: $_\n";
+    $::Xit=1;
+    next LINE;
+  }
+
+  my($ip,$n)=($1,$2+0);
+
+  my @mask = ();
+  while ($n > 8)
+  { push(@mask,255);
+    $n-=8;
+  }
+
+  my($m,$b)=(0,128);
+  while ($n > 0)
+  { $m+=$b;
+    $b>>=1;
+    $n--;
+  }
+
+  push(@mask,$m);
+  while (@mask < 4)
+  { push(@mask,0);
+  }
+
+  print "$ip/", join('.', @mask), "\n";
+}
+
+exit $::Xit;
