@@ -1,0 +1,23 @@
+#!/bin/sh
+#
+# Check presence or absense of timesheet reports.
+#	- Cameron Simpson <cs@zip.com.au> 15jan97
+#
+
+sheetcode=`sheetcode`
+
+case $1 in
+    [0-9]*)	sheetcode=$1; shift ;;
+esac
+
+missing=`outstanding "$sheetcode"|tr '\012' ' '`
+
+if [ -n "$missing" ]
+then
+    echo "$0: the following users have not submitted reports for date $sheetcode" >&2
+    echo "	$missing" | fmt >&2
+
+    exit 1
+fi
+
+exit 0
