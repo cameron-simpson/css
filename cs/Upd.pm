@@ -94,7 +94,7 @@ package cs::Upd;
 
 $cs::Upd::_Clip=79;	# default clip length
 
-$cs::Upd::This=new cs::Upd STDERR;	# default upd structure
+setDefault(STDERR);	# default upd structure
 $SIG{__WARN__}=sub { my($curr)=current();
 		     err(@_);
 		     out($curr);
@@ -109,6 +109,17 @@ $SIG{__DIE__} =sub { my($curr)=current();
 =head1 GENERAL FUNCTIONS
 
 =over 4
+
+=item setDefault(I<STREAM>)
+
+Make the default update stream I<STREAM>.
+The default default is B<STDERR>.
+
+=cut
+
+sub setDefault($)
+{ $cs::Upd::This=new cs::Upd $_[0];
+}
 
 =item out(I<message>)
 
