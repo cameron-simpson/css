@@ -5,6 +5,6 @@
 #
 
 exec \
-term +ip \
+term \
      -n "E [$dirname]@$HOST $*" \
      -e edit ${1+"$@"}
