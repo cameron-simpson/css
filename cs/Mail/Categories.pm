@@ -30,12 +30,12 @@ sub categorise($;$)
 
 sub categories(;$)
 { my($file)=@_;
-  $file="$ENV{MAILRCDIR}/categories";
+  $file="$ENV{MAILRCDIR}/categories" if ! defined $file;
 
   if (! defined $cs::Mail::Categories::_Known{$file})
   { $cs::Mail::Categories::_Known{$file}
 		=new cs::Mail::Categories
-			("$ENV{HOME}/etc/rc/mail/categories",
+			("$ENV{HOME}/rc/mail/categories.old",
 			 \&cs::Mail::Categories::_load_categories
 			);
   }
