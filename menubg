@@ -53,26 +53,41 @@ then
 fi
 
 imagefile=$1
-## alert "APPLY $imagefile"
-echo "$imagefile" >>$HOME/var/log/menubg
 
-##case "$bright,$imagefile" in
-##    *.png|*.xpm)
-##	# no format conversion needed
-##	exec fvwmcmd "ColorSet 0 AspectPixmap \"$imagefile\""
-##	;;
-##esac
+setpix()
+{ dorm=
+  [ "x$1" = x-r ] && { dorm=1; shift; rmwhat=$1; shift; }
+  set "ColorSet 2 Tint rgb:00/00/20 50, AspectPixmap \"$1\""
+  fvwmcmd "$@"
+  [ dorm ] && fvwmcmd "Exec rm -rf \"$rmwhat\""
+}
+
+case "$bright,$imagefile" in
+    *.png|*.xpm)
+	# no format conversion needed
+	setpix "$imagefile"
+	exit $?
+	;;
+esac
 
 wkdir=`mkdirn "${TMPDIR:-/tmp}/menubg"` || exit 1
-trap 'cd;(sleep 5; rm -rf "$wkdir")&' 0 1 2 15
 
 cp "$imagefile" "$wkdir/." || exit 1
+lastvalue menubg "$imagefile"
+echo "$imagefile" >>$HOME/var/log/menubg
 
 cd "$wkdir"
 imagefile=`basename "$imagefile"`
 impng=`echo "$imagefile" | sed 's/\\(.*\\.\)[^.]*$/\\1PNG/'`
 
 ##mogrify -geometry "$geom" -modulate 70 -despeckle -format PNG "$imagefile"
-mogrify -modulate 70 -format PNG "$imagefile"
-##fvwmcmd "MenuStyle '*' MenuFace AspectPixmap \"$wkdir/$impng\""
-fvwmcmd "ColorSet 0 AspectPixmap \"$wkdir/$impng\""
+if /opt/ImageMagick/bin/mogrify -format PNG "$imagefile"
+then
+    # horrible workaround for mogrify bug
+    rm -f "$imagefile"
+    mv ./* "$impng"
+    setpix -r "$wkdir" "$wkdir/$impng"
+else
+    L "$wkdir" >&2
+    exit 1
+fi
