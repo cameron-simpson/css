@@ -92,7 +92,7 @@ sub tape($)
 
 =head1 SEE ALSO
 
-cs::Legato::Networker::Tape
+cs::Legato::Networker::Tape(3)
 
 =head1 AUTHOR
 
