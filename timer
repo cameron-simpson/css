@@ -1,0 +1,74 @@
+#!/bin/sh
+#
+# Time tracking. Track elapsed time to a set of tasks.
+#	- Cameron Simpson <cs@zip.com.au> 30jun2003
+#
+
+idset=timer
+statedir=$SYSTEMID
+
+cmd=$0		## `basename "$0"`
+usage="Usage: $cmd [-i idset] key [time_t]
+	-i idset	Idset to use. Default: $idset
+	key		The key name for the timer.
+	time_t		UNIX seconds of event, if not right now."
+
+badopts=
+
+[ "x$1" = x-i ] && { idset=$2; shift; shift; }
+
+if [ $# = 0 ]
+then
+  echo "$cmd: missing key" >&2
+  badopts=1
+else
+  key=$1; shift
+  if [ $# = 0 ]
+  then
+    when=`now`
+  else
+    when=$1; shift
+    case "$when" in
+	''|*[^0-9]*)
+	  echo "$cmd: bad time_t \"$when\"; should be UNIX seconds" >&2
+	  badopts=1
+	  ;;
+    esac
+
+    [ $# = 0 ] || { echo "$cmd: extra arguments after time_t: $*" >&2
+		    badopts=1
+		  }
+  fi
+fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+# compute time from last timestamp to now (well, $when)
+last_key=`lastvalue "$idset"_what`
+if [ -n "$last_key" ]
+then
+    last_when=`lastvalue "$idset"_when`
+    case "$last_when" in
+      ''|*[^0-9]*)
+	last_when=
+	;;
+    esac
+    if [ -n "$last_when" ]
+    then
+      elapsed=`expr $when - $last_when`
+      if [ "$elapsed" -gt 0 ]
+      then
+	# update total time for this key
+	sofar=`idset -d "$statedir" -i "$idset" "$last_key" total`
+	case "$sofar" in
+	  ''|*[^0-9]*)
+	    sofar=0
+	    ;;
+	esac
+	idset -d "$statedir" -i "$idset" "$last_key" total "`expr $sofar + $elapsed`"
+      fi
+    fi
+fi
+
+lastvalue "$idset"_what "$key"
+lastvalue "$idset"_when "$when"
