@@ -108,6 +108,10 @@ do
       esac
 
       case "$f" in
+	  *[A-Z]*) lcf=`echo "$f" | tr '[A-Z]' '[a-z]'` ;;
+	  *)	   lcf=$f ;;
+      esac
+      case "$lcf" in
 	  *.xpm|*.gif)
 	      thfmt=xpm ;;
 	  *.png|*.jpg)
