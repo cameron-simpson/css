@@ -1,0 +1,290 @@
+#!/bin/sh
+#
+# Synchronise files between the usual spots.
+# I normally run synclinks after this, too.
+#	- Cameron Simpson <cs@zip.com.au> 22nov1998
+#
+# Use -R, just call rsync once. - cameron, 23jul1999
+# Let the transport do the compression. - cameron, 23jul1999
+# Big recode to do a single rsync. - cameron, 15jan2000
+#
+# =head1 NAME
+#
+# syncstuff - synchronise files between the usual spots
+#
+# =head1 SYNOPSIS
+#
+# syncstuff [B<-o> B<I<option>=I<value>>]... [B<--I<rsopt>>...] [B<-b>] [B<-n>] [B<-v>]
+# [I<targets>...]
+#
+# =head1 DESCRIPTION
+#
+# I<syncstuff>
+# synchronises data between two directories,
+# usually on different hosts.
+# Sound like a job for rsync(1)? You bet!
+# I<syncstuff> is a wrapper for I<rsync>
+# to pass it prepackaged arguments concerning what to sync.
+#
+
+cmd=`basename "$0"`
+usage="Usage: $cmd [-o option=value]... [-b] [-n] [-v] [targets...]
+	-b	Backup mode. Use amassbackup.
+	--rsync-path exec
+		Execute \"exec\" as the remote rsync command.
+		Passed to rsync.
+	-n	No action - just report actions.
+	-o option=value Set options, overriding the cf file.
+	-v	Verbose."
+
+HOST=${HOST-`hostname`}
+export HOST
+
+syncdir=$HOME/rc/sync
+[ -d "$syncdir/." ] || syncdir=$HOME/.sync
+
+#
+# =head1 DEFAULTS
+#
+# By default,
+# I<syncstuff> determines what to sync
+# from the name following the leading "B<sync>" in its command name.
+# Thus normal use links the core I<syncstuff> script
+# to a number of names such as B<synchome>, B<syncwork> etc.
+# This suffix (B<home>, B<work>, etc)
+# is used as the name of the I<syncset> - the list of files
+# to make the same at the target.
+# This default I<syncset> may be overidden on the command line
+# by setting the B<syncset> option with B<-o>.
+#
+
+syncset=
+synccore=
+case $cmd in
+    syncstuff)	;;
+    sync?*)	syncset=`expr "$cmd" : 'sync\(.*\)'` ;;
+    *)		echo "$cmd: sync what? I have the following cf files:" >&2
+		ls -d "$syncdir"/cf.* >&2 2>/dev/null
+		exit 1
+		;;
+esac
+#
+# =head1 INITIALISATION
+#
+# I<syncstuff> keeps its configuration files
+# in the directory B<$HOME/rc/sync> or B<$HOME/.sync>.
+# All the files named below should be placed there.
+# Before parsing the command line options
+# I<syncstuff> first reads the file B<cf> (if present)
+# and then the file B<cf.I<syncset>>
+# for options.
+# These are shell source files.
+#
+
+# load defaults
+tty=
+[ -t 2 ] && tty=1
+backupmode=
+from=
+to=
+tohomedir=
+needhost=
+needsite=
+tohomedir=
+localhomedir=$HOME
+postsync=
+rrsync=rsync
+rsopts=-rlptDH
+rsmode=--delete
+rswhere=
+verbose=$tty
+trace=; [ $verbose ] && trace=set-x
+dont=
+
+if [ -n "$syncset" ]
+then
+    [ -s "$syncdir/cf" ] && . "$syncdir/cf"
+    cf=$syncdir/cf.$syncset
+    if [ ! -s "$cf" ]
+    then
+	echo "$cmd: no config for $syncset (I wanted $cf)" >&2
+	exit 1
+    else
+	. "$cf"
+	badcf=
+	[ -n "$from"     ] || { badcf=1; echo "$cmd: no from!" >&2; }
+	[ -n "$to"       ] || { badcf=1; echo "$cmd: no to!" >&2; }
+	[ -n "$needsite" ] || { badcf=1; echo "$cmd: no needsite!" >&2; }
+	if [ $badcf ]
+	then
+	    echo "$cmd: errors in $cf" >&2
+	    exit 1
+	fi
+    fi
+fi
+
+#
+# =head1 OPTIONS
+#
+# =over 4
+#
+
+badopts=
+while :
+do
+    case $1 in
+#
+# =item B<-o> B<I<option>=I<value>>
+#
+# Set the I<option> to the specified I<value>.
+# This is a shell assignment statement,
+# so I<value>s with spaces need quoting and so forth.
+#
+	-o)	eval "$2"; shift ;;
+#
+# =item B<-b>
+#
+# Backup mode.
+# Use amassbackup(1) to make timestamped snapshots in the target.
+#
+	-b)	backupmode=1 ;;
+#
+# =item B<--rsync-path>
+#
+# Remote <B>rsync</B> command to execute.
+# Passed to rsync.
+#
+	-n)	dont=: verbose=1 trace=set-x rsopts="$rsopts -n" ;;
+#
+# =item B<-n>
+#
+# No action.
+# Only report what would happen.
+#
+	-n)	dont=: verbose=1 trace=set-x rsopts="$rsopts -n" ;;
+#
+# =item B<-v>
+#
+# Verbose.
+# Turn on tracing and make the synchronisation verbose.
+# This is the default if I<stderr> is a terminal.
+#
+	-v)	verbose=1 trace=set-x ;;
+#
+# =item B<--I<rsopt>>
+#
+# Add the rsync(1) option B<--I<rsopt>> to the rsync command line.
+#
+	--?*)	rsopts="$rsopts $1" ;;
+	--)	shift; break ;;
+	-?*)	echo "$cmd: unrecognised option: $1" >&2
+		badopts=1
+		;;
+	*)	break ;;
+    esac
+    shift
+done
+
+#
+# =back
+#
+
+[ -n "$from"     ] || { badopts=1; echo "$cmd: no from!" >&2; }
+[ -n "$to"       ] || { badopts=1; echo "$cmd: no to!" >&2; }
+[ -n "$needsite" ] || { badopts=1; echo "$cmd: no needsite!" >&2; }
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+rsopts="$rsopts $rsmode $rswhere"
+[ $verbose ] && { rsopts="$rsopts -v"
+		  [ $tty ] && rsopts="$rsopts --progress"
+		}
+
+[ "x$SYSTEMID" = "x$needsite" ] \
+	|| { echo "$cmd: can't run from $SYSTEMID, must be at $needsite" >&2
+	     exit 1
+	   }
+
+[ -z "$needhost" -o "x$HOST" = "x$needhost" ] \
+	|| { echo "$cmd: can't run from $HOST.$SYSTEMID, must be on ${needhost}.$needsite" >&2
+	     exit 1
+	   }
+
+# sanity check tohomedir
+[ "x$to" != "x$SYSTEMID" -o -d "$tohomedir/." ] \
+	|| { echo "$cmd: $tohomedir/. is not a directory" >&2
+	     exit 1
+	   }
+
+cd "$localhomedir" || { echo "$cmd: cd $localhomedir fails" >&2; exit 1; }
+echo "cd to `pwd` for sync"
+
+if [ "x$from" = "x$SYSTEMID" -o "x$from" = "x$HOST" ]
+then from=
+else from=$from:
+fi
+if [ "x$to" = "x$SYSTEMID" -o "x$to" = "x$HOST" ]
+then to=
+else to=$to:
+fi
+
+[ -n "$tohomedir" ]   || tohomedir=.
+
+xit=0
+
+# collect things if nothing specified
+if [ $# = 0 ]
+then
+    # collect generic and specific lists
+    for ext in "$synccore" ".$syncset" "$synccore-FINAL"
+    do
+	list=$syncdir/list$ext
+	[ -s "$list" ] && { [ $verbose ] && cat "$list"
+			    set x ${1+"$@"} "--include-from=$list"; shift
+			  }
+    done
+    if [ $backupmode ]
+    then
+	set amassbackup --rsync-path "$rrsync" "$from." "$to$tohomedir" $rsopts ${1+"$@"}
+    else
+	set rsync --rsync-path "$rrsync" $rsopts ${1+"$@"} "$from." "$to$tohomedir"
+    fi
+    $trace "$@" || xit=1
+else
+    if [ $backupmode ]
+    then
+	echo "$cmd: can't enumerate targets in backup mode: $*" >&2
+	exit 2
+    fi
+
+    # do targets individually
+    for dir
+    do
+	$trace rsync $rsopts "$from$dir/." "$to$dir/." || xit=1
+    done
+fi
+
+# post sync action
+if [ $xit = 0 ]
+then
+    $dont $trace sh -c "$postsync" || xit=1
+else
+    echo "Failures, suppressing postsync: $postsync" >&2
+fi
+
+exit $xit
+
+#
+# =head1 FILES
+#
+# $HOME/rc/sync or $HOME/.sync,
+# the directory holding configuration files and synclists
+#
+# =head1 SEE ALSO
+#
+# amassbackup(1), rsync(1)
+#
+# =head1 AUTHOR
+#
+# Cameron Simpson <cs@zip.com.au>
+#
