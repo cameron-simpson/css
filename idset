@@ -52,8 +52,9 @@ else
 	      || statedir=${SYSTEMID:-${HOMEHOST:-${HOST:-`hostname`}}}
       case "$statedir" in
 	  ./* | /* )	;;
-	  *)		statedir=$HOME/var/$idset/$statedir ;;
+	  *)		statedir=$HOME/var/idsets/$statedir ;;
       esac
+      statedir=$statedir/$idset
 fi
 
 idname=$1; shift
@@ -100,7 +101,7 @@ then
 	  done 2>/dev/null \
 	| sed -e 's:/: :' -e 's/:/ /'
     else
-	grep . [1-9]*/name /dev/null 2>/dev/null \
+	grep . [0-9]*/name /dev/null 2>/dev/null \
 	| sed 's|/name:| |' \
 	| if [ $all ]
 	  then  sed 's/^\([0-9][0-9]* \)\./\1/'
@@ -160,16 +161,17 @@ else
       # store new parameter
       echo "$pvalue" >"$pfile"
       # some parameters have side effects
-      case "$param" in
-	  name)	if [ -n "$DISPLAY" ]
-		then
-		  case "$pvalue" in
-		    .*)	name=`expr "x$pvalue" : 'x.\(.*\)'` ;;
-		    *)	name=$pvalue ;;
-		  esac
-		  fvwmcmd "idtopName $iddir $name" &
-		fi
-		;;
+      case "$idset,$param" in
+	desktop,name)
+	  if [ -n "$DISPLAY" ]
+	  then
+	    case "$pvalue" in
+	      .*)	name=`expr "x$pvalue" : 'x.\(.*\)'` ;;
+	      *)	name=$pvalue ;;
+	    esac
+	    fvwmcmd "desktopName $iddir $name" &
+	  fi
+	  ;;
       esac
     else
       if [ -s "$pfile" ]
