@@ -41,6 +41,8 @@ use Fcntl;
 
 package cs::Lock;
 
+sub new($$;$$);
+
 # delay parameters
 # with a bit of uncertainty to reduce racing
 $cs::Lock::Delay=1+($$%5);
