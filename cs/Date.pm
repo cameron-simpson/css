@@ -100,23 +100,23 @@ $cs::Date::month_ptn=join('|',@cs::Date::month_names);
 
 # returns 0..11 (warning: tm wants 1..12)
 sub mon2mnum
-	{ local($_)=@_;
-	  s/^(...).+/$1/; tr/A-Z/a-z/;
-	  return undef if ! exists $cs::Date::mon{$_};
-	  $cs::Date::mon{$_};
-	}
+{ local($_)=@_;
+  s/^(...).+/$1/; tr/A-Z/a-z/;
+  return undef if ! exists $cs::Date::mon{$_};
+  $cs::Date::mon{$_};
+}
 
 sub mnum2mon
-	{ my($mnum)=@_;
-	  die "mnum2mon($mnum)" if $mnum < 1 || $mnum > 12;
-	  $cs::Date::Mon_names[$mnum-1];
-	}
+{ my($mnum)=@_;
+  die "mnum2mon($mnum)" if $mnum < 1 || $mnum > 12;
+  $cs::Date::Mon_names[$mnum-1];
+}
 
 sub wday2dow
-	{ local($_)=@_; s/^(...).+/$1/; tr/A-Z/a-z/;
-	  return undef if !defined($cs::Date::wday{$_});
-	  $cs::Date::wday{$_};
-	}
+{ local($_)=@_; s/^(...).+/$1/; tr/A-Z/a-z/;
+  return undef if !defined($cs::Date::wday{$_});
+  $cs::Date::wday{$_};
+}
 
 sub tm2gmt($$)
 { my($tm,$givenlocaltime)=@_;
@@ -136,18 +136,36 @@ sub tm2gmt($$)
 }
 
 sub gmt2tm($$)
-	{ my($gmtime,$emitlocaltime)=@_;
+{ my($gmtime,$emitlocaltime)=@_;
 
-	  my($t_ss,$t_mm,$t_hh,$t_mday,$t_mon,$t_year,$t_wday,$t_yday)
-	   =($emitlocaltime ? localtime($gmtime) : gmtime($gmtime));
+  my($t_ss,$t_mm,$t_hh,$t_mday,$t_mon,$t_year,$t_wday,$t_yday)
+   =($emitlocaltime ? localtime($gmtime) : gmtime($gmtime));
 
-	  return { TIME => $gmtime,
-		   HH => $t_hh, MM => $t_mm, SS => $t_ss,
-		   MDAY => $t_mday, MON => $t_mon+1, YEAR => 1900+$t_year,
-		   WDAY => $t_wday, YY => $t_year%100,
-		   YDAY => $t_yday,
-		 };
-	}
+  return { TIME => $gmtime,
+	   HH => $t_hh, MM => $t_mm, SS => $t_ss,
+	   MDAY => $t_mday, MON => $t_mon+1, YEAR => 1900+$t_year,
+	   WDAY => $t_wday, YY => $t_year%100,
+	   YDAY => $t_yday,
+	 };
+}
+
+=item tzoffset()
+
+Compute the difference in seconds between localtime and UTC.
+Timezones ahead of UTC return a positive offset.
+
+=cut
+
+sub tzoffset()
+{
+  my $now = time;
+  my $tm = gmt2tm($now,1);
+
+  my $gmt = tm2gmt($tm,1);
+  my $lgmt= tm2gmt($tm,0);
+
+  $lgmt-$gmt;
+}
 
 sub HumanDate
 { my($this)=shift;
