@@ -319,6 +319,7 @@ sub ImageIndices($)
     { $imattrs->{HEIGHT}=$ty;
     }
 
+    # make a table cell
     my @imdesc
      = ( [TD, {ALIGN => CENTER, VALIGN => CENTER, CELLPADDING => "20%"},
 	      [A, $imHref,
@@ -341,7 +342,7 @@ sub ImageIndices($)
       }
       push(@$row, @imdesc);
       if (@$row >= $this->{TABLEWIDTH})
-      { ## warn "PUSH: low=$low, high=$high\n";
+      { warn "PUSH: low=$low, high=$high\n";
 	push(@rows,{ LOW => $low, HIGH => $high, HTML => $row});
 	$row=[];
       }
@@ -372,7 +373,7 @@ sub ImageIndices($)
   my @ndx=();
 
   while (@rows)
-  { ## warn "LENGTH=$this->{TABLELENGTH}, nrows=".scalar(@rows).", [@rows]";
+  { warn "LENGTH=$this->{TABLELENGTH}, nrows=".scalar(@rows).", [@rows]";
     my @front = splice(@rows,0,$this->{TABLELENGTH});
     push(@ndx, { LOW => $front[0]->{LOW},
 		 HIGH => $front[$#front]->{HIGH},
