@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # Wait for a set of process ids to die.
-# Needs kill priviledge on the processes.
+# Needs kill privilege on the processes.
 #	- Cameron Simpson <cs@zip.com.au> 26sep2000
 #
 
@@ -24,7 +24,7 @@ do  case $1 in
     shift
 done
 
-[ $# = 0 ] || { echo "$0: missing pids" >&2; badopts=1; }
+[ $# = 0 ] && { echo "$0: missing pids" >&2; badopts=1; }
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
