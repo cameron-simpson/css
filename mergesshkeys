@@ -1,0 +1,108 @@
+#!/usr/bin/perl
+#
+# Read ssh host keys from stdin and rewrite the named known_host file
+# with the new keys.
+#	- Cameron Simpson <cs@zip.com.au> 25jun2003
+#
+
+use strict qw(vars);
+
+use cs::Misc;
+
+sub keyline($);
+
+$::Usage="Usage: $::cmd known_hosts_file\n";
+
+my $badopts=0;
+
+if (! @ARGV)
+{ warn "$::cmd: missing known_hosts_file\n";
+  $badopts=1;
+}
+else
+{ $::KnownHosts=shift(@ARGV);
+  if (@ARGV)
+  { warn "$::cmd: extra arguments: @ARGV\n";
+    $badopts=1;
+  }
+}
+
+die $::Usage if $badopts;
+
+if (! open(KNOWN, "< $::KnownHosts\0"))
+{ die "$::cmd: open $::KnwonHosts: $!\n";
+}
+
+my $pretext='';
+OLDKEY:
+while (defined($_=<KNOWN>))
+{ keyline($_);
+}
+close(KNOWN);
+
+$pretext='';
+NEWKEY:
+while (defined($_=<STDIN>))
+{ keyline($_);
+}
+close(STDIN);
+
+if (! open(KNOWN, "> $::KnownHosts\0"))
+{ die "$::cmd: rewrite $::KnownHosts: $!\n";
+}
+
+KEYTYPE:
+for my $keytype (sort keys %::KeySets)
+{
+  my $keys = $::KeySets{$keytype};
+
+  my %didkey;
+
+  ID:
+  for my $id (sort keys %$keys)
+  {
+    next ID if $didkey{$id};
+
+    my $K = $keys->{$id};
+
+    my @ids = sort(::uniq(grep(!$didkey{$_}, @{$K->{IDS}})));
+    next ID if ! @ids;
+
+    if (! print KNOWN $K->{PRETEXT}, join(',',@ids), " ", $K->{KEYTAIL})
+    { die "$::cmd: write $::KnownHosts: $!";
+    }
+
+    for (@ids)
+    { $didkey{$_}=1;
+    }
+  }
+}
+close(KNOWN) || die "$::cmd: close $::KnownHosts: $!";
+
+exit 0;
+
+sub keyline($)
+{
+  local($_)=@_;
+
+  if (! /^([^#\s]\S+)\s+(\S+)\s+/)
+  { warn "$::cmd: bad key line: $_";
+    return;
+  }
+
+  my $ids=$1;
+  my $typefield=$2;
+  my $keytail=$';
+
+  my $K = { PRETEXT => $pretext, KEYTAIL => "$typefield $keytail", IDS => [] };
+  $pretext='';
+
+  if ($typefield =~ /^\d+$/)
+  { $typefield='RSA1';
+  }
+
+  for my $id (grep(length,split(/,+/, $ids)))
+  { $::KeySets{$typefield}->{$id}=$K;
+    push(@{$K->{IDS}}, $id);
+  }
+}
