@@ -1,0 +1,19 @@
+#!/bin/sh
+#
+# Copy TULP list info into majordomo files.
+#	- Cameron Simpson <cs@zip.com.au> 24jun96
+#
+
+tdir=$HOME/tulp
+mdir=/usr/local/etc/mj/lists
+
+xit=0
+for list
+do
+    echo "processing $list ..."
+    w=$tdir/$list.w
+    u=$tdir/$list.u
+    [ ! -r "$u" ] && { echo "no $u, skipping" >&2; xit=1; continue; }
+    [ -r "$w" ] && { cat "$w" >$mdir/$list.info || xit=$?; }
+    grep '^[^#]' "$u" >$mdir/$list || xit=$?
+done
