@@ -148,16 +148,16 @@ do
 	       /^$thing nosync\$/b nosync
 	       d
 	       :local
-	       s/.*/makelocal=1/
+	       s/.*/makelocal=1 nosync=/
 	       b done
 	       :nosync
-	       s/.*/nosync=1/
+	       s/.*/nosync=1 makelocal=/
 	       b done
 	       :vlocal
-	       s/^$thing \\([^ ]*\\).*/makelocal=1 version=\\1/
+	       s/^$thing \\([^ ]*\\).*/makelocal=1 version=\\1 nosync=/
 	       b done
 	       :vers
-	       s/^$thing /version=/
+	       s/^$thing /version= nosync=/
 	       :done"
     ## echo "$thing:"
     opts=`2>/dev/null sed -e "$sedscript" "$cf"`
