@@ -4,7 +4,51 @@
 #	- Cameron Simpson <cs@zip.com.au> 15may2003
 # 
 
-echo "AT$*"
-read ok || exit 1
-[ "x$ok" = xOK ] || exit 1
-exit 0
+doesecho=1
+postdelay=
+
+cmd=`basename "$0"`
+usage="Usage: $cmd [-d delay] [-e] Hayes-AT-command"
+
+badopts=
+while :
+do
+  case $1 in
+    -e)	doesecho=1 ;;
+    +e) doesecho= ;;
+    -d) delay=$2; shift ;;
+    -?*)echo "$cmd: unrecognised option: $1" >&2; badopts=1 ;;
+    *)	break ;;
+  esac
+  shift
+done
+
+if [ $# = 0 ]
+then  echo "$cmd: missing Hayes-AT-command" >&2
+      badopts=1
+fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+op=$*
+case "$op" in
+  AT*)	;;
+  *)	op=AT$op ;;
+esac
+
+set -x
+echo "$op"
+[ $delay ] && sleep $delay
+while read ok
+do
+  case "$ok" in
+    '')		: echo "$cmd: empty line" >&2 ;;
+    OK)		exit 0 ;;
+    ERROR)	: echo "$cmd: got \"ERROR\"" >&2; exit 1 ;;
+    "$op")	echo "$cmd: got echo \"$ok\"" >&2 ;;
+    *)		echo "$cmd: expected OK or ERROR or \"$op\", got \"$ok\"" >&2 ;;
+  esac
+done
+
+echo "$cmd: read fails" >&2
+exit 1
