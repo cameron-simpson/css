@@ -11,6 +11,8 @@
 # Make single wrapper for pl and sh.	- cameron 12feb2001
 #
 
+: ${TMPDIR:=/tmp}
+
 SCRIPT_FILENAME=${SCRIPT_FILENAME:-$0}
 export SCRIPT_FILENAME
 if [ "x$1" = "x-0" ]
@@ -22,7 +24,7 @@ else
 fi
 
 # snapshot errors and attach to output bottom
-STDERR=/tmp/stderr.$USER.$$
+STDERR=$TMPDIR/stderr.$USER.$$
 DEBUG=1; export DEBUG
 trap 'exec 2>&1
       if [ -n "$DEBUG" -a -s "$STDERR" ]
