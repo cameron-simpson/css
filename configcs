@@ -1,0 +1,4 @@
+#!/bin/sh
+
+cd $HOME/s/cs/include/cs/config || exit $?
+perl config.pl
