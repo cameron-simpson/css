@@ -1,0 +1,83 @@
+#!/bin/sh
+#
+# Fetch a web page that's a table of contents, and all the pages it references.
+# Peruse the TOC, offer up the links in document order for selection.
+# Generate a fresh flat page with everything in it for printing.
+#	- Cameron Simpson <cs@zip.com.au> 18may2004
+#
+
+cmd=`basename "$0"`
+usage="Usage: $cmd URL"
+
+trace=echo
+
+badopts=
+
+if [ $# = 0 ]
+then
+  echo "$cmd: missing URL [command [args...]]" >&2
+  badopts=1
+else
+  url=$1; shift
+  [ $# = 0 ] && set sh -c 'exec /opt/netscape/netscape "file://`pwd`/.print.html"'
+fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+urlorig=$url
+case "$url" in
+  *#*)	url=`expr "x$url" : 'x\([^#]*\)#.*'` ;;
+esac
+
+case "$url" in
+    */)	urlbase=index.html ;;
+    *)	urlbase=`basename "$url"` ;;
+esac
+
+wkdir=
+trap '[ -n "$wkdir" ] && [ -d "$wkdir/." ] && rm -r "$wkdir"' 0 1 15
+wkdir=`mkdirn "${TMPDIR:-/tmp}/$cmd"` || exit 1
+cd "$wkdir" || exit 1
+
+ncut=`IFS=/; set -- $url; echo $#`
+wget -r  -np -x -nH --cut-dirs=$ncut --convert-links "$url" || exit 1
+
+[ -s "$urlbase" ] || { echo "$cmd: no $urlbase file!" >&2; exit 1; }
+
+urllist=.urllist
+(
+  echo "# Comment out or delete all inapplicable URLs."
+  echo "# URLs may also be reordered here."
+  exec <"$urlbase" >"$urllist"
+  urls -Rt \
+  | sed -e 's/^\([^# 	]*\)#[^ 	]*/\1/' -e '/\.s*htm/!d' \
+  | keepfirst
+)
+
+eval "${EDITOR:-vi} \"\$urllist\""
+bsed '/^[^#]/!d' "$urllist" || exit 1
+[ -s "$urllist" ] || { echo "$cmd: empty URL list, aborting" >&2; exit 1; }
+
+xit=0
+
+exec >.print.html
+
+echo "<tt><small>$url</small></tt><br>"
+htmlbody <"$urlbase" || xit=1
+
+awk '{print$1}' <"$urllist" \
+| keepfirst \
+| while read rurl title
+  do  [ -f "$rurl" ] || { echo "$cmd: missing subURL: $rurl" >&2
+			  xit=1
+			  continue
+			}
+      echo "<hr><tt><small>$rurl</small></tt><br>"
+      htmlbody <"$rurl" || xit=1
+  done
+
+exec >&-
+
+"$@" || xit=1
+
+exit $xit
