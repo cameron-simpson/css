@@ -1,13 +1,26 @@
 #!/bin/sh
+
 : ${LOGDIR:=$HOME/var/log}
 : ${CONSOLE:=$LOGDIR/console}
 : ${TMPDIR:=/tmp}
+
+folder=+spam-corpus
+case "$1" in
+  +*) folder=$1; shift ;;
+esac
+
+[ $# = 0 ] || { echo "Usage: $0 [+folder]" >&2; exit 2; }
+
 exec >>"$CONSOLE" 2>&1
+
 tmp=$TMPDIR/procspam$$
 cat >"$tmp" || exit 1
+
 exec </dev/null
-( bogofilter -Ns <"$tmp"
-  filemailitem +spam-corpus <"$tmp"
+( lock bogofilter bogofilter -Ns <"$tmp"
+  filemailitem "$folder" <"$tmp"
   ##procmail <"$tmp"
   rm "$tmp"
 ) &
+
+exit 0
