@@ -184,7 +184,7 @@ do  [ $abort ] && exit 1
 	      mpg|mpeg|mpe) format=mpg ;;
 	      vob)	format=vob ;;
 	      ram|rm)	format=ram ;;
-	      jpg|jpeg|png|gif|xbm|xpm)
+	      jpg|jpeg|jpe|png|gif|xbm|xpm)
 			format=image ;;
 	      asf|mov|avi)	format=$cext ;;
 	      wrl)	format=vrml ;;
