@@ -1,0 +1,7 @@
+#!/bin/sh
+#
+# Print xauth info for piping into "gxauth -".
+#	- Cameron Simpson, 20jun94
+#
+
+exec xauth -i nextract - "$DISPLAY"
