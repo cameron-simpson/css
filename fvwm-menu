@@ -8,31 +8,35 @@
 
 noentries=
 noauto=
+title=
 
 cmd=$0
-usage="Usage: $cmd [-1] [-n] menu title cmd [args...]
+usage="Usage: $cmd [-1] [-n] [-t title] menu cmd [args...]
 	-n	Don't geneate any menu entries (bootstrap).
+	-t	Set title; default is menu name.
 	-1	Don't give this menu a DynamicPopUpAction."
 
 while :
 do
   case $1 in
     -n) noentries=1 ;;
+    -t)	title=$2; shift ;;
     -1) noauto=1 ;;
     *)  break ;;
   esac
   shift
 done
 
-[ $# -ge 3 ] || { echo "$usage" >&2; exit 2; }
+[ $# -ge 2 ] || { echo "$usage" >&2; exit 2; }
 
 menu=$1
-title=$2
-shift; shift
+shift
+
+[ -n "$title" ] || title=$menu
 
 ( [ $noentries ] || exec "$@" ) \
 | ( echo "DestroyMenu $menu"
     echo "AddToMenu $menu \"$title\" Title"
-    [ $noauto ] || echo "AddToMenu $menu DynamicPopUpAction Piperead '$0 $menu \"$title\" $*'"
+    [ $noauto ] || echo "AddToMenu $menu DynamicPopUpAction Piperead '$0 -t \"$title\" $menu $*'"
     exec sed "s/^/AddToMenu $menu /"
   )
