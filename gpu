@@ -3,6 +3,11 @@
 # Asynchronous getpageurls.	- Cameron Simpson <cs@zip.com.au>
 #
 
+async=1
+if [ "x$1" = x-s ]
+then  shift; async=
+fi
+
 # hack to permit leading subdir prefix
 case $1 in
     ''|-*|*://*)	;;
@@ -16,14 +21,10 @@ case $1 in
 		;;
 esac
 
+[ $# = 0 ] && { set x "`xunclip`"; shift; }
+
 ulimit -d 16384	## 16M process data limit
 
-if [ "x$1" = x-s ]
-then  shift
-      exec getpageurls -L download ${1+"$@"}
-else
-      [ $# = 0 ] && { set x "`xunclip`"; shift; }
-fi
-
 set -x
+[ $async ] || exec getpageurls -L download ${1+"$@"}
 ignhup getpageurls -L download ${1+"$@"} &
