@@ -5,10 +5,13 @@ cd || exit 1
 [ $# -ge 1 ] || { echo "Usage: $0 [login@]hostname" >&2; exit 2; }
 host=$1; shift
 
-[ $# = 0 ] && set scripts .profile .zprofile .zshrc .zshenv .setvar \
+if [ $# = 0 ]
+then
+    set .profile .zprofile .zshrc .zshenv .setvar \
 		  rc/shell rc/env rc/perl rc/vi rc/nvi rc/x11 \
 		  .less .lesskey rc/less rc/lesskey \
 		  .xinitrc .xsession
+fi
 
 case "$host" in
     agricola|tw|barstool)
@@ -20,7 +23,14 @@ case "$host" in
 	    set "$@" "--include=/$arg"
 	done
 	set -x
-	"$@" '--exclude=/rc/*' '--exclude=/*' "$HOME/." "$host:."
+	"$@" \
+		'--exclude=/scripts/CHANGELOG.txt' \
+		'--exclude=/scripts/CHANGELOG.html' \
+		'--exclude=/scripts/0README.txt' \
+		'--exclude=/scripts/defunct' \
+		'--exclude=/scripts/3rdparty' \
+		'--exclude=/rc/*' '--exclude=/*' \
+		"$HOME/." "$host:."
 	;;
     *)	set -x
 	tar cf - "$@" | ssho "$host" exec tar xf -
