@@ -12,7 +12,12 @@ usage="Usage: $cmd [-f] [-m logmessage] [arg1-options] [--] file [command [args.
 			The file will be edited with filteredit.
 			The filename will not be attached to the command.
 	-m logmessage	Specify log message.
-			Default from \$CVSEDIT_MSG."
+			Default from \$CVSEDIT_MSG.
+	--log		Log cvs diff to bug systems (default).
+	--no-log	Don't log the diff.
+	--log-terse	Make the diff terse (drop context lines).
+	--diff		Display cvs diff after edit (default).
+	--no-diff	No diff listing."
 
 msg=$CVSEDIT_MSG
 if [ -n "$msg" ]
@@ -24,6 +29,7 @@ dodiff=1
 dolog=1
 arg1opts=-end
 isfilter=
+cvsdiffgrep=''
 
 badopts=
 
@@ -39,6 +45,7 @@ do
     -m)	havemsg=1 msg=$2; shift ;;
     --log)	dolog=1 ;;
     --no-log)	dolog= ;;
+    --log-terse)dolog=1 cvsdiffgrep='^[^ ]' ;;
     --diff)	dodiff=1 ;;
     --no-diff)	dodiff= ;;
     -?*)	echo "$cmd: unrecognised option: $1" >&2; badopts=1 ;;
@@ -109,7 +116,7 @@ editxit=$?
    }
 
 # log the change and diff appropriately
-[ $dolog ] && cvs diff "$file" | buglog "cvsedit $base: $msg"
+[ $dolog ] && cvs diff "$file" | grep "$cvsdiffgrep" | buglog "cvsedit $base: $msg"
 
 ( cd "$dir" || exit 1
   exec cvs commit -m "$msg" "$base"
