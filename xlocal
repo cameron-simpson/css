@@ -1,0 +1,21 @@
+#!/bin/sh
+#
+# Strip local versions of $DISPLAY down to :n.
+#	- Cameron Simpson <cs@zip.com.au>
+#
+
+case $DISPLAY in
+    :*)	;;
+    unix:*|localhost:*|$HOST:*|$HOSTNAME:*)
+	DISPLAY=`expr "x$DISPLAY" : 'x.*\(:.*\)'`
+	;;
+    *)	echo "$0: can't get direct version of \"$DISPLAY\"" >&2
+	echo "	aborting exec of $*" >&2
+	exit 1
+	;;
+esac
+export DISPLAY
+
+[ $# = 0 ] && { echo "$DISPLAY"; exit 0; }
+
+exec "$@"
