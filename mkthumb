@@ -5,15 +5,15 @@
 #
 
 cmd=$0
-usage="Usage: $cmd [-x] [XxY] imagefiles..."
+usage="Usage: $cmd [-x] [XxY] {imagefile|dir}..."
 
+thsize=48x48
 trace=
 verbose=
 [ -t 1 ] && verbose=1
 
 [ "x$1" = x-x ] && { trace=set-x; shift; }
 
-thsize=48x48
 case "$1" in
   [1-9]*x[1-9]*)	thsize=$1; shift ;;
 esac
@@ -24,9 +24,21 @@ xit=0
 
 for file
 do
+  if [ -d "$file/." ]
+  then
+    ( cd "$file" || exit 1
+      [ $verbose ] && pwd
+      exec $trace "$0" *.jpg *.png
+    ) || xit=1
+    continue
+  fi
+
+  [ -s "$file" ] || continue
+
   thdir=`dirname "$file"`/.thumbnails/$thsize
   th=$thdir/`basename "$file"`.png
   [ -s "$th" ] && continue
+
   [ $verbose ] && echo "$file -> $th"
 
   [ -d "$thdir/." ] || needdir "$thdir" || { xit=1; continue; }
