@@ -16,7 +16,7 @@ report=$1
 EDITOR=$CVS_COMMIT_EDITOR
 export EDITOR
 
-cvs -q diff $CVS_COMMIT_FILES 2>&1 | sed 's/^/CVS: /' >>"$report"
+cvs -q diff $CVS_COMMIT_FILES 2>&1 </dev/null | sed 's/^/CVS: /' >>"$report"
 
 $EDITOR "$report"
 xit=$?
