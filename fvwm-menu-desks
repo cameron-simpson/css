@@ -11,6 +11,6 @@ op=SwitchToDesk
 desktop \
 | sort +1 \
 | awk '{ desks++
-         print "\"" $2 "\" '"$op"' 0 " ($1+24)
+         print "\"" $2 "\" '"$op"' 0 " $1
        }
        END { if (desks == 0) print "\"no named desktops\" Nop" }'
