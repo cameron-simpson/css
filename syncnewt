@@ -1,12 +1,23 @@
 #!/bin/sh
 
+cd || exit 1
+
 needhost amadeus@home kaper@cisra || exit 1
 
 [ $# = 0 ] || exec syncstuff @newt "$@"
 
 pfx small syncsmall @newt &
 for d in s cvs ## mail im
-do  pfx $d syncstuff @newt there/cameron@cskk.homeip.net/$d &
+do  pfx $d syncstuff @newt $d &
 done
+pfx var/slideshow syncstuff @newt -L var/slideshow &
+
+( cd $HOME/p/mail || exit 1
+  set -x
+  rsync -avHP --delete \
+	--include=/attn --include=/old --include=/out --include=/saved \
+	'--exclude=/*' \
+	. newt:p/mail/.
+) &
 
 wait
