@@ -1,0 +1,60 @@
+#!/bin/sh
+#
+# Manage named desktops for a session.
+# Allocate (or reuse) a named desk, returning its number.
+#	- Cameron Simpson <cs@zip.com.au> 18jul2002
+#
+# Method:
+# We keep a directory of desk numbered subdirs.
+# Each subdir has a "name" file.
+#
+
+cmd=$0
+usage="Usage: $cmd [[-r] deskname]"
+
+statedir=$HOME/var/desktop/$HOST
+
+[ -d "$statedir/." ] || mkdir -p "$statedir" || exit 1
+cd "$statedir" || exit 1
+
+if [ $# = 0 ]
+then
+    # list desks
+    grep . [1-9]*/name /dev/null 2>/dev/null | sed 's|/name:| |'
+    exit 0
+fi
+
+rmdesk=
+[ "x$1" = "x-r" ] && { rmdesk=1; shift
+		       [ $# = 0 ] && { echo "$cmd: -r: missing deskname" >&2
+				       echo "$usage" >&2
+				       exit 2
+				     }
+		     }
+
+deskname=$1; shift
+[ $# = 0 ] || { echo "$cmd: extra arguments: $*" >&2; exit "$usage" >&2; exit 2; }
+
+[ -n "$deskname" ] || { echo "$cmd: empty desk names not permitted" >&2; exit 1; }
+
+for name in [1-9]*/name
+do  [ -s "$name" ] || continue
+    tryname=`cat "$name"` || continue
+    if [ "x$deskname" = "x$tryname" ]
+    then
+	deskdir=`dirname "$name"`
+	if [ $rmdesk ]
+	then
+	    rm -r "$deskdir" || exit 1
+	else
+	    echo "$deskdir"
+	fi
+	exit 0
+    fi
+done
+
+[ $rmdesk ] && { echo "$cmd: -r: no desk named \"$deskname\"" >&2; exit 1; }
+
+newdesk=`mkdirn ''` || exit 1
+echo "$deskname" >"$newdesk/name"
+echo "$newdesk"
