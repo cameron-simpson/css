@@ -25,8 +25,24 @@ do
     --)	shift; break ;;
     -?*)echo "$cmd: unrecognised option: $1" >&2; badopts=1 ;;
     *)	break ;;
+  esac
   shift
 done
+
+if [ $# = 3 ]
+then
+    remote=$1 target=$2 port=$3
+    shift; shift; shift
+else
+    echo "$cmd: expected: remote target port, found: $*" >&2
+    badopts=1
+fi
+
+if [ -n "$keyfile" ] && [ ! -s "$keyfile" ]
+then
+    echo "$cmd: no keyfile: $keyfile" >&2
+    badopts=1
+fi
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
