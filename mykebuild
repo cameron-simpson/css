@@ -1,0 +1,386 @@
+#!/usr/bin/perl
+#
+# Wrapper for myke to build most binaries or libraries.
+# 	- Cameron Simpson, 19jul92
+#
+# Translated from SysV shell to Perl.	- cameron, 05may93
+#
+
+require 'cs/open.pl';
+require 'cs/pathname.pl';
+require 'cs/dir.pl';
+use cs::Upd;
+
+($cmd=$0) =~ s:.*/::;
+
+$ARCH=$ENV{ARCH};
+$HOME=$ENV{HOME};
+length($ENV{LOCAL}) || ($ENV{LOCAL}=$HOME);
+length($ENV{PWD}) || chop($ENV{PWD}=`pwd`);
+$PWD=$ENV{PWD};
+$LOCAL=$ENV{LOCAL};
+$BUILDDIR=$ENV{BUILDDIR}=$ENV{HOME}.'/etc/'.$cmd;
+
+$usage="Usage: $cmd [-dnNuvVx] \\
+	[-b buildee] [-f file] [-o option] [-Oopt] [-I incpath] \\
+	[-L libpath] [-l lib] [-Dlevel] [-j jobs] [-D define] \\
+	[-U define] [-E envvar=string] [macro=string] [--] [targets...]
+    Options:
+	-b buildee	Consult .buildopts.buildee.
+	-f file		Consult file.
+	-o option	Consult $BUILDDIR/option.opts.
+	-V		Verbose. Will trace .buildopts files if first option.
+	-dnNuxv		Passed to myke.
+	-D define	\\
+	-U define	 \\
+	-I incpath	--\\
+	-Olimit n	---\\
+	-Oopt		----> Passed to cc -c.
+	-Dlevel		Passed to myke.
+	-j jobs		Passed to myke.
+	-l lib		\\
+	-L libpath	-> Passed to cc -o.
+	-E envvar=string >Passed into the environment.
+	macro=string	Passed to myke.
+";
+
+$mykefile=$BUILDDIR.'/rc';
+$target=&basename($PWD);
+
+$badopts=0;
+@mflags=();
+@mmacros=("BUILDDIR=$BUILDDIR");
+@exts=();
+$verbose=0;
+@DEFINES=();
+@INCLUDES=();
+@stdLIBPATH=grep(length,split(/:/,$ENV{'LD_LIBRARY_PATH'}),'/opt/lib','/usr/lib','/lib','/usr/ccs/lib');
+@LIBPATH=();
+@LIBRARIES=();
+@CFLAGS=();
+
+$badopts=0;
+
+# catch -V up front in case we want to turn on tracing
+if ($ARGV[$[] eq '-V')	{ &parseopts(shift); }
+
+for $opts ($HOME.'/.buildopts','.buildopts')
+	{ -r $opts && &readopts($opts);
+	}
+
+@ARGV=&parseopts(@ARGV);
+
+$badopts && ( err($usage), exit 2 );
+
+# HFILES=`find *.h * -type f -name '*.h' -print`
+@dirents=&dirents('.');
+@HFILES=grep(/\.h$/,@dirents);
+@CFILES=grep(/\.c$/,@dirents);
+$binary=$target.'.'.$ARCH;
+$library=$target.'.'.$ARCH.'.a';
+
+if ($target =~ /^lib/)	{ $deftarget=$library; $deftype='lib'; }
+else			{ $deftarget=$binary;  $deftype='bin'; }
+
+@myke=('myke','-r','-f',$mykefile,@mflags,
+		"cmd=$cmd",
+		"HOME=$HOME",
+		"LOCAL=$LOCAL",
+		"ARCH=$ARCH",
+		&q(HFILES,@HFILES),
+		&q(CFILES,@CFILES),
+		&q(LDFLAGS,@CFLAGS),
+		&q(LIBRARIES,@LIBRARIES),
+		&q(CFLAGS,@CFLAGS,@INCLUDES,@DEFINES),
+		"target=$target",
+		"binary=$binary",
+		"library=$library",
+		"deftarget=$deftarget",
+		"deftype=$deftype",
+		@mmacros,
+		@ARGV);
+
+$verbose && nl("exec(@myke)");
+
+exec(@myke);
+err("$cmd: can't exec(@myke): $!\n");
+exit 1;
+
+sub readopts	# (optfile) -> status
+	{ local($optfile)=@_;
+	  local($F);
+
+	  (err($cmd, ": readopts: can't open ", $optfile, ": $!\n"),
+	   return 0
+	  ) unless defined($F=&subopen('<',$optfile));
+
+	  $verbose && nl("$cmd: readopts($optfile) ...");
+	  while (<$F>)
+		{ /\S/ && &parseopts(&shellargs($_));
+		}
+
+	  close($F);
+	  1;
+	}
+
+sub shellargs	# (shellline) -> @args
+	{ local($_)=@_;
+
+	  s/^\s+//;
+	  s/\s+\r?\n?$//;
+
+	  local(@args)=();
+	  local($arg);
+
+	  SHELLARGS:
+	    while (length)
+		{ $arg='';
+
+		  # quit on comment
+		  last SHELLARGS if /^#/;
+
+		  while (/^\S/)
+			{ # plain text
+			  if (/^[^"'\\\$\s]+/)
+				{ $arg.=$&;
+				  $_=$';
+				}
+			  # \x
+			  elsif (/^\\/)
+				{ $_=$';
+				  $arg.=substr($_,$[,1);
+				  substr($_,$[,1)='';
+				}
+			  # 'blah'
+			  elsif (/^'([^']*)'?/)
+				{ $arg.=$1;
+				  $_=$';
+				}
+			  # "blah"
+			  elsif (/^"(([^"\\]|\\["\\])*)"/)
+				{ local($quoted)=$1;
+				  $_=$';
+				  $arg.=&paramsub($quoted);
+				}
+			  # $var or ${var}
+			  elsif (/^\$([a-zA-Z_]\w*)/
+			      || /^\${\s*([a-zA-Z_]\w*)\s*}/
+				)
+				{ $arg.=$ENV{$1};
+				  $_=$';
+				}
+			  # ${var:-thing}
+			  elsif (/^\${\s*/)
+				{ local($front,$back)=&paramcurly($_);
+				  $arg.=$front;
+				  $_=$back;
+				}
+			  else
+			  { $arg.=substr($_,$[,1);
+			    substr($_,$[,1)='';
+			  }
+			}
+
+		  push(@args,$arg);
+		  s/^\s+//;
+		}
+
+	  @args;
+	}
+
+sub paramcurly	# ${blah}blah2 -> (subbed(blah),blah2)
+	{ local($_)=@_;
+
+	  if (/^\$\{\s*([a-zA-Z_]\w*)\s*\}/)
+		{ local($env,$rhs)=($1,$');
+		  $rhs=&paramsub($rhs);
+		  $_=$ENV{$env}.$rhs;
+
+		  return $_;
+		}
+
+	  return $_ unless /^\$\{\s*([a-zA-Z_]\w*)\s*(:?)([-+])\s*/;
+
+	  local($varname,$cond,$op,$rhs)=($1,$2,$3,'');
+	  $_=$';
+	  while (!/^\s*}/)
+		{ if (/^[^"'\\\$\s}]+/)
+			{ $rhs.=$&;
+			  $_=$';
+			}
+		  elsif (/'([^']*)'?/)
+			{ $rhs.=$1;
+			  $_=$';
+			}
+		  elsif (/^"(([^"\\]|\\["\\])*)"/)
+			{ local($quoted)=$1;
+			  $_=$';
+			  $rhs.=&paramsub($quoted);
+			}
+		  elsif (/^\$([a-zA-Z_]\w*)/
+		      || /^\${\s*([a-zA-Z_]\w*)\s*}/
+			)
+			{ $rhs.=$ENV{$1};
+			  $_=$';
+			}
+		  elsif (/^\\(.)/)
+			{ $rhs.=$1;
+			  $_=$';
+			}
+		  elsif (/^\${/)
+			{ local($front,$back)=&paramcurly($_);
+			  $rhs.=$front;
+			  $_=$back;
+			}
+		  else
+		  { $rhs.=substr($_,$[,1);
+		    substr($_,$[,1)='';
+		  }
+		}
+
+	  s/^\s*}//;
+
+	  local($arg);
+
+	  $arg=(($op eq ':'
+			? length($ENV{$varname})
+			: defined($ENV{$varname})
+		) ? ($op eq '-' ? $ENV{$varname} : $rhs)
+		  : ($op eq '-' ? $rhs : '')
+	       );
+
+	  ($arg,$_);
+	}
+
+sub paramsub	# string -> string-after-$-subs
+	{ local($_)=@_;
+	  local($subbed)='';
+
+	  while (length)
+		{ if (/^[^\$\\]+/)
+			{ $subbed.=$&;
+			  $_=$';
+			}
+		  elsif (/^\\(.)/)
+			{ $subbed.=$1;
+			  $_=$';
+			}
+		  elsif (/^\$([a-zA-Z_]\w*)/)
+			{ $subbed.=$ENV{$1};
+			  $_=$';
+			}
+		  elsif (/^\${/)
+			{ local($front,$back)=&paramcurly($_);
+			  $subbed.=$front;
+			  $_=$back;
+			}
+		  else
+		  { $rhs.=substr($_,$[,1);
+		    substr($_,$[,1)='';
+		  }
+		}
+
+	  $subbed;
+	}
+
+sub parseopts	# (@ARGV) -> (@unparsed)
+	{ local(@ARGV)=@_;
+	  local($_);
+
+	  $verbose && nl("@ARGV");
+
+	  PARSEOPTS:
+	    while (defined($_=shift(@ARGV)))
+		{ if ($_ eq '--')	{ last PARSEOPTS; }
+		  elsif ($_ eq '-b')	{ $target=shift(@ARGV);
+					  &readopts('.buildopts.'.$target)
+						|| ($badopts=1);
+					}
+		  elsif ($_ eq '-f')	{ &readopts(shift(@ARGV))
+						|| ($badopts=1);
+					}
+		  elsif ($_ eq '-o')	{ &readopts($BUILDDIR.'/'.shift(@ARGV).'.opts')
+						|| ($badopts=1);
+					}
+		  elsif ($_ eq '-V')	{ $verbose=1; }
+		  elsif (/^-[dnNuxv]/)	{ push(@mflags,$_); }
+		  elsif ($_ eq '-Olimit'){push(@CFLAGS,$_,shift(@ARGV)); }
+		  elsif (/^-O/)		{ push(@CFLAGS,$_); }
+		  elsif (/^-D\d+$/)	{ push(@mflags,$_); }
+		  elsif ($_ eq '-j')	{ push(@mflags,$_,shift); }
+		  elsif ($_ eq '-D')	{ $_=shift(@ARGV);
+					  push(@DEFINES,'-D'.$_);
+					  ($_ eq 'DEBUG' || $_ eq 'EBUG')
+						&& push(@exts,'-DEBUG');
+					}
+		  elsif (/^-D/)		{ unshift(@ARGV,'-D',$'); }
+		  elsif ($_ eq '-U')	{ $_=shift(@ARGV);
+					  push(@DEFINES,'-U'.$_);
+					}
+		  elsif (/^-U/)		{ unshift(@ARGV,'-U',$'); }
+		  elsif ($_ eq '-E')	{ $_=shift(@ARGV);
+					  if (/^([a-zA-Z_]\w*)=/)
+						{ $ENV{$1}=$';
+						}
+					  else
+					  { err("$cmd: parseopts: bad argument to -E: $_\n");
+					    $badopts=1;
+					  }
+					}
+		  elsif ($_ eq '-I')	{ push(@INCLUDES,'-I'.shift(@ARGV)); }
+		  elsif (/^-I/)		{ unshift(@ARGV,'-I',$'); }
+		  elsif ($_ eq '-L')	{ push(@LIBPATH,shift(@ARGV)); }
+		  elsif (/^-L/)		{ unshift(@ARGV,'-L',$'); }
+		  elsif ($_ eq '-l')	{ $_=shift(@ARGV);
+					  local($flib,$rlib);
+					  undef $rlib; # in case
+					  libPATH:
+					   for $p (@LIBPATH,@stdLIBPATH)
+					    { for $ext (@exts,'')
+						{ $flib=$p.'/lib'.$_.$ext.'.a';
+						  $verbose && out($flib);
+						  if (-r $flib)
+						    { $rlib=$flib;
+						      $verbose && nl($rlib);
+						      last libPATH;
+						    }
+						}
+					    }
+					  
+					  push(@LIBRARIES,'-l'.$_);
+					  if (!defined($rlib))
+						{ err("$cmd: parseopts: warning: can't locate lib$_ in @LIBPATH @stdLIBPATH\n");
+						}
+					}
+		  elsif (/^-l/)		{ unshift(@ARGV,'-l',$'); }
+		  elsif (/^-/)		{ err("$cmd: parseopts: $_: unrecognised option\n");
+					  $badopts=1;
+					}
+		  elsif (/^[a-zA-Z_]\w*=/) { push(@mmacros,$_); }
+		  else
+		  { unshift(@ARGV,$_);
+		    last PARSEOPTS;
+		  }
+		}
+
+	  @ARGV;
+	}
+
+sub enquote
+	{ local(@strs)=@_;
+	  local($quoted)='';
+
+	  for (@strs)
+		{ if (/[^\w\/.\-]/)
+			{ s/'/'\\''/g;
+			  $_="'".$_."'";
+			}
+		}
+
+	  @strs;
+	}
+
+sub q	{ local($_)=shift;
+
+	  $_.'='.join(' ',&enquote);
+	}
