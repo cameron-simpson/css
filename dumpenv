@@ -1,0 +1,26 @@
+#!/usr/bin/perl
+#
+# Emit shell script to reload environment.
+#	- Cameron Simpson 15may93
+#
+# Csh hack.	- cameron, 23sep96
+# Use cs::Shell.- cameron, 01dec98
+# Persist Hack.	- cameron, 02dec98
+#
+
+use cs::Shell;
+
+$dumpmode='sh';
+$force=0;
+ARGV:
+  while (@ARGV)
+	{ if ($ARGV[0] eq '-csh')	{ $dumpmode=CSH; shift(@ARGV); }
+	  elsif ($ARGV[0] eq '-sh')	{ $dumpmode=SH; shift(@ARGV); }
+	  elsif ($ARGV[0] eq '-persist'){ $dumpmode=PERSIST; shift(@ARGV); }
+	  elsif ($ARGV[0] eq '-f')	{ $force=1; shift(@ARGV); }
+	  else				{ last ARGV; }
+	}
+
+cs::Shell::putvars($force,$dumpmode);
+
+exit 0;
