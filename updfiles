@@ -1,0 +1,75 @@
+#!/bin/sh
+#
+# Accept chkfiles output on stdin, comm against snapshot and
+# write cpio archive of changed files.
+#	- Cameron Simpson <cs@zip.com.au> 17sep96
+#
+
+snapdir=${SNAPDIR-$HOME/etc/snap}
+snap=zip
+if [ -t 1 ]; then cpiov=v
+	     else cpiov=
+fi
+verbose=
+out=${TMP-$HOME/tmp}/$snap.cpio
+
+cmd=`basename "$0"`
+usage="Usage: $cmd [-d snapdir] [-o output] -s snap
+	-d snapdir	Location of snapshot files.
+			Default: \$SNAPDIR or $snapdir
+	-o output	Where to write the cpio archive.
+			Default: ${TMP-$HOME/tmp}/{snap}.cpio.
+	-s snap		Snapshot file or basename.
+	-v		Verbose."
+
+badopts=
+while :
+do  case $1 in
+	--)	shift; break ;;
+	-d)	snapdir=$2; shift ;;
+	-o)	out=$2; shift ;;
+	-s)	snap=$2; shift ;;
+	-v)	verbose=1 cpiov=v ;;
+	-?*)	echo "$cmd: unrecognised option: $1" >&2
+		badopts=1
+		;;
+	*)	break ;;
+    esac
+    shift
+done
+
+[ $# = 0 ] || { echo "$cmd: extra arguments: $*" >&2
+		badopts=1
+	      }
+
+if [ -z "$snap" ]
+then
+    echo "$cmd: no snapshot file specified" >&2
+    badopts=1
+else
+    case $snap in
+	/*)	snapfile=$snap ;;
+	*)	snapfile=$snapdir/$snap ;;
+    esac
+    [ -r "$snapfile" ] || { echo "$cmd: not snapshot at $snapfile" >&2
+			    badopts=1
+			  }
+fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+case $out in
+    -)	;;
+    *)	exec >"$out" ;;
+esac
+
+sort -o "$snapfile" "$snapfile" || { echo "$cmd: sort($snapfile) fails" >&2
+				     exit $?
+				   }
+
+$verbose && set -x
+sort \
+	| comm -23 - "$snapfile" \
+	| perl -pe 's/^(\w+=\S+ )*(.)/$2/' \
+	| sort \
+	| cpio -oLc${cpiov}
