@@ -62,7 +62,8 @@ then
     # sniff first 1k of file
     hdr=$TMPDIR/blk$$
     dd bs=1024 count=1 <&3 >$hdr 2>/dev/null || exit 1
-    mtype=`file2mime "$hdr"` || mtype=application/x-dont-parse
+    mtype=`file2mime "$hdr"` || mtype=
+    [ "$mtype" = application/octet-stream ] && mtype=
 
     # feed block and rest of file into ourself now we know the type
     ( rm "$hdr"
@@ -73,14 +74,17 @@ then
   fi
 
   # regular file - sniff directly
-  mtype=`file2mime "$file"` || mtype=application/x-dont-parse
+  mtype=`file2mime "$file"` || mtype=
 fi
 
 # ok, we have a type and the file on fd 3 (remember, may be a pipe)
 case "$mtype" in
+    ''|application/octet-stream)
+		mtype=application/x-dont-parse ;;
     text/plain)
 	case "$file" in
-	  *.csv)	mtype=text/x-csv ;;
+	  *.csv)
+		mtype=text/x-csv ;;
 	esac
 	;;
 esac
