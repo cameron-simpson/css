@@ -1,0 +1,183 @@
+#!/bin/sh
+#
+# Manage a list of identifiers and their attributes.
+# Generalised from desktop 01apr2003.
+#	- Cameron Simpson <cs@zip.com.au> 18jul2002
+#
+# Method:
+# We keep a directory of numbered subdirs.
+# Each subdir has a "name" file (and other attrs as desired).
+#
+
+idset=
+statedir=
+
+cmd=$0
+usage="Usage: $cmd [-a] [-d statedir] -i idset [-l] [[-r] idname [param [value]]]
+	-a		List all ids.
+	-i idset	Default: $idset
+	-d statedir	Specify id state subdirectory.
+			Default from \$SYSTEMID or \$HOMEHOST or \$HOST or hostname.
+	-l		Long: list all attributes of ids.
+	-r		Remove specified id or parameter."
+
+badopts=
+
+all= aflag=
+idname=
+rmid=
+long=
+
+while :
+do
+  case $1 in
+    -a)	all=1 aflag=$1 ;;
+    -d)	statedir=$2; shift ;;
+    -i)	idset=$2; shift ;;
+    -l)	long=1 ;;
+    -r)	rmid=1 ;;
+    -?*)echo "$cmd: unrecognised option: $1" >&2; badopts=1 ;;
+    --)	shift; break ;;
+    *)	break ;;
+  esac
+  shift
+done
+
+if [ -z "$idset" ]
+then  echo "$cmd: idset must be supplied" >&2
+      badopts=1
+else
+      # make sane decision about state dir
+      [ -n "$statedir" ] \
+	      || statedir=${SYSTEMID:-${HOMEHOST:-${HOST:-`hostname`}}}
+      case "$statedir" in
+	  ./* | /* )	;;
+	  *)		statedir=$HOME/var/$idset/$statedir ;;
+      esac
+fi
+
+idname=$1; shift
+if [ $# = 0 ]
+then  param=
+else  param=$1; shift
+      case "$param" in
+	*/* | . | ..) echo "$cmd: bad parameter name \"$param\"" >&2
+		      badopts=1 ;;
+      esac
+      if [ $# = 0 ]
+      then haspvalue=
+	   pvalue=
+      else haspvalue=1
+	   pvalue=$1; shift
+	   [ $rmid ] && { echo "$cmd: can't use -r with parameter values" >&2
+			    badopts=1
+			  }
+	   [ $# = 0 ] || { echo "$cmd: extra arguments: $*" >&2; badopts=1; }
+      fi
+fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+[ -d "$statedir/." ] || mkdir -p "$statedir" || exit 1
+cd "$statedir" || exit 1
+
+if [ -z "$idname" ]
+then
+    if [ $rmid ]
+    then
+	echo "$cmd: -r: missing idname" >&2
+	echo "$usage" >&2
+	exit 2
+    fi
+
+    # list ids
+    if [ $long ]
+    then
+	idset $aflag -i "$idset" \
+	| sed 's/ .*//' \
+	| while read id
+	  do  grep . "$id"/* /dev/null
+	  done 2>/dev/null \
+	| sed -e 's:/: :' -e 's/:/ /'
+    else
+	grep . [1-9]*/name /dev/null 2>/dev/null \
+	| sed 's|/name:| |' \
+	| if [ $all ]
+	  then  sed 's/^\([0-9][0-9]* \)\./\1/'
+	  else  sed '/^[0-9][0-9]* \./d'
+	  fi \
+	| sort -n
+    fi
+
+    exit 0
+fi
+
+iddir=
+case "$idname" in
+    *[^0-9]*)
+	for namefile in [1-9]*/name
+	do  [ -s "$namefile" ] || continue
+
+	    tryname=$(<$namefile) || continue
+	    if [ "x$idname" = "x$tryname" ] \
+	    || [ -n "$all" -a "x.$idname" = "x$tryname" ]
+	    then
+		iddir=`dirname "$namefile"`
+		break
+	    fi
+	done
+	;;
+    *)	iddir=$idname
+	needdir "$iddir" || exit 1
+	;;
+esac
+
+if [ -z "$iddir" ]
+then
+    if [ $rmid ]
+    then
+      echo "$cmd: -r: no id named \"$idname\"" >&2
+      exit 1
+    fi
+
+    iddir=`mkdirn ''` || exit 1
+    echo "$idname" >"$iddir/name"
+    echo "$iddir"
+fi
+
+if [ $rmid ]
+then
+  if [ -n "$param" ]
+  then rm "$iddir/$param" || exit 1
+  else rm -r "$iddir" || exit 1
+  fi
+else
+  if [ -n "$param" ]
+  then
+    pfile=$iddir/$param
+    if [ $haspvalue ]
+    then
+      # store new parameter
+      echo "$pvalue" >"$pfile"
+      # some parameters have side effects
+      case "$param" in
+	  name)	if [ -n "$DISPLAY" ]
+		then
+		  case "$pvalue" in
+		    .*)	name=`expr "x$pvalue" : 'x.\(.*\)'` ;;
+		    *)	name=$pvalue ;;
+		  esac
+		  fvwmcmd "idtopName $iddir $name" &
+		fi
+		;;
+      esac
+    else
+      if [ -s "$pfile" ]
+      then echo "$(<$iddir/$param)"
+      else echo
+      fi
+    fi
+  else
+    echo "$iddir"
+  fi
+fi
