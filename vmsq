@@ -1,0 +1,4 @@
+#!/bin/sh
+vmsquash -t .
+>.index
+>.index.db
