@@ -1,0 +1,17 @@
+#!/bin/sh
+#
+# Produce disc usage summaries.
+#	- Cameron Simpson <cs@zip.com.au>
+#
+# Extensions and usage.	- cameron, 21mar99
+#
+
+ext=
+[ -z "$1" ] || { ext=.$1; shift; }
+
+[ $# = 0 ] || { echo "Usage: $0 [ext]" >&2; exit 2; }
+
+dufs ${1+"$@"} \
+	| sed 's/^\([0-9][0-9]*\)	\.\/\/*/\1	/' \
+	| tee .du-a$ext \
+	| fgrep -v / > .du-s$ext
