@@ -4,10 +4,17 @@
 #	- Cameron Simpson <cs@zip.com.au> 08oct2003
 #
 
+cmd=$0
+
 PATH=/opt/j2sdk-sun/bin:$PATH
 export PATH
 
-soinst=/opt/openoffice
+soinst=
+for d in /opt/openoffice /usr/lib/ooo-1.1
+do
+  [ -d "$d/." ] && { soinst=$d; break; }
+done
+[ -n "$soinst" ] || { echo "$cmd: no soinst dir found, aborting!" >&2; exit 1; }
 
 oobase=${OPENOFFICE:-$HOME/OpenOffice}
 
@@ -30,6 +37,7 @@ then
     echo "Otherwise, you should proceed with a \"Workstation\" setup."
     echo
 
+    ls -ld "$soinst/program/setup"
     ask "Run OpenOffice setup" || exit 0
 
     ( cd "$soinst/program" || exit 1
@@ -49,4 +57,4 @@ then
 fi
 
 set -x
-exec "$oobase/soffice" ${1+"$@"} &
+"$oobase/soffice" ${1+"$@"} &
