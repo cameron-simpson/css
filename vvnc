@@ -1,0 +1,40 @@
+#!/bin/sh
+#
+# Run a VNC showing another VNC.
+# Basicly a hack to do backing store.
+#	- Cameron Simpson <cs@zip.com.au> 05dec2001
+#
+
+cmd=`basename "$0"`
+usage="Usage: $cmd [XxY] :n [host]:n
+	XxY	Specify geometry."
+
+badopts=
+
+# default setup if no args
+[ $# = 0 ] && { set x $VVNC_DEFAULT; shift; }
+
+geom=
+case "$1" in
+    *[0-9]x[1-9]*)	geom="-geometry $1"; shift ;;
+esac
+
+case "$1" in
+    :[0-9]*)	num=$1; shift ;;
+    *)		echo "$cmd: missing :n" >&2; badopts=1 ;;
+esac
+
+case "$1" in
+    lo:*)	disp=localhost:`expr "$1" : 'lo:\(.*\)'`; shift ;;
+    :[0-9]*)	disp=localhost$1; shift ;;
+    *)		echo "$cmd: missing host:n" >&2; badopts=1 ;;
+esac
+
+[ $# = 0 ] || { echo "$cmd: extra arguments: $*" >&2; badopts=1; }
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+set -vx
+VNC_XSTARTUP="vnc $disp" vncserver -depth 24 $num $geom
+sleep 1
+vnc "localhost$num"
