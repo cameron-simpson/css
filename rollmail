@@ -30,7 +30,7 @@ do  (
       pwd; set -x
 
       mkdir "$today" || exit $?
-      ls | grep '^[0-9]' | xargs mrg "$today/."
+      ls | grep '^[0-9]' | xxargs mrg "$today/."
       rmdir "$today" 2>/dev/null && exit 0
 
 ##      # stash addresses
