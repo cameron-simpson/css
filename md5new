@@ -1,0 +1,9 @@
+#!/bin/sh
+#
+# Read filenames from stdin and match against md5indices on the command line.
+# Emit filenames not known in the indices.
+#	- Cameron Simpson <cs@zip.com.au> 21jun2000
+#
+
+md5match ${1+"$@"} \
+| sed -n 's/^[^	][^	]*	\([^	][^	]*)$/\1/p'
