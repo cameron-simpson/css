@@ -6,4 +6,4 @@
 
 folder=$1
 summary=`email-summary-line`
-exec alert -c yellow `timecode` $folder "$summary"
+exec alert -c yellow "`timecode` $folder $summary"
