@@ -1,6 +1,8 @@
 #!/bin/sh
 
-tmp=/tmp/newurls.$$
+: ${TMPDIR:=/tmp}
+
+tmp=$TMPDIR/newurls.$$
 
 trap 'rm -f $tmp; exit 1' 1 2 3 15
 
