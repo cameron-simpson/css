@@ -8,8 +8,8 @@ pfx small syncsmall @jekyll &
 for d in s cvs ## mail im
 do  pfx $d syncstuff @jekyll there/cameron@cskk.homeip.net/$d &
 done
-for d in im/slideshow
-do  pfx $d syncstuff @jekyll -L "$d"
-done
+##for d in im/slideshow
+##do  pfx $d syncstuff @jekyll -L "$d"
+##done
 
 wait
