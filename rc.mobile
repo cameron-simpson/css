@@ -228,6 +228,9 @@ then
     [ -n "$iwhere" ] && where=$iwhere
 fi
 
+# make available to subprocesses and user environment
+setenv RC_MOBILE_WHERE "$where"
+
 doclause()
 {
   for clause
@@ -284,14 +287,8 @@ doops()
 	      var=`expr "$op" : '\([^=]*\)=.*'`
 	      eval "$op"
 	      export $var
-	      if [ -n "$envfile" ]
-	      then
-		  eval "val=\$$var"
-		  case "$val" in
-		      *\'*) val=`echo "$val" | sed "s/'/'\\\\\\\\''/g"` ;;
-		  esac
-		  echo "setenv $var '$val';" >>"$envfile"
-	      fi
+	      eval "val=\$$var"
+	      setenv "$var" "$val"
 	      ;;
       # =item /path/to/dir/ [template-dir]
       #
@@ -383,6 +380,20 @@ doops()
     # =back
     #
   done
+}
+
+setenv()
+{
+  setenv_var=$1
+  setenv_val=$2
+  eval "$setenv_var=\$setenv_val; export $setenv_var"
+  if [ -n "$envfile" ]
+  then
+      case "$setenv_val" in
+	  *\'*) setenv_val=`echo "$setenv_val" | sed "s/'/'\\\\\\\\''/g"` ;;
+      esac
+      echo "setenv $setenv_var '$setenv_val';" >>"$envfile"
+  fi
 }
 
 bgsvc()
