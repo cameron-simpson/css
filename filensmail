@@ -1,0 +1,32 @@
+#!/bin/sh
+#
+# Refile any netscape mail folders into my real mail folders.
+#	- Cameron Simpson <cs@zip.com.au>
+#
+
+nsmail=$HOME/nsmail
+
+cd "$nsmail" || exit 1
+
+splitmail "|smptsend $EMAIL" <Inbox && >Inbox
+
+for folder in *
+do  nsFolder=$nsmail/$folder
+    [ -s "$nsFolder" ] || continue
+
+    case $folder in
+	Sent)	myFolder=+out ;;
+	Trash)	myFolder=+deleted ;;
+	*)	echo "$0: don't know where to file $nsFolder" >&2
+		continue
+		;;
+    esac
+
+    wk=$MAILDIR/.ns-$folder-$daycode-$$
+    mv -i "$nsFolder" "$wk" || continue
+
+    splitmail <"$wk" | sed "s;.*;& $myFolder;" | filemail
+    rm "$wk"
+done
+
+rm .*.summary
