@@ -5,9 +5,12 @@
 #
 
 : ${VARLOG:=$HOME/var/log}
+termopts=
 
 cmd=$0
-usage="Usage: $cmd logfile..."
+usage="Usage: $cmd [-iconic] logfile..."
+
+[ "x$1" = x-iconic ] && { termopts="$termopts $1"; shift; }
 
 [ $# = 0 ] && { echo "$usage" >&2; exit 2; }
 
@@ -26,7 +29,7 @@ do
 		   }
 
   logname=`echo "$log" | entilde`
-  term -n "TAIL $logname" -e tail -f "$log" || xit=1
+  term -n "TAIL $logname" -small $termopts -e tail -f "$log" || xit=1
 done
 
 exit $xit
