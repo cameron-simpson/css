@@ -445,6 +445,7 @@ sub Hdr($$;$)
 
   $key=&hdrkey($key);
 
+  # !$first && scalar conext => arrayref returned, including fieldnames
   if (! $first && ! wantarray)
   { $this->Sync();
     my($hash)=$this->{cs::RFC822::HDRS};
