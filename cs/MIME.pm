@@ -181,12 +181,11 @@ sub new($;$$)
   $usecsize=0 if ! defined $usecsize;
 
   my($this)=bless {
-	      HDRS => new cs::RFC822,
-	      TYPE	=> TEXT,	# text/plain by default
-	      SUBTYPE	=> PLAIN,
-	      TYPEPARAMS=> {},
-	      HDRS	=> new cs::RFC822,
-	      CTE	=> '8BIT',	# Content-Transfer-Encoding
+	      cs::MIME::HDRS		=> new cs::RFC822,
+	      cs::MIME::TYPE		=> TEXT,   # text/plain by default
+	      cs::MIME::SUBTYPE		=> PLAIN,
+	      cs::MIME::TYPEPARAMS	=> {},
+	      cs::MIME::CTE		=> '8BIT', # Content-Transfer-Encoding
 	    }, $class;
 
   if (defined $s)
@@ -196,11 +195,75 @@ sub new($;$$)
   $this;
 }
 
+sub _TypeParams($) { shift->{cs::MIME::TYPEPARAMS}; }
+sub _Cte($) { shift->{cs::MIME::CTE}; }
+sub _Body($) { shift->{cs::MIME::BODY}; }
+
 =back
 
 =head1 OBJECT METHODS
 
 =over 4
+
+=item Hdrs()
+
+Return the B<cs::RFC822> object
+storing the headers of the MIME object.
+
+=cut
+
+sub Hdrs($)	{ shift->{cs::MIME::HDRS} }
+
+=item Type()
+
+Return the B<type> component of the object's B<Content-Type>.
+
+=cut
+
+sub Type($)	{ shift->{cs::MIME::TYPE}; }
+
+=item SubType()
+
+Return the B<subtype> component of the object's B<Content-Type>.
+
+=cut
+
+sub SubType($)	{ shift->{cs::MIME::SUBTYPE}; }
+
+=item UseHdrs(I<hdrs>)
+
+Incorporate the headers from the B<cs::RFC822> object I<hdrs>.
+
+=cut
+
+sub UseHdrs($$)
+{ my($this,$H)=@_;
+
+  $this->{cs::MIME::HDRS}=$H;
+
+  local($_);
+
+  $_=$H->Hdr(CONTENT_TYPE);
+  if (! defined || ! length)
+  # old-style messages
+  { $_='text/plain; charset=us-ascii';
+  }
+
+  # Content-Type
+  ($this->{cs::MIME::TYPE},
+   $this->{cs::MIME::SUBTYPE},
+   $this->{cs::MIME::TYPEPARAMS},$_
+  )
+  =parseContentType($_);
+
+  # Content-Transfer-Encoding
+  if (defined ($_=$H->Hdr(CONTENT_TRANSFER_ENCODING,1))
+   && length)
+  { s/^\s+//;
+    s/\s+$//;
+    $this->{cs::MIME::CTE}=uc($_);
+  }
+}
 
 =item UseSource(I<source>,I<usecsize>)
 
@@ -236,64 +299,7 @@ sub UseSource($$;$)
   # this way original stream is at a well defined spot
   # (just past the message) regardless of whether the
   # caller asks for the body
-  $this->{BODY}=$s->Get();
-}
-
-=item Hdrs()
-
-Return the B<cs::RFC822> object
-storing the headers of the MIME object.
-
-=cut
-
-sub Hdrs($)	{ shift->{HDRS} }
-
-=item Type()
-
-Return the B<type> component of the object's B<Content-Type>.
-
-=cut
-
-sub Type($)	{ shift->{TYPE}; }
-
-=item SubType()
-
-Return the B<subtype> component of the object's B<Content-Type>.
-
-=cut
-
-sub SubType($)	{ shift->{SUBTYPE}; }
-
-=item UseHdrs(I<hdrs>)
-
-Incorporate the headers from the B<cs::RFC822> object I<hdrs>.
-
-=cut
-
-sub UseHdrs($$)
-{ my($this,$H)=@_;
-
-  $this->{HDRS}=$H;
-
-  local($_);
-
-  $_=$H->Hdr(CONTENT_TYPE);
-  if (! defined || ! length)
-  # old-style messages
-  { $_='text/plain; charset=us-ascii';
-  }
-
-  # Content-Type
-  ($this->{TYPE},$this->{SUBTYPE},$this->{TYPEPARAMS},$_)
-	=parseContentType($_);
-
-  # Content-Transfer-Encoding
-  if (defined ($_=$H->Hdr(CONTENT_TRANSFER_ENCODING,1))
-   && length)
-  { s/^\s+//;
-    s/\s+$//;
-    $this->{CTE}=uc($_);
-  }
+  $this->{cs::MIME::BODY}=$s->Get();
 }
 
 =item Body(I<decoded>,I<istext>)
@@ -309,7 +315,7 @@ sub Body($;$)
 { my($this,$decoded)=@_;
   $decoded=0 if ! defined $decoded;
 
-  return $this->{BODY} if ! $decoded;
+  return $this->_Body() if ! $decoded;
 
   my $s = $this->BodySource($decoded);
   return undef if ! defined $s;
@@ -334,7 +340,7 @@ sub BodySource($;$$)
   return undef if ! defined $s;
   return $s if ! $decoded;
 
-  decodedSource($s,$this->{CTE},@_);
+  decodedSource($s,$this->_Cte(),@_);
 }
 
 =item ContentType(I<noparams>)
@@ -352,9 +358,9 @@ sub ContentType($;$)
 
   my($cte)=$this->Type().'/'.$this->SubType();
   if (! $noParams)
-  { my($value);
-    for my $param (sort keys %{$this->{TYPEPARAMS}})
-    { $value=$this->{TYPEPARAMS}->{$param};
+  { my $params = $this->_TypeParams();
+    for my $param (sort keys %$params)
+    { my $value=$params->{$param};
       $param=lc($param);
       $param =~ s/_/-/g;
 
@@ -369,7 +375,7 @@ sub WriteItem($$$;$$$)	# (this,sink,\@cs::MIME,pre,post,sep)
 { my($this,$sink,$mlist,$pre,$post,$sep)=@_;
   $pre='' if ! defined $pre;
   $post='' if ! defined $post;
-  $sep=$this->{ATTRS}->{BOUNDARY} if ! defined $sep;
+  $sep=$this->_TypeParams()->{BOUNDARY} if ! defined $sep;
 
   if (! length $sep)
   { ::need(cs::Date);
@@ -415,7 +421,7 @@ sub Parts($;$)
   my $post = '';
   my @parts;
 
-  my($boundary)='--'.$this->{TYPEPARAMS}->{BOUNDARY};
+  my($boundary)='--'.$this->_TypeParams()->{BOUNDARY};
   my($terminate)=$boundary.'--';
 
   ## warn "bound=[$boundary]";
