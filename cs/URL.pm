@@ -46,13 +46,13 @@ will be followed.
 
 =cut
 
-sub get($;$)
-{ my($url,$follow)=@_;
+sub get($;$$)
+{ my($url,$follow,$sinkfile)=@_;
   $follow=0 if ! defined $follow;
 
   my($U)=new cs::URL $url;
   return () if ! defined $U;
-  $U->Get($follow);
+  $U->Get($follow,$sinkfile);
 }
 
 =item head(I<url>)
@@ -294,7 +294,7 @@ sub new($$;$)
 
 =item Abs(I<relurl>)
 
-DEPRECIATED. Use T<new cs::URL I<relurl>, $this> instead.
+DEPRECIATED. Use B<new cs::URL I<relurl>, $this> instead.
 Return a new B<cs::URL> object
 from the URL string I<relurl> with the current URL as base.
 
@@ -683,17 +683,17 @@ or an empty array on error.
 
 =cut
 
-sub Get($;$)
-{ my($this,$follow)=@_;
+sub Get($;$$)
+{ my($this,$follow,$sinkfile)=@_;
   $follow=0 if ! defined $follow;
 
   local(%cs::URL::_Getting);
 
-  $this->_Get($follow);
+  $this->_Get($follow,$sinkfile);
 }
 
-sub _Get($$)
-{ my($this,$follow)=@_;
+sub _Get($$;$)
+{ my($this,$follow,$sinkfile)=@_;
   $follow=0 if ! defined $follow;
 
   my($url,$context);
@@ -735,7 +735,7 @@ sub _Get($$)
     my($rversion,$rcode,$rtext,$M);
 
     warn "GET $url\n" if $::Verbose;
-    ($rversion,$rcode,$rtext,$M)=$phttp->Request(GET,$url,$rqhdrs);
+    ($rversion,$rcode,$rtext,$M)=$phttp->Request(GET,$url,$rqhdrs,undef,undef,$sinkfile);
 
     if (! defined $rversion)
     { warn "$context: nothing from proxy";
