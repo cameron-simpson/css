@@ -25,7 +25,7 @@ fi
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
-tmpf=/tmp/$cmd$$
+tmpf=${TMPDIR:-/tmp}/$cmd$$
 
 formail -f -i "Fetchmail-Source-Mailbox: $srcmbox" >"$tmpf" \
 	|| { rm -f "$tmpf"; exit 1; }
