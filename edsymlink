@@ -1,0 +1,77 @@
+#!/usr/bin/perl
+#
+# Edit the named symlinks.
+#	- Cameron Simpson <cs@zip.com.au>, 01sep94
+#
+
+($cmd=$0) =~ s:.*/::;
+$usage="Usage: $cmd perlcode [symlinks]
+	If perlcode is \"-\" then just list values.
+";
+
+$badopts=0;
+
+$verbose=1;
+$justprint=0;
+
+if (!defined($perlcode=shift))
+	{ print STDERR "$cmd: missing perlcode\n";
+	  $badopts=1;
+	}
+
+die $usage if $badopts;
+
+if ($perlcode eq '-')
+	{ $justprint=1;
+	}
+else
+{ $sub="sub edit { local(\$_)=shift; $perlcode; \$_; }";
+  eval $sub;
+  die "$cmd: error in [$sub]: $@\n" if $@;
+}
+
+$xit=0;
+
+if (@ARGV)
+	{ for $link (@ARGV)
+		{ &sym($link);
+		}
+	}
+else
+{ while (defined($link=<STDIN>))
+	{ chop $link;
+	  &sym($link);
+	}
+}
+
+exit $xit;
+
+sub sym
+	{ local($l)=shift;
+
+	  if (! -l $l)
+		{ print STDERR "$cmd: $l: not a symlink\n";
+		  $xit=1;
+		}
+	  elsif (!defined($ptr=readlink($l)))
+		{ print STDERR "$cmd: can't read $l: $!\n";
+		  $xit=1;
+		}
+	  elsif ($justprint)
+		{ print "$l -> $ptr\n";
+		}
+	  else
+	  { $nptr=&edit($ptr);
+	    if ($nptr ne $ptr)
+		{ print "$l: $ptr -> $nptr\n" if $verbose;
+		  if (!unlink($l))
+			{ print STDERR "$cmd: $l: can't unlink, not replaced: $!\n";
+			  $xit=1;
+			}
+		  elsif (!symlink($nptr,$l))
+			{ print STDERR "$cmd: symlink($nptr,$l): $!\n";
+			  $xit=1;
+			}
+		}
+	  }
+	}
