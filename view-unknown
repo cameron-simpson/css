@@ -6,17 +6,23 @@
 #
 
 cmd=$0
-usage="Usage: $0 [-C] [file]
+usage="Usage: $cmd [-cC] [file]
+	-c	Use \"copiousoutput\" entries (default).
 	-C	Don't use \"copiousoutput\" entries."
 
 copious=1
-[ "x$1" = x-C ] && { copious=; shift; }
+copflag=
+[ "x$1" = x-c ] && { copflag=-c copious=1; shift; }
+[ "x$1" = x-C ] && { copflag=-C copious=; shift; }
 
 tmpf=
 trap '[ -z "$tmpf" ] || rm "$tmpf"' 0 1 15
 
 if [ $# = 0 ]
 then
+    [ -t 0 ] && { echo "$cmd: won't read stdin from a terminal" >&2
+		  exit 1
+		}
     tmpf=${TMPDIR:-/tmp}/vu$$
     cat >"$tmpf" || exit 1
     file=$tmpf
@@ -29,31 +35,29 @@ else
     case "$file" in /*) ;; *) file=./$file ;; esac
 fi
 
-type=`file "$file"` || exit 1
-mtype=
-case "$type" in
-    *': Bourne shell script'*)	mtype=application/x-sh ;;
-    *': JPEG image data'*)	mtype=image/jpeg ;;
-    *': PDF document'*)		mtype=application/pdf ;;
-    *': ASCII '*)		mtype=text/plain ;;
-    *': '*'program text'*)	mtype=text/plain ;;
-    *': HTML document text'*)	mtype=text/html ;;
-    *': '*'text'*)		mtype=text/plain ;;
+# no idea? run plain file and bail out
+mtype=`file2mime "$file"` || { ls-ld "$file"
+			       file "$file"
+			       exit 0
+			     }
+
+case "$mtype" in
+    text/plain)
+	case "$file" in
+	  *.csv)	mtype=text/x-csv ;;
+	esac
+	;;
 esac
 
-# unrecognised - just recite "file"  output
-[ -z "$mtype" ] && { echo "$type"; exit 0; }
-
 if [ $copious ]
-then  action=`grep "^$mtype"' *;.*; *copiousoutput *$' <$HOME/.mailcap | sed 1q`
-else  action=`grep "^$mtype"' *;' <$HOME/.mailcap | grep -v '.*; *copiousoutput *$' | sed 1q`
+then  mcflag=-c
+else  mcflag=+c
 fi
 
-[ -z "$action" ] && { echo "$type"; exit 0; }
+# no action? bail out
+action=`mailcap $mcflag -s "$file" "$mtype"` || exit 1
 
-action=`echo "$action" | sed -e 's/^[^;]*; *//' -e 's/ *;[^;]*$//' -e"s%s$fileg"`
+# empty action in mailcap
+[ -z "$action" ] && { echo "$mtype"; file "$file"; exit 0; }
 
-## echo "mtype=[$mtype] action=[$action]" >&2; exit 0
-
-exec <"$file"
 eval "$action"
