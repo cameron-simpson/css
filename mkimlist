@@ -6,11 +6,19 @@
 
 wd=`pwd`
 
-find . \
+justprint=
+[ "x$1" = x-n ] && { shift; justprint=1; }
+
+set \
+  find . \
     \( -type d ! -name . -name '.*' -prune \) \
  -o \( -type f -size +0 \
 	\( -name \*.png -o -name \*.jpg \) \
 	${1+"$@"} \
        -print \) \
+
+[ $justprint ] && exec "$@"
+
+"$@"
 | sed 's;^\./;;' \
 | xxargs imsize
