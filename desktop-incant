@@ -4,7 +4,10 @@
 #	- Cameron Simpson <cs@zip.com.au> 24mar2003
 #
 
-idsetlist "${DESKTOPSET:-desktop}" name \
+: ${DESKTOPSET:=desktop}
+: ${DESKTOPSET_SIZED:=$DESKTOPSET-${X11_X}x${X11_Y}}
+
+idsetlist "$DESKTOPSET" name \
 | sed -e '/^[0-9]*	./!d' \
       -e 's/^\([0-9][0-9]*	\)\./\1/' \
       -e 's/^/DesktopName /'
@@ -13,6 +16,6 @@ idsetlist "${DESKTOPSET:-desktop}" name \
 dfltbg=`rootbg` && echo "ColorSet 1023 AspectPixmap $dfltbg"
 
 ( seq 0 63
-  idsetlist "${DESKTOPSET:-desktop}" rootbg
+  idsetlist "$DESKTOPSET_SIZED" rootbg
 ) \
 | desktop-incant-bg
