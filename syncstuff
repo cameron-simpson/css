@@ -165,6 +165,12 @@ do
 #
 	-n)	dont=: verbose=1 trace=set-x rsopts="$rsopts -n" ;;
 #
+# =item B<-P>
+#
+# Progress reporting - passed to rsync.
+#
+	-P)	rsopts="$rsopts $1" ;;
+#
 # =item B<-v>
 #
 # Verbose.
@@ -238,12 +244,16 @@ xit=0
 if [ $# = 0 ]
 then
     # collect generic and specific lists
-    for ext in "$synccore" ".$syncset" "$synccore-FINAL"
+    for ext in "$synccore" $syncset -FINAL
     do
-	list=$syncdir/list$ext
-	[ -s "$list" ] && { [ $verbose ] && cat "$list"
-			    set x ${1+"$@"} "--include-from=$list"; shift
-			  }
+	case $ext in
+	  ''|-*)	list=$syncdir/list$ext ;;
+	  *)		list=$syncdir/list.$ext ;;
+	esac
+	[ -s "$list" ] \
+	&& { [ $verbose ] && cat "$list"
+	     set x ${1+"$@"} "--include-from=$list"; shift
+	   }
     done
     if [ $backupmode ]
     then
