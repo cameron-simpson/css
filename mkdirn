@@ -21,6 +21,7 @@ pfx=$1
 case "$pfx" in *[0-9]) pfx=$pfx- ;; esac
 
 up=`dirname "$pfx"`
+needdir "$up" || exit 1
 base=`basename "$pfx"`
 
 # check out existing directories
@@ -50,7 +51,7 @@ while ndir=$pfx$n
 do
   if [ -d "$ndir/." ]
   then  :
-  else  if mkdir -p "$ndir"
+  else  if mkdir "$ndir" 2>/dev/null
 	then  break
 	else  [ "$maxtries" -gt 1 ] || exit 1
 	      maxtries=`expr $maxtries - 1`
