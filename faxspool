@@ -1,0 +1,161 @@
+#!/bin/sh
+#
+# Complete rewrite of the faxspool script.
+#	- Cameron Simpson <cs@zip.com.au> 23may1997
+#
+
+cmd=`basename "$0"`
+usage="Usage: $cmd [options] [--] faxnumber [files...]
+	-D dest	Verbose form of the fax's destination.
+	-D2 company L
+	-f from	Ack back to this address by email.
+	-F From Verbose description of the sender (eg full name).
+	-h hdr	Header file for the fax."
+
+PATH=/usr/local/lib/mgetty+sendfax/sbin:/bin:/usr/bin:/opt/script:/opt/bin
+LD_LIBRARY_PATH=/usr/X11R6/lib:/usr/lib
+export PATH LD_LIBRARY_PATH
+
+FAXDIR=/usr/local/lib/mgetty+sendfax
+FAXSPOOL=$FAXDIR/sbin/faxspool
+FAXCOVER=$FAXDIR/canoncover.ps
+FAXHEADER=$FAXDIR/hdr.mail2fax
+FAXHDRFONT=$FAXDIR/cour25.pbm
+FAXID='+61 2 9805 2929'
+FAXSPOOL=/usr/spool/fax/outgoing
+spooldir=$FAXSPOOL/.work.`datecode`.$$
+
+badopts=
+
+TODESCRIPTION=
+TOCOMPANY=
+FAXCC=
+FULLNAME=
+USER=
+while :
+do
+    case $1 in
+	-D)	TODESCRIPTION=$2; shift ;;
+	-D2)	TOCOMPANY=$2; shift ;;
+	-CC)	FAXCC=$2; shift ;;
+	-f)	USER=$2; shift ;;
+	-F)	FULLNAME=$2; shift ;;
+	-S)	SUBJECT=$2; shift ;;
+	-h)	FAXHEADER=$2; shift ;;
+	--)	shift; break ;;
+	-?*)	echo "$cmd: unrecognised option: $1" >&2
+		badopts=1
+		;;
+	*)	break ;;
+    esac
+    shift
+done
+
+if [ $# = 0 ]
+then
+    echo "$cmd: missing faxnumber" >&2
+    badopts=1
+else
+    TONUMBER=$1; shift
+
+    # echo "$TONUMBER ..." >&2
+    TONUMBER=`echo "$TONUMBER" | sed 's/[^+0-9]//g
+				      s/^+61/0/
+				      s/^+/0011/
+				      s/^02//
+				      s/^/0/
+				      s/^0\([23][0-9][0-9][0-9]\)$/\1/'`
+    # echo " -> $TONUMBER" >&2
+
+    case $TONUMBER in
+	0112*|0000*)
+	    echo "$cmd: $TONUMBER would dial the emergency number!" >&2
+	    exit 1
+	    ;;
+    esac
+fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+tmp=/tmp/$cmd.$$
+
+which ps2pbm >&2
+
+srcfiles=$*
+2ps ${1+"$@"} \
+    | ps2pbm -h 204 -v 196 -o "$tmp.%02d.pbm"
+
+pbm=`ls -d $tmp.[0-9][0-9].pbm 2>/dev/null`
+
+[ -n "$pbm" ] || { echo "$cmd: no pages!" >&2; exit 1; }
+
+npages=`echo $pbm|wc -w`
+npages=`expr $npages + 1`
+
+mkdir "$spooldir" || exit $?
+
+##########################
+# Make cover sheet
+coverpbm=$tmp.0.pbm
+
+( set x `date`
+  echo TO		"$TODESCRIPTION"
+  echo FAXCOMPANY	"$TOCOMPANY"
+  echo FAXNUMBER	"$TONUMBER"
+  echo FAXCC		"$FAXCC"
+  echo FROM		"$FULLNAME"
+  echo SUBJECT		"$SUBJECT"
+  echo DATE		"$2, $4 $3 $7"
+  echo PAGES		"$npages"
+) | sed 's:/:\\/:g' \
+  | ( sedf='s:^systemdict /pdfmark known:false:'
+      while read KEY VALUE
+      do
+	  sedf="$sedf
+		 s/\\\$$KEY\\\$/$VALUE/"
+      done
+      set -x
+      sed -e "$sedf" <"$FAXCOVER"
+    ) \
+  | ps2pbm -h 204 -v 196 -o "$coverpbm"
+
+pbm="$coverpbm $pbm"
+
+###########################
+# Process all pages, putting header on each
+n=0
+pages=
+for f in $pbm
+do
+    n=`expr $n + 1`
+
+    # construct header text
+    sed "s;@T@;$TONUMBER;g
+	 s;@P@;$n;g
+	 s;@M@;$npages;g
+	 s;@U@;$USER;g
+	 s;@N@;$FULLNAME;g
+	 s;@D@;$TODESCRIPTION;g
+	 s;@ID@;$FAXID;g
+	 s;@DATE@;`date`;g" "$FAXHEADER" \
+    | pbmtext -font "$FAXHDRFONT" \
+    > "$tmp"
+
+    pnmpaste "$tmp" 0 0 <"$f" \
+    | pbmtog3 >"$spooldir/f$n.g3"
+
+    pages="$pages f$n.g3"
+done
+
+rm -f "$tmp" $pbm
+
+{ echo "phone $TONUMBER"
+  echo "user $USER"
+  echo "mail $USER"
+  echo "input $srcfiles"
+  echo "pages $pages"
+  echo "verbose_to $TODESCRIPTION"
+} >"$spooldir/JOB"
+# sed 's/^/JOB: /' "$spooldir/JOB"
+
+exec mv "$spooldir" "$FAXSPOOL/F`datecode`.$$"
