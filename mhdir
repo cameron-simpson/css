@@ -10,7 +10,7 @@ do  [ -d "$d/." ] || mkdir "$d" || continue
     mh=$d/.mh_sequences
     >>"$mh"
     for seq in unseen replied flagged
-    do  grep "^$seq:" <"$mh" >/dev/null || echo "$seq:" >>"$mh"
+    do  grep "^$seq: *[1-9]" <"$mh" >/dev/null || echo "$seq: 1" >>"$mh"
     done
 done
 
