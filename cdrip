@@ -78,25 +78,29 @@ cdtoc "$dev" \
       [ -d "$dir/." ] || mkdir -p "$dir" || { xit=1; continue; }
 
       echo "Ripping track #$track: $dir/$title ..."
-      set -x
-      if cdparanoia -q -d "$dev" -e -r "$track" "$raw" 2>cdp.err
+      if (set -x; cdparanoia -q -d "$dev" -e -r "$track" "$raw" 2>cdp.err)
       then
 	  [ -n "$encpid" ] && kill -0 "$encpid" 2>/dev/null && echo "waiting for previous encoder ..."
 	  wait
 
 	  ( if case $enc in
 		ogg)
-		  time oggenc -r -b $bps \
+		  ( set -x; exec time \
+		    oggenc -r -b $bps \
 			 -c "Ripped by $NAME with cdparanoia and oggenc on `date`" \
 			 -a "$artist" -N "$track" -t "$title" -l "$album" \
 			 -o "$out" "$raw"
+		  )
 		  ;;
 		mp3)
-		  time lame -r -b "$bps" -h -p "$raw" "$out"
+		  ( set -x; exec time \
+		    lame -r -b "$bps" -h -p "$raw" "$out"
+		  )
 		  ;;
 	      esac
 	    then rm "$raw"
-	    else rm "$out"; exit 1
+	    else echo "Encode of \"$raw\" fails." >&2
+		 rm "$out"; exit 1
 	    fi
 	  ) &
 	  encpid=$!
