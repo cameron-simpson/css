@@ -1,0 +1,140 @@
+#!/usr/bin/perl
+#
+# Read a titled listing (such as from ps) from stdin and sort on the named
+# columns. Functions by translating column names into sort(1) arguments and
+# passing the header line through direct.
+#	- Cameron Simpson <cs@zip.com.au> 28sep2000
+#
+
+use strict vars;
+
+require 'flush.pl';
+
+use cs::Misc;
+use cs::Shell;
+
+$::Usage="Usage: $::cmd [sort-options...]\n";
+
+my $headline = <STDIN>;
+die "$::cmd: empty input!\n" if ! defined $headline;
+printflush(STDOUT, $headline);
+
+$_=$headline;
+chomp;
+s/^\s+//;
+s/\s+$//;
+
+my @hdrs = split(/\s+/);
+
+for my $i (0..$#hdrs)
+{ my $hdr = $hdrs[$i];
+  $::Ndx{$hdr}=$i if ! exists $::Ndx{$hdr};
+}
+
+my $badopts = 0;
+
+my @args;
+
+{ my $arg;
+  my $ndx;
+
+  ARGV:
+  while (defined ($arg=shift(@ARGV)))
+  {
+
+    if ($arg eq '--')
+    { last ARGV;
+    }
+    elsif ($arg =~ /^\+/)
+    # handle +pos1 [-pos2]
+    { my $pos1 = $';
+      
+      if ($pos1 !~ /^\d+$/)
+      { $ndx = ndx($pos1);
+	if (defined $ndx)
+	{ $arg="+$ndx";
+	}
+	else
+	{ warn "$::cmd: unknown column heading \"$pos1\"\n";
+	  $badopts=1;
+	}
+      }
+
+      if (@ARGV && $ARGV[0] =~ /^-/ && defined($ndx=ndx($')))
+      { push(@args,$arg);
+	$arg="-$ndx";
+	shift(@ARGV);
+      }
+    }
+    elsif ($arg eq '-k')
+    # handle GNU -k pos1[,pos2]
+    { push(@args,$arg);
+      $arg=shift(@ARGV);
+      if (! defined $arg)
+      { warn "$::cmd: missing argument for -k\n";
+	$badopts=1;
+	last ARGV;
+      }
+
+      my($pos1,$pos2);
+      if ($arg =~ /,/)
+      { $pos1=$`; $pos2=$';
+      }
+      else
+      { $pos1=$arg;
+      }
+
+      if ($pos1 !~ /^\d+$/)
+      {}
+      elsif (! defined ($ndx=ndx($pos1)))
+      { warn "$::cmd: -k $pos1: unknown column name \"$pos1\"\n";
+	$badopts=1;
+      }
+      else
+      { $pos1=$ndx;
+      }
+
+      if (! defined $pos2 || $pos2 !~ /^\d+$/)
+      {}
+      elsif (! defined ($ndx=ndx($pos2)))
+      { warn "$::cmd: -k $pos1,$pos2: unknown column name \"$pos2\"\n";
+	$badopts=1;
+      }
+      else
+      { $pos2=$ndx;
+      }
+
+      $arg=$pos1;
+      $arg.=",$pos2" if defined $pos2;
+    }
+    elsif ($arg =~ /^[^-]/ && defined ($ndx=ndx($arg)))
+    { $arg="+$ndx";
+    }
+
+    push(@args,$arg);
+  }
+}
+
+if (@ARGV)
+{ warn "$::cmd: extra arguments: @ARGV\n";
+  $badopts=1;
+}
+
+die $::Usage if $badopts;
+
+my $shcmd = cs::Shell::quote('sort',@args);
+
+open(SORT, "| exec $shcmd ") || die "$::cmd: can't pipe to sort: $!\n";
+while (defined ($_=<STDIN>))
+{ print SORT $_;
+}
+close(SORT);
+
+exit $?;
+
+
+sub ndx($)
+{ my($hdr)=@_;
+  return undef if ! exists $::Ndx{$hdr};
+  $::Ndx{$hdr};
+}
