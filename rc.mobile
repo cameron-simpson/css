@@ -67,7 +67,7 @@ done
 		  }
 export HOST
 
-locations=`sed -n -e '/^#/d' -e 's/^\\[\\([a-z].*\\)\\]$/\\1/p' "$cf"`
+locations=`sed -n -e '/^#/d' -e 's/^\\[@\\([a-z].*\\)\\]$/\\1/p' "$cf"`
 
 # ask for info if interactive
 if [ $int ]
@@ -190,4 +190,4 @@ wait4pid()
   done
 }
 
-doclause GLOBAL "$where" | doops
+doclause GLOBAL "@$where" | doops
