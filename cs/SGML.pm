@@ -228,7 +228,7 @@ sub matchTag
 	  $$ptail=$_;
 	}
   else	{ 
-	  (1 || $::SGDB) && warn "fail tag match at [$_]\n";
+	  (0 && $::SGDB) && warn "fail tag match at [$_]\n";
 	  return 0;
 	}
 
