@@ -4,12 +4,32 @@
 #	- Cameron Simpson <cs@zip.com.au> 01jul2004
 #
 
-set -x
-##exec alog squid_redirect squid_redirect -P "8080:$SQUID"
-rc=$HOME/tmp/squid.conf$$
-envsub -p '\{\{([A-Z]\w*)\}\}' <$HOME/rc/squid/tplt >$rc
-case "$LOCATION" in
-    cisra)	;;
-    *)		bsed 's/^never_direct/##&/' $rc ;;
-esac
-exec alog squid/cache.log squid -f "$rc" -D
+cmd=$0
+usage="Usage: $cmd [-f]"
+
+force=
+[ "x$1" = x-f ] && { force=1; shift; }
+
+pidf=$HOME/var/run/squid.pid
+if [ -s "$pidf" ] && sqpid=`cat "$pidf"` && kill $sqpid \
+|| [ $force ]
+then
+    necho "waiting for old squid to die (30 secs)"
+    sleep 1
+    while kill -0 "$sqpid" 2>/dev/null
+    do  necho .; sleep 1
+    done
+    echo
+    ##exec alog squid_redirect squid_redirect -P "8080:$SQUID"
+    rc=$HOME/tmp/squid.conf$$
+    envsub -p '\{\{([A-Z]\w*)\}\}' <$HOME/rc/squid/tplt >$rc
+    case "$LOCATION" in
+	cisra)	;;
+	*)		bsed 's/^never_direct/##&/' $rc ;;
+    esac
+    set -x
+    exec alog squid/cache.log squid -f "$rc" -D
+fi
+
+echo "$cmd: can't kill squid, try with -f option" >&2
+exit 1
