@@ -13,13 +13,16 @@ trace=set-x
 cmd=`basename "$0"` || cmd=cddup
 usage="Usage: $cmd [-d cddev]"
 
+cdserv=`expr "x$CDDBSERVER" : 'x\(.*\):.*'` || exit 1
+cdport=`expr "x$CDDBSERVER" : 'x.*:\(.*\)'` || exit 1
+
 ripdir=`mkdirn "$TMPDIR/$cmd"`	|| exit 1
-trap 'rm -r "$ripdir"' 0 1 2 13 15
+trap 'rm -rf "$ripdir"' 0 1 2 13 15
 
 cd "$ripdir"			|| exit 1
 pwd
 
-$trace cdda2wav "dev=$CDRIP_DEV" -vall cddb=0 -B -Owav || exit 1
+$trace cdda2wav "dev=$CDRIP_DEV" -vall -B -Owav -L 0 cddb=0 "cddbp-server=$cdserv" "cddbp-port=$cdport" || exit 1
 $trace eject "$CDRIP_DEV"
 ask "Burn audio to $CDRIP_DEV" || exit 1
 $trace cdrecord "dev=$CDRIP_DEV" -v -dao -useinfo -text *.wav
