@@ -1,0 +1,6 @@
+#!/bin/sh
+pidf=$HOME/.fetchmail.pid
+[ -s "$pidf" ] \
+&& { echo >>"$pidf"; read pid etc <"$pidf"; } \
+&& [ -n "$pid" ] \
+&& { set -x; kill -USR1 "$pid"; }
