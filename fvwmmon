@@ -8,9 +8,7 @@
 
 ($::cmd=$0) =~ s:.*/::;
 
-if (-t STDIN)
-{ open(STDIN,'fvwmevlog |') || die "$::cmd: can't pipe from fvwmevlog: $!\n";
-}
+open(STDIN,'fvwmevlog |') || die "$::cmd: can't pipe from fvwmevlog: $!\n";
 
 $|=1;
 
@@ -55,6 +53,10 @@ while (<STDIN>)
     { if ($info =~ /^Mozilla \{Build ID: /)
       # fix up Mozilla pigheadedness
       { wincmd($id,'Move','0','-0');
+      }
+      elsif ($info eq 'Save File')
+      # put Mozilla save-file dialogue somewhere intelligent
+      { wincmd($id,'Move','m0','m0');
       }
     }
 
