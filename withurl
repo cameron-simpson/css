@@ -62,7 +62,7 @@ else
     esac
     tmpdir=`mkdirn "${TMPDIR:-/tmp}/$cmd"` || exit 1
     tmpf=$tmpdir/$base
-    trap 'rm -rf "$tmpdir"' 0 1 2 15
+    trap 'rm -rf "$tmpdir"' 0 1 2 13 15
     saveas=$tmpf
 fi
 
