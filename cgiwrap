@@ -46,7 +46,10 @@ if [ -s "$SCRIPT_FILENAME-pl" ]
 then  perl -I$HOME/rc/perl "$SCRIPT_FILENAME-pl" ${1+"$@"}
 else  if [ -s "$SCRIPT_FILENAME-sh" ]
       then  /bin/sh "$SCRIPT_FILENAME-sh" ${1+"$@"}
-      else  echo "$0: can't find $SCRIPT_FILENAME-sh or $SCRIPT_FILENAME-pl" >&2
+      else  if [ -s "$SCRIPT_FILENAME-ici" ]
+	    then  ici "$SCRIPT_FILENAME-ici" ${1+"$@"}
+	    else  echo "$0: can't find $SCRIPT_FILENAME-{sh,pl,ici}" >&2
+	    fi
       fi
 fi
 
