@@ -26,15 +26,18 @@
 PATH=$PATH:/usr/bin:/opt/bin:/opt/script
 export PATH
 
+rsync=rsync
+
 cmd=`basename "$0"`
-usage="Usage: $cmd [-n] [-f]
+usage="Usage: $cmd [-n] [-f] [l] [-R rsync-path] [-x] [-v] [items...]
 	-n	No action (default) - echo necessary actions.
 	-f	Force action.
 	-l	Localise the specified items.
+	-R rsync-path Rsync command path. Default: $rsync
 	-x	Force action with tracing.
 	-v	Verbose."
 
-echo=echo	# set-x	# set to nothing when debugged
+trace=echo	# set-x	# set to nothing when debugged
 localise=
 
 slashopt=/opt
@@ -54,10 +57,11 @@ vflag=
 badopts=
 while :
 do  case $1 in
-	-f)	echo= ;;
-	-x)	echo=set-x ;;
+	-f)	trace= ;;
+	-x)	trace=set-x ;;
 	-l)	localise=1 ;;
-	-n)	echo=echo ;;
+	-n)	trace=echo ;;
+	-R)	rsync=$2; shift ;;
 	-v)	verbose=1 vflag=-v ;;
 	--)	shift; break ;;
 	-?*)	echo "$cmd: unrecognised option: $1" >&2; badopts=1 ;;
@@ -80,7 +84,7 @@ cd "$archopt" || exit 1
 # ensure there is a real local /opt
 
 [ -d "$slashopt" ] \
-	|| { $echo mkdir $slashopt && $echo chmod 755 $slashopt; } \
+	|| { $trace mkdir $slashopt && $trace chmod 755 $slashopt; } \
 	|| exit 1
 
 xit=0
@@ -97,19 +101,23 @@ do
 
     # locate remote instance of thing
     r=
+    missed=
     for rroot in $archopt $commonopt
-    do  for subdir in $subdirs
+    do  [ -d "$rrot/." ] || continue
+	for subdir in $subdirs
 	do  case "$subdir" in
 		.|'')	r=$rroot/$thing ;;
 		*)	r=$rroot/$subdir/$thing ;;
 	    esac
 	    { test -f "$r" || test -d "$r/."; } \
 	    && break
+	    missed="$missed $r"
 	    r=
 	done
 	[ -n "$r" ] && break
     done
-    [ -n "$r" ] || { echo "$cmd: can't read $r, skipping $thing" >&2
+    [ -n "$r" ] || { echo "$cmd: can't read$missed" >&2
+		     echo "	skipping $thing" >&2
 		     xit=1
 		     continue
 		   }
@@ -154,14 +162,14 @@ do
     eval "$opts"
 
     # skip this?
-    [ $nosync ] && { $echo echo "SKIP $thing"; continue; }
+    [ $nosync ] && { echo "SKIP $thing"; continue; }
 
     # files - basicly /opt/ARCH really
     if test -f "$r"
     then
 	test -f "$l" && cmp -s "$r" "$l" && continue
 	rm -rf "$l"
-	$echo cp -p "$r" "$l" || xit=1
+	$trace cp -p "$r" "$l" || xit=1
 	continue
     fi
 
@@ -180,8 +188,8 @@ do
 #		: generic link matches - leave it alone
 #	    else
 #		# adjust local "default" link
-#		$echo rm "$dflt"
-#		$echo ln -s "$rlink" "$dflt" || xit=1
+#		$trace rm "$dflt"
+#		$trace ln -s "$rlink" "$dflt" || xit=1
 #	    fi
 
 	    # make thing into symlink to right version
@@ -195,15 +203,15 @@ do
 	    then
 		:
 	    else
-		$echo rm -rf "$l"
-		$echo ln -s "$sym" "$l" || xit=1
+		$trace rm -rf "$l"
+		$trace ln -s "$sym" "$l" || xit=1
 	    fi
 
 	    # ensure appropriate version is local
 	    if [ $makelocal ] && issymlink "$ldir/$sym"
 	    then
-		$echo rm "$ldir/$sym"
-		$echo mkdir "$ldir/$sym"
+		$trace rm "$ldir/$sym"
+		$trace mkdir "$ldir/$sym"
 	    fi
 	else
 	    echo "$cmd: can't readsymlink \"$r\"" >&2
@@ -214,21 +222,21 @@ do
 	if [ $makelocal ]
 	then
 	    issymlink "$l" && rm "$l"
-	    [ -d "$l/." ] || $echo mkdir "$l" || xit=1
+	    [ -d "$l/." ] || $trace mkdir "$l" || xit=1
 	else
 	    if [ -d "$l/." ]
 	    then
 		:
 	    else
 		# link to remote
-		$echo rm -f "$l"
-		$echo ln -s "$r" "$ldir/." || xit=$?
+		$trace rm -f "$l"
+		$trace ln -s "$r" "$ldir/." || xit=$?
 	    fi
 	fi
     fi
 
     issymlink "$l" \
-    || $echo rsync -aHW $vflag --delete "$r/." "$l/." | sed "s|^|$l: |"
+    || $trace $rsync -aHW $vflag --delete "$r/." "$l/." | sed "s|^|$l: |"
 
     set +x
 done
