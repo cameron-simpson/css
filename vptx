@@ -1,0 +1,41 @@
+#!/usr/bin/perl
+#
+# Read text files and emit index information of the form
+#	fname	word	lineno	offset
+#
+
+require 'cs/detab.pl';
+
+$IGN='/usr/lib/eign';
+
+undef %IGN;
+
+if (!open(IGN,"< $IGN\0"))
+	{ print STDERR "$cmd: can't read from $IGN: $!\n";
+	}
+else
+{ while (<IGN>)
+	{ chop;
+	  $IGN{$_}=1;
+	}
+  close(IGN);
+}
+
+while (<>)
+	{ s/\s*\r?\n$//;
+	  $_=&detab($_);
+	  $lhs='';
+	  undef %had;
+	  WD:
+	    while (/^(\w+|\W+)/)
+		{ $wd=$&; $_=$';
+		  next WD if $wd =~ /^\W/
+			  || defined($ign{$wd})
+			  || defined($had{$wd});
+		  $had{$wd}=1;
+		  print $ARGV, ' ', $wd, ' ', $., ' ', length($lhs), "\n";
+		}
+	    continue
+		{ $lhs.=$wd;
+		}
+	}
