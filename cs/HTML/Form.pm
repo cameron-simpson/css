@@ -1,7 +1,7 @@
-#!/USr/bin/perl
+#!/usr/bin/perl
 #
 # Methods for making forms.
-#	- Cameron Simpson <cs@zip.com.au> 07aug97
+#	- Cameron Simpson <cs@zip.com.au> 07aug1997
 #
 
 =head1 NAME
