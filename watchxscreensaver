@@ -1,0 +1,16 @@
+#!/bin/sh
+#
+# Expect the output of
+#	xscreensaver-command -watch
+# on stdin and log job activity accordingly.
+#	- Cameron Simpson <cs@zip.com.au> 28jul2003
+#
+
+cmd=$0
+
+[ -t 0 ] && { echo "$cmd: stdin should come from \"xscreensaver-command -watch\"" >&2; exit 2; }
+
+lastjob=`job`
+while read event etc
+do  handle-xscreensaver-event $event $etc
+done
