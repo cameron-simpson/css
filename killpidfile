@@ -1,0 +1,39 @@
+#!/bin/sh
+#
+# Kill the pid kept in the supplied pid file.
+#	- Cameron Simpson <cs@zip.com.au> 15jan2005
+#
+
+: ${VARRUN:=$HOME/var/run}
+
+sigopt=-TERM	# use USR1 if aiming at fetchmail daemon
+
+cmd=$0
+usage="Usage: $cmd [-signal] pidfile"
+
+badopts=
+
+case "$1" in
+  -*)	sigopt=$1; shift ;;
+esac
+
+if [ $# = 0 ]
+then
+  echo "$cmd: missing pidfile" >&2
+  badopts=1
+else
+  pidfile=$1; shift
+  [ $# = 0 ] || { echo "$cmd: extra arguments after pidfile: $*" >&2; badopts=1; }
+fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+case "$pidfile" in
+  ./* | ../* | /* ) ;;
+  *) pidfile=$VARRUN/$pidfile ;;
+esac
+
+[ -s "$pidfile" -a -f "$pidfile" ] \
+&& { echo >>"$pidfile"; read pid etc <"$pidfile"; } \
+&& [ -n "$pid" ] \
+&& { set -x; kill $sigopt "$pid"; }
