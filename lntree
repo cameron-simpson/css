@@ -1,0 +1,22 @@
+#!/usr/bin/perl
+#
+# Make a directory tree matching another, hardlinking the contents
+# from the original to the new one.
+#	- Cameron Simpson <cs@zip.com.au> 25nov99
+#
+
+use cs::Misc;
+
+$::Usage="Usage: $::cmd fromdir todir\n";
+
+@ARGV == 2 || die $::Usage;
+
+my($fromdir,$todir)=@_;
+
+if (! stat($fromdir) || ! -d _)
+{ die "$::cmd: fromdir $fromdir: not a directory\n";
+}
+
+if (lstat($todir))
+{ die "$::cmd: todir $todir: already exists\n";
+}
