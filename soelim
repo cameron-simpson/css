@@ -1,0 +1,136 @@
+#!/usr/bin/perl
+
+use strict qw(vars);
+
+use cs::Pathname;
+use cs::Source;
+
+$::SOPATH=(defined $ENV{SOPATH} ? $ENV{SOPATH} : ".:..:$ENV{MANPATH}");
+@::SOPATH=split(/:/,$::SOPATH);
+for (@::SOPATH)
+{ $_='.' if ! length;
+}
+
+my $ok=0;
+
+if (! @ARGV)
+{ $ok=soelim("stdin",".","-",0);
+}
+else
+{ $ok=1;
+  for (@ARGV)
+  { soelim("\"$_\"",".",$_,0) || ($ok=0);
+  }
+}
+
+exit($ok ? 0 : 1);
+
+sub soelim($$$$)
+{ my($context,$wrt,$file,$detab)=@_;
+
+  my $s;
+
+  if ($file eq '-')
+  { $s = new cs::Source (FILE,STDIN);
+  }
+  else
+  {
+    if ($file =~ m:^/:)
+    { $s = new cs::Source (PATH,$file,1);
+    }
+    else
+    { SOFILE:
+      for my $sop (@::SoPath)
+      { my $path="$sop/$file";
+	if (defined ($s=new cs::Source (PATH,$path,1)))
+	{ $file=$path;
+	  last SOFILE;
+	}
+      }
+    }
+
+    if (! defined $s)
+    { warn "$context: can't open \"$file\": $!\n";
+      return 0;
+    }
+  }
+
+  my($ok)=process($file,$s,$detab);
+  $ok;
+}
+
+sub process
+{ my($file,$s,$detab)=@_;
+  my($wrt)=cs::Pathname::dirname($file);
+
+  my($ok)=1;
+  my($lineno);
+  my($context);
+  my($nesting)=0;
+
+  local($_);
+
+  LINE:
+  while (defined ($_=$s->GetLine()) && length)
+  { $lineno=$.;
+    chomp;
+
+    $context="\"$file\", line $lineno";
+
+    $detab && s/\t/' 'x(8-length($`)%8)/eg;
+    $detab && s/\\/$&$&/g;
+
+    if ($nesting)
+    { if (/^[.']\./)
+      { $nesting--;
+      }
+    }
+    elsif (/^[.']\s*(\S\S)\s*(\S+)/)
+    { if ($1 eq 'de')
+      { $nesting++;
+      }
+      elsif ($1 eq 'so' || $1 eq 'SO'
+	  || $1 eq 'nx' || $1 eq 'NX')
+      { # warn "$context: $_\n";
+	my($so,$subfile)=($1,$2);
+	my($subdetab)=($so eq 'SO' || $so eq 'NX');
+
+	if ($subfile =~ m,^~([^/]*),)
+	# ~thing
+	{ my($who)=$2;
+	  $subfile=$';
+	  
+	  my @etc;
+
+	  if (length $who)
+	  { @etc=getpwnam($who);
+	  }
+	  else
+	  { @etc=getpwuid($>);
+	  }
+
+	  if (defined($etc[$[+7]))
+	  { $subfile=$etc[$[+7].$subfile;
+	  }
+	  else
+	  { $subfile='~'.$who.$subfile;
+	  }
+	}
+
+	soelim($context,$wrt,$subfile,$subdetab) || ($ok=0);
+
+	last if ($so eq 'nx' || $so eq 'NX');
+	next LINE;
+      }
+      elsif ($1 eq 'sy')
+      { warn "$context, line $lineno: .sy$'\n";
+	system($');
+	next LINE;
+      }
+    }
+
+    print "$_\n";
+  }
+
+  return $ok;
+}
