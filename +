@@ -14,10 +14,5 @@ esac
 
 [ $# = 0 ] && set attn
 
-if lock -q "mail/$1"
-then  echo "mail/$1 already locked" >&2
-      exit 1
-fi
-
 cd || exit 1
-exec term +ip -n "mutt +$1" lock "mail/$1" mutt -f "+$1"
+exec term +ip -n "mutt +$1" scrif "mutt_$1" mutt -f "+$1"
