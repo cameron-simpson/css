@@ -6,6 +6,7 @@
 
 trace=set-x
 cf=/etc/rc.mobile/conf
+envfile=/etc/rc.mobile/env.sh
 
 cmd=`basename "$0"`
 usage="Usage: $cmd location"
@@ -42,4 +43,4 @@ done
 $trace route del default
 
 # configure for new location
-exec $trace rc.mobile start -f "$cf" -r "net-$loc" online-cfg
+exec $trace env "NET=$loc" rc.mobile start -r -f "$cf" -E "$envfile" on-net
