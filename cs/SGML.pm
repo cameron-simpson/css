@@ -160,8 +160,8 @@ sub matchTag
   ATTR:
   while (1)
   {
-    #     tag                    =           "quoted"     'quoted'     unquoted  
-    if (/^([-:\/!\w_]+)([ \t\r\n]*=[ \t\r\n]*("(""|[^"])*"|'(''|[^'])*'|[^"'\s>][^>\s]*))?[ \t\n\r]*/)
+    #     tag                    =           "quoted"          'quoted'         unquoted  
+    if (/^([-:\/!\w_]+)([ \t\r\n]*=[ \t\r\n]*("(""|[^"\r\n])*"|'(''|[^'\r\n])*'|[^"'\s>][^>\s]*))?[ \t\n\r]*/)
     {
       $at=$1; $val=(length($2) ? $3 : '');
       $_=$';
@@ -178,7 +178,7 @@ sub matchTag
       $A->{uc($at)}=$val;
     }
     #        "str"
-    elsif (/^"([^"]*)"[ \t\n\r]*/)
+    elsif (/^"([^"\r\n]*)"[ \t\n\r]*/)
     { $A->{$1}=undef;
       $_=$';
       ## warn "$tag: \"$1\"\n";
@@ -186,7 +186,7 @@ sub matchTag
     # ugly hacks to catch syntax errors and recover
     elsif (/^">/)
     { $_='>'.$';
-      warn "\"> found";
+      ## warn "\"> found, \$_ is now [$_]";
     }
     #        =           "str"   'str'   str
     elsif (/^=[ \t\r\n]*("[^"]*"|'[^']*'|[^[ \t\n\r>]*)[ \t\n\r]*/)
@@ -226,17 +226,18 @@ sub matchTag
   }
 
   if (/^>/)
-	{ $$ptok=$T;
-	  $$ptail=$';
-	}
+  { $$ptok=$T;
+    $$ptail=$';
+  }
   elsif (/^</)
-	{ $$ptok=$T;
-	  $$ptail=$_;
-	}
-  else	{ 
-	  (0 && $::SGDB) && warn "fail tag match at [$_]\n";
-	  return 0;
-	}
+  { $$ptok=$T;
+    $$ptail=$_;
+  }
+  else
+  { 
+    (0 && $::SGDB) && warn "fail tag match at [$_]\n";
+    return 0;
+  }
 
   $::SGDB && warn "matched ".cs::Hier::h2a($T,0)."\n";
 
