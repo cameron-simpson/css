@@ -101,20 +101,7 @@ then
      }
 fi
 
-sed -e 's/^[ 	][ 	]*//' \
-    -e 's/^#.*//' \
-    -e '/^$/d' \
-    -e 's/^.*<\(.*\)>.*$/\1/' \
-    -e 's/^.*(\(.*\)).*$/\1/' \
-    -e 's/^[^a-z]*\([a-z][a-z]*:\/\/.*\)/\1/' \
-    -e '/^[a-z][a-z]*:\/\//b ok' \
-    -e '/^https:/b ok' \
-    -e '/^file:/b ok' \
-    -e '/^ftp:/b ok' \
-    -e '/^news:/b ok' \
-    -e '/^snews:/b ok' \
-    -e 's/^/http:\/\//' \
-    -e ':ok' \
+cleanurllist \
 | while read url
   do  
     case "$url" in
