@@ -1,0 +1,319 @@
+#!/usr/bin/perl
+#
+# Adjust the indices associated with archived news/mail items.
+#	- Cameron Simpson, cs@zip.com.au, 23jun94
+#
+# Indices:
+#	msgids	Msgids present in the archive, forward and backward refs.
+#	absent	Msgids _not_ present in the archive.
+#	ptx'	Permuted index.
+#
+
+($cmd=$0) =~ s:.*/::;
+$usage="Usage: $cmd [-i index] [files...]
+       $cmd [-i index] -l
+       $cmd [-i index] -x keys...
+	-d delimiters	Split keys up on these characters.
+	-i index	Base name of the index files.
+	-k		List keys with references.
+	-K		Read keys and references from files.
+	-l		List index.
+	-Q		Unquote any \%xx references in keys.
+	-r		List references with keys.
+	-x		Extract references.
+	-X		Extract references from files.
+";
+
+require 'getopts.pl';
+
+$badopts=0;
+$ptxname='.PTX';
+undef $delimiters;
+
+&Getopts('Dd:i:kKlQrxX') || ($badopts=1);
+$DEBUG=$opt_D;
+$delimiters=$opt_d if defined($opt_d);
+$ptxname=$opt_i if defined($opt_i);
+$listkeys=$opt_k;
+$listrefs=$opt_r;
+$doextract=($opt_x || $opt_X);
+$indirect=$opt_X;
+$dolist=$opt_l;
+$readkeys=$opt_K;
+$unquote=$opt_Q;
+
+# sanity checks
+$i=0;
+$dolist && $i++;
+$doextract && $i++;
+$readkeys && $i++;
+if ($i > 1)
+	{ print STDERR "$cmd: only one of -l, -{x|X} and -K permitted\n";
+	  $badopts=1;
+	}
+
+die $usage if $badopts;
+
+require 'cs/ptx.pl';
+require 'cs/rfc822.pl';
+require 'cs/html.pl' if $unquote;
+
+if (defined($delimiters))
+	{ $range=$delimiters;
+	  $range =~ s:[]/[]:\\$&:g;
+	  $range =~ s:-:\\-:g;
+	  $splitup="sub splitup{grep(length,split(/[$range]/o,\$_[0]));}";
+	  print "SPLITUP: [$splitup]\n";
+	  eval $splitup;
+	  die "Parse error: $@: $splitup\n" if $@;
+	}
+
+$xit=0;
+
+if ($dolist)		{ &list; }
+elsif ($doextract)	{ &extract; }
+elsif ($readkeys)	{ &readkeys; }
+else			{ &update; }
+
+exit $xit;
+
+sub list
+	{ &ptx'open($ptxname,0) || die "$cmd: can't open $ptxname\n";
+
+	  # @k=&ptx'keys;
+	  # print "#k=$#k\n";
+	  for (&ptx'keys)
+		{ if ($indirect)
+			{ &ref($_);
+			}
+		  else
+		  { print $_, "\n";
+		  }
+		}
+
+	  &ptx'close;
+	}
+
+sub extract
+	{ local($_);
+
+	  &ptx'open($ptxname) || die "$cmd: can't open $ptxname\n";
+	  if ($#ARGV < $[)
+		{ &fref(STDIN);
+		}
+	  else	{ for (@ARGV)
+			{ if ($_ eq '-')
+				{ &fref(STDIN);
+				}
+			  elsif (!defined($delimiters))
+				{ &ref($_); }
+			  else	{ local($__);
+				  for $__ (&splitup($_))
+					{ &ref($__);
+					}
+				}
+			}
+		}
+	  &ptx'close;
+	}
+
+sub fref{ local($F)=shift;
+	  local($_);
+
+	  while (<$F>) { chop; &ref($_); }
+	}
+
+sub ref	{ local($key)=shift;
+	  local($_);
+
+	  $key=&html'unquote($key) if $unquote;
+
+	  if ($key =~ m:^/:)
+		{ local($ptn,$unquote)=($',0);
+		  local($k);
+		  eval 'for $k (grep(/$ptn/o,&ptx'."'".'keys)) { &ref($k); }';
+		  return;
+		}
+	  if (!defined($_=&ptx'ref($key)))
+		{ print STDERR "$cmd: no references to $key\n";
+		  $xit=1;
+		}
+	  elsif ($indirect)
+		{ local($refstr);
+
+		  REFSTR:
+		    for $refstr (split)
+			{ if ($refstr !~ /^([^#]+)#(.*)/)
+				{ print STDERR "$cmd: can't fetch \"$key\" with ref \"$refstr\"\n";
+				  $xit=1;
+				  next REFSTR;
+				}
+
+			  local($file,$nums)=($1,$2);
+
+			  if (!open(ref_FILE,"< $file\0"))
+				{ print STDERR "$cmd: can't open $file: $!\n";
+				  $xit=1;
+				  next REFSTR;
+				}
+
+			  local($n,$_);
+
+			  N: for $n (sort { $a <=> $b; } split(/,+/,$nums))
+				{ while (<ref_FILE>)
+					{ if ($n == $.)
+	  					{ if ($listkeys)
+							{ print $key, ':'; }
+						  if ($listrefs)
+							{ print $file, '#', $n, ':'; }
+						  print;
+						  next N;
+						}
+					  elsif ($n < $.)
+						{ print STDERR "$cmd: $file, line $.: loss of sync, wanted line $n\n";
+						  $xit=1;
+						  next N;
+						}
+					}
+				}
+
+			  close(ref_FILE);
+			}
+		}
+	  else
+	  { if ($listkeys)	{ print $key, ':'; }
+	    print $_, "\n";
+	  }
+	}
+
+sub update
+	{ local($IGN,$_,$file,$inhdr,$hdrline,$hdrnum,%bodies);
+
+	  if (! @ARGV)
+		{ while (<STDIN>)
+			{ chop; push(@ARGV,$_);
+			}
+		}
+
+	  $IGN='/usr/lib/eign';
+	  if (open(IGN))
+		{ while (<IGN>)	{ chop; $IGN{$_}=1; }
+		  close(IGN);
+		}
+
+	  &ptx'open($ptxname,1) || die "$cmd: can't open $ptxname\n";
+
+	  ARGV:
+	    for $file (@ARGV)
+		{ print STDERR "$file ";
+		  next ARGV unless &readfrom(FILE,$file);
+
+		  undef %bodies;
+		  $inhdr=1;
+		  $hdrline='';
+		  $hdrnum=0;
+		  FILE:
+		    while (<FILE>)
+			{ if ($inhdr)
+				{ if (/^$/)
+					{ $inhdr=0;
+					  &updhdrline($hdrline,$file,$hdrnum)
+						if length($hdrline);
+					  &updhdrs;
+					}
+				  elsif (/^\s/)
+					{ $hdrline.=$_;
+					}
+				  else	{ &updhdrline($hdrline,$file,$hdrnum);
+					  $hdrline=$_;
+					  $hdrnum=$.;
+					}
+				}
+			  else
+			  { next FILE if /^M/
+				    && length == 62
+				    && pack('u',unpack('u',$_)) eq $_;
+			    &ptx'words("$file#$.",$_);
+			  }
+			}
+		  close(FILE);
+		  print STDERR "\n";
+		}
+
+	  &ptx'close;
+	}
+
+sub updhdrline
+	{ if ($hdrline =~ /^([^:]+):\s*/)
+		{ local($f,$b)=($1,$');
+		  $hdrlines=$f.': '.$b;
+		  $f =~ tr/A-Z_/a-z-/;
+		  $bodies{$f}=$b;
+		}
+
+	  &ptx'words("$file#$hdrnum",$hdrline);
+	}
+
+sub updhdrs
+	{ # mostly now accomplished by filemail
+	}
+
+sub readkeys
+	{ if ($#ARGV < $[)
+		{ print STDERR "$cmd: missing filenames\n";
+		  die $usage;
+		}
+
+	  &ptx'open($ptxname,1) || die "$cmd: can't open $ptxname\n";
+
+	  ARGV:
+	    for $file (@ARGV)
+		{ print STDERR "$file ";
+		  next ARGV unless &readfrom(FILE,$file);
+
+		  FILE:
+		    while (<FILE>)
+			{ chop;
+			  if (!/^([^:]+):([^\s#]+#[^\s#]+)(\s+[^\s#]+#[^\s#]+)*\s*$/)
+				{ print STDERR "$cmd: $file, line $.: bad ref: $_\n";
+				  next FILE;
+				}
+
+			  ($key,$refstr)=($1,$2);
+			  &ptx'addkey($key,$refstr);
+			}
+		  close(FILE);
+		  print STDERR "\n";
+		}
+
+	  &ptx'close;
+	}
+
+# open a file or STDIN if "-"
+sub readfrom	# (FILE,name) -> ok
+	{ local($FILE,$_)=@_;
+
+	  if ($_ eq '-')
+		{ if (!open($FILE,'<&STDIN'))
+			{ print STDERR "$cmd: can't dup STDIN: $!\n";
+			  return 0;
+			}
+		}
+	  else
+	  { local($filter)='';
+	    if (/\.Z$/)		{ $filter="zcat|$filter"; $_=$`; }
+	    if (/\.html?$/)	{ $filter="unhtml|$filter"; $_=$`; }
+
+	    if (length $filter)
+		{ $_=" < $_ $filter"; }
+	    else{ $_="< $_\0"; }
+
+	    # print STDERR "readfrom($_)\n";
+	    if (!open($FILE,$_))
+		{ print STDERR "$cmd: can't open($_): $!\n";
+		  return 0;
+		}
+	  }
+
+	  1;
+	}
