@@ -121,7 +121,7 @@ cdtoc "$dev" \
 		  set lame -r -b "$bps" -h -p "$raw" "$out"
 		  ;;
 	      esac
-	      [ -n "$lock" ] && set alog cdrip lock $lock rmafter "$raw" nice "$@"
+	      [ -n "$lock" ] && set alog cdrip lock "$lock" rmafter "$raw" nice "$@"
 	      ( set -x; exec "$@" )
 	    then :
 	    else echo "Encode of \"$raw\" fails." >&2
