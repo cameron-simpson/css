@@ -1,0 +1,94 @@
+#!/usr/bin/perl
+#
+# Read URLs and titles from stdin and update a state file.
+# Emit new URLs and titles on stdout.
+#	- Cameron Simpson <cs@zip.com.au> 25sep2000
+#
+# Recode to use MUCH less memory and a temporary file
+# (on the premise that the input is much smaller than the state).
+# Probably cheaper CPUwise, too.
+#	- Cameron Simpson <cs@zip.com.au> 06nov2000
+#
+
+use strict qw(vars);
+
+use cs::Misc;
+use cs::Date;
+use cs::Pathname;
+
+my $nowrite=0;
+if (@ARGV && $ARGV[0] eq '-n')
+{ $nowrite=1; shift(@ARGV);
+}
+
+if (@ARGV != 1)
+{ if (@ARGV < 1)	{ warn "$::cmd: missing statefile\n"; }
+  else			{ warn "$::cmd: extra arguments: @ARGV[1..$#ARGV]\n"; }
+
+  die "Usage: $::cmd [-n] statefile <urls >new-urls\n";
+}
+
+my $old = shift(@ARGV);
+
+my $daytag = cs::Date::gmt2yyyymmdd(time,1,1);
+
+
+# load new URLs
+my %in;
+while (defined ($_=<STDIN>))
+{ chomp;
+ my($url,$title)=split(/\s/,$_,2);
+ $in{$url}=$title;
+}
+
+# load state file, transcribe to tmp file
+die "$::cmd: open($old): $!\n" if ! open(OLD,"< $old\0");
+
+my $tmp;
+if (! $nowrite)
+{ $tmp = cs::Pathname::tmpnam();
+  die "$::cmd: can't create $tmp: $!\n" if ! open(NEWTMP,"> $tmp\0");
+}
+
+# pass over old URLs, adjusting days of "live" URLs
+while (defined ($_=<OLD>))
+{ chomp;
+  my($day,$url)=split(/\s+/,$_);
+
+  if (exists $in{$url})
+  { $day=$daytag;
+    delete $in{$url};
+  }
+
+  if (! $nowrite)
+  { print NEWTMP "$day $url\n";
+  }
+}
+
+# emit new URLs
+# append new URLs to old URLs
+for my $url (sort { lc($in{$a}) cmp lc($in{$b}) } keys %in)
+{
+  print "$url $in{$url}\n";
+  if (! $nowrite)
+  { print NEWTMP "$daytag $url\n";
+  }
+}
+
+# let the downstream client get on with things
+# while we laboriously copy the file back
+close(STDOUT);
+
+close(OLD);
+
+if (! $nowrite)
+{ close(NEWTMP) || warn "$::cmd: close($tmp): $!\n";
+  die "$::cmd: open($tmp): $!\n" if ! open(NEWTMP,"< $tmp\0");
+  die "$::cmd: rewrite($old): $!\n" if ! open(OLD,"> $old\0");
+  while (<NEWTMP>)
+  { print OLD $_;
+  }
+  close(OLD) || warn "$::cmd: close($old): $!\n";
+  close(NEWTMP);
+  unlink($tmp) || warn "$::cmd: unlink($tmp): $!\n";
+}
