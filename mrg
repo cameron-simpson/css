@@ -92,7 +92,7 @@ sub mrg($$$$$)
   my $mrg;
 
   if ($mrg=mrginto($dir,$file,$makedir,$relative))
-  { my $base = cs::Pathname::basename($file);
+  {
     if ($nounlink)
     { $ok=1;
     }
