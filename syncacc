@@ -25,6 +25,7 @@ exec \
 	'--include=/.less' \
 	'--include=/.lesskey' \
 	'--include=/.mailcap' \
+	'--include=/.maint' \
 	'--include=/.mh_profile' \
 	'--include=/.muttrc' \
 	'--include=/.profile' \
