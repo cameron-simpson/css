@@ -16,9 +16,14 @@ cmd=$0
 usage="Usage: $cmd [-f filter-cmd] [-r] [-n count] [ptns... [-- directories...]]
 	-f filter-cmd	Filter to pick out filenames from the INDEX.
 			Default: $filtercmd
+	-M mkndx	Command to run to generate the index if needed.
+	-U updndx	Command to run to update the index if needed.
 	-n count	Choose the first count items.
 	-o		\"or\" mode - any pattern may match, not all.
 	-r		Randomise output."
+
+mkndx=
+updndx=
 
 badopts=
 while :
@@ -27,6 +32,8 @@ do
       -n)	n=$2; shift ;;
       -o)	anyopt=-o ;;
       -r)	random=1 ;;
+      -M)	mkndx=$2; shift ;;
+      -U)	updndx=$2; shift ;;
       -f)	filtercmd=$2; shift ;;
       --)	gotptns=1; shift; break ;;
       -?*)	echo "$cmd: unrecognised option: $1" >&2
@@ -76,16 +83,44 @@ fi
 for dir
 do
     ndx=$dir/INDEX
+
+    catndx=
     if [ -s "$ndx" ]
-    then  eval "$filtercmd" <"$ndx"
-    else  if [ -s "$ndx.gz" ]
-	  then  gunzip < "$ndx.gz"
-	  else  if [ -s "$ndx.bz2" ]
-		then  bunzip2 <"$ndx.bz2"
-		else  find "$dir/." -type f -size +0 -print
-		fi
-	  fi | eval "$filtercmd"
-    fi \
+    then catndx='cat <"$ndx"'
+    else
+      if [ -s "$ndx.gz" ]
+      then catndx='gunzip <"$ndx.gz"'
+      else
+	if [ -s "$ndx.bz2" ]
+	then catndx='bunzip2 <"$ndx.bz2"'
+	fi
+      fi
+    fi
+
+    if [ -n "$catndx" ]
+    then  [ -n "$updndx" ] && eval "( cd \"\$dir\" || exit 1; pwd >&2; set -x; $updndx )"
+    else  if [ -n "$mkndx" ]
+	  then  eval "( cd \"\$dir\" || exit 1; pwd >&2; set -x; $mkndx )"
+	  else  continue
+	  fi
+
+	  catndx=
+	  if [ -s "$ndx" ]
+	  then catndx='cat <"$ndx"'
+	  else
+	    if [ -s "$ndx.gz" ]
+	    then catndx='gunzip <"$ndx.gz"'
+	    else
+	      if [ -s "$ndx.bz2" ]
+	      then catndx='bunzip2 <"$ndx.bz2"'
+	      else continue
+	      fi
+	    fi
+	  fi
+    fi
+
+    eval "$catndx" \
+    | eval "$filtercmd" \
     | sed "s;^[^/];$dir/&;"
 done \
 | ( set -x; eval "$filter"; cat >/dev/null )
