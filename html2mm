@@ -1,0 +1,407 @@
+#!/usr/bin/perl
+#
+# Convert HTML to troff-mm macros for printing.
+#	- Cameron Simpson <cs@zip.com.au>, 08jul94
+#
+# TABLE support.		- cameron, 30jun98
+# Better nested tag support.	- cameron, 01jul98
+#
+
+use strict qw(vars);
+
+use cs::Misc;
+use cs::Hier;
+use cs::HTML;
+use cs::Tokenise;
+use cs::Sink;
+use cs::Source;
+
+$::NoAnchors=0;
+$::FootNotes=0;
+$::manHeaders="$ENV{HOME}/etc/header/man";
+$::SrcURL='';
+
+if (@ARGV && $ARGV[0] eq '-a')
+{ shift; $::NoAnchors=0; }
+
+if (@ARGV && $ARGV[0] eq '-na')
+{ shift; $::NoAnchors=1; }
+
+if (@ARGV >= 2 && $ARGV[0] eq '-u')
+{ shift; $::SrcURL=shift; }
+
+$::Xit=0;
+
+{ my($pid);
+
+  if (! defined($pid=open(STDIN,"-|")))
+  { die "$::cmd: can't pipe/fork: $!\n";
+  }
+  elsif ($pid != 0)
+  # parent - clean up results
+  { $::PreFormatted=0;
+    while (<STDIN>)
+    { chomp;
+      s/\s+$//;
+
+      if ($_ eq '.[]' || $_ eq '.[')	{ $::PreFormatted=1; }
+      elsif ($_ eq '.][' || $_ eq '.]')	{ $::PreFormatted=0; }
+
+      s/^\s+// unless $::PreFormatted;
+      s/^$/.sp 1/ if $::PreFormatted;
+
+      print($_,"\n") unless /^$/;
+    }
+
+    exit 0;
+  }
+}
+
+-r $::manHeaders && system("cat $::manHeaders");
+
+print <<X
+.ds HF 3 3 3 3 3 3
+.ds HP 14 12 10 10 10 10
+.nr Hb 3
+.nr Hc 0
+.nr Hu 0
+.PH "''$::SrcURL''"
+X
+;
+
+$::Out=new cs::Sink (FILE,STDOUT);
+
+$::PreFormatted=0;
+$::InList=0;
+
+$::CurrentFont=R;
+@::FontStack=();
+
+# attach tokeniser to stdin
+{ my($html)=new cs::HTML (new cs::Source FILE, STDIN);
+
+  $::JustDidNL=0;
+  while (defined($_=$html->Tok()))
+  { emit($_);
+  }
+
+  Put $::Out "\n";
+}
+
+exit $::Xit;
+
+#####################################################################
+
+sub subemit
+{
+  for my $tok (@{$_[0]})
+  { emit($tok);
+  }
+}
+
+sub word{ Put $::Out @_;
+	  $::JustDidNL=0;
+	}
+sub nl	{ if (!$::JustDidNL) { Put $::Out "\n"; $::JustDidNL=1; } }
+sub dot { nl(); Put $::Out ".@_\n"; }
+sub in	{ my($amt)=@_;
+	  dot("in +$amt");
+	  push(@::IndentStack,$amt);
+	}
+sub out	{ my($amt)=pop(@::IndentStack);
+	  dot("in -$amt");
+	}
+
+sub emit
+{ local($_)=shift;
+
+  if (ref $_)
+  { my($tag)=$_->{TAG};
+    my($tokens)=$_->{TOKENS};
+    my($attrs)=$_->{ATTRS};
+
+    if ($tag eq UL)
+    { dot('BL');
+      { local($::InList)=1;
+	subemit($tokens);
+      }
+      dot('LE');
+    }
+    elsif ($tag eq OL)
+    { dot(AL,1);
+      { local($::InList)=1;
+	subemit($tokens);
+      }
+      dot('LE');
+      dot('sp 1');
+    }
+    elsif ($tag eq LI)
+    { if (!$::InList)
+      { warn "$::cmd: warning: <LI> when no list active, using <P> instead\n";
+	dot('P');
+      }
+      else
+      { dot('LI');
+      }
+      subemit($tokens);
+    }
+    elsif ($tag eq DL)
+    { nl();
+      { local($::InList)=1;
+	local($::DLpart)=0;
+	subemit($tokens);
+	if ($::DLpart == 2)
+	{ dot('in -1c');
+	}
+      }
+    }
+    elsif ($tag eq DT)
+    { if ($::DLpart == 2)
+      { dot("in -1c");
+      }
+      $::DLpart=1;
+
+      dot("br");
+      subemit($tokens);
+    }
+    elsif ($tag eq DD)
+    { $::DLpart=2;
+      dot("br"); dot("in +1c");
+      subemit($tokens);
+    }
+    elsif ($tag eq PRE)
+    { dot("[");
+      { local($::PreFormatted)=1;
+	subemit($tokens);
+      }
+      dot("]");
+    }
+    elsif ($tag eq BLOCKQUOTE || $tag eq ADDRESS)
+    { in('0.5c');
+      dot('ps -1');
+      subemit($tokens);
+      dot('ps +1');
+      out();
+    }
+    elsif ($tag eq LISTING)
+    { dot("[]");
+      { local($::PreFormatted)=1;
+	subemit($tokens);
+      }
+      dot("][");
+    }
+    elsif ($tag eq B || $tag eq STRONG)
+    { font('B'); subemit($tokens); oldfont();
+    }
+    elsif ($tag eq I || $tag eq EM || $tag eq VAR)
+    { font('I'); subemit($tokens); oldfont();
+    }
+    elsif ($tag eq TT || $tag eq CODE)
+    { font('C'); subemit($tokens); oldfont();
+    }
+    elsif ($tag eq KBD)
+    { font('CB'); subemit($tokens); oldfont();
+    }
+    elsif ($tag eq P)
+    { dot('P');
+      subemit($tokens);
+    }
+    elsif ($tag eq BR)
+    { dot("br");
+    }
+    elsif ($tag eq A)
+    { subemit($tokens);
+      if ($::NoAnchors)
+      {}
+      elsif ($::FootNotes)
+      { if (length($attrs->{HREF})
+	 && $attrs->{HREF} !~ /^#/
+	   )
+	{ dot('FS');
+	  font('C');
+	  Put $::Out $attrs->{HREF};
+	  oldfont();
+	  dot('FE');
+	}
+      }
+      else
+      { my(@attrtxt)=();
+
+	push(@attrtxt,"NAME=$attrs->{NAME}") if length $attrs->{NAME};
+	push(@attrtxt,"HREF=$attrs->{HREF}") if length $attrs->{HREF};
+
+	if (@attrtxt)
+	{ Put $::Out ' \\s-2'; font('C');
+	  Put $::Out "[@attrtxt]";
+	  oldfont(); Put $::Out '\\s+2';
+	}
+      }
+    }
+    elsif ($tag eq IMG)
+    {
+      if (! $::NoAnchors)
+      {
+	Put $::Out '\\s-2';
+	font('C');
+	Put $::Out "[IMG";
+
+	if (length $attrs->{ALT})
+	{ Put $::Out " $attrs->{ALT}";
+	}
+
+	if (length $attrs->{SRC})
+	{ Put $::Out " src=$attrs->{SRC}";
+	}
+
+	Put $::Out "]";
+	oldfont();
+	Put $::Out '\\s+2';
+      }
+    }
+    elsif ($tag eq HR)
+    { dot("br");
+      Put $::Out "\\l'\\nWu'\n";
+      dot("br");
+    }
+    elsif ($tag eq TITLE)
+    { nl();
+      Put $::Out ".PH \"''"; subemit($tokens); Put $::Out "''\"\n";
+    }
+    elsif ($tag =~ /^H(\d)$/)
+    { nl();
+      Put $::Out ".H ", $1+0, " \""; subemit($tokens); Put $::Out "\"\n";
+      # nl(); Put $::Out ".P\n";font('B');Put $::Out "\\s+2"; subemit($tokens); Put $::Out "\\s-2";oldfont();Put $::Out "\n.P\n";
+    }
+    elsif ($tag eq TABLE)
+    {
+      ## warn "TABLE:\n".cs::Hier::h2a($_,1)."\n\n\n";
+      my(@tblCode)=();
+      local($::TblCode)=new cs::Sink (ARRAY,\@tblCode);
+
+      local(@::TblRStyles);
+      local(@::TblRows);
+
+      { local($::Out)=new cs::Sink (FILE,STDERR);
+	subemit($tokens);
+      }
+
+      dot('TS');
+      { my(@rStyles)=();
+	for my $slist (@::TblRStyles)
+	{ push(@rStyles,
+	   join(" ",
+	     map($_ eq LEFT   ? 'l'
+	       : $_ eq RIGHT  ? 'r'
+	       : $_ eq CENTER ? 'c'
+	       : 'l', @$slist)));
+	}
+
+	Put $::Out join("\n", @rStyles), ".\n";
+      }
+
+      for my $row (@::TblRows)
+      { Put $::Out join("\t", @$row),
+		   "\n";
+      }
+      dot('TE');
+    }
+    elsif ($tag eq TR)
+    { local(@::tblRStyle)=();
+      local(@::tblRow)=();
+
+      subemit($tokens);
+
+      push(@::TblRStyles,[ @::tblRStyle ]);
+      push(@::TblRows,[ @::tblRow ]);
+    }
+    elsif ($tag eq TD || $tag eq TH)
+    { my($style)=LEFT;
+      $style=uc($attrs->{ALIGN}) if defined $attrs->{ALIGN};
+
+      my($tblDatum)='';
+      { local($::Out)=new cs::Sink(SCALAR,\$tblDatum);
+	subemit($tokens);
+      }
+
+      $tblDatum =~ s/\s+$//;
+      $tblDatum =~ s/^\s+//;
+
+      if ($tblDatum =~ /[\t\n]/)
+      { $tblDatum="T{\n$tblDatum\nT}";
+      }
+
+      # warn "datum=$tblDatum";
+      push(@::tblRStyle,$style);
+      push(@::tblRow,$tblDatum);
+    }
+    elsif ($tag eq FONT)
+    { ## XXX - ignore for now
+      ## probably do simple fixed/prop courier/bold stuff
+      ## later; point size fiddles, too
+      subemit($tokens);
+    }
+    elsif ($tag eq CENTER)
+    { dot('ce',10000);
+      subemit($tokens);
+      dot('ce',0);
+    }
+    elsif ($tag =~ /^!/ || grep($tag eq $_,HTML,HEAD,BODY))
+    { subemit($tokens);
+    }
+    else
+    { warn "$::cmd: can't grok <$tag>, ignoring\n";
+      # nl();
+      subemit($tokens);
+    }
+  }
+  elsif (/^\&(\w+);?/)
+  { $_=$1;
+    Put $::Out cs::HTML::unamp($_);
+    $::JustDidNL=0;
+  }
+  else
+  { s/\\/$&$&/g;
+    s/\n([.'])/\n\\\&$1/g;
+    word($_);
+    # Put $::Out " " unless $::JustDidNL;
+    # Put $::Out $_;
+    # $::JustDidNL=0;
+  }
+}
+
+sub font
+{ push(@::FontStack,$::CurrentFont);
+  $::CurrentFont=shift;
+  setfont($::CurrentFont);
+}
+
+sub oldfont
+{ $::CurrentFont=pop(@::FontStack);
+  setfont($::CurrentFont);
+}
+
+sub setfont
+{ if (length($_[0]) == 1)	{ Put $::Out "\\f$_[0]"; }
+  elsif (length($_[0]) == 2)	{ Put $::Out "\\f($_[0]"; }
+  else				{ warn "$::cmd: can't set font \"$_[0]\", using Roman\n";
+				  Put $::Out "\\fR";
+				}
+}
+
+sub userdir
+{ my($u)=shift;
+  my(@pw);
+
+  if (! defined $::pwCache{$u})
+	{ $::pwCache{$u}=[ getpwnam($u) ];
+	  if (! @{$::pwCache{$u}})
+		{ warn "$::cmd: userdir($u): who is $u?\n";
+		}
+	}
+
+  @pw=@{$::pwCache{$u}};
+
+  return undef unless @pw;
+
+  $pw[7];
+}
