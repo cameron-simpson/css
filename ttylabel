@@ -1,0 +1,61 @@
+#!/bin/sh
+#
+# Set terminals title and icon strings.
+#	- Cameron Simpson <cs@zip.com.au>
+#
+
+async=
+case $1 in -a) async=1; shift ;; esac
+
+[ $# = 0 ] && { set x "$TTYLABEL"; shift; }
+
+# clean the string up a bit
+## label=`echo "$*" | tr -s '\012\015\033' '  \['`
+##
+## broken in two because of bash bug on linux
+perlfunc='	$_=shift;
+		y/\012\015\033/  [/;
+		s/\s+/ /g;
+		$_=substr($_,$[,79) if length > 79;
+		print'
+label=`perl -e "$perlfunc" "$*"`
+
+# [ -n "$tty_yellow" ] && echo "$tty_yellow$label$tty_normal"
+(
+  esc=""
+  case "$TERM" in
+	xterm*)	_start_title="${esc}]0;"  _end_title=""
+		_start_icon="${esc}]1;"   _end_icon=""
+		;;
+	sun*)	## openwin cmdtool only?
+		case `tty` in
+		    /dev/console)
+			;;
+		    *)	_start_title="${esc}]l"   _end_title="${esc}\\\\"
+			_start_icon="${esc}]L"    _end_icon="${esc}\\\\"
+			;;
+		esac
+		;;
+	iris*)	_start_title="${esc}P1.y" _end_title="${esc}\\"
+		_start_icon="${esc}P3.y"  _end_icon="${esc}\\"
+		;;
+	tty5620*) # needs to contrive to running of myxban etc
+		_start_title=         _end_title=
+		_start_icon=          _end_icon=
+		;;
+	tty630*)_start_title="${esc}[?"   _end_title=";2v"
+		_start_icon=          _end_icon=
+		;;
+	*)	_start_title=         _end_title=
+		_start_icon=          _end_icon=
+		;;
+  esac
+
+  ttylabel=
+  [ -n "$_start_title" ] && ttylabel=$ttylabel$_start_title$label$_end_title
+  [ -n "$_start_icon" ] && ttylabel=$ttylabel$_start_icon$label$_end_icon
+
+  necho "$ttylabel"
+) &
+
+[ $async ] && wait || exit 0
