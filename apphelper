@@ -18,7 +18,7 @@ pager=${PAGER:-less}
 doview=$APPHELPER_DOVIEW
 savemode=${APPHELPER_SAVEMODE:-auto}
 extract=
-extract_globs=${APPHELPER_EXTRACT_GLOBS:-'*'}
+extract_globs=$APPHELPER_EXTRACT_GLOBS
 termname=$cmd
 
 # =head1 SYNOPSIS
@@ -232,11 +232,17 @@ then
 	x "$absfile"
 	set x
 	sep=
-        for glob in ${extract_globs:-'*'}
-	do  
-	  set "$@" $sep -name "$glob"
-	  sep=-o
-	done
+	# ugly workaround for weird bash glob/quoting bug:-(
+	if [ -n "$extract_globs" ]
+	then
+	    for glob in $extract_globs
+	    do  
+	      set "$@" $sep -name "$glob"
+	      sep=-o
+	    done
+	else
+	    set "$@" -name '*'
+	fi
 	shift
 	exec find . -type f -size +0 \( "$@" \) -print -exec "$0" {} $apphopts -A v ';'
       )
