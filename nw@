@@ -21,13 +21,16 @@ loc=$1; shift
 		  exit 1
 		}
 
-clausename=net-$loc
-grep "^\[ *$clausename *\]$" "$cf" >/dev/null \
-|| { echo "$cmd: no clause named \"$clausename\" in $cf" >&2
-     echo "  Known clause names:" >&2
-     sed -n 's/^\[ *net-\(.*[^ ]\) *\].*/\1/p' "$cf" | sort | fmt | sed 's/^/    /'
-     exit 1
-   }
+if [ "x$loc" != "xoff" ]
+then
+  clausename=net-$loc
+  grep "^\[ *$clausename *\]$" "$cf" >/dev/null \
+  || { echo "$cmd: no clause named \"$clausename\" in $cf" >&2
+       echo "  Known clause names:" >&2
+       sed -n 's/^\[ *net-\(.*[^ ]\) *\].*/\1/p' "$cf" | sort | fmt | sed 's/^/    /'
+       exit 1
+     }
+fi
 
 # stop any dhclients and their interfaces
 for pidf in /var/run/dhclient-*.pid
@@ -41,6 +44,8 @@ done
 
 # drop default route
 $trace route del default
+
+[ "x$loc" = xoff ] && exec ifconfig eth0 down
 
 # configure for new location
 exec $trace env "NET=$loc" rc.mobile start -r -f "$cf" -E "$envfile" on-net
