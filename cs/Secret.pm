@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 #
 # Manipulate my "secrets" db.
-#	- Cameron Simpson <cs@zip.com.au> 09nov99
+#	- Cameron Simpson <cs@zip.com.au> 09nov1999
 #
 
 use strict qw(vars);
@@ -12,7 +12,7 @@ use cs::Persist;
 package cs::Secret;
 
 $cs::Secret::DBpath = "$ENV{HOME}/private/secret/db";
-[ -e $cs::Secret::DBpath ] || ($cs::Secret::DBpath = "$ENV{HOME}/.secret");
+-e $cs::Secret::DBpath || ($cs::Secret::DBpath = "$ENV{HOME}/.secret");
 
 sub _db()
 { if (! defined $cs::Secret::_db)
