@@ -1,0 +1,34 @@
+#!/bin/sh
+#
+# Configure a directory tree for group sharing:
+#	- chgrp to named group
+#	- group r/w
+#	- setgid dirs
+# - Cameron Simpson <cs@zip.com.au> 27sep2000
+#
+
+all=
+[ "x$1" = x-a ] && { all=1; shift; }
+
+[ $# = 0 ] && { echo "Usage: $0 [-a] group [dirs...]" >&2; exit 2; }
+
+group=$1; shift
+grep "^$group:" /etc/group || ypmatch "$group" group || exit 1
+
+[ $# = 0 ] && set .
+
+pwd
+ask "Proceed with groupshare on $*" || exit 1
+
+for dir
+do  ( cd "$dir" || exit 1
+      pwd
+      set -x
+      find . ! -type l ! -group "$group" -print | xargs set-x chgrp "$group"
+      if [ $all ]
+      then  chmod -R go=u .;chmod -R o-w .
+      else  chmod -R g=u .
+      fi
+      find . -type d -exec chmod g+s {} ';'
+    )
+done
