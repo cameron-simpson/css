@@ -6,7 +6,7 @@
 
 : ${TMPDIR:=/tmp}
 
-ask "REALLY POST AN ANNOUNCEMENT" || exit 1
+ask "REALLY POST A MAJOR ANNOUNCEMENT" || exit 1
 
 webdir=$HOME/@/adzapper.sf/html
 script=scripts/squid_redirect
