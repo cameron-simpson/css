@@ -155,6 +155,7 @@ Flushes any pending output in I<handle> as a side-effect.
 		  ? new_from_fd IO::Handle (fileno($FILE),"w")
 		  : $FILE);
     $this->{FLAGS}|=$cs::IO::F_NOCLOSE;
+    $this->{FILE}=$FILE;
   }
 
 =item B<APPEND>, I<path>
@@ -371,7 +372,8 @@ sub Put
   while (length $data)
   { $n=$this->Write($data);
     if (! defined $n)
-    { warn "$::cmd: write error (possibly $!), aborting with [$data] unwritten";
+    { my@c=caller;
+      warn "$::cmd: write error (possibly $!), aborting with\n\t\t[$data]\n\tunwritten\n\tfrom [@c]";
       return undef;
     }
 
@@ -409,6 +411,7 @@ sub Write
     die "UseIO is back on!" if $cs::Sink::_UseIO;
     if (! print $io $datum)
     { undef $n;
+      warn "print $io \$datum: errno=$!";
     }
 ##	  # XXX - IO module doesn't like zero sized writes
 ##	  if ($n > 0 || ! $cs::Sink::_UseIO)
@@ -430,7 +433,11 @@ sub Write
   { ${$this->{SCALAR}}.=$datum;
   }
 
-  return undef if ! defined $n;
+  if (! defined $n)
+  { my@c=caller;
+    warn "\$n undef! type=[$type] FILE=[$this->{FILE}]\n\tfrom [@c]";
+    return undef;
+  }
 
   $n;
 }
