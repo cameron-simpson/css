@@ -13,6 +13,7 @@ from=$1 to=$2
 case "$from" in ''|*:) ;; *) from=$from: ;; esac
 case "$to" in   ''|*:) ;; *) to=$to:     ;; esac
 
+set -x
 exec \
   rsync -rlptHvP --delete --exclude=CVS/ \
 	'--include=/.bash_logout' \
@@ -76,6 +77,7 @@ exec \
 	'--include=/rc/ssh' \
 	'--include=/rc/tdl' \
 	'--include=/rc/term' \
+	'--include=/rc/urlmap' \
 	'--include=/rc/vi' \
 	'--include=/rc/x11' \
 	'--include=/rc/xplanet' \
