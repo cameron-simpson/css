@@ -1,0 +1,6 @@
+#!/bin/sh
+#
+# FTP to the DoD archive site.
+#
+
+exec aftp +A -l DOD -p spooge VAX1.Winona.MSUS.EDU
