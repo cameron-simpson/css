@@ -1,0 +1,280 @@
+#!/usr/bin/perl
+#
+# Unpacker for utmp/wtmp records on Apollos.
+#
+
+push(@INC,$ENV{'PERLLIB'});
+require 'libcs.pl';
+
+$usage="Usage: $cmd [-1] [-o outlog] [-W whodir] </etc/wtmp
+		-1	Make just one pass, rather than waiting for file growth.
+		-o	Send output to outlog, opening it for append each time.
+		-v	Verbose mode.
+		-W	Log entries by login name in whodir/login.
+			whodir/login must exist for such a log to be written.\n";
+
+# argument processing
+$badargs=0;
+$onepass=0;
+$verbose=0;
+undef $whodir, $outlog;
+while ($#ARGV >= 0)
+	{ $_=shift;
+
+	  if    (!/^-/)		{ unshift(@ARGV,$_); last; }
+	  elsif ($_ eq '--')	{ last; }
+	  elsif ($_ eq '-1')	{ $onepass=1; }
+	  elsif ($_ eq '-o')	{ $outlog=shift;
+				  if (!defined($outlog))
+					{ print STDERR "$cmd: -o requires an argument\n";
+					  $badargs=1;
+					}
+				}
+	  elsif ($_ eq '-v')	{ $verbose=1; }
+	  elsif ($_ eq '-W')	{ $whodir=shift;
+				  if (!defined($whodir))
+					{ print STDERR "$cmd: -W requires an argument\n";
+					  $badargs=1;
+					}
+				}
+	  else
+	  { print STDERR "$cmd: unrecognised argument '$_'\n";
+	    $badargs=1;
+	  }
+	}
+
+if ($#ARGV >= 0)
+	{ print STDERR "$cmd: unrecognised arguments: @ARGV\n";
+	  $badargs=1;
+	}
+
+die $usage if $badargs;
+
+# snarf definition section
+@DATA=<DATA>; eval "@DATA"; undef @DATA;
+
+undef %l_who, %l_what, %l_time, %l_host;
+
+&openlog;
+while (defined($utmprec=&readutmprec("STDIN")))
+	{ print STDERR '.' if !($verbose || $onepass);
+	  &newutmprec(!$onepass,$utmprec);
+	}
+&closelog;
+
+exit if $onepass;
+
+print STDERR "ok, polling ...\n";
+$osize=tell(STDIN);
+while (1)
+	{ sleep(15);
+	  ($dev,$ino,$mode,$nlink,$uid,$gid,$rdev,$size,@etc)=stat(STDIN);
+	  while (defined($size)
+	      && $size-$osize >= $sizeof_utmp
+	      && defined($utmprec=&readutmprec("STDIN")))
+		{ if (!mustcloseOUTPUT)
+			{ &openlog;
+			}
+
+		  &newutmprec(0,$utmprec);
+		  $osize=tell(STDIN);
+		}
+
+	  &closelog;
+	}
+
+die "finished\n";
+
+
+##########################
+# Functions.
+
+# read a record from a utmp file; return undef at EOF
+sub readutmprec	# (FILE) -> utmprec
+	{ local($FILE)=$_[0];
+	  local($utmprec,$i);
+
+	  if (!defined($i=read($FILE,$utmprec,$sizeof_utmp)))
+		{ print STDERR "readutmprec($FILE) fails: $!\n";
+		  return undef;
+		}
+	  elsif ($i == 0)
+		{ return undef;	# normal EOF
+		}
+	  elsif ($i < $sizeof_utmp)
+		{ print STDERR "readutmprec($FILE): expected $sizeof_utmp bytes, got $i\n";
+		  return undef;
+		}
+	  else
+	  { $utmprec;
+	  }
+	}
+
+sub unpackutmprec	# utmprec -> ($user,$id,$line,$pid,$type,
+		  	#	      $exit_termination,$exit_exit,$time,$host,
+		  	#	      $loc_node,$loc_boot_node)
+	{ unpack("A${UTMP_NAME_SIZE}LA12ss". # L was A4 for $id
+		 "ssLA${UTMP_NAME_SIZE}".
+		 "C${sizeof_ut_node_t}C${sizeof_ut_node_t}",$_[0]);
+	}
+
+sub enum		# (enum,@ENUMS) -> ENUM
+	{ local($n)=shift;
+
+	  for (@_)
+		{ if ($n == eval "\$$_")
+			{ return $_;
+			}
+		}
+
+	  "[$n]";
+	}
+
+sub enumutmptype # (type) -> type-name
+	{ &enum($_[0],'EMPTY','RUN_LVL','BOOT_TIME','OLD_TIME',
+		      'NEW_TIME','INIT_PROCESS','LOGIN_PROCESS',
+		      'USER_PROCESS','DEAD_PROCESS','ACCOUNTING',
+		      'SHUTDOWN_TIME');
+	}
+
+sub newutmprec	# (silent,utmprec) -> update %l_*
+	{ local($silent)=$_[0];
+	  local($user,$id,$line,$pid,$type,
+		$exit_termination,$exit_exit,$time,$host,
+		$loc_node,$loc_boot_node)=&unpackutmprec($_[1]);
+
+	  if ($type == $BOOT_TIME)
+		# reboot, flush sessions
+		{ for (sort keys %l_who)
+			{ &unsetline($silent,$_,$time);
+			}
+
+		  ($silent && !$verbose) || print "BOOT at ",&datestr($time,1);
+		}
+	  elsif ($type == $EMPTY)
+		# end of session
+		{ &clrline($silent,$line,$time);
+		}
+	  else
+	  # begin a session
+	  { local($what,$set);
+
+	    $set=1;
+	    if ($type == $USER_PROCESS)	{ $what='login'; }
+	    elsif ($line =~ /^ftp\d+$/)	{ $what='ftp';
+					  $set=length($user);
+					}
+	    else			{ $what=&enumutmptype($type); }
+
+	    if ($set)	{ &setline($silent,$user,$what,$line,$time,$host); }
+	    else	{ &clrline($silent,$line,$time); }
+	  }
+	}
+
+sub setline	# (silent,who,what,line,time,host)
+	{ local($silent,$who,$what,$line,$time,$host)=@_;
+
+	  if (defined($l_who{$line}))
+		{ &clrline($silent,$line,$time);
+		}
+
+	  $l_who{$line}=$who;
+	  $l_what{$line}=$what;
+	  $l_time{$line}=$time;
+	  $l_host{$line}=$host;
+
+	  if ($verbose || !$silent)
+		{ &openlog;
+		  print &datestr($time,1), ": $what by $who on $line";
+		  if (length($host))
+			{ print " from $host";
+			}
+
+		  print "\n";
+		  &closelog;
+		}
+	}
+
+sub clrline	# (silent,line,time)
+	{ local($silent,$line,$time)=@_;
+
+	  if (!defined($l_who{$line}))
+		{ print STDERR "clrline($line,".&datestr($time,1).") - no active session\n";
+		}
+	  else
+	  { if ($verbose || !$silent)
+		{ &openlog;
+		  print &datestr($time,1), ": logout-$l_what{$line} by $l_who{$line} on $line";
+		  if (length($l_host{$line}))
+			{ print " from $l_host{$line}";
+			}
+		  
+		  print "\n\t\t\t", &datestr($l_time{$line},1),
+			" to ", &datestr($time,1),
+			"\n\t\t\tduration ", &timestr($time-$l_time{$line})."\n";
+		  &closelog;
+		}
+
+	    delete $l_who{$line};
+	    delete $l_what{$line};
+	    delete $l_time{$line};
+	    delete $l_host{$line};
+	  }
+	}
+
+sub openlog
+	{ if (defined($outlog))
+		{ if ($mustcloseOUTPUT)
+			{ $mustcloseOUTPUT++;
+			}
+		  elsif (!open(OUTPUT,">>$outlog"))
+			{ print STDERR "$cmd: can't append to $outlog: $!\n";
+			  $oldSTDOUT=select(STDERR);
+			}
+		  else
+		  { $oldSTDOUT=select(OUTPUT);
+		    $mustcloseOUTPUT=1;
+		  }
+		}
+	}
+
+sub closelog
+	{ if ($mustcloseOUTPUT)
+		{ --$mustcloseOUTPUT || (close(OUTPUT), select($oldSTDOUT));
+		}
+	}
+__END__
+
+$UTMP_NAME_SIZE=32;
+$sizeof_ut_node_t=2+14;			# family+data
+$sizeof_utmp	= $UTMP_NAME_SIZE	# ut_user	user login name
+		+ 4			# ut_id		/etc/lines id (usually line #)
+		+ 12			# ut_line	device name (console, etc)
+		+ 2			# ut_pid
+		+ 2			# ut_type
+		+ 2			# ut_exit.e_termination
+		+ 2			# ut_exit.e_exit
+		+ 4			# ut_time	time entry was made
+		+ $UTMP_NAME_SIZE	# ut_host	remote host if any
+		+ $sizeof_ut_node_t	# ut_loc.node	node and boot node
+		+ $sizeof_ut_node_t	# ut_loc.boot_node
+		;
+
+# Definitions for ut_type.
+$EMPTY		= 0;
+$RUN_LVL	= 1;
+$BOOT_TIME	= 2;
+$OLD_TIME	= 3;
+$NEW_TIME	= 4;
+$INIT_PROCESS	= 5;
+$LOGIN_PROCESS	= 6;
+$USER_PROCESS	= 7;
+$DEAD_PROCESS	= 8;
+$ACCOUNTING	= 9;
+$SHUTDOWN_TIME	= 10;
+
+$RUNLVL_MSG	= 'run-level %c';
+$BOOT_MSG	= 'system boot';
+$OTIME_MSG	= 'old time';
+$NTIME_MSG	= 'new time';
+$SHUTDOWN_MSG	= 'shutdown';
