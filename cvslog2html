@@ -110,6 +110,8 @@ while (defined ($_=<STDIN>))
   }
 }
 
+die "$::cmd: nothing in the CVS log!\n" if ! @log;
+
 undef $day;
 undef $auhtor;
 undef $file;
