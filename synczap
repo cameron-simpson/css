@@ -6,6 +6,8 @@
 
 : ${TMPDIR:=/tmp}
 
+ask "REALLY POST AN ANNOUNCEMENT" || exit 1
+
 webdir=$HOME/@/adzapper.sf/html
 script=scripts/squid_redirect
 base=http://adzapper.sourceforge.net
