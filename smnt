@@ -5,7 +5,7 @@
 #
 
 mnt=/win
-user=`who am i | awk '{print$1}'`
+user=`who am i | sed -e 's/[ 	].*//' -e 's/.*!//'`
 [ -n "$user" ] || user=${LOGNAME:-$USER}
 : ${WORKGROUP:=$SYSTEMID}
 
