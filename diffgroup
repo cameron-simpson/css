@@ -1,0 +1,86 @@
+#!/usr/bin/perl
+#
+# Report differences between two group files.
+#	- Cameron Simpson <cs@zip.com.au> 12dec97
+#
+
+use cs::Misc;
+use cs::UNIX::Group;
+
+@ARGV=("-",@ARGV) if @ARGV == 1;
+
+die "Usage: $0 [groupfile1] groupfile2\n" if @ARGV != 2;
+
+loadfile(\%grp1,$ARGV[0]);
+loadfile(\%grp2,$ARGV[1]);
+
+@ngrps=grep(! exists $grp1{$_}, keys %grp2);
+@ogrps=grep(! exists $grp2{$_}, keys %grp1);
+
+if (@ogrps)
+	{ print "Groups removed:\n";
+
+	  for (sort @ogrps)
+		{ print "  ", $grp1{$_}->GrLine(), "\n";
+		}
+	}
+
+if (@ngrps)
+	{ print "Groups added:\n";
+
+	  for (sort @ngrps)
+		{ print "  ", $grp2{$_}->GrLine(), "\n";
+		}
+	}
+
+$first=1;
+CHECK:
+  for (sort grep(exists $grp2{$_}, keys %grp1))
+	{
+	  @g1=sort @{$grp1{$_}->{MEMBERS}};
+	  @g2=sort @{$grp2{$_}->{MEMBERS}};
+
+	  if ($grp1{$_}->{GID} != $grp2{$_}->{GID}
+	   || "@g1" ne "@g2")
+		{
+		  if ($first)	{ print "Changed groups:\n"; $first=0; }
+
+		  if ($grp1{$_}->{GID} != $grp2{$_}->{GID})
+			{ print "  $_: gid: $grp1{$_}->{GID} => $grp2{$_}->{GID}\n";
+			}
+
+		  map($g1{$_}=1, @g1);
+		  map($g2{$_}=1, @g2);
+		  @om=grep( ! $g2{$_}, @g1);
+		  @nm=grep( ! $g1{$_}, @g2);
+
+		  if (@om)
+			{ print "  $_: -", join(',',@om), "\n";
+			}
+
+		  if (@nm)
+			{ print "  $_: +", join(',',@nm), "\n";
+			}
+		}
+	}
+
+exit 0;
+
+sub loadfile
+	{ my($grps,$fname)=@_;
+
+	  die "$0: can't open \"$fname\": $!\n"
+		if ! ( $fname eq '-'
+			? open(GROUP,"<&STDIN")
+			: open(GROUP,"< $fname\0") );
+
+	  my($g);
+	  local($_);
+
+	  while (defined ($_=<GROUP>))
+		{ $g=new cs::UNIX::Group $_;
+		  $grps->{$g->{NAME}}=$g;
+		}
+
+	  close(GROUPS);
+	}
