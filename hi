@@ -8,7 +8,7 @@ hi=$HOME/rc/hi
 
 eval `datevars`
 weekly=
-mode=html
+mode=
 
 [ "x$wdayname" = xMon ] && weekly=1
 [ "x$1" = x-html ] && { mode=html; shift; }
@@ -17,9 +17,12 @@ mode=html
 
 if [ $# = 0 ]
 then
+    [ -n "$mode" ] || mode=html
     set rterm `cd "$hi" || exit 1
-	       ls -d [a-z]*|sed 's/\.weekly$//'|sort -u`
+	       ls -d [a-z]*|sed -e '/^cvs$/d' -e '/^Mykefile$/d' -e 's/\.weekly$//'|sort -u`
     shift
+else
+    [ -n "$mode" ] || mode=normal
 fi
 
 urllist=/tmp/hi-urls.$$
