@@ -120,15 +120,18 @@ sub EXISTS($$)
 || defined $this->FETCH($key);
 }
 
+# expect key to take on last_id if undef
 sub STORE($$$)
 { my($this,$key,$value)=@_;
 
   my($dbh,$table)=($this->{DBH}, $this->{TABLE});
 
-  $this->DELETE($key);
+  $this->DELETE($key) if defined $key;
 
   cs::DBI::insert($dbh, $table, keys %$value)
   ->ExecuteWithRec($value);
+
+  $key=cs::DBI::last_id() if ! defined $key;
 
   $this->{LIVE}->{$key}=$value;
 }
