@@ -1,0 +1,65 @@
+#!/usr/bin/perl
+#
+# Keep first (or last) instances of lines in a file.
+# Will take a regexp to match the section of the line of interest
+# in identifying duplicates.
+# Edits files in place if given filenames, otherwise is a pipe.
+#	- Cameron Simpson <cs@zip.com.au>
+#
+
+$regexp='^.*$';
+$keepfirst=0;
+
+@subargs=();
+
+if (@ARGV && $ARGV[0] eq '-1')
+{ $keepfirst=1;
+  push(@subargs,shift(@ARGV));
+}
+
+if (@ARGV && $ARGV[0] =~ m:^/: && $ARGV[0] =~ m:/$:)
+{ push(@subargs,$regexp=shift(@ARGV));
+  $regexp =~ s:^/(.*)/$:$1:;
+}
+
+if (@ARGV)
+{ for my $file (@ARGV)
+  { @sys=("lockedit","-",$file,$0,@subargs);
+    system(@sys);
+  }
+  exit 0;
+}
+
+$n=0;
+LINE:
+  while (defined ($_=<STDIN>))
+  { chomp;
+    next LINE unless length;
+
+    push(@lines,$_);
+    next LINE if ! /$regexp/o;
+
+    $key=defined $1 ? $1 : $&;	# hack to check for submatch
+
+    $n=$#lines;
+    if ($keepfirst)
+    { if (defined $k{$key})
+      { pop(@lines);
+      }
+      else
+      { $k{$key}=$n if ! defined $k{$key};
+      }
+    }
+    else
+    { if (defined $k{$key})
+      { $lines[$k{$key}]='';	# trim old line
+      }
+      $k{$key}=$n;
+    }
+  }
+
+for (@lines)
+{ if (length)
+  { print $_, "\n";
+  }
+}
