@@ -11,6 +11,4 @@ done
 
 [ $# = 0 ] && { set x -; shift; }
 
-catdoc-0.3 $opts "$@" \
-| tr '\015' '\012' \
-| pageif
+/opt/bin/catdoc $opts "$@" | tr '\015' '\012'
