@@ -292,7 +292,7 @@ runqueue()
   while [ $# -gt 0 ]
   do
     opline=$1; shift
-    ##echo "POPQUEUE $opline"
+    echo "POPQUEUE $opline" >&2
     case "$opline" in
 	*' '*)	op=` expr "x$opline" : 'x\([^ ]*\) .*'`
 		etc=`expr "x$opline" : 'x[^ ]*  *\(.*\)'`
@@ -319,6 +319,8 @@ runqueue()
 	  shuse=`shqclause "$use1"`
 	  ##echo "PUSHQUEUE $shuse"
 	  eval "set -- $shuse "'${1+"$@"}'
+	  ##echo "use $use1:" >&2
+	  ##for _arg; do echo "  arg: [$_arg]" >&2; done
 	fi
 	;;
 
@@ -329,7 +331,7 @@ runqueue()
       #
       [a-zA-Z]*=*)
 	var=`expr "$op" : '\([^=]*\)=.*'`
-	eval "$op $etc"
+	eval "$opline"
 	export $var
 	eval "val=\$$var"
 	setenv "$var" "$val"
@@ -407,7 +409,7 @@ runqueue()
       # The specified I<shell command> is run synchronously.
       #
       \!*)
-	shcmd=`expr "x$op $etc" : 'x.\(.*\)'`
+	shcmd=`expr "x$opline" : 'x.\(.*\)'`
 	$trace /bin/sh -c "$shcmd"
 	;;
 
@@ -447,7 +449,7 @@ runqueue()
 	;;
 
       *)
-	echo "$cmd: unrecognised operator \"$op\": $op $etc" >&2
+	echo "$cmd: unrecognised operator \"$op\": $opline" >&2
 	;;
 
     esac
