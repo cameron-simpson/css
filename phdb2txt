@@ -1,0 +1,22 @@
+#!/usr/bin/perl
+#
+# Dump my phone DB into flat text.
+#	- Cameron Simpson <cs@zip.com.au>
+#
+
+($::cmd=$0) =~ s:.*/::;
+
+use strict qw(vars);
+
+use cs::PhoneDB;
+
+my($DBPath)=( length $ENV{'telnos'}
+	    ? $ENV{'telnos'}
+	    : "$ENV{HOME}/etc/telnos"
+	    )."/.db";
+
+my($DB)=cs::PhoneDB::db($DBPath);
+
+die "$::cmd: no phone database at $DBPath\n" if ! defined $DB;
+
+for (
