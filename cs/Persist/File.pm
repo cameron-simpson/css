@@ -198,6 +198,9 @@ sub WriteSelf
 
     my($unparsed,$live)=($this->{UNPARSED}, $this->{LIVE});
 
+    warn "$fname: \$this->{META}=".cs::Hier::h2a($this->{META})
+	if ::reftype($this->{META}) ne HASH;
+
     if (keys %{$this->{META}})
     { ## warn "WRITE META\n";
       $s->Put(sprintf("%-15s ","\"\""));
