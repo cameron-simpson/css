@@ -1,0 +1,24 @@
+#!/bin/sh
+#
+# General wrapper for various shells to tweak SHELL to match.
+#	- Cameron Simpson <cs@zip.com.au> 28feb99
+#
+
+shell=`basename "$0"`
+
+case $shell-$SYSTEMID-$ARCH in
+    sh-*)		shell=/bin/sh ;;
+    bash-*-sun.*.solaris) shell=/opt/bin/bash ;;
+    bash-*)		shell=/bin/bash ;;
+    ae-*)		shell=$BIN/ae ;;
+    ksh-*)		shell=/bin/ksh ;;
+    *)			echo "$shell: no knowledge for $SYSTEMID-$ARCH" >&2
+			exit 1
+			;;
+esac
+
+# ugly hack to make shellrc work
+SHELL=$shell; export SHELL
+
+set -x
+exec "$shell" ${1+"$@"}
