@@ -53,7 +53,7 @@ exec term -n "#$session" \
 	logscript "$session" \
 	"$ssh" $sshproto -t $sshopts "root@$host" \
 		'. /etc/profile
-		 [ -s /opt/config/shell/env-basic ] && . /opt/config/shell/env-basic
+		 [ -s /opt/config/shell/rc ] && . /opt/config/shell/rc
 		 [ -f $HOME/.profile ] && . $HOME/.profile
 		 TERM=vt100
 		 PATH=$PATH:/opt/css/bin:/u/network/bin:/opt/gnu/bin
