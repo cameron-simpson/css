@@ -1,7 +1,17 @@
 #!/bin/sh
+
 : ${VARRUN:=$HOME/var/run}
+
+sig=TERM	# use USR1 if aiming at fetchmail daemon
+
+cmd=$0
+usage="Usage: $cmd [signal]"
+
+[ $# = 0 ] || { sig=$1; shift; }
+[ $# = 0 ] || { echo "$usage" >&2; exit 2; }
+
 pidf=$$VARRUN/fetchmail_sleep.pid
 [ -s "$pidf" ] \
 && { echo >>"$pidf"; read pid etc <"$pidf"; } \
 && [ -n "$pid" ] \
-&& { set -x; kill -USR1 "$pid"; }
+&& { set -x; kill "-$sig" "$pid"; }
