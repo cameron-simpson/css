@@ -28,7 +28,7 @@ This module implements a simple decomposition of numbers into human friendly sub
 
 use strict qw(vars);
 
-BEGIN { use cs::DEBUG; cs::DEBUG::using(__FILE__); }
+##BEGIN { use cs::DEBUG; cs::DEBUG::using(__FILE__); }
 
 use cs::Misc;
 
