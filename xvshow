@@ -1,0 +1,17 @@
+#!/bin/sh
+#
+
+xvim=`logpath xvim`
+if [ ! -f "$xvim" ]
+then	echo "$0: no xv poll image (xvim=$xvim)" >&2
+	exit 1
+fi
+
+verbose=
+[ "x$1" = x-v ] && { verbose=1; shift; }
+
+[ $# = 0 ] || exec <"$1"
+
+[ $verbose ] && echo "xvshow $*"
+
+exec cat > "$xvim"
