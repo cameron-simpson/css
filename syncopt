@@ -18,7 +18,7 @@
 # More detailed discussion of its use and the practices associated with
 # it is at this web page:
 #
-#	http://www.cskk.ezoshosting.com/cs/syncopt/index.html
+#	http://www.cskk.ezoshosting.com/cs/css/syncopt.html
 #
 # The intent is that packages built from source
 # (and to a limited extent other packages with relocatable installs)
@@ -266,7 +266,8 @@ resolve=$resolve'
 		      .)  absdir=$dir ;;
 		      *)  absdir=$dir/$subdir ;;
 		    esac
-		    if [ -d "$absdir/$target/." -o -f "$absdir/$target" ]
+		    if [ -d "$absdir/$target/." -o -f "$absdir/$target" ] \
+		    || issymlink "$absdir/$target"
 		    then  fullpath=$absdir/$target
 			  break
 		    fi
