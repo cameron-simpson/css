@@ -38,6 +38,7 @@ usage="Usage: $cmd [-Pprinter[/paper]] [-f filter]... [-q] [multips-options] [--
 			Specifiable via \$PRINTER (currently \"$PRINTER\").
 			An optional PostScript papersize directive may be
 			included (eg a3).
+			NB: plain -P is reserved for multips' portrait flag.
 	-f filter	Run each file (or stdin) through filter, which may
 			include options. Multiple filters are connected by
 			pipes in the order supplied.
@@ -111,8 +112,9 @@ do
 		# directive will be inserted in the output
 		# (eg B</a4>, B</letter> etc).
 		#
+		# Note that a plain B<-P> is reserved for multips' portrait flag.
+		#
 		-P?*)	PRINTER=`expr "x$1" : 'x-P\(.*\)'` ;;
-		-P)	PRINTER=$2; shift ;;
 
 		# =item B<-q>, B<+q>
 		#
