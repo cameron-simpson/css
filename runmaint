@@ -28,10 +28,10 @@
 # =head1 INSTALLATION
 #
 # Normally I<runmaint> is installed as a kit under a prefix
-# such as B</usr/local>,
-# with the script itself in B</usr/local/bin/runmaint>
+# such as B</> or B</usr/local>,
+# with the script itself in B</bin/runmaint> or B</usr/local/bin/runmaint>
 # and so forth.
-# The examples below presume the prefix is B</usr/local>
+# The examples below presume the prefix is B</>
 # and should be adjusted to match how your install is arranged.
 #
 # =head1 PERSONAL SETUP
@@ -42,11 +42,11 @@
 # Create a crontab file with the crontab(1) command.
 # Typically this is a single line such as:
 #
-#	0 * * * * exec /usr/local/bin/runmaint hourly
+#	0 * * * * exec /bin/runmaint hourly
 #
 # or
 #
-#	0 0 * * * exec /usr/local/bin/runmaint daily
+#	0 0 * * * exec /bin/runmaint daily
 #
 # The word after the B<runmaint> command is the name of a script to run
 # from the B<~/.maint> directory.
@@ -82,7 +82,7 @@
 #
 # Before running any script
 # B<runmaint> sources the file
-# B</usr/local/etc/runmaint/env>.
+# B</etc/runmaint/env>.
 # Systemwide default environment settings go in here as shell commands.
 # After this the file
 # B<~/.maint/env> is sourced.
@@ -90,7 +90,7 @@
 #
 # Normally you will want the cron environment to resemble the login
 # environment closely
-# and so B</usr/local/etc/runmaint/env> would normally contain the line
+# and so B</etc/runmaint/env> would normally contain the line
 #
 #	. /etc/profile
 #
@@ -141,7 +141,7 @@ noenv=
 
 badopts=
 
-xflag=
+xflag= traceon=: traceoff=:
 subj="runmaint@$HOST $*"
 datestr=
 
@@ -186,7 +186,7 @@ do
 #
 # Trace execution.
 #
-	-x)	xflag=-x ;;
+	-x)	xflag=-x traceon='set -x' traceoff='set +x' ;;
 	-?*)	echo "$0: unrecognised option: $1" >&2
 		badopts=1
 		;;
@@ -230,8 +230,10 @@ addresses=$*
 # =back
 #
 
+$traceon
 [ $noenv ] \
-|| { [ -s "$MaintEtc/env" ] && . "$MaintEtc/env"; }
+|| { [ -s "$MaintEtc/env" ] && { $traceon; . "$MaintEtc/env"; $traceoff; }; }
+$traceoff
 
 # note starting time
 if [ -n "$datestr" ]
@@ -297,7 +299,7 @@ do
 
 	if [ $ok ]
 	then
-	    ( [ -s "$scriptdir/env" ] && . "$scriptdir/env"
+	    ( [ -s "$scriptdir/env" ] && { $traceon; . "$scriptdir/env"; $traceoff; }
 	      [ $merge ] && exec 2>&1
 	      exec sh $xflag "$script"
 	    ) \
