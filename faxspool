@@ -4,6 +4,8 @@
 #	- Cameron Simpson <cs@zip.com.au> 23may1997
 #
 
+: ${TMPDIR:=/tmp}
+
 cmd=`basename "$0"`
 usage="Usage: $cmd [options] [--] faxnumber [files...]
 	-D dest	Verbose form of the fax's destination.
@@ -77,7 +79,7 @@ fi
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
-tmp=/tmp/$cmd.$$
+tmp=$TMPDIR/$cmd.$$
 
 which ps2pbm >&2
 
