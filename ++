@@ -1,0 +1,11 @@
+#!/bin/sh
+#
+# Search for stuff with mairix and then run up the result in mutt.
+#	- Cameron Simpson <cs@zip.com.au> 01jan2003
+#
+
+cmd=$0
+[ $# = 0 ] && { echo "Usage: $cmd mairix-search-args..." >&2; exit 2; }
+
+mairix "$@" || exit 1
+exec + mairix-result
