@@ -100,8 +100,16 @@ grep "^$mtype *;" <"$mailcap" \
   # insert hook for $subfile
   subfile=`shqstr "$subfile"`
   case "$cap_action" in
-      *'%s'*)	cap_action=`sedstrs "s%s$subfileg" "$cap_action"` ;;
-      *)	cap_action="exec <$subfile; $cap_action" ;;
+      *'%s'*)
+		# protect sed-specials
+		case "$subfile" in
+		  *[\&\\]*)	sedsubfile=`sedstrs 's/[&\\]/\\\\&/g' "$subfile"` ;;
+		  *)		sedsubfile=$subfile ;;
+		esac
+		cap_action=`sedstrs "s%s$sedsubfileg" "$cap_action"`
+		;;
+      *)	cap_action="exec <$subfile; $cap_action"
+      ;;
   esac
 
   echo "$cap_action"
