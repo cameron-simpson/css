@@ -121,6 +121,11 @@ exit 0
 
 # =back
 #
+# =head1 ENVIRONMENT
+#
+# B<$BUGSYSTEMS>, the list of bug subsystems to notify.
+# Default: "B<dlog logger>".
+#
 # =head1 SEE ALSO
 #
 # dlog(1), logger(1)
