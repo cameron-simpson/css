@@ -100,23 +100,44 @@ sub palm2gmt($;$)
 
 =over 4
 
-=item newPDB I<file>
+=item newPDB I<file>, I<creator>, I<dbname>
 
-Return a new B<cs::Palm::PDB> object attached to I<file>.
+Return a new B<cs::Palm::PDB> object attached to I<file>
+with the specified I<creator> and I<dbname> values.
 
 =cut
 
 sub newPDB
 { ::need(cs::Palm::PDB);
 
-  cs::Palm::PDB::new(cs::Palm::PDB,@_);
+  cs::Palm::PDB->new(@_);
+}
+
+=item newAppDB I<app>, I<file>
+
+Return a new I<app> specific object attached to I<file>,
+a subclass of B<cs::Palm::PDB> named B<cs::Palm::App::I<app>>.
+
+=cut
+
+sub newAppDB($$)
+{ my($app,$file)=@_;
+
+  ::need("cs::Palm::App::$app");
+  my $this = eval "cs::Palm::App::$app->new(\$file)";
+  if ($@)
+  { warn "$::cmd: eval: $@";
+    return undef;
+  }
+
+  $this;
 }
 
 =back
 
 =head1 SEE ALSO
 
-B<cs::Date(3)>, B<cs::Palm::PDB(3)>
+cs::Date(3), cs::Palm::PDB(3)
 
 =head1 AUTHOR
 
