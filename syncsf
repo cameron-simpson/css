@@ -60,6 +60,6 @@ then
       echo "Changes since last public update:"
       echo
       cvslog -rSYNCSF: rc/patterns scripts/squid_redirect
-      [ $dotag ] && cvs tag -R -F SYNCSF
+      [ $dotag ] && cvs tag -R SYNCSF .
     ) | mutt -s "adzapper-everyupdate notification" "$addr"
 fi
