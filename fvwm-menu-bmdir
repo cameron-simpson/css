@@ -40,16 +40,30 @@ pd=`dirname "$wd"`
 pnd=`basename "$pd"`
 echo "\"<-- $pnd\" PopBmDir $pd"
 
+dirs=
+dsep=
+urls=
+usep=
 for bm in *
 do
   if [ -d "$bm/." ]
   then
-      echo "\"$bm ->\" PopBmDir \"$wd/$bm\""
+      dirs="$dirs$dsep\"$bm ->\" PopBmDir \"$wd/$bm\""
+      dsep='
+'
   else
       exec <"$bm"
       if read url
-      then echo "\"$bm\" Exec us '$url'"
-      else : echo "\"--$bm--\" Nop"
+      then
+	  urls="$urls$usep\"$bm\" Exec us '$url'"
+	  usep='
+'
+      else
+	  : echo "\"--$bm--\" Nop"
       fi
   fi
 done
+
+[ -n "$dirs" ] && echo "$dirs"
+[ -n "$dirs" -a -n "$urls" ] && echo "\"\" Nop"
+[ -n "$urls" ] && echo "$urls"
