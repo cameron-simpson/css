@@ -292,6 +292,11 @@ my %E=(
 		  'sa'	=> 'Google Search',
 		},
 		],
+	EBAYITEM, [ 'http://cgi.ebay.com.au/ws/eBayISAPI.dll',
+		  { 'ViewItem'		=> undef,
+		    'item'		=> $query,
+		  },
+		],
 	EBAY,	[ 'http://search.ebay.com.au/search/search.dll',
 		  { 'MfcISAPICommand'	=> 'GetResult',
 		    'ht',		=> 1,
@@ -733,7 +738,7 @@ if (! length $query || ! length $engine || ! exists $E{$engine})
 
   print "I know the following search engines:<P>\n";
   print "<FORM METHOD=GET ACTION=\"$me\">\n";
-  print "Query:\n<INPUT TYPE=TEXT NAME=QUERY SIZE=40><P>\n";
+  print "Query:\n<INPUT TYPE=TEXT NAME=QUERY SIZE=40 VALUE=\"$query\"><P>\n";
   for my $engine (sort keys %E)
   { print " <INPUT TYPE=SUBMIT NAME=ENGINE VALUE=\"$engine\">\n";
   }
@@ -756,7 +761,7 @@ else
 $url='http://cgi.zipworld.com.au/cs/htclean.cgi/'.$url if $scour;
 
 print "Location: ", $url, "?";
-print join("&",map((length($_) ? enquery($_)."=" : "").enquery($data->{$_}),sort keys %$data));
+print join("&",map(enquery($_).(defined $data->{$_} ? "=" : "").enquery($data->{$_}),sort keys %$data));
 print "\n\n";
 
 exit 0;
