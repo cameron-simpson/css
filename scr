@@ -12,7 +12,8 @@ usage="Usage:	$cmd				List sessions.
 # nothing? list active sessions
 [ $# = 0 ] \
     && { screen -ls \
-	 | sed -e '/^	/!d' -e 's/^	\([^	]*\).*/\1/'
+	 | sed -e '/^	/!d' -e 's/^	\([^	]*\).*/\1/' \
+	 | awk '{ printf("%3d %s\n",NR,$0) }'
 	 exit 0
        }
 
@@ -41,9 +42,9 @@ fi
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
 case "$name" in
-    [1-9]|[1-9][0-9])
+    [1-9]|[1-9][0-9]|[1-9][0-9][0-9])
 	n=$name
-	name=`scr | sed -n -e 's/	.*//' -e "${n}p"`
+	name=`scr | sed -n -e "$n!d" -e 's/^ *[1-9][0-9]*  *//p'`
 	[ -n "$name" ] || { echo "$cmd: no ${n}th session; available sessions:" >&2
 			    scr >&2
 			    exit 1
@@ -51,4 +52,5 @@ case "$name" in
 	;;
 esac
 
-exec screen $scropts -a -A -x -r -e '' -h 10240 -l "$name"
+set -x
+exec screen $scropts -A -e '' -h 10240 -l -d -r "$name"
