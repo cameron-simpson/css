@@ -8,17 +8,20 @@
 # - Cameron Simpson, March 1993
 #
 
-($cmd=$0) =~ s:.*/::;
-$usage="Usage: $cmd [-{a|u}] [-g good|/pattern/] [files...]
+use strict qw(vars);
+
+use cs::Misc;
+
+$::Usage="Usage: $::cmd [-{a|u}] [-g good|/pattern/] [files...]
 	-a	Print all entries in files.
 	-u	Sort all entries, emit unique list.
 	-g good	Only consider entries satisfying Perl code 'good'.
 	/pattern/ Only consider entries containing pattern.
 ";
 
-$aflag=0;
-$uflag=0;
-$GOODSIG='length';
+my $aflag=0;
+my $uflag=0;
+my $GOODSIG='length';
 
 if (@ARGV)
 {
@@ -35,38 +38,42 @@ if (@ARGV)
 				}
 }
 
+my @signatures=();
+my %signatures;
+
 # how to stash a sig
 eval '
     sub sig
     { local($_)=@_;
 
-      push(@sigs,$_) if '.$GOODSIG.';
+      push(@signatures,$_) if '.$GOODSIG.';
     }';
 
 die $@ if $@;
 
 if (! @ARGV)	
-{ if (!length($ENV{SIGS}))
-  { $ENV{SIGS}=$ENV{HOME}.'/.sigs';
+{ if (!length($ENV{signatures}))
+  { $ENV{signatures}="$ENV{HOME}/rc/mail/signatures";
   }
 
-  @ARGV=$ENV{SIGS};
+  @ARGV=$ENV{signatures};
 }
 
-@sigs=();
+my $FILE;
+
 SIGFILE:
 for (@ARGV)
 { if ($_ eq '-')
   { $FILE='STDIN'; }
   elsif (!open(SIG,"< $_\0"))
-  { print STDERR "$cmd: can't open $_: $!\n";
+  { print STDERR "$::cmd: can't open $_: $!\n";
     next SIGFILE;
   }
   else
   { $FILE='SIG';
   }
 
-  $sig='';
+  my $sig='';
   while (<$FILE>)
   { if (/^--/)
     { &sig($sig);
@@ -78,22 +85,22 @@ for (@ARGV)
   }
 
   if ($FILE ne 'STDIN')
-	{ close($FILE);
-	}
+  { close($FILE);
+  }
 
   &sig($sig);
   $sig='';
 }
 
 if ($aflag)
-{ for (@sigs)
-	{ &psig($_);
-	}
+{ for (@signatures)
+  { &psig($_);
+  }
 }
 elsif ($uflag)
-{ local(%sigs,$sig,$_);
+{ local($_);
 
-  for $sig (@sigs)
+  for my $sig (@signatures)
   { $_=$sig;
     s/^--[^\n]*\n//;
     s/\W+/ /g;
@@ -101,17 +108,17 @@ elsif ($uflag)
     s/^ //;
     s/ $//;
     tr/A-Z/a-z/;
-    $sigs{$_}=$sig;
+    $signatures{$_}=$sig;
   }
 
-  for (sort keys %sigs)
-  { &psig($sigs{$_});
+  for (sort keys %signatures)
+  { &psig($signatures{$_});
   }
 }
 else
 { srand(time^(40503*$$));
-  $ndx=int(rand($#sigs-1));
-  &psig($sigs[$ndx]);
+  my $ndx=int(rand($#signatures-1));
+  &psig($signatures[$ndx]);
 }
 
 sub psig
