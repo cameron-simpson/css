@@ -91,7 +91,6 @@ popurl()
   return $popurl_ret
 }
 
-set -x
 if [ "x$DISPLAY" = "x$BROWSER_DISPLAY" ]
 then
     probe()
@@ -119,7 +118,6 @@ else
     DISPLAY=$BROWSER_DISPLAY
     export DISPLAY
 fi
-set +x
 
 cleanurllist \
 | while read url
