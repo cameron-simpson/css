@@ -1,0 +1,15 @@
+#!/bin/sed -nf
+#
+# Read mutt alias file.
+# Emit:
+#	addr	[name]
+#
+# alias foo bah <zit@zot>
+s/^ *alias  *\([^ ][^ ]*\)  *.*<\(.*@.*[^ ]\)>.*/\2 \1/p
+t ok
+# alias foo (bah) zit@zot
+s/^ *alias  *\([^ ][^ ]*\)  (.*)  *\([^ ][^ ]*@[^ ][^ ]*\) *$/\2 \1/p
+t ok
+# alias foo zit@zot
+s/^ *alias  *\([^ ][^ ]*\)  *\([^ ][^ ]*@[^ ][^ ]*\) *$/\2 \1/p
+:ok
