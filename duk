@@ -4,6 +4,8 @@
 #	- Cameron Simpson <cs@zip.com.au> 24aug1996
 #
 
+: ${OS:=`uname -s|tr '[A-Z]' '[a-z]'`}
+
 opt=
 case $OS in
     openbsd|solaris)
