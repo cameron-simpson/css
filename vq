@@ -1,0 +1,2 @@
+#!/bin/sh
+exec vm -t +attn -q ${1+"$@"}
