@@ -1,6 +1,6 @@
 #!/bin/sh
 #
-# Simple wrapper for screen.
+# Simple wrapper for screen to list screens or attach to running session.
 #	- Cameron Simpson <cs@zip.com.au> 16apr2002
 #
 
@@ -16,23 +16,39 @@ usage="Usage:	$cmd				List sessions.
 	 exit 0
        }
 
-# options - run screen directly
-case "$1" in
-    -\?)	echo "$usage" >&2; exit 0 ;;
-    -*)		exec screen "$@" ;;
-esac
+badopts=
+scropts=
 
-[ $# = 1 ] || { echo "$usage" >&2; exit 2; }
+while :
+do  case $1 in
+      -[aAfilLmOqRsUvxX]|-f[na]|-ln)
+		scropts="$scropts $1" ;;
+      -[cdDerSt])
+		scropts="$scropts $1 $2"; shift ;;
+      --)	shift; break ;;
+      -?*)	echo "$cmd: unrecognised option: $1" >&2; badopts=1 ;;
+      *)	break ;;
+    esac
+    shift
+done
 
-case "$1" in
+if [ $# = 0 ]
+then  echo "$cmd: missing screen name or number" >&2; badopts=1
+else  name=$1; shift
+      [ $# = 0 ] || { echo "$cmd: extra arguments: $*" >&2; badopts=1; }
+fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+case "$name" in
     [1-9]|[1-9][0-9])
-	name=`scr | sed -n -e 's/	.*//' -e "$1p"`
-	[ -n "$name" ] || { echo "$cmd: no ${1}th session; available sessions:" >&2
+	n=$name
+	name=`scr | sed -n -e 's/	.*//' -e "${n}p"`
+	[ -n "$name" ] || { echo "$cmd: no ${n}th session; available sessions:" >&2
 			    scr >&2
 			    exit 1
 			  }
-	set x "$name"; shift
 	;;
 esac
 
-exec screen -a -x -r "$1"
+exec screen $scropts -a -A -x -r -e '' -h 10240 -l "$name"
