@@ -1,0 +1,24 @@
+#!/bin/sh
+#
+
+dither=
+case $X11_DEPTH,$X11_CLASS in
+    1,*)	;;
+    *,*Gr[ae]y)	dither=gray ;;
+    *)		dither=$dither ;;	# color only for full colour
+esac
+
+flags='-quiet -shmem_off'
+while :
+do  case $1 in
+	-dither)	dither=$2; shift ;;
+	-*)		flags="$flags $1" ;;
+	*)		break ;;
+    esac
+    shift
+done
+
+[ -n "$dither" ] && flags="$flags -dither $dither"
+
+exec 3>&1
+$REAL/mpeg_play $flags ${1+"$@"} 2>&1 1>&3 3>&- | grep -v '^Warning: ' >&2
