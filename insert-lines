@@ -1,0 +1,44 @@
+#!/bin/sh
+#
+# Insert lines from stdin into a file after a marker line identified by a
+# regexp.
+#	- Cameron Simpson <cs@zip.com.au> 01aug2004
+#
+
+: ${TMPDIR:=/tmp}
+
+cmd=`basename "$0"`
+usage="Usage: $cmd regexp file"
+
+badopts=
+
+if [ $# = 0 ]
+then
+  echo "$cmd: missing regexp" >&2
+  badopts=1
+else
+  re=$1; shift
+  if [ $# = 0 ]
+  then
+    echo "$cmd: missing files" >&2
+    badopts=1
+  else
+    file=$1; shift
+    if [ $# -gt 0 ]
+    then
+      echo "$cmd: extra arguments after file" >&2
+      badopts=1
+    fi
+  fi
+fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+tmpf=$TMPDIR/$cmd$$
+trap 'rm -f "$tmpf"' 0 1 15
+
+xit=0
+cat >"$tmpf" || exit 1
+
+bsed "/$re/r $tmpf" "$file" || xit=1
+exit $xit
