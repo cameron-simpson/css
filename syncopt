@@ -138,7 +138,9 @@ do
 	       s/  *\$//
 	       s/   */ /g
 	       /^$thing local\$/b local
+	       /^\* local\$/b local
 	       /^$thing nosync\$/b nosync
+	       /^\* nosync\$/b nosync
 	       /^$thing [^ ][^ ]* local\$/b vlocal
 	       /^$thing [^ ][^ ]*\$/b vers
 	       s/ /-/
