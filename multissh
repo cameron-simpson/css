@@ -32,6 +32,9 @@ do
     -u)	userpfx=$2@; shift ;;
     -n)	trace=echo ;;
     -x)	trace=set-x ;;
+    [a-zA-Z]*=*)
+	sshopts="$sshopts $1"
+	;;
     --)	shift; break ;;
     -?*) echo "$cmd: unrecognised option: $1" >&2; badopts=1 ;;
     *)	break ;;
