@@ -4,7 +4,8 @@
 #	- Cameron Simpson <cs@zip.com.au>
 #
 
-csinc=$HOME/include
+csinc=$HOME/rc/include
+LIB=${LIB:-$HOME/lib/$ARCH}
 
 cc=gccanal
 dold=1
@@ -27,6 +28,6 @@ ldargs=
 eval "## set -x
       $cc -DEBUG "'\
 	      "-I$csinc/cs/config/site/$SYSTEMID.$ARCH" \
-	      "-I$csinc" "-I/usr/local/include" \
+	      "-I$csinc" \
 	      ${1+"$@"} \
 	      '"$ldargs"
