@@ -24,7 +24,7 @@ set -x
 
 for args
 do
-    ( set vncserver $args -alwaysshared -fp "$fontpath"
+    ( set vncserver $args -alwaysshared ## -fp unix:7100 ## "$fontpath"
       alog "vnc-$HOST-$2" "$@"
     )
 done
