@@ -44,7 +44,6 @@ fi
 cd || exit 1
 [ -s "$HOME/rc/mail/muttsh.$mfolder" ] && . "$HOME/rc/mail/muttsh.$mfolder"
 export mfolder
-set -x
 exec \
 	term $termopts +ip -n "mutt $mfolder" \
 	scr "mutt_$mfolder" \
