@@ -1,5 +1,5 @@
 #!/bin/sh
-LOGDIR=${LOGDIR:-$HOME/var/log}
+: ${LOGDIR:=$HOME/var/log}
 exec >>"$LOGDIR/alert"
 colour=
 case $1 in -c) colour=$2; shift; shift; ;; esac
