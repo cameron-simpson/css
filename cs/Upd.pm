@@ -72,7 +72,7 @@ use strict qw(vars);
 BEGIN { use cs::DEBUG; cs::DEBUG::using(__FILE__);
       }
 
-# use cs::Misc;
+use cs::Misc;
 
 require 'flush.pl';
 
@@ -237,7 +237,7 @@ sub _diff($$)	 # (oldline,newline) -> updstr
   }
 
   if ($newline =~ /\t/)
-  { $newline=&'detab($newline);
+  { $newline=::detab($newline);
   }
 
   if ($clip > 0 && length($newline) > $clip)
