@@ -421,6 +421,13 @@ sub out
   $cs::Upd::This->{STATE}=$_;
 }
 
+sub Flush { local($cs::Upd::This)=shift; &flush; }
+sub flush
+{
+  my($F)=$cs::Upd::This->{FILE};
+  ::flush($F);
+}
+
 sub Err	{ local($cs::Upd::This)=shift; &err; }
 sub err	# (@errargs) -> void
 { my($old)=$cs::Upd::This->{STATE};
@@ -435,6 +442,7 @@ sub err	# (@errargs) -> void
     $cs::Upd::This->{ERRSTATE}=$old;
   }
   out('');
+  flush();
   print STDERR $msg;
   out($old);
 }
