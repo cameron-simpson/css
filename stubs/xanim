@@ -1,0 +1,27 @@
+#!/bin/sh
+#
+
+stdflags='-Ae +Sr +Wp +Zpe'
+colourflags=+CF4
+case $X11_DEPTH,$X11_CLASS in
+    1,*)	;;
+    *,*Gr[ae]y)	colourflags='+Cg' ;;
+    *)		colourflags='+C3' ;;
+esac
+
+case "$1" in
+    x[0-9]*)	n=`expr "$1" : 'x\(.*\)'`; shift
+		stdflags="+Ss$n $stdflags"
+		;;
+esac
+
+# +Cn use colours from default colour map
+#
+flags="$stdflags $colourflags"
+
+xanim=/usr/X11R6/bin/xanim
+case $SYSTEMID-$ARCH in
+    *-sun.sparc.solaris)	xanim=/opt/xanim/bin/xanim ;;
+esac
+set -x
+exec $xanim $flags ${1+"$@"}
