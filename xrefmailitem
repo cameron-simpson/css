@@ -1,0 +1,31 @@
+#!/bin/sh
+#
+# Crossfile mail item based on addresses.
+#	- Cameron Simpson <cs@zip.com.au> 24may2002
+#
+
+cmd=`basename "$0"`
+usage="Usage: $cmd [hdrs...] <mailitem"
+
+[ $# = 0 ] && set from to cc bcc
+
+MAILDIR=${MAILDIR:-$HOME/Mail}
+export MAILDIR
+
+tmp=/tmp/$cmd.$$
+
+trap 'rm -f "$tmp"' 0
+trap 'rm -f "$tmp"; exit 1' 1 15
+
+cat >"$tmp" || exit 1
+
+xit=0
+
+for addr in `hdraddrs -lc "$@" <"$tmp"`
+do  base=$addr
+    needdir "$MAILDIR/$base" || { xit=1; continue; }
+    mhdir "$MAILDIR/$base"
+    lock "$cmd" filemailitem "+$addr" <"$tmp"
+done
+
+exit $xit
