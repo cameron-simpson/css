@@ -11,12 +11,12 @@ cmd=`basename "$0"`
 ## exec 2>"$tty" >&2 0</dev/tty
 ## set -vx
 ## set x +t "$@"; shift
-##echo "[$*]" >&2
+## echo "apphelper: \$*=[$*]" >&2
 
 savedir=
 pager=${PAGER:-less}
 doview=$APPHELPER_DOVIEW
-savemode=${APPHELPER_SAVEMODE:-ask}
+savemode=${APPHELPER_SAVEMODE:-auto}
 extract=
 extract_globs=${APPHELPER_EXTRACT_GLOBS:-'*'}
 termname=$cmd
@@ -172,10 +172,15 @@ else
 	  # The default is to ask.
 	  #
 	  -Y)	savemode=yes ;;
+	  # =item -a
+	  #
+	  # Ask: ask to save the file even if the file's already there.
+	  #
+	  -a)	savemode=ask ;;
 	  # =item -A
 	  #
 	  # Auto: don't ask to save the file if the file's already there.
-	  # The default is to ask.
+	  # The default is to auto.
 	  #
 	  -A)	savemode=auto ;;
 	  # =item -X
@@ -340,7 +345,9 @@ if [ "x$savemode" = xauto ]
 then
   trysave=$savedir/$fbase
   if [ -s "$trysave" ] && cmp -s "$file" "$trysave"
-  then  savemode=no
+  then  echo "This file already saved:"
+	ls -ld "$trysave"
+	savemode=no
   else  savemode=ask
   fi
 fi
@@ -353,7 +360,33 @@ case "$savemode" in
 		while [ $repeat ]
 		do
 		  repeat=
-		  necho "Save [$savedir/$fbase]? "
+		  trysave=$savedir/$fbase
+		  if [ -s "$trysave" ]
+		  then
+		      if cmp -s "$file" "$trysave"
+		      then  echo "Exists, same data."
+		      else  echo "Different data."
+			    # pick a similar name
+			    case "$fbase" in
+			      *.*)	fext=`expr "x$fbase" : 'x.*\.\(.*\)'`
+					fpre=`basename "$fbase" ".$fext"`
+					;;
+			      *)	fpre=$fbase
+					if ftype=`file2mime "$file"`
+					then  fext=`mimeext "$ftype"` || fext=dat
+					else  fext=dat
+					fi
+					;;
+			    esac
+			    n=2
+			    while trysave2=$savedir/$fpre$n.$fext
+				  [ -s "$trysave2" ]
+			    do  n=`expr $n + 1`
+			    done
+			    trysave=$trysave2
+		      fi
+		  fi
+		  necho "Save [$trysave]? "
 		  read saveas || exit 0
 		  case "$saveas" in
 		    \!*)	repeat=1
@@ -372,7 +405,7 @@ case "$savemode" in
 				esac
 				;;
 		    ''|n|no)	saveas= ;;
-		    y|yes)	saveas=$savedir/$fbase ;;
+		    y|yes)	saveas=$trysave ;;
 		    [/~]*)	;;
 		    *)		saveas=$savedir/$saveas ;;
 		  esac
@@ -409,7 +442,7 @@ esac
 
 parent=`dirname "$saveas"`
 [ -d "$parent/." ] \
-|| if ask -y "mkdir $parent"
+|| if ask "mkdir $parent"
 then  mkdir -p "$parent" || exit 1
 else  exit 0
 fi
