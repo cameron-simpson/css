@@ -31,6 +31,8 @@ fi
 
 [ $# = 0 ] && exec cat "$dir/$param"
 
+exec >/dev/null
+
 needdir "$dir" || exit 1
 
 if [ "x$1" = x- ]
