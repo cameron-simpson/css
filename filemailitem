@@ -7,7 +7,8 @@
 
 : ${MAILDIR:=$HOME/mail}
 : ${TMPDIR:=/tmp}
-: ${VARLOG:=$HOME/var/log}
+: ${LOGDIR:=$HOME/var/log}
+
 mode=maildir
 
 cmd=$0
@@ -79,7 +80,7 @@ case "$mode" in
 	cat >"$tmpf" <<X || exit 1
 	MAILDIR=$MAILDIR
 	DEFAULT=$fpath/
-	LOGFILE=$VARLOG/procmail
+	LOGFILE=$LOGDIR/procmail
 X
 	procmail "$tmpf"
 	xit=$?
