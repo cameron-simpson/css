@@ -4,12 +4,14 @@
 #	- Cameron Simpson <cs@zip.com.au>
 #
 
-sysv=
-case $ARCH in
-    sun.*.solaris)	sysv=1 ;;	# AIX too?
-esac
-
-if [ $sysv ]
-then  echo "$*\\c"
-else  echo -nE "$*"
-fi
+printf "%s" "$*"
+exit 0
+##sysv=
+##case $ARCH in
+##    sun.*.solaris)	sysv=1 ;;	# AIX too?
+##esac
+##
+##if [ $sysv ]
+##then  echo "$*\\c"
+##else  echo -nE "$*"
+##fi
