@@ -15,7 +15,7 @@
 
 cmd=$0
 usage="Usage: $cmd [-v] [-w width] [-h height] [-x x-pos] [-y y-pos]
-		[-l lock] [-1 lock]
+		[-l lock] [-1 lock] [-j job]
 		[-f font] [-n name] [-big] [-small] [-keepio] [-xauthhack]
 		[{-c shellcmd}/{-e exec-list}/{-- raw-args}]"
 
@@ -59,6 +59,7 @@ do
     -e)		shift; break ;;
     -l)		lock=$2; shift ;;
     -1)		lock1=$1 lock=$2; shift ;;
+    -j)		WINJOB=$2; shift; export WINJOB ;;
     -ip)	dotrans=1 ;;
     +ip)	dotrans= ;;
     -sh)	shade=$2; shift ;;
@@ -101,6 +102,12 @@ dolock=
 [ -n "$lock" ] && dolock="lock $lock1 \"\$lock\""
 
 termcmd='ttysane $dolock "$@"'
+if [ -n "$WINJOB" ]
+then
+  qWINJOB=`shqstr "$WINJOB"`
+  termcmd="winjob $qWINJOB $termcmd"
+fi
+
 case "$TERM,$DISPLAY" in
     *,?*)
 	termopts="$termopts -title \"\$title\""
