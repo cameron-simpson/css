@@ -1,2 +1,2 @@
 #!/bin/sh
-exec bgproc ${1+"$@"}
+exec bgproc -p - ${1+"$@"}
