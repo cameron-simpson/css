@@ -1,0 +1,19 @@
+#!/bin/sh
+#
+# Put ~ in place of the user's home directory.
+# Usually a postfilter for psa and psu.
+#	- Cameron Simpson <cs@zip.com.au>
+#
+
+sedf=
+
+[ -n "$BIN" ] && sedf="$sedf
+		       s:$BIN/:\$BIN/:g"
+
+[ -n "$USER" ] && sedf="$sedf
+		        s:/u/$USER/:~/:g"
+
+[ -n "$HOME" ] && sedf="$sedf
+		        s:$HOME/:~/:g"
+
+exec sed "$sedf"
