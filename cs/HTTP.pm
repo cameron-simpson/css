@@ -1,4 +1,4 @@
-#!/usr/bin/perl
+#!/usr/bin/perl=1;
 #
 # Do HTTP-related client stuff.
 #	- Cameron Simpson <cs@zip.com.au>
@@ -67,27 +67,27 @@ $cs::HTTP::E_GTIMEOUT	='503';	# gateway timeout - subservices didn't
 				# respond in time
 
 sub new	# (host[,port]) -> connection
-	{ my($class,$host,$port,$isProxy)=@_;
-	  $port=$cs::HTTP::Port if ! defined $port;
-	  $isProxy=0 if ! defined $isProxy;
+{ my($class,$host,$port,$isProxy)=@_;
+  $port=$cs::HTTP::Port if ! defined $port;
+  $isProxy=0 if ! defined $isProxy;
 
-	  my($this);
+  my $this;
 
-	  # warn "HTTP: calling new TCP($host,$port)";
-	  $this=new cs::Net::TCP ($host,$port);
-	  return undef if ! defined $this;
+  ## warn "HTTP: calling new TCP($host,$port)";
+  $this=new cs::Net::TCP ($host,$port);
+  return undef if ! defined $this;
 
-	  $this->{HOST}=lc($host);
-	  $this->{PORT}=$port;
-	  $this->{ISPROXY}=$isProxy;
+  $this->{HOST}=lc($host);
+  $this->{PORT}=$port;
+  $this->{ISPROXY}=$isProxy;
 
-	  bless $this, $class;
-	}
+  bless $this, $class;
+}
 
 sub DESTROY
-	{ my($this)=@_;
-	  $this->SUPER::DESTROY($this);
-	}
+{ my($this)=@_;
+  $this->SUPER::DESTROY($this);
+}
 
 # strangely, we supply everything before getting a response
 # simpler, I guess
@@ -137,28 +137,28 @@ sub Request	# (method,uri,[hdrs,[data,[version-string]]])
   ############################
   # Supply data if present.
   if (defined $data)
-	{
-	  while (defined ($_=$data->Read()) && length)
-		{ $this->Put($_);
-		}
-	}
+  {
+    while (defined ($_=$data->Read()) && length)
+    { $this->Put($_);
+    }
+  }
 
   $this->Flush();
 
   ############################
   # Collect response.
   if (! defined ($_=$this->GetLine()) || ! length)
-	{
-	  warn "EOF from HTTP server";
-	  return ();
-	}
+  {
+    warn "EOF from HTTP server";
+    return ();
+  }
 
   chomp;	s/\r$//;
   if (! /^(http\/\d+\.\d+)\s+(\d{3})\s*/i)
-	{
-	  warn "bad response from HTTP server: $_";
-	  return ();
-	}
+  {
+    warn "bad response from HTTP server: $_";
+    return ();
+  }
 
   my($rversion,$rcode,$rtext)=($1,$2,$');
   $hdrs=new cs::RFC822 $this->{IN};
