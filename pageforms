@@ -1,0 +1,12 @@
+#!/bin/sh
+#
+# Return the FORMs in a web page.
+#	- Cameron Simpson <cs@zip.com.au> 03mar99
+#
+
+htmlopt=
+[ "x$1" = x-html ] && { htmlopt=$1; shift; }
+
+[ $# = 1 ] || { echo "Usage: $0 [-html] url" >&2; exit 2; }
+
+wcat "$1" | htforms $htmlopt
