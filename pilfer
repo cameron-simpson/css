@@ -14,10 +14,12 @@
 #			replace URL list with output.
 #
 
+: ${TMPDIR:=/tmp}
+
 verbose=
 [ -t 2 ] && verbose=1
 
-tmp=/tmp/pilfer.$$
+tmp=$TMPDIR/pilfer.$$
 
 xit=0
 
