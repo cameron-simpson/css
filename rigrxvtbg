@@ -1,0 +1,53 @@
+#!/bin/sh
+#
+# Regularly run setrxvtbg in the background, then exec command.
+#	- Cameron Simpson <cs@zip.com.au> 31aug2000
+#
+
+cmd=`basename "$0"`
+usage="Usage: $cmd [-f] [-p shellpid] [-i interval] [cmd [args...]]"
+
+force=
+shellpid=$$
+period=${RXVTBGINTERVAL:-300}
+
+badopts=
+while :
+do
+  case $1 in
+    -p)	shellpid=$2; shift ;;
+    -i)	period=$2; shift ;;
+    -e)	shift; break ;;
+    -f)	force=1 ;;
+    --)	shift; break ;;
+    -?*)echo "$cmd: unrecognised option: $1" >&2
+	badopts=1
+	;;
+    *)	break ;;
+  esac
+  shift
+done
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+[ $# = 0 ] && { set x "${SHELL:-/bin/sh}"; shift; }
+
+# notice resizes - doesn't seem to work - shell job control to blame?
+[ -n "$SIGWINCH" ] && trap '( lock -s setrxvtbg setrxvtbg & )' "$SIGWINCH"
+
+if [ $force ] \
+|| { wantrxvtbg \
+  && xrdb -query | grep 'DORXVTBG:.*true' >/dev/null
+   }
+then
+    RXVTBGLOG=`rxvtbglog`
+    export RXVTBGLOG
+    (
+      while kill -0 "$shellpid" && { [ $force ] || wantrxvtbg; }
+      do  rawx lock setrxvtbg nice setrxvtbg -l "$RXVTBGLOG"
+	  sleep "$period" || exit 1
+      done
+    ) &
+fi
+
+exec "$@"
