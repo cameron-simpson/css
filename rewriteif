@@ -15,7 +15,7 @@ file=$1; shift
 [ -f "$file" ] || { echo "$0: $file: not a regular file" >&2; exit 1; }
 
 tmp=$TMPDIR/rwi$$
-trap 'rm "$tmp"' 0 1 2 15
+trap 'rm "$tmp"' 0 1 2 13 15
 
 cat >"$tmp" || exit 1
 
