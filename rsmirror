@@ -1,0 +1,397 @@
+#!/bin/sh
+#
+# Maintain mirrors of rsync repositories.
+#	- Cameron Simpson <cs@zip.com.au> 25aug2000
+#
+# =head1 NAME
+#
+# rsmirror - maintain a local mirror of portions of rsync servers
+#
+# =head1 SYNOPSIS
+#
+# B<rsmirror> [B<-n>] [B<-v>] [B<-f> I<config>] [B<-d> I<dir>] [B<-t> I<secs>] [I<server>B<::>I<root>...]
+#
+# =head1 DESCRIPTION
+#
+# I<rsmirror> reads a configuration file
+# to obtain a list of rsync servers and repository information
+# and keeps a local mirror up to date.
+#
+
+cf=.mirror
+where=.
+verbose=
+trace=
+[ -t 1 ] && verbose=1
+timeout=
+
+cmd=`basename "$0"`
+usage="Usage: $cmd [-n] [-v] [-f config] [-d dir] [[server]::root...]
+	-n -v		Passed to rsync.
+	-f config	Read config from this file. Default: $cf
+	-d dir		Install mirrors here. Default: $where
+	-t secs		Timeout each update after secs seconds."
+
+rsopts=
+rszopt=-z
+rsxopts=
+
+# =head1 OPTIONS
+#
+# =over 4
+#
+
+badopts=
+while :
+do  case $1 in
+
+	# =item B<-n>
+	#
+	# No action. Passed to the rsync command.
+	#
+	# =item B<-v>
+	#
+	# Verbose. Passed to the rsync command.
+	#
+	-n)	trace=1 rsopts="$rsopts $1" ;;
+	-v)	trace=1 verbose=1 rsxopts="$rsxopts $1"
+		;;
+
+	# =item B<-z>
+	#
+	# Use rsync compression.
+	#
+	# =item B<+z>
+	#
+	# Don't use rsync compression.
+	#
+	-z)	rszopt=-z ;;
+	+z)	rszopt= ;;
+
+	# =item B<-f> I<config>
+	#
+	# Read the configuration information from the file I<config>
+	# instead of from the B<.mirror> file.
+	#
+	-f)	cf=$2; shift ;;
+
+	# =item B<-d> I<dir>
+	#
+	# Make the root of the mirror I<dir>.
+	# By default the current directory is the root.
+	#
+	-d)	where=$2; shift ;;
+
+	# =item B<-t> I<secs>
+	#
+	# Timeout each update after I<secs> seconds.
+	# Note: this prepends the B<--partial> option
+	# to the rsync command options
+	# so that you can pick up where you left off later.
+	#
+	-t)	timeout=$2; shift ;;
+
+	# =item B<--I<long-option>>
+	#
+	# Any B<--I<long-option>> is also passed to I<rsync>.
+	#
+	--?*)	rsxopts="$rsxopts $1" ;;
+	--)	shift; break ;;
+	-?*)	echo "$cmd: unrecognised option: $1" >&2
+		badopts=1
+		;;
+	*)	break ;;
+    esac
+    shift
+done
+
+# =item [I<server>]B<::>I<root>
+#
+# If any B<I<server>::I<root>> or B<::I<root>> arguments are present,
+# act only on those lines in the file.
+#
+# =back
+#
+
+[ -d "$where/." ] || { echo "$cmd: directory \"$where\" missing" >&2
+		       badopts=1
+		     }
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+tracecmd=:
+[ $trace ] && tracecmd='set -x'
+
+timelimit=
+[ -n "$timeout" ] && { timelimit="timeout $timeout"
+		       rsopts="--partial $rsopts"
+		     }
+
+[ "x$cf" = x- ] || exec <"$cf"
+
+# =head1 CONFIGURATION FILE FORMAT
+#
+# The configuration file
+# is normally named B<.mirror>
+# and contains lines describing repositories to mirror.
+# Blank lines and lines commencing with an octothorpe (B<#>)
+# are discarded.
+# Other lines are of the form:
+#
+# [I<method>] I<server> I<root> [I<localroot>] [I<options>...]
+#
+# Presently, the only defined I<method> is the word B<rsync>.
+# If omitted, I<method> defaults to B<rsync>
+# (and in consequence I<server> should be a FQDN).
+#
+# The I<server> is an IP address or hostname
+# as may be passed to the rsync(1) command.
+#
+# The I<root> is the subtree of the I<server>'s mirror
+# that is to be copied.
+#
+# The optional I<localroot>
+# specifies where to place the subtree at this end.
+# If omitted, the value of I<root> is used.
+# I<localroot> may not commence with a dash(B<->)
+# (in order to distinguish it from I<options>).
+# If I<localroot> does not commence with a slash (B</>)
+# it is taken relative to I<dir>.
+#
+# Options specific to this particular line
+# may then follow, typically I<rsync>'s B<--include=> and B<--exclude=>
+# options.
+# The special option B<--latest>
+# may be specified as the first of these options;
+# it causes the mirror to only include the latest version
+# of versioned files
+# (eg "B<foo-1.2.tar.gz>")
+# from mirrors such as the GNU one
+# which keep multiple instances of software releases,
+# which eases your local disc space burden.
+# See the latest(1) script.
+#
+
+xit=0
+lineno=0
+while read how host path lpath opts
+do
+    lineno=`expr $lineno + 1`
+    pfx="$cmd: $cf, line $lineno"
+
+    # skip comments and blanks
+    case "$how" in
+      ''|\#*)	continue ;;
+    esac
+
+    # see if "rsync" default method omitted
+    case "$how" in
+	*.*)	opts="$lpath $opts"
+		lpath=$path
+		path=$host
+		host=$how
+		how=rsync
+		;;
+    esac
+
+    # see if lpath omitted
+    case "$lpath" in
+      -*)	opts="$lpath $opts"
+		lpath= ;;
+      ?*)	;;
+    esac
+
+    # special option "--latest" - must be first
+    case "$opts" in
+	--latest|--latest\ *)
+	    latest=1
+	    opts=`expr "x$opts" : 'x--latest *\(.*\)'`
+	    ;;
+	*)  latest=
+	    ;;
+    esac
+
+    # lpath == path, normally
+    [ "x$lpath" = x ] && lpath=$path
+
+    # check if only doing some mirrors
+    if [ $# -gt 0 ]
+    then
+      case " $* " in
+	*" $host::$path "*|*" ::$path "*)
+	  ;;
+	*)
+	  [ $verbose ] && echo "$pfx: skipping $host::$path"
+	  continue
+	  ;;
+      esac
+    fi
+
+    # compute full path
+    fpath=$lpath
+    case $fpath in /*) ;; *) fpath=$where/$fpath ;; esac
+    [ -d "$fpath/." ] \
+	|| mkdir -p "$fpath" \
+	|| { echo "$pfx: mkdir $fpath fails, skipping $host::$path" >&2
+	     xit=1
+	     continue
+	   }
+
+    # =head2 Per Mirror Configuration
+    #
+    # There is an additional facilty for overly complex I<options>.
+    # For each line a check is made for a file named:
+    #
+    # I<config>-I<method>-I<server>-I<root-trans>
+    #
+    # where I<config> is the name of the main configuration file
+    # and I<root-trans> is the I<root> string with slashes (B</>)
+    # replaced by colons (B<:>).
+    #
+    # For the I<method> B<rsync>
+    # the presence of this file causes the option:
+    #
+    # B<--include-from=>I<config>-I<method>-I<server>-I<root-trans>
+    #
+    # to be prepended to the options passed to rsync.
+    # This is a I<much> more succinct and readable way to pass complicated
+    # include/exclude patterns to I<rsync>.
+    #
+    allcf=$cf-$how
+    extracf=$cf-$how-$host-`echo $path|tr / :`
+    case $how in
+      rsync)
+	[ -s "$allcf" ] && opts='"--include-from=$allcf" '$opts
+	[ -s "$extracf" ] && opts='"--include-from=$extracf" '$opts
+
+	if [ $latest ]
+	then
+	    latelist=/tmp/$cmd-late$$
+	    latedir=/tmp/latest$$
+	    if mkdir "$latedir"
+	    then
+		eval "rsync -n -rlHt \$rsopts $opts \"\$host::\$path/.\" \"\$latedir/.\"" \
+		| fgrep -v ' -> ' \
+		| latest -V -o >$latelist
+		rmdir "$latedir"
+
+		opts="'--include-from=$latelist' '--include=*/' '--exclude=*' --delete-excluded $opts"
+	    fi
+	fi
+
+	eval \
+	  "($tracecmd; $timelimit rsync -rlHt \$rszopt \$rsxopts \$rsopts $opts \"\$host::\$path/.\" \"\$fpath/.\")" \
+	  || xit=1
+	[ $latest ] && rm -f "$latelist"
+	;;
+      *)echo "$pfx: method \"$how\" not supported" >&2
+	xit=1
+	;;
+    esac
+done
+
+exit $xit
+
+# =head1 EXAMPLES AND TIPS
+#
+# My nightly mirror run reads:
+#
+# B<rsmirror -v -t 3600>
+#
+# This produces a log of the update in my email
+# and prevents a huge update or a misconfiguration at my end
+# from using my link forever.
+#
+# Here is part of the mirror file for CISRA:
+#
+#	rsync mirror.aarnet.edu.au rsync
+#	rsync mirror.aarnet.edu.au samba
+#	rsync mirror.aarnet.edu.au redhat/updates/6.1/i386
+#	rsync mirror.aarnet.edu.au redhat/updates/6.1/noarch
+#	rsync mirror.aarnet.edu.au redhat/updates/6.2/i386
+#	rsync mirror.aarnet.edu.au redhat/updates/6.2/alpha
+#	rsync mirror.aarnet.edu.au redhat/updates/6.2/noarch
+#	rsync mirror.aarnet.edu.au apache
+#	rsync mirror.aarnet.edu.au apache-ssl
+#	rsync mirror.aarnet.edu.au sunfreeware/sparc
+#	rsync mirror.aarnet.edu.au rfc
+#
+# You can find out what is available like this:
+#
+#	rsync mirror.aarnet.edu.au::
+#
+# (That's a command, not a line from the B<.mirror> file).
+# You can then check out what's inside by putting a simple
+# line in your B<.mirror> file:
+#
+#	rsync mirror.aarnet.edu.au redhat
+#
+# and saying:
+#
+#	rsmirror -v -n mirror.aarnet.edu.au::redhat
+#
+# which runs a verbose no-action run of just that line.
+# Examine the output and start tuning your include/exclude list.
+# For anything complex you'll probably want to make a per-mirror
+# config file, which for the above example would be named:
+#
+#	.mirror-rsync-mirror.aarnet.edu.au-redhat
+#
+# See the B<--include-from=> option from the rsync(1) manual entry
+# for details on the format.
+#
+# There is also an optional config file:
+#
+#	.mirror-rsync
+#
+# which will be used before the per-mirror file.
+# Ours just says:
+#
+#	- .nfs[0-9]*
+#
+# which ignores NFS tempoprary files.
+#
+# =head1 CAUTION
+#
+# It is I<very> easy to request ludicrous quantities of data with this program.
+# Always make trial runs with the B<-n> and B<-v> flags
+# before using in any noninteractive context.
+# Also, think carefully about what you mirror.
+# It is easy to waste more bandwidth by mirroring
+# unnecessary stuff instead of only what you will really benefit from.
+# Finally,
+# try to mirror from a nearby host
+# such as your local country or ISP mirror service
+# if possible.
+#
+# =head1 CAVEATS
+#
+# As you may imagine,
+# the rsync protocol does not use your web proxy.
+# If you're mirroring popular stuff you may wish to do the initial
+# fetch of a lot of the big stuff with an HTTP-based tool like
+# I<wget> or I<curl> or I<lynx>.
+# That way the data are in your web cache
+# in case someone does a fetch before your mirror is up to speed.
+#
+# Remember, mirrors are a waste of resources if not used.
+# Make sure your site's population is well aware of your mirror
+# and encouraged to consult first it and then your nearest archive site
+# before hammering the origin server of any significant data
+# they want.
+#
+# The rsync(1) invocation used in rsmirror
+# does not preserve permissions or owners or groups
+# (because they are meaningless for public data like this).
+# I run our nightly mirror with a umask(1) of B<002>
+# and arrange group access to allow our sysadmin team
+# to manipulate the mirror.
+#
+# =head1 SEE ALSO
+#
+# rsync(1), wget(1), curl(1), lynx(1), latest(1cs), timeout(1cs)
+#
+# =head1 AUTHOR
+#
+# Cameron Simpson E<lt>cs@zip.com.auE<gt> 25 August 2000
+#
