@@ -95,6 +95,8 @@ sub ary2csv
 sub a2csv($)
 { local($_)=@_;
 
+  return $_ if /^[1-9a-z.\-][\w.\-]*$/i;
+
   s/"/$&$&/g;
 
   return "\"$_\"";
