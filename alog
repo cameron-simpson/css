@@ -23,6 +23,8 @@ case "$logfile" in
     *)	logfile=$varlog/$logfile ;;
 esac
 
-ignhup "$@" >>"$logfile" 2>&1 </dev/null &
+exec </dev/null
+exec >>"$logfile" 2>&1
+ignhup "$@" &
 
 exit 0
