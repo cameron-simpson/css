@@ -7,4 +7,4 @@
 
 FVWM_MENU_IMLIST_OP=${FVWM_MENU_IMLIST_OP:-"xv"}
 export FVWM_MENU_IMLIST_OP
-lastn ${1+"$@"} | reverse | fvwm-menu-imlist -l - .
+lastn ${1+"$@"} | reverse | fvwm-menu-imlist -l - RecentImages
