@@ -44,22 +44,22 @@ sub Digest
 }
 
 sub md5file
-	{ my($filename)=shift;
-	  $cs::MD5::_MD5proc=(new cs::MD5) if ! defined $cs::MD5::_MD5proc;
-	  return undef if ! defined $cs::MD5::_MD5proc;
-	  $cs::MD5::_MD5proc->Digest($filename);
-	}
+{ my($filename)=shift;
+  $cs::MD5::_MD5proc=(new cs::MD5) if ! defined $cs::MD5::_MD5proc;
+  return undef if ! defined $cs::MD5::_MD5proc;
+  $cs::MD5::_MD5proc->Digest($filename);
+}
 
 sub md5string
-	{ my($s)=new cs::PipeDecode (sub { ### warn "exec($cs::MD5::_MD5_PATH)";
-					   exec($cs::MD5::_MD5_PATH);
-					   ### warn "/*NOTREACHED*/";
-					 }, [],
-				     ARRAY,[ shift ]);
-	  return undef if ! defined $s;
-	  local($_)=$s->GetLine();
-	  /^([\da-f]{32})\s/ && return $1;
-	  return undef;
-	}
+{ my($s)=new cs::PipeDecode (sub { ### warn "exec($cs::MD5::_MD5_PATH)";
+				   exec($cs::MD5::_MD5_PATH);
+				   ### warn "/*NOTREACHED*/";
+				 }, [],
+			     ARRAY,[ shift ]);
+  return undef if ! defined $s;
+  local($_)=$s->GetLine();
+  /^([\da-f]{32})\s/ && return $1;
+  return undef;
+}
 
 1;
