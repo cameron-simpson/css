@@ -1,0 +1,21 @@
+#!/bin/sh
+
+ptopts=
+while :
+do  case $1 in
+      +?*)	ptopts="$ptopts $1" ;;
+      *)	break ;;
+    esac
+    shift
+done
+
+case $ARCH in
+    *.*.solaris)	exec pt $ptopts -e ;;
+    *.*.linux)		exec pt $ptopts wax ;;
+    *.*.*bsd|*.*.ultrix|*.*.domainos|*.*.sunos)
+			exec ps agxuww ;;
+    *)			echo "$0: don't know how to psa when ARCH=\"$ARCH\"" >&2
+			exit 1
+			;;
+esac \
+| entilde
