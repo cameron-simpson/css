@@ -1,0 +1,103 @@
+#!/usr/bin/perl
+#
+# Read RFC822 message from stdin and emit it in HTML form.
+#	- Cameron Simpson <cs@zip.com.au>
+#
+
+require 'cs/html.pl';
+require 'cs/msgid.pl';
+
+($cmd=$0) =~ s:.*/::;
+
+$pwd=`pwd`; chop($pwd);
+
+eval <<'XX'
+	sub html'msgid2html
+		{ # die "msgid2html not implemented";
+		  local($id)=shift;
+		  local($filename,$ref);
+		  if (defined($filename=&msgid'findlink($id,"^$pwd/")))
+			{ $ref="$ENV{SCRIPT_NAME}/$filename";
+			}
+		  else
+	  	  { local($shortid)=$id;
+		    $shortid =~ s/^<(.*)>$/$1/;
+		    $ref="news:$shortid";
+		  }
+
+		  &html'href($id,$ref);
+		}
+XX
+;
+die "$cmd: eval fails: $@" if $@;
+
+undef %fields;
+$inhdr=1;
+@hdrlines=();
+LINE:
+  while (<STDIN>)
+	{ $lineno=$.;
+	  if ($inhdr)
+		{ if (/^$/)
+			{ $inhdr=0;
+			  &hdr;
+			  &summarise;
+			  print '<PRE>';
+			  print "\n";
+			}
+		  elsif (/^\s/)
+			{ push(@hdrlines,$_);
+			}
+		  else	{ &hdr;
+			  @hdrlines=($_);
+			}
+		}
+	  else
+	  { s/\n$//;
+	    $_=&html'news2html($_);
+	    if (/^(\s*)([^<&\s]+)/)
+		{ $_="$1<A NAME=$lineno>$2</A>$'";
+		}
+
+	    print $_, "\n";
+	  }
+	}
+print "</PRE>\n";
+
+sub summarise
+	{ $title=$fields{'subject'};
+	  print "<H1>", &html'raw2html($title), "</H1>\n";
+	  H: for $h ('from','organization','date','keywords',
+		'message-id','references','reply-to')
+		{ next H unless length($fields{$h});
+		  next H if $h eq 'reply-to'
+			 && $fields{$h} eq $fields{'from'};
+		  print $Fields{$h},
+			': ', &html'news2html($fields{$h}),
+			"<BR>\n";
+		}
+
+#	  if (length($fields{'message-id'}))
+#		{ local(@children)=&ptx'parent2children($fields{'message-id'});
+#		  if (@children)
+#			{ print "Followups: ",
+#				&html'news2html(join(' ',@children)),
+#				"<BR>\n";
+#			}
+#		}
+	}
+
+sub hdr	{ local($H,$h,$_);
+
+	  $_=join('',@hdrlines);
+	  if (/^([^:]*):\s*/)
+		{ $H=$h=$1; $_=$';
+		  $h =~ tr/A-Z_/a-z-/;
+		  $fields{$h}=$_;
+		  $Fields{$h}=$H;
+		  # print $H, ': ', &html'news2html($_);
+		}
+	  else
+	  { print &html'news2html($_);
+	  }
+	}
