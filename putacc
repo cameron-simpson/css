@@ -5,53 +5,66 @@ cd || exit 1
 [ $# -ge 1 ] || { echo "Usage: $0 [login@]hostname" >&2; exit 2; }
 host=$1; shift
 
+hasrsync=1
+rrsync=rsync
+
 if [ $# = 0 ]
 then
     set .profile .zprofile .zshrc .zshenv .setvar \
-		  rc/shell rc/env rc/perl rc/vi rc/nvi rc/x11 \
+		  rc/shh rc/shell rc/env rc/perl rc/vi rc/nvi rc/x11 \
 		  .less .lesskey rc/less rc/lesskey \
-		  .xinitrc .xsession
+		  .xinitrc .xsession \
+		  scripts bin
+    hARCH=$ARCH
 fi
 
 case "$host" in
-    agricola|tw|barstool)
-	first=1
-	for arg
-	do  [ $first ] && { set rsync -avHPC --rsh=ssho --include=rc
-			    first=
-			  }
-	    set "$@" "--include=/$arg"
-	done
-	set -x
-	"$@" \
-		'--exclude=/scripts/CHANGELOG.txt' \
-		'--exclude=/scripts/CHANGELOG.html' \
-		'--exclude=/scripts/0README.txt' \
-		'--exclude=/scripts/defunct' \
-		'--exclude=/scripts/3rdparty' \
-		'--exclude=/rc/*' '--exclude=/*' \
-		"$HOME/." "$host:."
-	;;
-    *)	first=1
-	for f
-	do
-	    [ $first ] && { set x; shift; }
-	    if [ -d "$f/." ]
-	    then
-		( cd "$f" || exit 1
-		  pwd
-		  set -x
-		  tar cf - "." \
-		  | ssho "$host" "set -vx; rm -rf '$f'; [ -d '$f/.' ] || mkdir -p '$f' || exit 1; cd '$f/.' || exit 1; exec tar xf -"
-		)
-	    else
-		set x ${1+"$@"} "$f"; shift
-	    fi
-	    first=
-	done
-	if [ $# -gt 0 ]
-	then
-	    (set -x; tar cf - "$@" | ssho "$host" exec tar xf -)
-	fi
+    ivory|[ab].squid)
+	hasrsync=
 	;;
 esac
+
+rsinc=/tmp/putacc$$
+
+files=
+targs=
+for arg
+do
+  case "$arg" in
+      scripts)
+	targ="$arg there/home/$arg"
+	;;
+      bin)
+	targ="$arg there/home/$arg/$hARCH"
+	;;
+      *)targ=$arg ;;
+  esac
+  for target in $targ
+  do
+    if [ $hasrsync ]
+    then
+	if [ -d "$target" ]
+	then
+	    ( set -x
+	      ssh "$host" "[ -d '$target/.' ] || mkdir -p '$target'" || exit 1
+	      exec rsync -avH --delete "$target/." "$host:$target/."
+	    )
+	else
+	    ( set -x
+	      exec rsync -avH "$target" "$host:$target"
+	    )
+	fi
+    else
+	targs="$targs $target"
+    fi
+  done
+done
+
+if [ $hasrsync ]
+then
+    : rsync -avH --delete "--rsync-path=$rrsync" 
+else
+    (set -x; tar cf - $targs | ssho "$host" "rm -f $targs; exec tar xf -")&
+fi
+
+wait
