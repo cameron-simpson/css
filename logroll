@@ -17,8 +17,8 @@ usage="Usage: $0 [-m max] [-p {pid|procname}] [-s signal] [-v] [-z] \\
 	-m max			Max logrolls (default: no max).
 	-p {pid|procname}	Process id or name to kill.
 	-s signal		Signal to send (default $sig).
-	+daycode		Use .yyyymmdd as extension.
-	+datecode		Use .yyyymmddhhmmss as extension.
+	+daycode		Use .yyyy-mm-dd as extension.
+	+datecode		Use .yyyy-mm-dd:mm:mss as extension.
 	+format			Date-like extension for rolled log.
 				Collisions get rolled too.
 	-x extension		Arbitrary extension for rolled log.
