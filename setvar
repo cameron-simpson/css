@@ -326,7 +326,7 @@ sub fromfile
 sub untilde($)
 { local($_)=@_;
 
-  s;\~(\w*);(! length($`) || substr($tmp,-1,1) eq ':')
+  s;\~(\w*);(! length($`) || substr($`,-1,1) eq ':')
 		? (length($1) ? userdir($1) : $ENV{HOME})
 		: $&;eg;
 
