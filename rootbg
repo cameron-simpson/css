@@ -45,7 +45,7 @@ then
     imagefile=$1; shift
 else
     # used to use BGPATH=$WALLPAPER - possibly redundant
-    imagefile=`bglist -r -n 1 -w ${1+"$@"}`
+    imagefile=`bglist -r -n 1 -w !tiles !comics !funny ${1+"$@"}`
 
     ok=1
     if [ -z "$imagefile" ]
@@ -64,7 +64,7 @@ echo "$imagefile"
 
 if [ $xplanet ]
 then
-    imdir=$HOME/etc/im
+    imdir=$HOME/im
     backdrop=$imagefile
     projdir=$imdir/projections
     clouddir=$projdir
