@@ -1,6 +1,4 @@
-#!/usr/bin/perl -w
-#
-# Usage: ring [-a] [-f file]... patterns...
+#!/usr/bin/perl
 #
 # Look up phone lists. Each entry has a non-blank in column one.
 #	- Cameron Simpson
