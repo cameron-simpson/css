@@ -16,7 +16,7 @@ xit=1
 rmf=$wkdir
 trap '[ -z "$rmf" ] || rm -rf $rmf; exit $xit' 0
 
-pgpid=${PGPID-$EMAIL}
+pgpid=${PGPID:-$EMAIL}
 
 bak=$pgpfile.`datecode`
 cp "$pgpfile" "$bak" || { rm -f "$bak"; exit 1; }
@@ -57,3 +57,5 @@ else
 	  ls -ld "$pgpfile" "$bak" >&2
     fi
 fi
+
+exit $xit
