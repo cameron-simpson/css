@@ -1,0 +1,157 @@
+#!/usr/bin/perl
+#
+# Patch passwd file to match user db.
+#	- Cameron Simpson <cs@zip.com.au> 20nov97
+#
+
+use strict qw(vars);
+
+use CISRA::UserData;
+
+($::cmd=$0) =~ s:.*/::;
+
+$::PWFile='nispasswd';	# we expect to run in the nis CVS checkout
+
+if (@ARGV)
+{ $::PWFile=shift(@ARGV);
+}
+
+die "$::cmd: extra arguments: @ARGV\n" if @ARGV;
+
+die "$::cmd: $::PWFile: must be non-empty\n" if ! -s $::PWFile;
+
+die "$::cmd: $::PWFile: can't read: $!\n" if ! open(PW,"< $::PWFile\0");
+
+my(@pw,%pw);
+
+{ my($login);
+
+  while (defined($_=<PW>))
+  { push(@pw,$_);
+
+    if (/^([^:]+):/)
+    { $login=$1;
+
+      if (exists $pw{$login})
+      { warn "$::PWFile, line $.: dup entry for $login\n";
+      }
+      else
+      { $pw{$login}=$#pw;
+      }
+    }
+  }
+}
+
+close(PW);
+
+my($U)=CISRA::UserData::db();
+my($u,$crypt,$gid,$gecos,$home,$shell,$pwndx,@pwline,$exp,$uext);
+
+USER:
+  for my $login (sort keys %pw)
+  { next USER if ! defined ($u=CISRA::UserData::user($login));
+
+    $pwndx=$pw{$login};
+    $_=$pw[$pwndx];
+    chomp;
+    @pwline=split(/:/);
+
+    $crypt=$pwline[1];
+    $gid  =$pwline[3];
+    $gecos=$pwline[4];
+    $home =$pwline[5];
+    $shell=$pwline[6];
+
+    if (! exists $u->{HOMEDIR})
+    { warn "$::cmd: no HOMEDIR field in user db for $login; passwd has \"$home\"\n";
+    }
+    elsif ($home ne $u->{HOMEDIR})
+    { warn "$::cmd: changed homedir from \"$home\" to \"$u->{HOMEDIR}\"\n";
+      $home=$u->{HOMEDIR};
+    }
+
+    if (! length $crypt)
+    { warn "$::cmd: empty passwd for \"$login\"! replaced with \"*\"\n";
+      $crypt='*';
+    }
+
+    my $prefext = $u->{EXT};
+    $prefext=2000 if ! length $prefext;
+    my($prefphone)=($prefext =~ /-/ ? $prefext : "9805-$prefext");
+
+    if (! $u->IsCurrent())
+    { $prefphone='9805-2000';
+
+      if ($crypt ne '*')
+      { warn "$::cmd: inactive user $login: active crypt field! replaced with \"*\"\n";
+	$crypt='*';
+      }
+
+      if ($shell ne '/bin/false')
+      { warn "$::cmd: inactive user $login: active shell! replaced with /bin/false\n";
+	$shell='/bin/false';
+      }
+
+      if ($home !~ m:^/usr/local/archive/.:)
+      { warn "$::cmd: inactive user $login: home dir not moved to archive area!\n";
+      }
+    }
+    else
+    {
+      if ($crypt ne '*' && $shell eq '/bin/false')
+      { warn "$::cmd: active user $login: valid password but no shell!\n";
+      }
+    }
+
+    if ($gecos =~ /^\s*([^\s,][^,]*[^\s,])\s*,\s*(.*)\s*,\s*(.*)/)
+    { my($name,$desk,$phone,$tail)=($1,$2,$3,$');
+
+      if ($name ne $u->{NAME})
+      { warn "$::cmd: $login: changed name from \"$name\" to \"$u->{NAME}\"\n";
+	$name=$u->{NAME};
+      }
+      if ($desk ne $u->{DESK})
+      { warn "$::cmd: $login: changed desk from \"$desk\" to \"$u->{DESK}\"\n";
+	$desk=$u->{DESK};
+      }
+      if ($phone ne $prefphone)
+      { warn "$::cmd: $login: changed phone from \"$phone\" to $prefphone\n";
+	$phone=$prefphone;
+      }
+
+      $gecos="$name,$desk,$phone$tail";
+    }
+    elsif ($gecos eq $u->{NAME})
+    { warn "$::cmd: $login: added extension and desk to name\n";
+      $gecos.=",$u->{DESK},$prefphone";
+    }
+    else
+    { my($prefgecos)="$u->{NAME},$u->{DESK},$prefphone";
+
+      warn "$::cmd: $login: gecos should be:\n".
+	   "\t\t$prefgecos\n".
+	   "\tbut instead it's totally weird ($gecos)\n";
+    }
+
+    $pwline[1]=$crypt;
+    $pwline[3]=$gid;
+    $pwline[4]=$gecos;
+    $pwline[5]=$home;
+    $pwline[6]=$shell;
+    $pw[$pwndx]=join(':',@pwline)."\n";
+  }
+
+for my $login (sort keys %$U)
+	{ my $u = CISRA::UserData::user($login);
+	  warn "$::cmd: $login in user db but not in file $::PWFile!\n"
+		if ! exists $pw{$login}
+		&& $u->Alive()
+		&& ! grep($_ eq EXT, $u->Ilk())
+		;
+	}
+
+die "$::cmd: can't rewrite $::PWFile: $!\n" if ! open(PW,"> $::PWFile\0");
+print PW @pw;
+close(PW);
+
+exit 0;
