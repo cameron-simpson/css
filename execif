@@ -4,6 +4,8 @@
 #	- Cameron Simpson <cs@zip.com.au> 23jun98
 #
 
+: ${TMPDIR:=/tmp}
+
 cmd=$0
 usage="Usage: $cmd command [args...]"
 
@@ -11,7 +13,7 @@ usage="Usage: $cmd command [args...]"
 
 trap 'rm -f "$tmp"; exit 1' 1 15
 
-tmp=/tmp/execif.$$
+tmp=$TMPDIR/execif.$$
 sed -n -e '/^[ 	]*$/d
 	   :again
 	   p
