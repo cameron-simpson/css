@@ -1,0 +1,34 @@
+#!/bin/sh
+#
+# Remove a file from CVS control.
+#	- Cameron Simpson <cs@zip.com.au> 09apr97
+#
+
+xit=0
+
+for arg
+do  case $arg in
+	*/*)	echo "$0: can't uncvs names with a / - skipping $arg" >&2
+		xit=1
+		continue
+		;;
+    esac
+
+    if [ -f .$$ -o -d .$$ ]
+    then
+	echo "$0: temporary file \".$$\" already exists, skipping $arg" >&2
+	xit=1
+	continue
+    fi
+
+    if mv "$arg" .$$
+    then
+	cvs rm "$arg" && cvs commit -l -m '' "$arg" || xit=$?
+	mv .$$ "$arg" \
+		|| { echo "$0: warning: $arg is still called .$$ !" >&2
+		     xit=$?
+		   }
+    fi
+done
+
+exit $xit
