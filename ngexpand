@@ -16,7 +16,7 @@ usage="Usage: $cmd {host|@ng|!host|!ng}..."
 	      }
 
 hl=$TMPDIR/nge$$
-trap 'rm -f "$hl"' 0 1 15
+trap 'rm -f "$hl"' 0 1 2 13 15
 
 >>"$hl"
 
