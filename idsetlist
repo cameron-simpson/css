@@ -10,7 +10,7 @@ use strict qw(vars);
 
 ($::cmd=$0) =~ s:.*/::;
 $::Usage="Usage: $::cmd idsetdir fields...
-	-d idsetdir	Specify the directory holding the idset.
+	idsetdir	Specify the directory holding the idset.
 ";
 
 if (! @ARGV)
