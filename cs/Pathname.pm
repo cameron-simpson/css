@@ -64,8 +64,9 @@ sub catpath($$)
   "$dir/$path";
 }
 
-sub absname($$)
+sub absname($;$)
 { my($path,$dir)=@_;
+  $dir=pwd() if ! defined $dir;
 
   return $path if $path =~ m:^/:;
   return catpath($dir,$path);
