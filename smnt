@@ -31,6 +31,8 @@ fi
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
+: ${WORKGROUP:=$SYSTEMID}
+
 set -x
-mount -t smbfs -o "username=$user,workgroup=CISRA,uid=$user,fmask=644,dmask=755" "$share" "$mnt" || exit 1
+mount -t smbfs -o "username=$user,workgroup=$WORKGROUP,uid=$user,fmask=644,dmask=755" "$share" "$mnt" || exit 1
 L "$mnt"
