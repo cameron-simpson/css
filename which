@@ -1,0 +1,286 @@
+#!/usr/bin/perl
+#
+# Locate a command.	- Cameron Simpson <cs@zip.com.au>
+#
+
+use strict vars;
+
+use POSIX;
+use Getopt::Std;
+use cs::Misc;
+use cs::Pathname;
+use cs::Upd;
+
+$::Xit=0;
+
+{ my $badopts=0;
+
+  undef $::LinkDir;
+  undef $::ExecTest;
+  $::ListAll=-t STDOUT;
+  $::ListSubDirs=0;
+  $::Silent=0;
+  $::Verbose=0;
+  $::MergeMode=0;
+  $::DoUnlink=1;
+  $::MergeMode=0;
+  $::SearchPath=$ENV{PATH};
+
+  $::Usage="Usage: $::cmd [-1] [-a] [-d dir] [-m] [-M] [-p path] [-v] \\
+		[-c if-copy] [-x is-executable]
+		[--] commands...
+	-1	List only the first instance.
+		Default if output is not a terminal.
+	-a	List all instances of commands.
+		Default if output is a terminal.
+	-c	Specify copy-if test for path in \$_. Used if link fails.
+		_ already represents a stat(\$_).
+	-d	Make links to dir for commands, or all entries in \$::SearchPath
+		if no commands supplied.
+	-D	Examine subdirectories.
+	-m	Merge; ignore entries already in the directory specified
+		by -d, above.
+	-M	Modified merge; ignore the above entries only if they are
+		files with more than one link.
+	-p	Specify path. Default is \$::SearchPath.
+	-s	Silent.
+	-U	Suppress unlink phase.
+	-v	Verbose.
+	-x	Specify is-executable test for path in \$_.
+		_ already represents a stat(\$_).
+";
+
+  getopts("1ad:mMp:vc:x:") || ($badopts=1);
+
+  $::ListAll=0 if defined $::opt_1;
+  $::ListAll=1 if defined $::opt_a;
+  $::LinkDir=$::opt_d if defined $::opt_d;
+  $::ListSubDirs=1 if defined $::opt_D;
+  $::MergeMode=1 if defined $::opt_m || defined $::opt_M;
+  $::MultiMergeMode=1 if defined $::opt_M;
+  $::SearchPath=$::opt_p if defined $::opt_p;
+  if (defined $::opt_s)	{ $::Silent=1; $::Verbose=0; }
+  if (defined $::opt_v)	{ $::Silent=0; $::Verbose=1; }
+  $::DoUnlink=0 if defined $::opt_U;
+  $::ExecTest=$::opt_x if defined $::opt_x;
+
+  die $::Usage if $badopts;
+}
+
+@::SearchPath=grep(length,split(':',$::SearchPath));
+
+if (! defined $::LinkDir)
+{
+  $::Xit=1;
+
+  WCMD:
+  for (@ARGV)
+  { my @paths = which($_, !$::ListAll);
+    $::Xit=0 if @paths;
+    for (@paths)
+    { print "$_\n";
+    }
+
+    last WCMD if @paths && ! $::ListAll;
+  }
+
+  exit $::Xit;
+}
+
+$::Xit=0;
+
+my %seen;
+my @NAMES = cs::Pathname::dirents($::LinkDir);
+
+if ($::MergeMode)
+{ if (! $::MultiMergeMode)
+  { seen(@NAMES);
+  }
+  else
+  { my @s;
+
+    seen(grep((! -l "$::LinkDir/$_"	# force lstat()
+		&& -f _
+		&& ((@s=stat), $s[3] > 1 )
+	       ), @NAMES));
+  }
+}
+
+if (@ARGV)
+{ for (@ARGV)
+  { mrgdir($::LinkDir, which($_,1)) || ($::Xit=1);
+  }
+}
+else
+{
+  for my $dir (@::SearchPath)
+  {
+    my @names=cs::Pathname::dirents($dir);
+    if (! @names)
+    { my @dirnames;
+
+      warn "$::cmd: nothing in $dir? using original contents as list\n";
+      if (! @dirnames)
+      { @dirnames=cs::Pathname::dirents($::LinkDir);
+	warn "$::cmd: nothing in $::LinkDir?\n" if ! @dirnames;
+      }
+      
+      if (@dirnames)
+      { @names=grep(/^[^.]/, @dirnames);
+      }
+    }
+
+    my @mrg = ();
+    if (@names)
+    { for my $n (sort @names)
+      { my $path = cs::Pathname::catpath($dir,$n);
+	$::Silent || out($path);
+	if (defined $seen{$n})
+	{ push(@mrg,$path);
+	}
+	elsif (! stat($path))
+	{ # warn "$::cmd: stat($path): $!\n";
+	}
+	elsif (! $::ListSubDirs && -d _)
+	{
+	}
+	elsif (checkout($path))
+	{ $::Silent || nl($path);
+	  push(@mrg,$path);
+	}
+	else
+	{
+	}
+      }
+    }
+
+    mrgdir($::LinkDir,@mrg);
+  }
+
+  out('');
+}
+
+if (! $::MergeMode && $::DoUnlink)
+{ for (sort grep(!$seen{$_},@NAMES))
+  { my $ldpath=cs::Pathname::catpath($::LinkDir,$_);
+    $::Silent || out("unlink $ldpath");
+    unlink($ldpath) || warn "$::cmd: unlink $ldpath: $!\n";
+  }
+  out('');
+}
+
+exit $::Xit;
+
+sub seen	# @names
+{ for (@_) { $seen{$_}=1; }
+}
+
+sub mrgdir	# ($::LinkDir,@paths) -> ok
+{ my($linkdir,@paths)=@_;
+
+  my $ok=1;
+  my($base,$src,$dest,$slink,$subok);
+
+  warn "mrgdir(dir=$::LinkDir, paths=[@paths])\n";
+  PATH:
+    for my $path (@paths)
+    { $src=$path;
+      $base=basename($src);
+      if (defined $seen{$base})
+      { $::Verbose && warn "skip $src\n";
+	next PATH;
+      }
+
+      if (!(@_=stat($src)))
+      { warn "$::cmd: stat($src): $!\n";
+	next PATH;
+      }
+
+      $dest=cs::Pathname::catpath($::LinkDir,$base);
+      if (-e $dest && !unlink($dest))
+      { warn "$::cmd: unlink($dest): $!\n";
+	next PATH;
+      }
+
+      # follow symlink
+      while (-l $src
+	  && defined($slink=readlink($src))
+	  && $slink =~ /^\//)
+      { $src=$slink;
+      }
+
+      if (link($src,$dest))
+      { $::Silent || warn "link $src\n";
+	&seen($base);
+	next PATH;
+      }
+
+      if (symlink($src,$dest))
+      { $::Silent || warn "soft $src\n";
+	&seen($base);
+	next PATH;
+      }
+
+      warn "symlink($src,$dest): $!\n";
+      $ok=0;
+    }
+
+  return $ok;
+}
+
+# copy file preserving mode
+sub copy	# ($from,$to) -> ok
+{ my($from,$to)=@_;
+
+  if (! unlink($to)
+   && $! != &ENOENT)
+  { warn "$::cmd: unlink($to): $!\n";
+    return 0;
+  }
+
+  copy($from,$to) && cs::Pathname::cpperm($from,$to);
+}
+
+sub checkout	# is it executable
+{ local($_)=@_;
+
+  if (defined($::ExecTest))
+  { eval $::ExecTest;
+  }
+  elsif (stat($_))
+  { -f _ && -x _;
+  }
+  else
+  { $::Verbose && warn "$::cmd: can't stat $_: $!\n";
+    0;
+  }
+}
+
+sub which	# ($::SearchPath,$first) -> @paths
+{ my($srch,$onceonly)=@_;
+
+  my @paths=();
+  if ($srch =~ m,^/, || m,^\.\.?\/,)
+  { if (! stat $srch)
+    { warn "$::cmd: stat $srch: $!\n";
+    }
+    else
+    { checkout($srch) && push(@paths,$srch);
+    }
+  }
+  else
+  { LINKIT:
+    for $::LinkDir (@::SearchPath)
+    { my $ldpath = cs::Pathname::catpath($::LinkDir,$srch);
+      if (! stat $ldpath)
+      { $::Verbose && warn "$::cmd: stat $ldpath: $!\n";
+      }
+      elsif (checkout($ldpath))
+      { push(@paths,$ldpath);
+	last LINKIT if $onceonly;
+      }
+    }
+  }
+
+  return @paths;
+}
