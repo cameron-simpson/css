@@ -200,6 +200,7 @@ done
 if [ $raw ]
 then
     int=
+    async=
     if [ $# = 0 ]
     then
       echo "$cmd: missing clause names" >&2
@@ -244,70 +245,89 @@ setenv()
   fi
 }
 
-doclause()
+# list a clause with syntax cleaning
+listclause()
 {
-  for clause
-  do
-    winclause "$cf" "$clause" \
-    | sed -e 'y/	/ /' \
-	  -e 's/^  *//' \
-	  -e '/^#/d' \
-	  -e '/^$/d' \
-    | while read op etc
-      do
-	if [ "x$op" = xuse ]
-	then
-	  eval "subclause=$etc"
-	  [ $noaction ] && echo "USE $subclause" >&2
-	  doclause $subclause
-	else
-	  echo "$op $etc"
-	fi
-      done
-  done
+  winclause "$cf" "$1" \
+  | sed -e 'y/	/ /' \
+	-e 's/^  *//' \
+	-e '/^#/d' \
+	-e '/^$/d'
 }
 
-doops()
+# list a clause as a set of shell-safe strings for evaluation
+shqclause()
 {
-  : ${SYSTEMID:=home}
-  : ${LOCATION:=$SYSTEMID}
-  while read op etc
+  listclause "$1" \
+  | sed -e "s/'/'\\\\''/g" -e "s/.*/'&'/" \
+  | tr '\012' ' '
+}
+
+# =head1 CONFIGURATION FILE FORMAT
+#
+# The configuration file
+# resembles a Windows ".ini" file.
+# Blank lines and lines commencing with an octothorpe (`#')
+# are considered comments and discarded.
+#
+# The remainder consists of clauses marked out by lines of the form:
+#
+#	[name]
+#
+# where I<name> is the clause name.
+#
+# Clauses contain the following types of lines:
+#
+# =over 4
+#
+runqueue()
+{
+  while [ $# -gt 0 ]
   do
-    [ $noaction ] && echo "$op $etc"
-    # =head1 CONFIGURATION FILE FORMAT
-    #
-    # The configuration file file
-    # resembles a Windows ".ini" file.
-    # Blank lines and lines commencing with an octothorpe (`#')
-    # are comments, and discarded.
-    #
-    # The remainder consists of clauses marked out by lines of the form:
-    #
-    #	[name]
-    #
-    # where I<name> is the clause name.
-    #
-    # Clauses contain the following types of lines:
-    #
-    # =over 4
-    #
-    # =item B<use> I<clauses...>
-    #
-    # Process the named I<clauses> in order at this point.
-    #
+    opline=$1; shift
+    ##echo "POPQUEUE $opline"
+    case "$opline" in
+	*' '*)	op=` expr "x$opline" : 'x\([^ ]*\) .*'`
+		etc=`expr "x$opline" : 'x[^ ]*  *\(.*\)'`
+		;;
+	*)	op=$opline etc= ;;
+    esac
     case "$op" in
+      # =item B<use> I<clauses...>
+      #
+      # Process the named I<clauses> in order at this point.
+      #
+      use)
+	[ $noaction ] && echo "$opline"
+	use1=`   expr "x$etc" : 'x\([^ ]*\).*'`
+	if [ -n "$use1" ]
+	then
+	  usemore=`expr "x$etc" : 'x[^ ]* *\(.*\)'`
+	  if [ -n "$usemore" ]
+	  then
+	    ##echo "PUSHQUEUE USE $usemore"
+	    set -- "use $usemore" ${1+"$@"}
+	  fi
+	  eval "use1=$use1"
+	  shuse=`shqclause "$use1"`
+	  ##echo "PUSHQUEUE $shuse"
+	  eval "set -- $shuse "'${1+"$@"}'
+	fi
+	;;
+
       # =item I<var>B<=>I<value>
       #
       # Set the environment variable named I<var> to the value I<value>.
       # If the B<-E> option was used, also record the value in I<envfile>.
       #
       [a-zA-Z]*=*)
-	      var=`expr "$op" : '\([^=]*\)=.*'`
-	      eval "$op"
-	      export $var
-	      eval "val=\$$var"
-	      setenv "$var" "$val"
-	      ;;
+	var=`expr "$op" : '\([^=]*\)=.*'`
+	eval "$op"
+	export $var
+	eval "val=\$$var"
+	setenv "$var" "$val"
+	;;
+
       # =item /path/to/dir/ [template-dir]
       #
       # Prepare the specified directory from a template.
@@ -319,23 +339,28 @@ doops()
       # Otherwise, the directory is made identical to the template
       # with rsync(1).
       #
-      /*/)    : ${where:=$LOCATION}
-	      to=`expr "x$op" : 'x\(.*\)/'`
-	      from=
-	      if [ -n "$etc" ]
-	      then  set -- "$etc.$where" "$etc.DFLT" "$etc"
-	      else  set -- "$to.$where" "$to.DFLT"
-	      fi
-	      for d
-	      do  [ -d "$d/." ] && { from=$d; break; }
-	      done
-	      if [ -n "$from" ]
-	      then
-		$trace rsync -aH "$from/." "$to/."
-	      else
-		echo "$cmd: no master dir @$where for $to" >&2
-	      fi
-	      ;;
+      /*/)
+	: ${where:=$LOCATION}
+	: ${where:=$RC_MOBILE_WHERE}
+
+	to=`expr "x$op" : 'x\(.*\)/'`
+	tplt=$etc
+	[ -n "$tplt" ] || tplt=$to
+
+	from=
+	for d in "$tplt.$where" "$tplt.DFLT" "$tplt"
+	do  [ "x$d" = "x$to" ] && continue
+	    [ -d "$d/." ] && { from=$d; break; }
+	done
+
+	if [ -n "$from" ]
+	then
+	  $trace rsync -aH "$from/." "$to/."
+	else
+	  echo "$cmd: no master dir @$where for $to" >&2
+	fi
+	;;
+
       # =item /path/to/file [template-file]
       #
       # Prepare the specified file from a template.
@@ -348,31 +373,37 @@ doops()
       # If neither is present, the target file is unchanged.
       # Otherwise, the file is made identical to the template with cp(1).
       #
-      /*)     : ${where:=$LOCATION}
-	      to=$op
-	      from=
-	      if [ -n "$etc" ]
-	      then  set -- "$etc.$where" "$etc.DFLT" "$etc"
-	      else  set -- "$to.$where" "$to.DFLT"
-	      fi
-	      for f
-	      do  [ -f "$f" ] && { from=$f; break; }
-	      done
-	      if [ -n "$from" ]
-	      then
-		$trace cp -p "$from" "$to"
-	      else
-		echo "$cmd: no master file @$where for $to" >&2
-	      fi
-	      ;;
+      /*)
+	: ${where:=$LOCATION}
+	: ${where:=$RC_MOBILE_WHERE}
+
+	to=$op
+	tplt=$etc
+	[ -n "$tplt" ] || tplt=$to
+
+	from=
+	for f in "$tplt.$where" "$tplt.DFLT" "$tplt"
+	do  [ "x$f" = "x$to" ] && continue
+	    [ -f "$f" ] && { from=$f; break; }
+	done
+
+	if [ -n "$from" ]
+	then
+	  $trace cp -p "$from" "$to"
+	else
+	  echo "$cmd: no master file @$where for $to" >&2
+	fi
+	;;
+
       # =item ! I<shell command...>
       #
       # The specified I<shell command> is run synchronously.
       #
       \!*)
-	      shcmd=`expr "x$op $etc" : 'x.\(.*\)'`
-	      $trace /bin/sh -c "$shcmd"
-	      ;;
+	shcmd=`expr "x$op $etc" : 'x.\(.*\)'`
+	$trace /bin/sh -c "$shcmd"
+	;;
+
       # =item svc I<service...>
       #
       # The named I<service>s are started asynchronously.
@@ -392,8 +423,10 @@ doops()
       # or simply make symbolic links of suitable names;
       # I have not yet needed to do this myself.
       #
-      svc)    bgsvc $etc
-	      ;;
+      svc)
+	bgsvc $etc
+	;;
+
       # =item need I<service...>
       #
       # Require the named I<service>s' startup scripts
@@ -402,10 +435,14 @@ doops()
       # dispatch them as for the B<svc> directive
       # and then wait for them.
       #
-      need)   needsvc $etc
-	      ;;
-      *)      echo "$cmd: unrecognised operator \"$op\": $op $etc" >&2
-	      ;;
+      need)
+	needsvc $etc
+	;;
+
+      *)
+	echo "$cmd: unrecognised operator \"$op\": $op $etc" >&2
+	;;
+
     esac
     # =back
     #
@@ -475,7 +512,7 @@ then
     # just the specified clause and its subsidiaries are run.
     #
     where=
-    doclause $rawclauses | { doops; wait; }
+    set -- "use $rawclauses"
 else
     # =head2 Startup Mode
     #
@@ -515,8 +552,11 @@ else
     # make available to subprocesses and user environment
     setenv RC_MOBILE_WHERE "$where"
 
-    doclause GLOBAL "@$where" FINAL | { doops; [ $async ] || wait; }
+    set -- "use GLOBAL @$where FINAL"
 fi
+
+runqueue "$@"
+[ $async ] || wait
 
 # =head1 FILES
 #
