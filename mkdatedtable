@@ -1,0 +1,38 @@
+#!/bin/sh
+#
+# Create a dated table in a database.
+#	- Cameron Simpson <cs@zip.com.au> 06may2004
+#
+
+cmd=$0
+usage="Usage: $cmd db.table"
+
+badopts=
+
+if [ $# = 0 ]
+then  echo "$cmd: missing db.table" >&2
+      badopts=1
+else  dbtable=$1; shift
+      case $dbtable in
+	[a-zA-Z]*.[a-zA-Z]*) ;;
+	*)	echo "$cmd: bad db.table: $dbtable" >&2
+		badopts=1
+		;;
+      esac
+
+      [ $# = 0 ] || { echo "$cmd: extra arguments after db.table: $*" >&2
+		      badopts=1
+		    }
+fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+mys <<SQL
+create table $dbtable
+(
+  ID int(11) NOT NULL auto_increment,
+  START_DATE date NOT NULL,
+  END_DATE date NOT NULL,
+  PRIMARY KEY  (ID)
+);
+SQL
