@@ -4,6 +4,8 @@
 #	- Cameron Simpson <cs@zip.com.au>
 #
 
+: ${LOGDIR:=$HOME/var/log}
+
 cmd=$0
 usage="Usage: $cmd [-n] [-v] logspec [logpath]"
 
@@ -35,7 +37,7 @@ esac
 
 case "$path" in
     /*)	;;
-    *)	path=$HOME/var/log/$path ;;
+    *)	path=$LOGDIR/$path ;;
 esac
 
 dir=`dirname "$path"`
@@ -44,6 +46,6 @@ dir=`dirname "$path"`
 >>"$path"
 
 logmap -s "$spec" "$path" || exit $?
-echo "mklog: `date` $spec=$path" >> $HOME/var/log/mklog
+echo "mklog: `date` $spec=$path" >> $LOGDIR/mklog
 
 [ -z "$verbose" ] || echo "$path"
