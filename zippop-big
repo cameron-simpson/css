@@ -1,0 +1,2 @@
+#!/bin/sh
+exec ssh zip nc bigmail.zip.com.au 110
