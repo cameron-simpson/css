@@ -695,7 +695,7 @@ sub delDatedRecord
   my ($sql, @args) = sqlWhereText("UPDATE $table SET END_DATE = ?", @delwhere);
   $sql .= " AND START_DATE <= ? AND ISNULL(END_DATE)";
 
-  warn "delDatedRecord: SQL=\n$sql\n";
+  ##warn "delDatedRecord: SQL=\n$sql\n";
 
   my $sth = sql($dbh, $sql);
   if (! defined $sth)
