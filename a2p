@@ -1,0 +1,56 @@
+#!/usr/bin/perl
+#
+# Yet another ASCII to PostScript.
+#	- Cameron Simpson <cs@zip.com.au> 10may97
+#
+
+use cs::Misc;
+
+$NormalFont='Courier';
+$BoldFont='Courier-Bold';
+$PointSize=10;
+$VerticalSpacing=12;
+
+print "%!PS_Adobe-1.0\n";
+prefix();
+
+while (defined ($_=<>))
+	{ chomp;
+	  s/\s+$//;
+	  $_=detab($_);
+	  s/[()]/\\$&/g;
+	  print "($_) show nl\n";
+	}
+
+print "showpage\n";
+
+exit 0;
+
+sub prefix
+	{ print <<X
+		clippath pathbbox
+		/x1 /y1 /x2 /y2 pop def pop def pop def pop def
+		/dx x2 x1 sub def
+		/dy y2 y1 sub def
+		/startpage { x1 y2 $PointSize sub moveto
+			   } def
+		/nl   	   { x1
+			     currentpoint $VerticalSpacing sub dup
+			     y1 lt
+			     { pop pop
+			       showpage
+			       startpage
+			     }
+			     { moveto
+			     }
+			     ifelse
+			   } def
+		/normalfont /$NormalFont findfont $PointSize scalefont def
+		/boldfont /$BoldFont findfont $PointSize scalefont def
+		/normal    { normalfont setfont } def
+		/bold      { boldfont setfont } def
+
+		startpage
+		normal
+X
+	}
