@@ -179,7 +179,7 @@ then
 fi
 
 cachedir=`dirname "$cachefile"`
-needdir "$cachedir" || exit 1
+[ -d "$cachedir/." ] || needdir "$cachedir" || exit 1
 ##set -x
 gm "$@" -quality 100 png:- <"$imagefile" >"$cachefile" || { rm -f "$cachefile"; exit 1; }
 echo "$cachefile"
