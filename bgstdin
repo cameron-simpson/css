@@ -7,14 +7,22 @@
 : ${VARLOG:=$HOME/var/log}
 : ${CONSOLE:=$VARLOG/console}
 
-[ $# = 0 ] && { echo "Usage: $0 [-s|-C] command [args...] <input" >&2; exit 2; }
+cmd=$0
+usage="Usage: $cmd [-s|-C] command [args...] <input
+	-s	Silent. Send stdout and stderr to /dev/null.
+	-C	Console. Send stdout and stderr to \$CONSOLE."
+
+output=
+case $1 in
+  -s)	output=/dev/null; shift ;;
+  -C)	output=$CONSOLE; shift ;;
+esac
+
+[ $# = 0 ] && { echo "$usage" >&2; exit 2; }
 
 exec 3<&0
 ( exec 0<&3 3<&-
-  case "$1" in
-    -s) shift; exec >/dev/null 2>&1 ;;
-    -C) shift; exec >>"$CONSOLE" 2>&1 ;;
-  esac
+  [ -n "$output" ] && exec >>"$output" 2>&1
   exec "$@"
 ) &
 
