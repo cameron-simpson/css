@@ -163,6 +163,8 @@ do
 
 	       # just set version
 	       /^$thing [^ ][^ ]*\$/b vers
+
+	       # discard unrecognised stuff
 	       d
 	       :local
 	       s/.*/makelocal=1 nosync=/
