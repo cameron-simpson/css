@@ -1,0 +1,112 @@
+#!/bin/sh
+#
+# - Cameron Simpson <cs@zip.com.au>
+#
+
+usage="Usage: $0 [-f] [-r] [files...]
+	-f	Force overwrite.
+	-r	Recurse."
+
+badopts=
+flags=
+fflag=
+recurse=
+while :
+do  case "$1" in
+	-f)	fflag=1; flags="$flags $1" ;;
+	-r)	recurse=1 ;;
+	-?*)	echo "$0: unrecognised option: $1" >&2; badopts=1 ;;
+	*)	break ;;
+    esac
+    shift
+done
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+if [ $recurse ]
+then
+    xit=0
+    for dir in `find ${1+"$@"} ${1-.} -type d -print|sort`
+    do  ( cd "$dir" || exit $?
+	  echo "$dir ..."
+	  exec "$0" $flags
+	) || xit=$?
+    done
+
+    exit $xit
+fi
+
+[ $# = 0 ] && { case $0 in
+		    *bmp2jpg)	set x *.bmp ;;
+		    *pnm2jpg)	set x *.pnm ;;
+		    *jpg2pnm)	set x *.jpg ;;	# implemented through a hack
+		    *tif2jpg)	set x *.tif *.tiff ;;
+		    *gif2jpg)	set x *.gif ;;
+		    *png2jpg)	set x *.png ;;
+		esac
+		shift
+	      }
+
+tmp=/tmp/t$$
+xit=0
+
+for i
+do
+    case "$i" in
+	\*.gif|\*.tif|\*.tiff|\*.pnm|\*.jpg)
+		     continue ;;	# unmatched pattern, ignore
+	*-small.gif) continue ;;	# thumbnail, ignore
+	*.gif)	j=`exec expr "$i" : '\(.*\).gif'`.jpg ;;
+	*.tif)	j=`exec expr "$i" : '\(.*\).tif'`.jpg ;;
+	*.tiff)	j=`exec expr "$i" : '\(.*\).tiff'`.jpg ;;
+	*.pnm)	j=`exec expr "$i" : '\(.*\).pnm'`.jpg ;;
+	*.png)	j=`exec expr "$i" : '\(.*\).png'`.jpg ;;
+	*.jpg)	j=`exec expr "$i" : '\(.*\).jpg'`.pnm ;;
+	*.bmp)	j=`exec expr "$i" : '\(.*\).bmp'`.jpg ;;
+	*)	j=$i.jpg ;;
+    esac
+    necho "$i -> $tmp" >&2
+    case "$i" in
+	*.bmp)	bmptoppm < "$i" | cjpeg >"$tmp" ;;
+	*.tiff|*.tif)	tifftopnm < "$i" | cjpeg >"$tmp" ;;
+	*.pnm)	cjpeg < "$i" > "$tmp" ;;
+	*.png)	pngtopnm < "$i" | cjpeg > "$tmp" ;;
+	*.jpg)	djpeg -pnm < "$i" > "$tmp" ;;
+	*)	cjpeg < "$i" > "$tmp" ;;
+    esac
+    if [ $? != 0 ]
+    then
+	rm -f "$tmp"
+	xit=1
+    else
+	s1=`fls '%s' "$i"`
+	s2=`fls '%s' "$tmp"`
+	pcnt=`echo $s1 $s2 - 100 \* $s1 / p | dc`
+	necho " (${pcnt}% compression)" >&2
+	if [ -n "$fflag" ] \
+	|| [ ! -s "$j" -a $s1 -gt $s2 ]
+	then
+	    necho " -> $j" >&2
+	    cat "$tmp" > "$j" && rm -f "$tmp" "$i" && echo >&2 \
+		|| xit=$?
+	else
+	    if [ $s1 -le $s2 ]
+	    then
+	      necho ", bigger ($s1 -> $s2), $j not made" >&2
+	      rm -f "$tmp" && echo >&2 || xit=1
+	    else
+	      if cmp "$tmp" "$j"
+	      then
+		necho ", same as $j; $i removed" >&2
+		rm -f "$tmp" "$i" && echo >&2 || xit=$?
+	      else
+		necho "$tmp and $j differ, discarding $tmp, $i remains" >&2
+		rm -f "$tmp" && echo >&2
+		xit=1
+	      fi
+	    fi
+	fi
+    fi
+done
+
+exit $xit
