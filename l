@@ -1,2 +1,2 @@
 #!/bin/sh
-exec ls -CF ${1+"$@"}
+exec ls -aCF ${1+"$@"}
