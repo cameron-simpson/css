@@ -16,7 +16,7 @@ syncezos-rc
 
 rsync -avHPW --delete --exclude=CVS/ --exclude=/kath $ezos/html/. ezos:public_html/.
 
-syncezos-cgi
-rsync -avHPW --delete --exclude=CVS/ $ezos/cgi-bin/. ezos:cgi-bin/.
+##syncezos-cgi
+##rsync -avHPW --delete --exclude=CVS/ $ezos/cgi-bin/. ezos:cgi-bin/.
 
 putacc ezos
