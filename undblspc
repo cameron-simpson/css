@@ -1,0 +1,44 @@
+#!/usr/bin/perl
+#
+# Strip double spacing from text.
+# Try to cope with mixtures and nondoublespaced text.
+#	- Cameron Simpson <cs@zip.com.au> 26mar2000
+#
+
+$inbreak=1;
+$count=0;
+
+while (<>)
+{ chomp;
+  s/\s+$//;
+
+  if (length)
+  {
+    print $_, "\n";
+
+    /^\s*/;
+    $pfx=$&;
+
+    if ($inbreak)
+    {
+      $parapfx=$pfx;
+    }
+    elsif ($pfx eq $parapfx)
+    { $count++;
+    }
+    else
+    { $count=1;
+      $parapfx=$pfx;
+    }
+  }
+  else
+  {
+    if (! $inbreak)
+    {
+      # close off real paragraphs
+      print "\n" if $count > 1;
+
+      $inbreak=1;
+    }
+  }
+}
