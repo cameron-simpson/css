@@ -358,16 +358,19 @@ fi
 # insert paper setting outside postscript
 [ -n "$paper" ] && lp="( echo \"\$paper\"; cat ) | $lp"
 
-for arg
-do
+( for arg
+  do
     ## [ "x$itype" = xmentor ] && set -x
-    eval "$filter $lp" <"$arg" &
+    eval "$filter $lp" <"$arg"
     ## set +x
-done
+  done
 
-[ -z "$tmp" ] || ( sleep 2; rm "$tmp" ) || xit=$?
+  [ -z "$tmp" ] || ( sleep 2; rm "$tmp" ) || xit=$?
 
-[ -z "$lpqflag" ] || lpq "$printer" -l || xit=$?
+  [ -z "$lpqflag" ] || lpq "$printer" -l || xit=$?
+
+  exit $xit
+) &
 
 exit $xit
 
