@@ -525,7 +525,7 @@ sub followDatedRecords($$$$$$$;$)
 		  $id,$when,$when);
 
   if (!$sth)
-  { warn "$::cmd: followDatedRecords($srctable,$srcfield=$id -> $desttable.$desttablefield) fails";
+  { ##warn "$::cmd: followDatedRecords($srctable,$srcfield=$id -> $desttable.$desttablefield) fails";
     return ();
   }
 
