@@ -1,0 +1,70 @@
+#!/bin/sh
+#
+# Consult my .ftprc file and construct my ftp directory.
+#
+
+cd
+
+[ -r .ftprc ] || { echo "$0: no .ftp file" >&2 ; exit 1 ; }
+
+ftpdir=/usr/spool/ftp/pub/$USER
+
+[ -d "$ftpdir" ] || { echo "$0: no ftp directory for $USER" >&2 ; exit 1 ; }
+
+rm -rf "$ftpdir"/*
+
+Mkdir()
+{
+	mode=$1
+	shift
+	while [ $# -gt 0 ]
+	do
+		[ -d "$1" ] ||
+		case "$1" in
+			*/*)	{ Mkdir "$mode" "`exec expr x\"\$1\" : x'\(.*\)/.*'`" &&
+				  { [ -d "$1" ] || mkdir "$1" ; } &&
+				  chmod "$mode" "$1" &&
+				  echo "mkdir $1" >&2
+				} || return 1
+				;;
+			*)	{ { [ -d "$1" ] || mkdir "$1" ; } &&
+				  chmod "$mode" "$1" &&
+				  echo "mkdir $1" >&2
+			    	} || return 1
+				;;
+		esac
+		shift
+	done
+	return 0
+}
+
+exec <.ftprc
+while read findopts
+do
+	( eval "exec find $findopts" ) |
+	while read file
+	do
+		echo "$file ..." >&2
+		case "$file"
+		in
+			/*)	echo "can't link full paths" >&2 ;;
+			*)	if [ -d "$file" ]
+				then
+					Mkdir 755 "$file"
+				else
+					case "$file" in
+						*/*)	dir="$ftpdir/"`exec expr x"$file" : x'\(.*\)/.*'`
+							Mkdir 755 "$dir" &&
+							{ ln "$file" "$ftpdir/$file" 2>/dev/null ||
+							  cp "$file" "$ftpdir/$file"
+							} ;;
+						*)	{ ln "$file" "$ftpdir/$file" 2>/dev/null ||
+							  cp "$file" "$ftpdir/$file"
+							} ;;
+					esac
+					[ -f "$ftpdir/$file" ] && chmod 644 "$ftpdir/$file"
+				fi
+				;;
+		esac
+	done
+done
