@@ -1,0 +1,15 @@
+#!/usr/bin/perl
+#
+# Emit the arguments suitably quoted for passing via the shell.
+#	- Cameron Simpson <cs@zip.com.au> 22apr2001
+#
+
+use cs::Shell;
+
+while (defined($_=<STDIN>))
+{ chomp;
+  ($dqclip=$_) =~ s/["\\]/\\$&/g;
+  $setclipcmd="setxclip \"$dqclip\"";
+  $setclipcmd =~ s/["\\]/\\$&/g;
+  print "\"$dqclip\" Exec \"$setclipcmd\"\n";
+}
