@@ -8,7 +8,7 @@ classes	= $((java P)).class
 subclasses=$((subjava P)).class
 html	= $('*.html' G)
 
-htmandir = $(HOME)/public/man
+htmandir = $(HOME)/there/cameron@cskk.homeip.net/html/man
 pmsets	= cs MSQ CISRA
 pmset(set) = $('$(set)/*.pm' EG?) \
 	     $('$(set)/*/*.pm' EG?) \
@@ -93,7 +93,7 @@ $(scriptmandir)/%.1: %
 0README.txt: $(allscripts) INSTALL
 	mkscriptndx `ls -d $(allscripts) | sort` >$@
 
-noads	= $(HOME)/rc/adzap/patterns
+noads	= $(HOME)/there/adzapper.sourceforge.net/html/rc/patterns
 
 squid_redirect: $(noads)
 	cd $(?D) || exit 1 \
@@ -106,16 +106,18 @@ squid_redirect: $(noads)
 %.class-prereqs: %.java
 	javaprereqs $(@P).java >$@
 
-_tarballs: ../public/css/scripts.tar.gz ../public/cs.tar.gz
+_tarballs:
+	:make $(HOME)/there/cs@zip.com.au/html/css/scripts.tar.gz
+	:make $(HOME)/there/cs@zip.com.au/html/css/scripts.tar.gz
 
-../public/cs.tar.gz: $(pmset(cs))
+$(HOME)/there/cs@zip.com.au/html/css/cs.tar.gz: $(pmset(cs))
 	:make _man
 	gnutar cf - $(pmset(cs)) -C $(MANDIR)/cs man3/$((pmsetmans(cs) G?F)) | gzip -v -9 >$@
 	chmod 644 $@
 
-../public/css/scripts.tar.gz: $(allscripts)
+$(HOME)/there/cs@zip.com.au/html/css/scripts.tar.gz: $(allscripts)
 	cd .. || exit 1 \
 	tar cf - $(.F)/$((allscripts)) \\
 			$(.F)/synonyms $(.F)/stubs $(.F)/cs $(.F)/cgi-bin \\
-		| gzip -v -9 >$./$@
+		| gzip -v -9 >$@
 	chmod 644 $@
