@@ -6,7 +6,7 @@
 
 trace=set-x
 cf=/etc/rc.mobile/conf
-envfile=/etc/rc.mobile/env.sh
+envfiles='/etc/rc.mobile/env.sh /u/cameron/var/env.sh'
 
 cmd=`basename "$0"`
 usage="Usage: $cmd location"
@@ -48,4 +48,9 @@ $trace route del default
 [ "x$loc" = xoff ] && exec $trace ifconfig eth0 down
 
 # configure for new location
-exec $trace env "NET=$loc" rc.mobile start -r -f "$cf" -E "$envfile" on-net
+set -- $trace env "NET=$loc" rc.mobile start -r -f "$cf"
+for envfile in $envfiles
+do  set -- "$@" -E "$envfile"
+done
+
+exec "$@" on-net
