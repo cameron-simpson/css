@@ -161,23 +161,23 @@ sub _Coalesce
 
   COAL:
     for ($i=$[; $i < $#$ranges; $i++)
-	{ $r=$ranges->[$i];
+    { $r=$ranges->[$i];
 
-	  my($up)=$r->[1]+$cs::Range::_Epsilon;
+      my($up)=$r->[1]+$cs::Range::_Epsilon;
 
-	  ABUT:
-	    for ($j=$i+1; $j <= $#$ranges; $j++)
-		{ $r2=$ranges->[$j];
-		  last ABUT if $up < $r2->[0];
-		  $up=$r2->[1]+$cs::Range::_Epsilon;
-		}
-	  ## $j is now the first non-abutting block
-
-	  splice(@$ranges,$i,$j-$i,[$r->[0],$ranges->[$j-1]->[1]]);
+      ABUT:
+	for ($j=$i+1; $j <= $#$ranges; $j++)
+	{ $r2=$ranges->[$j];
+	  last ABUT if $up < $r2->[0];
+	  $up=$r2->[1]+$cs::Range::_Epsilon;
 	}
+      ## $j is now the first non-abutting block
+
+      splice(@$ranges,$i,$j-$i,[$r->[0],$ranges->[$j-1]->[1]]);
+    }
 }
 
-sub SubRanges
+sub SubRanges($;$)
 { my($this,$noCopy)=@_;
   $noCopy=0 if ! defined $noCopy;
 
@@ -189,14 +189,14 @@ sub SubRanges
   my(@sub)=();
 
   for my $r (@{$this->{RANGE}})
-	{
-	  push(@sub,[$r->[0],$r->[1]]);
-	}
+  {
+    push(@sub,[$r->[0],$r->[1]]);
+  }
 
   @sub;
 }
 
-sub Text
+sub Text($)
 { my($this)=@_;
 
   $this->_Coalesce();
@@ -204,88 +204,88 @@ sub Text
   local($_)='';
 
   for my $r (@{$this->{RANGE}})
-	{ $_.=', ' if length;
-	  $_.=( $r->[0] >= 0
-	      ? $r->[0]
-	      : "($r->[0])"
-	      );
-	  $_.='-'
-	     .( $r->[1] >= 0
-	      ? $r->[1]
-	      : "($r->[1])"
-	      ) if $r->[1] > $r->[0];
-	}
+  { $_.=', ' if length;
+    $_.=( $r->[0] >= 0
+	? $r->[0]
+	: "($r->[0])"
+	);
+    $_.='-'
+       .( $r->[1] >= 0
+	? $r->[1]
+	: "($r->[1])"
+	) if $r->[1] > $r->[0];
+  }
 
   $_;
 }
 
-sub Enum
-	{ my($this)=@_;
+sub Enum($)
+{ my($this)=@_;
 
-	  my(@e);
+  my(@e);
 
-	  for my $r (@{$this->{RANGE}})
-		{ for my $i ($r->[0]..$r->[1])
-			{ push(@e,$i);
-			}
-		}
+  for my $r (@{$this->{RANGE}})
+  { for my $i ($r->[0]..$r->[1])
+    { push(@e,$i);
+    }
+  }
 
-	  @e;
-	}
+  @e;
+}
 
-sub Bounds
-	{ my($this)=@_;
+sub Bounds($)
+{ my($this)=@_;
 
-	  my($range)=$this->{RANGE};
+  my($range)=$this->{RANGE};
 
-	  return (0,0) if ! @$range;
+  return (0,0) if ! @$range;
 
-	  ($range->[0]->[0],$range->[$#$range]->[1]);
-	}
+  ($range->[0]->[0],$range->[$#$range]->[1]);
+}
 
-sub InRange
-	{ my($this,$n)=@_;
+sub InRange($$)
+{ my($this,$n)=@_;
 
-	  my($range)=$this->{RANGE};
-	  my($i);
+  my($range)=$this->{RANGE};
+  my($i);
 
-	  for ($i=0; $i <= $#$range; $i++)
-		{
-		  # test first to prune faster
-		  return 1 if $range->[$i]->[1] >= $n
-			   && $range->[$i]->[0] <= $n;
-		}
+  for ($i=0; $i <= $#$range; $i++)
+  {
+    # test first to prune faster
+    return 1 if $range->[$i]->[1] >= $n
+	     && $range->[$i]->[0] <= $n;
+  }
 
-	  0;
-	}
+  0;
+}
 
 # return a new range with all the gaps
-sub Invert
-	{ my($this)=@_;
+sub Invert($)
+{ my($this)=@_;
 
-	  my($gaps)=new cs::Range;
+  my($gaps)=new cs::Range;
 
-	  $this->_Coalesce();
-	  my($low,$high)=$this->Bounds();
+  $this->_Coalesce();
+  my($low,$high)=$this->Bounds();
 
-	  my($range)=$this->{RANGE};
-	  my($i,$glow,$ghigh);
+  my($range)=$this->{RANGE};
+  my($i,$glow,$ghigh);
 
-	  # walk backwards through elements because we know
-	  # the Add() method is an insertion and would be O(n^2)
-	  # if we walked forward
-	  for my $j (0..$#$range-1)
-		{ $i=$#$range-$j-1;
+  # walk backwards through elements because we know
+  # the Add() method is an insertion and would be O(n^2)
+  # if we walked forward
+  for my $j (0..$#$range-1)
+	{ $i=$#$range-$j-1;
 
-		  $glow =$range->[$i]->[1]+$cs::Range::_Epsilon;
-		  $ghigh=$range->[$i+1]->[0]-$cs::Range::_Epsilon;
+	  $glow =$range->[$i]->[1]+$cs::Range::_Epsilon;
+	  $ghigh=$range->[$i+1]->[0]-$cs::Range::_Epsilon;
 
-		  if ($glow <= $ghigh)
-			{ $gaps->Add($glow,$ghigh);
-			}
+	  if ($glow <= $ghigh)
+		{ $gaps->Add($glow,$ghigh);
 		}
-
-	  $gaps;
 	}
+
+  $gaps;
+}
 
 1;
