@@ -13,6 +13,13 @@ case "$HOST@$SYSTEMID" in
 esac
 
 [ $# = 0 ] && set attn
+[ $# = 1 ] || { echo "Usage: $0 [mutt-folder]" >&2; exit 2; }
+folder=$1; shift
+case "$folder" in
+    +*)		mfolder=$folder ;;
+    *.*)	mfolder=nntp://$NNTPSERVER/$folder ;;
+    *)		mfolder=+$folder ;;
+esac
 
 cd || exit 1
-exec term +ip -n "mutt +$1" scrif "mutt_$1" mutt -f "+$1"
+exec term +ip -n "mutt $folder" scrif "mutt_$folder" mutt -f "$mfolder"
