@@ -1,0 +1,23 @@
+#!/bin/sh
+#
+# Convert msgids into DejaNews thread references.
+# Thanks to the Robot Wisdom Weblog
+#	http://www.robotwisdom.com/
+# - Cameron Simpson <cs@zip.com.au> 02aug99
+#
+
+if [ $# -gt 0 ]
+then
+    for msgid
+    do  echo "$msgid"
+    done | "$0"
+else
+    while [ -t 0 ] && necho "msgid> "
+	  read msgid
+    do  case "$msgid" in
+	    \<*\>)	;;
+	    *)		msgid="<$msgid>" ;;
+	esac
+	echo "http://www.deja.com/=dnc/$msgid"
+    done
+fi
