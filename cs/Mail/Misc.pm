@@ -86,6 +86,22 @@ sub normaddr($)
   $_;
 }
 
+# expects simple plain "foo@where, bar@else" address list string
+sub mailto
+{ my($addrs,$subj,@content)=@_;
+
+  my(@addrs)=grep(length,split(/[\s,]+/,$addrs));
+  die "$0: no addrs!" if ! @addrs;
+
+  my $msg = "To: ".join(", ", @addrs)."\n"
+	  . "Subject: $subj\n"
+	  . "\n"
+	  . join("",@content)."\n";
+
+  ::need(cs::Source);
+  smtpsend(cs::Source->new(SCALAR,\$msg), @addrs);
+}
+
 sub smtpsend
 { my($src,@addrs)=@_;
 
