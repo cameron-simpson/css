@@ -11,7 +11,7 @@ cmd=`basename "$0"`
 ## exec 2>"$tty" >&2 0</dev/tty
 ## set -vx
 ## set x +t "$@"; shift
-## echo "apphelper: \$*=[$*]" >&2
+echo "apphelper: \$*=[$*]" >&2
 
 savedir=
 pager=${PAGER:-less}
@@ -129,15 +129,16 @@ else
       [ -n "$DISPLAY" ] || { echo "$cmd: can't make new terminal: no \$DISPLAY!" >&2
 			     exit 1
 			   }
-      ( term -n "$termname" +a +ip -small -e "$0" +t "$file" ${1+"$@"}
-	rm -f "$tmpfile"
-      ) &
+      set -x
+      term -n "$termname" +a +ip -small -e "$0" +t "$file" ${1+"$@"}
+      rm -f "$tmpfile"
       exit 0
   fi
 
   [ -t 0 ] || exec </dev/tty;	[ -t 0 ] || exit 1
   [ -t 1 ] || exec >/dev/tty;	[ -t 1 ] || exit 1
 
+  set x $APPHELPER_OPTS ${1+"$@"}; shift
   apphopts=
   while :
   do
