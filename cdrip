@@ -7,16 +7,16 @@
 # Add MP3 mode, basicly for my brother.	 -cameron 25aug2001
 #
 
+dev=/dev/cdrom
+bps=192
+enc=ogg
+
 cmd=`basename "$0"`
 usage="Usage: $cmd [-b bps] [-d device] [-e enc]
 	-b bps		Bits per second for the final bitstream.
 			Default: ${bps}bps.
 	-d device	Device holding the CD. Default: $dev
 	-e enc		Select encoding. Default: $enc"
-
-dev=/dev/cdrom
-bps=192
-enc=ogg
 
 badopts=
 while :
@@ -76,20 +76,23 @@ cdtoc "$dev" \
       [ -d "$dir/." ] || mkdir -p "$dir" || { xit=1; continue; }
 
       echo "Ripping track #$track: $dir/$title ..."
-      time cdparanoia -q -d "$dev" -e -r "$track" - \
+      set -x
+      time cdparanoia -d "$dev" -e -r "$track" - \
 	2>>cdp.err \
       | buffer -m 1M \
+      | tee buf.out \
       | case $enc in
 	  ogg)
-	      oggenc -r -q -b $bps \
+	      oggenc -r -Q -b $bps \
 		     -c "Ripped by $NAME with cdparanoia and oggenc on `date`" \
-		     -a "$artist" -n "$track" -t "$title" -l "$album" \
-		     - >"$out"
+		     -a "$artist" -N "$track" -t "$title" -l "$album" \
+		     -o "$out" -
 	      ;;
 	  mp3)
 	      lame -r -b "$bps" -h -p - "$out"
 	      ;;
 	esac
+      set +x
     done
 
     exit $xit
