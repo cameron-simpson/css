@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 #
 # This is a front end for a Sink.
-#	- Cameron Simpson <cs@zip.com.au> 23may96
+#	- Cameron Simpson <cs@zip.com.au> 23may1996
 #
 # new cs::Encode Sink, \&encoder[, args-to-encoder]
 #   The encoder routine takes a data string and the args-to-encoder
@@ -23,37 +23,39 @@ package cs::Encode;
 @cs::Encode::ISA=qw(cs::Sink);
 
 sub new
-	{ my($class,$s,$encoder)=(shift,shift,shift);
-	  my($this);
-	  $this=new cs::Sink Sink, $s;
-	  $this->{ENCODE}=$encoder;
-	  $this->{ENCODE_ARGS}=[ @_ ];
+{ my($class,$s,$encoder)=(shift,shift,shift);
+  my($this);
+  $this=new cs::Sink Sink, $s;
+  $this->{cs::Encode::ENCODE}=$encoder;
+  $this->{cs::Encode::ENCODE_ARGS}=[ @_ ];
 
-	  bless $this, $class;
-	}
+  bless $this, $class;
+}
 
 sub DESTROY
-	{ my($this)=shift;
+{ my($this)=shift;
 
-	  # print STDERR "DESTROY(",Hier::h2a($this),")\n";
+  # print STDERR "DESTROY(",Hier::h2a($this),")\n";
 
-	  $this->Write(undef);
-	  $this->SUPER::DESTROY();
-	}
+  $this->Write(undef);
+  $this->SUPER::DESTROY();
+}
 
 sub Write
-	{ my($this,$data)=@_;
-	  my($edata);
+{ my($this,$data)=@_;
+  my($edata);
 
-	  $edata=&{$this->{ENCODE}}($data,@{$this->{ENCODE_ARGS}});
+  $edata=&{$this->{cs::Encode::ENCODE}}($data,
+					@{$this->{cs::Encode::ENCODE_ARGS}});
 
-	  return undef if ! defined $edata;
+  return undef if ! defined $edata;
 
-	  # print STDERR "Encode::Write: this=",Hier::h2a($this),"\n";
-	  # print STDERR "\tPut($edata)\n";
-	  $this->{DS}->Put($edata);
+  # warn "Encode::Write: this=",Hier::h2a($this),"\n";
+  # warn "\tPut($edata)\n";
 
-	  length $data;
-	}
+  $this->{DS}->Put($edata);
+
+  length $data;
+}
 
 1;
