@@ -88,6 +88,7 @@ sub out		{ if (@_ && ! defined $_[0])
 sub err		{ cs::Upd::err(@_); }
 sub nl		{ cs::Upd::nl(@_); }
 sub promptfor	{ cs::Upd::promptfor(@_); }
+sub ask		{ cs::Upd::ask(@_); }
 
 package cs::Upd;
 
@@ -331,6 +332,29 @@ sub promptfor($;$)
   $cs::Upd::This->{STATE}='';
 
   $_;
+}
+
+=item Ask(I<prompt>,I<FILE>)
+
+Issue the I<prompt> with "B< (Y/n)? >" appended
+and then read a line from the stream I<FILE>.
+If omitted, I<FILE> defaults to B<STDIN>.
+Return true if the line commences with a B<y>.
+
+=cut
+
+sub Ask($$;$){ local($cs::Upd::This)=shift; &ask; }
+sub ask($;$)
+{ my($prompt,$FILE)=@_;
+  local($_);
+
+  $FILE=STDIN if ! defined $FILE;
+
+  if (! defined ($_=promptfor("$prompt (Y/n)? ")))
+  { return undef;
+  }
+
+  /^y/i;
 }
 
 =item Current()
