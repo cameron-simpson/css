@@ -1,0 +1,14 @@
+#!/bin/sh
+#
+# Gather stats for later graphing.
+#	- Cameron Simpson <cs@zip.com.au> 15jan99
+#
+
+usage="Usage: $0 [-o output.gz] [snoop-options...]"
+
+out=snoop.log.gz
+case $1 in -o) out=$2; shift; shift ;; esac
+
+snoopstats ${1+"$@"} | ( trap '' INT
+			 exec gzip -v -9 >$out
+		       )
