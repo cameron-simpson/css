@@ -138,7 +138,7 @@ else
 			     exit 1
 			   }
       set -x
-      term -n "$termname" +a +ip -small -e "$0" +t "$file" ${1+"$@"}
+      term -n "$termname" +a -e "$0" +t "$file" ${1+"$@"}
       rm -f "$tmpfile"
       exit 0
   fi
