@@ -1,0 +1,10 @@
+#!/bin/sh
+#
+
+case "$DISPLAY" in
+    ?*)	set x -font '8x13bold' ${1+"$@"}
+	shift
+	;;
+esac
+
+exec $REAL/emacs ${1+"$@"}
