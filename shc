@@ -1,0 +1,57 @@
+#!/bin/sh
+#
+# Run a command with $1, $2 etc set up.
+#	- Cameron Simpson <cs@zip.com.au>, 04oct94
+#
+
+cmd=`basename "$0"`
+usage="Usage: $cmd [-s shell] [-a] {shellcmd|-c shellcmd} args...
+	-s shell	Shell to use (default \$SHELL or /bin/sh).
+	-a		Forall: run shellcmd once per argument.
+	shellcmd	Command to run."
+
+shell=${SHELL-/bin/sh}
+shcmd=
+forall=
+
+badopts=
+while [ $# -gt 0 ]
+do  case $1 in
+	-c)	shcmd=$2; shift ;;
+	-s)	shell=$2; shift ;;
+	-a)	forall=1 ;;
+	-*)	echo "$cmd: $1: unrecognised option" >&2
+		badopts=1
+		;;
+	*)	if [ -z "$shcmd" ]
+		then	shcmd=$1; shift
+		fi
+
+		break
+		;;
+    esac
+    shift
+done
+
+if [ -z "$shcmd" ]
+then	echo "$cmd: missing shellcmd" >&2
+	badopts=1
+fi
+
+if [ $# = 0 ]
+then	echo "$cmd: missing args" >&2
+	badopts=1
+fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+xit=0
+if [ $forall ]
+then  while [ $# -gt 0 ]
+      do  eval "$shcmd" || xit=$?
+	  shift
+      done
+else  eval "$shcmd" || xit=$?
+fi
+
+exit $xit
