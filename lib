@@ -1,0 +1,10 @@
+#!/bin/sh
+
+xit=1
+for dir in `unpath "$LDPATH"`
+do  for lib
+    do	ls -ld "$dir"/*"$lib"* && xit=0
+    done
+done 2>/dev/null
+
+exit $xit
