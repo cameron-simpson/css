@@ -96,6 +96,8 @@ sub smtpsend
 	   : 'smtp'	# guess
 	   ;
 
+  ## warn "smtp host = \"$host\"";
+
   my $ok = 1;
 
   my @pw = getpwuid($<);
@@ -106,21 +108,30 @@ sub smtpsend
   else
   { my $smtp = Net::SMTP->new($host);
 
-    if (! $smtp->mail($pw[0]))
-    { warn "$::cmd: problem announcing sender \"$pw[0]\"\n";
+    if (! defined $smtp)
+    { warn "$::cmd: can't connect to SMTP server \"$host\": $!\n";
       $ok=0;
     }
     else
     {
-      ADDR:
-      for my $addr (@addrs)
+      ## warn "smtp obj = $smtp";
+      if (! $smtp->mail($pw[0]))
+      { warn "$::cmd: problem announcing sender \"$pw[0]\"\n";
+	$ok=0;
+      }
+      else
       {
-	if (! $smtp->to($addr))
-	{ warn "$::cmd: problems with address $addr\n";
-	  $ok=0;
+	ADDR:
+	for my $addr (@addrs)
+	{
+	  if (! $smtp->to($addr))
+	  { warn "$::cmd: problems with address $addr\n";
+	    $ok=0;
+	  }
 	}
       }
     }
+    ## warn "smtp set up: ok=$ok";
 
     if ($ok)
     {
