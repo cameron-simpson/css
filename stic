@@ -72,7 +72,9 @@ else
     #
     adddir)
 	[ $# = 0 ] && set .
-	find "$@" -type f -name '*.*' -print \
+	find "$@" \( -type d -name '.*' -prune \) \
+		  -o \
+		  \( -type f -name '*.*' -print \) \
 	| stic add
 	xit=$?
 	;;
