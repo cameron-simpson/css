@@ -4,18 +4,22 @@
 #	- Cameron Simpson <cs@zip.com.au> 19may2000
 #
 
-[ $# = 1 ] || { echo "Usage: $0 filename" >&2; exit 2; }
+verbose=
+[ "x$1" = x-v ] && { verbose=1; shift; }
+
+[ $# = 1 ] || { echo "Usage: $0 [-v] filename" >&2; exit 2; }
 file=$1; shift
 
 [ -f "$file" ] || { echo "$0: $file: not a regular file" >&2; exit 1; }
 
 tmp=/tmp/rwi$$
-trap 'rm -f "$tmpf"' 0 1 2 15
+trap 'rm "$tmp"' 0 1 2 15
 
 cat >"$tmp" || exit 1
 
 cmp -s "$tmp" "$file" && exit 0
 
+[ $verbose ] && echo "rewrite $file"
 if cat "$tmp" >"$file"
 then
     exit 0
