@@ -12,8 +12,8 @@ myke -u \
      -f Mykefile.${X11_X}x${X11_Y} \
      -f Mykefile.$type \
      -f Mykefile \
-     "type=$type" defaults.auto
-exec xrdb -nocpp -load defaults.auto
+     "type=$type" _dflts
+exec xrdb -nocpp -load $HOME/.Xdefaults
 
 dpp ${1+"$@"} $X11/xinfo.dpp $X11/defaults \
       | xrdb -load -nocpp
