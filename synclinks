@@ -4,11 +4,38 @@
 #	- Cameron Simpson <cs@zip.com.au> 28feb99
 #
 
+trace=echo
 linklist=${SYNCLINKS:-$HOME/rc/sync/linklist}
 dir=${SYNCLINKSDIR:=$HOME}
 
-[ "x$1" = x-d ] && { dir=$2; shift; shift; }
+cmd=$0
+usage="Usage: $cmd [-d homedir] [-f] [linklistfile]
+	-d homedir	Where to put the links.
+			Default from \$SYNCLINKSDIR: $dir
+	-f		Fix things; default is to just check.
+	linklistfile	File listing links and targets.
+			Default from \$SYNCLINKS: $linklist"
+
+badopts=
+while :
+do  case $1 in
+	-d)	dir=$2; shift ;;
+	-f)	trace=set-x ;;
+	--)	shift; break ;;
+	-?*)	echo "$cmd: unrecognised option: $1" >&2
+		badopts=1
+		;;
+	*)	break ;;
+    esac
+done
+
 [ $# = 0 ] || { linklist=$1; shift; }
+
+[ $# = 0 ] || { echo "$cmd: extra arguments after linklist: $*" >&2
+		badopts=1
+	      }
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
 
 [ "x$linklist" = x- ] \
 || if [ -r "$linklist" ]
@@ -29,21 +56,26 @@ do  [ -n "$etc" ] && { echo "$cmd: $linklist: bad data, bailing out" >&2
     case "$tolink" in
 	/*) echo "$cmd: $linklist: skipping absolute link $tolink" >&2
 	    xit=1
-	    ;;
-	*)  lncmd="ln -s $fromlink \"\$tolink\""
-	    echo "$tolink -> $fromlink ..."
-	    if [ ! -s "$tolink" ] \
-	    && { [ -d "$tolink/." ] || >>"$tolink"
-		 rm "$tolink"
-	       } \
-	    && eval "$lncmd"
-	    then
-		:
-	    else
-		xit=1
-	    fi
+	    continue
 	    ;;
     esac
+
+    eval "fromlink=$fromlink"
+    eval "tolink=$tolink"
+    if [ -L "$tolink" ]
+    then
+	curfrom=`readsymlink "$tolink"`
+	[ "x$fromlink" = "x$curfrom" ] && continue
+	necho "# "; ls -ld "$tolink"
+	$trace rm -f "$tolink" || { xit=1; continue; }
+    else
+	if [ -e "$tolink" ]
+	then
+	    necho "# "; ls -ld "$tolink"
+	    $trace rm -rf "$tolink" || { xit=1; continue; }
+	fi
+    fi
+    $trace ln -s "$fromlink" "$tolink" || { xit=1; continue; }
 done
 
 exit $xit
