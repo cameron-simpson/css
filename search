@@ -17,10 +17,9 @@ cgi="${cgibase}search.cgi"
 
 cmd=`basename "$0"`
 
-query=`echo "$*"|sed 's/+/%2b/g
-		      s/&/%26/g
-		      s/[ 	][ 	]*/+/g'`
+query=$*
 [ -n "$query" ] || query=`xcut -p`
+query=`qsencode "$query"`
 
 target=$cmd
 case "$cmd" in
