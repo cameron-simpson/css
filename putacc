@@ -75,6 +75,7 @@ do
 	'--exclude=/rc/secret/*' \
 	'--include=/rc/shell' \
 	'--include=/rc/ssh' \
+	'--include=/rc/tdl' \
 	'--include=/rc/term' \
 	'--include=/rc/vi' \
 	'--include=/rc/x11' \
