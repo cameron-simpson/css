@@ -1,0 +1,63 @@
+#!/bin/sh
+#
+# Wrapper for su. If the first option begins with a dash, or there are arguments
+# after the login name, run a vanilla su. Otherwise pass much of our environment
+# through the su and exec the shell of our choice.
+#	- Cameron Simpson, January 1992
+#
+
+login=
+
+if [ -f /usr/bin/opiesu ]; then realsu=/usr/bin/opiesu
+			   else realsu=/bin/su
+fi
+
+sush=/bin/sh
+case $ARCH in
+    *.*.solaris)	sush=$BIN/ae ;; # bug workaround
+esac
+
+case $1 in -) login=-; shift ;; esac
+case "$1" in
+	'')	su=root ;;
+	-*)	su=root ;;
+	*)	su=$1; shift ;;
+esac
+
+[ -n "$login" -o $# -gt 0 ] \
+	&& exec "$realsu" $login "$su" ${1+"$@"}
+
+env=/tmp/env.$$.$SYSTEMID.$ARCH
+no-ssh-agent stashenv - >"$env"
+
+[ -n "$DISPLAY" ] && { xauth=`xauth nextract - "$DISPLAY"`
+		       # echo "xauth=$xauth"
+		     }
+
+# If some dickheads didn't use csh for root this would be much simpler.
+tmp=/tmp/su.$$
+
+tee $HOME/su.out >$tmp <<SU
+SHELL=$SHELL PS1= PS2= HOME=$HOME PATH=$PATH
+export SHELL PS1 PS2 HOME PATH
+test -r $env && . $env
+USER=$su
+EMAIL=$EMAIL
+DISPLAY=$DISPLAY
+PERL5LIB=$HOME/etc/pl:$PERL5LIB:/usr/local/lib/perl5
+export USER EMAIL DISPLAY PERL5LIB
+[ -n "\$DISPLAY" ] && { XAUTHORITY=/tmp/xa.\$\$
+			export XAUTHORITY
+			( umask 077
+			  >"\$XAUTHORITY"
+			  echo "$xauth" | xauth nmerge -
+			)
+		      }
+rm -f $tmp $env
+exec pushttylabel "$su@$HOST" term -n $su@$HOST
+SU
+
+chmod 755 $tmp
+echo exec $sush $tmp
+set-x arg0 su "$realsu" "$su" -c "exec $sush $tmp"
+rm -f $tmp
