@@ -18,9 +18,13 @@ usage="Usage: $cmd [-a] [+a] [-c] [+c] [-m mailcap] [-s subfile] mimetype
 	+c	Avoid the \"copiousoutput\" mailcap entry.
 	-m mailcap Specify the mailcap file.
 	-s subfile Replace any %s with subfile, correctly quoted.
-		   Actions with no %s get the it as stdin."
+		   Actions with no %s get the file as stdin."
 
 badopts=
+
+aflag=
+cflag=
+subcmd="\"\$0\" $aflag $cflag -m \"\$mailcap\""
 
 while :
 do  case $1 in
