@@ -9,6 +9,10 @@ ezos=$HOME/@/ezos
 set -x
 exec rsync -avHP --delete --delete-excluded \
 	--exclude=CVS/ \
+	--include='/mail' \
+	--include='/mail/mailcap' \
+	--include='/mail/mutt' \
+	--exclude='/mail/*' \
 	--include='/myke' \
 	--include='/myke/*' \
 	--include='/perl' \
