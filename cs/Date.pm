@@ -309,7 +309,7 @@ sub iso2gmt($$)
 { local($_)=shift;
   my($givenlocaltime)=shift;
 
-  if (! /^(\d\d\d\d)-?(\d?\d+)-?(\d?\d)$/)
+  if (! /^(\d\d\d\d)-?(\d?\d+)-?(\d?\d)(\s+\d.*)?$/)
   { my(@c)=caller;
     warn "$::cmd: iso2gmt($_): bad date format\n\tfrom [@c]";
     return undef;
