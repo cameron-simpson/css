@@ -73,7 +73,8 @@ sub new
 
   if (! @_)
   # no arguments - today's date
-  { warn "NEW(NOW)";return new cs::DMY(time);
+  { ##warn "NEW(NOW)";
+    return new cs::DMY(time);
   }
 
   if (@_ eq 3)
