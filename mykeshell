@@ -8,6 +8,9 @@
 cmd=$0
 [ $# = 0 ] && { echo "$cmd: missing arguments"; >&2; exit 2; }
 
+MYKE_STARTDIR=${MYKE_STARTDIR:-`pwd`}
+export MYKE_STARTDIR
+
 set /bin/sh "$@"
 
 if [ -n "$DISPLAY" ]
