@@ -1,0 +1,27 @@
+#!/bin/sh
+#
+# Instantiatie the usual load meters.
+#	- Cameron Simpson <cs@zip.com.au>
+#
+
+xmhostlist= xmvoff=3 xmhoff=100 xmdx=40 xmdy=40
+if [ "$X11_X" -ge 1024 ]
+then
+    for ext in ".$HOST@$SYSTEMID" ".$HOST" ".$SYSTEMID" ""
+    do  xmlist=$X11/xmlist$ext
+	[ -s "$xmlist" ] && { xmhostlist=$xmlist; break; }
+    done
+fi
+
+if [ -z "$xmhostlist" ]
+then  bgproc -p xmeter.$HOST.$DISPLAY xmeter -dv -geometry -$xmhoff+$xmvoff -h $xmdy -w $xmdx -load $HOST
+else  while read hosts
+      do
+	ncols=`set x $hosts; shift; echo $#`
+	set -x
+	bgproc -p xmeter.$HOST.$DISPLAY xmeter -dv -cols $ncols \
+						-geometry -$xmhoff+$xmvoff \
+						-h $xmdy -w $xmdx -load $hosts
+	xmvoff=`expr $xmvoff + $xmdy`
+      done <$xmhostlist
+fi
