@@ -1,0 +1,42 @@
+#!/bin/sh
+#
+# Make a virgin mysql data dir.
+#	- Cameron Simpson <cs@zip.com.au> 03jul99
+#
+
+mysqldir=/opt/mysql
+inst=$mysqldir/bin/mysql_install_db
+
+usage="Usage: $0 datadir [mysql_install_db-options...]";
+
+dummyhome=/tmp/home.$$
+mkdir "$dummyhome" || exit 1
+
+badopts=
+if [ $# = 0 ]
+then
+    echo "$0: missing datadir" >&2
+    badopts=1
+else
+    datadir=$1; shift
+fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+mkdir "$datadir" || { echo "$cmd: can't create $datadir" >&2; exit 1; }
+
+cf=$dummyhome/.my.cnf
+echo "[server]" >>"$cf"
+echo "datadir=$datadir" >>"$cf"
+
+set x "$inst" ${1+"$@"}
+shift
+
+( set -x
+  HOME=$dummyhome "$@"
+)
+xit=$?
+
+rm -rf "$dummyhome"
+
+exit $xit
