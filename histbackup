@@ -30,19 +30,23 @@
 cmd=`basename "$0"`
 usage="Usage:	$cmd [--rsync-path rrsync] [--no-copy] [--mono] [host:]source backupdir [rsyncopts...]
 	$cmd [--rsync-path rrsync] [--no-copy] [--mono] --inplace parent [rsyncopts...]
-	$cmd [--rsync-path rrsync] [--no-copy] --linkonly parent
+	$cmd [--no-copy] --linkonly parent
 
-	--mono		Don't pass --delete to the rsync pass.
+	--inplace	In addition to the dated subdirectories in the backupdir,
+			take the source to be backupdir/current.
+	--mono		Monotonic growth - don't pass --delete to the rsync pass.
 			May also be specified as --no-delete.
 	--linkonly	Don't do the rsync pass - just set up the new link tree
 			and report its basename.
-	--no-copy	Passwd to linktree - don't fall back to copying the
+	--no-copy	Passed to linktree - don't fall back to copying the
 			source file if the link fails (eg to link count
 			overflow).
 	--rsync-path rrsync Execute the command \"rrsync\" as the remote rsync.
-			Passed to rsync."
+			Passed to rsync.
+	--symlink name	Make a symlink named \"name\" pointing at the latest backup."
 
 badopts=
+symlink=
 src=
 dest=
 mono=
@@ -66,6 +70,7 @@ do case $1 in
 		exec 3>&1 1>&2	# ensure clean stdout
 		;;
     --rsync-path) rrsync=$2; shift ;;
+    --symlink)	symlink=$2; shift ;;
     --)		shift; break ;;
     -*)		echo "$cmd: unrecognised option: $1" >&2
 		badopts=1
@@ -88,6 +93,7 @@ then
 else
     if [ $inplace ]
     then
+	# src is the "current" subdir of the supplied dest
 	if [ $# -lt 1 ]
 	then
 	    echo "$cmd: missing parent" >&2
@@ -114,12 +120,21 @@ then
     badopts=1
 fi
 
-[ -d "$dest/." ] || { echo "$cmd: backupdir $dest: not a directory" >&2
+[ -d "$dest/." ] || { echo "$cmd: backup dir $dest: not a directory" >&2
 		      badopts=1
 		    }
+case "$src" in
+    *:*)	# remote - don't check
+		;;
+    *)		[ -d "$src/."  ] || { echo "$cmd: source dir $src: not a directory" >&2
+				      badopts=1
+				    }
+		;;
+esac
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
+# locate to most recent backup, if any
 lastbackup=`cd "$dest" || exit 1; ls -dr [0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]* 2>/dev/null | sed 1q`
 
 today=`daycode`
@@ -142,6 +157,8 @@ if [ -t 1 ];  then vflag=-v
               else vflag=
 fi
 
+xit=0
+
 if [ -n "$lastbackup" -a -d "$dest/$lastbackup/." ]
 then
     $echo "existing backup: linking $lastbackup to $thisbackup ..."
@@ -155,7 +172,8 @@ then
 	echo "$thisbackup" >&3
     else
 	$echo "updating $thisbackup from $src ..."
-	exec rsync -aH $vflag $delete --rsync-path "$rrsync" ${1+"$@"} "$src/." "$dest/$thisbackup/."
+	rsync -aH $vflag $delete --rsync-path "$rrsync" ${1+"$@"} "$src/." "$dest/$thisbackup/."
+	xit=$?
     fi
 else
     if [ $linkonly ]
@@ -174,12 +192,24 @@ else
 		 [ $# = 0 ] || use_rsync=1
 		 ;;
 	esac
+	set -x
 	if [ $use_rsync ]
 	then
 	    mkdir "$dest/$thisbackup" || exit 1
-	    exec rsync -aH $vflag --rsync-path "$rrsync" ${1+"$@"} "$src/." "$dest/$thisbackup/."
+	    rsync -aH $vflag --rsync-path "$rrsync" ${1+"$@"} "$src/." "$dest/$thisbackup/."
 	else
-	    exec cpdir "$src" "$dest/$thisbackup"
+	    cpdir "$src" "$dest/$thisbackup"
 	fi
+	xit=$?
     fi
 fi
+
+if [ -z "$linkonly" -a -n "$symlink" ]
+then
+    ( cd "$dest" || exit 1
+      rm -f "$symlink"
+      ln -s "$thisbackup" "$symlink"
+    )
+fi
+
+exit $xit
