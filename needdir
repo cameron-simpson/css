@@ -1,0 +1,12 @@
+#!/bin/sh
+#
+# Require existence of directory, creating it if needed.
+#	- Cameron Simpson <cs@zip.com.au> 04may2002
+#
+
+for d
+do
+    [ -d "$d/." ] || mkdir -p "$d" || exit 1
+done
+
+exit 0
