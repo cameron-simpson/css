@@ -1,0 +1,11 @@
+#!/bin/sh
+# Hack to log all my email while I debug my delivery scripts.
+
+logf=$HOME/procmail.everything
+tmpf=/tmp/lpm$$
+
+cat >"$tmpf" || exit 1
+cat "$tmpf" >>"$logf"
+exec <"$tmpf"
+rm "$tmpf"
+exec procmail
