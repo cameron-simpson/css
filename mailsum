@@ -1,0 +1,186 @@
+#!/usr/bin/perl
+#
+# Summarise the named mail items to stdout.
+#	- Cameron Simpson <cs@zip.com.au>, 13jul94
+#
+
+use cs::Source;
+use cs::RFC822;
+require 'cs/mailalias.pl';
+require 'flush.pl';
+require 'getopts.pl';
+
+($cmd=$0) =~ s:.*/::;
+$usage="Usage: $cmd [-n] [-x stashcmd] [files...]
+	-m max		Produce at most max descriptions from the files.
+	-M max		As above, but use files in reverse.
+	-n		No warnings for files $cmd can't open.
+	-r		Reverse the order of the descriptions.
+	-x stashcmd	Shell command to stash any X-Face: lines found.
+			Input is lines of the form
+				fromaddr x-face-text
+";
+
+undef $stashxface;
+
+$badopts=0;
+$MAILRC=(defined($ENV{MAILRC}) ? $ENV{MAILRC} : "$ENV{HOME}/.mailrc");
+$nowarnings=0;
+$forwards=1;
+$reverse=0;
+$max=0;
+undef $stashxface;
+&Getopts('m:M:nrx:') || ($badopts=1);
+$nowarnings=$opt_n;
+$stashxface=$opt_x if defined $opt_x;
+if ($opt_m)	{ $max=$opt_m+0; }
+elsif ($opt_M)	{ $max=$opt_M+0; $forwards=0; }
+$reverse=$opt_r;
+
+die $usage if $badopts;
+
+if ($#ARGV < $[)
+	{ @files=<STDIN>;
+	  for (@files) { chop; }
+	}
+else
+{ @files=@ARGV;
+}
+
+&mailalias'readmailrc($MAILRC);
+for (&mailalias'aliases)
+	{ @addrs=cs::RFC822::parseaddrs($mailalias'alias{$_}),1);
+	  if (@addrs == 1)
+		{ $addr=&normaddr(shift @addrs);
+		  $addr2alias{$addr}=$_;
+		  # print STDERR "$addr -> $_\n";
+		}
+	}
+
+$xit=0;
+$n=0;
+$nkeys=0;
+
+FILE:
+  for ($forwards ? @files : reverse @files)
+	{ $key=&summarise($_);
+	  next FILE unless defined $key;
+	  # print STDERR "$_: added $key\n";
+	  last FILE if $max && $nkeys > $max;
+	}
+
+&final;
+
+exit $xit;
+
+sub final
+	{ @keys=keys %x_face;
+	  if ($#keys >= $[ && defined($stashxface))
+		{ if (!open(X_FACE,"| $stashxface\0"))
+			{ print STDERR
+				"$cmd: can't pipe to \"$stashxface\": $!\n";
+			  $xit=1;
+			}
+		  else
+		  { for (@keys)
+			{ ($x_face=$x_face{$_}) =~ s/\s+//;
+			  print X_FACE $_, " ", $x_face, "\n";
+			}
+		    close(X_FACE);
+		    $xit+=$?;
+		  }
+		}
+
+	  @keys=keys %ndx;
+	  print "nobody@nowhere\n";	# dummy first line
+	  print "Cols=", $#keys-$[+1, " Rows=1\n";
+	  if ($#keys < $[)
+		{ print "nobody\tnowhere\n";
+		}
+	  else
+	  { @keys = reverse sort { $ndx{$a} <=> $ndx{$b}; } @keys;
+	    print "keys=[@keys]\n";
+	    if ($max)	{ @keys=@keys[0..$max-1]; }
+	    print "max keys=[@keys]\n";
+	    for ($reverse ? reverse @keys : @keys)
+		{ if (! (($user,$host)=/(.*)@(.*)/))
+			{ $user=$_; $host='';
+			}
+
+		  $vuser=&toalias($_);
+		  $vuser =~ s/\@cse\.unsw\.edu\.au$//;
+
+		  print $user, "\t", $host,
+			"\t", $vuser,
+			"\t", $count{$_},
+			"\n";
+		}
+	  }
+	}
+
+sub summarise	# file -> fromaddr or undef
+	{ my($file)=shift;
+	  my($s);
+
+	  if (! defined ($s=new cs::Source PATH, $file))
+		{ if (!$nowarnings)
+			{ print STDERR "$cmd: can't open $file: $!\n";
+			}
+
+		  $xit=1;
+		  return undef;
+		}
+
+	  fsummarise($file,$s);
+	}
+
+sub fsummarise	# (file,source) -> fromaddr or undef
+	{ my($file,$s)=@_;
+	  local($_);
+	  my(@lines);
+
+	  my($H)=new cs::RFC822 $s;
+
+	  my($from,@from,$x_face);
+
+	  $from=$H->Hdr(FROM);
+	  if (!defined $from)
+		{ $from=$H->Hdr(FROM_);
+		  if ($from =~ /^\s*(\S+)/)
+			{ $from=$1; }
+		}
+	  else
+	  { @from=cs::RFC822::parseaddrs($from,1));
+	    $from=shift @from;
+	  }
+
+	  $_=&normaddr($from);
+
+	  $nkeys++ if !defined $ndx{$_};
+	  $count{$_}++;
+	  $ndx{$_}=$n;
+	  $forwards ? $n++ : $n--;
+	  if (defined($x_face=$H->Hdr(X_FACE)))
+		{ $x_face{$_}=$x_face; }
+
+	  $_;
+	}
+
+sub normaddr
+	{ local($_)=shift;
+
+	  s/$/@cse.unsw.edu.au/ unless /@/;
+	  s/@[^@]*[A-Z][^@]*$/\L$&/;
+	  s/\.oz$/$&.au/;
+	  s/\@([^@]*\.)?cs\.unsw\.oz\.au/@cse.unsw.edu.au/;
+
+	  # s/@cse\.unsw\.edu\.au$//;
+
+	  $_;
+	}
+
+sub toalias
+	{ local($_)=shift;
+	  return $addr2alias{$_} if defined $addr2alias{$_};
+	  $_;
+	}
