@@ -1,0 +1,28 @@
+#!/bin/sh
+#
+# Report POD files with the specified keyword.
+#	- Cameron Simpson <cs@zip.com.au> 02apr2004
+#
+
+cmd=$0
+usage="Usage: $cmd keyword [podfiles...]"
+
+badopts=
+
+if [ $# = 0 ]
+then
+  echo "$cmd: missing keyword" >&2
+  badopts=1
+else
+  keyword=$1; shift
+fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+[ $# = 0 ] && set -- *.pod
+
+for podfile
+do
+  sed -n 's/^=keywords\([ 	].*\)/\1 /p' <"$podfile" | grep " $keyword " >/dev/null \
+  && echo "$podfile"
+done
