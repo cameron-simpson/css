@@ -28,7 +28,7 @@ rsync=rsync
 
 cmd=`basename "$0"`
 usage="Usage: $cmd [-n] [-v] [-P] [-B blocksize] [-f config] [-d dir] [[server]::rootpfx...]
-	-n -v -P	Passed to rsync.
+	-n -v -P -W	Passed to rsync.
 	-B blocksize	Passed to rsync.
 	-R rsync-cmd	Rsync command. Default: $rsync
 	-f config	Read config from this file. Default: $cf
@@ -63,9 +63,15 @@ do  case $1 in
 	#
 	# Verbose. Passed to the rsync command.
 	#
+	# =item B<-W>
+	#
+	# Whole file copies.
+	# Passed to the rsync command.
+	#
 	-n)	trace=1 rsopts="$rsopts $1" ;;
 	-P)	trace=1 verbose=1 rsxopts="$rsxopts $1" ;;
 	-v)	trace=1 verbose=1 rsxopts="$rsxopts $1" ;;
+	-W)	rsxopts="$rsxopts $1" ;;
 
 	# =item B<-B> I<blocksize>
 	#
@@ -210,7 +216,7 @@ timelimit=
 
 xit=0
 lineno=0
-while read how host path lpath opts
+while read how host rpath lpath opts
 do
     lineno=`expr $lineno + 1`
     pfx="$cmd: $cf, line $lineno"
@@ -222,8 +228,8 @@ do
 		then  echo "$pfx: missing umask value" >&2
 		      continue
 		fi
-		if [ -n "$path" ]
-		then  echo "$pfx: extra arguments after umask value: $path $lpath $opts" >&2
+		if [ -n "$rpath" ]
+		then  echo "$pfx: extra arguments after umask value: $rpath $lpath $opts" >&2
 		      continue
 		fi
 		[ $verbose ] && echo "umask $host"
@@ -235,8 +241,8 @@ do
     # see if "rsync" default method omitted
     case "$how" in
 	*.*)	opts="$lpath $opts"
-		lpath=$path
-		path=$host
+		lpath=$rpath
+		rpath=$host
 		host=$how
 		how=rsync
 		;;
@@ -259,26 +265,26 @@ do
 	    ;;
     esac
 
-    # lpath == path, normally
-    [ "x$lpath" = x ] && lpath=$path
+    # lpath == rpath, normally
+    [ "x$lpath" = x ] && lpath=$rpath
 
     # check if only doing some mirrors
     if [ $# -gt 0 ]
     then
       yep=
       for arg
-      do  case "$host::$path" in
+      do  case "$host::$lpath" in
 	      "$arg" | "$arg"/* )
 		yep=1; break ;;
 	  esac
-	  case "::$path" in
+	  case "::$lpath" in
 	      "$arg" | "$arg"/* )
 		yep=1; break ;;
 	  esac
       done
       if [ -z "$yep" ]
       then
-	  [ $verbose ] && echo "$pfx: skipping $host::$path"
+	  [ $verbose ] && echo "$pfx: skipping $host::$rpath"
 	  continue
       fi
     fi
@@ -288,14 +294,14 @@ do
     case $fpath in /*) ;; *) fpath=$where/$fpath ;; esac
     [ -d "$fpath/." ] \
 	|| mkdir -p "$fpath" \
-	|| { echo "$pfx: mkdir $fpath fails, skipping $host::$path" >&2
+	|| { echo "$pfx: mkdir $fpath fails, skipping $host::$rpath" >&2
 	     xit=1
 	     continue
 	   }
 
     # =head2 Per Mirror Configuration
     #
-    # There is an additional facilty for overly complex I<options>.
+    # There is an additional facility for overly complex I<options>.
     # For each line a check is made for a file named:
     #
     #	I<config>-I<method>-I<server>-I<root-trans>
@@ -327,7 +333,7 @@ do
     # to ignore NFS transient files, which are always noise.
     #
     allcf=$cf-$how
-    extracf=$cf-$how-$host-`echo $path|tr / :`
+    extracf=$cf-$how-$host-`echo $rpath|tr / :`
     case $how in
       rsync)
 	[ -s "$allcf" ] && opts='"--include-from=$allcf" '$opts
@@ -339,7 +345,7 @@ do
 	    latedir=/tmp/latest$$
 	    if mkdir "$latedir"
 	    then
-		eval "rsync -n -rlHt \$rsopts $opts \"\$host::\$path/.\" \"\$latedir/.\"" \
+		eval "rsync -n -rlHt \$rsopts $opts \"\$host::\$rpath/.\" \"\$latedir/.\"" \
 		| fgrep -v ' -> ' \
 		| latest -V -o >$latelist
 		rmdir "$latedir"
@@ -348,10 +354,11 @@ do
 	    fi
 	fi
 
-	synccmd="$timelimit $rsync -rlHt \$rsopts $opts \$rszopt \$rsxopts \"\$host::\$path/.\" \"\$fpath/.\""
+	synccmd="$timelimit $rsync -rlHt \$rsopts $opts \$rszopt \$rsxopts \"\$host::\$rpath/.\" \"\$fpath/.\""
 	;;
       http|ftp)
-	synccmd="$timelimit echo wget --mirror -nH -P \"\$fpath\" \"\$how://\$host/\$path\""
+	ncut=`IFS=/; set x $rpath; shift; echo $#`
+	synccmd="$timelimit wget --mirror -nH --cut-dirs=$ncut -np -P \"\$fpath\" \"\$how://\$host/\$rpath\""
 	;;
       *)echo "$pfx: method \"$how\" not supported" >&2
 	xit=1
