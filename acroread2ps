@@ -1,0 +1,58 @@
+#!/bin/sh
+#
+# Use acroread to convert PDF to PostScript (oh for PDF to HTML!).
+#	- Cameron Simpson <cs@zip.com.au> 14may1997
+#
+# No, acroread doesn't parse command line options like most UNIX
+# filters, hence the cat prefix.
+# No, you can't use -xrm to control things if you don't run
+# interactively, hence the juggling of .acrorcs.
+# No, the Level-1 option is a no-op on a Level-2 printer, hence the
+# override of "Level2?".
+# Yes, there's something odd about the halftoning, not sure what yet.
+#
+
+acrorc=$HOME/.acrorc
+oldacrorc=
+[ -f "$acrorc" ] \
+   && { oldacrorc=/tmp/pdf2ps.$$a
+	cp "$acrorc" "$oldacrorc" \
+		|| { echo "$0: can't save old $acrorc, bailing out" >&2
+		     rm -f "$oldacrorc"
+		     exit 1
+		   }
+      }
+
+{ echo "*PSLevel: 1"
+  echo "*EmitHalftones: false"
+} >"$acrorc"
+
+cat ${1+"$@"} \
+	| acroread -toPostScript \
+	| sed \
+	  \
+':top
+/^\/Level2?/!b nl2
+n
+n
+a\
+/Level2? { false } def
+:nl2
+/^\/HT here { sethalftone } if$/s/^/% /'
+
+xit=0
+
+if [ -n "$oldacrorc" ]
+then
+    if cat "$oldacrorc" >"$acrorc"
+    then
+	rm -f "$oldacrorc"
+    else
+	echo "$0: can't restore old $acrorc, copy left in $oldacrorc" >&2
+	xit=1
+    fi
+else
+    rm -f "$acrorc"
+fi
+
+exit $xit
