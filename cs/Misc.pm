@@ -60,7 +60,7 @@ sub ::log
 ## 	  new $class @_;
 ## 	}
 
-sub member
+sub ::member
 { my($str)=shift;
   scalar(grep($_ eq $str,@_));
 }
@@ -86,8 +86,26 @@ sub ::uniq
   wantarray ? @u : [ @u ];
 }
 
-sub max	{ cs::Math::max(@_) }
-sub min	{ cs::Math::min(@_) }
+sub ::max	{ cs::Math::max(@_) }
+sub ::min	{ cs::Math::min(@_) }
+
+# merge one hash into another
+sub addHash($$)
+{ my($h1,$h2)=@_;
+
+  for my $k (keys %$h2)
+  { $h1->{$k}=$h2->{$k};
+  }
+}
+
+# remove keys of one hash from another
+sub subHash($$)
+{ my($h1,$h2)=@_;
+
+  for my $k (keys %$h2)
+  { delete $h1->{$k};
+  }
+}
 
 sub detab($;$)	# (tabbed,tabsize) -> untabbed
 { my($line,$tabsize)=@_;
