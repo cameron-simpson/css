@@ -210,10 +210,26 @@ sub mrginto($$$$)
   }
 
   # check for hard link - probably means merging tree with self
-  my($sdev,$sino)=@s;
+  my($sdev,$sino,$smode,$snlink)=@s;
   my($tdev,$tino)=@t;
   if ($sino == $tino && $sdev == $tdev)
-  { warn "$::cmd: $file and $dirfile "
+  {
+    if ($snlink > 1)
+    # check that these files are distinct hard links
+    # if so we can remove one safely
+    {
+      my $sdir = cs::Pathname::dirname($file);
+      my $tdir = cs::Pathname::dirname($dirfile);
+      my @sd = stat($sdir);
+      my @td = stat($tdir);
+      if (@sd && @td && ($sd[0] != $td[0]  || $sd[1] != $td[1]))
+      # different dirs - unlink source file anyway
+      { ##warn "$::cmd: $file and $dirfile are distinct hard links, removing $file\n";
+	return 2;
+      }
+    }
+
+    warn "$::cmd: $file and $dirfile "
 	.($s[3] == 1 ? "are the same file!" : "hardlinked")
 	.", not merged\n";
     return 0;
