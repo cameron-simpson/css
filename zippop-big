@@ -1,10 +1,3 @@
 #!/bin/sh
-##exec nphssh "dsa-bigpop-${SYSTEMID}2zip" zip
-set nc bigmail.zip.com.au 110
-##case $SYSTEMID in
-##    home)	;;
-##    cisra)	set ssh upnp exec "$@" ;;
-##esac
-set sshb zip exec "$@"
 set -x
-exec "$@"
+exec sshb zip exec ./scripts/rigenv-trivial lock -1 bigmail.zip.com.au nc -q 5 bigmail.zip.com.au 110
