@@ -10,51 +10,138 @@
 #
 
 cmd=$0
-usage="Usage: $cmd [[-r] deskname]"
+usage="Usage: $cmd [-a] [-d statedir] [[-r] deskname [param [value]]]"
 
+badopts=
+
+all=
 statedir=$HOME/var/desktop/$HOST
+deskname=
+rmdesk=
+
+while :
+do
+  case $1 in
+    -a)	all=1 ;;
+    -d)	statedir=$2; shift ;;
+    -r)	rmdesk=1 ;;
+    -?*)echo "$cmd: unrecognised option: $1" >&2; badopts=1 ;;
+    --)	shift; break ;;
+    *)	break ;;
+  esac
+  shift
+done
+
+deskname=$1; shift
+if [ $# = 0 ]
+then  param=
+else  param=$1; shift
+      case "$param" in
+	*/* | . | ..) echo "$cmd: bad parameter name \"$param\"" >&2
+		      badopts=1 ;;
+      esac
+      if [ $# = 0 ]
+      then haspvalue=
+	   pvalue=
+      else haspvalue=1
+	   pvalue=$1; shift
+	   [ $rmdesk ] && { echo "$cmd: can't use -r with parameter values" >&2
+			    badopts=1
+			  }
+	   [ $# = 0 ] || { echo "$cmd: extra arguments: $*" >&2; badopts=1; }
+      fi
+fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
 
 [ -d "$statedir/." ] || mkdir -p "$statedir" || exit 1
 cd "$statedir" || exit 1
 
-if [ $# = 0 ]
+if [ -z "$deskname" ]
 then
+    if [ $rmdesk ]
+    then
+	echo "$cmd: -r: missing deskname" >&2
+	echo "$usage" >&2
+	exit 2
+    fi
+
     # list desks
-    grep . [1-9]*/name /dev/null 2>/dev/null | sed 's|/name:| |'
+    grep . [1-9]*/name /dev/null 2>/dev/null \
+    | sed 's|/name:| |' \
+    | if [ $all ]
+      then  sed 's/^\([0-9][0-9]* \)\./\1/'
+      else  sed '/^[0-9][0-9]* \./d'
+      fi
     exit 0
 fi
 
-rmdesk=
-[ "x$1" = "x-r" ] && { rmdesk=1; shift
-		       [ $# = 0 ] && { echo "$cmd: -r: missing deskname" >&2
-				       echo "$usage" >&2
-				       exit 2
-				     }
-		     }
+deskdir=
+case "$deskname" in
+    *[^0-9]*)
+	for namefile in [1-9]*/name
+	do  [ -s "$namefile" ] || continue
 
-deskname=$1; shift
-[ $# = 0 ] || { echo "$cmd: extra arguments: $*" >&2; exit "$usage" >&2; exit 2; }
+	    tryname=$(<$namefile) || continue
+	    if [ "x$deskname" = "x$tryname" ] \
+	    || [ -n "$all" -a "x.$deskname" = "x$tryname" ]
+	    then
+		deskdir=`dirname "$namefile"`
+		break
+	    fi
+	done
+	;;
+    *)	deskdir=$deskname
+	needdir "$deskdir" || exit 1
+	;;
+esac
 
-[ -n "$deskname" ] || { echo "$cmd: empty desk names not permitted" >&2; exit 1; }
-
-for name in [1-9]*/name
-do  [ -s "$name" ] || continue
-    tryname=`cat "$name"` || continue
-    if [ "x$deskname" = "x$tryname" ]
+if [ -z "$deskdir" ]
+then
+    if [ $rmdesk ]
     then
-	deskdir=`dirname "$name"`
-	if [ $rmdesk ]
-	then
-	    rm -r "$deskdir" || exit 1
-	else
-	    echo "$deskdir"
-	fi
-	exit 0
+      echo "$cmd: -r: no desk named \"$deskname\"" >&2
+      exit 1
     fi
-done
 
-[ $rmdesk ] && { echo "$cmd: -r: no desk named \"$deskname\"" >&2; exit 1; }
+    deskdir=`mkdirn ''` || exit 1
+    echo "$deskname" >"$deskdir/name"
+    echo "$deskdir"
+fi
 
-newdesk=`mkdirn ''` || exit 1
-echo "$deskname" >"$newdesk/name"
-echo "$newdesk"
+if [ $rmdesk ]
+then
+  if [ -n "$param" ]
+  then rm "$deskdir/$param" || exit 1
+  else rm -r "$deskdir" || exit 1
+  fi
+else
+  if [ -n "$param" ]
+  then
+    pfile=$deskdir/$param
+    if [ $haspvalue ]
+    then
+      # store new parameter
+      echo "$pvalue" >"$pfile"
+      # some parameters have side effects
+      case "$param" in
+	  name)	if [ -n "$DISPLAY" ]
+		then
+		  case "$pvalue" in
+		    .*)	name=`expr "x$pvalue" : 'x.\(.*\)'` ;;
+		    *)	name=$pvalue ;;
+		  esac
+		  fvwmcmd "DesktopName $deskdir $name" &
+		fi
+		;;
+      esac
+    else
+      if [ -s "$pfile" ]
+      then echo "$(<$deskdir/$param)"
+      else echo
+      fi
+    fi
+  else
+    echo "$deskdir"
+  fi
+fi
