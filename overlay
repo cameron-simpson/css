@@ -5,12 +5,12 @@
 #
 
 cmd=$0
-usage="Usage: $cmd srcdir destdir"
+usage="Usage: $cmd srcdir destdir [findopts...]"
 
 [ $# = 2 ] || { echo "$usage" >&2; exit 2; }
-src=$1 dest=$2
+src=$1 dest=$2; shift; shift
 
 dest=`cd "$dest" || exit 1; pwd` || exit 1
 
 cd "$src" || exit 1
-find . -type f -print | xxargs mrg -rp "$dest/."
+find . -type f ${1+"$@"} -print | xxargs mrg -rp "$dest/."
