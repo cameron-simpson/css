@@ -1,0 +1,5 @@
+#!/bin/sh
+
+[ $# = 0 ] && { echo "$0: missing arguments" >&2; exit 2; }
+
+"$@" | grep -v "^$HOST\$"
