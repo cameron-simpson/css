@@ -1,0 +1,2 @@
+#!/bin/sh
+sed 200q $HOME/var/log/dlog | lz ${1+"$@"}
