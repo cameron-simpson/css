@@ -15,7 +15,6 @@ case $shell-$SYSTEMID-$ARCH in
 			exec "$SHELL" ${1+"$@"} ;;
     sh-*)		shell=/bin/sh ;;
     bash-*-sun.*.solaris) shell=/opt/bin/bash ;;
-    bash-cisra-freebsd.x86.freebsd) shell=/usr/local/bin/bash ;;
     bash-*)		shell=/bin/bash ;;
     ae-*)		shell=$HOME/bin/$ARCH/ae ;;
     ksh-*)		shell=/bin/ksh ;;
