@@ -1,0 +1,50 @@
+#!/bin/sh
+#
+# X window -> PostScript.
+#
+
+cmd=`basename "$0"`
+usage="Usage: $cmd [-g] [-x] [-d DISPLAY] [-Pprinter] [--]
+	-g		Convert to greyscale.
+	-x		Run xwd to collect the window instead of reading XWD
+			data from stdin.
+	-d DISPLAY
+    or	-display DISPLAY Run xwd on the specified DISPLAY. Implies -x.
+	-Pprinter	Send PostScript to specified printer instead of stdout.
+
+If no options are given \$XWDTOPS_ARGS is consulted for defaults."
+
+case $1 in
+    -*)	;;
+    *)	set x $XWDTOPS_ARGS; shift ;;
+esac
+
+input=
+grey=
+print=
+while :
+do
+    case "$1" in
+	-g)	grey='ppmtopgm | ' ; shift ;;
+	-x)	input='xwd |' ; shift ;;
+	-d|-display)
+		DISPLAY=$2; export DISPLAY
+		shift; shift; set x -x; shift
+		;;
+	-P)	print="| lz -1 '-P$2'" ; shift; shift ;;
+	-P*)	print="| lz -1 '$1'" ; shift ;;
+	--)	shift; break ;;
+	-*)	echo "$cmd: $1: unrecognised option" >&2
+		badopts=1
+		shift
+		;;
+	*)	break ;;
+    esac
+done
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+pipeline="$input xwdtopnm | $grey pnmtops $print"
+
+set -vx
+eval "$pipeline"
