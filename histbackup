@@ -33,6 +33,7 @@ usage="Usage:	$cmd [--rsync-path rrsync] [--no-copy] [--mono] [host:]source back
 	$cmd [--rsync-path rrsync] [--no-copy] [--mono] --inplace parent [rsyncopts...]
 	$cmd [--no-copy] --linkonly parent
 
+	-v, --verbose	Verbose. Passed to rsync.
 	--inplace	In addition to the dated subdirectories in the backupdir,
 			take the source to be backupdir/current.
 	--mono		Monotonic growth - don't pass --delete to the rsync pass.
@@ -55,14 +56,13 @@ inplace=
 linkonly=
 ltargs=
 rrsync=rsync
-
-if [ -t 1 ]
-then  echo=echo
-else  echo=:
-fi
+rsopts=
+verbose=
+[ -t 1 ] && verbose=1
 
 while :
 do case $1 in
+    -v|--verbose) verbose=1 ;;
     --inplace)	inplace=1 ;;
     --mono|--no-delete)
 		mono=1 ;;
@@ -135,6 +135,12 @@ esac
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
+if [ $verbose ]
+then  echo=echo
+      rsopts="$rsopts -v"
+else  echo=:
+fi
+
 # locate to most recent backup, if any
 lastbackup=`cd "$dest" || exit 1; ls -dr [0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]* 2>/dev/null | sed 1q`
 
@@ -154,9 +160,6 @@ fi
 if [ $mono ]; then delete=
               else delete=--delete
 fi
-if [ -t 1 ];  then vflag=-v
-              else vflag=
-fi
 
 xit=0
 
@@ -173,7 +176,7 @@ then
 	echo "$thisbackup" >&3
     else
 	$echo "updating $thisbackup from $src ..."
-	rsync -aH $vflag $delete --rsync-path "$rrsync" ${1+"$@"} "$src/." "$dest/$thisbackup/."
+	rsync $rsopts -aH $delete --rsync-path "$rrsync" ${1+"$@"} "$src/." "$dest/$thisbackup/."
 	xit=$?
     fi
 else
@@ -197,7 +200,7 @@ else
 	if [ $use_rsync ]
 	then
 	    mkdir "$dest/$thisbackup" || exit 1
-	    rsync -aH $vflag --rsync-path "$rrsync" ${1+"$@"} "$src/." "$dest/$thisbackup/."
+	    rsync $rsopts -aH --rsync-path "$rrsync" ${1+"$@"} "$src/." "$dest/$thisbackup/."
 	else
 	    cpdir "$src" "$dest/$thisbackup"
 	fi
