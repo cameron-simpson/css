@@ -30,7 +30,7 @@ case "$HOST@$SYSTEMID" in
 		;;
 esac
 
-for mutt in /opt/mutt-1.5.5.1/bin/mutt /opt/mutt-1.4i-patched/bin/mutt /opt/mutt-cvs/bin/mutt /opt/mutt/bin/mutt /usr/bin/mutt
+for mutt in /opt/mutt-1.5.5.1-nntp.vvv/bin/mutt /opt/mutt-1.4i-patched/bin/mutt /opt/mutt-cvs/bin/mutt /opt/mutt/bin/mutt /usr/bin/mutt
 do  [ -f "$mutt" ] && { set -x; exec "$mutt" ${1+"$@"}; }
 done
 
