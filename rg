@@ -5,7 +5,7 @@
 #
 
 cmd=$0
-usage="Usage: $cmd [-g grep] [-l] string [paths...]"
+usage="Usage: $cmd [-g grep] [-l] [-v] string [paths...]"
 
 grep=fgrep
 flags=
@@ -15,7 +15,7 @@ while :
 do
   case $1 in
     -g) grep=$2; shift ;;
-    -l) flags="$flags $1" ;;
+    -[lv]) flags="$flags $1" ;;
     --)	shift; break ;;
     -?*)echo "$cmd: unrecognised option: $1" >&2; badopts=1 ;;
     *)	break ;;
