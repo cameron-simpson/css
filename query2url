@@ -1,0 +1,42 @@
+#!/usr/bin/perl
+#
+# Emit a GET URL embodying the specified query.
+#	- Cameron Simpson <cs@zip.com.au> 17may97
+#
+
+use cs::HTML;
+
+($cmd=$0) =~ s:.*/::;
+$usage="Usage: $cmd action-URL [field=value]...\n";
+
+$badopts=0;
+
+if (! @ARGV)
+	{ warn "$cmd: missing action-URL\n";
+	  $badopts=1;
+	}
+else
+{ $URL=shift(@ARGV);
+
+  for (@ARGV)
+	{ if (/^([^=]+)=/)
+		{ $Q{$1}=$';
+		}
+	  else
+	  { warn "$cmd: bad query field: $_\n";
+	    $badopts=1;
+	  }
+	}
+}
+
+die $usage if $badopts;
+
+print enquery($URL),
+	'?', join('&',
+		  map(enquery($_)."=".enquery($Q{$_}),
+		      sort keys %Q)),
+	"\n";
+
+exit 0;
+
+sub enquery { cs::HTML::quoteQueryField(@_); }
