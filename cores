@@ -1,0 +1,8 @@
+#!/bin/sh
+
+dir=.
+case "$1" in
+    ''|-*)	;; *) dir=$1; shift ;;
+esac
+
+exec find "$dir" -type f -name core -print ${1+"$@"}
