@@ -45,22 +45,17 @@ fi
 
 if needdir $cssdir/bin
 then
+  rm -f $cssdir/bin/cs
   rsync -aH \
 	--copy-links \
 	--copy-unsafe-links \
 	--delete \
 	--delete-excluded \
 	--exclude=CVS/ \
-	--exclude='defunct/' \
 	--include=/0README.txt \
 	--include=/CHANGELOG.txt \
 	--include=/CHANGELOG.html \
 	--exclude='/*/' \
-	--include='/cs/**.pm' \
-	--include='/cs/**.py' \
-	--include='/cs/**.pyc' \
-	--include='/cs/**/' \
-	--exclude='/cs/**' \
 	$HOME/scripts/. $cssdir/bin/.
 
   rsync -aH \
@@ -94,6 +89,8 @@ then
 	--exclude=CVS/ \
 	--include='*/' \
 	--include='*.pm' \
+	--include='*.py' \
+	--include='*.pyc' \
 	--exclude='*' \
 	$HOME/scripts/cs/. $cssdir/lib/cs/.
 fi
