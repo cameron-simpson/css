@@ -22,6 +22,18 @@ my $method=GET;
 my $me='http://cgi.zip.com.au/~cs/cgi-bin/search.cgi';
 
 my %E=(
+	# CISRA internal web
+	WEB,	[ 'http://web/websearch/cgi-bin/htsearch.cgi',
+		{ 'restrict'	=> '',
+		  'exclude'	=> '',
+		  'config'	=> 'htdig',
+		  'method'	=> 'and',
+		  'format'	=> 'builtin-long',
+		  'sort'	=> 'score',
+		  'words'	=> $query,
+		  'page'	=> 1,
+		},
+		],
 	YAHOO,	[ 'http://au.search.yahoo.com/search/aunz',
 		{ 'o'		=> 1,
 		  'p'		=> $query,
