@@ -13,8 +13,8 @@ clause=$2
 prefix=$3
 
 case "$prefix" in
-  ''|*[!a-z]*)
-    echo "$cmd: bad prefix \"$prefix\" - must be [a-z]+" >&2
+  ''|*[!a-zA-Z]*)
+    echo "$cmd: bad prefix \"$prefix\" - must be [a-zA-Z]+" >&2
     exit 2
     ;;
 esac
