@@ -429,23 +429,29 @@ sub ClearEOF
 sub Read
 { my($this,$size)=@_;
 
-  # for some weird reason IO reseeks to 0 on EOF on SunOS,
-  # hence this hack
-  return '' if ($this->{FLAGS}&($cs::IO::F_STICKYEOF|$cs::IO::F_HADEOF))
-	    == ($cs::IO::F_STICKYEOF|$cs::IO::F_HADEOF);
-
   $size=$this->ReadSize() if ! defined $size;
 
   my($type)=$this->{TYPE};
   local($_);
   my($n);
 
+  # check for buffered data
   if (length ($_=$this->_FromBuf($size)))
   # pending data
-  { return $_;
+  { ## warn "returned buffered data [$_]\n";
+    return $_;
   }
 
   # nothing buffered, get data from the source
+
+  # for some weird reason IO reseeks to 0 on EOF on SunOS,
+  # hence this hack
+  if ( ($this->{FLAGS}&($cs::IO::F_STICKYEOF|$cs::IO::F_HADEOF))
+    == ($cs::IO::F_STICKYEOF|$cs::IO::F_HADEOF)
+     )
+  { return '';
+  }
+
   if ($type eq FILE)
   { my($io)=$this->{IO};
     $n=($cs::Source::_UseIO
@@ -455,6 +461,8 @@ sub Read
     { warn "$::cmd: Source::Read($this($io),$size): $!";
       return undef;
     }
+
+    ## warn "read $n bytes [$_]";
 
     # clear error flag if we hit EOF
     if ($n == 0)
