@@ -7,10 +7,9 @@
 cmd=$0
 usage="Usage: $0 [some-mutt-options...] [mutt-folder]"
 
-needhost "$HOMEHOST@$SYSTEMID" || exit 1
-
 mfolder=+attn
 muttopts=
+anyhost=
 
 badopts=
 while :
@@ -31,8 +30,8 @@ then
   case $1 in
     /*)		mfolder=$1 ;;
     +*)		mfolder=$1 ;;
-    imap:*)	mfolder=$1 ;;
-    *.*)	mfolder=nntp://$NNTPSERVER/$1 ;;
+    imap:*)	mfolder=$1 anyhost=1 ;;
+    *.*)	mfolder=nntp://$NNTPSERVER/$1 anyhost=1 ;;
     *)		mfolder=+$1 ;;
   esac
   shift
@@ -41,10 +40,13 @@ fi
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
+[ $anyhost ] || needhost "$HOMEHOST@$SYSTEMID" || exit 1
+
 cd || exit 1
 [ -s "$HOME/rc/mail/muttsh.$mfolder" ] && . "$HOME/rc/mail/muttsh.$mfolder"
 export mfolder
+set -x
 exec \
 	term $termopts +ip -n "mutt $mfolder" \
-	scr "mutt_$mfolder" \
-	sh -c "exec mutt -f \"\$mfolder\" $muttopts"
+	sh -c "set -x; exec mutt -f \"\$mfolder\" $muttopts"
+##scr "mutt_$mfolder" \
