@@ -33,7 +33,7 @@ myke || exit 1
 
 rsync -avHPW --delete $HOME/there/adzapper.sourceforge.net/html/. sf:adzapper/htdocs/.
 
-if $dopost
+if [ $dopost ]
 then
     cd $zapdir/html/scripts || exit 1
     ( cd .. || exit 1
