@@ -62,8 +62,6 @@ if (! @phonelists)
   for (split(/:/,$telnos))
   { unshift(@phonelists,$_) if -e $_;
   }
-
-  warn "phonelists=[@phonelists]";
 }
 
 if (! @ARGV)
