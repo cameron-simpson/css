@@ -26,4 +26,4 @@ histbackup --inplace --symlink LATEST "$syncdir" \
 
 echo
 set -x
-exec pilot-xfer -s "$syncdir/current"
+exec pilot-xfer -p "$PILOTPORT" -s "$syncdir/current"
