@@ -30,6 +30,8 @@ BEGIN { use cs::DEBUG; cs::DEBUG::using(__FILE__); }
 
 use cs::Misc;
 use cs::Legato::Networker::Tape;
+use cs::Legato::Networker::Dump;
+use cs::Legato::Networker::Client;
 
 package cs::Legato::Networker;
 
@@ -51,13 +53,32 @@ sub tapes()
 { &cs::Legato::Networker::Tape::tapes;
 }
 
+=item clients()
+
+Return a list of the client names known.
+
+=cut
+
+sub clients()
+{ &cs::Legato::Networker::Client::clients;
+}
+
 =back
 
 =head1 OBJECT CREATION
 
 =over 4
 
+=item tape(I<label>)
+
+Return the B<cs::Legato::Networker::Tape> object with the specified I<label>
+or B<undef> if none.
+
 =cut
+
+sub tape($)
+{ &cs::Legato::Networker::Tape::find;
+}
 
 =back
 
