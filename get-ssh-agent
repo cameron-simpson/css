@@ -7,24 +7,24 @@
 cmd=$0
 usage="Usage: $cmd [-v] [statefile]"
 
-state=
+statefile=
 verbose=
 
 badopts=
 
 [ "x$1" = x-v ] && { verbose=1; shift; }
 
-[ $# = 0 ] || state=$1; shift
+[ $# = 0 ] || statefile=$1; shift
 
 [ $# = 0 ] || { echo "$cmd: extra arguments: $*" >&2; badopts=1; }
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
-[ -n "$state" ] || state=`ssh-agent-statefile` || exit 1
+[ -n "$statefile" ] || statefile=`ssh-agent-statefile` || exit 1
 
-[ -s "$state" ] \
-&& . "$state" \
+[ -s "$statefile" ] \
+&& . "$statefile" \
 && [ -n "$SSH_AGENT_PID" ] \
 && kill -0 "$SSH_AGENT_PID" 2>/dev/null \
-&& echo ". '$state'" \
+&& echo ". '$statefile'" \
 && { [ -z "$verbose" ] || ssh-add -l >&2; }
