@@ -1,0 +1,24 @@
+#!/usr/bin/perl
+
+use cs::Persist;
+
+$::AUTHDB="$ENV{HOME}/private/httpauth.db";
+$::db=cs::Persist::db($::AUTHDB,1);
+$::db=$::db->{BASIC};
+
+# host realm userid password
+if (@ARGV != 4)
+{ die "Usage: $0 host realm userid password\n";
+}
+
+my($host,$realm,$userid,$password)=@ARGV;
+$host=lc($host);
+$::db->{$host}={} if ! exists $::db{$host};
+$::db=$::db->{$host};
+$::db->{$realm}={ USERID => $userid, PASSWORD => $password };
+
+undef $::db;
+
+cs::Persist::finish();
+
+exit 0;
