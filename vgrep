@@ -1,0 +1,69 @@
+#!/usr/bin/perl
+#
+# Visual grep.
+#
+
+use cs::Upd;
+
+($cmd=$0) =~ s:.*/::;
+$usage="Usage: $cmd {-e perlcode | pattern} [files...]
+	-e perlcode	Embed perl code in a function:
+			    sub _ { local($_)=@_;
+				    perlcode;
+				  }
+			Print lines for which this returns true.
+	pattern		Full Perl regexp.
+";
+
+undef $perlcode;
+
+$badopts=0;
+
+ARGV:
+while (defined($_=shift))
+{ last ARGV if $_ eq '--';
+  (unshift(@ARGV,$_), last ARGV) if !/^-./;
+
+  if ($_ eq '-e')	{ $perlcode=shift;
+			  if (!defined($perlcode))
+			  { warn "$cmd: missing perlcode for $_\n";
+			    $badopts=1;
+			  }
+			}
+  else
+  { warn "$cmd: $_: unrecognised option\n";
+    $badopts=1;
+  }
+}
+
+die $usage if $badopts;
+
+if (defined($perlcode))
+{ eval 'sub _ { '.$perlcode.'; }';
+  die "$cmd: [$perlcode]: $@\n" if $@;
+}
+elsif (!defined($perlcode))
+{ $perlcode=shift;
+  if (!defined($perlcode))
+  { warn "$cmd: missing pattern\n";
+    $badopts=1;
+  }
+  else
+  { warn "looking for /$perlcode/\n";
+    eval 'sub _ { /$perlcode/o; }';
+    die "$cmd: /$perlcode/: $@\n" if $@;
+  }
+}
+
+die $usage if $badopts;
+
+$found=0;
+while (<>)
+{ chop;
+  if (&_)	{ nl($_); $found=1; }
+  else		{ out($_); }
+}
+
+out('');
+
+exit !$found;
