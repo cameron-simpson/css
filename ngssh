@@ -1,0 +1,17 @@
+#!/bin/sh
+#
+# Bgssh to a netgroup.
+#	- Cameron Simpson <cs@zip.com.au> 08feb2001
+#
+
+[ $# -lt 2 ] && { echo "Usage: $0 netgroup command" >&2; exit 2; }
+
+ngrs=$1; shift
+
+( for h in `ngr $ngrs | wired`
+  do  bgssh "$h" "$*"
+      sleep 1
+  done &
+) &
+
+exit 0
