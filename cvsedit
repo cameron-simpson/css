@@ -5,7 +5,10 @@
 #
 
 cmd=`basename "$0"`
-usage="Usage: $cmd [-m logmessage] file [command [args...]]
+usage="Usage: $cmd [-f] [-m logmessage] file [command [args...]]
+	-f		Command is a filter.
+			The file will be editing with filteredit,
+			with the current content of the file available on stdin.
 	-m logmessage	Specify log message."
 
 cameron=
@@ -20,10 +23,13 @@ fi
 dodl=$cameron
 dodiff=1
 
+isfilter=
+
 badopts=
 
 while :
 do  case $1 in
+	-f)	isfilter=1 ;;
 	-m)	havemsg=1 msg=$2; shift ;;
 	--diff)	dodiff=1 ;;
 	--no-diff) dodiff= ;;
@@ -72,7 +78,11 @@ editcmd=$*
   chmod +w "$base"
 ) || exit 1
 
-"$@" "$file"
+if [ $isfilter ]
+then set filteredit "$file" "$@"; exec <"$file"
+else set x "$@" "$file"; shift
+fi
+(set -x; "$@")
 editxit=$?
 
 [ $dodiff ] \
@@ -80,13 +90,15 @@ editxit=$?
      cvs diff "$base"
    )
 
-[ $editxit = 0 ] || ask "$* failed - really commit the file" || exit 1
+[ $editxit = 0 ] \
+|| { [ -t 0 ] && ask "$* failed - really commit the file"; } \
+|| exit 1
 
-[ $havemsg ] || { necho "Log message? "
-		  read msg
-		} || { echo "$cmd: commit cancelled - file in modified state" >&2
-		       exit 1
-		     }
+[ $havemsg ] \
+|| { [ -t 0 ] && { necho "Log message? "; read msg; }; } \
+|| { echo "$cmd: commit cancelled - file in modified state" >&2
+     exit 1
+   }
 
 if [ $dodl ] && [ -n "$msg$editcmd" ]
 then
