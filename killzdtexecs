@@ -1,0 +1,17 @@
+#!/bin/sh
+#
+# CDE under Solaris 8 leaks dtexec processes.
+# This script tidies up.
+#	- Cameron Simpson <cs@zip.com.au> 17oct2001
+#
+
+ps -ef \
+| awk '$6 == "<defunct>" { zombieparents[$3]=1 }
+       $8 == "/usr/dt/bin/dtexec" { dtexecs[$2]=1 }
+       END { for (pid in zombieparents)
+	       if (dtexecs[pid])
+		 print pid
+	   }' \
+| while read pid
+  do  (set -x; kill -9 "$pid")
+  done
