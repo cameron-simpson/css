@@ -382,164 +382,164 @@ sub ImageIndices($)
 
 $cs::IM2HTML::_shellFD=0;
 sub _shell
-	{ if (! $cs::IM2HTML::_shellFD)
-		{ if (! open(_shellFD,"| exec nice /bin/sh"))
-			{ warn "can't pipe to /bin/sh: $!";
-			  return undef;
-			}
-
-		  $cs::IM2HTML::_shellFD=1;
+{ if (! $cs::IM2HTML::_shellFD)
+	{ if (! open(_shellFD,"| exec nice /bin/sh"))
+		{ warn "can't pipe to /bin/sh: $!";
+		  return undef;
 		}
 
-	  ## warn "@_";
-	  print _shellFD @_;
-	  &'flush(cs::IM2HTML::_shellFD);
+	  $cs::IM2HTML::_shellFD=1;
 	}
+
+  ## warn "@_";
+  print _shellFD @_;
+  &'flush(cs::IM2HTML::_shellFD);
+}
 
 sub ThumbOf($$)
-	{ my($this,$im)=@_;
+{ my($this,$im)=@_;
 
-	  my($x,$y)=$this->ImageSize($im);
-	  my($xs,$ys)=$this->XYScale($x,$y);
+  my($x,$y)=$this->ImageSize($im);
+  my($xs,$ys)=$this->XYScale($x,$y);
 
-	  ($xs == $x && $ys == $y)
-	  ? $im				# small enough to leave alone
-	  : $this->DotDirRPath("$im.".lc($this->{THUMBTYPE}))
-	  ;
-	}
+  ($xs == $x && $ys == $y)
+  ? $im				# small enough to leave alone
+  : $this->DotDirRPath("$im.".lc($this->{THUMBTYPE}))
+  ;
+}
 
 sub ThumbSize($$)
-	{ my($this,$im)=@_;
-	  if (! exists $this->{THSIZE}->{$im})
-	  { $this->{THSIZE}->{$im}=[ $this->XYScale(
-	  				$this->ImageSize($im)) ];
-	  }
+{ my($this,$im)=@_;
+  if (! exists $this->{THSIZE}->{$im})
+  { $this->{THSIZE}->{$im}=[ $this->XYScale(
+				$this->ImageSize($im)) ];
+  }
 
-	  @{$this->{THSIZE}->{$im}};
-	}
+  @{$this->{THSIZE}->{$im}};
+}
 
 sub ImageSize($$)
-	{ my($this,$im)=@_;
-	  if (! exists $this->{IMSIZE}->{$im})
-	  { $this->{IMSIZE}->{$im}=[ Image::Size::imgsize(
-					$this->SubPath($im)) ];
-	  }
+{ my($this,$im)=@_;
+  if (! exists $this->{IMSIZE}->{$im})
+  { $this->{IMSIZE}->{$im}=[ Image::Size::imgsize(
+				$this->SubPath($im)) ];
+  }
 
-	  @{$this->{IMSIZE}->{$im}};
-	}
+  @{$this->{IMSIZE}->{$im}};
+}
 
 sub FileSize($$)
-	{ my($this,$rpath)=@_;
-	  my @s = stat($this->SubPath($rpath));
-	  return undef if ! @s;
-	  $s[7];
-	}
+{ my($this,$rpath)=@_;
+  my @s = stat($this->SubPath($rpath));
+  return undef if ! @s;
+  $s[7];
+}
 
 sub niceSize($)
-	{ my($size)=@_;
+{ my($size)=@_;
 
-	  if ($size < 1024)	{ "${size}c"; }
-	  else
-	  { $size=int($size/1024);
-	    if ($size < 1024)	{ "${size}k"; }
-	    else
-	    { $size=int($size/1024);
-	      if ($size < 1024)	{ "${size}M"; }
-	      else
-	      { $size=int($size/1024);
-		if ($size < 1024){ "${size}G"; }
-		else
-		{ $size=int($size/1024);
-		  "${size}T";
-		}
-	      }
-	    }
-	  }
+  if ($size < 1024)	{ "${size}c"; }
+  else
+  { $size=int($size/1024);
+    if ($size < 1024)	{ "${size}k"; }
+    else
+    { $size=int($size/1024);
+      if ($size < 1024)	{ "${size}M"; }
+      else
+      { $size=int($size/1024);
+	if ($size < 1024){ "${size}G"; }
+	else
+	{ $size=int($size/1024);
+	  "${size}T";
 	}
+      }
+    }
+  }
+}
 
 # compute thumbnail size
 sub XYScale($$$;$$)
-	{ my($this,$x,$y,$maxx,$maxy)=@_;
-	  $maxx=$this->{THUMBMAX} if ! defined $maxx;
-	  $maxy=$maxx if ! defined $maxy;
+{ my($this,$x,$y,$maxx,$maxy)=@_;
+  $maxx=$this->{THUMBMAX} if ! defined $maxx;
+  $maxy=$maxx if ! defined $maxy;
 
-	  my $xscale = ($x > $maxx*1.1	# permit 10% bloat
-			? $maxx/$x
-			: 1
-		       );
-	  my $yscale = ($y > $maxy*1.1	# permit 10% bloat
-			? $maxy/$y
-			: 1
-		       );
+  my $xscale = ($x > $maxx*1.1	# permit 10% bloat
+		? $maxx/$x
+		: 1
+	       );
+  my $yscale = ($y > $maxy*1.1	# permit 10% bloat
+		? $maxy/$y
+		: 1
+	       );
 
-	  my $scale = ($xscale < $yscale ? $xscale : $yscale);
+  my $scale = ($xscale < $yscale ? $xscale : $yscale);
 
-	  (int($x*$scale), int($y*$scale));
-	}
+  (int($x*$scale), int($y*$scale));
+}
 
 sub MakeThumbnail($$;$)
-	{ my($this,$im,$force)=@_;
-	  $force=0 if ! defined $force;
+{ my($this,$im,$force)=@_;
+  $force=0 if ! defined $force;
 
-	  my $impath = $this->SubPath($im);
-	  die "$::cmd: no image \"$impath\"" if ! $this->IsFile($im);
+  my $impath = $this->SubPath($im);
+  die "$::cmd: no image \"$impath\"" if ! $this->IsFile($im);
 
-	  my $thpath = $this->ThumbOf($im);
+  my $thpath = $this->ThumbOf($im);
 
-	  return if ! $force && $this->{DIDTHUMB}->{$im};
+  return if ! $force && $this->{DIDTHUMB}->{$im};
 
-	  my($th);
+  my($th);
 
-	  $th=$this->ThumbOf($im);
-	  my $thpath = $this->SubPath($th);
-	  if (! cs::Pathname::needfiledir($thpath))
-	  { warn "$::cmd: can't make dir for $thpath: $!\n";
-	    return;
-	  }
+  $th=$this->ThumbOf($im);
+  my $thpath = $this->SubPath($th);
+  if (! cs::Pathname::needfiledir($thpath))
+  { warn "$::cmd: can't make dir for $thpath: $!\n";
+    return;
+  }
 
-	  ## warn "mkthumb for $im\n";
-	  $this->{DIDTHUMB}->{$im}=1;
-	  _shell("[ -s '$impath' ] && { "
-		 .( $force ? "" : "[ -s '$thpath' ] || ")
-		 ."thumbnail"
-		 .($im =~ /\.gif$/i
-		   ? ' -G'
-		   : $im =~ /\.png$/i
-		     ? ' -P'
-		     : $im =~ /\.jpg$/i
-		       ? ' -J'
-		       : ''
-		  )
-		 ." -m $this->{THUMBMAX}"
-		 ." <'$impath'"
-		 ." >'$thpath'"
-		 ."; }\n");
-	}
+  ## warn "mkthumb for $im\n";
+  $this->{DIDTHUMB}->{$im}=1;
+  _shell("[ -s '$impath' ] && { "
+	 .( $force ? "" : "[ -s '$thpath' ] || ")
+	 ."thumbnail"
+	 .($im =~ /\.gif$/i
+	   ? ' -G'
+	   : $im =~ /\.png$/i
+	     ? ' -P'
+	     : $im =~ /\.jpg$/i
+	       ? ' -J'
+	       : ''
+	  )
+	 ." -m $this->{THUMBMAX}"
+	 ." <'$impath'"
+	 ." >'$thpath'"
+	 ."; }\n");
+}
 
 sub FromParam
-	{ my($this,$param)=@_;
+{ my($this,$param)=@_;
 
-	  my $txt=$this->FromFile("$this->{PFX}.$param");
-	  # warn "param($param)=[$txt]";
-	  $txt;
-	}
+  my $txt=$this->FromFile("$this->{PFX}.$param");
+  # warn "param($param)=[$txt]";
+  $txt;
+}
 sub FromFile
-	{ my($this,$base)=@_;
-	  # warn "FromFile($base)";
+{ my($this,$base)=@_;
+  # warn "FromFile($base)";
 
-	  my($s);
+  my($s);
 
-	  return "" if ! defined ($s=$this->Source($base));
+  return "" if ! defined ($s=$this->Source($base));
 
-	  local($_);
+  local($_);
 
-	  $_=$s->Get();
+  $_=$s->Get();
 
-	  s/^\s+//;
-	  s/\s+$//;
-	  s/[ \t]+\n/\n/g;
+  s/^\s+//;
+  s/\s+$//;
+  s/[ \t]+\n/\n/g;
 
-	  $_;
-	}
+  $_;
+}
 
 1;
