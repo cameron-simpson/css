@@ -1,0 +1,7 @@
+#!/bin/sed -f
+#
+# Strip RFC822 headers from input.
+#	- Cameron Simpson 17feb95
+#
+
+1,/^$/d
