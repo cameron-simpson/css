@@ -53,7 +53,6 @@ fi \
       -e 's/ has address / /' \
       -e 's/\.research\.canon\.com\.au//' \
 | tr -s ' ' '\012' \
-| tee /dev/tty \
 > "$hlist"
 
 # gather keys
@@ -65,7 +64,11 @@ done
 wait
 cvsmsg=${CVSEDIT_MSG:-"new ssh keys from $cvshostnames"}
 
-cvsedit -0 -m "$cvsmsg" ssh_known_hosts1 mergesshkeys $LOCALDOMAINS <"$keys-rsa1"	|| exit 1
-cvsedit -0 -m "$cvsmsg" ssh_known_hosts2 mergesshkeys $LOCALDOMAINS <"$keys-rsa"	|| exit 1
-cvsedit -0 -m "$cvsmsg" ssh_known_hosts2 mergesshkeys $LOCALDOMAINS <"$keys-dsa"	|| exit 1
-cvsedit -f -m "$cvsmsg" ssh_known_hosts_all cat ssh_known_hosts1 ssh_known_hosts2	|| exit 1
+xit=0
+
+cvsedit -0 -m "$cvsmsg" ssh_known_hosts1 mergesshkeys $LOCALDOMAINS <"$keys-rsa1"	|| xit=1
+cvsedit -0 -m "$cvsmsg" ssh_known_hosts2 mergesshkeys $LOCALDOMAINS <"$keys-rsa"	|| xit=1
+cvsedit -0 -m "$cvsmsg" ssh_known_hosts2 mergesshkeys $LOCALDOMAINS <"$keys-dsa"	|| xit=1
+cvsedit -f -m "$cvsmsg" ssh_known_hosts_all set-x cat ssh_known_hosts1 ssh_known_hosts2	|| xit=1
+
+exit $xit
