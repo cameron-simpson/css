@@ -7,11 +7,11 @@
 #	- Cameron Simpson <cs@zip.com.au> 12jul2000
 #
 
-scsiid=5	# for my work CD burner, 6 is also common
+scsiid=4	# for my work CD burner, 6 is also common
 speed="speed=12"
 blank=
 dummy=
-dev=
+dev=${MKCDDEV:+dev=$MKCDDEV}
 
 # override scsiid or speed or blank here
 [ -f /etc/mkcdrc ] && . /etc/mkcdrc
