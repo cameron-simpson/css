@@ -470,6 +470,73 @@ sub delByKey
   return sqlWhere2($dbh,$sql,@_);
 }
 
+=item lookupDatedIds(I<dbh>,I<table>,I<srcidfield>,I<destidfield>,I<id>,I<when>)
+
+Return the ids from the field I<destidfield>
+for records from I<table> overlapping the date I<when>
+and which has I<srcidfield> equal to the supplied I<id>.
+The parameter I<when> is optional, and defaults to today.
+
+=cut
+
+sub lookupDatedIds($$$$$;$)
+{ my($dbh,$table,$srcfield,$destfield,$id,$when)=@_;
+  $when=cs::DBI::isodate() if ! defined $when;
+
+  my $sth = dosql($dbh,
+		  "SELECT $destfield FROM $table WHERE $srcfield = ? AND (ISNULL(START_DATE) OR START_DATE <= ?) AND (ISNULL(END_DATE) OR END_DATE >= ?)",
+		  $id,$when,$when);
+  if (!$sth)
+  { warn "$::cmd: lookupDatedIds($table,$srcfield=$id -> $destfield) fails";
+    return ();
+  }
+
+  my $h;
+  my @ids = ();
+  while (defined ($h=$sth->fetchrow_hashref()))
+  { push(@ids,$h->{$destfield});
+  }
+
+  return @ids;
+}
+
+=item followDatedRecords(I<dbh>,I<srctable>,I<desttable>,I<srcidfield>,I<destidfield>,I<desttableidfield>,I<id>,I<when>)
+
+Lookup the dated table I<srctable>
+and return the records from the table I<desttable> whose field I<desttableidfield>
+matches the field I<destidfield> from I<srctable>
+for records from I<srctable> overlapping the date I<when>
+and which has I<srcidfield> equal to the supplied I<id>.
+The parameter I<when> is optional, and defaults to today.
+
+=cut
+
+sub followDatedRecords($$$$$$$;$)
+{ my($dbh,$srctable,$desttable,$srcfield,$destfield,$desttablefield,$id,$when)=@_;
+  $when=cs::DBI::isodate() if ! defined $when;
+
+  my $sth = dosql($dbh,
+		  "SELECT t2.*
+			FROM $srctable as t1, $desttable as t2
+			WHERE t1.$srcfield = ?
+			  AND (ISNULL(t1.START_DATE) OR t1.START_DATE <= ?) AND (ISNULL(t1.END_DATE) OR t1.END_DATE >= ?)
+			  AND t2.$desttablefield = t1.$destfield",
+		  $id,$when,$when);
+
+  if (!$sth)
+  { warn "$::cmd: followDatedRecords($srctable,$srcfield=$id -> $desttable.$desttablefield) fails";
+    return ();
+  }
+
+  my $h;
+  my @rows = ();
+  while (defined ($h=$sth->fetchrow_hashref()))
+  { push(@rows,$h);
+  }
+
+  return @rows;
+}
+
 =item datedRecords(I<dbh>,I<table>,I<keyfield>,I<key>,I<when>,I<alldates>)
 
 Retrieve active records from the specified I<table>
