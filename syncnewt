@@ -5,7 +5,7 @@ needhost amadeus@home || exit 1
 [ $# = 0 ] || exec syncstuff @newt "$@"
 
 pfx small syncsmall @newt &
-for d in s im
+for d in s im cvs
 do  pfx $d syncstuff @newt $d &
 done
 
