@@ -1,11 +1,11 @@
-#!/bin/sh
+#!/bin/sh -x
 #
 # Generic open-a-window.
 #
 # Default location is tuned to my X11 setup (i.e. 103 pixels down from
 # the top of the screen).
 # The -big option is tuned to my X setup on a 1280x1024 screen.
-#	- Cameron Simpson, December 1991
+#	- Cameron Simpson <cs@zip.com.au> December 1991
 #
 
 : ${TMPDIR:=/tmp}
@@ -162,7 +162,7 @@ case "$TERM,$DISPLAY" in
 	;;
 esac
 
-##set -x
+set -x
 eval "$detach"
 eval "$closefds"
 if [ $async ]
