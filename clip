@@ -1,0 +1,61 @@
+#!/usr/bin/perl
+#
+# Usage: clip [-r] [-f] [width] [--] [files...]
+#
+
+$defwidth=79;
+
+($cmd=$0) =~ s:.*/::;
+$usage="Usage: $cmd [-r] [-p] [width] [--] [files...]
+	-r	Print rightmost characters instead of leftmost.
+	-p	Piping hot. Flush output after each line.
+	width	Specify width (default: $defwidth).
+";
+
+undef $width;
+$rhs=0;
+
+$badopts=0;
+ARGV:
+  while (defined($_=shift))
+	{ if (!defined($width) && /^\d+$/)
+		{ $width=$_+0;
+		}
+	  elsif (!/^-./)
+		{ unshift(@ARGV,$_);
+		  last ARGV;
+		}
+	  elsif ($_ eq '--')
+		{ last ARGV;
+		}
+	  elsif ($_ eq '-r')
+		{ $rhs=1;
+		}
+	  elsif ($_ eq '-p')
+		{ $"=1;
+		}
+	  else
+	  { print STDERR "$cmd: $_: unrecognised option\n";
+	    $badopts=1;
+	  }
+	}
+
+die $usage if $badopts;
+
+$width=$defwidth if !defined($width);
+
+while (defined ($_=<>))
+	{ chomp;
+	  if (length($_) > $width)
+		{ if ($rhs)
+			{ $_=substr($_,$[+length($_)-$width);
+			}
+	  	  else
+	  	  { $_=substr($_,$[,$width);
+		  }
+		}
+
+	  print $_, "\n";
+	}
+
+exit 0;
