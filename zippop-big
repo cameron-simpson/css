@@ -1,2 +1,3 @@
 #!/bin/sh
-exec nphssh "dsa-bigpop-${SYSTEMID}2zip" zip
+##exec nphssh "dsa-bigpop-${SYSTEMID}2zip" zip
+exec ssh zip nc bigmail.zip.com.au 110
