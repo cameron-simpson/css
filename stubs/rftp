@@ -1,5 +1,5 @@
 #!/bin/sh
 
-rftp=/usr/local/bin/rftp
+rftp=/opt/bin/rftp
 
 exec term -n "RFTP $*" -e ignhup "$rftp" ${1+"$@"}
