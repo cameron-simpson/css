@@ -1,0 +1,97 @@
+#!/bin/sh
+#
+# $# > 0	==> run cmd with this type of stock path
+# $# = 0	==> run a shell
+#
+
+cmd=`basename "$0"`
+
+case "$cmd" in
+   buildenv)
+	exec noldpath env BSEDOPTS= \
+			  LD_LIBRARY_PATH=/opt/lib:/lib:/usr/lib:/opt/X11R6/bin:/usr/openwin/lib:/usr/X11R6/lib:/opt/X11R6/lib \
+			  PATH=/bin:/usr/bin:/usr/ccs/bin:/opt/bin:/opt/script:/usr/openwin/bin:/usr/X11R6/bin:/opt/X11R6/bin:$PATH \
+			  ${1+"$@"}
+	;;
+   stdenv)
+	exec env - HOME=$HOME USER=$USER PATH=/bin:/usr/bin \
+		   SHELL=$SHELL TERM=$TERM \
+	     /bin/sh -c "exec 9>&1 1>/tmp/dummy\$\$
+			 exec 8<&0 0</tmp/dummy\$\$
+			 rm -f /tmp/dummy\$\$
+			 . /etc/profile
+			 exec <&8 >&9 8>&- 9>&-
+			 exec $*"
+	;;
+   cisraenv)
+	eval `setvar -n -f -d /usr/local/etc/shell/env STANDARD`
+	;;
+   tsenv)
+	. /usr/local/etc/cisra/timesheets/bin/.env
+	;;
+   rawpath)
+	PATH=`env - sh -c '. /etc/profile;echo $PATH'`:$PATH
+	;;
+   local)
+	PATH=/opt/script:/opt/bin:$PATH
+	;;
+   openwin)
+	PATH=/usr/openwin/bin:/usr/dt/bin:$PATH
+	LD_PATH=/usr/openwin/lib:/usr/dt/lib:$LD_PATH
+	LD_RUN_PATH=/usr/openwin/lib:/usr/dt/lib:$LD_RUN_PATH
+	LD_LIBRARY_PATH=/usr/openwin/lib:/usr/dt/lib:$LD_LIBRARY_PATH
+	MANPATH=/usr/openwin/man:/usr/dt/man:$MANPATH
+	INCPATH=/usr/openwin/include:/usr/dt/include:$INCPATH
+	export PATH LD_PATH LD_RUN_PATH LD_LIBRARY_PATH MANPATH INCPATH
+	;;
+   gnome)
+	GNOMEDIR=${GNOMEDIR:-/opt/gnome-1999-09-10}
+	export GNOMEDIR
+	PATH=$GNOMEDIR/bin:$PATH
+	LD_PATH=$GNOMEDIR/lib:$LD_PATH
+	LD_RUN_PATH=$GNOMEDIR/lib:$LD_RUN_PATH
+	LD_LIBRARY_PATH=$GNOMEDIR/lib:$LD_LIBRARY_PATH
+	MANPATH=$GNOMEDIR/man:$MANPATH
+	INCPATH=$GNOMEDIR/include:$INCPATH
+	export PATH LD_PATH LD_RUN_PATH LD_LIBRARY_PATH MANPATH INCPATH
+	;;
+   gnu)
+	for base in /usr/local/gnu /usr/gnu /opt/gnu /usr /
+	do  bin=$base/bin lib=$base/lib inc=$base/include
+	    [ -d "$bin/." ] || continue
+	    PATH=$bin:$PATH
+	    LD_PATH=$lib:$LD_PATH
+	    LD_RUN_PATH=$lib:$LD_RUN_PATH
+	    LD_LIBRARY_PATH=$lib:$LD_LIBRARY_PATH
+	    MANPATH=$man:$MANPATH
+	    INCPATH=$inc:$INCPATH
+	done
+	export PATH LD_PATH LD_RUN_PATH LD_LIBRARY_PATH MANPATH INCPATH
+	;;
+   ucb|bsd)
+	PATH=/usr/ucb:/usr/bsd:/usr/bin:/bin:$PATH
+	case $ARCH in
+	    apollo.*.domainos)	SYSTYPE=bsd4.3; export SYSTYPE ;;
+	esac
+	;;
+   att|sysv|sys5)
+	PATH=/usr/ccs/bin:/usr/bin:/bin:/usr/sbin:/sbin:/sys5/bin:$PATH
+	case $ARCH in
+	    apollo.*.domainos)	SYSTYPE=sys5.3; export SYSTYPE ;;
+	esac
+	;;
+   *)	echo "$cmd: unknown os variant" >&2
+	exit 2
+	;;
+esac
+
+export PATH
+
+if [ $# = 0 ]
+then
+    set x "${SHELL:-/bin/sh}"; shift;
+else
+    [ -t 1 ] && set colourise "$@"
+fi
+
+exec "$@"
