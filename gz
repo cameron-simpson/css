@@ -1,0 +1,2 @@
+#!/bin/sh
+exec gzip -v -9 ${1+"$@"}
