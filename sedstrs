@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 #
 # Tired of fighting with broken echo commands which interpret -n
-# or cs@zip.com.au etc, I resort to this cumbersome wrapper for the common
+# or \c etc, I resort to this cumbersome wrapper for the common
 #	blah=`echo "$blah" | sed 's/this/that/g'`
 # thing.
 #	- Cameron Simpson <cs@zip.com.au> 25aug97
@@ -20,8 +20,8 @@ open(SED,"| exec sed -e '$sed'")
 
 select(SED);
 for (@ARGV)
-	{ print $_, "\n";
-	}
+{ print $_, "\n";
+}
 
 close(SED);
 
