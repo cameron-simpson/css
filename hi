@@ -37,7 +37,10 @@ do
   case "$task" in
       /*)	task=`expr "x$task" : 'x/\(.*[^/]\)/*$'`
 	      echo "# $task" >&3
-	      cat "$hi/"[a-z]* | egrep "$task" >&3
+	      ls -d "$hi/"[a-z]* \
+	      | grep -v '\.html$' \
+	      | xxargs cat \
+	      | egrep "$task" >&3
 	      ;;
       *)	sfxs=; [ $weekly ] && sfxs="$sfxs .weekly"
 	      for sfx in '' $sfxs
