@@ -4,4 +4,4 @@
 #	- Cameron Simpson 17feb95
 #
 
-1,/^$/d
+1,/^*$/d
