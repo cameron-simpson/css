@@ -1,0 +1,31 @@
+#!/bin/sh
+#
+# Wrapper for rc5des to work on multiple machines.
+#	- Cameron Simpson <cs@zip.com.au>
+#
+
+dir=$HOME/etc/rc5des
+base=rc5des
+exe=$BIN/$base
+ini=$base.ini
+lock=$base@$HOST.$SYSTEMID
+
+RC5INI=${RC5INI:-"$dir/$ini"}
+
+case "$1" in -*) exec "$exe" "$@" ;; esac
+
+subdir=$HOST
+[ -n "$1" ] && { subdir=$subdir-$1; shift; }
+
+cd $dir || exit $?
+[ -d "$subdir" ] || mkdir "$subdir" || exit $?
+cd "$subdir" || exit $?
+pwd
+
+cp "$dir/$ini" . || exit $?
+ln -s $exe .
+pwd
+ls -la
+RC5INI=$dir/$subdir/$ini acon lock -1 "$lock" \
+		 tag_fd 1,2 "$lock" \
+		 ./$base
