@@ -23,7 +23,8 @@ for file
 do
   thdir=`dirname "$file"`/.thumbnails/$thsize
   th=$thdir/`basename "$file"`.png
-  [ $verbose ] && echo "$f -> $th"
+  [ -s "$th" ] && continue
+  [ $verbose ] && echo "$file -> $th"
 
   [ -d "$thdir/." ] || needdir "$thdir" || { xit=1; continue; }
   gm convert -geometry "$thsize" -quality 100 - <"$file" png:- >"$th" \
