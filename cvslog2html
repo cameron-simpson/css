@@ -209,8 +209,8 @@ sub fref
 
 sub cmplogs
 {
-  my($f1,$d1,$t1,$a1)=@$a;
-  my($f2,$d2,$t2,$a2)=@$b;
+  my($f1,$r1,$d1,$t1,$a1)=@$a;
+  my($f2,$r2,$d2,$t2,$a2)=@$b;
 
   my $daf1 = "$d1 $a1 $f1";
   my $daf2 = "$d2 $a2 $f2";
