@@ -3,6 +3,9 @@
 # Dispatch a daemon mode fetchmail.
 #	- Cameron Simpson <cs@zip.com.au> 14dec2003
 #
+
+: ${LOGDIR:=$HOME/var/log}
+
 needhost $HOMEHOST@home || exit 1
 set -x
 cd
@@ -15,7 +18,7 @@ cd
   esac
   set -- -f "$HOME/.fetchmailrc" \
 	  -t 900 \
-	  --logfile "$HOME/var/log/fetchmail" \
+	  --logfile "$LOGDIR/fetchmail" \
 	  --nobounce --tracepolls --warnings 86400
   ( fetchmail "$@" -l 65536 $fmopts $fmhosts
     sleep 60
