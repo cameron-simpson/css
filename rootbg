@@ -71,11 +71,12 @@ then
 fi
 
 rootbg=`mkwall "$imagefile"` || exit 1
-echo "$rootbg" >>$HOME/var/log/rootbg
 
 (
-  # note backdrop if not a per-desk setting
-  ( [ $perdesk ] || lastvalue "defaultrootbg-$HOST" "$rootbg"
+  (
+    echo "$rootbg" >>$HOME/var/log/rootbg
+    # note backdrop if not a per-desk setting
+    [ $perdesk ] || lastvalue "defaultrootbg-$HOST" "$rootbg"
     lastvalue "rootbg-$HOST" "$rootbg"
   ) &
 
