@@ -1,0 +1,2 @@
+#!/bin/sh
+WEBPROXY=proxy-raw:8080 htv ${1+"$@"}
