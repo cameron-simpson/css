@@ -27,8 +27,9 @@ then
     ) \
     | if [ $dohtml ]
       then
-	set -x
-	pod2html "--title=Overview of $*" - \
+	prepod \
+	| pod2html "--title=Overview of $*" - \
+	| postpod \
 	| sed -n '1,/^<!-- INDEX END -->/d
 		/^<p>/b para
 		d
