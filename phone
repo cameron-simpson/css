@@ -1,0 +1,19 @@
+#!/bin/sh
+#
+# Complete rewrite by Cameron.
+# Moved much stuff into user db.	- cameron 20nov97
+#
+
+[ $# = 0 ] && { echo "Usage: phone name..." >&2; exit 2; }
+
+phtmp=/tmp/ph$$
+
+cat $HOME/.phone /usr/local/misc/phonedir.auto /usr/local/misc/phonedir \
+	>$phtmp 2>/dev/null
+
+for ptn
+do
+    grep -i "$ptn" <$phtmp
+done
+
+rm $phtmp
