@@ -1,0 +1,20 @@
+#!/bin/sh
+#
+# Set up a server which forwards to another server, logging things as
+# they go. Intended for debugging web transactions.
+#	- Cameron Simpson <cs@zip.com.au> 04sep2001
+#
+
+cmd=`basename "$0"`
+usage="Usage: $cmd srcport desthost destport inlog outlog"
+
+[ $# = 5 ] || { echo "$usage" >&2; exit 2; }
+
+srcp=$1 desth=$2 destp=$3 inlog=$4 outlog=$5
+
+[ -f "$inlog" ] || { echo "$cmd: $inlog: not a file" >&2; exit 1; }
+[ -f "$outlog" ] || { echo "$cmd: $outlog: not a file" >&2; exit 1; }
+
+tcpio -a "$srcp" sh -c "date >>'$inlog'
+			date >>'$outlog'
+			tee -a '$inlog' | nc '$desth' '$destp' | tee -a '$outlog'"
