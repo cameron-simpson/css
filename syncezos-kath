@@ -1,0 +1,8 @@
+#!/bin/sh
+#
+# Update my ezoshosting web site.
+#	- Cameron Simpson <cs@zip.com.au> 11jan2003
+
+pfx 'kath->cameron' rsync -avHPW --delete /u/kath/public_html/abbotly-html/. $HOME/there/cskk.ezoshosting.com/html/kath/abbotly/.
+
+pfx 'cameron->ezos' rsync -avHPW --delete $HOME/there/cskk.ezoshosting.com/html/kath/. ezos:html/kath/.
