@@ -1,9 +1,15 @@
 #!/bin/sh
+#
+# Set the root background, update state files to match.
+#	- Cameron Simpson <cs@zip.com.au>
+#
+
+: ${TMPDIR:=/tmp}
+: ${RBG_PICKIM:='-w -x "$HALFX" -y "$HALFY"'}
 
 cmd=$0
-usage="Usage: $cmd [-D] [-d desk] [imlist-search-args...]
-	-d desk	Set the background for the specified desk.
-	-D	The background is per-desk, not global."
+usage="Usage: $cmd [-d desk] [imlist-search-args...]
+	-d desk	Set the background for the specified desk."
 
 [ -n "$DISPLAY" ] || { echo "$cmd: no \$DISPLAY!" >&2; exit 1; }
 
@@ -16,47 +22,42 @@ aspect=-w
 pickopts=
 strippfx=
 bgop=rootbg
+bgdesk=-
 
 while :
 do  case $1 in
-	-d)	bgop="deskbg -d $2"; shift ;;
-	-D)	bgop="deskbg -d `currentdesk`" ;;
+	-d)	bgdesk=$2; shift ;;
 	*)	break ;;
     esac
     shift
 done
 
-tmp=${TMPDIR:-/tmp}
-
-dopick=1
-case "$#,$1" in
-  1,http://*)
-    # one argument which is an URL
-    exec withurl -C "$1" $bgop
-    ;;
-  1,X:* | 1,- | 1,*:- | 1,\|* )
-    # one argument which is a GraphicsMagick-ish name
-    dopick=
-    ;;
-esac
-
-[ $dopick ] || exec $bgop ${1+"$@"}
-
-set -- `pickim -P "$strippfx" -n "$pickn" ${1+"$@"} | sort -u`
-if [ $# = 0 ]
+if [ $# = 1 ]
 then
-  echo "$cmd: no image files chosen!" >&2
-  exit 1
+  case "$1" in
+    http://* | ftp://* )
+      exec withurl -C "$1" deskbg -d "$bgdesk"
+      ;;
+    X:* | 1,- | 1,*:- | 1,\|* )
+      # one argument which is a GraphicsMagick-ish name
+      exec deskbg -d "$bgdesk" "$1"
+      ;;
+  esac
+
+  # a file?
+  [ -f "$1" -a -s "$1" ] && exec deskbg -d "$bgdesk" "$1"
 fi
 
+tmpf=$TMPDIR/rbg$$
+eval "pickim -P \"\$strippfx\" -n \"\$pickn\" $RBG_PICKIM "'${1+"$@"}' | sort -u >"$tmpf"
+[ -s "$tmpf" ] || { echo "$cmd: no image files chosen!" >&2
+		    rm "$tmpf"
+		    exit 1
+		  }
+
 # pop up menu choice
-set -x
-tmpf=$tmp/rbg$$
-for arg
-do  echo "$arg"
-done >"$tmpf"
 exec fvwmcmd \
-  "SetEnv FVWM_MENU_IMLIST_OP \"acon set-x $bgop $opts\"" \
+  "SetEnv FVWM_MENU_IMLIST_OP \"acon set-x deskbg -d $bgdesk $opts\"" \
   "Piperead 'fvwm-menu -1 ImDirMenu \"$cmd $call\" fvwm-menu-imlist -l $tmpf .; rm $tmpf'" \
   "Popup ImDirMenu" \
   "UnSetEnv FVWM_MENU_IMLIST_OP"
