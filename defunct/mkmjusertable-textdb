@@ -1,0 +1,42 @@
+#!/usr/bin/perl
+#
+# Make usertable entries for named (or all) majordomo lists.
+#	- Cameron Simpson <cs@zip.com.au>
+#
+
+use strict qw(vars);
+
+use CISRA::DB;
+use cs::Misc;
+
+$::MJHome='/a/sid/home/majordomo';
+
+$::Aliases=CISRA::DB::db(['email','aliases']);
+die "$::cmd: can't open alias table\n" if ! defined $::Aliases;
+
+if (! @ARGV)
+{ @ARGV=grep(exists $::Aliases->{$_}->{MJADMIN}, sort keys %$::Aliases);
+}
+
+$::Xit=0;
+
+for my $mj (@ARGV)
+{ usertable($mj);
+}
+
+exit $::Xit;
+
+sub usertable
+{ my($mj)=@_;
+  
+  if (! exists $::Aliases->{$mj}
+   || ! exists $::Aliases->{$mj}->{MJADMIN})
+  { warn "$::cmd: \"$mj\" is not a majordomo list\n";
+    $::Xit=1;
+    return;
+  }
+
+  print "$mj:maildrop	\"|$::MJHome/etc/wrap resend -l $mj -h research.canon.com.au -s $mj-outgoing\"\n";
+  print "$mj-request:maildrop	\"|$::MJHome/etc/wrap majordomo -l $mj\"\n";
+  print "$mj-outgoing:maildrop	:include:$::MJHome/etc/lists/$mj\n";
+}
