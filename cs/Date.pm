@@ -71,7 +71,8 @@ sub mon2mnum
 
 sub mnum2mon
 { my($mnum)=@_;
-  die "mnum2mon($mnum)" if $mnum < 1 || $mnum > 12;
+  my@c=caller;
+  die "mnum2mon($mnum) from @c" if $mnum < 1 || $mnum > 12;
   $cs::Date::Mon_names[$mnum-1];
 }
 
