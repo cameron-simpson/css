@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # Use a 3rd party tape with Legato Networker.
-# Specificly, we want to make a tape which isn't part of Legato's
+# Specificly, we want to make use of a tape which isn't part of Legato's
 # indices using a Legato controlled jukebox.
 #
 # This is based on suggestions made by Janelle Filkin <janellef@dawn.com.au>.
@@ -9,13 +9,18 @@
 #
 
 pool=${NSR3P_POOL:-'Third Party'}
+slot=
+port=1
 
 cmd=`basename "$0"`
-usage="Usage:	$cmd load [-n] [-p pool]
+usage="Usage:	$cmd load [-n] [-p pool] [-P p] [-S s]
 	$cmd unload device
 		load	Load the tape in the first load bay slot.
 			-n	Don't label it!
 			-p pool	Specify the pool into which to label.
+			-P p	Specify the load port from which to take the
+				tape. Default: $port
+			-S s	Specify the slot into which to load the tape.
 		unload device
 			Unload the tape in the specified device
 			and return it to service. Export the tape to
@@ -35,6 +40,8 @@ else
       do  case $1 in
 	    -n)	nolabel=1 ;;
 	    -p)	pool=$2; shift ;;
+	    -P)	port=$2; shift ;;
+	    -S)	slot=$2; shift ;;
 	    --)	shift; break ;;
 	    -?*)echo "$cmd $dir: unrecognised option: $1" >&2
 		badopts=1 ;;
@@ -69,24 +76,24 @@ xit=0
 case $dir in
   load)
 	# locate an empty slot
-	slot=`(set -x; exec nsrjb -C) | sed -n 's/^ *\([0-9][0-9]*\): *$/\1/p' | sed 1q`
+	[ -n "$slot" ] || slot=`(set -x; exec nsrjb -C) | sed -n 's/^ *\([0-9][0-9]*\): *$/\1/p' | sed 1q`
 	[ -n "$slot" ] || { echo "$cmd $dir: no free slots!" >&2 ;exit 1; }
 
 	# get the tape from the load bay
-	(set -x; exec nsrjb -d -P 1 -S "$slot") || exit 1
+	(set -x; exec nsrjb -d -P "$port" -S "$slot") || exit 1
 
 	if [ -z "$nolabel" ]
 	then
 	    [ -n "$pool" ] \
 		|| { echo "$cmd $dir: label: no pool specified" >&2
-		     (set -x; exec nsrjb -w -S "$slot" -P 1)
+		     (set -x; exec nsrjb -w -S "$slot" -P "$port")
 		     exit 1
 		   }
 
 	    # label the tape
 	    (set -x; exec nsrjb -L -Y -B -b "$pool" -S "$slot") \
 		|| { echo "$cmd $dir: label fails" >&2
-		     (set -x; exec nsrjb -w -S "$slot" -P 1)
+		     (set -x; exec nsrjb -w -S "$slot" -P "$port")
 		     exit 1
 		   }
 	fi
@@ -94,7 +101,7 @@ case $dir in
 	# load the tape but don't mount it
 	(set -x; exec nsrjb -ln -S "$slot") \
 		|| { echo "$cmd $dir: load fails" >&2
-		     (set -x; exec nsrjb -w -S "$slot" -P 1)
+		     (set -x; exec nsrjb -w -S "$slot" -P "$port")
 		     exit 1
 		   }
 
@@ -104,7 +111,7 @@ case $dir in
 	[ -n "$device" ] \
 		|| { echo "$cmd $dir: can't find device holding tape" >&2
 		     (set -x; exec nsrjb -u -S "$slot")
-		     (set -x; exec nsrjb -w -S "$slot" -P 1)
+		     (set -x; exec nsrjb -w -S "$slot" -P "$port")
 		     exit 1
 		   }
 
@@ -135,7 +142,7 @@ case $dir in
 		     exit 1
 		   }
 
-	(set -x; exec nsrjb -w -P 1 -S "$slot") \
+	(set -x; exec nsrjb -w -P "$port" -S "$slot") \
 		|| { echo "$cmd $dir: can't export tape from slot $slot" >&2
 		     exit 1
 		   }
