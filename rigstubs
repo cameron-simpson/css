@@ -5,5 +5,5 @@ cd $HOME/stubs || exit $?
 for i in *
 do
     echo "$i ..."
-    rm -f "$BIN/$i" && lncp "$i" "$BIN/$i" && chmod 755 "$BIN/$i"
+    rm -f "$HOME/bin/$ARCH/$i" && lncp "$i" "$HOME/bin/$ARCH/$i" && chmod 755 "$HOME/bin/$ARCH/$i"
 done
