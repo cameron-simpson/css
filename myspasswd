@@ -1,0 +1,46 @@
+#!/bin/sh
+#
+# Set user password in MySQL database.
+#	- Cameron Simpson <cs@zip.com.au> 11nov2002
+#
+
+cmd=$0
+usage="Usage: $cmd user [password]"
+
+badopts=
+
+password=
+if [ $# = 0 ]
+then  echo "$cmd: missing user" >&2
+      badopts=1
+else  user=$1; shift
+      if [ $# -gt 0 ]
+      then
+	password=$1; shift
+	[ $# = 0 ] || { echo "$cmd: extra arguments: $*" >&2; badopts=1; }
+      fi
+fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+if [ -z "$password" ]
+then
+  stty -echo || exit $?
+  {
+     { necho "user password: ";read userpw && echo; } \
+  && { necho "user pw again: ";read userpw2 && echo; } \
+  && { [ "x$userpw" = "x$userpw2" ] || { echo "$cmd: user password mismatch" >&2
+					 false
+				       }
+     }
+  } || { stty echo; exit 1; }
+  stty echo
+  password=$userpw
+fi
+
+case "$password" in
+  *\'*)	password=`echo "$password" | sed "s/'/&&/g"` ;;
+esac
+
+echo "UPDATE mysql.user SET Password = PASSWORD('$password') WHERE Host = '%' AND User = '$user';" \
+| mys
