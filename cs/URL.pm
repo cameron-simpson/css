@@ -102,6 +102,7 @@ sub new($$;$)
   }
 
   my $this = {};
+
   my($scheme,$host,$port,$path,$query,$anchor);
   my $ok = 1;
 
@@ -151,7 +152,7 @@ sub new($$;$)
     if (substr($path,$[,1) ne '/')
     # relative path, insert base's path
     { if (defined $base)
-      { my $dirpart = $base->{PATH};
+      { my $dirpart = $base->Path();
 	$dirpart =~ s:[^/]*$::;
 	$dirpart="/" if ! length $dirpart;
 
@@ -198,12 +199,12 @@ sub new($$;$)
     }
   }
 
-  $this->{SCHEME}=$scheme;
-  $this->{HOST}=lc($host);
-  $this->{PORT}=urlPort($scheme,$port);
-  $this->{PATH}=cs::HTTP::unhexify($path);
-  $this->{QUERY}=$query;
-  $this->{ANCHOR}=$anchor;
+  $this->{cs::URL::SCHEME}=$scheme;
+  $this->{cs::URL::HOST}=lc($host);
+  $this->{cs::URL::PORT}=urlPort($scheme,$port);
+  $this->{cs::URL::PATH}=cs::HTTP::unhexify($path);
+  $this->{cs::URL::QUERY}=$query;
+  $this->{cs::URL::ANCHOR}=$anchor;
 
   bless $this, $class;
 }
@@ -227,132 +228,132 @@ sub Abs($$)
   new cs::URL $target, $base;
 }
 
-sub _OldAbs($$)
-{ my($base,$target)=@_;
-  # make target into an object
-  $target=new cs::URL $target if ! ref $target;
-
-##  warn "base url = ".$base->Text()."\n"
-##      ."targ url = ".$target->Text()."\n";
-
-  my($abs)=bless {};
-  for (keys %$target)
-  { $abs->{$_}=$target->{$_};
-  }
-
-  # short circuit
-  return $abs if $abs->IsAbs();
-
-  ## warn "NOT ABS ".$abs->Text();
-
-  # we need an absolute URL to resolve against
-  if (! $base->IsAbs())
-  {
-    my($context)=$base->Context();
-    ## warn "context=[".$context->Text()."]";
-
-    if (! defined $context)
-    {
-#	  ## warn "$::cmd: Abs(\""
-#	      .$base->Text()
-#	      ."\",\""
-#	      .$target->Text()
-#	      ."\"): no context for resolving LHS";
-      return $target;
-    }
-
-    if (! $context->IsAbs())
-    {
-#	  ## warn "$::cmd: non-absolute context (\""
-#	      .$context->Text()
-#	      ."\") for \""
-#	      .$base->Text()
-#	      ."\"";
-      return $target;
-    }
-
-    ## warn "call ABS from context";
-
-    $base=$context->Abs($base);
-
-    ## warn "ABS from CONTEXT(".$context->Text().")="
-    ##	.$base->Text();
-  }
-
-  my($dodgy,$used_dodge)=(0,0);
-
-  if (! defined $abs->{SCHEME}
-   && defined $base->{SCHEME})
-  { $abs->{SCHEME}=$base->{SCHEME};
-  }
-  elsif ($abs->{SCHEME} ne $base->{SCHEME})
-  {
-    $base=$target->Context($abs->{SCHEME});
-
-    ## my(@c)=caller;
-    ## warn "no context for ".cs::Hier::h2a($target,1)." from [@c]"
-    ##	if ! defined $base;
-
-    return $abs if ! defined $base;
-    $dodgy=! $base->IsAbs();
-  }
-
-  if (! defined $abs->{HOST}
-   && defined $base->{HOST})
-  { $used_dodge=1;
-
-    $abs->{HOST}=$base->{HOST};
-    ## warn "set HOST to $base->{HOST}\n";
-
-    if (defined $base->{PORT})
-    { $abs->{PORT}=$base->{PORT};
-    }
-    else
-    { delete $abs->{PORT};
-    }
-
-    # XXX - password code?
-    if (defined $base->{USER})
-    { $abs->{USER}=$base->{USER};
-    }
-    else
-    { delete $abs->{USER};
-    }
-  }
-
-  if ($abs->{PATH} !~ m:^/:)
-  { $used_dodge=1;
-
-    my($dirpart)=$base->{PATH};
-    $dirpart =~ s:[^/]*$::;
-    $dirpart="/" if ! length $dirpart;
-
-    $abs->{PATH}="$dirpart$abs->{PATH}";
-##    warn "interim path = $abs->{PATH}\n";
-  }
-
-  # trim /.
-  while ($abs->{PATH} =~ s:/+\./:/:)
-  {}
-
-  # trim leading /..
-  while ($abs->{PATH} =~ s:^/+\.\./:/:)
-  {}
-
-  # trim /foo/..
-  while ($abs->{PATH} =~ s:/+([^/]+)/+\.\./:/:)
-  {}
-
-  if ($dodgy && $used_dodge)
-  {
-    warn "$::cmd: no default for scheme \"$abs->{SCHEME}\",\n";
-    warn "\tusing \"".$base->Text()."\" instead, despite scheme mismatch\n";
-  }
-
-##  warn "RETURNING ABS = ".cs::Hier::h2a($abs,1);
-
-  $abs;
-}
+##sub _OldAbs($$)
+##{ my($base,$target)=@_;
+##  # make target into an object
+##  $target=new cs::URL $target if ! ref $target;
+##
+####  warn "base url = ".$base->Text()."\n"
+####      ."targ url = ".$target->Text()."\n";
+##
+##  my($abs)=bless {};
+##  for (keys %$target)
+##  { $abs->{$_}=$target->{$_};
+##  }
+##
+##  # short circuit
+##  return $abs if $abs->IsAbs();
+##
+##  ## warn "NOT ABS ".$abs->Text();
+##
+##  # we need an absolute URL to resolve against
+##  if (! $base->IsAbs())
+##  {
+##    my($context)=$base->Context();
+##    ## warn "context=[".$context->Text()."]";
+##
+##    if (! defined $context)
+##    {
+###	  ## warn "$::cmd: Abs(\""
+###	      .$base->Text()
+###	      ."\",\""
+###	      .$target->Text()
+###	      ."\"): no context for resolving LHS";
+##      return $target;
+##    }
+##
+##    if (! $context->IsAbs())
+##    {
+###	  ## warn "$::cmd: non-absolute context (\""
+###	      .$context->Text()
+###	      ."\") for \""
+###	      .$base->Text()
+###	      ."\"";
+##      return $target;
+##    }
+##
+##    ## warn "call ABS from context";
+##
+##    $base=$context->Abs($base);
+##
+##    ## warn "ABS from CONTEXT(".$context->Text().")="
+##    ##	.$base->Text();
+##  }
+##
+##  my($dodgy,$used_dodge)=(0,0);
+##
+##  if (! defined $abs->{cs::URL::SCHEME}
+##   && defined $base->{cs::URL::SCHEME})
+##  { $abs->{cs::URL::SCHEME}=$base->{cs::URL::SCHEME};
+##  }
+##  elsif ($abs->{cs::URL::SCHEME} ne $base->{cs::URL::SCHEME})
+##  {
+##    $base=$target->Context($abs->{cs::URL::SCHEME});
+##
+##    ## my(@c)=caller;
+##    ## warn "no context for ".cs::Hier::h2a($target,1)." from [@c]"
+##    ##	if ! defined $base;
+##
+##    return $abs if ! defined $base;
+##    $dodgy=! $base->IsAbs();
+##  }
+##
+##  if (! defined $abs->{cs::URL::HOST}
+##   && defined $base->{cs::URL::HOST})
+##  { $used_dodge=1;
+##
+##    $abs->{cs::URL::HOST}=$base->{cs::URL::HOST};
+##    ## warn "set HOST to $base->{cs::URL::HOST}\n";
+##
+##    if (defined $base->{cs::URL::PORT})
+##    { $abs->{cs::URL::PORT}=$base->{cs::URL::PORT};
+##    }
+##    else
+##    { delete $abs->{cs::URL::PORT};
+##    }
+##
+##    # XXX - password code?
+##    if (defined $base->{USER})
+##    { $abs->{USER}=$base->{USER};
+##    }
+##    else
+##    { delete $abs->{USER};
+##    }
+##  }
+##
+##  if ($abs->{PATH} !~ m:^/:)
+##  { $used_dodge=1;
+##
+##    my($dirpart)=$base->{PATH};
+##    $dirpart =~ s:[^/]*$::;
+##    $dirpart="/" if ! length $dirpart;
+##
+##    $abs->{PATH}="$dirpart$abs->{PATH}";
+####    warn "interim path = $abs->{PATH}\n";
+##  }
+##
+##  # trim /.
+##  while ($abs->{PATH} =~ s:/+\./:/:)
+##  {}
+##
+##  # trim leading /..
+##  while ($abs->{PATH} =~ s:^/+\.\./:/:)
+##  {}
+##
+##  # trim /foo/..
+##  while ($abs->{PATH} =~ s:/+([^/]+)/+\.\./:/:)
+##  {}
+##
+##  if ($dodgy && $used_dodge)
+##  {
+##    warn "$::cmd: no default for scheme \"$abs->{cs::URL::SCHEME}\",\n";
+##    warn "\tusing \"".$base->Text()."\" instead, despite scheme mismatch\n";
+##  }
+##
+####  warn "RETURNING ABS = ".cs::Hier::h2a($abs,1);
+##
+##  $abs;
+##}
 
 =item IsAbs()
 
@@ -369,16 +370,7 @@ and to generate a new URL object given a base URL and a relative URL string.
 sub IsAbs($)
 { my($this)=@_;
 
-  defined $this->{SCHEME}
-&& length $this->{SCHEME}
-# schemes needing paths
-&& ( ! grep($_ eq $this->{SCHEME},FILE,FTP,HTTP,HTTPS,GOPHER)
- || ( defined $this->{PATH} && length $this->{PATH} )
-  )
-# schemes needing hosts
-&& ( ! grep($_ eq $this->{SCHEME},FILE,FTP,HTTP,HTTPS,GOPHER,NEWS,SNEWS)
- || ( defined $this->{HOST} && length $this->{HOST} )
-  )
+  my@c=caller;die "cs::URL::IsAbs() called from [@c]";
 }
 
 =item Context
@@ -395,9 +387,9 @@ as a last resort.
 
 sub Context($;$)
 { my($this,$scheme)=@_;
-  $scheme=$this->{SCHEME} if ! defined $scheme
-			  && defined $this->{SCHEME}
-			  && length $this->{SCHEME};
+  $scheme=$this->{cs::URL::SCHEME} if ! defined $scheme
+			  && defined $this->{cs::URL::SCHEME}
+			  && length $this->{cs::URL::SCHEME};
 
   ## warn "this=".cs::Hier::h2a($this,0).", scheme=[$scheme]";
 
@@ -452,10 +444,10 @@ sub Text($;$)
   my $url;
 
   ## warn "computing TEXT for ".cs::Hier::h2a($this,1);
-  my $SC=$this->{SCHEME};
+  my $SC=$this->{cs::URL::SCHEME};
   $url=lc($SC).":" if length $SC;
   if ($SC eq FILE || $SC eq HTTP || $SC eq HTTPS || $SC eq FTP)
-  { $url.='//'.$this->HostPart() if defined $this->{HOST};
+  { $url.='//'.$this->HostPart() if defined $this->{cs::URL::HOST};
   }
   $url.=$this->LocalPart($noanchor);
 
@@ -471,7 +463,7 @@ Return the scheme name for this URL.
 =cut
 
 sub Scheme($)
-{ shift->{SCHEME};
+{ shift->{cs::URL::SCHEME};
 }
 
 =item Host()
@@ -481,7 +473,7 @@ Return the host name for this URL.
 =cut
 
 sub Host($)
-{ shift->{HOST};
+{ shift->{cs::URL::HOST};
 }
 
 =item Port()
@@ -491,7 +483,37 @@ Return the port number for this URL.
 =cut
 
 sub Port($)
-{ shift->{PORT};
+{ shift->{cs::URL::PORT};
+}
+
+=item Path()
+
+Return the path component of the URL.
+
+=cut
+
+sub Path($)
+{ shift->{cs::URL::PATH};
+}
+
+=item Query()
+
+Return the query_string component of the URL.
+
+=cut
+
+sub Query($)
+{ shift->{cs::URL::QUERY};
+}
+
+=item Anchor()
+
+Return the anchor component of the URL.
+
+=cut
+
+sub Anchor($)
+{ shift->{cs::URL::ANCHOR};
 }
 
 =item HostPart()
@@ -503,16 +525,16 @@ Return the B<I<user>@I<host>:I<port>> part of the URL.
 sub HostPart($)
 { my($this)=@_;
 
-  return "" if ! defined $this->{HOST};
+  return "" if ! defined $this->{cs::URL::HOST};
 
   my($hp);
 
   $hp='';
   $hp.="$this->{USER}\@" if defined $this->{USER};
-  $hp.=lc($this->{HOST}) if defined $this->{HOST};
-  $hp.=":".lc($this->{PORT}) if defined $this->{PORT}
-			      && $this->{PORT}
-			      ne urlPort($this->{SCHEME},$this->{PORT});
+  $hp.=lc($this->{cs::URL::HOST}) if defined $this->{cs::URL::HOST};
+  $hp.=":".lc($this->{cs::URL::PORT}) if defined $this->{cs::URL::PORT}
+			      && $this->{cs::URL::PORT}
+			      ne urlPort($this->{cs::URL::SCHEME},$this->{cs::URL::PORT});
 
   ## warn "HostPart=$hp\n";
 
@@ -531,13 +553,18 @@ sub LocalPart($;$)
 { my($this,$noanchor)=@_;
   $noanchor=0 if ! defined $noanchor;
 
-  my $l = $this->{PATH};
+  my $l = $this->{cs::URL::PATH};
 
-  if (length $this->{QUERY})
-  { $l.="?$this->{QUERY}"; }
+  my $q = $this->Query();
+  if (defined $q && length $q)
+  { $l.="?$q"; }
 
-  if (! $noanchor && length $this->{ANCHOR})
-  { $l.="#$this->{ANCHOR}"; }
+  if (! $noanchor)
+  { my $a = $this->Anchor();
+    if (defined $a && length $a)
+    { $l.="#$a";
+    }
+  }
 
   $l;
 }
@@ -558,10 +585,10 @@ sub MatchesCookie($$;$)
   ## my(@c)=caller;
   ## warn "this=$this, C=$C [@$C] from [@c]";
 
-  substr(lc($this->{HOST}),-length($C->{DOMAIN}))
+  substr(lc($this->{cs::URL::HOST}),-length($C->{DOMAIN}))
   eq $C->{DOMAIN}
   &&
-  substr($this->{PATH},0,length($C->{PATH}))
+  substr($this->{cs::URL::PATH},0,length($C->{PATH}))
   eq $C->{PATH}
   &&
   (! defined $when || $when <= $C->{EXPIRES});
@@ -572,13 +599,163 @@ sub MatchesCookie($$;$)
 Fetch a URL and return a B<cs::MIME> object.
 If the optional flag I<follow> is set,
 act on B<Redirect> responses etc.
+Returns a tuple of (I<endurl>,I<rversion>,I<rcode>,I<rtext>,I<MIME-object)
+where I<endurl> if the URL whose data was eventually retrieved
+and I<MIME-object> is a B<cs::MIME> object
+or an empty array on error.
 
 =cut
 
-sub Get($$)
+sub Get($;$)
+{ my($this,$follow)=@_;
+  $follow=0 if ! defined $follow;
+
+  local(%cs::URL::_Getting);
+
+  $this->_Get($follow);
+}
+
+sub _Get($$)
 { my($this,$follow)=@_;
 
-  die "UNIMPLEMENTED";
+  my($url,$context);
+
+  my %triedAuth;
+
+  GET:
+  do
+  { $url = $this->Text();
+    $context="$::cmd: GET $url";
+
+    if ($cs::URL::_Getting{$url})
+    { warn "$context:\n\tredirection loop detected";
+      last GET;
+    }
+
+    $cs::URL::_Getting{$url}=1;
+
+    my $scheme = $this->Scheme();
+    if ($scheme ne HTTP && $scheme ne FTP)
+    { warn "$context:\n\tscheme $scheme not implemented";
+      last GET;
+    }
+
+    my $rqhdrs = cs::HTTP::rqhdr($this);
+
+    my ($phost,$pport) = $this->Proxy();
+
+    my $phttp = new cs::HTTP ($phost,$pport,1);
+
+    if (! defined $phttp)
+    { warn "$context:\n\tcan't connect to proxy server $phost:$pport: $!";
+      last GET;
+    }
+
+    my($rversion,$rcode,$rtext,$M);
+
+    warn "GET $url\n" if $::Verbose;
+    ($rversion,$rcode,$rtext,$M)=$phttp->Request(GET,$url,$rqhdrs);
+
+    if (! defined $rversion)
+    { warn "$context: nothing from proxy";
+      last GET;
+    }
+
+    if ($rcode eq $cs::HTTP::M_MOVED || $rcode eq cs::HTTP::M_FOUND)
+    {
+      $ENV{HTTP_REFERER}=$url;
+      my $newurl=$M->Hdr(LOCATION);
+      chomp($newurl);
+      $newurl =~ s/^\s+//g;
+      $newurl =~ s/\s+$//g;
+
+      warn "REDIRECT($rcode) to $newurl\n" if $::Verbose;
+
+      $this = new cs::URL($newurl,$this);
+      if (! defined $this)
+      { warn "$context:\n\tcan't parse URL \"$newurl\"";
+	last GET;
+      }
+    }
+    elsif ($rcode eq $cs::HTTP::E_UNAUTH && ! $triedAuth{$url})
+    {
+      my $auth = $this->AuthDB();
+      if (! defined $auth)
+      { warn "$context:\n\tauthentication challenge but no auth db";
+	last GET;
+      }
+
+      # get challenge info from hdrs
+      my ($scheme,$label)=$auth->ParseWWW_AUTHENTICATE($M);
+      if (! defined $scheme)
+      { warn "$context:\n\tcan't parse WWW_AUTHENTICATE";
+	last GET;
+      }
+
+      my $host = $this->Host();
+
+      # get response info
+      my $resp = $auth->GetAuth($scheme,$host,$label);
+      if (! ref $resp)
+      { warn "$context:\n\tno login/password for $scheme/$host/$label";
+	last GET;
+      }
+
+      if ($::Verbose || $::Debug)
+      { warn "$context:\n\ttrying auth $resp->{USERID}:$resp->{PASSWORD}\n";
+      }
+
+      $rqhdrs=cs::HTTP::rqhdr($this);
+      $auth->HdrsAddAuth($rqhdrs,$scheme,$resp);
+      $triedAuth{$url}=1;
+    }
+    elsif ($rcode ne $cs::HTTP::R_OK)
+    { warn "$context:\n\tunexpected response: $rversion $rcode $rtext\n";
+      last GET;
+    }
+    else
+    {
+      return ($rversion,$rcode,$rtext,$M);
+    }
+  }
+  while ($follow);
+
+  return ();
+}
+
+=item Proxy()
+
+Return an array of (I<host>,I<port>) as the proxy to contact
+for this URL.
+Currently dissects the B<WEBPROXY> environment variable.
+
+=cut
+
+sub Proxy($)
+{ my($this)=@_;
+
+  my @proxy;
+
+  if (defined $ENV{WEBPROXY} && length $ENV{WEBPROXY})
+  { if ($ENV{WEBPROXY} =~ /:/)	{ @proxy=($`,$'); }
+    else			{ @proxy=($ENV{WEBPROXY},80); }
+  }
+
+  @proxy;
+}
+
+=item AuthDB()
+
+Return a B<cs::HTTP::Auth> object
+containing the authentication tokens we possess.
+
+=cut
+
+sub AuthDB($)
+{ my($this)=@_;
+
+  ::need(cs::HTTP::Auth);
+  cs::HTTP::Auth->new("$ENV{HOME}/private/httpauth.db");
 }
 
 =back
