@@ -1,0 +1,2 @@
+#!/bin/sh
+find ${1+"$@"} ${1-"."} -type d -print | sort -r | xxargs set-x rmdir 2>/dev/null
