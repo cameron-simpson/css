@@ -24,9 +24,20 @@ while (<>)
   push(@{$F->{HITS}},[$file,$left,$key,$right,$lineno]);
 }
 
-my @rows=();
+my @files = reverse sort { $byfile{$a}->{HITCOUNT} <=> $byfile{$b}->{HITCOUNT} } keys %byfile;
 
-for my $file (reverse sort { $byfile{$a}->{HITCOUNT} <=> $byfile{$b}->{HITCOUNT} } keys %byfile)
+exit 0 if ! @files;
+
+print "Files found:\n";
+for my $file (@files)
+{
+  print cs::HTML::tok2a([A,{HREF=>"#$file"},$file]," ($byfile{$file}->{HITCOUNT})");
+  print "", ($file eq $files[$#files] ? '.' : ','), "\n";
+}
+print "<HR>\n";
+
+my @rows=();
+for my $file (@files)
 {
   if (@rows) { push(@rows,[TR,[TD,{COLSPAN=>3},[HR]]]); }
 
@@ -38,7 +49,8 @@ for my $file (reverse sort { $byfile{$a}->{HITCOUNT} <=> $byfile{$b}->{HITCOUNT}
   {
     my @td=();
     if ($first)
-    { push(@td,[TD,{ALIGN=>LEFT, VALIGN=>TOP, ROWSPAN=>scalar(@hits)},$hit->[0]]);
+    { push(@td,[TD,{ALIGN=>LEFT, VALIGN=>TOP, ROWSPAN=>scalar(@hits)},
+		   [A,{NAME=>$hit->[0], HREF=>$hit->[0]},$hit->[0]]]);
     }
     push(@td,[TD,{ALIGN=>RIGHT},$hit->[1]],
 	     [TD,{ALIGN=>LEFT},[A,{HREF=>"$hit->[0]#$hit->[4]"},$hit->[2]]," ",$hit->[3]],"\n");
