@@ -1,0 +1,89 @@
+#!/usr/bin/perl
+#
+# Read cpio -c from stdin, emit index on stdout.
+#	- Cameron Simpson, 31dec93
+#
+
+require 'sys/stat.ph';
+
+$MGCLEN=6;	$MAGIC='070707';
+$HDRLEN=70;
+$TRAILER='TRAILER!!!';
+
+($dev,$ino,$mode,@etc)=stat(STDIN);
+die "stat(STDIN) fails: $!" unless defined($mode);
+
+$seekable=&S_ISREG($mode);
+$offset=0;
+
+CPIO:
+  while (1)
+	{ read(STDIN,$_,$MGCLEN) == $MGCLEN	|| die "can't read magic number in header";
+	  $offset+=$MGCLEN;
+
+	  /^(07){2,3}/				|| die "bad magic";
+
+	  read(STDIN,$hdr,$HDRLEN) == $HDRLEN	|| die "can't read header";
+	  $offset+=$HDRLEN;
+
+	  $_=$'.$hdr;
+
+	  (($dev,$ino,$mode,
+	   $uid,$gid,$nlink,$rdev,
+	   $mtime,$namesize,$filesize)
+	     = /^([0-7]{6})([0-7]{6})([0-7]{6})([0-7]{6})([0-7]{6})([0-7]{6})([0-7]{6})([0-7]{11})([0-7]{6})([0-7]{11})$/)
+		== 10				|| die "$_ doesn't match";
+
+	  $filesize=&unoct($filesize);
+	  $namesize=&unoct($namesize);
+
+	  read(STDIN,$_,$namesize) == $namesize	|| die "can't read name";
+	  $offset+=$namesize;
+
+	  chop;
+
+	  last CPIO if $_ eq $TRAILER;
+
+	  print $offset, ' ', $filesize, ' ', $_, "\n";
+
+	  &skip(STDIN,$filesize,$seekable);
+	  $offset+=$filesize;
+	}
+
+exit 0;
+
+sub unoct
+	{ local($_)=shift;
+	  local($n)=0;
+
+	  while (/^[0-7]/)
+		{ $n=$n*8+$&;
+		  $_=$';
+		}
+
+	  $n;
+	}
+
+sub skip	# (FILE,distance,seekable)
+	{ local($FILE,$dist,$canseek)=@_;
+
+	  if ($canseek)
+		{ seek($FILE,$dist,1);
+		}
+	  else
+	  { local($bufsize)=16384;
+	    local($buf,$i);
+
+	    while ($dist >= $bufsize)
+		{ $i=read($FILE,$buf,$bufsize);
+		  die "skip fails on $FILE: $!" if $i < 1;
+		  $dist-=$i;
+		}
+	    
+	    while ($dist > 0)
+		{ $i=read($FILE,$buf,$dist);
+		  die "skip fails on $FILE: $!" if $i < 1;
+		  $dist-=$i;
+		}
+	  }
+	}
