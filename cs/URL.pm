@@ -4,6 +4,20 @@
 #	- Cameron Simpson <cs@zip.com.au> 11jan96
 #
 
+=head1 NAME
+
+cs::URL - manipulate URLs
+
+=head1 SYNOPSIS
+
+use cs::URL;
+
+=head1 DESCRIPTION
+
+This module implements methods for dealing with URLs.
+
+=cut
+
 use strict qw(vars);
 
 BEGIN { use cs::DEBUG; cs::DEBUG::using(__FILE__); }
@@ -17,36 +31,137 @@ use cs::HTTP;
 
 package cs::URL;
 
-sub get
+=head1 GENERAL FUNCTIONS
+
+=over 4
+
+=item get(I<url>)
+
+Create a B<cs::URL> object from the I<url> supplied
+and call the B<Get> method below.
+
+=cut
+
+sub get($)
 { my($url)=shift;
   my($U)=new cs::URL $url;
   return undef if ! defined $U;
   $U->Get();
 }
 
-sub new	# url -> struct
+=item urlPort(I<scheme>,I<port>)
+
+Given a I<scheme> and I<port>,
+return the numeric value of I<port>.
+If the I<port> parameter is omitted,
+return the default port number for I<scheme>.
+
+=cut
+
+sub urlPort($$)
+{ my($scheme,$port)=@_;
+  $scheme=uc($scheme);
+
+  (length $port
+      ? cs::Net::portNum($port)
+      : length $scheme
+	  ? grep($_ eq $scheme,HTTP,FTP,GOPHER,HTTPS,NEWS,SNEWS)
+		  ? cs::Net::portNum($scheme)
+		  : ''
+	  : '');
+}
+
+=back
+
+=head1 OBJECT CREATION
+
+=over 4
+
+=item new(I<url>,I<base>)
+
+Create a new B<cs::URL> object from the I<url> string supplied.
+If I<base> (a B<cs::URL> object or URL string) is supplied
+
+=cut
+
+sub new($$;$)
 { my($class)=shift;
   local($_)=shift;
+  my($base)=shift;
+
+  # turn base URL into object
+  if (defined $base && ! ref $base)
+  { my $nbase = new cs::URL $base;
+    if (! defined $nbase)
+    { warn "$::cmd: new $class \"$_\", \"$base\": second URL invalid!";
+      undef $base;
+    }
+    else
+    { $base=$nbase;
+    }
+  }
 
   my $this = {};
   my($scheme,$host,$port,$path,$query,$anchor);
+  my $ok = 1;
 
   if (m|^(\w+):|)
-  { $scheme=$1; $_=$'; }
+  { $scheme=$1;
+    $_=$';
+  }
+  elsif (defined $base)
+  { $scheme=$base->Scheme();
+  }
+  else
+  { $ok=0;
+  }
 
   $port='';
   if (m|^//([^/:#?]+)(:(\d+))?|)
   { $host=$1;
+
     if (length($2))
     { $port=$3+0;
     }
 
     $_=$';
   }
+  elsif (defined $base)
+  { $host=$base->Host();
+    $port=$base->Port();
+  }
+  else
+  { $ok=0;
+  }
+
+  return undef if ! $ok;
 
   /^[^#?]*/;
   $path=$&;
   $_=$';
+
+  if (substr($path,$[,1) ne '/')
+  # relative path, insert base's path
+  { if (defined $base)
+    { my $dirpart = $base->{PATH};
+      $dirpart =~ s:[^/]*$::;
+      $dirpart="/" if ! length $dirpart;
+
+      $path="$dirpart$path";
+
+      # trim /.
+      while ($path =~ s:/+\./:/:)
+      {}
+
+      # trim leading /..
+      while ($path =~ s:^/+\.\./:/:)
+      {}
+
+      # trim /foo/..
+      while ($path =~ s:/+([^/]+)/+\.\./:/:)
+      {}
+    }
+  }
 
   if (/^\?([^#]*)/)
   { $query=$1; $_=$'; }
@@ -55,7 +170,6 @@ sub new	# url -> struct
   { $anchor=$1; $_=$'; }
 
   $host=uc($host);
-
   $scheme=uc($scheme);
 
   # disambiguate FILE and FTP
@@ -71,8 +185,8 @@ sub new	# url -> struct
     }
   }
 
-  $this->{SCHEME}=$scheme if length $scheme;
-  $this->{HOST}=lc($host) if length $host;
+  $this->{SCHEME}=$scheme;
+  $this->{HOST}=lc($host);
   $this->{PORT}=urlPort($scheme,$port);
   $this->{PATH}=cs::HTTP::unhexify($path);
   $this->{QUERY}=$query;
@@ -81,57 +195,26 @@ sub new	# url -> struct
   bless $this, $class;
 }
 
-sub Text
-{ my($this,$noanchor)=@_;
-  $noanchor=0 if ! defined $noanchor;
+=back
 
-  my $url;
+=head1 OBJECT METHODS
 
-  ## warn "computing TEXT for ".cs::Hier::h2a($this,1);
-  $url=lc($this->{SCHEME}).":" if defined $this->{SCHEME};
-  $url.='//'.$this->HostPart() if defined $this->{HOST};
-  $url.=$this->LocalPart($noanchor);
+=over 4
 
-  ## warn "text=$url\n";
+=item Abs(I<relurl>)
 
-  $url;
+DEPRECIATED. Use T<new cs::URL I<relurl>, $this> instead.
+Return a new B<cs::URL> object
+from the URL string I<relurl> with the current URL as base.
+
+=cut
+
+sub Abs($$)
+{ my($base,$target)=@_;
+  new cs::URL $target, $base;
 }
 
-sub HostPart
-{ my($this)=@_;
-
-  return "" if ! defined $this->{HOST};
-
-  my($hp);
-
-  $hp='';
-  $hp.="$this->{USER}\@" if defined $this->{USER};
-  $hp.=lc($this->{HOST}) if defined $this->{HOST};
-  $hp.=":".lc($this->{PORT}) if defined $this->{PORT}
-			      && $this->{PORT}
-			      ne urlPort($this->{SCHEME},$this->{PORT});
-
-  ## warn "HostPart=$hp\n";
-
-  $hp;
-}
-
-sub IsAbs
-{ my($this)=@_;
-
-  defined $this->{SCHEME}
-&& length $this->{SCHEME}
-# schemes needing paths
-&& ( ! grep($_ eq $this->{SCHEME},FILE,FTP,HTTP,HTTPS,GOPHER)
- || ( defined $this->{PATH} && length $this->{PATH} )
-  )
-# schemes needing hosts
-&& ( ! grep($_ eq $this->{SCHEME},FILE,FTP,HTTP,HTTPS,GOPHER,NEWS,SNEWS)
- || ( defined $this->{HOST} && length $this->{HOST} )
-  )
-}
-
-sub Abs	# (base_url,target_url,noQueryHack) -> abs_url
+sub _OldAbs($$)
 { my($base,$target)=@_;
   # make target into an object
   $target=new cs::URL $target if ! ref $target;
@@ -258,7 +341,177 @@ sub Abs	# (base_url,target_url,noQueryHack) -> abs_url
   $abs;
 }
 
-sub LocalPart
+=item IsAbs()
+
+DEPRECIATED.
+Test whether this URL is an absolute URL.
+This is legacy support for relative URLs
+which I'm in the process of removing
+in favour of a method to return the relative difference
+between two URLs as a text string
+and to generate a new URL object given a base URL and a relative URL string.
+
+=cut
+
+sub IsAbs($)
+{ my($this)=@_;
+
+  defined $this->{SCHEME}
+&& length $this->{SCHEME}
+# schemes needing paths
+&& ( ! grep($_ eq $this->{SCHEME},FILE,FTP,HTTP,HTTPS,GOPHER)
+ || ( defined $this->{PATH} && length $this->{PATH} )
+  )
+# schemes needing hosts
+&& ( ! grep($_ eq $this->{SCHEME},FILE,FTP,HTTP,HTTPS,GOPHER,NEWS,SNEWS)
+ || ( defined $this->{HOST} && length $this->{HOST} )
+  )
+}
+
+=item Context
+
+DEPRECIATED.
+Return a URL representing the current context
+for the specified I<scheme>.
+Use this URL's I<scheme> if the I<scheme> parameter is omitted.
+This is a very vague notion,
+drawing on the B<HTTP_REFERER> environment variable
+as a last resort.
+
+=cut
+
+sub Context($;$)
+{ my($this,$scheme)=@_;
+  $scheme=$this->{SCHEME} if ! defined $scheme
+			  && defined $this->{SCHEME}
+			  && length $this->{SCHEME};
+
+  ## warn "this=".cs::Hier::h2a($this,0).", scheme=[$scheme]";
+
+  my($context);
+
+  if (! defined $scheme)
+  { if (defined $ENV{HTTP_REFERER}
+     && length $ENV{HTTP_REFERER})
+    { $context=new cs::URL $ENV{HTTP_REFERER};
+    }
+  }
+  elsif ($scheme eq FILE)
+  { $context=_fileContext();
+  }
+
+  return undef if ! defined $context;
+  $context=new cs::URL $context if ! ref $context;
+  $context;
+}
+
+sub _fileContext
+{ my($dir)=@_;
+  ## warn "fileContext(@_): dir=[$dir]";
+
+  if (! defined $dir)
+  { ::need(Cwd);
+    $dir=cwd();
+    if (! defined $dir || ! length $dir)
+    { warn "$::cmd: cwd fails, using \"/\"";
+      $dir='/';
+    }
+    else
+    { ## warn "cwd=[$dir]";
+    }
+  }
+
+  "file://localhost$dir";
+}
+
+=item Text(I<noanchor>)
+
+Return the textual representation of this URL.
+Omit the B<#I<anchor>> part, if any, if the I<noanchor> parameter is true
+(it defaults to false).
+
+=cut
+
+sub Text($;$)
+{ my($this,$noanchor)=@_;
+  $noanchor=0 if ! defined $noanchor;
+
+  my $url;
+
+  ## warn "computing TEXT for ".cs::Hier::h2a($this,1);
+  $url=lc($this->{SCHEME}).":" if defined $this->{SCHEME};
+  $url.='//'.$this->HostPart() if defined $this->{HOST};
+  $url.=$this->LocalPart($noanchor);
+
+  ## warn "text=$url\n";
+
+  $url;
+}
+
+=item Scheme()
+
+Return the scheme name for this URL.
+
+=cut
+
+sub Scheme($)
+{ shift->{SCHEME};
+}
+
+=item Host()
+
+Return the host name for this URL.
+
+=cut
+
+sub Host($)
+{ shift->{HOST};
+}
+
+=item Port()
+
+Return the port number for this URL.
+
+=cut
+
+sub Port($)
+{ shift->{PORT};
+}
+
+=item HostPart()
+
+Return the B<I<user>@I<host>:I<port>> part of the URL.
+
+=cut
+
+sub HostPart($)
+{ my($this)=@_;
+
+  return "" if ! defined $this->{HOST};
+
+  my($hp);
+
+  $hp='';
+  $hp.="$this->{USER}\@" if defined $this->{USER};
+  $hp.=lc($this->{HOST}) if defined $this->{HOST};
+  $hp.=":".lc($this->{PORT}) if defined $this->{PORT}
+			      && $this->{PORT}
+			      ne urlPort($this->{SCHEME},$this->{PORT});
+
+  ## warn "HostPart=$hp\n";
+
+  $hp;
+}
+
+=item LocalPart(I<noanchor>)
+
+Return the local part (B</path#anchor>) of this URL.
+Omit the B<#I<anchor>> part, if any, if the I<noanchor> parameter is true
+(it defaults to false).
+
+=cut
+
+sub LocalPart($;$)
 { my($this,$noanchor)=@_;
   $noanchor=0 if ! defined $noanchor;
 
@@ -273,64 +526,18 @@ sub LocalPart
   $l;
 }
 
-sub urlPort
-	{ my($scheme,$port)=@_;
-	  $scheme=uc($scheme);
+=item MatchesCookie(I<cookie>,I<when>)
 
-	  (length $port
-	      ? $port
-	      : length $scheme
-		  ? grep($_ eq $scheme,HTTP,FTP,GOPHER,HTTPS,NEWS,SNEWS)
-			  ? cs::Net::portNum($scheme)
-			  : ''
-		  : '');
-	}
+Given a I<cookie>
+as a hasref with B<HOST>, B<DOMAIN>, B<PATH> and B<EXPIRES> fields
+and a time I<when> (which defaults to now),
+return whether the cookie should be associated with this URL.
 
-sub Context
-	{ my($this,$scheme)=@_;
-	  $scheme=$this->{SCHEME} if ! defined $scheme
-				  && defined $this->{SCHEME}
-				  && length $this->{SCHEME};
-
-	  ## warn "this=".cs::Hier::h2a($this,0).", scheme=[$scheme]";
-
-	  my($context);
-
-	  if (! defined $scheme)
-		{ if (defined $ENV{HTTP_REFERER}
-		   && length $ENV{HTTP_REFERER})
-			{ $context=new cs::URL $ENV{HTTP_REFERER};
-			}
-		}
-	  elsif ($scheme eq FILE)
-		{ $context=fileContext();
-		}
-
-	  return undef if ! defined $context;
-	  $context=new cs::URL $context if ! ref $context;
-	  $context;
-	}
-
-sub fileContext
-	{ my($dir)=@_;
-	  ## warn "fileContext(@_): dir=[$dir]";
-
-	  if (! defined $dir)
-		{ ::need(Cwd);
-		  $dir=cwd();
-		  if (! defined $dir || ! length $dir)
-			{ warn "$::cmd: cwd fails, using \"/\"";
-			  $dir='/';
-			}
-		  else	{ ## warn "cwd=[$dir]";
-			}
-		}
-
-  	  "file://localhost$dir";
-	}
+=cut
 
 sub MatchesCookie($$;$)
-{ my($this,$C,$now)=@_;
+{ my($this,$C,$when)=@_;
+  $when=time if ! defined $when;
 
   ## my(@c)=caller;
   ## warn "this=$this, C=$C [@$C] from [@c]";
@@ -341,7 +548,27 @@ sub MatchesCookie($$;$)
   substr($this->{PATH},0,length($C->{PATH}))
   eq $C->{PATH}
   &&
-  (! defined $now || $now <= $C->{EXPIRES});
+  (! defined $when || $when <= $C->{EXPIRES});
 }
+
+=item Get()
+
+Fetch a URL and return a B<cs::MIME> object.
+
+=cut
+
+sub Get($)
+{ my($this)=@_;
+
+  die "UNIMPLEMENTED";
+}
+
+=back
+
+=head1 AUTHOR
+
+Cameron Simpson E<lt>cs@zip.com.auE<gt>
+
+=cut
 
 1;
