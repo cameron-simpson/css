@@ -52,13 +52,13 @@ do
 		;;
 	.)	ptns=
 		stopplayer
-		sleep 1
+		sleep 2
 		runplayer
 		;;
 	*)
 		ptns=$line
 		stopplayer
-		sleep 1
+		sleep 2
 		runplayer
 		;;
     esac
