@@ -1,0 +1,2 @@
+#!/bin/sh
+exec pilot-xfer -i ${1+"$@"}
