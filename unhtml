@@ -1,0 +1,8 @@
+#!/usr/bin/perl
+#
+
+require 'cs/html.pl';
+
+while (<>)
+	{ print &html'html2raw($_);
+	}
