@@ -1,0 +1,8 @@
+#!/bin/sh
+
+tmpdir=$HOME/tmp/xv
+[ -d $tmpdir ] || mkdir $tmpdir || exit $?
+xvim=$tmpdir/pollim
+cp $HOME/etc/im/cartoons/martian3.jpg $xvim || exit $?
+logmap -s xvim $xvim
+xv -iconic -poll $xvim &
