@@ -1,0 +1,22 @@
+#!/usr/bin/perl
+#
+# Reorder the input lines at random.
+# (I really think seq(1) should have a -r to make a random sequence,
+# but apparently not).
+#	- Cameron Simpson <cs@zip.com.au> 14jul2000
+#
+
+my @lines = <STDIN>;
+
+srand((time^$#lines^$$)+getppid());
+
+my $ndx;
+
+while (@lines)
+{
+  $ndx = ($$+int(rand(@lines)))%@lines;
+
+  print $lines[$ndx];
+  $lines[$ndx]=$lines[$#lines] if $ndx < $#lines;
+  pop(@lines);
+}
