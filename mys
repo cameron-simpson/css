@@ -1,0 +1,12 @@
+#!/bin/sh
+
+eval `secret mysql@elph`
+set /opt/mysql/bin/mysql "-h$secretHOST" "-u$secretLOGIN" "-p$secretPASSWORD" ${1+"$@"}
+
+[ "x$HOST" = xelph ] \
+|| { tflag=; [ -t 0 ] && tflag=-t
+     set ssh $tflag elph exec "$@"
+   }
+
+set -x
+exec "$@"
