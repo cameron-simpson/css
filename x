@@ -35,7 +35,6 @@ else
     || { echo "$cmd: $file: no MIME type recognised" >&2; exit 1; }
 fi
 
-set -x
 if unpack=`mailcap -s "$file" "$mtype" unpack`
 then
     exec sh -c "$unpack"
