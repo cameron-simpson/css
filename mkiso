@@ -39,7 +39,7 @@
 #
 # =head1 FILES
 #
-# The B<PUBL> (publisher) and B<PREP> (perparer) values
+# The B<PUBL> (publisher) and B<PREP> (preparer) values
 # come from the B<$HOME/.mkisofsrc> file.
 # See mkisofs(1) for more information.
 #
