@@ -1,0 +1,7 @@
+#!/bin/sh
+#
+# Pull the RedHat release number from the /etc/redhat-release file.
+#	- Cameron Simpson <cs@zip.com.au> 07sep2003
+#
+
+exec awk 'NR == 1 { print $5 }' /etc/redhat-release
