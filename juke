@@ -8,6 +8,8 @@
 
 : ${TMPDIR:=/tmp}
 
+trace=set-x
+
 playcopy=
 
 cmd=`basename "$0"`
@@ -27,30 +29,36 @@ runplayer()
     playlist=$TMPDIR/$cmd.$$
     while [ $ok ]
     do
-	aulist -r $ptns >"$playlist"
-	exec <"$playlist"
-	rm -f "$playlist"
-	while [ $ok ] && read -r auf
-	do
-	    echo "[$auf]"
-	    if [ $playcopy ]
-	    then
-		tmpauf=$TMPDIR/$cmd$$`basename "$auf"`
-		(set -x; cp "$auf" "$tmpauf") && auf=$tmpauf
-	    fi
-	    case "$auf" in
-	      *.ogg)	ogg123 -d oss "$auf" & ;;
-	      *.mp3)	mpg123 -b 2048 "$auf" & ;;
-	      *)	echo "$cmd: how to play $auf ?" >&2
+	$trace aulist $ptns >"$playlist"
+	if [ -s "$playlist" ]
+	then
+	  exec <"$playlist"
+	  rm -f "$playlist"
+	  while [ $ok ] && read -r auf
+	  do
+	      echo "[$auf]"
+	      if [ $playcopy ]
+	      then
+		  tmpauf=$TMPDIR/$cmd$$`basename "$auf"`
+		  (set -x; cp "$auf" "$tmpauf") && auf=$tmpauf
+	      fi
+	      case "$auf" in
+		*.ogg)	$trace ogg123 -d oss "$auf" & ;;
+		*.mp3)	$trace mpg123 -b 2048 "$auf" & ;;
+		*)	echo "$cmd: how to play $auf ?" >&2
 			continue
 			;;
-	    esac
-	    subproc=$!
-	    wait
-	    [ $playcopy ] && rm -f "$tmpauf"
-	    [ $ok ] && sleep 2
-	    subproc=
-	done
+	      esac
+	      subproc=$!
+	      wait
+	      [ $playcopy ] && rm -f "$tmpauf"
+	      [ $ok ] && sleep 2
+	      subproc=
+	  done
+	else
+	  echo "$cmd: no hits found for keywords: $ptns" >&2
+	  ok=
+	fi
     done
   ) &
   playpid=$!
@@ -70,6 +78,13 @@ while lastline=$line
 do  
     [ "x$line" = "x!!" ] && line=$lastline
     case "$line" in
+	'?')	echo "Help:"
+		echo "  ?	This help message."
+		echo "  -	Stop the player."
+		echo "  .	Select with an empty pattern (pick anything)."
+		echo "  blank line: Make a new selection using the existing criteria."
+		echo "  keyword	Select tracks using the supplied keywords."
+		;;
 	'')	bumpplayer
 		;;
 	-)	stopplayer
