@@ -2,7 +2,8 @@
 
 set -vx
 
-echo "DISPLAY=$DISPLAY" >&2; xdpyinfo | wc >&2
+. $HOME/rc/x11/xenv.sh
+
 case "$X11_DEPTH,$X11_CLASS" in
     ,)				type=Colour ;;	# guess, not recurse
     1,*)			type=Mono ;;
