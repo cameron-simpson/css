@@ -21,8 +21,14 @@ runplayer()
 	aulist -r $ptns >"$playlist"
 	exec <"$playlist"
 	rm -f "$playlist"
-	while [ $ok ] && read -r ogg
-	do  ogg123 -d oss "$ogg" &
+	while [ $ok ] && read -r auf
+	do  case "$auf" in
+	      *.ogg)	ogg123 -d oss "$auf" & ;;
+	      *.mp3)	mpg123 -b 2048 "$auf" & ;;
+	      *)	echo "$cmd: how to play $auf ?" >&2
+			continue
+			;;
+	    esac
 	    subproc=$!
 	    wait
 	    subproc=
