@@ -1,0 +1,8 @@
+#!/bin/sh
+#
+# File up motion setings output the log file.
+#	- Cameron Simpson <cs@zip.com.au> 27jan2002
+#
+
+cd $HOME/motion || exit 1
+ignhup motion >>$LOGDIR/motion 2>&1 </dev/null &
