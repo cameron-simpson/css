@@ -23,7 +23,6 @@
 # as typically they need define only "pure PostScript" printer names.
 #
 
-printer=$PRINTER
 mpageargs=
 topsargs='-T "$arg"'
 pshufargs=
@@ -112,7 +111,7 @@ do
 		# directive will be inserted in the output
 		# (eg B</a4>, B</letter> etc).
 		#
-		-P?*)	printer=`expr "x$1" : 'x-P\(.*\)'` ;;
+		-P?*)	PRINTER=`expr "x$1" : 'x-P\(.*\)'` ;;
 
 		# =item B<-q>, B<+q>
 		#
@@ -328,8 +327,8 @@ fi
 
 # catch paper type
 case "$printer" in
-    */*)	paper=`expr "x$printer" : 'x.*/\(.*\)'`
-		printer=`expr "x$printer" : 'x\(.*\)/.*'`
+    */*)	paper=`expr "x$PRINTER" : 'x.*/\(.*\)'`
+		PRINTER=`expr "x$PRINTER" : 'x\(.*\)/.*'`
 		;;
     *)		paper=
 		;;
@@ -337,21 +336,21 @@ esac
 
 case $SYSTEMID in
     cisra)
-	lp='/opt/LPRng/bin/lpr "-P$printer"' ;;
+	lp=${LZPRINTCOMMAND:-'/opt/LPRng/bin/lpr "-P$PRINTER"'} ;;
     *)
 	case "$OS" in
 	    solaris)
-		lp='lp -d "$printer" -T postscript' ;;
+		lp='lp -d "$PRINTER" -T postscript' ;;
 	    sunos|linux)
-		lp='lpr "-P$printer"' ;;
+		lp='lpr "-P$PRINTER"' ;;
 	    *)	echo "$cmd: warning: unknown \$OS \"$OS\" - assuming sysv" >&2
-		lp='lp -d "$printer" -T postscript'
+		lp='lp -d "$PRINTER" -T postscript'
 		;;
 	esac
 	;;
 esac
 
-if [ "x$printer" = x- ]
+if [ "x$PRINTER" = x- ]
 then  lp=cat
 fi
 
@@ -385,13 +384,29 @@ fi
 
   [ -z "$tmp" ] || rm "$tmp" || xit=$?
 
-  [ -z "$lpqflag" ] || lpq "$printer" -l || xit=$?
+  [ -z "$lpqflag" ] || lpq "$PRINTER" -l || xit=$?
 
   exit $xit
 ) &
 
 exit $xit
 
+# =head1 ENVIRONMENT
+#
+# PRINTER: default printer to use.
+#
+# LZOPTIONS: default command line options.
+#
+# LZPRINTCOMMAND: low level printer delivery command.
+# Default:
+#
+#	/opt/LPRng/bin/lpr "-P$PRINTER"
+#
+# URL2TXT: filter to convert fetch a URL and emit as plain text.
+# Default:
+#
+#	w3m -dump -T text/html -cols 80 -F "$arg"
+#
 # =head1 CAVEATS
 #
 # Command line options are processed left to right
