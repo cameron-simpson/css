@@ -36,13 +36,13 @@ fi
 if [ $all ]
 then
   hdbinfo ARCH \
-  | awk '{print$1}'
+  | awk '{print$1}' \
+  | wired
 else
   for host
   do  echo "$host"
   done
 fi \
-| wired \
 | while read host
   do  host "$host"
   done \
@@ -54,6 +54,7 @@ fi \
 > "$hlist"
 
 # gather keys
+set -x
 for type in rsa1 rsa dsa
 do
   ssh-keyscan -f "$hlist" -t "$type" >"$keys-$type" &
@@ -61,8 +62,7 @@ done
 wait
 cvsmsg="new ssh keys from $cvshostnames"
 
-set -x
-ifcvs -m "$cvsmsg" ssh_known_hosts1 mergesshkeys <"$keys-rsa1"	|| exit 1
-ifcvs -m "$cvsmsg" ssh_known_hosts2 mergesshkeys <"$keys-rsa"	|| exit 1
-ifcvs -m "$cvsmsg" ssh_known_hosts2 mergesshkeys <"$keys-dsa"	|| exit 1
-ifcvs -f -m "$cvsmsg" ssh_known_hosts_all cat ssh_known_hosts1 ssh_known_hosts2 || exit 1
+cvsedit -1 -m "$cvsmsg" ssh_known_hosts1 mergesshkeys $LOCALDOMAINS <"$keys-rsa1"	|| exit 1
+cvsedit -1 -m "$cvsmsg" ssh_known_hosts2 mergesshkeys $LOCALDOMAINS <"$keys-rsa"	|| exit 1
+cvsedit -1 -m "$cvsmsg" ssh_known_hosts2 mergesshkeys $LOCALDOMAINS <"$keys-dsa"	|| exit 1
+cvsedit -f -m "$cvsmsg" ssh_known_hosts_all cat ssh_known_hosts1 ssh_known_hosts2	|| exit 1
