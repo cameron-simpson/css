@@ -18,4 +18,9 @@ export EDITOR
 
 cvs -q diff $CVS_COMMIT_FILES 2>&1 | sed 's/^/CVS: /' >>"$report"
 
-exec $EDITOR "$report"
+$EDITOR "$report"
+xit=$?
+
+bsed '/^[ 	]*$/d' "$report"
+
+exit $xit
