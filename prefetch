@@ -1,0 +1,28 @@
+#!/bin/sh
+#
+# Prefetch web pages so they're in the proxy cache.
+#	- Cameron Simpson <cs@zip.com.au> 19mar99
+#
+
+inline=
+verbose=
+[ -t 1 ] && verbose=1
+
+[ "x$1" = x-i ] && { inline=1; shift; }
+
+for prefetch
+do [ $verbose ] && echo "get $prefetch"
+   if [ $inline ]
+   then
+       # pageurls prefetches as side-effect
+       pageurls -i "$prefetch" \
+       | while read url
+	 do echo "get $url"
+	    wcat "$url" >/dev/null
+	 done
+       [ -n "$URLLOG" ] && echo "prefetch -i $url" >>"$URLLOG"
+   else
+       wcat "$prefetch" >/dev/null
+       [ -n "$URLLOG" ] && echo "prefetch $url" >>"$URLLOG"
+   fi
+done
