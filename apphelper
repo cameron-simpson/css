@@ -254,6 +254,12 @@ fi
 # with the default pathname in [square brackets].
 # Pressing return or entering "B<n>" or "B<no>" skips the save.
 # Entering "B<y>" or B"<yes>" saves the file under the supplied filename.
+# Entering a string commencing with a bang (`!')
+# performs a shell escape, running the tail of the string in the user's shell.
+# Occurences of bangs in the command are replaced by the last command
+# run from this instance of apphelper.
+# Occurences of percents (`%') in the command are replaced by the filename.
+#
 # Other answers are taken to be a different filename under which to save the file.
 #
 # If the file is to be saved
@@ -289,14 +295,35 @@ case "$savemode" in
     yes)	saveas=$savedir/$fbase ;;
     no)		saveas= ;;
     *)
-		necho "Save [$savedir/$fbase]? "
-		read saveas || exit 0
-		case "$saveas" in
+		repeat=1
+		lastshcmd=
+		while [ $repeat ]
+		do
+		  repeat=
+		  necho "Save [$savedir/$fbase]? "
+		  read saveas || exit 0
+		  case "$saveas" in
+		    \!*)	repeat=1
+				shcmd=`expr "x$saveas" : 'x! *\(.*\)'`
+				case "$shcmd" in
+				  '')	${SHELL:-sh} ;;
+				  *[!%]*) 
+					shcmd=`echo "$shcmd" | sed "s!$lastshcmdg"`
+					lastshcmd=$shcmd
+					shcmd=`echo "$shcmd" | sed "s%$fileg"`
+					"${SHELL:-sh}" -xc "$shcmd"
+					;;
+				  *)	"${SHELL:-sh}" -xc "$shcmd"
+					;;
+				  
+				esac
+				;;
 		    ''|n|no)	saveas= ;;
 		    y|yes)	saveas=$savedir/$fbase ;;
 		    [/~]*)	;;
 		    *)		saveas=$savedir/$saveas ;;
-		esac
+		  esac
+		done
 		;;
 esac
 [ -n "$saveas" ] || exit 0
