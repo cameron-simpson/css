@@ -365,7 +365,7 @@ fi
     ## set +x
   done
 
-  [ -z "$tmp" ] || ( sleep 2; rm "$tmp" ) || xit=$?
+  [ -z "$tmp" ] || rm "$tmp" || xit=$?
 
   [ -z "$lpqflag" ] || lpq "$printer" -l || xit=$?
 
