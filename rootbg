@@ -4,6 +4,8 @@
 #	- Cameron Simpson <cs@zip.com.au> 20nov2000
 #
 
+: ${LOGDIR:=$HOME/var/log}
+
 cmd=$0
 usage="Usage: $cmd [-s] imagefile
 	-s	Synchronous."
@@ -11,8 +13,6 @@ usage="Usage: $cmd [-s] imagefile
 [ -n "$DISPLAY" ] || { echo "$cmd: no \$DISPLAY!" >&2; exit 1; }
 
 ##con echo "$cmd $*"
-
-tmp=${TMPDIR:-/tmp}
 
 opts=
 sync=
@@ -68,9 +68,7 @@ rootbg=`mkwall "$imagefile"` || exit 1
 
 (
   (
-    echo "$rootbg" >>$HOME/var/log/rootbg
-    ##set -x
-    # note backdrop if not a per-desk setting
+    lastvalue rootbg "$rootbg"
     lastvalue "rootbg-$HOST" "$rootbg"
   ) &
 
