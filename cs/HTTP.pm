@@ -361,7 +361,7 @@ defaulting to the environment variable B<HTTP_REFERER>
 or failing that, I<url>.
 The optional I<agent> is used for the B<User-Agent:> field,
 defaulting to the environment variable B<HTTP_USER_AGENT>
-or failing that, "B<cs/1.0>".
+or failing that, "B<$::cmd/1.0>".
 
 =cut
 
@@ -369,7 +369,9 @@ sub rqhdr($;$$)
 { my($U,$srcURL,$agent)=@_;
   $srcURL=defined($ENV{HTTP_REFERER}) ? $ENV{HTTP_REFERER} : $U->Text()
 	if ! defined $srcURL;
-  $agent=defined($ENV{HTTP_USER_AGENT} ? $ENV{HTTP_USER_AGENT} : "$::cmd/1.0");
+
+  $agent=defined($ENV{HTTP_USER_AGENT}) ? $ENV{HTTP_USER_AGENT} : "$::cmd/1.0"
+	if ! defined $agent && ! length $agent;
 
   my $rqhdrs = new cs::RFC822;
 
