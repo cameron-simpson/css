@@ -1,0 +1,57 @@
+#!/usr/bin/perl
+#
+# Emit a table of contents for a CD.
+#	- Cameron Simpson <cs@zip.com.au> 14mar2001
+# 
+
+use strict qw(vars);
+
+use FreeDB;
+use cs::Hier;
+
+my $dev = '/dev/cdrom';
+
+($::cmd=$0) =~ s:.*/::;
+$::Usage="Usage: $::cmd [cd-device]\n";
+
+if (@ARGV)
+{ $dev=shift(@ARGV);
+}
+
+die $::Usage if @ARGV;
+
+my $fdb = new FreeDB;
+die "$::cmd: can't make new FreeDB object\n" if ! defined $fdb;
+
+$fdb->{_debug}=99;
+
+$fdb->cdrom_device($dev);
+# $fdb->proxy_value("http://proxy:8080/");
+
+die "$::cmd: trouble fetching from FreeDB\n" if ! $fdb->fetch();
+
+my($artist,$title)=($fdb->artist(), $fdb->title());
+
+## print cs::Hier::h2a($fdb,1),"\n";
+## exit 0;
+
+print "$artist\n$title\n";
+
+# track info
+my($tno,$tsecs,$toffset,$tinfo,$txinfo,$tdinfo);
+my($qtinfo,$qtxinfo);
+while ($fdb->next_track())
+{  
+  ($tno,$tsecs,$toffset,$tinfo,$txinfo,$tdinfo)
+  =( $fdb->current_track_number(),
+     $fdb->current_track_time_in_seconds(),
+     $fdb->current_track_offset(),
+     $fdb->current_track_info(),
+     $fdb->current_track_extended_info(),
+     $fdb->current_track_detailed_info()
+   );
+
+  print "$tno $tsecs $toffset\n$tinfo\n$txinfo\n";
+
+  ## print cs::Hier::h2a(\@a,1),"\n";
+}
