@@ -1,0 +1,204 @@
+#!/usr/bin/perl
+#
+# Parse squid logs and emit data suitable for use by logtally.
+#	- Cameron Simpson <cs@zip.com.au> 26mar99
+#
+
+use strict qw(vars);
+
+use cs::Misc;
+use cs::Net;
+
+$::Usage="Usage: $::cmd [-a] <logdata >genericlog
+	Output format:
+	    start duration size ACTION DATATYPE SUFFIX CLIENT WEBSITE PROTOCOL logline
+";
+
+$::AllLines=0;	# misses only
+{ my $badopts = 0;
+
+  if (@ARGV && $ARGV[0] eq '-a')
+  { $::AllLines=1;
+    shift(@ARGV);
+  }
+
+  if (@ARGV)
+  { warn "$::cmd: extra arguments: @ARGV\n";
+    $badopts=1;
+  }
+
+  die $::Usage if $badopts;
+}
+
+$::Xit=0;
+
+$::SiteSuffix='.'.$ENV{SITENAME};
+
+warn "loading data ...\n";
+my @log;
+{ my $datum;
+  my $earliest;
+  my $latest;
+
+  # collate lines and compute boundaries
+  LOGENTRY:
+    while (defined ($datum=readFILEline(STDIN)))
+    { next LOGENTRY if ! ref $datum
+		    || ( ! $::AllLines
+		      && ( $datum->{CLIENT} eq '127.0.0.1'  # proxy => proxy
+		        || $datum->{ACTION_TYPE} =~ /_HIT$/ # cache hits
+			 )
+		       )
+		    ;
+
+      my $start = $datum->{COMPLETED}-$datum->{ELAPSED};
+      print $start,
+	    " ", $datum->{ELAPSED},
+	    " ", $datum->{SIZE},
+	    " ", $datum->{ACTION_TYPE},
+	    " ", datatypeKey($datum),
+	    " ", suffixKey($datum),
+	    " ", clientKey($datum),
+	    " ", websiteKey($datum),
+	    " ", protocolKey($datum),
+	    " ", $datum->{LOGLINE},
+	    "\n";
+    }
+}
+
+exit 0;
+
+# read log lines from a file
+sub readFILE
+{ my($FILE)=@_;
+
+  my @data;
+  my $datum;
+
+  while (defined ($datum=readFILEline($FILE)))
+	{ if (ref $datum)
+	  { push(@data,$datum);
+	  }
+	  else
+	  { $::Xit=1;
+	  }
+	}
+
+  @data;
+}
+
+sub readFILEline
+{ my($FILE)=@_;
+
+  local($_)=scalar(<$FILE>);
+
+  return undef if ! defined;
+
+  my $datum = decodeLine($_);
+
+  return $datum if ref $datum;
+
+  chomp;
+  warn "$::cmd: $FILE, $.: parse error on: $_\n";
+  0;
+}
+
+# extra info from a log line sub
+sub decodeLine
+{ local($_)=@_;
+
+  chomp;
+  my @f = grep(length,split);
+  return undef if @f < 10;
+
+  ## warn "f=[@f]";
+
+  my($completed,$elapsed,$client,$hitmiss,
+     $size,$method,$uri,$ident,$hier,$content)=@f;
+
+  return undef if $completed !~ /^\d+\.\d+$/
+	       || $elapsed !~ /^\d+$/
+	       || $hitmiss !~ m:^[_\w]+/\d{3}$:
+	       || $size !~ /^\d+$/
+	       || $method !~ /^\w+$/
+	       || $hier !~ m:^[_\w]+/\S:
+	       || ($content ne '-' && $content !~ m:/:)
+	       ;
+
+  my ($act_type, $act_code) = ($hitmiss =~ /(.*)\/(.*)/);
+  my ($hier_type, $hier_from) = ($hier =~ /(.*)\/(.*)/);
+  my ($type, $subtype) = ( $content =~ m:/:
+			   ? ($`,$')
+			   : ('unknown', 'unknown')
+			 );
+
+  { LOGLINE => $_,		# actual log line
+    COMPLETED => $completed+0,	# seconds, to ms resolution
+    ELAPSED => $elapsed/1000,	# duration in seconds, to ms resolution
+    CLIENT => $client,		# requestor
+    ACTION_TYPE => $act_type,	# TCP_HIT, etc
+    ACTION_CODE => $act_code,	# 404, etc
+    SIZE => $size+0,		# fetched data in bytes
+    METHOD => $method,		# GET, etc
+    URI => $uri,		# http://blah etc
+    IDENT => $ident,
+    HIER_TYPE => $hier_type,	# SINGLE_PARENT, etc
+    HIER_FROM => $hier_from,	# upstream proxy or host
+    TYPE => $type,		# text, etc
+    SUBTYPE => $subtype,	# plain, etc
+  }
+}
+
+sub simpleHost
+{ local($_)=@_;
+
+  if ($_ eq '127.0.0.1')
+  { $_=LOCALHOST;
+  }
+  elsif (/^\d+\.\d+\.\d+\.\d+$/)
+  # numeric - convert to name
+  { my $n = $_;
+    if (defined $::_simpleHost{$n})
+    { $_=$::_simpleHost{$n};
+    }
+    else
+    { ## warn "resolve $n...";
+      my @h = cs::Net::hostnames(cs::Net::a2addr($n));
+      $_ = $h[0] if @h && length $h[0];
+      $::_simpleHost{$n}=$_;
+    }
+  }
+
+  if (substr($_, -length($::SiteSuffix)) eq $::SiteSuffix)
+  { substr($_, -length($::SiteSuffix))='';
+  }
+
+  lc;
+}
+
+sub clientKey { simpleHost(shift->{CLIENT}) }
+sub websiteKey{ local($_)=lc(shift->{URI});
+		s/^\w+:\/\/+//;
+		s/[^-.\w].*//;
+		$_;
+	      }
+sub protocolKey{ local($_)=lc(shift->{URI});
+		 /\W/ ? $` : $_;
+	       }
+sub datatypeKey{ local($_)=@_;
+		 ## my(@c)=caller; warn "datatypeKey(@_) from [@c]";
+		 lc($_->{TYPE}.'/'.$_->{SUBTYPE});
+	       }
+
+sub suffixKey  { local($_)=lc(shift->{URI});
+
+		 s/[?#].*//;		# trim query or anchor
+		 s/^\w+:\/\/[^\/]+//;	# trim scheme://host
+
+		 m:\.([^/.]+)$:
+		 ? $1
+		 : m:/$:	# suffix
+		   ? 'html'	# infer index.html
+		   : 'NONE'
+		 ;
+	       }
