@@ -1,4 +1,6 @@
 #!/bin/sh
-logf=$HOME/var/queue/httpgetd
->>"$logf"
-alog httpgetd httpget -Q "$logf" -l download
+log=$HOME/var/log/httpgetd
+queue=$HOME/var/queue/httpgetd
+logroll -z +datecode "$queue" "$log"
+>>"$queue"
+alog "$log" httpget -Q "$queue" -l download
