@@ -9,7 +9,7 @@ use strict qw(vars);
 
 use cs::Misc;
 
-$::Usage="Usage: $::cmd known_hosts_file localdomains...\n";
+$::Usage="Usage: $::cmd known_hosts_file localdomains... <new-ssh-keys\n";
 
 my $badopts=0;
 
