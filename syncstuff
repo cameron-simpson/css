@@ -269,7 +269,7 @@ else
     # do targets individually
     for dir
     do
-	$trace rsync $rsopts "$from$dir/." "$to$dir/." || xit=1
+	$trace rsync --rsync-path "$rrsync" $rsopts "$from$dir/." "$to$dir/." || xit=1
     done
 fi
 
