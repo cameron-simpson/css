@@ -1,2 +1,2 @@
 #!/bin/sh
-ATERM_SHADE=100 term -n JUKE -geometry 80x6-0+3 -e juke
+ATERM_SHADE=100 term -n JUKE -geometry 80x6-128+3 -e juke
