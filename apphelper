@@ -4,22 +4,31 @@
 #	- Cameron Simpson <cs@zip.com.au> 18jun1998
 #
 
+## tty=/dev/ttyp2
+## exec 2>"$tty" >&2 0</dev/tty
+## set -vx
+## set x +t "$@"; shift
+## echo "[$*]"
+
+# short circuit the make-a-tty-window stuff
+case $1 in
+    -t)	shift; set -x; exec term +a +ip -small -e sane "$0" +t ${1+"$@"} ;;
+    +t) shift ;;
+    *)  [ -t 0 -a -t 1 ] || exec term +a +ip -small -e sane "$0" +t ${1+"$@"} ;;
+esac
+
 savedir=${SAVEDIR-$HOME/dl}
 savedir=$HOME/dl
 pager=${PAGER:-less}
+doview=
 
 cmd=`basename "$0"`
-usage="Usage: $cmd [-t] file [-d savedir] viewer [viewer-args...]
+usage="Usage: $cmd [-t] file [-y] [-d savedir] viewer [viewer-args...]
 	-t		Run apphelper in a new terminal window.
 	+t		Do not run apphelper in a new terminal window.
+	-y		Run viewer immediately.
 	-d savedir	Save directory (from \$SAVEDIR: $savedir).
 	-p pager	Pager (default viewer, from \$PAGER: $pager)."
-
-case $1 in
-    -t)	shift; exec term +t +a -small -e sane "$0" ${1+"$@"} ;;
-    +t) shift ;;
-    *)  [ -t 0 -a -t 1 ] || exec term +t +a -small -e sane "$0" ${1+"$@"} ;;
-esac
 
 badopts=
 if [ $# = 0 ]
@@ -36,6 +45,7 @@ else
   do  case $1 in
 	  -d)	savedir=$2; shift ;;
 	  -p)	pager=$2; shift ;;
+	  -y)	doview=1 ;;
 	  --)	shift; break ;;
 	  -?*)	echo "$cmd: unrecognised option: $1" >&2; badopts=1 ;;
 	  *)	break ;;
@@ -54,13 +64,18 @@ export file fbase
 
 file "$file"; echo
 
-necho "View [$*]? "
-read viewit || exit 0
-case "$viewit" in
-    ''|y|yes)	"$@" "$file" ;;
-    n|no)	;;
-    *)		$viewit "$@" ;;
-esac
+if [ $doview ]
+then
+    "$@" "$file"
+else
+    necho "View [$*]? "
+    read viewit || exit 0
+    case "$viewit" in
+	''|y|yes)	"$@" "$file" ;;
+	n|no)	;;
+	*)		$viewit "$@" ;;
+    esac
+fi
 
 necho "Save [$savedir/$fbase]? "
 read saveas || exit 0
