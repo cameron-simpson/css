@@ -1,0 +1,9 @@
+#!/bin/sh
+#
+
+cmd=`basename "$0"`
+
+GLIMPSE_INDEX=${GLIMPSE_INDEX-'.'}
+export GLIMPSE_INDEX
+
+exec $REAL/"$cmd" -z -H "$GLIMPSE_INDEX" ${1+"$@"}
