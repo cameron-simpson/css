@@ -16,7 +16,7 @@ case $1 in
 		;;
 esac
 
-umlimit -d 16384	## 16M process data limit
+ulimit -d 16384	## 16M process data limit
 
 if [ "x$1" = x-s ]
 then  shift
