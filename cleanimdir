@@ -1,0 +1,38 @@
+#!/bin/sh
+#
+# Clean cruft from an image collection.
+# Ignore .* names.
+#	- Cameron Simpson <cs@zip.com.au> 27mar2003
+#
+
+cmd=$0
+usage="Usage: $cmd [-f] [-n] [directories...]"
+
+doit=
+imgptn='((PNG|JPEG|GIF) image data)'
+docptn='((ASCII|program|English|document) text|empty)$'
+
+case $1 in
+  -f)	doit=1; shift ;;
+  -n)	doit=; shift ;;
+esac
+
+find ${1+"$@"} ${1-.} \
+	\( \
+	  \( -name '.?*' -prune \) \
+	  -o \
+	  \( \
+	    ! -name Mykefile \
+	  \) \
+	\) \
+	-type f \
+| xxargs file \
+| if [ $doit ]
+  then
+    egrep -v "$imgptn" \
+    | egrep "$docptn" \
+    | sed 's/:.*//' \
+    | xxargs set-x rm
+  else
+    exec egrep -v "$imgptn"
+  fi
