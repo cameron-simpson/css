@@ -388,7 +388,7 @@ sub ImageIndices($)
 $cs::IM2HTML::_shellFD=0;
 sub _shell
 { if (! $cs::IM2HTML::_shellFD)
-	{ if (! open(_shellFD,"| exec nice /bin/sh"))
+	{ if (! open(_shellFD,"| exec nice /bin/sh -x"))
 		{ warn "can't pipe to /bin/sh: $!";
 		  return undef;
 		}
