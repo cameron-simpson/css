@@ -1,0 +1,158 @@
+#!/usr/bin/perl
+#
+# Usage: lpqdup queuename
+#
+# Walks the specified queue removing the second and following jobs for a user.
+#
+
+require 'open2.pl';
+
+$cmd=$0;
+$queue=shift;	die "which queue?\n" if !defined($queue);
+$lpq="lpq -P$queue -ar";
+
+if (!&open2('FROMLPQ','TOLPQ',$lpq))
+	{ die("$cmd: can't open2($lpq)\n");
+	}
+
+undef %printstate, %inqueue, @users, @job;
+$_=&getline;	die "unexpected EOF from $lpq" if !defined;
+if (/Printer\s+(\S+):\s*([^;]+);/)
+	{ $printstate{$1}=$2;
+	}
+
+if ($printstate{$queue} =~ /problem/)
+	{ ($s,$m,$h,$d,$my,$y,@etc)=localtime(time);
+	  printf("%2d:%02d %2d/%02d/%02d: lpq -P%-10s %s\n",
+		 $h,$m,$d,$my,$y,"$queue:",$printstate{$queue});
+	}
+
+$_=&getline;	exit 0 if !defined;
+
+$njobs=0;
+while (($i=read(FROMLPQ,$_,1)) > 0 && $_ ne 'D')
+	{ $_.=&getline;
+	  if (/^\*?\s*(\d+)\s+\d+\s+\d+:\d+\s+([^@\s]+)/)
+		{ $njobs++;
+		  $jobno=$1; $user=$2;
+
+		  $job[$jobno]=$_;
+		  if (!defined($inqueue{$user}))
+			{ $inqueue{$user}=$jobno;
+			  push(@users,$user);
+			}
+		  else
+		  { $inqueue{$user}.=",$jobno";
+		  }
+		}
+	  else
+	  { print STDERR "rejecting line: $_";
+	  }
+	}
+
+$i == 1 || die "unexpected EOF from $lpq";
+
+$prompt="Delete: ";
+
+$got = &getprompt($_,$prompt);
+die "\"$got\" is not a prompt" if $got ne $prompt;
+
+$deleted=0;
+
+if ($njobs > 9)
+	{ for $user (@users)
+		{ &eval("\@jobs=($inqueue{$user})");
+
+		  $keep=$job[shift @jobs];
+		  # print STDERR "keep: $keep";
+
+		  $mailed=0;
+		  $mailok=0;
+		  for $jobno (@jobs)
+			{ $job=$job[$jobno];
+			  # print STDERR "toss: $job";
+
+			  if (!$deleted)
+				{ $deleted=1;
+				  for (@job)
+					{ print STDERR;
+					}
+				}
+
+			  if (!$mailed)
+				{ if (open(MAIL,"|/opt/bin/mail -s 'some of your printer jobs have been dequeued' $user"))
+					{ $mailok=1;
+					  print MAIL <<X;
+Due to the size of the queue on [lpr -P$queue] no-one may have more than one
+job in the queue at a time. Accordingly your second and following jobs have
+been deleted.
+
+You can arrange to have the printer notify you when a print finishes by using
+the -m option to lpr, viz:
+	lpr -P$queue -mdone filename
+
+Your remaining queued job is:
+	$keep
+The jobs deleted are listed below.
+	- SS
+
+X
+					}
+				  else
+				  { $mailok=0;
+				  }
+
+				  $mailed=1;
+				}
+
+			  if ($mailok)
+				{ print MAIL $job;
+				}
+
+			  print TOLPQ "$jobno\n";
+			  $delmsg=&getline;
+			  die "EOF from $lpq in del msg" if !defined($delmsg);
+			  print STDERR $delmsg;
+			  $got = &getprompt("",$prompt);
+			  die "\"$got\" is not a prompt" if $got ne $prompt;
+			}
+
+		  if ($mailed && $mailok)
+			{ close(MAIL);
+			}
+		}
+	}
+
+exit 0;
+
+sub prt { print STDERR $_[0]; }
+
+sub eval
+	{ local($e)=$_[0];
+
+	  # print STDERR "eval($e)\n";
+	  eval $e;
+	}
+
+sub getline	# void -> line
+	{ local($_);
+
+	  $_=<FROMLPQ>;
+
+	  return undef if !defined;
+
+	  $_;
+	}
+
+sub getprompt	# (got,prompt) -> reallygot
+	{ local($_,$prompt)=@_;
+	  local($in);
+
+	  while (length($prompt) > length)
+		{ die "getprompt: unexpected EOF from $lpq in prompt" if read(FROMLPQ,$in,1) < 1;
+
+		  $_.=$in;
+		}
+	  
+	  return $_;
+	}
