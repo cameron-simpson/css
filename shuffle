@@ -8,13 +8,18 @@
 
 my @lines = <STDIN>;
 
-srand((time^$#lines^$$)+getppid());
+srand(time+@lines+$$+getppid());
+
+# trickle alone a bit
+for my $i (0..getppid()%64)
+{ rand($i);
+}
 
 my $ndx;
 
 while (@lines)
 {
-  $ndx = ($$+int(rand(@lines)))%@lines;
+  $ndx = int(rand(@lines));
 
   print $lines[$ndx];
   $lines[$ndx]=$lines[$#lines] if $ndx < $#lines;
