@@ -34,7 +34,7 @@ then
     myke || exit 1
 fi
 
-rsync -avHPW --delete $HOME/there/adzapper.sourceforge.net/html/. sf:adzapper/htdocs/.
+rsync -avHPW --delete --exclude=CVS/ $HOME/there/adzapper.sourceforge.net/html/. sf:adzapper/htdocs/.
 
 if [ $dopost ]
 then
