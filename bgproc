@@ -4,7 +4,7 @@
 # Copy output to a log.
 # Record the pid in a file.
 # NoHUP it.
-#	- Cameron Simpson <cs@zip.com.au> 25aug99
+#	- Cameron Simpson <cs@zip.com.au> 25aug1999
 # 
 
 : ${LOGDIR:=$HOME/var/log}
@@ -19,7 +19,18 @@ pidfile=
 ignhup=1
 async=1
 
-usage="Usage: $cmd [-i input] [-l logfile] [-p pidfile] [-s] command [args...]"
+usage="Usage: $cmd [-i input] [-l logfile] [-p pidfile] [-s] command [args...]
+	-i input	Input path.
+			\"-\" means don't change stdin.
+			Default: $input
+	-l logfile	Output and error output path.
+			\"-\" means don't change stdout or stderr.
+			Default, from \$CONSOLE: $logfile
+	-p pidfile	File to hold process id.
+			\"-\" means don't save the pid to a file.
+			Default: \$VARRUN/command@\$HOST
+	-s		Synchronous - wait for the process to terminate.
+			Default: asynchronous."
 
 badopts=
 while :
@@ -56,13 +67,25 @@ case $pidfile in -|/*) ;; *) pidfile=$VARRUN/$pidfile ;; esac
 
 ## echo "logfile=$logfile, pidfile=$pidfile"
 
-( [ "x$input" = x- ] || exec <"$input"
+exec 9<&0
+(
+  if [ "x$input" = x- ]
+  then  exec <&9
+  else  exec <"$input"
+  fi
+  exec 9<&-
+
   [ "x$logfile" = x- ] || exec >>"$logfile" 2>&1
+
   [ $ignhup ] && trap '' 1
   [ $async ] && trap '' 2
+
   exec "$@"
 ) &
 pid=$!
+
+# close input just in case
+exec <&-
 
 ( [ "x$pidfile" = x- ] || exec >>"$pidfile"
   echo "$pid"
