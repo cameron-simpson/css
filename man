@@ -16,6 +16,7 @@ $ManMacros=($ENV{OS} eq 'linux' ? '-mandoc' : '-man');
 $MyMacros="";	## "$ENV{HOME}/rc/header/man";
 $Roff=($ENV{OS} eq 'linux' ? 'groff -Tlatin1' : 'nroff');
 $ManProcess="soelim | neqn | tbl | $Roff $ManMacros $MyMacros -";
+
 # GNU col is a busted piece of crap
 if ($ENV{OS} ne 'linux') { $ManProcess.=" | col -x"; }
 $InfoProcess="info2pod | pod2text";	## "info2man | $ManProcess";
