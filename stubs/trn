@@ -3,7 +3,7 @@
 
 case $ARCH in
     linux.*.*)	trn=/usr/bin/trn ;;
-    *)		trn=/usr/local/bin/trn ;;
+    *)		trn=/opt/bin/trn ;;
 esac
 
 exec env GUI=lean term -n "TRN $*" -e pushttylabel "TRN $*" "$trn" \
