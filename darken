@@ -1,0 +1,69 @@
+#!/bin/sh
+#
+# Emit a darkened version of an image on stdout, in JPEG format.
+# Essentially a wrapper for ppmdim.
+#	- Cameron Simpson <cs@zip.com.au> 21jul2000
+#
+
+dimratio=0.6
+ofmt=jpg
+ifmt=jpg
+img=
+maxx=800 maxy=1080	# sized for tty on 1600x1200
+
+cmd=`basename "$0"`
+usage="Usage: $cmd [-i ifmt] [-o ofmt] [image]
+	-d dim	Produce an image \"dim\" as bright as the original.
+		Default: $dimratio
+	-i ifmt	Input image format.
+		Otherwise this is deduced from \"image\" if supplied.
+		Default: $ifmt
+	-o ofmt	Output image format, one of [pnm,jpg,png].
+		Default: $ofmt"
+
+badopts=
+while :
+do  case $1 in
+	-d)	dimratio=$2; shift ;;
+	-i)	ifmt=$2; shift ;;
+	-o)	ofmt=$2; shift ;;
+	--)	shift; break ;;
+	-?*)	echo "$cmd: unrecognised option: $1" >&2
+		badopts=1
+		;;
+	*)	break ;;
+    esac
+    shift
+done
+
+[ $# = 0 ] || { img=$1; shift; }
+
+[ $# = 0 ] || { echo "$cmd: extra arguments: $*" >&2; badopts=1; }
+
+[ "x$image" = x- ] && image=
+
+dim="ppmdim $dimratio"	## "| pnmscale -xysize $maxx $maxy"
+case $ofmt in
+    pnm)	;;
+    jpg)	dim="$dim | cjpeg" ;;
+    png)	dim="$dim | pnmtopng" ;;
+    *)		echo "$: huh? ofmt=$ofmt" >&2; badopts=1 ;;
+esac
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+if [ -n "$img" ]
+then  guessfrom=$img
+      exec <"$img"
+else  guessfrom=dummy.$ifmt
+fi
+
+## set -x
+case "$guessfrom" in
+  *.jpg) djpeg -pnm ;;
+  *.png) pngtopnm ;;
+  *.gif) giftopnm ;;
+  *.p[npgp]m) cat ;;
+  *) exit 1 ;;
+esac \
+| eval "$dim"
