@@ -1,0 +1,6 @@
+#!/bin/sed -nf
+#
+# Extract http: URLs from plain text.
+#	- Cameron Simpson <cs@zip.com.au> 24may2000
+#
+s/.*\(http:[^> 	]*\).*/\1/p
