@@ -75,6 +75,8 @@ toc_jar='jar t${vlet}f /dev/fd/0'
 extract_jar='jar x${vlet}f /dev/fd/0'
 view_jar=$toc_jar
 
+toc_ogg='ogginfo /dev/fd/0'
+
 toc_uu="egrep $formopts '^(begin|end) '"
 extract_uu='uudecode $formopts /dev/fd/0'
 view_uu=$toc_uu
@@ -173,7 +175,7 @@ do  [ $abort ] && exit 1
 	      o|so)	format=obj ;;
 	      a)	format=ar ;;
 	      arc|lzh)	format=lzh ;;
-	      uu|pdf|jar|tar|cpio|rpm|rm|rrd|rcp)
+	      ogg|uu|pdf|jar|tar|cpio|rpm|rm|rrd|rcp)
 			format=$cext ;;
 	      zip|exe)	format=zip ;;
 	      mpg|mpeg|mpe) format=mpg ;;
