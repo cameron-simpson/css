@@ -1,0 +1,53 @@
+#!/bin/sh
+#
+# Wrapper for CGI scripts which sets environment and captures and
+# reports errors.
+# For any perl CGI, mv the real .cgi to .cgi-pl and link this script to
+# the old .cgi name.
+# For any shell CGI, mv the real .cgi to .cgi-sh and link this script to
+# the old .cgi name.
+#	- Cameron Simpson <cs@zip.com.au> 03mar1999
+#
+# Make single wrapper for pl and sh.	- cameron 12feb2001
+#
+
+# snapshot errors and attach to output bottom
+STDERR=/tmp/stderr.$USER.$$
+DEBUG=1; export DEBUG
+trap 'exec 2>&1
+      if [ -n "$DEBUG" -a -s "$STDERR" ]
+      then
+	  echo "Content-Type: text/html"
+	  echo
+	  echo "<TITLE>Debugging Info for $0</TITLE>"
+	  echo "<BR><HR><B>Debugging Info</B><P>"
+	  echo "<B>STDERR of $0 $*</B><BR><PRE><SMALL>"
+	  fold <"$STDERR"
+	  echo "</SMALL></PRE>"
+	  echo "<P><B>Environment</B><BR><PRE><SMALL>"
+	  env | sort
+	  echo "</SMALL></PRE>"
+      fi
+      rm -f "$STDERR"' 0
+exec 2>"$STDERR"
+
+## exec 2>/dev/pts/11
+## id >&2
+## which perl >&2
+
+dir=`dirname "$0"`
+
+. $dir/.cgienv.sh
+
+if [ -s "$0-pl" ]
+then  perl -I$HOME/rc/perl "$0-pl" ${1+"$@"}
+else  if [ -s "$0-sh" ]
+      then  /bin/sh "$0-sh" ${1+"$@"}
+      else  if [ -s "$0-exec" ]
+	    then  "$dir/$0-exec" ${1+"$@"}
+	    else  echo "$0: can't find $0-sh or $0-pl" >&2
+	    fi
+      fi
+fi
+
+exit $?
