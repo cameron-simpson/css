@@ -1,0 +1,3 @@
+#!/bin/sh
+[ $# = 0 ] && set .
+exec find . -type d -print | xargs chmod g+s
