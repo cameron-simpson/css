@@ -20,11 +20,14 @@ badopts=
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
+# protect against rogue output
+exec 3>&1 1>/dev/null
+
 [ -n "$statefile" ] || statefile=`ssh-agent-statefile` || exit 1
 
 [ -s "$statefile" ] \
 && . "$statefile" \
 && [ -n "$SSH_AGENT_PID" ] \
 && kill -0 "$SSH_AGENT_PID" 2>/dev/null \
-&& echo ". '$statefile'" \
+&& echo ". '$statefile'" >&3 \
 && { [ -z "$verbose" ] || ssh-add -l >&2; }
