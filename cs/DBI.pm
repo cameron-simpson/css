@@ -419,6 +419,55 @@ sub sqlWhereText
   return ($sql, @args);
 }
 
+=item datedRecords(I<dbh>,I<table>,I<keyfield>,I<key>,I<when>,I<alldates>)
+
+Retrieve active records from the specified I<table>
+with the specified I<key> value.
+If the optional parameter I<alldates> is true (it defaults to false)
+return all the records for this I<key>, as an array of hashrefs.
+Otherwise return only those records which overlap the day I<when>.
+The parameter I<when> is optional, and defaults to today.
+
+The records are returned ordered from oldest to most recent.
+
+=cut
+
+sub datedRecords($$$$;$$)
+{ my($dbh,$table,$keyfield,$key,$when,$all)=@_;
+  $when=cs::DBI::isodate() if ! defined $when;
+  $all=0 if ! defined $all;
+
+  my $D = cs::DBI::arraytable($dbh,$table);
+
+  my @d =
+	  $all
+	  ? grep($_->{$keyfield} eq $key, @$D)
+	  : grep($_->{$keyfield} eq $key
+	      && $_->{START_DATE} le $when
+	      && ( ! length $_->{END_DATE} || $when le $_->{END_DATE}),
+		@$D)
+  ;
+
+  return
+      sort { my $sa = $a->{START_DATE};
+	     my $sb = $b->{START_DATE};
+
+	     return $sa cmp $sb if $sa ne $sb;
+
+	     my $ea = $a->{END_DATE};
+	     my $eb = $b->{END_DATE};
+
+	     return 0 if $ea eq $eb;
+
+	     # catch open ended ranges
+	     return 1 if ! length $eb;
+	     return -1 if ! length $ea;
+
+	     $ea cmp $eb;
+	   }
+      @d;
+}
+
 sub addDatedRecord
 { my($dbh,$table,$when,$rec,@delwhere)=@_;
   if (! defined $when)
@@ -467,6 +516,109 @@ sub delDatedRecord
   }
 
   $sth->execute($prevwhen,@args,$when);
+}
+
+=item cleanDates(I<dbh>,I<table>,I<keyfield>,I<keys...>)
+
+Edit the specified I<table>
+such that no records for a single value of I<keyfield> overlap.
+Later records are presumed to be more authoritative than earlier records.
+Earlier records overlapping later fields have their B<END_DATE> fields cropped.
+B<Warning>:
+earlier records completely overlapped by later records
+are B<discarded>.
+This may not be what you want.
+
+If the optional list of I<keyfields>, I<keys...>, is supplied
+then only those values will have their dates cleaned.
+The default behaviour is to clean the entire table.
+
+=cut
+
+sub cleanDates
+{ my($dbh,$table,$keyfield,@keys)=@_;
+
+  my $sth = cs::DBI::query($dbh,"SELECT $keyfield FROM $table");
+  if (! defined $sth)
+  { warn "$::cmd: cleanDates($dbh,$table,$keyfield): can't make SQL statement handle";
+    return;
+  }
+
+  if (! @keys)
+  { my $a = $sth->fetchall_arrayref();
+    @keys = ::uniq(map($_->[0], @$a));
+  }
+
+  KEY:
+  for my $key (@keys)
+  {
+    my @D = reverse cs::DBI::datedRecords($dbh,$table,$keyfield,$key,undef,1);
+
+    next KEY if ! @D;
+
+    my $prev_start = shift(@D)->{START_DATE};
+
+    # prune earlier records
+    while (@D)
+    { my $D = shift(@D);
+      my $start = $D->{START_DATE};
+      my $end   = $D->{END_DATE};
+
+      if (length $end && $end lt $start)
+      {
+	my @sqlargs=($key,$start);
+	my $sql = "DELETE FROM $table WHERE $keyfield = ? AND START_DATE = ? AND ";
+
+	if (length $end)
+	{ $sql.='END_DATE = ?';
+	  push(@sqlargs,$end);
+	}
+	else
+	{ $sql.='ISNULL(END_DATE)';
+	}
+
+	nl("$sql\n\t[@sqlargs]");
+	cs::DBI::dosql($dbh,$sql,@sqlargs);
+      }
+      elsif (! length $end || $end ge $prev_start)
+      { my $nend = cs::Day->new($prev_start)->Prev()->Code();
+	if ($nend lt $start)
+	{
+	  my @sqlargs=($key,$start);
+	  my $sql = "DELETE FROM $table WHERE $keyfield = ? AND START_DATE = ? AND ";
+
+	  if (length $end)
+	  { $sql.='END_DATE = ?';
+	    push(@sqlargs,$end);
+	  }
+	  else
+	  { $sql.='ISNULL(END_DATE)';
+	  }
+
+	  nl("$sql\n\t[@sqlargs]");
+	  cs::DBI::dosql($dbh,$sql,@sqlargs);
+	}
+	else
+	{
+	  my @sqlargs=($nend,$key,$start);
+	  my $sql = "UPDATE $table SET END_DATE = ? WHERE $keyfield = ? AND START_DATE = ? AND ";
+
+	  if (length $end)
+	  { $sql.='END_DATE = ?';
+	    push(@sqlargs,$end);
+	  }
+	  else
+	  { $sql.='ISNULL(END_DATE)';
+	  }
+
+	  nl("$sql\n\t[@sqlargs]");
+	  cs::DBI::dosql($dbh,$sql,@sqlargs);
+	}
+      }
+
+      $prev_start=$start;
+    }
+  }
 }
 
 =item last_id()
