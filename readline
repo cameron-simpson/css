@@ -1,0 +1,22 @@
+#!/bin/sh
+#
+# Read a line using the GNU readline stuff, for file completion.
+# Would that there was a way to supply come initial content...:-(
+#	- Cameron Simpson <cs@zip.com.au> 22feb2004
+#
+
+prompt=
+[ "x$1" = x-p ] && { prompt=$2; shift; shift; }
+export prompt
+
+[ -t 0 ] || { echo "$0: stdin must be a tty" >&2; exit 1; }
+
+if [ -x "/bin/bash" ]
+then
+    export prompt
+    exec bash -c 'read -p "$prompt" -r -e line >&2 || exit 1; echo "$line"'
+else
+    necho "$prompt"
+    read line || exit 1
+    echo "$line"
+fi
