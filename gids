@@ -1,0 +1,16 @@
+#!/bin/sh
+#
+# List numeric group ids for a user by reverse "groups" list.
+#	- Cameron Simpson <cs@zip.com.au> 12jun2002
+#
+
+[ $# = 1 ] || { echo "Usage: $0 user" >&2; exit 2; }
+user=$1; shift
+
+groups "$user" \
+| sed 's/.*: *//' \
+| tr ' ' '\012' \
+| while read g
+  do  ypmatch "$g" group
+  done \
+| awk -F: '{print$3}'
