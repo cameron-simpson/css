@@ -5,6 +5,8 @@
 # -f: remove the lock anyway.
 #
 
+cmd=$0
+
 LOCKDIR=${LOCKDIR:-"$HOME/var/locks"}
 export LOCKDIR
 
@@ -31,32 +33,39 @@ do
 	name=`sedstrs 's/_/__/g
 		       s:///*:/:g
 		       s:^/::
-		       s:/$::' "$lock"`
+		       s:/$::
+		       s:/:_:g' "$lock"`
 	;;
       *)name=$lock ;;
   esac
 
   lockdir=$LOCKDIR/$name
-  pidfile=$lockdir/$pid
 
-  [ -s "$pidfile" ] || { echo "$0: no pid file for $lock"; xit=1; continue; }
-
-  pid=`cat <"$pidfile"`
-  [ -n "$pid" ] || { echo "$0: no pid in $pidfile" >&2; xit=1; continue; }
-
-  kill $sig "$pid" && killed=1
+  [ -d "$lockdir/." ] \
+  || { echo "$cmd: no lock dir $lockdir" >&2
+       xit=1
+       continue
+     }
 
   lockdirs="$lockdirs $lockdir"
 
+  pidfile=$lockdir/$pid
+  [ -s "$pidfile" ] || { echo "$cmd: no pid file for $lock"; xit=1; continue; }
+
+  pid=`cat <"$pidfile"`
+  [ -n "$pid" ] || { echo "$cmd: no pid in $pidfile" >&2; xit=1; continue; }
+
+  kill $sig "$pid" && killed=1
 done
 
+# signalled anyone? give them a little time to tidy up
 [ $killed ] && sleep 1
 
 if [ -n "$lockdirs" ]
 then
     for lockdir in $lockdirs
     do
-	[ -d "$lockdir/." ] && rm -rf "$lockdir"
+	[ -d "$lockdir/." ] && (set -x; rm -rf "$lockdir")
     done
 fi
 
