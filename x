@@ -4,6 +4,8 @@
 #	- Cameron Simpson <cs@zip.com.au> 17dec2002
 #
 
+: ${TMPDIR:=/tmp}
+
 cmd=`basename "$0"`
 usage="Usage: $cmd [-t mimetype] [archive]"
 
@@ -21,9 +23,9 @@ then
     then
 	file=/dev/fd/0
     else
-	tmpf=${TMPDIR:-/tmp}/$cmd$$
+	tmpf=$TMPDIR/$cmd$$
 	trap 'rm -f "$tmpf"' 0 1 2 13 15
-	dd bs=1024 count=1 >"$tmpf" || exit 1
+	(umask 077; exec dd bs=1024 count=1 >"$tmpf") || exit 1
     	mtype=`file2mime "$tmpf"` \
 	|| { echo "$cmd: stdin: no MIME type recognised" >&2
 	     exit 1
