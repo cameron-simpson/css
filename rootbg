@@ -35,7 +35,7 @@ then
     imagefile=$1; shift
 else
     # note: -n 20 followed by pickn because -w happens _after_ -n
-    imagefile=`BGPATH=$HOME/etc/im/wallpaper bglist -r -n 20 -w ${1+"$@"} | pickn`
+    imagefile=`BGPATH=$WALLPAPER bglist -r -n 20 -w ${1+"$@"} | pickn`
     [ -n "$imagefile" ] && [ -s "$imagefile" ] || exec xsetroot -solid black
 fi
 
