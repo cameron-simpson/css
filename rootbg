@@ -76,6 +76,8 @@ then
     exit 0
 fi
 
+exec Esetroot -fit "$imagefile"
+
 case "$imagefile" in
     *.gif|*.xpm)	2xpm -s root $convopts "$imagefile" xpmroot & ;;
     *)			2png -s root $convopts "$imagefile" display -window root & ;;
