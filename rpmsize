@@ -18,10 +18,16 @@ tally()
 
 if [ $# = 0 ]
 then
-    exec xxargs "$0"
+    if [ -t 0 ]
+    then
+	set -x
+	exec rpm -qa
+    else
+	exec cat
+    fi | xxargs "$0"
+else
+    for rpm
+    do  size=`tally "$rpm"`
+	echo "$size	$rpm"
+    done
 fi
-
-for rpm
-do  size=`tally "$rpm"`
-    echo "$size	$rpm"
-done
