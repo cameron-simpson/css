@@ -5,5 +5,5 @@
 #
 
 joblist name category state title \
-| awk '-F	' '$4 != "CLOSED" { print "\"" $2 ": " $5 "\t" $3 "\" Exec exec job " $2 }' \
+| awk '-F	' '$4 != "CLOSED" { print "\"" $2 ": " $5 "\t" $3 "\" Exec exec deskjob " $2 }' \
 | sort
