@@ -1,3 +1,36 @@
 #!/bin/sh
-[ -t 1 ] || exec /bin/sh ${1+"$@"}
-exec colourise /bin/sh ${1+"$@"}
+#
+# Shell to run a command from a mykefile.
+# Colourises the output.
+#	- Cameron Simpson <cs@zip.com.au>
+#
+
+cmd=$0
+[ $# = 0 ] && { echo "$cmd: missing arguments"; >&2; exit 2; }
+
+set /bin/sh "$@"
+
+if [ -n "$DISPLAY" ]
+then
+    TMPDIR=${TMPDIR:-/tmp}
+    tmp=$TMPDIR/err$$
+    set filter_fd 2 "tee $tmp" "$@"
+fi
+
+[ -t 1 ] || exec "$@"
+
+set colourise "$@"
+
+"$@"
+xit=$?
+
+if [ -n "$DISPLAY" ]
+then
+    ( [ -t 1 ] || exec >/dev/null
+      [ -t 2 ] || exec 2>/dev/null
+      exec xclip <"$tmp"
+    )
+    rm "$tmp"
+fi
+
+exit $xit
