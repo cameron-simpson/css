@@ -39,5 +39,5 @@ fi
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
-kill -0 "$pid" && exit $yes
+kill -0 "$pid" 2>/dev/null && exit $yes
 exit $no
