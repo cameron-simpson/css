@@ -4,8 +4,10 @@
 #	- Cameron Simpson <cs@zip.com.au> 23jul2002
 #
 
+: ${TMPDIR:=/tmp}
+
 # arrange log file with event info
-FVWM_TMPDIR=/tmp/$USER/fvwm2
+FVWM_TMPDIR=$TMPDIR/$USER/fvwm2
 [ -d "$FVWM_TMPDIR/." ] || mkdir -p "$FVWM_TMPDIR" || exit 1
 fifodir=$FVWM_TMPDIR/fifo-$HOST
 [ -d "$fifodir/." ] || mkdir -p "$fifodir" || exit 1
