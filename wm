@@ -3,8 +3,17 @@
 : ${LOGDIR:=$HOME/var/log}
 
 cd
-
 . $HOME/rc/x11/xenv.sh
+
+# dispatch handler for event queue
+evlogdir=$LOGDIR/lastvalue
+if needdir "$evlogdir"
+then
+    evlog=$evlogdir/wm-eventlog-$XESSIONID
+    rm -f "$evlog"
+    >"$evlog"
+    ( tail -f "$evlog" | fvwm-event - & )
+fi
 
 for fvbin in \
 	/opt/fvwm-2.5.11-rh9/bin \
