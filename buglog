@@ -6,14 +6,13 @@
 #
 # =head1 SYNOPSIS
 #
-# buglog logline < attachment-data
+# buglog headline < description
 #
 # =head1 DESCRIPTION
 #
-# I<buglog> takes a change headline on the command line and descriptive text on its input
-# and logs it to the bug systems enumerated by the environment variable B<$BUGSYSTEMS>.
-# B<$BUGSYSTEMS> is a space separated list of subsystems
-# that accept log information.
+# I<buglog> takes a change I<headline> on the command line and a I<description> on its input
+# and logs it to the bug subsystems enumerated by the environment variable B<$BUGSYSTEMS>.
+# B<$BUGSYSTEMS> is a space separated list of subsystems that accept log information.
 #
 
 : ${TMPDIR:=/tmp}
@@ -21,7 +20,7 @@
 : ${BUGSYSTEMS:='dlog logger'}
 
 cmd=`basename "$0"`
-usage="Usage: $cmd logline < attachment-data"
+usage="Usage: $cmd headline < description"
 
 [ $# = 1 ] || { echo "$usage" >&2; exit 2; }
 headline=$1; shift
@@ -48,7 +47,7 @@ esac
 
 # =item B<mailto:>I<email-address>[B<?subject=>I<prefix>]
 #
-# The I<attachment-data> is sent as the body of an email message
+# The I<description> is sent as the body of an email message
 # to the specified I<email-address>
 # with the B<Subject:> line "I<prefix>: I<headline>".
 # Also, the header line "B<X-Buglog-Date:> I<date>" is included
@@ -89,7 +88,7 @@ esac
 
 # =item B<ddts>
 #
-# Submit the I<attachment-data>
+# Submit the I<description>
 # as an enclosure text to any ClearDDTS bug identifiers
 # mentioned in the headline.
 # For example,
