@@ -59,6 +59,7 @@ $::Silent=(! -t STDOUT);
 $::Headers=0;
 $::DoHEAD=0;
 $::Daemon=0;
+@::IgnoreErrors=();
 undef $::QueueFile;
 undef $::BigLock;
 undef $::SmallLock;
@@ -90,13 +91,14 @@ $::Usage="Usage: $::cmd [options...] [urls...]
 	-s		Silent.
 	-t		Print titles with URLs. Implies -n.
 	-v		Verbose.
+	-W eee,...	Ignore HTTP error codes eee,...
 	-x		Hexify the emitted URLs. Implies -n.
 ";
 
 { my $badopts=0;
   my %opt;
 
-  if (! getopts('#a:b:d:D:fg:hHiI:l:L:no:q:Q:rstvx',\%opt))
+  if (! getopts('#a:b:d:D:fg:hHiI:l:L:no:q:Q:rstvW:x',\%opt))
   { warn "$::cmd: unrecognised options\n";
     $badopts=1;
   }
@@ -349,6 +351,25 @@ Report warnings and progress messages.
       $::Silent=0;
     }
 
+=item B<-W> I<eee,...>
+
+Warning suppress.
+Be quiet about the specified HTTP error codes.
+
+=cut
+
+    elsif ($opt eq 'W')
+    { for my $err (grep(length,split(/[,\s]+/,$opt{$opt})))
+      { if ($err =~ /^[1-9]\d\d$/)
+	{ push(@::IgnoreErrors,$err);
+	}
+	else
+	{ warn "$::cmd:: -$opt: bad error code \"$err\"\n";
+	  $badopts=1;
+	}
+      }
+    }
+
 =item B<-x>
 
 Hexify (percent escape) reported URLs.
@@ -563,7 +584,7 @@ sub httpget($$)
 	  ($endurl,$rversion,$rcode,$rtext,$M)
 	  =($::DoHEAD
 	  ? cs::URL::head($url)
-	  : cs::URL::get($url,1,$sinkfile)
+	  : cs::URL::get($url,1,$sinkfile,\@::IgnoreErrors)
 	   );
 	}
 
