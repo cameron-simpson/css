@@ -1,0 +1,79 @@
+#!/usr/bin/perl
+
+$[=0;
+$x=0;
+if ($#ARGV >= 0 && $ARGV[0] eq '-x')
+	{ $x=1; shift;
+	}
+
+for (@ARGV)
+	{ print STDERR "$_ ...\n";
+	  open(F,"< $_\0") || ((print STDERR "can't read from $_ ($!)\n"), next);
+
+	  -f $_ || ((print STDERR "$_ is not a file, skipping\n"), close(F), next);
+
+	  ($dev,$ino,$mode,$nlink,$uid,$gid,$rdev,$size,@etc)=stat(F);
+
+	  print "$_: size=$size\n";
+
+	  seek(F,$size-2048,0) || die "seek fails\n";
+	  read(F,$buf,2048) || die "read fails\n";
+
+	  # print "buf=$buf\n\n";
+
+	  while (length($buf) > 0
+	      && $buf !~ /^;D\000[^\000]+\000[^\000]+\000[^\000]+,\d+,\d+,\d\d\d;/o)
+		{ $buf=substr($buf,1);
+		}
+
+	  if ($buf =~ /^;D\000([^\000]+)\000/)
+		{ $to=$1; $buf=$';
+		  print "To=$to\n";
+		}
+
+	  if ($buf =~ /^([^\000]+)\000/)
+		{ $from=$1; $buf=$';
+		  print "From=$from\n";
+		}
+
+	  $pos=0;
+	  while ($buf =~ /^([^;\000]+),(\d+),\d+,\d\d\d;/)
+		{ $file=$1; $size=$2+0; $matched=$&; $buf=$';
+
+		  print "file=$file, size=$size\n";
+		  if ($x)
+			{ &extract(F,$file,$pos,$size);
+			  $pos+=$size;
+			}
+		}
+
+	  if ($buf =~ /^([^\000]+),(\d+),\d+,\d\d\d\000/)
+		{ $file=$1; $size=$2+0; $buf=$';
+
+		  print "file=$file, size=$size; last file\n";
+		  if ($x)
+			{ &extract(F,$file,$pos,$size);
+			  $pos+=$size;
+			}
+		}
+
+	  close(F);
+	}
+
+sub extract	# (FILE,fname,pos,size)
+	{ local($F,$file,$pos,$size)=@_;
+	  local($data);
+
+	  seek($F,$pos,0);
+	  if (read($F,$data,$size) < $size)
+		{ print STDERR "short read getting data for $file\n";
+		}
+	  
+	  if (!open(OUT,"> $file\0"))
+		{ print STDERR "can't write to $file: $!\n";
+		}
+	  else
+	  { print OUT $data;
+	    close(OUT);
+	  }
+	}
