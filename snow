@@ -1,0 +1,2 @@
+#!/bin/sh
+exec xsnow -notrees -nosanta -norudolf -wsnowdepth "$X11_Y" -ssnowdepth "$X11_Y" ${1+"$@"}
