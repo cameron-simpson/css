@@ -6,7 +6,7 @@
 
 cmd=`basename "$0"`
 
-side=
+side=-north
 to=
 from=
 buttonblock=-buttonblock
@@ -14,15 +14,16 @@ x2xopts=
 passwd=
 shared=
 
-real=/opt/bin/$cmd
+real=x2x
 case $cmd in
-    x2x)	toopt=-to fromopt=-from ;;
-    x2vnc)	shared=-shared buttonblock= toopt= fromopt=-listen ;;
+    rigx2x)	toopt=-to fromopt=-from ;;
+    rigx2vnc)	shared=-shared buttonblock= toopt= fromopt=-listen ;;
 esac
 
-case $HOST@$SYSTEMID in
-    amadeus@home)	side=-west to=msdog:0 passwd=$HOME/rc/vnc/passwd-msdog@home ;;
-    janus@home)		side=-east to=cerebus:0 ;;
+case $LOCATION in
+    cisra)		to=lo:9 ;;
+    *)			echo "$cmd: no setup for location \"$LOCATION\"" >&2
+			exit 0 ;;
 esac
 
 while [ $# -gt 0 ]
@@ -49,4 +50,4 @@ done
 [ -n "$to" ] && { set x ${1+"$@"} $toopt "$to"; shift; }
 
 set -x
-"$real" $passwd $shared $buttonblock ${1+"$@"} &
+acon set-x "$real" $passwd $shared $buttonblock ${1+"$@"} &
