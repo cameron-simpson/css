@@ -1,0 +1,31 @@
+#!/bin/sh
+#
+# =head1 NAME
+#
+# append - append data to a file
+#
+# =head1 SYNOPSIS
+#
+# append filename
+#
+# =head1 DESCRIPTION
+#
+# I<append> is a trivial script to append data to a specified file.
+# This may seem like a waste of code until you realise it's intended to be
+# used as an editor. For example:
+#
+#	EDITOR=append crontab -e < extra-cron-lines
+#
+# =head1 AUTHOR
+#
+# Cameron Simpson E<lt>cs@zip.com.auE<gt> 01aug2001
+#
+
+cmd=$0
+
+[ $# = 1 ] || { echo "Usage: $cmd filename" >&2; exit 2; }
+f=$1
+
+## [ -f "$f" ] || { echo "$cmd: $f: not a regular file" >&2; exit 1; }
+
+exec cat >>"$f"
