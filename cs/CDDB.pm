@@ -776,10 +776,10 @@ sub TrackInfo($)
 
     for (@e)
     { if (/^TTITLE0*(\d+)=\s*/)
-      { $T->[$1]->{TTITLE}=$';
+      { $T->[$1]->{TTITLE}.=$';
       }
       elsif (/^EXTT0*(\d+)=\s*/)
-      { $T->[$1]->{EXTT}=$';
+      { $T->[$1]->{EXTT}.=$';
       }
     }
 
