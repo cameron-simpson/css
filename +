@@ -10,7 +10,7 @@ usage="Usage: $0 [+a] [+s] [+t] [-f] [some-mutt-options...] [mutt-folder]"
 # hack to clear my alert window when I view my default folder
 ( [ $# = 0 ] && alert "`clear`" ) &
 
-mfolder=+attn
+mfolder=+me
 muttopts=
 anyhost=
 use_term=1
