@@ -1,0 +1,274 @@
+#!/usr/bin/perl
+#
+$usage='Usage: getlost [-f] [-l] [-n] [+skip] [-search] patterns...
+	-f	Fast. Do not prompt for selection of log files or
+		selection of files matched.
+	-n	No retrieve. Just generate the script to retrieve the
+		files from backup.
+	+skip	Skip the first "skip" backup logs.
+	-search	Search only the first "search" backup logs (after first
+		discarding any specified by +skip.
+';
+
+$fflag=0;
+$lflag=0;
+$nflag=0;
+$nsearch=0;
+$nskip=0;
+if ($#ARGV >= 0 && $ARGV[0] eq '-f')
+	{ $fflag=1;
+	  shift;
+	}
+
+if ($#ARGV >= 0 && $ARGV[0] eq '-l')
+	{ $lflag=1;
+	  shift;
+	}
+
+if ($#ARGV >= 0 && $ARGV[0] eq '-n')
+	{ $nflag=1;
+	  shift;
+	}
+
+if ($#ARGV >= 0 && $ARGV[0] =~ /^\+(\d+)$/)
+	{ $nskip=$1;
+	  shift;
+	}
+
+if ($#ARGV >= 0 && $ARGV[0] =~ /^-(\d+)$/)
+	{ $nsearch=$1;
+	  shift;
+	}
+
+if ($#ARGV < 0)
+	{ die "nothing to search for!\n$usage";
+	}
+
+print STDERR "converting patterns ...\n";
+for $ptn (@ARGV)
+	{ print STDERR "\t$ptn -> ";
+	  $ptn =~ s,^/,^/,;
+	  $ptn =~ s,/,\\$&,g;
+	  print STDERR "$ptn\n";
+	}
+
+# collect files
+print STDERR "globbing ...\n";
+# $dir=shift;
+$dir='//iridium/user/backups/logs';
+@files=reverse sort <$dir/spectrum.incr.*>;
+
+# drop leading files
+while ($nskip > 0)
+	{ shift @files;
+	  $nskip--;
+	}
+
+# drop trailing files
+if ($nsearch > 0)
+	{ while ($#files >= $nsearch)
+		{ pop @files;
+		}
+	}
+
+# check out only interesting files
+if (!$lflag && !$fflag)
+	{ for (@files)
+		  { print STDERR "$_\n";
+		  }
+
+	  print STDERR "\nEdit log list (n)? ";
+	  die "\nEOF\n" if !defined($_=<STDIN>);
+
+	  # if (/^\s*[Yy]/)
+	  # 	{ $tmp="/tmp/logs$$";
+	  # 	  if 
+	}
+
+undef %file, %jukedev, %jukefile;
+
+$MAINLOOP='
+	for $file (reverse sort @files)
+		{ if ($nskip > 0)
+			{ $nskip--;
+			  print STDERR "$file skipped.\n";
+			}
+		  elsif (!open(INCR,"<$file"))
+			{ print STDERR "cannot open $file ($!)\n";
+			}
+		  else
+		  { print STDERR "searching $file ...\n";
+		    undef $jukedev, $jukefile;
+		    $found=0;
+		    while (<INCR>)
+			{ if (/^Dumping /o
+			   && defined($_=<INCR>)
+			   && /^\s+to file (\d+) of (\S+)/o)
+				{ $jukefile=$1;
+				  $jukedev=$2; # $jukedev =~ s/:/@/;
+				  print STDERR ".";
+				}
+#			  elsif (!defined($jukedev))
+#				{}
+			  elsif (!/^\((file|dir)\)\s"/o)
+				{}
+			  else
+			  { $_=$'."';";
+
+for $ptn (@ARGV)
+	{ $match="/($ptn".'[^"]*)"\s+written/o';
+	  if (!defined($search))
+		{ $search=$match;
+		}
+	  else
+	  { $search.=" || $match";
+	  }
+	}
+
+$MAINLOOP.="
+			    if ($search)
+				{ \$_=\$`.\$1;".'
+
+				  # we search most recent to least recent
+				  if (!defined($file{$_}))
+				  	{ $file{$_}=$file;
+				  	  $jukedev{$_}=$jukedev;
+				  	  $jukefile{$_}=$jukefile;
+				  	  $found=1;
+					  print STDERR "/";
+					}
+				  else
+				  { print STDERR "_";
+				  }
+				}
+			  }
+			}
+
+		    close(INCR);
+		    print STDERR "\n";
+		  }
+		}';
+
+eval "$MAINLOOP";
+
+if ($lflag)
+	{ for (sort keys %file)
+		{ print "$_\n";
+		}
+	  
+	  exit 0;
+	}
+
+undef %retrieve;
+if (!$fflag)
+	{ $tmp="/tmp/restore$$";
+	  if (!open(TMP,">$tmp"))
+		{ print STDERR "can't open $tmp for write ($!), files are:\n";
+		  $f='STDERR';
+		}
+	  else
+	  { $f='TMP';
+	  }
+
+	  print $f "# Edit this file to contain only those files you want retrieved.\n";
+	  for (sort keys %file)
+		{ print $f "$_\n";
+		}
+
+	  if ($f ne 'TMP')
+		{ exit 1;
+		}
+
+	  close(TMP);
+
+	  $editor=(defined($ENV{'EDITOR'}) ? $ENV{'EDITOR'} : '/bin/ed');
+	  system($editor,$tmp);
+	  if (!open(TMP,"<$tmp"))
+		{ print STDERR "can't open $tmp for read ($!)\n";
+		  unlink($tmp);
+		  exit 1;
+		}
+
+	  if (!unlink($tmp))
+		{ print STDERR "warning: can't unlink $tmp ($!)\n";
+		}
+
+	  while (<TMP>)
+		{ next if /^#/;
+		  next if /^\s*$/;
+
+		  chop;
+		  if (!defined($file{$_}))
+			{ print STDERR "$_: I didn't even suggest you could restore that!\n";
+			}
+		  else
+		  { $retrieve{$_}=1;
+		  }
+		}
+
+	  close(TMP);
+	}
+else
+{ for (keys %file)
+	{ $retrieve{$_}=1;
+	}
+}
+
+$devs=0;
+undef %devnos;
+for (keys %retrieve)
+	{ $dev=$jukefile{$_}.','.$jukedev{$_};
+	  if (defined($devnos{$dev}))
+		{ $val="push(\@files_$devnos{$dev},\$_)";
+		  eval $val;
+		}
+	  else
+	  { $devnos{$dev}=$devs;
+	    $val="\@files_$devs=(\$_);
+		  \$jukedev_$devs=\$jukedev{\$_};
+		  \$jukefile_$devs=\$jukefile{\$_}";
+	    eval $val;
+
+	    $devs++;
+	  }
+	}
+
+($sec,$min,$hr,$md,$mon,$yr,@etc)=gmtime(time);
+$script=sprintf("getlost.%02d%02d%02d%02d%02d%02d.sh",$yr,$mon,$md,$hr,$min,$sec);
+if (open(SCRIPT,">$script"))
+	{ $SCRIPT='SCRIPT';
+	}
+else
+{ print STDERR "can't open $script for write ($!)\n";
+  $SCRIPT='STDERR';
+}
+
+for $devs (keys %devnos)
+	{ $devno=$devnos{$devs};
+	  $val="\$jukedev=\$jukedev_$devno;
+		\$jukefile=\$jukefile_$devno;
+		\@files=\@files_$devno";
+	  eval $val;
+	  $rtape="rtape -t $jukedev -f $jukefile -r | rbak -r -stdin -pdt -sacl -l";
+	  ($subdir=$jukedev) =~ s/^dump\.spectrum\.//;
+	  for (@files)
+		{ if (length($rtape) > 3072)
+			{ print SCRIPT "$rtape\n";
+	  		  $rtape="rtape -t $jukedev -f $jukefile -r | rbak -r -stdin -pdt -sacl -l";
+			}
+
+		  $rtape.=" '$_'";
+		  s/^\/+//;
+		  # $rtape.=" -as 'getlost/$subdir/$_'";
+		  $rtape.=" -as 'getlost/$_'";
+		}
+
+	  print $SCRIPT "$rtape\n";
+	}
+
+die "script not run\n" if $SCRIPT eq STDERR;
+close($SCRIPT);
+print STDERR "retrieve script left in $script\n";
+exit 0 if $nflag;
+
+exec('/bin/sh','-x',$script);
