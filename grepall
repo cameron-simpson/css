@@ -41,10 +41,9 @@ do
   [ $first ] && { set x; shift; }
 
   case "$word" in
-    */*)  echo "$cmd: can't do slashes: $word" >&2
-	  ok=
-	  continue
-	  ;;
+    */*)  word=`echo "$word" | sed 's;/;\\\\/;g'`
+  esac
+  case "$word" in
     !*)   word=`expr "x$word" : 'x.\(.*\)'`
 	  set x -e "/$word/d" ${1+"$@"}; shift
 	  ;;
