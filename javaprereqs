@@ -1,0 +1,24 @@
+#!/bin/sh
+
+xit=0
+
+classpath=`echo "$CLASSPATH|tr : \ `
+
+for j
+do  [ -r "$j" ] || { echo "$0: can't read from $j" >&2; xit=1; continue; }
+    imports=`detab <"$j" \
+	   | sed -n '/\.\*/!s/^ *import  *\([^ ;]*\).*/\1/p' \
+	   | tr . /`
+    for i in $imports
+    do  dep=
+	for d in . $classpath
+	do  [ -f "$d/$i.java" ] && { dep=$d/$i.java; break; }
+	done
+	case $dep in
+	    ./*)	dep=`expr $dep : '..\(.*\)'` ;;
+	esac
+	[ -n "$dep" ] && echo "$dep"
+    done
+done
+
+exit $xit
