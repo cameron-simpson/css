@@ -1,0 +1,31 @@
+#!/bin/sh
+#
+# Exec command only if input is not empty.
+#	- Cameron Simpson <cs@zip.com.au> 23jun98
+#
+
+cmd=$0
+usage="Usage: $cmd command [args...]"
+
+[ $# = 0 ] && { echo "$usage" >&2; exit 2; }
+
+trap 'rm -f "$tmp"; exit 1' 1 15
+
+tmp=/tmp/execif.$$
+sed -n -e '/^[ 	]*$/d
+	   :again
+	   p
+	   n
+	   b again' >"$tmp"
+
+if [ -s "$tmp" ]
+then
+    "$@" <"$tmp"
+    xit=$?
+else
+    xit=0
+fi
+
+rm "$tmp"
+
+exit $xit
