@@ -2,14 +2,14 @@
 #
 # Script to compute various environment parameters.
 # Must be sourced, and defines the shell function setvar() as a consequence.
-#	- Cameron Simpson, 18may93
+#	- Cameron Simpson, 18may1993
 #
 # Removed -n option.
-# Recoded not to recurse to bypass Sys5 shell braindamage. - cameron, 30jul93
+# Recoded not to recurse to bypass Sys5 shell braindamage. - cameron, 30jul1993
 # Recoded in Perl to bypass more shell braindamage.
-# You don't source it anymore. - cameron, 07jan94
-# Added -f to force resetting variables. - cameron, 11jan94
-# Generalisation. - cameron, 02dec98
+# You don't source it anymore. - cameron, 07jan1994
+# Added -f to force resetting variables. - cameron, 11jan1994
+# Generalisation. - cameron, 02dec1998
 #
 
 use strict qw(vars);
