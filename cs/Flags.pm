@@ -26,7 +26,7 @@ sub new
 
 sub Members
 { my($this)=@_;
-  
+ 
   grep(length,split(/:/,$$this));
 }
 
