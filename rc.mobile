@@ -7,12 +7,40 @@
 #	http://www.cskk.ezoshosting.com/cs/css/#rc.mobile
 # - Cameron Simpson <cs@zip.com.au>
 #
+# =head1 NAME
+#
+# rc.mobile - run system startup scripts in various combinations for mobile hosts
+#
+# =head1 SYNOPSIS
+#
+# rc.mobile start [-n] [-f config] [@where]
+#
+# =head1 DESCRIPTION
+#
+# I<rc.mobile> runs startup scripts
+# for a machine that may startup in various locations,
+# and therefore require multiple configurations and combinations of services.
+# There is a little discussion of its installation here:
+#
+#	http://www.cskk.ezoshosting.com/cs/css/#rc.mobile
+#
+# In addition to choosing different configurations based on location or circumstance,
+# I<rc.mobile> also starts the services in parallel,
+# yeilding significantly faster boot times.
+# There are facilities for specifying that one service depends on another
+# and for running arbitrary shell commands for actions not encapsulated in standard startup files.
+# In a sense the locations represent a generalisation of the idea of run levels.
+#
+
+where=${SYSTEMID:-home}
+cf=/etc/rc.mobile.conf
+trace=set-x
 
 cmd=$0
-usage="Usage: $cmd [-n] {start|stop|restart}"
-
-trace=set-x
-[ "x$1" = x-n ] && { trace=echo; shift; }
+usage="Usage: $cmd {start|stop} [-n] [-f config]
+	-n		No action. Recite proposed actions.
+	-f config	Specify config file.
+			Default: $cf"
 
 LC_ALL=C
 PATH=$PATH:/sbin:/opt/css/bin
@@ -35,16 +63,28 @@ case "$mode" in
         exit 1
 esac
 
-where=${SYSTEMID:-home}
-cf=/etc/rc.mobile.conf
+# =head1 OPTIONS
+#
+# =over 4
+#
 
 badopts=
 while :
 do  case $1 in
 	-i)   int=1 ;;
-	-a)   action=$2; shift ;;
+
+	# =item B<-f> I<config>
+	#
+	# Specify a configuration file to use instead of B</etc/rc.mobile.conf>.
+	#
 	-f)   cf=$2; shift ;;
-	-h)   HOST=$2; shift ;;
+	# =item B<-n>
+	#
+	# No action.
+	# Recite proposed actions.
+	# handy for debugging configuration file changes.
+	#
+	-n)   trace=echo ;;
 	--)   shift; break ;;
 	-?*)  echo "$cmd: unrecognised option: $1" >&2
 	      badopts=1
@@ -55,21 +95,28 @@ do  case $1 in
     shift
 done
 
+# =back
+#
+
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
 [ -s "$cf" ] || { echo "$cmd: missing config file $cf" >&2; exit 1; }
 
-# we want the short hostname
-[ -n "$HOST" ] || { HOST=${HOST:-`hostname`}
-		    case $HOST in
-			*.*) HOST=`expr "x$HOST" : 'x\([^.]*\).*'` ;;
-		    esac
-		  }
-export HOST
-
 locations=`sed -n -e '/^#/d' -e 's/^\\[@\\([a-z].*\\)\\]$/\\1/p' "$cf"`
 
-# ask for info if interactive
+# =head1 OPERATION
+#
+# B<rc.mobile> asks the user where it it running.
+# The locations offered are taken from the clauses whose names commence with an "@",
+# discarding the "@".
+# The default location comes from the environment variable B<$SYSTEMID>,
+# defaulting to "B<home>" if this is not set.
+#
+# After obtaining the current location
+# (referring to as "I<where>" below)
+# the clauses B<GLOBAL> and I<where> are run respectively.
+#
+
 if [ $int ]
 then
     echo "$cmd - bring up interface according to location"
@@ -103,10 +150,45 @@ doops()
 {
   while read op etc
   do
+    # =head1 CONFIGURATION FILE FORMAT
+    #
+    # The configuration file file
+    # resembles a Windows ".ini" file.
+    # Blank lines and lines commencing with an octothorpe (`#')
+    # are comments, and discarded.
+    #
+    # The remainder consists of clauses marked out by lines of the form:
+    #
+    #	[name]
+    #
+    # where I<name> is the clause name.
+    #
+    # Clauses contain the following types of lines:
+    #
+    # =over 4
+    #
+    # =item B<use> I<clauses...>
+    #
+    # Process the named I<clauses> in order at this point.
+    #
     case "$op" in
+      # =item I<var>B<=>I<value>
+      #
+      # Set the environment variable named I<var> to the value I<value>.
+      #
       [a-zA-Z]*=*)
 	      eval "$op"
 	      ;;
+      # =item /path/to/dir/
+      #
+      # Prepare the spacified directory
+      # from a template.
+      # The template is the directory named
+      # B</path/to/dir.>I<where> or B</path/to/dir.DFLT>
+      # if the former is not present.
+      # If neither is present, the target direct is unchanged.
+      # Otherwise, the directory is made identical to the template with rsync(1).
+      #
       /*/)    to=`expr "x$op" : 'x\(.*\)/'`
 	      from=
 	      for d in $from.$where $from.DFLT
@@ -119,6 +201,17 @@ doops()
 		echo "no master dir @$where for $to" >&2
 	      fi
 	      ;;
+      # =item /path/to/file
+      #
+      # Prepare the spacified file
+      # from a template.
+      # You'll notice that files and directories are distinguished by the directory's trailing slash (`/').
+      # The template is the file named
+      # B</path/to/file.>I<where> or B</path/to/file.DFLT>
+      # if the former is not present.
+      # If neither is present, the target file is unchanged.
+      # Otherwise, the file is made identical to the template with cp(1).
+      #
       /*)     to=$op
 	      from=
 	      for f in $to.$where $to.DFLT
@@ -131,16 +224,38 @@ doops()
 		echo "no master file @$where for $to" >&2
 	      fi
 	      ;;
+      # =item ! I<shell command...>
+      #
+      # The specified I<shell command> is run synchronously.
+      #
       \!*)	shcmd=`expr "x$op $etc" : 'x.\(.*\)'`
 	      $trace /bin/sh -c "$shcmd"
 	      ;;
+      # =item svc I<services...>
+      #
+      # The named services are started asynchronously.
+      # They are dispatched by running the command:
+      #
+      #	/etc/init.d/service start
+      #
+      # in the background.
+      #
       svc)    bgsvc $etc
 	      ;;
+      # =item need I<services...>
+      #
+      # Require the names services' startup scripts to have completed before proceeding.
+      # If any of the services have not been dispatched,
+      # dispatch them as for the B<svc> directive
+      # and then wait for them.
+      #
       need)   needsvc $etc
 	      ;;
       *)      echo "$cmd: unrecognised operator \"$op\": $op $etc" >&2
 	      ;;
     esac
+    # =back
+    #
   done
 }
 
@@ -161,10 +276,16 @@ bgsvc()
 
 needsvc()
 {
+  # dispatch undispatched services
   for needsvc
   do
     eval "nsvcpid=\$pid_$needsvc"
     [ -n "$nsvcpid" ] || bgsvc "$needsvc"
+  done
+
+  # wait for all the services
+  for needsvc
+  do
     wait4svc "$needsvc" 
   done
 }
@@ -191,3 +312,20 @@ wait4pid()
 }
 
 doclause GLOBAL "@$where" | doops
+
+# =head1 FILES
+#
+# B</etc/rc.mobile.conf>, the default configuration file
+#
+# =head1 ENVIRONMENT
+#
+# B<$SYSTEMID>, the default boot location
+#
+# =head1 SEE ALSO
+#
+# rsync(1), winclause(1cs)
+#
+# =head1 AUTHOR
+#
+# Cameron Simpson E<lt>cs@zip.com.auE<gt> July 2003
+#
