@@ -9,15 +9,13 @@
 # Each subdir has a "name" file (and other attrs as desired).
 #
 
+idsetsbase=$HOME/var/idsets
 idset=
-statedir=
 
 cmd=$0
-usage="Usage: $cmd [-a] [-d statedir] -i idset [-l] [[-r] idname [param [value]]]
+usage="Usage: $cmd [-a] -i idset [-l] [[-r] idname [param [value]]]
 	-a		List all ids.
-	-i idset	Idset within statedir.
-	-d statedir	Specify id state subdirectory.
-			Default from \$SYSTEMID or \$HOMEHOST or \$HOST or hostname.
+	-i idset	Idset.
 	-l		Long: list all attributes of ids.
 	-r		Remove specified id or parameter."
 
@@ -32,7 +30,6 @@ while :
 do
   case $1 in
     -a)	all=1 aflag=$1 ;;
-    -d)	statedir=$2; shift ;;
     -i)	idset=$2; shift ;;
     -l)	long=1 ;;
     -r)	rmid=1 ;;
@@ -44,17 +41,16 @@ do
 done
 
 if [ -z "$idset" ]
-then  echo "$cmd: idset must be supplied" >&2
-      badopts=1
+then
+    echo "$cmd: -i idset must be supplied" >&2
+    badopts=1
 else
-      # make sane decision about state dir
-      [ -n "$statedir" ] \
-	      || statedir=${SYSTEMID:-${HOMEHOST:-${HOST:-`hostname`}}}
-      case "$statedir" in
-	  ./* | /* )	;;
-	  *)		statedir=$HOME/var/idsets/$statedir ;;
-      esac
-      statedir=$statedir/$idset
+    case "$idset" in
+      /* | ./* | ../* )
+	;;
+      *)idset=$idsetsbase/$idset
+	;;
+    esac
 fi
 
 if [ $# -gt 0 ]
@@ -82,8 +78,8 @@ fi
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
-[ -d "$statedir/." ] || mkdir -p "$statedir" || exit 1
-cd "$statedir" || exit 1
+needdir "$idset" || exit 1
+cd "$idset" || exit 1
 
 # no id or name specified - list stuff
 if [ -z "$idname" ]
@@ -123,71 +119,85 @@ fi
 
 iddir=
 case "$idname" in
-    *[!0-9]*)
-	for namefile in [0-9]*/name
-	do  [ -s "$namefile" ] || continue
-
-	    tryname=`tail -1 "$namefile"` || continue
-	    if [ "x$idname" = "x$tryname" ] \
-	    || [ -n "$all" -a "x.$idname" = "x$tryname" ]
-	    then
-		iddir=`dirname "$namefile"`
-		break
-	    fi
-	done
+    *[^0-9]*)
+	# must be a name
+	if [ -d "$idname/." ]
+	then
+	    iddir=`readsymlink "$idname"` || exit 1
+	else
+	    iddir=`mkdirn ''` || exit 1
+	    echo "$idname" >"$iddir/name"
+	    ln -s "$iddir" "$idname"
+	fi
 	;;
-    *)	iddir=$idname
+    *)  # must be a number
+	iddir=$idname
 	needdir "$iddir" || exit 1
+	idname=`tail -1 "$iddir/name" 2>/dev/null`
 	;;
 esac
 
-if [ -z "$iddir" ]
-then
-    if [ $rmid ]
-    then
-      echo "$cmd: -r: no id named \"$idname\"" >&2
-      exit 1
-    fi
-
-    iddir=`mkdirn ''` || exit 1
-    echo "$idname" >"$iddir/name"
-    echo "$iddir"
-fi
-
+# remove param or whole iddir
 if [ $rmid ]
 then
   if [ -n "$param" ]
-  then rm "$iddir/$param" || exit 1
+  then rm -f "$iddir/$param" || exit 1
   else rm -r "$iddir" || exit 1
+       [ -n "$idname" ] && rm -- "$idname" || exit 1
   fi
-else
-  if [ -n "$param" ]
-  then
-    pfile=$iddir/$param
-    if [ $haspvalue ]
+  exit 0
+fi
+
+# no param? just report id
+[ -z "$param" ] && { echo "$iddir"; exit 0; }
+
+# parameter - locate the file
+pfile=$iddir/$param
+
+# not setting it? report current value if any
+if [ -z "$haspvalue" ]
+then
+  if [ -s "$pfile" ]
+  then pvalue=`tail -1 "$pfile" 2>/dev/null`
+  else pvalue=
+  fi
+  echo "$pvalue"
+  exit $?
+fi
+
+if [ "x$param" = "xname" ]
+then
+    case "$pvalue" in
+      */*)	echo "$cmd: $pvalue: illegal name - slashes forbidden" >&2
+		exit 2
+		;;
+      *[^0-9]*)	;;
+      *)	echo "$cmd: $pvalue: illegal name - may not be a number" >&2
+		exit 2
+		;;
+    esac
+
+    # adjust name pointer
+    if [ "x$idname" != "x$pvalue" ]
     then
-      # store new parameter
-      echo "$pvalue" >>"$pfile"
-      # some parameters have side effects
-      case "$idset,$param" in
-	desktop,name)
-	  if [ -n "$DISPLAY" ]
-	  then
-	    case "$pvalue" in
-	      .*)	name=`expr "x$pvalue" : 'x.\(.*\)'` ;;
-	      *)	name=$pvalue ;;
-	    esac
-	    fvwmcmd "desktopName $iddir $name" &
-	  fi
-	  ;;
-      esac
-    else
-      if [ -s "$pfile" ]
-      then tail -1 "$pfile"
-      else echo
+      rm -f "$idname"
+      idname=$pvalue
+      ln -s "$iddir" "$idname"
+    fi
+
+    if [ -n "$DISPLAY" ]
+    then
+      idsetbase=`basename "$idset"`
+      if [ "x$idsetbase" = xdesktop ]
+      then
+	case "$pvalue" in
+	  .*)	name=`expr "x$pvalue" : 'x.\(.*\)'` ;;
+	  *)	name=$pvalue ;;
+	esac
+	fvwmcmd "desktopName $iddir $idname" &
       fi
     fi
-  else
-    echo "$iddir"
-  fi
 fi
+
+# store new parameter
+echo "$pvalue" >>"$pfile"
