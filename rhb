@@ -88,7 +88,7 @@ case "$subdir" in
 	;;
 esac
 
-[ -z "$src/$rabinc" -a -s "$src/.rab-include" ] && rabinc=--include-from=$src/.rab-include
+[ -z "$rabinc" -a -s "$src/.rab-include" ] && rabinc=--include-from=$src/.rab-include
 
 set -x
 exec rsync -e "$ssh" -aHW${vflag} $rsdel ${progress} $rabinc ${1+"$@"} "$src/." "$rsyncdest$destdir/$subdir/."
