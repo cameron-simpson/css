@@ -4,6 +4,11 @@
 #	- Cameron Simpson <cs@zip.com.au> 02feb2004
 #
 
+: ${DESKTOPSET:=desktop}
+: ${DESKTOPSET_SIZED:=$DESKTOPSET-${X11_X}x${X11_Y}}
+DESKTOPSET=$DESKTOPSET_SIZED	# backgrounds are sized
+export DESKTOPSET
+
 cmd=$0
 usage="Usage: $cmd [-d desk] imagefile
 	Default desk is the current desk.
