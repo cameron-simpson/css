@@ -1,18 +1,18 @@
 #!/bin/sh
 #
-# Set up an ssh-agent in daemon mode.
+# Set up an ssh-agent in daemon mode if needed.
 #	- Cameron Simpson <cs@zip.com.au> 30jul2001
 #
 
 cmd=$0
-usage="Usage: $cmd [-u] [statefile]"
+usage="Usage: $cmd [-f] [statefile]"
 
 statefile=
-unlock=
+force=
 
 badopts=
 
-[ "x$1" = x-u ] && { unlock=1; shift; }
+[ "x$1" = x-f ] && { force=1; shift; }
 
 [ $# = 0 ] || { statefile=$1; shift; }
 
@@ -22,8 +22,13 @@ badopts=
 
 [ -n "$statefile" ] || statefile=`ssh-agent-statefile` || exit 1
 
-# force unlock
-[ $unlock ] && ( set -x; unlock -f "$statefile" )
+if [ $force ]
+then
+  # force unlock
+  unlock -f "$statefile"
+else
+  eval `get-ssh-agent "$statefile"` && exit 0
+fi
 
 export statefile
 
