@@ -1,0 +1,23 @@
+#!/bin/sh
+#
+# Simple wrapper for screen.
+#	- Cameron Simpson <cs@zip.com.au> 16apr2002
+#
+
+cmd=`basename "$0"`
+usage="Usage:	$cmd				List sessions.
+	$cmd session-name		Join session (shared).
+	$cmd -options... [args...]]	Exec screen with supplied arguments."
+
+# nothing? list active sessions
+[ $# = 0 ] && exec screen -ls
+
+# options - run screen directly
+case "$1" in
+    -\?)	echo "$usage" >&2; exit 0 ;;
+    -*)		exec screen "$@" ;;
+esac
+
+[ $# = 1 ] || { echo "$usage" >&2; exit 2; }
+
+exec screen -x -r "$1"
