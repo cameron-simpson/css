@@ -290,6 +290,8 @@ then
   fi
 fi
 
+file2=`fixexts "$file"` && file=$file2
+
 fbase=`basename "$file"`
 case "$fbase" in
     =\?*\?Q\?*\?= )
