@@ -43,11 +43,11 @@ $cs::CDDB::CacheDir="$ENV{HOME}/.cddb";
 =item $cs::CDDB::DfltDev
 
 The default device to query for CD information.
-Default: B</dev/cdrom>
+Default: the envvar B<$CDDBDEVICE> or B</dev/cdrom>
 
 =cut
 
-$cs::CDDB::DfltDev='/dev/cdrom';
+$cs::CDDB::DfltDev=(length($ENV{CDDBDEVICE}) ? $ENV{CDDBDEVICE} : '/dev/cdrom');
 
 =head1 GENERAL FUNCTIONS
 
@@ -226,8 +226,6 @@ Forget everything learnt from the device or database.
 sub Reset()
 { my($this)=@_;
 
-  my $dev = $this->Device();
-
   for my $k (keys %$this)
   { delete $this->{$k}
 	if $k ne DEV && $k ne HOST && $k ne PORT;
@@ -245,7 +243,7 @@ sub Device($;$)
 { my($this,$dev)=@_;
 
   if (defined $dev)
-  { $this->{DEV}=$this;
+  { $this->{DEV}=$dev;
     $this->Reset();
   }
 
