@@ -92,6 +92,42 @@ sub GetSet($$;$)
   $D->{$field}=$value;
 }
 
+=item Flags()
+
+Return a B<cs::Flags> object containing the project's flags.
+Changes made to this object are not reflected in the database
+until the B<SaveFlags> method (below) is called.
+
+=cut
+
+sub Flags($)
+{ my($this)=@_;
+
+  if (! exists $this->{cs::DBI::Table::RowObject::FLAGS})
+  { ::need(cs::Flags);
+    $this->{cs::DBI::Table::RowObject::FLAGS}
+    = cs::Flags->new(grep(length, split(/[,\s]+/, $this->GetSet(FLAGS))));
+  }
+
+  my $flags = $this->{cs::DBI::Table::RowObject::FLAGS};
+
+  return $flags->Members() if wantarray;
+
+  return $flags;
+}
+
+=item SaveFlags()
+
+Bring the database into sync with the flags stored in the user object.
+
+=cut
+
+sub SaveFlags($)
+{ my($this)=@_;
+
+  $this->GetSet(FLAGS,join(",", $this->Flags()->Members()));
+}
+
 =back
 
 =head1 SEE ALSO
