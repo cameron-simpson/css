@@ -1,0 +1,23 @@
+#!/bin/sh
+#
+# View a PC desktop with VNC.
+#	- Cameron Simpson <cs@zip.com.au> 04dec2000
+#
+
+[ $# -ge 1 ] || { echo "Usage: $0 [-f passext] pcname [vncopts...]" >&2; exit 2; }
+
+passext=
+[ "x$1" = x-f ] && { shift; passext=$1; shift; }
+
+host=$1; shift
+
+for ext in $passext "$host@$SYSTEMID" "$host" "$SYSTEMID" pc ''
+do  passwd=$HOME/rc/vnc/passwd-$ext
+    [ -s "$passwd" ] && break
+done
+
+[ -n "$ext" ] || { echo "$0: no $HOME/rc/vnc/passwd-* file for \"$host\"" >&2
+		   exit 1
+		 }
+
+set-x vncviewer -passwd "$passwd" ${1+"$@"} "$host:0" &
