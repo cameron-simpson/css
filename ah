@@ -5,6 +5,17 @@
 #
 
 cmd=$0
+
+ahopts=
+while :
+do
+  case "$1" in
+    -[nyNYAX])	ahopts="$ahopts $1" ;;
+    *)		break ;;
+  esac
+  shift
+done
+
 if [ $# = 0 ]
 then
     if [ -n "$DISPLAY" ]
@@ -18,4 +29,5 @@ fi
 
 [ $# = 1 ] && { set x "$1" view-unknown; shift; }
 file=$1; shift
-exec apphelper "$file" -y "$@"
+set -x
+exec apphelper "$file" -y $ahopts "$@"
