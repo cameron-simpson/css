@@ -1,5 +1,5 @@
 #!/usr/bin/ksh
-# Solaris /bin/sh explodes on the perfectly legal remote() function.
+# Solaris /bin/sh explodes on the perfectly legal remote() function :-(
 #
 # =head1 NAME
 #
@@ -41,6 +41,34 @@ pathadd=:/usr/bin:/opt/bin:/opt/script
 PATH=$PATH$pathadd
 export PATH
 
+# installation directory
+slashopt=/opt
+cf=$slashopt/.syncopt
+
+# basic "trim comments" code
+sedpreamble='y/	/ /
+	     s/^  *//
+	     s/^#.*//
+	     /^$/d
+	     s/  *$//
+	     s/   */ /g'
+
+# extract envvars
+sedscript="$sedpreamble
+	   /^RSYNC=/b setvar
+	   /^SUBDIRS=/b setvar
+	   /^REMOTE=/b setvar
+	   d
+	   :setvar
+	   s/'/'\\\\''/g
+	   s/^\\([^=]*\\)=\\(.*\\)/SYNCOPT_\\1='\\2'; export SYNCOPT_\\1/"
+sedvars=`sed -e "$sedscript" "$cf"`
+eval "$sedvars"
+
+rsync=${SYNCOPT_RSYNC:-rsync}
+remote=$SYNCOPT_REMOTE
+subdirs=${SYNCOPT_SUBDIRS:="."}
+
 rsync=${SYNCOPT_RSYNC:-rsync}
 remote=$SYNCOPT_REMOTE
 
@@ -57,12 +85,9 @@ usage="Usage: $cmd [-n] [-f] [l] [-R rsync-path] [-x] [-v] [items...]
 trace=echo	# set-x	# set to nothing when debugged
 localise=
 
-slashopt=/opt
 archopt=/usr/local/opt
 commonopt=$archopt-common
 subdirs=${SYNCOPT_SUBDIRS:="."}
-
-cf=$slashopt/.syncopt
 
 vflag=
 [ -t 1 ] && vflag=-v
@@ -185,8 +210,13 @@ if [ $# = 0 ]
 then
     resolve=$resolve'
 	    set x `for subdir in $subdirs
-                    do ls "$archopt/$subdir/." 2>/dev/null
-                       ls "$commonopt/$subdir/." 2>/dev/null
+                    do case "$subdir" in
+			 /*) ls "$subdir/." 2>/dev/null
+			     ;;
+			 *)  ls "$archopt/$subdir/." 2>/dev/null
+                             ls "$commonopt/$subdir/." 2>/dev/null
+			     ;;
+		       esac
 	            done | sort -u`; shift'
 else
     resolve="$resolve; set x $*; shift"
@@ -199,11 +229,13 @@ resolve=$resolve'
 	    fullpath=
 	    for dir in $archopt $commonopt
 	    do  for subdir in $subdirs
-		do  if [ -d "$dir/$subdir/$target/." -o -f "$dir/$subdir/$target" ]
-		    then  if [ "x$subdir" = x. ]
-			  then  fullpath=$dir/$target
-			  else  fullpath=$dir/$subdir/$target
-			  fi
+		do  case "$subdir" in
+		      /*) absdir=$subdir ;;
+		      .)  absdir=$dir ;;
+		      *)  absdir=$dir/$subdir ;;
+		    esac
+		    if [ -d "$absdir/$target/." -o -f "$absdir/$target" ]
+		    then  fullpath=$absdir/$target
 			  break
 		    fi
 		done
@@ -258,6 +290,15 @@ do
     #
     # Blank lines and lines commencing with an octothorpe ('#') are comments, and skipped.
     #
+    # Lines of the form:
+    #
+    #	I<var>=I<value>
+    #
+    # are read once at the start of the script to set environment parameters.
+    # I<var> may take the names B<REMOTE>, B<RSYNC> or B<SUBDIRS>
+    # to set or override the environment variables B<$SYNCOPT_REMOTE>,
+    # B<$SYNCOPT_RSYNC> or B<$SYNCOPT_SUBDIRS> respectively.
+    #
     # Other lines are of the form:
     #
     #	I<package> I<mode>
@@ -280,12 +321,7 @@ do
     #
     #	/opt/Ipackage -> /opt/package-version
     #
-    sedscript="y/	/ /
-	       s/^  *//
-	       s/^#.*//
-	       /^$/d
-	       s/  *\$//
-	       s/   */ /g
+    sedscript="$sedpreamble
 
 	       # outright mode settings
 	       /^$thing local\$/b local
