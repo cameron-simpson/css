@@ -23,7 +23,7 @@ $usage="Usage: $cmd [-alLvV] [+l] [-f phonelist]... patterns...
 
 $telnos=(defined($ENV{TELNOS})
 	? $ENV{TELNOS}
-	: "$ENV{HOME}/.phonelist:/home/docs/misc/phonedir"
+	: "$ENV{HOME}/.phonelist"
 	);
 
 $badopts=0;
