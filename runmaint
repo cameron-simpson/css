@@ -280,7 +280,7 @@ then
 		if [ -d "$logdir/." ] || mkdir -p "$logdir"
 		then
 		    sh $xflag "$script" 2>&1 \
-		    | execif sh -c 'echo;echo ============================;date; cat' >>"$log"
+		    | execif sh -c "exec >>'$log'; echo;echo '============================';date;exec cat"
 		else
 		    echo "$0: can't make log dir \"$logdir\"" >&2
 		    echo "	suppressing run of \"$script\"" >&2
