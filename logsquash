@@ -1,0 +1,12 @@
+#!/usr/bin/perl
+
+while (<>)
+	{ chomp;
+	  if (/^(\S+)\s+(\S)/)
+		{ $map{$1}="$2$'";
+		}
+	}
+
+for (sort keys %map)
+	{ print "$_ $map{$_}\n";
+	}
