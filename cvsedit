@@ -9,8 +9,7 @@ usage="Usage: $cmd [-f] [-m logmessage] [arg1-options] [--] file [command [args.
 	Normally the filename will be appended as the last argument to the
 	  supplied command. The arg1-options may be used to change this.
 	-f		Command is a filter.
-			The file will be edited with filteredit,
-			with the current content of the file available on stdin.
+			The file will be edited with filteredit.
 			The filename will not be attached to the command.
 	-m logmessage	Specify log message.
 			Default from \$CVSEDIT_MSG."
@@ -23,6 +22,7 @@ fi
 
 dodiff=1
 arg1opts=-end
+isfilter=
 
 badopts=
 
@@ -33,7 +33,7 @@ do
       arg1opts="$arg1opts $1"
       ;;
     -f)
-      arg1opts="-stdin"
+      isfilter=1
       ;;
     -m)	havemsg=1 msg=$2; shift ;;
     --diff)	dodiff=1 ;;
@@ -82,7 +82,12 @@ base=`basename "$file"`
   chmod +w "$base"
 ) || exit 1
 
-(set -x; arg1 $arg1opts -- "$file" "$@")
+( set -x
+  if [ $isfilter ]
+  then  exec filteredit -discard $arg1opts -- "$file" "$@"
+  else  exec arg1 $arg1opts -- "$file" "$@"
+  fi
+)
 editxit=$?
 
 [ $dodiff ] \
