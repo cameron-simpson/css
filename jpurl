@@ -8,7 +8,7 @@ if [ $# = 0 ]
 then
   if [ -t 1 ]
   then
-    set x "`cutbuffer`"; shift
+    set -- `xclip -o` || exit 1
   else
     echo "Usage: $0 URLs..." >&2
     exit 2
