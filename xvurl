@@ -6,7 +6,8 @@
 #	- Cameron Simpson <cs@zip.com.au> 12jun2001
 #
 
-[ $# = 1 ] || { echo "Usage: $0 URL" >&2; exit 2; }
+[ $# = 0 ] && { set x "`xcut -p`"; shift; }
+[ $# = 1 ] || { echo "Usage: $0 [URL]" >&2; exit 2; }
 url=$1; shift
 
 dir=`mkdirn /tmp/vurl` || exit 1
