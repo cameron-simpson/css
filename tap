@@ -6,7 +6,7 @@
 
 cmd=`basename "$0"`
 usage="Usage: $cmd [ttydev]"
-[ $# =gt 1 ] && { echo "$usage" >&2; exit 2; }
+[ $# -gt 1 ] && { echo "$usage" >&2; exit 2; }
 
 dev=${1:-${TAP_DEV:-"/dev/ttyS0"}}
 case "$dev" in /*) ;; *) dev=/dev/$dev ;; esac
@@ -14,30 +14,12 @@ case "$dev" in /*) ;; *) dev=/dev/$dev ;; esac
 speed=9600
 parity=none
 
-dev_=`echo "$dev" | tr / _`
+dev_=`echo "$dev" | tr -s / _`
+
+exec scrif 
 lock=tap$dev_
 session=$lock
 
-if locked "$lock"
-then
-    exec scr "$session"
-fi
-
-logdir=${VARLOG:-$HOME/var/log}/tap
-logfile=$logdir/$HOST-${dev_}-`datecode`
-
-dl=`echo "$logfile"|entilde`
-dlog "start tap $dev >>$dl"
-
-{ echo
-  echo "$HOST@$SYSTEMID - $dev"
-  date
-  echo
-} >>"$logfile"
-
-exec \
-screen -h 102400 -S "$session" \
-	lock "$lock" \
-	env "tapoldSHELL=$SHELL" "SHELL=$0-shell" \
-		"tapdev=$dev" "tapspeed=$speed" "tapparity=$parity" \
-	script -a "$logfile"
+exec scrif "$session" \
+	logscript "$session" \
+	cu -l $dev -s $speed --parity=$parity --nostop
