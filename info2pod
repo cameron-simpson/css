@@ -39,7 +39,7 @@ use cs::GNUInfo;
 
 die "Usage: $::cmd info-file\n" if @ARGV != 1;
 
-$ARGV[0] =~ s/.(Z|gz|z)$//;
+$ARGV[0] =~ s/.(Z|gz|z|bz2)$//;
 my $I = new cs::GNUInfo $ARGV[0];
 
 ## warn "I=".cs::Hier::h2a($I,1);
