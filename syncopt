@@ -69,9 +69,6 @@ rsync=${SYNCOPT_RSYNC:-rsync}
 remote=$SYNCOPT_REMOTE
 subdirs=${SYNCOPT_SUBDIRS:="."}
 
-rsync=${SYNCOPT_RSYNC:-rsync}
-remote=$SYNCOPT_REMOTE
-
 cmd=`basename "$0"`
 usage="Usage: $cmd [-n] [-f] [l] [-R rsync-path] [-x] [-v] [items...]
 	-n	No action (default) - echo necessary actions.
@@ -383,11 +380,17 @@ do
 	continue
     fi
 
+    if [ $makelocal ]
+    then  state=local
+    else  state=link
+    fi
+
     # maintain generic links
     rlink=`remote "readsymlink '$r' 2>/dev/null"`
     if [ -n "$rlink" ]
     then
 	# make thing into symlink to right version
+	state=link
 	if [ -n "$version" ]
 	then  sym=$thing-$version
 	else  sym=$rlink
@@ -412,24 +415,28 @@ do
 	# remote end is real - must be the versioned thing
 	if [ $makelocal ]
 	then
+	    state=local
 	    issymlink "$l" && rm "$l"
 	    [ -d "$l/." ] || $trace mkdir "$l" || xit=1
 	else
-	    if [ -d "$l/." ]
+	    if issymlink "$l" || [ ! -d "$l/." ]
 	    then
-		:
-	    else
 		# link to remote
-		$trace rm -f "$l"
-		$trace ln -s "$r" "$ldir/." || xit=$?
+		state=link
+	        llink=`readsymlink "$l"`
+		if [ "x$r" != "x$llink" ]
+		then
+		    $trace rm -f "$l"
+		    $trace ln -s "$r" "$ldir/." || xit=$?
+		fi
+	    else
+		state=local
 	    fi
 	fi
     fi
 
-    issymlink "$l" \
-    || $trace $rsync -aHW $vflag --delete "$remotepfx$r/." "$l/." | sed "s|^|$l: |"
-
-    set +x
+    [ "x$state" = xlocal ] \
+    && $trace $rsync -aHW $vflag --delete "$remotepfx$r/." "$l/." | sed "s|^|$l: |"
 done
 
 exit $xit
