@@ -1,0 +1,6 @@
+#!/bin/sh
+#
+# Consult the jargon file. - Cameron Simpson, 04nov92
+#
+
+exec ring -f /usr/local/doc/misc/lore/Jargon* ${1+"$@"}
