@@ -58,15 +58,21 @@ fi
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
+# point intermediate stdout to stderr so we don't plug the subcommand's output
+exec 3>&1 1>&2
+
 trap '[ -z "$dir" ] || rm -rf "$dir"' 0 1 2 3 15
 dir=`mkdirn "${TMPDIR:-/tmp}/$cmd"` || exit 1
 
 ( cd "$dir" || exit 1
-  cvs -q co $coopts "$module" >&2 || exit 1
+  cvs -Q co $coopts "$module" >&2 || exit 1
 ) || exit 1
 
 where=$dir/$module
 [ $isfile ] && where=`dirname "$where"`
+
+# restore stdout
+exec 1>&3 3>&-
 
 # we don't exec because the trap needs to run for tidy up
 "$command" "$where" ${1+"$@"}
