@@ -1,0 +1,57 @@
+#!/bin/sh
+#
+# Obtain a user's login environment then run the supplied command.
+# Requires that their login files be readable.
+# Caveat: you're running this as _you_, so you're at the mercy of whatever
+# they might stuff into their startup.
+#	- Cameron Simpson <cs@zip.com.au> 23mar99
+#
+
+cmd=`basename "$0"`
+usage="Usage: $cmd user [command [args...]]"
+
+badopts=
+if [ $# -lt 2 ]
+then
+    echo "$cmd: insufficient arguments: $*" >&2
+    badopts=1
+else
+    user=$1; shift
+    home= shell=
+    eval `ypmatch "$user" passwd | awk -F: '{print "home=" $6 " shell=" $7}'`
+    if [ -z "$home" -o -z "$shell" ]
+    then
+	echo "$cmd: can't lookup $user in YP" >&2
+	badopts=1
+    else
+	[ -d "$home/." ] \
+	|| { echo "$cmd: can't see $home/." >&2; badopts=1; }
+    fi
+fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+[ $# = 0 ] && { set dumpenv -f; }
+
+cd "$home" || exit 1
+
+USER=$user HOME=$home SHELL=$shell
+export USER HOME SHELL
+
+case $SHELL in
+    *csh)	for f in $HOME/.cshrc /etc/login $HOME/.login
+		do  [ -f "$f" ] && eval "$SHELL -c 'source $f; dumpenv -f'"
+		done
+		;;
+    *zsh)	. /etc/profile
+		if [ -r "$HOME/.zprofile" ]
+		then  . "$HOME/.zprofile"
+		else  [ -r "$HOME/.profile" ] && . "$HOME/.profile"
+		fi
+		;;
+    *)		. /etc/profile
+		[ -r "$HOME/.profile" ] && . "$HOME/.profile"
+		;;
+esac
+
+exec "$@"
