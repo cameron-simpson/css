@@ -94,6 +94,9 @@ then
 fi
 
 imagefile=$1
+case "$imagefile" in
+  /*) ;; *) imagefile=`pwd`/$imagefile ;;
+esac
 echo "$imagefile" >>$HOME/var/log/rootbg
 
 if [ $xplanet ]
