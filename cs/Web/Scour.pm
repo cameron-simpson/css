@@ -7,11 +7,13 @@
 use strict qw(vars);
 
 use IPC::Open2;
+use cs::Misc;
+use cs::SGML;
 
 package cs::Web::Scour;
 
 # what we usually scour
-cs::HTTP::Scour::DfltType='text/html';
+cs::Web::Scour::DfltType='text/html';
 
 sub scourFILE($$$$$)
 { my($FILE)=shift;
@@ -32,7 +34,7 @@ sub scourSource($$$$$$)
     }
   }
 
-  my $type = $cs::HTTP::Scour::DfltType;
+  my $type = $cs::Web::Scour::DfltType;
   if ($hasHeaders)
   {
     HDR:
@@ -68,6 +70,9 @@ sub scourSource($$$$$$)
   }
 
   # assume text/html
+
+sub scourHTML($$)
+{ my($src,$dest)=@_;
 
   my $parse = new cs::SGML $src;
   my $base;
@@ -163,7 +168,7 @@ use cs::SGML;
 use cs::URL;
 
 # default: strip colours and fonts
-$cs::HTML::Scour::TagMap={ BGCOLOR => 1,
+$cs::Web::Scour::TagMap={ BGCOLOR => 1,
 	   BORDERCOLOR => 1,
 	   BACKGROUND => 1,
 	   TEXT => 1,
@@ -238,7 +243,7 @@ for (@ARGV)
     }
 
     ## print "{$tag}=$set\n";
-    $cs::HTML::Scour::TagMap->{uc($tag)}=$set;
+    $cs::Web::Scour::TagMap->{uc($tag)}=$set;
   }
   else
   { warn "$::cmd: bad argument: $_\n";
@@ -249,40 +254,43 @@ for (@ARGV)
 die $::Usage if $badopts;
 
 $::TagScour={};
-for my $pt (grep(m:/:, keys %$cs::HTML::Scour::TagMap))
+for my $pt (grep(m:/:, keys %$cs::Web::Scour::TagMap))
 { my($tag,$attr)=($pt =~ m:([^/]*)/+(.*):);
   $tag=uc($tag);
   $attr=uc($attr);
 
-  ## print "{$tag}/{$attr}=$cs::HTML::Scour::TagMap->{$pt}\n";
+  ## print "{$tag}/{$attr}=$cs::Web::Scour::TagMap->{$pt}\n";
   $::TagScour->{$tag}={} if ! exists $::TagScour->{$tag};
-  $::TagScour->{$tag}->{$attr}=$cs::HTML::Scour::TagMap->{$pt};
+  $::TagScour->{$tag}->{$attr}=$cs::Web::Scour::TagMap->{$pt};
 }
 
 if (! defined $servePort)
 { exit htclean(STDIN,$dropHTTPresponse,$hasHeaders,$refpfx,$baseURL);
 }
 
-# run as proxy server
-::need(cs::Net::TCP);
-my $this = cs::Net::TCP->new($::ListenOn);
-die "$::cmd: can't bind to port $::ListenOn: $!" if ! defined $this;
-$this->Serve(($cs::Net::TCP::F_FORK|$cs::Net::TCP::F_FORK2),SERVICE);
-# NOTREACHED
-exit 1;
+=item scourTag(I<tag>,I<relpfx>,I<base>,I<recurse>)
 
-#sub SERVICE	# (CONN,peer)
-#{ local($CONN,$peer)=@_;
-#  local($OUT)=select;
-#
-#  close($OUT) || warn "$cmd: can't close($OUT): $!\n";
-#
-#  my $outfh = $CONN->SourceHandle();
-#  open(STDOUT,">&$outfh")
-#	|| die "$cmd: can't attach stdout to $outfh\n";
-#
-#  exit htclean($CONN->SourceHandle(), 
-#}
+Take an HTML/SGML I<tag> and scour it,
+returning the scoured tag.
+
+The optional parameter I<relpfx>
+specifies a prefix to apply to B<HREF>s,
+images (B<IMG>) and frame B<SRC>s
+within the tag
+(as is needed if this routine is a component of a scouring CGI script,
+to return links to the CGI script).
+
+The optional parameter I<base>
+is a B<cs::URL> object
+specifying the base URL from which the I<tag> came
+and is used for resolving relative links.
+
+The optional parameter I<recurse>
+is a flag specifying that I<relpfx>
+is to be applied to B<HREF>s within the tag.
+By default these are left alone.
+
+=cut
 
 sub scourTag($$$$)
 { my($t,$refpfx,$base,$recurse)=@_;
@@ -312,11 +320,10 @@ sub scourTag($$$$)
       $A->{HREF}=$A->{SRC};
       unshift(@{$t->{TOKENS}}, "[ EMBEDment of $A->{HREF} ]");
     }
-      
 
     for my $a (@a)
     { my $uca = uc($a);
-      if (exists $cs::HTML::Scour::TagMap->{$uca} && $cs::HTML::Scour::TagMap->{$uca}
+      if (exists $cs::Web::Scour::TagMap->{$uca} && $cs::Web::Scour::TagMap->{$uca}
        || exists $::TagScour->{$tag} && exists $::TagScour->{$tag}->{$uca})
       { delete $A->{$a};
 	## print "remove $a from $t->{TAG}\n";
@@ -350,70 +357,8 @@ sub scourTag($$$$)
   $t;
 }
 
-sub scourTag($$$$)
-{ my($t,$refpfx,$base,$recurse)=@_;
+=back
 
-  if (ref $t)
-  { my $tag = uc($t->{TAG});
-
-    # disable STYLE tags
-    if ($tag eq STYLE)
-    { $t->{TAG}=NOSTYLE;
-    }
-
-    my $A = $t->{ATTRS};
-    my @a = keys %$A;
-
-    if ($tag eq BLINK)
-    { $t->{TAG}=EM;
-    }
-    elsif ($tag eq NOBR)
-    { $t->{TAG}=BR;
-    }
-    elsif ($tag eq LAYER)
-    { $t->{TAG}=DIV;
-    }
-    elsif ($tag eq EMBED)
-    { $t->{TAG}=A;
-      $A->{HREF}=$A->{SRC};
-      unshift(@{$t->{TOKENS}}, "[ EMBEDment of $A->{HREF} ]");
-    }
-      
-
-    for my $a (@a)
-    { my $uca = uc($a);
-      if (exists $cs::HTML::Scour::TagMap->{$uca} && $cs::HTML::Scour::TagMap->{$uca}
-       || exists $::TagScour->{$tag} && exists $::TagScour->{$tag}->{$uca})
-      { delete $A->{$a};
-	## print "remove $a from $t->{TAG}\n";
-      }
-    }
-
-    if (defined $base)
-    { for my $a (HREF,SRC,ACTION)
-      { if (exists $A->{$a})
-	{ $A->{$a}=$base->Abs($A->{$a})->Text();
-	}
-      }
-    }
-
-    if (length $refpfx)
-    { if ($recurse && exists $A->{HREF}
-       && $A->{HREF} =~ /^(http|ftp):\/\//i
-	 )
-      { $A->{HREF}="$refpfx/$A->{HREF}";
-      }
-
-      if ( ($tag eq FRAME || $tag eq IMG)
-	&& exists $A->{SRC}
-        && $A->{SRC} =~ /^(http|ftp):\/\//i
-	 )
-      { $A->{SRC}="$refpfx/$A->{SRC}";
-      }
-    }
-  }
-
-  $t;
-}
+=cut
 
 1;
