@@ -20,5 +20,5 @@ do
   [ $doqcmd ] && shcmd=`shqstr "$shcmd"`
   echo "\"$title\" Exec sh -c $shcmd"
 done \
-| tee $CONSOLE \
+| tee -a $CONSOLE \
 | sort -d
