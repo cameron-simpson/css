@@ -289,6 +289,16 @@ sub setvar
       next VAR;
     }
 
+    if (/^addprefix\s+/)
+    { $_=$';
+      for my $pfx (grep(length,split(/\s+/)))
+      { $pfx="/opt/$pfx" unless $pfx =~ /^\//;
+	setenv(PATH,"$::ENV{PATH}:$pfx/bin:$pfx/sbin");
+        setenv(MANPATH,"$::ENV{MANPATH}:$pfx/man");
+      }
+      next VAR;
+    }
+
     next VAR if $::did{$_};
     $::did{$_}=1;
 
@@ -542,6 +552,14 @@ sub useline($)
     setvar(1,grep(length,
 		split(/\s+/,
 		      estring($_,0))));
+  }
+  elsif (/^addprefix\s+/)
+  { $_=$';
+    for my $pfx (grep(length,split(/\s+/)))
+    { $pfx="/opt/$pfx" unless $pfx =~ /^\//;
+      setenv(PATH,"$::ENV{PATH}:$pfx/bin:$pfx/sbin");
+      setenv(MANPATH,"$::ENV{MANPATH}:$pfx/man");
+    }
   }
   elsif (/^final\s+/)
   { push(@::final,$');
