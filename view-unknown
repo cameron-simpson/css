@@ -10,6 +10,9 @@ usage="Usage: $cmd [-cC] [file]
 	-c	Use \"copiousoutput\" entries (default).
 	-C	Don't use \"copiousoutput\" entries."
 
+APPHELPER_SAVEMODE=no
+export APPHELPER_SAVEMODE
+
 copious=1
 copflag=
 [ "x$1" = x-c ] && { copflag=-c copious=1; shift; }
