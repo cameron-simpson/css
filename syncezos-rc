@@ -1,5 +1,23 @@
 #!/bin/sh
+#
+# Copy a few rc files into the EZOS web tree.
+#	- Cameron Simpson <cs@zip.com.au>
+#
+
+ezos=$HOME/@/ezos
+
 set -x
 exec rsync -avHP --delete --delete-excluded \
-	--include-from $HOME/rc/sync/list.ezos-rc \
-	$HOME/rc/. $HOME/there/ezos/html/cs/rc/.
+	--exclude=CVS/ \
+	--include='/myke' \
+	--include='/myke/*' \
+	--include='/perl' \
+	--include='/perl/cs' \
+	--exclude='/perl/*' \
+	--include='/x11' \
+	--include='/x11/session' \
+	--include='/x11/xenv.sh' \
+	--include='/x11/fvwm' \
+	--include='/x11/fvwm/rc' \
+	--exclude='*' \
+	$HOME/rc/. $ezos/html/cs/rc/.
