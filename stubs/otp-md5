@@ -8,7 +8,7 @@ otp=$BIN/otp-md5
 
 if resp=`$otp ${1+"$@"}`
 then
-    [ -n "$DISPLAY" ] && necho "$resp" | xcut
+    [ -n "$DISPLAY" ] && echo "$resp" | xcut
     echo "$resp"
 else
     echo "$resp"
