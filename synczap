@@ -14,7 +14,16 @@ myke || exit 1
 
 set -u
 
-news=`readdottext`
+tmpf=/tmp/adzap$$
+echo "Enter release announcement." >"$tmpf"
+while :
+do
+  ${EDITOR:-vi} "$tmpf"
+  cat "$tmpf"
+  ask Ok to release && break
+  ask Abort && exit 1
+done
+news=`cat "$tmpf"`
 
 dodiff=1
 commit=
