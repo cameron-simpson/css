@@ -1,0 +1,17 @@
+#!/bin/sh
+#
+# Look up acronyms.	- Cameron Simpson <cs@zip.com.au>
+#
+
+cmd=`basename "$0"`
+case $cmd in
+  acro2|aieee) base="http://www.brunching.com/cgi/toy-acronymer.cgi?acronym=" ;;
+  *)           base="http://curia.ucc.ie/cgi-bin/acronym?" ;;
+esac
+
+urls=
+for acro
+do  urls="$urls $base$acro"
+done
+
+exec urlshow $urls
