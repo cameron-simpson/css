@@ -5,7 +5,9 @@
 #
 
 if [ $# -gt 0 ]
-then for host; do echo "$host"; done
+then for host
+     do echo "$host"
+     done
 else cat
 fi \
 | while read host
@@ -14,8 +16,10 @@ fi \
 	  echo "$host"
 	  ;;
 	*)
-	  awk -v "host=$host" \
-		'BEGIN	{ hit=0 }
+	  awk "BEGIN	{ hit=0
+			  host=\"$host\"
+			}
+	      "'
 	       /^[0-9]/ { yes=0;
 			  for (n=2; n<=NF; n++)
 			  { if ($n == host) { yes=1; break }
