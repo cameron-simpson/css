@@ -18,7 +18,7 @@ cgi="${cgibase}search.cgi"
 cmd=`basename "$0"`
 
 query=$*
-[ -n "$query" ] || query=`xclip -o`
+[ -n "$query" ] || query=`xunclip`
 query=`qsencode "$query"`
 
 target=$cmd
@@ -57,9 +57,5 @@ case "$cmd" in
 		exit 0
 		;;
 esac
-
-query=`echo "$*"|sed 's/+/%2b/g
-		      s/&/%26/g
-		      s/[ 	][ 	]*/+/g'`
 
 us +c "$cgi?engine=$target&query=$query"
