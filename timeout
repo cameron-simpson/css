@@ -25,7 +25,25 @@ xit=1		# assume timed out
 "$@" &
 cmdpid=$!
 
-( { sleep $timeout; exec 2>/dev/null; kill $mypid $cmdpid; sleep 2; kill -9 $cmdpid; } & )
+( { exec </dev/null >/dev/null	## keep stderr
+
+    left=$timeout
+    while [ $left -ge 5 ]
+    do  kill -0 "$cmdpid" 2>/dev/null || exit 0
+	sleep 5; left=`expr $left - 5`
+    done
+    [ $left -gt 0 ] \
+      && { kill -0 "$cmdpid" 2>/dev/null || exit 0; sleep $left; }
+
+    if kill -0 $cmdpid 2>/dev/null
+    then
+	echo "$0: timed out after $timeout seconds: $*" >&2
+	exec 2>/dev/null
+	kill $cmdpid && { sleep 2; kill -9 $cmdpid; }
+	kill $mypid
+    fi
+  } &
+)
 
 wait
 xit=$?
