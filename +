@@ -20,4 +20,4 @@ then  echo "mail/$1 already locked" >&2
 fi
 
 cd || exit 1
-RXVTOPTS=+ip GUI=lean term -n "mutt +$1" lock "mail/$1" mutt -f "+$1"
+exec term +ip -n "mutt +$1" lock "mail/$1" mutt -f "+$1"
