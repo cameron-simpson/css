@@ -1,0 +1,41 @@
+#!/bin/sh
+#
+# Run to hook my core stuff up.
+#	- Cameron Simpson <cs@zip.com.au> 29jun2003
+#
+
+while read dir
+do  [ -d "$dir/." ] || mkdir -p "$dir"
+done <<X
+tmp
+var/cache/bg
+var/env
+var/fvwm
+var/idsets
+var/mairix
+var/locks
+var/log/build
+var/log/lastvalue
+var/run
+X
+
+while read link path
+do
+  rm -f "$link"
+  ln -s "$path" "$link"
+  [ -f "$link"   ] && continue
+  [ -d "$link/." ] && continue
+  [ -L "$link"   ] && continue
+
+done <<X
+.secret rc/secret
+.setvar rc/env
+.termenv rc/term/env
+.xinitrc rc/x11/xinitrc
+.xsession rc/x11/session
+.zprofile rc/shell/zsh/.zprofile
+.zshenv rc/shell/zsh/.zshenv
+.zshrc rc/shell/zsh/.zshrc
+bin there/cameron@cskk.homeip.net/bin
+scripts there/cameron@cskk.homeip.net/scripts
+X
