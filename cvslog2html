@@ -10,7 +10,7 @@ cvslog2html - transcribe CVS logs to HTML or plain text
 
 =head1 SYNOPSIS
 
-cvslog2html [-t] [-O] [cvs-log-args...]
+cvslog2html [-t] [-O] [{cvs-log-args...|-}]
 
 =head1 DESCRIPTION
 
@@ -18,14 +18,15 @@ I<cvslog2html>
 writes a CVS log as human friendly HTML or plain text
 to its standard output.
 
-If standard input is a terminal
-or some I<cvs-log-args> are supplied
-then the command:
+If the sole non-option argument is a dash
+then I<cvslog2html> expects 
+"cvs(1) log" output as its input.
+
+Otherwise the command:
 
 	B<cvs log> I<cvs-log-args...>
 
-is run to obtain the raw log data,
-otherwise standard input is assumed to be the output of a B<cvs log> command.
+is run to obtain the log data.
 
 =cut
 
@@ -61,8 +62,14 @@ $ObfuscateEmail=1 if defined $::opt_O;
 
 =cut
 
-if (-t STDIN || @ARGV)
-{ open(STDIN,"cvs log @ARGV |") || die "$0: can't pipe from cvs: $!\n";
+if (@ARGV == 1 && $ARGV[0] eq '-')
+{
+  if (-t STDIN)
+  { die "$::cmd: I'm expecting \"cvs log\" data on my input, not a terminal!\n";
+  }
+}
+else
+{ open(STDIN,"cvs log @ARGV |") || die "$0: can't pipe from \"cvs log @ARGV\": $!\n";
 }
 
 while (defined ($_=<STDIN>))
