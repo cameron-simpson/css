@@ -144,11 +144,14 @@ The default is 512 bytes.
 
   find(\&checkit, @ARGV);
 
+  $::Silent || nl("sorting file sizes ...");
+  my @sizes = sort { $b <=> $a; } keys %::SizedFiles;
+
   $::Silent || nl("comparing files ...");
 
   # for each size
   SIZE:
-  for my $sz (sort { $b <=> $a; } keys %::SizedFiles)
+  for my $sz (@sizes)
   { out($sz);
 
     next SIZE if @{$::SizedFiles{$sz}} < 2;
