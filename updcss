@@ -19,6 +19,7 @@ quick=
 [ "x$1" = x-n ] && { dosync=; shift; }
 
 common=/u/syncopt/common/`echo "$SYSTEMID" | tr '[a-z]' '[A-Z]'`
+[ -d "$common/." ] || { echo "$cmd: no \$common: $common" >&2; exit 1; }
 
 if [ -z "$quick" ]
 then
@@ -75,7 +76,7 @@ then
 	$HOME/scripts/cgi-bin/. $common/css/cgi-bin/.
 fi
 
-if needdir $common/css/cs
+if needdir $common/css/lib/cs
 then
   rsync -avH \
 	--delete \
@@ -83,7 +84,7 @@ then
 	--include='*/' \
 	--include='*.pm' \
 	--exclude='*' \
-	$HOME/scripts/cs/. $common/css/cs/.
+	$HOME/scripts/cs/. $common/css/lib/cs/.
 fi
 
 ##if needdir $common/css/lib
@@ -99,10 +100,16 @@ then
     ( cd $common || exit 1
       tar cf - css | gzip -v -9 >$cssweb/css.tar.gz
     )
-    for d in cs man bin
+    for d in man bin lib
     do
       rsync -avH --delete $common/css/$d/. $cssweb/$d/.
     done
+    ( cd "$cssweb/bin" || exit 1
+      ln -s ../lib/cs .
+    )
+    ( cd "$cssweb" || exit 1
+      myke _all
+    )
 fi
 
 wait
