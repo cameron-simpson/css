@@ -1,0 +1,8 @@
+#!/bin/sh
+#
+# List the otpad sets I know about.
+#	- Cameron Simpson <cs@zip.com.au> 04aug2000
+#
+
+list=$HOME/public/pads/padsets
+cat "$list"
