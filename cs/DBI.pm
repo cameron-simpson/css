@@ -1185,6 +1185,14 @@ sub insert	# dbh,table[,dfltok],fields...
   bless [ $dbh, $table, $sql, sql($dbh,$sql), $dfltok, @fields ];
 }
 
+sub insertrow($$$)	# dbh,table,hashref
+{ my($dbh,$table,$h)=@_;
+
+  my @k = sort grep(length,keys %$h);
+  dosql($dbh,"INSERT INTO $table(".join(',',@k).") VALUES (".join(",",map('?',@k)).")",
+	map($h->{$_},@k));
+}
+
 =back
 
 =head1 OBJECT METHODS
