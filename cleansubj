@@ -8,15 +8,17 @@
 :top
 s/^[Ss][Uu][Bb][Jj][Ee][Cc][Tt]:[ 	]*//
 t subject
-:done
 n
 b top
 :subject
-s/^\[[^\] 	]*\][ 	]*//
+s/^\[[^ 	]*\][ 	]*//
 t subject
+/^[Rr][Ee]:/!b nore
 :re
 s/^[Rr][Ee]:[ 	]*//
 t re
-s/^\[[^\] 	]*\][ 	]*//
+s/^\[[^ 	]*\][ 	]*//
 t re
-b done
+s/^/Re: /
+:nore
+s/^/Subject: /
