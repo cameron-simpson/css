@@ -32,6 +32,7 @@ first=1
 for arg
 do  case "$arg" in
 	jdk)	arg=file:///opt/j2sdk-sun-1.4.0-beta3/docs/api/overview-summary.html ;;
+	rfcs)	arg=http://www.faqs.org/rfcs/rfc-titles.html ;;
 	*/*)	;;
 	*.*)	arg=http://$arg/ ;;
     esac
