@@ -49,7 +49,6 @@ exec \
 	'--exclude=/man/*' \
 	'--include=/rc' \
 	'--include=/rc/@' \
-	'--include=/rc/bookmarks.html' \
 	'--include=/rc/cvs' \
 	'--include=/rc/env' \
 	'--include=/rc/getnews' \
@@ -90,6 +89,7 @@ exec \
 	'--include=/rc/urlmap' \
 	'--include=/rc/vi' \
 	'--include=/rc/x11' \
+	'--include=/rc/web' \
 	'--include=/rc/xplanet' \
 	'--exclude=/rc/*' \
 	'--include=/scripts' \
