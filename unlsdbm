@@ -1,0 +1,26 @@
+#!/usr/bin/perl
+#
+
+if ($#ARGV != $[)
+	{ print STDERR "Usage: $0 database\n";
+	  exit 2;
+	}
+
+$sep=' -> ';
+$dbm=shift;
+dbmopen(DBM,$dbm,0666) || die "$0: can't dbmopen($dbm): $!\n";
+
+RECORD:
+  while (<STDIN>)
+	{ s/\r?\n$//;
+	  if (($ndx=index($_,$sep)) < 0)
+		{ print STDERR "$0: stdin, line $.: bad record: $_\n";
+		  next RECORD;
+		}
+
+	  ($key,$data)=(substr($_,0,$ndx),substr($_,$ndx+length($sep)));
+	  print STDERR "$key -> $data\n";
+	  $DBM{$key}=$data;
+	}
+
+dbmclose(DBM);
