@@ -52,30 +52,20 @@ esac
 
 ok=1
 
-trap "rm -f $front $back; exit 1" 1 2 15
+trap 'rm -f "$front" "$back"' 0 1 2 15
 
 exec 3<&0	# save stdin
 
 [ "x$input" = x- ] || exec <"$input"
 
-sed -n ":front
-	w $front
-	/$from/b middle
-	n
-	b front
-	:middle
-	n
-	/$to/b back
-	b middle
-	:back
-	w $back
-	n
-	b back" || ok=
+set-x \
+sed -n "1,/$from/w $front
+        /$to/,\$w $back" || ok=
 
 if [ $ok ]
 then
     [ "x$output" = x- ] || exec >"$output"
-    for file in $front "$@" $back
+    for file in "$front" "$@" "$back"
     do  case $file in
 	    -)	cat <&3 ;;
 	    /*)	cat "$file" ;;
@@ -83,8 +73,6 @@ then
 	esac || ok=
     done
 fi
-
-rm -f $front $back
 
 [ $ok ] && exit 0
 exit 1
