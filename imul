@@ -68,6 +68,7 @@ while (defined($_=<STDIN>))
     }
     else
     { $fg=$im->colorAllocate(@args);
+      warn "new FG = $fg";
     }
   }
   elsif ($op eq BG)
@@ -77,6 +78,7 @@ while (defined($_=<STDIN>))
     }
     else
     { $bg=$im->colorAllocate(@args);
+      warn "new BG = $bg";
     }
   }
   elsif ($op eq LABEL)
@@ -90,7 +92,7 @@ while (defined($_=<STDIN>))
       my $dx = length($txt)*$fwidth;
       my $dy = $fheight;
 
-      $im->filledRectangle($x-1,$y-1,$x+$dx+1,$y+$dy+1,$bg);
+      ## $im->filledRectangle($x-1,$y-1,$x+$dx+1,$y+$dy+1,$bg);
       $im->string($font,$x,$y,$txt,$fg);
     }
   }
