@@ -1,0 +1,28 @@
+#!/bin/sh
+#
+# Send a single command to a switch, fetch reply.
+#	- Cameron Simpson <cs@zip.com.au> 27jan99
+#
+
+usage="Usage: $0 switch command [args...]"
+
+[ $# -gt 1 ] || { echo "$usage" >&2; exit 2; }
+
+sw=$1; shift
+swcmd=$*
+
+swcmdptn=$swcmd
+case $swcmd in
+    *[/.*\\]*)	swcmdptn=`sedstrs 's|[/.*\\\\]|\\\\&|g' "$swcmd"` ;;
+esac
+
+( echo "
+set length 0
+$swcmd
+quit"
+  sleep 2
+) \
+	| nc "$sw" 23 \
+	| tr -d '\015' \
+	| sed -e "1,/^$sw[^ >]*> $swcmdptn\$/d" \
+	      -e "/^$sw[^ >]*>/,\$d"
