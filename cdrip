@@ -71,6 +71,11 @@ cdtoc "$dev" \
        && read xtra
     do
       dir=$artist/$album
+      case $track in
+	  [0-9])	wtrack=0$track ;;
+	  *)		wtrack=$track ;;
+      esac
+      title="$wtrack: $title"
 
       raw=$dir/$title.raw
       case $enc in
