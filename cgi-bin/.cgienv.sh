@@ -9,43 +9,51 @@
 wd=`pwd`
 wdscripts=`dirname "$wd"`	## probably in ~/scripts/cgi-bin
 
-case "$wd" in
-    /u/cameron/*)
+case "$HOSTNAME" in
+  sweet.research.canon.com.au)
+    ARCH=redhat.x86.linux
+    SYSTEMID=cisra
+    HOME=/u/cameron
+    WEBPROXY=proxy:8080
+    ;;
+  *)
+    case "$wd" in
+      /u/cameron/*)
 	ARCH=sun.sparc.solaris
 	SYSTEMID=home
 	HOME=/u/cameron
 	WEBPROXY=proxy:8080
 	;;
-    /home/cameron/*)
+      /home/cameron/*)
 	;;
-    /home/virtual/site76/fst/var/www/cgi-bin)
+      /home/virtual/site76/fst/var/www/cgi-bin)
 	ARCH=redhat.x86.linux
 	SYSTEMID=ezos
 	HOME=$DOCUMENT_ROOT/cs
 	wdscripts=$HOME/scripts
 	;;
 
-    /home/kaper/cameron/* | /a/kaper/home/cameron/* )
+      /home/kaper/cameron/* | /a/kaper/home/cameron/* )
 	ARCH=redhat.x86.linux
 	SYSTEMID=cisra
 	HOME=/u/cameron
 	WEBPROXY=proxy:8080
 	PERL5LIB=/opt/perl/lib
 	;;
-    /home/docs/www/web/*|/usr/local/misc/htdocs/*)
+      /home/docs/www/web/*|/usr/local/misc/htdocs/*)
 	ARCH=redhat.x86.linux
 	SYSTEMID=cisra
 	HOME=/home/ivie/cameron
 	WEBPROXY=proxy:8080
 	PERL5LIB=/opt/perl/lib
 	;;
-    /home[13]/cs/* | /home/cs/*)
+      /home[13]/cs/* | /home/cs/*)
 	ARCH=redhat.x86.linux
 	SYSTEMID=zip
 	HOME=/home/cs
 	WEBPROXY=proxy:8080
 	;;
-    *)	echo content-type: text/plain
+      *)echo content-type: text/plain
 	echo
 	echo "$0: can't deduce system environment"
 	pwd
@@ -61,6 +69,8 @@ case "$wd" in
 	ls -la
 	exit 0
 	;;
+    esac
+    ;;
 esac
 
 CS_WRAPPER=$ARCH@$SYSTEMID
