@@ -1,0 +1,15 @@
+#!/usr/bin/perl
+#
+# Replace control characters with printable forms.
+#
+
+while (<>)
+	{ s/[\000-\010\013\015-\037\177-\377]/
+		($sub=''),
+		($c=unpack('C',$&)),
+		( $c >= 0200 && (($sub.='M-'), $c-=0200)),
+		( $sub .= '^'.( $c == 0177 ? '?' : pack('C',$c+64) ) ),
+		$sub
+		/eg;
+	  print;
+	}
