@@ -4,12 +4,14 @@
 #	- Cameron Simpson <cs@zip.com.au> 01mar95
 #
 
+: ${TMPDIR:=/tmp}
+
 usage="Usage: $0 f1 f2"
 
 [ $# = 2 ] || { echo "$usage" >&2; exit 2; }
 f1=$1 f2=$2
 
-tmp=/tmp/odump.$$
+tmp=$TMPDIR/odump.$$
 
 trap 'rm -f $tmp; exit 1' 1 2 15
 
