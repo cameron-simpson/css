@@ -44,7 +44,7 @@ then
     ##dotag=
     ##addr=cameron
 
-    cd $zapdir/html/scripts || exit 1
+    cd $zapdir/html || exit 1
     ( cd .. || exit 1
       echo "News:"
       echo "$news"
