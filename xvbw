@@ -1,0 +1,6 @@
+#!/bin/sh
+#
+# xv for black and white displays
+#
+
+exec xv -fg white -bg black -hi white -lo black ${1+"$@"}
