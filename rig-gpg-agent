@@ -1,0 +1,38 @@
+#!/bin/sh
+#
+# Set up a gpg-agent in daemon mode, much like rig-ssh-agent.
+#	- Cameron Simpson <cs@zip.com.au> 30mar2005
+#
+
+cmd=$0
+usage="Usage: $cmd [-u] [statefile]"
+
+statefile=
+unlock=
+
+badopts=
+
+[ "x$1" = x-u ] && { unlock=1; shift; }
+
+[ $# = 0 ] || { statefile=$1; shift; }
+
+[ $# = 0 ] || { echo "$cmd: extra arguments: $*" >&2; badopts=1; }
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+[ -n "$statefile" ] || statefile=`gpg-agent-statefile` || exit 1
+
+# force unlock
+[ $unlock ] && ( set -x; unlock -f "$statefile" )
+
+export statefile
+
+unset GPG_AGENT_INFO
+
+exec \
+  lock -1 -a "$statefile" \
+  rmthen -f "$statefile" \
+  set-x \
+  gpg-agent \
+  sh -c 'stash-gpg-agent "$statefile"; exec pause' \
+  </dev/null
