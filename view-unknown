@@ -1,0 +1,49 @@
+#!/bin/sh
+#
+# Generic handler for untyped data to be displayed inline (as for mailcap
+# "copiousoutput' entries).
+#	- Cameron Simpson <cs@zip.com.au> 24jul2002
+#
+
+cmd=$0
+usage="Usage: $0 [-C] [file]"
+
+copious=1
+[ "x$1" = x-C ] && { copious=; shift; }
+
+tmpf=
+trap '[ -z "$tmpf" ] || rm "$tmpf"' 0 1 15
+
+if [ $# = 0 ]
+then
+    tmpf=${TMPDIR:-/tmp}/vu$$
+    cat >"$tmpf" || exit 1
+    file=$tmpf
+else
+    file=$1; shift
+    [ $# = 0 ] || { echo "$cmd: extra arguments: $*" >&2
+		    echo "$usage" >&2
+		    exit 2
+		  }
+    case "$file" in /*) ;; *) file=./$file ;; esac
+fi
+
+type=`file "$file"` || exit 1
+mtype=
+case "$type" in
+    *': Bourne shell script'*)	mtype=application/x-sh ;;
+    *': JPEG image data'*)	mtype=image/jpeg ;;
+esac
+
+# unrecognised - just recite "file"  output
+[ -z "$mtype" ] && { echo "$type"; exit 0; }
+
+if [ $copious ]
+then  action=`grep "^$mtype"' *;.*; *copiousoutput *$' <$HOME/.mailcap | sed 1q`
+else  action=`grep "^$mtype"' *;' <$HOME/.mailcap | grep -v '.*; *copiousoutput *$' | sed 1q`
+fi
+
+[ -z "$action" ] && { echo "$type"; exit 0; }
+
+action=`echo "$action" | sed -e 's/^[^;]*; *//' -e 's/ *;[^;]*$//' -e"s%s$fileg"`
+eval "$action"
