@@ -4,7 +4,7 @@
 #	- Cameron Simpson <cs@zip.com.au> 09feb2002
 #
 
-varlog=${VARLOG:-$HOME/var/log}
+: ${LOGDIR:=$HOME/var/log}
 
 cmd=$0
 usage="Usage: $cmd logfile cmd [args...]"
@@ -20,7 +20,7 @@ esac
 logfile=$1; shift
 case "$logfile" in
     /*)	;;
-    *)	logfile=$varlog/$logfile ;;
+    *)	logfile=$LOGDIR/$logfile ;;
 esac
 
 exec </dev/null
