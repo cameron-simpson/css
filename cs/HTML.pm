@@ -991,6 +991,7 @@ sub Tok
 
   my($t);
 
+  # on EOF, fake up closing tags until stack of open tags exhausted
   if (! defined ($t=$this->{SGML}->Tok()))
   { ## warn "EOF from SGML, returning\n";
     my $ts = $this->{TAGSTACK};
@@ -1025,6 +1026,9 @@ sub Tok
     return $t;
   }
 
+  #################
+  # opening tag ...
+
   my($oldActiveState)=$this->{ACTIVE}->{$t->{TAG}};
   $this->{ACTIVE}->{$t->{TAG}}=1;
 
@@ -1053,14 +1057,14 @@ sub Tok
     }
     elsif (! $rt->{START})
     # closing tag
-    { if (exists $cs::HTML::_Structures{$rt->{TAG}}
+    { if (1 ## exists $cs::HTML::_Structures{$rt->{TAG}}
        && exists $enclose->{$rt->{TAG}})
       # closing tag for something other than this?
       # push back, fall out
       # this way we can parse <tag1><tag2></tag1>
       { if ($rt->{TAG} ne $t->{TAG})
 	{ $this->{SGML}->UnTok($rt);
-	  ## warn "pushing back </$rt->{TAG}>";
+	  ##warn "pushing back </$rt->{TAG}> because inside <$t->{TAG}>";
 	}
 	last TOK;
       }
