@@ -36,7 +36,7 @@ exec </dev/null
 
 if [ $async ]
 then
-    cons=`logpath console`
+    cons=$CONSOLE
     [ -n "$cons" ] && exec >>"$cons" 2>&1
 fi
 
@@ -46,7 +46,7 @@ fi
   tmp=${tmp}2
   >$tmp
 
-  cons=`logpath console`
+  cons=$CONSOLE
   exec >"$cons" 2>&1
 
   if [ -n "$pfx" ]
