@@ -352,7 +352,7 @@ X
     if ($::X_Label)
     {
       print <<X
-  :0 Whf:
+  :0 whf
   | formail -A "X-Label: $key" 
 X
       ;
@@ -361,7 +361,7 @@ X
     {
       print <<X
 
-  : 0hf
+  : 0whf
   | sed -e 's/^Subject: *\\[[^ ]*\\] */Subject: /' -e 's/^Subject: *[Rr][Ee] *: *\\[[^ ]*\\] */Subject: Re: /' -e 's/^Subject:/& [$key]/'
 X
       ;
