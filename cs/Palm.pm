@@ -94,6 +94,28 @@ sub palm2gmt($;$)
   $palm;
 }
 
+=item parseString0(I<data>)
+
+Parse a NUL terminated string at the start I<data>.
+Returns the string (without the NUL) in a scalar context
+and an array of B<(I<string>,I<tail>)> in an array context
+where I<tail> is the portion of I<data> after the NUL.
+Returns B<undef> or an empty array on error.
+
+=cut
+
+sub parseString0($)
+{ local($_)=@_;
+
+  if (/^([^\0]*)\0/)
+  { return $1 if ! wantarray;
+    return ($1,$');
+  }
+
+  return () if wantarray;
+  undef;
+}
+
 =back
 
 =head1 OBJECT CREATION
