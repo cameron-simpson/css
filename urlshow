@@ -11,16 +11,18 @@
 # Switch to mozilla-xremote-client.	cameron 26aug2002
 # 
 
+: ${BROWSER_DISPLAY:=$DISPLAY}
+: ${DISPLAY:=$BROWSER_DISPLAY}
+export DISPLAY
+
 cmd=`basename "$0"`
-usage="Usage: $cmd [-a] [-c] [-s] [-t] [-i file] [URLs...]
+usage="Usage: $cmd [-a] [-c] [-d display] [-s] [-t] [-i file] [URLs...]
 	-a	Anonymous.
 	-c	Clean.
 	+c	Don't clean.
 	-p	Probe for running browser first.
 	-t	Open a new tab instead of a new window.
 	-i file	Read URLs from file; \"-\" means stdin."
-
-[ -n "$DISPLAY" ] || { echo "$cmd: no \$DISPLAY!" >&2; exit 1; }
 
 doprobe=
 subopts=
@@ -39,6 +41,7 @@ do  case "$1" in
 	-a)	doanon=1 ;;
 	-c)	doclean=1 ;;
 	+c)	doclean= ;;
+	-d)	DISPLAY=$2; export DISPLAY; shift ;;
 	-p)	doprobe=1 ;;
 	-t)	popurl_mode=new-tab ;;
 	-i)	input=$2; shift
@@ -54,6 +57,30 @@ do  case "$1" in
 done
 
 [ $badopts ] && { echo "$usage" >&2; exit 1; }
+
+[ -n "$DISPLAY" ] || { echo "$cmd: no \$DISPLAY!" >&2; exit 1; }
+
+probe()
+{ "$mozremote" 'ping()'
+}
+
+# start browser if needed
+case "$DISPLAY" in
+  :* | lo:* | localhost:* | 127.0.0.1:* | "$IPADDR:"* )
+    browser -q \
+    || { acon set-x browser
+	 echo "waiting for browser..."
+	 while :
+	 do  browser -q && break
+	     necho .; sleep 1
+	 done
+	 while :
+	 do  probe && break
+	     necho .; sleep 1
+	 done
+       }
+    ;;
+esac
 
 if [ $anon ]; then anonpfx=http://anon.free.anonymizer.com/
               else anonpfx=
@@ -73,10 +100,6 @@ then
     exit $?
 fi
 
-probe()
-{ "$mozremote" 'ping()'
-}
-
 popurl()
 { popurl_ret=0
   for url
@@ -89,19 +112,6 @@ popurl()
   done
   return $popurl_ret
 }
-
-# ensure we have a browser
-if [ "$doprobe" ]
-then
-  probe \
-  || { ns
-       probed=
-       while sleep 1
-       do  probe && break
-	   [ $probed ] || { probed=1; echo "waiting for mozilla ..."; }
-       done
-     }
-fi
 
 cleanurllist \
 | while read url
