@@ -10,6 +10,7 @@ pcnt=5
 onepass=1
 keepn=1
 force=
+myperms=u
 
 cmd=`basename "$0"`
 usage="Usage: $cmd [-% pcnt] [-1rfnx] [-k keep] dir
@@ -75,6 +76,8 @@ ls -r \
       [ "$free" -lt "$pcnt" ] || break
 
       # remove a tree
+      [ -n "$myperms" ] \
+	&& find "./$sudir" -type d ! -perm -700 -exec $trace chmod "$myperms+rwx" {} ';'
       $trace rm -r "./$subdir" || xit=1
 
       # abort if only trying once
