@@ -35,39 +35,6 @@ $cs::DBI::_now=time;
 
 =over 4
 
-=item mydb(I<mysql-id>,I<dbname>)
-
-Return a database handle for my personal mysql installation.
-I<mysql-id> is an optional string representing the database
-to contact; it defaults to B<mysql@I<systemid>> where I<systemid>
-comes from the B<SYSTEMID> environment variable.
-This key is passed to B<cs::Secret::get> to obtain the database login keys.
-I<dbname> is the name of the database to which to attach.
-It defaults to B<CS_DB>.
-
-=cut
-
-sub mydb(;$$)
-{ my($id,$dbname)=@_;
-  $id="mysql\@$ENV{SYSTEMID}" if ! defined $id;
-  $dbname='CS_DB' if ! defined $dbname;
-
-  if ( ! defined $cs::DBI::_mydb{$id} )
-  { ::need(cs::Secret);
-    my $s = cs::Secret::get($id);
-    my $login = $s->Value(LOGIN);
-    my $password = $s->Value(PASSWORD);
-    my $host = $s->Value(HOST);	$host='mysql' if ! defined $host;
-    ## warn "$login\@$host: $password\n";
-
-    $cs::DBI::_mydb{$id}=DBI->connect("dbi:mysql:$dbname:$host",$login,$password);
-  }
-
-  ## $cs::DBI::_mydb{$id}->trace(1,"$ENV{HOME}/tmp/mydb.trace");
-
-  $cs::DBI::_mydb{$id};
-}
-
 =item isodate(I<gmt>)
 
 Return an ISO date string (B<I<yyyy>-I<mm>-I<dd>>)
@@ -448,24 +415,65 @@ sub datedRecords($$$$;$$)
 		@$D)
   ;
 
-  return
-      sort { my $sa = $a->{START_DATE};
-	     my $sb = $b->{START_DATE};
+  return sort cmpDatedRecords @d;
+}
 
-	     return $sa cmp $sb if $sa ne $sb;
+=item cmpDatedRecords()
 
-	     my $ea = $a->{END_DATE};
-	     my $eb = $b->{END_DATE};
+Compare for order the two dated records
+references by the global variables B<$a> and B<$b>,
+for use in B<sort>s.
 
-	     return 0 if $ea eq $eb;
+=cut
 
-	     # catch open ended ranges
-	     return 1 if ! length $eb;
-	     return -1 if ! length $ea;
+sub cmpDatedRecords
+{
+  my $sa = $a->{START_DATE};
+  my $sb = $b->{START_DATE};
 
-	     $ea cmp $eb;
-	   }
-      @d;
+  return $sa cmp $sb if $sa ne $sb;
+
+  my $ea = $a->{END_DATE};
+  my $eb = $b->{END_DATE};
+
+  return 0 if $ea eq $eb;
+
+  # catch open ended ranges
+  return 1 if ! length $eb;
+  return -1 if ! length $ea;
+
+  $ea cmp $eb;
+}
+
+=item datedRecordsBetween(I<dbh>,I<table>,I<start>,I<end>,I<keyfield>,I<key>
+
+Retrieve active records from the specified I<table>
+with the specified I<key> value
+whose dates overlap the period denoted by I<start> and I<end>.
+The (I<keyfield>, I<key>) pair is optional;
+if omitted, all records overlapping the period will be returned.
+
+The records are returned ordered from oldest to most recent.
+
+=cut
+
+sub datedRecordsBetween($$$$;$$)
+{ my($dbh,$table,$start,$end,$keyfield,$key)=@_;
+
+  my $all = defined $keyfield;
+
+  my $D = cs::DBI::arraytable($dbh,$table);
+
+  my @d = grep(defined $keyfield
+		? $_->{$keyfield} eq $key
+		: 1,
+	       grep( ! ( $_->{START_DATE} gt $end
+		      || (defined $_->{END_DATE} && $_->{END_DATE} lt $start)
+		       ),
+		     @$D))
+          ;
+
+  return sort cmpDatedRecords @d;
 }
 
 sub addDatedRecord
@@ -538,14 +546,22 @@ The default behaviour is to clean the entire table.
 sub cleanDates
 { my($dbh,$table,$keyfield,@keys)=@_;
 
-  my $sth = cs::DBI::query($dbh,"SELECT $keyfield FROM $table");
-  if (! defined $sth)
-  { warn "$::cmd: cleanDates($dbh,$table,$keyfield): can't make SQL statement handle";
-    return;
-  }
-
   if (! @keys)
-  { my $a = $sth->fetchall_arrayref();
+  {
+    my $sql = "SELECT $keyfield FROM $table";
+    my $sth = sql($dbh,$sql);
+    if (! defined $sth)
+    { warn "$::cmd: cleanDates($dbh,$table,$keyfield): can't make SQL statement handle";
+      return;
+    }
+
+    my $n = $sth->execute();
+    if (! defined $n)
+    { warn "$::cmd: execute($sql) fails";
+      return;
+    }
+
+    my $a = $sth->fetchall_arrayref();
     @keys = ::uniq(map($_->[0], @$a));
   }
 
@@ -577,7 +593,6 @@ sub cleanDates
 	{ $sql.='ISNULL(END_DATE)';
 	}
 
-	nl("$sql\n\t[@sqlargs]");
 	cs::DBI::dosql($dbh,$sql,@sqlargs);
       }
       elsif (! length $end || $end ge $prev_start)
@@ -595,7 +610,6 @@ sub cleanDates
 	  { $sql.='ISNULL(END_DATE)';
 	  }
 
-	  nl("$sql\n\t[@sqlargs]");
 	  cs::DBI::dosql($dbh,$sql,@sqlargs);
 	}
 	else
@@ -611,7 +625,6 @@ sub cleanDates
 	  { $sql.='ISNULL(END_DATE)';
 	  }
 
-	  nl("$sql\n\t[@sqlargs]");
 	  cs::DBI::dosql($dbh,$sql,@sqlargs);
 	}
       }
