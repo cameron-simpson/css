@@ -228,7 +228,10 @@ fi
 
 if [ $extract ]
 then
-  if mtype=`file2mime "$file"` \
+  mtype=`file2mime "$file"` || mtype=
+  [ "$mtype" = application/octet-stream ] && mtype=
+  [ -n "$mtype" ] || mtype=`ext2mime "$file"`
+  if [ -n "$mtype" ] \
   && action=`mailcap -s "$file" "$mtype" unpack !gui`
   then
       case "$file" in
