@@ -401,6 +401,8 @@ sub new
   $this;
 }
 
+sub DESTROY {}
+
 sub _HdrList(){ shift->{cs::RFC822::HDRLIST}; }
 sub _Hdrs(){ shift->{cs::RFC822::HDRS}; }
 sub _Synched(){ shift->{cs::RFC822::SYNCHED}; }
@@ -821,7 +823,7 @@ sub Addrs
 =item ForceMsgID()
 
 Generate and insert a B<Message-ID> field
-none is present.
+if none is present.
 
 =cut
 
