@@ -50,7 +50,7 @@ case "$1" in [1-5]) sev=$1; shift ;; esac
 	break
 	;;
       mailto:*)
-	buglog "new bug: $*"
+	BUGSYSTEMS=$bugsystem buglog "new bug: $*"
 	xit=$?
 	break
 	;;
