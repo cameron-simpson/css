@@ -150,6 +150,7 @@ while (<STDIN>)
     }
 
     $elapsed=time-$start;
+    $hb=cs::Units::bytes2human($bytes,1);
     $Bps=($elapsed > 0 ? cs::Units::bytes2human($bytes/$elapsed,1)."/s" : "");
     $line=sprintf("%7s %s",$Bps,"$d/$b");
 
@@ -158,7 +159,7 @@ while (<STDIN>)
 
     if (! defined($dir) || $dir ne $d)
     # new directory, emit
-    { nl(sprintf("%7s %s",$Bps,$d));
+    { nl(sprintf("%7s %s",$hb,$d));
       $dir=$d;
     }
 
