@@ -1,0 +1,8 @@
+#!/bin/sh
+
+article=$1; shift
+
+tmp=/tmp/trnrep.$$
+cp "$article" "$tmp" && ( vmrep "$tmp" & )
+
+m ${1+"$@"} -R "$article"
