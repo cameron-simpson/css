@@ -1,0 +1,18 @@
+#!/bin/sh
+#
+# Make 640x480 15 colour gzipped XPM image from a JPEG for use as grub splash backdrop.
+#	- Cameron Simpson <cs@zip.com.au> 15jul2002
+#
+
+cmd=$0
+usage="Usage: $cmd pathname.jpg >splash.xpm.gz"
+
+[ $# = 1 ] || { echo "$cmd: missing JPEG file name" >&2; echo "$usage" >&2; exit 2; }
+file=$1; shift
+case "$file" in /*) ;; *) file=./$file ;; esac
+
+djpeg -pnm "$file" \
+| pnmscale -xysize 640 480 \
+| fmogrify -colors 15 -despeckle \
+| ppmtoxpm \
+| gzip -9
