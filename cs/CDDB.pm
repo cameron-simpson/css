@@ -26,7 +26,7 @@ use strict qw(vars);
 use cs::Misc;
 use cs::Pathname;
 
-BEGIN { use cs::DEBUG; cs::DEBUG::using(__FILE__); }
+##BEGIN { use cs::DEBUG; cs::DEBUG::using(__FILE__); }
 
 package cs::CDDB;
 
