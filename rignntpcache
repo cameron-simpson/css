@@ -2,8 +2,8 @@
 
 cmd=$0
 
-[ "x$HOST" = xzapff -o "x$HOST" = xamadeus ] \
-	|| { echo "$cmd: not on zapff or amadeus, bailing" >&2; exit 1; }
+needhost kaper amadeus \
+	|| { echo "$cmd: not on kaper or amadeus, bailing" >&2; exit 1; }
 
 PATH=/opt/nntpcache/sbin:/opt/nntpcache/bin:$PATH; export PATH
 
