@@ -40,4 +40,4 @@ case $1 in
 	;;
 esac
 
-set-x acon vncviewer -passwd $HOME/rc/vnc/passwd -shared ${1+"$@"} "$vncdisp"
+set-x vncviewer -passwd $HOME/rc/vnc/passwd -shared ${1+"$@"} "$vncdisp"
