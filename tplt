@@ -32,6 +32,7 @@ esac
 DATESTR=`date|awk '{print $3 $2 $6}'|tr '[A-Z]' '[a-z]'`
 
 [ -n "$MYKEtarget" ] \
+	|| [ ! -s Mykefile ] \
 	|| MYKEtarget=`sed -n 's/^target.*= *\([^ ]*\).*/\1/p' Mykefile`
 
 export FILE BASE PFX FILEDIR FILEPATH DIRBASE DATESTR MYKEtarget
