@@ -28,7 +28,7 @@ I build my B<.procmailrc> like this:
 
 	cats2procmailrc \
 		-a 'announce-email "+%"' \
-		-t mh -L \
+		-t maildir -L \
 		-m cskk.homeip.net \
 		<categories >$HOME/.procmailrc
 
