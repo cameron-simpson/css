@@ -1,0 +1,73 @@
+#!/bin/sh
+#
+# Convert HTML to printable stuff.
+#	- Cameron Simpson <cs@zip.com.au> 21oct94
+#
+
+cmd=`basename "$0"`
+
+in=html
+out=mm
+case "$cmd" in
+    *2*)  i=`exec expr "x$cmd" : 'x\(.*\)2.*'`
+	  o=`exec expr "x$cmd" : 'x.*2\(.*\)'`
+	  case "$i" in
+	      html|url)	in=$i ;;
+	  esac
+	  case "$o" in
+	      mm|ps|txt)out=$o ;;
+	  esac
+	  ;;
+esac
+
+usage="Usage: $cmd [-i iformat] [-o oformat] [url|pathname]...
+	-i iformat	Specify input format (default: $in).
+	-o oformat	Specify output format (default: $out)."
+
+badopts=
+htargs=
+Larg=	# -rL67
+bflag=
+while :
+do  case "$1" in
+	-i)	in=$2; shift ;;
+	-o)	out=$2; shift ;;
+	-b)	bflag=$1 ;;
+	-na)	htargs="$htargs $1" ;;
+	-u)	htargs="$htargs $1 '$2'"; shift ;;
+	-L)	Larg=-rL$2; shift ;;
+	-rL*)	Larg=$1 ;;
+	--)	shift; break ;;
+	-?*)	echo "$cmd: $1: unrecognised option" >&2
+		badopts=1
+		;;
+	*)	break ;;
+    esac
+    shift
+done
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+[ $# = 0 ] && { set x -; shift; }
+
+xit=0
+for arg
+do  url=
+    case "$arg" in
+	-)		input='' ;;
+	http://*)	input='httpget -o - $arg |'
+			html2mm_args='-u "$arg"'
+			;;
+	*)		input='< "$arg"' ;;
+    esac
+
+    case "$out" in
+	mm)	post='' ;;
+	txt)	post='| nroff -mm $Larg -rO0 -rW78 | col $bflag' ;;
+	ps)	post='| troff -Tpost -mm' ;; #	post='| groff -Tps -mm' ;;
+    esac
+
+    eval "$input html2mm $htargs $html2mm_args | tbl $post" || xit=$?
+done
+
+exit $xit
