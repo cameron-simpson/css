@@ -92,8 +92,8 @@ while (defined($_=<STDIN>))
       my $dx = length($txt)*$fwidth;
       my $dy = $fheight;
 
-      ## $im->filledRectangle($x-1,$y-1,$x+$dx+1,$y+$dy+1,$bg);
-      $im->string($font,$x,$y,$txt,$fg);
+      ## $im->filledRectangle($x-1,$y-$dy-1,$x+$dx+1,$y+1,$bg);
+      $im->string($font,$x,$y-$dy,$txt,$fg);
     }
   }
   elsif ($op eq CENTRE)
