@@ -1,0 +1,3 @@
+#!/bin/sh
+
+exec keeplast -1 ${1+"$@"}
