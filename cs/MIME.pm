@@ -24,6 +24,7 @@ use cs::MIME;
 
 This module implements methods
 for dealing with MIME data.
+It is a subclass of the cs::RFC822(3) module.
 
 =cut
 
@@ -34,6 +35,7 @@ BEGIN { use cs::DEBUG; cs::DEBUG::using(__FILE__); }
 use cs::ALL;
 use cs::RFC822;
 use cs::Source;
+use cs::Sink;
 use cs::SubSource;
 use cs::CacheSource;
 use cs::MIME::Base64;
@@ -148,7 +150,7 @@ sub decodedSource($$;$)
     $s=new cs::MIME::QuotedPrintable (Decode, $s, $isText);
   }
   else
-  { warn "can't decode Content-Transfer-Encoding \"$cte\"";
+  { warn "$0: cs::MIME::decodedSource: can't decode Content-Transfer-Encoding \"$cte\"";
     return undef;
   }
 
@@ -197,9 +199,32 @@ sub new($;$$)
   $this;
 }
 
+sub DESTROY
+{ my($this)=@_;
+
+  if (! ref $this->{cs::MIME::BODY} && ! $this->{cs::MIME::BODY_KEEP})
+  { unlink($this->{cs::MIME::BODY})
+	|| warn "$0: cs::MIME::DESTROY: unlink($this->{cs::MIME::BODY}): $!";
+  }
+
+  $this->SUPER::DESTROY();
+}
+
 sub _TypeParams($) { shift->{cs::MIME::TYPEPARAMS}; }
 sub _Cte($) { shift->{cs::MIME::CTE}; }
-sub _Body($) { shift->{cs::MIME::BODY}; }
+
+# return a cs::Source attached to the undecoded body
+sub _BodySource($)
+{ my($this)=@_;
+
+  my $_body = $this->{cs::MIME::BODY};
+  if (ref $_body)
+  { my $copy = $$_body;
+    return new cs::Source(SCALAR,\$copy);
+  }
+
+  return new cs::Source(PATH,$_body);
+}
 
 =back
 
@@ -277,9 +302,10 @@ The default is to ignore it.
 
 =cut
 
-sub UseSource($$;$)
-{ my($this,$s,$usecsize)=@_;
+sub UseSource($$;$$$)
+{ my($this,$s,$usecsize,$sinkfile,$keepsink)=@_;
   $usecsize=0 if ! defined $usecsize;
+  $keepsink=0 if ! defined $keepsink;
 
   $s=new cs::Source (PATH, $s) if ! ref $s;
   return undef if ! defined $s;
@@ -300,7 +326,35 @@ sub UseSource($$;$)
   # this way original stream is at a well defined spot
   # (just past the message) regardless of whether the
   # caller asks for the body
-  $this->{cs::MIME::BODY}=$s->Get();
+  my $scalar;
+  
+  { my $sink;
+
+    if (defined $sinkfile)
+    { $sink = new cs::Sink(PATH,$sinkfile);
+      die "$0: cs::MIME::UseSource(sinkfile=\"$sinkfile\"): can't open: $!"
+	  if ! defined $sink;
+    }
+    else
+    { $scalar = '';
+      $sink = new cs::Sink(SCALAR,\$scalar);
+    }
+
+    local($_);
+
+    while (defined($_=$s->Read()) && length)
+    { $sink->Put($_);
+    }
+  }
+
+  if (defined $sinkfile)
+  { $this->{cs::MIME::BODY}=$sinkfile;
+    $this->{cs::MIME::BODY_KEEP}=$keepsink;
+  }
+  else
+  { $this->{cs::MIME::BODY}=\$scalar;
+  }
+
 }
 
 =item Body(I<decoded>,I<istext>)
@@ -316,12 +370,7 @@ sub Body($;$)
 { my($this,$decoded)=@_;
   $decoded=0 if ! defined $decoded;
 
-  return $this->_Body() if ! $decoded;
-
-  my $s = $this->BodySource($decoded);
-  return undef if ! defined $s;
-
-  $s->Get();
+  $this->BodySource($decoded)->Get();
 }
 
 =item BodySource(I<decoded>,I<istext>)
@@ -337,11 +386,12 @@ sub BodySource($;$$)
 { my($this,$decoded)=(shift,shift);
   $decoded=0 if ! defined $decoded;
 
-  my $s = new cs::Source (SCALAR, $this->Body());
-  return undef if ! defined $s;
+  my $s = $this->_BodySource();
   return $s if ! $decoded;
 
-  decodedSource($s,$this->_Cte(),@_);
+  return undef if ! defined $s;
+
+  return decodedSource($s,$this->_Cte(),@_);
 }
 
 =item ContentType(I<noparams>)
