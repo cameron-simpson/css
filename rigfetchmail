@@ -11,7 +11,7 @@ set -x
 cd
 ( fmopts=
   fmdelay=300
-  fmhosts='127.0.0.2 127.0.0.3'
+  fmhosts='optus.local zip.local'
   case "$LOCATION" in
     home|sco|tw)
 	fmopts="$fmopts -l 65536" fmdelay=3600 ;;
