@@ -1,0 +1,69 @@
+#!/bin/sh
+#
+# Handler for email delivered to mailman.
+# Invoked from procmail.
+#   mailman		-> postmaster
+#   mailman-list	-> wrapper post list
+#   mailman-list-admin	-> wrapper mailowner list
+#   mailman-list-request-> wrapper mailcmd list
+#   mailman-list-owner	-> mailman-list-admin
+#	- Cameron Simpson <cs@zip.com.au> 16may2001
+#
+
+PATH=$PATH:/opt/script
+export PATH
+
+date
+
+wrapper=/opt/mailman/mail/wrapper
+
+PATH=/bin:/usr/bin:/usr/sbin:/opt/script:$PATH
+export PATH
+
+tmp=/tmp/mmprcm$$
+
+cat >$tmp || exit 1
+
+xit=0
+
+<$tmp \
+sed -n -e '/^$/q' -e 's/@.*//' -e 's/^Delivered-To: *//p' \
+| sed 1q \
+| { read delivery || exit 1
+
+    wrapfor=
+
+    case "$delivery" in
+	mailman)
+		sendmail -oi cameron <$tmp; xit=$?
+		;;
+	mailman+*-owner | mailman+*-admin )
+		list=`expr "$delivery" : 'mailman+\(.*\)-.*'`
+		wrapfor=mailowner
+		;;
+	mailman+*-request )
+		list=`expr "$delivery" : 'mailman+\(.*\)-.*'`
+		wrapfor=mailcmd
+		;;
+	mailman+* )
+		list=`expr "$delivery" : 'mailman+\(.*\)'`
+		wrapfor=post
+		;;
+	*)	echo "$0: don't known what to do with email for \"$delivery\"" >&2
+		cat $tmp >&2
+		xit=1
+		;;
+    esac
+
+    ## echo "delivery=[$delivery] wrapfor=[$wrapfor] list=[$list]" >>/tmp/mm.log
+    
+    if [ -n "$wrapfor" ]
+    then
+	case "$list" in *-list) list=`expr "x$List" : 'x\(.*\)-list'` ;; esac
+	"$wrapper" "$wrapfor" "$list" <$tmp; xit=$?
+    fi
+
+    rm -f $tmp
+
+    exit $xit
+  }
