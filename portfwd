@@ -42,8 +42,10 @@ do  case "$fwd" in
 	    ;;
 	work2zip)
 	    echo "work2zip..."
-	    vpnssh $vflag -t 60 -i vpn_dsa-work2zip zip \
+	    vpnssh $vflag -t 60 -i vpn_dsa-cisra2zip zip \
 		   -L 8081:localhost:8081 \
+		   -L 9875:203.17.198.110:9875 \
+		   -L 9876:203.17.198.107:9875 \
 		   -L 2119:news:119 \
 		   -L 2025:mail:25 \
 		   -L 2080:proxy:8080 \
