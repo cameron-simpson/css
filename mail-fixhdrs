@@ -1,0 +1,15 @@
+#!/bin/sed -f
+#
+# Fix some fuckups by egroups.com's digest maker.
+#	- Cameron Simpson <cs@zip.com.au> 10jan2002
+#
+
+:top
+/^$/b body
+s/^  *\([A-Za-z][A-Za-z]*\):  */\1: /
+n
+b top
+
+:body
+n
+b body
