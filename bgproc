@@ -27,8 +27,8 @@ usage="Usage: $cmd [-i input] [-l logfile] [-p pidfile] [-s] command [args...]
 			\"-\" means don't change stdout or stderr.
 			Default, from \$CONSOLE: $logfile
 	-p pidfile	File to hold process id.
-			\"-\" means don't save the pid to a file.
-			Default: \$VARRUN/command@\$HOST
+			\"-\" means write the pid to stdout.
+			\"\" means write the pid file to \$VARRUN/command@\$HOST
 	-s		Synchronous - wait for the process to terminate.
 			Default: asynchronous."
 
@@ -87,7 +87,8 @@ pid=$!
 # close input just in case
 exec <&-
 
-( [ "x$pidfile" = x- ] || echo "$pid" >"$pidfile"
+( [ "x$pidfile" = x- ] || exec >"$pidfile"
+  echo "$pid"
 )
 
 [ $async ] || wait
