@@ -59,6 +59,9 @@ done 3>&1 1>&4 4>&- \
 	    | ( hit=
 		while read gurl
 		do  xvurl -f "$gurl" >/dev/null &
+		    ( cd $HOME/4h/im/comics || exit 1
+		      exec httpget "$gurl"
+		    ) &
 		    echo "$gurl" >&2
 		    hit=1
 		done
