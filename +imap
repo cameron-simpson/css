@@ -1,0 +1,14 @@
+#!/bin/sh
+#
+# Connect to my IMAP folder.
+#	- Cameron Simpson <cs@zip.com.au> 09sep2003
+#
+
+server=mail.zipworld.com.au
+
+eval `fetchmailclause -f $HOME/rc/mail/fetchmail "$server" | sed 's/^\([^ ][^ ]*\) /fm_\1=/'`
+
+exec + \
+	-e "set imap_force_ssl=no" \
+	-e "set imap_pass=\"$fm_pass\"" \
+	imap://$fm_user@$server/INBOX
