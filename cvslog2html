@@ -93,11 +93,11 @@ while (defined ($_=<STDIN>))
     }
   }
   else
-  { if (/^date:\s+(\d\d\d\d\/\d\d\/\d\d)\s+(\d\d:\d\d:\d\d);\s+author:\s+(\w+);/)
+  { if (/^date:\s+(\d\d\d\d)\/(\d\d)\/(\d\d)\s+(\d\d:\d\d:\d\d);\s+author:\s+(\w+);/)
     { $incomment=1;
-      $day=$1;
-      $time=$2;
-      $author=$3;
+      $day="$1-$2-$3";
+      $time=$4;
+      $author=$5;
       @comment=();
     }
   }
