@@ -2,4 +2,4 @@
 
 xine=/opt/xine/bin/xine
 
-exec set-x "$xine" -A null ${1+"$@"}
+exec set-x "$xine" ${1+"$@"}
