@@ -1,0 +1,106 @@
+#!/bin/sh
+#
+# Do a remote conform.	- Cameron Simpson, 11nov93
+#
+
+cmd=`basename "$0"`
+cfhost=ARCH
+cfhome=/var/conform
+usage="Usage: $cmd [-options...] [-cfarg]... [/dir]... [--] hosts...
+	-a	Run remote shells asynchronously.
+	-apollo	Run for an Apollo.
+	-h	Host with supporting cfd (default: $cfhost).
+	-H	Home tree for conform cache (default: $cfhome).
+	-v	Verbose. Passed to conform. Implies -x.
+	-x	Trace execution. Prints command as invoked on remote host.
+	-xref	Generate a cross-reference.
+	-cfarg	Any conform argument.
+	/dir	Restrict conform to just conforming the named subtree."
+
+async=
+cf=/usr/local/etc/conform
+cfargs=
+cfdirs=
+rsh=$BIN/rsh	# my rsh doesn't do so well if not me
+rhosts=
+verbose=
+setx=:
+badopts=
+while :
+do
+    case $1 in
+	-\?)	badopts=1 ;;
+	-a)	async=1 ;;
+	-apollo)cfargs="$cfargs -DOMAIN"; cfhome=//white/install/local ;;
+	-v)	verbose=1 cfargs="$cfargs $1" setx='set -x' ;;
+	-x)	setx='set -x' ;;
+	-xref)	cfargs="$cfargs -x" ;;
+	-h)	cfhost=$2; shift ;;
+	-H)	cfhome=$2; shift ;;
+	--)	shift; break ;;
+	-DONLY=*) cfargs="$cfargs -O '$1'" ;;	# in case I forget
+	-*)	cfargs="$cfargs '$1'" ;;
+	/*)	cfdirs="$cfdirs '$1'" ;;
+	[a-z]*.[a-z]*) cfargs="$cfargs -O '-DONLY=$1'" ;;
+	'')	[ $# = 0 ] && break ;;
+	*)	rhost=$1; shift
+		case $rhost in
+		    suns)	set x bach crwth clavier harmonica voice \
+					harp ${1+"$@"}
+				;;
+		    decs)	set x bin composer conductor albeniz dvorak \
+					elgar castanet banjo \
+					oboe tuba flute cello ${1+"$@"} ;;
+		    harp|cello|oboe|tuba|flute|boat|consult|sanctum|ee3|ai|servers|thesis)
+				set x `labhosts $rhost` ${1+"$@"} ;;
+		    *)		rhosts="$rhosts $rhost"
+				set x ${1+"$@"}
+				;;
+		esac
+		;;
+    esac
+    shift
+done
+
+[ $# = 0 ] || { echo "$cmd: extra arguments: $*" >&2
+		badopts=1
+	      }
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+rshcmd="cfhost='$cfhost'
+      "'ARCH=`cat /usr/local/etc/ARCH`; export ARCH
+	case "$cfhost,$ARCH" in
+	    ARCH,dec.mips.ultrix)	cfhost=albeniz ;;
+	    ARCH,sgi.mips.irix)		cfhost=karri ;;
+	    ARCH,apollo.m68k.domainos)	cfhost=white ;;
+	    ARCH,sun.sparc.solaris)	cfhost=bach ;;
+	    ARCH,*)			echo "can'\''t deduce cfd server for ARCH=$ARCH" >&2; exit 1 ;;
+	esac
+	'"
+	$setx; exec $cf -h \"\$cfhost\" -H '$cfhome' $cfargs $cfdirs"
+
+xit=0
+for host in $rhosts
+do
+    sedcmd=
+    [ $verbose ] || sedcmd="/^[ 	]*$/d
+			    /^-/b keep
+			    /^[<>+]/b keep
+			    d
+			    :keep
+			    $sedcmd"
+    sedcmd="$sedcmd
+	    s/^/$host: /"
+    if [ $async ]
+    then
+	necho "$host "
+	( $rsh "$host" "$rshcmd" 2>&1 | sed "$sedcmd" & )
+    else
+	echo "$host ..."
+	( set -x; exec $rsh "$host" "$rshcmd"; ) 2>&1 | sed "$sedcmd"
+    fi
+done
+echo
+
+exit $xit
