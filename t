@@ -48,10 +48,7 @@ case "$cmd" in
 	;;
 esac
 
-pageit=
-## [ -t 1 ] && pageit=1
-
-toc_obj='nm'
+toc_obj='pageif nm'
 extract_obj=
 view_obj=$toc_ar
 
@@ -59,37 +56,37 @@ toc_pdf=
 extract_pdf=
 view_pdf='xpdf /dev/fd/0'
 
-toc_ar='ar t${vlet}'
+toc_ar='pageif ar t${vlet}'
 extract_ar='ar x${vlet}'
 view_ar=$toc_ar
 
-toc_cpio='cpio -ic${vlet}t'
+toc_cpio='pageif cpio -ic${vlet}t'
 extract_cpio='cpio -icd${vlet}m'
 view_cpio=$toc_cpio
 
-toc_tar='tar t${vlet}f -'
+toc_tar='pageif tar t${vlet}f -'
 extract_tar=untar	# or use 'tar xvf -'
 view_tar=$toc_tar
 
-toc_jar='jar t${vlet}f /dev/fd/0'
+toc_jar='pageif jar t${vlet}f /dev/fd/0'
 extract_jar='jar x${vlet}f /dev/fd/0'
 view_jar=$toc_jar
 
-toc_ogg='ogginfo /dev/fd/0'
+toc_ogg='pageif ogginfo /dev/fd/0'
 
 toc_uu="egrep $formopts '^(begin|end) '"
 extract_uu='uudecode $formopts /dev/fd/0'
 view_uu=$toc_uu
 
-toc_lzh='xlharc v $formopts'
+toc_lzh='pageif xlharc v $formopts'
 extract_lzh='xlharc x $formopts'
 view_lzh=$toc_lzh
 
-toc_zip='unzip -l $formopts /dev/fd/0'
+toc_zip='pageif unzip -l $formopts /dev/fd/0'
 extract_zip='unzip -d . $formopts /dev/fd/0'
 view_zip=$toc_zip
 
-toc_rpm='rpm $verb -q -p /dev/fd/0 -i -R --provides -l $formopts'
+toc_rpm='pageif rpm $verb -q -p /dev/fd/0 -i -R --provides -l $formopts'
 extract_rpm='rpm -U $verb -h $formopts /dev/fd/0'
 view_rpm=$toc_rpm
 
@@ -115,9 +112,9 @@ view_rcp='pilrcui $formopts /dev/fd/0'
 
 view_vrml='gtklookat /dev/fd/0'
 
-toc_swf='swfdump -a -t /dev/fd/0'
+toc_swf='pageif swfdump -a -t /dev/fd/0'
 
-view_html='w3m -dump -T text/html /dev/fd/0'
+view_html='pageif w3m -dump -T text/html /dev/fd/0'
 
 xit=0
 
@@ -217,20 +214,18 @@ do  [ $abort ] && exit 1
 
       if [ -z "$format" ]
       then
-	  echo "$cmd: $f: unrecognised format" >&2
-	  exit 1
-      fi
-
-      eval "formatfilter=\$${mode}_$format"
-      if [ -z "$formatfilter" ]
-      then
-	  echo "$cmd: $f: don't know how to $mode format $format" >&2
-	  exit 1
+	  echo "$cmd: $f: unrecognised format, using pageif" >&2
+	  formatfilter=pageif
       else
-	  pipe="$pipe$pipeext $formatfilter $fargs"
+	  eval "formatfilter=\$${mode}_$format"
+	  if [ -z "$formatfilter" ]
+	  then
+	      echo "$cmd: $f: don't know how to $mode format $format, using pageif" >&2
+	      formatfilter=pageif
+	  fi
       fi
 
-      [ $pageit ] && pipe="$pipe | less -E"
+      pipe="$pipe$pipeext $formatfilter $fargs"
 
       eval "$trace; $pipe"
     ) || xit=1
