@@ -12,7 +12,7 @@ cs::DBI::Table::Hash - treat an indexed DBI table as a hash
 
 use cs::DBI::Table::Hash;
 
-tie %h, I<dbh>, I<table>, I<keyfield>;
+tie %h, I<dbh>, I<table>, I<keyfield>, I<where>;
 
 =head1 DESCRIPTION
 
@@ -36,13 +36,28 @@ require Exporter;
 
 @cs::DBI::Table::Hash::ISA=qw(cs::HASH);
 
-sub TIEHASH($$$$)
-{ my($class,$dbh,$table,$keyfield)=@_;
+=head1 OBJECT ATTACHMENT
+
+=over 4
+
+=item tie I<hash>, B<cs::DBI::Table::Hash>, I<dbh>, I<table>, I<keyfield>, I<where>
+
+Attach I<hash> to the I<table> in database I<dbh> with field I<keyfield>
+as the hash index.
+If I<where> is supplied is must be an SQL select...where condition
+to constrain the records to which I<hash> now applies.
+
+=cut
+
+sub TIEHASH($$$$;$)
+{ my($class,$dbh,$table,$keyfield,$where)=@_;
+  $where = '' if ! defined $where;
 
   bless { DBH => $dbh,
 	  TABLE => $table,
 	  LIVE => {},
 	  KEY => $keyfield,
+	  WHERE => $where,
 	}, $class;
 }
 
@@ -52,7 +67,9 @@ sub KEYS($)
   my $dbh = $this->{DBH};
 
   my $sql = "SELECT $this->{KEY} FROM $this->{TABLE}";
+  $sql.=" WHERE $this->{WHERE}" if length $this->{WHERE};
   ## warn "SQL is [$sql]";
+
   my $sth = cs::DBI::sql($this->{DBH},$sql);
   if (! defined $sth)
   { warn "$0: can't look up keys from $this->{TABLE}";
@@ -77,8 +94,13 @@ sub FETCH($$)
   return $this->{LIVE}->{$key}
   if exists $this->{LIVE}->{$key};
 
-  my @rows = cs::DBI::find($this->{DBH},$this->{TABLE},$this->{KEY},$key);
+  my $sql = 'SELECT * from $this->{TABLE} WHERE $this->{KEY} = ?';
+  $sql.=" AND $this->{WHERE}" if length $this->{WHERE};
 
+  my $sth = cs::DBI::sql($this->{DBH},$sql);
+  return undef if ! defined $sth;
+
+  my @rows = cs::DBI::fetchall_hashref($sth,$key);
   return undef if ! @rows;
 
   warn "$0: FETCH($this->{TABLE},$key): multiple hits!"
@@ -115,7 +137,10 @@ sub DELETE($$)
 { my($this,$key)=@_;
 
   # purge old records
-  cs::DBI::dosql($this->{DBH},"DELETE FROM $this->{TABLE} WHERE $this->{KEY} = ?", $key);
+  my $sql = "DELETE FROM $this->{TABLE} WHERE $this->{KEY} = ?";
+  $sql.=" AND $this->{WHERE}" if length $this->{WHERE};
+
+  cs::DBI::dosql($this->{DBH},$sql,$key);
 
   delete $this->{LIVE}->{$key};
 }
