@@ -139,7 +139,7 @@ The default is 512 bytes.
 
   # for each size
   SIZE:
-  for my $sz (sort { $a <=> $b; } keys %::SizedFiles)
+  for my $sz (sort { $b <=> $a; } keys %::SizedFiles)
   { out($sz);
 
     next SIZE if @{$::SizedFiles{$sz}} < 2;
