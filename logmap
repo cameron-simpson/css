@@ -1,0 +1,72 @@
+#!/usr/bin/perl
+#
+# Manipulate the log map.
+#	- Cameron Simpson <cs@zip.com.au>, 21jul94
+#
+
+use strict qw(vars);
+
+use cs::LogMap;
+
+($::cmd=$0) =~ s:.*/::;
+$::usage="Usage: $::cmd {-s logical logspec|[logical...]}
+	-s logical logspec	Map logical to logspec.
+	logical...		Print mappings for logical...
+";
+$::Xit=0;
+$::Tty = -t STDOUT;
+
+$::Xit=main(@ARGV);
+
+cs::LogMap::finish();
+
+exit $::Xit;
+
+sub main
+{ my(@ARGV)=@_;
+
+  my($db)=new cs::LogMap;
+
+  my($badopts)=0;
+
+  my($printmap)=0;
+  my($logical,$logspec);
+
+  if (@ARGV && $ARGV[0] eq '-s')
+  { shift(@ARGV);
+    if (! defined ($logical=shift(@ARGV))
+     || ! defined ($logspec=shift(@ARGV)))
+    { warn "$::cmd: missing arguments for -s\n";
+      $badopts=1;
+    }
+    elsif (@ARGV)
+    { warn "$::cmd: extra arguments: @ARGV\n";
+      $badopts=1;
+    }
+    else
+    {
+      (tied %$db)->SetReadWrite(1);
+      $db->{$logical}=$logspec;
+      return;
+    }
+  }
+  else
+  { $printmap=1;
+  }
+
+  die $::usage if $badopts;
+
+  return unless $printmap;
+
+  my(@keys)=(@ARGV ? @ARGV : sort keys %$db);
+
+  for (@keys)
+  { if (@keys > 1)
+    { print $_, ' -> ';
+    }
+
+    print $db->{$_}, "\n";
+  }
+
+  undef $db;
+}
