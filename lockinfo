@@ -1,0 +1,19 @@
+#!/bin/sh
+#
+# Report info on the named lock(s), or all locks.
+#	- Cameron Simpson <cs@zip.com.au> 27may2002
+#
+
+LOCKDIR=${LOCKDIR:=$HOME/var/locks}
+export LOCKDIR
+
+cd "$LOCKDIR" || exit 1
+
+[ $# = 0 ] && { set x *; shift; }
+
+xit=0
+for lock
+do  grep . "$lock"/* /dev/null || xit=1
+done
+
+exit $xit
