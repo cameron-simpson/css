@@ -5,8 +5,8 @@ needhost amadeus@home || exit 1
 [ $# = 0 ] || exec syncstuff @newt "$@"
 
 pfx small syncsmall @newt &
-for d in s im cvs
-do  pfx $d syncstuff @newt $d &
+for d in s cvs ## mail im
+do  pfx $d syncstuff @newt there/cameron@cskk.homeip.net/$d &
 done
 
 wait
