@@ -1,6 +1,6 @@
 #!/bin/sh
 : ${LOGDIR:=$HOME/var/log}
-[ $# = 1 ] || { echyo "Usage: $0 keyword" >&2; exit 2; }
+[ $# = 1 ] || { echo "Usage: $0 keyword" >&2; exit 2; }
 ring -f $LOGDIR/dlog "$1" \
 | sed -n "h
 	  /^[^ 	]/b ok
