@@ -1,0 +1,64 @@
+#!/usr/bin/perl
+#
+# Report the specified fields from entries in an idset.
+# This is really a speed thing for scripts wanting several attributes from several entries.
+# See fvwm-menu-jobs and joblist for example use.
+#	- Cameron Simpson <cs@zip.com.au> 14jul2003
+#
+
+use strict qw(vars);
+
+($::cmd=$0) =~ s:.*/::;
+$::Usage="Usage: $::cmd idsetdir fields...
+	-d idsetdir	Specify the directory holding the idset.
+";
+
+if (! @ARGV)
+{ warn "$::cmd: missing idsetdir\n";
+  die $::Usage;
+}
+$::Dir=shift(@ARGV);
+
+if (! @ARGV)
+{ warn "$::cmd: missing fields\n";
+  die $::Usage;
+}
+
+-d "$::Dir/." || die "$::cmd: no such dir: $::Dir\n";
+
+my @ids;
+die "$::cmd: opendir($::Dir): $!\n" if !opendir(DIR,$::Dir);
+@ids=sort { $a <=> $b } grep(/^\d+$/, readdir(DIR));
+closedir(DIR);
+
+ID:
+for my $id (@ids)
+{
+  print $id;
+
+  for my $field (@ARGV)
+  { my $file = "$::Dir/$id/$field";
+    if (! -e $file)
+    { $_='';
+    }
+    elsif (open(FILE, "< $::Dir/$id/$field\0"))
+    { my $value='';
+      while (defined($_=<FILE>))
+      { chomp;
+	s/\t/\\t/g;
+	s/\r?\n/\\n/g;
+	$value=$_;
+      }
+      close(FILE);
+      $_=$value;
+    }
+    else
+    { warn "$::cmd: open($file): $!\n";
+      $_='?';
+    }
+
+    print "\t", $_;
+  }
+
+  print "\n";
+}
