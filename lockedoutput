@@ -1,0 +1,21 @@
+#!/bin/sh
+#
+# Sequenced output. Used for shell loop parallelising, viz:
+#
+#	for n in a b c ...
+#	do  lockedoutput lockname command &
+#	done | something
+#
+# Runs "command" and takes lock when output commences so that
+# the command outputs are not damaged through interleaving.
+#	- Cameron Simpson <cs@zip.com.au> 25jul2000
+#
+
+[ $# -gt 1 ] || { echo "Usage: $0 lockname command args..." >&2; exit 2; }
+
+lock=$1; shift
+
+"$@" \
+| { read line1 || exit 0
+    LINE1=$line1 exec lock "$lock" sh -c 'echo "$LINE1"; exec cat'
+  }
