@@ -230,7 +230,7 @@ sub byAlias($)
   for my $id (keys %$H)
   { my $R=$H->{$id};
     if (grep($_ eq $alias, @{$R->{ALIASES}}))
-    { $R=byId($id);
+    { $R=byID($id);
       return $R if ! wantarray;
       push(@r,bless $R);
     }
