@@ -9,8 +9,8 @@ cmd=$0
 LINKPAGEPATH=${LINKPAGEPATH:-$HOME/.linkpages}
 export LINKPAGEPATH
 
-verbose=
-[ -t 0 ] && verbose=1
+verbose=1
+##[ -t 0 ] && verbose=1
 
 usage="Usage: $cmd [-d dir] [topic] [urls...]"
 
@@ -33,7 +33,13 @@ then
 fi
 
 if [ $# = 0 ]
-then [ -n "$DISPLAY" ] && { set x `xunclip`; shift; }
+then
+  if [ -t 0 ]
+  then
+      [ -n "$DISPLAY" ] && { set x `xunclip`; shift; }
+  else
+      set x `cat`; shift
+  fi
 fi
 [ $# = 0 ] && { echo "$cmd: no URLs and no X clipboard" >&2
 		badopts=1
