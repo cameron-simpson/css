@@ -6,11 +6,12 @@
 #
 
 use strict qw(vars);
-
 use Getopt::Std;
+sub loadfrom($);
+sub offset2index($);
 
 ($::cmd=$0) =~ s:.*/::;
-$::Usage="Usage: $::cmd [-owt] [-x lx] [-y ly] [-n nitems] [words...] <imlist
+$::Usage="Usage: $::cmd [-p path] [-owt] [-x lx] [-y ly] [-n nitems] [words...] <imlist
 	-o	OR words instead of ANDing them.
 	-w	Choose wide (landscape) pictures.
 	-t	Choose tall (portrait) pictures.
@@ -20,6 +21,7 @@ $::Usage="Usage: $::cmd [-owt] [-x lx] [-y ly] [-n nitems] [words...] <imlist
 	-y ly	Choose pictures ly pixels or more high.
 ";
 
+@::IMPath=();
 $::DoStat=0;
 $::AndWords=1;
 $::PickN=1;
@@ -30,11 +32,12 @@ undef $::Aspect;
 { my $badopts=0;
   my %opt;
 
-  if (! getopts('wtsx:y:n:',\%opt))
+  if (! getopts('wtsx:y:n:p:',\%opt))
   { warn "$::cmd: bad options\n";
     $badopts=1;
   }
 
+  if ($opt{'p'})		{ @::IMPath=grep(length,split(/:+/,$opt{'p'})); }
   if ($opt{'t'})		{ $::Aspect=PORTRAIT; }
   if ($opt{'w'})		{ $::Aspect=LANDSCAPE; }
   if ($opt{'s'})		{ $::DoStat=1; }
@@ -57,58 +60,56 @@ $::MinY=1 if $::MinY < 1;
 my $offset=0.0;
 my $nimages=0;
 
-IM:
-while (<STDIN>)
+@::IMPath=('-') if ! @::IMPath;
+
+$::Xit=0;
+
+SEARCH:
+for my $search (@::IMPath)
 {
-  chomp;
-  if (! /^\s*(\d+)\s+(\d+)\s+(\S.*)/)
-  { warn "$::cmd: stdin, line $.: bad data: $_\n";
-    next IM;
-  }
-
-  my ($dx,$dy,$impath)=($1,$2,$3);
-
-  # skip small images
-  next IM if $dx < $::MinX;
-  next IM if $dy < $::MinY;
-
-  # skip images that are the wrong shape
-  next IM if defined $::Aspect
-	  && (   ( $::Aspect eq PORTRAIT && $dx > $dy )
-	      || ( $::Aspect eq LANDSCAPE && $dy > $dx )
-	     );
-
-  # skip !words
-  REJECT:
-  for my $re (@::NotWords)
-  { next IM if $impath =~ $re;
-  }
-
-  # skip if missing required words
-  if ($::AndWords)
-  { TRY_AND:
-    for my $re (@::Words)
-    { next IM if $impath !~ $re;
+  if ($search eq '-')
+  { if (-t 0)
+    { warn "$::cmd: stdin may not be a tty\n";
+      $::Xit=1;
+      next SEARCH;
     }
+
+    undef $::Context;
+    loadfrom(STDIN);
   }
-  else
-  { my $ok=0;
-    TRY_OR:
-    for my $re (@::Words)
-    { if ($impath =~ $re)
-      { $ok=1;
-	last TRY_OR;
+  elsif (stat($search))
+  { if (-f _)
+    { $::Context=cs::Pathname::dirname($search);
+      if (! open(SEARCH,
+		 ( $search =~ /\.gz$/
+		   ? "gunzip <'$search' |"
+		   : "< $search\0"
+		 )))
+      { warn "$::cmd: can't open $search: $!\n";
+	$::Xit=1;
+	next SEARCH;
       }
     }
-    next IM if !$ok;
+    elsif (-d _)
+    { $::Context=$search;
+      if (! ( -f "$search/INDEX.gz"
+	      ? open(SEARCH,"gunzip <'$search/INDEX.gz' |")
+	      : open(SEARCH,"< $search/INDEX\0")
+	    ))
+      { warn "$::cmd: can't open INDEX in $search: $!\n";
+	$::Xit=1;
+	next SEARCH;
+      }
+    }
+    else
+    { warn "$::cmd: can't handle search object: $search\n";
+      $::Xit=1;
+      next SEARCH;
+    }
+
+    loadfrom(SEARCH);
+    close(SEARCH);
   }
-
-  # image is ok, add to list
-  push(@::IM,$impath);
-  push(@::IMOffset,$offset);
-
-  $offset+=$dx*$dy;
-  $nimages++;
 }
 
 die "$::cmd: nothing to pick!\n" if ! @::IM;
@@ -149,7 +150,7 @@ while ($::PickN > 0 && $nitems > 0)
   $::PickN--;
 }
 
-sub offset2index
+sub offset2index($)
 { my($off)=@_;
 
   my($low,$high)=(0,$#::IM);
@@ -163,4 +164,67 @@ sub offset2index
   }
 
   return $low;
+}
+
+sub loadfrom($)
+{ my($FILE)=@_;
+
+  IM:
+  while (<$FILE>)
+  {
+    chomp;
+    if (! /^\s*(\d+)\s+(\d+)\s+(\S.*)/)
+    { warn "$::cmd: stdin, line $.: bad data: $_\n";
+      next IM;
+    }
+
+    my ($dx,$dy,$impath)=($1,$2,$3);
+
+    # skip small images
+    next IM if $dx < $::MinX;
+    next IM if $dy < $::MinY;
+
+    # skip images that are the wrong shape
+    next IM if defined $::Aspect
+	    && (   ( $::Aspect eq PORTRAIT && $dx > $dy )
+		|| ( $::Aspect eq LANDSCAPE && $dy > $dx )
+	       );
+
+    # skip !words
+    REJECT:
+    for my $re (@::NotWords)
+    { next IM if $impath =~ $re;
+    }
+
+    # skip if missing required words
+    if ($::AndWords)
+    { TRY_AND:
+      for my $re (@::Words)
+      { next IM if $impath !~ $re;
+      }
+    }
+    else
+    { my $ok=0;
+      TRY_OR:
+      for my $re (@::Words)
+      { if ($impath =~ $re)
+	{ $ok=1;
+	  last TRY_OR;
+	}
+      }
+      next IM if !$ok;
+    }
+
+    # haven't needed image full path until now
+    if (defined $::Context)
+    { $impath="$::Context/$impath";
+    }
+
+    # image is ok, add to list
+    push(@::IM,$impath);
+    push(@::IMOffset,$offset);
+
+    $offset+=$dx*$dy;
+    $nimages++;
+  }
 }
