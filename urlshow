@@ -58,29 +58,7 @@ done
 
 [ $badopts ] && { echo "$usage" >&2; exit 1; }
 
-[ -n "$DISPLAY" ] || { echo "$cmd: no \$DISPLAY!" >&2; exit 1; }
-
-probe()
-{ "$mozremote" 'ping()'
-}
-
-# start browser if needed
-case "$DISPLAY" in
-  :* | lo:* | localhost:* | 127.0.0.1:* | "$IPADDR:"* )
-    browser -q \
-    || { acon set-x browser
-	 echo "waiting for browser..."
-	 while :
-	 do  browser -q && break
-	     necho .; sleep 1
-	 done
-	 while :
-	 do  probe && break
-	     necho .; sleep 1
-	 done
-       }
-    ;;
-esac
+[ -n "$BROWSER_DISPLAY" ] || { echo "$cmd: no \$BROWSER_DISPLAY!" >&2; exit 1; }
 
 if [ $anon ]; then anonpfx=http://anon.free.anonymizer.com/
               else anonpfx=
@@ -112,6 +90,36 @@ popurl()
   done
   return $popurl_ret
 }
+
+set -x
+if [ "x$DISPLAY" = "x$BROWSER_DISPLAY" ]
+then
+    probe()
+    { "$mozremote" 'ping()'
+    }
+
+    # start browser if needed
+    case "$BROWSER_DISPLAY" in
+      :* | lo:* | localhost:* | 127.0.0.1:* | "$IPADDR:"* )
+	browser -q \
+	|| { acon set-x browser
+	     echo "waiting for browser..."
+	     while :
+	     do  browser -q && break
+		 necho .; sleep 1
+	     done
+	     while :
+	     do  probe && break
+		 necho .; sleep 1
+	     done
+	   }
+	;;
+    esac
+else
+    DISPLAY=$BROWSER_DISPLAY
+    export DISPLAY
+fi
+set +x
 
 cleanurllist \
 | while read url
