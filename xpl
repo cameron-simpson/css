@@ -230,6 +230,10 @@ do
 		xplmode=
 		shift
 		;;
+    # =item B<-transpng> I<pathname>
+    #
+    # Passed to I<xplanet>.
+    #
     -transpng)	xplopts="$xplopts -transpng "`shqstr "$2"`
 		winmode=1
 		shift
@@ -306,18 +310,20 @@ do
 		  *)	name=$2 namepfx= ;;
 		esac
 		case $name in
-		  random)
+		  random | random\ *)
+		    sfx=`expr "$name" : '[^ ][^ ]* *\(.*\)'`
 		    xplclauses=`
 		      for body in $stars $planets $moons
 		      do echo "$body"
-		      done | pickn 1
+		      done | pickn 1 $sfx
 		      `
 		    ;;
 		  major)
+		    sfx=`expr "$name" : '[^ ][^ ]* *\(.*\)'`
 		    xplclauses=`
 		      for body in $stars $planets
 		      do echo "$body"
-		      done | pickn 1
+		      done | pickn 1 $sfx
 		      `
 		    ;;
 		  *)
