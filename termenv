@@ -1,0 +1,18 @@
+#!/bin/sh
+# Use TERM to pass environment information to remote command.
+#
+
+case $# in
+    0)	echo "Usage: $0 cmd [args...]" >&2; exit 2 ;;
+esac
+
+# stick a colon on the end to 
+TERM=$TERM:
+for var in $termenv INETADDR
+do
+    eval "TERM=\$TERM,\${$var+\"$var=\$$var\"}"
+done
+# echo "TERM=$TERM"
+export TERM
+
+exec "$@"
