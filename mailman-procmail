@@ -10,6 +10,8 @@
 #	- Cameron Simpson <cs@zip.com.au> 16may2001
 #
 
+: ${TMPDIR:=/tmp}
+
 PATH=$PATH:/opt/script
 export PATH
 
@@ -18,7 +20,7 @@ wrapper=/home/sweet/mailman/mail/wrapper
 PATH=/bin:/usr/bin:/usr/sbin:/opt/script:$PATH
 export PATH
 
-tmp=/tmp/mmprcm$$
+tmp=$TMPDIR/mmprcm$$
 
 formail -R Received: X-PreMailman-Received: >$tmp || exit 1
 
@@ -61,7 +63,7 @@ sed -n -e '/^$/q' -e 's/@.*//' -e 's/^Delivered-To: *//p' \
 		;;
     esac
 
-    ## echo "delivery=[$delivery] wrapfor=[$wrapfor] list=[$list]" >>/tmp/mm.log
+    ## echo "delivery=[$delivery] wrapfor=[$wrapfor] list=[$list]" >>"$TMPDIR/mm.log"
     
     if [ -n "$wrapfor" ]
     then
