@@ -282,6 +282,10 @@ case $target in
     /*)	try=$target ;;
     *)	try="$RUNMAINT_ETC/$USER/$target $RUNMAINT_SCRIPTS/$target" ;;
 esac
+case $target in
+    */*)	targetbase=`basename "$target"` ;;
+    *)		targetbase=$target ;;
+esac
 
 for script in $try
 do
@@ -301,7 +305,7 @@ do
 	    logdir=$scriptdir/log
 	    if [ -d "$logdir/." ]
 	    then
-		log=$logdir/$target@$HOST
+		log=$logdir/$targetbase@$HOST
 		[ -d "$log/." ] && log=$log/`datecode`
 	    else
 		addresses=${EMAIL:-$USER}
