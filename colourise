@@ -1,16 +1,18 @@
 #!/bin/sh
 #
-# Perform a typical colourisation.
-#	- Cameron Simpson <cs@zip.com.au> 06may99
+# Perform a typical colourisation: stderr -> cyan.
+#	- Cameron Simpson <cs@zip.com.au> 06may1999
 #
+
+cmd=$0
 
 [ "x$1" = x-f ] && { IS_COLOURISED=; export IS_COLOURISED; shift; }
 
-if [ -z "$IS_COLOURISED" ]
-then
-    IS_COLOURISED=1
-    export IS_COLOURISED
-    exec filter_fd 2 cyan ${1+"$@"}
-else
-    exec ${1+"$@"}
-fi
+[ $# = 0 ] && { echo "Usage: $cmd [-f] cmd [args...]" >&2; exit 2; }
+
+[ -z "$IS_COLOURISED" ] || exec "$@"
+
+IS_COLOURISED=1
+export IS_COLOURISED
+
+exec filter_fd 2 cyan "$@"
