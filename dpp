@@ -1,0 +1,94 @@
+#!/usr/bin/perl
+#
+# Simpleminded preprocessor which does
+#
+#	#includes
+#	#if	perl-expr
+#	#define	sym	text
+#	#eval	sym	perl-expr
+#	{ENVVAR}
+#
+
+require 'cs/dpp.pl';
+
+($cmd=$0) =~ s:.*/::;
+$usage="Usage: $cmd [-eperlcode] [-Eperlcode] [-Dsym=string]... \\
+		[-Iincdir] [-Usym] [-ddefns] [files..]
+	-v		Verbose.
+	-ddefns		Write symbol table to the file defns at end.
+	-Dsym=string	Set symbol.
+	-eperlcode	Run perlcode before processing lines.
+	-Eperlcode	Run perlcode after processing lines.
+	-Iincdir	Where to look for include files.
+	-Psym=perl-expr	Evaluate and set symbol.
+	-Usym		Unset symbol.
+";
+
+%dpp'symbol=%ENV;
+
+$badopts=0;
+
+ARGV:
+  while (defined($_=shift))
+	{ (unshift(@ARGV,$_), last ARGV) unless /^-./;
+
+	  if ($_ eq '--')	{ last ARGV; }
+	  elsif ($_ eq '-v')	{ $dpp'verbose=1; }
+	  elsif (/^-d/)		{ $defnsfile=$'; }
+	  elsif (/^-D(\w+)=/)	{ $sym=$1; $text=&dpp'preproc($');
+				  &dpp'define($sym,$text);
+				}
+	  elsif (/^-P(\w+)=/)	{ $sym=$1; $perl=&dpp'preproc($');
+				  $text=&dpp'eval($perl);
+				  if ($@)
+					{ print STDERR "$cmd: $_: [$perl]: $@\n";
+					  $badopts=1;
+					}
+				  else
+				  { &dpp'define($sym,$text);
+				  }
+				}
+	  elsif (/^-U(\w+)$/)	{ &dpp'undefine($1); }
+	  elsif (/^-I(.*)/)	{ push(@dpp'ipath,$1); }
+	  elsif (/^-e(.*)/)	{ $dpp'before.=$1.';'; }
+	  elsif (/^-E(.*)/)	{ $dpp'after.=$1.';'; }
+	  else			{ print STDERR "$cmd: $_: unrecognised option\n";
+				  $badopts=1;
+				}
+	}
+
+die $usage if $badopts;
+
+$xit=0;
+
+push(@ARGV,'-') if $#ARGV < $[;
+
+for (@ARGV)
+	{ if ($_ eq '-')
+		{ &dpp'preprocfile('stdin',STDIN);
+		}
+	  elsif (open(FILE,"< $_\0"))
+		{ &dpp'preprocfile($_,FILE);
+		  !length || close(FILE);
+		}
+	  else
+	  { print STDERR "$cmd: can't open $_: $!\n";
+	    $xit=1;
+	  }
+	}
+
+if (length $defnsfile)
+	{ if (!open(DEFNS,"> $defnsfile\0"))
+		{ print STDERR "$cmd: can't write defns to $defnsfile: $!\n";
+		  $xit=1;
+		}
+	  else
+	  { for (sort keys %dpp'symbol)
+		{ print DEFNS "$_=$dpp'symbol{$_}\n";
+		}
+
+	    close(DEFNS);
+	  }
+	}
+
+exit $xit;
