@@ -211,7 +211,7 @@ fi
 
 # ensure there is a real local /opt
 [ -d "$SYNCOPT_OPT/." ] \
-	|| { $trace mkdir "$SYNCOPT_OPT" && $trace chmod 755 "$SYNCOPT_OPT":; } \
+	|| { $trace mkdir "$SYNCOPT_OPT" && $trace chmod 755 "$SYNCOPT_OPT"; } \
 	|| { echo "$cmd: missing target dir $SYNCOPT_OPT" >&2
 	     exit 1
 	   }
@@ -366,9 +366,9 @@ do
     #	I<var>=I<value>
     #
     # are read once at the start of the script to set environment parameters.
-    # I<var> may take the names B<ARCH>, B<COMMON>, B<REMOTE>, B<RSYNC>, B<RSYNCOPTS> or B<SUBDIRS>
+    # I<var> may take the names B<PATH>, B<RSYNC>, B<RSYNCOPTS> or B<SUBDIRS>
     # to set or override the environment variables
-    # B<$SYNCOPT_ARCH>, B<$SYNCOPT_COMMON>, B<$SYNCOPT_REMOTE>,
+    # B<$SYNCOPT_PATH>,
     # B<$SYNCOPT_RSYNC>, B<$SYNCOPT_RSYNCOPTS> or B<$SYNCOPT_SUBDIRS> respectively.
     #
     # Other lines are of the form:
@@ -495,36 +495,28 @@ exit $xit
 # although on systems I administer I arrange this to be a string of the form
 # B<I<vendor>.I<cpu>.I<os>>, for example B<redhat.x86.linux>.
 #
-# =item B<SYNCOPT_ARCH>
-#
-# This is the location of the master copies of the architecture specific packages.
-# The default is B</u/syncopt/$ARCH>.
-#
-# =item B<SYNCOPT_COMMON>
-#
-# This is the location of the master copies of the architecture independent packages.
-# The default is B</u/syncopt/common>.
-#
 # =item B<SYNCOPT_OPT>
 #
 # This is the installation directory.
 # The default is B</opt>.
 #
-# =item B<SYNCOPT_REMOTE>
+# =item B<SYNCOPT_PATH>
 #
-# Use the specified remote host for the master
-# as though specified with the B<-r> command line option.
+# A space separated list of repositories to search for packages.
+# A repository is either a directory name
+# or a remote name like "B<bighost:/path/to/syncopt>".
+# A machine not on a fixed LAN might use the latter form.
+# Packages found in earlier repositories in this path
+# are chosen over packages found later in the path.
+# The default is "B</u/syncopt>".
 #
 # =item B<SYNCOPT_SUBDIRS>
 #
-# If set, expect a subhierarchy underneath each B<$SYNCOPT_{ARCH,COMMON}> repository.
-# For example, at home I set this to "B<HOME WORK>".
-# I put home built software in B</u/syncopt/$ARCH/HOME/I<package>>
-# and keep a copy of much of the repository from work in B</u/syncopt/$ARCH/WORK/I<package>>,
-# obviating any need to rebuild things already built for work.
-# The subhierachies are consulted in order,
-# thus arranging that my home installs
-# take precedence over the work copies.
+# This may be set to a space separated list of subdirectories
+# to search for packages.
+# The default is "B<$ARCH common>"
+# i.e. to look for the architecture specific stuff
+# and then the architecture independent stuff.
 #
 # =item B<SYNCOPT_RSYNC>
 #
