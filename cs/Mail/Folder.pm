@@ -89,7 +89,11 @@ sub FileItem	# folder->(srcpath,{LINK|COPY|MOVE})
   # just hand it off to the MIME filer
   { return $this->File($orig);
   }
-  
+
+  { my@c=caller;
+    warn "$0: no impl to file orig=\"$orig\", mode=\"$mode\" from [@c]";
+    return undef;
+  }
 }
 
 # file a cs::MIME object into a folder
