@@ -28,6 +28,7 @@ use strict qw(vars);
 BEGIN { use cs::DEBUG; cs::DEBUG::using(__FILE__); }
 
 use cs::Misc;
+use cs::Pathname;
 use cs::Math;
 use cs::IFMSink;
 
@@ -461,6 +462,46 @@ sub Bm2htmlFile
   else
   { ## warn "writing $target/index.html ...\n";
     $stubBm->Bm2htmlSink($s,$mainTitle);
+  }
+}
+
+=item Bm2dir(I<targetdir>)
+
+Write this category and its descendants
+to the specified I<targetdir>.
+
+=cut
+
+sub Bm2dir
+{ my($this,$target)=(shift,shift);
+
+  cs::Pathname::makedir($target) || return;
+
+  SUBCAT:
+  for my $subcat (@{$this->SubCats()})
+  { ## warn "subcat=$subcat from [@c]\n";
+    my $subkey = $subcat->TitleKey();
+    my $subtitle = $subcat->Title();
+    my $subdir = $subtitle;
+    $subdir =~ s:\s*/+\s*: -- :g;
+    $subdir =~ s:\s+: :g;
+
+    $subcat->Bm2dir("$target/$subdir");
+  }
+
+  ENTRY:
+  for my $entry (@{$this->Entries()})
+  {
+    my $title=$entry->{TITLE};
+    $title =~ s:\s*/+\s*: -- :g;
+    $title =~ s:\s+: :g;
+    if (! open(BMFILE, "> $target/$title\0"))
+    { warn "$::cmd: rewrite($target/$title): $!\n";
+      next ENTRY;
+    }
+
+    print BMFILE "$entry->{PARAMS}->{HREF}\n";
+    close(BMFILE);
   }
 }
 
