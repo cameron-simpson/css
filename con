@@ -17,6 +17,7 @@ export CONSOLE
 usage="Usage: $cmd [-a] [-i] [-t tty] { -c shellcmd | command [args...] }
 		-a	Fork and run asynchronously.
 		-c	Invoke shell with -c option.
+		-i	Input from /dev/null.
 		-t tty	Terminal to use instead of $tty."
 
 badopts=
