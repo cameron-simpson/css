@@ -1,0 +1,180 @@
+#!/usr/bin/perl
+
+use strict qw(vars);
+
+use cs::Upd;
+use cs::Misc;
+use cs::Pathname;
+use Getopt::Std;
+use File::Copy;
+use File::Compare;
+use File::Find;
+
+$::Usage="Usage: $::cmd [-npsv] [dir files...]
+	-n	No unlink of source file.
+	-p	Make directory if missing, including parents.
+	-s	Silent.
+	-r	Relative.
+	-v	Verbose.
+";
+
+$::NoUnlink=0;
+$::MakeDir=0;
+$::Relative=0;
+$::Verbose=-t STDOUT;
+
+$::badopts=0;
+getopts("nprsv") || ($::badopts=1);
+
+$::NoUnlink=1 if $::opt_n;
+$::MakeDir=1 if $::opt_p;
+$::Relative=1 if $::opt_r;
+$::Verbose=0 if $::opt_s;
+$::Verbose=1 if $::opt_v;
+
+if (! @ARGV)
+{ undef $::Dir;
+}
+else
+{ $::Dir=shift(@ARGV);
+  if (! @ARGV)
+  { warn "$::cmd: missing files\n";
+    $::badopts=1;
+  }
+  else
+  { @::Files=@ARGV;
+  }
+}
+
+die $::Usage if $::badopts;
+
+$::Xit=0;
+
+if (defined $::Dir)
+{ for my $file (@::Files)
+  { if (-d $file)
+    { find({ wanted => \&submerge, no_chdir => 1 }, $file);
+    }
+    elsif (-f _)
+    { mrg($::Dir,$file,$::MakeDir,$::NoUnlink,$::Relative) || ($::Xit=1);
+    }
+  }
+}
+else
+# expect "dir file" on stdin
+{ INPUT:
+  while (defined ($_=<STDIN>))
+  { chomp;
+    if (! /^(\S+) /)
+    { warn "$::cmd: bad input: $_\n";
+      $::Xit=1;
+      last INPUT;
+    }
+
+    mrg($1,$',$::MakeDir,$::NoUnlink,$::Relative) || ($::Xit=1);
+  }
+}
+
+exit $::Xit;
+
+sub submerge
+{
+  out($_);
+  if (-f $_)
+  { mrg($::Dir,$File::Find::name,$::MakeDir,$::NoUnlink,$::Relative);
+  }
+}
+
+sub mrg($$$$$)
+{ my($dir,$file,$makedir,$nounlink,$relative)=@_;
+
+  my $ok = 0;
+  my $mrg;
+
+  if ($mrg=mrginto($dir,$file,$makedir,$relative))
+  { my $base = cs::Pathname::basename($file);
+    if ($nounlink)
+    { $ok=1;
+    }
+    elsif (unlink($file))
+    { $ok=1;
+    }
+    else
+    { warn "$::cmd: unlink($file): $!\n";
+    }
+  }
+
+  out('') if $::Verbose;
+
+  $ok;
+}
+
+# merge file into dir; return:
+#	2 - identical file already in place
+#	1 - success
+#	0 - failure - different existing file, etc
+sub mrginto($$$$)
+{ my($dir,$file,$makedir,$relative)=@_;
+  
+  if ($relative)
+  { my $fdir = cs::Pathname::dirname($file);
+    $dir.="/$fdir" if $fdir ne ".";
+    ## warn "fdir=$fdir\ndir=$dir\n";
+  }
+
+  my $base = cs::Pathname::basename($file);
+  my $dirfile = "$dir/$base";
+
+  out("$file => $dir") if $::Verbose;
+
+  if (! stat($dir))
+  { if ($makedir)
+    { if (! cs::Pathname::makedir($dir))
+      { warn "$::cmd: makedir($dir): $!\n";
+	return 0;
+      }
+    }
+    else
+    { warn "$::cmd: $dir: $!\n";
+      return 0;
+    }
+  }
+
+  if (! stat($file))
+  { warn "$::cmd: $file: $!\n";
+    return 0;
+  }
+
+  if (! -f _)
+  { warn "$::cmd: $file: not a regular file: $!\n";
+    return 0;
+  }
+
+  if (! lstat($dirfile))
+  { if (link($file,$dirfile)
+     || File::Copy::copy($file,$dirfile))
+    { nl("$file => $dirfile");
+      return 1;
+    }
+
+    warn "$::cmd: File::Copy::copy($file,$dirfile): $!\n";
+    if (lstat($dirfile) && !unlink($dirfile))
+    { warn "$::cmd: unlink($dirfile): $!\n";
+    }
+    return 0;
+  }
+
+  if (! stat($dirfile) || ! -f _)
+  { warn "$::cmd: $dirfile: not a regular file\n";
+    return 0;
+  }
+
+  if (File::Compare::compare($file,$dirfile) == 0)
+  { nl("$file => $dirfile: identical");
+    return 2;
+  }
+
+  warn "$::cmd: $file and $dirfile differ\n";
+
+  return 0;
+}
