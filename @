@@ -4,9 +4,19 @@
 #	- Cameron Simpson <cs@zip.com.au> 23oct2001
 #
 
-[ $# = 0 ] && { echo "Usage: $0 host[@sitename] [rterm-args...]" >&2; exit 2; }
+[ $# = 0 ] && { echo "Usage: $0 host[@sitename][,host[@sitename]...] [rterm-args...]" >&2; exit 2; }
 
 host=$1; shift
+
+case "$host" in
+    *,*)
+	for h in `echo "$host" | tr , ' '`
+	do  "$0" "$h" ${1+"$@"}
+	done
+	exit 0
+	;;
+esac
+
 case $host in
     *@*)	;;
     *)		host=$host@$SYSTEMID ;;
