@@ -171,11 +171,11 @@ undef %cs::IO::_DirPrefs;
 sub dupR { _dup('<',shift); }
 sub dupW { _dup('>',shift); }
 sub _dup
-	{ my($io,$handle)=@_;
-	  my($newhandle)=mkHandle();
-	  open($newhandle,"$io&$handle")
-		? $newhandle : $handle;
-	}
+{ my($io,$handle)=@_;
+  my($newhandle)=mkHandle();
+  open($newhandle,"$io&$handle")
+	? $newhandle : $handle;
+}
 
 # take a target filename and some preferences
 # and return actual name and filters chosen (ordered)
@@ -288,8 +288,8 @@ sub choose	# (filename,prefs) -> (chosen-name,filters[ordered])
 }
 
 sub _a2preflist
-	{ grep(length,split(/[\s,]+/,shift));
-	}
+{ grep(length,split(/[\s,]+/,shift));
+}
 
 sub mkHandle { cs::Misc::mkHandle(@_) }
 
@@ -332,31 +332,34 @@ sub openR
   my($openstr)=$file;
 
   if (! @filters)
-	# short open - tidy up name
-	{ if ($openstr !~ m:^/:)
-		{ $openstr="./$openstr";
-		}
+  # short open - tidy up name
+  { if ($openstr !~ m:^/:)
+    { $openstr="./$openstr";
+    }
 
-	  $openstr="< $openstr\0";
-	}
+    $openstr="< $openstr\0";
+  }
   else
   # construct shell pipeline
   {
     # quote filename
     $openstr =~ s:':'\\'':g;
-    $openstr=" <'$openstr'";
+
+    # was just " <'$openstr' "
+    # but bash doesn't parse that:-(
+    $openstr="exec <'$openstr'; ";
 
     FILTER:
-      for (reverse @filters)
-	{ if (! defined $cs::IO::_Filter{$_})
-		{ warn "openR(@_): ignoring unknown filter \"$_\"";
-		  next FILTER;
-		}
+    for (reverse @filters)
+    { if (! defined $cs::IO::_Filter{$_})
+      { warn "openR(@_): ignoring unknown filter \"$_\"";
+	next FILTER;
+      }
 
-	  $openstr.=" $cs::IO::_Filter{$_}->{FROM} |";
-	}
+      $openstr.=" $cs::IO::_Filter{$_}->{FROM} |";
+    }
 
-    # warn "_openR(@_): [$openstr]";
+    ##warn "_openR(@_): [$openstr]";
   }
 
   ($cs::IO::_UseIO ? $io->open($openstr) : open($io,$openstr))
@@ -364,50 +367,50 @@ sub openR
 }
 
 sub openW
-	{ my($append,$file,@filters)=@_;
+{ my($append,$file,@filters)=@_;
 
-	  my($io);
+  my($io);
 
-	  if ($cs::IO::_UseIO)
-		{ $io=new IO::File;
-		}
-	  else	{ $io=mkHandle();
-		}
-
-	  my($openstr)=$file;
-	  my($openmode)=($append ? '>>' : '>');
-
-	  if (! @filters)
-		# short open - tidy up name
-		{ if ($openstr !~ m:^/:)
-			{ $openstr="./$openstr";
-			}
-
-		  $openstr="$openmode $openstr\0";
-		}
-	  else
-	  # construct shell pipeline
-	  {
-	    # quote filename
-	    $openstr =~ s:':'\\'':g;
-	    $openstr="$openmode'$openstr'";
-
-	    FILTER:
-	      for (reverse @filters)
-		{ if (! defined $cs::IO::_Filter{$_})
-			{ warn "IO::_openW(@_): ignoring unknown filter \"$_\"";
-			  next FILTER;
-			}
-
-		  $openstr="| $cs::IO::_Filter{$_}->{TO} $openstr";
-		}
-
-	    # print STDERR "openW(@_): \"$openstr\"\n";
-	  }
-
-	  ($cs::IO::_UseIO ? $io->open($openstr) : open($io,$openstr))
-		? $io : undef;
+  if ($cs::IO::_UseIO)
+	{ $io=new IO::File;
 	}
+  else	{ $io=mkHandle();
+	}
+
+  my($openstr)=$file;
+  my($openmode)=($append ? '>>' : '>');
+
+  if (! @filters)
+	# short open - tidy up name
+	{ if ($openstr !~ m:^/:)
+		{ $openstr="./$openstr";
+		}
+
+	  $openstr="$openmode $openstr\0";
+	}
+  else
+  # construct shell pipeline
+  {
+    # quote filename
+    $openstr =~ s:':'\\'':g;
+    $openstr="$openmode'$openstr'";
+
+    FILTER:
+      for (reverse @filters)
+	{ if (! defined $cs::IO::_Filter{$_})
+		{ warn "IO::_openW(@_): ignoring unknown filter \"$_\"";
+		  next FILTER;
+		}
+
+	  $openstr="| $cs::IO::_Filter{$_}->{TO} $openstr";
+	}
+
+    # print STDERR "openW(@_): \"$openstr\"\n";
+  }
+
+  ($cs::IO::_UseIO ? $io->open($openstr) : open($io,$openstr))
+	? $io : undef;
+}
 
 # return a filehandle open for read/write
 # normally the handle will be attached to an unlinked file
