@@ -35,18 +35,23 @@ package cs::URL;
 
 =over 4
 
-=item get(I<url>)
+=item get(I<url>,I<follow>)
 
 Create a B<cs::URL> object from the I<url> supplied
 and call the B<Get> method below.
+If the optional argument I<follow> is true
+then redirections (301 and 302 response codes)
+will be followed.
 
 =cut
 
-sub get($)
-{ my($url)=shift;
+sub get($;$)
+{ my($url,$follow)=@_;
+  $follow=0 if ! defined $follow;
+
   my($U)=new cs::URL $url;
   return () if ! defined $U;
-  $U->Get();
+  $U->Get($follow);
 }
 
 =item urlPort(I<scheme>,I<port>)
@@ -661,7 +666,7 @@ sub _Get($$)
       last GET;
     }
 
-    if ($rcode eq $cs::HTTP::M_MOVED || $rcode eq cs::HTTP::M_FOUND)
+    if ($rcode eq $cs::HTTP::M_MOVED || $rcode eq $cs::HTTP::M_FOUND)
     {
       $ENV{HTTP_REFERER}=$url;
       my $newurl=$M->Hdr(LOCATION);
