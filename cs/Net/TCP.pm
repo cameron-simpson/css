@@ -192,6 +192,20 @@ sub service	# [port] -> socket
 { my($port)=@_;
   $port=0 if ! defined $port;
 
+  # pull local interface prefix off
+  my $laddr;
+  my $laddrpart;
+  if ($port =~ /:/)
+  { $laddrpart=$`; $port=$';
+    $laddr=Socket::inet_aton($laddrpart)
+      || die "$::cmd: can't resolve \"$laddrpart\"\n";
+  }
+  else
+  { $laddrpart="INADDR_ANY";
+    $laddr=Socket::INADDR_ANY;
+  }
+  my($local)=scalar(Socket::sockaddr_in($port,$laddr));
+
   $port=cs::Net::portNum($port,TCP);
   return undef if ! defined $port;
 
@@ -201,14 +215,11 @@ sub service	# [port] -> socket
     return undef;
   }
 
-  my($laddr)=Socket::INADDR_ANY;
-  my($local)=scalar(Socket::sockaddr_in($port,$laddr));
-
   if (! bind($sockf,$local))
-	{ warn "bind($sockf,sockaddr_in($port,INADDR_ANY)): $!";
-	  close($sockf);
-	  return undef;
-	}
+  { warn "bind($sockf,sockaddr_in($port,$laddrpart)): $!";
+    close($sockf);
+    return undef;
+  }
 
   listen($sockf,10) || warn "listen($sockf,10): $!";
 
