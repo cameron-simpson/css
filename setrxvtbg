@@ -41,8 +41,6 @@ fi
 		    echo "`date` pid=$$" >>"$logf"
 		  )
 
-# subshell because some shells abort if the >> fails
-( [ -n "$logf" ] && [ -w "$logf" ] && echo "$src" >>"$logf" )
-
 # dropped "-d 0.6"
 2xpm -s tty "$src" xpm2rxvt
+[ -n "$logf" ] && [ -w "$logf" ] && echo "$src" >>"$logf"
