@@ -1,0 +1,13 @@
+#!/bin/sh
+#
+
+HOTJAVA_HOME=$HOME/etc/hotjava	# root of hotjava tree
+HOTJAVA=$HOME/etc/www/hotjava	# user support files
+CLASSPATH=$HOTJAVA_HOME/classes	# where class code lives
+LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$HOTJAVA_HOME/lib
+WEBLOG=${WEBLOG-$HOTJAVA/weblog}
+export HOTJAVA_HOME CLASSPATH LD_LIBRARY_PATH WEBLOG
+
+hotjava=$REAL/hotjava
+
+exec $hotjava ${1+"$@"}
