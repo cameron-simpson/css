@@ -112,7 +112,7 @@ sub new
       die "\$path not set from [@c]";
     }
 
-    my($io,$file)=_new_FILE($path,1);
+    my($io,$file)=_new_FILE($path,1,@_);
     return undef if ! defined $io;
     $this->{IO}=$io;
     $path->{PATH}=$path;
@@ -174,18 +174,14 @@ sub new
   if ($cs::Source::_UseIO
    && exists $this->{IO}
    && ($this->{FLAGS}&$cs::IO::F_ASYNC))
-	{ cs::IO::selAddSource($this);
-	}
+  { cs::IO::selAddSource($this);
+  }
 
   $this;
 }
 
-sub _new_FILE
+sub _new_FILE($;$$)
 { my($path,$rewind,$complex)=@_;
-  if (! defined $path)
-	{ my(@c)=caller;
-	  die "path not set from [@c]";
-	}
   $rewind=0 if ! defined $rewind;
   $complex=0 if ! defined $complex;
 
