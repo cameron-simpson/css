@@ -536,7 +536,7 @@ my %E=(
 		},
 		],
 	GOOGLEDJ, [ 'http://groups.google.com/groups',
-		{ 'q'		=> $query,
+		{ 'as_q'	=> $query,
 		  'hl'		=> 'en',
 		  'lr'		=> '',
 		  'safe'	=> 'off',
