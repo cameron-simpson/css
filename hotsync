@@ -1,0 +1,34 @@
+#!/bin/sh
+#
+# Backup my current hotsync and then sync from my palm.
+#	- Cameron Simpson <cs@zip.com.au> 03apr2000
+#
+
+cmd=`basename "$0"`
+
+case "$HOST@$SYSTEMID" in
+    zapff@cisra|amadeus@home)	;;
+    *)		echo "$cmd: I expect to be on cerebus@home or zapff@cisra" >&2
+		exit 1
+		;;
+esac
+
+PILOTPORT=${PILOTPORT:-/dev/pilot}
+export PILOTPORT
+
+[ -c "$PILOTPORT" ] || { echo "$cmd: $PILOTPORT: not a tty" >&2; exit 1; }
+id=`ls -ldL "$PILOTPORT" | awk '{print$3}'`
+[ "x$id" = "x$USER" ] || { echo "$cmd: $PILOTPORT: not owned by \"$USER\"" >&2
+			   exit 1
+			 }
+
+syncdir=$HOME/rc/palm/sync
+[ -d "$syncdir/." ] || { echo "$cmd: $syncdir: not a directory" >&2; exit 1; }
+
+amassbackup --inplace "$syncdir" \
+|| { echo "$cmd: $syncdir: backup fails, aborting sync" >&2
+     exit 1
+   }
+
+echo
+pilot-xfer -s "$syncdir/current"
