@@ -44,31 +44,6 @@ sub ::log
   ## warn join('',@_)." at @c";
 }
 
-## if ($ENV{SYSTEMID} eq 'zip')
-## { $cs::SiteName='zip.com.au';
-##   $cs::Organisation='ZipWorld';
-##   ## $cs::RootDN="o=$CISRA::Organisation, c=AU";
-## }
-## elsif ($ENV{SYSTEMID} eq 'cisra')
-## { ::need(CISRA::Misc);
-##   $cs::SiteName='zip.com.au';
-##   $cs::Organisation='Canon Information Systems Research Australia';
-##   $cs::RootDN="o=$CISRA::Organisation, c=AU";
-## }
-## elsif ($ENV{USER} eq 'cameron')
-## { $cs::SiteName='zip.com.au';;
-##   $cs::Organisation='ZipWorld';
-##   ## $cs::RootDN="o=$CISRA::Organisation, c=AU";
-## }
-
-## sub ::new
-## 	{ my($class)=shift;
-## 	  warn "N1($class @_)";
-## 	  ::need($class);
-## 	  warn N2;
-## 	  new $class @_;
-## 	}
-
 sub ::member
 { my($str)=shift;
   scalar(grep($_ eq $str,@_));
