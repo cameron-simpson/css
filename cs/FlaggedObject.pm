@@ -15,32 +15,33 @@ package cs::FlaggedObject;
 @cs::Flags::ISA=(cs::Object);
 
 sub _GetFlagsRef
-	{ my($this)=@_;
+{ my($this)=@_;
 
-	  my $flags;
+  my $flags;
 
-	  if (! exists $this->{FLAGS})
-		{ $flags=new cs::Flags;
-		}
-	  elsif (! ref $this->{FLAGS})
-		{ $flags=new cs::Flags;
+  if (! exists $this->{FLAGS})
+  { $flags=new cs::Flags;
+  }
+  elsif (! ref $this->{FLAGS})
+  { $flags=new cs::Flags;
 
-		  if (exists $this->{FLAGS}
-		   && defined $this->{FLAGS})
-		  { $flags->Set(split(/:/,$this->{FLAGS}));
-		  }
-		}
-	  else
-	  { $flags=bless $this->{FLAGS}, cs::Flags;
-	  }
+    if (exists $this->{FLAGS}
+     && defined $this->{FLAGS})
+    { $flags->Set(split(/:/,$this->{FLAGS}));
+    }
+  }
+  else
+  { $flags=bless $this->{FLAGS}, cs::Flags;
+  }
 
-	  $this->{FLAGS}=$flags;
-	}
+  $this->{FLAGS}=$flags;
+}
 
 # fetch the flags
-sub Flags{ my($flags)=_GetFlagsRef(shift);
-	   wantarray ? $flags->Members() : $flags;
-	 }
+sub Flags
+{ my($flags)=_GetFlagsRef(shift);
+  wantarray ? $flags->Members() : $flags;
+}
 
 sub Set	{ my($this)=shift; _GetFlagsRef($this)->Set(@_); }
 sub Clear{ my($this)=shift; _GetFlagsRef($this)->Clear(@_); }
