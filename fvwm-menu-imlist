@@ -127,7 +127,7 @@ done
 
 exec 1>&2
 
-( renice +10 -p $$
+(
   exec <"$thumblist"
   rm -f "$thumblist"
   while read thfmt f
@@ -143,3 +143,4 @@ exec 1>&2
     )
   done
 ) &
+renice +10 -p $!
