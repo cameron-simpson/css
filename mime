@@ -1,0 +1,28 @@
+#!/usr/bin/perl
+#
+# Parse MIME messages.
+# Currently a debugging tool.
+#	- Cameron Simpson <cs@zip.com.au> 04jun98
+#
+
+use cs::MIME;
+use cs::Source;
+use cs::Hier;
+
+my($in)=new cs::Source (FILE,STDIN);
+my($M)=new cs::MIME $in;
+
+exit 0 if $M->{TYPE} ne MULTIPART;
+
+my($slist,$pre,$post)=$M->Pieces();
+
+warn "$M=".cs::Hier::h2a($M,1)."\n\n";
+
+warn "pre=[$pre]\n";
+warn "post=[$post]\n";
+
+# warn "pieces=".cs::Hier::h2a($slist,1)."\n\n";
+
+my(@m)=map((new cs::MIME $_), @$slist);
+
+# warn "m=".cs::Hier::h2a(\@m,1)."\n";
