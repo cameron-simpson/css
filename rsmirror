@@ -374,27 +374,13 @@ exit $xit
 
 # =head1 EXAMPLES AND TIPS
 #
-# My nightly mirror run reads:
+# A nightly mirror run might read:
 #
-# 	rsmirror -v -t 3600
+# 	rsmirror -v -t 1200
 #
 # This produces a log of the update in my email
 # and prevents a huge update or a misconfiguration at my end
 # from using my link forever.
-#
-# Here is part of the mirror file for CISRA:
-#
-#	rsync mirror.aarnet.edu.au rsync
-#	rsync mirror.aarnet.edu.au samba
-#	rsync mirror.aarnet.edu.au redhat/updates/6.1/i386
-#	rsync mirror.aarnet.edu.au redhat/updates/6.1/noarch
-#	rsync mirror.aarnet.edu.au redhat/updates/6.2/i386
-#	rsync mirror.aarnet.edu.au redhat/updates/6.2/alpha
-#	rsync mirror.aarnet.edu.au redhat/updates/6.2/noarch
-#	rsync mirror.aarnet.edu.au apache
-#	rsync mirror.aarnet.edu.au apache-ssl
-#	rsync mirror.aarnet.edu.au sunfreeware/sparc
-#	rsync mirror.aarnet.edu.au rfc
 #
 # You can find out what is available like this:
 #
