@@ -6,12 +6,13 @@
 
 mailcap=$HOME/.mailcap
 
-copious=1
 action=1
 subfile=
+needattrs=
+rejectattrs=
 
 cmd=$0
-usage="Usage: $cmd [-a] [+a] [-c] [+c] [-m mailcap] [-s subfile] mimetype
+usage="Usage: $cmd [-a] [+a] [-c] [+c] [-m mailcap] [-s subfile] mimetype [[!]attribute...]
 	-a	Just print the action portion of the mailcap entry (default).
 	+a	Print the whole mailcap entry.
 	-c	Select the \"copiousoutput\" mailcap entry (default).
@@ -30,8 +31,8 @@ while :
 do  case $1 in
       -a)	action=1 ;;
       +a)	action= ;;
-      -c)	copious=1 ;;
-      +c)	copious= ;;
+      -c)	needattrs="$needattrs copiousoutput" ;;
+      +c)	rejectattrs="$rejectattrs copiousoutput" ;;
       -m)	mailcap=$2; shift ;;
       -s)	subfile=$2; shift ;;
       --)	shift; break ;;
@@ -46,34 +47,62 @@ then
   echo "$cmd: missing mime type" >&2; badopts=1
 else
   mtype=$1; shift
-  [ $# = 0 ] || { echo "$cmd: extra arguments: $*" >&2; badopts=1; }
 fi
+
+# gather up accept/reject attribute lists
+for attr
+do
+  case "$attr" in
+    !*) rejectattrs="$rejectattrs "`expr "x$attr" : 'x.\(.*\)'` ;;
+    *)  needattrs="$needattrs $attr" ;;
+  esac
+done
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
-if [ $copious ]
-then  match=`grep "^$mtype"' *;.*; *copiousoutput *$' <"$mailcap" | sed 1q`
-else  match=`grep "^$mtype"' *;' <"$mailcap" | grep -v '.*; *copiousoutput *$' | sed 1q`
-fi
+grep "^$mtype *;" <"$mailcap" \
+| \
+{
+  ok=
+  while oIFS=$IFS
+        IFS=';'
+	read cap_type cap_action cap_attrs || break
+	IFS=$oIFS
+  do
+    ok=1
 
-[ -n "$match" ] || exit 1
+    # make sure all the needed attributes are present
+    for attr in $needattrs
+    do  case " $cap_attrs " in
+	  *" $attr "*)	;;
+	  *)		ok=; break ;;
+	esac
+    done
+    [ $ok ] || continue
 
-[ $action ] || { echo "$match"; exit 0; }
+    # make sure none of the reject attributes are present
+    for attr in $rejectattrs
+    do  case " $cap_attrs " in
+	  *" $attr "*)	ok=; break ;;
+	esac
+    done
+    [ $ok ] || continue
 
-# clean up the mailcap line
-sedcmd='s/^[^;]*; *//
-        s/ *;[^;]*$//'
+    break
+  done
 
-if [ -n "$subfile" ]
-then
-    subfile=`shqstr "$subfile"`
-    match=`sedstrs "$sedcmd" "$match"`
-    case "$match" in
-	*'%s'*)	sedcmd="$sedcmd
-			s%s$subfileg" ;;
-	*)	sedcmd="$sedcmd
-			s^exec <$subfile; " ;;
-    esac
-fi
+  [ $ok ] || exit 1
 
-echo "$match" | sed -e "$sedcmd"
+  [ $action ] || { echo "$cap_type; $cap_action; $cap_attrs"; exit 0; }
+
+  [ -n "$subfile" ] || { echo "$cap_action"; exit 0; }
+
+  # insert hook for $subfile
+  subfile=`shqstr "$subfile"`
+  case "$cap_action" in
+      *'%s'*)	cap_action=`sedstrs "s%s$subfileg" "$cap_action"` ;;
+      *)	cap_action="exec <$subfile; $cap_action" ;;
+  esac
+
+  echo "$cap_action"
+}
