@@ -15,15 +15,14 @@ copflag=
 [ "x$1" = x-c ] && { copflag=-c copious=1; shift; }
 [ "x$1" = x-C ] && { copflag=-C copious=; shift; }
 
-tmpf=
-trap '[ -z "$tmpf" ] || rm "$tmpf"' 0 1 15
+tmpf=${TMPDIR:-/tmp}/vu$$
+trap '[ -f "$tmpf" ] && rm "$tmpf"' 0 1 15
 
 if [ $# = 0 ]
 then
     [ -t 0 ] && { echo "$cmd: won't read stdin from a terminal" >&2
 		  exit 1
 		}
-    tmpf=${TMPDIR:-/tmp}/vu$$
     cat >"$tmpf" || exit 1
     file=$tmpf
 else
@@ -32,7 +31,11 @@ else
 		    echo "$usage" >&2
 		    exit 2
 		  }
-    case "$file" in /*) ;; *) file=./$file ;; esac
+    case "$file" in
+      http://*) wcat "$file" >"$tmpf"; file=$tmpf ;;
+      /*) ;;
+      *) file=./$file ;;
+    esac
 fi
 
 # no idea? run plain file and bail out
@@ -55,7 +58,7 @@ else  mcflag=+c
 fi
 
 # no action? bail out
-action=`mailcap $mcflag -s "$file" "$mtype"` || exit 1
+action=`mailcap $mcflag -s "$file" "$mtype"`
 
 # empty action in mailcap
 [ -z "$action" ] && { echo "$mtype"; file "$file"; exit 0; }
