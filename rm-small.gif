@@ -1,0 +1,12 @@
+#!/bin/sh
+#
+
+set x `find ${1+"$@"} ${1-.} -type f -name '*-small.gif' -print`; shift
+if [ $# = 0 ]
+then
+    # echo "$0: nothing to remove" >&2
+    exit 1
+else
+    set -x
+    exec rm "$@"
+fi
