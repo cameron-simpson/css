@@ -46,6 +46,8 @@ done
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
+[ -n "$mkndx" ] || mkndx="find . -type f -size +0 -print >INDEX"
+
 ptns=
 
 if [ -z "$gotptns" ]
