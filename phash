@@ -1,0 +1,79 @@
+#!/usr/bin/perl -w
+#
+# Set or report data from a persistent object.
+# Based on the old user script.
+#	- Cameron Simpson <cs@zip.com.au> 10apr97
+#
+
+use strict qw(vars);
+
+use cs::Hier;
+use cs::Persist;
+
+my($Xit)=main(@ARGV);
+
+cs::Persist::finish();
+
+exit $Xit;
+
+sub main
+	{ my(@ARGV)=@_;
+	  my($Xit)=0;
+	  my($Force)=0;
+
+	  if (! @ARGV)
+		{ die "Usage: $0 [-f] phashdir [keychain...] [var=value]...\n";
+		}
+
+	  if ($ARGV[0] eq '-f')
+		{ $Force=1;
+		  shift(@ARGV);
+		}
+
+	  my($phashdir)=shift(@ARGV);
+
+	  my($h)=cs::Persist::db($phashdir);
+	  my($key,$val);
+
+	  my($loc)=$phashdir;
+
+	  while (@ARGV && $ARGV[0] !~ /=/)
+		{ $key=shift(@ARGV);
+		  if (exists $h->{$key}
+		   || ($Force && ($h->{$key}={})))
+			{ $h=$h->{$key};
+			  $loc.="/$key";
+			}
+		  else
+		  { die "no key \"$key\" in \"$loc\"";
+		  }
+		}
+
+	  for (@ARGV)
+		{ if (/^([a-z]\w*(\/[a-z]\w*)*)=/i)
+			{ $key=$1; $val=$';
+			  $val=cs::Hier::a2h($val)
+			    if $val =~ /^\{/;
+
+			  # warn "key=$key, val=[$val]\n";
+
+			  set($h,[split(m:/+:,$key)],$val);
+			}
+		  else	{ warn "bad assignment: $_\n";
+			}
+		}
+
+	  print cs::Hier::h2a($h,1), "\n";
+
+	  return $Xit;
+	}
+
+sub set
+	{ my($h,$k,$v)=@_;
+
+	  while (@$k > 1)
+		{ $h=$h->{shift(@$k)};
+		}
+
+	  $h->{shift(@$k)}=$v;
+	}
