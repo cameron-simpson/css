@@ -4,10 +4,12 @@
 #	- Cameron Simpson <cs@zip.com.au> 02dec2002
 #
 
+: ${LOGDIR:=$HOME/var/log}
+
 ##echo "[$0 $*]" >&2
 
-dir=$HOME/var/log/lastvalue
-append=
+dir=$LOGDIR/lastvalue
+append=1
 pop=
 
 cmd=$0
@@ -23,6 +25,7 @@ do
   case "$1" in
     -d)	dir=$2; shift ;;
     -a)	append=1 ;;
+    +a)	append= ;;
     -p)	pop=1 ;;
     --)	shift; break ;;
     -?*)echo "$cmd: unrecognised option: $1" &>2; badopts=1 ;;
