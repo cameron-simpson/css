@@ -116,7 +116,7 @@ editxit=$?
 || exit 1
 
 [ $havemsg ] \
-|| { [ -t 0 ] && { msg=`readline -p "Log message> "` && [ -n "$msg" ]; }; } \
+|| { [ -t 0 ] && { msg=`readline "Log message> "` && [ -n "$msg" ]; }; } \
 || { echo "$cmd: commit cancelled - file in modified state" >&2
      exit 1
    }
