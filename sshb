@@ -3,4 +3,4 @@
 # Ssh in batchmode.
 #	- Cameron Simpson <cs@zip.com.au> 26mar2003
 #
-exec ssho -T -e none -x -o 'batchmode yes' ${1+"$@"}
+exec sshto -T -e none -x batchmode=yes ${1+"$@"}
