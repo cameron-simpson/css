@@ -1,0 +1,12 @@
+#!/bin/sh
+#
+# Usage: rigmodem [-line n] [targets...]
+#
+# Expects to be used as "~$rigmodem [targets...]" from inside tip.
+#
+
+case "$1,$2" in
+	-line,[123])	tctl $1 $2 -parity none -bpc 8 ; shift ; shift ;;
+esac
+
+sh $HOME/etc/modem/setup.sh ${1+"$@"} | tr '\012' '\015'
