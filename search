@@ -39,7 +39,6 @@ then
 	imdb-actor) target=movieactors ;;
 	imdb-character-female) target=moviecharfemale ;;
 	imdb-character-male) target=moviecharmale ;;
-	imdb)	target=movietitles ;;
 	imdb-title) target=movietitles ;;
 	mcrawl)	target=metacrawler ;;
 	msgid)	target=googledjmsgid ;;
