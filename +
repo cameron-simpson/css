@@ -4,16 +4,39 @@
 #	- Cameron Simpson <cs@zip.com.au>
 #
 
+cmd=$0
+usage="Usage: $0 [some-mutt-options...] [mutt-folder]"
+
 needhost zapff@cisra amadeus@home || exit 1
 
-[ $# = 0 ] && set attn
-[ $# = 1 ] || { echo "Usage: $0 [mutt-folder]" >&2; exit 2; }
-folder=$1; shift
-case "$folder" in
-    +*)		mfolder=$folder ;;
-    *.*)	mfolder=nntp://$NNTPSERVER/$folder ;;
-    *)		mfolder=+$folder ;;
-esac
+mfolder=+attn
+muttopts=
+
+badopts=
+while :
+do
+  case $1 in
+    -[nR])	muttopts="$muttopts $1" ;;
+    -m)		muttopts="$muttopts $1 $2" ;;
+    --)		shift; break ;;
+    -?*)	echo "$cmd: unrecognised option: $1" >&2; badopts=1 ;;
+    *)		break ;;
+  esac
+  shift
+done
+
+if [ $# -gt 0 ]
+then
+  case $1 in
+    +*)		mfolder=$1 ;;
+    *.*)	mfolder=nntp://$NNTPSERVER/$1 ;;
+    *)		mfolder=+$1 ;;
+  esac
+  shift
+  [ $# = 0 ] || { echo "$cmd: extra arguments: $*" >&2; badopts=1; }
+fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
 
 cd || exit 1
-exec term +ip -n "mutt $folder" scrif "mutt_$folder" mutt -f "$mfolder"
+exec term +ip -n "mutt $folder" scrif "mutt_$folder" mutt -f "$mfolder" $muttopts
