@@ -64,6 +64,13 @@ sub catpath($$)
   "$dir/$path";
 }
 
+sub absname($$)
+{ my($path,$dir)=@_;
+
+  return $path if $path =~ m:^/:;
+  return catpath($dir,$path);
+}
+
 # safe rename - doesn't tromp target file if present
 sub saferename	# (from,to) -> success
 { my($from,$to,$noremove)=@_;
