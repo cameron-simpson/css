@@ -38,7 +38,7 @@ then
     iptables -A "$chain_out" -p tcp --source-port "$dport" ! --syn -j ACCEPT
 else
     set -x
-    for host
+    for host in `hostips "$@"`
     do
       [ $dolog ] && iptables -A "$chain_in" -p tcp -s "$host" --destination-port "$dport" --syn -j LOGACCEPT
       iptables -A "$chain_in" -p tcp -s "$host" --destination-port "$dport" -j ACCEPT
