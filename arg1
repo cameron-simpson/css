@@ -1,0 +1,75 @@
+#!/bin/sh
+#
+# Place argument 1 at the right place in a command line and then run
+# the command. This is a tool to support filteredit et al.
+#	- Cameron Simpson <cs@zip.com.au> 17jul2004
+#
+
+cmd=$0
+usage="Usage: $cmd [-stdin] [-end] [-n] [--] arg command [command-args...]
+	-stdin	Treat arg as a filename and attach stdin to the file.
+		Implies -discard; add a -n or -end to also use the arg.
+	-discard Discard the arg.
+	-end	Put arg after all the command-args.
+		This is the default.
+	-n	Put arg after the first n command-args.
+		-0 and -1 are the common examples."
+
+badopts=
+
+dostdin=
+pos=end
+
+while :
+do
+  case "$1" in
+    -stdin)	dostdin=1 pos= ;;
+    -discard)	pos= ;;
+    -end)	pos=end ;;
+    -[0-9]*)	pos=`expr "x$1" : 'x-\([0-9]*\)'` ;;
+    --)		shift; break ;;
+    -?*)	echo "$cmd: unrecognised argument: $1" >&2; badopts=1 ;;
+    *)		break ;;
+  esac
+  shift
+done
+
+if [ $# = 0 ]
+then
+  echo "$cmd: missing arg" >&2
+  badopts=1
+else
+  arg=$1; shift
+  if [ $# = 0 ]
+  then
+    echo "$cmd: missing command" >&2
+    badopts=1
+  else
+    command=$1
+    shift
+  fi
+fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+case "$pos" in
+  '')	;;
+  end)	set -- "$@" "$arg" ;;
+  *)	first=1
+	gotarg=1
+	skipped=0
+	for argv
+	do
+	  [ $first ] && { set --; first=; }
+	  [ $skipped = $pos ] && { set -- ${1+"$@"} "$arg"; gotarg=; }
+	  set -- ${1+"$@"} "$argv"
+	  skipped=`expr $skipped + 1`
+	done
+	[ $gotarg ] && set -- ${1+"$@"} "$arg"
+	;;
+esac
+
+[ $dostdin ] && exec <"$arg"
+
+set -x
+exec "$command" "$@"
