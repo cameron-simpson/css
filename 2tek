@@ -1,0 +1,9 @@
+#!/bin/sh
+
+case $TERM in
+    qvt311gx)	necho '%4' ;;
+    xterm*)	necho '[?38h' ;;
+    *)		echo "$0: can't go into TEK mode if TERM=$TERM" >&2
+		exit 1
+		;;
+esac
