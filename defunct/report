@@ -1,0 +1,214 @@
+#!/usr/bin/perl
+#
+# Monthly report #1:
+# For each project
+#    For each person
+#	tasks, time, cumulative, remarks
+#    For each task
+#	person, total time for task, schedule
+#
+
+use strict qw(vars);
+
+$::RepTypes={
+		PPREP	=> \&pprep,
+	    };
+
+($::cmd=$0) =~ s:.*/::;
+$::Usage="Usage: $0 reptype [args...]
+	reptype	One of [".join(',',map(lc($_),sort keys %$::RepTypes))."]
+";
+
+use CISRA::DB;
+use CISRA::TimeSheets;
+use CISRA::UserData;
+use cs::Hier;
+
+my($repsub);
+
+{ my($badopts)=0;
+
+  my($reptype)=shift(@ARGV);
+  if (! defined $reptype)
+	{ warn "$::cmd: missing reptype\n" if ! defined $reptype;
+	  $badopts=1;
+	}
+  elsif (! defined $::RepTypes->{uc($reptype)})
+	{ die "$::cmd: unrecognised reptype \"$reptype\"\n";
+	  $badopts=1;
+	}
+  else
+  { $repsub=$::RepTypes->{uc($reptype)};
+  }
+
+  die $::Usage if $badopts;
+}
+
+{ local($::DB)=CISRA::TimeSheets::db();
+  local($::UDB)=CISRA::UserData::db();
+  local($::Sheets)=$::DB->{'sheets'};
+  local($::MonthTable)=$::DB->{'months'};
+  local($::UserLists)=$::DB->{'userlists'};
+  local($::Projects)=CISRA::DB::db()->{'projects'};
+
+  $::Xit=&$repsub(@ARGV);
+}
+
+exit $::Xit;
+
+sub pprep
+	{ my(@ARGV)=@_;
+	  local($::Usage)="Usage: $::cmd pprep month [projid]\n";
+
+	  if (@ARGV != 1 && @ARGV != 2)
+		{ warn "$::cmd: missing month\n";
+		  die $::Usage;
+		}
+
+	  my($month,$specificProjid)=@ARGV;
+	  die "$::cmd: bad month ($month)\n" unless $month =~ /^(\d{4})-?(\d\d)$/;
+	  $month="$1-$2";
+
+	  die "$::cmd: $specificProjid: no such project code\n"
+		if defined($specificProjid)
+		&& ! exists $::Projects->{$specificProjid};
+
+	  die "month $month not in monthtable!" if ! exists $::MonthTable->{$month};
+	  my($weeks)=$::MonthTable->{$month};
+
+	  local(%::PPRep);
+
+	  my($user,$week,$ts,$projid,$task,$taskid);
+
+	  for $user (keys %$::Sheets)
+	    {
+	      for $week (@$weeks)
+		{
+		  if (exists $::Sheets->{$user}->{$week})
+		    { $ts=$::Sheets->{$user}->{$week};
+
+		      TASK:
+			for $task (@{$ts->{TASKS}})
+			{
+			  $projid=$task->{ACCTCODE};
+			  next TASK if defined $specificProjid
+				    && $projid ne $specificProjid;
+
+			  $taskid=usestasks($projid) ? $task->{TASKID} : "";
+
+			  my($pprep)=getpprep($projid,$user);
+			  $pprep->{TASKS}->{$taskid}->{HOURS}
+				+=$task->{HOURS};
+
+			  my($comment)=$task->{COMMENTS};
+			  $comment =~ s/^\s+//;
+			  $comment =~ s/\s+$//;
+			  $pprep->{TASKS}->{$taskid}->{COMMENTS}=$comment;
+
+			  my($ptrep)=getptrep($projid,$taskid);
+			  $ptrep->{BYUSER}->{$user}->{HOURS}+=$task->{HOURS};
+			  $ptrep->{HOURS}+=$task->{HOURS};
+			  my($schedule)=$task->{SCHEDULE};
+			  $schedule =~ s/^\s+//;
+			  $schedule =~ s/\s+$//;
+			  $ptrep->{BYUSER}->{$user}->{SCHEDULE}=$schedule;
+
+			}
+		    }
+		}
+	    }
+
+	  for $projid (sort { $a <=> $b } keys %::PPRep)
+	    {
+	      my($P)=$::Projects->{$projid};
+	      my($usestasks)=usestasks($projid);
+
+	      print "\nProject: $projid: $::Projects->{$projid}->{DESC}\n";
+	      printf("\n    %-23s %-7s %6s\n",
+			"User",$usestasks ? "Task ID" : "", "Hours");
+	      for $user ( sort keys %{$::PPRep{$projid}->{BYUSER}})
+		{
+		  my($U)=getpprep($projid,$user);
+		  my($firsttask)=1;
+
+		  for $taskid (sort keys %{$U->{TASKS}})
+		    {
+		      my($T)=$U->{TASKS}->{$taskid};
+		      printf("    %-23s %-7s %6.2f\n",
+				$firsttask ? "$user ($::UDB->{$user}->{NAME})" : "",
+				$usestasks ? length $taskid ? $taskid : "-" : "",
+				$T->{HOURS});
+
+		      if (length $T->{COMMENTS})
+			{ my($comment)=$T->{COMMENTS};
+			  $comment =~ s/\n/\n        /g;
+			  print "        ", $comment, "\n";
+			}
+
+		      $firsttask=0;
+		    }
+		}
+
+	      if ($usestasks)
+		{
+		  printf("\n    %-7s %-23s %6s\n",
+			    "Task ID", "User", "Hours");
+		  for $taskid (sort keys %{$::PPRep{$projid}->{BYTASK}})
+		    {
+		      my($T)=getptrep($projid,$taskid);
+		      my($firsttask)=1;
+
+		      for $user (sort keys %{$T->{BYUSER}})
+			{
+			  my($U)=$T->{BYUSER}->{$user};
+			  printf("    %-7s %-23s %6.2f\n",
+				$firsttask
+					? length $taskid
+						? $taskid : "-"
+					: "",
+				"$user ($::UDB->{$user}->{NAME})",
+				$U->{HOURS});
+
+			  if (length $U->{SCHEDULE})
+			    { my($schedule)=$U->{SCHEDULE};
+			      $schedule =~ s/\n/\n                /g;
+			      print "                ", $schedule, "\n";
+			    }
+
+			  $firsttask=0;
+			}
+		    }
+		}
+	    }
+
+	  return 0;
+	}
+
+sub getpprep
+	{ my($projid,$user)=@_;
+	  getcatent($projid,BYUSER,$user,{ TASKS	=> {},
+					   HOURS	=> 0,
+					 });
+	}
+
+sub getptrep
+	{ my($projid,$taskid)=@_;
+	  getcatent($projid,BYTASK,$taskid,{ HOURS	=> 0,
+					     BYUSER	=> {},
+					   });
+	}
+
+sub getcatent
+	{ my($projid,$cat,$subcat,$dflt)=@_;
+	  $::PPRep{$projid}->{$cat}->{$subcat}=$dflt
+		if ! defined $::PPRep{$projid}->{$cat}->{$subcat};
+
+	  $::PPRep{$projid}->{$cat}->{$subcat};
+	}
+
+sub usestasks
+	{ my($projid)=@_;
+	  my($P)=$::Projects->{$projid};
+	  # $P && $P->{FLAGS} && grep($_ eq USESTASKS,@{$P->{FLAGS}})
+	  1;
+	}
