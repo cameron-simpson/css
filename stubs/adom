@@ -1,0 +1,58 @@
+#!/bin/sh
+
+adom=/usr/local/bin/adom
+
+cd $HOME/rc/adom || exit 1
+
+[ -n "$DISPLAY" ] || exec "$adom" ${1+"$@"}
+
+TERMINFO= \
+xterm -n ADOM -T ADOM \
+	   -fn 9x15 -geometry 80x50+0-0 \
+	   -xrm 'XTerm*color8:   brown' \
+	   -xrm 'XTerm*VT100.translations: #override \n\
+ 			<KeyPress>KP_1  		: string("1") \n\
+ 			<KeyPress>KP_End		: string("1") \n\
+ 			Shift<KeyPress>KP_1  		: string("w1") \n\
+ 			Shift<KeyPress>KP_End		: string("w1") \n\
+ 			<KeyPress>KP_2                  : string("2") \n\
+ 			<KeyPress>KP_Down               : string("2") \n\
+ 			Shift<KeyPress>KP_2             : string("w2") \n\
+ 			Shift<KeyPress>KP_Down          : string("w2") \n\
+ 			<KeyPress>KP_3                  : string("3") \n\
+ 			<KeyPress>KP_Next               : string("3") \n\
+ 			Shift<KeyPress>KP_3             : string("w3") \n\
+ 			Shift<KeyPress>KP_Next          : string("w3") \n\
+ 			<KeyPress>KP_4                  : string("4") \n\
+ 			<KeyPress>KP_Left               : string("4") \n\
+ 			Shift<KeyPress>KP_4             : string("w4") \n\
+ 			Shift<KeyPress>KP_Left          : string("w4") \n\
+ 			<KeyPress>KP_5                  : string("5") \n\
+ 			<KeyPress>KP_Begin              : string("5") \n\
+ 			Shift<KeyPress>KP_5             : string("w5") \n\
+ 			Shift<KeyPress>KP_Begin         : string("w5") \n\
+ 			<KeyPress>KP_6                  : string("6") \n\
+ 			<KeyPress>KP_Right              : string("6") \n\
+ 			Shift<KeyPress>KP_6             : string("w6") \n\
+ 			Shift<KeyPress>KP_Right         : string("w6") \n\
+ 			<KeyPress>KP_7                  : string("7") \n\
+ 			<KeyPress>KP_Home               : string("7") \n\
+ 			Shift<KeyPress>KP_7             : string("w7") \n\
+ 			Shift<KeyPress>KP_Home          : string("w7") \n\
+ 			<KeyPress>KP_8                  : string("8") \n\
+ 			<KeyPress>KP_Up                 : string("8") \n\
+ 			Shift<KeyPress>KP_8             : string("w8") \n\
+ 			Shift<KeyPress>KP_Up            : string("w8") \n\
+ 			<KeyPress>KP_9                  : string("9") \n\
+ 			<KeyPress>KP_Prior              : string("9") \n\
+ 			Shift<KeyPress>KP_9             : string("w9") \n\
+ 			Shift<KeyPress>KP_Prior         : string("w9") \n\
+			Meta<KeyPress>			: string(0x1b) insert() \n\
+			Alt<KeyPress>			: string(0x1b) insert() \n\
+			Shift<Btn1Down>			: ignore() \n\
+			Shift<Btn1Up>			: insert-selection(PRIMARY,CUT_BUFFER0)\n\
+			Shift<Btn3Down>			: ignore() \n\
+			~Ctrl ~Meta <Btn2Up>		: ignore() \n\
+			~Ctrl ~Meta <Btn3Down>		: ignore() \n' \
+	   -e "$adom" ${1+"$@"} \
+	   &
