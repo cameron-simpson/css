@@ -1,0 +1,12 @@
+#!/bin/sh
+
+[ -f "$PWDLOG" ] || { # echo "$0: \$PWDLOG (\"$PWDLOG\") doesn't point at a file" >&2
+		      exit 1
+		    }
+
+case $# in
+    0)	pwd >>"$PWDLOG" ;;
+    *)	for path
+	do echo "$path" >>"$PWDLOG"
+	done ;;
+esac
