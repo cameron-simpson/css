@@ -1,0 +1,48 @@
+#!/bin/sh
+#
+# Given a prefix, create a file with a -date or -date-time suffix.
+#	- Cameron Simpson <cs@zip.com.au> 31jul2000
+#
+
+sfx=
+
+cmd=$0
+usage="Usage: $cmd [-s suffix] prefix"
+
+[ "x$1" = x-s ] && { sfx=$2; shift; shift; }
+
+badopts=
+if [ $# = 0 ]
+then  echo "$cmd: missing prefix" >&2
+      badopts=1
+else  pfx=$1; shift
+      [ $# = 0 ] || { echo "$cmd: extra arguments: $*" >&2
+		      badopts=1
+		    }
+fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+
+today=`daycode`
+try1=$pfx-$today$sfx
+if [ -f "$try1" ]
+then
+    now=`datecode`
+    try2=$pfx-$now$sfx
+    if [ -f "$try2" ]
+    then
+	echo "$cmd: both $try1" >&2
+	echo "	and $try2 are taken" >&2
+	exit 1
+    else
+	f=$try2
+    fi
+else
+    f=$try1
+fi
+
+>>"$f"
+[ -f "$f" ] || { echo "$cmd: can't create $f" >&2; exit 1; }
+
+echo "$f"
