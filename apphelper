@@ -13,12 +13,12 @@ cmd=`basename "$0"`
 ## set x +t "$@"; shift
 ##echo "[$*]" >&2
 
-savedir=`lastvalue savedir 2>/dev/null`
-savedir=${savedir:-"${SAVEDIR-$HOME/dl}"}
+savedir=
 pager=${PAGER:-less}
 doview=$APPHELPER_DOVIEW
-savemode=$APPHELPER_SAVEMODE
+savemode=${APPHELPER_SAVEMODE:-ask}
 extract=
+extract_globs=${APPHELPER_EXTRACT_GLOBS:-'*'}
 termname=$cmd
 
 # =head1 SYNOPSIS
@@ -65,9 +65,6 @@ badopts=
 #
 # Open a fresh terminal window in which to run apphelper.
 # Generally desirable when invoking inside a GUI web browser.
-# This is default behaviour if either standard input
-# or standard output
-# is not connected to a terminal.
 #
 # =item +t
 #
@@ -82,14 +79,6 @@ case $1 in
   -t)	shift; doterm=1 ;;
   -T)	shift; termname=$1; shift; doterm=1 ;;
   +t)	shift; doterm= ;;
-  *)	if [ -t 0 -a -t 1 ]
-	then  doterm=
-	else  [ -t 0 ] || echo STDIN not a tty
-	      [ -t 1 ] || echo STDOUT not a tty
-	      doterm=1
-	      pt
-	fi
-	;;
 esac
 
 if [ $# = 0 ]
@@ -100,16 +89,12 @@ else
   file=$1; shift
   if [ "x$file" = x- ]
   then
-      if [ -t 0 ]
+      if cat >"$tmpfile"
       then
-	  echo "$cmd: stdin can't be a tty if the file is \"-\"" >&2
-	  badopts=1
+	  file=$tmpfile
       else
-	  if cat >"$tmpfile"
-	  then	file=$tmpfile
-	  else	echo "$cmd: can't cat stdin to $tmpfile, aborting" >&2
-		badopts=1
-	  fi
+	  echo "$cmd: can't cat stdin to $tmpfile, aborting" >&2
+	  badopts=1
       fi
   else
       if [ ! -s "$file" ]
@@ -138,6 +123,9 @@ else
       ) &
       exit 0
   fi
+
+  [ -t 0 ] || exec </dev/tty;	[ -t 0 ] || exit 1
+  [ -t 1 ] || exec >/dev/tty;	[ -t 1 ] || exit 1
 
   apphopts=
   while :
@@ -183,9 +171,15 @@ else
 	  # The default is to ask.
 	  #
 	  -Y)	savemode=yes ;;
+	  # =item -Y
+	  #
+	  # Yes: save the file without asking.
+	  # The default is to ask.
+	  #
+	  -A)	savemode=auto ;;
 	  # =item -X
 	  #
-	  # Extract the file (presumed to be an archive)
+	  # Extract the file (if we know how)
 	  # with the x(1) command
 	  # and run apphelper on each component.
 	  #
@@ -209,18 +203,32 @@ fi
 
 if [ $extract ]
 then
-    case "$file" in
-	/*) absfile=$file ;;
-	*)  absfile=`pwd`/$file ;;
-    esac
-    xdir=`mkdirn "${TMPDIR:-/tmp}/$cmd"` || exit 1
-    ( cd "$xdir" || exit 1
-      x "$absfile"
-      set -x
-      exec find . -type f -size +0 -print -exec "$0" {} $apphopts ';'
-    )
-    rm -rf "$xdir"
-    exit
+  set -x
+  if mtype=`file2mime "$file"` \
+  && action=`mailcap -s "$file" "$mtype" unpack !gui`
+  then
+      case "$file" in
+	  /*) absfile=$file ;;
+	  *)  absfile=`pwd`/$file ;;
+      esac
+      xdir=`mkdirn "${TMPDIR:-/tmp}/$cmd"` || exit 1
+      ( cd "$xdir" || exit 1
+	x "$absfile"
+	set x
+	sep=
+        for glob in ${extract_globs:-'*'}
+	do  
+	  set "$@" $sep -name "$glob"
+	  sep=-o
+	done
+	shift
+	set -x
+	exec find . -type f -size +0 \( "$@" \) -print -exec "$0" {} $apphopts -A v ';'
+      )
+      rm -rf "$xdir"
+      exit
+  fi
+  set +x
 fi
 
 fbase=`basename "$file"`
@@ -325,6 +333,19 @@ fi
 # with the B<-i> option,
 # leaving it up to cp(1) to ask questions.
 #
+if [ -z "$savedir" ]
+then
+    savedir=`lastvalue savedir 2>/dev/null`
+    savedir=${savedir:-"${SAVEDIR-$HOME/dl}"}
+fi
+if [ "x$savemode" = xauto ]
+then
+  trysave=$savedir/$fbase
+  if [ -s "$trysave" ] && cmp -s "$file" "$trysave"
+  then  savemode=no
+  else  savemode=ask
+  fi
+fi
 case "$savemode" in
     yes)	saveas=$savedir/$fbase ;;
     no)		saveas= ;;
@@ -398,7 +419,7 @@ fi
 # stash savedir
 ( cd "$parent" || exit 1
   pwd | lastvalue savedir -
-) &
+)
 
 [ -s "$saveas" ] && cmp -s "$file" "$saveas" && exit 0
 
