@@ -1,0 +1,52 @@
+#!/bin/sh
+#
+# Report time for jobs by category.
+#	- Cameron Simpson <cs@zip.com.au> 01jul2003
+#
+
+jobtimer -a \
+| while read id name
+  do
+    cat=`jobtimer "$id" category`
+    [ -n "$cat" ] || cat=MISC
+
+    total=`jobtimer "$id" total`
+    [ -n "$total" ] || total=0
+
+    title=`jobtimer "$id" title`
+
+    echo "$id	$name	$cat	$total	$title"
+  done \
+| sort -t'	' +2 +1 -n +0 \
+| awk -F'	' \
+      'BEGIN	{ nids=0 }
+       		{ id=$1; name=$2; cat=$3; total=$4; title=$5
+		  ids[nids++]=id
+		  names[id]=name
+		  cats[id]=cat
+		  totals[id]=total
+		  titles[id]=title
+
+		  cat_totals[cat]+=total
+		}
+       END	{ for (cat in cat_totals)
+		  { print cat "\t" cat_totals[cat]
+		    for (nid=0; nid<nids; nid++)
+		    { id=ids[nid]
+		      if (cats[id] == cat)
+		      { print ".\t" totals[id] "\t" names[id] ": " titles[id]
+		      }
+		    }
+		  }
+		}
+      ' \
+| while read cat total etc
+  do
+    htotal=`humantime "$total"`
+    if [ "x$cat" = x. ]
+    then
+	printf "%9s %-11s %s\n" "$htotal" "" "$etc"
+    else
+	printf "%9s %-11s\n" "$htotal" "$cat"
+    fi
+  done
