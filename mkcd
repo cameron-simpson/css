@@ -86,7 +86,7 @@ dummy=
 dev=${MKCDDEV:+dev=$MKCDDEV}
 
 # override scsiid or speed or blank here
-[ -f /etc/mkcdrc ] && . /etc/mkcdrc
+[ -s /etc/mkcdrc ] && . /etc/mkcdrc
 [ -f $HOME/.mkcdrc ] && . $HOME/.mkcdrc
 [ -n "$dev" ] || dev="dev=0,$scsiid,0"
 
