@@ -5,5 +5,4 @@
 #
 
 eval `secret "mysql@$SYSTEMID"` || exit 1
-set -x
 exec /opt/mysql/bin/mysql "-h$secretHOST" "-u$secretLOGIN" "-p$secretPASSWORD" ${1+"$@"}
