@@ -8,4 +8,8 @@ set -x
 ##exec alog squid_redirect squid_redirect -P "8080:$SQUID"
 rc=$HOME/tmp/squid.conf$$
 envsub -p '\{\{([A-Z]\w*)\}\}' <$HOME/rc/squid/tplt >$rc
+case "$LOCATION" in
+    cisra)	;;
+    *)		bsed 's/^never_direct/##&/' $rc ;;
+esac
 exec alog squid/cache.log squid -f "$rc" -D
