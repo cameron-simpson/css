@@ -9,6 +9,9 @@ usage="Usage: $cmd [+l] dest-port {ALL | hosts...}"
 
 badopts=
 
+chain_in=FW_INPUT
+chain_out=FW_OUTPUT
+
 dolog=1
 [ "x$1" = x+l ] && { dolog=; shift; }
 
@@ -30,15 +33,15 @@ fi
 if [ "x$*" = xALL ]
 then
     set -x
-    [ $dolog ] && iptables -A INPUT -p tcp --destination-port "$dport" --syn -j LOGACCEPT
-    iptables -A INPUT -p tcp --destination-port "$dport" -j ACCEPT
-    iptables -A OUTPUT -p tcp --source-port "$dport" ! --syn -j ACCEPT
+    [ $dolog ] && iptables -A "$chain_in" -p tcp --destination-port "$dport" --syn -j LOGACCEPT
+    iptables -A "$chain_in" -p tcp --destination-port "$dport" -j ACCEPT
+    iptables -A "$chain_out" -p tcp --source-port "$dport" ! --syn -j ACCEPT
 else
     set -x
     for host
     do
-      [ $dolog ] && iptables -A INPUT -p tcp -s "$host" --destination-port "$dport" --syn -j LOGACCEPT
-      iptables -A INPUT -p tcp -s "$host" --destination-port "$dport" -j ACCEPT
-      iptables -A OUTPUT -p tcp -d "$host" --source-port "$dport" ! --syn -j ACCEPT
+      [ $dolog ] && iptables -A "$chain_in" -p tcp -s "$host" --destination-port "$dport" --syn -j LOGACCEPT
+      iptables -A "$chain_in" -p tcp -s "$host" --destination-port "$dport" -j ACCEPT
+      iptables -A "$chain_out" -p tcp -d "$host" --source-port "$dport" ! --syn -j ACCEPT
     done
 fi
