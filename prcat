@@ -108,7 +108,7 @@ sub copyout($;$)
   { $Bps='';
   }
   out('');
-  nl( (defined $file ? "$file: " : '').sprintf("%6s Time: %s",$Bps,scalar(cs::Units::sec2human($elapsed))) );
+  nl( (defined $file ? "$file: " : '').sprintf("%6s Size: %s Time: %s",$Bps,scalar(cs::Units::bytes2human($sofar,1)),scalar(cs::Units::sec2human($elapsed))) );
 
   if (! defined $n)
   { warn "$::cmd: read error: $!\n";
