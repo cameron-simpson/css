@@ -1,0 +1,20 @@
+#!/usr/bin/perl
+#
+# Output the contents of a MIME file, decoded.
+#	- Cameron Simpson <cs@zip.com.au>
+#
+
+use cs::MIME;
+use cs::Source;
+
+my($M)=new cs::MIME (new cs::Source (FILE,STDIN));
+die "can't make cs::MIME from STDIN" if ! defined $M;
+
+my($data)=$M->Source();
+die "can't get Source from cs::MIME(STDIN)" if ! defined $data;
+
+while (defined ($_=$data->GetLine()) && length)
+	{ print;
+	}
+
+exit 0;
