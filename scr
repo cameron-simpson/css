@@ -8,8 +8,11 @@ cmd=$0
 usage="Usage:
     $cmd
 	List sessions.
-    $cmd [-N] session-name [cmd [args...]]
+    $cmd [-c scrcmd]... [-l logfile] [-N] session-name [cmd [args...]]
 	Join named session, creating it if missing.
+	-c scrcmd  Run the supplied screen command in addition to the .screenrc
+	-l logfile Log session to the named file.
+		   You still need to turn logging on _in_ the session:-(
 	-N	Force new session."
 
 # nothing? list active sessions
@@ -22,8 +25,36 @@ usage="Usage:
 
 badopts=
 
-new=
-[ "x$1" = x-N ] && { new=1; shift; }
+rcfile=$HOME/.screenrc
+tmprc=
+
+addscrcmds()
+{ for scrcmd
+  do
+    if [ -z "$tmprc" ]
+    then
+      tmprc=${TMPDIR:-/tmp}/screenrc$$
+      cat "$rcfile" >"$tmprc" 2>/dev/null
+      rcfile=$tmprc
+    fi
+    echo "$scrcmd" >>"$tmprc"
+  done
+}
+
+while :
+do
+  case $1 in
+    -c)	addscrcmds "$2"; shift ;;
+    -N)	new=1 ;;
+    -l)	addscrcmds "logfile $2" "logfile flush 1"; shift ;;
+    --)	shift; break ;;
+    -?*)echo "$cmd: unrecognised option: $1" >&2
+	badopts=1
+	;;
+    *)	break ;;
+  esac
+  shift
+done
 
 if [ $# = 0 ]
 then
@@ -44,30 +75,34 @@ fi
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
-# if new, just run up a new screen session
-[ $new ] && exec screen -S "$sess" -- "$@"
+(
+  # if new, just run up a new screen session
+  [ $new ] && exec screen -c "$rcfile" -S "$sess" -- "$@"
 
-# otherwise convert $sess into session name to join
-case "$sess" in
-  [1-9]|[1-9][0-9]|[1-9][0-9][0-9])
-	# numeric - pull name from listing
-	nsess=`scr | sed -n "s/^ *$sess //p"`
-	[ -n "$nsess" ] || { echo "$cmd: no screen numbered $sess" >&2
-			     exit 1
-			   }
-	# matched - join the session
-	exec screen -x "$nsess"
-	;;
+  # otherwise convert $sess into session name to join
+  case "$sess" in
+    [1-9]|[1-9][0-9]|[1-9][0-9][0-9])
+	  # numeric - pull name from listing
+	  nsess=`scr | sed -n "s/^ *$sess //p"`
+	  [ -n "$nsess" ] || { echo "$cmd: no screen numbered $sess" >&2
+			       exit 1
+			     }
+	  # matched - join the session
+	  exec screen -c "$rcfile" -x "$nsess"
+	  ;;
 
-  # strip slashes from session name if necessary
-  */*)	sess=`echo "$sess" | tr / _` ;;
-esac
+    # strip slashes from session name if necessary
+    */*)  sess=`echo "$sess" | tr / _` ;;
+  esac
 
-# not numeric - look up in listing
-match=`scr | sed -e "/^ *[1-9][0-9]* [1-9][0-9]*\\.$sess\$/!d" -e 's/^ *[1-9][0-9]*  *//' -e q`
+  # not numeric - look up in listing
+  match=`scr | sed -e "/^ *[1-9][0-9]* [1-9][0-9]*\\.$sess\$/!d" -e 's/^ *[1-9][0-9]*  *//' -e q`
 
-# match found - join it
-[ -n "$match" ] && exec screen -x "$sess"
+  # match found - join it
+  [ -n "$match" ] && exec screen -c "$rcfile" -x "$sess"
 
-# start new session
-exec screen -S "$sess" -- "$@"
+  # start new session
+  exec screen -c "$rcfile" -S "$sess" -- "$@"
+)
+
+[ -n "$tmprc" ] && rm "$tmprc"
