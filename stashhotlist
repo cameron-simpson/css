@@ -1,0 +1,32 @@
+#!/bin/sh
+#
+# Stash hotlists.
+#	- Cameron Simpson <cs@zip.com.au> 06sep95
+#
+
+usage="Usage: $0 hotlistfiles..."
+
+stash=$HOME/public/private/hotlists
+daycode=`daycode`
+moncode=`expr "$daycode" : '\(....\)..'`
+daily=$stash/daily/$daycode
+monthly=$stash/monthly/$moncode
+
+[ $# = 0 ] && { echo "$usage" >&2; exit 2; }
+
+tmp=/tmp/hotlist.$$
+
+trap "rm -f \$tmp; exit 0" 0
+trap "rm -f \$tmp; exit 1" 1 2 15
+
+xit=0
+for hotlist
+do  cp "$hotlist" $tmp || { xit=$?; continue; }
+    dumphotlist "$hotlist" >>"$monthly" \
+	|| { xit=$?
+	     echo "restoring $hotlist from $tmp" >&2
+	     cp $tmp "$hotlist"
+	   }
+done
+
+exit $xit
