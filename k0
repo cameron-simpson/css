@@ -1,0 +1,3 @@
+#!/bin/sh
+DISPLAY=kaper:0; export DISPLAY
+exec "$@"
