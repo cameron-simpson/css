@@ -70,7 +70,7 @@ fi
 [ -n "$title" ] || title=$filetitle
 [ -n "$mtype" ] || mtype=`file2mime "$file"` || exit 1
 
-conf_mentor='mentor2ps -m "$medium"'
+conv_mentor='mentor2ps -m "$medium"'
 conv_pdf=acroread2ps
 conv_text='a2ps -1 -o- --stdin "$title" -T 8 -i --borders=no -b $a2ps_aspect --medium=$medium -f 10'
 conv_html=unhtml
@@ -80,9 +80,9 @@ case "$mtype" in
     application/postscript) conv=cat ;;
     application/mentor)	conv=$conv_mentor ;;
     application/x-sh)	conv=$conv_text ;;
-    text/plain)		conv=$conf_text ;;
+    text/plain)		conv=$conv_text ;;
     text/html)		conv=$conv_html ;;
-    text/*)		conv=$conf_text ;;
+    text/*)		conv=$conv_text ;;
     image/*)		conv=$conv_image ;;
     *)			echo "$cmd: supported input type \"$mtype\"" >&2
 			exit 1
