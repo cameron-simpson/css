@@ -1,0 +1,11 @@
+#!/bin/sh
+
+[ $# = 1 ] || { echo "Usage: $0 user" >&2; exit 2; }
+
+user=$1
+case "$user" in */*)	echo "$0: bad user \"$user\"" >&2; exit 2 ;; esac
+
+ypcat -k aliases \
+| sed -e 's/ \(.*\)/ ,\1,/' \
+      -e "/,$user,/!d" \
+      -e 's/ .*//'
