@@ -1,0 +1,48 @@
+#!/bin/sh
+#
+# Add a link page URL to a list of link pages.
+#	- Cameron Simpson <cs@zip.com.au> 04aug2000
+#
+
+LINKPAGEPATH=${LINKPAGEPATH:-$HOME/.linkpages}
+export LINKPAGEPATH
+
+verbose=
+[ -t 0 ] && verbose=1
+
+usage="Usage: $0 [-d dir] topic [urls...]"
+
+[ "x$1" = x-d ] && { LINKPAGEPATH=$2; shift; shift
+		     export LINKPAGEPATH
+		   }
+
+[ $# = 0 ] && { echo "$0: missing topic" >&2
+		echo "$usage" >&2
+		exit 2
+	      }
+topic=$1
+shift
+
+case "$topic" in
+    */*)	echo "$0: bad topic \"$topic\"" >&2
+		exit 2
+		;;
+esac
+
+for dir in `unpath "$LINKPAGEPATH"`
+do  topicfile=$dir/urls/$topic
+    [ -f "$topicfile" ] && break
+done
+
+[ -f "$topicfile" ]  || { echo "$0: can't find topic \"$topic\" in \$LINKPAGEPATH" >&2
+			  exit 1
+			}
+
+[ $# = 0 ] && { [ $verbose ] && echo "Reading URLs from stdin..." >&2
+		set x `cat`; shift
+	      }
+
+for url
+do  [ $verbose ] && echo "$url >> $topicfile" >&2
+    echo "$url" >>"$topicfile"
+done
