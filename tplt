@@ -52,7 +52,7 @@ case $FILE in
     ;;
   *.c)
     tplt=csapp.c ;;
-  *.java|*.html)
+  *.*)
     tplt=`expr "x$FILE" : 'x.*\.\(..*\)'`
     ;;
 esac
