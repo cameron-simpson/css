@@ -27,7 +27,6 @@ This module obtains a lock on a resource
 via an agreed name and lock directory.
 
 The current implementation uses directories
-(in an agreed spot, by default B<$HOME/.locks>)
 for the lock objects.
 The B<Put> method, if used,
 then makes files in these directories.
@@ -43,10 +42,11 @@ use Fcntl;
 package cs::Lock;
 
 # delay parameters
-# with a bit of uncertainty to lower racing
+# with a bit of uncertainty to reduce racing
 $cs::Lock::Delay=1+($$%5);
 $cs::Lock::Dincr=1+($$%7);
-$cs::Lock::Dmax=25+$cs::Lock::Dincr*($$%3);
+# over 30secs, the NFS cache time
+$cs::Lock::Dmax=45+$cs::Lock::Dincr*($$%3);
 
 $cs::Lock::Whingeafter=5;	# 5 consecutive lock failures? start saying so
 
@@ -109,9 +109,10 @@ I<maxtries> defaults to zero.
 
 =cut
 
-sub new($$;$)
-{ my($class,$key,$maxtries)=@_;
+sub new($$;$$)
+{ my($class,$key,$maxtries,$silent)=@_;
   $maxtries=0 if ! defined $maxtries;
+  $silent=0 if ! defined $silent;
 
   my $this;
 
@@ -119,6 +120,7 @@ sub new($$;$)
   # the real work
   { $this = bless { KEY => $key,
 		    PATH => keypath($key),
+		    SILENT => $silent,
 		  }, $class;
     return $this if $this->_Take();
     delete $this->{PATH};
@@ -138,7 +140,7 @@ sub new($$;$)
 	$this=new($class,$key,1);
 	if (defined $this)
 	{ warn "$::cmd: got lock on $path after $slept seconds\n"
-		if $saidwait;
+		if $saidwait && ! $silent;
 	  return $this;
 	}
 	## else {warn "this=$this, path=$path\n";}
@@ -152,7 +154,7 @@ sub new($$;$)
 	  { $firstwait=0; }
 	  else
 	  { if (! $saidwait && $waits >= $cs::Lock::Whingeafter)
-	    { warn "$::cmd: waiting for lock on $path ...\n";
+	    { $silent && warn "$::cmd: waiting for lock on $path ...\n";
 	      $saidwait=1;
 	    }
 	  }
@@ -242,6 +244,17 @@ sub Put($$;$)
 }
 
 =back
+
+=head1 FILES
+
+The lock directory is chosen as follows:
+the directory named in the environment variable B<$LOCKDIR>,
+or the subdirectory B<locks> of the directory returned by cs::Misc::tmpDir(3) if it exists,
+or the directory B<$HOME/.locks>.
+
+=head1 ENVIRONMENT
+
+B<LOCKDIR> - the preferred directory for locks.
 
 =head1 AUTHOR
 
