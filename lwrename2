@@ -1,4 +1,4 @@
-#!/usr/bin/perl
+#!/usr/bin/perl -w
 #
 # Recode of Larry Wall's rename script.
 #	- Cameron Simpson <cs@zip.com.au> 20aug2003
@@ -7,13 +7,43 @@
 use File::Basename;
 use File::Compare;
 use File::Path;
+use Getopt::Std;
 
 ($::cmd=$0) =~ s:.*/::;
-$::Usage="Usage: $::cmd perlop files...\n";
+$::Usage="Usage: $::cmd [-qvn] perlop files...\n";
 
-die $::Usage if @ARGV < 2;
+my $verbose=0;
+if (-t 1) { $verbose=1; }
 
-my $op = shift(@ARGV);
+my $doit=1;
+
+my $badopts=0;
+
+my %opt;
+if (! getopts("nqv",\%opt))
+{ warn "$::cmd: bad options\n";
+  $badopts=1;
+}
+
+$doit=0 if $opt{'n'};
+$verbose=0 if $opt{'q'};
+$verbose=1 if $opt{'v'};
+
+my $perlop;
+
+if (! @ARGV)
+{ warn "$::cmd: missing perlop\n";
+  $badopts=1;
+}
+else
+{ $perlop=shift(@ARGV);
+  if (! @ARGV)
+  { warn "$::cmd: missing files\n";
+    $badopts=1;
+  }
+}
+
+die $::Usage if $badopts;
 
 local($_);
 
@@ -23,7 +53,7 @@ for my $path (@ARGV)
   -e $path || next PATH;
   my $base = basename($path);
   $_=$base;
-  eval $op;
+  eval $perlop;
   die $@ if $@;
   if ($_ ne $base)
   {
@@ -33,7 +63,8 @@ for my $path (@ARGV)
     if (-e $npath)
     {
       if (compare($path,$npath) == 0)
-      { print "$path -> $npath: identical, unlinking $path\n";
+      { print "$path -> $npath: identical, unlinking $path\n"
+	  if $verbose;
 	unlink($path) || warn "$::cmd: unlink($path): $!";
       }
       else
@@ -41,7 +72,8 @@ for my $path (@ARGV)
       }
     }
     else
-    { rename($path,$npath) || warn "$path -> $npath: $!";
+    { print "$path -> $npath\n" if $verbose;
+      rename($path,$npath) || warn "$::cmd: $path -> $npath: $!";
     }
   }
 }
