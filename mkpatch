@@ -3,6 +3,8 @@
 # Usage: mkpatch [-v] [-c commentry] [--] olddir newdir
 #
 
+: ${TMPDIR:=/tmp}
+
 cmd=`exec basename "$0"`
 usage="Usage: $cmd [-c commentry] [--] olddir newdir"
 
@@ -37,7 +39,7 @@ case "$commentry" in
 		;;
 esac
 
-tmp=/tmp/mkpatch$$
+tmp=$TMPDIR/mkpatch$$
 diff -r -c "$old" "$new" |
 	fdtee "sed -e '/^Only/d' > $tmp" |
 	grep '^Only' |
