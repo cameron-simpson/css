@@ -216,15 +216,15 @@ do  [ $abort ] && exit 1
       then
 	  echo "$cmd: $f: unrecognised format" >&2
 	  exit 1
+      fi
+
+      eval "formatfilter=\$${mode}_$format"
+      if [ -z "$formatfilter" ]
+      then
+	  echo "$cmd: $f: don't know how to $mode format $format" >&2
+	  exit 1
       else
-	  eval "formatfilter=\$${mode}_$format"
-	  if [ -z "$formatfilter" ]
-	  then
-	      echo "$cmd: $f: don't know how to $mode format $format" >&2
-	      exit 1
-	  else
-	      pipe="$pipe$pipeext $formatfilter $fargs"
-	  fi
+	  pipe="$pipe$pipeext $formatfilter $fargs"
       fi
 
       [ $pageit ] && pipe="$pipe | less -E"
