@@ -99,4 +99,4 @@ done
 action=`mailcap -s "$file" "$mtype" decode`
 [ -n "$action" ] && { eval "set -vx; $action" | "$0" - ${1+"$@"}; exit $?; }
 echo "$mtype"
-file "$file"
+file "$file" | noesc
