@@ -17,7 +17,10 @@ cats2procmailrc [B<-a> I<alert>] [B<-m> I<maildomains>] [B<-t> I<type>] E<lt>cat
 I<cats2procmailrc> reads a human friendly mail category description file
 and emits a matching procmail(1) recipe to implement it.
 The intent it to have an extremely succinct file
-of easily editable one line rules.
+of easily editable one line rules,
+generally of the form:
+
+	folder	tag	pattern
 
 I build my B<.procmailrc> with the following myke(1) rule:
 
@@ -64,6 +67,12 @@ The default is B<unix>.
 =head2 LINE FORMAT
 
 Blank lines and lines beginning with an octothorpe ('#') are ignored.
+
+Lines of the form:
+
+	VARIABLE=value
+
+are passed through unchanged.
 
 Other lines are of the form:
 
@@ -228,14 +237,20 @@ while (<STDIN>)
   s/^#.*//;
   next CAT if ! length;
 
-  # leading + means continue after rule
+  # VARIABLE=value
+  if (/^[a-z]\w*=/)
+  { print "$_\n";
+    next CAT;
+  }
+
+  # leading "+" means continue after rule
   $cont='';
   if (/^\+\s*/)
   { $cont='c';
     $_=$';
   }
 
-  # leading ! means alert this message
+  # leading "!" means alert this message
   $doalert=0;
   if (/^\!\s*/)
   { $doalert=1;
