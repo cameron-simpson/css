@@ -4,7 +4,8 @@
 #	- Cameron Simpson <cs@zip.com.au> 14feb2003
 #
 
-while read key url
+while read title && read url
 do
-  echo "\"$key\" Exec us $url"
-done <$HOME/rc/urlmap
+  echo "\"$title\" Exec us $url"
+done <$HOME/rc/urlmap \
+| sort -d
