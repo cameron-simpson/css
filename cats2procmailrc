@@ -370,7 +370,7 @@ X
 
   print <<X
 
-  : 0$flags
+  : 0$flags:
   $deliver
 X
   ;
