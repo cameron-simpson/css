@@ -182,8 +182,14 @@ echo "<UL>"
 	htfile=`basename "$podfile" .pod`.html
 
 	## dbuser "$author" FULLNAME
-	fullname=`{ grep "^$author:" /etc/passwd || ypmatch "$author" passwd; } | awk -F: '{print$5}' | sed 's/,.*//'`
-	[ -n "$fullname" ] || fullname=author
+	fullname=
+	for auth in $author
+	do
+	  [ -n "$fullname" ] && fullname="$fullname, "
+	  fn=`{ grep "^$auth:" /etc/passwd || ypmatch "$auth" passwd; } | awk -F: '{print$5}' | sed 's/,.*//'`
+	  [ -n "$fn" ] || fn=$auth
+	  fullname=$fullname$fn
+	done
 
 	modtime=`ls -ld "$podfile" | awk '{print $6, $7, $8}'`
 
