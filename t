@@ -102,6 +102,7 @@ view_avi='xine -pf $f'
 view_mov=$view_avi
 view_asf=$view_avi
 view_vob='xine -pf $f'
+view_ram='realplay $f'
 
 view_xanm='xanim $formopts /dev/fd/0'
 
@@ -182,6 +183,7 @@ do  [ $abort ] && exit 1
 	      zip|exe)	format=zip ;;
 	      mpg|mpeg|mpe) format=mpg ;;
 	      vob)	format=vob ;;
+	      ram|rm)	format=ram ;;
 	      jpg|jpeg|png|gif|xbm|xpm)
 			format=image ;;
 	      asf|mov|avi)	format=$cext ;;
