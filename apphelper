@@ -1,0 +1,75 @@
+#!/bin/sh
+#
+# Generic wrapper for web data, offering save or view.
+#	- Cameron Simpson <cs@zip.com.au> 18jun1998
+#
+
+savedir=${SAVEDIR-$HOME/dl}
+savedir=$HOME/dl
+pager=${PAGER:-less}
+
+cmd=`basename "$0"`
+usage="Usage: $cmd [-t] file [-d savedir] viewer [viewer-args...]
+	-t		Run apphelper in a new terminal window.
+	-d savedir	Save directory (from \$SAVEDIR: $savedir).
+	-p pager	Pager (default viewer, from \$PAGER: $pager)."
+
+case $1 in
+    -t)	shift; exec term +a -small -e "$0" ${1+"$@"} ;;
+esac
+
+badopts=
+if [ $# = 0 ]
+then  echo "$cmd: missing file" >&2; badopts=1
+else
+  file=$1; shift
+  if [ ! -s "$file" ]
+  then	echo "$cmd: bad file?" >&2
+	ls -ld "$file" >&2
+	badopts=1
+  fi
+
+  while :
+  do  case $1 in
+	  -d)	savedir=$2; shift ;;
+	  -p)	pager=$2; shift ;;
+	  --)	shift; break ;;
+	  -?*)	echo "$cmd: unrecognised option: $1" >&2; badopts=1 ;;
+	  *)	break ;;
+      esac
+      shift
+  done
+fi
+
+[ $# = 0 ] && { set x $pager; shift; }
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+fbase=`basename "$file"`
+
+export file fbase
+
+file "$file"; echo
+
+necho "Save [$savedir/$fbase]? "
+read saveas || exit 0
+case "$saveas" in
+    ''|n|no)	saveas= ;;
+    y|yes)	saveas=$savedir/$fbase ;;
+    *)		saveas=$savedir/$saveas ;;
+esac
+if [ -n "$saveas" ]
+then
+    [ -d "$saveas/." ] && saveas=$saveas/$fbase
+    cp -i "$file" "$saveas"
+fi
+
+necho "View [$*]? "
+read viewit || exit 0
+case "$viewit" in
+    ''|y|yes)	;;
+    n|no)	exit 0 ;;
+    *)		set x $viewit; shift ;;
+esac
+
+exec "$@" "$file"
