@@ -55,8 +55,16 @@ done
 
 if [ $# = 1 -a -f "$1" -a -s "$1" ]
 then
-    :
+    # one argument which is a file
+    domenu=
 else
+    case "$#,$1" in
+      1,http://*)
+	# one argument which is a URL
+	exec withurl "$1" "$0"
+	;;
+    esac
+
     set x `set -x; pickim -P "$strippfx" -n $pickn -r $aspect ${1+"$@"} | sort -u` || exit 1
     shift
     [ $# = 0 ] && exit 1
@@ -118,73 +126,88 @@ umask 077
 
 tmpdir=`mkdirn "$tmp/rootbg"` || exit 1
 cp "$imagefile" "$tmpdir/." || exit 1
-lastvalue rootbg "$imagefile"
+lastvalue rootbg "$imagefile" &
 
-( cd "$tmpdir" || exit 1
-  img=`basename "$imagefile"`
-  sfx=`expr "x$img" : 'x.*\.\([^.]*$\)'`
-  base=`basename "$img" ".$sfx"`
-  final=$base.PNG
-  bgx=$X11_BGX bgy=$X11_Y
-  set /opt/ImageMagick/bin/mogrify -quality 0 -background black -geometry "${bgx}x${bgy}" -format PNG
+imagefilebase=`basename "$imagefile"`
+imagefiledir=`dirname "$imagefile"`
+bgx=$X11_BGX bgy=$X11_Y
+cachedir=$HOME/tmp/cache/bg/${bgx}x${bgy}/$imagefiledir
+cachefile=$cachedir/$imagefilebase.png
 
-  # see if we need to letterbox or something
-  ix= iy=
-  eval `imsize "$img" | awk '{print "ix="$1 " iy="$2}'`
-  if [ -n "$ix" -a -n "$iy" ]
-  then
-      awkf="BEGIN { ix=$ix; iy=$iy; bgx=$bgx; bgy=$bgy"'
-		    w=bgx; h=bgy
-		  }
-	    END   { if (ix > bgx || iy > bgy)
-		      # too big - shrink
-		      if (ix/bgx > iy/bgy)
-			# shrink X more than Y
-			h=int(iy * (bgx/ix))
-		      else
-			# shrink Y more than X
-			w=int(ix * (bgy/iy))
-		       
-		    else
-		    # smaller image - scale up
-		    if (bgx/ix < bgy/iy)
-		      # scale X less - use that
-		      h=iy*bgx/ix
-		    else
-		      # scale Y less
-		      w=ix*bgy/iy
+if [ -s "$cachefile" ]
+then
+    fvwm-root --retain-pixmap "$cachefile"
+else
+    ( cd "$tmpdir" || exit 1
+      img=$imagefilebase
+      sfx=`expr "x$img" : 'x.*\.\([^.]*$\)'`
+      base=`basename "$img" ".$sfx"`
+      final=$base.PNG
+      set /opt/ImageMagick/bin/mogrify -quality 0 -background black -geometry "${bgx}x${bgy}" -format PNG
 
-		    crop=0
-		    bx=int((bgx-w)/2+0.5)
-		    if (bx == 0) { bx=1; by++; crop=1; }
-		    by=int((bgy-h)/2+0.5)
-		    if (by == 0) { by=1; bx++; crop=1; }
-		    print "bx="bx " by="by " crop="crop
-		  }'
-      eval `awk "$awkf" </dev/null`
-      if [ "$bx" -gt 0 -o "$by" -gt 0 ]
+      # see if we need to letterbox or something
+      ix= iy=
+      eval `imsize "$img" | awk '{print "ix="$1 " iy="$2}'`
+      if [ -n "$ix" -a -n "$iy" ]
       then
-	  set "$@" -bordercolor "$BG" -border "${bx}x${by}"
-      fi
-      if [ "$crop" != 0 ]
-      then
-	  set "$@" -crop "${bgx}x${bgy}+${crop}+${crop}"
-      fi
-  fi
+	  awkf="BEGIN { ix=$ix; iy=$iy; bgx=$bgx; bgy=$bgy"'
+			w=bgx; h=bgy
+		      }
+		END   { if (ix > bgx || iy > bgy)
+			  # too big - shrink
+			  if (ix/bgx > iy/bgy)
+			    # shrink X more than Y
+			    h=int(iy * (bgx/ix))
+			  else
+			    # shrink Y more than X
+			    w=int(ix * (bgy/iy))
+			   
+			else
+			# smaller image - scale up
+			if (bgx/ix < bgy/iy)
+			  # scale X less - use that
+			  h=iy*bgx/ix
+			else
+			  # scale Y less
+			  w=ix*bgy/iy
 
-  # run mogrify on the image
-  "$@" "$img"
-  # workaround for mogrify bug
-  rm -f "$img"
-  mv ./* "$final"
-  ## fvwm-root -fe "$final" ## aterms don't listen to fvwm-root :-(
-  ## Esetroot "$final"
-  fvwm-root --retain-pixmap "$final"
-  cd
-  rm -rf "$tmpdir"
-) &
-[ $sync ] || exit 0
-wait
+			crop=0
+			bx=int((bgx-w)/2+0.5)
+			if (bx == 0) { bx=1; by++; crop=1; }
+			by=int((bgy-h)/2+0.5)
+			if (by == 0) { by=1; bx++; crop=1; }
+			print "bx="bx " by="by " crop="crop
+		      }'
+	  eval `awk "$awkf" </dev/null`
+	  if [ "$bx" -gt 0 -o "$by" -gt 0 ]
+	  then
+	      set "$@" -bordercolor "$BG" -border "${bx}x${by}"
+	  fi
+	  if [ "$crop" != 0 ]
+	  then
+	      set "$@" -crop "${bgx}x${bgy}+${crop}+${crop}"
+	  fi
+      fi
+
+      # run mogrify on the image
+      "$@" "$img"
+      # workaround for mogrify bug
+      rm -f "$img"
+      mv ./* "$final"
+
+      ## fvwm-root -fe "$final" ## aterms don't listen to fvwm-root :-(
+      ## Esetroot "$final"
+      fvwm-root --retain-pixmap "$final" \
+      && needdir "$cachedir" \
+      && mv "$final" "$cachefile"
+
+      cd
+      rm -rf "$tmpdir"
+    ) &
+    [ $sync ] || exit 0
+    wait
+fi
+
 exit
 
 ##exec Esetroot -fit "$imagefile"
