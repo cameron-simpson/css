@@ -160,6 +160,15 @@ timelimit=
 # and contains lines describing repositories to mirror.
 # Blank lines and lines commencing with an octothorpe (B<#>)
 # are discarded.
+#
+# A line of the form:
+#
+#	umask octal-value
+#
+# sets the umask for the script as specified (see umask(1)).
+# A typical umask for a public mirror with a group of people
+# who may maintain it would be 2.
+#
 # Other lines are of the form:
 #
 #	[I<method>] I<server> I<root> [I<localroot>] [I<options>...]
@@ -206,6 +215,18 @@ do
     # skip comments and blanks
     case "$how" in
       ''|\#*)	continue ;;
+      umask)	if [ -z "$host" ]
+		then  echo "$pfx: missing umask value" >&2
+		      continue
+		fi
+		if [ -n "$path" ]
+		then  echo "$pfx: extra arguments after umask value: $path $lpath $opts" >&2
+		      continue
+		fi
+		[ $verbose ] && echo "umask $host"
+		umask $host
+		continue
+		;;
     esac
 
     # see if "rsync" default method omitted
