@@ -10,7 +10,7 @@ cats2procmailrc - generate a procmail recipe from my mail categories file
 
 =head1 SYNOPSIS
 
-cats2procmailrc [B<-a> I<alert>] [B<-m> I<maildomains>] [B<-t> I<type>] E<lt>categories E<gt>procmailrc
+cats2procmailrc [B<-L>] [B<-a> I<alert>] [B<-m> I<maildomains>] [B<-t> I<type>] E<lt>categories E<gt>procmailrc
 
 =head1 DESCRIPTION
 
@@ -38,6 +38,11 @@ and adds the automatic rules by converting my categories file.
 =head1 OPTIONS
 
 =over 4
+
+=item b<-L>
+
+Put the tag into the B<X-Label> header field
+instead of as a prefix to the subject line.
 
 =item B<-a> I<alert>
 
@@ -174,12 +179,14 @@ use Getopt::Std;
 
 ($::cmd=$0) =~ s:.*/::;
 $::Usage="Usage: $::cmd [-a alert] [-m domains] [-t {unix|mh|maildir}] <categories >procmailrc
+	-L		Use X-Label: header instead of Subject: for tag.
 	-a alert	Command line to generate the alert.
 			The mail item is present on standard input.
 	-m domains	Select default mail domain(s).
 	-t type		Select default mailbox type.
 ";
 
+$::X_Label=0;
 $::DfltSfx="";		# unix style by default
 $::DfltType=UNIX;	# unix style by default
 @::DfltDom=$ENV{SITENAME};
@@ -188,9 +195,13 @@ $::RcvStore='/usr/lib/nmh/rcvstore';	# path to MH rcvstore command
 
 { my $badopts=0;
 
-  if (! getopts("a:m:t:"))
+  if (! getopts("a:Lm:t:"))
   { warn "$::cmd: bad options\n";
     $badopts=1;
+  }
+
+  if (defined $::opt_L)
+  { $::X_Label=1;
   }
 
   if (defined $::opt_a)
@@ -338,12 +349,23 @@ X
   if ($key ne '.')
   # note that we strip the typical mailing list [tag] stuff if using our own key
   {
-    print <<X
+    if ($::X_Label)
+    {
+      print <<X
+  :0 Whf:
+  | formail -A "X-Label: $key" 
+X
+      ;
+    }
+    else
+    {
+      print <<X
 
   : 0hf
   | sed -e 's/^Subject: *\\[[^ ]*\\] */Subject: /' -e 's/^Subject: *[Rr][Ee] *: *\\[[^ ]*\\] */Subject: Re: /' -e 's/^Subject:/& [$key]/'
 X
-    ;
+      ;
+    }
   }
 
   print <<X
