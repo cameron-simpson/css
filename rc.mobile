@@ -127,7 +127,7 @@ do  case $1 in
 	# =item B<-r>
 	#
 	# Raw.
-	# Run only the named clause.
+	# Run only the named clauses.
 	# The trailing clause name is now mandatory and need not start with an B<@>.
 	# 
 	-r)   raw=1 ;;
@@ -202,15 +202,12 @@ then
     int=
     if [ $# = 0 ]
     then
-      echo "$cmd: missing clause name" >&2
+      echo "$cmd: missing clause names" >&2
       echo "I know the following clauses:" >&2
-      sed -n 's/^\[\(.*\)\]$/	\1/p' "$cf" >&2
+      sed -n 's/^\[\(.*\)\]$/	\1/p' "$cf" | sort >&2
       badopts=1
     else
-      rawclause=$1; shift
-      [ $# = 0 ] || { echo "$cmd: extra arguments after clause name: $*" >&2
-		      badopts=1
-		    }
+      rawclauses=$*
     fi
 else
     # =head1 LOCATION
@@ -270,6 +267,8 @@ doclause()
 
 doops()
 {
+  : ${SYSTEMID:=home}
+  : ${LOCATION:=$SYSTEMID}
   while read op etc
   do
     [ $noaction ] && echo "$op $etc"
@@ -318,7 +317,8 @@ doops()
       # Otherwise, the directory is made identical to the template
       # with rsync(1).
       #
-      /*/)    to=`expr "x$op" : 'x\(.*\)/'`
+      /*/)    : ${where:=$LOCATION}
+	      to=`expr "x$op" : 'x\(.*\)/'`
 	      from=
 	      if [ -n "$etc" ]
 	      then  set -- "$etc.$where" "$etc.DFLT" "$etc"
@@ -346,7 +346,8 @@ doops()
       # If neither is present, the target file is unchanged.
       # Otherwise, the file is made identical to the template with cp(1).
       #
-      /*)     to=$op
+      /*)     : ${where:=$LOCATION}
+	      to=$op
 	      from=
 	      if [ -n "$etc" ]
 	      then  set -- "$etc.$where" "$etc.DFLT" "$etc"
@@ -471,7 +472,8 @@ then
     # In raw mode
     # just the specified clause and its subsidiaries are run.
     #
-    doclause "$rawclause" | { doops; wait; }
+    where=
+    doclause $rawclauses | { doops; wait; }
 else
     # =head2 Startup Mode
     #
