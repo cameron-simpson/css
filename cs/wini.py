@@ -1,6 +1,5 @@
 import sys
 import re
-from cs.lex import skipwhite
 
 # regexp to recognise a clause opening line
 clausehdr_re=re.compile(r'^\[\s*([^\s\]]+)\s*\]')
@@ -12,7 +11,7 @@ assign_re   =re.compile(r'^\s*([^\s=]+)\s*=\s*(.*)')
 int_re      =re.compile(r'^(0|[1-9][0-9]*)$')
 
 # read a win.ini file, return a dictionary of dictionaries
-def load(fp):
+def load(fp,parseInts=False):
   contents={}	# empty clause dictionary
   clause=None	# no current clause
 
@@ -24,10 +23,9 @@ def load(fp):
       line=line[:llen-1]
 
     # skip blank lines and comments
-    nw=skipwhite(line)
-    if nw >= len(line): continue	# blank line
-    c1=line[nw]
-    if c1 == '#': continue		# comment
+    line=string.strip(line)
+    if len(line) == 0: continue	# blank line
+    if line[0] == '#': continue	# comment
 
     # look for [foo]
     match=clausehdr_re.match(line)
@@ -46,8 +44,9 @@ def load(fp):
     match=assign_re.match(line)
     if match is not None:
       value=match.group(2)
-      valmatch=int_re.match(value)
-      if valmatch is not None: value=int(value)
+      if parseInts:
+	valmatch=int_re.match(value)
+	if valmatch is not None: value=int(value)
       clause[match.group(1)]=value
       continue
 
