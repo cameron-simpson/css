@@ -1,0 +1,2 @@
+#!/bin/sh
+exec pageurls -i ${1+"$@"}
