@@ -4,6 +4,8 @@
 #	- Cameron Simpson <cs@zip.com.au> 19may2000
 #
 
+: ${TMPDIR:=/tmp}
+
 verbose=
 [ "x$1" = x-v ] && { verbose=1; shift; }
 
@@ -12,7 +14,7 @@ file=$1; shift
 
 [ -f "$file" ] || { echo "$0: $file: not a regular file" >&2; exit 1; }
 
-tmp=/tmp/rwi$$
+tmp=$TMPDIR/rwi$$
 trap 'rm "$tmp"' 0 1 2 15
 
 cat >"$tmp" || exit 1
