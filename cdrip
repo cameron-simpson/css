@@ -83,8 +83,8 @@ cdtoc "$dev" \
 	  ogg)
 	      oggenc -r -q -b $bps \
 		     -c "Ripped by $NAME with cdparanoia and oggenc on `date`" \
-		     -a "$artist" \
-		     -n "$track" -a "$xtra" -t "$title" -l "$album" - >"$out"
+		     -a "$artist" -n "$track" -t "$title" -l "$album" \
+		     - >"$out"
 	      ;;
 	  mp3)
 	      lame -r -b "$bps" -h -p - "$out"
