@@ -5,19 +5,19 @@
 
 needhost $HOMEHOST@home
 
-ezos=$HOME/there/cskk.ezoshosting.com
+ezos=$HOME/@/ezos
 ezoscgi=$ezos/cgi-bin
 ezoshtml=$ezos/html
 ezoscss=$ezoshtml/cs/css
 
 set -x
 
-rsync -avHPL --delete $HOME/man/cs/. $ezoscss/man/.
-
 syncezos-rc
+rsync -avHPL --delete --exclude=CVS/ $HOME/man/cs/. $ezos/css/man/.
+
+rsync -avHPW --delete --exclude=CVS/ --exclude=/kath $ezos/html/. ezos:public_html/.
+
 syncezos-cgi
+rsync -avHPW --delete --exclude=CVS/ $ezos/cgi-bin/. ezos:cgi-bin/.
 
-rsync -avHPW --delete --exclude=/kath $ezoshtml/. ezos:public_html/.
-rsync -avHPW --delete $ezos/cgi/. ezos:cgi-bin/.
-
-syncsmall @ezos
+putacc ezos
