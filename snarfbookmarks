@@ -1,0 +1,10 @@
+#!/bin/sh
+#
+# Squirrel away a copy of my live bookmarks.
+#	- Cameron Simpson <cs@zip.com.au> 05oct99
+#
+
+live=$HOME/.netscape/bookmarks.html
+safe=$HOME/ns/bookmarks.html
+
+[ -s "$live" ] && set-x cp "$live" "$safe"
