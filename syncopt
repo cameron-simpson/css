@@ -83,8 +83,9 @@ sedvars=`[ ! -s "$cf" ] || sed -e "$sedscript" "$cf"` \
 	|| { echo "$cmd: can't parse $cf" >&2; exit 1; }
 eval "$sedvars"
 
-: ${SYNCOPT_RSYNC:=rsync}
 : ${ARCH:=`uname -s`}
+: ${SYNCOPT_PATH:=/u/syncopt}
+: ${SYNCOPT_RSYNC:=rsync}
 : ${SYNCOPT_ARCH:=/u/syncopt/$ARCH}
 : ${SYNCOPT_COMMON:=/u/syncopt/common}
 : ${SYNCOPT_SUBDIRS:="."}
@@ -241,7 +242,7 @@ done
 if [ $# = 0 ]
 then
     resolve=$resolve'
-	    set x `for subdir in $SYNCOPT_SUBDIRS
+	    set -- `for subdir in $SYNCOPT_SUBDIRS
                     do case "$subdir" in
 			 /*) ls "$subdir/." 2>/dev/null
 			     ;;
@@ -249,15 +250,15 @@ then
                              ls "$SYNCOPT_COMMON/$subdir/." 2>/dev/null
 			     ;;
 		       esac
-	            done | sort -u`; shift'
+	            done | sort -u`'
 else
-    resolve="$resolve; set x $*; shift"
+    resolve="$resolve; set -- $*"
 fi
 # resolve every target into a master directory
 resolve=$resolve'
 	first=1
         for target
-	do  [ $first ] && { first=; set x; shift; }
+	do  [ $first ] && { first=; set --; }
 	    fullpath=
 	    for dir in $SYNCOPT_ARCH $SYNCOPT_COMMON
 	    do  for subdir in $SYNCOPT_SUBDIRS
@@ -275,14 +276,13 @@ resolve=$resolve'
 		[ -n "$fullpath" ] && break
 	    done
 	    if [ -n "$fullpath" ]
-	    then  set x ${1+"$@"} "$fullpath"; shift
+	    then  set -- ${1+"$@"} "$fullpath"
 	    else  echo "$cmd: can'\''t locate master for \"$target\"" >&2
 	    fi
 	done
 	[ $# = 0 ] || ls -d "$@"'
-set x `remote "$resolve"` \
+set -- `remote "$resolve"` \
 	|| { echo "$cmd: resolution failed" >&2; exit 1; }
-shift
 
 xit=0
 
