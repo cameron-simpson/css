@@ -1,0 +1,37 @@
+#!/usr/bin/perl
+#
+# Massage archie responses into a more useful form.
+#	- Cameron Simpson, 19oct92
+#
+
+TOP:
+  while (<>)
+	{ next if /^From[ _]/../^$/;
+	  if (/^Host (\S+)\s+\(([\d.]+)\)/)
+		{ $host=$1; $inet=$2;
+		  $_=<>;
+		  redo TOP if !/^Last updated/;
+		  $_=<>;
+		  redo TOP if !/^$/;
+		  while (1)
+			{ last if !defined($_=<>)
+			       || !/^\s+Location: (.*)/;
+			  $dir=$1;
+			  last if !defined($_=<>)
+			       || !/^\s+(FILE|DIRECTORY)\s+\S+\s+(\d+)\s.*\s(\S+)/;
+			  ($type,$size,$name)=($1,$2,$3);
+			  $desc="$host $inet $type $size $dir";
+			  $fdesc{$name}.="\0$desc";
+			}
+		}
+	}
+
+for (sort keys %fdesc)
+	{ @descs=grep(length,split(/\0/,$fdesc{$_}));
+	  print "$_\n";
+	  for $desc (sort @descs)
+		{ ($host,$inet,$type,$size,$dir)=split(/ /,$desc);
+		  printf("\t%-9s %7d %20s %s\n",
+			$type,$size,"$host [$inet]",$dir);
+		}
+	}
