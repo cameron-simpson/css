@@ -6,6 +6,8 @@
 #	- Cameron Simpson <cs@zip.com.au> 01jun2002
 #
 
+: ${TMPDIR:=/tmp}
+
 playcopy=
 
 cmd=`basename "$0"`
@@ -22,7 +24,7 @@ runplayer()
     tmpauf=
     trap 'ok=; [ -n "$subproc" ] && kill $subproc; exit' 1 2 3 15
     trap '[ -n "$subproc" ] && kill $subproc' USR1
-    playlist=/tmp/$cmd.$$
+    playlist=$TMPDIR/$cmd.$$
     while [ $ok ]
     do
 	aulist -r $ptns >"$playlist"
@@ -33,7 +35,7 @@ runplayer()
 	    echo "[$auf]"
 	    if [ $playcopy ]
 	    then
-		tmpauf=${TMPDIR:-/tmp}/$cmd$$`basename "$auf"`
+		tmpauf=$TMPDIR/$cmd$$`basename "$auf"`
 		(set -x; cp "$auf" "$tmpauf") && auf=$tmpauf
 	    fi
 	    case "$auf" in
