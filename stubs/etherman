@@ -1,0 +1,28 @@
+#!/bin/sh
+#
+# Etherman wrapper.	- Cameron Simpson <cs@zip.com.au>
+#
+
+cmd=`basename "$0"`
+
+if=
+case $SYSTEMID-$ARCH in
+    *-sun.sparc.solaris)
+	d=/opt/netman
+	etc=$d/etc
+	bin=$d/bin
+	if='-I hme0'
+	;;
+    *-sgi.mips.irix)
+	d=/usr/local/lib/netman
+	etc=$d/etc
+	bin=$d/bin
+	if='-I et0'
+	;;
+    *)	echo "$cmd: unknown SYSTEMID-ARCH" >&2; exit 2
+	;;
+esac
+
+cd "$etc" || exit 1
+
+exec "$bin/$cmd" $if ${1+"$@"}
