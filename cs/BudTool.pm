@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 #
 # cs::BudTool: a module for working with the BudTool backup system.
-#	- Cameron Simpson <cs@zip.com.au> 11oct2000
+#	- Cameron Simpson <cs@zip.com.au> 07nov2000
 #
 
 =head1 NAME
