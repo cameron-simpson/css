@@ -1,0 +1,9 @@
+#!/bin/sh
+
+cd $HOME/stubs || exit $?
+
+for i in *
+do
+    echo "$i ..."
+    rm -f "$BIN/$i" && lncp "$i" "$BIN/$i" && chmod 755 "$BIN/$i"
+done
