@@ -155,7 +155,7 @@ case "$TERM,$DISPLAY" in
 		       else exec $dolock wsh -v "$@"
 	fi
 	;;
-    *)	exec "$@"
+    *)	set -x; exec "$@"
 	;;
 esac
 
