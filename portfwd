@@ -47,6 +47,7 @@ if [ $# = 0 ]
 then
     case "$HOST@$SYSTEMID" in
 	amadeus@home)	set home2cisra ;; ##nntpcached
+	zapff@cisra)	set cisra2home ;;
 	*)		echo "$cmd: no forwardings to do on $HOST@$SYSTEMID" >&2
 			badopts=1
 			;;
@@ -85,6 +86,15 @@ do  case "$fwd" in
 	    echo "cisra2home..."
 	    $trace \
 	    vpnssh $vflag -t 60 -q "$home" \
+		   -L 2111:mail-optus:110 \
+		   -L 2180:www-optus:110 \
+		   -L 2401:cvs-cskk:2401 \
+		   -L 3306:amadeus:3306 \
+		   -L 8880:amadeus:8880 \
+		   -L 3119:amadeus:119 \
+		   -L 5915:amadeus:5905 \
+		   -L 5916:amadeus:5906 \
+		   &
 	    ;;
 	home2zip)
 	    echo "home2zip..."
@@ -106,14 +116,7 @@ do  case "$fwd" in
 		   -L 5915:zapff:5905 \
 		   -L 5916:zapff:5906 \
 		   -L 5917:piaf:5900 \
-		   -R 2111:mail-optus:110 \
-		   -R 2180:www-optus:110 \
-		   -R 2401:cvs-cskk:2401 \
-		   -R 3306:amadeus:3306 \
-		   -R 8880:amadeus:8880 \
-		   -R 3119:amadeus:119 \
-		   -R 5915:amadeus:5905 \
-		   -R 5916:amadeus:5906 &
+		   &
 	    ;;
 ##	del)
 ##	    echo "web@del ..."
