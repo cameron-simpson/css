@@ -1,0 +1,2 @@
+#!/bin/sh
+awk '$1 == "server" { print $2 }' /etc/ntp.conf | hostips
