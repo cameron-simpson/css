@@ -1,0 +1,12 @@
+#!/bin/sed -nf
+#
+# Return all ancestors of the pathnnames on stdin.
+#	- Cameron Simpson <cs@zip.com.au> 02jul2004
+#
+
+:top
+s:[^/]*/*$::
+s:\([^/]\)//*$:\1:
+/^$/q
+p
+b top
