@@ -1,0 +1,225 @@
+#!/usr/bin/perl
+#
+# Patch group file to match auto/group db.
+#	- Cameron Simpson <cs@zip.com.au> 20nov97
+#
+
+use strict qw(vars);
+
+use cs::Misc;
+use CISRA::DB;
+use CISRA::Groups;
+use CISRA::UserData;
+
+($::cmd=$0) =~ s:.*/::;
+
+$::GrpFFile='group';	# we expect to run in the nis CVS checkout
+
+if (@ARGV)
+	{ $::GrpFFile=shift(@ARGV);
+	}
+
+die "$::cmd: extra arguments: @ARGV\n" if @ARGV;
+
+die "$::cmd: $::GrpFFile: must be non-empty\n" if ! -s $::GrpFFile;
+
+die "$::cmd: $::GrpFFile: can't read: $!\n" if ! open(GRP,"< $::GrpFFile\0");
+
+my($U)=CISRA::UserData::db();
+for my $user (keys %$U)
+{ my $u = CISRA::UserData::user($user);
+  $::Expired{$user}=! $u->IsCurrent();
+}
+
+my(@grp,@gf,$group,$gid,%grp,@groups,@bygid);
+
+# load current group table
+while (defined($_=<GRP>))
+	{ push(@grp,$_);
+
+	  chomp;
+	  @gf=split(/:/);
+	  $group=$gf[0];
+	  $gid=$gf[2]+0;
+
+	  push(@groups,$group);
+	  $grp{$group}={ GID => $gid,
+			 MEMBERS => [ liveusers(
+					uniq(grep(length,
+						split(/[,\s]+/,$gf[3])))
+					       )
+				    ],
+		       };
+	  $bygid[$gid]=$grp{$group};
+	}
+
+close(GRP);
+
+my($G)=CISRA::Groups::adb();
+my($basegid)=1000;
+my($g,@mem,$u);
+
+# load groups db
+GROUP:
+  for $group (sort grep(/^[a-z]/, keys %$G))
+  {
+    $g=$G->{$group};
+
+    next GROUP if $g->Type() eq ALIAS;
+
+    if (! exists $grp{$group})
+	  {
+	    while (ref $bygid[$basegid])
+		  { $basegid++;
+		  }
+
+	    push(@groups,$group);
+	    $grp{$group}={ GID => $basegid,
+			   MEMBERS => [],
+			 };
+	    $bygid[$basegid]=$grp{$group};
+	  }
+
+    @mem=@{$grp{$group}->{MEMBERS}};
+
+    $grp{$group}->{MEMBERS}=[ liveusers(uniq(
+				grep(! exists $U->{$_}, @mem),
+				$g->Users(),
+			      )) ];
+  }
+
+USER:
+  for my $user (keys %$U)
+  { $u=$U->{$user};
+    next USER if ! exists $u->{PREFGROUPS};
+    next USER if expired($user);
+
+    for $group (@{$u->{PREFGROUPS}})
+	  { if (! exists $grp{$group})
+	    { warn "$user: PREFGROUP($group): non-existent\n";
+	    }
+	    elsif (! grep($_ eq $user, @{$grp{$group}->{MEMBERS}}))
+	    { warn "$user: PREFGROUP($group) added, but user is not in db/groups table\n";
+	      push(@{$grp{$group}->{MEMBERS}},$user);
+	    }
+	  }
+  }
+
+my(%ng,$M,@m);
+
+# look for expired users
+for $group (sort @groups)
+{
+  $g=$grp{$group};
+  my($u);
+  @m=grep(defined ($u=CISRA::UserData::user($_)) && ! $u->IsCurrent(),
+	  @{$g->{MEMBERS}});
+
+  if (@m)
+  { warn "$group: expired members: @m\n";
+    $g->{MEMBERS}=[ grep(! defined ($u=CISRA::UserData::user($_))
+		      || $u->IsCurrent(),
+			 @{$g->{MEMBERS}})
+		  ];
+  }
+}
+
+# look for overflowed users
+my $grp15=rm15(\%grp,$U);
+
+if (! open(STDOUT,"> $::GrpFFile\0"))
+{ die "can't rewrite $::GrpFFile: $!\n";
+}
+
+for my $group (@groups)
+{ my $g = $grp{$group};
+  ## warn "grp{$group}=".cs::Hier::h2a($grp{$group},0);
+  my $line = "$group:*:$g->{GID}:"
+	   . join(',',@{$grp15->{$group}})
+	   ;
+
+  TRIM:
+  while (length($line) > 511)
+  { ($line =~ s/,[^,:]+$//) || last TRIM;
+  }
+  print $line, "\n";
+}
+
+exit 0;
+
+sub members
+{
+  CISRA::Groups::users(@_);
+}
+
+sub cmpgnames
+{
+  ratename($a) cmp ratename($b);
+}
+
+# pick a rating for a name
+sub ratename
+{
+  return $::_rating{$_[0]} if exists $::rating{$_[0]};
+
+  local($_)=@_;
+
+  $::_rating{$_}=( $_ eq 'app' || $_ eq 'perm' || $_ eq 'ilk' || /^app-/
+		 ? 0
+		 : /^perm-/
+		   ? 3
+		   : /-/
+		     ? 1
+		     : 2
+		 )."-$_";
+}
+
+sub rm15
+{ my($grps,$udb)=@_;
+
+  my($g,$u,%ug,$gnam);
+  local($_);
+
+  # populate %ug by inverting group->members
+  # append by order of name rating
+  # first pop with PREFGROUPS
+  for my $u (keys %$udb)
+  { $ug{$u}=[];
+    if (exists $udb->{$u}->{PREFGROUPS})
+    { push(@{$ug{$u}},@{$udb->{$u}->{PREFGROUPS}});
+    }
+  }
+  # then append ordered groups
+  for $gnam (reverse sort cmpgnames keys %$grps)
+  { $g=$grps->{$gnam};
+    for $u (@{$g->{MEMBERS}})
+    { push(@{$ug{$u}},$gnam);
+    }
+  }
+
+  for my $u (sort keys %ug)
+  { @{$ug{$u}}=::uniq(@{$ug{$u}});
+    if (@{$ug{$u}} >= 15)
+    { my $gp = $ug{$u};
+      ## warn "pruning $u: groups are [@$gp]";
+      @$gp=@$gp[0..13];
+    }
+  }
+
+  # now invert %ug to get group map
+  my %grp15;
+  for my $u (sort keys %ug)
+  { for my $g (@{$ug{$u}})
+    { $grp15{$g}=[] if ! exists $grp15{$g};
+      push(@{$grp15{$g}}, $u);
+    }
+  }
+
+  \%grp15;
+}
+
+sub liveusers
+{ grep(! expired($_), @_);
+}
+sub expired
+{ exists $::Expired{$_[0]} && $::Expired{$_[0]} }
