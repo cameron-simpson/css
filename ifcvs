@@ -3,18 +3,59 @@
 # Test if a particular file is CVS maintained.
 #	- Cameron Simpson <cs@zip.com.au> 23feb2003
 #
+# If command supplied, run it with cvsedit (if needed).
+#	- Cameron Simpson <cs@zip.com.au> 27jun2003
+#
 
 cmd=$0
-usage="Usage: $cmd filename"
+usage="Usage: $cmd [-f] [-m msg] filename [command [args...]]
+	-f	Supplied command is a filter.
+	-m msg	CVS log message."
 
-[ $# = 1 ] || { echo "$usage" >&2; exit 2; }
-file=$1; shift
+badopts=
+msg=
+isfilter=
+cveopts=
+
+while :
+do
+  case $1 in
+    -f)	isfilter=1 cveopts="$cveopts $1" ;;
+    -m)	msg=$2; shift ;;
+    --)	shift; break ;;
+    -?*)echo "$cmd: unrecognised option: $1" >&2; badopts=1 ;;
+    *)	break ;;
+  esac
+  shift
+done
+
+if [ $# = 0 ]
+then
+    echo "$cmd: missing filename" >&2
+    badopts=1
+else
+    file=$1; shift
+fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
 
 [ -f "$file" ] || { echo "$cmd: $file: not a file" >&2; exit 1; }
 
-dir=`dirname "$file"`
-base=`basename "$file"`
-cvsdir=$dir/CVS
-entries=$cvsdir/Entries
+# no command? just run the test
+if [ $# = 0 ]
+then
+    dir=`dirname "$file"`
+    base=`basename "$file"`
+    cvsdir=$dir/CVS
+    entries=$cvsdir/Entries
 
-[ -s "$entries" ] && grep "^/$base/" "$entries" >/dev/null 2>/dev/null
+    [ -s "$entries" ] && grep "^/$base/" "$entries" >/dev/null 2>/dev/null
+    exit $?
+fi
+
+set -x
+
+# just exec command if not CVSing
+ifcvs -- "$file" || { [ $isfilter ] && set filteredit "$file" "$@"; exec "$@"; }
+
+exec cvsedit $cveopts -m "$msg" "$file" "$@"
