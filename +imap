@@ -8,7 +8,7 @@ cmd=`basename "$0"`
 usage="Usage: $cmd [[user:pass@]server]"
 
 server=127.0.0.2	#mail.zipworld.com.au
-fmrc=$HOME/var/fetchmail/fetchmailrc
+fmrc=$HOME/.fetchmailrc
 
 [ $# = 0 ] || { server=$1; shift; }
 
