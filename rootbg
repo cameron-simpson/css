@@ -7,12 +7,28 @@
 #
 
 cmd=$0
-usage="Usage: $0 [-xpl] [{imagefile|ptns...}]"
+usage="Usage: $0 [-s] [-xpl] [{imagefile|ptns...}]"
 
 [ -n "$DISPLAY" ] || { echo "$cmd: no \$DISPLAY!" >&2; exit 1; }
 
+sync=
 xplanet=
-[ "x$1" = x-xpl ] && { xplanet=1; shift; }
+
+badopts=
+while :
+do  case $1 in
+        -xpl)	xplanet=1 ;;
+	-s)	sync=1 ;;
+	--)	shift; break ;;
+	-?*)	echo "$cmd: unrecognised option: $1" >&2
+		badopts=1
+		;;
+	*)	break ;;
+    esac
+    shift
+done
+
+[ $badopts ] && { echo "$usgae" >&2; exit 2; }
 
 if [ $# -gt 0 ] && [ -s "$1" ] && [ ! -d "$1/." ]
 then
@@ -26,22 +42,22 @@ if [ $xplanet ]
 then
     imdir=$HOME/etc/im
     backdrop=$imagefile
-    clouddir=$imdir/space
-    clouds=$clouddir/clouds_1600.jpg
+    projdir=$imdir/projections
+    clouddir=$projdir
+    clouds=$clouddir/clouds_2000.jpg
     ssecclouds=$clouddir/latest_moll.gif
-    dem=$imdir/space/earth-dem-5min.gif
-    nightside=$imdir/space/earthlights_dmsp_big.jpg
-    dayside=$imdir/space/earth_2400.jpg
+    nightside=$projdir/earthlights-dmsp-big.jpg
+    dayside=$projdir/earth-2400.jpg
 
     # pick a view on the Sydney side of the planet
     lat=`tzcoord.pl Sydney | perl -e '$_=<STDIN>; /^([^.]+)/ || die; srand((time^$$)+getppid()); print int($1-89.5+rand(180))'`
 
     ## -demfile "$dem" -grid
-    ## -cloud_image "$clouds" \
+    ## -cloud_ssec "$ssecclouds" \
     nice xplanet \
 	    -background "$backdrop" \
 	    -blend \
-	    -cloud_ssec "$ssecclouds" \
+	    -cloud_image "$clouds" \
 	    -image "$dayside" \
 	    -label -labelpos -15-15 \
 	    -markers \
@@ -59,3 +75,6 @@ case "$imagefile" in
     *.gif|*.xpm)	2xpm -s root "$imagefile" xpmroot & ;;
     *)			2png -s root "$imagefile" display -window root & ;;
 esac
+
+[ $sync ] || exit 0
+wait
