@@ -9,6 +9,7 @@ use strict qw(vars);
 
 use cs::Source;
 use cs::HTML;
+use cs::Sink;
 use cs::Misc;
 use cs::Web::Bookmarks;
 use cs::Upd;
@@ -93,7 +94,7 @@ die "$::cmd: no category for \"-t $::TopCat\"\n"
 $::Xit=0;
 
 if ($::OutPut eq '-')
-{ my $s = new Sink (FILE,STDOUT);
+{ my $s = new cs::Sink (FILE,STDOUT);
   $bm->Bm2htmlSink($s,$::Title);
 }
 else
@@ -104,96 +105,98 @@ exit $::Xit;
 
 # debugging routine to check HTML parse phase
 sub precis
-	{ my($t)=@_;
-	  my($p)=[];
+{ my($t)=@_;
+  my($p)=[];
 
-	  if (! ref $t)
-		{ push(@$p,$t);
-		}
-	  elsif (reftype($t) eq ARRAY)
-		{ push(@$p,[map(precis($_),@$t)]);
-		}
-	  else	{ push(@$p,[$t->{TAG},map(precis($_),@{$t->{TOKENS}}),"/".$t->{TAG}]);
-		}
-
-	  $p;
+  if (! ref $t)
+	{ push(@$p,$t);
 	}
+  elsif (reftype($t) eq ARRAY)
+	{ push(@$p,[map(precis($_),@$t)]);
+	}
+  else	{ push(@$p,[$t->{TAG},map(precis($_),@{$t->{TOKENS}}),"/".$t->{TAG}]);
+	}
+
+  $p;
+}
 
 sub walk
-	{ my($t)=@_;
+{ my($t)=@_;
 
-	  ## warn "walk($t)\n";
-	  ## out("walk($t)");
+  ## warn "walk($t)\n";
+  ## out("walk($t)");
 
-	  return if ! ref $t;
+  return if ! ref $t;
 
-	  my($tok);
+  my($tok);
 
-	  if (reftype($t) ne HASH)
-		{ warn "nonHASH!";
-		  return;
-		}
+  if (reftype($t) ne HASH)
+  { warn "nonHASH!";
+    return;
+  }
 
-	  my($tag)=$t->{TAG};
-	  my(@t)=@{$t->{TOKENS}};
+  my($tag)=$t->{TAG};
+  my(@t)=@{$t->{TOKENS}};
 
-	  ## warn "tag: $tag [@t]\n";
-	  if ($tag eq DL)
-		{
-		  local($::CurrentBM)=$::BM;
-		  for (@t)
-			{ walk($_);
-			}
-		  @t=();
-		  $::BM=$::CurrentBM;
-		}
-	  elsif ($tag eq DT)
-		{ $::BM=$::CurrentBM;
-		}
-	  elsif ($tag eq DD)
-		{ # suck up the description
-		  ## warn "SUCK(@t)\n";
-		  while (@t && (! ref $t[0]
-			     || grep($t[0]->{TAG} eq $_,BR)
-			       ))
-			{ push(@{$::LastRec->{DESC}},shift(@t));
-			}
-		  ## warn cs::Hier::h2a($::LastRec,1)."\n";
-		}
-	  elsif ($tag eq H3)
-		# subcategory
-		{ my($subtitle)=cs::HTML::tokFlat(@t);
-		  $::BM=$::LastRec=$::BM->AddCat($subtitle);
-		  @t=();
-		}
-	  elsif ($tag eq A && exists $t->{ATTRS}->{HREF})
-		{ my $mtitle = cs::HTML::tokFlat($t->{TOKENS});
-		  $::LastRec=$::BM->AddEntry($mtitle,$t->{ATTRS});
-		}
+  ## warn "tag: $tag [@t]\n";
+  if ($tag eq DL)
+  {
+    local($::CurrentBM)=$::BM;
+    for (@t)
+    { walk($_);
+    }
 
-	  ## warn "t=[@t]\n";
-	  for (@t)
-		{ walk($_);
-		}
-	}
+    @t=();
+    $::BM=$::CurrentBM;
+  }
+  elsif ($tag eq DT)
+  { $::BM=$::CurrentBM;
+  }
+  elsif ($tag eq DD)
+  { # suck up the description
+    ## warn "SUCK(@t)\n";
+    while (@t && (! ref $t[0]
+	       || grep($t[0]->{TAG} eq $_,BR)
+		 ))
+    { push(@{$::LastRec->{DESC}},shift(@t));
+    }
+    ## warn cs::Hier::h2a($::LastRec,1)."\n";
+  }
+  elsif ($tag eq H3)
+	# subcategory
+  { my($subtitle)=cs::HTML::tokFlat(@t);
+    $::BM=$::LastRec=$::BM->AddCat($subtitle);
+    @t=();
+  }
+  elsif ($tag eq A && exists $t->{ATTRS}->{HREF})
+  { my $mtitle = cs::HTML::tokFlat($t->{TOKENS});
+    $::LastRec=$::BM->AddEntry($mtitle,$t->{ATTRS});
+  }
+
+  ## warn "t=[@t]\n";
+  for (@t)
+  { walk($_);
+  }
+}
 
 sub printURLs
-	{ my($t)=@_;
-	  my($url);
+{ my($t)=@_;
 
-	  URL:
-	    for (cs::HTML::grepMarkUp(($::Inline
-				      ? sub { exists $_[0]->{ATTRS}->{SRC} }
-				      : sub { exists $_[0]->{ATTRS}->{HREF} }
-				      ),
-				    $t))
-		{ $url=($::Inline
-			? $_->{ATTRS}->{SRC}
-			: $_->{ATTRS}->{HREF}
-		       );
+  my($url);
 
-		  if (defined($url=mungeURL($url)))
-			{ print $url, "\n";
-			}
-		}
-	}
+  URL:
+  for (cs::HTML::grepMarkUp(($::Inline
+			    ? sub { exists $_[0]->{ATTRS}->{SRC} }
+			    : sub { exists $_[0]->{ATTRS}->{HREF} }
+			    ),
+			  $t))
+  { $url=($::Inline
+	  ? $_->{ATTRS}->{SRC}
+	  : $_->{ATTRS}->{HREF}
+	 );
+
+    if (defined($url=mungeURL($url)))
+    { print $url, "\n";
+    }
+  }
+}
