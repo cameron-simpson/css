@@ -43,9 +43,14 @@ else
   done
 fi \
 | wired \
-| xxargs ns localhost 2>/dev/null \
-| sed -e '/^localhost:/d' -e 's/://' \
+| while read host
+  do  host "$host"
+  done \
+| sed -e '/^Host [^ ]* not found/d' \
+      -e 's/ has address / /' \
+      -e 's/\.research\.canon\.com\.au//' \
 | tr -s ' ' '\012' \
+| tee /dev/tty \
 > "$hlist"
 
 # gather keys
