@@ -21,6 +21,8 @@
 #
 # "nosync" in .syncopt.
 #	- cameron 31may2001
+# "remote" in .syncopt.
+#	- cameron 22apr2002
 # 
 
 PATH=$PATH:/usr/bin:/opt/bin:/opt/script
