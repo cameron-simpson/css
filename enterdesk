@@ -11,6 +11,9 @@ if [ "x$thisdesk" != "x$lastdesk" ]
 then
     lastvalue "enterdesk-$HOST" "$thisdesk" &
 
+    desktop "$thisdesk" shcmds | sh -x &
+    desktop "$thisdesk" wmcmds | fvwmcmd &
+
     if [ "x$XSESSIONMODE" != xvnc ]
     then
 	# root backdrop
@@ -29,7 +32,7 @@ then
 	else
 	  fvwm-root --dummy
 	  xsetroot -solid black
-	fi
+	fi &
 
     #    # menu backdrop
     #    Dflag=-D
@@ -50,5 +53,6 @@ then
     #    fi
 
     fi
-
 fi
+
+wait
