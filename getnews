@@ -3,6 +3,7 @@
 
 use strict qw(vars);
 
+use cs::Upd;
 use cs::Misc;
 use cs::Newsrc;
 use cs::NNTP;
@@ -12,16 +13,19 @@ use Getopt::Std;
 sub fetchgroup($);
 
 $::Server=(length $ENV{NNTPSERVER} ? $ENV{NNTPSERVER} : 'nntp');
-$::NDA='wc';
+$::NDA='ng2to|bgprocmail';
 $::Newsrc="$ENV{HOME}/.fetchnews-state";
+$::CatchUp=0;
 
 $::Usage="Usage: $::cmd [-s nntpserver] [-d nda] newsgroup...
+	-c		Catch up the named group.
 	-s nntpserver	Specify server. Default: \$NNTPSERVER.
 	-n newsrc	Specify news file. Default: $::Newsrc.
-	-d nda		Specify news delivery agent. Default: procmail.
+	-d nda		Specify news delivery agent. Default: $::NDA
 ";
 
-getopts('s:d:n:') || die $::Usage;
+getopts('cs:d:n:') || die $::Usage;
+$::CatchUp=$::opt_c if defined $::opt_c;
 $::Server=$::opt_s if defined $::opt_s;
 $::NDA=$::opt_d if defined $::opt_d;
 $::Newsrc=$::opt_n if defined $::opt_n;
@@ -37,6 +41,7 @@ $::RC=new cs::Newsrc ($::Newsrc,$::Server);
 
 $::Xit=0;
 
+$::Count=0;
 for my $group (@ARGV)
 { fetchgroup($group);
 }
@@ -45,6 +50,8 @@ undef $::RC;
 
 $::Conn->Quit();
 undef $::Conn;
+
+nl("$::Count articles retrieved");
 
 exit $::Xit;
 
@@ -62,11 +69,20 @@ sub fetchgroup($)
   
   my $R = $::RC->Range("$group\@$::Server");
   ## warn "range($group)=".$R->Text();
+
+  if ($::CatchUp)
+  { $R->Add($low,$high);
+    $::RC->Sync();
+    return;
+  }
+
   my $M;
+  my $n=0;
 
   N:
   for my $n ($low..$high)
-  { next N if $R->InRange($n);
+  { out("$group: $n/$high");
+    next N if $R->InRange($n);
 
     $M=$::Conn->Article($n);
     if (! defined $M)
@@ -77,8 +93,11 @@ sub fetchgroup($)
     my $out = new cs::Sink(PIPE,$::NDA);
     $M->WriteItem($out);
     $R->Add($n);
+    $::Count++;
+    $n++;
   }
 
   $::RC->SetRange("$group\@$::Server", $R);
   $::RC->Sync();
+  nl("$group: $n articles") if $n > 0;
 }
