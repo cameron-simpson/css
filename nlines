@@ -1,0 +1,41 @@
+#!/bin/sh
+#
+# Find each line containing a regexp and print it and the following few lines.
+#	- Cameron Simpson <cs@zip.com.au> 31may2004
+#
+
+nlines=5
+
+cmd=`basename "$0"`
+usage="Usage: $cmd [-n] regexp [files...]
+	-n	Print n following lines. Default: $nlines"
+
+badopts=
+
+while :
+do
+  case $1 in
+    -[1-9]*)	nlines=`expr "x$1" : 'x-\([0-9]*\).*'` ;;
+    --)		shift; break ;;
+    -?*)	echo "$cmd: unrecgonised option: $1" >&2; badopts=1 ;;
+    *)		break ;;
+  esac
+  shift
+done
+
+if [ $# = 0 ]
+then
+  echo "$cmd: missing regexp" >&2
+  badopts=1
+else
+  regexp=$1; shift
+fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+case "$regexp" in
+  */*)	regexp=`echo "$regexp" | sed 's;/;\\&;g'` ;;
+esac
+
+awk "/$regexp/	{ counter=$nlines+1 }
+     counter > 0{ print; counter--; }" ${1+"$@"}
