@@ -40,7 +40,7 @@ sub linktree
 { my(@ARGV)=@_;
 
   local($::Xit)=0;
-  local($::Usage)="Usage: $::cmd srcdir destdir\n";
+  local($::Usage)="Usage: $::cmd [--no-copy] srcdir destdir\n";
 
   if (@ARGV && $ARGV[0] eq '--no-copy')
   { $::DoCopy=0;
