@@ -1,0 +1,19 @@
+#!/bin/sh
+
+cd || exit 1
+
+[ $# -ge 1 ] || { echo "Usage: $0 [login@]hostname" >&2; exit 2; }
+host=$1; shift
+
+[ $# = 0 ] && set scripts .profile .zprofile .zshrc .setvar \
+		  rc/shell rc/env rc/perl rc/vi rc/nvi \
+		  .less .lesskey rc/less rc/lesskey
+
+set -x
+case "$host" in
+    agricola|tw|barstool)
+	rsync -avHPC --delete --rsh=ssho "$@" "$host":
+	;;
+    *)	tar cf - "$@" | ssho "$host" exec tar xf -
+	;;
+esac
