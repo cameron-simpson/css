@@ -1,0 +1,37 @@
+#!/bin/sh
+#
+# Amend the LD_LIBRARY_PATH (which should normally be empty anyway)
+# and then run some program which needs special lib loading.
+#	- Cameron Simpson <cs@zip.com.au> 04jan2001
+#
+
+cmd=$0
+usage="Usage: $cmd cmd [args...]"
+
+badopts=
+
+while [ $# -gt 0 ]
+do  case $1 in
+	-)	LD_LIBRARY_PATH= ;;
+	'+^'*)	path=`expr 'x$1' : 'x..\(.*\)'`
+		LD_LIBRARY_PATH=$path:$LD_LIBRARY_PATH
+		;;
+	'+'*)	path=`expr 'x$1' : 'x.\(.*\)'`
+		LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$path
+		;;
+	--)	shift; break ;;
+	-*)	echo "$cmd: unrecognised option: $1" >&2
+		badopts=1
+		;;
+	*)	break ;;
+    esac
+    shift
+done
+
+[ $# = 0 ] && { echo "$cmd: missing command" >&2; badopts=1; }
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+export LD_LIBRARY_PATH
+
+exec "$@"
