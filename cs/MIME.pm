@@ -372,25 +372,46 @@ sub ContentType($;$)
   $cte;
 }
 
-sub WriteItem($$$;$$$)	# (this,sink,\@cs::MIME,pre,post,sep)
+sub WriteItem($$)
+{ my($this,$sink)=@_;
+
+  my $body = $this->Body();
+  $this->SUPER::WriteItem($sink, $body);
+}
+
+sub WriteParts($$$;$$$)	# (this,sink,\@cs::MIME,pre,post,sep)
 { my($this,$sink,$mlist,$pre,$post,$sep)=@_;
   $pre='' if ! defined $pre;
   $post='' if ! defined $post;
   $sep=$this->_TypeParams()->{BOUNDARY} if ! defined $sep;
+
+  $this->Del(CONTENT_LENGTH);
+
+  my($type,$subtype)=($this->Type(), $this->SubType());
+  if ($type ne MULTIPART)
+  {
+    if (@$mlist > 1)
+    { my @c = caller;
+      warn "$::cmd: type=\"$type\" but more than one item\n\tfrom[@c]\n\t";
+    }
+
+    # if ($type eq TEXT && $subtype eq PLAIN)
+    # { $this->Del(CONTENT_TYPE);
+  }
 
   if (! length $sep)
   { ::need(cs::Date);
     $sep="cs::MIME::".cs::Date::timecode(time,0)."::GMT"
   }
 
-  $this->Hdrs()->WriteItem($sink,$pre);
+  $this->SUPER::WriteItem($sink,$pre);
 
   for my $M (@$mlist)
   {
     $sink->Put("\r\n--$sep\r\n");
 
-    $M->Hdrs()->Del(CONTENT_LENGTH);	# just in case
-    $M->Hdrs()->WriteItem($sink);
+    $M->Del(CONTENT_LENGTH);	# just in case
+    $M->WriteItem($sink);
 
     $sink->Put($M->Body());
   }
