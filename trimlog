@@ -1,0 +1,17 @@
+#!/bin/sh
+
+usage="Usage: trimlog size logfile [output]"
+
+case $# in
+    2|3)	;;
+    *)		echo "$usage" >&2; exit 2 ;;
+esac
+
+size=$1
+log=$2
+olog=${3-"$log.real"}
+
+rm -f $log || exit $?
+/usr/etc/mknod $log p
+
+( /u/cameron/scripts/trimout $size <$log ) >$olog
