@@ -74,9 +74,9 @@ do  case "$fwd" in
 	    vpnssh $vflag work \
 		   -L 2080:web:80 \
 		   -L 2222:zapff:22 \
-		   -L 5905:zapff:5905 \
-		   -L 5906:zapff:5906 \
-		   -L 5907:piaf:5900 &
+		   -L 5915:zapff:5905 \
+		   -L 5916:zapff:5906 \
+		   -L 5917:piaf:5900 &
 	    ;;
 	del)
 	    echo "web@del ..."
