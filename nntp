@@ -1,3 +1,2 @@
 #!/bin/sh
-
-exec tcpio "${1-$NNTPSERVER}" nntp
+( cat && echo QUIT ) | tcpio "${1-$NNTPSERVER}" nntp
