@@ -6,9 +6,23 @@
 
 ($cmd=$0) =~ s:.*/::;
 
-if (@ARGV != 1)
-{ die "Usage: $cmd pathname\n";
+if (!@ARGV)
+{ die "Usage: $cmd pathnames...\n";
 }
 
-(@s=stat($ARGV[0])) || die "$cmd: stat($ARGV[0]): $!\n";
-print time-$s[9], "\n";
+$xit=0;
+
+for my $file (@ARGV)
+{
+  if (@s=stat($file))
+  { print time-$s[9];
+    if (@ARGV > 1) { print "\t$file"; }
+    print "\n";
+  }
+  else
+  { warn "$cmd: stat($file): $!\n";
+    $xit=1;
+  }
+}
+
+exit $xit;
