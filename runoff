@@ -1,0 +1,25 @@
+#!/bin/sh
+
+hdr=$HOME/etc/header/man
+macros=-mm
+print=
+roff=troff
+
+case "$1" in
+    -print)	print=1 ; shift ;;
+    -nroff)	roff=nroff ; shift ;;
+esac
+
+[ $# = 0 ] && { set x -; shift ; }
+
+dpp '-es/\{\{(([^\}]|}[^\}])+)\}\}/\\fB\\f(Co$1\\fR/g' \
+	"$hdr" "$@" \
+    | tee dpp.out \
+    | expand \
+    | tee roff.in \
+    | "$roff" "$macros" - \
+    | tee roff.out \
+    | case "$print" in
+	1)	lz -m "$*" ;;
+	*)	cat ;;
+      esac
