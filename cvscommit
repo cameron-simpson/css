@@ -13,7 +13,7 @@ CVS_COMMIT_EDITOR=$EDITOR
 EDITOR=$0-editor
 export CVS_COMMIT_FILES CVS_COMMIT_EDITOR CVS_COMMIT_DIFFS EDITOR
 
-trap 'rm -f "$diffs"' 0 1 15
+trap 'rm -f "$diffs"' 0 1 2 13 15
 cvs -q diff $CVS_COMMIT_FILES >$diffs 2>&1
 
 cvs commit -l ${1+"$@"}
