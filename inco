@@ -5,16 +5,28 @@
 #
 
 cmd=`basename "$0"`
-usage="Usage: $cmd module [-f] command [args...]"
+usage="Usage: $cmd module [-f] [-r rev] command [args...]"
+
+badopts=
 
 withcoopts=
-[ "x$1" = x-f ] && { withcoopts="$withcoopts $1"; shift; }
+while :
+do
+  case $1 in
+    -f)	withcoopts="$withcoopts $1" ;;
+    -r) withcoopts="$withcoopts $1 $2"; shift ;;
+    --)	shift; break ;;
+    -?*)echo "$cmd: unrecognised option: $1" >&2; badopts=1 ;;
+    *)  break ;;
+  esac
+  shift
+done
 
-[ $# -lt 2 ] && { echo "$cmd: insufficient arguments" >&2
-		  echo "$usage" >&2
-		  exit 2
+[ $# -lt 2 ] && { echo "$cmd: missing module or command" >&2
+		  badopts=1
 		}
-
 module=$1; shift
 
-exec withco $withcoopts "$module" incd "$@"
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+exec withco $withcoopts -- "$module" incd -p "$@"
