@@ -1,0 +1,38 @@
+#!/bin/sh
+#
+# List the shares offered by rsync servers.
+#	- Cameron Simpson <cs@zip.com.au> 25may2004
+#
+
+servers=${RSQ_SERVERLIST:-"mirror.pacific.net.au,mirror.aarnet.edu.au,orff.orchestra.cse.unsw.edu.au,rsync.planetmirror.com"}
+
+cmd=`basename "$0"`
+usage="Usage: $cmd [-s rsync-server,...] query"
+
+badopts=
+
+if [ "x$1" = x-s ]
+then
+    servers=$2; shift; shift
+fi
+
+if [ $# = 0 ]
+then
+    echo "$cmd: missing query" >&2
+    badopts=1
+else
+    query=$1; shift
+    [ $# = 0 ] || { echo "$cmd: extra arguments after query: $*" >&2
+		    badopts=1
+		  }
+fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+for sv in `echo "$servers" | tr , ' '`
+do
+  pfx "$sv" rsync -n "$sv::" &
+done \
+| g "$query"
+
+wait
