@@ -87,7 +87,7 @@ pid=$!
 # close input just in case
 exec <&-
 
-( [ "x$pidfile" = x- ] || exec >>"$pidfile"
+( [ "x$pidfile" = x- ] || exec >"$pidfile"
   echo "$pid"
 )
 
