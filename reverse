@@ -1,0 +1,10 @@
+#!/usr/bin/perl
+
+@l=();
+while (<>)
+{ push(@l,$_);
+}
+
+for (reverse @l)
+{ print;
+}
