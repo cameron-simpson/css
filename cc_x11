@@ -1,0 +1,3 @@
+#!/bin/sh
+
+exec gcc -I/usr/X11R6/include -L/usr/X11R6/lib -R/usr/X11R6/lib ${1+"$@"}
