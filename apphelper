@@ -13,6 +13,7 @@ cmd=`basename "$0"`
 ## set x +t "$@"; shift
 echo "apphelper: \$*=[$*]" >&2
 
+doterm=
 savedir=
 pager=${PAGER:-less}
 doview=$APPHELPER_DOVIEW
@@ -80,10 +81,11 @@ badopts=
 # Specify the title of the fresh terminal in which to run apphelper.
 # Implies the B<-t> option.
 # 
+ttyopts=
 case $1 in
-  -t)	shift; doterm=1 ;;
+  -t)	shift; doterm=1; ttyopts="$ttyopts $1" ;;
   -T)	shift; termname=$1; shift; doterm=1 ;;
-  +t)	shift; doterm= ;;
+  +t)	shift; doterm=; ttyopts="$ttyopts $1" ;;
   *)	doterm=; [ -t 0 -a -t 1 ] || doterm=1 ;;
 esac
 
@@ -93,8 +95,8 @@ then
   badopts=1
 else
   file=$1; shift
-  if [ "x$file" = x- ]
-  then
+  case "$file" in
+    -)
       if cat >"$tmpfile"
       then
 	  tmpfile=`fixexts "$tmpfile"` || exit 1
@@ -103,7 +105,11 @@ else
 	  echo "$cmd: can't cat stdin to $tmpfile, aborting" >&2
 	  badopts=1
       fi
-  else
+      ;;
+    http://*)
+      exec withurl -1 "$file" "$0" "$@"
+      ;;
+    *)
       # handed real filename
       if [ ! -s "$file" ]
       then
@@ -122,7 +128,8 @@ else
 		fi
 	    fi
       fi
-  fi
+      ;;
+  esac
 
   # fork off a terminal if need be
   if [ $doterm ]
