@@ -1,0 +1,31 @@
+#!/usr/bin/perl
+#
+
+use cs::HTML;
+use cs::Hier;
+
+($cmd=$0) =~ s:.*/::;
+
+if (@ARGV)
+	{ for (@ARGV)
+		{ if (! open(ML,"< $_\0"))
+			{ warn "can't open $_: $!\n";
+			}
+		  else
+		  { cs2ht(ML);
+		    close(ML);
+		  }
+		}
+	}
+else
+{ cs2ht(STDIN);
+}
+
+exit 0;
+
+sub cs2ht
+	{ my($F)=@_;
+	  my(@ml)=HTML::tokFILE("main::$F");
+
+	  print "ML=", cs::Hier::h2a(\@ml), "\n";
+	}
