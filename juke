@@ -89,36 +89,41 @@ do
 		echo "  ?	This help message."
 		echo "  -	Stop the player."
 		echo "  .	Select with an empty pattern (pick anything)."
+		echo "  n	Set main volume to n, from 0-100."
 		echo "  blank line: Skip to next selection from current criteria."
 		echo "  \"random\" Choose matching items sequentially."
 		echo "  \"seq\"	Choose matching items sequentially."
-		echo "  keyword	Select tracks using the supplied keywords."
+		echo "  keywords Select tracks using the supplied keywords."
 		;;
 	'')	bumpplayer
 		;;
 	-)	stopplayer
 		;;
+	[0-9]|[1-9][0-9]|100)
+		echo "Setting volume to $line."
+		set-x aumix -v "$line"
+		;;
 	random)	dorandom=1
 		echo "Reselecting with random play."
 		stopplayer
-		sleep 2  
+		sleep 1  
 		runplayer
 		;;
 	seq)	dorandom=
 		echo "Reselecting with sequential play."
 		stopplayer
-		sleep 2  
+		sleep 1  
 		runplayer
 		;;
 	.)	ptns=
 		stopplayer
-		sleep 2
+		sleep 1
 		runplayer
 		;;
 	*)
 		ptns=$line
 		stopplayer
-		sleep 2
+		sleep 1
 		runplayer
 		;;
     esac
