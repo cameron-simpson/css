@@ -7,7 +7,8 @@
 cmd=`basename "$0"`
 usage="Usage: $cmd [[user:pass@]server]"
 
-server=mail.zipworld.com.au
+server=127.0.0.2	#mail.zipworld.com.au
+fmrc=$HOME/var/fetchmail/fetchmailrc
 
 [ $# = 0 ] || { server=$1; shift; }
 
@@ -21,9 +22,11 @@ case "$server" in
     ;;
 esac
 
+[ -s "$fmrc" ] || { echo "$cmd: no $fmrc" >&2; exit 1; }
+
 fm_user=
 fm_pass=
-eval `fetchmailclause -f $HOME/var/fetchmail/fetchmailrc "$server" | sed 's/^\([^ ][^ ]*\) /fm_\1=/'`
+eval `fetchmailclause -f "$fmrc" "$server" | sed 's/^\([^ ][^ ]*\) /fm_\1=/'`
 [ -n "$sv_user" ] && fm_user=$sv_user
 [ -n "$sv_pass" ] && fm_pass=$sv_pass
 
