@@ -5,5 +5,5 @@ case $# in
   1)	vi "cats/$1" ;;
   *)	echo "Usage: $0 [subfile]" >&2; exit 1;;
 esac
-touch cats.$SYSTEMID
-exec myke procmailrc.$SYSTEMID
+touch cats.*
+exec myke _all
