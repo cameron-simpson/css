@@ -84,9 +84,9 @@ sub match	# (Data,State) -> (token,tail) or undef
   { $tok="$1;"; $tail=$';
   }
   # busted char entities
-  elsif (/^(\&)[^#a-z]/i)
+  elsif (/^\&([^#a-z])/i)
   { $tok='&amp;';
-    $tail=$';
+    $tail=$1.$';
   }
   # whitespace
   elsif (/^[ \t\n\r]+/)
@@ -177,6 +177,7 @@ sub matchTag
 
       $A->{uc($at)}=$val;
     }
+    #        "str"
     elsif (/^"([^"]*)"[ \t\n\r]*/)
     { $A->{$1}=undef;
       $_=$';
@@ -185,15 +186,20 @@ sub matchTag
     # ugly hacks to catch syntax errors and recover
     elsif (/^">/)
     { $_='>'.$';
+      warn "\"> found";
     }
+    #        =           "str"   'str'   str
     elsif (/^=[ \t\r\n]*("[^"]*"|'[^']*'|[^[ \t\n\r>]*)[ \t\n\r]*/)
     {
       $_=$';
+      warn "=foo found";
     }
+    #        "    foo=
     elsif (/^"\s+(\w+=)/i)
     # ugly hack
     {
       $_=$1.$';
+      warn "lone quote found";
     }
     elsif (/^"[ \t\r\n]*>/)
     {
