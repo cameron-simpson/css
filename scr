@@ -79,7 +79,7 @@ do
   case $1 in
     -c)	addscrcmds "$2"; shift ;;
     -N)	new=1 ;;
-    -l)	addscrcmds "logfile $2" "logfile flush 1"; shift ;;
+    -l)	addscrcmds "logfile $2" "logfile flush 1" "log on"; shift ;;
     --)	shift; break ;;
     -?*)echo "$cmd: unrecognised option: $1" >&2
 	badopts=1
