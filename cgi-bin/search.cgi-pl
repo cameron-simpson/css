@@ -34,6 +34,19 @@ my %E=(
 		  'page'	=> 1,
 		},
 		],
+	JPL,	[ 'http://search.jpl.nasa.gov:8080/cgi-bin/htsearch',
+		{ 'words'	=> $query,
+		},
+		],
+	WIKIPEDIA, [ 'http://www.wikipedia.org/w/wiki.phtml',
+		{ 'search'	=> $query,
+		},
+		],
+	DAYPOP,	[ 'http://www.daypop.com/search',
+		{ 'q'		=> $query,
+		  't'		=> 'a',
+		},
+		],
 	DMOZ,	[ 'http://search.dmoz.org/cgi-bin/search',
 		{ 'search'	=> $query,
 		  'all'		=> 'no',
@@ -339,7 +352,12 @@ my %E=(
 		  'searchButton.y' => 1,
 		},
 		],
-	DICT,	[ 'http://work.ucsd.edu:5141/cgi-bin/http_webster',
+	ONELOOK, [ 'http://www.onelook.com/',
+		{ 'w'		=> $query,
+		  'ls'		=> 'b',
+		},
+		],
+	HTTP_WEBSTER, [ 'http://smac.ucsd.edu/cgi-bin/http_webster',
 	  	{ 'isindex'	=> $query,
 		  'method'	=> 'approx',
 		},
@@ -789,9 +807,12 @@ else
 
 $url='http://cgi.zipworld.com.au/cs/htclean.cgi/'.$url if $scour;
 
-print "Location: ", $url, "?";
-print join("&",map(enquery($_).(defined $data->{$_} ? "=" : "").enquery($data->{$_}),sort keys %$data));
-print "\n\n";
+print "Content-Type: text/html\n";
+my $long = "$url?"
+         . join("&",map(enquery($_).(defined $data->{$_} ? "=" : "").enquery($data->{$_}),sort keys %$data));
+print "Location: $long\n";
+print "\n";
+print "Redirecting to <A HREF=\"".$long."\">$url</A> ...\n";
 
 exit 0;
 
