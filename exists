@@ -1,0 +1,12 @@
+#!/bin/sh
+#
+# Test for existence. (Stock test needs a -e like perl).
+#	- Cameron Simpson <cs@zip.com.au> 22aug2000
+#
+
+[ $# = 1 ] || { echo "Usage: $0 pathname" >&2; exit 2; }
+
+# in case we have a weirdo name
+case "$1" in -*) set "./$1" ;; esac
+
+exec ls -d "$1" >/dev/null 2>&1
