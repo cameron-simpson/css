@@ -138,23 +138,33 @@ do
 	       s/  *\$//
 	       s/   */ /g
 	       /^$thing local\$/b local
-	       /^\* local\$/b local
+	       /^$thing remote\$/b remote
 	       /^$thing nosync\$/b nosync
+	       /^\* local\$/b local
+	       /^\* remote\$/b remote
 	       /^\* nosync\$/b nosync
 	       /^$thing [^ ][^ ]* local\$/b vlocal
+	       /^$thing [^ ][^ ]* remote\$/b vremote
 	       /^$thing [^ ][^ ]*\$/b vers
 	       s/ /-/
 	       /^$thing local\$/b local
+	       /^$thing remote\$/b remote
 	       /^$thing nosync\$/b nosync
 	       d
 	       :local
 	       s/.*/makelocal=1 nosync=/
+	       b done
+	       :remote
+	       s/.*/makelocal= nosync=/
 	       b done
 	       :nosync
 	       s/.*/nosync=1 makelocal=/
 	       b done
 	       :vlocal
 	       s/^$thing \\([^ ]*\\).*/makelocal=1 version=\\1 nosync=/
+	       b done
+	       :vremote
+	       s/^$thing \\([^ ]*\\).*/makelocal= version=\\1 nosync=/
 	       b done
 	       :vers
 	       s/^$thing /version= nosync=/
