@@ -1,0 +1,99 @@
+#!/bin/sh
+#
+# My usual incantation for constructing an ISO FS image for a CDROM.
+# Partner for mkcd.
+# Makes plain vanilla data CDs, not bootables etc. Will make the
+# default Volume Identifier from a toplevel LABEL file if present
+# (as for the md5medium script).
+# PUBL and PREP come from the .mkisofsrc file.
+#	- Cameron Simpson <cs@zip.com.au> 12jul2000
+#
+
+cmd=`basename "$0"`
+usage="Usage: $cmd [-l label] [-o image.iso] directory
+	-l label	Label string (VOLI field, up to 32 bytes).
+			Default: the contents of the top level
+				 LABEL file.
+	-o image.iso	Specify output file.
+			Default: directory.iso"
+
+out=
+volid=
+label=
+iso=
+badopts=
+while :
+do  case $1 in
+      -l)	label=$2; shift ;;
+      -o)	out=$2; shift ;;
+      --)	shift; break ;;
+      -?*)	echo "$cmd: unrecognised option: $1" >&2
+		badopts=1
+		;;
+      *)	break ;;
+    esac
+    shift
+done
+
+if [ $# = 0 ]
+then
+    echo "$cmd: missing directory" >&2
+    badopts=1
+else
+    dir=$1; shift
+    [ $# = 0 ] || { echo "$cmd: extra arguments: $*" >&2
+		    badopts=1
+		  }
+fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+ok=1
+
+if [ -z "$out" ]
+then
+    out=`basename "$dir"`.iso
+    echo "iso=$out"
+fi
+
+if [ -z "$label" ]
+then
+    lfile=$dir/LABEL
+    if [ ! -s "$lfile" ]
+    then
+	echo "$cmd: no label file: $lfile" >&2
+	ok=
+    else
+	label=`cat <"$lfile"`
+	if [ $? != 0 ]
+	then
+	    echo "$cmd: problems reading label file $lfile" >&2
+	    ok=
+	else
+	    if [ -z "$label" ]
+	    then
+		echo "$cmd: empty label from $lfile" >&2
+		ok=
+	    else
+		echo "VOLI=$label"
+	    fi
+	fi
+    fi
+fi
+
+if [ -s "$iso" ]
+then
+    echo "$cmd: existing file: $iso" >&2
+    ok=
+fi
+
+if [ ! -d "$dir/." ]
+then
+    echo "$cmd: not a directory: $dir" >&2
+    ok=
+fi
+
+[ $ok ] || exit 1
+
+set -x
+exec mkisofs -D -J -L -N -r -T -v -V "$label" -o "$out" "$dir"
