@@ -1,0 +1,27 @@
+#!/bin/sh
+
+cmd=$0
+usage="Usage: $cmd [user@host [syncstuff-options...]]"
+
+if [ $# = 0 ]
+then
+    needhost zapff@cisra amadeus@home || exit 1
+    case $HOST@$SYSTEMID in
+      zapff@cisra)	set cameron@agricola cameron@agostino cameron@ivory cameron@upnp ;;
+      amadeus@home)	set cameron2@alpha cameron2@janus ;;
+      *)	echo "$cmd: $HOST@$SYSTEMID: huh?" >&2; exit 1 ;;
+    esac
+    for h
+    do  pfx "$h" syncsmall "$h" &
+    done
+    wait
+    exit 0
+fi
+
+case $1 in
+    @?*)	who=$USER$1; shift ;;
+    ?*@?*)	who=$1; shift ;;
+    *)		echo "$cmd: missing user@host" >&2; exit 2 ;;
+esac
+
+exec syncstuff @small -o "to=$who" ${1+"$@"}
