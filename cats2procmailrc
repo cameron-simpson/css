@@ -421,8 +421,6 @@ sub readcats($;$)
       $ptn=".*$ptn";
     }
 
-    my $hregexp = altre(@hdrs);
-
     if ($folder =~ /^\|/)
     { $deliver=($key eq '.' ? $folder : "$folder '$key'");
       undef $lockfile;
@@ -451,7 +449,8 @@ sub readcats($;$)
 
     print ": 0$cont\n";
     if (defined($ptn))
-    { print "* ^$hregexp:$ptn\n";
+    { my $hregexp = altre(@hdrs);
+      print "* ^$hregexp:$ptn\n";
     }
     print "{\n";
 
@@ -568,7 +567,10 @@ sub pathdir
 }
 
 sub altre
-{ die "altere() with no args" if ! @_;
+{ if (! @_)
+  { my@c=caller;
+    die "altere() with no args from [@c]";
+  }
   return $_[0] if @_ == 1;
   return '('.join('|',@_).')';
 }
