@@ -1,0 +1,10 @@
+#!/bin/sh
+#
+# Record build timestamp in suitable .java file for use as a String.
+#	- Cameron Simpson <cs@zip.com.au> 19dec2002
+#
+
+[ $# = 0 ] && { echo "Usage: $0 Javafiles..." >&2; exit 2; }
+
+set -x
+exec bsed "s#\"[^\"]*\";\\([ 	]*// AUTOBUILDTIMESTAMP\\)\$#\"`datecode`\";\\1#" "$@"
