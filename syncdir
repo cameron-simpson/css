@@ -1,0 +1,38 @@
+#!/bin/sh
+#
+# Rsync a directory from my homedir to another account.
+#	- Cameron Simpson <cs@zip.com.au> 19apr2004
+#
+
+cmd=$0
+usage="Usage: $cmd dir [user@]hosts..."
+
+badopts=
+
+if [ $# = 0 ]
+then
+    echo "$cmd: missing dir" >&2
+    badopts=1
+else
+    dir=$1; shift
+    [ $# = 0 ] && { echo "$cmd: missing user@host" >&2
+		    badopts=1
+		  }
+fi
+
+cd
+[ -d "$dir/." ] || { echo "$cmd: $dir: not a directory" >&2
+		     badopts=1
+		   }
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+xit=0
+
+for host
+do
+  pfx "$host" \
+  rsync -avHP "$dir/." "$host:$dir/." || xit=1
+done
+
+exit $xit
