@@ -257,7 +257,9 @@ doclause()
       do
 	if [ "x$op" = xuse ]
 	then
-	  doclause $etc
+	  eval "subclause=$etc"
+	  [ $noaction ] && echo "USE $subclause" >&2
+	  doclause $subclause
 	else
 	  echo "$op $etc"
 	fi
