@@ -1,0 +1,26 @@
+#!/bin/sh
+#
+# Emit the requested FAQ.
+#	- Cameron Simpson <cs@zip.com.au> 03aug95
+#
+
+FAQdir=$HOME/etc/FAQs
+
+cd "$FAQdir" || exit $?
+
+[ $# = 0 ] && exec ls
+
+xit=0
+for key
+do
+    for file in *"${key}"*
+    do
+	[ -r "$file" ] || { echo "$0: can't read \"$file\"" >&2
+			    xit=1
+			    continue
+			  }
+	cat "$file" || xit=$?
+    done
+done
+
+exit $xit
