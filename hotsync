@@ -6,12 +6,7 @@
 
 cmd=`basename "$0"`
 
-case "$HOST@$SYSTEMID" in
-    zapff@cisra|amadeus@home)	;;
-    *)		echo "$cmd: I expect to be on cerebus@home or zapff@cisra" >&2
-		exit 1
-		;;
-esac
+needhost janus@home || exit 1
 
 syncdir=$HOME/rc/palm/sync
 [ -d "$syncdir/." ] || { echo "$cmd: $syncdir: not a directory" >&2; exit 1; }
