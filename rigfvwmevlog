@@ -5,10 +5,10 @@
 [ -n "$FVWMEVLOG" ] || { echo "$0: no \$FVWMEVLOG envvar" >&2; exit 1; }
 [ -f "$FVWMEVLOG" ] || { echo "$0: no \$FVWMEVLOG log file" >&2; exit 1; }
 
-fifodir=$HOME/tmp
-[ -d "$fifodir/." ] || mkdir "$fifodir" || exit 1
-
-fifo=$HOME/tmp/fvwmevfifo-$HOST-$DISPLAY-$$
+set -vx
+fifodir=$FVWM_TMPDIR/fifo-$HOST
+[ -d "$fifodir/." ] || mkdir -p "$fifodir" || exit 1
+fifo=$fifodir/$DISPLAY-`datecode`-$$
 
 FvwmCommand -S "$fifo"
 sleep 5
