@@ -11,8 +11,7 @@
 xit=0
 
 for f
-do  ## echo "$f ..."
-
+do
     [ -f "$f" ] || { echo "$cmd: $f: not a regular file" >&2
 		     xit=1; continue;
 		   }
@@ -33,7 +32,7 @@ do  ## echo "$f ..."
     # see if ext is ok already
     fbase=`basename "$f"`
     case "$fbase" in
-      *".$prefext")	continue ;;
+      *".$prefext")	[ -t 1 ] || echo "$f"; continue ;;
     esac
 
     fdir=`dirname "$f"`
@@ -47,8 +46,9 @@ do  ## echo "$f ..."
 	*)	newf=$fdir$fbase.$prefext ;;
     esac
 
-    echo "$f -> $newf"
+    [ -t 1 ] && echo "$f -> $newf"
     mv -i -- "$f" "$newf" || xit=1
+    [ -t 1 ] || echo "$newf"
 done
 
 exit $xit
