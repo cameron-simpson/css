@@ -1,0 +1,19 @@
+#!/bin/sh
+#
+# Take argument as a $QUERY_STRING CGI parameter and emit shell to
+# turn the values into PARAM_x for each parameter x.
+#	- Cameron Simpson <cs@zip.com.au> 11aug1999
+#
+# Use $QUERY_STRING itself if no arg.
+#
+
+[ $# -le 1 ] || { echo "Usage: $0 [query_string]" >&2; exit 2; }
+qs=${1-"$QUERY_STRING"}
+
+echo "$qs" \
+| tr '&+' '\012 ' \
+| sed -e '/^[A-Za-z_][A-Za-z0-9_]*=/!d' \
+      -e "s/'/'\\\\''/g" \
+      -e "s/=\\(.*\\)/='\\1'/" \
+      -e "s/^/PARAM_/" \
+| unhexify
