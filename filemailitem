@@ -1,11 +1,94 @@
 #!/bin/sh
 #
-# Read mail item from stdin, file in MH folder.
-# I can never remember just how to invoke rcvstore...
+# Read mail item from stdin, file a folder.
+# Tries to be pretty fast.
 #	- Cameron Simpson <cs@zip.com.au> 20apr2001
 #
 
-[ $# = 1 ] || { echo "Usage: $0 folder <mailitem" >&2; exit 2; }
+: ${MAILDIR:=$HOME/mail}
+: ${TMPDIR:=/tmp}
+: ${VARLOG:=$HOME/var/log}
+mode=maildir
 
-##exec lock "filemailitem$1"
-unfrom_ | /usr/lib/nmh/rcvstore "$1" -unseen -nocreate
+cmd=$0
+usage="Usage: $cmd [-auto] folder <mailitem
+	-auto	Figure out the folder type.
+		Default: $mode"
+
+badopts=
+
+[ "x$1" = x-auto ] && { mode=auto; shift; }
+
+if [ $# = 0 ]
+then
+    echo "$cmd: missing folder" >&2
+    badopts=1
+else
+    folder=$1; shift
+    [ $# = 0 ] || { echo "$cmd: extra arguments after folder: $*" >&2
+		    badopts=1
+		  }
+fi
+
+if [ -t 0 ]
+then
+    echo "$cmd: stdin may not be a tty; I expect a mail item" >&2
+    badopts=1
+fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+fpath=
+
+# figure out the folder type if asked to guess
+if [ "x$mode" = xauto ]
+then
+    fpath=`mailfolderpath "$folder"` || exit 1
+    [ -n "$fpath" ] || { echo "$cmd: can't figure out pathname for folder \"$folder\"" >&2
+			 exit 1
+		       }
+    if [ -d "$fpath" ]
+    then
+	if ismhdir "$fpath"
+	then mode=mh
+	else mode=maildir
+	fi
+    else
+	mode=mbox
+    fi
+fi
+
+# compute fpath if meeded
+[ -n "$fpath" ] || [ "x$mode" = xmh ] \
+|| { fpath=`mailfolderpath "$folder"` || exit 1
+     [ -n "$fpath" ] \
+     || { echo "$cmd: can't figure out pathname for folder \"$folder\"" >&2
+	  exit 1
+	}
+   }
+
+# deliver
+case "$mode" in
+    mbox)
+	exec cat >>"$fpath"
+	;;
+    mh)	unfrom_ | /usr/lib/nmh/rcvstore "$1" -unseen -nocreate
+	;;
+    maildir)
+	tmpf=$TMPDIR/prc$$
+	cat >"$tmpf" <<X || exit 1
+	MAILDIR=$MAILDIR
+	DEFAULT=$fpath/
+	LOGFILE=$VARLOG/procmail
+X
+	procmail "$tmpf"
+	xit=$?
+	rm -f "$tmpf"
+	exit $xit
+	;;
+    *)	echo "$cmd: unsupported mode: $mode" >&2
+	exit 2
+	;;
+esac
+
+exit $?
