@@ -6,13 +6,22 @@
 
 cmd=`basename "$0"`
 usage="Usage: $cmd [-f] [-m logmessage] file [command [args...]]
+	Normally the filename will be appended as the last argument to the
+	  supplied command. The -0, -1 and -f options affect this.
+	-0		The filename will not be attached to the command,
+			which is assumed to be complete.
+	-1		The filename will be inserted as the first argument
+			to the command.
 	-f		Command is a filter.
-			The file will be editing with filteredit,
+			The file will be edited with filteredit,
 			with the current content of the file available on stdin.
-	-m logmessage	Specify log message."
+			The filename will not be attached to the command.
+	-m logmessage	Specify log message.
+			Default from \$CVSEDIT_MSG."
 
-cameron=
+cameron= cisra=
 [ "x$USER" = xcameron ] && cameron=1
+[ "x$SYSTEMID" = xcisra ] && cisra=1
 
 msg=$CVSEDIT_MSG
 if [ -n "$msg" ]
@@ -107,7 +116,7 @@ editxit=$?
 || exit 1
 
 [ $havemsg ] \
-|| { [ -t 0 ] && { necho "Log message? "; read msg; }; } \
+|| { [ -t 0 ] && { msg=`readline -p "Log message"` && -n "$msg"; } \
 || { echo "$cmd: commit cancelled - file in modified state" >&2
      exit 1
    }
