@@ -1,0 +1,68 @@
+#!/bin/sh
+#
+# List/manipulate info in HTML documents.
+#	- Cameron Simpson <cs@zip.com.au> 21nov96
+#
+
+cmd=`basename "$0"`
+usage="Usage: $cmd [-clean|-v|-verbose] [-title string] filenames...
+	-clean	Ensure the file has HEAD and BODY markup.
+	-title string
+		Replace the TITLE markup.
+	-v, -verbose Verbose."
+
+badopts=
+clean=
+title=
+verbose= vflag=
+
+while :
+do  case $1 in
+	-clean)	clean=1 ;;
+	-title)	title=$2; shift ;;
+	-v|-verbose)
+		verbose=1 vflag=-v ;;
+	--)	shift; break ;;
+	-?*)	echo "$cmd: unrecognised option: $1" >&2; badopts=1 ;;
+	*)	break ;;
+    esac
+    shift
+done
+
+[ $# -gt 0 ] || { echo "$cmd: missing filenames" >&2; badopts=1; }
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+xit=0
+
+if [ $clean ]
+then
+    for file
+    do
+	[ $verbose ] && echo "clean $file ..." >&2
+	fgrep '<HTML>' /dev/null "$file" >/dev/null \
+	  || bsed $vflag '1i\
+<HTML>
+$a\
+</HTML>' "$file"
+	fgrep '<HEAD' /dev/null "$file" >/dev/null \
+	  || bsed $vflag '/<HTML>/a\
+<HEAD>\
+</HEAD>' "$file"
+	fgrep '<BODY' /dev/null "$file" >/dev/null \
+	  || bsed $vflag '/<\/HEAD/a\
+<BODY>
+/<\/HTML/i\
+</BODY>' "$file"
+	fgrep '<TITLE' /dev/null "$file" >/dev/null \
+	  || bsed $vflag '/<\/HEAD>/i\
+'"<TITLE>Title of $file</TITLE>" "$file"
+    done
+fi
+
+if [ -n "$title" ]
+then
+    bsed $vflag 's/<TITLE>.*<\/TITLE>/<TITLE>'"$title"'<\/TITLE>/' "$@"
+fi
+
+exit $xit
