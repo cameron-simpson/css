@@ -30,4 +30,4 @@ session=root@$host$ext
 ## scrif $newflag "$session"
 exec term -n "#$session" \
 	logscript "$session" \
-	sshp1 "root@$host"
+	sshop1 "root@$host"
