@@ -29,8 +29,12 @@ case "$topic" in
 		;;
 esac
 
+topicfile=
 for dir in `unpath "$LINKPAGEPATH"`
-do  topicfile=$dir/urls/$topic
+do  for subdir in urls/ ''
+    do  topicfile=$dir/$subdir$topic
+	[ -f "$topicfile" ] && break
+    done
     [ -f "$topicfile" ] && break
 done
 
