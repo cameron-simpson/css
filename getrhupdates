@@ -4,6 +4,8 @@
 #	- Cameron Simpson <cs@zip.com.au> 07sep2003
 #
 
+: ${TMPDIR:=/tmp}
+
 release=`rhrelease`
 lang=en
 archs='athlon i386 i586 i686 noarch'
@@ -54,7 +56,7 @@ done
 
 updroot=$updates/$release/$lang/os
 
-inclist=/tmp/$cmd$$
+inclist=$TMPDIR/$cmd$$
 trap 'rm -f "$inclist"' 0 1 2 15
 
 (
