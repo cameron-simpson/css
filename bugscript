@@ -1,0 +1,25 @@
+#!/bin/sh
+#
+# Run command, log output to bug system.
+#	- Cameron Simpson <cs@zip.com.au> 22mar2005
+#
+
+: ${TMPDIR:=/tmp}
+
+trace=set-x
+
+cmd=`basename "$0"`
+usage="Usage: $cmd [-m msg] [{-c shcmd | cmd [args...]}]"
+
+msg=
+case "$1" in
+  -m) msg=$2; shift; shift ;;
+esac
+
+logfile=$TMPDIR/$cmd.$$.log
+set logscript +z -m "$msg" "$logfile" ${1+"$@"}
+
+$trace "$@"
+xit=$?
+rm "$logfile"
+exit $xit
