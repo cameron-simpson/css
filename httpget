@@ -30,6 +30,8 @@ use strict vars;
 use cs::Misc;
 use cs::URL;
 use cs::Lock;
+use cs::Source;
+use cs::Pathname;
 use Getopt::Std;
 
 sub URLsavepath($);
@@ -55,6 +57,8 @@ $::Verbose=0;
 $::Silent=(! -t STDOUT);
 $::Headers=0;
 $::DoHEAD=0;
+$::Daemon=0;
+undef $::QueueFile;
 undef $::BigLock;
 undef $::SmallLock;
 
@@ -79,6 +83,8 @@ $::Usage="Usage: $::cmd [options...] [urls...]
 	-L lock		Take the named lock for the duration of the entire fetch.
 	-n		No action - report final URLs which would be fetched.
 	-o output	Save output to file. \"-\" means stdout.
+	-q queue	Write actual URLs to be saved to the specified queue file.
+	-Q queue	Monitor the specified file as a queue.
 	-s		Silent.
 	-t		Print titles with URLs. Implies -n.
 	-v		Verbose.
@@ -88,7 +94,7 @@ $::Usage="Usage: $::cmd [options...] [urls...]
 { my $badopts=0;
   my %opt;
 
-  if (! getopts('#a:b:d:D:ghHiI:l:L:no:rstvx',\%opt))
+  if (! getopts('#a:b:d:D:ghHiI:l:L:no:q:Q:rstvx',\%opt))
   { warn "$::cmd: unrecognised options\n";
     $badopts=1;
   }
@@ -269,6 +275,29 @@ The name "B<->" means standard output.
     { $::Output=$opt{$opt};
     }
 
+=item B<-q> I<queue>
+
+Write actual URLs to be saved to the specified file I<queue>.
+
+=cut
+
+    elsif ($opt eq 'q')
+    { $::Daemon=0;
+      $::QueueFile=$opt{$opt};
+    }
+
+=item B<-Q> I<queue>
+
+Monitor the specified file I<queue>
+as a queue of pending downloads.
+
+=cut
+
+    elsif ($opt eq 'Q')
+    { $::Daemon=1;
+      $::QueueFile=$opt{$opt};
+    }
+
 =item B<-s>
 
 Silent.
@@ -354,6 +383,63 @@ if (defined $::BigLock)
 { $bigLock=new cs::Lock $::BigLock;
 }
 
+if ($::Daemon)
+{
+  if (! defined $::QueueFile)
+  { die "$::cmd: daemon mode but no queuefile defined!";
+  }
+
+  if (@ARGV)
+  { warn "$::cmd: you can't supply URLs on the command line if the -Q option is in use\n";
+    exit 2;
+  }
+
+  my $Q = (new cs::Source TAIL, $::QueueFile);
+  if (! defined $Q)
+  { warn "$::cmd: can't attach to queue file \"$::QueueFile\": $!\n";
+    exit 2;
+  }
+
+  # spin watching for requests
+  while (1)
+  { if (defined ($_=$Q->GetLine()) && length)
+    {
+      chomp;
+      my @f = split(/\s+/);
+      if (@f != 2)
+      { warn "$::cmd: bad line - expected URL and dir: $_\n";
+	$::Xit=1;
+      }
+      else
+      {
+	my($url,$dir)=@f;
+	if ($dir !~ m:^/:)
+	{ warn "$::cmd: dir must be absolute path, skipping URL \"$url\" for dir \"$dir\"\n";
+	  $::Xit=1;
+	}
+	elsif (!chdir($dir))
+	{ warn "$::cmd: chdir($dir): $!; skipping URL \"$url\"\n";
+	  $::Xit=1;
+	}
+	else
+	{ flush(STDOUT);
+	  system('pwd');
+	  print "$url\n";
+	  flush(STDOUT);
+
+	  relhttpget($url);
+	}
+      }
+    }
+
+    sleep($::Delay);
+  }
+
+  undef $Q;
+
+  exit $::Xit;
+}
+
 if (@ARGV)
 { my @urls = @ARGV;
   @ARGV='';
@@ -421,9 +507,20 @@ sub httpget($)
     { warn "$::cmd: file $outfile exists, skipping $url\n" if $::Verbose;
       return;
     }
+    elsif (! $::Daemon && defined $::QueueFile)
+    { my($dir)=cs::Pathname::absname(cs::Pathname::dirname($outfile));
+      if (!open(QUEUE,">>$::QueueFile"))
+      { warn "$::cmd: can't append to $::QueueFile: $!\n";
+	$::Xit=1;
+      }
+      else
+      { print QUEUE "$url $dir\n";
+	close(QUEUE);
+      }
+    }
     else
     {
-      if ($::Seen{$url})
+      if (! $::Daemon && $::Seen{$url})
       { warn "$::cmd: seen $url, skipping\n" if $::Verbose;
 	return;
       }
