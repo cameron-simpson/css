@@ -1,18 +1,26 @@
 #!/bin/sh
 
+cmd=$0
+
 needhost $HOMEHOST@home || exit 1
 
 hARCH=$ARCH
 
-[ $# = 1 ] || { echo "Usage: $0 [login@]hostname" >&2; exit 2; }
-host=$1; shift
+[ $# = 0 ] && { echo "$cmd: missing login@hostname" >&2
+		echo "Usage: $cmd [login@]hostname" >&2
+		exit 2
+	      }
 
 cd || exit 1
 set -x
-exec rsync -avHP --delete --exclude=CVS/ \
+for h
+do
+  pfx "$h" \
+  rsync -avHP --delete --exclude=CVS/ \
 	'--include=/.bash_logout' \
 	'--include=/.bash_profile' \
 	'--include=/.bashrc' \
+	'--include=/.gtkrc' \
 	'--include=/.less' \
 	'--include=/.lesskey' \
 	'--include=/.mailcap' \
@@ -25,8 +33,9 @@ exec rsync -avHP --delete --exclude=CVS/ \
 	'--exclude=/.ssh/*' \
 	'--include=/.xinitrc' \
 	'--include=/.xsession' \
-	'--include=/.zshenv' \
 	'--include=/.zprofile' \
+	'--include=/.zshenv' \
+	'--include=/.zshrc' \
 	'--include=/bin' \
 	"--include=/bin/$hARCH" \
 	'--exclude=/bin/*' \
@@ -55,4 +64,7 @@ exec rsync -avHP --delete --exclude=CVS/ \
 	'--exclude=/var/*/*' \
 	'--exclude=/var/*' \
 	'--exclude=/*' \
-	. "$host:."
+	. "$h:." \
+	&
+done
+wait
