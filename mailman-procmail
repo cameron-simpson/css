@@ -4,20 +4,20 @@
 # Invoked from procmail.
 #   mailman		-> postmaster
 #   mailman-list	-> wrapper post list
-#   mailman-list-admin	-> wrapper mailowner list
-#   mailman-list-request-> wrapper mailcmd list
-#   mailman-list-owner	-> mailman-list-admin
+#   mailman-list-*	-> wrapper * list
 #	- Cameron Simpson <cs@zip.com.au> 16may2001
 #
+
+exec 2>>/var/mailman/procmail.out
 
 : ${TMPDIR:=/tmp}
 
 PATH=$PATH:/opt/script
 export PATH
 
-wrapper=/home/sweet/mailman/mail/wrapper
+wrapper=/var/mailman/mail/mailman
 
-PATH=/bin:/usr/bin:/usr/sbin:/opt/script:$PATH
+PATH=/bin:/usr/bin:/usr/sbin:$PATH
 export PATH
 
 tmp=$TMPDIR/mmprcm$$
@@ -31,30 +31,39 @@ sed -n -e '/^$/q' -e 's/@.*//' -e 's/^Delivered-To: *//p' \
 | sed 1q \
 | { read delivery || exit 1
 
-    wrapfor=
-
+    xit=0
+    dowrap=
+    set -x
     case "$delivery" in
 	mailman)
-		sendmail -oi cameron <$tmp; xit=$?
+		sendmail -oi postmaster <$tmp || xit=$?
 		;;
-	mailman+*-owner | mailman+*-admin )
+
+	mailman+*-admin \
+	| mailman+*-bounces \
+	| mailman+*-confirm \
+	| mailman+*-join \
+	| mailman+*-leave \
+	| mailman+*-owner \
+	| mailman+*-request \
+	| mailman+*-subscribe \
+	| mailman+*-unsubscribe )
 		list=`expr "$delivery" : 'mailman+\(.*\)-.*'`
-		wrapfor=mailowner
+		op=`expr "$delivery" : 'mailman+.*-\(.*\)'`
+		"$wrapper" "$op" "$list" <$tmp || xit=$?
 		;;
-	mailman+*-request )
-		list=`expr "$delivery" : 'mailman+\(.*\)-.*'`
-		wrapfor=mailcmd
-		;;
+
 	mailman+* )
 		list=`expr "$delivery" : 'mailman+\(.*\)'`
 		wrapfor=post
 		if sed '/^$/q' $tmp | grep '^X-Spam-Status: Yes,'
 		then
-		    wrapfor=
 		    sed -e '/^$/,$b ok' \
 			-e "s/^[Ss][Uu][Bb][Jj][Ee][Cc][Tt]:/& SPAM to list \"$list\":/" \
 			$tmp \
 		    | sendmail -oi "mailman+$list-owner" 
+		else
+		    "$wrapper" post "$list" <"$tmp" || xit=$?
 		fi
 		;;
 	*)	echo "$0: don't known what to do with email for \"$delivery\"" >&2
@@ -65,12 +74,6 @@ sed -n -e '/^$/q' -e 's/@.*//' -e 's/^Delivered-To: *//p' \
 
     ## echo "delivery=[$delivery] wrapfor=[$wrapfor] list=[$list]" >>"$TMPDIR/mm.log"
     
-    if [ -n "$wrapfor" ]
-    then
-	case "$list" in *-list) list=`expr "x$List" : 'x\(.*\)-list'` ;; esac
-	"$wrapper" "$wrapfor" "$list" <$tmp; xit=$?
-    fi
-
     rm -f $tmp
 
     exit $xit
