@@ -159,7 +159,7 @@ sub smtpsend
     }
 
     if (! $smtp->quit())
-    { warn "$::cmd: tourble QUITting\n";
+    { warn "$::cmd: trouble QUITting\n";
       $ok=0;
     }
   }
