@@ -18,6 +18,8 @@ then
 	addr=adzapper-everyupdate@lists.sourceforge.net
 	dotag=1
 	dopost=1
+	news=`readdottext` || exit 1
+	[ -n "$news" ] || { echo "News may not be empty." >&2; exit 2; }
     fi
 else
     addr=$1; shift
@@ -38,12 +40,26 @@ rsync -avHPW --delete --exclude=CVS/ $zapdir/html/. sf:adzapper/htdocs/.
 
 if [ $dopost ]
 then
+    # test mode
+    ##dotag=
+    ##addr=cameron
+
     cd $zapdir/html/scripts || exit 1
     ( cd .. || exit 1
-      echo New script attached.
-      echo Diff since last public sync:
+      echo "News:"
+      echo "$news"
       echo
-      cvs diff -r SYNCSF squid_redirect
+      echo "New zapper available at:"
+      echo
+      echo "    http://adzapper.sourceforge.net/scripts/squid_redirect"
+      echo
+      echo "Full changelog here:"
+      echo
+      echo "    http://adzapper.sourceforge.net/cvslog.html"
+      echo
+      echo "Changes since last public update:"
+      echo
+      cvslog -rSYNCSF:
       [ $dotag ] && cvs tag -F SYNCSF
-    ) | mfiles "$addr" squid_redirect
+    ) | mutt -s "adzapper-everyupdate notification" "$addr"
 fi
