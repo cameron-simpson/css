@@ -25,10 +25,12 @@
 #	- cameron 22apr2002
 # 
 
-PATH=$PATH:/usr/bin:/opt/bin:/opt/script
+pathadd=:/usr/bin:/opt/bin:/opt/script
+PATH=$PATH$pathadd
 export PATH
 
 rsync=rsync
+remote=
 
 cmd=`basename "$0"`
 usage="Usage: $cmd [-n] [-f] [l] [-R rsync-path] [-x] [-v] [items...]
@@ -36,6 +38,7 @@ usage="Usage: $cmd [-n] [-f] [l] [-R rsync-path] [-x] [-v] [items...]
 	-f	Force action.
 	-l	Localise the specified items.
 	-R rsync-path Rsync command path. Default: $rsync
+	-r [user@]host Remote host with the master files.
 	-x	Force action with tracing.
 	-v	Verbose."
 
@@ -49,10 +52,6 @@ subdirs=${SYNCOPT_SUBDIRS:="."}
 
 cf=$slashopt/.syncopt
 
-# look for /usr/local/opt-$ARCH or failing that /usr/local/opt
-aopt=$archopt-$ARCH
-[ -d "$aopt/." ] && archopt=$aopt
-
 vflag=
 [ -t 1 ] && vflag=-v
 
@@ -64,6 +63,7 @@ do  case $1 in
 	-l)	localise=1 ;;
 	-n)	trace=echo ;;
 	-R)	rsync=$2; shift ;;
+	-r)	remote=$2; shift ;;
 	-v)	verbose=1 vflag=-v ;;
 	--)	shift; break ;;
 	-?*)	echo "$cmd: unrecognised option: $1" >&2; badopts=1 ;;
@@ -72,59 +72,105 @@ do  case $1 in
     shift
 done
 
-if [ $# = 0 ]
+# because the master repository may be remote
+# everything remote has an eval layer so it can be passed through ssh
+if [ -z "$remote" ]
 then
-    [ $localise ] && { echo "$cmd: -l requires specific targets" >&2; badopts=1; }
-    set x `for subdir in $subdirs; do ls "$archopt/$subdir/." 2>/dev/null; ls "$commonopt/$subdir/." 2>/dev/null; done | sort -u`; shift
+    remotepfx=
+    atremote=eval
+    remote()
+    { eval "$*"
+    }
+else
+    remotepfx=$remote:
+    atremote="ssh $remote"
+    remote()
+    { ssh "$remote" "PATH=\$PATH:$pathadd; export PATH; $*"
+    }
+fi
+
+if [ $# = 0 ] && [ $localise ]
+then
+    echo "$cmd: -l requires specific targets" >&2
+    badopts=1
 fi
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
-# go to the central opt dir
-cd "$archopt" || exit 1
-
 # ensure there is a real local /opt
-
-[ -d "$slashopt" ] \
+[ -d "$slashopt/." ] \
 	|| { $trace mkdir $slashopt && $trace chmod 755 $slashopt; } \
 	|| exit 1
+
+# locate the master copy for every target
+#
+# look for /usr/local/opt-$ARCH or failing that /usr/local/opt
+resolve="cmd=$cmd
+	 subdirs='$subdirs'
+	 commonopt='$commonopt'
+         if [ -d '$archopt-$ARCH/.' ]
+         then archopt='$archopt-$ARCH'
+	 else archopt='$archopt'
+	 fi"
+# get target list if not specified
+if [ $# = 0 ]
+then
+    resolve=$resolve'
+	    set x `for subdir in $subdirs
+                    do ls "$archopt/$subdir/." 2>/dev/null
+                       ls "$commonopt/$subdir/." 2>/dev/null
+	            done | sort -u`; shift'
+else
+    resolve="$resolve; set x $*; shift"
+fi
+# resolve every target into a master directory
+resolve=$resolve'
+	first=1
+        for target
+	do  [ $first ] && { first=; set x; shift; }
+	    fullpath=
+	    for dir in $archopt $commonopt
+	    do  for subdir in $subdirs
+		do  if [ -d "$dir/$subdir/$target/." ]
+		    then  if [ "x$subdir" = x. ]
+			  then  fullpath=$dir/$target
+			  else  fullpath=$dir/$subdir/$target
+			  fi
+			  break
+		    fi
+		done
+		[ -n "$fullpath" ] && break
+	    done
+	    if [ -n "$fullpath" ]
+	    then  set x ${1+"$@"} "$fullpath"; shift
+	    else  echo "$cmd: can'\''t locate master for \"$target\"" >&2
+	    fi
+	done
+	[ $# = 0 ] || ls -d "$@"'
+set x `remote "$resolve"`; shift
 
 xit=0
 
 # for everything in the central opt dirs
-for thing
+for thingpath
 do
+    thing=`basename "$thingpath"`
     ## echo "sync $thing ..."
     ## case "$thing" in gimp*) set -x ;; esac
 
-    # local thing
+    # local iinstance of thing
     ldir=$slashopt
     l=$ldir/$thing
 
-    # locate remote instance of thing
-    r=
-    missed=
-    for rroot in $archopt $commonopt
-    do  [ -d "$rrot/." ] || continue
-	for subdir in $subdirs
-	do  case "$subdir" in
-		.|'')	r=$rroot/$thing ;;
-		*)	r=$rroot/$subdir/$thing ;;
-	    esac
-	    { test -f "$r" || test -d "$r/."; } \
-	    && break
-	    missed="$missed $r"
-	    r=
-	done
-	[ -n "$r" ] && break
-    done
-    [ -n "$r" ] || { echo "$cmd: can't read$missed" >&2
-		     echo "	skipping $thing" >&2
-		     xit=1
-		     continue
-		   }
+    # remote instance of thing
+    r=$thingpath
 
-    case "$thing" in *-*) nvthing=`expr "x$thing" : 'x\([^\-]*\)-.*'` ;; *) nvthing=$thing ;; esac
+    # get unversioned name for $thing
+    case "$thing" in
+	*-*) nvthing=`expr "x$thing" : 'x\([^\-]*\)-.*'` ;;
+	*)   nvthing=$thing ;;
+    esac
+
     # determine default behaviour:
     # whether to localise by default
     makelocal=$localise
@@ -189,48 +235,39 @@ do
     eval "$opts"
 
     # skip this?
-    [ $nosync ] && { echo "SKIP $thing"; continue; }
+    [ $nosync ] && { echo "NOSYNC $thing"; continue; }
 
     # files - basicly /opt/ARCH really
-    if test -f "$r"
+    if remote "test -f '$r'"
     then
-	test -f "$l" && cmp -s "$r" "$l" && continue
-	rm -rf "$l"
-	$trace cp -p "$r" "$l" || xit=1
+	$trace $rsync -aH $vflag "$remotepfx$r" "$l"
 	continue
     fi
 
     # maintain generic links
-    if issymlink "$r"
+    rlink=`remote "readsymlink '$r' 2>/dev/null"`
+    if [ -n "$rlink" ]
     then
-	# remote end is symlink - must be the "DEFAULT" link
-	if rlink=`readsymlink "$r"` && [ -n "$rlink" ]
+	# make thing into symlink to right version
+	if [ -n "$version" ]
+	then  sym=$thing-$version
+	else  sym=$rlink
+	fi
+
+	if llink=`readsymlink "$l"` \
+	&& [ "x$sym" = "x$llink" ]
 	then
-
-	    # make thing into symlink to right version
-	    if [ -n "$version" ]
-	    then  sym=$thing-$version
-	    else  sym=$rlink
-	    fi
-
-	    if llink=`readsymlink "$l"` \
-	    && [ "x$sym" = "x$llink" ]
-	    then
-		:
-	    else
-		$trace rm -rf "$l"
-		$trace ln -s "$sym" "$l" || xit=1
-	    fi
-
-	    # ensure appropriate version is local
-	    if [ $makelocal ] && issymlink "$ldir/$sym"
-	    then
-		$trace rm "$ldir/$sym"
-		$trace mkdir "$ldir/$sym"
-	    fi
+	    :
 	else
-	    echo "$cmd: can't readsymlink \"$r\"" >&2
-	    xit=1
+	    $trace rm -rf "$l"
+	    $trace ln -s "$sym" "$l" || xit=1
+	fi
+
+	# ensure appropriate version is local
+	if [ $makelocal ] && issymlink "$ldir/$sym"
+	then
+	    $trace rm "$ldir/$sym"
+	    $trace mkdir "$ldir/$sym"
 	fi
     else
 	# remote end is real - must be the versioned thing
@@ -251,7 +288,7 @@ do
     fi
 
     issymlink "$l" \
-    || $trace $rsync -aHW $vflag --delete "$r/." "$l/." | sed "s|^|$l: |"
+    || $trace $rsync -aHW $vflag --delete "$remotepfx$r/." "$l/." | sed "s|^|$l: |"
 
     set +x
 done
