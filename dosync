@@ -30,16 +30,14 @@ rsync -avHP --rsync-path='$HOME/scripts/rrsync kaper' /u/syncopt/redhat.x86.linu
 )
 
 # push real accounts
-for w in @work @newt @jekyll @sf
-do  $trace pfx "$w" syncstuff "$w" &
-    [ $sync ] && wait
-done
-
-# push stub accounts
-for who in cameron2@alpha cameron2@janus
-do  $trace pfx "$who" syncsmall "$who" &
-    [ $sync ] && wait
-done
+$trace pfx work syncwork &
+[ $sync ] && wait
+$trace pfx newt syncnewt &
+[ $sync ] && wait
+$trace pfx jekyll syncjekyll &
+[ $sync ] && wait
+$trace pfx small syncsmall &
+[ $sync ] && wait
 
 $trace pfx sf syncsf &
 [ $sync ] && wait
