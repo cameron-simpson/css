@@ -10,4 +10,4 @@ str=$1; shift
 [ $# = 0 ] && set .
 case " $*" in *" -"*) ;; *) set "$@" -type f -print ;; esac
 
-find "$@" | xargs g "$str"
+find "$@" | xxargs g "$str"
