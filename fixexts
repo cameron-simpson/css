@@ -6,7 +6,7 @@
 # Base entirely on file2mime and mimeext now. - cameron 24jul2003
 #
 
-[ $# = 0 ] && { set x `cat`; shift; }
+[ $# = 0 ] && { [ -t 0 ] && echo "reading filenames from stdin..." >&2; set -- `cat`; }
 
 xit=0
 
