@@ -24,7 +24,7 @@ if (! @ARGV)
   die $::Usage;
 }
 
-if ($::Dir !~ m:^(\.\.?)?/:)
+if ($::Dir ne '.' && $::Dir !~ m:^(\.\.?)?/:)
 { $::Dir="$ENV{HOME}/var/idsets/$::Dir";
 }
 -d "$::Dir/." || die "$::cmd: no such dir: $::Dir\n";
