@@ -26,10 +26,9 @@ sub new
     ## {my(@c)=caller;warn "new cs::Date ".cs::Hier::h2a($gmt,0)." from [@c]";}
     $gmt=tm2gmt($gmt,@_);
     if ($gmt == -1)
-	  { ::need(cs::Hier);
-	    die "range error on "
-	       .cs::Hier::h2a($gmt,0);
-	  }
+    { ::need(cs::Hier);
+      die "range error on ".cs::Hier::h2a($gmt,0);
+    }
   }
 
   my($tm);
@@ -70,6 +69,21 @@ sub Yy  { my($this)=shift; $this->TMField(YY,  @_); }
 sub DayCode
 { my($this)=shift;
   gmt2yyyymmdd($this->GMTime(),@_);
+}
+
+sub Hms
+{ my($this,$emitlocaltime,$spacers)=@_;
+  $emitlocaltime=1 if ! defined $emitlocaltime;
+  $spacers=1 if ! defined $spacers;
+
+  my $sep = ($spacers ? ':' : '');
+
+  sprintf("%02d%s%02d%s%02d",
+  	$this->Hour($emitlocaltime),
+	$sep,
+	$this->Min($emitlocaltime),
+	$sep,
+	$this->Sec($emitlocaltime));
 }
 
 # cs::Date::weekday names
