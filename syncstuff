@@ -14,7 +14,7 @@
 #
 # =head1 SYNOPSIS
 #
-# syncstuff [B<-o> B<I<option>=I<value>>]... [B<--I<rsopt>>...] [B<-b>] [B<-n>] [B<-v>]
+# syncstuff [@I<where>] [B<-o> B<I<option>=I<value>>]... [B<--I<rsopt>>...] [B<-b>] [B<-n>] [B<-v>]
 # [I<targets>...]
 #
 # =head1 DESCRIPTION
@@ -28,7 +28,7 @@
 #
 
 cmd=`basename "$0"`
-usage="Usage: $cmd [-o option=value]... [-b] [-n] [-v] [targets...]
+usage="Usage: $cmd [-o option=value]... [-b] [-n] [-v] [@where] [targets...]
 	-b	Backup mode. Use amassbackup.
 	--rsync-path exec
 		Execute \"exec\" as the remote rsync command.
@@ -55,7 +55,9 @@ syncdir=$HOME/rc/sync
 # is used as the name of the I<syncset> - the list of files
 # to make the same at the target.
 # This default I<syncset> may be overidden on the command line
-# by setting the B<syncset> option with B<-o>.
+# by setting the B<syncset> option with B<-o>
+# or more prettily by using the optional B<@I<where>> leading argument
+# in which case I<where> will be taken to be the I<syncset>.
 #
 
 syncset=
@@ -68,6 +70,13 @@ case $cmd in
 		exit 1
 		;;
 esac
+
+case "$1" in
+    @?*)  syncset=`expr "$1" : '@\(.*\)'`
+	  shift
+	  ;;
+esac
+
 #
 # =head1 INITIALISATION
 #
