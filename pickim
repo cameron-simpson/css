@@ -1,0 +1,57 @@
+#!/bin/sh
+#
+# Do the common image selection bit from rootbg/menubg.
+#	- Cameron Simpson <cs@zip.com.au>
+#
+
+cmd=`basename "$0"`
+usage="Usage: $cmd [-P strippfx] [bglist-options...] [{imagefile|ptns...}]"
+
+bgopts=
+strippfx=
+while :
+do  case $1 in
+      -P)  strippfx=$2; shift ;;
+      -n)  bgopts="$bgopts $1 $2"; shift ;;
+      --)  shift; break ;;
+      -?*) bgopts="$bgopts $1" ;;
+      *)   break ;;
+    esac
+    shift
+done
+
+if [ -n "$strippfx" ]
+then
+  ##set -vx
+  "$0" $bgopts -- ${1+"$@"} | sed "s;^$strippfx/;;"
+  exit 0
+fi
+
+if [ $# -gt 0 ] && [ -s "$1" ] && [ ! -d "$1/." ]
+then
+    imagefile=$1; shift
+    [ $# = 0 ] || { echo "$cmd: extra arguments after imagefile: $*" >&2
+		    exit 2
+		  }
+    echo "$imagefile"
+else
+    [ $# = 0 ] && set !tiles !comics !funny !UNFILED
+    images=`bglist $bgopts "$@"`
+
+    if [ -z "$images" ]
+    then  echo "$cmd: nothing chosen!" >&2
+	  exit 1
+    else
+      ok=
+      for imagefile in $images
+      do
+	if [ ! -s "$imagefile" ]
+	then  echo "$cmd: empty file: $imagefile" >&2
+	else  echo "$imagefile"
+	      ok=1
+	fi
+      done
+      [ $ok ] && exit 0
+      exit 1
+    fi
+fi
