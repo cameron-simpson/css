@@ -1,0 +1,50 @@
+#!/bin/sh
+#
+# Create a suitable (480x480) JPEG for use as a Tungsten T5 background image.
+#	- Cameron Simpson <cs@zip.com.au> 14feb2005
+#
+
+geom=480x320
+
+cmd=`basename "$0"`
+usage="Usage: $cmd [-P] -o bgout.jpg imagefile"
+
+badopts=
+
+if [ "x$1" = x-P ]
+then
+    geom=320x480
+    shift
+fi
+
+if [ "x$1" = x-o ]
+then
+    bgout=$2; shift; shift
+
+    [ -s "$bgout" ] && { echo "$cmd: bgout $bgout already exists" >&2
+			 badopts=1
+		       }
+else
+    echo "$cmd: missing -o option" >&2
+    badopts=1
+fi
+
+if [ $# = 0 ]
+then
+    echo "$cmd: missing imagefile" >&2
+    badopts=1
+else
+    imagefile=$1; shift
+
+    [ -s "$imagefile" ] || { echo "$cmd: missing imagefile $imagefile" >&2
+			     badopts=1
+			   }
+fi
+
+[ $# = 0 ] || { echo "$cmd: extra arguments after imagefile: $*" >&2; badopts=1; }
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+set -x
+cached=`mkwall -g 480x480 "$imagefile"` \
+&& gm convert "$cached" "$bgout"
