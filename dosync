@@ -1,7 +1,6 @@
 #!/bin/sh
 
 needhost amadeus@home || exit 1
-
 ask "Is $HOST@$SYSTEMID up to date" || exit 1
 
 pfx work:opt/redhat.x86.linux \
@@ -10,7 +9,9 @@ rsync -avHP --rsync-path='$HOME/scripts/rrsync zapff' /u/syncopt/redhat.x86.linu
 ( # prepare the way
   snarfaddrs &
   for subdir in scripts im \
-		there/cs@zip.com.au/html  there/cs@zip.com.au/html/moto \
+		there/cs@zip.com.au/html \
+		there/cskk.ezoshosting.com/html/cs \
+		there/cskk.ezoshosting.com/html/cs/moto \
 		there/adzapper.sourceforge.net/html
   do ( cd "$HOME/$subdir" && myke _all ) &
   done
@@ -28,6 +29,7 @@ for who in cameron2@alpha cameron2@janus
 do  pfx "$who" syncsmall "$who" &
 done
 
-syncsf &
+pfx sf syncsf &
+pfx ezos syncezos &
 
 wait
