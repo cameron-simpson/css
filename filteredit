@@ -5,18 +5,38 @@
 #	- Cameron Simpson <cs@zip.com.au> 16jun99
 #
 
-usage="Usage: $0 file filter [filterargs...]"
+filepos=
+
+cmd=$0
+usage="Usage: $cmd [-0] [-1] [-end] file filter [filterargs...]
+	-0	Don't add the filename to the filter command (default).
+	-1	Add the filename as the first argument to the filter command.
+	-end	Add the filename as the last argument to the filter command."
 
 badopts=
+
+while :
+do
+  case "$1" in
+    -0)		filepos= ;;
+    -1)		filepos=first ;;
+    -end)	filepos=end ;;
+    --)		shift; break ;;
+    -?*)	echo "$cmd: unrecognised option: $1" >&2; badopts=1 ;;
+    *)		break ;;
+  esac
+  shift
+done
+
 if [ $# = 0 ]
 then
-    echo "$0: missing file" >&2
+    echo "$cmd: missing file" >&2
     badopts=1
 else
     file=$1; shift
     if [ $# = 0 ]
     then
-	echo "$0: missing filter" >&2
+	echo "$cmd: missing filter" >&2
     fi
 fi
 
@@ -25,9 +45,16 @@ fi
 tmp=/tmp/filter$$
 bak=/tmp/bak$$
 
+case "$filepos" in
+    '')		;;
+    end)	set x "$@" "$file"; shift ;;
+    first)	zero=$1; shift; set x "$zero" "$file" ${1+"$@"}; shift ;;
+    *)		echo "$cmd: unsupported \$filepos \"$filepos\"" >&2; exit 1 ;;
+esac
+
 "$@" <"$file" >"$tmp" || { rm -f "$tmp"; exit $?; }
 
-[ -s "$tmp" ] || { echo "$0: empty result, aborting" >&2
+[ -s "$tmp" ] || { echo "$cmd: empty result, aborting" >&2
 		   rm -f "$tmp"
 		   exit 1
 		 }
@@ -44,19 +71,19 @@ else
 	then
 	    rm "$bak"
 	else
-	    echo "$0: couldn't copy new content back onto $file" >&2
+	    echo "$cmd: couldn't copy new content back onto $file" >&2
 	    if cat <"$bak" >"$file"
 	    then
-		echo "$0: restored original content from backup" >&2
+		echo "$cmd: restored original content from backup" >&2
 		rm "$bak"
 		exit 1
 	    else
-		echo "$0: can't restore content from backup; original content left in $bak" >&2
+		echo "$cmd: can't restore content from backup; original content left in $bak" >&2
 		exit 1
 	    fi
 	fi
     else
-	echo "$0: can't backup $file, aborting" >&2
+	echo "$cmd: can't backup $file, aborting" >&2
 	rm -f "$bak"
 	xit=1
     fi
