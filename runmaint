@@ -107,16 +107,17 @@ then    RunMaint="$0 -E"
 else    RunMaint="$MaintDir/runmaint.sh -E"
 fi
 case $USER in
-    root)	MaintScripts=$MaintDir/scripts ;;
-    *)		MaintScripts=$HOME/.maint ;;
+    root)	MaintScripts=${MaintScripts:-$MaintDir/scripts} ;;
+    *)		MaintScripts=${MaintScripts:-$HOME/.maint} ;;
 esac
 
 export MaintDir MaintScripts RunMaint
 
-usage="Usage: $0 [-s subj] [-date datestr] [-x] target [addresses]
+usage="Usage: $0 [-d dir] [-s subj] [-date datestr] [-x] target [addresses]
     See:
 	http://www.zip.com.au/~cs/runmaint.html
     for more detailed information.
+	-d dir	Directory containing maintenance scripts.
 	-s subj	Subject for mail report.
 	-date datestr Use this instead of the date command output.
 	-x	Trace execution.
@@ -152,6 +153,17 @@ while :
 do
     case $1 in
 	--)	shift; break ;;
+#
+# =item B<-d> I<dir>
+#
+# Specify the directory containing maintenance scripts.
+#
+	-d)	MaintScripts=$2; shift
+		case "$MaintScripts" in
+		    /*) ;; *) MaintScripts=`pwd`/$MaintScripts ;;
+		esac
+		export MaintScripts
+		;;
 #
 # =item B<-s> I<subject>
 #
