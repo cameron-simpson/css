@@ -1,0 +1,16 @@
+#!/bin/sh
+#
+
+dppargs=
+while :
+do
+    case "$1" in
+	-*)	dppargs="$dppargs '$1'" ;;
+	*)	break ;;
+    esac
+    shift
+done
+
+[ $# = 0 ] && { set x -; shift ; }
+
+eval "exec dpp $dppargs $HOME/etc/header/man \${1+\"\$@\"}"
