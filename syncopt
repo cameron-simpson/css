@@ -26,18 +26,26 @@
 # and that ``client'' machines get a local copy or a symbolic link
 # as the administrator sees fit.
 #
-# The basic scheme is that packages get built and installed as B</opt/I<package>-I<version>>
-# and then copied to a central spot such as B</u/syncopt/I<arch>/I<package>-I<version>>,
+# The basic scheme is that packages get built
+# and installed as B</opt/I<package>-I<version>>
+# and then copied to a central spot
+# such as B</u/syncopt/I<arch>/I<package>-I<version>>,
 # leaving a symlink from B</opt> to the central package.
 # In this way things think they
-# live in B</opt> and become local or remote by either symlinking from B</opt> to the central copy
-# or by installing an exact copy of B</u/syncopt/I<arch>/I<thing>-I<version>> in </opt>.
+# live in B</opt>
+# and become local or remote by either symlinking from B</opt> to the central copy
+# or by installing an exact copy
+# of B</u/syncopt/I<arch>/I<thing>-I<version>> in </opt>.
 #
-# The purpose of B<syncopt> is to maintain that arrangement in a convenient and automatic fashion.
+# The purpose of B<syncopt> is to maintain that arrangement
+# in a convenient and automatic fashion.
 #
 # It would normally be run automatically on client machines via cron,
 # or batch dispatched on all clients by hand via ssh after a new package install.
 #
+
+: ${TMPDIR:=/tmp}
+: ${RSYNC_RSH:=sshto}; export RSYNC_RSH
 
 cmd=`basename "$0"` || cmd=$0
 
@@ -47,17 +55,23 @@ umask 2
 : ${SYNCOPT_OPT:=/opt}
 cf=$SYNCOPT_OPT/.syncopt
 
-if [ -z "$ARCH" -a -s "$SYNCOPT_OPT/ARCH" ]
+if [ -z "$ARCH" ]
 then
+  if [ -s "$SYNCOPT_OPT/ARCH" ]
+  then
     ARCH=`cat "$SYNCOPT_OPT/ARCH"` || { echo "$cmd: can't infer \$ARCH from $SYNCOPT_OPT/ARCH file" >&2
 					exit 1
 				      }
-    export ARCH
+  else
+    ARCH=`uname -s`
+  fi
+  export ARCH
 fi
 
-pathadd=:/usr/bin:$SYNCOPT_OPT/bin:$SYNCOPT_OPT/script:$SYNCOPT_OPT/css:/opt/css/bin
-PATH=$PATH$pathadd
-export PATH
+: ${SYNCOPT_PATH:=/u/syncopt}	# NB: space separated
+: ${SYNCOPT_RSYNC:=rsync}
+: ${SYNCOPT_RSYNCOPTS:=""}
+: ${SYNCOPT_SSH:=$RSYNC_RSH}
 
 # basic "trim comments" code
 sedpreamble='y/	/ /
@@ -69,12 +83,9 @@ sedpreamble='y/	/ /
 
 # extract envvars
 sedscript="$sedpreamble
-	   /^ARCH=/b setvar
-	   /^COMMON=/b setvar
 	   /^REMOTE=/b setvar
 	   /^RSYNC=/b setvar
 	   /^RSYNCOPTS=/b setvar
-	   /^SUBDIRS=/b setvar
 	   d
 	   :setvar
 	   s/'/'\\\\''/g
@@ -82,18 +93,6 @@ sedscript="$sedpreamble
 sedvars=`[ ! -s "$cf" ] || sed -e "$sedscript" "$cf"` \
 	|| { echo "$cmd: can't parse $cf" >&2; exit 1; }
 eval "$sedvars"
-
-: ${ARCH:=`uname -s`}
-: ${SYNCOPT_PATH:=/u/syncopt}
-: ${SYNCOPT_RSYNC:=rsync}
-: ${SYNCOPT_ARCH:=$SYNCOPT_PATH/$ARCH}
-: ${SYNCOPT_COMMON:=$SYNCOPT_PATH/common}
-: ${SYNCOPT_SUBDIRS:="."}
-: ${SYNCOPT_RSYNCOPTS:=""}
-
-# add a couple of possibilities for finding readsymlink and rsync
-PATH=$PATH:$SYNCOPT_COMMON/css/bin:$SYNCOPT_ARCH/rsync/bin:/opt/css/bin
-export PATH
 
 usage="Usage: $cmd [-n] [-f] [l] [-R rsync-path] [-x] [-v] [items...]
 	-n	No action (default) - echo necessary actions.
@@ -200,26 +199,9 @@ done
 # =back
 #
 
-# because the master repository may be remote
-# everything remote has an eval layer so it can be passed through ssh
-if [ -z "$SYNCOPT_REMOTE" ]
-then
-    remotepfx=
-    atremote=eval
-    remote()
-    { eval "$*"
-    }
-else
-    remotepfx=$SYNCOPT_REMOTE:
-    remote()
-    { echo "PATH=\$PATH:$pathadd; export PATH; $*" \
-      | eval "${RSYNC_RSH:-ssh} \"\$SYNCOPT_REMOTE\"" /bin/sh
-    }
-fi
-
 if [ $# = 0 ] && [ $localise ]
 then
-    echo "$cmd: -l requires specific targets" >&2
+    echo "$cmd: -l requires specific enumeration of targets targets" >&2
     badopts=1
 fi
 
@@ -227,87 +209,124 @@ fi
 
 # ensure there is a real local /opt
 [ -d "$SYNCOPT_OPT/." ] \
-	|| { $trace mkdir $SYNCOPT_OPT && $trace chmod 755 $SYNCOPT_OPT; } \
-	|| exit 1
+	|| { $trace mkdir "$SYNCOPT_OPT" && $trace chmod 755 "$SYNCOPT_OPT":; } \
+	|| { echo "$cmd: missing target dir $SYNCOPT_OPT" >&2
+	     exit 1
+	   }
 
-# set up necessary variables at remote end
-resolve="cmd=$cmd"
-for sfx in SUBDIRS ARCH COMMON
-do  eval "v=\$SYNCOPT_$sfx"
-    resolve="$resolve
-             SYNCOPT_$sfx='$v'"
-done
+# inrepository [host:]repository cmd [args...]
+# inrepository [host:]repository -c shcmd
+inrepository()
+{
+  _wr_rep=$1; shift
+  [ "x$1" = x-c ] && { shift; set -- /bin/sh -c "$@"; }
+  case "$_wr_rep" in
+    *:*)
+      _wr_remote=`expr "x$_wr_rep" : 'x\([^:]*\):.*'` || exit 1
+      _wr_rep=`   expr "x$_wr_rep" : 'x[^:]*:\(.*\)'` || exit 1
+      ;;
+    *)_wr_remote=
+      ;;
+  esac
+  if [ -z "$_wr_remote" ]
+  then
+    ( cd "$_wr_rep" || exit 1
+      exec "$@"
+    )
+    _wr_xit=$?
+  else
+    _wr_qrep=`shqstr "$_wr_rep"` || exit 1
+    _wr_rcmd=`shqstr "$@"`       || exit 1
+    eval "$SYNCOPT_SSH "'"$_wr_remote" "cd $_wr_qrep || exit 1; $_wr_rcmd"; _wr_xit=$?'
+  fi
+  return $_wr_xit
+}
 
-# get target list if not specified
+# readsymlink indir name
+rreadsymlink()
+{ inrepository "$1" \
+    perl -e '$_=readlink($ARGV[0]) || die "readlink($ARGV[0]): $!\n";
+	     print "$_\n";
+	     exit 0;
+	    ' "$2"
+}
+readsymlink()
+{ rreadsymlink . "$1"
+}
+
+# issymlink
+rissymlink()
+{ rreadsymlink "$1" "$2" >/dev/null 2>&1
+}
+issymlink()
+{ rissymlink . "$1"
+}
+
+tmppfx=$TMPDIR/$cmd$$
+trap 'rm -f "$tmppfx"*' 0 1 2 13 15
+
+# obtain list of names if none supplied
 if [ $# = 0 ]
 then
-    resolve=$resolve'
-	    set -- `for subdir in $SYNCOPT_SUBDIRS
-                    do case "$subdir" in
-			 /*) ls "$subdir/." 2>/dev/null
-			     ;;
-			 *)  ls "$SYNCOPT_ARCH/$subdir/." 2>/dev/null
-                             ls "$SYNCOPT_COMMON/$subdir/." 2>/dev/null
-			     ;;
-		       esac
-	            done | sort -u`'
-else
-    resolve="$resolve; set -- $*"
+  set -- `
+	  for rep in $SYNCOPT_PATH
+	  do
+	    inrepository "$rep" -c "( [ -d '$ARCH/.' ] && cd '$ARCH' && ls )
+				    ( [ -d common/.  ] && cd common && ls )
+				   "
+	  done \
+	  | sort -u
+	 `
 fi
-# resolve every target into a master directory
-resolve=$resolve'
-	first=1
-        for target
-	do  [ $first ] && { first=; set --; }
-	    fullpath=
-	    for dir in $SYNCOPT_ARCH $SYNCOPT_COMMON
-	    do  for subdir in $SYNCOPT_SUBDIRS
-		do  case "$subdir" in
-		      /*) absdir=$subdir ;;
-		      .)  absdir=$dir ;;
-		      *)  absdir=$dir/$subdir ;;
-		    esac
-		    if [ -d "$absdir/$target/." -o -f "$absdir/$target" ] \
-		    || issymlink "$absdir/$target"
-		    then  fullpath=$absdir/$target
-			  break
-		    fi
-		done
-		[ -n "$fullpath" ] && break
-	    done
-	    if [ -n "$fullpath" ]
-	    then  set -- ${1+"$@"} "$fullpath"
-	    else  echo "$cmd: can'\''t locate master for \"$target\"" >&2
-	    fi
-	done
-	[ $# = 0 ] || ls -d "$@"'
-set -- `remote "$resolve"` \
-	|| { echo "$cmd: resolution failed" >&2; exit 1; }
+
+# construct mapping of names to locations
+namelist=${tmppfx}nl
+for rep in $SYNCOPT_PATH
+do
+  inrepository "$rep" \
+    -c "for subdir in $ARCH common
+	do
+	  ls \"\$subdir\" | sed \"s|.*|& \$subdir|\"
+	done" | sed "s|.* |&$rep/|"
+done >"$namelist"
+
+# findmaster thing -> repository-location
+# locates _first_ (preferred) mention of thing in location map
+findmaster()
+{
+  _fm_name=$1; shift
+  awk "\$1 == \"$_fm_name\" { print \$2; exit; }" <"$namelist"
+}
 
 xit=0
 
-# for everything in the central opt dirs
-for thingpath
+# work in the specified /opt dir
+cd "$SYNCOPT_OPT" || exit 1
+
+# for every target
+for thing
 do
-    thing=`basename "$thingpath"` || exit 1
-    ## echo "sync $thing ..."
-    ## case "$thing" in gimp*) set -x ;; esac
+    thingrep=`findmaster "$thing"` || exit 1
+    if [ -z "$thingrep" ]
+    then
+	echo "$cmd: can't find master for \"$thing\", skipping" >&2
+	xit=1
+	continue
+    fi
+    ##echo "$thing -> $thingrep" >&2
 
     # local instance of thing
     ldir=$SYNCOPT_OPT
-    l=$ldir/$thing
-
-    # remote instance of thing
-    r=$thingpath
 
     # get unversioned name for $thing
     case "$thing" in
 	*-[0-9]*)
+	    # using sed instead of expr to do nongreedy prefix match
 	    nvthing=`echo "$thing" | sed 's/-[0-9].*//'`  || exit 1
 	    thingv=`echo "$thing" | sed "s/^$nvthing-//"` || exit 1
 	    if [ -z "$nvthing" -o -z "$thingv" ]
 	    then
-		echo "$0: empty nvthing [$nvthing] or thingv [$thinv] !!" >&2
+		echo "$cmd: empty nvthing [$nvthing] or thingv [$thinv] !!" >&2
 		echo "	SKIPPING $thing !!" >&2
 		continue
 	    fi
@@ -315,12 +334,17 @@ do
 	*)  nvthing=$thing thingv= ;;
     esac
 
+    ##############################
     # determine default behaviour:
+
     # whether to localise by default
     makelocal=$localise
-    issymlink "$l" || [ ! -d "$l" ] || makelocal=1
+    case "$thingrep" in *:*) makelocal=1 ;; esac
+    [ $makelocal ] || issymlink "$thing" || [ ! -d "$thing" ] || makelocal=1
+
     # what version to make the default for this host
     version=
+
     # leave this item alone?
     nosync=
 
@@ -366,136 +390,92 @@ do
     #
     #	/opt/package -> package-version
     #
-    sedscript="$sedpreamble
-
-	       # outright mode settings
-	       /^$thing local\$/b local
-	       /^$thing remote\$/b remote
-	       /^$thing nosync\$/b nosync
-
-	       # unversioned mode settings
-	       /^$nvthing local\$/b local
-	       /^$nvthing remote\$/b remote
-	       /^$nvthing nosync\$/b nosync
-
-	       # wildcard mode settings
-	       /^\* local\$/b local
-	       /^\* remote\$/b remote
-	       /^\* nosync\$/b nosync
-
-	       # set version for generic link
-	       /^$thing [^ ][^ ]* local\$/b vlocal
-	       /^$thing [^ ][^ ]* remote\$/b vremote
-
-	       # set mode for particular version
-	       /^$nvthing $thingv local\$/b vlocal
-	       /^$nvthing $thingv remote\$/b vremote
-
-	       # just set version
-	       /^$nvthing [^ ][^ ]*\$/b vers
-
-	       # discard unrecognised stuff
-	       d
-	       :local
-	       s/.*/makelocal=1 nosync=/
-	       b done
-	       :remote
-	       s/.*/makelocal= nosync=/
-	       b done
-	       :nosync
-	       s/.*/nosync=1 makelocal=/
-	       b done
-	       :vlocal
-	       s/^[^ ]* \\([^ ]*\\).*/makelocal=1 version=\\1 nosync=/
-	       b done
-	       :vremote
-	       s/^[^ ]* \\([^ ]*\\).*/makelocal= version=\\1 nosync=/
-	       b done
-	       :vers
-	       s/^$nvthing /nosync= version=/
-	       :done"
-    ## echo "$thing:"
-    opts=`2>/dev/null sed -e "$sedscript" "$cf"` \
-    || { echo "$0: sed of config file [$cf] FAILED, skipping $thing !!" >&2
+    awkf="BEGIN	{ thing=\"$thing\"
+		  nvthing=\"$nvthing\"
+		  thingv=\"$thingv\"
+		}
+	"'
+		{ useme=0 }
+	  $1 == "*" { useme=1 }
+	  NF == 1 && $1 == nvthing { print "nosync=" }
+	  $1 == thing || ( $1 == nvthing && $2 == thingv ) {
+		  useme=1
+		  print "nosync="
+		}
+	  useme && $NF == "nosync" { print "nosync=1" }
+	  useme && $NF == "local"  { print "makelocal=1" }
+	  useme && $NF == "remote" { print "makelocal=" }
+	  $1 == thing && $2 ~ /^[0-9]/ { print "version=" $2 }
+	 '
+    ##echo "awkf=[$awkf]" >&2
+    opts=`[ ! -s "$cf" ] || sed -e "$sedpreamble" "$cf" | awk "$awkf"` \
+    || { echo "$cmd: sed of config file [$cf] FAILED, skipping $thing !!" >&2
+	 xit=1
 	 continue
        }
 
     if [ -n "$opts" ]
     then
-	## echo "opts=[$opts]"
+	##echo "opts=[$opts]" >&2
         eval "$opts" \
 		|| { echo "$cmd: eval of options FAILED, skipping $thing" >&2
+		     xit=1
 		     continue
 		   }
     fi
+    ##echo "thing=$thing makelocal=$makelocal thingv=$thingv vnthing=$nvthing version=$version"
 
     # skip this?
     [ $nosync ] && { echo "NOSYNC $thing"; continue; }
 
-    # files - basicly /opt/ARCH really
-    if remote "test -f '$r'"
+    # versioned item? make link and continue
+    if [ -n "$version" ]
     then
-	$trace $SYNCOPT_RSYNC -aH $vflag $SYNCOPT_RSYNCOPTS "$remotepfx$r" "$l"
+	vlink=$thing-$version
+	if llink=`readsymlink "$thing" 2>/dev/null` \
+	&& [ "x$vlink" = "x$llink" ]
+	then
+	    : leave it alone
+	else
+	    $trace rm -rf "$thing"
+	    $trace ln -s "$vlink" "$thing" || xit=1
+	fi
 	continue
     fi
 
-    if [ $makelocal ]
-    then  state=local
-    else  state=link
-    fi
-
-    # maintain generic links
-    rlink=`remote "readsymlink '$r' 2>/dev/null"` || rlink=
-    if [ -n "$rlink" ]
+    # files - usually just /opt/ARCH
+    if inrepository "$thingrep" test -f "$thing"
     then
-	# make thing into symlink to right version
-	state=link
-	if [ -n "$version" ]
-	then  sym=$thing-$version
-	else  sym=$rlink
-	fi
-
-	if llink=`readsymlink "$l"` \
-	&& [ "x$sym" = "x$llink" ]
-	then
-	    :
-	else
-	    $trace rm -rf "$l"
-	    $trace ln -s "$sym" "$l" || xit=1
-	fi
-
-	# ensure appropriate version is local
-	if [ $makelocal ] && issymlink "$ldir/$sym"
-	then
-	    $trace rm "$ldir/$sym"
-	    $trace mkdir "$ldir/$sym"
-	fi
-    else
-	# remote end is real - must be the versioned thing
-	if [ $makelocal ]
-	then
-	    state=local
-	    issymlink "$l" && rm "$l"
-	    [ -d "$l/." ] || $trace mkdir "$l" || xit=1
-	else
-	    if issymlink "$l" || [ ! -d "$l/." ]
-	    then
-		# link to remote
-		state=link
-	        llink=`readsymlink "$l"`
-		if [ "x$r" != "x$llink" ]
-		then
-		    $trace rm -f "$l"
-		    $trace ln -s "$r" "$ldir/." || xit=$?
-		fi
-	    else
-		state=local
-	    fi
-	fi
+	$trace $SYNCOPT_RSYNC -a $vflag $SYNCOPT_RSYNCOPTS "$thingrep/$thing" "$thing"
+	continue
     fi
 
-    [ "x$state" = xlocal ] \
-    && $trace $SYNCOPT_RSYNC -aHW $vflag --delete $SYNCOPT_RSYNCOPTS "$remotepfx$r/." "$l/." | sed "s|^|$l: |"
+    ############################################
+    # now talking about dirs or symlinks to dirs
+
+    # if local end is not symlink, make local copy
+    issymlink "$thing" || [ ! -d "$thing" ] || makelocal=1
+
+    if [ -z "$makelocal" ]
+    then
+	rlink=`rreadsymlink "$thingrep" "$thing" 2>/dev/null` \
+	|| rlink=$thingrep/$thing
+
+	if llink=`readsymlink "$thing" 2>/dev/null` \
+	&& [ "x$rlink" = "x$llink" ]
+	then
+	    : leave it alone
+	else
+	    $trace rm -rf "$thing"
+	    $trace ln -s "$rlink" "$thing" || xit=1
+	fi
+	continue
+    fi
+
+    # either $makelocal or the remote end is not a symlink
+    # ==> we need a local copy
+
+    $trace $SYNCOPT_RSYNC -a $vflag --delete $SYNCOPT_RSYNCOPTS "$thingrep/$thing" "$thing"
 done
 
 exit $xit
