@@ -20,7 +20,7 @@ export PATH
 
 tmp=/tmp/mmprcm$$
 
-cat >$tmp || exit 1
+formail -R Received: X-PreMailman-Received: >$tmp || exit 1
 
 xit=0
 
