@@ -1,0 +1,12 @@
+#!/bin/sh
+#
+# du in kilobytes.
+#	- Cameron Simpson <cs@zip.com.au> 24aug96
+#
+
+opt=
+case $OS in
+    solaris)	opt=-k ;;
+esac
+
+exec du $opt ${1+"$@"}
