@@ -11,6 +11,13 @@ use cs::Units;
 sub copyout($;$);
 
 $::Xit=0;
+$::BSize=65536;
+
+if (@ARGV > 1 && $ARGV[0] eq '-b')
+{ $::BSize=$ARGV[1]+0;
+  shift(@ARGV);
+  shift(@ARGV);
+}
 
 if (! @ARGV)
 { @ARGV='-';
@@ -57,7 +64,7 @@ sub copyout($;$)
   my($Bps,$pcnt,$eta);
 
   READ:
-  while (defined($n=sysread($FILE,$_,65536)) && $n > 0)
+  while (defined($n=sysread($FILE,$_,$::BSize)) && $n > 0)
   { 
     $sofar+=$n;
     if (($now=time) > $start)
