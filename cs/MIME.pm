@@ -9,7 +9,7 @@
 #  1437	- The Extension of MIME Content-Types to a New Medium
 #  1521	- Media Type Registration Procedure
 #
-#	- Cameron Simpson <cs@zip.com.au> 17may96
+#	- Cameron Simpson <cs@zip.com.au> 17may1996
 #
 
 =head1 NAME
@@ -376,7 +376,16 @@ sub WriteItem($$)
 { my($this,$sink)=@_;
 
   my $body = $this->Body();
-  $this->SUPER::WriteItem($sink, $body);
+
+  my $n = $this->SUPER::WriteItem($sink, $body);
+
+  if (! defined $n)
+  { my@c=caller;
+    warn "SUPER::WriteItem fails from [@c]";
+    return undef;
+  }
+
+  return $n;
 }
 
 sub WriteParts($$$;$$$)	# (this,sink,\@cs::MIME,pre,post,sep)
