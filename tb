@@ -1,0 +1,11 @@
+#!/bin/sh
+
+case $ARCH in
+    apollo.*.domainos)	exec /usr/apollo/bin/tb ${1+"$@"} ;;
+    sun.sparc.solaris)	echo '$C' | adb "$1" ;;
+    *)			PWD=${PWD-`pwd`}
+			obj=${1-`basename "$PWD"`}
+			[ ! -r $obj -a -r $obj.$ARCH ] && obj=$obj.$ARCH
+			echo where|dbx "$obj" core
+			;;
+esac
