@@ -1,0 +1,52 @@
+#!/bin/sh
+#
+# Recursively list tar files.
+# Coded up for Loren Hobbs <loren.hobbs@philips.com>.
+# Returns my "mkdirn" and "t" scripts (and "x", a symlink to "t").
+#	- Cameron Simpson <cs@zip.com.au> 30mar2001
+#
+
+wd=`pwd`
+xit=0
+
+for tarf
+do
+    toc=/tmp/rtoc$$
+
+    case $tarf in
+	/*)	abs=$tarf ;;
+	*)	abs=$wd/$tarf ;;
+    esac
+
+    t "$tarf" | tee "$toc"
+
+    # locate any nested archives
+    subarchs=`egrep '\.(tar|tar.Z|tar.bz2|tar.gz|tgz)$' <"$toc"`
+
+    if [ -n "$subarchs" ]
+    then
+	xdir=`mkdirn "/tmp/rtocdir"` \
+	|| { xit=1
+	     continue
+	   }
+
+	( cd "$xdir" || exit 1
+	  x -1 "$abs" $subarchs || exit 1
+
+	  xit=0
+	  for subarch in $subarchs
+	  do
+	      echo
+	      "$0" "$subarch" || xit=1
+	  done
+
+	  exit $xit
+	) || xit=1
+
+	rm -rf "$xdir"
+    fi
+done
+
+rm -f "$toc"
+
+exit $xit
