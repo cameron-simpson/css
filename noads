@@ -9,7 +9,7 @@
 needhost $HOMEHOST@home		|| exit 1
 cd $HOME/@/adzapper.sf/html	|| exit 1
 umask 22
-echo "Addresses to CC?"
+necho "Addresses to CC? "
 read addrs || exit 1
 bugcc "$addrs" withjob adzap cvsedit rc/patterns || exit 1
 bugcc "$addrs" myke _script
