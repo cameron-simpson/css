@@ -6,6 +6,13 @@
 #	- Cameron Simpson <cs@zip.com.au> 14jul2000
 #
 
+my $max;
+if (@ARGV && $ARGV[0] =~ /^[1-9]\d*$/)
+{ $max=shift(@ARGV)+0;
+}
+
+die "Usage: $0 [max]\n" if @ARGV;
+
 my @lines = <STDIN>;
 
 srand(time+@lines+$$+getppid());
@@ -17,7 +24,7 @@ for my $i (0..getppid()%64)
 
 my $ndx;
 
-while (@lines)
+while (@lines && (! defined($max) || $max-- > 0))
 {
   $ndx = int(rand(@lines));
 
