@@ -22,7 +22,7 @@ cgibase="http://$serv/$cgibin"
 cgi="${cgibase}search.cgi"
 
 query=$*
-[ -n "$query" ] || query=`xunclip`
+[ -n "$query" ] || query=`cutbuffer`
 oquery=$query
 query=`qsencode "$query"`
 
@@ -88,4 +88,4 @@ case "$target" in
 esac
 
 echo "search $target $oquery" >>"$URLLOG"
-us +c "$cgi?engine=$target&query=$query"
+search-url "$target" "$query" | us -
