@@ -53,8 +53,8 @@ my @keys = keys %links;
 if (! opendir(DIR,'.'))
 { die "$::cmd: opendir(.) in $::Dir: $!\n";
 }
-
 my @dirents = grep(/^[^.]/, readdir(DIR));
+closedir(DIR);
 
 for my $dirent (sort @dirents)
 {
