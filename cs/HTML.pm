@@ -48,8 +48,8 @@ sub _tokenURLs($$$$);
 # inserting gratuitous whitespace into tables
 # and to keep A tags on one line
 # and to keep PRE sections pristine
-%cs::HTML::NoIndent=(	TABLE	=> 1,
-			A	=> 1,
+%cs::HTML::NoIndent=(	# TABLE	=> 1,
+			# A	=> 1,
 			PRE	=> 1,
 		    );
 
@@ -328,7 +328,7 @@ sub tok2s	# ([indent,]sink,tok...)
       else
       {
 	my $subindent=$indent;
-	if ($indent > 0)
+	if (1 || $indent > 0)
 	{ if (! ref $sink)
 	  { my @c = caller; warn "Put from [@c]";
 	  }
