@@ -10,7 +10,6 @@ use cs::Misc;
 use cs::Upd;
 use cs::Shell;
 use Getopt::Std;
-use Image::Size;
 
 $ENV{TMPDIR}='/tmp' if ! exists $ENV{TMPDIR} || ! length $ENV{TMPDIR};
 
@@ -81,13 +80,13 @@ while (defined($_=<STDIN>))
 out('') if $upd;
 
 if (! @stdin)
-{ nl("no new files") if $upd;
+{ nl("no new files from stdin") if $upd;
   exit 0;
 }
 
 my($err,$x,$y,$impath,@s);
 
-if ($mode ne APPEND && $indexfile ne '-')
+if ($indexfile ne '-')
 {
   nl("loading existing list ...") if $upd;
   if (-f "$indexfile.gz"
@@ -103,23 +102,14 @@ if ($mode ne APPEND && $indexfile ne '-')
       # skip bad lines
       next OLDINDEX if !/^(\d+) (\d+) (\S.*)/;
 
-      ($x,$y,$impath)=($1,$2,$3);
-
-      # prune missing/empty files
-      next OLDINDEX if ! (@s=stat($impath));
-      next OLDINDEX if ! -f _ || ! -s _;
-
-      if ($mode eq UPDATE)
-      {
-	($x,$y,$err)=eval { imgsize($impath) };
-	if ($@)
-	{ warn "$::cmd: imsize($impath): $@\n";
-	  ($x,$y)=(0,0);	# save repolling on subsequent passes
-	}
+      if ($mode eq APPEND)
+      { $::IMX{$3}=$1+0;
+	$::IMY{$3}=$2+0;
       }
-
-      $::IMX{$impath}=$x;
-      $::IMY{$impath}=$y;
+      else
+      # append index files to list to examine
+      { push(@stdin,$3);
+      }
     }
     close(INDEX);
     out('') if $upd;
@@ -132,37 +122,41 @@ if ($mode ne APPEND && $indexfile ne '-')
   }
 }
 
-@stdin=sort @stdin;
+@stdin=sort &::uniq(grep(! exists $::IMX{$_}, @stdin));
+if (! @stdin)
+{ nl("nothing to update") if $upd;
+  exit 0;
+}
+
+nl("create list to scan ...") if $upd;
+my $tmpf = "$ENV{TMPDIR}/$::cmd.$$";
+die "$::cmd: can't write temp file $tmpf: $!" if ! open(TMPF,"> $tmpf\0");
+for my $f (@stdin)
+{ print TMPF $f, "\n" if ! exists $::IMX{$f};
+}
+close(TMPF);
+
 nl("update new images ...") if $upd;
+
+die "$::cmd: can't pipe from imsize-gm: $!" if !open(TMPF,"exec < '$tmpf'; rm '$tmpf'; exec xxargs  imsize-gm |");
 
 my $n=0;
 my $nn=@stdin;
 
 NEWIMAGE:
-for $impath (@stdin)
+while (<TMPF>)
 {
+  chomp;
+  if (! /^(\d+) (\d+) (.*\S)/)
+  { warn "$::cmd: bad data from imsize-gm: $_\n";
+    next NEWIMAGE;
+  }
+
+  ($x,$y,$impath)=($1,$2,$3);
   $n++;
 
   $impath=normpath($impath);
   out(int($n*100/$nn)."%: $impath") if $upd && $n % 10 == 0;
-
-  # skip known images
-  next NEWIMAGE if exists $::IMX{$impath};
-
-  # skip missing/empty images
-  next NEWIMAGE if ! (@s=stat($impath));
-  next NEWIMAGE if ! -f _ || ! -s _;
-
-  ($x,$y,$err)=eval { imgsize($impath) };
-  if ($@)
-  { warn "$::cmd: imsize($impath): $@\n";
-    ($x,$y)=(0,0);	# record; saves repolling on subsequent passes
-  }
-
-  if (! defined $x)
-  { warn "updimlist: $impath: $err (possible errno \"$!\")\n";
-    next NEWIMAGE;
-  }
 
   $::IMX{$impath}=$x;
   $::IMY{$impath}=$y;
@@ -175,11 +169,19 @@ if ($indexfile eq '-')
   { die "$::cmd; dup(STDOUT,INDEX): $!";
   }
 }
-elsif (!open(INDEX,
-		( -f "$indexfile.gz" ? "| gzip -9 " : "")
-	       .($mode eq APPEND ? ">>" : ">")
-	       ." $indexfile\0"))
-{ die "$::cmd: open($indexfile): $!\n";
+else
+
+{
+  if (-f "$indexfile.gz")
+  { if (!open(INDEX,"| gzip -9 ".($mode eq APPEND ? ">>" : ">")." $indexfile.gz"))
+    { die "$::cmd: open($indexfile.gz): $!\n";
+    }
+  }
+  else
+  { if (!open(INDEX,($mode eq APPEND ? ">>" : ">")." $indexfile.gz"))
+    { die "$::cmd: open($indexfile): $!\n";
+    }
+  }
 }
 
 for $impath (sort keys %::IMX)
