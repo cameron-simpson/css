@@ -181,8 +181,15 @@ do
     # =item -v, --verbose
     #
     # Turn on verbose mode.
+    # Also passes B<-v> to rsync.
     #
-    -v|--verbose) verbose=1 ;;
+    -v|--verbose) verbose=1 rsopts="$rsopts -v" ;;
+
+    # =item -P
+    #
+    # Passes B<-P> to rsync.
+    #
+    -P) rsopts="$rsopts -P" ;;
 
     # =item -x
     #
@@ -258,7 +265,6 @@ esac
 
 if [ $verbose ]
 then  echo=echo
-      rsopts="$rsopts -v"
 else  echo=:
 fi
 
