@@ -4,4 +4,9 @@
 #	- Cameron Simpson <cs@zip.com.au> 23oct2002
 #
 set -x
+
+( cd $HOME/there/adzapper.sourceforge.net/html || exit 1
+  exec myke
+) || exit 1
+
 exec rsync -avHPW --delete $HOME/there/adzapper.sourceforge.net/html/. sf:adzapper/htdocs/.
