@@ -1,0 +1,12 @@
+#!/bin/sh
+#
+# Coloured tracing sh.
+#	- Cameron Simpson <cs@zip.com.au> 25jul99
+#
+
+if [ -t 2 ]
+then
+    exec colourise sh -x ${1+"$@"}
+else
+    exec sh -x ${1+"$@"}
+fi
