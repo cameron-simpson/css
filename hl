@@ -1,2 +1,2 @@
 #!/bin/sh
-exec colour_highlist cyan ${1+"$@"}
+exec colour_highlight cyan ${1+"$@"}
