@@ -1,0 +1,25 @@
+#!/bin/sh
+#
+# Read a string with echo turned off.
+# Echo the string to stdout.
+# We expect to be called as:
+#	passphrase=`nread prompttstring`
+#
+# - Cameron Simpson <cs@zip.com.au> 22oct96
+# 
+
+# set -vx
+
+exec 3>&1
+exec >/dev/tty </dev/tty
+
+stty -echo
+necho "$*: "
+read foo
+xit=$?
+stty echo
+echo
+
+exec >&3 3>&- <&-
+echo "$foo"
+exit $xit
