@@ -1,0 +1,118 @@
+#!/usr/bin/perl
+#
+# C and C++ prototype generator.
+# Believes fairly strongly in my formatting conventions.
+#	- Cameron Simpson <cs@zip.com.au>
+#
+
+require 'cs/cpp.pl';
+
+($cmd=$0) =~ s:.*/::;
+$usage="Usage: $cmd [-s staticfile] [-e externfile] < C-source
+	-s staticfile	Where to write static declarations (default /dev/null).
+	-e externfile	Where to write extern declarations (default stdout).
+";
+
+$extern='-';
+$static='/dev/null';
+
+$badopts=0;
+ARGV:
+  while (defined($_=shift))
+	{ if ($_ eq '--')	{ last ARGV; }
+	  elsif (!/^-./)	{ unshift(ARGV,$_); last ARGV; }
+	  elsif ($_ eq '-s')	{ $static=shift; }
+	  elsif ($_ eq '-e')	{ $extern=shift; }
+	  else			{ print STDERR "$cmd: $_: unrecognised option\n";
+				  $badopts=1;
+				}
+	}
+
+die $usage if $badopts;
+
+open(extern,($extern eq '-') ? '>&STDOUT' : "> $extern\0")
+	|| die "$cmd: can't open $extern: $!\n";
+open(static,($static eq '-') ? '>&STDOUT' : "> $static\0")
+	|| die "$cmd: can't open $static: $!\n";
+
+&cpp'initstate(static);
+&cpp'initstate(extern);
+
+undef $prevline;
+INPUT:
+  while (defined($_=&cpp'getline(STDIN)))
+	{ $thisline=$_;
+	
+	  s/\s*$//;
+	  if (/^(\w+)\(\s*(.*[,\)])\s*$/)
+		{ $type=$prevline;
+		  $func=$1;
+		  $_=$2;
+
+		  @args=();
+		  ARGS:
+		    while (!/^{/)
+			{ s/^\s+//;
+			  s/\s*[,)]\s*$//;
+			  push(@args,$_);
+			  $prevline=$thisline;
+			  $_=&cpp'getline(STDIN);
+			  last ARGS if !defined;
+			  $thisline=$_;
+			}
+
+		  @args=(void) if $#args < $[;
+
+		  $_=$type;
+		  s/^\s+//;
+		  if (/^(extern)\b\s*/
+		   || /^(static)\b\s*/
+		     )
+			{ $scope=$1;
+			  $_=$';
+			}
+		  else
+		  { $scope=extern;
+		  }
+
+		  $_='int' unless length;
+		  $type=$_;
+
+		  # suppress class functions
+		  for (&cpp'syncstate($scope))
+			{ print $scope $_, "\n";
+			}
+
+		  print $scope $scope, '  ', $type, "\n";
+		  print $scope '        ', $func, '(';
+		  if (length($func) > 7)
+			{ if ($#args > $[)
+				{ print $scope "\n                ";
+				}
+			}
+		  else
+		  { print $scope ' 'x(7-length($func));
+		  }
+
+		  while (defined($_=shift(@args)))
+			{ print $scope $_;
+			  if ($#args >= $[)
+				{ print $scope ",\n                ";
+				}
+			}
+
+		  print $scope ");\n";
+		}
+
+	    $prevline=$thisline;
+	  }
+
+for $scope ((extern,static))
+	{ for (&cpp'syncstate($scope))
+		{ print $scope $_, "\n";
+		}
+
+	}
+
+close(extern);
+close(static);
