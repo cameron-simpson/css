@@ -302,7 +302,7 @@ do
 		;;
     # =item B<-bg> I<image>
     #
-    # Converted into "B<-background> I<image>" and passed to I<xplanet>
+    # Converted into "B<-background> I<image>" and passed to I<xplanet>.
     # with the same extended functionality as B<-background>, below.
     #
     # =item B<-background> I<image>
@@ -330,6 +330,37 @@ do
 		    ;;
 		esac
 		xplopts="$xplopts -background \"\$bgim\""
+		shift
+		;;
+    # =item B<-lat> I<latitude>
+    #
+    # Converted into "B<-latitude> I<latitude>" and passed to I<xplanet>
+    # with the same extended functionality as B<-latitude>, below.
+    #
+    # =item B<-latitude> I<latitude>
+    #
+    # The I<latitude> is either an ordinary latitude between -180 and 180
+    # or the word "B<random>" which picks an arbitrary value in that range.
+    #
+    -latitude|-lat)
+		case $2 in
+		  random) lat=`seq -180 180 | pickn` ;;
+		  *)	  lat=$2 ;;
+		esac
+		xplopts="$xplopts -latitude \"\$lat\""
+		shift
+		;;
+    # =item B<-longitude> I<longitude>
+    #
+    # The I<longitude> is either an ordinary longitude between -09 and 90
+    # or the word "B<random>" which picks an arbitrary value in that range.
+    #
+    -longitude)
+		case $2 in
+		  random) long=`seq -90 90 | pickn` ;;
+		  *)	  long=$2 ;;
+		esac
+		xplopts="$xplopts -longitude \"\$long\""
 		shift
 		;;
     # =item B<-target>|B<-body> I<name>
