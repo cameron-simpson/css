@@ -9,7 +9,8 @@ wd=`pwd`
 find . \
     \( -type d ! -name . -name '.*' -prune \) \
  -o \( -type f -size +0 \
-		\( -name \*.png -o -name \*.jpg \) \
+	\( -name \*.png -o -name \*.jpg \) \
+	${1+"$@"} \
        -print \) \
 | sed 's;^\./;;' \
 | imsize
