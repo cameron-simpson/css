@@ -1,0 +1,2 @@
+#!/bin/sh
+exec note $HOME/var/log/dlog "$*"
