@@ -1,0 +1,94 @@
+#!/usr/bin/perl
+#
+# Tail -f of various inlogspecs, copying the results to the log
+# specified by a logmap logspec.
+#	- Cameron Simpson <cs@zip.com.au>, 27jul94
+#
+
+$timeout=60;
+
+($cmd=$0) =~ s:.*/::;
+$usage="Usage: $cmd [-t timeout] -l outlogspec inlogspecs...
+	-t timeout	Check the files every timeout seconds.
+			Default: $timeout
+	-l outlogspec	Which log to append the new data to.
+	inlogspecs	Logs to take data from.
+";
+
+require 'getopts.pl';
+require 'cs/logmap.pl';
+
+$badopts=0;
+
+&Getopts('t:l:') || ($badopts=1);
+$logspec=$opt_l if defined $opt_l;
+if (defined $opt_t)
+	{ if ($opt_t !~ /^[1-9]\d*$/)
+		{ print STDERR "$cmd: timeout must be an integer\n";
+		  $badopts=1;
+		}
+	  else
+	  { $timeout=$opt_t+0;
+	  }
+	}
+
+if (! defined $logspec)
+	{ print STDERR "$cmd: missing logspec specification\n";
+	  $badopts=1;
+	}
+
+if (@ARGV)
+	{ @inlogspecs=@ARGV;
+	}
+else	{ print STDERR "$cmd: missing inlogspecs\n";
+	  $badopts=1;
+	}
+
+die $usage if $badopts;
+
+$xit=0;
+
+while (1)
+	{ for (@inlogspecs)
+		{ &chklog($_);
+		}
+
+	  sleep($timeout);
+	}
+
+exit $xit;
+
+sub chklog	# logfile -> size or undef
+	{ local($logfile)=shift;
+	  local(@stat,$size);
+
+	  if (!&logmap'openspec(LOGFILE,$logfile,1))
+		{ print STDERR "$cmd: can't open $logfile for read: $!\n";
+		  return undef;
+		}
+
+	  @stat = stat LOGFILE;
+	  $size = $stat[7];
+
+	  if (defined($length{$logfile})
+	   && $length{$logfile} < $size)
+		{ local($_,$i);
+
+		  if (&logmap'openspec(LOG,$logspec,0))
+			{ seek(LOGFILE,$length{$logfile},0);
+			  while ($length{$logfile} < $size
+			      && ($i=read(LOGFILE,$_,$size-$length{$logfile})) > 0)
+				{ print LOG $_;
+				  $length{$logfile}+=$i;
+				}
+			  close(LOG);
+			}
+		}
+	  else
+	  { $length{$logfile}=$size;
+	  }
+
+	  close(LOGFILE);
+
+	  $length{$logfile};
+	}
