@@ -1,0 +1,2 @@
+#!/bin/sh
+exec splitmail '|email-summary-line; cat >/dev/null'
