@@ -1,0 +1,243 @@
+#!/usr/bin/perl
+#
+# Update index file for a folder.
+#	- Cameron Simpson <cs@zip.com.au>
+#
+
+use strict qw(vars);
+
+require 'flush.pl';
+use cs::Misc;
+use cs::Upd;
+use cs::Source;
+use cs::Pathname;
+use cs::Persist;
+use cs::RFC822;
+use cs::MIME;
+use cs::Date;
+use cs::Mail::Categories;
+
+$::Xit=0;
+
+$::UseDB=0;
+$::Threaded=0;
+$::Mixed=0;
+
+OPTION:
+while (@ARGV)
+{ $_=shift(@ARGV);
+  if ($_ eq '-db')	{ $::UseDB=1; }
+  elsif ($_ eq '-t')	{ $::Threaded=1; }
+  elsif ($_ eq '-T')	{ $::Threaded=1; $::Mixed=1; }
+  else			{ unshift(@ARGV,$_) if $_ ne '--';
+			  last OPTION;
+			}
+}
+
+if ($::UseDB)
+{ open(UPDDB,">> $ENV{MAILDIR}/addressqueue")
+		## "| exec lock \"\$MAILRC.rawdb\" updrawmailrc")
+	|| die "$::cmd: can't pipe to updrawmailrc: $!";
+}
+
+nl('load .index.db ...');
+$::Ndx=cs::Persist::db('.index.db',1);
+
+if (open(INDEX, "< .index"))
+{ nl('load .index ...');
+  while (defined ($_=<INDEX>))
+  { if (/^\s*(\d+)\s/)
+    { $::InIndex{$1}=1;
+    }
+  }
+  close(INDEX);
+}
+
+nl('reading directory entries ...');
+my @dirents = sort byindex grep(/^\d/, cs::Pathname::dirents("."));
+for (@dirents) { s/\..*$//; }
+
+nl("prune deleted messages ...");
+{ my %dirents; map($dirents{$_}=1, @dirents);
+
+  my @files = keys %$::Ndx;
+  for my $F (@files)
+  { delete $::Ndx->{$F} if ! exists $dirents{$F};
+  }
+}
+
+my @files = @dirents;
+
+nl("read new message headers ...");
+FILE:
+  for my $F (@files)
+  {
+    next FILE if exists $::Ndx->{$F} && exists $::InIndex{$F};
+
+    my $H;
+    { my $s = cs::Source::open($F);
+      next FILE if ! defined $s;
+      $H = new cs::RFC822 $s;
+    }
+
+    my $subject = $H->Hdr(SUBJECT);
+    out("$F $subject");
+
+    my $ndx = $::Ndx->{$F} = { SUBJECT => $subject };
+
+    $ndx->{NORMSUBJ} = normsubj($subject);
+
+    my $datestr = $H->Hdr(DATE);
+    my $dategmt = (length $datestr ? cs::Date::txt2gm($datestr) : undef);
+    if (! defined $dategmt || $dategmt < 1)
+    { my @s = stat($F);
+
+      $dategmt = @s ? $s[9] : 0;
+      warn "$F: \"$datestr\" doesn't parse, using mtime ($dategmt)\n"
+	if length $datestr;
+    }
+
+##    warn "$F: date($datestr) -> $dategmt (".cs::Date::gmt2yyyymmdd($dategmt,1).")\n"
+##	if $F > 1800 && 916716000 - $dategmt > 25920000;
+
+    $ndx->{DATE}     = $dategmt;
+    $ndx->{AFF}	     = $H->Hdr(X_CS_TOPIC);
+    if (! length $ndx->{AFF})
+    { $ndx->{AFF}=cs::Mail::Categories::categorise($H);
+    }
+    ## warn "AFF=[$ndx->{AFF}]";
+    $ndx->{THREAD}   = $ndx->{NORMSUBJ};
+    $ndx->{FROM}     = $H->Hdr(FROM);
+
+    if ($::UseDB)
+    { 
+      my $addrs = $H->Addrs(TO,CC,FROM,SENDER,BCC,
+			    REPLY_TO,X_SENDER,APPROVED_BY,
+			    X_DELETED_TO,
+			    X_DELETED_CC,
+			    X_DELETED_FROM,
+			    X_ORIGINAL_TO,
+			    X_ORIGINAL_CC,
+			    X_ORIGINAL_FROM,
+			    ERRORS_TO);
+      for (keys %$addrs)
+      { print UPDDB $addrs->{$_}, "\n";
+      }
+    }
+  }
+  sleep 5;
+out('');
+
+@files = keys %$::Ndx;
+my $nfiles = @files;
+
+if ($::Threaded)
+{ nl("compute thread dates ...");
+  my $lpcnt = 0;
+  my $nth   = 0;
+  my($npcnt,$thr,$ndx);
+  for my $F (sort byindex @files)
+  { $nth++;
+    $npcnt=$nth/$nfiles;
+    if ($npcnt - $lpcnt >= 0.01)
+	  { out(sprintf("%02d%%",100*$npcnt));
+	    $lpcnt=$npcnt;
+	  }
+
+    $ndx = $::Ndx->{$F};
+    $thr = $ndx->{THREAD};
+    $::thrdate{$thr}=( exists $::thrdate{$thr}
+		       ? ::max($::thrdate{$F}, $ndx->{DATE})
+		       : $ndx->{DATE}
+		       );
+  }
+  out('');
+}
+
+nl("sorting messages ...");
+my @files = $::Threaded
+		? sort bythread @files
+		: sort byindex  @files
+		;
+
+nl("updating index...");
+
+if ($::UseDB)	{ if (! close(UPDDB))
+			{ warn "$::cmd: close(updrawmailrc): $!";
+			  $::Xit=1;
+			}
+		}
+
+if (! open(INDEX, "> .index"))
+	{ warn "$::cmd: can't update .index: $!\n";
+	  $::Xit=1;
+	}
+else	{ for my $F (@files)
+	  { print INDEX ndxline($F), "\n";
+	  }
+	  close(INDEX);
+	}
+
+undef $::Ndx;
+cs::Persist::finish();
+
+exit $::Xit;
+
+sub ndxline
+{ my($F)=@_;
+
+  my $ndx = $::Ndx->{$F};
+
+  my $fullname = cs::RFC822::addr2fullname($ndx->{FROM});
+
+  my $flatsubj = $ndx->{SUBJECT};
+  $flatsubj =~ s/\s*\n\s*/ /g;
+
+  sprintf("%5d %-11s %-15.15s %-7s %s",
+		$F,
+		$ndx->{AFF},
+		length($fullname) ? $fullname : $ndx->{FROM},
+		$flatsubj);
+}
+
+sub normsubj
+{ local($_)=@_;
+  # strip leading "re:" and "[list-tag]" markers
+  while (s/^\s*(((([Rr][Ee]|[Ff][Ww][Dd]?)(\s*\[\d+\])?)\b(\s*:)?)|\[[-A-Z]+\])//)
+	{}
+  s/^\s+//;
+  s/\s+/ /g;
+  lc($_);
+}
+
+sub byindex { $a <=> $b; }
+
+sub bydate  { my $cmp = $::Ndx->{$a}->{DATE} <=> $::Ndx->{$b}->{DATE};
+	      return $cmp if $cmp;
+	      $a <=> $b;
+	    }
+
+sub bythread{ my $A = $::Ndx->{$a};
+	      my $B = $::Ndx->{$b};
+
+	      my $cmp;
+
+	      if ($::Mixed)
+		{ $cmp = lc($A->{AFF}) cmp lc($B->{AFF});
+	          return $cmp if $cmp;
+		}
+
+	      my $thrA = $A->{THREAD};
+	      my $thrB = $B->{THREAD};
+
+	      $cmp = $::thrdate{$thrA} <=> $::thrdate{$thrB};
+	      return $cmp if $cmp;
+
+	      $cmp = $thrA cmp $thrB;
+	      return $cmp if $cmp;
+
+	      $cmp = $A->{DATE} <=> $B->{DATE};
+	      return $cmp if $cmp;
+
+	      $a <=> $b;
+	    }
