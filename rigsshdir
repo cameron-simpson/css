@@ -1,0 +1,57 @@
+#!/bin/sh
+#
+# Construct necessary personal ssh keys and other setup for a host.
+#	- Cameron Simpson <cs@zip.com.au> 06nov2002
+#
+
+sshdir=$HOME/there/local/rc/ssh
+[ -d "$sshdir/." ] || (set -x; mkdir -p "$sshdir") || exit1
+cd "$sshdir" || exit 1
+
+xit=0
+
+while read link target
+do
+  target=`eval "echo $target"`
+  { sym=`readlink "$link" 2>/dev/null` \
+    && [ "x$sym" = "x$target" ]
+  } || { rm -f "$link"
+	 (set -x; ln -s "$target" "$link") || { xit=1; continue; }
+       }
+done <<X
+Mykefile ../../../../rc/ssh/Mykefile
+config   ../../../../rc/ssh/config
+pubkeys  ../../../../rc/ssh/pubkeys
+X
+
+# make key pairs
+if [ -d privkeys/. ] || mkdir -p privkeys
+then
+    for t in rsa1 rsa dsa
+    do
+      case $t in
+	  rsa1) base=identity ;;
+	  *)    base=id_$t ;;
+      esac
+      pri=privkeys/$base
+      [ -s "$pri" ] && continue
+
+      pub=pubkeys/$base@$HOSTNAME.pub
+      ( set -x
+	rm -f "$pub"
+	ssh-keygen -t $t -f $pri -C "$t $USER@$HOSTNAME `datecode`" \
+	&& mv "$pri.pub" "$pub"
+      ) || xit=1
+    done
+else
+    xit=1
+fi
+
+myke _env _auth || xit=1
+chmod 644 authorized_keys* environment
+
+cd || exit 1
+rm -f .ssh
+(set -x; ln -s there/local/rc/ssh .ssh) || xit=1
+
+exit $xit
