@@ -1,0 +1,22 @@
+#!/usr/bin/perl
+
+$cmd=$0;
+$width=80;
+if ($#ARGV >= 0 && $ARGV[$[] =~ /^-(\d+)/)
+{ $width=$1; shift;
+  if ($width < 1)
+  { die "$cmd: width must be positive\n";
+  }
+}
+
+while (<>)
+{ chomp;
+  while (length > $width)
+  { print substr($_,$[,$width)."\n";
+    $_=substr($_,$[+$width);
+  }
+
+  if (length)
+  { print $_."\n";
+  }
+}
