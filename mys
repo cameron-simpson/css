@@ -1,4 +1,4 @@
 #!/bin/sh
 
-eval `secret mysql@cisra`
+eval `secret "mysql@$SYSTEMID"`
 exec /opt/mysql/bin/mysql "-h$secretHOST" "-u$secretLOGIN" "-p$secretPASSWORD" ${1+"$@"}
