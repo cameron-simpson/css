@@ -1,0 +1,16 @@
+#!/usr/bin/perl
+#
+# Reduce a path to the extant components, tossing duplicates.
+#	- Cameron Simpson <cs@zip.com.au> 19oct97
+#
+
+my(@paths);
+
+for (@ARGV)
+	{ push(@paths,split(/:/));
+	}
+
+my(%got);
+
+print join(':',
+	   grep(!$got{$_} && ($got{$_}=1) && -e $_,@paths)), "\n";
