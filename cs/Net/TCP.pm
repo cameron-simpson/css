@@ -275,6 +275,10 @@ sub _sockHandle
 { "cs::Net::TCP::".$cs::Net::TCP::_SOCK++;
 }
 
+=head1 OBJECT METHODS
+
+=over 4
+
 =item Port()
 
 Return the local port number of this socket.
@@ -381,6 +385,8 @@ sub Serve	# (this,flags,func,@args) -> void
       last CONN if $onceonly;
     }
 }
+
+=back
 
 =head1 AUTHOR
 
