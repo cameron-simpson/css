@@ -118,6 +118,24 @@ sub Abort($;$)
   }
 }
 
+=item SetPathname(I<pathname>)
+
+Specify where to store the data component of the object.
+Must be called before the B<Request> method.
+
+=cut
+
+sub SetPathname($$)
+{ my($this,$path)=@_;
+
+  if ($this->{STATE} ne NEW)
+  { my @c = caller;
+    warn "$::cmd: SetPathname($path) called too late, from [@c]";
+  }
+
+  $this->{STASHPATH}=$path;
+}
+
 =item Request(I<headers>,I<method>,I<version>)
 
 Initiate the fetch from the proxy.
@@ -188,6 +206,8 @@ sub _RequestData
   { ## warn "EOF from ".$C->SourceHandle();
     $this->Abort(1);
     $this->{STATE}=FINAL;
+    delete $this->{CONN};
+
     &{$this->{NOTIFY}}($this,FINAL);
     return;
   }
@@ -215,15 +235,20 @@ sub _RequestData
       # complete response line
       $_=$`;
       $this->{SOFAR}=$';
-      ## warn "AFTER RESPONSE LINE\nSOFAR=[$this->{SOFAR}]";
+      s/\r$//;
+
+      ## warn "AFTER RESPONSE LINE\n+[=$_]\nSOFAR=[$this->{SOFAR}]";
       $this->{STATE}=HEADERS;
 
-      if (/^(\d\d\d)\s+/)
+      if (m:^HTTP/\d+\.\d+\s+(\d\d\d)\s+:)
       { my($rcode,$rtext)=($1,$');
 	warn "response = $rcode [$rtext]";
 
 	$this->{RCODE}=$rcode;
 	$this->{RTEXT}=$rtext;
+      }
+      else
+      { warn "bogus response: [$_]";
       }
 
       if ($this->{MODE} eq STEPPED)
@@ -241,19 +266,22 @@ sub _RequestData
         $this->{SOFAR}='';
 
         { my $s = new cs::Source (ARRAY, \@a);
-	  ($this->{RHEADERS}=new cs::RFC822)->SourceExtract($s);
+	  ($this->{RHEADERS}=cs::RFC822->new)->SourceExtract($s);
+	}
+
+	if ($this->{MODE} eq STEPPED)
+	{ &{$this->{NOTIFY}}($this,HEADERS);
 	}
 
 	$this->{STATE}=DATA;
-	$this->{SINK}=cs::Sink::tmpSink();
+	$this->{SINK}=( exists $this->{STASHPATH}
+		      ? new cs::Sink (PATH,$this->{STASHPATH})
+		      : cs::Sink::tmpSink()
+		      );
 	$this->{SINKPATH}=$this->{SINK}->Path();
 
         $this->{SINK}->Put(@a);
 	last PARSE;
-      }
-
-      if ($this->{MODE} eq STEPPED)
-      { &{$this->{NOTIFY}}($this,HEADERS);
       }
     }
     else
