@@ -53,9 +53,10 @@ case "$target" in
     tv)     target=sofcomtv ;;
     w3val)	target=w3c_validate ;;
     wiki)	target=wikipedia ;;
-    yp)	target=yellowpages ;;
+    yp)		target=yellowpages ;;
     www)	target='altavista yahoo dmoz google' ;;
-    yg)	target=yahoogroups ;;
+    yg)		target=yahoogroups ;;
+    yvid)	target=yahoo_video ;;
     movie)	exec us "http://www.cinema.pgh.pa.us/movie/reviews?$query" ;;
     ebay)	case "$query" in
 		*\ *)	;;
