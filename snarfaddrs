@@ -17,7 +17,10 @@ my $all = "$alldir/$allbase";
 
 exit 0 if ! -s $new;
 
+## my $today = `daycode`; chomp($today);
+
 my %addrs=();
+my %naddrs;
 
 die "$::cmd: open($all): $!\n" if ! open(ALL,"< $all\0");
 while (defined($_=<ALL>))
@@ -49,19 +52,19 @@ while (defined($_=<NEW>))
   { warn "$::cmd: $newnew, line $.: discarding bad data (no tab)\n";
   }
   elsif (! exists $addrs{$`})
-  { $addrs{$`}=$';
+  { $naddrs{$`}=$';
   }
 }
 close($newnew);
 
-if (! open(ALL,"> $all\0"))
-{ die "$::cmd: can't rewrite $all: $!\n";
+if (! open(ALL,">> $all\0"))
+{ die "$::cmd: can't append to $all: $!\n";
 }
 
 unlink($newnew) || warn "$::cmd: unlink($newnew): $!\n";
 
-for my $key (sort keys %addrs)
-{ print ALL "$key\t$addrs{$key}\n";
+for my $key (sort keys %naddrs)
+{ print ALL "$key\t$naddrs{$key}\n";
 }
 
 close(ALL);
