@@ -1,0 +1,10 @@
+#!/bin/sh
+#
+# Fetchmail from optus@home, forward to zip.
+#	- Cameron Simpson <cs@zip.com.au> 09nov2000
+#
+
+vflag=
+[ -t 2 ] && vflag=-v
+
+exec fetchmail $vflag -a -f $HOME/rc/fetchmail -S mail.zip.com.au --smtpname "$EMAIL" ${1+"$@"}
