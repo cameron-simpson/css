@@ -1,8 +1,9 @@
 #!/usr/bin/perl
 #
 # Split up an ordinary mailbox (From_ separated).
-# If a mailbox is specified, uses filemail to deposit the mail, so the
-# .file refiler works. Otherwise it unpacks into the current directory.
+# If a mailbox is specified, uses filemail to deposit the mail.
+# If a pipeline is specified, pipes each item to that command (eg "|bgprocmail").
+# Otherwise unpacks into the current directory.
 #	- Cameron Simpson, February 1992
 #
 # Support "| command" in place of mailbox.
@@ -16,7 +17,7 @@ use Fcntl;
 use cs::Misc;
 use cs::Upd;
 
-$::Usage="Usage: $::cmd ['|pipeto'] <mailfile\n";
+$::Usage="Usage: $::cmd [{ +folder | '|pipeto' }] <mailfile\n";
 
 $::SleepTime=0;
 
@@ -32,16 +33,16 @@ if (@ARGV)
 { if ("@ARGV" =~ /^\|/)
   { $::PipeTo=$';
   }
+  elsif ("@ARGV" =~ /^\+/)
+  { $::PipeTo="filemail @ARGV";
+  }
   else
-  { mkdir($::TmpDir,0777) || warn "$::cmd: mkdir($::TmpDir): $!\n";
-    chdir($::TmpDir)      || die "$::cmd: chdir($::TmpDir): $!\n";
-    warn "$::cmd: piping to \"vmin @ARGV\" ...\n";
-    open(STDOUT,"| vmin @ARGV ") || die "$::cmd: can't pipe to vmin: $!";
+  { warn "$::cmd: unrecognised arguments: @ARGV\n";
+    die $::Usage;
   }
 }
 else
-{
-  warn "$::cmd: just splitting, not filing\n";
+{ warn "$::cmd: just splitting, not filing\n";
 }
 
 splitmail('STDIN','stdin');
