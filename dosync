@@ -11,7 +11,9 @@ rsync -avHP --rsync-path='rrsync zapff' /u/syncopt/redhat.x86.linux/HOME/. work:
 
 ( # prepare the way
   snarfaddrs &
-  for subdir in scripts public public/adzap public/moto im
+  for subdir in scripts im \
+		there/cs@zip.com.au/html  there/cs@zip.com.au/html/moto \
+		there/adzapper.sourceforge.net/html
   do ( cd "$HOME/$subdir" && myke _all ) &
   done
   wait
@@ -20,7 +22,7 @@ rsync -avHP --rsync-path='rrsync zapff' /u/syncopt/redhat.x86.linux/HOME/. work:
 # push
 syncwork &
 synczip &
-synctw &
+##synctw &
 syncjekyll &
 syncsf &
 
