@@ -1,0 +1,3 @@
+#!/bin/sh
+
+ilbmtoppm ${1+"$@"} | ppmtogif
