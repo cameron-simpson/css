@@ -1,0 +1,86 @@
+#!/bin/sh
+#
+# Install a perl module.
+#	- Cameron Simpson <cs@zip.com.au> 01jun99
+#
+
+force=
+vers=${PREFPERL:+"-$PREFPERL"}
+perl=
+
+while :
+do
+  case $1 in
+    -[5-9].*)	vers=$ ;;
+    -f)		force=1 ;;
+    -p)		perl=$2; shift ;;
+    --)		shift; break ;;
+    -*)		echo "$0: $1: unrecognised option" >&2; badopts=1 ;;
+    *)		break ;;
+  esac
+  shift
+done
+
+[ $# = 0 ] && { echo "$0: missing modules" >&2; badopts=1; }
+
+[ $badopts ] && { echo "Usage: $0 [-f] [-perl_version] [-p perl] modules..." >&2
+		  exit 2
+		}
+
+umask 2
+
+[ -n "$perl" ] || perl=/opt/perl$vers/bin/perl
+echo "mask=`umask` perl=$perl"; echo
+
+xit=0
+jobs=0
+for perlmod
+do
+    if [ -d "$perlmod/." ]
+    then
+	subdir=$perlmod
+    else
+	if [ -f "$perlmod" ]
+	then
+	    goodext=
+	    for ext in .tgz .tar.gz .tar .tar.bz2
+	    do
+		case $perlmod in
+		    *$ext)	goodext=$ext; break ;;
+		esac
+	    done
+	    [ -n "$goodext" ] || { echo "Don't know how to unpack $perlmod." >&2
+				   exit 1
+				 }
+	    subdir=`basename "$perlmod" "$goodext"`
+	    x "$perlmod" || exit 1
+	    echo
+	fi
+    fi
+
+    echo "Entering $subdir to do install."
+    cd "$subdir" || exit $?
+
+    PATH=/usr/openwin/bin:/opt/bin:$PATH
+    export PATH
+
+    wd=`pwd`
+    base=`basename "$wd"`
+
+    colourise buildenv "$perl" Makefile.PL ${1+"$@"} \
+    && colourise buildenv make \
+    && { colourise buildenv make test || { colour_echo white "Make test fails!"
+					   if [ $force ] \
+					   || ask "Install $base anyway?"
+					   then :
+					   else exit 1
+					   fi
+					 }
+       } \
+    && ( umask 2; colourise buildenv lock perlinst make install ) \
+    && dl "$HOST/$ARCH: $perl $base"
+done
+wait
+
+[ $xit = 0 ] || colour_echo white "$0: some modules not installed!" >&2
+exit $xit
