@@ -4,12 +4,14 @@
 #	- Cameron Simpson <cs@zip.com.au> 12apr2000
 #
 
+: ${TMPDIR:=/tmp}
+
 [ $# -lt 2 ] && { echo "Usage: $0 list addresses..." >&2; exit 2; }
 
 list=$1; shift
 [ -s "$list" ] || { echo "$0: $list: no such list!" >&2; exit 1; }
 
-tmp=/tmp/bounce.$$
+tmp=$TMPDIR/bounce.$$
 xit=0
 
 for addr
