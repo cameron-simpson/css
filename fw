@@ -1,0 +1,81 @@
+#!/bin/sh
+#
+# Usage: fw [-p subject_prefix] m-args...
+#	- Cameron Simpson <cs@zip.com.au>
+#
+
+tmp=${TMP-/tmp}/fw$$
+
+USER=${USER-`whoami`}
+pfx="[fwd from $USER] "
+
+badopts=
+
+async=1
+fwraw=
+while :
+do  case $1 in
+      -a)	async=1 ;;
+      +a)	async= ;;
+      -p)	pfx=$2; shift;;
+      -r)	fwraw=1 ;;
+      --)	shift; break ;;
+      -?*)	echo "$0: unrecognised option: $1" >&2
+		badopts=1
+		;;
+      *)	break ;;
+    esac
+    shift
+done
+
+addrs=$*
+
+cat >$tmp
+exec <&-
+exec </dev/null
+
+if [ $async ]
+then
+    cons=`logpath console`
+    [ -n "$cons" ] && exec >>"$cons" 2>&1
+fi
+
+( exec <$tmp
+  rm -f $tmp
+
+  tmp=${tmp}2
+  >$tmp
+
+  cons=`logpath console`
+  exec >"$cons" 2>&1
+
+  if [ -n "$pfx" ]
+  then
+      set x +H "Subject: $pfx{subject}" +H "Reply-To: $EMAIL" ${1+"$@"}
+      shift
+  fi
+
+  if [ -z "$fwraw" ]
+  then
+      set x -D date +H "From: $EMAIL" +H "Reply-To: $EMAIL" \
+		-I "+-----------------------------------" \
+		-I "| Originally-From: {x_deleted_from}" \
+		-I "| Forwarded-By: $NAME <$EMAIL>" \
+		-I "| Forwarded-To: $addrs" \
+		-I "+-----------------------------------" \
+		-I "" \
+		${1+"$@"}
+      shift
+  fi
+
+  set m -h -S -D approved -D message-id -D to -D cc -D x-face \
+		-D xref -D newsgroups -d bcc -d received \
+		-D delivered-to \
+	  +H "Return-Path: $EMAIL" \
+	  +H "Errors-To: $EMAIL" \
+	  ${1+"$@"}
+
+  exec "$@"
+) &
+
+[ $async ] || wait
