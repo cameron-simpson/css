@@ -1,0 +1,45 @@
+#!/bin/sh
+#
+# Convert hotlist data to an HTML permuted index.
+#	- Cameron Simpson <cs@zip.com.au> 06may97
+#
+
+cmd=`basename "$0"`
+wkdir=${TMP:-/tmp}/$cmd.$$
+
+mkdir "$wkdir" || exit $?
+
+[ $# -gt 0 ] && { set x $HOME/private/hotlists/monthly/????; shift; }
+
+cat "$@" \
+  | sed 's/^[0-9][0-9]*	//' \
+  | pndx \
+  | wkdir=$wkdir perl -ne '
+
+$olck="";
+$olckey="";
+KEY:
+  while (<STDIN>)
+	{ chomp;
+	  ($href,$left,$key,$right)=split(/\t/);
+	  next KEY if length($key) < 2;
+	  $lckey=lc($key);
+	  $lck=($lckey =~ /./ ? $& : ".");
+
+	  $anchor="";
+	  if ($lck ne $olck)
+		{ $olck=$lck;
+		  $refs="$ENV{wkdir}/$lck";
+		  print STDERR "$refs - $key\n";
+		  open(STDOUT,">> $refs\0") || die "append $refs: $!";
+		}
+
+	  if ($lckey ne $olckey)
+		{ $olckey=$lckey;
+		  $anchor=" #$lckey";
+		}
+
+	  print "<TR><TD ALIGN=right>$left<TD ALIGN=left><A HREF=$href$anchor>$key</A><TD ALIGN=LEFT>$right\n";
+	}
+
+		'
