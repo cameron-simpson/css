@@ -46,7 +46,7 @@ xit=0
 
 # =head1 BUG SYSTEM BACKENDS
 #
-# The follow bubsystems are known:
+# The follow bugsystems are known:
 #
 # =over 4
 #
@@ -54,6 +54,32 @@ xit=0
 for bugsystem in $BUGSYSTEMS
 do
 
+  # =item B</>I<prefix>B</>I<bugsystem>
+  #
+  # Any I<bugsystem> name may be prefixed with B</>I<prefix>B</>
+  # to constrain its use.
+  # If the I<headline> does not commence with a string
+  # matching the regular expression I<prefix>
+  # that bugsystem is skipped.
+  # For example,
+  # including the bugsystem "B</BORG:/mailto:borglog@b.org>"
+  # in your bugsystems
+  # will only dispatch buglogs to B<borglog@b.org> if the headline commences
+  # with "B<BORG:>".
+  #
+  case "$bugsystem" in
+    /?*/?*)
+      pfxre=`expr "$bugsystem" : '/\([^/][^/]*\)/.*'` || { xit=1; continue; }
+      sfxbugsys=`expr "$bugsystem" : '/[^/][^/]*/\(.*\)'` || { xit=1; continue; }
+      if expr "x$headline" : "x$pfxre" >/dev/null
+      then
+	bugsystem=$sfxbugsys
+      else
+	continue
+      fi
+      ;;
+  esac
+	  
   case "$bugsystem" in
 
     # =item B<dlog>
