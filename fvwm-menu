@@ -6,11 +6,23 @@
 
 ##alert "$0 $*"
 
-cmd=$0
-usage="Usage: $cmd [-n] menu title cmd [args...]"
-
 noentries=
-[ "x$1" = x-n ] && { noentries=1; shift; }
+noauto=
+
+cmd=$0
+usage="Usage: $cmd [-1] [-n] menu title cmd [args...]
+	-n	Don't geneate any menu entries (bootstrap).
+	-1	Don't give this menu a DynamicPopUpAction."
+
+while :
+do
+  case $1 in
+    -n) noentries=1 ;;
+    -1) noauto=1 ;;
+    *)  break ;;
+  esac
+  shift
+done
 
 [ $# -ge 3 ] || { echo "$usage" >&2; exit 2; }
 
@@ -21,6 +33,6 @@ shift; shift
 ( [ $noentries ] || exec "$@" ) \
 | ( echo "DestroyMenu $menu"
     echo "AddToMenu $menu \"$title\" Title"
-    echo "AddToMenu $menu DynamicPopUpAction Piperead '$0 $menu \"$title\" $*'"
+    [ $noauto ] || echo "AddToMenu $menu DynamicPopUpAction Piperead '$0 $menu \"$title\" $*'"
     exec sed "s/^/AddToMenu $menu /"
   )
