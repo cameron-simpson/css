@@ -13,7 +13,7 @@
 thsize=48x48
 newmenu=
 
-cmd=$0
+cmd=`basename "$0"`
 usage="Usage: $cmd [-N] [-d dir] [-l filelist] [XxY] menuname [filecmd [args...]]
 	-N	New menu. Destroy and recreate this menu.
 	-d dir	Context directory. Default: current directory.
@@ -82,58 +82,65 @@ else
       echo "$path"
     done
 fi \
-| { exec 3>&1	# save stdout for use after eaten by pipe
+| \
+{ tmpf=$TMPDIR/$cmd.$$ims
+  exec 4>"$tmpf"
 
-    { exec 4>&1 1>&3 3>&-
-      # now stdout is original stdout and &4 is pipe to needthumbs
-      while read -r entry
-      do
-	if [ -d "$entry/." ]
-	then
-	  # directory pathname
-	  path=`cd "$entry" || exit 1; pwd` || continue
+  # now stdout is original stdout and &4 is pipe to needthumbs
+  while read -r entry
+  do
+    if [ -d "$entry/." ]
+    then
+      acon nice lock needthumbs set-x mkthumbs "$entry/."
 
-	  # menu entry tag
-	  case "$entry" in
-	      .|*/*)tag=`basename "$path"` ;;
-	      *)	tag=$entry ;;
-	  esac
+      # directory pathname
+      path=`cd "$entry" || exit 1; pwd` || continue
 
-	  ##alert "\"$tag\" PopImDir $path"
-	  echo "AddToMenu $menuname \"$tag\" PopImDir $path"
-	else
-	  f=$entry
-	  [ -s "$f" ] || continue;
+      # menu entry tag
+      case "$entry" in
+	  .|*/*)tag=`basename "$path"` ;;
+	  *)	tag=$entry ;;
+      esac
 
-	  case "$entry" in
-	      $HOME/*)	tag='~/'`expr "x$entry" : "x$HOME/\\(.*\\)"` ;;
-	      *)		tag=$entry ;;
-	  esac
+      ##alert "\"$tag\" PopImDir $path"
+      echo "AddToMenu $menuname \"$tag\" PopImDir $path"
+    else
+      f=$entry
+      [ -s "$f" ] || continue;
 
-	  d=`dirname "$f"`
-	  case "$d" in
-	      /*)		;;
-	      *)		d=$wd/$d ;;
-	  esac
-	  case "$f" in
-	      */*)	fbase=`basename "$f"` ;;
-	      *)		fbase=$f ;;
-	  esac
-	  case "$f" in
-	      /*)	;;
-	      *)	f=$d/$fbase ;;
-	  esac
+      case "$entry" in
+	  $HOME/*)	tag='~/'`expr "x$entry" : "x$HOME/\\(.*\\)"` ;;
+	  *)		tag=$entry ;;
+      esac
 
-	  thumb=$thsubdir/$fbase.png
-	  fthumb=$d/$thumb
-	  if [ -s "$fthumb" ]
-	  then tag="%$fthumb%$tag"
-	  else echo "$f" >&4
-	  fi
+      d=`dirname "$f"`
+      case "$d" in
+	  /*)		;;
+	  *)		d=$wd/$d ;;
+      esac
+      case "$f" in
+	  */*)	fbase=`basename "$f"` ;;
+	  *)		fbase=$f ;;
+      esac
+      case "$f" in
+	  /*)	;;
+	  *)	f=$d/$fbase ;;
+      esac
 
-	  echo "AddToMenu $menuname \"$tag\" Exec "`shqstr "$@" "$f"`
-	fi
-      done
-    } \
-    | needthumbsfor
-  }
+      thumb=$thsubdir/$fbase.png
+      fthumb=$d/$thumb
+      if [ -s "$fthumb" ]
+      then tag="%$fthumb%$tag"
+      else echo "$f" >&4
+      fi
+
+      echo "AddToMenu $menuname \"$tag\" Exec "`shqstr "$@" "$f"`
+    fi
+  done
+
+  exec >/dev/null
+
+  acon set-x mkthumbs `sed -e 's:/[^/]*$::' -e 's:^$:.:' <"$tmpf" | sort -u`
+  needthumbsfor <"$tmpf"
+  rm "$tmpf"
+}
