@@ -226,7 +226,7 @@ do
     fi
 
     issymlink "$l" \
-    || $echo rsync -a $vflag --delete "$r/." "$l/." | sed "s|^|$l: |"
+    || $echo rsync -aHW $vflag --delete "$r/." "$l/." | sed "s|^|$l: |"
 
     set +x
 done
