@@ -13,7 +13,7 @@ usage="Usage: $cmd [-v] [-w width] [-h height] [-x x-pos] [-y y-pos] [-l lock] [
 		[-f font] [-n name] [-big] [-small] [-keepio] [-xauthhack]
 		[{-c shellcmd}/{-e exec-list}/{-- raw-args}]"
 
-termopts=${TERMOPTIONS}
+termopts=
 detach='exec >/dev/null </dev/null'
 keepio=
 SHELL=${SHELL-/bin/sh}
@@ -34,6 +34,9 @@ lock1=
 [ -s $HOME/.termenv ] && . $HOME/.termenv
 
 badopts=
+
+# load default options first
+set x ${TERMOPTIONS} ${1+"$@"}; shift
 
 while :
 do
