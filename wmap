@@ -1,0 +1,66 @@
+#!/bin/sh
+#
+# Fetch and optionally display a weather map.
+#
+
+cmd=`exec basename "$0"`
+
+mapsite=marlin.jcu.edu.au 
+mapdir=JCUMetSat
+map=auslast	# used to be australialast
+root=
+file=
+
+usage="Usage: $cmd [-s site[:dir]] [-bg] [-o file] [map]
+	-s	Set site ($mapsite) and dir ($mapdir) if either is nonnull.
+	-bg	Set background of display to image.
+	-o	Write output to file rather than display."
+
+badopts=
+while :
+do
+    case $1 in
+	-s) case $2 in
+		*:*)	lhs=`expr "x$2" : 'x\([^:]*\):.*'`
+			rhs=`expr "x$2" : 'x[^:]*:\(.*\)'`
+			case $lhs in
+			    ?*)	mapsite=$lhs ;;
+			esac
+			case $rhs in
+			    ?*)	mapdir=$rhs ;;
+			esac
+			;;
+	    	?*)	mapsite=$2 ;;
+	    esac
+	    shift
+	    ;;
+	-bg)root='-root -max -quit' ;;
+	-o) file=$2 ; shift ;;
+	--) shift ; break ;;
+	-*) echo "$cmd: unrecognised option '$1'" >&2
+	    badopts=1
+	    ;;
+	*)  break ;;
+    esac
+    shift
+done
+
+case $1 in
+    ?*)	map=$1 ; shift ;;
+esac
+
+[ $badopts ] && { echo "$usage" >&2 ; exit 2 ; }
+
+tmp=/tmp/wmap.$$
+aftp +A "$mapsite" "cd \"$mapdir\"" "get \"$map\" $tmp.ilbm" quit
+[ -s $tmp.ilbm ] || { rm -f $tmp.ilbm; exit 1; }
+ilbmtogif $tmp.ilbm > $tmp.gif
+case $file in
+    ?*)	cp $tmp.gif "$file"
+	case $root in
+	    ?*)	xv $root "$file" ;;
+	esac
+	;;
+    '')	xv $root $tmp.gif ;;
+esac
+rm $tmp.ilbm $tmp.gif
