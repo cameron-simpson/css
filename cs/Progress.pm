@@ -78,18 +78,33 @@ sub new($$;$)
 sub _dfltReport($$$$$)
 { my($this,$when,$sofar,$eta,$context)=@_;
 
+  my $rpt = $this->{TAG};
+
+  if (length $context)
+  { $rpt.=sprintf(" - %-14s", $context);
+  }
+
   my $size = $this->Size();
 
-  my $rpt = (length($context) ? sprintf("%-14s: ", $context) : "");
-  my $pcnt = int( ($sofar*100)/$size + 0.5 );
+  if ($size > 0)
+  {
+    my $pcnt = int( ($sofar*100)/$size + 0.5 );
 
-  $rpt.=sprintf("%4s / %8s %3d%% Remaining: %s",
-		cs::Units::bytes2human($sofar,1),
-		cs::Units::bytes2human($size,2),
-		$pcnt,
-		cs::Units::sec2human($eta-$when,2));
+    $rpt.=sprintf(" %4s/%s %d%%",
+		  scalar(cs::Units::bytes2human($sofar,1)),
+		  scalar(cs::Units::bytes2human($size,2)),
+		  $pcnt);
 
-  cs::Upd::out($rpt);
+    if (defined $eta)
+    { $rpt.=" ETA: ".scalar(cs::Units::sec2human($eta-$when,2));
+    }
+  }
+  else
+  { $rpt.=" ".cs::Units::bytes2human($sofar,2);
+  }
+		
+
+  cs::Upd::nl($rpt);
 }
 
 =item Size(I<total>)
@@ -101,7 +116,7 @@ Set or return the expected size for the task.
 sub Size($;$)
 { my($this,$size)=@_;
 
-  retur $this->{SIZE} if ! defined $size;
+  return $this->{SIZE} if ! defined $size;
   
   $this->{SIZE}=$size;
 }
@@ -141,7 +156,7 @@ sub Report($;$)
     my $start = $this->{START};
 
     if ($size >= $sofar && $when > $start)
-    { $eta=$when + ($size-$sofar) * ($when-$start) / $sofar;
+    { $eta = $when + ($size-$sofar) * ($when-$start) / $sofar;
     }
   }
 
