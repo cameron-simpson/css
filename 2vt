@@ -1,0 +1,6 @@
+#!/bin/sh
+
+case $TERM in
+    qvt311gx)	necho '%1' ;;
+    xterm*)	necho '' ;;
+esac
