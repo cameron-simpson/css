@@ -26,67 +26,69 @@ package cs::Decode;
 @cs::Decode::ISA=qw(cs::Source);
 
 sub new
-	{ my($class,$s,$decoder)=(shift,shift,shift);
-	  my($this)=new cs::Source Source, $s;
+{ my($class,$s,$decoder)=(shift,shift,shift);
+  my($this)=new cs::Source Source, $s;
 
-	  return undef if ! defined $this;
+  return undef if ! defined $this;
 
-	  $this->{DECODE}=$decoder;
-	  $this->{DECODE_ARGS}=[ @_ ];
+  $this->{cs::Decode::DECODE}=$decoder;
+  $this->{cs::Decode::DECODE_ARGS}=[ @_ ];
 
-	  bless $this, $class;
+  bless $this, $class;
 
-	  # we wrap it in another layer to use the superclass's
-	  # $size handler
-	  new cs::Source Source, $this;
-	}
+  # we wrap it in another layer to use the superclass's
+  # $size handler
+  new cs::Source Source, $this;
+}
 
 sub DESTROY
-	{ my($this)=shift;
+{ my($this)=shift;
 
-	  # return unparsed data to source
-	  $this->{DS}->_PushBuf($this->{BUF});
+  # return unparsed data to source
+  $this->{DS}->_PushBuf($this->{BUF});
 
-	  $this->SUPER::DESTROY();
-	}
+  $this->SUPER::DESTROY();
+}
 
 sub _Decode
-	{ my($this,$newdata)=@_;
-	  my($decoded);
+{ my($this,$newdata)=@_;
+  my($decoded);
 
-	  $this->{BUF}.=$newdata if defined $newdata;
+  $this->{BUF}.=$newdata if defined $newdata;
 
-	  ($decoded,$this->{BUF})=
-	  	&{$this->{DECODE}}($this,$newdata,@{$this->{DECODE_ARGS}});
+  ($decoded,$this->{BUF})=
+	&{$this->{cs::Decode::DECODE}}($this,
+				       $newdata,
+				       @{$this->{cs::Decode::DECODE_ARGS}});
 
-	  $decoded;
-	}
+  $decoded;
+}
 
 # read data from source
 sub Read
-	{ my($this,$size)=@_;
-	  local($_)='';
+{ my($this,$size)=@_;
+  local($_)='';
 
-	  while (! length)
-		{ $_=$this->{DS}->Read();
+  while (! length)
+  { $_=$this->{DS}->Read();
 
-		  ## warn $_;
+    ## warn $_;
 
-		  if (! length)
-			# EOF - send undef sentinel
-			{ return $this->_Decode(undef);
-			}
-		  else
-		  { $_=$this->_Decode($_);
-		  }
+    if (! length)
+    # EOF - send undef sentinel
+    { return $this->_Decode(undef);
+    }
+    else
+    { $_=$this->_Decode($_);
+    }
 
-		  # catch errors
-		  return undef if ! defined;
-		}
+    # catch errors
+    return undef if ! defined;
+  }
 
-	  ## warn "Decode::Read: _=[$_]\n";
+  ## warn "cs::Decode::Read: _=[$_]\n";
 
-	  $_;
-	}
+  $_;
+}
 
 1;
