@@ -1,0 +1,38 @@
+#!/bin/sh
+
+cmd=`basename "$0"`
+usage="Usage: $cmd [-on] [//]host [-me] [-quiet] [--] command line"
+
+badopts=
+
+where=
+while [ -z "$where" ]
+do
+    case $1 in
+	-on)	shift ;;
+	//*)	where="-on $1" ;;
+	-*)	echo "$cmd: missing target host" >&2
+		badopts=1
+		break ;;
+	*)	where="-on //$1"; shift ;;
+    esac
+done
+
+as=-me
+crpopts=
+while :
+do
+    case $1 in
+	--)	shift; break ;;
+	-quiet)	crpopts="$crpopts $1" ;;
+	-me)	as=$1 ;;
+	-*)	echo "$cmd: $1; unsupported option" >&2
+		badopts=1 ;;
+	*)	break ;;
+    esac
+    shift
+done
+
+[ $badopts ] && { echo "$suage" >&2; exit 2; }
+
+exec /usr/apollo/bin/crp $where $as $crpopts ${1+"$@"}
