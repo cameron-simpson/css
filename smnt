@@ -44,7 +44,7 @@ then
 else
   share=$1; shift
   case "$share" in
-    //*/*) [ -n "$mnt" ] || { mnt=/mnt-`echo "$share" | tr -s / -`; needdir=1; } ;;
+    //*/*) [ -n "$mnt" ] || { mnt=/mnt`echo "$share" | tr -s / -`; needdir=1; } ;;
     *)	   echo "$cmd: bad PC share \"$share\", should look like //pc/share" >&2
 	   badopts=1
 	   ;;
