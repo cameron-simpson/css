@@ -1,6 +1,6 @@
 #!/bin/sh
 #
-# Permit outgoing traffic for a service to specified hosts (or "ALL").
+# Permit incoming UDP traffic for a service from specified hosts (or "ALL").
 #	- Cameron Simpson <cs@zip.com.au> 18oct2003
 #
 
