@@ -74,6 +74,31 @@ sub isodate
   sprintf("%d-%02d-%02d", $tm[5]+1900, $tm[4]+1, $tm[3]);
 }
 
+=item hashtable(I<dbh>,I<table>,I<keyfield>)
+
+Return a reference to a hash tied to a database table,
+which may then be manipulated directly.
+This is not as efficient as doing bulk changes via SQL
+(because every manipulation of the table
+does the matching SQL, incurring much latency)
+but it's very convenient.
+
+=cut
+
+sub hashtable($$$)
+{ my($dbh,$table,$keyfield)=@_;
+
+  my $h = {};
+
+  ::need(cs::DBI::Table::Hash);
+
+  if (! tie %$h, cs::DBI::Table::Hash, $dbh, $table, $keyfield)
+  { return undef;
+  }
+
+  $h;
+}
+
 =item sql(I<dbh>,I<sql>)
 
 Return a statement handle for the SQL command I<sql> applied to database I<dbh>.
@@ -182,6 +207,7 @@ where I<field> = I<value>.
 sub find($$$$)
 { my($dbh,$table,$field,$key)=@_;
 
+  ## warn "find $table.$field = $key";
   if (! wantarray)
   { my(@c)=caller;
     die "$0: cs::DBI::find not in array context from [@c]"; 
@@ -193,6 +219,7 @@ sub find($$$$)
     return ();
   }
 
+  ## warn "doing fetchall";
   fetchall_hashref($sth,$key);
 }
 
