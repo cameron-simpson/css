@@ -1,0 +1,157 @@
+#!/usr/bin/perl5
+#
+# Do the reporting for a week.
+#	- Cameron Simpson <cs@zip.com.au> 15jan97
+#
+
+use cs::Hier;
+use cs::Date;
+use CISRA::Projects;
+use CISRA::TimeSheets;
+use cs::Pathname;
+
+$sheetcode=shift(@ARGV);
+die "missing sheetcode" if ! defined $sheetcode;
+
+@UserList=CISRA::TimeSheets::userList($sheetcode);
+
+die "no userlist for $sheetcode" if ! @UserList;
+
+@sheets=();
+@missing=();
+for $user (@UserList)
+	{ $sheet="$CISRA::TimeSheets::SheetDir/$user/$sheetcode";
+	  if (-s $sheet)
+		{ push(@sheets,$sheet);
+		}
+	  else	{ push(@missing,$user);
+		}
+	}
+
+# system("ls -ld @sheets");
+
+$xit=0;
+
+print "Weekly Time Report for $sheetcode\n\n";
+
+# note missing users
+if (@missing)
+	{ print "WARNING: The following users are omitted from this report:\n";
+	  &flush(STDOUT);
+	  if (open(FMT,"|fmt"))
+		{ for (@missing) { print FMT "\t$_\n"; }
+		  close(FMT);
+		}
+	  print "\n";
+	}
+
+undef %Sheets;
+
+my($db)=CISRA::TimeSheets::sheets(0);
+
+# gather up the sheets for that week
+USER:
+  for $user (keys %$db)
+	{
+	  next USER if ! exists $db->{$user}
+		    || ! exists $db->{$user}->{$sheetcode};
+
+	  $Sheets{$user}=$db->{$user}->{$sheetcode};
+	}
+
+# tally up the times
+for $login (sort keys %Sheets)
+	{ $sheet=$Sheets{$login};
+	  # print STDERR "tasks for $sheet->{LOGIN}\n";
+	  for $task (@{$sheet->{TASKS}})
+		{ # print STDERR "note_task [$sheet->{LOGIN},$task]\n";
+		  note_task($login,$task);
+		}
+	}
+
+# report on each project
+#   include subprojects
+# print STDERR "Projects:\n", cs::Hier::h2a(\%ProjRec,1), "\n";
+
+PROJECT:
+  for $projid (sort { $a <=> $b } CISRA::Projects::projids())
+	{ $P=projrec($projid,0);
+	  next PROJECT if ! defined $P;
+
+	  $Project=CISRA::Projects::project($projid);
+
+	  my($superproj)=$Project->SuperProjectId($projid);
+
+	  # skip children - should have recounted them already
+	  next PROJECT if defined $superproj;
+
+	  $bigtotal=projhours($P,0);
+
+	  print "Project: $projid - ", $Project->Desc(), "\n";
+
+	  $total=0;
+	  for $tref (@{$P->{TASKS}})
+		{ printf("\t%-15s %5.1f\n", $tref->[0], $tref->[1]->{HOURS});
+		  $total+=$tref->[1]->{HOURS};
+		}
+
+	  printf("\t%-15s %5.1f\n","TOTAL",$total);
+	}
+
+exit $xit;
+
+sub projhours
+	{ my($P,$recurse)=@_;
+	  $recurse=0 if ! defined $recurse;
+
+	  my($total)=0;
+	  for (@{$P->{TASKS}})
+		{ $total+=$_->[1]->{HOURS};
+		}
+
+	  if ($recurse)
+		{ my($SP);
+
+		  for $SP (@{$P->{SUBPROJS}})
+			{ $total+=projhours($SP,1);
+			}
+		}
+
+	  $total;
+	}
+
+sub note_task
+	{ my($login,$task)=@_;
+	  my($projid)=$task->{ACCTCODE};
+	  my($P)=projrec($projid);
+	  my($Proj)=CISRA::Projects::project($projid);
+
+	  # note user, task and sheet
+	  push(@{$P->{TASKS}},[$login, $task]);
+	  $P->{USERS}->{$login}=$Sheets{$login};
+
+	  my($superproj)=(defined $Proj ? $Proj->SuperProjectId() : undef);
+	  if (defined $superproj)
+		{ my($SP)=projrec($superproj);
+		  $SP->{SUBPROJS}->{$projid}=$P;
+		}
+	}
+
+sub projrec
+	{ my($projid,$makeit)=@_;
+	  $makeit=1 if ! defined $makeit;
+
+	  if (! defined $ProjRec{$projid})
+		{ return undef if ! $makeit;
+
+		  # print STDERR "making ProjRec{$projid}\n";
+		  $ProjRec{$projid}={ ACCTCODE => $projid,
+				      TASKS  => [],	# tasks
+				      USERS  => {},	# sheet by login
+				      SUBPROJS => {},	# projrec by id
+				      FLAGS  => 0,
+				    };
+		}
+
+	  $ProjRec{$projid};
+	}
