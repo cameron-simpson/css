@@ -1,4 +1,9 @@
 #!/usr/bin/perl
+#
+# Replacement for the usual soelim program.
+# Handles relative .sos properly, compressed files etc.
+#	- Cameron Simpson <cs@zip.com.au>
+#
 
 use strict qw(vars);
 
@@ -40,8 +45,14 @@ sub soelim($$$$)
     }
     else
     { SOFILE:
-      for my $sop (@::SoPath)
-      { my $path="$sop/$file";
+      for my $sop (@::SOPATH)
+      {
+	my $dir = $sop;
+	$dir="$wrt/$dir" unless $dir =~ m:^/:;
+
+	my $path="$dir/$file";
+	warn "try $path\n";
+
 	if (defined ($s=new cs::Source (PATH,$path,1)))
 	{ $file=$path;
 	  last SOFILE;
