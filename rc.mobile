@@ -203,7 +203,7 @@ esac
 
 [ -s "$cf" ] || { echo "$cmd: missing config file $cf" >&2; exit 1; }
 
-locations=`sed -n -e '/^#/d' -e 's/^\\[@\\([a-z].*\\)\\]$/\\1/p' "$cf"`
+locations=`sed -n 's/^\\[@\\([a-z].*\\)\\]$/\\1/p' "$cf" | sort | tr '\012' ' '`
 
 # =head1 OPERATION
 #
@@ -237,10 +237,20 @@ setenv()
 if [ $int ]
 then
     echo "$cmd - bring up interface according to location"
-    echo "I know ["$locations"]"
-    echo -n "Where am I [$where]? "
-    read iwhere || { echo; exit 1; }
-    [ -n "$iwhere" ] && where=$iwhere
+    while echo "I know [$locations]"
+          echo -n "Where am I [$where]? "
+          read iwhere || { echo; exit 1; }
+    do
+      [ -z "$iwhere" ] && iwhere=$where
+      case " $locations " in
+	*" $iwhere "*)
+	  where=$iwhere
+	  break
+	  ;;
+	*)echo "$cmd: unknown location \"$iwhere\""
+	  ;;
+      esac
+    done
 fi
 
 # make available to subprocesses and user environment
