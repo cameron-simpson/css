@@ -1,4 +1,4 @@
 #!/bin/sh
 PATH=$HOME/scripts:$PATH
 export PATH
-exec qcmd -1 envssh l:o:nftv ${1+"$@"}
+exec qcmd -1 envssh l:o:nxXftv ${1+"$@"}
