@@ -1,0 +1,94 @@
+#!/bin/sh
+
+cmd=`basename "$0"`
+usage="Usage: $cmd [-v] [-i suf] [--] filter files...
+	-v		Verbose.
+	-i suf		Copy original to original.suf if changed.
+	-i suf/		Copy original to suf/original if changed."
+
+badopts=
+verbose=
+ibak=
+while :
+do
+    case $1 in
+	--)	shift ; break ;;
+	-v)	verbose=1 ;;
+	-i)	ibak=$2; shift ;;
+	-i?*)	ibak=`expr "x$1" : 'x-i\(.*\)'` ;;
+	-*)	echo "$cmd: $1: unknown option" >&2
+		badopts=1
+		;;
+	*)	break ;;
+    esac
+    shift
+done
+
+if [ $# -gt 0 ]
+then
+    filter=$1; shift
+else
+    echo "$cmd: missing filter" >&2
+    badopts=1
+fi
+
+[ $# -gt 0 ] || { echo "$cmd: missing filenames" >&2; badopts=1; }
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+tmp=/tmp/$cmd.$$
+trap 'rm -f "$tmp"; exit 1' 1 3 15
+
+xit=0
+while [ $# -gt 0 ]
+do
+    file=$1; shift
+    if [ "x$file" = x- ]
+    then
+	[ $verbose ] && echo "reading filenames from stdin..."
+	set x `cat` ${1+"$@"}; shift
+    else
+	[ $verbose ] && echo "$file ..."
+	ok=
+	if eval "$filter <\"\$file\" >\$tmp"
+	then
+	    if cmp -s "$file" "$tmp"
+	    then
+		ok=1		# no change
+	    else
+		[ $verbose ] && diff -c "$file" "$tmp"
+		if [ -z "$ibak" ] || { case "$ibak" in
+					*/)	filebak=$ibak/$file ;;
+					*)	filebak=$file.$ibak ;;
+				       esac
+				       cat < "$file" > "$filebak"
+				     }
+		then
+		    if cat "$tmp" > "$file"
+		    then
+			ok=1	# backup & update ok
+		    else
+			echo "$cmd: $file: can't update" >&2
+			if [ -n "$ibak" ]
+			then
+			    if cat "$filebak" > "$file"
+			    then
+				echo "$cmd: $file: original restored" >&2
+				rm "$filebak"
+			    else
+				echo "$cmd: $file: restore failed; original left in $filebak" >&2
+			    fi
+			else
+			    echo "$cmd: $file: no backup, may be corrupt" >&2
+			fi
+		    fi
+		else
+		    echo "$cmd: $file: can't backup to $filebak; original unchanged" >&2
+		fi
+	    fi
+	else
+	    echo "$cmd: $file: edit fails; original unchanged" >&2
+	fi
+	[ $ok ] || xit=1
+    fi
+done
