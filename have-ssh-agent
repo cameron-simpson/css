@@ -4,4 +4,4 @@
 #	- Cameron Simpson <cs@zip.com.au> 03jul2004
 #
 
-[ -n "$SSH_AUTH_SOCK" ] && ls -ld "$SSH_AUTH_SOCK" >/dev/null
+[ -n "$SSH_AUTH_SOCK" ] && exec ls -ld "$SSH_AUTH_SOCK" >/dev/null 2>&1
