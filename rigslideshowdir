@@ -9,9 +9,15 @@ cmd=`basename "$0"`
 usage="Usage: $cmd [pickim-options...] keywords...
   Suggestion: $cmd -w -o keywords..."
 
-[ $# = 0 ] && { echo "$usage" >&2; exit 2; }
+if [ $# = 0 ]
+then
+    if [ -s .slideshow ]
+    then  set x `cat .slideshow`; shift
+    fi
+    [ $# = 0 ] && { echo "$usage" >&2; exit 2; }
+fi
 
-pickim "$@" \
+set-x pickim -o "$@" \
 | while read path
   do  lpath=`echo "$path" | tr -s / _ | sed 's/^_//'`
       echo "$lpath $path"
