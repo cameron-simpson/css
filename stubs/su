@@ -19,7 +19,7 @@ usage="Usage: $cmd [-] [-a authtype] [loginname] [-c shcmd]"
 
 sush=/bin/sh
 case $ARCH in
-    *.*.solaris)	sush=$HOME/bin/$ARCH/ae ;; # bug workaround
+    *.*.solaris)	sush=/usr/bin/ksh ;; # bug workaround
 esac
 
 badopts=
