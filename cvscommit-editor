@@ -21,6 +21,7 @@ cvs -q diff $CVS_COMMIT_FILES 2>&1 </dev/null | sed 's/^/CVS: /' >>"$report"
 $EDITOR "$report"
 xit=$?
 
-bsed '/^[ 	]*$/d' "$report"
+# toss blank lines
+bsed -s '/^[ 	]*$/d' "$report"
 
 exit $xit
