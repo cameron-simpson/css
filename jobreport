@@ -42,6 +42,7 @@ jobtimer -a \
       ' \
 | while read cat total etc
   do
+    [ "$total" -gt 0 ] || continue
     htotal=`humantime "$total"`
     if [ "x$cat" = x. ]
     then
