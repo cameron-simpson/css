@@ -299,7 +299,7 @@ esac
 runpath()
 {
   _rp=$1; shift
-  echo "runpath $_rp..." >&2
+  ##echo "runpath $_rp..." >&2
   _rp_addrs=$*
   _rp_dir=`dirname "$_rp"` || return 1
   _rp_env=$_rp_dir/env
@@ -308,11 +308,13 @@ runpath()
   if [ -d "$_rp/." ]
   then
     for _rp_f in "$_rp/"*
-    do  echo "dirscript $_rp_f ..." >&2; runscript "$_rp_f" $_rp_addrs || _rp_xit=1
+    do  ##echo "dirscript $_rp_f ..." >&2
+	runscript "$_rp_f" $_rp_addrs || _rp_xit=1
     done
   else
     if [ -r "$_rp" ]
-    then  echo "script $_rp ..." >&2; runscript "$_rp" $_rp_addrs || _rp_xit=1
+    then  ##echo "script $_rp ..." >&2
+	  runscript "$_rp" $_rp_addrs || _rp_xit=1
     fi
   fi
   return $_rp_xit
@@ -376,7 +378,7 @@ runscript()
 
 for script in $try
 do
-    echo "$script ..." >&2
+    ##echo "$script ..." >&2
     # run the script if present
     runpath "$script" || xit=1
 
