@@ -17,4 +17,4 @@ joblist name category state title \
 			if (length($3) > 0 && $3 != ".") catlabel="\t"$3
 			print "\"" $2 ": " $5 catlabel "\"", action, $2
 		      }' \
-| sort
+| sort -r
