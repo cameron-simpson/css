@@ -16,38 +16,38 @@ use cs::Persist;
 package cs::Image::DB;
 
 sub new($$;$$)
-	{ my($class,$dir,$rw,$dbpath)=@_;
-	  $rw=0 if ! defined $rw;
-	  $dbpath="$dir/.imdb" if ! defined $dbpath;
+{ my($class,$dir,$rw,$dbpath)=@_;
+  $rw=0 if ! defined $rw;
+  $dbpath="$dir/.imdb" if ! defined $dbpath;
 
-	  my $this = { DBPATH	=> $dbpath,
-		       DIR	=> $dir,
-		       DB	=> cs::Persist::db($dbpath,$rw),
-		     };
+  my $this = { DBPATH	=> $dbpath,
+	       DIR	=> $dir,
+	       DB	=> cs::Persist::db($dbpath,$rw),
+	     };
 
-	  bless $this, $class;
-	}
+  bless $this, $class;
+}
 
 # compute hash for file
 sub _hashFile
-	{ my($file)=@_;
+{ my($file)=@_;
 
-	  return undef if ! open(F,"< $file\0");
-	  my @s = stat(F);
-	  
-	  my $md5 = new MD5;
-	  $md5->reset();
-	  $md5->addfile(F);
-	  close(F);
+  return undef if ! open(F,"< $file\0");
+  my @s = stat(F);
+  
+  my $md5 = new MD5;
+  $md5->reset();
+  $md5->addfile(F);
+  close(F);
 
-  	  $md5->hexdigest()."-".$s[7];
-	}
+  $md5->hexdigest()."-".$s[7];
+}
 
 # add record for file given relative path
 sub AddPath
-	{ my($this,$path)=@_;
-	  $this->AddFile($this->Path2File($path));
-	}
+{ my($this,$path)=@_;
+  $this->AddFile($this->Path2File($path));
+}
 
 # actual pathname for file
 sub Path2File
