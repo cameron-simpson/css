@@ -80,7 +80,7 @@ done \
       hit=
       hits=
       multihits=
-      for rpm in "$rhdir/$arch/$pkg"-*-*.$arch.rpm
+      for rpm in "$rhdir/"*"/$pkg"-*-*.$arch.rpm
       do
 	if [ -s "$rpm" ]
 	then
