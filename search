@@ -10,16 +10,6 @@ usage="Usage: $cmd [-t target] search terms ..."
 target=
 [ "x$1" = x-t ] && { target=$2; shift; shift; }
 
-case $SYSTEMID in
-    cisra)	serv=web
-		user=cameron
-		cgibin="~$user/cgi-bin/" ;;
-    *)		serv=cgi.zipworld.com.au
-    		user=cs
-    		cgibin="$user/" ;;
-esac
-cgibase="http://$serv/$cgibin"
-cgi="${cgibase}search.cgi"
 
 query=$*
 [ -n "$query" ] || query=`cutbuffer`
@@ -64,7 +54,6 @@ then
 	yp)	target=yellowpages ;;
 	www)	target='altavista yahoo dmoz google' ;;
 	movie)	exec us "http://www.cinema.pgh.pa.us/movie/reviews?$query" ;;
-	pagescour) exec us "${cgibase}htclean.cgi/$query" ;;
 	ebay)	case "$query" in
 		    *\ *)	;;
 		    [0-9]?????????) target=ebayitem ;;
