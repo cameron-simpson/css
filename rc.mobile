@@ -29,13 +29,12 @@ if [ -f /etc/sysconfig/pcmcia ]; then
 	. /etc/sysconfig/pcmcia
 fi
 
+cmd=$0
 
 # Check that networking is up.
-[ ${NETWORKING} = "no" ] && exit 0
+##[ ${NETWORKING} = "no" ] || { echo "$cmd: networking not up" >&2; exit 1; }
 
-[ -x /sbin/ifconfig ] || exit 0
-
-cmd=$0
+[ -x /sbin/ifconfig ] || { echo "$cmd: no /sbin/ifconfig" >&2; exit 1; }
 
 # See how we were called.
 case "$1" in
@@ -74,10 +73,10 @@ esac
 	  -N)	donfs=1 ;;
 	  --)	shift; break ;;
 	  -?*)	echo "$cmd: unrecognised option: $1" >&2
-		  badopts=1
-		  ;;
+		badopts=1
+		;;
 	  *)	break
-		  ;;
+		;;
       esac
       shift
   done
@@ -105,29 +104,32 @@ esac
       [ -n "$iwhere" ] && where=$iwhere
   fi
 
+  set -vx
+
   [ "x$where" = xnone ] && exit 0
 
-  config=`sed -e '/^#/d' -e "/^\\[$where\\]\\$/,/^\\[/!d" -e '/^\\[/d' "$cf"`
+  config=`sed -e '/^#/d' -e "/^\\[$where\\]\\$/,/^\\[/!d" -e '/^[a-zA-Z][a-zA-Z_0-9]*=/!d' -e 's/^/cf_/' "$cf"`
   [ -n "$config" ] || { echo "$cmd: $cf: no config for [$where]" >&2; exit 1; }
 
-  DEVICE=eth0
-  BOOTPROTO=static
-  IPADDR=
-  NETMASK=
-  GATEWAY=
-  DNS=
-  DOMAINS=
+  cfvars=
+  for var in DEVICE BOOTPROTO IPADDR NETMASK GATEWAY DNS DOMAINS EXPORTS
+  do  cfvars="$cfvars $var"
+      eval "cf_$var="
+  done
+  cf_DEVICE=eth0
+  cf_BOOTPROTO=static
 
   eval "$config"
 
-  cfgname=$DEVICE.$where
+  cfgname=$cf_DEVICE.$where
   cfg=/etc/sysconfig/network-scripts/ifcfg-$cfgname
 
+  # write config file
   exec 3>&1 1>"$cfg"
 
   echo ONBOOT=no >&3
 
-  for var in DEVICE BOOTPROTO IPADDR NETMASK
+  for var in $cfvars
   do  eval "val=\$$var"
       [ -n "$val" ] && echo "$var=$val"
   done
@@ -138,18 +140,24 @@ esac
 
   chmod a+r "$cfg"
 
+  exit 0
+
   case "$action" in
      up)
       ifup "$cfgname" || exit 1
-      [ -n "$GATEWAY" ] && route add default gw "$GATEWAY"
+      [ -n "$cf_GATEWAY" ] && route add default gw "$cf_GATEWAY"
 
-      [ -n "$DNS" ] && { echo "nameserver $DNS"
-			 echo "search $DOMAINS"
+      [ -n "$cf_DNS" ] && { echo "nameserver $cf_DNS"
+			 echo "search $cf_DOMAINS"
 		       } >/etc/resolv.conf
+      if [ -s "/etc/exports.$where" ]
+      then  cat "/etc/exports.$where"
+      fi >/etc/exports
+      exportfs -a
       ;;
 
     down)
-      [ -n "$GATEWAY" ] && route del default
+      [ -n "$cf_GATEWAY" ] && route del default
       ifdown "$cfgname" || exit 1
       ;;
 
