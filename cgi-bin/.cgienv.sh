@@ -6,17 +6,17 @@
 #
 
 # figure out where we are
-case $0 in
-    /*)	cmdpath=$0 ;;
-    *)	cmdpath=`pwd`/$0 ;;
-esac
+wd=`pwd`
+wdscripts=`dirname "$wd"`	## probably in ~/scripts/cgi-bin
 
-case "$cmdpath" in
+case "$wd" in
     /u/cameron/*)
 	ARCH=sun.sparc.solaris
 	SYSTEMID=home
 	HOME=/u/cameron
 	WEBPROXY=proxy:8080
+	;;
+    /home/cameron/*)
 	;;
     /home/zapff/cameron/* | /a/zapff/home/cameron/* )
 	ARCH=redhat.x86.linux
@@ -32,10 +32,10 @@ case "$cmdpath" in
 	WEBPROXY=proxy:8080
 	PERL5LIB=/opt/perl/lib
 	;;
-    /home[13]/cs/*)
+    /home[13]/cs/* | /home/cs/*)
 	ARCH=redhat.x86.linux
 	SYSTEMID=zip
-	HOME=/home1/cs
+	HOME=/home/cs
 	WEBPROXY=proxy:8080
 	;;
     *)	echo content-type: text/plain
@@ -56,13 +56,12 @@ case "$cmdpath" in
 	;;
 esac
 
-cmd=`basename "$0"`
 CS_WRAPPER=$ARCH@$SYSTEMID
 SCRIPT_URL=${SCRIPT_URL:-$SCRIPT_NAME}
 SCRIPT_URI=${SCRIPT_URI:-"http://$HTTP_HOST$SCRIPT_URL"}
 http_proxy=$WEBPROXY
 ftp_proxy=$WEBPROXY
-PATH=$HOME/scripts/stubs:$HOME/scripts:$HOME/bin/$ARCH:$PATH:/opt/script:/opt/bin:/usr/local/bin
+PATH=$wdscripts/stubs:$wdscripts:$HOME/scripts/stubs:$HOME/scripts:$HOME/bin/$ARCH:$PATH:/opt/script:/opt/bin:/usr/local/bin
 PERL5LIB=$HOME/rc/perl:${PERL5LIB:-'/opt/perl/lib:/usr/lib/perl5'}
-export ARCH SYSTEMID HOME WEBPROXY http_proxy ftp_proxy PATH PERL5LIB
+export HOME ARCH SYSTEMID HOME WEBPROXY http_proxy ftp_proxy PATH PERL5LIB
 export SCRIPT_URL SCRIPT_URI CS_WRAPPER
