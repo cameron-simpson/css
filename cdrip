@@ -44,9 +44,11 @@ lamequal=
 keep=
 jobs=1
 nice=10
+cdpara_noise=-q
 
 cmd=`basename "$0"`
 usage="Usage: $cmd [-q qual] [-b bps] [-d device] [-e enclist] [-l lock] [-j jobs] [-K]
+	-v		Verbose.
 	-q qual		Variable bitrate quality rating.
 			Default: $qual
 	-b kbps		Fixed bitrate kilobits per second for the encoding.
@@ -71,6 +73,13 @@ badopts=
 while :
 do
     case $1 in
+	# =item B<-v>
+	#
+	# Verbose.
+	# Make rippers more noisy.
+	#
+	-v)	cdpara_noise=-e ;;
+	#
 	# =item B<-b> I<kbps>
 	#
 	# Fixed bitrate kilobits per second for the encoding.
@@ -217,7 +226,7 @@ sed -e 's;//*; -- ;g' -e 's/   */ /g' \
       ripcomment="Ripped by $NAME with cdparanoia on `date`"
 
       [ -s "$raw" ] \
-      || (set -x; cdparanoia -q -d "$dev" -e -w "$track" "$raw" 2>cdp.err) \
+      || (set -x; cdparanoia $cdpara_noise -d "$dev" -e -w "$track" "$raw") \
       || { echo "cdparanoia failed" >&2
 	   tail -20 cdp.err >&2
 	   [ $keep ] || rm -f "$raw"
