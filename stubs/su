@@ -14,6 +14,9 @@ else if [ -f /usr/bin/su ]
      fi
 fi
 
+cmd=$0
+usage="Usage: $cmd [-] [-a authtype] [loginname] [-c shcmd]"
+
 sush=/bin/sh
 case $ARCH in
     *.*.solaris)	sush=$BIN/ae ;; # bug workaround
@@ -41,40 +44,31 @@ case $1 in
    *)		su=$1; shift ;;
 esac
 
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
 [ -n "$login" -o $# -gt 0 ] \
 	&& exec "$realsu" $suargs $login "$su" "$@"
-
-env=/tmp/env.$$.$SYSTEMID.$ARCH
-no-ssh-agent stashenv - >"$env"
-
-[ -n "$DISPLAY" ] && { xauth=`xauth nextract - "$DISPLAY"`
-		       # echo "xauth=$xauth"
-		     }
 
 # If some dickheads didn't use csh for root this would be much simpler.
 tmp=/tmp/su.$$
 
-tee $HOME/su.out >$tmp <<SU
-SHELL=$SHELL PS1= PS2= HOME=$HOME PATH=$PATH
+tee $HOME/var/log/su.out >$tmp <<SU
+SHELL=$SHELL
+PS1= PS2=
+HOME=$HOME PATH=$PATH
 export SHELL PS1 PS2 HOME PATH
-test -r $env && . $env
+##test -r $env && . $env
 USER=$su
 EMAIL=$EMAIL
 DISPLAY=$DISPLAY
 PERL5LIB=$HOME/rc/perl:$PERL5LIB:/opt/perl/lib
 export USER EMAIL DISPLAY PERL5LIB
-[ -n "\$DISPLAY" ] && { XAUTHORITY=/tmp/xa.\$\$
-			export XAUTHORITY
-			( umask 077
-			  >"\$XAUTHORITY"
-			  echo "$xauth" | xauth nmerge -
-			)
-		      }
+[ -n "\$DISPLAY" ] || unset DISPLAY
 rm -f $tmp $env
-exec pushttylabel "$su@$HOST" term -n $su@$HOST
+exec pushttylabel '$su@$HOST' term -n '$su@$HOST'
 SU
 
 chmod 755 $tmp
 echo exec $sush $tmp
-set-x arg0 su "$realsu" $suargs "$su" -c "exec $sush $tmp"
+(unset DISPLAY; exec "$realsu" $suargs "$su" -c "exec $sush $tmp")
 rm -f $tmp
