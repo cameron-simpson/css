@@ -1,0 +1,26 @@
+#!/usr/bin/perl
+#
+# Read HTML and rewrite it nicely indented.
+# Based on htparse, the debugging script.
+#	- Cameron Simpson, cs@zip.com.au, 15jun94
+#
+
+use strict qw(vars);
+
+use cs::Source;
+use cs::Sink;
+use cs::HTML;
+use cs::Hier;
+
+$cs::HTML::NoIndent{TABLE}=0;
+
+my($parse)=new cs::HTML (new cs::Source (FILE,STDIN));
+my($out)=new cs::Sink (FILE,STDOUT);
+
+my($t);
+
+while (defined ($t=$parse->Tok()))
+	{ cs::HTML::tok2s(1,$out,$t);
+	}
+
+exit 0;
