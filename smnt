@@ -4,7 +4,7 @@
 #	- Cameron Simpson <cs@zip.com.au> 10jan2003
 #
 
-mnt=/win
+mnt=
 user=`who am i | sed -e 's/[ 	].*//' -e 's/.*!//'`
 [ -n "$user" ] || user=${LOGNAME:-$USER}
 : ${WORKGROUP:=$SYSTEMID}
@@ -43,7 +43,7 @@ then
 else
   share=$1; shift
   case "$share" in
-    //*/*) ;;
+    //*/*) [ -n "$mnt" ] || mnt=/mnt-`echo "$share" | tr -s / -` ;;
     *)	   echo "$cmd: bad PC share \"$share\", should look like //pc/share" >&2
 	   badopts=1
 	   ;;
