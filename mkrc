@@ -1,0 +1,50 @@
+#!/bin/sh
+#
+# Regenerate an rc file.
+#	- Cameron Simpson <cs@zip.com.au> 23aug98
+#
+
+cmd=`basename "$0"`
+usage="Usage: $cmd spec"
+
+spec=
+dppopts=
+trace=:
+
+badopts=
+
+while :
+do
+  case $1 in
+      -D?*)	dppopts="$dppopts '$1'" ;;
+      -D)	dppopts="$dppopts '-D$2'" ; shift ;;
+      -x)	trace='set -x' ;;
+      --)	shift; break ;;
+      -?*)	echo "$cmd: unrecognised option: $1" >&2; badopts=1 ;;
+      *)	break ;;
+  esac
+  shift
+done
+
+if [ $# = 0 ]
+then	echo "$cmd: missing spec" >&2
+	badopts=1
+else	spec=$1
+	shift
+fi
+
+[ $# = 0 ] || { echo "$cmd: extra arguments: $*"; badopts=1; }
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+if [ -d "$spec" ]
+then	spec=$spec/rc
+fi
+
+if [ ! -f "$spec" ]
+then
+    echo "$cmd: $spec: missing" >&2
+    exit 1
+fi
+
+eval "$trace; dpp $dppopts $spec"
