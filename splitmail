@@ -16,7 +16,7 @@ use Fcntl;
 use cs::Misc;
 use cs::Upd;
 
-$::Usage="Usage: $::cmd [+mbox] < mailfile\n";
+$::Usage="Usage: $::cmd ['|pipeto'] <mailfile\n";
 
 $::SleepTime=0;
 
