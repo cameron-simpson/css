@@ -56,7 +56,7 @@ for arg
 do  echo "$arg"
 done >"$tmpf"
 exec fvwmcmd \
-  "SetEnv FVWM_MENU_IMLIST_OP \"$bgop $opts\"" \
+  "SetEnv FVWM_MENU_IMLIST_OP \"acon set-x $bgop $opts\"" \
   "Piperead 'fvwm-menu -1 ImDirMenu \"$cmd $call\" fvwm-menu-imlist -l $tmpf .; rm $tmpf'" \
   "Popup ImDirMenu" \
   "UnSetEnv FVWM_MENU_IMLIST_OP"
