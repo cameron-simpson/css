@@ -6,7 +6,6 @@
 
 use strict qw(vars);
 
-use FreeDB;
 use cs::CDDB;
 use cs::Hier;
 
@@ -21,38 +20,23 @@ if (@ARGV)
 
 die $::Usage if @ARGV;
 
-my $fdb = new FreeDB;
-die "$::cmd: can't make new FreeDB object\n" if ! defined $fdb;
+my $CD = new cs::CDDB;
+die "$::cmd: can't make new cs::CDDB object\n" if ! defined $CD;
 
-## $fdb->{_debug}=99;
-
-$fdb->cdrom_device($dev);
-# $fdb->proxy_value("http://proxy:8080/");
-
-die "$::cmd: trouble fetching from FreeDB\n" if ! $fdb->fetch();
-
-my($artist,$title)=($fdb->artist(), $fdb->title());
-
-## print cs::Hier::h2a($fdb,1),"\n";
-## exit 0;
+my($artist,$title)=($CD->Artist(), $CD->Title());
 
 print "$artist\n$title\n";
+# print cs::Hier::h2a($CD,1),"\n";
+# exit 0;
 
 # track info
-my($tno,$tsecs,$toffset,$tinfo,$txinfo,$tdinfo);
-my($qtinfo,$qtxinfo);
-while ($fdb->next_track())
-{  
-  ($tno,$tsecs,$toffset,$tinfo,$txinfo,$tdinfo)
-  =( $fdb->current_track_number(),
-     $fdb->current_track_time_in_seconds(),
-     $fdb->current_track_offset(),
-     $fdb->current_track_info(),
-     $fdb->current_track_extended_info(),
-     $fdb->current_track_detailed_info()
-   );
+my @T = $CD->TrackInfo();
+my $T;
 
-  print "$tno $tsecs $toffset\n$tinfo\n$txinfo\n";
+for my $i (0..$CD->NTracks()-1)
+{ $T=$T[$i];
 
-  ## print cs::Hier::h2a(\@a,1),"\n";
+   print $i+1, " ", $T->{LENGTH}, " ", $T->{OFFSET}, "\n";
+   print $T->{TTITLE}, "\n";
+   print $T->{EXTT}, "\n";
 }
