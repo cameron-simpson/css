@@ -21,7 +21,7 @@ pmFromMan(manf) = $(manf FP s:|::|/|).pm
 pmFromHtml(html) = $(html FPP s:|::|/|).pm
 
 subdirs = $('*/.' GD)
-allscripts = $('*' G !/\./ - subdirs - "0README.txt" - "INSTALL" + "synonyms")
+allscripts = $('*' G !/\./ - subdirs - "0README.txt" - "INSTALL" + "synonyms" + "rc.mobile")
 
 scriptmandir = $(MANDIR)/cs/man1
 scriptmans = $(scriptmandir)/$((allscripts)).1
