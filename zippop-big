@@ -1,3 +1,10 @@
 #!/bin/sh
 ##exec nphssh "dsa-bigpop-${SYSTEMID}2zip" zip
-exec ssh zip nc bigmail.zip.com.au 110
+set nc bigmail.zip.com.au 110
+##case $SYSTEMID in
+##    home)	;;
+##    cisra)	set ssh upnp exec "$@" ;;
+##esac
+set ssh zip exec "$@"
+set -x
+exec "$@"
