@@ -71,8 +71,14 @@ case "$saveas" in
     \~*)	saveas=`untilde "$saveas"` ;;
     *)		saveas=$savedir/$saveas ;;
 esac
+case $svaeas in
+    */)		saveas=$saveas$fbase ;;
+    *)		[ -d "$saveas/." ] && saveas=$saveas/$fbase ;;
+esac
 if [ -n "$saveas" ]
 then
-    [ -d "$saveas/." ] && saveas=$saveas/$fbase
-    cp -i "$file" "$saveas"
+    parent=`dirname "$saveas"`
+    if [ -d "$parent/." ] || { ask "mkdir $parent" && mkdir -p "$parent"; }
+    then  cp -i "$file" "$saveas"
+    fi
 fi
