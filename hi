@@ -19,7 +19,7 @@ noop=
 
 if [ $# = 0 ]
 then
-    set space science eco weather comics "$SYSTEMID"
+    set space science eco weather comics lists "$SYSTEMID"
     ## [ -n "$mode" ] || mode=html
     ## set rterm `cd "$hi" || exit 1
     ##     ls -d [a-z]*|sed -e '/^cvs$/d' -e '/^Mykefile$/d' -e 's/\.weekly$//'|sort -u`
