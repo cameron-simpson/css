@@ -24,6 +24,8 @@ usage="Usage: $cmd [-% pcnt] [-1rfnx] [-k keep] dir
 	-% pcnt	Desires free disc percentage. Default: $pcnt
 	-k keep	Keep at least this many backups. Default: $keepn"
 
+badopts=
+
 while :
 do
   case $1 in
