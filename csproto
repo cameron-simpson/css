@@ -1,0 +1,61 @@
+#!/usr/bin/perl
+#
+# Convert KnR C code of the form
+#	type
+#	fn(a,b)
+#	t1	a;
+#	t2	b;
+#	{
+# into
+#	type
+#	fn(	t1	a,
+#		t2	b)
+#	{
+#
+# Cameron Simpson, 10sep93
+#
+
+INPUT:
+  while (<>)
+	{ $protoline=1;
+
+	  FN:
+	    while (/^(\w+)\(.*\)$/../^{/)
+	      { # print STDERR '# ', $_;
+		if ($protoline == 1)
+			{ $fn=$1;
+			}
+
+		chop;
+		s/\s+$//;
+		if ($protoline == 1)
+		      { print $fn, '(';
+		      }
+		elsif (/^{/)
+		      { if ($protoline == 2)
+			      { print 'void';
+			      }
+
+			print ")\n", $_, "\n";
+		      }
+		else
+		{ s/;//;
+		  if ($protoline == 2)
+			{ if (length($fn) < 15)
+				{ print ' ' x (15-length($fn));
+				}
+			}
+		  else
+		  { print ",\n                ";
+		  }
+
+		  print;
+		}
+
+		$protoline++;
+
+		last unless defined($_=<>);
+	      }
+
+	  print;
+	}
