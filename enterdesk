@@ -4,8 +4,10 @@
 #	- Cameron Simpson <cs@zip.com.au> 24mar2003
 #
 
+: ${LOGDIR:=$HOME/var/log}
+
 exec </dev/null
-exec >>$HOME/var/log/console
+exec >>$LOGDIR/console
 exec 2>&1
 
 thisdesk=$1
