@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/sh -u
 #
 # Offer a list of files.
 # The common code from the bglist command, extracted to do generic selection
