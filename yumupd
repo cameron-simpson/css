@@ -1,0 +1,3 @@
+#!/bin/sh
+set -x
+exec yum update --exclude=gkrellm\* --exclude=kernel\* --exclude=initscripts --exclude=ppp --exclude=pppd
