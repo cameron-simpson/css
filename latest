@@ -1,0 +1,109 @@
+#!/usr/bin/perl
+#
+# Given a listing of files, emit only the latest versions.
+# Aimed primarily at things like the GNU source archive, which has many
+# versions of things but of which we want to mirror only the latest.
+#	- Cameron Simpson <cs@zip.com.au> 17apr2001
+#
+# Add -o to pass other, unversioned, files through.
+#	- cameron 07jun2001
+#
+
+use strict qw(vars);
+use Getopt::Std;
+
+$::Others=0;
+$::DiffMajor=0;
+
+($::cmd=$0) =~ s:.*/::;
+$::Usage="Usage: $::cmd [-V] [-o] <listing
+	-V	Consider the major number in the version to be significant.
+	-o	Include other files (not looking versioned) in the output.
+";
+
+{ my $badopts=0;
+
+  getopts('Vo') || ($badopts=1);
+  $::DiffMajor=1 if defined $::opt_V;
+  $::Others=1 if defined $::opt_o;
+
+  if (@ARGV)
+  { warn "$::cmd: extra arguments: @ARGV\n";
+    $badopts=1;
+  }
+
+  die $::Usage if $badopts;
+}
+
+my %paths;
+
+my($key,$vers,$vmaj,$path);
+
+LINE:
+while (<STDIN>)
+{
+  chomp;
+
+  #       dir/  name    -vers               .blah
+  #      12     3        45    6             7
+  if (m:^((.*/)?([^/]+))-((\d+)(\.\d\w*)*)(\.[^/]*)?$:)
+  { 
+    ($key,$vers,$vmaj,$path)=($1,$4,$5,$_);
+
+    if ($::DiffMajor)
+    { $key.="-$vmaj";
+    }
+
+    if (! exists $paths{$key}
+     || cmpvers($paths{$key}->{VERSION}, $vers) < 0)
+    { $paths{$key}={ PATH => $path, VERSION => $vers };
+    }
+  }
+  elsif ($::Others)
+  { print "$_\n";
+  }
+  else
+  { ## warn "$::cmd: stdin, line $.: ignoring: $_\n";
+    next LINE;
+  }
+}
+
+for my $key (sort keys %paths)
+{ print "$paths{$key}->{PATH}\n";
+}
+
+exit 0;
+
+sub cmpvers($$)
+{ my($v1,$v2)=@_;
+
+  my($n1,$n2,$t1,$t2);
+
+  while (length $v1 || length $v2)
+  {
+    if ($v1 =~ /^\d+/
+     && $v2 =~ /^\d+/)
+    { $n2=$&; $v2=$';
+      $v1 =~ /^\d+/;
+      $n1=$&; $v1=$';
+
+      return $n1 <=> $n2 if $n1 != $n2;
+    }
+    elsif ($v1 =~ /^[^\.]+/
+        || $v2 =~ /^[^\.]+/
+	  )
+    { $v1 =~ /^[^\.]*/; $t1=$&; $v1=$';
+      $v2 =~ /^[^\.]*/; $t2=$&; $v2=$';
+
+      return $t1 cmp $t2 if $t1 ne $t2;
+    }
+    else
+    { $v1 =~ s/^\.//;
+      $v2 =~ s/^\.//;
+      $v1 =~ s/^[^\.\w]*//;
+      $v2 =~ s/^[^\.\w]*//;
+    }
+  }
+
+  return 0;
+}
