@@ -1,0 +1,164 @@
+#!/usr/bin/perl
+#
+# Mimic transparent multiple directory mounts through cunning use
+# of link and symlink.
+#	- Cameron Simpson, 04dec92
+#
+
+use cs::Upd;
+use cs::Glob;
+
+($cmd=$0) =~ s:.*/::;
+
+$listdir="$ENV{HOME}/etc/$cmd";
+$deflist="$listdir/bin";
+$deftarget=$ENV{BIN};
+
+$dirlist=$deflist;
+$dirtarget=$deftarget;
+
+$usage="Usage: $cmd [-vsn] [-f from] [-d dir]
+	-v	Verbose.
+	-s	Silent.
+	-f from	Take directory list from from. Default: $dirlist
+	-d dir	Links files to dir. Default: $deftarget
+	-n	Do nothing, just print eligible dirs.
+";
+
+$listdir="$ENV{HOME}/etc/$cmd";
+$deflist="$listdir/bin";
+$deftarget=$ENV{BIN};
+
+$dirlist=$deflist;
+$dirtarget=$deftarget;
+
+# our options must lead if supplied
+# other arguments get passed to which
+$verbose=0;
+$silent=0;
+$nolink=0;
+ARGV:
+  while (defined($_=shift))
+    { if ($_ eq '-v')	{ $verbose=1; $silent=0; }
+      elsif ($_ eq '-s'){ $verbose=0; $silent=1; }
+      elsif ($_ eq '-n'){ $nolink=1; }
+      elsif ($_ eq '-f'){ $_=shift;
+			  if (m:^/:)	{ $dirlist=$_; }
+			  elsif (length){ $dirlist="$listdir/$_"; }
+			  else		{ $dirlist=$deflist; }
+			}
+      elsif ($_ eq '-d'){ $dirtarget=shift; }
+      else		{ last ARGV; }
+    }
+
+@ilkext=();
+for ($ENV{ARCH},reverse split(/\.+/,$ENV{ARCH}))
+    { push(@ilkext,".$_","/$_","-$_");
+      tr/a-z/A-Z/;
+      push(@ilkext,".$_","/$_","-$_");
+    }
+    print STDERR "ilkext=[@ilkext]\n";
+
+# Construct $PATH. Leave out $HOME/stubs.
+@path=();
+open(DIRLIST,"< $dirlist\0") || die "$cmd: can't open $dirlist: $1\n";
+
+select(STDERR);
+
+DIRLIST:
+  while (<DIRLIST>)
+    { chop;
+      out($_);
+      s/^\s*#.*//;
+      @words=&unquote($_);
+
+      next DIRLIST if ! @words;
+
+      if (/^-/)	{ unshift(@ARGV,@words);
+		  next DIRLIST;
+		}
+
+      for $rawdir (grep(length,@words))
+	{ out($rawdir);
+	  if ($rawdir =~ m:/$:)
+		{ out("$rawdir*");
+		  @dirs=Glob::glob("${rawdir}*");
+		}
+	  elsif ($rawdir =~ m:\*:)
+		{ out("$rawdir");
+		  @dirs=&Glob::glob($rawdir);
+		}
+	  else
+	  { @dirs=$rawdir;
+	  }
+
+	  push(@dirs,$rawdir) if $#dirs < $[;
+
+	  for $subdir (@dirs)
+		{ for $ext (@ilkext,'')
+			{ $edir=$subdir.$ext;
+			  out($edir);
+			  (nl($edir), push(@path,$edir)) if -d "$edir/.";
+			}
+		}
+	}
+    }
+
+close(DIRLIST);
+
+out('');
+select(STDOUT);
+
+if ($nolink)
+	{ for (@path)
+		{ print $_, "\n";
+		}
+
+	  exit 0;
+	}
+
+push(@ARGV,'-v') if $verbose;
+unshift(@ARGV,'-d',$dirtarget,'-p',join(':',@path));
+do "$ENV{BIN}/which";
+exit 0;
+
+sub unquote
+	{ local($_)=@_;
+	  local(@words,$word,$tmp);
+
+	  while (length)
+	    { s/^\s+//;
+	      if (length)
+	        { if (/^~(\w+)/)
+		    { local(@pw);
+
+		      @pw=getpwnam($1); $_=$';
+
+		      if (defined($pw[$[+7]))
+			{ $word=$pw[$[+7]; }
+		      else
+			{ $word=$&; }
+		    }
+		  else
+		    { $word=''; }
+
+		  while (/^\S/)
+		    { if (/^'([^']*)'/)
+			{ $word.=$1; $_=$'; }
+		      elsif (/^\$(\w+)/)
+			{ $word.=$ENV{$1}; $_=$'; }
+		      elsif (/^(([^'\\\$\s]|\\['\\\$\s])+)/)
+			{ $tmp=$1; $_=$';
+			  $tmp =~ s/\\(.)/$1/g;
+			  $word.=$tmp;
+			}
+		      else
+			{ /^./; $word.=$1; $_=$'; }
+		    }
+
+		  push(@words,$word);
+		}
+	    }
+
+	  @words;
+	}
