@@ -309,15 +309,22 @@ sub iso2gmt($$)
 { local($_)=shift;
   my($givenlocaltime)=shift;
 
-  if (! /^(\d\d\d\d)-?(\d?\d+)-?(\d?\d)(\s+\d.*)?$/)
+  if (! /^(\d\d\d\d)-?(\d?\d+)-?(\d?\d)([-\s]+(\d.*)?)?$/)
   { my(@c)=caller;
-    warn "$::cmd: iso2gmt($_): bad date format\n\tfrom [@c]";
+    warn "$::cmd: iso2gmt($_): bad date format\n\tfrom [@c]\n\t";
     return undef;
   }
 
   my($year,$mon,$mday)=($1+0,$2+0,$3+0);
 
-  tm2gmt({ SS=>0, MM=>0, HH=>0,
+  $_=$5;
+
+  my($hh,$mm,$ss)=(0,0,0);
+  if (defined && /^0*(\d+):0*(\d+):0*(\d+)/)
+  { ($hh,$mm,$ss)=($1,$2,$3);
+  }
+
+  tm2gmt({ SS=>$ss, MM=>$mm, HH=>$hh,
 	   MDAY=>$mday, MON=>$mon,
 	   YEAR=>$year },
 	  $givenlocaltime);
