@@ -33,6 +33,7 @@ usage="Usage:
 	$cmd [options...] --inplace parent [rsyncopts...]
 	$cmd [options...] --no-rsync parent
 
+	-x		Trace execution. Recite linktree and rsync invocations.
 	-v, --verbose	Verbose. Passed to rsync.
 	--inplace	In addition to the dated subdirectories in the backupdir,
 			take the source to be backupdir/current.
@@ -49,6 +50,7 @@ usage="Usage:
 	--symlink name	Make a symlink named \"name\" pointing at the latest backup."
 
 badopts=
+trace=
 symlink=
 src=
 dest=
