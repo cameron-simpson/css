@@ -140,7 +140,7 @@ while (defined($_=<STDIN>))
       if ($mapmode)
       { my $txtval = "$mapcgi?$txt";
 	$txtval =~ s/[^ !-~]|"/sprintf("%%%02x",ord($&))/eg;
-        print "<AREA ALT=\"$txt\" COORDS=\"$x1,$y1,$x2,$y2\" HREF=\"$txtval\" SHAPE=\"RECTANGLE\"></AREA>\n";
+        print "<AREA ALT=\"$txt\" COORDS=\"$x1,$y1,$x2,$y2\" HREF=\"$txtval\" SHAPE=\"RECT\"></AREA>\n";
       }
       else
       {
