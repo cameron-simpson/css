@@ -1,0 +1,43 @@
+#!/bin/sh
+#
+# Wrapper for the vnc programs.
+#	- Cameron Simpson <cs@zip.com.au> 26jul99
+#
+
+depth=24
+geom=1600x1200	# 1024x768
+
+usage="Usage: $0 :n [-d] [options...]
+	$0 host:n [options...]
+	$0 n [options...]
+
+With :n, start a vncserver on the specified number.
+  -d	d is a number indicating depth, default $depth.
+With host:n, run a vncviewer of host:n.
+With just n, run a vncviewer of localhost:n."
+
+vncspec=
+
+case $1 in
+    :[0-9]*)
+	vncnum=$1; shift
+	case $1 in
+	    -[0-9])	depth=`expr "x$1" : 'x-\(.*\)'`; shift ;;
+	esac
+	echo "starting server on $HOST$vncnum, depth $depth ..."
+	logf=$HOME/.vnc/$HOSTNAME$vncnum.log
+	[ -f "$logf" ] && mv "$logf" "$logf-`daycode`.$$"
+	exec set-x vncserver "$vncnum" -depth "$depth" -geometry "$geom" ${1+"$@"}
+	;;
+    *:[0-9]*)
+	vncdisp=$1; shift
+	;;
+    [0-9]*)
+	vncdisp=localhost:$1; shift
+	;;
+    *)	echo "$usage" >&2
+	exit 2
+	;;
+esac
+
+set-x acon vncviewer -passwd $HOME/rc/vnc/passwd -shared ${1+"$@"} "$vncdisp"
