@@ -138,7 +138,7 @@ then
 fi
 
 cachedir=`dirname "$cachefile"`
-[ -d "$cachedir/." ] || mkdir -p "$cachedir" || exit 1
-set -x
+needdir "$cachedir" || exit 1
+##set -x
 gm "$@" -quality 100 png:- <"$imagefile" >"$cachefile" || { rm -f "$cachefile"; exit 1; }
 echo "$cachefile"
