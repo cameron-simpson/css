@@ -27,6 +27,7 @@ BEGIN { use cs::DEBUG; cs::DEBUG::using(__FILE__); }
 
 use cs::HASH;
 use cs::DBI;
+use cs::DBI::Table::Row;
 
 package cs::DBI::Table::Hash;
 
@@ -37,11 +38,16 @@ require Exporter;
 sub TIEHASH($$$$)
 { my($class,$dbh,$table,$keyfield)=@_;
 
+  my $this =
   bless { DBH => $dbh,
 	  TABLE => $table,
 	  LIVE => {},
 	  KEY => $keyfield,
 	}, $class;
+
+  warn "this=".cs::Hier::h2a($this,1);
+
+  $this;
 }
 
 sub KEYS($)
@@ -49,7 +55,9 @@ sub KEYS($)
 
   my $dbh = $this->{DBH};
 
-  my $sth = cs::DBI::sql($this->{DBH},"SELECT $this->{KEY} from $this->{TABLE}");
+  my $sql = "SELECT $this->{KEY} FROM $this->{TABLE}";
+  ## warn "SQL is [$sql]";
+  my $sth = cs::DBI::sql($this->{DBH},$sql);
   if (! defined $sth)
   { warn "$0: can't look up keys from $this->{TABLE}";
     return ();
@@ -70,16 +78,16 @@ sub KEYS($)
 sub FETCH($$)
 { my($this,$key)=@_;
 
-  my @rows = cs::DBI::find($this->{DBH},$this->{KEY},$key);
+  my @rows = cs::DBI::find($this->{DBH},$this->{TABLE},$this->{KEY},$key);
 
   return undef if ! @rows;
 
   warn "$0: FETCH($this->{TABLE},$key): multiple hits!"
   if @rows > 1;
 
-  my $row = $rows[0];
+  my $row = {};
 
-  tie %$row, cs::DBI::Table::Row, $row, $key, $this;
+  tie %$row, cs::DBI::Table::Row, $rows[0], $key, $this;
 
   $row;
 }
