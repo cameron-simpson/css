@@ -1,0 +1,8 @@
+#!/bin/sh
+#
+# Copy stdin to the named files and also append to $MAIL.
+#	- Cameron Simpson, 06may94
+#
+
+MAIL=${MAIL-$HOME/.incoming-mail}
+sed '2,$s/^From />&/' | tee -a ${1+"$@"} >>"$MAIL"
