@@ -12,7 +12,7 @@ xit=0
 
 for im
 do  file "$im"			|| xit=1
-    imsize "$im" | sed 's/ /x/'	|| xit=1
+    gm identify "$im"		|| xit=1
     jhead "$im"
 done
 
