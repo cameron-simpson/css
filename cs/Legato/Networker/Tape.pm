@@ -60,7 +60,7 @@ sub _loadTapeInfo(;$)
   local($_);
   my($T,$D);
 
-  if (! open(MMINFO, "mminfo -a -r 'volume(15),\%used(5),pool(15),ssid(11),client(64),attrs(31),level(9),location(15),volume'|"))
+  if (! open(MMINFO, "set -x; mminfo -a -r 'volume(15),\%used(5),pool(15),ssid(11),client(64),attrs(31),level(9),location(15),volume'|"))
   { warn "$::cmd: can't pipe from mminfo: $!";
     return 0;
   }
