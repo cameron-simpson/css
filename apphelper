@@ -17,6 +17,7 @@ savedir=`lastvalue savedir 2>/dev/null`
 savedir=${savedir:-"${SAVEDIR-$HOME/dl}"}
 pager=${PAGER:-less}
 doview=
+savemode=
 termname=$cmd
 
 # =head1 SYNOPSIS
@@ -33,6 +34,8 @@ usage="Usage: $cmd [{-t|+t|-T title}] file [{-n|-y}] [-d savedir] [-p pager] \\
 	The file may be \"-\" to read it from standard input.
 	-n		Don't run the viewer at all.
 	-y		Run viewer immediately.
+	-N		Don't offer to save the file.
+	-Y		Save the file without asking questions.
 	-d savedir	Save directory (from \$SAVEDIR: $savedir).
 	-p pager	Pager (default viewer, from \$PAGER: $pager)."
 
@@ -64,7 +67,7 @@ badopts=
 # or standard output
 # is not connected to a terminal.
 #
-# =term +t
+# =item +t
 #
 # Do not open a terminal window.
 # 
@@ -159,6 +162,18 @@ else
 	  # The default is to ask first.
 	  #
 	  -y)	doview=1 ;;
+	  # =item -N
+	  #
+	  # No: do not offer to save the file.
+	  # The default is to ask.
+	  #
+	  -N)	savemode=no ;;
+	  # =item -Y
+	  #
+	  # Yes: save the file without asking.
+	  # The default is to ask.
+	  #
+	  -Y)	savemode=yes ;;
 	  --)	shift; break ;;
 	  -?*)	echo "$cmd: unrecognised option: $1" >&2; badopts=1 ;;
 	  *)	break ;;
@@ -270,13 +285,19 @@ fi
 # with the B<-i> option,
 # leaving it up to cp(1) to ask questions.
 #
-necho "Save [$savedir/$fbase]? "
-read saveas || exit 0
-case "$saveas" in
-    ''|n|no)	saveas= ;;
-    y|yes)	saveas=$savedir/$fbase ;;
-    [/~]*)	;;
-    *)		saveas=$savedir/$saveas ;;
+case "$savemode" in
+    yes)	saveas=$savedir/$fbase ;;
+    no)		saveas= ;;
+    *)
+		necho "Save [$savedir/$fbase]? "
+		read saveas || exit 0
+		case "$saveas" in
+		    ''|n|no)	saveas= ;;
+		    y|yes)	saveas=$savedir/$fbase ;;
+		    [/~]*)	;;
+		    *)		saveas=$savedir/$saveas ;;
+		esac
+		;;
 esac
 [ -n "$saveas" ] || exit 0
 
