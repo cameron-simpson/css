@@ -1,0 +1,66 @@
+#!/bin/sh
+#
+# INCOMPLETE
+#
+# A sort of inverse of the foreach script.
+# Foreach takes lines from its input and run a command for each
+# with an arbitrary degree of parallelism.
+# This script makes an arbitrary number of instances of a command
+# and parcels its input out to them a line at a time.
+# NOTE: this uses lock(1) for the pipe read locking, which is pretty
+# expensive, so this script is only a win when the work per line of input
+# is potentially large. Also, because of the pipe between the reader and
+# the subcommand you need a fair amount of input before things block,
+# so the "block the expensive branch and let the others flow" isn't as
+# even as you might hope. But the "let the others flow" half should work fine.
+#	- Cameron Simpson <cs@zip.com.au> 20oct2000
+#
+
+max=4
+
+cmd=`basename "$0"`
+usage="Usage: [-1] [-i] [-n max] cmd [args...]
+	-n max	Max number of subcommands at once. Zero means no limit.
+		Default: $max"
+
+lock=$cmd$$
+
+badopts=
+while :
+do  case $1 in
+	-n)	max=$2; shift ;;
+	--)	shift; break ;;
+	-?*)	echo "$cmd: unrecognised option: $1" >&2; badopts=1 ;;
+	*)	break ;;
+    esac
+    shift
+done
+
+if [ $# = 0 ]
+then
+    echo "$cmd: missing cmd" >&2
+    badopts=1
+fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+pipe=/tmp/$cmd$$
+mknod "$pipe" || exit 1
+
+( exec 3<"$pipe"
+  while [ $max -gt 0 ]
+  do  while lock "$pipe" sh -c 'exec <&3; read line; echo "$line"'
+      do  :
+      done | "$@" &
+      max=`expr $max - 1`
+  done
+
+  exec 3<&-	# make sure early exit of children closes write end
+  wait
+) &
+
+cat >"$pipe"
+xit=$?
+
+wait
+exit $xit
