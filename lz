@@ -112,6 +112,7 @@ do
 		# (eg B</a4>, B</letter> etc).
 		#
 		-P?*)	PRINTER=`expr "x$1" : 'x-P\(.*\)'` ;;
+		-P)	PRINTER=$2; shift ;;
 
 		# =item B<-q>, B<+q>
 		#
