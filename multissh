@@ -46,7 +46,7 @@ done
 
 for h in `set -- $hostspec; exec ngexpand $*`
 do
-  $trace pfx "$userpfx$h" bgssh $sshopts "$userpfx$h" "$command" &
+  $trace pfx "$userpfx$h" bgssh $sshopts "$userpfx$h" "$*" &
   if [ -n "$delay" ] && [ "$delay" -gt 0 ]
   then $trace sleep "$delay"
   else wait
