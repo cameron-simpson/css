@@ -442,6 +442,101 @@ sub cpperm($$)
   $ok;
 }
 
+=item compare(file1,file2)
+
+Compare the contents of two files.
+Returns:
+B<undef> if one of the files can't be opened or if a read fails.
+B<0> if the files are identical.
+B<-1> if the files differ and I<file1> is a prefix of I<file2>.
+B<-2> if the files differ and I<file1>'s differing byte is less than I<file2>'s byte.
+B<1> if the files differ and I<file2> is a prefix of I<file1>.
+B<2> if the files differ and I<file2>'s differing byte is less than I<file1>'s byte.
+
+=cut
+
+sub compare($$)
+{ my($f1,$f2)=@_;
+
+  if (! open(compare_FILE1,"< $f1\0"))
+  { warn "$0: open($f1): $!\n";
+    return undef;
+  }
+
+  if (! open(compare_FILE2,"< $f2\0"))
+  { warn "$0: open($f2): $!\n";
+    close(compare_FILE2);
+    return undef;
+  }
+
+  my $eof1 = 0;
+  my $eof2 = 0;
+  my $buf1 = '';
+  my $buf2 = '';
+  my $nread;
+
+  do
+  {
+    if (!$eof1 && length($buf1) == 0)
+    { if (! defined ($nread=sysread(compare_FILE1,$buf1,8192)))
+      { warn "$::cmd: sysread($f1): $!";
+	close(compare_FILE1);
+	close(compare_FILE2);
+	return undef;
+      }
+
+      $eof1=($nread == 0);
+    }
+    # POST: $buf1 not empty or $eof1
+
+    if (!$eof2 && length($buf2) == 0)
+    { if (! defined ($nread=sysread(compare_FILE2,$buf2,8192)))
+      { warn "$::cmd: sysread($f2): $!";
+	close(compare_FILE1);
+	close(compare_FILE2);
+	return undef;
+      }
+
+      $eof2=($nread == 0);
+    }
+    # POST: $buf2 not empty or $eof2
+
+    if (length($buf1) == 0)
+    { if (length($buf2) == 0)
+      {
+	close(compare_FILE1);
+	close(compare_FILE2);
+        return 0;
+      }
+      else
+      {
+	close(compare_FILE1);
+	close(compare_FILE2);
+        return -1;
+      }
+    }
+    elsif (length($buf2) == 0)
+    {
+      close(compare_FILE1);
+      close(compare_FILE2);
+      return 1;
+    }
+    # POST: $buf1 not empty and $buf2 not empty
+
+    # compare common data prefix
+    my $cmplen = (length($buf1) < length($buf2) ? length($buf1) : length($buf2));
+    my $cmp = substr($buf1,0,$cmplen) cmp substr($buf2,0,$cmplen);
+    ##warn "cmp(\"".substr($buf1,0,$cmplen)."\" <=> \"".substr($buf2,0,$cmplen)."\": $cmp\n";
+    if ($cmp < 0) { return -2; }
+    if ($cmp > 0) { return 2; }
+
+    # discard matching data
+    substr($buf1,0,$cmplen)='';
+    substr($buf2,0,$cmplen)='';
+  }
+  while (1);
+}
+
 =back
 
 =head1 AUTHOR
