@@ -34,17 +34,20 @@ package cs::HTML::Form;
 
 =over 4
 
-=item new cs::HTML::Form(I<action>, I<method>)
+=item new cs::HTML::Form(I<action>, I<method>, I<enctype>)
 
 Create a new B<cs::HTML::Form> object.
+I<method> is optional and defaults to B<GET>.
+I<enctype> is optional and defaults to B<application/x-www-form-urlencoded>.
 
 =cut
 
-sub new($$;$)
+sub new($$;$$)
 {
-  my($class,$action,$method)=@_;
+  my($class,$action,$method,$enctype)=@_;
   $action=$action->ScriptURL() if ref $action;
   $method=GET if ! defined $method;	# friendlier to bookmarks
+  $enctype='application/x-www-form-urlencoded' if ! defined $enctype;
 
   my($F)=bless { HTML => [],
 		 STACKED_HTML => [],
@@ -53,12 +56,9 @@ sub new($$;$)
 		 FLAGS => {},
 		 PARAMS => { METHOD => $method,
 			     ACTION => $action,
+			     ENCTYPE => $enctype,
 			   },
 	       }, $class;
-
-  if ($method eq POST)
-  { ## $F->{PARAMS}->{ENCTYPE}="application/x-www-form-urlencoded";
-  }
 
   $F;
 }
@@ -463,7 +463,7 @@ sub PopupMU
   _tagSelect($field,$map,$keylist,$selected,undef,0);
 }
 
-=item ScrollingListMU(I<field>,I<map>,I<selected>,I<keylist>,I<multiple>)
+=item ScrollingList(I<field>,I<map>,I<selected>,I<keylist>,I<size>,I<multiple>)
 
 Add a multiple value B<SELECT> token
 for the specified I<field>
@@ -487,7 +487,7 @@ it defaults to B<false>.
 # add a scrolling list
 sub ScrollingList{ my($F)=shift; $F->MarkUp($F->ScrollingListMU(@_)); }
 
-=item ScrollingListMU(I<field>,I<map>,I<selected>,I<keylist>,I<multiple>)
+=item ScrollingListMU(I<field>,I<map>,I<selected>,I<keylist>,I<size>,I<multiple>)
 
 Return a multiple value B<SELECT> token
 for the specified I<field>
@@ -566,7 +566,11 @@ for the specified I<field>.
 
 =cut
 
-sub FileUpload{ my($F)=shift; $F->MarkUp($F->FileUploadMU(@_)); }
+sub FileUpload
+{ my($F)=shift;
+
+  $F->MarkUp($F->FileUploadMU(@_));
+}
 
 =item FileUploadMU(I<field>)
 
@@ -577,6 +581,9 @@ for the specified I<field>.
 
 sub FileUploadMU($$)
 { my($F,$field)=@_;
+
+  # coerce ENCTYPE in case the user forgot
+  $F->{PARAMS}->{ENCTYPE}='multipart/form-data';
 
   return [INPUT, {TYPE => FILE, NAME => $field}];
 }
