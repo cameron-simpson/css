@@ -1,0 +1,128 @@
+#!/usr/bin/perl
+#
+
+require 'cs/html.pl';
+require 'cs/nntp.pl';
+
+print "Content-Type: text/html\n\n";
+
+$NNTPSERVER=$ENV{NNTPSERVER};
+$msgidptn='<[^>@]*@[^>@]*>';
+$groupptn='[-\w.]+';
+
+$_=$query=$ENV{QUERY};
+
+if (/^$msgidptn$/o)
+	{ &get_article($_);
+	}
+elsif (m:^($groupptn)/(\d+|$msgidptn)$:o)
+	{ &get_group_article($1,$2);
+	}
+elsif (/^$groupptn$/o)
+	{ &get_group($_);
+	}
+else
+{ print "Sorry, I don't understand the query: \"<TT>$_<TT>\".\n";
+}
+
+&quit;
+
+sub quit
+	{ &nntp'disconnect;
+	  print @_, "\n";
+	  exit 0;
+	}
+
+sub init
+	{ return if defined($can_post);
+	  $can_post=&nntp'connect($NNTPSERVER);
+	  if (!defined($can_post))
+		{ &quit("can't connect to \"$NNTPSERVER\": $!");
+		}
+	}
+
+sub get_article	# number/msgid -> print text or error
+	{ local($article)=@_;
+
+	  &init;
+
+	  &nntp'out('ARTICLE ',$article,"\n");
+	  local($code,$text)=&nntp'reply;
+	  &quit("Sorry, can't retrieve $article from \"$NNTPSERVER\" $code $text\n")
+		unless defined($code) && $code =~ /^2/;
+	  local(@text)=&nntp'text;
+	  &display_text(@text);
+	}
+
+sub display_text	# (@lines)
+	{ local(@hdrs,$_,$hdr);
+
+	  undef $hdr;
+	  HDR:
+	    while (defined($_=shift))
+		{ last HDR if /^$/;
+		  if (/^\s/)	{ $hdr.="\n".$_; }
+		  else		{ push(@hdrs,$hdr);
+				  $hdr=$_;
+				}
+		}
+	  push(@hdrs,$hdr) if defined $hdr;
+
+	  local($from,$subject,$reply_to,$references,$msgid,@refs,$org,
+		$newsgroups,$followup_to,$date);
+
+	  for (@hdrs)
+		{ if (/^from:\s*/i)		{ $from=$'; }
+		  elsif (/^reply-to:\s*/i)	{ $reply_to=$'; }
+		  elsif (/^subject:\s*/i)	{ $subject=$'; }
+		  elsif (/^references:\s*/i)	{ $references=$'; }
+		  elsif (/^message-id:\s*/i)	{ $msgid=$'; }
+		  elsif (/^organization:\s*/i)	{ $org=$'; }
+		  elsif (/^newsgroups:\s*/i)	{ $newsgroups=$'; }
+		  elsif (/^followup-to:\s*/i)	{ $followup_to=$'; }
+		  elsif (/^date:\s*/i)		{ $date=$'; }
+		}
+	  
+	  # tidy subject line
+	  while ($subject =~ /^\s*re\s*:\s*/i)
+		{ $subject=$'; }
+	  $subject =~ s/\s+/ /g;
+
+	  # collect references
+	  $_=$references;
+	  while (/$msgidptn/o)
+		{ push(@refs,$&); $_=$';
+		}
+
+	  print '<TITLE>', &html'raw2html("$subject $msgid"), "</TITLE>\n";
+	  print '<H1>', &html'raw2html($newsgroups.': '.$subject), "</H1>\n\n";
+	  print "<PRE>\n";
+	  if (defined($from))	{ print 'From: ', &html'raw2html($from), "\n"; }
+	  if (defined($reply_to)
+	   && $from ne $reply_to){ print 'Reply-To: ', &html'raw2html($reply_to), "\n"; }
+	  if (defined($org))	{ print 'Organization: ', $org, "\n"; }
+	  if (defined($followup_to)
+	   && $followup_to ne $newsgroups)
+				{ print 'Followup-To: ', $followup_to, "\n"; }
+	  if (defined($date))	{ print 'Date: ', $date, "\n"; }
+	  print 'Message-ID: ', &newsline2html($msgid), "\n";
+	  if ($#refs >= $[)
+				{ print 'References:';
+				  for (@refs) { print ' ', &newsline2html($_); }
+				  print "\n";
+				}
+	  print "\n";
+	  for (@_)
+		{ print &newsline2html($_), "\n";
+		}
+	}
+
+sub get_group_article	# (group,article)
+	{ local($group,$art)=@_;
+
+	  &init;
+	  local($low,$high)=&nntp'group($group);
+	  &quit("can't select group \"$group\"")
+		unless defined $low;
+	  &get_article($article);
+	}
