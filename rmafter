@@ -1,0 +1,17 @@
+#!/bin/sh
+#
+# Run a command and remove a file afterwards.
+#	- Cameron Simpson <cs@zip.com.au> 18feb2002
+#
+
+cmd=$0
+[ $# -gt 1 ] || { echo "Usage: $cmd filename command [args...]" >&2; exit 2; }
+
+file=$1; shift
+
+"$@"
+xit=$?
+
+rm "$file" || xit=1
+
+exit $xit
