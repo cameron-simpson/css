@@ -51,7 +51,7 @@ to constrain the records to which I<hash> now applies.
 
 sub TIEHASH($$$$;$)
 { my($class,$dbh,$table,$keyfield,$where)=@_;
-  $where = '' if ! defined $where;
+  $where='' if ! defined $where;
 
   bless { DBH => $dbh,
 	  TABLE => $table,
