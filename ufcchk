@@ -1,0 +1,13 @@
+#!/usr/bin/perl
+#
+# Parse output from ufc and check against encryptions.
+#
+
+while (<STDIN>)
+	{ chop;
+	  next if !(($crypt,$passwd)=split(/:/o,$_,2));
+
+	  for (@ARGV)
+		{ print "$crypt:$passwd\n" if $crypt eq $_;
+		}
+	}
