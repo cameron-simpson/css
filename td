@@ -5,7 +5,10 @@
 #
 
 cmd=$0
-usage="Usage: $cmd [+item] [tdl-args...]"
+usage="Usage: $cmd [-v] [+item] [tdl-args...]"
+
+finalopts=-a
+[ "x$1" = x-v ] && { finalopts="$finalopts -v"; shift; }
 
 context=
 case $1 in
@@ -49,4 +52,4 @@ then
     tdl "$op" $datespec $context ${1+"$@"}
 fi
 
-exec tdl ls -a $context
+exec tdl ls $finalopts $context
