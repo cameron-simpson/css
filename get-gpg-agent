@@ -5,14 +5,11 @@
 #
 
 cmd=$0
-usage="Usage: $cmd [-v] [statefile]"
+usage="Usage: $cmd [statefile]"
 
 statefile=
-verbose=
 
 badopts=
-
-[ "x$1" = x-v ] && { verbose=1; shift; }
 
 [ $# = 0 ] || { statefile=$1; shift; }
 
@@ -20,12 +17,12 @@ badopts=
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
-# protect against rogue output
-exec 3>&1 1>/dev/null
+# We 'ave already got one!
+have-gpg-agent && exec stash-gpg-agent -
 
 [ -n "$statefile" ] || statefile=`gpg-agent-statefile` || exit 1
 
 [ -s "$statefile" ] \
 && . "$statefile" \
 && have-gpg-agent \
-&& echo ". '$statefile'" >&3
+&& exec stash-gpg-agent -
