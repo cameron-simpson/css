@@ -4,8 +4,13 @@
 #	- Cameron Simpson <cs@zip.com.au> 30jul2001
 #
 
+lock=ssh-agent-$HOST
+
+# force unlock
+[ "x$1" = x-f ] && { shift; unlock -f "$lock"; }
+
 exec \
-  lock -1 -a "ssh-agent-$HOST" \
+  lock -1 -a "$lock" \
   no-ssh-agent \
   ignhup \
   ssh-agent \
