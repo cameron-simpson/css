@@ -1,0 +1,40 @@
+#!/bin/sh
+#
+# Set job type.
+#	- Cameron Simpson <cs@zip.com.au> 30jun2003
+#
+
+cmd=$0
+usage="Usage: $cmd job [type]"
+
+badopts=
+
+if [ $# = 0 ]
+then
+  echo "$cmd: missing job" >&2
+  badopts=1
+else
+  key=$1; shift
+  isjob "$key" || { echo "$cmd: unknown job \"$key\"" >&2
+		    badopts=1
+		  }
+  if [ $# = 0 ]
+  then
+    type=
+  else
+    type=$1; shift
+    [ $# = 0 ] || { echo "$cmd: extra arguments after type: $*" >&2
+		    badopts=1
+		  }
+  fi
+fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+case "$type" in
+    *[a-z]*)	type=`echo "$type" | tr '[a-z]' '[A-Z]'` ;;
+esac
+
+[ -n "$type" ] && exec jobtimer "$key" category "$type"
+
+exec jobtimer "$key" category
