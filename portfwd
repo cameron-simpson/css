@@ -57,7 +57,7 @@ do  case "$fwd" in
 		   -L 2401:cvs-cskk:2401 \
 		   -L 2888:amadeus:888 \
 		   -L 3119:news-optus:119 \
-		   -L 5916:janus:5906 &
+		   -L 5916:amadeus:5906 &
 	    ;;
 	home2zip)
 	    echo "home2zip..."
