@@ -1,0 +1,9 @@
+#!/bin/sh
+#
+# Stub to do nothing in place of some services like ssh-agent.
+#	- Cameron Simpson <cs@zip.com.au> 14jan98
+#
+
+[ $# = 0 ] && echo "$0: missing exec-list" >&2; exit 2; }
+
+exec ${1+"$@"}
