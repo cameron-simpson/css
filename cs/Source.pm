@@ -64,9 +64,9 @@ sub new
   $this->{BUF}='';
 
   if ($type eq ASYNC)
-	{ $this->{FLAGS}|=$cs::IO::F_ASYNC;
-	  $type=shift;
-	}
+  { $this->{FLAGS}|=$cs::IO::F_ASYNC;
+    $type=shift;
+  }
 
   if ($type eq FILE)
   { my($FILE)=shift;
