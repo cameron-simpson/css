@@ -668,6 +668,8 @@ from the I<string>.
 sub URLs($)	# html -> (url,tag,...)
 { local($_)=@_;
 
+  my@c=caller;die "cs::HTML::URLs(@_)\n\tfrom [@c]\n\t";
+
   my(@URLs,$anno,$url,$tag,$noslash,%attrs);
 
   while (m|$cs::SGML::AnnoPtn|oi)
@@ -688,6 +690,90 @@ sub URLs($)	# html -> (url,tag,...)
   }
 
   @URLs;
+}
+
+sub sourceURLs($$;$$)
+{ my($urls,$s,$inline,$base)=@_;
+  $inline=0 if ! defined $inline;
+
+  ## my@c=caller;
+  ## warn "s=$s from [@c]";
+
+  my $parse = new cs::HTML $s;
+
+  my $t;
+
+  while (defined ($t=$parse->Tok()))
+  { ## warn "got $t->{TAG} from HTML::Tok()";
+    ## warn cs::Hier::h2a($t,1), "\n";
+    tokenURLs($urls,$t,$inline,$base);
+    ## warn "getting another token";
+  }
+}
+
+sub tokenURLs($$;$$)
+{ my($urls,$t,$inline,$base)=@_;
+  $inline=0 if ! defined $inline;
+
+  local $cs::URL::_GrepInline = $inline;
+
+  URL:
+  for (cs::HTML::grepMarkUp(\&_htmlGrepSub, $t))
+  { my $attrs = $_->{ATTRS};
+    my @tags = _htmlGrepTags($cs::URL::_GrepInline);
+    ATTR:
+    for my $attr (@tags)
+    { next ATTR if ! exists $attrs->{$attr}
+		|| ! defined $attrs->{$attr};
+
+      my $url = $attrs->{$attr};
+
+      ::need(cs::URL);
+      my $NU = cs::URL->new($url,$base);
+      if (! defined $NU)
+      { ## warn "UNDEF from new cs::URL($url, $base)";
+      }
+      else
+      { $url = $NU->Text();
+      }
+
+      $url=cs::URL::undot($url);
+      my $title=join('',cs::HTML::tokFlat(@{$_->{TOKENS}}));
+      $title =~ s/\s+/ /g;
+      $title =~ s/^ //;
+      $title =~ s/ $//;
+
+      if (! exists $urls->{$url} || length($urls->{$url}) < length($title))
+      { $urls->{$url}=$title;
+      }
+    }
+  }
+}
+
+sub _htmlGrepTags($)
+{
+  $_[0] ? (SRC,BACKGROUND) : HREF;
+}
+
+sub _htmlGrepSub($)
+{ my($tok)=@_;
+
+  ## warn "tok=".cs::Hier::h2a($tok)."\n";
+  ## warn "\@_=[@_]\n";
+
+  return 0 if ! ref $tok;
+  my @attrs = keys %{$tok->{ATTRS}};
+  return 0 if ! @attrs;
+
+  my @tags = _htmlGrepTags($cs::URL::_GrepInline);
+
+  ## warn "look for [@tags] in [".join(",",keys %{$tok->{ATTRS}})."]\n";
+
+  for my $tag (@tags)
+  { return 1 if grep($_ eq $tag, @attrs);
+  }
+
+  0;
 }
 
 # Pseudo-attributes:
@@ -787,6 +873,8 @@ sub new
 { my($class,$s)=(shift,shift);
   if (! ref $s)
   { ::need(cs::Source);
+    my@c=caller;
+    warn "!ref s: s=$s from [@c]";
     $s=cs::Source->new($s,@_);
   }
 
