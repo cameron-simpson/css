@@ -1,0 +1,22 @@
+#!/bin/sh
+#
+
+eval "`setvar -n news`"
+
+{ for arg
+  do
+    case $arg in
+	\<*\>)	echo article "$arg" ;;
+	?*:*)	group=`expr "x$arg" : 'x\(.*\):.*'`
+		echo group "$group"
+		article=`expr "x$arg" : 'x.*:\(.*\)'`
+		case $article in
+		    ?*)	echo article "$article" ;;
+		esac
+		;;
+	*.*)	echo group "$arg" ;;
+	*)	echo article "$arg" ;;
+    esac
+  done
+  echo quit
+} | nntp | sed 's/$//'
