@@ -67,6 +67,7 @@ exec \
 	'--include=/rc/myke' \
 	'--include=/rc/nvi' \
 	'--include=/rc/perl' \
+	'--include=/rc/python' \
 	'--include=/rc/rterm.ini' \
 	'--include=/rc/screen' \
 	'--include=/rc/secret' \
