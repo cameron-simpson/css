@@ -53,6 +53,15 @@ $::Msg->WriteItem(new cs::Sink(SCALAR,\$msgtxt));
 
 $::Xit=0;
 
+if (!open(THREADS,"| bgstdin -C set-x thread-update $ENV{HOME}/rc/mail/threads/*/*"))
+{ warn "$::cmd: pipe to thread-update fails: $!";
+  $::Xit=1;
+}
+else
+{ print THREADS $msgtxt;
+  close(THREADS);
+}
+
 if (@::Groups)
 { warn "sending news to [@::Groups]";
   my $NNTP = new cs::NNTP;
