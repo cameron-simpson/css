@@ -12,8 +12,8 @@ qs=${1-"$QUERY_STRING"}
 
 echo "$qs" \
 | tr '&+' '\012 ' \
+| unhexify \
 | sed -e '/^[A-Za-z_][A-Za-z0-9_]*=/!d' \
       -e "s/'/'\\\\''/g" \
       -e "s/=\\(.*\\)/='\\1'/" \
-      -e "s/^/PARAM_/" \
-| unhexify
+      -e "s/^/PARAM_/"
