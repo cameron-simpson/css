@@ -1,0 +1,35 @@
+#!/bin/sh
+#
+# For each URL in the page, fetch it to a temporary file
+# and run the supplied command with the temp file name.
+#	- Cameron Simpson <cs@zip.com.au> 14mar2005
+#
+
+cmd=$0
+usage="Usage: $cmd URL command [args...]"
+
+badopts=
+
+if [ $# = 0 ]
+then
+  echo "$cmd: missing URL" >&2
+  badopts=1
+else
+  url=$1; shift
+  if [ $# = 0 ]
+  then
+    echo "$cmd: missing command" >&2
+    badopts=1
+  fi
+fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+pageurls "$url" \
+| { xit=0
+    while read url
+    do
+      set-x withurl "$url" "$@" || xit=1
+    done
+    exit $xit
+  }
