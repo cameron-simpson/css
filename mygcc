@@ -1,0 +1,16 @@
+#!/bin/sh
+#
+
+cmd=`basename "$0"`
+
+for d in `unpath -r $LDPATH`
+do  # echo "$d ..." >&2
+    set x "-L$d" "-R$d" ${1+"$@"}; shift; # echo "add $d" >&2
+    i=`dirname "$d"`/include
+    [ -d "$i/." ] && { set x "-I$i" ${1+"$@"}; shift
+		       # echo "add $i" >&2
+		     }
+done
+
+# set -x
+exec "$BIN/$cmd" ${1+"$@"}
