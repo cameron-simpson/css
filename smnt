@@ -5,6 +5,7 @@
 #
 
 mnt=
+needdir=
 user=`who am i | sed -e 's/[ 	].*//' -e 's/.*!//'`
 [ -n "$user" ] || user=${LOGNAME:-$USER}
 : ${WORKGROUP:=$SYSTEMID}
@@ -43,7 +44,7 @@ then
 else
   share=$1; shift
   case "$share" in
-    //*/*) [ -n "$mnt" ] || mnt=/mnt-`echo "$share" | tr -s / -` ;;
+    //*/*) [ -n "$mnt" ] || { mnt=/mnt-`echo "$share" | tr -s / -`; needdir=1; } ;;
     *)	   echo "$cmd: bad PC share \"$share\", should look like //pc/share" >&2
 	   badopts=1
 	   ;;
@@ -56,5 +57,6 @@ fi
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
 set -x
+[ $needdir ] && { needdir "$mnt" || exit 1; }
 mount -t smbfs -o "username=$user,workgroup=$WORKGROUP,uid=$user,fmask=644,dmask=755" "$share" "$mnt" || exit 1
 L "$mnt"
