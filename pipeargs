@@ -14,6 +14,8 @@
 # with input from a file containing the I<args>, one per line.
 #
 
+: ${TMPDIR:=/tmp}
+
 usage="Usage: $0 shcmd [args...]"
 
 badopts=
@@ -23,10 +25,7 @@ else  shcmd=$1; shift
 fi
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
-tmp=.pa$$
-[ -f "$tmp" ] && tmp=$HOME/.pa$$
-[ -f "$tmp" ] && tmp=/tmp/.pa$$
-[ -f "$tmp" ] && { echo "$0: can't create $tmp" >&2; exit 1; }
+tmp=$TMPDIR/.pa$$
 
 for arg
 do  echo "$arg"
