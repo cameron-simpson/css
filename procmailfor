@@ -27,7 +27,8 @@ fi
 
 tmpf=${TMPDIR:-/tmp}/$cmd$$
 
-formail -f -i "Fetchmail-Source-Mailbox: $srcmbox" >"$tmpf" \
+##formail -f -i "Fetchmail-Source-Mailbox: $srcmbox" >"$tmpf"
+cat >"$tmpf" \
 	|| { rm -f "$tmpf"; exit 1; }
 
 exec <"$tmpf"
