@@ -1,0 +1,28 @@
+#!/bin/sh
+#
+# Run command asynchronously with output to a logfile.
+#	- Cameron Simpson <cs@zip.com.au> 09feb2002
+#
+
+varlog=${VARLOG:-$HOME/var/log}
+
+cmd=$0
+usage="Usage: $cmd logfile cmd [args...]"
+
+badopts=
+case $# in
+    0)	echo "$cmd: missing logfile" >&2; badopts=1 ;;
+    1)	echo "$cmd: missing cmd" >&2; badopts=1 ;;
+esac
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+logfile=$1; shift
+case "$logfile" in
+    /*)	;;
+    *)	logfile=$varlog/$logfile ;;
+esac
+
+ignhup "$@" >>"$logfile" 2>&1 &
+
+exit 0
