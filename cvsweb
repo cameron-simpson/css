@@ -1,0 +1,19 @@
+#!/bin/sh
+
+cmd=`basename "$0"`
+
+cvsweb=http://web/cvsweb/cvsweb.cgi
+cvsdir=/u/archive
+
+xit=0
+
+for path
+do  [ -f "$cvsdir/$path,v" ] \
+	|| { echo "$cmd: $path not present in repository $cvsdir" >&2
+	     xit=1
+	     continue
+	   }
+    urlshow "$cvsweb/$path"
+done
+
+exit $xit
