@@ -5,7 +5,7 @@ while (<STDIN>)
 { chomp;
   last HDR if /^$/;
 
-  if ( /^([^: 	]*):[ 	]*/ )
+  if ( /^([a-z][-\w]*):[ 	]*/i )
   {
     $body=$';
     $hdr=uc($1);
