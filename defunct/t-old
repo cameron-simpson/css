@@ -1,0 +1,110 @@
+#!/bin/sh
+#
+# TOC or extract various archive formats.
+#	- Cameron Simpson <cs@zip.com.au>
+#
+# Iterative analysis of extensions; the combinations were getting too numerous.
+#	- cameron 22jan99
+#
+
+cmd=`basename "$0"`
+
+case "$cmd" in
+    t)	[ $# = 0 ] && exec term		# shorthand for term if no args
+    	mode=toc ;;
+    x)	mode=extract ;;
+    *)	echo "$cmd: who am I? I expected to be \"t\" or \"x\"" >&2
+	exit 1
+	;;
+esac
+
+pageit=
+## [ -t 1 ] && pageit=1
+
+toc_cpio='cpio -icvt'		extract_cpio='cpio -icvdm'
+toc_tar='tar tvf -'		extract_tar=untar	# or use 'tar xvf -'
+toc_uu="egrep '^(begin|end) '"	extract_uu='uudecode /dev/fd/0'
+toc_lzh='xlharc v'		extract_lzh='xlharc x'
+toc_zip='unzip -l $f'		extract_zip='unzip -d . $f'
+toc_rpm='rpm -q -p "$f" -i -R --provides -l'
+				extract_rpm='rpm -U -v -h "$f"'
+
+xit=0
+
+for f
+do  echo "$f ..."
+
+    if [ -d "$f/." ]
+    then
+	ls -la "$f/." || xit=1
+	continue
+    fi
+
+    (
+      pipe="<\"\$f\""
+      pipeext=
+      format=
+
+      # break name up into pieces
+      case $f in */*)	b=`basename "$f"` ;;
+		 *)	b=$f ;;
+      esac
+      oIFS=$IFS; IFS=.; set x $b; shift; IFS=$oIFS
+
+      nth=$#
+      while [ -z "$format" -a "$nth" -gt 0 ]
+      do
+	  # get nth arg
+	  eval "ext=\$$nth"
+
+	  filt=
+	  case $ext in
+	      z)	filt=unpack ;;
+	      Z)	filt=uncompress ;;
+	      gz)	filt=gunzip ;;
+	      bz2)	filt=bunzip2 ;;
+	      pgp)	filt='pgp -df' ;;
+	      tgz)	filt=gunzip format=tar ;;
+	      TAZ|taz)	filt=uncompress format=tar ;;
+	      arc|lzh)	format=lzh ;;
+	      uu)	format=uu ;;
+	      tar)	format=tar ;;
+	      cpio)	format=cpio ;;
+	      zip)	format=zip ;;
+	      rpm)	format=rpm ;;
+	      *)	case $b in
+			    cpiof*)	format=cpio ;;
+			    tarf*)	format=tar ;;
+			    *)		break ;;
+			esac
+			;;
+	  esac
+
+	  [ -n "$filt" ] && { pipe="$pipe$pipeext $filt"
+			      pipeext=" |"
+			    }
+
+	  # figured the format - bail and handle it
+	  [ -n "$format" ] && break
+
+	  # backstep for next pass
+	  nth=`expr $nth - 1`
+      done
+
+      if [ -z "$format" ]
+      then
+	  echo "$cmd: $f: unrecognised format" >&2
+	  exit 1
+      else
+	  eval "formatfilter=\$${mode}_$format"
+	  pipe="$pipe$pipeext $formatfilter"
+      fi
+
+      [ $pageit ] && pipe="$pipe | less -E"
+
+      eval "$pipe"
+    ) || xit=1
+
+done
+
+exit $xit
