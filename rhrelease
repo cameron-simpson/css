@@ -4,4 +4,4 @@
 #	- Cameron Simpson <cs@zip.com.au> 07sep2003
 #
 
-exec awk 'NR == 1 { print $5 }' /etc/redhat-release
+exec sed -n '1s/.*release \([0-9][.0-9]*\).*/\1/p' /etc/redhat-release
