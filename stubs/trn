@@ -1,0 +1,11 @@
+#!/bin/sh
+#
+
+case $ARCH in
+    linux.*.*)	trn=/usr/bin/trn ;;
+    *)		trn=/usr/local/bin/trn ;;
+esac
+
+exec env GUI=lean term -n "TRN $*" -e pushttylabel "TRN $*" "$trn" \
+	-d$DOTDIR/saved -m=u '-F| ' -T -s -x61ls -v -S -XX -M +HFrom \
+	${1+"$@"}
