@@ -1,0 +1,7 @@
+#!/bin/sh
+#
+# Test whether we have an ssh-agent to hand.
+#	- Cameron Simpson <cs@zip.com.au> 03jul2004
+#
+
+[ -n "$SSH_AUTH_SOCK" ] && ssh-add -l >/dev/null
