@@ -287,8 +287,12 @@ xit=0
 if [ -n "$lastbackup" -a -d "$dest/$lastbackup/." ]
 then
     $echo "existing backup: linking $lastbackup to $thisbackup ..."
-    if not $trace linktree $ltargs "$dest/$lastbackup" "$dest/$thisbackup"
+    if $trace linktree $ltargs "$dest/$lastbackup" "$dest/$thisbackup"
     then
+	# now fix the dirs made by linktree
+	$trace rsync -a '--include=*/' --exclude='*' \
+		"$dest/$lastbackup/." "$dest/$thisbackup/."
+    else
 	echo "$cmd: warning: linktree $dest/$lastbackup $dest/$thisbackup fails" >&2
     fi
 
