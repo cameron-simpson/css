@@ -31,7 +31,6 @@ BEGIN { use cs::DEBUG; cs::DEBUG::using(__FILE__); }
 
 use cs::Misc;
 use cs::DBI;
-use cs::DBI::Table::Row;
 
 package cs::DBI::Table::Array;
 
@@ -86,15 +85,7 @@ sub FETCH($$)
   my $live = $this->{LIVE};
   return undef if $ndx < 0 || $ndx > $#$live;
 
-  my $rows=$this->{ROWS};
-  return $rows->[$ndx] if defined $rows->[$ndx];
-
-  my $row = {};
-  tie %$row, cs::DBI::Table::Row, $live->{$ndx}, $key, $this;
-
-  $rows->[$ndx]=$row;
-
-  $row;
+  $live->[$ndx];
 }
 
 # expect key to take on last_id if undef
