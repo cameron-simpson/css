@@ -29,8 +29,6 @@ opts=
 sync=
 xplanet=
 convopts='-d 0.6'
-domenubg=
-domenu=
 thisdesk=
 pickn=1
 aspect=-w
@@ -41,8 +39,7 @@ badopts=
 while :
 do  case $1 in
         -xpl)	xplanet=1 ;;
-	-M)	pickn=20 aspect= domenu=1 strippfx=$HOME ;;
-	-m)	domenubg=1 ;;
+	-M)	pickn=20 aspect= strippfx=$HOME ;;
 	-[tw])	aspect=$1 ;;
 	-a)	aspect= ;;
 	-o)	pickopts="$pickopts $1" ;;
@@ -60,49 +57,78 @@ done
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
-if [ $# = 1 -a -f "$1" -a -s "$1" ]
-then
-    # one argument which is a file
-    domenu=
-else
-    case "$#,$1" in
-      1,http://*)
-	# one argument which is a URL
-	exec withurl -C "$1" "$0" $opts
-	;;
-    esac
-
-    set x `pickim -P "$strippfx" -n $pickn -r $aspect $pickopts ${1+"$@"} | sort -u` || exit 1
-    shift
-    [ $# = 0 ] && { echo "$cmd: no image files chosen!" >&2; exit 1; }
-    if [ -t 1 ]; then  cd; ls -ld "$@"; fi &
-    [ $# = 1 ] && domenu=
-fi
-
-if [ $domenu ]
-then
-    tmpf=/tmp/rootbg$$
-    for arg
-    do  echo "$arg"
-    done >"$tmpf"
-    fvwmcmd \
-	  "SetEnv FVWM_MENU_IMLIST_OP \"rootbg $opts\"" \
-	  "Piperead 'fvwm-menu -1 ImDirMenu \"$cmd $call\" fvwm-menu-imlist -l $tmpf .; rm $tmpf'" \
-	  "Popup ImDirMenu" \
-	  "UnSetEnv FVWM_MENU_IMLIST_OP"
-    exit $?
-fi
-
-imagefile=$1
-case "$imagefile" in
-  /*) ;; *) imagefile=`pwd`/$imagefile ;;
+dopick=1
+isfile=1
+case "$#,$1" in
+  1,http://*)
+    # one argument which is a URL
+    exec withurl -C "$1" "$0" $opts
+    ;;
+  1,X:* | 1,- | 1,*:- | 1,\|* )
+    # one argument which is a GraphicsMagick-ish name
+    dopick=
+    isfile=
+    ;;
+  1,*)
+    [ -f "$1" -a -s "$1" ] && dopick=
+    ;;
 esac
-echo "$imagefile" >>$HOME/var/log/rootbg
 
-if [ $xplanet ]
+if [ $dopick ]
 then
+    set x `pickim -P "$strippfx" -n $pickn -r $aspect $pickopts ${1+"$@"} | sort -u`
+    shift
+    if [ $# = 0 ]
+    then
+      echo "$cmd: no image files chosen!" >&2
+      exit 1
+    fi
+    if [ $# -gt 1 ]
+    then
+      tmpf=/tmp/rootbg$$
+      for arg
+      do  echo "$arg"
+      done >"$tmpf"
+      fvwmcmd \
+	"SetEnv FVWM_MENU_IMLIST_OP \"rootbg $opts\"" \
+	"Piperead 'fvwm-menu -1 ImDirMenu \"$cmd $call\" fvwm-menu-imlist -l $tmpf .; rm $tmpf'" \
+	"Popup ImDirMenu" \
+	"UnSetEnv FVWM_MENU_IMLIST_OP"
+      exit $?
+    fi
+
+    [ -f "$1" -a -s "$1" ] \
+    || { echo "$cmd: chose \"$1\", but it's not a file!" >&2
+	 exit 1
+       }
+    isfile=1
+    [ -t 1 ] && echo "$1"
+fi
+
+imagefile=$1; shift
+
+if [ "$isfile" ]
+then
+  case "$imagefile" in
+    /*) ;; *) imagefile=`pwd`/$imagefile ;;
+  esac
+  echo "$imagefile" >>$HOME/var/log/rootbg
+  lastvalue -a rootbg "$imagefile" &
+fi
+
+rootbg=`mkwall "$imagefile"` || exit 1
+
+(
+  if [ $thisdesk ]
+  then  thisdesk=`lastvalue "enterdesk-$HOST"`
+	desktop "$thisdesk" rootbg "$rootbg"
+  else  lastvalue "defaultrootbg-$HOST" "$rootbg"
+  fi &
+
+  if [ $xplanet ]
+  then
     imdir=$HOME/im
-    backdrop=$imagefile
+    backdrop=$rootbg
     projdir=$imdir/projections
     clouddir=$projdir
     clouds=$clouddir/clouds_2000.jpg
@@ -115,7 +141,7 @@ then
 
     ## -demfile "$dem" -grid
     ## -cloud_ssec "$ssecclouds" \
-    nice xplanet \
+    exec nice xplanet \
 	    -background "$backdrop" \
 	    -blend \
 	    -cloud_image "$clouds" \
@@ -126,137 +152,11 @@ then
 	    -observer "$lat,0" \
 	    -radius 40 \
 	    -root \
-	    ${1+"$@"} \
-	    &
-
-    exit 0
-fi
-
-umask 077
-
-[ $domenubg ] && menubg "$imagefile" &
-
-echo "$imagefile" >>$HOME/var/log/rootbg
-lastvalue -a rootbg "$imagefile" &
-if [ $thisdesk ]
-then  thisdesk=`lastvalue "enterdesk-$HOST"`
-      desktop "$thisdesk" rootbg "$imagefile"
-else  lastvalue "defaultrootbg-$HOST" "$imagefile"
-fi &
-
-bgx=$X11_BGX bgy=$X11_Y
-cachepfx=$HOME/tmp/cache/bg/${bgx}x${bgy}
-
-# somehow we're getting cache files in the list!
-# optimise for this - we know their size and format is good
-case "$imagefile" in
-  "$cachepfx/"*)
-    fvwm-root --retain-pixmap "$imagefile" &
-    [ $sync ] && wait
-    exit 0
-    ;;
-esac
-
-# see if by chance the image is the right size and format
-ix= iy=
-eval `imsize "$imagefile" | awk '{print "ix="$1 " iy="$2}'`
-sfx=`expr "x$imagefile" : 'x.*\.\([^/.]*$\)'`
-case "$ix,$iy,$ext" in
-  $bgx,$bgy,xpm | $bgx,$bgy,png)
-    fvwm-root --retain-pixmap "$imagefile" &
-    [ $sync ] && wait
-    exit 0
-    ;;
-esac
-
-imagefilebase=`basename "$imagefile"`
-imagefiledir=`dirname "$imagefile"`
-cachedir=$cachepfx/$imagefiledir
-cachefile=$cachedir/$imagefilebase.png
-
-# already have cached image of the correct size and format?
-if [ -s "$cachefile" ]
-then
-    fvwm-root --retain-pixmap "$cachefile" &
-    [ $sync ] && wait
-    exit 0
-fi
-
-# have to convert - make work area and proceed
-tmpdir=`mkdirn "$tmp/rootbg"` || exit 1
-cp "$imagefile" "$tmpdir/." || exit 1
-
-( cd "$tmpdir" || exit 1
-  img=$imagefilebase
-  base=`basename "$img" ".$sfx"`
-  final=$base.PNG
-  set /opt/ImageMagick/bin/mogrify -quality 0 -background black -geometry "${bgx}x${bgy}" -format PNG
-
-  # see if we need to letterbox or something
-  if [ -n "$ix" -a -n "$iy" ]
-  then
-      awkf="BEGIN { ix=$ix; iy=$iy; bgx=$bgx; bgy=$bgy"'
-		    w=bgx; h=bgy
-		  }
-	    END   { if (ix > bgx || iy > bgy)
-		      # too big - shrink
-		      if (ix/bgx > iy/bgy)
-			# shrink X more than Y
-			h=int(iy * (bgx/ix))
-		      else
-			# shrink Y more than X
-			w=int(ix * (bgy/iy))
-		       
-		    else
-		    # smaller image - scale up
-		    if (bgx/ix < bgy/iy)
-		      # scale X less - use that
-		      h=iy*bgx/ix
-		    else
-		      # scale Y less
-		      w=ix*bgy/iy
-
-		    crop=0
-		    bx=int((bgx-w)/2+0.5)
-		    if (bx == 0) { bx=1; by++; crop=1; }
-		    by=int((bgy-h)/2+0.5)
-		    if (by == 0) { by=1; bx++; crop=1; }
-		    print "bx="bx " by="by " crop="crop
-		  }'
-      eval `awk "$awkf" </dev/null`
-      if [ "$bx" -gt 0 -o "$by" -gt 0 ]
-      then
-	  set "$@" -bordercolor "$BG" -border "${bx}x${by}"
-      fi
-      if [ "$crop" != 0 ]
-      then
-	  set "$@" -crop "${bgx}x${bgy}+${crop}+${crop}"
-      fi
+	    ${1+"$@"}
+  else
+    exec fvwm-root --retain-pixmap "$rootbg"
   fi
-
-  # run mogrify on the image
-  "$@" "$img"
-  # workaround for mogrify bug
-  rm -f "$img"
-  mv ./* "$final"
-
-  ## fvwm-root -fe "$final" ## aterms don't listen to fvwm-root :-(
-  ## Esetroot "$final"
-  fvwm-root --retain-pixmap "$final" \
-  && needdir "$cachedir" \
-  && mv "$final" "$cachefile"
-
-  cd
-  rm -rf "$tmpdir"
 ) &
+
 [ $sync ] && wait
-
 exit 0
-
-##exec Esetroot -fit "$imagefile"
-##set -x
-##case "$imagefile" in
-##    *.gif|*.xpm)	2xpm -s root $convopts "$imagefile" xpmroot & ;;
-##    *)			2png -s root $convopts "$imagefile" display -window root & ;;
-##esac
-##
