@@ -37,7 +37,7 @@ bsed -s -e '/^CVS:/d' -e '/^[ 	]*$/d' "$report"
 if [ -s "$report" ]
 then
     headline=`sed 1q "$report"`
-    buglog "$headline" <"$report"
+    buglog "$CVSCOMMIT_FILES: $headline" <"$report"
 fi
 
 exit $xit
