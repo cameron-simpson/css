@@ -1497,7 +1497,7 @@ sub _Get($$;$$$)
 
   my %triedAuth;
 
-  my $rqhdrs = cs::HTTP::rqhdr($this);
+  my $rqhdrs;
 
   GET:
   while (1)
@@ -1530,6 +1530,7 @@ sub _Get($$;$$$)
     }
 
     my($rversion,$rcode,$rtext,$M);
+    $rqhdrs = cs::HTTP::rqhdr($this);
 
     if ($::Verbose)
     { warn "GET $url\n";
@@ -1545,6 +1546,7 @@ sub _Get($$;$$$)
 
     if ($rcode eq $cs::HTTP::M_MOVED || $rcode eq $cs::HTTP::M_FOUND)
     {
+      warn "set HTTP_REFERER to $url";
       $ENV{HTTP_REFERER}=$url;
       my $newurl=$M->Hdr(LOCATION);
       chomp($newurl);
