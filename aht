@@ -1,2 +1,2 @@
 #!/bin/sh
-exec term -e ah ${1+"$@"}
+exec term -small -e ah ${1+"$@"}
