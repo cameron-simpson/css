@@ -60,6 +60,8 @@ for my $id (@ids)
       $_='?';
     }
 
+    $_='.' if ! length;
+
     print "\t", $_;
   }
 
