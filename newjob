@@ -1,0 +1,29 @@
+#!/bin/sh
+#
+# Instantiate a new job.
+#	- Cameron Simpson <cs@zip.com.au> 30jun2003
+#
+
+cmd=$0
+usage="Usage: $cmd key title..."
+
+badopts=
+
+if [ $# = 0 ]
+then
+  echo "$cmd: missing key"
+  badopts=1
+else
+  key=$1; shift
+  [ $# -gt 0 ] || { echo "$cmd: missing title" >&2; badopts=1; }
+fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+if isjob "$key"
+then
+  echo "$cmd: job \"$key\" already exists" >&2
+  exit 1
+fi
+
+idset -i timer "$key" title "$*"
