@@ -6,10 +6,16 @@
 # -xpl for xplanet support - cameron 30nov2000
 #
 
+##alert "$0 $*"
+
 cmd=$0
 usage="Usage: $0 [-m] [-s] [-d dim] [-xpl] [{imagefile|ptns...}]
+	-M	Popup FVWM menu to pick from choices.
 	-m	Set the menu background as well.
 	-s	Synchronous.
+	-t	Select tall images (default wide).
+	-w	Select wide images (default).
+	-a	Select any images (default wide).
 	-d dim	Set dimming factor.
 	-xpl	Use xplanet for the background."
 
@@ -21,12 +27,19 @@ sync=
 xplanet=
 convopts='-d 0.6'
 domenubg=
+domenu=
+pickn=1
+aspect=-w
+strippfx=
 
 badopts=
 while :
 do  case $1 in
         -xpl)	xplanet=1 ;;
+	-M)	pickn=20 aspect= domenu=1 strippfx=$HOME ;;
 	-m)	domenubg=1 ;;
+	-[tw])	aspect=$1 ;;
+	-a)	aspect= ;;
 	-s)	sync=1 ;;
 	-d)	convopts="$convopts -d $2"; shift ;;
 	--)	shift; break ;;
@@ -40,27 +53,32 @@ done
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
-if [ $# -gt 0 ] && [ -s "$1" ] && [ ! -d "$1/." ]
+if [ $# = 1 -a -s "$1" ]
 then
-    imagefile=$1; shift
+    :
 else
-    # used to use BGPATH=$WALLPAPER - possibly redundant
-    imagefile=`bglist -r -n 1 -w !tiles !comics !funny ${1+"$@"}`
-
-    ok=1
-    if [ -z "$imagefile" ]
-    then  echo "$cmd: nothing chosen!" >&2
-	  ok=
-    else
-      if [ ! -s "$imagefile" ]
-      then  echo "$cmd: empty file: $imagefile" >&2
-	    ok=
-      fi
-    fi
-    [ $ok ] || exec xsetroot -solid black
+    set x `set -x; pickim -P "$strippfx" -n $pickn -r $aspect ${1+"$@"}` || exit 1
+    shift
+    [ $# = 0 ] && exit 1
+    [ $# = 1 ] && domenu=
 fi
 
-echo "$imagefile"
+tmpf=/tmp/rootbg$$
+trap 'rm -f "$tmpf"' 0 1 2 15
+
+for arg
+do  echo "$arg"
+done >"$tmpf"
+
+if [ $domenu ]
+then
+    fvwmcmd \
+	  "Piperead 'fvwm-menu -1 ImDirMenu \"$cmd $call\" fvwm-menu-imlist -o rootbg -l $tmpf ." \
+	  "Popup ImDirMenu"
+    exit $?
+fi
+
+imagefile=$1
 
 if [ $xplanet ]
 then
