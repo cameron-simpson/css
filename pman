@@ -1,0 +1,144 @@
+#!/bin/sh
+
+cmd=`basename "$0"`
+
+if [ -t 1 -a -t 0 ]
+then	tty=1
+else	tty=
+fi
+
+Pflag=-Plaser1
+trace=:
+onlyone=
+all=
+
+usage="Usage: $cmd [-Pprinter] [-1] [-a] manuals...
+	-Pprinter	Where to send printout. Default: $Pflag
+	-1		Print only the first entry found for each manual.
+	-a		Print all entries found.
+	-x		Trace formatting."
+
+badopts=
+
+# use default args from $PMANFLAGS if nothing supplied
+case $1 in -?*) ;; *) set x $PMANFLAGS ${1+"$@"}; shift ;; esac
+
+while :
+do  case $1 in
+        -P*)	Pflag=$1 ;;
+	-1)	onlyone=1 ;;
+	-a)	all=1 ;;
+	-x)	trace='set -x' ;;
+	--)	shift; break ;;
+	-?*)	echo "$cmd: unrecognised option: $1" >&2
+		badopts=1
+		;;
+	*)	break ;;
+    esac
+    shift
+done
+
+[ $# = 0 ] && { echo "$cmd: missing manual entry" >&2; badopts=1; }
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+xit=0
+
+for manual
+do  [ $tty ] && echo "Searching for $manual ..."
+    paths=`man -w "$manual" | grep -v '^No manual entry found for '|sort -u`
+    if [ -z "$paths" ]
+    then
+	  echo "$cmd: no entry for $manual" >&2
+	  xit=1
+	  continue
+    fi
+
+    ( xit=0
+      set x $paths; shift
+
+      if [ $# -gt 1 ]
+      then
+	  curpath=
+	  curtype=
+	  curcoll=
+
+	  found=
+	  for path
+	  do    dir1=`dirname "$path"`
+		c=`dirname "$dir1"`
+		case $dir1 in
+		    */man?)	ct=man ;;
+		    *)		ct=cat ;;
+		esac
+		if [ "$c" != "$curcoll" ]
+		then
+		    [ -n "$curpath" ] && found="$found $curpath"
+		    curcoll=$c
+		    curtype=$ct
+		    curpath=$path
+		else
+		    if [ "$ct" = man ]
+		    then
+			curtype=man
+			curpath=$path
+		    fi
+		fi
+	  done
+	  [ -n "$curpath" ] && found="$found $curpath"
+
+	  paths=$found
+      fi
+
+      set x $paths; shift
+
+      if [ $# -gt 0 ]
+      then    if [ $onlyone ]
+	      then paths=$1
+		   if [ $tty ]
+		   then
+		   	echo "The following paths apply to $manual:"
+			for path
+			do  echo "	$path"
+			done
+			echo "Using only $1."
+		   fi
+	      else if [ -z "$tty" -o -n "$all" ]
+		   then
+		       :
+		   else
+		       echo "The following paths apply to $manual:"
+		       for path
+		       do  echo "	$path"
+		       done
+
+		       found=
+		       for path
+		       do  ask "Print $path" && found="$found $path"
+		       done
+
+		       paths=$found
+		   fi
+	      fi
+      fi
+
+      set x $paths; shift
+      for path
+      do  [ $tty ] && echo "Printing $path ..."
+	  case $path in
+	      *.z)	cat="pcat $path" ;;
+	      *.Z)	cat="zcat $path" ;;
+	      *)	cat="cat $path" ;;
+	  esac
+	  case $path in
+	      */man?/*)	format="eqn | tbl | groff -man" ;;
+	      *)	format="col | /usr/local/lib/manFF | lwf -s11" ;;
+	  esac
+	  eval "$trace; $cat | $format | lpr $Pflag"
+      done
+
+      exit $xit
+    ) || xit=1
+done
+
+exit $xit
