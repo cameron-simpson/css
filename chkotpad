@@ -1,0 +1,61 @@
+#!/usr/bin/perl
+#
+# Check a pad file for matching its name.
+#	- Cameron Simpson <cs@zip.com.au> 24jul2000
+#
+
+use strict qw(vars);
+
+use cs::Misc;
+use cs::Pathname;
+use Digest::MD5;
+
+$::Usage="Usage: $::cmd pad-md5-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx.dat\n";
+
+my $file;
+
+my $badopts = 0;
+
+if (! @ARGV)
+{ warn "$::cmd: missing pad filename\n";
+  $badopts=1;
+}
+else
+{ $file=shift(@ARGV);
+  if (@ARGV)
+  { warn "$::cmd: extra arguments: @ARGV\n";
+    $badopts=1;
+  }
+}
+
+die $::Usage if $badopts;
+
+if (! open(FILE, "< $file\0"))
+{ die "$::cmd: can't open $file: $!\n";
+}
+
+my @s = stat FILE;
+die "$::cmd: fstat($file): $!\n" if ! @s;
+
+my $xit = 0;
+
+if ($s[7] != 128*1024)
+{ warn "$::cmd: $file($s[7]): not 128k in length\n";
+  $xit=1;
+}
+
+my $MD5 = new Digest::MD5;
+
+$MD5->addfile(FILE);
+close(FILE);
+
+my $hash = $MD5->hexdigest();
+my $bfile = cs::Pathname::basename($file);
+my $xfile = "pad-md5-$hash.dat";
+
+if ($bfile ne $xfile)
+{ warn "$::cmd: $file: mismatch: I expected $xfile\n";
+  $xit=1;
+}
+
+exit $xit;
