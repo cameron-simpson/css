@@ -25,8 +25,8 @@ PATH=$fvbin:$PATH
 export PATH
 
 ( set -x
-  exec "$fvwm" -blackout -f "$HOME/rc/x11/fvwm/rc" ${1+"$@"}
-) >$HOME/fv.out 2>$HOME/fv.err
+  exec "$fvwm" -cmd "PipeRead fvwmrc" ${1+"$@"}
+) >$HOME/var/log/fv.out 2>$HOME/var/log/fv.err
 
 ##for f in "$FVWMEVLOG" "$FVWMCMDLOG"
 ##do  >"$f"; rm -f "$f"
