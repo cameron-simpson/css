@@ -38,12 +38,7 @@ ok=1
 first=1
 for word
 do
-  [ $first ] && { first=
-		  if [ $icase ]
-		  then  set x -e h -e 'y/ABCDEFGHIJKLMNOPQRSTUVWXYZ/abcdefghijklmnopqrstuvwxyz/'; shift
-		  else  set x; shift
-		  fi
-		}
+  [ $first ] && { set x; shift; }
 
   case "$word" in
     */*)  echo "$cmd: can't do slashes: $word" >&2
@@ -59,10 +54,15 @@ do
 	  fi
 	  ;;
   esac
+
+  first=
 done
 
 [ $ok ] || exit 1
 
+[ $icase ] && { set x -e h -e 'y/ABCDEFGHIJKLMNOPQRSTUVWXYZ/abcdefghijklmnopqrstuvwxyz/' ${1+"$@"}
+		shift
+	      }
 [ $any ] && { set x ${1+"$@"} -e d -e ':ok'; shift; }
 [ $icase ] && { set x ${1+"$@"} -e g; shift; }
 
