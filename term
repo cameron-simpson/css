@@ -1,4 +1,4 @@
-#!/bin/sh -x
+#!/bin/sh
 #
 # Generic open-a-window.
 #
@@ -162,7 +162,7 @@ case "$TERM,$DISPLAY" in
 	;;
 esac
 
-set -x
+##set -x
 eval "$detach"
 eval "$closefds"
 if [ $async ]
