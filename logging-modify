@@ -84,6 +84,6 @@ sh -c "$reportcmd" >"$tmpf" || exit 1
 arg1 $arg1opts "$itemname" "$editcommand" "$@"
 xit=$?
 
-sh -c "$reportcmd" | diffu "$tmpf" - | tee /dev/tty | buglog "$message"
+sh -c "$reportcmd" | diffu "$tmpf" - | buglog "$itemname:$editcommand: $message"
 
 exit $xit
