@@ -1,7 +1,8 @@
 #!/bin/sh
+[ $# = 0 ] && set -- 127.0.0.2 127.0.0.3
 term -n GETMAIL \
-     -c 'set -x
+     -c "set -x
 	 ##fetchmail -v;getnews;exec +
-	 ##getnews -d "ng2to|procmail $HOME/rc/mail/procmailrc.spool"
+	 ##getnews -d \"ng2to|procmail \$HOME/rc/mail/procmailrc.spool\"
 	 getmail -q -v $*
-	 exec + +t'
+	 exec + +t"
