@@ -4,8 +4,11 @@
 #	- Cameron Simpson <cs@zip.com.au> 23oct2001
 #
 
+cmd=$0
+usage="Usage: $cmd [hosts...]"
+
 [ $# = 0 ] && case $SYSTEMID in
-		cisra)	set ferrari,linux,solaris,cass,sweet,ivory,elph ;;
+		cisra)	set cage,ferrari,linux,solaris,cass,sweet,screen:ivory,screen:elph ;;
 		home)	set jekyll,janus,alpha ;;
 		*)	echo "$0: no default host list for SYSTEMID == \"$SYSTEMID\"" >&2
 			exit 1
@@ -21,6 +24,10 @@ case "$host" in
 	done
 	exit 0
 	;;
+    screen:*)
+	host=`expr "$host" : 'screen:\(.*\)'`
+	exec rterm "$host" -s ${1+"$@"}
+	;;
+    *)	exec rterm "$host" ${1+"$@"}
+	;;
 esac
-
-exec rterm "$host" ${1+"$@"}
