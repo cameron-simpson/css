@@ -11,27 +11,22 @@ use cs::Misc;
 use Getopt::Std;
 
 $::Interactive=0;
-$::Pattern='{([A-Za-z][A-Za-z_0-9]*)}';
+$::Pattern='\\{([A-Za-z][A-Za-z_0-9]*)\\}';
 $::Recurse=0;
 
 $::Usage="Usage: $::cmd [-i] [-p pattern] [-r] [--] [files...]
 	-i		Interactive; flush output after each line.
 	-p pattern	Specify pattern; \$1 must match variable name.
-			Default: $::Pattern.
+			Default: $::Pattern
 	-r		Recurse on pattern.
 ";
 
 { my $badopts=0;
 
-  getopts('ip:r');
-  while (defined($_=shift))
-  { last if $_ eq '--';
-    (unshift(@ARGV,$_), last) if !/^-/;
-
-    $::Interactive=1 if defined $::opt_i;
-    $::Recurse=1 if defined $::opt_r;
-    $::Pattern=$::opt_p if defined $::opt_p;
-  }
+  getopts('ip:r') || ($badopts=1);
+  $::Interactive=1 if defined $::opt_i;
+  $::Recurse=1 if defined $::opt_r;
+  $::Pattern=$::opt_p if defined $::opt_p;
 
   die $::Usage if $badopts;
 }
@@ -44,11 +39,11 @@ if (! @ARGV)
 else
 { for (@ARGV)
   { if ($_ eq '-')
-    { &envsub(STDIN,'stdin');
+    { envsub(STDIN,'stdin');
     }
     else
     { if (open(FILE,"< $_\0"))
-      { &envsub(FILE,'"'.$_.'"');
+      { envsub(FILE,'"'.$_.'"');
 	close(FILE);
       }
       else
@@ -64,6 +59,8 @@ exit $::Xit;
 sub envsub
 { my($FILE,$file)=@_;
   my($line,$val);
+
+  local($_);
 
   while (<$FILE>)
   { $line='';
