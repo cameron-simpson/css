@@ -116,7 +116,8 @@ sub norm
 sub ngSet($)	# newsgrouptext -> cs::Flags
 { local($_)=@_;
 
-  new cs::Flags grep(length,split(/[\s,]+/));
+  ::need(cs::Flags);
+  cs::Flags->new(grep(length,split(/[\s,]+/)));
 }
 
 =item addrSet(I<addresses>)
@@ -947,11 +948,13 @@ sub Reply($;$$)
   $how=AUTHOR if ! defined $how;
   $myaddrs='' if ! defined $myaddrs;
 
+  ::need(cs::Flags);
+
   my $rep = new cs::RFC822;
 
   my $to = {};
   my $cc = {};
-  my $ng = {};
+  my $ng = cs::Flags->new();;
   my $bcc= {};
 
   for (ref $how ? @$how : $how)
@@ -979,7 +982,7 @@ sub Reply($;$$)
 
   # clean self references
   if (length $myaddrs)
-  { map(delete $cc->{$_}, addrSet($myaddrs)->KEYS());
+  { map(delete $cc->{$_}, keys %{addrSet($myaddrs)});
   }
 
   $rep->Add(TO,$to)			if keys %$to;
