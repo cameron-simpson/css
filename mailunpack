@@ -37,9 +37,9 @@ munpack || exit 1
 
 if [ $# = 0 ]
 then
-    if [ -s "$base/autoexec.sh" ]
+    if [ -s "$target/autoexec.sh" ]
     then
-	set /bin/sh "$base/autoexec.sh"
+	set /bin/sh "$target/autoexec.sh"
     else
 	set mrg .. *
     fi
@@ -48,6 +48,7 @@ fi
 xit=0
 echo "$wkdir"
 (set -x; exec "$@") || xit=1
+
 cd .. || exit 1
 rmdir "$wkdir"
 exit $xit
