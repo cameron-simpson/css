@@ -1,0 +1,2 @@
+#!/bin/sh
+exec /opt/firefox-1.0pr1-gtk2+xft/firefox ${1+"$@"}
