@@ -4,28 +4,27 @@
 # and convert it to raw form. See RFC2047.
 #	- Cameron Simpson <cs@zip.com.au> 01feb2002
 #
+# -c chregexp: cameron 26jun2002
+#
+
+use Getopt::Std;
 
 ($::cmd=$0) =~ s:.*/::;
 $::Usage="Usage: $::cmd [-r regexp] [strings...]
 	-r regexp	Only modify strings matching regexp (case insensitive).
 			Pass others through unchanged.
 			Intended for modifying particular header lines.
+	-c csregexp	Only unfontise if the charset matches chregexp.
 ";
 
 my $regexp;
+my $csregexp = '';
 
 { my $badopts = 0;
 
-  if (@ARGV && $ARGV[0] eq '-r')
-  { shift(@ARGV);
-    if (! @ARGV)
-    { warn "$::cmd: missing regexp\n";
-      $badopts=1;
-    }
-    else
-    { $regexp=shift(@ARGV);
-    }
-  }
+  getopts('r:c:') || ($badopts=1);
+  $regexp=$::opt_r if defined $::opt_r;
+  $csregexp=$::opt_c if defined $::opt_c;
 
   die $::Usage if $badopts;
 }
@@ -56,14 +55,20 @@ sub unfontise
   my $charset;
   my $enc;
   my $encwords;
+  my $m;
 
   while (/=\?([^?]+)\?([QB])\?([^?]*)\?=/i)
   {
     ($charset,$enc,$encwords)=(uc($1),uc($2),$3);
+    $m=$&;
     $dec.=$`;
     $_=$';
 
-    if ($enc eq 'Q')
+    if (length $csregexp && $charset !~ /^$csregexp$/oi)
+    # don't touch this charset
+    { $encwords=$m;
+    }
+    elsif ($enc eq 'Q')
     { $encwords =~ tr/_/ /;
       $encwords =~ s/=([\da-f][\da-f])/(($code=eval "0x$1") >= 32 && $code < 255 ? chr($code) : $&)/egi;
     }
