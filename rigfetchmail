@@ -5,9 +5,17 @@
 #
 needhost $HOMEHOST@home || exit 1
 set -x
-exec acon fetchmail \
-	-f /u/cameron/.fetchmailrc \
+cd
+fmopts=
+case "$LOCATION" in
+  home|sco|tw)	fmopts="$fmopts -l 65536" ;;
+esac
+acon fetchmail \
+	-f "$HOME/.fetchmailrc" \
+	$fmopts \
 	-d 900 \
-	--logfile /u/cameron/var/log/fetchmail \
+	--logfile "$HOME/var/log/fetchmail" \
 	--nobounce --tracepolls --warnings 86400 \
 	127.0.0.2 127.0.0.3
+## have to debug with change to maildir
+alog procmail lock -1 getmail-despool nice getmail-flush -p 300 spool
