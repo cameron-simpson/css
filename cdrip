@@ -1,13 +1,52 @@
 #!/bin/sh
 #
 # Yet another audio CD ripper. Easiest way to learn the tools :-)
+# Like mkcd and mkiso, this is meant to be a no brainer command line.
 #	- Cameron Simpson <cs@zip.com.au> 12mar2001
+#
+# Add MP3 mode, basicly for my brother.	 -cameron 25aug2001
 #
 
 cmd=`basename "$0"`
-usage="Usage: $cmd {rip|enc} [cdparanoia-args]"
+usage="Usage: $cmd [-b bps] [-d device] [-e enc]
+	-b bps		Bits per second for the final bitstream.
+			Default: ${bps}bps.
+	-d device	Device holding the CD. Default: $dev
+	-e enc		Select encoding. Default: $enc"
 
 dev=/dev/cdrom
+bps=192
+enc=ogg
+
+badopts=
+while :
+do
+    case $1 in
+	-b)	bps=$2; shift ;;
+	-d)	dev=$2 ;shift ;;
+	-e)	case $2 in
+		    mp3|ogg)	enc=$2 ;;
+		    *)		echo "$cmd: unrecognised encoder: $2" >&2
+				echo "	I known ogg and mp3" >&2
+				badopts=1
+				;;
+		esac
+		shift
+		;;
+	--)	shift ;break ;;
+	-?*)	echo "$cmd: unrecognised option: $1" >&2
+		badopts=1
+		;;
+	*)	break ;;
+    esac
+    shift
+done
+
+[ $# = 0 ] || { echo "$cmd: extra arguments: $* ">&2
+		abdopts=1
+	      }
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
 
 cdtoc "$dev" \
 | sed -e 's/\\/&&/g' -e 's;/;--;g' \
@@ -20,9 +59,17 @@ cdtoc "$dev" \
        && read xtra
     do
       dir=$artist/$album
-      ogg=$dir/$title.ogg
 
-      [ -s "$ogg" ] && { echo "$cmd: existing file $ogg, skipping track #$track" >&2
+      case $enc in
+	  ogg|mp3)
+		out=$dir/$title.$enc
+		;;
+	  *)	echo "$cmd: unimplemented encoding \"$enc\"!" >&2
+		xit=1
+		;;
+      esac
+	  
+      [ -s "$out" ] && { echo "$cmd: existing file $out, skipping track #$track" >&2
 			 continue
 		       }
 
@@ -32,9 +79,17 @@ cdtoc "$dev" \
       time cdparanoia -q -d "$dev" -e -r "$track" - \
 	2>>cdp.err \
       | buffer -m 1M \
-      | time oggenc -r -q \
-	       -c "Ripped by $NAME with cdparanoia and oggenc at `date`" \
-	       -n "$track" -a "$xtra" -t "$title" -l "$album" - >"$ogg"
+      | case $enc in
+	  ogg)
+	      oggenc -r -q -b $bps \
+		     -c "Ripped by $NAME with cdparanoia and oggenc on `date`" \
+		     -a "$artist" \
+		     -n "$track" -a "$xtra" -t "$title" -l "$album" - >"$out"
+	      ;;
+	  mp3)
+	      lame -r -b "$bps" -h -p - "$out"
+	      ;;
+	esac
     done
 
     exit $xit
