@@ -5,6 +5,8 @@
 # apphelper - a generic wrapper for email attachments or web browser file helpers, offering both save and view choices
 #
 
+: ${TMPDIR:=/tmp}
+
 cmd=`basename "$0"`
 
 ## tty=/dev/ttyp2
@@ -46,7 +48,7 @@ usage="Usage: $cmd [{-t|+t|-T title}] file [{-n|-y}] [-d savedir] [-p pager] \\
 	-p pager	Pager (default viewer, from \$PAGER: $pager)."
 
 trap 'rm -r "$tmpdir"' 0
-tmpdir=`mkdirn ${TMPDIR:-/tmp}/$cmd` || exit 1
+tmpdir=`mkdirn "$TMPDIR/$cmd"` || exit 1
 tmpfile=$tmpdir/$cmd$$
 
 # =head1 DESCRIPTION
@@ -482,7 +484,7 @@ fi
 
 [ -s "$saveas" ] && cmp -s "$file" "$saveas" && exit 0
 
-exec cp -i "$file" "$saveas"
+cp -i "$file" "$saveas"
 
 # =head1 EXAMPLE
 #
