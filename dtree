@@ -1,0 +1,7 @@
+#!/bin/sh
+# An ancient incantation from the Ur-Net ...
+#
+
+find ${1+"$@"} ${1-.} -print \
+	| sed -e 's,[^/]*/\([^/]*\)$,`--\1,' \
+	      -e 's,[^/]*/,|  ,g'
