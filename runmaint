@@ -259,47 +259,54 @@ esac
 
 for script in $try
 do
-    scriptdir=`dirname "$script"`
     # run the script if present
     if [ -r "$script" ]
     then
-	( 
-	  [ -s "$scriptdir/env" ] && . "$scriptdir/env"
+	scriptdir=`dirname "$script"`
 
-	  # if no addresses
-	  # then write a log if there's a log dir
-	  # otherwise email the user
-	  if [ "x$addresses" = x ]
-	  then
+	# if no addresses
+	# then write a log if there's a log dir
+	# otherwise email the user
+	if [ "x$addresses" = x ]
+	then
 	    logdir=$scriptdir/log
 	    if [ -d "$logdir/." ]
 	    then
 		log=$logdir/$target@$HOST
-		if [ -d "$log/." ]
-		then
-		    log=$log/`datecode`
-		fi
+		[ -d "$log/." ] && log=$log/`datecode`
 	    else
 		addresses=${EMAIL:-$USER}
 	    fi
-	  fi
+	fi
 
-	  case "$addresses" in
+	ok=1
+	merge=1
+	case "$addresses" in
 	    '')	logdir=`dirname "$log"`
-		if [ -d "$logdir/." ] || mkdir -p "$logdir"
-		then
-		    sh $xflag "$script" 2>&1 \
-		    | execif sh -c "exec >>'$log'; echo;echo '============================';date;exec cat"
-		else
-		    echo "$0: can't make log dir \"$logdir\"" >&2
-		    echo "	suppressing run of \"$script\"" >&2
-		    xit=1
-		fi
+		[ -d "$logdir/." ] \
+		|| mkdir -p "$logdir" \
+		|| { echo "$0: can't make log dir \"$logdir\"" >&2
+		     echo "	suppressing run of \"$script\"" >&2
+		     xit=1
+		     ok=
+		   }
 		;;
-	    -)	sh $xflag "$script" ;;
-	    *)	sh $xflag "$script" 2>&1 | mailif -s "$subj" $addresses ;;
-	  esac
-	)
+	    -)	merge=
+		;;
+	esac
+
+	if [ $ok ]
+	then
+	    ( [ -s "$scriptdir/env" ] && . "$scriptdir/env"
+	      [ $merge ] && exec 2>&1
+	      exec sh $xflag "$script"
+	    ) \
+	    | case "$addresses" in
+		'') exec execif sh -c "exec >>'$log'; echo;echo '============================';date;exec cat" ;;
+		-)  exec cat ;;
+		*)  exec mailif -s "$subj" $addresses ;;
+	      esac
+	fi
     fi
 
     if [ -r "$script.$HOST" ]
