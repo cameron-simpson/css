@@ -1,10 +1,82 @@
 #!/bin/sh
 #
-# Create a CD from an ISO image.
-# Partner for mkiso.
-# Only does single session CDs.
-# Calls mkiso if handed a directory instead of an ISO9660 image.
-#	- Cameron Simpson <cs@zip.com.au> 12jul2000
+# =head1 NAME
+#
+# mkcd - burn a data CD from an ISO image or data directory
+#
+# =head1 SYNOPSIS
+#
+# mkcd [-n] [dev=device] [speed=n] [blank=mode] {image.iso|dir}
+#
+# =head1 DESCRIPTION
+#
+# I<mkcd> is a script to burn data CD-Rs.
+# It is partner to mkiso(1cs), a program to make ISO9660 CD images.
+# Normally you would hand it a premade ISO9660 CD image to burn.
+# Alternatively you can hand it a directory containing the data for the CD
+# and it will call mkiso(1cs) to make the requisite CD image for you.
+#
+# =head1 OPTIONS
+#
+# =over 4
+#
+# =item B<-n>
+#
+# No action. Run cdrecord(1) in dummy mode.
+#
+# =item B<-l> I<label>
+#
+# If handing a directory to I<mkcd>
+# this can be used to supply a I<label> string in lieu of a B<LABEL> file.
+# 
+# =back
+#
+# =head1 CDRECORD ARGUMENTS
+#
+# The following arguments are passed to cdrecord(1).
+# The script obtains defaults for these from the configuration files
+# and the B<MKCDDEV> environment variable.
+#
+# =over 4
+#
+# =item B<dev=I<bus>,I<id>,I<lun>>
+#
+# Specifiy the location of the CD burner on the SCSI bus.
+#
+# =item B<speed=I<n>>
+#
+# Specify the burn speed.
+#
+# =item B<blank=I<type>>
+#
+# Blank a CD-RW before writing.
+#
+# =back
+#
+# =head1 FILES
+#
+# /etc/mkcdrc, a shell script to set I<mkcd> defaults
+# being B<speed=> and B<dev=>
+#
+# $HOME/.mkcdrc, personal I<mkcd> settings, also a shell script
+#
+# =head1 ENVIRONMENT
+#
+# MKCDDEV, the B<I<bus>,I<id>,I<lun>> string used in B<dev=I<bus>,I<id>,I<lun>>.
+# For example i set this to B<0,4,0> on our work CD burning machine.
+#
+# =head1 SEE ALSO
+#
+# mkiso(1cs), mkisofs(1), cdrecord(1)
+#
+# =head1 CREDITS
+#
+# I<mkcd> is really just a wrapper for the cdrecord(1) command
+# by Joerg Schilling.
+#
+# =head1 AUTHOR
+#
+# Cameron Simpson <cs@zip.com.au> 12jul2000
 #
 
 scsiid=4	# for my work CD burner, 6 is also common
@@ -19,7 +91,7 @@ dev=${MKCDDEV:+dev=$MKCDDEV}
 [ -n "$dev" ] || dev="dev=0,$scsiid,0"
 
 cmd=`basename "$0"`
-usage="Usage: $cmd [-n] [dev=device] [speed=n] [blank=mode] image.iso
+usage="Usage: $cmd [-n] [-l label] [dev=device] [speed=n] [blank=mode] image.iso
 	-l label	Label string (only useful if \"image.iso\" is
 			a directory instead of an ISO9660 image.
 			(VOLI field, up to 32 bytes).
