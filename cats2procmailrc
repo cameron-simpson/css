@@ -18,7 +18,7 @@ cats2procmailrc [B<-D>] [B<-L>] [B<-a> I<alert>] [B<-m> I<maildomains>] [B<-t> I
 
 I<cats2procmailrc> reads a human friendly mail category description file
 and emits a matching procmail(1) recipe to implement it.
-The intent it to have an extremely succinct file
+The intent is to have an extremely succinct file
 of easily editable one line rules,
 generally of the form:
 
@@ -29,7 +29,7 @@ I build my B<.procmailrc> like this:
 	cats2procmailrc \
 		-a 'announce-email "+%"' \
 		-t mh -L \
-		-m research.canon.com.au \
+		-m cskk.homeip.net \
 		<categories >$HOME/.procmailrc
 
 =head1 OPTIONS
@@ -113,7 +113,7 @@ appears in yellow in a small log window
 I have at the top of my screen for mail items I should read I<now>.
 
 The I<folder> names the folder in which to place the mail item.
-Normail UNIX mail files,
+Normal UNIX mail files,
 MH style directories and Maildir style directories are autodetetected.
 If the I<folder> contains an "at" (B<@>) character
 it is considered an email address
@@ -145,11 +145,11 @@ is appended.
 So I have rules like this:
 
 	!attn	Personal	cs
-	!attn	Personal	cameron@research.canon.com.au
+	!attn	Personal	cameron@cskk.homeip.net
 	attn	EFF-Cafe-News   cafe-news@eff.org
 	crypto  AUCrypto        aucrypto@suburbia.net
 
-matching B<cs@zip.com.au>, B<cameron@research.canon.com.au>, B<cafe-news@eff.org>
+matching B<cs@zip.com.au>, B<cameron@cskk.homeip.net>, B<cafe-news@eff.org>
 and B<aucrypto@suburbia.net> respectively. The "Personal" items generate an alert.
 
 It is also possible to select on a different header line
@@ -180,7 +180,7 @@ to accept mail aimed at B<fred@this.isp.com> and also copy it to B<fred@that.isp
 
 MAILDIR, the directory containing mail folders.
 
-MAILDOMAIN, the local mail domain (eg B<research.canon.com.au> for my current workplace).
+MAILDOMAIN, the local mail domain (eg B<cskk.homeip.net> for my home domain).
 
 =head1 SEE ALSO
 
