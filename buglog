@@ -17,7 +17,7 @@
 
 : ${TMPDIR:=/tmp}
 : ${USER:=`whoami`}
-: ${BUGSYSTEMS:='dlog logger'}
+: ${BUGSYSTEMS:="dlog logger mailto:$USER"}
 
 cmd=`basename "$0"`
 usage="Usage: $cmd headline < description"
