@@ -47,9 +47,8 @@ do
     sed -n 's/.*<[Tt][Ii][Tt][Ll][Ee]>\(.*\)<\/[Tt][Ii][Tt][Ll][Ee]>.*/Subject: \1/p' <"$tmpf"
     exec cat "$tmpf"
   ) \
-  | ( set -x;
-      exec /usr/lib/nmh/rcvstore "+$folder" -unseen
-    ) || xit=1
+  | filemailitem "+$folder" \
+  || xit=1
 done
 
 exit $xit
