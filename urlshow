@@ -63,23 +63,26 @@ then
 	else
 	    echo "$url"
 	fi
-    done | sed -e 's/^.*<\(.*\)>.*$/\1/' \
-	       -e 's/^.*(\(.*\)).*$/\1/' \
-	       -e 's/^[^a-z]*\([a-z][a-z]*:\/\/.*\)/\1/' \
-	       -e '/^[a-z][a-z]*:\/\//b ok' \
-	       -e '/^file:/b ok' \
-	       -e '/^news:/b ok' \
-	       -e 's/^/http:\/\//' \
-	       -e ':ok' \
-	 | "$0"
-else
-    set x -noraise -iconic
-    while read url
-    do  
+    done \
+    | "$0"
+    exit $?
+fi
 
-	case "$url" in
-	    ''|\#*)	continue ;;
-	esac
+set x -noraise -iconic
+
+sed -e 's/^[ 	][ 	]*//' \
+    -e 's/^#.*//' \
+    -e '/^$/d' \
+    -e 's/^.*<\(.*\)>.*$/\1/' \
+    -e 's/^.*(\(.*\)).*$/\1/' \
+    -e 's/^[^a-z]*\([a-z][a-z]*:\/\/.*\)/\1/' \
+    -e '/^[a-z][a-z]*:\/\//b ok' \
+    -e '/^file:/b ok' \
+    -e '/^news:/b ok' \
+    -e 's/^/http:\/\//' \
+    -e ':ok' \
+| { while read url
+    do  
 	[ -n "$URLLOG" ] && echo "urlshow $url" >>"$URLLOG"
 
 	url="$meta$url"
@@ -117,4 +120,4 @@ else
     esac
     "$NETSCAPE" "$@" \
 	|| { echo "FAILED request for $*" >&2; exit 1; }
-fi
+  }
