@@ -115,13 +115,13 @@ sed -e 's;//*; -- ;g' -e 's/   */ /g' \
 	  [0-9])	wtrack=0$track ;;
 	  *)		wtrack=$track ;;
       esac
-      title="$wtrack: $title"
+      ftitle="$wtrack: $title"
 
-      echo "Ripping track #$track: $dir/$title ..."
+      echo "Ripping track #$track: $dir/$ftitle ..."
 
       needenc=
       for enc in $enclist
-      do  out=$dir/$title.$enc
+      do  out=$dir/$ftitle.$enc
 	  if [ -s "$out" ]
 	  then  echo "$cmd: $out already exists" >&2
 	  else  needenc="$needenc $enc"
@@ -131,7 +131,7 @@ sed -e 's;//*; -- ;g' -e 's/   */ /g' \
       # skip if no encodings OR keep-raw mode on
       [ -n "$needenc" -o -n "$keep" ] || continue
 
-      raw=$dir/$title.wav
+      raw=$dir/$ftitle.wav
 
       [ -d "$dir/." ] || mkdir -p "$dir" || { xit=1; continue; }
       ripcomment="Ripped by $NAME with cdparanoia on `date`"
@@ -149,7 +149,7 @@ sed -e 's;//*; -- ;g' -e 's/   */ /g' \
       linksgood=1
       for enc in $needenc
       do
-	out=$dir/$title.$enc
+	out=$dir/$ftitle.$enc
 	[ -s "$out" ] && { echo "$cmd: existing file $out, skipping" >&2
 			   continue
 			 }
@@ -170,10 +170,12 @@ sed -e 's;//*; -- ;g' -e 's/   */ /g' \
 	if ln "$raw" "$link"
 	then
 	    set rmafter $"link" "$@"
+	    in=$link
 	else
 	    echo "$cmd: can't link raw to $link" >&2
 	    linksgood=
 	    link=
+	    in=$raw
 	fi
 	case $enc in
 	  ogg)
@@ -182,16 +184,31 @@ sed -e 's;//*; -- ;g' -e 's/   */ /g' \
 	    commentf=.tmp$$c
 	    [ -n "$xtra" ] && echo "$xtra" >"$commentf"
 	    echo "$ripcomment" >>"$commentf"
-	    echo "Encoded by $NAME with `oggenc -v` on `date`" >>"$commentf"
+	    echo "Encoded by $NAME with `oggenc -v` [$oggencqual] on `date`" >>"$commentf"
 	    while read -r comment
 	    do  [ -n "$comment" ] && set "$@" -c "COMMENT=$comment"
 	    done <$commentf
 	    rm "$commentf"
 
-	    set "$@" -o "$out" "$link"
+	    set "$@" -o "$out" "$in"
 	    ;;
 	  mp3)
-	    set lame -h $lamequal -p "$link" "$out"
+	    set lame -h $lamequal -p "$in" "$out"
+	    if [ -n "$link" ]
+	    then
+	      ( # dispatch job to id3 tag the file after encoding
+		while [ -s "$link" ]
+		do  sleep 1
+		done
+		if [ -s "$out" ]
+		then
+		  set -x
+		  id3ed -s "$title" -n "$artist" -a "$album" \
+			-c "Encoded by $NAME with `lame -v 2>&1 | sed 1q` [$lamequal] on `date`" \
+			-k "$track" "$out"
+		fi
+	      ) &
+	    fi
 	    ;;
 	  *)
 	    echo "$cmd: unimplemented encoding \"$enc\"!" >&2
