@@ -1,0 +1,41 @@
+#!/usr/bin/perl
+#
+# Return the contents of a symlink.
+#	- Cameron Simpson <cs@zip.com.au> 04dec2000
+#
+
+use strict qw(vars);
+
+($::cmd=$0) =~ s:.*/::;
+$::Usage="Usage: $::cmd [pathnames...]\n";
+
+$::Xit=0;
+
+@ARGV=("-") if ! @ARGV;
+
+my $link;
+
+for my $arg (@ARGV)
+{ if ($arg eq '-')
+  { while (defined($_=<STDIN>))
+    { chomp;
+      if (! defined($link=readlink($_)))
+      { warn "$::cmd: readlink($_): $!\n";
+	$::Xit=1;
+      }
+      else
+      { print "$_: $link\n";
+      }
+    }
+  }
+  elsif (! defined($link=readlink($arg)))
+  { warn "$::cmd: readlink($arg): $!\n";
+    $::Xit=1;
+  }
+  else
+  { print "$arg: " if @ARGV > 1;
+    print "$link\n";
+  }
+}
+
+exit $::Xit;
