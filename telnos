@@ -1,0 +1,75 @@
+#!/bin/sh
+#
+# Append to a log.
+#	- Cameron Simpson <cs@zip.com.au>
+#
+
+cmd=`basename "$0"`
+usage="Usage: $cmd file [text]"
+
+usenote=
+post=
+dodiff=
+
+badopts=
+
+case $cmd in
+    dl|dlog)	file=$HOME/var/log/dlog usenote=1 ;;
+    bill|gpx|zzr|fj) file=$HOME/etc/info/$cmd usenote=1 ;;
+    ramgate)	file=$HOME/private/contracts/ramgate/log usenote=1 ;;
+    mailrc)	file=$MAILRC ;;
+    telnos)	file=$telnos/main ;;
+    telno)	file=$telnos/adhoc ;;
+    sigs)	file=$HOME/.sigs ;;
+    dvds|vids|books) file=$HOME/private/$cmd ;;
+    raul)	file=$HOME/private/contracts/raul ;;
+    noads)	file=$HOME/rc/adzap/patterns
+		post='cd $HOME/rc/adzap && myke'
+		dodiff=1
+		;;
+    *)		if [ -f $HOME/rc/keys/$cmd.pgp ]
+		then
+		    file=$HOME/rc/keys/$cmd.pgp
+		else
+		    if [ -f $HOME/etc/info/$cmd ]
+		    then	file=$HOME/etc/info/$cmd
+		    else	echo "$cmd: who am I?" >&2
+			    exit 1
+		    fi
+		fi
+		;;
+esac
+
+case $file in
+    *.pgp)	usepgp=1 ;;
+    *)		usepgp= ;;
+esac
+
+orig=/tmp/orig.$$
+[ $dodiff ] \
+&& { cp "$file" "$orig" \
+     || { echo "$cmd: warning: can't copy $file for diff" >&2
+	  dodiff=
+	}
+   }
+
+if [ -n "$*" ]
+then
+    if [ $usepgp ]
+    then
+	echo "$cmd: can't just append to $file" >&2; exit 1
+    else
+	if [ $usenote ]
+	then
+	    note "$file" "$*" &
+	else
+	    echo "$*" | file=$file lock "$file" sh -c 'cat >>"$file"'
+	fi
+    fi
+else
+    [ $usenote ] && [ -z "$usepgp" ] && note "$file" ""
+    lock "$file" edit "$file"
+    [ $dodiff ] && { gnudiff -u "$orig" "$file"; rm "$orig"; }
+fi
+
+[ -z "$post" ] || eval "$post"
