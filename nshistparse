@@ -1,0 +1,110 @@
+#!/usr/bin/perl
+#
+# Parse the anchors in the cleaned netscape history dump
+# and write plain HTML.
+#	- Cameron Simpson <cs@zip.com.au> 13mar98
+#
+
+use strict qw(vars);
+
+use cs::Source;
+use cs::HTML;
+use cs::Misc;
+use cs::Web::Bookmarks;
+use cs::Upd;
+$cs::Upd::This=new cs::Upd STDERR;
+
+die "unimplemented";
+
+$::Usage=
+
+{ my($badopts)=0;
+
+  ARGV:
+    while (@ARGV)
+	{ $_=shift(@ARGV);
+	  last ARGV if $_ eq '--';
+	  if (! /^-./)
+		{ unshift(@ARGV,$_);
+		  last ARGV;
+		}
+	  else
+	  { warn "$::cmd: unrecognised option: $_\n";
+	    $badopts=1;
+	  }
+	}
+
+  die $::Usage if $badopts;
+}
+
+my($parse)=new cs::HTML (new cs::Source (FILE,STDIN));
+
+my($t,$p);
+
+%::BM=();
+
+while (defined ($t=$parse->Tok()))
+	{
+	  walk($t);
+	}
+
+exit 0;
+
+sub walk
+	{ my($t)=@_;
+
+	  ## warn "walk($t)\n";
+	  ## out("walk($t)");
+
+	  return if ! ref $t;
+
+	  my($tok);
+
+	  if (reftype($t) ne HASH)
+		{ warn "nonHASH!";
+		  return;
+		}
+
+	  my($tag)=$t->{TAG};
+	  my(@t)=@{$t->{TOKENS}};
+
+	  ## warn "tag: $tag [@t]\n";
+	  if ($tag eq A && exists $t->{ATTRS}->{HREF})
+		{ my($url)=new cs::URL $t->{ATTRS}->{HREF};
+		  my($mtitle)=cs::HTML::tokFlat($t->{TOKENS});
+		  my($mark)=new cs::Web::Bookmarks ($mtitle,$t->{ATTRS});
+		  my($cat)=locateNode($
+		  $::LastRec=$mark;
+
+		  ## warn "HREF\n";
+		  ## out($mtitle);
+
+		  $::BM->AddEntry($mark);
+		}
+
+	  ## warn "t=[@t]\n";
+	  for (@t)
+		{ walk($_);
+		}
+	}
+
+sub printURLs
+	{ my($t)=@_;
+	  my($url);
+
+	  URL:
+	    for (cs::HTML::grepMarkUp(($::Inline
+				      ? sub { exists $_[0]->{ATTRS}->{SRC} }
+				      : sub { exists $_[0]->{ATTRS}->{HREF} }
+				      ),
+				    $t))
+		{ $url=($::Inline
+			? $_->{ATTRS}->{SRC}
+			: $_->{ATTRS}->{HREF}
+		       );
+
+		  if (defined($url=mungeURL($url)))
+			{ print $url, "\n";
+			}
+		}
+	}
