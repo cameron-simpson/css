@@ -1,0 +1,144 @@
+#!/usr/bin/perl
+#
+# Redirect all requests to a given URL.
+# Once used by the ad zapping proxy.pac.
+#	- Cameron Simpson <cs@zip.com.au> 31jul97
+#
+
+BEGIN { unshift(@INC,"/u/cameron/etc/pl"); }
+
+use strict qw(vars);
+
+use Getopt::Std;
+use cs::HTTP;
+use cs::HTTPD;
+use cs::Persist;
+use cs::CachedFile;
+
+$::Debug=0;
+$::Port=8081;
+undef $::Mapping;
+
+($::cmd=$0) =~ s:.*/::;
+$::Usage="Usage: $::cmd [-d] [-p port] [-m map] URL
+	-d	Debug mode. Report requests.
+	-p port	Port to listen on (default: $::Port).
+	-m map	URL remapping table.
+";
+
+{ my($badopts)=0;
+
+  ## warn "ARGV=[@ARGV]";
+  if (! getopts('dp:m:'))
+	{
+	  warn "$::cmd: getopt errors\n";
+	  $badopts=1;
+	}
+  ## warn "post getopt: ARGV=[@ARGV]";
+
+  $::Debug=$::opt_d if defined $::opt_d;
+  $::Port=$::opt_p if defined $::opt_p;
+  $::Mapping=$::opt_m if defined $::opt_m;
+
+  if (@ARGV)
+	{
+	  $::URL=shift(@ARGV);
+	}
+  else	{
+	  warn "$::cmd: missing URL\n";
+	  $badopts=1;
+	}
+
+  if (@ARGV)
+	{ warn "$::cmd: extra arguments: @ARGV\n";
+	  $badopts=1;
+	}
+
+  die $::Usage if $badopts;
+}
+
+if (defined $::Mapping)
+	{ $::Mapping=new cs::CachedFile ($::Mapping,\&loadmap);
+	}
+
+my($serv)=new cs::HTTPD ($::Port,{ GET => \&do_get },{});
+die "$::cmd: can't attach to $::Port: $!\n" if ! defined $serv;
+
+$::MyPID=$$;
+$SIG{PIPE}=\&onpipe;	# what a pain
+
+while (1)
+	{
+	  $serv->Serve($cs::Net::TCP::F_FORK
+		      |$cs::Net::TCP::F_FORK2
+		      |$cs::Net::TCP::F_ONCE);
+	}
+
+exit 0;
+
+sub onpipe
+	{
+	  exit 1 if $::MyPID != $$;
+	  warn "SIGPIPE in main process!";
+	  $SIG{PIPE}=\&onpipe;
+	}
+
+sub do_get
+	{
+	  my($httpd,$rq)=@_;
+	  # warn "rq=".cs::Hier::h2a($rq,0);
+	  my($conn,$uri,$H,$hvers,$state)
+		=($rq->{CONN},
+		  $rq->{URI},
+		  $rq->{HDRS},
+		  $rq->{VERSION},
+		  $httpd->{STATE});
+
+	  warn "$::cmd: URI=$rq->{URI}\n" if $::Debug;
+
+	  my $RH  = new cs::RFC822;
+	  my $loc = $::URL;	# default
+
+	  $::Mapping->Poll() if defined $::Mapping;
+
+	  # see if there's a specific remap
+	  RE:
+	    for my $re (keys %$::Map)
+		{ if ($uri =~ /^$re$/i)
+			{ $loc=$::Map->{$re};
+			  last RE;
+			}
+		}
+
+	  $RH->Add("Location: $loc");
+	  $httpd->Respond($conn,
+			  $cs::HTTP::M_MOVED,
+			  "redirect $uri to $loc",
+			  $RH);
+	}
+
+sub loadmap
+	{
+	  my($this)=@_;
+
+	  $::Map={};
+
+	  my $map = cs::Persist::db($::Mapping,0,0,1);
+	  return if ! defined $map;
+
+	  for my $target (keys %$map)
+		{ my $srcfield = $map->{$target};
+
+		  for my $src (ref $srcfield
+			      ? @$srcfield
+			      : $srcfield)
+		  {
+		    my($re)=$src;
+
+		    $re =~ s/\./\\$&/g;
+		    $re =~ s/\*/.*/g;
+
+		    $::Map->{$re}=$target;
+		  }
+		}
+	}
