@@ -11,7 +11,9 @@ use strict qw(vars);
 chdir($ENV{MAILDIR}) || die "$::cmd: chdir($ENV{MAILDIR}): $!\n";
 
 my $new = 'addrs.new';
-my $all = 'addrs.all';
+my $alldir = "$ENV{HOME}/rc/mail";
+my $allbase = 'addrs.all';
+my $all = "$alldir/$allbase";
 
 exit 0 if ! -s $new;
 
@@ -64,4 +66,6 @@ for my $key (sort keys %addrs)
 
 close(ALL);
 
-exit 0;
+chdir($alldir) || die "$::cmd: can't chdir to $alldir for cvs commit: $!\n";
+
+exec('cvs','commit','-m',$::cmd,$allbase);
