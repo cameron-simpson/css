@@ -4,18 +4,15 @@
 #	- Cameron Simpson <cs@zip.com.au> 15may2003
 # 
 
-doesecho=1
 postdelay=
 
 cmd=`basename "$0"`
-usage="Usage: $cmd [-d delay] [-e] Hayes-AT-command"
+usage="Usage: $cmd [-d delay] Hayes-AT-command"
 
 badopts=
 while :
 do
   case $1 in
-    -e)	doesecho=1 ;;
-    +e) doesecho= ;;
     -d) delay=$2; shift ;;
     -?*)echo "$cmd: unrecognised option: $1" >&2; badopts=1 ;;
     *)	break ;;
