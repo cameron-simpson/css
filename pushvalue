@@ -1,0 +1,8 @@
+#!/bin/sh
+#
+# Push a value onto a value stack file.
+#	- Cameron Simpson <cs@zip.com.au> 28jul2003
+#
+
+set -x
+exec lastvalue -a ${1+"$@"}
