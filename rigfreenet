@@ -1,0 +1,15 @@
+#!/bin/sh
+#
+# Set up my freenet server.
+# Current is test mode, so no advertising.
+#	- Cameron Simpson <cs@zip.com.au> 29dec2000
+#
+
+case $HOST@$SYSTEMID in
+    ivie@cisra)	;;
+    *)		echo "$0: $HOST@$SYSTEMID: wrong host!" >&2; exit 2 ;;
+esac
+
+pwd
+set -x
+sh -x freenet_server -transient=yes -informWrite=no
