@@ -10,8 +10,8 @@ Installing my scripts:
 
     Unpack the tarball:
 	    http://www.cskk.ezoshosting.com/css/css.tar.gz
-	into a suitable directory (eg "/opt/css", which I will assume
-	for the sake of example below).
+    into a suitable directory (eg "/opt/css", which I will assume for the
+    sake of example below).
 
     Add the full pathname for the bin directory to the END of your $PATH.
 	Eg:
