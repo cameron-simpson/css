@@ -16,7 +16,6 @@ parity=none
 
 dev_=`echo "$dev" | tr -s / _`
 
-exec scrif 
 lock=tap$dev_
 session=$lock
 
