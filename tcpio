@@ -1,60 +1,68 @@
-#!/usr/bin/perl
+#!/usr/bin/perl -w
 #
 # tcpio - shell level TCP stream access
-#	- Cameron Simpson 04feb1994
+#	- Cameron Simpson <cs@zip.com.au> 04feb1994
 #
 
-require 'getopts.pl';
+use Getopt::Std;
 use cs::Net::TCP;
 
-($cmd=$0) =~ s:.*/::;
-$usage="Usage: $cmd [-io] [-p localport | -P localport] [-l logbase] host port
+($::cmd=$0) =~ s:.*/::;
+$usage="Usage: $::cmd [-io] [-p localport | -P localport] [-l logbase] host port
 	-i	Copy in; copy from the connection to stdout.
 	-o	Copy out; copy stdin to the connection.
 	-p	Bind local end of connection to specified port.
 	-P	Bind local end of connection to specified port,
 		or the next free one above that.
-       $cmd -a [-io1] [-l logbase] port command [args]
+       $::cmd -a [-io1] [-l logbase] port command [args]
 	-a	Accept connections on the given port.
 	-1	Accept only the first connection.
+	The port may include an \"address:\" prefix to bind to a specific
+	local interface.
 ";
 
-$badopts=0;
+my $badopts=0;
 
-$localport=0;
-$firstfree=0;
-undef $logto;
+my $localport=0;
+my $firstfree=0;
+my $logto;
+my $accmode=0;
+my $onceonly=0;
 
-Getopts('a1iop:P:l:') || ($badopts=1);
-$accmode=$opt_a;
-$onceonly=$opt_1;
-$copyin =($opt_i || !$opt_o);
-$copyout=($opt_o || !$opt_i);
-$logto=$::opt_l if defined $::opt_l;
-if ($opt_p)	{ $localport=$opt_p; $firstfree=0; }
-elsif ($opt_P)	{ $localport=$opt_P; $firstfree=1; }
+my %opt;
+getopts('a1iop:P:l:',\%opt) || ($badopts=1);
+$accmode=$opt{'a'};
+$onceonly=$opt{'1'};
+$copyin =($opt{'i'} || !$opt{'o'});
+$copyout=($opt{'o'} || !$opt{'i'});
+$logto=$::opt{'l'} if defined $::opt{'l'};
+if ($opt{'p'})		{ $localport=$opt{'p'}; $firstfree=0; }
+elsif ($opt{'P'})	{ $localport=$opt{'P'}; $firstfree=1; }
 
-if ($opt_p && $opt_P)		{ warn "$cmd: can't use both -p and -P\n";
-				  $badopts=1;
-				}
+if ($opt{'p'} && $opt{'P'})	
+{ warn "$::cmd: can't use both -p and -P\n";
+  $badopts=1;
+}
 
-if ($onceonly && !$accmode)	{ warn "$cmd: can't use -1 without -a\n";
-				  $badopts=1;
-				}
+if ($onceonly && !$accmode)
+{ warn "$::cmd: can't use -1 without -a\n";
+  $badopts=1;
+}
 
 if (!$accmode && !defined($host=shift))
-				{ warn "$cmd: missing host name\n";
-				  $badopts=1;
-				}
+{ warn "$::cmd: missing host name\n";
+  $badopts=1;
+}
 
-if (!defined($port=shift))	{ warn "$cmd: missing port name\n";
-				  $badopts=1;
-				}
+if (!defined($port=shift))
+{ warn "$::cmd: missing port name\n";
+  $badopts=1;
+}
 
 if ($accmode)
 {
   if (!@ARGV)
-  { warn "$cmd: missing command\n";
+  { warn "$::cmd: missing command\n";
     $badopts=1;
   }
   else
@@ -63,7 +71,7 @@ if ($accmode)
 }
 else
 { if (@ARGV)
-  { warn "$cmd: extra arguments: @ARGV\n";
+  { warn "$::cmd: extra arguments: @ARGV\n";
     $badopts=1;
   }
 }
@@ -87,11 +95,11 @@ if ($accmode)
 }
 
 # connect to service
-die "$cmd: can't connect to $host:$port: $!\n"
+die "$::cmd: can't connect to $host:$port: $!\n"
 	unless defined ($CONN=new cs::Net::TCP ($host,$port,$localport));
 
 if ($copyin && $copyout)
-{ die "$cmd: can't fork: $!\n" unless defined($pid=fork);
+{ die "$::cmd: can't fork: $!\n" unless defined($pid=fork);
   if ($pid)	{ $copyin=0;  }	# parent, no copyin
   else		{ $copyout=0; } # child, no copyout
 }
@@ -119,24 +127,24 @@ exit 0;
 #####################################################################
 
 sub SERVICE	# (CONN,peer)
-{ local($CONN,$peer)=@_;
-  local($OUT)=select;
+{ my($CONN,$peer)=@_;
+  my($OUT)=select;
 
-  close($OUT) || warn "$cmd: can't close($OUT): $!\n";
+  close($OUT) || warn "$::cmd: can't close($OUT): $!\n";
 
   if ($copyin)
   { my $infh = $CONN->SourceHandle();
     open(STDIN,"<&$infh")
-	  || die "$cmd: can't attach stdin to $infh\n";
+	  || die "$::cmd: can't attach stdin to $infh\n";
   }
 
   if ($copyout)
   { my $outfh = $CONN->SourceHandle();
     open(STDOUT,">&$outfh")
-	  || die "$cmd: can't attach stdout to $outfh\n";
+	  || die "$::cmd: can't attach stdout to $outfh\n";
   }
 
   ## warn "exec(@command)\n";
   exec(@command);
-  die "$cmd: exec(@command): $!\n";
+  die "$::cmd: exec(@command): $!\n";
 }
