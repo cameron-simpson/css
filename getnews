@@ -1,0 +1,84 @@
+#!/usr/bin/perl -w
+#
+
+use strict qw(vars);
+
+use cs::Misc;
+use cs::Newsrc;
+use cs::NNTP;
+use cs::Sink;
+use Getopt::Std;
+
+sub fetchgroup($);
+
+$::Server=(length $ENV{NNTPSERVER} ? $ENV{NNTPSERVER} : 'nntp');
+$::NDA='wc';
+$::Newsrc="$ENV{HOME}/.fetchnews-state";
+
+$::Usage="Usage: $::cmd [-s nntpserver] [-d nda] newsgroup...
+	-s nntpserver	Specify server. Default: \$NNTPSERVER.
+	-n newsrc	Specify news file. Default: $::Newsrc.
+	-d nda		Specify news delivery agent. Default: procmail.
+";
+
+getopts('s:d:n:') || die $::Usage;
+$::Server=$::opt_s if defined $::opt_s;
+$::NDA=$::opt_d if defined $::opt_d;
+$::Newsrc=$::opt_n if defined $::opt_n;
+
+if (! @ARGV)
+{ die "$::cmd: missing newsgroups\n$::Usage";
+}
+
+$::Conn=new cs::NNTP $::Server;
+die "$::cmd: can't connect to server $::Server: $!\n" if ! defined $::Conn;
+
+$::RC=new cs::Newsrc ($::Newsrc,$::Server);
+
+$::Xit=0;
+
+for my $group (@ARGV)
+{ fetchgroup($group);
+}
+
+undef $::RC;
+
+$::Conn->Quit();
+undef $::Conn;
+
+exit $::Xit;
+
+sub fetchgroup($)
+{ my($group)=@_;
+
+  my @r = $::Conn->Group($group);
+  if (@r != 2)
+  { warn "$::cmd: can't select group \"$group\" [@r]\n";
+    $::Xit=1;
+    return;
+  }
+
+  my($low,$high)=@r;
+  
+  my $R = $::RC->Range("$group\@$::Server");
+  ## warn "range($group)=".$R->Text();
+  my $M;
+
+  N:
+  for my $n ($low..$high)
+  { next N if $R->InRange($n);
+
+    $M=$::Conn->Article($n);
+    if (! defined $M)
+    { ## warn "$::cmd: $group/$n missing\n";
+      next N;
+    }
+
+    my $out = new cs::Sink(PIPE,$::NDA);
+    $M->WriteItem($out);
+    $R->Add($n);
+  }
+
+  $::RC->SetRange("$group\@$::Server", $R);
+  $::RC->Sync();
+}
