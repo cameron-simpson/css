@@ -11,17 +11,19 @@
 : ${TMPDIR:=/tmp}
 
 cmd=$0
-usage="Usage: $cmd [-v] [-w width] [-h height] [-x x-pos] [-y y-pos] [-l lock] [-1 lock]
+usage="Usage: $cmd [-v] [-w width] [-h height] [-x x-pos] [-y y-pos]
+		[-l lock] [-1 lock]
 		[-f font] [-n name] [-big] [-small] [-keepio] [-xauthhack]
 		[{-c shellcmd}/{-e exec-list}/{-- raw-args}]"
 
 termopts=
+xrmopts=
 dotrans=
 detach='exec >/dev/null </dev/null'
 keepio=
 SHELL=${SHELL-/bin/sh}
 CONSOLE=${CONSOLE:-$HOME/var/log/console}
-n= f=
+title= f=
 smallx=0 smally=103 smallw=80 smallh=24 smallf=
 w= h=
 bigx=0 bigy=-0 bigw=80 bigh=61 bigf=6x13
@@ -39,46 +41,47 @@ iconic=
 badopts=
 
 # load default options first
-set x ${TERMOPTIONS} ${1+"$@"}; shift
+eval "set -- $TERMOPTIONS "'${1+"$@"}'
 
 while [ $# -gt 0 ]
 do
   case "$#,$1" in
-    1,-[lwhxyns])
+    1,-[ceglwhxyns] | 1,-xrm | 1,-geometry)
 		echo "$cmd: $1 needs an argument" >&2
-		echo "$usage" >&2
-		exit 2
+		badopts=1
+		shift; break
 		;;
-    *,--)	shift; break ;;
-    *,-e)	shift; break ;;
-    *,-l)	lock=$2; shift ;;
-    *,-1)	lock1=$1 lock=$2; shift ;;
-    *,-ip)	dotrans=1 ;;
-    *,+ip)	dotrans= ;;
-    *,-sh)	shade=$2; shift ;;
-    *,-iconic)	termopts="$termopts $1" ;;
-    *,-fg|*,-bg)termopts="$termopts $1 $2"; shift ;;
-    *,-c)	shcmd=$2; shift; shift
-		set x ${1+"$@"} -e "${SHELL:-/bin/sh}" -c "$shcmd"
-		shift
+  esac
+  case $1 in
+    --)		shift; break ;;
+    -e)		shift; break ;;
+    -l)		lock=$2; shift ;;
+    -1)		lock1=$1 lock=$2; shift ;;
+    -ip)	dotrans=1 ;;
+    +ip)	dotrans= ;;
+    -sh)	shade=$2; shift ;;
+    -iconic)	termopts="$termopts $1" ;;
+    -fg|*,-bg)	termopts="$termopts $1 $2"; shift ;;
+    -c)		shcmd=$2; shift; shift
+		set -- ${1+"$@"} -e "${SHELL:-/bin/sh}" -c "$shcmd"
 		;;
-    *,-a)	async=1 ;;
-    *,+a)	async= ;;
-    *,-v)	set -x ;;
-    *,-w)	w=$2 ; shift ;;
-    *,-h)	h=$2 ; shift ;;
-    *,-x)	x=$2 ; shift ;;
-    *,-y)	y=$2 ; shift ;;
-    *,-n)	n=$2 ; shift ;;
-    *,-f)	f=$2 ; shift ;;
-    *,-big)	sized=1 x=$bigx y=$bigy w=$bigw h=$bigh f=$bigf ;;
-    *,-small)	sized=1 x=$smallx y=$smally w=$smallw h=$smallh f=$smallf ;;
-    *,-keepio)	detach='echo KEEPIO' ;;
-    *,-xauthhack)
-		xauthhack=1 ;;
-    *,-geometry)
-		sized=1 geometry=$2; shift ;;
-    *,-*)	echo "$cmd: unexpected argument \"$1\"" >&2
+    -a)		async=1 ;;
+    +a)		async= ;;
+    -v)		set -x ;;
+    -w)		w=$2 ; shift ;;
+    -h)		h=$2 ; shift ;;
+    -x)		x=$2 ; shift ;;
+    -y)		y=$2 ; shift ;;
+    -n)		title=$2 ; shift ;;
+    -f)		f=$2 ; shift ;;
+    -big)	sized=1 x=$bigx y=$bigy w=$bigw h=$bigh f=$bigf ;;
+    -small)	sized=1 x=$smallx y=$smally w=$smallw h=$smallh f=$smallf ;;
+    -keepio)	detach='echo KEEPIO' ;;
+    -xauthhack)	xauthhack=1 ;;
+    -g|-geometry)sized=1 geometry=$2; shift ;;
+    -xrm)	xrmopts="$xrmopts $1 "`shqstr "$2"`; shift ;;
+    --)		shift; break ;;
+    -?*)	echo "$cmd: unrecognised option: $1" >&2
 		badopts=1
 		;;
     *)		break ;;
@@ -88,29 +91,33 @@ done
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
-[ $# = 0 ] && { set x "${SHELL:-/bin/sh}"; shift; }
-[ -n "$n" ] || n=$*
+[ $# = 0 ] && set -- "${SHELL:-/bin/sh}"
+[ -n "$title" ] || title=$*
 
 # we keep fd 3 as hook for stdin
 closefds='for fd in 4 5 6 7 8 9; do eval "exec $fd>&-"; done'
 
 # suppress lock if none needed
-if [ -n "$lock" ]; then dolock="lock $lock1 $lock"; else dolock=; fi
+dolock=
+[ -n "$lock" ] && dolock="lock $lock1 \"\$lock\""
 
-args=
+termcmd='ttysane $dolock "$@"'
 case "$TERM,$DISPLAY" in
     *,?*)
-	set ttysane "$@"
-
-	opts=$termopts
+	termopts="$termopts -title \"\$title\""
+	case "$PREFTERM" in
+	  aterm)	;;
+	  *)		termopts="$termopts $xrmopts" ;;
+	esac
+	[ -n "$f" ] && termopts="$termopts -fn \"\$f\""
 
 	case $x in +*|-*) ;; *) x=+$x ;; esac
 	case $y in +*|-*) ;; *) y=+$y ;; esac
-
-	[ $sized ] && { [ "x$geometry" = x ] && geometry=${w}x${h}$x$y
-			opts="$opts -geometry $geometry"
-		      }
-	[ -n "$f" ] && opts="$opts -fn $f"
+	if [ $sized ]
+	then
+	  [ "x$geometry" = x ] && geometry=${w}x${h}$x$y
+	  termopts="$termopts -geometry \"\$geometry\""
+	fi
 
 	[ -n "$xauthhack" -a -r "$XAUTHORITY" ] &&
 		{ # Fight with NFS/xterm brain damage.
@@ -128,39 +135,33 @@ case "$TERM,$DISPLAY" in
 
 	PREFTERM=${PREFTERM:-xterm}	# safe default
 
-	## echo "PREFTERM=[$PREFTERM] termopts=[$termopts] dotrans=[$dotrans]" >&2
-	## set -x
 	case "$PREFTERM" in
-	    rxvt)	[ $dotrans ] && opts="$opts -ip"
+	    rxvt)	[ $dotrans ] && termopts="$termopts -ip"
 			;;
 	    aterm)	# -fade 90
-			[ $dotrans ] && opts="$opts -tr -sh $shade"
+			[ $dotrans ] && termopts="$termopts -tr -sh $shade"
 			;;
 	esac
 
-	if [ $async ]
-	then acon $dolock "$PREFTERM" -title "$n" $opts -e "$@" &
-	else exec $dolock "$PREFTERM" -title "$n" $opts -e "$@"
-	fi
+	termcmd="$PREFTERM $termopts -e $termcmd"
 	;;
 
     iris-ansi*,*)
-	set ttysane "$@"
+	[ -n "$f" ] && set -- -f "$f" "$@"
+	[ -n "$x$y" ] && set -- -p "$x,$y" "$@"
+	[ -n "$w$h" ] && set -- -s "$w,$h" "$@"
+	[ -n "$title" ] && set -- -t "$title" -n "$title" "$@"
 
-	[ -n "$f" ] && { set x -f "$f" "$@"; shift; }
-	[ -n "$x$y" ] && { set x -p "$x,$y" "$@"; shift; }
-	[ -n "$w$h" ] && { set x -s "$w,$h" "$@"; shift; }
-	[ -n "$n" ] && { set x -t "$n" -n "$n" "$@"; shift; }
-
-	eval "$detach"
-	eval "$closefds"
-
-	if [ $async ]; then acon $dolock wsh -v "$@"
-		       else exec $dolock wsh -v "$@"
-	fi
+	termcmd="wsh -v $termcmd"
 	;;
-    *)	set -x; exec "$@"
+    *)	async=
 	;;
 esac
 
-exit 0
+eval "$detach"
+eval "$closefds"
+if [ $async ]
+then termcmd="acon $termcmd"
+else termcmd="exec $termcmd"
+fi
+eval "set -x; $termcmd"
