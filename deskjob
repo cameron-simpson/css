@@ -8,10 +8,12 @@ desk=.
 [ $# = 0 ] && exec desktop "$desk" job
 
 job=$1; shift
-isjob "$job" || { echo "$cmd: unknown job \"$job\"" >&2; exit 2; }
 [ $# = 0 ] || { echo "$cmd: extra arguments after job name: $*" >&2
 		echo "$usage" >&2
 		exit 2
 	      }
 
+isjob "$job" || { echo "$cmd: unknown job \"$job\"" >&2; exit 2; }
+
+job "$job"
 exec desktop "$desk" job "$job"
