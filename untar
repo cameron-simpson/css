@@ -51,6 +51,8 @@ die $usage if $badopts;
 
 $start=time;
 $bytes=0;
+undef $lastfile;
+undef $lastfilesize;
 
 pipe(READEND,WRITEEND)	|| die "$cmd: can't make pipe: $!\n";
 my $pid = fork;
@@ -130,8 +132,20 @@ while (<STDIN>)
   else
   {
     if ($type eq '.')
-    { if (@s=lstat)
-      { $bytes+=$s[7];
+    { if (defined $lastfile)
+      # restat preceeding file to see how big it ended up
+      { if (@s=lstat($lastfile))
+	{ $bytes+=$s[7]-$lastsize;
+	}
+      }
+
+      $lastfile=$_;
+      if (@s=lstat)
+      { $lastsize=$s[7];
+	$bytes+=$lastsize;
+      }
+      else
+      { $lastsize=0;
       }
     }
 
