@@ -14,7 +14,14 @@ rc=$HOME/rc/mairix.$SYSTEMID
 # help?
 [ "x$*" = x-h -o "x$1" = 'x-?' ] && { echo "$usage"; exit 0; }
 
-[ $# = 0 ] && exec mrx-update "$MAILDIR/"* "$MAILDIR/"[A-Z]*/*
+if [ $# = 0 ]
+then
+  xit=0
+  for folder in "$MAILDIR/"* "$MAILDIR/"[A-Z]*/*
+  do  mrx-update "$folder" || xit=1
+  done
+  exit $xit
+fi
 
 qargs=`shqstr "$@"`
 
