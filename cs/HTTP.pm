@@ -627,7 +627,7 @@ sub Request($$;$$$)
 		? $rquri
 		: $U->LocalPart())
 	    ." $version\r\n");
-  (1||$cs::HTTP::Debug) && warn "HTTP: $method $rquri $version";
+  $cs::HTTP::Debug && warn "HTTP: $method $rquri $version";
 
   $rqhdrs->WriteItem($this->Sink());
   $cs::HTTP::Debug && warn "HTTP: ".cs::Hier::h2a($rqhdrs,1);
