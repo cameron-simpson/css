@@ -1,0 +1,12 @@
+#!/bin/sh
+#
+# Notice changes in tallies.
+#	- Cameron Simpson <cs@zip.com.au>
+#
+
+[ $# = 0 ] && { echo "$0: missing type" >&2; exit 2; }
+type=$1; shift
+
+[ -f .ap-$type ] && mv -f .ap-$type .ap-$type.old
+apsum $type ${1+"$@"}
+dudiff .ap-$type.old .ap-$type > .ap-$type.diff
