@@ -1,0 +1,16 @@
+#!/usr/bin/perl
+
+HDR:
+while (<STDIN>)
+{ chomp;
+  last HDR if /^$/;
+
+  if ( /^([^: 	]*):[ 	]*/ )
+  {
+    $body=$';
+    $hdr=uc($1);
+    $hdr=~s/-/_/g;
+
+    print "$hdr $body\n";
+  }
+}
