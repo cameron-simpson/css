@@ -1,0 +1,13 @@
+#!/bin/sh
+#
+# Wire in the core ldpath.
+#	- Cameron Simpson <cs@zip.com.au> 01feb2000
+#
+
+[ $# = 0 ] && { set x "$SHELL"; shift; }
+
+for var in LD_RUN_PATH LD_LIBRARY_PATH LDPATH
+do  eval "$var=/lib:/usr/lib:/opt/lib; export $var"
+done
+
+exec "$@"
