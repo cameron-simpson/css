@@ -1,0 +1,46 @@
+#!/bin/sh
+#
+# Modular arithmetic on YYYYMM numbers.
+#	- Cameron Simpson <cs@zip.com.au> 01feb2004
+#
+
+cmd=$0
+usage="Usage: $cmd [yyyymm] [[-]n]"
+
+mcode=`date +%Y%m`
+n=
+
+badopts=
+
+# handle yyyymm if supplied
+case "$1" in
+    [12][0-9][0-9][0-9][01][0-9])
+      mcode=$1
+      shift
+      ;;
+esac
+
+# handle [-]n if supplied
+case "$1" in
+  [0-9]*)
+    n=$1 op=+
+    shift
+    ;;
+  -[0-9]*)
+    n=`expr "x$1" : 'x-\([0-9]*\).*'` op=-
+    shift
+    ;;
+esac
+
+[ $# = 0 ] || { echo "$cmd: extra arguments: $*" >&2; badopts=1; }
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+if [ -n "$n" ]
+then
+    echo "$mcode d 100 / 12 * r 1 - 12 % +
+          $n $op
+	  d 12 / 100 * r 12 % 1 + + p" | dc
+else
+    echo "$mcode"
+fi
