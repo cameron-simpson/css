@@ -70,7 +70,7 @@ then
     do  echo "$arg"
     done >"$tmpf"
     fvwmcmd \
-	  "Piperead 'fvwm-menu -1 ImDirMenu \"$cmd $call\" fvwm-menu-imlist -o rootbg -l $tmpf .; rm $tmpf" \
+	  "Piperead 'fvwm-menu -1 ImDirMenu \"$cmd $call\" fvwm-menu-imlist -o rootbg -l $tmpf .; rm $tmpf'" \
 	  "Popup ImDirMenu"
     exit $?
 fi
