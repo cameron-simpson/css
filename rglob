@@ -1,0 +1,28 @@
+#!/bin/sh
+
+cmd=`basename "$0"`
+
+case $cmd in
+    r*)	recurse=1 ;;
+    *)	recurse= ;;
+esac
+
+case $1 in
+    -r)	recurse=1; shift ;;
+    +r)	recurse=; shift ;;
+esac
+
+[ $recurse ] || eval "exec ls -d $*"
+
+match=
+for ptn
+do  [ -n "$match" ] && match="$match -o"
+    case $ptn in
+	!*)	ptn=`expr "x$ptn" : 'x!\(.*\)'`
+		match="$match !"
+		;;
+    esac
+    match="$match -name '$ptn'"
+done
+
+eval "exec find . $match -print"
