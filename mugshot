@@ -1,0 +1,9 @@
+#!/bin/sh
+#
+
+pnmflag=
+case "$1" in
+    *.p?m)	pnmflag=-pnm ;;
+esac
+
+exec jpgscale -G $pnmflag -q 32 128 128 ${1+"$@"}
