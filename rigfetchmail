@@ -8,12 +8,12 @@ set -x
 cd
 fmopts=
 case "$LOCATION" in
-  home|sco|tw)	fmopts="$fmopts -l 65536" ;;
+  home|sco|tw)	fmopts="$fmopts -l 65536 -d 1800" ;;
+  *)		fmopts="$fmopts -d 900" ;;
 esac
 acon fetchmail \
 	-f "$HOME/.fetchmailrc" \
 	$fmopts \
-	-d 900 \
 	--logfile "$HOME/var/log/fetchmail" \
 	--nobounce --tracepolls --warnings 86400 \
 	127.0.0.2 127.0.0.3
