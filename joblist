@@ -6,15 +6,15 @@
 #	- Cameron Simpson <cs@zip.com.au> 14jul2003
 #
 
-dir=$HOME/var/idsets/$SYSTEMID/timer
+idset=timer
 
 cmd=$0
-usage="Usage: $cmd [-d idsetdir] fields...
-	-d	Specify idsetdir.
-		Default: $dir"
+usage="Usage: $cmd [-i idset] fields...
+	-i	Specify idset.
+		Default: $idset"
 
-[ "x$1" = x-d ] && { dir=$2; shift; shift; }
+[ "x$1" = x-i ] && { idset=$2; shift; shift; }
 
 [ $# = 0 ] && { echo "$cmd: missing fields..." >&2; echo "$usage" >&2; exit 2; }
 
-exec idsetlist "$dir" "$@"
+exec idsetlist "$idset" "$@"
