@@ -302,12 +302,12 @@ runpath()
   if [ -d "$_rp/." ]
   then
     for _rp_f in "$_rp/"*
-    do  ##echo "dirscript $_rp_f ..." >&2
+    do  echo "dirscript $_rp_f ..." >&2
 	runscript "$_rp_f" $_rp_addrs || _rp_xit=1
     done
   else
     if [ -r "$_rp" ]
-    then  ##echo "script $_rp ..." >&2
+    then  echo "script $_rp ..." >&2
 	  runscript "$_rp" $_rp_addrs || _rp_xit=1
     fi
   fi
