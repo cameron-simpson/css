@@ -14,6 +14,6 @@ pw=`exec 2>/dev/null
       tail -100 $LOGDIR/procmail
     ) | md5sum | dd bs=$len count=1`
 
-[ -n "$DISPLAY" ] && ( exec >/dev/null; necho "$pw" | xclip & )
+####[ -n "$DISPLAY" ] && ( exec >/dev/null; necho "$pw" | xclip & )
 
 echo "$pw"
