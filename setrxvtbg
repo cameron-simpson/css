@@ -29,7 +29,7 @@ fi
 
 if [ -z "$src" ]
 then
-    src=`bglist | pickn "$@"`
+    src=`bglist -r -n 1 "$@"`
     [ -n "$src" ] || { echo "$cmd: no INDEX entries matching: $*" >&2
 		       exit 1
 		     }
@@ -45,4 +45,4 @@ fi
 ( [ -n "$logf" ] && [ -s "$logf" ] && echo "$src" >>"$logf" )
 
 # dropped "-d 0.6"
-2xpm -s tty "$src" xpm2rxvt || set-x nbg -y "$src"
+2xpm -s tty "$src" xpm2rxvt
