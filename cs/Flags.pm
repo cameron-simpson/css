@@ -124,7 +124,7 @@ sub Intersect
 
   for my $flag (@_)
   { my $str = ":${flag}:";
-    push(@f,$flag) if substr($$this,$str) >= $[;
+    push(@f,$flag) if index($$this,$str) >= $[;
   }
 
   @f;
@@ -138,7 +138,7 @@ Test if the specified I<flag> is set.
 
 sub Test($$)
 { my($this,$flag)=@_;
-  substr($$this,":${flag}:") >= $[;
+  index($$this,":${flag}:") >= $[;
 }
 
 =item TestAll(I<flags...>)
