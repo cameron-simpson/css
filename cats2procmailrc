@@ -12,7 +12,7 @@ cats2procmailrc - generate a procmail recipe from my mail categories file
 
 =head1 SYNOPSIS
 
-cats2procmailrc [B<-D>] [B<-L>] [B<-a> I<alert>] [B<-m> I<maildomains>] [B<-t> I<type>] E<lt>categories E<gt>procmailrc
+cats2procmailrc [B<-D>] [B<-L>] [B<-a> I<alert>] [B<-m> I<maildomains>] [B<-t> I<type>] [B<-T>] E<lt>categories E<gt>procmailrc
 
 =head1 DESCRIPTION
 
@@ -68,6 +68,17 @@ If the mailbox exists the type is deduced automatically,
 but otherwise uses this default, which may be one of
 B<unix>, B<maildir> or B<mh>.
 The default is B<unix>.
+
+=item B<-T>
+
+Don't track rule matches.
+Normally a C<X-Cats2Procmailrc-Matching-Rule> header
+is inserted describing the match rule.
+This is done with formail
+and so can incur a noticable penalty if slow machines
+with lots of messages.
+If you're using the B<-L> option
+the labels will mostly track stuff for you anyway.
 
 =back
 
@@ -223,11 +234,13 @@ $::Usage="Usage: $::cmd [-a alert] [-m domains] [-t {unix|mh|maildir}] <categori
 			Default from \$MAILDOMAIN: @::DfltDom
 	-t type		Select default mailbox type.
 			Default: $::DfltType
+	-T		Don't track rule matches by inserting an
+			X-Cats2Procmailrc-Matching-Rule header.
 ";
 
 { my $badopts=0;
 
-  if (! getopts("a:DLm:t:"))
+  if (! getopts("a:DLm:t:T"))
   { warn "$::cmd: bad options\n";
     $badopts=1;
   }
@@ -454,12 +467,15 @@ X
       ;
     }
 
-    print <<X
+    if ($::TrackRules)
+    {
+      print <<X
 
   :0whf
   | formail -f -A 'X-Cats2Procmailrc-Matching-Rule: $rule'
 X
-    ;
+      ;
+    }
 
     if ($doalert)
     { my $alertfn = $::DfltAlert;
