@@ -9,4 +9,7 @@
 props=au.com.zip.cs
 set -x
 tty=`tty`
-exec nostubs java "-D$props.EDITOR=$EDITOR" "-D$props.tty=$tty" "$@"
+exec ${JAVA_HOME:-"/opt/j2sdk-sun"}/bin/java \
+	"-D$props.EDITOR=$EDITOR" \
+	"-D$props.tty=$tty" \
+	"$@"
