@@ -115,8 +115,9 @@ sub new($$;$)
 	next RCLINE;
       }
 
-      $server =~ s/:119$//;
+      $server='' if ! defined $server;
       $server=$this->DefaultServer() if ! length $server;
+      $server =~ s/:119$// if length $server;
       $group="$group\@$server";
 
       $this->AddGroup($group,$R,$subbed);
