@@ -1,6 +1,6 @@
 #!/bin/sh
 #
-# Deduce MIME type from file(1) output.
+# Infer MIME type from file(1) output.
 #	- Cameron Simpson <cs@zip.com.au> 14nov2002
 #
 
@@ -42,6 +42,7 @@ case "$type" in
     *': '*'ASCII '*)			mtype=text/plain ;;
     *': '*'program text'*)		mtype=text/plain ;;
     *': '*'text'*)			mtype=text/plain ;;
+    *)	mtype=`ext2mime "$file"` || mtype= ;;
 esac
 
 # unrecognised - just recite "file"  output
