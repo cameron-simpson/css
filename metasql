@@ -1,0 +1,11 @@
+#!/bin/sed -f
+#
+# Translate a lot of shorthand for common idioms.
+#	- Cameron Simpson <cs@zip.com.au> 06jul2004
+#
+
+# ISCURRENT(START_FIELD,END_FIELD,WHEN)
+#
+s/{{ISCURRENT}}/{{ISCURRENT(START_DATE,END_DATE)}}/g
+s/{{ISCURRENT(\([^,]*\),\([^,]*\))}}/{{ISCURRENT(START_DATE,END_DATE,CURDATE())}}/g
+s/{{ISCURRENT(\([^,]*\),\([^,]*\),\([^,]*\))}}/((ISNULL(\1) OR \1 <= \3) AND (ISNULL(\2) OR \2 > \3))/g
