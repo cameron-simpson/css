@@ -76,12 +76,21 @@ then
     exit 0
 fi
 
-exec Esetroot -fit "$imagefile"
-
-case "$imagefile" in
-    *.gif|*.xpm)	2xpm -s root $convopts "$imagefile" xpmroot & ;;
-    *)			2png -s root $convopts "$imagefile" display -window root & ;;
-esac
-
+set -vx
+( umask 077
+  tmpf=/tmp/$cmd$$.`basename "$imagefile"`
+  fmogrify -foreground black -geometry "${X11_BGX}x${X11_Y}" <"$imagefile" >"$tmpf"
+  Esetroot -fit "$tmpf"
+  rm "$tmpf"
+) &
 [ $sync ] || exit 0
 wait
+exit
+
+##exec Esetroot -fit "$imagefile"
+##set -x
+##case "$imagefile" in
+##    *.gif|*.xpm)	2xpm -s root $convopts "$imagefile" xpmroot & ;;
+##    *)			2png -s root $convopts "$imagefile" display -window root & ;;
+##esac
+##
