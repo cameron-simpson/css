@@ -25,7 +25,7 @@ done
 PATH=$fvbin:$PATH
 export PATH
 
-exec >>$HOME/var/log/fv.out 2>$HOME/var/log/fv.err
+exec >>$HOME/var/log/wm.out 2>>$HOME/var/log/wm.err
 exec "$fvwm" -cmd "PipeRead fvwmrc" ${1+"$@"}
 
 ##for f in "$FVWMEVLOG" "$FVWMCMDLOG"
