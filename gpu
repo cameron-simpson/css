@@ -3,6 +3,8 @@
 # Asynchronous getpageurls.	- Cameron Simpson <cs@zip.com.au>
 #
 
+: ${TMPDIR:=/tmp}
+
 cmd=$0
 usage="Usage: $cmd [-s] [dirpfx] pageurl"
 
@@ -28,26 +30,24 @@ esac
 
 if [ $# = 0 ]
 then
-  if false && [ -n "$DISPLAY" ]
+  [ -n "$DISPLAY" ] && { set -- `xclip -o` || xit 1; }
+  if [ $# = 0 ]
   then
-      set x "`cutbuffer`"; shift; echo "$1"
-  else
-      echo "$cmd: missing pageurl" >&2
-      ##echo "$cmd: no \$DISPLAY or URL" >&2
-      exit 1
+    echo "$cmd: missing pageurl and no default" >&2
+    exit 2
   fi
 fi
 
 ulimit -d 16384	## 16M process data limit
 
-tmp=${TMPDIR:-/tmp}/gpu$$
+tmp=$TMPDIR/gpu$$
 for arg
 do  echo "$arg"
 done >"$tmp"
 exec <"$tmp"
 cat "$tmp"
 rm "$tmp"
+set getpageurls -q "$HOME/var/queue/httpgetd"
 set -x
-set getpageurls -q $HOME/var/queue/httpgetd
 [ $async ] || exec "$@"
 exec bgstdin "$@"
