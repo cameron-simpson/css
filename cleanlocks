@@ -12,8 +12,11 @@ export LOCKDIR HOSTNAME
 
 cd "$LOCKDIR" || exit 1
 
-xit=1
-for lock in *
+ask=echo
+[ $# -gt 0 ] || { set x *; shift; ask=ask; }
+
+xit=0
+for lock
 do  info=$lock/info
     [ -s "$info" ] || { echo "$cmd: no info file in $LOCKDIR/$lock/" >&2
 			xit=1
@@ -27,7 +30,7 @@ do  info=$lock/info
     [ "x$hostname" = "x$HOSTNAME" ] || continue
     kill -0 "$pid" && continue
     echo "$cmd: removing $LOCKDIR/$lock ..."
-    echo rm -rf "./$lock"
+    $ask "remove $lock" && rm -rf "./$lock"
 done
 
 exit $xit
