@@ -5,6 +5,27 @@
 #	- Cameron Simpson <cs@zip.com.au> 01jul2003
 #
 
+# style sheet for "terse" button
+cat <<-'X'
+	<SCRIPT><!--
+	var displaymode;
+	function tersify()
+	{
+	  if (displaymode == "none")
+	    displaymode="inline";
+	  else
+	    displaymode="none";
+	  bquotes=document.getElementsByTagName("SPAN");
+	  for (i=0; i<bquotes.length; i++)
+	  { el=bquotes[i];
+	    if (el.className == "overview-para")
+	      el.style.display=displaymode;
+	  }
+	}
+	document.write("[&nbsp;<A HREF=\"javascript:tersify()\">Terse</A>&nbsp;]<BR>\n");
+	--></SCRIPT>
+X
+
 echo "<UL>"
 for f in *.pod
 do
@@ -29,6 +50,21 @@ done \
 
     echo "    <LI><A HREF=\"$htfile\">$title</A>"
     echo "        - last change $modtime, author <A HREF=\"mailto:$author\">$fullname</A>"
+
+    overview=`sed -n -e '1,/^=head2 Overview/d; :para; n; /^$/q; p; b para' <"$f"`
+    if [ -n "$overview" ]
+    then
+      necho "	<SPAN CLASS=\"overview-para\"><BR><SMALL>"
+      ( echo "=for html"
+	echo
+	echo "$overview"
+	echo
+      ) \
+      | pod2html - \
+      | sed -n '1,/^<!-- INDEX END -->/d; /^<p>/,/<\/p>$/p' \
+      | sed -e 's/^<p>//' -e 's/<\/p>$//'
+      echo "</SMALL></SPAN>"
+    fi
   done
 
 echo "</UL>"
