@@ -150,7 +150,8 @@ sub _Load($$$$)
   { $this->{$field}=cs::Palm::palm2gmt($this->{$field});
   }
 
-  $this->{DBNAME} =~ s/\0+$//;
+  # rip off stuff after the NUL
+  $this->{DBNAME} =~ s/\0.*$//s;
 
   if ((defined $creator && $creator ne $this->{CREATOR})
    || (defined $dbname && $dbname ne $this->{DBNAME})
