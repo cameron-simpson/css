@@ -13,7 +13,7 @@ usage="Usage: $cmd [-f] [URL]"
 
 force=
 [ "x$1" = x-f ] && { force=1; shift; }
-[ $# = 0 ] && { set x "`xunclip`"; shift; }
+[ $# = 0 ] && { set x "`cutbuffer`"; shift; }
 [ $# = 1 ] || { echo "$usage" >&2; exit 2; }
 
 exec withurl "$1" xv
