@@ -11,7 +11,7 @@ if [ $# = 0 ]
 then
   case $HOST@$SYSTEMID in
     kaper@cisra)
-	set cage,ferrari,linux,solaris,cass,sweet,screen:ivory,screen:elph ;;
+	set cage,ferrari,linux,solaris,cass,sweet,screen:ivory,screen:elph,screen:sunny ;;
     amadeus@home)
 	set jekyll,janus,alpha ;;
     newt@home)
