@@ -11,7 +11,7 @@ login=
 
 ngrs=$1; shift
 
-for h in `ngr $ngrs | wired`
+for h in `ngr $ngrs`
 do  [ -n "$login" ] && h=$login@$h
     set-x pfx $h bgssh "$h" "$*"
 done
