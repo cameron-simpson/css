@@ -87,6 +87,6 @@ muttcmd="mutt -f \"\$mfolder\" -e \"fcc-hook . \$mfolder\" $muttopts"
 set sh -c "set -x; exec $muttcmd"
 
 [ $use_screen ] && set scr "mutt_$mfolder" "$@"
-[ $use_term   ] && set term $termopts -n "mutt $mfolder" "$@"
+[ $use_term   ] && set term -j email $termopts -n "mutt $mfolder" "$@"
 
 exec "$@"
