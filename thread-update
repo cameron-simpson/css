@@ -1,0 +1,39 @@
+#!/bin/sh
+#
+# Check the message on stdin to see if it's tracked by a killfile.
+# Exit true if so, false if not. Add this message to the killfile if so
+# in order to kill this message's descendants too.
+#	- Cameron Simpson <cs@zip.com.au> 16apr2002
+#
+
+cmd=$0
+usage="Usage: $cmd threadfile <mailitem"
+
+badopts=
+
+if [ $# = 0 ]
+then  echo "$cmd: missing threadfile" >&2; badopts=1
+else  threadfile=$1; shift
+      if [ $# -gt 0 ]
+      then
+	echo "$cmd: extra arguments after threadfile: $*" >&2
+	badopts=1
+      fi
+fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+eval `mhdrs -sh | sed 's/^/HDR_/'`
+set -- $HDR_REFERENCES $HDR_IN_REPLY_TO
+
+[ $# = 0 ] && exit 1	# no refs => not in a thread
+
+id="$HDR_MESSAGE_ID"
+re='^('`echo "$*" | tr ' ' '|'`')$'
+re=`echo "$re" | sed 's/\./\\\\./g'`
+
+##set -x
+egrep "$re" <"$threadfile" >/dev/null || exit 1
+
+echo "$HDR_MESSAGE_ID" >>"$threadfile"
+exit 0
