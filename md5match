@@ -1,0 +1,51 @@
+#!/bin/sh
+#
+# Read filenames from stdin and match them against md5indices
+# (as produced by the md5index script) named on the command line.
+# Output is lines containing either just:
+#	size:md5\tfilename
+# for no match or
+#	size:md5\tfilename\tmd5index\tindex-filename
+# for a match on an md5index file, with "index-filename"
+# being the name from the index.
+#	- Cameron Simpson <cs@zip.com.au> 21jun2000
+#
+
+cmd=`basename "$0"`
+usage="Usage: $cmd md5indices... <filenames"
+
+badopts=
+
+[ $# = 0 ] && { echo "$cmd: missing md5indices" >&2; badopts=1; }
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+set -u
+
+tmp=/tmp/$cmd$$
+
+in=$tmp.in
+ndxdata=$tmp.ndx
+
+# collect md5 of input names, in background
+exec 3<&0
+md5index <&3 3<&- | sort >$in &
+exec 3<&-
+
+for ndx
+do  case $ndx in
+	*.gz)	gunzip <"$ndx" ;;
+	*.Z)	uncompress <"$ndx" ;;
+	*.z)	zcat <"$ndx" ;;
+	*)	cat <"$ndx" ;;
+    esac | sed "s^$ndx	"
+done | sort +1 >"$ndxdata" &
+
+wait
+
+join -a 1 -2 2 $in $ndxdata
+xit=$?
+
+rm -f $in $ndxdata
+
+exit $xit
