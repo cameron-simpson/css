@@ -12,6 +12,21 @@
 #	- Cameron Simpson <cs@zip.com.au> 17may96
 #
 
+=head1 NAME
+
+cs::MIME - handle Multipurpose Internet Mail Extension data
+
+=head1 SYNOPSIS
+
+use cs::MIME;
+
+=head1 DESCRIPTION
+
+This module implements methods
+for dealing with MIME data.
+
+=cut
+
 use strict qw(vars);
 
 BEGIN { use cs::DEBUG; cs::DEBUG::using(__FILE__); }
@@ -29,17 +44,28 @@ package cs::MIME;	# cs::ALL::useAll();
 
 $cs::MIME::_Range_tspecials='()<>@,;:\\"\/\[\]?.=';
 
-# Make a new cs::MIME object given a Source.
-# With no Source, just makes a cs::MIME object.
-# $usecsize says to trust the Content-Size header if supplied
-# (default is not to).
-# If you supply a Source, the entire message gets read from the
-# Source so it's in a well-defined place (just past the message).
-# To avoid this cost, call with no Source and use cs::RFC822 to
-# get the headers and stuff them into the cs::MIME object with
-# UseHdrs().
-#
-sub new
+=head1 OBJECT CREATION
+
+=over 4
+
+=item new cs::MIME I<source>, I<usecsize>
+
+Create a MIME object.
+If I<source> (a file pathname or a B<cs::Source>)
+is supplied then its content is copied
+and the headers extracted, leaving the copy
+positioned at the start of the body.
+To avoid this cost, call with no B<cs::Source>
+and use the B<UseHdrs> method to place header infomation
+into the object.
+The optional I<usecsize> parameter
+says to trust the B<Content-Size> header if present,
+placing a limit on the data read from the I<source>.
+The default is to ignore it.
+
+=cut
+
+sub new($;$$)
 { my($class,$s,$usecsize)=@_;
   $usecsize=0 if ! defined $usecsize;
 
@@ -47,25 +73,25 @@ sub new
 	      TYPE	=> TEXT,	# text/plain by default
 	      SUBTYPE	=> PLAIN,
 	      TYPEPARAMS=> {},
+	      HDRS	=> new cs::RFC822,
 	      CTE	=> '8BIT',	# Content-Transfer-Encoding
 	    }, $class;
 
-  my($h)=new cs::RFC822;
+  my $H = new cs::RFC822;
 
   if (defined $s)
   { $s=new cs::Source (PATH, $s) if ! ref $s;
     return undef if ! defined $s;
-    $h->SourceExtract($s);
+    $H->SourceExtract($s);
+    $this->UseHdrs($H);
   }
-
-  $this->UseHdrs($h);
 
   if (defined $s)
   # do stuff with stream
   {
     # Content-Size - push limit onto stream
     if ($usecsize
-     && defined ($_=$h->Hdr(CONTENT_SIZE))
+     && defined ($_=$H->Hdr(CONTENT_SIZE))
      && /\d+/)
     { my($size)=$&+0;
       $s=new cs::SubSource ($s, $s->Tell(), $size);
@@ -81,7 +107,7 @@ sub new
 
     # Content-Transfer-Encoding
     if (defined $s
-     && defined ($_=$h->Hdr(CONTENT_TRANSFER_ENCODING,1))
+     && defined ($_=$H->Hdr(CONTENT_TRANSFER_ENCODING,1))
      && length)
     { s/^\s+//;
       s/\s+$//;
@@ -92,85 +118,118 @@ sub new
   bless $this, $class;
 }
 
-sub Hdrs	{ shift->{HDRS} }
-sub Type	{ shift->{TYPE}; }
-sub SubType	{ shift->{SUBTYPE}; }
+=back
 
-sub UseHdrs
-{ my($this,$h)=@_;
+=head1 OBJECT METHODS
 
-  $this->{HDRS}=$h;
+=over 4
+
+=item Hdrs()
+
+Return the B<cs::RFC822> object
+storing the headers of the MIME object.
+
+=cut
+
+sub Hdrs($)	{ shift->{HDRS} }
+
+=item Type()
+
+Return the B<type> component of the object's B<Content-Type>.
+
+=cut
+
+sub Type($)	{ shift->{TYPE}; }
+
+=item SubType()
+
+Return the B<subtype> component of the object's B<Content-Type>.
+
+=cut
+
+sub SubType($)	{ shift->{SUBTYPE}; }
+
+=item UseHdrs(I<hdrs>)
+
+
+=cut
+
+sub UseHdrs($$)
+{ my($this,$H)=@_;
+
+  $this->{HDRS}=$H;
 
   local($_);
 
-  $_=$h->Hdr(CONTENT_TYPE);
+  $_=$H->Hdr(CONTENT_TYPE);
   if (! defined || ! length)
-	# old-style messages
-	{ $_='text/plain; charset=us-ascii';
-	}
+  # old-style messages
+  { $_='text/plain; charset=us-ascii';
+  }
 
   # Content-Type
-  my($type,$subtype);
-  ($type,$subtype,$_)=parseContentType($_,$this->{TYPEPARAMS});
-
-  $this->{TYPE}=$type;
-  $this->{SUBTYPE}=$subtype;
+  ($this->{TYPE},$this->{SUBTYPE},$this->{TYPEPARAMS},$_)
+	=parseContentType($_);
 }
 
-sub _RawSource	{ shift->{DS}; }
+sub _RawSource
+{ shift->{DS}; }
 
 # decoded Source - use $this->_RawSource() for raw data
 sub _Source
-	{ my($this)=@_;
-	  my($s)=$this->_RawSource();
+{ my($this)=@_;
+  my($s)=$this->_RawSource();
 
-	  # push decoder
-	  my($cte)=$this->{CTE};
-	  my($isText)=($this->{TYPE} eq TEXT);
+  # push decoder
+  my($cte)=$this->{CTE};
+  my($isText)=($this->{TYPE} eq TEXT);
 
-	  decodedSource($s,$cte,$isText);
-	}
+  decodedSource($s,$cte,$isText);
+}
 
 sub RawGet	{ shift->_RawSource()->Get(); }
 sub Get		{ shift->_Source()->Get(); }
 
-sub RawBody	{ my($this)=@_;
-		  my($body)=$this->RawGet();
-		  $this->{DS}=new cs::Source (SCALAR,$body);
-		  $body;
+sub RawBody
+{ my($this)=@_;
+  my($body)=$this->RawGet();
+  $this->{DS}=new cs::Source (SCALAR,$body);
+  $body;
+}
+sub Body
+{ my($this)=@_;
+  my($rawbody)=$this->RawBody();
+  my($cte,$isText)=($this->{CTE},
+		    ($this->{TYPE} eq TEXT)
+		   );
+
+  my $ds = decodedSource((new cs::Source (SCALAR,$rawbody)),
+			  $cte,$isText);
+
+  # unknown encoding?
+  return $rawbody if ! defined $ds;
+
+  $ds->Get();
+}
+
+sub ContentType
+{ my($this,$noParams)=@_;
+  $noParams=0 if ! defined $noParams;
+
+  my($cte)=$this->{TYPE}.'/'.$this->{SUBTYPE};
+  if (! $noParams)
+	{ my($value);
+	  for my $param (sort keys %{$this->{TYPEPARAMS}})
+		{ $value=$this->{TYPEPARAMS}->{$param};
+		  $param=lc($param);
+		  $param =~ s/_/-/g;
+
+		  $cte.="; $param=\"$value\"";
 		}
-sub Body	{ my($this)=@_;
-		  my($rawbody)=$this->RawBody();
-		  my($cte,$isText)=($this->{CTE},
-				    ($this->{TYPE} eq TEXT)
-				   );
+	}
 
-		  my $ds = decodedSource((new cs::Source (SCALAR,$rawbody)),
-					  $cte,$isText);
-
-		  # unknown encoding?
-		  return $rawbody if ! defined $ds;
-
-		  $ds->Get();
-		}
-
-sub ContentType	{ my($this,$noParams)=@_;
-		  $noParams=0 if ! defined $noParams;
-
-		  my($cte)=$this->{TYPE}.'/'.$this->{SUBTYPE};
-		  if (! $noParams)
-			{ my($value);
-			  for my $param (sort keys %{$this->{TYPEPARAMS}})
-				{ $value=$this->{TYPEPARAMS}->{$param};
-				  $param=lc($param);
-				  $param =~ s/_/-/g;
-
-				  $cte.="; $param=\"$value\"";
-				}
-			}
-
-		  $cte;
-		}
+  $cte;
+}
 
 sub WriteItem($$$;$$$)	# (this,sink,\@cs::MIME,pre,post,sep)
 { my($this,$sink,$mlist,$pre,$post,$sep)=@_;
@@ -224,114 +283,152 @@ sub decodedSource
 # collect pretext, pieces, posttext
 # return ([scalarSources],pretext,posttext)
 sub Pieces
-	{ my($this)=@_;
+{ my($this)=@_;
 
-	  ###### input stream
-	  my($s)=$this->_Source();
+  ###### input stream
+  my($s)=$this->_Source();
 
-	  ###### results
-	  my($slist,$pre,$post)=([],'','');
+  ###### results
+  my($slist,$pre,$post)=([],'','');
 
-	  my($boundary)='--'.$this->{TYPEPARAMS}->{BOUNDARY};
-	  my($terminate)=$boundary.'--';
+  my($boundary)='--'.$this->{TYPEPARAMS}->{BOUNDARY};
+  my($terminate)=$boundary.'--';
 
-	  my($line,$bound,$last,$crlf,$ncrlf,$first);
-	  my($cache);
-	  local($_);
+  my($line,$bound,$last,$crlf,$ncrlf,$first);
+  my($cache);
+  local($_);
 
-	  $crlf='';
-	  $first=1;
-	  $last=0;
+  $crlf='';
+  $first=1;
+  $last=0;
 
-	  PART:
-	    while (defined($_=$s->GetLine()) && length)
-		{ ($line=$_) =~ s/\r?\n$//;
-		  $ncrlf=$&;
+  PART:
+    while (defined($_=$s->GetLine()) && length)
+    { ($line=$_) =~ s/\r?\n$//;
+      $ncrlf=$&;
 
-		  # check for end of part
-		  if ($line eq $boundary)
-			{ $bound=1; $last=0; }
-		  elsif ($line eq $terminate)
-			{ $bound=1; $last=1; }
-		  else	{ $bound=0; }
+      # check for end of part
+      if ($line eq $boundary)	{ $bound=1; $last=0; }
+      elsif ($line eq $terminate){ $bound=1; $last=1; }
+      else			{ $bound=0; }
 
-		  if (! $bound)
-			{ if ($last)
-				{ $post.=$_;
-				}
-			  elsif (defined $cache)
-				{ $cache.=$_;
-				}
-			  else	{ $pre.=$_;
-				}
-			}
-		  else
-		  # boundary line
-		  { 
-		    if (defined $cache)
-			{ push(@$slist,new cs::Source (SCALAR,$cache));
-			}
-
-		    $cache='';
-		    undef $ncrlf;	# otherwise it leaks into the next part
-		  }
-
-		  $crlf=$ncrlf;
-		}
-
-	  ($slist,$pre,$post);
+      if (! $bound)
+      { if ($last)		{ $post.=$_; }
+	elsif (defined $cache)	{ $cache.=$_; }
+	else			{ $pre.=$_; }
+      }
+      else
+      # boundary line
+      { 
+	if (defined $cache)
+	{ push(@$slist,new cs::Source (SCALAR,$cache));
 	}
 
-sub parseTypeParams	# (params-text,\%params) -> unparsed
-	{ local($_)=shift;
-	  my($p)=@_;
-	  my($param,$value);
+	$cache='';
+	undef $ncrlf;	# otherwise it leaks into the next part
+      }
 
-	  s/^\s*(;+\s*)+//;
-	  PARAM:
-	    while (length)
-		{ last PARAM unless /^([-\w]+)\s*=\s*/;
+      $crlf=$ncrlf;
+    }
 
-		  $param=$1; $_=$';
+  ($slist,$pre,$post);
+}
 
-		  $param=uc($param);
-		  $param =~ s/-/_/g;
+=back
 
-		  if (/^"((\\.|[^\\"])*)"\s*/)
-			{ $value=$1; $_=$';
-			  $value =~ s/\\(.)/$1/g;
-			}
-		  else
-		  { /^([^\s$cs::MIME::_Range_tspecials]*)\s*/;
-		    $value=$1; $_=$';
-		  }
+=head1 GENERAL FUNCTIONS
 
-		  $p->{$param}=$value;
+=over 4
 
-	  	  s/^\s*(;+\s*)+//;
-		}
+=item parseContentType(I<content-type>)
 
-	  $_;
-	}
+Parse a B<Content-Type> line I<content-type>,
+returning a tuple of (I<typ>,I<subtype>,I<params>,I<unparsed>)
+being the type and subtype,
+a hashref containing any parameters on the line
+and any remaining data which could not be parsed.
 
-sub parseContentType	# (content-type,\%params) -> (type,subtype,unparsed)
-	{ local($_)=shift;
-	  my($p)=@_;
-	  my($type,$subtype);
+=cut
 
-	  if (m:^\s*([-\w]+)\s*/\s*([-\w]+)\s*:)
-		{ $type=uc($1);
-		  $subtype=uc($2);
-		  $_=$';
+sub parseContentType($)
+{ local($_)=@_;
 
-		  $_=parseTypeParams($_,$p);
-		}
-	  else
-	  { $type=TEXT;
-	    $subtype=PLAIN;
-	  }
+  my($params)={};
+  my($type,$subtype);
 
-	  ($type,$subtype,$_);
-	}
+  if (m:^\s*([-\w]+)\s*/\s*([-\w]+)\s*:)
+  { $type=uc($1);
+    $subtype=uc($2);
+    $_=$';
+
+    ($_,$params)=parseTypeParams($_);
+  }
+  else
+  { $type=TEXT;
+    $subtype=PLAIN;
+  }
+
+  ($type,$subtype,$params,$_);
+}
+
+=item parseTypeParams(I<parameter-string>)
+
+Parse a the parameters section of a B<Content-Type> line
+returning a tuple of (I<params>,I<unparsed>)
+a hashref containing any parameters on the line
+and any remaining data which could not be parsed.
+
+=cut
+
+sub parseTypeParams($)
+{ local($_)=@_;
+
+  my($params)={};
+  my($param,$value);
+
+  s/^\s*(;+\s*)+//;
+  PARAM:
+    while (length)
+    { last PARAM unless /^([-\w]+)\s*=\s*/;
+
+      $param=$1; $_=$';
+
+      $param=uc($param);
+      $param =~ s/-/_/g;
+
+      if (/^"((\\.|[^\\"])*)"\s*/)
+      { $value=$1; $_=$';
+	$value =~ s/\\(.)/$1/g;
+      }
+      else
+      { /^([^\s$cs::MIME::_Range_tspecials]*)\s*/;
+	$value=$1; $_=$';
+      }
+
+      $params->{$param}=$value;
+
+      s/^\s*(;+\s*)+//;
+    }
+
+  ($params,$_);
+}
+
+=back
+
+=head1 SEE ALSO
+
+cs::RFC822(3), cs::Source(3)
+
+RFCs:
+822 - Internet Mail Messages,
+1344 - Implications of MIME for Internet Mail Gateways,
+1437 - The Extension of MIME Content-Types to a New Medium,
+1521 - Media Type Registration Procedure
+
+=head1 AUTHOR
+
+Cameron Simpson E<lt>cs@zip.com.auE<gt>
+
+=cut
 
 1;
