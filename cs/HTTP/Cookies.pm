@@ -16,103 +16,103 @@ package cs::HTTP::Cookies;
 @cs::HTTP::Auth::ISA=qw();
 
 sub finish
-	{ cs::Persist::finish();
-	}
+{ cs::Persist::finish();
+}
 
 sub new
-	{ my($class,$db,$rw)=@_;
-	  $db="$ENV{HOME}/.http-cookie-db" if ! defined $db;
-	  $rw=0 if ! defined $rw;
+{ my($class,$db,$rw)=@_;
+  $db="$ENV{HOME}/.http-cookie-db" if ! defined $db;
+  $rw=0 if ! defined $rw;
 
-	  if (! ref $db)
-		{ return undef if ! defined ($db=cs::Persist::db($db,$rw))
-		}
-
-	  bless { DB => $db,
-		}, $class;
+  if (! ref $db)
+	{ return undef if ! defined ($db=cs::Persist::db($db,$rw))
 	}
+
+  bless { DB => $db,
+	}, $class;
+}
 
 # hdr -> (cname,cvalue,paramhash)
 sub ParseCookieHdr
-	{ my($this,$chdr)=@_;
+{ my($this,$chdr)=@_;
 
-	  my($h,$chdr2)=cs::HTTP::parseAttrs($chdr,1);
-	  my($cname,$cval)=%$h;
+  my($h,$chdr2)=cs::HTTP::parseAttrs($chdr,1);
+  my($cname,$cval)=%$h;
 
-	  return undef if ! defined $cname;
+  return undef if ! defined $cname;
 
-	  $h=cs::HTTP::parseAttrs($chdr2);
+  $h=cs::HTTP::parseAttrs($chdr2);
 
-	  ( $cname, $cval, $h );
-	}
+  ( $cname, $cval, $h );
+}
 
 sub normHost
-	{ local($_)=@_;
-	  s/:80$//;
-	  lc($_);
-	}
+{ local($_)=@_;
+  s/:80$//;
+  lc($_);
+}
 
 # Look up cookies for URL..
 # url -> { USERID => userid, PASSWORD => password }
 sub GetCookies
-	{ my($this,$url)=@_;
+{ my($this,$url)=@_;
 
-	  $url=new cs::URL $url if ! ref $url;
-	  return undef if ! exists $url->{HOST}
-		       || ! length $url->{HOST};
+  $url=new cs::URL $url if ! ref $url;
+  return undef if ! exists $url->{HOST}
+	       || ! length $url->{HOST};
 
-	  my($db)=$this->{DB};
+  my($db)=$this->{DB};
 
-	  my($hostkey)=$url->{HOST};
-	  $hostkey.=":$url->{PORT}" if defined $url->{PORT};
-	  $hostkey=normHost($hostkey);
+  my($hostkey)=$url->{HOST};
+  $hostkey.=":$url->{PORT}" if defined $url->{PORT};
+  $hostkey=normHost($hostkey);
 
-	  my(@cookies)=();
+  my(@cookies)=();
 
-	  my($h,$hkey);
+  my($h,$hkey);
 
-	  for $hkey (keys %$db)
-		{ 
-		  if (
-		}
-	  for (
-	  my(@keys)=(uc($scheme),lc($host),$label);
-
-	  local($_);
-
-	  while (@keys)
-		{ $_=shift(@keys);
-		  return undef if ! exists $h->{$_};
-		  $h=$h->{$_};
-		}
-
-	  $h;
+  for $hkey (keys %$db)
+	{ 
+	  if (
 	}
+  for (
+  my(@keys)=(uc($scheme),lc($host),$label);
+
+  local($_);
+
+  while (@keys)
+  { $_=shift(@keys);
+    return undef if ! exists $h->{$_};
+    $h=$h->{$_};
+  }
+
+  $h;
+}
 
 sub SaveCookie
-	{ my($this,$hostkey,$cname,$cvalue,$params)=@_;
+{ my($this,$hostkey,$cname,$cvalue,$params)=@_;
 
-	  my($db)=$this->{DB};
+  my($db)=$this->{DB};
 
-	  $hostkey=normHost($hostkey);
+  $hostkey=normHost($hostkey);
 
-	  $cname=uc($cname);
+  $cname=uc($cname);
 
-	  $db->{$hostkey}={} if ! exists $db->{$hostkey};
-	  $db=$db->{$hostkey};
+  $db->{$hostkey}={} if ! exists $db->{$hostkey};
+  $db=$db->{$hostkey};
 
-	  $db->{$cname}={ NAME => $cname,
-			  VALUE => $cvalue,
-			  PARAMS => $params,
-			};
-	}
+  $db->{$cname}={ NAME => $cname,
+		  VALUE => $cvalue,
+		  PARAMS => $params,
+		};
+}
 
 # annotate some headers with an authority
 sub HdrsAddAuth
-	{ my($this,$hdrs,$scheme,$auth)=@_;
+{ my($this,$hdrs,$scheme,$auth)=@_;
 
-	  $hdrs->Add([AUTHORIZATION,
-		"$scheme ".base64("$auth->{USERID}:$auth->{PASSWORD}")]);
-	}
+  $hdrs->Add([AUTHORIZATION,
+	"$scheme ".base64("$auth->{USERID}:$auth->{PASSWORD}")]);
+}
 
 1;
