@@ -15,7 +15,7 @@ if [ $# = 0 ]
 then
     if ask "Post to everyupdate"
     then
-	set adzapper-everyupdate@lists.sourceforge.net
+	addr=adzapper-everyupdate@lists.sourceforge.net
 	dotag=1
 	dopost=1
     fi
