@@ -380,6 +380,8 @@ sub rqhdr($;$$)
   $rqhdrs->Add([HOST,$U->Host()]);
   $rqhdrs->Add([USER_AGENT,$agent]);
 
+  @::Cookies=getCookies() if ! @::Cookies;
+
   my $cookieline = "";
   for my $C (@::Cookies)
   { ## warn "check ".cs::Hier::h2a($C,0);
@@ -395,6 +397,62 @@ sub rqhdr($;$$)
   }
 
   $rqhdrs;
+}
+
+=item getCookies(I<cookiefile>)
+
+Return an array of hashrefs representing cookies
+from the specified file.
+If I<cookiefile> is omitted
+use the file specified by the environment variable B<$COOKIE_FILE>
+or failing that B<$HOME/.netscape/cookies.txt>.
+
+=cut
+
+sub getCookies()
+{ my($file)=@_;
+  if (! defined $file)
+  { $file = (exists $ENV{COOKIE_FILE} && length $ENV{COOKIE_FILE})
+	  ? $file=$ENV{COOKIE_FILE}
+	  : "$ENV{HOME}/.netscape/cookies.txt"
+	  ;
+  }
+
+  my $C = cs::Source::open($file);
+  return () if ! defined $C;
+
+  my @C;
+
+  my $lineno = 0;
+  local($_);
+
+  COOKIELINE:
+  while (defined($_=$C->GetLine()) && length)
+  { $lineno++;
+
+    chomp;
+    s/^\s+//;
+    next COOKIELINE if !length || /^#/;
+
+    my (@f) = split(/\t/);
+    if (@f != 7)
+    { warn "$::cmd: $file, line $lineno: wrong # of fields\n";
+      next COOKIELINE;
+    }
+
+    my($domain,$bool1,$pathpfx,$bool2,$expires,$name,$value)=@f;
+
+    push(@C, { DOMAIN => $domain,
+	       BOOL1 => ($bool1 eq TRUE),
+	       PATH => $pathpfx,
+	       BOOL2 => ($bool2 eq TRUE),
+	       EXPIRES => $expires+0,
+	       NAME => $name,
+	       VALUE => $value,
+	     });
+  }
+
+  return @C;
 }
 
 #######################
