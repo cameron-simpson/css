@@ -7,7 +7,11 @@
 	   }
 
 # flush alert window when I read my important email
-[ "x$*" = 'x-f +attn' ] && { clear | alert; }
+[ "x$*" = 'x-f +attn' ] && { clear | alert;
+			     # set atime > mtime for alert log
+			     LOGDIR=${LOGDIR:-$HOME/var/log}
+			     sed 1q "$LOGDIR/alert" >/dev/null
+			   }
 
 case "$TERM" in
     xterm)
