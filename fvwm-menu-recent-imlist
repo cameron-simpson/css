@@ -5,4 +5,6 @@
 #	- Cameron Simpson <cs@zip.com.au> 19mar2003
 #
 
-lastn ${1+"$@"} | reverse | fvwm-menu-imlist -l - -o menubg .
+FVWM_MENU_IMLIST_OP=${FVWM_MENU_IMLIST_OP:-"xv"}
+export FVWM_MENU_IMLIST_OP
+lastn ${1+"$@"} | reverse | fvwm-menu-imlist -l - .
