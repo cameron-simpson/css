@@ -23,6 +23,7 @@ termopts=
 xrmopts=
 dotrans=
 detach='exec >/dev/null </dev/null'
+closefds='for fd in 3 4 5 6 7 8 9; do eval "exec $fd>&-"; done'
 keepio=
 title= f=
 smallx=0 smally=103 smallw=80 smallh=24 smallf=
@@ -77,7 +78,7 @@ do
     -f)		f=$2 ; shift ;;
     -big)	sized=1 x=$bigx y=$bigy w=$bigw h=$bigh f=$bigf ;;
     -small)	sized=1 x=$smallx y=$smally w=$smallw h=$smallh f=$smallf ;;
-    -keepio)	detach='echo KEEPIO' ;;
+    -keepio)	detach= ;;
     -xauthhack)	xauthhack=1 ;;
     -g|-geometry)sized=1 geometry=$2; shift ;;
     -xrm)	xrmopts="$xrmopts $1 "`shqstr "$2"`; shift ;;
@@ -94,9 +95,6 @@ done
 
 [ $# = 0 ] && set -- "${SHELL:-/bin/sh}"
 [ -n "$title" ] || title=$*
-
-# we keep fd 3 as hook for stdin
-closefds='for fd in 4 5 6 7 8 9; do eval "exec $fd>&-"; done'
 
 # suppress lock if none needed
 dolock=
@@ -153,12 +151,11 @@ case "$TERM,$DISPLAY" in
 	termcmd="wsh -v $termcmd"
 	;;
     *)	async=
-	closefds=
 	detach=
 	;;
 esac
 
-set -x
+##set -x
 eval "$detach"
 eval "$closefds"
 if [ $async ]
