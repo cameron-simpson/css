@@ -164,26 +164,26 @@ sub humanDate($$)
 }
 
 sub gmt2dmy($$)	# (gmtime,emitlocaltime) -> "MMmonYY"
-	{ my($gmt,$emitlocaltime)=@_;
+{ my($gmt,$emitlocaltime)=@_;
 
-	  my($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst)
-		=($emitlocaltime ? localtime($gmt) : gmtime($gmt));
+  my($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst)
+	=($emitlocaltime ? localtime($gmt) : gmtime($gmt));
 
-	  sprintf("%02d%s%02d",$mday,$cs::Date::mon_names[$[+$mon],$year);
-	}
+  sprintf("%02d%s%02d",$mday,$cs::Date::mon_names[$[+$mon],$year);
+}
 
 sub dmy2gmt($$$$)
 { my($mday,$mon,$year,$givenlocaltime)=@_;
   if (! defined $givenlocaltime)
-	{ my(@c)=caller;
-	  warn "no givenLocalTime, assuming ==1, from [@c]";
-	}
+  { my(@c)=caller;
+    warn "no givenLocalTime, assuming ==1, from [@c]";
+  }
   $givenlocaltime=1 if ! defined $givenlocaltime;
 
   if ($mon < 1 || $mon > 12)
-	{ my(@c)=caller;
-	  warn "dmy2gmt(@_): mon=$mon from [@c]";
-	}
+  { my(@c)=caller;
+    warn "dmy2gmt(@_): mon=$mon from [@c]";
+  }
 
   if ($year < 1970)
   { my(@c)=caller;
@@ -197,54 +197,54 @@ sub dmy2gmt($$$$)
 }
 
 sub timecode($$) # (gmtime,emitlocaltime) -> yyyymmddhhmmss
-	{ my($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst)
-		=($_[1] ? localtime($_[0]) : gmtime($_[0]));
+{ my($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst)
+	=($_[1] ? localtime($_[0]) : gmtime($_[0]));
 
-	  sprintf("%02d%02d%02d%02d%02d%02d",$year+1900,$mon+1,$mday,$hour,$min,$sec);
-	}
+  sprintf("%02d%02d%02d%02d%02d%02d",$year+1900,$mon+1,$mday,$hour,$min,$sec);
+}
 
 sub datestr($$)	# (gmtime,emitlocaltime) -> "MMmonYY, hh:mm:ss"
-	{ my($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst)
-		=($_[1] ? localtime($_[0]) : gmtime($_[0]));
+{ my($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst)
+	=($_[1] ? localtime($_[0]) : gmtime($_[0]));
 
-	  sprintf("%02d%s%02d, %02d:%02d:%02d",
-		  $mday,$cs::Date::mon_names[$[+$mon],$year,$hour,$min,$sec);
-	}
+  sprintf("%02d%s%02d, %02d:%02d:%02d",
+	  $mday,$cs::Date::mon_names[$[+$mon],$year,$hour,$min,$sec);
+}
 
 sub timestr	# (time) -> "[[[days, ]hours, ]minutes, ]seconds"
-	{ my($time)=@_;
+{ my($time)=@_;
 
-	  my @str;
-	  my $slop;
+  my @str;
+  my $slop;
 
-	  $time=int($time+0.5);
-	  if ($time >= 86400)
-		{ $slop=$time%86400;
-		  $time-=$slop;
-		  push(@str,($time/86400)." days");
-		  $time=$slop;
-		}
-
-	  if ($time >= 3600)
-		{ $slop=$time%3600;
-		  $time-=$slop;
-		  push(@str,($time/3600)." hours");
-		  $time=$slop;
-		}
-	  
-	  if ($time >= 60)
-		{ $slop=$time%60;
-		  $time-=$slop;
-		  push(@str,($time/60)." minutes");
-		  $time=$slop;
-		}
-
-	  if ($time > 0)
-		{ push(@str,"$time seconds");
-		}
-
-	  join(", ",@str);
+  $time=int($time+0.5);
+  if ($time >= 86400)
+	{ $slop=$time%86400;
+	  $time-=$slop;
+	  push(@str,($time/86400)." days");
+	  $time=$slop;
 	}
+
+  if ($time >= 3600)
+	{ $slop=$time%3600;
+	  $time-=$slop;
+	  push(@str,($time/3600)." hours");
+	  $time=$slop;
+	}
+  
+  if ($time >= 60)
+	{ $slop=$time%60;
+	  $time-=$slop;
+	  push(@str,($time/60)." minutes");
+	  $time=$slop;
+	}
+
+  if ($time > 0)
+	{ push(@str,"$time seconds");
+	}
+
+  join(", ",@str);
+}
 
 sub ctime2gm
 	{ local($_)=@_;
@@ -286,15 +286,16 @@ sub tm2ctime
 	}
 
 # time,givenlocaltime -> gmt
-sub yyyymmdd2gmt($$)
+sub yyyymmdd2gmt($$) { iso2gmt(@_) }
+sub iso2gmt($$)
 { local($_)=shift;
   my($givenlocaltime)=shift;
 
   if (! /^(\d\d\d\d)-?(\d\d)-?(\d\d)$/)
-	{ my(@c)=caller;
-	  warn "yyyymmdd2gmt($_) from [@c]";
-	  return undef;
-	}
+  { my(@c)=caller;
+    warn "iso2gmt($_) from [@c]";
+    return undef;
+  }
 
   my($year,$mon,$mday)=($1+0,$2+0,$3+0);
 
@@ -322,39 +323,39 @@ sub gmt2yyyymmdd($$;$)
 #	- rfc822 date format
 #	- unix ctime format
 sub txt2gm
-	{ local($_)=@_;
+{ local($_)=@_;
 
-	  ::need(cs::RFC822);
+  ::need(cs::RFC822);
 
-	  my $time;
+  my $time;
 
-	  if (defined($time=cs::RFC822::date2gm($_)))
-		{}
-	  # non-kosher, but I've seen it in email
-	  # dow mon mday hh:mm:ss year tz
-	  elsif (/^($cs::Date::wday_ptn)\s+($cs::Date::mon_ptn)\s+(\d+)\s+(\d\d?):(\d\d):(\d\d)\s+(\d{4})\s+([-+]?\d{4}|[a-z]+)/)
-		{ my($mon,$dom,$hh,$mm,$ss,$yr,$offset)
-			=($2,$3,$4,$5,$6,$7,$8);
+  if (defined($time=cs::RFC822::date2gm($_)))
+  {}
+  # non-kosher, but I've seen it in email
+  # dow mon mday hh:mm:ss year tz
+  elsif (/^($cs::Date::wday_ptn)\s+($cs::Date::mon_ptn)\s+(\d+)\s+(\d\d?):(\d\d):(\d\d)\s+(\d{4})\s+([-+]?\d{4}|[a-z]+)/)
+  { my($mon,$dom,$hh,$mm,$ss,$yr,$offset)
+	  =($2,$3,$4,$5,$6,$7,$8);
 
-		  my($mnum);
-		  return undef unless defined($mnum=cs::Date::mon2mnum($mon));
+    my($mnum);
+    return undef unless defined($mnum=cs::Date::mon2mnum($mon));
 
-		  if (length($yr) == 2)	{ $yr+=1900; }
+    if (length($yr) == 2)	{ $yr+=1900; }
 
-		  $time=dmy2gmt($dom,$mnum+1,$yr,0)
-		       +($hh*60+$mm)*60+$ss
-		       -cs::RFC822::tzone2minutes($offset);
-		}
-	  elsif (defined($time=ctime2gm($_)))
-		{}
-	  elsif (defined($time=yyyymmdd2gmt($_,1)))
-		{}
-	  else
-	  { warn "$_ doesn't look like a Date: line";
-	    return undef;
-	  }
+    $time=dmy2gmt($dom,$mnum+1,$yr,0)
+	 +($hh*60+$mm)*60+$ss
+	 -cs::RFC822::tzone2minutes($offset);
+  }
+  elsif (defined($time=ctime2gm($_)))
+  {}
+  elsif (defined($time=iso2gmt($_,1)))
+  {}
+  else
+  { warn "$_ doesn't look like a Date: line";
+    return undef;
+  }
 
-	  $time;
-	}
+  $time;
+}
 
 1;
