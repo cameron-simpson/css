@@ -1,6 +1,7 @@
 #!/bin/sh
 #
 # Add trailing REJECT rules to the specified chains.
+# First yanks any existing wildcard REJECTs.
 #	- Cameron Simpson <cs@zip.com.au>
 #
 
@@ -24,5 +25,6 @@ fi
 set -x
 for chain
 do
+  iptables -D "$chain" -j $rej
   iptables -A "$chain" -j $rej
 done
