@@ -23,6 +23,7 @@ cgi="${cgibase}search.cgi"
 
 query=$*
 [ -n "$query" ] || query=`xunclip`
+oquery=$query
 query=`qsencode "$query"`
 
 if [ -z "$target" ]
@@ -32,6 +33,7 @@ then
 	aarn)	[ $# = 0 ] && exec us http://mirror.aarnet.edu.au/ ;;
 	av)	target=altavista ;;
 	trans)	target=systranslinks ;;
+	dict)	target=onelook ;;
 	babel)	target=babelfish ;;
 	nlight)	target=northernlight ;;
 	raging)	target=avraging ;;
@@ -56,6 +58,7 @@ then
 	imdb-character-male) target=moviecharmale ;;
 	imdb-character-female) target=moviecharfemale ;;
 	tv)     target=sofcomtv ;;
+	wiki)	target=wikipedia ;;
 	www)	for target in altavista yahoo dmoz google
 		do  search -t "$target" "$*" &
 		done
@@ -77,4 +80,5 @@ then
     esac
 fi
 
+echo "search $target $oquery" >>"$URLLOG"
 us +c "$cgi?engine=$target&query=$query"
