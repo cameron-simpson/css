@@ -1,60 +1,49 @@
 #!/bin/sh
 #
-# Grab a window and put it as a gif on my web site, return the URL.
-# Stripped out of bgfg.
+# Wrapper for xwd to produce common data formats.
+# Saves window in $HOME/var/xwd and puts the pathname into the X cut buffer
+# and on stdout.
 #	- Cameron Simpson <cs@zip.com.au>
 #
-# Grab a PNG.	- Cameron Simpson <cs@zip.com.au> 25may2000
-#
-
-TMPDIR=${TMPDIR-/tmp}
 
 cmd=`basename "$0"`
-usage="Usage: $cmd [xwd-args]"
+usage="Usage: $cmd [-{gif|png|pnm|jpg}] [xwdargs...]"
 
-cd || exit 1
+fmt=xwd
+post=		# filter - xwdto...
+quant=64	# default colour quanization
+args=		# passed to real xwd
+
+# default to PNG mode
+set x -png ${1+"$@"}; shift
 
 badopts=
-
-scphost=zip
-scpuser=cs
-snapdir=etc/im/winsnap
-scpurlpfx=http://www.zip.com.au/~cs/winsnap
+while :
+do
+    case $1 in
+	-gif)		fmt=gif post='| xwdtopnm | ppmquant 256 | ppmtogif' ;;
+	-pnm)		fmt=pnm post='| xwdtopnm' ;;
+	-png)		fmt=png post='| xwdtopnm | pnmtopng' ;;
+	-jpg)		fmt=jpg post='| xwdtopnm | cjpeg' ;;
+	-display)	DISPLAY=$2; export DISPLAY; shift ;;
+	-root|-debug|-help|-nobdrs|-xy|-frame)
+			args="$args $1" ;;
+	-add)		args="$args -add $2" ; shift ;;
+	--)		shift; break ;;
+	-*)		echo "$cmd: unrecognised argument: $1" >&2; badopts=1 ;;
+	*)		break ;;
+    esac
+    shift
+done
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
-echo "Select window to include ..." >&2
+dir=$HOME/var/xwd
+[ -d "$dir/." ] || mkdir -p "$dir" || exit 1
 
-png=$TMPDIR/xwd.$$.png
-xwd -png -out $png ${1+"$@"} || exit 1
+file=$dir/xwd`datecode`.$fmt
+[ -s "$file" ] && { echo "$cmd: already exists: $file" >&2; exit 1; }
 
-[ -s $png ] || \
-  { echo "$cmd: failed to make $png" >&2
-    ls -ld "$png" >&2
-    exit 1
-  }
-
-imbase=
-sfx=`daycode`
-n=1
-while
-    im=$snapdir/${imbase:-"winsnap"}-$sfx-$n.png
-    [ -s "$im" ]
-do
-    n=`expr $n + 1`
-done
-
-mv "$png" "$im" || exit 1
-imname=`basename "$im"`
-
-case $SYSTEMID in
-    cisra)
-	echo "propagating to zip ..." >&2
-	synczip "$snapdir" || exit 1
-	echo "$scpurlpfx/$imname"
-	;;
-    *)	echo "ok, filed as $im"
-	echo "getting it to zip is your problem"
-	exit 0
-	;;
-esac
+eval "xwd $args $post >\"\$file\"" || exit 1
+echo "$file" | xclip &
+echo "$file"
