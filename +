@@ -43,6 +43,24 @@ fi
 
 [ $anyhost ] || needhost "$HOMEHOST@$SYSTEMID" || exit 1
 
+case "$mfolder" in
+  /*)	fpath=$mfolder ;;
+  +*)	fpath=$MAILDIR/`expr "x$mfolder" : '..\(.*\)'` ;;
+  imap:*) fpath= ;;
+  *.*)	fpath= ;;
+  ?*)	fpath=$MAILDIR/$mfolder ;;
+  *)	fpath= ;;
+esac
+if [ -z "$fpath" ]
+then
+    DELETE_FOLDER=
+else
+    fbase=`basename "$fpath"` || exit 1
+    mhdir "$MAILDIR/DELETED/$fbase"
+    DELETE_FOLDER=+DELETED/$fbase
+fi
+export DELETE_FOLDER
+
 cd || exit 1
 [ -s "$HOME/rc/mail/muttsh.$mfolder" ] && . "$HOME/rc/mail/muttsh.$mfolder"
 export mfolder
