@@ -50,7 +50,7 @@ $cs::MIME::_Range_tspecials='()<>@,;:\\"\/\[\]?.=';
 =item parseContentType(I<content-type>)
 
 Parse a B<Content-Type> line I<content-type>,
-returning a tuple of (I<typ>,I<subtype>,I<params>,I<unparsed>)
+returning a tuple of (I<type>,I<subtype>,I<params>,I<unparsed>)
 being the type and subtype,
 a hashref containing any parameters on the line
 and any remaining data which could not be parsed.
@@ -68,7 +68,7 @@ sub parseContentType($)
     $subtype=uc($2);
     $_=$';
 
-    ($_,$params)=parseTypeParams($_);
+    ($params,$_)=parseTypeParams($_);
   }
   else
   { $type=TEXT;
@@ -237,15 +237,6 @@ sub UseSource($$;$)
   # (just past the message) regardless of whether the
   # caller asks for the body
   $this->{BODY}=$s->Get();
-
-  # Content-Transfer-Encoding
-  if (defined $s
-   && defined ($_=$H->Hdr(CONTENT_TRANSFER_ENCODING,1))
-   && length)
-  { s/^\s+//;
-    s/\s+$//;
-    $this->{CTE}=uc($_);
-  }
 }
 
 =item Hdrs()
@@ -295,6 +286,14 @@ sub UseHdrs($$)
   # Content-Type
   ($this->{TYPE},$this->{SUBTYPE},$this->{TYPEPARAMS},$_)
 	=parseContentType($_);
+
+  # Content-Transfer-Encoding
+  if (defined ($_=$H->Hdr(CONTENT_TRANSFER_ENCODING,1))
+   && length)
+  { s/^\s+//;
+    s/\s+$//;
+    $this->{CTE}=uc($_);
+  }
 }
 
 =item Body(I<decoded>,I<istext>)
@@ -351,7 +350,7 @@ sub ContentType($;$)
 { my($this,$noParams)=@_;
   $noParams=0 if ! defined $noParams;
 
-  my($cte)=$this->{TYPE}.'/'.$this->{SUBTYPE};
+  my($cte)=$this->Type().'/'.$this->SubType();
   if (! $noParams)
   { my($value);
     for my $param (sort keys %{$this->{TYPEPARAMS}})
@@ -393,18 +392,20 @@ sub WriteItem($$$;$$$)	# (this,sink,\@cs::MIME,pre,post,sep)
   $sink->Put($post);
 }
 
-=item Parts()
+=item Parts(I<wantPrePost>)
 
 Collect pretext, parts and posttext
 from the object
 (presumably multipart)
-and return an array of strings
-containing (pretext,posttext,parts...).
+and return an array of B<cs::MIME> objects for each part.
+If the optional parameter I<wantPrePost> is true,
+prefix the pretext and posttext to the array.
 
 =cut
 
-sub Parts()
-{ my($this)=@_;
+sub Parts($;$)
+{ my($this,$wantPrePost)=@_;
+  $wantPrePost=0 if ! defined $wantPrePost;
 
   ###### input stream
   my($s)=$this->BodySource();
@@ -416,6 +417,9 @@ sub Parts()
 
   my($boundary)='--'.$this->{TYPEPARAMS}->{BOUNDARY};
   my($terminate)=$boundary.'--';
+
+  ## warn "bound=[$boundary]";
+  ## warn "M=".cs::Hier::h2a($this,1);
 
   my($line,$bound,$last,$crlf,$ncrlf,$first);
   my($cache);
@@ -454,7 +458,15 @@ sub Parts()
       $crlf=$ncrlf;
     }
 
-  ($pre,$post,@parts);
+  my @mparts = ();
+
+  for my $part (@parts)
+  { push(@mparts,
+	 new cs::MIME (new cs::Source (SCALAR, \$part)));
+  }
+
+  return @mparts if ! $wantPrePost;
+  return ($pre,$post,@mparts);
 }
 
 =back
