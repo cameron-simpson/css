@@ -1,0 +1,12 @@
+#!/bin/sh
+#
+# Read an email message from stdin and recite a summary line.
+#	- Cameron Simpson <cs@zip.com.au> 16apr2002
+#
+
+mhdrs \
+| { while read hdr body
+    do  eval "HDR_$hdr=\$body"
+    done
+    echo ${HDR_X_LABEL:+"[$HDR_X_LABEL]"} "$HDR_FROM; $HDR_SUBJECT"
+  }
