@@ -74,7 +74,7 @@ do  case "$fwd" in
 	cisra2zip)
 	    echo "cisra2zip..."
 	    $trace \
-	    vpnssh $vflag -t 60 -i dsa-vpn-cisra2zip "$zip" \
+	    vpnssh $vflag -t 60 "$zip" \
 		   -L 8081:localhost:8081 \
 		   -L 9875:203.17.198.110:9875 \
 		   -L 9876:203.17.198.107:9875 \
@@ -86,7 +86,7 @@ do  case "$fwd" in
 	cisra2home)
 	    echo "cisra2home..."
 	    $trace \
-	    vpnssh $vflag -t 60 -q -i rsa1-vpn-cisra2home "$home" \
+	    vpnssh $vflag -t 60 -q "$home" \
 		   -L 2111:mail-optus:110 \
 		   -L 2180:www-optus:110 \
 		   -L 2401:cvs-cskk:2401 \
@@ -99,7 +99,7 @@ do  case "$fwd" in
 	home2zip)
 	    echo "home2zip..."
 	    $trace \
-	    vpnssh $vflag -i vpn_dsa-home2zip "$zip" \
+	    vpnssh $vflag "$zip" \
 		   -L 8081:localhost:8081 \
 		   -L 2119:news:119 \
 		   -L 2025:mail:25 \
