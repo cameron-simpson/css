@@ -6,7 +6,9 @@
 #	- Cameron Simpson <cs@zip.com.au>
 #
 
-tmp=/tmp/$$
+: ${TMPDIR:=/tmp}
+
+tmp=$TMPDIR/$$
 cat >$tmp || exit $?
 
 spamcount=100	# 100 copies by default
