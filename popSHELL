@@ -1,0 +1,26 @@
+#!/bin/sh
+#
+# Restore $SHELL from saved setting then exec $popSHELLexec.
+# This is really an ugly hack to get the script(1) command
+# to run something arbitrary rather than the user's shell
+# since for some unknown reason is just execs $SHELL.
+# Sad but true. Hence this script.
+#	- Cameron Simpson <cs@zip.com.au> 18may2002
+#
+
+cmd=$0
+
+[ -n "$popSHELL" ] \
+	|| { echo "$cmd: no \$popSHELL set, aborting" >&2
+	     exit 2
+	   }
+SHELL=$popSHELL
+export SHELL
+
+[ -n "$popSHELLexec" ] \
+    || { echo "$cmd: no args and no \$popSHELLexec, aborting" >&2
+	 exit 2
+       }
+set x $popSHELLexec; shift
+
+exec "$@"
