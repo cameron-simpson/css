@@ -1,4 +1,5 @@
 #!/bin/sh
 set -x
-exec rsync -avHP --delete --delete-excluded --include-from $HOME/rc/sync/list.ezos-rc \
+exec rsync -avHP --delete --delete-excluded \
+	--include-from $HOME/rc/sync/list.ezos-rc \
 	$HOME/rc/. $HOME/there/ezos/html/cs/rc/.
