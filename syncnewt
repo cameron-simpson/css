@@ -1,6 +1,6 @@
 #!/bin/sh
 
-needhost amadeus@home || exit 1
+needhost amadeus@home kaper@cisra || exit 1
 
 [ $# = 0 ] || exec syncstuff @newt "$@"
 
