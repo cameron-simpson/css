@@ -13,4 +13,4 @@ do  # echo "$d ..." >&2
 done
 
 # set -x
-exec "$BIN/$cmd" ${1+"$@"}
+exec "$HOME/bin/$ARCH/$cmd" ${1+"$@"}
