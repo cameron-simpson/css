@@ -1,0 +1,121 @@
+#!/bin/sh
+#
+# Find several words (egrep regexps) in files;
+# order the found files on the hit rate.
+#	- Cameron Simpson <cs@zip.com.au> 30jan97
+#
+
+cmd=`basename "$0"`
+usage="Usage: $cmd [-I filelist] [-] [-l] [-R] [-r] [-s] [-v] [--] regexps...
+	-I filelist	Fetch filenames from filelist.
+			\"-\" means stdin. Default: files in current directory.
+	-		Synonym for \"-I -\".
+	-l		Long listing. Report lines containing regexps.
+	-R		Recurse. Search recursively down the directory.
+	-r		Report hits (args are: \"regexp-list\" files-to-egrep).
+			This is usually used for an internal subfunction.
+	-s		Silent. Do not report search progress.
+	-v		Verbose.
+	--		End of options."
+
+silent=
+verbose=
+long=
+filelist=
+report=
+recurse=
+
+badopts=
+
+passopts=
+while :
+do  case $1 in
+	-l)	long=1 ;;
+	-I)	filelist=$2; shift;	passopts="$passopts -I $filelist" ;;
+	-)	filelist=$1;		passopts="$passopts -I -" ;;
+	-R)	recurse=1;		passopts="$passopts -R" ;;
+	-r)	report=1 ;;
+	-s)	silent=1 verbose=;	passopts="$passopts -s" ;;
+	-v)	silent= verbose=1;	passopts="$passopts -v" ;;
+	--)	shift; break ;;
+	-?*)	echo "$cmd: unrecognised option: $1" >&2; badopts=1 ;;
+	*)	break ;;
+    esac
+    shift
+done
+
+[ $# = 0 ] && { echo "$cmd: missing regexps" >&2; badopts=1; }
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+if [ $report ]
+then
+    wlist=$1; shift
+    flist=$*
+
+    # report hits in files
+    [ $silent ] || echo "reporting $wlist ..." >&2
+    echo "$wlist:$flist"
+    ptn=`echo $wlist|tr ' ' '|'`
+    case $ptn in
+	*\|*)	ptn="($ptn)" ;;
+    esac
+    for subfile in $flist
+    do
+	[ $silent ] || necho " $subfile" >&2
+	echo "    $subfile"
+	egrep -in "$ptn" $subfile \
+	    | sed 's/^\([0-9]*\):/	\1        /'
+    done
+    [ $silent ] || echo >&2
+    exit 0
+fi
+
+if [ $long ]
+then
+    $0 $passopts -- ${1+"$@"} \
+	| { flist= owlist=
+	    while read file wlist
+	    do
+		 if [ "x$wlist" = "x$owlist" ]
+		 then
+		     flist="$flist $file"
+		 else
+		     [ -n "$flist" ] && $0 $passopts -r -- "$owlist" "$flist"
+		     # start new list
+		     flist=$file owlist=$wlist
+		 fi
+	    done
+	    [ -n "$flist" ] && $0 $passopts -r -- "$owlist" "$flist"
+	  }
+    exit 0
+fi
+
+# weed out in a single pass files not containing any hits
+[ $silent ] || echo "winnowing boring files ..." >&2
+allptn=`echo $*|tr ' ' '|'`
+
+if [ -z "$filelist" ]
+then  flist=`echo *`
+else  if [ "x$filelist" = x- ]
+      then  flist=`cat`
+      else  flist=`cat "$filelist"`
+      fi
+fi
+
+[ $recurse ] && flist=`find $flist ! -type d -print`
+
+flist=`egrep -il "($allptn)" $flist`
+
+# get short list
+for word
+do  [ $silent ] || echo "looking for $word ..." >&2
+
+    egrep -il "$word" $flist | sed "s/\$/ $word/"
+done | awk '	{ words[$1]=words[$1] " " $2
+		  nwords[$1]++
+		}
+	    END	{ for (file in words)
+			{ print nwords[file] " " file words[file]
+			}
+		}' | sort +0nr +2d | cut '-d ' -f2- | sed 's/ /	/'
