@@ -1,0 +1,29 @@
+#!/bin/sh
+#
+# Called by mailrepack to build and send the new message.
+#	- Cameron Simpson <cs@zip.com.au> 08jul2002
+#
+
+cmd=$0
+usage="Usage: $cmd hdrfile [key]"
+
+[ $# = 1 ] || { echo "$usage" >&2; exit 2; }
+
+set -x
+
+hdrs=$1; shift
+
+for f in *.desc
+do  [ -s "$f" ] || cat "$f" >>"$hdrs"
+done
+
+# construct the mutt command
+set mutt -H "$hdrs" -e "set sendmail=$HOME/scripts/send2procmail"
+
+for f in `find . -type f -print`
+do  [ -s "$f" ] || { echo "$cmd: skipping \"$f\"" >&2; continue; }
+    set "$@" -a "$f"
+done
+
+cat "$hdrs"
+exec strace -f "$@" cameron@cskk.homeip.net </dev/null 2>&1 | grep exec
