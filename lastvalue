@@ -4,10 +4,14 @@
 #	- Cameron Simpson <cs@zip.com.au> 02dec2002
 #
 
+dir=$HOME/var/log/lastvalue
+
 cmd=$0
-Usage="Usage: $cmd param [value|-]"
+Usage="Usage: $cmd [-d dir] param [value|-]"
 
 badopts=
+
+[ "x$1" = x-d ] && { dir=$2; shift; shift; }
 
 if [ $# = 0 ]
 then
@@ -25,13 +29,13 @@ fi
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
-[ $# = 0 ] && exec cat "$HOME/var/log/last-$param"
+[ $# = 0 ] && exec cat "$dir/$param"
 
-[ -d "$HOME/var/log/." ] || mkdir -p "$HOME/var/log" || exit 1
+needdir "$dir" || exit 1
 
 if [ "x$1" = x- ]
 then
     cat
 else
     echo "$1"
-fi >"$HOME/var/log/last-$param"
+fi >"$dir/$param"
