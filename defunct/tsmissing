@@ -1,0 +1,84 @@
+#!/usr/bin/perl
+#
+# Dispatch complaints about unsubmitted timesheets.
+#	- Cameron Simpson <cs@zip.com.au> 19feb97
+#
+# Perlify, just do due month.	- cameron, 02sep98
+#
+
+use strict qw(vars);
+
+use cs::Misc;
+use CISRA::UserData;
+use CISRA::TimeSheets;
+
+$::Usage="Usage: $::cmd monthcode\n";
+
+my $badopts = 0;
+
+if (! @ARGV)
+	{ warn "$::cmd: missing monthcode\n";
+	  $badopts=1;
+	}
+else
+{ $::MCode=shift(@ARGV);
+  if ($::MCode !~ /^\d{4}-\d\d$/)
+	{ warn "$::cmd: bad monthcode: $::MCode\n";
+	  $badopts=1;
+	}
+
+  if (@ARGV)
+	{ warn "$::cmd: extra arguments: @ARGV\n";
+	  $badopts=1;
+	}
+}
+
+die $::Usage if $badopts;
+
+my(@weeks)=sort(&CISRA::TimeSheets::monthWeeks($::MCode));
+
+die "$::cmd: no weeks for month \"$::MCode\"\n" if ! @weeks;
+## warn "weeks($::MCode) = @weeks\n";
+
+my($leastWeek,$mostWeek)=($weeks[0],$weeks[$#weeks]);
+
+my $sheets = CISRA::TimeSheets::sheets();
+
+my $U;
+
+USER:
+  for my $user (sort(&CISRA::UserData::users()))
+	{
+	  ## warn "user=$user\n";
+	  $U = CISRA::UserData::user($user);
+
+	  next USER if ! defined $U;
+	  next USER if ! $U->NeedsTimesheet();
+	  next USER if ! $U->Alive();
+
+	  my(@active)=sort(grep($_ ge $leastWeek && $_ le $mostWeek,
+				$U->ActiveWeeks()));
+	  ## warn "active = @active\n";
+
+	  my(@missing)=();
+
+	  if (! exists $sheets->{$user})
+		{ @missing=@active;
+		}
+	  else
+	  {
+	    my $TS = $sheets->{$user};
+
+	   WEEK:
+	    for my $week (@active)
+		{
+		  push(@missing,$week) if ! exists $TS->{$week};
+		}
+	  }
+
+	  if (@missing)
+		{ print "$user @missing\n";
+		}
+	}
+
+exit 0;
