@@ -104,7 +104,7 @@ sub _dfltReport($$$$$)
   }
 		
 
-  cs::Upd::nl($rpt);
+  cs::Upd::out($rpt);
 }
 
 =item Size(I<total>)
