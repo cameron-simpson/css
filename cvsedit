@@ -121,19 +121,8 @@ editxit=$?
      exit 1
    }
 
-if [ $dodl ] && [ -n "$msg$editcmd" ]
-then
-    case "$file" in /*) pwdpfx= ;; *) pwdpfx="`pwd`: " ;; esac
-    dl=`echo "cvsedit $pwdpfx$file $editcmd: $msg" | entilde`
-    dlog "$dl"
-fi
-
-if [ $cisra ]
-then
-  ddtsids=`echo "$msg" | ddtsids`
-  [ -n "$ddtsids" ] \
-  && cvs diff "$file" | ( set -x; mailif -s "$base: $msg" $ddtsids )
-fi
+# log the change and diff appropriately
+cvs diff "$file" | buglog "cvsedit $base: $msg"
 
 ( cd "$dir" || exit 1
   exec cvs commit -m "$msg" "$base"
