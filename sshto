@@ -21,7 +21,11 @@ do
   case $1 in
     -t)	topt=-t ;;
     +t)	topt= ;;
-    -o)	sshopts="$sshopts $1 "`shqstr "$2"`
+    -[aAfgknNqsTvxXC1246])
+	sshopts="$sshopts $1"
+	;;
+    -[bceiIlmopFLRD])
+    	sshopts="$sshopts $1 "`shqstr "$2"`
 	shift
 	;;
     [a-zA-Z]*=?*)
@@ -46,7 +50,9 @@ fi
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
-sshargv="ssh $sshopts"
+[ -t 0 -a -t 1 ] && topt=-t
+
+sshargv="ssh $sshopts $topt"
 sshcmd=$*
 
 while :
@@ -62,8 +68,6 @@ do
 		;;
   esac
 done
-
-[ -t 0 -a -t 1 ] && topt=-t
 
 ##set -x
 eval "exec $sshargv $host \"$sshcmd\""
