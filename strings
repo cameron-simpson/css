@@ -1,0 +1,138 @@
+#!/usr/bin/perl
+#
+# Strings rewrite.	- Cameron Simpson <cs@zip.com.au>
+#
+# Hook to mark start/end of block.
+# Major recode. - cameron 18jun99
+#
+
+use strict qw(vars);
+
+use cs::Misc;
+use Getopt::Std;
+
+$::Threshold=3;
+$::Printable='\t\r\n -\176';
+$::Marker='';
+
+$::Usage="Usage: $::cmd [-m marker] [-p printable] [-t threshold] [files...]
+	-m marker	Delimit separate text chunks with \nmarker\n.
+			Default: none.
+	-p printable	Regexp character class to be considered printable.
+			Default: $::Printable.
+	-t threshold	How many contiguous printables to find before output.
+			Default: $::Threshold.
+";
+
+{ my $badopts = 0;
+  getopts('m:p:t:') || ($badopts=1);
+
+  $::Marker=$::opt_m if defined $::opt_m;
+  $::Marker="\n$::Marker\n" if length $::Marker;
+
+  $::Printable=$::opt_p if defined $::opt_p;
+
+  if (defined $::opt_t)
+  { if ($::opt_t =~ /^\d+$/)
+    { $::Threshold=$::opt_t+0;
+      if ($::Threshold < 1)
+      { warn "$::cmd: threshold must be >0\n";
+	$badopts=1;
+      }
+    }
+    else
+    { warn "$::cmd: threshold must be numeric\n";
+      $badopts=1;
+    }
+  }
+
+  die $::Usage if $badopts;
+}
+
+my $xit = 0;
+
+if (! @ARGV)
+	{ strings(STDIN,'') || ($xit=1);
+	}
+else
+{ for my $f (@ARGV)
+  { if ($f eq '-')
+    { strings(STDIN,'') || ($xit=1);
+    }
+    elsif (!open(F,"< $f\0"))
+    { warn "$::cmd: can't open $f: $!\n";
+      $xit=1;
+    }
+    else
+    { strings(F,$f) || ($xit=1);
+      close(F);
+    }
+  }
+}
+
+exit $xit;
+
+sub strings	# (FILE,name) -> ok
+{ my($FILE,$fname)=@_;
+
+  my($ok)=1;
+
+  my $textbuf = '';
+  my $intext = 0;
+  local $_ = '';
+
+  SCAN:
+  while (1)
+  {
+    if (! length)
+    { my $n = read($FILE,$_,8192);
+      if (! defined $n)
+      { warn "$::cmd: read("
+	    .(length($fname) ? "\"$fname\"" : $FILE)
+	    ."): $!\n";
+	$ok=0;
+	last SCAN;
+      }
+
+      last SCAN if $n == 0;
+    }
+
+    if (/^[$::Printable]+/o)
+    {
+      if ($intext >= $::Threshold)
+      # threshold reached - copy following contiguous text to output
+      { print $&;
+	$intext+=length($&);
+      }
+      else
+      # threshold not reached - pending data in $textbuf
+      # see if we reach it this time
+      { $textbuf.=$&;
+	$intext+=length($&);
+	if ($intext >= $::Threshold)
+	# yep - flush $textbuf to output
+	{ print $textbuf;
+	  $textbuf='';
+	}
+      }
+
+      $_=$';
+    }
+    elsif (/^[^$::Printable]+/o)
+    { if ($intext)
+      {
+	print $::Marker if length $::Marker && $intext >= $::Threshold;
+	$intext=0;
+      }
+
+      $_=$';
+    }
+    else
+    { die "$0: logic bug!";
+    }
+  }
+
+  print $::Marker if length $::Marker && $intext >= $::Threshold;
+
+  $ok;
+}
