@@ -1,0 +1,9 @@
+#!/bin/sed -f
+#
+# Strip leading "From " line on email message, if any.
+#	- Cameron Simpson <cs@zip.com.au> 13jul2002
+#
+
+1!b ok
+/^From /d
+:ok
