@@ -17,7 +17,9 @@ case "$#,$1" in 1,*.pgp) exec pgpedit "$1" ;; esac
 
 # make templates
 for arg
-do  [ -s "$arg" ] || template "$arg" >>"$arg"
+do  [ -s "$arg" ] || { tplt "$arg" >>"$arg"
+		       [ -s "$arg" ] || rm "$arg"
+		     }
 done
 
 [ -s .exrc ] && { EXINIT="$EXINIT|source .exrc"
