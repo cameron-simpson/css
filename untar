@@ -1,0 +1,152 @@
+#!/usr/bin/perl
+#
+# Run tar extract with tidier verbose mode.
+#	- Cameron Simpson <cs@zip.com.au>
+#
+
+use cs::Upd;
+
+($cmd=$0) =~ s,.*/,,;
+$usage="Usage: $cmd [-o] [-O] [-f file] [--] [targets...]
+	-f file	File to use rather than stdin.
+	-o	Keep file owner from archive.
+	-O	Use extractor's uid for ownership.
+";
+
+$badopts=0;
+$tar='gnutar';
+$gnutar=1;
+$tarflags='xpv';
+$suser=($> == 0);
+$keepowner=($suser ? '' : 'o');	# use extractor's uid
+$tarf='-';
+@tarargs=();
+while (@ARGV && $ARGV[0] =~ /^-/)
+{ $_ = shift @ARGV;
+  last if ($_ eq '--');
+
+  if ($_ eq '-f')
+  { if (! @ARGV)
+    { err("$cmd: missing argument for -f\n");
+      $badopts=1;
+    }
+    else
+    { $tarf=shift(@ARGV);
+    }
+  }
+  elsif ($_ eq '-o')	{ $keepuser='o'; }
+  elsif ($_ eq '-O')	{ $keepuser=''; }
+  else
+  { err("$cmd: bad option '$_'\n");
+    $badopts=1;
+  }
+}
+
+$tarflags.=$keepowner;
+$tarflags.='f';
+push(@tarargs,$tarf);
+
+die $usage if $badopts;
+
+pipe(READEND,WRITEEND)	|| die "$cmd: can't make pipe: $!\n";
+my $pid = fork;
+die "$cmd: fork: $!\n" if ! defined $pid;
+
+if ($pid == 0)
+# child, redirect then exec tar
+{ close(READEND);
+
+  open(STDERR,'>&WRITEEND')
+	  || die "$cmd: can't dup write end of pipe to STDERR: $!\n";
+
+  open(STDOUT,'>&WRITEEND')
+	  || die "$cmd: can't dup write end of pipe to STDOUT: $!\n";
+
+  close(WRITEEND);
+
+  @e=($tar,$tarflags,@tarargs,@ARGV);
+  warn "exec(@e)\n";
+  exec(@e);
+  die "exec(@e): $!";
+}
+
+# child, monitor tar output
+close(WRITEEND);
+open(STDIN,'<&READEND')
+      || die "$cmd: can't dup read end of pipe: $!\n";
+close(READEND);
+
+undef $oldline;
+undef $dir;
+while (<STDIN>)
+{ chop;
+
+  if ($gnutar && /^gnutar:\s/)
+  { $type='e';
+  }
+  elsif (/^x (.*), \d+ bytes?, \d+ (tape )?blocks?$/)
+  # extract file
+  { $_=$1; $type='.';
+  }
+  elsif (/^x (.*) symbolic link to (.*)/)
+  # extract symlink
+  { $_=$1; $type='s'; $l=$2;
+  }
+  elsif (/^(.*) linked to (.*)/)
+  # hard link
+  { $_=$1; $type='l'; $l=$2;
+  }
+  elsif (/^x (.*)\/$/)
+  # extract directory
+  { $_=$1; $type='d';
+  }
+  elsif ($gnutar)
+  { $type='.';
+  }
+  else
+  { $type='e';
+  }
+
+  if ($type eq 'e')
+  { $d=''; $b='';
+  }
+  else
+  { if (/(.*)\//)
+    { $d=$1; $b=$';
+    }
+    else
+    { $d='.'; $b=$_;
+    }
+  }
+
+  if ($type eq 'e')
+  # error, display and restart
+  { err($_,"\n");
+  }
+  else
+  { if (defined($dir) && $dir ne $d)
+    # new directory, emit old one
+    { if (!$emitted{$dir})
+      { nl($dir);
+	$emitted{$dir}=1;
+      }
+
+      $dir=$d;
+    }
+
+    if (!defined($dir))
+    { $dir=$d;
+    }
+
+    if ($_ eq 'l')	{ $b.=" == $l"; }
+    elsif ($_ eq 's')	{ $b.=" -> $l"; }
+
+    $line=$d.'/'.$b;
+    out($line);
+  }
+}
+
+waitpid($pid,0);
+$::Xit=1 if $? != 0;
+
+exit $::Xit;
