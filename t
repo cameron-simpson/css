@@ -146,6 +146,17 @@ do  [ $abort ] && exit 1
 	continue
     fi
 
+    if [ ! -f "$f" ]
+    then
+	case "$f" in
+	    http://*)	pageif w3m -dump "$f" ;;
+	    *)		echo "$cmd: $f: no such file" >&2
+			xit=1
+			;;
+	esac
+	continue
+    fi
+
     (
       pipe="<\"\$f\""
       pipeext=
