@@ -1,0 +1,24 @@
+#!/bin/sh
+#
+# Take email on stdin and deliver to the addresses specified.
+# Prune several headers to avoid bloat.
+#	- Cameron Simpson <cs@zip.com.au>
+#
+
+cmd=$0
+usage="Usage: $cmd addrs..."
+
+[ $# = 0 ] && { echo "$cmd: missing addrs" >&2; echo "$usage" >&2; exit 2; }
+
+case "$EMAIL" in
+  ?*@?*.?*)	;;
+  *)		echo "$cmd: \$EMAIL not set to valid address, aborting" >&2
+		exit 2
+		;;
+esac
+
+formail -U 'received' \
+	-U 'x-prefetchmail-received' \
+	-U 'delivered-to' \
+	-A "Return-Path: $EMAIL" \
+| sendmail -oi "$@"
