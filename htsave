@@ -4,7 +4,8 @@
 #	- Cameron Simpson <cs@zip.com.au> 05jan2003
 #
 
-MAILDIR=${MAILDIR:-$HOME/mail}
+: ${TMPDIR:=/tmp}
+: ${MAILDIR:=$HOME/mail}
 export MAILDIR
 
 folder=+SAVED/web
@@ -32,7 +33,7 @@ done
 
 xit=0
 
-tmpf=${TMPDIR:-/tmp}/htsave$$
+tmpf=$TMPDIR/htsave$$
 trap 'rm -f "$tmpf"' 0 1 15
 
 for url
@@ -43,7 +44,7 @@ do
       continue
   fi
 
-  lock htsave httpget -h -o "$tmpf" "$url" \
+  httpget -h -o "$tmpf" "$url" \
   || { xit=1; continue; }
 
   (
