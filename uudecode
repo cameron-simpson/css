@@ -1,0 +1,277 @@
+#!/usr/bin/perl
+#
+# uumerge - merge multiple uuencoded split files
+#
+$usage="Usage: $0 [-svtcC] [-p ptn] [-b begin] [-e end] [--] [uufiles...]
+	-s	Silent mode.
+	-v	Verbose mode.
+	-p ptn	Print lines satifying the expression ptn.
+	-t	Table of contents.
+	-c	Convert extracted filenames to lower case.
+	-C	Convert extracted filenames to upper case.
+	-b begin Pattern matching BEGIN line of wrapper.
+	-e end	Pattern matching END line of wrapper.
+";
+
+undef $begin, $end;
+$badargs=0;
+$silent=0;
+$verbose=0;
+$toc=0;
+$convlower=0;
+$convupper=0;
+undef $pflag;
+while ($#ARGV >= $[)
+	{ $_=shift;
+	  if (!/^-/)		{ unshift(@ARGV,$_); last; }
+	  elsif ($_ eq '--')	{ last; }
+	  elsif ($_ eq '-s')	{ $silent=1; $verbose=0; }
+	  elsif ($_ eq '-v')	{ $verbose=1; $silent=0; }
+	  elsif ($_ eq '-p')	{ if (!defined($pflag=shift))
+					{ print STDERR "$cmd: missing argument to -p option\n";
+					  $badargs=1;
+					}
+				  else
+				  { eval 'sub pflag { local($_)=@_; '
+					.$pflag
+					.'}';
+				    die $@ if $@;
+				  }
+				}
+	  elsif ($_ eq '-t')	{ $toc=1; }
+	  elsif ($_ eq '-c')	{ $convlower=1; $convupper=0; }
+	  elsif ($_ eq '-C')	{ $convupper=1; $convlower=0; }
+	  elsif ($_ eq '-b')	{ if (!defined($begin=shift))
+					{ print STDERR "$cmd: missing argument to -b option\n";
+					  $badargs=1;
+					}
+				}
+	  elsif ($_ eq '-e')	{ if (!defined($end=shift))
+					{ print STDERR "$cmd: missing argument to -e option\n";
+					  $badargs=1;
+					}
+				}
+	  else			{ print STDERR "unexpected argument '$_'\n";
+				  $badargs=1;
+				}
+	} 
+
+if (defined($begin) && !defined($end)
+ || !defined($begin) && defined($end))
+	{ print STDERR "$cmd: both -b and -e must be supplied if either is\n";
+	  $badargs=1;
+	}
+
+die $usage if $badargs;
+
+undef $pic, $PIC;
+$skipped=0;
+$in=1;
+
+ARGV:
+  for (@ARGV)
+	{ if (/\.Z$/)
+		{ if (!open(UU,"zcat <'$_'|"))
+			{ print STDERR "pipe from \"zcat <'$_'\" fails: $!\n";
+			  next ARGV;
+			}
+
+		  $silent || print "zcat < '$_' ...\n";
+		}
+	  elsif (!open(UU,"< $_\0"))
+		{ print STDERR "open($_): $!\n";
+		  next ARGV;
+		}
+	  else
+	  { $silent || print "'$_' ...\n";
+	  }
+
+	  UU: while (<UU>)
+		{ print if defined($pflag) && &pflag($_);
+
+		  chomp;
+		  s/\r$//;
+
+		  # deal with markers
+		  $accept=0;
+
+		  # Recognise Header lines and use known markers.
+		  if (/^From: /o)
+			{ local($oldbegin)=$begin;
+
+			  { local($begin);
+			    local($_)=$';
+
+			    undef $begin;
+			    if (-f '.uufrom')
+				{ do '.uufrom';
+				  warn $@ if $@;
+				}
+
+			    if (defined($begin))
+				{ $oldbegin=$begin;
+
+				  $silent
+					|| print STDERR "$_\n\tbegin=$begin\n\tend  =$end\n";
+
+				  $oldbegin=$begin;
+				}
+			  }
+
+			  $begin=$oldbegin;
+			}
+
+		  next UU if defined($begin) && (/$end/../$begin/);
+
+		  next UU if !(/^begin(\s+\d{3})?\s*\S/../^end$/);
+
+		  # check for beginning of picture
+		  if (!defined($pic) && /^begin\s+\d+\s+(\S+)/)
+			{ $pic=$1;
+			  $pic =~ tr/a-z/A-Z/ if $convupper;
+			  $pic =~ tr/A-Z/a-z/ if $convlower;
+
+			  $uulines=0;
+			  $uudata=0;
+
+			  if ($toc)
+				{ if ($verbose)
+					{ local($|)=1;
+					  printf("line %5d: %-16s ",$.,$pic);
+					}
+				  else
+				  { print "$pic\n";
+				  }
+				}
+			  else
+			  { $silent || print STDERR "line $.: begin file $pic\n";
+			    if (open(PIC,"> $pic\0"))
+				{ $PIC=1;
+				}
+			    else
+			    { print STDERR "line $.: can't open $pic: $!\n\tskipping file ... ";
+			    }
+			  }
+
+			  $accept=1;
+			  next UU;
+			}
+
+		  if (/^end$/)
+			{ if (!defined($pic))
+				{ print STDERR "line $.: unexpected \"end\"\n";
+				}
+			  else
+			  { if ($toc)
+				{ $verbose && printf("%5d uulines, %7d data\n",$uulines,$uudata);
+				}
+			    else
+			    { $silent || print STDERR "line $.: end file $pic: $uulines uulines, $uudata data\n";
+			    }
+
+			    undef $pic;
+			    if (defined($PIC))
+				{ close(PIC);
+				  undef $PIC;
+				}
+			  }
+
+			  $accept=1;
+			  next UU;
+			}
+
+		  if (!defined($pic))
+			# cpio rides again!
+			{ die "line $.: out of sync: seek help\n";
+			}
+
+		  next UU if !length || /[^ -`]/;
+
+		  tr/ /`/;
+		  next UU if $_ eq '`' || /^-+$/;
+		  next UU if /^END---/../^BEGIN---/;
+
+
+		  # supposed length not counting newline
+		  $len=1+int((unpack('C',substr($_,$[,1))-30)/3)*4;
+
+		  next UU if length($_) < $len;
+
+		  if (length($_) > $len)
+			{ # print STDERR 'chopping ', $_, "\n";
+			  $_=substr($_,$[,$len);
+			}
+
+		  $uu=unpack("u",$_."\n"); defined($uu) || print STDERR "\$uu NOT DEFINED\n";
+
+		  if (!defined($uu))
+			{ $ok=0;
+			  $ok || print "NOT OK 0\n";
+			}
+		  elsif (length($uu)%3 != 0)
+			{ next UU if /^-+\s*$/;
+
+			  print STDERR "length=", length, ", length(\$uu)=", length($uu), "\n";
+			  $UU=substr($uu,$[,length($uu)-length($uu)%3);
+			  $UU=substr(pack("u",$UU),$[+1);
+
+			  chop $UU;
+
+			  $ok=($UU eq substr($_,$[+1,length($UU)));
+			  $ok || print "NOT OK 1\n";
+			}
+		  else
+		  { $UU=pack("u",$uu); chop $UU;
+		    $ok=($UU eq $_);
+			  $ok || print "NOT OK 2\n";
+		  }
+		  
+		  if (!$ok)
+			{ print STDERR "line $.: bad uu line: $_\n";
+			  print STDERR "_ = [$_]\n";
+			  print STDERR "UU= [$UU]\n";
+			  die;
+			  next UU;
+			}
+
+		  $accept=1;
+
+		  $uulines++;
+		  $uudata+=length($uu);
+		  if ($PIC)
+			{ print PIC $uu;
+			}
+		}
+	continue
+		{ if ($accept)
+			{ if ($in)
+				{}
+			  else
+				{ $in=1;
+				  $toc || $silent || print STDERR "new hunk at line $.\n";
+				}
+			}
+		  else
+			{ if ($in)
+				{ $in=0;
+				  $toc || $silent || print STDERR "skipping noise from line $. ...\n";
+				}
+			  else
+				{}
+
+			  # print skipped portions
+			  $verbose && print STDERR "< $_\n";
+			}
+		}
+	
+	  close(UU);
+	}
+
+# catch loose ends
+if (defined($pic))
+	{ print STDERR "unexpected EOF in file $pic\n";
+	  if (defined($PIC))
+		{ close(PIC);
+		  undef $pic, $PIC;
+		}
+	}
