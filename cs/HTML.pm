@@ -62,6 +62,7 @@ map($cs::HTML::_Singular{uc($_)}=1,
 =(	DL,	[DT,DD],
 	TABLE,	[TR],
 	TR,	[TD,TH],
+	HTML,	[HEAD,BODY],
 	UL,	[LI],
 	OL,	[LI],
  );
@@ -174,7 +175,10 @@ sub tokFlat
   for my $t (@_)
   {
     if (! ref $t)
-    { $text.=$t;
+    { my $str = $t;
+      my $noamp;
+      $str =~ s/\&(\w+);?/(($noamp=unamp($1)) eq $1 ? $& : $noamp)/eg;
+      $text.=$str;
     }
     elsif (::reftype($t) eq ARRAY)
     { $text.=tokFlat(@$t);
@@ -242,7 +246,7 @@ sub tok2s	# ([indent,]sink,tok...)
 
   my(@html)=();
 
-  ## warn "tok2a:\n".cs::Hier::h2a([@_],1);
+  ## warn "tok2s:\n".cs::Hier::h2a([@_],1);
 
   if (@_ < 1)
   {}
@@ -333,24 +337,24 @@ sub tok2s	# ([indent,]sink,tok...)
 	$sink->Put(_justtok2a($html));
 	for (@{$html->{TOKENS}})
 	{ if (! defined)
-		{
+	  {
 ##				  my(@c)=caller;
 ##				  warn "undef in TOKENS (html="
 ##				      .cs::Hier::h2a($html,0)
 ##				      .") from [@c]";
-		}
+	  }
 	  else
 	  { tok2s($subindent,$sink,$_);
 	  }
 	}
 
 	if (! singular($html->{TAG}))
-		{ if ($indent > 0)
-			{ $sink->Put("\n".(" " x ($indent-1)));
-			}
+	{ if ($indent > 0)
+	  { $sink->Put("\n".(" " x ($indent-1)));
+	  }
 
-		  $sink->Put('</'.uc($html->{TAG}).'>');
-		}
+	  $sink->Put('</'.uc($html->{TAG}).'>');
+	}
       }
     }
   }
