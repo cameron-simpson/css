@@ -1,0 +1,102 @@
+#!/bin/sh
+#
+# Edit a file, making a template if needed.
+#	- Cameron Simpson <cs@zip.com.au> 27oct95
+#
+
+cmd=`basename "$cmd"`
+usage="Usage: $cmd [-e editor] [files...]"
+
+EDITOR=${EDITOR:-vi}
+case "$1" in -e) EDITOR=$2; shift; shift ;; esac
+export EDITOR
+
+## what was this for?
+## datestr=`date|awk '{print $3 $2 $6}'|tr '[A-Z]' '[a-z]'`
+
+# PGP edit a single file
+case "$1" in
+    *.pgp)	pgpfile=$1; shift
+
+		if [ -z "$PGPPASS" ]
+		then
+		    echo "$cmd: no \$PGPPASS" >&2
+		    [ -t 0 -a -t 2 ] || exit $?
+		    necho "Pass-phrase for $pgpfile? " >&2
+		    read PGPPASS || exit $?
+		    export PGPPASS
+		fi
+
+		tmpdir=$HOME/private/tmp
+		[ -d "$tmpdir" ] || mkdir -p "$tmpdir" || exit $?
+
+		bpgpfile=`basename "$pgpfile"`
+		for t in "$bpgpfile" "$bpgpfile.$$" "$cmd$$" "e$$" ''
+		do  if [ -z "$t" ]
+		    then  echo "$cmd: can't make temp file for $pgpfile" >&2
+			  exit 1
+		    fi
+		    [ ! -f "$tmpdir/$t" ] && { tmp=$t; break; }
+		done
+
+		now=`datecode`
+		pgpid=${PGPID-$EMAIL}
+
+		xit=1
+
+		if cp "$pgpfile" "$pgpfile.$now"
+		then
+		    if echo "decrypting $pgpfile ..." >&2
+		       pgp -fd <"$pgpfile" >"$tmpdir/$tmp"
+		    then
+			# conceal the dir with the plaintext
+			( cd "$tmpdir" || exit $?
+			  exec "$EDITOR" "$tmp"
+			)
+			clear
+			if [ ! -s "$tmpdir/$tmp" ]
+			then
+			    echo "$cmd: temp file is empty, leaving original untouched" >&2
+			else
+			    if echo "encrypting $pgpfile ..." >&2
+			       pgp -fe "$pgpid" <"$tmpdir/$tmp" >"$pgpfile"
+			    then
+				rm -f "$pgpfile.$now"
+				xit=0
+			    else
+				echo "$cmd: reencryption failed, restoring $pgpfile from snapshot" >&2
+				if cp "$pgpfile.$now" "$pgpfile"
+				then  rm -f "$pgpgfile.$now"
+				else  echo "$cmd: warning: couldn't restore $pgpfile from $pgpfile.$now" >&2
+				      ls -ld "$pgpfile" "$pgpfile.$now" >&2
+				fi
+			    fi
+			fi
+		    fi
+		else
+		    rm -f "$pgpfile.now"	# in case
+		fi
+
+		rm -f "$tmpdir/$tmp"
+		exit $xit
+		;;
+esac
+
+for arg
+do 
+    base=`basename "$arg"`
+    pfx=`expr "x$base" : 'x\(.*\)\..*'`
+
+    case $arg in
+	-*|+*)	continue ;;
+    esac
+
+    [ -s "$arg" ] || template "$arg" >>"$arg"
+done
+
+[ -s .exrc ] && { EXINIT="$EXINIT|source .exrc"
+		  NEXINIT="$NEXINIT|source .exrc"
+		  export EXINIT NEXINIT
+		}
+
+exec pushttylabel +a "E [$dirname]@$HOST $*" "$EDITOR" ${1+"$@"}
