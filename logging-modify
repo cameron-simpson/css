@@ -7,8 +7,7 @@
 : ${TMPDIR:=/tmp}
 
 cmd=`basename "$0"`
-usage="Usage: $cmd [args1-opts...] -r report-command [-m message] \
-		itemname editcommand [editargs...]
+usage="Usage: $cmd [args1-opts...] -r report-command [-m message] itemname editcommand [editargs...]
 	arg1opts	Used to control passing itemname to editcommand.
 	-r report-command Shell command to report on itemname.
 			%s within the string will be replaced by quoted itemname.
@@ -85,6 +84,6 @@ sh -c "$reportcmd" >"$tmpf" || exit 1
 arg1 $arg1opts "$itemname" "$editcommand" "$@"
 xit=$?
 
-sh -c "$reportcmd" | diffu "$tmpf" - | buglog "$message"
+sh -c "$reportcmd" | diffu "$tmpf" - | tee /dev/tty | buglog "$message"
 
 exit $xit
