@@ -39,4 +39,4 @@ fi
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
 cd || exit 1
-exec term +ip -n "mutt $folder" scrif "mutt_$folder" mutt -f "$mfolder" $muttopts
+exec term +ip -n "mutt $mfolder" scrif "mutt_$mfolder" mutt -f "$mfolder" $muttopts
