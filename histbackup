@@ -261,7 +261,14 @@ then  echo=echo
 else  echo=:
 fi
 
-# use the dest/.hbinclude file if present
+# =head1 CUSTOMISATION FILE
+#
+# If the file I<backupdir>/F<.hbinclude> is present
+# the option B<"--include-from=>I<backupdir>/F<.hbinclude>
+# will be added to the I<rsync> command invocation.
+# In this way the content backed up may be tuned.
+# See rsync(1).
+#
 hbinclude=$dest/.hbinclude
 [ -s "$hbinclude" ] && set -- ${1+"$@"} "--include-from=$hbinclude"
 
