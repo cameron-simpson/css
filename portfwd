@@ -46,7 +46,7 @@ done
 if [ $# = 0 ]
 then
     case "$HOST@$SYSTEMID" in
-	zapff@cisra)	set cisra2zip cisra2home nntpcached ;;
+	zapff@cisra)	set cisra2zip cisra2home ;; # nntpcached
 	amadeus@home)	set home2cisra home2zip nntpcached ;;
 	*)		echo "$cmd: no forwardings to do on $HOST@$SYSTEMID" >&2
 			badopts=1
