@@ -113,7 +113,7 @@ or B<undef> if it does not exist.
 sub GetSet($$;$)
 { my($this,$field,$value)=@_;
 
-  if (defined $value)
+  if (@_ > 2)
   { $this->{$field}=$value;
   }
   else
