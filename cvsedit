@@ -44,12 +44,6 @@ fi
 
 umask 2
 
-[ -n "$msg" ] || { necho "Log message? "
-		   read msg
-		 } || exit $?
-
-[ $dodl ] && dl "cvsedit $file $*: $msg"
-
 [ $# = 0 ] && { set x "${EDITOR-vi}" "$file"; shift; }
 
 cvs update "$file" || exit $?
@@ -60,13 +54,21 @@ chmod +w "$file"
 if if [ $cameron ]; then pushttylabel "cvsedit $*" "$@"
 		    else "$@"
    fi
-then :
-else if ask "$* failed - really commit the file"
-     then :
-     else [ ! -d CVS/Base ] || cvs unedit "$file"
-	  exit 1
-     fi
+then
+    cvs diff "$file"
+    [ -n "$msg" ] || { necho "Log message? "
+		       read msg
+		     } || { echo "commit cancelled - file in modified state" >&2
+			    exit 1
+			  }
+
+    [ $dodl ] && dl "cvsedit $file $*: $msg"
+else
+    if ask "$* failed - really commit the file"
+    then :
+    else [ ! -d CVS/Base ] || cvs unedit "$file"
+	 exit 1
+    fi
 fi
 
-cvs diff "$file"
 exec cvs commit -m "$msg" "$file"
