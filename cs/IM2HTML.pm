@@ -311,15 +311,20 @@ sub ImageIndices($)
     my $imHref = { HREF => "../$im" };
     $imHref->{TARGET}=$this->{FRAMETARGET} if length $this->{FRAMETARGET};
 
+    my $imattrs = { SRC => "../".$this->ThumbOf($im), BORDER => 0, };
+    if (defined($tx) && $tx > 0)
+    { $imattrs->{WIDTH}=$tx;
+    }
+    if (defined($ty) && $ty > 0)
+    { $imattrs->{HEIGHT}=$ty;
+    }
+
     my @imdesc
      = ( [TD, {ALIGN => CENTER, VALIGN => CENTER, CELLPADDING => "20%"},
 	      [A, $imHref,
 		  $im,
 		  [BR],
-		  [IMG, { SRC => "../".$this->ThumbOf($im),
-			  BORDER => 0,
-			  WIDTH => $tx,
-			  HEIGHT => $ty }],
+		  [IMG, $imattrs],
 		  [BR],
 		  "${ix}x${iy}",
 		  ",", ["&nbsp;"],
