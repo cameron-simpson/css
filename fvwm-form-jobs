@@ -1,0 +1,20 @@
+#!/bin/sh
+#
+# Generate a form definition for manipulating my job list.
+#	- Cameron Simpson <cs@zip.com.au> 11aug2003
+#
+
+echo "WarpPointer"
+echo "ColorSet 2"
+echo "Font fixed"
+echo "InputFont fixed"
+echo "Title \"Job List\""
+
+joblist name category state title \
+| sort -d +1 \
+| while read id name category state title
+  do  [ "x$state" = xCLOSED ] && continue
+      echo "Line left"
+      echo "Text \"$name\""
+      echo "Input title$id 40 \"$title\""
+  done
