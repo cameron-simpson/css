@@ -1,0 +1,19 @@
+#!/bin/sh
+#
+# Supercede one PROJ_ID with another.
+#	- Cameron Simpson <cs@zip.com.au> 27sep2002
+#
+
+cmd=$0
+usage="Usage: $cmd old-projid new-projid"
+
+[ $# = 2 ] || { echo "$usage" >&2; exit 2; }
+old=$1 new=$2
+
+cat <<X
+use TIMESHEETS_DB;
+update SUBPROJECTS     set PARENT_PROJ_ID = $new WHERE PARENT_PROJ_ID = $old;
+update SUBPROJECTS     set CHILD_PROJ_ID  = $new WHERE CHILD_PROJ_ID = $old;
+update PROJECT_MEMBERS set PROJ_ID = $new where PROJ_ID = $old;
+update ENTRIES         set PROJ_ID = $new where PROJ_ID = $old;
+X
