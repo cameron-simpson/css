@@ -1,0 +1,54 @@
+#!/bin/sh
+#
+# Resize a JPEG image, outputs JPEG by default, with a few simple alternatives.
+#	- Cameron Simpson <cs@zip.com.au>
+#
+
+cmd=`basename "$0"`
+usage="Usage: $cmd [-pnm] [-G] [-ppm] [-q quant] maxx maxy [jpegfile]
+	-pnm	Input is PNM.
+	-gif	Input is GIF.
+	-png	Input is PNG.
+	-jpg	Input is JPEG.
+	-G	Output is GIF.
+	-P	Output is PNG (default).
+	-q quant Quantise to quant distinct colours."
+
+topnm='djpeg -P'
+outgif='ppmquant -floyd $quant | ppmtogif -interlace'
+outjpg=cjpeg
+outpng='ppmquant -floyd $quant | pnmtopng'
+out=$outpng
+quant=256
+while :
+do
+    case "$1" in
+	-G)	out=$outgif ;;
+	-J)	out=$outjpg ;;
+	-P)	out=$outpng ;;
+	-pnm)	topnm=cat ;;
+	-png)	topnm=pngtopnm ;;
+	-jpg)	topnm='djpeg -P' ;;
+	-gif)	topnm='giftoppm 2>/dev/null' ;;
+	-q)	quant=$2; shift ;;
+	-*)	echo "$cmd: $1: unrecognised option" >&2
+		badopts=1
+		;;
+	*)	break ;;
+    esac
+    shift
+done
+
+case $# in
+    0|1)	echo "$cmd: missing maxx or maxy" >&2; badopts=1 ;;
+    2|3)	;; # maxx maxy [file]
+    *)		shift; shift; shift; echo "$cmd: extra arguments: $*" >&2
+		badopts=1 ;;
+esac
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+maxx=$1; shift
+maxy=$1; shift
+
+eval "$topnm"' ${1+"$@"} | pnmscale -xysize "$maxx" "$maxy" | '"$out"
