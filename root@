@@ -17,7 +17,7 @@ ext=
 
 session=root@$host$ext
 
+## scrif $newflag "$session"
 exec term -n "#$session" \
-	scrif $newflag "$session" \
 	logscript "$session" \
 	sshp1 "root@$host"
