@@ -1,0 +1,19 @@
+#!/bin/sh
+#
+# Add symlinks for dumb apps with hardcoded paths :-(
+#	- Cameron Simpson <cs@zip.com.au> 20aug2000
+#
+# chkconfig: 2345 00 99
+# description: Makes compatibility symlinks for the weak.
+# probe: false
+
+cd /dev || exit 1
+
+case $1 in
+  start)	ln -s misc/psaux mouse
+		ln -s ide/host0/bus1/target0/lun0/cd cdrom
+  		for n in 0 1 2 3 4 5 6 7 8 9
+		do  ln -s vc/$n tty$n
+		done
+		;;
+esac
