@@ -21,6 +21,7 @@ else  havemsg=
 fi
 
 dodiff=1
+dolog=1
 arg1opts=-end
 isfilter=
 
@@ -36,8 +37,10 @@ do
       isfilter=1
       ;;
     -m)	havemsg=1 msg=$2; shift ;;
+    --log)	dolog=1 ;;
+    --no-log)	dolog= ;;
     --diff)	dodiff=1 ;;
-    --no-diff) dodiff= ;;
+    --no-diff)	dodiff= ;;
     -?*)	echo "$cmd: unrecognised option: $1" >&2; badopts=1 ;;
     --)	shift; break ;;
     *)	break ;;
@@ -106,7 +109,7 @@ editxit=$?
    }
 
 # log the change and diff appropriately
-cvs diff "$file" | buglog "cvsedit $base: $msg"
+[ $dolog ] && cvs diff "$file" | buglog "cvsedit $base: $msg"
 
 ( cd "$dir" || exit 1
   exec cvs commit -m "$msg" "$base"
