@@ -5,6 +5,7 @@ cd
 . $HOME/rc/x11/xenv.sh
 
 for fvbin in \
+	/opt/fvwm-2003-04-16/bin \
 	/opt/fvwm-2.5.6/bin \
 	/opt/fvwm-2.5.4/bin \
 	/opt/fvwm-2.5.4cvs/bin \
