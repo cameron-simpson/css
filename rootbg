@@ -7,18 +7,20 @@
 #
 
 cmd=$0
-usage="Usage: $0 [-s] [-xpl] [{imagefile|ptns...}]"
+usage="Usage: $0 [-s] [-d dim] [-xpl] [{imagefile|ptns...}]"
 
 [ -n "$DISPLAY" ] || { echo "$cmd: no \$DISPLAY!" >&2; exit 1; }
 
 sync=
 xplanet=
+convopts='-d 0.6'
 
 badopts=
 while :
 do  case $1 in
         -xpl)	xplanet=1 ;;
 	-s)	sync=1 ;;
+	-d)	convopts="$convopts -d $2"; shift ;;
 	--)	shift; break ;;
 	-?*)	echo "$cmd: unrecognised option: $1" >&2
 		badopts=1
@@ -73,8 +75,8 @@ then
 fi
 
 case "$imagefile" in
-    *.gif|*.xpm)	2xpm -s root "$imagefile" xpmroot & ;;
-    *)			2png -s root "$imagefile" display -window root & ;;
+    *.gif|*.xpm)	2xpm -s root $convopts "$imagefile" xpmroot & ;;
+    *)			2png -s root $convopts "$imagefile" display -window root & ;;
 esac
 
 [ $sync ] || exit 0
