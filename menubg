@@ -16,16 +16,24 @@ usage="Usage: $cmd [-M] [ imagefile | bglist-args... ]
 	-M	Popup FVWM menu to pick from choices."
 
 badopts=
+subopts=
 
-[ "x$1" = x-M ] && { pickn=20 aspect= domenu=1 strippfx=$HOME; shift; }
+[ "x$1" = x-M ] && { subopts="$subopts -M" pickn=20 aspect= domenu=1 strippfx=$HOME; shift; }
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
 if [ $# = 1 -a -f "$1" -a -s "$1" ]
 then
     # one argument which is a file pathname
-    :
+    domenu=
 else
+    case "$#,$1" in
+      1,http://*)
+	# one argument which is a URL
+	exec withurl "$1" "$0"
+	;;
+    esac
+
     # presume search args instead
     set x `set -x; pickim -P "$strippfx" -n $pickn -r $aspect ${1+"$@"} | sort -u` || exit 1
     shift
