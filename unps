@@ -1,0 +1,13 @@
+#!/bin/sh
+#
+# Like strings(1) for PostScript.
+#	- Cameron Simpson, 21nov92
+#
+
+sed -e '/([^()]*)/!d
+	s/[^()]*(//
+	s/)[^()]*(/\
+/g
+	s/)[^()]*$//
+	s/\\\([()]\)/\1/g
+	/^$/d' ${1+"$@"} | fmt
