@@ -113,7 +113,7 @@ x_subsys=
 eval "$config"
 
 cfgname=$cf_DEVICE.$where
-cfg=/etc/sysconfig/network-scripts/ifcfg-$cfgname
+cfg=/etc/sysconfig/network-scripts/ifcfg-$cf_DEVICE
 
 echo "cfg=[$cfg]"
 
@@ -132,7 +132,7 @@ case "$action" in
    up)
     echo "Bringing up loopback interface..."; ifup ifcfg-lo
     $trace ifdown "$cf_DEVICE"
-    $trace ifup "$cfgname" || exit 1
+    $trace ifup "$cf_DEVICE" || exit 1
     [ -n "$cf_GATEWAY" ] && $trace route add default gw "$cf_GATEWAY"
 
     [ -n "$x_dns" ] && { echo "nameserver $x_dns"
