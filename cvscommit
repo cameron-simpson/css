@@ -4,9 +4,14 @@
 #	- Cameron Simpson <cs@zip.com.au> 12apr1997
 #
 
+diffs=/tmp/cvd$$
+CVS_COMMIT_DIFFS=$diffs
 CVS_COMMIT_FILES=$*
 CVS_COMMIT_EDITOR=$EDITOR
 EDITOR=$0-editor
-export CVS_COMMIT_FILES CVS_COMMIT_EDITOR EDITOR
+export CVS_COMMIT_FILES CVS_COMMIT_EDITOR CVS_COMMIT_DIFFS EDITOR
+
+trap 'rm -f "$diffs"' 0 1 15
+cvs -q diff $CVS_COMMIT_FILES >$diffs 2>&1
 
 exec cvs commit -l ${1+"$@"}
