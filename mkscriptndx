@@ -23,6 +23,8 @@
 # Cameron Simpson <cs@zip.com.au> 01mar2000
 #
 
+cat INSTALL
+echo
 for f
 do  [ -s "$f" ] || continue
     egrep "^(# *)?$f - [a-z]" <"$f" \
