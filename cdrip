@@ -76,20 +76,23 @@ cdtoc "$dev" \
       [ -d "$dir/." ] || mkdir -p "$dir" || { xit=1; continue; }
 
       echo "Ripping track #$track: $dir/$title ..."
-      time cdparanoia -q -d "$dev" -e -r "$track" - \
+      set -x
+      cdparanoia -q -d "$dev" -e -r "$track" - \
 	2>>cdp.err \
-      | buffer -m 10M \
+      >cdp.out
+      cat cdp.out \
       | case $enc in
 	  ogg)
-	      oggenc -r -Q -b $bps \
+	      time strace -f oggenc -r -b $bps \
 		     -c "Ripped by $NAME with cdparanoia and oggenc on `date`" \
 		     -a "$artist" -N "$track" -t "$title" -l "$album" \
-		     -o "$out" -
+		     -o "$out" - 2>ogg.str
 	      ;;
 	  mp3)
-	      lame -r -b "$bps" -h -p - "$out"
+	      time lame -r -b "$bps" -h -p - "$out"
 	      ;;
 	esac
+      exit 0
     done
 
     exit $xit
