@@ -2,6 +2,7 @@
 URLLOG=${URLLOG:-$HOME/var/log/urllog}
 export URLLOG
 sed -n 's;^urlshow  *http://;;p' <"$URLLOG" \
-| tail -20 \
+| keeplast \
+| tail -40 \
 | sort -u \
 | awk '{ print "\"" $0 "\" Exec us \"http://"$0"\"" }'
