@@ -1,6 +1,12 @@
 #!/bin/sh
+#
+# Copy a directory tree - refuse it target exists as safety measure.
+# Faster, safer, more accurate and more informative than "cp -rp".
+#	- Cameron Simpson <cs@zip.com.au>
+#
 
 tar=gnutar
+buffer="buffer -m 1M"	# just use "cat" if you lack buffer
 
 [ $# = 2 ] || { echo "Usage: $0 fromdir todir" >&2
 		exit 2
@@ -16,7 +22,7 @@ case $ARCH in
 
 	( cd "$1/." && $tar -cf - .
 	) \
-	| buffer -m 1M \
+	| $cat \
 	| ( mkdir "$2" && cd "$2" && untar )
 	;;
 esac
