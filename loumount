@@ -9,9 +9,9 @@ cmd=$0
 [ $# = 1 ] || echo "Usage: $cmd mountpoint" >&2
 mnt=$1
 
-escmnt=`sedstrs 's:/:\\&:g' "$mnt"`	# for sed
+escmnt=`sedstrs 's:/:\\\\&:g' "$mnt"`	# for sed
 
-loop=`mount | sed -n "/^\\(\\/dev\\/loop[0-9][0-9]*\\) on $escmnt type .*/\\1/p"
+loop=`mount | sed -n "s/^\\(\\/dev\\/loop[0-9][0-9]*\\) on $escmnt type .*/\\1/p"`
 
 [ -n "$loop" ] || { echo "$cmd: can't find loop mount for $mnt" >&2; exit 1; }
 
