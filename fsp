@@ -1,0 +1,415 @@
+#!/usr/bin/perl
+#!/opt/bin/perl_dbm
+
+($cmd=$0) =~ s:.*/::;
+$usage="Usage: $cmd [-h host] [-p port] [-d dir] [-v] [--] [commands...]
+	-h host	Host to connect to.
+	-p post	Port on host.
+	-d dir	Initial directory.
+";
+
+require 'flush.pl';
+require 'cs/attrdbm.pl';
+require 'cs/date.pl';
+require 'cs/logmap.pl';
+
+undef $host, $port, $dir, $state;
+$dir='/';
+$addrpattern='\d+(\.\d+){3}:\d+';	# pattern to match numeric address
+
+$STATEDBM="$ENV{HOME}/.fsp" unless defined($STATEDBM=$ENV{'FSP_STATE'});
+
+&srcenv($STATEDBM);
+
+defined($ENV{'FSP_DIR'}) && ($dir=$ENV{'FSP_DIR'});
+defined($ENV{'FSP_HOST'}) && ($host=$ENV{'FSP_HOST'});
+defined($ENV{'FSP_PORT'}) && ($port=$ENV{'FSP_PORT'}+0);
+
+$badopts=0;
+$verbose=0;
+while (defined($_=shift))
+	{ last if $_ eq '--';
+	  (unshift(@ARGV,$_), last) unless /^-/;
+
+	  if ($_ eq '-h')	{ $host=shift; }
+	  elsif ($_ eq '-p')	{ $port=shift(@ARGV)+0; }
+	  elsif ($_ eq '-d')	{ $dir=shift; }
+	  elsif ($_ eq '-v')	{ $verbose=1; }
+	  else
+	  { print STDERR "$cmd: $_: unrecognised option\n";
+	    $badopts=1;
+	  }
+	}
+
+die $usage if $badopts;
+
+die "$cmd: can't pipe/fork: $!\n" unless defined($pid=open(GETPIPE,"|-"));
+if ($pid == 0)
+	{ $SIG{INT}=IGNORE;
+	  undef $ocwd;
+	  CHILD:
+	    while (<STDIN>)
+		{ chop;
+		  ($cwd,$host,$port,$dir,@argv)=split(/\0/);
+		  if ($#argv < $[)
+			{ print STDERR "$cmd child: bad line: $_\n";
+			  next CHILD;
+			}
+
+		  if (!defined($ocwd) || $ocwd ne $cwd)
+			{ if (!chdir($cwd))
+				{ print STDERR "$cmd child: can't chdir($cwd): $!\n";
+				  next CHILD;
+				}
+
+			  $ocwd=$cwd;
+			}
+
+		  &fspenv;
+		  system('fgetcmd',@argv);
+		}
+
+	  exit 0;
+	}
+
+if (!defined($host))	{ exit 1 if !defined($host=&prompt("Host: ")); }
+if (!defined($port))	{ exit 1 if !defined($port=&prompt("Port: ")); $port+=0; }
+
+&syncenv;
+
+open(dupSTDOUT,">&STDOUT") || die "$cmd: can't dup STDOUT: $!";
+
+$cwd=`pwd`; chop $cwd;
+
+for (@ARGV)
+	{ $verbose && print STDERR $_, "\n";
+	  &fsp($_);
+	}
+
+while (defined($_=&prompt("$cmd://$host:$port$dir> ")))
+	{ s/^\s+//;
+	  next if !length;
+	  if (/^!\s*/)
+		{ &shellcmd($');
+		}
+	  else
+	  { &fsp($_);
+	  }
+	}
+
+sub shellcmd
+	{ local($verbose)=0;
+	  &fspenv;
+	  system("@_");
+	}
+
+sub fspenv
+	{ $ENV{'FSP_HOST'}=$host;
+	  $ENV{'FSP_PORT'}=$port;
+	  $ENV{'FSP_DIR'}=$dir;
+	}
+
+sub fsp	# (cmd) -> void
+	{ local($_)=@_;
+	  local($piped)=0;
+
+	  &log($_);
+
+	  if (/\|/)
+		{ if (!open(STDOUT,"|$'\0"))
+			{ print STDERR "$cmd: can't pipe to $': $!\n";
+			  open(STDOUT,">&dupSTDOUT");
+			  return;
+			}
+
+		  $_=$`;
+		  $piped=1;
+		}
+
+	  &fspenv;
+
+	  local(@ARGV)=grep(length,split);
+	  $_=shift(@ARGV);
+	  local($ARGS)=join(' ',@ARGV);
+
+	  if ($verbose)		{ $ENV{'FSP_TRACE'}='1'; }
+	  else			{ undef $ENV{'FSP_TRACE'}; }
+
+	  if (/^(\w+)=/)	{ $_.=' '.$ARGS if length($ARGS);
+				  &setattr("$host:$port",$_);
+				}
+	  elsif ($_ eq 'ping')	{ &shellcmd('ping -i 5 $FSP_HOST'); }
+	  elsif ($_ eq 'ps')	{ &shellcmd("psu|egrep ' f(ls|cd|get)'"); }
+	  elsif ($_ eq 'log')	{ &shellcmd("sed 's/ .*//' $STATEDBM.log | uniq"); }
+	  elsif ($_ eq 'ver')	{ if (!defined($pid=fork))	{ print STDERR "$cmd: fork: $!\n"; }
+				  elsif ($pid == 0)		{ exec('f'.$_,@ARGV);
+								  die "$cmd: exec f$_ $ARGS: $!\n";
+								}
+				  else				{ $verbose && print STDERR "version ...\n"; }
+				}
+	  elsif ($_ eq 'ls')	{ system('flscmd',@ARGV); }
+	  elsif ($_ eq 'dir')	{ system('flscmd','-la',@ARGV); }
+	  elsif ($_ eq 'get')	{ print GETPIPE join("\0",$cwd,$host,$port,$dir,@ARGV), "\n";
+				  &flush(GETPIPE);
+				  $verbose && print STDERR "queuing @ARGV ...\n";
+				}
+	  elsif ($_ eq 'cat')	{ if (!defined($pid=fork))	{ print STDERR "$cmd: fork: $!\n"; }
+				  elsif ($pid == 0)		{ exec('f'.$_.'cmd',@ARGV);
+								  die "$cmd: exec f$_ @ARGV: $!\n";
+								}
+				  else				{ $verbose && print STDERR "$_ting @ARGV ...\n"; }
+				}
+	  elsif ($_ eq 'pwd')	{ print $dir, "\n"; }
+	  elsif ($_ eq 'cd')	{ local(@out)=`fcdcmd @ARGV`;
+				  # print @out, "exit code = $?\n";;
+				  chop($ndir=pop(@out));
+				  if ($ndir =~ m:^/:)
+					{ $dir=$ndir;
+					  &setattr("$host:$port",
+						'lastup='.time,
+						"dir=$dir");
+					  &syncenv;
+					}
+				}
+	  elsif ($_ eq 'sync')	{ &syncenv; }
+	  elsif ($_ eq 'resync'){ &srcenv($STATEDBM); }
+	  elsif ($_ eq 'lcd')	{ $_=shift(@ARGV);
+				  defined || ($_=$ENV{HOME});
+				  s:^~/:$ENV{HOME}/:;
+				  if (chdir($_))
+					{ chop($cwd=`pwd`);
+					}
+				  else
+				  { print STDERR "$cmd: chdir($_): $!\n";
+				  }
+				}
+	  elsif ($_ eq 'quit')	{ exit $xit; }
+	  elsif ($_ eq 'key')	{ if (defined($_=shift(@ARGV)))
+					{ &setattr($_,"addr=$host:$port");
+					}
+				  elsif (length($_=&prompt("key? ")))
+					{ &setattr($_,"addr=$host:$port");
+					}
+				}
+	  elsif ($_ eq 'comment'){ if (length($ARGS))
+					{ &setattr("$host:$port","comment=$ARGS");
+					}
+				   elsif (length($_=&prompt("comment? ")))
+					{ &setattr("$host:$port","comment=$_");
+					}
+				}
+	  elsif ($_ eq 'hosts'
+	      || $_ eq 'sites')	{ &listSTATE; }
+	  elsif ($_ eq 'host'
+	      || $_ eq 'site')	{ &openSTATE;
+				  $_=shift(@ARGV);
+				  if (!defined)
+					{ printf("%-23s %s %s\n","$host:$port",$dir,&addr2name("$host:$port"));
+					}
+				  else
+				  { if (!/^$addrpattern$/o)
+					{ if (defined($STATEDBM{$_}))
+						{ $addr=&attrdbm'attrs($STATEDBM{$_},'addr');
+						  print "$_ -> $addr\n";
+						  $_=$addr;
+						}
+					}
+
+				    if (/(.+):(\d+)/)
+					{ $host=$1; $port=$2+0;
+					  ($dir,$comment)=&attrdbm'attrs($STATEDBM,'dir','comment');
+					  printf("%-23s %-7s %s\n","$host:$port",$dir,$comment);
+					}
+				    else
+				    { print STDERR "$cmd: $_: unknown host\n";
+				    }
+				  }
+
+				  &closeSTATE;
+				  &syncenv;
+				}
+	  elsif ($_ eq 'port')	{ $port=shift(@ARGV)+0;
+				  &syncenv;
+				}
+	  else
+	  { print STDERR "unsupported command $_ $ARGS\n";
+	  }
+
+	  $piped && open(STDOUT,">&dupSTDOUT");
+	}
+
+sub srcenv
+	{ open(ENV,"< $_[0]\0") || return;
+	  while (<ENV>)
+		{ chop;
+		  if (/^(FSP_\w+)=/)
+			{ $ENV{$1}=$';
+			}
+		  else
+		  { print STDERR "$cmd: $_[0], line $.: can't parse $_\n";
+		  }
+		}
+
+	  close(ENV);
+	}
+
+sub writenv
+	{ open(ENV,"> $_[0]\0") || return;
+	  for (sort grep(/^FSP_/,keys %ENV))
+		{ print ENV $_, '=', $ENV{$_}, "\n";
+		}
+	  close(ENV);
+	}
+
+sub syncenv
+	{ &fspenv;
+	  # fork to bypass NFS delays
+	  if (fork == 0)	{ &writenv($STATEDBM);
+				  exit 0;
+				}
+	}
+
+sub setattr	# (key,@attrs) -> ok
+	{ &openSTATE || return undef;
+	  local($key,@attrs)=@_;
+	  &attrdbm'setattrs(STATEDBM,$key,@attrs);
+	  &closeSTATE;
+	}
+
+sub getattr	# (key,attr) -> attr or undef
+	{ &openSTATE || return undef;
+	  local($key,$attr)=@_;
+	  local($value)=&attrdbm'attrs($STATEDBM{$key},$attr);
+	  &closeSTATE;
+	  $value;
+	}
+
+sub openSTATE	# void -> number of active opens or undef
+	{ # print "on entry to openSTATE openSTATEs == $openSTATEs\n";
+	  return $openSTATEs if $openSTATEs++;
+
+	  if (!dbmopen(STATEDBM,$STATEDBM,0666))
+		{ # print STDERR "$cmd: can't dbmopen($STATEDBM): $!\n";
+		  $openSTATEs--;
+		  return undef;
+		}
+	  # print "on exit from openSTATE openSTATEs == $openSTATEs\n";
+	  $openSTATEs;
+	}
+sub closeSTATE { # print "on entry to closeSTATE openSTATEs == $openSTATEs\n";
+		 if (--$openSTATEs == 0)
+			{ dbmclose(STATEDBM);
+			  # print STDERR "really closed STATEDBM\n";
+			}
+		 # print "on exit from closeSTATE openSTATEs == $openSTATEs\n";
+		 $openSTATEs;
+	       }
+
+sub listSTATE
+	{ local(%seen,$key,$value,$addr);
+
+	  &openSTATE || return;
+	  for $key (&names)
+		{ $seen{$key}=1;
+		  $value=$STATEDBM{$key};
+		  $addr=&attrdbm'attrs($value,'addr');
+		  if (defined($STATEDBM{$addr}))
+			{ $value.=' '.$STATEDBM{$addr};
+			  $seen{$addr}=1;
+			}
+
+		  printf("%-23s",$key);
+		  &listattrs(&attrdbm'attrs($value));
+		  print "\n";
+		}
+
+	  for $key (sort grep(!$seen{$_},keys %STATEDBM))
+		{ $value=$STATEDBM{$key};
+		  printf("%-23s",$key);
+		  &listattrs(&attrdbm'attrs($value));
+		  print "\n";
+		}
+	  &closeSTATE;
+	}
+
+sub addr2name	# (addr:port) -> name or undef
+	{ &openSTATE || return undef;
+
+	  local($addr)=@_;
+	  local($name,$n_addr);
+	  for $name (&names)
+		{ $n_addr=&getattr($name,'addr');
+		  return $name if $n_addr eq $addr;
+		}
+
+	  return undef;
+	}
+
+sub name2addr	# name -> addr or undef
+	{ &openSTATE || return undef;
+
+	  local($name)=@_;
+	  &getattr($name,'addr');
+	}
+
+sub names	# void -> names in STATEDBM
+	{ &openSTATE || return undef;
+	  local(@names)=sort grep(!/^$addrpattern$/o,keys %STATEDBM);
+	  &closeSTATE;
+	  @names;
+	}
+
+sub addrs	# void -> addrs in STATEDBM
+	{ &openSTATE || return undef;
+	  local(@addrs)=sort grep(/^$addrpattern$/o,keys %STATEDBM);
+	  &closeSTATE;
+	  print STDERR "addrs=[@addrs]\n";
+	  @addrs;
+	}
+
+sub listattrs	# (%attrs)
+	{ local(%attrs)=@_;
+	  local($_,$attr);
+
+	  for (sort keys %attrs)
+		{ $attr=$attrs{$_};
+		  print ' ';
+		  if ($_ eq 'lastup')
+			{ print $_, '=', &date'gm2ldmy($attr);
+			}
+		  else
+		  { print $_, '=', $attr;
+		  }
+		}
+	}
+
+sub time2dmy
+	{
+	}
+
+sub prompt
+	{ &printflush(STDOUT,@_);
+	  local($_);
+	  return undef if !defined($_=<STDIN>);
+	  s/^\s+//;
+	  s/\s+$//;
+	  $_;
+	}
+
+sub log
+	{ local($F);
+	
+	  if (! &logmap'logto(FSP,'fsp'))
+		{ print STDERR "$cmd: can't log to fsp log\n";
+		  $F=STDERR;
+		}
+	  else	{ $F=FSP;
+		}
+
+	  for (@_)
+		{ s/\r?\n$//;
+		  print $F "$host:$port $dir $_\n";
+		}
+
+	  close($F);
+	}
