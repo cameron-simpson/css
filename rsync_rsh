@@ -1,3 +1,3 @@
 #!/bin/sh
-set -x
+##set -x
 exec sshto stricthostkeychecking=no forwardx11=no ${1+"$@"}
