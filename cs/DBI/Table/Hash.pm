@@ -81,7 +81,9 @@ sub TIEHASH($$$$$$)
 
     my $L = $this->{cs::DBI::Table::Hash::LIVE};
     for my $row (cs::DBI::fetchall_hashref($sth))
-    { $this->_Stash($row->{$keyfield}, $row);
+    { if (defined $row->{$keyfield})
+      { $this->_Stash($row->{$keyfield}, $row);
+      }
     }
   }
 
