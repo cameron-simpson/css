@@ -78,6 +78,17 @@ Return the hashref to the actual row data
 
 sub _Data($) { shift->{cs::DBI::Table::RowObject::DATA}; }
 
+=item Fields()
+
+Return the field names in this row.
+
+=cut
+
+sub Fields($)
+{ my($this)=@_;
+  return keys %{$this->_Data()};
+}
+
 =item GetSet(I<field>,I<value>)
 
 If I<value> is omitted,
