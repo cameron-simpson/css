@@ -114,22 +114,31 @@ sub phone
 sub phonefile
 { local($file)=@_;
 
-  if ($file eq '-'
+  if ($file =~ /\.pgp$/)
+  { if (! $usepgp)
+    { return;
+    }
+
+    if (! open(PHONES,"pgp -fd <'$file' |"))
+    { if ($! != POSIX->EACCES)
+      { warn "$cmd: pgp -fd <$file: $!\n";
+      }
+      return;
+    }
+  }
+  elsif ($usepgp)
+  { return;
+  }
+  elsif ($file eq '-'
 	? open(PHONES,'<&STDIN')
 	: $file =~ /\.Z$/
 	  ? open(PHONES,"zcat '$file' 2>/dev/null |")
-	  : $file =~ /\.pgp$/
-	    ? $usepgp
-	      && length($ENV{PGPPASS})
-	      ? open(PHONES,"pgp -fd <'$file' |")
-	      : open(PHONES,"< /dev/null\0")
-	    : open(PHONES,"< $file\0"))
+	  : open(PHONES,"< $file\0"))
   {}
   else
   { if ($! != POSIX->EACCES)
     { warn "$cmd: can't open $file: $!\n";
     }
-
     return;
   }
 
