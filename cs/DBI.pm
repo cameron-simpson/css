@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 #
 # Subclass of the DBI class. Supplies some handy things.
-#	- Cameron Simpson <cs@zip.com.au> 27jun99
+#	- Cameron Simpson <cs@zip.com.au> 27jun1999
 #
 
 =head1 NAME
