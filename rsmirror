@@ -138,7 +138,7 @@ done
 # If any B<I<server>::I<rootpfx>> or B<::I<rootpfx>> arguments are present,
 # act only on those lines in the configuration file.
 # I<rootpfx> may match any complete path component prefix
-# i.e. ::foo would match B<foo> and B<foo/bar> but not B<foobar>.
+# i.e. B<::foo> would match B<foo> and B<foo/bar> but not B<foobar>.
 #
 # =back
 #
@@ -221,9 +221,11 @@ do
     lineno=`expr $lineno + 1`
     pfx="$cmd: $cf, line $lineno"
 
-    # skip comments and blanks
     case "$how" in
+      # skip comments and blanks
       ''|\#*)	continue ;;
+
+      # set umask - 002 is a common choice
       umask)	if [ -z "$host" ]
 		then  echo "$pfx: missing umask value" >&2
 		      continue
