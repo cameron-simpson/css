@@ -59,7 +59,9 @@ then
     fi &
 
     ( deskjob=`deskjob -d "$thisdesk"`
-      [ -n "$deskjob" ] || { isjob idle || exit 0; deskjob=idle; }
-      job "$deskjob"
+      case "$deskjob" in
+	''|.|idle)	;;
+	*)		job "$deskjob" ;;
+      esac
     ) &
 fi
