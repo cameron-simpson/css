@@ -1,0 +1,17 @@
+#!/bin/sh
+
+tmp=/tmp/newurls.$$
+
+trap 'rm -f $tmp; exit 1' 1 2 3 15
+
+urllist=urllist.Z
+oldlist=old-$urllist
+
+[ ! -f $urllist ] || mv $urllist $oldlist || exit $?
+>>$oldlist
+
+urls-r ${1+"$@"} | tee $tmp | compress > $urllist
+
+zcat <$oldlist | comm -23 $tmp -
+
+rm -f $tmp
