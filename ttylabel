@@ -57,7 +57,7 @@ esac
 [ $# = 0 ] && { set x "$TTYLABEL"; shift; }
 
 # clean the string up a bit
-label=`echo $* | tr -s ' \011\012\015\033' '    \['`
+label=`echo "$*" | tr -s ' \011\012\015\033' '    \['`
 
 ttylabel=
 [ -n "$_start_title" ] && ttylabel=$ttylabel$_start_title$label$_end_title
