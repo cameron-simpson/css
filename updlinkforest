@@ -1,0 +1,85 @@
+#!/usr/bin/perl
+#
+# Update a directory of symlinks.
+#	- Cameron Simpson <cs@zip.com.au> 10apr2001
+#
+
+use strict qw(vars);
+
+use MSQ::User;
+
+($::cmd=$0) =~ s:.*/::;
+$::Usage="Usage: $::cmd [directory]\n";
+
+$::Dir='.';
+
+if (@ARGV)
+{ $::Dir=shift(@ARGV);
+}
+
+die "$::cmd: extra arguments: @ARGV\n$::Usage" if @ARGV;
+
+die "$::cmd: $::Dir: not a directory\n" if ! -d "$::Dir/.";
+
+chdir($::Dir) || die "$::cmd: chdir($::Dir): $!\n";
+
+print "cd '$::Dir' || exit 1\n";
+
+my $ok=1;
+my %links;
+
+while (<STDIN>)
+{ chomp;
+  if (/^(\S+)\s+(\S+)$/)
+  { if (exists $links{$1})
+    { warn "$::cmd: stdin, line $.: repeated key \"$1\"\n";
+      $ok=0;
+    }
+    else
+    { $links{$1}=$2;
+    }
+  }
+  else
+  { warn "$::cmd: stdin, line $.: bad input data: $_\n";
+    $ok=0;
+  }
+}
+
+die "$::cmd: bad input data\n" if ! $ok;
+
+my @keys = keys %links;
+
+if (! opendir(DIR,'.'))
+{ die "$::cmd: opendir(.) in $::Dir: $!\n";
+}
+
+my @dirents = grep(/^[^.]/, readdir(DIR));
+
+for my $dirent (sort @dirents)
+{
+  my $rm = "rm -rf '$dirent'";
+
+  if (exists $links{$dirent}
+   && -l $dirent)
+  {
+    my $sym = readlink($dirent);
+    if (! defined $sym)
+    { warn "$::cmd: readlink($dirent): $!\n";
+    }
+    elsif ($sym eq $links{$dirent})
+    { undef $rm;
+      delete $links{$dirent};
+    }
+  }
+
+  if (defined $rm)
+  { print "$rm\n";
+  }
+}
+
+for my $link (sort keys %links)
+{
+  print "ln -s '$links{$link}' '$link'\n";
+}
+
+exit 0;
