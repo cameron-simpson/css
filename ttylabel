@@ -4,6 +4,8 @@
 #	- Cameron Simpson <cs@zip.com.au>
 #
 
+[ -n "$TTYLABEL_SUPPRESS" ] && exit 0
+
 report=
 xclip=
 case $1 in
