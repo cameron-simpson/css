@@ -18,13 +18,5 @@ esac
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
 logfile=$1; shift
-case "$logfile" in
-    /*)	;;
-    *)	logfile=$LOGDIR/$logfile ;;
-esac
 
-exec </dev/null
-exec >>"$logfile" 2>&1
-ignhup "$@" &
-
-exit 0
+exec bgproc -l "$logfile" -- "$@"
