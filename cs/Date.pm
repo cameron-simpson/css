@@ -265,43 +265,43 @@ sub timestr	# (time) -> "[[[days, ]hours, ]minutes, ]seconds"
 }
 
 sub ctime2gm
-	{ local($_)=@_;
-	  my($time);
+{ local($_)=@_;
+  my($time);
 
-	  #     1:mon       2:mday  3:hh  4:mm  5:ss      6:tzone  7:   8:yy
-	  if (/($cs::Date::mon_ptn)\s+(\d+)\s+(\d+):(\d\d):(\d\d)\s*(\S+)?\s+(19)?(\d\d)/io)
-		{ my($mon,$mday,$hh,$mm,$ss,$tzone,$yy)
-			=($1,$2,$3,$4,$5,$6,$8);
+  #     1:mon       2:mday  3:hh  4:mm  5:ss      6:tzone  7:   8:yy
+  if (/($cs::Date::mon_ptn)\s+(\d+)\s+(\d+):(\d\d):(\d\d)\s*(\S+)?\s+(19)?(\d\d)/io)
+	{ my($mon,$mday,$hh,$mm,$ss,$tzone,$yy)
+		=($1,$2,$3,$4,$5,$6,$8);
 
-		  $tzone='+0000' if ! defined $tzone;
+	  $tzone='+0000' if ! defined $tzone;
 
-		  my($mnum)=mon2mnum($mon);	# 0..11
-		  return undef if !defined($mnum);
+	  my($mnum)=mon2mnum($mon);	# 0..11
+	  return undef if !defined($mnum);
 
-		  { package main;
-		    need(cs::RFC822);
-		  }
-
-		  $time=::timelocal($ss,$mm,$hh,$mday,$mnum,$yy)
-		       +cs::RFC822::tzone2minutes($tzone);
-		}
-	  else
-	  { return undef;
+	  { package main;
+	    need(cs::RFC822);
 	  }
 
-	  $time;
+	  $time=::timelocal($ss,$mm,$hh,$mday,$mnum,$yy)
+	       +cs::RFC822::tzone2minutes($tzone);
 	}
+  else
+  { return undef;
+  }
+
+  $time;
+}
 
 sub tm2ctime
-	{ my($tm)=shift;
+{ my($tm)=shift;
 
-	  sprintf("%3s %3s %2d %02d:%02d:%02d %4d",
-		$cs::Date::Wday_names[$tm->{cs::Date::WDAY}],
-		$cs::Date::Mon_names[$tm->{MON}-1],
-		$tm->{MDAY},
-		$tm->{HH},$tm->{MM},$tm->{SS},
-		$tm->{YEAR});
-	}
+  sprintf("%3s %3s %2d %02d:%02d:%02d %4d",
+	$cs::Date::Wday_names[$tm->{cs::Date::WDAY}],
+	$cs::Date::Mon_names[$tm->{MON}-1],
+	$tm->{MDAY},
+	$tm->{HH},$tm->{MM},$tm->{SS},
+	$tm->{YEAR});
+}
 
 # time,givenlocaltime -> gmt
 sub yyyymmdd2gmt($$) { iso2gmt(@_) }
@@ -309,9 +309,9 @@ sub iso2gmt($$)
 { local($_)=shift;
   my($givenlocaltime)=shift;
 
-  if (! /^(\d\d\d\d)-?(\d\d)-?(\d\d)$/)
+  if (! /^(\d\d\d\d)-?(\d?\d+)-?(\d?\d)$/)
   { my(@c)=caller;
-    warn "iso2gmt($_) from [@c]";
+    warn "$::cmd: iso2gmt($_): bad date format\n\tfrom [@c]";
     return undef;
   }
 
