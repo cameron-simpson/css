@@ -1,0 +1,5 @@
+#!/bin/sh
+log=$HOME/var/log/xclip
+tail -20 "$log" \
+| sort -u \
+| fvwm-menu-xclips
