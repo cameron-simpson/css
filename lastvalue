@@ -55,7 +55,7 @@ fi
 # no args - recite value
 if [ $# = 0 ]
 then
-  [ $append ] && { echo "$cmd: value required in append mode" >&2; exit 2; }
+  ##[ $append ] && { echo "$cmd: value required in append mode" >&2; exit 2; }
   tail -1 "$dir/$param" || exit 1
   exec >/dev/null
   [ $pop ] && lock "lastvalue_$param" bsed -s '$d' "$dir/$param"
