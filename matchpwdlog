@@ -1,0 +1,48 @@
+#!/usr/bin/perl
+#
+# Locate latest best match in pwdlog for use by cd alias.
+#	- Cameron Simpson <cs@zip.com.au> 18feb98
+#
+
+die "Usage: $0 pattern [logfiles]\n" unless @ARGV;
+
+my($ptn)=shift(@ARGV);
+warn "$0: empty pattern!\n" if ! length $ptn;
+
+my $matched;
+my $rating=0;
+my $rate;
+
+@ARGV=('-') if ! @ARGV;
+
+LOG:
+for my $log (@ARGV)
+{
+  if ($log eq '-')
+  { $FILE=STDIN;
+  }
+  elsif (! open(LOG, "< $log\0"))
+  { warn "$0: open($log): $!\n";
+    next LOG;
+  }
+  else
+  { $FILE=LOG;
+  }
+
+  LINE:
+  while (defined ($_=<$FILE>))
+  { chomp;
+    if ($rating <= 9 && m:/$ptn$:oi)		{ $rate=9; }
+    elsif ($rating <= 7 && m:/$ptn[^/]*$:oi)	{ $rate=7; }
+    elsif ($rating <= 6 && m:$ptn$:oi)		{ $rate=6; }
+    elsif ($rating <= 5 && m:$ptn:oi)		{ $rate=5; }
+    else					{ next LINE; }
+
+    if ($_ ne $matched && stat && -d _)	{ $rating=$rate; $matched=$_; }
+  }
+}
+
+exit 1 if ! defined $matched;
+
+print "$matched\n";
+exit 0;
