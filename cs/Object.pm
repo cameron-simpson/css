@@ -23,7 +23,7 @@ The B<cs::Object> module provided a few common methods for most objects.
 
 use strict qw(vars);
 
-BEGIN { use cs::DEBUG; cs::DEBUG::using(__FILE__); }
+##BEGIN { use cs::DEBUG; cs::DEBUG::using(__FILE__); }
 
 package cs::Object;
 
