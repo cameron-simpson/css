@@ -20,7 +20,7 @@ case "$fbase" in
     lcbase=`echo "$fbase" | tr '[A-Z]' '[a-z]'`
     for base in "$fbase" "$lcbase"
     do
-      if  cat "$HOME/.mime.types" "$HOME/rc/mime.types" /etc/mime.types \
+      if  cat "$HOME/.mime.types" "$HOME/rc/mime.types" /opt/config/mime.types /etc/mime.types \
 	      2>/dev/null \
 	| grep '^[ 	]*[^#]' 2>/dev/null \
 	| { while read mttype mtetc || exit 1
