@@ -532,14 +532,15 @@ sub Request($$;$$$)
   }
 
   my($rversion,$rcode,$rtext)=($1,$2,$');
-  $hdrs=new cs::RFC822 $this->{IN};
+  
+  my $M = new cs::MIME ($this->{IN},1);
 
   wantarray
-  ? ($rversion,$rcode,$rtext,$hdrs)
+  ? ($rversion,$rcode,$rtext,$M)
   : { VERSION => $rversion,
       CODE    => $rcode,
       TEXT    => $rtext,
-      HDRS    => $hdrs,
+      MESSAGE => $M,
     }
   ;
 }
