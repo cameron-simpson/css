@@ -1,0 +1,10 @@
+#!/bin/sh
+
+path=
+for dir in `rigbin -n`
+do  if [ -n "$path" ];	then path=$path:$dir
+			else path=$dir
+    fi
+done
+
+echo "$path" >$HOME/rc/env/PATH.$ARCH
