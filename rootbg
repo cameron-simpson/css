@@ -61,7 +61,7 @@ else
     case "$#,$1" in
       1,http://*)
 	# one argument which is a URL
-	exec withurl "$1" "$0"
+	exec withurl -C "$1" "$0"
 	;;
     esac
 
