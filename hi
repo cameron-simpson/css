@@ -27,52 +27,49 @@ fi
 
 urllist=/tmp/hi-urls.$$
 
-while [ $# -gt 0 ]
-do
+( exec 4>&1
+  while [ $# -gt 0 ]
+  do
     task=$1; shift
     case "$task" in
-	rterm)	case $SYSTEMID in
-		    cisra)
-			for h in ixus elph sid lennon ivie cass
-			do
-			  lock -1 rterm-$h@cisra rterm $h@cisra &
-			done
-			;;
+	rterm)	case $HOST@$SYSTEMID in
+		    zapff@cisra)	hosts='elph wanda' ;;
+		    amadeus@home)	hosts='work janus' ;;
+		    *)			hosts= ;;
 		esac
+		for h in $hosts
+		do  lock -1 rterm-$h rterm $h &
+		done
 		;;
 	/*)	task=`expr "x$task" : 'x/\(.*[^/]\)/*$'`
-		echo "# $task" >>"$urllist"
-		cat "$hi/[a-z]"* | grep '^[^#]' | egrep "$task" \
-		| while read url
-		  do eval "echo \"$url\""
-		  done >>"$urllist"
+		echo "# $task" >&3
+		cat "$hi/"[a-z]* | egrep "$task" >&3
 		;;
 	*)	if [ -f "$hi/$task" -o -f "$hi/$task.weekly" ]
 		then
-		    echo "# $task" >>"$urllist"
-		    ( cat "$hi/$task"
-		      [ $weekly ] && cat "$hi/$task.weekly"
-		    ) 2>/dev/null \
-			| grep '^[^#]' \
-			| while read mod url
-			  do case "$mod" in
-			       scour)	url=http://web/htc.cgi/$url ;;
-			       *)	url=$mod ;;
-			     esac
-			     eval "echo \"$url\""
-			  done >>"$urllist"
+		    echo "# $task" >&3
+		    [ -s "$hi/$task" ] && cat "$hi/$task" >&3
+		    [ $weekly ] && [ -s "$hi/$task.weekly" ] && cat "$hi/$task.weekly" >&3
 		else
 		    echo "$cmd: $task: unknown task" >&2
 		fi
 		;;
     esac
-done
+  done 3>&1 1>&4 4>&- \
+| grep '^[^#]' \
+| while read url grep
+  do  if [ -z "$grep" ]
+      then  echo "$url"
+      else  pageurls -i "$url" | grep "$grep"
+      fi
+  done >>"$urllist"
+)
 
 wait
 
 case $mode in
     normal)
-	[ -f "$urllist" ] && { grep -v '^#' <"$urllist" | us -; rm "$urllist"; }
+	[ -f "$urllist" ] && { grep '^[^#]' <"$urllist" | us -; rm "$urllist"; }
 	;;
     html)
 	html=$HOME/tmp/hi.html
