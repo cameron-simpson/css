@@ -1,0 +1,21 @@
+#!/bin/sh
+#
+# Prompt for text (typically a change description).
+#	- Cameron Simpson <cs@zip.com.au> 23dec99
+#
+
+prompt="Enter short update description. Terminate with lone dot."
+[ $# -gt 0 ] && prompt=$*
+
+news=
+echo "$prompt" >&2
+while necho "> " >&2; read line || exit 1
+do  [ "x$line" = x. ] && break
+    if [ -z "$news" ]
+    then  news=$line
+    else  news="$news
+$line"
+    fi
+done
+
+echo "$news"
