@@ -1,0 +1,11 @@
+#!/bin/sh
+
+for mcode
+do
+    tsmissing "$mcode" \
+    | while read user missing
+      do  ( echo "The following timesheets are needed for the month of $mcode"
+	    echo "	$missing"
+	  ) | mailif -s "missing timesheets for $mcode" "$user"
+      done
+done
