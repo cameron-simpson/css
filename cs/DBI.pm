@@ -384,7 +384,7 @@ sub addDatedRecord
   }
 
   $rec->{START_DATE}=$when;
-  cs::DBI::insert(MSQ::tsdb(),$table, keys %$rec)->ExecuteWithRec($rec);
+  cs::DBI::insert($dbh,$table, keys %$rec)->ExecuteWithRec($rec);
 }
 
 sub delDatedRecord
