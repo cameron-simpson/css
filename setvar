@@ -26,7 +26,7 @@ chomp($ENV{PWD}=`pwd`);
 
 @ENVPATH=( length $ENV{ENVPATH}
 	 ? grep(length,split(/:+/,$ENV{ENVPATH}))
-	 : ("$ENV{HOME}/.setvar", "/usr/local/etc/shell/env")
+	 : ("$ENV{HOME}/.setvar", "/opt/shell/env")
 	 );
 
 $usage="Usage:\t$::cmd [-f] varnames command [args...]
