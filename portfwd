@@ -55,7 +55,7 @@ do  case "$fwd" in
 		   -L 2111:mail-optus:110 \
 		   -L 2180:www-optus:110 \
 		   -L 2401:cvs-cskk:2401 \
-		   -L 2888:amadeus:888 \
+		   -L 8880:amadeus:8880 \
 		   -L 3119:news-optus:119 \
 		   -L 5916:amadeus:5906 &
 	    ;;
