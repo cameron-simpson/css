@@ -61,7 +61,9 @@ fi
 wd=`pwd`
 thdir=.thumbnails/$thsize
 
-exec 3>&1 1>&2
+thumblist=${TMPDIR:-/tmp}/imlist$$th
+
+exec 3>"$thumblist"
 
 ##echo "entries=[$*]" >&2
 for entry
@@ -78,7 +80,7 @@ do
       esac
 
       ##alert "\"$tag\" PopImDir $path $imop"
-      echo "\"$tag\" PopImDir $path $imop" >&3
+      echo "\"$tag\" PopImDir $path $imop"
     else
       f=$entry
       [ -s "$f" ] || continue;
@@ -111,25 +113,30 @@ do
       esac
 
       ##echo "f=[$f] d=[$d]" >&2
-      echo "$thfmt $f"	# to the thumb maker ...
+      echo "$thfmt $f" >&3	# to the thumb maker ...
 
       thumb=$thdir/$fbase.$thfmt
 
       ##alert "\"%$d/$thumb%$tag\" Exec $imop $f"
-      echo  "\"%$d/$thumb%$tag\" Exec $imop $f" >&3
+      echo  "\"%$d/$thumb%$tag\" Exec $imop $f"
     fi
-done \
-| ( exec 3>&-
-    while read thfmt f
-    do
-      d=`dirname "$f"`
-      ( cd "$d" || exit 1
-	[ -d "$thdir/." ] || mkdir -p "$thdir" || exit 1
+done
 
-	f=`basename "$f"`
-	thumb=$thdir/$f.$thfmt
-	[ -s "$thumb" ] && continue
-	exec "mk$thfmt" -o "$thumb" "$thsize" "$f"
-      )
-    done
-  ) &
+exit 1>&2
+
+( renice 10 $$
+  exec <"$thumblist"
+  rm -f "$thumblist"
+  while read thfmt f
+  do
+    d=`dirname "$f"`
+    ( cd "$d" || exit 1
+      [ -d "$thdir/." ] || mkdir -p "$thdir" || exit 1
+
+      f=`basename "$f"`
+      thumb=$thdir/$f.$thfmt
+      [ -s "$thumb" ] && continue
+      exec "mk$thfmt" -o "$thumb" "$thsize" "$f"
+    )
+  done
+) &
