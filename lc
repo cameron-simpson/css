@@ -1,11 +1,12 @@
 #!/bin/sh
 
-exec rename 'if (m:[^/]+$:)
-		{ $lhs=$`; $rhs=$&;
-		  $rhs =~ s/\%([0-9a-f][0-9a-f])/chr(hex($1))/ieg;
-		  $rhs =~ tr/_&A-Z/-+a-z/;
-		  $rhs =~ s/[-\s]+/-/g;
-		  $rhs =~ s/^-/_/;
-		  $_=$lhs.$rhs;
-		}
-	    ' ${1+"$@"}
+exec lwrename2 \
+	'if (m:[^/]+$:)
+	 { $lhs=$`; $rhs=$&;
+	   $rhs =~ s/\%([0-9a-f][0-9a-f])/chr(hex($1))/ieg;
+	   $rhs =~ tr/_&A-Z/-+a-z/;
+	   $rhs =~ s/[-\s]+/-/g;
+	   $rhs =~ s/^-/_/;
+	   $_=$lhs.$rhs;
+	 }
+	' ${1+"$@"}
