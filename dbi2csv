@@ -58,8 +58,8 @@ $where=" $where" if length $where;
 my $dsn = "DBI:${dbd}:database=${dbname}";
 $dsn.=";host=$host" if length $host;
 
-my @login=('anonymous','anonymous');
-my $dbh = DBI->connect($dsn);	## ,@login);
+my @login=('root','foo');
+my $dbh = DBI->connect($dsn,@login);
 die "$::cmd: can't get DBI handle for \"$dsn\"\n"
 	if ! defined $dbh;
 
