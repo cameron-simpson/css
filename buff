@@ -1,0 +1,200 @@
+#!/usr/bin/perl
+#
+# buff - backup file finder
+#	- Cameron Simpson <cs@zip.com.au> 14sep96
+#
+
+use cs::Upd;
+use cs::Source;
+
+($cmd=$0) =~ s:.*/::;
+$usage="Usage: $cmd [-4 target] [-v] [directories]
+	-4 target	Archive list is for target.
+	-v		Verbose.
+	-x		Extract.
+";
+
+$Target=ALL;
+$Verbose=0;
+
+$badopts=0;
+while (@ARGV)
+	{ last ARGV if ! defined ($_=shift(@ARGV));
+
+	  if (! /^-./)	{ unshift(@ARGV,$_); last ARGV; }
+
+	  last ARGV if $_ eq '--';
+
+	  if ($_ eq '-4')	{ $Target=shift(@ARGV); }
+	  elsif ($_ eq '-v')	{ $Verbose=1; }
+	  else
+	  { print STDERR "$cmd: unrecognised argument: $_\n";
+	    $badopts=1;
+	  }
+	}
+
+die $usage if $badopts;
+
+$Xit=0;
+
+@ARGV='.' unless @ARGV;
+
+for (@ARGV)
+      { buff($_,\&_usefile,\&_usedir);
+      }
+
+exit $Xit;
+
+sub _usefile	{ /^[^.]/ }
+sub _usedir	{ /^[^.]/ }
+
+sub buff
+      { my($dir,$usefile,$usedir)=@_;
+
+	$Verbose && err("buff($dir)\n");
+	{ my($s);
+	  my($rc)="$dir/.buffrc";
+
+	  $s=new cs::Source PATH, $rc;
+	  if ($s)
+	      { ($usefile,$usedir)=parse_rc($rc,$s,$usefile,$usedir);
+	      }
+	  }
+
+	  local($_);
+	  local($fullpath);
+
+	  NAME:
+	    for (cs::Pathname::dirents($dir))
+		{ $fullpath="$dir/$_";
+		  lstat($fullpath) || (next NAME);
+		  if (-d _)
+			{ buff($fullpath,$usefile,$usedir)
+				if &$usedir();
+			  next NAME;
+			}
+
+		  if (-l _)
+			{ if (! stat $fullpath)
+				{ warn "bad symlink: $fullpath\n";
+				  next NAME;
+				}
+			}
+
+		  if (! -f _)
+			# skip non-files
+			{}
+		  else	{ nl($fullpath)
+				if &$usefile();
+			}
+		}
+	}
+
+sub parse_rc
+	{ my($fname,$s,$ousefile,$ousedir)=@_;
+	  local($_);
+	  my(@dcode,@fcode);
+
+	  LINE:
+	    while (defined ($_=$s->GetLine()) && length)
+		{ chomp;
+		  s/^\s+//;
+		  next LINE if !length || /^#/;
+
+		  if (! /^([A-Z,]+)\s+(\w+)\s+/)
+			{ err("$fname: bad line: $_\n");
+			  $Xit=1;
+			  next LINE;
+			}
+
+		  my($targets,$cmd)=($1,uc($2));
+		  $_=$';
+		  my(@args)=grep(length,split(/\s+/));
+
+		  { my($ok)=0;
+		    TARGET:
+		      for (grep(length,split(/,+/,$targets)))
+			{ if ($_ eq ALL || $_ eq $Target)
+				{ $ok=1;
+				  last TARGET;
+				}
+			}
+
+		    next LINE if ! $ok;
+		  }
+
+		  my($mode);
+
+		  if ($cmd eq INCLUDE)	{ $mode=1; }
+		  elsif ($cmd eq EXCLUDE){$mode=0; }
+		  else
+		  { err("$fname: bad cmd \"$cmd\"\n");
+		    $Xit=1;
+		  }
+
+		  if (defined $mode)
+			{
+			  my($c,$isf,$isd);
+
+			  for (@args)
+				{ $isf=0; $isd=0;
+				  if (m:^/: && m:/[io]*$:
+				   || /^\(/ && /\)$/)
+					{ $c=$_; $isf=1; $isd=1; }
+				  else	{ if (m:/$:)
+						{ $isd=1; $_=$`; }
+					  else	{ $isf=1; }
+					  $c="\$_ eq '$_'";
+					}
+
+				  push(@fcode,"return $mode if ($c)") if $isf;
+				  push(@dcode,"return $mode if ($c)") if $isd;
+				}
+			}
+		}
+
+	  my($fnf,$fnd);
+
+	  if (@fcode)
+	  	{ push(@fnfstack,$ousefile);
+	  	  $fnf=mksub("&{\$fnfstack[$#fnfstack]}()",@fcode);
+		  if (! $fnf)
+			{ pop(@fnfstack);
+			  $Xit=1;
+			  $fnf=$ousefile;
+			}
+		}
+	  else	{ $fnf=$ousefile; }
+
+	  if (@dcode)
+	  	{ push(@fndstack,$ousedir);
+	  	  $fnd=mksub("&{\$fndstack[$#fndstack]}()",@dcode);
+		  if (! $fnd)
+			{ pop(@fndstack);
+			  $Xit=1;
+			  $fnd=$ousedir;
+			}
+		}
+	  else	{ $fnd=$ousedir;
+		}
+
+	  ($fnf,$fnd);
+	}
+
+sub mksub
+	{ my($default)=shift;
+	  my($code)="sub { "
+		   .join(";\n      ",@_)
+		   .";\n      return $default"
+		   .";\n    }";
+	  my($fn);
+	  # err("default=[$default], code=$code\n");
+	  eval "\$fn=$code";
+	  if ($@)
+		{ err("syntax error: $@\n");
+		  err("code was\n$code");
+		  return undef;
+		}
+
+	  $fn;
+	}
