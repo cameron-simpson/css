@@ -23,14 +23,14 @@ esac
 
 fm_user=
 fm_pass=
-eval `fetchmailclause -f $HOME/private/fetchmailrc "$server" | sed 's/^\([^ ][^ ]*\) /fm_\1=/'`
+eval `fetchmailclause -f $HOME/var/fetchmail/fetchmailrc "$server" | sed 's/^\([^ ][^ ]*\) /fm_\1=/'`
 [ -n "$sv_user" ] && fm_user=$sv_user
 [ -n "$sv_pass" ] && fm_pass=$sv_pass
 
 tunnel=
 case "$server" in
   mail.zipworld.com.au)
-    tunnel="exec ssh zip nc $server imap" ;;
+    tunnel="sshb zip nc $server imap" ;;
 esac
 
 set -x
