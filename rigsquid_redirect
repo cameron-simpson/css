@@ -1,0 +1,7 @@
+#!/bin/sh
+#
+# Dispatch the adzapper in proxy mode.
+#	- Cameron Simpson <cs@zip.com.au> 01jul2004
+#
+
+exec alog squid_redirect squid_redirect -P "8080:$SQUID"
