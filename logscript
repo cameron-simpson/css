@@ -11,7 +11,7 @@ logbase=$1; shift
 # adjust to full path of popSHELL because script uses execve, not execvep
 popshell=$HOME/scripts/popSHELL
 
-logdir=${VARLOG:-"$HOME/var/log"}
+logdir=${VARLOG:-"$HOME/var/log"}/sessions
 logfile=$logdir/$logbase-`datecode`
 
 [ -d "$logdir/." ] || mkdir -p "$logdir" || exit 1
