@@ -1,0 +1,44 @@
+#!/usr/bin/perl
+#
+# Syntax check a cs::Hier text file.
+#	- Cameron Simpson <cs@zip.com.au> 19may2004
+#
+
+use cs::Misc;
+use cs::Source;
+use cs::Hier;
+
+$::Usage="Usage: $::cmd datafile\n";
+
+my $badopts=0;
+
+if (! @ARGV)
+{ warn "$::cmd: missing datafile\n";
+  $badopts=1;
+}
+else
+{ $datafile=shift(@ARGV);
+  if (@ARGV)
+  { warn "$::cmd: extra arguments after datafile: @ARGV\n";
+    $badopts=1;
+  }
+}
+
+die $::Usage if $badopts;
+
+my $s = new cs::Source(PATH,$datafile);
+die "$::cmd: open($datafile): $!\n" if ! defined $s;
+
+LINE:
+while (defined($line=cs::Hier::getKVLine($s,0,1)))
+{
+  if (ref $line)
+  {}
+  elsif ($line eq EOF)
+  { last LINE;
+  }
+  else
+  { warn "error";
+    last LINE;
+  }
+}
