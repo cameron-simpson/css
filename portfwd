@@ -57,6 +57,7 @@ do  case "$fwd" in
 		   -L 2111:mail-optus:110 \
 		   -L 2180:www-optus:110 \
 		   -L 2401:cvs-cskk:2401 \
+		   -L 3316:amadeus:3306 \
 		   -L 8880:amadeus:8880 \
 		   -L 3119:news-optus:119 \
 		   -L 5915:amadeus:5905 \
@@ -75,6 +76,8 @@ do  case "$fwd" in
 	    vpnssh $vflag cisra \
 		   -L 2080:web:80 \
 		   -L 2222:zapff:22 \
+		   -L 3306:mysql:3306 \
+		   -L 3316:mysql:3306 \
 		   -L 5915:zapff:5905 \
 		   -L 5916:zapff:5906 \
 		   -L 5917:piaf:5900 &
@@ -82,7 +85,7 @@ do  case "$fwd" in
 ##	del)
 ##	    echo "web@del ..."
 ##	    acon lock -1 web@del tcpio -a 2082 need-ssh-agent -f ssh del nc localhost 80
-	    ;;
+##	    ;;
 	*)  echo "$0: unknown forwarding target \"$fwd\"" >&2
 	    exit 1
 	    ;;
