@@ -1,0 +1,13 @@
+#!/bin/sh
+#
+# Use this machine as an X terminal, and ssh to somewhere else for all
+# the clients.
+#	- Cameron Simpson <cs@zip.com.au> 13jul2002
+#
+
+[ $# = 0 ] && { echo "Usage: $0 rhost [xinit-args...]" >&2; exit 2; }
+
+REMOTE_XSESSION_HOST=$1; shift
+export REMOTE_XSESSION_HOST
+
+exec xinit ${1+"$@"}
