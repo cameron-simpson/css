@@ -7,11 +7,13 @@
 #	- Cameron Simpson <cs@zip.com.au> 23jan2004
 #
 
+: ${TMPDIR:=/tmp}
+
 cmd=$0
 [ $# = 0 ] && { echo "Usage: $cmd command [args...] < stdin" >&2; exit 2; }
 
 trap 'rm -f $"$tmpf"' 0 1 15
-tmpf=/tmp/catthen$$
+tmpf=$TMPDIR/catthen$$
 cat >"$tmpf" || exit 1
 exec <"$tmpf"
 rm "$tmpf"
