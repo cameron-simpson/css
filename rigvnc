@@ -29,5 +29,7 @@ set -x
 
 for args
 do
-    ignhup vncserver $args -alwaysshared -fp "$fontpath"
+    ( set vncserver $args -alwaysshared -fp "$fontpath"
+      acon "vnc-$HOST-$1" "$@"
+    )
 done
