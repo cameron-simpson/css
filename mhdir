@@ -6,7 +6,7 @@
 
 xit=0
 for d
-do  [ -d "$d/." ] || mkdir "$d" || continue
+do  needdir "$d" || { xit=1; continue; }
     mh=$d/.mh_sequences
     >>"$mh"
     for seq in unseen replied flagged
