@@ -1,0 +1,81 @@
+#!/bin/sh
+#
+# Wrapper for time to print the user, system and real times in seconds
+# to stderr (by default).	- Cameron Simpson <cs@zip.com.au> 23apr99
+#
+
+cmd=`basename "$0"`
+usage="Usage: $cmd [-u] [-s] [-r] [-o file] command [args...]
+	-u	Report user time.
+	-s	Report system time.
+	-r	Report real time.
+	-o file	Write report to file instead of stderr.
+		NB: The command's stderr still goes to stderr
+		    unless through misfortune it closely resembles
+		    the output of \"time\"."
+
+timeout=/tmp/time.$$
+
+badopts=
+
+user=
+system=
+real=
+output=-
+while :
+do  case $1 in 
+	-u)	user=1 ;;
+	-s)	system=1 ;;
+	-r)	real=1 ;;
+	-o)	output=$2; shift ;;
+	--)	shift; break ;;
+	-?*)	echo "$cmd: unrecognised option: $1" >&2
+		badopts=1 ;;
+	*)	break ;;
+    esac
+    shift
+done
+
+[ $# = 0 ] && { echo "$cmd: missing command" >&2; badopts=1; }
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+time "$@" 2>"${timeout}a"
+xit=$?
+
+sed '/^user  *[0-9][0-9]*\.[0-9][0-9]*$/b stdtime
+     /^real  *[0-9][0-9]*\.[0-9][0-9]*$/b stdtime
+     /^sys  *[0-9][0-9]*\.[0-9][0-9]*$/b stdtime
+     /^[0-9]*\.[0-9][0-9]*user *[0-9][0-9]*\.[0-9][0-9]*system *[0-9][0-9]*:[0-9][0-9]*\.[0-9][0-9]* *elapsed /b gnutime
+     p
+     d
+     :stdtime
+     s/  */=/
+     w '"${timeout}b"'
+     d
+     :gnutime
+     s/^\([0-9]*\.[0-9][0-9]*\)user *\([0-9][0-9]*\.[0-9][0-9]*\)system *\([0-9][0-9]*\):0*\([0-9][0-9]*\.[0-9][0-9]*\) *elapsed .*/user=\1 sys=\2 real=\3:\4/
+     w '"${timeout}b"'
+     d
+     :bad
+     s/^/BAD /
+     w '"${timeout}b"'
+     d
+     ' <"${timeout}a" >&2
+
+# load up the time info
+. "${timeout}b"
+case "$real" in
+    *:*)	real=`echo "$real" | sed 's/\(.*\):\(.*\)/60 \1 * \2 + p/' | dc`
+		;;
+esac
+
+rm "$timeout"[ab]
+
+[ "x$output" = x- ] || exec 2>"$output"
+{ echo "$user"
+  echo "$sys"
+  echo "$real"
+} >&2
+
+exit $xit
