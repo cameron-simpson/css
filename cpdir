@@ -1,0 +1,24 @@
+#!/bin/sh
+
+tar=gnutar
+
+[ $# = 2 ] || { echo "Usage: $0 fromdir todir" >&2
+		exit 2
+	      }
+
+case $ARCH in
+    *.*.domainos) # preserve ACLs
+	exec /com/cpt "$1" "$2" -pdt -sacl -ld
+	;;
+    *)	[ -d "$2/." ] && { echo "$0: $2 already exists" >&2
+			   exit 1
+			 }
+
+	( cd "$1/." && $tar -cf - .
+	) \
+	| buffer -m 1M \
+	| ( mkdir "$2" && cd "$2" && untar )
+	;;
+esac
+
+sync &
