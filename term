@@ -86,7 +86,7 @@ done
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
 [ $# = 0 ] && { set x "${SHELL:-/bin/sh}"; shift; }
-## [ -n "$n" ] || n=$*
+[ -n "$n" ] || n=$*
 
 # we keep fd 3 as hook for stdin
 closefds='for fd in 4 5 6 7 8 9; do eval "exec $fd>&-"; done'
@@ -123,14 +123,11 @@ case "$TERM,$DISPLAY" in
 	eval "$detach"
 	eval "$closefds"
 
-	[ -n "$n" ] && set pushttylabel -exec +a "$n" "$@"
-
 	PREFTERM=${PREFTERM:-xterm}	# safe default
-	## [ "x$PREFTERM" = xrxvt ] && set rigrxvtbg "$@"
 
 	if [ $async ]
-	then $dolock "$PREFTERM" $opts -e "$@" &
-	else exec $dolock "$PREFTERM" $opts -e "$@"
+	then $dolock "$PREFTERM" -title "$n" $opts -e "$@" &
+	else exec $dolock "$PREFTERM" -title "$n" $opts -e "$@"
 	fi
 	;;
 
@@ -145,8 +142,8 @@ case "$TERM,$DISPLAY" in
 	eval "$detach"
 	eval "$closefds"
 
-	if [ $async ]; then acon $dolock wsh -v pushttylabel -exec +a "$n" "$@"
-		       else exec $dolock wsh -v pushttylabel -exec +a "$n" "$@"
+	if [ $async ]; then acon $dolock wsh -v "$@"
+		       else exec $dolock wsh -v "$@"
 	fi
 	;;
     *)	exec "$@"
