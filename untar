@@ -124,18 +124,10 @@ while (<STDIN>)
   { err($_,"\n");
   }
   else
-  { if (defined($dir) && $dir ne $d)
-    # new directory, emit old one
-    { if (!$emitted{$dir})
-      { nl($dir);
-	$emitted{$dir}=1;
-      }
-
+  { if (! defined($dir) || $dir ne $d)
+    # new directory, emit
+    { nl($d);
       $dir=$d;
-    }
-
-    if (!defined($dir))
-    { $dir=$d;
     }
 
     if ($_ eq 'l')	{ $b.=" == $l"; }
