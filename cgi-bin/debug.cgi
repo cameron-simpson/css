@@ -1,15 +1,20 @@
 #!/bin/sh
 
-## . `dirname "$0"`/.cgienv.sh
-
 echo "Content-Type: text/plain"
 echo
 
-uptime
-pwd
 hostname
 id
+uptime
+/bin/pwd
 which perl
+df -k .
+df -lk
+df -k
+mount
+
+echo
+ls -la ..
 
 echo
 echo "0=$0"
