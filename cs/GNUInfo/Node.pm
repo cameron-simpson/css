@@ -31,6 +31,8 @@ require Exporter;
 
 @cs::GNUInfo::Node::ISA=qw(cs::Object);
 
+sub dbg { &cs::GNUInfo::dbg; }
+
 =head1 GENERAL FUNCTIONS
 
 =over 4
@@ -418,11 +420,18 @@ sub Pod2s($$)
 
   my $title = $this->Title();
 
+  dbg("transcribe node \"$title\"");
+
   my $name = $this->Name();
   if (defined $name)
   {
-    return if exists $::SeenNode{$name};
-    $::SeenNode{$name}=1;
+    if (exists $cs::GNUInfo::Node::SeenNode{$name})
+    {
+      ## dbg("already seen \"$name\"");
+      return;
+    }
+
+    $cs::GNUInfo::Node::SeenNode{$name}=1;
 
     if (! length $title)
     { $title=$name;
@@ -433,13 +442,20 @@ sub Pod2s($$)
   if (length $title)
   { my $level = $this->Level();
     $level=2 if ! defined $level;
-    $s->Put("=head$level $title\n\n");
+    if ($level == 1 || $level == 2)
+    { $s->Put("=head$level $title\n\n");
+    }
+    else
+    { $s->Put("\nB<$title>\n\n");
+    }
   }
 
   my $data = $this->Data();
+  ## dbg("NO DATA!") if ! @$data;
 
   for my $D (@$data)
-  { if (! ref $D)
+  { 
+    if (! ref $D)
     # plain text
     {
       $D =~ s/[<>]/$& eq '<' ? 'E<lt>' : 'E<gt>'/eg;
@@ -466,6 +482,7 @@ sub Pod2s($$)
 
       $D =~ s/`([^`']+)'/`B<$1>'/g;
 
+      ## dbg("PUT $D");
       $s->Put($D);
       $s->Put("\n");
       $neednl=length($D);
@@ -476,6 +493,8 @@ sub Pod2s($$)
 
       if ($dtype eq MENU)
       {
+	dbg("MENU: no data!") if ! @{$detc[0]};
+
 	for my $M (@{$detc[0]})
 	{
 	  if (! ref $M)
