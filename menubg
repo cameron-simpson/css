@@ -93,6 +93,7 @@ case "$bright,$imagefile" in
 	;;
 esac
 
+tmpf=
 wkdir=`mkdirn "${TMPDIR:-/tmp}/menubg"` || exit 1
 cp "$imagefile" "$wkdir/." || exit 1
 
