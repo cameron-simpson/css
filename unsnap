@@ -1,0 +1,4 @@
+#!/bin/sh
+#
+
+cpio -ivdm -H newc
