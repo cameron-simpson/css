@@ -53,6 +53,7 @@ then
 	wiki)	target=wikipedia ;;
 	yp)	target=yellowpages ;;
 	www)	target='altavista yahoo dmoz google' ;;
+	yg)	target=yahoogroups ;;
 	movie)	exec us "http://www.cinema.pgh.pa.us/movie/reviews?$query" ;;
 	ebay)	case "$query" in
 		    *\ *)	;;
