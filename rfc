@@ -1,0 +1,25 @@
+#!/bin/sh
+#
+# Pop up an RFC.
+#	- Cameron Simpson <cs@zip.com.au> 05nov96
+#
+
+[ $# = 0 ] && { echo "Usage: $0 keys..." >&2; exit 2; }
+
+rfcdir=/home/docs/Internet/rfc
+
+xit=0
+
+for key
+do
+    case $key in
+	[0-9]*)		urlshow "http://freesoft.org/CIE/RFC/$key/index.htm"
+			continue
+			;;
+	*)		rfcconnected "$key"
+			continue
+			;;
+    esac
+done
+
+exit $xit
