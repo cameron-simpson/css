@@ -20,7 +20,10 @@
 [ $# = 1 ] || { echo "Usage: $0 filename (argv=[$*])" >&2; exit 2; }
 
 report=$1
-sed 's/^/CVS: /' "$CVS_COMMIT_DIFFS" >>"$report"
+if egrep '^(-|\+)' "$CVS_COMMIT_DIFFS" >/dev/null
+then cat "$CVS_COMMIT_DIFFS"
+else grep . /dev/null $CVS_COMMIT_FILES
+fi | sed 's/^/CVS: /' >>"$report"
 
 EDITOR=$CVS_COMMIT_EDITOR
 export EDITOR
