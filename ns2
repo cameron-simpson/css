@@ -1,0 +1,12 @@
+#!/bin/sh
+
+case $0 in
+    *ns2)	NETSCAPE_VERSION=2.02 ;;
+    *ns3)	NETSCAPE_VERSION=3.01i-mine ;;
+    *ns4)	NETSCAPE_VERSION=4.0b6 ;;
+    *)		echo "$0: unknown netscape variety" >&2; exit 1 ;;
+esac
+
+export NETSCAPE_VERSION
+
+exec netscape ${1+"$@"}
