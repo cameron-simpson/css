@@ -1,0 +1,94 @@
+#!/bin/sh
+#
+# Watch a set of link post pages (eg freshmeat) and report new links.
+#	- Cameron Simpson <cs@zip.com.au> 29jul2000
+#
+
+cmd=`basename "$0"`
+usage="Usage: $cmd [-a] [-n] [-f sedf] [-p perlf] indexfile <linkpageurls
+	-a	All links, not just new ones.
+	-n	No update - don't rewrite indexfile.
+	-f sedf	Sed script to filter the \"url title\" stage.
+	-p perlf Perl-p script to filter the \"url title\" stage."
+
+all=
+nflag=
+sedf=
+perlf=
+
+badopts=
+while :
+do  case $1 in
+      -a)	all=1 ;;
+      -n)	nflag=$1 ;;
+      -f)	sedf=$2 perlf=; shift ;;
+      -p)	perlf=$2 sedf=; shift ;;
+      --)	shift; break ;;
+      -?*)	echo "$cmd: unrecognised option: $1" >&2; badopts=1 ;;
+      *)	break ;;
+    esac
+    shift
+done
+
+if [ $# = 0 ]
+then
+    echo "$cmd: missing indexfile" >&2
+    badopts=1
+else
+    oldposts=$1; shift
+    [ $# = 0 ] || { echo "$cmd: extra arguments: $*" >&2; badopts=1; }
+fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+tmp=$HOME/tmp
+[ -d "$tmp/." ] || ( set -x; mkdir -p "$tmp" ) || exit 1
+
+oldposts=$1
+case $oldposts in
+    /*)	;;
+    *)	oldposts=`pwd`/$oldposts ;;
+esac
+
+nowposts=$tmp/$cmd$$now
+newposts=$tmp/$cmd$$new
+
+[ -w "$oldposts" ] \
+|| { echo "$cmd: $oldposts: indexfile must exist and be writable" >&2
+     exit 1
+   }
+
+# get all links, with titles
+sort -u \
+| pageurls -# -x -t - \
+| perl -ne 'chomp;
+	    next unless /^(http:[^\t]*)\t/;
+	    ($url,$title)=($1,$'\'');
+	    next if length $url > 96;
+	    $url.="/" if $url =~ m|^http://[^/]*$|;
+	    $title =~ s/\s+/ /g;
+	    $title=substr($title,$[,79) if length $title > 79;
+	    $_="$url $title\n";
+	    print
+	   ' \
+| if [ -n "$sedf" ]
+  then  exec sed -f "$sedf"
+  else
+    if [ -n "$perlf" ]
+    then  exec perl -p "$perlf"
+    else  exec cat
+    fi
+  fi \
+> $nowposts
+
+if [ $all ]
+then
+    cat <$nowposts
+else
+    # locate new URLs and merge into state file
+    # emit new URLs with titles on output
+    lock "$oldposts" updlinklist $nflag "$oldposts" <$nowposts
+fi
+
+wait
+rm -f $nowposts $newposts
