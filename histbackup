@@ -51,6 +51,11 @@ linkonly=
 ltargs=
 rrsync=rsync
 
+if [ -t 1 ]
+then  echo=echo
+else  echo=:
+fi
+
 while :
 do case $1 in
     --inplace)	inplace=1 ;;
@@ -139,7 +144,7 @@ fi
 
 if [ -n "$lastbackup" -a -d "$dest/$lastbackup/." ]
 then
-    echo "existing backup: linking $lastbackup to $thisbackup ..."
+    $echo "existing backup: linking $lastbackup to $thisbackup ..."
     if not linktree $ltargs "$dest/$lastbackup" "$dest/$thisbackup"
     then
 	echo "$cmd: warning: linktree $dest/$lastbackup $dest/$thisbackup fails" >&2
@@ -149,7 +154,7 @@ then
     then
 	echo "$thisbackup" >&3
     else
-	echo "updating $thisbackup from $src ..."
+	$echo "updating $thisbackup from $src ..."
 	exec rsync -aH $vflag $delete --rsync-path "$rrsync" ${1+"$@"} "$src/." "$dest/$thisbackup/."
     fi
 else
@@ -159,7 +164,7 @@ else
 	ls -la "$dest" >&2
 	exit 1
     else
-	echo "fresh backup, just copying source ..."
+	$echo "fresh backup, just copying source ..."
 	use_rsync=
 	case "$src" in
 	    *:*) # probably remote directory - use rsync
