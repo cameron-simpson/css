@@ -158,7 +158,7 @@ for my $L (reverse sort cmplogs @log)
 
   for my $comment (@C)
   { if ($ObfuscateEmail)
-    { $comment =~ s/(\S)\@(\S+)/$1 at $2/g;
+    { $comment =~ s/(\S)\@(\S+)/$1-at-$2/g;
     }
 
     if (! defined $file || $file ne $f)
