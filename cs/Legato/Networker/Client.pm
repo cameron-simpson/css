@@ -34,7 +34,19 @@ require Exporter;
 
 =over 4
 
+=item clients()
+
+Return a list of known clients.
+
 =cut
+
+sub clients()
+{
+  ::need(cs::Legato::Networker::Tape);
+  cs::Legato::Networker::Tape::_loadTapeInfo();
+
+  keys %cs::Legato::Networker::Client::_clientInfo;
+}
 
 =back
 
@@ -62,17 +74,17 @@ sub _new($$)
   bless $C, $class;
 }
 
-=item cs::Legato::Networker::Client::find(I<seq>)
+=item cs::Legato::Networker::Client::find(I<client>)
 
 Obtain a B<cs::Legato::Networker::Client> object
-representing the dump with sequence number I<seq>.
+representing the named I<client>.
 
 =cut
 
 sub find($)
-{ my($seq)=@_;
-  return undef if ! defined $cs::Legato::Networker::Client::_dumpInfo[$seq];
-  $cs::Legato::Networker::Client::_dumpInfo[$seq];
+{ my($client)=@_;
+  return undef if ! defined $cs::Legato::Networker::Client::_clientInfo{$client};
+  $cs::Legato::Networker::Client::_clientInfo{$client};
 }
 
 sub get($)
