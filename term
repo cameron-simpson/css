@@ -31,7 +31,7 @@ async=1
 lock=
 lock1=
 
-[ -s $HOME/.termenv ] && . $HOME/.termenv
+[ -s $HOME/.termenv -a -r $HOME/.termenv ] && . $HOME/.termenv
 
 badopts=
 
