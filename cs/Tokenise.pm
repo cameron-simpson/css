@@ -18,37 +18,37 @@ BEGIN { use cs::DEBUG; cs::DEBUG::using(__FILE__); }
 
 package cs::Tokenise;
 
-sub new	# (Source,match[,State]) -> ref
-	{ my($class)=shift;
+sub new($$$;$)	# (Source,match[,State]) -> ref
+{ my($class)=shift;
 
-	  die "$'cmd: usage: Tokenise->new(matchfnref,inputfnref[,state])"
-		unless @_ == 2 || @_ == 3;
+  die "$::cmd: usage: Tokenise->new(matchfnref,inputfnref[,state])"
+	unless @_ == 2 || @_ == 3;
 
-	  my($Source,$Match,$State)=@_;
+  my($Source,$Match,$State)=@_;
 
-	  die "$'cmd: Source($Source) is not a ref"
-		unless ref $Source;
-	  die "$'cmd: Match(".(ref $Match).") is not a CODE ref"
-		unless ref $Match eq CODE;
+  die "$::cmd: Source($Source) is not a ref"
+	unless ref $Source;
+  die "$::cmd: Match(".(ref $Match).") is not a CODE ref"
+	unless ref $Match eq CODE;
 
-	  if (! ref $State)
-		{ my($copy)=$State;
+  if (! ref $State)
+  { my($copy)=$State;
 
-		  $State=\$copy;
-		}
+    $State=\$copy;
+  }
 
-	  bless { MATCH	=> $Match,
-		  DS	=> $Source,
-		  STATE	=> $State,
-		  DATA	=> '',
-		  PENDING => [],
-		}, $class;
-	}
+  bless { MATCH	=> $Match,
+	  DS	=> $Source,
+	  STATE	=> $State,
+	  DATA	=> '',
+	  PENDING => [],
+	}, $class;
+}
 
 sub UnTok
-	{ my($this)=shift;
-	  unshift(@{$this->{PENDING}},@_);
-	}
+{ my($this)=shift;
+  unshift(@{$this->{PENDING}},@_);
+}
 
 sub Tok	# this -> token or undef
 { my($this)=@_;
