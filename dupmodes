@@ -1,0 +1,84 @@
+#!/usr/bin/perl
+#
+# Read path pairs from stdin and copy the modes from one to the other.
+#	- Cameron Simpson <cs@zip.com.au> 30sep99
+#
+
+use strict qw(vars);
+
+($::cmd=$0) =~ s:.*/::;
+$::Usage="Usage: $::cmd [-f]
+	-f	Force. Copy modes even when the target is a symlink.
+";
+
+$::Force=0;
+if (@ARGV && $ARGV[0] eq '-f')
+{ $::Force=1; shift(@ARGV);
+}
+
+die $::Usage if @ARGV;
+
+$::Xit=0;
+
+my($from,$to,@s,$mode,$omode,$type,$otype);
+
+PAIR:
+while (defined ($_=<STDIN>))
+{ chomp;
+  if (! /\s/)
+  { warn "$::cmd: line $.: no second file\n";
+    $::Xit=1;
+    next PAIR;
+  }
+
+  ($from,$to)=($`,$');
+
+  if (! (@s=lstat($from)))
+  { warn "$::cmd: from: lstat($from): $!\n";
+    $::Xit=1;
+    next PAIR;
+  }
+
+  if (-f _)	{ $type=FILE; }
+  elsif (-d _)	{ $type=DIR; }
+  elsif (-l _)	{ $type=SYM; }
+  else		{ $type=OTHER; }
+
+  if ($type eq SYM)
+  { if (! $::Force)
+    { warn "$::cmd: warning: from: $from is a symlink, skipped\n";
+      next PAIR;
+    }
+  }
+
+  $mode = $s[2] & 07777;
+
+  if (! (@s=lstat($to)))
+  { warn "$::cmd: to: lstat($to): $!\n";
+    $::Xit=1;
+    next PAIR;
+  }
+
+  if (-f _)	{ $otype=FILE; }
+  elsif (-d _)	{ $otype=DIR; }
+  elsif (-l _)	{ $otype=SYM; }
+  else		{ $otype=OTHER; }
+
+  if ($type ne $otype)
+  { warn "$::cmd: type($from)=$type, type($to)=$otype, skipping\n";
+    $::Xit=1 if $otype ne SYM;
+    next PAIR;
+  }
+
+  $omode = $s[2] & 07777;
+  next PAIR if $mode == $omode;
+
+  printf("chmod 0%4o %s\t# <== %s\n",$mode,$to,$from);
+  if (! chmod($mode,$to))
+  { warn "$::cmd: chmod(".sprintf("0%4o",$mode).", $to): $!\n";
+    $::Xit=1;
+    next PAIR;
+  }
+}
+
+exit $::Xit;
