@@ -1,0 +1,60 @@
+#!/usr/bin/perl
+#
+# Extract URLs from HTML on stdin.
+#	- Cameron Simpson <cs@zip.com.au> 24aug2000
+#
+
+use strict vars;
+
+use cs::Misc;
+use cs::Source;
+use cs::URL;
+use cs::HTML;
+use cs::HTTP;
+use Getopt::Std;
+
+$::Usage="Usage: $::cmd [-itx] [baseURL] < html\n";
+
+my $inline=0;
+my $titles=0;
+my $hexify=0;
+my $base;
+
+my $badopts=0;
+
+getopts("itx") || ($badopts=1);
+$inline=1 if defined $::opt_i;
+$titles=1 if defined $::opt_t;
+$hexify=1 if defined $::opt_x;
+
+if (@ARGV)
+{ $base=shift(@ARGV);
+  my $U = new cs::URL $base;
+  if (! defined $U)
+  { warn "$::cmd: bad base URL: $base\n";
+    $badopts=1;
+  }
+  else
+  { $base=$U;
+  }
+}
+
+if (@ARGV)
+{ warn "$::cmd: extra arguments: @ARGV\n";
+  $badopts=1;
+}
+
+die $::Usage if $badopts;
+
+my $src = new cs::Source (FILE,STDIN);
+my %urls;
+
+cs::HTML::sourceURLs(\%urls,$src,$inline,$base);
+
+for my $url (sort keys %urls)
+{ print $hexify ? cs::HTTP::hexify($url,HTML) : $url;
+  print "\t$urls{$url}" if $titles;
+  print "\n";
+}
+
+exit 0;
