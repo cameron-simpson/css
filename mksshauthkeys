@@ -5,14 +5,11 @@
 #
 
 site=$SYSTEMID
-sshdir=$HOME/.ssh
 verbose=
 
 cmd=$0
-usage="Usage: $cmd [-s site] [-d sshdir]
+usage="Usage: $cmd [-v] [-s site]
 	-v		Verbose.
-	-d sshdir	Specify ssh directory.
-			Default: $sshdir
 	-s site		Specify site.
 			Default from \$SYSTEMID: $site"
 
@@ -22,7 +19,6 @@ while :
 do
   case $1 in
     -v)	verbose=1 ;;
-    -d)	sshdir=$2; shift ;;
     -s)	site=$2; shift ;;
     --)	shift; break ;;
     -?*)echo "$cmd: unrecognised option: $1" >&2
@@ -36,10 +32,6 @@ done
 [ $# = 0 ] || { echo "$cmd: extra arguments: $*" >&2
 		badopts=1
 	      }
-
-[ -d "$sshdir/." ] || { echo "$cmd: $sshdir: not a directory" >&2
-			badopts=1
-		      }
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
