@@ -1,0 +1,33 @@
+#!/bin/sh
+#
+# Produce thumbnails for the names image files.
+#	- Cameron Simpson <cs@zip.com.au> 12sep2003
+#
+
+cmd=$0
+usage="Usage: $cmd [XxY] imagefiles..."
+
+verbose=
+[ -t 1 ] && verbose=1
+
+thsize=48x48
+case "$1" in
+  [1-9]*x[1-9]*)	thsize=$1; shift ;;
+esac
+
+[ $# = 0 ] && { echo "$usage"; exit 2; }
+
+xit=0
+
+for file
+do
+  thdir=`dirname "$file"`/.thumbnails/$thsize
+  th=$thdir/`basename "$0"`.png
+  [ $verbose ] && echo "$f -> $th"
+
+  [ -d "$thdir/." ] || needdir "$thdir" || { xit=1; continue; }
+  gm convert -geometry "$thsize" -quality 100 - <"$file" png:- >"$th" \
+      || { rm "$th"; xit=1; }
+done
+
+exit $xit
