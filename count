@@ -1,0 +1,8 @@
+#!/bin/sh
+
+low=$1 high=$2
+
+while [ $low -le $high ]
+do  echo $low
+    low=`expr $low + 1`
+done
