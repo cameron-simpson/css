@@ -4,7 +4,7 @@
 #	- Cameron Simpson <cs@zip.com.au> 05jan2003
 #
 
-folder=saved
+folder=saved-web
 
 cmd=$0
 usage="Usage: $cmd -f folder [URLs...]
