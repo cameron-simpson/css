@@ -88,7 +88,8 @@ case "$mode" in
 	$trace "$cmd" stop && $trace "$cmd" start ${1+"$@"}
 	exit $?
 	;;
-  *)	echo "$usage" >&2
+  *)	echo "$cmd: unsupported action \"$mode\"" >&2
+	echo "$usage" >&2
         exit 1
 esac
 
@@ -307,8 +308,8 @@ doops()
       # =item /path/to/dir/ [template-dir]
       #
       # Prepare the specified directory from a template.
-      # If not specified,
-      # the template is the directory named
+      # If a template is not specified,
+      # the template is taken to be the directory named
       # B</path/to/dir.>I<where> or B</path/to/dir.DFLT>
       # if the former is not present.
       # If neither is present, the target directory is unchanged.
@@ -367,22 +368,32 @@ doops()
 	      shcmd=`expr "x$op $etc" : 'x.\(.*\)'`
 	      $trace /bin/sh -c "$shcmd"
 	      ;;
-      # =item svc I<services...>
+      # =item svc I<service...>
       #
-      # The named services are started asynchronously.
+      # The named I<service>s are started asynchronously.
       # They are dispatched by running the command:
       #
       #	/etc/init.d/service start
       #
       # in the background.
       #
+      # Note that I<service> names must be identifiers
+      # because of their use as part of shell variables
+      # internally to B<rc.mobile>.
+      # For example, the names B<foo>, B<foo_bah> and B<foo123> are usable
+      # while the name B<foo-bah> is not because of the dash.
+      # It is possible you may need to rename some startup scripts
+      # to accomodate this,
+      # or simply make symbolic links of suitable names;
+      # I have not yet needed to do this myself.
+      #
       svc)    bgsvc $etc
 	      ;;
-      # =item need I<services...>
+      # =item need I<service...>
       #
-      # Require the named services' startup scripts
+      # Require the named I<service>s' startup scripts
       # to have completed before proceeding.
-      # If any of the services have not been dispatched,
+      # If any of the I<service>s have not been dispatched,
       # dispatch them as for the B<svc> directive
       # and then wait for them.
       #
