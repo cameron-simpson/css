@@ -54,7 +54,7 @@ dir=`dirname "$file"`
 base=`basename "$file"`
 
 editcmd=$*
-[ $# = 0 ] && { set x "${EDITOR-vi}" "$file"; shift; }
+[ $# = 0 ] && { set x "${EDITOR-vi}"; shift; }
 
 ( cd "$dir" || exit 1
   cvs update "$base" || exit $?
