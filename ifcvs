@@ -16,10 +16,12 @@ badopts=
 msg=
 isfilter=
 cveopts=
+fposarg=
 
 while :
 do
   case $1 in
+    -0|-1|-end) fposarg=$1 ;;
     -f)	isfilter=1 cveopts="$cveopts $1" ;;
     -m)	msg=$2; shift ;;
     --)	shift; break ;;
@@ -53,9 +55,7 @@ then
     exit $?
 fi
 
-set -x
-
 # just exec command if not CVSing
-ifcvs -- "$file" || { [ $isfilter ] && set filteredit "$file" "$@"; exec "$@"; }
+ifcvs -- "$file" || { [ $isfilter ] && set filteredit $fposarg "$file" "$@"; exec "$@"; }
 
-exec cvsedit $cveopts -m "$msg" "$file" "$@"
+exec cvsedit $cveopts $fposarg -m "$msg" "$file" "$@"
