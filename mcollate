@@ -15,7 +15,9 @@
 # (by default a copy arrives in the user's mail file, too).
 #
 
-tmp=/tmp/m$$collate
+: ${TMPDIR:=/tmp}
+
+tmp=$TMPDIR/m$$collate
 
 USER=`basename "$HOME"`
 MAIL=/var/spool/mail/$USER
