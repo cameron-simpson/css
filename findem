@@ -1,0 +1,19 @@
+#!/bin/sh
+#
+
+cmd=$0
+usage="Usage: $cmd [-mtime time] ptn dirs"
+
+fflags=
+case $1 in
+    -mtime)	fflags="$fflags -mtime $2"; shift; shift ;;
+esac
+
+[ $# = 0 ] && { echo "$cmd: missing ptn" >&2; echo "$usage" >&2; exit 2; }
+
+ptn=$1; shift
+
+for dir
+do
+    find $dir -name "$ptn" -type f $fflags -print | mail -s "find.$HOSTNAME.$dir.$ptn" cameron &
+done
