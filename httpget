@@ -42,7 +42,7 @@ $::NoAction=0;
 undef $::Output;
 $::Count=0;
 $::CountBase=0;
-$::Delay=1;
+$::Delay=5;
 $::NBase=1;
 $::Inline=0;
 $::Ptn=( defined $ENV{HTTPGET_PATTERN} && length $ENV{HTTPGET_PATTERN}
