@@ -1,0 +1,38 @@
+#!/bin/sh
+
+cmd=`basename "$0"`
+
+fastfs=
+unmount=
+ejectcmd=:
+case "$cmd" in
+    um*)	unmount=1 what=`expr "$cmd" : 'um\(.*\)'` ;;
+    m*)		what=`expr "$cmd" : 'm\(.*\)'` ;;
+    *)		echo "$cmd: unknown op \"$cmd\"" >&2; exit 2 ;;
+esac
+
+case "$what" in
+    zip)	ejectcmd='ziptool eject' mpt=/mnt/zip ;;
+    zipfat)	ejectcmd='ziptool eject' mpt=/mnt/zipfat ;;
+    cdrom)	mpt=/mnt/cdrom ;;
+    dvd|dvdext2)mpt=/mnt/dvdext2 ;;
+    dvdudf)	mpt=/mnt/dvdudf ;;
+    *)		echo "$cmd: don't know where to mount \"$what\"" >&2
+		exit 2
+		;;
+esac
+
+fastfs=
+[ "x$OS" = xsolaris ] && fastfs=1
+
+if [ $unmount ]
+then
+    set -x
+    [ -z "$fastfs" ] || fastfs "$mpt" slow
+    sync \
+      && umount "$mpt" \
+      && $ejectcmd
+else
+    set -x
+    mount "$mpt" && dfk "$mpt/." && { [ -z "$fastfs" ] || fastfs "$mpt" fast; }
+fi
