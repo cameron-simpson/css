@@ -1,0 +1,38 @@
+#!/bin/sh
+#
+# Return the base name of the ssh key file for the given type and purpose.
+#	- Cameron Simpson <cs@zip.com.au> 31aug2003
+#
+
+purpose=
+
+cmd=$0
+usage="Usage: $cmd [-p purpose] type"
+
+badopts=
+
+[ "x$1" = x-p ] && { purpose=$2; shift; shift; }
+
+if [ $# = 0 ]
+then  echo "$cmd: missing type" >&2; badopts=1
+else  type=$1; shift
+      [ $# = 0 ] || { echo "$cmd: extra arguments after type: $*" >&2
+		      badopts=1
+		    }
+fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+[ -n "$purpose" ] || purpose=identity
+
+case "$purpose" in
+    identity)
+      if [ "$type" = rsa1 ]; then f=identity
+			     else f=id_$type
+      fi
+      ;;
+    *)f=$purpose-$type
+      ;;
+esac
+
+echo "$f"
