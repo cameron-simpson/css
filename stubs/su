@@ -8,8 +8,12 @@
 
 login=
 
-if [ -f /usr/bin/opiesu ]; then realsu=/usr/bin/opiesu
-			   else realsu=/bin/su
+if [ -f /usr/bin/opiesu ]
+then realsu=/usr/bin/opiesu
+else if [ -f /usr/bin/su ]
+     then realsu=/usr/bin/su
+     else realsu=/bin/su
+     fi
 fi
 
 sush=/bin/sh
