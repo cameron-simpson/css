@@ -8,7 +8,7 @@ cmd=`basename "$0"`
 usage="Usage [-f file] currentgroup newgroup"
 
 groupfile=group
-dbdir=/usr/local/etc/cisra/db/groups
+dbdir=/u/network/db/groups
 
 case $1 in
     -f)	groupfile=$2; shift; shift ;;
