@@ -1,2 +1,2 @@
 #!/bin/sh
-exec egrep -i ${1+"$@"}
+exec g -g egrep ${1+"$@"}
