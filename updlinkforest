@@ -24,6 +24,7 @@ die "$::cmd: $::Dir: not a directory\n" if ! -d "$::Dir/.";
 chdir($::Dir) || die "$::cmd: chdir($::Dir): $!\n";
 
 print "cd '$::Dir' || exit 1\n";
+print "set -x\n";
 
 my $ok=1;
 my %links;
