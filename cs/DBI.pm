@@ -41,8 +41,8 @@ Return a database handle for my personal mysql installation.
 I<mysql-id> is an optional string representing the database
 to contact; it defaults to B<mysql@I<systemid>> where I<systemid>
 comes from the B<SYSTEMID> environment variable.
-This key is used passed to B<cs::Secret::get> to obtain the database login keys.
-I<dbname> is the ame of the database to which to attach.
+This key is passed to B<cs::Secret::get> to obtain the database login keys.
+I<dbname> is the name of the database to which to attach.
 It defaults to B<CS_DB>.
 
 =cut
@@ -122,6 +122,24 @@ sub hashtable($$$;$$)
   }
 
   $cs::DBI::_HashTables{$dbh,$table,$keyfield,$where}=$h;
+}
+
+=item hashentry(I<keyvalue>,I<dbh>,I<table>,I<keyfield>,I<where>,I<preload>)
+
+Return a B<cs::DBI::Table::RowObject> representing the row
+whose I<keyfield> matches I<keyvalue>
+from the table specified by I<dbh>, I<table> and I<where>
+as for B<hashtable> above.
+This object is suitable for subclassing
+by a table specific module.
+
+=cut
+
+sub hashentry($$$$;$$)
+{ my($keyvalue,$dbh,$table,$keyfield,$where,$preload)=@_;
+
+  ::need(cs::DBI::Table::RowObject);
+  cs::DBI::Table::RowObject->fetch($keyvalue,$dbh,$table,$keyfield,$where,$preload);
 }
 
 =item arraytable(I<dbh>,I<table>,I<where>)
@@ -410,7 +428,8 @@ sub addDatedRecord
 
   if (@delwhere)
   # delete old records first
-  { my ($sth, @args) = sqlWhere($dbh,'DELETE FROM $table',@delwhere);
+  { warn "$0: addDatedRecord with delwhere=[@delwhere]";
+    my ($sth, @args) = sqlWhere($dbh,'DELETE FROM $table',@delwhere);
     if (! defined $sth)
     { warn "$::cmd: cs::DBI::addDatedRecord($table): can't make sql to delete old records";
       return undef;
@@ -631,7 +650,7 @@ sub GetDateRanges
 
 =head1 SEE ALSO
 
-L<DBI>
+DBI(3), cs::DBI::Table::RowObject(3)
 
 =head1 AUTHOR
 
