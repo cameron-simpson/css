@@ -27,7 +27,7 @@ if [ $# = 0 ]
 then
   if [ -n "$DISPLAY" ]
   then
-      set x "`xunclip`"; shift; echo "$1"
+      set x "`cutbuffer`"; shift; echo "$1"
   else
       echo "$cmd: no \$DISPLAY or URL" >&2
       exit 1
