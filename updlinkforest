@@ -1,12 +1,12 @@
 #!/usr/bin/perl
 #
 # Update a directory of symlinks.
-#	- Cameron Simpson <cs@zip.com.au> 10apr2001
+# Input is lines of the form:
+#	basename	symlink-target
+# - Cameron Simpson <cs@zip.com.au> 10apr2001
 #
 
 use strict qw(vars);
-
-##use MSQ::User;
 
 ($::cmd=$0) =~ s:.*/::;
 $::Usage="Usage: $::cmd [directory]\n";
