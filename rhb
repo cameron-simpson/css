@@ -1,8 +1,8 @@
 #!/bin/sh
 #
-# rab - remote amassbackup
+# rab - remote histbackup
 #
-# Backup a directory as per amassbackup, but to a remote host.
+# Backup a directory as per histbackup, but to a remote host.
 #	- Cameron Simpson <cs@zip.com.au> 27jun2001
 #
 # Do it locally, too.
@@ -73,7 +73,7 @@ stdout=/tmp/$cmd$$
 
 $sshdest \
 	"cd '$destdir' || exit 1
-	 exec amassbackup --no-copy --linkonly ." \
+	 exec histbackup --no-copy --linkonly ." \
 	 > "$stdout" \
 || exit 1
 
