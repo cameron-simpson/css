@@ -19,9 +19,6 @@ do  case $1 in
     shift
 done
 
-# grab cut/paste buffer if no args
-[ $# = 0 ] && { ( xunclip; echo ) | "$0" -; exit $?; }
-
 case $DISPLAY in
     :*)	id=$HOST$DISPLAY ;;
     *)	id=$DISPLAY ;;
@@ -31,11 +28,14 @@ esac
 first=1
 for arg
 do  case "$arg" in
+	xclip)	set x `xunclip`; shift; first=; arg= ;;
+	home)	arg=http://www.zip.com.au/~cs/ ;;
 	jdk)	arg=file:///opt/j2sdk-sun-1.4.0-beta3/docs/api/overview-summary.html ;;
 	rfcs)	arg=http://www.faqs.org/rfcs/rfc-titles.html ;;
 	*/*)	;;
 	*.*)	arg=http://$arg/ ;;
     esac
+    [ -n "$arg" ] || continue
     if [ $first ]
     then  set x "$arg"; shift
     else  set x "$@" "$arg"; shift; first=
