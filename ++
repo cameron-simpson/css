@@ -16,9 +16,10 @@ rc=$HOME/rc/mairix.$SYSTEMID
 
 [ $# = 0 ] && exec mrx-update "$MAILDIR/"*
 
-res=`mrx-query "$@"` || exit 1
+qargs=`shqstr "$@"`
 
-term -n "++ $*" -e + -f +t -R "$res"
-rm -rf "$res"
-
-exit 0
+exec term -n "++ $*" \
+	  -c "set -- $qargs"'
+	      res=`mrx-query "$@"` || exit 1
+	      + -f +t -R "$res"
+	      rm -rf "$res"'
