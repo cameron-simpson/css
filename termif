@@ -2,5 +2,5 @@
 cmd=$0
 usage="Usage: $cmd command [args...]"
 [ $# = 0 ] && { echo "$cmd: missing command" >&2; echo "$usage" >&2; exit 2; }
-[ -t 0 -a -t 1 ] || set term ${1+"$@"}
+[ -t 0 -a -t 1 ] || set term -e ${1+"$@"}
 exec "$@"
