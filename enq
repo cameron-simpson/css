@@ -1,0 +1,72 @@
+#!/usr/bin/perl
+#
+
+($cmd=$0) =~ s:.*/::;
+
+require 'flush.pl';
+
+$log=$ENV{'HOME'}.'/.'.$cmd.'.log';
+if (!open(LOG,">> $log\0"))
+	{ print STDERR "$cmd: can't append to $log: $!\n";
+	  exit 1;
+	}
+
+$loop=1;
+LOGIN: while ($loop)
+	{ print "Login name: "; &flush(STDOUT);
+	  last LOGIN if !defined($_=<STDIN>);
+
+	  chop;
+	  s/^\s+//;
+	  next LOGIN if !length;
+
+	  s/^\d{7}$/s$&/;
+
+	  $login=$_;
+	  if ($login =~ /^[a-z]\w+$/ && !(@pp=getpwnam($login)))
+		{ print STDERR "$cmd: who is $login?\n";
+		  next LOGIN;
+		}
+
+	  $login_now=time;
+
+	  @lines=();
+	  print "Enter query or problem description. Terminate input with a dot.\n";
+	  INPUT:
+	    while (<STDIN>)
+		{ chop;
+		  s/\s+$//;
+		  next if $#lines < $[ && !length;
+
+		  last INPUT if $_ eq '.';
+
+		  push(@lines,$_);
+		}
+
+	  if ($#lines < $[)
+		{ print "$cmd: no input!\n";
+		  next LOGIN;
+		}
+
+	  $now=time;
+	  ($nsec,$nmin,$nhour,$now_mday,$now_mon,$now_year,@etc)=localtime($now);
+	  $now_mon++;
+	  ($lsec,$lmin,$lhour,$login_mday,$login_mon,$login_year,@etc)=localtime($login_now);
+	  $login_mon++;
+
+	  printf LOG "%-10s %02d%02d%02d %02d:%02d:%02d (%9d) - %02d%02d%02d %02d:%02d:%02d (%9d)\n",
+		$login,
+		$login_year, $login_mon, $login_mday,
+		$lhour, $lmin, $lsec,
+		$login_now,
+		$now_year, $now_mon, $now_mday,
+		$nhour, $nmin, $nsec,
+		$now;
+
+	  for (@lines)
+		{ print LOG "\t", $_, "\n";
+		}
+
+	  &flush(LOG);
+	  last LOGIN;
+	}
