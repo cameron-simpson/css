@@ -40,4 +40,4 @@ then  echo "$cmd: missing host" >&2
 else  host=$1; shift
 fi
 
-eval "tag_fd 1,2 '$host' ssh -n $xflag $sshopts '$host' \${1+\"\$@\"} &"
+eval "tag_fd 1,2 '$host' ssh -n -o 'BatchMode yes' $xflag $sshopts '$host' \${1+\"\$@\"} &"
