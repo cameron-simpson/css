@@ -10,9 +10,9 @@ do  case $1 in
 done
 
 case $ARCH in
-    *.*.solaris)	exec pt $ptopts -e ;;
-    *.*.linux)		exec pt $ptopts wax ;;
-    *.*.*bsd|*.*.ultrix|*.*.domainos|*.*.sunos)
+    *.*.solaris)	exec pt -e  $ptopts ;;
+    *bsd|*.*.linux)	exec pt wax $ptopts ;;
+    *.*.ultrix|*.*.domainos|*.*.sunos)
 			exec ps agxuww ;;
     *)			echo "$0: don't know how to psa when ARCH=\"$ARCH\"" >&2
 			exit 1
