@@ -192,7 +192,7 @@ sub matchTag
     elsif (/^=[ \t\r\n]*("[^"]*"|'[^']*'|[^[ \t\n\r>]*)[ \t\n\r]*/)
     {
       $_=$';
-      warn "=foo found";
+      ## warn "=foo found";
     }
     #        "    foo=
     elsif (/^"\s+(\w+=)/i)
