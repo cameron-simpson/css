@@ -246,9 +246,8 @@ sub tok2s	# ([indent,]sink,tok...)
   if (! ref $sink)
   { $indent=$sink; $sink=shift; }
 
-  my(@html)=();
-
-  ## warn "tok2s:\n".cs::Hier::h2a([@_],1);
+  ##::need(cs::Hier);
+  ##warn "tok2s: indent=$indent\n".cs::Hier::h2a([@_],1);
 
   if (@_ < 1)
   {}
@@ -328,7 +327,7 @@ sub tok2s	# ([indent,]sink,tok...)
       else
       {
 	my $subindent=$indent;
-	if (1 || $indent > 0)
+	if ($indent > 0)
 	{ if (! ref $sink)
 	  { my @c = caller; warn "Put from [@c]";
 	  }
