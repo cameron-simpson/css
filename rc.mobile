@@ -40,10 +40,13 @@ envfile=
 async=1
 asyncall=1
 trace=set-x
+noaction=
 int=1
+raw=
 
 cmd=$0
-usage="Usage: $cmd {start|stop|restart} [-n] [-f config] [@where]
+usage="Usage: $cmd {start|stop|restart} [options...] [@where]
+	-r		Raw. Run only the named clause.
 	-n		No action. Recite proposed actions.
 	-y		Yes: proceed with the default location without asking.
 	-s		Synchronous. Default: asynchronous.
@@ -114,13 +117,21 @@ do  case $1 in
 	# Recite proposed actions.
 	# handy for debugging configuration file changes.
 	#
-	-n)   trace=echo ;;
+	-n)   trace=echo noaction=1 ;;
 	# =item B<-y>
 	#
 	# Yes.
 	# Proceed with the default location without asking.
 	#
 	-y)   int= ;;
+	# =item B<-r>
+	#
+	# Raw.
+	# Run only the named clause.
+	# The trailing clause name is now mandatory and need not start with an B<@>.
+	# 
+	-r)   raw=1 ;;
+	#
 	# =item B<-s>
 	#
 	# Synchronous.
@@ -185,40 +196,42 @@ done
 
 # =back
 #
-# =head1 LOCATION
-#
-# If the optional argument B<@I<where>> is supplied after the options above,
-# use that as the default location.
-#
-case "$1" in
-  @?*)
-    where=`expr "x$1" : 'x@\(.*\)'`
-    shift
-    ;;
-esac
 
-[ $# = 0 ] || { echo "$cmd: extra arguments: $*" >&2; badopts=1; }
+if [ $raw ]
+then
+    int=
+    if [ $# = 0 ]
+    then
+      echo "$cmd: missing clause name" >&2
+      echo "I know the following clauses:" >&2
+      sed -n 's/^\[\(.*\)\]$/	\1/p' "$cf" >&2
+      badopts=1
+    else
+      rawclause=$1; shift
+      [ $# = 0 ] || { echo "$cmd: extra arguments after clause name: $*" >&2
+		      badopts=1
+		    }
+    fi
+else
+    # =head1 LOCATION
+    #
+    # If the optional argument B<@I<where>> is supplied after the options above,
+    # use that as the default location.
+    #
+    case "$1" in
+      @?*)
+	where=`expr "x$1" : 'x@\(.*\)'`
+	shift
+	;;
+    esac
+    [ $# = 0 ] || { echo "$cmd: extra arguments after @where: $*" >&2; badopts=1; }
+fi
+
+[ -s "$cf" ] || { echo "$cmd: missing config file $cf" >&2
+		  badopts=1
+		}
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
-
-[ -s "$cf" ] || { echo "$cmd: missing config file $cf" >&2; exit 1; }
-
-locations=`sed -n 's/^\\[@\\([a-z].*\\)\\]$/\\1/p' "$cf" | sort | tr '\012' ' '`
-
-# =head1 OPERATION
-#
-# B<rc.mobile> asks the user where it it running
-# (unless the B<-y> option is supplied).
-# The locations offered
-# are taken from the clauses whose names commence with an "@",
-# discarding the "@".
-# The default location comes from the environment variable B<$SYSTEMID>,
-# defaulting to "B<home>" if this is not set.
-#
-# After obtaining the current location
-# (referred to as "I<where>" below)
-# the clauses B<GLOBAL>, I<where> and B<FINAL> are run in that order.
-#
 
 setenv()
 {
@@ -233,28 +246,6 @@ setenv()
       echo "setenv $setenv_var '$setenv_val';" >>"$envfile"
   fi
 }
-
-if [ $int ]
-then
-    echo "$cmd - bring up interface according to location"
-    while echo "I know [$locations]"
-          echo -n "Where am I [$where]? "
-          read iwhere || { echo; exit 1; }
-    do
-      [ -z "$iwhere" ] && iwhere=$where
-      case " $locations " in
-	*" $iwhere "*)
-	  where=$iwhere
-	  break
-	  ;;
-	*)echo "$cmd: unknown location \"$iwhere\""
-	  ;;
-      esac
-    done
-fi
-
-# make available to subprocesses and user environment
-setenv RC_MOBILE_WHERE "$where"
 
 doclause()
 {
@@ -281,6 +272,7 @@ doops()
 {
   while read op etc
   do
+    [ $noaction ] && echo "$op $etc"
     # =head1 CONFIGURATION FILE FORMAT
     #
     # The configuration file file
@@ -470,7 +462,57 @@ wait4pid()
   done
 }
 
-doclause GLOBAL "@$where" FINAL | { doops; [ $async ] || wait; }
+# =head1 OPERATION
+#
+if [ $raw ]
+then
+    # =head2 Raw Mode
+    #
+    # In raw mode
+    # just the specified clause and its subsidiaries are run.
+    #
+    doclause "$rawclause" | { doops; wait; }
+else
+    # =head2 Startup Mode
+    #
+    # In startup (normal) mode
+    # B<rc.mobile> asks the user where it it running
+    # (unless the B<-y> or B<-r> option is supplied).
+    # The locations offered
+    # are taken from the clauses whose names commence with an "@",
+    # discarding the "@".
+    # The default location comes from the environment variable B<$SYSTEMID>,
+    # defaulting to "B<home>" if this is not set.
+    #
+    # After obtaining the current location
+    # (referred to as "I<where>" below)
+    # the clauses B<GLOBAL>, I<where> and B<FINAL> are run in that order.
+    #
+    locations=`sed -n 's/^\\[@\\([a-z].*\\)\\]$/\\1/p' "$cf" | sort | tr '\012' ' '`
+    if [ $int ]
+    then
+	echo "$cmd - bring up interface according to location"
+	while echo "I know [$locations]"
+	      echo -n "Where am I [$where]? "
+	      read iwhere || { echo; exit 1; }
+	do
+	  [ -z "$iwhere" ] && iwhere=$where
+	  case " $locations " in
+	    *" $iwhere "*)
+	      where=$iwhere
+	      break
+	      ;;
+	    *)echo "$cmd: unknown location \"$iwhere\""
+	      ;;
+	  esac
+	done
+    fi
+
+    # make available to subprocesses and user environment
+    setenv RC_MOBILE_WHERE "$where"
+
+    doclause GLOBAL "@$where" FINAL | { doops; [ $async ] || wait; }
+fi
 
 # =head1 FILES
 #
