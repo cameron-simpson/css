@@ -9,6 +9,8 @@
 #	- Cameron Simpson <cs@zip.com.au> 23jul2000
 #
 
+: ${TMPDIR:=/tmp}
+
 cmd=`basename "$0"`
 
 rootdev=`awk '$2 == "/" { print $1 }' /etc/fstab`
@@ -72,7 +74,7 @@ fi
 
 ################################################
 # Construct ramdisk.
-rdi=/tmp/$cmd-rd
+rdi=$TMPDIR/$cmd-rd
 if [ -n "$ramdisk" ]
 then  cp "$ramdisk" "$rdi" || exit 1
 else  mkrd "$rdi" || exit 1
@@ -84,7 +86,7 @@ fi
 ask "Ready to mke2fs $rdev" || exit 1
 mke2fs "$rdev"
 
-mnt=`mkdirn /tmp/$cmd`
+mnt=`mkdirn "$TMPDIR/$cmd"`
 mount -t ext2 "$rdev" "$mnt" || exit 1
 
 rmdir $mnt/lost+found
