@@ -1,0 +1,95 @@
+#!/usr/bin/perl
+#
+# Usage: chserver [-a] oldserver newserver machines...
+#
+# Change links in /server on the specified machines.
+# Oldserver and newserver are machine names, possibly with leading slashes.
+# Each machine named is either
+#	- A machine name, possibly with leading slashes.
+#	- A directory name. This is distinguished by having
+#	  further components after the machine name.
+#
+# Machine names map to the directory //machine/server.
+# The directories thus specified are walked, and all symlinks pointing
+# directly at //oldserver are removed, and new ones pointing at //newserver
+# are made. If the -a flag is supplied, symlinks of the form //oldserver/...
+# are also suitably manipulated.
+#
+# For example, to point all the blue machines at silver one might say:
+#	chserver gold silver //blue*/server
+#
+
+$cmd=$0;
+$usage="Usage: $cmd [-a] oldserver newserver machines...\n";
+
+$aflag=0;
+if ($#ARGV >= 0 && $ARGV[0] eq '-a')
+	{ $aflag=1;
+	  shift;
+	}
+
+die "$cmd: missing oldserver\n$usage" if $ARGV < 0;
+$oldserver=shift;
+
+die "$cmd: missing newserver\n$usage" if $ARGV < 0;
+$newserver=shift;
+
+die "$cmd: missing machine list\n$usage" if $ARGV < 0;
+
+die "$cmd: bad oldserver ($oldserver)\n" if $oldserver !~ m,^(//)?\w+$,;
+die "$cmd: bad newserver ($newserver)\n" if $newserver !~ m,^(//)?\w+$,;
+
+$oldserver =~ s,^//,,;	$oldserver="//$oldserver";
+$newserver =~ s,^//,,;	$newserver="//$newserver";
+
+for (@ARGV)
+	{ if (m,^(//)?\w+$,)
+		# machine name -> //machine/server
+		{ s,^//,,;
+		  s,.*,//$&/server,;
+		}
+	  else
+	  # literal directory name
+	  { }
+
+	  if (! -d $_)
+		{ print STDERR "$cmd: $_ is not a directory\n";
+		  next;
+		}
+
+	  if (!opendir(DIR,$_))
+		{ print STDERR "$cmd: can't opendir($_): $!\n";
+		  next;
+		}
+	  
+	  @dirents=readdir(DIR);
+	  closedir(DIR);
+	  for $dirent (@dirents)
+		{ $f="$_/$dirent";
+		  -l $f || next;
+
+		  if (!defined($link=readlink($f)))
+			{ print STDERR "$cmd: can't readlink($f): $!\n";
+			  next;
+			}
+		  
+		  if ($aflag ? (length($link) >= length($oldserver)
+				&& substr($link,$[,length($oldserver)) eq $oldserver
+			       )
+			     : ($link eq $oldserver)
+		     )
+			{ print STDERR "$f: $link -> ";
+			  substr($link,$[,length($oldserver))=$newserver;
+			  print STDERR $link;
+			  if (!unlink($f))
+				{ print STDERR ": unlink($f): $!\n";
+				}
+			  elsif (!symlink($link,$f))
+				{ print STDERR ": symlink($link,$f): $!\n";
+				}
+			  else
+			  { print STDERR "\n";
+			  }
+			}
+		}
+	}
