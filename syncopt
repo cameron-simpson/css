@@ -86,8 +86,8 @@ eval "$sedvars"
 : ${ARCH:=`uname -s`}
 : ${SYNCOPT_PATH:=/u/syncopt}
 : ${SYNCOPT_RSYNC:=rsync}
-: ${SYNCOPT_ARCH:=/u/syncopt/$ARCH}
-: ${SYNCOPT_COMMON:=/u/syncopt/common}
+: ${SYNCOPT_ARCH:=$SYNCOPT_PATH/$ARCH}
+: ${SYNCOPT_COMMON:=$SYNCOPT_PATH/common}
 : ${SYNCOPT_SUBDIRS:="."}
 : ${SYNCOPT_RSYNCOPTS:=""}
 
