@@ -75,9 +75,11 @@ fi
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
+title=$sess
+
 (
   # if new, just run up a new screen session
-  [ $new ] && exec screen -c "$rcfile" -S "$sess" -- "$@"
+  [ $new ] && exec screen -c "$rcfile" -S "$sess" -t "$title" -- "$@"
 
   # otherwise convert $sess into session name to join
   case "$sess" in
@@ -102,7 +104,7 @@ fi
   [ -n "$match" ] && exec screen -c "$rcfile" -x "$sess"
 
   # start new session
-  exec screen -c "$rcfile" -S "$sess" -- "$@"
+  exec screen -c "$rcfile" -S "$sess" -t "$title" -- "$@"
 )
 
 [ -n "$tmprc" ] && rm "$tmprc"
