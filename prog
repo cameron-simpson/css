@@ -1,0 +1,24 @@
+#!/bin/sh
+#
+# Query archie via email.
+#
+
+cmd=`basename "$0"`
+
+archie=archie@archie.au
+
+exec 3>&1
+
+case $# in
+    0)	while [ -t 0 ] && necho "$cmd> " >&3
+	      read pattern
+	do
+	    echo "prog $pattern"
+	done
+	;;
+    *)	for pattern
+	do
+	    echo "prog $pattern"
+	done
+	;;
+esac | SIGNATURE=/dev/null m -s "[prog $*]" "$archie"
