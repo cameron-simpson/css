@@ -1,0 +1,31 @@
+#!/bin/sh
+#
+# Get the daemonised gpg-agent info, as for get-ssh-agent.
+#	- Cameron Simpson <cs@zip.com.au> 30mar2005
+#
+
+cmd=$0
+usage="Usage: $cmd [-v] [statefile]"
+
+statefile=
+verbose=
+
+badopts=
+
+[ "x$1" = x-v ] && { verbose=1; shift; }
+
+[ $# = 0 ] || { statefile=$1; shift; }
+
+[ $# = 0 ] || { echo "$cmd: extra arguments: $*" >&2; badopts=1; }
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+# protect against rogue output
+exec 3>&1 1>/dev/null
+
+[ -n "$statefile" ] || statefile=`gpg-agent-statefile` || exit 1
+
+[ -s "$statefile" ] \
+&& . "$statefile" \
+&& have-gpg-agent \
+&& echo ". '$statefile'" >&3
