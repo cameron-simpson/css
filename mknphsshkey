@@ -44,4 +44,5 @@ ok=1
 
 [ $ok ] || exit 1
 
+set -x
 exec ssh-keygen -b 2048 -f "$key" -t "$type" -N '' -C "$purpose (type $type)"
