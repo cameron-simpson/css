@@ -1,5 +1,6 @@
 #!/bin/sh
 
+num=:6
 case $HOST@$SYSTEMID in
     zapff@cisra|amadeus@home)
 		;;
@@ -8,4 +9,31 @@ case $HOST@$SYSTEMID in
 		;;
 esac
 
-lock -1 "vnc-$HOST@$SYSTEMID" vnc :6 -depth 24 -geometry 1600x1200
+case $1 in
+    :*)	num=$1; shift ;;
+esac
+
+fontpath=
+sep=
+for fonttop in /usr/X11R6/lib/X11/fonts
+do  for fontdir in $fonttop/*
+    do
+	if [ -f "$fontdir/fonts.dir" ]
+	then
+	    fontpath=$fontpath$sep$fontdir
+	    sep=,
+	fi
+    done
+done
+
+set -x
+
+lock -1 "vnc-$HOST$num@$SYSTEMID" \
+	vnc "$num" \
+		-depth 16 \
+		-geometry 1600x1200 \
+		-name "$HOST$num @ $SYSTEMID" \
+		-alwaysshared \
+		-localhost \
+		-fp "$fontpath"
+
