@@ -13,7 +13,9 @@ rsync -avHP --rsync-path='$HOME/scripts/rrsync zapff' /u/syncopt/redhat.x86.linu
 		there/cskk.ezoshosting.com/html/cs \
 		there/cskk.ezoshosting.com/html/cs/moto \
 		there/adzapper.sourceforge.net/html
-  do ( cd "$HOME/$subdir" && myke _all ) &
+  do ( cd "$HOME/$subdir" || exit 1
+       exec myke _all
+     ) &
   done
   wait
   updsysscripts
@@ -21,7 +23,7 @@ rsync -avHP --rsync-path='$HOME/scripts/rrsync zapff' /u/syncopt/redhat.x86.linu
 
 # push real accounts
 for w in @work @newt @jekyll @sf
-do  syncstuff "$w" &
+do  pfx "$w" syncstuff "$w" &
 done
 
 # push stub accounts
