@@ -44,7 +44,7 @@ test -r $env && . $env
 USER=$su
 EMAIL=$EMAIL
 DISPLAY=$DISPLAY
-PERL5LIB=$HOME/etc/pl:$PERL5LIB:/usr/local/lib/perl5
+PERL5LIB=$HOME/rc/perl:$PERL5LIB:/opt/perl/lib
 export USER EMAIL DISPLAY PERL5LIB
 [ -n "\$DISPLAY" ] && { XAUTHORITY=/tmp/xa.\$\$
 			export XAUTHORITY
