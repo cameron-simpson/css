@@ -1,0 +1,33 @@
+#!/bin/tcsh -f
+#
+# Source csh (gack!) script(s) then dumpenv.
+#	- Cameron Simpson <cs@zip.com.au> 04may98
+#
+
+set fflag=''
+set shflag='-sh'
+
+while ( $#argv > 0 )
+    if ( "x$1" == x-f ) then
+	set fflag='-f'
+	shift
+    else
+	if ( "x$1" == x-sh || "x$1" == x-csh ) then
+	    set shflag="$1"
+	    shift
+	else
+	    break
+	endif
+    endif
+end
+
+
+while ($#argv > 0)
+	if ( -r "$1" ) then
+	    # what I really want is to say is ">&2", but csh can't
+	    source "$1" >/dev/null
+	endif
+	shift
+end
+
+exec dumpenv $fflag $shflag
