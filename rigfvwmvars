@@ -1,0 +1,24 @@
+#!/bin/sh
+#
+# Set up a fresh set of FVWM logs and FIFOs and save in envvars.
+#	- Cameron Simpson <cs@zip.com.au> 23jul2002
+#
+
+# arrange log file with event info
+FVWM_TMPDIR=/tmp/$USER/fvwm2
+[ -d "$FVWM_TMPDIR/." ] || mkdir -p "$FVWM_TMPDIR" || exit 1
+fifodir=$FVWM_TMPDIR/fifo-$HOST
+[ -d "$fifodir/." ] || mkdir -p "$fifodir" || exit 1
+
+FVWMEVLOG=$FVWM_TMPDIR/evlog-$HOST-$DISPLAY-`datecode`-$$
+FVWMCMDLOG=$FVWM_TMPDIR/cmdlog-$HOST-$DISPLAY-`datecode`-$$
+FVWMEVFIFO=$fifodir/$DISPLAY-`datecode`-$$
+export FVWM_TMPDIR FVWMEVLOG FVWMCMDLOG FVWMEVFIFO
+
+rm -f "$FVWMEVLOG" "$FVWMCMDLOG"
+>>"$FVWMEVLOG"
+>>"$FVWMCMDLOG"
+
+for v in FVWM_TMPDIR FVWMEVLOG FVWMCMDLOG FVWMEVFIFO
+do  eval "echo \"$v=\$$v; export $v\""
+done
