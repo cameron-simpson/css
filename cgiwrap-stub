@@ -2,5 +2,5 @@
 PATH=$PATH:/opt/css/bin
 MYKEPATH=/opt/config/myke:${MYKEPATH:-/usr/share/myke/rc}
 export PATH MYKEPATH
-. ./.cgienv.sh
+[ -s .cgienv.sh ] && . ./.cgienv.sh
 exec cgiwrap -0 "$0" ${1+"$@"}
