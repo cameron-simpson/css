@@ -4,4 +4,4 @@
 #	- Cameron Simpson <cs@zip.com.au> 03jan2003
 #
 
-echo "/opt/perl_local/$VENDOR$VENDORRELEASE/$PERL_VERSION"
+echo "/opt/perl_local/$VENDORRELEASE/$PERL_VERSION"
