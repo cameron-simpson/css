@@ -167,12 +167,12 @@ do
     if issymlink "$r"
     then
 	# remote end is symlink - must be the "DEFAULT" link
-	if rlink=`readlink "$r"` && [ -n "$rlink" ]
+	if rlink=`readsymlink "$r"` && [ -n "$rlink" ]
 	then
 
 #	    # make thing-DEFAULT symlink to default version
 #	    dflt="$l-DEFAULT"
-#	    if llink=`readlink "$dflt"` \
+#	    if llink=`readsymlink "$dflt"` \
 #	    && [ "x$rlink" = "x$llink" ]
 #	    then
 #		: generic link matches - leave it alone
@@ -188,7 +188,7 @@ do
 	    else  sym=$rlink
 	    fi
 
-	    if llink=`readlink "$l"` \
+	    if llink=`readsymlink "$l"` \
 	    && [ "x$sym" = "x$llink" ]
 	    then
 		:
@@ -204,7 +204,7 @@ do
 		$echo mkdir "$ldir/$sym"
 	    fi
 	else
-	    echo "$cmd: can't readlink \"$r\"" >&2
+	    echo "$cmd: can't readsymlink \"$r\"" >&2
 	    xit=1
 	fi
     else
