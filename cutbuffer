@@ -1,0 +1,34 @@
+#!/bin/sh
+#
+# Manipulate CUT_BUFFER0 via xprop(1).
+#	- Cameron Simpson <cs@zip.com.au> 10aug2003
+#
+
+dfltbuf=0
+
+cmd=$0
+usage="Usage: $cmd [-n n] [string|-]
+    -n n    Specify cut buffer. Default: $dfltbuf"
+
+[ "x$1" = x-n ] && { dfltbuf=$2; shift; shift; }
+
+prop=CUT_BUFFER$dfltbuf
+
+if [ $# = 0 ]
+then
+    xprop -root -notype "$prop" \
+    | sed -e 's/^[^ ]* = "\(.*\)"$/\1/' \
+          -e 's/\\n/\
+/g'
+    exit
+fi
+
+value=$1; shift
+[ $# = 0 ] || { echo "$cmd: extra arguments after string: $*" >&2
+                echo "$usage" >&2
+		exit 2
+	      }
+
+[ "x$value" = x- ] && value=`cat`
+
+exec xprop -root -set "$prop" "$value"
