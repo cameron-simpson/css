@@ -13,7 +13,7 @@ all=
 [ $# = 0 ] && { echo "Usage: $0 [-a] group [dirs...]" >&2; exit 2; }
 
 group=$1; shift
-grep "^$group:" /etc/group || ypmatch "$group" group || exit 1
+grep "^$group:" /etc/group || ypmatch "$group" group || ask "Can't look up group \"$group\", proceed anyway" || exit 1
 
 [ $# = 0 ] && set .
 
