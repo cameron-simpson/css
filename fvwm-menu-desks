@@ -1,8 +1,11 @@
 #!/bin/sh
-newdesk \
+op=SwitchToDesk
+
+[ "x$1" = x-o ] && { op=$2; shift; shift; }
+
+desktop \
 | sort +1 \
 | awk '{ desks++
-         print "\"" $2 "	switch to\" SwitchToDesk 0 " ($1+13)
-         print "\"	push\" PushToDesk 0 " ($1+13)
+         print "\"" $2 "\" '"$op"' 0 " ($1+13)
        }
        END { if (desks == 0) print "\"no named desktops\" Nop" }'
