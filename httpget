@@ -1,0 +1,618 @@
+#!/usr/bin/perl
+#
+# httpget v2
+#	- Cameron Simpson <cs@zip.com.au> 7aug2000
+#
+
+=head1 NAME
+
+httpget - download web pages
+
+=head1 SYNOPSIS
+
+httpget [options] [URLs...]
+
+=head1 DESCRIPTION
+
+I<httpget>
+downloads or reports the specified URLs
+with an optional degree of indirection.
+It is pretty handy for downloading the contents of a direcory
+or reporting the URLs in a web page.
+
+=cut
+
+BEGIN { use cs::DEBUG; cs::DEBUG::using(__FILE__);
+      }
+
+use strict vars;
+
+use cs::Misc;
+use cs::URL;
+use cs::Lock;
+use Getopt::Std;
+
+## open(STDERR,">>/dev/pts/5");
+
+undef $::AbsBase;
+$::NoAnchors=0;
+$::NoAction=0;
+undef $::Output;
+$::Count=0;
+$::CountBase=0;
+$::Delay=5;
+$::NBase=1;
+$::Inline=0;
+$::Ptn=( defined $ENV{HTTPGET_PATTERN} && length $ENV{HTTPGET_PATTERN}
+       ? $ENV{HTTPGET_PATTERN}
+       : '.'
+       );
+$::Hexify=0;
+$::Titles=0;
+$::Verbose=0;
+$::Silent=(! -t STDOUT);
+$::Headers=0;
+$::DoHEAD=0;
+undef $::BigLock;
+undef $::SmallLock;
+
+=head1 OPTIONS
+
+=over 4
+
+=cut
+
+$::Usage="Usage: $::cmd [options...] [urls...]
+	-#		Strip # anchors.
+	-a absbase	Base URL for resolving relative input URLs.
+	-b n		Keep the last n components of the basename. Default: $::NBase
+	-d depth	Depth of links to search. Default $::Count
+	-D delay	Delay seconds between final fetches. Default: $::Delay
+	-g ptn		Get only finals URLs matching regexp ptn.
+	-h		Print headers.
+	-H		Do a HEAD request. Implies -h.
+	-i		List inlined (SRC= instead of HREF=).
+	-I inc		Add inc to depth.
+	-l lock		Take the named lock for the duration of each fetch.
+	-L lock		Take the named lock for the duration of the entire fetch.
+	-n		No action - report final URLs which would be fetched.
+	-o output	Save output to file. \"-\" means stdout.
+	-s		Silent.
+	-t		Print titles with URLs. Implies -n.
+	-v		Verbose.
+	-x		Hexify the emitted URLs. Implies -n.
+";
+
+{ my $badopts=0;
+  my %opt;
+
+  if (! getopts('#a:b:d:D:ghHiI:l:L:no:rstvx',\%opt))
+  { warn "$::cmd: unrecognised options\n";
+    $badopts=1;
+  }
+
+  for my $opt (sort keys %opt)
+  {
+
+=item B<-#>
+
+Strip the B<#I<anchor>> component of reported URLs, if any.
+
+=cut
+
+    if ($opt eq '#')
+    { $::NoAnchors=1; }
+
+=item B<-a> I<URL>
+
+Resolve relative URLs into absolute URLs with respect to supplied base I<URL>.
+
+=cut
+
+    elsif (defined $opt{'a'})
+    { $::AbsBase=new cs::URL $opt{'a'};
+      if (! defined $::AbsBase)
+      { warn "$::cmd: problems parsing with -a URL: $opt{'a'}\n";
+	$badopts=1;
+      }
+    }
+
+=item B<-b> I<baselength>
+
+Keep the last I<baselength> components of a URL
+for use as the local pathname
+The default is 1,
+which means all downloads land in the local directory.
+
+=cut
+
+    elsif ($opt eq 'b')
+    { $::NBase=$opt{$opt}+0;
+    }
+
+=item B<-d> I<depth>
+
+Indirect I<depth> times.
+The default is 0,
+which means the supplied URLs are downloaded.
+A value of 1 means the URLs those pages reference are downloaded, and so forth.
+
+=cut
+
+    elsif ($opt eq 'd')
+    { $::Count=$opt{$opt}+0;
+    }
+
+=item B<-D> I<delay>
+
+Delay I<delay> seconds between a successful download
+and commencement of the next fetch.
+The default is 5 seconds.
+
+=cut
+
+    elsif ($opt eq 'D')
+    { $::Delay=$opt{$opt}+0;
+    }
+
+=item B<-g> I<regexp>
+
+Grep: download only URLs matching the Perl I<regexp>.
+This is applied only to final URLs,
+not intermediate URLs used during indirection.
+The default is the content of the B<$HTTPGET_PATTERN>
+environment variable.
+
+=cut
+
+    elsif ($opt eq 'g')
+    { $::Ptn=$opt{'g'};
+    }
+
+=item B<-h>
+
+Include the MIME headers in the downloaded file.
+
+=cut
+
+    elsif ($opt eq 'h')
+    { $::Headers=1;
+    }
+
+=item B<-H>
+
+Do a HEAD request for the leaf fetches, thus returning only the headers
+of the target page.
+This implies the B<-h> option.
+
+=cut
+
+    elsif ($opt eq 'H')
+    { $::DoHEAD=1;
+      $::Headers=1;
+    }
+
+=item B<-i>
+
+Inline: at the final level of indirection,
+instead of using URLs attached to B<HREF=> attributes
+use URLs attached to B<SRC=> and B<BACKGROUND=> attributes.
+This is typically used to collect inline images.
+
+=cut
+
+    elsif ($opt eq 'i')
+    { $::Inline=1;
+    }
+
+=item B<-I> I<idepth>
+
+Add an "ur-depth" I<idepth>
+to the indirection I<depth>.
+The reason for this option in addition to the B<-d> option
+is obtuse,
+but see the pageurls(1) command for an example use.
+
+=cut
+
+    elsif ($opt eq 'I')
+    { $::CountBase+=$opt{$opt}+0;
+    }
+
+=item B<-l> I<lock>
+
+Lock the named I<lock> during each subfetch.
+This can be used to ensure a link isn't swamped.
+
+=cut
+
+    elsif ($opt eq 'l')
+    { $::SmallLock=$opt{$opt};
+    }
+
+=item B<-L> I<lock>
+
+Lock the named I<lock> for the entire B<httpget> run.
+This can be used to ensure a items are fetched in chunks
+or to ensure the B<-D> I<delay> code actually causes
+laid back fetching with competing B<httpget>s.
+
+=cut
+
+    elsif ($opt eq 'L')
+    { $::BigLock=$opt{$opt};
+    }
+
+=item B<-n>
+
+No action.
+Report final download URLs
+instead of downloading these pages.
+Generally used for table-of-contents operations.
+
+=cut
+
+    elsif ($opt eq 'n')
+    { $::NoAction=1;
+    }
+
+=item B<-o> I<output>
+
+Save the downloaded page as the file I<output>.
+The name "B<->" means standard output.
+
+=cut
+
+    elsif ($opt eq 'o')
+    { $::Output=$opt{$opt};
+    }
+
+=item B<-s>
+
+Silent.
+Omit all warning messages.
+
+=cut
+
+    elsif ($opt eq 's')
+    { $::Verbose=0;
+      $::Silent=1;
+    }
+
+=item B<-t>
+
+Print title strings with reported URLs, separated by a TAB character.
+Implies the B<-n> option.
+
+=cut
+
+    elsif ($opt eq 't')
+    { $::Titles=1;
+      $::NoAction=1;
+    }
+
+=item B<-v>
+
+Verbose.
+Report warnings and progress messages.
+
+=cut
+
+    elsif ($opt eq 'v')
+    { $::Verbose=1;
+      $::Silent=0;
+    }
+
+=item B<-x>
+
+Hexify (percent escape) reported URLs.
+Implies the B<-n> option.
+
+=cut
+
+    elsif ($opt eq 'x')
+    { $::Hexify=1;
+      $::NoAction=1;
+    }
+    else
+    { warn "$::cmd: -$opt: unimplemented option\n";
+      $badopts=1;
+    }
+  }
+
+  $::Count+=$::CountBase;
+
+  # sanity check
+  if ($::Inline && $::Count < 1)
+  { warn "$::cmd: inline selected but depth < 1\n";
+    $badopts=1;
+  }
+
+  die $::Usage if $badopts;
+}
+
+=item I<URLs...>
+
+Fetch the named I<URLs>.
+The URL "B<->" causes I<httpget> to read URLs from standard input, one per line.
+Also, if no URLs are supplied on the command line
+then URLs are read from standard input, one per line.
+
+=cut
+
+$::NeedSleep=0;
+
+$::TmpPfx=".$::cmd$$";
+$::TmpCount=1;
+sub newtmp() { $::TmpPfx."-".$::TmpCount++; }
+
+my $bigLock;
+
+if (defined $::BigLock)
+{ $bigLock=new cs::Lock $::BigLock;
+}
+
+if (@ARGV)
+{ for my $url (@ARGV)
+  { if ($url eq '-')
+    { while (defined($_=<STDIN>))
+      { chomp;
+	relhttpget($_);
+      }
+    }
+    else
+    { relhttpget($url);
+    }
+  }
+}
+else
+{ while (defined ($_=<STDIN>))
+  { chomp;
+    relhttpget($_);
+  }
+}
+
+undef $bigLock;
+
+=back
+
+=cut
+
+exit $::Xit;
+
+sub relhttpget($)
+{ my($rurl)=@_;
+
+  if (defined $::AbsBase)
+  { my $U = new cs::URL ($rurl, $::AbsBase);
+    if (! defined $U)
+    { warn "$::cmd: can't resolve \"$rurl\"\n";
+      $::Xit=1;
+      return;
+    }
+
+    $rurl=$U->Text();
+  }
+
+  httpget($rurl);
+}
+
+sub httpget($)
+{ my($url)=@_;
+
+  ## warn "pid $$: GET $url\n\tCount=$::Count, Inline=$::Inline\n";
+
+  if ($::Count < 1)
+  { my $method=($::DoHEAD ? HEAD : GET);
+
+    if ($url !~ /$::Ptn/oi)
+    {
+    }
+    elsif ($::NoAction)
+    { $url =~ s/#.*// if $::NoAnchors;
+      print "$method $url\n";
+    }
+    else
+    {
+      if ($::Seen{$url})
+      { warn "$::cmd: seen $url, skipping\n" if $::Verbose;
+	return;
+      }
+      $::Seen{$url}=1;
+
+      # pause
+      sleep($::Delay) if $::NeedSleep && $::Delay > 0;
+      $::NeedSleep=0;
+
+      { my($endurl,$rversion,$rcode,$rtext,$M,$sinkfile);
+
+	$sinkfile=newtmp();
+
+	{ my($smallLock);
+	  if (defined $::SmallLock)
+	  { $smallLock=new cs::Lock($::SmallLock);
+	  }
+
+	  ($endurl,$rversion,$rcode,$rtext,$M)
+	  =($::DoHEAD
+	  ? cs::URL::head($url)
+	  : cs::URL::get($url,1,$sinkfile)
+	   );
+	}
+
+	if (defined $M)
+	{
+	  if ($endurl->Text() !~ /$::Ptn/oi)
+	  { warn "$::cmd: $method $url\n"
+		."\tfinal URL: ".$endurl->Text()."\n"
+		."\tdoesn't match pattern: $::Ptn\n"
+		."\tnot saving\n";
+	  }
+	  else
+	  { $::NeedSleep=1;
+	    saveMIME($endurl->Text(),$M) || ($::Xit=1);
+	  }
+
+	  $::DoHEAD
+	  || unlink($sinkfile)
+	  || warn "$::cmd: warning: unlink($sinkfile): $!";
+	}
+	undef $M;
+      }
+    }
+  }
+  else
+  {
+    my %suburls;
+    cs::URL::urls($url,\%suburls,($::Count == 1 && $::Inline))
+	|| ($::Xit=1);
+
+    $::Count--;
+
+    { local($::AbsBase)=$url;
+
+      for my $suburl (sort keys %suburls)
+      {
+	if ($::Count < 1 && $suburl !~ /$::Ptn/oi)
+	{
+	}
+	elsif ($::Count < 1 && $::NoAction)
+	{
+	  my $outurl = $suburl;
+
+	  $outurl=hexify($outurl) if $::Hexify;
+	  print $outurl;
+	  print "\t$suburls{$suburl}" if $::Titles;
+	  print "\n";
+	}
+	elsif ($suburl =~ /^(http|ftp):/i)
+	{ httpget($suburl);
+	}
+	else
+	{
+	}
+      }
+    }
+
+    $::Count++;
+  }
+}
+
+sub hexify
+{ local($_)=@_;
+  my $old=$_;
+  $_=cs::HTTP::hexify($_,HTML);
+  ## if ($old ne $_) { warn "$old -> $_\n"; }
+  $_;
+}
+
+sub saveMIME($$)
+{ my($url,$M)=@_;
+
+  # put the result somewhere
+  if (@::ExecList)
+  { my($pid);
+
+    if (! defined ($pid=open(CHILD,"|-")))
+    { warn "$::cmd: can't pipe/fork to [@::ExecList] for $url: $!\n";
+      return 0;
+    }
+
+    if ($pid == 0)
+    # child - rig env and exec
+    { for my $hdr ($M->HdrNames())
+      { $ENV{'HTTP_'.cs::RFC822::hdrkey($hdr)}=$M->Hdr($hdr);
+      }
+
+      $ENV{URL}=$url;
+
+      exec(@::ExecList) || die "$::cmd: exec(@::ExecList): $!";
+    }
+  }
+  else
+  { 
+    my $outfile;
+
+    # where to put it?
+    if (! defined $::Output || ! length $::Output)
+    {
+      my $eurl = $url;
+      if ($eurl =~ m:/$:)	{ $eurl.='index.html'; }
+
+      my($ebase)='';
+      my($nb)=$::NBase;
+      ## warn "nb=$nb, eurl=[$eurl]";
+      while ($nb-- > 0 && $eurl =~ m:/+[^/]+$:)
+      { $ebase=$&.$ebase;
+	$eurl=$`;
+      }
+
+      $ebase =~ s:^/+::;
+
+      my $edir = cs::Pathname::dirname($ebase);
+      -d "$edir/."
+	    || cs::Pathname::makedir($edir,0777)
+	    || warn "$::cmd: mkdir($edir): $!\n";
+      $outfile=$ebase;
+      ## warn "save $url to \"$outfile\"...\n";
+    }
+    elsif ($::Output eq '-')	
+    { undef $outfile;
+    }
+    else
+    { $outfile=$::Output;
+    }
+
+    if (defined ($outfile))
+    {
+      if (-s $outfile)
+      { warn "$::cmd: $outfile exists, not overwriting\n\tURL $url not saved\n";
+	return 0;
+      }
+
+      if (! open(CHILD,"> $outfile\0"))
+      { warn "$::cmd: can't write to $outfile: $!\n\tURL $url not saved\n";
+	return 0;
+      }
+    }
+    elsif (! open(CHILD,">&STDOUT"))
+    { warn "$::cmd: can't dup STDOUT: $!\n";
+      return 0;
+    }
+  }
+
+  if ($::Headers)
+  { for ($M->Hdrs())
+    { print CHILD $_, "\n";
+    }
+
+    print CHILD "\n";
+  }
+
+  # write body decoded if no headers
+  print CHILD $M->Body($::printHeaders ? 0 : 1);
+
+  if (! close(CHILD))
+  { warn "$::cmd: problem closing pipe to [@::ExecList] for $url: $!\n";
+    return 0;
+  }
+
+  1;
+}
+
+=head1 ENVIRONMENT
+
+HTTPGET_PATTERN	Regexp to select download URLs.
+
+WEBPROXY	Web proxy setting of the form B<I<host>:I<port>>.
+
+=head1 SEE ALSO
+
+htv(1), urls(1), pageurls(1), getpageurls(1), watchlinkpages(1),
+wget(1), curl(1), lynx(1)
+
+=head1 AUTHOR
+
+Cameron Simpson E<lt>cs@zip.com.auE<gt>
+
+=cut
