@@ -44,16 +44,24 @@ fi
 
 umask 2
 
+dir=`dirname "$file"`
+base=`basename "$file"`
+
 [ $# = 0 ] && { set x "${EDITOR-vi}" "$file"; shift; }
 
-cvs update "$file" || exit $?
+( cd "$dir" || exit 1
+  cvs update "$base" || exit $?
 
-[ ! -d CVS/Base ] || cvs edit "$file" || exit $?
-chmod +w "$file"
+  [ ! -d CVS/Base ] || cvs edit "$base" || exit $?
+  chmod +w "$base"
+) || exit 1
 
 "$@"
 editxit=$?
-cvs diff "$file"
+
+( cd "$dir" || exit 1
+  cvs diff "$base"
+)
 [ $editxit = 0 ] || ask "$* failed - really commit the file" || exit 1
 
 [ -n "$msg" ] || { necho "Log message? "
@@ -63,4 +71,6 @@ cvs diff "$file"
 		      }
 
 [ $dodl ] && dl "cvsedit $file $*: $msg"
-exec cvs commit -m "$msg" "$file"
+( cd "$dir" || exit 1
+  exec cvs commit -m "$msg" "$base"
+)
