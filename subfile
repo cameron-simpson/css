@@ -1,0 +1,29 @@
+#!/bin/sh
+
+[ -s subfile.sed ] || exit 0
+
+ls | sed -n -f subfile.sed | \
+( xit=0
+  while read old new
+  do
+    [ -s "$old" ] || continue
+    [ "x$old" = "x$new" ] && continue
+    dir=`dirname "$new"`
+    [ -d "$dir/." ] || sh-x mkdir -p "$dir" || continue
+    if [ -s "$new" ]
+    then
+	if cmp -s "$old" "$new"
+	then
+	    echo "$old and $new are identical, removing $old" >&2
+	    rm "$old"
+	else
+	    echo "$old and $new differ, $old not refiled" >&2
+	    xit=1
+	fi
+    else
+	sh-x mv "$old" "$new"
+    fi
+    [ -s "$dir/subfile.sed" ] && ( cd "$dir" && exec subfile )
+  done
+  exit $xit
+)
