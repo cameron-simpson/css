@@ -127,32 +127,31 @@ sub diff
     $new=$n;
   }
 
-
   my($add,$del)=({},{});
 
   my($key,%h1,%h2,$n,$i);
 
   for $key (@chkkeys)
-	{ undef %h1; undef %h2;
-	  map($h1{$_}++, @{$old->{$key}});
-	  map($h2{$_}++, @{$new->{$key}});
+  { undef %h1; undef %h2;
+    map($h1{$_}++, @{$old->{$key}});
+    map($h2{$_}++, @{$new->{$key}});
 
-	  $add->{$key}=[];
-	  $del->{$key}=[];
-	  for (::uniq(keys(%h1), keys(%h2)))
-		{ $n=$h1{$_}-$h2{$_};
-		  if ($n < 0)
-			{ for $i (1..-$n)
-				{ push(@{$add->{$key}},$_);
-				}
-			}
-		  elsif ($n > 0)
-			{ for $i (1..$n)
-				{ push(@{$del->{$key}},$_);
-				}
-			}
-		}
+    $add->{$key}=[];
+    $del->{$key}=[];
+    for (::uniq(keys(%h1), keys(%h2)))
+    { $n=$h1{$_}-$h2{$_};
+      if ($n < 0)
+      { for $i (1..-$n)
+	{ push(@{$add->{$key}},$_);
 	}
+      }
+      elsif ($n > 0)
+      { for $i (1..$n)
+	{ push(@{$del->{$key}},$_);
+	}
+      }
+    }
+  }
 
   ($add,$del);
 }
@@ -222,17 +221,17 @@ sub NewRec2Modify
 	"dn: $dn\n",
 	"changetype: add\n");
   for (@{$rec->{'objectclass'}})
-	{ push(@modlines,"objectclass: $_\n");
-	}
+  { push(@modlines,"objectclass: $_\n");
+  }
 
   my($key);
 
   for $key (grep($_ ne 'dn' && $_ ne 'objectclass',
 		sort keys %$rec))
-	{ for (@{$rec->{$key}})
-		{ push(@modlines,"$key: $_\n");
-		}
-	}
+  { for (@{$rec->{$key}})
+    { push(@modlines,"$key: $_\n");
+    }
+  }
 
   @modlines;
 }
