@@ -1,0 +1,21 @@
+#!/bin/sh
+#
+# Wrapper for $EDITOR for cvs commits to append the changes for inquisition
+# in the change report.
+#	- Cameron Simpson <cs@zip.com.au> 09mar2002
+#
+
+[ -n "$CVS_COMMIT_FILES" ] || { echo "$0: \$CVS_COMMIT_FILES not set!" >&2
+				exit 1
+			      }
+[ -n "$CVS_COMMIT_EDITOR" ] || { echo "$0: \$CVS_COMMIT_EDITOR not set!" >&2
+				 exit 1
+			       }
+
+report=$1
+EDITOR=$CVS_COMMIT_EDITOR
+export EDITOR
+
+cvs -q diff $CVS_COMMIT_FILES 2>&1 | sed 's/^/CVS: /' >>"$report"
+
+exec $EDITOR "$report"
