@@ -1,0 +1,501 @@
+#!/usr/bin/perl
+#
+# Produce gallery indices with and without frames.
+#	- Cameron Simpson <cs@zip.com.au> 14feb96
+#
+
+use strict qw(vars);
+
+use cs::HTML;
+use cs::IM2HTML;
+use cs::Pathname;
+use cs::Sink;
+use File::Find;
+
+($::cmd=$0) =~ s:.*/::;
+$::Usage="Usage: $::cmd [-fgnqrtv] [+gt] [-i indexbase] [-T width] [directories]
+	-C chunk Use tables with \"chunk\" rows.
+		Default: $cs::IM2HTML::TableLength, use 0 for a single table.
+		This is a hack to bypass NetScape's braindead positioning bug.
+	-F	Use FRAMES for layout.
+	-g	Use imstat to embed inline sizes.
+	+g	Suppress imstat command.
+	-i indexbase
+		Deal with indexbase.* rather than $cs::IM2HTML::Index.*.
+	-m	Order on mtime, not filename.
+	-n	No thumbnails. Suppress thumbnail creation.
+	+n	Thumbnails. Do thumbnail creation.
+	-q	Quiet.
+	-r	Recurse. Run $::cmd in subdirectories.
+	-T width Use tables with width columns. Default: $cs::IM2HTML::TableWidth.
+	-v	Verbose.
+	directories
+		List if directories to process.
+		\"-\" is replaced by a list read from stdin.
+";
+
+my($xit)=im2html(@ARGV);
+
+exit $xit;
+
+################################################################
+
+# stubs
+sub tok2a { cs::HTML::tok2a(@_) }
+
+# main program
+sub im2html
+	{ my(@ARGV)=@_;
+	  my($xit)=0;
+
+	  # options to pass to each dir
+	  my(%o);
+
+	  # global state
+	  local($::Verbose,$::Silent)=(0,0);
+
+	  my($recurse);
+
+	  $recurse=0;
+	  $::Silent=0;
+	  $::Verbose=0;
+
+	  { my($badopts)=0;
+
+	    OPTION:
+	      while (@ARGV)
+		{ $_=shift(@ARGV);
+		  if (! /^[-+]./)
+			{ unshift(@ARGV,$_);
+			  last OPTION;
+			}
+
+		  last OPTION if $_ eq '--';
+
+		  if ($_ eq '-C')	{ $o{TABLELENGTH}=shift(@ARGV)+0; }
+		  elsif ($_ eq '-g')	{ $o{DOIMSTAT}=0; }
+		  elsif ($_ eq '+g')	{ $o{DOIMSTAT}=1; }
+		  elsif ($_ eq '-i')	{ $o{INDEXBASE}=shift(@ARGV); }
+		  elsif ($_ eq '-m')	{ $o{ORDER}=MTIME; }
+		  elsif ($_ eq '-n')	{ $o{DOTHUMBS}=0; }
+		  elsif ($_ eq '+n')	{ $o{DOTHUMBS}=1; }
+		  elsif ($_ eq '-q')	{ $::Silent=1; $::Verbose=0; }
+		  elsif ($_ eq '-r')	{ $recurse=1; }
+		  elsif ($_ eq '-T')	{ $o{TABLEWIDTH}=shift(@ARGV)+0; }
+		  elsif ($_ eq '-v')	{ $::Verbose=1; $::Silent=0; }
+		  else			{ warn "$::cmd: unrecognised option: $_\n";
+					  $badopts=1;
+					}
+
+		}
+
+	    if ($badopts)
+		{ warn $::Usage;
+		  return 2;
+		}
+	  }
+
+	  if (! @ARGV)	{ @ARGV='.'; }
+
+	  my(@dirs);
+
+	  for (@ARGV)
+		{ $_=cs::Pathname::fullpath($_);
+		  # warn "checking $_ ...\n";
+		  if ($_ eq '-')
+			{ push(@dirs,linesOf(<STDIN>));
+			}
+		  else	{ push(@dirs,$_);
+			}
+		}
+
+	  if ($recurse)
+		{ @dirs=findDirs(@dirs);
+		}
+
+	  # ok, do each directory
+	  my($dir,$im2);
+
+	  DIR:
+	    for $dir (sort @dirs)
+		{ $::Verbose && warn "$::cmd $dir ...\n";
+
+		  if (! defined ($im2=new cs::IM2HTML ($dir,\%o)))
+			{ warn "$::cmd: can't make cs::IM2HTML object for \"$dir\"\n";
+			  $xit=1;
+			}
+		  else
+		  { makeIndex($im2);
+		  }
+		}
+
+	  return $xit;
+	}
+
+# XXX: should really use File::Find, but later sometime
+sub findDirs
+	{ my(@dirs)=@_;
+	  my($dir,%fdirs);
+	  my(@e);
+
+	  DIR:
+	    for $dir (@dirs)
+		{
+		  if (! lstat($dir))
+			{
+			  warn "$::cmd: lstat($dir): $!\n";
+			  next DIR;
+			}
+		  elsif (-l _)
+			# silently skip symlinks
+			{ next DIR;
+			}
+		  elsif (! -d _)
+			{
+			  warn "$::cmd: $dir is not a directory\n";
+			  next DIR;
+			}
+
+		  $fdirs{$dir}=1;
+
+		  # do the children
+		  @e=grep(/^[^.]/ && $_ ne CVS,cs::Pathname::dirents($dir));
+		  @e=grep(lstat($_) && -d $_, map("$dir/$_",@e));
+		  map($fdirs{$_}=1,
+		      findDirs(grep(lstat($_) && -d $_, @e)))
+			if @e;
+		}
+
+	  keys %fdirs;
+	}
+
+# actually do the indexing
+sub makeIndex
+	{ my($im2)=@_;
+	
+	  ## warn "makeIndex($im2->{DIR})";
+
+	  my($init_body,$init_view);
+
+	  # list of images in each page
+	  my(@imgtables)=$im2->GroupImages();
+
+	  # subdirectories
+	  my(@subdirs)=$im2->SubDirs();
+	  my(@hrefs)=$im2->Hrefs();
+
+	  if (@imgtables > 1 || @subdirs || @hrefs)
+		{ $init_body=$im2->IndexFile("toc");
+		}
+	  elsif (@imgtables)
+		{ $init_body=$im2->IndexFile(0);
+		}
+	  else	{ $init_body=$im2->IndexFile("header");
+		}
+
+	  if (@imgtables)
+		{ $init_view=$imgtables[0]->[0]->[0];
+		}
+	  else	{ $init_view=$cs::IM2HTML::WebPage;
+		}
+
+	  my($group,@ims,$groupfile,$fullgroupfile,$grouplabel,@grouphtml,@index);
+	  my(@contents)=();
+
+	  my($i);
+
+	  TABLE:
+	    for $i (0..$#imgtables)
+		{
+		  $group=$imgtables[$i];
+
+		  # unpack images into flat list
+		  @ims=();
+		  map(push(@ims,@$_),@$group);
+
+		  $groupfile=$im2->IndexFile($i);
+
+		  @index=();
+		  if ($i > 0)
+			{ push(@index,[ A,
+					{ TARGET => BODY,
+					  HREF => $im2->IndexFile($i-1)
+					},
+					"Previous" ]);
+			}
+
+		  if (@imgtables)
+		  	{ push(@index,[ A,
+					{ TARGET => BODY,
+					  HREF => $im2->IndexFile("toc")
+					},
+					"Contents" ]);
+			}
+
+		  if ($i < $#imgtables)
+			{
+			  push(@index,[ A,
+					{ TARGET => BODY,
+					  HREF => $im2->IndexFile($i+1)
+					},
+					"Next" ]);
+			}
+
+		  $grouplabel=groupLabel($im2,$i,@ims);
+
+		  push(@contents,[LI,[A, { HREF => $groupfile,
+					   TARGET => BODY,
+					 }, $grouplabel ] ]);
+
+		  @grouphtml=tableHTML($im2,$group);
+
+		  # wrap in index markers
+		  if (@index)
+			{ @index=shortIndex(@index);
+			  unshift(@grouphtml,@index,[P],"\n");
+			  push(@grouphtml,"\n",[P],"\n",@index);
+			}
+
+		  putHTML($im2,$i,
+			  [ [ BASE, { TARGET => VIEW } ] ],
+			  $im2->Title().": $grouplabel",
+			  $grouplabel,@grouphtml);
+		}
+
+	  # ok, wrap up the list
+	  @contents=([H1, "Thumbnail Pages"], "\n",
+		     [UL, @contents], "\n",
+		    );
+
+	  # header
+	  my(@hindex)=( [ A,{ TARGET => "_top",
+			      HREF => "../".$im2->IndexFile(""),
+			    }, "Parent" ],
+			[ A,{ TARGET => "_top",
+			      HREF => $im2->IndexFile(""),
+			    }, "View" ],
+			[ A,{ TARGET => "_top",
+			      HREF => $im2->IndexFile("noview"),
+			    }, "No View" ]);
+	  push(@hindex,[ A,{ TARGET => BODY,
+			      HREF => $im2->IndexFile("toc"),
+			    }, "Contents" ])
+		if @contents > 1;
+
+	  # note the subdirectories
+	  if (@subdirs)
+		{ my(@subims)=grep(defined,
+				   map((new cs::IM2HTML $im2->{DIR}."/$_"),
+				  	@subdirs));
+
+		  unshift(@contents,
+			  [H1,"Subdirectories"], "\n",
+			  [UL,
+			    map([LI,[A,{ TARGET => "_top",
+					 HREF => $_->Basename()."/".$im2->IndexFile(""),
+				       }, $_->Title()
+				    ]
+				 ], @subims)
+			  ], "\n",
+			 );
+		}
+
+	  # note the references
+	  if (@hrefs)
+		{ unshift(@contents,
+			  [H1,"References"],
+			  [UL,
+			    map([LI,
+				  [BASE,	# XXX - is this legal?
+				    {TARGET => "_top"},
+				    [INCLUDE,{SRC => $im2->Pathname($_)}]
+				  ]
+				], @hrefs),
+			  ],"\n",
+			 );
+		}
+
+	  # table of contents
+	  putHTML($im2,"toc",
+			$im2->Title().": Contents",
+			"Contents",[ UL, @contents ]);
+
+	  putHTML($im2,"header",
+			$im2->Title(),
+			$im2->Title(),
+			$im2->Credit(), [P], "\n",
+			shortIndex(@hindex), [P], "\n",
+			$im2->FromParam("header"));
+				
+
+	  # frames
+	  { my($framefile)="$im2->{DIR}/".$im2->IndexFile("noview");
+	    my($frames);
+
+	    if (! defined ($frames=new cs::Sink (PATH,$framefile)))
+		{
+		  warn "$::cmd: can't write to $framefile; possible error: $!\n";
+		}
+	    else
+	    {
+	      $frames->Put(
+		tok2a([ HTML, {}, "\n",
+			[ HEAD, {},
+			  [ TITLE, {}, $im2->Title().": Frameset without view" ],
+			  "\n",
+			],
+			[ FRAMESET, { ROWS => "15%,*" }, "\n",
+			  [ FRAME, { NAME => "header",
+				     SRC => $im2->IndexFile("header")
+				   } ], "\n",
+			  [ FRAME,{ NAME => BODY,
+				    SRC => $init_body,
+				  } ], "\n",
+			  [ NOFRAMES, {}, "\n",
+			    [ BODY, {}, "\n",
+			      [ H1, {}, $im2->Title()." (non-frames)" ], "\n",
+			      shortIndex(@hindex), "\n",
+			    ],
+			  ],
+			],
+		      ], "\n"));
+	    }
+
+	    $framefile=$im2->IndexPath("");
+
+	    if (! defined ($frames=new cs::Sink (PATH,$framefile)))
+		{
+		  warn "$::cmd: can't write to $framefile; possible error: $!\n";
+		}
+	    else
+	    {
+	      $frames->Put(
+		tok2a([ HTML, {}, "\n",
+			[ HEAD, {},
+			  [ TITLE, {}, $im2->Title().": Frameset with view" ],
+			  "\n",
+			],
+			[ FRAMESET, { ROWS => "15%,*" }, "\n",
+			  [ FRAME, { NAME => "header",
+				     SRC => $im2->IndexFile("header")
+				   } ], "\n",
+			  [ FRAMESET, { COLS => "50%,*" }, "\n",
+			      [ FRAME,{ NAME => BODY,
+					SRC => $init_body,
+				      } ], "\n",
+			      [ FRAME,{ NAME => VIEW,
+					SRC => $init_view,
+				      } ], "\n",
+			  ], "\n",
+			  [ NOFRAMES, {}, "\n",
+			    [ BODY, {}, "\n",
+			      [ H1, {}, $im2->Title()." (non-frames)" ], "\n",
+			      shortIndex(@hindex), "\n",
+			    ],
+			  ],
+			],
+		      ], "\n"));
+	    }
+	  }
+	}
+
+sub shortIndex
+	{ my(@hrefs)=@_;
+	  my(@ndx)=();
+
+	  for (@hrefs)
+		{ push(@ndx," | ") if @ndx;
+		  push(@ndx,$_);
+		}
+
+	  ("[ ",@ndx, " ]");
+	}
+
+# text for label
+sub groupLabel
+	{ my($im2,$i,@ims)=@_;
+
+	  # warn "groupLabel: ims=[ @ims ]";
+	  @ims > 2
+	    ? "$ims[0] .. $ims[$#ims]"
+	    : @ims == 2
+	      ? "$ims[0], $ims[$#ims]"
+	      : $ims[0];
+	}
+
+sub putHTML
+	{ my($im2,$file,$title)=(shift,shift,shift);
+	  my($headlist)=[];
+	  if (ref $title)
+		{ $headlist=$title;
+		  $title=shift;
+		}
+	  my($heading,@html)=@_;
+
+	  $file=$im2->IndexFile($file);
+	  $file=$im2->Pathname($file) unless $file =~ m:^/:;
+
+	  # warn "putHTML($file)";
+
+	  my($s);
+
+	  if (! defined ($s=new cs::Sink (PATH, $file)))
+		{ warn "$::cmd: can't write to \"$file\": $!\n";
+		  return 0;
+		}
+	  
+	  my($head)=[ [ TITLE, {} , $title ], "\n", @$headlist ];
+	  $s->Put(tok2a([ HTML, {}, "\n",
+			  [ HEAD,{}, "\n",
+			    @$head,
+			  ], "\n",
+			  [ BODY, {}, "\n",
+			    [ H1, {}, $heading ],"\n",
+			    @html, "\n"
+			  ], "\n",
+			], "\n"));
+	}
+
+sub tableHTML
+	{ my($im2,$table)=@_;
+
+	  my(@html)=();
+
+	  @html=([ TABLE, {}, "\n",
+		   map(rowHTML($im2,$_), @$table)
+		 ], "\n");
+
+	  @html;
+	}
+
+sub rowHTML
+	{ my($im2,$row)=@_;
+
+	  my(@html);
+	  my($desc,$im);
+
+	  if (@$row == 1)
+		{ $im=$row->[0];
+		  $desc=$im2->Desc($im);
+
+		  @html=([ TD, { VALIGN => TOP,
+				 ALIGN => CENTER
+			       },
+			   $im2->ImagePrecis($im), "\n",
+			 ],
+			 [ TD, { VALIGN => TOP,
+				 ALIGN => LEFT,
+				 COLSPAN => ::max(1, $im2->{TABLEWIDTH}-1),
+			       },
+			   $desc, "\n",
+			 ]);
+		}
+	  else
+	  { @html=map([ TD, { ALIGN => CENTER },
+			$im2->ImagePrecis($_), "\n",
+			$im2->Desc($_), "\n",
+		      ], @$row);
+	  }
+
+	  [ TR, {}, @html ];
+	}
