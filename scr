@@ -8,7 +8,7 @@ cmd=$0
 usage="Usage:
     $cmd
 	List sessions.
-    $cmd -A
+    $cmd -A [[!]regexp...]
 	Put up terms for every screen.
     $cmd [-c scrcmd]... [-l logfile] [-N] session-name [cmd [args...]]
 	Join named session, creating it if missing.
@@ -25,10 +25,31 @@ usage="Usage:
 	 exit 0
        }
 
-if [ "x$*" = x-A ]
+if [ "x$1" = x-A ]
 then
     [ -n "$DISPLAY" ] || { echo "$cmd: no \$DISPLAY!" >&2; exit 1; }
-    for scr in `scr | awk '{print$1}'`
+    shift
+    grepfor=
+    grepnot=
+    for re
+    do  case "$re" in
+	  !*)	re=`expr "x$re" : 'x.\(.*\)'`
+		if [ -n "$grepnot" ]
+		then  grepnot="$grepnot|$re"
+		else  grepnot=$re
+		fi
+		;;
+	  *)	if [ -n "$grepfor" ]
+		then  grepfor="$grepfor|$re"
+		else  grepfor=$re
+		fi
+		;;
+	esac
+    done
+    choose=scr
+    [ -n "$grepnot" ] && choose="$choose | egrep -iv \"\$grepnot\""
+    [ -n "$grepfor" ] && choose="$choose | egrep -i \"\$grepfor\""
+    for scr in `eval "$choose" | awk '{print$1}'`
     do  term -iconic -e scr "$scr"
     done
     exit 0
