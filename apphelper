@@ -9,6 +9,7 @@
 : ${SAVEDIR:=$HOME/dl}
 : ${APPHELPER_SAVEMODE:=auto}
 : ${APPHELPER_REMAPFILE:=$HOME/rc/remap}
+: ${APPHELPER_SAVEMAP:="remap \"\$APPHELPER_REMAPFILE\" | tr '[A-Z]' '[a-z]'"}
 
 cmd=`basename "$0"`
 
@@ -398,34 +399,31 @@ then
     : ${savedir:=$SAVEDIR}
 fi
 
-# offer remapped name if one exists
-if [ -n "$APPHELPER_REMAPFILE" ] && [ -s "$APPHELPER_REMAPFILE" ]
+# offer remapped name
+remaptmp=$TMPDIR/$cmd-remap$$
+if printf "%s\n" "$fbase" | eval "$APPHELPER_SAVEMAP" >"$remaptmp"
 then
-  remaptmp=$TMPDIR/$cmd-remap$$
-  if printf "%s\n" "$fbase" | remap "$APPHELPER_REMAPFILE" >"$remaptmp"
+  exec 3<&0 0<"$remaptmp"
+  if read -r oldname \
+  && read -r newname \
+  && [ -n "$newname" ] \
+  && [ "x$oldname" != "x$newname" ]
   then
-    exec 3<&0 0<"$remaptmp"
-    if read -r oldname \
-    && read -r newname \
-    && [ -n "$newname" ] \
-    && [ "x$oldname" != "x$newname" ]
-    then
-      case "$newname" in
-	*/*)
-	  savedir=`expr "x$newname" : 'x\(.*\)/.*'`
-	  newname=`expr "x$newname" : 'x.*/\(.*\)'`
-	  case "$savedir" in /*) ;; *) savedir=$SAVEDIR/$savedir ;; esac
-	  [ -n "$newname" ] && fbase=$newname
-	  ;;
-	?*)
-	  fbase=$newname
-	  ;;
-      esac
-    fi
-    exec 0<&3 3<&-
+    case "$newname" in
+      */*)
+	savedir=`expr "x$newname" : 'x\(.*\)/.*'`
+	newname=`expr "x$newname" : 'x.*/\(.*\)'`
+	case "$savedir" in /*) ;; *) savedir=$SAVEDIR/$savedir ;; esac
+	[ -n "$newname" ] && fbase=$newname
+	;;
+      ?*)
+	fbase=$newname
+	;;
+    esac
   fi
-  rm -f "$remaptmp"
+  exec 0<&3 3<&-
 fi
+rm -f "$remaptmp"
 
 if [ "x$savemode" = xauto ]
 then
