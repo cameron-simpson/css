@@ -66,7 +66,11 @@ then
     done | sed -e 's/^.*<\(.*\)>.*$/\1/' \
 	       -e 's/^.*(\(.*\)).*$/\1/' \
 	       -e 's/^[^a-z]*\([a-z][a-z]*:\/\/.*\)/\1/' \
-	       -e '/^[a-z][a-z]*:\/\//!s/^/http:\/\//' \
+	       -e '/^[a-z][a-z]*:\/\//b ok' \
+	       -e '/^file:/b ok' \
+	       -e '/^news:/b ok' \
+	       -e 's/^/http:\/\//' \
+	       -e ':ok' \
 	 | "$0"
 else
     set x -noraise -iconic
