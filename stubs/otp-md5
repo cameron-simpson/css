@@ -1,0 +1,16 @@
+#!/bin/sh
+#
+# Wrapper for otp-md5 which places the response into the cut buffer.
+#	- Cameron Simpson <cs@zip.com.au> 10nov2000
+#
+
+otp=$BIN/otp-md5
+
+if resp=`$otp ${1+"$@"}`
+then
+    [ -n "$DISPLAY" ] && necho "$resp" | xcut
+    echo "$resp"
+else
+    echo "$resp"
+    exit 1
+fi
