@@ -79,12 +79,16 @@ Lines of the form:
 
 are passed through unchanged.
 
+Lines of the form:
+
+	< filename
+
+interpolate raw procmailrc files.
+
 Other lines are of the form:
 
 	[+][!]folder tag pattern
-
-or
-
+	[+][!]who@where tag pattern
 	[+][!]|progname tag pattern
 
 A leading plus sign (B<'+'>) means that this rule should be a continue rule,
@@ -256,6 +260,21 @@ while (<STDIN>)
   # VARIABLE=value
   if (/^[a-z]\w*=/)
   { print "$_\n";
+    next CAT;
+  }
+
+  # < filename
+  if (/^<\s*/)
+  { $_=$';
+    s/\s+$//;
+    if (! open(INCLUDE, "< $_\0"))
+    { warn "$::cmd: line $.: can't open \"$_\": $!\n";
+      next CAT;
+    }
+    while (defined($_=<INCLUDE>))
+    { print;
+    }
+    close(INCLUDE);
     next CAT;
   }
 
