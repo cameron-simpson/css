@@ -1,0 +1,26 @@
+#!/usr/bin/perl
+#
+# Read a db holding the remapping shExprs and emit equivalent JavaScript.
+#	- Cameron Simpson <cs@zip.com.au> 07aug98
+#
+
+use cs::Persist;
+
+die "Usage: $0 mappingdb\n" if @ARGV != 1;
+
+my($map)=cs::Persist::db($ARGV[0]);
+
+for my $target (keys %$map)
+	{ my $srcfield = $map->{$target};
+
+	  for my $shptn (ref $srcfield
+			? @$srcfield
+			: $srcfield)
+	  {
+	    $::Map->{$shptn}=$target;
+	  }
+	}
+
+print "   ", join("\n|| ",
+		  map("shExpMatch(url, \"$_\")",
+		      sort keys %$::Map)), "\n";
