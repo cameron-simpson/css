@@ -1,28 +1,33 @@
 #!/bin/sh
-#
-# Invoke our window manager of choice.
-#
 
-wm=
-wmopts=
-for wm in `cat $HOME/etc/env/WM 2>/dev/null` ctwm tvtwm twm mwm none
-do
-    wmdir=$X11/$wm
-    wmrc=$wmdir/rc
-    wmexec=`which $wm`
-    [ -f "$wmexec" -a -r "$wmrc" ] && break
+cd
+
+. $HOME/rc/x11/xenv.sh
+
+for fvbin in \
+	/opt/fvwm-2.5.4cvs/bin \
+	/opt/fvwm-2.5.3/bin \
+	/opt/fvwm-2.5.1/bin \
+	/opt/fvwm-2.4.4/bin \
+	/opt/fvwm/bin \
+	/opt/fvwm-2.3.23 \
+	/opt/fvwm/bin \
+	/opt/bin \
+	/usr/X11R6/bin \
+	/nowhere
+do   fvwm=$fvbin/fvwm
+     [ -f "$fvwm" ] && break
 done
-case "$wm" in
-    none)	exec xterm -n 'NO WM' -T 'NO WM' -e /bin/sh ;;
-esac
 
-tmpwmrc=$HOME/.${wm}rc-$DISPLAY
-[ -r $wmdir/opts ] && wmopts=`cat $wmdir/opts`
-dpp -DWM=$wm -DWMDIR=$wmdir "-DAGAIN=$again" $X11/xinfo.dpp $wmrc >$tmpwmrc
+[ -f "$fvwm" ] || { echo "$0: no fvwm!" >&2; exit 1; }
 
-"$wmexec" -f $tmpwmrc $wmopts
-xit=$?
+PATH=$fvbin:$PATH
+export PATH
 
-rm -f $tmpwmrc || xit=$?
+( set -x
+  exec "$fvwm" -blackout -f "$HOME/rc/x11/fvwm/rc" ${1+"$@"}
+) >$HOME/fv.out 2>$HOME/fv.err
 
-exit $xit
+##for f in "$FVWMEVLOG" "$FVWMCMDLOG"
+##do  >"$f"; rm -f "$f"
+##done
