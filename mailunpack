@@ -1,34 +1,53 @@
 #!/bin/sh
 #
-# Extract all components of an email message with munpack, in a distinctively
-# named directory.  If the shell script autoexec.sh is present in the key
-# directory, run that after extraction.
+# Extract all components of an email message with munpack into the specified
+# directory.
+# Extraction actually happens in a new subdirectory of the target.
+# After extraction, _within_ that subdirectory:
+#   If a command is supplied, run that after extraction.
+#   If no command is supplied and if the shell script autoexec.sh is present in
+#   the directory, run that after extraction.
+#   Otherwise use "mrg" to merge the files into the target directory.
 #	- Cameron Simpson <cs@zip.com.au> 03dec2001
 #
 
+target=`lastvalue mailunpack`
+
 cmd=$0
-usage="Usage: $cmd [-d unpackdir] key [command [args...]] <mailitem
-	-d unpackdir		Specify unpack base directory.
+usage="Usage: $cmd [-d unpackdir] [command [args...]] <mailitem
+	-d unpackdir		Specify unpack directory.
+				Default from last mailunpack run: $target
 	command [args...]	Command to run.
 				Default: \"basedir/autoexec.sh key\" if present."
 
-[ "x$1" = x-d ] && { MAILUNPACKDIR=$2; shift; shift; }
+[ "x$1" = x-d ] && { target=$2; shift; shift; }
 
-key=in
-[ $# = 0 ] || { key=$1; shift; }
+[ -n "$target" ] || { echo "$cmd: no unpackdir and no default, aborting" >&2; exit 1; }
 
-base=${MAILUNPACKDIR:-$HOME/incoming}/$key
+needdir "$target" || exit 1
+cd "$target"      || exit 1
 
-dl=`mkdirn "$base/"` || exit 1
-cd "$dl" || exit 1
+lastvalue mailunpack "`pwd`"
 
-pwd; set -x
+wkdir=`mkdirn .mailunpack` || exit 1
+cd "$wkdir"	  || xit 1
+wkdir=`pwd`       || exit 1
+
 munpack || exit 1
 
 if [ $# = 0 ]
 then
-    [ ! -s "$base/autoexec.sh" ] || exit 0
-    exec /bin/sh "$base/autoexec.sh" "$key"
+    if [ -s "$base/autoexec.sh" ]
+    then
+	set /bin/sh "$base/autoexec.sh"
+    else
+	set mrg .. *
+    fi
 fi
 
-exec "$@"
+xit=0
+echo "$wkdir"
+(set -x; exec "$@") || xit=1
+cd .. || exit 1
+rmdir "$wkdir"
+exit $xit
