@@ -379,8 +379,9 @@ exit $xit
 #
 # CDRIP_DEV, the device from which to read the audio CD. Default: B</dev/cdrom>.
 #
-# CDRIP_ENC, a comma separated list of encoding formats to produce. Default:
-# B<ogg>. Known: B<ogg> and <mp3>.
+# CDRIP_ENC, a comma separated list of encoding formats to produce.
+# Default: B<ogg>.
+# Known: B<ogg> and <mp3>.
 #
 # CDRIP_LOCK, the base name for the lock to use between encoders.
 #
@@ -390,13 +391,16 @@ exit $xit
 #
 # Note that quality and bits-per-second interact.
 # If specified on the command line, the later of B<-b> and B<-q> is used.
-# If you're using the environment variables, a non-empty B<CDRIP_QUAL> will always win.
+# If you're using the environment variables, a non-empty B<CDRIP_QUAL> will always win over B<CDRIP_BPS>.
+# Command line options win over environment variables.
 # The best way to get a fixed rate encoding from the environment variables
 # is to use B<CDRIP_OPTS> to specify a B<-b> option.
 #
+# CDDBSERVER, in the form I<server>B<:>I<port>, used by cdtoc(1cs) to obtain album and track information.
+#
 # =head1 SEE ALSO
 #
-# oggenc(1), lame(1), cdparanoia(1), mkiso(1cs), mkcd(1cs)
+# oggenc(1), lame(1), cdparanoia(1), mkiso(1cs), mkcd(1cs), cdtoc(1cs)
 #
 # =head1 AUTHOR
 #
