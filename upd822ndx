@@ -1,0 +1,24 @@
+#!/bin/sh
+#
+# Update the 822ndx in a given directory.
+#
+
+cmd=`basename "$0"`
+usage="Usage: $cmd [-d directory]"
+
+case $1 in
+    -d)	directory=$2; shift; shift
+	cd "$directory" || exit $?
+	;;
+esac
+
+pwd=`pwd`
+echo "updating index in $pwd ..."
+
+filed=.PTX/filed
+refs=.PTX/refs
+
+>>"$filed"	# ensure this exists
+
+ls | comm -23 - "$filed" | sort -n | ndx822 \
+	&& tr ' ' '\012' < "$refs" | sed 's/#.*//' | sort -u > "$filed"
