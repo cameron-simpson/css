@@ -8,8 +8,9 @@
 : ${RBG_PICKIM:='-w -x "$HALFX" -y "$HALFY"'}
 
 cmd=$0
-usage="Usage: $cmd [-d desk] [imlist-search-args...]
-	-d desk	Set the background for the specified desk."
+usage="Usage: $cmd [-d desk] [-n] [imlist-search-args...]
+	-d desk	Set the background for the specified desk.
+	-n	No action. Just print the chosen image(s)."
 
 [ -n "$DISPLAY" ] || { echo "$cmd: no \$DISPLAY!" >&2; exit 1; }
 
@@ -27,6 +28,8 @@ bgdesk=-
 while :
 do  case $1 in
 	-d)	bgdesk=$2; shift ;;
+	-n)	doit= ;;
+	-1)	pickn=1 ;;
 	*)	break ;;
     esac
     shift
@@ -54,6 +57,8 @@ eval "pickim -P \"\$strippfx\" -n \"\$pickn\" $RBG_PICKIM "'${1+"$@"}' | sort -u
 		    rm "$tmpf"
 		    exit 1
 		  }
+
+[ $doit ] || { cat "$tmpf"; xit=$?; rm "$tmpf"; exit $xit; }
 
 # pop up menu choice
 exec fvwmcmd \
