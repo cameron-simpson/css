@@ -13,6 +13,8 @@ package cs::Secret;
 
 $cs::Secret::DBpath = "$ENV{HOME}/private/secret/db";
 -e $cs::Secret::DBpath || ($cs::Secret::DBpath = "$ENV{HOME}/.secret");
+##system("id >&2; env|sort >&2");
+##warn "cs::Secret::DBpath = [$cs::Secret::DBpath]";
 
 sub _db()
 { if (! defined $cs::Secret::_db)
