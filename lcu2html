@@ -1,0 +1,39 @@
+#!/usr/bin/perl
+#
+# Read a .CSV file from my credit union's internet banking facility
+# and emit an HTML table.
+#	- Cameron Simpson <cs@zip.com.au> 04jun2001
+#
+
+use cs::Misc;
+use cs::TSF;
+use cs::HTML;
+
+print "<TABLE BORDER=1>\n";
+
+my @rows = [ TR,
+	      [TH, "Seq"], [TH, "Date"], [TH, "Type"], [TH, "Amount"],
+	      [TH, "Description"], [TH, "Balance"]
+	   ];
+
+undef $oseq;
+while (<STDIN>)
+{ my($seq,$dmy,$type,$amt,$desc,$bal)=cs::TSF::splitTSLine($_,",");
+
+  if ($seq == $oseq)			{ $pseq=""; }
+  else					{ $pseq=$seq; }
+
+  if (uc($type) eq CONTINUATION)	{ $type=''; $amt=''; }
+
+  if ($bal eq "_")			{ $bal=''; }
+
+  push(@rows, [TR,
+		[TD, $seq], [TD, $dmy], [TD, $type], [TD, $amt],
+		[TD, $desc], [TD, $bal]], "\n");
+
+  $oseq=$seq;
+}
+
+print cs::HTML::tok2a([TABLE,
+			{BORDER => 1},
+			@rows]), "\n";
