@@ -1,0 +1,22 @@
+#!/bin/sh
+
+case $# in
+    0)	echo "Usage: $0 targetdir [files]" >&2; exit 2 ;;
+esac
+
+targetdir=$1; shift
+case "$targetdir" in
+    /*) ;; *) targetdir=`pwd`/$targetdir ;;
+esac
+
+[ -d "$targetdir" ] || mkdir "$targetdir" || exit $?
+
+case $# in
+    0)	cp *.[ch] "$targetdir" &
+	[ -d "$targetdir/static" ] || mkdir "$targetdir/static" || exit $?
+	cd static
+	cp *.[ch] "$targetdir/static" &
+	wait
+	;;
+    *)	cp "$@" "$targetdir" ;;
+esac
