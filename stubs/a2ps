@@ -3,4 +3,4 @@
 
 set x -1 ${1+"$@"}; shift
 
-exec /opt/bin/a2ps ${1+"$@"}
+exec /usr/bin/a2ps ${1+"$@"}
