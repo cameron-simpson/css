@@ -1,0 +1,73 @@
+#!/bin/sh
+#
+# Archive a log file in a separate archival area.
+#	- Cameron Simpson <cs@zip.com.au> 19nov97
+#
+
+archdir=
+archname=current
+
+cmd=`basename "$0"`
+usage="Usage: $cmd [-n archname] -d archdir logfile
+	-d archdir	Directory in which to keep the archived data.
+	-n archname	What file within the directory to append to.
+			Default: $archname"
+
+badopts=
+while :
+do
+    case $1 in
+	-d)	archdir=$2; shift ;;
+	-n)	archname=$2; shift ;;
+	--)	shift; break ;;
+	-?*)	echo "$cmd: unrecognised option: $1" >&2; badopts=1 ;;
+	*)	break ;;
+    esac
+    shift
+done
+
+case "$archname" in
+    /*)	archdir=`basename "$archname"` ;;
+    *)	if [ -n "$archdir" ]
+	then  archname=$archdir/$archname
+	else  echo "$cmd: missing archdir" >&2; badopts=1
+	fi
+	;;
+esac
+
+if [ $# = 0 ]
+then  echo "$cmd: missing logfile" >&2; badopts=1
+else
+      logfile=$1; shift
+      case $logfile in -*) logfile=./$logfile ;; esac
+      [ $# = 0 ] || { echo "$cmd: extra arguments: $*" >&2; badopts=1; }
+fi
+
+# catch bad options
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+[ -r "$logfile" ] || { echo "$cmd: no readable file \"$logfile\"" >&2
+		       badopts=1
+		     }
+
+[ -d "$archdir" ] || { echo "$cmd: no directory \"$archdir\"" >&2
+		       badopts=1
+		     }
+
+# catch bad setup - give usage anyway, as a reminder
+[ $badopts ] && { echo "$usage" >&2; exit 1; }
+
+[ -s "$logfile" ] || exit 0	# nothing to save
+
+logbase=`basename "$logfile"`
+wk=.$cmd.$logbase.$$
+
+# snapshot the log
+# XXX - race condition here
+cp "$logfile" "$wk" && { >"$logfile"; }
+
+# save data - if ok, remove snapshot
+{ tee -a "$archname" <"$wk" >/dev/null && rm "$wk"; } \
+	|| { echo "$cmd: can't save to \"$archname, data left in $wk" >&2
+	     exit 1
+	   }
