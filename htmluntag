@@ -1,0 +1,10 @@
+#!/usr/bin/perl -p
+#
+# Remove most HTML tags from input so as to leave "plain text".
+#	- Cameron Simpson <cs@zip.com.au> 11nov2003
+#
+
+$_='' if /<script>/i../<\/script>/i;
+s:<(\s*/)?("[^"]*"|'[^']*'|[^"'/>])*(/\s*)?>: :g;
+s/\s+/ /g;
+$_.="\n";
