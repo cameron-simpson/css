@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # For each target, move aside and issue an async rm.
-#	- Cameron Simpson <cs@zip.com.au> 19jul98
+#	- Cameron Simpson <cs@zip.com.au> 19jul1998
 #
 
 rmopts=
@@ -31,7 +31,7 @@ do  case $arg in
     n=`expr $n + 1`
     if mv -i "$orig" "$aside"
     then
-	rm $rmopts "$aside" &
+	lock bgrm rm $rmopts "$aside" &
     else
 	xit=$?
     fi
