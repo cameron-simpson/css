@@ -1,0 +1,2 @@
+#!/bin/sh
+exec egrep -i ${1+"$@"}
