@@ -45,7 +45,7 @@ done
 # drop default route
 $trace route del default
 
-[ "x$loc" = xoff ] && exec ifconfig eth0 down
+[ "x$loc" = xoff ] && exec $trace ifconfig eth0 down
 
 # configure for new location
 exec $trace env "NET=$loc" rc.mobile start -r -f "$cf" -E "$envfile" on-net
