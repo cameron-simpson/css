@@ -1,0 +1,130 @@
+#!/usr/bin/perl -w
+#
+# Read an imlist (x y pathname) from stdin, choose images from it as specified.
+#	- Cameron Simpson <cs@zip.com.au> 16jun2004
+#
+
+use strict qw(vars);
+
+use Getopt::Std;
+
+($::cmd=$0) =~ s:.*/::;
+$::Usage="Usage: $::cmd [-owt] [-x lx] [-y ly] [-n nitems] [words...] <imlist
+	-o	OR words instead of ANDing them.
+	-w	Choose wide (landscape) pictures.
+	-t	Choose tall (portrait) pictures.
+	-n n	Choose n items. Default: 1
+	-x lx	Choose pictures lx pixels or more wide.
+	-y ly	Choose pictures ly pixels or more high.
+";
+
+$::AndWords=1;
+$::PickN=1;
+$::MinX=0;
+$::MinY=0;
+undef $::Aspect;
+
+{ my $badopts=0;
+  my %opt;
+
+  if (! getopts('wtx:y:n:',\%opt))
+  { warn "$::cmd: bad options\n";
+    $badopts=1;
+  }
+
+  if ($opt{'t'})		{ $::Aspect=PORTRAIT; }
+  if ($opt{'w'})		{ $::Aspect=LANDSCAPE; }
+  if (defined $opt{'x'})	{ $::MinX=$opt{'x'}+0; }
+  if (defined $opt{'y'})	{ $::MinY=$opt{'y'}+0; }
+  if (defined $opt{'n'})	{ $::PickN=$opt{'n'}+0; }
+
+  @::Words=map(qr($_)i,@ARGV);
+
+  die $::Usage if $badopts;
+}
+
+@::IM=();	# list of image paths
+@::IMOffset=();	# list of float image offsets
+
+my $offset=0.0;
+my $nimages=0;
+
+IM:
+while (<STDIN>)
+{
+  chomp;
+  if (! /^\s*(\d+)\s+(\d+)\s+(\S.*)/)
+  { warn "$::cmd: stdin, line $.: bad data: $_\n";
+    next IM;
+  }
+
+  my ($dx,$dy,$impath)=($1,$2,$3);
+
+  next IM if $::MinX > 0 && $dx < $::MinX;
+  next IM if $::MinY > 0 && $dy < $::MinY;
+  next IM if defined $::Aspect
+	  && (   ( $::Aspect eq PORTRAIT && $dx > $dy )
+	      || ( $::Aspect eq LANDSCAPE && $dy > $dx )
+	     );
+
+  if ($::AndWords)
+  { TRY_AND:
+    for my $re (@::Words)
+    { next IM if $impath !~ $re;
+    }
+  }
+  else
+  { my $ok=0;
+    TRY_OR:
+    for my $re (@::Words)
+    { if ($impath =~ $re)
+      { $ok=1;
+	last TRY_OR;
+      }
+    }
+    next IM if !$ok;
+  }
+
+  push(@::IM,$impath);
+  push(@::IMOffset,$offset);
+
+  $offset+=$dx*$dy;
+  $nimages++;
+}
+
+die "$::cmd: nothing to pick!\n" if ! @::IM;
+
+# optimisation
+if (@::IM <= $::PickN)
+{ for (@::IM)
+  { print "$_\n";
+  }
+  exit 0;
+}
+
+PICK:
+while ($::PickN > 0)
+{
+  my $poff = rand($offset);
+  my $pndx = offset2index($poff);
+  next PICK if ! length $::IM[$pndx];
+  print "$::IM[$pndx]\n";
+  $::IM[$pndx]='';
+  $::PickN--;
+}
+
+sub offset2index
+{ my($off)=@_;
+
+  my($low,$high)=(0,$#::IM);
+
+  while ($low+1 < $high)
+  {
+    my $mid = int(($low+$high)/2);
+    my $ioff = $::IMOffset[$mid];
+    if ($ioff <= $off)	{ $low=$mid; }
+    else		{ $high=$mid; }
+  }
+
+  return $low;
+}
