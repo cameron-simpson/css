@@ -559,6 +559,28 @@ sub _tagSelect($$$$$$)
   [SELECT, $args, @content];
 }
 
+=item FileUpload(I<field>)
+
+Add a file upload B<INPUT> token
+for the specified I<field>.
+
+=cut
+
+sub FileUpload{ my($F)=shift; $F->MarkUp($F->FileUploadMU(@_)); }
+
+=item FileUploadMU(I<field>)
+
+Return a file upload B<INPUT> token
+for the specified I<field>.
+
+=cut
+
+sub FileUploadMU($$)
+{ my($F,$field)=@_;
+
+  return [INPUT, {TYPE => FILE, NAME => $field}];
+}
+
 =back
 
 =head1 SEE ALSO
