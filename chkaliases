@@ -1,0 +1,18 @@
+#!/bin/sh
+#
+# Check for undeliverable addresses in system aliases.
+#	- Cameron Simpson <cs@zip.com.au> 26jul95
+#
+
+aliasfile=/usr/lib/aliases
+sendmail=/usr/lib/sendmail
+
+[ $# = 0 ] && { set x `sed -n 's/^\([^#: 	]*[^#: 	]*\):.*/\1/p' "$aliasfile"`
+		shift
+	      }
+
+for alias
+do
+    [ "x$alias" = x+ ] && continue	# skip YP hook
+    $sendmail -bv $alias 2>&1 | fgrep -v ' deliverable: ' | sed "s/^/$alias: /"
+done
