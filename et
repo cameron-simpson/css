@@ -53,7 +53,7 @@ shift
 # Eterm is really fucking stupid about options
 case "$title" in -*) title=" $title" ;; esac
 
-exec acon \
+exec bgproc -p - \
 Eterm --name "$title" \
       --path "$ETERMPATH" \
       -t bgpic \
