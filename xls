@@ -1,0 +1,7 @@
+#!/bin/sh
+#
+# List windows with names.
+#	- Cameron Simpson <cs@zip.com.au>
+#
+
+xlswins ${1+"$@"} | grep  '([^)][^)]*)'
