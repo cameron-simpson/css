@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # Do a loopback mount of a file containing a filesystem.
-# Linux specific at present.
+# Linux specific at present. See also loumount.
 #	- Cameron Simpson <cs@zip.com.au> 12jul2000
 #
 
