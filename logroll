@@ -1,0 +1,146 @@
+#!/bin/sh
+#
+# Roll over a logfile; HUP daemon.
+#	- Cameron Simpson <cs@zip.com.au> 10oct97
+#
+
+sig=HUP
+pid=
+max=
+zme=
+ext=
+if [ -t 1 -a -t 0 ]; then verbose=1; else verbose=; fi
+
+usage="Usage: $0 [-m max] [-p {pid|procname}] [-s signal] [-v] [-z] \\
+		[+daycode] [+datecode] [+format] [-x exttension] \\
+		logfiles...
+	-m max			Max logrolls (default: no max).
+	-p {pid|procname}	Process id or name to kill.
+	-s signal		Signal to send (default $sig).
+	+daycode		Use .yyyymmdd as extension.
+	+datecode		Use .yyyymmddhhmmss as extension.
+	+format			Date-like extension for rolled log.
+				Collisions get rolled too.
+	-x extension		Arbitrary extension for rolled log.
+	-v			Verbose.
+	-z			Gzip rolled file."
+
+badopts=
+
+# use defaults
+set x $LOGROLLOPTS ${1+"$@"}; shift
+
+while :
+do  case $1 in
+	-m)	max=$2; shift ;;
+	-p)	pid=$2; shift ;;
+	-s)	sig=$2; shift ;;
+	-z)	zme=1 ;;
+	-x)	case $2 in
+		    .*)	ext=$ext$2 ;;
+		    *)	ext=$ext.$2 ;;
+		esac; shift ;;
+	+daycode) ext=$ext.`daycode` ;;
+	+datecode) ext=$ext.`datecode` ;;
+	+*)	fmt=`date "$1"` && [ -n "$fmt" ] && ext=$ext.$fmt ;;
+	--)	shift; break ;;
+	-?*)	echo "$0: unrecognised option: $1" >&2; badopts=1 ;;
+	*)	break ;;
+    esac
+    shift
+done
+
+if [ $# = 0 ]
+then
+    echo "$0: missing logfile" >&2
+    badopts=1
+fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+setx= dashv=
+[ $verbose ] && { setx='set -x' dashv=-v; }
+
+# make sure the daemon's there
+if [ -n "$pid" ]
+then
+    case $pid in
+	[0-9]*)	;;
+	*)	npid=`psa | grep "[ ]$pid" | awk '{print $2}' | sed 1q`
+   	        [ -z "$npid" ] && { echo "$0: can't find pid for \"$pid\"" >&2
+				    exit 1
+				  }
+		pid=$npid
+		;;
+    esac
+fi
+
+xit=0
+
+for logfile
+do
+    ok=1
+
+    # wrap up option-resembling names
+    case "$logfile" in
+	-*)	logfile=./$logfile ;;
+    esac
+
+    [ -f "$logfile" ] || { echo "$0: no logfile named \"$logfile\"" >&2
+			   xit=1
+			   continue
+			 }
+
+    if [ -n "$ext" ]
+    then
+	# specific extension
+	roll=$logfile$ext
+	[ -f "$roll" ] && { logroll "$roll" || { xit=1; continue; }; }
+    else
+	# numeric extension
+
+	# locate gap or max
+	n=0
+	while :
+	do 
+	    { [ -z "$max" -o $n -lt "$max" ] \
+	      && [ -f "$logfile.$n" -o -f "$logfile.$n.gz" ]
+	    } || break
+	    n=`expr $n + 1`
+	done
+
+	# $n should now be the empty slot; make it so
+	rm -f "$logfile.$n" "$logfile.$n.gz"
+
+	# move them all up one
+	while [ $n -gt 0 ]
+	do  n1=`expr $n - 1`
+	    ( if [ -f "$logfile.$n1.gz" ]
+	      then mv "$logfile.$n1.gz" "$logfile.$n.gz"
+	      else mv "$logfile.$n1" "$logfile.$n"
+	      fi
+	    ) || { ok=; break; }
+	    n=$n1
+	done
+	# catch error
+	[ $ok ] || { xit=1; continue; }
+
+	roll=$logfile.0
+    fi
+
+    # move original file
+    ($setx; mv "$logfile" "$roll") || { xit=1; continue; }
+    >>"$logfile"
+    cpmod "$roll" "$logfile"
+
+    # compress shifted log
+    [ -z "$zme" ] || [ ! -s "$roll" ] || ( gzip -9 $dashv "$roll" & )
+done
+
+if [ $xit = 0 ]
+then
+    # kick daemon
+    [ -n "$pid" ] && ($setx; kill -$sig $pid)
+fi
+
+exit $xit
