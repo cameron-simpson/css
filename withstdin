@@ -1,0 +1,21 @@
+#!/bin/sh
+#
+# Copy stdin to a temp file, then pass as arg to a command expecting a filename.
+#	- Cameron Simpson <cs@zip.com.au> 14jul2004
+#
+
+: ${TMPDIR:=/tmp}
+
+cmd=$0
+usage="Usage: $cmd command [args...]"
+
+[ $# = 0 ] && { echo "$usage" >&2; exit 2; }
+
+tmpf=$TMPDIR/withstdin$$
+
+trap 'rm -f "$tmpf"' 0 1 15
+
+cat >"$tmpf" || exit 1
+
+# no exec because the trap must run
+"$@" "$tmpf"
