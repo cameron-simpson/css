@@ -1,6 +1,8 @@
 #!/usr/bin/python
 
 import re
+import os
+import os.path
 from types import *
 from cStringIO import StringIO
 from cs.lex import skipwhite, lastlinelen
@@ -121,6 +123,21 @@ def dictEncode(fp,d,i=None):
     fp.popindent()
 
   fp.write("}")
+
+def load(path):
+  if os.path.isdir(path):
+    val=loaddir(path)
+  else:
+    val=loadfile(path)
+  return val
+
+def loaddir(dirname):
+  "Read hier data from a directory."
+  dict={}
+  dents=[ dirent for dirent in os.listdir(dirname) if dirent[0] != '.']
+  for dent in dents:
+    dict[dent]=load(os.path.join(dirname,dent))
+  return dict
 
 def loadfile(filename):
   "Read hier data from a file"
