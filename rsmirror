@@ -9,7 +9,7 @@
 #
 # =head1 SYNOPSIS
 #
-# B<rsmirror> [B<-n>] [B<-v>] [B<-f> I<config>] [B<-d> I<dir>] [B<-t> I<secs>] [I<server>B<::>I<root>...]
+# B<rsmirror> [B<-d> I<dir>] [B<-f> I<config>] [B<-n>] [B<-P>] [B<-v>] [B<-t> I<secs>] [I<server>B<::>I<root>...]
 #
 # =head1 DESCRIPTION
 #
@@ -26,8 +26,8 @@ trace=
 timeout=
 
 cmd=`basename "$0"`
-usage="Usage: $cmd [-n] [-v] [-f config] [-d dir] [[server]::root...]
-	-n -v		Passed to rsync.
+usage="Usage: $cmd [-n] [-v] [-P] [-f config] [-d dir] [[server]::root...]
+	-n -v -P	Passed to rsync.
 	-f config	Read config from this file. Default: $cf
 	-d dir		Install mirrors here. Default: $where
 	-t secs		Timeout each update after secs seconds."
@@ -49,13 +49,18 @@ do  case $1 in
 	#
 	# No action. Passed to the rsync command.
 	#
+	# =item B<-P>
+	#
+	# Rsync's shorthand for B<--progress --partial>.
+	# Passed to the rsync command.
+	#
 	# =item B<-v>
 	#
 	# Verbose. Passed to the rsync command.
 	#
 	-n)	trace=1 rsopts="$rsopts $1" ;;
-	-v)	trace=1 verbose=1 rsxopts="$rsxopts $1"
-		;;
+	-P)	trace=1 verbose=1 rsxopts="$rsxopts $1" ;;
+	-v)	trace=1 verbose=1 rsxopts="$rsxopts $1" ;;
 
 	# =item B<-z>
 	#
