@@ -75,12 +75,12 @@ badopts=
 # =item +t
 #
 # Do not open a terminal window.
-# 
+#
 # =item -T I<title>
 #
 # Specify the title of the fresh terminal in which to run apphelper.
 # Implies the B<-t> option.
-# 
+#
 ttyopts=
 case $1 in
   -t)	shift; doterm=1; ttyopts="$ttyopts $1" ;;
@@ -244,7 +244,7 @@ then
 	if [ -n "$extract_globs" ]
 	then
 	    for glob in $extract_globs
-	    do  
+	    do
 	      set "$@" $sep -name "$glob"
 	      sep=-o
 	    done
@@ -418,7 +418,7 @@ case "$savemode" in
 				shcmd=`expr "x$saveas" : 'x! *\(.*\)'`
 				case "$shcmd" in
 				  '')	${SHELL:-sh} ;;
-				  *[!%]*) 
+				  *[!%]*)
 					shcmd=`echo "$shcmd" | sed "s!$lastshcmdg"`
 					lastshcmd=$shcmd
 					shcmd=`echo "$shcmd" | sed "s%$fileg"`
@@ -426,7 +426,7 @@ case "$savemode" in
 					;;
 				  *)	"${SHELL:-sh}" -xc "$shcmd"
 					;;
-				  
+
 				esac
 				;;
 		    ''|n|no)	saveas= ;;
@@ -497,7 +497,7 @@ exec cp -i "$file" "$saveas"
 #
 # causes mozilla to run xpdf(1) to view PDF files
 # and then to offer a save option.
-#	
+#
 # =head1 AUTHOR
 #
 # Cameron Simpson E<lt>cs@zip.com.auE<gt> 18jun1998
