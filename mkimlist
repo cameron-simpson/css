@@ -4,8 +4,6 @@
 #	- Cameron Simpson <cs@zip.com.au> 09jan2002
 #
 
-wd=`pwd`
-
 justprint=
 [ "x$1" = x-n ] && { shift; justprint=1; }
 
@@ -15,10 +13,10 @@ set \
  -o \( -type f -size +0 \
 	\( -name \*.png -o -name \*.jpg \) \
 	${1+"$@"} \
-       -print \) \
+       -print \)
 
 [ $justprint ] && exec "$@"
 
-"$@"
+"$@" \
 | sed 's;^\./;;' \
 | xxargs imsize
