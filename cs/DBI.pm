@@ -78,6 +78,13 @@ sub hashtable($$$;$$)
   $where='' if ! defined $where;
   $preload=0 if ! defined $preload;
 
+  if (! defined $dbh)
+  { my @c=caller;die "dbh UNDEF from [@c]";
+  }
+  elsif (! ref $dbh)
+  { my @c=caller;die "dbh ($dbh) not a ref from [@c]";
+  }
+
   return $cs::DBI::_HashTables{$dbh,$table,$keyfield,$where}
   if exists $cs::DBI::_HashTables{$dbh,$table,$keyfield,$where};
 
@@ -148,6 +155,7 @@ This handle is cached for later reuse.
 # it is cached for speed, since most SQL gets reused
 sub sql($$)
 { my($dbh,$sql)=@_;
+
   if (! defined $dbh)
   { my @c=caller;warn "dbh UNDEF from [@c]";
   }
@@ -156,6 +164,10 @@ sub sql($$)
 
   ## my @c = caller;
   ## warn "sql($dbh,\"$sql\") from [@c]";
+
+  if (! defined $dbh)
+  { my @c=caller;warn "dbh UNDEF from [@c]";
+  }
 
   return $cs::DBI::_cachedQuery{$stkey}
 	if defined $cs::DBI::_cachedQuery{$stkey};
