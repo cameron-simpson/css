@@ -1,0 +1,25 @@
+#!/bin/sh
+#
+# Set the job id for the current window.
+# The run command if supplied.
+#	- Cameron Simpson <cs@zip.com.au> 03nov2004
+#
+
+cmd=$0
+usage="Usage: $cmd [-w wid] [jobid [command [args...]]]"
+
+[ "x$1" = x-w ] && { WINDOWID=$2; shift; shift; }
+
+# no window?
+[ -n "$WINDOWID" ] || exit 1
+
+# transmute 0x into decimal
+case "$WINDOWID" in 0x*) WINDOWID=`perl -e "print $WINDOWID"` || exit 1 ;; esac
+
+[ $# = 0 ] && exec windowidset "$WINDOWID" job
+
+job=$1; shift
+[ -n "$job" ] || job=misc
+windowidset "$WINDOWID" job "$job" &
+job "$job"
+[ $# = 0 ] || exec "$@"
