@@ -13,6 +13,9 @@
 ##    ssh-add
 ##fi
 
+vflag=
+[ "x$1" = x-v ] && { vflag=-v; shift; }
+
 if [ $# = 0 ]
 then
     case "$HOST@$SYSTEMID" in
@@ -39,7 +42,7 @@ do  case "$fwd" in
 	    ;;
 	work2zip)
 	    echo "work2zip..."
-	    vpnssh -t 60 zip \
+	    vpnssh $vflag -t 60 -i vpn_dsa-work2zip zip \
 		   -L 8081:localhost:8081 \
 		   -L 2119:news:119 \
 		   -L 2025:mail:25 \
@@ -48,7 +51,7 @@ do  case "$fwd" in
 	    ;;
 	work2home)
 	    echo "work2home..."
-	    vpnssh -t 60 -q home \
+	    vpnssh $vflag -t 60 -q home \
 		   -L 2111:mail-optus:110 \
 		   -L 2180:www-optus:110 \
 		   -L 2401:janus:2401 \
@@ -57,7 +60,7 @@ do  case "$fwd" in
 	    ;;
 	home2zip)
 	    echo "home2zip..."
-	    vpnssh zip \
+	    vpnssh $vflag -i vpn_dsa-home2zip zip \
 		   -L 8081:localhost:8081 \
 		   -L 2119:news:119 \
 		   -L 2025:mail:25 \
@@ -65,12 +68,9 @@ do  case "$fwd" in
 	    ;;
 	home2work)
 	    echo "home2work..."
-	    vpnssh work \
-		   -L 2022:ivie:22 \
+	    vpnssh $vflag work \
 		   -L 2080:web:80 \
-		   -L 2082:ivie:2082 \
 		   -L 2222:zapff:22 \
-		   -L 3306:ivie:3306 \
 		   -L 5905:zapff:5905 \
 		   -L 5906:zapff:5906 \
 		   -L 5907:piaf:5900 &
