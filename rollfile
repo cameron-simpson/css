@@ -1,0 +1,69 @@
+#!/bin/sh
+#
+# Roll a file sideways to file.1 etc.
+# Understands both uncompressed and gzipped backups.
+#	- Cameron Simpson <cs@zip.com.au> 25nov2003
+#
+
+keep=9
+trace=
+
+cmd=`basename "$0"`
+usage="Usage: $cmd [-k keep] files...
+	-k keep	Keep this many rolled copies.
+		0 means no limit.
+		Default: $keep"
+
+[ "x$1" = x-k ] && { keep=$2; shift; shift; }
+
+if [ $# = 0 ]
+then
+    echo "$cmd: missing files" >&2
+    echo "$usage" >&2
+    exit 2
+fi
+
+xit=0
+
+for file
+do
+  [ -f "$file" ] \
+  || { echo "$cmd: missing $file" >&2; xit=1; continue; }
+
+  # locate end of rolled copies
+  gap=1
+  while [ "$keep" = 0 -o "$gap" -lt "$keep" ]
+  do
+    [ ! -f "$file.$gap" -a ! -f "$file.$gap.gz" ] && break
+    gap=`expr $gap + 1`
+  done
+
+  while [ $gap -gt 0 ]
+  do
+    # compute gap for next iteration
+    ngap=`expr $gap - 1`
+
+    if [ $ngap = 0 ]
+    then
+      this=$file.$gap
+      prev=$file
+    else
+      if [ -f "$file.$ngap" ]
+      then
+	this=$file.$gap
+	prev=$file.$ngap
+      else
+	this=$file.$gap.gz
+	prev=$file.$ngap.gz
+      fi
+    fi
+
+    # move the previous file up one
+    $trace mv -- "$prev" "$this" \
+    || { echo "$cmd: $prev -> $this fails, aborting" >&2; xit=1; break; }
+
+    gap=$ngap
+  done
+done
+
+exit $xit
