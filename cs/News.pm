@@ -15,99 +15,99 @@ use cs::Range;
 package cs::News;
 
 sub new
-	{ my($class)=shift;
+{ my($class)=shift;
 
-	  my($this)=bless { TYPE	=> TOPLEVEL,
-			  }, $class;
+  my($this)=bless { TYPE	=> TOPLEVEL,
+		  }, $class;
 
-	  my($nntp)=$this->_MetaNNTP();
-	  return undef if ! defined $nntp;
+  my($nntp)=$this->_MetaNNTP();
+  return undef if ! defined $nntp;
 
-	  $this->{NNTP}=$nntp;
+  $this->{NNTP}=$nntp;
 
-	  $this;
-	}
+  $this;
+}
 
 sub Top
-	{ my($this)=@_;
+{ my($this)=@_;
 
-	  return $this if $this->{TYPE} eq TOPLEVEL;
+  return $this if $this->{TYPE} eq TOPLEVEL;
 
-	  $this->{TOP};
-	}
+  $this->{TOP};
+}
 
 sub CanPost
-	{ my($this)=@_;
+{ my($this)=@_;
 
-	  $this->{TYPE} eq TOPLEVEL
-		? $this->{NNTP}->{NNTP}->CanPost()
-		: $this->Top()->CanPost();
-	}
+  $this->{TYPE} eq TOPLEVEL
+	? $this->{NNTP}->{NNTP}->CanPost()
+	: $this->Top()->CanPost();
+}
 
 # fork and return an object to the caller
 # child listens to object and speaks to the NNTP server
 sub _MetaNNTP
-	{ my($this)=shift;
+{ my($this)=shift;
 
-	  my($nntp)=new cs::NNTP (@_);
-	  return undef if ! defined $nntp;
+  my($nntp)=new cs::NNTP (@_);
+  return undef if ! defined $nntp;
 
-	  my($meta)=bless { TYPE	=> METANNTP,
-			    TOP		=> $this,
-			    NNTP	=> $nntp,	# real NNTP
-			  }, cs::News;
+  my($meta)=bless { TYPE	=> METANNTP,
+		    TOP		=> $this,
+		    NNTP	=> $nntp,	# real NNTP
+		  }, cs::News;
 
-	  my($toChild)=cs::IO::mkHandle();
-	  my($pid);
+  my($toChild)=cs::IO::mkHandle();
+  my($pid);
 
-	  if (! defined ($pid=open($toChild,"|-")))
-		{
-		  warn "$::cmd: open/fork: $!\n";
-		  return undef;
-		}
-
-	  if ($pid != 0)
-		# parent - return object
-		{ $meta->{CHILD}=$toChild;
-		  return $meta;
-		}
-
-	  local($_);
-	  my($rq);
-
-	  while (defined ($_=<STDIN>))
-		{ chomp;
-		  if (! /^(\w+)\s?/)
-			{ die "$::cmd: bad request \"$_\"";
-			}
-		  else
-		  { $rq=uc($&);
-		    $_=$';
-
-		    if ($rq eq LITERAL)
-			{ $nntp->Out("$_\n");
-			}
-		    elsif ($rq eq MHEAD)
-			{
-			  for my $n ((new cs::Range $_)->Enum())
-				{ $nntp->Out("HEAD $n\n");
-				}
-			}
-		    elsif ($rq eq MBODY)
-			{
-			  for my $n ((new cs::Range $_)->Enum())
-				{ $nntp->Out("BODY $n\n");
-				}
-			}
-		    else
-		    # pass through
-		    { $nntp->Out("$rq $_\n");
-		    }
-		  }
-		}
-
-	  exit 0;
+  if (! defined ($pid=open($toChild,"|-")))
+	{
+	  warn "$::cmd: open/fork: $!\n";
+	  return undef;
 	}
+
+  if ($pid != 0)
+	# parent - return object
+	{ $meta->{CHILD}=$toChild;
+	  return $meta;
+	}
+
+  local($_);
+  my($rq);
+
+  while (defined ($_=<STDIN>))
+	{ chomp;
+	  if (! /^(\w+)\s?/)
+		{ die "$::cmd: bad request \"$_\"";
+		}
+	  else
+	  { $rq=uc($&);
+	    $_=$';
+
+	    if ($rq eq LITERAL)
+		{ $nntp->Out("$_\n");
+		}
+	    elsif ($rq eq MHEAD)
+		{
+		  for my $n ((new cs::Range $_)->Enum())
+			{ $nntp->Out("HEAD $n\n");
+			}
+		}
+	    elsif ($rq eq MBODY)
+		{
+		  for my $n ((new cs::Range $_)->Enum())
+			{ $nntp->Out("BODY $n\n");
+			}
+		}
+	    else
+	    # pass through
+	    { $nntp->Out("$rq $_\n");
+	    }
+	  }
+	}
+
+  exit 0;
+}
 
 sub Put
 	{ my($this)=shift;
