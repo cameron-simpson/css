@@ -1,0 +1,92 @@
+#!/usr/bin/perl
+#
+# Invoke @ARGV and filter output.
+#
+
+open(OLDSTDOUT,">&STDOUT") || die "dup(STDOUT) fails: $!";
+
+$pid=open(FROM_GCC,"-|");
+
+die "can't fork: $!\n" if !defined($pid);
+
+if ($pid == 0)
+	# child, run @ARGV
+	{ open(STDERR,">&STDOUT") || die "can't point STDERR at pipe";
+	  open(STDOUT,">&OLDSTDOUT") || die "can't point STDOUT at OLDSTDOUT";
+	  close(OLDSTDOUT);
+	  exec(@ARGV);
+	  die "can't exec(@ARGV): $!";
+	}
+
+close(OLDSTDOUT);
+
+undef $context, $oldcontext, $cline;
+GCCERR:
+  while (<FROM_GCC>)
+	{ if (/,$/)
+		{ $cline.=$_;
+		  next GCCERR;
+		}
+	  
+	  $_=$cline.$_;
+	  $cline='';
+
+	  if (/:$/
+	   && (/^In file included from \S/
+	    || /\S+\.c: In function `\S+'/
+	    || /\S+\.c: At top level/
+	      )
+	     )
+		{ $context=$_;
+		}
+	  else
+	  { &spit($_);
+	  }
+	}
+
+close(FROM_GCC);
+exit $?>>8;
+
+sub spit
+	{ local($_)=@_;
+
+	  return if
+		/warning: `\S+' and `\S+' identical in first \d+ characters$/
+	     || /warning: passing arg \d+ of `\S+' as unsigned due to prototype$/
+	     || /too many arguments for format$/
+	     || /value computed is not used$/
+	     || /ANSI C forbids an empty source file$/
+	     || /warning: bit-field `\w+' type invalid in ANSI C$/
+	     || /^cc1: warning: -Wuninitialized is not supported without -O$/
+	     || /^cc: .*: linker input file unused since linking not done$/
+		;
+
+	  # Hack for NeilB's rpcgen output
+	  return if /\budb\/udbh?\.h:\d+:/
+	     && (/warning: function declaration isn't a prototype$/
+	      || /warning: declaration of `uname' shadows global declaration$/
+		)
+		;
+
+	  # Hack for netCDF
+	  return if /function declaration isn't a prototype$/;
+
+	  # RPC still lives in the dark ages
+	  return if /^\/usr\/include\/rpc\/clnt\.h:\d+:/
+	     && (/warning: \`struct netbuf' declared inside parameter list$/
+	      || /warning: its scope is only this definition or declaration,$/
+	      || /warning: which is probably not what you want/
+		)
+		;
+
+	  if (defined($context)
+	   && (!defined($oldcontext)
+	    || $context ne $oldcontext
+	      )
+	     )
+		{ print $context;
+		  $oldcontext=$context;
+		}
+
+	  print;
+	}
