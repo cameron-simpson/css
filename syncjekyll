@@ -1,6 +1,6 @@
 #!/bin/sh
 
-needhost amadeus@home || exit 1
+needhost $HOMEHOST@home || exit 1
 
 [ $# = 0 ] || exec syncstuff @jekyll "$@"
 
