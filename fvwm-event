@@ -7,8 +7,6 @@
 cmd=$0
 usage="Usage: $cmd {-|event [args...]}"
 
-##acon echo "$0 $*"
-
 [ $# = 0 ] && { echo "$cmd: missing event" >&2; echo "$usage" >&2; exit 2; }
 
 doevent()
