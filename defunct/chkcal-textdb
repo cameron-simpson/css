@@ -1,0 +1,396 @@
+#!/usr/bin/perl
+#
+# Chkcal - check calendar against user db.
+#	- Cameron Simpson <cs@zip.com.au>
+#
+
+use strict qw(vars);
+
+use cs::Upd;
+use Getopt::Std;
+use cs::Hier;
+use cs::LDAP;
+use cs::Misc;
+use CISRA::Misc;
+use CISRA::UserData;
+use CISRA::Groups;
+use IO;
+
+($::cmd=$0) =~ s:.*/::;
+$::Usage="Usage: $::cmd [-f] [-v] [-w password] [groups...]
+	-f		Force. Actually apply changes instead of reporting them.
+	-l		List expected user and group DNs.
+	-v		Verbose.
+	-w password	Supply password for admin user. Implies -f. Discouraged.
+";
+
+$::Mode=LIST;
+undef $::Password;
+$::Verbose = -t STDOUT;
+
+$::BadOpts=0;
+
+if (getopts('flvw:') > 0){ # $::BadOpts=1;
+			}
+if (defined $::opt_w)
+{ warn "$::cmd: you really shouldn't supply a password on the command line!\n";
+  $::Password=$::opt_w;
+  $::opt_f=1;
+}
+
+$::Mode=APPLY if $::opt_f;
+$::Verbose=1 if $::opt_v;
+$::ListOnly=1 if $::opt_l;
+
+die $::Usage if $::BadOpts;
+
+# check only current users
+@::ChkUsers=&CISRA::UserData::users();
+{ my $U;
+  my @u;
+  for my $user (@::ChkUsers)
+  { push(@u,$user) if defined ($U=CISRA::UserData::user($user))
+		   && $U->Alive();
+  }
+  @::ChkUsers=sort @u;
+}
+
+$::GDB=CISRA::Groups::adb();
+$::rawGDB=CISRA::Groups::db();
+@::ChkGroups=sort grep(! /^\d+$/
+		    && ! /^(app|backup|perm|teamleaders|teammanagers|ilk)(|-.*)$/
+		    && $::GDB->{$_}->IsCurrent(),
+		    keys %$::GDB);
+
+$::LDAP=new cs::LDAP;
+
+my($basedn)=$::LDAP->BaseDN();
+
+if ($::ListOnly)
+{
+  PUSER:
+  for my $user (sort @::ChkUsers)
+  { print userDn($user,$::LDAP), "\n";
+  }
+
+  PGROUP:
+  for my $group (sort @::ChkGroups)
+  { my $G=$::GDB->{$group};
+    next PGROUP if $G->Type() eq ALIAS;
+    print grp2ldap($::LDAP,$G,$group)->{'dn'}->[0], "\n";
+  }
+
+  exit 0;
+}
+
+@::Mods=();
+$::FirstMod=1;
+
+my(@q);
+
+#######################
+#
+# Check users.
+#
+
+out("get objectclass=person ...") if $::Verbose;
+@q=$::LDAP->Query("objectclass=person");
+
+{ my($cusers)={};
+  map($cusers->{$_->{'dn'}->[0]}=$_, @q);
+
+  my($rec,$udn,@pw);
+
+  USER:
+    for my $login (@::ChkUsers)
+    {
+      out("check user $login") if $::Verbose;
+
+      my $U = CISRA::UserData::user($login);
+      if (! defined $U)
+      { warn "$::cmd: $login: no such user in db\n";
+	next USER;
+      }
+      next USER if ! $U->IsPerson();
+
+      $udn=userDn($login,$::LDAP);
+      $rec=user2ldap($::LDAP,$U,$login);
+
+      if (! exists $cusers->{$udn})
+      # emit add data for new record
+      {
+	warn "$::cmd: missing user: $login\n";
+	push(@::Mods,[ $::LDAP->NewRec2Modify($rec,$udn) ]);
+      }
+      else
+      {
+	my($diffadd,$diffdel)=cs::LDAP::diff($cusers->{$udn},$rec,
+					     'uid',
+					     'cn','sn','givenname',
+					     'mail','telephonenumber',
+					     'nscalnotifmechanism'
+					    );
+	if (exists $rec->{'userpassword'}
+	 && ! exists $cusers->{$udn}->{'userpassword'})
+	    { $diffadd->{'userpassword'}=[ $rec->{'userpassword'} ];
+	    }
+
+	my @modlines = $::LDAP->Diff2Modify($udn,$diffadd,$diffdel);
+	if (@modlines)
+	      { warn "$::cmd: update user: $login\n" if $::Verbose;
+		push(@::Mods,[ @modlines ]);
+	      }
+      }
+    }
+
+  out('') if $::Verbose;
+
+##   CALUSER:
+##     for my $dn (sort keys %$cusers)
+##     {
+##       my $cu = $cusers->{$dn};
+##       my @uids = @{$cu->{'uid'}};
+## 
+##       if (@uids != 1)
+##       { warn "$::cmd: dn $dn:\n\tuids=[@uids]\n";
+## 	next CALUSER;
+##       }
+## 
+##       my $uid = $uids[0];
+##       ## warn "uid=".cs::Hier::h2a($uid,1);
+## 
+##       next CALUSER if $uid eq 'calendar'|| $uid eq 'suitespot-admin';
+## 
+##       my $U = CISRA::UserData::user($uid);
+## 
+##       if (! defined $U || ! $U->IsPerson())
+##       { warn "$::cmd: extra user $uid\n";
+## 	push(@::Mods,[ $::LDAP->DelDN2Modify($dn) ]);
+## 	next CALUSER;
+##       }
+## ##      elsif (! $U->Alive())
+## ##      { warn "$::cmd: uid $uid should be dead\n" if $::Verbose;
+## ##	push(@::Mods,[ $::LDAP->DelDN2Modify($dn) ]);
+## ##	next CALUSER;
+## ##      }
+##     }
+
+}
+
+#######################
+#
+# Check groups.
+#
+
+## out("get objectclass=groupOfUniqueNames ...") if $::Verbose;
+## @q=$::LDAP->Query("objectclass=groupOfUniqueNames");
+
+{ ## my($cgrps)={};
+  ## map($cgrps->{$_->{'dn'}->[0]}=$_, @q);
+
+  my($G,$gn,$gdn,$rec,$key,@modlines);
+  my(%grps);
+
+  GROUP:
+    for $gn (@::ChkGroups)
+    {
+      out("check group $gn") if $::Verbose;
+
+      if (! exists $::GDB->{$gn})
+      { warn "$::cmd: $gn: no such group in db\n";
+	next GROUP;
+      }
+
+      $G=$::GDB->{$gn};
+
+      if ($G->Type() eq ALIAS)
+      { ## warn "$::cmd: skipping alias $gn\n";
+	next GROUP;
+      }
+
+      if (! $G->Users())
+      { ## warn "$::cmd: skipping empty group $gn\n";
+	next GROUP;
+      }
+
+      my @ldapRec = $::LDAP->Query("cn=$gn");
+      my $lrec = ( @ldapRec ? $ldapRec[0] : undef);
+
+      $rec=grp2ldap($::LDAP,$G,$gn);
+
+      $gdn=$rec->{'dn'}->[0];
+      $grps{$gdn}=1;
+
+      if (! defined $lrec)
+      # emit add data for new record
+      {
+	warn "$::cmd: missing group: $gn ($gdn)\n";
+	push(@::Mods,[ $::LDAP->NewRec2Modify($rec,$gdn) ]);
+      }
+      else
+      {
+	my($diffadd,$diffdel)=cs::LDAP::diff($lrec,$rec,
+					     'uniquemember',
+					     'description',
+					     'cn');
+	my(@modlines)=$::LDAP->Diff2Modify($gdn,$diffadd,$diffdel);
+	if (@modlines)
+	{ warn "$::cmd: update group: $gn\n" if $::Verbose;
+	  push(@::Mods,[ @modlines ]);
+
+##	  if (defined $lrec)
+##	  { warn "modlines=[".join("\n\t",@modlines)."]\n\n";
+##	    die "lrec=".cs::Hier::h2a($lrec,1)."\n\nrec=".cs::Hier::h2a($rec,1);
+##	  }
+	}
+      }
+    }
+
+  out('') if $::Verbose;
+
+##   XGROUPS:
+##     for $gdn (sort keys %$cgrps)
+##     {
+##       out("extra? $gdn") if $::Verbose;
+##       if (! $grps{$gdn})
+##       {
+## 	warn "$::cmd: extra group: $gdn\n" if $::Verbose;
+## 	push(@::Mods,[ $::LDAP->DelDN2Modify($gdn) ]);
+##       }
+##     }
+
+  out('') if $::Verbose;
+}
+
+if ($::Mode eq LIST)
+	{ my $first=1;
+	  for my $mod (@::Mods)
+		{ if ($first)	{ $first=0; }
+		  else		{ print "\n"; }
+
+		  print @$mod;
+		}
+	}
+elsif ($::Mode eq APPLY)
+	{ if (@::Mods)
+		{ if (! defined $::Password)
+			{ if (-t STDIN)
+				{ system('stty -echo');
+				  print "Changes needed.\n";
+				  print "Admin user: ",$::LDAP->AdminDN(),"\n";
+				  print "Password? ";
+				  IO::Handle::flush(STDOUT);
+				  $::Password=<STDIN>;
+				  system('stty echo');
+				  die "\n" if ! defined $::Password;
+				}
+			  else
+				{
+				  $::Password=<STDIN>;
+				  die "\n" if ! defined $::Password;
+				}
+
+			  chomp $::Password;
+			}
+
+		  $::LDAP->Apply(\@::Mods,$::Password);
+		}
+	}
+else	{ die "$::cmd: unknown mode \"$::Mode\"";
+	}
+
+exit 0;
+
+sub grpDn
+{ my($cn,$grp,$ldap)=@_;
+  "cn=$cn, ".$ldap->BaseDN();
+}
+sub grp2ldap
+{ my($ldap,$grp,$gn)=@_;
+  
+  my $root = $grp->Root();
+  my $cn = $gn;
+  my $dn = grpDn($cn,$grp,$ldap);
+  my $desc = $root->{DEF}->{DESC};
+
+  if ($grp->Type() eq SUBGROUP)
+	{
+	  my($ext)=$grp->{NAME};
+	  substr($ext,$[,length($root->{NAME})+1)='';
+	  $desc.=" - $ext";
+	}
+
+  my($rec)={ 'dn' => [ $dn ],
+	     'objectclass' => [ 'top', 'groupOfUniqueNames' ],
+	     'cn' => [ $cn ],
+	     'description' => [ $desc ],
+	     'uniquemember' => [],
+	   };
+
+#	  if ($dn =~ /^cn=Group for quixel/)
+#		{ warn "rec=".cs::Hier::h2a($rec,1)."\n";
+#		  warn "grp=".cs::Hier::h2a($grp,1)."\n";
+#		  warn "root=".cs::Hier::h2a($root,1)."\n";
+#	  	  exit 0;
+#		}
+
+  my(@u)=::uniq(CISRA::Groups::Users($grp));
+  for (sort @u)
+	{ push(@{$rec->{'uniquemember'}}, userDn($_,$::LDAP));
+	}
+
+  $rec;
+}
+
+sub userUid
+{ my($login)=@_;
+  $login =~ tr/-./__/;
+  $login;
+}
+
+sub userDn
+{ my($login,$ldap)=@_;
+  $login=userUid($login);
+  "uid=$login, ".$ldap->BaseDN();
+}
+
+sub user2ldap
+{ my($ldap,$u,$login)=@_;
+
+  my $cn = $u->{NAME};
+  $cn=$login if ! length $cn;
+  my $uid = userUid($login);
+
+  my($gn,$sn);
+  if ($cn =~ /(.*\S)\s+(\S+)/)
+	{ $gn=$1; $sn=$2;
+	}
+  else	{ $gn=$cn; $sn=$cn;
+	}
+
+  my $dn = userDn($login,$ldap);
+
+  my($rec)={ 'dn' => [ $dn ],
+	     'objectclass' => [ 'top',
+				'person',
+				'organizationalPerson',
+				'inetOrgPerson',
+			      ],
+	     'cn' => [ $cn ],
+	     'sn' => [ $sn ],
+	     'givenname' => [ $gn ],
+	     'mail' => "$login\@$CISRA::SiteName",
+	     'telephonenumber' => $u->{EXT},
+	     'uid' => [ $uid ],
+	     'nscalnotifmechanism' => 1,
+	   };
+
+  $rec->{'telephonenumber'}=2000 if ! length $rec->{'telephonenumber'};
+
+  my(@pw)=getpwnam($login);
+  if (@pw && length $pw[1] == 13)
+	{ $rec->{'userpassword'}="{CRYPT}$pw[1]";
+	}
+
+  $rec;
+}
