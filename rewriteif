@@ -10,13 +10,14 @@ file=$1; shift
 [ -f "$file" ] || { echo "$0: $file: not a regular file" >&2; exit 1; }
 
 tmp=/tmp/rwi$$
+trap "rm -f "$tmpf"' 0 1 2 15
+
 cat >"$tmp" || exit 1
 
 cmp -s "$tmp" "$file" && exit 0
 
 if cat "$tmp" >"$file"
 then
-    rm -f "$tmp"
     exit 0
 else
     echo "$0: rewrite of $file fails, probably damaged" >&2
