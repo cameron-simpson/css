@@ -1,8 +1,9 @@
 #!/bin/sh
-#
+
+: ${TMPDIR:=/tmp}
 
 cmd=`basename "$0"`
-tmp=/tmp/$cmd.$$
+tmp=$TMPDIR/$cmd.$$
 
 xrdb -query > $tmp
 ${EDITOR-vi} $tmp
