@@ -1,2 +1,3 @@
 #!/bin/sh
-exec /opt/firefox-1.0PR-i686-linux-gtk2+xft/firefox ${1+"$@"}
+exec /opt/firefox-1.0pr1.1-gtk2+xft/firefox ${1+"$@"}
+##exec /opt/firefox-1.0PR-i686-linux-gtk2+xft/firefox ${1+"$@"}
