@@ -13,14 +13,17 @@ cameron=
 
 msg=$CVSEDIT_MSG
 dodl=$cameron
+dodiff=1
 
 badopts=
 
 while :
 do  case $1 in
 	-m)	msg=$2; shift ;;
-	--no-dl)dodl= ;;
+	--diff)	dodiff=1 ;;
+	--no-diff) dodiff= ;;
 	--dl)	dodl=1 ;;
+	--no-dl) dodl= ;;
 	-?*)	echo "$cmd: unrecognised option: $1" >&2; badopts=1 ;;
 	--)	shift; break ;;
 	*)	break ;;
@@ -43,6 +46,8 @@ then
       exit 1
 fi
 
+ifcvs "$file" || exit $?
+
 umask 2
 
 dir=`dirname "$file"`
@@ -53,17 +58,23 @@ editcmd=$*
 
 ( cd "$dir" || exit 1
   cvs update "$base" || exit $?
+  cvs diff "$base" || { echo "Uncommited changes already exist in $base." >&2
+			echo "Please commit them before proceeding." >&2
+			exit 1
+		      }
 
   [ ! -d CVS/Base ] || cvs edit "$base" || exit $?
   chmod +w "$base"
 ) || exit 1
 
-"$@"
+"$@" "$file"
 editxit=$?
 
-( cd "$dir" || exit 1
-  cvs diff "$base"
-)
+[ $dodiff ] \
+&& ( cd "$dir" || exit 1
+     cvs diff "$base"
+   )
+
 [ $editxit = 0 ] || ask "$* failed - really commit the file" || exit 1
 
 [ -n "$msg" ] || { necho "Log message? "
