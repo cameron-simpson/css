@@ -66,12 +66,12 @@ sub portNum($;$)
   if (! defined $proto)	{ $proto=TCP; }
   else			{ $proto=uc($proto); }
 
-  return $portspec+0 if $portspec =~ /^\d+/;
+  return $portspec+0 if $portspec =~ /^\d+$/;
 
   $portspec=uc($portspec);
   if (exists $cs::Net::_ports{$proto}
    && exists $cs::Net::_ports{$proto}->{$portspec})
-  { return $$cs::Net::_ports{$proto}->{$portspec};
+  { return $cs::Net::_ports{$proto}->{$portspec};
   }
 
   my($servnam,$aliases,$port,$protonum)=getservbyname(lc($portspec),
