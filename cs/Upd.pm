@@ -162,7 +162,8 @@ sub new($;$$)
 
   if (! defined $cs::Upd::_U{$FILE})
   { $cs::Upd::_U{$FILE}
-   =bless { FILE	=> $FILE,
+   =bless { TYPE	=> FILE,
+	    FILE	=> $FILE,
 	    STATE	=> '',
 	    ERRSTATE	=> '',
 	    TPUT	=> 0,
