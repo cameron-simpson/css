@@ -1,0 +1,112 @@
+## :include	dir2html
+
+JAVADIR	= $(ETCDIR)/www/java/classes
+java	= $(localjava) $(subjava)
+localjava= $('*.java' G)
+subjava	= $('cs/*.java' G?)
+classes	= $((java P)).class
+subclasses=$((subjava P)).class
+html	= $('*.html' G)
+
+htmandir = $(HOME)/public/man
+pmsets	= cs MSQ CISRA
+pmset(set) = $('$(set)/*.pm' EG?) \
+	     $('$(set)/*/*.pm' EG?) \
+	     $('$(set)/*/*/*.pm' EG?)
+pmsetmans(set) = $(MANDIR)/$(set)/man3/$(('$(pmset($(set)))' EP s:|/|::|)).3
+pmsethtml(set) = $(htmandir)/$(('$(pmset($(set)))' EP s:|/|::|)).3.html
+pmmans = $('$$(pmsetmans($((pmsets))))' EE)
+pmhtml = $('$$(pmsethtml($((pmsets))))' EE)
+pmFromMan(manf) = $(manf FP s:|::|/|).pm
+pmFromHtml(html) = $(html FPP s:|::|/|).pm
+
+subdirs = $('*/.' GD)
+allscripts = $('*' G !/\./ - subdirs - "README.txt" + "synonyms")
+
+scriptmandir = $(MANDIR)/cs/man1
+scriptmans = $(scriptmandir)/$((allscripts)).1
+scriptfromman(manf) = $(manf FP)
+
+default: squid_redirect README.txt _submakes _tarballs _man
+
+_test:
+	echo $(pmmans)
+
+_man: _pmmans _scriptmans
+
+_pmmans: $(pmmans)
+
+$(pmmans):	$(pmFromMan($@))
+	:make $(@D)/.
+	@if grep '^=head1 NAME' <$? >/dev/null \
+	then \
+	    echo "pod2man $?" \
+	    pod2man --center="Cameron Simpson's Perl Modules" $? >$@ \
+	    chmod 644 $@ \
+	    htman=$(htmandir)/$(@F).html \
+	    echo "pod2html $?" \
+	    pod2html --title="Cameron Simpson's Perl Modules: $?" $? >$$htman \
+	    chmod 644 $$htman \
+	else \
+	    : \
+	fi
+
+_scriptmans:
+	egrep -l '^(# *)?=head1 NAME' $(allscripts) \\
+	| while read script \
+	  do  $(MAKE) "$(scriptmandir)/$$script.1" \
+	  done
+
+$(scriptmandir)/%.1: %
+	:make $(@D)/.
+	@htman=$(htmandir)/$(@F).html \
+	 case "`sed 1q <$?`" in \
+	    '#!/usr/bin/perl'*) \
+		grep '^=head1 NAME' <$? >/dev/null || exit 0 \
+		echo "pod2man $?" \
+		pod2man --section=1cs --center="Cameron Simpson's Scripts" $? >$@ \
+		echo "pod2html $?" \
+		pod2html --title="Cameron Simpson's Scripts: $?" $? >$$htman \
+		;; \
+	    *) \
+		grep '^# *=head1 NAME' <$? >/dev/null || exit 0 \
+		echo "unhashpod $? -> $@" \
+		tmp=/tmp/$(@F).$$ \
+		unhashpod <$? >$$tmp \
+		pod2man --section=1cs --center="Cameron Simpson's Scripts" $$tmp >$@ \
+		pod2html --title="Cameron Simpson's Scripts: $?" $$tmp >$$htman \
+		rm $$tmp \
+		;; \
+	 esac \
+	 chmod 644 $@ $$htman
+
+README.txt: $(allscripts)
+	mkscriptndx `ls -d $< | sort` >$@
+
+noads	= $(HOME)/rc/adzap/patterns
+
+squid_redirect: $(noads)
+	cd $(?D) || exit 1 \
+	exec $(MAKE)
+
+%.class: %.java %.class-prereqs : $(("%.class-prereqs" G?<P)).class
+	:make $(("$@-prereqs" E<P)).class
+	$(JAVAC) $(@P).java
+
+%.class-prereqs: %.java
+	javaprereqs $(@P).java >$@
+
+_tarballs: ../public/scripts.tar.gz ../public/cs.tar.gz
+
+../public/scripts.tar.gz: $(allscripts)
+../public/cs.tar.gz: $(pmset(cs))
+	:make _man
+	gnutar cf - $(pmset(cs)) -C $(MANDIR)/cs man3/$((pmsetmans(cs) G?F)) | gzip -v -9 >$@
+	chmod 644 $@
+
+../public/scripts.tar.gz: $(allscripts)
+	cd .. || exit 1 \
+	tar cvf - $(.F)/$((allscripts)) \\
+			$(.F)/synonyms $(.F)/stubs $(.F)/cs $(.F)/cgi-bin \\
+		| gzip -v -9 >$./$@
+	chmod 644 $@
