@@ -32,13 +32,34 @@ done
                             exit 2
 			  }
 
-set -x
 LIB=$perl_local
 INSTALLMAN1DIR=$perl_local/man/man1
 INSTALLMAN3DIR=$perl_local/man/man3
 PERL5LIB=$LIB:$PERL5LIB
 export LIB INSTALLMAN1DIR INSTALLMAN3DIR PERL5LIB
 
-which perl || exit 1
-perl -v
-exec perl -MCPAN -e shell
+exec screen -S "cpan-local-$ARCH-$HOST" \
+    logscript -d "${VARLOG:-$HOME/var/log}/build" "cpan-local-$ARCH-$HOST" \
+    sh -c '
+
+	    which perl || exit 1
+	    perl -v
+
+	    echo
+	    echo Now paste this:
+	    echo
+	    for conf in make_arg make_install_arg makepl_arg
+	    do
+	      echo "o conf $conf \"PREFIX=$perl_local \\
+		      LIB=$perl_local \\
+		      INSTALLMAN1DIR=$perl_local/man/man1 \\
+		      INSTALLMAN3DIR=$perl_local/man/man3\""
+	    done
+	    echo "o conf commit"
+	    echo
+	    echo "at the prompt before proceeding."
+	    echo
+
+	    set -x
+	    umask 2
+	    exec perl -MCPAN -e shell'
