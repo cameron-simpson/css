@@ -1,6 +1,21 @@
 #!/bin/sh
+#
+# Lowercase a bunch of pathnames.
+#	- Cameron Simpson <cs@zip.com.au>
+#
 
-exec lwrename2 \
+rnopts=
+while :
+do
+  case $1 in
+    --)		shift; break ;;
+    -?*)	rnopts="$rnopts $1" ;;
+    *)		break ;;
+  esac
+  shift
+done
+
+exec lwrename2 $rnopts -- \
 	'if (m:[^/]+$:)
 	 { $lhs=$`; $rhs=$&;
 	   $rhs =~ s/\%([0-9a-f][0-9a-f])/chr(hex($1))/ieg;
