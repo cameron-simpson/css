@@ -5,6 +5,7 @@ cd
 . $HOME/rc/x11/xenv.sh
 
 for fvbin in \
+	/opt/fvwm-2.5.4/bin \
 	/opt/fvwm-2.5.4cvs/bin \
 	/opt/fvwm-2.5.3/bin \
 	/opt/fvwm-2.5.1/bin \
@@ -24,9 +25,8 @@ done
 PATH=$fvbin:$PATH
 export PATH
 
-( set -x
-  exec "$fvwm" -cmd "PipeRead fvwmrc" ${1+"$@"}
-) >$HOME/var/log/fv.out 2>$HOME/var/log/fv.err
+exec >>$HOME/var/log/fv.out 2>$HOME/var/log/fv.err
+exec "$fvwm" -cmd "PipeRead fvwmrc" ${1+"$@"}
 
 ##for f in "$FVWMEVLOG" "$FVWMCMDLOG"
 ##do  >"$f"; rm -f "$f"
