@@ -25,6 +25,38 @@ case " $BUGSYSTEMS " in
   *' dlog '*)	dlog "$logmsg" ;;
 esac
 case " $BUGSYSTEMS " in
+  *' mailto:'*)
+		echo "$BUGSYSTEMS" \
+		| tr ' ' '\012' \
+		| sed '/^mailto:/!d
+		       s/^mailto://
+		       s/?/ /' \
+		| \
+		{
+		  # ensure no spurious envvars
+		  params=`env | sed -n 's/^\(PARAM_[A-Za-z0-9_]*\)=.*/\1/p'`
+		  eval unset $params	# no quotes to turn newlines into spaces
+
+		  while read addr args
+		  do
+		    hdrs="To: $addr"
+		    subj=$logmsg
+
+		    ( qsvals=`query_string2sh "$args"`
+		      eval "$qsvals"
+		      [ -n "$PARAM_subject" ] && subj="$subj: $PARAM_subject"
+
+		      echo "To: $addr"
+		      echo "Subject: $subj"
+		      echo "X-Buglog: `date`"
+		      echo
+		      cat "$tmpf"
+		    ) | sendmail -oi "$addr"
+		  done
+		}
+		;;
+esac
+case " $BUGSYSTEMS " in
   *' ddts '*)	ddtsids=`echo "$logmsg" | ddtsids`
 		[ -n "$ddtsids" ] && mailif -s "$logmsg" $ddtsids < "$tmpf"
 		;;
