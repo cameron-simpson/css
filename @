@@ -28,12 +28,13 @@ done
 at_dflt=
 at_target=
 
+# no args - try for default list of targets
 if [ $# = 0 ]
 then
   at_default=
   eval `winclause "$HOME/rc/@" "$HOST@$SYSTEMID" | sed -n 's/^default=/at_&/p'`
   if [ -n "$at_default" ]
-  then set $at_default
+  then set -- $at_default
   else echo "$0: no default host list for $HOST@$SYSTEMID" >&2
 	exit 1
   fi
