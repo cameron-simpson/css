@@ -7,18 +7,22 @@
 # Recode to be more generic.	- cameron, 18jul94
 #
 
+echo "$0 is OBSOLETE; port to pipecmd script instead!" >&2
+
 cmd=`basename "$0"`
 usage="Usage:	[PIPECMD=pipecmd] $cmd [-n] [-v pipename] [-c pipecmd] \\
 			[command [commandargs]]
 		Establish a named pipe, attach pipecmd to it, run command
 		with \$pipename set to the path of the named pipe.
 
-		-n		No command, echo name of pipe to stdout.
+		-c pipecmd	Command to attach to pipe output side
+				Default from \$PIPECMD: $PIPECMD
 		-v pipename	Specify name of variable to point at pipe
 				instead of \$pipename.
-		-c pipecmd	Command to attach to pipe
-				(default from \$PIPECMD).
-		command		Command to run with \$pipename."
+		-n		No command for pipe input side,
+				instead echo name of pipe to stdout.
+		command		Command to run with \$pipename,
+				to write to pipe input side."
 
 badopts=
 pipevar=
@@ -51,8 +55,8 @@ esac
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
-pipename=/tmp/pipe$$
-mknod $pipename p || exit $?
+pipename=${TMPDIR:-/tmp}/pipe$$
+mknod "$pipename" p || exit $?
 export pipename
 # ls -ld $pipename >&2
 
