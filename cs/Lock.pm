@@ -72,7 +72,7 @@ the I<key> supplied.
 
 sub keypath($)
 { local($_)=@_;
-  s/_/__/g;
+  ##s/_/__/g; # to make au.com.zip.cs.Lockdir a bit simpler
   s://+:/:g;
   s:/$::;
   s:^/::;
@@ -149,6 +149,8 @@ sub new($$;$$)
   my $firstwait = 0;
   my $path = keypath($key);
 
+  my $delay = $cs::Lock::Delay;
+
   do {
 	$this=new($class,$key,1);
 	if (defined $this)
@@ -173,9 +175,9 @@ sub new($$;$$)
 	  }
 	}
 
-	sleep($cs::Lock::Delay); $slept+=$cs::Lock::Delay;
-	if ($cs::Lock::Delay < $cs::Lock::Dmax)
-	{ $cs::Lock::Delay+=$cs::Lock::Dincr; }
+	sleep($delay); $slept+=$delay;
+	if ($delay < $cs::Lock::Dmax)
+	{ $delay=$cs::Lock::Dincr; }
 	$waits++;
      }
   while(1);
