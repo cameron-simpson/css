@@ -1,0 +1,6 @@
+#!/bin/sh
+for mhdir
+do  for f in "$mhdir/"[1-9]*
+    do  [ -s "$f" ] && xrefmailitem <"$f"
+    done
+done
