@@ -36,7 +36,7 @@ if [ $# = 0 ]
 then
   if [ -t 0 ]
   then
-      [ -n "$DISPLAY" ] && { set x `xunclip`; shift; }
+      [ -n "$DISPLAY" ] && { set x `cutbuffer`; shift; }
   else
       set x `cat`; shift
   fi
