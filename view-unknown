@@ -6,47 +6,75 @@
 #
 
 cmd=$0
-usage="Usage: $cmd [-cC] [file]
-	-c	Use \"copiousoutput\" entries (default).
-	-C	Don't use \"copiousoutput\" entries."
+usage="Usage: $cmd [-cC] [-t mimetype] {file|-} [[!]attribute...]
+	-t mimetype Supply type."
 
-APPHELPER_SAVEMODE=no
-export APPHELPER_SAVEMODE
+TMPDIR=${TMPDIR:=/tmp}
 
-copious=1
-copflag=
-[ "x$1" = x-c ] && { copflag=-c copious=1; shift; }
-[ "x$1" = x-C ] && { copflag=-C copious=; shift; }
+mtype=
 
-tmpf=${TMPDIR:-/tmp}/vu$$
-trap '[ -f "$tmpf" ] && rm "$tmpf"' 0 1 15
+badopts=
+while :
+do
+  case $1 in
+    -t) mtype=$2; shift ;;
+    --)	shift; break ;;
+    -?*)echo "$cmd: unrecognised option: $1" >&2; badopts=1 ;;
+    *)	break ;;
+  esac
+  shift
+done
 
 if [ $# = 0 ]
 then
-    [ -t 0 ] && { echo "$cmd: won't read stdin from a terminal" >&2
-		  exit 1
-		}
-    cat >"$tmpf" || exit 1
-    file=$tmpf
+  echo "$cmd: missing file" >&2
+  badopts=1
 else
-    file=$1; shift
-    [ $# = 0 ] || { echo "$cmd: extra arguments: $*" >&2
-		    echo "$usage" >&2
-		    exit 2
-		  }
-    case "$file" in
-      http://*) wcat "$file" >"$tmpf"; file=$tmpf ;;
-      /*) ;;
-      *) file=./$file ;;
-    esac
+  file=$1; shift
 fi
 
-# no idea? run plain file and bail out
-mtype=`file2mime "$file"` || { ls -ld "$file"
-			       file "$file"
-			       exit 0
-			     }
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
 
+# fix up the file name
+case "$file" in
+  http://*)
+      # URL: grab it and pipe
+      wcat "$file" | "$0" -t "$mtype" - ${1+"$@"}
+      exit $?
+      ;;
+  -)  file=/dev/fd/0 ;;
+  /*) ;;
+  *)  file=./$file ;;
+esac
+
+exec 3<"$file"
+[ -t 3 ] && { echo "$cmd: won't read from a terminal" >&2
+	      exit 1
+	    }
+
+if [ -z "$mtype" ]
+then
+  # if not regular file sniff as a pipeline
+  if [ ! -f "$file" ]
+  then
+    # sniff first 1k of file
+    hdr=$TMPDIR/blk$$
+    dd bs=1024 count=1 <&3 >$hdr 2>/dev/null || exit 1
+    mtype=`file2mime "$hdr"` || mtype=application/x-dont-parse
+
+    # feed block and rest of file into ourself now we know the type
+    ( rm "$hdr"
+      cat
+      exec cat <&3
+    ) <"$hdr" | "$0" -t "$mtype" - ${1+"$@"}
+    exit $?
+  fi
+
+  # regular file - sniff directly
+  mtype=`file2mime "$file"` || mtype=application/x-dont-parse
+fi
+
+# ok, we have a type and the file on fd 3 (remember, may be a pipe)
 case "$mtype" in
     text/plain)
 	case "$file" in
@@ -55,16 +83,18 @@ case "$mtype" in
 	;;
 esac
 
-if [ $copious ]
-then  mcflag=-c
-else  mcflag=+c
-fi
-
 # no action? bail out
-action=`mailcap $mcflag -s "$file" "$mtype"`
-[ -n "$action" ] || [ $copious ] || action=`mailcap -c -s "$file" "$mtype"`
+for gui in `[ -n "$DISPLAY" ] && echo gui` !gui
+do action=`mailcap -s "$file" "$mtype" $gui ${1+"$@"}` && break
+done
 
-# empty action in mailcap
-[ -z "$action" ] && { echo "$mtype"; file "$file"; exit 0; }
+[ -n "$action" ] && { eval "$action"; exit $?; }
+
+action=`mailcap -s "$file" "$mtype" decode`
+[ -n "$action" ] && { eval "$action" | "$0" - ${1+"$@"}; exit $?; }
+echo "$mtype"
+file "$file"
+eval "$action
+
 
 eval "$action"
