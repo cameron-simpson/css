@@ -1,0 +1,11 @@
+#!/bin/sh
+#
+# Read my desktop names and incant them back at FVWM.
+#	- Cameron Simpson <cs@zip.com.au> 24mar2003
+#
+
+set -x
+desktop -a \
+| while read desk name
+  do  desktop $desk name "`desktop $desk name`"
+  done
