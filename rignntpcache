@@ -1,0 +1,10 @@
+#!/bin/sh
+
+[ "x$HOST" = xzapff ] || { echo "$0: not on zapff, bailing" >&2; exit 1; }
+if locked nntpcached
+then
+    echo "$0: lock for nntpcached already taken, bailing" >&2
+    exit 1
+fi
+
+acon lock nntpcached nntpcached -n -c $HOME/rc/nntpcache/etc/nntpcache.config
