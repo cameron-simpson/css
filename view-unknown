@@ -6,7 +6,7 @@
 #
 
 cmd=$0
-usage="Usage: $cmd [-cC] [-t mimetype] {file|-} [[!]attribute...]
+usage="Usage: $cmd [-t mimetype] {file|-} [[!]attribute...]
 	-t mimetype Supply type."
 
 TMPDIR=${TMPDIR:=/tmp}
@@ -37,7 +37,9 @@ fi
 
 # fix up the file name
 case "$file" in
-  http://*)
+  http://* | \
+  https://* | \
+  ftp://* )
       # URL: grab it and pipe
       wcat "$file" | "$0" -t "$mtype" - ${1+"$@"}
       exit $?
@@ -91,10 +93,6 @@ done
 [ -n "$action" ] && { eval "$action"; exit $?; }
 
 action=`mailcap -s "$file" "$mtype" decode`
-[ -n "$action" ] && { eval "$action" | "$0" - ${1+"$@"}; exit $?; }
+[ -n "$action" ] && { eval "set -vx; $action" | "$0" - ${1+"$@"}; exit $?; }
 echo "$mtype"
 file "$file"
-eval "$action
-
-
-eval "$action"
