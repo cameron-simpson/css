@@ -6,7 +6,7 @@
 
 server=mail.zipworld.com.au
 
-eval `fetchmailclause -f $HOME/rc/mail/fetchmail "$server" | sed 's/^\([^ ][^ ]*\) /fm_\1=/'`
+eval `fetchmailclause -f $HOME/private/fetchmailrc "$server" | sed 's/^\([^ ][^ ]*\) /fm_\1=/'`
 
 tunnel=
 case "$server" in
