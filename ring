@@ -155,7 +155,7 @@ sub gpgwith($)
     return gpgwith($phrase);
   }
 
-  return "gpg --passphrase-fd $tmpfd";
+  return "gpg --batch -q --passphrase-fd $tmpfd";
 }
 
 sub phonefile
