@@ -10,6 +10,7 @@ usage="Usage: $cmd file [text]"
 usenote=
 post=
 dodiff=
+cvsedit=
 
 badopts=
 
@@ -25,6 +26,7 @@ case $cmd in
     raul)	file=$HOME/private/contracts/raul ;;
     noads)	file=$HOME/public/adzap/rc/patterns
 		post='cd $HOME/public/adzap && myke'
+		cvsedit="cvsedit $file"
 		dodiff=1
 		;;
     *)		if [ -f $HOME/rc/keys/$cmd.pgp ]
@@ -68,7 +70,7 @@ then
     fi
 else
     [ $usenote ] && [ -z "$usepgp" ] && note "$file" ""
-    lock "$file" edit "$file"
+    lock "$file" $cvsedit edit "$file"
     [ $dodiff ] && { gnudiff -u "$orig" "$file"; rm "$orig"; }
 fi
 
