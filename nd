@@ -30,7 +30,7 @@ fi
 
 desknum=`desktop "$deskname"`	|| exit 1
 set -x
-fvwmcmd "SwitchToDesk 0 $desknum" &
+fvwmcmd "SwitchToDesk 0 $desknum" "DesktopName $desknum '$deskname'" &
 ( lastdesk=`lastvalue "desktop-$HOST"`
   if [ "x$lastdesk" != "x$desknum" ]
   then
