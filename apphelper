@@ -9,7 +9,7 @@
 : ${SAVEDIR:=$HOME/dl}
 : ${APPHELPER_SAVEMODE:=auto}
 : ${APPHELPER_REMAPFILE:=$HOME/rc/remap}
-: ${APPHELPER_SAVEMAP:="remap \"\$APPHELPER_REMAPFILE\" | tr '[A-Z]' '[a-z]'"}
+: ${APPHELPER_SAVEMAP:="remap \"\$APPHELPER_REMAPFILE\" | tr '[A-Z_]' '[a-z-]'"}
 
 cmd=`basename "$0"`
 
