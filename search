@@ -42,6 +42,7 @@ case "$cmd" in
     fst)	target=findsametext ;;
     yp)		target=yellowpages ;;
     mcrawl)	target=metacrawler ;;
+    w3val)	target=w3c_validate ;;
     imdb-actor)	target=movieactors ;;
     imdb-title)	target=movietitles ;;
     imdb-character-male) target=moviecharmale ;;
