@@ -3,11 +3,13 @@
 # Usage: fixnewsrc < old-newsrc > new-newsrc
 #
 
+: ${TMPDIR:=/tmp}
+
 NNTPSERVER=${NNTPSERVER-`cat /usr/local/lib/news/nntp_host`}
 export NNTPSERVER
 
-tmp=/tmp/newsrc.$$
-perlscript=/tmp/perl.$$
+tmp=$TMPDIR/newsrc.$$
+perlscript=$TMPDIR/perl.$$
 
 # nntp <<'X' |
 # list
