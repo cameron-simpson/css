@@ -1,5 +1,7 @@
 #!/bin/sh
 #
+# Freshmeat release: 2004-09-21
+#
 # =head1 NAME
 #
 # histbackup - backup a directory using an incremental technique
@@ -23,7 +25,8 @@
 # In this way each backup directory is a full copy of the source directory
 # but the disc space cost is that of an incremental backup.
 # Because it uses rsync,
-# it is possibly to efficient backup remote directories in the manner.
+# it is possible to efficient backup remote directories in this manner.
+# The companion script I<histbackup-prune> keeps the growth under control.
 #
 # =head1 SETUP AND USE
 #
