@@ -35,7 +35,7 @@ moons='moon
        triton nereid
        charon'
 
-cmd=`basename "$0"`
+cmd=`basename "$0"` || cmd=xpl
 usage="Usage: $cmd [xplanet-options...] [config=value...]
 	xplanet-options	Passed to xplanet.
 	config=value	Config options as for an xplanet config file.
@@ -53,6 +53,10 @@ winmode=
 dx= dy=
 xplopts=
 xplclauses=default
+mkimage=
+label_string=
+body=
+origin=
 
 >>"$tmpconfig"
 [ -s "$config" ] && cat "$config" >>"$tmpconfig"
@@ -105,6 +109,22 @@ findimindir()	# imagebase dirs...
     done
   done
   return 1
+}
+
+pickbody()
+{
+  _pickbody_from=$1; shift
+  case $_pickbody_from in
+    random)		_pickbody_from="$stars $planets $moons" ;;
+    major)		_pickbody_from="$stars $planets" ;;
+    minor)		_pickbody_from=$moons ;;
+    planet|planets)	_pickbody_from=$planets ;;
+    moon|moons)		_pickbody_from=$moons ;;
+    star|stars)		_pickbody_from=$stars ;;
+  esac
+  for _pickbody in $_pickbody_from
+  do  echo "$_pickbody"
+  done | pickn 1 $*
 }
 
 # =head1 OPTIONS
@@ -230,6 +250,22 @@ do
 		xplmode=
 		shift
 		;;
+
+    # =item B<-jpg>|B<-png>
+    #
+    # Create a JPEG or PNG of the view and print its pathname on standard output.
+    #
+    -jpg)	mkimage=$TMPDIR/$cmd$$-snap.jpg
+		xplopts="$xplopts -num_times 1 -output "`shqstr "$mkimage"`
+		winmode=1
+		xplmode=
+		;;
+    -png)	mkimage=$TMPDIR/$cmd$$-snap.png
+		xplopts="$xplopts -num_times 1 -output "`shqstr "$mkimage"`
+		winmode=1
+		xplmode=
+		;;
+
     # =item B<-transpng> I<pathname>
     #
     # Passed to I<xplanet>.
@@ -305,32 +341,24 @@ do
     # Also see the B<-clause> option above.
     #
     -target|-body|-origin)
+		optname=`expr "x$1" : 'x-\(.*\)'`
 		case $2 in
 		  -*)	name=`expr "x$2" : 'x-\(.*\)'` namepfx=- ;;
 		  *)	name=$2 namepfx= ;;
 		esac
-		case $name in
-		  random | random\ *)
-		    sfx=`expr "$name" : '[^ ][^ ]* *\(.*\)'`
-		    xplclauses=`
-		      for body in $stars $planets $moons
-		      do echo "$body"
-		      done | pickn 1 $sfx
-		      `
-		    ;;
-		  major)
-		    sfx=`expr "$name" : '[^ ][^ ]* *\(.*\)'`
-		    xplclauses=`
-		      for body in $stars $planets
-		      do echo "$body"
-		      done | pickn 1 $sfx
-		      `
-		    ;;
-		  *)
-		    xplclauses=$name
-		    ;;
-		esac
+		xplclauses=`pickbody $name`
+		echo "$optname=$xplclauses" >&2
+		eval "$optname=\$xplclauses"
 		xplopts="$xplopts "`shqstr "$1" "$namepfx$xplclauses"`
+		shift
+		;;
+    # =item B<-label_string> I<string>
+    #
+    # Passed to I<xplanet>.
+    # If not supplied, "I<body> from I<origin>" is used.
+    #
+    -label_string)
+		label_string=$2
 		shift
 		;;
     # =item B<-searchdir> I<dirpath>
@@ -374,6 +402,8 @@ done
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
+exec 3>&1 1>&2
+
 if [ -n "$bgim" ]
 then
   if [ -z "$dx" ]
@@ -387,8 +417,11 @@ then
   && lastvalue xplanetbg "$bgim"
 fi
 
-cat $tmpconfig
-eval "(set -x; exec xplanet -config \"\$tmpconfig\" $xplmode $xplopts)"
+##cat $tmpconfig >&2
+[ -n "$label_string" ] || { label_string='%t'; [ -n "$origin" ] && label_string="$label_string from %o"; }
+eval "(set -x; exec xplanet -config \"\$tmpconfig\" -label_string \"\$label_string\" $xplmode $xplopts)"
+
+[ -n "$mkimage" ] && echo "$mkimage" >&3
 
 exit $?
 
