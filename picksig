@@ -1,0 +1,118 @@
+#!/usr/bin/perl
+#
+# Print a random signature.
+# The file has the format
+#	-- [keywords]
+#	sig, may be multiple lines
+#
+# - Cameron Simpson, March 1993
+#
+
+($cmd=$0) =~ s:.*/::;
+$usage="Usage: $cmd [-{a|u}] [-g good|/pattern/] [files...]
+	-a	Print all entries in files.
+	-u	Sort all entries, emit unique list.
+	-g good	Only consider entries satisfying Perl code 'good'.
+	/pattern/ Only consider entries containing pattern.
+";
+
+$aflag=0;
+$uflag=0;
+$GOODSIG='length';
+
+if ($ARGV[0] eq '-a')		{ $aflag=1; shift; }
+elsif ($ARGV[0] eq '-u')	{ $uflag=1; shift; }
+
+if ($ARGV[0] eq '-g')		{ shift; $GOODSIG=shift; }
+elsif ($ARGV[0] =~ m;^/;)
+				{ if ( ! -f $ARGV[0] )
+				  { $GOODSIG=shift(@ARGV);
+				    $GOODSIG.='/' unless $GOODSIG =~ m:/$:;
+				    $GOODSIG.='i';
+				  }
+				}
+
+# how to stash a sig
+eval '
+    sub sig
+    { local($_)=@_;
+
+      push(@sigs,$_) if '.$GOODSIG.';
+    }';
+
+die $@ if $@;
+
+if (! @ARGV)	{ if (!length($ENV{SIGS}))
+			{ $ENV{SIGS}=$ENV{HOME}.'/.sigs';
+			}
+
+		  @ARGV=$ENV{SIGS};
+		}
+
+@sigs=();
+SIGFILE:
+for (@ARGV)
+{ if ($_ eq '-')
+  { $FILE='STDIN'; }
+  elsif (!open(SIG,"< $_\0"))
+  { print STDERR "$cmd: can't open $_: $!\n";
+    next SIGFILE;
+  }
+  else
+  { $FILE='SIG';
+  }
+
+  $sig='';
+  while (<$FILE>)
+  { if (/^--/)
+    { &sig($sig);
+      $sig=$_;
+    }
+    else
+    { $sig.=$_;
+    }
+  }
+
+  if ($FILE ne 'STDIN')
+	{ close($FILE);
+	}
+
+  &sig($sig);
+  $sig='';
+}
+
+if ($aflag)
+{ for (@sigs)
+	{ &psig($_);
+	}
+}
+elsif ($uflag)
+{ local(%sigs,$sig,$_);
+
+  for $sig (@sigs)
+  { $_=$sig;
+    s/^--[^\n]*\n//;
+    s/\W+/ /g;
+    s/\s+/ /g;
+    s/^ //;
+    s/ $//;
+    tr/A-Z/a-z/;
+    $sigs{$_}=$sig;
+  }
+
+  for (sort keys %sigs)
+  { &psig($sigs{$_});
+  }
+}
+else
+{ srand(time^(40503*$$));
+  $ndx=int(rand($#sigs-1));
+  &psig($sigs[$ndx]);
+}
+
+sub psig
+{ local($_)=shift;
+
+  s/^--[^\n]*\n+// unless $uflag || $aflag;
+  print;
+}
