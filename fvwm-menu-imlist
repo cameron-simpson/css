@@ -15,7 +15,7 @@ thsize=48x48
 
 ##alert "DFLT=[$FVWM_MENU_IMLIST_OP]"
 ##env|grep FVWM >>$HOME/var/log/alert
-imop=${FVWM_MENU_IMLIST_OP:-"Exec xv"}
+imop=${FVWM_MENU_IMLIST_OP:-"xv"}
 
 filelist=
 inter=
@@ -119,13 +119,13 @@ do
 	  *)  continue ;;
       esac
 
-      ##echo "f=[$f] d=[$d]" >&2
-      echo "$thfmt $f" >&3	# to the thumb maker ...
-
       thumb=$thdir/$fbase.$thfmt
-
-      ##alert "\"%$d/$thumb%$tag\" Exec $imop $f"
-      echo  "\"%$d/$thumb%$tag\" Exec $imop $f"
+      fthumb=$d/$thumb
+      if [ -s $fthumb ]
+      then echo  "\"%$fthumb%$tag\" Exec $imop $f"
+      else echo  "\"$tag\" Exec $imop $f"
+           echo "$thfmt $f" >&3	# to the thumb maker ...
+      fi
     fi
 done
 
@@ -147,4 +147,4 @@ exec 1>&2
     )
   done
 ) &
-renice +10 -p $!
+renice +10 -p $! >/dev/null
