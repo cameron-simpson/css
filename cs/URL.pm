@@ -567,14 +567,16 @@ sub MatchesCookie($$;$)
   (! defined $when || $when <= $C->{EXPIRES});
 }
 
-=item Get()
+=item Get(I<follow>)
 
 Fetch a URL and return a B<cs::MIME> object.
+If the optional flag I<follow> is set,
+act on B<Redirect> responses etc.
 
 =cut
 
-sub Get($)
-{ my($this)=@_;
+sub Get($$)
+{ my($this,$follow)=@_;
 
   die "UNIMPLEMENTED";
 }
