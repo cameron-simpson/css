@@ -1,7 +1,11 @@
 #!/bin/sh
 
+dflt=
+[ "x$1" = "x-y" ] && { dflt=Y; shift; }
+
 necho "$* (y/n)? "
 read ans
+[ -n "$ans" ] || ans=$dflt
 case "$ans" in
 	[Yy]*)	exit 0 ;;
 	*)	exit 1 ;;
