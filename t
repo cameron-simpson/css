@@ -54,7 +54,7 @@ view_obj=$toc_ar
 
 toc_pdf=
 extract_pdf=
-view_pdf='xpdf /dev/fd/0'
+view_pdf='pageif unpdf /dev/fd/0'	## 'xpdf /dev/fd/0'
 
 toc_ar='pageif ar t${vlet}'
 extract_ar='ar x${vlet}'
