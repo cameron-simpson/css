@@ -42,7 +42,7 @@ done
 PATH=$PATH:$fvbin
 export PATH
 
-exec >>$LOGDIR/wm.out 2>>$LOGDIR/wm.err
+exec >$LOGDIR/wm.out 2>$LOGDIR/wm.err
 exec "$fvwm" -cmd "PipeRead fvwmrc" ${1+"$@"}
 
 ### set up FVWM log/fifo vars
