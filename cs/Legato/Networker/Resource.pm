@@ -139,7 +139,9 @@ sub _addResourceNode($$)
 
   # turn some fields into arrays
   for my $field (ADMINISTRATOR, ALIASES, GROUP, SAVE_SET)
-  { $R->{$field}=[ grep(length,split(/[,\s]+/, $R->{$field} )) ];
+  { if (exists $R->{$field})
+    { $R->{$field}=[ grep(length,split(/[,\s]+/, $R->{$field} )) ];
+    }
   }
 
   $H->{$R->{RESOURCE_IDENTIFIER}}=$R;
