@@ -11,73 +11,14 @@ usage="Usage:     $cmd    Update mairix index.
 mairix=/opt/mairix/bin/mairix
 rc=$HOME/rc/mairix.$SYSTEMID
 
+# help?
 [ "x$*" = x-h -o "x$1" = 'x-?' ] && { echo "$usage"; exit 0; }
 
-if [ $# != 0 ]
-then
-    ################
-    ## args - search
+[ $# = 0 ] && exec mrx-update "$MAILDIR/"*
 
-    # make work area
-    mrdir=$HOME/tmp/mairix
-    needdir "$mrdir" || exit 1
+res=`mrx-query "$@"` || exit 1
 
-    # devise informative basename
-    base=`echo "$*" | tr -s ' 	/' ___`
-    [ -n "$base" ] || { echo "$cmd: no args!" >&2; exit 2; }
+term -n "++ $*" -e + -f +t -R "$res"
+rm -rf "$res"
 
-    # make result directory
-    res=`mkdirn "$mrdir/$base"` || exit 1
-    mhdir "$res" || exit 1
-    base=`basename "$res"`
-
-    # make mairixrc in the result dir
-    resrc=$res/.mairixrc
-
-    sed "s:^vfolder=.*:vfolder=mairix-result/$base:" \
-	<"$rc" >"$resrc"
-    "$mairix" -f "$resrc" "$@" || exit 1
-
-    + +a -R "$res"
-    rm -rf "$res"
-
-    exit 0
-fi
-
-#############################
-## no args - update the index
-##
-
-wkdir=$HOME/var/mairix
-
-mhf=
-mhfsep=
-for site in home cisra
-do
-  for srcfolder in $HOME/there/$site/mail/*
-  do
-    ismhdir "$srcfolder" || continue
-
-    folder=`basename "$srcfolder"`
-    case "$folder" in
-	deleted|saved-deleted|spam*)
-	  continue
-	  ;;
-    esac
-
-    wkfolder=$site-$folder
-
-    rm -f "$wkdir/$wkfolder"
-    (set -x; ln -s "$srcfolder" "$wkdir/$wkfolder")
-    mhf=$mhf$mhfsep$wkfolder
-    mhfsep=:
-  done
-done
-
-set -x
-bsed \
-	-e "s;^mh_folders=.*;mh_folders=$mhf;" \
-	-e "s;^base=.*;base=$wkdir;" \
-	"$rc"
-
-exec "$mairix" -v -f "$rc" ${1+"$@"}
+exit 0
