@@ -12,7 +12,7 @@ tmp=$TMPDIR/fm$$
 { cat >$tmp && [ -s "$tmp" ]; } || { rm -f "$tmp"; exit 1; }
 
 # DISPLAY hack because sometimes mogrify seems to take it into its head to pop up a window
-DISPLAY= mogrify ${1+"$@"} $tmp
+DISPLAY= /opt/ImageMagick/bin/mogrify ${1+"$@"} $tmp
 xit=$?
 
 { [ -s "$tmp" ] && cat $tmp; } || xit=1
