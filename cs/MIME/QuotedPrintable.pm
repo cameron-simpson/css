@@ -12,6 +12,14 @@ use cs::Encode;
 
 package cs::MIME::QuotedPrintable;
 
+sub encode
+{ my($dataqp)='';
+  my($sinkqp)=new cs::MIME::QuotedPrintable(Encode,new cs::Sink(SCALAR,\$dataqp));
+  $sinkqp->Put(@_);
+  undef $sinkqp;
+  $dataqp;
+}
+
 sub decode
 { my($dataqp,$isText)=@_;
   $isText=1 if ! defined $isText;
@@ -26,9 +34,11 @@ sub decode
 # return a Decode or Encode object using this as its sub-source
 sub new
 { my($class,$type,$s,$isText)=@_;
+  $isText=1 if ! defined $isText;
+
   my($this);
 
-  # print STDERR "new cs::QP [@_]\n";
+  # warn "new cs::QP [@_]\n";
   if ($type eq Decode)
   { $this=new cs::Decode $s, \&_Decode, { ISTEXT => $isText };
   }
@@ -58,6 +68,7 @@ sub _Decode
 
   ## warn "decode($_)\n";
 
+  my($istext)=$state->{ISTEXT};
   my($data)='';
 
   DECODE:
@@ -71,6 +82,7 @@ sub _Decode
     elsif (/^=([\da-f][\da-f])/i)
     # hex encoding
     { $data.=chr hex $1;
+      $data =~ s/\r\n/\n/ if $istext;
       $_=$';
     }
     elsif (/^=\r?\n/)
@@ -116,7 +128,7 @@ sub _encode
     return $encoded;
   }
 
-  # print STDERR "QP: encode($_)\n";
+  # warn "QP: encode($_)\n";
 
   my($retenc)='';	# full lines to return
   my($qp,$chop);
