@@ -1,0 +1,258 @@
+#!/usr/bin/perl
+#
+# Convert HTML to troff-mm macros for printing.
+#	- Cameron Simpson <cs@zip.com.au>, 08jul94
+#
+
+require HTML;
+require Tokenise;
+
+($cmd=$0) =~ s:.*/::;
+
+for (LI,P,HR,BR,ISINDEX,IMG,INC,DD,DT)
+	{ tr/A-Z/a-z/;
+	  $singular{$_}=1;
+	}
+
+$footnotes=0;
+$HEADER='/HOME/cameron/etc/header/man';
+$url='';
+
+if (@ARGV >= 2 && $ARGV[0] eq '-u')
+	{ shift; $url=shift; }
+
+$xit=0;
+
+if (! defined($pid=open(STDOUT,"|-")))
+	{ die "$cmd: can't pipe/fork: $!\n";
+	}
+elsif ($pid == 0)
+	{ $preformatted=0;
+	  while (<STDIN>)
+		{ chop;
+		  s/\s+$//;
+
+		  if ($_ eq '.[]')	{ $preformatted=1; }
+		  elsif ($_ eq '.][')	{ $preformatted=0; }
+
+		  s/^\s+// unless $preformatted;
+
+		  print($_,"\n") unless /^$/;
+		}
+	  exit 0;
+	}
+
+system("cat $HEADER");
+print <<X
+.ds HF 3 3 3 3 3 3
+.ds HP 14 12 10 10 10 10
+.nr Hb 3
+.nr Hc 1
+.PF "''$url''"
+X
+;
+
+$preformatted=0;
+$inlist=0;
+
+$font=R;
+@font=();
+
+$html=HTML::newtok(\&Tokenise::fromARGV);
+
+$nl=0;
+while (defined($_=$html->Tok()))
+	{ &emit($_);
+	}
+
+print "\n";
+
+exit $xit;
+
+sub subemit
+	{ local($tok);
+
+	  for $tok (@_)
+		{ &emit($tok);
+		}
+	}
+
+sub nl	{ if (!$nl) { print "\n"; $nl=1; } }
+sub dot { &nl; print ".@_\n"; }
+
+sub emit
+	{ local($_)=shift;
+
+	  if (ref $_)
+		{ local($type,$token)=(shift(@$_),shift(@$_));
+		  pop(@$_);
+
+		  local($tag,$start,%attr)=&SGML'annodecode($token);
+
+		  if ($type eq 'ul')
+		      { &dot('BL');
+			{ local($inlist)=1;
+			  &subemit(@$_);
+			}
+			&dot('LE');
+		      }
+		  elsif ($type eq 'ol')
+		      { &dot(AL,1);
+			{ local($inlist)=1;
+			  &subemit(@$_);
+			}
+			&dot('LE');
+		      }
+		  elsif ($type eq 'li')
+		      { if (!$inlist)
+			      { print STDERR "$cmd: warning: <LI> when no list active, using <P> instead\n";
+				&dot('P');
+			      }
+			else
+			{ &dot('LI');
+			}
+		      }
+		  elsif ($type eq 'dl')
+		      { &nl;
+			{ local($inlist)=1;
+			  local($dl_part)=0;
+			  &subemit(@$_);
+			  if ($dl_part == 2)
+			      { &dot('in -1c');
+			      }
+			}
+		      }
+		  elsif ($type eq 'dt')
+		      { if ($dl_part == 2)
+			      { &dot("in -1c");
+			      }
+			$dl_part=1;
+
+			&dot("br");
+		      }
+		  elsif ($type eq 'dd')
+		      { $dl_part=2;
+			&dot("br"); &dot("in +1c");
+		      }
+		  elsif ($type eq 'pre')
+		      { &dot("[");
+			{ local($preformatted)=1;
+			  &subemit(@$_);
+			}
+			&dot("]");
+		      }
+		  elsif ($type eq 'listing')
+		      { &dot("[]");
+			{ local($preformatted)=1;
+			  &subemit(@$_);
+			}
+			&dot("][");
+		      }
+		  elsif ($type eq 'b') { &font('B'); &subemit(@$_); &oldfont;; }
+		  elsif ($type eq 'i') { &font('I'); &subemit(@$_); &oldfont;; }
+		  elsif ($type eq 'tt') { &font('C');; &subemit(@$_); &oldfont;; }
+		  elsif ($type eq 'em') { &font('B'); &subemit(@$_); &oldfont;; }
+		  elsif ($type eq 'p')
+		      { &dot('P');
+			&subemit(@$_);
+		      }
+		  elsif ($type eq 'br')
+		      { &dot("br");
+		      }
+		  elsif ($type eq 'a')
+		      { &subemit(@$_);
+			if ($footnotes)
+			      { if (length($attr{'href'})
+				 && $attr{'href'} !~ /^#/
+				   )
+				      { &dot('FS');
+					&font('C');
+					print $attr{'href'};
+					&oldfont;
+					&dot('FE');
+				      }
+			      }
+			else
+			{ print '\\s-2'; &font('C'); print '[';
+			  if (length($attr{'name'}))
+			      { print '(' if length $attr{'href'};
+				print "NAME=$attr{'name'}";
+				print ')' if length $attr{'href'};
+			      }
+
+			  if (length($attr{'href'}))
+			      { &font('C'); print $attr{'href'}; &oldfont;
+			      }
+
+			  print ']'; &oldfont; print '\\s+2';
+			}
+		      }
+		  elsif ($type eq 'img')
+		      { print '\\s-2';
+		        &font('C');
+			print "[IMG";
+
+			if (length $attr{'alt'})
+			      { print " ", $attr{'alt'};
+			      }
+
+			if (length $attr{'src'})
+			      { print "src=$attr{'src'}";
+			      }
+
+			print "]";
+			&oldfont;
+			print '\\s+2';
+		      }
+		  elsif ($type eq 'hr')
+		      { &dot("br");
+		        print "\\l'\\nWu'\n";
+			&dot("br");
+		      }
+		  elsif ($type eq 'title')
+		      { &nl;
+			print ".PH \"''"; &subemit(@$_); print "''\"\n";
+		      }
+		  elsif ($type =~ /^h(\d)$/)
+		      { &nl;
+			print ".H ", $1+0, " \""; &subemit(@$_); print "\"\n";
+			# &nl; print ".P\n";&font('B');print "\\s+2"; &subemit(@$_); print "\\s-2";&oldfont;print "\n.P\n";
+		      }
+		  else
+		  { print STDERR "$cmd: can't grok <$type>, ignoring\n";
+		    &subemit(@$_);
+		  }
+		}
+	  elsif (/^\&(\w+)/)
+		{ $_=$1;
+		  tr/A-Z/a-z/;
+		  print $HTML'special_ch{$_};
+		  $nl=0;
+		}
+	  else
+	  { s/\\/$&$&/g;
+	    s/\n([.'])/\n\\\&$1/g;
+	    print " " unless $nl;
+	    print $_;
+	    $nl=0;
+	  }
+	}
+
+sub font
+	{ push(@font,$font);
+	  $font=shift;
+	  &setfont($font);
+	}
+
+sub oldfont
+	{ $font=pop(@font);
+	  &setfont($font);
+	}
+
+sub setfont
+	{ if (length($_[0]) == 1)	{ print "\\f$_[0]"; }
+	  elsif (length($_[0]) == 2)	{ print "\\f($_[0]"; }
+	  else				{ print STDERR "$cmd: can't set font \"$_[0]\", using Roman\n";
+					  print "\\fR";
+					}
+	}
