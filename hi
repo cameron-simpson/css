@@ -64,7 +64,7 @@ urllist=/tmp/hi-urls.$$
 	      | egrep -i "$grep" \
 	      | ( hit=
 		  while read gurl
-		  do  xvurl "$gurl" >/dev/null &
+		  do  xvurl -f "$gurl" >/dev/null &
 		      echo "$gurl" >&2
 		      hit=1
 		  done
