@@ -18,7 +18,7 @@ $Roff=($ENV{OS} eq 'linux' ? 'groff -Tlatin1' : 'nroff');
 $ManProcess="soelim | neqn | tbl | $Roff $ManMacros $MyMacros -";
 # GNU col is a busted piece of crap
 if ($ENV{OS} ne 'linux') { $ManProcess.=" | col -x"; }
-$InfoProcess="info2man | $ManProcess";
+$InfoProcess="info2pod | pod2text";	## "info2man | $ManProcess";
 $Section="";
 $UseFirst=1;
 $UsePager= -t STDOUT;
