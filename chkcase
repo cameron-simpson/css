@@ -1,0 +1,55 @@
+#!/usr/bin/perl
+#
+# Look for case conflicts in directories.
+#	- Cameron Simpson <cs@zip.com.au> 24oct98
+#
+
+$::Xit=0;
+
+@ARGV='.' if ! @ARGV;
+
+for my $arg (@ARGV)
+	{ if ($arg eq '-')
+		{ while (defined($_=<STDIN>))
+		  { chomp;
+		    chk($_);
+		  }
+		}
+	  else	{ chk($arg);
+		}
+	}
+
+exit $::Xit;
+
+sub chk
+	{ my($dir)=@_;
+
+	  if (! opendir(DIR,$dir))
+		{ warn "$0: can't opendir $dir: $!\n";
+		  $::Xit=1;
+		  return;
+		}
+	  
+	  my(@e)=readdir(DIR);
+	  closedir(DIR);
+
+	  my %hits;
+
+	  for (@e)
+		{ my $le = norm($_);
+
+		  if (! exists $hits{$le})	{ $hits{$le}=[ $_ ]; }
+		  else				{ push(@{$hits{$le}},$_); }
+		}
+
+	  for my $le (sort keys %hits)
+	  { if (@{$hits{$le}} > 1)
+		{ warn "$dir: @{$hits{$le}}\n";
+		  $::Xit=1;
+		}
+	  }
+	}
+
+sub norm
+	{ lc($_[0]);
+	}
