@@ -2,7 +2,7 @@
 
 cd || exit 1
 
-needhost amadeus@home || exit 1
+needhost $HOMEHOST@home || exit 1
 
 set -x
 
