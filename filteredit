@@ -66,7 +66,6 @@ then
 else
     if cp "$file" "$bak"
     then
-	
 	if cat <"$tmp" >"$file"
 	then
 	    rm "$bak"
