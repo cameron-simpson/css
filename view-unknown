@@ -48,4 +48,5 @@ fi
 [ -z "$action" ] && { echo "$type"; exit 0; }
 
 action=`echo "$action" | sed -e 's/^[^;]*; *//' -e 's/ *;[^;]*$//' -e"s%s$fileg"`
+exec <"$file"
 eval "$action"
