@@ -6,7 +6,7 @@
 #
 # The -sh option emits a bunch of shell variable settings.
 # Example use:
-#	eval "mhdrs < mailitem | sed 's/^/hdr_/'`
+#	eval "mhdrs -sh < mailitem | sed 's/^/hdr_/'`
 # gets a bunch of values like $hdr_MESSAGE_ID for "Message-Id", etc.
 #	- Cameron Simpson <cs@zip.com.au>
 #
