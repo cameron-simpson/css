@@ -1,0 +1,66 @@
+#!/bin/sh
+#
+# Format, newfs, chown etc to make up a filesystem on a Zip disc.
+#	- Cameron Simpson <cs@zip.com.au> 22nov96
+#
+FORMAT=${FORMAT-$HOME/etc/format.dat}
+export FORMAT
+
+user=cameron
+mnt=/mnt/zip
+sc=0 st=5 sd=0
+type="Iomega ZIP 100"
+ptable=0
+doformat=1
+domount=1
+
+cmd=`basename "$0"`
+usage="Usage: $cmd [options]
+	-f	Format disc (default).
+	+f	No format - just writes filesystem.
+	-m	Mount and chown files.
+	+m	No mount - don't mount and chown.
+	-t type	Medium type (default: $type)."
+
+badopts=
+while :
+do  case $1 in
+	-f)	doformat=1 ;;
+	+f)	doformat= ;;
+	-m)	domount=1 ;;
+	+m)	domount= ;;
+	-t)	type=$2; shift ;;
+	--)	shift; break ;;
+	-?*)	echo "$cmd: unrecognised option: $1" >&2; badopts=1 ;;
+	*)	break ;;
+    esac
+    shift
+done
+
+[ $# = 0 ] || { echo "$cmd: extra arguments: $*" >&2; badopts=1; }
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+fmtcmds=/tmp/mzfs$$
+( for cmd in partition select "$ptable" label print quit quit
+  do echo "$cmd"
+  done
+) >$fmtcmds
+
+[ -t 1 ] && set -x
+
+ { [ -z "$doformat" ] \
+|| format -x "$FORMAT" -d "c${sc}t${st}d${sd}" -t "$type" -M -f $fmtcmds
+ } && zipfs -f -s $st <&- \
+   && { [ -z "$mnt" -o -z "$domount" ] \
+     || { mount "$mnt" \
+       && chown "$user" "$mnt" \
+       && ls -la "$mnt" \
+       && dfk "$mnt"
+	}
+      }
+
+xit=$?
+rm -f $fmtcmds
+
+exit $xit
