@@ -20,7 +20,7 @@ filelist=
 inter=
 dir=
 
-usage="Usage: $cmd [-o image-op] dir [files/dirs...]]"
+usage="Usage: $cmd [-l filelist] [-o image-op] dir [files/dirs...]]"
 
 badopts=
 
@@ -63,7 +63,7 @@ thdir=.thumbnails/$thsize
 
 exec 3>&1 1>&2
 
-echo "entries=[$*]" >&2
+##echo "entries=[$*]" >&2
 for entry
 do
     if [ -d "$entry/." ]
@@ -84,7 +84,7 @@ do
       [ -s "$f" ] || continue;
 
       case "$entry" in
-	  $HOME/*)	tag='~/'`expr "x$entry" : 'x$HOME/\(.*\)'` ;;
+	  $HOME/*)	tag='~/'`expr "x$entry" : "x$HOME/\\(.*\\)"` ;;
 	  *)		tag=$entry ;;
       esac
 
@@ -110,13 +110,13 @@ do
 	  *)  continue ;;
       esac
 
-      echo "f=[$f] d=[$d]" >&2
+      ##echo "f=[$f] d=[$d]" >&2
       echo "$thfmt $f"	# to the thumb maker ...
 
       thumb=$thdir/$fbase.$thfmt
 
       ##alert "\"%$d/$thumb%$tag\" Exec $imop $f"
-      echo "\"%$d/$thumb%$tag\" Exec $imop $f" >&3
+      echo  "\"%$d/$thumb%$tag\" Exec $imop $f" >&3
     fi
 done \
 | ( exec 3>&-
