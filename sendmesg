@@ -64,7 +64,7 @@ if (@::Groups)
 
 if (@::Email)
 # dispatch via sendmail unless $NO_LOCALSENDMAIL > 0, in which case use SMTP
-{ if ($ENV{NO_LOCALSENDMAIL} > 0)
+{ if (defined($ENV{NO_LOCALSENDMAIL}) && $ENV{NO_LOCALSENDMAIL} =~ /^[1-9]/)
   { warn "sending email to [@::Email]";
     my $src = new cs::Source (SCALAR,$msgtxt);
     if (! cs::Mail::Misc::smtpsend($src,@::Email))
