@@ -1,0 +1,321 @@
+#!/usr/bin/perl
+#
+# Generate a permuted index.
+#
+
+($cmd=$0) =~ s:.*/::;
+$usage="Usage: $cmd [-822] [-d dir] [-i ign] [-ndx] [-v] [files]
+	-822	Treat files as RFC822 messages.
+	-ndx	Rebuild the ndx DBM file and ptx.html file.
+	-i ign	Ignore words from file \"ign\".
+	-d dir	Directory for .html files and index.
+	-v	Verbose.
+";
+
+$EIGN='/usr/lib/eign';	# system ignore list
+@IGNORE=(defined($ENV{EIGN})
+		? split(/:/,$ENV{EIGN})
+		: ("$ENV{HOME}/.eign",$EIGN));
+$HTMLPTN='<\s*/?\w+(\s+\w+=("[^"]*"|[^>\s]*))*\s*>';
+$rfc822=0;
+$dir='.';
+$index='ptx';
+$verbose=0;
+$updindex=0;
+
+$badopts=0;
+ARGV:
+  while ($#ARGV >= $[)
+	{ $_=shift;
+	  last ARGV if $_ eq '--';
+	  (unshift(@ARGV,$_), last ARGV) unless /^-./;
+
+	  if ($_ eq '-822')	{ $rfc822=1; }
+	  elsif ($_ eq '-ndx')	{ $updindex=1; }
+	  elsif ($_ eq '-i')	{ push(@EIGN,shift); }
+	  elsif ($_ eq '-d')	{ $dir=shift; }
+	  elsif ($_ eq '-v')	{ $verbose=1; }
+	  else
+	  { print STDERR "$cmd: $_: unrecognised option\n";
+	    $badopts=1;
+	  }
+	}
+
+die $usage if $badopts;
+
+require 'cs/html.pl';
+require 'cs/rfc822.pl' if $rfc822;
+
+for $IGN (@IGNORE)
+	{ print STDERR "ignoring words from $IGN ...\n";
+	  if (open(IGN,"< $IGN\0"))
+		{ while (<IGN>)
+			{ chop;
+			  if (/\W/)
+				{ $ignptn{$_}=1;
+				}
+			  else
+			  { tr/A-Z/a-z/;
+			    $ignore{$_}=1;
+			  }
+			}
+		  close(IGN);
+		}
+	  else
+	  { $verbose && print STDERR "$cmd: can't read $IGN: $!\n";
+	  }
+	}
+
+@ignptn=keys %ignptn;
+if ($#ignptn < $[)	{ eval 'sub ignptn { 0; }'; }
+else			{ eval 'sub ignptn { /^'
+			      .join('/ || /^',sort @ignptn)
+			      .'/; }';
+			}
+
+$refcount=0;
+
+$xit=0;
+
+-d "$dir/." || mkdir($dir,0777)	|| die "$cmd: can't mkdir($dir): $!\n";
+open(STDOUT,"> $dir/ptx.html")	|| die "$cmd: can't write $dir/ptx.html: $!\n";
+
+if ($#ARGV < $[)
+	{ &ptx(STDIN,'');
+	}
+else
+{ FILE:
+    for $FILE (@ARGV)
+	{ $ishtml=($FILE =~ /\.html$/);
+
+	  if ($ishtml)
+		{ print STDERR "$cmd: skipping HTML file: $FILE\n";
+		  $xit=1;
+		  next FILE;
+		}
+	  
+	  $htmlref="$FILE.html";
+	  $htmlfile="$dir/$htmlref";
+	  $ptxfile="$dir/$FILE.ptx";
+	  if (!open(FILE,"< $FILE\0"))
+		{ print STDERR "$cmd: can't open $FILE: $!\n";
+		  $xit=1;
+		  next FILE;
+		}
+
+	  if (!open(PTX,"> $ptxfile\0"))
+		{ print STDERR "$cmd: can't write to $ptxfile: $!\n";
+		  $xit=1;
+		  close(FILE);
+		  next FILE;
+		}
+
+	  if (!open(HTML,"> $htmlfile\0"))
+		{ print STDERR "$cmd: can't write to $htmlfile: $!\n";
+		  $xit=1;
+		  close(FILE);
+		  close(PTX);	unlink($ptxfile);
+		  next FILE;
+		}
+
+	  $old=select(HTML);
+	  print "<H1>$htmlfile</H1>\n";
+	  print "<PRE>\n";
+	  if ($rfc822)
+		{ &ptx822FILE(FILE,$FILE,$htmlref);
+		}
+	  else
+		{ &ptxFILE(FILE,$FILE,$htmlref);
+		}
+	  print "</PRE>\n";
+	  select($old);
+	  close(FILE);
+	  close(HTML);
+	  close(PTX);
+	}
+}
+
+if ($updindex)
+	{ &updindex($dir);
+	}
+
+exit $xit;
+
+sub ptx822FILE	# (FILE,filename,htmlref)
+	{ local($FILE,$filename,$htmlref)=@_;
+	  print STDERR "indexing $filename ...\n";
+	  &ptx822lines($filename,$htmlref,<$FILE>);
+	}
+
+sub ptx822lines	# (filename,htmlref,@lines)
+	{ local($filename,$htmlref)=(shift,shift);
+	  local(@hdrs,%hdrs);
+	  &rfc822'clrhdrs;
+	  local(@lines)=&rfc822'addhdrs(@_);
+	  local($line,@refs);
+
+	  for (@hdrs)
+		{ if (/^(subject|keywords|organization|newsgroups|from|reply-to|summary):\s*/i)
+			{ ($line,$refs)=&ptxline($',$htmlref);
+			  print $&, $line, "\n";
+			  for (@refs)
+				{ print PTX $_, "\n";
+				}
+			}
+		  else
+		  { print &html'raw2html($_), "\n";
+		  }
+		}
+
+	  print "\n";
+	  for (@lines)
+		{ ($line,@refs)=&ptxline($_,$htmlref);
+		  print $line;
+		  for (@refs)
+			{ print PTX $_, "\n";
+			}
+		}
+	}
+
+sub ptxFILE	# (FILE,filename,htmlref)
+	{ local($FILE,$filename,$htmlref)=@_;
+	  local($_);
+	  local($line,@refs);
+
+	  print STDERR "indexing $filename ...\n";
+	  while (<$FILE>)
+		{ chop;
+		  s/^\s+//;
+		  s/\s+$//;
+
+		  ($line,@refs)=&ptxline($_,$htmlref);
+		  print $line, "\n";
+		  for (@refs)
+			{ print PTX $_, "\n";
+			}
+		}
+	}
+
+sub ptxline	# (line,htmlref) -> (annotated-line,(word/anchor)...)
+	{ local($line,$htmlref)=@_;
+	  local($sofar,$left,$word,$rawword,$right);
+	  local($_,$ref,$anchor);
+	  local(%thisline);
+	  local(@refs);
+
+	  $line=&html'raw2html($line);
+
+	  $sofar='';
+	  WORD:
+	    while ($line =~ /(\w+|$HTMLPTN|[^<]\W*)/og)
+		{ ($left,$word,$right)=($`,$&,$');
+		  $_=$rawword=$word;
+		  tr/A-Z/a-z/;
+		  next WORD unless /^[a-z]/;
+		  next WORD if length($_) < 2 || $ignore{$_} || $thisline{$_};
+		  next WORD if &ignptn($_);
+		  $thisline{$_}=1;
+
+		  $anchor="$cmd$refcount"; $refcount++;
+
+		  $word="<A NAME=\"$anchor\">$rawword</A>";
+		  $ref="$left<A HREF=\""
+		      .&html'quote($htmlref)
+		      ."#$anchor\">$rawword</A>$right\n";
+		  push(@refs,"$_ $ref");
+		}
+	  continue
+		{ $sofar.=$word;
+		}
+
+	  ($sofar,@refs);
+	}
+
+sub updindex	# (dir)
+	{ local($dir)=@_;
+	  local($dbmndx,%NDX,$_,$key,$first,$letter,@keys,@ptx,$ptx,@refs);
+
+	  opendir(DIR,$dir) || die "$cmd: can't opendir($dir): $!\n";
+	  @ptx=grep(/\.ptx$/,readdir(DIR));
+	  closedir(DIR);
+
+	  $dbmndx="$dir/ndx";
+	  dbmopen(%NDX,"$dir/ndx",0666)	|| die "$cmd: can't dbmopen($dir/ndx): $!\n";
+
+	  print STDERR "opened $dir/ndx\n";
+	  for (keys %NDX)
+		{ delete $NDX{$_}; print STDERR "delete $_\n";
+		}
+
+	  PTX:
+	    for $ptx (@ptx)
+		{ if (!open(PTX,"< $dir/$ptx\0"))
+			{ print STDERR "$cmd: can't open $dir/$ptx: $!\n";
+			  next PTX;
+			}
+
+		  print STDERR "processing $dir/$ptx ...\n";
+		  PTXLINE:
+		    while (<PTX>)
+			{ /^(\S+)\s+(.+)$/ || next PTXLINE;
+			  $NDX{$1}.=$2."\n";
+			}
+
+		  close(PTX);
+		}
+
+	  @keys=sort keys %NDX;
+	  print "<H1>Index</H1>\n",
+		"This index contains:\n",
+		"<UL> <LI> the <A HREF=\"#permuted_index\">permuted index</A> of the files\n",
+		"     <LI> the <A HREF=\"#word_list\">list of words</A> in the permuted index\n",
+		"</UL>\n";
+
+	  print "<H2><A NAME=\"word_list\">List of Words</A>\n";
+	  print "<H3>Very Short List<H3>\n";
+	  undef $letter;
+	  $first=1;
+	  for $key (@keys)
+		{ if (substr($key,$[,1) ne $letter)
+			{ if (!$first)	{ print ", "; }
+			  else		{ $first=0; }
+			  $letter=substr($key,$[,1);
+			  print "<A HREF=\"#letter_$letter\">$letter</A>";
+			}
+		}
+	  print "\n";
+	  print "<H3>Short List<H3>\n";
+	  $first=1;
+	  for $key (@keys)
+		{ if ($first)	{ $first=0; }
+		  else		{ print ", "; }
+		  print "<A HREF=\"#key_$key\">$key</A>\n";
+		}
+	  print "\n";
+
+	  print "<H2><A NAME=\"permuted_index\">Permuted Index</A></H1>\n";
+	  print "<DL>\n";
+	  undef $letter;
+	  for $key (@keys)
+		{ @refs=grep(length,split(/\n/,$NDX{$key}));
+		  if (substr($key,$[,1) ne $letter)
+			{ $letter=substr($key,$[,1);
+			  print "<DT> <A NAME=\"letter_$letter\">($letter)</A><DD>\n";
+			}
+
+		  print "  <DT> <A NAME=\"key_$key\">$key</A>\n";
+		  if ($#refs == $[)
+			{ print "<DD>$refs[$[]</DD>\n";
+			}
+		  else
+		  { print "  <DD> <UL>\n";
+		    for $ref (@refs)
+			{ print "    <LI> ", $ref, "\n";
+			}
+		    print "  </UL>\n";
+		  }
+		}
+	  print "</DL>\n";
+
+	  dbmclose(%NDX);
+	}
