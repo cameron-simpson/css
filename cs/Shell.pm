@@ -79,14 +79,14 @@ sub sputvars
  VAR:
   for my $var (sort @vars)
   {
-    next VAR if ! defined $ENV{$var};
+    next VAR if ! defined $::ENV{$var};
 
     if (! $force && ($mode eq SH || $mode eq CSH))
     { $s->Put("test -n \"\$$var\" || ");
     }
 
     my $v;
-    $v=quote($ENV{$var}) if $mode eq SH || $mode eq CSH;
+    $v=quote($::ENV{$var}) if $mode eq SH || $mode eq CSH;
 
     if ($mode eq CSH)
     { $s->Put("setenv $var $v\n");
@@ -95,7 +95,7 @@ sub sputvars
     { $s->Put("{ $var=$v; export $var; }\n");
     }
     else
-    { cs::Hier::putKVLine($s,$var,$ENV{$var});
+    { cs::Hier::putKVLine($s,$var,$::ENV{$var});
     }
   }
 }
@@ -144,12 +144,16 @@ sub statpath
   my %igot;	# dev:inode
   my @s;
 
-  mkpath(grep(length			# drop empties
-	   && !$got{$_}			# new path
-	   && ($got{$_}=1)
-	   && (@s=stat($_))		# exists
-	   && !$igot{"$s[1]:$s[2]"}	# new object
-	   && ($igot{"$s[1]:$s[2]"}=1),
+  mkpath(grep(m:^[^/]:			# keep relative paths
+	   ||
+	      (
+		length			# drop empties
+	     && !$got{$_}			# new path
+	     && ($got{$_}=1)
+	     && (@s=stat($_))		# exists
+	     && !$igot{"$s[1]:$s[2]"}	# new object
+	     && ($igot{"$s[1]:$s[2]"}=1)
+	      ),
 		@p));
 }
 
