@@ -5,14 +5,35 @@
 #
 
 cmd=$0
+usage="Usage: $cmd [-g grep] [-l] string [paths...]"
+
 grep=fgrep
+flags=
 
-[ "x$1" = "x-g" ] && { grep=$2; shift; shift; }
+badopts=
+while :
+do
+  case $1 in
+    -g) grep=$2; shift ;;
+    -l) flags="$flags $1" ;;
+    --)	shift; break ;;
+    -?*)echo "$cmd: unrecognised option: $1" >&2; badopts=1 ;;
+    *)	break ;;
+  esac
+  shift
+done
 
-[ $# -gt 0 ] || { echo "Usage: $cmd [-g grep] string [find-args...]"; exit 2; }
-str=$1; shift
+if [ $# = 0 ]
+then
+    echo "$cmd: missing string" >&2
+    badopts=1
+else
+    ptn=$1; shift
+fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
 
 [ $# = 0 ] && set .
 case " $*" in *" -"*) ;; *) set "$@" -type f -print ;; esac
 
-find "$@" | xxargs g -g "grep" "$str"
+find "$@" | xxargs g -g "grep" "$ptn"
