@@ -1,0 +1,47 @@
+#!/bin/sh
+#
+# Convert PhotoShop (PSD) file to JPEG using the gimp.
+#	- Cameron Simpson <cs@zip.com.au> 10nov2003
+#
+
+cmd=$0
+usage="Usage: $cmd [-f] psdfile [jpgfile]
+	-f	Force: overwrite jpgfile if present."
+
+force=
+
+badopts=
+
+[ "x$1" = x-f ] && { force=1; shift; }
+
+if [ $# = 0 ]
+then
+    echo "$cmd: missing psdfile" >&2
+    badopts=1
+else
+    psdfile=$1; shift
+    if [ $# = 0 ]
+    then
+	jpgfile=`basename "$psdfile" .psd`.jpg
+    else
+	jpgfile=$1; shift
+	[ $# = 0 ] || { echo "$cmd: extra arguments after jpgfile: $*" >&2
+			badopts=1
+		      }
+    fi
+fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+[ -s "$psdfile" ] || { echo "$cmd: missing PSD file: $psdfile" >&2; exit 1; }
+
+if [ -s "$jpgfile" ] && [ -z "$force" ]
+then
+  echo "$cmd: JPEG file exists: $jpgfile" >&2
+  exit 1
+fi
+
+echo '(set! psd (car (gimp-file-load 1 psdfile psdfile)))
+      (set! save-layer (car (gimp-image-flatten psd)))
+      (file-jpeg-save 1 psd save-layer jpgfile jpgfile 1.0 0.0 0 0 "psd to jpg" 0 0 0 0))' \
+| gimp-batch "psdfile=\"$psdfile\"" "jpgfile=\"$jpgfile\"" "psd=\"\"" "save-layer=\"\""
