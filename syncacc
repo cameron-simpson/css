@@ -37,6 +37,7 @@ exec \
 	'--exclude=/.ssh/*' \
 	'--include=/.termenv' \
 	'--include=/.xinitrc' \
+	'--include=/.xplanet' \
 	'--include=/.xsession' \
 	'--include=/.zprofile' \
 	'--include=/.zshenv' \
@@ -77,6 +78,7 @@ exec \
 	'--include=/rc/term' \
 	'--include=/rc/vi' \
 	'--include=/rc/x11' \
+	'--include=/rc/xplanet' \
 	'--exclude=/rc/*' \
 	'--include=/scripts' \
 	'--include=/scripts/cs/' \
