@@ -7,7 +7,7 @@
 vfolder=.mairix-result
 
 cmd=`basename "$0"`
-usage="Usage: $cmd [-r resdir] mhdir
+usage="Usage: $cmd [-r resdir] mail-folder
 	-r resdir	Specify result directory.
 			Default: $vfolder"
 
@@ -20,24 +20,34 @@ then
     dir=$1; shift
     case "$dir" in
 	/*)	;;
-	*)	echo "$cmd: mhdir must be a full path" >&2
+	*)	echo "$cmd: mail-folder must be a full path" >&2
 		badopts=1
 		;;
     esac
 else
-    echo "$cmd: missing mhdir" >&2
+    echo "$cmd: missing mail-folder" >&2
     badopts=1
 fi
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
-ismhdir "$dir" || { echo "$dir: not an MH folder" >&2; exit 1; }
+folder_directive=
+if ismhdir "$dir"
+then folder_directive=mh_folders
+else
+  if ismaildir "$dir"
+  then folder_directive=folders
+  else
+    echo "$dir: not an MH or Maildir folder" >&2
+    exit 1
+  fi
+fi
 
 cd "$dir" || exit 1
 
 exec >".mairixrc"
 echo "base=$dir"
-echo "mh_folders=."
+echo "$folder_directive=."
 echo "vfolder=$vfolder"
 echo "vfolder_format=mh"
 echo "database=$dir/.mairix.db"
