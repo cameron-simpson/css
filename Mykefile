@@ -30,6 +30,7 @@ scriptfromman(manf) = $(manf FP)
 default: squid_redirect 0README.txt _submakes _tarballs _man _cvslog
 
 _cvslog:
+	[ "$$HOST@$$SYSTEMID" = amadeus@home ]
 	cvslog >CHANGELOG.txt
 	cvslog2html >CHANGELOG.html
 
