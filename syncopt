@@ -1,36 +1,48 @@
-#!/bin/sh
+#!/usr/bin/ksh
+# Solaris /bin/sh explodes on the perfectly legal remote() function.
 #
-# Keep per-machine /opt in sync with shared one.
+# =head1 NAME
 #
-# Homepage:
+# syncopt - keep per-machine /opt in sync with shared one
+#
+# =head1 SYNOPSIS
+#
+# syncopt [options] [packages...]
+#
+# =head1 DESCRIPTION
+#
+# I<syncopt> is a command for keeping host local package installations
+# synchronised with a master host.
+# More detailed discussion of its use and the practices associated with
+# it is at this web page:
+#
 #	http://www.zip.com.au/~cs/syncopt/index.html
 #
-# The scheme is that things get built and installed as /opt/thing-version,
-# then copied to /usr/local/opt/thing-version in the central spot, with a
-# symlink from there to /usr/local/opt/thing. That way things think they
-# live in /opt and become local or remote by either symlinking from /opt
-# to /usr/local/opt or installing an exact copy of
-# /usr/local/opt/thing-version in /opt.
-#	- Cameron Simpson <cs@zip.com.au> 13feb1999
+# The intent is that packages built from source
+# (and to a limited extent other packages with relocatable installs)
+# need only be installed once on a central host,
+# and that ``client'' machines get a local copy or a symbolic link
+# as the administrator sees fit.
 #
-# Use /usr/local/opt-common as a secondary source.
-#	- cameron 18jun1999
+# The basic scheme is that packages get built and installed as B</opt/I<package>-I<version>>
+# and then copied to a central spot such as B</usr/local/opt/I<package>-I<version>>,
+# leaving a symlink from B</opt> to the central package.
+# In this way things think they
+# live in B</opt> and become local or remote by either symlinking from B</opt>
+# installing an exact copy of B</usr/local/opt/I<thing>-I<version>> in </opt>.
 #
-# /opt/.syncopt config file.
-#	- cameron 14feb2001
+# The purpose of B<syncopt> is to maintain that arrangement in a convenient and automatic fashion.
 #
-# "nosync" in .syncopt.
-#	- cameron 31may2001
-# "remote" in .syncopt.
-#	- cameron 22apr2002
-# 
+# It would normally be run automatically on client machines via cron,
+# or batch dispatched on all clients by hand via ssh after a new package install.
+#
 
 pathadd=:/usr/bin:/opt/bin:/opt/script
 PATH=$PATH$pathadd
 export PATH
 
-rsync=rsync
-remote=
+rsync=${SYNCOPT_RSYNC:-rsync}
+remote=$SYNCOPT_REMOTE
 
 cmd=`basename "$0"`
 usage="Usage: $cmd [-n] [-f] [l] [-R rsync-path] [-x] [-v] [items...]
@@ -55,15 +67,69 @@ cf=$slashopt/.syncopt
 vflag=
 [ -t 1 ] && vflag=-v
 
+# =head1 OPTIONS
+#
+# =over 4
+#
+
 badopts=
 while :
 do  case $1 in
+	# =item B<-f>
+	#
+	# Force installation.
+	# The default action is to change nothing,
+	# merely reciting the actions which would be performed.
+	#
 	-f)	trace= ;;
+	# =item B<-x>
+	#
+	# Trace execution. Implies B<-f>.
+	# Report actions as they are taken.
+	#
 	-x)	trace=set-x ;;
+	# =item B<-l>
+	#
+	# Default to installing all packages locally.
+	# This is almost never what you want at the command line
+	# and I may remove this option.
+	# At need a suitable
+	#
+	#	* local
+	#
+	# line can be placed in the B</opt/.syncopt> configuration file.
+	#
 	-l)	localise=1 ;;
+	# =item B<-n>
+	#
+	# No action. This is the default.
+	# Merely recite the actions which would be performed.
+	#
 	-n)	trace=echo ;;
+	# =item B<-R> I<rsync-path>
+	#
+	# Path to the rsync(1) command.
+	# useful to run a particular rsync version
+	# or for bootstrapping.
+	#
 	-R)	rsync=$2; shift ;;
+	# =item B<-r> I<remote>
+	#
+	# Use the host I<remote> as the master repository host.
+	# Normally B<syncopt> will expect direct access to the master copies
+	# or the packages via the normal filesystem namespace,
+	# usually in B</usr/local/opt*>
+	# which is typically NFS mounted.
+	# Sometimes this isn't feasible.
+	# The B<-r> option causes B<syncopt> to use ssh(1)
+	# to access a remote host to obtain packages.
+	#
 	-r)	remote=$2; shift ;;
+	# =item B<-v>
+	#
+	# Verbose.
+	# Produce more output during the run.
+	#
 	-v)	verbose=1 vflag=-v ;;
 	--)	shift; break ;;
 	-?*)	echo "$cmd: unrecognised option: $1" >&2; badopts=1 ;;
@@ -71,6 +137,9 @@ do  case $1 in
     esac
     shift
 done
+
+# =back
+#
 
 # because the master repository may be remote
 # everything remote has an eval layer so it can be passed through ssh
@@ -180,7 +249,38 @@ do
     # leave this item alone?
     nosync=
 
-    # check config file
+    # =head1 CONFIGURATION FILE
+    #
+    # The defaults for B<syncopt> may be tuned by editing the file
+    # B</opt/.syncopt>.
+    # This is a simple text file with one line directives in it.
+    # Directives are read in order,
+    # with the I<last> matching directive having precedence.
+    #
+    # Blank lines and lines commencing with an octothorpe ('#') are comments, and skipped.
+    #
+    # Other lines are of the form:
+    #
+    #	I<package> I<mode>
+    #
+    # or
+    #
+    #	I<package> I<version> I<mode>
+    #
+    # where I<package> is the name of the package
+    # (eg "B<perl>" or "B<xine>"),
+    # I<version> is the optional package revision,
+    # and I<mode> is one of B<local> for a local copy of the package,
+    # B<remote> for a symbolic link,
+    # and B<nosync>
+    # to have syncopt leave this package alone.
+    #
+    # If the I<version> is supplied,
+    # B<syncopt> uses that to specify the default package version
+    # for the unversioned symlink:
+    #
+    #	/opt/Ipackage -> /opt/package-version
+    #
     sedscript="y/	/ /
 	       s/^  *//
 	       s/^#.*//
@@ -294,3 +394,73 @@ do
 done
 
 exit $xit
+
+# =head1 ENVIRONMENT
+#
+# =over 4
+#
+# =item B<SYNCOPT_REMOTE>
+#
+# Use the specified remote host for the master
+# as though specified with the B<-r> command line option.
+#
+# =item B<SYNCOPT_SUBDIRS>
+#
+# expect a sub hierarchy underneath each B</usr/local/opt*> respoitory.
+# For example, at home I set this to "B<HOME WORK>".
+# I put home built software in B</usr/local/opt/HOME/I<package>>
+# and keep a copy of much of the repository from work in B</usr/local/opt/WORK/I<package>>,
+# obviating any need to rebuild things already built for work.
+# The subhierachies are consulted in order so that my home installs
+# take precedence over the work copies.
+#
+# =item B<SYNCOPT_RSYNC>
+#
+# Preferred path to the rsync(1) command
+# as though specified with the B<-R> command line option.
+#
+# =back
+#
+# =head1 EXAMPLE CONFIGURATION FILES
+#
+# A typical machine with a small B</opt> area might say:
+#
+#	perl local
+#	mozilla local
+#	fvwm local
+#
+# and so forth to make particular packages normally used by the machine's owner
+# locally installed
+# to provide resilience against downtime on the master NFS server.
+#
+# A modern machine with plenty of room might say:
+#
+#	* local
+#
+# so that all packages are installed locally,
+# providing complete NFS independence from the master host.
+#
+# A minimal service machine
+# which normally has no NFS mounts at all
+# but which wants some packages installed might say:
+#
+#	* nosync
+#	perl local
+#	rsync local
+#	script local
+#
+# to make local installs of useful packages only,
+# and no installs at all of the rest.
+# This machine must be maintained by passing the B<-r> option to B<syncopt>
+# to use ssh(1) to access the master machine
+# or by setting the B<SYNCOPT_REMOTE> environment variable
+# in the system environment.
+#
+# =head1 SEE ALSO
+#
+# ssh(1), rsync(1)
+#
+# =head1 AUTHOR
+#
+# Cameron Simpson E<lt>cs@zip.com.auE<gt> 1996
+#
