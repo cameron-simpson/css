@@ -1,0 +1,376 @@
+#!/usr/bin/perl
+#
+# Parse squid logs and do cool things, like graph bandwidth etc.
+#	- Cameron Simpson <cs@zip.com.au> 19nov98
+#
+
+use strict qw(vars);
+
+use cs::Net;
+use cs::Misc;
+use cs::Date;
+use cs::Hier;
+use cs::Upd;
+use cs::Stats::Slots;
+use GIFgraph::bars;
+
+$::CatType=DATATYPE;
+
+$::Usage="Usage: $::cmd [categorisation] >file.gif
+	categorisation	One of client, website, protocol, datatype, suffix.
+			Default: ".lc($::CatType)."
+";
+
+-t STDOUT && die "$::cmd: stdout should not be a terminal!\n";
+
+{ my $badopts = 0;
+  if (@ARGV)
+	{ $::CatType=uc(shift(@ARGV));
+	}
+
+  if (@ARGV)
+	{ warn "$::cmd: extra arguments: @ARGV\n";
+	  $badopts=1;
+	}
+
+  if ($::CatType eq CLIENT)	{ $::CatFn=\&clientKey; }
+  elsif ($::CatType eq WEBSITE)	{ $::CatFn=\&websiteKey; }
+  elsif ($::CatType eq PROTOCOL){ $::CatFn=\&protocolKey; }
+  elsif ($::CatType eq DATATYPE){ $::CatFn=\&datatypeKey; }
+  elsif ($::CatType eq DATASIZE){ $::CatFn=\&datasizeKey; }
+  elsif ($::CatType eq SUFFIX)	{ $::CatFn=\&suffixKey; }
+  else
+  { warn "$::cmd: bad categorisation: $::CatType\n";
+    $badopts=1;
+  }
+
+  die $::Usage if $badopts;
+}
+
+$::Xit=0;
+
+$::SiteSuffix='.'.$ENV{SITENAME};
+
+warn "loading data ...\n";
+my @log;
+{ my $datum;
+  my $earliest;
+  my $latest;
+
+  LOGENTRY:
+    while (defined ($datum=readFILEline(STDIN)))
+    { next LOGENTRY if ! ref $datum
+		    || $datum->{CLIENT} eq '127.0.0.1'
+		    || $datum->{ACTION_TYPE} =~ /_HIT$/
+		    ;
+      push(@log,$datum);
+
+      if (! defined $latest || $datum->{COMPLETED} > $latest)
+      { $latest=$datum->{COMPLETED};
+      }
+
+      if (! defined $earliest
+       || $datum->{COMPLETED}-$datum->{ELAPSED} < $earliest)
+      { $earliest=$datum->{COMPLETED}-$datum->{ELAPSED};
+      }
+    }
+
+  die "no log entries!" if ! @log;
+  ## warn "latest=$latest\n";
+  ## warn "earliest=$earliest\n";
+  $latest=$earliest+1 if $latest <= $earliest;
+
+  $::Epoch = $earliest;
+  $::Slotsize = ($latest-$earliest)/100;
+}
+
+$::Threshold = $::Slotsize*256*1024/10;
+
+warn scalar(@log)." lines loaded\n";
+
+warn "tally totals...\n";
+# tally data per host
+undef %::RawTotals;
+$::AllTotal=0;
+for my $datum (@log)
+{ my $key = $::CatFn->($datum);
+  $::RawTotals{$key}+=$datum->{SIZE};
+}
+map( ($::AllTotal+=$::RawTotals{$_}), keys %::RawTotals);
+
+# index totals so we can get the top n
+{ my @keys = sort { $::RawTotals{$b} <=> $::RawTotals{$a} } keys %::RawTotals;
+  for my $i (0..$#keys)
+  { $::TotalNdx{$keys[$i]}=$i;
+  }
+}
+
+my $nlog = @log;
+my $opcnt = 0;
+my $n;
+
+warn "distribute data...\n";
+DATUM:
+  for my $datum (@log)
+  {
+    # report progress
+    $n++;
+    my $pcnt = int(100*$n/$nlog);
+    if ($pcnt != $opcnt)
+    { out("completed $pcnt%");
+      $opcnt=$pcnt;
+    }
+
+    my $key = $::CatFn->($datum);
+    if ($::TotalNdx{$key} >= 6)	## $::RawTotals{$key}/$::AllTotal < 0.05
+    { $key=MISC;
+    }
+    ## warn "key=$key" if $key ne MISC;
+
+    my $S = slotSet($key);
+
+    $::Totals{$key}+=$datum->{SIZE};
+
+    my $comp = $datum->{COMPLETED};
+    my $start= $comp-$datum->{ELAPSED};
+
+    ## print cs::Hier::h2a($datum,1), "\n";
+    ## warn "$key: start=$start, comp=$comp, size=$datum->{SIZE}\n";
+
+    if ($start > $comp) { warn "HUH? datum=".cs::Hier::h2a($datum,1); }
+    elsif ($start == $comp) { $start=$comp-1; } # fake it
+
+    $S->Distribute($datum,$start,$comp);
+    $::KeyTotals{$key}+=$datum->{SIZE};
+  }
+out('');
+
+## print "\nS=", cs::Hier::h2a($S,1), "\n";
+
+warn "generate graph...\n";
+my $G = new GIFgraph::bars(800,600);
+
+my $maxslot = ::max(map(slotSet($_)->MaxSlotNdx(), keys %::S));
+my $minslot = ::min(map(slotSet($_)->MinSlotNdx(), keys %::S));
+
+warn "lowndx=$minslot, high=$maxslot";
+
+my @keys = reverse sort { $::Totals{$a} <=> $::Totals{$b} } keys %::Totals;
+
+$G->set( 'x_label_skip' => int($maxslot)/10,
+	 'y_min_value'  => 0,
+	 'y_max_value'  => $::Threshold,
+	 'y_number_format' => \&byteCount,
+	 't_margin'     => 5,
+	 'b_margin'     => 5,
+	 'l_margin'     => 5,
+	 'r_margin'     => 5,
+	 'interlaced'	=> 0,
+	 'title'	=> 'Timeslots of '.secondCount($::Slotsize),
+	 'overwrite'    => 2,
+	 'transparent'	=> 0,
+       );
+
+$G->set_legend( map(legend($_), @keys) );
+
+my @data = ();
+
+{ my $S = slotSet($keys[0]);
+  warn "push labels...";
+  push(@data, [ map(shortTime($S->NdxLowOffset($_)), $minslot..$maxslot) ]);
+}
+
+for my $key (@keys)
+{ my $S = slotSet($key);
+
+  warn "push data for $key ...\n";
+  push(@data,
+	[ map(::min($::Threshold, $S->Slot($_)->{TOTAL}), $minslot..$maxslot)
+	]);
+}
+
+warn "plot graph...\n";
+
+print $G->plot( \@data );
+
+exit $::Xit;
+
+sub slotSet
+	{ my($key)=@_;
+
+	  $::S{$key}=new cs::Stats::Slots ($::Epoch, $::Slotsize, SIZE, $::Threshold)
+		if ! exists $::S{$key};
+
+	  $::S{$key};
+	}
+
+# read log lines from a file
+sub readFILE
+	{ my($FILE)=@_;
+
+	  my @data;
+	  my $datum;
+
+	  while (defined ($datum=readFILEline($FILE)))
+		{ if (ref $datum)
+			{ push(@data,$datum);
+			}
+		  else	{ $::Xit=1;
+			}
+		}
+
+	  @data;
+	}
+
+sub readFILEline
+	{ my($FILE)=@_;
+
+	  local($_)=scalar(<$FILE>);
+
+	  return undef if ! defined;
+
+	  my $datum = decodeLine($_);
+
+	  return $datum if ref $datum;
+
+	  chomp;
+	  warn "$::cmd: $FILE, $.: parse error on: $_\n";
+	  0;
+	}
+
+# extra info from a log line sub
+sub decodeLine
+	{ local($_)=@_;
+
+	  chomp;
+	  my @f = grep(length,split);
+	  return undef if @f < 10;
+
+	  ## warn "f=[@f]";
+
+	  my($completed,$elapsed,$client,$hitmiss,
+	     $size,$method,$uri,$ident,$hier,$content)=@f;
+
+	  return undef if $completed !~ /^\d+\.\d+$/
+		       || $elapsed !~ /^\d+$/
+		       || $hitmiss !~ m:^[_\w]+/\d{3}$:
+		       || $size !~ /^\d+$/
+		       || $method !~ /^\w+$/
+		       || $hier !~ m:^[_\w]+/\S:
+		       || ($content ne '-' && $content !~ m:/:)
+		       ;
+
+	  my ($act_type, $act_code) = ($hitmiss =~ /(.*)\/(.*)/);
+	  my ($hier_type, $hier_from) = ($hier =~ /(.*)\/(.*)/);
+	  my ($type, $subtype) = ( $content =~ m:/:
+				   ? ($`,$')
+				   : ('unknown', 'unknown')
+				 );
+
+	  { COMPLETED => $completed+0,	# seconds, to ms resolution
+	    ELAPSED => $elapsed/1000,	# duration in seconds, to ms resolution
+	    CLIENT => $client,		# requestor
+	    ACTION_TYPE => $act_type,	# TCP_HIT, etc
+	    ACTION_CODE => $act_code,	# 404, etc
+	    SIZE => $size+0,		# fetched data in bytes
+	    METHOD => $method,		# GET, etc
+	    URI => $uri,		# http://blah etc
+	    IDENT => $ident,
+	    HIER_TYPE => $hier_type,	# SINGLE_PARENT, etc
+	    HIER_FROM => $hier_from,	# upstream proxy or host
+	    TYPE => $type,		# text, etc
+	    SUBTYPE => $subtype,	# plain, etc
+	  }
+	}
+
+sub shortTime
+	{ my($gmt)=@_;
+
+	  my $tm = cs::Date::gmt2tm($gmt,1);
+
+	  sprintf("%2d:%02d%2s",
+		($tm->{HH}-1)%12+1, $tm->{MM},
+		( $tm->{HH} > 12 || ($tm->{HH} == 12 && $tm->{MM} > 0)
+		? 'pm'
+		: 'am'
+		));
+	}
+
+sub byteCount
+	{ my($n)=@_;
+
+	  my $fmt;
+
+	  if ($n < 1024)	{ $fmt="%d"; }
+	  elsif ($n < 1024*1024){ $fmt="%1.1fK"; $n/=1024; }
+	  elsif ($n < 1024*1024*1024){ $fmt="%1.1fM"; $n/=1024*1024; }
+	  elsif ($n < 1024*1024*1024*1024){ $fmt="%1.1fG"; $n/=1024*1024*1024; }
+
+	  sprintf($fmt,$n);
+	}
+
+sub secondCount
+	{ cs::Date::timestr(@_);
+	}
+
+sub simpleHost
+	{ local($_)=@_;
+
+	  if ($_ eq '127.0.0.1')
+	  { $_=NOADS;
+	  }
+	  elsif (/^\d+\.\d+\.\d+\.\d+$/)
+	  # numeric - convert to name
+	  { my @h = cs::Net::hostnames(cs::Net::a2addr($_));
+	    $_ = $h[0] if @h;
+	  }
+
+	  if (substr($_, -length($::SiteSuffix)) eq $::SiteSuffix)
+	  { substr($_, -length($::SiteSuffix))='';
+	  }
+
+	  lc;
+	}
+
+sub legend
+	{ my($key)=@_;
+
+	  my $pcnt = 100*$::KeyTotals{$key}/$::AllTotal;
+
+	  $pcnt >= 1 ? sprintf("%s - %d%%",$key,$pcnt) : $key;
+	}
+
+sub clientKey { simpleHost(shift->{CLIENT}) }
+sub websiteKey{ local($_)=lc(shift->{URI});
+		s/^\w+:\/\/+//;
+		s/[^-.\w].*//;
+		$_;
+	      }
+sub protocolKey{ local($_)=lc(shift->{URI});
+		 /\W/ ? $` : $_;
+	       }
+sub datatypeKey{ local($_)=@_;
+		 ## my(@c)=caller; warn "datatypeKey(@_) from [@c]";
+		 lc($_->{TYPE}.'/'.$_->{SUBTYPE});
+	       }
+sub datasizeKey{ my $size = shift->{SIZE}+0;
+		 if ($size < 1024)	{ "sub 1k" }
+		 elsif ($size < 10240)	{ "sub 10k" }
+		 elsif ($size < 102400)	{ "sub 100k" }
+		 elsif ($size < 1024*1024) { "sub 1M" }
+		 elsif ($size < 10*1024*1024) { "sub 10M" }
+		 else			{ "10M+" }
+	       }
+
+sub suffixKey  { local($_)=lc(shift->{URI});
+
+		 s/[?#].*//;		# trim query or anchor
+		 s/^\w+:\/\/[^\/]+//;	# trim scheme://host
+
+		 m:\.([^/.]+)$:
+		 ? $1
+		 : m:/$:	# suffix
+		   ? 'html'	# infer index.html
+		   : 'NONE'
+		 ;
+	       }
