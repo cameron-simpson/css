@@ -1,0 +1,15 @@
+#!/bin/sh
+#
+# Read permuted index, emit HTML table of citations.
+# The permuted index should be like that produced from htmlptx:
+#	file	left-context	keyword	right-context	line-number
+# tab separated.
+#	- Cameron Simpson <cs@zip.com.au> 01dec2004
+#
+
+cmd=$0
+usage="Usage: $cmd <ptx >html"
+
+echo "<TABLE>"
+awk '-F	' '{ print "<TR><TD ALIGN=LEFT>" $1 "<TD ALIGN=RIGHT>" $2 "<TD ALIGN=LEFT><A HREF=\"" $1 "#" $5 "\">" $3 "</A> " $4 }'
+echo "</TABLE>"
