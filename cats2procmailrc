@@ -10,7 +10,7 @@ cats2procmailrc - generate a procmail recipe from my mail categories file
 
 =head1 SYNOPSIS
 
-cats2procmailrc [B<-t> I<type>] E<lt>categories E<gt>procmailrc
+cats2procmailrc [B<-m> I<maildomain>] [B<-t> I<type>] E<lt>categories E<gt>procmailrc
 
 =head1 DESCRIPTION
 
@@ -28,6 +28,25 @@ I build my B<.procmailrc> with the following myke(1) rule:
 Which starts with a few small manual rules from B<procmailrc.pre>
 and adds the automatic rules by converting my categories file.
 
+=head1 OPTIONS
+
+=over 4
+
+=item B<-m> I<maildomain>
+
+Specify the default mail domain for rule addresses lacking an B<@I<domain>>.
+The default comes from the environment variable B<$SITENAME>.
+
+=item B<-t> I<type>
+
+Specify the default mailbox type.
+If the mailbox exists the type is deduced automatically,
+but otherwise uses this default, which may be one of
+B<unix>, B<maildir> or B<mh>.
+The default is B<unix>.
+
+=back
+
 =head1 FILE FORMAT
 
 The categories file consists of single line entries of the form:
@@ -44,11 +63,6 @@ I have at the top of my screen for mail items I should read I<now>.
 The I<folder> names the folder in which to place the mail item.
 Normail UNIX mail files,
 MH style directories and Maildir style directories are autodetetected.
-
-The B<-t> option
-selects the default folder type if the folder does not exist.
-The I<type> may be one of B<unix> (the default),
-B<maildir> or B<mh> for the three types above.
 
 The I<tag> is placed at the start of the mail's B<Subject> line for ready recognition in mixed folders.
 The special tag dot (".") suppresses this action.
@@ -104,38 +118,43 @@ BEGIN { use cs::DEBUG; cs::DEBUG::using(__FILE__);
       }
 
 use strict vars;
+use Getopt::Std;
 
 ($::cmd=$0) =~ s:.*/::;
 $::Usage="Usage: $::cmd [-t {unix|mh|maildir}] <categories >procmailrc
+	-m type	Select default mail domain.
 	-t type	Select default mailbox type.
 ";
 
 $::DfltSfx="";	# unix style by default
+$::DfltDom=$ENV{SITENAME};
 
 { my $badopts=0;
 
-  if (@ARGV && $ARGV[0] eq '-t')
-  { shift(@ARGV);
-    if (! @ARGV)
-    { warn "$::cmd: -t: missing type\n";
-      $badopts=1;
+  if (! getopts("m:t:"))
+  { warn "$::cmd: bad options\n";
+    $badopts=1;
+  }
+
+  if (defined $::opt_m)
+  { $::DfltDom=$::opt_m;
+  }
+
+  if (defined $::opt_t)
+  { my $type = uc($::opt_t);
+
+    if ($type eq UNIX)
+    { $::DfltSfx='';
+    }
+    elsif ($type eq MAILDIR)
+    { $::DfltSfx='/';
+    }
+    elsif ($type eq MH)
+    { $::DfltSfx='/.';
     }
     else
-    { my $type = uc(shift(@ARGV));
-
-      if ($type eq UNIX)
-      { $::DfltSfx='';
-      }
-      elsif ($type eq MAILDIR)
-      { $::DfltSfx='/';
-      }
-      elsif ($type eq MH)
-      { $::DfltSfx='/.';
-      }
-      else
-      { warn "$::cmd: -t: bad mailbox type \"$type\"\n\tI know: UNIX MAILBOX MH.\n";
-	$badopts=1;
-      }
+    { warn "$::cmd: -t: bad mailbox type \"$type\"\n\tI know: UNIX MAILBOX MH.\n";
+      $badopts=1;
     }
   }
 
@@ -187,7 +206,7 @@ while (<STDIN>)
   { $ptn=$1;
   }
   else
-  { $ptn.="\@.*$ENV{SITENAME}" if $ptn !~ /\@/;
+  { $ptn.="\@.*$::DfltDom" if $ptn !~ /\@/;
   }
 
   $ptn =~ s/\.[^*]/\\$&/g;
