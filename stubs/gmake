@@ -1,0 +1,14 @@
+#!/bin/sh
+
+case $SYSTEMID-$ARCH in
+    *-linux.*.linux)	gmake=/usr/bin/make ;;
+    *-sun.*.solaris)	gmake=/usr/local/bin/gmake ;;
+    *)			echo "$0: where is gmake?" >&2; exit 1 ;;
+esac
+
+if [ -t 1 ]
+then
+    exec colourise "$gmake" ${1+"$@"}
+else
+    exec "$gmake" ${1+"$@"}
+fi
