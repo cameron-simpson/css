@@ -7,8 +7,10 @@
 cmd=`basename "$0"`
 usage="Usage: $cmd [-d logdir] logbase [{-c shcmd | cmd [args...]}]"
 
-logdir=${VARLOG:-"$HOME/var/log"}/sessions
-SHELL=${SHELL:-/bin/sh}
+: ${LOGDIR:=$HOME/var/log}
+: ${SHELL:=/bin/sh}
+
+logdir=$LOGDIR/sessions
 
 badopts=
 
