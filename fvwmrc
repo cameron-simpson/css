@@ -6,5 +6,5 @@
 
 . $HOME/rc/x11/xenv.sh
 
-uncurly $HOME/rc/x11/fvwm2/rc.curly \
+uncurly $HOME/rc/x11/fvwm/rc.curly \
 | tee $HOME/fv.rc
