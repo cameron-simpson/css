@@ -22,6 +22,7 @@ exec \
 	'--include=/.bashrc' \
 	'--include=/.cvsrc' \
 	'--include=/.getnews-state' \
+	'--include=/.gkrellm2' \
 	'--include=/.gtkrc' \
 	'--include=/.gtkrc-2.0' \
 	'--include=/.inputrc' \
@@ -53,6 +54,7 @@ exec \
 	'--include=/rc/cvs' \
 	'--include=/rc/env' \
 	'--include=/rc/getnews' \
+	'--include=/rc/gkrellm2' \
 	'--include=/rc/gnupg' \
 	'--include=/rc/gnupg/options' \
 	'--include=/rc/gnupg/pubring.gpg' \
