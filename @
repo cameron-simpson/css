@@ -5,7 +5,7 @@
 #
 
 [ $# = 0 ] && case $SYSTEMID in
-		cisra)	set linux,solaris,cass,sweet,ivory ;;
+		cisra)	set ferrari,linux,solaris,cass,sweet,ivory,elph ;;
 		home)	set jekyll,janus,alpha ;;
 		*)	echo "$0: no default host list for SYSTEMID == \"$SYSTEMID\"" >&2
 			exit 1
@@ -21,11 +21,6 @@ case "$host" in
 	done
 	exit 0
 	;;
-esac
-
-case $host in
-    *@*)	;;
-    *)		host=$host@$SYSTEMID ;;
 esac
 
 exec rterm "$host" ${1+"$@"}
