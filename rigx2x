@@ -1,0 +1,53 @@
+#!/bin/sh
+#
+# Wrapper for x2x and x2vnc to use default options.
+#	- Cameron Simpson <cs@zip.com.au> 28dec2000
+#
+
+cmd=`basename "$0"`
+
+side=
+to=
+from=
+buttonblock=-buttonblock
+x2xopts=
+passwd=
+shared=
+
+real=/opt/bin/$cmd
+case $cmd in
+    x2x)	toopt=-to fromopt=-from ;;
+    x2vnc)	shared=-shared buttonblock= toopt= fromopt=-listen ;;
+esac
+
+case $HOST@$SYSTEMID in
+    amadeus@home)	side=-west to=msdog:0 passwd=$HOME/rc/vnc/passwd-msdog@home ;;
+    janus@home)		side=-east to=cerebus:0 ;;
+    tiomkin@cisra)	side=-west to=wendy:0 ;;
+esac
+
+while [ $# -gt 0 ]
+do  case $1 in
+	-to)		to=$2; shift ;;
+	-from)		from=$2; shift ;;
+	-east|-west)	side=$1 ;;
+	-geometry)	side="$1 $2"; shift ;;
+	-buttonblock)	buttonblock=$1 ;;
+	+buttonblock)	buttonblock= ;;
+	-shadow|-sticky) x2xopts="$x2xopts $1 $2"; shift ;;
+	-*)		x2xopts="$x2xopts $1" ;;
+	*:*)		to=$1 ;;
+	*)		echo "$0: unrecognised argument discarded: $1" >&2
+			;;
+    esac
+    shift
+done
+
+# install the chosen options
+[ -n "$side" ] && { set x ${1+"$@"} $side; shift; }
+[ -n "$x2xopts" ] && { set x ${1+"$@"} $x2xopts; shift; }
+[ -n "$from" ] && { set x ${1+"$@"} $fromopt "$from"; shift; }
+[ -n "$to" ] && { set x ${1+"$@"} $toopt "$to"; shift; }
+
+set -x
+"$real" $passwd $shared $buttonblock ${1+"$@"} &
