@@ -79,8 +79,7 @@ popurl()
   for url
   do
       [ -n "$URLLOG" ] && echo "urlshow $url" >>"$URLLOG"
-      ## lock mozilla-xremote-client
-      if mozilla-xremote-client "openurl($url,$popurl_mode)"
+      if lock mozilla-xremote-client mozilla-xremote-client "openurl($url,$popurl_mode)"
       then  popurl_mode=new-tab
       else  popurl_ret=1
       fi
