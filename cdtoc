@@ -30,7 +30,7 @@ if (@q < 1)
 { die "$::cmd: no matches for $discid\n";
 }
 
-if (@q > 1)
+if (@q > 1 || @q > 0 && $q[0]->[2] ne $discid)
 { warn "$::cmd: multiple matches for discid $discid:\n";
   my $m;
   for my $i (1..@q)
