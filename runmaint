@@ -34,7 +34,7 @@
 # with the script itself in B</bin/runmaint> or B</opt/script/runmaint> or B</usr/local/bin/runmaint>
 # and so forth.
 # The examples below presume the prefix is B</>
-# and should be adjusted to match how your install is arranged.
+# and should be adjusted to your install arrangement.
 #
 # =head1 PERSONAL SETUP
 #
@@ -82,6 +82,10 @@
 # B<runmaint> infers B<$HOST> from the first component of the output of the hostname(1) command,
 # and sets B<$SYSTEMID> to B<localdomain>.
 #
+# Additionally,
+# if B<foo> names a directory
+# then all files in the top level of that directory are run.
+#
 # =head1 ENVIRONMENT
 #
 # Before running any script
@@ -104,16 +108,18 @@
 #
 # in this way sourcing the user's normal startup files.
 #
+# =head2 RUNMAINT_DIR
+#
 # Installation prefix, typically C</opt/css> or C</usr/local>.
 # The C</opt/css> path fits the syncopt scheme as described here:
 #
 #	http://www.cskk.ezoshosting.com/cs/syncopt/
 #
-# Can be overridden by presetting this variable.
-RUNMAINT_DIR=${RUNMAINT_DIR:-/opt/runmaint}
+# If not set, runmaint attempts to deduce it.
+: ${RUNMAINT_DIR:=/opt/runmaint}
 MaintDir=$RUNMAINT_DIR
 
-USER=${USER-$LOGNAME}; export USER
+USER=${USER:-$LOGNAME}; export USER
 [ -n "$USER" ] || { echo "$0: no \$USER or \$LOGNAME, bailing out" >&2
 		    exit 1
 		  }
@@ -125,8 +131,12 @@ then    RUNMAINT="$0 -E"
 else    RUNMAINT="$RUNMAINT_DIR/bin/runmaint -E"
 fi
 RunMaint=$RUNMAINT
-RUNMAINT_ETC=$RUNMAINT_DIR/etc/runmaint MaintEtc=$RUNMAINT_ETC
-RUNMAINT_SCRIPTS=${RUNMAINT_SCRIPTS:-$HOME/.maint} MaintScripts=$RUNMAINT_SCRIPTS
+
+RUNMAINT_ETC=$RUNMAINT_DIR/etc/runmaint
+MaintEtc=$RUNMAINT_ETC
+
+: ${RUNMAINT_SCRIPTS:=$HOME/.maint}
+MaintScripts=$RUNMAINT_SCRIPTS
 
 export RUNMAINT_DIR MaintDir \
        RUNMAINT_SCRIPTS MaintScripts \
@@ -285,108 +295,130 @@ case $target in
     *)		targetbase=$target ;;
 esac
 
+# runscript pathname [addrs...]
+runpath()
+{
+  _rp=$1; shift
+  echo "runpath $_rp..." >&2
+  _rp_addrs=$*
+  _rp_dir=`dirname "$_rp"` || return 1
+  _rp_env=$_rp_dir/env
+  [ -s "$_rp_env" ] || _rp_env=
+  _rp_xit=0
+  if [ -d "$_rp/." ]
+  then
+    for _rp_f in "$_rp/"*
+    do  echo "dirscript $_rp_f ..." >&2; runscript "$_rp_f" $_rp_addrs || _rp_xit=1
+    done
+  else
+    if [ -r "$_rp" ]
+    then  echo "script $_rp ..." >&2; runscript "$_rp" $_rp_addrs || _rp_xit=1
+    fi
+  fi
+  return $_rp_xit
+}
+
+# runscript scriptpath [addrs...]
+runscript()
+{
+  _rs=$1; shift
+  _rs_addrs=$*
+  _rs_dir=`dirname "$_rs"` || return 1
+  _rs_xit=0
+
+  # log every run here as single line
+  echo "`date` `hostname` $_rs [$invocation]" >>"$_rs_dir/.runlog"
+
+  if [ -z "$_rs_addrs" ]
+  then
+    # if no addresses
+    # then write a log if there's a log dir
+    # otherwise email the user
+    _rs_logdir=$_rs_dir/log
+    if [ -d "$_rs_logdir/." ]
+    then
+	_rs_log=$_rs_logdir/`basename "$_rs"` || return 1
+	[ -d "$_rs_log/." ] && { _rs_log=$_rs_log/`datecode` || return 1; }
+    else
+	_rs_addrs=${EMAIL:-$USER}
+    fi
+  fi
+
+  _rs_merge=1	# merge stdout and stderr
+
+  case "$_rs_addrs" in
+      '') _rs_logdir2=`dirname "$log"` || return 1
+	  mkdir -p "$_rs_logdir2" || return 1
+	  ;;
+      -)  _rs_merge=
+	  ;;
+  esac
+
+  ( [ -n "$_rp_env" ] && { $traceon; . "$_rp_env"; $traceoff; }
+    [ $_rs_merge ] && exec 2>&1
+    exec sh $xflag "$_rs"
+  ) \
+  | case "$_rs_addrs" in
+      '') exec sh -c "exec >>'$_rs_log'
+		      echo
+		      echo '============================'
+		      echo 'command=$invocation'
+		      echo 'script=$_rs'
+		      date
+		      exec execif cat"
+	  ;;
+      -)  exec cat ;;
+      *)  exec mailif -s "$subj" $_rs_addrs ;;
+    esac
+
+  return 0
+}
+
 for script in $try
 do
+    echo "$script ..." >&2
     # run the script if present
-    if [ -r "$script" ]
-    then
-	scriptdir=`dirname "$script"`
+    runpath "$script" || xit=1
 
-	# log every run here as single line
-	echo "`date` `hostname` $script [$invocation]" >>"$scriptdir/.runlog"
-
-	# if no addresses
-	# then write a log if there's a log dir
-	# otherwise email the user
-	if [ "x$addresses" = x ]
-	then
-	    logdir=$scriptdir/log
-	    if [ -d "$logdir/." ]
-	    then
-		log=$logdir/$targetbase@$HOST
-		[ -d "$log/." ] && log=$log/`datecode`
-	    else
-		addresses=${EMAIL:-$USER}
-	    fi
-	fi
-
-	ok=1
-	merge=1
-	case "$addresses" in
-	    '')	logdir=`dirname "$log"`
-		[ -d "$logdir/." ] \
-		|| mkdir -p "$logdir" \
-		|| { echo "$0: can't make log dir \"$logdir\"" >&2
-		     echo "	suppressing run of \"$script\"" >&2
-		     xit=1
-		     ok=
-		   }
-		;;
-	    -)	merge=
-		;;
-	esac
-
-	if [ $ok ]
-	then
-	    ( [ -s "$scriptdir/env" ] && { $traceon; . "$scriptdir/env"; $traceoff; }
-	      [ $merge ] && exec 2>&1
-	      exec sh $xflag "$script"
-	    ) \
-	    | case "$addresses" in
-		'') exec sh -c "exec >>'$log'
-				echo
-				echo '============================'
-				echo 'command=$invocation'
-				echo 'script=$script'
-				date
-				exec execif cat"
-		    ;;
-		-)  exec cat ;;
-		*)  exec mailif -s "$subj" $addresses ;;
-	      esac
-	fi
-    fi
-
-    for localscript in "$script.$HOST" "$script.$HOST@$SYSTEMID"
+    osubj=$subj
+    for ext in "$HOST" "$HOST@$SYSTEMID"
     do
-      if [ -r "$localscript" ]
-      then
-	  $RUNMAINT -date "$datestr" $xflag -s "$subj - perhost($HOST)" "$localscript" $addresses \
-	  || xit=$?
-      fi
+      localscript=$script.$ext
+      subj="$osubj - perhost($ext)"
+      runpath "$localscript" || xit=1
     done
 
     # run the implied scripts
     case $target in
-	hourly)
-		$RUNMAINT -date "$datestr" $xflag hourly.$hh $addresses || xit=1
-		if [ $hh -eq 0 ]
-		then
-		    $RUNMAINT -date "$datestr" $xflag daily $addresses \
-		    || xit=$?
-		fi
-		;;
-	daily)
-		$RUNMAINT -date "$datestr" $xflag "$wday" $addresses || xit=$?
-		$RUNMAINT -date "$datestr" $xflag "daily.$wday" $addresses || xit=$?
-		if [ "x$wday" = xmon ]
-		then
-		    $RUNMAINT -date "$datestr" $xflag weekly $addresses \
-		    || xit=$?
-		fi
-		if [ $mday -eq 1 ]
-		then
-		    $RUNMAINT -date "$datestr" $xflag monthly $addresses \
-		    || xit=$?
-		fi
-		;;
-	monthly)
-		if [ $mon = jan ]
-		then
-		    $RUNMAINT -date "$datestr" $xflag yearly $addresses \
-		    || xit=$?
-		fi
-		;;
+      hourly)
+	$RUNMAINT -date "$datestr" $xflag hourly.$hh $addresses || xit=1
+	if [ $hh -eq 0 ]
+	then
+	    $RUNMAINT -date "$datestr" $xflag daily $addresses \
+	    || xit=$?
+	fi
+	;;
+      daily)
+	$RUNMAINT -date "$datestr" $xflag "$wday" $addresses || xit=$?
+	$RUNMAINT -date "$datestr" $xflag "daily.$wday" $addresses || xit=$?
+	if [ "x$wday" = xmon ]
+	then
+	    $RUNMAINT -date "$datestr" $xflag weekly $addresses \
+	    || xit=$?
+	fi
+	if [ $mday -eq 1 ]
+	then
+	    $RUNMAINT -date "$datestr" $xflag monthly $addresses \
+	    || xit=$?
+	fi
+        ;;
+      monthly)
+	if [ $mon = jan ]
+	then
+	    $RUNMAINT -date "$datestr" $xflag yearly $addresses \
+	    || xit=$?
+	fi
+	;;
     esac
 done
 
