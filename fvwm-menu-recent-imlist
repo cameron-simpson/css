@@ -1,0 +1,8 @@
+#!/bin/sh
+#
+# Make recent imlist menu from log file on input.
+# Arguments as for lastn.
+#	- Cameron Simpson <cs@zip.com.au> 19mar2003
+#
+
+lastn ${1+"$@"} | reverse | fvwm-menu-imlist -l - -o menubg .
