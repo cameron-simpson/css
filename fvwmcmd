@@ -1,17 +1,15 @@
 #!/bin/sh
 
-[ -n "$FVWMCMDLOG" ] || { echo "$0: no \$FVWMCMDLOG envvar" >&2; exit 1; }
-[ -f "$FVWMCMDLOG" ] || { echo "$0: $FVWMCMDLOG missing!" >&2; exit 1; }
+##[ -n "$FVWMCMDLOG" ] || { echo "$0: no \$FVWMCMDLOG envvar" >&2; exit 1; }
+##[ -f "$FVWMCMDLOG" ] || { echo "$0: $FVWMCMDLOG missing!" >&2; exit 1; }
+##exec >>"$FVWMCMDLOG"
 
-exec >>"$FVWMCMDLOG"
 if [ $# = 0 ]
 then
     # don't use "cat" because I want unbuffered output
-    while read arg
-    do  echo "$arg"
-    done
+    FvwmCommand -c
 else
     for arg
-    do  echo "$arg"
+    do  FvwmCommand "$arg"
     done
 fi
