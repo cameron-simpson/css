@@ -1,0 +1,11 @@
+#!/bin/sh
+#
+# Add a total of an arbitrary column to a report.
+#	- Cameron Simpson <cs@zip.com.au> 14apr98
+#
+
+col=1
+case $1 in --) shift ;; [1-9]|[1-9][0-9]) col=$1; shift ;; esac
+
+awk "		{ total+=\$$col; print; }
+     END	{ print total; }" ${1+"$@"}
