@@ -1,0 +1,40 @@
+#!/bin/sh
+#
+# Verify authentication using UNIX NIS crypt password for a CGI script.
+#	- Cameron Simpson <cs@zip.com.au> 15feb2001
+#
+# Exit status:
+#	0	Login and password match.
+#	1	Mismatch or lookup failure.
+#	2	Usage (invocation error).
+#
+
+cmd=$0
+usage="Usage: $cmd [login password [crypt]]"
+
+case $# in
+    0)	set x $HTTP_AUTHORIZATION
+	case $# in
+	    3)	type=$2 b64=$3 ;;
+	    *)	echo "$cmd: unrecognised Authorization header \"$HTTP_AUTHORIZATION\"" >&2
+		exit 1
+		;;
+	esac
+	case $type in
+	    [Bb][Aa][Ss][Ii][Cc])
+		;;
+	    *)	echo "$cmd: unsupported authentication scheme \"$type\"" >&2
+		exit 1
+		;;
+	esac
+	settings=`echo "$b64" | (unb64;echo) | sed -n -e "s/'/'\\\\\\\\''/g" -e "s/^\\([^:]*\\):\\(.*\\)/userid='\\1' password='\2'/p" -e 1q`
+	[ -n "$settings" ] \
+	|| { echo "$cmd: malformed userid:password base64: \"$b64\"" >&2
+	     exit 1
+	   }
+	eval "$settings"
+	set x "$userid" "$password"; shift
+	;;
+esac
+
+exec nisauth ${1+"$@"}
