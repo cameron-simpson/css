@@ -9,8 +9,9 @@ usage="Usage: $cmd [-l] dest-port {ALL | hosts...}"
 
 badopts=
 
-dolog=
+dolog=1
 [ "x$1" = x-l ] && { dolog=1; shift; }
+[ "x$1" = x+l ] && { dolog=; shift; }
 
 if [ $# = 0 ]
 then
