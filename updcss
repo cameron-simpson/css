@@ -18,8 +18,7 @@ quick=
 [ "x$1" = x-q ] && { quick=1; shift; }
 [ "x$1" = x-n ] && { dosync=; shift; }
 
-common=/u/syncopt/common/`echo "$SYSTEMID" | tr '[a-z]' '[A-Z]'`
-[ -d "$common/." ] || { echo "$cmd: no \$common: $common" >&2; exit 1; }
+cssdir=/opt/css
 
 if [ -z "$quick" ]
 then
@@ -30,23 +29,25 @@ fi
 
 set -x
 
-if needdir $common/css/man
+if needdir $cssdir/man
 then
   rsync -avH \
 	--delete \
 	--delete-excluded \
+	--exclude=CVS/ \
 	--include='/man[1-9]/' \
 	--exclude='/*' \
-	$HOME/man/cs/. $common/css/man/.
+	$HOME/man/cs/. $cssdir/man/.
 fi
 
-if needdir $common/css/bin
+if needdir $cssdir/bin
 then
-  rsync -aHC \
+  rsync -aH \
 	--copy-links \
 	--copy-unsafe-links \
 	--delete \
 	--delete-excluded \
+	--exclude=CVS/ \
 	--exclude='/synonyms/' \
 	--include=/0README.txt \
 	--include=/CHANGELOG.txt \
@@ -55,54 +56,57 @@ then
 	--include='/cs/**.pm' \
 	--include='/cs/**/' \
 	--exclude='/cs/**' \
-	$HOME/scripts/. $common/css/bin/.
+	$HOME/scripts/. $cssdir/bin/.
 
-  rsync -aHC \
+  rsync -aH \
 	--copy-links \
 	--copy-unsafe-links \
-	$HOME/scripts/synonyms/. $common/css/bin/.
+	--exclude=CVS/ \
+	$HOME/scripts/synonyms/. $cssdir/bin/.
 fi
 
-if needdir $common/css/cgi-bin
+if needdir $cssdir/cgi-bin
 then
-  rsync -aHC \
+  rsync -aH \
 	--copy-links \
 	--copy-unsafe-links \
 	--delete \
 	--delete-excluded \
+	--exclude=CVS/ \
 	--include='/.cgienv.sh' \
 	--include='/*.cgi*' \
 	--exclude='/*' \
-	$HOME/scripts/cgi-bin/. $common/css/cgi-bin/.
+	$HOME/scripts/cgi-bin/. $cssdir/cgi-bin/.
 fi
 
-if needdir $common/css/lib/cs
+if needdir $cssdir/lib/cs
 then
   rsync -avH \
 	--delete \
 	--delete-excluded \
+	--exclude=CVS/ \
 	--include='*/' \
 	--include='*.pm' \
 	--exclude='*' \
-	$HOME/scripts/cs/. $common/css/lib/cs/.
+	$HOME/scripts/cs/. $cssdir/lib/cs/.
 fi
 
-##if needdir $common/css/lib
+##if needdir $cssdir/lib
 ##then
-##  rsync -avW $HOME/rc/java/au.com.zip.cs.jar $common/css/lib/.
+##  rsync -avW $HOME/rc/java/au.com.zip.cs.jar $cssdir/lib/.
 ##fi
 
 wait
 
-cssweb=$HOME/there/cskk.ezoshosting.com/html/cs/css
+cssweb=$HOME/@/ezos/html/cs/css
 if [ -d "$cssweb" ]
 then
-    ( cd $common || exit 1
+    ( cd $cssdir/.. || exit 1
       tar cf - css | gzip -v -9 >$cssweb/css.tar.gz
     )
     for d in man bin lib
     do
-      rsync -avH --delete $common/css/$d/. $cssweb/$d/.
+      rsync -avH --delete $cssdir/$d/. $cssweb/$d/.
     done
     ( cd "$cssweb/bin" || exit 1
       ln -s ../lib/cs .
