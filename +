@@ -75,7 +75,8 @@ do
 done
 
 export mfolder
-set sh -c "set -x; exec mutt -f \"\$mfolder\" $muttopts"
+## -e \"fcc-hook \$mfolder \$mfolder\"
+set sh -c "set -x; exec mutt -f \"\$mfolder\" -e \"fcc-hook . \$mfolder\" $muttopts"
 
 [ $use_screen ] && set scr "mutt_$mfolder" "$@"
 [ $use_term   ] && set term $termopts -n "mutt $mfolder" "$@"
