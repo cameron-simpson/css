@@ -1,0 +1,8 @@
+#!/bin/sh
+
+while read url title
+do
+  [ -n "$title" ] || title=$url
+  title=`echo "$title" | htencode`
+  echo "<A HREF=\"$url\">$title</A><BR>"
+done
