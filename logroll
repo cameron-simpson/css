@@ -36,12 +36,13 @@ do  case $1 in
 	-p)	pid=$2; shift ;;
 	-s)	sig=$2; shift ;;
 	-z)	zme=1 ;;
+	+z)	zme= ;;
 	-x)	case $2 in
-		    .*)	ext=$ext$2 ;;
-		    *)	ext=$ext.$2 ;;
+		    .*)	ext=$2 ;;
+		    *)	ext=.$2 ;;
 		esac; shift ;;
-	+daycode) ext=$ext.`daycode` ;;
-	+datecode) ext=$ext.`datecode` ;;
+	+daycode) ext=.`daycode` ;;
+	+datecode) ext=.`datecode` ;;
 	+*)	fmt=`date "$1"` && [ -n "$fmt" ] && ext=$ext.$fmt ;;
 	--)	shift; break ;;
 	-?*)	echo "$0: unrecognised option: $1" >&2; badopts=1 ;;
