@@ -1,0 +1,47 @@
+#!/usr/bin/perl
+#
+
+sub match	# property,@resources
+	{ local($prop,@res)=@_;
+	  local($class,$tail,@prop)=&parseprop($prop);
+
+	  &submatch(@
+
+	  local($match);
+	  local($rclass,$rtail,@rprop);
+	  local($res,$_,$rprop,$rval);
+
+	  RES:
+	    for $res (@res)
+		{ $_=$res;
+		  s/\s*\r?\n$//;
+		  
+		  next unless /^([^:\s])+:\s*/;
+
+		  ($rprop,$rval)=($1,$');
+		  ($rclass,$rtail,@rprop)=&parseprop($rprop);
+
+		  next RES if $rtail ne $tail;
+		  next RES if length($class)
+			   && length($rclass)
+			   && $class ne $rclass;
+
+		  return ($rprop,$rval) if &submatch(\@prop,\@rprop);
+		  # resource may match, do a left to right match
+		  &submatch(\@prop,\@rprop,@res);
+		}
+	}
+
+sub parseprop	# propertyname -> (class,tail,@midst)
+	{ local($prop)=@_;
+
+	  local(@prop)=split(/[.*]+/,$prop);
+	  local($class,$tail);
+
+	  if ($prop =~ /^[.*]+/)	{ $class=''; $prop=$'; }
+	  else				{ $class=shift @prop; }
+
+	  $tail=pop @prop;
+
+	  ($class,$tail,@prop);
+	}
