@@ -1,0 +1,19 @@
+#!/bin/sh
+#
+# Return the path of a log.
+#	- Cameron Simpson <cs@zip.com.au> 17may1997
+#
+
+[ $# = 0 ] && { echo "Usage: $0 lognames..." >&2; exit 2; }
+
+mapfile=${LOGMAP-"$HOME/.logmap"}.sh
+
+[ -s "$mapfile" ] || { echo "$0: missing map: $mapfile" >&2; exit 1; }
+
+. "$mapfile"
+
+for name
+do  eval "log=\$log_$name"
+    [ -n "$log" ] || log=$HOME/var/log/$name
+    echo "$log"
+done
