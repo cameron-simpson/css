@@ -7,25 +7,32 @@
 
 indextitle="Index of `pwd`"
 dotersefn=1
+doauthinfo=1
 linkfile=
 bykeys=
+usekey=
 
 cmd=$0
-usage="Usage: $cmd [-j] [-l linkfile] [-t title] [podfiles...]
+usage="Usage: $cmd [+a] [-j] [-k] [-K key] [-l linkfile] [-t title] [podfiles...]
+	+a		Don't show author info.
 	-j		Skip JavaScript tersify() function.
 			Useful if you're making several indices in one file.
 	-k		By keywords.
+	-K key		Select POD files and links with the specified key.
 	-l linkfile	Pull plain links from linkfile.
 	-t title 	Set title."
 
 badopts=
+subopts=
 
 while :
 do
   case $1 in
+    +a)	doauthinfo= subopts="$subopts $1" ;;
     -j)	dotersefn= ;;
     -k)	bykeys=1 ;;
-    -l)	linkfile=$2; shift ;;
+    -K)	usekey=$2; shift ;;
+    -l)	linkfile=$2 subopts="$subopts -l $2"; shift ;;
     -t)	title=$2; shift ;;
     --)	shift; break ;;
     -?*)echo "$cmd: unrecognisedoption: $1" >&2
@@ -39,6 +46,7 @@ done
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
 [ $# = 0 ] && set -- *.pod
+[ -n "$usekey" ] && set -- `podsbykey "$usekey" "$@"`
 
 # javascript for "terse" button
 if [ $dotersefn ]
@@ -68,7 +76,10 @@ if [ $bykeys ]
 then
   xit=0
 
-  keys=`podkeywords "$@"`
+  keys=`( podkeywords "$@"
+	  [ -n "$linkfile" ] && awk '{print$2}' "$linkfile" | tr , '\012'
+	) | sort -u
+       `
 
   # generate TOC
   for key in $keys
@@ -92,8 +103,8 @@ then
     [ -n "$defn" ] && echo " - $defn"
     echo "</H2>"
 
-    grep "^$key[      ]" keywords
-    "$0" -j -- `podsbykey "$key" "$@"` || xit=1
+    ##grep "^$key[      ]" keywords
+    "$0" $subopts -j -K "$key" -- "$@" || xit=1
   done
   exit $xit
 fi
@@ -111,14 +122,39 @@ echo "<UL>"
 
     echo "$podfile $author $title"
   done
-  [ -n "$linkfile" ] && sed 's/^[^ 	]*/& HREF/' "$linkfile"
+
+  # list HREFs if supplied
+  # replace keywords with "HREF" in output
+  if [ -n "$linkfile" ]
+  then
+    if [ -n "$usekey" ]
+    then
+      # just the specified keyword
+      sed 'y/	/ /
+	   s/^\([^ ]*\)  *\([^ ]*\)/\1 ,\2,/
+	 '"/^[^ ]*  *[^ ]*,$usekey,/!d" <"$linkfile"
+    else
+      # all HREFs
+      tr '	' ' ' <"$linkfile"
+    fi \
+    | sed 's/^\([^ ]*\)  *[^ ]*/\1 HREF/'
+  fi
 } \
 | sort +2 \
 | while read podfile author title
   do
     if [ "x$author" = xHREF ]
     then
-	echo "    <LI><A HREF=\"$podfile\">$title</A>"
+	# HREFs come from the $linkfile
+	case "$title" in
+	  *,*) anchor=`expr "x$title" : 'x\([^,]*\),.*'`
+	       tail=`expr "x$title" : 'x[^,]*\(,.*\)'`
+	       ;;
+	  *)   anchor=$title
+	       tail=
+	       ;;
+	esac
+	echo "    <LI><A HREF=\"$podfile\">$anchor</A>$tail"
     else
 	htfile=`basename "$podfile" .pod`.html
 
@@ -129,10 +165,12 @@ echo "<UL>"
 	modtime=`ls -ld "$podfile" | awk '{print $6, $7, $8}'`
 
 	echo "    <LI><A HREF=\"$htfile\">$title</A>"
-	echo "        <SMALL>- last change $modtime, author <A HREF=\"mailto:$author\">$fullname</A></SMALL>"
+	[ $doauthinfo ] \
+	&& echo "        <SMALL>- last change $modtime, author <A HREF=\"mailto:$author\">$fullname</A></SMALL>"
 
 	overview_cache=.cache/overview/`basename "$podfile" .pod`.html
-	[ -s "$overview_cache" -a "$overview_cachemyke" -nt "$podfile" ] || myke "$overview_cache" >&2
+	[ -s "$overview_cache" -a "$overview_cache" -nt "$podfile" ] \
+		|| myke "$overview_cache" >&2
 
 	if [ -s "$overview_cache" ]
 	then
