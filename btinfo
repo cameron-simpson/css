@@ -1,0 +1,65 @@
+#!/usr/bin/perl
+#
+# Get info from the budtool system.
+#	- Cameron Simpson <cs@zip.com.au> 07nov2000
+#
+
+BEGIN { use cs::DEBUG; cs::DEBUG::using(__FILE__);
+      }
+
+use strict vars;
+
+use cs::Misc;
+use cs::Upd;
+use cs::BudTool;
+
+my @full;
+
+nl("loading tape database ...");
+LABEL:
+for my $label (sort &cs::BudTool::tapes())
+{
+  out($label);
+
+  my $T = cs::BudTool::tape($label);
+  next LABEL if ! defined $T;
+
+  my($label,$loc,$slot,$drive,$used)
+  = ($T->Label(), $T->Location(), $T->Slot(), $T->Drive(), $T->Used());
+
+  ## warn "$label: loc=$loc, slot=$slot, used=$used\n";
+  next LABEL if $used ne 'full'
+	     || ! length $loc
+	     || length $drive;
+
+  nl("$label, slot $slot: used $used");
+
+  push(@full,$T);
+}
+
+exit 0;
+
+ask("Is the load bay clear") || exit 1;
+
+my $warned = 0;
+my $toeject;
+my @slots;
+
+for my $T (@full)
+{
+  if (! $warned)
+  {
+    nl("Prepare $toeject blank tapes for insertion.");
+    $warned=1;
+
+    $toeject = ::min($::BaySize,scalar(@full));
+    @slots=();
+  }
+
+  push(@slots,$T->Slot());
+
+  if (@slots >= $toeject)
+  { out('');
+    system("nsreject @slots");
+  }
+}
