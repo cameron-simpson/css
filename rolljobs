@@ -5,7 +5,7 @@
 #
 
 scale=1.0
-dir=$SYSTEMID/timer
+dir=timer
 
 cmd=`basename "$0"`
 usage="Usage: $cmd [-d dir] [scale]"
@@ -18,7 +18,7 @@ esac
 
 [ $# = 0 ] || { echo "$usage" >&2; exit 2; }
 
-wkdir=$HOME/var/idsets/$SYSTEMID
+wkdir=$HOME/var/idsets
 cd "$wkdir" || exit 1
 
 current=$wkdir/timer
