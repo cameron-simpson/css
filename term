@@ -165,4 +165,4 @@ if [ $async ]
 then termcmd="acon $termcmd"
 else termcmd="exec $termcmd"
 fi
-eval "set -x; $termcmd"
+eval "$termcmd"
