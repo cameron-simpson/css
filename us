@@ -21,7 +21,7 @@ do  case $1 in
 done
 
 # grab cut/paste buffer if no args
-[ $# = 0 ] && { xclip -o | "$0" -; exit $?; }
+[ $# = 0 ] && { ( xclip -o; echo ) | "$0" -; exit $?; }
 
 case $DISPLAY in
     :*)	id=$HOST$DISPLAY ;;
