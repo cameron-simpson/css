@@ -39,6 +39,8 @@
 # or batch dispatched on all clients by hand via ssh after a new package install.
 #
 
+cmd=`basename "$0"` || cmd=$0
+
 umask 2
 
 # installation directory
@@ -47,11 +49,13 @@ cf=$SYNCOPT_OPT/.syncopt
 
 if [ -z "$ARCH" -a -s "$SYNCOPT_OPT/ARCH" ]
 then
-    ARCH=`cat "$SYNCOPT_OPT/ARCH"`
+    ARCH=`cat "$SYNCOPT_OPT/ARCH"` || { echo "$cmd: can't infer \$ARCH from $SYNCOPT_OPT/ARCH file" >&2
+					exit 1
+				      }
     export ARCH
 fi
 
-pathadd=:/usr/bin:$SYNCOPT_OPT/bin:$SYNCOPT_OPT/script:$SYNCOPT_OPT/css
+pathadd=:/usr/bin:$SYNCOPT_OPT/bin:$SYNCOPT_OPT/script:$SYNCOPT_OPT/css:/opt/css/bin
 PATH=$PATH$pathadd
 export PATH
 
@@ -75,7 +79,8 @@ sedscript="$sedpreamble
 	   :setvar
 	   s/'/'\\\\''/g
 	   s/^\\([^=]*\\)=\\(.*\\)/SYNCOPT_\\1='\\2'; export SYNCOPT_\\1/"
-sedvars=`sed -e "$sedscript" "$cf"`
+sedvars=`[ ! -s "$cf" ] || sed -e "$sedscript" "$cf"` \
+	|| { echo "$cmd: can't parse $cf" >&2; exit 1; }
 eval "$sedvars"
 
 : ${SYNCOPT_RSYNC:=rsync}
@@ -85,11 +90,10 @@ eval "$sedvars"
 : ${SYNCOPT_SUBDIRS:="."}
 : ${SYNCOPT_RSYNCOPTS:=""}
 
-# add a couple of possibilities for finding rsync and readsymlink
-PATH=$PATH:$SYNCOPT_COMMON/script:$SYNCOPT_ARCH/rsync/bin
+# add a couple of possibilities for finding readsymlink and rsync
+PATH=$PATH:$SYNCOPT_COMMON/css/bin:$SYNCOPT_ARCH/rsync/bin:/opt/css/bin
 export PATH
 
-cmd=`basename "$0"`
 usage="Usage: $cmd [-n] [-f] [l] [-R rsync-path] [-x] [-v] [items...]
 	-n	No action (default) - echo necessary actions.
 	-f	Force action.
@@ -275,14 +279,16 @@ resolve=$resolve'
 	    fi
 	done
 	[ $# = 0 ] || ls -d "$@"'
-set x `remote "$resolve"`; shift
+set x `remote "$resolve"` \
+	|| { echo "$cmd: resolution failed" >&2; exit 1; }
+shift
 
 xit=0
 
 # for everything in the central opt dirs
 for thingpath
 do
-    thing=`basename "$thingpath"`
+    thing=`basename "$thingpath"` || exit 1
     ## echo "sync $thing ..."
     ## case "$thing" in gimp*) set -x ;; esac
 
@@ -296,8 +302,8 @@ do
     # get unversioned name for $thing
     case "$thing" in
 	*-[0-9]*)
-	    nvthing=`echo "$thing" | sed 's/-[0-9].*//'`
-	    thingv=`echo "$thing" | sed "s/^$nvthing-//"`
+	    nvthing=`echo "$thing" | sed 's/-[0-9].*//'`  || exit 1
+	    thingv=`echo "$thing" | sed "s/^$nvthing-//"` || exit 1
 	    if [ -z "$nvthing" -o -z "$thingv" ]
 	    then
 		echo "$0: empty nvthing [$nvthing] or thingv [$thinv] !!" >&2
@@ -416,7 +422,10 @@ do
     if [ -n "$opts" ]
     then
 	## echo "opts=[$opts]"
-        eval "$opts"
+        eval "$opts" \
+		|| { echo "$cmd: eval of options FAILED, skipping $thing" >&2
+		     continue
+		   }
     fi
 
     # skip this?
@@ -435,7 +444,7 @@ do
     fi
 
     # maintain generic links
-    rlink=`remote "readsymlink '$r' 2>/dev/null"`
+    rlink=`remote "readsymlink '$r' 2>/dev/null"` || rlink=
     if [ -n "$rlink" ]
     then
 	# make thing into symlink to right version
@@ -543,7 +552,8 @@ exit $xit
 # Extra command line options to supply to rsync(1).
 # This was implemented primarily to allow supply of the B<--copy-links>
 # option to make link safe local copies,
-# robust against loss of a central server which my ordinarily have been supplying
+# robust against loss of a central server
+# which might ordinarily have been supplying
 # some non-local packages.
 #
 # =item B<RSYNC_RSH>
