@@ -9,8 +9,8 @@ use cs::Persist;
 
 my($old,$new);
 
-$old=cs::Persist::db('/usr/local/etc/cisra/db/projects');
-$new=cs::Persist::db('/usr/local/etc/cisra/db/project.new',1);
+$old=cs::Persist::db('/u/network/db/projects');
+$new=cs::Persist::db('/u/network/db/project.new',1);
 
 for (keys %$old)
 	{ $new->{$_}=$old->{$_};
