@@ -1,11 +1,31 @@
 #!/bin/sh
+#
+# Sync hosts from master.
+#	- Cameron Simpson <cs@zip.com.au> 14jan2004
+#
+
+cmd=`basename "$0"`
+usage="Usage: $cmd [-s] [-x] [hosts...]"
+
+needhost amadeus@home || exit 1
+ask "Is $HOST@$SYSTEMID up to date" || exit 1
 
 trace=set-x
 sync=
 [ "x$1" = x-s ] && { shift; sync=1; }
 
-needhost amadeus@home || exit 1
-ask "Is $HOST@$SYSTEMID up to date" || exit 1
+[ $# = 0 ] && set newt jekyll
+
+xit=0
+
+for rhost
+do
+  cf=$HOME/rc/sync/cf.$rhost
+  [ -s "$cf" ] || { echo "$cmd: no cf for $rhost at $cf" >&2; xit=1; continue; }
+done
+
+exit $xit
+
 
 $trace \
 pfx work:opt/redhat.x86.linux \
