@@ -102,7 +102,7 @@ sub STORE($$$)
 
 =head1 AUTHOR
 
-Cameron Simpson E<lt>cs@zip.com.au<gt>
+Cameron Simpson E<lt>cs@zip.com.auE<gt>
 
 =cut
 
