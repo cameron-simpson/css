@@ -1,0 +1,28 @@
+#!/bin/sh
+#
+# Send mail with subject line.
+#	- Cameron Simpson <cs@zip.com.au> 23jun98
+#
+
+cmd=$0
+usage="Usage: $cmd [-s subject] addresses..."
+
+subject=
+case $1 in -s)	subject="Subject: $2"; shift; shift ;; esac
+
+[ $# = 0 ] && { echo "$usage" >&2; exit 2; }
+
+(
+  them=$1; shift
+  while :
+  do
+      case $# in 0) break ;; esac
+      them="$them, $1"
+      shift
+  done
+
+  echo "To: $them"
+  [ -n "$subject" ] && echo "$subject"
+  echo
+  exec cat
+) | smtpsend "$@"
