@@ -10,15 +10,44 @@ s/^[Ss][Uu][Bb][Jj][Ee][Cc][Tt]:[ 	]*//
 t subject
 n
 b top
+
 :subject
-s/^\[[^ 	]*\][ 	]*//
-t subject
-/^[Rr][Ee]:/!b nore
-:re
+# clear the hold space
+x
+s/.*//
+x
+
+:strip
+# strip leading whitespace
+s/^[ 	][ 	]*//
+t strip
+# strip trailing whitespace
+s/[ 	][ 	]*$//
+t strip
+# strip [foo] -> foo (suggestion from Patrick Shanahan)
+s/^\[[ 	]*\(.*\)\]$/\1/
+t strip
+# strip leading [nonwhite]
+s/^\[[^ 	]*\]//
+t strip
+
+# last check: a "re:"?
+/^[Rr][Ee]:/!b finish
+# we have a leading "re:"
+
+# place a "re:" to the hold space
+x
+s/.*/Re:/
+x
+
+# strip leading "re:"
 s/^[Rr][Ee]:[ 	]*//
-t re
-s/^\[[^ 	]*\][ 	]*//
-t re
-s/^/Re: /
-:nore
+t strip
+
+:finish
+# insert hold space at start of line ("" or "Re: " depending on what we saw)
+H
+x
+s/\n/ /
+
 s/^/Subject: /
