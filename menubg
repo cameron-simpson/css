@@ -32,7 +32,7 @@ if [ $# = 1 -a -f "$1" -a -s "$1" ]
 then
     :
 else
-    set x `pickim -P "$strippfx" -n $pickn -r $aspect ${1+"$@"} | sort -u` || exit 1
+    set x `set -x; pickim -P "$strippfx" -n $pickn -r $aspect ${1+"$@"} | sort -u` || exit 1
     shift
     [ $# = 0 ] && exit 1
     [ $# = 1 ] && domenu=
