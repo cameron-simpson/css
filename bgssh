@@ -1,0 +1,23 @@
+#!/bin/sh
+#
+# Wrapper to background ssh and prefix the output.
+#	- Cameron Simpson <cs@zip.com.au> 24may99
+#
+
+usage="Usage: $0 [+x] host [command]"
+
+if [ "x$1" = x+x ]
+then  shift				## use X!
+      xflag=
+else  unset DISPLAY			## no X passprase prompting
+      xflag=-x				## no X forward
+fi
+
+if [ $# = 0 ]
+then  echo "$0: missing host" >&2
+      echo "$usage" >&2
+      exit 2
+else  host=$1; shift
+fi
+
+tag_fd 1,2 "$host" ssh -n $xflag "$host" ${1+"$@"} &
