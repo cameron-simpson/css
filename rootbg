@@ -63,22 +63,20 @@ else
     [ $# = 1 ] && domenu=
 fi
 
-tmpf=/tmp/rootbg$$
-trap 'rm -f "$tmpf"' 0 1 2 15
-
-for arg
-do  echo "$arg"
-done >"$tmpf"
-
 if [ $domenu ]
 then
+    tmpf=/tmp/rootbg$$
+    for arg
+    do  echo "$arg"
+    done >"$tmpf"
     fvwmcmd \
-	  "Piperead 'fvwm-menu -1 ImDirMenu \"$cmd $call\" fvwm-menu-imlist -o rootbg -l $tmpf ." \
+	  "Piperead 'fvwm-menu -1 ImDirMenu \"$cmd $call\" fvwm-menu-imlist -o rootbg -l $tmpf .; rm $tmpf" \
 	  "Popup ImDirMenu"
     exit $?
 fi
 
 imagefile=$1
+echo "$imagefile" >>$HOME/var/log/rootbg
 
 if [ $xplanet ]
 then
