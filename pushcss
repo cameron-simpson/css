@@ -1,6 +1,6 @@
 #!/bin/sh
 #
-# Rebuilt the css kit, put to EZOS, also push account and css to named hosts.
+# Rebuild the css kit, put to EZOS, also push account and css to named hosts.
 #	- Cameron Simpson <cs@zip.com.au> 09jul2004
 #
 
