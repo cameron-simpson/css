@@ -77,6 +77,9 @@
 # you can place the cron line on many machines
 # and still perform specific actions on particular machines
 # simply by adding suitably named scripts.
+# If B<$HOST> or B<$SYSTEMID> are missing,
+# B<runmaint> infers B<$HOST> from the first component of the output of the hostname(1) command,
+# and sets B<$SYSTEMID> to B<localdomain>.
 #
 # =head1 ENVIRONMENT
 #
@@ -88,13 +91,13 @@
 # B<~/.maint/env> is sourced.
 # Personal environment settings go in here as shell commands.
 #
-# Normally you will want the cron environment to resemble the login
+# Usually you will want the cron environment to resemble the login
 # environment closely
 # and so B</etc/runmaint/env> would normally contain the line
 #
 #	. /etc/profile
 #
-# and the B<~/.maint/env> file would normally contain the line
+# and the B<~/.maint/env> file would reasonably contain the line
 #
 #	. $HOME/.profile
 #
@@ -119,6 +122,11 @@ MaintEtc=$MaintDir/etc/runmaint
 MaintScripts=${MaintScripts:-$HOME/.maint}
 
 export MaintDir MaintScripts RunMaint
+
+SYSTEMID=${SYSTEMID:-localdomain}
+HOST=${HOST:-`hostname`}
+case $HOST in *.*) HOST=`expr "x$HOST" : 'x\([^.]*\)\..*'` ;; esac
+export HOST SYSTEMID
 
 usage="Usage: $0 [-d dir] [-s subj] [-date datestr] [-x] target [addresses]
     See:
@@ -229,11 +237,6 @@ addresses=$*
 #
 # =back
 #
-
-$traceon
-[ $noenv ] \
-|| { [ -s "$MaintEtc/env" ] && { $traceon; . "$MaintEtc/env"; $traceoff; }; }
-$traceoff
 
 # note starting time
 if [ -n "$datestr" ]
