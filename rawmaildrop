@@ -29,7 +29,7 @@ done
 [ -n "$logit" ] || exit 0
 
 ( PATH=$HOME/scripts:$PATH:/opt/script:/opt/bin
-  log=`logpath filemail`
+  log=$LOGDIR/filemail
   [ -s "$log" ] && echo "$f $mbox" >>"$log"
 ) </dev/null >/dev/null 2>&1 &
 
