@@ -1,7 +1,7 @@
 use cs::Persist;
 
-$old=cs::Persist::db('/usr/local/etc/cisra/db/projects');
-$new=cs::Persist::db('/usr/local/etc/cisra/db/projects-new',1);
+$old=cs::Persist::db('/u/network/db/projects');
+$new=cs::Persist::db('/u/network/db/projects-new',1);
 
 for (keys %$old)
 	{ $P=$old->{$_};
