@@ -58,7 +58,7 @@ else
   esac
 fi
 
-[ $# = 0 ] || { echo "$cmd: extra arguments: $*' >&2
+[ $# = 0 ] || { echo "$cmd: extra arguments: $*" >&2
 		badopts=1
 	      }
 
@@ -69,7 +69,7 @@ xit=0
 case $dir in
   load)
 	# locate an empty slot
-	slot=`nsrjb -C | sed -n '/^ *\([0-9][0-9]*\): *$/p' | sed 1q`
+	slot=`nsrjb -C | sed -n 's/^ *\([0-9][0-9]*\): *$/\1/p' | sed 1q`
 	[ -n "$slot" ] || { echo "$cmd $dir: no free slots!" >&2 ;exit 1; }
 
 	# get the tape from the load bay
@@ -110,7 +110,7 @@ case $dir in
 
 	# disable the drive
 	( echo ". type:NSR device;name:$device"
-	  echo "enabled:No"
+	  echo "update enabled:No"
 	) | nsradmin -i -
 
 	echo "TAPE=$device; export TAPE"
@@ -120,7 +120,7 @@ case $dir in
   unload)
 	# enable the drive
 	( echo ". type:NSR device;name:$device"
-	  echo "enabled:Yes"
+	  echo "update enabled:Yes"
 	) | nsradmin -i -
 
 	subst="s|^ *drive [0-9][0-9]* *($device) *slot *\\([0-9][0-9]*\\):.*|\\1|p"
