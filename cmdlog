@@ -4,6 +4,9 @@
 #	- Cameron Simpson <cs@zip.com.au> 15dec2000
 #
 
+: ${LOGDIR:=$HOME/var/log}
+
+cmd=$0
 usage="Usage: $0 [-a] command [args...]"
 
 log=
@@ -34,7 +37,7 @@ fi
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
 # full path to log file
-case "$log" in /*) ;; *) log=$HOME/var/log/$log ;; esac
+case "$log" in /*) ;; *) log=$LOGDIR/$log ;; esac
 
 [ -s "$log" -a -n "$fresh" ] && logroll +datecode "$log"
 
