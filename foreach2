@@ -5,6 +5,8 @@
 #	- Cameron Simpson <cs@zip.com.au> 28jul2000
 #
 
+: ${TMPDIR:=/tmp}
+
 max=4
 
 cmd=`basename "$0"`
@@ -15,7 +17,7 @@ usage="Usage: [-1] [-i] [-n max] cmd [args...]
 		Default: $max"
 
 lock=$cmd$$
-pipe=/tmp/pipe-$lock
+pipe=$TMPDIR/pipe-$lock
 pipelock=pipe-$lock
 
 oneword=
