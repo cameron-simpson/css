@@ -1,0 +1,47 @@
+#!/bin/sh
+#
+# Add a
+#	<BASE HREF=url>
+# markup to the HTML on stdin, writing result to stdout.
+#	- Cameron Simpson <cs@zip.com.au> 13jan2003
+#
+
+cmd=`basename "$0"`
+usage="Usage: $cmd baseurl"
+
+badopts=
+
+if [ $# = 0 ]
+then
+    echo "$cmd: missing baseurl" >&2
+    badopts=1
+else
+    baseurl=$1; shift
+    case "$baseurl" in
+	http://*|https://*|ftp://*) ;;
+	*) echo "$cmd: bad baseurl: $baseurl" >&2
+	   badopts=1
+	   ;;
+    esac
+    [ $# = 0 ] || { echo "$cmd: extra arguments: $*" >&2; badopts=1; }
+fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+tmp=${TMPDIR:-/tmp}/$cmd$$
+
+trap 'rm -f "$tmp"' 0 1 15
+
+cat >"$tmp" || exit 1
+if grep -s -i '<head' "$tmp"
+then
+    sed '/<[Hh][Ee][Aa][Dd]/a\
+	'"<BASE HREF=\"$baseurl\">" <"$tmp"
+else
+    echo "<HTML><HEAD>
+	  <BASE HREF=\"$baseurl\">
+	  </HEAD>
+	  <BODY>"
+    cat "$tmp"
+    echo "</BODY></HTML>"
+fi
