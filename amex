@@ -1,4 +1,4 @@
 #!/bin/sh
 # AMEX Online Services.	- Cameron Simpson <cs@zip.com.au> 03may2002
-netscape https://www.americanexpress.com/en_AU/en/cards/balance/BalCards?aexp_nav=sc_checkbill&aus_pers=cards_cyccad &
+us 'https://www.americanexpress.com/en_AU/en/cards/balance/BalCards?aexp_nav=sc_checkbill&aus_pers=cards_cyccad'
 exec withpgppass pring amex
