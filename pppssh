@@ -1,0 +1,45 @@
+#!/bin/sh
+#
+# Yet another ppp-over-ssh script.
+# Calls pppssh-connect for the remote end.
+#	- Cameron Simpson <cs@zip.com.au> 05oct2003
+#
+
+cmd=`basename "$0"`
+
+: ${PPPSSH_PPPD:=/usr/sbin/pppd}	# local pppd
+: ${PPPSSH_RPPPD:=$PPPSSH_PPPD}		# remote pppd
+: ${PPPSSH_LOGFILE:=$HOME/var/log/$cmd.log}
+export PPPSSH_PPPD PPPSSH_RPPPD PPPSSH_LOGFILE
+
+usage="Usage: $cmd [-r rpppd] remote [pppd-args...]"
+
+rpppd=
+[ "x$1" = x-r ] && { rpppd=$2; shift; shift; }
+
+target=$1; shift
+remote=$target
+
+# load config for remote target
+pppssh_remote=
+pppssh_ips=
+pppssh_pppdargs=
+pppssh_rpppd=
+eval `winclausevars "$HOME/rc/pppssh.ini" "$target" pppssh`
+
+# get real target
+[ -n "$pppssh_remote" ] && remote=$pppssh_remote
+# get remote pppd if not set
+[ -z "$rpppd" ] && rpppd=$pppssh_rpppd
+
+set -x
+"$PPPSSH_PPPD" \
+	ipparam "$target" \
+	pty "$0-connect $remote $rpppd" \
+	logfile "$PPPSSH_LOGFILE" \
+	noauth nodefaultroute \
+	nodeflate nobsdcomp \
+	noipdefault "$pppssh_ips" \
+	netmask 255.255.255.255 \
+	$pppssh_pppdargs \
+	${1+"$@"} || exit 1
