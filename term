@@ -14,6 +14,7 @@ usage="Usage: $cmd [-v] [-w width] [-h height] [-x x-pos] [-y y-pos] [-l lock] [
 		[{-c shellcmd}/{-e exec-list}/{-- raw-args}]"
 
 termopts=
+dotrans=
 detach='exec >/dev/null </dev/null'
 keepio=
 SHELL=${SHELL-/bin/sh}
@@ -48,7 +49,8 @@ do
     *,-e)	shift; break ;;
     *,-l)	lock=$2; shift ;;
     *,-1)	lock1=$1 lock=$2; shift ;;
-    *,-ip|*,+ip)termopts="$termopts $1" ;;
+    *,-ip)	dotrans=1 ;;
+    *,+ip)	dotrans= ;;
     *,-fg|*,-bg)termopts="$termopts $1 $2"; shift ;;
     *,-c)	shcmd=$2; shift; shift
 		set x ${1+"$@"} -e "${SHELL:-/bin/sh}" -c "$shcmd"
@@ -119,6 +121,13 @@ case "$TERM,$DISPLAY" in
 	eval "$closefds"
 
 	PREFTERM=${PREFTERM:-xterm}	# safe default
+
+	echo "PREFTERM=[$PREFTERM] termopts=[$termopts] dotrans=[$dotrans]" >&2
+	set -x
+	case "$PREFTERM" in
+	    rxvt)	[ $dotrans ] && opts="$opts -ip" ;;
+	    aterm)	[ $dotrans ] && opts="$opts -tr -sh 60 -fade 90" ;;
+	esac
 
 	if [ $async ]
 	then $dolock "$PREFTERM" -title "$n" $opts -e "$@" &
