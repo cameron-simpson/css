@@ -1,0 +1,104 @@
+#!/usr/bin/perl
+#
+# setperms - set permissions on files
+#
+
+use cs::Upd;
+
+($cmd=$0) =~ s,.*/,,;
+$usage="Usage: $cmd [-s|-v|-f] mode [files...]
+	-f	Force - coerce perms to mode, otherwise just add missing modes.
+	-s	Silent.
+	-v	Verbose.
+";
+
+$verbose=(-t STDOUT);
+$force=0;
+
+$badopts=0;
+while (@ARGV && $ARGV[0] =~ /^-./)
+{ $_=shift(@ARGV);
+  if ($_ eq '-v')	{ $verbose=1; }
+  elsif ($_ eq '-s')	{ $verbose=0; }
+  elsif ($_ eq '-f')	{ $force=1; }
+  else
+  { err("$cmd: unrecognised option: $_\n");
+    $badopts=1;
+  }
+}
+
+if (($mode=shift) !~ /^[0-7]+$/)
+{ err("$cmd: mode should be octal\n");
+  $badopts=1;
+}
+
+die $usage if $badopts;
+
+$mode=oct($mode);
+
+$xit=0;
+$oldline='';
+
+if ($#ARGV < 0)
+{ while (<STDIN>)
+  { chop;
+    &mod($_,$mode,$verbose);
+  }
+}
+else
+{ for (@ARGV)
+  { &mod($_,$mode,$verbose);
+  }
+}
+
+$verbose && out('');
+exit $xit;
+
+sub mod	# (file,mode,verbose) -> void
+{ my($f,$m,$v)=@_;
+  my($dev,$ino,$fmode,@etc);
+
+  $v && out("checking  $f");
+
+  if (!(($dev,$ino,$fmode,@etc)=lstat($f)))
+  { $oldline=''; err("$cmd: can't stat $f: $!\n");
+    $xit=1;
+    return;
+  }
+
+  if (-f _)	{ $m&=0666; }	# don't care about search on files
+  elsif (-d _)	{ }
+  elsif (-l _)	{ return; }	# ignore symlinks
+  else		{ err("$cmd: $f: odd file type\n");
+		  $xit=1;
+		  return;
+		}
+
+  # compute target mode
+  my($tm);
+
+  $tm=$fmode&~0777;	# setuid etc from file
+
+  if ($force)
+	# low bits from user
+	{ $tm|=($m&0777);
+	}
+  else	# low bits from both
+	{ $tm|=($fmode|$m)&0777;
+	}
+
+  if ($fmode == $tm)
+	# modes are ok
+	{ if ($v && -d _)
+		{ nl($f);
+		}
+	}
+  # adjust modes
+  elsif (chmod($tm,$f))
+	{ $v && nl(sprintf("chmod %03o %s",$tm&0777,$f));
+	}
+  else
+  { err("$cmd: chmod($f,..): $!\n");
+    $xit=1;
+  }
+}
