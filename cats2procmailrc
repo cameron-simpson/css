@@ -410,6 +410,7 @@ sub readcats($;$)
 
       if ($ptn =~ m:^/(.*?)/?$:)
       { $ptn=$1;
+	if ($ptn !~ /^\^/) { $ptn=".*$ptn"; }
       }
       else
       { $ptn.="\@.*".altre(@::DfltDom) if $ptn !~ /\@/;
@@ -417,6 +418,7 @@ sub readcats($;$)
       }
 
       $ptn =~ s/\.[^*]/\\$&/g;
+      $ptn=".*$ptn";
     }
 
     my $hregexp = altre(@hdrs);
@@ -449,7 +451,7 @@ sub readcats($;$)
 
     print ": 0$cont\n";
     if (defined($ptn))
-    { print "* ^$hregexp:.*$ptn\n";
+    { print "* ^$hregexp:$ptn\n";
     }
     print "{\n";
 
