@@ -1,5 +1,7 @@
 #!/bin/sh
 
+: ${CONSOLE:=$HOME/var/log/console}
+
 log=$CONSOLE
 [ -n "$log" ] || log=console
 
