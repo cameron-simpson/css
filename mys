@@ -1,4 +1,9 @@
 #!/bin/sh
+#
+# Connect to default MySQL database.
+#	- Cameron Simpson <cs@zip.com.au>
+#
 
-eval `secret "mysql@$SYSTEMID"`
+eval `secret "mysql@$SYSTEMID"` || exit 1
+set -x
 exec /opt/mysql/bin/mysql "-h$secretHOST" "-u$secretLOGIN" "-p$secretPASSWORD" ${1+"$@"}
