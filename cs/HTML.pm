@@ -189,7 +189,7 @@ sub tokFlat
 
 =item tok2a(I<doindent>,I<tokens...>)
 
-Take a list of HTML tokens and return the HTML text,
+take a list of HTML tokens and return the HTML text,
 nicely indented if I<doindent> = 1.
 If omitted, I<doindent> defaults to 0.
 In a scalar context returns a single string with the HTML in it.
@@ -236,22 +236,22 @@ sub tok2s	# ([indent,]sink,tok...)
   ## warn "tok2a:\n".cs::Hier::h2a([@_],1);
 
   if (@_ < 1)
-	{}
+  {}
   elsif (@_ > 1)
-	{ map(tok2s($indent,$sink,$_),@_);
-	}
+  { map(tok2s($indent,$sink,$_),@_);
+  }
   else
   {
     my($html)=tokUnfold(@_);
 
     if (! defined $html)
-	{ my(@c)=caller;
-	  warn "tokUnfold(@_) gives undef from [@c]";
-	}
+    { my(@c)=caller;
+      warn "tokUnfold(@_) gives undef from [@c]";
+    }
     elsif (! ref $html)
-	{ if ($html =~ /^\&(\#\d+|\w+);/) { $sink->Put($html); }
-	  else				  { $sink->Put(raw2html($html)); }
-	}
+    { if ($html =~ /^\&(\#\d+|\w+);/) { $sink->Put($html); }
+      else				  { $sink->Put(raw2html($html)); }
+    }
     else
     # unfold into stream of tokens
     {
@@ -268,9 +268,9 @@ sub tok2s	# ([indent,]sink,tok...)
       elsif ($html->{TAG} =~ /^&/)
       { my($char)=$html->{TAG};
 	if (! $char =~ /;$/)
-	      { warn "no closing \";\" for \"$char\"";
-		$char.=';';
-	      }
+	{ warn "no closing \";\" for \"$char\"";
+	  $char.=';';
+	}
 
 	$sink->Put($char);
       }
@@ -932,11 +932,27 @@ sub Tok
     $t={ TAG => $tsv->{TAG}, START => 0, };
   }
 
-  ## warn "parse TAG=$t->{TAG}\n";
   # scalar or simple tag? return it
   if (! ref $t || singular($t->{TAG}) || ! $t->{START})
   { ## warn "single token ".cs::Hier::h2a($t,0) if ref($t) && $t->{TAG} eq DL;
     $t=&$pertok($t) if defined $pertok;
+    return $t;
+  }
+
+  # the evil <script> tag - gobble up the script
+  if ($t->{TAG} eq 'SCRIPT')
+  { ## warn "found SCRIPT, skipping to /SCRIPT ...";
+
+    my($skip,$match)=$this->{SGML}->SkipToRegexp('<\s*/\s*script\s*>',1);
+    if (! defined $skip)
+    { $t=&$pertok($t) if defined $pertok;
+      return $t;
+    }
+
+    ## warn "SCRIPT:\n\tCLOSE=\"$match\"\n\tskip=[$skip]\n\n";
+
+    $t->{TOKENS}=[ $skip ];
+
     return $t;
   }
 
