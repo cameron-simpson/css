@@ -4,14 +4,14 @@
 # Supports _only_ sequential reading or skipping.
 # The base method to be overridden by subclasses is Read.
 # The fields TYPE, BUF and POS are used.
-#	- Cameron Simpson <cs@zip.com.au> 15may96
+#	- Cameron Simpson <cs@zip.com.au> 15may1996
 #
 # Added Seek() and Seekable().
 # They may need overriding if you implement a seekable subclass.
-#	- cameron, 29mar97
+#	- cameron, 29mar1997
 #
 # Added asynchronous interface.
-#	- cameron, 19apr97
+#	- cameron, 19apr1997
 #
 # Added fetch call.
 #	- cameron, 04jun1997
@@ -40,13 +40,6 @@ sub fetch
 { my($s)=new cs::Source @_;
   return undef if ! defined $s;
   $s->Fetch();
-}
-
-sub Fetch
-{ my($s)=@_;
-  my(@a)=$s->GetAllLines();
-  return @a if wantarray;
-  join('',@a);
 }
 
 sub open
@@ -249,6 +242,38 @@ sub DESTROY
 sub Handle	# return filehandle name
 { my($this)=@_;
   exists $this->{IO} ? $this->{IO} : undef;
+}
+
+sub Warn	# issue warning with context
+{ my($this)=shift;
+ 
+  my $type = $this->{TYPE};
+  my $context="cs::Source($type)";
+  if ($type eq FILE)
+  {
+    if (defined $this->{PATH})
+    { $context.=": \"$this->{PATH}\"";
+    }
+
+    $context.=", line ".HANDLE->input_line_number($this->{IO});
+  }
+
+##  if ($this->{TYPE} eq ARRAY || $this->{TYPE} eq Source)
+##    $type=ARRAY;
+##      $type=FILE;
+##      $type=Source;
+##    $type=FILE;
+##    $type=FILE;
+##    $type=shift;
+
+  warn "$::cmd: $context: @_";
+}
+
+sub Fetch
+{ my($s)=@_;
+  my(@a)=$s->GetAllLines();
+  return @a if wantarray;
+  join('',@a);
 }
 
 # skip forward in a source
