@@ -30,14 +30,14 @@ do  (
       pwd; set -x
 
       mkdir "$today" || exit $?
-      mv [0-9]* "$today/."
+      ls | grep '^[0-9]' | xargs mrg "$today/."
       rmdir "$today" 2>/dev/null && exit 0
 
-      # stash addresses
-      ( cd "$today" || exit 1
-	>.index
-	lock $MAILRC.rawdb vmupdindex -db
-      )
+##      # stash addresses
+##      ( cd "$today" || exit 1
+##	>.index
+##	lock $MAILRC.rawdb vmupdindex -db
+##      )
 
       arch="$archdir/$today.um.gz$pgpext"
       if [ -s "$arch" ]
@@ -50,7 +50,6 @@ do  (
 	&& filteredit "$arch" gzip -v
 	then
 	  rmr "$today"
-	  gzip -9 "$tarf" &
 	else
 	  rm -f "$arch"
 	  exit 1
