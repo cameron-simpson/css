@@ -122,9 +122,9 @@ do
     fi
 done
 
-exit 1>&2
+exec 1>&2
 
-( renice 10 $$
+( renice +10 -p $$
   exec <"$thumblist"
   rm -f "$thumblist"
   while read thfmt f
@@ -135,8 +135,8 @@ exit 1>&2
 
       f=`basename "$f"`
       thumb=$thdir/$f.$thfmt
-      [ -s "$thumb" ] && continue
-      exec "mk$thfmt" -o "$thumb" "$thsize" "$f"
+      [ -s "$thumb" ] && exit 0
+      exec lock mkthumb "mk$thfmt" -o "$thumb" "$thsize" "$f"
     )
   done
 ) &
