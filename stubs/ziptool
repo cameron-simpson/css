@@ -5,4 +5,4 @@ case $1 in
   *)	set x "${ZIPDEV:-/dev/rdsk/c0t5d0s2}" ${1+"$@"}; shift ;;
 esac
 
-exec $BIN/ziptool ${1+"$@"}
+exec $HOME/bin/$ARCH/ziptool ${1+"$@"}
