@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # Permit PASV FTP to hosts.
-# This needs to be upgrades to do the stateful FTP connection tracking
+# This needs to be upgraded to do the stateful FTP connection tracking
 # instead of this open slather for the high ports.
 #	- Cameron Simpson <cs@zip.com.au> 21mar2004
 #
