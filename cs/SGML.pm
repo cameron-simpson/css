@@ -99,7 +99,11 @@ sub match	# (Data,State) -> (token,tail) or undef
   # comments
   elsif (/^<!--/)
   { $tail=$';
-    return undef unless $tail =~ /-->/;
+    if ($tail !~ /-->/)
+    { warn "\"<--\" with no close yet at:\n[$tail]";
+      return undef;
+    }
+
     $tok={ TAG => '!--',
 	   START => 1,
 	   ATTRS => {},
@@ -138,6 +142,7 @@ sub matchTag
   ## warn "matched [$&]";
   my($tag)=$2;
   my($endtag)=length($1);
+  ## debugging DL, probably from nsbmparse
   ## warn "tag=[$tag] endmarker=[$1] endtag=$endtag" if $tag eq DL;
 
   $_=$';
@@ -153,66 +158,66 @@ sub matchTag
   my($at,$val);
 
   ATTR:
-    while (1)
+  while (1)
+  {
+    #     tag                    =           "quoted"     'quoted'     unquoted  
+    if (/^([-:\/!\w_]+)([ \t\r\n]*=[ \t\r\n]*("(""|[^"])*"|'(''|[^'])*'|[^"'\s>][^>\s]*))?[ \t\n\r]*/)
     {
-      #     tag                    =           "quoted"     'quoted'     unquoted  
-      if (/^([-:\/!\w_]+)([ \t\r\n]*=[ \t\r\n]*("(""|[^"])*"|'(''|[^'])*'|[^"'\s>][^>\s]*))?[ \t\n\r]*/)
-      {
-	$at=$1; $val=(length($2) ? $3 : '');
-	$_=$';
+      $at=$1; $val=(length($2) ? $3 : '');
+      $_=$';
 
-	## warn "at=[$at], val=[$val]\n";
-	if (length $val > 1)
-	{ if ($val =~ /^"/ && $val =~ /"$/
-	   || $val =~ /^'/ && $val =~ /'$/
-	     )
-	  { $val=substr($val,1,length($val)-2);
-	  }
+      ## warn "at=[$at], val=[$val]\n";
+      if (length $val > 1)
+      { if ($val =~ /^"/ && $val =~ /"$/
+	 || $val =~ /^'/ && $val =~ /'$/
+	   )
+	{ $val=substr($val,1,length($val)-2);
 	}
+      }
 
-	$A->{uc($at)}=$val;
-      }
-      elsif (/^"([^"]*)"[ \t\n\r]*/)
-      { $A->{$1}=undef;
-	$_=$';
-	## warn "$tag: \"$1\"\n";
-      }
-      # ugly hacks to catch syntax errors and recover
-      elsif (/^">/)
-      { $_='>'.$';
-      }
-      elsif (/^=[ \t\r\n]*("[^"]*"|'[^']*'|[^[ \t\n\r>]*)[ \t\n\r]*/)
-      {
-	$_=$';
-      }
-      elsif (/^"\s+(\w+=)/i)
-      # ugly hack
-      {
-	$_=$1.$';
-      }
-      elsif (/^"[ \t\r\n]*>/)
-      {
-	$_='>'.$';
-      }
-      elsif (/^("[^"]*")[ \t\r\n]*/)
-      {
-	## warn "skip [$1]";
-	$_=$';
-      }
-      elsif (/^([.,]+)[ \t\r\n]*/)
-      {
-	## warn "skip [$1]";
-	$_=$';
-      }
-      elsif (/^([^-<>\s":\/!\w_]+)[ \t\r\n]*/)
-      {
-	## warn "skip [$1]";
-	$_=$';
-      }
-      else
-      { last ATTR;
-      }
+      $A->{uc($at)}=$val;
     }
+    elsif (/^"([^"]*)"[ \t\n\r]*/)
+    { $A->{$1}=undef;
+      $_=$';
+      ## warn "$tag: \"$1\"\n";
+    }
+    # ugly hacks to catch syntax errors and recover
+    elsif (/^">/)
+    { $_='>'.$';
+    }
+    elsif (/^=[ \t\r\n]*("[^"]*"|'[^']*'|[^[ \t\n\r>]*)[ \t\n\r]*/)
+    {
+      $_=$';
+    }
+    elsif (/^"\s+(\w+=)/i)
+    # ugly hack
+    {
+      $_=$1.$';
+    }
+    elsif (/^"[ \t\r\n]*>/)
+    {
+      $_='>'.$';
+    }
+    elsif (/^("[^"]*")[ \t\r\n]*/)
+    {
+      ## warn "skip [$1]";
+      $_=$';
+    }
+    elsif (/^([.,]+)[ \t\r\n]*/)
+    {
+      ## warn "skip [$1]";
+      $_=$';
+    }
+    elsif (/^([^-<>\s":\/!\w_]+)[ \t\r\n]*/)
+    {
+      ## warn "skip [$1]";
+      $_=$';
+    }
+    else
+    { last ATTR;
+    }
+  }
 
   if (/^>/)
 	{ $$ptok=$T;
@@ -223,7 +228,7 @@ sub matchTag
 	  $$ptail=$_;
 	}
   else	{ 
-	  $::SGDB && warn "fail tag match at [$_]\n";
+	  (1 || $::SGDB) && warn "fail tag match at [$_]\n";
 	  return 0;
 	}
 
