@@ -5,6 +5,9 @@
 # Backup a directory as per amassbackup, but to a remote host.
 #	- Cameron Simpson <cs@zip.com.au> 27jun2001
 #
+# Do it locally, too.
+#	- Cameron Simpson <cs@zip.com.au> 19dec2001
+#
 
 vflag=v
 progress=
@@ -13,7 +16,7 @@ rsdel=
 [ -t 1 ] && progress=-P
 
 cmd=`basename "$0"`
-usage="Usage: $cmd [-i identity] [--delete] srcdir host:destdir [rsync-options...]
+usage="Usage: $cmd [-i identity] [--delete] srcdir [host:]destdir [rsync-options...]
 	-i identity	Ssh identity file to use.
 	--include-from=file Specify an rsync include-from file to edit the backup.
 			Should be an absolute path unless you're standing in the srcdir.
@@ -39,7 +42,7 @@ do  case $1 in
     shift
 done
 
-[ $# == 2 ] || { echo "$cmd: missing srcdir or host:destdir" >&2; badopts=1; }
+[ $# -ge 2 ] || { echo "$cmd: missing srcdir or host:destdir" >&2; badopts=1; }
 src=$1 dest=$2
 shift; shift
 
@@ -47,20 +50,28 @@ shift; shift
 case $dest in
     [a-z]*:/*)	desthost=`expr "$dest" : '\([^:]*\):/.*'`
 		destdir=`expr "$dest" : '[^:]*:\(/.*\)'`
+		sshdest="ssh $desthost"
+		rsyncdest=$desthost:
 		;;
-    *)		echo "$cmd: bad host:destdir: $dest" >&2
-		badopts=1
+    *)		if [ -d "$dest/." ]
+		then
+		    desthost=
+		    destdir=$dest
+		    sshdest="sh -c"
+		    rsyncdest=
+		else
+		    echo "$cmd: dest not a directory: $dest" >&2
+		    echo "	missing hostname in host:destdir?" >&2
+		    badopts=1
+		fi
 		;;
 esac
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
-cd "$src/." || exit 1
-[ -z "$rabinc" -a -s .rab-include ] && rabinc=--include-from=.rab-include
-
 stdout=/tmp/$cmd$$
 
-$ssh "$desthost" \
+$sshdest \
 	"cd '$destdir' || exit 1
 	 exec amassbackup --no-copy --linkonly ." \
 	 > "$stdout" \
@@ -77,6 +88,7 @@ case "$subdir" in
 	;;
 esac
 
-pwd
+[ -z "$src/$rabinc" -a -s "$src/.rab-include" ] && rabinc=--include-from=$src/.rab-include
+
 set -x
-exec rsync -e "$ssh" -aHW${vflag} $rsdel ${progress} $rabinc . "$desthost:$destdir/$subdir/."
+exec rsync -e "$ssh" -aHW${vflag} $rsdel ${progress} $rabinc ${1+"$@"} "$src/." "$rsyncdest$destdir/$subdir/."
