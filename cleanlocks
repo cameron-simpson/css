@@ -18,7 +18,8 @@ ask=echo
 xit=0
 exec 3<&0
 for lock
-do  info=$lock/info
+do  [ -d "$lock/." ] || continue
+    info=$lock/info
     [ -s "$info" ] || { echo "$cmd: no info file in $LOCKDIR/$lock/" >&2
 			xit=1
 			continue
