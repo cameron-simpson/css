@@ -57,24 +57,27 @@ else
       statedir=$statedir/$idset
 fi
 
-idname=$1; shift
-if [ $# = 0 ]
-then  param=
-else  param=$1; shift
-      case "$param" in
-	*/* | . | ..) echo "$cmd: bad parameter name \"$param\"" >&2
-		      badopts=1 ;;
-      esac
-      if [ $# = 0 ]
-      then haspvalue=
-	   pvalue=
-      else haspvalue=1
-	   pvalue=$1; shift
-	   [ $rmid ] && { echo "$cmd: can't use -r with parameter values" >&2
-			    badopts=1
-			  }
-	   [ $# = 0 ] || { echo "$cmd: extra arguments: $*" >&2; badopts=1; }
-      fi
+if [ $# -gt 0 ]
+then
+    idname=$1; shift
+    if [ $# = 0 ]
+    then  param=
+    else  param=$1; shift
+	  case "$param" in
+	    */* | . | ..) echo "$cmd: bad parameter name \"$param\"" >&2
+			  badopts=1 ;;
+	  esac
+	  if [ $# = 0 ]
+	  then haspvalue=
+	       pvalue=
+	  else haspvalue=1
+	       pvalue=$1; shift
+	       [ $rmid ] && { echo "$cmd: can't use -r with parameter values" >&2
+				badopts=1
+			      }
+	       [ $# = 0 ] || { echo "$cmd: extra arguments: $*" >&2; badopts=1; }
+	  fi
+    fi
 fi
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
@@ -115,11 +118,11 @@ fi
 
 iddir=
 case "$idname" in
-    *[^0-9]*)
+    *[!0-9]*)
 	for namefile in [1-9]*/name
 	do  [ -s "$namefile" ] || continue
 
-	    tryname=$(<$namefile) || continue
+	    tryname=`cat "$namefile"` || continue
 	    if [ "x$idname" = "x$tryname" ] \
 	    || [ -n "$all" -a "x.$idname" = "x$tryname" ]
 	    then
@@ -175,7 +178,7 @@ else
       esac
     else
       if [ -s "$pfile" ]
-      then echo "$(<$iddir/$param)"
+      then cat "$iddir/$param"
       else echo
       fi
     fi
