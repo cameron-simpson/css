@@ -1,0 +1,8 @@
+#!/bin/sh
+
+[ $# = 0 ] && { set x -; shift; }
+
+if [ "x$*" = x- ]
+then urls -x
+else pageurls ${1+"$@"}
+fi | urlshow
