@@ -1,4 +1,82 @@
 #!/bin/sh
-domenu=
-[ $# = 1 -a -f "$1" -a -s "$1" ] || domenu=-M
-exec rootbg $domenu ${1+"$@"}
+
+cmd=$0
+usage="Usage: $cmd [-s] [-d dim] [-xpl] [{imagefile|ptns...}]
+	-M	Popup FVWM menu to pick from choices.
+	-s	Synchronous.
+	-t	Select tall images (default wide).
+	-w	Select wide images (default).
+	-a	Select any images (default wide).
+	-o	OR the ptns instead of AND.
+	-D	The background is per-desk, not global.
+	-xpl	Use xplanet for the background."
+
+[ -n "$DISPLAY" ] || { echo "$cmd: no \$DISPLAY!" >&2; exit 1; }
+
+badopts=
+
+opts=
+sync=
+xplanet=
+pickn=20
+perdesk=
+aspect=-w
+pickopts=
+strippfx=
+bgop=rootbg
+
+while :
+do  case $1 in
+        -xpl)	xplanet=1 ;;
+	-[tw])	aspect=$1 ;;
+	-a)	aspect= ;;
+	-o)	pickopts="$pickopts $1" ;;
+	-s)	sync=1 ;;
+	-d)	bgop="deskbg -d $2"; shift ;;
+	-D)	bgop="deskbg -d `currentdesk`" ;;
+	--)	shift; break ;;
+	-?*)	echo "$cmd: unrecognised option: $1" >&2
+		badopts=1
+		;;
+	*)	break ;;
+    esac
+    shift
+done
+
+tmp=${TMPDIR:-/tmp}
+
+dopick=1
+case "$#,$1" in
+  1,http://*)
+    # one argument which is an URL
+    exec withurl -C "$1" $bgop
+    ;;
+  1,X:* | 1,- | 1,*:- | 1,\|* )
+    # one argument which is a GraphicsMagick-ish name
+    dopick=
+    ;;
+esac
+
+[ $dopick ] || exec $bgop ${1+"$@"}
+
+set x `pickim -P "$strippfx" -n $pickn -r $aspect $pickopts ${1+"$@"} | sort -u`
+shift
+if [ $# = 0 ]
+then
+  echo "$cmd: no image files chosen!" >&2
+  exit 1
+fi
+
+[ $# = 1 ] && exec $bgop "$1"
+
+# pop up menu choice
+tmpf=$tmp/rbg$$
+for arg
+do  echo "$arg"
+done >"$tmpf"
+cat $tmpf
+exec fvwmcmd \
+  "SetEnv FVWM_MENU_IMLIST_OP \"$bgop $opts\"" \
+  "Piperead 'fvwm-menu -1 ImDirMenu \"$cmd $call\" fvwm-menu-imlist -l $tmpf .; rm $tmpf'" \
+  "Popup ImDirMenu" \
+  "UnSetEnv FVWM_MENU_IMLIST_OP"
