@@ -1,0 +1,30 @@
+#!/bin/sh
+#
+# =head1 NAME
+#
+# mkscriptndx - produce a simple summary of the named scripts
+#
+# =head1 SYNOPSIS
+#
+# mkscriptndx files...
+#
+# =head1 DESCRIPTION
+#
+# I<mkscriptndx> is used to keep my B<README.txt> file current
+# by dragging the pod synopsis (or opening comment if there's no pod)
+# from the script.
+#
+# =head1 SEE ALSO
+#
+# unhashpod(1)
+#
+# =head1 AUTHOR
+#
+# Cameron Simpson <cs@zip.com.au> 01mar2000
+#
+
+for f
+do  [ -s "$f" ] || continue
+    egrep "^(# *)?$f - [a-z]" <"$f" \
+    || sed -n -e '/^$$/q' -e '/^[^#]/q' -e "s/^#/$f: #/p" <"$f"
+done
