@@ -60,7 +60,7 @@ $cs::Hier::Indent=0;
 =item h2a(I<ref>,I<useindent>)
 
 Return a textual representation of a data structure references by I<ref>.
-I<useindent> is an optional praremeter
+I<useindent> is an optional parameter
 indicating whether to generate multiline indented text or single line text,
 defaulting to 1.
 
@@ -82,7 +82,7 @@ sub h2a	# scalar or ref -> text version
 
 Transcribe the data structure references by I<ref>
 to the B<cs::Sink> I<sink>.
-I<useindent> is an optional praremeter
+I<useindent> is an optional parameter
 indicating whether to generate multiline indented text or single line text,
 defaulting to 1.
 
