@@ -1,0 +1,41 @@
+#!/bin/sh
+#
+# Find based on link count.
+# Leading arguments are shorthand:
+#	+n	Files with more than n links.
+#	-n	Files with less than n links.
+#	n	Files with exactly n links.
+#	-ls	Do an ls -ld of the file.
+#	-rm	Remove the file.
+#	-x	Print the find command issued.
+#
+# - Cameron Simpson <cs@zip.com.au>
+#
+
+links=+1	# default
+
+targets=
+actions=
+trace=:
+
+while :
+do
+    case "$1" in
+	+[0-9])	links=$1 ;;
+	-[2-9])	links=$1 ;;
+	[1-9])	links=$1 ;;
+	-ls)	actions="$actions -exec ls -ld {} ';'" ;;
+	-rm)	actions="$actions -exec rm {} ';'" ;;
+	-x)	trace='set -x' ;;
+	-name)	actions="$actions -name '$2'"; shift ;;
+	-[a-z]*) break ;;
+	'!')	break ;;
+	'')	break ;;
+	*)	targets="$targets $1" ;;
+    esac
+    shift
+done
+
+[ -z "$targets" ] && targets=.
+
+eval "$trace; exec find \$targets -type f -links $links \${1+\"\$@\"} $actions"
