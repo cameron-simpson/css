@@ -75,7 +75,9 @@ done
 
 export mfolder
 ## -e \"fcc-hook \$mfolder \$mfolder\"
-set sh -c "set -x; exec mutt -f \"\$mfolder\" -e \"fcc-hook . \$mfolder\" $muttopts"
+muttcmd="mutt -f \"\$mfolder\" -e \"fcc-hook . \$mfolder\" $muttopts"
+[ -n "$fpath" ] && muttcmd="$muttcmd -e 'set maildir_cache=$fpath/.mutt-hcache'"
+set sh -c "set -x; exec $muttcmd"
 
 [ $use_screen ] && set scr "mutt_$mfolder" "$@"
 [ $use_term   ] && set term $termopts -n "mutt $mfolder" "$@"
