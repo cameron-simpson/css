@@ -115,7 +115,7 @@ sub Clear
 Return a list of flags from I<flags>
 which are currently set.
 
-==cut
+=cut
 
 sub Intersect
 { my($this)=shift;
