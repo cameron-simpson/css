@@ -42,6 +42,8 @@ require Exporter;
 @cs::HTML::ISA=qw(Exporter);
 @cs::HTML::EXPORT_OK=qw(TABLE TD TR IMG HREF);
 
+sub _tokenURLs($$$);
+
 # hack to prevent Netscape 4
 # inserting gratuitous whitespace into tables
 # and to keep A tags on one line
