@@ -6,6 +6,9 @@
 
 cmd=$0
 
+quiet=
+[ "x$1" = "x-q" ] && { quiet=1; shift; }
+
 [ $# -gt 0 ] || { echo "Usage: $cmd { host | [host]@systemid }..." >&2; exit 2; }
 
 for target
@@ -17,5 +20,6 @@ do
   esac
 done
 
-echo "$cmd: $HOST@$SYSTEMID or its variants don't match \"$*\"" >&2
+[ $quiet ] \
+  || echo "$cmd: $HOST@$SYSTEMID or its variants don't match \"$*\"" >&2
 exit 1
