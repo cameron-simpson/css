@@ -11,14 +11,26 @@ domenu=
 aspect=-t
 strippfx=
 pickn=1
+thisdesk= Dflag=
 
 usage="Usage: $cmd [-M] [ imagefile | bglist-args... ]
+	-D	Set the menu backdrop only for this desktop.
 	-M	Popup FVWM menu to pick from choices."
 
 badopts=
 subopts=
 
-[ "x$1" = x-M ] && { subopts="$subopts -M" pickn=20 aspect= domenu=1 strippfx=$HOME; shift; }
+while :
+do
+  case $1 in
+    -D)	thisdesk=1 Dflag=$1 ;;
+    -M)	subopts="$subopts -M" pickn=20 aspect= domenu=1 strippfx=$HOME ;;
+    -?*)echo "$cmd: unrecognised option: $1" >&2; badopts=1 ;;
+    --)	shift; break ;;
+    *)	break ;;
+  esac
+  shift
+done
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
@@ -76,10 +88,15 @@ case "$bright,$imagefile" in
 esac
 
 wkdir=`mkdirn "${TMPDIR:-/tmp}/menubg"` || exit 1
-
 cp "$imagefile" "$wkdir/." || exit 1
-lastvalue menubg "$imagefile"
+
 echo "$imagefile" >>$HOME/var/log/menubg
+lastvalue menubg "$imagefile" &
+if [ $thisdesk ]
+then  thisdesk=`lastvalue "enterdesk-$HOST"`
+      desktop "$thisdesk" menubg "$imagefile"
+else  lastvalue "defaultmenubg-$HOST" "$imagefile"
+fi &
 
 cd "$wkdir"
 imagefile=`basename "$imagefile"`
