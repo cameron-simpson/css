@@ -82,6 +82,7 @@ case "$mtype" in
     application/postscript) conv=cat ;;
     application/mentor)	conv=$conv_mentor ;;
     application/x-sh)	conv=$conv_text ;;
+    application/x-csh)	conv=$conv_text ;;
     text/plain)		conv=$conv_text ;;
     text/html)		conv=$conv_html ;;
     text/*)		conv=$conv_text ;;
