@@ -1,11 +1,12 @@
 #!/usr/bin/perl
 #
 # Compare two md5index outputs after the fashion of comm(1),
-# producing 3 columns of output:
+# producing 4 columns of output:
 #	files present only in the first listing, or different
 #	files present only in the second listing, or different
-#	files present and the same in both
-#
+#	files present and the same in both, column 3 is the name in the first
+#					    index and 4 is the name in the
+#					    second
 # - Cameron Simpson <cs@zip.com.au> 20jun2000
 #
 
