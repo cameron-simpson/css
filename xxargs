@@ -1,0 +1,91 @@
+#!/usr/bin/perl
+#
+# Having pretty much had it with xargs, which is a busted piece of crap due
+# to its quoting/whitepsace problems, here is a less featured but more robust one.
+#	- Cameron Simpson <cs@zip.com.au> 20dec2001
+#
+
+use strict qw(vars);
+
+use Getopt::Std;
+
+$::MaxLen=5120;	# conservative but workable
+$::Sep="\n";
+$::FastAbort=0;
+$::Trace=0;
+
+($::cmd=$0) =~ s:.*/::;
+$::Usage="Usage: $::cmd [-01x] command [command-args...]
+	-0	Expect NULs to delimit input strings instead of newlines.
+	-1	Quit on the first command failure.
+	-x	Trace execution.
+";
+
+getopts("01x") || die $::Usage;
+$::Sep="\0" if defined $::opt_0;
+$::FastAbort=1 if defined $::opt_1;
+$::Trace=1 if defined $::opt_x;
+
+if (! @ARGV)
+{ warn "$::cmd: missing command\n";
+  die $::Usage;
+}
+
+my @command = @ARGV;
+
+# compute base length of command
+my $baselen = $ARGV[0];
+map($baselen+=1+length($_), @ARGV[1..$#ARGV]);
+
+my $len = $baselen;
+my $newlen;
+my @args;
+
+$::Xit=0;
+
+$/=$::Sep;
+
+ARG:
+while (defined ($_=<STDIN>))
+{
+  chomp;
+
+  $newlen=$len+1+length;
+  if ($newlen > $::MaxLen)
+  {
+    if (flushCommand() != 0)
+    { $::Xit=1;
+      last ARG if $::FastAbort;
+    }
+
+    $newlen=$len+1+length;
+  }
+
+  push(@args,$_);
+  $len=$newlen;
+}
+
+if (flushCommand() != 0)
+{ $::Xit=1;
+}
+
+exit $::Xit;
+
+sub flushCommand()
+{
+  return 0 if ! @args;
+
+  my @execv = (@command, @args);
+  my $exec0 = $execv[0];
+
+  if ($::Trace)
+  { warn "+ @execv\n";
+  }
+
+  my $xit   = system $exec0 @execv;
+
+  @args = ();
+  $len  = $baselen;
+
+  return $xit/256;
+}
