@@ -5,19 +5,40 @@
 #	- Cameron Simpson <cs@zip.com.au> 01jul2003
 #
 
-cmd=$0
-usage="Usage: $cmd [-j] [-t title] [podfiles...]
-	-j	Skip JavaScript tersify() function.
-		Useful if you're making several indices in one file.
-	-t title Set title."
-
 indextitle="Index of `pwd`"
 dotersefn=1
+linkfile=
+bykeys=
 
-[ "x$1" = x-j ] && { dotersefn=; shift; }
-[ "x$1" = x-t ] && { title=$2; shift; shift; }
+cmd=$0
+usage="Usage: $cmd [-j] [-l linkfile] [-t title] [podfiles...]
+	-j		Skip JavaScript tersify() function.
+			Useful if you're making several indices in one file.
+	-k		By keywords.
+	-l linkfile	Pull plain links from linkfile.
+	-t title 	Set title."
 
-[ $# = 0 ] && { set x *.pod; shift; }
+badopts=
+
+while :
+do
+  case $1 in
+    -j)	dotersefn= ;;
+    -k)	bykeys=1 ;;
+    -l)	linkfile=$2; shift ;;
+    -t)	title=$2; shift ;;
+    --)	shift; break ;;
+    -?*)echo "$cmd: unrecognisedoption: $1" >&2
+	badopts=1
+	;;
+    *)	break ;;
+  esac
+  shift
+done
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+[ $# = 0 ] && set -- *.pod
 
 # javascript for "terse" button
 if [ $dotersefn ]
@@ -43,37 +64,80 @@ then
 X
 fi
 
+if [ $bykeys ]
+then
+  xit=0
+
+  keys=`podkeywords "$@"`
+
+  # generate TOC
+  for key in $keys
+  do
+    label=$key
+    defn=`sed -n "s/^$key[ 	]//p" keywords 2>/dev/null`
+    echo "<A HREF=\"#key-$key\">$key</A>"
+    [ -n "$defn" ] && echo " - $defn"
+    echo "<BR>"
+  done
+
+  echo "<P>"
+
+  # generate per-keyword TOCs
+  for key in $keys
+  do
+    label=$key
+    defn=`sed -n "s/^$key[ 	]//p" keywords 2>/dev/null`
+
+    echo "<H2><A NAME=\"key-$key\">$key</A>"
+    [ -n "$defn" ] && echo " - $defn"
+    echo "</H2>"
+
+    grep "^$key[      ]" keywords
+    "$0" -j -- `podsbykey "$key" "$@"` || xit=1
+  done
+  exit $xit
+fi
+
 echo "<UL>"
-for podfile
-do
-  title=`sed -n 's/^=head1  *//p' "$podfile" | sed 1q`
-  [ -n "$title" ] || title="[$podfile]"
 
-  author=`awk '/^=author /{print$2}' "$podfile" | sed 1q`
-  [ -n "$author" ] || author=`ls -ld "$podfile" | awk '{print$3}'`
+{
+  for podfile
+  do
+    title=`sed -n 's/^=head1  *//p' "$podfile" | sed 1q`
+    [ -n "$title" ] || title="[$podfile]"
 
-  echo "$podfile $author $title"
-done \
+    author=`awk '/^=author /{print$2}' "$podfile" | sed 1q`
+    [ -n "$author" ] || author=`ls -ld "$podfile" | awk '{print$3}'`
+
+    echo "$podfile $author $title"
+  done
+  [ -n "$linkfile" ] && sed 's/^[^ 	]*/& HREF/' "$linkfile"
+} \
 | sort +2 \
 | while read podfile author title
   do
-    htfile=`basename "$podfile" .pod`.html
-
-    ## dbuser "$author" FULLNAME
-    fullname=`{ grep "^$author:" /etc/passwd || ypmatch "$author" passwd; } | awk -F: '{print$5}' | sed 's/,.*//'`
-    [ -n "$fullname" ] || fullname=author
-
-    modtime=`ls -ld "$podfile" | awk '{print $6, $7, $8}'`
-
-    echo "    <LI><A HREF=\"$htfile\">$title</A>"
-    echo "        <SMALL>- last change $modtime, author <A HREF=\"mailto:$author\">$fullname</A></SMALL>"
-
-    overview_cache=.cache/overview/`basename "$podfile" .pod`.html
-    [ -s "$overview_cache" -a "$overview_cachemyke" -nt "$podfile" ] || myke "$overview_cache" >&2
-
-    if [ -s "$overview_cache" ]
+    if [ "x$author" = xHREF ]
     then
-      cat "$overview_cache"
+	echo "    <LI><A HREF=\"$podfile\">$title</A>"
+    else
+	htfile=`basename "$podfile" .pod`.html
+
+	## dbuser "$author" FULLNAME
+	fullname=`{ grep "^$author:" /etc/passwd || ypmatch "$author" passwd; } | awk -F: '{print$5}' | sed 's/,.*//'`
+	[ -n "$fullname" ] || fullname=author
+
+	modtime=`ls -ld "$podfile" | awk '{print $6, $7, $8}'`
+
+	echo "    <LI><A HREF=\"$htfile\">$title</A>"
+	echo "        <SMALL>- last change $modtime, author <A HREF=\"mailto:$author\">$fullname</A></SMALL>"
+
+	overview_cache=.cache/overview/`basename "$podfile" .pod`.html
+	[ -s "$overview_cache" -a "$overview_cachemyke" -nt "$podfile" ] || myke "$overview_cache" >&2
+
+	if [ -s "$overview_cache" ]
+	then
+	  cat "$overview_cache"
+	fi
     fi
   done
 
