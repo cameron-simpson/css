@@ -1,0 +1,236 @@
+#!/bin/sh
+#
+# Synchronise files between the usual spots.
+# I normally run synclinks after this, too.
+#	- Cameron Simpson <cs@zip.com.au> 22nov98
+#
+# Use -R, just call rsync once. - cameron, 23jul99
+# Let the transport do the compression. - cameron, 23jul99
+#
+
+cmd=`basename "$0"`
+usage="Usage: $cmd [-D] [-F] [-f file]... [-o option=value]...  \\
+			[-n] [-s] [-x] [targets...]
+	-D	Only sync the directory list, not the file list.
+	-F	Only sync the file list, not the directory list.
+	--merge	No deletions, don't update newer files.
+	-f file	Sync the named file.
+	-n	No action - just report actions.
+	-s	Sequential - don't overlap rsyncs.
+	-p	Passed to mkdir - handy for initial syncs.
+	-o option=value Set options, overriding the cf file.
+	-x	Trace actions."
+
+HOST=${HOST-`hostname`}
+export HOST
+
+syncdir=$HOME/rc/rsync-old
+[ -d "$syncdir/." ] || syncdir=$HOME/.sync-old
+
+syncset=
+case $cmd in
+    syncstuff)	;;
+    sync?*)	syncset=`expr "$cmd" : 'sync\(.*\)'` ;;
+    *)		echo "$cmd: sync what? I have the following cf files:" >&2
+		ls -d "$syncdir"/cf.* >&2 2>/dev/null
+		exit 1
+		;;
+esac
+
+# load defaults
+
+from=
+to=
+tohomedir=
+needhost=
+needsite=
+tohomedir=
+localhomedir=$HOME
+syncfiles=
+overlap=1
+doall=1
+
+if [ -n "$syncset" ]
+then
+    cf=$syncdir/cf.$syncset
+    if [ ! -s "$cf" ]
+    then
+	echo "$cmd: no config for $syncset (I wanted $cf)" >&2
+	exit 1
+    else
+	## echo "loading $cf ..."
+	## set -vx
+	. "$cf"
+	## set +vx
+	badcf=
+	[ -n "$from"     ] || { badcf=1; echo "$cmd: no from!" >&2; }
+	[ -n "$to"       ] || { badcf=1; echo "$cmd: no to!" >&2; }
+	[ -n "$needsite" ] || { badcf=1; echo "$cmd: no needsite!" >&2; }
+	if [ $badcf ]
+	then
+	    echo "$cmd: errors in $cf" >&2
+	    exit 1
+	fi
+    fi
+fi
+
+onlyfiles=
+onlydirs=
+trace=
+dotrace=
+dsopts=--update
+pflag=
+
+badopts=
+while :
+do  case $1 in
+	-D)	onlydirs=1 ;;
+	-F)	onlyfiles=1 ;;
+	-f)	syncfiles="$syncfiles $2"; shift ;;
+	-o)	eval "$2"; shift ;;
+	-n)	trace=echo overlap= ;;
+        -s)     overlap= ;;
+	-p)	pflag=-p ;;
+	-x)	dotrace=1 trace=set-x ;;
+	--merge) dsopts="$dsopts $1" ;;
+	--)	shift; break ;;
+	-?*)	echo "$cmd: unrecognised option: $1" >&2
+		badopts=1
+		;;
+	*)	break ;;
+    esac
+    shift
+done
+
+[ -n "$from"     ] || { badopts=1; echo "$cmd: no from!" >&2; }
+[ -n "$to"       ] || { badopts=1; echo "$cmd: no to!" >&2; }
+[ -n "$needsite" ] || { badopts=1; echo "$cmd: no needsite!" >&2; }
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+[ "x$SYSTEMID" = "x$needsite" ] \
+	|| { echo "$cmd: can't run from $SYSTEMID, must be at $needsite" >&2
+	     exit 1
+	   }
+
+[ -z "$needhost" -o "x$HOST" = "x$needhost" ] \
+	|| { echo "$cmd: can't run from $HOST.$SYSTEMID, must be on ${needhost}.$needsite" >&2
+	     exit 1
+	   }
+
+# sanity check tohomedir
+[ "x$to" != "x$SYSTEMID" -o -d "$tohomedir/." ] \
+	|| { echo "$cmd: $tohomedir/. is not a directory" >&2
+	     exit 1
+	   }
+
+cd "$localhomedir" || { echo "$cmd: cd $localhomedir fails" >&2; exit 1; }
+echo "cd to `pwd` for sync"
+
+if [ -z "$syncfiles" -a $# = 0 ]
+then
+    # collect generic and specific lists
+    for ext in "" ".$syncset"
+    do
+	# maybe skip the common directory list
+	[ -z "$ext$doall" ] && continue
+
+	list=$syncdir/dirs$ext
+	flist=$syncdir/files$ext
+	[ -s "$list" -a -z "$onlyfiles" ] \
+			&& { # complicated hack to do globbing
+			     listfiles=`grep '^[^#]' "$list"`
+			     # set -x
+			     eval "set x \${1+\"\$@\"} `echo $listfiles`"
+			     # set +x
+			     shift
+			   }
+	[ -s "$flist" -a -z "$onlydirs" ] \
+			&& { # complicated hack to do globbing
+			     flistfiles=`grep '^[^#]' "$flist"`
+			     # set -x
+			     syncfiles="$syncfiles `echo $flistfiles`"
+			     # set +x
+			   }
+    done
+
+    [ $# = 0 -a -z "$syncfiles" ] \
+	&& { echo "$cmd: nothing to sync? (yes, I did look in $syncdir)" >&2
+	     exit 1
+	   }
+fi
+
+if [ "x$from" = "x$SYSTEMID" -o "x$from" = "x$HOST" ]
+then from=
+else from=$from:
+fi
+if [ "x$to" = "x$SYSTEMID" -o "x$to" = "x$HOST" ]
+then to=
+else to=$to:
+fi
+
+xit=0
+
+# synchronise directories
+sleep=1
+for dir
+do
+    fromdir=$dir
+    case $tohomedir in
+	'')	todir=$dir ;;
+	*/)	todir=$tohomedir$dir ;;
+	*)	todir=$tohomedir/$dir ;;
+    esac
+    if [ -d "$dir/." ]
+    then
+	[ $dotrace ] && echo sync "$from$fromdir" "$to$todir"
+	[ -n "$to" -o -d "$todir/." ] || set-x mkdir $pflag "$todir"
+	tag_fd 1,2 "$todir" \
+	    filter_fd 2 'sed "/\\/\$/d"' \
+	    $trace \
+	    dsync -v "$from$fromdir" "$to$todir" &
+
+	if [ $overlap ]
+	then sleep $sleep
+	     [ $sleep -gt 4 ] || sleep=`expr $sleep + 1`
+	else wait
+	fi
+    else
+	echo "$cmd: missing $dir, skipped" >&2
+	xit=1
+    fi
+done
+
+wait
+sleep=1
+
+# synchronise specific files
+if [ -n "$syncfiles" ]
+then
+    for file in $syncfiles
+    do
+	fromfile=$file
+	case $tohomedir in
+	    '')	tofile=$file ;;
+	    */)	tofile=$tohomedir$file ;;
+	    *)	tofile=$tohomedir/$file ;;
+	esac
+	if [ -f "$file" ]
+	then
+	    [ $dotrace ] && echo sync "$from$fromdir" "$to$todir"
+	    $trace rsync -vrlptH "$from$fromfile" "$to$tofile" &
+	    if [ $overlap ]
+	    then sleep $sleep
+		 [ $sleep -gt 4 ] || sleep=`expr $sleep + 1`
+	    else wait
+	    fi
+	else
+	  echo "$cmd: missing $file, skipped" >&2
+	  xit=1
+	fi
+    done
+fi
+
+wait
+
+exit $xit
