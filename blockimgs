@@ -1,0 +1,40 @@
+#!/usr/bin/perl
+#
+# Read a Mozilla cookperm.txt file, rather poorly documents here:
+#	http://moz.zope.org/Members/fabian/drafts/cookperm.txt
+# and set the "block images" flag for the hosts on the command line.
+#	- Cameron Simpson <cs@zip.com.au> 09oct2002
+# 
+
+use strict qw(vars);
+
+my $perm = "1F";
+
+my %hostmap;
+
+for my $host (@ARGV)
+{ $hostmap{$host}=1;
+}
+
+while (<STDIN>)
+{
+  chomp;
+
+  if (/^([^#\s][\S+])\t/)
+  {
+    my(@perms)=split(/\t/);
+    my($host)=shift(@perms);
+
+    if (exists $hostmap{$host})
+    { @perms=grep(!/^\d+/ || $& ne 1, @perms);
+      $hostmap{$host}=0;
+      $_=join("\t",$host,@perms,$perm);
+    }
+  }
+
+  print "$_\n";
+}
+
+for my $host (sort keys %hostmap)
+{ print "$host\t$perm\n" if $hostmap{$host};
+}
