@@ -8,7 +8,7 @@ classes	= $((java P)).class
 subclasses=$((subjava P)).class
 html	= $('*.html' G)
 
-htmandir = $(HOME)/there/cameron@cskk.homeip.net/html/man
+htmandir = $(HOME)/there/cskk.ezoshosting.com/html/cs/man
 pmsets	= cs MSQ CISRA
 pmset(set) = $('$(set)/*.pm' EG?) \
 	     $('$(set)/*/*.pm' EG?) \
