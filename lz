@@ -42,7 +42,7 @@ usage="Usage: $cmd [-Pprinter[/paper]] [-f filter]... [-q] [multips-options] [--
 			Specifiable via \$PRINTER (currently \"$PRINTER\").
 			An optional PostScript papersize directive may be
 			included (eg a3).
-			NB: plain -P is reserved for multips' portrait flag.
+			NOTE: a plain -P is reserved for multips' portrait flag.
 	-f filter	Run each file (or stdin) through filter, which may
 			include options, _before_ conversion to PostScript.
 			Multiple filters are connected by pipes in the order
@@ -119,7 +119,8 @@ do
 		# directive will be inserted in the output
 		# (eg B</a4>, B</letter> etc).
 		#
-		# Note that a plain B<-P> is reserved for multips' portrait flag.
+		# Note that a plain B<-P> is reserved for multips' portrait flag;
+		# using "C<-P I<printer>>" with a space is a common mistake.
 		#
 		-P?*)	PRINTER=`expr "x$1" : 'x-P\(.*\)'` ;;
 
@@ -188,6 +189,11 @@ do
 		#
 		-[LP])	multipsargs="$multipsargs $1"
 			topsargs="$topsargs $1"
+			if [ "x$1" = x-P -a -t 2 ]
+			then
+			    echo "$cmd: warning: plain -P (portrait mode) is the default" >&2
+			    echo "    did you mean -Pprinter? if so, there should be no space" >&2
+			fi
 			;;
 
 		# =item B<-c> I<columns>
