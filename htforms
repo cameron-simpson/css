@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 #
-# Extract forms from HTML.
-#	- Cameron Simpson <cs@zip.com.au> 03mar99
+# Extract forms from HTML on stdin.
+#	- Cameron Simpson <cs@zip.com.au> 03mar1999
 #
 
 use strict qw(vars);
@@ -25,6 +25,10 @@ while (defined ($t=$parse->Tok()))
 { pforms($t) if ref($t) eq HASH;
 }
 
+for my $F (@::Formlist)
+{ reciteform($F);
+}
+
 exit 0;
 
 sub pforms
@@ -32,26 +36,39 @@ sub pforms
 
   my $tag = $t->{TAG};
 
+  ##if (exists $t->{ATTRS}->{NAME})
+  ##{ warn "tag $tag NAME=\"$t->{ATTRS}->{NAME}\"\n";
+  ##}
+
   if ($tag eq FORM)
   { if ($::InHTML)	{ print cs::HTML::tok2a(1,$t), "\n\n"; }
     else		{ newform($t); }
   }
   else
   { 
-    if (defined $::F)
-    { my $fields = $::F->{FIELDS};
-      if ($tag eq INPUT
-       || $tag eq TEXTAREA
-       || $tag eq SELECT)
-      { push(@$fields, { TAG => $tag,
+    if ($tag eq INPUT
+     || $tag eq TEXTAREA
+     || $tag eq BUTTON
+     || $tag eq SELECT)
+    {
+      if (defined $::F)
+      { my $fields = $::F->{FIELDS};
+	##warn "add field \"$tag\" ".cs::Hier::h2a($t->{ATTRS},0);
+	push(@$fields, { TAG => $tag,
 			 ATTRS => $t->{ATTRS},
 			 TOKENS => $t->{TOKENS},
 		       });
       }
+      else
+      { warn "no form active for $tag "..cs::Hier::h2a($t->{ATTRS},0);
+      }
+    }
+    else
+    { ##warn "skip tag \"$tag\"\n";
     }
 
     for my $subt (@{$t->{TOKENS}})
-    { pforms($subt);
+    { pforms($subt) if ref($subt) eq HASH;
     }
   }
 }
@@ -59,35 +76,51 @@ sub pforms
 sub newform
 { my($t)=@_;
 
-  local($::F)={ ATTRS => $t->{ATTRS},
-		FIELDS => [],
-	      };
+  my $lastform;
 
-  for my $subt (@{$t->{TOKENS}})
-  { pforms($subt) if ref $t eq HASH;
+  {
+    local($::F)={ ATTRS => $t->{ATTRS},
+		  FIELDS => [],
+		};
+    $lastform=$::F;
+    push(@::Formlist,$::F);
+
+    # suck up fields from inner tokens
+    for my $subt (@{$t->{TOKENS}})
+    { pforms($subt) if ref($t) eq HASH;
+    }
   }
 
-  { my $A = $::F->{ATTRS};
+  # gross hack to keep form alive after close
+  $::F=$lastform if ! defined $::F;
+}
+
+sub reciteform
+{ my($F)=@_;
+
+  # recite outer FORM token
+  { my $A = $F->{ATTRS};
     print "FORM";
-    for my $a (sort keys %$A)
-    { print " $a=\"$A->{$a}\"";
+    for my $attr (sort keys %$A)
+    { print " $attr=\"$A->{$attr}\"";
     }
     print "\n";
   }
 
-  { my $fields = $::F->{FIELDS};
-    for my $f (@$fields)
+  # recite fields noticed
+  { my $fields = $F->{FIELDS};
+    for my $field (@$fields)
     { my $firstattr=1;
-      my $A = $f->{ATTRS};
-      for my $a (sort keys %$A)
-      { if ($firstattr)	{ $firstattr=0; }
+      my $A = $field->{ATTRS};
+      for my $attr (sort keys %$A)
+      { if ($firstattr)	{ print "  "; $firstattr=0; }
 	else		{ print " "; }
-	print "$a=\"$A->{$a}\"";
+	print "$attr=\"$A->{$attr}\"";
       }
       print "\n";
 
-      if (@{$f->{TOKENS}})
-      { print "  ", cs::Hier::h2a($fields->{$f}->{TOKENS}, 0), "\n";
+      if (@{$field->{TOKENS}})
+      { print "  ", cs::Hier::h2a($fields->{$field}->{TOKENS}, 0), "\n";
       }
     }
   }
