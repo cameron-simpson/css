@@ -12,29 +12,46 @@ use cs::HTML;
 print "<TABLE BORDER=1>\n";
 
 my @rows = [ TR,
-	      [TH, "Seq"], [TH, "Date"], [TH, "Type"], [TH, "Amount"],
-	      [TH, "Description"], [TH, "Balance"]
+	      [TH, {ALIGN => LEFT, VALIGN => TOP}, "Date"],
+	      [TH, {ALIGN => RIGHT, VALIGN => TOP}, "Amount"],
+	      [TH, {ALIGN => LEFT, VALIGN => TOP}, "Description"],
+	      [TH, {ALIGN => RIGHT, VALIGN => TOP}, "Balance"]
 	   ];
 
-undef $oseq;
-while (<STDIN>)
-{ my($seq,$dmy,$type,$amt,$desc,$bal)=cs::TSF::splitTSLine($_,",");
+# skip final balance records
+$_=<STDIN>;
+$_=<STDIN>;
 
-  if ($seq == $oseq)			{ $pseq=""; }
-  else					{ $pseq=$seq; }
+## undef $oseq;
+undef $orow;
+while (<STDIN>)
+{ my($dmy,$amt,$desc,$bal)=cs::TSF::splitTSLine($_,",");
+
+  if ($bal eq "_")			{ $bal=''; }
+  if ($dmy eq "_")			{ $dmy=''; }
+  if ($amt eq "_")			{ $amt=''; }
+
+  if (uc($type) eq CONTINUATION)	{ $type=''; $amt=''; }
+
+  ## if ($seq == $oseq)			{ $pseq=""; }
+  ## else				{ $pseq=$seq; }
 
   if ($dmy == $odmy)			{ $pdmy=""; }
   else					{ $pdmy=$dmy; }
 
-  if (uc($type) eq CONTINUATION)	{ $type=''; $amt=''; }
+  if (defined $orow
+   && ! length $amt && ! length $dmy && ! length $bal)
+  { push(@{$orow->[3]}, [BR], $desc);
+  }
+  else
+  { $orow = [ TR,
+	      [TD, {ALIGN => LEFT, VALIGN => TOP}, $pdmy],
+	      [TD, {ALIGN => RIGHT, VALIGN => TOP}, $amt],
+	      [TD, {ALIGN => LEFT, VALIGN => TOP}, $desc],
+	      [TD, {ALIGN => RIGHT, VALIGN => TOP}, $bal]];
+    push(@rows, $orow, "\n");
+  }
 
-  if ($bal eq "_")			{ $bal=''; }
-
-  push(@rows, [TR,
-		[TD, $pseq], [TD, $pdmy], [TD, $type], [TD, $amt],
-		[TD, $desc], [TD, $bal]], "\n");
-
-  $oseq=$seq;
   $odmy=$dmy;
 }
 
