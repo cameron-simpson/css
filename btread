@@ -1,0 +1,64 @@
+#!/bin/sh
+#
+# Read a file from a tape written by budtool.
+# This script primarily exists to document the magic blocksize.
+#	- Cameron Simpson <cs@zip.com.au> 27jul98
+#
+
+cmd=`basename "$0"`
+usage="Usage: $cmd [-t tapedev] [-f fileo] [-s blocksize]
+NOTE: the fileno is an \`mt' fileno, and thus one LESS than a budtool fileno."
+
+tape=
+fileno=
+blocksize=184320
+
+badopts=
+while :
+do  case $1 in
+	-t)	tape=$2; shift ;;
+	-f)	fileno=$2; shift ;;
+	-s)	blocksize=$2; shift ;;
+	-?*)	echo "$cmd: unrecognised option: $1" >&2; badopts=1 ;;
+	--)	shift; break ;;
+	*)	break ;;
+    esac
+    shift
+done
+
+[ $# = 0 ] || { echo "$cmd: extra arguments: $*" >&2; badopts=1; }
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+[ -n "$tape" ] || tape=$TAPE
+
+if [ -n "$tape" ]
+then
+    TAPE=$tape
+    export TAPE
+else
+    echo "$cmd: warning: using stdin (no \$TAPE)!" >&2
+fi
+
+if [ -n "$fileno" ]
+then
+    case $tape in
+	'')	echo "$cmd: no tape device: can't use -f option" >&2
+		exit 1
+		;;
+	-)	echo "$cmd: can't use -f with stdin" >&2
+		exit 1
+		;;
+	*)	echo "rewinding $TAPE..." >&2;		mt rewind >&2
+		echo "skipping to file $fileno..." >&2;	mt fsf "$fileno" >&2
+		mt status >&2
+		;;
+    esac
+fi
+
+case $tape in
+    ''|-)	;;
+    *)		exec <"$TAPE" ;;
+esac
+
+exec buffer -s "$blocksize"
