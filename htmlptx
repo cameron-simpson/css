@@ -1,16 +1,45 @@
 #!/bin/sh
 #
 # Generate a permuted index of the specified HTML files.
-# It is presumed that each physical source line number "n" of the HTML has an:
+# The -html option presumes that each physical source line number "n" of the
+# HTML has an:
 #	<A NAME="n"></A>
 # at the start to use as an anchor. See html-line-anchors.
+#
+# UnHTML output has the form:
+#	file	left-context	keyword	right-context	line-number
+# tab separated.
 #	- Cameron Simpson <cs@zip.com.au> 11nov2003
 #
 
-[ $# = 0 ] && { echo "Usage: $0 [-i ignlist] html-files..." >&2; exit 2; }
+cmd=$0
 
+[ $# = 0 ] && { echo "Usage: $cmd [-html] [-i ignlist] html-files..." >&2; exit 2; }
+
+dohtml=
 ptxopts=
-[ "x$1" = x-i ] && { ptxopts="$1 $2"; shift; shift; }
+
+badopts=
+
+while [ $# -gt 0 ]
+do
+  case $1 in
+    -i)		ptxopts="$ptxopts $1 $2"; shift ;;
+    -html)	dohtml=1 ;;
+    --)		shift; break ;;
+    -?*)	echo "$cmd: unrecognised option: $1" >&2; badopts=1 ;;
+    *)		break ;;
+  esac
+  shift
+done
+
+if [ $# = 0 ]
+then
+  echo "$cmd: missing html-files" >&2
+  badopts=1
+fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
 
 for htmlf
 do
@@ -19,11 +48,12 @@ do
   | ptx -A -r -f -O $ptxopts \
   | sed -n \
 	-e 's/^.xx "[^"]*" "\([^"]*\)" "\([^ "][^ "]*\) *\([^"]*\)" "[^"]*" ":\([1-9][0-9]*\)".*/\1	\2	\3	\4/' \
-	-e "s/^/$htmlf	/p"
+	-e "s^$htmlf	p"
 done \
 | sort -d -f '-t	' +2 \
-| { echo "<TABLE>"
-    awk '-F	' "BEGIN	{ ref=\"$htmlf\" }
-		  "'$3 ~ /^[a-zA-Z][a-zA-Z0-9_][a-zA-Z0-9_]*[a-zA-Z0-9]$/ { print "<TR><TD ALIGN=RIGHT>" $2 "<TD ALIGN=LEFT><A HREF=\"" $1 "#" $5 "\">" $3 "</A> " $4 }'
-    echo "</TABLE>"
-  }
+| if [ $dohtml ]
+  then
+    exec ptx2html
+  else
+    exec cat
+  fi
