@@ -728,6 +728,60 @@ sub tokenURLs($$;$$)
 { my($urls,$t,$inline,$base)=@_;
   $inline=0 if ! defined $inline;
 
+  local($cs::HTML::_BaseURL)=$base;
+  _tokenURLs($urls,$t,$inline);
+}
+
+sub _tokenURLs($$$)
+{ my($urls,$t,$inline)=@_;
+
+  ::need(cs::URL);
+
+  # notice <BASE HREF="...">
+  my $tag = $t->{TAG};
+  my $A = $t->{ATTRS};
+
+  if ($tag eq BASE)
+  { if (exists $A->{HREF} && defined($A->{HREF}) && length($A->{HREF}))
+    { $cs::HTML::_BaseURL=$A->{HREF};
+    }
+  }
+
+  ATTR:
+  for my $attr ( $inline ? (SRC,BACKGROUND) : HREF )
+  { next ATTR if ! exists $A->{$attr}
+	      || ! defined $A->{$attr};
+
+    my $url = $A->{$attr};
+    my $NU = cs::URL->new($url,$cs::HTML::_BaseURL);
+    if (! defined $NU)
+    { ## warn "UNDEF from new cs::URL($url, $cs::HTML::_BaseURL)";
+    }
+    else
+    { $url = $NU->Text();
+    }
+
+    $url=cs::URL::undot($url);
+    my $title=join('',cs::HTML::tokFlat(@{$_->{TOKENS}}));
+    $title =~ s/\s+/ /g;
+    $title =~ s/^ //;
+    $title =~ s/ $//;
+
+    if (! exists $urls->{$url} || length($urls->{$url}) < length($title))
+    { $urls->{$url}=$title;
+    }
+  }
+
+  SUBTOKENS:
+  for my $tok (@{$t->{TOKENS}})
+  { _tokenURLs($urls,$tok,$inline);
+  }
+}
+
+sub oldTokenURLs($$;$$)
+{ my($urls,$t,$inline,$base)=@_;
+  $inline=0 if ! defined $inline;
+
   local $cs::URL::_GrepInline = $inline;
 
   URL:
