@@ -1,0 +1,157 @@
+#!/bin/sh
+#
+# Dump users to archive.
+#
+# Usage: dumpuser <<-X
+#	login dirs...
+#	...
+#	X
+#
+#	- Cameron Simpson, 26may93
+#
+
+DUMPLOG=${DUMPLOG:-"$HOME/etc/dumplog"}	# log
+TAPE=${TAPE:-dat:jarrah}		# device
+RTAPE=${RTAPE:-rtape}			# rtape-like program
+
+cmd=`basename "$0"`
+usage="Usage: $cmd [-f] [-t tapedev] [-r rtapecmd] -{c|L} label < userindex
+	-f		Force. Turn off safety checks.
+			Default if stdout is not a tty or we're not on a tty.
+	-t tapedev	Device to access via rtape (default $TAPE).
+	-r rtapecmd	Program to access device (default $RTAPE).
+	-c label	Check label on tape.
+	-L label	Write label on new tape."
+
+{ tty=`tty 2>/dev/null` && [ -n "$tty" -a -t 1 -a -w "$tty" ]; } || tty=
+[ -n "$tty" ] || force=1
+
+badopts=
+LABEL=
+checklabel=1
+while :
+do
+    case $1 in
+	--)	shift; break ;;
+	-f)	force=1 ;;
+	-t)	TAPE=$2; shift ;;
+	-r)	RTAPE=$2; shift ;;
+	-[cL])	if [ -n "$LABEL" ]
+		then
+		    echo "$cmd: only one instance of -c or -L is allowed" >&2
+		    badopts=1
+		else
+		    LABEL=$2
+		    case $1 in
+			-c)	checklabel=1 ;;
+			-L)	checklabel= ;;
+		    esac
+		fi
+		shift
+		;;
+	-*)	echo "$cmd: $1: unrecognised option" >&2; badopts=1 ;;
+	*)	break ;;
+    esac
+    shift
+done
+
+[ -z "$LABEL" ] && { echo "$cmd: one of -c or -L must be given" >&2
+		     badopts=1
+		   }
+
+set x $LABEL; shift
+case $#
+    1)	;;
+    *)	echo "$cmd: label must be one word, rejecting $LABEL" >&2
+	exit 1
+	;;
+esac
+
+[ $# = 0 ] || { echo "$cmd: extra arguments: $*" >&2; badopts=1; }
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+export TAPE RTAPE LABEL
+rtape="$RTAPE -t $TAPE"
+log=$DUMPLOG/$LABEL
+vlog=$DUMPLOG/$LABEL-v
+
+if [ $checklabel ]
+then
+    [ -r "$log" ] \
+	|| { echo "$cmd: no log file $log, aborting" >&2
+	     exit 1
+	   }
+    $rtape -c "$LABEL" \
+	|| { echo "$cmd: $TAPE label doesn't match \"$LABEL\", aborting" >&2
+	     exit 1
+	   }
+    fileno=`wc -l < $log`
+else
+    [ ! -f "$log" ] \
+	|| { echo "$cmd: log file $log exists, not labelling tape, aborting" >&2
+	     exit 1
+	   }
+    [ $force ] \
+	|| ask "Are you SURE you want to label $TAPE as \"$LABEL\"" \
+	|| { echo "$cmd: not labelling $TAPE, aborting" >&2
+	     exit 1
+	   }
+    $rtape -L "$LABEL" || { echo "$cmd: can't label $TAPE as \"$LABEL\"" >&2
+			    exit 1
+			  }
+    echo "label: $LABEL" >"$log"
+    fileno=1
+fi
+
+lineno=0
+while [ $tty ] && necho "$cmd> " >"$tty"
+      read login dirs
+do
+    lineno=`expr $lineno + 1`
+    [ -n "$login" ] \
+	|| { echo "$cmd: line $lineo: missing login" >&2
+	     continue
+	   }
+    [ -n "$dirs" ] \
+	|| { echo "$cmd: line $lineo: missing directories" >&2
+	     continue
+	   }
+
+    necho "dumping $login ..."
+
+    set x `date`; shift
+    dow=$1 mon=$2 dom=$3 time=$4 tz=$5 year=$6
+    case $dom in [0-9]) dom=0$dom ;; esac
+    case $time in [0-9]:) time=0$time ;; esac
+    case $mon in
+       Jan)	mon=01 ;;
+       Feb)	mon=02 ;;
+       Mar)	mon=03 ;;
+       Apr)	mon=04 ;;
+       May)	mon=05 ;;
+       Jun)	mon=06 ;;
+       Jul)	mon=07 ;;
+       Aug)	mon=08 ;;
+       Sep)	mon=09 ;;
+       Oct)	mon=10 ;;
+       Nov)	mon=11 ;;
+       Dec)	mon=12 ;;
+    esac
+    date=$year$mon${dom}_$time
+
+    for dir in $dirs
+    do
+	necho " $dir"
+	fileno=`expr $fileno + 1`
+	echo "date=$date label=$LABEL file=$fileno login=$login $dirs" >>"$log"
+#	{ echo "date=$date label=$LABEL file=$fileno login=$login $dirs"
+#	  ( pp "$login"
+#	    # XXX - this should use buff | pax sometime
+#	    pax -w -v -s 's:^//*::' $dir | $rtape -w -f $fileno
+#	  ) 2>&1 | sed 's/^/	/'
+#	} >>"$vlog"
+    done
+
+    echo
+done
