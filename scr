@@ -20,4 +20,15 @@ esac
 
 [ $# = 1 ] || { echo "$usage" >&2; exit 2; }
 
+case "$1" in
+    [1-9]|[1-9][0-9])
+	name=`scr | sed -n -e 's/	.*//' -e "$1p"`
+	[ -n "$name" ] || { echo "$cmd: no ${1}th session; available sessions:" >&2
+			    scr >&2
+			    exit 1
+			  }
+	set x "$name"; shift
+	;;
+esac
+
 exec screen -x -r "$1"
