@@ -1,0 +1,24 @@
+#!/usr/bin/perl
+#
+# Convert troff-like input to real troff or HGML.
+#	- Cameron Simpson, 01jan93
+#
+
+($cmd=$0) =~ s:.*/::;
+$usage="csroff files...\n";
+
+$[=0;
+$xit=0;
+
+ARGV:
+  for (@ARGV)
+	{ &roff($_);
+	}
+
+exit $xit;
+
+sub roff	# (filename) -> void
+	{ local($file)=@_;
+
+	  if (&
+	}
