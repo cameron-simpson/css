@@ -118,6 +118,9 @@ view_html='pageif w3m -dump -T text/html /dev/fd/0'
 
 view_msword=catdoc
 
+toc_mbox=mbox-toc
+extract_mbox=splitmail
+
 xit=0
 
 abort=
@@ -174,7 +177,7 @@ do  [ $abort ] && exit 1
 	      gz)	filt=gunzip ;;
 	      bz2)	filt=bunzip2 ;;
 	      pgp)	filt='pgp -df' ;;
-	      tgz)	filt=gunzip format=tar ;;
+	      tgz|nif)	filt=gunzip format=tar ;;
 	      taz)	filt=uncompress format=tar ;;
 	      o|so)	format=obj ;;
 	      a)	format=ar ;;
@@ -191,6 +194,7 @@ do  [ $abort ] && exit 1
 	      wrl)	format=vrml ;;
 	      html|htm)	format=html ;;
 	      doc)	format=msword ;;
+	      um)	format=mbox ;;
 	      *)	case $b in
 			    cpiof*)	format=cpio ;;
 			    tarf*)	format=tar ;;
