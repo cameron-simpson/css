@@ -1,0 +1,148 @@
+#!/bin/sh
+#
+# Peruse a list of date-named files, directories and references and emit an
+# ordered HTML index.
+#	- Cameron Simpson <cs@zip.com.au> 03may96
+#
+
+cmd=`basename "$0"`
+
+today=`daycode +i`
+hlevel=1
+dopast=   past=
+dofuture= future=
+reverse=  rflag=-r
+
+usage="Usage: $cmd [-r] [-t today] [-p [title]] [-f [title]] [files/dirs...]
+	-h n		Heading level. Default is $hlevel.
+	-r		Reverse order (this means \"oldest first\").
+	-t today	Pretend the date is \`today'. Format: yyyymmdd.
+	-p title	Emit list of past events with the given title.
+	-f title	Emit list of future events with the given title.
+An empty title suppresses the <H$hlevel>, <UL> and <LI> markup."
+
+badopts=
+while :
+do  case $1 in
+	--)	shift; break ;;
+	-r)	reverse=1 rflag= ;;
+	-h)	case $hlevel in
+		    [1-6])	hlevel=$2 ;;
+		    *)		echo "$cmd: bad level for -h: $2" >&2
+				badopts=1
+				;;
+		esac
+		shift
+		;;
+	-t)	case $2 in
+		    [12][0-9][0-9][0-9][01][0-9][0-3][0-9])
+				today=$2 ;;
+		    *)		echo "$cmd: bad date specification for -t: $2" >&2
+				badopts=1
+				;;
+		esac
+		shift
+		;;
+	-p)	dopast=1 past=$2; shift ;;
+	-f)	dofuture=1 future=$2; shift ;;
+	-?*)	echo "$cmd: unrecognised option: $1" >&2
+		badopts=1
+		;;
+	*)	break ;;
+    esac
+    shift
+done
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+[ -z "$dopast" -a -z "$dofuture" ] && { dopast=1 dofuture=1; }
+
+# get dates, in order
+[ $# = 0 ] && set 19[0-9][0-9][01][0-9][0-3][0-9]* \
+		  20[0-9][0-9][01][0-9][0-3][0-9]*
+set x `ls -d -- "$@"` $today; shift
+set x `for date in "$@"; do echo "$date"; done | sort $rflag`; shift
+
+xit=0
+
+needheading=1
+if [ $reverse ]; then before=1; else before=; fi
+
+for f
+do
+
+  # check out the name format
+  case $f in
+      # today sentinel
+      $today)
+		if [ $reverse ]; then before=; else before=1; fi
+		if [ -z "$needheading" ]
+		then	# must have printed a heading - tidy up UL
+			echo '</UL>'
+			needheading=1
+		fi
+		continue
+		;;
+      # valid date-named file
+      [12][0-9][0-9][0-9][01][0-9][0-3][0-9]*)
+		;;
+      # oddball name
+      *)	echo "$cmd: can't deal with \"$f\": odd filename" >&2
+		xit=1
+		continue
+		;;
+  esac
+
+  # skip unwanted sections
+  [ -n "$before" -a -z "$dopast" ] && continue
+  [ -z "$before" -a -z "$dofuture" ] && continue
+
+  # do markup
+  if [ $needheading ]
+  then
+      if [ $before ]
+      then  if [ -n "$past" ]
+	    then  echo "<H$hlevel>$past</H$hlevel>"
+		  echo "<UL>"
+		  needheading=
+	    fi
+      else  if [ -n "$future" ]
+	    then  echo "<H$hlevel>$future</H$hlevel>"
+		  echo "<UL>"
+		  needheading=
+	    fi
+      fi
+  fi
+
+  date=`echo "$f" | sed 's/\(....\)\(..\)\(..\).*/\1-\2-\3/'`
+
+  [ -d "$f/." ] && f=$f/index.html
+  if [ ! -s "$f" ]
+  then
+      echo "$cmd: $f: empty file" >&2
+      xit=1
+  else
+      case $f in
+	  *.html)
+	    b=`expr "$f" : '\(.*\)\.html'`
+	    t=`sed -n 's/.*<[Tt][Ii][Tt][Ll][Ee]>\(.*\)<\/[Tt][Ii][Tt][Ll][Ee]>.*/\1/p' $f|sed 1q`
+	    echo "    <LI><A NAME=$b HREF=$f>$date</A> - $t"
+	    ;;
+	  *.href)
+	    b=`expr "$f" : '\(.*\)\.href'`
+	    t=`sed -n 's/.*<[Tt][Ii][Tt][Ll][Ee]>\(.*\)<\/[Tt][Ii][Tt][Ll][Ee]>.*/\1/p' $f|sed 1q`
+	    echo "    <LI><A NAME=$b>$date</A> - `cat $f`"
+	    ;;
+	  *)
+	    echo "$cmd: unrecognised extension: $f" >&2
+	    ls -ld "$f" >&2
+	    xit=1
+		;;
+      esac
+  fi
+done
+
+# close markup
+[ $needheading ] || echo '</UL>'
+
+exit $xit
