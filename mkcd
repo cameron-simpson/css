@@ -97,6 +97,8 @@ usage="Usage: $cmd [-n] [-l label] [dev=device] [speed=n] [blank=mode] image.iso
 			a directory instead of an ISO9660 image.
 			(VOLI field, up to 32 bytes).
 	-n		No action (cdrecord's -dummy flag).
+	cdrecord=cmd	Use cmd as the cdrecord invocation.
+			Default: $cdrecord
 	dev=device	Passed to cdrecord.
 			Default: $dev
 	speed=n		Passed to cdrecord.
