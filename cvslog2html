@@ -1,0 +1,196 @@
+#!/usr/bin/perl
+#
+# Convert "cvs log" output to HTML.
+#	- Cameron Simpson <cs@zip.com.au> 19may2000
+#
+
+=head1 NAME
+
+cvslog2html - transcribe CVS logs to HTML or plain text
+
+=head1 SYNOPSIS
+
+cvslog2html [-t] [cvs-log-args...]
+
+=head1 DESCRIPTION
+
+I<cvslog2html>
+writes a CVS log as human friendly HTML or plain text
+to its standard output.
+
+If standard input is a terminal
+or some I<cvs-log-args> are supplied
+then the command:
+
+=over 4
+
+=item B<cvs log> I<cvs-log-args...>
+
+=back
+
+is run to obtain the raw log data,
+otherwise standard input is assumed to be the output of a B<cvs log> command.
+
+=cut
+
+use cs::Misc;
+use cs::HTML;
+
+=head1 OPTIONS
+
+=over 4
+
+=item B<-t>
+
+Text mode - write plain text instead of HTML.
+
+=back
+
+=cut
+
+$TextMode=0;
+if ($ARGV[0] eq '-t')
+{ $TextMode=1;
+  shift(@ARGV);
+}
+
+=back
+
+=cut
+
+if (-t STDIN || @ARGV)
+{ open(STDIN,"cvs log @ARGV |") || die "$0: can't pipe from cvs: $!\n";
+}
+
+while (defined ($_=<STDIN>))
+{
+  chomp;
+
+  if ($incomment)
+  { if (/^=============================================================================$/
+     || /^----------------------------$/
+      )
+    { $incomment=0;
+      if (@comment)
+      { push(@log,[$file, $day, $time, $author, @comment]);
+      }
+    }
+    elsif (!@comments && /^branches:/)
+    {}
+    elsif (!@comments
+        && ( $_ eq '*** empty log message ***'
+	  || /^initial (commit|check\s*in|revision)/i
+	   )
+	  )
+    {}	# Noise
+    else
+    { push(@comment,$_);
+      ## warn "note $_\n";
+    }
+  }
+  elsif (/^$/)
+  { undef $file;
+  }
+  elsif (! defined $file)
+  { if (/^Working file:\s+/)
+    { $file=$';
+    }
+  }
+  else
+  { if (/^date:\s+(\d\d\d\d\/\d\d\/\d\d)\s+(\d\d:\d\d:\d\d);\s+author:\s+(\w+);/)
+    { $incomment=1;
+      $day=$1;
+      $time=$2;
+      $author=$3;
+      @comment=();
+    }
+  }
+}
+
+undef $day;
+undef $auhtor;
+undef $file;
+undef $time;
+
+if (! $TextMode)
+{ my $pwd;
+  chomp($pwd=`pwd`);
+  my $htpwd = r2h($pwd);
+  print "<TITLE>CVS log for $htpwd</TITLE>\n";
+  print "<H1>CVS log for $htpwd</H1>\n";
+}
+
+if (! $TextMode)
+{ print "<UL>\n";
+}
+
+for my $L (reverse sort cmplogs @log)
+{
+  my($f,$d,$t,$a,@C)=@$L;
+
+  if (! defined $day || $day ne $d)
+  { if (defined $day && ! $TextMode)
+    { print "</PRE>\n";
+    }
+
+    $day=$d;
+    undef $author;
+
+    if ($TextMode)
+    { print "$day\n";
+    }
+    else
+    { print "<LI><B>$day</B><BR>\n";
+      print "<PRE>";
+    }
+  }
+
+  if (! defined $author || $author ne $a)
+  { $author=$a;
+    undef $file;
+    print "    $author:\n";
+  }
+
+  for my $comment (@C)
+  { if (! defined $file || $file ne $f)
+    { $file=$f;
+      print "      ".r2h($file).": ";
+      $indent="      ".(' ' x length($file))."  ";
+    }
+    else
+    { print $indent;
+    }
+
+    print r2h($comment), "\n";
+  }
+}
+
+if (! $TextMode)
+{ print "</UL>\n";
+}
+
+sub r2h { $TextMode ? $_[0] : &cs::HTML::raw2html }
+
+sub cmplogs
+{
+  my($f1,$d1,$t1,$a1)=@$a;
+  my($f2,$d2,$t2,$a2)=@$b;
+
+  my $daf1 = "$d1 $a1 $f1";
+  my $daf2 = "$d2 $a2 $f2";
+
+  $daf1 eq $daf2
+  ? $t2 cmp $t1
+  : $daf1 cmp $daf2
+  ;
+}
+
+=head1 SEE ALSO
+
+cvs(1)
+
+=head1 AUTHOR
+
+Cameron Simpson E<lt>cs@zip.com.auE<gt> 19may2000
+
+=cut
