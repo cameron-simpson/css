@@ -1,0 +1,87 @@
+#!/bin/sh
+#
+# Attach a command to a named pipe so that other things can pipe info
+# to it with abandon.
+#	- Cameron Simpson <cs@zip.com.au> 16dec93
+#
+# Recode to be more generic.	- cameron, 18jul94
+#
+
+cmd=`basename "$0"`
+usage="Usage:	[PIPECMD=pipecmd] $cmd [-n] [-v pipename] [-c pipecmd] \\
+			[command [commandargs]]
+		Establish a named pipe, attach pipecmd to it, run command
+		with \$pipename set to the path of the named pipe.
+
+		-n		No command, echo name of pipe to stdout.
+		-v pipename	Specify name of variable to point at pipe
+				instead of \$pipename.
+		-c pipecmd	Command to attach to pipe
+				(default from \$PIPECMD).
+		command		Command to run with \$pipename."
+
+badopts=
+pipevar=
+nocommand=
+while :
+do  case $#,$1 in
+	0,*)		break ;;
+	1,-[vc])	echo "$cmd: missing argument to $1" >&2; badopts=1 ;;
+	*,-n)		nocommand=1 ;;
+	*,-v)		pipevar=$2; shift ;;
+	*,-c)		PIPECMD=$2; shift ;;
+	*,--)		shift; break ;;
+	*,-*)		echo "$cmd: $1: unrecognised option" >&2; badopts=1 ;;
+	*)		break ;;
+    esac
+    shift
+done
+
+[ -n "$PIPECMD" ] || { echo "$cmd: no specification for \"pipecmd\"" >&2
+		       badopts=1
+		     }
+
+case "$nocommand,$#" in
+    ,0)	echo  "$cmd: no specification for \"command\"" >&2
+	badopts=1 ;;
+    1,0);;
+    1,*)echo "$cmd: can't supply \"command\" with -n option" >&2
+	badopts=1 ;;
+esac
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+pipename=/tmp/pipe$$
+mknod $pipename p || exit $?
+export pipename
+# ls -ld $pipename >&2
+
+# attach to read end of pipe
+( [ $nocommand ] && exec 1>&2
+  # echo "read from $pipename ..." >&2
+  exec <$pipename
+  # echo "reader attached to $pipename" >&2
+  # set -vx
+  eval "$PIPECMD"
+) &
+
+# leave attachment and tidyup to caller
+[ $nocommand ] && { echo $pipename; exit 0; }
+
+# protect pipe from EOF
+# echo "write to $pipename ..." >&2
+exec 8>$pipename
+# echo "writer attached to $pipename" >&2
+
+( [ -n "$pipevar" ] && eval "$pipevar=\$pipename; pipename=; export \$pipevar pipename"
+  exec "$@"
+)
+xit=$?
+
+# close write end
+exec 8>&-
+
+# tidy up
+rm $pipename
+
+exit $xit
