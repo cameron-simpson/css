@@ -1,0 +1,74 @@
+#!/usr/bin/perl
+#
+# Use the specified perl file and then serve HTTP requests.
+# Call doCGI($cgiObj) for each request.
+#	- Cameron Simpson <cs@zip.com.au> 30dec97
+#
+
+BEGIN { unshift(@INC,"/u/cameron/etc/pl"); }
+
+use strict qw(vars);
+
+use Getopt::Std;
+use cs::HTTP;
+use cs::HTTPD;
+
+$::Port=80;
+
+($::cmd=$0) =~ s:.*/::;
+$::Usage="Usage: $::cmd [-p port] cgicode
+	-p port	Port to listen on (default: $::Port).
+";
+
+{ my($badopts)=0;
+
+  if (getopt('p:'))
+	{
+	  warn "$::cmd: getopt errors\n";
+	  $badopts=1;
+	}
+
+  $::Port=$::opt_p if defined $::opt_p;
+
+  if (@ARGV)
+	{
+	  $::CodeFile=shift(@ARGV);
+	}
+  else	{
+	  warn "$::cmd: missing cgicode\n";
+	  $badopts=1;
+	}
+
+  if (@ARGV)
+	{ warn "$::cmd: extra arguments: @ARGV\n";
+	  $badopts=1;
+	}
+
+  die $::Usage if $badopts;
+}
+
+do $::CodeFile; die $@ if $@;
+
+my($serv)=new cs::HTTPD ($::Port,{ CGI => { "" => { HANDLER => \&mkCGI } },
+				 },{});
+die "$::cmd: can't attach to $::Port: $!\n" if ! defined $serv;
+
+$SIG{PIPE}=\&onpipe;	# what a pain
+
+while (1)
+	{
+	  $serv->Serve($cs::Net::TCP::F_FORK
+		      |$cs::Net::TCP::F_ONCE
+		      |$cs::Net::TCP::F_SYNC);
+	}
+
+exit 0;
+
+sub onpipe
+	{ $SIG{PIPE}=\&onpipe;
+	}
+
+sub mkCGI
+	{ my($httpd,$rq,$cgi)=@_;
+	  doCGI($cgi);
+	}
