@@ -4,4 +4,8 @@
 #	- Cameron Simpson <cs@zip.com.au> 03sep2004
 #
 
-exec barcode -u mm -p 210x297 -e 128b -c -t 3x10 -g 55x20 -m 2,2
+barcode -u mm -p 210x297 -e 128b -t 3x10+16+16 -g 55x20 -m 4,4 \
+| sed '1a\
+a4\
+clippath pathbbox stroke\
+30 30 translate'
