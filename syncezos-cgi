@@ -1,7 +1,12 @@
 #!/bin/sh
 set -x
-rsync -avHP --delete --delete-excluded \
-	$HOME/there/home/scripts/cgi-bin/. $HOME/there/ezos/html/cs/cgi-bin/.
-rsync -avHP --delete --delete-excluded \
-	--include-from $HOME/rc/sync/list.ezos-cgi \
-	$HOME/there/ezos/html/cs/cgi-bin/. $HOME/there/ezos/cgi-bin/.
+ezos=$HOME/@/ezos
+
+# copy active CGIs to live cgi dir
+rsync -avHP --delete --delete-excluded --exclude=CVS/ \
+	--include=.cgienv.sh \
+	--include=debug.cgi \
+	--include=search.cgi \
+	--include=search.cgi-pl \
+	--exclude='*' \
+	$HOME/scripts/cgi-bin/. $ezos/cgi-bin/.
