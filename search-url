@@ -1,0 +1,34 @@
+#!/usr/bin/perl
+#
+# Return a search URL for the supplied engine and query.
+#	- Cameron Simpson <cs@zip.com.au> 05aug2003
+#
+
+use strict qw(vars);
+
+use cs::Misc;
+use cs::URL;
+
+$::Usage="Usage: $::cmd [-m maxhits] engine query\n";
+
+my $maxhits;
+if (@ARGV >= 2 && $ARGV[0] eq '-m')
+{ $maxhits=$ARGV[1]+0;
+  shift(@ARGV);
+  shift(@ARGV);
+}
+
+if (@ARGV < 2)
+{ die "$::cmd: missing engine and/or query\n$::Usage";
+}
+
+my $engine = shift(@ARGV);
+my $query  = "@ARGV";
+
+my $url = cs::URL::search($engine,$query,$maxhits);
+
+die "$::cmd: unknown engine \"$engine\"\n" if ! defined $url;
+
+print "$url\n";
+
+exit 0;
