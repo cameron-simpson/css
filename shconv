@@ -9,7 +9,7 @@ cmd=`basename "$0"`
 usage="Usage: $cmd [-fnsx] oldsfx newsfx shellcmd {file|-}..."
 
 trace= report=:
-[ -t 1 ] && { trace=set-x; report=echo; }
+[ -t 1 ] && { : trace=set-x; report=echo; }
 force=
 
 badopts=
