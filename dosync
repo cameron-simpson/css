@@ -20,5 +20,7 @@ rsync -avHP --rsync-path='rrsync zapff' /usr/local/opt/HOME/. work:/cameron/opt-
 # push
 syncwork &
 synczip &
+synctw &
+syncjekyll &
 
 wait
