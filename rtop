@@ -1,0 +1,3 @@
+#!/bin/sh
+[ $# = 0 ] && { echo "Usage: $0 [ssh-opts] host" >&2; exit 2; }
+exec ssh -t "$@" top
