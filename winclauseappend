@@ -5,7 +5,8 @@
 #
 
 cmd=$0
-usage="Usage: $cmd filename clause <extra-lines"
+usage="Usage: $cmd filename clause <extra-lines
+	Use \"-\" as filename to filter."
 
 [ $# = 2 ] || { echo "$usage" >&2; exit 2; }
 filename=$1 clause=$2; shift; shift
@@ -43,4 +44,7 @@ sedf="/^ *\[ *$clause *\]/{
 	   }
 	   :out"
 
-exec bsed "$sedf" "$filename"
+case "$filename" in
+  -) exec sed "$sedf" ;;
+  *) exec bsed "$sedf" "$filename" ;;
+esac
