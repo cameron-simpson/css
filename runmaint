@@ -301,6 +301,7 @@ runpath()
   _rp_xit=0
   if [ -d "$_rp/." ]
   then
+    ##echo "$_rp is a directory" >&2
     for _rp_f in "$_rp/"*
     do  ##echo "dirscript $_rp_f ..." >&2
 	runscript "$_rp_f" $_rp_addrs || _rp_xit=1
