@@ -1,0 +1,115 @@
+#!/bin/sh
+#
+# Rummage through a web page pulling out the items of interest.
+#	- Cameron Simpson <cs@zip.com.au> 19jun99
+#
+# Input format:
+#	TITLE title	Output TITLE tag. Should come early.
+#	URL [-i] title	Page to pilfer. -i gets inline refs.
+#			Make an H1 heading with the title.
+#	Hn heading	Category heading.
+#	LI ptn		Rexgexp for URLs, implicitly anchored at ^.
+#	! command	Run shell command with the current page URL
+#			appended and with the page URLs on stdin;
+#			replace URL list with output.
+#
+
+verbose=
+[ -t 2 ] && verbose=1
+
+tmp=/tmp/pilfer.$$
+
+xit=0
+
+sed -e 's/^#.*//' -e 's/^[ 	]*//' -e '/^$/d' ${1+"$@"} \
+| ( xit=0
+    url=
+    n=0
+    while read tag etc
+    do
+	pipe=cat
+	case "$etc" in
+	    *\ \|*) pipe=`sedstrs 's/^[^|]* | *//' "$etc"`
+		    etc=`sedstrs 's/  *|.*//' "$etc"`
+		    ;;
+	esac
+	case "$tag" in
+	    TITLE)
+		echo "<TITLE>$etc</TITLE>" | eval "$pipe" ;;
+	    http://*)
+		mainurl=$tag
+		mainhost=`expr "x$mainurl" : 'xhttp://\([^/]*\).*'`
+		## echo "mainurl=$mainurl"
+		## echo "mainhost=$mainhost"
+
+		case "$etc" in
+		    "")		iflag= etc=$mainurl ;;
+		    -i)		iflag=-i etc=$mainurl ;;
+		    -i\ *)	iflag=-i etc=`sedstrs 's/^-i  *//' "$etc"` ;;
+		    *)		iflag= ;;
+		esac
+		echo "<H1><A NAME=\"$n\" HREF=\"$mainurl\">$etc</A></H1>"
+		[ $n -gt 0 ] && necho "<A HREF=\"#$on\">^- Up</A> | "
+		on=$n
+		n=`expr $n + 1`
+		echo "<A HREF=\"#$n\">Down -v</A><BR>"
+
+		[ $verbose ] && echo "fetching $mainurl..." >&2
+		wcat "$mainurl" \
+		    | urls -u $iflag -t \
+		    | absurl "$mainurl" \
+		    | eval "$pipe" \
+		    > "$tmp"
+		[ -s "$tmp" ] || { echo "$0: no content from $mainurl" >&2
+				   xit=1
+				 }
+		sed 's/^/urls: /' "$tmp" >&2
+		;;
+	    H[1-6])
+		echo "<$tag>$etc</$tag>" | eval "$pipe"
+		;;
+	    LI) regexp=$etc
+		case "$regexp" in
+		    http://*)	;;
+		    /*)		regexp="http://$mainhost$regexp" ;;
+		    *)		regexp="http://$mainhost/$regexp" ;;
+		esac
+
+		grep "^$regexp" <"$tmp" \
+		| absurl "$mainurl" \
+		| while read ref title
+		  do  [ -n "$title" ] || title=$ref
+		      echo "- <A HREF=$ref>$title</A><BR>"
+		  done \
+		| eval "$pipe"
+		;;
+	    IMG)regexp=$etc
+		case "$regexp" in
+		    http://*)	;;
+		    /*)		regexp="http://$mainhost$regexp" ;;
+		    *)		regexp="http://$mainhost/$regexp" ;;
+		esac
+
+		grep "^$regexp" <"$tmp" \
+		| absurl "$mainurl" \
+		| while read ref title
+		  do  # [ -n "$title" ] || title=$ref
+		      echo "<IMG SRC=\"$ref\"><BR>"
+		  done \
+		| eval "$pipe"
+		;;
+	    !)  sh -xc "$etc $mainurl | $pipe" <"$tmp"
+		;;
+	    *)  echo "$0: can't parse: $tag $etc" >&2
+		xit=1
+		;;
+	esac
+    done
+    exit $xit
+  )
+
+xit=$?
+
+rm -f "$tmp"
+
+exit $xit
