@@ -8,6 +8,8 @@ use strict qw(vars);
 
 BEGIN { use cs::DEBUG; cs::DEBUG::using(__FILE__); }
 
+use cs::Misc;
+
 package cs::Mail::Aliases;
 
 @cs::Mail::Aliases::ISA=qw();
@@ -16,6 +18,7 @@ sub db
 { my($path,$rw)=@_;
   $rw=0 if ! defined $rw;
 
+  ::need(cs::Persist);
   my($db)=cs::Persist::db($path,$rw);
 
   return undef if ! defined $db;
@@ -66,16 +69,13 @@ sub newEntry
 }
 
 sub AddDB
-{ my($this,$db)=(shift,shift);
+{ my($this,@db)=@_;
 
-  my($pushdb)=$db;
+  my $pushdb = {};
 
-  if (@_)
-	{ $pushdb={};
-	  for (@_)
-		{ $pushdb->{$_}=$db->{$_};
-		}
-	}
+  for my $db (@db)
+  { ::addHash($pushdb,$db);
+  }
 
   push(@{$this->{DBS}},$pushdb);
 }
@@ -85,8 +85,8 @@ sub Add
   $force=0 if ! defined $force;
 
   if ($force || ! exists $this->{ALIASES}->{$key})
-	{ $this->{ALIASES}->{$key}=newEntry($value,$context);
-	}
+  { $this->{ALIASES}->{$key}=newEntry($value,$context);
+  }
 }
 
 sub implAliases
@@ -152,35 +152,32 @@ sub Expand
 
 sub _Expand
 { my($this,$text,$live)=@_;
-  my($ndx)=cs::RFC822::addrSet($text);
 
-  my($useaddr)=new cs::Set;
-  my($exp);
-  my($purge);
+  my $ndx = cs::RFC822::addrSet($text);
 
-  for my $addr ($ndx->KEYS())
-	{ if ($purge=($addr =~ /^!\s*/))
-		{ $addr=$';
-		}
+  my $useaddr = {};
+  my $purge;
 
-	  $exp=$this->_ExpAlias($addr,$live);
-	  if (! $exp)
-		# $addr isn't an alias name - use as-is
-		{ ($exp=new cs::Set)->STORE($addr,$ndx->FETCH($addr));
-		}
+  for my $addr (keys %$ndx)
+  { if ($purge=($addr =~ /^!\s*/))
+    { $addr=$';
+    }
 
-	  # array of expanded addresses
-	  if ($purge)
-		{ for my $subaddr ($exp->KEYS())
-			{ $useaddr->DELETE($subaddr);
-			}
-		}
-	  else	{ for my $subaddr ($exp->KEYS())
-			{ $useaddr->STORE($subaddr,
-					  $exp->FETCH($subaddr));
-			}
-		}
-	}
+    my $exp = $this->_ExpAlias($addr,$live);
+    if (! $exp)
+    # $addr isn't an alias name - use as-is
+    { $exp={};
+      $exp->{$addr}=$ndx->{$addr};
+    }
+
+    # array of expanded addresses
+    if ($purge)
+    { ::subHash($useaddr,$exp);
+    }
+    else
+    { ::addHash($useaddr,$exp);
+    }
+  }
 
   $useaddr;
 }
@@ -210,10 +207,10 @@ sub Aliases
   my(%hash);
 
   map($hash{$_}=1, keys %{$this->{ALIASES}});
-  my($db);
-  for $db (@{$this->{DBS}})
-	{ map($hash{$_}=1, keys %$db);
-	}
+
+  for my $db (@{$this->{DBS}})
+  { map($hash{$_}=1, keys %$db);
+  }
 
   keys %hash;
 }
@@ -225,21 +222,21 @@ sub Alias
   my($A)=$this->{ALIASES};
 
   if (exists $A->{$alias})
-	{ return undef if ! defined $A->{$alias};
-	  return $A->{$alias};
-	}
+  { return undef if ! defined $A->{$alias};
+    return $A->{$alias};
+  }
 
   DB:
-    for (@{$this->{DBS}})
-	{
-	  next DB if ! exists $_->{$alias};
+  for my $db (@{$this->{DBS}})
+  {
+    next DB if ! exists $db->{$alias};
 
-	  # cache it and return
-	  my($v)=$_->{$alias};
-	  $v={VALUE => $v} if ! ref $v;
-	  $A->{$alias}=bless $v, cs::Mail::Aliases;
-	  return $A->{$alias};
-	}
+    # cache it and return
+    my($v)=$db->{$alias};
+    $v={VALUE => $v} if ! ref $v;
+    $A->{$alias}=bless $v, cs::Mail::Aliases;
+    return $A->{$alias};
+  }
 
   return undef;
 }
