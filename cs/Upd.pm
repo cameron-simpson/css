@@ -92,6 +92,8 @@ sub ask		{ cs::Upd::ask(@_); }
 
 package cs::Upd;
 
+sub setDefault($);
+
 $cs::Upd::_Clip=79;	# default clip length
 
 setDefault(STDERR);	# default upd structure
