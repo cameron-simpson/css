@@ -13,19 +13,30 @@ use cs::HTML;
 use cs::HTTP;
 use Getopt::Std;
 
-$::Usage="Usage: $::cmd [-itx] [baseURL] < html\n";
+$::Usage="Usage: $::cmd [-itxR] [baseURL] < html
+	-A	Trim anchors from URLs.
+	-i	Get inline URLs (SRCs) instead of HREFs.
+	-t	Print URLs title text after each URL.
+	-x	Hexify the URLs.
+	-R	Raw listing - list every URL mention in native order
+		instead of a sorted unique list of URLs.
+";
 
+my $noanchors=0;
 my $inline=0;
 my $titles=0;
 my $hexify=0;
+my $rawlist=0;
 my $base;
 
 my $badopts=0;
 
-getopts("itx") || ($badopts=1);
+getopts("AitxR") || ($badopts=1);
+$noanchors=1 if defined $::opt_A;
 $inline=1 if defined $::opt_i;
 $titles=1 if defined $::opt_t;
 $hexify=1 if defined $::opt_x;
+$rawlist=1 if defined $::opt_R;
 
 if (@ARGV)
 { $base=shift(@ARGV);
@@ -49,9 +60,9 @@ die $::Usage if $badopts;
 my $src = new cs::Source (FILE,STDIN);
 my %urls;
 
-cs::HTML::sourceURLs(\%urls,$src,$inline,$base);
+my @urls = cs::HTML::sourceURLs(\%urls,$src,$inline,$base,$noanchors);
 
-for my $url (sort keys %urls)
+for my $url ($rawlist ? @urls : sort keys %urls)
 { print $hexify ? cs::HTTP::hexify($url,HTML) : $url;
   print "\t$urls{$url}" if $titles;
   print "\n";
