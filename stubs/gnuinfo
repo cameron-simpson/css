@@ -1,0 +1,9 @@
+#!/bin/sh
+
+info=/usr/bin/info
+case $SYSTEMID-$ARCH in
+    *-sun.sparc.solaris|cisra-*.*.*)
+	info=/usr/gnu/bin/info ;;
+esac
+
+exec "$info" ${1+"$@"}
