@@ -13,11 +13,11 @@ use Getopt::Std;
 sub fetchgroup($);
 
 $::Server=(length $ENV{NNTPSERVER} ? $ENV{NNTPSERVER} : 'nntp');
-$::NDA='ng2to|bgprocmail';
+$::NDA='ng2to|procmail';
 $::Newsrc="$ENV{HOME}/.fetchnews-state";
 $::CatchUp=0;
 
-$::Usage="Usage: $::cmd [-s nntpserver] [-d nda] newsgroup...
+$::Usage="Usage: $::cmd [-s nntpserver] [-d nda] [newsgroup...]
 	-c		Catch up the named group.
 	-s nntpserver	Specify server. Default: \$NNTPSERVER.
 	-n newsrc	Specify news file. Default: $::Newsrc.
@@ -30,14 +30,27 @@ $::Server=$::opt_s if defined $::opt_s;
 $::NDA=$::opt_d if defined $::opt_d;
 $::Newsrc=$::opt_n if defined $::opt_n;
 
-if (! @ARGV)
-{ die "$::cmd: missing newsgroups\n$::Usage";
-}
-
 $::Conn=new cs::NNTP $::Server;
 die "$::cmd: can't connect to server $::Server: $!\n" if ! defined $::Conn;
 
 $::RC=new cs::Newsrc ($::Newsrc,$::Server);
+
+if (! @ARGV)
+{
+  if ($::CatchUp)
+  { die "$::cmd: no newsgroups! catch up mode can only be used with explicit groups\n";
+  }
+
+  @ARGV=grep(/\@$::Server$/, $::RC->Groups());
+  if (! @ARGV)
+  { warn "$::cmd: no groups known for server \"$::Server\"\n";
+  }
+  else
+  { for (@ARGV)
+    { s/\@$::Server$//;
+    }
+  }
+}
 
 $::Xit=0;
 
