@@ -23,8 +23,7 @@
 # as typically they need define only "pure PostScript" printer names.
 #
 
-#### needed? #### # ensure env is set up
-#### needed? #### [ -n "$SYSTEMID" ] || { [ -s /opt/shell/STANDARD ] && . /opt/shell/STANDARD; }
+: ${OS:=`uname -s|tr '[A-Z]' '[a-z]'`}
 
 multipsargs=
 postps=
