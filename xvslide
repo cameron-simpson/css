@@ -1,0 +1,6 @@
+#!/bin/sh
+while :
+do  bglist -r -n 256 -o -w ${1+"$@"} \
+    | xvmax -flist /dev/fd/0 \
+    || exit 1
+done 
