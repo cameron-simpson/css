@@ -1,0 +1,26 @@
+#!/bin/sh
+#
+# Stop lp queue, flush, restart.
+#	- Cameron Simpson <cs@zip.com.au> 03mar98
+#
+# Full paths for use via rsh etc.	- cameron, 24jun98
+#
+
+norm=
+[ "x$1" = x-n ] && { norm=1; shift; }
+
+/usr/sbin/lpshut
+cd /var/spool/lp || exit $?
+tty=`tty 2>/dev/null`
+[ -n "$tty" ] || tty=/dev/null
+if [ -z "$norm" ]
+then
+    spooled=`find . -type f -name '[0-9]*' -print`
+    if [ -n "$spooled" ]
+    then
+	echo "rm $spooled"
+	rm $spooled
+    fi
+fi
+sleep 2
+/usr/lib/lpsched
