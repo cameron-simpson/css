@@ -1,0 +1,15 @@
+#!/bin/sh
+#
+# Get the daemonised ssh-agent info.
+#	- Cameron Simpson <cs@zip.com.au> 30jul2001
+#
+
+f=$VARRUN/ssh-agent-$HOST
+
+[ -s "$f" ] \
+&& v=`cat "$f"` \
+&& [ -n "$v" ] \
+&& eval "$v" \
+&& [ -n "$SSH_AGENT_PID" ] \
+&& kill -0 "$SSH_AGENT_PID" \
+&& echo "$v"
