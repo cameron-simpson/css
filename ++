@@ -4,16 +4,14 @@
 #	- Cameron Simpson <cs@zip.com.au> 01jan2003
 #
 
-cmd=$0
+cmd=`basename "$0"`
+usage="Usage:     $cmd    Update mairix index.
+	$cmd mairix-search-args... Search and display."
 
 mairix=/opt/mairix/bin/mairix
-rc=$HOME/rc/mairix
+rc=$HOME/rc/mairix.$SYSTEMID
 
-[ "x$*" = x-h -o "x$*" = 'x-?' ] \
-  && { echo "Usage:	$cmd	Update mairix index.
-	$cmd mairix-search-args... Search and display."
-       exit 0
-     }
+[ "x$*" = x-h -o "x$1" = 'x-?' ] && { echo "$usage"; exit 0; }
 
 if [ $# != 0 ]
 then
