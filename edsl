@@ -1,0 +1,71 @@
+#!/usr/bin/perl
+#
+# Edit symlinks.
+#	- Cameron Simpson <cs@zip.com.au> 07mar2001
+#
+
+($::cmd=$0) =~ s:.*/::;
+
+die "Usage: $::cmd perlcode [links...]\n" if @ARGV < 1;
+
+my $perlcode = shift(@ARGV);
+
+eval "sub modify { local(\$_)=\@_; $perlcode; return \$_; }";
+die "$::cmd: errors in perlcode: $@\n\tcode is: $perlcode\n" if $@;
+
+@ARGV=('-') if ! @ARGV;
+
+$::Xit=0;
+$::Verbose = -t STDOUT;
+
+my $olink;
+my $nlink;
+
+for my $path (@ARGV)
+{
+  if ($path eq '-')
+  {
+    while (defined ($_=<STDIN>))
+    { chomp;
+      edlink($_);
+    }
+  }
+  else
+  {
+    edlink($path);
+  }
+}
+
+exit $::Xit;
+
+sub edlink($)
+{ my($path)=@_;
+
+  if (! defined($olink=readlink($path)))
+  { warn "$::cmd: $path: readlink: $!\n";
+    $::Xit=1;
+  }
+  else
+  {
+    $nlink=modify($olink);
+    if (! defined $nlink || ! length $nlink)
+    {
+      warn "$::cmd: ${path} -> $olink\n\tbad new value: $nlink\n";
+      $::Xit=1;
+    }
+    elsif ($olink ne $nlink)
+    {
+      if (! unlink($path))
+      { warn "$::cmd: can't unlink $path: $!\n";
+	$::Xit=1;
+      }
+      elsif (! symlink($nlink,$path))
+      { warn "$::cmd: can't make new link of $path -> $nlink\n\told link was $olink\n";
+	$::Xit=1;
+      }
+      elsif ($::Verbose)
+      { print "$path -> $nlink\n";
+      }
+    }
+  }
+}
