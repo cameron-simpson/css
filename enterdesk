@@ -20,7 +20,8 @@ then
     desktop "$thisdesk" shcmds | sh -x &
     desktop "$thisdesk" wmcmds | fvwmcmd &
 
-    if [ "x$XSESSIONBG" = xpixmap ]
+    # moving backdrops into FvwmBacker
+    if false && [ "x$XSESSIONBG" = xpixmap ]
     then
 	# check root backdrop
 	syncrootbg -d "$thisdesk" &
