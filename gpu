@@ -21,10 +21,18 @@ case $1 in
 		;;
 esac
 
-[ $# = 0 ] && { set x "`xunclip`"; shift; }
+[ $# = 0 ] && { set x "`xunclip`"; shift; echo "$1"; }
 
 ulimit -d 16384	## 16M process data limit
 
+tmp=${TMPDIR:-/tmp}/gpu$$
+for arg
+do  echo "$arg"
+done >"$tmp"
+exec <"$tmp"
+cat "$tmp"
+rm "$tmp"
 set -x
-[ $async ] || exec getpageurls -L download ${1+"$@"}
-ignhup getpageurls -L download ${1+"$@"} &
+set getpageurls -q $HOME/var/log/httpgetd-queue
+[ $async ] || exec "$@"
+exec bgstdin "$@"
