@@ -7,12 +7,12 @@ if [ $# = 0 ]
 then
     needhost zapff@cisra amadeus@home || exit 1
     case $HOST@$SYSTEMID in
-      zapff@cisra)	set cameron@agricola cameron@agostino cameron@ivory cameron@upnp ;;
+      zapff@cisra)	set cameron@agricola cameron@agostino cameron@ivory cameron@upnp cameron@cvs.cgn ;;
       amadeus@home)	set cameron2@alpha cameron2@janus ;;
       *)	echo "$cmd: $HOST@$SYSTEMID: huh?" >&2; exit 1 ;;
     esac
     for h
-    do  pfx "$h" syncsmall "$h" &
+    do  (set -x; exec pfx "$h" syncsmall "$h" ) &
     done
     wait
     exit 0
@@ -24,4 +24,5 @@ case $1 in
     *)		echo "$cmd: missing user@host" >&2; exit 2 ;;
 esac
 
+set -x
 exec syncstuff @small -o "to=$who" ${1+"$@"}
