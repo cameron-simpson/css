@@ -42,7 +42,7 @@ require Exporter;
 @cs::HTML::ISA=qw(Exporter);
 @cs::HTML::EXPORT_OK=qw(TABLE TD TR IMG HREF);
 
-sub _tokenURLs($$$);
+sub _tokenURLs($$$$);
 
 # hack to prevent Netscape 4
 # inserting gratuitous whitespace into tables
@@ -707,9 +707,10 @@ sub URLs($)	# html -> (url,tag,...)
   @URLs;
 }
 
-sub sourceURLs($$;$$)
-{ my($urls,$s,$inline,$base)=@_;
+sub sourceURLs($$;$$$)
+{ my($urls,$s,$inline,$base,$noanchors)=@_;
   $inline=0 if ! defined $inline;
+  $noanchors=0 if ! defined $noanchors;
 
   ## my@c=caller;
   ## warn "s=$s from [@c]";
@@ -718,26 +719,34 @@ sub sourceURLs($$;$$)
 
   my $t;
 
+  my @urls = ();
+
   while (defined ($t=$parse->Tok()))
   { ## warn "got $t->{TAG} from HTML::Tok()";
     ## warn cs::Hier::h2a($t,1), "\n";
-    tokenURLs($urls,$t,$inline,$base);
+    push(@urls,tokenURLs($urls,$t,$inline,$base,$noanchors));
     ## warn "getting another token";
   }
+
+  return @urls;
 }
 
-sub tokenURLs($$;$$)
-{ my($urls,$t,$inline,$base)=@_;
+sub tokenURLs($$;$$$)
+{ my($urls,$t,$inline,$base,$noanchors)=@_;
   $inline=0 if ! defined $inline;
+  $noanchors=0 if ! defined $noanchors;
 
   local($cs::HTML::_BaseURL)=$base;
-  _tokenURLs($urls,$t,$inline);
+  return _tokenURLs($urls,$t,$inline,$noanchors);
 }
 
-sub _tokenURLs($$$)
-{ my($urls,$t,$inline)=@_;
+sub _tokenURLs($$$$)
+{ my($urls,$t,$inline,$noanchors)=@_;
+  $noanchors=0 if ! defined $noanchors;
 
   ::need(cs::URL);
+
+  my @urls = ();
 
   # notice <BASE HREF="...">
   my $tag = $t->{TAG};
@@ -764,20 +773,26 @@ sub _tokenURLs($$$)
     }
 
     $url=cs::URL::undot($url);
-    my $title=join('',cs::HTML::tokFlat(@{$_->{TOKENS}}));
+    push(@urls,$url);
+
+    ##warn "tokFlat(".cs::Hier::h2a($t->{TOKENS},0).")...";
+    my $title=join('',cs::HTML::tokFlat(@{$t->{TOKENS}}));
     $title =~ s/\s+/ /g;
     $title =~ s/^ //;
     $title =~ s/ $//;
 
     if (! exists $urls->{$url} || length($urls->{$url}) < length($title))
     { $urls->{$url}=$title;
+      ##warn "title($url)=[$title]";
     }
   }
 
   SUBTOKENS:
   for my $tok (@{$t->{TOKENS}})
-  { _tokenURLs($urls,$tok,$inline);
+  { push(@urls,_tokenURLs($urls,$tok,$inline,$noanchors));
   }
+
+  return @urls;
 }
 
 sub oldTokenURLs($$;$$)
