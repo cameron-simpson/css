@@ -1,0 +1,30 @@
+#!/bin/sh
+#
+# fastfs	Make local solaris filesystems asynchronous.
+#
+# Cameron Simpson <cs@zip.com.au> 26jun2000
+#
+# chkconfig: 2345 90 10
+# description: Turn on asynchronous mode for local UFS filesystems.
+# probe: false
+
+# See how we were called.
+case "$1" in
+  start)
+	echo "Making local filesystems fast (except for /)."
+	grep '^/' /etc/vfstab \
+	| awk '$4 == "ufs" && $3 != "/" { print $3 }' \
+	| while read fs
+	  do  fastfs "$fs" fast
+	  done
+	# fire off safety valve
+	while sleep 300; do sync; done &
+        ;;
+  stop)
+        ;;
+  *)
+        echo "Usage: $0 {start|stop}"
+        exit 1
+esac
+
+exit 0
