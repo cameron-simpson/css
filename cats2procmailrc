@@ -1,0 +1,209 @@
+#!/usr/bin/perl
+#
+# Convert my categories file to procmail recipes.
+#	- Cameron Simpson <cs@zip.com.au> 02mar2001
+#
+
+=head1 NAME
+
+cats2procmailrc - generate a procmail recipe from my mail categories file
+
+=head1 SYNOPSIS
+
+cats2procmailrc E<lt>categories E<gt>procmailrc
+
+=head1 DESCRIPTION
+
+I<cats2procmailrc> reads a human friendly mail category description file
+and emits a matching procmail(1) recipe to implement it.
+
+I build my B<.procmailrc> with the following myke(1) rule:
+
+	procmailrc:	$@.pre $(HOME)/scripts/cats2procmailrc categories
+		( cat $@.pre \
+		  echo \
+		  cats2procmailrc <categories \
+		) >$@
+
+Which starts with a few small manual rules from B<procmailrc.pre>
+and adds the automatic rules by converting my categories file.
+
+=head1 FILE FORMAT
+
+The categories file consists of single line entries of the form:
+
+	[!]folder tag pattern
+
+Blank lines and lines beginning with an octothorpe ('#') are ignored.
+
+A leading exclaimation mark ('!') means that mail items matching this rule
+should generate an alert.
+For me, this means a single line summary of the mail item appears in yellow in a small log window
+I have at the top of my screen for mail items I should read I<now>.
+
+The I<folder> names the folder in which to place the mail item.
+Normail UNIX mail files, MH style directories and Maildir style directories are autodetetected.
+
+The I<tag> is placed at the start of the mail's B<Subject> line for ready recognition in mixed folders.
+The special tag dot (".") suppresses this action.
+
+The I<pattern> selects the mail items.
+
+The usual form is simply an address (see RFC822 and RFC2822)
+to be present in the B<To>, B<CC> or B<BCC> header lines.
+If the address string lacks an at ("@") then an at and the value of the environment variable B<$SITENAME>
+is appended.
+So I have rules like this:
+
+	!attn	Personal	cs
+	!attn	Personal	cameron@research.canon.com.au
+	attn	EFF-Cafe-News   cafe-news@eff.org
+	crypto  AUCrypto        aucrypto@suburbia.net
+
+matching B<cs@zip.com.au>, B<cameron@research.canon.com.au>, B<cafe-news@eff.org>
+and B<aucrypto@suburbia.net> respectively. The "Personal" items generate an alert.
+
+It is also possible to select on a different header line
+by prefixing the I<pattern> string with a header name, viz:
+
+	applix  ApplixWare      sender:owner-applixware-list@applix.com
+
+which selects for an address in the B<Sender> header line.
+
+The I<pattern> may also be an arbitrary regular expression in egrep(1) syntax.
+In this case the I<pattern> starts with a slash ("/")
+and optionally ends in a slash, viz:
+
+	!adzap  AdZap           subject:/(noads|add?[-  s]*zap|squid_?redir|zapp(er|ing)|wrapzap)/
+
+which matches mail items with subjects regarding my adzap program.
+
+=head1 ENVIRONMENT
+
+MAILDIR, the directory containing mail folders.
+
+SYSTEMID, the local mail domain (eg B<research.canon.com.au> for my current workplace).
+
+=head1 SEE ALSO
+
+procmail(1), procmailrc(1), procmailex(1), egrep(1)
+
+=head1 AUTHOR
+
+Cameron Simpson E<lt>cs@zip.com.auE<gt>
+
+=cut
+
+BEGIN { use cs::DEBUG; cs::DEBUG::using(__FILE__);
+      }
+
+use strict vars;
+use cs::Source;
+
+my $doalert;
+my $sfx;
+
+CAT:
+while (<STDIN>)
+{
+  chomp;
+  s/^\s+//;
+  s/^#.*//;
+  next CAT if ! length;
+
+  # leading ! means alert this message
+  $doalert=0;
+  if (/^\!\s*/)
+  { $doalert=1;
+    $_=$';
+  }
+
+  # we expect "mailbox tag rule"
+  if (! /^(\S+)\s+(\S+)\s+(\S.*\S)/)
+  { warn "$::cmd: stdin, line $.: bad line: $_\n";
+    next CAT;
+  }
+
+  my($folder,$key,$ptn)=($1,$2,$3);
+  $folder='attn' if $folder eq '.';
+
+  my @hdrs;
+  if ($ptn =~ /^(\w[-,\w]*):/)
+  { $ptn=$';
+    @hdrs=split(/,+/, $1);
+  }
+  else
+  { @hdrs=('to','cc','bcc');
+  }
+
+  if ($ptn =~ m:^/(.*)/?$:)
+  { $ptn=$1;
+  }
+  else
+  { $ptn.="\@.*$ENV{SITENAME}" if $ptn !~ /\@/;
+  }
+
+  $ptn =~ s/\.[^*]/\\$&/g;
+
+  my $hregexp = '('.join('|',@hdrs).')';
+
+  print <<X
+: 0
+* ^$hregexp:.*$ptn
+{
+X
+  ;
+
+  if ($doalert)
+  { print <<X
+
+  : 0hc
+  | mhdrs | { while read hdr body; do eval "HDR_\$hdr=\\\$body"; done; alert -c yellow "`timecode` +$folder \$HDR_FROM; \$HDR_SUBJECT"; }
+X
+    ;
+  }
+
+  if ($key ne '.')
+  {
+    print <<X
+
+  : 0hf
+  | sed 's/^Subject:/& [$key]/'
+X
+    ;
+  }
+
+  $sfx=foldersfx($folder);
+  print <<X
+
+  : 0
+  $folder$sfx
+}
+
+X
+  ;
+}
+
+print <<X
+: 0
+spam/.
+
+X
+;
+
+exit 0;
+
+sub foldersfx
+{ my($folder)=@_;
+
+  $folder="$ENV{MAILDIR}/$folder" unless $folder =~ m:^/:;
+  if (! stat($folder) || ! -d _)
+  { return "";
+  }
+
+  if (-e "$folder/.mh_sequences")
+  { return "/.";
+  }
+
+  return "/";
+}
