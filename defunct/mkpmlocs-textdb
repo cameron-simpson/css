@@ -1,0 +1,127 @@
+#!/usr/bin/perl
+#
+# Emit commands for the PortMaster to write the dialback location table.
+#	- Cameron Simpson <cs@zip.com.au> 11jun97
+#
+# Use auto/pmlocs table to preserve IP addrs.
+# Reuse IPs for people with ALTDIALBACK #s.	- cameron 20nov97
+# Fold DIALBACKALT into DIALBACK.		- cameron 07jan98
+#
+
+use strict qw(vars);
+use CISRA::DB;
+use CISRA::UserData;
+
+{ my($users)=CISRA::UserData::db();
+  die "no user database" if ! defined $users;
+
+  my($pmlocs)=CISRA::DB::db(['auto','pmlocs'],1);
+
+  # address range
+  $::IP3='10.0.0';
+  $::IP1=1;		# start on odd number, inc by 2  (31 bit netmask)
+
+  $::Xit=0;
+
+  my($u,$exp,$a,$dialkey,$dial,$ip,$first);
+  my(@u)=CISRA::UserData::users();
+
+  DIALBACK:
+    for my $login (sort @u)
+	{
+	  next DIALBACK if ! defined ($u=CISRA::UserData::user($login))
+			|| ! exists $u->{DIALBACK};
+
+	  if ($u->IsExpired())
+		{ warn "ignoring dialback for $login: defunct user!";
+		  $::Xit=1;
+		  next DIALBACK;
+		}
+
+	  $dial=$u->{DIALBACK};
+	  $dial={ $login => $dial } if ! ref $dial;
+
+	  $first=1;
+	  ENTRY:
+	    for $dialkey ($login,grep($_ ne $login, sort keys %$dial))
+		{ next ENTRY if ! exists $dial->{$dialkey};
+		  if ($first)
+			{ $ip=dialback($login,$dialkey,$dial->{$dialkey},$pmlocs);
+			  $first=0;
+			}
+		  else	{ dialback($login,$dialkey,$dial->{$dialkey},$pmlocs,$ip);
+			}
+		}
+	}
+}
+
+CISRA::DB::finish();
+
+print "save loc\n";
+
+exit $::Xit;
+
+sub dialback
+	{ my($login,$dialkey,$db,$pmlocs,$ip)=@_;
+	  my($phone);
+
+	  if ($db =~ /^\d{4}$/)
+		{ $phone=",,$db"; }
+	  elsif ($db =~ /^\d[-\d]*-[-\d]*\d$/)
+		{ $phone=",0,,$db"; }
+	  else	{ warn "dialback \"$dialkey\" for $login: bad phone #: $db\n";
+		  $::Xit=1;
+		  return;
+		}
+
+	  if (! defined $ip)
+		{ if (defined ($ip=findip($pmlocs,$login)))
+			{ $ip=$ip->{IP};
+			}
+		  else
+			{ $ip=picknewip($pmlocs);
+			}
+
+		  $pmlocs->{$ip}={ LOC => $dialkey, DIALBACK => $db, IP => $ip, USER => $login };
+		}
+
+	  print <<X
+add loc $dialkey
+set loc $dialkey destination $ip
+set loc $dialkey netmask 255.255.255.254
+set loc $dialkey group 0
+set loc $dialkey maxports 1
+set loc $dialkey script 1 "atdt$phone\\r" ~
+set loc $dialkey script 2
+set loc $dialkey protocol PPP
+X
+;
+
+	  $::IPbyLogin{$login}=$ip;
+
+	  $ip;
+	}
+
+sub picknewip
+	{ my($pmlocs)=@_;
+
+	  my($ip);
+
+	  $ip="$::IP3.$::IP1";
+	  while (exists $pmlocs->{$ip})
+		{ $::IP1+=2;
+		  $ip="$::IP3.$::IP1";
+		}
+
+	  $ip;
+	}
+
+sub findip
+	{ my($pmlocs,$login)=@_;
+
+	  for (keys %$pmlocs)
+		{ return $pmlocs->{$_} if $pmlocs->{$_}->{USER} eq $login;
+		}
+
+	  return undef;
+	}
