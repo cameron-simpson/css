@@ -12,6 +12,7 @@ s/^.*(\(.*\)).*$/\1/
 s/^[^a-zA-Z]*\([a-z][a-z]*:\/\/.*\)/\1/
 s/^Http:/http:/
 /^[a-z][a-z]*:\/\//b ok
+/^about:/b ok
 /^https:/b ok
 /^file:/b ok
 /^ftp:/b ok
