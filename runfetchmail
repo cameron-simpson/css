@@ -36,6 +36,7 @@ do
 	--logfile "$LOGDIR/fetchmail" \
 	--nobounce --tracepolls --warnings 86400 \
 	$fmopts ${1+"$@"} $fmhosts
+  echo `date`: fetchmail done >&2
 
   [ $once ] && break
   sleep $fmdelay &
