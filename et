@@ -1,0 +1,66 @@
+#!/bin/sh
+#
+# Wrapper for eterm.
+#	- Cameron Simpson <cs@zip.com.au> 10may99
+#
+
+CONSOLE=${CONSOLE:-$HOME/var/log/console}
+PREFTERM=${PREFTERM:-et}
+export CONSOLE PREFTERM
+
+opts=
+theme=${ETERMTHEME:-Eterm}
+title="$*"
+geometry=
+while :
+do case "$1" in
+    +ut)		;;
+    -display)		DISPLAY=$2; shift ;;
+    -fn)		opts="$opts --font '$2'"; shift ;;
+    -t)			opts="$opts -t '$2'"; shift ;;
+    -title|-n)		title=$2; shift ;;
+    -name)		opts="$opts --icon-name '$2'"; shift ;;
+    -g|-geom*)		geometry=$2; shift ;;
+    *:[0-9]*)		DISPLAY=$1 ;;
+    *+[0-9])		geometry=$1 ;;
+    [1-9]|[1-9][0-9])	geometry=80x$1-0-0 ;;
+    [1-9]*x[1-9]*)	geometry=$1-0-0 ;;
+    --)			shift; break ;;
+    -e)			shift; break ;;
+    -C)			opts="$opts -C" ;;
+    -?*)		opts="$opts $1 '$2'"; shift ;;
+    *)			break ;;
+   esac
+   shift
+done
+
+[ -n "$geometry" ] && geometry="-g '$geometry'"
+export DISPLAY
+
+[ -n "$DISPLAY" ] || exec term $geometry -e ttyexec ${1+"$@"}
+
+ETERMTHEME=$theme
+export ETERMTHEME
+
+xt=/opt/Eterm/bin/Eterm
+
+eval "set x $geometry $opts -e ttyexec \${1+\"\$@\"}"
+shift
+
+## LD_LIBRARY_PATH=/opt/Eterm/lib:$LD_LIBRARY_PATH
+## export LD_LIBRARY_PATH
+
+# Eterm is really fucking stupid about options
+case "$title" in -*) title=" $title" ;; esac
+
+(
+
+exec >>$CONSOLE 2>&1
+
+Eterm --name "$title" \
+      --path "$ETERMPATH" \
+      -t bgpic \
+      -N "300 `bglist -r -n 32`" \
+      --menubar off --select-line \
+      "$@" &
+)
