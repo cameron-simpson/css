@@ -31,34 +31,35 @@ then
     target=$cmd
     case "$cmd" in
 	aarn)	[ $# = 0 ] && exec us http://mirror.aarnet.edu.au/ ;;
+	avim|im)target=avimagesearcher ;;
+	avsubmit) target=altavistasubmit ;;
 	av)	target=altavista ;;
-	trans)	target=systranslinks ;;
-	dict)	target=onelook ;;
 	babel)	target=babelfish ;;
+	de2en)	target=google_de2en ;;
+	deja)	target=dejanews ;;
+	dict)	target=onelook ;;
+	djid)	exec us `msgid2dj ${1+"$@"}` ;;
+	dj)	target=googledj ;;
+	fm)	target=freshmeat ;;
+	fst)	target=findsametext ;;
+	fsu)	target=findsameurl ;;
+	gim)	target=googleimagesearch ;;
+	imdb-actor) target=movieactors ;;
+	imdb-character-female) target=moviecharfemale ;;
+	imdb-character-male) target=moviecharmale ;;
+	imdb)	target=movietitles ;;
+	imdb-title) target=movietitles ;;
+	mcrawl)	target=metacrawler ;;
+	msgid)	target=googledjmsgid ;;
 	nlight)	target=northernlight ;;
 	raging)	target=avraging ;;
-	avsubmit) target=altavistasubmit ;;
-	dj)	target=googledj ;;
-	msgid)	target=googledjmsgid ;;
-	deja)	target=dejanews ;;
-	djid)	exec us `msgid2dj ${1+"$@"}` ;;
-	avim|im)target=avimagesearcher ;;
-	fm)	target=freshmeat ;;
-	gim)	target=googleimagesearch ;;
 	rpmfind)target=speakeasy-rpmfind ;;
-	fsu)	target=findsameurl ;;
-	fst)	target=findsametext ;;
 	sf)	target=sourceforge ;;
-	yp)	target=yellowpages ;;
-	mcrawl)	target=metacrawler ;;
-	w3val)	target=w3c_validate ;;
-	imdb)	target=movietitles ;;
-	imdb-actor) target=movieactors ;;
-	imdb-title) target=movietitles ;;
-	imdb-character-male) target=moviecharmale ;;
-	imdb-character-female) target=moviecharfemale ;;
+	trans)	target=systranslinks ;;
 	tv)     target=sofcomtv ;;
+	w3val)	target=w3c_validate ;;
 	wiki)	target=wikipedia ;;
+	yp)	target=yellowpages ;;
 	www)	for target in altavista yahoo dmoz google
 		do  search -t "$target" "$*" &
 		done
