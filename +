@@ -28,6 +28,7 @@ done
 if [ $# -gt 0 ]
 then
   case $1 in
+    /*)		mfolder=$1 ;;
     +*)		mfolder=$1 ;;
     *.*)	mfolder=nntp://$NNTPSERVER/$1 ;;
     *)		mfolder=+$1 ;;
