@@ -16,6 +16,7 @@ usage="Usage: $0 [-m] [-s] [-d dim] [-xpl] [{imagefile|ptns...}]
 	-t	Select tall images (default wide).
 	-w	Select wide images (default).
 	-a	Select any images (default wide).
+	-o	OR the ptns instead of AND.
 	-d dim	Set dimming factor.
 	-D	Set the backdrop only for this desktop.
 	-xpl	Use xplanet for the background."
@@ -33,6 +34,7 @@ domenu=
 thisdesk=
 pickn=1
 aspect=-w
+pickopts=
 strippfx=
 
 badopts=
@@ -43,6 +45,7 @@ do  case $1 in
 	-m)	domenubg=1 ;;
 	-[tw])	aspect=$1 ;;
 	-a)	aspect= ;;
+	-o)	pickopts="$pickopts $1" ;;
 	-s)	sync=1 ;;
 	-d)	convopts="$convopts -d $2"; shift ;;
 	-D)	thisdesk=1 opts="$opts $1" ;;
@@ -69,7 +72,7 @@ else
 	;;
     esac
 
-    set x `pickim -P "$strippfx" -n $pickn -r $aspect ${1+"$@"} | sort -u` || exit 1
+    set x `pickim -P "$strippfx" -n $pickn -r $aspect $pickopts ${1+"$@"} | sort -u` || exit 1
     shift
     [ $# = 0 ] && { echo "$cmd: no image files chosen!" >&2; exit 1; }
     if [ -t 1 ]; then  cd; ls -ld "$@"; fi &
