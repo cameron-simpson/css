@@ -21,36 +21,7 @@ then
     if [ "x$XSESSIONBG" = xpixmap ]
     then
 	# check root backdrop
-	rootbg=`desktop "$thisdesk" rootbg`
-	if [ -n "$rootbg" -a -s "$rootbg" ]
-	then
-	    ##con echo choose bg for desk $thisdesk: $rootbg
-	    perdeskbg=1
-	else
-	    # no valid per-desk background - use global default
-	    perdeskbg=
-	    rootbg=`lastvalue "defaultrootbg-$HOST"`
-	    ##con echo choose bg for all desks $rootbg
-	fi
-
-	if [ -n "$rootbg" -a -s "$rootbg" ]
-	then
-	  # valid background image? compare and change if necessary
-	  lastrootbg=`lastvalue "rootbg-$HOST"`
-	  if [ "x$rootbg" != "x$lastrootbg" ]
-	  then
-	      if [ $perdeskbg ]
-	      then
-		  deskbg -d "$thisdesk" "$rootbg"
-	      else
-		  rootbg "$rootbg"
-	      fi
-	  fi
-	else
-	  fvwm-root --dummy
-	  xsetroot -solid darkblue
-	  lastvalue "rootbg-$HOST" ""
-	fi &
+	syncrootbg -d "$thisdesk" &
 
     #    # menu backdrop
     #    Dflag=-D
