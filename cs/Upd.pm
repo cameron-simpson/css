@@ -46,13 +46,16 @@ cs::Upd - update dynamic progress line
 
 =head1 SYNOPSIS
 
-use cs::Upd;
+	use cs::Upd;
 
-out(I<message>);
+	out(I<message>);
+	nl(I<message>);
+	err(I<message-with-B<\n>>);
 
-nl(I<message>);
-
-err(I<message-with-B<\n>>);
+	$U = new cs::Upd (STATUSTTY, TTY);
+	$U->Out(I<message>);
+	$U->Nl(I<message>);
+	$U->Err(I<message-with-B<\n>>);
 
 =head1 DESCRIPTION
 
@@ -144,7 +147,7 @@ I<mode> is one of B<TTY> or B<FILE>.
 In B<TTY> mode,
 B<cs::Upd> makes use of the B<\r> and B<\b> characters
 to do an optimal rewrite of the line
-(to use minimum bandwidth for uses openating over a low bandwidth connection)
+(to use minimum bandwidth for users operating over a low bandwidth connection)
 when the B<out> function or B<Out> method is called.
 In B<FILE> mode,
 simply prints a B<\n> and the new line.
