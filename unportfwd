@@ -1,0 +1,16 @@
+#!/bin/sh
+#
+# Turn off the portfwd sshs.
+#	- Cameron Simpson <cs@zip.com.au> 06nov99
+#
+
+VARRUN=${VARRUN:-/var/run}
+
+pidfile=$VARRUN/portfwd@$HOST
+
+if [ -s "$pidfile" ]
+then
+    pids=`cat "$pidfile"`
+    set-x kill $pids
+    >"$pidfile"
+fi
