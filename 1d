@@ -1,0 +1,2 @@
+#!/bin/sh
+exec sed 1d ${1+"$@"}
