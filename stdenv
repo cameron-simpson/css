@@ -24,10 +24,10 @@ case "$cmd" in
 			 exec $*"
 	;;
    cisraenv)
-	eval `setvar -n -f -d /usr/local/etc/shell/env STANDARD`
+	eval `setvar -n -f -d /opt/shell/env STANDARD`
 	;;
    tsenv)
-	. /usr/local/etc/cisra/timesheets/bin/.env
+	. /usr/local/misc/cisra/timesheets/bin/.env
 	;;
    rawpath)
 	PATH=`env - sh -c '. /etc/profile;echo $PATH'`:$PATH
