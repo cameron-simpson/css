@@ -1,0 +1,7 @@
+#!/bin/sh
+# - Cameron Simpson <cs@zip.com.au>
+stty sane
+stty intr '^?' erase '^h' kill '^x'
+stty werase '^w'
+stty susp '^z' dsusp '^y'
+exec "$@"
