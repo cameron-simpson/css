@@ -1,0 +1,2 @@
+#!/bin/sh
+exec grep . /proc/ide/hd*/model
