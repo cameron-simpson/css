@@ -271,10 +271,12 @@ while (<STDIN>)
     { warn "$::cmd: line $.: can't open \"$_\": $!\n";
       next CAT;
     }
+    print "\n";
     while (defined($_=<INCLUDE>))
     { print;
     }
     close(INCLUDE);
+    print "\n";
     next CAT;
   }
 
