@@ -52,17 +52,20 @@ bgim=
 winmode=
 dx= dy=
 xplopts=
-xplclause=default
+xplclauses=default
 
 >>"$tmpconfig"
 [ -s "$config" ] && cat "$config" >>"$tmpconfig"
 
 setting()
 {
-  echo "[$xplclause] $*" >&2
-  for _setting
-  do echo "$_setting"
-  done | winclauseappend "$tmpconfig" "$xplclause"
+  echo "[$xplclauses] $*" >&2
+  for _setting_cl in $xplclauses
+  do
+    for _setting
+    do echo "$_setting"
+    done | winclauseappend "$tmpconfig" "$_setting_cl"
+  done
 }
 
 findim()	# imagebase
@@ -195,14 +198,29 @@ do
     #
     # Converted into "B<-num_times 1>" and passed to I<xplanet>.
     #
-    -1)		xplopts="$xpltops -num_times 1" ;;
-    # =item B<-clause> I<name>
+    -1)		xplopts="$xplopts -num_times 1" ;;
+    # =item B<-clause> I<names>
     #
+    # I<names> is a space or comma separated list,
+    # of course usually just a single name.
     # Subsequent B<I<param>=I<value>> configuration directives
-    # will be appened to the B<[>I<name>B<]> clause.
+    # will be appended to each B<[>I<name>B<]> clause listed.
+    # Also the special names B<stars>, B<planets> and B<moons>
+    # are expanded.
+    # 
     # Also see the B<-body> and B<-origin> options below.
     #
-    -clause)	xplclause=$2; shift ;;
+    -clause)	xplclauses=
+		for xplcname in `echo "$2" | tr , ' '`
+		do
+		  case "$xplcname" in
+		    stars|planets|moons)
+		      xplclauses="$xplcauses "`eval echo \\\$$xplcname` ;;
+		    *)xplclauses="$xplclauses $xplcname" ;;
+		  esac
+		done
+		shift
+		;;
     # =item B<-o> I<pathname>
     #
     # Converted into "B<-output> I<pathname>" and passed to I<xplanet>.
@@ -282,27 +300,31 @@ do
     # into which subsequent "B<param=>I<value>" directives are inserted.
     # Also see the B<-clause> option above.
     #
-    -target|-body)
+    -target|-body|-origin)
 		case $2 in
+		  -*)	name=`expr "x$2" : 'x-\(.*\)'` namepfx=- ;;
+		  *)	name=$2 namepfx= ;;
+		esac
+		case $name in
 		  random)
-		    xplclause=`
+		    xplclauses=`
 		      for body in $stars $planets $moons
 		      do echo "$body"
 		      done | pickn 1
 		      `
 		    ;;
 		  major)
-		    xplclause=`
+		    xplclauses=`
 		      for body in $stars $planets
 		      do echo "$body"
 		      done | pickn 1
 		      `
 		    ;;
 		  *)
-		    xplclause=$2
+		    xplclauses=$name
 		    ;;
 		esac
-		xplopts="$xplopts "`shqstr "$1" "$xplclause"`
+		xplopts="$xplopts "`shqstr "$1" "$namepfx$xplclauses"`
 		shift
 		;;
     # =item B<-searchdir> I<dirpath>
@@ -353,7 +375,7 @@ then
   && lastvalue xplanetbg "$bgim"
 fi
 
-##cat $tmpconfig
+cat $tmpconfig
 eval "(set -x; exec xplanet -config \"\$tmpconfig\" $xplmode $xplopts)"
 
 exit $?
