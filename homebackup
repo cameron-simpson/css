@@ -1,0 +1,27 @@
+#!/bin/sh
+#
+# Backup home account from hosts.
+#	- Cameron Simpson <cs@zip.com.au> 13may2004
+#
+
+cmd=`basename "$0"`
+usage="Usage: $cmd [user@]hosts...";
+
+[ $# = 0 ] && { echo "$usage" >&2; exit 2; }
+
+vopts=
+[ -t 1 ] && vopts="-vP"
+
+xit=0
+
+for host
+do
+  [ -d "$host/." ] || { echo "$cmd: no directory for $host, skipping" >&2; xit=1; continue; }
+  (
+    set -x
+    histbackup -x --symlink LATEST "$host:." "$host" $vopts || exit 1
+    histbackup-prune -x -k 7 "$host" || exit 1
+  ) || xit=1
+done
+
+exit $xit
