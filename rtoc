@@ -6,12 +6,14 @@
 #	- Cameron Simpson <cs@zip.com.au> 30mar2001
 #
 
+: ${TMPDIR:=/tmp}
+
 wd=`pwd`
 xit=0
 
 for tarf
 do
-    toc=/tmp/rtoc$$
+    toc=$TMPDIR/rtoc$$
 
     case $tarf in
 	/*)	abs=$tarf ;;
@@ -25,7 +27,7 @@ do
 
     if [ -n "$subarchs" ]
     then
-	xdir=`mkdirn "/tmp/rtocdir"` \
+	xdir=`mkdirn "$TMPDIR/rtocdir"` \
 	|| { xit=1
 	     continue
 	   }
