@@ -81,7 +81,7 @@ if (! @stdin)
   exit 0;
 }
 
-my($err,$x,$y,$impath);
+my($err,$x,$y,$impath,@s);
 
 if ($mode ne APPEND && $indexfile ne '-')
 {
@@ -93,19 +93,21 @@ if ($mode ne APPEND && $indexfile ne '-')
     { chomp;
       out("$indexfile, $.: $_") if $upd && $. % 10 == 0;
 
+      # skip bad lines
       next OLDINDEX if !/^(\d+) (\d+) (\S.*)/;
 
       ($x,$y,$impath)=($1,$2,$3);
 
       # prune missing/empty files
-      next OLDINDEX if ! -f $impath || ! -s _;
+      next OLDINDEX if ! (@s=stat($impath));
+      next OLDINDEX if ! -f _ || ! -s _;
 
       if ($mode eq UPDATE)
       {
 	($x,$y,$err)=eval { imgsize($impath) };
 	if ($@)
 	{ warn "$::cmd: imsize($impath): $@\n";
-	  next NEWIMAGE;
+	  ($x,$y)=(0,0);	# save repolling on subsequent passes
 	}
       }
 
@@ -140,10 +142,14 @@ for $impath (@stdin)
   # skip known images
   next NEWIMAGE if exists $::IMX{$impath};
 
+  # skip missing/empty images
+  next NEWINDEX if ! (@s=stat($impath));
+  next NEWINDEX if ! -f _ || ! -s _;
+
   ($x,$y,$err)=eval { imgsize($impath) };
   if ($@)
   { warn "$::cmd: imsize($impath): $@\n";
-    next NEWIMAGE;
+    ($x,$y)=(0,0);	# record; saves repolling on subsequent passes
   }
 
   if (! defined $x)
