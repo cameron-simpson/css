@@ -1,0 +1,35 @@
+#!/bin/sh
+#
+# Wrapper for "diff -u". Supports line selection too.
+#	- Cameron Simpson <cs@zip.com.au>
+#
+
+usage="Usage:	$0 [!]/regexp/ file1 file2
+	$0 [diffargs...]"
+
+case "$1" in
+    /*/)	vflag=   ptn=`expr "x$1" : 'x/\(.*\)/$'` ;;
+    !/*/)	vflag=-v ptn=`expr "x$1" : 'x./\(.*\)/$'` ;;
+    *)		exec pageif gnudiff -u ${1+"$@"} ;;
+esac
+shift
+
+[ $# = 2 ] || { echo "$0: I expected file1 and file2" >&2
+		echo "$usage" >&2
+		exit 2
+	      }
+f1=$1 f2=$2
+
+t1=/tmp/diffu.$$a
+t2=/tmp/diffu.$$b
+
+xit=1
+trap 'rm -f $t1 $t2; exit $xit' 0 1 3 15
+
+egrep $vflag "$ptn" "$f1" >"$t1"
+egrep $vflag "$ptn" "$f2" >"$t2"
+
+pageif gnudiff -u "$t1" "$t2"
+xit=$?
+
+exit $xit
