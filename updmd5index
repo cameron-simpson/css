@@ -4,7 +4,9 @@
 #	- Cameron Simpson <cs@zip.com.au> 04dec98
 #
 
-tmp=/tmp/umd5.$$
+: ${TMPDIR:=/tmp}
+
+tmp=$TMPDIR/umd5.$$
 
 newer='-newer .md5index'
 [ -f .md5index ] || newer=
