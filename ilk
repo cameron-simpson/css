@@ -1,0 +1,44 @@
+#!/bin/sh
+#
+# Are we of a particular ilk?
+#	- Cameron Simpson <cs@zip.com.au> 07jun96
+#
+
+ilk=$ILK
+mode=AND	# must be of all ilk specified
+
+cmd=`basename "$0"`
+usage="Usage: $cmd [-o] [-r] [--] [ilk...]
+	-a	AND: must be all of the ilk specified (default)
+	-o	OR: any of the specified ilk
+	-r	get ilk in reverse (meaningful only without specs)
+	ilk	ilk specifications; none means print ilk"
+
+
+badopts=
+while :
+do  case $1 in
+	-a)	mode=AND ;;
+	-o)	mode=OR ;;
+	-r)	ilk=$rILK ;;
+	--)	shift; break ;;
+	-?*)	echo "$cmd: unrecognised option: $1"
+		badopts=1
+		;;
+	*)	break ;;
+    esac
+    shift
+done
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+[ $# = 0 ] && { echo $ilk; exit 0; }
+
+for arg
+do  if echo " $ilk " | grep " $arg " >/dev/null
+    then  [ $mode = OR ] && exit 0
+    else  [ $mode = AND ] && exit 1
+    fi
+done
+
+[ $mode = AND ]
