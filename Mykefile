@@ -33,11 +33,11 @@ _cvslog: CHANGELOG.txt CHANGELOG.html
 
 CHANGELOG.txt:	_always
 	[ "$$HOST@$$SYSTEMID" = amadeus@home ]
-	cvslog -O >$@
+	cvslog -O . >$@
 
 CHANGELOG.html:	_always
 	[ "$$HOST@$$SYSTEMID" = amadeus@home ]
-	cvslog2html -O >$@
+	cvslog2html -O . >$@
 
 _test:
 	echo $(pmmans)
