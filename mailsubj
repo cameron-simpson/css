@@ -4,7 +4,9 @@
 #	- Cameron Simpson <cs@zip.com.au> 23jun1998
 #
 
+# point at sendmail; if not there hope $PATH finds it
 sendmail=/usr/sbin/sendmail
+[ -x "$sendmail" ] || sendmail=sendmail
 
 cmd=$0
 usage="Usage: $cmd [-s subject] addresses..."
