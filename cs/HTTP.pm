@@ -227,7 +227,7 @@ If I<chptn> is B<HTML>, use B<[^!-~]|"> for the pattern.
 sub hexify($$)
 { my($str,$hexchptn)=@_;
 
-  if ($hexchptn eq HTML) { $hexchptn='[^!-~]|"'; }
+  if ($hexchptn eq HTML) { $hexchptn='[^!-~]|["@#]'; }
 
   $str =~ s/$hexchptn/sprintf("%%%02x",ord($&))/eg;
 
@@ -607,8 +607,7 @@ sub Request($$;$$$)
   }
 
   # minor cleans - XXX should do something more thorough
-  $uri =~ s/ /%20/g;
-  $uri =~ s/\t/%09/g;
+  $uri=hexify($uri,HTML);
   my($U)=new cs::URL $uri;
 
   my($rqhdrs)=rqhdr($U,$olduri);
