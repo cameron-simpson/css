@@ -1,0 +1,18 @@
+#!/bin/sh
+#
+# Load up stdin before issuing a command.
+# Eg:
+#	foodata-generator | catthen lock foo foocmd args...
+# to defer taking the lock until ready with all of foodata.
+#	- Cameron Simpson <cs@zip.com.au> 23jan2004
+#
+
+cmd=$0
+[ $# = 0 ] && { echo "Usage: $cmd command [args...] < stdin" >&2; exit 2; }
+
+trap 'rm -f $"$tmpf"' 0 1 15
+tmpf=/tmp/catthen$$
+cat >"$tmpf" || exit 1
+exec <"$tmpf"
+rm "$tmpf"
+exec "$@"
