@@ -1,0 +1,12 @@
+#!/bin/sh
+#
+# Bypass MH/next on systems which stupidly put that stuff in a main bin dir.
+#	- Cameron Simpson <cs@zip.com.au> 14jan99
+#
+
+next=false
+case $SYSTEMID-$ARCH in
+    *-next.*.*)	next=true ;;
+esac
+
+exec "$next" ${1+"$@"}
