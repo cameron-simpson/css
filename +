@@ -10,17 +10,21 @@ usage="Usage: $0 [-f] [+a] [some-mutt-options...] [mutt-folder]"
 mfolder=+attn
 muttopts=
 anyhost=
+use_term=1
+use_screen=1
 
 badopts=
 while :
 do
   case $1 in
     +a)		termopts="$termopts $1" ;;
+    +s)		use_screen= ;;
+    +t)		use_term= ;;
     -f)		anyhost=1 ;;
     -[nR])	muttopts="$muttopts $1" ;;
     -[em])	muttopts="$muttopts $1 "`shqstr "$2"`; shift ;;
     --)		shift; break ;;
-    -?*)	echo "$cmd: unrecognised option: $1" >&2; badopts=1 ;;
+    -?*|+?*)	echo "$cmd: unrecognised option: $1" >&2; badopts=1 ;;
     *)		break ;;
   esac
   shift
@@ -54,18 +58,27 @@ esac
 if [ -z "$fpath" ]
 then
     DELETE_FOLDER=
+    SAVE_FOLDER=+SAVED/misc
+    mhdir "$MAILDIR/SAVED/misc"
 else
     fbase=`basename "$fpath"` || exit 1
-    mhdir "$MAILDIR/DELETED/$fbase"
     DELETE_FOLDER=+DELETED/$fbase
+    SAVE_FOLDER=+SAVED/$fbase
+    mhdir "$MAILDIR/DELETED/$fbase" "$MAILDIR/SAVED/$fbase"
 fi
-export DELETE_FOLDER
+export DELETE_FOLDER SAVE_FOLDER
 
 cd || exit 1
-[ -s "$HOME/rc/mail/muttsh.$mfolder" ] && . "$HOME/rc/mail/muttsh.$mfolder"
+for shfile in muttsh muttsh.$mfolder
+do
+  [ -s "$HOME/rc/mail/$shfile" ] && . "$HOME/rc/mail/$shfile"
+done
+
 export mfolder
+set sh -c "set -x; exec mutt -f \"\$mfolder\" $muttopts"
+
+[ $use_screen ] && set scr "mutt_$mfolder" "$@"
+[ $use_term   ] && set term $termopts -n "mutt $mfolder" "$@"
+
 set -x
-exec \
-	term $termopts -n "mutt $mfolder" \
-	scr "mutt_$mfolder" \
-	sh -c "set -x; exec mutt -f \"\$mfolder\" $muttopts"
+exec "$@"
