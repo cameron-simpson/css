@@ -32,6 +32,9 @@ tmpconfig=$TMPDIR/$cmd$$.cfg
 
 badopts=
 
+bgim=
+winmode=
+dx= dy=
 xplopts=
 xplclause=default
 
@@ -58,7 +61,7 @@ findim()	# imagebase
 	_findim_found=
 	for _findim_dir in `unpath "$XPLANETIMPATH"`
 	do
-	  _findim_subdirs=`find "$_findim_dir/." -type d \( \( -name '.\*' -prune \) -o -print \)`
+	  _findim_subdirs=`find "$_findim_dir/." -type d \( -name '.\*' -prune -o -print \)`
 	  _findim_found=`findimindir "$_findim_im" $_findim_subdirs` && break
 	done
 	;;
@@ -108,18 +111,24 @@ do
     [a-z]*=*)	setting "$1" ;;
     -1)		xplopts="$xpltops -num_times 1" ;;
     -o)		xplopts="$xplopts -outfile "`shqstr "$2"`; shift ;;
+    -g|-geometry)
+		dx=`expr "x$2" : 'x\([1-9][0-9]*\)x.*'`
+		dy=`expr "x$2" : 'x[1-9][0-9]*x\([1-9][0-9]*\).*'`
+		xplopts="$xplopts -geometry "`shqstr "$2"`
+		shift
+		;;
     -background|-bg)
 		case $2 in
 		  random*)
 		    words=`expr "$2" : 'random/*\(.*\)'`
-		    bg=`rbg -n -1 -w $words` \
+		    bgim=`set -x; rbg -n -1 -w $words` \
 		    || { echo "$cmd: no background chosen" >&2; badopts=1; }
 		    ;;
 		  *)
-		    bg=$2
+		    bgim=$2
 		    ;;
 		esac
-		xplopts="$xplopts -background "`shqstr "$bg"`
+		xplopts="$xplopts -background \"\$bgim\""
 		shift
 		;;
     -target|-body)
@@ -158,8 +167,27 @@ done
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
-##cat $tmpconfig
 set -x
+
+if [ -n "$bgim" ]
+then
+  if [ -z "$dx" ]
+  then
+    if [ $winmode ]
+    then dx=512 dy=512
+    else dx=${X11_BGX:-"$X11_X"}
+	 dy=${X11_BGY:-"$X11_Y"}
+	 [ -n "$dx" ] \
+	 || { eval `xinfo`
+	      dx=$xinfo_screen0_x
+	      dy=$xinfo_screen0_y
+	    }
+    fi
+  fi
+  bgim=`mkwall -g "${dx}x${dy}" "$bgim"`
+fi
+
+##cat $tmpconfig
 eval "xplanet -config \"\$tmpconfig\" $xplopts"
 
 exit $?
