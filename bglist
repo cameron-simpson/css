@@ -1,0 +1,97 @@
+#!/bin/sh
+#
+# Offer a list of background images.
+# Mostly used by Eterm (via et) to pick a background.
+#	- Cameron Simpson <cs@zip.com.au> 10may1999
+#
+# Use an INDEX file instead of find.	- cameron 15aug2000
+#
+
+random=
+n=0
+forcefind=
+wide=
+ignfile=.bgignore
+ignlist=
+ptn=
+ptnnot=
+
+cmd=$0
+usage="Usage: $cmd [-f] [-r] [-p ptn] [-i igndirs] [-I ignfile] [-n count] [directories...]
+	-f	Use find(1) even if there is an INDEX file.
+	-p ptn	Select only files matching the regexp ptn.
+	-i igndirs A space separated list of directories to ignore.
+	-I ignfile A file containing directories to ignore, one per line.
+		Default: $ignfile
+	-r	Randomise output.
+	-n count Choose the first count items.
+	-w	Choose wide images (eg for wallpaper)."
+
+badopts=
+while :
+do  case $1 in
+      -f)	forcefind=1 ;;
+      -p)	ptn=$2; shift ;;
+      -i)	ignlist="$ignlist $2"; shift ;;
+      -I)	ignfile=$2; shift ;;
+      -r)	random=1 ;;
+      -n)	n=$2; shift ;;
+      -w)	wide=1 ;;
+      --)	shift; break ;;
+      -?*)	echo "$cmd: unrecognised option: $1" >&2
+		badopts=1
+		;;
+      *)	break ;;
+    esac
+    shift
+done
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+[ $# = 0 ] && { set x `bgdirs`; shift; }
+
+case $ptn in
+    !*)	ptnnot=-v
+	ptn=`expr "x$ptn" : 'x!\(.*\)'`
+	;;
+esac
+case $ptn in
+    /*/)	ptn=`expr "x$ptn" : '..\(.*\).'` ;;
+    /*)		ptn=`expr "x$ptn" : '..\(.*\)'` ;;
+esac
+
+[ -s "$ignfile" ] && ignlist="$ignlist "`cat "$ignfile"`
+ignargs=
+for igndir in $ignlist
+do  ignargs="$ignargs -o -name $igndir"
+done
+
+filter=cat
+[ -n "$ptn" ] && filter="egrep $ptnnot \"\$ptn\" | $filter"
+[ $random ] && filter="$filter | shuffle"
+[ "x$n" = x0 ] || filter="$filter | sed '${n}q'"
+[ $wide ] && filter="$filter | grepwideimg"
+
+for dir
+do  if [ -z "$forcefind" -a -s "$dir/INDEX" ]
+    then
+	ndx=$dir/INDEX
+	reject=$ndx-notbg
+	if [ -s "$reject" ]
+	then
+	    comm -23 "$ndx" "$reject"
+	else
+	    cat "$ndx"
+	fi | sed "s:^[^/]:$dir/&:"
+    else
+	find "$dir" \( -type d ! -name . \
+			\( -name '.*' \
+			$ignargs \
+			\) \
+			-prune \) \
+		 -o \( -type f -size +0 \
+				\( -name \*.png -o -name \*.jpg \) \
+		       -print \)
+    fi
+done \
+| ( : set -x; eval "$filter" )
