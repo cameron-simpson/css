@@ -1,0 +1,180 @@
+#!/usr/bin/perl
+#
+# Usage: mktags [-v] files... | sort -u > vi-tags
+#	- Cameron Simpson <cs@zip.com.au>
+#
+
+use cs::Source;
+
+($cmd=$0) =~ s:.*/::;
+
+$PRI_GLOBAL=0;
+$PRI_SHORTHAND=9;
+$PRI_TRANSIENT=10;
+
+$verbose=0;
+if (@ARGV && $ARGV[$[] eq '-v')
+	{ $verbose=1;
+	  shift;
+	}
+
+for (@ARGV)
+	{ mktags($_);
+	}
+
+for (sort keys %Tags)
+	{ $T=$Tags{$_};
+	  print "$T->{TAG} $T->{FILE} $T->{LINE}\n";
+	}
+
+while (<>)
+	{ if (!defined($oARGV) || $ARGV ne $oARGV)
+		{ $oARGV=$ARGV;
+
+		  # tags for files because I forget
+		  &tag($ARGV,$ARGV,1);
+		}
+
+	  if ($ARGV =~ /\.[ch]$/o
+				&& (/^#\s*define\s+([_\w]+)/o
+				 || /^([_\w]+)\s*\(/o	# my style
+				 || /^\w[\s*()]+\s([_\w]+)\s*\([\w_,\s]*\)\s*$/
+				 || /^\s*struct\s+([_\w]+)\s*{/o
+				 || /^\s*union\s+([_\w]+)\s*{/o	# not (s|u) to keep $1 ok
+				   )
+	   || $ARGV =~ /\.p[lh]$/o
+				&& /^sub\s+((_\w]*')?[_\w]+)/o
+	   || $ARGV =~ /\.tcl$/o
+				&& /^proc\s+([_\w]+)/o
+	   || $ARGV =~ /\.html$/o
+				&& /<a\s+name="([^"]+)"\s*>/oi
+	     )
+		{ &tag($1,$ARGV,$.);
+		}
+
+	  close(ARGV) if eof;
+	}
+
+exit 0;
+
+sub mktags
+	{ local($_)=@_;
+
+	  $verbose && warn "$_ ...\n";
+	  tag($_,$PRI_GLOBAL,$_,1);
+
+	  my($type);
+
+	  if (/\.p[lm]$/)	{ $type=PERL; }
+	  elsif (/\.[ch]$/)	{ $type=C; }
+	  elsif (/\.tcl$/)	{ $type=TCL; }
+	  elsif (/\.html?$/)	{ $type=HTML; }
+	  else
+	  { warn "$cmd: skipping unrecognised file type: $_\n";
+	    return;
+	  }
+
+	  my($fn)="mktags_$type";
+
+	  my($s);
+
+	  if (! defined ($s=new cs::Source(PATH,$_)))
+		{ warn "$cmd: can't open $_: $!\n";
+		  return;
+		}
+
+	  &$fn($_,$s);
+	}
+
+sub tag
+	{ my($tag,$pri,$file,$line)=@_;
+
+	  return if exists $Tags{$tag} && $Tags{$tag}->{PRI} <= $pri;
+
+	  $Tags{$tag}={ PRI => $pri,
+			FILE => $file,
+			LINE => $line,
+			TAG => $tag
+		      };
+	}
+
+sub mktags_C
+	{ my($file,$s)=@_;
+	  my($line);
+	  local($_);
+
+	  $line=0;
+	  while (defined ($_=$s->GetLine()) && length)
+		{ $line++;
+
+		  if (/^#\s*define\s+([_\w]+)/o
+		   || /^([_\w]+)\s*\(/o	# my style
+		   || /^\w[\s*()]+\s([_\w]+)\s*\([\w_,\s]*\)\s*$/
+		   || /^\s*struct\s+([_\w]+)\s*{/o
+		   || /^\s*union\s+([_\w]+)\s*{/o	# not (s|u) to keep $1 ok
+		     )
+			{
+			  tag($1,$PRI_GLOBAL,$file,$line);
+			}
+		}
+	}
+
+sub mktags_PERL
+	{ my($file,$s)=@_;
+	  my($line);
+	  local($_);
+
+	  $line=0;
+	  while (defined ($_=$s->GetLine()) && length)
+		{ $line++;
+
+		  if (/^package\s+((\w|'|::)+)/)
+			{ $package=$1.'::';
+			}
+		  elsif (/^sub\s+((_\w]*('|::))?[_\w]+)/o)
+			{ $tag=$1;
+			  $tag="$package$tag" unless $tag =~ /::|'/;
+			  ($basetag=$tag) =~ s/.*(::|')//;
+
+			  tag($tag,$PRI_GLOBAL,$file,$line);
+			  tag($basetag,$PRI_TRANSIENT,$file,$line);
+
+			  while ($tag =~ /'|::/)
+				{ $tag=$';
+				  tag($tag,$PRI_SHORTHAND,$file,$line);
+				}
+			}
+		}
+	}
+
+sub mktags_TCL
+	{ my($file,$s)=@_;
+	  my($line);
+	  local($_);
+
+	  $line=0;
+	  while (defined ($_=$s->GetLine()) && length)
+		{ $line++;
+
+		  if (/^proc\s+([_\w]+)/o)
+			{ tag($1,$PRI_GLOBAL,$file,$line);
+			}
+		}
+	}
+
+sub mktags_HTML
+	{ my($file,$s)=@_;
+	  my($line);
+	  local($_);
+
+	  $line=0;
+	  while (defined ($_=$s->GetLine()) && length)
+		{ $line++;
+
+		  if (/<a\s+name="([^"]+)">/oi
+		   || /<a\s+name=([^>\s]+)>/oi)
+			{ tag("$file#$1",$PRI_GLOBAL,$file,$line);
+			  tag($1,$PRI_TRANSIENT,$file,$line);
+			}
+		}
+	}
