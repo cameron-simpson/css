@@ -1,0 +1,59 @@
+#!/bin/sh
+#
+# Save an md5index of a whole medium.
+#	- Cameron Simpson <cs@zip.com.au> 03jul2000
+#
+
+cmd=`basename "$0"`
+usage="Usage: $cmd [-d dir] [-f] [-l label] -m medium"
+
+MD5INDEXDIR=${MD5INDEXDIR:-$HOME/.md5index}
+export MD5INDEXDIR
+
+dir=.
+label=
+medium=
+force=
+
+badopts=
+while :
+do  case $1 in
+	-d)	dir=$2; shift ;;
+	-f)	force=1 ;;
+	-l)	label=$2; shift ;;
+	-m)	medium=$2; shift ;;
+	--)	shift; break ;;
+	-?*)	echo "$cmd: unrecognised option: $1" >&2; badopts=1 ;;
+	*)	break ;;
+    esac
+    shift
+done
+
+[ -n "$medium" ] || { echo "$cmd: missing medium spec" >&2; badopts=1; }
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+cd "$dir" || exit 1
+
+if [ -z "$label" ]
+then
+    if [ ! -s LABEL ]
+    then
+	echo "$cmd: no LABEL file!" >&2
+	exit 1
+    fi
+    label=`cat LABEL` || exit 1
+    [ -n "$label" ] || { echo "$cmd: empty LABEL!" >&2; exit 1; }
+fi
+
+index=$MD5INDEXDIR/$medium/$label.gz
+
+[ -s "$index" -a -z "$force" ] \
+	&& { echo "$cmd: existing index file: $index" >&2
+	     exit 1
+	   }
+
+find . -type f -print \
+| sed 's:^\./::' \
+| md5index \
+| gzip -v -9 >"$index"
