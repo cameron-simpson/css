@@ -11,6 +11,8 @@ usage="Usage: $0 [-s] [-d dim] [-xpl] [{imagefile|ptns...}]"
 
 [ -n "$DISPLAY" ] || { echo "$cmd: no \$DISPLAY!" >&2; exit 1; }
 
+tmp=${TMPDIR:-/tmp}
+
 sync=
 xplanet=
 convopts='-d 0.6'
@@ -30,7 +32,7 @@ do  case $1 in
     shift
 done
 
-[ $badopts ] && { echo "$usgae" >&2; exit 2; }
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
 
 if [ $# -gt 0 ] && [ -s "$1" ] && [ ! -d "$1/." ]
 then
@@ -38,7 +40,18 @@ then
 else
     # used to use BGPATH=$WALLPAPER - possibly redundant
     imagefile=`bglist -r -n 1 -w ${1+"$@"}`
-    [ -n "$imagefile" ] && [ -s "$imagefile" ] || exec xsetroot -solid black
+
+    ok=1
+    if [ -z "$imagefile" ]
+    then  echo "$cmd: nothing chosen!" >&2
+	  ok=
+    else
+      if [ ! -s "$imagefile" ]
+      then  echo "$cmd: empty file: $imagefile" >&2
+	    ok=
+      fi
+    fi
+    [ $ok ] || exec xsetroot -solid black
 fi
 
 echo "$imagefile"
@@ -76,12 +89,67 @@ then
     exit 0
 fi
 
-set -vx
-( umask 077
-  tmpf=/tmp/$cmd$$.`basename "$imagefile"`
-  fmogrify -foreground black -geometry "${X11_BGX}x${X11_Y}" <"$imagefile" >"$tmpf"
-  Esetroot -fit "$tmpf"
-  rm "$tmpf"
+##set -vx
+umask 077
+cp "$imagefile" "$tmp/." || exit 1
+
+( cd "$tmp" || exit 1
+  img=`basename "$imagefile"`
+  sfx=`expr "x$img" : 'x.*\.\([^.]*$\)'`
+  base=`basename "$img" ".$sfx"`
+  final=$base.PNG
+  bgx=$X11_BGX bgy=$X11_Y
+  set mogrify -quality 0 -foreground black -geometry "${bgx}x${bgy}" -format PNG
+
+  # see if we need to letterbox or something
+  ix= iy=
+  eval `imsize "$img" | awk '{print "ix="$1 " iy="$2}'`
+  if [ -n "$ix" -a -n "$iy" ]
+  then
+      awkf="BEGIN { ix=$ix; iy=$iy; bgx=$bgx; bgy=$bgy"'
+		    w=bgx; h=bgy
+		  }
+	    END   { if (ix > bgx || iy > bgy)
+		      # too big - shrink
+		      if (ix/bgx > iy/bgy)
+			# shrink X more than Y
+			h=int(iy * (bgx/ix))
+		      else
+			# shrink Y more than X
+			w=int(ix * (bgy/iy))
+		       
+		    else
+		    # smaller image - scale up
+		    if (bgx/ix < bgy/iy)
+		      # scale X less - use that
+		      h=iy*bgx/ix
+		    else
+		      # scale Y less
+		      w=ix*bgy/iy
+
+		    crop=0
+		    bx=int((bgx-w)/2+0.5)
+		    if (bx == 0) { bx=1; by++; crop=1; }
+		    by=int((bgy-h)/2+0.5)
+		    if (by == 0) { by=1; bx++; crop=1; }
+		    print "bx="bx " by="by " crop="crop
+		  }'
+      eval `awk "$awkf" </dev/null`
+      if [ "$bx" -gt 0 -o "$by" -gt 0 ]
+      then
+	  set "$@" -bordercolor "$BG" -border "${bx}x${by}"
+      fi
+      if [ "$crop" != 0 ]
+      then
+	  set "$@" -crop "${bgx}x${bgy}+${crop}+${crop}"
+      fi
+  fi
+
+  # run mogrify on the image
+  "$@" "$img"
+  ## fvwm-root -fe "$final" ## aterms don't listen to fvwm-root :-(
+  Esetroot "$final"
+  rm -f "$img" "$final"
 ) &
 [ $sync ] || exit 0
 wait
