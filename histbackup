@@ -132,7 +132,7 @@ do
     # =item --inplace
     #
     # Specify the parent of the source directory;
-    # backs up B<I<parent>/current> to B<I<parent>/I<datestamp>.
+    # backs up B<I<parent>/current> to B<I<parent>/I<datestamp>>.
     #
     --inplace)	inplace=1 ;;
 
