@@ -1,0 +1,101 @@
+#!/usr/bin/perl
+#
+# Parse Carl Paukstis's mailing list roundup and emit a Perl Hier file.
+#	- Cameron Simpson <cs@zip.com.au> 21jul95
+#
+
+($cmd=$0) =~ s:.*/::;
+
+use cs::cs::Hier;
+
+%lists=();
+
+%fields=(	'description'		=> { },
+		'to-subscribe'		=> { Canon => 'subscribe' },
+		'digest-available'	=> { Canon => 'digest', Type => Boolean },
+		'admin-address'		=> { Canon => 'admin' },
+		'list-owner'		=> { Canon => 'owner' },
+		'www-url'		=> { Canon => 'url' }
+	);
+
+$xit=0;
+
+$this=undef;
+LINE:
+  while (<>)
+	{ $context="$cmd: $ARGV, line $.";
+
+	  chomp; s/\s+$//;
+
+	  if (m|^([\dA-Z][-/\w]*(\s\([^)]+\))?):|)
+		# new list
+		{ undef $this;
+
+		  $key=$1;
+		  $key =~ tr/ A-Z/-a-z/;
+
+		  if (defined $lists{$key})
+			{ print STDERR "$context: list \"$key\" already defined, new description ignored\n";
+			  $xit=1;
+			}
+		  $lists{$key}={ Key => $key };
+		  $this=$lists{$key};
+		}
+	  elsif (! defined $this)
+		{ print STDERR "$context: skipping $_\n";
+		}
+	  elsif (/^$/)
+		{}
+	  elsif (/^\s+([A-Z\s]+)[:?]\s*/)
+		{ $field=$1; $data=$';
+		  $field =~ tr/A-Z /a-z-/;
+
+		  if (! defined $fields{$field})
+			{ print STDERR "$context: $key: unrecognised field \"$field\" ignored\n";
+			  $xit=1;
+			  next LINE;
+			}
+		  else
+		  { $f=$fields{$field};
+		    if (defined $f->{Canon})
+			{ $field=$f->{Canon};
+			}
+
+		    if (defined $this->{$field})
+			{ print STDERR "$context: field \"$field\" already defined for list \"$this->{Key}\",\n\tignoring \"$_\"\n";
+			  $xit=1;
+			  next LINE;
+			}
+
+		    if (defined $f->{Type} && $f->{Type} ne 'Text')
+			{ $t=$f->{Type};
+			  if ($t eq 'Boolean')
+				{ if ($data =~ /^(y(es)?|no?|digest\s+only)[-:\s]*/i)
+					{ $bool=$1; $addenda=$';
+					  $this->{$field}=($bool =~ /^(y|digest only)/);
+					  if (length $addenda)
+						{ $this->{"$field-addenda"}=$addenda;
+						}
+					}
+				  else
+				  { print STDERR "$context: can't convert \"$_\" to $t, ignored\n";
+				    $xit=1;
+				    next LINE;
+				  }
+				}
+			  else
+			  { print STDERR "$context: don't know how to convert to type \"$t\", ignoring \"$_\"\n";
+			    $xit=1;
+			    next LINE;
+			  }
+			}
+		    else
+		    { $this->{$field}=$data;
+		    }
+		  }
+		}
+	}
+
+print &Hier::h2a(\%lists), "\n";
+
+exit $xit;
