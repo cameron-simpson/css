@@ -1,0 +1,16 @@
+#!/bin/sh
+#
+# Read a mail folder with mutt.
+#	- Cameron Simpson <cs@zip.com.au>
+#
+
+[ $# = 0 ] && set attn
+
+if lock -q "mail/$1"
+then  echo "mail/$1 already locked" >&2
+      exit 1
+fi
+
+cd || exit 1
+GUI=lean term -n "mutt +$1 @ $HOST" \
+	      -e lock "mail/$1" mutt -f "+$1"
