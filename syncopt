@@ -40,6 +40,7 @@ localise=
 slashopt=/opt
 archopt=/usr/local/opt
 commonopt=$archopt-common
+subdirs=${SYNCOPT_SUBDIRS:="."}
 
 cf=$slashopt/.syncopt
 
@@ -68,7 +69,7 @@ done
 if [ $# = 0 ]
 then
     [ $localise ] && { echo "$cmd: -l requires specific targets" >&2; badopts=1; }
-    set x `( ls "$archopt/."; ls "$commonopt/." ) | sort -u`; shift
+    set x `for subdir in $subdirs; do ls "$archopt/$subdir/." 2>/dev/null; ls "$commonopt/$subdir/." 2>/dev/null; done | sort -u`; shift
 fi
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
@@ -94,7 +95,23 @@ do
     ldir=$slashopt
     l=$ldir/$thing
 
-    # default behaviour:
+    # locate remote instance of thing
+    r=
+    for rroot in $archopt $commonopt
+    do  for subdir in $subdirs
+	do  r=$rroot/$subdir/$thing
+	    { test -f "$r" || test -d "$r/."; } \
+	    && break
+	    r=
+	done
+	[ -n "$r" ] && break
+    done
+    [ -n "$r" ] || { echo "$cmd: can't read $r, skipping $thing" >&2
+		     xit=1
+		     continue
+		   }
+
+    # determine default behaviour:
     # whether to localise by default
     makelocal=$localise
     issymlink "$l" || [ ! -d "$l" ] || makelocal=1
@@ -135,24 +152,6 @@ do
 
     # skip this?
     [ $nosync ] && { $echo echo "SKIP $thing"; continue; }
-
-    # locate remote instance of thing
-    # in either opt-arch or opt-common
-    r=$archopt/$thing
-    if test -f "$r" || test -d "$r/."
-    then
-	:
-    else
-	r=$commonopt/$thing
-	if test -f "$r" || test -d "$r/."
-	then
-	    :
-	else
-	    echo "$cmd: can't read $r, skipping $thing" >&2
-	    xit=1
-	    continue
-	fi
-    fi
 
     # files - basicly /opt/ARCH really
     if test -f "$r"
