@@ -1,0 +1,80 @@
+#!/usr/bin/perl
+#
+# Read filenames, emit "size:MD5 filename".
+#	- Cameron Simpson <cs@zip.com.au> 27oct97
+#
+# Recoded to use MD5 module and be simpler. - cameron 30nov1998
+# Now lives off the cs::Image::DB module so they use the same hashes.
+#					    - cameron 13apr1999
+# Back out to plain MD5 stuff.		    - cameron 20jun2000
+#
+
+use strict qw(vars);
+
+use cs::Misc;
+use Getopt::Std;
+use Digest::MD5;
+
+$::Usage="Usage: $::cmd [-n count] <filenames
+	-n count	Read only the first count bytes of the file.
+";
+
+undef $::Count;
+
+my $badopts=0;
+
+getopts('n:');
+if (defined $::opt_n)
+{ if ($::opt_n =~ /^\d+$/)
+  { $::Count=$::opt_n+0;
+  }
+  else
+  { warn "$::cmd: bad count: $::opt_n\n";
+    $badopts=1;
+  }
+}
+
+if (@ARGV)
+{ warn "$::cmd: unexpected arguments: @ARGV\n";
+  $badopts=1;
+}
+
+die $::Usage if $badopts;
+
+$::verbose = -t STDERR;
+
+$::Xit=0;
+
+my $MD5 = new Digest::MD5;
+
+FILE:
+while (defined ($_=<STDIN>))
+{ chomp;
+
+  my(@s)=stat($_);
+
+  if (! @s)
+  { warn "$::cmd: stat($_): $!\n";
+    $::Xit=1;
+    next FILE;
+  }
+
+  if (! -f _)
+  { warn "$::cmd: $_: not a regular file\n";
+    next FILE;
+  }
+
+  if (! open(FILE, "< $_\0"))
+  { warn "$::cmd: open($_): $!\n";
+    $::Xit=1;
+    next FILE;
+  }
+
+  $MD5->reset();
+  $MD5->addfile(FILE);
+  close(FILE);
+
+  print $s[7], ":", $MD5->hexdigest(), "\t$_\n";
+}
+
+exit $::Xit;
