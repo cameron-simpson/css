@@ -1,0 +1,7 @@
+#!/bin/sh
+
+for arg
+do
+    necho "$arg "
+    aftp +A -d . "$arg" "ls -laR ls.$arg" quit
+done
