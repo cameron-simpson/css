@@ -1,0 +1,98 @@
+#!/bin/sh
+#
+# Put files to the named accounts in parallel.
+#	- Cameron Simpson <cs@zip.com.au> 05mar2004
+#
+
+cmd=`basename "$0"`
+usage="Usage: $cmd [-n] [-q] [-x] [-v] [user@]host[,[user@]host...]: files..."
+
+basedir=$HOME
+trace=set-x
+scpopts=
+
+badopts=
+
+while :
+do  case $1 in
+      -n)	trace=echo ;;
+      -q)	trace= ;;
+      -x)	trace=set-x ;;
+      -v)	scpopts="$scpopts $1" ;;
+      --)	shift; break ;;
+      -?*)	echo "$cmd: unrecognised option: $1" >&2; badopts=1 ;;
+      *)	break ;;
+    esac
+    shift
+done
+
+case "$1" in
+    *:)	accts=$1; shift ;;
+    *)	echo "$cmd: missing accounts" >&2; badopts=1 ;;
+esac
+
+if [ $# = 0 ]
+then
+  echo "$cmd: missing files" >&2
+  badopts=1
+fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+accts=`echo "$accts" | sed -e 's/:$//' -e 's/,/ /g'`
+
+xit=0
+
+cd "$basedir" || exit 1
+
+# In the loop below we batch together all adjacent files from a particular
+# directory because the ssh negotiation can be significant overhead.
+# Also, to protect against whitespace trouble we reuse to command line
+# argument list within the loop. This the $first hackery.
+
+orbase=
+first=1
+
+for file
+do
+  [ $first ] && { set --; first=; }
+
+  case "$file" in
+    /*)	ffile=$file ;;
+    *)	ffile=$basedir/$file ;;
+  esac
+  [ -f "$ffile" ] || { echo "$cmd: missing file $ffile" >&2; xit=1; continue; }
+
+  rbase=`dirname "$file"`
+
+  # flush queued files on directory change
+  if [ "x$orbase" != "x$rbase" ]
+  then
+    if [ $# -gt 0 ]
+    then
+      for acct in $accts
+      do
+	$trace scp "$@" "$acct:$orbase/." &
+      done
+      wait
+      set --
+    fi
+    orbase=$rbase
+  fi
+
+  # queue up this file for dispatch
+  set -- "$@" "$ffile"
+done
+
+# dispatch the last bunch
+if [ $# -gt 0 ]
+then
+  for acct in $accts
+  do
+    $trace scp "$@" "$acct:$orbase/." &
+  done
+  wait
+  set --
+fi
+
+exit $xit
