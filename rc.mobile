@@ -329,7 +329,7 @@ runqueue()
       #
       [a-zA-Z]*=*)
 	var=`expr "$op" : '\([^=]*\)=.*'`
-	eval "$op"
+	eval "$op $etc"
 	export $var
 	eval "val=\$$var"
 	setenv "$var" "$val"
