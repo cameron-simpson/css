@@ -1,0 +1,103 @@
+#!/bin/sh
+#
+# Try really hard to run the most sane compiler we can with POSIX and XOPEN
+# support.
+#	- Cameron Simpson
+#
+
+realcc=gcc		# usually
+
+opts=
+ansi=
+posix=-D_POSIX_SOURCE
+xopen=-D_XOPEN_SOURCE
+osf=-D_OSF_SOURCE
+aes=-D_AES_SOURCE
+svid=
+_opts='$ansi $posix $xopen $osf $aes $svid'
+
+case $SYSTEMID-$ARCH in
+    *-apollo.*.domainos)	cctype=domainos ;;
+    *-dec.*.ultrix)		cctype=ultrix ;;
+    *-dec.*.osf1)		cctype=osf1 ;;
+    *-sun.sparc.solaris)	cctype=gcc ;;
+    *-sun.sparc.sunos)		cctype=gcc ;;
+    *-sgi.mips.irix)		cctype=irix ;;
+    *)				cctype= ;;
+esac
+
+while :
+do  case $1 in
+	-raw)	shift; exec arg0 cc $REAL/cc ${1+"$@"} ;;
+	-cc)	shift; cctype=$1; shift ;;
+	-gcc)	shift; cctype=gcc ;;
+	-g++)	shift; cctype=g++ ;;
+	-c++)	shift
+		case $SYSTEMID,$ARCH in
+    			circus,sun.sparc.solaris)
+				cctype=SUNWspro/CC ;;
+			*)	cctype=g++ ;;
+		esac
+		;;
+	*)	break ;;
+    esac
+done
+
+case $cctype in
+    '')	;;
+    domainos)
+	# opts='-W0,-info,4 -W0,-std -A ansi'
+	ansi='-W0,-std -A ansi'
+	;;
+    ultrix)
+	PROG_ENV=${PROG_ENV-'POSIX'}; export PROG_ENV
+	posix="$posix -DPOSIX"
+	;;
+    osf1)
+	ansi=-std1
+	posix=
+	xopen=
+	svid=-D_SVID3_COMPAT
+	opts=-verbose
+	;;
+    SUNWspro/CC)
+	realcc=/opt/SUNWspro/bin/CC
+	;;
+    g++)# -f{all-virtual,dollars-in-identifiers,enum-int-equiv,
+	#    external-templates,no-gnu-linker,
+	#    memoize-lookups,save-memoized,
+	#    no-default-inline,no-strict-prototype,
+	#    nonnull-objects,	XXX
+	#    this-is-variable
+	#   }
+	opts='-felide-constructors'
+	cc=/opt/bin/g++
+	;;
+    gcc) _opts='-ansi -pedantic \
+	      -Wimplicit -Wreturn-type -Wunused \
+	      -Wswitch -Wcomment -Wtrigraphs \
+	      -Wformat -Wuninitialized -Wparentheses \
+	      -Wshadow -Wid-clash-8 -Wpointer-arith \
+	      -Wcast-align -Wconversion -Wstrict-prototypes \
+	      -Wmissing-prototypes -Wnested-externs -Winline \
+	     '
+	cc="gcc_clean $cc"
+	;;
+    irix)
+	# SGI_CC=${SGI_CC-'-ansiposix'}; export SGI_CC
+	# 24 - constant in conditional context
+	# 205 - bodiless if
+	# 269 - intermediate result is int in ANSI, unsigned int in K&R
+	# 302 - bodiless for statement
+	# 303 - bodiless while statement
+	# 309 - unsigned char bitfield:x
+	# 310 - files with no definitions or declarations
+	# ansi='-fullwarn -acpp -prototypes -woff 24,205,269,302,303,309,310'
+	ansi='-prototypes -acpp'
+	;;
+    *)	echo "$0: warning: unknown cctype [$cctype]" >&2
+	;;
+esac
+
+# set -x
+eval "exec $cc $_opts $opts "'${1+"$@"}'
