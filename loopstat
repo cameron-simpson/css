@@ -1,0 +1,15 @@
+#!/bin/sh
+#
+# Hack to keep amd caching alive. Jeez.
+#	- Cameron Simpson, 01mar94
+#
+
+usage="Usage: $0 pathnames..."
+
+exec >/dev/null
+while :; do
+  for d
+  do ( ls -ld "$d" & )
+  done
+  sleep 60
+done
