@@ -51,7 +51,9 @@ sub parseLine($)
   return () unless length;
 
   ## warn "[$_]";
-  if (! /^([^.@\s:!]+(\.[^.@\s:!]+)*)\s*(@([^\s:]+(:\d+)))?\s*([:!])\s*/)
+  #        news        .group             @host     :port        :
+  #       1          2                  3  4       5            6
+  if (! /^([^.@\s:!]+(\.[^.@\s:!]+)*)\s*(\@([^\s:]+(:\d+)?))?\s*([:!])\s*/)
   { return ();
   }
 
@@ -82,6 +84,7 @@ sub new($$;$)
   my $this = bless { FILE => $file,
 		     INVALID => 0,
 		     GROUPS => {},
+		     GROUPLIST => [],
 		     SUBBED => {},
 		   }, $class;
   
@@ -213,13 +216,15 @@ sub PushGroup($$)
 =item Sync(I<file>)
 
 Write the current state of the object to the specified I<file>
-(or the file supplpied to B<new> if not specified).
+(or the file supplied to B<new> if not specified).
 
 =cut
 
 sub Sync($;$$)
 { my($this,$file,$dropdflt)=@_;
   $file=$this->{FILE} if ! defined $file;
+
+  ## warn "Sync(file=$file)";
 
   my $s = new cs::Sink (PATH,$file);
   if (! defined $s)
@@ -231,6 +236,7 @@ sub Sync($;$$)
 
   for my $group ($this->Groups())
   { my $keygrp = $group;
+    ## warn "write \"$group\"";
 
     if ($dropdflt && substr($group,-length($dfltsfx)) eq $dfltsfx)
     { $group=substr($group,$[,length($group)-length($dfltsfx));
@@ -242,6 +248,8 @@ sub Sync($;$$)
 	    $this->Range($keygrp)->Text(),
 	    "\n");
   }
+
+  undef $s;
 
   1;
 }
