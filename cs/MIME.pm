@@ -41,6 +41,8 @@ use cs::MIME::QuotedPrintable;
 
 package cs::MIME;	# cs::ALL::useAll();
 
+@cs::MIME::ISA=cs::RFC822;
+
 $cs::MIME::_Range_tspecials='()<>@,;:\\"\/\[\]?.=';
 
 =head1 GENERAL FUNCTIONS
@@ -180,13 +182,13 @@ sub new($;$$)
 { my($class,$s,$usecsize)=@_;
   $usecsize=0 if ! defined $usecsize;
 
-  my($this)=bless {
-	      cs::MIME::HDRS		=> new cs::RFC822,
-	      cs::MIME::TYPE		=> TEXT,   # text/plain by default
-	      cs::MIME::SUBTYPE		=> PLAIN,
-	      cs::MIME::TYPEPARAMS	=> {},
-	      cs::MIME::CTE		=> '8BIT', # Content-Transfer-Encoding
-	    }, $class;
+  my $this = new cs::RFC822;
+  $this->{cs::MIME::TYPE}=TEXT;		# text/plain by default
+  $this->{cs::MIME::SUBTYPE}=PLAIN;
+  $this->{cs::MIME::TYPEPARAMS}={};
+  $this->{cs::MIME::CTE}='8BIT';	# Content-Transfer-Encoding
+
+  bless $this, $class;
 
   if (defined $s)
   { $this->UseSource($s,$usecsize);
@@ -204,15 +206,6 @@ sub _Body($) { shift->{cs::MIME::BODY}; }
 =head1 OBJECT METHODS
 
 =over 4
-
-=item Hdrs()
-
-Return the B<cs::RFC822> object
-storing the headers of the MIME object.
-
-=cut
-
-sub Hdrs($)	{ shift->{cs::MIME::HDRS} }
 
 =item Type()
 
@@ -239,11 +232,19 @@ Incorporate the headers from the B<cs::RFC822> object I<hdrs>.
 sub UseHdrs($$)
 { my($this,$H)=@_;
 
-  $this->{cs::MIME::HDRS}=$H;
+  for my $hdr (@{$H->Hdrs()})
+  { $this->Add($hdr);
+  }
+
+  _ReSync($this);
+}
+
+sub _ReSync($)
+{ my($this)=@_;
 
   local($_);
 
-  $_=$H->Hdr(CONTENT_TYPE);
+  $_=$this->Hdr(CONTENT_TYPE);
   if (! defined || ! length)
   # old-style messages
   { $_='text/plain; charset=us-ascii';
@@ -252,12 +253,13 @@ sub UseHdrs($$)
   # Content-Type
   ($this->{cs::MIME::TYPE},
    $this->{cs::MIME::SUBTYPE},
-   $this->{cs::MIME::TYPEPARAMS},$_
+   $this->{cs::MIME::TYPEPARAMS},
+   $_
   )
   =parseContentType($_);
 
   # Content-Transfer-Encoding
-  if (defined ($_=$H->Hdr(CONTENT_TRANSFER_ENCODING,1))
+  if (defined ($_=$this->Hdr(CONTENT_TRANSFER_ENCODING,1))
    && length)
   { s/^\s+//;
     s/\s+$//;
@@ -282,13 +284,12 @@ sub UseSource($$;$)
   $s=new cs::Source (PATH, $s) if ! ref $s;
   return undef if ! defined $s;
 
-  my $H = $this->Hdrs();
-  $H->SourceExtract($s);
-  $this->UseHdrs($H);
+  $this->SourceExtract($s);
+  _ReSync($this);
 
   # Content-Size - push limit onto stream
   if ($usecsize
-   && defined ($_=$H->Hdr(CONTENT_SIZE))
+   && defined ($_=$this->Hdr(CONTENT_SIZE))
    && /\d+/)
   { my($size)=$&+0;
     $s=new cs::SubSource ($s, $s->Tell(), $size);
