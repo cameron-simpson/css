@@ -4,6 +4,9 @@
 #	- Cameron Simpson <cs@zip.com.au> 14feb2003
 #
 
+echo "\"Hi\" PopHiMenu"
+echo "\"\" Nop"
+
 while read title && read url
 do
   echo "\"$title\" Exec us $url"
