@@ -68,7 +68,8 @@ then
   export ARCH
 fi
 
-: ${SYNCOPT_PATH:=/u/syncopt}	# NB: space separated
+: ${SYNCOPT_PATH:=/u/syncopt}		# NB: space separated
+: ${SYNCOPT_SUBDIRS:="$ARCH common"}	# NB: space separated
 : ${SYNCOPT_RSYNC:=rsync}
 : ${SYNCOPT_RSYNCOPTS:=""}
 : ${SYNCOPT_SSH:=$RSYNC_RSH}
@@ -83,7 +84,8 @@ sedpreamble='y/	/ /
 
 # extract envvars
 sedscript="$sedpreamble
-	   /^REMOTE=/b setvar
+	   /^PATH=/b setvar
+	   /^SUBDIRS=/b setvar
 	   /^RSYNC=/b setvar
 	   /^RSYNCOPTS=/b setvar
 	   d
@@ -271,8 +273,9 @@ then
   set -- `
 	  for rep in $SYNCOPT_PATH
 	  do
-	    inrepository "$rep" -c "( [ -d '$ARCH/.' ] && cd '$ARCH' && ls )
-				    ( [ -d common/.  ] && cd common && ls )
+	    inrepository "$rep" -c "for d in $SYNCOPT_SUBDIRS
+				    do ( [ -d \\"\\$d/.\\" ] && cd \\"\\$d\\" && ls )
+				    done
 				   "
 	  done \
 	  | sort -u
@@ -284,9 +287,9 @@ namelist=${tmppfx}nl
 for rep in $SYNCOPT_PATH
 do
   inrepository "$rep" \
-    -c "for subdir in $ARCH common
+    -c "for subdir in $SYNCOPT_SUBDIRS
 	do
-	  ls \"\$subdir\" | sed \"s|.*|& \$subdir|\"
+	  ( [ -d \"\$subdir/.\" ] && cd \"\$subdir\" && ls ) | sed \"s|.*|& \$subdir|\"
 	done" | sed "s|.* |&$rep/|"
 done >"$namelist"
 
@@ -406,6 +409,7 @@ do
 	  useme && $NF == "local"  { print "makelocal=1" }
 	  useme && $NF == "remote" { print "makelocal=" }
 	  $1 == thing && $2 ~ /^[0-9]/ { print "version=" $2 }
+	  thingv == "" && NF == 3 { print "makelocal=" }
 	 '
     ##echo "awkf=[$awkf]" >&2
     opts=`[ ! -s "$cf" ] || sed -e "$sedpreamble" "$cf" | awk "$awkf"` \
@@ -475,7 +479,7 @@ do
     # either $makelocal or the remote end is not a symlink
     # ==> we need a local copy
 
-    $trace $SYNCOPT_RSYNC -a $vflag --delete $SYNCOPT_RSYNCOPTS "$thingrep/$thing" "$thing"
+    $trace $SYNCOPT_RSYNC -a $vflag --delete $SYNCOPT_RSYNCOPTS "$thingrep/$thing" .
 done
 
 exit $xit
