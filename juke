@@ -30,6 +30,7 @@ runplayer()
 	rm -f "$playlist"
 	while [ $ok ] && read -r auf
 	do
+	    echo "[$auf]"
 	    if [ $playcopy ]
 	    then
 		tmpauf=${TMPDIR:-/tmp}/$cmd$$`basename "$auf"`
