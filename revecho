@@ -1,0 +1,8 @@
+#!/bin/sh
+
+args=
+for arg
+do
+    args="$arg $args"
+done
+exec echo "$args"
