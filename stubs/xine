@@ -2,4 +2,12 @@
 
 xine=/opt/xine/bin/xine
 
+if mkdir test$$
+then snapdir=`pwd`
+     rmdir test$$
+else snapdir=$HOME/private/im/vidcap
+fi
+
+bsed "s^gui.snapshotdir:.*gui.snapshotdir:$snapdir" $HOME/.xine/config
+
 exec set-x "$xine" ${1+"$@"}
