@@ -1,0 +1,36 @@
+#!/usr/bin/perl
+#
+# Dump a cs::Persist database.
+#	- Cameron Simpson <cs@zip.com.au> 13nov97
+#
+
+use cs::Persist;
+use cs::Hier;
+
+$xit=0;
+
+$first=1;
+
+DB:
+  for (@ARGV)
+  { $db=cs::Persist::db($_);
+
+    if (! ref $db)
+    { warn "$0: no db for $_?\n";
+      $xit=1;
+      next DB;
+    }
+
+    print "\f" if ! $first;
+
+    print "$_\n", '=' x length($_), "\n\n";
+    for $key (sort keys %$db)
+    { printf("%-15s ",$key);
+      print cs::Hier::h2a($db->{$key},1,0,0,16), "\n";
+    }
+    
+    undef $db;
+    $first=0;
+  }
+
+exit $xit;
