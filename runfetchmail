@@ -1,0 +1,34 @@
+#!/bin/sh
+#
+# Run a regular fetchmail. Pulled from rigfetchmail.
+#	- Cameron Simpson <cs@zip.com.au> 31dec2003
+#
+
+: ${LOGDIR:=$HOME/var/log}
+: ${VARRUN:=$HOME/var/run}
+
+while :
+do
+  mypid=$$
+  eval "`syncenv $mypid`"
+
+  fmopts=
+  fmdelay=300
+  fmhosts='optus.local zip.local'
+  case "$LOCATION" in
+    cisra)	;;
+    home)	fmopts="$fmopts -l 128000" ;;
+    *)		fmopts="$fmopts -l 65536" fmdelay=900 ;;
+  esac
+  date
+  set-x \
+  fetchmail \
+	-f "$HOME/.fetchmailrc" \
+	-t 1800 \
+	--logfile "$LOGDIR/fetchmail" \
+	--nobounce --tracepolls --warnings 86400 \
+	$fmopts $fmhosts
+  sleep $fmdelay &
+  echo $! >"$VARRUN/fetchmail_sleep.pid"
+  wait
+done
