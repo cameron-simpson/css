@@ -1,0 +1,47 @@
+#!/bin/sed -f
+#
+# Do a bunch of simplistic recodings to effect a lot of the
+# grunt work of converting an HTML file into a POD file.
+#	- Cameron Simpson <cs@zip.com.au> 10apr2004
+#
+
+# headings
+s|^<[Hh]\([1-6]\)>\(.*\)</[Hh][1-6]>|\
+=head\1 \2|
+
+# paragraphs
+s|^<[Pp]>$||
+s|<[Pp]>|\
+\
+|g
+
+# lists
+s|^[ 	]*<[UuOo][Ll]>|\
+=over 4|
+s|^[ 	]*<[Ll][Ii]>\(.*\)|\
+=item \1|
+s|^[ 	]*</[UuOo][Ll]>|\
+=back|
+
+# monospaced text
+s|<[Cc][Oo][Dd][Ee]>\([^<]*\)</[Cc][Oo][Dd][Ee]>|C<\1>|g
+s|<[Tt][Tt]>\([^<]*\)</[Tt][Tt]>|C<\1>|g
+
+# italic
+s|<[Ii]>\([^<]*\)</[Ii]>|C<\1>|g
+s|<[Ee][Mm]>\([^<]*\)</[Ee][Mm]>|C<\1>|g
+
+# bold
+s|<[Bb]>\([^<]*\)</[Bb]>|C<\1>|g
+
+# absolute HREFs
+s|<[Aa] [Hh][Rr][Ee][Ff]="http:\([^"]*\)">\([^<]*\)</[Aa]>|\2 [L<\1>]|g
+
+# relative HREFs, probably
+s|<[Aa] [Hh][Rr][Ee][Ff]="\([^"]*\)">\([^<]*\)</[Aa]>|\2 [L<./\1>]|g
+
+# character entities
+s|\&lt;|<|g
+s|\&gt;|>|g
+s|\&nbsp;| |g
+s|\&amp;|\&|g
