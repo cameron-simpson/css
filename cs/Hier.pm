@@ -632,7 +632,7 @@ sub savehash($$)
 
 sub edithash($;$)
 { my($h,$editor)=@_;
-  my $editor = ( defined $ENV{EDITOR} ? $ENV{EDITOR} : 'vi' );
+  $editor = ( defined $ENV{EDITOR} ? $ENV{EDITOR} : 'vi' ) if ! defined $editor;
 
   my $tmp;
 
