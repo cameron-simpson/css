@@ -1,0 +1,41 @@
+#!/usr/bin/perl
+#
+# Connect to the opieauth service and validate things.
+#
+# Usage:
+#   otp user		Print challenge on stdout.
+#   otp user response	Try response, set exit value to success/fail.
+#
+#	- Cameron Simpson <cs@zip.com.au> 05dec96
+#
+
+use cs::OTP;
+
+($cmd=$0) =~ s:.*/::;
+$usage="Usage: $cmd key [response]\n";
+
+die $usage if @ARGV != 1 && @ARGV != 2;
+
+$user=shift(@ARGV);
+
+$otp=new cs::OTP;	die if ! defined $otp;
+
+$Xit=0;
+if (@ARGV)
+	# try response
+	{ $response=join(' ',@ARGV);
+	  if ($otp->Try($user,$response))
+		{}
+	  else	{ $Xit=1;
+		}
+	}
+else	{ $ch=$otp->Get($user);
+	  if (! defined $ch)
+		{ $Xit=1;
+		}
+	  else
+	  { print "$ch\n";
+	  }
+	}
+
+exit $Xit;
