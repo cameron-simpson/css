@@ -14,11 +14,11 @@ usage="Usage: $0 [-xpl] [{imagefile|ptns...}]"
 xplanet=
 [ "x$1" = x-xpl ] && { xplanet=1; shift; }
 
-if [ $# -gt 0 ] && [ -s "$1" ]
+if [ $# -gt 0 ] && [ -s "$1" ] && [ ! -d "$1/." ]
 then
     imagefile=$1; shift
 else
-    imagefile=`bglist -r -n 20 -w ${1+"$@"} | pickn`
+    imagefile=`BGPATH=$HOME/etc/im/wallpaper bglist -r -n 20 -w ${1+"$@"} | pickn`
 fi
 
 if [ $xplanet ]
