@@ -19,7 +19,8 @@ up=`dirname "$pfx"`
 base=`basename "$pfx"`
 
 # check out existing directories
-n=`cd "$up" || exit 1
+n=`exec 2>/dev/null
+   cd "$up" || exit 1
    ls \
    | sed -n "/^$base"'0*[1-9][0-9]*/s/.*[^0-9]0*\([1-9][0-9]*\)$/\1/p' \
    | sort -n \
