@@ -31,8 +31,9 @@ usage="Usage: $cmd [-B bugsystems] headline < description"
 # Deliver reports to the specified I<bugsystems> instead of the default.
 #
 [ "x$1" = x-B ] && { BUGSYSTEMS=$2; export BUGSYSTEMS; shift; shift; }
-#
+
 # =back
+#
 
 [ $# = 1 ] || { echo "$usage" >&2; exit 2; }
 headline=$1; shift
