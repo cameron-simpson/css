@@ -1,4 +1,8 @@
 #!/bin/sh
+#
+# Set the job id of the current desktop.
+#	- Cameron Simpson <cs@zip.com.au>
+#
 
 cmd=$0
 usage="Usage: $cmd [-d desk] [job]"
