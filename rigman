@@ -1,0 +1,3 @@
+#!/bin/sh
+
+exec rigdir -f "$HOME/etc/rigdir/man" -d "${MAN-$HOME/man/man.$ARCH}" ${1+"$@"}
