@@ -4,15 +4,15 @@
 #	- Cameron Simpson <cs@zip.com.au>
 #
 
+: ${LOGDIR:=$HOME/var/log}
+: ${CONSOLE:=$LOGDIR/console}
+
 cmd=$0
 
 async=
 dashc=
 iflag=
 tty=
-
-CONSOLE=${CONSOLE:-$HOME/var/log/console}
-export CONSOLE
 
 usage="Usage: $cmd [-a] [-i] [-t tty] { -c shellcmd | command [args...] }
 		-a	Fork and run asynchronously.
@@ -40,7 +40,7 @@ done
 case "$tty" in
     '')	tty=$CONSOLE ;;
     /*)	;;
-    *)	tty=$HOME/var/log/$tty ;;
+    *)	tty=$LOGDIR/$tty ;;
 esac
 
 case $#,$dashc in
