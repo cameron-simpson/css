@@ -1,0 +1,105 @@
+#!/usr/bin/perl
+#
+# Print out the list of files `use'd by a perl program for bundling
+# things up.
+#	- Cameron Simpson <cs@zip.com.au> 05mar97
+#
+
+($cmd=$0) =~ s:.*/::;
+
+use cs::Source;
+
+$Xit=0;
+$Context=$cmd;
+
+undef %_Checked;
+@Path=@INC;
+
+if (@ARGV)
+{ for (@ARGV)
+  { deps($_);
+  }
+}
+else
+{ while (defined ($_=<STDIN>))
+  { chomp;
+    deps($_);
+  }
+}
+
+exit $Xit;
+
+#########################################################################
+
+sub deps
+{ my($file)=shift;
+  my($s)=new cs::Source PATH, $file;
+
+  return if $_Checked{$file};
+  $_Checked{$file}=1;
+
+  if (! defined $s)
+  { warn "$Context: $file: $!\n";
+    $Xit=1;
+    return;
+  }
+
+  print $file, "\n";
+
+  local($_);
+  my($lineno)=0;
+  local($Context);
+
+  while (defined($_=$s->GetLine()) && length)
+  { $lineno++;
+    $Context="$cmd: $file, line $lineno";
+    if (/^\s*use\s+((::|')?(\w+(::|'))*\w+)\s*;/)
+    { do_use($1);
+    }
+    elsif (/^\s*(require|do)\s*'([^']+)'/
+	|| /^\s*(require|do)\s*"([^"]+)"/
+	  )
+    { do_require($2);
+    }
+  }
+}
+
+sub do_use
+{ my($use)=shift;
+
+  return if $_Used{$use};
+  $_Used{$use}=1;
+
+  local($_)=$use;
+
+  s|(::)+|/|g;
+  s|^/+||;
+
+  _do_req("$_.pm","use $_");
+}
+
+sub _do_req
+{ local($_,$call)=@_;
+  my($I,$s);
+
+  INC:
+    for $I (@Path)
+    { if (defined ($s=new cs::Source PATH, "$I/$_"))
+      { undef $s;
+	deps("$I/$_");
+	return;
+      }
+    }
+
+  warn "$Context: can't find file for \"$call\"\n";
+  $Xit=1;
+}
+
+sub do_require
+{ my($req)=shift;
+
+  return if $_Required{$req};
+  $_Required{$req}=1;
+
+  _do_req($req,"require '$req'");
+}
