@@ -76,11 +76,9 @@ cdtoc "$dev" \
       [ -d "$dir/." ] || mkdir -p "$dir" || { xit=1; continue; }
 
       echo "Ripping track #$track: $dir/$title ..."
-      set -x
-      time cdparanoia -d "$dev" -e -r "$track" - \
+      ##  buffer -m 1M 
+      time cdparanoia -q -d "$dev" -e -r "$track" - \
 	2>>cdp.err \
-      | buffer -m 1M \
-      | tee buf.out \
       | case $enc in
 	  ogg)
 	      oggenc -r -Q -b $bps \
@@ -92,7 +90,6 @@ cdtoc "$dev" \
 	      lame -r -b "$bps" -h -p - "$out"
 	      ;;
 	esac
-      set +x
     done
 
     exit $xit
