@@ -1,0 +1,121 @@
+#!/usr/bin/perl
+#
+# Extract tables from HTML.
+#	- Cameron Simpson <cs@zip.com.au> 03apr2001
+#
+
+use strict qw(vars);
+
+use cs::Source;
+use cs::Sink;
+use cs::HTML;
+use cs::Hier;
+use cs::CSV;
+
+die "Usage: $0\n" if @ARGV;
+
+my $parse = new cs::HTML (new cs::Source (FILE,STDIN));
+my $out   = new cs::Sink (FILE,STDOUT);
+my $err   = new cs::Sink (FILE,STDERR);
+
+my @t;
+my $t;
+
+while (defined ($t=$parse->Tok()))
+{ my @tables = cs::HTML::grepMarkUp(TABLE,$t);
+  for my $table (@tables)
+  { my @table = gettable($table);
+    
+    my(%r,@d1,@d2,$lastk);
+
+    for my $row (@table)
+    {
+      if (@$row != 2)
+      { warn "$::cmd: warning: expected exactly two columns!";
+	## warn "\trow = ".cs::Hier::h2a($row,1)."\n";
+      }
+
+      @d1 = @{$row->[0]};
+      @d2 = @{$row->[1]};
+
+      shift(@d1);
+      shift(@d2);
+
+      my $k = stripwhite(cs::HTML::tokFlat(@d1));
+      $k =~ s/\s*:$//;
+
+      # hack to work around a parsing bug in my code
+      while ($k =~ s/\s*<\s*\/\s*\w+\s*>\s*$//)
+      {}
+      $k =~ s/\s*:$//;
+
+      my $v = stripwhite(cs::HTML::tokFlat(@d2));
+
+      if (length $k)
+      { $r{$k}=$v;
+	$lastk=$k;
+      }
+      else
+      { $r{$lastk}.="\n$v";
+      }
+    }
+
+    push(@t, { %r } );
+  }
+
+  ## cs::Hier::h2s($err,$t,1);
+  ## print STDERR "\n^--- LAST TOKEN\n";
+}
+
+cs::CSV::save($out,@t);
+
+exit 0;
+
+# return ( rows... )
+sub gettable($)
+{ my($table)=@_;
+
+  my @t = ();
+
+  SUBTOKEN:
+  for my $t (@{$table->{TOKENS}})
+  {
+    next SUBTOKEN if ! ref $t;
+
+    my $tag = $t->{TAG};
+    if ($tag eq TR)
+    { push(@t,[getrow($t)]);
+    }
+  }
+
+  return @t;
+}
+
+# return ( [tag,@tokens], ... )
+sub getrow($)
+{ my($row)=@_;
+
+  my @r = ();
+
+  SUBTOKEN:
+  for my $t (@{$row->{TOKENS}})
+  {
+    next SUBTOKEN if ! ref $t;
+
+    my $tag = $t->{TAG};
+    if ($tag eq TH || $tag eq TD)
+    { push(@r,[$tag, @{$t->{TOKENS}}]);
+    }
+  }
+
+  return @r;
+}
+
+sub stripwhite($)
+{ local($_)=@_;
+
+  s/^\s+//;
+  s/\s+$//;
+
+  return $_;
+}
