@@ -1,0 +1,143 @@
+#!/usr/bin/perl
+#
+# Wrapper for icontact to figure out optimal layout for contact sheet.
+#
+
+($cmd=$0) =~ s:.*/::;
+$usage="Usage: $cmd [-n num] [-l] images
+	-n How many images per sheet.
+	-l Use labels.
+";
+
+$icwide=1152;	# Sun screen dimensions
+$ichigh=900;
+
+$rows=0;
+$cols=0;
+$num=12;
+$labels=0;
+
+$TEXTVS=16;	# pixel height of text
+
+$badopts=0;
+while ($#ARGV >= $[)
+	{ $_=shift;
+	  if ($_ !~ /^-/)
+		{ unshift(@ARGV,$_);
+		  last;
+		}
+	  
+	  last if $_ eq '--';
+
+	  if ($_ eq '-r')	{ $rows=shift; }
+	  elsif ($_ eq '-c')	{ $cols=shift; }
+	  elsif ($_ eq '-n')	{ $num=shift; }
+	  elsif ($_ eq '-l')	{ $labels=1; }
+	  else
+	  { print STDERR "$cmd: $_: unrecognised option\n";
+	    $badopts=1;
+	  }
+	}
+
+die $usage if $badopts || $#ARGV < $[;
+
+$maxx=0; $maxy=0;
+@files=();
+for (@ARGV)
+	{ $pnmconv='';
+	  if (/\.gif$/)		{ $pnmconv="giftoppm $_ |"; }
+	  elsif (/\.jpg/)	{ $pnmconv="djpeg $_ |"; }
+
+	  if (!open(FILE,"exec <$_; $pnmconv pnmfile |"))
+		{ print STDERR "$cmd: can't pipe from pnmfile($_): $!\n";
+		  next;
+		}
+	  
+	  if (!defined($size=<FILE>)
+	   || $size !~ /:.*,\s*(\d+)\s+by\s+(\d+)/)
+		{ print STDERR "$cmd: bad data from pnmfile\n";
+		  close(FILE);
+		  next;
+		}
+
+	  close(FILE);
+
+	  ($x,$y)=($1,$2);
+	  push(@files,$_);
+	  $maxx=&max($maxx,$x);
+	  $maxy=&max($maxy,$y);
+
+	  print STDERR "$_: $x x $y\n";
+	}
+
+die "bad karma" if $#files < $[ || $maxx < 1 || $maxy < 1;
+
+$maxy+=$TEXTVS if $labels;	# allow some room for label text
+
+open(SHELL,"|sh") || die "can't pipe to shell\n";
+while ($#files >= $[)
+	{
+	  # How to compute a nice arrangement?
+	  #
+	  # We know:
+	  #	a * b = num
+	  #	a*maxx/k = icwide
+	  #	b*maxy/k = ichigh
+	  #
+	  # Thus:
+	  #	b=ichigh*k / maxy
+	  #	a=icwide*k / maxx
+	  #
+	  #	num = icwide*ichigh*k*k / maxx*maxy
+	  #
+	  #	k*k = num*maxx*maxy / icw*ich
+	  #
+	  #	k = sqrt(num*maxx*maxy / icw*ich)
+	  #
+	  # Therefore:
+	  #	b=ichigh*k / maxy
+	  #	a=icwide*k / maxx
+
+	  # desired number for this sheet
+	  $thisnum=&min($num,$#files-$[+1);
+
+	  $k=sqrt($thisnum*$maxx*$maxy/$icwide/$ichigh);
+	  print STDERR "thisnum=$thisnum, k=$k, maxx=$maxx, maxy=$maxy\n";
+	  $rows=int(($ichigh*$k+$maxy-1)/$maxy);
+	  $cols=int(($icwide*$k+$maxx-1)/$maxx);
+
+	  print STDERR "maxx=$maxx, maxy=$maxy, k=$k, rows=$rows, cols=$cols\n";
+
+	  # These will be rounded down. Try r,c, r,c+1, r+1,c, r+1,c+1
+	  # for nearest match to $thisnum.
+	  undef $r, $c, $d;
+	  for ($dr=0; $dr<2; $dr++)
+		{ for ($dc=0; $dc<2; $dc++)
+			{ $n=($rows+$dr)*($cols+$dc);
+			  $nd=($thisnum-$n); if ($nd < 0) { $nd = -$nd; }
+			  if (!defined($d)
+			   || $nd < $d)
+				{ $r=$rows+$dr;
+				  $c=$cols+$dc;
+				  $d=$nd;
+				}
+			}
+		}
+
+	  $w=int($icwide/$c);
+	  $h=int($ichigh/$r);	if ($labels) { $h-=$TEXTVS; }
+
+	  for (@piclist=(); $n > 0 && $#files >= $[; $n--)
+		{ push(@piclist,shift @files);
+		}
+
+	  print SHELL "icontact -i -r $r -c $c -w $w -h $h",
+			$labels ? " -l" : "",
+			" @piclist\n";
+	}
+
+close(SHELL);
+
+sub max { $_[0] < $_[1] ? $_[1] : $_[0]; }
+
+sub min { $_[0] > $_[1] ? $_[1] : $_[0]; }
