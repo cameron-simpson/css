@@ -1,0 +1,61 @@
+#!/bin/sh
+#
+# Archive a user directory.
+#	- Cameron Simpson <cs@zip.com.au> 21feb2001
+#
+
+HOST=${HOST:-`hostname|sed 's/\..*//'`}
+export HOST
+
+archhost=shot
+archhdir=/StorNext/Archive/users
+archive=/usr/local/archive/users
+
+cmd=`basename "$0"`
+usage="Usage: $cmd users..."
+
+[ $# = 0 ] && { echo "$cmd: missing users" >&2; echo "$usage" >&2; exit 2; }
+
+xit=0
+
+cd /home/$HOST || exit 1
+
+for user
+do  [ -d "$user" ] || { echo "$cmd: $user: not a directory" >&2
+			xit=1
+			continue
+		      }
+
+    rbase=$user-$HOST-`daycode`
+    rdir=$archhdir/$rbase
+
+    dbuser "$user"
+    ypmatch "$user" passwd
+    ls -ld "$user"
+    ask "archive $user to $archhost:$rdir" || continue
+
+    # move data with tar - faster
+    ( set -x; cd "$user" || exit 1; tar cf - . ) \
+    | ssh "$archhost" "mkdir '$rdir' && cd '$rdir' && (pwd; set -x; tar xf -)" \
+    || { xit=1
+	 continue
+       }
+
+    # then make sure it's all ok
+    set-x rsync -avH --progress "$user/." "$archhost:$rdir/."
+
+    echo
+    echo checking "$rdir..."
+    rsync -avHn "$user/." "$archhost:$rdir/."
+
+    echo
+    echo "updating $user ..."
+    set-x dbuser -e "$user" "HOMEDIR=$archive/$rbase"
+
+    echo
+    echo "Now you must:"
+    echo "	rmr $user"
+    echo
+done
+
+exit $xit
