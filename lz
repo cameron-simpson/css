@@ -342,11 +342,12 @@ then
     esac
 fi
 
+# insert paper setting outside postscript
+[ -n "$paper" ] && postps="$postps | sed -e '1a\\
+$paper'"
+
 # use printer unless sending to stdout
 [ "x$PRINTER" = x- ] || postps="$postps | bgstdin $lp"
-
-# insert paper setting outside postscript
-[ -n "$paper" ] && postps="$postps | ( echo \"\$paper\"; exec cat )"
 
 # =head2 Files
 #
