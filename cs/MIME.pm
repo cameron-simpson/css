@@ -130,7 +130,7 @@ I<istext> defaults to false for B<BASE64> data and true for B<QUOTED-PRINTABLE> 
 
 =cut
 
-sub decodedSource($$$)
+sub decodedSource($$;$)
 { my($s,$cte,$isText)=@_;
   $cte=uc($cte);
 
@@ -164,8 +164,8 @@ sub decodedSource($$$)
 Create a MIME object.
 If I<source> (a file pathname or a B<cs::Source>)
 is supplied then its content is copied
-and the headers extracted, leaving the copy
-positioned at the start of the body.
+and the headers extracted, leaving the I<source>
+positioned just past the end of the body.
 To avoid this cost, call with no B<cs::Source>
 and use the B<UseHdrs> method to place header infomation
 into the object.
@@ -181,14 +181,13 @@ sub new($;$$)
   $usecsize=0 if ! defined $usecsize;
 
   my($this)=bless {
+	      HDRS => new cs::RFC822,
 	      TYPE	=> TEXT,	# text/plain by default
 	      SUBTYPE	=> PLAIN,
 	      TYPEPARAMS=> {},
 	      HDRS	=> new cs::RFC822,
 	      CTE	=> '8BIT',	# Content-Transfer-Encoding
 	    }, $class;
-
-  my $H = new cs::RFC822;
 
   if (defined $s)
   { $this->UseSource($s,$usecsize);
@@ -220,6 +219,7 @@ sub UseSource($$;$)
   $s=new cs::Source (PATH, $s) if ! ref $s;
   return undef if ! defined $s;
 
+  my $H = $this->Hdrs();
   $H->SourceExtract($s);
   $this->UseHdrs($H);
 
@@ -310,7 +310,7 @@ sub Body($;$)
 { my($this,$decoded)=@_;
   $decoded=0 if ! defined $decoded;
 
-  return $this->{BODY} if ! decoded;
+  return $this->{BODY} if ! $decoded;
 
   my $s = $this->BodySource($decoded);
   return undef if ! defined $s;
@@ -393,16 +393,26 @@ sub WriteItem($$$;$$$)	# (this,sink,\@cs::MIME,pre,post,sep)
   $sink->Put($post);
 }
 
-# collect pretext, pieces, posttext
-# return ([scalarSources],pretext,posttext)
-sub Pieces
+=item Parts()
+
+Collect pretext, parts and posttext
+from the object
+(presumably multipart)
+and return an array of strings
+containing (pretext,posttext,parts...).
+
+=cut
+
+sub Parts()
 { my($this)=@_;
 
   ###### input stream
-  my($s)=$this->_Source();
+  my($s)=$this->BodySource();
 
   ###### results
-  my($slist,$pre,$post)=([],'','');
+  my $pre = '';
+  my $post = '';
+  my @parts;
 
   my($boundary)='--'.$this->{TYPEPARAMS}->{BOUNDARY};
   my($terminate)=$boundary.'--';
@@ -434,7 +444,7 @@ sub Pieces
       # boundary line
       { 
 	if (defined $cache)
-	{ push(@$slist,new cs::Source (SCALAR,$cache));
+	{ push(@parts, $cache);
 	}
 
 	$cache='';
@@ -444,7 +454,7 @@ sub Pieces
       $crlf=$ncrlf;
     }
 
-  ($slist,$pre,$post);
+  ($pre,$post,@parts);
 }
 
 =back
