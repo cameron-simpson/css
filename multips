@@ -29,6 +29,7 @@ vdividers=true
 duplexmode=true
 tumble=false
 papertray=
+bw=
 fgcolour=
 bgcolour=
 X11RGB=${X11RGB-'/usr/local/X11/lib/rgb.txt:/usr/X11/lib/rgb.txt:/usr/lib/X11/rgb.txt'}
@@ -42,6 +43,7 @@ usage="Usage: $0 [-1248dLPDT] [+DT] [-r rows] [-c cols] \\
 	-dv	Only vertical dividers.
 	-dh	Only horizontal dividers.
 	+d	No dividers.
+	-bw	Black-and-white. Hack: make \"setrgbcolor\" always choose black.
 	-fg colour Set foreground colour to be the colour specified.
 	-bg colour Set background colour to be the colour specified.
 		Colours come in three forms:
@@ -74,6 +76,7 @@ do
 		-dh)	hdividers=true vdividers=false ;;
 		-dv)	hdividers=false vdividers=true ;;
 		+d)	hdividers=false vdividers=false ;;
+		-bw)	bw=1 ;;
 		-fg)	fgcolour=$2; shift ;;
 		-bg)	bgcolour=$2; shift ;;
 		-t)	papertray=$2; shift
@@ -797,8 +800,13 @@ esac
 PSMULTI
 [ -n "$needmulti" ] && echo "$landscape $incolumns $nrows $ncols $hdividers $vdividers multi"
 
-cat ${1+"$@"}
-xit=$?
+cat ${1+"$@"} \
+| if false && [ $bw ]
+  then
+    sed 's/setrgbcolor/pop pop pop 0.0 0.0 0.0 &/g'
+  else
+    cat
+  fi
 
 [ -n "$needmulti" ] && echo endmulti
 
