@@ -1,0 +1,23 @@
+#!/usr/bin/perl
+#
+#	- Cameron Simpson <cs@zip.com.au> 
+#
+
+use strict qw(vars);
+
+use cs::Persist;
+
+my($old,$new);
+
+$old=cs::Persist::db('/usr/local/etc/cisra/db/projects');
+$new=cs::Persist::db('/usr/local/etc/cisra/db/project.new',1);
+
+for (keys %$old)
+	{ $new->{$_}=$old->{$_};
+	}
+
+undef $old;
+undef $new;
+
+
+cs::Persist::finish();
