@@ -27,7 +27,7 @@ subopts=
 doclean=
 doanon=
 popurl_mode=new-window
-mozremote=/opt/firebird/mozilla-xremote-client
+mozremote=/opt/firefox/mozilla-xremote-client
 
 badopts=
 
