@@ -1,4 +1,4 @@
-#!/usr/local/bin/tkperl
+#!/opt/bin/tkperl
 #
 #	- Cameron Simpson <cs@zip.com.au> 16mar1997
 #
