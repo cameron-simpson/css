@@ -43,4 +43,4 @@ case $1 in
 esac
 
 set -x
-ignhup vncviewer -passwd $HOME/rc/vnc/passwd -shared ${1+"$@"} "$vncdisp" &
+ignhup vncviewer -passwd $HOME/.vnc/passwd -shared ${1+"$@"} "$vncdisp" &
