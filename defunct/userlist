@@ -1,0 +1,20 @@
+#!/usr/bin/perl
+#
+# Live users.
+#	- Cameron Simpson <cs@zip.com.au> 
+#
+
+use CISRA::UserData;
+
+$db=CISRA::UserData::db();
+
+USER:
+  for (sort keys %$db)
+	{ $u=$db->{$_};
+
+	  next USER if ! CISRA::UserData::needsTimesheet($u);
+
+	  my(@u)=getpwnam($_);
+	  next USER if $u[2] >= 1000;
+	  print $_, "\n";
+	}
