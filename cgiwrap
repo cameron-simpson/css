@@ -2,14 +2,24 @@
 #
 # Wrapper for CGI scripts which sets environment and captures and
 # reports errors.
-# For any perl CGI, mv the real .cgi to .cgi-pl and link this script to
+# For any perl CGI, move the real .cgi to .cgi-pl and copy cgiwrap-stub to
 # the old .cgi name.
-# For any shell CGI, mv the real .cgi to .cgi-sh and link this script to
+# For any shell CGI, move the real .cgi to .cgi-sh and copy cgiwrap-stub to
 # the old .cgi name.
 #	- Cameron Simpson <cs@zip.com.au> 03mar1999
 #
 # Make single wrapper for pl and sh.	- cameron 12feb2001
 #
+
+SCRIPT_FILENAME=${SCRIPT_FILENAME:-$0}
+export SCRIPT_FILENAME
+if [ "x$1" = "x-0" ]
+then
+    SCRIPT_FILENAME=$2; shift; shift
+else
+    echo "$0: missing mandatory -0 option" >&2
+    exit 2
+fi
 
 # snapshot errors and attach to output bottom
 STDERR=/tmp/stderr.$USER.$$
@@ -32,22 +42,11 @@ trap 'exec 2>&1
       rm -f "$STDERR"' 0
 exec 2>"$STDERR"
 
-## exec 2>/dev/pts/11
-## id >&2
-## which perl >&2
-
-dir=`dirname "$0"`
-
-. $dir/.cgienv.sh
-
-if [ -s "$0-pl" ]
-then  perl -I$HOME/rc/perl "$0-pl" ${1+"$@"}
-else  if [ -s "$0-sh" ]
-      then  /bin/sh "$0-sh" ${1+"$@"}
-      else  if [ -s "$0-exec" ]
-	    then  "$dir/$0-exec" ${1+"$@"}
-	    else  echo "$0: can't find $0-sh or $0-pl" >&2
-	    fi
+if [ -s "$SCRIPT_FILENAME-pl" ]
+then  perl -I$HOME/rc/perl "$SCRIPT_FILENAME-pl" ${1+"$@"}
+else  if [ -s "$SCRIPT_FILENAME-sh" ]
+      then  /bin/sh "$SCRIPT_FILENAME-sh" ${1+"$@"}
+      else  echo "$0: can't find $SCRIPT_FILENAME-sh or $SCRIPT_FILENAME-pl" >&2
       fi
 fi
 
