@@ -1,0 +1,124 @@
+#!/usr/bin/perl
+#
+# Update a solaris /etc/system file with the specified values.
+# Reads /etc/system formatted lines from stdin and updates the file with
+# the max of the input value and the value in the file.
+#	- Cameron Simpson <cs@zip.com.au> 18jan2001
+#
+
+use strict qw(vars);
+
+use cs::Misc;
+use Getopt::Std;
+
+$::File='/etc/system';
+$::ReWrite=0;
+
+$::Usage="Usage: $::cmd [-f file] [-y] < new-etc-system-lines
+	-f file	Edit file instead of $::File.
+	-y	yes: rewrite $::File instead of copying to stdout.
+";
+
+getopts("f:y");
+$::File=$::opt_f if defined $::opt_f;
+$::ReWrite=1 if defined $::opt_y;
+
+if (! open(SYS, "< $::File\0"))
+{ die "$::cmd: can't read $::File: $!\n";
+}
+
+@::Lines=();
+%::Sym=();
+
+$::Xit=0;
+
+while (<SYS>)
+{ push(@::Lines,$_);
+
+  chomp;
+
+  if (/^\s*set\s+([a-z][\w_:]+)\s*=\s*(.*\S)/)
+  {
+    my($sym,$val)=($1,$2);
+
+    if (exists $::Sym{$sym})
+    {
+      my($oldndx,$oldval)=@{$::Sym{$sym}};
+
+      if ($oldval eq $val)
+      # same - drop later line
+      { @::Lines[$#::Lines]="";
+      }
+      else
+      { warn "$::cmd: $::File, line $.: warning: repeated instance of \"$sym\" replaces instance from line ".($oldndx+1)."\n\told value = $oldval\n\tnew value = $val\n";
+	substr($::Lines[$oldndx],$[,0)="** overridden by line $. ** ";
+        $::Sym{$sym}=[$#::Lines, $val];
+      }
+    }
+    else
+    { $::Sym{$sym}=[$#::Lines, $val];
+    }
+  }
+}
+
+close(SYS);
+
+INPUT:
+while (<STDIN>)
+{
+  chomp;
+  s/^\s+//;
+  if (! length || /^\*/)
+  {
+    push(@::Lines, "$_\n");
+    next INPUT;
+  }
+
+  if (/^set\s+([a-z][\w_:]+)\s*=\s*(.*\S)/)
+  {
+    my($sym,$val)=($1,$2);
+
+    if (exists $::Sym{$sym})
+    {
+      my($oldndx,$oldval)=@{$::Sym{$sym}};
+
+      if ($oldval eq $val)
+      {}
+      elsif ($val !~ /^\d+$/ || $oldval !~ /^\d+$/)
+      {
+	warn "$::cmd: stdin, line $.: replacing nonnumeric value \"$oldval\" at line ".($oldndx+1)
+		." with \"$val\"\n";
+	substr($::Lines[$oldndx],$[,0)="** replaced with \"$val\" later ** ";
+	push(@::Lines,"$_\n");
+      }
+      elsif ($val == $oldval)
+      {}
+      elsif ($val < $oldval)
+      { warn "$::cmd: stdin, line $.: keeping old value $oldval (larger than $val)\n";
+      }
+      else
+      { warn "$::cmd: stdin, line $.: replacing old value $oldval with $val\n";
+	substr($::Lines[$oldndx],$[,0)="** replaced with $val later ** ";
+	push(@::Lines,"$_\n");
+      }
+    }
+    else
+    { warn "$::cmd: stdin, line $.: adding $_\n";
+      push(@::Lines,"$_\n");
+      $::Sym{$sym}=[$#::Lines, $val];
+    }
+  }
+  else
+  { warn "$::cmd: bad input, line $.: $_\n";
+    $::Xit=1;
+  }
+}
+
+if ($::ReWrite)
+{ die "$::cmd: open $::File: $!\n" if ! open(SYS, "> $::File\0");
+  select SYS;
+}
+
+print @::Lines;
+
+exit $::Xit;
