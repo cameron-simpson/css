@@ -1,0 +1,32 @@
+#!/bin/sh
+#
+# Simple way to invoke cc for my code.
+#	- Cameron Simpson <cs@zip.com.au>
+#
+
+csinc=$HOME/include
+
+cc=gccanal
+dold=1
+[ "x$1" = x-c ] && dold=
+
+yplib=-lyp
+rpclib=-lrpclib
+case $ARCH in
+    *.*.solaris)	postlibs='-lnsl -lsocket' ;;
+    *.*.irix)		postlibs=-lsun ;;
+    *.*.ultrix)		postlibs= rpclib=$LIB/librpclib.a ;;
+    *.*.osf1)		rpclib= yplib= ;;
+    *)			postlibs=-lrpclib ;;
+esac
+
+# -L/usr/local/lib/udb -L/opt/lib -llists $yplib $rpclib $postlibs
+ldargs=
+[ $dold ] && ldargs=$LIB/libcs.a	## '-L$LIB -lcs'
+
+eval "## set -x
+      $cc -DEBUG "'\
+	      "-I$csinc/cs/config/site/$SYSTEMID.$ARCH" \
+	      "-I$csinc" "-I/usr/local/include" \
+	      ${1+"$@"} \
+	      '"$ldargs"
