@@ -1,0 +1,26 @@
+#!/bin/sh
+#
+# Infer relevant job from context.
+#	- Cameron Simpson <cs@zip.com.au> 05nov2004
+#
+
+cmd=$0
+usage="Usage: $cmd [-w windowid]"
+
+badopts=
+
+[ "x$1" = x-w ] && { WINDOWID=$2; shift; shift; }
+
+[ $# = 0 ] || { echo "$cmd: extra arguments: $*" >&2; badopts=1; }
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+##exec 2>>$HOME/var/log/procmail
+##set -x
+
+   { [ -n "$WINDOWID" ] && job=`winjob -w "$WINDOWID"` && [ -n "$job" ]; } \
+|| { [ -f .job ] && job=`dirjob` && [ -n "$job" ]; } \
+|| { [ -n "$DISPLAY" ] && job=`deskjob` && [ -n "$job" ]; } \
+|| job=misc
+
+echo "$job"
