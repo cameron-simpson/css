@@ -1,6 +1,6 @@
 #!/bin/sh
 #
-# Autostart netscape and show URLs. Backgrounds so the user can get on
+# Autostart browser and show URLs. Backgrounds so the user can get on
 # with things.
 #	- Cameron Simpson <cs@zip.com.au>
 #
