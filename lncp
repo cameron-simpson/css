@@ -1,0 +1,82 @@
+#!/bin/sh
+#
+# Link or copy (link preferred).
+#	- Cameron Simpson <cs@zip.com.au>
+#
+
+cmd=`basename "$0"`
+usage="Usage: $cmd [-fnsv] [--] file newfile
+	-f	Remove target first.
+	-n	No action (implies -v).
+	-q	Quiet (cancels -v).
+	-s	Symlink instead of copies if hard link fails.
+	-v	Verbose."
+
+badopts=
+symlink=
+noaction=
+verbose=
+rmf=
+while :
+do
+    case $1 in
+	-s)	symlink=1 ;;
+	-n)	noaction=1 verbose=1 ;;
+	-q)	verbose= ;;
+	-v)	verbose=1 ;;
+	-f)	rmf=1 ;;
+	--)	shift; break ;;
+	-*)	echo "$cmd: $1: unrecognised option" >&2
+		badopts=1
+		;;
+	*)	break ;;
+    esac
+    shift
+done
+
+case $# in
+    2)	;;
+    *)	echo "$cmd: missing filenames" >&2
+	badopts=1
+	;;
+esac
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+from=$1
+to=$2
+
+case "$from" in /*) ;; *) from=./$from ;; esac
+case "$to"   in /*) ;; *) to=./$to     ;; esac
+
+[ $rmf ] && { [ -f "$to" -o -d "$to" ] && [ $verbose ] && echo "rm -f $to"
+	      [ $noaction ] || if rm -f "$to" || [ ! -f "$to" ]
+			       then  :
+			       else  aside=$to.$$.DEFUNCT
+				     mv "$to" "$aside" \
+				  && ( sleep 30
+				       exec rm -f "$aside" 2>/dev/null
+				     ) &
+			       fi
+	    }
+
+if [ $noaction ] || ln "$from" "$to" 2>/dev/null
+then
+    [ $verbose ] && echo "ln $from $to"
+    exit 0
+fi
+
+if [ $symlink ]
+then
+    if [ $noaction ] || ln -s "$from" "$to"
+    then [ $verbose ] && echo "ln -s $from $to"
+    else xit=$?
+    fi
+else
+    if [ $noaction ] || cp "$from" "$to"
+    then [ $verbose ] && echo "cp $from $to"
+    else xit=$?
+    fi
+fi
+
+exit $xit
