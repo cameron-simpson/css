@@ -5,10 +5,7 @@ import os
 import string
 
 def cursorColumns(c):
-  names=[]
-  for meta in c.description:
-    names.append(meta[0])
-  return names
+  return [ meta[0] for meta in c.description ]
 
 def fieldTestTplt(f):
   return f+" = %s"
@@ -34,12 +31,13 @@ def valueKey(values):
 
 """ an iterator for the results of a selection
 """
-class Selection(cs.misc.HasNameIndex):
+class Selection(cs.misc.OrderedKeys):
+
   def __init__(self,dbconn,sel,params=()):
     if string.upper(sel[0:7]) != "SELECT ": sel="SELECT "+sel
     self.__cursor=dbconn.newCursor()
     doSql(self.__cursor,sel,params)
-    self.initNameIndex(cursorColumns(self.__cursor))
+    self.setKeyOrder(cursorColumns(self.__cursor))
 
   def getCursor(self):
     return self.__cursor
@@ -50,7 +48,7 @@ class Selection(cs.misc.HasNameIndex):
       yield rowvalues
       rowvalues=self.__cursor.fetchone()
 
-class View(cs.misc.HasNameIndex):
+class View(cs.misc.OrderedKeys):
   def __init__(self,dbconn,selection,where="",wparams=()):
     self.dbconn=dbconn
     self.selection="SELECT "+selection
@@ -64,7 +62,7 @@ class View(cs.misc.HasNameIndex):
   def selectWhere(self,extra_where="",wparams=()):
     sel=self.withWhere(self.selection,extra_where)
     selobj=Selection(self.dbconn,sel,self.wparams+wparams)
-    self.initNameIndex(selobj.getNames())
+    self.setKeyOrder(selobj.keys())
     return selobj
 
   def selectEqual(self,fields,values):
@@ -89,28 +87,17 @@ class View(cs.misc.HasNameIndex):
       return a list of the chosen column values
   """
   def chooseRowValues(self,rowvalues,fields):
-    return [ rowvalues[self.lookupNameIndex(f)] for f in fields ]
+    return [ rowvalues[self.keyIndex(f)] for f in fields ]
       
   # return a sequence of Rows specified by the where clause
   def fetch(self,extra_where="",*args):
+    print "Row.FETCH"
     return [ self.newRow(rowvalues) for rowvalues in self.selectWhere(extra_where,*args) ]
-
-class Row(cs.misc.IndexedSeqWrapper):
-  def __init__(self,view,values):
-    cs.misc.IndexedSeqWrapper.__init__(self,values,view.getNames())
-    self.setView(view)
-  def setView(self,view):
-    self.__view=view
-  def getView(self):
-    return self.__view
-  def __setitem__(self,key,value):
-    raise TypeError, "change to anonymous row can't affect database, rejected"
-  def __delitem__(self,key):
-    raise TypeError, "deletion from anonymous row can't affect database, rejected"
 
 """ A View indexable by identifying fields, and thus updateable.
 """
 class UpdateableTableView(View):
+
   def __init__(self,dbconn,table,idfields,otherfields=None,where="",wparams=()):
     self.__keys=None
     self.__liveRows={}
@@ -123,32 +110,58 @@ class UpdateableTableView(View):
 
   def setTable(self,table):
     self.__table=table
+
   def getTable(self):
     return self.__table
 
   def getFieldNum(self,fieldname):
-    return self.lookupNameIndex(fieldname)
+    return self.keyIndex(fieldname)
 
   def setIdFields(self,idfields):
     self.__idfields=idfields
+
   def getIdFields(self):
     return self.__idfields
 
   def isIdField(self,field):
     return field in self.getIdFields()
+
   def isIdFieldNum(self,fieldnum):
-    isidfield = self.getNames()[fieldnum] in self.getIdFields()
+    isidfield = self.keys()[fieldnum] in self.getIdFields()
     print "isIdField(", fieldnum, ")=", `isidfield`
     return isidfield
 
-  """ tuple of id field values for this row
+  def fetch(self,extra_where="",*args):
+    return [ self.__freshRow(r) for r in View.fetch(self,extra_where,*args) ]
+
+  """ Note a row returned from a fetch.
+      If we already have it, update the cached row's values
+	and substitute the cached row.
+      Otherwise cache the new row.
+  """
+  def __freshRow(self,row):
+    key=self.__rowIdentity(row.rowValues())
+    cached=self.__getCachedItem(key)
+    if cached is None:
+      print "NEW CACHE:", `key`
+      self.__cacheItem(key,row)
+    else:
+      print "UPDATE CACHE:", `key`
+      cached.updateFromRow(row,True)	# set noSQL
+      row=cached
+
+    return row
+
+  """ tuple of id field values from a whole-row set of values
       or simple scalar if just one id field
   """
   def __rowIdentity(self,rowvalues):
-    print "rowvalues=", `rowvalues`
-    print "len = ", len(rowvalues)
+    ##print "rowvalues=", `rowvalues`
+    ##print "len = ", len(rowvalues)
     return valueKey(self.chooseRowValues(rowvalues,self.getIdFields()))
 
+  """ iterate over the real keys from the database
+  """
   def __iter__(self):
     selobj=Selection(self.dbconn,
     		     "SELECT "+string.join(self.getIdFields(),", ")
@@ -157,14 +170,10 @@ class UpdateableTableView(View):
       vk=valueKey(selrow)
       yield vk
 
-  def keys(self):
-    if self.__keys is None:
-      self.__keys=[ key for key in self.__iter__() ]
-    return self.__keys
-
-  def __cachedItem(self,key):
+  def __getCachedItem(self,key):
     # cached, return it
     if key in self.__liveRows:
+      print "CACHED:",`key`
       return self.__liveRows[key]
     return None
 
@@ -176,15 +185,18 @@ class UpdateableTableView(View):
     return IdentifiableRow(self,rowvalues)
 
   def __getitem__(self,key):
-    row=self.__cachedItem(key)
-    if row is not None: return row
+    row=self.__getCachedItem(key)
+    if row is not None:
+      return row
 
     # obtain the record from the db
+    # return None if not found
     selobj=self.selectEqual(self.getIdFields(),key)
     rowvv=[ rowvalues for rowvalues in selobj ]
-    rowvalues=rowvv[0]
+    if len(rowvv) == 0:
+      raise IndexError, "key out of range: "+`key`
 
-    row=self.newRow(rowvalues)
+    row=self.newRow(rowvv[0])
     self.__cacheItem(key,row)
     return row
 
@@ -196,6 +208,21 @@ class UpdateableTableView(View):
     if not hasattr(value,'keys'):
       list
     row._updateAllValues(value)
+
+""" An anonymous row.
+"""
+class Row(cs.misc.IndexedSeqWrapper):
+  def __init__(self,view,values):
+    cs.misc.IndexedSeqWrapper.__init__(self,values,view.keys())
+    self.__view=view
+  def getView(self):
+    return self.__view
+  def rowValues(self):
+    return self.getSeq()
+  def __setitem__(self,key,value):
+    raise TypeError, "change to anonymous row can't affect database, rejected"
+  def __delitem__(self,key):
+    raise TypeError, "deletion from anonymous row can't affect database, rejected"
 
 class IdentifiableRow(Row):
   def __init__(self,view,values):
@@ -216,24 +243,37 @@ class IdentifiableRow(Row):
   def __setitem__(self,key,value):
     self.update({key: value})
 
-  def update(self,dict):
-    fields=self.getNameIndex().keys()
+  # update this row from another row
+  # possible of different field order
+  def updateFromRow(self,otherrow,noSQL=False):
+    upd={}
+    for k in otherrow.keys():
+      if not self.getView().isIdField(k):
+	d[k]=otherrow[k]
+    self.update(d,noSQL)
+
+  def update(self,dict,noSQL=False):
+    fields=self.keys()
+    print "fields=",`fields`
     for key in dict.keys():
       if key not in fields:
 	raise TypeError, "unknown column named \""+key+"\""
       if self.getView().isIdField(key):
 	raise TypeError, "can't set id field \""+key+"\""
 
-    sql="UPDATE "+self.getTable()+" SET "+string.join([ field+"=%s" for field in dict.keys() ],", ")
-    sqlparams=[ dict[k] for k in dict.keys() ]
+    # apply changes unless told not to
+    if not noSQL:
+      sql="UPDATE "+self.getTable()+" SET "+string.join([ field+"=%s" for field in dict.keys() ],", ")
+      sqlparams=[ dict[k] for k in dict.keys() ]
 
-    idsql=self.getIdentity()
-    sql=sql+" WHERE "+idsql[0]
-    sqlparams+=idsql[1:]
+      idsql=self.getIdentity()
+      sql=sql+" WHERE "+idsql[0]
+      sqlparams+=idsql[1:]
 
-    ##print "SQL: ", sql
-    ##print "     ", `sqlparams`
-    cursor=self.getView().newCursor()
-    doSql(cursor,sql,sqlparams)
+      ##print "SQL: ", sql
+      ##print "     ", `sqlparams`
+      cursor=self.getView().newCursor()
+      doSql(cursor,sql,sqlparams)
+
     for k in dict.keys():
       cs.misc.IndexedSeqWrapper.__setitem__(self,k,dict[k])
