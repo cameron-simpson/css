@@ -7,22 +7,27 @@
 : ${LOGDIR:=$HOME/var/log}
 
 needhost $HOMEHOST@home || exit 1
-set -x
 cd
 ( fmopts=
   fmdelay=300
   fmhosts='optus.local zip.local'
   case "$LOCATION" in
-    home|sco|tw)
-	fmopts="$fmopts -l 65536" fmdelay=3600 ;;
+    cisra|home) ;;
+    *) fmopts="$fmopts -l 65536" fmdelay=900 ;;
   esac
   set -- -f "$HOME/.fetchmailrc" \
-	  -t 900 \
+	  -t 1800 \
 	  --logfile "$LOGDIR/fetchmail" \
 	  --nobounce --tracepolls --warnings 86400
-  ( fetchmail "$@" -l 65536 $fmopts $fmhosts
+  (
+    set -x
+
+    # fetch and file small items
+    fetchmail "$@" $fmopts -l 65536 $fmhosts
+    lock -1 getmail-despool getmail-flush spool
+
+    # dispatch daemons to regularly fetch and file
     alog procmail lock -1 getmail-despool nice getmail-flush -p 30 spool
-    sleep 60
     acon fetchmail "$@" -d "$fmdelay" $fmopts $fmhosts
   ) &
 )
