@@ -1,0 +1,37 @@
+#!/bin/sh
+#
+# Perform a task and attribute its time to a job.
+# Return to the old job on exit if we haven't already switched.
+#	- Cameron Simpson <cs@zip.com.au> 02jul2003
+#
+
+cmd=$0
+usage="Usage: $cmd job command [args...]"
+
+badopts=
+
+if [ $# = 0 ]
+then
+    echo "$cmd: missing job" >&2
+    badopts=1
+else
+    thisjob=$1; shift
+    [ $# = 0 ] && { echo "$cmd: missing command" >&2; badopts=1; }
+fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+isjob "$thisjob" || { echo "$cmd: unknown job \"$thisjob\"" >&2; exit 2; }
+
+set -x
+lastjob=`job`
+
+job "$thisjob"
+
+"$@"
+xit=$?
+
+[ "x`job`" = "x$thisjob" ] || lastjob=`dfltjob`
+job "$lastjob"
+
+exit $xit
