@@ -5,11 +5,7 @@
 #	- Cameron Simpson <cs@zip.com.au> 29dec2000
 #
 
-case $HOST@$SYSTEMID in
-    ivie@cisra)	;;
-    *)		echo "$0: $HOST@$SYSTEMID: wrong host!" >&2; exit 2 ;;
-esac
-
+needhost amadeus@home || exit 1
 pwd
 set -x
-sh -x freenet_server -transient=yes -informWrite=no
+exec sh -x freenet_server -transient=yes -informWrite=no
