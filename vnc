@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # Wrapper for the vnc programs.
-#	- Cameron Simpson <cs@zip.com.au> 26jul99
+#	- Cameron Simpson <cs@zip.com.au> 26jul1999
 #
 
 depth=24
@@ -29,6 +29,8 @@ case $1 in
 	[ -f "$logf" ] && mv "$logf" "$logf-`daycode`.$$"
 	exec set-x vncserver "$vncnum" -depth "$depth" -geometry "$geom" ${1+"$@"}
 	;;
+    lo:[0-9]*)
+	vncdisp=localhost:`expr "$1" : 'lo:\(.*\)'`; shift ;;
     *:[0-9]*)
 	vncdisp=$1; shift
 	;;
@@ -40,4 +42,5 @@ case $1 in
 	;;
 esac
 
-set-x vncviewer -passwd $HOME/rc/vnc/passwd -shared ${1+"$@"} "$vncdisp"
+set -x
+ignhup vncviewer -passwd $HOME/rc/vnc/passwd -shared ${1+"$@"} "$vncdisp" &
