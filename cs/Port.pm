@@ -22,7 +22,7 @@ tttached to the supplied command.
 
 use strict qw(vars);
 
-BEGIN { use cs::DEBUG; cs::DEBUG::using(__FILE__); }
+##BEGIN { use cs::DEBUG; cs::DEBUG::using(__FILE__); }
 
 use cs::Misc;
 use cs::Sink;
