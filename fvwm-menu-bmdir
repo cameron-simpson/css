@@ -1,0 +1,55 @@
+#!/bin/sh
+#
+# Generate menu for a bookmark directory.
+#	- Cameron Simpson <cs@zip.com.au> 02mar2003
+#
+
+cmd=$0
+usage="Usage: $cmd dir"
+
+badopts=
+
+while :
+do
+  case $1 in
+    --) shift; break ;;
+    -?*)echo "$cmd: unrecognised option: $1">&2
+	badopts=1
+	;;
+    *)	break ;;
+  esac
+  shift
+done
+
+if [ $# = 0 ]
+then
+    echo "$cmd: missing dir" >&2
+    badopts=1
+else
+    dir=$*; shift
+    cd "$dir" || exit 1
+fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+wd=`pwd`
+nd=`basename "$wd"`
+##echo "\"$nd\" Title"
+
+pd=`dirname "$wd"`
+pnd=`basename "$pd"`
+echo "\"<-- $pnd\" PopBmDir $pd"
+
+for bm in *
+do
+  if [ -d "$bm/." ]
+  then
+      echo "\"$bm ->\" PopBmDir \"$wd/$bm\""
+  else
+      exec <"$bm"
+      if read url
+      then echo "\"$bm\" Exec us '$url'"
+      else : echo "\"--$bm--\" Nop"
+      fi
+  fi
+done
