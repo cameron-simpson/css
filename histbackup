@@ -99,9 +99,6 @@ usage="Usage:
 	--no-rsync, --linkonly
 			Don't do the rsync pass - just set up the new link tree
 			and report its basename.
-	--no-copy	Passed to linktree - don't fall back to copying the
-			source file if the link fails (eg to link count
-			overflow).
 	--rsync-path rrsync Execute the command \"rrsync\" as the remote rsync.
 			Passed to rsync.
 	--symlink name	Make a symlink named \"name\" pointing at the latest backup."
@@ -114,7 +111,7 @@ dest=
 mono=
 inplace=
 linkonly=
-ltargs=
+ltargs=--no-copy
 rrsync=rsync
 includefile=
 rsopts=
@@ -135,13 +132,6 @@ do
     # backs up B<I<parent>/current> to B<I<parent>/I<datestamp>>.
     #
     --inplace)	inplace=1 ;;
-
-    # =item --no-copy
-    #
-    # This option is passed to linktree(1).
-    # Normally I<linktree> will fall back to copying a source file if it can't hardlink it.
-    #
-    --no-copy)	ltargs="$ltargs $1" ;;
 
     # =item --no-delete, --mono
     #
