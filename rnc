@@ -1,0 +1,46 @@
+#!/bin/sh
+#
+# Remote netcat.
+#	- Cameron Simpson <cs@zip.com.au> 11jul2004
+#
+
+location=
+keyfile=
+remote=
+target=
+port=
+
+cmd=`basename "$0"`
+usage="Usage: $cmd [-l location] [-i keyfile] remote target port
+	-i keyfile	Specify keyfile to use.
+	-l location	Don't both with remote if \$LOCATION matches this."
+
+badopts=
+
+while :
+do
+  case $1 in
+    -i)	keyfile=$2; shift ;;
+    -l)	location=$2; shift ;;
+    --)	shift; break ;;
+    -?*)echo "$cmd: unrecognised option: $1" >&2; badopts=1 ;;
+    *)	break ;;
+  shift
+done
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+nccmd="exec nc $target $port"
+
+if [ -n "$location" ] && [ "x$location" = "x$LOCATION" ]
+then
+    set sh -c "$nccmd"
+else
+    set -- "$remote" "exec nc $target $port"
+    [ -n "$keyfile" ] && set -- -i "$keyfile" "$@"
+    set -- sshb "$@"
+    [ -n "$keyfile" ] && set -- no-ssh-agent "$@"
+fi
+
+set -x
+exec "$@"
