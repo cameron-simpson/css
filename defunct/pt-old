@@ -1,0 +1,89 @@
+#!/usr/bin/perl
+#
+
+use strict vars;
+
+use cs::Misc;
+use cs::Shell;
+use cs::Hier;
+
+my @args = ('ps','-o','user group pid ppid sid wchan vsz rss args',@ARGV);
+my $shcmd = cs::Shell::quote(@args);
+
+# collect listing
+if (! open(PS," set -x; $shcmd | tee /dev/tty |"))
+{ die "$::cmd: can't pipe from ps: $!\n";
+}
+
+while (<PS>)
+{
+  chomp;
+  s/^\s+//;
+  s/\s+/ /g;
+  my @ps = split(/ /,$_,9);
+  warn "\@ps=[@ps]";
+  my $P = {};
+
+  for my $f (USER,GROUP,PID,PPID,SID,WCHAN,VSZ,RSS,ARGS)
+  { $P->{$f}=shift(@ps);
+  }
+  $P->{_CHILDREN}=[];
+
+  warn "P=".cs::Hier::h2a($P,1);
+
+  $::PS{$P->{PID}}=$P;
+}
+close(PS);
+
+# compute children
+for my $pid (keys %::PS)
+{
+  my $P = $::PS{$pid};
+
+  if (exists $::PS{$P->{PPID}})
+  { my $PP = $::PS{$P->{PPID}};
+    push(@{$PP->{_CHILDREN}}, $pid);
+  }
+}
+
+# print tree
+printf("%7s %7s %5s %5s %5s %11s %5s %5s %s\n",
+	USER,GROUP,PID,PPID,SID,WCHAN,VSZ,RSS,ARGS);
+
+for my $pid (sort { $a <=> $b } keys %::PS)
+{ my $P = $::PS{$pid};
+  if (! $P->{_PRINTED}
+   && ! exists $::PS{$P->{PPID}}
+     )
+  { pstree($pid);
+  }
+}
+
+sub pstree($;$)
+{ my($pid,$indent)=@_;
+  $indent=0 if ! defined $indent;
+
+  my $P=$::PS{$pid};
+
+  printf("%7s %7s %5d %5d %5d %11s %5d %5d ",
+	$P->{USER},
+	$P->{GROUP},
+	$P->{PID},
+	$P->{PPID},
+	$P->{SID},
+	$P->{WCHAN},
+	$P->{VSZ},
+	$P->{RSS});
+
+  if ($indent > 0)
+  { if ($indent > 2)
+    { print " " x ($indent-2);
+    }
+    print "\\_ ";
+  }
+  print $P->{ARGS}, "\n";
+
+  for my $subpid (sort { $a <=> $b } @{$P->{_CHILDREN}})
+  { pstree($subpid,$indent+2);
+  }
+}
