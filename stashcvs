@@ -1,0 +1,20 @@
+#!/bin/sh
+#
+# Snapshot my cvs archive.	- Cameron Simpson <cs@zip.com.au> 18may1997
+#
+
+save=$HOME/private/backup/cvs/$daycode.tar.gz
+
+[ -f "$save" ] && { echo "$0: $save already exists" >&2
+		    ls -ld "$save" >&2
+		    exit 1
+		  }
+
+[ -d "$CVSROOT" ] || { echo "$0: no $CVSROOT" >&2
+		       exit 1
+		     }
+
+cd "$CVSROOT/.." || exit $?
+
+set -x
+tar cvf - `basename "$CVSROOT"` | gzip -v -9 >"$save"
