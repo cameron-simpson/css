@@ -1,0 +1,172 @@
+#!/usr/bin/perl
+#
+# Merge files into named dir.
+# A bit like move, but won't tread on existing files and will unlink
+# source if identical target is already there.
+# Makes the target directory if missing.
+#	- Cameron Simpson <cs@zip.com.au>
+#
+
+use cs::Misc;
+use cs::Upd;
+use cs::Pathname;
+use POSIX;
+use Getopt::Std;
+use File::Compare;
+use File::Copy;
+
+($CMD=$::cmd) =~ tr/a-z/A-Z/;
+$usage="Usage: $::cmd [-nft] dir [files...]
+	-n	No remove of original.
+	-f	Make target directory if missing.
+	-t	Touch moved files.
+";
+
+$badopts=0;
+
+$MkDir=0;
+$NoRemove=0;
+$Touch=0;
+undef $mungefile;
+unshift(@ARGV,grep(length,split(/\s/,$ENV{MRGOPTS}))) if exists $ENV{MRGOPTS};
+getopts('nft') || ($badopts=1);
+$MkDir=1 if $opt_f;
+$NoRemove=1 if $opt_n;
+$Touch=1 if $opt_t;
+
+if (@ARGV)
+	{ $::Dir=shift(@ARGV);
+	}
+else	{ warn "$::cmd: missing dir\n";
+	  $badopts=1;
+	}
+
+die $usage if $badopts;
+
+! $MkDir || -d "$::Dir/." || mkdir($::Dir,0777) || die "$::cmd: mkdir($::Dir): $!\n";
+
+$mungefile="$::Dir/.${::cmd}rc" if ! defined $mungefile;
+if (! -r $mungefile && defined($ENV{$CMD.RC}))
+	{ $mungefile=$ENV{$CMD.RC};
+	}
+
+if (-r $mungefile)
+	{ open(MUNGE,"< $mungefile\0") || die "can't open $mungefile";
+	  $munge=join('',<MUNGE>);
+	  close(MUNGE);
+	}
+else	{ $munge='';
+	}
+
+eval 'sub munge { local($_)=@_; '.$munge.'; $_; }';
+die "$::cmd: $mungefile: $@" if $@;
+
+if (! @ARGV)
+	{ while (defined ($_=<STDIN>))
+		{ chomp;
+		  mrg($::Dir,$_);
+		}
+	}
+else
+{ for (@ARGV)
+	{ mrg($::Dir,$_);
+	}
+}
+
+sub mrg
+	{ local($::Dir,$file)=@_;
+
+	  local($_)="$::Dir/".munge(cs::Pathname::basename($file));
+
+	  my $motion = "$file -> $_";
+	  out($motion);
+
+	  my($pass)=0;
+
+	  if (! stat($file))
+		{ warn "$::cmd: $file: $!\n";
+		}
+	  elsif (! -f _)
+		{ warn "$::cmd: $file: not a file!\n";
+		}
+	  elsif (stat($_))
+		{ if (! -f _)
+			{ warn "$::cmd: $_: not a file!";
+			}
+		  else
+		  # target exists, compare
+		  { my($cmp);
+
+		    $cmp=compare($_,$file);
+		    if (! defined $cmp)
+			{ warn "cmp gives undef";
+			}
+		    elsif ($cmp == 0)
+			{ $motion.=": identical";
+			  out($motion);
+
+			  if ($NoRemove)
+				{ }
+			  elsif (unlink($file))
+				{ $motion.=", unlinked($file)";
+				}
+			  else
+			  { $motion.=", unlink($file): $!"
+			  }
+			}
+		    else
+		    { $motion.=" differ";
+		    }
+		  }
+		}
+	  # no target, move current into new place
+	  elsif (mv($file,$_))
+		{ $motion.=($NoRemove ? ", linked" : ", moved");
+		}
+	  else
+	  # mv will have complained
+	  { }
+
+	  nl($motion);
+	}
+
+sub mv	{ my($a,$b)=@_;
+	  my($ok)=0;
+
+	  if (-e $b)
+		{ warn "$::cmd: $b: already exists\n";
+		}
+	  elsif (link($a,$b))
+		{ $ok=1;
+		  if ($NoRemove)
+			{}
+		  elsif (unlink($a))
+			{}
+		  else
+		  { warn "$::cmd: warning: mv($a,$b): unlink($a): $!\n";
+		  }
+		}
+	  elsif ($! == EXDEV)
+		{ if (! -f $a)
+			{ warn "$::cmd: $a: not a file\n";
+			}
+		  elsif (copy($a,$b))
+			{ $ok=1;
+			  unlink($a) || warn "$::cmd: unlink($a): $!\n";
+			}
+		  else
+		  { warn "$::cmd: copy($a,$b): $!\n";
+		    unlink($b) || warn "$::cmd: unlink($b): $!\n";
+		  }
+		}
+	  else
+	  { warn "$::cmd: link($a,$b): $!\n";
+	  }
+
+	  if ($ok && $Touch)
+	  { my $now=time;
+	    utime($now,$now,$b) || warn "$::cmd: utime($b): $!\n";
+	  }
+
+	  $ok;
+	}
