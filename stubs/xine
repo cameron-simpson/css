@@ -1,5 +1,5 @@
 #!/bin/sh
 
-xine=/usr/bin/xine	## /opt/xine/bin/xine
+xine=/usr/bin/xine	# /opt/xine/bin/xine
 
 exec set-x "$xine" -A null ${1+"$@"}
