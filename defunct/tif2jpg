@@ -1,0 +1,108 @@
+#!/bin/sh
+#
+# - Cameron Simpson <cs@zip.com.au>
+#
+
+usage="Usage: $0 [-f] [-r] [files...]
+	-f	Force overwrite.
+	-r	Recurse.
+	-x	Trace.
+	+x	No trace."
+
+badopts=
+flags=
+fflag=
+recurse=
+trace=
+while :
+do  case "$1" in
+	-f)	fflag=1; flags="$flags $1" ;;
+	-r)	recurse=1 ;;
+	-x)	trace=set-x flags="$flags $1" ;;
+	+x)	trace= flags="$flags $1" ;;
+	--)	shift; break ;;
+	-?*)	echo "$0: unrecognised option: $1" >&2; badopts=1 ;;
+	*)	break ;;
+    esac
+    shift
+done
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+if [ $recurse ]
+then
+    find ${1+"$@"} ${1-.} -type f -print \
+    | sort \
+    | xxargs "$0" $flags --
+    exit $?
+fi
+
+[ $# = 0 ] && { case $0 in
+		    *bmp2jpg)	set x *.bmp ;;
+		    *pnm2jpg)	set x *.pnm ;;
+		    *jpg2pnm)	set x *.jpg ;;	# implemented through a hack
+		    *tif2jpg)	set x *.tif *.tiff ;;
+		    *gif2jpg)	set x *.gif ;;
+		    *png2jpg)	set x *.png ;;
+		esac
+		shift
+	      }
+
+tmp=/tmp/t$$
+xit=0
+
+for img
+do
+    [ -s "$img" ] || continue
+    case "$img" in
+	*-small.gif) continue ;;	# thumbnail, ignore
+	*.gif)	j=`exec expr "x$img" : 'x\(.*\).gif'`.jpg ;;
+	*.tif)	j=`exec expr "x$img" : 'x\(.*\).tif'`.jpg ;;
+	*.tiff)	j=`exec expr "x$img" : 'x\(.*\).tiff'`.jpg ;;
+	*.pnm)	j=`exec expr "x$img" : 'x\(.*\).pnm'`.jpg ;;
+	*.png)	j=`exec expr "x$img" : 'x\(.*\).png'`.jpg ;;
+	*.bmp)	j=`exec expr "x$img" : 'x\(.*\).bmp'`.jpg ;;
+	*)	continue ;;
+    esac
+    necho "$img -> $tmp" >&2
+    case "$img" in
+	*.bmp)	$trace cjpeg <"$img" >"$tmp" ;;
+	*.tiff|*.tif)	$trace tifftopnm < "$img" | $trace cjpeg >"$tmp" ;;
+	*.pnm)	$trace cjpeg < "$img" > "$tmp" ;;
+	*.png)	$trace pngtopnm < "$img" | $trace cjpeg > "$tmp" ;;
+	*)	$trace cjpeg < "$img" > "$tmp" ;;
+    esac
+    if [ $? != 0 ]
+    then
+	rm -f "$tmp"
+	xit=1
+    else
+	s1=`fls '%s' "$img"`
+	s2=`fls '%s' "$tmp"`
+	if [ -n "$fflag" ] \
+	|| [ ! -s "$j" -a $s1 -gt $s2 ]
+	then
+	    necho " -> $j" >&2
+	    cat "$tmp" > "$j" && rm -f "$tmp" "$img" && echo >&2 \
+		|| xit=$?
+	else
+	    if [ $s1 -le $s2 ]
+	    then
+	      necho ", bigger ($s1 -> $s2), $j not made" >&2
+	      rm -f "$tmp" && echo >&2 || xit=1
+	    else
+	      if cmp "$tmp" "$j"
+	      then
+		necho ", same as $j; $img removed" >&2
+		rm -f "$tmp" "$img" && echo >&2 || xit=$?
+	      else
+		necho "$tmp and $j differ, discarding $tmp, $img remains" >&2
+		rm -f "$tmp" && echo >&2
+		xit=1
+	      fi
+	    fi
+	fi
+    fi
+done
+
+exit $xit
