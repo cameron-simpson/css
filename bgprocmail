@@ -1,0 +1,15 @@
+#!/bin/sh
+#
+# Copy input, run procmail in the background.
+#	- Cameron Simpson <cs@zip.com.au> 05may2002
+#
+
+wkdir=$HOME/private/tmp
+wk=$wkdir/bgprocmail$$
+
+[ -f "$wk" ] && { echo "$0: $wk exists" >&2; exit 1; }
+cat >"$wk" || { rm -f "$wk"; exit 1; }
+
+ignhup sh -c "procmail <'$wk' && rm '$wk'" || { rm -f "$wk"; exit 1; }
+
+exit 0
