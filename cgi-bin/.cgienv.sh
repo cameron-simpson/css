@@ -18,7 +18,14 @@ case "$wd" in
 	;;
     /home/cameron/*)
 	;;
-    /home/zapff/cameron/* | /a/zapff/home/cameron/* | /home/kaper/cameron/* | /a/kaper/home/cameron/* )
+    /home/virtual/site76/fst/var/www/cgi-bin)
+	ARCH=redhat.x86.linux
+	SYSTEMID=ezos
+	HOME=$DOCUMENT_ROOT/cs
+	wdscripts=$HOME/scripts
+	;;
+
+    /home/kaper/cameron/* | /a/kaper/home/cameron/* )
 	ARCH=redhat.x86.linux
 	SYSTEMID=cisra
 	HOME=/u/cameron
