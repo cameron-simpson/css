@@ -7,8 +7,18 @@
 echo "\"Hi\" PopHiMenu"
 echo "\"\" Nop"
 
-while read title && read url
+exec <$HOME/rc/urlmap
+while read title && read url shcmd
 do
-  echo "\"$title\" Exec us $url"
-done <$HOME/rc/urlmap \
+  doqcmd=
+  [ -n "$shcmd" ] && { shcmd="; $shcmd" doqcmd=1; }
+  case "$url" in
+    *[^a-zA-Z0-9:/.]*)	qurl=`shqstr "$url"` doqcmd=1 ;;
+    *)			qurl=$url ;;
+  esac
+  shcmd="us $qurl $shcmd"
+  [ $doqcmd ] && shcmd=`shqstr "$shcmd"`
+  echo "\"$title\" Exec sh -c $shcmd"
+done \
+| tee $CONSOLE \
 | sort -d
