@@ -1,0 +1,188 @@
+#!/usr/bin/perl
+#
+# Convert mod.recipes/alt.gourmand recipes source to HTML.
+#	- Cameron Simpson <cs@zip.com.au> 17may95
+#
+
+$usemetric=1;	# preference
+$usecelcius=1;	# preference
+%macro=(
+	RH => \&RH,
+	RZ => \&RZ,
+	IH => \&IH,
+	IG => \&IG,
+	SK => \&SK,
+	PH => \&PH,
+	NX => \&NX,
+	WR => \&WR,
+	PP => \&PP,
+	SH => \&SH,
+	TE => \&TE,
+	IR => \&IR,
+	AB => \&AB,
+	IB => \&IB,
+	I  => \&I,
+	B => \&B,
+	'sp' => \&sp,
+       );
+
+$didhdr=0;
+
+while (<STDIN>)
+	{ chomp;
+	  $rc_line=$_;
+
+	  if (/^\.\s*(\S\S?)\s*/)
+		{ $dir=$1; $args=$';
+		  @args=&args($args);
+
+		  if (defined $macro{$dir})
+			{ &{$macro{$dir}}(@args);
+			}
+		  else
+		  { print STDERR "line $.: can't handle macro .$dir: ignoring $_\n";
+		  }
+		}
+	  else
+	  { &needhdr;
+	    print &mkhtml($_), "\n";
+	    print "<BR>\n" if $nofill;
+	  }
+	}
+
+exit 0;
+
+sub args
+	{ local($_)=@_;
+	  my(@args);
+
+	  while (length)
+		{ s/^\s+//;
+		  if (/^'([^']*)'/
+		   || /^"([^"]*)"/)
+			{ push(@args,$1);
+			  $_=$';
+			}
+		  elsif (/^\S+/)
+			{ push(@args,$&);
+			  $_=$';
+			}
+		}
+
+	  for (@args)
+		{ $_=&mkhtml($_); }
+
+	  @args;
+	}
+
+sub nohdr
+	{ if ($didhdr)
+		{ print STDERR "line $.: header already printed\n";
+		}
+	}
+
+sub needhdr
+	{ if (! $didhdr)
+		{ my($title)="$rc_key($rc_class) - $rc_name - $rc_source - $rc_date";
+		  print "<TITLE>$title</TITLE>\n";
+		  &H1("$rc_key($rec_class) - $rc_name");
+		  print "$rc_name - $rc_desc\n";
+		  &P;
+		  $didhdr=1;
+		}
+	}
+
+sub mkhtml
+	{ local($_)=@_;
+	  my($sofar,$code,$match);
+
+	  while (/\\\*?(\\|\(..|[^\\\(])/)
+		{ $code=$1;
+		  $sofar.=$`;
+		  $match=$&;
+		  $_=$';
+
+		  if ($code eq '\\')	{ $sofar.='\\'; }
+		  elsif ($code eq '(12'){ $sofar.="&frac12;"; }
+		  elsif ($code eq '(14'){ $sofar.="&frac14;"; }
+		  elsif ($code eq '(34'){ $sofar.="&frac34;"; }
+		  elsif ($code eq '(em'){ $sofar.="&mdash;"; }
+		  elsif ($code eq '(de'){ $sofar.="&deg;"; }
+		  elsif ($code eq '(mu'){ $sofar.="&mu;"; }
+		  elsif ($code eq '-')
+			{ $sofar.=$code;
+			}
+		  else
+		  { print STDERR "line $.: unknown code \"$match\"\n";
+		    $sofar.=$match;
+		  }
+		}
+
+	  $_=$sofar.$_;
+
+	  s/&/&amp;/g;
+	  s/</&lt;/g;
+	  s/>/&gt;/g;
+
+	  $_;
+	}
+
+sub RH	{ &nohdr(); ($rc_source,$rc_key,$rc_class,$rc_date,$rc_year)=@_; }
+sub RZ	{ &nohdr(); ($rc_name,$rc_desc)=@_; }
+sub IH	{ &needhdr;
+	  my($serves)=@_;
+	  &H1("INGREDIENTS ($serves)");
+	}
+sub IG	{ &needhdr;
+	  &inDL;
+	  my($imperial,$ingredient,$metric)=@_;
+	  print "<DT>",
+		join(' ',
+			grep(length,
+			    $usemetric
+			    ? ($metric, length($imperial) ? "($imperial)" : '')
+			    : ($imperial, length($metric) ? "($metric)" : '')
+			    )
+		    ),
+		"\n";
+	  print "<DD><I>$ingredient</I>\n";
+	}
+sub SK	{ &inDL;
+	  my($step)=@_;
+	  print "<DT>($step)<DD>\n";
+	}
+sub PH	{ &H1("PROCEDURE @_"); }
+sub NX	{ &H1("NOTES"); }
+sub WR	{ &H1("CONTRIBUTOR"); $nofill=1; }
+sub IR	{ print "<I>$_[0]</I>$_[1]\n"; }
+sub SH	{ &H1("@_"); }
+sub AB	{ my($imperial,$metric,$blah)=@_;
+	  print $usemetric ? $metric : $imperial;
+	  print " $blah" if length $blah;
+	  print "\n";
+	}
+sub TE	{ my($fahr,$cels,$blah)=@_;
+	  print $usecelcius ? "$cels&deg;C" : "$fahr&deg;F";
+	  print " $blah" if length $blah;
+	  print "\n";
+	}
+
+sub IB	{ my($rec,$cr)=@_;
+	  print "<A HREF=".lc($rec).".html>$rec</A> $cr\n";
+	}
+sub H1	{ &outDL; print "<H1>@_</H1>\n"; }
+sub P	{ print "<P>\n"; }
+sub PP	{ print "<P>\n"; }
+sub I	{ print "<I>@_<\I>\n"; }
+sub B	{ print "<B>@_<\B>\n"; }
+sub sp	{ print "<PRE>\n</PRE>\n"; }
+sub inDL{ if (! $inDL)
+		{ print "<DL>\n";
+		  $inDL=1;
+		}
+	}
+sub outDL{ if ($inDL)
+		{ print "</DL>\n";
+		  $inDL=0;
+		}
+	 }
