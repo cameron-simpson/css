@@ -99,7 +99,10 @@ do
     r=
     for rroot in $archopt $commonopt
     do  for subdir in $subdirs
-	do  r=$rroot/$subdir/$thing
+	do  case "$subdir" in
+		.|'')	r=$rroot/$thing ;;
+		*)	r=$rroot/$subdir/$thing ;;
+	    esac
 	    { test -f "$r" || test -d "$r/."; } \
 	    && break
 	    r=
