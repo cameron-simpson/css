@@ -5,14 +5,14 @@
 #
 
 cmd=$0
-usage="Usage: $cmd [-u] [statefile]"
+usage="Usage: $cmd [-f] [statefile]"
 
 statefile=
-unlock=
+force=1
 
 badopts=
 
-[ "x$1" = x-u ] && { unlock=1; shift; }
+[ "x$1" = x-f ] && { force=1; shift; }
 
 [ $# = 0 ] || { statefile=$1; shift; }
 
@@ -22,17 +22,8 @@ badopts=
 
 [ -n "$statefile" ] || statefile=`gpg-agent-statefile` || exit 1
 
-# force unlock
-[ $unlock ] && ( set -x; unlock -f "$statefile" )
-
-export statefile
+# bail if we've already got an agent
+[ -z "$force" ] && eval `get-gpg-agent "$statefile"` && exit 0
 
 unset GPG_AGENT_INFO
-
-exec \
-  lock -1 -a "$statefile" \
-  rmthen -f "$statefile" \
-  set-x \
-  gpg-agent \
-  sh -c 'stash-gpg-agent "$statefile"; exec pause' \
-  </dev/null
+exec gpg-agent --daemon >"$statefile"
