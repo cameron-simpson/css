@@ -7,16 +7,34 @@
 use cs::Misc;
 use cs::Upd;
 use cs::Units;
+use Getopt::Std;
 
 sub copyout($;$);
 
-$::Xit=0;
 $::BSize=65536;
+$::Type=BINARY;
+$::Units=CHAR;
 
-if (@ARGV > 1 && $ARGV[0] eq '-b')
-{ $::BSize=$ARGV[1]+0;
-  shift(@ARGV);
-  shift(@ARGV);
+$::Usage="Usage: $::cmd [-b iosize] [-BDlc] [files...]
+	-b iosize	Read/write buffer size. Default: $::BSize
+	-B		Use \"binary\" units (default).
+	-D		Use \"decimal\" units.
+	-c		Count characters (default).
+	-l		Count lines.
+";
+
+$::Xit=0;
+
+{ my $badopts=0;
+  my %opt;
+  getopts('b:BDcl',\%opt) || ($badopts=1);
+  if (defined $opt{'b'})	{ $::BSize=$opt{'b'}+0; }
+  if (defined $opt{'B'})	{ $::Type=BINARY; }
+  if (defined $opt{'D'})	{ $::Type=DECIMAL; }
+  if (defined $opt{'c'})	{ $::Units=CHAR; }
+  if (defined $opt{'l'})	{ $::Units=LINE; }
+
+  die $::Usage if $badopts;
 }
 
 if (! @ARGV)
@@ -41,6 +59,12 @@ for my $f (@ARGV)
 
 exit $::Xit;
 
+sub human($;$)
+{ my($n,$t)=@_;
+  $t=$::Type if ! defined $t;
+  return scalar( $t eq BINARY ? cs::Units::bytes2human($n,1) : cs::Units::num2human($n,1) );
+}
+
 sub copyout($;$)
 { my($FILE,$file)=@_;
 
@@ -61,18 +85,46 @@ sub copyout($;$)
   my $sofar = 0;
   my $now;
 
-  my($Bps,$pcnt,$eta);
+  my($thruput,$pcnt,$eta);
 
   READ:
   while (defined($n=sysread($FILE,$_,$::BSize)) && $n > 0)
   { 
-    $sofar+=$n;
-    if (($now=time) > $start)
-    { $elapsed=$now-$start;
-      $Bps=cs::Units::bytes2human($sofar/$elapsed,1)."/s";
+    # chuck the data out the back as early as possible
+    WRITE:
+    for ($off=0; $off<length; $off+=$n)
+    { $n=syswrite(STDOUT,$_,length($_)-$off,$off);
+      if (! defined $n)
+      { warn "$::cmd: write error on stdout: $!\n";
+	return 0;
+      }
+    }
+    # and _then_ report throughput
+
+    if ($::Units eq CHAR)
+    { $sofar+=$n;
+    }
+    elsif ($::Units eq LINE)
+    {
+      my $off=0;
+      LOOP:
+      while (1)
+      { $off=index($_,"\n",$off);
+	last LOOP if $off < 0;
+	$sofar++;
+	$off++;
+      }
     }
     else
-    { $Bps='';
+    { die "$::cmd: unsupported units \"$::Units\"\n";
+    }
+
+    if (($now=time) > $start)
+    { $elapsed=$now-$start;
+      $thruput=human($sofar/$elapsed,1)."/s";
+    }
+    else
+    { $thruput='';
     }
 
     if (defined $size && $size > 0)
@@ -86,29 +138,24 @@ sub copyout($;$)
     }
     else
     { $pcnt='';
-      $eta=sprintf("Data: %4s",scalar(cs::Units::bytes2human($sofar,1)));
+      $eta=sprintf( ($::Units eq CHAR ? "Bytes: %4s" : "Lines: %4s"), human($sofar) );
     }
-    out( (defined $file ? "$file: " : '').sprintf("%6s %4s %s",$Bps,$pcnt,$eta) );
-
-    WRITE:
-    for ($off=0; $off<length; $off+=$n)
-    { $n=syswrite(STDOUT,$_,length($_)-$off,$off);
-      if (! defined $n)
-      { warn "$::cmd: write error on stdout: $!\n";
-	return 0;
-      }
-    }
+    out( (defined $file ? "$file: " : '').sprintf("%6s %4s %s",$thruput,$pcnt,$eta) );
   }
 
   if (($now=time) > $start)
   { $elapsed=$now-$start;
-    $Bps=cs::Units::bytes2human($sofar/$elapsed,1)."/s";
+    $thruput=cs::Units::bytes2human($sofar/$elapsed,1)."/s";
   }
   else
-  { $Bps='';
+  { $thruput='';
   }
   out('');
-  nl( (defined $file ? "$file: " : '').sprintf("%6s Size: %s Time: %s",$Bps,scalar(cs::Units::bytes2human($sofar,1)),scalar(cs::Units::sec2human($elapsed))) );
+  nl( (defined $file ? "$file: " : '')
+     .sprintf("%6s Size: %s Time: %s",
+		$thruput,human($sofar),scalar(cs::Units::sec2human($elapsed))
+	     )
+    );
 
   if (! defined $n)
   { warn "$::cmd: read error: $!\n";
