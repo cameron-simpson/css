@@ -51,4 +51,5 @@ esac
 maxx=$1; shift
 maxy=$1; shift
 
+set -x
 eval "$topnm"' ${1+"$@"} | pnmscale -xysize "$maxx" "$maxy" | '"$out"
