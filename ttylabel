@@ -52,15 +52,7 @@ esac
 [ $# = 0 ] && { set x "$TTYLABEL"; shift; }
 
 # clean the string up a bit
-## label=`echo "$*" | tr -s '\012\015\033' '  \['`
-##
-## broken in two because of bash bug on linux
-perlfunc='$_=shift;
-          y/\012\015\033/  [/;
-          s/\s+/ /g;
-          $_=substr($_,$[,79) if length > 79;
-          print'
-label=`perl -e "$perlfunc" -- "$*"`
+label=`echo $* | tr -s ' \011\012\015\033' '    \['`
 
 ttylabel=
 [ -n "$_start_title" ] && ttylabel=$ttylabel$_start_title$label$_end_title
