@@ -1,0 +1,6 @@
+#!/bin/sh
+
+[ $# = 0 ] && { echo "$0: missing type" >&2; exit 2; }
+type=$1; shift
+
+exec aptally $type ${1+"$@"} >.ap-$type
