@@ -9,7 +9,7 @@ usage="Usage: $cmd [-f] [-p shellpid] [-i interval] [cmd [args...]]"
 
 force=
 shellpid=$$
-period=${RXVTBGINTERVAL:-300}
+period=${RXVTBGINTERVAL:-60}
 
 badopts=
 while :
@@ -43,9 +43,9 @@ then
     RXVTBGLOG=`rxvtbglog`
     export RXVTBGLOG
     (
-      while kill -0 "$shellpid" && { [ $force ] || wantrxvtbg; }
-      do  rawx lock setrxvtbg nice setrxvtbg -l "$RXVTBGLOG"
-	  sleep "$period" || exit 1
+      while kill -0 "$shellpid"
+      do  rawx lock "setrxvtbg@$HOST" nice setrxvtbg -l "$RXVTBGLOG"
+	  sleep "$period" || break
       done
     ) &
 fi
