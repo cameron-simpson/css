@@ -111,20 +111,13 @@ do
 	  *[A-Z]*) lcf=`echo "$f" | tr '[A-Z]' '[a-z]'` ;;
 	  *)	   lcf=$f ;;
       esac
-      case "$lcf" in
-	  *.xpm|*.gif)
-	      thfmt=xpm ;;
-	  *.png|*.jpg)
-	      thfmt=png ;;
-	  *)  continue ;;
-      esac
 
-      thumb=$thdir/$fbase.$thfmt
+      thumb=$thdir/$fbase.png
       fthumb=$d/$thumb
-      if [ -s $fthumb ]
+      if [ -s "$fthumb" ]
       then echo  "\"%$fthumb%$tag\" Exec $imop $f"
       else echo  "\"$tag\" Exec $imop $f"
-           echo "$thfmt $f" >&3	# to the thumb maker ...
+           echo "$f" >&3	# to the thumb maker ...
       fi ## | tee -a $HOME/imlist.out
     fi
 done
@@ -134,17 +127,9 @@ exec 1>&2
 (
   exec <"$thumblist"
   rm -f "$thumblist"
-  while read thfmt f
+  while read f
   do
-    d=`dirname "$f"`
-    ( cd "$d" || exit 1
-      [ -d "$thdir/." ] || mkdir -p "$thdir" || exit 1
-
-      f=`basename "$f"`
-      thumb=$thdir/$f.$thfmt
-      [ -s "$thumb" ] && exit 0
-      exec lock mkthumb "mk$thfmt" -o "$thumb" "$thsize" "$f"
-    )
+    mkthumb "$f"
   done
 ) &
 renice +10 -p $! >/dev/null 2>&1
