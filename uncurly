@@ -1,0 +1,49 @@
+#!/bin/sh
+#
+# Replace {foo} with $foo in the specified file, for a specified
+# list of "foo".
+#	- Cameron Simpson <cs@zip.com.au> 27may2001
+#
+
+cmd=$0
+usage="Usage: $cmd varlist [files...]
+	varlist	A single argument with a space separated list of
+		environment variables to insert."
+
+badopts=
+
+if [ $# = 0 ]
+then
+  echo "$cmd: missing varlist" >&2
+  badopts=1
+else
+  varlist=$1; shift
+fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+[ $# = 0 ] && set x -; shift
+
+xit=0
+
+first=1
+for file
+do  
+  if [ $first ]
+  then
+      first=
+      # reset arg list now we've set the loop running
+      set x; shift
+      for var in $varlist
+      do  eval "val=\$$var"
+	  set x -e "s{$var}$valg"; shift
+      done
+  fi
+
+  if [ "x$file" = x- ]
+  then  sed ${1+"$@"}		|| xit=1
+  else  bsed ${1+"$@"} "$file"	|| xit=1
+  fi
+done
+
+exit $xit
