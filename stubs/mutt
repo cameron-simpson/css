@@ -7,7 +7,7 @@
 	   }
 
 # flush alert window when I read my important email
-[ "x$*" = 'x-f +attn' ] && { alert ''; alert ''; alert ''; }
+[ "x$*" = 'x-f +attn' ] && { clear | alert; }
 
 case "$TERM" in
     xterm)
