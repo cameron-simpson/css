@@ -22,7 +22,7 @@ for ready conversion to other useful formats.
 
 use strict qw(vars);
 
-BEGIN { use cs::DEBUG; cs::DEBUG::using(__FILE__); }
+##BEGIN { use cs::DEBUG; cs::DEBUG::using(__FILE__); }
 
 use cs::Pathname;
 use cs::Source;
