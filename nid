@@ -1,0 +1,11 @@
+#!/bin/sh
+
+file=//white/sys/ns/ns_list
+case $1 in
+    -f)	file=$2; shift; shift ;;
+esac
+
+for nid
+do
+    grep -i "$nid" "$file"
+done
