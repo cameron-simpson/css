@@ -1,0 +1,240 @@
+#!/usr/bin/perl
+#
+# Mail reader.
+#	- Cameron Simpson <cs@zip.com.au>
+#
+
+use cs::VDis;
+use cs::Browse::MBox;
+
+($cmd=$0) =~ s:.*/::;
+
+$Xit=0;
+
+$M=new cs::Browse::MBox '.';
+
+@Keys=$M->Keys();
+warn "keys=[@Keys]\n";
+die "$cmd: no mail\n" unless @Keys;
+
+$V=curses();
+die "$cmd: can't attach to display: $!" if ! defined $V;
+
+$Pos=$#Keys;
+$Top=max(0,$Pos-$Rows+1);
+
+$M->Visit($V);
+
+exit $Xit;
+
+#################
+
+sub browseMBox
+	{
+	  TOC();
+	  $V->Sync();
+
+	  local($Done,$Count)=(0,0);
+
+	  my($c);
+	  my($onkey)={
+			'v'	=> sub { &browseItem($Keys[$Pos]); },
+			'q'	=> sub { $Done=1; },
+		     };
+
+	  KEY:
+	    while (! $Done && defined ($c=getkey()))
+		{ if (defined $onkey->{$c})
+			{ &{$onkey->{$c}}();
+			}
+		  else
+		  { $V->Bell();
+		  }
+		}
+	}
+
+sub browseItem
+	{ my($item)=shift;
+	  my($s);
+
+	  if (! defined ($s=new cs::Source PATH, $item)
+	   || ! defined ($s=new cs::MIME::Source $s))
+		{ return "can't view item $item";
+		}
+
+	  if (0 && $s->{TYPE} eq MULTIPART)
+		{ browseMultiPart($s);
+		}
+	  else
+	  { 
+	  }
+
+	  undef;
+	}
+
+sub getkey
+	{ local($_);
+
+	  return $_ if sysread(STDIN,$_,1);
+
+	  undef;
+	}
+
+# resolve folder or item reference
+sub resolve
+	{ local($_)=shift;
+	  my($item)='';
+
+	  if (! defined || ! length)
+		{ $_='.';
+		}
+	  elsif (/^\+/)
+		{ $_=$ENV{MAILDIR}."/$'";
+		}
+
+	  if (/:([^\/]*)$/)
+		{ $item=$1; $_=$`;
+		}
+
+	  my($F);
+
+	  if (/^[-\w]+(\.[-\w]+)+$/)
+		# newsgroup
+		{ $F=new cs::NNTP::Group $_;
+		}
+	  else
+	  # mail folder
+	  { $F=new cs::Mail::Folder $_;
+	  }
+
+	  ($F,$item);
+	}
+
+sub attachIndex
+	{ my($fname)=shift;
+	  $Index=tie(%Index,FlatHash,$fname);
+	}
+
+sub Keys
+	{ sort { $a <=> $b } keys %Index;
+	}
+
+sub min	{ $_[0] < $_[1] ? $_[0] : $_[1] }
+sub max	{ $_[0] > $_[1] ? $_[0] : $_[1] }
+
+sub curses
+	{ my($v);
+
+	  ($v=new cs::VDis) || return undef;
+
+	  # will be cleaned up automatically by cs::VDis::DESTROY
+	  cs::VDis::echo(0);
+	  cs::VDis::icanon(0);
+
+	  ($Cols,$Rows)=(80,60); # ($Cols,$Rows)=$V->Size();
+
+	  $v;
+	}
+
+sub TOC
+	{ my($i,$k,$m,$line,$h);
+
+	  $V->NewPage;
+
+	  # err("Index=",Hier::h2a(\%Index),"\n");
+
+	  Row:
+	    for $i ($Top..$Top+$Rows-1)
+		{ last Row if $i > $#Keys;
+		  TOC_Row($i);
+		}
+
+	  TOC_Mark();
+	}
+
+sub TOC_Unmark{TOC_Mark(' ');}
+sub TOC_Mark
+	{ my($mark)=@_;
+	  $mark='>' if ! defined $mark;
+
+	  $V->Move(0,$Pos-$Top);
+	  $V->Out($mark);
+	}
+sub TOC_Row
+	{ my($i)=shift;
+	  my($k,$m,$h,$line);
+
+	  $k=$Keys[$i];
+	  $m=$Index{$k};
+	  $h=Hdrs($m);
+
+	  $line=sprintf(" %5d %s",$i,$h->Hdr('subject'));
+
+	  # nl($line);
+
+	  $V->Move(0,$i-$Top);
+	  $V->Out($line);
+	}
+
+sub Save{ my($m)=shift; $Index->Upd($m->{KEY}); }
+sub Hdrs
+	{ my($m)=shift;
+
+	  if (! defined $m->{Hdrs})
+		{ $m->{Hdrs}=new cs::RFC822;
+
+		  my($s)=dsOpen($m->{KEY});
+		  if ($s)
+			{ $m->{Hdrs}->SourceExtract($s);
+			}
+
+		  Save($m);
+		}
+
+	  $m->{Hdrs};
+	}
+
+sub dsOpen
+	{ my($f)=shift;
+	  my($F);
+	  my($s);
+
+	  $F=IO::newHandle();
+
+	(
+	   (-r $f && defined ($s=(new cs::Source PATH, $f)))
+	|| (-r "$f.gz" && open($F,"gunzip <$f.gz |")
+		       && defined ($s=(new cs::Source FILE, $F)))
+	|| (-r "$f.Z" && open($F,"uncompress <$f.Z |")
+		       && defined ($s=(new cs::Source FILE, $F)))
+	) ? $s : undef;
+	}
+
+sub key2ndx
+	{ my($k)=shift;
+	  my($ndx);
+	  my($low,$high,$mid);
+
+	  $low=0;
+	  $high=$#Keys;
+	  $mid=int(($low+$high)/2);
+
+	  Key:
+	    while ($high > $low)
+	  	{ if ($Key[$mid] lt $k)
+			{ $low=$mid+1; }
+		  elsif ($Key[$mid] gt $k)
+			{ $high=$mid-1; }
+		  else
+		  # must match!
+		  { return $mid; }
+
+	  	  $mid=int(($low+$high)/2);
+		}
+
+	  if ($high == $low && $Key[$low] eq $k)
+		{ return $mid;
+		}
+
+	  $mid;
+	}
