@@ -1,0 +1,3 @@
+#!/bin/sh
+
+strings ${1+"$@"} | grep -v '[^a-zA-Z0-9 \011]'
