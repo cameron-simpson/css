@@ -23,7 +23,6 @@ esac
 case $HOST@$SYSTEMID in
     amadeus@home)	side=-west to=msdog:0 passwd=$HOME/rc/vnc/passwd-msdog@home ;;
     janus@home)		side=-east to=cerebus:0 ;;
-    tiomkin@cisra)	side=-west to=wendy:0 ;;
 esac
 
 while [ $# -gt 0 ]
