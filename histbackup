@@ -66,6 +66,7 @@ verbose=
 
 while :
 do case $1 in
+    -x)		trace=set-x ;;
     -v|--verbose) verbose=1 ;;
     --inplace)	inplace=1 ;;
     --no-delete|--mono)
@@ -175,7 +176,7 @@ xit=0
 if [ -n "$lastbackup" -a -d "$dest/$lastbackup/." ]
 then
     $echo "existing backup: linking $lastbackup to $thisbackup ..."
-    if not linktree $ltargs "$dest/$lastbackup" "$dest/$thisbackup"
+    if not $trace linktree $ltargs "$dest/$lastbackup" "$dest/$thisbackup"
     then
 	echo "$cmd: warning: linktree $dest/$lastbackup $dest/$thisbackup fails" >&2
     fi
@@ -185,7 +186,7 @@ then
 	echo "$thisbackup" >&3
     else
 	$echo "updating $thisbackup from $src ..."
-	rsync $rsopts -aH $delete --rsync-path "$rrsync" ${1+"$@"} "$src/." "$dest/$thisbackup/."
+	$trace rsync $rsopts -aH $delete --rsync-path "$rrsync" ${1+"$@"} "$src/." "$dest/$thisbackup/."
 	xit=$?
     fi
 else
@@ -208,10 +209,10 @@ else
 	set -x
 	if [ $use_rsync ]
 	then
-	    mkdir "$dest/$thisbackup" || exit 1
-	    rsync $rsopts -aH --rsync-path "$rrsync" ${1+"$@"} "$src/." "$dest/$thisbackup/."
+	    $trace mkdir "$dest/$thisbackup" || exit 1
+	    $trace rsync $rsopts -aH --rsync-path "$rrsync" ${1+"$@"} "$src/." "$dest/$thisbackup/."
 	else
-	    cpdir "$src" "$dest/$thisbackup"
+	    $trace cpdir "$src" "$dest/$thisbackup"
 	fi
 	xit=$?
     fi
