@@ -6,46 +6,29 @@
 # -xpl for xplanet support - cameron 30nov2000
 #
 
-##alert "$0 $*"
-
 cmd=$0
-usage="Usage: $0 [-m] [-s] [-d dim] [-xpl] [{imagefile|ptns...}]
-	-M	Popup FVWM menu to pick from choices.
-	-m	Set the menu background as well.
+usage="Usage: $cmd [-s] [-D] [-xpl] imagefile
 	-s	Synchronous.
-	-t	Select tall images (default wide).
-	-w	Select wide images (default).
-	-a	Select any images (default wide).
-	-o	OR the ptns instead of AND.
-	-d dim	Set dimming factor.
-	-D	Set the backdrop only for this desktop.
+	-D	The background is per-desk, not global.
 	-xpl	Use xplanet for the background."
 
 [ -n "$DISPLAY" ] || { echo "$cmd: no \$DISPLAY!" >&2; exit 1; }
+
+##con echo "$cmd $*"
 
 tmp=${TMPDIR:-/tmp}
 
 opts=
 sync=
 xplanet=
-convopts='-d 0.6'
-thisdesk=
-pickn=1
-aspect=-w
-pickopts=
-strippfx=
+perdesk=
 
 badopts=
 while :
 do  case $1 in
-        -xpl)	xplanet=1 ;;
-	-M)	pickn=20 aspect= strippfx=$HOME ;;
-	-[tw])	aspect=$1 ;;
-	-a)	aspect= ;;
-	-o)	pickopts="$pickopts $1" ;;
-	-s)	sync=1 ;;
-	-d)	convopts="$convopts -d $2"; shift ;;
-	-D)	thisdesk=1 opts="$opts $1" ;;
+        -xpl)	xplanet=1 opts="$opts -xpl" ;;
+	-s)	sync=1 opts="$opts -s" ;;
+	-D)	perdesk=1 opts="$opts -D" ;;
 	--)	shift; break ;;
 	-?*)	echo "$cmd: unrecognised option: $1" >&2
 		badopts=1
@@ -55,75 +38,46 @@ do  case $1 in
     shift
 done
 
-[ $badopts ] && { echo "$usage" >&2; exit 2; }
-
-dopick=1
-isfile=1
-case "$#,$1" in
-  1,http://*)
-    # one argument which is a URL
-    exec withurl -C "$1" "$0" $opts
-    ;;
-  1,X:* | 1,- | 1,*:- | 1,\|* )
-    # one argument which is a GraphicsMagick-ish name
-    dopick=
-    isfile=
-    ;;
-  1,*)
-    [ -f "$1" -a -s "$1" ] && dopick=
-    ;;
-esac
-
-if [ $dopick ]
+if [ $# = 0 ]
 then
-    set x `pickim -P "$strippfx" -n $pickn -r $aspect $pickopts ${1+"$@"} | sort -u`
-    shift
-    if [ $# = 0 ]
-    then
-      echo "$cmd: no image files chosen!" >&2
-      exit 1
-    fi
-    if [ $# -gt 1 ]
-    then
-      tmpf=/tmp/rootbg$$
-      for arg
-      do  echo "$arg"
-      done >"$tmpf"
-      fvwmcmd \
-	"SetEnv FVWM_MENU_IMLIST_OP \"rootbg $opts\"" \
-	"Piperead 'fvwm-menu -1 ImDirMenu \"$cmd $call\" fvwm-menu-imlist -l $tmpf .; rm $tmpf'" \
-	"Popup ImDirMenu" \
-	"UnSetEnv FVWM_MENU_IMLIST_OP"
-      exit $?
-    fi
-
-    [ -f "$1" -a -s "$1" ] \
-    || { echo "$cmd: chose \"$1\", but it's not a file!" >&2
-	 exit 1
-       }
-    isfile=1
-    [ -t 1 ] && echo "$1"
+    echo "$cmd: missing imagefile" >&2
+    badopts=1
+else
+    imagefile=$1; shift
+    [ $# = 0 ] || { echo "$cmd: extra arguments: $*" >&2
+		    badopts=1
+		  }
 fi
 
-imagefile=$1; shift
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+isfile=1
+case "$imagefile" in
+  http://*)
+    # one argument which is an URL
+    exec withurl -C "$imagefile" "$0" $opts
+    ;;
+  X:* | - | *:- | \|* )
+    # one argument which is a GraphicsMagick-ish name
+    isfile=
+    ;;
+esac
 
 if [ "$isfile" ]
 then
   case "$imagefile" in
     /*) ;; *) imagefile=`pwd`/$imagefile ;;
   esac
-  echo "$imagefile" >>$HOME/var/log/rootbg
-  lastvalue -a rootbg "$imagefile" &
 fi
 
 rootbg=`mkwall "$imagefile"` || exit 1
+echo "$rootbg" >>$HOME/var/log/rootbg
 
 (
-  if [ $thisdesk ]
-  then  thisdesk=`lastvalue "enterdesk-$HOST"`
-	desktop "$thisdesk" rootbg "$rootbg"
-  else  lastvalue "defaultrootbg-$HOST" "$rootbg"
-  fi &
+  # note backdrop if not a per-desk setting
+  ( [ $perdesk ] || lastvalue "defaultrootbg-$HOST" "$rootbg"
+    lastvalue "rootbg-$HOST" "$rootbg"
+  ) &
 
   if [ $xplanet ]
   then
