@@ -8,8 +8,11 @@
 
 props=au.com.zip.cs
 tty=`tty`
+CLASSPATH=`absclasspath`
+export CLASSPATH
 set -x
 exec ${JAVA_HOME:-"/opt/j2sdk-sun"}/bin/java \
+	-cp "$CLASSPATH" \
 	"-D$props.env.HOME=$HOME" \
 	"-D$props.env.EDITOR=$EDITOR" \
 	"-D$props.tty=$tty" \
