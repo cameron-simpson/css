@@ -1,0 +1,213 @@
+#!/usr/bin/perl
+#
+
+=head1 NAME
+
+lock - obtain a lock before running a command
+
+=head1 SYNOPSIS
+
+lock [B<-p> I<pidfile>] [B<-1>] [B<-a>] [B<-s>] I<key> I<command> [I<files...>]
+
+lock B<-q> I<key>
+
+=head1 DESCRIPTION
+
+Lock obtains a named lock (specified by I<key>), runs a specified command
+and then releases the lock.
+The locking is NFS-safe,
+being based on making an empty subdirectory in an area
+shared by the processes using the lock.
+
+=head1 OPTIONS
+
+=over 4
+
+=item B<-p> I<pidfile>
+
+Record the process-id of the I<command>
+in the file named I<pidfile>
+(see kproc(1)).
+
+=item B<-1>
+
+Onceonly.
+Instead of waiting for the lock to become free,
+immediately exit successfully without running I<command>
+if the lock is taken.
+Useful to ensure some daemon is active without accidentally running two
+instances.
+
+=item B<-a>
+
+Asynchronous.
+If the lock is obtained,
+run I<command> as an asynchronous child.
+
+=item B<-q>
+
+Query the lock named I<key>,
+returning a meaningful exit status
+(0 for lock taken ,1 for lock not taken).
+Useful in B<if> statements.
+
+=item B<-s>
+
+Silent. Do not report "B<waiting for lock...>"
+after the initial boredom period.
+
+=item I<key>
+
+Then name of the lock to obtain.
+An empty key silently bypasses any locking and just runs I<command>.
+
+=back
+
+=head1 SEE ALSO
+
+kproc(1), cs::Lock(3)
+
+=head1 AUTHOR
+
+Cameron Simpson E<lt>cs@zip.com.auE<gt> 01oct1997
+
+=cut
+
+#
+# Converted to perl to beat fork/exec load.	- cameron, 10feb1999
+# -q to test for lock.				- cameron, 10apr1999
+# Moved lock code into cs::Lock.		- cameron, 27jun1999
+# -p flag.					- cameron, 28feb2000
+# -s flag.					- cameron, 20oct2000
+# -a flag.					- cameron, 30jul2001
+#
+
+use strict qw(vars);
+
+use cs::Misc;
+use cs::Lock;
+use Getopt::Std;
+
+$::Usage="Usage: $::cmd [-p pidfile] [-q] [-1] key command [args...]
+	-a	Asynchronous.
+	-p pidfile Pid file. Record child pid in this file.
+	-q	Query - is lock taken?
+	-s	Silent.
+	-1	Onceonly - bail if lock can't be had immediately.
+		Useful for congestion control where you're running
+		something periodic and it's enough for a single
+		instance to be live.
+";
+
+$::Async=0;
+$::Onceonly=0;
+$::Query=0;
+$::Silent=(-t STDERR);
+undef $::Pidfile;
+
+my $badopts = ! getopts('ap:qs1');
+$::Async=1 if defined $::opt_a;
+$::Pidfile=$::opt_p if defined $::opt_p;
+$::Query=1 if defined $::opt_q;
+$::Onceonly=1 if defined $::opt_1;
+$::Silent=1 if defined $::opt_s;
+
+if (@ARGV < 1)
+{ warn "$::cmd: missing key\n";
+  $badopts=1;
+}
+else
+{ $::Key=shift @ARGV;
+  if ($::Query)
+  { if (@ARGV > 0)
+    { warn "$::cmd: command not expected with -q option\n";
+      $badopts=1;
+    }
+  }
+  elsif (@ARGV < 1)
+  { warn "$::cmd: missing command\n";
+    $badopts=1;
+  }
+}
+
+die $::Usage if $badopts;
+
+if ($::Query)
+{ ## warn "QUERY: key=$::Key";
+  ## warn "check($::Key) == ".cs::Lock::check($::Key);
+  exit ( cs::Lock::check($::Key) ? 0 : 1 );
+}
+
+if (length $::Key)
+{ $::Lock = new cs::Lock ($::Key,($::Onceonly ? 1 : 0),$::Silent);
+  die "$::cmd: can't lock \"$::Key\"\n" if ! defined $::Lock;
+}
+else
+{ undef $::Lock;
+}
+
+$::Xit=0;
+
+## BUG: We don't want to do this if these signals are ignored
+##      but AFAIK you can't test that in Perl. That sucks. Big time.
+$SIG{HUP}=\&slap;
+$SIG{INT}=\&slap;
+$SIG{TERM}=\&slap;
+
+my $pid;
+
+if ($::Async)
+{
+  if (! defined ($pid=fork))
+  {
+    tidy();
+    exit 1;
+  }
+
+  if ($pid != 0)
+  # mainline program
+  { $::Lock->{TAKEN}=0;	# don't tidy up after fork
+    exit 0;
+  }
+}
+
+# now the for-real fork/wait
+$pid = fork;
+if (! defined $pid)
+{ warn "$::cmd: can't fork: $!\n";
+  $::Xit=1;
+}
+elsif ($pid == 0)
+{ exec @ARGV;
+}
+else
+{
+  if (defined $::Lock)
+  { $::Pidfile=$::Lock->Path().'/pid' if ! defined $::Pidfile;
+    if (! open(PIDFILE,"> $::Pidfile\0"))
+    { warn "$::cmd: can't save pid ($pid) in file \"$::Pidfile\": $!\n";
+      $::Xit=1;
+    }
+    else
+    { print PIDFILE "$pid\n";
+      close(PIDFILE);
+    }
+  }
+
+  waitpid($pid, 0);
+  $::Xit=1 if $? != 0;
+}
+
+tidy();
+
+exit $::Xit;
+
+sub slap
+{ $::Xit=1;
+  tidy();
+}
+
+sub tidy
+{ undef $::Lock;
+  exit $::Xit;
+}
