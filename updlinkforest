@@ -58,7 +58,7 @@ my @dirents = grep(/^[^.]/, readdir(DIR));
 
 for my $dirent (sort @dirents)
 {
-  my $rm = "rm -f '$dirent'";
+  my $rm = "/bin/rm -f '$dirent'";
 
   if (exists $links{$dirent}
    && -l $dirent)
@@ -80,7 +80,7 @@ for my $dirent (sort @dirents)
 
 for my $link (sort keys %links)
 {
-  print "ln -s '$links{$link}' '$link'\n";
+  print "/bin/ln -s '$links{$link}' '$link'\n";
 }
 
 exit 0;
