@@ -132,22 +132,45 @@ sub new($;$$)	# server -> connectionrec or undef
 
 sub DESTROY
 { my($this)=@_;
-  $this->Disconnect();
+  $this->Quit();
   $cs::NNTP::Debug && warn "closed connection to $this->{SERVER}";
 }
 
-sub Disconnect($)
-{ shift->Put("quit\n");
+=back
+
+=head1 OBJECT METHODS
+
+=item Quit()
+
+Send the QUIT command.
+
+=cut
+
+sub Quit($)
+{ shift->Command(QUIT);
 }
+
+=item CanPost()
+
+Return whether this connection allows posting.
+
+=cut
 
 sub CanPost()
 { shift->{CANPOST};
 }
 
+=item Group(I<group>)
+
+Select the specified I<group>.
+Returns an array with the elements B<(low,high)> for the group.
+
+=cut
+
 sub Group($$)
 { my($this,$group)=@_;
 
-  my($code,$text)=$this->Command("group $group\n");
+  my($code,$text)=$this->Command("GROUP $group");
   return undef unless defined $code;
 
   if ($code =~ /^2/ && $text =~ /^\s*\d+\s+(\d+)\s+(\d+)/)
@@ -161,11 +184,18 @@ sub Group($$)
   return ();
 }
 
+=item List()
+
+Return the newsgroup listing from the server's LIST command
+as from the B<Text()> method.
+
+=cut
+
 # return list of active newsgroups
 sub List($)
 { my($this)=@_;
 
-  my($code,$text)=$this->Command("LIST\n");
+  my($code,$text)=$this->Command(LIST);
 
   return undef unless defined $code;
   return undef unless $code =~ /^2/;
@@ -173,10 +203,17 @@ sub List($)
   $this->Text();
 }
 
+=item Head(I<id>)
+
+Return a B<cs::RFC822> object containing the headers of the article specified by the
+Message-ID or sequence number I<id>.
+
+=cut
+
 sub Head($$)
 { my($this,$id)=@_;
 
-  my($code,$text)=$this->Command("HEAD $id\n");
+  my($code,$text)=$this->Command("HEAD $id");
 
   return undef unless defined $code;
   return undef unless $code eq '221';
@@ -189,17 +226,32 @@ sub Head($$)
   $H;
 }
 
+=item Article(I<id>)
+
+Return a B<cs::MIME> object containing the article specified by the
+Message-ID or sequence number I<id>.
+
+=cut
+
 sub Article($$)
 { my($this,$id)=@_;
 
-  my($code,$text)=$this->Command("ARTICLE $id\n");
+  my($code,$text)=$this->Command("ARTICLE $id");
   return undef if ! defined $code || $code ne '220';
 
   my $art = $this->Text();
   new cs::MIME (new cs::Source (SCALAR, \$art));
 }
 
-# collect reply from  server, skipping info replies
+=item Reply()
+
+Collect the server's response to a command.
+Returns a two element array with the three digit response code
+and the accompanying text.
+
+=cut
+
+# collect reply from server, skipping info replies
 sub Reply($)
 { my($this)=@_;
 
@@ -210,6 +262,7 @@ sub Reply($)
   FINDREPLY:
   do {	$_=$this->GetLine();
 	return undef if ! defined || ! length;
+	::log("<- $_") if $::DEBUG;
 	return ($1,$2) if /^([2345][0123489]\d)\s*(.*\S?)/;
 
 	if (/^1[0123489]\d/)	# add $verbose hook later
@@ -222,11 +275,30 @@ sub Reply($)
   while (1);	# return is inside loop
 }
 
+=item Command(I<command>)
+
+Send the specified I<command> to the NNTP server.
+Return the response as from the B<Reply()> method.
+
+=cut
+
 sub Command($$)
 { my($this,$command)=@_;
+  $command =~ s/[\s\r\n]+$//;
+  $command .= "\r\n";
+
+  ::log("-> ".cs::Hier::h2a($command,0));
   $this->Put($command);
   $this->Reply();
 }
+
+=item Text()
+
+Collect a data response from the server.
+Returns an array of lines in an array context,
+the concatenation of the lines in a scalar context.
+
+=cut
 
 # collect a text response from the server, stripping \r?\n
 sub Text($)
@@ -238,14 +310,25 @@ sub Text($)
   $this->Flush();
 
   @lines=();
+
+  TEXT:
   while (defined ($_=$this->GetLine()) && length)
-  { last if /^\.\r?\n$/;
+  { chomp;
+    s/\r$//;
+    last TEXT if $_ eq '.';
     s/^\.\././;
     push(@lines,$_);
   }
 
-  wantarray ? @lines : join('',@lines);
+  wantarray ? @lines : join("\n",@lines);
 }
+
+=item PostFile(I<fname>)
+
+Post the news item present in the file named I<fname>.
+Return success.
+
+=cut
 
 # post a complete article contained in a file
 sub PostFile($$)
@@ -257,6 +340,13 @@ sub PostFile($$)
   $this->PostSource($s);
 }
 
+=item PostSource(I<s>)
+
+Post the news item present in the B<cs::Source> I<s>.
+Return success.
+
+=cut
+
 sub PostSource($$)
 { my($this,$s)=@_;
 
@@ -265,7 +355,7 @@ sub PostSource($$)
     return 0;
   }
 
-  my($code,$text)=$this->Command("POST\n");
+  my($code,$text)=$this->Command(POST);
 
   if (! defined $code)
   { warn "$::cmd: unexpected EOF\n";
@@ -282,12 +372,15 @@ sub PostSource($$)
   local($_);
 
   while (defined ($_=$s->GetLine()) && length)
-  { if ($inhdrs)
-    { if (/^\r?\n$/)
+  { chomp;
+    s/\r$//;
+
+    if ($inhdrs)
+    { if (! length)
       { $inhdrs=0;
 	if (! $hadfrom)
-	{ my($login)=scalar getpwuid($>);
-	  $this->Put("From: $login\@research.canon.com.au\n");
+	{ ## my($login)=scalar getpwuid($>);
+	  ## $this->Put("From: $login\@$ENV{MAILDOMAIN}\r\n");
 	}
       }
       elsif (/^from:/i)
@@ -295,11 +388,14 @@ sub PostSource($$)
       }
     }
 
+    $_.="\r\n";
+    ::log("-> ".cs::Hier::h2a($_,0));
     $this->Put(".") if /^\./;
     $this->Put($_);
   }
 
-  $this->Put(".\n");
+  ::log("-> .");
+  $this->Put(".\r\n");
 
   ($code,$text)=$this->Reply();
 
@@ -314,5 +410,17 @@ sub PostSource($$)
 
   0;
 }
+
+=back
+
+=head1 SEE ALSO
+
+cs::Newsrc(3cs)
+
+=head1 AUTHOR
+
+Cameron Simpson E<lt>cs@zip.com.auE<gt>
+
+=cut
 
 1;
