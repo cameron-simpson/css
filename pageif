@@ -7,6 +7,10 @@
 PAGER=${PAGER:-less}
 export PAGER
 
+# turn on autoquit, for less anyway
+LESS="$LESS -E"
+export LESS
+
 if [ $# = 0 ]
 then
     if [ -t 1 ]
