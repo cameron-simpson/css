@@ -19,7 +19,7 @@ use File::Find;
 $::Silent=0;
 $::Verbose=(-t STDERR);
 $::Recurse=0;
-$::FrameMode=EXTERNAL;
+$::FrameMode=INLINE;	## EXTERNAL
 
 ($::cmd=$0) =~ s:.*/::;
 $::Usage="Usage: $::cmd [-fgnqrtv] [+gt] [-i indexbase] [-T width] [directories]
@@ -108,9 +108,6 @@ sub im2html($)
   my @toc=();
   my $title=$dir->Title();
 
-  push(@index,[HEAD,
-	       [TITLE,$title],"\n",
-	      ]);
   push(@index,[H1,$title],"\n");
 
   push(@toc,[A, {HREF => "../index.html"}, "Parent"]);
@@ -204,9 +201,6 @@ sub im2html($)
       }
 
       $dir->WriteHTMLFile( $dir->DotDirRPath($ndxrfile),
-			 [HEAD,
-			   [TITLE,"$title: $subndx->{LOW}..$subndx->{HIGH}"], "\n",
-			 ],
 			 [H1,"$title: $subndx->{LOW}..$subndx->{HIGH}"], "\n",
 			 "[ ", @subtoc, " ]",
 			 [BR], "\n",
