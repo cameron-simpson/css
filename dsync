@@ -1,0 +1,46 @@
+#!/bin/sh
+#
+# Synchronise two directories.
+# Wrapper for rsync which takes two directories and synchronises them,
+# because rsync takes a directory and a parent and I keep forgetting.
+#	- Cameron Simpson <cs@zip.com.au> 05oct98
+#
+
+tty=
+[ -t 1 ] && tty=1
+
+vflag= verbose=
+rsopts=
+badopts=
+delete=--delete
+
+[ $tty ] && { rsopts=--progress vflag=-v verbose=1; }
+
+while :
+do
+    case $1 in
+	--merge) shift; set x --update +D ${1+"$@"}; shift ;;
+	+D|--no-delete)	delete= ;;
+	-D|--delete)	delete=--delete ;;
+	--?*)	rsopts="$rsopts $1" ;;
+	-v)	vflag=-v verbose=1 ;;
+	+v)	vflag=   verbose=  ;;
+	-?*)	rsopts="$rsopts $1" ;;
+	--)	shift; break ;;
+	*)	break ;;
+    esac
+    shift
+done
+
+[ $# -lt 2 ] && { echo "$0: missing dirs" >&2; exit 2; }
+
+srcd=$1
+destd=$2
+shift; shift
+
+[ $badopts ] && exit 2
+
+filter_fd 1 \
+	'sed "/^building file list \\.\\.\\. done\$/d
+	      /^total size is [0-9]*  *speedup is [0-9]*\\.[0-9]*\$/d"' \
+	rsync $delete -rlptDH $vflag $rsopts "$srcd/." "$destd"
