@@ -23,6 +23,7 @@ use strict qw(vars);
 BEGIN { use cs::DEBUG; cs::DEBUG::using(__FILE__); }
 
 use cs::Misc;
+use cs::DMY;
 use DBI;
 
 package cs::DBI;
@@ -38,6 +39,7 @@ $cs::DBI::_now=time;
 =item isodate(I<gmt>)
 
 Return an ISO date string (B<I<yyyy>-I<mm>-I<dd>>)
+in local time
 for the supplied UNIX B<time_t> I<gmt>.
 If not supplied, I<gmt> defaults to now.
 
@@ -495,7 +497,7 @@ sub datedRecords($$$$;$$)
 	  ? grep($_->{$keyfield} eq $key, @$D)
 	  : grep($_->{$keyfield} eq $key
 	      && $_->{START_DATE} le $when
-	      && ( ! length $_->{END_DATE} || $when le $_->{END_DATE}),
+	      && ( ! defined $_->{END_DATE} || ! length $_->{END_DATE} || $when le $_->{END_DATE}),
 		@$D)
   ;
 
@@ -618,8 +620,8 @@ sub delDatedRecord
   }
 
   # set closing date of the day before the deletion day
-  my $today = new cs::Day $when;
-  my $prevwhen = $today->Prev()->Code();
+  my $today = new cs::DMY $when;
+  my $prevwhen = $today->Prev()->IsoDate();
 
   my ($sql, @args) = sqlWhereText("UPDATE $table SET END_DATE = ?", @delwhere);
   $sql .= " AND START_DATE <= ? AND ISNULL(END_DATE)";
@@ -670,12 +672,12 @@ sub cropDatedRecords
   my $ok = 1;
 
   if (defined $start)
-  { my $prev_start = (new cs::Day $start)->Prev()->Code();
+  { my $prev_start = (new cs::DMY $start)->Prev()->IsoDate();
 
     if (defined $end)
     # both defined
     {
-      my $next_end = (new cs::Day $end)->Next()->Code();
+      my $next_end = (new cs::DMY $end)->Next()->IsoDate();
 
       ## warn "CROP BOTH: prev_start='$prev_start', next_end='$next_end'\n";
 
@@ -853,7 +855,7 @@ sub cropDatedRecords
   else
   # only $end defined
   {
-    my $next_end = (new cs::Day $end)->Next()->Code();
+    my $next_end = (new cs::DMY $end)->Next()->IsoDate();
 
     # delete swallowed records
     #
@@ -976,7 +978,7 @@ sub cleanDates
 	dosql($dbh,$sql,@sqlargs);
       }
       elsif (! length $end || $end ge $prev_start)
-      { my $nend = cs::Day->new($prev_start)->Prev()->Code();
+      { my $nend = cs::DMY->new($prev_start)->Prev()->IsoDate();
 	if ($nend lt $start)
 	{
 	  my @sqlargs=($key,$start);
@@ -1038,7 +1040,7 @@ sub cropDates($$$$$$)
   $sql = "DROP FROM $table WHERE $keyfield = ? AND START_DATE >= ? AND END_DATE <= ?";
   dosql($dbh,$sql,$key,$start,$end);
 
-  my $prestart = (new cs::Day $start)->Prev()->Code();
+  my $prestart = (new cs::DMY $start)->Prev()->IsoDate();
 
   $sql = "UPDATE $table SET END_DATE = ? WHERE $keyfield = ? AND START_DATE <= ? AND (ISNULL(END_DATE) OR (END_DATE >= ? AND END_DATE <= ?))";
   dosql($dbh,$sql,$prestart,$key,$start,$start,$end);
