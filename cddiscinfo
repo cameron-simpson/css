@@ -7,11 +7,11 @@
 
 use strict qw(vars);
 
-use FreeDB;
+## use FreeDB;
 ## use CDDB_get;
-use cs::Hier;
+use cs::CDDB;
 
-my $dev = '/dev/cdrom';
+my $dev;
 
 ($::cmd=$0) =~ s:.*/::;
 $::Usage="Usage: $::cmd [cd-device]\n";
@@ -22,37 +22,15 @@ if (@ARGV)
 
 die $::Usage if @ARGV;
 
-## my @toc = CDDB_get::read_toc($dev);
-## my $total = @toc-1;
-## printf("discid=%08x\n",CDDB_get::cddb_discid($total,\@toc));
-## die "toc=".cs::Hier::h2a(\@toc,1)."\n";
+my $CD = new cs::CDDB;
+$CD->Device($dev) if defined $dev;
 
-my $fdb = new FreeDB;
-die "$::cmd: can't make new FreeDB object\n" if ! defined $fdb;
+printf("%08x\n", $CD->DiscId());
+my(@t)=$CD->Tracks();
+print scalar(@t), "\n";
 
-## $fdb->{_debug}=99;
-
-$fdb->cdrom_device($dev);
-
-die "$::cmd: trouble getting disc details from $dev\n" if ! $fdb->create_new();
-
-## print STDERR cs::Hier::h2a($fdb,1),"\n";
-
-print $fdb->discid(), "\n";
-print $fdb->number_of_tracks(), "\n";
-
-# track info
-my($tno,$tsecs,$toffset,$tinfo,$txinfo,$tdinfo);
-my($qtinfo,$qtxinfo);
-while ($fdb->next_track())
-{  
-  ($tno,$tsecs,$toffset,$tinfo,$txinfo,$tdinfo)
-  =( $fdb->current_track_number(),
-     $fdb->current_track_time_in_seconds(),
-     $fdb->current_track_offset()
-   );
-
-  print "$tno $tsecs $toffset\n";
+for my $T (@t)
+{ print "$T->{TRACK} $T->{LENGTH} $T->{OFFSET}\n";
 }
 
 exit 0;
