@@ -16,7 +16,7 @@ usage="Usage: $cmd [-f] [-i itype] [-T title] [files...]"
 eval "txtconv=\$conv$dfltconv"
 
 aspect=-R
-txtconv='a2ps -1 -o- -B -T 8 -i --borders=no -b $aspect -f 10'
+txtconv='a2ps -1 -o- -B -T 8 -i --borders=no -b $aspect --medium=A4 -f 10'
 pdfconv='pdftops /dev/fd/0' ## pdf2ps
 psconv=cat
 
@@ -42,7 +42,7 @@ do  case $1 in
 done
 
 txtconv="$txtconv $aspect"
-[ -n "$title" ] && txtxconv="$txtconv --medium=A4 \"--footer=\$title\""
+[ -n "$title" ] && txtxconv="$txtconv \"--footer=\$title\""
 
 case "$itype" in
     ps|postscript)	conv=$psconv ;;
