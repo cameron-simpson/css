@@ -13,7 +13,7 @@ ext=
 
 session=root@$host$ext
 
-exec term +ip -n "$session" \
+exec term +ip -n "#$session" \
 	scrif "$session" \
 	logscript "$session" \
 	sshp1 "root@$host"
