@@ -1,0 +1,15 @@
+#!/bin/sh
+#
+# Add the message id of the mail item on stdin to a killfile.
+#	- Cameron Simpson <cs@zip.com.au> 13jun2004
+#
+
+cmd=$0
+usage="Usage: $cmd killfile <mailitem"
+
+[ $# = 1 ] || { echo "$usage" >&2; exit 2; }
+killfile=$1; shift
+
+eval `mhdrs -sh | sed 's/^/HDR_/'`
+[ -n "$HDR_MESSAGE_ID" ] || exit 1
+echo "$HDR_MESSAGE_ID" >>"$killfile"
