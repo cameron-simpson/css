@@ -1,6 +1,6 @@
 #!/usr/bin/perl -w
 #
-# Convert info file into pod, largely because
+# Convert info file into POD, largely because:
 #
 #	- info's too stupid to read stdin, so incorporating it
 #	  into other tools sucks
@@ -9,15 +9,14 @@
 #	  do the right thing.
 #
 #	- the GNU people are arrogant scum, and produce farces of
-#	  manual entries, each prefaced with "we like info,
-#	  so we don't maintain this page, and it's probably
-#	  a pack of lies - go read the info file". Of course,
-#	  the only way to do that is to fire up emacs or to
-#	  use their weird info tool, which doesn't act much
+#	  manual entries, each prefaced with "we like info, so we don't
+#	  maintain this page, and it's probably a pack of lies - go read the
+#	  info file". Of course, the only way to do that is to fire up emacs
+#	  or to use their weird info tool, which doesn't act much
 #	  like a pager at all and violates the "use my preferred pager"
 #	  approach people should be able to expect.
 #	  
-# Accordingly, since the Perl people can get this right (pod converts handily
+# Accordingly, since the Perl people can get this right (POD converts handily
 # to all sorts of stuff), here is info2pod, which can be piped to pod2man
 # to make manual entries.
 #	- Cameron Simpson <cs@zip.com.au> 14nov1999
