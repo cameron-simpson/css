@@ -1,0 +1,168 @@
+#!/usr/bin/perl
+#
+# Extract data from a stream.
+#	- Cameron Simpson, 18jan94
+#
+
+require 'flush.pl';
+
+($cmd=$0) =~ s:.*/::;
+$usage="Usage: $cmd [-i index] archive
+	-i index	Read index (offset size extract-name) from named file
+			instead of stdin.
+	archive		Archive to dump from ('-' means stdin).
+";
+
+undef $index;
+
+$badopts=0;
+ARGV:
+  while (defined($_=shift))
+	{ last ARGV if $_ eq '--';
+	  (unshift(@ARGV,$_), last ARGV) unless /^-./;
+
+	  if ($_ eq '-i')	{ $index=shift; }
+	  else
+	  { print STDERR "$cmd: $_: unrecognised option\n";
+	    $badopts=1;
+	  }
+	}
+
+if (!defined($archive=shift))
+	{ print STDERR "$cmd: missing archive name\n";
+	  $badopts=1;
+	}
+
+if ($#ARGV >= $[)
+	{ print STDERR "$cmd: extra arguments: @ARGV\n";
+	  $badopts=1;
+	}
+
+die $usage if $badopts;
+
+# open index first so we don't touch a tape drive needlessly
+if (defined($index))
+	{ if ($index eq '-')
+		{ $INDEX=STDIN;
+		}
+	  elsif (!open(INDEX,"< $index\0"))
+		{ die "$cmd: can't open $index: $!\n";
+		}
+	  else
+	  { $INDEX=INDEX;
+	  }
+	}
+else
+{ $INDEX=STDIN;
+}
+
+if ($archive eq '-')
+	{ $ARCHIVE=STDIN;
+	}
+elsif (!open(ARCHIVE,"< $archive\0"))
+	{ die "$cmd: can't open $archive: $!\n";
+	}
+else
+{ $ARCHIVE=ARCHIVE;
+}
+
+$xit=0;
+$seekable = eval "-f $ARCHIVE";
+
+$archpos=0;
+INDEX:
+  while (<$INDEX>)
+	{ if (!/^\s*(\d+)\s+(\d+)\s*(\S.*)/)
+		{ print STDERR "$cmd: $index, line $.: malformed line\n";
+		  $xit=1;
+		  next INDEX;
+		}
+
+	  ($offset,$size,$name)=($1,$2,$3);
+	  if ($seekable)
+		{ seek($ARCHIVE,$offset,0);
+		  $archpos=$offset;
+		}
+	  elsif ($offset < $archpos)
+		{ print STDERR "$cmd: $index, line $.: $offset requires a reverse seek and $archive is not a seekable file\n";
+		  $xit=1;
+		  next INDEX;
+		}
+	  elsif (!&skip($ARCHIVE,$offset-$archpos))
+		{ die "$cmd: $index, line $.: can't skip forward to offset $offset, aborting\n";
+		}
+
+	  $archpos=$offset;
+
+	  if ($name eq '-')
+		{ $OUTPUT=STDOUT;
+		}
+	  elsif (!open(OUTPUT,"> $name\0"))
+		{ print STDERR "$cmd: can't write to $name: $!\n";
+		  $xit=1;
+		  next INDEX;
+		}
+	  else
+	  { $OUTPUT=OUTPUT;
+	  }
+
+	  print STDERR "$offset $size $name\n";
+	  if (!&dd($ARCHIVE,$OUTPUT,$size))
+		{ print STDERR "$cmd: couldn't copy $size bytes from $archive to $name\n";
+		  $xit=1;
+		}
+
+	  if ($OUTPUT ne STDOUT && !close($OUTPUT))
+		{ print STDERR "$cmd: can't close $name properly, maybe buffers didn't flush: $!\n";
+		  $xit=1;
+		}
+	}
+
+exit $xit;
+
+sub skip	# (FILE,howfar) -> ok
+	{ local($FILE,$skip)=@_;
+	  local($i,$_);
+
+	  while ($skip > 0)
+		{ if ($skip > 16384)	{ $i=16384; }
+		  else			{ $i=$skip; }
+
+		  if (!defined($i=read($FILE,$_,$i)))
+			{ print STDERR "$cmd: can't read from $FILE: $!\n";
+			  return 0;
+			}
+		  elsif ($i < 1)
+			{ print STDERR "$cmd: reached eof on $FILE with $skip bytes to go\n";
+			  return 0;
+			}
+
+		  $skip-=$i;
+		}
+
+	  1;
+	}
+
+sub dd		# (FROM,TO,size) -> ok
+	{ local($FROM,$TO,$size)=@_;
+	  local($i,$_);
+
+	  while ($size > 0)
+		{ if ($size > 16384)	{ $i=16384; }
+		  else			{ $i=$size; }
+
+		  if (!defined($i=read($FROM,$_,$i)))
+			{ print STDERR "$cmd: can't read from $FROM: $!\n";
+			  return 0;
+			}
+		  elsif ($i < 1)
+			{ print STDERR "$cmd: reached eof on $FROM with $size bytes to go\n";
+			  return 0;
+			}
+
+		  $size-=$i;
+		  print $TO $_;
+		}
+
+	  1;
+	}
