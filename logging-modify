@@ -35,7 +35,7 @@ do
   shift
 done
 
-[ -z "$reportcmd" ] || { echo "$cmd: missing report-command" >&2; badopts=1; }
+[ -n "$reportcmd" ] || { echo "$cmd: missing report-command" >&2; badopts=1; }
 
 if [ $# = 0 ]
 then
@@ -68,9 +68,11 @@ case "$reportcmd" in
     reportcmd=`reportcmd=$reportcmd q=$itemname perl -e '
 		use cs::Shell;
 		$q=cs::Shell::quote($ENV{q});
+		$a=cs::Shell::quote(@ARGV);
+		$ENV{reportcmd} =~ s/%a/$a/g;
 		$ENV{reportcmd} =~ s/%s/$q/g;
 		print $ENV{reportcmd}, "\n";
-	       '
+	       ' ${1+"$@"}
 	      `
 		;;
 esac
