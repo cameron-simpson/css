@@ -1,0 +1,11 @@
+#!/bin/sh
+#
+# Budtool compatible dd command.
+#	- Cameron Simpson <cs@zip.com.au> 12nov99
+#
+
+case $1 in
+    bs=*)	;;
+    *)		set bs=184320 ${1+"$@"} ;;
+esac
+exec dd "$@"
