@@ -1,0 +1,7 @@
+#!/bin/sh
+neqn=/usr/bin/neqn
+case $ARCH in
+    *.*.linux)	set x -Tlatin1 ${1+"$@"}; shift ;;
+esac
+
+exec "$neqn" ${1+"$@"}
