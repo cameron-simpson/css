@@ -1,5 +1,6 @@
 #!/bin/sh
-log=$HOME/var/log/httpgetd
+: ${LOGDIR:=$HOME/var/log}
+log=$LOGDIR/httpgetd
 queue=$HOME/var/queue/httpgetd
 logroll -z +datecode "$queue" "$log"
 >>"$queue"
