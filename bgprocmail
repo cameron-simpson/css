@@ -9,8 +9,4 @@ wk=$wkdir/bgprocmail$$
 
 [ -f "$wk" ] && { echo "$0: $wk exists" >&2; exit 1; }
 cat >"$wk" || { rm -f "$wk"; exit 1; }
-exec >/dev/null 2>&1
-
-acon ignhup sh -c "procmail <'$wk' && rm '$wk'"
-
-exit 0
+exec bgproc -l /dev/null ignhup sh -c "procmail <'$wk' && rm '$wk'"
