@@ -18,7 +18,7 @@ case "$wd" in
 	;;
     /home/cameron/*)
 	;;
-    /home/zapff/cameron/* | /a/zapff/home/cameron/* )
+    /home/zapff/cameron/* | /a/zapff/home/cameron/* | /home/kaper/cameron/* | /a/kaper/home/cameron/* )
 	ARCH=redhat.x86.linux
 	SYSTEMID=cisra
 	HOME=/u/cameron
