@@ -2,13 +2,61 @@
 #
 # Wrapper for CGI scripts which sets environment and captures and
 # reports errors.
-# For any perl CGI, move the real .cgi to .cgi-pl and copy cgiwrap-stub to
+# For any perl CGI, move the real .cgi to .cgi-pl and symlink cgiwrap-stub to
 # the old .cgi name.
-# For any shell CGI, move the real .cgi to .cgi-sh and copy cgiwrap-stub to
+# For any shell CGI, move the real .cgi to .cgi-sh and symlink cgiwrap-stub to
 # the old .cgi name.
 #	- Cameron Simpson <cs@zip.com.au> 03mar1999
 #
-# Make single wrapper for pl and sh.	- cameron 12feb2001
+# Make into a single wrapper for pl and sh.	- cameron 12feb2001
+#
+# =head1 NAME
+#
+# cgiwrap - wrapper for CGI scripts which sets environment and captures and reports errors to the browser
+#
+# =head1 SYNOPSIS
+#
+# mv cgi-script cgi-script-ext
+# ln -s /opt/css/bin/cgiwrap-stub cgi-script
+#
+# =head1 DESCRIPTION
+#
+# I<cgiwrap> and its partner script I<cgiwrap-stub>
+# comprise a wrapper for CGI scripts
+# for systems where the web server I<error_log> file
+# is unavailable or simply inconvenient to the CGI author.
+#
+# Normal behaviour for a failing CGI script is to log error messages
+# to the web server I<error_log> file
+# and for the web server to return an unhelpful 500 series error code
+# to the web browser.
+# While this avoids leaking security sensitive error messages
+# and prevents the semblance of a functioning script
+# which would be bad for a production system),
+# it is very unhelpful to the script developer.
+#
+# A script wrapped with cgiwrap 
+# behaves normally when the script itself works correctly.
+# If an error message escapes
+# the wrapper presents it on the web page
+# with some accompanying environment dump
+# for rapid debugging.
+#
+# =head2 Deployment
+#
+# For an arbitrary CGI script I<cgi-script> go:
+#
+#	mv cgi-script cgi-script-ext
+#	ln -s /opt/css/bin/cgiwrap-stub cgi-script
+#
+# where I<ext> is B<sh> for a script written in shell,
+# B<pl> for Perl, B<py> for Python or B<ici> for ici.
+#
+# Additionally a Bourne shell file B<.cgienv.sh>
+# may be provided in the directory containing the CGI script.
+# If present, it is sourced to provide
+# environment settings for the script
+# beyond what the web server may provide.
 #
 
 : ${TMPDIR:=/tmp}
@@ -48,11 +96,19 @@ if [ -s "$SCRIPT_FILENAME-pl" ]
 then  perl -I$HOME/rc/perl "$SCRIPT_FILENAME-pl" ${1+"$@"}
 else  if [ -s "$SCRIPT_FILENAME-sh" ]
       then  /bin/sh "$SCRIPT_FILENAME-sh" ${1+"$@"}
-      else  if [ -s "$SCRIPT_FILENAME-ici" ]
-	    then  ici "$SCRIPT_FILENAME-ici" ${1+"$@"}
-	    else  echo "$0: can't find $SCRIPT_FILENAME-{sh,pl,ici}" >&2
+      else  if [ -s "$SCRIPT_FILENAME-py" ]
+	    then  python "$SCRIPT_FILENAME-py" ${1+"$@"}
+	    else  if [ -s "$SCRIPT_FILENAME-ici" ]
+		  then  ici "$SCRIPT_FILENAME-ici" ${1+"$@"}
+		  else  echo "$0: can't find $SCRIPT_FILENAME-{sh,pl,ici}" >&2
+		  fi
 	    fi
       fi
 fi
 
 exit $?
+
+# =head1 AUTHOR
+#
+# Cameron Simpson <cs@zip.com.au> 30mar1999
+#
