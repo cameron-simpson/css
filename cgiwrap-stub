@@ -1,6 +1,8 @@
 #!/bin/sh
 PATH=$PATH:/opt/css/bin
-MYKEPATH=/opt/config/myke:${MYKEPATH:-/usr/share/myke/rc}
-export PATH MYKEPATH
+PERL5LIB=${PERL5LIB:+"$PERL5LIB:"}/opt/css/lib
+PYTHONPATH=${PYTHONPATH:+"$PYTHONPATH:"}/opt/css/lib
+MYKEPATH=/opt/config/myke:${MYKEPATH:-/usr/share/myke/rc}:/opt/myke/share/myke/rc
+export PATH PERL5LIB PYTHONPATH MYKEPATH
 [ -s .cgienv.sh ] && . ./.cgienv.sh
 exec cgiwrap -0 "$0" ${1+"$@"}
