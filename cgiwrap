@@ -16,7 +16,7 @@
 #
 # =head1 SYNOPSIS
 #
-# mv cgi-script cgi-script-ext
+# mv cgi-script cgi-script-ext;
 # ln -s /opt/css/bin/cgiwrap-stub cgi-script
 #
 # =head1 DESCRIPTION
