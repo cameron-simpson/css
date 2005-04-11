@@ -5,62 +5,49 @@
 #
 
 cmd=$0
-usage="Usage: $cmd [-X] [hosts...]"
+usage="Usage: $cmd [host,host... [rterm-args...]]"
 
 badopts=
-
-rtopts=
-
-while :
-do  case $1 in
-      -X)	rtopts="$rtopts $1" ;;
-      --)	shift; break ;;
-      -?*)	echo "$cmd: unrecognised option: $1" >&2
-		badopts=1
-		;;
-      *)	break ;;
-    esac
-    shift
-done
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
 at_dflt=
 at_target=
 
-# no args - try for default list of targets
-if [ $# = 0 ]
+if [ $# -gt 0 ]
 then
+  host=$1
+  shift
+else
+  # no hosts? try for default list of targets
   at_default=
-  eval `winclause "$HOME/rc/@" "$HOST@$SYSTEMID" | sed -n 's/^default=/at_&/p'`
+  eval `winclause "$HOME/rc/@" "$HOST.$SYSTEMID@$LOCATION" | sed -n 's/^default=/at_&/p'`
   if [ -n "$at_default" ]
-  then set -- $at_default
-  else echo "$0: no default host list for $HOST@$SYSTEMID" >&2
+  then host=$at_default
+  else echo "$0: no default host list for $HOST.$SYSTEMID@$LOCATION" >&2
 	exit 1
   fi
 fi
 
-for host
-do
-  # transmute some names
-  at_target=
-  eval `winclause "$HOME/rc/@" "$host" | sed -n 's/^target=/at_&/p'`
-  [ -n "$at_target" ] && host=$at_target
+# transmute some names
+at_target=
+eval `winclause "$HOME/rc/@" "$host" | sed -n 's/^target=/at_&/p'`
+[ -n "$at_target" ] && host=$at_target
 
-  case "$host" in
-    *,*)
-	[ -n "$DISPLAY" ] || { echo "$cmd: can't do multiple sessions without a \$DISPLAY" >&2
-			       exit 1
-			     }
-	for h in `echo "$host" | tr , ' '`
-	do  "$0" $rtopts "$h"
-	done
-	exit 0
-	;;
-    root@*)
-	exec root@ $rtopts "$host"
-	;;
-    *)	exec rterm "$host" $rtopts
-	;;
-  esac
-done
+case "$host" in
+  *,*)
+      [ -n "$DISPLAY" ] || { echo "$cmd: can't do multiple sessions without a \$DISPLAY" >&2
+			     exit 1
+			   }
+      xit=0
+      for h in `echo "$host" | tr , ' '`
+      do  "$0" "$h" ${1+"$@"} || xit=1
+      done
+      exit $xit
+      ;;
+  root@*)
+      exec root@ "$host" ${1+"$@"}
+      ;;
+  *)	exec rterm "$host" ${1+"$@"}
+      ;;
+esac
