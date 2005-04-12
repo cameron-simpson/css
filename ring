@@ -35,7 +35,7 @@ $usepgp=0;
 @phonelists=();
 
 $::_GPG2=( length($ENV{GPG_AGENT_INFO}) && system("have-gpg-agent") == 0 );
-warn "GPG2=$::GPG2";
+##warn "GPG2=$::GPG2";
 
 OPTION:
 while (@ARGV)
