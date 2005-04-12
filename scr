@@ -12,8 +12,8 @@ usage="Usage:
     $cmd
 	List sessions.
     $cmd -A [[!]regexp...]
-	Put up terms for all screen sessions.
-    $cmd [-c scrcmd]... [-l logfile] [session | -e cmd [args...]]
+	Put up terms for all matching screen sessions.
+    $cmd [-c scrcmd]... [-l logfile] [-e cmd [args...] | session [cmd [args...]]]
 	Join named session, creating it if missing.
 	-c scrcmd  Run the supplied screen command in addition to the .screenrc
 	-l logfile Log session to the named file.
@@ -78,8 +78,6 @@ addscrcmds()
   done
 }
 
-echo "pre args = $*"
-
 sess=
 havecmd=
 
@@ -104,55 +102,41 @@ do
   shift
 done
 
-echo "post opts = $*"
-
-if [ $havecmd ]
+# no -e option? grab possible session and cmd
+if [ -z "$havecmd" ]
 then
-  new=1
-else
-  if [ $# = 0 ]
-  then
-    new=1
-    set -- "$SHELL"
-  else
-    sess=$1; shift
-    if [ $# -gt 0 ]
-    then
-      echo "$cmd: extra arguments after session name \"$sess\": $*" >&2
-      badopts=1
-    fi
-  fi
+  [ $# -gt 0 ] && { sess=$1; shift; }
+  [ $# = 0 ] && set -- "$SHELL"
 fi
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
-echo "post post opts = $*"
-
 (
-  # if new, just run up a new screen session
-  [ $new ] && exec screen -c "$rcfile" -- "$@"
+  # look for matching session if supplied
+  if [ -n "$sess" ]
+  then
+    # otherwise convert $sess into session name to join
+    case "$sess" in
+      [1-9]|[1-9][0-9]|[1-9][0-9][0-9])
+	    # numeric - pull name from listing
+	    nsess=`scr | sed -n "s/^ *$sess //p"`
+	    [ -n "$nsess" ] || { echo "$cmd: no screen numbered $sess" >&2
+				 exit 1
+			       }
+	    # matched - join the session
+	    exec screen -c "$rcfile" -x "$nsess"
+	    ;;
 
-  # otherwise convert $sess into session name to join
-  case "$sess" in
-    [1-9]|[1-9][0-9]|[1-9][0-9][0-9])
-	  # numeric - pull name from listing
-	  nsess=`scr | sed -n "s/^ *$sess //p"`
-	  [ -n "$nsess" ] || { echo "$cmd: no screen numbered $sess" >&2
-			       exit 1
-			     }
-	  # matched - join the session
-	  exec screen -c "$rcfile" -x "$nsess"
-	  ;;
+      # strip slashes and whitespace from session name if necessary
+      *[/\ \	]*)  sess=`echo "$sess" | tr '[/ 	]' '[___]'` ;;
+    esac
 
-    # strip slashes from session name if necessary
-    */*)  sess=`echo "$sess" | tr / _` ;;
-  esac
+    # not numeric - look up in listing
+    match=`scr | sed -e "/^ *[1-9][0-9]* [1-9][0-9]*\\.$sess\$/!d" -e 's/^ *[1-9][0-9]*  *//' -e q`
 
-  # not numeric - look up in listing
-  match=`scr | sed -e "/^ *[1-9][0-9]* [1-9][0-9]*\\.$sess\$/!d" -e 's/^ *[1-9][0-9]*  *//' -e q`
-
-  # match found - join it
-  [ -n "$match" ] && exec screen -c "$rcfile" -x "$sess"
+    # match found - join it
+    [ -n "$match" ] && exec screen -c "$rcfile" -x "$sess"
+  fi
 
   # start new session
   exec screen -c "$rcfile" -- "$@"
