@@ -111,6 +111,12 @@ fi
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
+if [ ! -f /usr/bin/screen ]
+then
+  echo "$cmd: no /usr/bin/screen, just running: $*" >&2
+  exec "$@"
+fi
+
 (
   # look for matching session if supplied
   if [ -n "$sess" ]
