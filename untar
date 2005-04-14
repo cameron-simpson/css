@@ -17,9 +17,9 @@ $usage="Usage: $cmd [-o] [-O] [-f file] [--] [targets...]
 $badopts=0;
 $tar='gnutar';
 $gnutar=1;
-$tarflags='xpv';
+$tarflags='xv';
 $suser=($> == 0);
-$keepowner=($suser ? '' : 'o');	# use extractor's uid
+$keepowner='';	##($suser ? '' : 'o');	# use extractor's uid
 $tarf='-';
 @tarargs=();
 while (@ARGV && $ARGV[0] =~ /^-/)
