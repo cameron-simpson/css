@@ -34,7 +34,8 @@ done
 
 if [ $# = 0 ]
 then
-    set space science eco chores "$SYSTEMID" weather news-au
+    set .hi
+    ##set space science eco chores "$SYSTEMID" weather news-au
     ## [ -n "$mode" ] || mode=html
     ## set rterm `cd "$hi" || exit 1
     ##     ls -d [a-z]*|sed -e '/^cvs$/d' -e '/^Mykefile$/d' -e 's/\.weekly$//'|sort -u`
