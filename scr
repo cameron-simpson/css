@@ -13,7 +13,9 @@ usage="Usage:
 	List sessions.
     $cmd -A [[!]regexp...]
 	Put up terms for all matching screen sessions.
-    $cmd [-c scrcmd]... [-l logfile] [-e cmd [args...] | session [cmd [args...]]]
+    $cmd [-c scrcmd]... [-l logfile] -e cmd [args...
+	Start new session running the supplied command.
+    $cmd [-c scrcmd]... [-l logfile] session [cmd [args...]]
 	Join named session, creating it if missing.
 	-c scrcmd  Run the supplied screen command in addition to the .screenrc
 	-l logfile Log session to the named file.
