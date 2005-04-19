@@ -17,7 +17,7 @@ badopts=
 
 key=$1; shift
 [ -n "$key" ] || key=misc
-isjob "$key" || { echo "$cmd: unknown job \"$key\"" >&2; badopts=1; }
+isjob "$key" || { [ "x$key" = xmisc ] || echo "$cmd: unknown job \"$key\"" >&2; badopts=1; }
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
