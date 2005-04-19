@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/sh -u
 #
 # =head1 NAME
 #
@@ -6,11 +6,15 @@
 #
 
 : ${TMPDIR:=/tmp}
+: ${PAGER:=less}
 : ${SAVEDIR:=$HOME/dl}
 : ${APPHELPER_SAVEMODE:=auto}
 : ${APPHELPER_REMAPFILE:=$HOME/rc/remap}
 : ${APPHELPER_SAVEMAP:="remap \"\$APPHELPER_REMAPFILE\" | tr '[A-Z_]' '[a-z-]'"}
 : ${APPHELPER_IDSET:=$HOME/var/apphelper}
+: ${APPHELPER_DOVIEW:=''}
+: ${APPHELPER_EXTRACT_GLOBS:=''}
+: ${APPHELPER_OPTS:=''}
 
 cmd=`basename "$0"`
 
@@ -21,18 +25,20 @@ cmd=`basename "$0"`
 ## echo "apphelper: \$*=[$*]" >&2
 
 doterm=
+itype=
 savedir=
 doview=$APPHELPER_DOVIEW
 savemode=$APPHELPER_SAVEMODE
 extract=
 extract_globs=$APPHELPER_EXTRACT_GLOBS
 termname=$cmd
+pager=$PAGER
 
 # =head1 SYNOPSIS
 #
-# apphelper [{-t|+t|-T title}] file [{-n|-y}]] [-d savedir] [-p pager] viewer [viewer-args...]
+# apphelper [{-t|+t|-T title}] file [{-n|-y}]] [-d savedir] [-i type] [-p pager] viewer [viewer-args...]
 #
-usage="Usage: $cmd [{-t|+t|-T title}] file [{-n|-y}] [-d savedir] [-p pager] \\
+usage="Usage: $cmd [{-t|+t|-T title}] file [{-n|-y}] [-d savedir] [-i type] [-p pager] \\
 		viewer [viewer-args...]
 	-t		Run apphelper in a new terminal window.
 	+t		Do not run apphelper in a new terminal window.
@@ -48,6 +54,7 @@ usage="Usage: $cmd [{-t|+t|-T title}] file [{-n|-y}] [-d savedir] [-p pager] \\
 	-Y		Save the file without asking questions.
 	-A		Auto-notsave if file already present.
 	-X		Extract archive and run apphelper for each entry.
+	-i type		Specify MIME type of file.
 	-d savedir	Save directory (from \$SAVEDIR: $savedir).
 	-p pager	Pager (default viewer, from \$PAGER: $pager)."
 
@@ -90,12 +97,15 @@ badopts=
 # Implies the B<-t> option.
 #
 ttyopts=
-case $1 in
-  -t)	shift; doterm=1; ttyopts="$ttyopts $1" ;;
-  -T)	shift; termname=$1; shift; doterm=1 ;;
-  +t)	shift; doterm=; ttyopts="$ttyopts $1" ;;
-  *)	doterm=; [ -t 0 -a -t 1 ] || doterm=1 ;;
-esac
+if [ $# -gt 0 ]
+then
+  case $1 in
+    -t)	shift; doterm=1; ttyopts="$ttyopts $1" ;;
+    -T)	shift; termname=$1; shift; doterm=1 ;;
+    +t)	shift; doterm=; ttyopts="$ttyopts $1" ;;
+    *)	doterm=; [ -t 0 -a -t 1 ] || doterm=1 ;;
+  esac
+fi
 
 # =back
 #
@@ -123,7 +133,7 @@ else
     -)
       if cat >"$tmpfile"
       then
-	  tmpfile=`fixexts "$tmpfile"` || exit 1
+	  tmpfile=`fixexts -i "$itype" "$tmpfile"` || exit 1
 	  file=$tmpfile
       else
 	  echo "$cmd: can't cat stdin to $tmpfile, aborting" >&2
@@ -151,7 +161,7 @@ else
 	then
 	  tmpfile=$tmpdir/`basename "$file"`
 	  if cp "$file" "$tmpfile"
-	  then  tmpfile=`fixexts "$tmpfile"` || exit 1
+	  then  tmpfile=`fixexts -i "$itype" "$tmpfile"` || exit 1
 		file=$tmpfile
 	  else  echo "$cmd: can't cp $file to $tmpfile, aborting" >&2
 		badopts=1
@@ -183,62 +193,68 @@ else
   #
   # =over 4
   #
-  set x $APPHELPER_OPTS ${1+"$@"}; shift
+  set -- $APPHELPER_OPTS ${1+"$@"}
   apphopts=
-  while :
+  while [ $# -gt 0 ]
   do
       apphopt=$1
       apphopt2=
       case $1 in
-	  # =item -d I<directory>
+	  # =item B<-d>d I<directory>
 	  #
 	  # Specify a default directory in which to save files.
 	  # Lacking this, use the value of the envvar B<$SAVEDIR>
 	  # or B<$HOME/dl> if that is not set.
 	  #
 	  -d)	apphopt2=$2 savedir=$2; shift ;;
-	  # =item -n
+	  # =item B<-n>
 	  #
 	  # No: do not run the viewer program.
 	  # The default is to ask first.
 	  #
 	  -n)	doview=0 ;;
-	  # =item -y
+	  # =item <-y>
 	  #
 	  # Yes: always run the viewer program.
 	  # The default is to ask first.
 	  #
 	  -y)	doview=1 ;;
-	  # =item -N
+	  # =item B<-N>
 	  #
 	  # No: do not offer to save the file.
 	  # The default is to ask.
 	  #
 	  -N)	savemode=no ;;
-	  # =item -Y
+	  # =item B<-Y>
 	  #
 	  # Yes: save the file without asking.
 	  # The default is to ask.
 	  #
 	  -Y)	savemode=yes ;;
-	  # =item -a
+	  # =item B<-a>
 	  #
 	  # Ask: ask to save the file even if the file's already there.
 	  #
 	  -a)	savemode=ask ;;
-	  # =item -A
+	  # =item B<-A>
 	  #
 	  # Auto: don't ask to save the file if the file's already there.
 	  # The default is to auto.
 	  #
 	  -A)	savemode=auto ;;
-	  # =item -X
+	  # =item B<-X>
 	  #
 	  # Extract the file (if we know how)
 	  # with the x(1) command
 	  # and run apphelper on each component.
 	  #
 	  -X)	extract=1 apphopt= ;;
+	  # =item B<-i> I<type>
+	  #
+	  # Specify the MIME I<type>.
+	  # Otherwise the type will be guessed from the file content.
+	  #
+	  -i)	itype=$2; shift ;;
 	  --)	shift; break ;;
 	  -?*)	echo "$cmd: unrecognised option: $1" >&2; badopts=1 ;;
 	  *)	break ;;
@@ -292,7 +308,7 @@ then
   fi
 fi
 
-file2=`fixexts "$file"` && file=$file2
+file2=`fixexts -i "$itype" "$file"` && file=$file2
 
 fbase=`basename "$file"`
 case "$fbase" in
