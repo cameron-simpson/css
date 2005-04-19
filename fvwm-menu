@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/sh -u
 #
 # Generate a self generating FVWM menu.
 #	- Cameron Simpson <cs@zip.com.au> 18may2002
@@ -16,7 +16,7 @@ usage="Usage: $cmd [-1] [-n] [-t title] menu cmd [args...]
 	-t	Set title; default is menu name.
 	-1	Don't give this menu a DynamicPopUpAction."
 
-while :
+while [ $# -gt 0 ]
 do
   case $1 in
     -n) noentries=1 ;;
