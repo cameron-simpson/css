@@ -1,0 +1,63 @@
+#!/bin/sh
+#
+# A placeholder to apply virtual server based context to sftp connections,
+# providing distinct initial working directories for sftp operations
+# based on server IP address.
+#
+# Install: Move real /usr/libexec/openssh/sftp-server to sftp-server.real
+# and symlink this in.
+#
+# Config file format:
+#	users,... vhost-ip /directory
+# The first matching line applies. The special user "*" matches any user.
+#	- Cameron Simpson <cs@zip.com.au> 31mar2005
+# 
+
+cfg=/etc/vsftpd.conf
+realsftpd=/usr/libexec/openssh/sftp-server.real
+logfile=/tmp/vsftpd.log
+exec 2>>"$logfile"
+
+[ -n "$SSH_CONNECTION" ] || { echo "$0: no \$SSH_CONNECTION envvar, aborting" >&2
+			      exit 1
+			    }
+## ::ffff:10.11.0.12 36601 ::ffff:10.11.0.12 22
+set -- $SSH_CONNECTION
+[ $# = 4 ] || { echo "$0: malformed \$SSH_CONNECTION envvar, expected 4 words" >&2
+		exit 1
+	      }
+srcip=$1
+destip=$3
+## pretty up IPv4 addrs
+case "$srcip" in ::ffff:?*) srcip=`expr "x$srcip" : 'x::ffff:\(.*\)'` ;; esac
+case "$destip" in ::ffff:?*) destip=`expr "x$destip" : 'x::ffff:\(.*\)'` ;; esac
+
+user=`whoami` || exit 1
+
+# see if this user should chdir
+while read cfuser cfip cfdir
+do
+
+  # skip blank lines and comments
+  case "$cfuser" in
+    '' | \#* ) continue ;;
+  esac
+  
+  # skip lines not for this host
+  [ "x$cfip" = "x$destip" ] || continue
+
+  case ",$cfuser," in
+    *,\*,* | *",$user,"* ) ;;
+    *)	continue ;; # user not mentioned
+  esac
+
+  # a match - go to the target directory
+  [ -d "$cfdir/." ] || exit 1
+  cd "$cfdir"       || exit 1
+  break
+
+done <"$cfg"
+
+echo "`date`: $user@$destip from $srcip, wd=`pwd`" >>"$logfile"
+
+exec "$realsftpd" ${1+"$@"}
