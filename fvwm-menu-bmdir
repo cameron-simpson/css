@@ -1,15 +1,21 @@
-#!/bin/sh
+#!/bin/sh -u
 #
 # Generate menu for a bookmark directory.
 #	- Cameron Simpson <cs@zip.com.au> 02mar2003
 #
+# Updated to use bmk bookmarks. - cameron 19apr2005
+#
+
+: ${BMK_DIR:=$HOME/rc/bmk}
+
+dir=$BMK_DIR
 
 cmd=$0
-usage="Usage: $cmd dir"
+usage="Usage: $cmd [dir]"
 
 badopts=
 
-while :
+while [ $# -gt 0 ]
 do
   case $1 in
     --) shift; break ;;
@@ -21,24 +27,22 @@ do
   shift
 done
 
-if [ $# = 0 ]
-then
-    echo "$cmd: missing dir" >&2
-    badopts=1
-else
-    dir=$*; shift
-    cd "$dir" || exit 1
-fi
+[ $# -gt 0 ] && { dir=$1; shift; }
+
+[ $# = 0 ] || { echo "$cmd: extra arguments after dir: $*" >&2; badopts=1; }
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
-wd=`pwd`
-nd=`basename "$wd"`
+cd "$dir"		|| exit 1
+wd=`pwd`		|| exit 1
+nd=`basename "$wd"`	|| exit 1
 ##echo "\"$nd\" Title"
 
-pd=`dirname "$wd"`
-pnd=`basename "$pd"`
+pd=`dirname "$wd"`	|| exit 1
+pnd=`basename "$pd"`	|| exit 1
 echo "\"<-- $pnd\" PopBmDir $pd"
+
+xit=0
 
 dirs=
 dsep=
@@ -51,19 +55,25 @@ do
       dirs="$dirs$dsep\"$bm ->\" PopBmDir \"$wd/$bm\""
       dsep='
 '
-  else
-      exec <"$bm"
-      if read url
-      then
-	  urls="$urls$usep\"$bm\" Exec us '$url'"
-	  usep='
+      continue
+  fi
+  
+  if [ -s "$bm" ]
+  then
+      url=`sed -n -e '/^$/q' -e '/^[Uu][Rr][Ll]:/{ s/^[^:]*: *//p; q; }' <"$bm"`
+      [ -n "$url" ] || url=file://$wd/$bm
+      title=`sed -n -e '/^$/q' -e '/^[Ss][Uu][Bb][Jj][Ee][Cc][Tt]:/{ s/^[^:]*: *//p; q; }' <"$bm"`
+      [ -n "$title" ] || title=$bm
+
+      urls="$urls$usep\"$title\" Exec us '$url'"
+      usep='
 '
-      else
-	  : echo "\"--$bm--\" Nop"
-      fi
+      continue
   fi
 done
 
 [ -n "$dirs" ] && echo "$dirs"
 [ -n "$dirs" -a -n "$urls" ] && echo "\"\" Nop"
 [ -n "$urls" ] && echo "$urls"
+
+exit $xit
