@@ -1,12 +1,20 @@
-#!/bin/sh
+#!/bin/sh -u
 #
 # Examine the named files and attach correct extensions to misnamed ones.
 #	- Cameron Simpson <cs@zip.com.au> 22feb1999
 #
 # Base entirely on file2mime and mimeext now. - cameron 24jul2003
+# Added "-i type" option to bypass file2mime. - cameron 19apr2005
 #
 
-[ $# = 0 ] && { [ -t 0 ] && echo "reading filenames from stdin..." >&2; set -- `cat`; }
+cmd=$0
+usage="Usage: $cmd [-i type] [filenames...]
+  -i type	Specify the MIME type instead of guessing from content."
+
+itype=
+[ $# -gt 0 ] && [ "x$1" = x-i ] && { itype=$2; shift; shift; }
+
+[ $# = 0 ] && { [ -t 0 ] && echo "$cmd: reading filenames from stdin..." >&2; set -- `cat` || exit 1; }
 
 xit=0
 
@@ -19,10 +27,15 @@ do
 		     xit=1; continue;
 		   }
 
-    type=`file2mime "$f"` || { echo "$cmd: can't deduce MIME type of \"$f\"" >&2
-			       xit=1
-			       continue
-			     }
+    if [ -n "$itype" ]
+    then
+      type=$itype
+    else
+      type=`file2mime "$f"` || { echo "$cmd: can't deduce MIME type of \"$f\"" >&2
+				 xit=1
+				 continue
+			       }
+    fi
 
     prefext=`mimeext "$type"` || { echo "$cmd: no preferred extension for $type" >&2
 				   xit=1
