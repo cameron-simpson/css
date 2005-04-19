@@ -1,0 +1,94 @@
+#!/bin/sh -u
+#
+# Bookmark manager.
+#	- Cameron Simpson <cs@zip.com.au> 19apr2005
+#
+
+: ${BMK_DIR:=$HOME/rc/bmk}
+: ${TMPDIR:=/tmp}
+
+cmd=`basename "$0"`
+usage="Usage: $cmd [-o out] [-d bmdir] [-t title] [-d desc] [URL]"
+
+url=
+title=
+outputfile=
+desc=
+
+badopts=
+
+while [ $# -gt 0 ]
+do
+  case $1 in
+    -d)	desc=$2; shift ;;
+    -o)	outputfile=$2; shift ;;
+    -t)	title=$2; shift ;;
+    --)	shift; break ;;
+    -?*)echo "$cmd: unrecognised option: $1" >&2
+	badopts=1
+	;;
+    *)	break ;;
+  esac
+  shift
+done
+
+if [ $# -gt 0 ]
+then
+  url=$1; shift
+  [ $# = 0 ] || { echo "$cmd: extra arguments: $*" >&2; badopts=1; }
+else
+  url=`xclip -o` || exit 1
+  echo "$*" >&2
+fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+if [ -n "$url" ]
+then
+  date=`822date` || exit 1
+
+  echo "Date: $date"
+  echo "URL: $url"
+  if [ -n "$title" ]
+  then  echo "Title: $title"
+  else  title=`readline 'Title: '` || exit 1
+        [ -n "$title" ] || { echo "$cmd: title may not be empty!" >&2; exit 1; }
+  fi
+  titlebase=`printf "%s" "$title" | tr ' \011\012/"' '...-'`
+  if [ -n "$desc" ]
+  then  printf "%s\n" "$desc"
+  else  [ ! -t 0 ] || desc=`readdottext` || exit 1
+  fi
+
+  if [ -n "$outputfile" ]
+  then
+    case "$outputfile" in /*) ;; *) outputfile=$BMK_DIR/$outputfile ;; esac
+    case "$outputfile" in
+      */ | */. )	outputfile=`expr "x$outputfile" : 'x\(.*\)/[^/]*$'`/$titlebase.bmk ;;
+      *.bmk)	;;
+      *)		outputfile=$outputfile.bmk ;;
+    esac
+    titlefile=$outputfile
+    [ -s "$outputfile" ] && { echo "$cmd: $outputfile: already exists, skipoing $url" >&2
+			      exit 1
+			    }
+    od=`dirname "$outputfile"` || exit 1
+    needdir "$od" || exit 1
+    echo "-> $outputfile"
+  else
+    tmpdir=`mkdirn "$TMPDIR/$cmd"` || exit 1
+    trap 'rm -rf "$tmpdir"' 0
+    titlefile=$tmpdir/$titlebase.bmk || exit 1
+  fi
+
+  { echo "Date: $date"
+    echo "URL: $url"
+    echo "Subject: $title"
+    echo
+    printf "%s\n" "$desc"
+  } >"$titlefile"
+
+  [ -n "$outputfile" ] && exit 0
+
+  exec apphelper "$titlefile" -n -d "$BMK_DIR" -i text/x-cs-bmk
+fi
