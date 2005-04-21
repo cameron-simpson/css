@@ -57,7 +57,7 @@ then
   titlebase=`printf "%s" "$title" | tr ' \011\012/"' '...-'`
   if [ -n "$desc" ]
   then  printf "%s\n" "$desc"
-  else  [ ! -t 0 ] || desc=`readdottext` || exit 1
+  else  : || [ ! -t 0 ] || desc=`readdottext` || exit 1
   fi
 
   if [ -n "$outputfile" ]
