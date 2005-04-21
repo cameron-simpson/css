@@ -28,7 +28,7 @@ doprobe=
 subopts=
 doclean=
 doanon=
-popurl_mode=new-window
+popnew=1
 mozremote=/opt/firefox/mozilla-xremote-client
 
 badopts=
@@ -43,7 +43,7 @@ do  case "$1" in
 	+c)	doclean= ;;
 	-d)	DISPLAY=$2; export DISPLAY; shift ;;
 	-p)	doprobe=1 ;;
-	-t)	popurl_mode=new-tab ;;
+	-t)	popnew= ;;
 	-i)	input=$2; shift
 		set x ${1+"$@"} "" `cat $input`; shift
 		;;
@@ -79,16 +79,18 @@ then
 fi
 
 popurl()
-{ popurl_ret=0
+{
   for url
   do
       [ -n "$URLLOG" ] && echo "urlshow $url" >>"$URLLOG"
-      if lock mozilla-xremote-client set-x "$mozremote" "openurl($url,$popurl_mode)"
-      then  popurl_mode=new-tab
-      else  popurl_ret=1
+      if [ $popnew ]
+      then
+        lock mozilla-xremote-client set-x "$mozremote" "openurl($url,new-window)"
+	popnew=
+      else
+        lock mozilla-xremote-client set-x "$mozremote" "openurl($url,new-tab)" &
       fi
   done
-  return $popurl_ret
 }
 
 if [ "x$DISPLAY" = "x$BROWSER_DISPLAY" ]
