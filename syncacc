@@ -51,6 +51,7 @@ exec \
 	'--exclude=/man/*' \
 	'--include=/rc' \
 	'--include=/rc/@' \
+	'--include=/rc/bmk' \
 	'--include=/rc/cvs' \
 	'--include=/rc/env' \
 	'--include=/rc/getnews' \
