@@ -84,9 +84,9 @@ do
   [ -s "$HOME/rc/mail/$shfile" ] && . "$HOME/rc/mail/$shfile"
 done
 
-export mfolder
+##export mfolder
 ## -e \"fcc-hook \$mfolder \$mfolder\"
-muttcmd="mutt -f \"\$mfolder\" -e \"fcc-hook . \$mfolder\" $muttopts"
+muttcmd="mutt -f '$mfolder' -e 'fcc-hook . $mfolder' $muttopts"
 if [ -n "$fpath" ]
 then
   ##muttcmd="$muttcmd -e 'set maildir_cache=$fpath/.mutt-hcache'"
