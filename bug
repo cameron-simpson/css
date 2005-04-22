@@ -53,14 +53,7 @@ exec 3>&1
     case "$bugsystem" in
       ddts)
 	pro=sa.maintenance
-	exec 3>&1
-	if [ -t 0 ]
-	then
-	    echo
-	else
-	    [ -t 3 ] && echo "Reading bug details from stdin ..." >&3
-	    cat
-	fi | mkddtsrq -S "$sev" -p "$pro" "$*"
+	mkddtsrq -S "$sev" -p "$pro" "$*"
 	xit=$?
 	break
 	;;
