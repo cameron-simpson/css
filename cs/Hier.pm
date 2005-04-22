@@ -395,9 +395,14 @@ sub _a2scalar	# string -> (value,unparsed)
   {
     ## warn "$::cmd: bareword at [$_]<BR>\n";
 
-    /^[-+\/\w\.\@_]*/;
-    $sofar=$&;
-    $unparsed=$';
+    if (/^[-+\/\w\.\@_]+/)
+    {
+      $sofar=$&;
+      $unparsed=$';
+    }
+    else
+    { $unparsed=$_;
+    }
   }
 
   ## warn "$::cmd: sofar=[$sofar], unparsed=[$unparsed]<BR>\n";
