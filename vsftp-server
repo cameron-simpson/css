@@ -17,6 +17,7 @@ cfg=/etc/vsftpd.conf
 realsftpd=/usr/libexec/openssh/sftp-server.real
 logfile=/tmp/vsftpd.log
 exec 2>>"$logfile"
+exec 3>&1 1>&2
 
 [ -n "$SSH_CONNECTION" ] || { echo "$0: no \$SSH_CONNECTION envvar, aborting" >&2
 			      exit 1
@@ -60,4 +61,5 @@ done <"$cfg"
 
 echo "`date`: $user@$destip from $srcip, wd=`pwd`" >>"$logfile"
 
+exec 1>&3 3>&-
 exec "$realsftpd" ${1+"$@"}
