@@ -65,7 +65,7 @@ do
 done <"$cfg"
 
 [ -n "$wd" ] || wd=`pwd`
-logger -t vsftp "$user@$destip from $srcip, wd=$cfdir"
+logger -t vsftp "$user@$destip from $srcip, wd=$wd"
 
 exec 1>&3 3>&-
 exec "$realsftpd" ${1+"$@"}
