@@ -1,0 +1,22 @@
+#!/usr/bin/python
+
+import sys
+import cs.gui
+
+top=cs.gui.toplevel()
+top.set_size_request(400,800)
+
+##topvbox=cs.gui.vbox()
+##top.add(topvbox)
+
+import pygtk
+pygtk.require("2.0")
+import gtk
+import cs.bmk
+
+bmk=cs.treemodel.CSTreeModel(cs.bmk.BMKNode('/home/cameron/rc/bmk'))
+tv=bmk.gettreeview()
+top.add(cs.gui.scrolled(tv))
+
+top.show_all()
+cs.gui.main()
