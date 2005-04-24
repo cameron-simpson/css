@@ -52,7 +52,7 @@ esac
 # If some dickheads didn't use csh for root this would be much simpler.
 tmp=/tmp/su.$$
 
-tee $HOME/var/log/su.out >$tmp <<SU
+cat >$tmp <<SU
 SHELL=$SHELL
 PS1= PS2=
 HOME=$HOME PATH=$PATH
@@ -62,7 +62,8 @@ USER=$su
 EMAIL=$EMAIL
 DISPLAY=$DISPLAY
 PERL5LIB=$HOME/rc/perl:$PERL5LIB:/opt/perl/lib
-export USER EMAIL DISPLAY PERL5LIB
+SCREENDIR=/tmp/screen-\$USER
+export USER EMAIL DISPLAY PERL5LIB SCREENDIR
 [ -n "\$DISPLAY" ] || unset DISPLAY
 rm -f $tmp $env
 exec term -n '$su@$HOST'
