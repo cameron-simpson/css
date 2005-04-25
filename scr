@@ -119,6 +119,10 @@ then
   exec "$@"
 fi
 
+case "$TERM" in
+  rxvt-*) TERM=rxvt ;;
+esac
+
 (
   # look for matching session if supplied
   if [ -n "$sess" ]
