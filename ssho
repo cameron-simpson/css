@@ -1,2 +1,2 @@
 #!/bin/sh
-exec ssh -o 'stricthostkeychecking no' ${1+"$@"}
+exec sshto -o 'stricthostkeychecking no' ${1+"$@"}
