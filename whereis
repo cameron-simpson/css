@@ -27,6 +27,7 @@ do
   case "$1" in
     av|ave|avenue \
     | st|street \
+    | rd|road \
     | pl|place \
     | cr|cres|crescent \
     | ln|lane \
