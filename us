@@ -23,7 +23,7 @@ do
 done
 
 if [ $# = 0 ]
-then  set x -; shift
+then  set -- -
 else  [ "x$*" = x- ] || exec </dev/null
 fi
 
