@@ -1,15 +1,15 @@
 import re
 from cStringIO import StringIO
 
-shunsafe_re=re.compile(r'[^\-a-z0-9.]');
+sh_unsafe_re=re.compile(r'[^\-a-z0-9.]');
 
-def quote(*args):
-  quoted=()
-  for arg in *args:
-    if !arg.length:
+def quote(args):
+  quoted=[]
+  for arg in args:
+    if len(arg) == 0:
       qarg="''"
     else:
-      if unsafe_re.match(arg): qarg=quotestr(arg)
+      if sh_unsafe_re.match(arg): qarg=quotestr(arg)
       else: qarg=arg
 
     quoted.append(qarg)
@@ -27,4 +27,4 @@ def quotestr(s):
       qs.write(c)
 
   qs.write("'")
-  return qs
+  return qs.getvalue()
