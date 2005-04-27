@@ -27,7 +27,7 @@ then
   # force unlock
   unlock -f "$statefile"
 else
-  eval `get-ssh-agent "$statefile"` && exit 0
+  eval `get-ssh-agent "$statefile" || echo false` && exit 0
 fi
 
 export statefile
