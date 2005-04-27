@@ -130,28 +130,39 @@ esac
     # otherwise convert $sess into session name to join
     case "$sess" in
       [1-9]|[1-9][0-9]|[1-9][0-9][0-9])
-	    # numeric - pull name from listing
-	    nsess=`scr | sed -n "s/^ *$sess //p"`
-	    [ -n "$nsess" ] || { echo "$cmd: no screen numbered $sess" >&2
-				 exit 1
-			       }
-	    # matched - join the session
-	    exec screen -c "$rcfile" -x "$nsess"
-	    ;;
-
-      # strip slashes and whitespace from session name if necessary
-      *[/\ \	]*)  sess=`echo "$sess" | tr '[/ 	]' '[___]'` ;;
+	# numeric - pull name from listing
+	nsess=`scr | sed -n "s/^ *$sess //p"`
+	[ -n "$nsess" ] || { echo "$cmd: no screen numbered $sess" >&2
+			     exit 1
+			   }
+	# matched - join the session
+	exec screen -c "$rcfile" -x "$nsess"
+	;;
     esac
 
     # not numeric - look up in listing
-    match=`scr | sed -e "/^ *[1-9][0-9]* [1-9][0-9]*\\.$sess\$/!d" -e 's/^ *[1-9][0-9]*  *//' -e q`
+
+    # slashes forbidden in session - triggers multiuser mode
+    case "$sess" in */*) sess=`printf "%s" "$sess" | tr / _` ;; esac
+
+    case "$sess" in
+      *[\\.]*)
+	sessre=`printf "%s" "$sess" | sed 's/[\\.]/\\&/g'`
+	;;
+      *)sessre=$sess
+	;;
+    esac
+    match=`scr | sed -e "/^ *[1-9][0-9]* [1-9][0-9]*\\.$sessre\$/!d" -e 's/^ *[1-9][0-9]*  *//' -e q`
 
     # match found - join it
     [ -n "$match" ] && exec screen -c "$rcfile" -x "$sess"
+  else
+    sess=$*
+    case "$sess" in */*) sess=`printf "%s" "$sess" | tr / _` ;; esac
   fi
 
   # start new session
-  exec screen -c "$rcfile" -- "$@"
+  exec screen -S "$sess" -c "$rcfile" -- "$@"
 )
 
 [ -n "$tmprc" ] && rm "$tmprc"
