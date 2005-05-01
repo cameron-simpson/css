@@ -1,0 +1,30 @@
+#!/bin/sh -u
+#
+# Endpoint for receipt of the 2any sshtunnels key.
+#	- Cameron Simpson <cs@zip.com.au> 01may2005
+#
+
+cmd=$0
+usage="Usage: $cmd
+	\$SSH_ORIGINAL_COMMAND expected to hold \"nc host port\""
+
+badopts=
+
+if [ $# -gt 0 ]
+then
+  echo "$cmd: unexpected command line arguments: $*" >&2
+  badopts=1
+fi
+
+set -- $SSH_ORIGINAL_COMMAND
+[ $# = 3 ] || { echo "$cmd: expect exactly 3 words in \$SSH_ORIGINAL_COMMAND, got: $SSH_ORIGINAL_COMMAND" >&2
+		badopts=1
+	      }
+
+[ "x$1" = xnc ] || { echo "$cmd: expected first \$SSH_ORIGINAL_COMMAND word 1 == nc" >&2
+		     badopts=1
+		   }
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+exec nc "$2" "$3"
