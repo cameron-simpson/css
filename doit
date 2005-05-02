@@ -8,7 +8,7 @@
 
 if "$@"
 then
-  alert -c "OK: $*"
+  alert -c white "OK: $*"
   exit 0
 fi
 
