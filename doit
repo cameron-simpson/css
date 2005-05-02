@@ -1,0 +1,16 @@
+#!/bin/sh
+#
+# Run command, report completion to alert log.
+#	- Cameron Simpson <cs@zip.com.au> 03may2005
+#
+
+[ $# = 0 ] && { echo "Usage: $0 command [args...]" >&2; exit 2; }
+
+if "$@"
+then
+  alert -c "OK: $*"
+  exit 0
+fi
+
+alert -c red "FAILED: $*"
+exit 1
