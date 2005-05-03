@@ -36,8 +36,8 @@ else
 
   if [ -n "$pidfile" ]
   then
-    {  [ -s "$pidfile" -a -f "$pidfile" ] \
-    && read pid etc <"$pidfile" \
+    {
+       read pid etc <"$pidfile" \
     && [ -n "$pid" ]
     } || { echo "$cmd: can't read pid from file \"$pidfile\"" >&2; exit 1; }
   fi
