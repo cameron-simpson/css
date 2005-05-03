@@ -5,10 +5,16 @@
 #
 
 cmd=$0
-usage="Usage: $cmd [!] {pid|pidfile}
+usage="Usage: $cmd [-v] [!] {pid|pidfile}
+	-v	Verbose. Print pid if real.
 	!	Test that the process does not exist."
 
 badopts=
+
+verbose=
+if [ $# -gt 0 ] && [ "x$1" = "x-v" ]
+then  verbose=1; shift
+fi
 
 yes=0 no=1
 if [ $# -gt 0 ] && [ "x$1" = "x!" ]
@@ -39,5 +45,5 @@ fi
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
-kill -0 "$pid" 2>/dev/null && exit $yes
+kill -0 "$pid" 2>/dev/null && { [ $verbose ] && echo "$pid"; exit $yes; }
 exit $no
