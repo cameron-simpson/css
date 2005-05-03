@@ -12,7 +12,6 @@ force=
 
 if pid=`ifpid -v squid.pid`
 then  kill "$pid" || exit 1
-      rm -f $HOME/var/run/squid.pid
       sleep 2	# let it wake up and let go of sockets
 else
   [ $force ] || { echo "$cmd: no squid to kill, retry with -f option" >&2; exit 1; }
@@ -22,7 +21,8 @@ fi
 ##exec alog squid_redirect squid_redirect -P "8080:$SQUID"
 
 rc=$HOME/tmp/squid.conf$$
-envsub -p '\{\{([A-Z]\w*)\}\}' <"$HOME/rc/squid/tplt" >"$rc"
+pidf=$HOME/var/run/squid.pid-$$
+env SQUID_PIDFILE=$pidf envsub -p '\{\{([A-Z]\w*)\}\}' <"$HOME/rc/squid/tplt" >"$rc"
 mksquidpeers $SQUID_PEERS \
 | rlr -f '^##MKSQUIDPEERS OUTPUT BEGIN' -t '##MKSQUIDPEERS OUTPUT END' -i "$rc" -o "$rc" -
 case "$LOCATION" in
@@ -32,4 +32,6 @@ case "$LOCATION" in
     *)		;;
 esac
 set -x
+rm -f $HOME/var/run/squid.pid
+ln -s $pidf $HOME/var/run/squid.pid
 exec alog squid/cache.log squid -f "$rc" -D
