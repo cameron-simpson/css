@@ -17,6 +17,7 @@ then
 fi
 
 set -- $SSH_ORIGINAL_COMMAND
+[ $# -gt 0 ] && [ "x$1" = xexec ] && shift
 [ $# = 3 ] || { echo "$cmd: expect exactly 3 words in \$SSH_ORIGINAL_COMMAND, got: $SSH_ORIGINAL_COMMAND" >&2
 		badopts=1
 	      }
