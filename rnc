@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/sh -u
 #
 # Remote netcat.
 #	- Cameron Simpson <cs@zip.com.au> 11jul2004
