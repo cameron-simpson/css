@@ -20,13 +20,14 @@ then
 else
     refpid=$1
     shift
+    [ "x$refpid" = x- ] && refpid=$$
 fi
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
 if [ $# -gt 0 ]
 then
-    eval `"$0"`
+    eval `"$0" "$refpid"`
     exec "$@"
 fi
 
@@ -51,7 +52,7 @@ then
   do
     if [ -s "$envfile" ]
     then
-      echo "echo \"\$0: source $envfile\" >&2"
+      echo "echo \"\$0: source $envfile\" >&2; "
       cat "$envfile"
     fi
   done
