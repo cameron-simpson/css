@@ -1,0 +1,32 @@
+#!/bin/sh -u
+#
+# Read a bug line from stdin and subject it to sanity tests.
+#	- Cameron Simpson <cs@zip.com.au> 04may2005
+#
+
+cmd=$0
+usage="Usage: $cmd [-p prompt] [test-commands...]"
+
+[ -t 0 -a -t 2 ] \
+|| { echo "$cmd: stdin and stdout must be terminals" >&2
+     exit 1
+   }
+
+prompt=
+[ $# -gt 0 ] && [ "x$1" = x-p ] && { prompt=$2; shift; shift; }
+
+while :
+do
+  msg=`readbugline "$prompt"` || exit 1
+  ok=1
+  for testcmd
+  do
+    printf "%s" "$msg" | eval "$testcmd" \
+    || { echo "$cmd: bug line fails requirement: $testcmd" >&2
+	 ok=
+       }
+  done
+  [ $ok ] && break
+done
+
+printf "%s" "$msg"
