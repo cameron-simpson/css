@@ -1,0 +1,77 @@
+#!/bin/sh -u
+#
+# Overlay specific subtrees of a directory tree onto another.
+# Useful for exporting particular subtrees to another area.
+#	- Cameron Simpson <cs@zip.com.au> 04may2005
+#
+
+cmd=`basename "$0"` || exit 1
+usage="Usage: $cmd [-n] [-x] [-g glob] fromdir todir
+	-n	No action. Recite plan.
+	-p	Prune matched sourced dirs.
+	-x	Trace execution.
+	-g glob	Glob pattern matching target directories, used by find."
+
+trace=
+glob=
+prune=
+
+badopts=
+
+while [ $# -gt 0 ]
+do
+  case "$1" in
+    -g)	glob=$2; shift ;;
+    -n)	trace=echo ;;
+    -p)	prune=1 ;;
+    -x)	trace=set-x ;;
+    --)	shift; break ;;
+    -?*)echo "$cmd: unrecognised option: $1" >&2; badopts=1 ;;
+    *)	break ;;
+  esac
+  shift
+done
+
+if [ $# = 2 ]
+then
+  fromdir=$1 todir=$2
+  shift; shift
+  [ -d "$fromdir/." ] || { echo "$cmd: fromdir $fromdir: not a directory" >&2; badopts=1; }
+  [ -d "$todir/." ] || { echo "$cmd: todir $todir: not a directory" >&2; badopts=1; }
+else
+  echo "$cmd: final arguments expected to be: fromdir todir, found: $*" >&2
+  badopts=1
+fi
+
+[ -n "$glob" ] || { echo "$cmd: missing -g option" >&2; badopts=1; }
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+if [ $prune ]
+then  ov=ov
+else  ov=overlay
+fi
+
+# need full path of $todir
+case "$todir" in
+  /*) ;; *) todir=`pwd`/$todir || exit 1 ;;
+esac
+
+( cd "$fromdir" || exit 1
+  find . -type d -name "$glob" -print -prune \
+) \
+| \
+{ xit=0
+  while read -r matchdir
+  do
+    srcdir=$fromdir/$matchdir
+    destdir=$todir/$matchdir
+    echo "$srcdir -> $destdir"
+    (
+      cd "$srcdir" || exit 1
+      [ -d "$destdir/." ] || $trace needdir "$destdir" || exit 1
+      $trace "$ov" . "$destdir/."
+    ) || xit=1
+  done
+  exit $xit
+}
