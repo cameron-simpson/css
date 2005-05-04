@@ -243,7 +243,7 @@ setenv()
     for envfile in $envfiles
     do
       [ -s "$envfile" ] \
-      || echo 'setenv(){ eval "$1=\$2; export $1"; }' >>"$envfile" \
+      || echo 'function setenv { eval "$1=\$2; export $1"; }; ' >>"$envfile" \
       || echo "$cmd: can't write to $envfile" >&2
     done
 
