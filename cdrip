@@ -22,7 +22,7 @@
 # Normally it is sufficient to cd to your audio archive directory,
 # insert your audio CD in the CDROM drive and say:
 #
-#	mkcd
+#	cdrip
 #
 # I<cdrip> will consult the FreeDB database for track and album titles,
 # and extract and encode the tracks.
@@ -409,7 +409,7 @@ exit $xit
 #
 # =head1 SEE ALSO
 #
-# oggenc(1), lame(1), cdparanoia(1), mkiso(1cs), mkcd(1cs), cdtoc(1cs)
+# oggenc(1), lame(1), cdparanoia(1), mkiso(1cs), mkcd(1cs), cdtoc(1cs), cdsubmit(1cs)
 #
 # =head1 AUTHOR
 #
