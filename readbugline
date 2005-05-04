@@ -1,15 +1,16 @@
-#!/bin/sh
+#!/bin/sh -u
 #
 # Prompt for a change log line for a bug report.
 #	- Cameron Simpson <cs@zip.com.au> 10aug2004
 #
 
-prompt="Please enter the reason and bug id for this session."
+prompt=
 
 cmd=$0
 usage="Usage: $cmd [prompt]"
 
 [ $# = 0 ] || prompt=$*
+[ -n "$prompt" ] || prompt="Please enter the reason and bug id for this session."
 
 [ -t 0 ] || { echo "$cmd: stdin must be a tty" >&2; exit 1; }
 echo "$prompt" >&2
