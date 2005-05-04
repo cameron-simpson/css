@@ -14,7 +14,7 @@ grep '^[^#]' \
   do
     set-x \
     tcpio -a "$localif:$localport" \
-      env ENVFILES=/etc/rc.mobile/env.sh syncenv \
+      env ENVFILES=/etc/rc.mobile/env.sh syncenv - \
       rnc -l "$sshsite" -u sshtunnels -i /home/sshtunnels/.ssh/2any \
 	  "$sshsite" "$fwdhost" "$fwdport" &
   done
