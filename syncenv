@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/sh -u
 #
 # Emit output to re-source the environment files if they've been updated.
 # Have to do them all if any are new because of ordering.
@@ -9,13 +9,30 @@
 : ${TMPDIR:=/tmp}
 
 cmd=$0
-usage="Usage: $cmd ppid"
+usage="Usage: $cmd refpid [command [command-args...]]"
 
-[ $# = 1 ] || { echo "$usage" >&2; exit 2; }
-refpid=$1; shift
+badopts=
+
+if [ $# = 0 ]
+then
+    echo "$cmd: missing refpid" >&2
+    badopts=1
+else
+    refpid=$1
+    shift
+fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+if [ $# -gt 0 ]
+then
+    eval `"$0"`
+    exec "$@"
+fi
 
 file=$TMPDIR/env$refpid
 new=
+
 for envfile in "$0" $ENVFILES
 do
   if [ -s "$envfile" ]
@@ -26,6 +43,7 @@ do
     fi
   fi
 done
+
 if [ $new ]
 then
   ##set -x
