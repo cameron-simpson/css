@@ -146,4 +146,5 @@ fi
 [ $ok ] || exit 1
 
 set -x
-exec mkisofs -D -J -L -N -r -T -v -V "$label" -o "$out" "$dir"
+exec mkisofs -D -J -allow-leading-dots -N -r -T -v -V "$label" -o "$out" "$dir"
+## old mkisofs ## exec mkisofs -D -J -L -N -r -T -v -V "$label" -o "$out" "$dir"
