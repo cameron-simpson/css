@@ -52,6 +52,7 @@ $cs::Hier::_UseIndent=1;
 $cs::Hier::PtrTags=0;
 $cs::Hier::PackageTags=1;
 $cs::Hier::Indent=0;
+$cs::Hier::Prettier=0;
 
 =head1 GENERAL FUNCTIONS
 
@@ -228,8 +229,10 @@ sub putKVLine
   $s->Put("\n");
 }
 
-sub _sep
-{ $cs::Hier::_UseIndent ? ",\n".(' ' x $cs::Hier::Indent) : ', ';
+sub _sep(;$)
+{ my($sepch)=@_;
+  $sepch=',' if ! defined $sepch;
+  $cs::Hier::_UseIndent ? "$sepch\n".(' ' x $cs::Hier::Indent) : "$sepch ";
 }
 
 sub _scalar2a
@@ -240,10 +243,17 @@ sub _scalar2a
   }
   elsif (/[^-+_\w.\/\@]/)
   { s/["\\]/\\$&/g;
-    s/\n/\\n/g;
-    s/\r/\\r/g;
+    s/[^\n\020-\176]/sprintf("\\x%02x",ord($&))/eg;
+    if ($cs::Hier::Prettier)
+    { s/\s+$//;
+      s/\n/_sep('').' '/eg;
+      s/\r//g;
+    }
+    else
+    { s/\n/\\n/g;
+      s/\r/\\r/g;
+    }
     s/\t/\\t/g;
-    s/[^\020-\176]/sprintf("\\x%02x",ord($&))/eg;
     return "\"$_\"";
   }
   else
@@ -258,13 +268,13 @@ sub _array2s
   $s->Put('[');
 
   if (@$a)
-	{ my(@a)=@$a;
-	  h2s($s,shift(@a));
-	  for my $el (@a)
-		{ $s->Put(_sep());
-		  h2s($s,$el);
-		}
-	}
+  { my(@a)=@$a;
+    h2s($s,shift(@a));
+    for my $el (@a)
+    { $s->Put(_sep());
+      h2s($s,$el);
+    }
+  }
 
   $s->Put(']');
 }
