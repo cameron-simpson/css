@@ -4,6 +4,8 @@
 #	- Cameron Simpson <cs@zip.com.au> 04may2005
 #
 
+: ${BUGSYSTEM_CHECKS:=''}
+
 cmd=$0
 usage="Usage: $cmd [-p prompt] [test-commands...]"
 
@@ -15,13 +17,15 @@ usage="Usage: $cmd [-p prompt] [test-commands...]"
 prompt=
 [ $# -gt 0 ] && [ "x$1" = x-p ] && { prompt=$2; shift; shift; }
 
+[ $# = 0 ] && set -- $BUGSYSTEM_CHECKS
+
 while :
 do
   msg=`readbugline "$prompt"` || exit 1
   ok=1
   for testcmd
   do
-    printf "%s" "$msg" | eval "$testcmd" \
+    printf "%s" "$msg" | "$testcmd" \
     || { echo "$cmd: bug line fails requirement: $testcmd" >&2
 	 ok=
        }
