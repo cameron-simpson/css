@@ -90,6 +90,7 @@ exec \
 	'--include=/rc/shell' \
 	'--include=/rc/squid' \
 	'--include=/rc/ssh' \
+	'--include=/rc/tplt' \
 	'--include=/rc/tdl' \
 	'--include=/rc/term' \
 	'--include=/rc/urlmap' \
