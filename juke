@@ -30,7 +30,7 @@ runplayer()
     playlist=$TMPDIR/$cmd.$$
     while [ $ok ]
     do
-	if [$dorandom ]
+	if [ $dorandom ]
 	then  auropt=-r
 	      echo "Selecting randomly, patterns are: $ptns"
 	else  auropt=
