@@ -51,7 +51,7 @@ sub Query
   $host=$this->{HOST} if ! defined $host;
 
   my($ldapcmd);
-  $ldapcmd=cs::Shell::quote('ldapsearch','-h',$host,$query);
+  $ldapcmd=cs::Shell::quote('ldapsearch','-x','-h',$host,$query);
   my($s)=new cs::Source (PIPE,$ldapcmd);
   die "$::cmd: can't pipe from \"$ldapcmd\": $!" if ! defined $s;
 
