@@ -4,6 +4,7 @@
 #	- Cameron Simpson <cs@zip.com.au> 14jul2001
 #
 
+host=$HOST
 site=$SYSTEMID
 verbose=
 
@@ -39,7 +40,8 @@ vpncmd="exec ./scripts/vpnendpoint"
 
 xit=0
 
-for ext in ALL "$site"
+set --
+for ext in ALL "$site" "$host@$site"
 do
     list=$HOME/rc/ssh/auth-$ext
     [ -r "$list" ] || { echo "$cmd: can't read file \"$list\"" >&2
@@ -74,7 +76,7 @@ do
 		 xit=1
 		 continue
 	       }
-	    set "$fullkey.pub"
+	    set -- "$@" "$fullkey.pub"
       fi
 
       for keyf
