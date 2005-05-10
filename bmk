@@ -69,7 +69,7 @@ then
       *)		outputfile=$outputfile.bmk ;;
     esac
     titlefile=$outputfile
-    [ -s "$outputfile" ] && { echo "$cmd: $outputfile: already exists, skipoing $url" >&2
+    [ -s "$outputfile" ] && { echo "$cmd: $outputfile: already exists, skipping $url" >&2
 			      exit 1
 			    }
     od=`dirname "$outputfile"` || exit 1
@@ -90,5 +90,5 @@ then
 
   [ -n "$outputfile" ] && exit 0
 
-  exec apphelper "$titlefile" -n -d "$BMK_DIR" -i text/x-cs-bmk
+  exec env SAVEDIR=$BMK_DIR APPHELPER_LASTVALUE=bmk_savedir apphelper "$titlefile" -n -i text/x-cs-bmk
 fi
