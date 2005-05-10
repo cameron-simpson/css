@@ -417,34 +417,7 @@ fi
 # leaving it up to cp(1) to ask questions.
 #
 
-# see if we've saved this before
-md5pfx=`md5sum "$file" | sed 's;\(..\)\([^ ]*\)  .*;\1/\2;'`
-if [ -n "$md5pfx" ]
-then
-  cachefile=$cacheroot/$md5pfx
-  if [ -s "$cachefile" ]
-  then
-    while read -r oldsave
-    do
-      if [ -f "$oldsave" ] && cmp -s "$file" "$oldsave"
-      then
-	savedir=`dirname "$oldsave"` || exit 1
-	fbase=`basename "$oldsave"` || exit 1
-	break
-      fi
-    done <"$cachefile"
-  fi
-else
-  echo "$cmd: warning: can't checksum $file" >&2
-fi
-
-if [ -z "$savedir" ]
-then
-    savedir=`lastvalue "$APPHELPER_LASTVALUE" 2>/dev/null`
-    : ${savedir:=$SAVEDIR}
-fi
-
-# offer remapped name
+# offer remapped name if inferrable
 remaptmp=$TMPDIR/$cmd-remap$$
 if printf -- "%s\n" "$fbase" | eval "$APPHELPER_SAVEMAP" >"$remaptmp"
 then
@@ -469,6 +442,34 @@ then
   exec 0<&3 3<&-
 fi
 rm -f "$remaptmp"
+
+# see if we've saved this before
+md5pfx=`md5sum "$file" | sed 's;\(..\)\([^ ]*\)  .*;\1/\2;'`
+if [ -n "$md5pfx" ]
+then
+  cachefile=$cacheroot/$md5pfx
+  if [ -s "$cachefile" ]
+  then
+    while read -r oldsave
+    do
+      if [ -f "$oldsave" ] && cmp -s "$file" "$oldsave"
+      then
+	savedir=`dirname "$oldsave"` || exit 1
+	fbase=`basename "$oldsave"` || exit 1
+	break
+      fi
+    done <"$cachefile"
+  fi
+else
+  echo "$cmd: warning: can't checksum $file" >&2
+fi
+
+# no guesses? offer last save directory
+if [ -z "$savedir" ]
+then
+    savedir=`lastvalue "$APPHELPER_LASTVALUE" 2>/dev/null`
+    : ${savedir:=$SAVEDIR}
+fi
 
 if [ "x$savemode" = xauto ]
 then
