@@ -15,6 +15,7 @@
 : ${APPHELPER_DOVIEW:=''}
 : ${APPHELPER_EXTRACT_GLOBS:=''}
 : ${APPHELPER_OPTS:=''}
+: ${APPHELPER_LASTVALUE:=savedir}
 
 cmd=`basename "$0"`
 
@@ -33,6 +34,9 @@ extract=
 extract_globs=$APPHELPER_EXTRACT_GLOBS
 termname=$cmd
 pager=$PAGER
+
+# location of md5 records
+cacheroot=$HOME/var/cache/filesave
 
 # =head1 SYNOPSIS
 #
@@ -413,9 +417,30 @@ fi
 # leaving it up to cp(1) to ask questions.
 #
 
+# see if we've saved this before
+md5pfx=`md5sum "$file" | sed 's;\(..\)\([^ ]*\)  .*;\1/\2;'`
+if [ -n "$md5pfx" ]
+then
+  cachefile=$cacheroot/$md5pfx
+  if [ -s "$cachefile" ]
+  then
+    while read -r oldsave
+    do
+      if [ -f "$oldsave" ] && cmp -s "$file" "$oldsave"
+      then
+	savedir=`dirname "$oldsave"` || exit 1
+	fbase=`basename "$oldsave"` || exit 1
+	break
+      fi
+    done <"$cachefile"
+  fi
+else
+  echo "$cmd: warning: can't checksum $file" >&2
+fi
+
 if [ -z "$savedir" ]
 then
-    savedir=`lastvalue savedir 2>/dev/null`
+    savedir=`lastvalue "$APPHELPER_LASTVALUE" 2>/dev/null`
     : ${savedir:=$SAVEDIR}
 fi
 
@@ -555,12 +580,44 @@ fi
 
 # stash savedir
 ( cd "$parent" || exit 1
-  pwd | lastvalue savedir -
+  pwd | lastvalue "$APPHELPER_LASTVALUE" -
 )
 
 [ -f "$saveas" -a -s "$saveas" ] && cmp -s "$file" "$saveas" && exit 0
 
-cp -i "$file" "$saveas"
+# no exec so the trap gets to run
+xit=0
+if cp -i "$file" "$saveas"
+then
+  # note location of save
+  if [ -n "$cachefile" ]
+  then
+    cachedir=`dirname "$cachefile"` || exit 1
+    if [ -d "$cachedir/." ] || mkdir -p "$cachedir"
+    then
+      # try to clean up the save path
+      if savedir=`dirname "$saveas"` \
+      && savedir=`( cd "$savedir" && exec pwd )` \
+      && savebase=`basename "$saveas"`
+      then
+	saveas=$savedir/$savebase
+      fi
+
+      # now record the save path
+      if [ -s "$cachefile" ]
+      then
+	bsed "1i\
+$saveas" "$cachefile"
+      else
+	printf '%s\n' "$saveas" >>"$cachefile"
+      fi
+    else
+      echo "$cmd: warning: can't make dir for md5 cachefile $cachefile" >&2
+    fi
+  fi
+fi
+
+exit $xit
 
 # =head1 EXAMPLE
 #
