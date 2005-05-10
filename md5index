@@ -23,7 +23,7 @@ undef $::Count;
 
 my $badopts=0;
 
-getopts('n:');
+getopts('n:') || ($badopts=1);
 if (defined $::opt_n)
 { if ($::opt_n =~ /^\d+$/)
   { $::Count=$::opt_n+0;
