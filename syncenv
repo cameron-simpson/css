@@ -20,25 +20,27 @@ then
 else
     refpid=$1
     shift
-    [ "x$refpid" = x- ] && refpid=$$
 fi
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
+if [ "x$refpid" = x- ]
+then  file=
+else  file=$TMPDIR/env$refpid
+fi
 if [ $# -gt 0 ]
 then
     eval `"$0" "$refpid"`
     exec "$@"
 fi
 
-file=$TMPDIR/env$refpid
 new=
 
 for envfile in "$0" $ENVFILES
 do
   if [ -s "$envfile" ]
   then
-    if [ ! -f "$file" ] || [ "$envfile" -nt "$file" ]
+    if [ -z "$file" ] || [ ! -f "$file" ] || [ "$envfile" -nt "$file" ]
     then
       new=1
     fi
@@ -56,7 +58,7 @@ then
       cat "$envfile"
     fi
   done
-  touch "$file"
+  [ -n "$file" ] && touch "$file"
   ##set +x
   echo "PATH='$PATH'; export PATH"	# just in case
 fi
