@@ -8,8 +8,5 @@
 
 needhost "$HOMEHOST@home" || exit 1
 cd
-# fetch the small stuff first
-set -x
-bgproc -l procmail -p getmail-flush -- set-x lock -1 getmail-despool nice set-x getmail-flush -p 30 spool
 runfetchmail -1 -l 65536
 bgproc runfetchmail
