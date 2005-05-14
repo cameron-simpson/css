@@ -5,7 +5,7 @@
 #	- Cameron Simpson <cs@zip.com.au> 12may2005
 #
 
-trace=echo
+trace=set-x	## echo
 baseif=eth0
 basen=1
 
