@@ -4,6 +4,9 @@
 #	- Cameron Simpson <cs@zip.com.au> 30mar2005
 #
 
+: ${LOGDIR:=$HOME/var/log}
+: ${CONSOLE:=$LOGDIR/console}
+
 cmd=$0
 usage="Usage: $cmd [-f] [statefile]"
 
@@ -26,4 +29,5 @@ badopts=
 [ -z "$force" ] && eval `get-gpg-agent "$statefile"` && exit 0
 
 unset GPG_AGENT_INFO
+exec 2>>"$CONSOLE"
 exec gpg-agent --daemon >"$statefile"
