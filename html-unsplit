@@ -1,0 +1,13 @@
+#!/bin/sed -f
+#
+# Join lines where a tag is split across the line end.
+# Makes subsequent parsing much easier.
+#	- Cameron Simpson <cs@zip.com.au> 15may2005
+#
+
+:top
+/<[^>]*$/{
+  N
+  s/\n/ /
+  b top
+}
