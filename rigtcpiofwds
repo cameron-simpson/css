@@ -1,0 +1,18 @@
+#!/bin/sh
+#
+# Dispatch tcpio cleartext TCP forwards according to input data.
+# Input line format:
+#	localaddr localport remotehost remoteport
+# which sets up a "tcpio -a" to listening on the interface "localaddr"
+# on port "localport", using rnc to forward connections via nc
+# to the host "remotehost", port "remoteport".
+#	- Cameron Simpson <cs@zip.com.au> 03may2005
+#
+
+grep '^[^#]' \
+| while read localaddr localport fwdhost fwdport
+  do
+    set-x \
+    tcpio -a "$localaddr:$localport" \
+      nc "$fwdhost" "$fwdport" &
+  done
