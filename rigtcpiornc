@@ -2,18 +2,18 @@
 #
 # Dispatch tcpio ssh tunnel according to input data.
 # Input line format:
-#	localif localport remotesite remotehost remoteport
-# which sets up a "tcpio -a" to listing on the interface "localif"
+#	localaddr localport remotesite remotehost remoteport
+# which sets up a "tcpio -a" to listening on the interface "localaddr"
 # on port "localport", using rnc to forward connections via ssh to "remotesite"
 # and thence via nc to the host "remotehost", port "remoteport".
 #	- Cameron Simpson <cs@zip.com.au> 03may2005
 #
 
 grep '^[^#]' \
-| while read localif localport sshsite fwdhost fwdport
+| while read localaddr localport sshsite fwdhost fwdport
   do
     set-x \
-    tcpio -a "$localif:$localport" \
+    tcpio -a "$localaddr:$localport" \
       env ENVFILES=/etc/rc.mobile/env.sh syncenv - \
       rnc -l "$sshsite" -u sshtunnels -i /home/sshtunnels/.ssh/2any \
 	  "$sshsite" "$fwdhost" "$fwdport" &
