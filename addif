@@ -1,0 +1,84 @@
+#!/bin/sh -u
+#
+# Add a logical interface with the specified address.
+# Allocates a fresh logical interface on the fly.
+#	- Cameron Simpson <cs@zip.com.au> 12may2005
+#
+
+trace=echo
+baseif=eth0
+basen=1
+
+cmd=`basename "$0"`
+usage="Usage: $cmd [-i baseif] [-n basen] ipaddr...
+	-i baseif	Base interface. Default: $baseif
+	-n basen	Base number. Default: $basen"
+
+badopts=
+
+while [ $# -gt 0 ]
+do
+  case $1 in
+    -i)	baseif=$2; shift ;;
+    -n)	basen=$2; shift ;;
+    --)	shift; break ;;
+    -?*)echo "$cmd: unrecognised option: $1" >&2
+	badopts=1
+	;;
+    *)	break ;;
+  esac
+  shift
+done
+
+[ $# = 0 ] && { echo "$cmd: missing ipaddrs" >&2; badopts=1; }
+
+# check final baseif
+synok=1
+case "$baseif" in
+  *:* | *[^a-z0-9]* )
+    synok=
+    ;;
+  lo | [a-z]*[0-9])
+    ;;
+  *)synok=
+    ;;
+esac
+if [ $synok ]
+then
+  ifconfig "$baseif" >/dev/null \
+  || { echo "$cmd: can't find baseif \"$baseif\"" >&2
+       badopts=1
+     }
+else
+  echo "$cmd: bad baseif name \"$baseif\": should match ^[a-z]+[0-9]+\$" >&2
+  badopts=1
+fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+xit=0
+
+# choose the next free interface number
+nextn=`ifconfig -a \
+       | sed -n "s/^$baseif"':\([0-0][0-9]*\) .*/\1/p' \
+       | awk "BEGIN     { n=$basen }
+              \$1 >= n { n=$1+1 }
+              END       { print n }"` || exit 1
+for host
+do
+  set -- `hostips "$host"`
+  if [ $# = 0 ]
+  then
+    echo "$cmd: no ip addresses for \"$host\"" >&2
+    xit=1
+    continue
+  fi
+
+  for ipaddr
+  do
+    $trace ifconfig "$baseif:$nextn" "$ipaddr" || xit=1
+    nextn=`expr "$nextn" + 1`
+  done
+done
+
+exit $xit
