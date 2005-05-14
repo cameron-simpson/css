@@ -33,6 +33,7 @@ fi
 export statefile
 
 exec \
+  bgproc \
   lock -1 -a "$statefile" \
   rmthen -f "$statefile" \
   no-ssh-agent \
