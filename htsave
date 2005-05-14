@@ -54,22 +54,7 @@ do
   (
     echo "X-URL: $url"
     echo "X-Fetch-Date: `date`"
-    ( 
-      sed -n -e 'y/	/ /' \
-	     -e 's/.*<[Tt][Ii][Tt][Ll][Ee]>\([^< ][^<]*\).*/Subject: \1/p' \
-	     -e 'T nope; q; :nope; d' \
-	     "$tmpf"
-      sed -n -e 'y/	/ /' \
-	     -e 's/.*<[Hh]1>\([^< ][^<]*\).*/Subject: \1/p' \
-	     -e 'T nope; q; :nope; d' \
-	     "$tmpf"
-    ) \
-    | sed -e 's/\&lt;/</g;' \
-	  -e 's/\&gt;/>/g' \
-	  -e 's/\&nbsp;/ /g' \
-	  -e 's/\&quot;/"/g' \
-	  -e 's/\&amp;/\&/g' \
-	  -e 1q
+    unhdr "$tmpf" | html-title | sed -n '1s/^/Subject: /p'
     exec cat "$tmpf"
   ) \
   | filemailitem "$folder" \
