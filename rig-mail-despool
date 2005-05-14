@@ -1,0 +1,2 @@
+#!/bin/sh
+exec bgproc -l procmail -p getmail-flush -- set-x lock -1 getmail-despool nice set-x getmail-flush -p 30 spool
