@@ -1,0 +1,33 @@
+#!/bin/sh -u
+#
+# Try to guess suitable title string from HTML data. Try TITLE then H1.
+# Doomed to failure because MANY MANY web pages are completely badly formed.
+#	- Cameron Simpson <cs@zip.com.au> 15may2005
+#
+
+: ${TMPDIR:=/tmp}
+
+cmd=`basename "$0"` || exit 1
+usage="Usage: $cmd [files...]"
+
+tmpf=$TMPDIR/$cmd$$
+trap 'rm -f "$tmpf"' 0 1 2 13 15
+
+html-unsplit -- ${1+"$@"} >"$tmpf" || exit 1
+
+( 
+  sed -n -e 'y/	/ /' \
+	 -e 's/.*< *[Tt][Ii][Tt][Ll][Ee] *>\([^< ][^<]*\).*/\1/p' \
+	 -e 'T nope; q; :nope; d' \
+	 "$tmpf"
+  sed -n -e 'y/	/ /' \
+	 -e 's/.*< *[Hh]1 *>\([^< ][^<]*\).*/\1/p' \
+	 -e 'T nope; q; :nope; d' \
+	 "$tmpf"
+) \
+| sed -e 's/\&lt;/</g;' \
+      -e 's/\&gt;/>/g' \
+      -e 's/\&nbsp;/ /g' \
+      -e 's/\&quot;/"/g' \
+      -e 's/\&amp;/\&/g' \
+      -e 1q
