@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/sh -u
 #
 # Wrapper for "gm montage" to try to size things easily.
 #	- Cameron Simpson <cs@zip.com.au> 25feb2005
@@ -65,8 +65,9 @@ do
       arg=`set-x withurl -C "$arg" echo` || ok=
       ;;
     X:*)
-      set-x gm convert "$arg" "$tmpimg" || ok=
-      arg=`imagecache "$tmpimg"` || ok=
+      {  set-x gm convert "$arg" "$tmpimg" \
+      && arg=`filecache "$tmpimg"`
+      } || ok=
       ;;
     *)[ -f "$arg" ] || { echo "$cmd: $img: not a file" >&2; ok=; }
       ;;
