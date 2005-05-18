@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/sh -u
 #
 # Construct a wallpaper image by resizing a source image and padding.
 # Pulled from rootbg and updated to use GraphicsMagick.
@@ -12,10 +12,9 @@
 eval `bgsize -v | sed 's/^d/bg/'`
 
 doauto=1
-cacheroot=$HOME/var/cache/bg
 
 cmd=`basename "$0"`
-usage="Usage: $cmd [-c cachedir] [-g geom] [-bg bg-colour] imagefiles..."
+usage="Usage: $cmd [-g geom] [-bg bg-colour] imagefiles..."
 
 badopts=
 
@@ -24,7 +23,6 @@ do
   case "$1" in
     +a)	doauto= ;;
     -bg)BG=$2; shift ;;
-    -c)	cacheroot=$2; shift ;;
     -g)	geom=$2; shift
 	ok=1
 	bgx=`expr "x$geom" : 'x\([1-9][0-9]*\)x[1-9][0-9]*$'` || ok=
@@ -67,11 +65,11 @@ then
 		    exit 2
 		  }
     hx=`expr $bgx / 2` || exit 1
-    bg1=`mkwall +a -c "$cacheroot" -g "${hx}x${bgy}" "$1"` || exit 1
+    bg1=`mkwall +a -g "${hx}x${bgy}" "$1"` || exit 1
 
     if [ "x$1" = "x$2" ]
     then  bg2=$bg1
-    else  bg2=`mkwall +a -c "$cacheroot" -g "${hx}x${bgy}" "$2"` || exit 1
+    else  bg2=`mkwall +a -g "${hx}x${bgy}" "$2"` || exit 1
     fi
 
     tmpf=$TMPDIR/$cmd$$.png
@@ -83,7 +81,7 @@ then
 		-geometry "${hx}x${bgy}+0+0" "$bg1" \
 		-geometry "${hx}x${bgy}+0+0" "$bg2" \
 		"png:$tmpf" || exit 1
-    montage=`imagecache "$tmpf"` || exit 1
+    montage=`filecache "$tmpf"` || exit 1
     rm "$tmpf"
     echo "$montage"
     exit $xit
@@ -124,19 +122,25 @@ then
     sfx=`expr "x$imagefile" : 'x.*\.\([^/.]*$\)'`
     case "$ix,$iy,$sfx" in
       $bgx,$bgy,png)
-	echo "$imagefile"
-	exit 0
+	# it's good - report persistent name
+	exec filecache "$imagefile"
 	;;
     esac
 fi
 
+######################################################
+# ok, the image is the wrong size or not a PNG
+
 # see if we've cached this image's conversion yet
-md5pfx=`md5sum "$imagefile" | sed 's;\(..\)\([^ ]*\)  .*;\1/\2;'`
+# we keep a cache based on md5 of source image
+md5pfx=`md5path "$imagefile"`
 [ -n "$md5pfx" ] || { echo "$cmd: can't checksum $imagefile" >&2; exit 1; }
-cachefile=$cacheroot/${bgx}x${bgy}/$md5pfx.png
-if [ -s "$cachefile" ]
+convimage=$HOME/var/cache/pngof/${bgx}x${bgy}/$md5pfx.png
+
+# got it? ok!
+if [ -s "$convimage" ]
 then
-    echo "$cachefile"
+    echo "$convimage"
     exit 0
 fi
 
@@ -184,8 +188,8 @@ then
   fi
 fi
 
-cachedir=`dirname "$cachefile"`
+cachedir=`dirname "$convimage"`
 [ -d "$cachedir/." ] || needdir "$cachedir" || exit 1
 ##set -x
-gm "$@" -quality 100 png:- <"$imagefile" >"$cachefile" || { rm -f "$cachefile"; exit 1; }
-echo "$cachefile"
+gm "$@" -quality 100 png:- <"$imagefile" >"$convimage" || { rm -f "$convimage"; exit 1; }
+echo "$convimage"
