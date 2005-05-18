@@ -1,0 +1,37 @@
+#!/bin/sh
+#
+# Cache file my md5 sum and type.
+#	- Cameron Simpson <cs@zip.com.au> 18may2005
+#
+
+: ${TMPDIR:=/tmp}
+
+cmd=`basename "$0"` || exit 1
+usage="Usage: $cmd filename"
+
+[ $# = 1 ] || { echo "$usage" >&2; exit 2; }
+file=$1; shift
+
+[ -f "$file" -a -s "$file" ] || { echo "$cmd: $file: not a file!" >&2; exit 1; }
+
+cacheroot=$HOME/var/cache/file
+
+ext=bin
+mtype=`file2mime "$file"` && { ext=`mimeext "$mtype"` || ext=bin; }
+md5path=`md5path "$file"` || exit 1
+
+cachefile=$cacheroot/$md5path.$ext
+
+if [ -s "$cachefile" ]
+then
+  cmp -s "$cachefile" "$file" || exit 1
+else
+  cachedir=`dirname "$cachefile"`
+  [ -d "$cachedir/." ] || needdir "$cachedir" || exit 1
+  ln "$file" "$cachefile" \
+  || cp "$file" "$cachefile" \
+  || exit 1
+fi
+
+echo "$cachefile"
+exit 0
