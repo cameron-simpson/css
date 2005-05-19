@@ -35,9 +35,6 @@ extract_globs=$APPHELPER_EXTRACT_GLOBS
 termname=$cmd
 pager=$PAGER
 
-# location of md5 records
-cacheroot=$HOME/var/cache/filesave
-
 # =head1 SYNOPSIS
 #
 # apphelper [{-t|+t|-T title}] file [{-n|-y}]] [-d savedir] [-i type] [-p pager] viewer [viewer-args...]
@@ -444,24 +441,11 @@ fi
 rm -f "$remaptmp"
 
 # see if we've saved this before
-md5pfx=`md5path "$file"`
-if [ -n "$md5pfx" ]
+if oldsave=`fileloc "$file"` \
+&& cmp -s "$file" "$oldsave"
 then
-  cachefile=$cacheroot/$md5pfx
-  if [ -s "$cachefile" ]
-  then
-    while read -r oldsave
-    do
-      if [ -f "$oldsave" ] && cmp -s "$file" "$oldsave"
-      then
-	savedir=`dirname "$oldsave"` || exit 1
-	fbase=`basename "$oldsave"` || exit 1
-	break
-      fi
-    done <"$cachefile"
-  fi
-else
-  echo "$cmd: warning: can't checksum $file" >&2
+  savedir=`dirname "$oldsave"` || exit 1
+  fbase=`basename "$oldsave"` || exit 1
 fi
 
 # no guesses? offer last save directory
