@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/sh -u
 #
 # Manage named desktops for a session.
 # Allocate (or reuse) a named desk, returning its number.
