@@ -1,31 +1,24 @@
-#!/bin/sh
+#!/bin/sh -u
 #
-# Read desk numbers and bg pathnames, incant for fvwm.
+# Incant desktop background stuff for FVWM.
 #	- Cameron Simpson <cs@zip.com.au> 28oct2004
 #
 
-directive=AspectPixmap
-csetbase=1024
+: ${DESKTOPSET:=desktop}
 
 cmd=$0
-usage="Usage: $0 [cset-base]
-	cset-base	Start value for special ColorSets.
-			Default: $csetbase
-			Note: ColorSet csetbase-1 is used for defaults."
+usage="Usage: $0"
 
-[ $# = 0 ] || { csetbase=$1; shift; }
-[ $# = 0 ] || { echo "$cmd: extra arguments after cset-base: $*" >&2
+[ $# = 0 ] || { echo "$cmd: extra arguments: $*" >&2
 		echo "$usage" >&2
 		exit 2
 	      }
 
-awk "BEGIN { csetbase=$csetbase }
-    "'     { if (length($2) > 0 && $2 != ".")
-	     { print "Colorset", csetbase+$1, "AspectPixmap", $2
-	       cset=csetbase+$1
-	     }
-	     else
-	     { cset=csetbase-1
-	     }
-	     print "*FvwmBacker: Command (Desk", $1, ") colorset", cset
-	   }'
+dfltbg=`rootbg` && fvwmcmd "ColorSet 1023 AspectPixmap $dfltbg"
+
+idsetlist "$DESKTOPSET" rootbg \
+| awk '$2 != "." { print }' \
+| while read -r desk bg
+  do
+    deskbg -d "$desk" $bg
+  done
