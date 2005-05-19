@@ -1,21 +1,16 @@
-#!/bin/sh
+#!/bin/sh -u
 #
-# Read my desktop names and produce incantations for FVWM's startup.
+# Incant basic desktop settings except for backgrounds for FVWM.
 #	- Cameron Simpson <cs@zip.com.au> 24mar2003
 #
 
 : ${DESKTOPSET:=desktop}
-: ${DESKTOPSET_SIZED:=$DESKTOPSET-${X11_X}x${X11_Y}}
+
+fvwmcmd 'Colorset 1023 Foreground Green, Background Black'
+seq 0 63 \
+| awk '{print "*FvwmBacker: Command (Desk " $1 ") colorset 1023" }' \
+| fvwmcmd
 
 idsetlist "$DESKTOPSET" name \
-| sed -e '/^[0-9]*	./!d' \
-      -e 's/^\([0-9][0-9]*	\)\./\1/' \
-      -e 's/^/DesktopName /'
-
-##echo "*FvwmBacker: Command (Desk *) colorset 1023"
-dfltbg=`rootbg` && echo "ColorSet 1023 AspectPixmap $dfltbg"
-
-( seq 0 63
-  idsetlist "$DESKTOPSET_SIZED" rootbg
-) \
-| desktop-incant-bg
+| awk '$2 != "." { print "DesktopName", $1, $2 }' \
+| fvwmcmd
