@@ -1,0 +1,14 @@
+#!/bin/sh -u
+#
+# Run command if specified file not known to "fileloc". With no args, just test.
+#	- Cameron Simpson <cs@zip.com.au> 19may2005
+#
+
+cmd=$0
+usage="Usage: $cmd filename [command [args...]]"
+
+[ $# = 0 ] && { echo "$cmd: missing filename" >&2; echo "$usage" >&2; exit 2; }
+file=$1; shift
+
+fileloc "$file" >/dev/null 2>&1 && exit 0
+[ $# -gt 0 ] && exec "$@" "$file"
