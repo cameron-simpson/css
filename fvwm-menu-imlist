@@ -73,7 +73,6 @@ then
     echo "AddTomenu   $menuname \"$menutitle\" Title"
 fi
 
-set -x
 if [ -n "$filelist" ]
 then
     cat "$filelist"
