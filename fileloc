@@ -78,7 +78,8 @@ $srcfile" "$cachefile"
     done < "$cachefile"
   fi
   [ -n "$where" ] || { echo "$cmd: $srcfile: no location recorded" >&2; xit=1; }
-  printf "%s\t%s\n" "$srcfile" "$where"
+  [ $# -gt 1 ] && printf "%s\t" "$srcfile"
+  printf "%s\n" "$where"
 done
 
 exit $xit
