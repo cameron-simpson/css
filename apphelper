@@ -584,41 +584,15 @@ fi
   pwd | lastvalue "$APPHELPER_LASTVALUE" -
 )
 
-[ -f "$saveas" -a -s "$saveas" ] && cmp -s "$file" "$saveas" && exit 0
-
-# no exec so the trap gets to run
-xit=0
-if cp -i "$file" "$saveas"
+if [ -f "$saveas" -a -s "$saveas" ] && cmp -s "$file" "$saveas"
 then
-  # note location of save
-  if [ -n "$cachefile" ]
-  then
-    cachedir=`dirname "$cachefile"` || exit 1
-    if [ -d "$cachedir/." ] || mkdir -p "$cachedir"
-    then
-      # try to clean up the save path
-      if savedir=`dirname "$saveas"` \
-      && savedir=`( cd "$savedir" && exec pwd )` \
-      && savebase=`basename "$saveas"`
-      then
-	saveas=$savedir/$savebase
-      fi
-
-      # now record the save path
-      if [ -s "$cachefile" ]
-      then
-	bsed "1i\
-$saveas" "$cachefile"
-      else
-	printf '%s\n' "$saveas" >>"$cachefile"
-      fi
-    else
-      echo "$cmd: warning: can't make dir for md5 cachefile $cachefile" >&2
-    fi
-  fi
+  # note location and exit
+  exec fileloc -a "$saveas"
 fi
 
-exit $xit
+# no exec so the trap gets to run
+cp -i "$file" "$saveas" && fileloc -a "$saveas"
+exit
 
 # =head1 EXAMPLE
 #
