@@ -8,4 +8,4 @@
 
 FVWM_MENU_IMLIST_OP=${FVWM_MENU_IMLIST_OP:-"menubg"}
 export FVWM_MENU_IMLIST_OP
-exec fvwm-menu-recent-imlist ${1-0} ${1-40} ${1+"$@"} <"$LOGDIR/menubg"
+exec fvwm-menu-recent-imlist ${1-0} ${1-40} ${1+"$@"} <"$LOGDIR/lastvalue/menubg"
