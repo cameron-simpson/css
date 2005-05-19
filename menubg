@@ -13,13 +13,13 @@ domenu=
 aspect=-t
 strippfx=
 pickn=1
-thisdesk= Dflag=
+desk=
 
 usage="Usage: $cmd [-M] [ imagefile | bglist-args... ]
 	-t	Choose tall images.
 	-w	Choose wider images.
-	-D	Set the menu backdrop only for this desktop.
-	-M	Popup FVWM menu to pick from choices."
+	-d n	Set the menu backdrop for the specified desktop.
+		Default: the current desktop."
 
 badopts=
 opts=
@@ -27,8 +27,8 @@ opts=
 while :
 do
   case $1 in
-    -D)	opts="$opts $1" thisdesk=1 Dflag=$1 ;;
-    -M)	opts="$opts $1" pickn=20 domenu=1 strippfx=$HOME ;;
+    -d)	desk=$2; shift
+	opts="$opts -d $desk" ;;
     -[tw]) aspect=$1 ;;
     -?*)echo "$cmd: unrecognised option: $1" >&2; badopts=1 ;;
     --)	shift; break ;;
@@ -39,80 +39,49 @@ done
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
-if [ "x$*" = xnone ]
-then
-    exec fvwmcmd 'ColorSet 2 RootTransparent buffer, Tint black 30'
-fi
+thisdesk=`currentdesk`
+[ -n "$desk" ] || desk=$thisdesk
 
-##set -x
-if [ $# = 1 -a -f "$1" -a -s "$1" ]
-then
-    # one argument which is a file pathname
-    domenu=
-else
-    case "$#,$1" in
-      1,http://*)
-	# one argument which is a URL
-	exec withurl -C "$1" "$0"
-	;;
-    esac
-
-    # presume search args instead
-    set x `pickim -P "$strippfx" -n $pickn -r $aspect ${1+"$@"} | sort -u` || exit 1
-    shift
-    [ $# = 0 ] && { echo "$cmd: no image files chosen!" >&2; exit 1; }
-    if [ -t 1 ]; then  cd; ls -ld "$@"; fi &
-    [ $# = 1 ] && domenu=
-fi
-
-##set +x
-##echo "*=[$*]" >&2
-
-if [ $domenu ]
-then
-    tmpf=$TMPDIR/menubg$$
-    for arg
-    do  echo "$arg"
-    done >"$tmpf"
-    fvwmcmd \
-	  "SetEnv FVWM_MENU_IMLIST_OP \"menubg $opts\"" \
-	  "Piperead 'fvwm-menu -1 ImDirMenu \"$cmd $call\" fvwm-menu-imlist -l $tmpf .; rm $tmpf'" \
-	  "Popup ImDirMenu" \
-	  "UnSetEnv FVWM_MENU_IMLIST_OP"
-    exit $?
-fi
-
-imagefile=$1
-
-( lastvalue menubg "$imagefile"
-  if [ $thisdesk ]
-  then  thisdesk=`lastvalue "enterdesk-$HOST"`
-	desktop "$thisdesk" menubg "$imagefile"
-  else  lastvalue "defaultmenubg-$HOST" "$imagefile"
-  fi
-) &
-
-setpix()
-{ dorm=
-  [ "x$1" = x-r ] && { dorm=1; shift; }
-  setpic=$1; shift
-  L "$setpic"
-  set "ColorSet 2 Tint rgb:00/00/20 50, TiledPixmap \"$setpic\""
-  set -x
-  fvwmcmd "$@"
-  [ $dorm ] && fvwmcmd "Exec rm -rf \"$setpic\""
-}
-
-case "$bright,$imagefile" in
-    *.png|*.xpm)
-	# no format conversion needed
-	setpix "$imagefile"
-	exit $?
-	;;
+# A URL? Fetch and use.
+case "$#,$1" in
+  1,http://*)
+    set -x
+    exec withurl "$1" "$0" $opts ;;
 esac
 
-tmpf=$TMPDIR/$cmd$$.png
-gm convert - -geometry '200x>' png:- <"$imagefile" >"$tmpf" || exit 1
+if [ "x$*" = xnone ]
+then
+    desktop "$desk" menubg '' || exit 1
+else
+    if [ $# != 1 ] || [ ! -f "$1" -o ! -s "$1" ]
+    then
+      # presume search args
+      set -- `pickim -P "$strippfx" -n $pickn $aspect ${1+"$@"} | sort -u` || exit 1
+      [ $# = 0 ] && { echo "$cmd: no image files chosen!" >&2; exit 1; }
+      if [ -t 1 ]; then  cd; ls -ld "$@"; fi &
+      
+      if [ $# -gt 1 ]
+      then
+	tmpf=$TMPDIR/menubg$$
+	for arg
+	do  echo "$arg"
+	done >"$tmpf"
+	fvwmcmd \
+	      "SetEnv FVWM_MENU_IMLIST_OP \"menubg $opts\"" \
+	      "Piperead 'fvwm-menu -1 ImDirMenu \"$cmd $call\" fvwm-menu-imlist -l $tmpf .; rm $tmpf'" \
+	      "Popup ImDirMenu" \
+	      "UnSetEnv FVWM_MENU_IMLIST_OP"
+	exit $?
+      fi
+    fi
 
-set -x
-setpix -r "$tmpf"
+    # set image directly
+
+    srcimage=$1; shift
+    cachefile=`filecache "$srcimage"` || exit 1
+    imagefile=`pngof "$cachefile"` || exit 1
+    desktop "$desk" menubg "$imagefile" || exit 1
+    lastvalue menubg "$cachefile" &
+fi
+
+exec enterdesk -f
