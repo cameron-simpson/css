@@ -1,0 +1,84 @@
+#!/bin/sh -u
+#
+# Return or note file location based on md5 checksum.
+#	- Cameron Simpson <cs@zip.com.au> 19may2005
+#
+
+: ${FILELOC_CACHE:=$HOME/var/cache/fileloc}
+
+cmd=$0
+usage="Usage: $cmd [-a] sourcefiles...
+	-a	Add sourcefile full path to cache."
+
+badopts=
+
+add=
+
+while [ $# -gt 0 ]
+do
+  case $1 in
+    -a)	add=1 ;;
+    --)	shift; break ;;
+    -?*)echo "$cmd: unrecognised option: $1" >&2
+	badopts=1
+	;;
+    *)	break ;;
+  esac
+  shift
+done
+
+[ $# = 0 ] && { echo "$cmd: missing sourcefiles" >&2; badopts=1; }
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+xit=0
+
+for srcfile
+do
+  cachefile=$FILELOC_CACHE/`md5path "$srcfile"` \
+  || { echo "$cmd: can't checksum $srcfile" >&2
+       xit=1
+       continue
+     }
+
+  if [ $add ]
+  then
+    cachedir=`dirname "$cachefile"` || exit 1
+    [ -d "$cachedir/." ] || mkdir -p "$cachedir" \
+    || { echo "$cmd: $srcfile: warning: can't make dir for md5 cachefile $cachefile" >&2
+	 xit=1
+	 continue
+       }
+
+    # try to clean up the path
+    if srcdir=`dirname "$srcfile"` \
+    && srcdir=`( cd "$srcdir" && exec pwd )` \
+    && srcbase=`basename "$srcfile"`
+    then
+      srcfile=$srcdir/$srcbase
+    fi
+
+    # now record the path
+    if [ -s "$cachefile" ]
+    then
+      bsed "1i\
+$srcfile" "$cachefile"
+    else
+      printf '%s\n' "$srcfile" >>"$cachefile"
+    fi
+
+    continue
+  fi
+
+  where=
+  if [ -s "$cachefile" ]
+  then
+    while read -r path
+    do [ -f "$path" ] && { where=$path; break; }
+    done < "$cachefile"
+  fi
+  [ -n "$where" ] || { echo "$cmd: $srcfile: no location recorded" >&2; xit=1; }
+  printf "%s\t%s\n" "$srcfile" "$where"
+done
+
+exit $xit
