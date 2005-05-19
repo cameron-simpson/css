@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/sh -u
 #
 # Set the root background, update state files to match.
 #	- Cameron Simpson <cs@zip.com.au>
@@ -6,6 +6,7 @@
 
 : ${TMPDIR:=/tmp}
 : ${RBG_PICKIM:='-w -x "$HALFX" -y "$HALFY"'}
+
 tmppfx=$TMPDIR/rbg$$
 trap 'rm -f "$tmppfx".*' 0 1 2 13 15
 
@@ -48,7 +49,7 @@ then
     set -x
     if xplimg=`xpl -png -g screen ${1+"$@"}`
     then
-       xplimg=`imagecache "$xplimg"` || exit 1
+       xplimg=`filecache "$xplimg"` || exit 1
        deskbg -d "$bgdesk" "$xplimg"
     fi
     exit $?
