@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/sh -u
 #
 # Operations to perform when entering a desktop.
 #	- Cameron Simpson <cs@zip.com.au> 24mar2003
@@ -10,20 +10,38 @@ exec </dev/null
 exec >>$LOGDIR/console
 exec 2>&1
 
-thisdesk=$1
+force=
+thisdesk=
+
+[ $# -gt 0 ] && [ "x$1" = x-f ] && { force=1; shift; }
+[ $# = 0 ] || { thisdesk=$1; shift; }
+
 lastdesk=`currentdesk` || exit 1
+[ -n "$thisdesk" ] || thisdesk=$lastdesk
 
-if [ "x$thisdesk" != "x$lastdesk" ]
+if [ "x$thisdesk" = "x$lastdesk" ]
 then
-    currentdesk "$thisdesk"
-
-    desktop "$thisdesk" shcmds | sh -x &
-    desktop "$thisdesk" wmcmds | fvwmcmd &
-
-    ( deskjob=`deskjob -d "$thisdesk"`
-      case "$deskjob" in
-	''|.|idle)	;;
-	*)		job "$deskjob" ;;
-      esac
-    ) &
+  [ $force ] || exit 0
+else
+  currentdesk "$thisdesk"
 fi
+
+(
+  desktop "$thisdesk" shcmds | sh -x &
+
+  menubg=`desktop "$thisdesk" menubg` || exit 1
+  if [ -n "$menubg" ] && menubg=`pngof "$menubg"`
+  then  fvwmcmd "Colorset 2 TiledPixmap $menubg"
+  else  fvwmcmd 'Colorset 2 RootTransparent'
+  fi
+
+  desktop "$thisdesk" wmcmds | fvwmcmd
+
+  deskjob=`deskjob -d "$thisdesk"`
+  case "$deskjob" in
+    ''|.|idle)	;;
+    *)		job "$deskjob" ;;
+  esac
+) &
+
+exit 0
