@@ -73,7 +73,7 @@ do
 		pageurls -i "$url" \
 		| egrep -i "$grep" \
 		| ( hit=
-		    while read gurl
+		    while read -r gurl
 		    do  ( exec >&2
 			  cd $HOME/4h/im/comics || exit 1
 			  base=`basename "$gurl"` || exit 1
