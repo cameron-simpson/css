@@ -5,9 +5,6 @@
 #
 
 : ${DESKTOPSET:=desktop}
-: ${DESKTOPSET_SIZED:=$DESKTOPSET-${X11_X}x${X11_Y}}
-DESKTOPSET=$DESKTOPSET_SIZED	# backgrounds are sized
-export DESKTOPSET
 
 cmd=$0
 usage="Usage: $cmd [-d desk] imagefiles...
@@ -44,21 +41,39 @@ then
     else lastvalue "desk_dfltrootbg" ""
     fi
 else
-    # set new background
+    first=1
+    for arg
+    do
+      if [ $first ]
+      then
+	set --
+	first=
+      fi
+      set -- ${1+"$@"} `filecache "$arg"`
+    done
+
+    # compute new background
     rootbg=`set-x mkwall "$@"` || exit 1
-    bg=$rootbg
+
+    # note supplied images
     if [ $perdesk ]
-    then desktop "$desk" rootbg "$rootbg"
-    else lastvalue "desk_dfltrootbg" "$rootbg"
+    then desktop "$desk" rootbg "$*"
+    else lastvalue "desk_dfltrootbg" "$*"
     fi
+
+    bg=$rootbg
 fi
+
+[ -n "$bg" ] || exit 0
 
 if [ $perdesk ]
 then
     # apply new background, set desktop to use it
-    echo "$desk" $bg | desktop-incant-bg
+    cset=`expr 1024 + $desk`
+    echo "ColorSet $cset Pixmap $rootbg"
+    echo "*FvwmBacker: Command (Desk $desk) colorset $cset"
 else
     # apply new default background
-    [ -n "$bg" ] && echo "Colorset 1023 AspectPixmap $bg"
+    echo "Colorset 1023 AspectPixmap $bg"
 fi \
 | fvwmcmd
