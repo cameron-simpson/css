@@ -201,7 +201,7 @@ else
       apphopt=$1
       apphopt2=
       case $1 in
-	  # =item B<-d>d I<directory>
+	  # =item B<-d> I<directory>
 	  #
 	  # Specify a default directory in which to save files.
 	  # Lacking this, use the value of the envvar B<$SAVEDIR>
@@ -214,7 +214,7 @@ else
 	  # The default is to ask first.
 	  #
 	  -n)	doview=0 ;;
-	  # =item <-y>
+	  # =item B<-y>
 	  #
 	  # Yes: always run the viewer program.
 	  # The default is to ask first.
