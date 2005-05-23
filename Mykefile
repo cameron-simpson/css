@@ -22,7 +22,7 @@ pmFromMan(manf) = $(manf FP s:|::|/|).pm
 pmFromHtml(html) = $(html FPP s:|::|/|).pm
 
 subdirs = $('*/.' GD)
-allscripts = $('*' G !/\./ - subdirs - "0README.txt" - "INSTALL" + "synonyms" + "rc.mobile")
+allscripts = $('*' G !/\./ - subdirs - "0README.txt" - "1INDEX.txt" - "INSTALL" + "synonyms" + "rc.mobile")
 
 scriptmandir = $(MANDIR)/cs/man1
 scriptmans = $(scriptmandir)/$((allscripts)).1
@@ -89,7 +89,10 @@ $(scriptmandir)/%.1: %
 	 esac \
 	 chmod 644 $@ $$htman
 
-0README.txt: $(allscripts) INSTALL
+0README.txt: INSTALL
+	( cat INSTALL; echo; echo Autoindex of scripts is in 1INDEX.txt ) >$@
+
+1INDEX.txt: $(allscripts)
 	mkscriptndx `ls -d $(allscripts) | sort` >$@
 
 noads	= $(HOME)/@/adzapper.sf/html/rc/patterns
