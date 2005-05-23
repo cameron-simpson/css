@@ -14,7 +14,7 @@ usage="Usage: $0"
 		exit 2
 	      }
 
-dfltbg=`rootbg` && fvwmcmd "ColorSet 1023 AspectPixmap $dfltbg"
+dfltbg=`rootbg` && rootbg "$dfltbg"
 
 idsetlist "$DESKTOPSET" rootbg \
 | awk '$2 != "." { print }' \
