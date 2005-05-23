@@ -72,7 +72,9 @@ rootbg=`mkwall "$imagefile"` || exit 1
   ) &
 
   fvwm-root --retain-pixmap "$rootbg" \
-  && fvwmcmd 'setenv XSESSIONBG pixmap'	# make new terms be transparent
+  && fvwmcmd \
+       'setenv XSESSIONBG pixmap' \
+       "ColorSet 1023 AspectPixmap $rootbg"
   exit
 ) &
 
