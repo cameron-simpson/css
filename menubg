@@ -82,6 +82,7 @@ else
     imagefile=`pngof "$cachefile"` || exit 1
     desktop "$desk" menubg "$imagefile" || exit 1
     lastvalue menubg "$cachefile" &
+    lastvalue menubg-pngof "$imagefile" &
 fi
 
 exec enterdesk -f
