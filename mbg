@@ -1,4 +1,2 @@
 #!/bin/sh
-domenu=
-[ $# = 1 -a -f "$1" -a -s "$1" ] || domenu=-M
-exec menubg $domenu ${1+"$@"}
+exec menubg ${1+"$@"}
