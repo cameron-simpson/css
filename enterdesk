@@ -27,15 +27,22 @@ else
 fi
 
 (
-  desktop "$thisdesk" shcmds | sh -x &
-
-  menubg=`desktop "$thisdesk" menubg` || exit 1
-  if [ -n "$menubg" ] && menubg=`pngof "$menubg"`
-  then  fvwmcmd "Colorset 2 TiledPixmap $menubg"
-  else  fvwmcmd 'Colorset 2 RootTransparent'
+  menubg=`desktop "$thisdesk" menubg-pngof` || exit 1
+  if [ -n "$menubg" ]
+  then
+    fvwmcmd "Colorset 2 TiledPixmap $menubg"
+  else
+    menubg=`desktop "$thisdesk" menubg` || exit 1
+    if [ -n "$menubg" ] && menubg=`pngof "$menubg"`
+    then  lastvalue "$thisdesk" menubg-pngof "$menubg" &
+	  fvwmcmd "Colorset 2 Pixmap $menubg"
+    else  fvwmcmd 'Colorset 2 RootTransparent'
+    fi
   fi
 
   desktop "$thisdesk" wmcmds | fvwmcmd
+
+  desktop "$thisdesk" shcmds | sh -x &
 
   deskjob=`deskjob -d "$thisdesk"`
   case "$deskjob" in
