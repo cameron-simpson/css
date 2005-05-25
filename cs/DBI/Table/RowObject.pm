@@ -89,23 +89,6 @@ sub Fields($)
   return keys %{$this->_Data()};
 }
 
-=item GetSet(I<field>,I<value>)
-
-If I<value> is omitted,
-return the current value of the I<field>.
-If supplied,
-set the value of the I<field>.
-
-=cut
-
-sub GetSet($$;$)
-{ my($this,$field,$value)=@_;
-  my $D = $this->_Data();
-  return $D->{$field} if @_ <= 2;
-  ## warn "GetSet: Set $field=$value";
-  $D->{$field}=$value;
-}
-
 =item Flags()
 
 Return a B<cs::Flags> object containing the project's flags.
@@ -143,6 +126,23 @@ sub SaveFlags($)
 { my($this)=@_;
 
   $this->GetSet(FLAGS,join(",", $this->Flags()->Members()));
+}
+
+=item GetSet(I<field>,I<value>)
+
+If I<value> is omitted,
+return the current value of the I<field>.
+If supplied,
+set the value of the I<field>.
+
+=cut
+
+sub GetSet($$;$)
+{ my($this,$field,$value)=@_;
+  my $D = $this->_Data();
+  return $D->{$field} if @_ <= 2;
+  ## warn "GetSet: Set $field=$value";
+  $D->{$field}=$value;
 }
 
 =back
