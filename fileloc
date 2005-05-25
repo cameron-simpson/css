@@ -61,7 +61,7 @@ do
     # now record the path
     if [ -s "$cachefile" ]
     then
-      bsed "1i\
+      bsed -s "1i\
 $srcfile" "$cachefile"
     else
       printf '%s\n' "$srcfile" >>"$cachefile"
