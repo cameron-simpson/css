@@ -158,6 +158,55 @@ sub h2s
   $cs::Hier::_Active{$refkey}=0;
 }
 
+=item pushCHANGELOG(I<hashref>,I<logline>[,I<fieldname>])
+
+Prepend the supplied I<logline> string to the B<CHANGELOG> field of the hash
+referenced by I<hashref>.
+The optional argument I<fieldname> may be supplied to override the default
+"B<CHANGELOG>" field name.
+
+=cut
+
+sub pushCHANGELOG($$;$)
+{ my($h,$log,$f)=@_;
+  $f=CHANGELOG if ! defined $f;
+
+  my @pw = getpwuid($>);
+  my $mylogin=$pw[0];
+  if (! defined $mylogin)
+  { warn "$::cmd: can't look up login for euid == $>";
+    $mylogin="??(euid=$>)";
+  }
+  my @tm = localtime(time);
+  $h->{CHANGELOG}=sprintf("%04d-%02d-%02d, %s: %s\n", $tm[5]+1900, $tm[4]+1, $tm[3], $mylogin, $log)
+		 .$h->{CHANGELOG};
+}
+
+=item setField(I<hashref>,I<field>,I<newvalue>[,I<changelogfield>])
+
+Set the specified I<field>
+of the hash referenced by I<hashref>
+to the new value I<newvalue>.
+If the field is not the changelog
+and the old value and the new value differ,
+prepend a changelog entry to the field "B<CHANGELOG>".
+The optional argument I<fieldname> may be supplied to override the default
+"B<CHANGELOG>" field name.
+
+=cut
+
+sub setField($$$;$)
+{ my($h,$f,$v,$chf)=@_;
+  $chf=CHANGELOG if ! defined $chf;
+
+  my $ov;
+  my $doch = ($f ne $chf && ($ov=$h->{$f}) ne $v);
+
+  $h->{$f}=$v;
+
+  pushCHANGELOG($h,"$f: ".h2a($ov,0)." -> ".h2a($v,0),$chf) if $doch;
+}
+
 =item getKVLine(I<source>,I<noparse>)
 
 Read a single key-value entry from the B<cs::Source> I<source>,
