@@ -178,8 +178,8 @@ sub pushCHANGELOG($$;$)
     $mylogin="??(euid=$>)";
   }
   my @tm = localtime(time);
-  $h->{CHANGELOG}=sprintf("%04d-%02d-%02d, %s: %s\n", $tm[5]+1900, $tm[4]+1, $tm[3], $mylogin, $log)
-		 .$h->{CHANGELOG};
+  my $ochlog = $h->{$f};
+  $h->{$f}=sprintf("%04d-%02d-%02d, %s: %s\n", $tm[5]+1900, $tm[4]+1, $tm[3], $mylogin, $log).$ochlog;
 }
 
 =item setField(I<hashref>,I<field>,I<newvalue>[,I<changelogfield>])
@@ -204,7 +204,15 @@ sub setField($$$;$)
 
   $h->{$f}=$v;
 
-  pushCHANGELOG($h,"$f: ".h2a($ov,0)." -> ".h2a($v,0),$chf) if $doch;
+  if ($doch)
+  {
+    my $hv = h2a($v,0);
+    my $hov = h2a($ov,0);
+    my $log = "$f: $hov -> $hv";
+    ##warn "setField: hashref=".cs::Hier::h2a($h,0);
+    ##warn "pushCHANGELOG(..,$log,chf=$chf)";
+    pushCHANGELOG($h,$log,$chf);
+  }
 }
 
 =item getKVLine(I<source>,I<noparse>)
