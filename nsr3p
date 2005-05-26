@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/sh -u
 #
 # Use a 3rd party tape with Legato Networker.
 # Specificly, we want to make use of a tape which isn't part of Legato's
@@ -8,9 +8,12 @@
 #	- Cameron Simpson <cs@zip.com.au> 
 #
 
-pool=${NSR3P_POOL:-'Third Party'}
+: ${NSR3P_POOL:='Third Party'}
+
+pool=$NSR3P_POOL
 slot=
 port=1
+nolabel=
 
 cmd=`basename "$0"`
 usage="Usage:	$cmd load [-n] [-p pool] [-P p] [-S s]
@@ -27,6 +30,7 @@ usage="Usage:	$cmd load [-n] [-p pool] [-P p] [-S s]
 			the first load bay slot."
 
 badopts=
+
 if [ $# = 0 ]
 then
   echo "$cmd: missing load/unload directive" >&2
@@ -36,7 +40,7 @@ else
   case $dir in
     load)
       nolabel=
-      while :
+      while [ $# -gt 0 ]
       do  case $1 in
 	    -n)	nolabel=1 ;;
 	    -p)	pool=$2; shift ;;
