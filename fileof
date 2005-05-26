@@ -1,0 +1,29 @@
+#!/bin/sh -u
+#
+# Return a filecache path for an object such as an URL.
+#	- Cameron Simpson <cs@zip.com.au> 27may2005
+#
+
+: ${TMPDIR:=/tmp}
+
+cmd=`basename "$0"` || exit 1
+usage="Usage: $cmd {URL | X:[windowid]}"
+
+[ $# = 1 ] || { echo "$usage" >&2; exit 2; }
+obj=$1; shift
+
+case "$obj" in
+  http://* | ftp://* )
+    exec withurl "$obj" filecache
+    ;;
+  X:*)
+    tmpf=$TMPDIR/$cmd$$.png
+    trap 'rm -f "$tmpf"' 0 1 2 13 15
+    gm convert "$obj" "png:$tmpf" || exit 1
+    filecache "$tmpf"
+    ;;
+  *)
+    echo "$cmd: $obj: unsupported object name" >&2
+    exit 2
+    ;;
+esac
