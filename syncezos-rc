@@ -18,6 +18,9 @@ exec rsync -avHP --delete --delete-excluded \
 	--include='/perl' \
 	--include='/perl/cs' \
 	--exclude='/perl/*' \
+	--include='/shell' \
+	--exclude='/shell/**/hist*' \
+	--include='/shell/**' \
 	--include='/x11' \
 	--include='/x11/session' \
 	--include='/x11/xenv.sh' \
