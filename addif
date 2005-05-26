@@ -60,9 +60,10 @@ xit=0
 
 # choose the next free interface number
 nextn=`ifconfig -a \
-       | sed -n "s/^$baseif"':\([0-0][0-9]*\) .*/\1/p' \
+       | sed -n "s/^$baseif"':\\([0-9][0-9]*\\) .*/\\1/p' \
+       | tee /dev/tty \
        | awk "BEGIN     { n=$basen }
-              \$1 >= n { n=$1+1 }
+              \\$1 >= n { n=\\$1+1 }
               END       { print n }"` || exit 1
 for host
 do
