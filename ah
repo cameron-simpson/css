@@ -6,10 +6,12 @@
 
 cmd=$0
 
+unlink=
 ahopts=
 while :
 do
   case "$1" in
+    -u)		unlink=1 ;;
     -[nyNYAX])	ahopts="$ahopts $1" ;;
     *)		break ;;
   esac
@@ -30,4 +32,11 @@ fi
 [ $# = 1 ] && set -- "$1" view-unknown
 file=$1; shift
 ##set -x
-exec apphelper "$file" -y $ahopts "$@"
+apphelper "$file" -y $ahopts "$@" || exit 1
+
+# unlink old copy?
+[ $unlink ] || exit 0
+[ -s "$file" ] || exit 0
+loc=`fileloc "$file"` || exit 1
+[ "x$loc" = "x$file" ] && exit 0
+exec rm -- "$file"
