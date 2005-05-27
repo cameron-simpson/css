@@ -1,12 +1,17 @@
-#!/bin/sh
+#!/bin/sh -u
 #
 # Fetch URL into file then run command with filename.
 #	- Cameron Simpson <cs@zip.com.au> 12feb2003
 #
 
-cmd=`basename "$0"`
+: ${TMPDIR:=/tmp}
+
+trace=
+
+cmd=`basename "$0"` || exit 1
 usage="Usage: $cmd [-1] [-end] [-c] [-h] URL command [args...]
 	-1, -end Passed to arg1.
+	-x	Trace execution of sub command.
 	-c	Cache the fetched URL.
 	-C	Cache the fetched URL; skip fetch if already cached.
 	-h	Passed to httpget."
@@ -20,6 +25,8 @@ badopts=
 while :
 do  case $1 in
       -[0-9]*|-end|-discard)
+		arg1opts="$arg1opts $1" ;;
+      -x)	trace=set-x
 		arg1opts="$arg1opts $1" ;;
       -c)	docache=1 trustcache= ;;
       -C)	docache=1 trustcache=1 ;;
@@ -61,7 +68,7 @@ else
       */)	base=index.html ;;
       *)	base=`basename "$url"` ;;
     esac
-    tmpdir=`mkdirn "${TMPDIR:-/tmp}/$cmd"` || exit 1
+    tmpdir=`mkdirn "$TMPDIR/$cmd"` || exit 1
     tmpf=$tmpdir/$base
     trap 'rm -rf "$tmpdir"' 0 1 2 13 15
     saveas=$tmpf
@@ -69,10 +76,12 @@ fi
 
 if [ $trustcache ] && [ -f "$saveas" -a -s "$saveas" ]
 then  :
-else  httpget -f -o "$saveas" "$url" || exit 1
+else
+  wget -q -O "$saveas" "$url" || exit 1
+  ##httpget -f -o "$saveas" "$url" || exit 1
 fi
 
-env "WITHURL_URL=$url" "WITHURL_FILE=$saveas" arg1 $arg1opts -- "$saveas" "$@"
+$trace env "WITHURL_URL=$url" "WITHURL_FILE=$saveas" arg1 $arg1opts -- "$saveas" "$@"
 xit=$?
 
 exit $xit
