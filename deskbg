@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/sh -u
 #
 # Set the root background on per-desktop basis.
 #	- Cameron Simpson <cs@zip.com.au> 02feb2004
@@ -16,7 +16,8 @@ desk=
 
 badopts=
 
-[ "x$1" = x-d ] && { desk=$2; shift; shift; }
+[ $# -gt 0 ] && [ "x$1" = x-d ] && { desk=$2; shift; shift; }
+[ $# -gt 0 ] && [ "x$1" = x-- ] && shift
 
 if [ $# = 0 ]
 then
