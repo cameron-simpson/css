@@ -59,21 +59,20 @@ if [ $# = 0 ]
 then
   allfiles=
 else
+  # try to recast line as a list of cachefiles
   allfiles=1
+  first=
   for file
   do
-    case "$file" in
-      http://* | ftp://* | X:* | - | *:- | \|* )
-	;;
-      *)[ -f "$file" -a -s "$file" ] || allfiles=
-	;;
-    esac
+    if [ $first ]; then first=; set --; fi
+    cfile=`filecache "$file"` || { allfiles= cfile=$file; }
+    set -- ${1+"$@"} "$cfile"
   done
 fi
 
 [ $allfiles ] && exec deskbg -d "$bgdesk" -- ${1+"$@"}
-# presume keyword search
 
+# presume keyword search
 tmpf=$tmppfx.txt
 eval "pickim -P \"\$strippfx\" -n \"\$pickn\" -w -x \"\$HALFX\" -y \"\$HALFY\" $RBG_PICKIM "'${1+"$@"}' | sort -u >"$tmpf"
 [ -s "$tmpf" ] || { echo "$cmd: no image files chosen!" >&2
