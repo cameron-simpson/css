@@ -1,10 +1,11 @@
 #!/bin/sh
 #
-# Cache file my md5 sum and type.
+# Cache file or fetchable object by md5 sum and type.
 #	- Cameron Simpson <cs@zip.com.au> 18may2005
 #
 
 : ${TMPDIR:=/tmp}
+: ${FILECACHE_ROOT:=$HOME/var/cache/file}
 
 cmd=`basename "$0"` || exit 1
 usage="Usage: $cmd filename"
@@ -12,15 +13,15 @@ usage="Usage: $cmd filename"
 [ $# = 1 ] || { echo "$usage" >&2; exit 2; }
 file=$1; shift
 
-[ -f "$file" -a -s "$file" ] || { echo "$cmd: $file: not a file!" >&2; exit 1; }
-
-cacheroot=$HOME/var/cache/file
+[ -f "$file" -a -s "$file" ] \
+|| file=`fileof "$file"` \
+|| { echo "$cmd: $file: not a file or ftechable object!" >&2; exit 1; }
 
 ext=bin
 mtype=`file2mime "$file"` && { ext=`mimeext "$mtype"` || ext=bin; }
 md5path=`md5path "$file"` || exit 1
 
-cachefile=$cacheroot/$md5path.$ext
+cachefile=$FILECACHE_ROOT/$md5path.$ext
 
 if [ -s "$cachefile" ]
 then
