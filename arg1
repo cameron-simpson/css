@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/sh -u
 #
 # Place argument 1 at the right place in a command line and then run
 # the command. This is a tool to support filteredit et al.
@@ -13,12 +13,14 @@ usage="Usage: $cmd [-stdin] [-end] [-n] [--] arg command [command-args...]
 	-end	Put arg after all the command-args.
 		This is the default.
 	-n	Put arg after the first n command-args.
-		-0 and -1 are the common examples."
+		-0 and -1 are the common examples.
+	-x	trace execution of command."
 
 badopts=
 
 dostdin=
 pos=end
+trace=
 
 while :
 do
@@ -27,6 +29,7 @@ do
     -discard)	pos= ;;
     -end)	pos=end ;;
     -[0-9]*)	pos=`expr "x$1" : 'x-\([0-9]*\)'` ;;
+    -x)		trace=set-x ;;
     --)		shift; break ;;
     -?*)	echo "$cmd: unrecognised argument: $1" >&2; badopts=1 ;;
     *)		break ;;
@@ -71,4 +74,4 @@ esac
 
 [ $dostdin ] && exec <"$arg"
 
-exec "$command" "$@"
+exec $trace "$command" "$@"
