@@ -30,7 +30,7 @@ else  silent=1
 fi
 ibak=
 
-set x $BSEDOPTS ${1+"$@"}; shift
+set -- $BSEDOPTS ${1+"$@"}
 
 badopts=
 while :
