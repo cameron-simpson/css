@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/sh -u
 #
 # Reconfigure for a new network location.
 #	- Cameron Simpson <cs@zip.com.au> 23dec2004
@@ -11,25 +11,40 @@ envfiles='/etc/rc.mobile/env.sh /u/cameron/var/env.sh'
 cmd=`basename "$0"`
 usage="Usage: $cmd location"
 
-[ $# = 1 ] || { echo "$cmd: missing location" >&2
-		echo "$usage" >&2
-		exit 2
-	      }
-loc=$1; shift
+badopts=
+
+if [ $# = 1 ]
+then
+  loc=$1
+  shift
+  [ -n "$loc" ] || { echo "$cmd: location may not be empty" >&2
+		     badopts=1
+		   }
+else
+  echo "$cmd: missing location" >&2
+  badopts=1
+  loc=
+fi
 
 [ -s "$cf" ] || { echo "$cmd: missing config file: $cf" >&2
-		  exit 1
+		  badopts=1
 		}
 
-if [ "x$loc" != "xoff" ]
+if [ -n "$loc" -a "x$loc" != "xoff" ]
 then
   clausename=net-$loc
   grep "^\[ *$clausename *\]$" "$cf" >/dev/null \
   || { echo "$cmd: no clause named \"$clausename\" in $cf" >&2
-       echo "  Known clause names:" >&2
-       sed -n 's/^\[ *net-\(.*[^ ]\) *\].*/\1/p' "$cf" | sort | fmt | sed 's/^/    /'
-       exit 1
+       badopts=1
      }
+fi
+
+if [ $badopts ]
+then
+  echo "$usage" >&2
+  echo "  Known clause names:" >&2
+  sed -n 's/^\[ *net-\(.*[^ ]\) *\].*/\1/p' "$cf" | sort | fmt | sed 's/^/    /'
+  exit 2
 fi
 
 # stop any dhclients and their interfaces
