@@ -4,5 +4,6 @@
 #	- Cameron Simpson <cs@zip.com.au> 16apr2002
 #
 
-eval `mhdrs -sh | sed 's/^/HDR_/'`
+mhdrs_sh=`mhdrs -sh | sed 's/^/HDR_/'`
+eval "$mhdrs_sh"
 echo ${HDR_X_LABEL:+"[$HDR_X_LABEL]"} "$HDR_FROM; $HDR_SUBJECT"
