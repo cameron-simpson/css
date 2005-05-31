@@ -1,11 +1,11 @@
-#!/bin/sh
+#!/bin/sh -u
 #
 # Copy a directory tree - refuse if target exists as safety measure.
 # Faster, safer, more accurate and more informative than "cp -rp".
 #	- Cameron Simpson <cs@zip.com.au>
 #
 
-cmd=`basename "$0"`
+cmd=`basename "$0"` || exit 1
 tar=gnutar
 buffer="buffer -m 1M"	# just use "cat" if you lack buffer
 
