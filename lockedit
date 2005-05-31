@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # Lock a file, edit, release.
-#	- Cameron Simpson <cs@zip.com.au> 16jun99
+#	- Cameron Simpson <cs@zip.com.au> 16jun1999
 #
 
 cmd=`basename "$0"`
