@@ -7,6 +7,7 @@
 #	- Cameron Simpson <cs@zip.com.au>
 #
 
+warn "[$0 @ARGV]...";
 $regexp='^.*$';
 $keepfirst=0;
 
@@ -24,7 +25,7 @@ if (@ARGV && $ARGV[0] =~ m:^/: && $ARGV[0] =~ m:/$:)
 
 if (@ARGV)
 { for my $file (@ARGV)
-  { @sys=("lockedit","-",$file,$0,@subargs);
+  { @sys=("filteredit","-discard",$file,$0,@subargs);
     system(@sys);
   }
   exit 0;
