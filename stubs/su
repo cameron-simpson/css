@@ -49,6 +49,12 @@ esac
 [ -n "$login" -o $# -gt 0 ] \
 	&& exec "$realsu" $suargs $login "$su" "$@"
 
+case "$DISPLAY" in
+  localhost:[1-9]*)
+    unset DISPLAY
+    ;;
+esac
+
 # If some dickheads didn't use csh for root this would be much simpler.
 tmp=/tmp/su.$$
 
