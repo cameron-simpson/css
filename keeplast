@@ -7,7 +7,6 @@
 #	- Cameron Simpson <cs@zip.com.au>
 #
 
-warn "[$0 @ARGV]...";
 $regexp='^.*$';
 $keepfirst=0;
 
