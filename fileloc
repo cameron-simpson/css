@@ -8,16 +8,19 @@
 
 cmd=$0
 usage="Usage: $cmd [-a] sourcefiles...
-	-a	Add sourcefile full path to cache."
+	-a	Add sourcefile full path to cache.
+	-u	Unique: remove duplicate paths from the cache file."
 
 badopts=
 
 add=
+keepfirst=
 
 while [ $# -gt 0 ]
 do
   case $1 in
     -a)	add=1 ;;
+    -u)	keepfirst=1 ;;
     --)	shift; break ;;
     -?*)echo "$cmd: unrecognised option: $1" >&2
 	badopts=1
@@ -27,6 +30,10 @@ do
   shift
 done
 
+[ -n "$keepfirst" -a -z "$add" ] && { echo "$cmd: -u requires -a" >&2
+				      badopts=1
+				    }
+
 [ $# = 0 ] && { echo "$cmd: missing sourcefiles" >&2; badopts=1; }
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
@@ -35,6 +42,10 @@ xit=0
 
 for srcfile
 do
+  [ -f "$srcfile" ] || { echo "$cmd: $srcfile: not a regular file" >&2
+			 xit=1
+			 continue
+		       }
   cachefile=$FILELOC_CACHE/`md5path "$srcfile"` \
   || { echo "$cmd: can't checksum $srcfile" >&2
        xit=1
@@ -61,8 +72,11 @@ do
     # now record the path
     if [ -s "$cachefile" ]
     then
-      bsed -s "1i\
+      if bsed -s "1i\\
 $srcfile" "$cachefile"
+      then
+	[ $keepfirst ] && { keepfirst "$cachefile" || xit=1; }
+      fi
     else
       printf '%s\n' "$srcfile" >>"$cachefile"
     fi
