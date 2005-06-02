@@ -5,13 +5,33 @@
 #
 
 cmd=$0
-usage="Usage: $cmd"
+usage="Usage: $cmd [@where] [dbname]"
+
+PATH=$PATH:/usr/local/mysql/bin
+export PATH
 
 pfx=root
 db=
+where=
 
-[ $# = 0 ] || { db=$1 pfx=$1; shift; }
+if [ $# -gt 0 ]
+then
+  case "$1" in
+    @*)	where=$1; shift ;;
+  esac
+fi
+
+[ $# = 0 ] || { db=$1; shift; }
 [ $# = 0 ] || { echo "$usage" >&2; exit 2; }
 
-eval `secret "${pfx}-mysql@$SYSTEMID"` || exit 1
+if [ -n "$where" ]
+then
+  eval `secret "$pfx-mysql$where"` \
+  || exit 1
+else
+  eval `secret "$pfx-mysql@$HOST.$SYSTEMID"` \
+  || eval `secret "$pfx-mysql@$SYSTEMID"` \
+  || exit 1
+fi
+
 exec mysql "-h$secretHOST" "-u$secretLOGIN" "-p$secretPASSWORD" $db
