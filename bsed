@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/sh -u
 #
 # bsed - batch edit with sed
 #	- Cameron Simpson <cs@zip.com.au>
