@@ -5,6 +5,7 @@
 #
 
 : ${TMPDIR:=/tmp}
+: ${BSEDOPTS:=''}
 
 cmd=`basename "$0"`
 usage="Usage: $cmd [-v] [-i suf] {-f script|{-e sedcmd}...|sedcmd}... [--] files...
