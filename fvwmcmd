@@ -21,7 +21,7 @@ then
       then  first=
       else  [ "$sleep" = 0 ] || sleep "$sleep"
       fi
-      alert "fvwmcmd: $fvcmd"
+      ##alert "fvwmcmd: $fvcmd"
       FvwmCommand "$fvcmd"
     done
 else
@@ -32,7 +32,7 @@ else
       then  first=
       else  [ "$sleep" = 0 ] || sleep "$sleep"
       fi
-      alert "fvwmcmd: $fvcmd"
+      ##alert "fvwmcmd: $fvcmd"
       FvwmCommand "$fvcmd"
     done
 fi
