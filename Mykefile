@@ -28,7 +28,7 @@ scriptmandir = $(MANDIR)/cs/man1
 scriptmans = $(scriptmandir)/$((allscripts)).1
 scriptfromman(manf) = $(manf FP)
 
-_all: squid_redirect 0README.txt _submakes _man _cvslog
+_all: squid_redirect 1INDEX.txt _submakes _man _cvslog
 
 _cvslog: CHANGELOG.txt CHANGELOG.html
 
@@ -88,9 +88,6 @@ $(scriptmandir)/%.1: %
 		;; \
 	 esac \
 	 chmod 644 $@ $$htman
-
-0README.txt: INSTALL
-	( cat INSTALL; echo; echo Autoindex of scripts is in 1INDEX.txt ) >$@
 
 1INDEX.txt: $(allscripts)
 	mkscriptndx `ls -d $(allscripts) | sort` >$@
