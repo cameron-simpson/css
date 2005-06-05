@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/sh -u
 #
 # Freshmeat release: 2004-09-21
 #
@@ -114,12 +114,28 @@ dest=
 mono=
 inplace=
 linkonly=
-ltargs=--no-copy
 rrsync=rsync
 includefile=
 rsopts=
 verbose=
 [ -t 1 ] && verbose=1
+
+# have "cp -rpl"? otherwise rely on my linktree script
+if [ "x`cp --help 2>&1 | grep ' -[rpl][, ]' | wc -l`" = x3 ]
+then  mklinktree(){ $trace cp -rpl "$1" "$2"; }
+      cpr(){ $trace cp -rp "$1" "$2"; }
+else  mklinktree(){ $trace linktree "$1" "$2"; }
+      cpr(){ $trace cpdir "$1" "$2"; }
+fi
+
+# rsync capabilities at local end
+rsync_has_link_dest=
+rsv=`rsync --version | sed -n 's/^rsync *version \([1-9]\)\.\([0-9][0-9]*\)\.\([0-9][0-9]*\) .*/\1 \2 \3/p'`
+if [ -n "$rsv" ] && rsvn=`set -- $rsv; printf "%d%03d%03d\n" "$@"`
+then
+  [ "$rsvn" -ge 2005006 ] && rsync_has_link_dest=1
+  ## other end needs proto 29 also ## [ "$rsvn" -ge 2006004 ] && rsopts="$rsopts --fuzzy"
+fi
 
 # =head1 OPTIONS
 #
@@ -297,13 +313,13 @@ xit=0
 if [ -n "$lastbackup" -a -d "$dest/$lastbackup/." ]
 then
     $echo "existing backup: linking $lastbackup to $thisbackup ..."
-    if $trace linktree $ltargs "$dest/$lastbackup" "$dest/$thisbackup"
+    if mklinktree "$dest/$lastbackup" "$dest/$thisbackup"
     then
 	# now fix the dirs made by linktree
 	$trace rsync -a '--include=*/' --exclude='*' \
 		"$dest/$lastbackup/." "$dest/$thisbackup/."
     else
-	echo "$cmd: warning: linktree $dest/$lastbackup $dest/$thisbackup fails" >&2
+	echo "$cmd: warning: mklinktree $dest/$lastbackup $dest/$thisbackup fails" >&2
     fi
 
     if [ $linkonly ]
@@ -336,7 +352,7 @@ else
 	    $trace mkdir "$dest/$thisbackup" || exit 1
 	    $trace rsync $rsopts -aH --rsync-path "$rrsync" ${1+"$@"} "$src/." "$dest/$thisbackup/."
 	else
-	    $trace cpdir "$src" "$dest/$thisbackup"
+	    cpr "$src" "$dest/$thisbackup"
 	fi
 	xit=$?
     fi
@@ -358,5 +374,5 @@ exit $xit
 #
 # =head1 SEE ALSO
 #
-# histbackup-prune(1), linktree(1), rsync(1), ssh(1)
+# histbackup-prune(1cs), linktree(1cs), rsync(1), ssh(1), cp(1), cpdir(1cs)
 #
