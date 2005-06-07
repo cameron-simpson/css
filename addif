@@ -26,6 +26,7 @@ while [ $# -gt 0 ]
 do
   case $1 in
     -i)	baseif=$2; shift ;;
+    -m)	netmask=$2; shift ;;
     -n)	basen=$2; shift ;;
     --)	shift; break ;;
     -?*)echo "$cmd: unrecognised option: $1" >&2
