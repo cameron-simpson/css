@@ -7,17 +7,16 @@
 
 : ${ADDIF:=eth0}	# default base interface
 : ${ADDIF_LOW:=1}	# default base subinterface number
-: ${ADDIF_MASK:=''}	# default netmask
 
 trace=set-x	## echo
 baseif=$ADDIF
 basen=$ADDIF_LOW
-netmask=$ADDIF_MASK
+netmask=
 
 cmd=`basename "$0"`
 usage="Usage: $cmd [-i baseif] [-n basen] ipaddr...
 	-i baseif	Base interface. Default, from \$ADDIF: $baseif
-	-m mask		Interface netmask. Default, from \$ADDIF_MASK: $netmask.
+	-m mask		Interface netmask. Default: from the base interface.
 	-n basen	Base number. Default, from \$ADDIF_LOW: $basen"
 
 badopts=
@@ -65,8 +64,13 @@ fi
 
 xit=0
 
-nmop=
-[ -n "$netmask" ] && nmop="netmask $netmask"
+if [ -z "$netmask" ]
+then
+  netmask=`ifconfig "$baseif" | sed -n 's/.* Mask:\([^ ]*\).*/\1/p'`
+  [ -n "$netmask" ] || { echo "$cmd: can't deduce netmask for $baseif" >&2
+			 exit 1
+		       }
+fi
 
 for host
 do
@@ -88,7 +92,7 @@ do
 		END       { print n }"` || exit 1
 
     # apply and then bump $basen
-    $trace ifconfig "$baseif:$nextn" "$ipaddr" $nmopt || xit=1
+    $trace ifconfig "$baseif:$nextn" "$ipaddr" netmask "$netmask" || xit=1
     basen=`expr "$nextn" + 1`
   done
 done
