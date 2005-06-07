@@ -7,14 +7,17 @@
 
 : ${ADDIF:=eth0}	# default base interface
 : ${ADDIF_LOW:=1}	# default base subinterface number
+: ${ADDIF_MASK:=''}	# default netmask
 
 trace=set-x	## echo
 baseif=$ADDIF
 basen=$ADDIF_LOW
+netmask=$ADDIF_MASK
 
 cmd=`basename "$0"`
 usage="Usage: $cmd [-i baseif] [-n basen] ipaddr...
 	-i baseif	Base interface. Default, from \$ADDIF: $baseif
+	-m mask		Interface netmask. Default, from \$ADDIF_MASK: $netmask.
 	-n basen	Base number. Default, from \$ADDIF_LOW: $basen"
 
 badopts=
@@ -61,12 +64,9 @@ fi
 
 xit=0
 
-# choose the next free interface number
-nextn=`ifconfig -a \
-       | sed -n "s/^$baseif"':\\([0-9][0-9]*\\) .*/\\1/p' \
-       | awk "BEGIN     { n=$basen }
-              \\$1 >= n { n=\\$1+1 }
-              END       { print n }"` || exit 1
+nmop=
+[ -n "$netmask" ] && nmop="netmask $netmask"
+
 for host
 do
   set -- `hostips "$host"`
@@ -79,8 +79,16 @@ do
 
   for ipaddr
   do
-    $trace ifconfig "$baseif:$nextn" "$ipaddr" || xit=1
-    nextn=`expr "$nextn" + 1`
+    # choose the next free interface number
+    nextn=`ifconfig -a \
+	   | sed -n "s/^$baseif"':\\([0-9][0-9]*\\) .*/\\1/p' \
+	   | awk "BEGIN     { n=$basen }
+		  \\$1 >= n { n=\\$1+1 }
+		END       { print n }"` || exit 1
+
+    # apply and then bump $basen
+    $trace ifconfig "$baseif:$nextn" "$ipaddr" $nmopt || xit=1
+    basen=`expr "$nextn" + 1`
   done
 done
 
