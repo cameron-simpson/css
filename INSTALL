@@ -6,6 +6,8 @@ and manual entries in HTML format here:
 
 	http://www.cskk.ezoshosting.com/cs/man/
 
+An autoindex of the scripts is in the file 1INDEX.txt.
+
 Installing my scripts:
 
     Unpack the tarball:
@@ -15,7 +17,15 @@ Installing my scripts:
     into a suitable directory (eg "/opt/css", which I will assume for the
     sake of example below).
 
-    Add the css components to the END of your PATHs:
+    Configure your environment to use the scripts:
+
+	. /opt/css/env.sh
+
+    That line should be in your .profile or other environment setup script.
+    It's pretty simple; it adds the css components to the END of your PATHs
+    (so no css script name preempt anything you already have).
+
+    It mostly does this:
 
 	PATH=$PATH:/opt/css/bin
 	PERL5LIB=$PERL5LIB:/opt/css/lib
@@ -23,7 +33,7 @@ Installing my scripts:
 	export PATH PERL5LIB MANPATH
 
     The aim with $PERL5LIB is that "use cs::blah" will find the module
-    /opt/css/lib/cs/blah.pm. Alternatively you could just symlink
+    /opt/css/lib/cs/blah.pm. Alternatively (for Perl) you could just symlink
     from your site_perl dir:
 
 		cd /usr/lib/perl5/site_perl
@@ -67,4 +77,3 @@ Warrantee:
 
 - Cameron Simpson <cs@zip.com.au>
   http://www.cskk.ezoshosting.com/cs/
-
