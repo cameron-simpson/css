@@ -1,10 +1,11 @@
-#!/bin/sh
+#!/bin/sh -u
 #
 # Gather ssh host keys using ssh-keyscan(1) and incorporate into system tables.
 #	- Cameron Simpson <cs@zip.com.au> 25jun2003
 #
 
 : ${TMPDIR:=/tmp}
+: ${LOCALDOMAINS:=$HOSTDOMAIN}
 
 cmd=`basename "$0"`
 usage="Usage: $cmd {-a|hosts...}"
@@ -66,9 +67,9 @@ cvsmsg=${CVSEDIT_MSG:-"new ssh keys from $cvshostnames"}
 
 xit=0
 
-cvsedit -0 -m "$cvsmsg" ssh_known_hosts1 mergesshkeys $LOCALDOMAINS <"$keys-rsa1"	|| xit=1
-cvsedit -0 -m "$cvsmsg" ssh_known_hosts2 mergesshkeys $LOCALDOMAINS <"$keys-rsa"	|| xit=1
-cvsedit -0 -m "$cvsmsg" ssh_known_hosts2 mergesshkeys $LOCALDOMAINS <"$keys-dsa"	|| xit=1
+cvsedit -0 -m "$cvsmsg" ssh_known_hosts1 mergesshkeys "$LOCALDOMAINS" <"$keys-rsa1"	|| xit=1
+cvsedit -0 -m "$cvsmsg" ssh_known_hosts2 mergesshkeys "$LOCALDOMAINS" <"$keys-rsa"	|| xit=1
+cvsedit -0 -m "$cvsmsg" ssh_known_hosts2 mergesshkeys "$LOCALDOMAINS" <"$keys-dsa"	|| xit=1
 cvsedit -f -m "$cvsmsg" ssh_known_hosts_all set-x cat ssh_known_hosts1 ssh_known_hosts2	|| xit=1
 
 exit $xit
