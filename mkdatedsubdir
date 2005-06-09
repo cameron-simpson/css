@@ -1,0 +1,43 @@
+#!/bin/sh -u
+#
+# Create a directory named after the date as with histbackup.
+#	- Cameron Simpson <cs@zip.com.au> 09jun2005
+#
+
+cmd=$0
+usage="Usage: $cmd dir"
+
+badopts=
+
+if [ $# = 0 ]
+then
+  echo "$cmd: missing dir" >&2
+  badopts=1
+else
+  dir=$1; shift
+  [ -d "$dir/." ] || { echo "$cmd: $dir: not a directory" >&2
+		       badopts=1
+		     }
+
+  [ $# = 0 ] || { echo "$cmd: extra arguments after dir: $*" >&2
+		  badopts=1
+		}
+fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+subdir=`daycode` || exit 1
+if mkdir "$dir/$subdir" 2>/dev/null
+then
+  echo "$dir/$subdir"
+  exit 0
+fi
+
+subdir=`datecode` || exit 1
+if mkdir "$dir/$subdir" 2>/dev/null
+then
+  echo "$dir/$subdir"
+  exit 0
+fi
+
+exit 1
