@@ -29,9 +29,10 @@ then
   eval `secret "$pfx-mysql$where"` \
   || exit 1
 else
-  eval `secret "$pfx-mysql@$HOST.$SYSTEMID"` \
-  || eval `secret "$pfx-mysql@$SYSTEMID"` \
+  secret=`secret "$pfx-mysql@$HOST.$SYSTEMID"` \
+  || secret=`secret "$pfx-mysql@$SYSTEMID"` \
   || exit 1
+  eval "$secret" || exit 1
 fi
 
 exec mysql "-h$secretHOST" "-u$secretLOGIN" "-p$secretPASSWORD" $db
