@@ -17,9 +17,12 @@ set -- $SSHTO_OPTS ${1+"$@"}
 
 badopts=
 
+host=
+havehost=
 first=1
 while :
 do
+  ##echo "*=[$*]" >&2
   case $1 in
     -t)	topt=-t ;;
     +t)	topt= ;;
@@ -37,17 +40,22 @@ do
 	;;
     --)	shift; break ;;
     -?*)echo "$cmd: unrecognised option: $1" >&2; badopts=1 ;;
-    *)	break ;;
+    *)	[ $havehost ] && break
+	host=$1; havehost=1
+	;;
   esac
   shift
 done
 
-if [ $# = 0 ]
+if [ -z "$havehost" ]
 then
+  if [ $# = 0 ]
+  then
     echo "$cmd: missing host" >&2
     badopts=1
-else
+  else
     host=$1; shift
+  fi
 fi
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
