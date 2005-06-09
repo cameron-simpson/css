@@ -8,13 +8,16 @@
 : ${HOSTNAME:=`hostname`}
 : ${HOST:=`echo "$HOSTNAME" | sed 's/\..*//'`}
 : ${HOSTDOMAIN=`echo "$HOSTNAME" | sed 's/[^.]*\.//'`}
+: ${USER:=`whoami`}
+: ${SITENAME:=$HOSTDOMAIN}
+: ${EMAIL:="$USER@$SITENAME"}
 
 PATH=$PATH:$OPTCSS/bin
 MANPATH=$MANPATH:$OPTCSS/man
 PERL5LIB=$PERL5LIB:$OPTCSS/lib
+CLASSPATH=$CLASSPATH:$OPTCSS/lib/au.com.zip.cs.jar
 
 ## When actually used much.
-## CLASSPATH=$CLASSPATH:$OPTCSS/lib/au.com.zip.cs.jar
 ## PYTHONPATH=$PYTHONPATH:$OPTCSS/lib
 
-export PATH MANPATH PERL5LIB HOST HOSTNAME HOSTDOMAIN
+export PATH MANPATH PERL5LIB HOST HOSTNAME HOSTDOMAIN USER SITENAME EMAIL
