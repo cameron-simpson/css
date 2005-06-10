@@ -1,17 +1,20 @@
-#!/bin/sh
+#!/bin/sh -u
 #
 # Bang style ssh for hopping through firewalls etc.
 # Sshes from host to host to reach destination.
 #	- Cameron Simpson <cs@zip.com.au> 28may2004
 #
 
-cmd=`basename "$0"`
+: ${SSHTO_OPTS:=''}
+
+trace=set-x
+sshopts=
+topt=
+
+cmd=`basename "$0"` || cmd=$0
 usage="Usage: $cmd [ssh-options...] [sshcfg=value...] [user@]host[![user2@]host2...] [command ...]
 	ssh-options...	Passed to all ssh commands.
 	sshcfg=value	Transmuted to -o 'sshcfg value' and added to ssh-option."
-
-sshopts=
-topt=
 
 set -- $SSHTO_OPTS ${1+"$@"}
 
@@ -22,7 +25,7 @@ havehost=
 first=1
 while :
 do
-  ##echo "*=[$*]" >&2
+  ##echo "sshto: *=[$*]" >&2
   case $1 in
     -t)	topt=-t ;;
     +t)	topt= ;;
@@ -34,6 +37,7 @@ do
 	shift
 	;;
     [a-zA-Z]*=?*)
+	[ $havehost ] && break	# not supported after host - it's the shell command now
 	cfg=`expr "$1" : '\([^=]*\)=.*'`
 	val=`expr "$1" : '[^=]*=\(.*\)'`
 	sshopts="$sshopts -o "`shqstr "$cfg $val"`
@@ -79,5 +83,4 @@ do
   esac
 done
 
-##set -x
-eval "exec $sshargv $host \"\$sshcmd\""
+eval "exec $trace $sshargv $host \"\$sshcmd\""
