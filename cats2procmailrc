@@ -36,6 +36,12 @@ I build my B<.procmailrc> like this:
 
 =over 4
 
+=item B<-a> I<alert>
+
+Specify a shell command to run as the alert function (see L<FILE FORMAT> below),
+such as mailblink(1).
+The character percent (B<'%'>) is replaced by the I<folder> name.
+
 =item B<-D>
 
 Insert a variation on the standard formail(1) recipe for deleting duplicates
@@ -47,12 +53,6 @@ otherwise use the file B<MAILDIR/.msgid.cache-I<folder>>.
 
 Put the tag into the B<X-Label> header field
 instead of as a prefix to the subject line.
-
-=item B<-a> I<alert>
-
-Specify a shell command to run as the alert function (see L<FILE FORMAT> below),
-such as mailblink(1).
-The character percent (B<'%'>) is replaced by the I<folder> name.
 
 =item B<-m> I<maildomains>
 
@@ -413,7 +413,15 @@ sub readcats($;$)
 	if ($ptn !~ /^\^/) { $ptn="$ptn"; }
       }
       else
-      { $ptn.="\@.*".altre(@::DfltDom) if $ptn !~ /\@/;
+      { if ($ptn !~ /\@./)
+	# no @? add domains
+	{ $ptn =~ s/\@?$/"\@.*".altre(@::DfltDom)/e;
+	}
+	# no localpart? add wildcard prefix
+	elsif ($ptn =~ /^@/)
+	{ $ptn="[^>\@]+$ptn";
+	}
+
 	$ptn="\\<$ptn\\>";
       }
 
