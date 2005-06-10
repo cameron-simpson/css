@@ -159,7 +159,9 @@ to be present in the B<To>, B<CC> or B<BCC> header lines.
 If the address string lacks an at ("@") then an at ("@")
 and the value of the environment variable B<$MAILDOMAIN>
 is appended.
-So I have rules like this:
+If the address string lacks the local part, any localpart is accepted.
+
+I have rules like this:
 
 	!attn	Personal	cs
 	!attn	Personal	cameron@cskk.homeip.net
