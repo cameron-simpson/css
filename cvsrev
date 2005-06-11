@@ -1,0 +1,14 @@
+#!/bin/sh -u
+#
+# Report the revision of a particular file within a CVS checkout.
+#	- Cameron Simpson <cs@zip.com.au> 11jun2005
+#
+
+usage="Usage: $0 filename"
+
+[ $# = 1 ] || { echo "$usage" >&2; exit 2; }
+file=$1; shift
+
+filecvsdir=`dirname "$file"`/CVS || exit 1
+awk -F/ "BEGIN      { file=\"$file\" }
+       "'$2 == file { print $3 }' "$filecvsdir/Entries"
