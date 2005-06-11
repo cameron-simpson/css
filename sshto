@@ -23,7 +23,7 @@ badopts=
 host=
 havehost=
 first=1
-while :
+while [ $# -gt 0 ]
 do
   ##echo "sshto: *=[$*]" >&2
   case $1 in
