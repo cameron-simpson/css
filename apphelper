@@ -32,7 +32,7 @@ doview=$APPHELPER_DOVIEW
 savemode=$APPHELPER_SAVEMODE
 extract=
 extract_globs=$APPHELPER_EXTRACT_GLOBS
-termname=$cmd
+termname=
 pager=$PAGER
 
 # =head1 SYNOPSIS
@@ -181,8 +181,10 @@ else
       [ -n "$DISPLAY" ] || { echo "$cmd: can't make new terminal: no \$DISPLAY!" >&2
 			     exit 1
 			   }
-      set -x
-      term -n "$termname" +a -e "$0" +t "$file" ${1+"$@"}
+      ( [ -n "$termname" ] || termname="$cmd - $file"
+	set -x
+	exec term -n "$termname" +a -e "$0" +t "$file" ${1+"$@"}
+      )
       rm -f "$tmpfile"
       exit 0
   fi
