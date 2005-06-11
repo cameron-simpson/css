@@ -10,5 +10,6 @@ usage="Usage: $0 filename"
 file=$1; shift
 
 filecvsdir=`dirname "$file"`/CVS || exit 1
-awk -F/ "BEGIN      { file=\"$file\" }
+filebase=`basename "$file"`      || exit 1
+awk -F/ "BEGIN      { file=\"$filebase\" }
        "'$2 == file { print $3 }' "$filecvsdir/Entries"
