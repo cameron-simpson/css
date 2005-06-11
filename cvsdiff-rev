@@ -1,0 +1,44 @@
+#!/bin/sh -u
+#
+# Print diff that made a particular cvs revision of a file.
+#	- Cameron Simpson <cs@zip.com.au> 11jun2005
+#
+
+cmd=$0
+usage="Usage: $cmd [-r rev] file"
+
+trace=	##set-x
+rev=
+
+badopts=
+
+[ $# -gt 0 ] && [ "x$1" = x-r ] && { rev=$2; shift; shift; }
+
+if [ $# = 0 ]
+then
+  echo "$cmd: missing file" >&2
+  badopts=1
+else
+  file=$1
+  shift
+  [ $# = 0 ] || { echo "$cmd: extra arguments after file: $*" >&2
+		  badopts=1
+		}
+fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+[ -z "$rev" ] || rev=`cvsrev "$file"` || exit 1
+
+if [ "x$rev" = x1.1 ]
+then
+  echo "$cmd: $file: no diff available for revision $rev" >&2
+  exit 1
+fi
+
+revmaj=`expr "x$rev" : 'x\([0-9][0-9]*\).*'`
+revmin=`expr "x$rev" : 'x[0-9][0-9]*\.\([0-9][0-9]*\)'`
+revprev=$revmaj.`expr "$revmin" - 1`
+
+$trace cvs diff -r "$revprev" -r "$rev" "$file"
+exit 0
