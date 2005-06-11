@@ -1,11 +1,9 @@
-#!/bin/sh
+#!/bin/sh -u
 #
 # Prune a tree from a histbackup directory
 # if the disc is too full.
 #	- Cameron Simpson <cs@zip.com.au> 22jun2003
 #
-
-set -u
 
 trace=set-x
 pcnt=5
