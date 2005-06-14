@@ -1,0 +1,17 @@
+#!/bin/sh -u
+#
+# List uninstalled stuff by diffing "yum list available" against rpm.
+#	- Cameron Simpson <cs@zip.com.au> 14jun2005
+#
+
+: ${TMPDIR:=/tmp}
+
+[ $# = 0 ] || { echo "Usage: $0" >&2; exit 2; }
+
+exec </dev/null
+
+tmpf=$TMPDIR/ym$$y
+trap 'rm -f "$tmpf"' 0 1 2 13 15
+
+yum list available | sed 's/\..*//' | sort -u >"$tmpf"
+rpm -qa | sed 's/-[^-]*-[^-]*$//' | sort -u  | diffu - "$tmpf" | sed -n 's/^\+//p'
