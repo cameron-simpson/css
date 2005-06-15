@@ -25,7 +25,8 @@ do
   ok=1
   for testcmd
   do
-    printf "%s" "$msg" | "$testcmd" \
+    set -x
+    printf '%s\n' "$msg" | "$testcmd" \
     || { echo "$cmd: bug line fails requirement: $testcmd" >&2
 	 ok=
        }
@@ -33,4 +34,4 @@ do
   [ $ok ] && break
 done
 
-printf "%s" "$msg"
+printf '%s\n' "$msg"
