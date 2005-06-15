@@ -300,7 +300,7 @@ sub _scalar2a
   }
   elsif (/[^-+_\w.\/\@]/)
   { s/["\\]/\\$&/g;
-    s/[^\n\020-\176]/sprintf("\\x%02x",ord($&))/eg;
+    s/[^\n\040-\176]/sprintf("\\x%02x",ord($&))/eg;
     if ($cs::Hier::Prettier)
     { s/\s+$//;
       s/\n/_sep('').' '/eg;
