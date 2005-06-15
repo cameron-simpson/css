@@ -10,7 +10,7 @@ cvslog2html - transcribe CVS logs to HTML or plain text
 
 =head1 SYNOPSIS
 
-cvslog2html [{-D date|-r rev}] [-t] [-O] [{-|cvs-log-args...}]
+cvslog2html [{-D I<date>|-r I<rev>}] [-t] [-O] [--diffs] [{-|I<cvs-log-args>...}]
 
 =head1 DESCRIPTION
 
@@ -59,15 +59,14 @@ Text mode - write plain text instead of HTML.
 
 $TextMode=0;
 $ObfuscateEmail=0;
+$DoDiffs=0;
 $cvsopts='';
-getopts("r:tO") || die "$::cmd: bad options\n";
+getopts("dD:r:tO") || die "$::cmd: bad options\n";
+$DoDiffs=1 if defined $::opt_d;
 $TextMode=1 if defined $::opt_t;
 $ObfuscateEmail=1 if defined $::opt_O;
 $cvsopts="$cvsopt -r$::opt_r" if defined $::opt_r;
-
-=back
-
-=cut
+$cvsopts="$cvsopt -D$::opt_D" if defined $::opt_D;
 
 if (@ARGV == 1 && $ARGV[0] eq '-')
 {
@@ -152,6 +151,9 @@ if (! $TextMode)
 for my $L (reverse sort cmplogs @log)
 {
   my($f,$r,$d,$t,$a,$C)=@$L;
+  if ($r eq '1.1')
+  { unshift(@$C,"Initial checkin.");
+  }
 
   if (! defined $day || $day ne $d)
   { if (defined $day && ! $TextMode)
@@ -194,6 +196,22 @@ for my $L (reverse sort cmplogs @log)
 
     print r2h($comment), "\n";
   }
+
+  if ($DoDiffs && $r ne '1.1')
+  {
+    if (!open(DIFF,"cvsdiff-rev -r $r '$f' | sed -n '/^[+\-]/p' |"))
+    { warn "$::cmd: can't get diff for $f, revision $r\n";
+    }
+    else
+    { while (defined($_=<DIFF>))
+      { chomp;
+	print $indent, "  ", r2h($_), "\n";
+      }
+      close(DIFF);
+    }
+
+    undef $file;
+  }
 }
 
 if (! $TextMode)
@@ -219,6 +237,13 @@ sub cmplogs
   ? $t2 cmp $t1
   : $daf1 cmp $daf2
   ;
+}
+
+sub revprev
+{ my($rev)=@_;
+
+  die "0: can't compute revprev($rev)" if $rev !~ /^(\d+)\.(\d+)/;
+  return "$1.".($2-1);
 }
 
 =head1 SEE ALSO
