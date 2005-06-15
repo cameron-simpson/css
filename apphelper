@@ -548,6 +548,7 @@ esac
 # foo- -> foo-file
 case $saveas in
     */|*-)	saveas=$saveas$fbase ;;
+    */. | */..)	saveas=$saveas/$fbase ;;
 esac
 
 case `basename "$saveas"` in
