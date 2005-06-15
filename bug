@@ -41,12 +41,8 @@ exec 3>&1
       /?*/?*)
 	pfxre=`expr "$bugsystem" : '/\([^/][^/]*\)/.*'` || { xit=1; continue; }
 	sfxbugsys=`expr "$bugsystem" : '/[^/][^/]*/\(.*\)'` || { xit=1; continue; }
-	if expr "x$headline" : "x$pfxre" >/dev/null
-	then
-	  bugsystem=$sfxbugsys
-	else
-	  continue
-	fi
+	expr "x$headline" : "x$pfxre" >/dev/null || continue
+	bugsystem=$sfxbugsys
 	;;
     esac
 
