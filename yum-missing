@@ -10,8 +10,12 @@
 
 exec </dev/null
 
-tmpf=$TMPDIR/ym$$y
-trap 'rm -f "$tmpf"' 0 1 2 13 15
+tmpf=$TMPDIR/ym$$
+yumout=${tmpf}y
+rpmout=${tmpf}r
+trap 'rm -f "$yumout" "$rpmout"' 0 1 2 13 15
 
-yum list available | sed 's/\..*//' | sort -u >"$tmpf"
-rpm -qa | sed 's/-[^-]*-[^-]*$//' | sort -u  | diffu - "$tmpf" | sed -n 's/^\+//p'
+yum list available | sed 's/\..*//' | sort -u >"$yumout" &
+rpm -qa | sed 's/-[^-]*-[^-]*$//' | sort -u  >"$rpmout" &
+wait
+diffu "$rpmout" "$yumout" | sed -n '/-debuginfo$/d; s/^\+//p'
