@@ -25,7 +25,6 @@ do
   ok=1
   for testcmd
   do
-    set -x
     printf '%s\n' "$msg" | "$testcmd" \
     || { echo "$cmd: bug line fails requirement: $testcmd" >&2
 	 ok=
