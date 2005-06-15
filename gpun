@@ -1,4 +1,5 @@
 #!/bin/sh
+
 cmd=$0
 usage="Usage: $cmd [subdirpfx] [-w] [lown] highn URLtplt"
 
