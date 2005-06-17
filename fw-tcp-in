@@ -1,19 +1,20 @@
-#!/bin/sh
+#!/bin/sh -u
 #
 # Permit outgoing traffic for a service to specified hosts (or "ALL").
 #	- Cameron Simpson <cs@zip.com.au> 18oct2003
 #
+
+: ${FW_CHAIN_INPUT:=INPUT}
+: ${FW_CHAIN_OUTPUT:=OUTPUT}
+: ${FW_CHAIN_FORWARD:=FORWARD}
 
 cmd=$0
 usage="Usage: $cmd [+l] dest-port {ALL | hosts...}"
 
 badopts=
 
-chain_in=FW_INPUT
-chain_out=FW_OUTPUT
-
 dolog=1
-[ "x$1" = x+l ] && { dolog=; shift; }
+[ $# -gt 0 ] && [ "x$1" = x+l ] && { dolog=; shift; }
 
 if [ $# = 0 ]
 then
@@ -33,15 +34,15 @@ fi
 if [ "x$*" = xALL ]
 then
     set -x
-    [ $dolog ] && iptables -I "$chain_in" -p tcp --destination-port "$dport" --syn -j LOGACCEPT
-    iptables -I "$chain_in" -p tcp --destination-port "$dport" -j ACCEPT
-    iptables -I "$chain_out" -p tcp --source-port "$dport" ! --syn -j ACCEPT
+    [ $dolog ] && iptables -I "$FW_CHAIN_INPUT" -p tcp --destination-port "$dport" --syn -j LOGACCEPT
+    iptables -I "$FW_CHAIN_INPUT" -p tcp --destination-port "$dport" -j ACCEPT
+    iptables -I "$FW_CHAIN_OUTPUT" -p tcp --source-port "$dport" ! --syn -j ACCEPT
 else
     set -x
     for host in `hostips "$@"`
     do
-      [ $dolog ] && iptables -I "$chain_in" -p tcp -s "$host" --destination-port "$dport" --syn -j LOGACCEPT
-      iptables -I "$chain_in" -p tcp -s "$host" --destination-port "$dport" -j ACCEPT
-      iptables -I "$chain_out" -p tcp -d "$host" --source-port "$dport" ! --syn -j ACCEPT
+      [ $dolog ] && iptables -I "$FW_CHAIN_INPUT" -p tcp -s "$host" --destination-port "$dport" --syn -j LOGACCEPT
+      iptables -I "$FW_CHAIN_INPUT" -p tcp -s "$host" --destination-port "$dport" -j ACCEPT
+      iptables -I "$FW_CHAIN_OUTPUT" -p tcp -d "$host" --source-port "$dport" ! --syn -j ACCEPT
     done
 fi
