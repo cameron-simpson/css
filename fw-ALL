@@ -1,19 +1,20 @@
-#!/bin/sh
+#!/bin/sh -u
 #
 # Permit ALL traffic to/from specified hosts (or "ALL").
 #	- Cameron Simpson <cs@zip.com.au> 14jun2004
 #
+
+: ${FW_CHAIN_INPUT:=INPUT}
+: ${FW_CHAIN_OUTPUT:=OUTPUT}
+: ${FW_CHAIN_FORWARD:=FORWARD}
 
 cmd=$0
 usage="Usage: $cmd [+l] {ALL | hosts...}"
 
 badopts=
 
-chain_in=FW_INPUT
-chain_out=FW_OUTPUT
-
 dolog=1
-[ "x$1" = x+l ] && { dolog=; shift; }
+[ $# -gt 0 ] && [ "x$1" = x+l ] && { dolog=; shift; }
 
 [ $# = 0 ] && { echo "$cmd: missing ALL or hosts" >&2; badopts=1; }
 
@@ -22,17 +23,17 @@ dolog=1
 if [ "x$*" = xALL ]
 then
     set -x
-    iptables -I "$chain_in" -j ACCEPT
-    iptables -I "$chain_out" -j ACCEPT
-    [ $dolog ] && iptables -I "$chain_in" -p tcp --syn -j LOGACCEPT
-    [ $dolog ] && iptables -I "$chain_out" -p tcp --syn -j LOGACCEPT
+    iptables -I "$FW_CHAIN_INPUT" -j ACCEPT
+    iptables -I "$FW_CHAIN_OUTPUT" -j ACCEPT
+    [ $dolog ] && iptables -I "$FW_CHAIN_INPUT" -p tcp --syn -j LOGACCEPT
+    [ $dolog ] && iptables -I "$FW_CHAIN_OUTPUT" -p tcp --syn -j LOGACCEPT
 else
     set -x
     for host in `hostips "$@"`
     do
-      iptables -I "$chain_in" -s "$host" -j ACCEPT
-      iptables -I "$chain_out" -d "$host" -j ACCEPT
-      [ $dolog ] && iptables -I "$chain_in" -s "$host" -p tcp --syn -j LOGACCEPT
-      [ $dolog ] && iptables -I "$chain_out" -d "$host" -p tcp --syn -j LOGACCEPT
+      iptables -I "$FW_CHAIN_INPUT" -s "$host" -j ACCEPT
+      iptables -I "$FW_CHAIN_OUTPUT" -d "$host" -j ACCEPT
+      [ $dolog ] && iptables -I "$FW_CHAIN_INPUT" -s "$host" -p tcp --syn -j LOGACCEPT
+      [ $dolog ] && iptables -I "$FW_CHAIN_OUTPUT" -d "$host" -p tcp --syn -j LOGACCEPT
     done
 fi
