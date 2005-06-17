@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/sh -u
 #
 # Toss all chains, remake LOG* and FW_* chains.
 #	- Cameron Simpson <cs@zip.com.au> 18oct2003
