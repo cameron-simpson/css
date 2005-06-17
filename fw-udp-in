@@ -1,19 +1,20 @@
-#!/bin/sh
+#!/bin/sh -u
 #
 # Permit incoming UDP traffic for a service from specified hosts (or "ALL").
 #	- Cameron Simpson <cs@zip.com.au> 18oct2003
 #
+
+: ${FW_CHAIN_INPUT:=INPUT}
+: ${FW_CHAIN_OUTPUT:=OUTPUT}
+: ${FW_CHAIN_FORWARD:=FORWARD}
 
 cmd=$0
 usage="Usage: $cmd [-l] dest-port {ALL | hosts...}"
 
 badopts=
 
-chain_in=FW_INPUT
-chain_out=FW_OUTPUT
-
 dolog=
-[ "x$1" = x-l ] && { dolog=1; shift; }
+[ $# -gt 0 ] && [ "x$1" = x-l ] && { dolog=1; shift; }
 
 if [ $# = 0 ]
 then
@@ -36,13 +37,13 @@ target=ACCEPT
 set -x
 if [ "x$*" = xALL ]
 then
-    iptables -I "$chain_in" -p udp --destination-port "$dport" -j "$target"
-    iptables -I "$chain_out" -p udp --source-port "$dport" -j "$target"
+    iptables -I "$FW_CHAIN_INPUT" -p udp --destination-port "$dport" -j "$target"
+    iptables -I "$FW_CHAIN_OUTPUT" -p udp --source-port "$dport" -j "$target"
 else
     set -x
     for host in `hostips "$@"`
     do
-      iptables -I "$chain_in" -p udp -s "$host" --destination-port "$dport" -j "$target"
-      iptables -I "$chain_out" -p udp -d "$host" --source-port "$dport" -j "$target"
+      iptables -I "$FW_CHAIN_INPUT" -p udp -s "$host" --destination-port "$dport" -j "$target"
+      iptables -I "$FW_CHAIN_OUTPUT" -p udp -d "$host" --source-port "$dport" -j "$target"
     done
 fi
