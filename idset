@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/sh -u
 #
 # Manage a list of identifiers and their attributes.
 # Generalised from desktop 01apr2003.
@@ -14,6 +14,8 @@ idset=
 
 cmd=$0
 usage="Usage: $cmd [-a] -i idset [-l] [[-r] idname [param [value]]]
+    With param, report param.
+    With value, set param.
 	-a		List all ids.
 	-i idset	Idset.
 	-l		Long: list all attributes of ids.
@@ -26,7 +28,7 @@ idname=
 rmid=
 long=
 
-while :
+while [ $# -gt 0 ]
 do
   case $1 in
     -a)	all=1 aflag=$1 ;;
@@ -56,6 +58,7 @@ fi
 if [ $# -gt 0 ]
 then
     idname=$1; shift
+
     if [ $# = 0 ]
     then  param=
     else  param=$1; shift
@@ -69,8 +72,8 @@ then
 	  else haspvalue=1
 	       pvalue=$1; shift
 	       [ $rmid ] && { echo "$cmd: can't use -r with parameter values" >&2
-				badopts=1
-			      }
+			      badopts=1
+			    }
 	       [ $# = 0 ] || { echo "$cmd: extra arguments: $*" >&2; badopts=1; }
 	  fi
     fi
