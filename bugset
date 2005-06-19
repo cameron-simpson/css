@@ -1,0 +1,2 @@
+#!/bin/sh
+exec idset -i bugsets ${1+"$@"}
