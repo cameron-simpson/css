@@ -373,7 +373,7 @@ sub ImageIndices($)
   my @ndx=();
 
   while (@rows)
-  { warn "LENGTH=$this->{TABLELENGTH}, nrows=".scalar(@rows).", [@rows]";
+  { ##warn "LENGTH=$this->{TABLELENGTH}, nrows=".scalar(@rows).", [@rows]";
     my @front = splice(@rows,0,$this->{TABLELENGTH});
     push(@ndx, { LOW => $front[0]->{LOW},
 		 HIGH => $front[$#front]->{HIGH},
