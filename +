@@ -17,6 +17,7 @@ use_term=1
 use_screen=
 preshcmd=
 postshcmd=
+termopts=
 
 badopts=
 while [ $# -gt 0 ]
