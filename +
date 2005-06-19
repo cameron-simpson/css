@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/sh -u
 #
 # Read a mail folder with mutt.
 #	- Cameron Simpson <cs@zip.com.au>
@@ -19,7 +19,7 @@ preshcmd=
 postshcmd=
 
 badopts=
-while :
+while [ $# -gt 0 ]
 do
   case $1 in
     +a)		termopts="$termopts $1" ;;
