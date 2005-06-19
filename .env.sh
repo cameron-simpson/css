@@ -11,6 +11,10 @@
 : ${USER:=`whoami`}
 : ${SITENAME:=$HOSTDOMAIN}
 : ${EMAIL:="$USER@$SITENAME"}
+: ${MANPATH:=/usr/man:/usr/share/man}
+: ${PATH:=/usr/bin:/bin}
+: ${PERL5LIB:=/usr/lib/perl5}
+: ${CLASSPATH:=/usr/lib/jre/lib}
 
 PATH=$PATH:$OPTCSS/bin
 MANPATH=$MANPATH:$OPTCSS/man
