@@ -1,0 +1,89 @@
+#!/bin/sh -u
+#
+# Transcribe my bookmarks to HTML.
+#	- Cameron Simpson <cs@zip.com.au> 16jun2005
+#
+
+: ${BMK_DIR:=$HOME/rc/bmk}
+: ${TMPDIR:=/tmp}
+
+pfx=
+
+cmd=`basename "$0"` || cmd=$0
+usage="Usage: $cmd [bmkdirs...]"
+
+badopts=
+
+while [ $# -gt 0 ]
+do
+  case $1 in
+    --)	shift; break ;;
+    -?*)echo "$cmd: unrecognised option: $1" >&2
+	badopts=1
+	;;
+    *)	break ;;
+  esac
+  shift
+done
+
+[ $# = 0 ] && set -- "$BMK_DIR"
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+xit=0
+
+for bmkdir
+do
+  ( [ -n "$pfx" ] || pfx=`basename "$bmkdir"` || exit 1
+    cd "$bmkdir" || exit 1
+
+    printf '<H1><A NAME="%s">%s</A></H1>\n' "$pfx" "$pfx"
+    set -- *
+
+    [ $# = 0 ] && { echo "No entries."; exit 0; }
+
+    drefs=
+    bmktxt=
+
+    set --
+    for entry in *
+    do
+      if [ -f "$entry" ]
+      then
+	mhdrs_sh=`mhdrs -sh <"$entry" | sed 's/^/bmkhdr_/'` \
+	|| { xit=1; continue; }
+	eval "$mhdrs_sh"
+
+	[ -n "$bmktxt" ] || bmktxt="<UL>"
+	bmktxt="$bmktxt<LI><A HREF=\"$bmkhdr_URL\">$bmkhdr_SUBJECT</A>"
+      else
+	if [ -d "$entry/." ]
+	then
+	  set -- ${1+"$@"} "$entry"
+	  drefs="$drefs $pfx/$entry"
+	else
+	  echo "$cmd: unhandled entry: $bmkdir/$entry" >&2
+	  ls -ld "$bmkdir/$entry" >&2
+	  xit=1
+	  continue
+	fi
+      fi
+    done
+    [ -n "$bmktxt" ] && bmktxt="$bmktxt</UL>"
+
+    if [ -n "$drefs" ]
+    then
+      echo "["
+      for dref in $drefs
+      do
+	basedref=`basename "$dref"`
+	printf '<A HREF="#%s">%s</A>\n' "$dref" "$basedref"
+      done
+      echo "]<P>"
+    fi
+
+    [ -n "$bmktxt" ] && printf "%s\n" "$bmktxt"
+  ) || xit=1
+done
+
+exit $xit
