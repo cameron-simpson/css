@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/sh -u
 #
 # Generic open-a-window.
 #
@@ -12,6 +12,9 @@
 : ${LOGDIR:=$HOME/var/log}
 : ${CONSOLE:=$LOGDIR/console}
 : ${SHELL:=/bin/sh}
+: ${TERMOPTIONS:=''}
+: ${WINJOB:=''}
+: ${XAUTHORITY:=''}
 
 cmd=$0
 usage="Usage: $cmd [-v] [-w width] [-h height] [-x x-pos] [-y y-pos]
@@ -27,7 +30,7 @@ closefds='for fd in 3 4 5 6 7 8 9; do eval "exec $fd>&-"; done'
 keepio=
 title= f=
 smallx=0 smally=103 smallw=80 smallh=24 smallf=
-w= h=
+x= y= w= h=
 bigx=0 bigy=-0 bigw=80 bigh=61 bigf=6x13
 geometry=
 sized=
@@ -125,7 +128,7 @@ case "$TERM,$DISPLAY" in
 	  termopts="$termopts -geometry \"\$geometry\""
 	fi
 
-	[ -n "$xauthhack" -a -r "$XAUTHORITY" ] &&
+	[ -n "$xauthhack" -a -n "$XAUTHORITY" -a -r "$XAUTHORITY" ] &&
 		{ # Fight with NFS/xterm brain damage.
 		  xauth=$TMPDIR/$cmd.$$
 		  exec 4>$xauth
