@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/sh -u
 #
 # Make the next directory in a sequence.
 # Lifted from my cdfn shell function.
@@ -14,7 +14,7 @@ usage="Usage: $cmd [-1] dirpfx"
 startn=
 maxtries=20
 
-[ "x$1" = x-1 ] && { startn=1 maxtries=1024; shift; }
+[ $# -gt 0 ] && [ "x$1" = x-1 ] && { startn=1 maxtries=1024; shift; }
 [ $# = 1 ] || { echo "$usage" >&2; exit 2; }
 
 pfx=$1
@@ -36,8 +36,8 @@ else
        cd "$up" || exit 1
        ls \
        | sed -n "/^$base"'0*[1-9][0-9]*/s/.*[^0-9]0*\([1-9][0-9]*\)$/\1/p' \
-       | sort -n \
-       | tail -1`
+       | sort -nr \
+       | sed 1q`
 
     # nothing? start at 1
     if [ -n "$n" ]
