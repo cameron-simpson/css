@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/sh -u
 #
 # Simple jukebox.
 # Runs a player in the background, reads keyword selections and commands
@@ -16,7 +16,11 @@ dorandom=
 cmd=`basename "$0"`
 usage="Usage: $cmd [-C]"
 
-[ "x$1" = x-C ] && { playcopy=1; shift; }
+[ $# -gt 0 ] && [ "x$1" = x-C ] && { playcopy=1; shift; }
+
+##statedir=
+##trap '[ -n "$statedir" ] && rm -r "$statedir"' 0 1 2 13 15
+##statedir=`mkdirn "$TMPPDIR"` || exit 1
 
 playpid=
 
@@ -25,7 +29,7 @@ runplayer()
   ( ok=1
     subproc=
     tmpauf=
-    trap 'ok=; [ -n "$subproc" ] && kill $subproc; exit' 1 2 3 15
+    trap 'ok=; [ -n "$subproc" ] && kill $subproc; exit' 1 2 15
     trap '[ -n "$subproc" ] && kill $subproc' USR1
     playlist=$TMPDIR/$cmd.$$
     while [ $ok ]
@@ -75,6 +79,14 @@ stopplayer()
 { [ -n "$playpid" ] && { kill "$playpid"; playpid=; }
 }
 
+pauseplayer()
+{ [ -n "$playpid" ] && { kill -STOP "$playpid"; playpid=; }
+}
+
+contplayer()
+{ [ -n "$playpid" ] && { kill -CONT "$playpid"; playpid=; }
+}
+
 bumpplayer()
 { [ -n "$playpid" ] && { kill -USR1 "$playpid"; }
 }
@@ -95,9 +107,12 @@ do
 		echo "  \"seq\"	Choose matching items sequentially."
 		echo "  keywords Select tracks using the supplied keywords."
 		;;
-	'')	bumpplayer
+	:NEXT | '')
+		bumpplayer
 		;;
-	-)	stopplayer
+
+	:STOP | -)
+		stopplayer
 		;;
 	[0-9]|[1-9][0-9]|100)
 		echo "Setting volume to $line."
