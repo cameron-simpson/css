@@ -19,12 +19,6 @@
 
 cmd=`basename "$0"`
 
-## tty=/dev/ttyp2
-## exec 2>"$tty" >&2 0</dev/tty
-## set -vx
-## set x +t "$@"; shift
-## echo "apphelper: \$*=[$*]" >&2
-
 doterm=
 itype=
 savedir=
@@ -287,24 +281,23 @@ then
 	  /*) absfile=$file ;;
 	  *)  absfile=`pwd`/$file ;;
       esac
-      xdir=`mkdirn "${TMPDIR:-/tmp}/$cmd"` || exit 1
+      xdir=`mkdirn "$TMPDIR/$cmd"` || exit 1
       ( cd "$xdir" || exit 1
 	x "$absfile"
-	set x
+	set --
 	sep=
 	# ugly workaround for weird bash glob/quoting bug:-(
 	if [ -n "$extract_globs" ]
 	then
-	    for glob in $extract_globs
-	    do
-	      set "$@" $sep -name "$glob"
-	      sep=-o
-	    done
+	  for glob in $extract_globs
+	  do
+	    set -- ${1+"$@"} $sep -name "$glob"
+	    sep=-o
+	  done
 	else
-	    set "$@" -name '*'
+	  set -- ${1+"$@"} -name '*'
 	fi
-	shift
-	exec find . -type f -size +0 \( "$@" \) -print -exec "$0" {} $apphopts -A v ';'
+	exec find . -type f -size +0 \( "$@" \) -print -exec ifnewfile -v {} "$0" +t {} $apphopts -A v ';'
       )
       rm -rf "$xdir"
       exit
@@ -353,7 +346,7 @@ then
     case "$viewit" in
 	''|y|yes)	doview=1 ;;
 	n|no)		doview=0 ;;
-	*)		set x $viewit "$file"; shift
+	*)		set -- $viewit "$file"
 			doview=1 ;;
     esac
 fi
