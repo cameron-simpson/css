@@ -13,7 +13,7 @@ export LOCKDIR HOSTNAME
 cd "$LOCKDIR" || exit 1
 
 ask=echo
-[ $# -gt 0 ] || { set -- *; ask=ask; }
+[ $# -gt 0 ] || { set -- *; [ -t 0 -a -t 1 ] && ask=ask; }
 
 xit=0
 exec 3<&0
