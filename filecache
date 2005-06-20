@@ -15,7 +15,7 @@ file=$1; shift
 
 [ -f "$file" -a -s "$file" ] \
 || file=`fileof "$file"` \
-|| { echo "$cmd: $file: not a file or ftechable object!" >&2; exit 1; }
+|| { echo "$cmd: $file: not a file or fetchable object!" >&2; exit 1; }
 
 ext=bin
 mtype=`file2mime "$file"` && { ext=`mimeext "$mtype"` || ext=bin; }
