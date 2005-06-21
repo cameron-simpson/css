@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/sh -u
 #
 # Generic handler for untyped data to be displayed inline (as for mailcap
 # "copiousoutput' entries).
@@ -6,6 +6,7 @@
 #
 
 : ${TMPDIR:=/tmp}
+: ${VIEW_UNKNOWN_FILENAME:=''}
 
 cmd=$0
 usage="Usage: $cmd [-t mimetype] {file|-} [[!]attribute...]
@@ -18,7 +19,7 @@ mtype=
 trace=set-x
 
 badopts=
-while :
+while [ $# -gt 0 ]
 do
   case $1 in
     -t) mtype=$2; shift ;;
@@ -43,12 +44,12 @@ fi
 case "$file" in
   http://* | \
   https://* | \
-  ftp://* )
-      # URL: grab it and pipe
-      wcat "$file" | "$0" -t "$mtype" - ${1+"$@"}
-      exit $?
+  ftp://* | \
+  - )
+      # URL or stdin: grab it and use as file
+      file=`fileof "$file"` || exit 1
+      exec $trace "$0" -t "$mtype" "$file" ${1+"$@"}
       ;;
-  -)  file=/dev/fd/0 ;;
   /*|./*|../*) ;;
   *)  file=./$file ;;
 esac
