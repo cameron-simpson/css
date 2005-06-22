@@ -9,20 +9,22 @@
 : ${VIEW_UNKNOWN_FILENAME:=''}
 
 cmd=$0
-usage="Usage: $cmd [-t mimetype] {file|-} [[!]attribute...]
-	-t mimetype Supply type."
+usage="Usage: $cmd [-x] [-t mimetype] {file|-} [[!]attribute...]
+	-x		trace execution of view subcommand.
+	-t mimetype	Supply type."
 
 ##echo "$cmd: pid $$: argv=$*" >&2
 ##echo "$cmd: pid $$: VIEW_UNKNOWN_FILENAME=$VIEW_UNKNOWN_FILENAME" >&2
 
 mtype=
-trace=set-x
+trace=	##set-x
 
 badopts=
 while [ $# -gt 0 ]
 do
   case $1 in
     -t) mtype=$2; shift ;;
+    -x)	trace=set-x ;;
     --)	shift; break ;;
     -?*)echo "$cmd: unrecognised option: $1" >&2; badopts=1 ;;
     *)	break ;;
@@ -81,7 +83,7 @@ then
     ( rm "$hdr"
       cat
       exec cat <&3
-    ) <"$hdr" | "$0" -t "$mtype" - ${1+"$@"}
+    ) <"$hdr" | $trace "$0" -t "$mtype" - ${1+"$@"}
     exit $?
   fi
 
@@ -122,7 +124,7 @@ if [ -n "$action" ]
 then
   ##echo "decode using \"$action\"" >&2
   unset VIEW_UNKNOWN_FILENAME
-  eval "set -vx; $action" | "$0" - ${1+"$@"}
+  $trace sh -c "$action" | $trace "$0" - ${1+"$@"}
   exit $?
 fi
 
