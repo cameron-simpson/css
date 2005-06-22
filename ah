@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/sh -u
 #
 # Run app-helper with the autoview mode on, defaulting to view-unknown.
 #	- Cameron Simpson <cs@zip.com.au> 17dec2002
@@ -7,8 +7,9 @@
 cmd=$0
 
 unlink=
+trace=
 ahopts=
-while :
+while [ $# -gt 0 ]
 do
   case "$1" in
     -u)		unlink=1 ;;
@@ -29,10 +30,8 @@ then
     fi
 fi
 
-[ $# = 1 ] && set -- "$1" view-unknown
 file=$1; shift
-##set -x
-apphelper "$file" -y $ahopts "$@" || exit 1
+$trace apphelper "$file" -y $ahopts ${1+"$@"} || exit 1
 
 # unlink old copy?
 [ $unlink ] || exit 0
