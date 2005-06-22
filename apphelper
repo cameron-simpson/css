@@ -303,7 +303,7 @@ then
 	else
 	  set -- ${1+"$@"} -name '*'
 	fi
-	$trace find . -type f -size +0 \( "$@" \) -print -exec $trace ifnewfile -discard {} "$0" +t {} $apphopts -A ';'
+	$trace find . -type f -size +0 \( "$@" \) -exec $trace ifnewfile -v -discard {} "$0" +t {} $apphopts -A ';'
       )
       rm -rf "$xdir"
       exit
