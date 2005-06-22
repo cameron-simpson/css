@@ -27,7 +27,7 @@ for file
 do
   if [ "x$file" = x- ]
   then cat
-  else printf -- "%s\n" "$file"
+  else printf "%s\n" "$file"
   fi
 done \
 | eval "set -vx; $AUTOFILE_SAVEMAP" \
