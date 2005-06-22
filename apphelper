@@ -28,6 +28,7 @@ extract=
 extract_globs=$APPHELPER_EXTRACT_GLOBS
 termname=
 pager=$PAGER
+trace=	##set-x
 
 # =head1 SYNOPSIS
 #
@@ -49,12 +50,13 @@ usage="Usage: $cmd [{-t|+t|-T title}] file [{-n|-y}] [-d savedir] [-i type] [-p 
 	-Y		Save the file without asking questions.
 	-A		Auto-notsave if file already present.
 	-X		Extract archive and run apphelper for each entry.
+	-x		trace execution of subcommands.
 	-i type		Specify MIME type of file.
 	-d savedir	Save directory (from \$SAVEDIR: $savedir).
 	-p pager	Pager (default viewer, from \$PAGER: $pager)."
 
 trap 'rm -r "$tmpdir"' 0
-tmpdir=`mkdirn "$TMPDIR/$cmd"` || exit 1
+tmpdir=`mkdirn "$TMPDIR/$cmd$$."` || exit 1
 tmpfile=$tmpdir/$cmd$$
 
 # =head1 DESCRIPTION
@@ -141,8 +143,7 @@ else
     # are taken to be URLs and fetched.
     #
     http://* | ftp://*)
-      ##set -x
-      exec withurl -0 "$file" "$0" "$@"
+      exec $trace withurl -0 "$file" "$0" "$@"
       ;;
     *)
       # handed real filename
@@ -176,8 +177,7 @@ else
 			     exit 1
 			   }
       ( [ -n "$termname" ] || termname="$cmd - $file"
-	set -x
-	exec term -n "$termname" +a -e "$0" +t "$file" ${1+"$@"}
+	exec $trace term -n "$termname" +a -e "$0" +t "$file" ${1+"$@"}
       )
       rm -f "$tmpfile"
       exit 0
@@ -246,6 +246,11 @@ else
 	  # and run apphelper on each component.
 	  #
 	  -X)	extract=1 apphopt= ;;
+	  # =item B<-x>
+	  #
+	  # Trace execution of subcommands.
+	  #
+	  -x)	trace=set-x ;;
 	  # =item B<-i> I<type>
 	  #
 	  # Specify the MIME I<type>.
@@ -265,7 +270,7 @@ fi
 #
 
 # default to "v" for the command
-[ $# = 0 ] && set v
+[ $# = 0 ] && set v '%s'
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
@@ -281,9 +286,10 @@ then
 	  /*) absfile=$file ;;
 	  *)  absfile=`pwd`/$file ;;
       esac
-      xdir=`mkdirn "$TMPDIR/$cmd"` || exit 1
-      ( cd "$xdir" || exit 1
-	x "$absfile"
+      xdir=`mkdirn "$TMPDIR/$cmd$$.x"` || exit 1
+      (
+	cd "$xdir" || exit 1
+	$trace x "$absfile"
 	set --
 	sep=
 	# ugly workaround for weird bash glob/quoting bug:-(
@@ -297,7 +303,7 @@ then
 	else
 	  set -- ${1+"$@"} -name '*'
 	fi
-	exec find . -type f -size +0 \( "$@" \) -print -exec ifnewfile -v {} "$0" +t {} $apphopts -A v ';'
+	$trace find . -type f -size +0 \( "$@" \) -print -exec $trace ifnewfile -discard {} "$0" +t {} $apphopts -A ';'
       )
       rm -rf "$xdir"
       exit
@@ -353,7 +359,18 @@ fi
 
 if [ "$doview" = 1 ]
 then
-    "$@" "$file" \
+    # transmute %s into the (possibly renamed by fixexts or remap) file and run viewer
+    ( first=1
+      for arg
+      do
+	[ $first ] && { set --; first=; }
+	if [ "x$arg" = 'x%s' ]
+	then  set -- ${1+"$@"} "$file"
+	else  set -- ${1+"$@"} "$arg"
+	fi
+      done
+      exec $trace "$@"
+    ) \
     || { echo "failed: $* $file"
 	 necho "View with? "
 	 read viewit || exit 0
@@ -500,13 +517,18 @@ case "$savemode" in
 		  case "$saveas" in
 		    \!*)	repeat=1
 				shcmd=`expr "x$saveas" : 'x! *\(.*\)'`
+				case "$file" in
+				  /*)	absfile=$file ;;
+				  *)	absfile=`pwd`/$file ;;
+				esac
 				( [ -d "$savedir/." ] && cd "$savedir"
 				  case "$shcmd" in
 				    '')	${SHELL:-sh} ;;
-				    *[!%]*)
+				    *[%!]*)
+					qfile=`shqstr "$absfile"`
 					shcmd=`echo "$shcmd" | sed "s!$lastshcmdg"`
 					lastshcmd=$shcmd
-					shcmd=`echo "$shcmd" | sed "s%$fileg"`
+					shcmd=`echo "$shcmd" | sed "s%$qfileg"`
 					"${SHELL:-sh}" -xc "$shcmd"
 					;;
 				    *)	"${SHELL:-sh}" -xc "$shcmd"
