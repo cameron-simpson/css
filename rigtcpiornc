@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/sh -u
 #
 # Dispatch tcpio ssh tunnel according to input data.
 # Input line format:
@@ -8,6 +8,34 @@
 # and thence via nc to the host "remotehost", port "remoteport".
 #	- Cameron Simpson <cs@zip.com.au> 03may2005
 #
+
+user=
+id=
+
+cmd=`basename "$0"` || exit 1
+usage="Usage: $cmd [-u user] [-i identity] < config
+	-u user		Passed to rnc.
+	-i identity	Passed to rnc. Default: \$HOME/.ssh/2any"
+
+badopts=
+
+while [ $# -gt 0 ]
+do
+  case $1 in
+    -u)	user=$2; shift ;;
+    -i)	id=$2; shift ;;
+    --)	shift; break ;;
+    -?*)echo "$cmd: unrecognised option: $1" >&2
+	badopts=1
+	;;
+    *)	break ;;
+  esac
+  shift
+done
+
+[ $# = 0 ] || { echo "$cmd: extra arguments: $*" >&2; badopts=1; }
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
 
 grep '^[^#]' \
 | while read localaddr localport sshsite fwdhost fwdport
