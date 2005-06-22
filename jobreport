@@ -48,8 +48,8 @@ joblist -i "$dir" name category total title \
     htotal=`humantime "$total"`
     if [ "x$cat" = x. ]
     then
-	printf -- "%9s %-11s %s\n" "$htotal" "" "$etc"
+	printf "%9s %-11s %s\n" "$htotal" "" "$etc"
     else
-	printf -- "%9s %-11s\n" "$htotal" "$cat"
+	printf "%9s %-11s\n" "$htotal" "$cat"
     fi
   done
