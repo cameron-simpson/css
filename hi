@@ -66,11 +66,12 @@ do
   | if [ -n "$pickn" ]; then pickn "$pickn"; else cat; fi \
   | ( set --
       exec 4>&1 1>&2
-      while read url grep savedir
+      while read -r url grep savedir
       do
+	[ $nogrep ] && { echo "$url" >&4; continue; }
 	[ -n "$grep" ] || { echo "$url" >&4; continue; }
 
-	hits=`pageurls -i "$url" | egrep -i "$grep"`
+	hits=`set -x; pageurls -i "$url" | egrep -i "$grep"`
 	[ -n "$hits" ] || { echo "$url" >&4; continue; }
 
 	[ -n "$savedir" ] || savedir=.
