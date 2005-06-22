@@ -5,7 +5,7 @@
 #
 
 cmd=$0
-usage="Usage: $cmd [-v] [args1options...] filename [command [args...]]"
+usage="Usage: $cmd [-v] [-x] [args1options...] filename [command [args...]]"
 
 arg1opts=
 verbose= trace=
@@ -15,7 +15,7 @@ badopts=
 while [ $# -gt 0 ]
 do
   case "$1" in
-    -v)	verbose=1 trace=set-x ;;
+    -v)	verbose=1 ;;
     -stdin | -discard | -end | -[0-9]*)
 	arg1opts="$arg1opts $1" ;;
     -x) trace=set-x arg1opts="$arg1opts $1" ;;
