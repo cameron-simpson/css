@@ -428,7 +428,7 @@ fi
 
 # offer remapped name if inferrable
 remaptmp=$TMPDIR/$cmd-remap$$
-if printf -- "%s\n" "$fbase" | eval "$APPHELPER_SAVEMAP" >"$remaptmp"
+if printf "%s\n" "$fbase" | eval "$APPHELPER_SAVEMAP" >"$remaptmp"
 then
   exec 3<&0 0<"$remaptmp"
   if read -r oldname \
