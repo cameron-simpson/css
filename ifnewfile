@@ -5,10 +5,34 @@
 #
 
 cmd=$0
-usage="Usage: $cmd filename [command [args...]]"
+usage="Usage: $cmd [-v] [args1options...] filename [command [args...]]"
+
+arg1opts=
+verbose= trace=
+
+badopts=
+
+while [ $# -gt 0 ]
+do
+  case "$1" in
+    -v)	verbose=1 trace=set-x ;;
+    -stdin | -discard | -end | -[0-9]*)
+	arg1opts="$arg1opts $1" ;;
+    -x) trace=set-x arg1opts="$arg1opts $1" ;;
+    --)	shift; break ;;
+    -?*)echo "$cmd: unrecognised option: $1" >&2
+	badopts=1
+	;;
+    *)	break ;;
+  esac
+  shift
+done
 
 [ $# = 0 ] && { echo "$cmd: missing filename" >&2; echo "$usage" >&2; exit 2; }
 file=$1; shift
 
-fileloc "$file" >/dev/null 2>&1 && exit 0
-[ $# -gt 0 ] && exec "$@" "$file"
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+loc=`fileloc "$file" 2>/dev/null` && { [ $verbose ] && echo "$file: $loc"; exit 0; }
+[ $# -gt 0 ] && exec $trace arg1 $arg1opts "$file" "$@"
+[ $verbose ] && echo "$file: new file"
