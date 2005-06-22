@@ -10,7 +10,7 @@
 [ $# -le 1 ] || { echo "Usage: $0 [query_string]" >&2; exit 2; }
 qs=${1-"$QUERY_STRING"}
 
-printf -- "%s\n" "$qs" \
+printf "%s\n" "$qs" \
 | tr '&+' '\012 ' \
 | sed -n 's/^\([A-Za-z_][A-Za-z0-9_]*\)=/\1 /p' \
 | while read var value
