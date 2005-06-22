@@ -1,0 +1,66 @@
+#!/bin/sh -u
+#
+# Chown objects in the specified file trees from one uid to another.
+#	- Cameron Simpson <cs@zip.com.au> 19jun2005
+#
+
+trace=echo
+
+cmd=`basename "$0"`
+usage="Usage: $cmd olduid newuid directories..."
+
+badopts=
+
+if [ $# = 0 ]
+then
+  echo "$cmd: missing olduid" >&2
+  badopts=1
+else
+  olduid=$1; shift
+  case "$olduid" in
+    *[!0-9]*)
+      echo "$cmd: bad olduid \"$olduid\", must be numeric" >&2
+      badopts=1
+      ;;
+  esac
+  if [ $# = 0 ]
+  then
+    echo "$cmd: missing newuid" >&2
+    badopts=1
+  else
+    newuid=$1; shift
+    [ "x$olduid" = "x$newuid" ] && { echo "$cmd: newuid == $olduid" >&2
+				     badopts=1
+				   }
+    case "$newuid" in
+      *[!0-9]*)
+	echo "$cmd: bad newuid \"$newuid\", must be numeric" >&2
+	badopts=1
+	;;
+      *)grep "^[^:]*:[^:]*:$newuid:" /etc/passwd \
+	|| { echo "$cmd: new uid \"$newuid\" not in /etc/passwd" >&2
+	     badopts=1
+	   }
+	;;
+    esac
+    if [ $# = 0 ]
+    then
+      echo "$cmd: missing directories" >&2
+      badopts=1
+    else
+      for dir
+      do
+	[ -d "$dir" ] || { echo "$cmd: $dir: not a directory" >&2; badopts=1; }
+      done
+    fi
+  fi
+fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+for dir
+do
+  echo "$dir ..."
+  find "$dir" ! -type l -user "$olduid" -print \
+  | xxargs $trace chown "$newuid"
+done
