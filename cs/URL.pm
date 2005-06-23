@@ -595,6 +595,11 @@ sub _getSearchEngineTable($$)
 		  'imgsafe' => 'off',
 		},
 		],
+	YAHOOIMAGESEARCH =>
+		[ 'http://images.search.yahoo.com/search/images',
+		{ 'q'	=> $query,
+		},
+		],
 	AVIMAGESEARCHER =>
 		[ 'http://www.altavista.com/cgi-bin/query',
 	  	{ 'pg'		=> 'q',
