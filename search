@@ -38,6 +38,7 @@ case "$target" in
     fst)	target=findsametext ;;
     fsu)	target=findsameurl ;;
     gim)	target=googleimagesearch ;;
+    yim)	target=yahooimagesearch ;;
     gnews)	target=googlenews ;;
     imdb-actor) target=movieactors ;;
     imdb-character-female) target=moviecharfemale ;;
