@@ -1,0 +1,2 @@
+#!/bin/sh -u
+exec genv RUNFETCHMAIL_HOSTS RUNFETCHMAIL_FMOPTS
