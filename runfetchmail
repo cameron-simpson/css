@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/sh -u
 #
 # Run a regular fetchmail. Pulled from rigfetchmail.
 #	- Cameron Simpson <cs@zip.com.au> 31dec2003
@@ -6,43 +6,53 @@
 
 : ${LOGDIR:=$HOME/var/log}
 : ${VARRUN:=$HOME/var/run}
+: ${FM_HOSTS:=''}
+: ${FM_IDLEDELAY:=1800}
+: ${FM_EXPUNGE:=512}
+: ${FM_LOGFILE:=$LOGDIR/fetchmail}
+: ${FM_DELAY:=300}
 
-once=
 trace=set-x
-idledelay=1800
-expunge=512
-logfile=$LOGDIR/fetchmail
 
 cmd=$0
 usage="Usage: $cmd [-1] [fetchmail-options...]"
 
-[ "x$1" = x-1 ] && { once=1; shift; }
+once=
+[ $# -gt 0 ] && [ "x$1" = x-1 ] && { once=1; shift; }
 
-while :
-do
-  mypid=$$
-  eval "`syncenv $mypid`"
+mypid=$$
 
-  fmopts=
-  fmdelay=300
-  fmhosts=${RUNFETCHMAIL_HOSTS:-'optuscable zipworld'}
-  case "$LOCATION" in
-    cisra)	;;
-    home)	fmopts="$fmopts -l 128000" ;;
-    *)		fmopts="$fmopts -l 65536" fmdelay=900 ;;
-  esac
-  necho `date`': ' >&2
+if [ $once ]
+then
+  exec \
   $trace \
   fetchmail \
 	-f "$HOME/.fetchmailrc" \
-	-t "$idledelay" \
-	-e "$expunge" \
-	--logfile "$logfile" \
+	-t "$FM_IDLEDELAY" \
+	-e "$FM_EXPUNGE" \
+	--logfile "$FM_LOGFILE" \
 	--nobounce --tracepolls --warnings 86400 \
-	$fmopts $RUNFETCHMAIL_FMOPTS ${1+"$@"} $fmhosts
-  echo `date`: fetchmail done | tee -a "$logfile" >&2
+	${1+"$@"}
+fi
+
+while :
+do
+  eval "`syncenv $mypid`"
+
+  fmlimit=${FM_LIMIT:=''}
+  case "$LOCATION" in
+    cisra)	;;
+    home)	: ${fmlimit:=128000} ;;
+    *)		: ${fmlimit:=65536} ;;
+  esac
+  necho `date`': ' >&2
+
+  fmopts=
+  [ -n "$fmlimit" ] && fmopts="$fmopts -l $fmlimit"
+
+  "$0" -1 $fmopts ${1+"$@"} $FM_HOSTS
+  echo `date`: fetchmail done | tee -a "$FM_LOGFILE" >&2
   killpidfile getmail_flush.pid
 
-  [ $once ] && break
-  bgproc -s -p fetchmail_sleep.pid sleep $fmdelay
+  bgproc -s -p fetchmail_sleep.pid sleep "$FM_DELAY"
 done
