@@ -1,0 +1,50 @@
+#!/bin/sh -u
+#
+# Edit the global environment file.
+#	- Cameron Simpson <cs@zip.com.au> 23jun2005
+#
+
+: ${TMPDIR:=/tmp}
+: ${EDITOR:=vi}
+: ${envfile:=$HOME/var/env.sh}
+
+cmd=`basename "$0"` || cmd=$0
+usage="Usage: $cmd [-f envfile] vars..."
+
+badopts=
+
+while [ $# -gt 0 ]
+do
+  case $1 in
+    -f)	envfile=$2; shift ;;
+    --)	shift; break ;;
+    -?*)echo "$cmd: unrecognised option: $1" >&2
+	badopts=1
+	;;
+    *)	break ;;
+  esac
+  shift
+done
+
+[ $# = 0 ] && { echo "$cmd: missing vars" >&2; badopts=1; }
+
+[ -f "$envfile" ] || { echo "$cmd: $envfile: not a file" >&2; badopts=1; }
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+eval "`syncenv -`"
+
+tmpf=$TMPDIR/$cmd.$$.txt
+trap 'rm -f "$tmpf"' 0 1 2 13 15
+
+for var
+do
+  eval ": \${$var:=''}"
+  eval "val=\$$var"
+  qval=`shqstr "$val"`
+  printf "%s=%s; export %s\n" "$var" "$qval" "$var"
+done >"$tmpf"
+
+eval "$EDITOR \"\$tmpf\""
+
+cat "$tmpf" >>"$envfile"
