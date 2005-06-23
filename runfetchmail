@@ -25,7 +25,7 @@ do
 
   fmopts=
   fmdelay=300
-  fmhosts=${RUNFETCHMAIL_HOSTS:-'mail.optusnet.com.au mail.zip.com.au'}
+  fmhosts=${RUNFETCHMAIL_HOSTS:-'optuscable zipworld'}
   case "$LOCATION" in
     cisra)	;;
     home)	fmopts="$fmopts -l 128000" ;;
