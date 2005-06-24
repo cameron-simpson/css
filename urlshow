@@ -131,7 +131,6 @@ cleanurllist \
     # escape stuff for OpenURL() call
     url=`echo "$url" | hexify`
     [ -n "$URLLOG" ] && echo "urlshow $url" >>"$URLLOG"
-    set -x
     if [ $popnew ]
     then
       echo "$mozremote 'openurl($url,new-window)'" >&3
@@ -139,7 +138,6 @@ cleanurllist \
     else
       echo "$mozremote 'openurl($url,new-tab)'" >&3
     fi
-    set +x
   done \
 ) \
-| catthen lock mozilla-xremote-client sh -x
+| catthen lock mozilla-xremote-client sh
