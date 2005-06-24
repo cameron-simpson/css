@@ -44,6 +44,18 @@ while (defined($_=<MAPFILE>))
     next MAPLINE;
   }
 
+  my $subptn;
+  while ($F[0] =~ /\{\{(WORD|SEQ|NAME)\}\}/)
+  { if ($& eq '{{WORD}}') { $subptn='[a-z]{2,}'; }
+    elsif ($& eq '{{SEQ}}'){$subptn='\d+[a-z]*'; }
+    elsif ($& eq '{{NAME}}'){$subptn='{{WORD}}([^a-z\d]+{{WORD}})+'; }
+    else { die "$0: bad metaptn: $&"; }
+
+    ##print STDERR "$&: $F[0] -> ";
+    $F[0] = $`.$subptn.$';
+    ##print STDERR "$F[0]\n";
+  }
+
   $code .= "elsif (m($F[0])io) { \$munged=\"\$`$F[1]\$'\"; next INPUTLINE; }\n";
 }
 close(MAPFILE);
