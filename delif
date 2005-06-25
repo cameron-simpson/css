@@ -1,0 +1,39 @@
+#!/bin/sh -u
+#
+# Bring down a logical interface, partner to addif.
+#	- Cameron Simpson <cs@zip.com.au> 25jun2005
+#
+
+trace=echo
+
+cmd=`basename "$0"` || cmd=$0
+usage="Usage: $cmd ip-addrs..."
+
+badopts=
+
+[ $# = 0 ] && { echo "$cmd: missing ip-addrs" >&2; badopts=1; }
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+xit=0
+
+for ipaddr
+do
+  set -- `eth "$ipaddr" | sed -n 's/^\([a-z][a-z]*[0-9][0-9]*:[0-9][0-9]*\) .*/\1/p'`
+  if [ $# = 0 ]
+  then
+    echo "$cmd: no logical interface has address \"$ipaddr\"" >&2
+    xit=1
+    continue
+  fi
+  if [ $# -gt 1 ]
+  then
+    echo "$cmd: multiple logical interfaces match address \"$ipaddr\"" >&2
+    echo "	matches: $*" >&2
+    xit=1
+    continue
+  fi
+  $trace ifconfig "$iface" 0.0.0.0 down || xit=1
+done
+
+exit $xit
