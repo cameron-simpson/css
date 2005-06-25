@@ -1,84 +1,26 @@
-#!/bin/sh
+#!/bin/sh -u
 #
-# Search a web index via my multiway CGI script.
+# Search arbitrary web indices.
 #	- Cameron Simpson <cs@zip.com.au> 10may1997
 #
 
 cmd=`basename "$0"`
-usage="Usage: $cmd [-t target] search terms ..."
+usage="Usage: $cmd engine[,engine...] query..."
 
-target=
-[ "x$1" = x-t ] && { target=$2; shift; shift; }
+badopts=
 
-
-query=$*
-[ -n "$query" ] || query=`xclip -o` || exit 1
-oquery=$query
-query=`qsencode "$query"`
-
-if [ -z "$target" ]
+if [ $# = 0 ]
 then
-    target=$cmd
+  echo "$cmd: missing engine" >&2
+  badopts=1
+else
+  engines=$1; shift
+  [ $# = 0 ] && { echo "$cmd: missing query" >&2; badopts=1; }
 fi
 
-case "$target" in
-    aarn)	[ $# = 0 ] && exec us http://mirror.aarnet.edu.au/ ;;
-    anime)	target=tamara ;;
-    avim|im)target=avimagesearcher ;;
-    avsubmit) target=altavistasubmit ;;
-    av)	target=altavista ;;
-    babel)	target=babelfish ;;
-    de2en)	target=google_de2en ;;
-    deja)	target=dejanews ;;
-    dict)	target=onelook ;;
-    djid)	exec us `msgid2dj ${1+"$@"}` ;;
-    dj)	target=googledj ;;
-    ev)	target=everything ;;
-    fm)	target=freshmeat ;;
-    fst)	target=findsametext ;;
-    fsu)	target=findsameurl ;;
-    gim)	target=googleimagesearch ;;
-    yim)	target=yahooimagesearch ;;
-    gnews)	target=googlenews ;;
-    imdb-actor) target=movieactors ;;
-    imdb-character-female) target=moviecharfemale ;;
-    imdb-character-male) target=moviecharmale ;;
-    imdb-title) target=movietitles ;;
-    mcrawl)	target=metacrawler ;;
-    msgid)	target=googledjmsgid ;;
-    nlight)	target=northernlight ;;
-    raging)	target=avraging ;;
-    rpmfind)target=speakeasy-rpmfind ;;
-    sf)	target=sourceforge ;;
-    trans)	target=systranslinks ;;
-    tv)     target=sofcomtv ;;
-    w3val)	target=w3c_validate ;;
-    wiki)	target=wikipedia ;;
-    yp)		target=yellowpages ;;
-    www)	target='altavista yahoo dmoz google' ;;
-    yg)		target=yahoogroups ;;
-    yvid)	target=yahoo_video ;;
-    movie)	exec us "http://www.cinema.pgh.pa.us/movie/reviews?$query" ;;
-    ebay)	case "$query" in
-		*\ *)	;;
-		[0-9]?????????) target=ebayitem ;;
-	    esac
-	    ;;
-    urlsubmit)
-	    avsubmit ${1+"$@"} &
-	    googlesubmit ${1+"$@"} &
-	    wait
-	    exit 0
-	    ;;
-esac
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
 
-case "$target" in
-  *\ *)	for t in $target
-	do  search -t "$t" "$*" &
-	done
-	exit 0
-	;;
-esac
-
-echo "search $target $oquery" >>"$URLLOG"
-search-url "$target" "$query" | us -
+for engine in `echo "$engines" | tr , ' '`
+do
+  search-url "$engine" "$@"
+done | urlshow -
