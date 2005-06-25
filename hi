@@ -64,38 +64,58 @@ do
   esac \
   | grep '^[^#]' \
   | if [ -n "$pickn" ]; then pickn "$pickn"; else cat; fi \
-  | ( set --
-      exec 4>&1 1>&2
-      while read -r url grep savedir
-      do
-	[ $nogrep ] && { echo "$url" >&4; continue; }
-	[ -n "$grep" ] || { echo "$url" >&4; continue; }
+  | tee /dev/tty \
+  | (
+      exec 4>&1 1>&2	# 4 goes to urlshow
+      (
+	exec 5>&1 1>&2	# 5 goes to image URL xv filter
 
-	hits=`set -x; pageurls -i "$url" | egrep -i "$grep"`
-	[ -n "$hits" ] || { echo "$url" >&4; continue; }
-
-	[ -n "$savedir" ] || savedir=.
-	case "$savedir" in
-	  /*) ;; *) savedir=$HOME/im/comics/$savedir ;;
-	esac
-
-	for url
+	while read -r url grep savedir
 	do
-	  if cached=`set-x fileof "$gurl"` \
-	  && set-x ifnewfile "$cached"
+	  [ $nogrep ] && { echo "$url" >&4; continue; }
+	  [ -n "$grep" ] || { echo "$url" >&4; continue; }
+
+	  (
+	    hits=`set -x; pageurls -i "$url" | egrep -i "$grep"`
+	    # nothing? pass main page to urlshow
+	    [ -n "$hits" ] || exec echo "$url" >&4
+
+	    # pass images, savedir and main page to xv filter
+	    for imgurl in $hits
+	    do  echo "$imgurl $savedir $url" >&5
+	    done
+	  ) &
+	done
+      ) \
+      | \
+      (
+	set --
+	while read -r imgurl savedir pageurl
+	do
+	  [ -n "$savedir" ] || savedir=.
+	  case "$savedir" in
+	    /*) ;; *) savedir=$HOME/im/comics/$savedir ;;
+	  esac
+
+	  # grab it
+	  cached=`set-x fileof "$imgurl"` \
+	  || { echo "$pageurl" >&4; continue; }	# no grab? display source page
+
+	  if set-x ifnewfile "$cached"
 	  then
 	    set -- ${1+"$@"} "$cached"
-	    ( gbase=`basename "$gurl"`
+	    ( gbase=`basename "$imgurl"`
 	      saveas=$savedir/$gbase
 	      set-x lncp "$cached" "$saveas" && set-x fileloc -a "$saveas"
 	    ) &
 	  else
-	    echo "SEEN $gurl" >&2
+	    echo "SEEN $imgurl" >&2
 	  fi
 	done
-      done
-      [ $# = 0 ] || xvmax "$@" &
+	[ $# = 0 ] || xvmax "$@" &
+      )
     ) \
+  | sort -u \
   | urlshow \
   &
 done
