@@ -6,11 +6,6 @@
 
 : ${LOGDIR:=$HOME/var/log}
 : ${VARRUN:=$HOME/var/run}
-: ${FM_HOSTS:=''}
-: ${FM_IDLEDELAY:=1800}
-: ${FM_EXPUNGE:=512}
-: ${FM_LOGFILE:=$LOGDIR/fetchmail}
-: ${FM_DELAY:=300}
 
 trace=set-x
 
@@ -20,26 +15,17 @@ usage="Usage: $cmd [-1] [fetchmail-options...]"
 once=
 [ $# -gt 0 ] && [ "x$1" = x-1 ] && { once=1; shift; }
 
-mypid=$$
-
 if [ $once ]
 then
-  exec \
-  $trace \
-  fetchmail \
-	-f "$HOME/.fetchmailrc" \
-	-t "$FM_IDLEDELAY" \
-	-e "$FM_EXPUNGE" \
-	--logfile "$FM_LOGFILE" \
-	--nobounce --tracepolls --warnings 86400 \
-	${1+"$@"}
-fi
+  eval "`syncenv -`"
+  : ${FM_HOSTS:=''}
+  : ${FM_IDLEDELAY:=1800}
+  : ${FM_EXPUNGE:=512}
+  : ${FM_LOGFILE:=$LOGDIR/fetchmail}
+  : ${FM_DELAY:=300}
+  : ${FM_LIMIT:=''}
 
-while :
-do
-  eval "`syncenv $mypid`"
-
-  fmlimit=${FM_LIMIT:=''}
+  fmlimit=$FM_LIMIT
   case "$LOCATION" in
     cisra)	;;
     home)	: ${fmlimit:=128000} ;;
@@ -50,9 +36,25 @@ do
   fmopts=
   [ -n "$fmlimit" ] && fmopts="$fmopts -l $fmlimit"
 
-  "$0" -1 $fmopts ${1+"$@"} $FM_HOSTS
+  exec \
+  $trace \
+  fetchmail \
+	-f "$HOME/.fetchmailrc" \
+	-t "$FM_IDLEDELAY" \
+	-e "$FM_EXPUNGE" \
+	--logfile "$FM_LOGFILE" \
+	--nobounce --tracepolls --warnings 86400 \
+	$fmopts ${1+"$@"} $FM_HOSTS
+fi
+
+mypid=$$
+while :
+do
+  $trace "$0" -1 ${1+"$@"}
+  eval "`syncenv $mypid`"
+  : ${FM_LOGFILE:=$LOGDIR/fetchmail}
   echo `date`: fetchmail done | tee -a "$FM_LOGFILE" >&2
   killpidfile getmail_flush.pid
-
-  bgproc -s -p fetchmail_sleep.pid sleep "$FM_DELAY"
+  fmdelay=${FM_DELAY:=300}
+  bgproc -s -p fetchmail_sleep.pid $trace sleep "$fmdelay"
 done
