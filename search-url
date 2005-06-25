@@ -1,34 +1,132 @@
-#!/usr/bin/perl
+#!/bin/sh -u
 #
 # Return a search URL for the supplied engine and query.
 #	- Cameron Simpson <cs@zip.com.au> 05aug2003
 #
+# Transmute into shell. - cameron 25jun2005
+#
 
-use strict qw(vars);
+maxhits=100
 
-use cs::Misc;
-use cs::URL;
+cmd=`basename "$0"` || cmd=$0
+usage="Usage: $cmd [-m maxhits] engine query"
 
-$::Usage="Usage: $::cmd [-m maxhits] engine query\n";
+badopts=
 
-my $maxhits;
-if (@ARGV >= 2 && $ARGV[0] eq '-m')
-{ $maxhits=$ARGV[1]+0;
-  shift(@ARGV);
-  shift(@ARGV);
-}
+while [ $# -gt 0 ]
+do
+  case $1 in
+    -m)	maxhits=$2; shift ;;
+    --)	shift; break ;;
+    -?*)echo "$cmd: unrecognised option: $1" >&2
+	badopts=1
+	;;
+    *)	break ;;
+  esac
+  shift
+done
 
-if (@ARGV < 2)
-{ die "$::cmd: missing engine and/or query\n$::Usage";
-}
+if [ $# = 0 ]
+then
+  echo "$cmd: missing engine" >&2
+  badopts=1
+else
+  engine=$1; shift
+  [ $# = 0 ] && { echo "$cmd: missing query" >&2; badopts=1; }
+  query=`qsencode "$*"` || exit 1
+fi
 
-my $engine = shift(@ARGV);
-my $query  = "@ARGV";
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
 
-my $url = cs::URL::search($engine,$query,$maxhits);
+case `echo "$engine" | tr '[a-z]' '[A-Z]'` in
+  AARN)		url=http://mirror.aarnet.edu.au/cgi-bin/SearchArchive?query_string=$query\&archive=all ;;
+  ACRONYM)	url=http://www.ucc.ie/cgi-bin/acronym?=$query ;;
+  ALTAVISTA)	url=http://www.altavista.com/cgi-bin/query?q=$query\&r=\&kl=XX\&d0=\&d1=\&pg=aq\&Translate=on\&search.x=10\&search.y=10 ;;
+  ALTAVISTA)	url=http://www.altavista.com/web/results?itag=ody\&q=$query\&kgs=1\&kls=0 ;;
+  ALTAVISTA-IMAGE) url=http://www.altavista.com/image/results?itag=ody\&q=$query\&kgs=1\&kls=0 ;;
+  ALTAVISTA-VIDEO) url=http://www.altavista.com/video/results?q=$query\&mik=photo\&mik=graphic\&mip=all\&mis=all\&miwxh=all ;;
+  ALTAVISTASUBMIT)url=http://add-url.altavista.digital.com/cgi-bin/newurl?q=$query\&ad=1 ;;
+  BITOOGLE)	url=http://search.bitoogle.biz/search.php?q=$query\&st=t ;;
+  BITTORRENT)	url=http://search.bittorrent.com/search.jsp?query=$query\&Submit2=Search ;;
+  BRITANNICA)	url=http://www.britannica.com/search?query=$query\&go_button.x=0\&go_button.y=0\&ct= ;;
+  BTBOT)	url=http://www.btbot.com/search.bt?q=$query ;;
+  CISCO)	url=http://cisco.com/pcgi-bin/search/search.pl?searchPhrase=$query\&x=0\&y=0\&nv=Search+All+cisco.com%23%23cisco.com\&nv=Technical+Support+%26+documentation%23%23cisco.com%23TSD\&language=en\&country=US\&accessLevel=Guest\&siteToSearch=cisco.com ;;
+  DAYPOP)	url=http://www.daypop.com/search?q=$query\&search=Search\&t=a ;;
+  EBAY)		url=http://search.ebay.com.au/$query ;;
+  EBAYITEM)	url=http://cgi.ebay.com.au/ws/eBayISAPI.dll?ViewItem\&item=$query ;;
+  EVERYTHING)	url=http://www.everything2.org/index.pl?node=$query\&soundex=1\&match_all=1 ;;
+  EZYDVD)	url=http://www.ezydvd.com.au/mech/search.zml?f=title\&q=$query\&x=0\&y=0 ;;
+  FINDSAMETEXT)	url=http://www.findsame.com/submit.cgi?rawtext=$query ;;
+  FINDSAMEURL)	url=http://www.findsame.com/submit.cgi?url=$query ;;
+  FRESHMEAT)	url=http://freshmeat.net/search/?q=$query ;;
+  FROOGLE)	url=http://froogle.google.com/froogle?as_q=$query\&num=$maxhits\&btnG=Froogle+Search\&as_epq=\&as_oq=\&as_eq=\&price=under\&price0=\&price1=\&price2=\&as_occt=any\&cat=0 ;;
+  FTPSEARCH)	url=http://ftpsearch.lycos.com/cgi-bin/search?form=medium\&query=$query\&doit=Search\&type=insensitive multiple substrings search\&hits=$maxhits\&matches=$maxhits\&hitsprmatch=$maxhits\&limdom=\&limpath=\&f1=Count\&f2=Mode\&f3=Size\&f4=Date\&f5=Host\&f6=Path\&header=all\&sort=date\&strlen=200 ;;
+  GOOGLE)	url=http://www.google.com.au/search?q=$query ;;
+  GOOGLEDJ)	url=http://groups.google.com/groups?as_q=$query\&hl=en\&lr=\&safe=off\&site=groups\&num=$maxhits ;;
+  GOOGLEDJMSGID)	url=http://groups.google.com/groups?safe=off\&ie=ISO-8859-1\&as_umsgid=$query\&lr=\&num=$maxhits\&hl=en ;;
+  GOOGLEIMAGESEARCH)	url=http://images.google.com/images?q=$query\&num=$maxhits\&hl=en\&safe=off\&imgsafe=off ;;
+  GOOGLENEWS)	url=http://news.google.com.au/news?hl=en\&ned=au\&q=$query\&btnG=Search+News ;;
+  GOOGLESUBMIT)	url=http://www.google.com/addurl?q=$query\&dq=\&submit=Add URL ;;
+  GOOGLE_DE2EN)	url=http://translate.google.com/translate?u=$query\&langpair=de%7Cen\&hl=en\&ie=UTF-8\&oe=UTF-8\&prev=%2Flanguage_tools ;;
+  HOTBOT)	url=http://www.hotbot.com/text/default.asp?SM=MC\&MT=$query\&DC=$maxhits\&DE=2\&AM0=MC\&AT0=words\&AW0=\&AM1=MN\&AT1=words\&AW1=\&savenummod=2\&date=within\&DV=0\&DR=newer\&DM=1\&DD=1\&DY=99\&LG=any\&FS=\&Domain=\&RD=RG\&RG=all\&PS=A\&PD=\&search=SEARCH\&NUMMOD=2 ;;
+  HTTP_WEBSTER)	url=http://smac.ucsd.edu/cgi-bin/http_webster?isindex=$query\&method=approx ;;
+  IMAGESURFER)	url=http://isurf.yahoo.com/cgi-bin/y/keyword_search.cgi?q=$query\&db=/data/global_keyword ;;
+  IMDB)	url=http://us.imdb.com/find?q="$query;tt=on;nm=on;mx=$maxhits" ;;
+  ISOHUNT)	url=http://isohunt.com/torrents.php?ihq=$query\&ext=\&op=and ;;
+  JAVABUG)	url=http://search.java.sun.com/search/java/index.jsp?qt=$query\&col=obug\&category=\&state=\&query=$query ;;
+  JDK)	url=http://www.siteforum.com/servlets/sfs?c=Default\&t=onSunSearched\&b=960992632796\&i=960992632796\&l=0\&s=sjI04o56Gsoc4BOA\&top=0\&project=jdk13\&keywords=$query\&und=1\&maxcount=$maxhits ;;
+  JPL)		url=http://search.jpl.nasa.gov:8080/cgi-bin/htsearch?words=$query ;;
+  LINUXGOOGLE)	url=http://www.google.com/linux?q=$query\&num=$maxhits ;;
+  LINUXNOW)	url=http://www.linuxnow.com/exec/search.cgi?arch=\&type=both\&keywords=$query ;;
+  LYCOS)	url=http://search.lycos.com/default.asp?loc=searchbox\&tab=web\&query=$query\&submit.x=0\&submit.y=0\&submit=image ;;
+  MERRIAMWEBSTER)url=http://www.m-w.com/netdict?va=$query ;;
+  METACRAWLER)	url=http://www.metacrawler.com/info.metac/search/web/$query ;;
+  MININOVA)	url=http://www.mininova.org/search/?search=$query ;;
+  MIRROR)	url=http://mirror.aarnet.edu.au/cgi-bin/SearchArchive?query_string=$query\&archive=all ;;
+  MOTORCYCLEONLINE) url=http://www.motorcycle.com/cgi-bin/ffwcgi.en/www.motorcycle.com?key=$query\&go=Search ;;
+  MOVIEACTORS)	url=http://us.imdb.com/Nsearch?name=$query\&occupation=All professions\&submit4.x=1\&submit4.y=1 ;;
+  MOVIECHARFEMALE) url=http://us.imdb.com/Character?char=$query\&gender=female\&submit4.x=1\&submit4.y=1 ;;
+  MOVIECHARMALE)url=http://us.imdb.com/Character?char=$query\&gender=male\&submit4.x=1\&submit4.y=1 ;;
+  NETSCAPE)	url=http://www10.netscape.com/search-bin?NS-search-page=results\&NS-query-pat=/text/NS-advquery.pat\&NS-tocstart-pat',='/text/HTML-advquery-tocstart.pat\&NS-search-type=NS-boolean-query\&NS-collection=netscape\&NS-sort-by=\&NS-query=$query\&submit=OK\&NS-max-records=$maxhits ;;
+  NORTHERNLIGHT)	url=http://www.NorthernLight.com/nlquery.fcg?dx=1004\&qr=$query\&qt=\&pu=\&qu=\&si=\&la=All\&qc=All\&d1=\&d2=\&rv=1\&search.x=10\&search.y=10'
+  ODP)	url=http://search.dmoz.org/cgi-bin/osearch?search=$query\&cat=\&t=b\&fb=0\&fo=0\&all=no ;;
+  OLDDEJANEWS)	url=http://xp7.dejanews.com/dnquery.xp?query=$query\&defaultOp=OR\&svcclass=dncurrent\&maxhits=$maxhits\&format=verbose\&threaded=1\&showsort=score\&agesign=1\&ageweight=1 ;;
+  ONELOOK)	url=http://www.onelook.com/?w=$query\&ls=b ;;
+  OZFTP)	url=http://psy.uq.oz.au/cgi-bin/find.pl?url=\&desc=$query ;;
+  PALMGEAR)	url=http://www.palmgear.com/software/searchanswer.cfm?quicksearch2=$query ;;
+  PBONE)	url=http://rpm.pbone.net/index.php3?stat=3\&search=$query ;;
+  PGPKEY)	url=http://wwwkeys.pgp.net:11371/pks/lookup?op=index\&search=$query ;;
+  PLANETMIRROR =>url=http://www.planetmirror.com/cgi-bin/SearchArchive.pl?query=$query\&maxlines=$maxhits\&indexdir=%2Fserver%2Fwww%2Fhtdocs%2Fglimpse%2F7%2Findex\&Go.x=22\&Go.y=12 ;;
+  RFCCONNECTED)	url=http://www.freesoft.org/Connected/cgi-bin/search.cgi?SEARCH_STRING=$query\&BASE_URL=/Connected/RFC/index.html\&DEPTH=0\&TYPE=REGEX\&CASE_INDEPENDANT=1\&WHOLE_WORD=0 ;;
+  RFCNEXOR)	url=http://web.nexor.co.uk/public/rfc/index/cgi-bin/search/form?query=$query\&regexp=on\&titlefield=on\&abstractfield'=>'on\&authorfield=on\&site=Australia ;;
+  ROGET)	url=http://www.thesaurus.com/roget.ihnd?KEYWORDS=$query\&HEADER='roget-english-frames-head\&FOOTER=roget-english-frames-foot\&INDEX=roget.idx\&LANGUAGE=roget-english-frames\&MAXHITS=$maxhits ;;
+  SCOUR)	url=http://www.scour.com/Search/Search.phtml?query=$query\&index=image\&protocol=all\&x=14\&y=2 ;;
+  SOFCOMTV)	url=http://www.sofcom.com.au/cgi-bin/TV/Search.cgi?state=Sydney\&fta=1\&fox=1\&opt=1\&type=keyword\&term=$query\&searchtype=All ;;
+  SOURCEFORGE)	url=http://sourceforge.net/search/?type_of_search=soft\&exact=1\&words=$query ;;
+  SPEAKEASY_RPMFIND) url=http://speakeasy.rpmfind.net/linux/rpm2html/search.php?query=$query ;;
+  SUNDOC)	url=http://docs.sun.com/?q=$query ;;
+  SUNDOC2)	url=http://search.sun.com/query.html?col=www\&op0=%2B\&fl0=\&ty0=w\&tx0=$query\&op1=%2B\&fl1=\&ty1=w\&tx1=\&op2=-\&fl2=\&ty2=w\&tx2=\&dt=an\&inthe=604800\&amo=7\&ady=4\&ayr=2000\&bmo=7\&bdy=11\&byr=2000\&nh=$maxhits\&rf=0\&lk=2\&qp=\&qt=\&qs=\&qc=\&pw=455\&qm=0\&st=1\&rq=0\&ql=a ;;
+  SYSTRANSLINKS)	url=http://www.systranlinks.com/systran/links?lp=de_en\&url=$query ;;
+  TAMARA)	url=http://www.tamarasanime.com/search.cfm?dis=\&query=$query\&hdr= ;;
+  THESAURUS)	url=http://humanities.uchicago.edu/cgi-bin/ROGET.sh?word=$query ;;
+  THROUGHPUT)	url=http://throughput.de/index.php?btaction=btsearch\&page=torrent-search\&keywords=$query\&nres=$maxhits#results ;;
+  TORRENTREACTOR) url=http://www.torrentreactor.net/search.php?search=\&words=$query\&cid=\&B1.x=0\&B1.y=0 ;;
+  TORRENTSPY)	url=http://torrentspy.com/search.asp?query=$query\&submit.x=0\&submit.y=0 ;;
+  UNISCI)	url=http://unisci.com/cgi-local/AT-unisc1archives1search.cgi?sp=sp\&mode=simple\&search=$query ;;
+  WEBCRAWLER)	url=http://www.webcrawler.com/cgi-bin/WebQuery?mode=summaries\&maxhits=$maxhits\&searchText=$query ;;
+  WEBSHOTS)	url=http://www.webshots.com/search/search.fcgi?words=$query\&x=0\&y=0 ;;
+  WEBSTER)	url=http://humanities.uchicago.edu/cgi-bin/WEBSTER.sh?word=$query\&FLOAT=ON ;;
+  WEBSTER2)	url=http://work.ucsd.edu:5141/cgi-bin/http_webster?isindex=$query ;;
+  WIKIPEDIA)	url=http://www.wikipedia.org/w/wiki.phtml?$query ;;
+  YAHOO)	url=http://au.search.yahoo.com/search/aunz?o=1\&p=$query\&d=y\&za=default\&h=c\&g=0\&n=$maxhits ;;
+  YAHOOGROUPS)	url=http://groups.yahoo.com/search?query=$query\&submit=Search ;;
+  YAHOOIMAGESEARCH) url=http://images.search.yahoo.com/search/images?p=$query\&ei=UTF-8\&fl=0\&x=wrt ;;
+  YAHOOIMAGESURFER) url=http://ipix.yahoo.com/cgi-bin/y/keyword_search.cgi?q=$query ;;
+  YAHOO_VIDEO)	url=http://video.search.yahoo.com/search/video?ei=UTF-8\&p=$query ;;
+  YELLOWPAGES)	url=http://www.yellowpages.com.au/results/?N=$query\&C=\&L=\&S=\&R="11 12 13 14 15 16"\&Y=1\&SEARCH NOW=ON ;;
+  YOTOSHI)	url=http://search.yotoshi.org/search.php?q=$query\&st=t ;;
+  YNEWS)	url=http://search.main.yahoo.com/search/news?p=$query\&n=$maxhits ;;
+  *)		echo "$cmd: unknown engine \"$engine\"" >\&2; exit 2 ;;
+esac
 
-die "$::cmd: unknown engine \"$engine\"\n" if ! defined $url;
-
-print "$url\n";
-
-exit 0;
+printf "%s\n" "$url"
