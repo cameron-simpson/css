@@ -19,7 +19,7 @@ xit=0
 
 for ipaddr
 do
-  set -- `eth "$ipaddr" | sed -n 's/^\([a-z][a-z]*[0-9][0-9]*:[0-9][0-9]*\) .*/\1/p'`
+  set -- `eth "$ipaddr" | sed -n 's/^\([a-z][a-z]*[0-9]*:[0-9][0-9]*\) .*/\1/p'`
   if [ $# = 0 ]
   then
     echo "$cmd: no logical interface has address \"$ipaddr\"" >&2
@@ -33,6 +33,7 @@ do
     xit=1
     continue
   fi
+  iface=$1; shift
   $trace ifconfig "$iface" 0.0.0.0 down || xit=1
 done
 
