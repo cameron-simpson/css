@@ -29,12 +29,13 @@ extract_globs=$APPHELPER_EXTRACT_GLOBS
 termname=
 pager=$PAGER
 trace=	##set-x
+arg1opts=
 
 # =head1 SYNOPSIS
 #
-# apphelper [{-t|+t|-T title}] file [{-n|-y}]] [-d savedir] [-i type] [-p pager] viewer [viewer-args...]
+# apphelper [{-t|+t|-T title}] file [{-n|-y}]] [-d savedir] [-i type] [-p pager] [arg1opts...] viewer [viewer-args...]
 #
-usage="Usage: $cmd [{-t|+t|-T title}] file [{-n|-y}] [-d savedir] [-i type] [-p pager] \\
+usage="Usage: $cmd [{-t|+t|-T title}] file [{-n|-y}] [-d savedir] [-i type] [-p pager] [arg1opts...] \\
 		viewer [viewer-args...]
 	-t		Run apphelper in a new terminal window.
 	+t		Do not run apphelper in a new terminal window.
@@ -53,7 +54,9 @@ usage="Usage: $cmd [{-t|+t|-T title}] file [{-n|-y}] [-d savedir] [-i type] [-p 
 	-x		trace execution of subcommands.
 	-i type		Specify MIME type of file.
 	-d savedir	Save directory (from \$SAVEDIR: $savedir).
-	-p pager	Pager (default viewer, from \$PAGER: $pager)."
+	-p pager	Pager (default viewer, from \$PAGER: $pager).
+	arg1opts	Options as for arg1(1cs). Default: none.
+			If specified, the viewer is run via arg1."
 
 trap 'rm -r "$tmpdir"' 0
 tmpdir=`mkdirn "$TMPDIR/$cmd$$."` || exit 1
@@ -257,6 +260,22 @@ else
 	  # Otherwise the type will be guessed from the file content.
 	  #
 	  -i)	itype=$2; shift ;;
+	  # =item I<arg1-option>
+	  #
+	  # Supply an argument for I<arg1>, one of
+	  # B<-discard>, B<-end>, B<->I<n>.
+	  # If specified,
+	  # the view will be invoked via I<arg1>.
+	  # See arg1(1cs) for semantics.
+	  # This permits mailcap entries like this:
+	  #
+	  #   image/jpeg; ah %s -end xv; gui
+	  #
+	  # which will correctly invoke I<xv> with the possibly modified filename I<ah> may use.
+	  #
+	  -stdin|-end|-[0-9]*)
+		arg1opts="$arg1opts $1"
+		;;
 	  --)	shift; break ;;
 	  -?*)	echo "$cmd: unrecognised option: $1" >&2; badopts=1 ;;
 	  *)	break ;;
@@ -360,7 +379,9 @@ fi
 if [ "$doview" = 1 ]
 then
     # transmute %s into the (possibly renamed by fixexts or remap) file and run viewer
-    ( first=1
+    (
+      echo "$0: view args=[$*]" >&2
+      first=1
       for arg
       do
 	[ $first ] && { set --; first=; }
@@ -369,7 +390,10 @@ then
 	else  set -- ${1+"$@"} "$arg"
 	fi
       done
-      exec $trace "$@"
+      [ -n "$trace" ] && set -- $trace ${1+"$@"}
+      [ -n "$arg1opts" ] && set -- arg1 $arg1opts -- "$file" ${1+"$@"}
+      set -x
+      exec "$@"
     ) \
     || { echo "failed: $* $file"
 	 necho "View with? "
