@@ -10,6 +10,9 @@ exec </dev/null
 exec >>$LOGDIR/console
 exec 2>&1
 
+##echo "[$0 $*]"
+trace=	##set-x
+
 force=
 thisdesk=
 
@@ -27,27 +30,26 @@ else
 fi
 
 (
-  menubg=`desktop "$thisdesk" menubg-pngof` || exit 1
-  if [ -n "$menubg" ]
+  menubg=`desktop "$thisdesk" menubg-pngof` || menubg=
+  if [ -z "$menubg" ]
   then
-    fvwmcmd "Colorset 2 TiledPixmap $menubg"
-  else
-    menubg=`desktop "$thisdesk" menubg` || exit 1
-    if [ -n "$menubg" ] && menubg=`pngof "$menubg"`
-    then  lastvalue "$thisdesk" menubg-pngof "$menubg" &
-	  fvwmcmd "Colorset 2 Pixmap $menubg"
-    else  fvwmcmd 'Colorset 2 RootTransparent'
-    fi
+    menubg=`desktop "$thisdesk" menubg` || menubg=
+    [ -n "$menubg" ] && menubg=`pngof "$menubg"` && ( $trace desktop "$thisdesk" menubg-pngof "$menubg" & )
   fi
 
-  desktop "$thisdesk" wmcmds | fvwmcmd
+  if [ -n "$menubg" ]
+  then $trace fvwmcmd "Colorset 2 Pixmap $menubg"
+  else $trace fvwmcmd 'Colorset 2 RootTransparent'
+  fi
 
-  desktop "$thisdesk" shcmds | sh -x &
+  $trace desktop "$thisdesk" wmcmds | fvwmcmd
+
+  $trace desktop "$thisdesk" shcmds | sh -x &
 
   deskjob=`deskjob -d "$thisdesk"`
   case "$deskjob" in
     ''|.|idle)	;;
-    *)		job "$deskjob" ;;
+    *)		$trace job "$deskjob" ;;
   esac
 ) &
 
