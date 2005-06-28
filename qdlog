@@ -1,12 +1,5 @@
 #!/bin/sh
 : ${LOGDIR:=$HOME/var/log}
 [ $# = 1 ] || { echo "Usage: $0 keyword" >&2; exit 2; }
-ring -f $LOGDIR/dlog "$1" \
-| sed -n "h
-	  /^[^ 	]/b ok
-	  y/ABCDEFGHIJKLMNOPQRSTUVWXYZ/abcdefghijklmnopqrstuvwxyz/
-	  /$1/b ok
-	  d
-	  :ok
-	  g
-	  p"
+ring -f $LOGDIR/dlog "$1:" \
+| sed -n "/^[^ 	]/p; /$1:/p"
