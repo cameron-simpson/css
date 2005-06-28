@@ -1,0 +1,99 @@
+#!/bin/sh -u
+#
+# The "run once" mode pulled from runfetchmail.
+#	- Cameron Simpson <cs@zip.com.au> 28jun2005
+#
+
+: ${LOGDIR:=$HOME/var/log}
+: ${VARRUN:=$HOME/var/run}
+
+trace=set-x
+
+cmd=`basename "$0"` || cmd=$0
+usage="Usage: $cmd [fetchmail-options...]"
+
+eval "`syncenv -`"
+: ${FM_HOSTS:=`awk '$1 == "poll" { print $2 }' $HOME/.fetchmailrc`}
+: ${FM_IDLEDELAY:=1800}
+: ${FM_EXPUNGE:=512}
+: ${FM_LOGFILE:=$LOGDIR/fetchmail}
+: ${FM_DELAY:=300}
+: ${FM_LIMIT:=''}
+
+fmlimit=$FM_LIMIT
+case "$LOCATION" in
+  cisra);;
+  home)	: ${fmlimit:=128000} ;;
+  *)	: ${fmlimit:=65536} ;;
+esac
+necho `date`': ' >&2
+
+fmopts=
+
+badopts=
+
+# gather fetchmail options so that we are left with hostnames
+while [ $# -gt 0 ]
+do
+  case "$1" in
+
+    # options with special handling
+    -l | --limit )
+	fmlimit=$2; shift ;;
+
+    # single options
+    -[csvakKFUn] \
+    | --check | --silent | --verbose \
+    | --all | --keep | --nokeep | --flush \
+    | --uidl | --port | --tracepolls \
+    | --ssl | --sslcertok | --sslfingerprint \
+    | --norewrite | --configdump \
+    )
+	fmopts="$fmopts $1" ;;
+
+    # options with an argument
+    -[pPtrSDZmwbBeuIMfi] \
+    | --protocol | --principal | --timeout | --plugin | --plugout | --folder \
+    | --sslcert | --sslkey | --sslproto | --sslcertpath \
+    | --smtphost | --fetchdomains | --smtpaddress | --smtpname \
+    | --antispam | --mda | --lmtp | --bsmtp \
+    | --warnings | --batchlimit | --fetchlimit | --fetchsizelimit \
+    | --fastuidl | --expunge \
+    | --username | --interface | --monitor | --auth \
+    | --fetchmailrc | --idfile | --envelope | --qvirtual \
+    )
+	fmopts="$fmopts $1 $2"; shift ;;
+
+    # end of options
+    --)	shift; break ;;
+
+    -?*)echo "$cmd: unsupported fetchmail option: $1" >&2; badopts=1 ;;
+    *)	break ;;
+  esac
+  shift
+done
+
+[ -n "$fmlimit" ] && fmopts="$fmopts -l $fmlimit"
+
+[ $# = 0 ] || FM_HOSTS=$*
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+xit=0
+
+for fmhost in $FM_HOSTS
+do
+  set -- \
+  fetchmail \
+      -f "$HOME/.fetchmailrc" \
+      -t "$FM_IDLEDELAY" \
+      -e "$FM_EXPUNGE" \
+      --logfile "$FM_LOGFILE" \
+      --nobounce --tracepolls --warnings 86400 \
+      $fmopts "$fmhost" \
+
+  echo "`date`: $*" >>"$FM_LOGFILE"
+  $trace "$@" || xit=1
+done
+
+exit $xit
