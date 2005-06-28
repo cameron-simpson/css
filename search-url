@@ -50,6 +50,7 @@ case `echo "$engine" | tr '[a-z]' '[A-Z]'` in
   BITTORRENT)	url=http://search.bittorrent.com/search.jsp?query=$query\&Submit2=Search ;;
   BRITANNICA)	url=http://www.britannica.com/search?query=$query\&go_button.x=0\&go_button.y=0\&ct= ;;
   BTBOT)	url=http://www.btbot.com/search.bt?q=$query ;;
+  BYTENOVA)	url=http://www.bytenova.org/search.php?search=$query ;;
   CISCO)	url=http://cisco.com/pcgi-bin/search/search.pl?searchPhrase=$query\&x=0\&y=0\&nv=Search+All+cisco.com%23%23cisco.com\&nv=Technical+Support+%26+documentation%23%23cisco.com%23TSD\&language=en\&country=US\&accessLevel=Guest\&siteToSearch=cisco.com ;;
   DAYPOP)	url=http://www.daypop.com/search?q=$query\&search=Search\&t=a ;;
   EBAY)		url=http://search.ebay.com.au/$query ;;
@@ -120,7 +121,7 @@ case `echo "$engine" | tr '[a-z]' '[A-Z]'` in
   WIKIPEDIA)	url=http://www.wikipedia.org/w/wiki.phtml?$query ;;
   YAHOO)	url=http://au.search.yahoo.com/search/aunz?o=1\&p=$query\&d=y\&za=default\&h=c\&g=0\&n=$maxhits ;;
   YAHOOGROUPS)	url=http://groups.yahoo.com/search?query=$query\&submit=Search ;;
-  YAHOOIMAGESEARCH) url=http://images.search.yahoo.com/search/images?p=$query\&ei=UTF-8\&fl=0\&x=wrt ;;
+  YAHOOIMAGESEARCH) url=http://images.search.yahoo.com/search/images?p=$query\&sm=Yahoo%21+Search\&toggle=1\&ei=UTF-8\&fr=FP-tab-web-t ;;
   YAHOOIMAGESURFER) url=http://ipix.yahoo.com/cgi-bin/y/keyword_search.cgi?q=$query ;;
   YAHOO_VIDEO)	url=http://video.search.yahoo.com/search/video?ei=UTF-8\&p=$query ;;
   YELLOWPAGES)	url=http://www.yellowpages.com.au/results/?N=$query\&C=\&L=\&S=\&R="11 12 13 14 15 16"\&Y=1\&SEARCH NOW=ON ;;
