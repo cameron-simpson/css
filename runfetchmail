@@ -1,59 +1,28 @@
 #!/bin/sh -u
 #
 # Run a regular fetchmail. Pulled from rigfetchmail.
+# Why not "fetchmail --daemon"? Because I want to tune options between
+# runs, from outside.
 #	- Cameron Simpson <cs@zip.com.au> 31dec2003
 #
 
 : ${LOGDIR:=$HOME/var/log}
-: ${VARRUN:=$HOME/var/run}
 
 trace=set-x
 
 cmd=$0
-usage="Usage: $cmd [-1] [fetchmail-options...]"
-
-once=
-[ $# -gt 0 ] && [ "x$1" = x-1 ] && { once=1; shift; }
-
-if [ $once ]
-then
-  eval "`syncenv -`"
-  : ${FM_HOSTS:=''}
-  : ${FM_IDLEDELAY:=1800}
-  : ${FM_EXPUNGE:=512}
-  : ${FM_LOGFILE:=$LOGDIR/fetchmail}
-  : ${FM_DELAY:=300}
-  : ${FM_LIMIT:=''}
-
-  fmlimit=$FM_LIMIT
-  case "$LOCATION" in
-    cisra)	;;
-    home)	: ${fmlimit:=128000} ;;
-    *)		: ${fmlimit:=65536} ;;
-  esac
-  necho `date`': ' >&2
-
-  fmopts=
-  [ -n "$fmlimit" ] && fmopts="$fmopts -l $fmlimit"
-
-  exec \
-  $trace \
-  fetchmail \
-	-f "$HOME/.fetchmailrc" \
-	-t "$FM_IDLEDELAY" \
-	-e "$FM_EXPUNGE" \
-	--logfile "$FM_LOGFILE" \
-	--nobounce --tracepolls --warnings 86400 \
-	$fmopts ${1+"$@"} $FM_HOSTS
-fi
+usage="Usage: $cmd [fetchmail-options...]"
 
 mypid=$$
 while :
 do
-  $trace "$0" -1 ${1+"$@"}
   eval "`syncenv $mypid`"
   : ${FM_LOGFILE:=$LOGDIR/fetchmail}
-  echo `date`: fetchmail done | tee -a "$FM_LOGFILE" >&2
+  $trace dofetchmail ${1+"$@"}
+  echo "`date`: fetchmail done" | tee -a "$FM_LOGFILE" >&2
+
+  eval "`syncenv $mypid`"
+  : ${FM_LOGFILE:=$LOGDIR/fetchmail}
   killpidfile getmail_flush.pid
   fmdelay=${FM_DELAY:=300}
   bgproc -s -p fetchmail_sleep.pid $trace sleep "$fmdelay"
