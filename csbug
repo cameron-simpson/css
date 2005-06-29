@@ -1,0 +1,244 @@
+#!/bin/sh -u
+#
+# My bug system.
+#	- Cameron Simpson <cs@zip.com.au> 28jun2005
+#
+
+: ${CSBUG_ROOT:=$HOME/var/bugs}
+: ${CSBUG_BUGNUM:=''}
+
+cmd=`basename "$0"` || cmd=$0
+usage="Usage: $cmd [-b bugnum] op [op-args...]
+	-b bugnum	Bug number."
+
+trace=set-x
+bugnum=
+
+badopts=
+
+while [ $# -gt 0 ]
+do
+  case $1 in
+    -b)	bugnum=$2; shift ;;
+    -d)	CSBUG_ROOT=$2; export CSBUG_ROOT; shift ;;
+    --)	shift; break ;;
+    -?*)echo "$cmd: unrecognised option: $1" >&2
+	badopts=1
+	;;
+    *)	break ;;
+  esac
+  shift
+done
+
+if [ $# = 0 ]
+then
+  echo "$cmd: missing op" >&2
+  badopts=1
+else
+  op=$1; shift
+
+  if [ "x$op" = xNEW ]
+  then
+    [ -z "$bugnum" ] || { echo "$cmd: $op: a bug number may not be specified" >&2
+			  badopts=1
+			}
+    CSBUG_BUGNUM=
+    export CSBUG_BUGNUM
+  else
+    : ${bugnum:=$CSBUG_BUGNUM}
+    [ -z "$bugnum" ] && { echo "$cmd: $op: a bug number is required via -b or \$CSBUG_BUGNUM" >&2
+			  badopts=1
+			}
+    bugdir="$CSBUG_ROOT/$bugnum"
+    [ -d "$bugdir/." ] || { echo "$cmd: $op: invalid bug number \"$bugnum\"" >&2
+			    badopts=1
+			  }
+    CSBUG_BUGNUM=$bugnum
+    export CSBUG_BUGNUM
+  fi
+fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+xit=0
+
+set -x
+exec 4>&1 1>&2	# avoid accidental output
+case "$op" in
+  NEW)	[ $# = 0 ] && { echo "$cmd: $op: missing headline" >&2; exit 2; }
+	bugdir=`mkdirn "$CSBUG_ROOT/"`	|| exit 1
+	bugnum=`basename "$bugdir"`	|| exit 1
+	CSBUG_BUGNUM=$bugnum
+	export CSBUG_BUGNUM
+	echo "NEW BUG #$bugnum"
+	for field in headline state
+	do  >>"$bugdir/$field"
+	done
+	maildir "$bugdir/mail"		|| exit 1
+	mkdir "$bugdir/attach"		|| exit 1
+	"$0" STATE NEW	|| exit 1
+	"$0" SET headline "$*" || exit 1
+	L "$bugdir"
+	;;
+  STATE)[ $# = 0 ] && { echo "$cmd: $op: missing state" >&2; exit 2; }
+	state=$1; shift
+	[ $# -gt 0 ] && { echo "$cmd: $op: extra aguments after state \"$state\": $*" >&2
+			  exit 2
+			}
+	case "$state" in
+	  NEW|OPEN|DONE)
+	    echo "$state" >"$bugdir/state" || exit 1
+	    ;;
+	  *)echo "$cmd: unsupported state \"$state\"" >&2; exit 2
+	    ;;
+	esac
+	;;
+  GET)	[ $# = 0 ] && { echo "$cmd: $op: missing fieldname" >&2; exit 2; }
+	field=$1; shift
+	[ $# = 0 ] || { echo "$cmd: $op: extra argument after fieldname \"$field\": $*" >&2; exit 2; }
+	case "$field" in
+	  COMMENT-PATHS)
+	    maildir-messages "$bugdir/mail" \
+	    | while read -r msgpath
+	      do  msgbase=`basename "$msgpath"` || exit 1
+		  printf "%s %s\n" "$msgbase" "$msgpath"
+	      done \
+	    | sort -n \
+	    | awk '{ print $2}' \
+	    >&4
+	    ;;
+	  COMMENT:)
+	    maildir-messages "$bugdir/mail" | wc -l >&4
+	    ;;
+	  COMMENT:[0-9]*)
+	    n=`expr "$field" : 'COMMENT:\(.*\)'`
+	    "$0" GET COMMENT-PATHS \
+	    | sed -n "${n}p" \
+	    | { read -r msgpath || exit 1
+		exec cat "$msgpath"
+	      } \
+	    >&4
+	    ;;
+	  *)
+	    [ -f "$bugdir/$field" ] || { echo "$cmd: $op: $fieldname: no such field!" >&2; exit 1; }
+	    exec cat "$bugdir/$field" >&4
+	    ;;
+	esac
+	;;
+  SET)	[ $# = 0 ] && { echo "$cmd: $op: missing fieldname" >&2; exit 2; }
+	field=$1; shift
+	[ $# = 0 ] && { echo "$cmd: $op: field \"$field\": missing value" >&2; exit 2; }
+	value=$*
+	fieldf=$bugdir/$field
+	[ -f "$fieldf" ] || { echo "$cmd: $op: $field=[$value]: field not present!" >&2; exit 2; }
+	printf "%s\n" "$*" >"$fieldf" || exit 1
+	printf "SET %s=%s\n" "$field" "$*" | tr '\n' ';' >&4
+	;;
+  COMMENT)
+	[ $# = 0 ] || { echo "$cmd: $op: extra arguments: $*" >&2; exit 2; }
+	exec procmail "DEFAULT=$bugdir/mail/" /dev/null
+	;;
+  ATTACH)
+	[ $# = 0 ] && { echo "$cmd: $op: no files to attach!" >&2; exit 2; }
+	ok=1
+	first=1
+	for file
+	do
+	  if [ $first ]; then first=; set --; fi
+
+	  if [ -f "$file" ]
+	  then
+	    [ -s "$file" ] || { echo "$cmd: $op: $file: empty file rejected" >&2
+				ok=
+				continue
+			      }
+	  else
+	    fileof=`fileof "$file"` || { echo "$cmd: $op: $file: rejected" >&2
+					 ok=
+					 continue
+				       }
+	    file=$fileof
+	  fi
+	  set -- ${1+"$@"} "$file"
+	done
+	[ $ok ] || { echo "$cmd: $op: aborting" >&2; exit 2; }
+	for file
+	do
+	  attachdir=`mkdirn "$bugdir/attach/"` || exit 1
+	  nattach=`basename "$attachdir"`      || exit 1
+	  case "$file" in
+	    -*)	ffile=./$file ;;
+	    *)	ffile=$file ;;
+	  esac
+	  cp -i "$ffile" "$attachdir/." || { rmdir "$attachdir"; exit 1; }
+	  printf "%s\n" "$file" >"$attachdir.pathname"
+	  id >"$attachdir.id"
+	  printf "ATTACH %s %s\n" "$nattach" "$file" >&4
+	done
+	;;
+  HTML)	[ $# = 0 ] && set -- status comments attachments
+	ht_title=`"$0" GET headline | htencode`
+	echo "<TITLE>Bug $CSBUG_BUGNUM: $ht_title</TITLE>" >&4
+	echo "<H1>Bug $CSBUG_BUGNUM: $ht_title</H1>" >&4
+	for section
+	do
+	  case "$section" in
+	    status)
+	      ht_status=`"$0" GET status | htencode`
+	      echo "Status: $ht_status" >&4
+	      ;;
+	    comments)
+	      echo "<H2>Comments</H2>" >&4
+	      ncomments=`"$0" GET COMMENT:` || exit 1
+	      [ "$ncomments" = 0 ] && { echo "No comments."; continue; }
+	      n=0
+	      "$0" GET COMMENT-PATHS \
+	      | \
+	      {
+		first=1
+		while read -r msgpath
+		do
+		  L "$msgpath" ; echo "<BR>" >&4
+		  n=`expr $n + 1` || exit 1
+
+		  ( eval `mhdrs -sh <"$msgpath" | sed 's/^/msg_/'`
+		    ht_subject=`htstr "$msg_SUBJECT"`
+		    ht_date=`htstr "$msg_DATE"`
+
+		    exec >&4
+		    echo "<H3>$n: $ht_subject</H3>"
+		    echo "<SMALL>"
+		    echo "<B>Date:</B> $ht_date<BR>"
+		    echo "<BR>"
+		    echo "<pre><blockquote>"
+		    unhdr <"$msgpath" | htencode
+		    echo "</blockquote></pre>"
+		    echo "</SMALL>"
+		  )
+		done
+	      }
+	      ;;
+	    attachments)
+	      echo "<H2>Attachments</H2>" >&4
+	      for attdir in $bugdir/attach/[0-9]*
+	      do
+		[ -d "$attdir/." ] || continue
+		ls -ldL "$attdir/"* >&4
+		echo "<BR>" >&4
+	      done
+	      ;;
+	    *)
+	      echo "$cmd: $op: unimplemented section \"$section\"" >&2
+	      xit=1
+	      continue
+	      ;;
+	  esac
+	done
+	echo "<P>"
+	;;
+  *)	echo "$cmd: unsupported op: $op" >&2
+	exit 1
+	;;
+esac
+
+exit $xit
