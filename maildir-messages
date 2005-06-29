@@ -1,0 +1,8 @@
+#!/bin/sh -u
+[ $# = 1 ] || { echo "Usage: $0 maildir" >&2; exit 2; }
+dir=$1; shift
+cd "$dir" || exit 1
+for subdir in new cur
+do
+  ls "$subdir" | sed "s^$dir/$subdir/"
+done
