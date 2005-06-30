@@ -5,7 +5,7 @@
 #
 # =head1 NAME
 #
-# qcsbug - a simple bug tracking system
+# csbug - a simple bug tracking system
 #
 # =head1 SYNOPSIS
 #
@@ -25,7 +25,7 @@ usage="Usage: $cmd [-b bugnum] op [op-args...]
 
 # =head1 DESCRIPTION
 #
-# I<csbug> is simple bug system.
+# I<csbug> is a simple bug system.
 #
 
 trace=set-x
@@ -150,6 +150,47 @@ case "$op" in
 	  printf "ATTACH %s %s\n" "$nattach" "$file" >&4
 	done
 	;;
+  # =item B<CHILDREN> {+|-}I<n>...
+  #
+  # Add or delete bug numbers to/from the B<children> field.
+  #
+  CHILDREN)
+	[ $# = 0 ] && { echo "$cmd: $op: missing child bugs" >&2; exit 2; }
+	children=`"$0" GET children` || exit 1
+	for ch
+	do
+	  case "$ch" in
+	    -[1-9]* | +[1-9]*)
+	      chmode=`expr "x$ch" : 'x\(.\).*'`
+	      chnum=`expr "x$ch" : 'x.\([1-9][0-9]*\).*'`
+	      ;;
+	    *)echo "$cmd: $op: $ch: bad child bug reference, expect -bugnum or +bugnum" >&2
+	      xit=1
+	      continue
+	      ;;
+	  esac
+	  chstatus=`"$0" -b "$chnum" GET status` \
+	  || { echo "$cmd: $op: $ch: nonexistent bug" >&2
+	       xit=1
+	       continue
+	     }
+	  if [ "x$chmode" = x+ ]
+	  then
+	    case ",$children," in
+	      ,,)children=$chnum ;;
+	      *,$chnum,*) ;;
+	      *) children=$children,$chnum ;;
+	    esac
+	  else
+	    case ",$children," in
+	      *,$chnum,*)
+		children=`echo "$children" | tr , '\012' | grep -v "^$chnum\$" | tr '\012' ,`
+		;;
+	    esac
+	  fi
+	done
+	exec $trace "$0" SET children "$children"
+	;;
   # =item B<COMMENT> <mail-item
   #
   # Add the mail item on stdandard input to the bug as a comment.
@@ -203,9 +244,14 @@ case "$op" in
 	      } \
 	    >&4
 	    ;;
-	  *)
-	    [ -f "$bugdir/$field" ] || { echo "$cmd: $op: $fieldname: no such field!" >&2; exit 1; }
-	    exec cat "$bugdir/$field" >&4
+	  [a-z]*)
+	    fieldf=$bugdir/$field
+	    [ -d "$fieldf" ] && { echo "$cmd: $op: $field: not a scalar field" >&2; exit 1; }
+	    [ -f "$fieldf" ] || exit 0
+	    exec cat "$fieldf" >&4
+	    ;;
+	  *)echo "$cmd: $op: invalid field name \"$field\"" >&2
+	    exit 2
 	    ;;
 	esac
 	#
@@ -305,19 +351,27 @@ case "$op" in
   # on the standard output, where I<bugnum> is the bug number of the new bug.
   #
   NEW)	[ $# = 0 ] && { echo "$cmd: $op: missing headline" >&2; exit 2; }
-	bugdir=`mkdirn "$CSBUG_ROOT/"`	|| exit 1
+	bugdir=`$trace mkdirn "$CSBUG_ROOT/"`	|| exit 1
 	bugnum=`basename "$bugdir"`	|| exit 1
 	CSBUG_BUGNUM=$bugnum
 	export CSBUG_BUGNUM
-	echo "NEW $bugnum"
+	echo "NEW $bugnum" >&4
 	for field in headline state
 	do  >>"$bugdir/$field"
 	done
-	maildir "$bugdir/mail"		|| exit 1
-	mkdir "$bugdir/attach"		|| exit 1
-	"$0" SET status NEW	|| exit 1
-	"$0" SET headline "$*" || exit 1
-	L "$bugdir"
+	$trace maildir "$bugdir/mail"	|| exit 1
+	$trace mkdir "$bugdir/attach"	|| exit 1
+	$trace "$0" SET status NEW	|| exit 1
+	$trace "$0" SET headline "$*"	|| exit 1
+	;;
+  # =item PARENTS
+  #
+  # Return the list of parent bug numbers for this bug.
+  # This requires the B<sqlite> package: http://freshmeat.net/projects/sqlite/
+  #
+  PARENTS)
+	[ $# = 0 ] || { echo "$cmd: $op: extra arguments: $*" >&2; exit 2; }
+	exec $trace "$0" SQL "select bugnum from bugfields where field == 'children' and ','||value||',' like '%,$bugnum,%'"
 	;;
   # =item B<SET> I<field> I<value>
   #
@@ -330,9 +384,11 @@ case "$op" in
 	fieldf=$bugdir/$field
 	[ -d "$fieldf" ] && { echo "$cmd: $op: $field=[$value]: not a scalar field!" >&2; exit 2; }
 	printf "%s\n" "$*" >"$fieldf" || exit 1
-	printf "SET %s=%s\n" "$field" "$*" | tr '\n' ';' >&4
 	dblog=$CSBUG_ROOT/db.log.csv
-	printf "%d,%s,%s\n" "$bugnum" "$field" "$*" >>"$dblog"
+	( printf "%d,%s," "$bugnum" "$field"
+	  printf "%s" "$*" | tr '\012' ';'
+	  echo
+	) >>"$dblog"
 	;;
   # =item B<SQL> I<sql-statement>
   #
@@ -346,23 +402,42 @@ case "$op" in
 	dblog=$CSBUG_ROOT/db.log.csv
 
 	# update db if necessary
-	if [ ! -f "$sqldb" ] \
-	|| { [ -s "$dblog" ] && [ "$dblog" -nt "$sqldb" ]; }
+	if [ ! -f "$sqldb" ]
 	then
-	  [ -f "$sqldb" ] \
-	  || $trace sqlite "$sqldb" 'create table bugfields (bugnum int primary key, field varchar(64), value varchar(16384))' \
+	  # create db
+	  $trace sqlite "$sqldb" 'create table bugfields (bugnum int, field varchar(64), value varchar(16384));' \
 	  || exit 1
 
-	  tmpf=$TMPDIR/$cmd.$$.dblog.csv
-	  mv "$dblog" "$tmpf" || exit 1
+	  [ -f "$dblog" ] && $trace rm "$dblog"
 
-	  awk -F, '{print "delete from bugfields where bugnum ==", $1, "and field == \"" $2 "\";"
-		    print "insert into bugfields values ("$1",\""$2"\",\""$3"\");"
-		   }' <"$tmpf" \
+	  # populate db
+	  ( cd "$CSBUG_ROOT" || exit 1
+	    for fieldf in [1-9]*/[a-z]*
+	    do  [ -f "$fieldf" ] && echo "$fieldf"
+	    done \
+	    | xxargs $trace fgrep '' /dev/null
+	  ) \
 	  | tee /dev/tty \
-	  | $trace sqlite "$sqldb" || exit 1
+	  | sed -n 's|\([1-9][0-9]*\)/\([a-z][^/]*\):\(.*\)|insert into bugfields values (\1,"\2","\3");|p' \
+	  | tee /dev/tty \
+	  | sqlite "$sqldb" \
+	  || exit 1
+	else
+	  if [ -s "$dblog" ] && [ "$dblog" -nt "$sqldb" ]
+	  then
+	    # update the db
+	    tmpf=$TMPDIR/$cmd.$$.dblog.csv
+	    mv "$dblog" "$tmpf" || exit 1
+
+	    awk -F, '{print "delete from bugfields where bugnum ==", $1, "and field == \"" $2 "\";"
+		      print "insert into bugfields values ("$1",\""$2"\",\""$3"\");"
+		     }' <"$tmpf" \
+	    | tee /dev/tty \
+	    | $trace sqlite "$sqldb" || exit 1
+	  fi
 	fi
 
+	# run the SQL on the now up to date db
 	$trace sqlite -list "$sqldb" "$sql;"
 	;;
   *)	echo "$cmd: unsupported op: $op" >&2
@@ -375,6 +450,15 @@ esac
 
 exit $xit
 
+# =head1 ENVIRONMENT
+#
+# B<$CSBUG_ROOT>, the root directory of the bug data.
+# Default: B<$HOME/var/bugs>
+#
+# B<CSBUG_BUGNUM>, the default bug number for per-bug operations.
+#
+# B<$TMPDIR>, where temporary files reside
+#
 # =head1 SEE ALSO
 #
 # sqlite(1)
