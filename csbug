@@ -3,23 +3,55 @@
 # My bug system.
 #	- Cameron Simpson <cs@zip.com.au> 28jun2005
 #
+# =head1 NAME
+#
+# qcsbug - a simple bug tracking system
+#
+# =head1 SYNOPSIS
+#
+# csbug [-b bugnum] [-d bugrootdir] op [op-args...]
+#
 
+: ${TMPDIR:=/tmp}
 : ${CSBUG_ROOT:=$HOME/var/bugs}
 : ${CSBUG_BUGNUM:=''}
 
 cmd=`basename "$0"` || cmd=$0
 usage="Usage: $cmd [-b bugnum] op [op-args...]
-	-b bugnum	Bug number."
+	-b bugnum	Bug number.
+			Default from \$CSBUG_BUGNUM.
+	-d bugrootdir	Root directory of bug system.
+			Default from \$CSBUG_ROOT: $HOME/var/bugs"
+
+# =head1 DESCRIPTION
+#
+# I<csbug> is simple bug system.
+#
 
 trace=set-x
 bugnum=
 
+# =head1 OPTIONS
+#
+# over 4
+#
 badopts=
 
 while [ $# -gt 0 ]
 do
   case $1 in
+    # =item B<-b> I<bugnum>
+    #
+    # Specify the bug to which the operation I<op> is to be applied.
+    # The environment variable B<$CSBUG_BUGNUM> contains the default bug number.
+    #
     -b)	bugnum=$2; shift ;;
+    # =item B<-d> I<bugrootdir>
+    #
+    # Specify the root directory of the bug data.
+    # The default may be controlled by the B<$CSBUG_ROOT> environment variable,
+    # which in turn defaults to B<$HOME/var/bugs>.
+    #
     -d)	CSBUG_ROOT=$2; export CSBUG_ROOT; shift ;;
     --)	shift; break ;;
     -?*)echo "$cmd: unrecognised option: $1" >&2
@@ -29,6 +61,9 @@ do
   esac
   shift
 done
+#
+# =back
+#
 
 if [ $# = 0 ]
 then
@@ -37,107 +72,46 @@ then
 else
   op=$1; shift
 
-  if [ "x$op" = xNEW ]
-  then
-    [ -z "$bugnum" ] || { echo "$cmd: $op: a bug number may not be specified" >&2
-			  badopts=1
-			}
-    CSBUG_BUGNUM=
-    export CSBUG_BUGNUM
-  else
-    : ${bugnum:=$CSBUG_BUGNUM}
-    [ -z "$bugnum" ] && { echo "$cmd: $op: a bug number is required via -b or \$CSBUG_BUGNUM" >&2
-			  badopts=1
-			}
-    bugdir="$CSBUG_ROOT/$bugnum"
-    [ -d "$bugdir/." ] || { echo "$cmd: $op: invalid bug number \"$bugnum\"" >&2
+  case "$op" in
+    NEW|SQL)
+      [ -z "$bugnum" ] || { echo "$cmd: $op: a bug number may not be specified" >&2
 			    badopts=1
 			  }
-    CSBUG_BUGNUM=$bugnum
-    export CSBUG_BUGNUM
-  fi
+      CSBUG_BUGNUM=
+      export CSBUG_BUGNUM
+      ;;
+    *)
+      : ${bugnum:=$CSBUG_BUGNUM}
+      [ -z "$bugnum" ] && { echo "$cmd: $op: a bug number is required via -b or \$CSBUG_BUGNUM" >&2
+			    badopts=1
+			  }
+      bugdir="$CSBUG_ROOT/$bugnum"
+      [ -d "$bugdir/." ] || { echo "$cmd: $op: invalid bug number \"$bugnum\"" >&2
+			      badopts=1
+			    }
+      CSBUG_BUGNUM=$bugnum
+      export CSBUG_BUGNUM
+      ;;
+  esac
 fi
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
 xit=0
 
+# =head1 OPERATIONS
+#
+# The following operations are supported.
+#
+# =over 4
+#
 set -x
 exec 4>&1 1>&2	# avoid accidental output
 case "$op" in
-  NEW)	[ $# = 0 ] && { echo "$cmd: $op: missing headline" >&2; exit 2; }
-	bugdir=`mkdirn "$CSBUG_ROOT/"`	|| exit 1
-	bugnum=`basename "$bugdir"`	|| exit 1
-	CSBUG_BUGNUM=$bugnum
-	export CSBUG_BUGNUM
-	echo "NEW BUG #$bugnum"
-	for field in headline state
-	do  >>"$bugdir/$field"
-	done
-	maildir "$bugdir/mail"		|| exit 1
-	mkdir "$bugdir/attach"		|| exit 1
-	"$0" STATE NEW	|| exit 1
-	"$0" SET headline "$*" || exit 1
-	L "$bugdir"
-	;;
-  STATE)[ $# = 0 ] && { echo "$cmd: $op: missing state" >&2; exit 2; }
-	state=$1; shift
-	[ $# -gt 0 ] && { echo "$cmd: $op: extra aguments after state \"$state\": $*" >&2
-			  exit 2
-			}
-	case "$state" in
-	  NEW|OPEN|DONE)
-	    echo "$state" >"$bugdir/state" || exit 1
-	    ;;
-	  *)echo "$cmd: unsupported state \"$state\"" >&2; exit 2
-	    ;;
-	esac
-	;;
-  GET)	[ $# = 0 ] && { echo "$cmd: $op: missing fieldname" >&2; exit 2; }
-	field=$1; shift
-	[ $# = 0 ] || { echo "$cmd: $op: extra argument after fieldname \"$field\": $*" >&2; exit 2; }
-	case "$field" in
-	  COMMENT-PATHS)
-	    maildir-messages "$bugdir/mail" \
-	    | while read -r msgpath
-	      do  msgbase=`basename "$msgpath"` || exit 1
-		  printf "%s %s\n" "$msgbase" "$msgpath"
-	      done \
-	    | sort -n \
-	    | awk '{ print $2}' \
-	    >&4
-	    ;;
-	  COMMENT:)
-	    maildir-messages "$bugdir/mail" | wc -l >&4
-	    ;;
-	  COMMENT:[0-9]*)
-	    n=`expr "$field" : 'COMMENT:\(.*\)'`
-	    "$0" GET COMMENT-PATHS \
-	    | sed -n "${n}p" \
-	    | { read -r msgpath || exit 1
-		exec cat "$msgpath"
-	      } \
-	    >&4
-	    ;;
-	  *)
-	    [ -f "$bugdir/$field" ] || { echo "$cmd: $op: $fieldname: no such field!" >&2; exit 1; }
-	    exec cat "$bugdir/$field" >&4
-	    ;;
-	esac
-	;;
-  SET)	[ $# = 0 ] && { echo "$cmd: $op: missing fieldname" >&2; exit 2; }
-	field=$1; shift
-	[ $# = 0 ] && { echo "$cmd: $op: field \"$field\": missing value" >&2; exit 2; }
-	value=$*
-	fieldf=$bugdir/$field
-	[ -f "$fieldf" ] || { echo "$cmd: $op: $field=[$value]: field not present!" >&2; exit 2; }
-	printf "%s\n" "$*" >"$fieldf" || exit 1
-	printf "SET %s=%s\n" "$field" "$*" | tr '\n' ';' >&4
-	;;
-  COMMENT)
-	[ $# = 0 ] || { echo "$cmd: $op: extra arguments: $*" >&2; exit 2; }
-	exec procmail "DEFAULT=$bugdir/mail/" /dev/null
-	;;
+  # =item B<ATTACH> {I<file>|I<URL>}...
+  #
+  # Attach the named I<file>s or I<URL>s to the bug.
+  #
   ATTACH)
 	[ $# = 0 ] && { echo "$cmd: $op: no files to attach!" >&2; exit 2; }
 	ok=1
@@ -176,17 +150,95 @@ case "$op" in
 	  printf "ATTACH %s %s\n" "$nattach" "$file" >&4
 	done
 	;;
+  # =item B<COMMENT> <mail-item
+  #
+  # Add the mail item on stdandard input to the bug as a comment.
+  #
+  COMMENT)
+	[ $# = 0 ] || { echo "$cmd: $op: extra arguments: $*" >&2; exit 2; }
+	exec procmail "DEFAULT=$bugdir/mail/" /dev/null
+	;;
+  # =item B<GET> I<field>
+  #
+  # Print the value of the supplied field on the standard output.
+  # The following field names are special:
+  #
+  GET)	[ $# = 0 ] && { echo "$cmd: $op: missing fieldname" >&2; exit 2; }
+	field=$1; shift
+	[ $# = 0 ] || { echo "$cmd: $op: extra argument after fieldname \"$field\": $*" >&2; exit 2; }
+	# =over 2
+	#
+	case "$field" in
+	  # =item B<COMMENT-PATHS>
+	  #
+	  # Print the full pathname to each comment file.
+	  #
+	  COMMENT-PATHS)
+	    maildir-messages "$bugdir/mail" \
+	    | while read -r msgpath
+	      do  msgbase=`basename "$msgpath"` || exit 1
+		  printf "%s %s\n" "$msgbase" "$msgpath"
+	      done \
+	    | sort -n \
+	    | awk '{print $2}' \
+	    >&4
+	    ;;
+	  # =item B<COMMENT:>
+	  #
+	  # Print the number of comments.
+	  #
+	  COMMENT:)
+	    maildir-messages "$bugdir/mail" | wc -l >&4
+	    ;;
+	  # =item B<COMMENT:>I<n>
+	  #
+	  # Print comment number I<n>. Comments count from 1.
+	  #
+	  COMMENT:[0-9]*)
+	    n=`expr "$field" : 'COMMENT:\(.*\)'`
+	    "$0" GET COMMENT-PATHS \
+	    | sed -n "${n}p" \
+	    | { read -r msgpath || exit 1
+		exec cat "$msgpath"
+	      } \
+	    >&4
+	    ;;
+	  *)
+	    [ -f "$bugdir/$field" ] || { echo "$cmd: $op: $fieldname: no such field!" >&2; exit 1; }
+	    exec cat "$bugdir/$field" >&4
+	    ;;
+	esac
+	#
+	# =back
+	#
+	;;
+  # =item B<HTML> [I<section>...]
+  #
+  # Emit HTML markup for various bug sections on the standard output.
+  # If no sections are specified, the following are printed: B<status comments attachments>.
+  # The following sections are supported:
+  #
   HTML)	[ $# = 0 ] && set -- status comments attachments
 	ht_title=`"$0" GET headline | htencode`
 	echo "<TITLE>Bug $CSBUG_BUGNUM: $ht_title</TITLE>" >&4
 	echo "<H1>Bug $CSBUG_BUGNUM: $ht_title</H1>" >&4
 	for section
 	do
+	  # =over 2
+	  #
 	  case "$section" in
+	    # =item B<status>
+	    #
+	    # The bug's B<status> field.
+	    #
 	    status)
 	      ht_status=`"$0" GET status | htencode`
 	      echo "Status: $ht_status" >&4
 	      ;;
+	    # =item B<comments>
+	    #
+	    # The comments to the bug.
+	    #
 	    comments)
 	      echo "<H2>Comments</H2>" >&4
 	      ncomments=`"$0" GET COMMENT:` || exit 1
@@ -218,6 +270,10 @@ case "$op" in
 		done
 	      }
 	      ;;
+	    # =item B<attachments>
+	    #
+	    # The attachments to the bug.
+	    #
 	    attachments)
 	      echo "<H2>Attachments</H2>" >&4
 	      for attdir in $bugdir/attach/[0-9]*
@@ -233,12 +289,97 @@ case "$op" in
 	      continue
 	      ;;
 	  esac
+	  #
+	  # =back
+	  #
 	done
 	echo "<P>"
+	;;
+  # =item B<NEW> I<headline>
+  #
+  # Create a new bug with the specified I<headline>.
+  # Print:
+  #
+  #	NEW bugnum
+  #
+  # on the standard output, where I<bugnum> is the bug number of the new bug.
+  #
+  NEW)	[ $# = 0 ] && { echo "$cmd: $op: missing headline" >&2; exit 2; }
+	bugdir=`mkdirn "$CSBUG_ROOT/"`	|| exit 1
+	bugnum=`basename "$bugdir"`	|| exit 1
+	CSBUG_BUGNUM=$bugnum
+	export CSBUG_BUGNUM
+	echo "NEW $bugnum"
+	for field in headline state
+	do  >>"$bugdir/$field"
+	done
+	maildir "$bugdir/mail"		|| exit 1
+	mkdir "$bugdir/attach"		|| exit 1
+	"$0" SET status NEW	|| exit 1
+	"$0" SET headline "$*" || exit 1
+	L "$bugdir"
+	;;
+  # =item B<SET> I<field> I<value>
+  #
+  # Set the value of the specified I<field> to the specified I<value>.
+  #
+  SET)	[ $# = 0 ] && { echo "$cmd: $op: missing fieldname" >&2; exit 2; }
+	field=$1; shift
+	[ $# = 0 ] && { echo "$cmd: $op: field \"$field\": missing value" >&2; exit 2; }
+	value=$*
+	fieldf=$bugdir/$field
+	[ -d "$fieldf" ] && { echo "$cmd: $op: $field=[$value]: not a scalar field!" >&2; exit 2; }
+	printf "%s\n" "$*" >"$fieldf" || exit 1
+	printf "SET %s=%s\n" "$field" "$*" | tr '\n' ';' >&4
+	dblog=$CSBUG_ROOT/db.log.csv
+	printf "%d,%s,%s\n" "$bugnum" "$field" "$*" >>"$dblog"
+	;;
+  # =item B<SQL> I<sql-statement>
+  #
+  # Perform an SQL query on the bug database.
+  # This requires the B<sqlite> package: http://freshmeat.net/projects/sqlite/
+  #
+  SQL)	[ $# = 0 ] && { echo "$cmd: $op: missing SQL statement" >&2; exit 2; }
+	sql=$1; shift
+	[ $# = 0 ] || { echo "$cmd: $op: extra arguments after SQL \"$sql\": $*" >&2; exit 2; }
+	sqldb=$CSBUG_ROOT/db.sqlite
+	dblog=$CSBUG_ROOT/db.log.csv
+
+	# update db if necessary
+	if [ ! -f "$sqldb" ] \
+	|| { [ -s "$dblog" ] && [ "$dblog" -nt "$sqldb" ]; }
+	then
+	  [ -f "$sqldb" ] \
+	  || $trace sqlite "$sqldb" 'create table bugfields (bugnum int primary key, field varchar(64), value varchar(16384))' \
+	  || exit 1
+
+	  tmpf=$TMPDIR/$cmd.$$.dblog.csv
+	  mv "$dblog" "$tmpf" || exit 1
+
+	  awk -F, '{print "delete from bugfields where bugnum ==", $1, "and field == \"" $2 "\";"
+		    print "insert into bugfields values ("$1",\""$2"\",\""$3"\");"
+		   }' <"$tmpf" \
+	  | tee /dev/tty \
+	  | $trace sqlite "$sqldb" || exit 1
+	fi
+
+	$trace sqlite -list "$sqldb" "$sql;"
 	;;
   *)	echo "$cmd: unsupported op: $op" >&2
 	exit 1
 	;;
 esac
+#
+# =back
+#
 
 exit $xit
+
+# =head1 SEE ALSO
+#
+# sqlite(1)
+#
+# =head1 AUTHOR
+#
+# Cameron Simpson E<lt>cs@zip.com.auE<gt> 28jun2005
+#
