@@ -73,6 +73,7 @@ do
   shift
 done
 
+[ "x$fmlimit" = x0 ] && fmlimit=
 [ -n "$fmlimit" ] && fmopts="$fmopts -l $fmlimit"
 
 [ $# = 0 ] || FM_HOSTS=$*
