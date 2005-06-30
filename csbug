@@ -33,7 +33,7 @@ bugnum=
 
 # =head1 OPTIONS
 #
-# over 4
+# =over 4
 #
 badopts=
 
