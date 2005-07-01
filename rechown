@@ -4,12 +4,15 @@
 #	- Cameron Simpson <cs@zip.com.au> 19jun2005
 #
 
-trace=echo
+passwd=/etc/passwd
+trace=set-x
 
 cmd=`basename "$0"`
-usage="Usage: $cmd olduid newuid directories..."
+usage="Usage: $cmd [-f passwdfile] olduid newuid directories..."
 
 badopts=
+
+[ $# -gt 0 ] && [ "x$1" = x-f ] && { passwd=$2; shift; shift; }
 
 if [ $# = 0 ]
 then
@@ -37,8 +40,8 @@ else
 	echo "$cmd: bad newuid \"$newuid\", must be numeric" >&2
 	badopts=1
 	;;
-      *)grep "^[^:]*:[^:]*:$newuid:" /etc/passwd \
-	|| { echo "$cmd: new uid \"$newuid\" not in /etc/passwd" >&2
+      *)grep "^[^:]*:[^:]*:$newuid:" "$passwd" \
+	|| { echo "$cmd: new uid \"$newuid\" not in $passwd" >&2
 	     badopts=1
 	   }
 	;;
@@ -56,11 +59,13 @@ else
   fi
 fi
 
+[ -s "$passwd" ] || { echo "$cmd: $passwd: not a file" >&2; badopts=1; }
+
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
 for dir
 do
   echo "$dir ..."
-  find "$dir" ! -type l -user "$olduid" -print \
+  $trace find "$dir" ! -type l -user "$olduid" -print \
   | xxargs $trace chown "$newuid"
 done
