@@ -1,0 +1,71 @@
+#!/bin/sh -u
+#
+# Chgrp objects in the specified file trees from one gid to another.
+#	- Cameron Simpson <cs@zip.com.au> 01jul2005
+#
+
+groupfile=/etc/group
+trace=set-x
+
+cmd=`basename "$0"`
+usage="Usage: $cmd [-f groupfile] oldgid newgid directories..."
+
+badopts=
+
+[ $# -gt 0 ] && [ "x$1" = x-f ] && { groupfile=$2; shift; shift; }
+
+if [ $# = 0 ]
+then
+  echo "$cmd: missing oldgid" >&2
+  badopts=1
+else
+  oldgid=$1; shift
+  case "$oldgid" in
+    *[!0-9]*)
+      echo "$cmd: bad oldgid \"$oldgid\", must be numeric" >&2
+      badopts=1
+      ;;
+  esac
+  if [ $# = 0 ]
+  then
+    echo "$cmd: missing newgid" >&2
+    badopts=1
+  else
+    newgid=$1; shift
+    [ "x$oldgid" = "x$newgid" ] && { echo "$cmd: newgid == $oldgid" >&2
+				     badopts=1
+				   }
+    case "$newgid" in
+      *[!0-9]*)
+	echo "$cmd: bad newgid \"$newgid\", must be numeric" >&2
+	badopts=1
+	;;
+      *)grep "^[^:]*:[^:]*:$newgid:" "$groupfile" \
+	|| { echo "$cmd: new gid \"$newgid\" not in $groupfile" >&2
+	     badopts=1
+	   }
+	;;
+    esac
+    if [ $# = 0 ]
+    then
+      echo "$cmd: missing directories" >&2
+      badopts=1
+    else
+      for dir
+      do
+	[ -d "$dir" ] || { echo "$cmd: $dir: not a directory" >&2; badopts=1; }
+      done
+    fi
+  fi
+fi
+
+[ -s "$groupfile" ] || { echo "$cmd: $groupfile: not a file" >&2; badopts=1; }
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+for dir
+do
+  echo "$dir ..."
+  $trace find "$dir" ! -type l -group "$oldgid" -print \
+  | xxargs $trace chgrp "$newgid"
+done
