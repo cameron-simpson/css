@@ -64,4 +64,13 @@ $trace bsed "/^$groupname:[^:]*:$oldgid:/{
 	     }" "$groupfile" \
 || exit 1
 
+passwd=`dirname "$groupfile"`/passwd
+if [ -s "$passwd" ]
+then
+  ask "Renumber the gid in $passwd" \
+  && $trace bsed "s/\\(^[^:]*:[^:]*:[0-9][0-9]*\\):$oldgid:/\\1:$newgid:/" "$passwd"
+else
+  echo "NOTE: no $passwd! you may need to renumber the gid file of a passwd file somewhere" >&2
+fi
+
 echo rechgrp -f "$groupfile" "$oldgid" "$newgid" dirs...
