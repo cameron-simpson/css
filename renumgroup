@@ -50,7 +50,7 @@ oldgid=`awk -F: "\\$1 == \\"$groupname\\" {print \\$3}" "$groupfile"` || exit 1
 # look up new gid, whinge if already in use
 if grep "^[^:]*:[^:]*:$newgid:" "$groupfile" >&2
 then
-  echo "$cmd: existing user above conflicts with new gid $newgid for $groupname" >&2
+  echo "$cmd: existing group above conflicts with new gid $newgid for $groupname" >&2
   exit 1
 fi
 
