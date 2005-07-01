@@ -66,4 +66,8 @@ $trace bsed "/^$login:[^:]*:$olduid:/{
 	     }" "$passwd" \
 || exit 1
 
+echo pwconv
 echo rechown -f "$passwd" "$olduid" "$newuid" "$homedir/." ...
+
+ask "Renumber the group \"$login\" to $newuid as well" \
+&& renumgroup "$login" "$newuid"
