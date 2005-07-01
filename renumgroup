@@ -47,8 +47,6 @@ oldgid=`awk -F: "\\$1 == \\"$groupname\\" {print \\$3}" "$groupfile"` || exit 1
 [ -n "$oldgid" ] || { echo "$cmd: $groupfile: no line for groupname \"$groupname\"" >&2
 		      exit 1
 		    }
-homedir=`awk -F: "\\$1 == \\"$groupname\\" {print \\$6}" "$groupfile"` || exit 1
-
 # look up new gid, whinge if already in use
 if grep "^[^:]*:[^:]*:$newgid:" "$groupfile" >&2
 then
@@ -66,4 +64,4 @@ $trace bsed "/^$groupname:[^:]*:$oldgid:/{
 	     }" "$groupfile" \
 || exit 1
 
-echo rechgrp -f "$groupfile" "$oldgid" "$newgid" "$homedir/." ...
+echo rechgrp -f "$groupfile" "$oldgid" "$newgid" dirs...
