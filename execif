@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # Exec command only if input is not empty.
-#	- Cameron Simpson <cs@zip.com.au> 23jun98
+#	- Cameron Simpson <cs@zip.com.au> 23jun1998
 #
 
 : ${TMPDIR:=/tmp}
@@ -11,23 +11,9 @@ usage="Usage: $cmd command [args...]"
 
 [ $# = 0 ] && { echo "$usage" >&2; exit 2; }
 
-trap 'rm -f "$tmp"; exit 1' 1 15
-
 tmp=$TMPDIR/execif.$$
-sed -n -e '/^[ 	]*$/d
-	   :again
-	   p
-	   n
-	   b again' >"$tmp"
+trap 'rm -f "$tmp"' 0 1 2 13 15
 
-if [ -s "$tmp" ]
-then
-    "$@" <"$tmp"
-    xit=$?
-else
-    xit=0
-fi
-
-rm "$tmp"
-
-exit $xit
+stripwhite >"$tmp" || exit 1
+[ -s "$tmp" ] || exit 0
+"$@"
