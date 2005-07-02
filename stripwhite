@@ -1,0 +1,12 @@
+#!/bin/sed -nf
+#
+# Strip trailing whitespace and leading blank lines.
+#	- Cameron Simpson <cs@zip.com.au> 02jul2005
+#
+
+/^[ 	]*$/d
+:again
+s/[ 	][ 	]*$//
+p
+n
+b again
