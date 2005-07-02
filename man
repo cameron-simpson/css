@@ -120,7 +120,7 @@ MANDIR:
 	($key=$file) =~ s/(\.(gz|Z|z))+$//;
 	$found{$key}=[$type,$file];
 	push(@found,$key);
-	## warn "found $key ($type)\n";
+	##warn "found $key ($type)\n";
       }
     }
   }
@@ -134,7 +134,7 @@ CAT:
   for $cat (keys %found)
   { $type=$found{$cat}[0];
     next CAT if $type ne CAT;
-    ($man=$cat) =~ s:/man(${Section}[^/]*/[^/]+)$:/cat$1:oi;
+    ($man=$cat) =~ s:/cat(${Section}[^/]*/[^/]+)$:/man$1:oi;
     delete $found{$cat} if exists $found{$man};
   }
 
