@@ -73,7 +73,7 @@ else
   op=$1; shift
 
   case "$op" in
-    NEW|SQL)
+    LIST|NEW|SQL)
       [ -z "$bugnum" ] || { echo "$cmd: $op: a bug number may not be specified" >&2
 			    badopts=1
 			  }
@@ -82,7 +82,7 @@ else
       ;;
     *)
       : ${bugnum:=$CSBUG_BUGNUM}
-      [ -z "$bugnum" ] && { echo "$cmd: $op: a bug number is required via -b or \$CSBUG_BUGNUM" >&2
+      [ -z "$bugnum" ] && { echo "$cmd: $op: a bug number is required via -b or \$CSBUG_BUGNUM [$CSBUG_BUGNUM]" >&2
 			    badopts=1
 			  }
       bugdir="$CSBUG_ROOT/$bugnum"
@@ -105,7 +105,6 @@ xit=0
 #
 # =over 4
 #
-set -x
 exec 4>&1 1>&2	# avoid accidental output
 case "$op" in
   # =item B<ATTACH> {I<file>|I<URL>}...
@@ -152,44 +151,25 @@ case "$op" in
 	;;
   # =item B<CHILDREN> {+|-}I<n>...
   #
-  # Add or delete bug numbers to/from the B<children> field.
+  # Add or delete bug numbers of bugs this bug waits on.
+  # Use B<GET CHILDREN> to obtain the current list.
   #
   CHILDREN)
 	[ $# = 0 ] && { echo "$cmd: $op: missing child bugs" >&2; exit 2; }
-	children=`"$0" GET children` || exit 1
 	for ch
 	do
 	  case "$ch" in
 	    -[1-9]* | +[1-9]*)
 	      chmode=`expr "x$ch" : 'x\(.\).*'`
 	      chnum=`expr "x$ch" : 'x.\([1-9][0-9]*\).*'`
+	      $trace "$0" -b "$chnum" PARENTS "$chmode$bugnum" || xit=1
 	      ;;
 	    *)echo "$cmd: $op: $ch: bad child bug reference, expect -bugnum or +bugnum" >&2
 	      xit=1
 	      continue
 	      ;;
 	  esac
-	  chstatus=`"$0" -b "$chnum" GET status` \
-	  || { echo "$cmd: $op: $ch: nonexistent bug" >&2
-	       xit=1
-	       continue
-	     }
-	  if [ "x$chmode" = x+ ]
-	  then
-	    case ",$children," in
-	      ,,)children=$chnum ;;
-	      *,$chnum,*) ;;
-	      *) children=$children,$chnum ;;
-	    esac
-	  else
-	    case ",$children," in
-	      *,$chnum,*)
-		children=`echo "$children" | tr , '\012' | grep -v "^$chnum\$" | tr '\012' ,`
-		;;
-	    esac
-	  fi
 	done
-	exec $trace "$0" SET children "$children"
 	;;
   # =item B<COMMENT> <mail-item
   #
@@ -210,9 +190,25 @@ case "$op" in
 	# =over 2
 	#
 	case "$field" in
+	  # =item B<BUG-PATH>
+	  #
+	  # Print the full pathname of the bug.
+	  #
+	  BUG-PATH)
+	    echo "$bugdir" >&4
+	    ;;
+	  # =item B<CHILDREN>
+	  #
+	  # Print other bugs that this bug depends upon.
+	  # This requires the B<sqlite> package: http://freshmeat.net/projects/sqlite/
+	  #
+	  CHILDREN)
+	    exec $trace "$0" SQL "select bugnum from bugfields where field == 'parents' and ','||value||',' like '%,$bugnum,%'"
+	    ;;
 	  # =item B<COMMENT-PATHS>
 	  #
 	  # Print the full pathname to each comment file.
+	  # This requires the B<sqlite> package: http://freshmeat.net/projects/sqlite/
 	  #
 	  COMMENT-PATHS)
 	    maildir-messages "$bugdir/mail" \
@@ -243,6 +239,23 @@ case "$op" in
 		exec cat "$msgpath"
 	      } \
 	    >&4
+	    ;;
+	  # =item B<FIELDS>
+	  #
+	  # Print the defined fields and their values.
+	  #
+	  FIELDS)
+	    ( cd "$bugdir" || exit 1
+	      exec fgrep '' [a-z]* 2>/dev/null
+	    ) \
+	    | sed 's/:/	/' >&4
+	    ;;
+	  # =item B<PARENTS>
+	  #
+	  # Print the list of other bugs waiting on this bug.
+	  #
+	  PARENTS)
+	    $trace "$0" GET parents | tr , '\012'
 	    ;;
 	  [a-z]*)
 	    fieldf=$bugdir/$field
@@ -341,12 +354,20 @@ case "$op" in
 	done
 	echo "<P>"
 	;;
+  # =item B<LIST>
+  #
+  # List all bug numbers.
+  #
+  LIST)	[ $# = 0 ] || { echo "$cmd: $op: extra arguments: $*" >&2; exit 2; }
+	cd "$CSBUG_ROOT" || exit 1
+	ls | grep '^[1-9][0-9]*$' | sort -n
+	;;
   # =item B<NEW> I<headline>
   #
   # Create a new bug with the specified I<headline>.
   # Print:
   #
-  #	NEW bugnum
+  #	bugnum
   #
   # on the standard output, where I<bugnum> is the bug number of the new bug.
   #
@@ -355,8 +376,8 @@ case "$op" in
 	bugnum=`basename "$bugdir"`	|| exit 1
 	CSBUG_BUGNUM=$bugnum
 	export CSBUG_BUGNUM
-	echo "NEW $bugnum" >&4
-	for field in headline state
+	echo "$bugnum" >&4
+	for field in headline status
 	do  >>"$bugdir/$field"
 	done
 	$trace maildir "$bugdir/mail"	|| exit 1
@@ -364,14 +385,45 @@ case "$op" in
 	$trace "$0" SET status NEW	|| exit 1
 	$trace "$0" SET headline "$*"	|| exit 1
 	;;
-  # =item PARENTS
+  # =item B<PARENTS> {+|-}I<n>...
   #
-  # Return the list of parent bug numbers for this bug.
-  # This requires the B<sqlite> package: http://freshmeat.net/projects/sqlite/
+  # Add or delete bug numbers of bugs waiting on this bug.
+  # Use B<GET PARENTS> to obtain the current list.
   #
   PARENTS)
-	[ $# = 0 ] || { echo "$cmd: $op: extra arguments: $*" >&2; exit 2; }
-	exec $trace "$0" SQL "select bugnum from bugfields where field == 'children' and ','||value||',' like '%,$bugnum,%'"
+	[ $# = 0 ] && { echo "$cmd: $op: missing parent bugs" >&2; exit 2; }
+	parents=`$trace "$0" GET parents` || exit 1
+	for pa
+	do
+	  case "$pa" in
+	    -[1-9]* | +[1-9]*)
+	      pamode=`expr "x$pa" : 'x\(.\).*'`
+	      panum=`expr "x$pa" : 'x.\([1-9][0-9]*\).*'`
+	      ;;
+	    *)echo "$cmd: $op: $pa: bad parent bug reference, expect -bugnum or +bugnum" >&2
+	      xit=1
+	      continue
+	      ;;
+	  esac
+
+	  if [ "x$pamode" = x+ ]
+	  then
+	    # add parent if missing
+	    case ",$parents," in
+	      ,,)parents=$panum ;;
+	      *,$panum,*) ;;
+	      *) parents=$parents,$panum ;;
+	    esac
+	  else
+	    # remove parent if present
+	    case ",$parents," in
+	      *,$panum,*)
+		parents=`echo "$parents" | tr , '\012' | grep -v "^$panum\$" | tr '\012' ,`
+		;;
+	    esac
+	  fi
+	done
+	exec $trace "$0" SET parents "$parents"
 	;;
   # =item B<SET> I<field> I<value>
   #
