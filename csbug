@@ -171,6 +171,25 @@ case "$op" in
 	  esac
 	done
 	;;
+  # =item B<CLONE>
+  #
+  # Duplicate a bug. Print the number of the new bug.
+  #
+  CLONE)
+	[ $# = 0 ] || { echo "$cmd: $op: extra arguments: $*" >&2; exit 2; }
+	# prepare new bug
+	tpdir=`csbug -b "$bugnum" GET BUG-PATH` || exit 1
+	newbug=`$trace csbug NEW ''` || exit 1
+	echo "$newbug" >&4
+	exec 4>&-
+
+	CSBUG_BUGNUM=$newbug
+	export CSBUG_BUGNUM
+
+	# dup template bug onto new bug
+	newdir=`csbug GET BUG-PATH` || exit 1
+	$trace rsync -aH "$tpdir/." "$newdir/."
+	;;
   # =item B<COMMENT> <mail-item
   #
   # Add the mail item on stdandard input to the bug as a comment.
