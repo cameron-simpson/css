@@ -47,23 +47,26 @@ exec 3>&1
     esac
 
     case "$bugsystem" in
+      csbug)
+	bugnum=`csbug NEW "$@" </dev/null` || exit 1
+	( echo "From: $EMAIL"
+	  echo "Subject: $*"
+	  echo
+	  exec cat
+	) | csbug -b "$bugnum" COMMENT
+	exit $?
+	;;
       ddts)
 	pro=sa.maintenance
-	mkddtsrq -S "$sev" -p "$pro" "$*"
-	xit=$?
-	break
+	exec mkddtsrq -S "$sev" -p "$pro" "$*"
 	;;
       tdl)
-	td --add "$*"
-	xit=$?
-	break
+	exec td --add "$*"
 	;;
       mailto:*)
-	BUGSYSTEMS=$bugsystem buglog "new bug: $*"
-	xit=$?
-	break
+	exec env BUGSYSTEMS=$bugsystem buglog "new bug: $*"
 	;;
     esac
   done
-  exit "$xit"
+  exit 1
 }
