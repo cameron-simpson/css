@@ -6,13 +6,29 @@
 
 passwd=/etc/passwd
 trace=set-x
+yesmode=
+yflag=
 
 cmd=`basename "$0"`
-usage="Usage: $cmd [-f passwdfile] login newuid"
+usage="Usage: $cmd [-y] [-f passwdfile] login newuid
+	-y		Presume \"yes\" answer to questions.
+	-f passwdfile	Specify passwd file to modify."
 
 badopts=
 
-[ $# -gt 0 ] && [ "x$1" = x-f ] && { passwd=$2; shift; shift; }
+while [ $# -gt 0 ]
+do
+  case $1 in
+    -f)	passwd=$2; shift ;;
+    -y)	yesmode=1 yflag=-y ;;
+    --)	shift; break ;;
+    -?*)echo "$cmd: unrecognised option: $1" >&2
+	badopts=1
+	;;
+    *)	break ;;
+  esac
+  shift
+done
 
 if [ $# = 0 ]
 then
@@ -40,6 +56,12 @@ fi
 
 [ -s "$passwd" ] || { echo "$cmd: $passwd: not a file" >&2; badopts=1; }
 
+[ $yesmode ] \
+|| [ -t 0 -a -t 1 ] \
+|| { echo "$cmd: terminal required unless -y specified" >&2
+     badopts=1
+   }
+
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
 # look up login, note old uid
@@ -52,7 +74,25 @@ homedir=`awk -F: "\\$1 == \\"$login\\" {print \\$6}" "$passwd"` || exit 1
 # look up new uid, whinge if already in use
 if grep "^[^:]*:[^:]*:$newuid:" "$passwd" >&2
 then
-  echo "$cmd: existing user above conflicts with new uid $newuid for $login" >&2
+  echo "$cmd: $passwd: existing user above conflicts with new uid $newuid for $login" >&2
+  exit 1
+fi
+
+dogrprenum=
+groupfile=`dirname "$passwd"`/group
+if [ -s "$groupfile" ]
+then
+  { [ $yesmode ] \
+    || ask "Renumber the group \"$login\" to $newuid in $groupfile as well"
+  } \
+  && dogrprenum=1
+else
+  echo "NOTE: no $groupfile! you may need to renumber the group in a group file somewhere" >&2
+fi
+
+if [ $dogrprenum ] && grep "^[^:]*:[^:]*:$newuid:" "$groupfile"
+then
+  echo "$cmd: $groupfile: existing group above conflicts with new uid $newuid for $login" >&2
   exit 1
 fi
 
@@ -66,8 +106,8 @@ $trace bsed "/^$login:[^:]*:$olduid:/{
 	     }" "$passwd" \
 || exit 1
 
+{ [ $dogrprenum ] && renumgroup $yflag -f "$groupfile" "$login" "$newuid"; } \
+|| exit 1
+
 echo pwconv
 echo rechown -f "$passwd" "$olduid" "$newuid" "$homedir/." ...
-
-ask "Renumber the group \"$login\" to $newuid as well" \
-&& renumgroup "$login" "$newuid"
