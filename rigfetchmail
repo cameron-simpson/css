@@ -8,5 +8,5 @@
 
 needhost "$HOMEHOST@home" || exit 1
 cd
-runfetchmail -1 -l 65536
+dofetchmail -l 65536
 bgproc runfetchmail
