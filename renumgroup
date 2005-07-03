@@ -12,7 +12,19 @@ usage="Usage: $cmd [-f groupfile] groupname newgid"
 
 badopts=
 
-[ $# -gt 0 ] && [ "x$1" = x-f ] && { groupfile=$2; shift; shift; }
+while [ $# -gt 0 ]
+do
+  case $1 in
+    -f)	groupfile=$2; shift ;;
+    -y)	yesmode=1 yflag=-y ;;
+    --)	shift; break ;;
+    -?*)echo "$cmd: unrecognised option: $1" >&2
+	badopts=1
+	;;
+    *)	break ;;
+  esac
+  shift
+done
 
 if [ $# = 0 ]
 then
@@ -40,6 +52,12 @@ fi
 
 [ -s "$groupfile" ] || { echo "$cmd: $groupfile: not a file" >&2; badopts=1; }
 
+[ $yesmode ] \
+|| [ -t 0 -a -t 1 ] \
+|| { echo "$cmd: terminal required unless -y specified" >&2
+     badopts=1
+   }
+
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
 # look up groupname, note old gid
@@ -54,6 +72,16 @@ then
   exit 1
 fi
 
+doprenum=
+passwd=`dirname "$groupfile"`/passwd
+if [ -s "$passwd" ]
+then
+  { [ $yesmode ] || ask "Renumber the gid in $passwd"; } \
+  && $trace bsed "s/\\(^[^:]*:[^:]*:[0-9][0-9]*\\):$oldgid:/\\1:$newgid:/" "$passwd"
+else
+  echo "NOTE: no $passwd! you may need to renumber the gid file of a passwd file somewhere" >&2
+fi
+
 $trace bsed "/^$groupname:[^:]*:$oldgid:/{
 		h
 		s/:/-oldgid:/
@@ -63,14 +91,5 @@ $trace bsed "/^$groupname:[^:]*:$oldgid:/{
 		G
 	     }" "$groupfile" \
 || exit 1
-
-passwd=`dirname "$groupfile"`/passwd
-if [ -s "$passwd" ]
-then
-  ask "Renumber the gid in $passwd" \
-  && $trace bsed "s/\\(^[^:]*:[^:]*:[0-9][0-9]*\\):$oldgid:/\\1:$newgid:/" "$passwd"
-else
-  echo "NOTE: no $passwd! you may need to renumber the gid file of a passwd file somewhere" >&2
-fi
 
 echo rechgrp -f "$groupfile" "$oldgid" "$newgid" dirs...
