@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# Usage: detab [-tabsize] [files...]
+# Usage: detab [-tabsize] [--] [files...]
 #
 
 $tabsize=8;	# default
@@ -9,6 +9,10 @@ if (@ARGV && $ARGV[0] =~ /^-(\d+)$/)
   shift;
 
   die "tabsize should be >= 1\n" if $tabsize < 1;
+}
+
+if (@ARGV && $ARGV[0] eq '--')
+{ shift;
 }
 
 while (<>)
