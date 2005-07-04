@@ -205,7 +205,9 @@ case "$op" in
   #
   GET)	[ $# = 0 ] && { echo "$cmd: $op: missing fieldname" >&2; exit 2; }
 	field=$1; shift
-	[ $# = 0 ] || { echo "$cmd: $op: extra argument after fieldname \"$field\": $*" >&2; exit 2; }
+	[ "x$field" = xFIELDS ] \
+	|| [ $# = 0 ] \
+	|| { echo "$cmd: $op: extra argument after fieldname \"$field\": $*" >&2; exit 2; }
 	# =over 2
 	#
 	case "$field" in
@@ -227,7 +229,6 @@ case "$op" in
 	  # =item B<COMMENT-PATHS>
 	  #
 	  # Print the full pathname to each comment file.
-	  # This requires the B<sqlite> package: http://freshmeat.net/projects/sqlite/
 	  #
 	  COMMENT-PATHS)
 	    maildir-messages "$bugdir/mail" \
@@ -259,15 +260,29 @@ case "$op" in
 	      } \
 	    >&4
 	    ;;
-	  # =item B<FIELDS>
+	  # =item B<FIELDS> [B<-sh>]
 	  #
 	  # Print the defined fields and their values.
 	  #
 	  FIELDS)
-	    ( cd "$bugdir" || exit 1
-	      exec fgrep '' [a-z]* 2>/dev/null
-	    ) \
-	    | sed 's/:/	/' >&4
+	    if [ $# -gt 0 ] && [ "x$1" = x-sh ]
+	    then
+	      shift
+	      "$0" "$op" "$field" ${1+"$@"} \
+	      | while read field value
+		do
+		  qvalue=`shqstr "$value"`
+		  printf "%s=%s;\n" "$field" "$qvalue" >&4
+		done
+	    else
+	      ( cd "$bugdir" || exit 1
+		[ $# = 0 ] && exec fgrep '' [a-z]* 2>/dev/null
+		for field
+		do  fgrep '' "$field" /dev/null 2>/dev/null
+		done
+	      ) \
+	      | sed 's/:/	/' >&4
+	    fi
 	    ;;
 	  # =item B<PARENTS>
 	  #
@@ -293,10 +308,10 @@ case "$op" in
   # =item B<HTML> [I<section>...]
   #
   # Emit HTML markup for various bug sections on the standard output.
-  # If no sections are specified, the following are printed: B<status comments attachments>.
+  # If no sections are specified, the following are printed: B<status COMMENTS ATTACHMENTS>.
   # The following sections are supported:
   #
-  HTML)	[ $# = 0 ] && set -- status comments attachments
+  HTML)	[ $# = 0 ] && set -- status COMMENTS ATTACHMENTS
 	ht_title=`"$0" GET headline | htencode`
 	echo "<TITLE>Bug $CSBUG_BUGNUM: $ht_title</TITLE>" >&4
 	echo "<H1>Bug $CSBUG_BUGNUM: $ht_title</H1>" >&4
@@ -317,7 +332,7 @@ case "$op" in
 	    #
 	    # The comments to the bug.
 	    #
-	    comments)
+	    COMMENTS)
 	      echo "<H2>Comments</H2>" >&4
 	      ncomments=`"$0" GET COMMENT:` || exit 1
 	      [ "$ncomments" = 0 ] && { echo "No comments."; continue; }
@@ -352,7 +367,7 @@ case "$op" in
 	    #
 	    # The attachments to the bug.
 	    #
-	    attachments)
+	    ATTACHMENTS)
 	      echo "<H2>Attachments</H2>" >&4
 	      for attdir in $bugdir/attach/[0-9]*
 	      do
@@ -379,7 +394,7 @@ case "$op" in
   #
   LIST)	[ $# = 0 ] || { echo "$cmd: $op: extra arguments: $*" >&2; exit 2; }
 	cd "$CSBUG_ROOT" || exit 1
-	ls | grep '^[1-9][0-9]*$' | sort -n
+	ls | grep '^[1-9][0-9]*$' | sort -n >&4
 	;;
   # =item B<NEW> I<headline>
   #
