@@ -1,0 +1,7 @@
+#!/bin/sh
+#
+# Convert Mac text data to UNIX (CR -> NL).
+#	- Cameron Simpson <cs@zip.com.au> 06jul2005
+#
+
+cat ${1+"$@"} | tr '\015' '\012'
