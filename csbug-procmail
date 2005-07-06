@@ -1,0 +1,62 @@
+#!/bin/sh -u
+#
+# Handler for csbug email.
+#	- Cameron Simpson <cs@zip.com.au> 06jul2005
+#
+
+exec >>$HOME/var/log/procmail 2>&1
+
+: ${TMPDIR:=/tmp}
+: ${CSBUG_ROOT:=`csbug ROOT`} || exit 1
+: ${CSBUG_MAILPREFIX:=csbug}
+
+: ${CSS_PREFIX:=/opt/css}
+. "$CSS_PREFIX/env.sh"
+
+tmpmail=$TMPDIR/csbug-mail.$$
+
+cat >"$tmpmail" || exit 1
+
+xit=0
+
+eval `mhdrs -sh <"$tmpmail" | sed 's/^/mhdrs_/'`
+delivery=`echo "$mhdrs_DELIVERED_TO" | sed 's/@.*//'`
+from=$mhdrs_FROM
+
+case "$from" in
+  *\<*@*\>*)	from=`expr "x$from" : 'x.*<\([^<>]*@[^<>]*\)>.*'` ;;
+  *@*\(*\)*)	from=`expr "x$from" : 'x\(.*@.*\) *(.*)'` ;;
+  \(*\)*@*)	from=`expr "x$from" : 'x(.*) *\(.*@.*\)'` ;;
+esac
+
+hackerok=
+case "$from" in
+  .*|*/*)	;;
+  *)		[ -d "$CSBUG_ROOT/hackers/$from" ] && hackerok=1
+		;;
+esac
+
+[ $hackerok ] \
+|| { echo "$0: rejecting invalid hacker \"$from\"" >&2
+     exit 1
+   }
+case "$delivery" in
+  "$CSBUG_MAILPREFIX"+NEW)
+    CSBUG_BUGNUM=`csbug NEW "$mhdrs_SUBJECT"` || exit 1
+    export CSBUG_BUGNUM
+    csbug COMMENT <"$tmpmail" || xit=1
+    ;;
+  "$CSBUG_MAILPREFIX"[1-9]*+COMMENT)
+    echo "delivery=[$delivery]" >&2
+    n=`expr "x$delivery" : 'x.*[^0-9]\([1-9][0-9]*\)+COMMENT'`
+    echo "n=[$n]" >&2
+    csbug -b "$n" COMMENT <"$tmpmail" || xit 1
+    ;;
+  *)
+    echo "$0: unsupported delivery: $delivery" >&2
+    env|sort >&2
+    xit=1
+    ;;
+esac
+
+exit $xit
