@@ -30,6 +30,7 @@ usage="Usage: $cmd [-b bugnum] op [op-args...]
 
 trace=set-x
 bugnum=
+necho(){ printf "%s" "$*"; }
 
 # =head1 OPTIONS
 #
@@ -73,7 +74,7 @@ else
   op=$1; shift
 
   case "$op" in
-    LIST|NEW|SQL)
+    LIST|NEW|ROOT|SQL)
       [ -z "$bugnum" ] || { echo "$cmd: $op: a bug number may not be specified" >&2
 			    badopts=1
 			  }
@@ -162,7 +163,7 @@ case "$op" in
 	    -[1-9]* | +[1-9]*)
 	      chmode=`expr "x$ch" : 'x\(.\).*'`
 	      chnum=`expr "x$ch" : 'x.\([1-9][0-9]*\).*'`
-	      $trace "$0" -b "$chnum" PARENTS "$chmode$bugnum" || xit=1
+	      $trace "$0" -b "$chnum" PARENTS "$chmode$bugnum" >&4 || xit=1
 	      ;;
 	    *)echo "$cmd: $op: $ch: bad child bug reference, expect -bugnum or +bugnum" >&2
 	      xit=1
@@ -224,7 +225,7 @@ case "$op" in
 	  # This requires the B<sqlite> package: http://freshmeat.net/projects/sqlite/
 	  #
 	  CHILDREN)
-	    exec $trace "$0" SQL "select bugnum from bugfields where field == 'parents' and ','||value||',' like '%,$bugnum,%'"
+	    exec $trace "$0" SQL "select bugnum from bugfields where field == 'parents' and ','||value||',' like '%,$bugnum,%'" >&4
 	    ;;
 	  # =item B<COMMENT-PATHS>
 	  #
@@ -289,7 +290,7 @@ case "$op" in
 	  # Print the list of other bugs waiting on this bug.
 	  #
 	  PARENTS)
-	    $trace "$0" GET parents | tr , '\012'
+	    $trace "$0" GET parents | tr , '\012' >&4
 	    ;;
 	  [a-z]*)
 	    fieldf=$bugdir/$field
@@ -308,32 +309,45 @@ case "$op" in
   # =item B<HTML> [I<section>...]
   #
   # Emit HTML markup for various bug sections on the standard output.
-  # If no sections are specified, the following are printed: B<status COMMENTS ATTACHMENTS>.
-  # The following sections are supported:
+  # If no sections are specified, the following are printed: B<hacker COMMENTS ATTACHMENTS>.
+  # Lower case sections are field names.
+  # The following special sections are supported:
   #
-  HTML)	[ $# = 0 ] && set -- status COMMENTS ATTACHMENTS
-	ht_title=`"$0" GET headline | htencode`
-	echo "<TITLE>Bug $CSBUG_BUGNUM: $ht_title</TITLE>" >&4
-	echo "<H1>Bug $CSBUG_BUGNUM: $ht_title</H1>" >&4
+  # =over 4
+  #
+  HTML)	[ $# = 0 ] && set -- hacker COMMENTS ATTACHMENTS
 	for section
 	do
 	  # =over 2
 	  #
 	  case "$section" in
-	    # =item B<status>
+	    # =item B<COMMENT:>I<n>
 	    #
-	    # The bug's B<status> field.
+	    # The full listing of comment #I<n>.
 	    #
-	    status)
-	      ht_status=`"$0" GET status | htencode`
-	      echo "Status: $ht_status" >&4
+	    COMMENT:[1-9]*)
+	      n=`expr "$section" : 'COMMENT:\([1-9][0-9]*\).*'`
+	      "$0" GET "COMMENT:$n" \
+	      | ( tmpf=$TMPDIR/comment$$
+		  trap 'rm -f "$tmpf"' 0
+		  cat >"$tmpf" || exit 1
+		  eval `mhdrs -sh <"$tmpf" | sed 's/^/msg_/'`
+		  ht_from=`htstr "$msg_FROM"`
+		  ht_subject=`htstr "$msg_SUBJECT"`
+		  ht_date=`htstr "$msg_DATE"`
+		  echo "<B><BIG>Comment #$n</BIG></B><BR>"
+		  echo "<B>From:</B> $ht_from<BR>"
+		  echo "<B>Subject:</B> $ht_subject<BR>"
+		  echo "<B>Date:</B> $ht_date<BR>"
+		  echo "<P>"
+		  necho "<PRE><SMALL>"; unhdr <"$tmpf"; echo "</SMALL></PRE>"
+		) >&4
 	      ;;
-	    # =item B<comments>
+	    # =item B<COMMENTS>
 	    #
-	    # The comments to the bug.
+	    # The B<Subject:> lines of the comments to the bug.
 	    #
 	    COMMENTS)
-	      echo "<H2>Comments</H2>" >&4
 	      ncomments=`"$0" GET COMMENT:` || exit 1
 	      [ "$ncomments" = 0 ] && { echo "No comments."; continue; }
 	      n=0
@@ -341,27 +355,22 @@ case "$op" in
 	      | \
 	      {
 		first=1
+		echo "<TABLE>"
 		while read -r msgpath
 		do
-		  L "$msgpath" ; echo "<BR>" >&4
 		  n=`expr $n + 1` || exit 1
 
 		  ( eval `mhdrs -sh <"$msgpath" | sed 's/^/msg_/'`
 		    ht_subject=`htstr "$msg_SUBJECT"`
-		    ht_date=`htstr "$msg_DATE"`
+		    ht_from=`htstr "$msg_FROM"`
 
-		    exec >&4
-		    echo "<H3>$n: $ht_subject</H3>"
-		    echo "<SMALL>"
-		    echo "<B>Date:</B> $ht_date<BR>"
-		    echo "<BR>"
-		    echo "<pre><blockquote>"
-		    unhdr <"$msgpath" | htencode
-		    echo "</blockquote></pre>"
-		    echo "</SMALL>"
+		    echo "<TR><TD ALIGN=RIGHT>$n:"
+		    echo "    <TD ALIGN=LEFT><A HREF=\"COMMENTS/$n\">$ht_subject</A>"
+		    echo "    - $ht_from"
 		  )
 		done
-	      }
+		echo "</TABLE>"
+	      } >&4
 	      ;;
 	    # =item B<attachments>
 	    #
@@ -459,6 +468,13 @@ case "$op" in
 	done
 	exec $trace "$0" SET parents "$parents"
 	;;
+  # =item B<ROOT>
+  #
+  # Print the root directory of the bug database.
+  #
+  ROOT)
+    echo "$CSBUG_ROOT" >&4
+    ;;
   # =item B<SET> I<field> I<value>
   #
   # Set the value of the specified I<field> to the specified I<value>.
@@ -503,9 +519,9 @@ case "$op" in
 	    done \
 	    | xxargs $trace fgrep '' /dev/null
 	  ) \
-	  | tee /dev/tty \
+	  | tee -a /dev/fd/2 \
 	  | sed -n 's|\([1-9][0-9]*\)/\([a-z][^/]*\):\(.*\)|insert into bugfields values (\1,"\2","\3");|p' \
-	  | tee /dev/tty \
+	  | tee -a /dev/fd/2 \
 	  | sqlite "$sqldb" \
 	  || exit 1
 	else
@@ -518,13 +534,13 @@ case "$op" in
 	    awk -F, '{print "delete from bugfields where bugnum ==", $1, "and field == \"" $2 "\";"
 		      print "insert into bugfields values ("$1",\""$2"\",\""$3"\");"
 		     }' <"$tmpf" \
-	    | tee /dev/tty \
+	    | tee -a /dev/fd/2 \
 	    | $trace sqlite "$sqldb" || exit 1
 	  fi
 	fi
 
 	# run the SQL on the now up to date db
-	$trace sqlite -list "$sqldb" "$sql;"
+	$trace sqlite -list "$sqldb" "$sql;" >&4
 	;;
   *)	echo "$cmd: unsupported op: $op" >&2
 	exit 1
@@ -543,7 +559,8 @@ exit $xit
 #
 # B<CSBUG_BUGNUM>, the default bug number for per-bug operations.
 #
-# B<$TMPDIR>, where temporary files reside
+# B<$TMPDIR>, where temporary files reside.
+# Default: B</tmp>
 #
 # =head1 SEE ALSO
 #
