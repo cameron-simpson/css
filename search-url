@@ -118,7 +118,7 @@ case `echo "$engine" | tr '[a-z]' '[A-Z]'` in
   WEBSHOTS)	url=http://www.webshots.com/search/search.fcgi?words=$query\&x=0\&y=0 ;;
   WEBSTER)	url=http://humanities.uchicago.edu/cgi-bin/WEBSTER.sh?word=$query\&FLOAT=ON ;;
   WEBSTER2)	url=http://work.ucsd.edu:5141/cgi-bin/http_webster?isindex=$query ;;
-  WIKIPEDIA)	url=http://www.wikipedia.org/w/wiki.phtml?$query ;;
+  WIKI|WIKIPEDIA) url=http://www.wikipedia.org/w/wiki.phtml?$query ;;
   YAHOO)	url=http://au.search.yahoo.com/search/aunz?o=1\&p=$query\&d=y\&za=default\&h=c\&g=0\&n=$maxhits ;;
   YAHOOGROUPS)	url=http://groups.yahoo.com/search?query=$query\&submit=Search ;;
   YAHOOIMAGESEARCH) url=http://images.search.yahoo.com/search/images?p=$query\&sm=Yahoo%21+Search\&toggle=1\&ei=UTF-8\&fr=FP-tab-web-t ;;
