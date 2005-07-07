@@ -23,7 +23,7 @@ usage="Usage: $cmd [-d unpackdir] [command [args...]] <mailitem
 	command [args...]	Command to run.
 				Default: \"basedir/autoexec.sh key\" if present."
 
-[ "x$1" = x-d ] && { target=$2; shift; shift; }
+[ $# -gt 0 ] && [ "x$1" = x-d ] && { target=$2; shift; shift; }
 
 [ -n "$target" ] || { echo "$cmd: no unpackdir and no default, aborting" >&2; exit 1; }
 
