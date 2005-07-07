@@ -173,7 +173,7 @@ do  case $1 in
 	# useful to run a particular rsync version
 	# or for bootstrapping.
 	#
-	-R)	rsync=$2; shift ;;
+	-R)	SYNCOPT_RSYNC=$2; shift ;;
 	# =item B<-r> I<remote>
 	#
 	# Use the host I<remote> as the master repository host.
