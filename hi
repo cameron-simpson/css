@@ -112,6 +112,8 @@ do
 	    echo "SEEN $imgurl" >&2
 	  fi
 	done
+	# done - shut up!
+	exec >&2
 	[ $# = 0 ] || xvmax "$@" &
       )
     ) \
