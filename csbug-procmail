@@ -15,6 +15,11 @@ exec >>$HOME/var/log/procmail 2>&1
 
 tmpmail=$TMPDIR/csbug-mail.$$
 
+( echo "$0 $*"
+  id; pwd
+  env | sort
+) >&2
+
 cat >"$tmpmail" || exit 1
 
 xit=0
