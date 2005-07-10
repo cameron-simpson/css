@@ -4,6 +4,7 @@
 #	- Cameron Simpson <cs@zip.com.au> 04feb1994
 #
 
+require 'flush.pl';
 use Getopt::Std;
 use cs::Net::TCP;
 
@@ -28,14 +29,16 @@ my $firstfree=0;
 my $logto;
 my $accmode=0;
 my $onceonly=0;
+my $killreader=0;
 
 my %opt;
-getopts('a1iop:P:l:',\%opt) || ($badopts=1);
+getopts('a1iop:P:l:k',\%opt) || ($badopts=1);
 $accmode=$opt{'a'};
 $onceonly=$opt{'1'};
 $copyin =($opt{'i'} || !$opt{'o'});
 $copyout=($opt{'o'} || !$opt{'i'});
-$logto=$::opt{'l'} if defined $::opt{'l'};
+$logto=$opt{'l'} if defined $opt{'l'};
+$killreader=1 if defined $opt{'k'};
 if ($opt{'p'})		{ $localport=$opt{'p'}; $firstfree=0; }
 elsif ($opt{'P'})	{ $localport=$opt{'P'}; $firstfree=1; }
 
@@ -79,8 +82,8 @@ else
 die $usage if $badopts;
 
 if (defined $logto)
-{ open(LOGOUT,"> $logto.out") || die "$::cmd: can't write to $logto.out: $!\n";
-  open(LOGIN ,"> $logto.in" ) || die "$::cmd: can't write to $logto.in: $!\n";
+{ open(LOGOUT,">> $logto.out") || die "$::cmd: can't write to $logto.out: $!\n";
+  open(LOGIN ,">> $logto.in" ) || die "$::cmd: can't write to $logto.in: $!\n";
 }
 
 if ($accmode)
@@ -98,6 +101,7 @@ if ($accmode)
 die "$::cmd: can't connect to $host:$port: $!\n"
 	unless defined ($CONN=new cs::Net::TCP ($host,$port,$localport));
 
+my $mainpid=$$;
 if ($copyin && $copyout)
 { die "$::cmd: can't fork: $!\n" unless defined($pid=fork);
   if ($pid)	{ $copyin=0;  }	# parent, no copyin
@@ -106,20 +110,32 @@ if ($copyin && $copyout)
 
 if ($copyout)
 # parent, read stdin
-{ COPYOUT:
-  while (defined ($_=<STDIN>))
-  { print LOGOUT $_ if defined $logto;
+{
+  close(STDOUT);
+  COPYOUT:
+  my $nread;
+  while (($nread = sysread(STDIN,$_,8192)) > 0)
+  {
+    printflush(LOGIN,$_) if defined $logto;
     $CONN->Put($_);
-    $CONN->Flush() if -t STDIN;
+    $CONN->Flush();
   }
+  shutdown($CONN->Sink()->{IO},1);
+  shutdown(STDIN,0);
 }
 else
 # child, copy to stdout
-{ while (defined ($_=$CONN->Read()) && length)
+{
+  close(STDIN);
+  while (defined ($_=$CONN->Read()) && length)
   {
-    print LOGIN $_ if defined $logto;
-    print;
+    printflush(LOGOUT,$_) if defined $logto;
+    printflush(STDOUT,$_);
   }
+  shutdown(STDOUT,1);
+  ##::need(cs::Hier);warn "CONN=".cs::Hier::h2a($CONN,1);
+  shutdown($CONN->Source()->{IO},0);
+  if ($killreader) { kill(15, $mainpid); }
 }
 
 exit 0;
