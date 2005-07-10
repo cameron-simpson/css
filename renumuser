@@ -98,7 +98,7 @@ fi
 
 $trace bsed "/^$login:[^:]*:$olduid:/{
 		h
-		s/:/-olduid:/
+		s/:/-old$olduid:/
 		x
 		s/^\\($login:[^:]*\\):$olduid:/\\1:$newuid:/
 		x
