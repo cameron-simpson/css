@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/sh -u
 #
 # Maintain mirrors of rsync repositories.
 #	- Cameron Simpson <cs@zip.com.au> 25aug2000
@@ -26,7 +26,7 @@ cf=.mirror
 where=.
 verbose=
 trace=
-[ -t 1 ] && verbose=1
+##[ -t 1 ] && verbose=1
 timeout=
 rsync=rsync
 
@@ -38,6 +38,7 @@ usage="Usage: $cmd [-n] [-v] [-P] [-B blocksize] [-f config] [-d dir] [[server]:
 	-f config	Read config from this file. Default: $cf
 	-d dir		Install mirrors here. Default: $where
 	-t secs		Timeout each update after secs seconds.
+	-x		Trace subcommand execution.
 	-z		Use compression.
 	+z		Don't use compression."
 
@@ -58,23 +59,28 @@ do  case $1 in
 	#
 	# No action. Passed to the rsync command.
 	#
+	-n)	trace=set-x rsopts="$rsopts $1" ;;
 	# =item B<-P>
 	#
 	# Rsync's shorthand for B<--progress --partial>.
 	# Passed to the rsync command.
 	#
+	-P)	trace=set-x verbose=1 rsxopts="$rsxopts $1" ;;
 	# =item B<-v>
 	#
 	# Verbose. Passed to the rsync command.
 	#
+	-v)	trace=set-x verbose=1 rsxopts="$rsxopts $1" ;;
+	# =item B<-x>
+	#
+	# Trace subcommand execution.
+	#
+	-x)	trace=set-x ;;
 	# =item B<-W>
 	#
 	# Whole file copies.
 	# Passed to the rsync command.
 	#
-	-n)	trace=1 rsopts="$rsopts $1" ;;
-	-P)	trace=1 verbose=1 rsxopts="$rsxopts $1" ;;
-	-v)	trace=1 verbose=1 rsxopts="$rsxopts $1" ;;
 	-W)	rsxopts="$rsxopts $1" ;;
 
 	# =item B<-B> I<blocksize>
@@ -152,9 +158,6 @@ done
 		     }
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
-
-tracecmd=:
-[ $trace ] && tracecmd='set -x'
 
 timelimit=
 [ -n "$timeout" ] && { timelimit="timeout $timeout"
@@ -299,7 +302,7 @@ do
     fpath=$lpath
     case $fpath in /*) ;; *) fpath=$where/$fpath ;; esac
     [ -d "$fpath/." ] \
-	|| mkdir -p "$fpath" \
+	|| $trace mkdir -p "$fpath" \
 	|| { echo "$pfx: mkdir $fpath fails, skipping $host::$rpath" >&2
 	     xit=1
 	     continue
@@ -349,22 +352,22 @@ do
 	then
 	    latelist=$TMPDIR/$cmd-late$$
 	    latedir=$TMPDIR/latest$$
-	    if mkdir "$latedir"
+	    if $trace mkdir "$latedir"
 	    then
-		eval "rsync -n -rlHt \$rsopts $opts \"\$host::\$rpath/.\" \"\$latedir/.\"" \
+		eval "$trace rsync -n -rlHt \$rsopts $opts \"\$host::\$rpath/.\" \"\$latedir/.\"" \
 		| fgrep -v ' -> ' \
 		| latest -V -o >$latelist
-		rmdir "$latedir"
+		$trace rmdir "$latedir"
 
 		opts="'--include-from=$latelist' '--include=*/' '--exclude=*' --delete-excluded $opts"
 	    fi
 	fi
 
-	synccmd="$timelimit $rsync -rlHt \$rsopts $opts \$rszopt \$rsxopts \"\$host::\$rpath/.\" \"\$fpath/.\""
+	synccmd="$trace $timelimit $rsync -rlHt \$rsopts $opts \$rszopt \$rsxopts \"\$host::\$rpath/.\" \"\$fpath/.\""
 	;;
       http|ftp)
 	ncut=`IFS=/; set -- $rpath; echo $#`
-	synccmd="$timelimit wget --mirror -D \"\$host\" -L -nH --cut-dirs=$ncut -np -P \"\$fpath\" \"\$how://\$host/\$rpath\""
+	synccmd="$trace $timelimit wget --mirror -D \"\$host\" -L -nH --cut-dirs=$ncut -np -P \"\$fpath\" \"\$how://\$host/\$rpath\""
 	;;
       *)echo "$pfx: method \"$how\" not supported" >&2
 	xit=1
@@ -372,8 +375,8 @@ do
 	;;
     esac
 
-    eval "($tracecmd; $synccmd)" || xit=1
-    [ $latest ] && rm -f "$latelist"
+    eval "($synccmd)" || xit=1
+    [ $latest ] && $trace rm -f "$latelist"
 done
 
 exit $xit
