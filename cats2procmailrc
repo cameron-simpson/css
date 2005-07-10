@@ -1,4 +1,4 @@
-#!/usr/bin/perl
+#!/usr/bin/perl -w
 #
 # Convert my categories file to procmail recipes.
 #	- Cameron Simpson <cs@zip.com.au> 02mar2001
@@ -108,9 +108,16 @@ interpolate category files.
 
 Other lines are of the form:
 
-	[+][!]folder tag pattern
-	[+][!]who@where tag pattern
-	[+][!]|progname tag pattern
+	[+][!]target[,target...] tag pattern
+
+where each target has the form:
+
+	folder
+	who@where
+	|progname
+
+Multiple targets may be specified to file the message
+to multiple places for this rule.
 
 A leading plus sign (B<'+'>) means that this rule should be a continue rule,
 and not abort processing.
@@ -214,7 +221,7 @@ Cameron Simpson E<lt>cs@zip.com.auE<gt>
 ##BEGIN { use cs::DEBUG; cs::DEBUG::using(__FILE__);
 ##      }
 
-use strict vars;
+use strict qw(vars);
 use Getopt::Std;
 
 sub readcats($;$);
@@ -225,7 +232,8 @@ $::DfltSfx="";		# unix style by default
 $::DfltType=UNIX;	# unix style by default
 @::DfltDom=$ENV{MAILDOMAIN};
 undef $::DfltAlert;
-$::RcvStore='/usr/lib/nmh/rcvstore';	# path to MH rcvstore command
+##$::RcvStore='/usr/lib/nmh/rcvstore';	# path to MH rcvstore command
+$::TrackRules=1;
 
 ($::cmd=$0) =~ s:.*/::;
 $::Usage="Usage: $::cmd [-a alert] [-m domains] [-t {unix|mh|maildir}] <categories >procmailrc
@@ -290,14 +298,6 @@ $::Usage="Usage: $::cmd [-a alert] [-m domains] [-t {unix|mh|maildir}] <categori
 }
 
 $::_INCHANDLE="INCLUDE0";
-
-my $doalert;
-my $sfx;
-my $type;
-my $flags;
-my $deliver;
-my $cont;
-my $lockfile;
 
 readcats(STDIN);
 
@@ -364,37 +364,26 @@ sub readcats($;$)
       next CAT;
     }
 
-    # implicit lockfile by default
-    $lockfile='';
-
-    # leading "+" means continue after rule
-    $cont='';
-    if (/^\+\s*/)
-    { $cont='c';
-      $_=$';
-    }
-
-    # leading "!" means alert this message
-    $doalert=0;
-    if (/^\!\s*/)
-    { $doalert=1;
-      $_=$';
-
-      if (! defined $::DfltAlert || ! length $::DfltAlert)
-      { warn "$::cmd: line $.: no alert shell command defined!\n";
-	$doalert=0;
-      }
-    }
-
-    # we expect "mailbox tag rule"
-    if (! /^("[^"]*"|[^\s"]\S*)\s+(\S+)\s+(\S.*)/)
+    # we expect "[flags]mailboxes tag rule"
+    #       1      23                  4 5                        6       7
+    if (! /^([+!]*)(("[^"]*"|[^\s"]\S*)(,("[^"]*"|[^\s"]\S*))*)\s+(\S+)\s+(\S.*)/)
     { warn "$::cmd: stdin, line $.: bad line: $_\n";
       next CAT;
     }
 
-    my($folder,$key,$ptn)=($1,$2,$3);
-    $folder =~ s/^"(.*)"$/$1/;
-    $folder='attn' if $folder eq '.';
+    my($flags,$folders,$key,$ptn)=($1,$2,$6,$7);
+
+    # leading "+" means continue after rule
+    my $cont = (index($flags,'+') >= 0 ? 'c' : '');
+
+    # leading "!" means alert this message
+    my $doalert = (index($flags,'!') >= 0);
+    if ($doalert
+     && (! defined $::DfltAlert || ! length $::DfltAlert)
+       )
+    { warn "$::cmd: line $.: no alert shell command defined!\n";
+      $doalert=0;
+    }
 
     my @hdrs;
     if ($ptn eq '.')
@@ -432,72 +421,15 @@ sub readcats($;$)
       $ptn=".*$ptn";
     }
 
-    if ($folder =~ /^\|/)
-    { $deliver=($key eq '.' ? $folder : "$folder '$key'");
-      undef $lockfile;
-    }
-    elsif ($folder =~ /\@/)
-    { $deliver="! $folder";
-      undef $lockfile;
-    }
-    else
-    { $type=foldertype($folder);
-      
-## Cease use of rcvstore - supposedly procmail can do this without locks.
-##      if ($type eq MH)
-##      # procmail doesn't do .mh_sequences support
-##      { $deliver="| $::RcvStore +$folder -unseen";
-##	undef $lockfile; ## $lockfile="$ENV{MAILDIR}/$folder/.procmail-lock";
-##      }
-##      else
-      undef $lockfile;
-      { $sfx=typesfx($type);
-	$deliver="$folder$sfx";
-      }
-    }
-
-    $flags=($deliver =~ /^\|/ ? "w" : "");
-
-    print ": 0$cont\n";
+    print "\n: 0$cont\n";
     if (defined($ptn))
     { my $hregexp = altre(@hdrs);
       print "* ^$hregexp:$ptn\n";
     }
     print "{\n";
 
-    if ($::FolderDups && defined($lockfile) && $deliver !~ /^\!/)
-    {
-      my $cache = ( $type eq MH || $type eq MAILDIR
-		  ? "$ENV{MAILDIR}/$folder/.msgid.cache"
-		  : "$ENV{MAILDIR}/.msgid.cache-$folder"
-		  );
-      print <<X
-
-  :0 Wh: $cache.lock
-  | formail -D 819200 $cache
-X
-      ;
-    }
-
     if ($::TrackRules)
-    {
-      print <<X
-
-  :0whf
-  | formail -f -A 'X-Cats2Procmailrc-Matching-Rule: $rule'
-X
-      ;
-    }
-
-    if ($doalert)
-    { my $alertfn = $::DfltAlert;
-      $alertfn =~ s/\%/$folder/g;
-      print <<X
-
-  :0hc
-  | $alertfn
-X
-      ;
+    { print "  :0whf\n  | formail -f -A 'X-Cats2Procmailrc-Matching-Rule: $rule'\n";
     }
 
     if ($key ne '.')
@@ -515,7 +447,6 @@ X
       else
       {
 	print <<X
-
   :0whf
   | sed -e 's/^Subject: *\\[[^ ]*\\] */Subject: /' -e 's/^Subject: *[Rr][Ee] *: *\\[[^ ]*\\] */Subject: Re: /' -e 's/^Subject:/& [$key]/'
 X
@@ -523,22 +454,75 @@ X
       }
     }
 
-    if (defined $lockfile)
-    { $flags.=":$lockfile";
+    FOLDER:
+    while (length($folders))
+    {
+      my $folder;
+
+      if ($folders =~ /^"([^"]*)",*/)
+      { $folder=$1;
+	$folders=$';
+      }
+      elsif ($folders =~ /^([^,\s"]+),*/)
+      { $folder=$1;
+	$folders=$';
+      }
+      else
+      { $folders =~ /^([^,]*),*/;
+	$folder=$1;
+	$folders=$';
+	if (length $folder)
+	{ warn "$::cmd: unparsable folder: $folder\n";
+	}
+	next FOLDER;
+      }
+      # transmute "." into "attn"
+      $folder='attn' if $folder eq '.';
+
+      my $deliver;
+      my $type;
+
+      if ($folder =~ /^\|/)
+      { $type=PIPE;
+	$deliver=($key eq '.' ? $folder : "$folder '$key'");
+      }
+      elsif ($folder =~ /\@/)
+      { $type=EMAIL;
+	$deliver="! $folder";
+      }
+      else
+      { $type=foldertype($folder);
+	$deliver=$folder.typesfx($type);
+      }
+
+      # wait for delivery to programs
+      my $flags = ($deliver =~ /^\|/ ? "w" : "");
+      if (length $folders) { $flags.='c'; }
+
+      print "\n  :0$flags\n  {\n";
+
+      if ($doalert)
+      { my $alertfn = $::DfltAlert;
+	$alertfn =~ s/\%/$folder/g;
+	print "    :0hc\n    | $alertfn\n\n";
+      }
+
+      # duplicate stripping
+      if ($::FolderDups && $deliver !~ /^\!/)
+      {
+	my $cache = ( $type eq MH || $type eq MAILDIR
+		    ? "$ENV{MAILDIR}/$folder/.msgid.cache"
+		    : "$ENV{MAILDIR}/.msgid.cache-$folder"
+		    );
+	print "    :0 Wh: $cache.lock\n    | formail -D 819200 $cache\n";
+      }
+
+      print "    :0\n    $deliver\n";
+
+      print "  }\n";
     }
 
-    print <<X
-
-  : 0$flags
-  $deliver
-X
-    ;
-
-    print <<X
-}
-
-X
-    ;
+    print "}\n";
   }
 }
 
