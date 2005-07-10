@@ -197,7 +197,8 @@ case "$op" in
   #
   COMMENT)
 	[ $# = 0 ] || { echo "$cmd: $op: extra arguments: $*" >&2; exit 2; }
-	exec procmail "DEFAULT=$bugdir/mail/" /dev/null
+	procmail "DEFAULT=$bugdir/mail/" /dev/null || exit 1
+	find "$bugdir/mail/*/." -print | setperms 770
 	;;
   # =item B<GET> I<field>
   #
@@ -349,7 +350,7 @@ case "$op" in
 	    #
 	    COMMENTS)
 	      ncomments=`"$0" GET COMMENT:` || exit 1
-	      [ "$ncomments" = 0 ] && { echo "No comments."; continue; }
+	      [ "$ncomments" = 0 ] && { echo "No comments." >&4; continue; }
 	      n=0
 	      "$0" GET COMMENT-PATHS \
 	      | \
