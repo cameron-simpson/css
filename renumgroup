@@ -6,9 +6,11 @@
 
 groupfile=/etc/group
 trace=set-x
+yesmode=
+yflag=
 
 cmd=`basename "$0"`
-usage="Usage: $cmd [-f groupfile] groupname newgid"
+usage="Usage: $cmd [-y] [-f groupfile] groupname newgid"
 
 badopts=
 
@@ -84,7 +86,7 @@ fi
 
 $trace bsed "/^$groupname:[^:]*:$oldgid:/{
 		h
-		s/:/-oldgid:/
+		s/:/-old$oldgid:/
 		x
 		s/^\\($groupname:[^:]*\\):$oldgid:/\\1:$newgid:/
 		x
