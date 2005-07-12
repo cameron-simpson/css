@@ -122,6 +122,7 @@ if ($copyout)
   }
   shutdown($CONN->Sink()->{IO},1);
   shutdown(STDIN,0);
+  close(LOGIN) if defined $logto;
 }
 else
 # child, copy to stdout
@@ -136,6 +137,7 @@ else
   ##::need(cs::Hier);warn "CONN=".cs::Hier::h2a($CONN,1);
   shutdown($CONN->Source()->{IO},0);
   if ($killreader) { kill(15, $mainpid); }
+  close(LOGOUT) if defined $logto;
 }
 
 exit 0;
