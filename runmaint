@@ -120,9 +120,10 @@
 : ${RUNMAINT_DIR:=/opt/runmaint}
 MaintDir=$RUNMAINT_DIR
 : ${SYSTEMID:=localdomain}
+: ${USER:=`whoami || id -un`}
 : ${HOST:=`hostname`}
 case $HOST in *.*) HOST=`expr "x$HOST" : 'x\([^.]*\)\..*'` ;; esac
-export HOST SYSTEMID
+export USER HOST SYSTEMID
 
 USER=${USER:-$LOGNAME}; export USER
 [ -n "$USER" ] || { echo "$0: no \$USER or \$LOGNAME, bailing out" >&2
@@ -173,7 +174,7 @@ badopts=
 args=$*
 
 trace= xflag= traceon=: traceoff=:
-subj=runmaint@$HOST
+subj="runmaint: $USER@$HOST"
 datestr=
 
 #
