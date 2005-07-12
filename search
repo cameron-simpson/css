@@ -15,6 +15,12 @@ then
   badopts=1
 else
   engines=$1; shift
+
+  if [ $# = 0 ] && [ -n "$DISPLAY" ]
+  then
+    set -- `xclip -o` || exit 1
+  fi
+
   [ $# = 0 ] && { echo "$cmd: missing query" >&2; badopts=1; }
 fi
 
