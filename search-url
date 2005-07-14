@@ -113,6 +113,7 @@ case `echo "$engine" | tr '[a-z]' '[A-Z]'` in
   THROUGHPUT)	url=http://throughput.de/index.php?btaction=btsearch\&page=torrent-search\&keywords=$query\&nres=$maxhits#results ;;
   TORRENTREACTOR) url=http://www.torrentreactor.net/search.php?search=\&words=$query\&cid=\&B1.x=0\&B1.y=0 ;;
   TORRENTSPY)	url=http://torrentspy.com/search.asp?query=$query\&submit.x=0\&submit.y=0 ;;
+  TORRENTTYPHOON) url=http://www.torrenttyphoon.com/default.aspx?q=$query\&cat=all ;;
   UNISCI)	url=http://unisci.com/cgi-local/AT-unisc1archives1search.cgi?sp=sp\&mode=simple\&search=$query ;;
   WEBCRAWLER)	url=http://www.webcrawler.com/cgi-bin/WebQuery?mode=summaries\&maxhits=$maxhits\&searchText=$query ;;
   WEBSHOTS)	url=http://www.webshots.com/search/search.fcgi?words=$query\&x=0\&y=0 ;;
