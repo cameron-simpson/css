@@ -58,7 +58,7 @@ do
   else
     for port in $ports
     do
-      options=
+      options=weight=2
       if [ $isparent ]
       then  peertype=parent
       else  peertype=sibling
@@ -69,5 +69,13 @@ do
       fi
       echo "cache_peer $peer $peertype $port $icpport $options"
     done
+    if [ -s "$HOME/private/squid-peers" ]
+    then
+      for other in `awk '$1 == "acl" { print $2 }' "$HOME/private/squid-peers" | sort -u`
+      do
+	echo "cache_peer_access $peer deny $other"
+      done
+      echo cache_peer_access $peer allow all
+    fi
   fi
 done
