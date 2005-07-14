@@ -147,8 +147,8 @@ done
 #
 # If any B<I<server>::I<rootpfx>> or B<::I<rootpfx>> arguments are present,
 # act only on those lines in the configuration file.
-# I<rootpfx> may match any complete path component prefix
-# i.e. B<::foo> would match B<foo> and B<foo/bar> but not B<foobar>.
+# I<rootpfx> may match any complete local path component prefix
+# i.e. B<::foo> would match the local trees B<foo> and B<foo/bar> but not B<foobar>.
 #
 # =back
 #
