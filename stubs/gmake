@@ -3,7 +3,7 @@
 case $SYSTEMID-$ARCH in
     *-linux.*.linux)	gmake=/usr/bin/make ;;
     *-sun.*.solaris)	gmake=/opt/bin/gmake ;;
-    *)			echo "$0: where is gmake?" >&2; exit 1 ;;
+    *)			gmake=/usr/local/bin/gmake ;;
 esac
 
 if [ -t 1 ]
