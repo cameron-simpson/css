@@ -10,26 +10,31 @@ usage="Usage: $cmd [-f]"
 force=
 [ "x$1" = x-f ] && { force=1; shift; }
 
-if pid=`ifpid -v squid.pid`
-then  kill "$pid" || exit 1
-      sleep 2	# let it wake up and let go of sockets
+if ksquid -TERM
+then
+  sleep 2	# let it wake up and let go of sockets
 else
   [ $force ] || { echo "$cmd: no squid to kill, retry with -f option" >&2; exit 1; }
 fi
 
-## old proxy-mode redirector
+## old proxy-mode standalone redirector
 ##exec alog squid_redirect squid_redirect -P "8080:$SQUID"
 
 rc=$HOME/tmp/squid.conf$$
 pidf=$HOME/var/run/squid.pid-$$
 env SQUID_PIDFILE=$pidf envsub -p '\{\{([A-Z]\w*)\}\}' <"$HOME/rc/squid/tplt" >"$rc"
+
 mksquidpeers $SQUID_PEERS \
-| rlr -f '^##MKSQUIDPEERS OUTPUT BEGIN' -t '##MKSQUIDPEERS OUTPUT END' -i "$rc" -o "$rc" -
+| rlr -f '^##MKSQUIDPEERS OUTPUT BEGIN' -t '^##MKSQUIDPEERS OUTPUT END' -i "$rc" -o "$rc" -
+cat $HOME/private/squid-peers \
+| rlr -f '^##CUSTOM PEERS BEGIN' -t '^##CUSTOM PEERS END' -i "$rc" -o "$rc" -
+
 case "$LOCATION" in
-    sco)		bsed -e 's/^never_direct/##&/' \
-			 -e 's/^cache_peer/##&/' "$rc"
-		    ;;
-    *)		;;
+    sco)
+      bsed -e 's/^never_direct/##&/' \
+	   -e 's/^cache_peer/##&/' "$rc"
+      ;;
+    *);;
 esac
 set -x
 rm -f $HOME/var/run/squid.pid
