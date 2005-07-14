@@ -69,15 +69,17 @@ do
       srcfile=$srcdir/$srcbase
     fi
 
-    # now record the path
+    # now record the path in the md5-based cache file
     if [ -s "$cachefile" ]
     then
+      # prepend to existing list
       if bsed -s "1i\\
 $srcfile" "$cachefile"
       then
 	[ $keepfirst ] && { keepfirst "$cachefile" || xit=1; }
       fi
     else
+      # new cache map - just make it
       printf '%s\n' "$srcfile" >>"$cachefile"
     fi
 
