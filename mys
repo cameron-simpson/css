@@ -5,14 +5,17 @@
 #
 
 cmd=$0
-usage="Usage: $cmd [@where] [dbname]"
+usage="Usage: $cmd [-x] [@where] [dbname]"
 
 PATH=$PATH:/usr/local/mysql/bin
 export PATH
 
+trace=
 pfx=root
 db=
 where=
+
+[ $# -gt 0 ] && [ "x$1" = x-x ] && { shift; trace-set-x; }
 
 if [ $# -gt 0 ]
 then
@@ -35,4 +38,4 @@ else
   eval "$secret" || exit 1
 fi
 
-exec mysql "-h$secretHOST" "-u$secretLOGIN" "-p$secretPASSWORD" $db
+exec $trace mysql "-h$secretHOST" "-u$secretLOGIN" "-p$secretPASSWORD" $db
