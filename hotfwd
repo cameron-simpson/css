@@ -1,0 +1,125 @@
+#!/bin/sh -u
+#
+# Fire up port forwarding ssh on demand.
+# To be run as handler for tcpio to forward traffic as needed.
+#	- Cameron Simpson <cs@zip.com.au> 16jul2005
+#
+
+: ${HOSTNAME:=`hostname`}
+: ${LOCKDIR:=$HOME/var/locks}
+
+trace=set-x
+pingsleep=10
+
+cmd=$0
+usage="Usage: $cmd [-l location:rhost:rport] localport fwdsite sshopts..."
+
+badopts=
+
+if [ $# -gt 0 ] && [ "x$1" = x-l ]
+then
+  locarg=$2
+  shift; shift
+  case "$locarg" in
+    *:*:*)
+      location=`expr "x$logarg" : 'x\([^:]*\):.*'`
+      rhost=`expr "x$logarg" : 'x[^:]*:\([^:]*\):.*'`
+      rport=`expr "x$logarg" : 'x[^:]*:[^:]*:\(.*\)'`
+      ;;
+    *)echo "$cmd: bad argument to -l: $locarg" >&2
+      badopts=1
+      ;;
+  esac
+fi
+
+if [ $# -ge 3 ]
+then
+  localport=$1
+  fwdsite=$2;
+  shift; shift
+else
+  echo "$cmd: expected localport fwdsite sshopts, found: $*" >&2
+  badopts=1
+fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+# on site? no tunnel needed
+[ -n "$location" ] && [ "x$location" = "x$LOCATION" ] && exec $trace tcpio -k "$rhost" "$rport"
+
+# getlock [-p pid] name
+getlock()
+{
+  lockpid=$$
+  [ $# -gt 0 ] && [ "x$1" = x-p ] && { shift; lockpid=$1; shift; }
+  [ $# = 1 ] || { echo "$cmd: Usage: getlock [-p pid] name" >&2; return 2; }
+  lockname=$1; shift
+
+  lockdir=$LOCKDIR/hotfwd-$lockname
+  while :
+  do  $trace mkdir "$lockdir" 2>/dev/null && break
+      sleep 1 || return 1
+  done
+  echo "$lockpid $HOSTNAME" >"$lockdir/info"
+}
+# freelock name
+freelock()
+{
+  [ $# = 1 ] || { echo "$cmd: Usage: freelock name" >&2; return 2; }
+  lockname=$1; shift
+
+  lockdir=$LOCKDIR/hotfwd-$lockname
+  [ -d "$lockdir/." ] || return 1
+  $trace rm -r "$lockdir"
+}
+# locked name
+locked()
+{
+  [ $# = 1 ] || { echo "$cmd: Usage: freelock name" >&2; return 2; }
+  lockname=$1; shift
+
+  lockdir=$LOCKDIR/hotfwd-$lockname
+  $trace [ -d "$lockdir/." ]
+}
+
+# portfwd active? just use it!
+locked "portfwd-$fwdsite" && exec $trace tcpio -k localhost "$localport"
+
+# fire up portfwd then use it
+getlock "testfwd-$fwdsite" || exit 1
+locked "portfwd-$fwdsite" \
+|| \
+(
+  getlock "portfwd-$fwdsite" || { freelock "test-$fwdsite"
+				  exit 1
+				}
+
+  getlock "wait-$fwdsite" || { freelock "test-$fwdsite"
+			       freelock "portfwd-$fwdsite"
+			       exit 1
+			     }
+
+  ( exec </dev/null
+    while locked "portfwd-$fwdsite"
+    do    echo . || break
+	  sleep $pingsleep
+    done
+  ) \
+  | $trace ssh "$@" "$fwdsite" 'while read ping; do echo .; done' \
+  | \
+  ( exec >/dev/null
+    while read ack
+    do    locked "wait-$fwdsite" && freelock "wait-$fwdsite"
+    done
+    locked "wait-$fwdsite" && freelock "wait-$fwdsite"
+    freelock "portfwd-$fwdsite"
+  ) \
+  &
+
+  while locked "wait-$fwdsite"
+  do  sleep 1
+  done
+)
+freelock "test-$fwdsite"
+
+exec $trace tcpio -k localhost "$localport"
