@@ -1,0 +1,38 @@
+#!/bin/sh
+#
+# Check currency of a lock. Presumes the lock is local (the pid is checked).
+#	- Cameron Simpson <cs@zip.com.au> 15jul2005
+#
+
+: ${LOCKDIR:=$HOME/var/locks}
+: ${HOSTNAME:=`hostname`}
+export LOCKDIR HOSTNAME
+
+cmd=`basename "$0"`
+usage="Usage: $cmd lock"
+
+badopts=
+
+if [ $# = 0 ]
+then
+  echo "$cmd: missing lock" >&2
+  badopts=1
+else
+  lock=$1
+  shift
+  [ $# = 0 ] || { echo "$cmd: extra arguments after lock: $*" >&2
+		  badopts=1
+		}
+fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+cd "$LOCKDIR" || exit 1
+
+info=$lock/info
+
+[ -d "$lock/." ] \
+&& [ -s "$info" ] \
+&& read pid hostname <"$info" \
+&& [ "x$hostname" = "x$HOSTNAME" ] \
+&& kill -0 "$pid" >/dev/null
