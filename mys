@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/sh -u
 #
 # Connect to default MySQL database.
 #	- Cameron Simpson <cs@zip.com.au>
@@ -15,7 +15,7 @@ pfx=root
 db=
 where=
 
-[ $# -gt 0 ] && [ "x$1" = x-x ] && { shift; trace-set-x; }
+[ $# -gt 0 ] && [ "x$1" = x-x ] && { shift; trace=set-x; }
 
 if [ $# -gt 0 ]
 then
