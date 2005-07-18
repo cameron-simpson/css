@@ -42,7 +42,7 @@ sub quote
   local($_);
 
   for (@args)
-  { if (! length || /[^-\w.]/)
+  { if (! length || m([^-\w.:/]))
     { s/'/$&\\$&$&/g;
       $_="'$_'";
     }
