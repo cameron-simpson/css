@@ -14,7 +14,8 @@ topt=
 cmd=`basename "$0"` || cmd=$0
 usage="Usage: $cmd [ssh-options...] [sshcfg=value...] [user@]host[![user2@]host2...] [command ...]
 	ssh-options...	Passed to all ssh commands.
-	sshcfg=value	Transmuted to -o 'sshcfg value' and added to ssh-option."
+	sshcfg=value	Transmuted to -o 'sshcfg value' and added to ssh-option.
+	-z, +z		Pass -o Compression yes/no to ssh."
 
 set -- $SSHTO_OPTS ${1+"$@"}
 
@@ -36,6 +37,8 @@ do
     	sshopts="$sshopts $1 "`shqstr "$2"`
 	shift
 	;;
+    -z)	sshopts="$sshopts -o 'Compression yes'" ;;
+    +z)	sshopts="$sshopts -o 'Compression no'" ;;
     [a-zA-Z]*=?*)
 	[ $havehost ] && break	# not supported after host - it's the shell command now
 	cfg=`expr "$1" : '\([^=]*\)=.*'`
