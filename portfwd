@@ -14,10 +14,3 @@ case "$HOST.$SYSTEMID@$LOCATION" in
 #	       exec x2x -north -to localhost:9'
     ;;
 esac
-
-if [ "$LOCATION" != home ]
-then
-    alog portfwd lock -1 portfwd-home \
-	sh -c 'set -x
-	       exec ssh -g -L 8081:localhost:8080 -L 1143:mail.zip.com.au:143 -L 1110:mail.zip.com.au:110 home "while sleep 60; do :; done"'
-fi
