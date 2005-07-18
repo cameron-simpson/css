@@ -7,6 +7,7 @@
 
 : ${HOSTNAME:=`hostname`}
 : ${LOCKDIR:=$HOME/var/locks}
+: ${ENVFILES:="/etc/rc.mobile/env.sh $HOME/var/env.sh"}
 
 trace=set-x
 pingsleep=10
@@ -43,6 +44,11 @@ else
 fi
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+# see if we've been teleported
+for envfile in $ENVFILES
+do  [ -s "$envfile" ] && . "$envfile"
+done
 
 # on site? no tunnel needed
 [ -n "$location" ] && [ "x$location" = "x$LOCATION" ] && exec $trace tcpio -k "$rhost" "$rport"
