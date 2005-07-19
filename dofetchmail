@@ -94,7 +94,10 @@ do
       $fmopts "$fmhost" \
 
   echo "`date`: $*" >>"$FM_LOGFILE"
+  killpidfile -STOP getmail_flush.pid
   $trace "$@" || xit=1
+  killpidfile -CONT getmail_flush.pid
+  killpidfile getmail_flush.pid
 done
 
 exit $xit
