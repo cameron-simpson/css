@@ -102,12 +102,20 @@ locked "tunnel-$fwdsite" \
 			       }
 
     ( exec </dev/null
+      oldloc=$LOCATION
       while :
       do    echo . || break
 	    sleep $pingsleep || break
+
+	    # see if we've been teleported
+	    # end tunnel if so
+	    for envfile in $ENVFILES
+	    do  [ -s "$envfile" ] && . "$envfile"
+	    done
+	    [ "x$LOCATION" = "x$oldloc" ] || break
       done
     ) \
-    | $trace ssh "$@" "$fwdsite" 'while read ping; do echo .; done' \
+    | $trace bgproc -s -i - -l - -p "$HOME/.hotfwd-$fwdsite.pid" ssh "$@" "$fwdsite" 'while read ping; do echo .; done' \
     | \
     ( exec >&2
       if read ack && getlock "tunnel-$fwdsite"
