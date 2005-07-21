@@ -152,6 +152,7 @@ done
 #
 # =back
 #
+mirrorlist=$*
 
 [ -d "$where/." ] || { echo "$cmd: directory \"$where\" missing" >&2
 		       badopts=1
@@ -180,14 +181,24 @@ timelimit=
 #
 # sets the umask for the script as specified (see umask(1)).
 # A typical umask for a public mirror with a group of people
-# who may maintain it would be 2.
+# who may maintain it would be B<002>.
 #
-# Other lines are of the form:
+# Other lines specify datasets to mirror
+# and take the forms:
 #
 #	[I<method>] I<server> I<root> [I<localroot>] [I<options>...]
 #
-# If omitted, I<method> defaults to B<rsync>
-# (and in consequence I<server> should be a FQDN so that it does not resemble a I<method> name).
+# or
+#
+#	I<URL> [I<localroot>] [I<options>...]
+#
+# The latter format is preferred, and takes a URL of the form:
+#
+#	I<method>://I<server>/I<root>
+#
+# In the former format
+# an omitted I<method> defaults to B<rsync>.
+# In consequence, I<server> should be a FQDN so that it does not resemble a I<method> name.
 # The other methods known are B<http> and B<ftp>, for which the wget(1) command is used
 # in mirror mode.
 #
@@ -205,10 +216,10 @@ timelimit=
 # If I<localroot> does not commence with a slash (B</>)
 # it is taken relative to I<dir>.
 #
-# Options specific to this particular line
-# may then follow, typically I<rsync>'s B<--include=> and B<--exclude=>
-# options
-# or wgte(1)'s B<--accept> and B<--reject> options.
+# I<Option>s specific to this particular line
+# may then follow,
+# typically I<rsync>'s B<--include=> and B<--exclude=> options
+# or wget(1)'s B<--accept> and B<--reject> options.
 #
 # For the B<rsync> method, the special option B<--latest>
 # may be specified as the first of these options;
@@ -223,79 +234,99 @@ timelimit=
 
 xit=0
 lineno=0
-while read how host rpath lpath opts
+found=
+##while read how host rpath lpath opts
+while read words
 do
+    set -- $words
+
     lineno=`expr $lineno + 1`
     pfx="$cmd: $cf, line $lineno"
 
-    case "$how" in
-      # skip comments and blanks
-      ''|\#*)	continue ;;
+    # skip comments and blanks
+    [ $# = 0 ] && continue
+    case "$1" in
+      \#*)	continue ;;
+    esac
 
+    pfx="$pfx: $1"
+
+    if [ "x$1" = xumask ]
+    then
       # set umask - 002 is a common choice
-      umask)	if [ -z "$host" ]
-		then  echo "$pfx: missing umask value" >&2
-		      continue
-		fi
-		if [ -n "$rpath" ]
-		then  echo "$pfx: extra arguments after umask value: $rpath $lpath $opts" >&2
-		      continue
-		fi
-		[ $verbose ] && echo "umask $host"
-		umask $host
-		continue
-		;;
+      if [ $# -gt 2 ]
+      then
+	echo "$pfx: missing umask value" >&2
+	continue
+      fi
+
+      if [ $# -gt 2 ]
+      then
+	echo "$pfx: extra arguments after umask value: $rpath $lpath $opts" >&2
+	continue
+      fi
+
+      [ $verbose ] && echo "umask $2"
+      umask "$2"
+      continue
+    fi
+
+    # see if we were given a URL
+    case "$1" in
+      http://* | ftp://* | rsync://* )
+	how=`expr "$1" : '\([^:]*\)://.*'`
+	host=`expr "$1" : '[^:]*://\([^/]*\)/.*'`
+	rpath=`expr "$1" : '[^:]*://[^/]*\(/.*\)'`
+	shift
+	;;
+
+      *.*)
+	how=rsync
+	host=$1
+	rpath=$2
+	shift; shift
+	;;
+      *)
+	how=$1
+	host=$2
+	rpath=$3
+	shift; shift; shift
+	;;
     esac
 
-    # see if "rsync" default method omitted
-    case "$how" in
-	*.*)	opts="$lpath $opts"
-		lpath=$rpath
-		rpath=$host
-		host=$how
-		how=rsync
-		;;
-    esac
-
-    # see if lpath omitted
-    case "$lpath" in
-      -*)	opts="$lpath $opts"
-		lpath= ;;
-      ?*)	;;
-    esac
-
-    # special option "--latest" - must be first
-    case "$opts" in
-	--latest|--latest\ *)
-	    latest=1
-	    opts=`expr "x$opts" : 'x--latest *\(.*\)'`
-	    ;;
-	*)  latest=
-	    ;;
-    esac
-
-    # lpath == rpath, normally
-    [ "x$lpath" = x ] && lpath=$rpath
-
-    # check if only doing some mirrors
     if [ $# -gt 0 ]
     then
+      case "$1" in
+	-*)	lpath=`basename "$rpath"` || exit 1 ;;
+	*)	lpath=$1; shift ;;
+      esac
+    fi
+
+    # special option "--latest" - must be first
+    latest=
+    [ $# -gt 0 ] && [ "x$1" = x--latest ] && { latest=1; shift; }
+
+    # lpath == rpath, normally
+    [ -n "$lpath" ] || lpath=$rpath
+
+    # check if only doing some mirrors
+    if [ -n "$mirrorlist" ]
+    then
       yep=
-      for arg
-      do  case "$host::$lpath" in
-	      "$arg" | "$arg"/* )
-		yep=1; break ;;
-	  esac
-	  case "::$lpath" in
-	      "$arg" | "$arg"/* )
-		yep=1; break ;;
-	  esac
+      for arg in $mirrorlist
+      do
+	case "$host::$lpath" in
+	  "$arg" | "$arg"/* )
+	    yep=1; break ;;
+	esac
+	case "::$lpath" in
+	  "$arg" | "$arg"/* )
+	    yep=1; break ;;
+	esac
       done
-      if [ -z "$yep" ]
-      then
-	  [ $verbose ] && echo "$pfx: skipping $host::$rpath"
-	  continue
-      fi
+      [ "$yep" ] || { [ $verbose ] && echo "$pfx: skipping $host::$rpath"
+		      continue
+		    }
     fi
 
     # compute full path
@@ -345,8 +376,8 @@ do
     extracf=$cf-$how-$host-`echo $rpath|tr / :`
     case $how in
       rsync)
-	[ -s "$allcf" ] && opts='"--include-from=$allcf" '$opts
-	[ -s "$extracf" ] && opts='"--include-from=$extracf" '$opts
+	[ -s "$allcf" ] && set -- "--include-from=$allcf" ${1+"$@"}
+	[ -s "$extracf" ] && set -- "--include-from=$extracf" ${1+"$@"}
 
 	if [ $latest ]
 	then
@@ -354,20 +385,20 @@ do
 	    latedir=$TMPDIR/latest$$
 	    if $trace mkdir "$latedir"
 	    then
-		eval "$trace rsync -n -rlHt \$rsopts $opts \"\$host::\$rpath/.\" \"\$latedir/.\"" \
+		$trace rsync -n -rlHt $rsopts ${1+"$@"} "$host::$rpath/." "$latedir/." \
 		| fgrep -v ' -> ' \
 		| latest -V -o >$latelist
 		$trace rmdir "$latedir"
 
-		opts="'--include-from=$latelist' '--include=*/' '--exclude=*' --delete-excluded $opts"
+		set -- "--include-from=$latelist" '--include=*/' '--exclude=*' --delete-excluded ${1+"$@"}
 	    fi
 	fi
 
-	synccmd="$trace $timelimit $rsync -rlHt \$rsopts $opts \$rszopt \$rsxopts \"\$host::\$rpath/.\" \"\$fpath/.\""
+	set -- $rsync -rlHt $rsopts ${1+"$@"} $rszopt $rsxopts "$host::$rpath/." "$fpath/."
 	;;
       http|ftp)
 	ncut=`IFS=/; set -- $rpath; echo $#`
-	synccmd="$trace $timelimit wget --mirror -D \"\$host\" -L -nH --cut-dirs=$ncut -np -P \"\$fpath\" \"\$how://\$host/\$rpath\""
+	set -- wget --mirror -D "$host" -L -nH "--cut-dirs=$ncut" -np -P "$fpath" "$how://$host/$rpath"
 	;;
       *)echo "$pfx: method \"$how\" not supported" >&2
 	xit=1
@@ -375,9 +406,12 @@ do
 	;;
     esac
 
-    eval "($synccmd)" || xit=1
+    found=1
+    $trace $timelimit "$@" || xit=1
     [ $latest ] && $trace rm -f "$latelist"
 done
+
+[ $found ] || { echo "$cmd: nothing to mirror?" >&2; xit=1; }
 
 exit $xit
 
@@ -395,7 +429,7 @@ exit $xit
 #
 #	rsync mirror.aarnet.edu.au::
 #
-# (That's a command, not a line from the B<.mirror> file).
+# (That's a shell command, not a line from the B<.mirror> file).
 # You can then check out what's inside by putting a simple
 # line in your B<.mirror> file:
 #
@@ -407,6 +441,7 @@ exit $xit
 #
 # which runs a verbose no-action run of just that line.
 # Examine the output and start tuning your include/exclude list.
+#
 # For anything complex you'll probably want to make a per-mirror
 # config file, which for the above example would be named:
 #
