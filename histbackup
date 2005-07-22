@@ -104,11 +104,13 @@ usage="Usage:
 			and report its basename.
 	--rsync-path rrsync Execute the command \"rrsync\" as the remote rsync.
 			Passed to rsync.
-	--symlink name	Make a symlink named \"name\" pointing at the latest backup."
+	--symlink name	Make a symlink named \"name\" pointing at the latest backup.
+			Default: LATEST
+			Use the empty string for no symlink."
 
 badopts=
 trace=
-symlink=
+symlink=LATEST
 src=
 dest=
 mono=
@@ -358,7 +360,7 @@ else
     fi
 fi
 
-if [ -d "$dest/$thisbackup/." -a -z "$linkonly" -a -n "$symlink" ]
+if [ -d "$dest/$thisbackup/." -a -n "$symlink" ]
 then
     ( cd "$dest" || exit 1
       rm -f "$symlink"
