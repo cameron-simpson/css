@@ -115,7 +115,8 @@
 #
 #	http://www.cskk.ezoshosting.com/cs/syncopt/
 #
-# If not set, runmaint attempts to deduce it.
+# If not set, runmaint attempts to guess it.
+#
 
 : ${RUNMAINT_DIR:=/opt/runmaint}
 MaintDir=$RUNMAINT_DIR
@@ -147,6 +148,13 @@ MaintScripts=$RUNMAINT_SCRIPTS
 export RUNMAINT_DIR MaintDir \
        RUNMAINT_SCRIPTS MaintScripts \
        RUNMAINT RunMaint
+
+: ${OPTCSS:=/opt/css}
+export OPTCSS
+if [ -s "$OPTCSS/env.sh" ]
+then  . "$OPTCSS/env.sh"
+else  echo "$0: warning: no $OPTCSS/env.sh" >&2
+fi
 
 usage="Usage: $0 [-d dir] [-s subj] [-date datestr] [-x] target [addresses]
     See:
@@ -372,7 +380,6 @@ runscript()
 	  exec mailif -s "$_rs_subj" $_rs_addrs ;;
     esac
 
-  return 0
 }
 
 for script in $try
