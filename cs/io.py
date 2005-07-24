@@ -1,5 +1,9 @@
+import os
 import string
 from StringIO import StringIO
+
+def loadfile(path):
+  return file(path).read()
 
 """ read a line which may be continued with leading whitespace """
 def readcontline(fp):
