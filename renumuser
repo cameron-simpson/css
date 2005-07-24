@@ -92,8 +92,13 @@ fi
 
 if [ $dogrprenum ] && grep "^[^:]*:[^:]*:$newuid:" "$groupfile"
 then
-  echo "$cmd: $groupfile: existing group above conflicts with new uid $newuid for $login" >&2
-  exit 1
+  if grep "^$login:[^:]*:$newuid:" "$groupfile" >/dev/null
+  then
+    dogrprenum=
+  else
+    echo "$cmd: $groupfile: existing group above conflicts with new uid $newuid for $login" >&2
+    exit 1
+  fi
 fi
 
 $trace bsed "/^$login:[^:]*:$olduid:/{
@@ -106,7 +111,7 @@ $trace bsed "/^$login:[^:]*:$olduid:/{
 	     }" "$passwd" \
 || exit 1
 
-{ [ $dogrprenum ] && renumgroup $yflag -f "$groupfile" "$login" "$newuid"; } \
+{ [ -z "$dogrprenum" ] || renumgroup $yflag -f "$groupfile" "$login" "$newuid"; } \
 || exit 1
 
 echo pwconv
