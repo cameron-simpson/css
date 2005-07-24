@@ -7,7 +7,7 @@
 
 : ${SSHTO_OPTS:=''}
 
-trace=set-x
+trace=	##set-x
 sshopts=
 topt=
 
