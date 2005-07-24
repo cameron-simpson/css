@@ -1,0 +1,81 @@
+#!/bin/sh
+#
+# Read passwd style lines from stdin, check uid and gid against /etc/passwd and /etc/group.
+#	- Cameron Simpson <cs@zip.com.au> 24jul2005
+#
+
+passwd=/etc/passwd
+group=/etc/group
+
+cmd=`basename "$0"`
+usage="Usage: $cmd"
+
+badopts=
+
+[ $# = 0 ] || { echo "$cmd: extra arguments: $*" >&2; badopts=1; }
+
+[ -f "$passwd" -a -s "$passwd" ] || { echo "$cmd: $passwd: not a file" >&2
+				      badopts=1
+				    }
+[ -f "$group" -a -s "$group" ] || { echo "$cmd: $group: not a file" >&2
+				    badopts=1
+				  }
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+while oIFS=$IFS
+      IFS=: read login crypt uid gid gecos home shell || break
+      IFS=$oIFS
+do
+  gr_gid=
+  gr_group=
+  eval `awk -F: -v "gid=$gid" -v "login=$login" '$1 == login { print "gr_gid=" $3 }
+				   	         $3 == gid   { print "gr_group=" $1}' "$group"`
+  groupok=
+  # test the group using the desired gid
+  case "$gr_group" in
+    # gid in use by specified login - ok!
+    "$login")
+	groupok=1
+	;;
+    # gid not in use
+    '')	# test the gid in use by the specified group name
+	case "$gr_gid" in
+	  # group name not in use - add group
+	  '') echo groupadd -g "$gid" "$login" ;;
+	  # group name in use, but gid must differ
+	  *)  echo renumgroup -y -f "$group" "$login" "$gid" ;;
+	esac
+	;;
+    # gid taken by other group
+    *)	echo "$group: gid $gid taken by group $gr_group"
+	case "$gr_gid" in
+	  # name missing -> gid taken
+	  '') echo echo "$group: must add missing group $login after renumber of $gr_group" ;;
+	  *)  echo echo "$group: must renumber group $login after renumber of $gr_group" ;;
+	esac
+	;;
+  esac
+
+  pw_uid=
+  pw_login=
+  eval `awk -F: -v "uid=$uid" -v "login=$login" '$1 == login { print "pw_uid=" $3 " pw_gid=" $4 " pw_gecos='\''" $5 "'\''" }
+						 $3 == uid   { print "pw_login=" $1 }' "$passwd"`
+  # test the login using the desired uid
+  loginok=
+  case "$pw_login" in
+    # uid in use by specified login - ok!
+    "$login")
+	loginok=1
+	;;
+    # uid not in use
+    '') # test the uid in use by the specified login
+	case "$pw_uid" in
+	  # login name not in use - add it
+	  '')	echo adduser -g "$login" -u "$uid" -s /bin/false -c "'$gecos'" "$login" ;;
+	  # uid wrong, renumber
+	  *)	echo renumuser -y -f "$passwd" "$login" "$uid" ;;
+	esac
+	;;
+  esac
+done
