@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/sh -u
 #
 # Connect to my IMAP folder.
 #	- Cameron Simpson <cs@zip.com.au> 09sep2003
@@ -7,8 +7,9 @@
 cmd=`basename "$0"`
 usage="Usage: $cmd [[user:pass@]server]"
 
-server=zip.local	#mail.zipworld.com.au
+server=zipworld
 fmrc=$HOME/.fetchmailrc
+trace=set-x
 
 [ $# = 0 ] || { server=$1; shift; }
 
@@ -26,20 +27,15 @@ esac
 
 fm_user=
 fm_pass=
-eval `fetchmailclause -f "$fmrc" "$server" | sed 's/^\([^ ][^ ]*\) /fm_\1=/'`
-[ -n "$sv_user" ] && fm_user=$sv_user
-[ -n "$sv_pass" ] && fm_pass=$sv_pass
+fm_host=$server
+set -vx
+eval `fetchmailclause -f "$fmrc" "$server" | detab | sed -n 's/^\([^ ][^ ]*\) /sv_\1=/p'|tee /dev/tty`
+[ -n "${sv_user:=}" ] && fm_user=$sv_user
+[ -n "${sv_pass:=}" ] && fm_pass=$sv_pass
+[ -n "${sv_via:=}"  ] && fm_host=$sv_via
 
-tunnel=
-case "$server" in
-  mail.zipworld.com.au)
-    tunnel="sshb zip nc $server imap" ;;
-esac
-
-set -x
-exec + +s +t \
+exec $trace + +s +t \
 	-e "set imap_pass=\"$fm_pass\"" \
-	-e "set tunnel=\"$tunnel\"" \
 	--pre='set-x fmprod -STOP' \
 	--post='set-x fmprod -CONT' \
-	imap://$fm_user@$server/INBOX
+	imap://$fm_user@$fm_host/INBOX
