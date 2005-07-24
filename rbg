@@ -65,7 +65,7 @@ else
   for file
   do
     if [ $first ]; then first=; set --; fi
-    cfile=`filecache "$file"` || { allfiles= cfile=$file; }
+    cfile=`filecache "$file" 2>/dev/null` || { allfiles= cfile=$file; }
     set -- ${1+"$@"} "$cfile"
   done
 fi
