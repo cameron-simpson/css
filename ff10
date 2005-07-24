@@ -1,5 +1,6 @@
 #!/bin/sh
-exec /opt/firefox-1.0.4/firefox ${1+"$@"}
+exec /opt/firefox-1.0.6/firefox ${1+"$@"}
+##exec /opt/firefox-1.0.4/firefox ${1+"$@"}
 ##exec /usr/bin/firefox ${1+"$@"}
 ##exec /opt/firefox-1.0.1/firefox ${1+"$@"}
 ##exec /opt/firefox-1.0pr1.1-gtk2+xft/firefox ${1+"$@"}
