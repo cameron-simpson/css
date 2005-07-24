@@ -13,7 +13,7 @@
 #
 
 : ${TMPDIR:=/tmp}
-: ${CSBUG_ROOT:=$HOME/var/bugs}
+: ${CSBUG_ROOT:=$HOME/var/csbugs}
 : ${CSBUG_BUGNUM:=''}
 
 cmd=`basename "$0"` || cmd=$0
