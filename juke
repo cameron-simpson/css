@@ -136,7 +136,7 @@ do
 		runplayer
 		;;
 	*)
-		ptns=$line
+		ptns=`printf "%s\n" "$line" | tr '[A-Z]' '[a-z]'`
 		stopplayer
 		sleep 1
 		runplayer
