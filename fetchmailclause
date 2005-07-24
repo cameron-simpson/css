@@ -6,6 +6,7 @@
 #
 
 rc=$HOME/.fetchmailrc
+start=skip	# vs poll
 
 cmd=$0
 usage="Usage: $cmd [-f fetchmailrc] clause"
@@ -24,12 +25,21 @@ fi
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
-exec sed -e '
+set -x
+exec sed -ne '
+		y/	/ /
+	    '"	/^ *skip  *$clause/b start
+		/^ *poll  *$clause/b start
+		d
+		:start
+		n
 		y/	/ /
 		s/   */ /g
 		s/^ //
 		s/ $//
-		/^#/d
-		/^$/d
-	    '"	1,/^poll $clause\$/d
-		/^poll/,\$d" "$rc"
+		/^#/b start
+		/^$/b start
+		/^skip /d
+		/^poll /d
+		p
+		b start" "$rc"
