@@ -1,3 +1,10 @@
+# trim trailing newline if present, a la the perl func of the same name
+def chomp(s):
+  slen=len(s)
+  if slen > 0 and s[-1:] == '\n':
+    return s[:-1]
+  return s
+
 def index(seq,val):
   for i in xrange(len(seq)-1):
     if val == seq[i]: return i
