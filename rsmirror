@@ -235,9 +235,9 @@ timelimit=
 xit=0
 lineno=0
 found=
-##while read how host rpath lpath opts
 while read words
 do
+    unset how host rpath lpath
     set -- $words
 
     lineno=`expr $lineno + 1`
@@ -254,24 +254,26 @@ do
     if [ "x$1" = xumask ]
     then
       # set umask - 002 is a common choice
-      if [ $# -gt 2 ]
+      if [ $# -lt 2 ]
       then
 	echo "$pfx: missing umask value" >&2
 	continue
       fi
 
-      if [ $# -gt 2 ]
+      umask=$2; shift; shift
+
+      if [ $# -gt 0 ]
       then
-	echo "$pfx: extra arguments after umask value: $rpath $lpath $opts" >&2
+	echo "$pfx: extra arguments after umask value: $*" >&2
 	continue
       fi
 
-      [ $verbose ] && echo "umask $2"
-      umask "$2"
+      [ $verbose ] && echo "umask $umask"
+      umask "$umask"
       continue
     fi
 
-    # see if we were given a URL
+    lpath=
     case "$1" in
       http://* | ftp://* | rsync://* )
 	how=`expr "$1" : '\([^:]*\)://.*'`
@@ -297,7 +299,7 @@ do
     if [ $# -gt 0 ]
     then
       case "$1" in
-	-*)	lpath=`basename "$rpath"` || exit 1 ;;
+	-*)	;;
 	*)	lpath=$1; shift ;;
       esac
     fi
@@ -307,7 +309,7 @@ do
     [ $# -gt 0 ] && [ "x$1" = x--latest ] && { latest=1; shift; }
 
     # lpath == rpath, normally
-    [ -n "$lpath" ] || lpath=$rpath
+    [ -n "$lpath" ] || lpath=`basename "$rpath"` || exit 1
 
     # check if only doing some mirrors
     if [ -n "$mirrorlist" ]
