@@ -1,3 +1,10 @@
+import os
+import os.path
+import errno
+import sys
+import dircache
+import string
+
 # trim trailing newline if present, a la the perl func of the same name
 def chomp(s):
   slen=len(s)
@@ -13,6 +20,44 @@ def index(seq,val):
 def dict2ary(d,keylist=None):
   if keylist is None: keylist=sort(keys(d))
   return [ [k,d[k]] for k in keylist ]
+
+def mkdirn(path):
+  if len(path) == 0:
+    path='.'+os.sep
+
+  if path[-1:] == os.sep:
+    dir=path[:-1]
+    pfx=''
+  else:
+    dir=os.path.dirname(path)
+    pfx=os.path.basename(path)
+
+  if not os.path.isdir(dir):
+    return None
+
+  newn=1
+  pfxlen=len(pfx)
+  for base in dircache.listdir(dir):
+    if len(base) > pfxlen and base[:pfxlen] == pfx:
+      numeric=True
+      for c in base[pfxlen:]:
+	if c not in string.digits:
+	  numeric=False
+	  break
+      if numeric:
+	sfxval=int(base[pfxlen:])
+	if sfxval > newn:
+	  newn=sfxval
+
+  while True:
+    newn=newn+1
+    newpath=path+str(newn)
+    try:
+      os.mkdir(newpath)
+      return newpath
+    except OSError:
+      if sys.exc_value[0] == errno.EACCES:
+	return None
 
 # trivial wrapper for extension in subclasses
 class SeqWrapper:
