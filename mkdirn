@@ -1,69 +1,25 @@
-#!/bin/sh -u
+#!/usr/bin/python
 #
 # Make the next directory in a sequence.
-# Lifted from my cdfn shell function.
 #	- Cameron Simpson <cs@zip.com.au> 28jun2000
 #
 # Dash suffix if numeric prefix. - cameron 03sep2000
 # Limit on number of directory tries. - cameron 05sep2000
+# Move to python. - cameron, 25jul2005
 #
 
-cmd=$0
-usage="Usage: $cmd [-1] dirpfx"
+import sys
+import cs.misc
 
-startn=
-maxtries=20
+if len(sys.argv) != 2:
+  sys.stderr.write("Usage: mkdirn dirpfx\n")
+  sys.stderr.flush()
+  sys.exit(2)
 
-[ $# -gt 0 ] && [ "x$1" = x-1 ] && { startn=1 maxtries=1024; shift; }
-[ $# = 1 ] || { echo "$usage" >&2; exit 2; }
+dir=cs.misc.mkdirn(sys.argv[1])
+if dir is None:
+  sys.stderr.write("mkdirn: can't make next in sequence for prefix "+sys.argv[1]+"\n")
+  sys.stderr.flush()
+  sys.exit(1)
 
-pfx=$1
-case "$pfx" in
-  *[0-9]) pfx=$pfx- ;;
-  */)	  [ -d "$pfx/." ] || needdir "$pfx" || exit 1 ;;
-esac
-
-up=`dirname "$pfx"`
-needdir "$up" || exit 1
-base=`basename "$pfx"`
-
-# check out existing directories
-if [ -n "$startn" ]
-then
-    n=$startn
-else
-    n=`exec 2>/dev/null
-       cd "$up" || exit 1
-       ls \
-       | sed -n "/^$base"'0*[1-9][0-9]*/s/.*[^0-9]0*\([1-9][0-9]*\)$/\1/p' \
-       | sort -nr \
-       | sed 1q`
-
-    # nothing? start at 1
-    if [ -n "$n" ]
-    then
-	n=`expr $n + 1`
-    else
-	n=1
-    fi
-fi
-
-# scan for a new slot
-while ndir=$pfx$n
-      :
-do
-  if [ -d "$ndir/." ]
-  then  :
-  else  if mkdir "$ndir" 2>/dev/null
-	then  break
-	else  [ "$maxtries" -gt 1 ] || exit 1
-	      maxtries=`expr $maxtries - 1`
-	fi
-  fi
-
-  n=`expr $n + 1`
-  ## echo "[n=$n maxtries=$maxtries]" >&2
-done
-
-# report
-echo "$ndir"
+print dir
