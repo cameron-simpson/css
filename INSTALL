@@ -36,8 +36,8 @@ Installing my scripts:
     /opt/css/lib/cs/blah.pm. Alternatively (for Perl) you could just symlink
     from your site_perl dir:
 
-		cd /usr/lib/perl5/site_perl
-		ln -s /opt/css/lib/cs .
+	cd /usr/lib/perl5/site_perl
+	ln -s /opt/css/lib/cs .
 
     Several of the scripts expect the following shell environment variables:
 
