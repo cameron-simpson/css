@@ -15,10 +15,11 @@ usage="Usage: $cmd [fetchmail-options...]"
 eval "`syncenv -`"
 : ${FM_HOSTS:=`awk '$1 == "poll" { print $2 }' $HOME/.fetchmailrc`}
 : ${FM_IDLEDELAY:=1800}
-: ${FM_EXPUNGE:=512}
+: ${FM_EXPUNGE:=256}
 : ${FM_LOGFILE:=$LOGDIR/fetchmail}
 : ${FM_DELAY:=300}
 : ${FM_LIMIT:=''}
+: ${FM_OPTS:=''}
 
 fmlimit=$FM_LIMIT
 case "$LOCATION" in
@@ -28,7 +29,7 @@ case "$LOCATION" in
 esac
 necho `date`': ' >&2
 
-fmopts=
+fmopts=$FM_OPTS
 
 badopts=
 
