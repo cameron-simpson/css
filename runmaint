@@ -121,7 +121,9 @@
 : ${RUNMAINT_DIR:=/opt/runmaint}
 MaintDir=$RUNMAINT_DIR
 
-[ -s /opt/css/env.sh ] && . /opt/css/env.sh
+: ${OPTCSS:=/opt/css}
+export OPTCSS
+[ -s "$OPTCSS/env.sh" ] && . "$OPTCSS/env.sh"
 
 : ${SYSTEMID:=localdomain}
 : ${USER:=`whoami || id -un`}
