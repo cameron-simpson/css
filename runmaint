@@ -120,6 +120,9 @@
 
 : ${RUNMAINT_DIR:=/opt/runmaint}
 MaintDir=$RUNMAINT_DIR
+
+[ -s /opt/css/env.sh ] && . /opt/css/env.sh
+
 : ${SYSTEMID:=localdomain}
 : ${USER:=`whoami || id -un`}
 : ${HOST:=`hostname`}
