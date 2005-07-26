@@ -63,6 +63,11 @@ do
   case $1 in
     --)		shift; break ;;
     -e)		shift; break ;;
+    -c)		shcmd=$2; shift; shift
+		set -- ${1+"$@"} -e "${SHELL:-/bin/sh}" -c "$shcmd"
+		;;
+    -a)		async=1 ;;
+    +a)		async= ;;
     -l)		lock=$2; shift ;;
     -1)		lock1=$1 lock=$2; shift ;;
     -j)		WINJOB=$2; shift; export WINJOB ;;
@@ -71,11 +76,6 @@ do
     -sh)	shade=$2; shift ;;
     -iconic)	termopts="$termopts $1" ;;
     -fg|*,-bg)	termopts="$termopts $1 $2"; shift ;;
-    -c)		shcmd=$2; shift; shift
-		set -- ${1+"$@"} -e "${SHELL:-/bin/sh}" -c "$shcmd"
-		;;
-    -a)		async=1 ;;
-    +a)		async= ;;
     -v)		set -x ;;
     -w)		w=$2 ; shift ;;
     -h)		h=$2 ; shift ;;
