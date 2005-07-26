@@ -7,7 +7,8 @@
 : ${OPTCSS:=/opt/css}
 : ${HOSTNAME:=`hostname`}
 : ${HOST:=`echo "$HOSTNAME" | sed 's/\..*//'`}
-: ${HOSTDOMAIN=`echo "$HOSTNAME" | sed 's/[^.]*\.//'`}
+: ${HOSTDOMAIN:=`echo "$HOSTNAME" | sed 's/[^.]*\.//'`}
+[ -n "$HOSTDOMAIN" ] || HOSTDOMAIN=localdomain
 : ${USER:=`whoami`}
 : ${SITENAME:=$HOSTDOMAIN}
 : ${MAILDOMAIN:=$SITENAME}
