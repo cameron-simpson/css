@@ -92,11 +92,12 @@ do
       -e "$FM_EXPUNGE" \
       --logfile "$FM_LOGFILE" \
       --nobounce --tracepolls --warnings 86400 \
-      $fmopts "$fmhost" \
+      $fmopts
 
   echo "`date`: $*" >>"$FM_LOGFILE"
   killpidfile -STOP getmail_flush.pid
-  $trace "$@" || xit=1
+  $trace "$@" -l 65536 "$fmhost" || xit=1
+  $trace "$@" -B 100 "$fmhost" || xit=1
   killpidfile -CONT getmail_flush.pid
   killpidfile getmail_flush.pid
 done
