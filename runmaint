@@ -317,11 +317,12 @@ runpath()
   then
     ##echo "$_rp is a directory" >&2
     for _rp_f in "$_rp/"*
-    do  ##echo "dirscript $_rp_f ..." >&2
+    do  [ -f "$_rp_f" ] || continue
+	##echo "dirscript $_rp_f ..." >&2
 	runscript "$_rp_f" $_rp_addrs || _rp_xit=1
     done
   else
-    if [ -r "$_rp" ]
+    if [ -f "$_rp" ]
     then  ##echo "script $_rp ..." >&2
 	  runscript "$_rp" $_rp_addrs || _rp_xit=1
     fi
