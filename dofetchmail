@@ -96,7 +96,7 @@ do
 
   echo "`date`: $*" >>"$FM_LOGFILE"
   killpidfile -STOP getmail_flush.pid
-  $trace "$@" -l 65536 "$fmhost" || xit=1
+  $trace "$@" -e 512 -l 65536 "$fmhost" || xit=1
   $trace "$@" -B 100 "$fmhost" || xit=1
   killpidfile -CONT getmail_flush.pid
   killpidfile getmail_flush.pid
