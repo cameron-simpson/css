@@ -505,6 +505,9 @@ X
       { my $alertfn = $::DfltAlert;
 	$alertfn =~ s/\%/$folder/g;
 	print "    :0hc\n    | $alertfn\n\n";
+
+	# only alert on the first folder
+	$doalert=0;
       }
 
       # duplicate stripping
