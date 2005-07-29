@@ -1,4 +1,5 @@
 import re
+import string
 from cStringIO import StringIO
 
 sh_unsafe_re=re.compile(r'[^\-a-z0-9.]');
@@ -28,3 +29,6 @@ def quotestr(s):
 
   qs.write("'")
   return qs.getvalue()
+
+def vpopen(argv,mode='r',bufsize=-1):
+  return os.popen(string.join(quote(argv)),mode,bufsize)
