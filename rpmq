@@ -1,0 +1,6 @@
+#!/bin/sh
+#
+# Invoke rpm -q with useful package names.
+#	- Cameron Simpson <cs@zip.com.au> 29jul2005
+#
+exec rpm -q --qf '%{NAME}-%{VERSION}-%{RELEASE}.%{ARCH}\n' ${1+"$@"}
