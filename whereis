@@ -30,6 +30,7 @@ do
     | rd|road \
     | pl|place \
     | cr|cres|crescent \
+    | cl|close \
     | ln|lane \
     | pd|pde|parade \
     )
