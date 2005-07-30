@@ -25,7 +25,6 @@ fi
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
-set -x
 exec sed -ne '
 		y/	/ /
 	    '"	/^ *skip  *$clause/b start
