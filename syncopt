@@ -46,6 +46,7 @@
 
 : ${TMPDIR:=/tmp}
 : ${RSYNC_RSH:=sshto}; export RSYNC_RSH
+: ${VENDOR_RELEASE:=''}
 
 cmd=`basename "$0"` || cmd=$0
 
@@ -73,6 +74,8 @@ fi
 : ${SYNCOPT_RSYNC:=rsync}
 : ${SYNCOPT_RSYNCOPTS:=""}
 : ${SYNCOPT_SSH:=$RSYNC_RSH}
+
+cpu=`uname -p` || exit 1
 
 # basic "trim comments" code
 sedpreamble='y/	/ /
