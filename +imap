@@ -28,8 +28,7 @@ esac
 fm_user=
 fm_pass=
 fm_host=$server
-set -vx
-eval `fetchmailclause -f "$fmrc" "$server" | detab | sed -n 's/^\([^ ][^ ]*\) /sv_\1=/p'|tee /dev/tty`
+eval `fetchmailclause -f "$fmrc" "$server" | detab | sed -n 's/^\([^ ][^ ]*\) /sv_\1=/p'`
 [ -n "${sv_user:=}" ] && fm_user=$sv_user
 [ -n "${sv_pass:=}" ] && fm_pass=$sv_pass
 [ -n "${sv_via:=}"  ] && fm_host=$sv_via
