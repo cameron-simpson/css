@@ -12,6 +12,10 @@ def chomp(s):
     return s[:-1]
   return s
 
+def extend(arr,items):
+  for i in items:
+    arr.append(i)
+
 def index(seq,val):
   for i in xrange(len(seq)-1):
     if val == seq[i]:
@@ -31,6 +35,7 @@ def mkdirn(path):
     pfx=''
   else:
     dir=os.path.dirname(path)
+    if len(dir) == 0: dir='.'
     pfx=os.path.basename(path)
 
   if not os.path.isdir(dir):
