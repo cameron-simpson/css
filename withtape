@@ -1,0 +1,58 @@
+#!/bin/sh -u
+#
+# Load a tape from the specified jukebox slot, run a command, return the tape
+# to its slot.
+#	- Cameron Simpson <cs@zip.com.au> 01aug2005
+#
+
+: ${TAPE:='/dev/tape'}
+
+trace=set-x
+
+cmd=`basename "$0"` || cmd=$0
+usage="Usage: $cmd -j jukeslot [-t tapedev] command [args...]"
+
+jukeslot=
+
+badopts=
+
+while [ $# -gt 0 ]
+do
+  case $1 in
+    -j)	jukeslot=$2; shift ;;
+    -t)	TAPE=$2; shift ;;
+    --)	shift; break ;;
+    -?*)echo "$cmd: unrecognised option: $1" >&2
+	badopts=1
+	;;
+    *)	break ;;
+  esac
+  shift
+done
+
+[ $# = 0 ] && { echo "$cmd: missing command" >&2; badopts=1; }
+
+case "$jukeslot" in
+  '')		echo "$cmd: missing jukeslot" >&2; badopts=1 ;;
+  [0-9]*)	;;
+  *)		echo "$cmd: bad jukeslot \"$jukeslot\"" >&2; badopts=1 ;;
+esac
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+export TAPE
+
+xit=1
+
+if $trace mover mv "s$jukeslot" d0
+then
+  if mt rewind
+  then
+    $trace "$@"
+    xit=$?
+    $trace mt offline || xit=1
+  fi
+  $trace move mv d0 "s$jukeslot" || xit=1
+fi
+
+exit $xit
