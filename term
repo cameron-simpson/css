@@ -150,6 +150,8 @@ case "$TERM,$DISPLAY" in
 	    aterm)	# -fade 90
 			[ $dotrans ] && termopts="$termopts -tr -sh $shade"
 			;;
+	    urxvtc)	[ $async ] || PREFTERM=urxvt	# gotta be synchronous
+			;;
 	esac
 
 	termcmd="$PREFTERM $termopts -e $termcmd"
