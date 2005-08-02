@@ -58,6 +58,7 @@ usage="Usage: $cmd [{-t|+t|-T title}] file [{-n|-y}] [-d savedir] [-i type] [-p 
 	arg1opts	Options as for arg1(1cs). Default: none.
 			If specified, the viewer is run via arg1."
 
+unset tmpdir
 trap 'rm -r "$tmpdir"' 0
 tmpdir=`mkdirn "$TMPDIR/$cmd$$."` || exit 1
 tmpfile=$tmpdir/$cmd$$
