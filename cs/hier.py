@@ -30,6 +30,7 @@ def h2a(o,i=None):
   buf.close()
   return e
 
+# NB: fp must be a cs.io.IndentedFile
 def h2f(fp,o):
   t=type(o)
   if t in [IntType, LongType]:
