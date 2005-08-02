@@ -41,7 +41,7 @@ def mkdirn(path):
   if not os.path.isdir(dir):
     return None
 
-  newn=1
+  maxn=0
   pfxlen=len(pfx)
   for base in dircache.listdir(dir):
     if len(base) > pfxlen and base[:pfxlen] == pfx:
@@ -52,9 +52,10 @@ def mkdirn(path):
 	  break
       if numeric:
 	sfxval=int(base[pfxlen:])
-	if sfxval > newn:
-	  newn=sfxval
+	if sfxval > maxn:
+	  maxn=sfxval
 
+  newn=maxn
   while True:
     newn=newn+1
     newpath=path+str(newn)
