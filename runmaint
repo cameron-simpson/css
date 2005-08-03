@@ -125,6 +125,10 @@ MaintDir=$RUNMAINT_DIR
 export OPTCSS
 [ -s "$OPTCSS/env.sh" ] && . "$OPTCSS/env.sh"
 
+# tack on a few things to help find stuff like whoami
+PATH=$PATH:/usr/ucb
+export PATH
+
 : ${SYSTEMID:=localdomain}
 : ${USER:=`whoami || id -un`}
 : ${HOST:=`hostname`}
