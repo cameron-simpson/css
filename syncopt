@@ -487,6 +487,8 @@ do
     # either $makelocal or the remote end is not a symlink
     # ==> we need a local copy
 
+    $trace rm -f "$thing"
+    [ -d "$thing/." ] || $trace mkdir "$thing"
     $trace $SYNCOPT_RSYNC -a $vflag --delete $SYNCOPT_RSYNCOPTS "$thingrep/$thing" .
 done
 
