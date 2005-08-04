@@ -1,0 +1,80 @@
+#!/bin/sh -u
+#
+# Dump the databases from a MySQL database.
+#	- Cameron Simpson <cs@zip.com.au>
+#
+
+set -u
+
+trace=set-x
+user=
+password=
+host=localhost
+dir=.
+dohistbackup=
+keepn=14
+pcntfree=20
+
+cmd=$0
+usage="Usage: $cmd [-u user] [-p password] [-h host] [databases...]
+	-u user		Specify user name.
+	-p password	Specify user password.
+	-h host		Specify MySQL host. Default: $host
+	-S secret	Get user/password/host from the named secret.
+	-d dir		Target directory for dumps. Default: $dir
+	-H		Target directory is a histbackup directory.
+	databases	Database names to dump. Default: all of them."
+
+badopts=
+
+while [ $# -gt 0 ]
+do
+  case $1 in
+    -u)	user=$2; shift ;;
+    -p)	password=$2; shift ;;
+    -h)	host=$2; shift ;;
+    -S)	eval `secret "$2"` || exit 1; shift
+	user=$secretLOGIN
+	password=$secretPASSWORD
+	host=$secretHOST
+	;;
+    -d)	dir=$2; shift ;;
+    -H)	dohistbackup=1 ;;
+    --)	shift; break ;;
+    -?*)echo "$cmd: unrecognised option: $1" >&2
+	badopts=1
+	;;
+    *)	break ;;
+  esac
+  shift
+done
+
+[ -d "$dir/." ] || { echo "$cmd: $dir: not a directory" >&2; badopts=1; }
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+[ $dohistbackup ] && { dir=`histbackup --no-rsync "$dir"` || exit 1; }
+cd "$dir" || exit 1
+
+if [ $# = 0 ]
+then
+  echo show databases \
+  | mysql -h "$host" "-u$user" "-p$password" \
+  | sed 1d
+else
+  for db
+  do  echo "$db"
+  done
+fi \
+| sort \
+| while read dbname
+  do
+    squiz=$dbname.sql.gz
+    rm -f "$squiz"
+    $trace mysqldump -h "$host" "-u$user" "-p$password" --opt "$dbname" \
+    | gzip --fast >"$squiz"
+  done
+
+[ $dohistbackup ] && $trace mklinks -newer ..
+
+exit 0
