@@ -54,6 +54,9 @@ case "$DISPLAY" in
     unset DISPLAY
     ;;
 esac
+case "$PREFTERM" in
+  urxvtc)	PREFTERM=urxvt ;;
+esac
 
 # If some dickheads didn't use csh for root this would be much simpler.
 tmp=/tmp/su.$$
@@ -67,6 +70,7 @@ export SHELL PS1 PS2 HOME PATH
 USER=$su
 EMAIL=$EMAIL
 DISPLAY=$DISPLAY
+PREFTERM=$PREFTERM
 PERL5LIB=$HOME/rc/perl:$PERL5LIB:/opt/perl/lib
 SCREENDIR=/tmp/screen-\$USER
 export USER EMAIL DISPLAY PERL5LIB SCREENDIR
