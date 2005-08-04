@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/sh -u
 #
 # Generic open-a-window.
 #
@@ -18,6 +18,9 @@
 : ${PREFTERM:=xterm}
 : ${DISPLAY:=''}
 : ${TERM:=dumb}
+: ${TERMSHADE:=30}
+: ${TERMTINT:=white}
+: ${TERMOPTIONS:=''}
 
 cmd=$0
 usage="Usage: $cmd [-v] [-w width] [-h height] [-x x-pos] [-y y-pos]
@@ -25,6 +28,7 @@ usage="Usage: $cmd [-v] [-w width] [-h height] [-x x-pos] [-y y-pos]
 		[-f font] [-n name] [-big] [-small] [-keepio] [-xauthhack]
 		[{-c shellcmd}/{-e exec-list}/{-- raw-args}]"
 
+trace=
 termopts=
 xrmopts=
 dotrans=
@@ -37,7 +41,8 @@ x= y= w= h=
 bigx=0 bigy=-0 bigw=80 bigh=61 bigf=6x13
 geometry=
 sized=
-shade=${ATERM_SHADE:-30}
+tint=$TERMTINT
+shade=$TERMSHADE
 xauthhack=
 async=1
 lock=
@@ -83,6 +88,7 @@ do
     -y)		y=$2 ; shift ;;
     -n)		title=$2 ; shift ;;
     -f)		f=$2 ; shift ;;
+    -env)	exec genv TERMOPTIONS TERMTINT TERMSHADE ;;
     -big)	sized=1 x=$bigx y=$bigy w=$bigw h=$bigh f=$bigf ;;
     -small)	sized=1 x=$smallx y=$smally w=$smallw h=$smallh f=$smallf ;;
     -keepio)	detach= ;;
@@ -147,10 +153,11 @@ case "$TERM,$DISPLAY" in
 	case "$PREFTERM" in
 	    rxvt)	[ $dotrans ] && termopts="$termopts -ip"
 			;;
+	    urxvtc)	[ $dotrans ] && termopts="$termopts -ip -tint $tint -sh $shade"
+	    		[ $async ] || PREFTERM=urxvt	# gotta be synchronous
+			;;
 	    aterm)	# -fade 90
 			[ $dotrans ] && termopts="$termopts -tr -sh $shade"
-			;;
-	    urxvtc)	[ $async ] || PREFTERM=urxvt	# gotta be synchronous
 			;;
 	esac
 
