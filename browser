@@ -1,27 +1,31 @@
-#!/bin/sh
+#!/bin/sh -u
 #
 # Dispatch my preferred browser.
 # Compare to $BROWSER, which is for opening a fresh window in the browser.
 #	- Cameron Simpson <cs@zip.com.au> 08aug2004
 #
 
-: ${BROWSER:="urlshow %s"}
 : ${VARRUN:="$HOME/var/run"}
-
-cmd=$0
-usage="Usage: $cmd [-f] [url]
-	-f	Force: start browser even if already running.
-	-q	Test if browser running."
 
 url=
 mode=start
+profile=$USER@$HOST
+br=/opt/firefox-1.0.6/firefox
+
+cmd=$0
+usage="Usage: $cmd [-f] [-q] [url]
+	-f		Force: start browser even if already running.
+	-P profile	Select desired profile.
+			Default: $profile
+	-q		Test if browser running."
 
 badopts=
 
-while :
+while [ $# -gt 0 ]
 do
   case "$1" in
     -f)	mode=force ;;
+    -P)	profile=$2; shift ;;
     -q)	mode=query ;;
     --)	shift; break ;;
     -?*)echo "$cmd: unrecognised option: $1" >&2; badopts=1 ;;
@@ -57,20 +61,6 @@ case "$mode" in
 esac
 
 [ -n "$url" ] && set -- "$url"
-( set -x
-  case "$HOST@$SYSTEMID" in
-    kirsty@home) br=ff10 ;;
-    *)           br=ff10 ;;	## ff08
-  esac
-  bm=$HOME/.mozilla/firefox/subdir/bookmarks.html
-  rcbm=$HOME/rc/web/bookmarks.html
-  [ "$rcbm" -nt "$bm" ] && cp "$rcbm" "$bm"
-  "$br" -width "$FULLX" -height "$PIX_HIGH" ${1+"$@"}
-  if [ -s "$bm" ]
-  then
-      ( cd $HOME/rc/web || exit 1
-	LIVE_BOOKMARKS=$bm myke _bookmarks
-      )
-  fi
-) &
+histbackup -x "$HOME/var/firefox" "$HOME/var/backup/firefox"
+set-x "$br" -width "$FULLX" -height "$PIX_HIGH" -P "$profile" ${1+"$@"} &
 echo $! >"$pidfile"
