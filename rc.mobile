@@ -40,6 +40,7 @@ envfiles=
 async=1
 asyncall=1
 trace=set-x
+verbose=1
 noaction=
 int=1
 raw=
@@ -416,6 +417,27 @@ runqueue()
       \!*)
 	shcmd=`expr "x$opline" : 'x.\(.*\)'`
 	$trace /bin/sh -c "$shcmd"
+	;;
+
+      # =item . /path/to/shell-files...
+      #
+      # Source Bourne shell syntax files.
+      # This is intended for the rare occasions that
+      # some environment setup must be done that involves
+      # shell code beyond a simple I<var>B<=>I<value> assignment,
+      # or to source a prepackaged external setup file.
+      # It is I<strongly> recommended
+      # that I<var>B<=>I<value> be used where possible;
+      # remember that I<var>B<=`>I<shell-stuff>B<`>
+      # can do quite a lot.
+      #
+      \.\ *)
+	shfiles=`expr "x$opline" : 'x\. \(.*\)'`
+	for shfile in $shfiles
+	do
+	  [ $verbose ] && echo ". $shfile" >&2
+	  . "$shfile"
+	done
 	;;
 
       # =item svc I<service...>
