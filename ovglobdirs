@@ -67,6 +67,7 @@ esac
     srcdir=$fromdir/$matchdir
     destdir=$todir/$matchdir
     echo "$srcdir -> $destdir"
+    [ $prune ] && rmdir "$srcdir" 2>/dev/null && continue
     (
       cd "$srcdir" || exit 1
       [ -d "$destdir/." ] || $trace needdir "$destdir" || exit 1
