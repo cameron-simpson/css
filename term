@@ -49,7 +49,7 @@ lock=
 lock1=
 iconic=
 
-[ -s $HOME/.termenv -a -r $HOME/.termenv ] && . $HOME/.termenv
+[ -s $HOME/.termenv -a -r $HOME/.termenv ] && { set +u; . $HOME/.termenv; set -u; }
 
 badopts=
 
