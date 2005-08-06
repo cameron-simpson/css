@@ -52,7 +52,7 @@ $::Usage="Usage: $::cmd [-apu] [-e exts] [-f file] [{-|dirs...}]
   }
 
   if ("@ARGV" ne '-')
-  { open(STDIN,'-|','set-x','find',@ARGV,'(','-type','d','-name','.?*','-prune',')','-o','(','-type','f','-size','+0','-print',')')
+  { open(STDIN,'-|','find',@ARGV,'(','-type','d','-name','.?*','-prune',')','-o','(','-type','f','-size','+0','-print',')')
 	|| die "$::cmd: can't pipe from find: $!";
   }
 
