@@ -87,8 +87,9 @@ class SeqWrapper:
     del(self.__seq[key])
 
   def __iter__(self):
-    for i in self.__seq:
-      yield i
+    return [i for i in self.__seq]
+#    for i in self.__seq:
+#      yield i
 
   def _updateAllValues(self,newvalues):
     self.__seq=newvalues
