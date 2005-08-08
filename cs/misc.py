@@ -124,8 +124,9 @@ class OrderedKeys:
     return self.__keys
 
   def __iterkeys__(self):
-    for k in self.keys():
-      yield k
+    return self.keys()
+#    for k in self.keys():
+#      yield k
 
 class IndexedSeqWrapper(OrderedKeys,SeqWrapper):
   def __init__(self,seq,names=None):
