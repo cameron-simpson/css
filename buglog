@@ -163,6 +163,11 @@ do
     # with the I<headline> as its sole argument
     # and the I<description> on its standard input.
     #
+    \|*)
+      { command=`expr "x$bugsystem" : 'x.\(.*\)'` \
+        && "$command" "$headline" <"$attachment"
+      } || xit=1
+      ;;
 
     # =item B<ddts>
     #
@@ -177,15 +182,12 @@ do
     #
     # which would add an enclosure to bug B<CISaa12345>.
     #
-    \|*)
-      { command=`expr "x$bugsystem" : 'x.\(.*\)'` \
-        && "$command" "$headline" <"$attachment"
-      } || xit=1
-      ;;
-      
     ddts)
       { ddtsids=`echo "$headline" | ddtsids` \
-	&& { [ -z "$ddtsids" ] || mailif -s "$headline" $ddtsids < "$attachment"
+	&& { [ -z "$ddtsids" ] \
+	     || ( printf "%s\n\n" "$headline"
+		  exec cat "$attachment"
+		) | mailif -s "$headline" $ddtsids
 	   }
       } || xit=1
       ;;
