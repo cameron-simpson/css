@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/sh -u
 #
 # Modify something and record the diff.
 #	- Cameron Simpson <cs@zip.com.au> 04aug2004
@@ -19,7 +19,7 @@ reportcmd=
 args1opts=-end
 message=
 
-while :
+while [ $# -gt 0 ]
 do
   case $1 in
     -r)	reportcmd=$2; shift ;;
