@@ -129,6 +129,8 @@ then  mklinktree(){ $trace cp -rpl "$1" "$2"; }
 else  mklinktree(){ $trace linktree "$1" "$2"; }
       cpr(){ $trace cpdir "$1" "$2"; }
 fi
+daycode(){ date '+%Y-%m-%d'; }
+datecode(){ date '+%Y-%m-%d-%H:%M:%S'; }
 
 # rsync capabilities at local end
 rsync_has_link_dest=
