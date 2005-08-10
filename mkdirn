@@ -16,9 +16,10 @@ if len(sys.argv) != 2:
   sys.stderr.flush()
   sys.exit(2)
 
-dir=cs.misc.mkdirn(sys.argv[1])
+base=sys.argv[1]
+dir=cs.misc.mkdirn(base)
 if dir is None:
-  sys.stderr.write("mkdirn: can't make next in sequence for prefix "+sys.argv[1]+"\n")
+  sys.stderr.write("mkdirn: can't make next in sequence for prefix "+base+"\n")
   sys.stderr.flush()
   sys.exit(1)
 
