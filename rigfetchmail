@@ -8,5 +8,5 @@
 
 needhost "$HOMEHOST@home" || exit 1
 cd
-dofetchmail -l 65536
+## dof new saner in fetch pattern ## dofetchmail -l 65536
 bgproc runfetchmail
