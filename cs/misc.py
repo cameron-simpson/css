@@ -27,6 +27,7 @@ def dict2ary(d,keylist=None):
   return [ [k,d[k]] for k in keylist ]
 
 def mkdirn(path):
+  opath=path
   if len(path) == 0:
     path='.'+os.sep
 
@@ -61,6 +62,8 @@ def mkdirn(path):
     newpath=path+str(newn)
     try:
       os.mkdir(newpath)
+      if len(opath) == 0:
+	newpath=os.path.basename(newpath)
       return newpath
     except OSError:
       if sys.exc_value[0] == errno.EACCES:
