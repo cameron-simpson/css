@@ -20,6 +20,9 @@ eval "`syncenv -`"
 : ${FM_DELAY:=300}
 : ${FM_LIMIT:=''}
 : ${FM_OPTS:=''}
+: ${FM_BIGBATCH:=100}
+: ${FM_SMALLEXPUNGE:=512}
+: ${FM_SMALLLIMIT:=65536}
 
 fmlimit=$FM_LIMIT
 case "$LOCATION" in
@@ -96,8 +99,8 @@ do
 
   echo "`date`: $*" >>"$FM_LOGFILE"
   killpidfile -STOP getmail_flush.pid
-  $trace "$@" -e 512 -l 65536 "$fmhost" || xit=1
-  $trace "$@" -B 100 "$fmhost" || xit=1
+  $trace "$@" -e "$FM_SMALLEXPUNGE" -l "$FM_SMALLLIMIT" "$fmhost" || xit=1
+  $trace "$@" -B "$FM_BIGBATCH" "$fmhost" || xit=1
   killpidfile -CONT getmail_flush.pid
   killpidfile getmail_flush.pid
 done
