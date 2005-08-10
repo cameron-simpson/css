@@ -9,13 +9,6 @@ cmd=$0
 PATH=/opt/j2sdk-sun/bin:$PATH
 export PATH
 
-soinst=
-for d in /usr/lib/ooo-1.1 /opt/openoffice 
-do
-  [ -d "$d/." ] && { soinst=$d; break; }
-done
-[ -n "$soinst" ] || { echo "$cmd: no soinst dir found, aborting!" >&2; exit 1; }
-
 oobase=${OPENOFFICE:-$HOME/OpenOffice}
 
 vrc=$HOME/.sversionrc
@@ -36,6 +29,13 @@ then
     echo
     echo "Otherwise, you should proceed with a \"Workstation\" setup."
     echo
+
+    soinst=
+    for d in /usr/lib/ooo-1.1 /opt/openoffice 
+    do
+      [ -d "$d/." ] && { soinst=$d; break; }
+    done
+    [ -n "$soinst" ] || { echo "$cmd: no soinst dir found, aborting!" >&2; exit 1; }
 
     ls -ld "$soinst/program/setup"
     ask "Run OpenOffice setup" || exit 0
