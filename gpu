@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/sh -u
 #
 # Asynchronous getpageurls.	- Cameron Simpson <cs@zip.com.au>
 #
@@ -9,24 +9,31 @@ cmd=$0
 usage="Usage: $cmd [-s] [dirpfx] pageurl"
 
 async=1
-if [ "x$1" = x-s ]
+if [ $# -gt 0 ] && [ "x$1" = x-s ]
 then  shift; async=
 fi
 
 # hack to permit leading subdir prefix
-case $1 in
-    ''|-*|*://*)	;;
+if [ $# -gt 0 ]
+then
+  case $1 in
+    -*|*://*)	;;
     *)		dirpfx=$1; shift
 		case "$dirpfx" in
 		  */*?)	;;
 		  *)	dirpfx=$dirpfx/ ;;
+		esac
+		case "$dirpfx" in
+		  */)	needdir "$dirpfx" ;;
+		  *)	parent=`dirname "$dirpfx"` && needdir "$parent" ;;
 		esac
 		subdir=`mkdirn "$dirpfx"` || exit 1
 		cd "$subdir" || exit 1
 		colour_echo white "`pwd`"
 		L
 		;;
-esac
+  esac
+fi
 
 if [ $# = 0 ]
 then
