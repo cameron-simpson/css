@@ -71,6 +71,8 @@ sub _parseData
     { chomp;
       s/\n\s+//g;
 
+      next LINE if /^#/;
+
       if (/^$/)
       { $inrecord=0;
 	next LINE;
@@ -82,12 +84,12 @@ sub _parseData
 	$field='dn';
 	$body=$_;
       }
-      elsif (! /^(\w+)[:=]\s*/)
-      { warn "bad data: [$_]\n";
-	next LINE;
+      elsif (/^(\w+)[:=]\s*/)
+      { ($field,$body)=($1,$');
       }
       else
-      { ($field,$body)=($1,$');
+      { warn "bad data: [$_]\n";
+	next LINE;
       }
 
       $r->{$field}=[] if ! exists $r->{$field};
