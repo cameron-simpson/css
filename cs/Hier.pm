@@ -150,7 +150,7 @@ sub h2s
 				}
     else
     { warn "$::cmd: h2a($ref): can't convert references of type $type"
-	if $type ne CODE;
+	if $type ne CODE && $type ne GLOB;
       $s->Put("\\"._scalar2a("UNCONVERTABLE: $ref"));
     }
   }
