@@ -53,7 +53,7 @@ done
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
-[ $dohistbackup ] && { dir=`histbackup --no-rsync "$dir"` || exit 1; }
+[ $dohistbackup ] && { dir=$dir/`histbackup --no-rsync "$dir"` || exit 1; }
 cd "$dir" || exit 1
 
 if [ $# = 0 ]
