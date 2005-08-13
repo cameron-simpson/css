@@ -106,7 +106,7 @@ sub diff
   @chkkeys=::uniq(@chkkeys);
 
   # unfold into lists
-  { my($o,$n)={},{};
+  { my($o,$n)=({},{});
 
     for (@chkkeys)
     { $o->{$_}=[ exists $old->{$_}
