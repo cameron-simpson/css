@@ -14,19 +14,21 @@ basen=$ADDIF_LOW
 netmask=
 
 cmd=`basename "$0"`
-usage="Usage: $cmd [-i baseif] [-n basen] ipaddr...
+usage="Usage: $cmd [-b basen] [-i baseif] [-m netmask] [-n] ipaddr...
+	-b basen	Base number. Default, from \$ADDIF_LOW: $basen
 	-i baseif	Base interface. Default, from \$ADDIF: $baseif
 	-m mask		Interface netmask. Default: from the base interface.
-	-n basen	Base number. Default, from \$ADDIF_LOW: $basen"
+	-n		No action. Recite commands."
 
 badopts=
 
 while [ $# -gt 0 ]
 do
   case $1 in
+    -b)	basen=$2; shift ;;
     -i)	baseif=$2; shift ;;
     -m)	netmask=$2; shift ;;
-    -n)	basen=$2; shift ;;
+    -n)	trace=echo ;;
     --)	shift; break ;;
     -?*)echo "$cmd: unrecognised option: $1" >&2
 	badopts=1
