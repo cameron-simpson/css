@@ -16,7 +16,7 @@ usage="Usage: $cmd [args1-opts...] -r report-command [-m message] itemname editc
 badopts=
 
 reportcmd=
-args1opts=-end
+arg1opts=-end
 message=
 
 while [ $# -gt 0 ]
