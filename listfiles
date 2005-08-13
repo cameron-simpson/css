@@ -55,7 +55,7 @@ then
     while [ $# -gt 0 ]
     do  case "$1" in
 	  --)	gotptns=1; shift; break ;;
-	  *)	ptns="$ptns '$1'"; shift ;;
+	  *)	ptns="$ptns "`shqstr "$1"`; shift ;;
 	esac
     done
 fi
