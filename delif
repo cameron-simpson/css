@@ -4,7 +4,7 @@
 #	- Cameron Simpson <cs@zip.com.au> 25jun2005
 #
 
-trace=echo
+trace=set-x
 
 cmd=`basename "$0"` || cmd=$0
 usage="Usage: $cmd ip-addrs..."
@@ -17,9 +17,11 @@ badopts=
 
 xit=0
 
+os=`uname -s` || exit 1
+
 for ipaddr
 do
-  set -- `eth "$ipaddr" | sed -n 's/^\([a-z][a-z]*[0-9]*:[0-9][0-9]*\) .*/\1/p'`
+  set -- `eth "$ipaddr" | sed -n 's/^\([a-z][a-z]*[0-9]*\)[^ ]* .*/\1/p'`
   if [ $# = 0 ]
   then
     echo "$cmd: no logical interface has address \"$ipaddr\"" >&2
@@ -34,7 +36,15 @@ do
     continue
   fi
   iface=$1; shift
-  $trace ifconfig "$iface" 0.0.0.0 down || xit=1
+
+  case "$os" in
+    OpenBSD)
+      $trace ifconfig "$iface" -alias "$ipaddr" || xit=1
+      ;;
+    *)
+      $trace ifconfig "$iface" 0.0.0.0 down || xit=1
+      ;;
+  esac
 done
 
 exit $xit
