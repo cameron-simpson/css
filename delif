@@ -7,9 +7,11 @@
 trace=set-x
 
 cmd=`basename "$0"` || cmd=$0
-usage="Usage: $cmd ip-addrs..."
+usage="Usage: $cmd [-n] ip-addrs..."
 
 badopts=
+
+[ $# -gt 0 ] && [ "x$1" = x-n ] && { trace=echo; shift; }
 
 [ $# = 0 ] && { echo "$cmd: missing ip-addrs" >&2; badopts=1; }
 
@@ -21,7 +23,14 @@ os=`uname -s` || exit 1
 
 for ipaddr
 do
-  set -- `eth "$ipaddr" | sed -n 's/^\([a-z][a-z]*[0-9]*\)[^ ]* .*/\1/p'`
+  case "$os" in
+    OpenBSD)
+      set -- `eth "$ipaddr" | sed -n 's/^\([a-z][a-z]*[0-9]*\)[^ ]* .*/\1/p'`
+      ;;
+    *)
+      set -- `eth "$ipaddr" | sed -n 's/^\([a-z][a-z]*[0-9]*:[0-9]*\)[^ ]* .*/\1/p'`
+      ;;
+  esac
   if [ $# = 0 ]
   then
     echo "$cmd: no logical interface has address \"$ipaddr\"" >&2
