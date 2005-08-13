@@ -1,2 +1,10 @@
 #!/bin/sh
-ifconfig -a | ring -f - "addr:$1"
+os=`uname -s` || exit 1
+case "$os" in
+  OpenBSD)
+    ifconfig -A | ring -f - "inet $1 "
+    ;;
+  *)
+    ifconfig -a | ring -f - "inet addr:$1 "
+    ;;
+esac
