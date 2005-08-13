@@ -21,8 +21,8 @@ eval "`syncenv -`"
 : ${FM_LIMIT:=''}
 : ${FM_OPTS:=''}
 : ${FM_BIGBATCH:=100}
-: ${FM_SMALLEXPUNGE:=512}
-: ${FM_SMALLLIMIT:=65536}
+: ${FM_SMALLEXPUNGE:=1024}
+: ${FM_SMALLLIMIT:=128000}
 
 fmlimit=$FM_LIMIT
 case "$LOCATION" in
