@@ -41,7 +41,7 @@ done
 # check final baseif
 synok=1
 case "$baseif" in
-  *:* | *[^a-z0-9]* )
+  *:* | *[!a-z0-9]* )
     synok=
     ;;
   lo | [a-z]*[0-9])
@@ -64,6 +64,8 @@ fi
 
 xit=0
 
+os=`uname -s` || exit 1
+
 if [ -z "$netmask" ]
 then
   netmask=`ifconfig "$baseif" | sed -n 's/.* Mask:\([^ ]*\).*/\1/p'`
@@ -84,16 +86,23 @@ do
 
   for ipaddr
   do
-    # choose the next free interface number
-    nextn=`ifconfig -a \
-	   | sed -n "s/^$baseif"':\\([0-9][0-9]*\\) .*/\\1/p' \
-	   | awk "BEGIN     { n=$basen }
-		  \\$1 >= n { n=\\$1+1 }
-		END       { print n }"` || exit 1
-
-    # apply and then bump $basen
-    $trace ifconfig "$baseif:$nextn" "$ipaddr" netmask "$netmask" || xit=1
-    basen=`expr "$nextn" + 1`
+    case "$os" in
+      OpenBSD)
+	# no silly :n logical interfaces for BSD!
+	$trace ifconfig "$baseif" alias "$ipaddr" netmask "$netmask" || xit=1
+	;;
+      *)
+	# choose the next free interface number
+	nextn=`ifconfig -a \
+	       | sed -n "s/^$baseif"':\\([0-9][0-9]*\\) .*/\\1/p' \
+	       | awk "BEGIN     { n=$basen }
+		      \\$1 >= n { n=\\$1+1 }
+		    END       { print n }"` || exit 1
+	# apply and then bump $basen
+	$trace ifconfig "$baseif:$nextn" "$ipaddr" netmask "$netmask" || xit=1
+	basen=`expr "$nextn" + 1`
+	;;
+    esac
   done
 done
 
