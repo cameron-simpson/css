@@ -7,23 +7,33 @@
 #
 
 : ${LOGDIR:=$HOME/var/log}
+buildlogs=$LOGDIR/build
 
 cmd=`basename "$0"`
-usage="Usage: $cmd pkgdir"
+usage="Usage: $cmd [pkgdir]"
 
-[ $# = 1 ] || { echo "$usage" >&2; exit 2; }
-pkgdir=$1; shift
+badopts=
 
-cd "$pkgdir" || { echo "$cmd: chdir($pkgdir) fails" >&2; exit 1; }
+if [ $# -gt 0 ]
+then
+  pkgdir=$1; shift
+  cd "$pkgdir" || { echo "$cmd: chdir($pkgdir) fails" >&2; exit 1; }
+fi
+
+[ $# = 0 ] || { echo "$cmd: extra arguments after pkgdir" >&2; badopts=1; }
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
 
 cwd=`pwd` || exit 1
-pkg=`basename "$cwd"`
+pkg=`basename "$cwd"` || exit 1
 
 logbase=$pkg-$ARCH-$HOST
+
+needdir "$buildlogs" || exit 1
 
 umask 2
 session=$cmd-$pkg-$ARCH-$HOST
 exec term -n "$session" \
     screen -S "$session" \
     buildenv env ps1pfx=":$ps1pfx" ps2pfx=" $ps2pfx" \
-    logscript -d "$LOGDIR/build" "$logbase"
+    logscript -d "$buildlogs" "$logbase"
