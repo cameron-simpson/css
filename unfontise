@@ -4,11 +4,14 @@
 # and convert it to raw form. See RFC2047.
 #	- Cameron Simpson <cs@zip.com.au> 01feb2002
 #
-# -c chregexp: cameron 26jun2002
-# -C; cameron 12jul2002
+# -c chregexp - cameron 26jun2002
+# -C - cameron 12jul2002
+# Add ?B? support. - cameron, 16aug2005
 #
 
 use Getopt::Std;
+use cs::MIME::Base64;
+use cs::Misc;
 
 ($::cmd=$0) =~ s:.*/::;
 $::Usage="Usage: $::cmd [-r regexp] [strings...]
@@ -75,6 +78,7 @@ sub unfontise
   my $encwords;
   my $m;
 
+  #          charset  encoding encoded-text	rfc2047.2
   while (/=\?([^?]+)\?([QB])\?([^?]*)\?=/i)
   {
     ($charset,$enc,$encwords)=(uc($1),uc($2),$3);
@@ -84,17 +88,26 @@ sub unfontise
 
     if (length $csregexp && $charset !~ /^$csregexp$/oi)
     # don't touch this charset
-    { $encwords=$m;
+    {
     }
     elsif ($enc eq 'Q')
     { $encwords =~ tr/_/ /;
       $encwords =~ s/=([\da-f][\da-f])/(($code=eval "0x$1") >= 32 && $code < 255 ? chr($code) : $&)/egi;
+      $m=$encwords;
+    }
+    elsif ($enc eq 'B')
+    { if ($encwords =~ m:^([a-z0-9+/=]{4})*$:)	# valid base64
+      { $m=cs::MIME::Base64::decode($encwords);
+      }
+      else
+      { warn "$::cmd: bad =?...?B?...?= encoded-text: $encwords";
+      }
     }
     else
-    { warn "$0: unsupported encoding: \"$enc\"";
+    { warn "$::cmd: unsupported encoding: \"$enc\"";
     }
 
-    $dec.=$encwords;
+    $dec.=$m;
   }
 
   return $dec.$_;
