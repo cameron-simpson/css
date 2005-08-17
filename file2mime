@@ -4,6 +4,8 @@
 #	- Cameron Simpson <cs@zip.com.au> 14nov2002
 #
 
+: ${OS:=`uname -s|tr '[A-Z]' '[a-z]'`}
+
 cmd=$0
 usage="Usage: $cmd filename
 	Exit status 0 => Output is MIME type.
@@ -12,9 +14,9 @@ usage="Usage: $cmd filename
 [ $# = 1 ] || { echo "$usage" >&2; exit 2; }
 file=$1; shift
 
-case "`uname -s`" in
-  SunOS)	lopt= ;;	# standard file(1)
-  *)		lopt=-L ;;	# hope for GNUish file(1)
+case "$OS" in
+  sunos|solaris)	lopt= ;;	# standard file(1)
+  *)			lopt=-L ;;	# hope for GNUish file(1)
 esac
 type=`file $lopt "$file" | tr '	' ' '` || exit 1
 
