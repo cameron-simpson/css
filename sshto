@@ -30,7 +30,7 @@ do
   case $1 in
     -t)	topt=-t ;;
     +t)	topt= ;;
-    -[aAfgknNqsTvxXC1246])
+    -[aAfgknNqsTvxXYC1246])
 	sshopts="$sshopts $1"
 	;;
     -[bceiIlmopFLRD])
