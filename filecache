@@ -7,7 +7,7 @@
 : ${TMPDIR:=/tmp}
 : ${FILECACHE_ROOT:=$HOME/var/cache/file}
 
-cmd=`basename "$0"` || exit 1
+cmd=$0	## speed! `basename "$0"` || exit 1
 usage="Usage: $cmd filename"
 
 [ $# = 1 ] || { echo "$usage" >&2; exit 2; }
