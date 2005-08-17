@@ -48,6 +48,6 @@ case "$host" in
   root@*)
       exec root@ "$host" ${1+"$@"}
       ;;
-  *)	exec rterm "$host" ${1+"$@"}
+  *)  exec rterm "$host" ${1+"$@"}
       ;;
 esac
