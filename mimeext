@@ -7,8 +7,11 @@
 [ $# = 1 ] || { echo "Usage: $0 mime-type" >&2; exit 2; }
 type=$1; shift
 
-cat "$HOME/.mime.types" "$HOME/rc/mime.types" /etc/mime.types 2>/dev/null \
-| grep "^$type[ 	][ 	]*[^ 	]" \
-| { read mttype mtext mtetc || exit 1
-    echo "$mtext"
-  }
+exec sed -n '
+	y/	/ /
+      '"s|^$type"'  *\([^ ][^ ]*\).*|\1|p
+	t yes
+	d
+	:yes
+	q' \
+"$HOME/.mime.types" "$HOME/rc/mime.types" /etc/mime.types 2>/dev/null
