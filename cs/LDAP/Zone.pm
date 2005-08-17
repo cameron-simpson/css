@@ -64,7 +64,7 @@ sub UserDN($$)
 sub GroupDN($$)
 { my($this,$id)=@_;
   if (ref $id) { $id=$this->Attr(GROUP_OBJ2ID)->($id); }
-  sprintf($this->GroupSubFmt(), $id).", ".$this->UserSubDN();
+  sprintf($this->GroupSubFmt(), $id).", ".$this->GroupSubDN();
 }
 
 # $Z->UserSearch(Net::LDAP,user) -> @Net::LDAP::Entry
