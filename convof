@@ -1,0 +1,132 @@
+#!/bin/sh -u
+#
+# =head1 NAME
+#
+# convof - return cached conversion of file
+#
+# =head1 SYNOPSIS
+#
+# convof -C convname [arg1opts...] file convertor [convargs...]
+#
+# =head1 DESCRIPTION
+#
+# I<convof> returns a cached conversion of the specified file.
+# It is intended to save redoing expensive file conversions.
+# If the cached entry does not yet exist
+# the command
+#
+# arg1 I<arg1opts> I<file> I<convertor> I<convargs...>
+#
+# is issued to compute it,
+# placing the result on its standard output.
+# 
+
+: ${TMPDIR:=/tmp}
+: ${CONVCACHE_ROOT:=$HOME/var/cache/convof}
+
+cmd=`basename "$0"` || exit 1
+usage="Usage: $cmd -C convname [arg1opts...] file convertor [convargs...]
+	-C convname	Name for this conversion.
+	arg1opts	Passwd to arg1 to invoke convertor."
+
+badopts=
+
+# =head1 OPTIONS
+#
+# =over 4
+#
+
+badopts=
+
+arg1opts=
+convname=
+
+while [ $# -gt 0 ]
+do
+  case $1 in
+    # =item B<-C> I<convname>
+    #
+    # The conversion name.
+    # This string is used as a path component in the cache result
+    # to designate this type of conversion.
+    -C)	convname=$2; shift ;;
+    -stdin|-discard|-end|-x|-[0-9]*)
+	arg1opts="$arg1opts $1"
+	;;
+    --)	shift; break ;;
+    -?*)echo "$cmd: unrecognised option: $1" >&2
+	badopts=1
+	;;
+    *)	break ;;
+  esac
+  shift
+done
+
+# =back
+#
+
+case "/$convname/" in
+  //)	echo "$cmd: missing -C convname" >&2
+	badopts=1
+	;;
+  //* | */../* )
+	echo "$cmd: bad convname; absolute paths and .. forbidden" >&2
+	badopts=1
+	;;
+esac
+
+if [ $# = 0 ]
+then
+  echo "$cmd: missing file" >&2
+  badopts=1
+else
+  file=$1; shift
+  if [ $# = 0 ]
+  then
+    echo "$cmd: missing convertor" >&2
+    badopts=1
+  fi
+fi
+
+if [ ! -f "$file" -o ! -s "$file" ]
+then
+  echo "$cmd: $file: not a file" >&2
+  badopts=1
+fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+md5path=`md5path "$file"` || exit 1
+cachepath=$CONVCACHE_ROOT/$convname/$md5path
+
+if [ ! -s "$cachepath" ]
+then
+  tmpf=$TMPDIR/$cmd$$
+  trap 'rm -f "$tmpf"' 0 1 2 13 15
+
+  cachedir=`dirname "$cachepath"` || exit 1
+  [ -d "$cachedir/." ] || needdir "$cachedir" || exit 1
+
+  arg1 $arg1opts "$file" "$@" >"$tmpf" || exit 1
+  mv "$tmpf" "$cachepath" || exit 1
+fi
+
+printf "%s\n" "$cachepath"
+
+# =head1 EXAMPLES
+#
+# Shaded sized wallpaper, 
+#
+# =head1 ENVIRONMENT
+#
+# CONVCACHE_ROOT, the location of the conversions cache.
+# Default: B<$HOME/var/cache/convof/>I<convname>
+#
+# =head1 SEE ALSO
+#
+# arg1(1cs)
+#
+# =head1 AUTHOR
+#
+# Cameron Simpson E<lt>cs@zip.com.auE<gt>
+#
