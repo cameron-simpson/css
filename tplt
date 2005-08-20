@@ -12,7 +12,7 @@ FILE=$1
 case $FILE in /*) ;; *) FILE=`pwd`/$FILE ;; esac
 
 BASE=`basename "$FILE"`
-PFX=`expr "x$BASE" : 'x\(.*\)\..*'`
+PFX=`expr "x$BASE" : 'x\(.*\)\..*'` || PFX=$BASE
 FILEDIR=`dirname "$FILE"`
 FILEDIR=`cd "$FILEDIR"; pwd`
 FILEPATH=$FILEDIR/$BASE
@@ -22,7 +22,7 @@ tpltenv=$FILEDIR/.tplt
 
 DIRBASE=`basename "$FILEDIR"`
 case $FILE in
-    /*/scripts/*)
+    /*/scripts/*/*)
 	PFX=`expr "x$FILEPATH" : 'x.*/scripts/\(.*\)/.*'`
 	;;
     /*/s/java/*)
