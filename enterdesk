@@ -38,7 +38,7 @@ fi
   fi
 
   if [ -n "$menubg" ]
-  then $trace fvwmcmd "Colorset 2 Pixmap $menubg"
+  then $trace fvwmcmd "Colorset 2 AspectPixmap $menubg"
   else $trace fvwmcmd 'Colorset 2 RootTransparent'
   fi
 
