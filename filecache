@@ -29,7 +29,7 @@ then
 else
   cachedir=`dirname "$cachefile"`
   [ -d "$cachedir/." ] || needdir "$cachedir" || exit 1
-  ln "$file" "$cachefile" \
+  ln "$file" "$cachefile" 2>/dev/null \
   || cp "$file" "$cachefile" \
   || exit 1
 fi
