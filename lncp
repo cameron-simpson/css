@@ -9,7 +9,7 @@ usage="Usage: $cmd [-fnsv] [--] file newfile
 	-f	Remove target first.
 	-n	No action (implies -v).
 	-q	Quiet (cancels -v).
-	-s	Symlink instead of copies if hard link fails.
+	-s	Symlink instead of copy if hard link fails.
 	-v	Verbose."
 
 badopts=
