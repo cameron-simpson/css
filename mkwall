@@ -8,6 +8,8 @@
 
 : ${BG:=black}
 : ${TMPDIR:=/tmp}
+: ${WALLPAPER_SHADE:=100}
+
 # set $bgx and $bgy
 eval `bgsize -v | sed 's/^d/bg/'`
 
@@ -18,11 +20,14 @@ usage="Usage: $cmd [-g geom] [-bg bg-colour] imagefiles..."
 
 badopts=
 
+shade=$WALLPAPER_SHADE
+
 while [ $# -gt 0 ]
 do
   case "$1" in
     +a)	doauto= ;;
     -bg)BG=$2; shift ;;
+    -sh)shade=$2; shift ;;
     -g)	geom=$2; shift
 	ok=1
 	bgx=`expr "x$geom" : 'x\([1-9][0-9]*\)x[1-9][0-9]*$'` || ok=
@@ -92,7 +97,7 @@ fi
 imagefile=$1; shift
 
 tmpf=
-original=1
+original=
 
 # if stdin-ish name, suck it into a temp file
 case "$imagefile" in
@@ -107,6 +112,8 @@ case "$imagefile" in
   http://* | ftp://* )
     imagefile=`withurl -C "$imagefile" echo` || exit 1
     ;;
+  *)original=1
+    ;;
 esac
 
 # get image size
@@ -115,8 +122,8 @@ eval `imsize-gm "$imagefile" | awk '{print "ix="$1 " iy="$2}'`
 [ -n "$ix" -a -n "$iy" ] \
 	|| { echo "$cmd: can't deduce source image size" >&2; exit 1; }
 
-# see if by chance the image is the right size and format
-if [ $original ]
+# see if by chance the image is the right size and format and brightness
+if [ $original ] && [ "x$shade" = x100 ]
 then
     # get image suffix
     sfx=`expr "x$imagefile" : 'x.*\.\([^/.]*$\)'`
@@ -131,21 +138,26 @@ fi
 ######################################################
 # ok, the image is the wrong size or not a PNG
 
-# see if we've cached this image's conversion yet
-# we keep a cache based on md5 of source image
-md5pfx=`md5path "$imagefile"`
-[ -n "$md5pfx" ] || { echo "$cmd: can't checksum $imagefile" >&2; exit 1; }
-convimage=$HOME/var/cache/pngof/${bgx}x${bgy}/$md5pfx.png
+convname=pngof
+set gm convert "$imagefile"
 
-# got it? ok!
-if [ -s "$convimage" ]
+if [ "x$shade" != 100 ]
 then
-    echo "$convimage"
-    exit 0
+  convname=$convname/sh$shade
+  ## -modulate does the wrong thing ## set "$@" -modulate "$shade"
+  case "$shade" in
+    [0-9])	mulshade=0.0$shade ;;
+    [0-9][0-9]*)mulshade=0.$shade ;;
+    *)		echo "$cmd: upsupported shade \"$shade\", expected 0-99" >&2
+		exit 1
+		;;
+  esac
+  set "$@" \
+      -normalize \
+      -operator red Multiply "$mulshade" \
+      -operator green Multiply "$mulshade" \
+      -operator blue Multiply "$mulshade"
 fi
-
-# have to convert; commence arg list
-set convert -
 
 if [ "x${bgx}x${bgy}" != "x${ix}x${iy}" ]
 then
@@ -181,15 +193,13 @@ then
 
   eval `awk "$awkf" </dev/null`
 
+  convname=$convname/${bgx}x${bgy}
   set "$@" -geometry "${bgx}x${bgy}"
   if [ "$bx" -gt 0 -o "$by" -gt 0 ]
   then
+      convname=$convname/pad-${bx}x${by}-$BG
       set "$@" -bordercolor "$BG" -border "${bx}x${by}"
   fi
 fi
 
-cachedir=`dirname "$convimage"`
-[ -d "$cachedir/." ] || needdir "$cachedir" || exit 1
-##set -x
-gm "$@" -quality 100 png:- <"$imagefile" >"$convimage" || { rm -f "$convimage"; exit 1; }
-echo "$convimage"
+exec convof -C "$convname" -discard "$imagefile" "$@" -quality 100 png:-
