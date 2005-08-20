@@ -63,18 +63,17 @@ then
   esac
 fi
 
-rootbg=`mkwall "$imagefile"` || exit 1
-
 (
   (
     lastvalue rootbg "$rootbg"
     lastvalue "rootbg-$HOST" "$rootbg"
   ) &
 
-  fvwm-root --retain-pixmap "$rootbg" \
+  wall=`mkwall "$imagefile"` || exit 1
+  fvwm-root --retain-pixmap "$wall" \
   && fvwmcmd \
        'setenv XSESSIONBG pixmap' \
-       "ColorSet 1023 AspectPixmap $rootbg"
+       "ColorSet 1023 AspectPixmap $wall"
   exit
 ) &
 
