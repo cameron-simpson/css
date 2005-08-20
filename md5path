@@ -1,7 +1,8 @@
-#!/bin/sh
+#!/bin/sh -u
 #
 # Return a subpath based of a file's MD5 checksum of the form:
 #	xx/xxxx.....
+# Used to construct content-based cache directories.
 # - Cameron Simpson <cs@zip.com.au> 18may2005
 #
 
