@@ -39,7 +39,7 @@ then
     bg=
     if [ $perdesk ]
     then desktop -r "$desk" rootbg
-    else lastvalue "desk_dfltrootbg" ""
+    else lastvalue "rootbg" ""
     fi
 else
     first=1
@@ -50,7 +50,7 @@ else
 	set --
 	first=
       fi
-      set -- ${1+"$@"} `filecache "$arg"`
+      set -- ${1+"$@"} `filecache "$arg"` || xit 1
     done
 
     # compute new background
@@ -59,7 +59,7 @@ else
     # note supplied images
     if [ $perdesk ]
     then desktop "$desk" rootbg "$*"
-    else lastvalue "desk_dfltrootbg" "$*"
+    else lastvalue "rootbg" "$*"
     fi
 
     bg=$rootbg
