@@ -15,9 +15,4 @@ imagefile=$1; shift
 imtype=`file2mime "$imagefile"` || exit 1
 [ "x$imtype" = 'ximage/png' ] && exec echo "$imagefile"
 
-tmpf=$TMPDIR/gm$$.png
-trap 'rm -f "$tmpf"' 0 1 2 13 15
-
-gm convert "$imagefile" "png:$tmpf" || exit 1
-saved=`filecache "$tmpf"` || exit 1
-exec printf "$saved\n"
+exec convof -C pngof -discard -x "$imagefile" gm convert "$imagefile" "png:-"
