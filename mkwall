@@ -141,7 +141,7 @@ fi
 convname=pngof
 set gm convert "$imagefile"
 
-if [ "x$shade" != 100 ]
+if [ "x$shade" != x100 ]
 then
   convname=$convname/sh$shade
   ## -modulate does the wrong thing ## set "$@" -modulate "$shade"
