@@ -6,8 +6,10 @@
 
 : ${MAILDIR:=$HOME/mail}
 
+verbose=
 vflag=
-trace=set-x
+trace=
+[ -t 1 ] && { verbose=1 trace=set-x; }
 
 cmd=`basename "$0"`
 usage="Usage: $cmd [-v] [mhdirs...]"
@@ -30,7 +32,7 @@ do
   db=$folder/.mairix.db
   [ -f "$db" -a ! -w "$db" ] && continue
 
-  echo "$folder"
+  [ $verbose ] && echo "$folder"
   $trace mrx-mkrc "$folder" || { xit=1; continue; }
   $trace mairix $vflag -p -f "$folder/.mairixrc" || xit=1
 done
