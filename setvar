@@ -245,6 +245,10 @@ sub envstuff
     return undef;
   }
 
+  sub envkeys()
+  { ::uniq(map((s/[^\w_].*//, $_), keys %envpath));
+  }
+
   loadenvpath();
   for my $needvar (OS,ARCH,SYSTEMID)
   { needenv($needvar);
@@ -279,6 +283,11 @@ sub setvar
 
     $trace && out $_;
 
+    if ($_ eq '*')
+    { unshift(@vars, envkeys());
+      next VAR;
+    }
+
     if (/^use\s+/)
     { $_=$';
       map(usefile($_,0),grep(length,split(/\s+/)));
@@ -293,10 +302,10 @@ sub setvar
 
     if (/^addprefix\s+/)
     { $_=$';
-      for my $pfx (grep(length,split(/\s+/)))
+      for my $pfx (map(estring($_), grep(length,split(/\s+/))))
       { $pfx="/opt/$pfx" unless $pfx =~ /^\//;
 	setenv(PATH,"$::ENV{PATH}:$pfx/bin:$pfx/sbin");
-        setenv(MANPATH,"$::ENV{MANPATH}:$pfx/man");
+        setenv(MANPATH,"$::ENV{MANPATH}:$pfx/man:$pfx/catman");
       }
       next VAR;
     }
