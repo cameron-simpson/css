@@ -1,0 +1,20 @@
+#!/bin/sh -u
+#
+# Report users and groups involved in directories trees.
+#	- Cameron Simpson <cs@zip.com.au> 23aug2005
+#
+
+cmd=`basename "$0"` || cmd=$0
+usage="Usage: $cmd [dirs...]"
+
+[ $# = 0 ] && set -- .
+
+find "$@" -ls \
+| awk '	{ users[$5]++; groups[$6]++; }
+    END	{ printf("Users:")
+	  for (u in users) { printf(" %s",u); }
+	  printf "\n";
+	  printf("Groups:")
+	  for (g in groups) { printf(" %s",g); }
+	  printf "\n";
+	}'
