@@ -35,16 +35,28 @@ then
 fi
 
 new=
-
 for envfile in "$0" $ENVFILES
 do
-  if [ -s "$envfile" ]
+  if [ -d "$envfile/." ]
   then
-    if [ -z "$file" ] || [ ! -f "$file" ] || [ "$envfile" -nt "$file" ]
+    for f in "$envfile/"*
+    do
+      if [ -z "$file" ] || [ ! -f "$file" ] || [ "$envfile" -nt "$file" ]
+      then
+	new=1
+	break
+      fi
+    done
+  else
+    if [ -s "$envfile" ]
     then
-      new=1
+      if [ -z "$file" ] || [ ! -f "$file" ] || [ "$envfile" -nt "$file" ]
+      then
+	new=1
+      fi
     fi
   fi
+  [ $new ] && break
 done
 
 if [ $new ]
@@ -52,10 +64,22 @@ then
   ##set -x
   for envfile in $ENVFILES
   do
-    if [ -s "$envfile" ]
+    if [ -d "$envfile/." ]
     then
-      echo "echo \"\$0: source $envfile\" >&2; "
-      cat "$envfile"
+      for f in "$envfile/*"
+      do
+	if [ -s "$f" ]
+	then
+	  echo "echo \"\$0: source $f\" >&2; "
+	  cat "$f"
+	fi
+      done
+    else
+      if [ -s "$envfile" ]
+      then
+	echo "echo \"\$0: source $envfile\" >&2; "
+	cat "$envfile"
+      fi
     fi
   done
   [ -n "$file" ] && touch "$file"
