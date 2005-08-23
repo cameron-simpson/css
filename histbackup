@@ -32,8 +32,7 @@
 #
 # Before deployment, decide who will own and do the backups.
 # Do all the local (backup end) setup as that user.
-# If you're not a sysadmin,
-# that user is probably yourself.
+# If you're not a sysadmin then that user is probably yourself.
 #
 # Generally, setup is as follows:
 #
@@ -66,7 +65,7 @@
 #
 # If these backups are to happen regularly
 # a crontab(5) entry should be made to do so.
-# Use "C<crontab -e>" to mak this.
+# Use "C<crontab -e>" to make this.
 # Example:
 #
 #	MAILTO=backup-admin@yoursite
