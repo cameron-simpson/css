@@ -99,9 +99,16 @@ then
     then
 	# list every attribute of every id; output is
 	#	id\tattr\tvalue
-	for f in [0-9]*/*
-	do  [ -s "$f" ] || continue
-	    necho "$f	" | tr / '	'; tail -1 "$f"
+	for id in [0-9]*
+	do
+	  ( cd "$id" || exit 1
+	    for attr in *
+	    do
+	      [ -s "$attr" ] || continue
+	      printf "%s\t%s\t" "$id" "$attr"
+	      tail -1 "$attr"
+	    done
+	  )
 	done
     else
 	# list the name for every id; output is
@@ -180,10 +187,7 @@ fi
 # not setting it? report current value if any
 if [ -z "$haspvalue" ]
 then
-  if [ -s "$pfile" ]
-  then pvalue=`tail -1 "$pfile" 2>/dev/null`
-  else pvalue=
-  fi
+  pvalue=`[ ! -s "$pfile" ] || tail -1 "$pfile"`
   echo "$pvalue"
   exit $?
 fi
@@ -192,13 +196,16 @@ fi
 if [ "x$param" = "xname" ]
 then
     case "$pvalue" in
-      */*)	echo "$cmd: $pvalue: illegal name - slashes forbidden" >&2
-		exit 2
-		;;
-      *[^0-9]*)	;;
-      *)	echo "$cmd: $pvalue: illegal name - may not be a number" >&2
-		exit 2
-		;;
+      */*)
+	echo "$cmd: $pvalue: illegal name - slashes forbidden" >&2
+	exit 2
+	;;
+      *[^0-9]*)
+	;;
+      *)
+	echo "$cmd: $pvalue: illegal name - may not be a number" >&2
+	exit 2
+	;;
     esac
 
     [ -n "$idnum"  ] || idnum=`readsymlink "$idname"` || exit 1
