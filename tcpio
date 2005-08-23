@@ -9,13 +9,18 @@ use Getopt::Std;
 use cs::Net::TCP;
 
 ($::cmd=$0) =~ s:.*/::;
-$usage="Usage: $::cmd [-io] [-p localport | -P localport] [-l logbase] host port
+$usage="Usage: $::cmd [-io] [-u user[:group]] [-p localport | -P localport] [-l logbase] host port
+	-u user[:group]
+		Setuid to the specified user and group.
+		In connect mode, do so after connection.
+		In accept mode, do so after binding the listening port.
+		If group is omitted, use the group with the name of the user.
 	-i	Copy in; copy from the connection to stdout.
 	-o	Copy out; copy stdin to the connection.
 	-p	Bind local end of connection to specified port.
 	-P	Bind local end of connection to specified port,
 		or the next free one above that.
-       $::cmd -a [-io1] [-l logbase] port command [args]
+       $::cmd -a [-io1] [-u user[:group]] [-l logbase] port command [args]
 	-a	Accept connections on the given port.
 	-1	Accept only the first connection.
 	The port may include an \"address:\" prefix to bind to a specific
@@ -30,9 +35,10 @@ my $logto;
 my $accmode=0;
 my $onceonly=0;
 my $killreader=0;
+my $ugid;
 
 my %opt;
-getopts('a1iop:P:l:k',\%opt) || ($badopts=1);
+getopts('a1iop:P:l:ku:',\%opt) || ($badopts=1);
 $accmode=$opt{'a'};
 $onceonly=$opt{'1'};
 $copyin =($opt{'i'} || !$opt{'o'});
@@ -41,6 +47,7 @@ $logto=$opt{'l'} if defined $opt{'l'};
 $killreader=1 if defined $opt{'k'};
 if ($opt{'p'})		{ $localport=$opt{'p'}; $firstfree=0; }
 elsif ($opt{'P'})	{ $localport=$opt{'P'}; $firstfree=1; }
+$ugid=$opt{'u'} if defined $opt{'u'};
 
 if ($opt{'p'} && $opt{'P'})	
 { warn "$::cmd: can't use both -p and -P\n";
@@ -60,6 +67,37 @@ if (!$accmode && !defined($host=shift))
 if (!defined($port=shift))
 { warn "$::cmd: missing port name\n";
   $badopts=1;
+}
+
+my($user,$group);
+if (defined $ugid)
+{
+  if ($ugid =~ /:/)
+  { $user=$`; $group=$'; }
+  else
+  { $user=$ugid; $group=$ugid; }
+
+  if ($user =~ /^\d+$/) { $user=$user+0; }
+  else			{ my @pw = getpwnam($user);
+			  if (@pw)
+			  { $user=$pw[2];
+			  }
+			  else
+			  { warn "$::cmd: can't look up user \"$user\"\n";
+			    $badopts=1;
+			  }
+			}
+
+  if ($group =~ /^\d+$/){ $group=$group+0; }
+  else			{ my @gr = getgrnam($group);
+			  if (@gr)
+			  { $group=$gr[2];
+			  }
+			  else
+			  { warn "$::cmd: can't look up group \"$group\"\n";
+			    $badopts=1;
+			  }
+			}
 }
 
 if ($accmode)
@@ -90,6 +128,13 @@ if ($accmode)
 # supply service
 { my $this = new cs::Net::TCP $port;
   die "$::cmd: can't bind to port $port: $!" if ! defined $this;
+  if (defined($group) && POSIX::setgid($group) != 0)
+  { die "$::cmd: setgid($group): $!";
+  }
+  if (defined($user) && POSIX::setuid($user) != 0)
+  { die "$::cmd: setuid($user): $!";
+  }
+  POSIX::setgid
   $this->Serve(($onceonly ? $cs::Net::TCP::F_ONCE
 			  : $cs::Net::TCP::F_FORK|$cs::Net::TCP::F_FORK2),
 	       SERVICE);
@@ -100,6 +145,13 @@ if ($accmode)
 # connect to service
 die "$::cmd: can't connect to $host:$port: $!\n"
 	unless defined ($CONN=new cs::Net::TCP ($host,$port,$localport));
+
+if (defined($group) && !defined(POSIX::setgid($group)))
+{ die "$::cmd: setgid($group): $!";
+}
+if (defined($user) && !defined(POSIX::setuid($user)))
+{ die "$::cmd: setuid($user): $!";
+}
 
 my $mainpid=$$;
 if ($copyin && $copyout)
