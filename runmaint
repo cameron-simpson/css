@@ -29,12 +29,8 @@
 #
 # =head1 INSTALLATION
 #
-# Normally I<runmaint> is installed as a kit under a prefix
-# such as B</usr> or B</opt/runmaint> or B</usr/local>,
-# with the script itself in B</usr/bin/runmaint> or B</opt/runmaint/bin/runmaint> or B</usr/local/bin/runmaint>
-# and so forth.
-# The examples below presume the prefix is B</>
-# and should be adjusted to your install arrangement.
+# Normally I<runmaint> is installed as part of the B<css> package in </opt/css>,
+# and the examples below are written on that basis.
 #
 # =head1 PERSONAL SETUP
 #
@@ -111,23 +107,26 @@
 # =head2 RUNMAINT_DIR
 #
 # Installation prefix, typically C</opt/css> or C</usr/local>.
+# If not set, runmaint attempts to guess it.
 # The C</opt/css> path fits the syncopt scheme as described here:
 #
 #	http://www.cskk.ezoshosting.com/cs/syncopt/
 #
-# If not set, runmaint attempts to guess it.
+# The B<css> package is here:
+#
+#	http://www.cskk.ezoshosting.com/cs/css/
 #
 
-: ${RUNMAINT_DIR:=/opt/runmaint}
+: ${RUNMAINT_DIR:=/opt/css}
 MaintDir=$RUNMAINT_DIR
-
-: ${OPTCSS:=/opt/css}
-export OPTCSS
-[ -s "$OPTCSS/env.sh" ] && . "$OPTCSS/env.sh"
 
 # tack on a few things to help find stuff like whoami
 PATH=$PATH:/usr/ucb
 export PATH
+
+: ${OPTCSS:=/opt/css}
+export OPTCSS
+[ -s "$OPTCSS/env.sh" ] && . "$OPTCSS/env.sh"
 
 : ${SYSTEMID:=localdomain}
 : ${USER:=`whoami || id -un`}
@@ -158,12 +157,6 @@ export RUNMAINT_DIR MaintDir \
        RUNMAINT_SCRIPTS MaintScripts \
        RUNMAINT RunMaint
 
-: ${OPTCSS:=/opt/css}
-export OPTCSS
-if [ -s "$OPTCSS/env.sh" ]
-then  . "$OPTCSS/env.sh"
-else  echo "$0: warning: no $OPTCSS/env.sh" >&2
-fi
 
 usage="Usage: $0 [-d dir] [-s subj] [-date datestr] [-x] target [addresses]
     See:
