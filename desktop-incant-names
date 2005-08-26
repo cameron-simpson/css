@@ -1,0 +1,17 @@
+#!/bin/sh -u
+#
+# Incant fresh menus for named desktops.
+#	- Cameron Simpson <cs@zip.com.au> 25aug2005
+#
+
+cmd=$0
+usage="Usage: $0 [-]
+	-	Write commands to stdout instead of to FVWM."
+
+if [ $# = 0 ]
+then
+  "$0" - | fvwmcmd
+else
+  fvwm-menu -1 -t 'Switch To Named Desk' NamedDeskTops  fvwm-menu-desks -o SwitchToDesk
+  fvwm-menu -1 -t 'Push To Named Desk'   PushToDeskTops fvwm-menu-desks -o PushToDesk
+fi
