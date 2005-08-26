@@ -5,8 +5,25 @@
 #
 
 op=SwitchToDesk
+menuname=
+
+cmd=`basename "$0"` || cmd=$0
+usage="Usage: $cmd [-o op] [menuname]
+	-o op		Specify desk operation. Default: $op
+	menuname	Generate complete static menu definition for named menu."
 
 [ "x$1" = x-o ] && { op=$2; shift; shift; }
+if [ $# -gt 0 ]
+then
+  menuname=$1; shift
+  [ $# = 0 ] || { echo "$cmd: extra arguments after menuname: $*" >&2
+		  badopts=1
+		}
+fi
+
+[ $adopts ] && { echo "$usage" >&2; exit 2; }
+
+[ -n "$menuname" ] && exec fvwm-menu -1 -t "$menuname" "$menuname" "$0" -o "$op"
 
 desktop \
 | sort +1 \
