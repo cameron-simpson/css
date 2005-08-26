@@ -155,6 +155,9 @@ case "$TERM,$DISPLAY" in
 			;;
 	    urxvtc)	[ $dotrans ] && termopts="$termopts -ip -tint $tint -sh $shade"
 	    		[ $async ] || PREFTERM=urxvt	# gotta be synchronous
+			case "$DISPLAY" in
+			  :*) ;; *) PREFTERM=urxvt ;;
+			esac
 			;;
 	    aterm)	# -fade 90
 			[ $dotrans ] && termopts="$termopts -tr -sh $shade"
