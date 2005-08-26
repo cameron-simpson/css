@@ -57,7 +57,7 @@ fi
 
 case "$pos" in
   '')	;;
-  end)	set -- "$@" "$arg" ;;
+  end)	set -- ${1+"$@"} "$arg" ;;
   *)	first=1
 	gotarg=1
 	skipped=0
@@ -74,4 +74,4 @@ esac
 
 [ $dostdin ] && exec <"$arg"
 
-exec $trace "$command" "$@"
+exec $trace "$command" ${1+"$@"}
