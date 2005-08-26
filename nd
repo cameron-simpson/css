@@ -40,7 +40,9 @@ case "$deskname" in
     ;;
 esac
 set -x
-fvwmcmd "GotoDesk 0 $desknum" "DesktopName $desknum '$deskname'" &
+( fvwmcmd "GotoDesk 0 $desknum" "DesktopName $desknum '$deskname'"
+  desktop-incant-names
+) &
 ( lastdesk=`lastvalue "desktop-$HOST"`
   if [ "x$lastdesk" != "x$desknum" ]
   then
