@@ -1211,7 +1211,7 @@ sub ExecuteWithRec
 { my($isth)=shift;
 
   my($dbh,$table,$sql,$sth,$dfltok,@fields)=@$isth;
-  ##warn "ExecuteWithRec: sql =\n$sql\n";
+  ##warn "ExecuteWithRec: sql =\n$sql\n\tfields = [@fields]";
 
   my $ok = 1;
 
@@ -1248,7 +1248,7 @@ sub ExecuteWithRec
     ## for (@execargs) { $_=' ' if defined && ! length; }
 
 
-    ##{my@c=caller;warn "sth=[$sth] from [@c]";}
+    ##{my@c=caller;warn "sth=".cs::Hier::h2a($sth,1)."\nexecargs[@execargs]\nfrom [@c]";}
 
     if (! $sth->execute(@execargs))
     { warn "$::cmd: ERROR with insert";
