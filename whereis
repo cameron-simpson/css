@@ -33,6 +33,7 @@ do
     | cl|close \
     | ln|lane \
     | pd|pde|parade \
+    | hw|hwy|highway \
     )
       shift; break ;;
   esac
