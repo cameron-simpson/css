@@ -76,7 +76,7 @@ esac
 
 sh -c "$reportcmd" >"$tmpf" || exit 1
 
-arg1 $arg1opts "$itemname" "$editcommand" "$@"
+arg1 $arg1opts "$itemname" "$editcommand" ${1+"$@"}
 xit=$?
 
 sh -c "$reportcmd" | diffu "$tmpf" - | buglog "$itemname:$editcommand: $message"
