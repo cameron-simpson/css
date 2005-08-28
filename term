@@ -86,7 +86,7 @@ do
     -h)		h=$2 ; shift ;;
     -x)		x=$2 ; shift ;;
     -y)		y=$2 ; shift ;;
-    -n)		title=$2 ; shift ;;
+    -n|-T)	title=$2 ; shift ;;
     -f)		f=$2 ; shift ;;
     -env)	exec genv TERMOPTIONS TERMTINT TERMSHADE ;;
     -big)	sized=1 x=$bigx y=$bigy w=$bigw h=$bigh f=$bigf ;;
@@ -153,7 +153,7 @@ case "$TERM,$DISPLAY" in
 	case "$PREFTERM" in
 	    rxvt)	[ $dotrans ] && termopts="$termopts -ip"
 			;;
-	    urxvtc)	[ $dotrans ] && termopts="$termopts -ip -tint $tint -sh $shade"
+	    urxvt*)	[ $dotrans ] && termopts="$termopts -ip -tint $tint -sh $shade"
 	    		[ $async ] || PREFTERM=urxvt	# gotta be synchronous
 			case "$DISPLAY" in
 			  :*) ;; *) PREFTERM=urxvt ;;
