@@ -6,12 +6,15 @@
 
 : ${DESKTOPSET:=desktop}
 
-fvwmcmd 'Colorset 1023 Foreground Green, Background Black'
+if [ $# = 0 ]
+then
+  "$0" - | fvwmcmd
+else
+  echo 'Colorset 1023 Foreground Green, Background Black'
 
-( seq 0 63 \
+  seq 0 63 \
   | awk '{print "*FvwmBacker: Command (Desk " $1 ") colorset 1023" }'
 
   idsetlist "$DESKTOPSET" name \
   | awk '$2 != "." { print "DesktopName", $1, $2 }'
-) \
-| fvwmcmd
+fi
