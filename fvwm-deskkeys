@@ -4,11 +4,14 @@
 #	- Cameron Simpson <cs@zip.com.au> 10aug2002
 
 for fn in 1 2 3 4 5 6 7 8 9 10 11 12
-do  fn1=$fn	## `expr $fn - 1`
-    fn12=`expr $fn + 12`
-    echo "KeyFn DeskOps \"SwitchToDesk $fn\" F$fn A M  \"SwitchToDesk 0 $fn1\""
-    echo "Key                                      F$fn A MS \"SwitchToDesk 0 $fn12\""
-    echo "KeyFn DeskOps \"PushToDesk $fn\"      F$fn W S  \"PushToDesk   0 $fn1\""
-    echo "Key                                      F$fn W CS   PushToDesk   0 $fn12"
-    echo "KeyFn DeskWinLists \"Desk $fn\"          F$fn R C  \"WindowList Desk $fn1, Alphabetic\""
+do
+  fn1=$fn	## `expr $fn - 1`
+  fn12=`expr $fn + 12`
+  echo "SetEnv CURRENT_MENU DeskOps"
+  echo "KeyFn \"SwitchToDesk $fn\" F$fn A M  \"SwitchToDesk 0 $fn1\""
+  echo "Key                        F$fn A MS \"SwitchToDesk 0 $fn12\""
+  echo "KeyFn \"PushToDesk $fn\"   F$fn W S  \"PushToDesk   0 $fn1\""
+  echo "Key                        F$fn W CS   PushToDesk   0 $fn12"
+  echo "SetEnv CURRENT_MENU DeskWinLists"
+  echo "KeyFn \"Desk $fn\"         F$fn R C  \"WindowList Desk $fn1, Alphabetic\""
 done
