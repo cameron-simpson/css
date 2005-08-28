@@ -6,5 +6,11 @@
 
 . $HOME/rc/x11/xenv.sh
 
-uncurly $HOME/rc/x11/fvwm/rc \
+(
+  uncurly $HOME/rc/x11/fvwm/rc-curly
+  desktop-incant -
+  desktop-incant-names -
+  fvwm-deskkeys
+  echo SwitchToDesk 1
+) \
 | tee $HOME/tmp/fv.rc-$HOST-$DISPLAY
