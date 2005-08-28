@@ -39,9 +39,9 @@ then
     bg=
     if [ $perdesk ]
     then desktop -r "$desk" rootbg
-    else lastvalue "rootbg" ""
     fi
 else
+    srcargs=$*
     first=1
     for arg
     do
@@ -54,12 +54,17 @@ else
     done
 
     # compute new background
-    rootbg=`set-x mkwall "$@"` || exit 1
+    rootbg=`mkwall "$@"` || exit 1
 
     # note supplied images
     if [ $perdesk ]
-    then desktop "$desk" rootbg "$*"
-    else lastvalue "rootbg" "$*"
+    then
+      desktop "$desk" rootbg "$*"
+      desktop "$desk" rootbg_src "$srcargs"
+    else
+      lastvalue "rootbg-$HOST" "$*"
+      lastvalue "rootbg" "$*"
+      lastvalue "rootbg_src" "$srcargs"
     fi
 
     bg=$rootbg
@@ -75,6 +80,6 @@ then
     echo "*FvwmBacker: Command (Desk $desk) colorset $cset"
 else
     # apply new default background
-    echo "Colorset 1023 AspectPixmap $bg"
+    echo "Colorset 1023 Pixmap $bg"
 fi \
 | fvwmcmd
