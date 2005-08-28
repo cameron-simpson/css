@@ -8,13 +8,13 @@ cmd=`basename "$0"`
 usage="Usage: $cmd [-o sshopt] [-[xX] [-l login] [-a] [-n] [-v] [-x] host command [args...]
 	-l login	Specify remote login name.
 	-o sshopt	Pass option to ssh.
-	-a		Asynchronous.
 	-n		Input from /dev/null.
 	-t		Require a tty.
 	-x -X		Passed to ssh.
 	-v		Verbose."
 
 rsh=ssh
+trace=
 
 badopts=
 
@@ -22,8 +22,8 @@ sshopts=
 async=
 nflag=
 tflag=
-vecho=:
 xset=:
+vecho=:
 
 eval `rigSOURCE_DISPLAY`
 passvars='DISPLAY_SYSTEMID SOURCE_HOST SOURCE_DISPLAY'
@@ -32,9 +32,8 @@ while :
 do
     case $1 in
 	-[lo])	sshopts="$sshopts $1 '$2'"; shift ;;
-	-n)	nflag=-n ;;
-	-[tfxX])sshopts="$sshopts $1" ;;
-	-v)	xset='set -vx' sshopts="$sshopts -v"
+	-[ntfxX])sshopts="$sshopts $1" ;;
+	-v)	setx='set -x' trace=set-x sshopts="$sshopts -v"
 		vecho=echo
 		set -x ;;
 	--)	shift; break ;;
@@ -71,7 +70,7 @@ rcmd="$xset
       $vecho loading environment ...
       [ -s \"\$env\" ] && . \"\$env\"
       $vecho running ...
-      $xset
+      $setx
       $*"
 
 eval "$xset; exec ssh $sshopts $host \"\$rcmd\""
