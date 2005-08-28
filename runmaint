@@ -86,7 +86,7 @@
 #
 # Before running any script
 # B<runmaint> sources the file
-# B</etc/runmaint/env>.
+# B</opt/css/etc/runmaint/env>.
 # Systemwide default environment settings go in here as shell commands.
 # After this the file
 # B<~/.maint/env> is sourced.
@@ -94,7 +94,7 @@
 #
 # Usually you will want the cron environment to resemble the login
 # environment closely
-# and so B</etc/runmaint/env> would normally contain the line
+# and so B</opt/css/etc/runmaint/env> would normally contain the line
 #
 #	. /etc/profile
 #
@@ -106,26 +106,25 @@
 #
 # =head2 RUNMAINT_DIR
 #
-# Installation prefix, typically C</opt/css> or C</usr/local>.
-# If not set, runmaint attempts to guess it.
-# The C</opt/css> path fits the syncopt scheme as described here:
+# The installation prefix, typically C</opt/css> or C</usr/local>.
+# The default comes from B<$OPTCSS> (default: B</opt/css>)
+# fitting the syncopt scheme as described here:
 #
 #	http://www.cskk.ezoshosting.com/cs/syncopt/
 #
-# The B<css> package is here:
+# The B<css> package itself is here:
 #
 #	http://www.cskk.ezoshosting.com/cs/css/
 #
 
-: ${RUNMAINT_DIR:=/opt/css}
+: ${OPTCSS:=/opt/css}; export OPTCSS
+: ${RUNMAINT_DIR:=$OPTCSS}
 MaintDir=$RUNMAINT_DIR
 
 # tack on a few things to help find stuff like whoami
 PATH=$PATH:/usr/ucb
 export PATH
 
-: ${OPTCSS:=/opt/css}
-export OPTCSS
 [ -s "$OPTCSS/env.sh" ] && . "$OPTCSS/env.sh"
 
 : ${SYSTEMID:=localdomain}
