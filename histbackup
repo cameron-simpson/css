@@ -316,7 +316,9 @@ xit=0
 if [ -n "$lastbackup" -a -d "$dest/$lastbackup/." ]
 then
     $echo "existing backup: linking $lastbackup to $thisbackup ..."
-    mklinktree "$dest/$lastbackup" "$dest/$thisbackup" \
+    ( cd "$dest" || exit 1
+      mklinktree "$lastbackup" "$thisbackup"
+    ) \
     || echo "$cmd: warning: mklinktree $dest/$lastbackup $dest/$thisbackup fails" >&2
 
     if [ $linkonly ]
