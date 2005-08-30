@@ -730,18 +730,18 @@ sub CopyTo
   local($_);
 
   COPY:
-    while ((! defined $max || $max > 0)
-	&& defined ($_=$this->Read(defined $max
-					? $max
-					: $this->ReadSize()))
-	&& length)
-	{ $copied+=length;
-	  if (! $sink->Put($_))
-		{ warn "$::cmd: CopyTo: Put fails";
-		  last COPY;
-		}
-	  ## warn "copied [$_]";
-	}
+  while ((! defined $max || $max > 0)
+      && defined ($_=$this->Read(defined $max
+				      ? $max
+				      : $this->ReadSize()))
+      && length)
+  { $copied+=length;
+    if (! $sink->Put($_))
+    { warn "$::cmd: CopyTo: Put fails";
+      last COPY;
+    }
+    ## warn "copied [$_]";
+  }
 
   $copied;
 }
@@ -770,14 +770,14 @@ sub DupToFILE
   my($c1);
 
   if (wantarray)
-	{ my($c1);
+  { my($c1);
 
-	  $c1=$this->Get();
-	  print $FILE $c1;
-	  sysseek($FILE,0,0) || warn "$::cmd: rewind(tmpfile): $!";
+    $c1=$this->Get();
+    print $FILE $c1;
+    sysseek($FILE,0,0) || warn "$::cmd: rewind(tmpfile): $!";
 
-	  return ($FILE,(new cs::Source (SCALAR,\$c1)));
-	}
+    return ($FILE,(new cs::Source (SCALAR,\$c1)));
+  }
 
   ::need(cs::Sink);
   my($sink)=new cs::Sink (FILE,$FILE);
@@ -787,6 +787,53 @@ sub DupToFILE
   sysseek($FILE,0,0) || warn "$::cmd: rewind(tmpfile): $!";
 
   return $FILE;
+}
+
+sub PipeThru($$)
+{ my($this,$shcmd)=@_;
+
+  my $pid;
+
+  my $pr = cs::IO::mkHandle();
+  my $pw = cs::IO::mkHandle();
+  pipe($pr,$pw) || die "$::cmd: pipe(): $!";
+
+  $pid=fork();
+  die "$::cmd: fork(): $!" if ! defined $pid;
+  if ($pid > 0)
+  # mainline program - just read from pipe
+  {
+    close($pw) || warn "$::cmd: close($pw): $!";
+    return new cs::Source(FILE,$pr);
+  }
+
+  # child - fork into filter and feeder
+  $::cmd="$::cmd: PipeThru-child";
+  close($pr) || warn "$::cmd: close($pr): $!";
+  open(STDOUT,">&$pw") || warn "$::cmd: dup($pw,STDOUT): $!";
+  close($pw) || warn "$::cmd: close($pw): $!";
+
+  pipe($pr,$pw) || die "$::cmd: pipe(): $!";
+
+  $pid=fork();
+  die "$::cmd: fork(): $!" if ! defined $pid;
+  if ($pid > 0)
+  # immediate child - exec shell command
+  {
+    close($pw) || warn "$::cmd:: close($pw): $!";
+    open(STDIN,"<&$pr") || die "$::cmd:: dup($pr,STDIN): $!";
+    close($pr) || warn "$::cmd: close($pr): $!";
+    exec('/bin/sh','-c',$shcmd);
+    die "$::cmd: exec(sh -c $shcmd): $!";
+  }
+
+  # grandchild - copy $this to pipe
+  $::cmd="$::cmd: PipeThru-grandchild";
+  close($pr) || warn "$::cmd: close($pr): $!";
+  close(STDOUT) || warn "$::cmd: close(STDOUT): $!";
+  close(STDIN) || warn "$::cmd: close(STDIN): $!";
+  $this->CopyTo(new cs::Sink(FILE,$pw));
+  exit(0);
 }
 
 1;
