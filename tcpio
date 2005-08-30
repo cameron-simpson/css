@@ -134,7 +134,6 @@ if ($accmode)
   if (defined($user) && POSIX::setuid($user) != 0)
   { die "$::cmd: setuid($user): $!";
   }
-  POSIX::setgid
   $this->Serve(($onceonly ? $cs::Net::TCP::F_ONCE
 			  : $cs::Net::TCP::F_FORK|$cs::Net::TCP::F_FORK2),
 	       SERVICE);
@@ -143,8 +142,8 @@ if ($accmode)
 }
 
 # connect to service
-die "$::cmd: can't connect to $host:$port: $!\n"
-	unless defined ($CONN=new cs::Net::TCP ($host,$port,$localport));
+$CONN=new cs::Net::TCP ($host,$port,$localport);
+die "$::cmd: can't connect to $host:$port: $!\n" if !defined($CONN);
 
 if (defined($group) && !defined(POSIX::setgid($group)))
 { die "$::cmd: setgid($group): $!";
