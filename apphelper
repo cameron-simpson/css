@@ -8,9 +8,10 @@
 : ${TMPDIR:=/tmp}
 : ${PAGER:=less}
 : ${SAVEDIR:=$HOME/dl}
-: ${APPHELPER_SAVEMODE:=auto}
 : ${APPHELPER_REMAPFILE:=$HOME/rc/remap}
 : ${APPHELPER_SAVEMAP:="remap \"\$APPHELPER_REMAPFILE\" | tr '[A-Z_]' '[a-z-]'"}
+: ${APPHELPER_SAVEMODE:=auto}
+: ${APPHELPER_SAVEPOST:=''}
 : ${APPHELPER_IDSET:=$HOME/var/apphelper}
 : ${APPHELPER_DOVIEW:=''}
 : ${APPHELPER_EXTRACT_GLOBS:=''}
@@ -28,6 +29,7 @@ extract=
 extract_globs=$APPHELPER_EXTRACT_GLOBS
 termname=
 pager=$PAGER
+savepost=$APPHELPER_SAVEPOST
 trace=	##set-x
 arg1opts=
 
@@ -602,7 +604,7 @@ esac
 parent=`dirname "$saveas"`
 [ -d "$parent/." ] \
 || if ask "mkdir $parent"
-then  mkdir -p "$parent" || exit 1
+then  $trace mkdir -p "$parent" || exit 1
 else  exit 0
 fi
 
@@ -611,15 +613,25 @@ fi
   pwd | lastvalue "$APPHELPER_LASTVALUE" -
 )
 
-if [ -f "$saveas" -a -s "$saveas" ] && cmp -s "$file" "$saveas"
+xit=1
+
+if { [ -f "$saveas" -a -s "$saveas" ] && cmp -s "$file" "$saveas"; } \
+|| $trace cp -i "$file" "$saveas"
 then
-  # note location and exit
-  exec fileloc -a "$saveas"
+  xit=0
+  $trace fileloc -a "$saveas" || xit=1
+  if [ -n "$savepost" ]
+  then
+    if qsaveas=`shqstr "$saveas"`
+    then
+      $trace sh -c "$savepost $qsaveas" || xit=1
+    else
+      xit=1
+    fi
+  fi
 fi
 
-# no exec so the trap gets to run
-cp -i "$file" "$saveas" && fileloc -a "$saveas"
-exit
+exit $xit
 
 # =head1 EXAMPLE
 #
