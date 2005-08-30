@@ -352,50 +352,50 @@ sub Serve	# (this,flags,func,@args) -> void
   warn "$::cmd: can't use F_SYNC and F_FORK2" if $sync && $dofork2;
 
   if (! ref $func && $func !~ /'|::/)
-	{ my($caller,@etc)=caller;
-	  $func=$caller."::".$func;
-	}
+  { my($caller,@etc)=caller;
+    $func=$caller."::".$func;
+  }
 
   my($conn,$pid);
 
   CONN:
-    while (defined ($conn=$this->Accept()))
-    { if ($dofork || $dofork2)
-      { if (defined($pid=fork))
-	{ if ($pid)
-	  # parent
-	  { undef $conn;
-	    waitpid($pid,0) if $sync || $dofork2;
-	    last CONN if $onceonly;
-	    next CONN;
-	  }
-	  elsif ($dofork2)
-	  # child - make grandchild
-	  { if (! defined ($pid=fork))
-	    { warn "subfork fails(): $!; a zombie will result";
-	    }
-	    else
-	    { exit 0 if $pid;
-	    }
-
-	    # child or grandchild proceeds
-	    close($this->{cs::Net::TCP::SOCKET})
-	    	|| warn "$::cmd: child: can't close($this->{cs::Net::TCP::SOCKET}): $!\n";
-	  }
-	}
-	else
-	{ warn "fork(): $!";
+  while (defined ($conn=$this->Accept()))
+  { if ($dofork || $dofork2)
+    { if (defined($pid=fork))
+      { if ($pid)
+	# parent
+	{ undef $conn;
+	  waitpid($pid,0) if $sync || $dofork2;
+	  last CONN if $onceonly;
 	  next CONN;
 	}
+	elsif ($dofork2)
+	# child - make grandchild
+	{ if (! defined ($pid=fork))
+	  { warn "subfork fails(): $!; a zombie will result";
+	  }
+	  else
+	  { exit 0 if $pid;
+	  }
+
+	  # child or grandchild proceeds
+	  close($this->{cs::Net::TCP::SOCKET})
+	      || warn "$::cmd: child: can't close($this->{cs::Net::TCP::SOCKET}): $!\n";
+	}
       }
-
-      &$func($conn,@args);
-      undef $conn;	# flush, close, etc
-
-      exit 0 if $dofork;
-
-      last CONN if $onceonly;
+      else
+      { warn "fork(): $!";
+	next CONN;
+      }
     }
+
+    &$func($conn,@args);
+    undef $conn;	# flush, close, etc
+
+    exit 0 if $dofork;
+
+    last CONN if $onceonly;
+  }
 }
 
 =back
