@@ -1728,7 +1728,7 @@ sub _URLsFromMIME($$$$)
 
     return;
   }
-  
+
   if ($type eq TEXT)
   {
     if ($subtype eq HTML)
