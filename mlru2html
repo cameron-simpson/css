@@ -44,7 +44,9 @@ for $key (sort keys %list)
       { print "\t<A HREF=\"mailto:$_->{$field}\">$_->{$field}</A><BR>\n";
       }
       else
-      { print "\t", $_->{$field}, "<BR>\n";
+      { my $pf = $_->{$field};
+	$pf =~ s|\@|<SCRIPT>document.write("&#64;")</SCRIPT><NOSCRIPT>&#64;</NOSCRIPT>|g;
+	print "\t$pf<BR>\n";
       }
     }
 }
