@@ -25,8 +25,8 @@ fi
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
 if [ "x$refpid" = x- ]
-then  file=
-else  file=$TMPDIR/env$refpid
+then  reffile=
+else  reffile=$TMPDIR/env$refpid
 fi
 if [ $# -gt 0 ]
 then
@@ -34,55 +34,38 @@ then
     exec "$@"
 fi
 
-new=
-for envfile in "$0" $ENVFILES
+envfiles=
+for envpath in $ENVFILES
 do
-  if [ -d "$envfile/." ]
+  if [ -d "$envpath/." ]
   then
-    for f in "$envfile/"*
+    for envfile in "$envpath"/*
     do
-      if [ -z "$file" ] || [ ! -f "$file" ] || [ "$envfile" -nt "$file" ]
-      then
-	new=1
-	break
-      fi
+      [ -f "$envfile" -a -s "$envfile" ] && envfiles="$envfiles $envfile"
     done
   else
-    if [ -s "$envfile" ]
-    then
-      if [ -z "$file" ] || [ ! -f "$file" ] || [ "$envfile" -nt "$file" ]
-      then
-	new=1
-      fi
-    fi
+    [ -f "$envpath" -a -s "$envpath" ] && envfiles="$envfiles $envpath"
   fi
-  [ $new ] && break
 done
+
+if [ -n "$reffile" ]
+then
+  new=
+  for testfile in "$0" $envfiles
+  do
+    if [ "$testfile" -nt "$reffile" ]
+    then
+      new=1
+      break
+    fi
+  done
+else
+  new=1
+fi
 
 if [ $new ]
 then
-  ##set -x
-  for envfile in $ENVFILES
-  do
-    if [ -d "$envfile/." ]
-    then
-      for f in "$envfile/*"
-      do
-	if [ -s "$f" ]
-	then
-	  echo "echo \"\$0: source $f\" >&2; "
-	  cat "$f"
-	fi
-      done
-    else
-      if [ -s "$envfile" ]
-      then
-	echo "echo \"\$0: source $envfile\" >&2; "
-	cat "$envfile"
-      fi
-    fi
-  done
-  [ -n "$file" ] && touch "$file"
-  ##set +x
+  [ -n "$reffile" ] && touch "$reffile"
+  cat $envfiles
   echo "PATH='$PATH'; export PATH"	# just in case
 fi
