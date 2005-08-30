@@ -124,33 +124,38 @@ sub parseTypeParams($)
   ($params,$_);
 }
 
-=item decodedSource(I<source>, I<cte>, I<istext>)
+=item decodedSource(I<source>, I<enc>, I<istext>)
 
 Return a new B<cs::Source>
 containing the decoded content of the supplied B<cs::Source> I<source>
-according to the supplied B<Content-Transfer-Encoding> string I<cte>
+according to the supplied encoding string I<enc>
+(as for the C<Content-Encoding> or C<Content-Transfer-Encoding> headers)
 and optional I<istext> flag.
 I<istext> defaults to false for B<BASE64> data and true for B<QUOTED-PRINTABLE> data.
 
 =cut
 
 sub decodedSource($$;$)
-{ my($s,$cte,$isText)=@_;
-  $cte=uc($cte);
+{ my($s,$enc,$isText)=@_;
+  $enc=uc($enc);
 
-  if ($cte eq '8BIT' || $cte eq '7BIT' || $cte eq 'BINARY')
+  ##warn "decodedSource: enc=[$enc], istext=[$isText]";
+  if ($enc eq '8BIT' || $enc eq '7BIT' || $enc eq 'BINARY' || $enc eq 'IDENTITY')
   # recognised null-encodings
   { }
-  elsif ($cte eq BASE64)
+  elsif ($enc eq BASE64)
   { $isText=0 if ! defined $isText;
     $s=new cs::MIME::Base64 (Decode, $s, $isText);
   }
-  elsif ($cte eq 'QUOTED-PRINTABLE')
+  elsif ($enc eq 'QUOTED-PRINTABLE')
   { $isText=1 if ! defined $isText;
     $s=new cs::MIME::QuotedPrintable (Decode, $s, $isText);
   }
+  elsif ($enc eq 'GZIP')
+  { $s=$s->PipeThru("exec gunzip");
+  }
   else
-  { warn "$0: cs::MIME::decodedSource: can't decode Content-Transfer-Encoding \"$cte\"";
+  { warn "$0: cs::MIME::decodedSource: can't decode encoding \"$enc\"";
     return undef;
   }
 
@@ -190,6 +195,7 @@ sub new($;$$$)
   $this->{cs::MIME::SUBTYPE}=PLAIN;
   $this->{cs::MIME::TYPEPARAMS}={};
   $this->{cs::MIME::CTE}='8BIT';	# Content-Transfer-Encoding
+  $this->{cs::MIME::CE}='8BIT';		# Content-Encoding
 
   bless $this, $class;
 
@@ -213,6 +219,7 @@ sub DESTROY
 
 sub _TypeParams($) { shift->{cs::MIME::TYPEPARAMS}; }
 sub _Cte($) { shift->{cs::MIME::CTE}; }
+sub _Ce($) { shift->{cs::MIME::CE}; }
 
 # return a cs::Source attached to the undecoded body
 sub _BodySource($)
@@ -283,6 +290,14 @@ sub _ReSync($)
    $_
   )
   =parseContentType($_);
+
+  # Content-Encoding
+  if (defined ($_=$this->Hdr(CONTENT_ENCODING,1))
+   && length)
+  { s/^\s+//;
+    s/\s+$//;
+    $this->{cs::MIME::CE}=uc($_);
+  }
 
   # Content-Transfer-Encoding
   if (defined ($_=$this->Hdr(CONTENT_TRANSFER_ENCODING,1))
@@ -397,7 +412,10 @@ sub BodySource($;$$)
 
   return undef if ! defined $s;
 
-  return decodedSource($s,$this->_Cte(),@_);
+  $s=decodedSource($s,$this->_Cte(),@_);
+  $s=decodedSource($s,$this->_Ce(),@_);
+
+  return $s;
 }
 
 =item ContentType(I<noparams>)
