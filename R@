@@ -1,0 +1,26 @@
+#!/bin/sh -u
+
+cmd=$0
+usage="Usage: $cmd host [cmd [args...]"
+
+badopts=
+
+if [ $# = 0 ]
+then
+  echo "$cmd: missing host" >&2
+  badopts=1
+else
+  host=$1
+  shift
+fi
+
+[ $# = 0 ] && set -- /bin/sh -c 'exec "${SHELL:-/bin/sh}"'
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+rcmd=`shqstr env "DISPLAY=$HOST:0" term -e "$@"` || exit 1
+
+for h in `echo "$host" | tr , ' '`
+do
+  envssh -f "$h" "$rcmd"
+done
