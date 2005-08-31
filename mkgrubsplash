@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/sh -u
 #
 # Make 640x480 14 colour gzipped XPM image from a JPEG for use as grub splash
 # backdrop.
@@ -7,6 +7,11 @@
 # See also:
 #	http://ruslug.rutgers.edu/~mcgrof/grub-images/
 #
+
+geom=640x480
+quant=14
+fmt=xpm
+trace=set-x
 
 cmd=$0
 usage="Usage: $cmd imagefile >splash.xpm.gz"
@@ -17,6 +22,6 @@ usage="Usage: $cmd imagefile >splash.xpm.gz"
 	      }
 file=$1; shift
 
-set -x
-gm convert - <"$file" -geometry 640x480 -colors 14 xpm:- \
-| gzip -v -9
+set -- sh -c "$trace gm convert - -geometry 640x480 -colors 14 xpm:- | gzip -9"
+conv=`convof -C "$geom-q$quant-$fmt-gz" -stdin "$file" "$@" <"$file"` || exit 1
+exec cat "$conv"
