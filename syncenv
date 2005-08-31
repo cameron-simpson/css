@@ -41,12 +41,16 @@ do
   then
     for envfile in "$envpath"/*
     do
-      [ -f "$envfile" -a -s "$envfile" ] && envfiles="$envfiles $envfile"
+      [ -f "$envfile" ] && envfiles="$envfiles $envfile"
     done
   else
-    [ -f "$envpath" -a -s "$envpath" ] && envfiles="$envfiles $envpath"
+    [ -f "$envpath" ] && envfiles="$envfiles $envpath"
   fi
 done
+
+[ -n "$envfiles" ] || { echo "$cmd: no envfiles? ENVFILES=[$ENVFILES]" >&2
+			exit 1
+		      }
 
 if [ -n "$reffile" ]
 then
