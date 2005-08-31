@@ -1,20 +1,134 @@
-#!/bin/sh
+#!/bin/sh -u
 #
 # Pick a fresh image and update the grub splash backdrop.
-#	- Cameron Simpson <cs@zip.com.au> 13sep2003
+#
+# =head1 NAME
+#
+# updgrubsplash -  pick a fresh image and update the grub splash backdrop
+#
+# =head1 SYNOPSIS
+#
+# updgrubsplash [-f conf] [-o splash-image] [pickim-args]
+#
+# =head1 DESCRIPTION
+#
+# I<updgrubsplash> updates the grub(8) configuration with a new splash image.
 #
 
+: ${TMPDIR:=/tmp}
+
 splash=/boot/grub/splash.xpm.gz
+conf=/boot/grub/grub.conf
+trace=set-x
+ask=1
+[ -t 0 -a -t 1 ] || ask=
 
 cmd=`basename "$0"`
-usage="Usage: $cmd [pickim-args]"
+usage="Usage: $cmd [-f conf] [-i|+i] [-o splash-image] {imagefile|pickim-args}
+	-f conf		grub.conf file location.
+			Default: $conf
+	-i		Interactive. Ask before applying new image.
+			Default on a terminal.
+	+i		Non-interactive. Default in batch mode.
+	-o splash-image	Where the splash image is to be written.
+			Default: $splash"
+
+badopts=
+
+# =head1 OPTIONS
+#
+# =over 4
+#
+
+badopts=
+
+while [ $# -gt 0 ]
+do
+  case $1 in
+    # =item B<-f> I<conf>
+    #
+    # Specifiy the grub.conf file to update.
+    # Default: /boot/grub/grub.conf
+    #
+    -f)	conf=$2; shift ;;
+    # =item B<-i>
+    #
+    # Ask before applying the new image.
+    # This is the default on a terminal.
+    #
+    -i)	ask=1 ;;
+    # =item B<+i>
+    #
+    # Do not ask before applying the new image.
+    # This is the default in batch mode.
+    #
+    +i)	ask= ;;
+    # =item B<-o> I<splash-image>
+    #
+    # Output file to hodl the splash image.
+    # Default: /boot/grub/splash.xpm.gz
+    #
+    -o)	splash=$2; shift ;;
+    --)	shift; break ;;
+    -?*)echo "$cmd: unrecognised option: $1" >&2
+	badopts=1
+	;;
+    *)	break ;;
+  esac
+  shift
+done
+
+# =back
+#
+# The following arguments are either a single image filename
+# or a set of arguments to pass to pickim to choose an image.
+#
+
+[ $# = 0 ] && { echo "$cmd: missing imagefile or pickim-args" >&2; badopts=1; }
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
 
 if [ $# = 1 ] && [ -s "$1" ]
 then  imagefile=$1; shift
-else  imagefile=`pickim -n 1 -w -r ${1+"$@"}` || exit 1
+else  imagefile=`pickim -n 1 -w "$@"` || exit 1
+fi
+[ -s "$imagefile" ] || { "$cmd: $imagefile: missing?" >&2; exit 1; }
+
+case "$splash" in
+  /*) ;; *) splash=`pwd`/$splash || exit 1 ;;
+esac
+
+tmpf=$TMPDIR/ugs$$.xpm.gz
+trap 'rm -f "$tmpf"' 0 1 2 13 15
+
+$trace mkgrubsplash "$imagefile" >"$tmpf" || exit 1
+if [ $ask ]
+then
+  [ -t 0 -a -t 1 ] \
+  || { echo "$cmd: can't ask for approval if not on a terminal, aborting" >&2
+       exit 1
+     }
+  gm display "$tmpf" &
+  vpid=$!
+  ask "Apply this image to $conf as $splash" || { kill "$vpid"; exit 1; }
+  kill "$vpid"
 fi
 
-[ -s "$imagefile" ] || exit 1
+$trace bsed '/^splashimage=/s/^/#/
+             /default=/a\
+'"splashimage=$splash" "$conf"
 
-set -x
-exec mkgrubsplash "$imagefile" >"$splash"
+# =head1 ENVIRONMENT
+#
+# $TMPDDIR, the location for temporary files.
+#
+# $BGPATH, used by pickim when selecting images.
+#
+# =head1 SEE ALSO
+#
+# grub(8), mkgrubsplash(1cs)
+#
+# =head1 AUTHOR
+#
+# Cameron Simpson E<lt>cs@zip.com.auE<gt> 13sep2003
+#
