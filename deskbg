@@ -7,15 +7,19 @@
 : ${DESKTOPSET:=desktop}
 
 cmd=$0
-usage="Usage: $cmd [-d desk] imagefiles...
-	Default desk is the current desk.
-	The desk \"-\" means the global default.
+usage="Usage: $cmd [-] [-d desk] imagefiles...
+	-	Do nothing. Recite fvwm commands.
+	-d desk	Specify desk number to affect.
+		Default desk is the current desk.
+		The desk \"-\" means the global default.
 	The imagefile \"\" means remove the per desk setting for this desk."
 
 desk=
+doit=1 dasharg= towm=fvwmcmd
 
 badopts=
 
+[ $# -gt 0 ] && [ "x$1" = x-  ] && { doit=; dasharg=$1; towm=echo; shift; }
 [ $# -gt 0 ] && [ "x$1" = x-d ] && { desk=$2; shift; shift; }
 [ $# -gt 0 ] && [ "x$1" = x-- ] && shift
 
@@ -38,7 +42,7 @@ then
     # flush background
     bg=
     if [ $perdesk ]
-    then desktop -r "$desk" rootbg
+    then [ $doit ] && desktop -r "$desk" rootbg
     fi
 else
     srcargs=$*
@@ -57,14 +61,17 @@ else
     rootbg=`mkwall "$@"` || exit 1
 
     # note supplied images
-    if [ $perdesk ]
+    if [ $doit ]
     then
-      desktop "$desk" rootbg "$*"
-      desktop "$desk" rootbg_src "$srcargs"
-    else
-      lastvalue "rootbg-$HOST" "$*"
-      lastvalue "rootbg" "$*"
-      lastvalue "rootbg_src" "$srcargs"
+      if [ $perdesk ]
+      then
+	desktop "$desk" rootbg "$*"
+	desktop "$desk" rootbg_src "$srcargs"
+      else
+	lastvalue "rootbg-$HOST" "$*"
+	lastvalue "rootbg" "$*"
+	lastvalue "rootbg_src" "$srcargs"
+      fi
     fi
 
     bg=$rootbg
@@ -76,10 +83,9 @@ if [ $perdesk ]
 then
     # apply new background, set desktop to use it
     cset=`expr 1024 + $desk`
-    echo "ColorSet $cset Pixmap $rootbg"
-    echo "*FvwmBacker: Command (Desk $desk) colorset $cset"
+    $towm "ColorSet $cset Pixmap $rootbg"
+    $towm "*FvwmBacker: Command (Desk $desk) colorset $cset"
 else
     # apply new default background
-    echo "Colorset 1023 Pixmap $bg"
-fi \
-| fvwmcmd
+    $towm "Colorset 1023 Pixmap $bg"
+fi
