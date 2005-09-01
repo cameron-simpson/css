@@ -9,6 +9,7 @@
 cmd=`basename "$0"`
 case "$cmd" in
    buildenv)
+	unset ARCH CPU OS OPT BIN
 	exec noldpath env BSEDOPTS= \
 			  LD_LIBRARY_PATH=/lib:/usr/lib:/usr/openwin/lib:/opt/X11R6/lib:/opt/lib \
 			  PATH=/bin:/usr/bin:/usr/ccs/bin:/usr/openwin/bin:/usr/X11R6/bin:/opt/X11R6/bin:/opt/bin:/opt/script:$PATH \
