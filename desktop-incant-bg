@@ -6,19 +6,30 @@
 
 : ${DESKTOPSET:=desktop}
 
+quick=
+doit=1
+dasharg=
+
 cmd=$0
-usage="Usage: $0"
+usage="Usage: $0 [-] [-q]
+	-	Write commands to stdout.
+	-q	Quick. Don't do the per-desk settings."
+
+[ $# -gt 0 ] && [ "x$1" = x-  ] && { doit=; dasharg=$1; shift; }
+[ $# -gt 0 ] && [ "x$1" = x-q ] && { quick=1; shift; }
 
 [ $# = 0 ] || { echo "$cmd: extra arguments: $*" >&2
 		echo "$usage" >&2
 		exit 2
 	      }
 
-dfltbg=`rootbg` && rootbg "$dfltbg"
+dfltbg=`rootbg` && rootbg $dasharg "$dfltbg"
+xit=$?
+[ $quick ] && exit $xit
 
 idsetlist "$DESKTOPSET" rootbg \
 | awk '$2 != "." { print }' \
 | while read -r desk bg
   do
-    deskbg -d "$desk" $bg
+    deskbg $dasharg -d "$desk" $bg
   done
