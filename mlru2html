@@ -41,7 +41,9 @@ for $key (sort keys %list)
       { print "\t<A HREF=$_->{$field}>$_->{$field}</A><BR>\n";
       }
       elsif ($field eq 'admin' || $field eq 'owner')
-      { print "\t<A HREF=\"mailto:$_->{$field}\">$_->{$field}</A><BR>\n";
+      { my $pf = $_->{$field};
+	$pf =~ s|(\S+)\@(\S+)|<A HREF="mailto:$1%40$2">$1&#64;$2</A>|g;
+	print "\t$pf<BR>\n";
       }
       else
       { my $pf = $_->{$field};
