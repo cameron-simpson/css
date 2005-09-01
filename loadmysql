@@ -1,0 +1,69 @@
+#!/bin/sh -u
+#
+# Load up a mysql server from scratch, using dumped tables from another db.
+#	- Cameron Simpson <cs@zip.com.au> 04aug2005
+#
+
+trace=echo
+sqldir=.
+datadir=/var/lib/mysql
+newgrants=
+
+cmd=`basename "$0"` || cmd=$0
+usage="Usage: $cmd --datadir=... --new-grant-tables
+	--datadir		Specify datadir. Default: $datadir
+	--new-grant-tables	Reset the grant tables.
+				Loads mysql.sql.gz and runs mysql_fix_privilege_tables.
+				Normally the mysql db itself is skipped."
+
+badopts=
+
+while [ $# -gt 0 ]
+do
+  case $1 in
+    --datadir=*)
+	datadir=`expr "x$1" : 'x--datadir=\(.*\)'`
+	;;
+    --new-grant-tables)
+	newgrants=1
+	;;
+    --)	shift; break ;;
+    -?*)echo "$cmd: unrecognised option: $1" >&2
+	badopts=1
+	;;
+    *)	break ;;
+  esac
+  shift
+done
+
+[ $# = 0 ] || { echo "$cmd: extra arguments: $*" >&2; badopts=1; }
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+cd "$sqldir" || exit 1
+[ -s "mysql.sql.gz" ] || { echo "$cmd: no mysql.sql.gz, aborting" >&2; exit 2; }
+
+$trace /etc/init.d/mysqld stop || exit 1
+
+if [ $newgrants ]
+then
+    [ -d "$datadir/mysql" ] || exit 1
+    $trace rm -rf "$datadir/mysql" || exit 1
+    $trace mysql_install_db || exit 1
+fi
+
+$trace /etc/init.d/mysqld start || exit 1
+
+xit=0
+
+for squiz in *.sql.gz
+do
+  [ -s "$squiz" ] || { echo "$cmd: $squiz: no data!" >&2; xit=1; continue; }
+  dbname=`expr "x$squiz" : 'x\(.*\).sql.gz'` || exit 1
+  $trace echo "create database $dbname;" | $trace mysql
+  gunzip < "$squiz" | $trace mysql "$dbname"
+done
+
+$trace mysql_fix_privilege_tables || xit=1
+
+exit $xit
