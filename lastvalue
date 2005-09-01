@@ -46,9 +46,10 @@ fi
 
 param=$1; shift
 case "$param" in
-    ''|*/*)	echo "$cmd: bad param \"$param\"" >&2
-	    badopts=1
-	    ;;
+  ''|*/*)
+    echo "$cmd: bad param \"$param\"" >&2
+    badopts=1
+    ;;
 esac
 [ $# -gt 1 ] && { echo "$cmd: $param=$value: extra arguments after value: $*" >&2; badopts=1; }
 
