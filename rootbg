@@ -1,40 +1,26 @@
-#!/bin/sh
+#!/bin/sh -u
 #
-# Set the root backdrop.
+# Get or set the global/default root backdrop.
 #	- Cameron Simpson <cs@zip.com.au> 20nov2000
 #
 
-: ${LOGDIR:=$HOME/var/log}
-
 cmd=$0
-usage="Usage: $cmd [-s] [imagefile]
-	-s	Synchronous."
-
-[ -n "$DISPLAY" ] || { echo "$cmd: no \$DISPLAY!" >&2; exit 1; }
-
-##con echo "$cmd $*"
-
-opts=
-sync=
-perdesk=
+usage="Usage: $cmd [-] [imagefile]
+	-	Do nothing. Recite fvwm actions."
 
 badopts=
-while :
-do  case $1 in
-	-s)	sync=1 opts="$opts -s" ;;
-	--)	shift; break ;;
-	-?*)	echo "$cmd: unrecognised option: $1" >&2
-		badopts=1
-		;;
-	*)	break ;;
-    esac
-    shift
-done
+
+doit=1 dasharg= towm=fvwmcmd
+[ $# -gt 0 ] && [ "x$1" = x-  ] && { doit=; dasharg=$1; towm=echo; shift; }
 
 if [ $# = 0 ]
 then
-  bg=`lastvalue "rootbg-$HOST"` && [ -n "$bg" ] && [ -s "$bg" ] && echo "$bg"
-  exit
+  bg=`desktop 1 rootbg` && [ -n "$bg" ] && [ -s "$bg" ] \
+  || bg=`lastvalue "rootbg-$HOST"` && [ -n "$bg" ] && [ -s "$bg" ] \
+  || bg=`lastvalue rootbg_src` && [ -n "$bg" ] && [ -s "$bg" ] \
+  || bg=`lastvalue rootbg` && [ -n "$bg" ] && [ -s "$bg" ] \
+  || exit 1
+  exec echo "$bg"
 fi
 
 imagefile=$1; shift
@@ -44,38 +30,28 @@ imagefile=$1; shift
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
-isfile=1
-case "$imagefile" in
-  http://*)
-    # one argument which is an URL
-    exec withurl -C "$imagefile" "$0" $opts
-    ;;
-  X:* | - | *:- | \|* )
-    # one argument which is a GraphicsMagick-ish name
-    isfile=
-    ;;
-esac
-
-if [ "$isfile" ]
+imsrc=$imagefile
+if [ -s "$imagefile" ]
 then
-  case "$imagefile" in
-    /*) ;; *) imagefile=`pwd`/$imagefile ;;
-  esac
+  imagefile=`filecache "$imagefile"` || exit 1
+else
+  imagefile=`fileof "$imagefile"` || exit 1
 fi
 
-(
+wall=`mkwall "$imagefile"` || exit 1
+
+if [ $doit ]
+then
   (
-    lastvalue rootbg "$rootbg"
-    lastvalue "rootbg-$HOST" "$rootbg"
+    lastvalue "rootbg-$HOST" "$imagefile"
+    lastvalue rootbg "$imagefile"
+    lastvalue rootbg_src "$imsrc"
   ) &
+  fvwm-root --retain-pixmap "$wall"
+fi
 
-  wall=`mkwall "$imagefile"` || exit 1
-  fvwm-root --retain-pixmap "$wall" \
-  && fvwmcmd \
-       'setenv XSESSIONBG pixmap' \
-       "ColorSet 1023 AspectPixmap $wall"
-  exit
-) &
-
-[ $sync ] && wait
-exit 0
+for fvcmd in \
+     'setenv XSESSIONBG pixmap' \
+     "ColorSet 1023 Pixmap $wall"
+do  $towm "$fvcmd"
+done
