@@ -6,7 +6,8 @@ cmd=$0
 
 needhost $HOMEHOST@$SYSTEMID || exit 1
 
-set ":5 -name vnc:5@$HOST -depth 16 -geometry 1024x768"
+set ":5 -name vnc:0@$HOST -depth 24 -geometry 1400x1050"
+##set ":5 -name vnc:5@$HOST -depth 16 -geometry 1024x768"
 ## ":6 -name vnc:6@$HOST -depth 24 -geometry 1600x1200"
 
 fontpath=unix/:7100
