@@ -54,7 +54,8 @@ else
 	set --
 	first=
       fi
-      set -- ${1+"$@"} `filecache "$arg"` || xit 1
+      cached=`filecache "$arg"` || cached=$arg
+      set -- ${1+"$@"} "$cached"
     done
 
     # compute new background
