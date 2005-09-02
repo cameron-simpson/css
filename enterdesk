@@ -7,8 +7,6 @@
 : ${LOGDIR:=$HOME/var/log}
 
 exec </dev/null
-exec >>$LOGDIR/console
-exec 2>&1
 
 ##echo "[$0 $*]"
 trace=	##set-x
@@ -22,12 +20,8 @@ thisdesk=
 lastdesk=`currentdesk` || exit 1
 [ -n "$thisdesk" ] || thisdesk=$lastdesk
 
-if [ "x$thisdesk" = "x$lastdesk" ]
-then
-  [ $force ] || exit 0
-else
-  currentdesk "$thisdesk"
-fi
+[ "x$thisdesk" = "x$lastdesk" ] || [ $force ] || exit 0
+currentdesk "$thisdesk"
 
 (
   menubg=`desktop "$thisdesk" menubg-pngof` || menubg=
