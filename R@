@@ -1,9 +1,20 @@
 #!/bin/sh -u
 
+: ${DISPLAY:=''}
+
 cmd=$0
-usage="Usage: $cmd host [cmd [args...]"
+usage="Usage: $cmd [-r rdisplay] host [cmd [args...]"
+
+case "$DISPLAY" in
+  :*)	rdisplay=$HOST$DISPLAY ;;
+  localhost:* | 127.0.0.1:* )
+	rdisplay=$HOST`expr "x$DISPLAY" : 'x.*\(:.*\)'` ;;
+  *)	rdisplay=$HOST:0 ;;
+esac
 
 badopts=
+
+[ $# -gt 0 ] && [ "x$1" = x-r ] && { rdisplay=$2; shift; shift; }
 
 if [ $# = 0 ]
 then
@@ -18,9 +29,9 @@ fi
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
-rcmd=`shqstr env "DISPLAY=$HOST:0" term -e "$@"` || exit 1
+rcmd=`shqstr env "DISPLAY=$rdisplay" term -e "$@"` || exit 1
 
 for h in `echo "$host" | tr , ' '`
 do
-  envssh -f "$h" "$rcmd"
+  set-x envssh -f "$h" "$rcmd"
 done
