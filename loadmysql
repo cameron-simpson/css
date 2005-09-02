@@ -4,13 +4,15 @@
 #	- Cameron Simpson <cs@zip.com.au> 04aug2005
 #
 
-trace=echo
+trace=set-x
 sqldir=.
 datadir=/var/lib/mysql
+rawmysqld=/usr/libexec/mysqld
+initmysqld=/etc/init.d/mysqld
 newgrants=
 
 cmd=`basename "$0"` || cmd=$0
-usage="Usage: $cmd --datadir=... --new-grant-tables
+usage="Usage: $cmd [--datadir=...] [--new-grant-tables]
 	--datadir		Specify datadir. Default: $datadir
 	--new-grant-tables	Reset the grant tables.
 				Loads mysql.sql.gz and runs mysql_fix_privilege_tables.
@@ -43,27 +45,38 @@ done
 cd "$sqldir" || exit 1
 [ -s "mysql.sql.gz" ] || { echo "$cmd: no mysql.sql.gz, aborting" >&2; exit 2; }
 
-$trace /etc/init.d/mysqld stop || exit 1
+$trace "$initmysqld" stop || { echo "WARNING: no MySQL to stop!?!" >&2
+			       ask "Proceed anyway" || exit 1
+			     }
 
 if [ $newgrants ]
 then
     [ -d "$datadir/mysql" ] || exit 1
     $trace rm -rf "$datadir/mysql" || exit 1
-    $trace mysql_install_db || exit 1
+    $trace su mysql -c "mysql_install_db '--datadir=$datadir'" || exit 1
+    $trace $rawmysqld -u mysql "--datadir=$datadir" --skip-grant-tables --bind-address=127.0.0.1 &
+    $trace sleep 5
+    gunzip < mysql.sql.gz | $trace mysql -h 127.0.0.1 mysql || exit 1
+    $trace mysql_fix_privilege_tables -h 127.0.0.1 || xit=1
 fi
 
-$trace /etc/init.d/mysqld start || exit 1
+$trace "$initmysqld" start || exit 1
 
 xit=0
 
 for squiz in *.sql.gz
 do
-  [ -s "$squiz" ] || { echo "$cmd: $squiz: no data!" >&2; xit=1; continue; }
-  dbname=`expr "x$squiz" : 'x\(.*\).sql.gz'` || exit 1
-  $trace echo "create database $dbname;" | $trace mysql
-  gunzip < "$squiz" | $trace mysql "$dbname"
-done
+  case "$squiz" in
+    mysql.sql.gz|test.sql.gz)
+      continue
+      ;;
+  esac
 
-$trace mysql_fix_privilege_tables || xit=1
+  [ -s "$squiz" ] || { echo "$cmd: $squiz: no data!" >&2; xit=1; continue; }
+
+  dbname=`expr "x$squiz" : 'x\(.*\).sql.gz'` || exit 1
+  $trace echo "create database $dbname;" | $trace mysql -h 127.0.0.1
+  gunzip < "$squiz" | $trace mysql -h 127.0.0.1 "$dbname"
+done
 
 exit $xit
