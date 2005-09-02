@@ -39,8 +39,7 @@ done
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
-thisdesk=`currentdesk`
-[ -n "$desk" ] || desk=$thisdesk
+[ -n "$desk" ] || desk=`currentdesk` || exit 1
 
 # A URL? Fetch and use.
 case "$#,$1" in
@@ -49,40 +48,40 @@ case "$#,$1" in
     exec withurl "$1" "$0" $opts ;;
 esac
 
-if [ "x$*" = xnone ]
+[ "x$*" = xnone ] && exec desktop "$desk" menubg ''
+
+# offer menu if not handed single image file
+if [ $# != 1 ] || [ ! -f "$1" -o ! -s "$1" ]
 then
-    desktop "$desk" menubg '' || exit 1
-else
-    if [ $# != 1 ] || [ ! -f "$1" -o ! -s "$1" ]
-    then
-      # presume search args
-      set -- `pickim -P "$strippfx" -n $pickn $aspect ${1+"$@"} | sort -u` || exit 1
-      [ $# = 0 ] && { echo "$cmd: no image files chosen!" >&2; exit 1; }
-      if [ -t 1 ]; then  cd; ls -ld "$@"; fi &
-      
-      if [ $# -gt 1 ]
-      then
-	tmpf=$TMPDIR/menubg$$
-	for arg
-	do  echo "$arg"
-	done >"$tmpf"
-	fvwmcmd \
-	      "SetEnv FVWM_MENU_IMLIST_OP \"menubg $opts\"" \
-	      "Piperead 'fvwm-menu -1 ImDirMenu \"$cmd $call\" fvwm-menu-imlist -l $tmpf .; rm $tmpf'" \
-	      "Popup ImDirMenu" \
-	      "UnSetEnv FVWM_MENU_IMLIST_OP"
-	exit $?
-      fi
-    fi
-
-    # set image directly
-
-    srcimage=$1; shift
-    cachefile=`filecache "$srcimage"` || exit 1
-    imagefile=`pngof "$cachefile"` || exit 1
-    desktop "$desk" menubg "$imagefile" || exit 1
-    lastvalue menubg "$cachefile" &
-    lastvalue menubg-pngof "$imagefile" &
+  # presume search args
+  set -- `pickim -P "$strippfx" -n $pickn $aspect ${1+"$@"} | sort -u` || exit 1
+  [ $# = 0 ] && { echo "$cmd: no image files chosen!" >&2; exit 1; }
+  if [ -t 1 ]; then  cd; ls -ld "$@"; fi &
+  
+  tmpf=$TMPDIR/menubg$$
+  for arg
+  do  echo "$arg"
+  done >"$tmpf"
+  fvwmcmd \
+	"SetEnv FVWM_MENU_IMLIST_OP \"menubg $opts\"" \
+	"Piperead 'fvwm-menu -1 ImDirMenu \"$cmd $call\" fvwm-menu-imlist -l $tmpf .; rm $tmpf'" \
+	"Popup ImDirMenu" \
+	"UnSetEnv FVWM_MENU_IMLIST_OP"
+  exit $?
 fi
 
-exec enterdesk -f
+# set image directly
+
+srcimage=$1; shift
+desktop "$desk" menubg_src "$srcimage" || exit 1
+
+cachefile=`filecache "$srcimage"` || exit 1
+desktop "$desk" menubg "$imagefile" || exit 1
+lastvalue menubg "$cachefile" &
+
+if [ "x$desk" = "x`currentdesk`" ]
+then
+  imagefile=`pngof "$cachefile"` || exit 1
+  lastvalue menubg-pngof "$imagefile" &
+  enterdesk -f
+fi
