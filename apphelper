@@ -62,7 +62,7 @@ usage="Usage: $cmd [{-t|+t|-T title}] file [{-n|-y}] [-d savedir] [-i type] [-p 
 
 unset tmpdir
 trap 'rm -r "$tmpdir"' 0
-tmpdir=`mkdirn "$TMPDIR/$cmd$$."` || exit 1
+tmpdir=`mkdirn "$TMPDIR/$cmd"` || exit 1
 tmpfile=$tmpdir/$cmd$$
 
 # =head1 DESCRIPTION
