@@ -5,6 +5,9 @@
 #
 
 cssweb=$HOME/@/ezos/html/cs/css
+cssdir=/opt/css
+dosync=1
+quick=
 
 cmd=$0
 usage="Usage: $cmd [-q] [-n] [pushhosts...]"
@@ -15,12 +18,8 @@ needhost $HOMEHOST@home || exit 2
 
 umask 22
 
-dosync=1
-quick=
 [ "x$1" = x-q ] && { quick=1; shift; }
 [ "x$1" = x-n ] && { dosync=; shift; }
-
-cssdir=/opt/css
 
 if [ -z "$quick" ]
 then
@@ -107,7 +106,9 @@ wait
 if [ -d "$cssweb" ]
 then
     ( cd $cssdir/.. || exit 1
-      tar chf - css | gzip -v -9 >$cssweb/css.tar.gz
+      set -- `find -H css -type f -print`
+      [ $# = 0 ] && { echo "NO ARGS!" >&2; ls -ld css >&2; exit 1; }
+      ls -tdr "$@" | tar cvhTf - - | gzip -v -9 >$cssweb/css.tar.gz
     )
     for d in man bin lib
     do
