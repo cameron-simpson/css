@@ -9,8 +9,10 @@
 : ${LOCKDIR:=$HOME/var/locks}
 : ${ENVFILES:="/etc/rc.mobile/env.sh $HOME/var/env.sh"}
 
-trace=set-x
+trace=set-x	## ''
+setx='set -x'	## :
 pingsleep=10
+conn=nc		## tcpio -k
 
 cmd=$0
 usage="Usage: $cmd [-l location:rhost:rport] localport fwdsite sshopts..."
@@ -51,7 +53,7 @@ do  [ -s "$envfile" ] && . "$envfile"
 done
 
 # on site? no tunnel needed
-[ -n "$location" ] && [ "x$location" = "x$LOCATION" ] && exec $trace tcpio -k "$rhost" "$rport"
+[ -n "$location" ] && [ "x$location" = "x$LOCATION" ] && { $setx; exec $conn "$rhost" "$rport"; }
 
 # getlock [-p pid] name
 getlock()
@@ -89,7 +91,7 @@ locked()
 }
 
 # short path if tunnel is up
-locked "tunnel-$fwdsite" && exec $trace nc localhost "$localport" ## tcpio -k localhost "$localport"
+locked "tunnel-$fwdsite" && { $setx; exec $conn localhost "$localport"; }
 
 # do a locking check for the tunnel being active
 getlock "test-$fwdsite" || exit 1
@@ -139,4 +141,5 @@ locked "tunnel-$fwdsite" \
 
 freelock "test-$fwdsite"
 
-exec $trace tcpio -k localhost "$localport"
+$setx
+exec $conn localhost "$localport"
