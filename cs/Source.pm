@@ -810,7 +810,7 @@ sub PipeThru($$)
   # child - fork into filter and feeder
   $::cmd="$::cmd: PipeThru-child";
   close($pr) || warn "$::cmd: close($pr): $!";
-  open(STDOUT,">&$pw") || warn "$::cmd: dup($pw,STDOUT): $!";
+  CORE::open(STDOUT,">&$pw") || warn "$::cmd: dup($pw,STDOUT): $!";
   close($pw) || warn "$::cmd: close($pw): $!";
 
   pipe($pr,$pw) || die "$::cmd: pipe(): $!";
@@ -821,7 +821,7 @@ sub PipeThru($$)
   # immediate child - exec shell command
   {
     close($pw) || warn "$::cmd:: close($pw): $!";
-    open(STDIN,"<&$pr") || die "$::cmd:: dup($pr,STDIN): $!";
+    CORE::open(STDIN,"<&$pr") || die "$::cmd:: dup($pr,STDIN): $!";
     close($pr) || warn "$::cmd: close($pr): $!";
     exec('/bin/sh','-c',$shcmd);
     die "$::cmd: exec(sh -c $shcmd): $!";
