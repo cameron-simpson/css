@@ -89,7 +89,7 @@ locked()
 }
 
 # short path if tunnel is up
-locked "tunnel-$fwdsite" && exec $trace tcpio -k localhost "$localport"
+locked "tunnel-$fwdsite" && exec $trace nc localhost "$localport" ## tcpio -k localhost "$localport"
 
 # do a locking check for the tunnel being active
 getlock "test-$fwdsite" || exit 1
