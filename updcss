@@ -108,7 +108,7 @@ then
     ( cd $cssdir/.. || exit 1
       set -- `find -H css -type f -print`
       [ $# = 0 ] && { echo "NO ARGS!" >&2; ls -ld css >&2; exit 1; }
-      ls -tdr "$@" | tar cvhTf - - | gzip -v -9 >$cssweb/css.tar.gz
+      ls -tdr "$@" | tar chTf - - | gzip -v -9 >$cssweb/css.tar.gz
     )
     for d in man bin lib
     do
