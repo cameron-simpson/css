@@ -4,11 +4,7 @@ cmd=$0
 
 [ $# = 0 ] || { echo "Usage: $cmd" >&2; exit 2; }
 
-needhost $HOMEHOST@$SYSTEMID || exit 1
-
-set ":5 -name vnc:0@$HOST -depth 24 -geometry 1400x1050"
-##set ":5 -name vnc:5@$HOST -depth 16 -geometry 1024x768"
-## ":6 -name vnc:6@$HOST -depth 24 -geometry 1600x1200"
+set :5 -name "vnc:5@$HOST" -depth 24 -geometry 1400x1050
 
 fontpath=unix/:7100
 for fonttop in /usr/X11R6/lib/X11/fonts
@@ -21,11 +17,4 @@ do  for fontdir in $fonttop/*
     done
 done
 
-set -x
-
-for args
-do
-    ( set vncserver $args -alwaysshared ## -fp unix:7100 ## "$fontpath"
-      alog "vnc-$HOST-$2" "$@"
-    )
-done
+set-x vncserver $args -alwaysshared ## -fp unix:7100 ## "$fontpath"
