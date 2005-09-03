@@ -30,23 +30,22 @@ fi
 		exit 2
 	      }
 
-[ $rmdesk ] && exec desktop -r "$deskname"
+incant=1
+if [ $rmdesk ]
+then
+  desktop -r "$deskname" || exit 1
+else
+  case "$deskname" in
+    [0-9]|[1-9][0-9]|[1-9][0-9][0-9]|[1-9][0-9][0-9][0-9])
+      desknum=$deskname
+      incant=
+      ;;
+    *)desknum=`desktop "$deskname"`	|| exit 1
+      ;;
+  esac
+  set -x
+  fvwmcmd "GotoDesk 0 $desknum" &
+fi
 
-case "$deskname" in
-  [0-9]|[1-9][0-9]|[1-9][0-9][0-9]|[1-9][0-9][0-9][0-9])
-    desknum=$deskname
-    ;;
-  *)desknum=`desktop "$deskname"`	|| exit 1
-    ;;
-esac
-set -x
-( fvwmcmd "GotoDesk 0 $desknum" "DesktopName $desknum '$deskname'"
-  desktop-incant-names
-) &
-( lastdesk=`lastvalue "desktop-$HOST"`
-  if [ "x$lastdesk" != "x$desknum" ]
-  then
-      lastvalue "desktop-$HOST-previous" "$lastdesk"
-      lastvalue "desktop-$HOST" "$desknum"
-  fi
-) &
+[ $incant ] || exit 0
+desktop-incant-names &
