@@ -1,10 +1,12 @@
-#!/bin/sh
+#!/bin/sh -u
 
 cmd=$0
 
 [ $# = 0 ] || { echo "Usage: $cmd" >&2; exit 2; }
 
 set :5 -name "vnc:5@$HOST" -depth 24 -geometry 1400x1050
+disp=$1; shift
+args=
 
 fontpath=unix/:7100
 for fonttop in /usr/X11R6/lib/X11/fonts
@@ -17,4 +19,4 @@ do  for fontdir in $fonttop/*
     done
 done
 
-set-x vncserver $args -alwaysshared ## -fp unix:7100 ## "$fontpath"
+set-x vncserver $disp $args -alwaysshared "$@" $disp ## -fp unix:7100 ## "$fontpath"
