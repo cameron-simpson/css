@@ -58,7 +58,7 @@ case "$todir" in
 esac
 
 ( cd "$fromdir" || exit 1
-  find . -type d -name "$glob" -print -prune \
+  $trace find . -type d -name "$glob" -print -prune \
 ) \
 | \
 { xit=0
