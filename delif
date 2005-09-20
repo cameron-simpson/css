@@ -51,7 +51,7 @@ do
       $trace ifconfig "$iface" -alias "$ipaddr" || xit=1
       ;;
     *)
-      $trace ifconfig "$iface" 0.0.0.0 down || xit=1
+      $trace ifconfig "$iface" down || xit=1
       ;;
   esac
 done
