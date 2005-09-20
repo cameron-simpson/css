@@ -25,5 +25,10 @@ do
   : ${FM_LOGFILE:=$LOGDIR/fetchmail}
   killpidfile getmail_flush.pid
   fmdelay=${FM_DELAY:=300}
-  bgproc -s -p fetchmail_sleep.pid $trace sleep "$fmdelay"
+  ( if [ "x$fmdelay" = x0 ]
+    then  set -- pause
+    else  set -- sleep "$fmdelay"
+    fi
+    exec bgproc -s -p fetchmail_sleep.pid $trace "$@"
+  )
 done
