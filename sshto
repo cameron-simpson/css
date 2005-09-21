@@ -8,7 +8,8 @@
 : ${SSHTO_OPTS:=''}
 
 trace=	##set-x
-sshopts="-F \"\$HOME/.ssh/config\""
+sshopts=
+[ -s "$HOME/.ssh/config" ] && sshopts="$sshopts -F \"\$HOME/.ssh/config\""
 topt=
 
 cmd=`basename "$0"` || cmd=$0
