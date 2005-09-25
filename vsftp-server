@@ -65,7 +65,10 @@ do
 done <"$cfg"
 
 [ -n "$wd" ] || wd=`pwd`
-logger -t vsftp "$user@$destip from $srcip, wd=$wd"
+logger -t vsftp "start $user@$destip from $srcip, wd=$wd"
 
-exec 1>&3 3>&-
-exec "$realsftpd" ${1+"$@"}
+"$realsftpd" ${1+"$@"} 1>&3 3>&-
+xit=$?
+
+logger -t vsftp "end $user@$destip from $srcip, wd=$wd, exit=$xit"
+exit $xit
