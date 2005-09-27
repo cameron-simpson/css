@@ -10,7 +10,6 @@
 
 : ${TMPDIR:=/tmp}
 : ${LOGDIR:=$HOME/var/log}
-: ${CONSOLE:=$LOGDIR/console}
 : ${SHELL:=/bin/sh}
 : ${TERMOPTIONS:=''}
 : ${WINJOB:=''}
