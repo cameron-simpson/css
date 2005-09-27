@@ -15,7 +15,8 @@ strippfx=
 pickn=1
 desk=
 
-usage="Usage: $cmd [-M] [ imagefile | bglist-args... ]
+usage="Usage: $cmd [options...] [ imagefile | bglist-args... ]
+	-	Write FVWM commands to stdout instead of to FVWM.
 	-t	Choose tall images.
 	-w	Choose wider images.
 	-d n	Set the menu backdrop for the specified desktop.
@@ -23,6 +24,10 @@ usage="Usage: $cmd [-M] [ imagefile | bglist-args... ]
 
 badopts=
 opts=
+
+exec 3>&1 1>&2
+fvcmd=fvwmcmd
+[ "x$1" = x- ] && { fvcmd=echo; shift; }
 
 while :
 do
@@ -48,7 +53,12 @@ case "$#,$1" in
     exec withurl "$1" "$0" $opts ;;
 esac
 
-[ "x$*" = xnone ] && exec desktop "$desk" menubg ''
+[ "x$*" = xnone ] && { desktop "$desk" menubg ''
+		       desktop "$desk" menubg-pngof ''
+		       menucs=`expr 2048 + $desk`
+		       exec >&3 3>&-
+		       exec $fvcmd "Colorset $menucs RootTransparent"
+		     }
 
 # offer menu if not handed single image file
 if [ $# != 1 ] || [ ! -f "$1" -o ! -s "$1" ]
@@ -73,15 +83,17 @@ fi
 # set image directly
 
 srcimage=$1; shift
-desktop "$desk" menubg_src "$srcimage" || exit 1
+desktop "$desk" menubg_src "$srcimage" &
 
 cachefile=`filecache "$srcimage"` || exit 1
 desktop "$desk" menubg "$imagefile" || exit 1
 lastvalue menubg "$cachefile" &
+imagefile=`pngof "$cachefile"` || exit 1
+lastvalue menubg-pngof "$imagefile" &
 
-if [ "x$desk" = "x`currentdesk`" ]
+if [ -n "$DISPLAY" ]
 then
-  imagefile=`pngof "$cachefile"` || exit 1
-  lastvalue menubg-pngof "$imagefile" &
-  enterdesk -f
+  menucs=`expr 2048 + $desk`
+  exec >&3 3>&-
+  $fvcmd "Colorset $menucs AspectPixmap $imagefile"
 fi
