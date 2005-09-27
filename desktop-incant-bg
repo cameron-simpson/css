@@ -23,6 +23,13 @@ usage="Usage: $0 [-] [-q]
 		exit 2
 	      }
 
+idsetlist "$DESKTOPSET" menubg \
+| awk '$2 != "." { print }' \
+| while read -r desk bg
+  do
+    menubg $dasharg -d "$desk" $bg
+  done
+
 dfltbg=`rootbg` && rootbg $dasharg "$dfltbg"
 xit=$?
 [ $quick ] && exit $xit
