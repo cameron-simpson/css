@@ -20,24 +20,12 @@ thisdesk=
 lastdesk=`currentdesk` || exit 1
 [ -n "$thisdesk" ] || thisdesk=$lastdesk
 
-[ "x$thisdesk" = "x$lastdesk" ] || [ $force ] || exit 0
-currentdesk "$thisdesk"
+[ "x$thisdesk" != "x$lastdesk" ] || [ $force ] || exit 0
+currentdesk "$thisdesk" &
 
 (
-  menubg=`desktop "$thisdesk" menubg-pngof` || menubg=
-  if [ -z "$menubg" ]
-  then
-    menubg=`desktop "$thisdesk" menubg` || menubg=
-    [ -n "$menubg" ] && menubg=`pngof "$menubg"` && ( $trace desktop "$thisdesk" menubg-pngof "$menubg" & )
-  fi
-
-  if [ -n "$menubg" ]
-  then $trace fvwmcmd "Colorset 2 AspectPixmap $menubg"
-  else $trace fvwmcmd 'Colorset 2 RootTransparent'
-  fi
-
+  menucs=`expr 2048 + $thisdesk` && fvwmcmd "MenuStyle \"*\" MenuColorSet $menucs"
   $trace desktop "$thisdesk" wmcmds | fvwmcmd
-
   $trace desktop "$thisdesk" shcmds | sh -x &
 
   deskjob=`deskjob -d "$thisdesk"`
