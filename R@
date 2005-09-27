@@ -29,7 +29,7 @@ fi
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
-rcmd=`shqstr env "DISPLAY=$rdisplay" term -e "$@"` || exit 1
+rcmd=`shqstr env "DISPLAY=$rdisplay" term -keepio -e "$@"` || exit 1
 
 for h in `echo "$host" | tr , ' '`
 do
