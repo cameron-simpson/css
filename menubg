@@ -54,7 +54,6 @@ case "$#,$1" in
 esac
 
 [ "x$*" = xnone ] && { desktop "$desk" menubg ''
-		       desktop "$desk" menubg-pngof ''
 		       menucs=`expr 2048 + $desk`
 		       exec >&3 3>&-
 		       exec $fvcmd "Colorset $menucs RootTransparent"
@@ -89,7 +88,6 @@ cachefile=`filecache "$srcimage"` || exit 1
 desktop "$desk" menubg "$imagefile" || exit 1
 lastvalue menubg "$cachefile" &
 imagefile=`pngof "$cachefile"` || exit 1
-lastvalue menubg-pngof "$imagefile" &
 
 if [ -n "$DISPLAY" ]
 then
