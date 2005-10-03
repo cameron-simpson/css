@@ -8,7 +8,11 @@
 : ${TMPDIR:=/tmp}
 
 cmd=`basename "$0"`
-usage="Usage: $cmd [-o out] [-d bmdir] [-t title] [-d desc] [URL]"
+usage="Usage: $cmd [-o out] [-d bmdir] [-t title] [-D desc] [URL]
+	-d dir		Base directory for bookmarks.
+	-D desc		Descriptive text for bookmark.
+	-o out		File path in which to save the bookmark.
+	-t title	Title string for bookmark."
 
 url=
 title=
@@ -20,7 +24,8 @@ badopts=
 while [ $# -gt 0 ]
 do
   case $1 in
-    -d)	desc=$2; shift ;;
+    -d)	BMK_DIR=$2; export BMK_DIR; shift ;;
+    -D)	desc=$2; shift ;;
     -o)	outputfile=$2; shift ;;
     -t)	title=$2; shift ;;
     --)	shift; break ;;
@@ -65,7 +70,7 @@ then
     case "$outputfile" in /*) ;; *) outputfile=$BMK_DIR/$outputfile ;; esac
     case "$outputfile" in
       */ | */. )	outputfile=`expr "x$outputfile" : 'x\(.*\)/[^/]*$'`/$titlebase.bmk ;;
-      *.bmk)	;;
+      *.bmk)		;;
       *)		outputfile=$outputfile.bmk ;;
     esac
     titlefile=$outputfile
