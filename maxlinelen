@@ -1,0 +1,9 @@
+#!/bin/sh
+#
+# Report length of the longest line in the input data.
+#	- Cameron Simpson <cs@zip.com.au> 03oct2005
+#
+
+exec awk 'BEGIN { maxlen=0 }
+                { if (length > maxlen) maxlen=length }
+	  END   { print maxlen }' ${1+"$@"}
