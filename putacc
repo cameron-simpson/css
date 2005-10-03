@@ -1,21 +1,38 @@
-#!/bin/sh
+#!/bin/sh -u
 #
 # Push my account to other places.
 #	- Cameron Simpson <cs@zip.com.au>
 #
 
-cmd=$0
-usage="Usage: $cmd [-f] [login@]hostname..."
+cmd=`basename "$0"` || cmd=$0
+usage="Usage: $cmd [-s] [-f] [login@]hostname..."
 
 hARCH=$ARCH
 
 force=
+async=1
 
-[ "x$1" = x-f ] && { force=1; shift; }
+badopts=
+
+while [ $# -gt 0 ]
+do
+  case $1 in
+    -f)	force=1 ;;
+    -s)	async= ;;
+    --)	shift; break ;;
+    -?*)echo "$cmd: unrecognised option: $1" >&2
+	badopts=1
+	;;
+    *)	break ;;
+  esac
+  shift
+done
+
 [ $# = 0 ] && { echo "$cmd: missing login@hostname" >&2
-		echo "$usage" >&2
-		exit 2
+		badopts=1
 	      }
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
 
 [ $force ] || needhost $HOMEHOST@home || exit 1
 
@@ -23,5 +40,6 @@ cd || exit 1
 set -x
 for host
 do pfx "$host" syncacc '' "$host" &
+   [ $async ] || wait
 done
 wait
