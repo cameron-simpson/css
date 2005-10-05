@@ -84,7 +84,11 @@ done
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
-xit=0
+# We return a fetchmail-like exit status:
+#	0	1 or more messages retrieved ("busy")
+#	1	No messages for retrieval.
+#	2	An error.
+xit=1
 
 for fmhost in $FM_HOSTS
 do
@@ -99,8 +103,10 @@ do
 
   echo "`date`: $*" >>"$FM_LOGFILE"
   killpidfile -STOP getmail_flush.pid
-  $trace "$@" -e "$FM_SMALLEXPUNGE" -l "$FM_SMALLLIMIT" "$fmhost" || xit=1
-  $trace "$@" -B "$FM_BIGBATCH" "$fmhost" || xit=1
+  $trace "$@" -e "$FM_SMALLEXPUNGE" -l "$FM_SMALLLIMIT" "$fmhost"
+  case $? in 0) [ "x$xit" = x1 ] && xit=0 ;; 1) ;; *) xit=2 ;; esac
+  $trace "$@" -B "$FM_BIGBATCH" "$fmhost"
+  case $? in 0) [ "x$xit" = x1 ] && xit=0 ;; 1) ;; *) xit=2 ;; esac
   killpidfile -CONT getmail_flush.pid
   killpidfile getmail_flush.pid
 done
