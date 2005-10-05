@@ -19,12 +19,17 @@ do
   eval "`syncenv $mypid`"
   : ${FM_LOGFILE:=$LOGDIR/fetchmail}
   $trace dofetchmail ${1+"$@"}
+  case $? in
+    0)	busy=1 ;;
+    *)  busy= ;;
+  esac
   echo "`date`: fetchmail done" | tee -a "$FM_LOGFILE" >&2
 
   eval "`syncenv $mypid`"
   : ${FM_LOGFILE:=$LOGDIR/fetchmail}
   killpidfile getmail_flush.pid
   fmdelay=${FM_DELAY:=300}
+  [ $busy ] && fmdelay=30
   ( if [ "x$fmdelay" = x0 ]
     then  set -- pause
     else  set -- sleep "$fmdelay"
