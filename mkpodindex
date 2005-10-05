@@ -19,7 +19,7 @@ usage="Usage: $cmd [+a] [-j] [-k] [+k keywords,...] [-K key] [-l linkfile] [-t t
 	-j		Skip JavaScript tersify() function.
 			Useful if you're making several indices in one file.
 	-k		By keywords.
-	+k keywords,...	By keywords, skipping the specified categories (comma separated).
+	+k keywords,...	By keywords, skipping TOCs for the specified categories (comma separated).
 	-K key		Select POD files and links with the specified key.
 	-l linkfile	Pull plain links from linkfile.
 	-t title 	Set title."
