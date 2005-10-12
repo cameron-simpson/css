@@ -1,9 +1,24 @@
 #!/bin/sh
+#
+# Write a possibly-colourised string to the alert log.
+#	- Cameron Simpson <cs@zip.com.au>
+#
+
+cmd=$0
+usage="Usage: $cmd [-c colour] [echo-args...]"
+
 : ${LOGDIR:=$HOME/var/log}
-exec >>"$LOGDIR/alert"
+: ${ALERTLOG:=$LOGDIR/alert}
+exec >>"$ALERTLOG"
+badopts=
 colour=
-case $1 in -c) colour=$2; shift; shift; ;; esac
-[ $# = 0 ] && { set x "`cat`"; shift; }
+case $1 in
+  -c) colour=$2; shift; shift ;;
+  --) shift ;;
+  -?*)echo "$cmd: unrecognised option: $1" >&2; badopts=1; shift ;;
+esac
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+[ $# = 0 ] && set -- "`cat`"
 if [ -n "$colour" ]
 then  colour_echo "$colour" "$*"
 else  echo "$*"
