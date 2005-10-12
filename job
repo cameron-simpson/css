@@ -7,6 +7,10 @@
 cmd=$0
 usage="Usage: $cmd [task [comment...]]"
 
+isjob()
+{ [ -d "$HOME/var/idsets/timer/$1/." ]
+}
+
 setdesk=
 
 oldkey=`timer`
@@ -21,7 +25,7 @@ isjob "$key" || { [ "x$key" = xmisc ] || echo "$cmd: unknown job \"$key\"" >&2; 
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
-[ $setdesk ] && deskjob "$key"
+[ $setdesk ] && deskjob "$key" &
 
 when=`now`
 
@@ -40,5 +44,5 @@ category=`jobtimer "$key" category`
 ## computed at report time
 ##timer -i timer_sets "$category" "$when"
 
-title=`jobtimer "$key" title`
+##title=`jobtimer "$key" title`
 ##[ "x$oldkey" = "x$key" ] || alert -c white "JOB: $key ($category - $title) $*" &
