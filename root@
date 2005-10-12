@@ -5,23 +5,13 @@
 #
 
 cmd=$0
-usage="Usage: $cmd [-m msg] [-N] [+N] [-X] hostname
-       $cmd hostname command..."
+usage="Usage: $cmd [-m msg] hostname"
 
 badopts=
-ssh=ssho
-sshproto=
-sshopts=
 msg=
-
-newflag=-N
 
 while :
 do  case $1 in
-      -[12])	sshproto=$1 ;;
-      -[xXv])	sshopts="$sshopts $1" ;;
-      -N)	newflag=-N ;;
-      +N)	newflag= ;;
       -m)	msg=$2; shift ;;
       --)	shift; break ;;
       -?*)	echo "$cmd: unrecognised option: $1" >&2
@@ -46,23 +36,4 @@ fi
 || msg=`readbugline` \
 || { echo "$cmd: empty message rejected" >&2; exit 1; }
 
-ext=
-
-session=root@$host$ext
-
-exec term -n "#$session" \
-	scr \
-	  -e logscript -m "root@$host: $msg" "$session" \
-	     "$ssh" $sshproto -t $sshopts "root@$host" \
-		'. /etc/profile
-		 [ -s /opt/config/shell/rc ] && . /opt/config/shell/rc
-		 [ -f $HOME/.profile ] && . $HOME/.profile
-		 : ${SHELL:=/bin/sh}
-		 TERM=vt100
-		 PATH=$PATH:/opt/css/bin:/u/network/bin:/opt/gnu/bin
-		 MANPATH=$MANPATH:/opt/css/man:/u/network/man:/opt/gnu/man:/opt/gnu/info
-		 PERL5LIB=${PERL5LIB:+"$PERL5LIB:"}/opt/css/lib:/u/network/lib
-		 export TERM PATH MANPATH PERL5LIB
-		 [ -f /bin/zsh ] && { SHELL=/bin/zsh; export SHELL; }
-		 set -x
-		 exec $SHELL'
+exec term -e bugscript -m "$msg" ssho -v -x "root@$host"
