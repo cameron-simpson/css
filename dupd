@@ -3,7 +3,7 @@
 # Notice changes in disc usage.
 #	- Cameron Simpson <cs@zip.com.au>
 #
-# Timestamping.	- cameron, 21mar99
+# Timestamping.	- cameron, 21mar1999
 #
 
 now=`datecode`
