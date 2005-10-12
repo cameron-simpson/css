@@ -1,9 +1,11 @@
-#!/bin/sh
+#!/bin/sh -u
 #
 # Set the job id for the current window.
 # The run command if supplied.
 #	- Cameron Simpson <cs@zip.com.au> 03nov2004
 #
+
+: ${WINDOWID:=''}
 
 cmd=$0
 usage="Usage: $cmd [-w wid] [jobid [command [args...]]]"
@@ -15,7 +17,7 @@ case "$WINDOWID" in 0x*) WINDOWID=`perl -e "print $WINDOWID"` || exit 1 ;; esac
 
 if [ $# = 0 ]
 then
-# no window?
+  # no window?
   [ -n "$WINDOWID" ] || exit 1
   exec windowidset "$WINDOWID" job
 fi
