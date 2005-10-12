@@ -6,7 +6,8 @@ def get(secret,base=os.path.join(os.environ["HOME"],".secret")):
   return cs.hier.load(os.path.join(base,secret))
 
 def mysql(secret,db=None):
-  if not(hasattr(secret,'__keys__') or hasattr(o,'keys')):
+  import types
+  if type(secret) is types.StringType or not(hasattr(secret,'__keys__') or hasattr(secret,'keys')):
     # transmute secret name into structure
     secret=get(secret)
 
@@ -14,12 +15,16 @@ def mysql(secret,db=None):
   return cs.dbi.mysql.Conn(host=secret['HOST'],
 			   db=db,
 			   user=secret['LOGIN'],
-			   password=secret['PASSWORD'])
+			   passwd=secret['PASSWORD'])
 
-def ldap(secret,basedn,user=None,password=None):
-  if not(hasattr(secret,'__keys__') or hasattr(o,'keys')):
-    # transmute secret name into structure
-    secret=get(secret)
+def ldap(secret):
+  # transmute secret name into structure
+  if not(hasattr(secret,'__keys__') or hasattr(secret,'keys')):
+    import cs.secret
+    secret=cs.secret.get(secret)
 
+  print "secret =", `secret`
   import ldap
-  return ldap.open(secret['HOST'])
+  L=ldap.open(secret['HOST'])
+  L.simple_bind_s(secret['BINDDN'],secret['BINDPW'])
+  return L
