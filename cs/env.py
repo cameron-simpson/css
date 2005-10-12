@@ -5,8 +5,10 @@ def dflt(envvar,dfltval,doenvsub=0):
   env=os.environ
   if envvar in env:
     return env[envvar]
+
   if doenvsub:
     return envsub(dfltval)
+
   return dfltval
 
 def envsub(s):
