@@ -1,0 +1,10 @@
+#!/bin/sh
+#
+# Count the TCP states in lsof output, which should come from stdin.
+#	- Cameron Simpson <cs@zip.com.au> 10oct2005
+#
+
+sed -n 's/.* (\([A-Z][A-Z_0-9]*\))$/\1/p' \
+| awk '    { state[$1]++}
+       END { for (s in state) {print state[s] "\t" s} }' \
+| sort -n
