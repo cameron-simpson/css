@@ -1,6 +1,7 @@
 #!/bin/sh
 [ $# = 0 ] && { echo "Usage: $0 command [args...]" >&2; exit 2; }
 DISPLAY=
-export DISPLAY
+WINDOWID=
+export DISPLAY WINDOWID
 unset DISPLAY
 exec "$@"
