@@ -70,6 +70,12 @@ fi
 
 [ -t 0 -a -t 1 ] && topt=-t
 
+if [ $# = 0 ]
+then
+  qcmd=`shqstr /bin/sh -c ': set -x; exec ${SHELL:=/bin/sh}'`
+  set -- "$qcmd"
+fi
+
 sshargv="ssh $sshopts $topt"
 sshcmd=$*
 
