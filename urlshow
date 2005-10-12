@@ -70,7 +70,7 @@ then
     do
       case "$url" in
 	-)	cat ;;
-	xclip)	xclip -o | tr ' \011' '\012\012'; echo ;; # was cutbuffer
+	xclip)	xclip -o | tr '\011' ' '; echo ;; # was cutbuffer
 	*)	echo "$url" ;;
       esac
     done \
