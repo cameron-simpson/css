@@ -1,0 +1,12 @@
+#!/bin/sh
+#
+# Count the TCP states in "netstat -an" output.
+#	- Cameron Simpson <cs@zip.com.au> 07oct2005
+#
+
+netstat -an \
+| awk '    { state[$6]++ }
+       END { for (s in state) { print state[s] "\t" s }}' \
+| grep '	[A-Z][A-Z_0-9]*$' \
+| sort -n
+
