@@ -1,3 +1,4 @@
+import os
 import re
 import string
 from cStringIO import StringIO
@@ -10,8 +11,10 @@ def quote(args):
     if len(arg) == 0:
       qarg="''"
     else:
-      if sh_unsafe_re.match(arg): qarg=quotestr(arg)
-      else: qarg=arg
+      if sh_unsafe_re.search(arg):
+	qarg=quotestr(arg)
+      else:
+	qarg=arg
 
     quoted.append(qarg)
 
@@ -23,7 +26,7 @@ def quotestr(s):
 
   for c in s:
     if c == "'":
-      qs.write("'\''")
+      qs.write("'\\''")
     else:
       qs.write(c)
 
@@ -31,4 +34,5 @@ def quotestr(s):
   return qs.getvalue()
 
 def vpopen(argv,mode='r',bufsize=-1):
-  return os.popen(string.join(quote(argv)),mode,bufsize)
+  quoted=string.join(quote(argv))
+  return os.popen(quoted,mode,bufsize)
