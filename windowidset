@@ -1,7 +1,11 @@
-#!/bin/sh
+#!/bin/sh -u
 #
 # Manage details for window ids in a desktop.
 #	- Cameron Simpson <cs@zip.com.au> 18jul2002
 #
+: ${DISPLAY:=''}
 : ${XSESSIONID:="$HOST-$DISPLAY"}
+case "$XSESSIONID" in
+  *-) exit 1 ;; # no $DISPLAY
+esac
 exec idset -i "xsession/$XSESSIONID" ${1+"$@"}
