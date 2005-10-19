@@ -1,0 +1,32 @@
+#!/bin/sh -u
+#
+# Run a command handing stdout and stderr to mailsubj.
+#	- Cameron Simpson <cs@zip.com.au> 19oct2005
+#
+
+cmd=$0
+usage="Usage: $cmd [-s subj] address command [args...]"
+
+badopts=
+subj=
+
+[ $# -gt 0 ] && [ "x$1" = x-s ] && { subj=$2; shift; shift; }
+
+if [ $# = 0 ]
+then
+  echo "$cmd: missing address" >&2
+  badopts=1
+else
+  address=$1; shift
+  if [ $# = 0 ]
+  then
+    echo "$cmd: missing command" >&2
+    badopts=1
+  fi
+fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+[ -n "$subj" ] || subj=$*
+
+"$@" 2>&1 | mailsubj -s "$subj" "$address"
