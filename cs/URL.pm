@@ -1531,7 +1531,7 @@ sub _Get($$;$$$)
     $cs::URL::_Getting{$url}=1;
 
     my $scheme = $this->Scheme();
-    if (! grep($_ eq $scheme, HTTP, FTP,HTTPS))
+    if (! grep($_ eq $scheme, HTTP, FTP,HTTPS, MMS))
     { warn "$context:\n\tscheme $scheme not implemented";
       last GET;
     }
