@@ -7,7 +7,10 @@
 : ${LOGDIR:=$HOME/var/log}
 
 cmd=$0
-usage="Usage: $cmd logfile cmd [args...]"
+usage="Usage: $cmd [-p pidfile] logfile cmd [args...]"
+
+popt=/dev/null
+[ "x$1" = x-p ] && { popt=$2; shift; shift; }
 
 badopts=
 case $# in
@@ -19,4 +22,4 @@ esac
 
 logfile=$1; shift
 
-exec bgproc -p /dev/null -l "$logfile" -- "$@"
+exec bgproc -p "$popt" -l "$logfile" -- "$@"
