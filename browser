@@ -10,7 +10,7 @@
 url=
 mode=start
 profile=$USER@$HOST
-br=/opt/firefox-1.0.6/firefox
+br=/opt/firefox-1.0.7/firefox
 
 cmd=$0
 usage="Usage: $cmd [-f] [-q] [url]
@@ -61,6 +61,6 @@ case "$mode" in
 esac
 
 [ -n "$url" ] && set -- "$url"
+set -x
 histbackup -x "$HOME/var/firefox" "$HOME/var/backup/firefox"
-set-x "$br" -width "$FULLX" -height "$PIX_HIGH" -P "$profile" ${1+"$@"} &
-echo $! >"$pidfile"
+alog -p "$pidfile" alert set-x "$br" -width "$FULLX" -height "$PIX_HIGH" -P "$profile" ${1+"$@"} &
