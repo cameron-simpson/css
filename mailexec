@@ -29,4 +29,4 @@ fi
 
 [ -n "$subj" ] || subj=$*
 
-"$@" 2>&1 | mailsubj -s "$subj" "$address"
+"$@" 2>&1 | catthen mailsubj -s "$subj" "$address"
