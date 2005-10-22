@@ -84,4 +84,4 @@ chmod 755 $tmp
 echo exec $sush $tmp
 unset DISPLAY
 ##set -x
-exec "$realsu" $suargs "$su" -c ": set -x; exec $sush -x $tmp"
+exec "$realsu" $suargs "$su" -c "exec $sush -x $tmp"
