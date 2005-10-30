@@ -1,4 +1,5 @@
-#!/bin/sh
+#!/bin/sh -u
 : ${LOGDIR:=$HOME/var/log}
+: ${DLOG_WHEN:=now}
 [ $# = 0 ] && exec pageif cat "$LOGDIR/dlog"
-exec note "$LOGDIR/dlog" "$*"
+exec note -d "$DLOG_WHEN" "$LOGDIR/dlog" "$*"
