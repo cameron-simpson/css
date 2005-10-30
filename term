@@ -182,6 +182,7 @@ esac
 ##set -x
 eval "$detach"
 eval "$closefds"
+##exec 2>>$HOME/var/log/alert
 if [ $async ]
 then termcmd="bgproc -p - -- $termcmd"
 else termcmd="exec $termcmd"
