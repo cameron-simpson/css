@@ -50,9 +50,9 @@ then
 		       }
     if [ -d "$fpath" ]
     then
-	if ismhdir "$fpath"
-	then mode=mh
-	else mode=maildir
+	if ismaildir "$fpath"
+	then mode=maildir
+	else mode=mh
 	fi
     else
 	mode=mbox
@@ -82,7 +82,7 @@ case "$mode" in
 	DEFAULT=$fpath/
 	LOGFILE=$LOGDIR/procmail
 X
-	procmail "$tmpf"
+	set-x procmail "$tmpf"
 	xit=$?
 	rm -f "$tmpf"
 	exit $xit
