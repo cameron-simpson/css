@@ -82,7 +82,7 @@ case "$mode" in
 	DEFAULT=$fpath/
 	LOGFILE=$LOGDIR/procmail
 X
-	set-x procmail "$tmpf"
+	procmail "$tmpf"
 	xit=$?
 	rm -f "$tmpf"
 	exit $xit
