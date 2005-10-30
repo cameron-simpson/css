@@ -226,6 +226,7 @@ use Getopt::Std;
 
 sub readcats($;$);
 
+$::TrackRules=1;
 $::X_Label=0;
 $::FolderDups=0;
 $::DfltSfx="";		# unix style by default
@@ -233,7 +234,6 @@ $::DfltType=UNIX;	# unix style by default
 @::DfltDom=$ENV{MAILDOMAIN};
 undef $::DfltAlert;
 ##$::RcvStore='/usr/lib/nmh/rcvstore';	# path to MH rcvstore command
-$::TrackRules=1;
 
 ($::cmd=$0) =~ s:.*/::;
 $::Usage="Usage: $::cmd [-a alert] [-m domains] [-t {unix|mh|maildir}] <categories >procmailrc
@@ -261,6 +261,10 @@ $::Usage="Usage: $::cmd [-a alert] [-m domains] [-t {unix|mh|maildir}] <categori
 
   if (defined $::opt_L)
   { $::X_Label=1;
+  }
+
+  if (defined $::opt_T)
+  { $::TrackRules=0;
   }
 
   if (defined $::opt_a)
@@ -511,7 +515,7 @@ X
       }
 
       # duplicate stripping
-      if ($::FolderDups && $deliver !~ /^\!/)
+      if ($::FolderDups && $type ne PIPE)
       {
 	my $cache = ( $type eq MH || $type eq MAILDIR
 		    ? "$ENV{MAILDIR}/$folder/.msgid.cache"
