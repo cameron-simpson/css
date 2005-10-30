@@ -1,0 +1,14 @@
+#!/bin/sh -u
+#
+# Read an email message from stdin and log with dlog.
+#	- Cameron Simpson <cs@zip.com.au> 30oct2005
+#
+
+usage="Usage: $0 [label [preamble]]"
+
+label=mail
+[ $# = 0 ] || { label=$1; shift; }
+
+mhdrs_sh=`mhdrs -sh | sed 's/^/HDR_/'`
+eval "$mhdrs_sh"
+exec dlog "$label:" $* "$HDR_SUBJECT"
