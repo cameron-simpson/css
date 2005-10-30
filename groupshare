@@ -1,6 +1,6 @@
 #!/bin/sh
 #
-# Configure a directory tree for group sharing:
+# Configure directory trees for group sharing:
 #	- chgrp to named group
 #	- group r/w
 #	- setgid dirs
@@ -8,7 +8,7 @@
 #
 
 cmd=`basename "$0"`
-usage="Usage: $cmd [-a] group dir"
+usage="Usage: $cmd [-a] group dirs..."
 
 badopts=
 
@@ -23,13 +23,8 @@ else
   group=$1; shift
   if [ $# = 0 ]
   then
-    echo "$cmd: missing dir" >&2
+    echo "$cmd: missing dirs" >&2
     badopts=1
-  else
-    dir=$1; shift
-    [ $# = 0 ] || { echo "$cmd: extra arguments after dir: $*" >&2
-		    badopts=1
-		  }
   fi
 fi
 
@@ -40,27 +35,39 @@ grep "^$group:" /etc/group \
 || ask "Can't look up group \"$group\", proceed anyway" \
 || exit 1
 
-cd "$dir" || exit 1
+for dir
+do
+  [ -f "$dir" ] && continue
+  ( cd "$dir" || exit 1
+    exec /bin/pwd
+  ) || exit 1
+done
 
-wd=`pwd` || exit 1
-ask "Proceed with groupshare on $wd" || exit 1
+ask "Proceed with groupshare on the above directories" || exit 1
 
-set -x
+for dir
+do
+  [ -f "$dir" ] && { echo "SKIPPING $dir" >&2; continue; }
+  ( cd "$dir" || exit 1
+    /bin/pwd || exit 1
 
-find . ! -type l ! -group "$group" -print \
-| xxargs set-x chgrp "$group"
+    set -x
+    find . ! -type l ! -group "$group" -print \
+    | xxargs set-x chgrp "$group"
 
-if [ $all ]
-then
-    find . ! -type l -print \
-    | xxargs set-x chmod go=u
+    if [ $all ]
+    then
+	find . ! -type l -print \
+	| xxargs set-x chmod go=u
 
-    find . ! -type l -print \
-    | xxargs set-x chmod o-w
-else
-    find . ! -type l -print \
-    | xxargs set-x chmod g=u
-fi
+	find . ! -type l -print \
+	| xxargs set-x chmod o-w
+    else
+	find . ! -type l -print \
+	| xxargs set-x chmod g=u
+    fi
 
-find . -type d -print \
-| xxargs set-x chmod g+s
+    find . -type d -print \
+    | xxargs set-x chmod g+s
+  ) || break
+done
