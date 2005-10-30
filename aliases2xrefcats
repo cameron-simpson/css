@@ -1,0 +1,53 @@
+#!/usr/bin/python
+#
+# Read my aliases file, which has the form:
+#	key,... aliasname name <address>
+# and generate aggregate lines with regexps for massaging into cats lines.
+#	- Cameron Simpson <cs@zip.com.au> 30oct2005
+#
+
+import sys
+import re
+import string
+from cs.misc import chomp
+
+# crude address parsers
+RE_ADDR1=re.compile('<(.*@.*)>')
+RE_ADDR2=re.compile('\(.*\) *(.*@.*)')
+RE_ADDR3=re.compile('(.*@.*) *\(.*\)')
+RE_ADDR4=re.compile('(.*@.*)')
+
+xrefs={}
+
+for line in sys.stdin:
+  line=chomp(line)
+  (cats,alias,addr)=string.split(line,None,2)
+  if len(cats) == 0 or cats[0] == '#':
+    continue
+
+  m=RE_ADDR1.search(addr)
+  if not m: m=RE_ADDR2.search(addr)
+  if not m: m=RE_ADDR3.search(addr)
+  if not m: m=RE_ADDR4.search(addr)
+  if not m:
+    ## PLUG ## print "can't match", addr
+    continue
+
+  addr=m.group(1)
+  addr=string.lower(addr)
+
+  for cat in string.split(cats,','):
+    pair=(alias,addr)
+    if cat not in xrefs:
+      xrefs[cat]=[pair]
+    else:
+      xrefs[cat].append(pair)
+
+cats=xrefs.keys()
+cats.sort()
+for cat in cats:
+  ucat=string.upper(cat)
+  pairs=xrefs[cat]
+  pairs.sort
+  for pair in pairs:
+    print ucat, pair[0], pair[1]
