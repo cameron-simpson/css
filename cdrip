@@ -7,6 +7,7 @@
 # Add MP3 mode, basicly for my brother.	 -cameron 25aug2001
 # Support multiple encodings, add -k option, switch to WAV as
 # intermediate file format.		- cameron 16mar2003
+# Log completed tracks to the INDEX file if present. - cameron 27oct2005
 #
 # =head1 NAME
 #
@@ -315,7 +316,7 @@ sed -e 's;//*; -- ;g' -e 's/   */ /g' \
 	set nice -n "$nice" "$@"
 
 	if ( set -x; exec "$@" )
-	then :
+	then [ -s INDEX ] && printf "%s\n" "$out" >>INDEX
 	else echo "Encode of \"$raw\" fails." >&2
 	     rm -f "$out"
 	     exit 1
