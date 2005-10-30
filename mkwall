@@ -9,6 +9,7 @@
 : ${BG:=black}
 : ${TMPDIR:=/tmp}
 : ${WALLPAPER_SHADE:=100}
+: ${XINERAMA:=''}
 
 # set $bgx and $bgy
 eval `bgsize -v | sed 's/^d/bg/'`
