@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/sh -u
 #
 # Stash strings for later.
 # Adapted from noteurl.
@@ -13,6 +13,7 @@
 
 cmd=`basename "$0"`
 usage="Usage: $cmd [-t tag] notefile [strings...]
+	-d date	Make tag line for specified date.
 	-p pfx	Addenda prefix (default: a tab).
 	-s sfx	Addenda suffix.
 	-t tag	Tag line.
@@ -20,7 +21,9 @@ usage="Usage: $cmd [-t tag] notefile [strings...]
 
 notedir=$LOGDIR/notes
 notefile=
+when=now
 tag=
+tagfmt='%a %b %d %Y'
 hhmm=
 pfx='	'
 sfx=
@@ -28,9 +31,10 @@ locked=
 
 badopts=
 
-while :
+while [ $# -gt 0 ]
 do
     case $1 in
+	-d)	when=$2; shift ;;
 	-p)	pfx=$2; shift ;;
 	-s)	sfx=$2; shift ;;
 	-t)	tag=$2; shift ;;
@@ -63,9 +67,8 @@ esac
 
 # default tag if none supplied
 
-eval `( set x \`date|tr : " "\`; echo now_tag=\"$2 $3 $4 $9\" now_hhmm=$5:$6 )`
-[ -n "$tag" ] || tag=$now_tag
-[ -n "$hhmm" ] || hhmm=$now_hhmm
+[ -n "$tag" ] || tag=`date -d "$when" "+$tagfmt"` || exit 1
+[ -n "$hhmm" ] || hhmm=`date -d "$when" '+%H:%M'` || exit 1
 
 # loopback - lock the file and rerun
 [ $locked ] \
