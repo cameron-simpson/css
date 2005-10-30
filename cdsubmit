@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/sh -u
 #
 # Submit a CD description to the FreeDB CD Database.
 # Also write a cache entry into ~/.cddb for use by programs.
@@ -6,6 +6,7 @@
 #
 
 : ${TMPDIR:=/tmp}
+: ${EDITOR:=vi}
 
 cmd=`basename "$0"`
 version=1.0
@@ -15,11 +16,10 @@ cachedir=$HOME/.cddb
 realsubmit=freedb-submit@freedb.org
 testsubmit=test-submit@freedb.org
 
-submitto=$testsubmit
-cachesave=
+submitto=$realsubmit
+cachesave=1
 doedit=
-
-EDITOR=${EDITOR:-vi}
+note=
 
 usage="Usage: $cmd [-entf] [-m addr] category
 	-e	Invoke editor to enter information.
@@ -29,7 +29,8 @@ usage="Usage: $cmd [-entf] [-m addr] category
 		Don't make cache entry.
 	-f	FreeDB submit. Submit to the real submission address.
 	-m addr	Submit to the mail address addr.
-		Default: $submitto"
+		Default: $submitto
+		Valid: $testsubmit, $realsubmit"
 
 badopts=
 
@@ -75,8 +76,7 @@ xit=0
 desc=$TMPDIR/cdsub$$d
 tmp=$TMPDIR/cdsub$$t
 cddb=$TMPDIR/cdsub$$c
-trap 'rm -f $desc $cddb $tmp; exit $xit' 0
-trap 'rm -f $desc $cddb $tmp; exit 1' 1 15
+trap 'rm -f $desc $cddb $tmp' 0 1 15
 
 # gather basic disc info
 cddiscinfo ${CDRIP_DEV:-/dev/cdrom} >"$tmp" || exit 1
