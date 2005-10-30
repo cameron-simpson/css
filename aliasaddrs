@@ -4,6 +4,7 @@
 # Emit:
 #	addr	[name]
 #
+y/	/ /
 # alias foo bah <zit@zot>
 s/^ *alias  *\([^ ][^ ]*\)  *.*<\(.*@.*[^ ]\)>.*/\2 \1/p
 t ok
