@@ -10,7 +10,8 @@
 url=
 mode=start
 profile=$USER@$HOST
-br=/opt/firefox-1.0.7/firefox
+##br=/opt/firefox-1.0.7/firefox
+br=/opt/firefox-1.5b2-enGB/firefox
 
 cmd=$0
 usage="Usage: $cmd [-f] [-q] [url]
