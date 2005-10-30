@@ -1,0 +1,85 @@
+#!/bin/sh -u
+#
+# Process all messages in a maildir or MH dir against the dir's .procmailrc.
+#	- Cameron Simpson <cs@zip.com.au> 30oct2005
+#
+
+: ${MAILDIR:=$HOME/mail}
+
+cmd=`basename "$0"` || cmd=$0
+usage="Usage: $cmd [-d delay] [-f procmailrc] maildir"
+
+delay=
+procmailrc=
+
+badopts=
+
+while [ $# -gt 0 ]
+do
+  case $1 in
+    -d)	delay=$2; shift ;;
+    -f)	procmailrc=$2; shift ;;
+    --)	shift; break ;;
+    -?*)echo "$cmd: unrecognised option: $1" >&2
+	badopts=1
+	;;
+    *)	break ;;
+  esac
+  shift
+done
+
+if [ $# = 0 ]
+then
+  echo "$cmd: missing maildir" >&2
+  badopts=1
+else
+  maildir=$1; shift
+  [ $# = 0 ] || { echo "$cmd: extra arguments: $*" >&2; badopts=1; }
+fi
+
+case "$maildir" in
+  +*) maildir=$MAILDIR/`expr "x$maildir" : 'x.\(.*\)'` || exit 1 ;;
+esac
+
+ismaildir "$maildir" \
+|| ismhdir "$maildir" \
+|| { echo "$cmd: $maildir: must be a maildir or an MH dir" >&2
+     badopts=1
+   }
+[ -n "$procmailrc" ] || procmailrc=$maildir/.procmailrc
+case "$procmailrc" in
+  /*) ;; *) procmailrc=`/bin/pwd`/$procmailrc || exit 1 ;;
+esac
+[ -f "$procmailrc" -a -s "$procmailrc" ] \
+	|| { echo "$cmd: no procmailrc: $procmailrc" >&2
+	     badopts=1
+	   }
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+cd "$maildir" || exit 1
+
+xit=0
+while :
+do
+  busy=
+  if ismaildir .
+  then
+    for f in cur/* new/*
+    do
+      [ -s "$f" ] || continue
+      { procmail "$procmailrc" <"$f" && rm "$f" && busy=1; } || xit=1
+    done
+  else
+    ismhdir . || exit 1
+    for f in [1-9]*
+    do
+      [ -s "$f" ] || continue
+      { procmail "$procmailrc" <"$f" && rm "$f" && busy=1; } || xit=1
+    done
+  fi
+  [ -n "$delay" ] || break
+  [ $busy ] || sleep "$delay"
+done
+
+exit $xit
