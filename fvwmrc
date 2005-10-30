@@ -9,7 +9,6 @@
 (
   uncurly $HOME/rc/x11/fvwm/rc-curly
   desktop-incant -
-  desktop-incant-bg - -q
   desktop-incant-names -
   fvwm-deskkeys
   echo SwitchToDesk 1
