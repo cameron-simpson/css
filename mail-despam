@@ -1,0 +1,158 @@
+#!/bin/sh -u
+#
+# Spam filter every item in an MH or maildir folder.
+#	- Cameron Simpson <cs@zip.com.au> 26mar2004
+# 
+
+: ${MAILDIR:=$HOME/mail}
+: ${TMPDIR:=/tmp}
+
+cmd=`basename "$0"` || cmd=$0
+usage="Usage: $cmd [-d delay] folder nonspam [spam]"
+
+spam=+spam
+nonspam=
+delay=
+
+badopts=
+
+while [ $# -gt 0 ]
+do
+  case $1 in
+    -d)	delay=$2; shift ;;
+    --)	shift; break ;;
+    -?*)echo "$cmd: unrecognised option: $1" >&2
+	badopts=1
+	;;
+    *)	break ;;
+  esac
+  shift
+done
+
+if [ $# = 0 ]
+then
+  echo "$cmd: missing folder" >&2
+  badopts=1
+else
+  maildir=$1; shift
+  if [ $# = 0 ]
+  then
+    echo "$cmd: missing nonspam" >&2
+    badopts=1
+  else
+    nonspam=$1; shift
+    [ $# = 0 ] || { spam=$1; shift; }
+  fi
+
+  [ $# = 0 ] || { echo "$cmd: extra arguments: $*" >&2; badopts=1; }
+fi
+
+case "$maildir" in
+  +*) maildir=$MAILDIR/`expr "x$maildir" : 'x.\(.*\)'` || exit 1 ;;
+esac
+case "$nonspam" in
+  +*) nonspam=$MAILDIR/`expr "x$nonspam" : 'x.\(.*\)'` || exit 1 ;;
+esac
+case "$spam" in
+  +*) spam=$MAILDIR/`expr "x$spam" : 'x.\(.*\)'` || exit 1 ;;
+esac
+
+# sanity check folders
+for dir in "$maildir" "$nonspam" "$spam"
+do
+  [ -n "$dir" ] || continue
+  ismaildir "$dir" \
+  || ismhdir "$dir" \
+  || { echo "$cmd: $dir: must be a maildir or an MH dir" >&2
+       badopts=1
+     }
+done
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+cd "$maildir" || exit 1
+
+xit=0
+
+tmpf=$TMPDIR/$cmd$$
+trap 'rm -f "$tmpf."*' 0 1 2 13 15
+
+rawlist=$tmpf.raw
+bogolist=$tmpf.bogo
+
+while :
+do
+  if ismaildir .
+  then
+    for dir in cur new
+    do
+      ls -tr "$dir" | sed "s^$dir/"
+    done
+  else
+    if ismhdir .
+    then
+      ls | grep '^[1-9][0-9]*$' | sort -rn
+    else
+      echo "$cmd: $maildir: neither MH nor maildir folder" >&2
+    fi
+  fi \
+  | sed 128q \
+  | while read -r mfile
+    do
+      msize=`ls -ld -- "$mfile" | awk '{print $5}'` || msize=
+      if [ -n "$msize" ] \
+      && [ "$msize" -gt 128000 ] \
+      && filemailitem "$nonspam" <"$mfile"
+      then
+	rm -- "$mfile"
+      else
+	printf "%s\n" "$mfile"
+      fi
+    done \
+  >"$rawlist"
+
+  # stuff to do?
+  busy=
+  if [ -s "$rawlist" ]
+  then
+    busy=1
+    bogofilter -l -b -T -o 0.6,0.45 -u 2>>"$CONSOLE" <"$rawlist" >"$bogolist"
+
+    # file known non-spam
+    awk '$2 == "H" { print $1 }' <"$bogolist" \
+    | while read -r f
+      do  filemailitem "$nonspam" <"$f" && rm -- "$f"
+      done
+
+    # file spam
+    awk '$2 == "S" { print $1 }' <"$bogolist" \
+    | while read -r f
+      do  filemailitem "$spam" <"$f" && rm -- "$f"
+      done
+
+    # try everything else against spam assassin, which is slower
+    while read -r f
+    do
+      [ -s "$f" ] || continue	# skip files already processed
+      ##echo "spamassassin $f ..." >>"$LOGDIR/procmail"
+      if spamassassin -e -L <"$f" >/dev/null
+      then
+	bogofilter -Sn <"$f"
+	filemailitem "$nonspam" <"$f" && rm -- "$f"
+      else
+	bogofilter -Ns <"$f"
+	filemailitem "$spam" <"$f" && rm -- "$f"
+      fi
+    done <"$rawlist"
+  fi
+
+  [ -n "$delay" ] || break
+  if [ $busy ]
+  then
+    sleep 1
+  else
+    sleep "$delay"
+  fi
+done
+
+exit $xit
