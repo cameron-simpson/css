@@ -193,7 +193,8 @@ if (! defined $pid)
 }
 elsif ($pid == 0)
 # child - run command
-{ exec @ARGV;
+{ $::Lock->{TAKEN}=0; # don't tidy up after fork
+  exec @ARGV;
 }
 else
 # parent - wait for command
