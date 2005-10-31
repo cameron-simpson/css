@@ -197,7 +197,7 @@ sub DESTROY
   if ($this->Taken())
   {
     (system("/bin/rm -r '$this->{PATH}'")>>8) == 0
-      || warn "$::cmd: rm -r $this->{PATH}: $!\n";
+      || warn "$::cmd: pid $$: rm -r $this->{PATH}: $!\n";
 
     $this->{TAKEN}=0;
   }
@@ -212,7 +212,7 @@ with I<maxtries> less than zero and the lock already taken by someone else.
 =cut
 
 sub Taken($)
-{ return shift->{TAKEN};
+{ return $_[0]->{TAKEN} != 0;
 }
 
 sub _SetInfo($)
