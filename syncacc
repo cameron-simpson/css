@@ -70,6 +70,7 @@ exec \
 	'--include=/rc/mail/Mykefile' \
 	'--include=/rc/mail/mailcap' \
 	'--include=/rc/mail/mutt*' \
+	'--include=/rc/mail/procmailrc*' \
 	'--include=/rc/mail/signature' \
 	'--include=/rc/mail/signatures' \
 	'--exclude=/rc/mail/*' \
