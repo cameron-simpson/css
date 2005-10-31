@@ -2,9 +2,10 @@
 
 : ${MAILDIR:=$HOME/mail}
 
-bgproc -l procmail -p mail-despam -- set-x lock -1 "$MAILDOR/spool" mail-despam -d 10 +spool +spool-in
+bgproc -l procmail -p mail-despam -- set-x lock -1 "$MAILDIR/spool" mail-despam -d 10 +spool +spool-in
+
 for spool in spool-in spool-out
 do
   maildir=$MAILDIR/$spool
-  bgproc -l procmail -p "mail-$spool" -- set-x lock -1 "$maildir" maildir-despool -d 10 "$maildir"
+  bgproc -l procmail -p "mail-$spool" -- set-x lock -1 "$maildir" mail-despool -d 10 "$maildir"
 done
