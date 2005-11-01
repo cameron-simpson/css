@@ -1,0 +1,86 @@
+#!/bin/sh -u
+#
+# =head1 NAME
+#
+# colpad - reformat leftmost text columns to specified widths
+#
+# =head1 SYNOPSIS
+#
+# colpad [/[!]glob] widths... <old >new
+#
+# =head1 DESCRIPTION
+#
+# I<colpad> reads the input text and pads the input columns to specified widths.
+#
+
+cmd=`basename "$0"` || cmd=$0
+usage="Usage: $cmd widths..."
+
+badopts=
+
+glob=
+
+if [ $# -gt 0 ]
+then
+  case "$1" in
+    /!?*)	inc=  glob=`expr "x$1" : 'x..\(.*\)'`; shift ;;
+    /?*)	inc=1 glob=`expr "x$1" : 'x.\(.*\)'`; shift ;;
+  esac
+fi
+
+[ $# = 0 ] && { echo "$cmd: missing widths" >&2; badopts=1; }
+
+n=0
+fmt=
+widths=
+fields=
+efields=
+for width
+do
+  case "$width" in
+    [2-9]|[1-9][0-9]|[1-9][0-9][0-9])
+	n=`expr $n + 1`			|| exit 1
+	width1=`expr "$width" - 1`	|| exit 1
+	fmt="$fmt%-${width1}s "
+	widths="$widths $width"
+	fields="$fields f$n"
+	efields="$efields \"\$f$n\""
+	;;
+    *)	echo "$cmd: bad width: $width" >&2
+	badopts=1
+	;;
+  esac
+done
+
+fmt="$fmt%s\n"
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+while read -r $fields etc
+do
+  munge=1
+  if [ -n "$glob" ]
+  then
+    mu
+    case "$efields $etc" in
+      $glob)	[ $inc ] || munge= ;;
+      *)	[ $inc ] && munge= ;;
+    esac
+  fi
+
+  [ $munge ] || { eval "printf '%s\n' \"$efields \$etc\""
+		  continue
+		}
+
+  eval "printf \"\$fmt\" $efields \"\$etc\""
+done
+
+# =head1 BUGS
+#
+# Collapses some whitespace in the "unprocessed" lines.
+# Column overflow should unpad following columns until back in range.
+#
+# =head1 AUTHOR
+#
+# Cameron Simpson E<lt>cs@zip.com.auE<gt>
+#
