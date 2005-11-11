@@ -42,12 +42,11 @@ fi
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
 echo "Access group will be \""`echo "$*"|tr ' ' -`\"
-necho "CD title (vendor excluded)? "
-read title || exit 1
+title=`readline 'CD title (vendor excluded)? '` || exit 1
 [ -n "$title" ] || { echo "No title, upload aborted." >&2; exit 1; }
 shtitle=`shqstr "$title"`
 
-mkgroup "$@" || exit 1
+echo SKIPPING mkgroup "$@" || exit 1
 
 vendor=$1 appname=$2; shift; shift; version=`echo "$*" | tr ' ' -`
 
