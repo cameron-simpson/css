@@ -20,6 +20,7 @@
 : ${TERMSHADE:=30}
 : ${TERMTINT:=white}
 : ${TERMOPTIONS:=''}
+: ${RXVT_SOCKET:=''}
 
 cmd=$0
 usage="Usage: $cmd [-v] [-w width] [-h height] [-x x-pos] [-y y-pos]
@@ -68,7 +69,7 @@ do
     --)		shift; break ;;
     -e)		shift; break ;;
     -c)		shcmd=$2; shift; shift
-		set -- ${1+"$@"} -e "${SHELL:-/bin/sh}" -c "$shcmd"
+		set -- ${1+"$@"} -e "$SHELL" -c "$shcmd"
 		;;
     -a)		async=1 ;;
     +a)		async= ;;
@@ -105,7 +106,7 @@ done
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
-[ $# = 0 ] && set -- "${SHELL:-/bin/sh}"
+[ $# = 0 ] && set -- "$SHELL"
 [ -n "$title" ] || title=$*
 
 # suppress lock if none needed
@@ -147,15 +148,23 @@ case "$TERM,$DISPLAY" in
 		  export XAUTHORITY
 		}
 
-	PREFTERM=${PREFTERM:-xterm}	# safe default
-
 	case "$PREFTERM" in
 	    rxvt)	[ $dotrans ] && termopts="$termopts -ip"
 			;;
 	    urxvt*)	[ $dotrans ] && termopts="$termopts -ip -tint $tint -sh $shade"
 	    		[ $async ] || PREFTERM=urxvt	# gotta be synchronous
-			case "$DISPLAY" in
-			  :*) ;; *) PREFTERM=urxvt ;;
+			case "$PREFTERM" in
+			  urxvtc)
+			    if [ -z "$RXVT_SOCKET" ]
+			    then
+			      if RXVT_SOCKET=`rig-urxvtd`
+			      then
+				export RXVT_SOCKET
+			      else
+				PREFTERM=urxvt
+			      fi
+			    fi
+			    ;;
 			esac
 			;;
 	    aterm)	# -fade 90
