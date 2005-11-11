@@ -34,7 +34,7 @@ usage="Usage: $cmd [-entf] [-m addr] category
 
 badopts=
 
-while :
+while [ $# -gt 0 ]
 do
     case $1 in
 	-e)	doedit=1 ;;
