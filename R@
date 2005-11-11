@@ -33,5 +33,5 @@ rcmd=`shqstr env "DISPLAY=$rdisplay" term -keepio -e "$@"` || exit 1
 
 for h in `echo "$host" | tr , ' '`
 do
-  set-x envssh -f "$h" "$rcmd"
+  envssh -f "$h" "$rcmd"
 done
