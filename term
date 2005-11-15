@@ -17,8 +17,8 @@
 : ${PREFTERM:=xterm}
 : ${DISPLAY:=''}
 : ${TERM:=dumb}
-: ${TERMSHADE:=30}
-: ${TERMTINT:=white}
+: ${TERMSHADE:=''}
+: ${TERMTINT:=''}
 : ${TERMOPTIONS:=''}
 : ${RXVT_SOCKET:=''}
 
@@ -151,7 +151,10 @@ case "$TERM,$DISPLAY" in
 	case "$PREFTERM" in
 	    rxvt)	[ $dotrans ] && termopts="$termopts -ip"
 			;;
-	    urxvt*)	[ $dotrans ] && termopts="$termopts -ip -tint $tint -sh $shade"
+	    urxvt*)	[ $dotrans ] && { termopts="$termopts -ip"
+					  [ -n "$tint" ] && termopts="$termopts -tint $tint"
+					  [ -n "$shade" ] && termopts="$termopts -sh $shade"
+					}
 	    		[ $async ] || PREFTERM=urxvt	# gotta be synchronous
 			case "$PREFTERM" in
 			  urxvtc)
@@ -168,7 +171,9 @@ case "$TERM,$DISPLAY" in
 			esac
 			;;
 	    aterm)	# -fade 90
-			[ $dotrans ] && termopts="$termopts -tr -sh $shade"
+			[ $dotrans ] && { termopts="$termopts -tr"
+					  [ -n "$shade" ] && termopts="$termopts -sh $shade"
+					}
 			;;
 	esac
 
