@@ -8,11 +8,13 @@
 
 termopts=
 multitail=1
+title=
 
 cmd=$0
 usage="Usage: $cmd [-iconic] [-T] logfiles...
 	-iconic	Start terminal iconifyied.
-	-T	Use tail instead of multitail."
+	-T	Use tail instead of multitail.
+	-t title Window title."
 
 badopts=
 
@@ -21,6 +23,7 @@ do
   case "$1" in
     -iconic)	termopts="$termopts $1" ;;
     -T)		multitail= ;;
+    -t)		title=$2; shift ;;
     --)		shift; break ;;
     -?*)	echo "$cmd: unrecognised option: $1" >&2
 		badopts=1
@@ -57,7 +60,8 @@ done
 
 if [ $multitail ]
 then
-  exec term -n "TAIL $lognames" -small $termopts \
+  ntitle=${title:="TAIL $lognames"}
+  exec term -n "$ntitle" -small $termopts \
 	    -e multitail -M 10240 -b 8 -x 'MTAIL %t %f' "$@"
 fi
 
@@ -66,7 +70,8 @@ xit=0
 for log
 do
   logname=`echo "$log" | entilde`
-  term -n "TAIL $logname" -small $termopts -e tail -f "$log" || xit=1
+  ntitle=${title:="TAIL $logname"}
+  term -n "$ntitle" -small $termopts -e tail -f "$log" || xit=1
 done
 
 exit $xit
