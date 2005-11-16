@@ -9,14 +9,17 @@
 quick=
 doit=1
 dasharg=
+delay=
 
 cmd=$0
-usage="Usage: $0 [-] [-q]
+usage="Usage: $0 [-] [-q] [-d delay]
 	-	Write commands to stdout.
-	-q	Quick. Don't do the per-desk settings."
+	-q	Quick. Don't do the per-desk settings.
+	-d delay Delay between desktops."
 
 [ $# -gt 0 ] && [ "x$1" = x-  ] && { doit=; dasharg=$1; shift; }
 [ $# -gt 0 ] && [ "x$1" = x-q ] && { quick=1; shift; }
+[ $# -gt 0 ] && [ "x$1" = x-d ] && { delay=$2; shift; shift; }
 
 [ $# = 0 ] || { echo "$cmd: extra arguments: $*" >&2
 		echo "$usage" >&2
@@ -36,7 +39,12 @@ xit=$?
 
 idsetlist "$DESKTOPSET" rootbg \
 | awk '$2 != "." { print }' \
-| while read -r desk bg
+| \
+{ first=1
+  while read -r desk bg
   do
+    [ $first ] || [ -z "$delay" ] || sleep "$delay" || exit 1
     deskbg $dasharg -d "$desk" $bg
+    first=
   done
+}
