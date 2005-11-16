@@ -1,2 +1,3 @@
 #!/bin/sh
 desktop-incant-bg -q
+nice desktop-incant-bg -d 1
