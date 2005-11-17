@@ -1,0 +1,130 @@
+#!/bin/sh -u
+#
+# =head1 NAME
+#
+# mail-backup - backup my email directories
+#
+# =head1 SYNOPSIS
+#
+# mail-backup [-d maildir] [-B backupdir] [folders...]
+#
+# =head1 DESCRIPTION
+#
+# I<mail-backup> backs up my mail folders using histbackup.
+#
+
+: ${MAILDIR:=$HOME/mail}
+: ${MAILBACKUPDIR:=$HOME/backup/MAIL}
+
+trace=set-x
+
+cmd=`basename "$0"` || cmd=$0
+usage="Usage: $cmd [-d maildir] [-B backupdir] [folders...]
+	-B backupdir	Where my email backups live. Default, from \$MAILBACKUPDIR: $MAILBACKUPDIR
+	-d maildir	Where my email lives. Default, from \$MAILDIR: $MAILDIR"
+
+badopts=
+
+# =head1 OPTIONS
+#
+# =over 4
+#
+
+badopts=
+
+while [ $# -gt 0 ]
+do
+  case $1 in
+    # =item B<-B> I<backupdir>
+    #
+    # Specify the directory holding the mail folder backups.
+    # Default from B<$MAILBACKUPDIR> or B<$HOME/backup/MAIL>.
+    #
+    -B)	MAILBACKUPDIR=$2; shift ;;
+
+    # =item B<-d> I<maildir>
+    #
+    # Specify the directory holding the mail folders.
+    # Default from B<$MAILDIR> or B<$HOME/mail>.
+    #
+    -d)	MAILDIR=$2; shift ;;
+
+    --)	shift; break ;;
+    -?*)echo "$cmd: unrecognised option: $1" >&2
+	badopts=1
+	;;
+    *)	break ;;
+  esac
+  shift
+done
+
+# =back
+#
+
+case "$MAILDIR" in
+  /*) [ -d "$MAILDIR/." ] \
+      || { echo "$cmd: maildir $MAILDIR: not a directory" >&2
+	   badopts=1
+	 }
+      ;;
+  *)  echo "$cmd: maildir $MAILDIR: not an absolute path" >&2
+      badopts=1
+      ;;
+esac
+
+case "$MAILBACKUPDIR" in
+  /*) [ -d "$MAILBACKUPDIR/." ] \
+      || { echo "$cmd: backupdir $MAILBACKUPDIR: not a directory" >&2
+	   badopts=1
+	 }
+      ;;
+  *)  echo "$cmd: backupdir $MAILBACKUPDIR: not an absolute path" >&2
+      badopts=1
+      ;;
+esac
+
+[ -d "$MAILBACKUPDIR/." ] || { echo "$cmd: $MAILBACKUPDIR: not a directory" >&2
+			       badopts=1
+			     }
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+cd "$MAILDIR"
+
+[ $# = 0 ] && set -- *
+
+xit=0
+
+for folder
+do
+  [ -d "$folder/." ] || { echo "$cmd: $MAILDIR/$folder: not a directory" >&2;
+			  xit=1
+			  continue
+			}
+  hbopts=
+  if ismaildir "$folder"
+  then hbopts='--exclude=/tmp/ --exclude=.*'
+  fi
+
+  backup=$MAILBACKUPDIR/$folder
+  needdir "$backup" || { xit=1; continue; }
+
+  $trace histbackup -x "$folder" "$backup" $hbopts || xit=1
+done
+
+exit $xit
+
+# =head1 ENVIRONMENT
+#
+# B<$MAILDIR>, default location of mail folders.
+#
+# B<$MAILBACKUPDIR>, default location of mail folder backups.
+#
+# =head1 SEE ALSO
+#
+# histbackup(1cs)
+#
+# =head1 AUTHOR
+#
+# Cameron Simpson E<lt>cs@zip.com.auE<gt> 16nov2005
+#
