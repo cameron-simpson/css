@@ -12,10 +12,11 @@ def conn(db,systemid=os.environ['SYSTEMID']):
 """
 class Conn:
   def __init__(self,host="localhost",db=None,user="",passwd=""):
+    print "connect to "+host+"/"+db
     self.__conn=MySQLdb.connect(host=host,db=db,user=user,passwd=passwd)
-    print "paramstyle=", MySQLdb.paramstyle
+    ##print "paramstyle=", MySQLdb.paramstyle
 
-  def newCursor(self):
+  def cursor(self):
     return self.__conn.cursor()
 
   def view(self,*args):
