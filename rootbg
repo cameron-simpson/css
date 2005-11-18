@@ -5,53 +5,13 @@
 #
 
 cmd=$0
-usage="Usage: $cmd [-] [imagefile]
+usage="Usage: $cmd [-] [imagefiles...]
 	-	Do nothing. Recite fvwm actions."
 
 badopts=
 
-doit=1 dasharg= towm=fvwmcmd
-[ $# -gt 0 ] && [ "x$1" = x-  ] && { doit=; dasharg=$1; towm=echo; shift; }
+dasharg=
+[ $# -gt 0 ] && [ "x$1" = x-  ] && { dasharg=$1; shift; }
 
-if [ $# = 0 ]
-then
-  bg=`desktop 1 rootbg` && [ -n "$bg" ] && [ -s "$bg" ] \
-  || bg=`lastvalue "rootbg-$HOST"` && [ -n "$bg" ] && [ -s "$bg" ] \
-  || bg=`lastvalue rootbg_src` && [ -n "$bg" ] && [ -s "$bg" ] \
-  || bg=`lastvalue rootbg` && [ -n "$bg" ] && [ -s "$bg" ] \
-  || exit 1
-  exec echo "$bg"
-fi
-
-imagefile=$1; shift
-[ $# = 0 ] || { echo "$cmd: extra arguments: $*" >&2
-		badopts=1
-	      }
-
-[ $badopts ] && { echo "$usage" >&2; exit 2; }
-
-imsrc=$imagefile
-if [ -s "$imagefile" ]
-then
-  imagefile=`filecache "$imagefile"` || exit 1
-else
-  imagefile=`fileof "$imagefile"` || exit 1
-fi
-
-wall=`mkwall "$imagefile"` || exit 1
-
-if [ $doit ]
-then
-  (
-    lastvalue "rootbg-$HOST" "$imagefile"
-    lastvalue rootbg "$imagefile"
-    lastvalue rootbg_src "$imsrc"
-  ) &
-  fvwm-root --retain-pixmap "$wall"
-fi
-
-for fvcmd in \
-     'setenv XSESSIONBG pixmap' \
-     "ColorSet 1023 Pixmap $wall"
-do  $towm "$fvcmd"
-done
+[ $# = 0 ] && exec desktop 1 rootbg
+exec deskbg $dasharg -d 1 "$@"
