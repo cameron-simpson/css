@@ -136,8 +136,9 @@ cleanurllist \
       echo "$mozremote 'openurl($url,new-window)'" >&3
       popnew=
     else
+      echo usleep 200000 >&3
       echo "$mozremote 'openurl($url,new-tab)'" >&3
     fi
   done \
 ) \
-| catthen lock mozilla-xremote-client sh
+| catthen lock mozilla-xremote-client sh -x
