@@ -274,7 +274,7 @@ sub Stat($)
   }
   else
   {
-    my $cdhdr = "";
+    my $cdhdr = ' ' x 256;
     if (! ioctl(CDROM, 0x5305, $cdhdr))
     { warn "$::cmd: Stat($dev): ioctl(..,0x5305,..): $!\n";
     }
