@@ -1,0 +1,12 @@
+#!/bin/sh -u
+#
+# Look for music. in several search engines.
+#	- Cameron Simpson <cs@zip.com.au> 21nov2005
+#
+
+cmd=`basename "$0"` || cmd=$0
+usage="Usage: $cmd query"
+
+[ $# = 0 ] && { echo "$usage" >&2; exit 2; }
+
+exec search sanity "$@"
