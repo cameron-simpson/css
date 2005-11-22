@@ -63,6 +63,11 @@ then
     SAVE_FOLDER=+SAVED/misc
     maildir "$MAILDIR/SAVED/misc"
 else
+    [ -d "$fpath/." ] || \
+    { echo "$cmd: $fpath: not a directory" >&2
+      exit 1
+    }
+
     ismaildir "$fpath" || ismhdir "$fpath" \
     || { echo "$cmd: $fpath: not Maildir or MH folder" >&2
 	 exit 1
