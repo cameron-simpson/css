@@ -19,7 +19,8 @@
 trace=set-x
 
 cmd=`basename "$0"` || cmd=$0
-usage="Usage: $cmd [-d maildir] [-B backupdir] [folders...]
+usage="Usage: $cmd [-n] [-d maildir] [-B backupdir] [folders...]
+	-n		No action. Recite plan.
 	-B backupdir	Where my email backups live. Default, from \$MAILBACKUPDIR: $MAILBACKUPDIR
 	-d maildir	Where my email lives. Default, from \$MAILDIR: $MAILDIR"
 
@@ -35,6 +36,7 @@ badopts=
 while [ $# -gt 0 ]
 do
   case $1 in
+
     # =item B<-B> I<backupdir>
     #
     # Specify the directory holding the mail folder backups.
@@ -48,6 +50,13 @@ do
     # Default from B<$MAILDIR> or B<$HOME/mail>.
     #
     -d)	MAILDIR=$2; shift ;;
+
+    # =item B<-n>
+    #
+    # No action.
+    # Recite planned backup actions.
+    #
+    -n)	trace=echo ;;
 
     --)	shift; break ;;
     -?*)echo "$cmd: unrecognised option: $1" >&2
@@ -91,7 +100,23 @@ esac
 
 cd "$MAILDIR"
 
-[ $# = 0 ] && set -- *
+if [ $# = 0 ]
+then
+  skipfile=$MAILBACKUPDIR/.mail-backup.skip
+  if [ -s "$skipfile" ]
+  then
+    regexps=`sed -e 's/\./\\\\&/g' -e 's/?/./g' -e 's/\\*/.&/g' -e 's/^/^/' -e 's/$/$/' "$skipfile"`
+  else
+    regexps=
+  fi
+  set --
+  for folder in *
+  do  [ -d "$folder/." ] || continue
+      [ -n "$regexps" ] && printf '%s\n' "$folder" | grep -e "$regexps" && continue
+      set -- ${1+"$@"} "$folder"
+  done
+  [ $# = 0 ] && { echo "$cmd: nothing to back up!" >&2; exit 1; }
+fi
 
 xit=0
 
@@ -107,7 +132,7 @@ do
   fi
 
   backup=$MAILBACKUPDIR/$folder
-  needdir "$backup" || { xit=1; continue; }
+  [ -d "$backup/." ] || $trace needdir "$backup" || { xit=1; continue; }
 
   $trace histbackup -x "$folder" "$backup" $hbopts || xit=1
 done
