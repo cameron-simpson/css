@@ -79,7 +79,7 @@ do
     -ip)	dotrans=1 ;;
     +ip)	dotrans= ;;
     -sh)	shade=$2; shift ;;
-    -iconic)	termopts="$termopts $1" ;;
+    -C|-iconic)	termopts="$termopts $1" ;;
     -fg|*,-bg)	termopts="$termopts $1 $2"; shift ;;
     -v)		set -x ;;
     -w)		w=$2 ; shift ;;
