@@ -6,7 +6,7 @@
 #
 # =head1 SYNOPSIS
 #
-# mail-backup [-d maildir] [-B backupdir] [folders...]
+# mail-backup [-B backupdir] [-d maildir] [-n] [folders...]
 #
 # =head1 DESCRIPTION
 #
@@ -19,7 +19,7 @@
 trace=set-x
 
 cmd=`basename "$0"` || cmd=$0
-usage="Usage: $cmd [-n] [-d maildir] [-B backupdir] [folders...]
+usage="Usage: $cmd [-B backupdir] [-d maildir] [-n] [folders...]
 	-n		No action. Recite plan.
 	-B backupdir	Where my email backups live. Default, from \$MAILBACKUPDIR: $MAILBACKUPDIR
 	-d maildir	Where my email lives. Default, from \$MAILDIR: $MAILDIR"
