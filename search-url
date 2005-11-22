@@ -101,6 +101,7 @@ case `echo "$engine" | tr '[a-z]' '[A-Z]'` in
   RFCCONNECTED)	url=http://www.freesoft.org/Connected/cgi-bin/search.cgi?SEARCH_STRING=$query\&BASE_URL=/Connected/RFC/index.html\&DEPTH=0\&TYPE=REGEX\&CASE_INDEPENDANT=1\&WHOLE_WORD=0 ;;
   RFCNEXOR)	url=http://web.nexor.co.uk/public/rfc/index/cgi-bin/search/form?query=$query\&regexp=on\&titlefield=on\&abstractfield'=>'on\&authorfield=on\&site=Australia ;;
   ROGET)	url=http://www.thesaurus.com/roget.ihnd?KEYWORDS=$query\&HEADER='roget-english-frames-head\&FOOTER=roget-english-frames-foot\&INDEX=roget.idx\&LANGUAGE=roget-english-frames\&MAXHITS=$maxhits ;;
+  SANITY)	url=http://www.sanity.com.au/search.asp?LOC=1379\&q=$query\&l=1303 ;;
   SCOUR)	url=http://www.scour.com/Search/Search.phtml?query=$query\&index=image\&protocol=all\&x=14\&y=2 ;;
   SOFCOMTV)	url=http://www.sofcom.com.au/cgi-bin/TV/Search.cgi?state=Sydney\&fta=1\&fox=1\&opt=1\&type=keyword\&term=$query\&searchtype=All ;;
   SOURCEFORGE)	url=http://sourceforge.net/search/?type_of_search=soft\&exact=1\&words=$query ;;
