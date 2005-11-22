@@ -112,7 +112,7 @@ then
   set --
   for folder in *
   do  [ -d "$folder/." ] || continue
-      [ -n "$regexps" ] && printf '%s\n' "$folder" | grep -e "$regexps" && continue
+      [ -n "$regexps" ] && printf '%s\n' "$folder" | grep -e "$regexps" >/dev/null && continue
       set -- ${1+"$@"} "$folder"
   done
   [ $# = 0 ] && { echo "$cmd: nothing to back up!" >&2; exit 1; }
