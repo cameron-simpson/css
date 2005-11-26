@@ -1,5 +1,8 @@
 #!/bin/sh -u
 : ${LOGDIR:=$HOME/var/log}
 : ${DLOG_WHEN:=now}
-[ $# = 0 ] && exec pageif cat "$LOGDIR/dlog"
-exec note -d "$DLOG_WHEN" "$LOGDIR/dlog" "$*"
+logname=dlog
+[ $# -gt 0 ] && [ "x$1" = x-l ] && { logname=$2; shift; shift; }
+case "$logname" in /*) ;; *) logname=$LOGDIR/$logname ;; esac
+[ $# = 0 ] && exec pageif cat "$logname"
+exec note -d "$DLOG_WHEN" "$logname" "$*"
