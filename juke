@@ -7,6 +7,7 @@
 #
 
 : ${TMPDIR:=/tmp}
+: ${AUDIODIR:=$HOME/ogg}
 
 trace=set-x
 
@@ -93,7 +94,7 @@ bumpplayer()
 
 line=
 while lastline=$line
-      read line
+      line=`readline -d "$AUDIODIR" ""`
 do  
     [ "x$line" = "x!!" ] && line=$lastline
     case "$line" in
@@ -103,7 +104,7 @@ do
 		echo "  .	Select with an empty pattern (pick anything)."
 		echo "  n	Set main volume to n, from 0-100."
 		echo "  blank line: Skip to next selection from current criteria."
-		echo "  \"random\" Choose matching items sequentially."
+		echo "  \"random\" Choose matching items random."
 		echo "  \"seq\"	Choose matching items sequentially."
 		echo "  keywords Select tracks using the supplied keywords."
 		;;
