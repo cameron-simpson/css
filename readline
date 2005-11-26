@@ -1,14 +1,19 @@
-#!/bin/sh
+#!/bin/sh -u
 #
 # Read a line using the GNU readline stuff, for file completion.
 # Would that there was a way to supply come initial content...:-(
 #	- Cameron Simpson <cs@zip.com.au> 22feb2004
 #
 
+cddir=
+
 cmd=$0
-usage="Usage: readline prompt"
+usage="Usage: readline [-d dir] prompt
+	-d dir	Resolve completions in dir."
 
 badopts=
+
+[ $# -gt 0 ] && [ "x$1" = x-d ] && { cddir=$2; shift; shift; }
 
 if [ $# = 0 ]
 then
@@ -26,6 +31,7 @@ fi
 if [ -x "/bin/bash" ]
 then
     export prompt
+    [ -n "$cddir" ] && [ -d "$cddir/." ] && cd "$cddir"
     exec bash -c 'read -p "$prompt" -r -e line >&2 || exit 1; echo "$line"'
 else
     necho "$prompt"
