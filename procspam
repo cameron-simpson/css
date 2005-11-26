@@ -1,25 +1,12 @@
 #!/bin/sh
+#
+# Process the mail item on stdin as spam.
+#	- Cameron Simpson <cs@zip.com.au>
+#
 
-: ${TMPDIR:=/tmp}
 : ${LOGDIR:=$HOME/var/log}
-: ${CONSOLE:=$LOGDIR/console}
 : ${ALERTLOG:=$LOGDIR/alert}
 
-folder=+spam
-case "$1" in
-  +*) folder=$1; shift ;;
-esac
-
-[ $# = 0 ] || { echo "Usage: $0 [+folder]" >&2; exit 2; }
-
-exec >>"$CONSOLE" 2>>"$ALERTLOG"
-
-tmp=$TMPDIR/procspam$$
-cat >"$tmp" || exit 1
-exec </dev/null
-
-( bogofilter -Ns <"$tmp"
-  filemailitem "$folder" <"$tmp" && procmail <"$tmp"
-) &
-
+exec 3<&0 >>"$ALERTLOG" 2>&1
+bgproc -p /dev/null -i - -l alert set-x bogofilter -Ns <&3 3<&- &
 exit 0
