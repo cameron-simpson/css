@@ -1,53 +1,42 @@
-#!/bin/sh
+#!/bin/sh -u
 #
-# Make thumbnail GIFs for inclusion in Web pages.
-#	- Cameron Simpson <cs@zip.com.au> 19feb95
+# Make thumbnail of image, report pagename.
+#	- Cameron Simpson <cs@zip.com.au> 19feb1995
 #
-# Prefer PNG to GIF, handle other input types. - cameron, 26may99
+# Prefer PNG to GIF, handle other input types. - cameron, 26may1999
+# Prefer JPG to PNG, handle other input types. - cameron, 26nov2005
 #
 
-maxx=128 maxy=128 quant=64 fromtype=jpg outflag=-P
+thsize=128x128
+trace=	##set-x
 
-usage="Usage: $0 [-G] [-m max] [-q quant] [-x maxx] [-y maxy] [srcimage]
-	-G		Srcimage (or input) is GIF, not JPEG.
-	-m max		Set max X and Y (default: $maxx, $maxy).
-	-q quant	Quantise to quant colours (default $quant).
-	-o gif		Output GIF instead of PNG.
-	-o png		Output PNG (default).
-	-x maxx		Max X (default: $maxx).
-	-y maxy		Max Y (default: $maxy).
-	srcimage	Input image (default stdin)."
+cmd=$0
+usage="Usage: $cmd [-g geometry] srcimage
+	-g XxY		Set max X and Y. Default: $thsize
+	srcimage	Input image."
 
 badopts=
-while :
+while [ $# -gt 0 ]
 do  case $1 in
-	-G)	fromtype=gif ;;
-	-J)	fromtype=jpg ;;
-	-P)	fromtype=png ;;
-	-m)	maxx=$2 maxy=$2; shift ;;
-	-q)	quant=$2; shift ;;
-	-x)	maxx=$2; shift ;;
-	-y)	maxy=$2; shift ;;
-	-o)	outtype=$2; shift
-		case "$outtype" in
-		    png)	outflag=-P ;;
-		    gif)	outflag=-G ;;
-		    *)		echo "$0: unrecognised output type \"$outtype\"; I understand png or gif" >&2
-				badopts=1
-				;;
-		esac
-		;;
+	-g)	thsize=$2; shift ;;
 	--)	shift; break ;;
-	-?*)	echo "$0: unrecognised option: $1" >&2; badopts=1 ;;
+	-?*)	echo "$cmd: unrecognised option: $1" >&2; badopts=1 ;;
 	*)	break ;;
     esac
     shift
 done
 
-[ $# = 0 ] || { exec <"$1"; shift; }
-[ $# = 0 ] || { echo "$0: extra arguments: $*" >&2; badopts=1; }
+if [ $# = 0 ]
+then
+  echo "$cmd: missing srcimage" >&2
+  badopts=1
+else
+  srcimage=$1; shift
+  [ $# = 0 ] || { echo "$cmd: extra arguments after srcimage: $*" >&2; badopts=1; }
+fi
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
-set -x
-exec jpgscale "-$fromtype" "$outflag" -q $quant $maxx $maxy
+thsize=${maxx}x${maxy}
+
+exec $trace convof -C "jpgof/$thsize" -discard <"$srcimage" "$srcimage" gm convert -geometry "$thsize" - jpg:-
