@@ -540,7 +540,7 @@ case "$savemode" in
 		      fi
 		  fi
 		  prompt="Save [$trysave]? "
-		  saveas=`{ [ -d "$savedir/." ] && cd "$savedir"; } || pwd >&2; readline "$prompt"` || exit 0
+		  saveas=`readline -d "$savedir" "$prompt"` || exit 0
 		  case "$saveas" in
 		    \!*)	repeat=1
 				shcmd=`expr "x$saveas" : 'x! *\(.*\)'`
