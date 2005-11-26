@@ -4,4 +4,6 @@
 #	- Cameron Simpson <cs@zip.com.au> 01jun2002
 #
 
-exec listfiles -f "egrep '\\.(ogg|mp3)\$'" ${1+"$@"} -- "$HOME/ogg"
+: ${AUDIODIR:=$HOME/ogg}
+
+exec listfiles -f "egrep '\\.(ogg|mp3)\$'" ${1+"$@"} -- "$AUDIODIR"
