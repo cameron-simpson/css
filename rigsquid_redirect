@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/sh -u
 #
 # Dispatch my squid - generally runs an adzapper.
 #	- Cameron Simpson <cs@zip.com.au> 01jul2004
@@ -8,7 +8,7 @@ cmd=$0
 usage="Usage: $cmd [-f]"
 
 force=
-[ "x$1" = x-f ] && { force=1; shift; }
+[ $# -gt 0 ] && [ "x$1" = x-f ] && { force=1; shift; }
 
 if ksquid -TERM
 then
@@ -26,16 +26,11 @@ env SQUID_PIDFILE=$pidf envsub -p '\{\{([A-Z]\w*)\}\}' <"$HOME/rc/squid/tplt" >"
 
 mksquidpeers $SQUID_PEERS \
 | rlr -f '^##MKSQUIDPEERS OUTPUT BEGIN' -t '^##MKSQUIDPEERS OUTPUT END' -i "$rc" -o "$rc" -
-cat $HOME/private/squid-peers \
+cat $HOME/rc/squid/squid-peers \
 | rlr -f '^##CUSTOM PEERS BEGIN' -t '^##CUSTOM PEERS END' -i "$rc" -o "$rc" -
 
-case "$LOCATION" in
-    sco)
-      bsed -e 's/^never_direct/##&/' \
-	   -e 's/^cache_peer/##&/' "$rc"
-      ;;
-    *);;
-esac
+bsed '/^$/d; /^#/d' "$rc"
+
 set -x
 rm -f $HOME/var/run/squid.pid
 ln -s $pidf $HOME/var/run/squid.pid
