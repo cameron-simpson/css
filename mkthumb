@@ -33,17 +33,7 @@ do
     continue
   fi
 
-  [ -s "$file" ] || continue
-
-  thdir=`dirname "$file"`/.thumbnails/$thsize
-  th=$thdir/`basename "$file"`.png
-  [ -s "$th" ] && continue
-
-  [ $verbose ] && echo "$file -> $th"
-
-  [ -d "$thdir/." ] || needdir "$thdir" || { xit=1; continue; }
-  $trace gm convert -geometry "$thsize" -quality 100 - <"$file" png:- >"$th" \
-      || { $trace rm "$th"; xit=1; }
+  mkthumbnail -g "$thsize" "$file" || xit=1
 done
 
 exit $xit
