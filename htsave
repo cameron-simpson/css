@@ -29,8 +29,8 @@ done
 
 if [ $# = 0 ]
 then
-    [ -n "$DISPLAY" ] && { set -- `xclip -o` || exit 1; echo "$*" >&2; }
-    [ $# = 0 ] && { echo "$cmd: no URLs and no default" >&2; badopts=1; }
+    echo "$cmd: no URLs" >&2
+    badopts=1
 fi
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
