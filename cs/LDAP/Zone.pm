@@ -79,6 +79,7 @@ sub UserSearch($$$)
 	    filter => sprintf("(&(".$this->Attr(USER_SEARCH)."))",$id),
 	    scope => 'sub',	# vs 'one'
 	  );
+  ##warn "query=".cs::Hier::h2a(\%q,1);
   return $L->search(%q);
 }
 
