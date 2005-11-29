@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/sh -u
 #
 # Change the image menu backdrop image for the running FVWM.
 #	- Cameron Simpson <cs@zip.com.au> 18oct2002
@@ -12,7 +12,7 @@ call="$0 $*"
 domenu=
 aspect=-t
 strippfx=
-pickn=1
+pickn=16
 desk=
 
 usage="Usage: $cmd [options...] [ imagefile | bglist-args... ]
@@ -44,8 +44,7 @@ done
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
-[ -n "$desk" ] || desk=`currentdesk` || exit 1
-
+###############################################################
 # A URL? Fetch and use.
 case "$#,$1" in
   1,http://*)
@@ -53,45 +52,56 @@ case "$#,$1" in
     exec withurl "$1" "$0" $opts ;;
 esac
 
-[ "x$*" = xnone ] && { desktop "$desk" menubg ''
-		       menucs=`expr 2048 + $desk`
-		       exec >&3 3>&-
-		       exec $fvcmd "Colorset $menucs RootTransparent"
-		     }
+[ -n "$desk" ] || desk=`currentdesk` || exit 1
+menucs=`expr 2048 + $desk`
 
-# offer menu if not handed single image file
-if [ $# != 1 ] || [ ! -f "$1" -o ! -s "$1" ]
+###############################################################
+# Erase menu backdrop.
+if [ "x$*" = xnone ]
 then
-  # presume search args
-  set -- `pickim -P "$strippfx" -n $pickn $aspect ${1+"$@"} | sort -u` || exit 1
-  [ $# = 0 ] && { echo "$cmd: no image files chosen!" >&2; exit 1; }
-  if [ -t 1 ]; then  cd; ls -ld "$@"; fi &
-  
-  tmpf=$TMPDIR/menubg$$
-  for arg
-  do  echo "$arg"
-  done >"$tmpf"
-  fvwmcmd \
-	"SetEnv FVWM_MENU_IMLIST_OP \"menubg $opts\"" \
-	"Piperead 'fvwm-menu -1 ImDirMenu \"$cmd $call\" fvwm-menu-imlist -l $tmpf .; rm $tmpf'" \
-	"Popup ImDirMenu" \
-	"UnSetEnv FVWM_MENU_IMLIST_OP"
-  exit $?
-fi
-
-# set image directly
-
-srcimage=$1; shift
-desktop "$desk" menubg_src "$srcimage" &
-
-cachefile=`filecache "$srcimage"` || exit 1
-desktop "$desk" menubg "$imagefile" || exit 1
-lastvalue menubg "$cachefile" &
-imagefile=`pngof "$cachefile"` || exit 1
-
-if [ -n "$DISPLAY" ]
-then
-  menucs=`expr 2048 + $desk`
+  desktop "$desk" menubg ''
   exec >&3 3>&-
-  $fvcmd "Colorset $menucs AspectPixmap $imagefile"
+  exec $fvcmd "Colorset $menucs RootTransparent"
 fi
+
+###############################################################
+# single filename - set image directly
+if [ $# = 1 ] && [ -f "$1" -a -s "$1" ]
+then
+  srcimage=$1; shift
+  desktop "$desk" menubg_src "$srcimage" &
+
+  cachefile=`filecache "$srcimage"` || exit 1
+  desktop "$desk" menubg "$cachefile" || exit 1
+  lastvalue menubg "$cachefile" &
+  imagefile=`pngof "$cachefile"` || exit 1
+
+  if [ -n "$DISPLAY" ]
+  then
+    exec >&3 3>&-
+    $fvcmd "Colorset $menucs AspectPixmap $imagefile"
+  fi
+
+  exit 0
+fi
+
+###############################################################
+# presume search args
+pickimargs=$*
+set -- `pickim -P "$strippfx" -n $pickn $aspect ${1+"$@"} | sort -u` || exit 1
+[ $# = 0 ] && { echo "$cmd: no image files chosen!" >&2; exit 1; }
+[ -t 1 ] && ( cd; ls -ld -- "$@" )
+
+tmpf=$TMPDIR/menubg$$
+for arg
+do  echo "$arg"
+done >"$tmpf"
+
+(
+  echo "DestroyMenu MenuBG"
+  echo "AddToMenu MenuBG \"MenuBG $pickimargs\" Title"
+  fvwm-menu-imlist -l "$tmpf" MenuBG menubg; rm "$tmpf"
+  echo "Popup MenuBG"
+) | fvwmcmd
+
+exit $?
