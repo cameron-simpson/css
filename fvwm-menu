@@ -11,7 +11,7 @@ noauto=
 title=
 
 cmd=$0
-usage="Usage: $cmd [-1] [-n] [-t title] menu cmd [args...]
+usage="Usage: $cmd [-1] [-n] [-t title] menuname cmd [args...]
 	-n	Don't geneate any menu entries (bootstrap).
 	-t	Set title; default is menu name.
 	-1	Don't give this menu a DynamicPopUpAction."
