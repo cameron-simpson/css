@@ -13,6 +13,7 @@ trace=set-x
 
 playcopy=
 dorandom=
+ptns=
 
 cmd=`basename "$0"`
 usage="Usage: $cmd [-C]"
