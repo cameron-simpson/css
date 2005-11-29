@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/sh -u
 #
 # Generate actions for an image directory menu, with thumbnails.
 #	- Cameron Simpson <cs@zip.com.au> 19oct2002
@@ -26,6 +26,7 @@ usage="Usage: $cmd [-N] [-d dir] [-l filelist] [XxY] menuname [filecmd [args...]
 ##alert "DFLT=[$FVWM_MENU_IMLIST_OP]"
 ##env|grep FVWM >>$LOGDIR/alert
 
+menutitle=
 filelist=
 inter=
 dir=.
@@ -65,7 +66,6 @@ fi
 
 cd "$dir" || exit 1
 wd=`pwd`  || exit 1
-thsubdir=.thumbnails/$thsize
 
 if [ $newmenu ]
 then
@@ -104,46 +104,34 @@ fi \
 
       ##alert "\"$tag\" PopImDir $path"
       echo "AddToMenu $menuname \"$tag\" PopImDir $path"
-    else
-      f=$entry
-      [ -s "$f" ] || continue;
-
-      case "$entry" in
-	  $HOME/*)	tag='~/'`expr "x$entry" : "x$HOME/\\(.*\\)"` ;;
-	  *)		tag=$entry ;;
-      esac
-
-      d=`dirname "$f"`
-      case "$d" in
-	  /*)		;;
-	  *)		d=$wd/$d ;;
-      esac
-      case "$f" in
-	  */*)	fbase=`basename "$f"` ;;
-	  *)		fbase=$f ;;
-      esac
-      case "$f" in
-	  /*)	;;
-	  *)	f=$d/$fbase ;;
-      esac
-
-      thumb=$thsubdir/$fbase.png
-      fthumb=$d/$thumb
-      if [ -s "$fthumb" ]
-      then tag="%$fthumb%$tag"
-      else echo "$f" >&4
-      fi
-
-      echo "AddToMenu $menuname \"$tag\" Exec "`shqstr "$@" "$f"`
+      continue
     fi
+
+    f=$entry
+    [ -s "$f" ] || continue;
+
+    case "$entry" in
+	$HOME/*)	tag='~/'`expr "x$entry" : "x$HOME/\\(.*\\)"` ;;
+	*)		tag=$entry ;;
+    esac
+
+    d=`dirname "$f"`
+    case "$d" in
+	/*)		;;
+	*)		d=$wd/$d ;;
+    esac
+    case "$f" in
+	*/*)	fbase=`basename "$f"` ;;
+	*)		fbase=$f ;;
+    esac
+    case "$f" in
+	/*)	;;
+	*)	f=$d/$fbase ;;
+    esac
+
+    thumb=`mkthumbnail -t png -g 48x48 "$f"` || thumb=
+    [ -n "$thumb" ] && [ -s "$thumb" ] && tag="%$thumb%$tag"
+
+    echo "AddToMenu $menuname \"$tag\" Exec "`shqstr "$@" "$f"`
   done
-
-  exec >/dev/null
-
-  ( ( sort -u "$tmpf"
-      sed -e 's:/[^/]*$::' -e 's:^$:.:' "$tmpf" | sort -u
-    ) \
-    | bgstdin con lock mkthumb set-x xxargs mkthumb
-    rm "$tmpf"
-  ) &
 }
