@@ -9,9 +9,11 @@
 
 thsize=128x128
 trace=	##set-x
+thtype=jpg
 
 cmd=$0
 usage="Usage: $cmd [-g geometry] srcimage
+	-t {png|jpg}	Preferred thumbnail image format.
 	-g XxY		Set max X and Y. Default: $thsize
 	srcimage	Input image."
 
@@ -19,6 +21,7 @@ badopts=
 while [ $# -gt 0 ]
 do  case $1 in
 	-g)	thsize=$2; shift ;;
+	-t)	thtype=$2; shift ;;
 	--)	shift; break ;;
 	-?*)	echo "$cmd: unrecognised option: $1" >&2; badopts=1 ;;
 	*)	break ;;
@@ -37,6 +40,4 @@ fi
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
-thsize=${maxx}x${maxy}
-
-exec $trace convof -C "jpgof/$thsize" -discard <"$srcimage" "$srcimage" gm convert -geometry "$thsize" - jpg:-
+exec $trace convof -C "${thtype}of/$thsize" -discard <"$srcimage" "$srcimage" gm convert -geometry "$thsize" - "$thtype:-"
