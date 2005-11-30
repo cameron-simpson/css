@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/sh -u
 #
 # Yet another audio CD ripper. Easiest way to learn the tools :-)
 # Like mkcd and mkiso, this is meant to be a no brainer command line.
@@ -32,14 +32,23 @@
 #
 
 : ${TMPDIR:=/tmp}
+: ${EDITOR:=vi}
+: ${CDRIP_TRACKFMT:='%02d - %s'}	# track number then title
+: ${CDRIP_DEV:=/dev/cdrom}
+: ${CDRIP_ENC:=ogg}			# comma separated list of ogg,mp3
+: ${CDRIP_BPS:=192}
+: ${CDRIP_QUAL=6}
+: ${CDRIP_LOCK:=''}
+: ${CDRIP_OPTS:=''}
+: ${CDDBSERVER:=au.freedb.org:8880}
+export CDDBSERVER
 
-EDITOR=${EDITOR:-vi}
-
-dev=${CDRIP_DEV:-/dev/cdrom}
-enclist=${CDRIP_ENC:-ogg}
-bps=${CDRIP_BPS-192}
-qual=${CDRIP_QUAL-6}
+dev=$CDRIP_DEV
+enclist=$CDRIP_ENC
+bps=$CDRIP_BPS
+qual=$CDRIP_QUAL
 lock=$CDRIP_LOCK
+trackfmt=$CDRIP_TRACKFMT
 oggencqual=
 lamequal=
 keep=
@@ -71,7 +80,7 @@ set x -b "$bps" -q "$qual" $CDRIP_OPTS ${1+"$@"}; shift
 # =over 4
 #
 badopts=
-while :
+while [ $# -gt 0 ]
 do
     case $1 in
 	# =item B<-v>
@@ -205,7 +214,7 @@ sed -e 's;//*; -- ;g' -e 's/   */ /g' \
 	  [0-9])	wtrack=0$track ;;
 	  *)		wtrack=$track ;;
       esac
-      ftitle="$wtrack: $title"
+      ftitle=`printf "$trackfmt" "$track" "$title"`
 
       echo "Ripping track #$track: $dir/$ftitle ..."
 
@@ -407,6 +416,8 @@ exit $xit
 # is to use B<CDRIP_OPTS> to specify a B<-b> option.
 #
 # CDDBSERVER, in the form I<server>B<:>I<port>, used by cdtoc(1cs) to obtain album and track information.
+#
+# CDRIP_TRACKFMT, printf(1) format string expecting %d and %s in order
 #
 # =head1 SEE ALSO
 #
