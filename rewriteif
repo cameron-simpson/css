@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/sh -u
 #
 # Rewrite the named file if the input differs.
 #	- Cameron Simpson <cs@zip.com.au> 19may2000
@@ -6,18 +6,55 @@
 
 : ${TMPDIR:=/tmp}
 
+cmd=`basename "$0"`
+usage="Usage: $cmd [-0] [-v] filename
+	-0	Rewrite the file even if the input is empty.
+	-v	Verbose."
+
+rw0=
 verbose=
 [ "x$1" = x-v ] && { verbose=1; shift; }
 
-[ $# = 1 ] || { echo "Usage: $0 [-v] filename" >&2; exit 2; }
-file=$1; shift
+badopts=
 
-[ -f "$file" ] || { echo "$0: $file: not a regular file" >&2; exit 1; }
+while [ $# -gt 0 ]
+do
+  case "$1" in
+    -0)	rw0=1 ;;
+    -v)	verbose=1 ;;
+    --)	shift; break ;;
+    -?*)echo "$cmd: unrecognised option: $1" >&2
+	badopts=1
+	;;
+    *)	break ;;
+  esac
+  shift
+done
+
+if [ $# = 0 ]
+then
+  echo "$cmd: missing filename" >&2
+  badopts=1
+else
+  file=$1; shift
+  [ -f "$file" ] || { echo "$cmd: $file: not a regular file" >&2
+		      badopts=1
+		    }
+  [ $# = 0 ] || { echo "$cmd: extra arguments after filename: $*" >&2
+		  badopts=1
+		}
+fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
 
 tmp=$TMPDIR/rwi$$
 trap 'rm "$tmp"' 0 1 2 13 15
 
 cat >"$tmp" || exit 1
+
+[ $rw0 ] || [ -s "$tmp" ] || { echo "$cmd: empty input, rewrite aborted" >&2
+			       exit 1
+			     }
 
 cmp -s "$tmp" "$file" && exit 0
 
@@ -26,7 +63,7 @@ if cat "$tmp" >"$file"
 then
     exit 0
 else
-    echo "$0: rewrite of $file fails, probably damaged" >&2
+    echo "$cmd: rewrite of $file fails, probably damaged" >&2
     echo "	rewrite content left in $tmp" >&2
     exit 1
 fi
