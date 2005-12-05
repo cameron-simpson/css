@@ -26,7 +26,7 @@ env SQUID_PIDFILE=$pidf envsub -p '\{\{([A-Z]\w*)\}\}' <"$HOME/rc/squid/tplt" >"
 
 mksquidpeers $SQUID_PEERS \
 | rlr -f '^##MKSQUIDPEERS OUTPUT BEGIN' -t '^##MKSQUIDPEERS OUTPUT END' -i "$rc" -o "$rc" -
-cat $HOME/rc/squid/squid-peers \
+cat $HOME/rc/squid/peers \
 | rlr -f '^##CUSTOM PEERS BEGIN' -t '^##CUSTOM PEERS END' -i "$rc" -o "$rc" -
 
 bsed '/^$/d; /^#/d' "$rc"
