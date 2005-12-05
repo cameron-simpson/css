@@ -32,9 +32,9 @@ if [ -x "/bin/bash" ]
 then
     export prompt
     [ -n "$cddir" ] && [ -d "$cddir/." ] && cd "$cddir"
-    exec bash -c 'read -p "$prompt" -r -e line >&2 || exit 1; echo "$line"'
+    exec bash -c 'read -p "$prompt" -r -e line >&2 || exit 1; eval "line=$line"; printf "%s\n" "$line"'
 else
     necho "$prompt"
     read line || exit 1
-    echo "$line"
+    printf "%s\n" "$line"
 fi
