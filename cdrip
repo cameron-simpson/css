@@ -11,7 +11,7 @@
 #
 # =head1 NAME
 #
-# cdrip - extract tracks from an audio CD and encode as Ogg or MP3
+# cdrip - extract tracks from an audio CD and encode as Ogg, MP3 and/or FLAC
 #
 # =head1 SYNOPSIS
 #
@@ -33,9 +33,10 @@
 
 : ${TMPDIR:=/tmp}
 : ${EDITOR:=vi}
+: ${NAME:=''}
 : ${CDRIP_TRACKFMT:='%02d - %s'}	# track number then title
 : ${CDRIP_DEV:=/dev/cdrom}
-: ${CDRIP_ENC:=ogg}			# comma separated list of ogg,mp3
+: ${CDRIP_ENC:=ogg}			# comma separated list of ogg,mp3,flac
 : ${CDRIP_BPS:=192}
 : ${CDRIP_QUAL=6}
 : ${CDRIP_LOCK:=''}
@@ -51,6 +52,7 @@ lock=$CDRIP_LOCK
 trackfmt=$CDRIP_TRACKFMT
 oggencqual=
 lamequal=
+flacqual=--best
 keep=
 jobs=1
 nice=10
@@ -64,7 +66,8 @@ usage="Usage: $cmd [-q qual] [-b bps] [-d device] [-e enclist] [-l lock] [-j job
 	-b kbps		Fixed bitrate kilobits per second for the encoding.
 			Default: variable bit rate using quality.
 	-d device	Device holding the CD. Default: $dev
-	-e enclist	Select encoding(s), comma separated. Default: $enclist
+	-e enclist	Select encoding(s), comma separated.
+			Supported: ogg,mp3,flac. Default: $enclist
 	-K		Keep the WAV file around.
 	-j jobs		Use this many CPUs for the encoding phase.
 			(jobs > 1) implies \"-l $cmd\".
@@ -104,8 +107,20 @@ do
 	# Note: this is the oggenc(1) quality numbering (1 is bad, 9 is good).
 	# Lame(1)'s quality numbering goes the other way.
 	# The script converts as appropriate, but this should be bourne in mind if encoding to MP3.
+	# Flac(1) encoding uses this to control the compression level.
 	#
-	-q)	[ -n "$2" ] && { oggencqual="-q $2" lamequal="-v -V `expr 9 - $2`"; }
+	-q)	if [ -n "$2" ]
+		then
+		  oggencqual="-q $2"
+		  lamequal="-v -V `expr 9 - $2`"
+		  case "$2" in
+		    9)		flacenc=-8 ;; # we do not go to 11
+		    [0-8])	flacenc=-$2 ;;
+		    *)		echo "$cmd: unsupported quality: $1 $2" >&2
+				badopts=1
+				;;
+		  esac
+		fi
 		shift ;;
 	# =item B<-d> I<device>
 	#
@@ -116,17 +131,19 @@ do
 	# =item B<-e> I<encodings>
 	#
 	# Comma separated list of encoding formats to produce.
+	# Supported: ogg, mp3, flac.
 	# Default: B<ogg>, or the value of B<$CDRIP_ENC>.
 	#
 	-e)	enclist=
 		for e in `echo "$2" | tr , ' '`
 		do
 		  case $e in
-		    mp3|ogg)	enclist="$enclist $e" ;;
-		    *)		echo "$cmd: unrecognised encoding: $e" >&2
-				echo "	I known ogg and mp3" >&2
-				badopts=1
-				;;
+		    mp3|ogg|flac)
+			enclist="$enclist $e" ;;
+		    *)	echo "$cmd: unrecognised encoding: $e" >&2
+			echo "	I known ogg, mp3 and flac" >&2
+			badopts=1
+			;;
 		  esac
 		done
 		shift
@@ -189,6 +206,9 @@ then
     lock=$cmd
 fi
 
+byNAME=
+[ -n "$NAME" ] && byNAME=" by $NAME"
+
 toc=$TMPDIR/cdtoc.$$
 cdtoc "$dev" >"$toc" || { rm -f "$toc"; exit 1; }
 
@@ -233,7 +253,7 @@ sed -e 's;//*; -- ;g' -e 's/   */ /g' \
       raw=$dir/$ftitle.wav
 
       [ -d "$dir/." ] || mkdir -p "$dir" || { xit=1; continue; }
-      ripcomment="Ripped by $NAME with cdparanoia on `date`"
+      ripcomment="Ripped$byNAME with cdparanoia on `date`"
 
       [ -s "$raw" ] \
       || (set -x; cdparanoia $cdpara_noise -d "$dev" -w "$track" "$raw") \
@@ -277,13 +297,16 @@ sed -e 's;//*; -- ;g' -e 's/   */ /g' \
 	    in=$raw
 	fi
 	case $enc in
+	  flac)
+	    set flac $flacenc -o "$out" "$in"
+	    ;;
 	  ogg)
 	    set oggenc $oggencqual -a "$artist" -N "$track" -t "$title" -l "$album"
 	    # This fiddling is because oggenc blows up with long comments.
 	    commentf=.tmp$$c
 	    { [ -n "$xtra" ] && echo "$xtra"
 	      echo "$ripcomment"
-	      echo "Encoded by $NAME with `oggenc -v` [$oggencqual] on `date`"
+	      echo "Encoded$byNAME with `oggenc -v` [$oggencqual] on `date`"
 	    } >"$commentf"
 
 	    while read -r comment
@@ -305,7 +328,7 @@ sed -e 's;//*; -- ;g' -e 's/   */ /g' \
 		then
 		  set -x
 		  id3ed -s "$title" -n "$artist" -a "$album" \
-			-c "Encoded by $NAME with `lame -v 2>&1 | sed 1q` [$lamequal] on `date`" \
+			-c "Encoded$byNAME with `lame -v 2>&1 | sed 1q` [$lamequal] on `date`" \
 			-k "$track" "$out"
 		fi
 	      ) &
@@ -392,6 +415,8 @@ exit $xit
 #
 # EDITOR, the program used to edit the table of contents if desired. Default: B<vi>.
 #
+# NAME, your name. Noted as the ripper if not empty.
+#
 # CDRIP_OPTS, a list of default options to prepend to the command line options
 # to specify default behaviour. Alternatively the separate environment variables below may be used.
 # Options specified in B<CDRIP_OPTS> will override the defaults below if both are used.
@@ -417,11 +442,12 @@ exit $xit
 #
 # CDDBSERVER, in the form I<server>B<:>I<port>, used by cdtoc(1cs) to obtain album and track information.
 #
-# CDRIP_TRACKFMT, printf(1) format string expecting %d and %s in order
+# CDRIP_TRACKFMT, printf(1) format string expecting a B<%d> and a B<%s> in that order.
+# Default: B<%02d - %s>
 #
 # =head1 SEE ALSO
 #
-# oggenc(1), lame(1), cdparanoia(1), mkiso(1cs), mkcd(1cs), cdtoc(1cs), cdsubmit(1cs)
+# oggenc(1), lame(1), flac(1), cdparanoia(1), mkiso(1cs), mkcd(1cs), cdtoc(1cs), cdsubmit(1cs)
 #
 # =head1 AUTHOR
 #
