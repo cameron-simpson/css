@@ -57,7 +57,7 @@ runplayer()
 	      fi
 	      case "$auf" in
 		*.ogg)	$trace ogg123 -d oss "$auf" & ;;
-		*.mp3)	$trace mpg123 -b 2048 "$auf" & ;;
+		*.mp3)	$trace mpg123 -v -b 2048 "$auf" & ;;
 		*)	echo "$cmd: how to play $auf ?" >&2
 			continue
 			;;
