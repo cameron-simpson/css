@@ -8,6 +8,8 @@ case "$HOST.$SYSTEMID@$LOCATION" in
   newt.home@cisra|kirsty.home@cisra|zoob.home@cisra)
     ##tcpio -a work.local:6001 rnc -l cisra -u sshtunnels -i /home/sshtunnels/.ssh/2x11 kaper localhost x11 &
     alog alert lock -1 kaper-alert-log ssh kaper tail -f var/log/alert
+    envssh -f peter env DISPLAY=$HOST:0 xddts
+    envssh -f kaper env DISPLAY=$HOST:0 ./scripts/rig-urxvtd
 #    alog portfwd lock -1 portfwd-kaper \
 #	sh -c 'set -x
 #	       ssh -f -L 6009:127.0.0.1:6000 kaper exec ./bin/redhat.x86.linux/pause
