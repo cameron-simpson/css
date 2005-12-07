@@ -1,0 +1,27 @@
+#!/bin/sh -u
+#
+# Read ifconfig output, generate addif commands to create the logical interfaces.
+#	- Cameron Simpson <cs@zip.com.au> 07dec2005
+#
+
+ifconfig -a \
+| perl -wne '
+	chomp;
+	if (/^[a-z][a-z\d]*:\d/../^$/)
+	{ if (/^([a-z][a-z\d]*):\d+\s/)
+	  { $if=$1;
+	  }
+	  if (/inet addr:(\d+(\.\d+){3})\s/)
+	  { $addr=$1;
+	  }
+	  if (/Mask:(\d+(\.\d+){3})\b/)
+	  { $mask=$1;
+	  }
+	  if (/^$/)
+	  { print "addif -i $if -m $mask $addr\n";
+	    undef $if;
+	    undef $mask;
+	    undef $addr;
+	  }
+	}
+	'
