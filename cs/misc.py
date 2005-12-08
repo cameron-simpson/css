@@ -5,6 +5,14 @@ import sys
 import dircache
 import string
 
+# print to stderr
+def warn(*args):
+  for arg in args:
+    sys.stderr.write(arg)
+    sys.stderr.flush()
+  sys.stderr.write("\n")
+  sys.stderr.flush()
+
 # trim trailing newline if present, a la the perl func of the same name
 def chomp(s):
   slen=len(s)
