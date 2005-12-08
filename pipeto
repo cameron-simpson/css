@@ -1,91 +1,66 @@
-#!/bin/sh
+#!/bin/sh -u
 #
 # Attach a command to a named pipe so that other things can pipe info
 # to it with abandon.
-#	- Cameron Simpson <cs@zip.com.au> 16dec93
-#
-# Recode to be more generic.	- cameron, 18jul94
+#	- Cameron Simpson <cs@zip.com.au> 09nov2002
 #
 
-echo "$0 is OBSOLETE; port to pipecmd script instead!" >&2
+cmd=`basename "$0"` || cmd=pipeto
 
-cmd=`basename "$0"`
-usage="Usage:	[PIPECMD=pipecmd] $cmd [-n] [-v pipename] [-c pipecmd] \\
-			[command [commandargs]]
-		Establish a named pipe, attach pipecmd to it, run command
-		with \$pipename set to the path of the named pipe.
+: ${TMPDIR:=/tmp}
+PIPETO_PIPENAME=$TMPDIR/$cmd$$
 
-		-c pipecmd	Command to attach to pipe output side
-				Default from \$PIPECMD: $PIPECMD
-		-v pipename	Specify name of variable to point at pipe
-				instead of \$pipename.
-		-n		No command for pipe input side,
-				instead echo name of pipe to stdout.
-		command		Command to run with \$pipename,
-				to write to pipe input side."
+usage="Usage: $cmd [-fd n] [-p pipename] command [commandargs...]
+	-fd n	Emit shell to attach the pipe to file descriptor n
+		instead of emitting the name of the pipe.
+	-p pipename
+		Specify name for the pipe.
+	command	Command attached to output end of named pipe.
+		The pipe name is in the envvar \$PIPETO_PIPENAME.
+		This name is also written to stdout for use by the caller."
 
+fd=
 badopts=
-pipevar=
-nocommand=
-while :
-do  case $#,$1 in
-	0,*)		break ;;
-	1,-[vc])	echo "$cmd: missing argument to $1" >&2; badopts=1 ;;
-	*,-n)		nocommand=1 ;;
-	*,-v)		pipevar=$2; shift ;;
-	*,-c)		PIPECMD=$2; shift ;;
-	*,--)		shift; break ;;
-	*,-*)		echo "$cmd: $1: unrecognised option" >&2; badopts=1 ;;
-	*)		break ;;
-    esac
-    shift
+
+while [ $# -gt 0 ]
+do
+  case $1 in
+    -fd)fd=$2; shift ;;
+    -p)	PIPETO_PIPENAME=$2; shift ;;
+    --)	shift; break ;;
+    -?*)echo "$cmd: unrecognised option: $1" >&2
+	badopts=1
+	;;
+    *)	break ;;
+  esac
+  shift
 done
 
-[ -n "$PIPECMD" ] || { echo "$cmd: no specification for \"pipecmd\"" >&2
-		       badopts=1
-		     }
-
-case "$nocommand,$#" in
-    ,0)	echo  "$cmd: no specification for \"command\"" >&2
-	badopts=1 ;;
-    1,0);;
-    1,*)echo "$cmd: can't supply \"command\" with -n option" >&2
-	badopts=1 ;;
-esac
+if [ $# = 0 ]
+then
+  echo "$cmd: missing command" >&2
+  badopts=1
+fi
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
-pipename=${TMPDIR:-/tmp}/pipe$$
-mknod "$pipename" p || exit $?
-export pipename
-# ls -ld $pipename >&2
+export PIPETO_PIPENAME
 
-# attach to read end of pipe
-( [ $nocommand ] && exec 1>&2
-  # echo "read from $pipename ..." >&2
-  exec <$pipename
-  # echo "reader attached to $pipename" >&2
-  # set -vx
-  eval "$PIPECMD"
+mknod "$PIPETO_PIPENAME" p || exit $?
+
+( exec >&2	# stdout to stderr so child doesn't hang parent stdout read
+  exec <"$PIPETO_PIPENAME"
+
+  [ -n "$fd" ] && exec "$@"
+
+  "$@"
+  xit=$?
+  rm -f "$PIPETO_PIPENAME"
+  exit $?
 ) &
 
-# leave attachment and tidyup to caller
-[ $nocommand ] && { echo $pipename; exit 0; }
-
-# protect pipe from EOF
-# echo "write to $pipename ..." >&2
-exec 8>$pipename
-# echo "writer attached to $pipename" >&2
-
-( [ -n "$pipevar" ] && eval "$pipevar=\$pipename; pipename=; export \$pipevar pipename"
-  exec "$@"
-)
-xit=$?
-
-# close write end
-exec 8>&-
-
-# tidy up
-rm $pipename
-
-exit $xit
+if [ -n "$fd" ]
+then qpipe=`shqstr "$PIPETO_PIPENAME"` || { rm -- "$PIPETO_PIPENAME"; exit 1; }
+     printf "%s\n" "exec $fd>$qpipe; rm -- $qpipe"
+else printf "%s\n" "$PIPETO_PIPENAME"
+fi
