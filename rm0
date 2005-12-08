@@ -1,0 +1,19 @@
+#!/bin/sh -u
+#
+# Remove empty files.
+#	- Cameron Simpson <cs@zip.com.au> 05dec2005
+#
+
+xit=0
+
+for f
+do
+  ls -ld -- "$f" || { xit=1; continue; }
+
+  [  ! -f "$f" ] \
+  || [ -s "$f" ] \
+  || (set -x; rm -- "$f" ) \
+  || xit=1
+done
+
+exit $xit
