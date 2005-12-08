@@ -40,8 +40,23 @@ case "$host" in
 			     exit 1
 			   }
       xit=0
+
+      lastbase=
       for h in `echo "$host" | tr , ' '`
-      do  "$0" "$h" ${1+"$@"} || xit=1
+      do  case "$h" in
+	    [0-9])
+	      [ -n "$lastbase" ] \
+	      || { echo "$cmd: no previous hostN name, skipping: $h" >&2
+		   xit=1
+		   continue
+		 }
+	      h=$lastbase$h
+	      ;;
+	    [a-z]*[0-9])
+	      lastbase=`expr "x$h" : 'x\(.*[^0-9]\)[0-9]*'` || xit=1
+	      ;;
+	  esac
+	  "$0" "$h" ${1+"$@"} || xit=1
       done
       exit $xit
       ;;
