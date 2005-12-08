@@ -15,6 +15,11 @@ safeStringRe = re.compile('^'+safeChunkPtn+'$')
 integerRe    = re.compile('^-?[0-9]+$')
 
 def flavour(o):
+  """ Return the ``flavour'' of an object:
+      ARRAY: TupleType, ListType, objects with an __iter__ attribute.
+      HASH: DictType, DictionaryType, objects with an __keys__ or keys attribute.
+      SCALAR: Anything else.
+  """
   t=type(o)
   if t in (TupleType, ListType): return 'ARRAY'
   if t in (DictType, DictionaryType): return 'HASH'
@@ -23,6 +28,10 @@ def flavour(o):
   return 'SCALAR'
 
 def h2a(o,i=None):
+  """ ``Hier'' to ``ASCII''- convert an object to text.
+      Return a textual representation of an object in Hier format.
+      i is the indent mode, default None.
+  """
   buf=StringIO()
   io=cs.io.IndentedFile(buf,i)
   h2f(io,o)
@@ -30,8 +39,11 @@ def h2a(o,i=None):
   buf.close()
   return e
 
-# NB: fp must be a cs.io.IndentedFile
 def h2f(fp,o):
+  """ ``Hier'' to ``ASCII''- convert an object to text.
+      Transcribe a textual representation of an object in Hier format to the File fp.
+      NB: fp must be a cs.io.IndentedFile
+  """
   t=type(o)
   if t in [IntType, LongType]:
     fp.write(str(o))
@@ -51,6 +63,8 @@ def h2f(fp,o):
       h2f(fp,`o`)
 
 def stringEncode(fp,s):
+  """ Transcribe a string to the File fp in Hier format.
+  """
   if safeStringRe.match(s):
     fp.write(s)
   else:
@@ -72,6 +86,9 @@ def stringEncode(fp,s):
     fp.write('"')
 
 def unsafeSubstringEncode(fp,s):
+  """ Transcribe the characters of a string in escaped form.
+      This is the inner portion of stringEncode() for unsafe strings.
+  """
   for c in s:
     if c == '\t':			enc='\\t'
     elif c == '\n':			enc='\\n'
@@ -84,6 +101,8 @@ def unsafeSubstringEncode(fp,s):
     fp.write(enc)
 
 def listEncode(fp,l):
+  """ Transcribe a List to the File fp in Hier format.
+  """
   fp.write("[")
 
   if len(l) > 0:
@@ -104,6 +123,8 @@ def listEncode(fp,l):
   fp.write("]")
 
 def dictEncode(fp,d,i=None):
+  """ Transcribe a Dictionary to the File fp in Hier format.
+  """
   fp.write("{")
   keys=d.keys()
 
@@ -132,6 +153,8 @@ def dictEncode(fp,d,i=None):
   fp.write("}")
 
 def load(path):
+  """ Read an object structure from the named file or directory.
+  """
   if os.path.isdir(path):
     val=loaddir(path)
   else:
@@ -139,7 +162,8 @@ def load(path):
   return val
 
 def loaddir(dirname):
-  "Read hier data from a directory."
+  """ Read Hier data from the named directory.
+  """
   dict={}
   dents=[ dirent for dirent in os.listdir(dirname) if dirent[0] != '.']
   for dent in dents:
@@ -147,7 +171,8 @@ def loaddir(dirname):
   return dict
 
 def loadfile(filename):
-  "Read hier data from a file"
+  """ Read Hier data from the named file.
+  """
   fp=cs.io.ContLineFile(filename)
   dict={}
   for line in fp:
@@ -157,7 +182,8 @@ def loadfile(filename):
   return dict
 
 def savefile(dict,filename):
-  "Write dictionary to a file."
+  """ Write a Dictionary to the named file in Hier format.
+  """
   fp=file(filename,"w")
   ifp=cs.io.IndentedFile(fp,0)
   keys=dict.keys()
@@ -177,7 +203,9 @@ def savefile(dict,filename):
   fp.close()
 
 def kvline(line):
-  "Parse (key,value) from file, return tuple or None"
+  """ Parse a (key,value) pair from a line of text, return (key,value) tuple or None.
+      This is the inner operation of loadfile().
+  """
   (key,pos)=tok(line)
   (value,pos)=tok(line,pos)
   pos=skipwhite(line,pos)
@@ -186,7 +214,9 @@ def kvline(line):
   return (key,value)
 
 def tok(s,pos=0):
-  "Fetch token from string, return (value,end)"
+  """ Fetch a token from the string s, return the tuple (value,end).
+      value is the parsed value, end is the unparsed portion of the string.
+  """
   pos=skipwhite(s,pos)
   if pos == len(s): return (None,pos)
 
@@ -204,7 +234,7 @@ def tok(s,pos=0):
   return (str,pos)
 
 def a2str(s,pos):
-  "Read text from opening quote, assemble into string."
+  "Read a quoted string from the opening quote, assemble into string."
   assert s[pos] == '"', "expected '\"', found '"+s[pos]+"'"
   buf=StringIO()
   pos+=1
