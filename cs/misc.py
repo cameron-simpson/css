@@ -7,9 +7,16 @@ import string
 
 # print to stderr
 def warn(*args):
+  first=True
   for arg in args:
+    if first:
+      first=False
+    else:
+      sys.stderr.write(' ')
+
     sys.stderr.write(arg)
     sys.stderr.flush()
+
   sys.stderr.write("\n")
   sys.stderr.flush()
 
