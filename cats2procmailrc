@@ -250,6 +250,12 @@ $::Usage="Usage: $::cmd [-a alert] [-m domains] [-t {unix|mh|maildir}] <categori
 
 { my $badopts=0;
 
+  undef $::opt_a;
+  undef $::opt_D;
+  undef $::opt_L;
+  undef $::opt_t;
+  undef $::opt_T;
+  undef $::opt_m;
   if (! getopts("a:DLm:t:T"))
   { warn "$::cmd: bad options\n";
     $badopts=1;
