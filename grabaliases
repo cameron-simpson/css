@@ -1,0 +1,97 @@
+#!/bin/sh -u
+#
+# Read 
+#
+
+: ${TMPDIR:=/tmp}
+
+mailcfg=$HOME/rc/mail
+aliasfile=$mailcfg/aliases
+
+cmd=`basename "$0"` || cmd=grabaliases
+usage="Usage: $cmd [-t] mailitem
+	-t	Open a new term.
+	-T	Attach to /dev/tty."
+
+useterm=
+usetty=
+
+badopts=
+
+while [ $# -gt 0 ]
+do
+  case $1 in
+    -t)	useterm=1 ;;
+    -T)	usetty=1 ;;
+    --)	shift; break ;;
+    -?*)echo "$cmd: unrecognised option: $1" >&2
+	badopts=1
+	;;
+    *)	break ;;
+  esac
+  shift
+done
+
+if [ $# = 0 ]
+then
+  echo "$cmd: missing mailitem" >&2
+  badopts=1
+else
+  mailitem=$1; shift
+
+  [ $# = 0 ] || { echo "$cmd: extra arguments: $*" >&2; badopts=1; }
+fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+if [ "x$mailitem" = x- ]
+then  exec 3<&0
+      usetty=1
+else  exec 3<"$mailitem"
+fi
+
+[ $usetty ] && exec </dev/tty >/dev/tty 2>&1
+
+tmpaliases=$TMPDIR/$cmd$$aliases
+trap 'rm -f "$tmpaliases"' 0 1 2 13 15
+
+( sed -n 's/.*<\([^<>@]*@[^<>]*\)>.*/\1/p' "$aliasfile"
+  echo NEW
+  grabaddrs-all <&3
+) \
+| awk 'BEGIN		{ part=1 }
+       $1 == "NEW"	{ part=2 }
+       $1 != "NEW"	{ if (part == 2 && !seen[$1])
+			  { print
+			  }
+			  seen[$1]=1
+			}
+      ' \
+| sed '	y/\t/ /
+	s/   */ /g
+	h
+	s/ .*//
+	s/^/</
+	s/$/>/
+	x
+	s/^[^ ]* //
+	G
+	s/\n/ /
+	h
+	s/ <[^ ]*>$//
+	y/ /./
+	s/[^a-zA-Z0-9.-]/./g
+	s/\.\.\.*/./g
+	G
+	s/\n/ /
+	s/^/known /' \
+| colpad 16 40 \
+> "$tmpaliases"
+
+cat "$aliasfile" >>"$tmpaliases" || exit 1
+
+set -- "$EDITOR" "$tmpaliases"
+[ $useterm ] && set -- term -e "$@"
+"$@" || exit 1
+
+rewriteif "$aliasfile" <"$tmpaliases" && cd "$mailcfg" && myke
