@@ -1,0 +1,46 @@
+#!/bin/sed -nf
+#
+# Read a mail item on stdin, grab all addresses from headers.
+#	- Cameron Simpson <cs@zip.com.au> 11dec2005
+#
+
+/^From /d
+/^[ \t]/{ H; d}
+x
+
+y/\n\t/  /
+y/ABCDEFGHIJKLMNOPQRSTUVWXYZ/abcdefghijklmnopqrstuvwxyz/
+/^to:/b hdr
+/^cc:/b hdr
+/^bcc:/b hdr
+/^from:/b hdr
+/^reply-to:/b hdr
+/^sender:/b hdr
+d
+
+:hdr
+s/^[^:]*://
+s/   */ /g
+s/^ //
+s/ $//
+s/ *, */\n/g
+
+:addr
+# catch foo <a@b> bar and reformat
+s/^\([^\n<]*\)<\([^\n@<>]*@[^\n<>]*\)> *\(.*\)/\2 \1 \3/
+t ready
+
+# move "foo a@b" to "a@b foo"
+s/\(^[^\n]*\) \([^\n<>@ ]@[^\n<>@ ]*\)/\2 \1/
+
+:ready
+s/  *\n/\n/
+s/  *$//
+P
+s/^[^\n]*\n//
+t addr
+
+:done
+x
+/^$/q
+x
