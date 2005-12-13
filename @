@@ -60,9 +60,6 @@ case "$host" in
       done
       exit $xit
       ;;
-  root@*)
-      exec root@ "$host" ${1+"$@"}
-      ;;
   *)  exec rterm "$host" ${1+"$@"}
       ;;
 esac
