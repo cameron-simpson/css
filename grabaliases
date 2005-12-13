@@ -1,6 +1,7 @@
 #!/bin/sh -u
 #
-# Read 
+# Read mail item, grab unknown addresses, prepend to mutt aliases file, edit.
+#	- Cameron Simpson <cs@zip.com.au> 10dec2005
 #
 
 : ${TMPDIR:=/tmp}
@@ -10,17 +11,20 @@ aliasfile=$mailcfg/aliases
 
 cmd=`basename "$0"` || cmd=grabaliases
 usage="Usage: $cmd [-t] mailitem
+	-q	Quick. Skip edit and myke.
 	-t	Open a new term.
 	-T	Attach to /dev/tty."
 
 useterm=
 usetty=
+quick=
 
 badopts=
 
 while [ $# -gt 0 ]
 do
   case $1 in
+    -q)	quick=1 ;;
     -t)	useterm=1 ;;
     -T)	usetty=1 ;;
     --)	shift; break ;;
@@ -92,6 +96,6 @@ cat "$aliasfile" >>"$tmpaliases" || exit 1
 
 set -- "$EDITOR" "$tmpaliases"
 [ $useterm ] && set -- term -e "$@"
-"$@" || exit 1
+[ $quick ] || "$@" || exit 1
 
-rewriteif "$aliasfile" <"$tmpaliases" && cd "$mailcfg" && myke
+rewriteif "$aliasfile" <"$tmpaliases" && { [ $quick ] || { cd "$mailcfg" && myke; }; }
