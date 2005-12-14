@@ -1,0 +1,31 @@
+#!/bin/sh -u
+#
+# Wrapper for sendmesg to take copies of message in the specified folders.
+#	- Cameron Simpson <cs@zip.com.au> 14dec2005
+#
+
+: ${TMPDIR:=/tmp}
+: ${SENDMESG_FCC:=+spool-out}
+
+cmd=$0
+usage="Usage: $cmd [--] addresses..."
+
+tmpf=$TMPDIR/fcc$$
+trap 'rm -f "$tmpf"' 0 1 2 13 15
+
+cat >"$tmpf" || exit 1
+exec </dev/null
+
+sendmesg ${1+"$@"} <"$tmpf" || exit 1
+
+exec >&2
+
+xit=0
+
+set -x
+for fcc in $SENDMESG_FCC
+do
+  filemailitem -auto "$fcc" <"$tmpf" || xit=1
+done
+
+exit $xit
