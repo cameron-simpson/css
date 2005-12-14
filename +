@@ -57,6 +57,11 @@ fi
 [ $anyhost ] || needhost "$HOMEHOST@$SYSTEMID" || exit 1
 
 fpath=`mailfolderpath "$mfolder"` || exit 1
+
+# where to taqke copies - presumes sendmail=sendmesg-fcc in muttrc
+SENDMESG_FCC="$fpath +spool-out"
+export SENDMESG_FCC
+
 if [ -z "$fpath" ]
 then
     DELETE_FOLDER=
