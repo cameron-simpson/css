@@ -1,6 +1,6 @@
 #!/bin/sh -u
 : ${LOGDIR:=$HOME/var/log}
-: ${DLOG_WHEN:=now}
+: ${DLOG_WHEN:=`date`}
 logname=dlog
 [ $# -gt 0 ] && [ "x$1" = x-l ] && { logname=$2; shift; shift; }
 case "$logname" in /*) ;; *) logname=$LOGDIR/$logname ;; esac
