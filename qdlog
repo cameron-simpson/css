@@ -1,5 +1,152 @@
-#!/bin/sh
-: ${LOGDIR:=$HOME/var/log}
-[ $# = 1 ] || { echo "Usage: $0 keyword" >&2; exit 2; }
-ring -f $LOGDIR/dlog "$1:" \
-| pageif sed -n "/^[^ 	]/p; /$1:/p"
+#!/usr/bin/python
+#
+# Query my dlog.
+#	- Cameron Simpson <cs@zip.com.au> 14dec2005
+#
+
+import os
+import sys
+import re
+import string
+import cs.lex
+import cs.misc
+
+usage="Usage: qdlog prefix"
+
+olddate=None
+thisdate=None
+email={}
+
+def flushline(hhmm,line):
+  flushdate()
+  print ' ', hhmm, line
+
+def flushdate():
+  global olddate
+  global newdate
+  if newdate is not None and newdate != olddate:
+    flushemail()
+    print newdate
+    olddate=newdate
+
+def cmpmsgs(a,b):
+  return cmp(a['HHMM'],b['HHMM'])
+
+def flushemail():
+  global email
+  if email:
+    print "  EMAIL:"
+    for subj in email:
+      pfx='   '+subj+':'
+      topic=email[subj]
+      msgs=[topic[msgid] for msgid in topic]
+      msgs.sort(cmpmsgs)
+      for msg in msgs:
+	if len(pfx) > 24:
+	  print pfx
+	  pfx='   '
+	rpt=msg['HHMM']+": "
+	if 'FROM' in msg: rpt=rpt+string.join(cs.misc.uniq(msg['FROM']),', ')
+	if 'TO' in msg:   rpt=rpt+'->'+string.join(cs.misc.uniq(msg['TO']),', ')
+	print pfx, rpt	##  msg['MSGID']
+	pfx='   '
+    email={}
+
+def noteEmail(subj,msgid,hhmm,attr,value):
+  global email
+  if subj not in email: email[subj]={}
+  topic=email[subj]
+  if msgid not in topic: topic[msgid]={}
+
+  msg=topic[msgid]
+
+  if 'HHMM' not in msg: msg['HHMM']=hhmm
+  if 'MSGID' not in msg: msg['MSGID']=msgid
+
+  if attr in msg: msg[attr].append(value)
+  else:           msg[attr]=[value]
+
+if len(sys.argv) != 2:
+  print usage
+  sys.exit(2)
+
+q_re=re.compile(sys.argv[1]+':')
+
+qto_re=re.compile(r'([^@ \t]+@[^@ \t]+)<-\s+(re:?\s*)*')
+qto_re2=re.compile(r'->([^@ \t]+@[^@ \t]+)\s+(re:?\s*)*')
+
+qfrom_re=re.compile(r'<-([^@ \t]+@[^@ \t]+)\s+(re:?\s*)*')
+qfrom_re2=re.compile(r'([^@ \t]+@[^@ \t]+)->\s+(re:?\s*)*')
+
+qmsgid_re=re.compile(r'\s+(<[^<>@ \t]+@[^<>@ \t]+>)$')
+
+hhmm_re=re.compile(r'^(\d\d:\d\d)\s*')
+
+for line in sys.stdin:
+  if line[-1:] == '\n':
+    line=line[:-1]
+
+  if len(line) == 0:
+    continue
+
+  if line[0] not in string.whitespace:
+    newdate=line
+    continue
+  line=line[cs.lex.skipwhite(line):]
+
+  m=hhmm_re.match(line)
+  if not hhmm_re.match(line):
+    print "BAD LINE:", line
+    continue
+  hhmm=m.group(1)
+  line=line[cs.lex.skipwhite(line,len(hhmm)):]
+
+  m=q_re.match(line)
+  if not m:
+    continue
+
+  line=line[cs.lex.skipwhite(line,len(m.group(0))):]
+
+  #####################################
+  # Look for Q: foo@bar<- subj <msgid>
+  #       or Q: ->foo@bar subj <msgid>
+  m=qto_re.match(line)
+  if not m: qto_re2.match(line)
+  if m:
+    m_to=m.group(1)
+    m_subj=line[len(m.group(0)):]
+    m_msgid=''
+    m=qmsgid_re.search(m_subj)
+    if m:
+      m_msgid=m.group(1)
+      m_subj=m_subj[:-len(m.group(0))]
+    else:
+      m_msgid=''
+
+    noteEmail(m_subj,m_msgid,hhmm,'TO',m_to)
+    continue
+
+  #####################################
+  # Look for Q: <-foo@bar subj <msgid>
+  #       or Q: foo@bar-> subj <msgid>
+  m=qfrom_re.match(line)
+  if not m: qfrom_re2.match(line)
+  if m:
+    m_from=m.group(1)
+    m_subj=line[len(m.group(0)):]
+    m_msgid=''
+    m=qmsgid_re.search(m_subj)
+    if m:
+      m_msgid=m.group(1)
+      m_subj=m_subj[:-len(m.group(0))]
+    else:
+      m_msgid=''
+
+    noteEmail(m_subj,m_msgid,hhmm,'FROM',m_from)
+    continue
+
+  #####################################
+  # Just Q: logline
+  flushline(hhmm,line)
+
+flushemail()
