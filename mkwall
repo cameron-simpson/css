@@ -97,23 +97,11 @@ fi
 # Single image - scale to fit.
 imagefile=$1; shift
 
-tmpf=
-original=
-
-# if stdin-ish name, suck it into a temp file
+# if stdin-ish name, fetch and convert to PNG
 case "$imagefile" in
-  X:*|-|*:-|\|*)
-    tmpf=$TMPDIR/$cmd$$.png
-    trap 'rm -f "$tmpf"' 0 1 2 13 15
-    # dropped -quality 0 now that FvwmBacker does the backdrops,
-    # and so we want space saving instead of minimum decompress cost
-    gm convert "$imagefile" "png:$tmpf" || exit 1
-    imagefile=$tmpf
-    ;;
-  http://* | ftp://* )
-    imagefile=`withurl -C "$imagefile" echo` || exit 1
-    ;;
-  *)original=1
+  X:*|-|*:-|\|* | http://* | ftp://* )
+    imagefile=`fileof "$imagefile"` || exit 1
+    imagefile=`pngof  "$imagefile"` || exit 1
     ;;
 esac
 
@@ -123,28 +111,12 @@ eval `imsize-gm "$imagefile" | awk '{print "ix="$1 " iy="$2}'`
 [ -n "$ix" -a -n "$iy" ] \
 	|| { echo "$cmd: can't deduce source image size" >&2; exit 1; }
 
-# see if by chance the image is the right size and format and brightness
-if [ $original ] && [ "x$shade" = x100 ]
-then
-    # get image suffix
-    sfx=`expr "x$imagefile" : 'x.*\.\([^/.]*$\)'`
-    case "$ix,$iy,$sfx" in
-      $bgx,$bgy,png)
-	# it's good - report persistent name
-	exec filecache "$imagefile"
-	;;
-    esac
-fi
-
-######################################################
-# ok, the image is the wrong size or not a PNG
-
 convname=pngof
 set gm convert "$imagefile"
 
+convname=$convname/sh$shade
 if [ "x$shade" != x100 ]
 then
-  convname=$convname/sh$shade
   ## -modulate does the wrong thing ## set "$@" -modulate "$shade"
   case "$shade" in
     [0-9])	mulshade=0.0$shade ;;
@@ -160,6 +132,8 @@ then
       -operator blue Multiply "$mulshade"
 fi
 
+convname=$convname/${bgx}x${bgy}
+bx=0 by=0
 if [ "x${bgx}x${bgy}" != "x${ix}x${iy}" ]
 then
   # must rescale
@@ -194,13 +168,13 @@ then
 
   eval `awk "$awkf" </dev/null`
 
-  convname=$convname/${bgx}x${bgy}
   set "$@" -geometry "${bgx}x${bgy}"
-  if [ "$bx" -gt 0 -o "$by" -gt 0 ]
-  then
-      convname=$convname/pad-${bx}x${by}-$BG
-      set "$@" -bordercolor "$BG" -border "${bx}x${by}"
-  fi
+fi
+
+convname=$convname/pad-${bx}x${by}-$BG
+if [ "$bx" -gt 0 -o "$by" -gt 0 ]
+then
+    set "$@" -bordercolor "$BG" -border "${bx}x${by}"
 fi
 
 exec convof -C "$convname" -discard "$imagefile" "$@" -quality 100 png:-
