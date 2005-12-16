@@ -11,4 +11,5 @@ label=mail
 
 mhdrs_sh=`mhdrs -sh | sed 's/^/HDR_/'`
 eval "$mhdrs_sh"
-exec dlog "$label:" $* "$HDR_SUBJECT"
+set +u
+exec dlog "$label:" $* "$HDR_SUBJECT $HDR_MESSAGE_ID"
