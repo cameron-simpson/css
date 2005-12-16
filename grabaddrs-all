@@ -16,6 +16,7 @@ y/ABCDEFGHIJKLMNOPQRSTUVWXYZ/abcdefghijklmnopqrstuvwxyz/
 /^from:/b hdr
 /^reply-to:/b hdr
 /^sender:/b hdr
+/^return-receipt-to/b hdr
 d
 
 :hdr
