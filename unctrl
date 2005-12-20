@@ -1,13 +1,23 @@
-#!/usr/bin/perl -p
+#!/usr/bin/perl -n
 #
 # Replace control characters with printable forms.
 #	- Cameron Simpson <cs@zip.com.au>
 #
 
-# trim ANSI escape sequences
-s/\033\[[0-9;]*[a-zA-Z]//g;
+chomp;
 
-# printify control characters
+# trim CR, except at end
+s/\r+$//;
+s/.*\r(.+)/$1/;
+
+# trim ANSI escape sequences
+s/\033\[[\d;]*[a-zA-Z]//g;
+
+# prune backspaces
+while (s/[\040-\377]\010//g) {}
+s/^\010+//;
+
+# printify control characters (except TAB)
 s/[\000-\010\013\015-\037\177-\377]/
 	($sub=''),
 	($c=unpack('C',$&)),
@@ -15,3 +25,10 @@ s/[\000-\010\013\015-\037\177-\377]/
 	( $sub .= '^'.( $c == 0177 ? '?' : pack('C',$c+64) ) ),
 	$sub
 	/eg;
+
+# detab
+while (/\t/)
+{ $_=$`.(' ' x (8-length($`)%8)).$';
+}
+
+print $_, "\n";
