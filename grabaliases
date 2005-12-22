@@ -12,9 +12,11 @@ aliasfile=$mailcfg/aliases
 cmd=`basename "$0"` || cmd=grabaliases
 usage="Usage: $cmd [-t] mailitem
 	-q	Quick. Skip edit and myke.
+	-M	Run a myke to rebuild.
 	-t	Open a new term.
 	-T	Attach to /dev/tty."
 
+domyke=
 useterm=
 usetty=
 quick=
@@ -25,6 +27,7 @@ while [ $# -gt 0 ]
 do
   case $1 in
     -q)	quick=1 ;;
+    -M)	domyke=1 ;;
     -t)	useterm=1 ;;
     -T)	usetty=1 ;;
     --)	shift; break ;;
@@ -98,4 +101,4 @@ set -- "$EDITOR" "$tmpaliases"
 [ $useterm ] && set -- term -e "$@"
 [ $quick ] || "$@" || exit 1
 
-rewriteif "$aliasfile" <"$tmpaliases" && { [ $quick ] || { cd "$mailcfg" && myke; }; }
+rewriteif "$aliasfile" <"$tmpaliases" && { [ -z "$domyke" ] || { cd "$mailcfg" && myke; }; }
