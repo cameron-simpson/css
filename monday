@@ -1,0 +1,19 @@
+#!/bin/sh -u
+#
+# Given a date, report the latest Monday not preceeding it.
+# Code reefed from ts.
+#	- Cameron Simpson <cs@zip.com.au> 22dec2005
+#
+
+when=today
+[ $# -gt 0 ] && { when=$1; shift; }
+
+when=`date '+%Y-%m-%d'` || exit 1
+
+while dow=`date -d "$when" '+%u'` || exit 1
+      [ "$dow" -gt 1 ]
+do
+  when=`date -d "$when 1 day ago" '+%Y-%m-%d'` || exit 1
+done
+
+echo "$when"
