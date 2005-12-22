@@ -9,8 +9,11 @@ import os.path
 import sys
 import re
 import string
+import getopt
 import cs.lex
 import cs.misc
+warn=cs.misc.warn
+cmderr=cs.misc.cmderr
 
 if 'LOGDIR' in os.environ:
   logdir=os.environ['LOGDIR']
@@ -19,7 +22,28 @@ else:
 
 log=os.path.join(logdir,'dlog')
 
-usage="Usage: qdlog prefix"
+usage="Usage: "+cmd+" prefix"
+
+badopts=False
+
+try:
+  (opts,argv)=getopt('x:',argv[1:])
+except getopt.GetoptException, e:
+  cmderr("unrecognised option: "+str(e))
+  badopts=True
+
+if len(argv) == 0:
+  cmderr("missing prefix")
+  badopts=True
+else:
+  prefix=argv[0]
+  if len(argv) > 1:
+    cmderr("extra arguments after prefix:", argv[1:])
+    badopts=True
+
+if badopts:
+  warn(usage)
+  sys.exit(2)
 
 showndate=None
 curdate=None
@@ -82,10 +106,6 @@ def noteEmail(subj,msgid,hhmm,attr,value):
 
   if attr in msg: msg[attr].append(value)
   else:           msg[attr]=[value]
-
-if len(sys.argv) != 2:
-  print usage
-  sys.exit(2)
 
 q_re=re.compile(sys.argv[1]+':')
 
