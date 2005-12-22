@@ -115,6 +115,7 @@ if eval "$preshcmd"
 then
   "$@"
   xit=$?
+  ( cd $HOME/rc/mail && myke ) || xit=1
   eval "$postshcmd" || xit=1
   exit $xit
 fi
