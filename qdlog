@@ -5,29 +5,43 @@
 #
 
 import os
+import os.path
 import sys
 import re
 import string
 import cs.lex
 import cs.misc
 
+if 'LOGDIR' in os.environ:
+  logdir=os.environ['LOGDIR']
+else:
+  logdir=os.path.join(os.environ['HOME'],'var','log')
+
+log=os.path.join(logdir,'dlog')
+
 usage="Usage: qdlog prefix"
 
-olddate=None
-thisdate=None
+showndate=None
+curdate=None
 email={}
 
-def flushline(hhmm,line):
-  flushdate()
-  print ' ', hhmm, line
+def showdate():
+  global showndate
+  global curdate
+  if curdate != showndate:
+    print curdate
+    showndate=curdate
 
-def flushdate():
-  global olddate
-  global newdate
-  if newdate is not None and newdate != olddate:
+def newdate(when):
+  global email
+  global curdate
+  if email:
     flushemail()
-    print newdate
-    olddate=newdate
+  curdate=when
+
+def flushline(hhmm,line):
+  showdate()
+  print ' ', hhmm, line
 
 def cmpmsgs(a,b):
   return cmp(a['HHMM'],b['HHMM'])
@@ -35,8 +49,11 @@ def cmpmsgs(a,b):
 def flushemail():
   global email
   if email:
+    showdate()
     print "  EMAIL:"
-    for subj in email:
+    subjlist=email.keys()
+    subjlist.sort()
+    for subj in subjlist:
       pfx='   '+subj+':'
       topic=email[subj]
       msgs=[topic[msgid] for msgid in topic]
@@ -72,17 +89,17 @@ if len(sys.argv) != 2:
 
 q_re=re.compile(sys.argv[1]+':')
 
-qto_re=re.compile(r'([^@ \t]+@[^@ \t]+)<-\s+(re:?\s*)*')
-qto_re2=re.compile(r'->([^@ \t]+@[^@ \t]+)\s+(re:?\s*)*')
+qto_re=re.compile(r'([^@ \t]+@[^@ \t]+)<-\s+(re:?\s*)*',re.I)
+qto_re2=re.compile(r'->([^@ \t]+@[^@ \t]+)\s+(re:?\s*)*',re.I)
 
-qfrom_re=re.compile(r'<-([^@ \t]+@[^@ \t]+)\s+(re:?\s*)*')
-qfrom_re2=re.compile(r'([^@ \t]+@[^@ \t]+)->\s+(re:?\s*)*')
+qfrom_re=re.compile(r'<-([^@ \t]+@[^@ \t]+)\s+(re:?\s*)*',re.I)
+qfrom_re2=re.compile(r'([^@ \t]+@[^@ \t]+)->\s+(re:?\s*)*',re.I)
 
 qmsgid_re=re.compile(r'\s+(<[^<>@ \t]+@[^<>@ \t]+>)$')
 
 hhmm_re=re.compile(r'^(\d\d:\d\d)\s*')
 
-for line in sys.stdin:
+for line in file(log):
   if line[-1:] == '\n':
     line=line[:-1]
 
@@ -90,7 +107,7 @@ for line in sys.stdin:
     continue
 
   if line[0] not in string.whitespace:
-    newdate=line
+    newdate(line)
     continue
   line=line[cs.lex.skipwhite(line):]
 
@@ -111,7 +128,7 @@ for line in sys.stdin:
   # Look for Q: foo@bar<- subj <msgid>
   #       or Q: ->foo@bar subj <msgid>
   m=qto_re.match(line)
-  if not m: qto_re2.match(line)
+  if not m: m=qto_re2.match(line)
   if m:
     m_to=m.group(1)
     m_subj=line[len(m.group(0)):]
@@ -130,7 +147,7 @@ for line in sys.stdin:
   # Look for Q: <-foo@bar subj <msgid>
   #       or Q: foo@bar-> subj <msgid>
   m=qfrom_re.match(line)
-  if not m: qfrom_re2.match(line)
+  if not m: m=qfrom_re2.match(line)
   if m:
     m_from=m.group(1)
     m_subj=line[len(m.group(0)):]
@@ -149,4 +166,4 @@ for line in sys.stdin:
   # Just Q: logline
   flushline(hhmm,line)
 
-flushemail()
+newdate(None)
