@@ -7,16 +7,16 @@
 # Deduce list by inspecting the input. - cameron 09sep2002
 #
 
-cmd=`basename "$0"`
+: ${TMPDIR:=/tmp}
+
+cmd=`basename "$0"` || cmd=uncurly
 usage="Usage: $cmd [-v varlist] [files...]
 	-v varlist
 		A space separated list of environment variables to
 		insert. By default, all {foo} constructs are replaced."
 
 varlist=
-[ "x$1" = x-v ] && { varlist=$2; shift; shift; }
-
-tmpdir=${TMPDIR:-/tmp}
+[ $# -gt 0 ] && [ "x$1" = x-v ] && { varlist=$2; shift; shift; }
 
 cat ${1+"$@"} \
 | ( if [ -z "$varlist" ]
