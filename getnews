@@ -97,7 +97,7 @@ sub fetchgroup($)
   }
 
   my $M;
-  my $n=0;
+  my $na=0;
 
   N:
   for my $n ($low..$high)
@@ -115,11 +115,13 @@ sub fetchgroup($)
 
     my $out = new cs::Sink(PIPE,$::NDA);
     $M->WriteItem($out);
-    $::Count++;
-    $n++;
+    $na++;
   }
 
   $::RC->SetRange("$group\@$::Server", $R);
   $::RC->Sync();
-  nl("$group: $n articles") if $n > 0;
+  if ($na > 0)
+  { $::Count+=$na;
+    nl("$group: $na articles") if $na > 0;
+  }
 }
