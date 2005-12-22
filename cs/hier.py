@@ -45,13 +45,13 @@ def h2f(fp,o):
       NB: fp must be a cs.io.IndentedFile
   """
   t=type(o)
-  if t in [IntType, LongType]:
+  if isinstance(o,int):
     fp.write(str(o))
   elif t is FloatType:
     stringEncode(fp,str(o))
   elif t is BooleanType:
     fp.write(int(o))
-  elif t in (StringType, UnicodeType):
+  elif isinstance(o, StringTypes):
     stringEncode(fp,o)
   else:
     fl=flavour(o)
