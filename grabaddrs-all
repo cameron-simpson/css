@@ -30,9 +30,6 @@ s/ $//
 s/ *, */\n/g
 
 :addr
-# no a@b? try new address
-/[^ \n@]@[^ \n@]/!b naddr
-
 # catch foo <a@b> bar and reformat
 s/^\([^\n<]*\)<\([^\n@<>]*@[^\n<>]*\)> *\(.*\)/\2 \1 \3/
 t ready
@@ -43,7 +40,7 @@ s/\(^[^\n]*\) \([^\n<>@ ]@[^\n<>@ ]*\)/\2 \1/
 :ready
 s/  *\n/\n/
 s/  *$//
-P
+/^[^ \n@][^ \n@]*@[^ \n@]/P
 
 :naddr
 s/^[^\n]*\n//
