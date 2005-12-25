@@ -5,6 +5,8 @@ import sys
 import dircache
 import string
 
+cmd=os.path.basename(sys.argv[0])
+
 # print to stderr
 def warn(*args):
   first=True
@@ -14,11 +16,17 @@ def warn(*args):
     else:
       sys.stderr.write(' ')
 
-    sys.stderr.write(arg)
+    sys.stderr.write(str(arg))
     sys.stderr.flush()
 
   sys.stderr.write("\n")
   sys.stderr.flush()
+
+def cmderr(*args):
+  global cmd
+  sys.stderr.write(cmd)
+  sys.stderr.write(": ")
+  warn(*args)
 
 # trim trailing newline if present, a la the perl func of the same name
 def chomp(s):
@@ -199,3 +207,29 @@ class IndexedSeqWrapper(OrderedKeys,SeqWrapper):
     for i in xrange(0,len(okeys)):
       d[okeys[i]]=self[i]
     return `d`
+
+class HasFlags:
+  """ A collection of strings whose presence may be tested. """
+  def __init__(self,flagfield='FLAGS'):
+    self.__flagfield=flagfield
+
+  def __flaglist(self):
+    flagv=self[self.__flagfield]
+    if flagv is None:
+      return ()
+
+    return string.split(flagv)
+
+  def testFlag(self,flag):
+    flags=self.__flaglist()
+    return flag in flags
+
+  def setFlag(self,flag):
+    if not self.testFlags(flag):
+      flagv=self[self.__flagfield]
+      if flagv is None: flagv=''
+      self[self.__flagfield]=flagv+' '+flag
+
+  def clearFlag(self,flag):
+    if self.testFlag(flag):
+      self[self.__flagfield]=string.join([f for f in self.__flaglist() if f != flag])
