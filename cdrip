@@ -329,7 +329,7 @@ sed -e 's;//*; -- ;g' -e 's/   */ /g' \
 		  set -x
 		  id3ed -s "$title" -n "$artist" -a "$album" \
 			-c "Encoded$byNAME with `lame -v 2>&1 | sed 1q` [$lamequal] on `date`" \
-			-k "$track" "$out"
+			-k "$track" "$out" </dev/null
 		fi
 	      ) &
 	    fi
