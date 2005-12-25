@@ -9,11 +9,9 @@ import os.path
 import sys
 import re
 import string
-import getopt
+from getopt import getopt, GetoptError
 import cs.lex
-import cs.misc
-warn=cs.misc.warn
-cmderr=cs.misc.cmderr
+from cs.misc import warn,cmd,cmderr
 
 if 'LOGDIR' in os.environ:
   logdir=os.environ['LOGDIR']
@@ -21,16 +19,31 @@ else:
   logdir=os.path.join(os.environ['HOME'],'var','log')
 
 log=os.path.join(logdir,'dlog')
+relist=[]
+lastremode=False
 
-usage="Usage: "+cmd+" prefix"
+usage="""Usage: """+cmd+""" [-i incre]... [-e excre]... prefix
+	-i	Include lines matching the regexp incre.
+	-e	Exclude lines matching the regexp excre.
+	The default is the inverse of the last include/exclude."""
 
 badopts=False
 
 try:
-  (opts,argv)=getopt('x:',argv[1:])
-except getopt.GetoptException, e:
-  cmderr("unrecognised option: "+str(e))
+  (opts,argv)=getopt(sys.argv[1:],'i:e:')
+except GetoptError, e:
+  cmderr("unrecognised option: "+e.opt+": "+e.msg)
   badopts=True
+
+for (opt,val) in opts:
+  if opt == '-i':
+    relist.append((True, re.compile(val), val))
+    lastremode=True
+  elif opt == '-e':
+    relist.append((False, re.compile(val), val))
+    lastremode=False
+
+relist.append((not lastremode, None, ''))
 
 if len(argv) == 0:
   cmderr("missing prefix")
@@ -83,7 +96,7 @@ def flushemail():
       msgs=[topic[msgid] for msgid in topic]
       msgs.sort(cmpmsgs)
       for msg in msgs:
-	if len(pfx) > 24:
+	if True:	####len(pfx) > 24:
 	  print pfx
 	  pfx='   '
 	rpt=msg['HHMM']+": "
@@ -107,7 +120,7 @@ def noteEmail(subj,msgid,hhmm,attr,value):
   if attr in msg: msg[attr].append(value)
   else:           msg[attr]=[value]
 
-q_re=re.compile(sys.argv[1]+':')
+q_re=re.compile(prefix+':')
 
 qto_re=re.compile(r'([^@ \t]+@[^@ \t]+)<-\s+(re:?\s*)*',re.I)
 qto_re2=re.compile(r'->([^@ \t]+@[^@ \t]+)\s+(re:?\s*)*',re.I)
@@ -139,10 +152,25 @@ for line in file(log):
   line=line[cs.lex.skipwhite(line,len(hhmm)):]
 
   m=q_re.match(line)
-  if not m:
+  if m is None:
     continue
 
   line=line[cs.lex.skipwhite(line,len(m.group(0))):]
+
+  ok=True
+  for (mode,re,ptn) in relist:
+    if re is None:
+      ok=mode
+      break
+
+    m=re.search(line)
+    if m:
+      ok=mode
+      break
+
+  if not ok:
+    # regexp is a rejection
+    continue
 
   #####################################
   # Look for Q: foo@bar<- subj <msgid>
