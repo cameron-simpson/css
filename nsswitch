@@ -1,0 +1,47 @@
+#!/bin/sh -u
+#
+# Hack the /etc/nsswitch.conf file.
+#	- Cameron Simpson <cs@zip.com.au> 25dec2005
+#
+
+: ${NSSWITCH_CONF:=/etc/nsswitch.conf}
+
+cmd=`basename "$0"` || cmd=nssswitch
+usage="Usage: $cmd [-f conf] map[,map...] sources..."
+
+badopts=
+
+[ $# -gt 0 ] && [ "x$1" = x-f ] && { NSSWITCH_CONF=$2; shift; shift; }
+
+[ -f "$NSSWITCH_CONF" -a -s "$NSSWITCH_CONF" ] \
+|| { echo "$cmd: $NSSWITCH_CONF: need non-empty regular file" >&2
+     ls -ld -- "$NSSWITCH_CONF" >&2
+     badopts=1
+   }
+
+if [ $# = 0 ]
+then
+  echo "$cmd: missing maps" >&2
+  badopts=1
+else
+  maps=`echo "$1" | tr , ' '`
+  shift
+  if [ $# = 0 ]
+  then
+    echo "$cmd: missing sources" >&2
+    badopts=1
+  fi
+fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+sedf=
+for map in $maps
+do
+  sedf="$sedf
+	/^ *$map *:/c\\
+$map: $*"
+done
+
+set -x
+exec bsed "$sedf" "$NSSWITCH_CONF"
