@@ -172,7 +172,7 @@ do  case $1 in
 	# Further, the first line of the file defines a shell function called
 	# B<setenv> that acts like the csh directive of that name,
 	# and the settings are then performed with that function.
-	# Therefore, the C</etc/login> file may obtain the same
+	# Thus, the C</etc/login> file may obtain the same
 	# startup settings with the simple incantation:
 	#
 	#	eval `sed 1d /etc/profile.d/rc.mobile.sh`
