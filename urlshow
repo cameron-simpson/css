@@ -78,10 +78,20 @@ then
     exit $?
 fi
 
+mrfn='
+    mozremote()
+    { for _mr_n in 1 2 3
+      do '"$mozremote"' ${1+"$@"} && return 0
+	 sleep 1
+      done
+      return 1
+    }'
+eval "$mrfn"
+
 if [ "x$DISPLAY" = "x$BROWSER_DISPLAY" ]
 then
     probe()
-    { "$mozremote" 'ping()'
+    { mozremote 'ping()'
     }
 
     # start browser if needed
@@ -109,6 +119,7 @@ fi
 cleanurllist \
 | \
 ( exec 3>&1 1>&2
+  printf "%s\n" "$mrfn" >&3
   while read url
   do  
     case "$url" in
@@ -133,12 +144,12 @@ cleanurllist \
     [ -n "$URLLOG" ] && echo "urlshow $url" >>"$URLLOG"
     if [ $popnew ]
     then
-      echo "$mozremote 'openurl($url,new-window)'" >&3
+      echo mozremote "'openurl($url,new-window)'" >&3
       popnew=
     else
-      echo usleep 200000 >&3
-      echo "$mozremote 'openurl($url,new-tab)'" >&3
+      ##echo usleep 200000 >&3
+      echo mozremote "'openurl($url,new-tab)'" >&3
     fi
   done \
 ) \
-| catthen lock mozilla-xremote-client sh -x
+| catthen lock mozilla-xremote-client sh
