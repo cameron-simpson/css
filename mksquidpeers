@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/sh -u
 #
 # Emit cache_peer and never_direct directives for insertion into a squid.conf.
 #	- Cameron Simpson <cs@zip.com.au> 26dec2004
@@ -8,6 +8,7 @@ trace=set-x
 fwmode=
 dfltports='8080 3128'
 dflticp=3130
+peercfg=$HOME/rc/squid/peers
 
 cmd=$0
 usage="Usage: $cmd [-fw] [=][peer:[ports][:[icpport]]...
@@ -23,6 +24,12 @@ then
   echo "$cmd: no squid peers!" >&2
   exit 0
 fi
+
+direct_acls=`awk '$1 == "acl" && $2 ~ /^peer_DIRECT/ { print $2; }' "$peercfg" | sort -u`
+for direct in $direct_acls
+do  echo always_direct allow $direct
+    echo never_direct deny $direct
+done
 
 for peer
 do
@@ -69,9 +76,12 @@ do
       fi
       echo "cache_peer $peer $peertype $port $icpport $options"
     done
-    if [ -s "$HOME/private/squid-peers" ]
+    if [ -s "$peercfg" ]
     then
-      for other in `awk '$1 == "acl" { print $2 }' "$HOME/private/squid-peers" | sort -u`
+      for direct in $direct_acls
+      do echo cache_peer_access $peer deny $direct
+      done
+      for other in `awk '$1 == "acl" && !($2 ~ /^peer_DIRECT/) { print $2 }' "$peercfg" | sort -u`
       do
 	echo "cache_peer_access $peer deny $other"
       done
