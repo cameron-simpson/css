@@ -54,18 +54,13 @@ def mysql(secret,db=None):
 			 passwd=secret['PASSWORD'])
 
 _cache_dbpool={}
-def dbpool(secret,db):
+def dbpool(secret,dbname):
   """ Cache for sharing database connections for a specific secret and db name. """
   global _cache_dbpool
-  if secret not in _cache_dbpool:
-    _cache_dbpool[secret]={}
+  if (secret,dbname) not in _cache_dbpool:
+    _cache_dbpool[secret,dbname]=mysql(secret,dbname)
 
-  if db not in _cache_dbpool[secret]:
-    _cache_dbpool[secret][db]=conn=mysql(secret,db)
-  else:
-    conn=_cache_dbpool[secret][db]
-
-  return conn
+  return _cache_dbpool[secret,dbname]
 
 def sqlise(v):
   """ Mark up a value for direct insertion into an SQL statement. """
@@ -130,32 +125,38 @@ def getTable(conn,table,keyfields,fieldlist,constraint=None):
     keyfields=(keyfields,)
 
   global __tableCache
-  if conn not in __tableCache:
-    __tableCache[conn]={}
+  cacheKey=(conn,table,keyfields,fieldlist,constraint)
+  if cacheKey not in __tableCache:
+    if len(keyfields) == 1:
+      # present the keys directly
+      view=SingleKeyTableView(conn,table,keyfields[0],fieldlist,constraint)
+    else:
+      # keys in tuples
+      view=KeyedTableView(conn,table,keyfields,fieldlist,constraint)
 
-  views=__tableCache[conn]
-  viewname=table+'['+string.join(keyfields,',')+']('+string.join(fieldlist,',')+')'
-  if constraint is not None:
-    viewname=viewname+' WHERE '+constraint
+    __tableCache[cacheKey]=view
 
-  if viewname not in views:
-    views[viewname]=KeyedTableView(conn,table,keyfields,fieldlist,constraint)
-
-  return views[viewname]
+  return __tableCache[cacheKey]
 
 def getDatedTable(conn,table,keyfields,fieldlist,whensql='CURDATE()'):
   return getTable(conn,table,keyfields,fieldlist,constraint=sqlDatedRecordTest(whensql))
 
 class KeyedTableView:
+  """ A view of a table where each key designated a unique row.
+      A key may span multiple table columns.
+      Each row is indexed by a tuple of the key values.
+      If you have a single key column (a common case),
+      use the SingleKeyTableView class,
+      which is a simple subclass of KeyedTableView
+      that presents the keys directly instead of as a single element tuple.
+  """
 
   def __init__(self,conn,tablename,keyfields,fieldlist,constraint=None):
-    if isinstance(keyfields,str):
-      keyfields=(keyfields,)
-
     self.conn=conn
     self.name=tablename
 
     self.__keyfields=keyfields
+
     self.__fieldlist=fieldlist
     self.__sqlfields=string.join(self.__fieldlist,",")	# precompute
     self.__constraint=constraint
@@ -168,6 +169,7 @@ class KeyedTableView:
     self.__preload=None
 
   def insert(self,row,sqlised_fields=()):
+    """ Insert a new row into the table. """
     sqlrow={}
 
     for f in row.keys():
@@ -179,32 +181,37 @@ class KeyedTableView:
     self.insertSQLised(sqlrow)
 
   def insertSQLised(self,row):
+    """ Insert a new row into the table.
+	The row values are already in SQL syntax.
+    """
     fields=row.keys()
     sql='INSERT INTO '+self.name+'('+string.join(fields,',')+') VALUES ('+string.join([row[k] for k in fields],',')+')'
-    warn("dosql(self.conn,"+sql+")")
-    dosql(self.conn,sql)
-
-  def columnIndex(self,column):
-    return self.__fieldmap[column]
-
-  def selectFields(self):
-    return self.__sqlfields
+    warn("SKIPPING dosql(self.conn,"+sql+")")
+    ##dosql(self.conn,sql)
 
   def fieldMap(self):
     return self.__fieldmap
 
-  def rowkey(self,row):
+  def _columnIndex(self,column):
+    return self.__fieldmap[column]
+
+  def _selectFields(self):
+    """ Return the table view fields, comma separated. """
+    return self.__sqlfields
+
+  def __rowkey(self,row):
+    """ Return the key values for the supplied row. """
     return tuple([row[i] for i in self.__keyindices])
 
-  def keyWhereClause(self,key):
+  def __keyWhereClause(self,key):
     ##warn("key =", `key`)
     clause=string.join([self.__keyfields[i]+" = "+sqlise(key[i]) for i in range(len(key))]," AND ")
     if self.__constraint:
       clause=clause+' AND ('+self.__constraint+')'
     return clause
 
-  def rowWhereClause(self,row):
-    return self.keyWhereClause(self.rowkey(row))
+  def __rowWhereClause(self,row):
+    return self.__keyWhereClause(self.__rowkey(row))
 
   # load up a table
   def preload(self):
@@ -216,7 +223,7 @@ class KeyedTableView:
     res=SQLQuery(self.conn,sql)
     warn("result =", `res`)
     for row in res:
-      self.__preload[self.rowkey(row)]=TableRow(self,self.rowWhereClause(row),rowdata=row)
+      self.__preload[self.__rowkey(row)]=_TableRow(self,self.__rowWhereClause(row),rowdata=row)
 
   def __preloaded(self,key):
     if self.__preload is None:
@@ -231,64 +238,60 @@ class KeyedTableView:
     return self.__preload[key]
 
   def findrow(self,where):
-    sql='SELECT '+self.__keyfield+' FROM '+self.name+' WHERE '+where
-    rows=dosql(self.conn,sql).allrows()
+    kfsqlfields=string.join(self.__keyfields,",")
+    sql='SELECT '+kfsqlfields+' FROM '+self.name+' WHERE '+where
+    rows=SQLQuery(self.conn,sql).allrows()
     if len(rows) == 0:
       return None
-    id=rows[0][0]
+    id=tuple(rows[0])
     if len(rows) > 1:
-      warn("multiple hits in",self.name,"- selecting first one:",self.__keyfield,'=',`id`)
+      warn("multiple hits in",self.name,"- selecting first one:",kfsqlfields,'=',`id`)
     return self[id]
 
   def __getitem__(self,key):
-    ##t=type(key); warn("type =", `t`)
-    if isinstance(key,str) or isinstance(key,int) or isinstance(key,long) or isinstance(key,float):
-      key=(key,)
-
     row=self.__preloaded(key)
     if row is None:
       if self.__preload is None: self.__preload={}
-      row=self.__preload[key]=TableRow(self,self.keyWhereClause(key))
+      row=self.__preload[key]=_TableRow(self,self.__keyWhereClause(key))
     return row
 
   def keys(self):
     if self.__preload is None:
       self.preload()
-
     return self.__preload.keys()
+
+  def __iter__(self):
+    for key in self.keys():
+      yield self[key]
 
   def __contains__(self,key):
     if self.__preload is None:
-	  self.preload()
-
+      self.preload()
     return key in self.__preload
-
   def has_key(self,key):
     return self.__contains__(key)
 
-  class __SingleKeyTableViewIter:
-    def __init__(self,tv):
-      self.tv=tv
-      self.keys=tv.keys()
-      self.n=0
-    def __iter__(self):
-      return self
-    def next(self):
-      n=self.n
-      keys=self.keys
-      if n >= len(keys): raise StopIteration
-      row=self.tv[keys[n]]
-      self.n=n+1
-      return row
+class SingleKeyTableView(KeyedTableView):
+  def __init__(self,conn,tablename,keyfield,fieldlist,constraint=None):
+    KeyedTableView.__init__(self,conn,tablename,(keyfield,),fieldlist,constraint)
 
-  def __iter__(self):
-    return self.__SingleKeyTableViewIter(self)
+  def keys(self):
+    return [k[0] for k in KeyedTableView.keys(self)]
+
+  def __getitem__(self,key):
+    return KeyedTableView.__getitem__(self,(key,))
+
+  def __contains__(self,key):
+    return KeyedTableView.__contains__(self,(key,))
+
+  def has_key(self,key):
+    return self.__contains__(key)
 
 ###############################################################################
 # Database Table Rows
 #
 
-class TableRow:
+class _TableRow:
   def __init__(self,table,whereclause,rowdata=None):
     self.table=table
 
@@ -309,10 +312,10 @@ class TableRow:
     self.__rowcache=[d for d in rowdata]
 
   def __loadrowcache(self):
-    ##for arg in ('SELECT ', self.table.selectFields(), ' FROM ', self.table.name, ' WHERE ', self.__whereclause, ' LIMIT 1'):
+    ##for arg in ('SELECT ', self.table._selectFields(), ' FROM ', self.table.name, ' WHERE ', self.__whereclause, ' LIMIT 1'):
     ##  warn("arg =", `arg`)
     self.__setrowcache([row for row in SQLQuery(self.table.conn,
-					     'SELECT '+self.table.selectFields()+' FROM '+self.table.name+' WHERE '+self.__whereclause+' LIMIT 1',
+					     'SELECT '+self.table._selectFields()+' FROM '+self.table.name+' WHERE '+self.__whereclause+' LIMIT 1',
 					    ).allrows()[0]])
 
   def __getrowcache(self):
@@ -327,7 +330,7 @@ class TableRow:
 
   def __getitem__(self,column):
     # fetch from cache, loading it if necessary
-    return self.__getrowcache()[self.table.columnIndex(column)]
+    return self.__getrowcache()[self.table._columnIndex(column)]
 
   def __setitem__(self,column,value):
     # update the db
@@ -335,11 +338,11 @@ class TableRow:
 	  'UPDATE '+self.table.name+' SET '+column+' = %s WHERE '+self.__whereclause,
 	  (value,))
     # update the cache
-    self.__getrowcache()[self.table.columnIndex(column)]=value
+    self.__getrowcache()[self.table._columnIndex(column)]=value
 
 class TableRowWrapper:
-  def __init__(self,tv,key):
-    self.TableRow=tv[key]
+  def __init__(self,tableview,key):
+    self.TableRow=tableview[key]
 
   def __getitem__(self,column):
     return self.TableRow[column]
