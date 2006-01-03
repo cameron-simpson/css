@@ -1,0 +1,35 @@
+#!/bin/sh -u
+#
+# Test if the specified local port is listening.
+#	- Cameron Simpson <cs@zip.com.au> 03jan2006
+#
+
+cmd=$0
+usage="Usage: $0 [addr:]port"
+
+badopts=
+
+if [ $# = 0 ]
+then
+  echo "$cmd: missing [addr:]port" >&2
+  badopts=1
+else
+  port=$1; shift
+  case "$port" in
+    :*)	addr=0.0.0.0 ;;
+    *:*)addr=`expr "x$port" : 'x\(.*\):.*'`
+    	port=`expr "x$port" : 'x.*:\(.*\)'`
+	;;
+    *)	addr=0.0.0.0 ;;
+  esac
+  if [ $# -gt 0 ]
+  then
+    echo "$cmd: extra arguments after [addr:]port" >&2
+    badopts=1
+  fi
+fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+line=`netstat -anl | awk -v "laddr=$addr:$port" '$1 == "tcp" && $4 == laddr && $6 == "LISTEN" { print }'`
+[ -n "$line" ]
