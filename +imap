@@ -7,7 +7,7 @@
 cmd=`basename "$0"`
 usage="Usage: $cmd [[user:pass@]server]"
 
-server=zipworld
+server=zipworld-direct
 fmrc=$HOME/.fetchmailrc
 trace=set-x
 
@@ -37,4 +37,4 @@ exec $trace + +s +t \
 	-e "set imap_pass=\"$fm_pass\"" \
 	--pre='set-x fmprod -STOP' \
 	--post='set-x fmprod -CONT' \
-	imap://$fm_user@$fm_host/INBOX
+	imaps://$fm_user@$fm_host/INBOX
