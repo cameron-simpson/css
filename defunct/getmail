@@ -1,0 +1,65 @@
+#!/bin/sh
+#
+# Retrieve my email.	- Cameron Simpson <cs@zip.com.au> 13aug2002
+#
+
+: ${MAILDIR:=$HOME/mail}
+
+rc=$HOME/var/fetchmail/fetchmailrc
+quick=
+expunge=
+trace=set-x
+verbose=
+
+cmd=`basename "$0"`
+usage="Usage: $cmd [-n] [-q] [-v] [-e expunge] [hosts...]"
+
+badopts=
+
+while :
+do
+  case "$1" in
+    -n) trace=echo ;;
+    -q) quick=1 ;;
+    -v)	verbose=-v ;;
+    -e)	expunge="$1 $2"; shift ;;
+    --)	shift; break ;;
+    -?*)echo "$cmd: unrecognised option: $1" >&2; badopts=1 ;;
+    *)	break ;;
+  esac
+  shift
+done
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+[ $# = 0 ] && { set x `sed -n 's/^poll  *\([^ ][^ ]*\).*/\1/p' "$rc"`; shift; }
+
+echo "$0 $* ..."
+
+xit=0
+
+mhdir $MAILDIR/spool $MAILDIR/spool0 || exit 1
+dfltproc="procmail $HOME/rc/mail/procmailrc.spool"
+
+for host
+do
+  gm_fmopts=
+  eval `winclausevars "$HOME/rc/getmail" "$HOST@$SYSTEMID:$host" gm`
+  eval "$trace iffetchmail -f \"\$rc\" -a $verbose $expunge $gm_fmopts \"\$host\""
+done
+getmail-flush spool0 || xit=1
+
+for nntp in localhost news.optusnet.com.au news.isys.com.au
+do
+  [ "x$LOCATION" = xhome ] || [ "x$nntp" = xlocalhost ] || continue
+  echo "news from $nntp ..."
+  getnews -s "$nntp" -d "ng2to|$dfltproc"
+done
+
+getmail-flush spool0 || xit=1
+if [ $quick ]
+then  bgproc getmail-flush spool
+else  getmail-flush spool || xit=1
+fi
+
+exit $xit
