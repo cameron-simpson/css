@@ -6,12 +6,12 @@
 
 import string
 import types
-import cs.misc
-warn=cs.misc.warn
+import cs.secret
+from cs.misc import warn, isodate
 
 def today():
   "Today's date in ISO-8601 format (YYYY-MM-DD)."
-  return time.strftime("%Y-%m-%d",time.localtime())
+  return isodate()
 
 def iscurrent(row,when=None,startndx='START_DATE',endndx='END_DATE'):
   """ Test if a row object is ``current''.
@@ -69,6 +69,7 @@ def sqlise(v):
 
   t=type(v)
   if t is types.StringType:
+    if v.find("'") >= 0: v=string.join(v.split("'"),"''")
     return "'"+v+"'"
 
   if t in (types.IntType,types.LongType,types.FloatType):
@@ -100,18 +101,18 @@ class SQLQuery:
     return [row for row in self]
 
   def __iter__(self):
-    return self
-
-  def next(self):
     row=self.__cursor.fetchone()
-    if row is None: raise StopIteration
-    return row
+    while row is not None:
+      yield row
+      row=self.__cursor.fetchone()
 
 class DateRangeRecord:
   def iscurrent(self,when=None):
     return iscurrent(self,when)
 
-def sqlDatedRecordTest(whensql='CURDATE()',startfield='START_DATE',endfield='END_DATE'):
+def sqlDatedRecordTest(when=today(),startfield='START_DATE',endfield='END_DATE'):
+  """ Return SQL to test that a dated record overlaps the specified date. """
+  whensql=sqlise(when)
   return '(ISNULL('+startfield+') OR '+startfield+' <= '+whensql+')' \
        + ' AND (ISNULL('+endfield+') OR '+endfield+' > '+whensql+')'
 
@@ -124,8 +125,9 @@ def getTable(conn,table,keyfields,fieldlist,constraint=None):
   if isinstance(keyfields,str):
     keyfields=(keyfields,)
 
-  global __tableCache
   cacheKey=(conn,table,keyfields,fieldlist,constraint)
+
+  global __tableCache
   if cacheKey not in __tableCache:
     if len(keyfields) == 1:
       # present the keys directly
@@ -138,8 +140,8 @@ def getTable(conn,table,keyfields,fieldlist,constraint=None):
 
   return __tableCache[cacheKey]
 
-def getDatedTable(conn,table,keyfields,fieldlist,whensql='CURDATE()'):
-  return getTable(conn,table,keyfields,fieldlist,constraint=sqlDatedRecordTest(whensql))
+def getDatedTable(conn,table,keyfields,fieldlist,when=today()):
+  return getTable(conn,table,keyfields,fieldlist,constraint=sqlDatedRecordTest(when))
 
 class KeyedTableView:
   """ A view of a table where each key designated a unique row.
