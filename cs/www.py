@@ -7,13 +7,19 @@ import cgitb; cgitb.enable()
 import re
 import types
 import cs.hier
+from cs.misc import extend, warn
 
 cookie_sepRe=re.compile(r'\s*;\s*')
 cookie_valRe=re.compile(r'([a-z][a-z0-9_]*)=([^;,\s]*)',re.I)
 
 hexSafeRe=re.compile(r'[-=.\w:@/?~#+&]+')
+dqAttrValSafeRe=re.compile(r'[-=. \w:@/?~#+&]+')
 
 def hexify(str,fp,safeRe=hexSafeRe):
+  """ Percent encode a string, transcribing to a file.
+      safeRe is a regexp matching a non-empty seqeunce of characters that do not need encoding.
+      FIXME: percent encoding for Unicode?
+  """
   while len(str):
     m=safeRe.match(str)
     if m:
@@ -27,6 +33,7 @@ def hexify(str,fp,safeRe=hexSafeRe):
 textSafeRe=re.compile(r'[^<>&]+')
 
 def puttext(fp,str,safeRe=textSafeRe):
+  """ Transcribe plain text in HTML safe form. """
   while len(str):
     m=safeRe.match(str)
     if m:
@@ -46,10 +53,13 @@ def puttext(fp,str,safeRe=textSafeRe):
       str=str[1:]
 
 def puthtml(fp,*args):
+  """ Transcribe tokens as HTML. """
   for a in args:
     puttok(fp,a)
 
 def puttok(fp,tok):
+  """ transcribe a single token as HTML. """
+  global dqAttrValSafeRe
   f=cs.hier.flavour(tok)
   if f is 'SCALAR':
     # flat text
@@ -63,11 +73,13 @@ def puttok(fp,tok):
       # Tag class item
       tag=tok.tag
       attrs=tok.attrs
-    else
+    else:
       # raw array [ tag[,attrs][,tokens...] ]
-      tag=tok[0]; tok[:1]=()
+      tag=tok[0]; tok=tok[1:]
       if len(tok) > 0 and cs.hier.flavour(tok[0]) is 'HASH':
-	attrs=tok[0]; tok[:1]=()
+	attrs=tok[0]; tok=tok[1:]
+      else:
+	attrs={}
 
     fp.write('<')
     fp.write(tag)
@@ -77,11 +89,11 @@ def puttok(fp,tok):
       v=attrs[k]
       if v is not None:
 	fp.write('="')
-	hexify(v,fp)
+	hexify(str(v),fp,dqAttrValSafeRe)
 	fp.write('"')
     fp.write('>')
-    for subtok in tok:
-      puttok(fp,subtok)
+    for t in tok:
+      puttok(fp,t)
     fp.write('</')
     fp.write(tag)
     fp.write('>')
@@ -89,8 +101,12 @@ def puttok(fp,tok):
     # unexpected
     raise TypeError
 
-def ht_form(action,method,*toks):
-  return [FORM,{'ACTION': action, 'METHOD': method},toks]
+def ht_form(action,method,*tokens):
+  """ Make a <FORM> token, ready for content. """
+  form=['FORM',{'ACTION': action, 'METHOD': method}]
+  extend(form,tokens)
+  warn("NEW FORM =", cs.hier.h2a(form))
+  return form
 
 class CGI:
   def __init__(self,input=sys.stdin,output=sys.stdout,env=os.environ):
@@ -100,38 +116,43 @@ class CGI:
     self.env=env
     self.qs=None
     self.headers=[]	# HTTP headers
-    self.head=[]	# HTML <HEAD> section
-    self.body=[]	# HTML <BODY> section
+    self.tokens={'HEAD': [], 'BODY': []}
     if 'QUERY_STRING' in env:
       self.qs=cgi.parse_qs(env['QUERY_STRING'])
 
     self.path_info=None
     if 'PATH_INFO' in env:
-      self.path_info=[word for word in split(env['PATH_INFO'],'/') if len(word) > 0]
+      self.path_info=[word for word in string.split(env['PATH_INFO'],'/') if len(word) > 0]
 
     self.cookies={}
     if 'HTTP_COOKIE' in self.env:
       for m in cookie_valRe.finditer(env['HTTP_COOKIE']):
 	self.cookies[m.group(1)]=m.group(2)
 
+    self.uri=None
+    if 'REQUEST_URI' in env:
+      self.uri=env['REQUEST_URI']
+
     self.script_name=None
     if 'SCRIPT_NAME' in env:
       self.script_name=env['SCRIPT_NAME']
 
-    atexit.register(CGI.__del__,self)
-
-  def __del__(self):
-    if self.output is not None:
-      self.close()
+#    atexit.register(CGI.__del__,self)
+#
+#  def __del__(self):
+#    if self.output is not None:
+#      self.close()
 
   def close(self):
     self.flush()
     self.output=None
 
   def flush(self):
-    if self.header is not None:
+    ##print "Content-Type: text/plain"
+    ##print
+    if self.headers is not None:
       ctype=self.content_type()
-      self.ishtml=(ctype is 'text/html')
+      self.ishtml=(ctype == 'text/html')
       self.header('Content-Type',ctype)
       for hdr in self.headers:
 	self.output.write(hdr[0])
@@ -139,45 +160,50 @@ class CGI:
 	self.output.write(hdr[1])
 	self.output.write('\n')
       self.output.write('\n')
-      self.header=None
+      self.headers=None
 
     if not self.ishtml:
-      for b in self.body:
+      for b in self.tokens['BODY']:
 	self.output.write(b)
     else:
       puthtml(self.output,
-	      ['!DOCTYPE','HTML','PUBLIC', '-//W3C//DTD HTML 4.01 Transitional//EN'],
+	      ['!DOCTYPE',{'HTML': None,'PUBLIC': None, '-//W3C//DTD HTML 4.01 Transitional//EN': None}],
 	      ['HTML',
-	       ['HEAD']+self.head,
-	       ['BODY']+self.body
+	       ['HEAD']+self.tokens['HEAD'],
+	       ['BODY']+self.tokens['BODY'],
 	      ])
-    self.head=[]
-    self.body=[]
+    self.tokens={'HEAD': [], 'BODY': []}
 
   def header(self,field,value,append=0):
     if not append:
       lcfield=string.lower(field)
-      self.header=[hdr for hdr in self.header if string.lower(hdr[0]) != lcfield]
-    self.header.append((field,value))
+      self.headers=[hdr for hdr in self.headers if string.lower(hdr[0]) != lcfield]
+    self.headers.append((field,value))
 
   def content_type(self):
     ctype='text/html'
-    for hdr in self.header:
+    for hdr in self.headers:
       if string.lower(hdr[0]) == 'content-type':
 	ctype=string.lower(hdr[1])
     return ctype
 
-  def head(self,*tokens):
-    self.head=self.head+tokens
+  def markup(self,part,*tokens):
+    extend(self.tokens[part],tokens)
 
-  def out(self,*tokens)
-    self.body=self.body+tokens
+  def head(self,*tokens):
+    self.markup('HEAD',*tokens)
+
+  def out(self,*tokens):
+    warn("CGI.out() TOKENS = ...")
+    for t in tokens:
+      warn(" ", `t`)
+    self.markup('BODY',*tokens)
 
   def nl(self,*tokens):
     self.out(*tokens)
     self.out('\n')
 
-  def prepend(self,*args)
+  def prepend(self,*args):
     self.body=args+self.body
 
 # convenience classes for tags with complex substructure
@@ -185,37 +211,39 @@ class Tag:
   def __init__(self,tag,attrs={},*tokens):
     self.tag=tag
     self.attrs=attrs
-    self.tokens=*tokens
+    self.tokens=[]
+    extend(self.tokens,tokens)
 
   def token(self):
     return (self.tag,self.attrs,self.tokens)
 
-  def __getattr__(self,key):
+  def __getitem__(self,key):
     return self.attrs[key]
 
-  def __setattr__(self,key,value):
+  def __setitem__(self,key,value):
     self.attrs[key]=value
 
   def __iter__(self):
-    return self.tokens
+    for t in self.tokens:
+      yield t
 
-  def append(self,*tokens)
-    self.tokens=self.tokens+*tokens
+  def extend(self,*tokens):
+    extend(self.tokens,tokens)
 
 class Table(Tag):
   def __init__(self,attrs={}):
     Tag.__init__(self,'TABLE',attrs)
 
   def TR(self,attrs={}):
-    tr=Tag('TR',attrs)
-    tokens.append(tr)
+    tr=TableTR(attrs)
+    self.tokens.append(tr)
     return tr
 
-class TR(Tag):
+class TableTR(Tag):
   def __init__(self,attrs={}):
     Tag.__init__(self,'TR',attrs)
 
   def TD(self,*args):
     td=Tag('TD',*args)
-    self.tokens.appen(td)
+    self.tokens.append(td)
     return td
