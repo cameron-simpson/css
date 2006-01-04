@@ -4,6 +4,7 @@ import errno
 import sys
 import dircache
 import string
+import time
 
 cmd=os.path.basename(sys.argv[0])
 
@@ -27,6 +28,9 @@ def cmderr(*args):
   sys.stderr.write(cmd)
   sys.stderr.write(": ")
   warn(*args)
+
+def isodate(when=time.localtime()):
+  return time.strftime("%Y-%m-%d",when)
 
 # trim trailing newline if present, a la the perl func of the same name
 def chomp(s):
