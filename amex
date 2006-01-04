@@ -1,4 +1,4 @@
 #!/bin/sh
 # AMEX Online Services.	- Cameron Simpson <cs@zip.com.au> 03may2002
-us www.americanexpress.com.au
+us http://www.americanexpress.com/links/myca/en_AU/
 exec ring amex
