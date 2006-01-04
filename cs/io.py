@@ -5,8 +5,8 @@ from StringIO import StringIO
 def loadfile(path):
   return file(path).read()
 
-""" read a line which may be continued with leading whitespace """
 def readcontline(fp):
+  """ read a line which may be continued with leading whitespace """
   line=fp.readline()
   if len(line) > 0:
     contlines=StringIO()
@@ -25,17 +25,17 @@ def readcontline(fp):
 
   return line
 
-""" a file object whose iterator returns contlines """
 class ContLineFile(file):
+  """ a file object whose iterator returns contlines """
   def next(self):
     nline=readcontline(self)
     if not nline: raise StopIteration
     return nline
 
-""" base class for wrapping a file
-    expects to be extended by IFileWrapper or OFileWrapper
-"""
 class BaseFileWrapper:
+  """ base class for wrapping a file
+      expects to be extended by IFileWrapper or OFileWrapper
+  """
   def __init__(self,fp):
     self.fp=fp
   def close(self):
@@ -51,8 +51,8 @@ class BaseFileWrapper:
   def tell(self):
     return self.fp.tell()
 
-""" base class for wrapping a file open for input """
 class IFileWrapper(BaseFileWrapper):
+  """ base class for wrapping a file open for input """
   def __init__(self,fp):
     BaseFileWrapper.__init(self,fp)
   def __iter__(self):
@@ -68,8 +68,8 @@ class IFileWrapper(BaseFileWrapper):
   def xreadlines(self):
     return self.fp.xreadlines()
 
-""" base class for wrapping a file open for output """
 class OFileWrapper(BaseFileWrapper):
+  """ base class for wrapping a file open for output """
   def __init__(self,fp):
     BaseFileWrapper.__init__(self,fp)
   def truncate(self,*args):
@@ -79,8 +79,8 @@ class OFileWrapper(BaseFileWrapper):
   def writelines(self,seq):
     self.fp.writelines(seq)
 
-""" file object with a "prevailing indent" """
 class IndentedFile(OFileWrapper):
+  """ file object with a "prevailing indent" """
   def __init__(self,fp,i=0):
     OFileWrapper.__init__(self,fp)
     self.indent=i
