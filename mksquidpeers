@@ -6,18 +6,28 @@
 
 trace=set-x
 fwmode=
+nodirect=
 dfltports='8080 3128'
 dflticp=3130
 peercfg=$HOME/rc/squid/peers
 
 cmd=$0
-usage="Usage: $cmd [-fw] [=][peer:[ports][:[icpport]]...
+usage="Usage: $cmd [-fw] [-nodirect] [=][peer:[ports][:[icpport]]...
 	-fw	Emit suitable firewall control commands instead.
+	-nodirect Don't try to send anything directly.
 	Leading \"=\" implies sibling cache instead of parent.
 	Omitted ports default to \"$dfltports\".
 	Omitted icp defaults to \"$dflticp\"."
 
-[ "x$1" = x-fw ] && { fwmode=1; shift; }
+while [ $# -gt 0 ]
+do
+  case $1 in
+    -fw)	fwmode=1 ;;
+    -nodirect)	nodirect=1 ;;
+    *)		break ;;
+  esac
+  shift
+done
 
 if [ $# = 0 ]
 then
@@ -25,11 +35,17 @@ then
   exit 0
 fi
 
-direct_acls=`awk '$1 == "acl" && $2 ~ /^peer_DIRECT/ { print $2; }' "$peercfg" | sort -u`
-for direct in $direct_acls
-do  echo always_direct allow $direct
-    echo never_direct deny $direct
-done
+if [ $nodirect ]
+then
+  echo always_direct deny all
+  echo never_direct allow all
+else
+  direct_acls=`awk '$1 == "acl" && $2 ~ /^peer_DIRECT/ { print $2; }' "$peercfg" | sort -u`
+  for direct in $direct_acls
+  do  echo always_direct allow $direct
+      echo never_direct deny $direct
+  done
+fi
 
 for peer
 do
@@ -62,30 +78,34 @@ do
     do  $trace fw-tcp-out "$port" "$peer"
     done
     [ -n "$icp" ] && $trace fw-udp-out "$icp" "$peer"
-  else
-    for port in $ports
-    do
-      options=weight=2
-      if [ $isparent ]
-      then  peertype=parent
-      else  peertype=sibling
-      fi
-      if [ -n "$icp" ]
-      then  icpport=$icp
-      else  icpport=0 options="$options no-query"
-      fi
-      echo "cache_peer $peer $peertype $port $icpport $options"
-    done
-    if [ -s "$peercfg" ]
+    continue
+  fi
+
+  for port in $ports
+  do
+    options=weight=2
+    if [ $isparent ]
+    then  peertype=parent
+    else  peertype=sibling
+    fi
+    if [ -n "$icp" ]
+    then  icpport=$icp
+    else  icpport=0 options="$options no-query"
+    fi
+    echo "cache_peer $peer $peertype $port $icpport $options"
+  done
+  if [ -s "$peercfg" ]
+  then
+    if [ -z "$nodirect" ]
     then
       for direct in $direct_acls
       do echo cache_peer_access $peer deny $direct
       done
-      for other in `awk '$1 == "acl" && !($2 ~ /^peer_DIRECT/) { print $2 }' "$peercfg" | sort -u`
-      do
-	echo "cache_peer_access $peer deny $other"
-      done
-      echo cache_peer_access $peer allow all
     fi
+    for other in `awk '$1 == "acl" && !($2 ~ /^peer_DIRECT/) { print $2 }' "$peercfg" | sort -u`
+    do
+      echo "cache_peer_access $peer deny $other"
+    done
+    echo cache_peer_access $peer allow all
   fi
 done
