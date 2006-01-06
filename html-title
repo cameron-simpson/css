@@ -17,10 +17,24 @@ html-unsplit -- ${1+"$@"} >"$tmpf" || exit 1
 
 ( 
   sed -n -e 'y/	/ /' \
+	 -e ':detag' \
+	 -e 's/<\([^<>=]*\) [a-zA-Z][a-zA-Z]*="[^"]*"/<\1/g' \
+	 -e 't detag' \
+	 -e 's/<\([^<>=]*\) [a-zA-Z][a-zA-Z]*='\''[^'\'']*'\''/<\1/g' \
+	 -e 't detag' \
+	 -e 's/<\([^<>=]*\) [a-zA-Z][a-zA-Z]*=[^<> ]*/<\1/g' \
+	 -e 't detag' \
 	 -e 's/.*< *[Tt][Ii][Tt][Ll][Ee] *>\([^< ][^<]*\).*/\1/p' \
 	 -e 'T nope; q; :nope; d' \
 	 "$tmpf"
   sed -n -e 'y/	/ /' \
+	 -e ':detag' \
+	 -e 's/<\([^<>=]*\) [a-zA-Z][a-zA-Z]*="[^"]*"/<\1/g' \
+	 -e 't detag' \
+	 -e 's/<\([^<>=]*\) [a-zA-Z][a-zA-Z]*='\''[^'\'']*'\''/<\1/g' \
+	 -e 't detag' \
+	 -e 's/<\([^<>=]*\) [a-zA-Z][a-zA-Z]*=[^<> ]*/<\1/g' \
+	 -e 't detag' \
 	 -e 's/.*< *[Hh]1 *>\([^< ][^<]*\).*/\1/p' \
 	 -e 'T nope; q; :nope; d' \
 	 "$tmpf"
