@@ -28,11 +28,23 @@ playpid=
 
 runplayer()
 {
-  ( ok=1
+  (
+    subkill()
+    { [ -z "$subproc" ] && return 1
+      dodelay=
+      kill $subproc || return 1
+      while printf .; usleep 200 && kill -0 $subproc
+      do :
+      done
+      echo
+      return 0
+    }
+
+    ok=1
     subproc=
     tmpauf=
-    trap 'ok=; [ -n "$subproc" ] && kill $subproc; exit' 1 2 15
-    trap '[ -n "$subproc" ] && kill $subproc' USR1
+    trap 'ok=; subkill; exit' 1 2 15
+    trap subkill USR1
     playlist=$TMPDIR/$cmd.$$
     while [ $ok ]
     do
@@ -50,23 +62,27 @@ runplayer()
 	  while [ $ok ] && read -r auf
 	  do
 	      echo "[$auf]"
+	      dodelay=
 	      if [ $playcopy ]
 	      then
 		  tmpauf=$TMPDIR/$cmd$$`basename "$auf"`
 		  (set -x; cp "$auf" "$tmpauf") && auf=$tmpauf
 	      fi
 	      case "$auf" in
-		*.ogg)	$trace ogg123 -d oss "$auf" & ;;
-		*.mp3)	$trace mpg123 -v -b 2048 "$auf" & ;;
+		*.ogg)	dodelay=1
+			$trace ogg123 -d oss "$auf" &
+			subproc=$! ;;
+		*.mp3)	dodelay=1
+			$trace mpg123 -v -b 2048 "$auf" &
+			subproc=$! ;;
 		*)	echo "$cmd: how to play $auf ?" >&2
 			continue
 			;;
 	      esac
-	      subproc=$!
 	      wait
 	      subproc=
 	      [ $playcopy ] && rm -f "$tmpauf"
-	      [ $ok ] && sleep 2
+	      [ $ok ] && [ $dodelay ] && sleep 2
 	  done
 	else
 	  echo "$cmd: no hits found for keywords: $ptns" >&2
