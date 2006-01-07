@@ -1,33 +1,51 @@
-#!/bin/sh
+#!/bin/sh -u
 #
 # Search for stuff with mairix and then run up the result in mutt.
 #	- Cameron Simpson <cs@zip.com.au> 01jan2003
 #
 
+: ${TMPDIR:=/tmp}
+
 cmd=`basename "$0"`
 usage="Usage:     $cmd    Update mairix index.
 	$cmd mairix-search-args... Search and display."
 
-mairix=/opt/mairix/bin/mairix
-rc=$HOME/rc/mairix.$SYSTEMID
-
 # help?
 [ "x$*" = x-h -o "x$1" = 'x-?' ] && { echo "$usage"; exit 0; }
 
-if [ $# = 0 ]
-then
-  xit=0
-  for folder in "$MAILDIR/"* "$MAILDIR/"[A-Z]*/*
-  do  mrx-update "$folder" || xit=1
-  done
-  exit $xit
-fi
+[ $# = 0 ] && exec mairix -v
 
-qargs=`shqstr "$@"`
+res=`mkdirn $TMPDIR/mairix` || exit 1
+trap 'rm -rf -- "$res"' 1 2 13 15
+
+maildir "$res" || exit 1
+qargs=`shqstr "$res" "$@"` || exit 1
 
 exec term -n "++ $*" \
 	  -c "set -- $qargs"'
-	      res=`mrx-query "$@"`
-	      + +t -f "$res"
+	      res=$1; shift
 	      set -x
-	      rm -rf "$res"'
+	      mairix -o "$res" "$@"
+	      + +t -f "$res"
+	      rm -rf -- "$res"'
+
+####mairix=/opt/mairix/bin/mairix
+####rc=$HOME/rc/mairix.$SYSTEMID
+####
+####if [ $# = 0 ]
+####then
+####  xit=0
+####  for folder in "$MAILDIR/"* "$MAILDIR/"[A-Z]*/*
+####  do  mrx-update "$folder" || xit=1
+####  done
+####  exit $xit
+####fi
+####
+####qargs=`shqstr "$@"`
+####
+####exec term -n "++ $*" \
+####	  -c "set -- $qargs"'
+####	      res=`mrx-query "$@"`
+####	      + +t -f "$res"
+####	      set -x
+####	      rm -rf "$res"'
