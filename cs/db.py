@@ -188,8 +188,7 @@ class KeyedTableView:
     """
     fields=row.keys()
     sql='INSERT INTO '+self.name+'('+string.join(fields,',')+') VALUES ('+string.join([row[k] for k in fields],',')+')'
-    warn("SKIPPING dosql(self.conn,"+sql+")")
-    ##dosql(self.conn,sql)
+    dosql(self.conn,sql)
 
   def fieldMap(self):
     return self.__fieldmap
