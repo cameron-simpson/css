@@ -58,7 +58,7 @@ case "$todir" in
 esac
 
 ( cd "$fromdir" || exit 1
-  $trace find . -type d -name "$glob" -print -prune \
+  $trace find . -type d -name "$glob" -print -prune
 ) \
 | \
 { xit=0
@@ -73,6 +73,7 @@ esac
       [ -d "$destdir/." ] || $trace needdir "$destdir" || exit 1
       $trace "$ov" . "$destdir/."
     ) || xit=1
+    [ $prune ] && rmdir "$srcdir" 2>/dev/null
   done
   exit $xit
 }
