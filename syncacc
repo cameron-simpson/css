@@ -30,6 +30,7 @@ exec \
 	'--include=/.lesskey' \
 	'--include=/.mailcap' \
 	'--include=/.maint' \
+	'--include=/.mairixrc' \
 	'--include=/.mh_profile' \
 	'--include=/.muttrc' \
 	'--include=/.profile' \
@@ -74,6 +75,7 @@ exec \
 	'--include=/rc/mail/signature' \
 	'--include=/rc/mail/signatures' \
 	'--exclude=/rc/mail/*' \
+	'--exclude=/rc/mairix' \
 	'--include=/rc/mh' \
 	'--include=/rc/myke' \
 	'--include=/rc/nvi' \
