@@ -4,6 +4,8 @@
 #	- Cameron Simpson <cs@zip.com.au> 26dec2004
 #
 
+: ${MKSQUIDPEERS_OPTS:=''}
+
 trace=set-x
 fwmode=
 nodirect=
@@ -18,6 +20,8 @@ usage="Usage: $cmd [-fw] [-nodirect] [=][peer:[ports][:[icpport]]...
 	Leading \"=\" implies sibling cache instead of parent.
 	Omitted ports default to \"$dfltports\".
 	Omitted icp defaults to \"$dflticp\"."
+
+set -- $MKSQUIDPEERS_OPTS ${1+"$@"}
 
 while [ $# -gt 0 ]
 do
