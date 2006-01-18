@@ -11,7 +11,7 @@ usage="Usage:     $cmd    Update mairix index.
 	$cmd mairix-search-args... Search and display."
 
 # help?
-[ "x$*" = x-h -o "x$1" = 'x-?' ] && { echo "$usage"; exit 0; }
+[ $# -gt 0 ] && [ "x$*" = x-h -o "x$1" = 'x-?' ] && { echo "$usage"; exit 0; }
 
 [ $# = 0 ] && exec mairix -v
 
