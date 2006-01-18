@@ -40,11 +40,11 @@
 # Create a crontab file with the crontab(1) command.
 # Typically this is a single line such as:
 #
-#	0 * * * * exec /bin/runmaint hourly
+#	0 * * * * exec /opt/css/bin/runmaint hourly
 #
 # or
 #
-#	0 0 * * * exec /bin/runmaint daily
+#	0 0 * * * exec /opt/css/bin/runmaint daily
 #
 # The word after the B<runmaint> command is the name of a script to run
 # from the B<~/.maint> directory.
@@ -83,6 +83,26 @@
 # then all files in the top level of that directory are run.
 #
 # =head1 ENVIRONMENT
+#
+# B<Runmaint> prepopulates the environment
+# with some convenience variables
+# reflecting the date and time
+# that B<runmaint> commenced.
+# These are derived from the output of date(1), and are:
+#
+#  wday The day of the week, eg "Tue".
+#  mon  The month, eg "Apr".
+#  mday The month day, eg 23.
+#  hh   The hour, eg 09.
+#  mm   The minute, eg 13.
+#  ss   The seconds, eg 00.
+#  tz   The timezone.
+#  year The year, eg 1998.
+#
+# These are passed to any cascaded scripts intact
+# i.e. if a 6pm runmaint job kicks off and runs long enough
+# that some cascased jobs commences much later
+# the convenience variables will still be for 6pm.
 #
 # Before running any script
 # B<runmaint> sources the file
