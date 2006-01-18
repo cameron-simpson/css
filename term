@@ -80,7 +80,7 @@ do
     +ip)	dotrans= ;;
     -sh)	shade=$2; shift ;;
     -C|-iconic)	termopts="$termopts $1" ;;
-    -fg|*,-bg)	termopts="$termopts $1 $2"; shift ;;
+    -fg|-bg)	termopts="$termopts $1 $2"; shift ;;
     -v)		set -x ;;
     -w)		w=$2 ; shift ;;
     -h)		h=$2 ; shift ;;
@@ -149,15 +149,23 @@ case "$TERM,$DISPLAY" in
 		}
 
 	case "$PREFTERM" in
-	    rxvt)	[ $dotrans ] && termopts="$termopts -ip"
+	    rxvt)	if [ $dotrans ]
+			then termopts="$termopts -ip"
+			else termopts="$termopts +ip"
+			fi
 			;;
-	    urxvt*)	[ $dotrans ] && { termopts="$termopts -ip"
-					  [ -n "$tint" ] && termopts="$termopts -tint $tint"
-					  [ -n "$shade" ] && termopts="$termopts -sh $shade"
-					}
+	    urxvt*)	if [ $dotrans ]
+			then
+			  termopts="$termopts -ip"
+			  [ -n "$tint" ] && termopts="$termopts -tint $tint"
+			  [ -n "$shade" ] && termopts="$termopts -sh $shade"
+			else
+			  termopts="$termopts +ip"
+			fi
 	    		[ $async ] || PREFTERM=urxvt	# gotta be synchronous
 			case "$PREFTERM" in
 			  urxvtc)
+			    set -x
 			    if [ -z "$RXVT_SOCKET" ]
 			    then
 			      if RXVT_SOCKET=`rig-urxvtd`
@@ -171,9 +179,13 @@ case "$TERM,$DISPLAY" in
 			esac
 			;;
 	    aterm)	# -fade 90
-			[ $dotrans ] && { termopts="$termopts -tr"
-					  [ -n "$shade" ] && termopts="$termopts -sh $shade"
-					}
+			if [ $dotrans ]
+			then
+			  termopts="$termopts -tr"
+			  [ -n "$shade" ] && termopts="$termopts -sh $shade"
+			else
+			  termopts="$termopts +tr"
+			fi
 			;;
 	esac
 
@@ -201,4 +213,5 @@ if [ $async ]
 then termcmd="bgproc -p - -- $termcmd"
 else termcmd="exec $termcmd"
 fi
+set -x
 eval "$termcmd"
