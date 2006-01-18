@@ -27,4 +27,6 @@ then  set -- -
 else  [ "x$*" = x- ] || exec </dev/null
 fi
 
-exec bgstdin urlshow $urlshowopts -- "$@"
+set -- urlshow $urlshowopts -- "$@"
+alert -- "$*" &
+exec bgstdin "$@"
