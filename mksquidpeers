@@ -8,17 +8,17 @@
 
 trace=set-x
 fwmode=
-nodirect=
-dfltports='8080 3128'
+dfltport=3128
 dflticp=3130
 peercfg=$HOME/rc/squid/peers
+peerprv=
 
 cmd=$0
-usage="Usage: $cmd [-fw] [-nodirect] [=][peer:[ports][:[icpport]]...
+usage="Usage: $cmd [-fw] [private=peer] [=][peer:[port][:[icpport]]...
 	-fw	Emit suitable firewall control commands instead.
-	-nodirect Don't try to send anything directly.
+	private=peer Send private URLs via specified peer instead of direct.
 	Leading \"=\" implies sibling cache instead of parent.
-	Omitted ports default to \"$dfltports\".
+	Omitted port defaults to \"$dfltport\".
 	Omitted icp defaults to \"$dflticp\"."
 
 set -- $MKSQUIDPEERS_OPTS ${1+"$@"}
@@ -27,89 +27,125 @@ while [ $# -gt 0 ]
 do
   case $1 in
     -fw)	fwmode=1 ;;
-    -nodirect)	nodirect=1 ;;
     *)		break ;;
   esac
   shift
 done
 
+if [ $# -gt 0 ]
+then
+  case $1 in
+    private=*:*)
+	peerprv=`expr "$1" : 'private=\(.*\)'` || exit 1
+	peerprv_host=`expr "x$peerprv" : 'x\(.*\):.*'` || exit 1
+	peerprv_port=`expr "x$peerprv" : 'x.*:\(.*\)'` || exit 1
+	##echo "prv=$peerprv ph=$peerprv_host pp=$peerprv_port"
+	shift
+	;;
+  esac
+fi
+
 if [ $# = 0 ]
 then
   echo "$cmd: no squid peers!" >&2
-  exit 0
+  exit 1
 fi
 
-if [ $nodirect ]
-then
-  echo always_direct deny all
-  echo never_direct allow all
-else
-  direct_acls=`awk '$1 == "acl" && $2 ~ /^peer_DIRECT/ { print $2; }' "$peercfg" | sort -u`
-  for direct in $direct_acls
-  do  echo always_direct allow $direct
-      echo never_direct deny $direct
-  done
-fi
-
-for peer
-do
-  icp=
-  ports=
+# the direct no-peer ACLs
+pr_direct()
+{ sed -n 's/^DIRECT[ \t][ \t]*//p' "$peercfg"
+}
+# the private peer ACLs
+pr_private()
+{ sed -n 's/^PRIVATE[ \t][ \t]*//p' "$peercfg"
+}
+# the per-peer allow ACLs
+pr_via()
+{ sed -n 's/^VIA[ \t][ \t]*'"$1"'[ \t][ \t]*//p' "$peercfg"
+}
+pr_other()
+{ sed '/^DIRECT[ \t]/d
+       /^PRIVATE[ \t]/d
+       /^VIA[ \t]/d' "$peercfg"
+}
+pr_peer_vars()
+{
+  icpport=
   isparent=1
-  case $peer in
-    =*)		isparent=
+  for peer
+  do
+    case $peer in
+      =*)	isparent=
 		peer=`expr "x$peer" : '..\(.*\)'`
 		;;
-  esac
-  case $peer in
-    *:*:*)	icp=`expr "x$peer" : 'x.*:\(.*\)'`
+    esac
+    case $peer in
+      *:*:*)	icp=`expr "x$peer" : 'x.*:\(.*\)'`
 		[ -n "$icp" ] || icp=$dflticp
 		peer=`expr "x$peer" : 'x\(.*\):.*'`
 		;;
-  esac
-  case $peer in
-    *:*)	ports=`expr "x$peer" : 'x.*:\(.*\)' | tr , ' '`
-		[ -n "$ports" ] || ports=$dfltports
+    esac
+    case $peer in
+      *:*)	port=`expr "x$peer" : 'x.*:\(.*\)' | tr , ' '`
+		[ -n "$port" ] || port=$dfltport
 		peer=`expr "x$peer" : 'x\(.*\):.*'`
 		;;
-    *)		ports=$dfltports
+      *)	port=$dfltport
 		;;
-  esac
+    esac
+    echo "peer=$peer isparent=$isparent port=$port icpport=$icpport"
+  done
+}
 
-  if [ $fwmode ]
-  then
-    for port in $ports
-    do  $trace fw-tcp-out "$port" "$peer"
-    done
-    [ -n "$icp" ] && $trace fw-udp-out "$icp" "$peer"
-    continue
-  fi
-
-  for port in $ports
+# recite acl definitions
+pr_direct  | awk '{ print "acl DIRECT" NR, $0 }'
+pr_private | awk '{ print "acl PRIVATE" NR, $0 }'
+pr_peer_vars "$@" \
+| while read -r vars
   do
+    eval "$vars"
+    pr_via "$peer" | awk "{ print \"acl VIA_$peer\" NR, \$0 }"
+  done
+
+# control direct access to stuff
+if [ -n "$peerprv" ]
+then
+  echo "cache_peer $peerprv_host parent $peerprv_port 0 weight=0 no-query"
+  pr_private | awk '{ print "always_direct deny PRIVATE" NR
+		      print "never_direct allow PRIVATE" NR
+		    }'
+else
+  pr_private | awk '{ print "always_direct allow PRIVATE" NR
+		      print "never_direct deny PRIVATE" NR
+		    }'
+fi
+
+# recite main config
+pr_other
+
+pr_peer_vars "$@" \
+| while read -r vars
+  do
+    eval "$vars"
+
     options=weight=2
     if [ $isparent ]
     then  peertype=parent
     else  peertype=sibling
     fi
-    if [ -n "$icp" ]
-    then  icpport=$icp
-    else  icpport=0 options="$options no-query"
-    fi
+    [ -n "$icpport" ] || { icpport=0 options="$options no-query"; }
     echo "cache_peer $peer $peertype $port $icpport $options"
-  done
-  if [ -s "$peercfg" ]
-  then
-    if [ -z "$nodirect" ]
-    then
-      for direct in $direct_acls
-      do echo cache_peer_access $peer deny $direct
-      done
-    fi
-    for other in `awk '$1 == "acl" && !($2 ~ /^peer_DIRECT/) { print $2 }' "$peercfg" | sort -u`
+
+    # force per-peer stuff to this peer, overriding PRIVATE
+    pr_via "$peer" | awk -v "peer=$peer" '{ print "cache_peer_access", peer, "allow VIA_" peer NR }'
+
+    # prevent PRIVATE stuff using this peer
+    pr_private | awk -v "peer=$peer" '{ print "cache_peer_access", peer, "deny PRIVATE" NR }'
+
+    # prevent stuff for specific other peers from using this peer
+    for opeer in "$@"
     do
-      echo "cache_peer_access $peer deny $other"
+      [ "x$peer" = "x$opeer" ] && continue
+      pr_via "$opeer" | awk -v "peer=$peer" -v "opeer=$opeer" '{ print "cache_peer_access", peer, "deny VIA_" opeer NR }'
     done
-    echo cache_peer_access $peer allow all
-  fi
-done
+  done
