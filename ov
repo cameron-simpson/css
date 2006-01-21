@@ -1,18 +1,19 @@
-#!/bin/sh
+#!/bin/sh -u
 #
 # Overlay one dir on another, prune first one.
 #	- Cameron Simpson <cs@zip.com.au> 22jul2004
 #
 
 cmd=$0
-usage="Usage: $cmd [-d] srcdir destdir
+usage="Usage: $cmd [-d] srcdir destdir [findopts...]
 	-d	Make destdir if missing."
 
 needdest=1
-[ "x$1" = x-d ] && { needdest=; shift; }
+[ $# -gt 0 ] && [ "x$1" = x-d ] && { needdest=; shift; }
 
-[ $# = 2 ] || { echo "$usage" >&2; exit 2; }
+[ $# -lt 2 ] && { echo "$usage" >&2; exit 2; }
 srcdir=$1 destdir=$2
+shift; shift
 
 [ -d "$srcdir/." ] || { echo "$cmd: not a directory: $srcdir" >&2; exit 1; }
 
@@ -25,6 +26,6 @@ then
 fi
 
 set -x
-overlay "$srcdir" "$destdir"
+overlay -- "$srcdir" "$destdir" ${1+"$@"}
 pruneleafdirs "$srcdir"
 exit 0
