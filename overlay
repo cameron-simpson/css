@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/sh -u
 #
 # Overlay the contents of one directory on another.
 #	- Cameron Simpson <cs@zip.com.au> 07feb2003
@@ -11,14 +11,15 @@ mrgopts=
 
 badopts=
 
-while :
-do  case $1 in
-      -n|-z)	mrgopts="$mrgopts $1" ;;
-      --)	shift; break ;;
-      -?*)	echo "$cmd: unrecognised option: $1" >&2; badopts=1 ;;
-      *)	break ;;
-    esac
-    shift
+while [ $# -gt 0 ]
+do
+  case $1 in
+    -n|-z)	mrgopts="$mrgopts $1" ;;
+    --)		shift; break ;;
+    -?*)	echo "$cmd: unrecognised option: $1" >&2; badopts=1 ;;
+    *)		break ;;
+  esac
+  shift
 done
 
 if [ $# -lt 2 ]
@@ -34,5 +35,6 @@ fi
 
 dest=`cd "$dest" || exit 1; pwd` || exit 1
 
+set -x
 cd "$src" || exit 1
 find . -type f ${1+"$@"} -print | xxargs mrg -rp $mrgopts "$dest/."
