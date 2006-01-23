@@ -23,6 +23,10 @@ def warn(*args):
   sys.stderr.write("\n")
   sys.stderr.flush()
 
+def debug(*args):
+  if 'DEBUG' in os.environ and len(os.environ['DEBUG']) > 0 and os.environ['DEBUG'] != "0":
+    warn(*args)
+
 def cmderr(*args):
   global cmd
   sys.stderr.write(cmd)
