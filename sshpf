@@ -1,0 +1,13 @@
+#!/bin/sh -u
+#
+# Kick of a port forward ssh.
+#	- Cameron Simpson <cs@zip.com.au> 18jan2006
+#
+
+cf=$HOME/rc/ssh/config-pf
+delay=120
+
+host=$1; shift
+
+set -x
+exec ssh -f -F "$cf" "$host" "while echo .; do sleep $delay; done" >/dev/null
