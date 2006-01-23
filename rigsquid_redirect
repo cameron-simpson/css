@@ -24,7 +24,7 @@ rc=$HOME/tmp/squid.conf$$
 pidf=$HOME/var/run/squid.pid-$$
 
 env SQUID_PIDFILE=$pidf envsub -p '\{\{([A-Z]\w*)\}\}' <"$HOME/rc/squid/tplt" >"$rc"
-mksquidpeers $SQUID_PEERS >>"$rc"
+mksquidpeers >>"$rc"
 
 bsed -s '/^$/d; /^#/d' "$rc"
 cat "$rc"
