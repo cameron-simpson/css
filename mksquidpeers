@@ -5,6 +5,7 @@
 #
 
 : ${MKSQUIDPEERS_OPTS:=''}
+: ${SQUID_PEERS:=''}
 
 trace=set-x
 fwmode=
@@ -21,7 +22,7 @@ usage="Usage: $cmd [-fw] [private=peer] [=][peer:[port][:[icpport]]...
 	Omitted port defaults to \"$dfltport\".
 	Omitted icp defaults to \"$dflticp\"."
 
-set -- $MKSQUIDPEERS_OPTS ${1+"$@"}
+set -- $MKSQUIDPEERS_OPTS ${1+"$@"} ${1-$SQUID_PEERS}
 
 while [ $# -gt 0 ]
 do
@@ -111,9 +112,14 @@ pr_peer_vars "$@" \
 if [ -n "$peerprv" ]
 then
   echo "cache_peer $peerprv_host parent $peerprv_port 0 weight=0 no-query"
-  pr_private | awk '{ print "always_direct deny PRIVATE" NR
-		      print "never_direct allow PRIVATE" NR
-		    }'
+  pr_private | awk -v "ppeer=$peerprv_host" '{ print "cache_peer_access", ppeer, "allow PRIVATE" NR }'
+  echo "cache_peer_access $peerprv_host deny all"
+
+##pr_private | awk '{ print "always_direct deny PRIVATE" NR
+##		      print "never_direct allow PRIVATE" NR
+##		    }'
+  echo "always_direct deny all"
+  echo "never_direct allow all"
 else
   pr_private | awk '{ print "always_direct allow PRIVATE" NR
 		      print "never_direct deny PRIVATE" NR
@@ -123,6 +129,7 @@ fi
 # recite main config
 pr_other
 
+echo "## pr_peer_vars $*"
 pr_peer_vars "$@" \
 | while read -r vars
   do
