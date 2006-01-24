@@ -1,0 +1,30 @@
+#!/bin/sh -u
+#
+# Look up bookmarks and pop up matching URLs.
+#	- Cameron Simpson <cs@zip.com.au> 24jan2006
+#
+
+: ${BMK_DIR:=$HOME/rc/bmk}
+
+cmd=$0
+usage="Usage: $cmd [-d dir] words..."
+
+[ $# -gt 0 ] && [ "x$1" = x-d ] && { BMK_DIR=$2; shift; shift; }
+if [ $# = 0 ]
+then
+  echo "$cmd: missing words" >&2
+  exit 2
+fi
+
+first=1
+
+for word
+do
+  [ $first ] && set -- find "$BMK_DIR" -type f
+  set -- "$@" -exec fgrep -iq -- "$word" {} ';'
+  first=
+done
+
+set -- "$@" -exec sed -n '/^URL: *[^ ]/{s/^URL: *\([^ ][^ ]*\).*/\1/p;q;}' {} ';'
+
+set-x "$@" | sort -u | tee /dev/fd/2 | us -
