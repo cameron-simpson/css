@@ -16,15 +16,18 @@ then
   exit 2
 fi
 
-first=1
+word1=$1; shift
+sedf='/^URL: *[^ ]/{s/^URL: *\([^ ][^ ]*\).*/\1/p;q;}'
 
-for word
-do
-  [ $first ] && set -- find "$BMK_DIR" -type f
-  set -- "$@" -exec fgrep -iq -- "$word" {} ';'
-  first=
-done
-
-set -- "$@" -exec sed -n '/^URL: *[^ ]/{s/^URL: *\([^ ][^ ]*\).*/\1/p;q;}' {} ';'
-
-set-x "$@" | sort -u | tee /dev/fd/2 | us -
+fgrep -ilr -- "$word1" "$BMK_DIR" \
+| while read -r file
+  do
+    ok=1
+    for word
+    do fgrep -iq -- "$word" "$file" || { ok=; break; }
+    done
+    [ $ok ] && sed -n '/^URL: *[^ ]/{s/^URL: *\([^ ][^ ]*\).*/\1/p;q;}' "$file"
+  done \
+| sort -u \
+| tee /dev/fd/2 \
+| us -
