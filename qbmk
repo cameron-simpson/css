@@ -29,5 +29,4 @@ fgrep -ilr -- "$word1" "$BMK_DIR" \
     [ $ok ] && sed -n '/^URL: *[^ ]/{s/^URL: *\([^ ][^ ]*\).*/\1/p;q;}' "$file"
   done \
 | sort -u \
-| tee /dev/fd/2 \
 | us -
