@@ -1,0 +1,156 @@
+#!/bin/sh -u
+#
+# =head1 NAME
+#
+# nsr-savedir - save a particular directory path using Legato Networker
+#
+# =head1 SYNOPSIS
+#
+# nsr-savedir [-a] [B<-n>] [B<-x>] [B<-g> I<savegroup>] [B<-l> I<logfile>] [B<-s> I<server>] I<dirs>...
+#
+# =head1 DESCRIPTION
+#
+# I<nsr-savedir> invokes Networker's save(1) command
+# for the specified directories.
+# This is useful for large areas where the default
+# "save the whole volume" simply takes too long
+# or where you want to backup some new data immediately.
+#
+
+full=
+doit=1
+trace=echo	##set-x
+savegroup=
+logfile=.nsr-savedir.log
+server=
+masq=`hostname` || exit 1
+
+cmd=`basename "$0"` || cmd=$0
+usage="Usage: $cmd [-a] [-n] [-x] [-g savegroup] [-l logfile] [-s server] dirs...
+	-a		Backup all files - do not get a timestamp from the
+			logfile.
+	-g savegroup	Specify the savegroup to use.
+	-l logfile	Specify the logfile to store timestamps.
+			A non-absolute path will be relative to each backup
+			directory. Default: $logfile in each directory.
+	-n		No action. Passed to save(1) to simply report planned
+			backup.
+	-s server	Specify the Legato server to use.
+	-x		Trace - report save(1) commands issued."
+
+badopts=
+
+# =head1 OPTIONS
+#
+# =over 4
+#
+
+badopts=
+
+while [ $# -gt 0 ]
+do
+  case $1 in
+
+    # =item B<-a>
+    #
+    # Backup all files / full dump.
+    # Do not do an incremental backup using a timestamp from the I<logfile>.
+    #
+    -a)	full=1 ;;
+
+    # =item B<-g> I<savegroup>
+    #
+    # Specify savegroup.
+    #
+    -g)	savegroup=$2 ;;
+
+    # =item B<-l> I<logfile>
+    #
+    # Specify the I<logfile> in which to store backup timestamps.
+    #
+    -l)	logfile=$2 ;;
+
+    # =item B<-n>
+    #
+    # No action. Passed to save(1); reports proposed backup.
+    #
+    -n)	doit= ;;
+
+    # =item B<-s> I<server>
+    #
+    # Specify the Legato server to use.
+    #
+    -s)	server=$2 ;;
+
+    # =item B<-x>
+    #
+    # Trace execution of save commands.
+    #
+    -x)	trace=set-x ;;
+
+    --)	shift; break ;;
+    -?*)echo "$cmd: unrecognised option: $1" >&2
+	badopts=1
+	;;
+    *)	break ;;
+  esac
+  shift
+done
+
+# =back
+#
+
+if [ $# = 0 ]
+then
+  echo "$cmd: missing dirs" >&2
+  badopts=1
+fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+xit=0
+
+for dir
+do
+  [ -d "$dir" ] || { echo "$cmd: $dir: not a directory" >&2; xit=1; continue; }
+
+  case "$logfile" in
+    /*)	dlogfile=$logfile ;;
+    *)	dlogfile=$dir/$logfile ;;
+  esac
+
+  if [ $full ]
+  then
+    lastdump=`awk -v "hostdir=$hostdir" '$2 == hostdir { lastdump=$1 }
+					 END	    { if (lastdump) print lastdump }' "$dlogfile"`
+  else
+    lastdump=
+  fi
+
+  thisdump=`now` || { xit=1; continue; }
+
+  if 
+    ( set save
+      [ $doit           ] || set -- "$@" -n
+      [ -n "$lastdump"  ] && set -- "$@" -t "$lastdump"
+      [ -n "$server"    ] && set -- "$@" -s "$server"
+      [ -n "$savegroup" ] && set -- "$@" -g "$savegroup"
+      exec $trace "$@" -LL -m "$masq" -W 78 "$dir"
+    )
+  then
+    [ $doit ] && echo "$thisdump $dir" >>"$logfile"
+  else
+    xit=1
+  fi
+done
+
+exit $xit
+
+# =head1 SEE ALSO
+#
+# save(1)
+#
+# =head1 AUTHOR
+#
+# Cameron Simpson E<lt>cs@zip.com.auE<gt>
+#
