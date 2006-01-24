@@ -68,9 +68,10 @@ for (@MANPATH)
 }
 
 # step 1 - locate manual entries
+($reManual=$Manual) =~ s/(\W)/\\$1/g;
 $ptn=($Prefix
-	? "$Manual.*\\.$Section"
-	: "^$Manual\\.$Section"
+	? "$reManual.*\\.$Section"
+	: "^$reManual\\.$Section"
      );
 undef %found;
 MANDIR:
@@ -84,7 +85,7 @@ MANDIR:
     ## }
 
     # look for info files
-    for my $info (grep(/^$Manual\b(.*\.info.*)?$/, @entries))
+    for my $info (grep(/^$reManual\b(.*\.info.*)?$/, @entries))
     { my $file = "$dir/$info";
       my $key = $file;
       $key =~ s/(\.(gz|Z|z))+$//;
