@@ -22,7 +22,7 @@ $::CatchUp=0;
 
 $::Usage="Usage: $::cmd [-s nntpserver] [-d nda] [newsgroup...]
 	-c		Catch up the named group.
-	-s nntpserver	Specify server. Default: \$NNTPSERVER.
+	-s nntpserver	Specify server. Default from \$NNTPSERVER: $::Server
 	-n newsrc	Specify news file. Default: $::Newsrc.
 	-d nda		Specify news delivery agent. Default: $::NDA
 ";
