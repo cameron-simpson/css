@@ -7,7 +7,10 @@
 cf=$HOME/rc/ssh/config-pf
 delay=120
 
-host=$1; shift
+[ $# -gt 0 ] || set -- $SSHPF_DFLT
 
 set -x
-exec ssh -f -F "$cf" "$host" "while echo .; do sleep $delay; done" >/dev/null
+for host
+do
+  ssh -f -F "$cf" "$host" "while echo .; do sleep $delay; done" >/dev/null
+done
