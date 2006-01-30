@@ -75,7 +75,9 @@ exec \
 	'--include=/rc/mail/signature' \
 	'--include=/rc/mail/signatures' \
 	'--exclude=/rc/mail/*' \
-	'--exclude=/rc/mairix' \
+	'--include=/rc/mairix' \
+	'--include=/rc/maint' \
+	'--exclude=/rc/maint/**/.runlog' \
 	'--include=/rc/mh' \
 	'--include=/rc/myke' \
 	'--include=/rc/nvi' \
