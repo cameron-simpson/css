@@ -2,5 +2,4 @@
 doit=1
 [ $# -gt 0 ] && [ "x$1" = x-n ] && { doit=; shift; }
 genv ZAP_POSTMATCH ZAP_PREMATCH SQUID_PEERS MKSQUIDPEERS_OPTS
-eval "`syncenv -`"
-[ -z "$doit" ] || { set -x; exec rigsquid_redirect ${1+"$@"}; }
+[ -z "$doit" ] || { set -x; eval "`syncenv -`"; exec rigsquid_redirect ${1+"$@"}; }
