@@ -208,9 +208,9 @@ sub envstuff
 	 grep(length,
 	 (
 	  "$::ENV{HOST}\@$::ENV{LOCATION}",
-	  "$::ENV{HOST}\@$::ENV{SYSTEMID}",
-	  "$::ENV{ARCH}\@$::ENV{SYSTEMID}",
-	  $::ENV{LOCATION},
+	  "$::ENV{HOST}.$::ENV{SYSTEMID}",
+	  "$::ENV{SYSTEMID}.$::ENV{ARCH}",
+	  "\@$::ENV{LOCATION}",
 	  $::ENV{HOSTNAME},
 	  $::ENV{HOST},
 	  $::ENV{SYSTEMID},
@@ -222,8 +222,9 @@ sub envstuff
 
     for my $ext (@extlist, '')
     {
-      my $key = length($ext) ? "$var.$ext" : $var;
+      my $key = ( $ext =~ /^[^\.@]/ ? "$var.$ext" : "$var$ext" );
 
+      ##warn "try $key";
       if (exists $envpath{$key})
       {
 	my $val = $envpath{$key};
