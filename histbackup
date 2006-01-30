@@ -86,28 +86,6 @@
 # =back
 #
 
-cmd=`basename "$0"`
-usage="Usage:
-	$cmd [options...] [host:]source backupdir [rsyncopts...]
-	$cmd [options...] --inplace parent [rsyncopts...]
-	$cmd [options...] --no-rsync parent
-
-	-x		Trace execution. Recite linktree and rsync invocations.
-	-v, --verbose	Verbose. Passed to rsync.
-	--inplace	In addition to the dated subdirectories in the backupdir,
-			take the source to be backupdir/current.
-	--no-delete, --mono
-			Monotonic growth - don't pass --delete to the rsync pass.
-	--no-rsync, --linkonly
-			Don't do the rsync pass - just set up the new link tree
-			and report its basename.
-	--rsync-path rrsync Execute the command \"rrsync\" as the remote rsync.
-			Passed to rsync.
-	--symlink name	Make a symlink named \"name\" pointing at the latest backup.
-			Default: LATEST
-			Use the empty string for no symlink."
-
-badopts=
 trace=
 symlink=LATEST
 src=
@@ -120,6 +98,30 @@ includefile=
 rsopts=
 verbose=
 [ -t 1 ] && verbose=1
+
+cmd=`basename "$0"`
+usage="Usage:
+	$cmd [options...] [host:]source backupdir [rsyncopts...]
+	$cmd [options...] --inplace parent [rsyncopts...]
+	$cmd [options...] --no-rsync parent
+
+	-x		Trace execution. Recite linktree and rsync invocations.
+	-v, --verbose	Verbose. Passed to rsync.
+	--inplace	In addition to the dated subdirectories in the backupdir,
+			take the source to be backupdir/current.
+			Turns off --symlink.
+	--no-delete, --mono
+			Monotonic growth - don't pass --delete to the rsync pass.
+	--no-rsync, --linkonly
+			Don't do the rsync pass - just set up the new link tree
+			and report its basename.
+	--rsync-path rrsync Execute the command \"rrsync\" as the remote rsync.
+			Passed to rsync.
+	--symlink name	Make a symlink named \"name\" pointing at the latest backup.
+			Default: $symlink
+			Use the empty string for no symlink."
+
+badopts=
 
 # have "cp -rpl"? otherwise rely on my linktree script
 if [ "x`cp --help 2>&1 | grep ' -[rpl][, ]' | wc -l`" = x3 ]
@@ -153,7 +155,7 @@ do
     # Specify the parent of the source directory;
     # backs up B<I<parent>/current> to B<I<parent>/I<datestamp>>.
     #
-    --inplace)	inplace=1 ;;
+    --inplace)	inplace=1 symlink= ;;
 
     # =item --no-delete, --mono
     #
