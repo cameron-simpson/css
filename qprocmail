@@ -1,0 +1,2 @@
+#!/bin/sh -u
+sed 's/^  *Subject:/Subject:/' "$HOME/var/log/procmail" | ring -f - ${1+"$@"}
