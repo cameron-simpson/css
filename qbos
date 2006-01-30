@@ -1,0 +1,6 @@
+#!/bin/sh
+exec pageif qdlog -e 'Cron ' \
+		  -e 'sync from ' \
+		  -e 'LogWatch ' \
+		  -e 'osiris .* changes' \
+		  BOS
