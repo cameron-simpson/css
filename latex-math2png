@@ -1,0 +1,70 @@
+#!/bin/sh -u
+#
+# =head1 NAME
+#
+# latex-math2png - convert LaTex math notation into a PNG image
+#
+# =head1 SYNOPSIS
+#
+# latex-math2png [dvipng-options...]
+#
+# =head1 DESCRIPTION
+#
+# I<latex-math2png> reads LaTex math notation on standard input
+# and writes a PNG image to standard output.
+# Any options are passed to dvipng(1).
+#
+
+: ${TMPDIR:=/tmp}
+
+cmd=`basename "$0"` || cmd=$0
+usage="Usage: $cmd [dvipng-options...]"
+
+unset mkdir
+trap 'rm -rf "$wkdir"' 0 1 2 13 15
+wkdir=`mkdirn "$TMPDIR/latex-math2png."` || exit 1
+cd "$wkdir" || exit 1
+
+cat >foo.tex <<'PREAMBLE'
+\documentclass{article} 
+\usepackage{amsmath}
+\usepackage{amsthm}
+\usepackage{amssymb}
+\usepackage{bm}
+\newcommand{\mx}[1]{\mathbf{\bm{#1}}} % Matrix command
+\newcommand{\vc}[1]{\mathbf{\bm{#1}}} % Vector command 
+\newcommand{\T}{\text{T}}             % Transpose
+\pagestyle{empty} 
+\begin{document} 
+PREAMBLE
+
+sed 'y/	/ /; s/^ *\([^ ].*[^ ]\) *$/$\1$ \\newpage/p' >>foo.tex || exit 1
+
+echo '\end{document}' >>foo.tex
+
+latex foo.tex >/dev/null || exit 1
+dvipng -T tight -z 9 ${1+"$@"} -o foo.png foo.dvi >/dev/null || exit 1
+cat foo.png
+
+# =head1 EXAMPLES
+#
+# =head1 ENVIRONMENT
+#
+# $TMPDIR, the location for the work area. Default: /tmp
+#
+# =head1 CREDITS
+#
+# The mechanism is shamelessly derived from Andrew Kuchling's
+# "MT-Math: LaTeX Math for Movable Type" eqhtml.py,
+# detailed here: http://www.amk.ca/python/code/mt-math
+# which in turn derives from Kjell Magne Fauske's code,
+# available here: http://fauskes.net/nb/htmleqII/
+#
+# =head1 SEE ALSO
+#
+# latex(1), dvipng(1)
+#
+# =head1 AUTHOR
+#
+# Cameron Simpson E<lt>cs@zip.com.auE<gt> 02feb2006
+#
