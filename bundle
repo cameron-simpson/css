@@ -59,7 +59,7 @@ do
 		[ -s "$tarf" ] && { echo "$tarf: already exists" >&2; exit 1; }
 		[ -d "$dir/." ] || mkdir "$dir" || exit $?
 		echo "$bundle -> $tarf ..." >&2
-		{ tar c${vflag}f - "$bundle" | buffer | gz > "$tarf" \
+		{ tar c${vflag}f - "$bundle" | gz > "$tarf" \
 	       && ls -l "$tarf"
 		} || xit=$?
 	else
