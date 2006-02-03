@@ -1,0 +1,55 @@
+#!/bin/sh -u
+#
+# Run a mairix query, generate MHonArc index.
+#	- Cameron Simpson <cs@zip.com.au> 03feb2006
+#
+
+: ${TMPDIR:=/tmp}
+
+rc=$HOME/.mairixrc
+
+cmd=`basename "$0"` || cmd=$0
+usage="Usage: $cmd -d mhonarc-out [-f mairixrc] -p url-prefix [-t] terms...
+	-d mhonarc-out	Where to generate the MHonArc index.
+	-f mairixrc	Mairix conf file. Default: $rc
+	-p url-prefix	URL to mhonarc-out directory.
+	-t		Follow threads, passed to mairix.
+	terms...	Query terms, passed to mairix."
+
+mrxopts=
+
+badopts=
+
+while [ $# -gt 0 ]
+do
+  case $1 in
+    -d)	mhonarcdir=$2; shift ;;
+    -f)	rc=$2; shift ;;
+    -p)	urlpfx=$2; shift ;;
+    -t)	mrxopts="$mrxopts $1" ;;
+    --)	shift; break ;;
+    -?*)echo "$cmd: unrecognised option: $1" >&2; badopts=1 ;;
+    *)	break ;;
+  esac
+  shift
+done
+
+[ $# = 0 ] && { echo "$cmd: missing terms" >&2; badopts=1; }
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+mrxres=$TMPDIR/mrx$$
+
+mkdir -p "$mhonarcdir" || exit 1
+cd "$mhonarcdir" || exit 1
+
+xit=1
+
+set -x
+mairix -v -f "$rc" -o "$mrxres" $mrxopts "$@" \
+&& mhonarc "$mrxres" \
+&& xit=0
+
+rm -rf "$mrxres"
+
+exit $xit
