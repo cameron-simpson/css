@@ -129,6 +129,15 @@ def mkdirn(path):
       if sys.exc_value[0] == errno.EACCES:
 	return None
 
+def mailsubj(addrs,subj,body):
+  import cs.sh
+  pipe=cs.sh.vpopen(('set-x','mailsubj','-s',subj)+addrs,mode="w")
+  pipe.write(body)
+  if len(body) > 0 and body[-1] != '\n':
+    pipe.write('\n')
+
+  return pipe.close() is None
+
 # trivial wrapper for extension in subclasses
 class SeqWrapper:
   def __init__(self,seq):
