@@ -1,0 +1,87 @@
+#!/bin/sh -u
+#
+# Pull complete databases from one mysql server to another.
+#	- Cameron Simpson <cs@zip.com.au> 29dec2005
+#
+
+cmd=`basename "$0"`
+usage="Usage: $cmd -s user@srchost -d user@desthost [databases...]"
+
+srchost=
+srcuser=root
+desthost=
+destuser=root
+
+badopts=
+
+gotsrc=
+gotdest=
+
+while [ $# -gt 0 ]
+do
+  case $1 in
+    -d)	case $2 in
+	  *@*)	desthost=`expr "x$2" : 'x.*@\(.*\)'` || exit 1
+		destuser=`expr "x$2" : 'x\(.*\)@.*'` || exit 1
+		;;
+	  *)	desthost=$2
+		;;
+	esac
+	shift
+	;;
+    -s)	case $2 in
+	  *@*)	srchost=`expr "x$2" : 'x.*@\(.*\)'` || exit 1
+		srcuser=`expr "x$2" : 'x\(.*\)@.*'` || exit 1
+		;;
+	  *)	srchost=$2
+		;;
+	esac
+	shift
+	;;
+    --)	shift; break ;;
+    -?*)echo "$cmd: unrecognised option: $1" >&2
+	badopts=1
+	;;
+    *)	break ;;
+  esac
+  shift
+done
+
+[ -n "$srchost" ] || { echo "$cmd: no srchost specified" >&2; badopts=1; }
+[ -n "$desthost" ] || { echo "$cmd: no desthost specified" >&2; badopts=1; }
+
+[ -t 0 -a -t 1 ] || { echo "$cmd: stdin and stdout must be attached to a terminal" >&2
+		      badopts=1
+		    }
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+necho "Enter password for $srcuser@$srchost:"; read -r srcpw || exit 1
+[ -n "$srcpw" ] || { echo "$cmd: empty source password" >&2; exit 1; }
+
+necho "Enter password for $destuser@$desthost:"; read -r destpw || exit 1
+[ -n "$destpw" ] || { echo "$cmd: empty destination password" >&2; exit 1; }
+
+if [ $# = 0 ]
+then
+  echo "Fetching data list from $srchost"
+  dbs=`echo show databases | mysql "-h$srchost" "-u$srcuser" "-p$srcpw" | sed '1d;/^mysql$/d' | sort` || exit 1
+  set -- $dbs
+fi
+
+echo "dbs = $*"
+
+tmpf=$TMPDIR/$cmd$$.sql
+trap 'echo SKIP rm -f "$tmpf"' 0 1 2 13 15
+
+for db
+do
+  echo "$db ..."
+  tmpf=$db.sql
+  set-x mysqldump "-h$srchost" "-u$srcuser" "-p$srcpw" \
+	-a --opt --set-variable=max_allowed_packet=32M \
+	--databases "$db" >"$tmpf" || exit 1
+  set-x mysql "-h$desthost" "-u$destuser" "-p$destpw" \
+	--max_allowed_packet=32M -C <"$tmpf"
+  ##break
+done
