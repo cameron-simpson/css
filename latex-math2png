@@ -48,9 +48,16 @@ cat foo.png
 
 # =head1 EXAMPLES
 #
+# Make a pretty equation in big text.
+# The B<-D 1500> is passed to dvipng(1);
+# the <-x> option would probably be a better choice.
+#
+#  echo 'y = \int_0^\infty \gamma^2 \cos(x) dx' \
+#  | latex-math2png -D 1500 > eqn.png
+#
 # =head1 ENVIRONMENT
 #
-# $TMPDIR, the location for the work area. Default: /tmp
+# $TMPDIR, the location for the work area. Default: F</tmp>
 #
 # =head1 CREDITS
 #
