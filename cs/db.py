@@ -7,29 +7,31 @@
 import string
 import types
 import cs.secret
-from cs.misc import warn, isodate
+from cs.misc import debug, warn, isodate
 
 def today():
   "Today's date in ISO-8601 format (YYYY-MM-DD)."
   return isodate()
 
-def iscurrent(row,when=None,startndx='START_DATE',endndx='END_DATE'):
+def iscurrent(row,when=None,startndx='START_DATE',endndx='END_DATE',inclusive=False):
   """ Test if a row object is ``current''.
       A row is an array of values.
       The optional parameter when defaults to today().
-      The optional startndx is the row element index for the inclusive lower bound of currency,
+      The optional parameter startndx is the row element index for the inclusive lower bound of currency,
       default 'START_DATE'.
-      The optional endndx is the row element index for the exclusive upper bound of currency,
+      The optional parameter endndx is the row element index for the exclusive upper bound of currency,
       default 'END_DATE'.
+      The optional parameter inclusive, if True, specifies that the upper bound is inclusive
+      instead of exclusive (the default).
       Bounds values of None mean no bound.
   """
   if when is None: when=today()
-  ##warn "ROW =", `row`, "when =", when
+  ##debug "ROW =", `row`, "when =", when
   start=row[startndx]
   if start is not None and start > when:
     return False
   end=row[endndx]
-  if end is not None and end <= when:
+  if end is not None and ((inclusive and end < when) or (not inclusive and end <= when)):
     return False
   return True
 
@@ -90,12 +92,12 @@ class SQLQuery:
     self.__conn=conn
     self.__query=query
     self.__args=args
-    ##warn("conn =", `conn`)
+    ##debug("conn =", `conn`)
     self.__cursor=conn.cursor()
-    ##warn('SQLQuery:', query)
-    ##warn("SQLQuery: args =", `args`)
+    debug('SQLQuery:', query)
+    ##debug("SQLQuery: args =", `args`)
     self.__cursor.execute(query,*args)
-    ##warn("executed")
+    ##debug("executed")
 
   def allrows(self):
     return [row for row in self]
@@ -170,6 +172,9 @@ class KeyedTableView:
 
     self.__preload=None
 
+  def columns(self):
+    return self.__fieldlist
+
   def insert(self,row,sqlised_fields=()):
     """ Insert a new row into the table. """
     sqlrow={}
@@ -205,10 +210,11 @@ class KeyedTableView:
     return tuple([row[i] for i in self.__keyindices])
 
   def __keyWhereClause(self,key):
-    ##warn("key =", `key`)
+    ##debug("__keyWhereClause: key =", `key`)
     clause=string.join([self.__keyfields[i]+" = "+sqlise(key[i]) for i in range(len(key))]," AND ")
     if self.__constraint:
       clause=clause+' AND ('+self.__constraint+')'
+    ##debug("__keyWhereClause: clause =", clause)
     return clause
 
   def __rowWhereClause(self,row):
@@ -220,22 +226,22 @@ class KeyedTableView:
     sql='SELECT '+self.__sqlfields+' FROM '+self.name;
     if self.__constraint:
       sql=sql+' WHERE ('+self.__constraint+')'
-    warn("SQL ",sql)
+    ##debug("SQL ",sql)
     res=SQLQuery(self.conn,sql)
-    warn("result =", `res`)
+    ##debug("result =", `res`)
     for row in res:
       self.__preload[self.__rowkey(row)]=_TableRow(self,self.__rowWhereClause(row),rowdata=row)
 
   def __preloaded(self,key):
     if self.__preload is None:
-      ##warn("table."+self.name+": not preloaded")
+      ##debug("table."+self.name+": not preloaded")
       return None
 
     if key not in self.__preload:
-      ##warn("table."+self.name+": key", key, "not in preload")
+      ##debug("table."+self.name+": key", key, "not in preload")
       return None
 
-    ##warn("__preload[", `key`, "] =", `self.__preload[key]`)
+    ##debug("__preload[", `key`, "] =", `self.__preload[key]`)
     return self.__preload[key]
 
   def findrow(self,where):
@@ -244,15 +250,17 @@ class KeyedTableView:
     rows=SQLQuery(self.conn,sql).allrows()
     if len(rows) == 0:
       return None
-    id=tuple(rows[0])
+    row1=rows[0]
+    id=tuple(row1)
     if len(rows) > 1:
-      warn("multiple hits in",self.name,"- selecting first one:",kfsqlfields,'=',`id`)
-    return self[id]
+      warn("multiple hits in",self.name,"- choosing the first one:",kfsqlfields,'=',`id`)
+    return KeyedTableView.__getitem__(self,id)
 
   def __getitem__(self,key):
     row=self.__preloaded(key)
     if row is None:
       if self.__preload is None: self.__preload={}
+      ##debug("new _TableRow(key =", `key`, ")")
       row=self.__preload[key]=_TableRow(self,self.__keyWhereClause(key))
     return row
 
@@ -297,13 +305,21 @@ class _TableRow:
     self.table=table
 
     self.__whereclause=whereclause
-    ##wc=`whereclause`
-    ##warn("where(", table.name, ") =", wc)
+    wc=`whereclause`
+    ##debug("where(", table.name, ") =", wc)
     ##if wc[0] == '<': raise StopIteration
 
     self.__rowcache=None
     if rowdata is not None:
       self.__setrowcache(rowdata)
+
+  def keys(self):
+    return self.table.columns()
+
+  def __repr__(self):
+    return '[' \
+	 + string.join([ `k`+": "+`self[k]` for k in self.keys() ], ", ") \
+	 + ']'
 
   def whereClause(self):
     return self.__whereclause
@@ -314,7 +330,7 @@ class _TableRow:
 
   def __loadrowcache(self):
     ##for arg in ('SELECT ', self.table._selectFields(), ' FROM ', self.table.name, ' WHERE ', self.__whereclause, ' LIMIT 1'):
-    ##  warn("arg =", `arg`)
+    ##  debug("arg =", `arg`)
     self.__setrowcache([row for row in SQLQuery(self.table.conn,
 					     'SELECT '+self.table._selectFields()+' FROM '+self.table.name+' WHERE '+self.__whereclause+' LIMIT 1',
 					    ).allrows()[0]])
@@ -322,7 +338,7 @@ class _TableRow:
   def __getrowcache(self):
     if self.__rowcache is None:
       ## FIXME - caching for dated tables!
-      ##warn("no __rowcache for WHERE", self.__whereclause)
+      warn("no __rowcache for "+self.table.name+" WHERE", self.__whereclause)
       self.__loadrowcache()
     return self.__rowcache
 
@@ -344,6 +360,9 @@ class _TableRow:
 class TableRowWrapper:
   def __init__(self,tableview,key):
     self.TableRow=tableview[key]
+
+  def keys(self):
+    return self.TableRow.keys()
 
   def __getitem__(self,column):
     return self.TableRow[column]
