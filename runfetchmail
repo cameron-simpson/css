@@ -18,7 +18,7 @@ while :
 do
   eval "`syncenv $mypid`"
   : ${FM_LOGFILE:=$LOGDIR/fetchmail}
-  $trace dofetchmail ${1+"$@"}
+  $trace lock mail-io dofetchmail ${1+"$@"}
   case $? in
     0)	busy=1 ;;
     *)  busy= ;;
