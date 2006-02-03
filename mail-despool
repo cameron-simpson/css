@@ -5,12 +5,14 @@
 #
 
 : ${MAILDIR:=$HOME/mail}
+: ${TMPDIR:=/tmp}
 
 cmd=`basename "$0"` || cmd=$0
-usage="Usage: $cmd [-d delay] [-f procmailrc] maildir"
+usage="Usage: $cmd [-d delay] [-f procmailrc] [-l lockname] maildir"
 
 delay=
 procmailrc=
+lock=mail-despool-$$
 
 badopts=
 
@@ -19,6 +21,7 @@ do
   case $1 in
     -d)	delay=$2; shift ;;
     -f)	procmailrc=$2; shift ;;
+    -l)	lock=$2; shift ;;
     --)	shift; break ;;
     -?*)echo "$cmd: unrecognised option: $1" >&2
 	badopts=1
@@ -59,27 +62,46 @@ esac
 
 cd "$maildir" || exit 1
 
+busyflag=$TMPDIR/mail-despool.$$busy
+
 xit=0
+
 while :
 do
-  busy=
-  if ismaildir .
-  then
-    for f in cur/* new/*
-    do
-      [ -s "$f" ] || continue
-      { procmail "$procmailrc" <"$f" && rm "$f" && busy=1; } || xit=1
-    done
-  else
-    ismhdir . || exit 1
-    for f in [1-9]*
-    do
-      [ -s "$f" ] || continue
-      { procmail "$procmailrc" <"$f" && rm "$f" && busy=1; } || xit=1
-    done
-  fi
+  lock "$lock" \
+    env "busyflag=$busyflag" "procmailrc=$procmailrc" \
+    sh -xuc '
+	  # locate new items
+	  if ismaildir .
+	  then
+	    set -- cur/* new/*
+	  else
+	    if ismhdir .
+	    then
+	      set -- [1-0]*
+	    else
+	      set --
+	    fi
+	  fi
+
+	  rm -f "$busyflag"
+	  xit=0
+
+	  for f
+	  do
+	    [ -s "$f" ] || continue
+	    { procmail "$procmailrc" <"$f" && rm -- "$f" && touch "$busyflag"; } || xit=1
+	  done
+
+	  exit $xit
+	' \
+  || xit=1
+
   [ -n "$delay" ] || break
-  [ $busy ] || sleep "$delay"
+  if [ -f "$busyflag" ]
+  then sleep 1
+  else sleep "$delay"
+  fi
 done
 
 exit $xit
