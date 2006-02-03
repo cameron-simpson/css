@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/sh -u
 #
 # Take a folder name and return the file path to it.
 # Yanked from "+" for use there and in filemailitem.
@@ -6,7 +6,7 @@
 #
 
 cmd=$0
-usage="Usage: $cmd folder"
+usage="Usage: $cmd foldername"
 
 [ $# = 1 ] || { echo "$usage" >&2; exit 2; }
 folder=$1; shift
