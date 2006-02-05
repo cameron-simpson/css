@@ -1,0 +1,23 @@
+#!/bin/sh -u
+#
+# Backup my mail folder to another host.
+#	- Cameron Simpson <cs@zip.com.au> 05feb2006
+#
+
+: ${MAILDIR:=$HOME/mail}
+
+trace=set-x
+
+cmd=`basename "$0"` || cmd=$0
+usage="Usage: $cmd rhost"
+
+[ $# = 1 ] || { echo "$cmd: missing rhost" >&2; echo "$usage" >&2; exit 2; }
+rhost=$1; shift
+
+rsinc=$HOME/rc/putmail/$HOST@$LOCATION-to-$rhost
+[ -s "$rsinc" ] || { echo "$0: no $rsinc" >&2; exit 1; }
+
+$trace \
+env SSHTO_OPTS='compression=no cipher=blowfish' \
+rsync -avHP --delete --delete-excluded "--include-from=$rsinc" \
+	"$MAILDIR/." "$rhost:mail.$HOST/."
