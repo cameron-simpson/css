@@ -53,7 +53,7 @@ then
     $trace mt rewind || xit=1
     $trace mt offline || xit=1
   fi
-  $trace move mv d0 "s$jukeslot" || xit=1
+  $trace mover mv d0 "s$jukeslot" || xit=1
 fi
 
 exit $xit
