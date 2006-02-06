@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/sh -u
 #
 # Add a link page URL to a list of link pages.
 #	- Cameron Simpson <cs@zip.com.au> 04aug2000
@@ -11,19 +11,24 @@ cmd=$0
 verbose=1
 ##[ -t 0 ] && verbose=1
 
-usage="Usage: $cmd [-d dir] [topic] [urls...]"
+usage="Usage: $cmd [-d dir] [topic[,topic...] [urls...]"
 
 badopts=
 
-[ "x$1" = x-d ] && { LINKPAGEPATH=$2; shift; shift
-		     export LINKPAGEPATH
-		   }
+if [ $# -gt 0 ] && [ "x$1" = x-d ]
+then
+  LINKPAGEPATH=$2; shift; shift
+ export LINKPAGEPATH
+fi
 
 topic=
-case $1 in
+if [ $# -gt 0 ]
+then
+  case $1 in
     ''|*://*)	topic=$LINKPAGETOPIC ;; # URL - take default topic
     *)		topic=$1; shift ;;
-esac
+  esac
+fi
 
 [ -n "$topic" ] || topic=`lastvalue addlinkpage`
 if [ -z "$topic" ]
@@ -46,27 +51,38 @@ case "$topic" in
 		;;
 esac
 
-[ $badopts ] && { echo "$usage" >&2; exit 2; }
-
-topicfile=
-for dir in `unpath "$LINKPAGEPATH"`
-do  for subdir in urls/ ''
-    do  topicfile=$dir/$subdir$topic
-	[ -f "$topicfile" ] && break
-    done
-    [ -f "$topicfile" ] && break
+topicfiles=
+for basetopic in `echo "$topic" | tr , ' '`
+do
+  topicfile=
+  for dir in `unpath "$LINKPAGEPATH"`
+  do  for subdir in urls/ ''
+      do  topicfile=$dir/$subdir$basetopic
+	  [ -f "$topicfile" ] && break
+      done
+      [ -f "$topicfile" ] && break
+  done
+  [ -f "$topicfile" ]  || { echo "$cmd: can't find topic \"$basetopic\" in \$LINKPAGEPATH" >&2
+			    badopts=1
+			    continue
+			  }
+  topicfiles="$topicfiles $topicfile"
 done
 
-[ -f "$topicfile" ]  || { echo "$cmd: can't find topic \"$topic\" in \$LINKPAGEPATH" >&2
-			  exit 1
-			}
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
 
 lastvalue addlinkpage "$topic"
 
+xit=0
+
 for url
-do  [ $verbose ] && echo "$url >> $topicfile" >&2
-    if [ "x$url" = x- ]
-    then  cat
-    else  echo "$url"
-    fi >>"$topicfile"
+do
+  [ "x$url" = x- ] && { url=`cat` || exit 1; }
+  for topicfile in $topicfiles
+  do
+    [ $verbose ] && echo "$url >> $topicfile" >&2
+    printf "%s\n" "$url" >>"$topicfile"
+  done
 done
+
+exit $xit
