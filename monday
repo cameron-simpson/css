@@ -8,7 +8,7 @@
 when=today
 [ $# -gt 0 ] && { when=$1; shift; }
 
-when=`date '+%Y-%m-%d'` || exit 1
+when=`date -d "$when" '+%Y-%m-%d'` || exit 1
 
 while dow=`date -d "$when" '+%u'` || exit 1
       [ "$dow" -gt 1 ]
