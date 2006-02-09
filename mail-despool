@@ -10,6 +10,7 @@
 cmd=`basename "$0"` || cmd=$0
 usage="Usage: $cmd [-d delay] [-f procmailrc] [-l lockname] maildir"
 
+trace=set-x
 delay=
 procmailrc=
 lock=mail-despool-$$
@@ -69,8 +70,8 @@ xit=0
 while :
 do
   lock "$lock" \
-    env "busyflag=$busyflag" "procmailrc=$procmailrc" \
-    sh -xuc '
+    env "trace=$trace" "busyflag=$busyflag" "procmailrc=$procmailrc" \
+    sh -uc '
 	  # locate new items
 	  if ismaildir .
 	  then
@@ -90,7 +91,7 @@ do
 	  for f
 	  do
 	    [ -s "$f" ] || continue
-	    { procmail "$procmailrc" <"$f" && rm -- "$f" && touch "$busyflag"; } || xit=1
+	    { $trace procmail "$procmailrc" <"$f" && $trace rm -- "$f" && touch "$busyflag"; } || xit=1
 	  done
 
 	  exit $xit
@@ -99,8 +100,8 @@ do
 
   [ -n "$delay" ] || break
   if [ -f "$busyflag" ]
-  then sleep 1
-  else sleep "$delay"
+  then $trace sleep 1
+  else $trace sleep "$delay"
   fi
 done
 
