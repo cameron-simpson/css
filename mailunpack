@@ -27,8 +27,8 @@ usage="Usage: $cmd [-d unpackdir] [command [args...]] <mailitem
 
 [ -n "$target" ] || { echo "$cmd: no unpackdir and no default, aborting" >&2; exit 1; }
 
-needdir "$target" || exit 1
-cd "$target"      || exit 1
+[ -d "$target/." ] || needdir "$target" || exit 1
+cd "$target"                            || exit 1
 
 lastvalue mailunpack "`pwd`"
 
@@ -44,7 +44,7 @@ else
   then
     $trace metamail -w -x | sed -n 's/^Wrote file //p' | xxargs $trace mrg .
   else
-    echo "$0: don't know how to unpack MIME messages :-(" >&2
+    echo "$cmd: don't know how to unpack MIME messages :-(" >&2
     exit 1
   fi
 fi
