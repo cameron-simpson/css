@@ -371,7 +371,7 @@ do
     #
     # Lines of the form:
     #
-    #	I<var>=I<value>
+    #	var=value
     #
     # are read once at the start of the script to set environment parameters.
     # I<var> may take the names B<PATH>, B<RSYNC>, B<RSYNCOPTS> or B<SUBDIRS>
