@@ -13,10 +13,7 @@ else
   echo "Colorset 1025 Foreground Green, Background Black"
 
   seq 0 63 \
-  | awk '{print "*FvwmBacker: Command (Desk " $1 ") colorset 1025"
-	  csnum=2048+$1
-	  print "Colorset " csnum " fg rgb:90/ff/ff, bg rgb:00/00/20, hi green, sh green, RootTransparent"
-	  print "*FvwmBacker: Command (Desk " $1 ") MenuStyle \"*\" MenuColorset " csnum }'
+  | awk '{print "*FvwmBacker: Command (Desk " $1 ") colorset 1025"}'
 
   idsetlist "$DESKTOPSET" name \
   | awk '$2 != "." { print "DesktopName", $1, $2 }'
