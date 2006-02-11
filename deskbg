@@ -11,7 +11,7 @@ usage="Usage: $cmd [-] [-d desk] imagefiles...
 	-	Do nothing. Recite fvwm commands.
 	-d desk	Specify desk number to affect.
 		Default desk is the current desk.
-		The desk \"-\" means the global default.
+		The desk \"-\" means the global default (desk 1).
 	The imagefile \"\" means remove the per desk setting for this desk."
 
 desk=
@@ -31,62 +31,41 @@ fi
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
-perdesk=1
+cmdesk=
 case "$desk" in
   ''|.)	desk=`currentdesk` || exit 1 ;;
-  -)	desk= perdesk= ;;
+  -)	desk=1 ;;
 esac
 
 if [ -z "$*" ]
 then
     # flush background
-    bg=
-    if [ $perdesk ]
-    then [ $doit ] && desktop -r "$desk" rootbg
-    fi
-else
-    srcargs=$*
-    first=1
-    for arg
-    do
-      if [ $first ]
-      then
-	set --
-	first=
-      fi
-      cached=`filecache "$arg"` || cached=$arg
-      set -- ${1+"$@"} "$cached"
-    done
-
-    # compute new background
-    rootbg=`mkwall "$@"` || exit 1
-
-    # note supplied images
-    if [ $doit ]
-    then
-      if [ $perdesk ]
-      then
-	desktop "$desk" rootbg "$*"
-	desktop "$desk" rootbg_src "$srcargs"
-      else
-	lastvalue "rootbg-$HOST" "$*"
-	lastvalue "rootbg" "$*"
-	lastvalue "rootbg_src" "$srcargs"
-      fi
-    fi
-
-    bg=$rootbg
+    [ $doit ] && exec desktop -r "$desk" rootbg
+    exit $?
 fi
 
-[ -n "$bg" ] || exit 0
+# transmute args to cache filenames
+srcargs=$*
+first=1
+for arg
+do
+  [ $first ] && { set --; first=; }
+  cached=`filecache "$arg"` || cached=$arg
+  set -- ${1+"$@"} "$cached"
+done
 
-if [ $perdesk ]
+# compute new background
+rootbg=`mkwall "$@"` || exit 1
+
+# note supplied images
+if [ $doit ]
 then
-    # apply new background, set desktop to use it
-    cset=`expr 1024 + $desk`
-    $towm "ColorSet $cset Pixmap $rootbg"
-    $towm "*FvwmBacker: Command (Desk $desk) colorset $cset"
-else
-    # apply new default background
-    $towm "Colorset 1023 Pixmap $bg"
+  ( desktop "$desk" rootbg "$*"
+    desktop "$desk" rootbg_src "$srcargs"
+  ) &
 fi
+
+# apply new background, set desktop to use it
+cset=`expr 1024 + $desk` || exit 1
+$towm "ColorSet $cset Pixmap $rootbg"
+[ $desk = 1 ] || $towm "*FvwmBacker: Command (Desk $desk) colorset $cset"
