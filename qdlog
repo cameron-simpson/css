@@ -29,6 +29,7 @@ usage="""Usage: """+cmd+""" [-i incre]... [-e excre]... prefix
 
 badopts=False
 
+print "argv =", `sys.argv`
 try:
   (opts,argv)=getopt(sys.argv[1:],'i:e:')
 except GetoptError, e:
@@ -36,6 +37,7 @@ except GetoptError, e:
   badopts=True
 
 for (opt,val) in opts:
+  print 'opt =', opt, 'val =', `val`
   if opt == '-i':
     relist.append((True, re.compile(val), val))
     lastremode=True
@@ -120,13 +122,28 @@ def noteEmail(subj,msgid,hhmm,attr,value):
   if attr in msg: msg[attr].append(value)
   else:           msg[attr]=[value]
 
+def testre(line):
+  global relist
+  ok=True
+  for (mode,re,ptn) in relist:
+    if re is None:
+      ok=mode
+      break
+
+    m=re.search(line)
+    if m:
+      ok=mode
+      break
+
+  return ok
+
 q_re=re.compile(prefix+':')
 
-qto_re=re.compile(r'([^@ \t]+@[^@ \t]+)<-\s+(re:?\s*)*',re.I)
-qto_re2=re.compile(r'->([^@ \t]+@[^@ \t]+)\s+(re:?\s*)*',re.I)
+qto_re=re.compile(r'([^@ \t]+@[^@ \t]+)<-\s+(re\b:?\s*)*',re.I)
+qto_re2=re.compile(r'->([^@ \t]+@[^@ \t]+)\s+(re\b:?\s*)*',re.I)
 
-qfrom_re=re.compile(r'<-([^@ \t]+@[^@ \t]+)\s+(re:?\s*)*',re.I)
-qfrom_re2=re.compile(r'([^@ \t]+@[^@ \t]+)->\s+(re:?\s*)*',re.I)
+qfrom_re=re.compile(r'<-([^@ \t]+@[^@ \t]+)\s+(re\b:?\s*)*',re.I)
+qfrom_re2=re.compile(r'([^@ \t]+@[^@ \t]+)->\s+(re\b:?\s*)*',re.I)
 
 qmsgid_re=re.compile(r'\s+(<[^<>@ \t]+@[^<>@ \t]+>)$')
 
@@ -156,20 +173,8 @@ for line in file(log):
     continue
 
   line=line[cs.lex.skipwhite(line,len(m.group(0))):]
-
-  ok=True
-  for (mode,re,ptn) in relist:
-    if re is None:
-      ok=mode
-      break
-
-    m=re.search(line)
-    if m:
-      ok=mode
-      break
-
-  if not ok:
-    # regexp is a rejection
+  if not testre(line):
+    # rejected by regexps
     continue
 
   #####################################
