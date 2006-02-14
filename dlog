@@ -5,4 +5,7 @@ logname=dlog
 [ $# -gt 0 ] && [ "x$1" = x-l ] && { logname=$2; shift; shift; }
 case "$logname" in /*) ;; *) logname=$LOGDIR/$logname ;; esac
 [ $# = 0 ] && exec pageif cat "$logname"
+
+ts=`date -d "$DLOG_WHEN" '+%Y-%m-%d-%H:%M:%S'`
+echo "$ts $*" >>"$LOGDIR/dlog-quick"
 exec note -d "$DLOG_WHEN" "$logname" "$*"
