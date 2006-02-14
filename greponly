@@ -1,0 +1,37 @@
+#!/bin/sh -u
+#
+# Print all strings matching the supplied regexp.
+#	- Cameron Simpson <cs@zip.com.au> 14feb2006
+#
+
+cmd=$0
+usage="Usage: $cmd regexp [files...]"
+
+trace=set-x
+
+badopts=
+
+if [ $# = 0 ]
+then
+  echo "$cmd: missing regexp" >&2
+  badopts=1
+else
+  regexp=$1
+  shift
+  case "$regexp" in
+    */*)
+      regexp=`printf "%s\n" "$regexp" | sed 's;/;\\\\/;g'`
+      ;;
+  esac
+fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+exec $trace sed -n -e "
+	:top
+	/$regexp/!d
+	s/$regexp/\\n&\\n/
+	s/[^\\n]*\\n//
+	P
+	s/[^\\n]*\\n//
+	b top" ${1+"$@"}
