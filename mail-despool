@@ -88,12 +88,14 @@ do
   fi
 
   rm -f "$busyflag"
-  if [ $havenew ]
+  if [ $havenew ] \
+  && qargv=`shqstr "$@"`
   then
     lock "$lock" \
       env "trace=$trace" "busyflag=$busyflag" "procmailrc=$procmailrc" \
-      sh -uc '
-	xit=0
+      sh -uc "
+	set -- $qargv
+      "'xit=0
 	for f
 	do
 	  [ -s "$f" ] || continue
