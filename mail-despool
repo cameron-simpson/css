@@ -69,34 +69,40 @@ xit=0
 
 while :
 do
-  lock "$lock" \
-    env "trace=$trace" "busyflag=$busyflag" "procmailrc=$procmailrc" \
-    sh -uc '
-	  # locate new items
-	  if ismaildir .
-	  then
-	    set -- cur/* new/*
-	  else
-	    if ismhdir .
-	    then
-	      set -- [1-0]*
-	    else
-	      set --
-	    fi
-	  fi
+  # locate new items
+  havenew=
+  if ismaildir .
+  then
+    havenew=1
+    set -- cur/* new/*
+    [ $# = 2 ] && [ "x$1" = 'xcur/*' -a "x$2" = 'xnew/*' ] && havenew=
+  else
+    if ismhdir .
+    then
+      havenew=1
+      set -- [1-9]*
+      [ $# = 1 ] && [ "x$1" = 'x[1-9]*' ] && havenew=
+    else
+      set --
+    fi
+  fi
 
-	  rm -f "$busyflag"
-	  xit=0
-
-	  for f
-	  do
-	    [ -s "$f" ] || continue
-	    { $trace procmail "$procmailrc" <"$f" && $trace rm -- "$f" && touch "$busyflag"; } || xit=1
-	  done
-
-	  exit $xit
-	' \
-  || xit=1
+  rm -f "$busyflag"
+  if [ $havenew ]
+  then
+    lock "$lock" \
+      env "trace=$trace" "busyflag=$busyflag" "procmailrc=$procmailrc" \
+      sh -uc '
+	xit=0
+	for f
+	do
+	  [ -s "$f" ] || continue
+	  { $trace procmail "$procmailrc" <"$f" && $trace rm -- "$f" && touch "$busyflag"; } || xit=1
+	done
+	exit $xit
+      ' \
+    || xit=1
+  fi
 
   [ -n "$delay" ] || break
   if [ -f "$busyflag" ]
