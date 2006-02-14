@@ -62,13 +62,13 @@ do
     #
     # Specify savegroup.
     #
-    -g)	savegroup=$2 ;;
+    -g)	savegroup=$2; shift ;;
 
     # =item B<-l> I<logfile>
     #
     # Specify the I<logfile> in which to store backup timestamps.
     #
-    -l)	logfile=$2 ;;
+    -l)	logfile=$2; shift ;;
 
     # =item B<-n>
     #
@@ -80,7 +80,7 @@ do
     #
     # Specify the Legato server to use.
     #
-    -s)	server=$2 ;;
+    -s)	server=$2; shift ;;
 
     # =item B<-x>
     #
@@ -121,10 +121,10 @@ do
 
   if [ $full ]
   then
-    lastdump=`awk -v "hostdir=$hostdir" '$2 == hostdir { lastdump=$1 }
-					 END	    { if (lastdump) print lastdump }' "$dlogfile"`
-  else
     lastdump=
+  else
+    lastdump=`awk -v "dir=$dir" '$2 == dir	{ lastdump=$1 }
+				 END		{ if (lastdump) print lastdump }' "$dlogfile"`
   fi
 
   thisdump=`now` || { xit=1; continue; }
@@ -142,6 +142,7 @@ do
   else
     xit=1
   fi
+  break
 done
 
 exit $xit
