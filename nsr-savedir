@@ -112,11 +112,15 @@ xit=0
 
 for dir
 do
-  [ -d "$dir" ] || { echo "$cmd: $dir: not a directory" >&2; xit=1; continue; }
-
   case "$logfile" in
-    /*)	dlogfile=$logfile ;;
-    *)	dlogfile=$dir/$logfile ;;
+    /*)	dlogfile=$logfile
+	;;
+    *)  [ -d "$dir" ] || { echo "$cmd: $dir: not a directory, can't put logfile inside" >&2
+			   xit=1
+			   continue
+			 }
+	dlogfile=$dir/$logfile
+	;;
   esac
 
   if [ $full ]
