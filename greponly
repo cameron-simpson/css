@@ -7,7 +7,7 @@
 cmd=$0
 usage="Usage: $cmd regexp [files...]"
 
-trace=set-x
+trace=	##set-x
 
 badopts=
 
@@ -28,10 +28,8 @@ fi
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
 exec $trace sed -n -e "
-	:top
 	/$regexp/!d
 	s/$regexp/\\n&\\n/
 	s/[^\\n]*\\n//
 	P
-	s/[^\\n]*\\n//
-	b top" ${1+"$@"}
+	D" ${1+"$@"}
