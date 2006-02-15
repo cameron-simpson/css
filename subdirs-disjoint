@@ -1,0 +1,70 @@
+#!/usr/bin/python
+#
+# Report a minimal set of distinct spanning subdirectories including the
+# specified subdirectories.
+#	- Cameron Simpson <cs@zip.com.au>
+#
+
+import sys
+import os.path
+from cs.misc import cmd, cmderr, warn
+
+usage="Usage: "+cmd+" topdir [subpaths...]\n"
+
+badopts=False
+
+if len(sys.argv) < 2:
+  cmderr("missing topdir")
+  badopts=True
+else:
+  topdir=sys.argv[1]
+  subpaths=sys.argv[2:]
+
+if badopts:
+  sys.stderr.write(usage)
+  sys.exit(2)
+
+def pathnodelen(path):
+  return len(path.split('/'))
+def bypathnodelen(a,b):
+  return pathnodelen(a) - pathnodelen(b)
+
+subpaths.sort(bypathnodelen)
+
+dirs={}
+dirs[topdir]=True
+
+def splitdir(dir,topdir):
+  global dirs
+
+  try:
+    dirents=os.listdir(dir)
+  except OSError, e:
+    cmderr("listdir("+dir+")", `e`)
+    return
+
+  dirents.sort()
+
+  if dir != topdir:
+    up=os.path.dirname(dir)
+    if len(up):
+      splitdir(up,topdir)
+
+  warn("block", dir)
+  dirs[dir]=False
+  for peer in dirents:
+    peerpath=os.path.join(dir,peer)
+    warn("add  ", peerpath)
+    dirs[peerpath]=True
+
+while len(subpaths) > 0:
+  subpath=subpaths.pop(0)
+  dir=os.path.join(topdir,subpath)
+  print dir
+  splitdir(os.path.dirname(dir),topdir)
+
+paths=dirs.keys()
+paths.sort()
+for path in paths:
+  if dirs[path]:
+    print path
