@@ -40,7 +40,7 @@ def splitdir(dir,topdir):
   try:
     dirents=os.listdir(dir)
   except OSError, e:
-    cmderr("listdir("+dir+")", `e`)
+    cmderr("listdir("+dir+"):", str(e))
     return
 
   dirents.sort()
@@ -50,17 +50,17 @@ def splitdir(dir,topdir):
     if len(up):
       splitdir(up,topdir)
 
-  warn("block", dir)
+  ##warn("block", dir)
   dirs[dir]=False
   for peer in dirents:
     peerpath=os.path.join(dir,peer)
-    warn("add  ", peerpath)
-    dirs[peerpath]=True
+    if peerpath not in dirs:
+      ##warn("add  ", peerpath)
+      dirs[peerpath]=True
 
 while len(subpaths) > 0:
   subpath=subpaths.pop(0)
   dir=os.path.join(topdir,subpath)
-  print dir
   splitdir(os.path.dirname(dir),topdir)
 
 paths=dirs.keys()
