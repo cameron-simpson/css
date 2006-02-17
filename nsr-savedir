@@ -24,6 +24,7 @@ savegroup=
 logfile=.nsr-savedir.log
 server=
 masq=`hostname` || exit 1
+saveopts='-v -LL -B -E'
 
 cmd=`basename "$0"` || cmd=$0
 usage="Usage: $cmd [-a] [-n] [-x] [-g savegroup] [-l logfile] [-s server] dirs...
@@ -134,12 +135,12 @@ do
   thisdump=`now` || { xit=1; continue; }
 
   if 
-    ( set save
+    ( set save $saveopts
       [ $doit           ] || set -- "$@" -n
       [ -n "$lastdump"  ] && set -- "$@" -t "$lastdump"
       [ -n "$server"    ] && set -- "$@" -s "$server"
       [ -n "$savegroup" ] && set -- "$@" -g "$savegroup"
-      exec $trace "$@" -LL -m "$masq" -W 78 "$dir"
+      exec $trace "$@" -m "$masq" -W 78 "$dir"
     )
   then
     [ $doit ] && echo "$thisdump $dir" >>"$logfile"
