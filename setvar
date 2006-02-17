@@ -61,36 +61,49 @@ my $badopts=0;
 my $outfile;
 my $keepOutfile=0;
 ARGV:
-  while (@ARGV)
-  { $_=shift(@ARGV);
-    last ARGV if $_ eq '--';
-    (unshift(@ARGV,$_), last ARGV) unless /^-./;
+while (@ARGV)
+{ $_=shift(@ARGV);
+  last ARGV if $_ eq '--';
+  (unshift(@ARGV,$_), last ARGV) unless /^-./;
 
-    if ($_ eq '-n')	{ $noexec=1; $outfile="/tmp/$::cmd.$$"; }
-    elsif ($_ eq '-N')	{ $noexec=1; $outfile=shift(@ARGV); $keepOutfile=1; }
-    elsif ($_ eq '-f')	{ $::Force=1; }
-    elsif ($_ eq '-d')	{ unshift(@::ENVPATH,shift(@ARGV)); }
-    elsif ($_ eq '-s')	{ $silent=1; $verbose=0; }
-    elsif ($_ eq '-v')	{ $silent=0; $verbose=1; }
-    elsif ($_ eq '-x')	{ $trace=1; }
-    elsif ($_ eq '-c')	{ $CshMode=1; }
-    else
-    { err("$::cmd: $_: unrecognised option\n");
-      $badopts=1;
-    }
+  if ($_ eq '-n')	{ $noexec=1; $outfile="/tmp/$::cmd.$$"; }
+  elsif ($_ eq '-N')	{ $noexec=1; $outfile=shift(@ARGV); $keepOutfile=1; }
+  elsif ($_ eq '-f')	{ $::Force=1; }
+  elsif ($_ eq '-d')	{ unshift(@::ENVPATH,shift(@ARGV)); }
+  elsif ($_ eq '-s')	{ $silent=1; $verbose=0; }
+  elsif ($_ eq '-v')	{ $silent=0; $verbose=1; }
+  elsif ($_ eq '-x')	{ $trace=1; }
+  elsif ($_ eq '-c')	{ $CshMode=1; }
+  else
+  { err("$::cmd: $_: unrecognised option\n");
+    $badopts=1;
   }
+}
 
 my(@vars)=();
-if ($noexec)			{ @vars=@ARGV;
-				}
-elsif (!defined($_=shift))	{ err "$::cmd: missing varnames\n";
-				  $badopts=1;
-				}
-elsif (!/^\s*[_\w]+(\s+[_\w]+)*\s*$/) { err "$::cmd: $_: bad varname list\n";
-				  $badopts=1;
-				}
-else				{ @vars=grep(length,split(/,+/));
-				}
+
+if ($noexec)
+{ @vars=@ARGV;
+}
+elsif (!defined($_=shift(@ARGV)))
+{ err "$::cmd: missing varnames\n";
+  $badopts=1;
+}
+else
+{
+  if (!/^\s*[_\w]+(\s+[_\w]+)*\s*$/)
+  { err "$::cmd: $_: bad varname list\n";
+    $badopts=1;
+  }
+  else
+  { @vars=grep(length,split(/,+/));
+  }
+
+  if (@ARGV)
+  { err "$::cmd: extra arguments after varnames: @ARGV\n";
+    $badopts=1;
+  }
+}
 
 die $::Usage if $badopts;
 
@@ -98,53 +111,55 @@ $::UseExtant=0;
 
 envstuff();
 
-if ($noexec)	{ if (defined($outfile))
-		  { if (!open(OUTFILE,"> $outfile\0"))
-		    { err "$::cmd: can't write to $outfile: $!\n";
-		      undef $outfile;
-		    }
-		    else
-		    { chmod(0755,$outfile);
-		      select(OUTFILE);
-		    }
-		  }
+if (! $noexec)
+{
+  setvar(0,@vars);
+  finalvars();
+  strippaths();
+  exec @ARGV;
+  exit 1;
+}
 
-		  # XXX - csh mode for -vx if ever restored
-		  # print "set -vx\n" if $trace;
+if (defined($outfile))
+{ if (!open(OUTFILE,"> $outfile\0"))
+  { err "$::cmd: can't write to $outfile: $!\n";
+    undef $outfile;
+  }
+  else
+  { chmod(0755,$outfile);
+    select(OUTFILE);
+  }
+}
 
-		  setvar(0,@vars);
-		  # print "set +vx\n" if $trace;
-		  finalvars();
-		  strippaths();
-		  putvars();
+# FIXME: csh mode for -vx if ever restored
+# print "set -vx\n" if $trace;
 
-		  if (defined($outfile))
-		  {
-		    close(OUTFILE);
+setvar(0,@vars);
+# print "set +vx\n" if $trace;
+finalvars();
+strippaths();
+putvars();
 
-		    if ($CshMode)
-		    { print STDOUT "source '$outfile'";
-		    }
-		    else
-		    { print STDOUT ". '$outfile'";
-		    }
+if (defined($outfile))
+{
+  close(OUTFILE);
 
-		    if (! $keepOutfile)
-		    { print STDOUT "; /bin/rm -f '$outfile'";
-		    }
+  if ($CshMode)
+  { print STDOUT "source '$outfile'";
+  }
+  else
+  { print STDOUT ". '$outfile'";
+  }
 
-		    print STDOUT "\n";
+  if (! $keepOutfile)
+  { print STDOUT "; /bin/rm -f '$outfile'";
+  }
 
-		    stat($outfile) || warn "$::cmd: stat($outfile): $!\n";
-		    # system("exec >&2; ls -ld $outfile; cat $outfile");
-		  }
-		}
-else		{
-	          setvar(0,@vars);
-		  finalvars();
-		  strippaths();
-		  exec @ARGV;
-		}
+  print STDOUT "\n";
+
+  stat($outfile) || warn "$::cmd: stat($outfile): $!\n";
+  # system("exec >&2; ls -ld $outfile; cat $outfile");
+}
 
 exit $::Xit;
 
@@ -310,6 +325,13 @@ sub setvar
 	setenv(PATH,"$::ENV{PATH}:$pfx/bin:$pfx/sbin");
         setenv(MANPATH,"$::ENV{MANPATH}:$pfx/man:$pfx/catman");
       }
+      next VAR;
+    }
+
+    if (/^([a-z_]\w*)=/i)
+    { my($var,$val)=($1,$');
+      setenv($var,estring($val,$missok));
+      $::did{$var}=1;
       next VAR;
     }
 
