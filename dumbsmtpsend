@@ -1,0 +1,52 @@
+#!/bin/sh -u
+#
+# Read fully formatted email from stdin, send to addresses via named SMTP server.
+# Neither clever nor robust, but handy if the local sendmail is busted.
+#	- Cameron Simpson <cs@zip.com.au> 01mar2006
+#
+
+cmd=`basename "$0"` || cmd=$0
+usage="Usage: $cmd your-address smtpserver addresses..."
+
+badopts=
+
+if [ $# = 0 ]
+then
+  echo "$cmd: missing your-address" >&2
+  badopts=1
+else
+  you=$1; shift
+  if [ $# = 0 ]
+  then
+    echo "$cmd: missing smtpserver" >&2
+    badopts=1
+  else
+    server=$1; shift
+    if [ $# = 0 ]
+    then
+      echo "$cmd: missing addresses" >&2
+      badopts=1
+    fi
+  fi
+fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+(
+  sleep 2
+  echo "HELO `hostname`"
+  echo "MAIL FROM:<$you>"
+  for address
+  do
+    echo "RCPT TO:<$address>"
+  done
+  sleep 1
+  echo "DATA"
+  sleep 1
+  sed -e 's/^\./../' -e 's/$//'
+  echo "."
+  sleep 2
+  echo QUIT
+  sleep 1
+) \
+| telnet "$server" 25 | cat
