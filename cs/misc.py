@@ -63,10 +63,10 @@ def uniq(ary):
 
   return u
 
-# fill out an array to be at least "length" elements long
-def padlist(l,length,dflt=None):
+# fill out an array with None to be at least "length" elements long
+def padlist(l,length):
   if len(l) < length:
-    l+=[dflt]*(length-len(l))
+    l+=[None]*(length-len(l))
 
 def listpermute(lol):
   # empty list
