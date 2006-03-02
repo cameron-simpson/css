@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/sh -u
 #
 # Configure directory trees for group sharing:
 #	- chgrp to named group
@@ -8,12 +8,14 @@
 #
 
 cmd=`basename "$0"`
-usage="Usage: $cmd [-a] group dirs..."
+usage="Usage: $cmd [-a] [-y] group dirs..."
 
 badopts=
 
 all=
+yes=
 [ "x$1" = x-a ] && { all=1; shift; }
+[ "x$1" = x-y ] && { yes=1; shift; }
 
 if [ $# = 0 ]
 then
@@ -43,7 +45,7 @@ do
   ) || exit 1
 done
 
-ask "Proceed with groupshare on the above directories" || exit 1
+[ $yes ] || ask "Proceed with groupshare on the above directories" || exit 1
 
 for dir
 do
