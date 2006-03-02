@@ -338,7 +338,7 @@ class _TableRow:
   def __getrowcache(self):
     if self.__rowcache is None:
       ## FIXME - caching for dated tables!
-      warn("no __rowcache for "+self.table.name+" WHERE", self.__whereclause)
+      debug("no __rowcache for "+self.table.name+" WHERE", self.__whereclause)
       self.__loadrowcache()
     return self.__rowcache
 
