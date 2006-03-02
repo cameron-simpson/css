@@ -4,7 +4,7 @@
 #	- Cameron Simpson <cs@zip.com.au> 21feb2003
 #
 
-delay=2
+delay=
 userpfx=
 hostspec=
 command=
@@ -17,6 +17,7 @@ usage="Usage: $cmd [options...] command...
 	-n		No action; recite actions.
 	-x		Trace execution.
 	-d delay	Delay this many seconds between ssh invocations.
+			Default: no delay.
 	-h hostspec	Specify hosts: host, @netgroup and !host, !@netgroup.
 	-u asuser	Specify the user as which to connect to each host.
 	command		As with ssh. specify the command to run on each host."
@@ -51,7 +52,15 @@ done
 
 for h in `ngexpand $hostspec`
 do
-  $trace pfx "$userpfx$h" bgssh $sshopts "$userpfx$h" "$@" &
+
+  pfx=$userpfx$h
+  case "$pfx" in
+    */*)	qpfx=`printf "%s\n" "$pfx" | sed 's:/:\\&:g'` ;;
+    *)		qpfx=$pfx ;;
+  esac
+  command="( $* ) 2>&1 | sed 's/^/$qpfx: /'"
+
+  $trace ssh -f $sshopts "$userpfx$h" "$command"
   if [ -n "$delay" ] && [ "$delay" -gt 0 ]
   then $trace sleep "$delay"
   else wait
