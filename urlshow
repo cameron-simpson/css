@@ -144,11 +144,11 @@ cleanurllist \
     [ -n "$URLLOG" ] && echo "urlshow $url" >>"$URLLOG"
     if [ $popnew ]
     then
-      echo mozremote "'openurl($url,new-window)'" >&3
+      echo mozremote "'openurl($url,new-window)' || exit 1" >&3
       popnew=
     else
       ##echo usleep 200000 >&3
-      echo mozremote "'openurl($url,new-tab)'" >&3
+      echo mozremote "'openurl($url,new-tab)' || exit 1" >&3
     fi
   done \
 ) \
