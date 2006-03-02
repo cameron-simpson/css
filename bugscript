@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/sh -u
 #
 # Run command, log output to bug system, discard log file.
 #	- Cameron Simpson <cs@zip.com.au> 22mar2005
