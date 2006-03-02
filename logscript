@@ -85,7 +85,7 @@ case "$logfile" in
 esac
 
 logdir=`dirname "$logfile"` || exit 1
-needdir "$logdir" || exit 1
+[ -d "$logdir/." ] || needdir "$logdir" || exit 1
 
 # hideous hack to restore $SHELL inside script command
 # because script, curse its negligent author, only runs $SHELL
@@ -108,6 +108,7 @@ fi
 ##wd=`pwd|entilde`
 ##dl "$HOST@$SYSTEMID: $wd: start $popSHELLcmd"
 
+unset DISPLAY
 script -a "$logfile"
 xit=$?
 
