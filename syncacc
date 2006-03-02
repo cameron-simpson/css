@@ -68,6 +68,9 @@ exec \
 	'--include=/rc/less' \
 	'--include=/rc/lesskey' \
 	'--include=/rc/mail' \
+	'--include=/rc/mail/cats*' \
+	'--include=/rc/mail/bcc-list' \
+	'--include=/rc/mail/dlog-list' \
 	'--include=/rc/mail/Mykefile' \
 	'--include=/rc/mail/mailcap' \
 	'--include=/rc/mail/mutt*' \
