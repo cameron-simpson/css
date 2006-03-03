@@ -10,6 +10,7 @@ hostspec=
 command=
 sshopts=
 trace=
+timeout=10	# timeout before giving up on authentication
 
 cmd=`basename "$0"`
 usage="Usage: $cmd [options...] command...
@@ -19,6 +20,8 @@ usage="Usage: $cmd [options...] command...
 	-d delay	Delay this many seconds between ssh invocations.
 			Default: no delay.
 	-h hostspec	Specify hosts: host, @netgroup and !host, !@netgroup.
+	-t timeout	Specify timeout before giving up on ssh authentication.
+			Default: $timeout
 	-u asuser	Specify the user as which to connect to each host.
 	command		As with ssh. specify the command to run on each host."
 
@@ -31,6 +34,7 @@ do
     -h)	hostspec="$hostspec $2"; shift ;;
     -u)	userpfx=$2@; shift ;;
     -n)	trace=echo ;;
+    -t)	timeout=$2; shift ;;
     -x)	trace=set-x ;;
     --)	shift; break ;;
     -?*) echo "$cmd: unrecognised option: $1" >&2; badopts=1 ;;
@@ -60,7 +64,7 @@ do
   esac
   command="( $* ) 2>&1 | sed 's/^/$qpfx: /'"
 
-  $trace ssho -f +t $sshopts PasswordAuthentication=no "$userpfx$h" "$command" </dev/null
+  $trace timeout "$timeout" ssho -f +t $sshopts PasswordAuthentication=no "$userpfx$h" "$command" </dev/null
   if [ -n "$delay" ] && [ "$delay" -gt 0 ]
   then $trace sleep "$delay"
   else wait
