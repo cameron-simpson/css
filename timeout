@@ -1,10 +1,17 @@
-#!/bin/sh
+#!/bin/sh -u
 #
 # Run a command with a real-time timeout.
 #	- Cameron Simpson <cs@zip.com.au>
 #
 
-usage="Usage: $0 seconds command [args...]"
+sig=TERM
+
+usage="Usage: $0 [-s signal] seconds command [args...]"
+
+badopts=
+
+[ $# -gt 0 ] && [ "x$1" = x-s ] && { sig=$2; shift; shift; }
+[ $# -gt 0 ] && [ "x$1" = x-- ] && shift
 
 [ $# -lt 2 ] && { echo "$usage" >&2; exit 2; }
 
@@ -39,7 +46,7 @@ cmdpid=$!
     then
 	echo "$0: timed out after $timeout seconds: $*" >&2
 	exec 2>/dev/null
-	kill $cmdpid && { sleep 2; kill -9 $cmdpid; }
+	kill -s "$sig" $cmdpid && { sleep 2; kill -9 $cmdpid; }
 	kill $mypid
     fi
   } &
