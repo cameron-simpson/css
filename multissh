@@ -60,7 +60,7 @@ do
   esac
   command="( $* ) 2>&1 | sed 's/^/$qpfx: /'"
 
-  $trace ssho -f $sshopts PasswordAuthentication=no "$userpfx$h" "$command"
+  $trace ssho -f +t $sshopts PasswordAuthentication=no "$userpfx$h" "$command" </dev/null
   if [ -n "$delay" ] && [ "$delay" -gt 0 ]
   then $trace sleep "$delay"
   else wait
