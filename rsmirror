@@ -161,7 +161,7 @@ mirrorlist=$*
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
 timelimit=
-[ -n "$timeout" ] && { timelimit="timeout $timeout"
+[ -n "$timeout" ] && { timelimit="timeout -- $timeout"
 		       rsopts="--partial $rsopts"
 		     }
 
