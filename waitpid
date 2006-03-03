@@ -29,7 +29,7 @@ done
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
 # implement timeout
-[ -n "$timeout" ] && exec timeout "$timeout" "$0" $vflag -d "$delay" ${1+"$@"}
+[ -n "$timeout" ] && exec timeout -- "$timeout" "$0" $vflag -d "$delay" ${1+"$@"}
 
 pids=$*
 while [ -n "$pids" ]
