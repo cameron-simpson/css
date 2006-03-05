@@ -207,7 +207,7 @@ then
 fi
 
 byNAME=
-[ -n "$NAME" ] && byNAME=" by $NAME"
+##[ -n "$NAME" ] && byNAME=" by $NAME"
 
 toc=$TMPDIR/cdtoc.$$
 cdtoc "$dev" >"$toc" || { rm -f "$toc"; exit 1; }
@@ -238,64 +238,44 @@ sed -e 's;//*; -- ;g' -e 's/   */ /g' \
 
       echo "Ripping track #$track: $dir/$ftitle ..."
 
-      needenc=
-      for enc in $enclist
-      do  out=$dir/$ftitle.$enc
-	  if [ -s "$out" ]
-	  then  echo "$cmd: $out already exists" >&2
-	  else  needenc="$needenc $enc"
-	  fi
-      done
-
-      # skip if no encodings OR keep-raw mode on
-      [ -n "$needenc" -o -n "$keep" ] || continue
-
       raw=$dir/$ftitle.wav
 
       [ -d "$dir/." ] || mkdir -p "$dir" || { xit=1; continue; }
       ripcomment="Ripped$byNAME with cdparanoia on `date`"
 
-      [ -s "$raw" ] \
-      || (set -x; cdparanoia $cdpara_noise -d "$dev" -w "$track" "$raw") \
-      || { echo "cdparanoia failed" >&2
-	   tail -20 cdp.err >&2
-	   [ $keep ] || rm -f "$raw"
-	   xit=1
-	   continue
-	 }
-
-      firstenc=1
       linksgood=1
-      for enc in $needenc
+      for enc in $enclist
       do
 	out=$dir/$ftitle.$enc
-	[ -s "$out" ] && { echo "$cmd: existing file $out, skipping" >&2
-			   continue
-			 }
-
-	if [ -z "$lock" ]
-	then
-	    [ -n "$encpid" ] && kill -0 "$encpid" 2>/dev/null \
-	      && { echo; echo "waiting for previous encoder ..."; }
-	    wait
-	fi
-
-	if [ $firstenc ]; then firstenc=
-			  else ls -ld "$raw"
-	fi
-
-	# set up command line for each encoding
 	link=$raw-4$enc
-	if ln "$raw" "$link"
+
+	# rip title if necessary
+	doenc=1
+	[ -s "$out" ] && doenc=1
+
+	if [ $keep ] || [ $doenc ]
 	then
-	    set rmafter $"link" "$@"
-	    in=$link
-	else
-	    echo "$cmd: can't link raw to $link" >&2
-	    linksgood=
-	    link=
-	    in=$raw
+	  [ -s "$raw" ] \
+	  || (set -x; cdparanoia $cdpara_noise -d "$dev" -w "$track" "$raw") \
+	  || { echo "cdparanoia failed" >&2
+	       tail -20 cdp.err >&2
+	       [ $keep ] || rm -f "$raw"
+	       xit=1
+	       continue
+	     }
+
+	  ln "$raw" "$link" || doenc=
+	  in=$link
+
+	  if [ -z "$lock" ]
+	  then
+	      [ -n "$encpid" ] && kill -0 "$encpid" 2>/dev/null \
+		&& { echo; echo "waiting for previous encoder ..."; }
+	      wait
+	      encpid=
+	  fi
 	fi
+
 	case $enc in
 	  flac)
 	    set flac $flacenc -o "$out" "$in"
@@ -318,21 +298,18 @@ sed -e 's;//*; -- ;g' -e 's/   */ /g' \
 	    ;;
 	  mp3)
 	    set lame -h $lamequal -p "$in" "$out"
-	    if [ -n "$link" ]
-	    then
-	      ( # dispatch job to id3 tag the file after encoding
-		while [ -s "$link" ]
-		do  sleep 1
-		done
-		if [ -s "$out" ]
-		then
-		  set -x
-		  id3ed -s "$title" -n "$artist" -a "$album" \
-			-c "Encoded$byNAME with `lame -v 2>&1 | sed 1q` [$lamequal] on `date`" \
-			-k "$track" "$out" </dev/null
-		fi
-	      ) &
-	    fi
+	    ( # dispatch job to id3 tag the file after encoding
+	      while [ -s "$link" ]
+	      do  sleep 1
+	      done
+	      if [ -s "$out" ]
+	      then
+		set -x
+		id3ed -s "$title" -n "$artist" -a "$album" \
+		      -c "Encoded$byNAME with `lame -v 2>&1 | sed 1q` [$lamequal] on `date`" \
+		      -k "$track" "$out" </dev/null
+	      fi
+	    ) &
 	    ;;
 	  *)
 	    echo "$cmd: unimplemented encoding \"$enc\"!" >&2
@@ -341,24 +318,28 @@ sed -e 's;//*; -- ;g' -e 's/   */ /g' \
 	    ;;
 	esac
 
-	[ -n "$link" ] && set rmafter "$link" "$@"
+	set rmafter "$link" "$@"
 	[ -n "$lock" ] && { set alog cdrip lock "$lock@$HOST-$nextjob" "$@"
 			    nextjob=`expr \( $nextjob \) \% $jobs + 1`
 			  }
 	set nice -n "$nice" "$@"
 
-	if ( set -x; exec "$@" )
-	then [ -s INDEX ] && printf "%s\n" "$out" >>INDEX
-	else echo "Encode of \"$raw\" fails." >&2
-	     rm -f "$out"
-	     exit 1
-	fi &
-	encpid=$!
+	if [ $doenc ]
+	then
+	  if ( set -x; exec "$@" )
+	  then [ -s INDEX ] && printf "%s\n" "$out" >>INDEX
+	  else echo "Encode of \"$raw\" fails." >&2
+	       rm -f "$out"
+	       exit 1
+	  fi &
+	  encpid=$!
+	else
+	  encpid=
+	fi
 
       done
 
-      [ $keep ] \
-      || [ -z "$lock" -o -n "$linksgood" ] && (set -x; exec rm "$raw")
+      [ $keep ] || ( set -x; exec rm "$raw" )
     done
 
     [ -z "$lock" ] && wait
