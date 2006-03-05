@@ -236,8 +236,6 @@ sed -e 's;//*; -- ;g' -e 's/   */ /g' \
       esac
       ftitle=`printf "$trackfmt" "$track" "$title"`
 
-      echo "Ripping track #$track: $dir/$ftitle ..."
-
       raw=$dir/$ftitle.wav
 
       [ -d "$dir/." ] || mkdir -p "$dir" || { xit=1; continue; }
@@ -248,13 +246,15 @@ sed -e 's;//*; -- ;g' -e 's/   */ /g' \
       do
 	out=$dir/$ftitle.$enc
 	link=$raw-4$enc
+	in=$link
 
 	# rip title if necessary
 	doenc=1
-	[ -s "$out" ] && doenc=1
+	[ -s "$out" ] && doenc=
 
 	if [ $keep ] || [ $doenc ]
 	then
+	  echo "Ripping track #$track: $dir/$ftitle ..."
 	  [ -s "$raw" ] \
 	  || (set -x; cdparanoia $cdpara_noise -d "$dev" -w "$track" "$raw") \
 	  || { echo "cdparanoia failed" >&2
@@ -265,7 +265,6 @@ sed -e 's;//*; -- ;g' -e 's/   */ /g' \
 	     }
 
 	  ln "$raw" "$link" || doenc=
-	  in=$link
 
 	  if [ -z "$lock" ]
 	  then
@@ -307,7 +306,7 @@ sed -e 's;//*; -- ;g' -e 's/   */ /g' \
 		set -x
 		id3ed -s "$title" -n "$artist" -a "$album" \
 		      -c "Encoded$byNAME with `lame -v 2>&1 | sed 1q` [$lamequal] on `date`" \
-		      -k "$track" "$out" </dev/null
+		      -k "$track" "$out" </dev/null >/dev/null
 	      fi
 	    ) &
 	    ;;
@@ -339,7 +338,7 @@ sed -e 's;//*; -- ;g' -e 's/   */ /g' \
 
       done
 
-      [ $keep ] || ( set -x; exec rm "$raw" )
+      [ $keep ] || ( set -x; exec rm -f "$raw" )
     done
 
     [ -z "$lock" ] && wait
