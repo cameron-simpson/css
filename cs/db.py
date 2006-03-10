@@ -64,18 +64,35 @@ def dbpool(secret,dbname):
 
   return _cache_dbpool[secret,dbname]
 
+# convert DateTime objects into strings
+# trim DateTime strings that are exact days to just the date
+# this make naive string comparisons behave well
+def datestr(date):
+  if date is not None:
+    date=str(date)
+    if date[-12:] == ' 00:00:00.00':
+      date=date[:-12]
+
+  return date
+
 def sqlise(v):
   """ Mark up a value for direct insertion into an SQL statement. """
   if v is None:
     return "NULL"
 
   t=type(v)
-  if t is types.StringType:
+  if t is str:
     if v.find("'") >= 0: v=string.join(v.split("'"),"''")
     return "'"+v+"'"
 
   if t in (types.IntType,types.LongType,types.FloatType):
     return str(v)
+
+  ## FIXME: doesn't work with mysql - no real boolean, and TRUE gets "ERROR 1054: Unknown column 'true' in 'field list'"
+  if t is bool:
+    if v:
+      return 'TRUE'
+    return 'FALSE'
 
   # FIXME: awful hack - throw exception?
   return sqlise(`v`)
@@ -95,7 +112,7 @@ class SQLQuery:
     ##debug("conn =", `conn`)
     self.__cursor=conn.cursor()
     debug('SQLQuery:', query)
-    ##debug("SQLQuery: args =", `args`)
+    debug("SQLQuery: args =", `args`)
     self.__cursor.execute(query,*args)
     ##debug("executed")
 
