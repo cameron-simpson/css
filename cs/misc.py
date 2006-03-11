@@ -5,6 +5,7 @@ import sys
 import dircache
 import string
 import time
+from cs.lex import parseline
 
 cmd=os.path.basename(sys.argv[0])
 
@@ -142,6 +143,41 @@ def mailsubj(addrs,subj,body):
     pipe.write('\n')
 
   return pipe.close() is None
+
+# Accept a dict of the for key->(fn, help_string)
+# and perform entered commands.
+def runCommandPrompt(fnmap,prompt=cmd+"> "):
+  ok=True
+  while True:
+    line=raw_input(cmd+"> ")
+    if line is None:
+      return ok
+   
+    line=chomp(line)
+   
+    line=string.lstrip(chomp(line))
+    if len(line) == 0 or line[0] == "#":
+      continue
+   
+    words=parseline(line)
+    if words is None:
+      xit=1
+      cmderr("syntax error in line:", line)
+      continue
+   
+    op=words[0]
+    words=words[1:]
+    if op in fnmap:
+      if not fnmap[op][0](op,words):
+        ok=False
+      continue
+   
+    xit=1
+    cmderr("unsupported operation:", op)
+    ops=fnmap.keys()
+    ops.sort()
+    for op in ops:
+      warn("  %-7s %s" % (op,fnmap[op][1]))
 
 # trivial wrapper for extension in subclasses
 class SeqWrapper:
