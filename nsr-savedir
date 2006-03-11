@@ -25,11 +25,13 @@ logfile=.nsr-savedir.log
 server=
 masq=`hostname` || exit 1
 saveopts='-v -LL -B -E'
+pool=
 
 cmd=`basename "$0"` || cmd=$0
 usage="Usage: $cmd [-a] [-n] [-x] [-g savegroup] [-l logfile] [-s server] dirs...
 	-a		Backup all files - do not get a timestamp from the
 			logfile.
+	-b pool		Specify the tape pool to use.
 	-g savegroup	Specify the savegroup to use.
 	-l logfile	Specify the logfile to store timestamps.
 			A non-absolute path will be relative to each backup
@@ -58,6 +60,12 @@ do
     # Do not do an incremental backup using a timestamp from the I<logfile>.
     #
     -a)	full=1 ;;
+
+    # =item B<-b> I<pool>
+    #
+    # Specify the pool to use.
+    #
+    -b)	pool=$2; shift ;;
 
     # =item B<-g> I<savegroup>
     #
@@ -137,6 +145,7 @@ do
   if 
     ( set save $saveopts
       [ $doit           ] || set -- "$@" -n
+      [ -n "$pool"      ] && set -- "$@" -b "$pool"
       [ -n "$lastdump"  ] && set -- "$@" -t "$lastdump"
       [ -n "$server"    ] && set -- "$@" -s "$server"
       [ -n "$savegroup" ] && set -- "$@" -g "$savegroup"
