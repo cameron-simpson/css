@@ -9,11 +9,12 @@
 cmd=`basename "$0"`
 usage="Usage: $cmd [-0] [-v] filename
 	-0	Rewrite the file even if the input is empty.
+	-d	Do a diff of the file changes.
 	-v	Verbose."
 
 rw0=
+dodiff=
 verbose=
-[ "x$1" = x-v ] && { verbose=1; shift; }
 
 badopts=
 
@@ -21,6 +22,7 @@ while [ $# -gt 0 ]
 do
   case "$1" in
     -0)	rw0=1 ;;
+    -d)	dodiff=1 ;;
     -v)	verbose=1 ;;
     --)	shift; break ;;
     -?*)echo "$cmd: unrecognised option: $1" >&2
@@ -59,6 +61,7 @@ cat >"$tmp" || exit 1
 cmp -s "$tmp" "$file" && exit 0
 
 [ $verbose ] && echo "rewrite $file"
+[ $dodiff  ] && diff "$file" "$tmp"
 if cat "$tmp" >"$file"
 then
     exit 0
