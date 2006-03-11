@@ -191,7 +191,7 @@ and optionally ends in a slash, viz:
 
 	!adzap  AdZap           subject:/(noads|add?[-  s]*zap|squid_?redir|zapp(er|ing)|wrapzap)/
 
-which matches mail items with subjects regarding my adzap program.
+which matches mail items with subjects probably regarding my adzap program.
 
 A typical use of the "at" sign is in conjunction with the plus sign above
 to copy particular mail items to another account while still delivering locally.
@@ -309,9 +309,9 @@ $::Usage="Usage: $::cmd [-a alert] [-m domains] [-t {unix|mh|maildir}] <categori
 
 $::_INCHANDLE="INCLUDE0";
 
+$::Xit=0;
 readcats(STDIN);
-
-exit 0;
+exit $::Xit;
 
 sub readcats($;$)
 { my($FILE,$fname)=@_;
@@ -324,6 +324,13 @@ sub readcats($;$)
   while (<$FILE>)
   {
     chomp;
+
+    # glom backslashed lines together
+    while (/\\$/)
+    { $_=$`."\n".<$FILE>;
+      chomp;
+    }
+
     s/^\s+//;
 
     # pass blanks and comments through almost unchanged
@@ -346,14 +353,23 @@ sub readcats($;$)
     if (/^<<\s*/)
     { $_=$';
       s/\s+$//;
-      my $incfh = ++$::_INCHANDLE;
-      my $path = ( m:^/: ? $_ : defined($fname) ? pathdir($fname)."/$_" : $_ );
-      if (! open($incfh, "< $path\0"))
-      { warn "$::cmd: line $.: can't open \"$path\": $!\n";
-	next CAT;
+
+      if (!m:^/: && defined $fname)
+      { $_=pathdir($fname)."/".$_;
       }
-      readcats($incfh,$_);
-      close($incfh);
+
+      my $incfh = ++$::_INCHANDLE;
+
+      if (! open($incfh, "< $_\0"))
+      { warn "$::cmd: line $.: can't open \"$_\": $!\n";
+	$::Xit=1;
+      }
+      else
+      {
+	readcats($incfh,$_);
+	close($incfh);
+      }
+
       next CAT;
     }
 
@@ -361,16 +377,25 @@ sub readcats($;$)
     if (/^<\s*/)
     { $_=$';
       s/\s+$//;
+
+      if (!m:^/: && defined $fname)
+      { $_=pathdir($fname)."/".$_;
+      }
+
       if (! open(INCLUDE, "< $_\0"))
       { warn "$::cmd: line $.: can't open \"$_\": $!\n";
-	next CAT;
+	$::Xit=1;
       }
-      print "\n";
-      while (defined($_=<INCLUDE>))
-      { print;
+      else
+      {
+	print "\n";
+	while (defined($_=<INCLUDE>))
+	{ print;
+	}
+	close(INCLUDE);
+	print "\n";
       }
-      close(INCLUDE);
-      print "\n";
+
       next CAT;
     }
 
@@ -378,6 +403,7 @@ sub readcats($;$)
     #       1      23                  4 5                        6       7
     if (! /^([+!]*)(("[^"]*"|[^\s"]\S*)(,("[^"]*"|[^\s"]\S*))*)\s+(\S+)\s+(\S.*)/)
     { warn "$::cmd: stdin, line $.: bad line: $_\n";
+      $::Xit=1;
       next CAT;
     }
 
