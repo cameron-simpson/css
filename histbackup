@@ -112,6 +112,8 @@ usage="Usage:
 			Turns off --symlink.
 	--no-delete, --mono
 			Monotonic growth - don't pass --delete to the rsync pass.
+	--delete, --delete-excluded
+			Passed to rsync.
 	--no-rsync, --linkonly
 			Don't do the rsync pass - just set up the new link tree
 			and report its basename.
@@ -164,6 +166,17 @@ do
     #
     --no-delete|--mono)
 		mono=1 ;;
+
+    # =item --delete
+    #
+    # Passed to rsync.
+    #
+    # =item --delete-excluded
+    #
+    # Passed to rsync.
+    #
+    --delete|--delete-excluded)
+		mono= rsopts="$rsopts $1" ;;
 
     # =item --no-rsync, --linkonly
     #
