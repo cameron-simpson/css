@@ -86,6 +86,9 @@ the labels will mostly track stuff for you anyway.
 
 =head2 LINE FORMAT
 
+Lines ending in a slosh ('\\') are continued to the next line,
+keeping the newline and discarding the slosh.
+
 Blank lines and lines beginning with an octothorpe ('#') are ignored.
 
 Lines of the form:
@@ -108,7 +111,7 @@ interpolate category files.
 
 Other lines are of the form:
 
-	[+][!]target[,target...] tag pattern
+	[+][!]target[,target...] tag pattern [newline pattern...]
 
 where each target has the form:
 
@@ -148,7 +151,11 @@ unless the B<-L> option is used,
 in which case it is placed in the B<X-Label:> header line.
 The special tag dot (".") suppresses this action.
 
-The I<pattern> selects the mail items.
+The I<pattern>s select the mail items.
+All the patterns in a rule must match the mail item for the rule to apply.
+The special pattern "B<.>" always matches.
+It's intended as a placeholder for ``continue'' rules that should always fire,
+typically to feed every mail item to a program.
 
 The I<folder> or I<who@where> or I<|progname> may be enclosed in double quotes
 if desired,
@@ -156,10 +163,6 @@ for example if the folder name or program invocation contains whitespace.
 Note that the quotes do not enclose the leading "B<+>" or "B<!>".
 
 =head2 Example Patterns
-
-Firstly, the special pattern "B<.>" always matches.
-It's intended as a placeholder for ``continue'' rules that should always fire,
-typically to feed every mail item to a program.
 
 The usual form is simply an address (see RFC822 and RFC2822)
 to be present in the B<To>, B<CC> or B<BCC> header lines.
@@ -201,6 +204,11 @@ For example:
 	fredmail Fred fred@this.isp.com
 
 to accept mail aimed at B<fred@this.isp.com> and also copy it to B<fred@that.isp.com>.
+
+Patterns with more than one condition:
+
+	logs	cron	root \
+			subject:/Cron <root
 
 =head1 ENVIRONMENT
 
@@ -319,6 +327,7 @@ sub readcats($;$)
   local($_);
 
   my $rule;
+  my $hasnl=0;
 
   CAT:
   while (<$FILE>)
@@ -401,13 +410,14 @@ sub readcats($;$)
 
     # we expect "[flags]mailboxes tag rule"
     #       1      23                  4 5                        6       7
-    if (! /^([+!]*)(("[^"]*"|[^\s"]\S*)(,("[^"]*"|[^\s"]\S*))*)\s+(\S+)\s+(\S.*)/)
+    if (! /^([+!]*)(("[^"]*"|[^\s"]\S*)(,("[^"]*"|[^\s"]\S*))*)\s+(\S+)\s+(\S)/)
     { warn "$::cmd: stdin, line $.: bad line: $_\n";
       $::Xit=1;
       next CAT;
     }
 
-    my($flags,$folders,$key,$ptn)=($1,$2,$6,$7);
+    my($flags,$folders,$key)=($1,$2,$6);
+    $_=$7.$';
 
     # leading "+" means continue after rule
     my $cont = (index($flags,'+') >= 0 ? 'c' : '');
@@ -421,12 +431,16 @@ sub readcats($;$)
       $doalert=0;
     }
 
+    print "\n: 0$cont\n";
+
     my @hdrs;
-    if ($ptn eq '.')
-    { undef $ptn;
-    }
-    else
-    {
+
+    PATTERN:
+    for my $ptn (split(/\n[ \t]*/))
+    { $ptn =~ s/\s+$//;
+   
+      next PATTERN if $ptn eq '' || $ptn eq '.';
+
       if ($ptn =~ /^(\w[-,\w]*):/)
       { $ptn=$';
 	@hdrs=split(/,+/, $1);
@@ -455,13 +469,10 @@ sub readcats($;$)
       $ptn =~ s/\.[^*]/\\$&/g;
       $ptn =~ s/\+/\\$&/g;
       $ptn=".*$ptn";
+
+      print "* ^", altre(@hdrs), ":$ptn\n";
     }
 
-    print "\n: 0$cont\n";
-    if (defined($ptn))
-    { my $hregexp = altre(@hdrs);
-      print "* ^$hregexp:$ptn\n";
-    }
     print "{\n";
 
     if ($::TrackRules)
