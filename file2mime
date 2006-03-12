@@ -46,6 +46,7 @@ case "$type" in
     *': '*'MPEG system stream data'*) mtype=video/mpeg ;;
     *': '*'Microsoft Office Document'*) mtype=application/msword ;;
     *': '*'RIFF (little-endian) data, AVI') mtype=video/avi ;;
+    *': uuencoded or xxencoded text'*)	mtype=application/x-uuencode ;;
     *': '*'PGP armored data signed message'*)
 					mtype=text/plain ;;
     *': '*'ASCII '*)			mtype=text/plain ;;
