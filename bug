@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/sh -u
 #
 # Log a fresh bug in the specified bug system.
 # Default: the first supported bug in the $BUGSYSTEMS envvar, defaulting to mailto:$USER.
