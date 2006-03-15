@@ -11,14 +11,30 @@
 sev=2
 
 cmd=$0
-usage="Usage: $cmd [-B bugsystem] [severity] title-words...
+usage="Usage: $cmd [-B bugsystem] [-S severity] title-words...
 	-B bugsystem	Specify the bugsystem.
 			Supported: ddts, mailto:addr.
-	severity	A number in the range 1-5. Default: $sev"
+	-S severity	A number in the range 1-5. Default: $sev"
 
-[ "x$1" = x-B ] && { BUGSYSTEMS=$2; shift; }
-case "$1" in [1-5]) sev=$1; shift ;; esac
-[ $# = 0 ] && { echo "Usage: $0 bug [severity] title" >&2; exit 2; }
+badopts=
+
+while [ $# -gt 0 ]
+do
+  case "$1" in
+    -B)	BUGSYSTEMS=$2; shift ;;
+    -S)	sev=$2; shift ;;
+    --)	shift; break ;;
+    -?*)echo "$cmd: unrecognised otpion: $1" >&2
+	badopts=1
+	;;
+    *)	break ;;
+  esac
+  shift
+done
+
+[ $# -gt 0 ] || { echo "$cmd: missing title-words" >&2; badopts=1; }
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
 
 exec 3>&1
 
@@ -58,7 +74,7 @@ exec 3>&1
 	;;
       ddts)
 	pro=sa.maintenance
-	exec mkddtsrq -S "$sev" -p "$pro" "$*"
+	exec mkddtsrq -S "$sev" -p "$pro" -- "$*"
 	;;
       tdl)
 	exec td --add "$*"
