@@ -187,7 +187,7 @@ I<execute-args> supplied.
 sub dosql
 { my($dbh,$sql)=(shift,shift);
 
-  ##warn "dosql: sql=\n$sql\nargs = [@_]\n" if $sql !~ /^select\b/i;
+  ::debug("dosql: sql=\n$sql\nargs = [".join(',',map(defined($_) ? $_ : 'UNDEF', @_))."]\n");
   my $sth = sql($dbh,$sql);
   return undef if ! defined $sth;
 
@@ -1181,7 +1181,7 @@ sub insert	# dbh,table[,dfltok],fields...
 	  . join(',',map('?',@fields))
 	  . ")";
 
-  ## warn "SQL is [$sql]";
+  ::debug("cs::DBI::insert: SQL is [$sql]");
   bless [ $dbh, $table, $sql, sql($dbh,$sql), $dfltok, @fields ];
 }
 
@@ -1222,7 +1222,7 @@ sub ExecuteWithRec
   INSERT:
   while (@_)
   { my $rec = shift(@_);
-    ##warn "INSERT rec = ".cs::Hier::h2a($rec,1);
+    ::debug("INSERT rec = ".cs::Hier::h2a($rec,1));
     my @execargs=();
 
     for my $field (@fields)
@@ -1245,10 +1245,11 @@ sub ExecuteWithRec
     }
 
     # for some reason, text fields can't be empty - very bogus
+    # (probably the '' quote escape in SQL syntax - cameron 17mar2006)
     ## for (@execargs) { $_=' ' if defined && ! length; }
 
 
-    ##{my@c=caller;warn "sth=".cs::Hier::h2a($sth,1)."\nexecargs[@execargs]\nfrom [@c]";}
+    {my@c=caller;::debug("sth=".cs::Hier::h2a($sth,1)."\nexecargs[@execargs]\nfrom [@c]");}
 
     if (! $sth->execute(@execargs))
     { warn "$::cmd: ERROR with insert";
@@ -1285,7 +1286,7 @@ sub SelectDateRanges($$$;$)
   $when=$dbh->quote($when);
 
   my $statement = "SELECT * FROM $table WHERE $constraint START_DATE <= $when AND ( ISNULL(END_DATE) OR END_DATE >= $when )";
-  ## warn "statement=[$statement]";
+  ##::debug("statement=[$statement]");
   dosql($dbh,$statement);
 }
 
