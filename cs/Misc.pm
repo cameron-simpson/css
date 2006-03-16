@@ -44,6 +44,12 @@ sub ::log
   ## warn join('',@_)." at @c";
 }
 
+sub ::debug
+{ if (exists $::ENV{DEBUG} && length $::ENV{DEBUG})
+  { warn(@_);
+  }
+}
+
 sub ::member
 { my($str)=shift;
   scalar(grep($_ eq $str,@_));
