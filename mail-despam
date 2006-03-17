@@ -118,7 +118,7 @@ do
   if [ -s "$rawlist" ]
   then
     busy=1
-    lock "$lock" bogofilter -l -b -T -o 0.6,0.45 -u 2>>"$CONSOLE" <"$rawlist" >"$bogolist"
+    lock "$lock" bogof -b -T -o 0.6,0.45 -u 2>>"$CONSOLE" <"$rawlist" >"$bogolist"
 
     # file known non-spam
     awk '$2 == "H" { print $1 }' <"$bogolist" \
@@ -142,14 +142,17 @@ do
 	    ##echo "spamassassin $f ..." >>"$LOGDIR/procmail"
 	    if spamassassin -e -L <"$f" >/dev/null
 	    then
-	      bogofilter -Sn <"$f"
+	      bogof -Sn <"$f"
 	      filemailitem "$nonspam" <"$f" && rm -- "$f"
 	    else
-	      bogofilter -Ns <"$f"
+	      bogof -Ns <"$f"
 	      filemailitem "$spam" <"$f" && rm -- "$f"
 	    fi
 	  done
 	' <"$rawlist"
+
+    # update master table
+    bogof-sync
   fi
 
   [ -n "$delay" ] || break
