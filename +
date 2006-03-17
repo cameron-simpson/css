@@ -4,6 +4,8 @@
 #	- Cameron Simpson <cs@zip.com.au>
 #
 
+: ${MAILHOMEHOST:=$HOMEHOST}
+
 cmd=$0
 usage="Usage: $0 [+a] [+s] [+t] [-f] [some-mutt-options...] [mutt-folder]"
 
