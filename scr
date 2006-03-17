@@ -6,6 +6,7 @@
 
 : ${TMPDIR:=/tmp}
 : ${SHELL:=/bin/sh}
+: ${SCR_PREARGV='ssh-agent'}
 
 cmd=$0
 usage="Usage:
@@ -109,6 +110,7 @@ if [ -z "$havecmd" ]
 then
   [ $# -gt 0 ] && { sess=$1; shift; }
   [ $# = 0 ] && set -- "$SHELL"
+  set -- $SCR_PREARGV "$@"
 fi
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
@@ -116,6 +118,7 @@ fi
 if [ ! -f /usr/bin/screen ] && [ ! -f /opt/bin/screen ]
 then
   echo "$cmd: no /usr/bin/screen or /opt/bin/screen, just running: $*" >&2
+  set -x
   exec "$@"
 fi
 
