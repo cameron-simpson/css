@@ -14,4 +14,4 @@ bfdir=${BOGOFILTER:=$HOME/.bogofilter}
 owf=$bfdir/wordlist.db
 swf=$shmbf/wordlist.db
 
-[ -s "$swf" -a -s "$owf" ] && exec rsync -a -- "$swf" "$owf"
+[ -s "$swf" -a -s "$owf" ] && exec cp -- "$swf" "$owf"	## rsync -a -- "$swf" "$owf"
