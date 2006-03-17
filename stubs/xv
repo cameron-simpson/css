@@ -1,7 +1,12 @@
 #!/bin/sh
 #
 
-xv=/opt/bin/xv
+xv=
+for xvpath in /usr/local/bin/xv /usr/bin/xv /opt/bin/xv
+do
+  [ -x "$xvpath" ] && { xv=$xvpath; break; }
+done
+[ -n "$xv" ] || { echo "$0: no xv binary?" >&2; exit 1; }
 
 case $1 in
     -display)	DISPLAY=$2; export DISPLAY; shift; shift ;;
