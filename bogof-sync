@@ -1,0 +1,17 @@
+#!/bin/sh -u
+#
+# Rsync SHM bogofilter db to master db.
+#	- Cameron Simpson <cs@zip.com.au> 17mar2006
+# 
+#
+
+: ${SHMFS:=/dev/shm}
+
+shmbf=$SHMFS/$USER/bogofilter
+
+bfdir=${BOGOFILTER:=$HOME/.bogofilter}
+
+owf=$bfdir/wordlist.db
+swf=$shmbf/wordlist.db
+
+[ -s "$swf" -a -s "$owf" ] && exec rsync -a -- "$swf" "$owf"
