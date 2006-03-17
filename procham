@@ -16,7 +16,7 @@ tmp=$TMPDIR/procham$$
 cat >"$tmp" || exit 1
 exec </dev/null
 
-( bogofilter -Sn <"$tmp"
+( bogof -Sn <"$tmp"
   filemailitem +spool-in <"$tmp" && rm "$tmp"
 ) &
 [ $sync ] || exit 0
