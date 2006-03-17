@@ -8,5 +8,5 @@
 : ${ALERTLOG:=$LOGDIR/alert}
 
 exec 3<&0 >>"$ALERTLOG" 2>&1
-bgproc -p /dev/null -i - -l alert set-x bogofilter -Ns <&3 3<&- &
+bgproc -p /dev/null -i - -l alert set-x bogof -Ns <&3 3<&- &
 exit 0
