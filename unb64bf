@@ -23,6 +23,6 @@ then
 fi
 
 # not exec because we want the trap to work later
-bogofilter ${1+"$@"} <"$tmp"
+bogof ${1+"$@"} <"$tmp"
 
 exit $?
