@@ -1,0 +1,25 @@
+#!/bin/sh -u
+#
+# Wrapper for bogofilter to subvert the fsync()-happy nature of its db backend.
+#	- Cameron Simpson <cs@zip.com.au> 17mar2006
+# 
+#
+
+: ${SHMFS:=/dev/shm}
+
+shmbf=$SHMFS/$USER/bogofilter
+
+bfdir=${BOGOFILTER:=$HOME/.bogofilter}
+
+owf=$bfdir/wordlist.db
+swf=$shmbf/wordlist.db
+
+if [ -s "$owf" -a ! -s "$swf" ] \
+&& { [ -d "$shmbf/." ] || needdir "$shmbf"; } \
+&& cp -- "$owf" "$swf"
+then
+  BOGOFILTER_DIR=$shmbf
+  export BOGOFILTER_DIR
+fi
+
+exec bogofilter ${1+"$@"}
