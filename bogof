@@ -14,9 +14,11 @@ bfdir=${BOGOFILTER:=$HOME/.bogofilter}
 owf=$bfdir/wordlist.db
 swf=$shmbf/wordlist.db
 
-if [ -s "$owf" -a ! -s "$swf" ] \
+[ -s "$owf" -a ! -s "$swf" ] \
 && { [ -d "$shmbf/." ] || needdir "$shmbf"; } \
 && cp -- "$owf" "$swf"
+
+if [ -s "$swf" ]
 then
   BOGOFILTER_DIR=$shmbf
   export BOGOFILTER_DIR
