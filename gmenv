@@ -1,0 +1,2 @@
+#!/bin/sh -u
+exec genv GM_OPTS GM_ACCOUNTS GM_DELAY GM_LOGFILE
