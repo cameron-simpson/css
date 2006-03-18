@@ -1,0 +1,3 @@
+#!/bin/sh
+set -x
+exec killpidfile ${1+"$@"} getmail_sleep.pid
