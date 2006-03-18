@@ -109,7 +109,7 @@ do
   [ -n "$delay" ] || break
   if [ -f "$busyflag" ]
   then $trace sleep 1
-  else $trace sleep "$delay"
+  else sleep "$delay"
   fi
 done
 
