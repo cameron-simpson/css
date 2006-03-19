@@ -1,65 +1,161 @@
-#!/bin/sh
+#!/bin/sh -u
 #
-# Open fresh shell on target machine in new window.
-#	- Cameron Simpson <cs@zip.com.au> 23oct2001
+# Quick attach to remote host.
+#	- Cameron Simpson <cs@zip.com.au>
 #
 
-cmd=$0
-usage="Usage: $cmd [host,host... [rterm-args...]]"
+: ${RTERM_SSHOPTS:=''}
+: ${TERM:=vt100}
+: ${DISPLAY:=''}
+
+cmd=`basename "$0"`
+usage="Usage: $cmd [login@]host[,[login@host]...] [-v] [-n name] [-o opt] {-A | [-c sh-command] | [[--] command [args...]]}
+	-A	Pop up terminals for all screens on the remote host.
+	-ip +ip	Passed to term.
+	-v	Verbose.
+	-1	Use ssh protocol 1.
+	-2	Use ssh protocol 2.
+	-m msg	Log session with the supplied message.
+	-T term	Remote terminal name to use.
+		Default from \$TERM: $TERM
+	-x	Ssh option: X11 forwarding off.
+	-X	Ssh option: X11 forwarding on. NB: Turns on ForwardX11Trusted.
+	-n name	Name for window and remote screen session."
 
 badopts=
 
-[ $badopts ] && { echo "$usage" >&2; exit 2; }
-
-at_dflt=
-at_target=
-
 if [ $# -gt 0 ]
 then
-  host=$1
+  targets=$1
   shift
 else
-  # no hosts? try for default list of targets
-  at_default=
-  eval `winclause "$HOME/rc/@" "$HOST.$SYSTEMID@$LOCATION" | sed -n 's/^default=/at_&/p'`
-  if [ -n "$at_default" ]
-  then host=$at_default
-  else echo "$0: no default host list for $HOST.$SYSTEMID@$LOCATION" >&2
-	exit 1
-  fi
+  echo "$cmd: missing host[@systemid]" >&2
+  badopts=1
 fi
 
-# transmute some names
-at_target=
-eval `winclause "$HOME/rc/@" "$host" | sed -n 's/^target=/at_&/p'`
-[ -n "$at_target" ] && host=$at_target
+trace=:
+name=
+verbose=
+farhost=
+newflag=
+sshopts=
+sshx11opt=
+##[ -n "$DISPLAY" ] && sshx11opt=-Y
+termopts=
+doscript=
+doscreen=
+allscreens=
+msg=
+nomsgopt=-M
 
-case "$host" in
-  *,*)
-      [ -n "$DISPLAY" ] || { echo "$cmd: can't do multiple sessions without a \$DISPLAY" >&2
-			     exit 1
-			   }
-      xit=0
+##set -vx
+dflt_env=': set -vx
+	  [ -s /etc/profile ] && . /etc/profile
+          [ -s rc/shell/rigenv ] && . ./rc/shell/rigenv
+	  wSHELL=
+	  for sh in zsh bash ksh sh $SHELL
+	  do
+	    for bin in /bin /usr/bin /usr/local/bin
+	    do
+	      case "$sh" in /*) binsh=$sh ;; *) binsh=$bin/$sh ;; esac
+	      [ -x "$binsh" ] && { wSHELL=$binsh; break; }
+	    done
+	    [ -n "$wSHELL" ] && break
+	  done
+	  [ -n "$wSHELL" ] && SHELL=$wSHELL
+	  export SHELL
+	  [ -s /opt/css/env.sh ] && . /opt/css/env.sh'
 
-      lastbase=
-      for h in `echo "$host" | tr , ' '`
-      do  case "$h" in
-	    [0-9])
-	      [ -n "$lastbase" ] \
-	      || { echo "$cmd: no previous hostN name, skipping: $h" >&2
-		   xit=1
-		   continue
-		 }
-	      h=$lastbase$h
-	      ;;
-	    [a-z]*[0-9])
-	      lastbase=`expr "x$h" : 'x\(.*[^0-9]\)[0-9]*'` || xit=1
-	      ;;
-	  esac
-	  "$0" "$h" ${1+"$@"} || xit=1
-      done
-      exit $xit
-      ;;
-  *)  exec rterm "$host" ${1+"$@"}
-      ;;
-esac
+gotargs=
+while [ $# -gt 0 ]
+do  case $1 in
+	-A)	doscreen=1 allscreens=1 ;;
+	-c)	shift; set -- sh -c "$1"; break ;;
+	-e)	shift
+		[ $# = 0 ] && { echo "$cmd: -e: missing command" >&2
+				badopts=1
+			      }
+		break
+		;;
+	-m)	msg=$2; shift; nomsgopt=; doscript=1 ;;
+	-n)	name=$2; shift ;;
+	-v)	sshopts="$sshopts -v" verbose=1 ;;
+	-T)	TERM=$2; shift ;;
+	-[XY])	sshx11opt=$1 ;;
+	+X)	sshx11opt=forwardx11=no ;;
+	-[12])sshopts="$sshopts $1" ;;
+	-ip|+ip)termopts="$termopts $1" ;;
+	-s)	doscreen=1 ;;
+	+s)	doscreen= ;;
+	--)	shift; break ;;
+	-?*)	echo "$cmd: unrecognised option: $1" >&2; badopts=1 ;;
+	*)	break ;;
+    esac
+    shift
+done
+
+[ $allscreens ] \
+ && { [ $# = 0 ] \
+   || { echo "$cmd: a command may not be supplied with -A option" >&2
+	badopts=1
+      }
+    }
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+xit=0
+
+for target in `printf "%s\n" "$targets" | tr , ' '`
+do
+  (
+    [ -n "$name" ] || name=$target
+
+    if [ $allscreens ]
+    then
+	sshto $RTERM_SSHOPTS $sshopts -- "$target" "$dflt_env; exec scr" \
+	| { xit=0
+	    hit=
+	    while read n title
+	    do  
+	      hit=1
+	      term -n "$name: $title" -e sshto $RTERM_SSHOPTS $sshopts -- "$target" "$dflt_env; exec scr $n" \
+		    || xit=1
+	    done
+	    [ $hit ] || { echo "$cmd: no remote screens on $target, starting new session" >&2
+			  set -x
+			  exec "$0" $sshopts $termopts "$target"
+			}
+	    exit $xit
+	  }
+	exit $?
+    fi
+
+    # no command? just run the preferred shell
+    [ $# = 0 ] && set -- sh -c '[ -s /opt/css/env.sh ] && . /opt/css/env.sh; exec $SHELL'
+
+    if [ $doscreen ]
+    then
+      case "$TERM" in
+	rxvt*)
+	  oTERM=$TERM
+	  TERM=vt100
+	  export TERM
+	  echo "$cmd: warning: changing TERM from \"$oTERM\" to \"$TERM\" for screen" >&2
+	  ;;
+      esac
+    fi
+
+    # pass envvars
+    set -- env "TERM=$TERM" "$@"
+
+    [ $doscreen ] && set -- scr -e "$@"
+    qcmd="$dflt_env; exec "`shqstr "$@"`
+    set -- sshto $RTERM_SSHOPTS $sshx11opt $sshopts -- "$target" "$qcmd"
+    [ $doscript ] && set -- logscript -m "$name: $msg" $nomsgopt -- "$name" "$@"
+
+    set -x
+    exec term $termopts -n "$name" -e "$@"
+  ) || xit=1
+done
+
+exit $xit
