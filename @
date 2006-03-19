@@ -105,29 +105,44 @@ done
 
 xit=0
 
+lastbase=
 for target in `printf "%s\n" "$targets" | tr , ' '`
 do
+  case "$target" in
+    [0-9])
+      [ -n "$lastbase" ] \
+      || { echo "$cmd: no previous hostN name, skipping: $target" >&2
+	   xit=1
+	   continue
+	 }
+      target=$lastbase$target
+      ;;
+    [a-z]*[0-9])
+      lastbase=`expr "x$target" : 'x\(.*[^0-9]\)[0-9]*'` || xit=1
+      ;;
+  esac
+
   (
     [ -n "$name" ] || name=$target
 
     if [ $allscreens ]
     then
-	sshto $RTERM_SSHOPTS $sshopts -- "$target" "$dflt_env; exec scr" \
-	| { xit=0
-	    hit=
-	    while read n title
-	    do  
-	      hit=1
-	      term -n "$name: $title" -e sshto $RTERM_SSHOPTS $sshopts -- "$target" "$dflt_env; exec scr $n" \
-		    || xit=1
-	    done
-	    [ $hit ] || { echo "$cmd: no remote screens on $target, starting new session" >&2
-			  set -x
-			  exec "$0" $sshopts $termopts "$target"
-			}
-	    exit $xit
-	  }
-	exit $?
+    sshto $RTERM_SSHOPTS $sshopts -- "$target" "$dflt_env; exec scr" \
+    | { xit=0
+	hit=
+	while read n title
+	do  
+	  hit=1
+	  term -n "$name: $title" -e sshto $RTERM_SSHOPTS $sshopts -- "$target" "$dflt_env; exec scr $n" \
+		|| xit=1
+	done
+	[ $hit ] || { echo "$cmd: no remote screens on $target, starting new session" >&2
+		      set -x
+		      exec "$0" $sshopts $termopts "$target"
+		    }
+	exit $xit
+      }
+    exit $?
     fi
 
     # no command? just run the preferred shell
@@ -135,14 +150,14 @@ do
 
     if [ $doscreen ]
     then
-      case "$TERM" in
-	rxvt*)
-	  oTERM=$TERM
-	  TERM=vt100
-	  export TERM
-	  echo "$cmd: warning: changing TERM from \"$oTERM\" to \"$TERM\" for screen" >&2
-	  ;;
-      esac
+    case "$TERM" in
+    rxvt*)
+      oTERM=$TERM
+      TERM=vt100
+      export TERM
+      echo "$cmd: warning: changing TERM from \"$oTERM\" to \"$TERM\" for screen" >&2
+      ;;
+    esac
     fi
 
     # pass envvars
@@ -153,7 +168,6 @@ do
     set -- sshto $RTERM_SSHOPTS $sshx11opt $sshopts -- "$target" "$qcmd"
     [ $doscript ] && set -- logscript -m "$name: $msg" $nomsgopt -- "$name" "$@"
 
-    set -x
     exec term $termopts -n "$name" -e "$@"
   ) || xit=1
 done
