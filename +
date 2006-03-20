@@ -5,6 +5,7 @@
 #
 
 : ${MAILHOMEHOST:=$HOMEHOST}
+: ${DISPLAY:=''}
 
 cmd=$0
 usage="Usage: $0 [+a] [+s] [+t] [-f] [some-mutt-options...] [mutt-folder]"
@@ -15,7 +16,7 @@ usage="Usage: $0 [+a] [+s] [+t] [-f] [some-mutt-options...] [mutt-folder]"
 mfolder=+me
 muttopts=
 anyhost=
-use_term=1
+use_term=1; case "$DISPLAY" in localhost:[1-9]*) use_term= ;; esac
 use_screen=
 preshcmd=
 postshcmd=
