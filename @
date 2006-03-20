@@ -48,24 +48,6 @@ allscreens=
 msg=
 nomsgopt=-M
 
-##set -vx
-dflt_env=': set -vx
-	  [ -s /etc/profile ] && . /etc/profile
-          [ -s rc/shell/rigenv ] && . ./rc/shell/rigenv
-	  wSHELL=
-	  for sh in zsh bash ksh sh $SHELL
-	  do
-	    for bin in /bin /usr/bin /usr/local/bin
-	    do
-	      case "$sh" in /*) binsh=$sh ;; *) binsh=$bin/$sh ;; esac
-	      [ -x "$binsh" ] && { wSHELL=$binsh; break; }
-	    done
-	    [ -n "$wSHELL" ] && break
-	  done
-	  [ -n "$wSHELL" ] && SHELL=$wSHELL
-	  export SHELL
-	  [ -s /opt/css/env.sh ] && . /opt/css/env.sh'
-
 gotargs=
 while [ $# -gt 0 ]
 do  case $1 in
@@ -127,22 +109,22 @@ do
 
     if [ $allscreens ]
     then
-    sshto $RTERM_SSHOPTS $sshopts -- "$target" "$dflt_env; exec scr" \
-    | { xit=0
-	hit=
-	while read n title
-	do  
-	  hit=1
-	  term -n "$name: $title" -e sshto $RTERM_SSHOPTS $sshopts -- "$target" "$dflt_env; exec scr $n" \
-		|| xit=1
-	done
-	[ $hit ] || { echo "$cmd: no remote screens on $target, starting new session" >&2
-		      set -x
-		      exec "$0" $sshopts $termopts "$target"
-		    }
-	exit $xit
-      }
-    exit $?
+      envssh $RTERM_SSHOPTS $sshopts -- "$target" exec scr \
+      | { xit=0
+	  hit=
+	  while read n title
+	  do  
+	    hit=1
+	    term -n "$name: $title" -e sshto $RTERM_SSHOPTS $sshopts -- "$target" "$dflt_env; exec scr $n" \
+		  || xit=1
+	  done
+	  [ $hit ] || { echo "$cmd: no remote screens on $target, starting new session" >&2
+			set -x
+			exec "$0" $sshopts $termopts "$target"
+		      }
+	  exit $xit
+	}
+      exit $?
     fi
 
     # no command? just run the preferred shell
