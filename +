@@ -6,12 +6,11 @@
 
 : ${MAILHOMEHOST:=$HOMEHOST}
 : ${DISPLAY:=''}
+: ${LOGDIR:=$HOME/var/log}
+: ${ALERTLOG:=$LOGDIR/alert}
 
 cmd=$0
 usage="Usage: $0 [+a] [+s] [+t] [-f] [some-mutt-options...] [mutt-folder]"
-
-# hack to clear my alert window when I view my default folder
-( [ $# = 0 ] && alert "`clear`" ) &
 
 mfolder=+me
 muttopts=
@@ -53,15 +52,16 @@ then
   esac
   shift
   [ $# = 0 ] || { echo "$cmd: extra arguments: $*" >&2; badopts=1; }
+else
+  # hack to clear my alert window when I view my default folder
+  ( clear >>"$ALERTLOG" ) &
 fi
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
-[ $anyhost ] || needhost "$HOMEHOST@$SYSTEMID" || exit 1
-
 fpath=`mailfolderpath "$mfolder"` || exit 1
 
-# where to taqke copies - presumes sendmail=sendmesg-fcc in muttrc
+# where to take copies - presumes sendmail=sendmesg-fcc in muttrc
 SENDMESG_FCC="$fpath +spool-out"
 export SENDMESG_FCC
 
@@ -110,6 +110,8 @@ set sh -c "exec $muttcmd"
 
 [ $use_screen ] && set scr "mutt_$mfolder" "$@"
 [ $use_term   ] && set term -j email $termopts -n "mutt $mfolder" "$@"
+
+[ $anyhost ] || [ "x$MAILHOMEHOST" = "x$HOST" ] || exec envssh "$MAILHOMEHOST" `shqstr "$@"`
 
 set -x
 [ -z "$preshcmd" -a -z "$postshcmd" ] && exec "$@"
