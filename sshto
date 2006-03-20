@@ -2,6 +2,7 @@
 #
 # Bang style ssh for hopping through firewalls etc.
 # Sshes from host to host to reach destination.
+# Assorted other minor features.
 #	- Cameron Simpson <cs@zip.com.au> 28may2004
 #
 
@@ -11,12 +12,31 @@ trace=	##set-x
 sshopts=
 [ -s "$HOME/.ssh/config" ] && sshopts="$sshopts -F \"\$HOME/.ssh/config\""
 topt=
+presh=
+env_presh=': set -vx
+	  [ -s /etc/profile ] && . /etc/profile
+          [ -s $HOME/.profile ] && . $HOME/.profile
+	  wSHELL=
+	  for sh in zsh bash ksh sh $SHELL
+	  do
+	    for bin in /bin /usr/bin /usr/local/bin
+	    do
+	      case "$sh" in /*) binsh=$sh ;; *) binsh=$bin/$sh ;; esac
+	      [ -x "$binsh" ] && { wSHELL=$binsh; break; }
+	    done
+	    [ -n "$wSHELL" ] && break
+	  done
+	  [ -n "$wSHELL" ] && SHELL=$wSHELL
+	  export SHELL
+	  [ -s /opt/css/env.sh ] && . /opt/css/env.sh
+	 '
 
 cmd=`basename "$0"` || cmd=$0
 usage="Usage: $cmd [ssh-options...] [sshcfg=value...] [user@]host[![user2@]host2...] [command ...]
 	ssh-options...	Passed to all ssh commands.
 	sshcfg=value	Transmuted to -o 'sshcfg value' and added to ssh-option.
-	-z, +z		Pass -o Compression yes/no to ssh."
+	-z, +z		Pass -o Compression yes/no to ssh.
+	-E		Run login setup at far end."
 
 set -- $SSHTO_OPTS ${1+"$@"}
 
@@ -31,6 +51,7 @@ do
   case $1 in
     -t)	topt=-t ;;
     +t)	topt= ;;
+    -E)	presh=$env_presh ;;
     -[aAfgknNqsTvxXYC1246])
 	sshopts="$sshopts $1"
 	;;
@@ -70,14 +91,10 @@ fi
 
 [ -t 0 -a -t 1 ] && topt=-t
 
-if [ $# = 0 ]
-then
-  qcmd=`shqstr /bin/sh -c ': set -x; exec ${SHELL:=/bin/sh}'`
-  set -- "$qcmd"
-fi
+[ $# = 0 ] && set -- 'exec ${SHELL:=/bin/sh}'
 
 sshargv="ssh $sshopts $topt"
-sshcmd=$*
+sshcmd=$presh$*
 
 while :
 do
