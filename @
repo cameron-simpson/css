@@ -115,7 +115,7 @@ do
 	  while read n title
 	  do  
 	    hit=1
-	    term -n "$name: $title" -e sshto $RTERM_SSHOPTS $sshopts -- "$target" "$dflt_env; exec scr $n" \
+	    term -n "$name: $title" -e envssh $RTERM_SSHOPTS $sshopts -- "$target" "exec scr $n" \
 		  || xit=1
 	  done
 	  [ $hit ] || { echo "$cmd: no remote screens on $target, starting new session" >&2
@@ -146,8 +146,8 @@ do
     set -- env "TERM=$TERM" "$@"
 
     [ $doscreen ] && set -- scr -e "$@"
-    qcmd="$dflt_env; exec "`shqstr "$@"`
-    set -- sshto $RTERM_SSHOPTS $sshx11opt $sshopts -- "$target" "$qcmd"
+    qcmd=exec\ `shqstr "$@"`
+    set -- envssh $RTERM_SSHOPTS $sshx11opt $sshopts -- "$target" "$qcmd"
     [ $doscript ] && set -- logscript -m "$name: $msg" $nomsgopt -- "$name" "$@"
 
     exec term $termopts -n "$name" -e "$@"
