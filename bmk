@@ -46,6 +46,8 @@ else
   echo "$*" >&2
 fi
 
+needhost "$HOMEHOST@home" || badopts=1
+
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
 if [ -n "$url" ]
