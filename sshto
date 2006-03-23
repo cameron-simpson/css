@@ -10,8 +10,9 @@
 
 trace=	##set-x
 sshopts=
+lsshopts=
 mycfg=$HOME/.ssh/config
-[ -s "$mycfg" -a -r "$mycfg" ] && sshopts="$sshopts -F \"\$mycfg\""
+[ -s "$mycfg" -a -r "$mycfg" ] && lsshopts="$lsshopts -F \"\$mycfg\""
 topt=
 presh=
 env_presh=': set -vx
@@ -94,7 +95,7 @@ fi
 
 [ $# = 0 ] && set -- 'exec ${SHELL:=/bin/sh}'
 
-sshargv="ssh $sshopts $topt"
+sshargv="$sshopts $topt"
 sshcmd=$presh$*
 
 while :
@@ -103,7 +104,7 @@ do
       *!*)	rhost=`expr "x$host" : 'x.*!\(.*\)'`
 		host=` expr "x$host" : 'x\(.*\)!.*'`
 		osshcmd=$sshcmd
-		sshcmd="exec $sshargv "`shqstr "$rhost" "$sshcmd"`
+		sshcmd="exec ssh $sshargv "`shqstr "$rhost" "$sshcmd"`
 		##echo "[$osshcmd] -> [$sshcmd]" >&2
 		;;
       *)	break
@@ -111,4 +112,4 @@ do
   esac
 done
 
-eval "exec $trace $sshargv $host \"\$sshcmd\""
+eval "exec $trace ssh $lsshopts $sshargv $host \"\$sshcmd\""
