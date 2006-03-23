@@ -9,6 +9,17 @@
 : ${LOGDIR:=$HOME/var/log}
 : ${ALERTLOG:=$LOGDIR/alert}
 
+needhost "$MAILHOMEHOST@$SYSTEMID" \
+|| { set -x
+     case "$LOCATION" in
+       $SYSTEMID) rhost=$MAILHOMEHOST ;;
+       *)	  rhost=$SYSTEMID!$MAILHOMEHOST ;;
+     esac
+     qargv=`shqstr "$@"`
+     set -x
+     exec envssh -t "$rhost" "+ $qargv"
+   }
+
 cmd=$0
 usage="Usage: $0 [+a] [+s] [+t] [-f] [some-mutt-options...] [mutt-folder]"
 
@@ -110,8 +121,6 @@ set sh -c "exec $muttcmd"
 
 [ $use_screen ] && set scr "mutt_$mfolder" "$@"
 [ $use_term   ] && set term -j email $termopts -n "mutt $mfolder" "$@"
-
-[ $anyhost ] || [ "x$MAILHOMEHOST" = "x$HOST" ] || exec envssh "$MAILHOMEHOST" `shqstr "$@"`
 
 set -x
 [ -z "$preshcmd" -a -z "$postshcmd" ] && exec "$@"
