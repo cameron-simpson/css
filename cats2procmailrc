@@ -195,6 +195,7 @@ and optionally ends in a slash, viz:
 	!adzap  AdZap           subject:/(noads|add?[-  s]*zap|squid_?redir|zapp(er|ing)|wrapzap)/
 
 which matches mail items with subjects probably regarding my adzap program.
+A leading "^.*" is added to the regexp unless it already starts with a "^".
 
 A typical use of the "at" sign is in conjunction with the plus sign above
 to copy particular mail items to another account while still delivering locally.
@@ -451,7 +452,6 @@ sub readcats($;$)
 
       if ($ptn =~ m:^/(.*?)/?$:)
       { $ptn=$1;
-	if ($ptn !~ /^\^/) { $ptn="$ptn"; }
       }
       else
       { if ($ptn !~ /\@./)
@@ -468,9 +468,12 @@ sub readcats($;$)
 
       $ptn =~ s/\.[^*]/\\$&/g;
       $ptn =~ s/\+/\\$&/g;
-      $ptn=".*$ptn";
+      if ($ptn =~ /^\^/)
+      { $ptn=$'; }
+      else
+      { $ptn=".*$ptn"; }
 
-      print "* ^", altre(@hdrs), ":$ptn\n";
+      print "* ^", altre(@hdrs), ":[ 	]*$ptn\n";
     }
 
     print "{\n";
