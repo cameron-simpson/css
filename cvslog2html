@@ -81,49 +81,65 @@ else
 while (defined ($_=<STDIN>))
 {
   chomp;
+  ::debug("[$_]\n");
 
   if ($incomment)
   { if (/^=============================================================================$/
      || /^----------------------------$/
       )
-    { $incomment=0;
+    { ::debug("END COMMENT");
+      $incomment=0;
       if (@comment)
       { push(@log,[$file, $rev, $day, $time, $author, [@comment]]);
       }
     }
     elsif (!@comments && /^branches:/)
-    {}
+    {
+    ::debug("branch: while no comments");
+    }
     elsif (!@comments
         && ( $_ eq '*** empty log message ***'
 	  || /^initial (commit|check\s*in|revision)/i
 	   )
 	  )
-    {}	# Noise
+    {
+    ::debug("noise: $_\n");
+    }	# Noise
     else
-    { push(@comment,$_);
-      ## warn "note $_\n";
+    { ::debug("add comment: $_\n");
+      push(@comment,$_);
     }
   }
   elsif (/^$/)
-  { undef $file;
+  { ::debug("forget $file\n");
+    undef $file;
   }
   elsif (! defined $file)
   { if (/^Working file:\s+/)
     { $file=$';
+      ::debug("new file: $file\n");
+    }
+    else
+    { ::debug("no current file: skip: $_\n");
     }
   }
   else
   {
     if (/^revision (\d+\.\d+)$/)
     { $rev=$1;
+      ::debug("set rev=$rev\n");
     }
-
-    if (/^date:\s+(\d\d\d\d)\/(\d\d)\/(\d\d)\s+(\d\d:\d\d:\d\d);\s+author:\s+(\w+);/)
-    { $incomment=1;
+    elsif (/^date:\s+(\d\d\d\d)[^\d\s](\d\d)[^\d\s](\d\d)\s+(\d\d:\d\d:\d\d)[^;]*;\s+author:\s+(\w+);/)
+    {
+      $incomment=1;
       $day="$1-$2-$3";
       $time=$4;
       $author=$5;
       @comment=();
+      ::debug("new change start: $_\n");
+    }
+    else
+    { ::debug("skip: $_\n");
     }
   }
 }
