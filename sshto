@@ -10,7 +10,8 @@
 
 trace=	##set-x
 sshopts=
-[ -s "$HOME/.ssh/config" ] && sshopts="$sshopts -F \"\$HOME/.ssh/config\""
+mycfg=$HOME/.ssh/config
+[ -s "$mycfg" -a -r "$mycfg" ] && sshopts="$sshopts -F \"\$mycfg\""
 topt=
 presh=
 env_presh=': set -vx
