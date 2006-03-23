@@ -199,8 +199,9 @@ timelimit=
 # In the former format
 # an omitted I<method> defaults to B<rsync>.
 # In consequence, I<server> should be a FQDN so that it does not resemble a I<method> name.
-# The other methods known are B<http> and B<ftp>, for which the wget(1) command is used
-# in mirror mode.
+# The other methods known are B<http> and B<ftp>,
+# for which the wget(1) and lftp(1) commands are used
+# in mirror mode, respectively.
 #
 # The I<server> is an IP address or hostname
 # as may be passed to the rsync(1) command.
@@ -218,7 +219,7 @@ timelimit=
 #
 # I<Option>s specific to this particular line
 # may then follow,
-# typically I<rsync>'s B<--include=> and B<--exclude=> options
+# typically I<rsync>'s or I<lftp>'s B<--include=> and B<--exclude=> options
 # or wget(1)'s B<--accept> and B<--reject> options.
 #
 # For the B<rsync> method, the special option B<--latest>
@@ -398,9 +399,12 @@ do
 
 	set -- $rsync -rlHt $rsopts ${1+"$@"} $rszopt $rsxopts "$host::$rpath/." "$fpath/."
 	;;
-      http|ftp)
+      http)
 	ncut=`IFS=/; set -- $rpath; echo $#`
 	set -- wget --mirror -D "$host" -L -nH "--cut-dirs=$ncut" -np -P "$fpath" "$how://$host/$rpath"
+	;;
+      ftp)
+	set -- lftp -c "mirror $how://$host/$rpath $fpath"
 	;;
       *)echo "$pfx: method \"$how\" not supported" >&2
 	xit=1
