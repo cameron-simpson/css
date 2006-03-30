@@ -73,7 +73,6 @@ fi
 
 # snapshot errors and attach to output bottom
 STDERR=$TMPDIR/stderr.$USER.$$
-DEBUG=1; export DEBUG
 trap 'exec 2>&1
       if [ -n "$DEBUG" -a -s "$STDERR" ]
       then
