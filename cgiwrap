@@ -74,7 +74,7 @@ fi
 # snapshot errors and attach to output bottom
 STDERR=$TMPDIR/stderr.$USER.$$
 trap 'exec 2>&1
-      if [ -n "$DEBUG" -a -s "$STDERR" ]
+      if [ -s "$STDERR" ]
       then
 	  echo "Content-Type: text/html"
 	  echo
