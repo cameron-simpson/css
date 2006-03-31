@@ -399,8 +399,7 @@ then
       exec "$@"
     ) \
     || { echo "failed: $* $file"
-	 necho "View with? "
-	 read viewit || exit 0
+	 viewit=`readline 'View with? '` || exit 0
 	 case "$viewit" in
 	    ''|n|no)	;;
 	    *)		$viewit "$file" ;;
