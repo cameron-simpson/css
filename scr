@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/sh -u
 #
 # Attach to specified screen or make new one of specified name.
 #	- Cameron Simpson <cs@zip.com.au> 18may2002
