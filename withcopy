@@ -1,0 +1,52 @@
+#!/bin/sh -u
+#
+# Copy the supplied file, run command with copy.
+#	- Cameron Simpson <cs@zip.com.au> 31mar2006
+#
+
+: ${TMPDIR:=/tmp}
+
+trace=
+
+cmd=`basename "$0"` || exit 1
+usage="Usage: $cmd [-x] [arg1opts] filename command [args...]"
+
+badopts=
+
+arg1opts=
+
+while [ $# -gt 0 ]
+do
+  case "$1" in
+    -stdin|-discard|-end|-[0-9]*)
+    		arg1opts="$arg1opts $1" ;;
+    -x)		trace=set-x ;;
+    --)		shift; break ;;
+    -?*)	echo "$cmd: unrecognised argument: $1" >&2; badopts=1 ;;
+    *)		break ;;
+  esac
+  shift
+done
+
+if [ $# = 0 ]
+then
+  echo "$cmd: missing filename" >&2
+  badopts=1
+else
+  filename=$1
+  shift
+  if [ $# = 0 ]
+  then
+    echo "$cmd: missing command" >&2
+    badopts=
+  fi
+fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+copy=$TMPDIR/$cmd$$
+trap 'rm -f -- "$copy"' 0 1 2 13 15
+
+cp -p -- "$filename" "$copy" || exit 1
+# no exec so the trap cleans up
+$trace arg1 $arg1opts -- "$copy" "$@"
