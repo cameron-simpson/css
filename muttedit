@@ -6,6 +6,8 @@
 #	- Cameron Simpson <cs@zip.com.au> 31mar2006
 # 
 
+: ${TMPDIR:=/tmp}
+
 cmd=$0
 usage="Usage: $cmd filename"
 
@@ -16,5 +18,13 @@ filename=$1; shift
 now=`date '+%d%b%Y-%H:%M'|tr '[A-Z]' '[a-z]'`
 subj=`sed -n -e '/^$/q; /^[Ss]ubject:/{ s/^[^:]*:[ 	]*//; s/[^a-zA-Z0-9]/_/g; s/___*/_/g; p; q; }' <"$filename"`
 
+copy=$TMPDIR/muttedit$$.txt
+cp -p -- "$filename" "$copy" || exit 1
+
 set -x
-exec withcopy -x -- "$filename" screen -m -S "mutt-$now $subj" mutt -F "$HOME/rc/mail/mutt" -e 'set editor=$EDITOR' -H
+screen -m -S "mutt-$now $subj" mutt -F "$HOME/rc/mail/mutt" -e 'set editor=$EDITOR' -e 'unset signature' -H "$copy"
+xit=$?
+
+rm -f -- "$copy"
+
+exit $xit
