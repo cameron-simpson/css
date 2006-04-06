@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/sh -u
 #
 # Permit PASV FTP to hosts.
 # This needs to be upgraded to do the stateful FTP connection tracking
