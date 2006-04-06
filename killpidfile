@@ -1,39 +1,85 @@
-#!/bin/sh
+#!/bin/sh -u
 #
-# Kill the pid kept in the supplied pid file.
+# Kill the pid kept in the supplied pid files.
 #	- Cameron Simpson <cs@zip.com.au> 15jan2005
 #
 
 : ${VARRUN:=$HOME/var/run}
 
+trace=set-x
 sigopt=-TERM	# use USR1 if aiming at fetchmail daemon
+dounlink=
+dowait=
+killafter=
 
 cmd=$0
-usage="Usage: $cmd [-signal] pidfile"
+usage="Usage: $cmd [-d pidfiledir] [-u] [-w] [-W seconds] [-signal] pidfiles...
+	-d	Default directory for pidfiles. Default from \$VARRUN or \$HOME/var/run.
+	-u	Unlink pidfiles if used.
+	-w	Wait for processes to exit.
+	-W	Wait seconds for processes to exit, then send SIGKILL.
+	-signal	Initial signal to send. Passed to kill(1)."
 
 badopts=
 
-case "$1" in
-  -*)	sigopt=$1; shift ;;
-esac
+while [ $# -gt 0 ]
+do
+  case "$1" in
+    -d)	VARRUN=$2; shift ;;
+    -u)	dounlink=1 ;;
+    -w)	dowait=1 ;;
+    -W)	killafter=$2; shift ;;
+    -[0-9]* | -[A-Z]* )
+	sigopt=$1
+	;;
+    --)	shift; break ;;
+    -?*)echo "$cmd: unrecognised option: $1" >&2
+	badopts=1
+	;;
+    *)	break ;;
+  esac
+  shift
+done
 
 if [ $# = 0 ]
 then
-  echo "$cmd: missing pidfile" >&2
+  echo "$cmd: missing pidfiles" >&2
   badopts=1
-else
-  pidfile=$1; shift
-  [ $# = 0 ] || { echo "$cmd: extra arguments after pidfile: $*" >&2; badopts=1; }
 fi
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
-case "$pidfile" in
-  ./* | ../* | /* ) ;;
-  *) pidfile=$VARRUN/$pidfile ;;
-esac
+pids=
+for pidfile
+do
+  case "$pidfile" in
+    ./* | ../* | /* ) ;;
+    *) pidfile=$VARRUN/$pidfile ;;
+  esac
+  if [ -s "$pidfile" -a -f "$pidfile" ]
+  then
+    pids=$pids\ `cat "$pidfile"`
+    [ $dounlink ] && rm "$pidfile"
+  else
+    echo "SKIP $pidfile" >&2
+  fi
+done
 
-[ -s "$pidfile" -a -f "$pidfile" ] \
-&& { echo >>"$pidfile"; read pid etc <"$pidfile"; } \
-&& [ -n "$pid" ] \
-&& { set -x; kill $sigopt "$pid"; }
+pass=1
+while [ -n "$pids" ]
+do
+  livepids=
+  for pid in $pids
+  do $trace kill $sigopt "$pid" && livepids="$livepids $pid"
+  done
+
+  [ -n "$livepids" ] || break
+  [ $dowait ] || break
+
+  pids=$livepids
+  sleep 1
+
+  sigopt=-0
+  pass=`expr "$pass" + 1`
+  [ -n "$killafter" ] && [ "$pass" -ge "$killafter" ] && sigopt=-9
+done
