@@ -108,51 +108,7 @@ esac
 badopts=
 while :
 do  case $1 in
-	# =item B<-f> I<config>
 	#
-	# Specify a configuration file to use instead of B</etc/rc.mobile.conf>.
-	#
-	-f)   cf=$2; shift ;;
-	# =item B<-n>
-	#
-	# No action.
-	# Recite proposed actions.
-	# handy for debugging configuration file changes.
-	#
-	-n)   trace=echo noaction=1 ;;
-	# =item B<-y>
-	#
-	# Yes.
-	# Proceed with the default location without asking.
-	#
-	-y)   int= ;;
-	# =item B<-r>
-	#
-	# Raw.
-	# Run only the named clauses.
-	# The trailing clause name is now mandatory and need not start with an B<@>.
-	# 
-	-r)   raw=1 ;;
-	#
-	# =item B<-s>
-	#
-	# Synchronous.
-	# Wait for all dispatched actions to complete before exiting B<rc.mobile>.
-	# Normally the script will quit after everything is dispatched
-	# so as to have the system offer a login prompt as soon as possible.
-	# Some users find the completion messages appearing after the
-	# login prompt annoying, thus this option.
-	#
-	-s)   async= ;;
-	# =item B<-S>
-	#
-	# Really synchronous.
-	# In addition to waiting before exit,
-	# wait for each service script to complete.
-	# This pretty much obviates the speed advantages of B<rc.mobile>
-	# but might be useful during debugging.
-	#
-	-S)   async= asyncall= ;;
 	# =item B<-E> I<envfile>
 	#
 	# Save environment settings to the file I<envfile>.
@@ -186,6 +142,56 @@ do  case $1 in
 	# typically wanted by @nw(1cs).
 	# 
 	-E)   envfiles="$envfiles $2"; shift ;;
+	#
+	# =item B<-f> I<config>
+	#
+	# Specify a configuration file to use instead of B</etc/rc.mobile.conf>.
+	#
+	-f)   cf=$2; shift ;;
+	#
+	# =item B<-n>
+	#
+	# No action.
+	# Recite proposed actions.
+	# handy for debugging configuration file changes.
+	#
+	-n)   trace=echo noaction=1 ;;
+	#
+	# =item B<-r>
+	#
+	# Raw.
+	# Run only the named clauses.
+	# The trailing clause name is now mandatory and need not start with an B<@>.
+	# 
+	-r)   raw=1 ;;
+	#
+	# =item B<-s>
+	#
+	# Synchronous.
+	# Wait for all dispatched actions to complete before exiting B<rc.mobile>.
+	# Normally the script will quit after everything is dispatched
+	# so as to have the system offer a login prompt as soon as possible.
+	# Some users find the completion messages appearing after the
+	# login prompt annoying, thus this option.
+	#
+	-s)   async= ;;
+	#
+	# =item B<-S>
+	#
+	# Really synchronous.
+	# In addition to waiting before exit,
+	# wait for each service script to complete.
+	# This pretty much obviates the speed advantages of B<rc.mobile>
+	# but might be useful during debugging.
+	#
+	-S)   async= asyncall= ;;
+	#
+	# =item B<-y>
+	#
+	# Yes.
+	# Proceed with the default location without asking.
+	#
+	-y)   int= ;;
 	--)   shift; break ;;
 	-?*)  echo "$cmd: unrecognised option: $1" >&2
 	      badopts=1
@@ -431,7 +437,7 @@ runqueue()
       # remember that I<var>B<=`>I<shell-stuff>B<`>
       # can do quite a lot.
       #
-      \.\ *)
+      .)
 	shfiles=`expr "x$opline" : 'x\. \(.*\)'`
 	for shfile in $shfiles
 	do
@@ -563,7 +569,7 @@ else
     #
     # After obtaining the current location
     # (referred to as "I<where>" below)
-    # the clauses B<GLOBAL>, I<where> and B<FINAL> are run in that order.
+    # the clauses B<GLOBAL>, @I<where> and B<FINAL> are run in that order.
     #
     locations=`sed -n 's/^\\[@\\([a-z].*\\)\\]$/\\1/p' "$cf" | sort | tr '\012' ' '`
     if [ $int ]
