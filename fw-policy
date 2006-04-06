@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/sh-u
 #
 # Set policies.
 #	- Cameron Simpson <cs@zip.com.au> 18oct2003
@@ -6,6 +6,8 @@
 
 cmd=$0
 usage="Usage: $cmd policy [chains...]"
+
+trace=
 
 if [ $# = 0 ]
 then  echo "$cmd: missing policy" >&2
@@ -18,9 +20,8 @@ policy=$1; shift
 
 xit=0
 
-set -x
 for chain
-do iptables -P "$chain" "$policy" || xit=1
+do $trace iptables -P "$chain" "$policy" || xit=1
 done
 
 exit $xit
