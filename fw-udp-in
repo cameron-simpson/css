@@ -11,6 +11,8 @@
 cmd=$0
 usage="Usage: $cmd [-l] dest-port {ALL | hosts...}"
 
+trace=
+
 badopts=
 
 dolog=
@@ -34,16 +36,14 @@ fi
 target=ACCEPT
 [ $dolog ] && target=LOGACCEPT
 
-set -x
 if [ "x$*" = xALL ]
 then
-    iptables -I "$FW_CHAIN_INPUT" -p udp --destination-port "$dport" -j "$target"
-    iptables -I "$FW_CHAIN_OUTPUT" -p udp --source-port "$dport" -j "$target"
+    $trace iptables -I "$FW_CHAIN_INPUT" -p udp --destination-port "$dport" -j "$target"
+    $trace iptables -I "$FW_CHAIN_OUTPUT" -p udp --source-port "$dport" -j "$target"
 else
-    set -x
     for host in `hostips "$@"`
     do
-      iptables -I "$FW_CHAIN_INPUT" -p udp -s "$host" --destination-port "$dport" -j "$target"
-      iptables -I "$FW_CHAIN_OUTPUT" -p udp -d "$host" --source-port "$dport" -j "$target"
+      $trace iptables -I "$FW_CHAIN_INPUT" -p udp -s "$host" --destination-port "$dport" -j "$target"
+      $trace iptables -I "$FW_CHAIN_OUTPUT" -p udp -d "$host" --source-port "$dport" -j "$target"
     done
 fi
