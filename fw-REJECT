@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/sh -u
 #
 # Add trailing REJECT rules to the specified chains.
 # First yanks any existing wildcard REJECTs.
@@ -9,6 +9,8 @@ cmd=$0
 usage="Usage: $cmd [+l] [chains...]"
 
 badopts=
+
+trace=
 
 dolog=1
 [ "x$1" = x+l ] && { dolog=; shift; }
@@ -22,9 +24,8 @@ then rej=LOGREJECT
 else rej=JUSTREJECT
 fi
 
-set -x
 for chain
 do
-  iptables -D "$chain" -j $rej
-  iptables -A "$chain" -j $rej
+  $trace iptables -D "$chain" -j $rej
+  $trace iptables -A "$chain" -j $rej
 done
