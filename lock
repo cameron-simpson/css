@@ -28,8 +28,7 @@ shared by the processes using the lock.
 =item B<-p> I<pidfile>
 
 Record the process-id of the I<command>
-in the file named I<pidfile>
-(see kproc(1)).
+in the file named I<pidfile>.
 
 =item B<-1>
 
@@ -72,7 +71,7 @@ or if the I<command> returns a non-zero exit status.
 
 =head1 SEE ALSO
 
-kproc(1), cs::Lock(3)
+cs::Lock(3)
 
 =head1 AUTHOR
 
