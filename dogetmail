@@ -7,6 +7,9 @@
 : ${LOGDIR:=$HOME/var/log}
 : ${VARRUN:=$HOME/var/run}
 
+gmlog=$LOGDIR/getmail
+timeout=1800
+
 trace=set-x
 
 cmd=`basename "$0"` || cmd=$0
@@ -20,4 +23,9 @@ do
   set -- -r "$acct" ${1+"$@"}
 done
 
-exec getmail ${1+"$@"}
+timeout "$timeout" getmail ${1+"$@"}
+xit=$?
+
+date >>"$gmlog"
+
+exit $xit
