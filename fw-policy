@@ -1,4 +1,4 @@
-#!/bin/sh-u
+#!/bin/sh -u
 #
 # Set policies.
 #	- Cameron Simpson <cs@zip.com.au> 18oct2003
