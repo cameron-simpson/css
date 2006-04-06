@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/sh -x
 #
 # Convert input to PostScript.
 #	- Cameron Simpson <cs@zip.com.au> 12dec1996
