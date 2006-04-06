@@ -11,6 +11,8 @@
 cmd=$0
 usage="Usage: $cmd [+l] {ALL | hosts...}"
 
+trace=
+
 badopts=
 
 dolog=1
@@ -22,18 +24,16 @@ dolog=1
 
 if [ "x$*" = xALL ]
 then
-    set -x
-    iptables -I "$FW_CHAIN_INPUT" -j ACCEPT
-    iptables -I "$FW_CHAIN_OUTPUT" -j ACCEPT
-    [ $dolog ] && iptables -I "$FW_CHAIN_INPUT" -p tcp --syn -j LOGACCEPT
-    [ $dolog ] && iptables -I "$FW_CHAIN_OUTPUT" -p tcp --syn -j LOGACCEPT
+    $trace iptables -I "$FW_CHAIN_INPUT" -j ACCEPT
+    $trace iptables -I "$FW_CHAIN_OUTPUT" -j ACCEPT
+    [ $dolog ] && $trace iptables -I "$FW_CHAIN_INPUT" -p tcp --syn -j LOGACCEPT
+    [ $dolog ] && $trace iptables -I "$FW_CHAIN_OUTPUT" -p tcp --syn -j LOGACCEPT
 else
-    set -x
     for host in `hostips "$@"`
     do
-      iptables -I "$FW_CHAIN_INPUT" -s "$host" -j ACCEPT
-      iptables -I "$FW_CHAIN_OUTPUT" -d "$host" -j ACCEPT
-      [ $dolog ] && iptables -I "$FW_CHAIN_INPUT" -s "$host" -p tcp --syn -j LOGACCEPT
-      [ $dolog ] && iptables -I "$FW_CHAIN_OUTPUT" -d "$host" -p tcp --syn -j LOGACCEPT
+      $trace iptables -I "$FW_CHAIN_INPUT" -s "$host" -j ACCEPT
+      $trace iptables -I "$FW_CHAIN_OUTPUT" -d "$host" -j ACCEPT
+      [ $dolog ] && $trace iptables -I "$FW_CHAIN_INPUT" -s "$host" -p tcp --syn -j LOGACCEPT
+      [ $dolog ] && $trace iptables -I "$FW_CHAIN_OUTPUT" -d "$host" -p tcp --syn -j LOGACCEPT
     done
 fi
