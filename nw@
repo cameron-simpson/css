@@ -4,6 +4,8 @@
 #	- Cameron Simpson <cs@zip.com.au> 23dec2004
 #
 
+: ${LOCATION:=''}
+
 trace=set-x
 cf=/etc/rc.mobile/conf
 envfiles='/etc/rc.mobile/env.sh /u/cameron/var/env.sh'
@@ -32,7 +34,7 @@ fi
 
 if [ -n "$loc" -a "x$loc" != "xoff" ]
 then
-  clausename=net-$loc
+  clausename=@$loc
   grep "^\[ *$clausename *\]$" "$cf" >/dev/null \
   || { echo "$cmd: no clause named \"$clausename\" in $cf" >&2
        badopts=1
@@ -57,10 +59,17 @@ do
   $trace ifconfig "$iface" down
 done
 
+# kill network sensitive processes
+killpidfile -u -w -d /var/run dhclient-eth0.pid dhclient-eth1.pid ntpd.pid
+
 # drop default route
 $trace route del default
 
-[ "x$loc" = xoff ] && exec $trace ifconfig eth0 down
+# drop interfaces
+$trace ifconfig eth0 down
+$trace ifconfig eth1 down
+
+[ "x$loc" = xoff ] && exit 0
 
 # configure for new location
 set -- $trace env "NET=$loc" rc.mobile start -r -f "$cf"
@@ -68,4 +77,4 @@ for envfile in $envfiles
 do  set -- "$@" -E "$envfile"
 done
 
-exec "$@" env_all on-net
+exec "$@" env_all "$clausename"
