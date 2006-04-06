@@ -7,36 +7,35 @@
 cmd=$0
 usage="Usage: $cmd"
 
+trace=
+
 [ $# = 0 ] || { echo "$usage" >&2; exit 2; }
 
 iptables -L -n \
 | awk '/^Chain [A-Z]/ {print $2}' \
-| ( set -x
-    while read chain
-    do  iptables -F "$chain"
-    done
-  )
-set -x
-iptables -X
+| while read chain
+  do  $trace iptables -F "$chain"
+  done
+$trace iptables -X
 
-iptables -N LOGREJECT
-iptables -N JUSTREJECT
-iptables -N LOGACCEPT
-iptables -N FW_INPUT
-iptables -N FW_OUTPUT
-iptables -N FW_FORWARD
+$trace iptables -N LOGREJECT
+$trace iptables -N JUSTREJECT
+$trace iptables -N LOGACCEPT
+$trace iptables -N FW_INPUT
+$trace iptables -N FW_OUTPUT
+$trace iptables -N FW_FORWARD
 
-iptables -A INPUT -j FW_INPUT
-iptables -A OUTPUT -j FW_OUTPUT
-iptables -A FORWARD -j FW_FORWARD
+$trace iptables -A INPUT -j FW_INPUT
+$trace iptables -A OUTPUT -j FW_OUTPUT
+$trace iptables -A FORWARD -j FW_FORWARD
 
-iptables -A LOGREJECT -j LOG --log-prefix 'REJECT: '
-iptables -A LOGREJECT -j JUSTREJECT
+$trace iptables -A LOGREJECT -j LOG --log-prefix 'REJECT: '
+$trace iptables -A LOGREJECT -j JUSTREJECT
 
-iptables -A JUSTREJECT -p tcp -m tcp -j REJECT --reject-with tcp-reset
-iptables -A JUSTREJECT -p udp -m udp -j REJECT
-iptables -A JUSTREJECT -j DROP
+$trace iptables -A JUSTREJECT -p tcp -m tcp -j REJECT --reject-with tcp-reset
+$trace iptables -A JUSTREJECT -p udp -m udp -j REJECT
+$trace iptables -A JUSTREJECT -j DROP
 
-iptables -A LOGACCEPT -j LOG --log-prefix 'ACCEPT: '
-iptables -A LOGACCEPT -j ACCEPT
-iptables -A LOGACCEPT -j DROP
+$trace iptables -A LOGACCEPT -j LOG --log-prefix 'ACCEPT: '
+$trace iptables -A LOGACCEPT -j ACCEPT
+$trace iptables -A LOGACCEPT -j DROP
