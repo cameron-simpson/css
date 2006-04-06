@@ -30,13 +30,13 @@ iptables -A INPUT -j FW_INPUT
 iptables -A OUTPUT -j FW_OUTPUT
 iptables -A FORWARD -j FW_FORWARD
 
-iptables -A LOGREJECT -j LOG
+iptables -A LOGREJECT -j LOG --log-prefix 'REJECT: '
 iptables -A LOGREJECT -j JUSTREJECT
 
 iptables -A JUSTREJECT -p tcp -m tcp -j REJECT --reject-with tcp-reset
 iptables -A JUSTREJECT -p udp -m udp -j REJECT
 iptables -A JUSTREJECT -j DROP
 
-iptables -A LOGACCEPT -j LOG
+iptables -A LOGACCEPT -j LOG --log-prefix 'ACCEPT: '
 iptables -A LOGACCEPT -j ACCEPT
 iptables -A LOGACCEPT -j DROP
