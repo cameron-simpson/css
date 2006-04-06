@@ -11,6 +11,8 @@
 cmd=$0
 usage="Usage: $cmd [+l] dest-port {ALL | hosts...}"
 
+trace=
+
 badopts=
 
 dolog=1
@@ -33,16 +35,14 @@ fi
 
 if [ "x$*" = xALL ]
 then
-    set -x
-    [ $dolog ] && iptables -I "$FW_CHAIN_INPUT" -p tcp --destination-port "$dport" --syn -j LOGACCEPT
-    iptables -I "$FW_CHAIN_INPUT" -p tcp --destination-port "$dport" -j ACCEPT
-    iptables -I "$FW_CHAIN_OUTPUT" -p tcp --source-port "$dport" ! --syn -j ACCEPT
+    [ $dolog ] && $trace iptables -I "$FW_CHAIN_INPUT" -p tcp --destination-port "$dport" --syn -j LOGACCEPT
+    $trace iptables -I "$FW_CHAIN_INPUT" -p tcp --destination-port "$dport" -j ACCEPT
+    $trace iptables -I "$FW_CHAIN_OUTPUT" -p tcp --source-port "$dport" ! --syn -j ACCEPT
 else
-    set -x
     for host in `hostips "$@"`
     do
-      [ $dolog ] && iptables -I "$FW_CHAIN_INPUT" -p tcp -s "$host" --destination-port "$dport" --syn -j LOGACCEPT
-      iptables -I "$FW_CHAIN_INPUT" -p tcp -s "$host" --destination-port "$dport" -j ACCEPT
-      iptables -I "$FW_CHAIN_OUTPUT" -p tcp -d "$host" --source-port "$dport" ! --syn -j ACCEPT
+      [ $dolog ] && $trace iptables -I "$FW_CHAIN_INPUT" -p tcp -s "$host" --destination-port "$dport" --syn -j LOGACCEPT
+      $trace iptables -I "$FW_CHAIN_INPUT" -p tcp -s "$host" --destination-port "$dport" -j ACCEPT
+      $trace iptables -I "$FW_CHAIN_OUTPUT" -p tcp -d "$host" --source-port "$dport" ! --syn -j ACCEPT
     done
 fi
