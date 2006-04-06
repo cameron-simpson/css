@@ -13,7 +13,7 @@ badopts=
 trace=
 
 dolog=1
-[ "x$1" = x+l ] && { dolog=; shift; }
+[ $# -gt 0 ] && [ "x$1" = x+l ] && { dolog=; shift; }
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
