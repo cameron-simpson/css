@@ -49,18 +49,9 @@ then
   exit 2
 fi
 
-# stop any dhclients and their interfaces
-for pidf in /var/run/dhclient-*.pid
-do
-  [ -s "$pidf" ] || continue
-  pid=`cat "$pidf"` || continue
-  $trace kill "$pid"
-  iface=`expr "x$pidf" = 'x/var/run/dhclient-\(..*\).pid'` || continue
-  $trace ifconfig "$iface" down
-done
-
 # kill network sensitive processes
 killpidfile -u -w -d /var/run dhclient-eth0.pid dhclient-eth1.pid ntpd.pid
+killpidfile -w -d /var/run named.pid
 
 # drop default route
 $trace route del default
