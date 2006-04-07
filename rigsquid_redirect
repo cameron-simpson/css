@@ -4,31 +4,29 @@
 #	- Cameron Simpson <cs@zip.com.au> 01jul2004
 #
 
+: ${VARRUN:=$HOME/var/run}
+
 cmd=$0
 usage="Usage: $cmd [-f]"
+
+trace=set-x
+
+eval `setvar -x -n -f SQUID_PEERS`
 
 force=
 [ $# -gt 0 ] && [ "x$1" = x-f ] && { force=1; shift; }
 
-if ksquid -TERM
-then
-  sleep 2	# let it wake up and let go of sockets
-else
-  [ $force ] || { echo "$cmd: no squid to kill, retry with -f option" >&2; exit 1; }
-fi
+$trace killpidfile -w squid.pid
 
 ## old proxy-mode standalone redirector
 ##exec alog squid_redirect squid_redirect -P "8080:$SQUID"
 
-rc=$HOME/tmp/squid.conf$$
-pidf=$HOME/var/run/squid.pid-$$
+rc=$HOME/tmp/squid.conf
+pidf=$VARRUN/squid.pid
 
 env SQUID_PIDFILE=$pidf envsub -p '\{\{([A-Z]\w*)\}\}' <"$HOME/rc/squid/tplt" >"$rc"
 mksquidpeers >>"$rc"
 
 bsed -s '/^$/d; /^#/d' "$rc"
 cat "$rc"
-set -x
-rm -f $HOME/var/run/squid.pid
-ln -s $pidf $HOME/var/run/squid.pid
-exec alog squid/cache.log squid -f "$rc" -D
+exec $trace alog squid/cache.log squid -f "$rc" -D
