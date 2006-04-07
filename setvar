@@ -222,9 +222,13 @@ sub envstuff
     my @extlist=
 	 grep(length,
 	 (
+	  "$::ENV{HOST}\@$::ENV{NET}.$::ENV{LOCATION}",
+	  "$::ENV{HOST}\@$::ENV{NET}",
 	  "$::ENV{HOST}\@$::ENV{LOCATION}",
 	  "$::ENV{HOST}.$::ENV{SYSTEMID}",
 	  "$::ENV{SYSTEMID}.$::ENV{ARCH}",
+	  "\@$::ENV{NET}.$::ENV{LOCATION}",
+	  "\@$::ENV{NET}",
 	  "\@$::ENV{LOCATION}",
 	  $::ENV{HOSTNAME},
 	  $::ENV{HOST},
