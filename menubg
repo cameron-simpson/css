@@ -74,7 +74,17 @@ then
   cachefile=`filecache "$srcimage"` || exit 1
   desktop "$desk" menubg "$cachefile" || exit 1
   lastvalue menubg "$cachefile" &
-  imagefile=`pngof "$cachefile"` || exit 1
+
+  shade=60
+  mulshade=0.$shade
+  convname=pngof/sh$shade
+  imagefile=`convof -C "$convname" -discard "$cachefile" \
+		gm convert "$cachefile" \
+			-normalize \
+			-operator red Multiply "$mulshade" \
+			-operator green Multiply "$mulshade" \
+			-operator blue Multiply "$mulshade" \
+			-quality 100 png:-` || exit 1
 
   if [ -n "$DISPLAY" ]
   then
