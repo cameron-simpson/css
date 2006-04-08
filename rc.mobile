@@ -141,7 +141,10 @@ do  case $1 in
 	# this allowing the raw run to override previous values,
 	# typically wanted by @nw(1cs).
 	# 
-	-E)   envfiles="$envfiles $2"; shift ;;
+	-E)   envfiles="$envfiles $2"
+	      echo "# `date` - $0 -E $2" >>"$2"
+	      shift
+	      ;;
 	#
 	# =item B<-f> I<config>
 	#
