@@ -9,4 +9,4 @@ usage="Usage: $cmd query"
 
 [ $# = 0 ] && { echo "$usage" >&2; exit 2; }
 
-exec search sanity "$@"
+exec search sanity,musicmatch "$@"
