@@ -34,12 +34,15 @@
 # the location clauses represent a generalisation of the idea of run levels.
 #
 
-where=${SYSTEMID:-home}
+: ${LOCATION:=${SYSTEMID:-home}}
+export LOCATION
+
 cf=/etc/rc.mobile.conf
 envfiles=
 async=1
 asyncall=1
 trace=set-x
+shx=x
 verbose=1
 noaction=
 int=1
@@ -55,8 +58,8 @@ usage="Usage: $cmd {start|stop|restart} [options...] [@where]
 	-E envfile	File in which to record environment values.
 	-f config	Specify config file.
 			Default: $cf
-	@where		Default location. Falls back to \$SYSTEMID or \"home\".
-			Default: $where"
+	@where		Default location. Default from \$LOCATION, falls back to \$SYSTEMID or \"home\".
+			Default: $LOCATION"
 
 LC_ALL=C
 PATH=$PATH:/sbin:/opt/css/bin
@@ -158,7 +161,7 @@ do  case $1 in
 	# Recite proposed actions.
 	# handy for debugging configuration file changes.
 	#
-	-n)   trace=echo noaction=1 ;;
+	-n)   trace=echo shx= noaction=1 ;;
 	#
 	# =item B<-r>
 	#
@@ -229,7 +232,7 @@ else
     #
     case "$1" in
       @?*)
-	where=`expr "x$1" : 'x@\(.*\)'`
+	LOCATION=`expr "x$1" : 'x@\(.*\)'`
 	shift
 	;;
     esac
@@ -307,7 +310,7 @@ runqueue()
   while [ $# -gt 0 ]
   do
     opline=$1; shift
-    echo "POPQUEUE $opline" >&2
+    printf 'POPQUEUE %s\n' "$opline" >&2
     case "$opline" in
 	*' '*)	op=` expr "x$opline" : 'x\([^ ]*\) .*'`
 		etc=`expr "x$opline" : 'x[^ ]*  *\(.*\)'`
@@ -321,7 +324,7 @@ runqueue()
       #
       use)
 	[ $noaction ] && echo "$opline"
-	use1=`   expr "x$etc" : 'x\([^ ]*\).*'`
+	use1=`expr "x$etc" : 'x\([^ ]*\).*'`
 	if [ -n "$use1" ]
 	then
 	  usemore=`expr "x$etc" : 'x[^ ]* *\(.*\)'`
@@ -357,22 +360,19 @@ runqueue()
       # Prepare the specified directory from a template.
       # If a template is not specified,
       # the template is taken to be the directory named
-      # B</path/to/dir.>I<where> or B</path/to/dir.DFLT>
+      # B</path/to/dir.$LOCATION> or B</path/to/dir.DFLT>
       # if the former is not present.
       # If neither is present, the target directory is unchanged.
       # Otherwise, the directory is made identical to the template
       # with rsync(1).
       #
       /*/)
-	: ${where:=$LOCATION}
-	: ${where:=$RC_MOBILE_WHERE}
-
 	to=`expr "x$op" : 'x\(.*\)/'`
 	tplt=$etc
 	[ -n "$tplt" ] || tplt=$to
 
 	from=
-	for d in "$tplt.$where" "$tplt.DFLT" "$tplt"
+	for d in "$tplt.$LOCATION" "$tplt.DFLT" "$tplt"
 	do  [ "x$d" = "x$to" ] && continue
 	    [ -d "$d/." ] && { from=$d; break; }
 	done
@@ -381,7 +381,7 @@ runqueue()
 	then
 	  $trace rsync -aH "$from/." "$to/."
 	else
-	  echo "$cmd: no master dir @$where for $to" >&2
+	  echo "$cmd: no master dir @$LOCATION for $to" >&2
 	fi
 	;;
 
@@ -392,22 +392,20 @@ runqueue()
       # by the directory's trailing slash (`/').
       # If not specified,
       # the template is the file named
-      # B</path/to/file.>I<where> or B</path/to/file.DFLT>
+      # B</path/to/file.$LOCATION> or B</path/to/file.DFLT>
       # if the former is not present.
       # If neither is present, the target file is unchanged.
       # Otherwise, the file is made identical to the template with cp(1).
       #
       /*)
-	: ${where:=$LOCATION}
-	: ${where:=$RC_MOBILE_WHERE}
-
 	to=$op
 	tplt=$etc
 	[ -n "$tplt" ] || tplt=$to
 
 	from=
-	for f in "$tplt.$where" "$tplt.DFLT" "$tplt"
-	do  [ "x$f" = "x$to" ] && continue
+	for f in "$tplt.$LOCATION" "$tplt.DFLT" "$tplt"
+	do  echo "try $f ..." >&2
+	    [ "x$f" = "x$to" ] && continue
 	    [ -f "$f" ] && { from=$f; break; }
 	done
 
@@ -415,7 +413,7 @@ runqueue()
 	then
 	  $trace cp -p "$from" "$to"
 	else
-	  echo "$cmd: no master file @$where for $to" >&2
+	  echo "$cmd: no master file @$LOCATION for $to" >&2
 	fi
 	;;
 
@@ -425,7 +423,7 @@ runqueue()
       #
       \!*)
 	shcmd=`expr "x$opline" : 'x.\(.*\)'`
-	$trace /bin/sh -c "$shcmd"
+	$trace /bin/sh -${shx}c "$shcmd"
 	;;
 
       # =item . /path/to/shell-files...
@@ -556,7 +554,6 @@ then
     # In raw mode
     # just the specified clause and its subsidiaries are run.
     #
-    where=
     set -- "use $rawclauses"
 else
     # =head2 Startup Mode
@@ -579,13 +576,13 @@ else
     then
 	echo "$cmd - bring up interface according to location"
 	while echo "I know [$locations]"
-	      echo -n "Where am I [$where]? "
+	      echo -n "Where am I [$LOCATION]? "
 	      read iwhere || { echo; exit 1; }
 	do
-	  [ -z "$iwhere" ] && iwhere=$where
+	  [ -z "$iwhere" ] && iwhere=$LOCATION
 	  case " $locations " in
 	    *" $iwhere "*)
-	      where=$iwhere
+	      LOCATION=$iwhere
 	      break
 	      ;;
 	    *)echo "$cmd: unknown location \"$iwhere\""
@@ -601,9 +598,9 @@ else
     done
 
     # make available to subprocesses and user environment
-    setenv RC_MOBILE_WHERE "$where"
+    setenv LOCATION "$LOCATION"
 
-    set -- "use GLOBAL @$where FINAL"
+    set -- "use GLOBAL @$LOCATION FINAL"
 fi
 
 runqueue "$@"
