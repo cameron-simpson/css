@@ -88,6 +88,7 @@ case `echo "$engine" | tr '[a-z]' '[A-Z]'` in
   MOVIEACTORS)	url=http://us.imdb.com/Nsearch?name=$query\&occupation=All professions\&submit4.x=1\&submit4.y=1 ;;
   MOVIECHARFEMALE) url=http://us.imdb.com/Character?char=$query\&gender=female\&submit4.x=1\&submit4.y=1 ;;
   MOVIECHARMALE)url=http://us.imdb.com/Character?char=$query\&gender=male\&submit4.x=1\&submit4.y=1 ;;
+  MUSICMATCH)	url=http://www.mmguide.musicmatch.com/search/nm.cgi?rightere=$query ;;
   NETSCAPE)	url=http://www10.netscape.com/search-bin?NS-search-page=results\&NS-query-pat=/text/NS-advquery.pat\&NS-tocstart-pat',='/text/HTML-advquery-tocstart.pat\&NS-search-type=NS-boolean-query\&NS-collection=netscape\&NS-sort-by=\&NS-query=$query\&submit=OK\&NS-max-records=$maxhits ;;
   NORTHERNLIGHT)	url=http://www.NorthernLight.com/nlquery.fcg?dx=1004\&qr=$query\&qt=\&pu=\&qu=\&si=\&la=All\&qc=All\&d1=\&d2=\&rv=1\&search.x=10\&search.y=10'
   ODP)	url=http://search.dmoz.org/cgi-bin/osearch?search=$query\&cat=\&t=b\&fb=0\&fo=0\&all=no ;;
