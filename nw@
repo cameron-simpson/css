@@ -50,8 +50,11 @@ then
 fi
 
 # kill network sensitive processes
-killpidfile -u -w -d /var/run dhclient-eth0.pid dhclient-eth1.pid ntpd.pid
-killpidfile -w -d /var/run named.pid
+killpidfile -u -w -d /var/run \
+	dhclient-eth0.pid dhclient-eth1.pid \
+	ntpd.pid \
+	/var/named/chroot/var/run/named/named.pid \
+	sshd-eth0.pid sshd-eth1.pid
 
 # drop default route
 $trace route del default
