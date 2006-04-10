@@ -8,7 +8,7 @@
 : ${ADDIF:=eth0}	# default base interface
 : ${ADDIF_LOW:=1}	# default base subinterface number
 
-trace=set-x	## echo
+trace=
 baseif=$ADDIF
 basen=$ADDIF_LOW
 netmask=
