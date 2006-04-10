@@ -49,6 +49,7 @@ do
     # The conversion name.
     # This string is used as a path component in the cache result
     # to designate this type of conversion.
+    #
     -C)	convname=$2; shift ;;
     -stdin|-discard|-end|-x|-[0-9]*)
 	arg1opts="$arg1opts $1"
