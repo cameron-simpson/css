@@ -1,0 +1,45 @@
+#!/bin/sh -u
+#
+# Return specified value from an interface.
+#	- Cameron Simpson <cs@zip.com.au> 10apr2006
+#
+
+: ${NET_IF:=''}
+
+cmd=$0
+usage="Usage: $cmd [-i interface] field
+	-i interface	Specify network interface.
+			Default from \$NET_IF or guess.
+	field		One of: address, netmask."
+
+badopts=
+
+[ $# -gt 0 ] && [ "x$1" = x-i ] && { NET_IF=$2; shift; shift; }
+
+if [ $# = 0 ]
+then
+  echo "$cmd: missing field" >&2
+  badopts=1
+else
+  field=$1
+  shift
+  [ $# = 0 ] || { echo "$cmd: extra arguments after field: $*" >&2
+		  badopts=1
+		}
+fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+[ -n "$NET_IF" ] || NET_IF=`ifconfig -a|sed '/^[a-z]/{ s/ .*//; q; }'`
+
+case "$field" in
+  address)
+	ifconfig "$NET_IF" | sed -n 's/.* inet addr:\([^ ]*\).*/\1/p'
+	;;
+  netmask)
+	ifconfig "$NET_IF" | sed -n 's/.* Mask:\([^ ]*\).*/\1/p'
+	;;
+  *)	echo "$cmd: unreconised field \"$field\"" >&2
+	exit 1
+	;;
+esac
