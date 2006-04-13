@@ -149,7 +149,11 @@ def mailsubj(addrs,subj,body):
 def runCommandPrompt(fnmap,prompt=cmd+"> "):
   ok=True
   while True:
-    line=raw_input(cmd+"> ")
+    try:
+      line=raw_input(cmd+"> ")
+    except EOFError:
+      break
+
     if line is None:
       return ok
    
