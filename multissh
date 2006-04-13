@@ -26,7 +26,7 @@ usage="Usage: $cmd [options...] command...
 	command		As with ssh. specify the command to run on each host."
 
 badopts=
-while :
+while [ $# -gt 0 ]
 do
   case $1 in
     -[12v]) sshopts="$sshopts $1" ;;
