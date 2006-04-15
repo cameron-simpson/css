@@ -91,7 +91,7 @@ do
     case "$os" in
       OpenBSD)
 	# no silly :n logical interfaces for BSD!
-	$trace ifconfig "$baseif" alias "$ipaddr" netmask "$netmask" || xit=1
+	( set -x; $trace ifconfig "$baseif" alias "$ipaddr" netmask "$netmask" ) || xit=1
 	;;
       *)
 	# choose the next free interface number
@@ -101,7 +101,7 @@ do
 		      \\$1 >= n { n=\\$1+1 }
 		    END       { print n }"` || exit 1
 	# apply and then bump $basen
-	$trace ifconfig "$baseif:$nextn" "$ipaddr" netmask "$netmask" || xit=1
+	( set -x; $trace ifconfig "$baseif:$nextn" "$ipaddr" netmask "$netmask" ) || xit=1
 	basen=`expr "$nextn" + 1`
 	;;
     esac
