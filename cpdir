@@ -6,8 +6,7 @@
 #
 
 cmd=`basename "$0"` || exit 1
-tar=gnutar
-buffer="buffer -m 1M"	# just use "cat" if you lack buffer
+####buffer="buffer -m 1M"	# just use "cat" if you lack buffer
 
 [ $# = 2 ] || { echo "Usage: $cmd fromdir todir" >&2
 		exit 2
@@ -23,7 +22,7 @@ case $ARCH in
     *.*.domainos) # preserve ACLs
 	exec /com/cpt "$from" "$to" -pdt -sacl -ld
 	;;
-    *)	( cd "$from/." && $tar -cf - .
+    *)	( cd "$from/." && tar -cf - .
 	) \
 	| ( mkdir "$to" && cd "$to" && untar )
 	;;
