@@ -15,7 +15,7 @@ $usage="Usage: $cmd [-o] [-O] [-f file] [--] [targets...]
 ";
 
 $badopts=0;
-$tar='gnutar';
+$tar='tar';
 $gnutar=1;
 $tarflags='xv';
 $suser=($> == 0);
