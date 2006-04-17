@@ -13,7 +13,8 @@ profile=$USER@$HOST
 ##br=/opt/firefox-1.0.7/firefox
 ##br=/opt/firefox-1.5rc1-enGB/firefox
 ##br=/opt/firefox-1.5/firefox
-br=/opt/firefox-1.5.0.1/firefox
+##br=/opt/firefox-1.5.0.1/firefox
+br=/opt/firefox-1.5.0.2/firefox
 
 cmd=$0
 usage="Usage: $cmd [-f] [-q] [url]
