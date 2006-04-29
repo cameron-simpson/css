@@ -99,8 +99,18 @@ do
     fi
   fi \
   | sed 128q \
-  | while read -r mfile
+  | \
+  { exec 3>"$rawlist"
+    while read -r mfile
     do
+      [ -f "$mfile" ] || continue
+      if [ ! -s "$mfile" ]
+      then
+        printf '%s' "$0: removing empty file"; ls -ld -- "$mfile"
+	rm -- "$mfile"
+	continue
+      fi
+      
       msize=`ls -ld -- "$mfile" | awk '{print $5}'` || msize=
       if [ -n "$msize" ] \
       && [ "$msize" -gt 128000 ] \
@@ -108,10 +118,10 @@ do
       then
 	rm -- "$mfile"
       else
-	printf "%s\n" "$mfile"
+	printf "%s\n" "$mfile" >&3
       fi
-    done \
-  >"$rawlist"
+    done
+  }
 
   # stuff to do?
   busy=
