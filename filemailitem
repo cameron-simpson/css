@@ -77,7 +77,7 @@ case "$mode" in
 	;;
     maildir)
 	tmpf=$TMPDIR/prc$$
-	cat >"$tmpf" <<X || exit 1
+	cat >"$tmpf" <<X || { rm -f "$tmpf"; exit 1; }
 	MAILDIR=$MAILDIR
 	DEFAULT=$fpath/
 	LOGFILE=$LOGDIR/procmail
