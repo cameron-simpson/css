@@ -17,8 +17,4 @@ case "$HOST.$SYSTEMID@$LOCATION" in
     ;;
 esac
 
-case "$LOCATION" in
-  home|home-wifi)
-    alog alert lock -1 janus-alert-log ssh janus tail -f var/log/alert ;;
-  *)alog alert lock -1 janus-alert-log ssh home  tail -f var/log/alert ;;
-esac
+alog alert lock -1 janus-alert-log ssh home.local exec tail -f var/log/alert
