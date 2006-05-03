@@ -308,23 +308,28 @@ sub ScriptURL($)
 { shift->Env(SCRIPT_NAME);
 }
 
-=item FullURL()
+=item FullURL([I<usehost>])
 
 Return the full URL of the CGI invocation:
 with the B<PathInfo> appended
 but without the ?B<Query_String>.
+The optional parameter I<usehost> specifies that the leading B<http://>I<hostpart>
+is to be supplied; default is false.
 
 =cut
 
-sub FullURL($)
-{ my($this)=@_;
+sub FullURL($;$)
+{ my($this,$usehost)=@_;
+  $usehost=0 if ! defined $usehost;
+
   my($E)=scalar $this->Env();
 
   ## warn "FullURL: E=".cs::Hier::h2a($E,0);
 
-  my($url)="http://".$E->{SERVER_NAME};
+  my $url = ($usehost ? "http://".$E->{SERVER_NAME} : "");
 
-  $url.=":$E->{SERVER_PORT}" if defined $E->{SERVER_POR}
+  $url.=":$E->{SERVER_PORT}" if $usehost
+			     && defined $E->{SERVER_PORT}
 			     && length $E->{SERVER_PORT};
 
   $url.=$E->{SCRIPT_NAME};
@@ -333,31 +338,35 @@ sub FullURL($)
   $url;
 }
 
-=item SelfURL()
+=item SelfURL([I<usehost>])
 
 Returns the full URL needed to repeat this query via a B<GET> method.
+The optional parameter I<usehost> specifies that the leading B<http://>I<hostpart>
+is to be supplied; default is false.
 
 =cut
 
 sub SelfURL
-{ my($this)=shift;
-  $this->SelfQuery($this->Query());
+{ my($this,$usehost)=shift;
+  $this->SelfQuery($this->Query(),$usehost);
 }
 
-=item SelfQuery(I<query-hashref>)
+=item SelfQuery(I<query-hashref>,I<usehost>)
 
 Returns the full URL needed to call this CGI
 with an arbitrary query via a B<GET> method.
 Omits the "B<?>I<query_string>" if the I<query-hashref> is omitted.
+The optional parameter I<usehost> specifies that the leading B<http://>I<hostpart>
+is to be supplied; default is false.
 
 =cut
 
-sub SelfQuery($;$)
-{ my($this,$q)=@_;
+sub SelfQuery($;$$)
+{ my($this,$q,$usehost)=@_;
 
   defined $q && ref $q && keys %$q
-  ? $this->FullURL()."?"._qsEncode($q)
-  : $this->FullURL();
+  ? $this->FullURL($usehost)."?"._qsEncode($q)
+  : $this->FullURL($usehost);
 }
 
 =item PathInfo($)
