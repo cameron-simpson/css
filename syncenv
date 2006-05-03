@@ -57,7 +57,7 @@ then
   new=
   for testfile in "$0" $envfiles
   do
-    if [ "$testfile" -nt "$reffile" ]
+    if test "$testfile" -nt "$reffile" 2>/dev/null
     then
       new=1
       break
