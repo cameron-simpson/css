@@ -112,4 +112,5 @@ do
   esac
 done
 
+##set -x
 eval "exec $trace ssh $lsshopts $sshargv $host \"\$sshcmd\""
