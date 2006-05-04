@@ -5,6 +5,7 @@
 #
 
 : ${TMPDIR:=/tmp}
+: ${DIFFOPTS=-c}
 
 cmd=`basename "$0"`
 usage="Usage: $cmd [-0] [-v] filename
@@ -61,7 +62,7 @@ cat >"$tmp" || exit 1
 cmp -s "$tmp" "$file" && exit 0
 
 [ $verbose ] && echo "rewrite $file"
-[ $dodiff  ] && diff "$file" "$tmp"
+[ $dodiff  ] && diff $DIFFOPTS "$file" "$tmp"
 if cat "$tmp" >"$file"
 then
     exit 0
