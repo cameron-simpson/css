@@ -1,0 +1,27 @@
+#!/usr/bin/python
+#
+# Prepare filenames for transport to a MacOSX machine.
+# Read the specified filenames on the basis that they are a sequence
+# of Latin-1 bytes, and rename them to a Normal Form D UTF-8 sequence of bytes.
+# Such names will still be valid on a UNIX filesystem, and be accepted by
+# a MacOSX HFS filesystem, which rejects attempts to make filenames with
+# invalid NFD UTF8 byte sequence names.
+#	- Cameron Simpson <cs@zip.com.au> 09may2006
+#
+
+import os
+import sys
+import unicodedata
+
+if len(sys.argv) > 1:
+  names=sys.argv[1:]
+else:
+  names=[f for f in os.listdir('.')]
+
+for f in names:
+  uf=unicode(f,'iso8859-1')		# get Unicode from Latin-1
+  nfduf=unicodedata.normalize('NFD',uf)	# transform to Normal Form D
+  utf8f=nfduf.encode('utf8')		# transcribe to UTF-8
+  if f != utf8f:
+    print `f`, "->", `utf8f`
+    ##os.rename(f,utf8f)
