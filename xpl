@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/sh -u
 #
 # Wrapper for xplanet which makes all config file options tunable
 # on the command line and provides a number of convenience features.
@@ -57,6 +57,7 @@ mkimage=
 label_string=
 body=
 origin=
+switches=
 
 >>"$tmpconfig"
 [ -s "$config" ] && cat "$config" >>"$tmpconfig"
@@ -113,14 +114,18 @@ findimindir()	# imagebase dirs...
 
 pickbody()
 {
-  _pickbody_from=$1; shift
-  case $_pickbody_from in
+  case $1 in
     random)		_pickbody_from="$stars $planets $moons" ;;
     major)		_pickbody_from="$stars $planets" ;;
     minor)		_pickbody_from=$moons ;;
-    planet|planets)	_pickbody_from=$planets ;;
-    moon|moons)		_pickbody_from=$moons ;;
-    star|stars)		_pickbody_from=$stars ;;
+    planets)		_pickbody_from=$planets ;;
+    moons)		_pickbody_from=$moons ;;
+    stars)		_pickbody_from=$stars ;;
+    sol)		echo sun; return 0 ;;
+    luna)		echo moon; return 0 ;;
+    terra)		echo earth; return 0 ;;
+    perelandra)		echo venus; return 0 ;;
+    *)			printf "%s\n" "$1"; return 0 ;;
   esac
   for _pickbody in $_pickbody_from
   do  echo "$_pickbody"
@@ -187,6 +192,7 @@ do
     # includes the word "B<nebulae>".
     #
     image=* | map=* | night_map=* | cloud_map=* )
+		switches="$switches $1"
 		cf=`expr "x$1" : 'x\([^=]*\)=.*'`
 		im=`expr "x$1" : 'x[^=]*=\(.*\)'`
 		case "$im" in
@@ -203,7 +209,8 @@ do
 					    }
 		setting "$cf=$im"
 		;;
-    [a-z]*=*)	setting "$1" ;;
+    [a-z]*=*)	switches="$switches $1"
+    		setting "$1" ;;
     # =back
     #
     # =head2 Conventional Options
@@ -226,11 +233,12 @@ do
     # Subsequent B<I<param>=I<value>> configuration directives
     # will be appended to each B<[>I<name>B<]> clause listed.
     # Also the special names B<stars>, B<planets> and B<moons>
-    # are expanded.
+    # are expanded to the known bodies of that type.
     # 
     # Also see the B<-body> and B<-origin> options below.
     #
-    -clause)	xplclauses=
+    -clause)	switches="$switches $1 $2"
+		xplclauses=
 		for xplcname in `echo "$2" | tr , ' '`
 		do
 		  case "$xplcname" in
@@ -270,7 +278,8 @@ do
     #
     # Passed to I<xplanet>.
     #
-    -transpng)	xplopts="$xplopts -transpng "`shqstr "$2"`
+    -transpng)	switches="$switches $1 $2"
+		xplopts="$xplopts -transpng "`shqstr "$2"`
 		winmode=1
 		shift
 		;;
@@ -288,6 +297,7 @@ do
     # This is handy when using I<xpl> to make screen backdrop images.
     #
     -g|-geometry)
+		switches="$switches $1 $2"
 		case "$2" in
 		  screen)
 		    eval `bgsize -v`
@@ -316,6 +326,7 @@ do
     # chosen with I<xpl>.
     #
     -background|-bg)
+		switches="$switches $1 $2"
 		case $2 in
 		  last)
 		    bgim=`lastvalue xplanetbg`
@@ -343,6 +354,7 @@ do
     # or the word "B<random>" which picks an arbitrary value in that range.
     #
     -latitude|-lat)
+		switches="$switches $1 $2"
 		case $2 in
 		  random) lat=`seq -90 90 | pickn` ;;
 		  *)	  lat=$2 ;;
@@ -356,6 +368,7 @@ do
     # or the word "B<random>" which picks an arbitrary value in that range.
     #
     -longitude)
+		switches="$switches $1 $2"
 		case $2 in
 		  random) long=`seq -180 180 | pickn` ;;
 		  *)	  long=$2 ;;
@@ -363,15 +376,18 @@ do
 		xplopts="$xplopts -longitude \"\$long\""
 		shift
 		;;
-    # =item B<-target>|B<-body> I<name>
+    # =item B<-target>|B<-body>|B<-origin> I<name>
     #
     # Passed to I<xplanet>.
     # Additionally,
     # these options change the clause
     # into which subsequent "B<param=>I<value>" directives are inserted.
+    # The special names B<stars>, B<planets> and B<moons>
+    # clause a random body of that type to be chosen.
     # Also see the B<-clause> option above.
     #
     -target|-body|-origin)
+		switches="$switches $1 $2"
 		optname=`expr "x$1" : 'x-\(.*\)'`
 		case $2 in
 		  -*)	name=`expr "x$2" : 'x-\(.*\)'` namepfx=- ;;
@@ -399,7 +415,8 @@ do
     # to the environment variable B<$XPLANETIMPATH>,
     # used to locate short image names.
     #
-    -searchdir)	XPLANETIMPATH=$2:$XPLANETIMPATH
+    -searchdir)	switches="$switches $1 $2"
+		XPLANETIMPATH=$2:$XPLANETIMPATH
 		xplopts="$xplopts "`shqstr "$1" "$2"`
 		shift
 		;;
@@ -418,12 +435,12 @@ do
     # Passes B<-transparency> to I<xplanet> and sets B<-root> mode (above).
     #
     -tr|-transparency)
-		xplmode= winmode= xplopts="$xplopts -transparency" ;;
+		switches="$switches $1" xplmode= winmode= xplopts="$xplopts -transparency" ;;
     -fork|-gmtlabel|-label|-interpolate_origin_file|-light_time \
     	|-make_cloud_maps|-pango|-print_ephemeris|-random|-save_desktop_file \
     	|-tt|-timewarp|-utclabel|-version)
-		xplopts="$xplopts "`shqstr "$1"` ;;
-    -[a-z]*)	xplopts="$xplopts "`shqstr "$1" "$2"`; shift ;;
+		switches="$switches $1" xplopts="$xplopts "`shqstr "$1"` ;;
+    -[a-z]*)	switches="$switches $1 $2" xplopts="$xplopts "`shqstr "$1" "$2"`; shift ;;
     *)	echo "$cmd: unrecognised argument: $1" >&2; badopts=1 ;;
     # =back
     #
@@ -450,6 +467,14 @@ fi
 
 ##cat $tmpconfig >&2
 [ -n "$label_string" ] || { label_string='%t'; [ -n "$origin" ] && label_string="$label_string from %o"; }
+case "$label_string" in
+  *'%{switches}'*)
+	lh=`expr "x$label_string" : 'x\(.*\)%{switches}.*'`
+	rh=`expr "x$label_string" : 'x.*%{switches}\(.*\)'`
+	label_string=$lh$switches$rh
+	;;
+esac
+
 eval "(set -x; exec xplanet -tmpdir \"\$TMPDIR\" -config \"\$tmpconfig\" -label_string \"\$label_string\" $xplmode $xplopts)"
 xit=$?
 
