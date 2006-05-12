@@ -20,7 +20,7 @@ usage="Usage: $cmd [-v] [-i suf] {-f script|{-e sedcmd}...|sedcmd}... [--] files
 	sedcmd		Passed to sed."
 
 fflag=
-diffopts=-c
+diffopts=${DIFFOPTS:-'-c'}
 sedopts=
 sedscript=
 ecmd=
