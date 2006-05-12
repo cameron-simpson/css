@@ -46,5 +46,5 @@ sedf="/^ *\[ *$clause *\]/{
 
 case "$filename" in
   -) exec sed "$sedf" ;;
-  *) exec bsed "$sedf" "$filename" ;;
+  *) exec bsed -s "$sedf" "$filename" ;;
 esac
