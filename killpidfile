@@ -56,13 +56,8 @@ do
     ./* | ../* | /* ) ;;
     *) pidfile=$VARRUN/$pidfile ;;
   esac
-  if [ -s "$pidfile" -a -f "$pidfile" ]
-  then
-    pids=$pids\ `cat "$pidfile"`
-    [ $dounlink ] && rm "$pidfile"
-  else
-    echo "SKIP $pidfile" >&2
-  fi
+  pids=$pids\ `cat "$pidfile"`
+  [ $dounlink ] && rm "$pidfile"
 done
 
 pass=1
