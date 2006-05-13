@@ -6,7 +6,7 @@
 
 : ${TMPDIR:=/tmp}
 
-trace=set-x
+trace=	##set-x
 
 cmd=`basename "$0"`
 usage="Usage: $cmd [-m msg] [{-c shcmd | cmd [args...]}]"
