@@ -150,7 +150,7 @@ do
 	  do
 	    [ -s "$f" ] || continue	# skip files already processed
 	    ##echo "spamassassin $f ..." >>"$LOGDIR/procmail"
-	    if spamassassin -e -L <"$f" >/dev/null
+	    if spamassassin -e <"$f" >/dev/null
 	    then
 	      bogof -Sn <"$f"
 	      filemailitem "$nonspam" <"$f" && rm -- "$f"
