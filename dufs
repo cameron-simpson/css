@@ -1,8 +1,8 @@
-#!/bin/sh
+#!/bin/sh -u
 #
 
 onefs=-x
-case $SO in
+case $OS in
     solaris)	onefs=-d ;;
 esac
 
