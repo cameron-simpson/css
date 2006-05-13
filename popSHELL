@@ -25,5 +25,5 @@ SHELL=$popSHELL
 export SHELL
 unset popSHELL popSHELLcmd
 
-set -x
+##set -x
 exec "$SHELL" -c "$shcmd"
