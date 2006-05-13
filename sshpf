@@ -14,7 +14,7 @@ delay=120
 pidfile=$VARRUN/sshpf.pid
 
 set -x
-killpidfile "$pidfile"
+killpidfile -w "$pidfile"
 >"$pidfile"
 for host
 do
