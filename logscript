@@ -1,11 +1,12 @@
 #!/bin/sh -u
 #
 # Run and log a script session.
+# Hands the output log to buglog if there is a log message..
 #	- Cameron Simpson <cs@zip.com.au> 18may2002
 #
 
 cmd=`basename "$0"`
-usage="Usage: $cmd [{-M | -m msg}] [-d logdir] logbase [{-c shcmd | cmd [args...]}]"
+usage="Usage: $cmd [{-M | -m msg}] [-d logdir] [-u] logbase [{-c shcmd | cmd [args...]}]"
 
 : ${LOGDIR:=$HOME/var/log}
 : ${SHELL:=/bin/sh}
@@ -14,6 +15,7 @@ logdir=$LOGDIR/sessions
 msg=
 nomsg=
 dozip=1
+dounlink=
 
 badopts=
 
@@ -23,6 +25,7 @@ do
     -d)	logdir=$2; shift ;;
     -m)	nomsg= msg=$2; shift ;;
     -M)	nomsg=1 ;;
+    -u)	dounlink=1 ;;
     +z)	dozip= ;;
     --)	shift; break ;;
     -?*)echo "$cmd: unrecognised option: $1" >&2; badopts=1 ;;
@@ -115,6 +118,9 @@ xit=$?
 ##dl "$HOST@$SYSTEMID: $wd: end   $popSHELLcmd"
 
 [ $nomsg ] || { [ -n "$BUGSYSTEMS" ] && bgstdin buglog "$msg" <"$logfile"; }
-[ $dozip ] && gzip -v -9 "$logfile"
+if [ $dounlink ]
+then rm "$logfile" || xit=1
+else [ $dozip ] && { gzip -v -9 "$logfile" || xit=1; }
+fi
 
 exit $xit
