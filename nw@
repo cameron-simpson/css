@@ -9,11 +9,14 @@
 trace=set-x
 cf=/etc/rc.mobile/conf
 envfiles='/etc/rc.mobile/env.sh /u/cameron/var/env.sh'
+rcmopts=
 
 cmd=`basename "$0"`
-usage="Usage: $cmd location"
+usage="Usage: $cmd [-s] location"
 
 badopts=
+
+[ $# -gt 0 ] && [ "x$1" = x-s ] && { rcmopts="$rcmopts $1"; shift; }
 
 if [ $# = 1 ]
 then
@@ -66,7 +69,7 @@ $trace ifconfig eth1 down
 [ "x$loc" = xoff ] && exit 0
 
 # configure for new location
-set -- $trace env "NET=$loc" rc.mobile start -r -f "$cf"
+set -- $trace env "NET=$loc" rc.mobile start $rcmopts -r -f "$cf"
 for envfile in $envfiles
 do  set -- "$@" -E "$envfile"
 done
