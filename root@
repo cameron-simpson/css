@@ -36,4 +36,4 @@ fi
 || msg=`readbugline` \
 || { echo "$cmd: empty message rejected" >&2; exit 1; }
 
-exec term -e bugscript -m "$msg" ssho -v -x "root@$host"
+exec term -e logscript -u -m "$msg" ssho -v -x "root@$host"
