@@ -274,10 +274,12 @@ setenv()
 listclause()
 {
   winclause "$cf" "$1" \
-  | sed -e 'y/	/ /' \
-	-e 's/^  *//' \
-	-e '/^#/d' \
-	-e '/^$/d'
+  | sed -e ':top
+	    y/	/ /
+	    s/^  *//
+	    /^#/d
+	    /^$/d
+	    /\\$/{ s/\\$//; N; s/\n//; b top; }'
 }
 
 # list a clause as a set of shell-safe strings for evaluation
@@ -300,6 +302,19 @@ shqclause()
 #	[name]
 #
 # where I<name> is the clause name.
+#
+# Lines within a clause may be slosh extended;
+# a trailing backslash is removed and the following line appended
+# as though the pair were a single line
+# (the newline character is discarded).
+# Example:
+#
+#	! if [ -n "$foo" ]; \
+#	  then \
+#	    echo foo; \
+#	  else \
+#	    echo not foo; \
+#	  fi
 #
 # Clauses contain the following types of lines:
 #
