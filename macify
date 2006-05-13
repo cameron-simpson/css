@@ -1,27 +1,99 @@
 #!/usr/bin/python
 #
-# Prepare filenames for transport to a MacOSX machine.
-# Read the specified filenames on the basis that they are a sequence
-# of Latin-1 bytes, and rename them to a Normal Form D UTF-8 sequence of bytes.
+# Prepare filenames for transport to a MacOSX machine # by converting Latin-1
+# encoded filenames into UTF-8 Normal Form D encoded filenames.
 # Such names will still be valid on a UNIX filesystem, and be accepted by
 # a MacOSX HFS filesystem, which rejects attempts to make filenames with
 # invalid NFD UTF8 byte sequence names.
-#	- Cameron Simpson <cs@zip.com.au> 09may2006
+#
+# This command operates in two modes.
+#
+# Without arguments it reads strings from standard input,
+# presumes them to be ISO8859-1 (Latin-1) encoded,
+# and writes the original string and the UTF-8 Normal Form D version
+# to standard output on separate lines.
+#
+# With two arguments the first is taken to be a directory with Latin-1
+# encoded filenames and the seconds is a directory to be populated
+# with UTF-8 NFD encoded names. This is done by hardlinking files
+# from the first directory to the second. This may be run incrementally;
+# if a name already exists in the second directory, if it is a link to
+# the original file it is left alone; if not it is unlinked and a
+# hard link from the original made.
+#
+# Example:
+#	macify my-unix-music-dir my-mac-dir-for-copying
+#
+# - Cameron Simpson <cs@zip.com.au> 09may2006
 #
 
 import os
+import os.path
 import sys
 import unicodedata
+from cs.misc import cmd, cmderr
+import cs.mac
 
-if len(sys.argv) > 1:
-  names=sys.argv[1:]
-else:
-  names=[f for f in os.listdir('.')]
+SrcEncoding='iso8859-1'
 
-for f in names:
-  uf=unicode(f,'iso8859-1')		# get Unicode from Latin-1
-  nfduf=unicodedata.normalize('NFD',uf)	# transform to Normal Form D
-  utf8f=nfduf.encode('utf8')		# transcribe to UTF-8
-  if f != utf8f:
-    print `f`, "->", `utf8f`
-    ##os.rename(f,utf8f)
+usage="Usage: "+cmd+" [srcdir macdir]\n"
+
+if len(sys.argv) == 1:
+  for line in sys.stdin:
+    name=cs.misc.chomp(line)
+    print name
+    print cs.mac.nfd(name,SrcEncoding)
+  sys.exit(0)
+
+if len(sys.argv) != 3:
+  sys.stderr.write(usage)
+  sys.exit(2)
+
+srcdir=sys.argv[1]
+macdir=sys.argv[2]
+
+def macifydir(srcdir,macdir,srcencoding='iso8859-1'):
+  print "macifydir", srcdir, macdir, srcencoding
+  if not os.path.isdir(macdir):
+    print "mkdir", macdir
+    os.mkdir(macdir)
+
+  names=os.listdir(srcdir)
+  names.sort()
+  dirs=[]
+  files=[]
+  slinks=[]
+  for name in names:
+    path=os.path.join(srcdir,name)
+    if os.path.islink(path):   slinks.append(name)
+    elif os.path.isdir(path):  dirs.append(name)
+    elif os.path.isfile(path): files.append(name)
+    else:
+      cmderr("warning: not file, dir or symlink:", path)
+
+  for name in files:
+    path=os.path.join(srcdir,name)
+    macpath=os.path.join(macdir,cs.mac.nfd(name,srcencoding))
+    if os.path.isfile(macpath):
+      s1=os.lstat(path)
+      s2=os.lstat(macpath)
+      if os.path.samestat(s1,s2):
+	print "samestat", path, macpath
+	continue
+
+      print "unlink", macpath
+      os.unlink(macpath)
+
+    print "link", path, macpath
+    os.link(path,macpath)
+
+  for name in slinks:
+    path=os.path.join(srcdir,name)
+    print "skip-symlink", path
+
+  for name in dirs:
+    path=os.path.join(srcdir,name)
+    macpath=os.path.join(macdir,cs.mac.nfd(name,srcencoding))
+    macifydir(path,macpath,srcencoding)
+
+macifydir(srcdir,macdir)
