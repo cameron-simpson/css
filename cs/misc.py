@@ -24,9 +24,26 @@ def warn(*args):
   sys.stderr.write("\n")
   sys.stderr.flush()
 
-def debug(*args):
-  if 'DEBUG' in os.environ and len(os.environ['DEBUG']) > 0 and os.environ['DEBUG'] != "0":
+# debug_level:
+#   0 - quiet
+#   1 - progress reporting
+#   2 - verbose progress reporting
+#   3 or more - more verbose, and activates the debug() function
+#
+debug_level=0
+if sys.stderr.isatty(): debug_level=1
+if 'DEBUG' in os.environ \
+   and len(os.environ['DEBUG']) > 0 \
+   and os.environ['DEBUG'] != "0":
+    debug_level=3
+
+def debugif(level,*args):
+  if debug_level >= level:
     warn(*args)
+
+def progress(*args): debugif(1,*args)
+def verbose(*args):  debugif(2,*args)
+def debug(*args):    debugif(3,*args)
 
 def cmderr(*args):
   global cmd
@@ -34,7 +51,8 @@ def cmderr(*args):
   sys.stderr.write(": ")
   warn(*args)
 
-def isodate(when=time.localtime()):
+def isodate(when=None):
+  if when is None: when=time.localtime()
   return time.strftime("%Y-%m-%d",when)
 
 # trim trailing newline if present, a la the perl func of the same name
@@ -146,7 +164,8 @@ def mailsubj(addrs,subj,body):
 
 # Accept a dict of the for key->(fn, help_string)
 # and perform entered commands.
-def runCommandPrompt(fnmap,prompt=cmd+"> "):
+def runCommandPrompt(fnmap,prompt=None):
+  if prompt is None: promt=cmd+"> "
   ok=True
   while True:
     try:
