@@ -16,7 +16,8 @@ def _dfltRoot():
   return cs.env.dflt('CSBUG_ROOT','/home/cameron/var/csbugs',1)
 
 class BugSet:
-  def __init__(self,pathname=_dfltRoot()):
+  def __init__(self,pathname=None):
+    if pathname is None: pathname=_dfltRoot()
     self.root=pathname
     self.bugcache={}
 
