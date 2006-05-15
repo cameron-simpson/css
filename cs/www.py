@@ -15,11 +15,12 @@ cookie_valRe=re.compile(r'([a-z][a-z0-9_]*)=([^;,\s]*)',re.I)
 hexSafeRe=re.compile(r'[-=.\w:@/?~#+&]+')
 dqAttrValSafeRe=re.compile(r'[-=. \w:@/?~#+&]+')
 
-def hexify(str,fp,safeRe=hexSafeRe):
+def hexify(str,fp,safeRe=None):
   """ Percent encode a string, transcribing to a file.
       safeRe is a regexp matching a non-empty seqeunce of characters that do not need encoding.
       FIXME: percent encoding for Unicode?
   """
+  if safeRe is None: safeRe=hexSafeRe
   while len(str):
     m=safeRe.match(str)
     if m:
@@ -32,8 +33,10 @@ def hexify(str,fp,safeRe=hexSafeRe):
 
 textSafeRe=re.compile(r'[^<>&]+')
 
-def puttext(fp,str,safeRe=textSafeRe):
-  """ Transcribe plain text in HTML safe form. """
+def puttext(fp,str,safeRe=None):
+  """ Transcribe plain text in HTML safe form.
+  """
+  if safeRe is None: safeRe=textSafeRe
   while len(str):
     m=safeRe.match(str)
     if m:
@@ -109,7 +112,10 @@ def ht_form(action,method,*tokens):
   return form
 
 class CGI:
-  def __init__(self,input=sys.stdin,output=sys.stdout,env=os.environ):
+  def __init__(self,input=None,output=None,env=None):
+    if input is None: input=sys.stdin
+    if output is None: output=sys.stdout
+    if env is None: env=os.environ
     self.state='OPEN'
     self.input=input
     self.output=output
@@ -208,7 +214,8 @@ class CGI:
 
 # convenience classes for tags with complex substructure
 class Tag:
-  def __init__(self,tag,attrs={},*tokens):
+  def __init__(self,tag,attrs=None,*tokens):
+    if attrs is None: attrs={}
     self.tag=tag
     self.attrs=attrs
     self.tokens=[]
@@ -234,13 +241,15 @@ class Table(Tag):
   def __init__(self,attrs={}):
     Tag.__init__(self,'TABLE',attrs)
 
-  def TR(self,attrs={}):
+  def TR(self,attrs=None):
+    if attrs is None: attrs={}
     tr=TableTR(attrs)
     self.tokens.append(tr)
     return tr
 
 class TableTR(Tag):
-  def __init__(self,attrs={}):
+  def __init__(self,attrs=None):
+    if attrs is None: attrs={}
     Tag.__init__(self,'TR',attrs)
 
   def TD(self,*args):
