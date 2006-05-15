@@ -1,8 +1,11 @@
 import os
 import os.path
 import cs.hier
+from cs.misc import debug
 
-def get(secret,base=os.path.join(os.environ["HOME"],".secret")):
+def get(secret,base=None):
+  if base is None:
+    base=os.path.join(os.environ["HOME"],".secret")
   return cs.hier.load(os.path.join(base,secret))
 
 def mysql(secret,db=None):
@@ -23,7 +26,7 @@ def ldap(secret):
     import cs.secret
     secret=cs.secret.get(secret)
 
-  print "secret =", `secret`
+  debug("secret =", `secret`)
   import ldap
   L=ldap.open(secret['HOST'])
   L.simple_bind_s(secret['BINDDN'],secret['BINDPW'])
