@@ -226,12 +226,12 @@ sub envstuff
 	  "$::ENV{HOST}.$::ENV{SYSTEMID}",
 	  "$::ENV{SYSTEMID}.$::ENV{ARCH}",
 	  "\@$::ENV{LOCATION}",
-	  ".$::ENV{HOSTNAME}",
-	  ".$::ENV{HOST}",
-	  ".$::ENV{SYSTEMID}",
-	  ".$::ENV{HOSTDOMAIN}",
-	  ".$::ENV{OS}",
-	  ".$::ENV{ARCH}",
+	  $::ENV{HOSTNAME},
+	  $::ENV{HOST},
+	  $::ENV{SYSTEMID},
+	  $::ENV{HOSTDOMAIN},
+	  $::ENV{OS},
+	  $::ENV{ARCH},
 	 ))
 	 ;
 
