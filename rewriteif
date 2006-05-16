@@ -5,7 +5,7 @@
 #
 
 : ${TMPDIR:=/tmp}
-: ${DIFFOPTS=-c}
+: ${DIFFOPTS='-c'}
 
 cmd=`basename "$0"`
 usage="Usage: $cmd [-0] [-v] filename
@@ -16,6 +16,7 @@ usage="Usage: $cmd [-0] [-v] filename
 rw0=
 dodiff=
 verbose=
+diff=diff
 
 badopts=
 
@@ -51,7 +52,7 @@ fi
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
 tmp=$TMPDIR/rwi$$
-trap 'rm "$tmp"' 0 1 2 13 15
+trap 'rm "$tmp"' 1 2 13 15
 
 cat >"$tmp" || exit 1
 
@@ -62,9 +63,10 @@ cat >"$tmp" || exit 1
 cmp -s "$tmp" "$file" && exit 0
 
 [ $verbose ] && echo "rewrite $file"
-[ $dodiff  ] && diff $DIFFOPTS "$file" "$tmp"
+[ $dodiff  ] && $diff $DIFFOPTS "$file" "$tmp"
 if cat "$tmp" >"$file"
 then
+    rm "$tmp"
     exit 0
 else
     echo "$cmd: rewrite of $file fails, probably damaged" >&2
