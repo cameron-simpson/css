@@ -5,7 +5,8 @@
 #
 
 : ${TMPDIR:=/tmp}
-: ${BSEDOPTS:=''}
+: ${BSEDOPTS=''}
+: ${DIFFOPTS='-c'}
 
 cmd=`basename "$0"`
 usage="Usage: $cmd [-v] [-i suf] {-f script|{-e sedcmd}...|sedcmd}... [--] files...
@@ -19,8 +20,8 @@ usage="Usage: $cmd [-v] [-i suf] {-f script|{-e sedcmd}...|sedcmd}... [--] files
 	-e sedcmd	Passed to sed.
 	sedcmd		Passed to sed."
 
+diff=diff
 fflag=
-diffopts=${DIFFOPTS:-'-c'}
 sedopts=
 sedscript=
 ecmd=
@@ -41,7 +42,7 @@ do
 	-v)	silent= verbose=1 ;;
 	+v)	verbose= ;;
 	-s)	silent=1 verbose= ;;
-	-d)	diffopts=$2; shift ;;
+	-d)	DIFFOPTS=$2; shift ;;
 	-f)	fflag=1; sedscript=$2; shift ;;
 	-i)	ibak=$2; shift ;;
 	-i?*)	ibak=`expr "x$1" : 'x-i\(.*\)'` ;;
@@ -55,8 +56,6 @@ do
     esac
     shift
 done
-
-diff="diff $diffopts"
 
 sedf="sed $sedopts"
 if [ $fflag ]
@@ -160,7 +159,7 @@ do
 
 
 	fi
-	[ $silent ] || $diff "$file" "$tmp"
+	[ $silent ] || $diff $DIFFOPTS "$file" "$tmp"
 
 	# ensure we have a backup
 	if [ -n "$bakfile" ]
