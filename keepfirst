@@ -1,3 +1,13 @@
-#!/bin/sh
+#!/usr/bin/awk -f
+#
+# Keep first instances of lines.
+# - Cameron Simpson <cs@zip.com.au>
+#
+# Converted to awk, made simple filter. - cameron
+#
 
-exec keeplast -1 ${1+"$@"}
+{ if (!seen["x"$0])
+  { print
+    seen["x"$0]=1
+  }
+}
