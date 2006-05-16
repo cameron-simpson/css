@@ -1,65 +1,22 @@
-#!/usr/bin/perl
+#!/usr/bin/awk -f
 #
-# Keep first (or last) instances of lines in a file.
-# Will take a regexp to match the section of the line of interest
-# in identifying duplicates.
-# Edits files in place if given filenames, otherwise is a pipe.
-#	- Cameron Simpson <cs@zip.com.au>
+# Keep last instances of lines.
+# - Cameron Simpson <cs@zip.com.au>
+#
+# Converted to awk, made simple filter. - cameron
 #
 
-$regexp='^.*$';
-$keepfirst=0;
-
-@subargs=();
-
-if (@ARGV && $ARGV[0] eq '-1')
-{ $keepfirst=1;
-  push(@subargs,shift(@ARGV));
-}
-
-if (@ARGV && $ARGV[0] =~ m:^/: && $ARGV[0] =~ m:/$:)
-{ push(@subargs,$regexp=shift(@ARGV));
-  $regexp =~ s:^/(.*)/$:$1:;
-}
-
-if (@ARGV)
-{ for my $file (@ARGV)
-  { @sys=("filteredit","-discard",$file,$0,@subargs);
-    system(@sys);
-  }
-  exit 0;
-}
-
-$n=0;
-LINE:
-  while (defined ($_=<STDIN>))
-  { chomp;
-    next LINE unless length;
-
-    push(@lines,$_);
-    next LINE if ! /$regexp/o;
-
-    $key=defined $1 ? $1 : $&;	# hack to check for submatch
-
-    $n=$#lines;
-    if ($keepfirst)
-    { if (defined $k{$key})
-      { pop(@lines);
-      }
-      else
-      { $k{$key}=$n if ! defined $k{$key};
-      }
-    }
-    else
-    { if (defined $k{$key})
-      { $lines[$k{$key}]='';	# trim old line
-      }
-      $k{$key}=$n;
-    }
-  }
-
-for (@lines)
-{ if (length)
-  { print $_, "\n";
-  }
-}
+	{ lines[NR-1]=$0
+	  key="x"$0
+	  if (pos[key] > 0)
+	  { i=pos[key]-1
+	    skip[i]=1
+	    lines[i]="SKIP"
+	  }
+	  pos[key]=NR
+	}
+END	{ for (i=0; i<NR; i++)
+	  { if (!skip[i]) print lines[i]
+	    i++
+	  }
+	}
