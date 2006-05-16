@@ -76,7 +76,7 @@ do
       if bsed -s "1i\\
 $srcfile" "$cachefile"
       then
-	[ $keepfirst ] && { keepfirst "$cachefile" || xit=1; }
+	[ $keepfirst ] && { keepfirst <"$cachefile" | rewriteif "$cachefile" || xit=1; }
       fi
     else
       # new cache map - just make it
