@@ -1,18 +1,19 @@
-#!/bin/sh
+#!/bin/sh -u
 #
 # Run a file through a filter and rewrite the file.
 # Do not rewrite if error or unchanged or empty result.
-#	- Cameron Simpson <cs@zip.com.au> 16jun99
+#	- Cameron Simpson <cs@zip.com.au> 16jun1999
 #
 
 : ${TMPDIR:=/tmp}
+: ${DIFFOPTS='-c'}
 
 cmd=$0
 usage="Usage: $cmd [-v] [-s] [arg1-options...] [--] file filter [filterargs...]
 	arg1-options are as for the arg1 command."
 
 silent=
-[ -t 1 ] || silent=1
+[ -t 2 ] || silent=1
 
 badopts=
 
@@ -65,7 +66,7 @@ then
   :
 else
   # changed; backup then overwrite
-  [ $silent ] || $diff "$file" "$tmp"
+  [ $silent ] || $diff $DIFFOPTS "$file" "$tmp"
   if cp "$file" "$bak"
   then
     if cat <"$tmp" >"$file"
