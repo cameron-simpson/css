@@ -6,7 +6,7 @@
 #
 
 cmd=`basename "$0"`
-usage="Usage: $cmd [{-M | -m msg}] [-d logdir] [-u] logbase [{-c shcmd | cmd [args...]}]"
+usage="Usage: $cmd [{-M | -m msg}] [-d logdir] {-u | logbase} [{-c shcmd | cmd [args...]}]"
 
 : ${LOGDIR:=$HOME/var/log}
 : ${SHELL:=/bin/sh}
@@ -34,25 +34,28 @@ do
   shift
 done
 
-if [ $# = 0 ]
+if [ $dounlink ]
 then
-  echo "$cmd: missing logbase" >&2
-  badopts=1
+  logfile=$TMPDIR/$cmd
 else
-  logfile=$1; shift
-
-  if [ $# -gt 0 ]
+  if [ $# = 0 ]
   then
-    if [ "x$1" = x-c ]
-    then
-	# convert -c into explicit command
-	shcmd=$2; shift; shift
-	[ $# = 0 ] || { echo "$cmd: extra arguments after \"-c shcmd\": $*" >&2
-			badopts=1
-		      }
-	set -- "$SHELL" -c "$shcmd"
-    fi
+    echo "$cmd: missing logbase" >&2
+    badopts=1
+  else
+    logfile=$1
+    shift
   fi
+fi
+
+if [ $# -gt 0 ] && [ "x$1" = x-c ]
+then
+    # convert -c into explicit command
+    shcmd=$2; shift; shift
+    [ $# = 0 ] || { echo "$cmd: extra arguments after \"-c shcmd\": $*" >&2
+		    badopts=1
+		  }
+    set -- "$SHELL" -c "$shcmd"
 fi
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
