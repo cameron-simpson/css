@@ -1,4 +1,4 @@
-#!/bin/sh -x
+#!/bin/sh -u
 #
 # Convert input to PostScript.
 #	- Cameron Simpson <cs@zip.com.au> 12dec1996
@@ -18,35 +18,37 @@ title=
 badopts=
 mtype=
 medium=A4
-while :
-do  case $1 in
-	-T)	title=$2; shift ;;
-	-L)	a2ps_aspect="-r --columns=1" ;;
-	-P)	a2ps_aspect="-R --columns=1" ;;
-	-m)	medium=$2; shift ;;
-	-i)	mtype=$2; shift
-		case "$mtype" in
-		    any|'')		mtype= ;;
-		    ps|postscript)	mtype=application/postscript ;;
-		    pdf)		mtype=application/pdf ;;
-		    mentor)		mtype=application/mentor ;;
-		    text)		mtype=text/plain ;;
-		    */*)		;;
-		    *)			echo "$cmd: unrecognised file type \"$mtype\"" >&2
-					badopts=1
-					;;
-		esac
-		;;
-	--)	shift; break ;;
-	-*)	echo "$cmd: unrecognised option: $1" >&2
-		badopts=1
-		;;
-	*)	break ;;
-    esac
-    shift
+txtconv=
+while [ $# -gt 0 ]
+do
+  case $1 in
+      -T) title=$2; shift ;;
+      -L) a2ps_aspect="-r --columns=1" ;;
+      -P) a2ps_aspect="-R --columns=1" ;;
+      -m) medium=$2; shift ;;
+      -i) mtype=$2; shift
+          case "$mtype" in
+	    any|'')	mtype= ;;
+	    ps|postscript) mtype=application/postscript ;;
+	    pdf)	mtype=application/pdf ;;
+	    mentor)	mtype=application/mentor ;;
+	    text)	mtype=text/plain ;;
+	    */*)	;;
+	    *)		echo "$cmd: unrecognised file type \"$mtype\"" >&2
+			badopts=1
+			;;
+	  esac
+	  ;;
+      --) shift; break ;;
+      -*) echo "$cmd: unrecognised option: $1" >&2
+	  badopts=1
+	  ;;
+      *)  break ;;
+  esac
+  shift
 done
 
-txtconv="$txtconv $aspect"
+txtconv="$txtconv $a2ps_aspect"
 [ -n "$title" ] && txtxconv="$txtconv \"--footer=\$title\""
 
 if [ $# = 0 ]
