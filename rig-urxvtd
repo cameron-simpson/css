@@ -1,24 +1,27 @@
-#!/bin/sh
+#!/bin/sh -u
 #
 # Set up a urxvtd to run terminals. Report the control socket.
 #	- Cameron Simpson <cs@zip.com.au> 10nov2005
 #
 
-exec 3>&1 1>&2
-[ $# = 0 ] && exec </dev/null
-
 : ${LOGDIR:=$HOME/var/log}
 : ${ALERTLOG:=$LOGDIR/alert}
+: ${RXVT_SOCKET:=''}
 
-user=`whoami || id -un` || exit 1
-RXVT_SOCKET=/tmp/urxvtd-socket-$user-$DISPLAY
-export RXVT_SOCKET
+# socket exists? otherwise we need to make a new one
+{ [ -n "$RXVT_SOCKET" ] && ls -d "$RXVT_SOCKET" >/dev/null 2>&1
+} || RXVT_SOCKET=
 
-lock=$RXVT_SOCKET
-
-alog "$ALERTLOG" set-x lock -1 "$RXVT_SOCKET" set-x sh -xc 'rm -f "$RXVT_SOCKET"; exec urxvtd -o' 3>&-
-
-exec 1>&3 3>&-
+if [ -z "$RXVT_SOCKET" ]
+then
+  user=`whoami || id -un` || exit 1
+  RXVT_SOCKET=/tmp/urxvtd-socket-$user-$DISPLAY-$$
+  export RXVT_SOCKET
+  rm -f "$RXVT_SOCKET"
+  ( set -x
+    exec urxvtd -f -o </dev/null >/dev/null 2>>"$ALERTLOG"
+  ) || exit 1
+fi
 
 [ $# = 0 ] && exec echo "$RXVT_SOCKET"
 exec "$@"
