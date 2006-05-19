@@ -165,15 +165,11 @@ case "$TERM,$DISPLAY" in
 	    		[ $async ] || PREFTERM=urxvt	# gotta be synchronous
 			case "$PREFTERM" in
 			  urxvtc)
-			    set -x
-			    if [ -z "$RXVT_SOCKET" ]
+			    if [ -n "$RXVT_SOCKET" ] || RXVT_SOCKET=`rig-urxvtd`
 			    then
-			      if RXVT_SOCKET=`rig-urxvtd`
-			      then
-				export RXVT_SOCKET
-			      else
-				PREFTERM=urxvt
-			      fi
+			      export RXVT_SOCKET
+			    else
+			      PREFTERM=urxvt
 			    fi
 			    ;;
 			esac
@@ -213,5 +209,4 @@ if [ $async ]
 then termcmd="bgproc -p - -- $termcmd"
 else termcmd="exec $termcmd"
 fi
-set -x
 eval "$termcmd"
