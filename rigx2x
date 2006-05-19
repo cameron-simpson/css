@@ -1,10 +1,11 @@
-#!/bin/sh
+#!/bin/sh -u
 #
 # Wrapper for x2x and x2vnc to use default options.
 #	- Cameron Simpson <cs@zip.com.au> 28dec2000
 #
 
 cmd=`basename "$0"`
+usage="Usage: $cmd [-to target] [-from localdisplay] [-east] [-west]
 
 side=-north	## '-geometry 200x1-0+0'	##-north
 to=
