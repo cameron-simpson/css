@@ -84,7 +84,7 @@ else
   [ $readstdin ] && cat >"$attachment"
 fi
 
-filteredit -s "$attachment" sh -c 'detab | unbs | unctrl'
+[ -s "$attachment" ] && filteredit -s "$attachment" sh -c 'detab | unbs | unctrl'
 
 xit=0
 
