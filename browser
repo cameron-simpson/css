@@ -67,6 +67,6 @@ esac
 
 [ -n "$url" ] && set -- "$url"
 set -x
-rm -rf "$HOME"/var/firefox/subdir/Cache*
+##rm -rf "$HOME"/var/firefox/subdir/Cache*
 histbackup -x --delete-excluded "$HOME/var/firefox" "$HOME/var/backup/firefox"
 alog -p "$pidfile" alert set-x "$br" -width "$FULLX" -height "$PIX_HIGH" -P "$profile" ${1+"$@"} &
