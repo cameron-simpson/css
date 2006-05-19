@@ -5,7 +5,7 @@
 #
 
 cmd=`basename "$0"`
-usage="Usage: $cmd [-to target] [-from localdisplay] [-east] [-west]
+usage="Usage: $cmd [-to target] [-from localdisplay] [-east] [-west] [-geometry geo] [-shadow] [-sticky] [x2x-options...] [display]"
 
 side=-north	## '-geometry 200x1-0+0'	##-north
 to=
