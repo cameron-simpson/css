@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/sh -u
 #
 # Replace text between two lines denoted by regexps.
 #	- Cameron Simpson <cs@zip.com.au> 20sep95
@@ -19,18 +19,20 @@ from=
 to=
 
 badopts=
-while :
-do  case $1 in
-	-f)	from=$2; shift ;;
-	-t)	to=$2; shift ;;
-	-i)	input=$2; shift ;;
-	-o)	output=$2; shift ;;
-        --)	shift; break ;;
-	-?*)	echo "$cmd: unrecognised option: $1" >&2
-		badopts=1 ;;
-	*)	break ;;
-    esac
-    shift
+
+while [ $# -gt 0 ]
+do
+  case $1 in
+    -f)	from=$2; shift ;;
+    -t)	to=$2; shift ;;
+    -i)	input=$2; shift ;;
+    -o)	output=$2; shift ;;
+    --)	shift; break ;;
+    -?*)echo "$cmd: unrecognised option: $1" >&2
+	badopts=1 ;;
+    *)	break ;;
+  esac
+  shift
 done
 
 [ -n "$from" ] || { echo "$cmd: missing -f option" >&2; badopts=1; }
@@ -44,10 +46,10 @@ front=$tmp.a
 back=$tmp.b
 
 case $from in
-    */*)	from=`echo "$from"|sed 's|/|\\\\/|g'` ;;
+    */*)	from=`printf '%s\n' "$from"|sed 's|/|\\\\/|g'` ;;
 esac
 case $to in
-    */*)	to=`echo "$to"|sed 's|/|\\\\/|g'` ;;
+    */*)	to=`printf '%s\n' "$to"|sed 's|/|\\\\/|g'` ;;
 esac
 
 ok=1
@@ -58,6 +60,8 @@ exec 3<&0	# save stdin
 
 [ "x$input" = x- ] || exec <"$input"
 
+# read the whole input file and grab the top and bottom bits
+# this lets us use the same file for input and output
 sed -n "1,/$from/w $front
         /$to/,\$w $back" || ok=
 
@@ -65,11 +69,12 @@ if [ $ok ]
 then
     [ "x$output" = x- ] || exec >"$output"
     for file in "$front" "$@" "$back"
-    do  case $file in
-	    -)	cat <&3 ;;
-	    /*)	cat "$file" ;;
-	    *)	cat "./$file" ;;
-	esac || ok=
+    do
+      case $file in
+	-)	cat <&3 ;;
+	/*)	cat "$file" ;;
+	*)	cat "./$file" ;;
+      esac || ok=
     done
 fi
 
