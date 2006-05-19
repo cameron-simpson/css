@@ -25,6 +25,7 @@
 
 : ${OS:=`uname -s|tr '[A-Z]' '[a-z]'`}
 : ${PRINTER:=$LPDEST}
+: ${PAPER:=A4}
 
 multipsargs=
 postps=
@@ -32,12 +33,11 @@ topsargs=
 pshufargs=
 filter=
 domessage=	# only works at UNSW CSE
-lpqflag=
 itype=
 title=
 
 cmd=`exec basename "$0"`
-usage="Usage: $cmd [-Pprinter[/paper]] [-f filter]... [-q] [multips-options] [--] [files...]
+usage="Usage: $cmd [-Pprinter[/paper]] [-f filter]... [multips-options] [--] [files...]
 
 	-Pprinter[/paper] Send to specified printer.
 			Specifiable via \$PRINTER (currently \"$PRINTER\").
@@ -48,8 +48,6 @@ usage="Usage: $cmd [-Pprinter[/paper]] [-f filter]... [-q] [multips-options] [--
 			include options, _before_ conversion to PostScript.
 			Multiple filters are connected by pipes in the order
 			supplied.
-	-q		Do an lpq of the printer after submitting the jobs.
-	+q		No lpq. (Default)
 	/pattern/	Highlight regular expression (only works for a2ps as
 			the postscript conversion).
 
@@ -124,14 +122,6 @@ do
 		# using "C<-P I<printer>>" with a space is a common mistake.
 		#
 		-P?*)	PRINTER=`expr "x$1" : 'x-P\(.*\)'` ;;
-
-		# =item B<-q>, B<+q>
-		#
-		# Display the print queue for the printer.
-		# B<+q>: don't display the queue (default).
-		#
-		-q)	lpqflag=1 ;;
-		+q)	lpqflag= ;;
 
 		# =item B<-t> I<tray>
 		#
@@ -322,7 +312,10 @@ xit=0
 # catch paper type
 case "$PRINTER" in
     */*)	paper=`expr "x$PRINTER" : 'x.*/\(.*\)'`
-		topsargs="$topsargs -m \"\$paper\""
+		case "$paper" in
+		  A[12345])	topsargs="$topsargs -m A4" ;;
+		  *)		topsargs="$topsargs -m \"\$paper\"" ;;
+		esac
 		PRINTER=`expr "x$PRINTER" : 'x\(.*\)/.*'`
 		;;
     *)		paper=
@@ -401,8 +394,6 @@ do
     esac
     ## set +x
 done
-
-[ -z "$lpqflag" ] || lpq "$PRINTER" -l || xit=$?
 
 exit $xit
 
