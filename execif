@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/sh -u
 #
 # Exec command only if input is not empty.
 #	- Cameron Simpson <cs@zip.com.au> 23jun1998
