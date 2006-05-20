@@ -35,19 +35,30 @@ sub ::need
 
 }
 
-sub ::log
-{ return if ! $::DEBUG;
-  local($_)=join('',@_);
-  $_.="\n" unless /\n$/;
-  warn $_;
-  ## my(@c)=caller;
-  ## warn join('',@_)." at @c";
-}
+# debug_level:
+#   0 - quiet
+#   1 - progress reporting
+#   2 - verbose progress reporting
+#   3 or more - more verbose, and activates the debug() function
+#
+$cs::Misc::debug_level=0;
+$cs::Misc::debug_level=1 if -t STDERR;
+$cs::Misc::debug_level=3 if exists $::ENV{DEBUG}
+			 && length $::ENV{DEBUG}
+			 && $::ENV{DEBUG} ne 0;
 
-sub ::debug
-{ if (exists $::ENV{DEBUG} && length $::ENV{DEBUG})
-  { warn(@_);
-  }
+sub ::debugif
+{ my($level)=shift(@_);
+  warn(join(' ',@_)."\n") if $cs::Misc::debug_level >= $level;
+}
+sub ::progress	{ ::debugif(1,@_); }
+sub ::verbose	{ ::debugif(2,@_); }
+sub ::debug	{ ::debugif(3,@_); }
+
+sub ::log
+{ local($_)=join('',@_);
+  $_.="\n" unless /\n$/;
+  ::debug($_);
 }
 
 sub ::member
