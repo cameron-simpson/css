@@ -1,3 +1,7 @@
 #!/bin/sh
-set -x
-exec rsync -avHP --modify-window=2 ${1+"$@"}
+#
+# Rsync adapted to MS Windows FAT filesystems, which have only 2-second
+# time resultion.
+#	- Cameron Simpson <cs@zip.com.au>
+#
+exec rsync -aH --modify-window=1 ${1+"$@"}
