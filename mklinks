@@ -32,9 +32,6 @@ use File::Find;
 use File::Compare;
 use Digest::MD5 qw(md5);
 
-$::Verbose = -t STDOUT;
-$::Silent = 0;
-
 $::SFiles=0;
 $::SBytes=0;
 $::SBytesRead=0;
@@ -45,12 +42,10 @@ $::KeepNewer=0;
 
 my $xit = mklinks(@ARGV);
 
-if ($::Verbose)
-{ nl("$::SFiles files total, $::SOpens files opened (".pcnt($::SOpens,$::SFiles)."\%)");
-  nl("$::SBytes bytes total, $::SBytesRead bytes read (".pcnt($::SBytesRead,$::SBytes)."\%)");
-  nl("$::SLinked files hardlinked");
-  nl("$::SLinkBytesSaved bytes reclaimed (".pcnt($::SLinkBytesSaved,$::SBytes)."\%)");
-}
+nlif(1,"$::SFiles files total, $::SOpens files opened (".pcnt($::SOpens,$::SFiles)."\%)");
+nlif(1,"$::SBytes bytes total, $::SBytesRead bytes read (".pcnt($::SBytesRead,$::SBytes)."\%)");
+nlif(1,"$::SLinked files hardlinked");
+nlif(1,"$::SLinkBytesSaved bytes reclaimed (".pcnt($::SLinkBytesSaved,$::SBytes)."\%)");
 
 exit $xit;
 
@@ -140,19 +135,19 @@ The default is 512 bytes.
 
   push(@ARGV,'.') unless @ARGV > 0;
 
-  $::Silent || nl("find @ARGV ...");
+  progress("find @ARGV ...");
 
-  find(\&checkit, @ARGV);
+  find(\&checkit, @ARGV); outif(1,'');
 
-  $::Silent || nl("sorting file sizes ...");
+  progress("sorting file sizes ...");
   my @sizes = sort { $b <=> $a; } keys %::SizedFiles;
 
-  $::Silent || nl("comparing files ...");
+  progress("comparing files ...");
 
   # for each size
   SIZE:
   for my $sz (@sizes)
-  { out($sz);
+  { outif(1,$sz);
 
     next SIZE if @{$::SizedFiles{$sz}} < 2;
 
@@ -172,7 +167,7 @@ The default is 512 bytes.
       for my $f2 (@files)
       { next F2 if $::Linked{$f2};
 
-	$::Verbose && out("$sz: $f1 <=> $f2");
+	outif(1,"$sz: $f1 <=> $f2");
 
 	if ($::Ident{$f1} eq $::Ident{$f2})
 	# already linked to f1
@@ -196,7 +191,11 @@ The default is 512 bytes.
 	my($keep,$toss)=($f1,$f2);
 
 	# link keep to toss
-	$::verbose && nl("link($f1 => $f2)");
+	nlif(1,"link($f1 => $f2");
+
+	my $lastlink=0;
+	my @ts = lstat($toss);
+	if ($ts[3] == 1) { $lastlink=1; }
 
 	if (! $::DoIt)
 	{}	# pretend ok
@@ -213,7 +212,7 @@ The default is 512 bytes.
 	}
 
 	$::SLinked++;
-	$::SLinkBytesSaved+=$sz;
+	if ($lastlink) { $::SLinkBytesSaved+=$sz; }
 
 	$::Linked{$f2}=1;
 	$::Ident{$toss}=$::Ident{$keep};
@@ -236,7 +235,7 @@ sub checkit
   ## warn "\tFile::Find::name=$File::Find::name\n";
   ## warn "\tFile::Find::dir=$File::Find::dir\n";
 
-  $::Verbose && out($File::Find::name);
+  outif(1,$File::Find::name);
 
   # ignore uninteresting files
   return if defined $::DirPrune && $File::Find::dir =~ /$::DirPrune$/o;
@@ -245,17 +244,7 @@ sub checkit
   my @stat = lstat;
 
   if (! @stat)
-  {
-    warn "$::cmd: $_: can't lstat: $!\n";
-    ## out('');
-    ## my@c=caller;warn "from [@c]\n";
-    ## warn "\t_=$_\n";
-    ## warn "\tFile::Find::name=$File::Find::name\n";
-    ## warn "\tFile::Find::dir=$File::Find::dir\n";
-    ## my(@s)=lstat($_);
-    ## warn "second lstat($_): $! [@s]";
-    ## system('/bin/pwd >&2; ls -l');
-    ## exit 0;
+  { warn "$::cmd: $_: can't lstat: $!\n";
     return;
   }
 
@@ -284,11 +273,12 @@ sub checkit
     $::SizedFiles{$size}=[] if ! defined $::SizedFiles{$size};
     push(@{$::SizedFiles{$size}},$File::Find::name);
 
-    $::SFiles++;
-    $::SBytes+=$size;
+    if (! $::Seen{$ident})
+    { $::Seen{$ident}=1;
+      $::SFiles++;
+      $::SBytes+=$size;
+    }
   }
-
-  ## die "_=[$_], o_=[$_]" if $_ ne $o_;
 }
 
 # MD5 of first 8k of file
