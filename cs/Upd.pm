@@ -89,6 +89,17 @@ sub nl		{ cs::Upd::nl(@_); }
 sub promptfor	{ cs::Upd::promptfor(@_); }
 sub ask		{ cs::Upd::ask(@_); }
 
+sub outif	{ my($level)=shift(@_);
+		  if ($cs::Misc::debug_level >= $level)
+		  { out(@_);
+		  }
+		}
+sub nlif	{ my($level)=shift(@_);
+		  if ($cs::Misc::debug_level >= $level)
+		  { nl(@_);
+		  }
+		}
+
 package cs::Upd;
 
 sub setDefault($);
@@ -215,6 +226,7 @@ sub END
 
 Set the mode of the object to I<mode>.
 If omitted, B<stat>() the stream to choose a mode.
+If I<mode> is B<TTY>, try to set the clip width to the tty column count - 1.
 
 =cut
 
@@ -224,12 +236,21 @@ sub SetMode($;$)
   my($FILE)=$this->{FILE};
   $mode=(-t $FILE ? TTY : FILE) if ! defined $mode;
 
+  if ($mode eq TTY)
+  { my $fn = fileno($FILE);
+    my $cols = `stty -a <&$fn 2>/dev/null`;
+    if ($cols =~ / columns (\d+);/)
+    { $this->{CLIP}=$1-1;
+      ##warn "set clip size to $this->{CLIP}";
+    }
+  }
+
   $this->{MODE}=$mode;
 }
 
 =item Select()
 
-Make this object the default one
+Make this object the default
 for use by the B<out> and B<nl> functions.
 
 =cut
