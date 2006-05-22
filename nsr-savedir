@@ -25,13 +25,16 @@ logfile=.nsr-savedir.log
 server=
 masq=`hostname` || exit 1
 saveopts='-v -LL -B -E'
-pool=
+pool=Staging
+archivemode=
 
 cmd=`basename "$0"` || cmd=$0
 usage="Usage: $cmd [-a] [-n] [-x] [-g savegroup] [-l logfile] [-s server] dirs...
 	-a		Backup all files - do not get a timestamp from the
 			logfile.
-	-b pool		Specify the tape pool to use.
+	-A		Archive mode. After a successful save write a .dir
+			file to prevent Networker backing up this content again.
+	-b pool		Specify the tape pool to use. Default: $pool
 	-g savegroup	Specify the savegroup to use.
 	-l logfile	Specify the logfile to store timestamps.
 			A non-absolute path will be relative to each backup
@@ -57,6 +60,17 @@ do
     # =item B<-a>
     #
     # Backup all files / full dump.
+    # Do not do an incremental backup using a timestamp from the I<logfile>.
+    #
+    -a)	full=1 ;;
+
+    # =item B<-A>
+    #
+    # Archive mode. After a successful save write a B<.dir> file
+    # containing the directive
+    #	+ignore: *
+    # to prevent Networker backing up this content again.
+    -A)	archivemode=1 ;;
     # Do not do an incremental backup using a timestamp from the I<logfile>.
     #
     -a)	full=1 ;;
@@ -152,7 +166,11 @@ do
       exec $trace "$@" -m "$masq" -W 78 "$dir"
     )
   then
-    [ $doit ] && echo "$thisdump $dir" >>"$logfile"
+    if [ $doit ]
+    then
+      echo "$thisdump $dir" >>"$logfile"
+      [ $archivemode ] && echo '+ignore: *' >"$dir/.dir"
+    fi
   else
     xit=1
   fi
@@ -164,6 +182,10 @@ exit $xit
 # =head1 SEE ALSO
 #
 # save(1)
+#
+# =head1 CREDITS
+#
+# Siobhan Ellis for the per-directory save idea and the archive mode suggestion.
 #
 # =head1 AUTHOR
 #
