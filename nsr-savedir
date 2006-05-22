@@ -67,13 +67,10 @@ do
     # =item B<-A>
     #
     # Archive mode. After a successful save write a B<.dir> file
-    # containing the directive
-    #	+ignore: *
+    # containing the directive "B<+ignore: *>"
     # to prevent Networker backing up this content again.
-    -A)	archivemode=1 ;;
-    # Do not do an incremental backup using a timestamp from the I<logfile>.
     #
-    -a)	full=1 ;;
+    -A)	archivemode=1 ;;
 
     # =item B<-b> I<pool>
     #
