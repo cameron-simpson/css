@@ -19,21 +19,24 @@
 
 full=
 doit=1
-trace=echo	##set-x
+trace=set-x
 savegroup=
 logfile=.nsr-savedir.log
 server=
 masq=`hostname` || exit 1
-saveopts='-v -LL -B -E'
+saveopts='-LL -B -E'
 pool=Staging
 archivemode=
+browse_time=
+reten_time=
 
 cmd=`basename "$0"` || cmd=$0
 usage="Usage: $cmd [-a] [-n] [-x] [-g savegroup] [-l logfile] [-s server] dirs...
 	-a		Backup all files - do not get a timestamp from the
-			logfile.
-	-A		Archive mode. After a successful save write a .dir
+			logfile or honour .nsr directive files.
+	-A		Archive mode. After a successful save write a .nsr
 			file to prevent Networker backing up this content again.
+			Does not imply -a.
 	-b pool		Specify the tape pool to use. Default: $pool
 	-g savegroup	Specify the savegroup to use.
 	-l logfile	Specify the logfile to store timestamps.
@@ -42,7 +45,9 @@ usage="Usage: $cmd [-a] [-n] [-x] [-g savegroup] [-l logfile] [-s server] dirs..
 	-n		No action. Passed to save(1) to simply report planned
 			backup.
 	-s server	Specify the Legato server to use.
-	-x		Trace - report save(1) commands issued."
+	-w browse_time	Specify the browse time for this save set.
+	-x		Trace - report save(1) commands issued.
+	-y reten_time	Specify the retention time for this save set."
 
 badopts=
 
@@ -60,15 +65,17 @@ do
     # =item B<-a>
     #
     # Backup all files / full dump.
-    # Do not do an incremental backup using a timestamp from the I<logfile>.
+    # Do not do an incremental backup using a timestamp from the I<logfile>;
+    # also passes the B<-i> (ignore B<.nsr> directive files) to save(1).
     #
-    -a)	full=1 ;;
+    -a)	full=1 saveopts="$saveopts -i" ;;
 
     # =item B<-A>
     #
-    # Archive mode. After a successful save write a B<.dir> file
+    # Archive mode. After a successful save write a B<.nsr> file
     # containing the directive "B<+ignore: *>"
     # to prevent Networker backing up this content again.
+    # B<Note>: this does not imply the B<-a> option.
     #
     -A)	archivemode=1 ;;
 
@@ -102,11 +109,25 @@ do
     #
     -s)	server=$2; shift ;;
 
+    # =item B<-w> I<browse_time>
+    #
+    # Specify the browse time for this save set. See save(1).
+    # It should not contain whitespace.
+    #
+    -w)	browse_time=$2; shift ;;
+
     # =item B<-x>
     #
     # Trace execution of save commands.
     #
     -x)	trace=set-x ;;
+
+    # =item B<-y> I<reten_time>
+    #
+    # Specify the retention time for this save set. See save(1).
+    # It should not contain whitespace.
+    #
+    -y)	reten_time=$2; shift ;;
 
     --)	shift; break ;;
     -?*)echo "$cmd: unrecognised option: $1" >&2
@@ -154,19 +175,23 @@ do
   thisdump=`now` || { xit=1; continue; }
 
   if 
-    ( set save $saveopts
+    ( set -x
+      set save $saveopts
       [ $doit           ] || set -- "$@" -n
       [ -n "$pool"      ] && set -- "$@" -b "$pool"
       [ -n "$lastdump"  ] && set -- "$@" -t "$lastdump"
       [ -n "$server"    ] && set -- "$@" -s "$server"
       [ -n "$savegroup" ] && set -- "$@" -g "$savegroup"
+      [ -n "$browse_time" ] && set -- "$@" -w "$browse_time"
+      [ -n "$reten_time" ] && set -- "$@" -y "$reten_time"
+      printf '%s\n' "args=[$*]" >&2
       exec $trace "$@" -m "$masq" -W 78 "$dir"
     )
   then
     if [ $doit ]
     then
       echo "$thisdump $dir" >>"$logfile"
-      [ $archivemode ] && echo '+ignore: *' >"$dir/.dir"
+      [ $archivemode ] && echo '+ignore: *' >"$dir/.nsr"
     fi
   else
     xit=1
