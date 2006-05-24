@@ -64,6 +64,7 @@ exec \
 	'--exclude=/rc/gnupg/*' \
 	'--include=/rc/gtk' \
 	'--include=/rc/hi' \
+	'--include=/rc/java' \
 	'--include=/rc/inputrc' \
 	'--include=/rc/less' \
 	'--include=/rc/lesskey' \
