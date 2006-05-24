@@ -13,19 +13,26 @@ doevent()
 {
   event=$1; shift
   case "$event" in
+    add_window)
+      wid=$1
+      [ $X11_COMPOSITE ] && ( set -x
+			      sleep 2
+			      transset -id "$wid" -rootChild ${X11_TRANSPARENCY:=0.75}
+			    ) &
+      ;;
     enter_window|leave_window)
-	wid=$1; shift
-	winjob=`WINDOWID=$wid curjob`
-	case "$event" in
-	  enter_window)
-	    job "$winjob"
-	    ;;
-	  leave_window)
-	    ;;
-	  *)echo "$0: unhandled event \"$event\"" >&2; exit 2
-	    ;;
-	esac
-	;;
+      wid=$1; shift
+      winjob=`WINDOWID=$wid curjob`
+      case "$event" in
+	enter_window)
+	  job "$winjob"
+	  ;;
+	leave_window)
+	  ;;
+	*)echo "$0: unhandled event \"$event\"" >&2; exit 2
+	  ;;
+      esac
+      ;;
   esac
 }
 
