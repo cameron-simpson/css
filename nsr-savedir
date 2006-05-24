@@ -74,10 +74,10 @@ do
     # =item B<-A>
     #
     # Archive mode. After a successful save write a B<.nsr> file
-    # containing the directive "B<+ignore: *>"
+    # containing the directive "B<+skip: .?* *>"
     # to prevent Networker backing up this content again.
     # If the archived path is not a directory,
-    # append "B<+ignore: base>" to the B<.nsr> file in the enclosing directory,
+    # append "B<+skip: base>" to the B<.nsr> file in the enclosing directory,
     # where I<base> is the basename of the path.
     #
     # B<Note>: this option does not imply the B<-a> option.
@@ -202,11 +202,11 @@ do
       then
         if [ -d "$dir" ]
 	then
-	  echo '+ignore: *' >"$dir/.nsr"
+	  echo '+skip: .?* *' >"$dir/.nsr"
 	else
 	  dirbase=`basename "$dir"`
 	  dirdir=`dirname "$dir"`
-	  echo "+ignore: $dirbase" >>"$dirdir/.nsr"
+	  echo "+skip: $dirbase" >>"$dirdir/.nsr"
 	fi
       fi
     fi
