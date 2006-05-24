@@ -42,6 +42,7 @@ usage="Usage: $cmd [-a] [-n] [-x] [-g savegroup] [-l logfile] [-s server] dirs..
 	-l logfile	Specify the logfile to store timestamps.
 			A non-absolute path will be relative to each backup
 			directory. Default: $logfile in each directory.
+			An empty logfile name suppresses this facility.
 	-n		No action. Passed to save(1) to simply report planned
 			backup.
 	-s server	Specify the Legato server to use.
@@ -75,7 +76,11 @@ do
     # Archive mode. After a successful save write a B<.nsr> file
     # containing the directive "B<+ignore: *>"
     # to prevent Networker backing up this content again.
-    # B<Note>: this does not imply the B<-a> option.
+    # If the archived path is not a directory,
+    # append "B<+ignore: base>" to the B<.nsr> file in the enclosing directory,
+    # where I<base> is the basename of the path.
+    #
+    # B<Note>: this option does not imply the B<-a> option.
     #
     -A)	archivemode=1 ;;
 
@@ -154,6 +159,8 @@ xit=0
 for dir
 do
   case "$logfile" in
+    '')	dlogfile=
+    	;;
     /*)	dlogfile=$logfile
 	;;
     *)  [ -d "$dir" ] || { echo "$cmd: $dir: not a directory, can't put logfile inside" >&2
@@ -164,7 +171,7 @@ do
 	;;
   esac
 
-  if [ $full ]
+  if [ $full ] || [ -z "$flogfile" ]
   then
     lastdump=
   else
@@ -190,8 +197,18 @@ do
   then
     if [ $doit ]
     then
-      echo "$thisdump $dir" >>"$logfile"
-      [ $archivemode ] && echo '+ignore: *' >"$dir/.nsr"
+      [ -n "$dlogfile" ] && echo "$thisdump $dir" >>"$dlogfile"
+      if [ $archivemode ]
+      then
+        if [ -d "$dir" ]
+	then
+	  echo '+ignore: *' >"$dir/.nsr"
+	else
+	  dirbase=`basename "$dir"`
+	  dirdir=`dirname "$dir"`
+	  echo "+ignore: $dirbase" >>"$dirdir/.nsr"
+	fi
+      fi
     fi
   else
     xit=1
