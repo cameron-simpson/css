@@ -55,6 +55,19 @@ def isodate(when=None):
   if when is None: when=time.localtime()
   return time.strftime("%Y-%m-%d",when)
 
+def winsize(f):
+  '''	Return a (rows,columns) tuple or None for the specified file object.
+  '''
+  fd=os.dup(f.fileno())	# obtain fresh fd to pass to the shell
+  sttycmd="stty -a <&"+str(fd)+" 2>/dev/null"
+  stty=os.popen(sttycmd).read()
+  os.close(fd)
+  import re
+  m=re.compile(r' rows (\d+); columns (\d+)').search(stty)
+  if not m:
+    return None
+  return (int(m.group(1)),int(m.group(2)))
+
 # trim trailing newline if present, a la the perl func of the same name
 def chomp(s):
   slen=len(s)
@@ -63,24 +76,113 @@ def chomp(s):
   return s
 
 def extend(arr,items):
+  warn("replace use of cs.misc.extend with array extend builtin")
   for i in items:
     arr.append(i)
 
 def index(seq,val):
+  warn("replace use of cs.misc.index with array index/find builtin")
   for i in xrange(len(seq)-1):
     if val == seq[i]:
       return i
   return -1
 
-def uniq(ary):
+def uniq(ary,canonical=None):
   u=[]
   d={}
   for a in ary:
-    if a not in d:
+    if canonical is None:
+      ca=a
+    else:
+      ca=canonical(a)
+
+    if ca not in d:
       u.append(a)
-      d[a]=None
+      d[ca]=None
 
   return u
+
+class CanonicalSeq:
+  def __init__(self,seq,canonical=None):
+    self.__canon=canonical
+    self.__seq=seq
+
+  def __canonical(self,key):
+    if self.__canon is None:
+      return key
+    return self.__canon(key)
+
+  def __len__(self):
+    return len(self.__seq)
+
+  def __getitem__(self,ndx):
+    return self.__seq[ndx]
+
+  def __setitem__(self,ndx,value):
+    self.__seq[ndx]=value
+
+  def __iter__(self):
+    for i in self.__seq:
+      yield i
+
+  def __delitem__(self,ndx):
+    del self.__seq[ndx]
+
+  def __contains__(self,value):
+    cv=self.__canonical(value)
+    for v in self.__seq:
+      if self.__canonical(v) == cv:
+	return True
+
+    return False
+
+class CanonicalDict:
+  def __init__(self,map,canonical=None):
+    self.__canon=canonical
+    self.__dict={}
+    if map is not None:
+      self.update(map)
+
+  def __canonical(self,key):
+    if self.__canon is None:
+      return key
+    return self.__canon(key)
+
+  def __len__(self):
+    return len(self.__dict)
+
+  def keys(self):
+    return [self.__dict[self.__canonical(k)][0] for k in self.__dict.keys()]
+
+  def update(self,map):
+    for k in map.keys():
+      self[k]=map[k]
+
+  def __getitem__(self,key):
+    return self.__dict[self.__canonical(key)][1]
+
+  def __setitem__(self,key,value):
+    self.__dict[self.__canonical(key)]=(key,value)
+
+  def __iter__(self):
+    for k in self.__dict.keys():
+      yield k
+  def iterkeys(self):
+    return self.__iter__()
+
+  def __delitem__(self,key):
+    del self.__dict[self.__canonical(key)]
+
+  def __contains__(self,key):
+    return self.__canonical(key) in self.__dict
+
+class LCDict(CanonicalDict):
+  def __init__(self,dict):
+    CanonicalDict.__init__(self,dict,canonical=string.lower)
+
+class LCSeq(CanonicalSeq):
+  def __init__(self,seq):
+    CanonicalSeq.__init__(self,seq,canonical=string.lower)
 
 # fill out an array with None to be at least "length" elements long
 def padlist(l,length):
@@ -162,9 +264,10 @@ def mailsubj(addrs,subj,body):
 
   return pipe.close() is None
 
-# Accept a dict of the for key->(fn, help_string)
-# and perform entered commands.
 def runCommandPrompt(fnmap,prompt=None):
+  ''' Accept a dict of the for key->(fn, help_string)
+      and perform entered commands.
+  '''
   if prompt is None: promt=cmd+"> "
   ok=True
   while True:
