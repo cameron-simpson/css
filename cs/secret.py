@@ -1,7 +1,7 @@
 import os
 import os.path
 import cs.hier
-from cs.misc import debug
+from cs.misc import debug, progress, warn
 
 def get(secret,base=None):
   if base is None:
@@ -24,9 +24,10 @@ def ldap(secret):
   # transmute secret name into structure
   if not(hasattr(secret,'__keys__') or hasattr(secret,'keys')):
     import cs.secret
+    progress("lookup secret:", secret)
     secret=cs.secret.get(secret)
 
-  debug("secret =", `secret`)
+  warn("LDAP secret =", `secret`)
   import ldap
   L=ldap.open(secret['HOST'])
   L.simple_bind_s(secret['BINDDN'],secret['BINDPW'])
