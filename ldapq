@@ -1,6 +1,36 @@
-#!/bin/sh
+#!/bin/sh -u
+#
+# Quick'n'easy ldapsearch.
+#	- Cameron Simpson <cs@zip.com.au>
+#
 
-LDAP_HOST=${LDAP_HOST:-ldap}
-export LDAP_HOST
+: ${LDAPQOPTS:='-x'}
+: ${LDAP_HOST:=ldap}
 
-exec ldapsearch -h "$LDAP_HOST" ${1+"$@"}
+cmd=`basename "$0"`
+usage="Usage: $cmd [ldapsearchopts...]"
+
+set -- $LDAPQOPTS ${1+"$@"}
+
+ldsopts=
+badopts=
+
+while [ $# -gt 0 ]
+do
+  case $1 in
+    -b)	LDAP_BASEDN=$2; shift ;;
+    -h)	LDAP_HOST=$2; shift ;;
+    -x)	ldsopts="$ldsopts $1" ;;
+    --)	shift; break ;;
+    -?*)echo "$cmd: unrecognised option: $1" >&2
+    	badopts=1
+	;;
+    *)	break ;;
+  esac
+  shift
+done
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+set -x
+exec ldapsearch $ldsopts -h "$LDAP_HOST" -b "$LDAP_BASEDN" ${1+"$@"}
