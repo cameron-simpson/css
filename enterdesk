@@ -24,7 +24,10 @@ lastdesk=`currentdesk` || exit 1
 currentdesk "$thisdesk" &
 
 (
-  menucs=`expr 2048 + $thisdesk` && fvwmcmd "MenuStyle \"*\" MenuColorSet $menucs"
+  menucs=`desktop "$thisdesk" menucs`
+  [ -n "$menucs" ] || menucs=2
+  $trace fvwmcmd "MenuStyle \"*\" MenuColorSet $menucs"
+
   $trace desktop "$thisdesk" wmcmds | fvwmcmd
   $trace desktop "$thisdesk" shcmds | sh -x &
 
