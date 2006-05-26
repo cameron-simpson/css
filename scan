@@ -1,0 +1,63 @@
+#!/bin/sh -u
+#
+# Simple wrapper for scanimage.
+#	- Cameron Simpson <cs@zip.com.au> 20may2006
+#
+
+: ${SCANOPTS=''}
+
+res=300
+dx=215 dy=297
+progress=
+[ -t 2 ] && progress=--progress
+scanopts=
+
+cmd=`basename "$0"`
+usage="Usage: $cmd [-o outputfile] [-x dx] [-y dy] [scanimage-arguments...]
+	-o			Redirect standard output to the specified file.
+	-x dx			Scan width, default $dx.
+	-y dy			Scan height, default $dy.
+	--resolution res	Scan resolution, default $res.
+	The variable \$SCANOPTS is prepended to the argument list."
+
+
+badopts=
+
+set -- $SCANOPTS ${1+"$@"}
+
+while [ $# -gt 0 ]
+do
+  case "$1" in
+    -h | --help)	echo "$usage"
+			echo
+			echo "See also scanimage(1)."
+			exit 0
+			;;
+    -p|--progress)	progress=$1 ;;
+    --no-progress)	progress= ;;
+    -o)			exec >"$2"; shift ;;
+    -x)			dx=$2; shift ;;
+    -y)			dy=$2; shift ;;
+    --resolution)	res=$2; shift ;;
+    -i | --icc-profile \
+    | -L | --list-devices \
+    | --batch-double | --batch-prompt \
+    | --accept-md5-only \
+    | -n | --dont-scan \
+    | -T | --test \
+    | -v | --verbose \
+    | -B | --buffersize \
+    | -V | --version \
+    | --default-enhancements \
+    )			scanopts="$scanopts $1" ;;
+    --)			shift; break ;;
+    -? | --?*)		scanopts="$scanopts $1 $2" ;;
+    *)			break ;;
+  esac
+  shift
+done
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+set -x
+exec scanimage $progress --resolution "$res" -x "$dx" -y "$dy" $scanopts -- ${1+"$@"}
