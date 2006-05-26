@@ -27,7 +27,7 @@ def ldap(secret):
     progress("lookup secret:", secret)
     secret=cs.secret.get(secret)
 
-  warn("LDAP secret =", `secret`)
+  debug("LDAP secret =", `secret`)
   import ldap
   L=ldap.open(secret['HOST'])
   L.simple_bind_s(secret['BINDDN'],secret['BINDPW'])
