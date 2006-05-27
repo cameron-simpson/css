@@ -12,4 +12,4 @@ umask 22
 necho "Addresses to CC? "
 read addrs || exit 1
 bugcc "$addrs" withjob adzap cvsedit rc/patterns || exit 1
-bugcc "$addrs" myke _script
+bugcc "$addrs" myke _scripts
