@@ -1,0 +1,42 @@
+#!/bin/sh -u
+#
+# Take the almost-URL handed out by Picasa and hand to mutt.
+# Install:
+#	ln -s /opt/css/bin/mutt-picasa /opt/picasa/bin/picasa-hook-email.sh
+# - Cameron Simpson <cs@zip.com.au> 28may2006
+#
+
+: ${TMPDIR:=/tmp}
+: ${TERMINAL:=xterm}
+: ${EDITOR:=vi}
+
+[ $# = 1 ] || { echo "$0: expected exactly 1 arguments, got $# [$*]" >&2
+                exit 2
+	      }
+url=$1; shift
+
+case "$url" in
+  mailto:*) url=`expr "x$url" : 'xmailto:\(.*\)'` ;;
+esac
+case "$url" in
+  \?*)	url=`expr "x$url" : 'x.\(.*\)'` ;;
+esac
+case "$url" in
+  *'&attach='*)
+	pre=`   expr "x$url" : 'x\(.*\)&attach=.*'`
+	attach=`expr "x$url" : 'x.*&attach=\([^&]*\).*'`
+	post=`  expr "x$url" : 'x.*&attach=[^&]*\(.*\)'`
+	if [ -f "$attach" ]
+	then
+	  tmpf=$TMPDIR/`basename "$attach" | tr -s ' \011' '____'`
+	  trap 'rm -f "$tmpf"' 0
+	  rm -f "$tmpf"
+	  cp "$attach" "$tmpf" && attach=$tmpf
+	fi
+	url="$pre&attach=$attach$post"
+	;;
+esac
+
+url='mailto:?to=--who--&'$url
+
+$TERMINAL -e mutt -e 'set editor=$EDITOR; set edit_headers=yes; set abort_unmodified=no' "$url"
