@@ -60,7 +60,7 @@ case "$to"   in /*) ;; *) to=./$to     ;; esac
 			       fi
 	    }
 
-if [ $noaction ] || ln "$from" "$to" 2>/dev/null
+if [ $noaction ] || ln -- "$from" "$to" 2>/dev/null
 then
     [ $verbose ] && echo "ln $from $to"
     exit 0
@@ -73,7 +73,7 @@ then
     else xit=$?
     fi
 else
-    if [ $noaction ] || cp "$from" "$to"
+    if [ $noaction ] || cp -- "$from" "$to"
     then [ $verbose ] && echo "cp $from $to"
     else xit=$?
     fi
