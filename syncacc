@@ -65,6 +65,10 @@ exec \
 	'--include=/rc/gtk' \
 	'--include=/rc/hi' \
 	'--include=/rc/java' \
+	'--include=/rc/java/au.com.zip.cs.jar' \
+	'--include=/rc/java/mm.mysql*' \
+	'--include=/rc/java/mysql-connector*' \
+	'--exclude=/rc/java/*' \
 	'--include=/rc/inputrc' \
 	'--include=/rc/less' \
 	'--include=/rc/lesskey' \
