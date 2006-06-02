@@ -1,9 +1,9 @@
-#!/bin/sh
+#!/bin/sh -u
 #
 # Filter an output filedescriptor.
-#	- Cameron Simpson <cs@zip.com.au> 06may99
+#	- Cameron Simpson <cs@zip.com.au> 06may1999
 #
-# Multiple fds. - cameron, 23may99
+# Multiple fds. - cameron, 23may1999
 #
 
 : ${TMPDIR:=/tmp}
@@ -24,9 +24,7 @@ case $1 in
 		shift; shift
 		# rewrite the command line
     		for fd in `echo "$fds" | tr , ' '`
-    		do
-		    set x "$0" "$fd" "$filter" ${1+"$@"}
-		    shift
+    		do set -- "$0" "$fd" "$filter" ${1+"$@"}
 		done
 		# rerun
 		exec "$@"
@@ -86,7 +84,7 @@ xitcode=$TMPDIR/xit.$$
 
 # collect exit status
 while [ ! -s $xitcode ]; do sleep 1; done
-xit=`cat $xitcode`
+xit=`cat $xitcode` || xit=1
 rm -f $xitcode
 
 [ -n "$xit" ] || { echo "$cmd: can't get exit code for $*" >&2
