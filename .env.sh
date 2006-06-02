@@ -18,7 +18,7 @@
 : ${PERL5LIB:=/usr/lib/perl5}
 : ${CLASSPATH:=/usr/lib/jre/lib}
 
-PATH=$PATH:$OPTCSS/bin
+PATH=$PATH:$OPTCSS/bin:/sbin:/usr/sbin
 MANPATH=$MANPATH:$OPTCSS/man
 PERL5LIB=$PERL5LIB:$OPTCSS/lib
 CLASSPATH=$CLASSPATH:$OPTCSS/lib/au.com.zip.cs.jar
