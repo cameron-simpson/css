@@ -77,7 +77,7 @@ do
     # containing the directive "B<+skip: .?* *>"
     # to prevent Networker backing up this content again.
     # If the archived path is not a directory,
-    # append "B<+skip: base>" to the B<.nsr> file in the enclosing directory,
+    # append "B<+skip:> I<base>" to the B<.nsr> file in the enclosing directory,
     # where I<base> is the basename of the path.
     #
     # B<Note>: this option does not imply the B<-a> option.
