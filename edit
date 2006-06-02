@@ -4,10 +4,9 @@
 #	- Cameron Simpson <cs@zip.com.au> 27oct1995
 #
 
-EDITOR=${EDITOR:-vi}
-export EDITOR
+: ${EDITOR:=vi}
 
-doscr=1
+doscr=
 
 cmd=`basename "$cmd"`
 usage="Usage: $cmd [+s] [-e editor] file"
