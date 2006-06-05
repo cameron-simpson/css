@@ -9,4 +9,4 @@ usage="Usage: $cmd query"
 
 [ $# = 0 ] && { echo "$usage" >&2; exit 2; }
 
-exec search googleimagesearch,yahooimagesearch,altavista-image "$@"
+exec search ask-images,googleimagesearch,yahooimagesearch,altavista-image "$@"
