@@ -13,7 +13,7 @@ usage="Usage:     $cmd    Update mairix index.
 # help?
 [ $# -gt 0 ] && [ "x$*" = x-h -o "x$1" = 'x-?' ] && { echo "$usage"; exit 0; }
 
-[ $# = 0 ] && exec mairix -v
+[ $# = 0 ] && { vflag=; [ -t 1 ] && vflag=-v; exec mairix $vflag; }
 
 res=`mkdirn $TMPDIR/mairix` || exit 1
 trap 'rm -rf -- "$res"' 1 2 13 15
