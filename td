@@ -1,14 +1,34 @@
-#!/bin/sh
+#!/bin/sh -u
 #
 # Wrapper for the tdl to-do list app.
 #	- Cameron Simpson <cs@zip.com.au> 21jun2004
 #
 
 cmd=$0
-usage="Usage: $cmd [-v] [+item] [tdl-args...]"
+usage="Usage: $cmd [-v] [-q] [+item] [tdl-args...]"
+
+trace=set-x
 
 finalopts=-a
-[ "x$1" = x-v ] && { finalopts="$finalopts -v"; shift; }
+tdqopt=
+verbose=
+[ -t 2 ] && set -- -v ${1+"$@"}
+
+while [ $# -gt 0 ]
+do
+  case $1 in
+    -v)	verbose=1 tdqopt= ;;
+    -q)	verbose= tdqopt=-q ;;
+    --)	shift; break ;;
+    -?*)echo "$cmd: unsupported leading option: $1" >&2
+	badtops=1
+	;;
+    *)	break ;;
+  esac
+  shift
+done
+
+[ $verbose ] && { finalopts="$finalopts -v"; shift; }
 
 context=
 case $1 in
@@ -32,6 +52,8 @@ case $1 in
 	;;
 esac
 
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
 if [ $# -gt 0 ]
 then
     case "$1" in
@@ -46,7 +68,7 @@ then
     # join all args for "add"
     [ "x$op" = xadd ] && set -- "$*"
 
-    (set -x; tdl "$op" $datespec $context ${1+"$@"})
+    $trace tdl "$op" $datespec $context ${1+"$@"}
 fi
 
 exec tdl ls $finalopts $context
