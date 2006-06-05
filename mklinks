@@ -137,7 +137,7 @@ The default is 512 bytes.
 
   progress("find @ARGV ...");
 
-  find(\&checkit, @ARGV); outif(1,'');
+  find(\&checkit, @ARGV); out('');
 
   progress("sorting file sizes ...");
   my @sizes = sort { $b <=> $a; } keys %::SizedFiles;
@@ -147,7 +147,7 @@ The default is 512 bytes.
   # for each size
   SIZE:
   for my $sz (@sizes)
-  { outif(1,$sz);
+  { progress($sz);
 
     next SIZE if @{$::SizedFiles{$sz}} < 2;
 
@@ -167,7 +167,7 @@ The default is 512 bytes.
       for my $f2 (@files)
       { next F2 if $::Linked{$f2};
 
-	outif(1,"$sz: $f1 <=> $f2");
+	progress("$sz: $f1 <=> $f2");
 
 	if ($::Ident{$f1} eq $::Ident{$f2})
 	# already linked to f1
