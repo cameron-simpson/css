@@ -1,0 +1,20 @@
+#!/bin/sh
+#
+# Remove an empty maildir.
+#	- Cameron Simpson <cs@zip.com.au> 05jun2006
+#
+
+xit=0
+
+for maildir
+do
+  {  { [ ! -d "$maildir/tmp" ] || rmdir "$maildir/tmp"; } \
+  && { [ ! -d "$maildir/new" ] || rmdir "$maildir/new"; } \
+  && { [ ! -d "$maildir/cur" ] || rmdir "$maildir/cur"; } \
+  && { [ ! -d "$maildir"     ] || rmdir "$maildir"; }
+  } \
+  || maildir "$maildir" \
+  || xit=1
+done
+
+exit $xit
