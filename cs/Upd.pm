@@ -99,6 +99,9 @@ sub nlif	{ my($level)=shift(@_);
 		  { nl(@_);
 		  }
 		}
+sub progress	{ outif(1,@_); }
+sub verbose	{ nlif(2,@_); }
+sub debug	{ nlif(3,@_); }
 
 package cs::Upd;
 
