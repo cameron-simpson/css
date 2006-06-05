@@ -19,19 +19,26 @@ $::Server=(exists $ENV{NNTPSERVER} && length $ENV{NNTPSERVER} ? $ENV{NNTPSERVER}
 $::NDA='ng2to|procmail';
 $::Newsrc="$ENV{HOME}/.getnews-state";
 $::CatchUp=0;
+$::Verbose=0;
+$::Progress=0;
+if (-t STDERR) { $::Progress=1; }
 
 $::Usage="Usage: $::cmd [-s nntpserver] [-d nda] [newsgroup...]
 	-c		Catch up the named group.
 	-s nntpserver	Specify server. Default from \$NNTPSERVER: $::Server
 	-n newsrc	Specify news file. Default: $::Newsrc.
 	-d nda		Specify news delivery agent. Default: $::NDA
+	-q		Quiet.
+	-v		Verbose.
 ";
 
-getopts('cs:d:n:') || die $::Usage;
+getopts('cs:d:n:qv') || die $::Usage;
 $::CatchUp=$::opt_c if defined $::opt_c;
 $::Server=$::opt_s if defined $::opt_s;
 $::NDA=$::opt_d if defined $::opt_d;
 $::Newsrc=$::opt_n if defined $::opt_n;
+if ($::opt_q)	{ $::Progress=0; $Verbose=0; }
+if ($::opt_v)	{ $::Progress=1; $Verbose=1; }
 
 $::Conn=new cs::NNTP $::Server;
 die "$::cmd: can't connect to server $::Server: $!\n" if ! defined $::Conn;
@@ -68,7 +75,7 @@ $::Conn->Quit();
 undef $::Conn;
 
 if ($::Count > 0)
-{ nl("$::Count article".($::Count == 1 ? '' : 's')." retrieved");
+{ $::Progress && nl("$::Count article".($::Count == 1 ? '' : 's')." retrieved");
 }
 
 exit $::Xit;
@@ -76,7 +83,7 @@ exit $::Xit;
 sub fetchgroup($)
 { my($group)=@_;
 
-  out($group);
+  $::Progress && out($group);
 
   my @r = $::Conn->Group($group);
   if (@r != 2)
@@ -103,7 +110,7 @@ sub fetchgroup($)
   for my $n ($low..$high)
   {
     next N if $R->InRange($n); ## we know it's not in the range
-    out("$group: $n/$high");
+    $::Progress && out("$group: $n/$high");
 
     $R->Add($n);	# articles come in in sequence
 
@@ -122,6 +129,6 @@ sub fetchgroup($)
   $::RC->Sync();
   if ($na > 0)
   { $::Count+=$na;
-    nl("$group: $na articles") if $na > 0;
+    $::Progress && nl("$group: $na articles") if $na > 0;
   }
 }
