@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/sh -u
 #
 # Set up an ssh-agent in daemon mode if needed.
 #	- Cameron Simpson <cs@zip.com.au> 30jul2001
