@@ -11,7 +11,7 @@ import re
 import string
 from getopt import getopt, GetoptError
 import cs.lex
-from cs.misc import warn,cmd,cmderr
+from cs.misc import warn,cmd,cmderr,chomp
 
 if 'LOGDIR' in os.environ:
   logdir=os.environ['LOGDIR']
@@ -45,8 +45,6 @@ for (opt,val) in opts:
     relist.append((False, re.compile(val), val))
     lastremode=False
 
-relist.append((not lastremode, None, ''))
-
 if len(argv) == 0:
   cmderr("missing prefix")
   badopts=True
@@ -59,6 +57,14 @@ else:
 if badopts:
   warn(usage)
   sys.exit(2)
+
+dfltrelist=file(os.path.join(os.environ['HOME'],'rc','dlog','q-'+prefix))
+if dfltrelist:
+  for regexp in dfltrelist:
+    regexp=chomp(regexp)
+    relist.append((False, re.compile(regexp), regexp))
+
+relist.append((not lastremode, None, ''))
 
 showndate=None
 curdate=None
@@ -93,14 +99,12 @@ def flushemail():
     subjlist=email.keys()
     subjlist.sort()
     for subj in subjlist:
-      pfx='   '+subj+':'
+      print '  ', subj+':'
+      pfx='   '
       topic=email[subj]
       msgs=[topic[msgid] for msgid in topic]
       msgs.sort(cmpmsgs)
       for msg in msgs:
-	if True:	####len(pfx) > 24:
-	  print pfx
-	  pfx='   '
 	rpt=msg['HHMM']+": "
 	if 'FROM' in msg: rpt=rpt+string.join(cs.misc.uniq(msg['FROM']),', ')
 	if 'TO' in msg:   rpt=rpt+'->'+string.join(cs.misc.uniq(msg['TO']),', ')
@@ -150,8 +154,7 @@ qmsgid_re=re.compile(r'\s+(<[^<>@ \t]+@[^<>@ \t]+>)$')
 hhmm_re=re.compile(r'^(\d\d:\d\d)\s*')
 
 for line in file(log):
-  if line[-1:] == '\n':
-    line=line[:-1]
+  line=chomp(line)
 
   if len(line) == 0:
     continue
