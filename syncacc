@@ -55,6 +55,7 @@ exec \
 	'--include=/rc' \
 	'--include=/rc/@' \
 	'--include=/rc/cvs' \
+	'--include=/rc/dlog' \
 	'--include=/rc/env' \
 	'--include=/rc/getnews' \
 	'--include=/rc/gkrellm2' \
