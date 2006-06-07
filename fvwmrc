@@ -6,6 +6,19 @@
 
 . $HOME/rc/x11/xenv.sh
 
+: ${X11_COMPOSITE:=''}
+case "$X11_COMPOSITE" in
+  '')	fvwm_Transparent=Transparent
+	fvwm_RootTransparent=RootTransparent
+	fvwm_ParentalRelativity=ParentalRelativity
+	;;
+  *)	fvwm_Transparent=
+	fvwm_RootTransparent=
+	fvwm_ParentalRelativity=
+	;;
+esac
+export fvwm_Transparent fvwm_RootTransparent fvwm_ParentalRelativity
+
 (
   uncurly $HOME/rc/x11/fvwm/rc-curly
   desktop-incant -
