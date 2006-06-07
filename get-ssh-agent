@@ -5,14 +5,27 @@
 #
 
 cmd=$0
-usage="Usage: $cmd [-v] [statefile]"
+usage="Usage: $cmd [-h] [-v] [--] [statefile]"
 
 statefile=
 verbose=
+thishost=
 
 badopts=
 
-[ "x$1" = x-v ] && { verbose=1; shift; }
+while [ $# -gt 0 ]
+do
+  case "$1" in
+    -h)	thishost=1 ;;
+    -v)	verbose=1 ;;
+    --)	shift; break ;;
+    -?*)echo "$cmd: unrecognised option: $1" >&2
+	badopts=1
+	;;
+    *)	break ;;
+  esac
+  shift
+done
 
 [ $# = 0 ] || { statefile=$1; shift; }
 
@@ -20,7 +33,7 @@ badopts=
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
-have-ssh-agent && exec stash-ssh-agent -
+[ -z "$thishost" ] && have-ssh-agent && exec stash-ssh-agent -
 
 # protect against rogue output
 exec 3>&1 1>/dev/null
