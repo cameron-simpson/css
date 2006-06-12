@@ -1,319 +1,201 @@
-#!/usr/bin/perl
+#!/usr/bin/python
 #
-# Walk directories, linking identical files.
-#	- Cameron Simpson <cs@zip.com.au>
+# Recode of mklinks in Python, partly for the exercise and partly to
+# improve the algorithm.
+#	- Cameron Simpson <cs@zip.com.au> 21may2006
 #
 
-=head1 NAME
+import sys
+import os
+import os.path
+import stat
+import filecmp
+import md5
+from cs.misc import progress, warn, verbose, debug, chomp, tmpdirn
 
-mklinks - walk directories, linking identical files
+sizeinfo={}
+identinfo={}
+pathinfo={}
 
-=head1 SYNOPSIS
+noAction=False
 
-mklinks [-newer] [-name I<regexp>] [-prune I<regexp>] [-size I<smallest>] [I<directories...>]
+def st_ident(st):
+  return str(st[stat.ST_DEV])+":"+str(st[stat.ST_INO])
 
-=head1 DESCRIPTION
+class FileInfo:
+  def __init__(self,path,st):
+    self.path=path
+    self.paths=[]
+    self.ident=st_ident(st)
+    self.size=st[stat.ST_SIZE]
+    self.mtime=st[stat.ST_MTIME]
+    self.md5pfx=None
+    self.addpath(path)
+    debug("new FileInfo ident =",self.ident,"size =",str(self.size),":",path)
 
-I<mklinks> walks the specified directories inspecting files.
-Identical files above a certain size threshold
-(default 512 bytes)
-are hard linked, keeping the older copy
-(which lets you import a bunch of new files into an area
-and have only the genuinely new ones remain).
+  def addpath(self,path):
+    self.paths.append(path)
+    pathinfo[path]=self
 
-=cut
+  def getmd5pfx(self):
+    if self.md5pfx is None:
+      self.md5pfx=md5pfx(self.path)
+    return self.md5pfx
 
-use strict qw(vars);
+  def subsume(self,other):
+    for path in other.paths:
+      other.paths.remove(path)
+      linkto(self.path,path)
 
-use cs::Misc;
-use cs::Pathname;
-use cs::Upd;
-use File::Find;
-use File::Compare;
-use Digest::MD5 qw(md5);
+    # discard mention of other
+    sizeinfo[self.size].remove(other)
+    identinfo[other.ident]=self.path
 
-$::SFiles=0;
-$::SBytes=0;
-$::SBytesRead=0;
-$::SOpens=0;
-$::SLinked=0;
-$::SLinkBytesSaved=0;
-$::KeepNewer=0;
+# fetch md5 hash of first 8192 bytes of the file
+def md5pfx(path,size=8192):
+  ##progress("md5", path)
+  return md5.new(file(path).read(size)).digest()
 
-my $xit = mklinks(@ARGV);
+def linkto(srcpath,dstpath):
+  progress(srcpath,"=>",dstpath)
+  pathinfo[srcpath].addpath(dstpath)
+  global noAction
+  noAction or os.unlink(dstpath)
+  noAction or os.link(srcpath,dstpath)
 
-nlif(1,"$::SFiles files total, $::SOpens files opened (".pcnt($::SOpens,$::SFiles)."\%)");
-nlif(1,"$::SBytes bytes total, $::SBytesRead bytes read (".pcnt($::SBytesRead,$::SBytes)."\%)");
-nlif(1,"$::SLinked files hardlinked");
-nlif(1,"$::SLinkBytesSaved bytes reclaimed (".pcnt($::SLinkBytesSaved,$::SBytes)."\%)");
-
-exit $xit;
-
-sub mklinks
-{ my(@ARGV)=@_;
-
-  my($xit)=0;
-
-  $::Usage="Usage: $::cmd [-n] [-name regexp] [-newer] [-prune regexp] [-size smallest] [directories...]\n";
-
-  local $::FileMatch;
-  local $::DirPrune;
-  local $::DoIt = 1;
-  local $::SizeThreshold = 512;
-
-=head1 OPTIONS
-
-=over 4
-
-=cut
-
-  { my $badopts=0;
-
-    ARGV:
-      while (@ARGV)
-      { $_=shift(@ARGV);
-	last ARGV if $_ eq '--';
-
-	if (! /^-./)
-	{ unshift(@ARGV,$_);
-	  last ARGV;
-	}
-
-=item B<-n>
-
-No action.
-Do nothing, just report what would be done.
-
-=cut
-
-	if ($_ eq '-n')	{ $::DoIt=0; }
-
-=item B<-name> I<regexp>
-
-Inpect only files matching I<regexp>.
-
-=cut
-
-	elsif ($_ eq '-name') { $::FileMatch=shift(@ARGV); }
-
-=item B<-newer>
-
-Keep the newer of two files to be linked, not the older.
-
-=cut
-
-	elsif ($_ eq '-newer') { $::KeepNewer=1; }
-
-=item B<-prune> I<regexp>
-
-Ignore directories matching I<regexp>.
-
-=cut
-
-	elsif ($_ eq '-prune'){ $::DirPrune=shift(@ARGV); }# dirs to ignore
-
-=item B<-size> I<smallest>
-
-Adjust the low size threshold for files to consider candidates for linking.
-The default is 512 bytes.
-
-=cut
-
-	elsif ($_ eq '-size'){ $::SizeThreshold=shift(@ARGV)+0; }
+def do(path):
+  ''' Process each file in the directory tree.
+      If a file is known by dev:ino,
+	if another file is preferred,
+	  replace with other file
+	  add this path to other file list
 	else
-	{ warn "$::cmd: unrecognised option: $_\n";
-	  $badopts=1;
-	}
-      }
+	  add this path to this file list
+      else
+	if this is the first file of this size
+	  stash it, but don't open it for prefix md5
+	else
+	  o
+  '''
+  ##progress("DO", path)
+  st=os.lstat(path)
+  if not stat.S_ISREG(st[stat.ST_MODE]):
+    return
 
-    die $::Usage if $badopts;
-  }
+  ident=st_ident(st)
+  if ident in identinfo:
+    # known file
+    info=identinfo[ident]
+    if type(info) is str:
+      # known to be replaceable - replace
+      ##progress("know to replace",path,"by",info)
+      linkto(info,path)
+      return
 
-=back
+    # just note new path for this file
+    debug("note new instance of",info.path,":",path)
+    info.addpath(path)
+    return
 
-=cut
+  # new file, note it
+  info=identinfo[ident]=FileInfo(path,st)
 
-  push(@ARGV,'.') unless @ARGV > 0;
+  size=st[stat.ST_SIZE]
+  if size not in sizeinfo:
+    # new size, nothing to compare to; save and return
+    debug("new size",size,"on file",path)
+    sizeinfo[size]=[info]
+    return
 
-  progress("find @ARGV ...");
+  # existing size - compare against files of same size
+  md5=info.getmd5pfx()
+  for other in sizeinfo[size]:
+    ##warn("cmp", path, "vs", other.path)
+    if md5 == other.getmd5pfx() and filecmp.cmp(path,other.path):
+      # same contents
+      ##progress("match with", other.path)
+      if info.mtime < other.mtime:
+	# we are older - discard newer file
+	##progress("I am older, subsume", other.path)
+	info.subsume(other)
+	return
 
-  find(\&checkit, @ARGV); out('');
+      # we are newer - let the older file subsume us
+      ##progress("I am younger, subsume", path)
+      sizeinfo[size].insert(0,info)
+      other.subsume(info)
+      return
 
-  progress("sorting file sizes ...");
-  my @sizes = sort { $b <=> $a; } keys %::SizedFiles;
+  # no other file matches - add this file to the size list
+  debug("no matches, size",size,"+",path)
+  sizeinfo[size].append(info)
 
-  progress("comparing files ...");
+def slotfile(size):
+  slot=0
+  while size > 0:
+    size/=16
+    slot+=1
 
-  # for each size
-  SIZE:
-  for my $sz (@sizes)
-  { progress($sz);
+  global slotfiles
+  global slotpaths
+  while slot >= len(slotfiles):
+    slotfiles.append(None)
+    slotpaths.append(None)
 
-    next SIZE if @{$::SizedFiles{$sz}} < 2;
+  ##print "slot =", slot, "len(slotfiles) =", len(slotfiles)
+  if slotfiles[slot] is None:
+    slotpaths[slot]=os.path.join(slotdir,str(slot))
+    slotfiles[slot]=file(slotpaths[slot],'w')
 
-    # for each group of files that size
-    my @files = sort
-		{ $::KeepNewer ? ($::MTime{$b} <=> $::MTime{$a}) : ($::MTime{$a} <=> $::MTime{$b}) }
-    		@{$::SizedFiles{$sz}};
+  return slotfiles[slot]
 
-    # compare files of same size
-    F1:
-    for my $f1 (@files)
-    { next F1 if $::Linked{$f1};	# already processed
+def scatter(path):
+  st=os.lstat(path)
+  if not stat.S_ISREG(st[stat.ST_MODE]):
+    return
+  f=slotfile(st[stat.ST_SIZE])
+  f.write(path)
+  f.write('\n')
 
-      $::Linked{$f1}=1;
+splitMode=False
+slotdir=None
+if sys.argv[1] == "--split":
+  splitMode=True
+  del sys.argv[1]
+  slotfiles=[]
+  slotpaths=[]
+  slotdir=tmpdirn()
 
-      F2:
-      for my $f2 (@files)
-      { next F2 if $::Linked{$f2};
+for path in sys.argv[1:]:
+  if path == "-":
+    for line in sys.stdin:
+      line=chomp(line)
+      if splitMode:
+        scatter(line)
+      else:
+	do(line)
+  else:
+    for dirpath, dirnames, filenames in os.walk(path):
+      progress(dirpath)
+      filenames.sort()
+      for name in filenames:
+	subpath=os.path.join(dirpath,name)
+	if splitMode:
+	  scatter(subpath)
+	else:
+	  do(subpath)
+      dirnames.sort()
 
-	progress("$sz: $f1 <=> $f2");
+if splitMode:
+  for slotfile in slotfiles:
+    if slotfile:
+      slotfile.close()
 
-	if ($::Ident{$f1} eq $::Ident{$f2})
-	# already linked to f1
-	{ $::Linked{$f2}=1;
-	  next F2;
-	}
+  slotpaths.reverse()	# do big files first
+  for path in slotpaths:
+    if path:
+      progress("mklinks - <"+path)
+      os.system("exec <"+path+"; rm "+path+"; exec "+sys.argv[0]+" -")
 
-	# different, leave it alone
-	## nl("compare $f1 <=> $f2");
-	my($md51,$md52)=(md($f1),md($f2));
-	next F2 if defined($md51) && defined($md52) && $md51 ne $md52;
-
-	# overestimate cost of full compare
-	$::SOpens+=2;
-	$::SBytesRead+=2*$sz;
-
-	# different, leave it alone
-	next F2 if compare($f1,$f2) != 0;
-
-	# the same - keep one, toss other, link kept to tossed
-	my($keep,$toss)=($f1,$f2);
-
-	# link keep to toss
-	nlif(1,"link($f1 => $f2");
-
-	my $lastlink=0;
-	my @ts = lstat($toss);
-	if ($ts[3] == 1) { $lastlink=1; }
-
-	if (! $::DoIt)
-	{}	# pretend ok
-	elsif (! unlink($toss))
-	{ warn "$::cmd: unlink($toss): $!\n";
-	  $xit=1;
-	  next F2;
-	}
-	elsif (! link($keep,$toss))
-	{ warn "$::cmd: can't link ($keep,$toss): $!\n";
-	  warn "\t$toss now missing\n";
-	  $xit=1;
-	  next F2;
-	}
-
-	$::SLinked++;
-	if ($lastlink) { $::SLinkBytesSaved+=$sz; }
-
-	$::Linked{$f2}=1;
-	$::Ident{$toss}=$::Ident{$keep};
-	$::MTime{$toss}=$::MTime{$keep};
-	setmd5($toss,$md52) if defined $md52;
-      }
-    }
-  }
-
-  out('');
-
-  return $xit;
-}
-
-sub checkit
-{
-  ## my $o_=$_;
-  ## warn "Into checkit:\n";
-  ## warn "\t_=$_\n";
-  ## warn "\tFile::Find::name=$File::Find::name\n";
-  ## warn "\tFile::Find::dir=$File::Find::dir\n";
-
-  outif(1,$File::Find::name);
-
-  # ignore uninteresting files
-  return if defined $::DirPrune && $File::Find::dir =~ /$::DirPrune$/o;
-  return if defined $::FileMatch && ! /^$::FileMatch$/o;
-
-  my @stat = lstat;
-
-  if (! @stat)
-  { warn "$::cmd: $_: can't lstat: $!\n";
-    return;
-  }
-
-  # ignore non-files
-  return if ! -f _;
-
-  my
-  ($dev,$ino,$mode,$nlink,$uid,$gid,$rdev,$size,
-   $atime,$mtime,$ctime,$blksize,$blocks
-  )
-  =
-  @stat;
-
-  # ignore small files
-  return if $size < $::SizeThreshold;
-
-  if (defined($::Size{$File::Find::name}))
-  { err("repeated mention of $_ skipped\n");
-  }
-  else
-  { my $ident = "$dev:$ino";
-    $::Ident{$File::Find::name}=$ident;
-    $::MTime{$File::Find::name}=$mtime;
-    $::Size{$File::Find::name}=$size;
-
-    $::SizedFiles{$size}=[] if ! defined $::SizedFiles{$size};
-    push(@{$::SizedFiles{$size}},$File::Find::name);
-
-    if (! $::Seen{$ident})
-    { $::Seen{$ident}=1;
-      $::SFiles++;
-      $::SBytes+=$size;
-    }
-  }
-}
-
-# MD5 of first 8k of file
-sub md($)
-{ my($file)=@_;
-
-  return $::MD5pfx{$file} if exists $::MD5pfx{$file};
-
-  return undef if ! open(MD5PFX, "< $file\0");
-
-  $::SOpens++;
-
-  local($_);
-  read(MD5PFX,$_,8192) || return undef;
-  close(MD5PFX);
-
-  $::SBytesRead+=length;
-
-  setmd5($file,md5($_));
-}
-
-sub setmd5($)
-{ my($file)=@_;
-
-  $::MD5pfx{$file}=md5($_);
-}
-
-sub pcnt($$)
-{ my($top,$bot)=@_;
-  return 0 if $bot <= 0;
-  int($top*100/$bot);
-}
-
-=head1 AUTHOR
-
-Cameron Simpson E<lt>cs@zip.com.auE<gt>
-
-=cut
+if slotdir:
+  os.rmdir(slotdir)
