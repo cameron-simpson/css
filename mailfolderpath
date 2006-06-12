@@ -12,12 +12,23 @@ usage="Usage: $cmd foldername"
 folder=$1; shift
 
 case "$folder" in
-  /*)	fpath=$folder ;;
+  /*|.|./*|..|../*)
+  	fpath=$folder
+	if [ -d "$fpath/." ]
+	then
+	  fpath=`cd "$fpath" && /bin/pwd` || exit 1
+	else
+	  fdir=`dirname "$fpath"`	|| exit 1
+	  fbase=`basename "$fpath"`	|| exit 1
+	  fdir=`cd "$fdir" && /bin/pwd` || exit 1
+	  fpath=$fdir/$fbase
+	fi
+	;;
   [+=]*)fpath=$MAILDIR/`expr "x$folder" : '..\(.*\)'` ;;
   imap:*) fpath= ;;
-  *.*)	fpath= ;;
+  *?.?*)fpath= ;;
   ?*)	fpath=$MAILDIR/$folder ;;
   *)	fpath= ;;
 esac
 
-echo "$fpath"
+printf "%s\n" "$fpath"
