@@ -35,6 +35,6 @@ eval `fetchmailclause -f "$fmrc" "$server" | detab | sed -n 's/^\([^ ][^ ]*\) /s
 
 exec $trace + +s +t \
 	-e "set imap_pass=\"$fm_pass\"" \
-	--pre='set-x fmprod -STOP' \
-	--post='set-x fmprod -CONT' \
+	--pre='set-x gmprod -STOP' \
+	--post='set-x gmprod -CONT' \
 	imaps://$fm_user@$fm_host/INBOX
