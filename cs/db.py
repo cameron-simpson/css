@@ -111,8 +111,8 @@ class SQLQuery:
     self.__args=args
     ##debug("conn =", `conn`)
     self.__cursor=conn.cursor()
-    debug('SQLQuery:', query)
-    debug("SQLQuery: args =", `args`)
+    ##warn('SQLQuery:', query)
+    ##warn("SQLQuery: args =", `args`)
     self.__cursor.execute(query,*args)
     ##debug("executed")
 
@@ -305,6 +305,7 @@ class SingleKeyTableView(KeyedTableView):
     return [k[0] for k in KeyedTableView.keys(self)]
 
   def __getitem__(self,key):
+    ##warn("SingleKeyTableView.__getitem__ - key =", key)
     return KeyedTableView.__getitem__(self,(key,))
 
   def __contains__(self,key):
