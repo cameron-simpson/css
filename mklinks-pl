@@ -1,0 +1,320 @@
+#!/usr/bin/perl
+#
+# Walk directories, linking identical files.
+# Now obsoleted by the python implementation.
+#	- Cameron Simpson <cs@zip.com.au>
+#
+
+=head1 NAME
+
+mklinks - walk directories, linking identical files
+
+=head1 SYNOPSIS
+
+mklinks [-newer] [-name I<regexp>] [-prune I<regexp>] [-size I<smallest>] [I<directories...>]
+
+=head1 DESCRIPTION
+
+I<mklinks> walks the specified directories inspecting files.
+Identical files above a certain size threshold
+(default 512 bytes)
+are hard linked, keeping the older copy
+(which lets you import a bunch of new files into an area
+and have only the genuinely new ones remain).
+
+=cut
+
+use strict qw(vars);
+
+use cs::Misc;
+use cs::Pathname;
+use cs::Upd;
+use File::Find;
+use File::Compare;
+use Digest::MD5 qw(md5);
+
+$::SFiles=0;
+$::SBytes=0;
+$::SBytesRead=0;
+$::SOpens=0;
+$::SLinked=0;
+$::SLinkBytesSaved=0;
+$::KeepNewer=0;
+
+my $xit = mklinks(@ARGV);
+
+nlif(1,"$::SFiles files total, $::SOpens files opened (".pcnt($::SOpens,$::SFiles)."\%)");
+nlif(1,"$::SBytes bytes total, $::SBytesRead bytes read (".pcnt($::SBytesRead,$::SBytes)."\%)");
+nlif(1,"$::SLinked files hardlinked");
+nlif(1,"$::SLinkBytesSaved bytes reclaimed (".pcnt($::SLinkBytesSaved,$::SBytes)."\%)");
+
+exit $xit;
+
+sub mklinks
+{ my(@ARGV)=@_;
+
+  my($xit)=0;
+
+  $::Usage="Usage: $::cmd [-n] [-name regexp] [-newer] [-prune regexp] [-size smallest] [directories...]\n";
+
+  local $::FileMatch;
+  local $::DirPrune;
+  local $::DoIt = 1;
+  local $::SizeThreshold = 512;
+
+=head1 OPTIONS
+
+=over 4
+
+=cut
+
+  { my $badopts=0;
+
+    ARGV:
+      while (@ARGV)
+      { $_=shift(@ARGV);
+	last ARGV if $_ eq '--';
+
+	if (! /^-./)
+	{ unshift(@ARGV,$_);
+	  last ARGV;
+	}
+
+=item B<-n>
+
+No action.
+Do nothing, just report what would be done.
+
+=cut
+
+	if ($_ eq '-n')	{ $::DoIt=0; }
+
+=item B<-name> I<regexp>
+
+Inpect only files matching I<regexp>.
+
+=cut
+
+	elsif ($_ eq '-name') { $::FileMatch=shift(@ARGV); }
+
+=item B<-newer>
+
+Keep the newer of two files to be linked, not the older.
+
+=cut
+
+	elsif ($_ eq '-newer') { $::KeepNewer=1; }
+
+=item B<-prune> I<regexp>
+
+Ignore directories matching I<regexp>.
+
+=cut
+
+	elsif ($_ eq '-prune'){ $::DirPrune=shift(@ARGV); }# dirs to ignore
+
+=item B<-size> I<smallest>
+
+Adjust the low size threshold for files to consider candidates for linking.
+The default is 512 bytes.
+
+=cut
+
+	elsif ($_ eq '-size'){ $::SizeThreshold=shift(@ARGV)+0; }
+	else
+	{ warn "$::cmd: unrecognised option: $_\n";
+	  $badopts=1;
+	}
+      }
+
+    die $::Usage if $badopts;
+  }
+
+=back
+
+=cut
+
+  push(@ARGV,'.') unless @ARGV > 0;
+
+  progress("find @ARGV ...");
+
+  find(\&checkit, @ARGV); out('');
+
+  progress("sorting file sizes ...");
+  my @sizes = sort { $b <=> $a; } keys %::SizedFiles;
+
+  progress("comparing files ...");
+
+  # for each size
+  SIZE:
+  for my $sz (@sizes)
+  { progress($sz);
+
+    next SIZE if @{$::SizedFiles{$sz}} < 2;
+
+    # for each group of files that size
+    my @files = sort
+		{ $::KeepNewer ? ($::MTime{$b} <=> $::MTime{$a}) : ($::MTime{$a} <=> $::MTime{$b}) }
+    		@{$::SizedFiles{$sz}};
+
+    # compare files of same size
+    F1:
+    for my $f1 (@files)
+    { next F1 if $::Linked{$f1};	# already processed
+
+      $::Linked{$f1}=1;
+
+      F2:
+      for my $f2 (@files)
+      { next F2 if $::Linked{$f2};
+
+	progress("$sz: $f1 <=> $f2");
+
+	if ($::Ident{$f1} eq $::Ident{$f2})
+	# already linked to f1
+	{ $::Linked{$f2}=1;
+	  next F2;
+	}
+
+	# different, leave it alone
+	## nl("compare $f1 <=> $f2");
+	my($md51,$md52)=(md($f1),md($f2));
+	next F2 if defined($md51) && defined($md52) && $md51 ne $md52;
+
+	# overestimate cost of full compare
+	$::SOpens+=2;
+	$::SBytesRead+=2*$sz;
+
+	# different, leave it alone
+	next F2 if compare($f1,$f2) != 0;
+
+	# the same - keep one, toss other, link kept to tossed
+	my($keep,$toss)=($f1,$f2);
+
+	# link keep to toss
+	nlif(1,"link($f1 => $f2");
+
+	my $lastlink=0;
+	my @ts = lstat($toss);
+	if ($ts[3] == 1) { $lastlink=1; }
+
+	if (! $::DoIt)
+	{}	# pretend ok
+	elsif (! unlink($toss))
+	{ warn "$::cmd: unlink($toss): $!\n";
+	  $xit=1;
+	  next F2;
+	}
+	elsif (! link($keep,$toss))
+	{ warn "$::cmd: can't link ($keep,$toss): $!\n";
+	  warn "\t$toss now missing\n";
+	  $xit=1;
+	  next F2;
+	}
+
+	$::SLinked++;
+	if ($lastlink) { $::SLinkBytesSaved+=$sz; }
+
+	$::Linked{$f2}=1;
+	$::Ident{$toss}=$::Ident{$keep};
+	$::MTime{$toss}=$::MTime{$keep};
+	setmd5($toss,$md52) if defined $md52;
+      }
+    }
+  }
+
+  out('');
+
+  return $xit;
+}
+
+sub checkit
+{
+  ## my $o_=$_;
+  ## warn "Into checkit:\n";
+  ## warn "\t_=$_\n";
+  ## warn "\tFile::Find::name=$File::Find::name\n";
+  ## warn "\tFile::Find::dir=$File::Find::dir\n";
+
+  outif(1,$File::Find::name);
+
+  # ignore uninteresting files
+  return if defined $::DirPrune && $File::Find::dir =~ /$::DirPrune$/o;
+  return if defined $::FileMatch && ! /^$::FileMatch$/o;
+
+  my @stat = lstat;
+
+  if (! @stat)
+  { warn "$::cmd: $_: can't lstat: $!\n";
+    return;
+  }
+
+  # ignore non-files
+  return if ! -f _;
+
+  my
+  ($dev,$ino,$mode,$nlink,$uid,$gid,$rdev,$size,
+   $atime,$mtime,$ctime,$blksize,$blocks
+  )
+  =
+  @stat;
+
+  # ignore small files
+  return if $size < $::SizeThreshold;
+
+  if (defined($::Size{$File::Find::name}))
+  { err("repeated mention of $_ skipped\n");
+  }
+  else
+  { my $ident = "$dev:$ino";
+    $::Ident{$File::Find::name}=$ident;
+    $::MTime{$File::Find::name}=$mtime;
+    $::Size{$File::Find::name}=$size;
+
+    $::SizedFiles{$size}=[] if ! defined $::SizedFiles{$size};
+    push(@{$::SizedFiles{$size}},$File::Find::name);
+
+    if (! $::Seen{$ident})
+    { $::Seen{$ident}=1;
+      $::SFiles++;
+      $::SBytes+=$size;
+    }
+  }
+}
+
+# MD5 of first 8k of file
+sub md($)
+{ my($file)=@_;
+
+  return $::MD5pfx{$file} if exists $::MD5pfx{$file};
+
+  return undef if ! open(MD5PFX, "< $file\0");
+
+  $::SOpens++;
+
+  local($_);
+  read(MD5PFX,$_,8192) || return undef;
+  close(MD5PFX);
+
+  $::SBytesRead+=length;
+
+  setmd5($file,md5($_));
+}
+
+sub setmd5($)
+{ my($file)=@_;
+
+  $::MD5pfx{$file}=md5($_);
+}
+
+sub pcnt($$)
+{ my($top,$bot)=@_;
+  return 0 if $bot <= 0;
+  int($top*100/$bot);
+}
+
+=head1 AUTHOR
+
+Cameron Simpson E<lt>cs@zip.com.auE<gt>
+
+=cut
