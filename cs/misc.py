@@ -255,6 +255,18 @@ def mkdirn(path):
       if sys.exc_value[0] == errno.EACCES:
 	return None
 
+def tmpdir():
+  if 'TMPDIR' in os.environ:
+    tmpdir=os.environ['TMPDIR']
+    if len(tmpdir) > 0:
+      return tmpdir
+
+  return '/tmp'
+
+def tmpdirn(tmp=None):
+  if tmp is None: tmp=tmpdir()
+  return mkdirn(os.path.join(tmp,os.path.basename(sys.argv[0])))
+
 def mailsubj(addrs,subj,body):
   import cs.sh
   pipe=cs.sh.vpopen(('set-x','mailsubj','-s',subj)+addrs,mode="w")
