@@ -4,6 +4,7 @@
 #	- Cameron Simpson <cs@zip.com.au>
 #
 
+set -x
 : ${MAILHOMEHOST:=$HOMEHOST}
 : ${DISPLAY:=''}
 : ${LOGDIR:=$HOME/var/log}
@@ -55,10 +56,12 @@ done
 if [ $# -gt 0 ]
 then
   case $1 in
-    /*)		mfolder=$1 ;;
+    /*|.|./*|..|../*)
+    		mfolder=$1 ;;
     +*)		mfolder=$1 ;;
-    imap:*)	mfolder=$1 anyhost=1 ;;
-    *.*)	mfolder=nntp://$NNTPSERVER/$1 anyhost=1 ;;
+    imap:*|imaps:*)
+    		mfolder=$1 anyhost=1 ;;
+    *?.?*)	mfolder=nntp://$NNTPSERVER/$1 anyhost=1 ;;
     *)		mfolder=+$1 ;;
   esac
   shift
@@ -78,44 +81,45 @@ export SENDMESG_FCC
 
 if [ -z "$fpath" ]
 then
-    DELETE_FOLDER=
+    DELETE_FOLDER=+DELETED/misc
     SAVE_FOLDER=+SAVED/misc
     maildir "$MAILDIR/SAVED/misc"
 else
-    [ -d "$fpath/." ] || \
-    { echo "$cmd: $fpath: not a directory" >&2
-      exit 1
-    }
-
-    ismaildir "$fpath" || ismhdir "$fpath" \
+    ismaildir "$fpath" \
+    || ismhdir "$fpath" \
     || { echo "$cmd: $fpath: not Maildir or MH folder" >&2
 	 exit 1
        }
+
     fbase=`basename "$fpath"` || exit 1
     DELETE_FOLDER=+DELETED/$fbase
     SAVE_FOLDER=+SAVED/$fbase
-    if ismaildir "$fpath"
-    then maildir "$MAILDIR/DELETED/$fbase" "$MAILDIR/SAVED/$fbase"
-    else mhdir "$MAILDIR/DELETED/$fbase" "$MAILDIR/SAVED/$fbase"
-    fi
+
+    CURRENT_FOLDER=$fpath
+    export CURRENT_FOLDER
 fi
+
+for var in DELETE SAVE
+do  eval "vf=\$${var}_FOLDER"
+    vf=`mailfolderpath "$vf"` || exit 1
+    eval "${var}_FOLDER=\$vf"
+done
 export DELETE_FOLDER SAVE_FOLDER
 
-cd || exit 1
-for shfile in muttsh muttsh.$mfolder
-do
-  [ -s "$HOME/rc/mail/$shfile" ] && . "$HOME/rc/mail/$shfile"
-done
-
-##export mfolder
-## -e \"fcc-hook \$mfolder \$mfolder\"
 muttcmd="mutt -f '$mfolder' -e 'fcc-hook . $mfolder' $muttopts"
+
 if [ -n "$fpath" ]
 then
-  ##muttcmd="$muttcmd -e 'set maildir_cache=$fpath/.mutt-hcache'"
   mutthcache=$HOME/var/mutt/header-cache
   needdir "$mutthcache" && muttcmd="$muttcmd -e 'set header_cache=$mutthcache'"
-  [ -s "$fpath/.muttrc" ] && muttcmd="$muttcmd -e 'source $fpath/.muttrc'"
+
+  fmuttrc=$fpath/.muttrc
+  [ -s "$fmuttrc" ] && muttcmd="$muttcmd -e 'source $fmuttrc'"
+
+  if ismaildir "$fpath"
+  then maildir "$DELETE_FOLDER" "$SAVE_FOLDER"
+  else mhdir "$DELETE_FOLDER" "$SAVE_FOLDER"
+  fi
 fi
 set sh -c "exec $muttcmd"
 
