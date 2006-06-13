@@ -1,15 +1,23 @@
-#!/bin/sh
+#!/bin/sh -u
 #
 # Stash the SSH environment state variables.
 #	- Cameron Simpson <cs@zip.com.au> 01feb2004
 #
 
 cmd=$0
-usage="Usage: $cmd [{-|statefile}]"
+usage="Usage: $cmd [-h] [{-|statefile}]"
 
 statefile=
 
 badopts=
+
+if [ $# -gt 0 ] && [ "x$1" = x-h ]
+then
+  shift
+  statefile=`ssh-agent-statefile` || exit 1
+  [ -f "$statefile" -a -s "$statefile" ] || exit 1
+  . "$statefile"
+fi
 
 [ $# = 0 ] || { statefile=$1; shift; }
 
