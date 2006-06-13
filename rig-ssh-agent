@@ -9,10 +9,12 @@ usage="Usage: $cmd [-f] [statefile]"
 
 statefile=
 force=
+hopt=
 
 badopts=
 
-[ "x$1" = x-f ] && { force=1; shift; }
+[ $# -gt 0 ] && [ "x$1" = x-f ] && { force=1; shift; }
+[ $# -gt 0 ] && [ "x$1" = x-h ] && { hopt=-h; shift; }
 
 [ $# = 0 ] || { statefile=$1; shift; }
 
@@ -27,7 +29,7 @@ then
   # force unlock
   unlock -f "$statefile"
 else
-  eval `get-ssh-agent "$statefile" || echo false` && exit 0
+  eval `get-ssh-agent $hopt "$statefile"` && exit 0
 fi
 
 export statefile
