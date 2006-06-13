@@ -9,61 +9,6 @@ def typeTest(*types):
   warn("types =", `types`)
   return "TYPE IN ("+string.join([ sqlise(type) for type in types ], ",")+")"
 
-class DBDiGraphAttrs:
-  def __init__(self,attrTable,digraph):
-    self.table=attrTable
-    self.digraph=digraph
-
-  def preload(self):
-    self.table.preload()
-
-  def getAttr(self,srcid,key):
-    return [ row[0]
-             for row in SQLQuery(self.table.conn,
-	     			 'SELECT VALUE FROM '+self.table.name
-				 +' WHERE ID_REF = '+str(srcid)+' AND ATTR = '+sqlise(key))
-	   ]
-
-  def delAttr(self,srcid,attr):
-    dosql(self.table.conn,
-	  'DELETE FROM '+self.table.name
-	  +' WHERE ID_REF = '+str(srcid)+' AND ATTR = '+sqlise(attr))
-
-  def addAttr(self,srcid,attr,values):
-    for value in values:
-      warn("insert(ID_REF="+str(srcid)+",ATTR="+attr+",VALUE="+`value`+")")
-      dosql(self.table.conn,
-      	    'INSERT DELAYED INTO '+self.table.name
-	    +' SET ID_REF=?, ATTR=?, VALUE=?',
-	    (srcid,attr,value))
-
-  def setAttr(self,srcid,attr,values):
-    self.delAttr(srcid,attr)
-    self.addAttr(srcid,attr,values)
-
-  def getAttrNames(self,srcid):
-    return [ row[0]
-             for row in SQLQuery(self.table.conn,
-	     			 'SELECT DISTINCT(ATTR) FROM '+self.table.name
-				 +' WHERE ID_REF = '+str(srcid))
-	   ]
-
-  def getAttrs(self,srcid):
-    attrs={}
-    for (attr,value) in SQLQuery(self.table.conn,
-	     			 'SELECT ATTR, VALUE FROM '+self.table.name
-				 +' WHERE ID_REF = '+str(srcid)):
-      if attr not in attrs:
-	attrs[attr]=[value]
-      else:
-	attrs[attr].append(value)
-
-    for attr in attrs:
-      if len(attrs[attr]) == 1:
-	attrs[attr]=attrs[attr][0]
-
-    return attrs
-
 class DBDiGraph:
   def __init__(self,nodeTable,edgeTable,attrTable):
     self.nodes=nodeTable
@@ -146,3 +91,58 @@ class DBDiGraphNode:
 
   def addAttrs(self,key,values):
     self.digraph.attrs.addAttr(self.id,key,values)
+
+class DBDiGraphAttrs:
+  def __init__(self,attrTable,digraph):
+    self.table=attrTable
+    self.digraph=digraph
+
+  def preload(self):
+    self.table.preload()
+
+  def getAttr(self,srcid,key):
+    return [ row[0]
+             for row in SQLQuery(self.table.conn,
+	     			 'SELECT VALUE FROM '+self.table.name
+				 +' WHERE ID_REF = '+str(srcid)+' AND ATTR = '+sqlise(key))
+	   ]
+
+  def delAttr(self,srcid,attr):
+    dosql(self.table.conn,
+	  'DELETE FROM '+self.table.name
+	  +' WHERE ID_REF = '+str(srcid)+' AND ATTR = '+sqlise(attr))
+
+  def addAttr(self,srcid,attr,values):
+    for value in values:
+      warn("insert(ID_REF="+str(srcid)+",ATTR="+attr+",VALUE="+`value`+")")
+      dosql(self.table.conn,
+      	    'INSERT DELAYED INTO '+self.table.name
+	    +' SET ID_REF=?, ATTR=?, VALUE=?',
+	    (srcid,attr,value))
+
+  def setAttr(self,srcid,attr,values):
+    self.delAttr(srcid,attr)
+    self.addAttr(srcid,attr,values)
+
+  def getAttrNames(self,srcid):
+    return [ row[0]
+             for row in SQLQuery(self.table.conn,
+	     			 'SELECT DISTINCT(ATTR) FROM '+self.table.name
+				 +' WHERE ID_REF = '+str(srcid))
+	   ]
+
+  def getAttrs(self,srcid):
+    attrs={}
+    for (attr,value) in SQLQuery(self.table.conn,
+	     			 'SELECT ATTR, VALUE FROM '+self.table.name
+				 +' WHERE ID_REF = '+str(srcid)):
+      if attr not in attrs:
+	attrs[attr]=[value]
+      else:
+	attrs[attr].append(value)
+
+    for attr in attrs:
+      if len(attrs[attr]) == 1:
+	attrs[attr]=attrs[attr][0]
+
+    return attrs
