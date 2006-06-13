@@ -1,0 +1,16 @@
+#!/bin/sh -u
+#
+# Connect to the per-host ssh-agent, starting it if necessary.
+#	- Cameron Simpson <cs@zip.com.au> 13jun2006
+#
+
+cmd=$0
+usage="Usage: $cmd [command [args...]]"
+
+have-ssh-agent -h || rig-ssh-agent -f || exit 1
+eval `get-ssh-agent -h` || exit 1
+
+[ $# = 0 ] && exec get-ssh-agent -h
+
+eval `get-ssh-agent -h` || exit 1
+exec "$@"
