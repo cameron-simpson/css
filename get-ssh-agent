@@ -10,13 +10,14 @@ usage="Usage: $cmd [-h] [-v] [--] [statefile]"
 statefile=
 verbose=
 thishost=
+hopt=
 
 badopts=
 
 while [ $# -gt 0 ]
 do
   case "$1" in
-    -h)	thishost=1 ;;
+    -h)	thishost=1 hopt=-h ;;
     -v)	verbose=1 ;;
     --)	shift; break ;;
     -?*)echo "$cmd: unrecognised option: $1" >&2
@@ -33,7 +34,11 @@ done
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
-[ -z "$thishost" ] && have-ssh-agent && exec stash-ssh-agent -
+# if $thishost then prefer the per-host agent if present
+[ $thishost ] && have-ssh-agent $hopt && exec stash-ssh-agent $hopt -
+
+# otherwise try for an inherited agent
+have-ssh-agent && exec stash-ssh-agent -
 
 # protect against rogue output
 exec 3>&1 1>/dev/null
