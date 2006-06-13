@@ -1,7 +1,18 @@
-#!/bin/sh
+#!/bin/sh -u
 #
 # Test whether we have an ssh-agent to hand.
 #	- Cameron Simpson <cs@zip.com.au> 03jul2004
 #
 
-[ -n "$SSH_AUTH_SOCK" ] && exec ls -ld "$SSH_AUTH_SOCK" >/dev/null 2>&1
+if [ $# -gt 0 ] && [ "x$1" = x-h ]
+then
+  shift
+  statefile=`ssh-agent-statefile` || exit 1
+  [ -f "$statefile" -a -s "$statefile" ] || exit 1
+  . "$statefile"
+fi
+
+[ -n "${SSH_AUTH_SOCK:-''}" ] || exit 1
+
+# 0: ok and has some keys, 1: ok but no keys, 2: no agent
+ssh-add -l >/dev/null 2>&1 || [ $? = 1 ]
