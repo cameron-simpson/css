@@ -11,13 +11,15 @@ case "$X11_COMPOSITE" in
   '')	fvwm_Transparent=Transparent
 	fvwm_RootTransparent=RootTransparent
 	fvwm_ParentalRelativity=ParentalRelativity
+	fvwm_OpaqueMoveSize=0
 	;;
   *)	fvwm_Transparent=
 	fvwm_RootTransparent=
 	fvwm_ParentalRelativity=
+	fvwm_OpaqueMoveSize=100
 	;;
 esac
-export fvwm_Transparent fvwm_RootTransparent fvwm_ParentalRelativity
+export fvwm_Transparent fvwm_RootTransparent fvwm_ParentalRelativity fvwm_OpaqueMoveSize
 
 (
   uncurly $HOME/rc/x11/fvwm/rc-curly
