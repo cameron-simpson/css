@@ -111,8 +111,8 @@ class SQLQuery:
     self.__args=args
     ##debug("conn =", `conn`)
     self.__cursor=conn.cursor()
-    ##warn('SQLQuery:', query)
-    ##warn("SQLQuery: args =", `args`)
+    debug('SQLQuery:', query)
+    debug("SQLQuery: args =", `args`)
     self.__cursor.execute(query,*args)
     ##debug("executed")
 
@@ -122,6 +122,7 @@ class SQLQuery:
   def __iter__(self):
     row=self.__cursor.fetchone()
     while row is not None:
+      debug("yield row", `row`)
       yield row
       row=self.__cursor.fetchone()
 
@@ -129,8 +130,9 @@ class DateRangeRecord:
   def iscurrent(self,when=None):
     return iscurrent(self,when)
 
-def sqlDatedRecordTest(when=today(),startfield='START_DATE',endfield='END_DATE'):
+def sqlDatedRecordTest(when=None,startfield='START_DATE',endfield='END_DATE'):
   """ Return SQL to test that a dated record overlaps the specified date. """
+  if when is None: when=today()
   whensql=sqlise(when)
   return '(ISNULL('+startfield+') OR '+startfield+' <= '+whensql+')' \
        + ' AND (ISNULL('+endfield+') OR '+endfield+' > '+whensql+')'
@@ -159,7 +161,7 @@ def getTable(conn,table,keyfields,fieldlist,constraint=None):
 
   return __tableCache[cacheKey]
 
-def getDatedTable(conn,table,keyfields,fieldlist,when=today()):
+def getDatedTable(conn,table,keyfields,fieldlist,when=None):
   return getTable(conn,table,keyfields,fieldlist,constraint=sqlDatedRecordTest(when))
 
 class KeyedTableView:
@@ -349,9 +351,10 @@ class _TableRow:
   def __loadrowcache(self):
     ##for arg in ('SELECT ', self.table._selectFields(), ' FROM ', self.table.name, ' WHERE ', self.__whereclause, ' LIMIT 1'):
     ##  debug("arg =", `arg`)
-    self.__setrowcache([row for row in SQLQuery(self.table.conn,
-					     'SELECT '+self.table._selectFields()+' FROM '+self.table.name+' WHERE '+self.__whereclause+' LIMIT 1',
-					    ).allrows()[0]])
+
+    self.__setrowcache(SQLQuery(self.table.conn,
+			        'SELECT '+self.table._selectFields()+' FROM '+self.table.name+' WHERE '+self.__whereclause+' LIMIT 1',
+			       ).allrows()[0])
 
   def __getrowcache(self):
     if self.__rowcache is None:
