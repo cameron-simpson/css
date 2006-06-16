@@ -112,6 +112,9 @@ class CanonicalSeq:
       return key
     return self.__canon(key)
 
+  def __repr__(self):
+    return `self.__seq`
+
   def __len__(self):
     return len(self.__seq)
 
