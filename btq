@@ -9,4 +9,4 @@ usage="Usage: $cmd query"
 
 [ $# = 0 ] && { echo "$usage" >&2; exit 2; }
 
-exec search bittorrent,bitoogle,throughput,btbot,yotoshi,isohunt,torrentspy,mininova,torrentreactor,bytenova,torrenttyphoon "$@"
+exec search bittorrent,bitoogle,throughput,btbot,yotoshi,isohunt,torrentspy,mininova,torrentreactor,bytenova,torrenttyphoon,torrentz_ws "$@"
