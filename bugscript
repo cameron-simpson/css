@@ -12,9 +12,7 @@ cmd=`basename "$0"`
 usage="Usage: $cmd [-m msg] [{-c shcmd | cmd [args...]}]"
 
 msg=
-case "$1" in
-  -m) msg=$2; shift; shift ;;
-esac
+[ $# -gt 0 ] && [ "x$1" = x-m ] && { msg=$2; shift; shift; }
 
 logfile=$TMPDIR/$cmd.$$.log
 set logscript +z -m "$msg" "$logfile" ${1+"$@"}
