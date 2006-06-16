@@ -61,6 +61,11 @@ runplayer()
 	  rm -f "$playlist"
 	  while [ $ok ] && read -r auf
 	  do
+	      [ -f "$auf" -a -s "$auf" ] \
+	      || { echo "$cmd: missing audio file: $auf" >&2
+		   continue
+		 }
+
 	      echo "[$auf]"
 	      dodelay=
 	      if [ $playcopy ]
@@ -114,8 +119,11 @@ while lastline=$line
       line=`readline -d "$AUDIODIR" ""`
 do  
     [ "x$line" = "x!!" ] && line=$lastline
-    case "$line" in
-	'?')	echo "Help:"
+    set -- $line
+    op=${1:-''}
+    case "$op" in
+	:help | '?')
+		echo "Help:"
 		echo "  ?	This help message."
 		echo "  -	Stop the player."
 		echo "  .	Select with an empty pattern (pick anything)."
@@ -125,24 +133,26 @@ do
 		echo "  \"seq\"	Choose matching items sequentially."
 		echo "  keywords Select tracks using the supplied keywords."
 		;;
-	:NEXT | '')
+	:n | :next | '')
 		bumpplayer
 		;;
 
-	:STOP | -)
+	:stop | -)
 		stopplayer
 		;;
 	[0-9]|[1-9][0-9]|100)
 		echo "Setting volume to $line."
 		set-x aumix -v "$line"
 		;;
-	random)	dorandom=1
+	:random)
+		dorandom=1
 		echo "Reselecting with random play."
 		stopplayer
 		sleep 1  
 		runplayer
 		;;
-	seq)	dorandom=
+	:seq | :sequential)
+		dorandom=
 		echo "Reselecting with sequential play."
 		stopplayer
 		sleep 1  
