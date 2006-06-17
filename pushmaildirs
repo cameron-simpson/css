@@ -1,0 +1,78 @@
+#!/bin/sh -u
+#
+# Merge one set of maildirs onto another. I use this to stash mail from my
+# laptop onto our home server, where my main mail lives.
+#	- Cameron Simpson <cs@zip.com.au> 18jun2006
+#
+
+: ${MAILDIR:=$HOME/mail}
+
+cmd=`basename "$0"`
+usage="Usage: $cmd [-d maildir] [[user@]host:]targetdir"
+
+trace=
+rsopts=
+progress=:
+[ -t 2 ] && trace=set-x progress=errln rsopts="$rsopts --progress"
+errln(){ printf '%s\n' "$*" >&2; }
+
+badopts=
+
+while [ $# -gt 0 ]
+do
+  case "$1" in
+    -d)	MAILDIR=$2; shift ;;
+    --)	shift; break ;;
+    -?*)echo "$cmd: unrecognised option: $1" >&2
+	badopts=1
+	;;
+    *)	break ;;
+  esac
+  shift
+done
+
+if [ $# = 0 ]
+then
+  echo "$cmd: missing [[user@]host:]targetdir" >&2
+  badopts=1
+else
+  targetdir=$1
+  shift
+  case "$targetdir" in
+    *:*)	;;
+    *)		wd=`/bin/pwd` || exit 1
+		targetdir=$wd/$targetdir
+		;;
+  esac
+  if [ $# -gt 0 ]
+  then
+    echo "$cmd: extra arguments after [[user@]host:]targetdir: $*" >&2
+    badopts=1
+  fi
+fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+cd "$MAILDIR" || exit 1
+
+find . -type d -exec ismaildir {} ';' -print \
+| \
+{ xit=0
+  while read maildir
+  do
+    ( cd "$maildir" || exit 1
+      set -- new/* cur/*
+      if [ "x$*" = "xnew/* cur/*" ]
+      then
+	##$progress "SKIP $maildir - no mail"
+	exit 0
+      fi
+
+      exec $trace \
+	rsync -aHW --ignore-existing --remove-sent-files $rsopts \
+	  --include=new/ --include=cur/ '--exclude=*/' '--exclude=/*' \
+	  -- . "$targetdir/$maildir/."
+    ) || xit=1
+  done
+  exit $xit
+}
