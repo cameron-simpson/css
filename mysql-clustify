@@ -1,0 +1,60 @@
+#!/bin/sh -u
+#
+# Emit commes to update the tables in a database for cluster use by
+# altering the engine. Should be run in the mysql basedir.
+#	- Cameron Simpson <cs@zip.com.au> 25jun2006
+#
+
+cmd=$0
+usage="Usage: $cmd -u user -p password -S socket database"
+
+user=
+pw=
+sock=
+db=
+
+badopts=
+
+while [ $# -gt 0 ]
+do
+  case "$1" in
+    -u)	user=$2; shift ;;
+    -p)	pw=$2; shift ;;
+    -S)	sock=$2; shift ;;
+    --)	shift; break ;;
+    -?*)echo "$cmd: unrecognised option: $1" >&2
+    	badopts=1
+	;;
+    *)	break ;;
+  esac
+  shift
+done
+
+[ -n "$user" ] || { echo "$cmd: missing -u user" >&2;     badopts=1; }
+[ -n "$pw"   ] || { echo "$cmd: missing -p password" >&2; badopts=1; }
+[ -n "$sock" ] || { echo "$cmd: missing -S sock" >&2;     badopts=1; }
+
+if [ $# = 0 ]
+then
+  echo "$cmd: missing database" >&2
+  badopts=1
+else
+  db=$1
+  shift
+  [ $# = 0 ] || { echo "$cmd: extra arguments after database" >&2
+  		  badopts=1
+		}
+fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+echo 'show tables;' \
+| ./bin/mysql -u "$user" "-p$pw" -S "$sock" "$db" \
+| sed '1d
+       s/.*/alter table & engine=ndbcluster;/' \
+| if [ $doit ]
+  then
+    ./bin/mysql -u "$user" "-p$pw" -S "$sock" "$db"
+  else
+    cat
+  fi
