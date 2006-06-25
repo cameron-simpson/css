@@ -48,10 +48,11 @@ fi
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
-echo 'show tables;' \
-| ./bin/mysql -u "$user" "-p$pw" -S "$sock" "$db" \
-| sed '1d
-       s/.*/alter table & engine=ndbcluster;/' \
+( echo 'show tables;'
+  ./bin/mysql -u "$user" "-p$pw" -S "$sock" "$db" \
+  | sed '1d
+	 s/.*/alter table & engine=ndbcluster;/'
+) \
 | if [ $doit ]
   then
     ./bin/mysql -u "$user" "-p$pw" -S "$sock" "$db"
