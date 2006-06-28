@@ -1,0 +1,37 @@
+#!/bin/sh -u
+#
+# urlshow for mozilla, URLs on stdin, no smarts.
+#	- Cameron Simpson <cs@zip.com.au> 25jun2006
+#
+
+: ${BROWSER_DISPLAY:=$DISPLAY}
+: ${DISPLAY:=$BROWSER_DISPLAY}
+export DISPLAY
+
+cmd=`basename "$0"`
+usage="Usage: $cmd [-t] < url-list
+	-t	Open a new tab instead of a new window."
+
+popnew=1
+[ $# -gt 0 ] && [ "x$1" = x-t ] && { popnew=; shift; }
+
+mozremote=/opt/firefox/mozilla-xremote-client
+
+mozremote()
+{ for _mr_n in 1 2 3
+  do "$mozremote" ${1+"$@"} && return 0
+     sleep 1
+  done
+  return 1
+}
+
+cat ${1+"$@"} \
+| while read -r url
+  do
+    url=`printf "%s\n" "$url" | hexify`
+    if [ $popnew ]
+    then  how=new-window
+    else  how=new-tab
+    fi
+    mozremote "openurl($url,$how)" && popnew=
+  done
