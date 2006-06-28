@@ -1,0 +1,54 @@
+#!/bin/sh -u
+#
+# urlshow for opera, URLs on stdin, no smarts.
+#	- Cameron Simpson <cs@zip.com.au> 25jun2006
+#
+
+: ${BROWSER_DISPLAY:=$DISPLAY}
+: ${DISPLAY:=$BROWSER_DISPLAY}
+export DISPLAY
+
+cmd=`basename "$0"`
+usage="Usage: $cmd [-n name] [-t] < url-list
+	-n name	Name of new window, or window to extend.
+	-t	Open a new tab instead of a new window."
+
+name=
+popnew=1
+
+while [ $# -gt 0 ]
+do
+  case "$1" in
+    -t)	popnew= ;;
+    -n)	name=$2; shift ;;
+    --)	shift; break ;;
+    -?*)echo "$0: unrecognised option: $1" >&2
+	echo "$usage" >&2
+	exit 2
+	;;
+  esac
+  shift
+done
+
+cat ${1+"$@"} \
+| \
+{ set --
+  while read -r url
+  do
+    set -- ${1+"$@"} "$url"
+    if [ $popnew ]
+    then
+      ( set -- -newwindow ${1+"$@"}
+	[ -n "$name" ] && set -- -windowname "$name" ${1+"$@"}
+	set -x
+	exec opera "$@"
+      ) && { popnew=; set --; continue; }
+    fi
+  done
+  if [ $# -gt 0 ]
+  then
+    [ -n "$name" ] && set -- -windowname "$name" "$@"
+    set -x
+    exec opera -newpage "$@"
+  fi
+}
