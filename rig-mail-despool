@@ -10,5 +10,5 @@ bgproc -l procmail -p mail-despam -- set-x lock -1 "$MAILDIR/spool" mail-despam 
 for spool in spool-in spool-out spool-xref
 do
   maildir=$MAILDIR/$spool
-  bgproc -l procmail -p "mail-$spool" -- set-x lock -1 "$maildir" mail-despool -d "$delay" -l "$lock" "$maildir"
+  bgproc -l procmail -p "mail-$spool" -- set-x lock -1 "$maildir" mail-despool -d "$delay" "$maildir"
 done
