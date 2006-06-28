@@ -5,6 +5,7 @@ import sys
 import dircache
 import string
 import time
+from StringIO import StringIO
 from cs.lex import parseline
 
 cmd=os.path.basename(sys.argv[0])
@@ -145,6 +146,12 @@ class CanonicalDict:
     self.__dict={}
     if map is not None:
       self.update(map)
+
+  def __repr__(self):
+    d={}
+    for k in self.keys():
+      d[k]=self[k]
+    return `d`
 
   def __canonical(self,key):
     if self.__canon is None:
