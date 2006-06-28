@@ -8,12 +8,11 @@
 : ${TMPDIR:=/tmp}
 
 cmd=`basename "$0"` || cmd=$0
-usage="Usage: $cmd [-d delay] [-f procmailrc] [-l lockname] maildir"
+usage="Usage: $cmd [-d delay] [-f procmailrc] maildir"
 
 trace=set-x
 delay=
 procmailrc=
-lock=mail-despool-$$
 
 badopts=
 
@@ -22,7 +21,6 @@ do
   case $1 in
     -d)	delay=$2; shift ;;
     -f)	procmailrc=$2; shift ;;
-    -l)	lock=$2; shift ;;
     --)	shift; break ;;
     -?*)echo "$cmd: unrecognised option: $1" >&2
 	badopts=1
@@ -88,22 +86,13 @@ do
   fi
 
   rm -f "$busyflag"
-  if [ $havenew ] \
-  && qargv=`shqstr "$@"`
+  if [ $havenew ]
   then
-    lock "$lock" \
-      env "trace=$trace" "busyflag=$busyflag" "procmailrc=$procmailrc" \
-      sh -uc "
-	set -- $qargv
-      "'xit=0
-	for f
-	do
-	  [ -s "$f" ] || continue
-	  { $trace procmail "$procmailrc" <"$f" && $trace rm -- "$f" && touch "$busyflag"; } || xit=1
-	done
-	exit $xit
-      ' \
-    || xit=1
+    for f
+    do
+      [ -s "$f" ] || continue
+      { $trace procmail "$procmailrc" <"$f" && $trace rm -- "$f" && touch "$busyflag"; } || xit=1
+    done
   fi
 
   [ -n "$delay" ] || break
