@@ -28,7 +28,7 @@ set -- $SCANOPTS ${1+"$@"}
 while [ $# -gt 0 ]
 do
   case "$1" in
-    -h | --help)	echo "$usage"
+    -\? | -h | --help)	echo "$usage"
 			echo
 			echo "See also scanimage(1)."
 			exit 0
