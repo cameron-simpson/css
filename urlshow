@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/sh -u
 #
 # Display URLs with a browser.
 #	- Cameron Simpson <cs@zip.com.au>
@@ -16,51 +16,55 @@
 export DISPLAY
 
 cmd=`basename "$0"`
-usage="Usage: $cmd [-a] [-c] [-d display] [-s] [-t] [-i file] [URLs...]
+usage="Usage: $cmd [-a] [-c] [-d display] [-n windowname] [-s] [-t] [-i file] [URLs...]
 	-a	Anonymous.
 	-c	Clean.
 	+c	Don't clean.
-	-p	Probe for running browser first.
+	-n windowname New window name, or window name for new tabs.
 	-t	Open a new tab instead of a new window.
 	-i file	Read URLs from file; \"-\" means stdin."
 
-doprobe=
 subopts=
 doclean=
 doanon=
-popnew=1
-mozremote=/opt/firefox/mozilla-xremote-client
+name=
+tflag=
+
+browser=opera	## mozilla
+browser=mozilla
 
 badopts=
 
-while :
-do  case "$1" in
-	-[acst]) subopts="$subopts $1" ;;
-    esac
-    case $1 in
-	-a)	doanon=1 ;;
-	-c)	doclean=1 ;;
-	+c)	doclean= ;;
-	-d)	DISPLAY=$2; export DISPLAY; shift ;;
-	-p)	doprobe=1 ;;
-	-t)	popnew= ;;
-	-i)	input=$2; shift
+while [ $# -gt 0 ]
+do
+  case "$1" in
+    -[acst]) subopts="$subopts $1" ;;
+  esac
+  case $1 in
+      -a)	doanon=1 ;;
+      -c)	doclean=1 ;;
+      +c)	doclean= ;;
+      -d)	DISPLAY=$2; export DISPLAY; shift ;;
+      -n)	name=$2; shift ;;
+      -t)	tflag=-t ;;
+      -i)	input=$2; shift
 		set x ${1+"$@"} "" `cat $input`; shift
 		;;
-	--)	shift; break ;;
-	-?*)	echo "$cmd: $1: unrecognised option" >&2
+      --)	shift; break ;;
+      -?*)	echo "$cmd: $1: unrecognised option" >&2
 		badopts=1
 		;;
-	*)	break ;;
-    esac
-    shift
+      *)	break
+      		;;
+  esac
+  shift
 done
 
 [ $badopts ] && { echo "$usage" >&2; exit 1; }
 
 [ -n "$BROWSER_DISPLAY" ] || { echo "$cmd: no \$BROWSER_DISPLAY!" >&2; exit 1; }
 
-if [ $anon ]; then anonpfx=http://anon.free.anonymizer.com/
+if [ $doanon ]; then anonpfx=http://anon.free.anonymizer.com/
               else anonpfx=
 fi
 
@@ -71,55 +75,16 @@ then
       case "$url" in
 	-)	cat ;;
 	xclip)	xclip -o | tr '\011' ' '; echo ;; # was cutbuffer
-	*)	echo "$url" ;;
+	*)	printf "%s\n" "$url" ;;
       esac
     done \
-    | "$0" $subopts
+    | "$0" $subopts -n "$name"
     exit $?
-fi
-
-mrfn='
-    mozremote()
-    { for _mr_n in 1 2 3
-      do '"$mozremote"' ${1+"$@"} && return 0
-	 sleep 1
-      done
-      return 1
-    }'
-eval "$mrfn"
-
-if [ "x$DISPLAY" = "x$BROWSER_DISPLAY" ]
-then
-    probe()
-    { mozremote 'ping()'
-    }
-
-    # start browser if needed
-    case "$BROWSER_DISPLAY" in
-      :* | lo:* | localhost:* | 127.0.0.1:* | "$IPADDR:"* )
-	: browser -q \
-	|| { set-x bgproc -p - -- browser
-	     echo "waiting for browser..."
-	     while :
-	     do  browser -q && break
-		 necho .; sleep 1
-	     done
-	     while :
-	     do  probe && break
-		 necho .; sleep 1
-	     done
-	   }
-	;;
-    esac
-else
-    DISPLAY=$BROWSER_DISPLAY
-    export DISPLAY
 fi
 
 cleanurllist \
 | \
-( exec 3>&1 1>&2
-  printf "%s\n" "$mrfn" >&3
+{ exec 3>&1 1>&2
   while read url
   do  
     case "$url" in
@@ -137,19 +102,21 @@ cleanurllist \
 	;;
     esac
     [ $doclean ] && url="http://web/~cameron/cgi-bin/htclean.cgi/$url"
-    [ $doanon  ] && url="http://anon.free.anonymizer.com/$url"
+    [ $doanon  ] && url="$anonpfx/$url"
 
-    # escape stuff for OpenURL() call
-    url=`echo "$url" | hexify`
-    [ -n "$URLLOG" ] && echo "urlshow $url" >>"$URLLOG"
-    if [ $popnew ]
-    then
-      echo mozremote "'openurl($url,new-window)' || exit 1" >&3
-      popnew=
-    else
-      ##echo usleep 200000 >&3
-      echo mozremote "'openurl($url,new-tab)' || exit 1" >&3
-    fi
+    printf "%s\n" "$url" >&3
   done \
-) \
-| catthen lock mozilla-xremote-client sh
+} \
+| case "$browser" in
+    mozilla)
+      set -x
+      exec urlshow-mozilla $tflag ;;
+    opera)
+      set -x
+      exec urlshow-opera $tflag -n "$name"
+      ;;
+    *)
+      echo "$0: unsupported browser \"$browser\"" >&2
+      exit 2
+      ;;
+  esac
