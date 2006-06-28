@@ -11,4 +11,6 @@ usage="Usage: $0 fd[,fd...] pfx command [args...]"
 fds=$1 pfx=$2
 shift; shift
 
-exec filter_fd "$fds" "exec sed 's^$pfx: '" "$@"
+sedstr=`shqstr "s^$pfx: "` || exit 1
+
+exec filter_fd "$fds" "exec sed $sedstr" "$@"
