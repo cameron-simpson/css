@@ -10,6 +10,7 @@ usage="Usage: $cmd [{-M | -m msg}] [-d logdir] {-u | logbase} [{-c shcmd | cmd [
 
 : ${LOGDIR:=$HOME/var/log}
 : ${SHELL:=/bin/sh}
+: ${TMPDIR:=/tmp}
 
 logdir=$LOGDIR/sessions
 msg=
