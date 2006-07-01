@@ -78,7 +78,12 @@ def do(path):
 	  o
   '''
   ##progress("DO", path)
-  st=os.lstat(path)
+  try:
+    st=os.lstat(path)
+  except os.OSerr, e:
+    cmderr(path+": "+str(e))
+    return
+
   if not stat.S_ISREG(st[stat.ST_MODE]):
     return
 
