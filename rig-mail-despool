@@ -3,7 +3,7 @@
 : ${MAILDIR:=$HOME/mail}
 
 lock=mail-io
-delay=15
+delay=5
 
 bgproc -l procmail -p mail-despam -- set-x lock -1 "$MAILDIR/spool" mail-despam -d "$delay" -l "$lock" +spool +spool-in
 
