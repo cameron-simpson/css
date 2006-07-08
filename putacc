@@ -39,7 +39,7 @@ done
 cd || exit 1
 set -x
 for host
-do pfx "$host" syncacc '' "$host" &
+do pfx "$host" syncacc '' "$host:" &
    [ $async ] || wait
 done
 wait
