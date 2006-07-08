@@ -8,4 +8,4 @@
 remote=$1
 
 set -x
-exec syncacc "$remote" ''
+exec syncacc "$remote:" ''
