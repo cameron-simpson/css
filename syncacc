@@ -8,110 +8,21 @@
 cmd=$0
 usage="Usage: $cmd from to"
 
+syncset=acc
+
 [ $# = 2 ] || { echo "$usage" >&2; exit 2; }
 from=$1 to=$2
-case "$from" in ''|*:) ;; *) from=$from: ;; esac
-case "$to" in   ''|*:) ;; *) to=$to:     ;; esac
+
+case "$syncset" in
+  /* | ./* | ../* ) ;;
+  *)  syncset=$HOME/rc/sync/$syncset ;;
+esac
+
+cd
+pwd
 
 set -x
 exec \
   rsync -rlptHvP --delete --exclude=CVS/ \
-	'--include=/.bash_history' \
-	'--include=/.bash_logout' \
-	'--include=/.bash_profile' \
-	'--include=/.bashrc' \
-	'--include=/.cvsrc' \
-	'--include=/.getnews-state' \
-	'--include=/.gkrellm2' \
-	'--include=/.gtkrc' \
-	'--include=/.gtkrc-2.0' \
-	'--include=/.inputrc' \
-	'--include=/.less' \
-	'--include=/.lesskey' \
-	'--include=/.mailcap' \
-	'--include=/.maint' \
-	'--include=/.mairixrc' \
-	'--include=/.mh_profile' \
-	'--include=/.muttrc' \
-	'--include=/.profile' \
-	'--include=/.screenrc' \
-	'--include=/.secret' \
-	'--include=/.setvar' \
-	'--include=/.ssh' \
-	'--include=/.ssh/config' \
-	'--exclude=/.ssh/*' \
-	'--include=/.termenv' \
-	'--include=/.terminfo' \
-	'--include=/.vnc' \
-	'--include=/.xinitrc' \
-	'--include=/.xplanet' \
-	'--include=/.xsession' \
-	'--include=/.zprofile' \
-	'--include=/.zshenv' \
-	'--include=/.zshrc' \
-	'--include=/man' \
-	'--include=/man/cs' \
-	'--exclude=/man/*' \
-	'--include=/rc' \
-	'--include=/rc/@' \
-	'--include=/rc/cvs' \
-	'--include=/rc/dlog' \
-	'--include=/rc/env' \
-	'--include=/rc/getnews' \
-	'--include=/rc/gkrellm2' \
-	'--include=/rc/gnupg' \
-	'--include=/rc/gnupg/options' \
-	'--include=/rc/gnupg/pubring.gpg' \
-	'--exclude=/rc/gnupg/*' \
-	'--include=/rc/gtk' \
-	'--include=/rc/hi' \
-	'--include=/rc/java' \
-	'--include=/rc/java/au.com.zip.cs.jar' \
-	'--include=/rc/java/mm.mysql*' \
-	'--include=/rc/java/mysql-connector*' \
-	'--exclude=/rc/java/*' \
-	'--include=/rc/inputrc' \
-	'--include=/rc/less' \
-	'--include=/rc/lesskey' \
-	'--include=/rc/mail' \
-	'--include=/rc/mail/cats*' \
-	'--include=/rc/mail/bcc-list' \
-	'--include=/rc/mail/dlog-list' \
-	'--include=/rc/mail/Mykefile' \
-	'--include=/rc/mail/mailcap' \
-	'--include=/rc/mail/mutt*' \
-	'--include=/rc/mail/procmailrc*' \
-	'--include=/rc/mail/signature' \
-	'--include=/rc/mail/signatures' \
-	'--exclude=/rc/mail/*' \
-	'--include=/rc/mairix' \
-	'--include=/rc/maint' \
-	'--exclude=/rc/maint/**/.runlog' \
-	'--include=/rc/mh' \
-	'--include=/rc/myke' \
-	'--include=/rc/nvi' \
-	'--include=/rc/perl' \
-	'--include=/rc/python' \
-	'--include=/rc/rterm.ini' \
-	'--include=/rc/screen' \
-	'--include=/rc/shell' \
-	'--include=/rc/squid' \
-	'--include=/rc/ssh' \
-	'--include=/rc/tplt' \
-	'--include=/rc/term' \
-	'--include=/rc/urlmap' \
-	'--include=/rc/vi' \
-	'--include=/rc/x11' \
-	'--include=/rc/xplanet' \
-	'--exclude=/rc/*' \
-	'--include=/scripts' \
-	'--include=/scripts/cs/' \
-	'--include=/scripts/stubs/' \
-	'--include=/scripts/synonyms/' \
-	'--exclude=/scripts/*/' \
-	'--include=/var' \
-	'--include=/var/*/' \
-	'--exclude=/var/*/*' \
-	'--exclude=/var/*' \
-	'--exclude=/*' \
+	"--include-from=$syncset" \
 	"$from." "$to."
