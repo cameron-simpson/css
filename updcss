@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/sh -u
 #
 # Rebuild css from my development copy.
 #	- Cameron Simpson <cs@zip.com.au> 09apr1997
@@ -105,27 +105,34 @@ wait
 
 if [ -d "$cssweb" ]
 then
-    ( cd $cssdir/.. || exit 1
-      set -- `find -H css -type f -print`
-      [ $# = 0 ] && { echo "NO ARGS!" >&2; ls -ld css >&2; exit 1; }
-      ls -tdr "$@" | tar chTf - - | gzip -v -9 >$cssweb/css.tar.gz
-    )
-    for d in man bin lib
-    do
-      rsync -avH --delete $cssdir/$d/. $cssweb/$d/.
-    done
-    ( cd "$cssweb/bin" || exit 1
-      ln -s ../lib/cs .
-    )
-    ( cd "$cssweb" || exit 1
-      myke _all
-    )
+    if [ -z "$quick" ]
+    then
+      ( cd $cssdir/.. || exit 1
+	set -- `find -H css -type f -print`
+	[ $# = 0 ] && { echo "NO ARGS!" >&2; ls -ld css >&2; exit 1; }
+	ls -tdr "$@" | tar chTf - - | gzip -v -9 >$cssweb/css.tar.gz
+      )
+      for d in man bin lib
+      do
+	rsync -avH --delete $cssdir/$d/. $cssweb/$d/.
+      done
+      ( cd "$cssweb/bin" || exit 1
+	ln -s ../lib/cs .
+      )
+      ( cd "$cssweb" || exit 1
+	myke _all
+      )
+    fi
 fi
 
 wait
 
-syncezos &
-for host
-do  pfx "$host:/opt/css" putcss "$host" &
-done
+if [ $dosync ]
+then
+  syncezos &
+  for host
+  do  pfx "$host:/opt/css" putcss "$host" &
+  done
+fi
+
 wait
