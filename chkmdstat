@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/sh -u
 #
 # Simple check and report failed metadevices from /proc/mdstat.
 #	- Cameron Simpson <cs@zip.com.au> 27jun2005
@@ -7,17 +7,18 @@
 if [ $# -gt 0 ] && [ "x$1" = x-q ]
 then
   shift
-  out=`"$0"` && [ -z "$out" ]
-  exit $?
+  exec sed -n '/^[^ ]/{
+		  h
+		  b test
+	       }
+	       H
+	       :test
+	       /^  *[0-9][0-9]* blocks \[[0-9][0-9]*\/[0-9][0-9]*\] \[.*_.*\]$/{
+		  x
+		  p
+	       }' /proc/mdstat
 fi
 
-exec sed -n '/^[^ ]/{
-		h
-		b test
-	     }
-	     H
-	     :test
-	     /^  *[0-9][0-9]* blocks \[[0-9][0-9]*\/[0-9][0-9]*\] \[.*_.*\]$/{
-		x
-		p
-	     }' /proc/mdstat
+out=`"$0" -q` || exit 1
+printf '%s\n' "$out"
+[ -z "$out" ]
