@@ -1,16 +1,37 @@
-#!/bin/sh
+#!/bin/sh -u
 #
 # Rebuild the css kit, put to EZOS, also push account and css to named hosts.
 #	- Cameron Simpson <cs@zip.com.au> 09jul2004
 #
 
-umask 22
-updcss
+cmd=$0
+usage="Usage: [-n] [-q] [pushhosts...]"
 
+badopts=
+
+qopt=
+nopt=
+while [ $# -gt 0 ]
+do
+  case "$1" in
+    -n)	nopt=-n ;;
+    -q)	qopt=-q ;;
+    --)	shift; break ;;
+    -?*)echo "$cmd: unrecognised option: $1" >&2
+    	badopts=1
+	;;
+    *)	break ;;
+  esac
+  shift
+done
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+umask 22
 set -x
 
+updcss $qopt $nopt
 syncezos &
-
 for xtra
 do  sleep 1; putacc $xtra &
     sleep 1; putcss $xtra &
