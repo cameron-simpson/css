@@ -4,6 +4,13 @@
 #	- Cameron Simpson <cs@zip.com.au> 27jun2005
 #
 
+if [ $# -gt 0 ] && [ "x$1" = x-q ]
+then
+  shift
+  out=`"$0"` && [ -z "$out" ]
+  exit $?
+fi
+
 exec sed -n '/^[^ ]/{
 		h
 		b test
