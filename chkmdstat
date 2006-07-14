@@ -20,5 +20,5 @@ then
 fi
 
 out=`"$0" -q` || exit 1
-printf '%s\n' "$out"
+[ -n "$out" ] && printf '%s\n' "$out"
 [ -z "$out" ]
