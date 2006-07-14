@@ -1,0 +1,19 @@
+#!/bin/sh -u
+#
+# Unfold leading-space-folded text, such as LDIF.
+#	- Cameron Simpson <cs@zip.com.au> 
+#
+
+( cat ${1+"$@"}
+  echo
+) \
+| sed -n '
+	/^ / {
+		s/^  *//
+		H
+		d
+	}
+	x
+	s/\n//g
+	p
+      '
