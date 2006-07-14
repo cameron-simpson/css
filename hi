@@ -7,24 +7,14 @@
 
 cmd=`basename "$0"`
 hi=$HOME/rc/hi
+dflt=.hi
+
 pickn=
 
-eval `datevars`
-weekly=
-mode=normal
-noop=
-nogrep=
-
-[ "x$wdayname" = xMon ] && weekly=1
-
-while :
+while [ $# -gt 0 ]
 do
-  case $1 in
-    -html)	mode=html ;;
-    -normal)	mode=normal ;;
-    -w)		weekly=1 ;;
-    -n)		noop=1 ;;
-    -q)		nogrep=1 ;;
+  case "$1" in
+    -d)		hi=$2; shift ;;
     -[0-9]*)	pickn=`expr "x$1" : 'x-\([0-9]*\).*'` ;;
     --)		shift; break ;;
     *)		break ;;
@@ -32,87 +22,20 @@ do
   shift
 done
 
-if [ $# = 0 ]
-then
-    set -- .hi
-else
-    [ -n "$mode" ] || mode=normal
-fi
+[ $# = 0 ] && set -- $dflt
 
 for task
 do
   case "$task" in
     /*)	task=`expr "x$task" : 'x/\(.*[^/]\)/*$'`
 	echo "# $task"
-	ls -d "$hi/"[a-z]* \
-	| grep -v '\.html$' \
-	| xxargs cat \
-	| egrep "$task"
+	cat "$hi"/* | egrep -i "$task"
 	;;
-    *)	sfxs=; [ $weekly ] && sfxs="$sfxs .weekly"
-	for sfx in '' $sfxs
-	do  for f in "$hi/$task$sfx" "$hi/$task-"*".$sfx"
-	    do  [ -s "$f" ] && cat "$f"
-	    done
-	done
+    *)	cat -- "$hi/$task"
 	;;
-  esac \
-  | grep '^[^#]' \
-  | if [ -n "$pickn" ]; then pickn "$pickn"; else cat; fi \
-  | tee /dev/tty \
-  | (
-      exec 4>&1 1>&2	# 4 goes to urlshow
-      (
-	exec 5>&1 1>&2	# 5 goes to image URL xv filter
-
-	while read -r url grep savedir
-	do
-	  [ $nogrep ] && { echo "$url" >&4; continue; }
-	  [ -n "$grep" ] || { echo "$url" >&4; continue; }
-
-	  (
-	    hits=`set -x; pageurls -i "$url" | egrep -i "$grep"`
-	    # nothing? pass main page to urlshow
-	    [ -n "$hits" ] || exec echo "$url" >&4
-
-	    # pass images, savedir and main page to xv filter
-	    for imgurl in $hits
-	    do  echo "$imgurl $savedir $url" >&5
-	    done
-	  ) &
-	done
-      ) \
-      | \
-      (
-	set --
-	while read -r imgurl savedir pageurl
-	do
-	  [ -n "$savedir" ] || savedir=.
-	  case "$savedir" in
-	    /*) ;; *) savedir=$HOME/im/comics/$savedir ;;
-	  esac
-
-	  # grab it
-	  cached=`set-x fileof "$imgurl"` \
-	  || { echo "$pageurl" >&4; continue; }	# no grab? display source page
-
-	  if set-x ifnewfile "$cached"
-	  then
-	    set -- ${1+"$@"} "$cached"
-	    ( gbase=`basename "$imgurl"`
-	      saveas=$savedir/$gbase
-	      set-x lncp "$cached" "$saveas" && set-x fileloc -a "$saveas"
-	    ) &
-	  else
-	    echo "SEEN $imgurl" >&2
-	  fi
-	done
-	# done - shut up!
-	exec >&2
-	[ $# = 0 ] || xvmax "$@" &
-      )
-    ) \
-  | sort -u \
-  | urlshow \
-  &
-done
+  esac
+done \
+| grep '^[^#]' \
+| if [ -n "$pickn" ]; then pickn "$pickn"; else cat; fi \
+| tee /dev/tty \
+| urlshow
