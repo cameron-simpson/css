@@ -67,7 +67,7 @@ my @args;
       }
     }
     elsif ($arg eq '-k')
-    # handle GNU -k pos1[,pos2]
+    # handle POSIX -k pos1[,pos2]
     { push(@args,$arg);
       $arg=shift(@ARGV);
       if (! defined $arg)
