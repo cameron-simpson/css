@@ -6,33 +6,23 @@
 #
 
 : ${VARRUN:="$HOME/var/run"}
+: ${BROWSER_PROFILE:=$USER@$HOST}
 
 url=
-mode=start
-profile=$USER@$HOST
-##br=/opt/firefox-1.0.7/firefox
-##br=/opt/firefox-1.5rc1-enGB/firefox
-##br=/opt/firefox-1.5/firefox
-##br=/opt/firefox-1.5.0.1/firefox
-##br=/opt/firefox-1.5.0.2/firefox
-##br=/opt/firefox-1.5.0.3-enGB/firefox
+profile=$BROWSER_PROFILE
 br=/opt/firefox-1.5.0.4-enGB/firefox
 
 cmd=$0
 usage="Usage: $cmd [-f] [-q] [url]
-	-f		Force: start browser even if already running.
 	-P profile	Select desired profile.
-			Default: $profile
-	-q		Test if browser running."
+			Default from \$BROWSER_PROFILE: $profile"
 
 badopts=
 
 while [ $# -gt 0 ]
 do
   case "$1" in
-    -f)	mode=force ;;
     -P)	profile=$2; shift ;;
-    -q)	mode=query ;;
     --)	shift; break ;;
     -?*)echo "$cmd: unrecognised option: $1" >&2; badopts=1 ;;
     *)	break ;;
@@ -46,28 +36,8 @@ done
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
-pidfile=$VARRUN/browser.pid
-
-case "$mode" in
-  force)
-      ;;
-  *)  [ -s "$pidfile" ] && pid=`cat "$pidfile"` && kill -0 "$pid" 2>/dev/null
-      testcode=$?
-      case "$mode" in
-	query)
-	  exit $testcode ;;
-      esac
-      if [ $testcode = 0 ]
-      then
-        echo "$cmd: browser already running with pid $pid" >&2
-        echo "	(from $pidfile)" >&2
-        exit 1
-      fi
-      ;;
-esac
-
 [ -n "$url" ] && set -- "$url"
+
 set -x
-##rm -rf "$HOME"/var/firefox/subdir/Cache*
 histbackup -x --delete-excluded "$HOME/var/firefox" "$HOME/var/backup/firefox"
-alog -p "$pidfile" alert set-x "$br" -width "$FULLX" -height "$PIX_HIGH" -P "$profile" ${1+"$@"} &
+acon "$br" -width "$FULLX" -height "$PIX_HIGH" -P "$profile" ${1+"$@"} &
