@@ -13,31 +13,25 @@ usage="Usage: $cmd [files...]"
 tmpf=$TMPDIR/$cmd$$
 trap 'rm -f "$tmpf"' 0 1 2 13 15
 
-html-unsplit -- ${1+"$@"} >"$tmpf" || exit 1
+html-unsplit -- ${1+"$@"} \
+| sed '# detab
+       y/	/ /
+       :detag
+       # remove param="value" from tags
+       s/<\([^<>=]*\) [a-zA-Z][a-zA-Z]*="[^"]*"/<\1/g
+       t detag
+       # remove param='value' from tags
+       s/<\([^<>=]*\) [a-zA-Z][a-zA-Z]*='\''[^'\'']*'\''/<\1/g
+       t detag
+       # remove param=value from tags
+       s/<\([^<>=]*\) [a-zA-Z][a-zA-Z]*=[^<> ]*/<\1/g
+       t detag
+      ' \
+> "$tmpf"
 
 ( 
-  sed -n -e 'y/	/ /' \
-	 -e ':detag' \
-	 -e 's/<\([^<>=]*\) [a-zA-Z][a-zA-Z]*="[^"]*"/<\1/g' \
-	 -e 't detag' \
-	 -e 's/<\([^<>=]*\) [a-zA-Z][a-zA-Z]*='\''[^'\'']*'\''/<\1/g' \
-	 -e 't detag' \
-	 -e 's/<\([^<>=]*\) [a-zA-Z][a-zA-Z]*=[^<> ]*/<\1/g' \
-	 -e 't detag' \
-	 -e 's/.*< *[Tt][Ii][Tt][Ll][Ee] *>\([^< ][^<]*\).*/\1/p' \
-	 -e 'T nope; q; :nope; d' \
-	 "$tmpf"
-  sed -n -e 'y/	/ /' \
-	 -e ':detag' \
-	 -e 's/<\([^<>=]*\) [a-zA-Z][a-zA-Z]*="[^"]*"/<\1/g' \
-	 -e 't detag' \
-	 -e 's/<\([^<>=]*\) [a-zA-Z][a-zA-Z]*='\''[^'\'']*'\''/<\1/g' \
-	 -e 't detag' \
-	 -e 's/<\([^<>=]*\) [a-zA-Z][a-zA-Z]*=[^<> ]*/<\1/g' \
-	 -e 't detag' \
-	 -e 's/.*< *[Hh]1 *>\([^< ][^<]*\).*/\1/p' \
-	 -e 'T nope; q; :nope; d' \
-	 "$tmpf"
+  sed -ne 's/.*< *[Tt][Ii][Tt][Ll][Ee] *> *\([^<]*[^< ]\).*/\1/p' "$tmpf"
+  sed -ne 's/.*< *[Hh]1 *> *\([^<]*[^< ]\).*/\1/p' "$tmpf"
 ) \
 | sed -e 's/\&lt;/</g;' \
       -e 's/\&gt;/>/g' \
