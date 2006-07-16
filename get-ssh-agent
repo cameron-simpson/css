@@ -5,40 +5,15 @@
 #
 
 cmd=$0
-usage="Usage: $cmd [-h] [-v] [--] [statefile]"
-
-statefile=
-verbose=
-thishost=
-hopt=
+usage="Usage: $cmd [statefile]"
 
 badopts=
-
-while [ $# -gt 0 ]
-do
-  case "$1" in
-    -h)	thishost=1 hopt=-h ;;
-    -v)	verbose=1 ;;
-    --)	shift; break ;;
-    -?*)echo "$cmd: unrecognised option: $1" >&2
-	badopts=1
-	;;
-    *)	break ;;
-  esac
-  shift
-done
-
+statefile=
 [ $# = 0 ] || { statefile=$1; shift; }
-
 [ $# = 0 ] || { echo "$cmd: extra arguments: $*" >&2; badopts=1; }
-
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
-# if $thishost then prefer the per-host agent if present
-[ $thishost ] && have-ssh-agent $hopt && exec stash-ssh-agent $hopt -
-
-# otherwise try for an inherited agent
-have-ssh-agent && exec stash-ssh-agent -
+have-ssh-agent -h -0 || exit 1
 
 # protect against rogue output
 exec 3>&1 1>/dev/null
@@ -47,6 +22,5 @@ exec 3>&1 1>/dev/null
 
 [ -s "$statefile" ] \
 && . "$statefile" \
-&& have-ssh-agent \
-&& echo ". '$statefile'" >&3 \
-&& { [ -z "$verbose" ] || ssh-add -l >&2; }
+&& have-ssh-agent -0 \
+&& echo ". '$statefile'" >&3
