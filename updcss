@@ -18,8 +18,8 @@ needhost $HOMEHOST@home || exit 2
 
 umask 22
 
-[ "x$1" = x-q ] && { quick=1; shift; }
-[ "x$1" = x-n ] && { dosync=; shift; }
+[ $# -gt 0 ] && [ "x$1" = x-q ] && { quick=1; shift; }
+[ $# -gt 0 ] && [ "x$1" = x-n ] && { dosync=; shift; }
 
 if [ -z "$quick" ]
 then
