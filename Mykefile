@@ -61,10 +61,10 @@ $(pmmans):	$(pmFromMan($@))
 	fi
 
 _scriptmans:
+	@echo make $@ ... \
 	egrep -l '^(# *)?=head1 NAME' $(allscripts) \\
-	| while read script \
-	  do  $(MAKE) "$(scriptmandir)/$$script.1" \
-	  done
+	| sed 's|.*|$(scriptmandir)/&.1|' \\
+	| xxargs set-x $(MAKE)
 
 $(scriptmandir)/%.1: %
 	:make $(@D)/.
@@ -95,7 +95,8 @@ $(scriptmandir)/%.1: %
 noads	= $(HOME)/@/adzapper.sf/html/rc/patterns
 
 squid_redirect: $(noads)
-	cd $(?DD) || exit 1 \
+	@cd $(?DD) || exit 1 \
+	pwd; set -x \
 	exec $(MAKE) _script
 
 %.class: %.java %.class-prereqs : $(("%.class-prereqs" G?<P)).class
