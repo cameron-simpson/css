@@ -90,7 +90,7 @@ $(scriptmandir)/%.1: %
 	 chmod 644 $@ $$htman
 
 1INDEX.txt: $(allscripts)
-	mkscriptndx `ls -d $(allscripts) | sort` >$@
+	@echo make $@; mkscriptndx `ls -d $(allscripts) | sort` >$@
 
 noads	= $(HOME)/@/adzapper.sf/html/rc/patterns
 
