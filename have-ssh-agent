@@ -1,10 +1,29 @@
 #!/bin/sh -u
 #
 # Test whether we have an ssh-agent to hand.
+# 0: ok and has some keys, 1: ok but no keys, 2: no agent
 #	- Cameron Simpson <cs@zip.com.au> 03jul2004
 #
 
-if [ $# -gt 0 ] && [ "x$1" = x-h ]
+cmd=$0
+usage="Usage: $cmd [-h] [-0]
+	-h	Test per-host agent instead of envvar agent.
+	-0	It's ok to have no keys."
+
+perhost=
+needkeys=1
+
+while [ $# -gt 0 ]
+do
+  case $1 in
+    -h)	perhost=1 ;;
+    -0)	needkeys= ;;
+    *)	break ;;
+  esac
+  shift
+done
+
+if [ $perhost ]
 then
   shift
   statefile=`ssh-agent-statefile` || exit 1
@@ -12,7 +31,19 @@ then
   . "$statefile"
 fi
 
-[ -n "${SSH_AUTH_SOCK:-''}" ] || exit 1
+# no agent? failure
+[ -n "${SSH_AUTH_SOCK:-''}" ] || exit 2
 
-# 0: ok and has some keys, 1: ok but no keys, 2: no agent
-ssh-add -l >/dev/null 2>&1 || [ $? = 1 ]
+ssh-add -l >/dev/null 2>&1
+case $? in
+  0)	# agent with keys
+	exit 0
+	;;
+  1)	# agent without keys
+	[ $needkeys ] && exit 1
+	exit 0
+	;;
+esac
+
+# no agent
+exit 2
