@@ -130,11 +130,11 @@ do
     busy=1
     lock "$lock" bogof -b -T -o 0.6,0.45 -u 2>>"$CONSOLE" <"$rawlist" >"$bogolist"
 
-    # file known non-spam
-    awk '$2 == "H" { print $1 }' <"$bogolist" \
-    | while read -r f
-      do  filemailitem "$nonspam" <"$f" && rm -- "$f"
-      done
+    ##### file known non-spam
+    ####awk '$2 == "H" { print $1 }' <"$bogolist" \
+    ####| while read -r f
+    ####  do  filemailitem "$nonspam" <"$f" && rm -- "$f"
+    ####  done
 
     # file spam
     awk '$2 == "S" { print $1 }' <"$bogolist" \
