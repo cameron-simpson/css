@@ -1,0 +1,39 @@
+#!/bin/sh -u
+#
+# Return the date of a mail message, as formatted by the date(1) command.
+# It requires a date(1) that accepts a '-d datestring' option.
+
+cmd=$0
+usage="Usage: $cmd [date(1)-options...] [filename]"
+
+dateopts=
+
+badopts=
+
+while [ $# -gt 0 ]
+do
+  case "$1" in
+    -[dfrs]|--date=*|--file=*|--reference=*|--set=*)
+      echo "$cmd: $1 forbidden" >&2
+      ;;
+    +?* | -I?* | --iso-8601 | --iso-8601=* | -[Ru] | --rfc-2822 \
+    | --utc | --universal)
+      dateopts="$dateopts "`shqstr "$1"` || badopts=1
+      ;;
+    --)
+      shift; break ;;
+    -?*)
+      echo "$cmd: unrecognised option: $1" >&2
+      badopts=1
+      ;;
+    *)break
+      ;;
+  esac
+  shift
+done
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+datestr=`sed -n '/^$/q; s/^[Dd][Aa][Tt][Ee]: *//p' ${1+"$@"}` || exit 1
+set -x
+eval "exec date -d \"\$datestr\" $dateopts"
