@@ -35,5 +35,5 @@ done
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
 datestr=`sed -n '/^$/q; s/^[Dd][Aa][Tt][Ee]: *//p' ${1+"$@"}` || exit 1
-set -x
+
 eval "exec date -d \"\$datestr\" $dateopts"
