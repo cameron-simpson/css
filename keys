@@ -1,8 +1,16 @@
-#!/bin/sh
+#!/bin/sh -u
 base=
 usage="Usage: $0 [base]"
 [ $# = 0 ] || { base=$1; shift; }
 [ $# = 0 ] || { echo "$usage" >&2; exit 2; }
 [ -n "$base" ] || base=`basename "$0"`
 umask 077
-exec e "$HOME/rc/secret-gpg/$base.gpg"
+case "$base" in
+  /* | ./* | ../* ) file=$base ;;
+  *)		    file=$HOME/rc/secret-gpg/$base ;;
+esac
+case "$file" in
+  *.gpg) ;;
+  *)	 file=$file.gpg ;;
+esac
+exec e "$file"
