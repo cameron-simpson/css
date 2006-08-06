@@ -1,106 +1,61 @@
-#!/usr/bin/python
-#
-
-import sys
-import getopt
+import os
 import os.path
-import pwd
-import re
-import string
-import cStringIO
-import readline
-import email
-import email.Errors
 import email.Parser
-import mailbox
-import cs.misc
-from cs.misc import cmderr, debug, warn
-import cs.gzindex
+import StringIO
+from cs.misc import warn
 
-# Code from module-mailbox.html.
-def _emailFactory(fp):
-  try:
-    return email.message_from_file(fp)
-  except email.Errors.MessageParseError:
-    # Don't return None since that will
-    # stop the mailbox iterator
-    return ''
+def ismhdir(path):
+  return os.path.isfile(os.path.join(path,'.mh_sequences'))
 
-# An interface to a Maildir mail store.
-class Maildir(mailbox.Maildir):
+def ismaildir(path):
+  for subdir in ('new','cur','tmp'):
+    if not os.path.isdir(os.path.join(path,subdir)):
+      return False
+  return True
+
+def maildirify(path):
+  for subdir in ('new','cur','tmp'):
+    dpath=os.path.join(path,subdir)
+    if not os.path.isdir(dpath):
+      os.makedirs(dpath)
+
+class Maildir:
   def __init__(self,path):
     self.__path=path
+    self.__parser=email.Parser.Parser()
+
+  def keys(self):
+    return self.subpaths()
+
+  def subpaths(self):
+    for subdir in ('new','cur'):
+      subpath=os.path.join(self.__path,subdir)
+      for name in os.listdir(subpath):
+        if len(name) > 0 and name[0] != '.':
+	  yield os.path.join(subdir,name)
+
+  def fullpath(self,subpath):
+    return os.path.join(self.__path,subpath)
+
+  def paths(self):
+    for subpath in self.subpaths():
+      yield self.fullpath(subpath)
 
   def __iter__(self):
-    for msg in mailbox.Maildir(self.__path,_emailFactory):
-      if msg != '':
-	yield msg
+    P=email.Parser.Parser()
+    for subpath in self.subpaths():
+      yield self[subpath]
 
-class MailItem(email.Message):
-  def __init__(self,folder,subpath):
-    email.Message.__init(self)
-    self.__folder=folder
-    self.__subpath=subpath
-    self.__dirty=False
+  def __getitem__(self,subpath):
+    return self.__parser.parse(file(self.fullpath(subpath)))
 
-class MaildirFolder:
-  def __init__(self,path):
-    self.__path=path
-    self.__msgindex={}
+  def headers(self,subpath):
+    fp=file(self.fullpath(subpath))
+    headertext=''
+    for line in fp:
+      headertext+=line
+      if len(line) == 0 or line == "\n":
+        break
 
-    self.__pathindex={}
-
-    # Look up all the existing messages
-    # with quick readdir()s of "new" and "cur".
-    #
-    for subdir in ("cur", "new"):
-      subdirpath=os.path.join(path,subdir)
-      debug("reading", subdirpath)
-      for name in os.listdir(subdirpath):
-	if len(name) == 0 or name[0] == '.':
-	  continue
-
-	subpath=os.path.join(subdir,name)
-	debug(subpath)
-	self.__pathindex[subpath]=None
-
-    # Load the index file if present,
-    # discarding entries not seen in the readdir() passes.
-    #
-    self.__indexpath=os.path.join(path,'.hdrindex.gz')
-    hparse=email.Parser.HeaderParser()
-    debug("loading", self.__indexpath)
-    for (key,lines) in cs.gzindex.iter(self.__indexpath):
-      if key not in self.__pathindex:
-	continue
-
-      debug(" ", key)
-      item=MailItem(self,key)
-      ndxitem=hparse.parsestr(string.join(lines,''),True)
-      self.__pathindex[key]=
-      self.__pathindex[key][2]=self.__papi.parse(cStringIO.StringIO(string.join(lines,'')),True)
-
-    for entry in self.__pathindex:
-      if entry[2] is None:
-	entry[2]=self.__papi.parse(file(os.path.join(path,subpath)),True)
-
-  def __syncIndex(self):
-    gzout=cs.gzindex.append(self.__indexpath)
-    for entry in self.__pathindex:
-      if not entry[1]:
-	continue
-
-      subpath=entry[0]
-      gzout.write(subpath)
-      gzout.write("\n")
-      for (hdr,val) in entry[2].items():
-	gzout.write(hdr)
-	gzout.write(":")
-	gzout.write(val)
-	gzout.write("\n")
-
-      gzout.write("\n")
-
-  def __iter__(self):
-    for subpath in self.__pathindex:
-      yield self.__pathindex[subpath][0]
+    fp=StringIO.StringIO(headertext)
+    return self.__parser.parse(fp, headersonly=True)
