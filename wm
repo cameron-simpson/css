@@ -15,35 +15,44 @@ then
     ( tail -f "$evlog" | fvwm-event - & )
 fi
 
-for fvbin in \
-	/opt/fvwm-2.5.15-fc4/bin \
-	/opt/fvwm-cvs-20050815-fc4/bin \
-	/opt/fvwm-2.5.12-fc3/bin \
-	/opt/fvwm-2.5.11-rh9/bin \
-	/opt/fvwm-cvs-20040711/bin \
-	/opt/fvwm-2003-07-24/bin \
-	/opt/fvwm-2003-05-24/bin \
-	/opt/fvwm-2003-04-16/bin \
-	/opt/fvwm-2.5.6/bin \
-	/opt/fvwm-2.5.4/bin \
-	/opt/fvwm-2.5.4cvs/bin \
-	/opt/fvwm-2.5.3/bin \
-	/opt/fvwm-2.5.1/bin \
-	/opt/fvwm-2.4.4/bin \
-	/opt/fvwm/bin \
-	/opt/fvwm-2.3.23 \
-	/opt/fvwm/bin \
-	/opt/bin \
-	/usr/X11R6/bin \
+for fv in \
+	2.5.17-fc4 \
+	2.5.15-fc4 \
+	cvs-20050815-fc4 \
+	2.5.12-fc3 \
+	2.5.11-rh9 \
+	cvs-20040711 \
+	2003-07-24 \
+	2003-05-24 \
+	2003-04-16 \
+	2.5.6 \
+	2.5.4 \
+	2.5.4cvs \
+	2.5.3 \
+	2.5.1 \
+	2.4.4 \
+	fvwm \
+	2.3.23 \
+	/opt/fvwm \
+	/usr/local \
+	/opt \
+	/usr/X11R6 \
 	/nowhere
-do   fvwm=$fvbin/fvwm
-     [ -f "$fvwm" ] && break
+do
+  case $fv in
+    /*)		;;
+    fvwm-*)	fv=/opt/$fv ;;
+    *)		fv=/opt/fvwm-$fv ;;
+  esac
+  fvwm=$fv/bin/fvwm
+  [ -f "$fvwm" ] && break
 done
 
 [ -f "$fvwm" ] || { echo "$0: no fvwm!" >&2; exit 1; }
 
-PATH=$PATH:$fvbin
-export PATH
+PATH=$PATH:$fv/bin
+PYTHONPATH=$PYTHONPATH:$HOME/rc/python/Fvwmpy
+export PATH PYTHONPATH
 
 exec >$LOGDIR/wm.out 2>$LOGDIR/wm.err
 exec "$fvwm" -cmd "PipeRead fvwmrc" ${1+"$@"}
