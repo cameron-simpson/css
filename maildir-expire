@@ -66,6 +66,7 @@ def saferename(oldpath,newpath):
 
 for subpath in M.subpaths():
   fullpath=M.fullpath(subpath)
+
   hdrs=M.headers(subpath)
   date=hdrs['date']
   tm=rfc822.parsedate(date)
@@ -80,11 +81,9 @@ for subpath in M.subpaths():
     if S[stat.ST_SIZE] == 0:
       cmderr(fullpath+": empty file, skipping")
       continue
-
     cmderr(fullpath+": bad date:", date, "- using mtime")
-    when=[stat.ST_MTIME]
-
-  if when >= keeptime:
+    when=S[stat.ST_MTIME]
+  if days > 0 and when >= keeptime:
     continue
 
   savefolder=os.path.join(archivedir,
