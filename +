@@ -4,15 +4,13 @@
 #	- Cameron Simpson <cs@zip.com.au>
 #
 
-set -x
 : ${MAILHOMEHOST:=$HOMEHOST}
 : ${DISPLAY:=''}
 : ${LOGDIR:=$HOME/var/log}
 : ${ALERTLOG:=$LOGDIR/alert}
 
 needhost "$MAILHOMEHOST@$SYSTEMID" \
-|| { set -x
-     case "$LOCATION" in
+|| { case "$LOCATION" in
        $SYSTEMID) rhost=$MAILHOMEHOST ;;
        *)	  rhost=$SYSTEMID!$MAILHOMEHOST ;;
      esac
@@ -126,7 +124,6 @@ set sh -c "exec $muttcmd"
 [ $use_screen ] && set scr "mutt_$mfolder" "$@"
 [ $use_term   ] && set term -j email $termopts -n "mutt $mfolder" "$@"
 
-set -x
 [ -z "$preshcmd" -a -z "$postshcmd" ] && exec "$@"
 
 if eval "$preshcmd"
