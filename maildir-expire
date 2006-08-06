@@ -1,0 +1,100 @@
+#!/usr/bin/python
+#
+# Roll messages older than "days" from maildir
+# into archivedir/date/`basename maildir`.
+#	- Cameron Simpson <cs@zip.com.au> 05aug2006
+#
+
+import sys
+import time
+import rfc822
+import cs.mail
+import os
+import stat
+import errno
+from cs.misc import cmd, cmderr, warn
+
+fmt='%Y-%m'
+
+usage="Usage: "+cmd+" [+fmt] days maildir archivedir"
+
+badopts=False
+argv=sys.argv[1:]
+
+if len(argv) > 0 and argv[0][:1] == '+':
+  fmt=argv[0][1:]
+  argv.pop(0)
+
+if len(argv) != 3:
+  badopts=True
+else:
+  (daysarg,maildir,archivedir)=argv
+  try:
+    days=int(daysarg)
+  except ValueError:
+    cmderr("bad days value:", daysarg)
+    badopts=True
+
+  if not cs.mail.ismaildir(maildir):
+    cmderr(maildir+": not a maildir")
+    badopts=True
+
+  if not os.path.isdir(archivedir):
+    cmderr(archivedir+": not a directory")
+    badopts=True
+
+if badopts:
+  warn(usage)
+  sys.exit(2)
+
+now=time.time()
+keeptime=now-days*24*3600
+base=os.path.basename(maildir)
+
+M=cs.mail.Maildir(maildir)
+
+savedirs={}
+
+def saferename(oldpath,newpath):
+  try:
+    os.lstat(newpath)
+    raise OSError(errno.EEXIST)
+  except OSError, e:
+    if e.errno != errno.ENOENT:
+      raise e
+    os.rename(oldpath,newpath)
+
+for subpath in M.subpaths():
+  fullpath=M.fullpath(subpath)
+  hdrs=M.headers(subpath)
+  date=hdrs['date']
+  tm=rfc822.parsedate(date)
+  if tm:
+    try:
+      when=time.mktime(tm)
+    except ValueError, e:
+      cmderr(fullpath+":", `e`, "parsing Date:", date, "(tm="+`tm`+")")
+      continue
+  else:
+    S=os.stat(fullpath)
+    if S[stat.ST_SIZE] == 0:
+      cmderr(fullpath+": empty file, skipping")
+      continue
+
+    cmderr(fullpath+": bad date:", date, "- using mtime")
+    when=[stat.ST_MTIME]
+
+  if when >= keeptime:
+    continue
+
+  savefolder=os.path.join(archivedir,
+  			  time.strftime(fmt,time.localtime(when)),
+			  base)
+  if savefolder not in savedirs:
+    cs.mail.maildirify(savefolder)
+    savedirs[savefolder]=1
+
+  savepath=os.path.join(savefolder,subpath)
+
+  print fullpath, "=>", savepath
+  saferename(fullpath, savepath)
