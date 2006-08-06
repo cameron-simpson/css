@@ -1,0 +1,74 @@
+#!/bin/sh -u
+#
+# Archive older mail from several mail folders.
+#	- Cameron Simpson <cs@zip.com.au> 02aug2006
+# 
+
+: ${MAILDIR:=$HOME/mail}
+
+trace=set-x
+fmt=+%Y-%m
+archivedir=
+
+cmd=`basename "$0"` || cmd=$0
+usage="Usage: $cmd [-d maildir] [-A archivedir] [+fmt] days [folders...]
+    -d maildir	Mail folder parent directory, default from \$MAILDIR: $MAILDIR
+    -A archivedir Archive directory. Default: \$MAILDIR/ARCHIVE
+    +fmt	Archive date folder in strftime(3) output format. Default: $fmt
+    days	Minimum age in days of items to archive.
+    folders	Specific folders to archive. Default: [a-z]*"
+
+badopts=
+
+while [ $# -gt 0 ]
+do
+  case "$1" in
+    +?*)	fmt=$1 ;;
+    -d)		MAILDIR=$2; shift ;;
+    -A)		archivedir=$2; shift ;;
+    --)		shift; break ;;
+    -?*)	echo "$cmd: unrecognised option: $1" >&2
+    		badopts=1
+		;;
+    *)		break ;;
+  esac
+  shift
+done
+
+if [ $# = 0 ]
+then
+  echo "$cmd: missing days" >&2
+  badopts=1
+else
+  case "$1" in
+    [0-9]|[1-9][0-9]|[1-9][0-9][0-9]|[1-9][0-9][0-9][0-9])
+      days=$1
+      shift
+      ;;
+    *)echo "$cmd: bad days: $1" >&2
+      badopts=1
+      ;;
+  esac
+fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+[ -n "$archivedir" ] || archivedir=$MAILDIR/ARCHIVE
+case "$archivedir" in
+  /*) ;;
+  *)  archivedir=`pwd`/$archivedir || exit 1 ;;
+esac
+
+cd "$MAILDIR" || exit 1
+
+[ $# -gt 0 ] || set -- [a-z]*
+
+xit=0
+
+for maildir
+do
+  ismaildir "$maildir" || continue
+  $trace maildir-expire "$fmt" "$days" "$maildir" "$archivedir" || xit=1
+done
+
+exit $xit
