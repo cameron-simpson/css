@@ -154,7 +154,7 @@ fi
 if [ $ok ]
 then
     set -x
-    $cdrecord -v $dummy -eject $speed $blank "$dev" -data "$iso"
+    $cdrecord -v $dummy -sao -eject $speed $blank "$dev" -data "$iso"
     xit=$?
     set +x
 else
