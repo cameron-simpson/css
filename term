@@ -122,7 +122,10 @@ fi
 
 case "$TERM,$DISPLAY" in
     *,?*)
-	termopts="$termopts -title \"\$title\""
+	case "$PREFTERM" in
+	  gnome-terminal)	termopts="$termopts --title \"\$title\"" ;;
+	  *)			termopts="$termopts -title \"\$title\"" ;;
+	esac
 	case "$PREFTERM" in
 	  aterm)	;;
 	  *)		termopts="$termopts $xrmopts" ;;
@@ -185,7 +188,10 @@ case "$TERM,$DISPLAY" in
 			;;
 	esac
 
-	termcmd="$PREFTERM $termopts -e $termcmd"
+	case "$PREFTERM" in
+	  gnome-terminal) termcmd="$PREFTERM $termopts -x $termcmd" ;;
+	  *)		  termcmd="$PREFTERM $termopts -e $termcmd" ;;
+	esac
 	;;
 
     iris-ansi*,*)
