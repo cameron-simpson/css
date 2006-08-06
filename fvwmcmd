@@ -13,26 +13,29 @@ sleep=0
 first=1
 if [ $# = 0 ]
 then
-    # don't use "cat" because I want unbuffered output
-    while read -r fvcmd
-    do
-      [ -n "$fvcmd" ] || continue
-      if [ $first ]
-      then  first=
-      else  [ "$sleep" = 0 ] || sleep "$sleep"
-      fi
-      alert "fvwmcmd: $fvcmd"
-      FvwmCommand "$fvcmd"
-    done
+  # don't use "cat" because I want unbuffered output
+  while if [ -t 0 ]
+	then  fvcmd=`readline 'fvwmcmd> '`
+	else  read -r fvcmd
+	fi
+  do
+    [ -n "$fvcmd" ] || continue
+    if [ $first ]
+    then  first=
+    else  [ "$sleep" = 0 ] || sleep "$sleep"
+    fi
+    alert "fvwmcmd: $fvcmd"
+    FvwmCommand "$fvcmd"
+  done
 else
-    for fvcmd
-    do
-      [ -n "$fvcmd" ] || continue
-      if [ $first ]
-      then  first=
-      else  [ "$sleep" = 0 ] || sleep "$sleep"
-      fi
-      ##alert "fvwmcmd: $fvcmd"
-      FvwmCommand "$fvcmd"
-    done
+  for fvcmd
+  do
+    [ -n "$fvcmd" ] || continue
+    if [ $first ]
+    then  first=
+    else  [ "$sleep" = 0 ] || sleep "$sleep"
+    fi
+    ##alert "fvwmcmd: $fvcmd"
+    FvwmCommand "$fvcmd"
+  done
 fi
