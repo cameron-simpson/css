@@ -16,8 +16,10 @@ do
     -[dfrs]|--date=*|--file=*|--reference=*|--set=*)
       echo "$cmd: $1 forbidden" >&2
       ;;
-    +?* | -I?* | --iso-8601 | --iso-8601=* | -[Ru] | --rfc-2822 \
-    | --utc | --universal)
+    +?* \
+    | -I?* | --iso-8601 | --iso-8601=* \
+    | -R | --rfc-2822 \
+    | -u | --utc | --universal)
       dateopts="$dateopts "`shqstr "$1"` || badopts=1
       ;;
     --)
