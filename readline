@@ -7,7 +7,7 @@
 
 cddir=
 
-cmd=$0
+{ [ -t 0 ] && cmd=`basename "$0"`; } || cmd=$0
 usage="Usage: readline [-d dir] prompt
 	-d dir	Resolve completions in dir."
 
