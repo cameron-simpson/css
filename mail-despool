@@ -8,7 +8,7 @@
 : ${TMPDIR:=/tmp}
 
 cmd=`basename "$0"` || cmd=$0
-usage="Usage: $cmd [-d delay] [-f procmailrc] maildir"
+usage="Usage: $cmd [-d delay] [-f procmailrc] maildir [filer [args...]]"
 
 trace=set-x
 delay=
@@ -36,7 +36,6 @@ then
   badopts=1
 else
   maildir=$1; shift
-  [ $# = 0 ] || { echo "$cmd: extra arguments: $*" >&2; badopts=1; }
 fi
 
 case "$maildir" in
@@ -48,16 +47,24 @@ ismaildir "$maildir" \
 || { echo "$cmd: $maildir: must be a maildir or an MH dir" >&2
      badopts=1
    }
-[ -n "$procmailrc" ] || procmailrc=$maildir/.procmailrc
-case "$procmailrc" in
-  /*) ;; *) procmailrc=`/bin/pwd`/$procmailrc || exit 1 ;;
-esac
-[ -f "$procmailrc" -a -s "$procmailrc" ] \
-	|| { echo "$cmd: no procmailrc: $procmailrc" >&2
-	     badopts=1
-	   }
+
+# arrange default filer if none specified
+if [ $# = 0 ]
+then
+  set -- procmail "$procmailrc"
+  [ -n "$procmailrc" ] || procmailrc=$maildir/.procmailrc
+  case "$procmailrc" in
+    /*) ;; *) procmailrc=`/bin/pwd`/$procmailrc || exit 1 ;;
+  esac
+  [ -f "$procmailrc" -a -s "$procmailrc" ] \
+	  || { echo "$cmd: no procmailrc: $procmailrc" >&2
+	       badopts=1
+	     }
+fi
+filer_shcmd=`shqstr "$@"` || exit 1
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
+
 
 cd "$maildir" || exit 1
 
@@ -91,7 +98,7 @@ do
     for f
     do
       [ -s "$f" ] || continue
-      { $trace procmail "$procmailrc" <"$f" && $trace rm -- "$f" && touch "$busyflag"; } || xit=1
+      { eval "$trace $filer_shcmd" <"$f" && $trace rm -- "$f" && touch "$busyflag"; } || xit=1
     done
   fi
 
