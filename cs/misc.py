@@ -52,6 +52,12 @@ def cmderr(*args):
   sys.stderr.write(": ")
   warn(*args)
 
+_seq=0
+def seq():
+  global _seq
+  _seq+=1
+  return _seq
+
 def isodate(when=None):
   if when is None: when=time.localtime()
   return time.strftime("%Y-%m-%d",when)
@@ -439,3 +445,24 @@ class HasFlags:
   def clearFlag(self,flag):
     if self.testFlag(flag):
       self[self.__flagfield]=string.join([f for f in self.__flaglist() if f != flag])
+
+def saferename(oldpath,newpath):
+  ''' Rename a path using os.rename(), but raise an exception if the target
+      path already exists. Slightly racey.
+  '''
+  try:
+    os.lstat(newpath)
+    raise OSError(errno.EEXIST)
+  except OSError, e:
+    if e.errno != errno.ENOENT:
+      raise e
+    os.rename(oldpath,newpath)
+
+def trysaferename(oldpath,newpath):
+  ''' A saferename() that returns True on success, False on failure.
+  '''
+  try:
+    saferename(oldpath,newpath)
+  except:
+    return False
+  return True
