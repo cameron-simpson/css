@@ -5,47 +5,86 @@
 #
 
 : ${TMPDIR:=/tmp}
+: ${MAILDIR:=$HOME/mail}
 
 cmd=`basename "$0"`
-usage="Usage:     $cmd    Update mairix index.
-	$cmd mairix-search-args... Search and display."
+usage="Usage:     $cmd [-A]   Update mairix index.
+	$cmd [-A] mairix-search-args... Search and display.
+	$cmd -I [-A|foldersets...] Index the specified foldersets."
 
 # help?
 [ $# -gt 0 ] && [ "x$*" = x-h -o "x$1" = 'x-?' ] && { echo "$usage"; exit 0; }
 
-[ $# = 0 ] && { vflag=; [ -t 1 ] && vflag=-v; exec mairix $vflag; }
+maildirs=
+tflag=-t
+alldirs=
+indexmode=
+trace=
+vflag=
+[ -t 1 ] && { vflag=-v trace=set-x; }
+
+badopts=
+
+while [ $# -gt 0 ]
+do
+  case "$1" in
+    -A)	alldirs=1 ;;
+    -I)	indexmode=1 ;;
+    -n)	trace=echo ;;
+    -v)	vflag=-v ;;
+    -x)	trace=set-x ;;
+    --)	shift; break ;;
+    -?*)echo "$cmd: unrecognised option: $1" >&2
+    	badopts=1
+	;;
+    *)	break ;;
+  esac
+  shift
+done
+
+[ $# -gt 0 ] || indexmode=1
+
+# update indices?
+if [ $indexmode ]
+then
+  if [ $# = 0 ]
+  then
+    if [ $alldirs ]
+    then set -- "$MAILDIR" "$MAILDIR/ARCHIVE/"[0-9]*
+    else set -- "$MAILDIR"
+    fi
+  fi
+  xit=0
+  for dir
+  do  rc=$dir/.mairixrc
+      [ -s "$rc" ] || mkmairixrc -d "$dir" >"$rc" || { xit=1; continue; }
+      $trace mairix $vflag -f "$rc" || xit=1
+  done
+  exit $xit
+fi
 
 res=`mkdirn $TMPDIR/mairix` || exit 1
 trap 'rm -rf -- "$res"' 1 2 13 15
-
 maildir "$res" || exit 1
-qargs=`shqstr "$res" "$@"` || exit 1
 
-exec term -n "++ $*" \
-	  -c "set -- $qargs"'
-	      res=$1; shift
-	      set -x
-	      mairix -o "$res" "$@"
-	      + +t -f "$res"
-	      rm -rf -- "$res"'
+qargs=`shqstr "$@"` || exit 1
 
-####mairix=/opt/mairix/bin/mairix
-####rc=$HOME/rc/mairix.$SYSTEMID
-####
-####if [ $# = 0 ]
-####then
-####  xit=0
-####  for folder in "$MAILDIR/"* "$MAILDIR/"[A-Z]*/*
-####  do  mrx-update "$folder" || xit=1
-####  done
-####  exit $xit
-####fi
-####
-####qargs=`shqstr "$@"`
-####
-####exec term -n "++ $*" \
-####	  -c "set -- $qargs"'
-####	      res=`mrx-query "$@"`
-####	      + +t -f "$res"
-####	      set -x
-####	      rm -rf "$res"'
+if [ $alldirs ]
+then set -- "$MAILDIR" "$MAILDIR/ARCHIVE/"[0-9]*
+else set -- "$MAILDIR"
+fi
+
+xit=0
+for dir
+do
+  rc=$dir/.mairixrc
+  db=$dir/.mairix.db
+  [ -s "$rc" -a -s "$db" ] || { echo "$cmd: skipping $dir: missing $rc or $db" >&2
+  				continue
+			      }
+  eval "$trace mairix -f '$rc' -o '$res' -a $tflag $qargs" || xit=1
+done
+
++ +t -f "$res" || xit=1
+
+exit $xit
