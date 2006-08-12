@@ -2,6 +2,12 @@ import os
 import string
 from StringIO import StringIO
 
+def lastline(fp):
+  last=None
+  for line in fp:
+    last=line
+  return last
+
 def loadfile(path):
   return file(path).read()
 
