@@ -1,7 +1,7 @@
 import os
 import string
 
-def dflt(envvar,dfltval,doenvsub=0):
+def dflt(envvar,dfltval,doenvsub=False):
   env=os.environ
   if envvar in env:
     return env[envvar]
