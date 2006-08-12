@@ -7,13 +7,13 @@
 : ${MAILDIR:=$HOME/mail}
 
 trace=set-x
-fmt=+%Y-%m
+fmt=+%Y
 archivedir=
 
 cmd=`basename "$0"` || cmd=$0
 usage="Usage: $cmd [-d maildir] [-A archivedir] [+fmt] days [folders...]
     -d maildir	Mail folder parent directory, default from \$MAILDIR: $MAILDIR
-    -A archivedir Archive directory. Default: \$MAILDIR/ARCHIVE
+    -A archivedir Archive directory. Default: maildir/ARCHIVE
     +fmt	Archive date folder in strftime(3) output format. Default: $fmt
     days	Minimum age in days of items to archive.
     folders	Specific folders to archive. Default: [a-z]*"
