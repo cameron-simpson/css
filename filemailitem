@@ -48,14 +48,14 @@ then
     [ -n "$fpath" ] || { echo "$cmd: can't figure out pathname for folder \"$folder\"" >&2
 			 exit 1
 		       }
-    if [ -d "$fpath" ]
+    if [ -f "$fpath" ]
     then
-	if ismaildir "$fpath"
-	then mode=maildir
-	else mode=mh
-	fi
+      mode=mbox
     else
-	mode=mbox
+      if maildir "$fpath"
+      then mode=maildir
+      else mode=mh
+      fi
     fi
 fi
 
@@ -76,6 +76,7 @@ case "$mode" in
     mh)	unfrom_ | /usr/lib/nmh/rcvstore "$1" -unseen -nocreate
 	;;
     maildir)
+	maildir "$fpath" || exit 1
 	tmpf=$TMPDIR/prc$$
 	cat >"$tmpf" <<X || { rm -f "$tmpf"; exit 1; }
 	MAILDIR=$MAILDIR
