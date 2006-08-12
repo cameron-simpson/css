@@ -8,13 +8,13 @@
 import sys
 import time
 import rfc822
-import cs.mail
 import os
 import stat
 import errno
+import cs.mail
 from cs.misc import cmd, cmderr, warn
 
-fmt='%Y-%m'
+fmt='%Y'
 
 usage="Usage: "+cmd+" [+fmt] days maildir archivedir"
 
@@ -51,18 +51,9 @@ now=time.time()
 keeptime=now-days*24*3600
 base=os.path.basename(maildir)
 
-M=cs.mail.Maildir(maildir)
+M=cs.mail.openMaildir(maildir)
 
 savedirs={}
-
-def saferename(oldpath,newpath):
-  try:
-    os.lstat(newpath)
-    raise OSError(errno.EEXIST)
-  except OSError, e:
-    if e.errno != errno.ENOENT:
-      raise e
-    os.rename(oldpath,newpath)
 
 for subpath in M.subpaths():
   fullpath=M.fullpath(subpath)
@@ -83,6 +74,7 @@ for subpath in M.subpaths():
       continue
     cmderr(fullpath+": bad date:", date, "- using mtime")
     when=S[stat.ST_MTIME]
+
   if days > 0 and when >= keeptime:
     continue
 
@@ -93,7 +85,4 @@ for subpath in M.subpaths():
     cs.mail.maildirify(savefolder)
     savedirs[savefolder]=1
 
-  savepath=os.path.join(savefolder,subpath)
-
-  print fullpath, "=>", savepath
-  saferename(fullpath, savepath)
+  M2=cs.mail.openMaildir(savefolder).importPath(fullpath)
