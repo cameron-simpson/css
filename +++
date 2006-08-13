@@ -1,2 +1,6 @@
 #!/bin/sh
-exec ++ -t ${1+"$@"}
+#
+# Mairix search including archives.
+#	- Cameron Simpson <cs@zip.com.au>
+#
+exec ++ -A ${1+"$@"}
