@@ -14,6 +14,9 @@ spam=+spam
 nonspam=
 delay=
 lock=mail-io
+fABORT=mail-despam-ABORT
+fRUNNING=mail-despam-RUNNING
+fSA=mail-despam-SA
 
 badopts=
 
@@ -77,12 +80,13 @@ cd "$maildir" || exit 1
 xit=0
 
 tmpf=$TMPDIR/$cmd$$
-trap 'rm -f "$tmpf."*' 0 1 2 13 15
+trap 'flag "$fRUNNING" false; rm -f "$tmpf."*' 0 1 2 13 15
+flag "$fRUNNING" true
 
 rawlist=$tmpf.raw
 bogolist=$tmpf.bogo
 
-while :
+while flag ! "$fABORT"
 do
   if ismaildir .
   then
@@ -128,13 +132,9 @@ do
   if [ -s "$rawlist" ]
   then
     busy=1
-    lock "$lock" bogof -b -T -o 0.6,0.45 -u 2>>"$CONSOLE" <"$rawlist" >"$bogolist"
-
-    ##### file known non-spam
-    ####awk '$2 == "H" { print $1 }' <"$bogolist" \
-    ####| while read -r f
-    ####  do  filemailitem "$nonspam" <"$f" && rm -- "$f"
-    ####  done
+    ## suppress -u
+    lock "$lock" bogof -b -T 2>>"$CONSOLE" <"$rawlist" >"$bogolist"
+    bogof-sync
 
     # file spam
     awk '$2 == "S" { print $1 }' <"$bogolist" \
@@ -142,27 +142,17 @@ do
       do  filemailitem "$spam" <"$f" && rm -- "$f"
       done
 
-    # try everything else against spam assassin, which is slower
-    lock "$lock" \
-      env "spam=$spam" "nonspam=$nonspam" \
-	sh -uc '
-	  while read -r f
-	  do
-	    [ -s "$f" ] || continue	# skip files already processed
-	    ##echo "spamassassin $f ..." >>"$LOGDIR/procmail"
-	    if spamassassin -e <"$f" >/dev/null
-	    then
-	      bogof -Sn <"$f"
-	      filemailitem "$nonspam" <"$f" && rm -- "$f"
-	    else
-	      bogof -Ns <"$f"
-	      filemailitem "$spam" <"$f" && rm -- "$f"
-	    fi
-	  done
-	' <"$rawlist"
-
-    # update master table
-    bogof-sync
+    # file non spam with spamassassin amendment
+    while read -r f && flag ! "$fABORT"
+    do
+      [ -s "$f" ] || continue	# skip files already processed
+      if flag "$fSA"
+      then
+        spamassassin <"$f" | filemailitem "$nonspam" && rm -- "$f"
+      else
+        filemailitem "$nonspam" <"$f" && rm -- "$f"
+      fi
+    done <"$rawlist"
   fi
 
   [ -n "$delay" ] || break
@@ -173,5 +163,7 @@ do
     sleep "$delay"
   fi
 done
+
+flag "$fABORT" false
 
 exit $xit
