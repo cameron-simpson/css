@@ -16,6 +16,8 @@ popnew=1
 [ $# -gt 0 ] && [ "x$1" = x-t ] && { popnew=; shift; }
 
 mozremote=/opt/firefox/mozilla-xremote-client
+LD_LIBRARY_PATH=/opt/firefox
+export LD_LIBRARY_PATH
 
 mozremote()
 { for _mr_n in 1 2 3
