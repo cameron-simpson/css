@@ -473,6 +473,10 @@ sub readcats($;$)
       else
       { $ptn=".*$ptn"; }
 
+      for my $hdr (@hdrs)
+      { $hdr =~ s/[a-z]/"[".uc($&)."$&]"/eg;
+      }
+
       print "* ^", altre(@hdrs), ":[ 	]*$ptn\n";
     }
 
