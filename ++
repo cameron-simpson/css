@@ -31,6 +31,8 @@ do
     -A)	alldirs=1 ;;
     -I)	indexmode=1 ;;
     -n)	trace=echo ;;
+    -t)	tflag=$1 ;;
+    +t)	tflag= ;;
     -v)	vflag=-v ;;
     -x)	trace=set-x ;;
     --)	shift; break ;;
@@ -86,5 +88,7 @@ do
 done
 
 + +t -f "$res" || xit=1
+
+rm -r "$res"
 
 exit $xit
