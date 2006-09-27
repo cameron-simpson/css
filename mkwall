@@ -8,8 +8,9 @@
 
 : ${BG:=black}
 : ${TMPDIR:=/tmp}
-: ${WALLPAPER_SHADE:=100}
+: ${WALLPAPER_SHADE:=''}
 : ${XINERAMA:=''}
+: ${X11_COMPOSITE:=''}
 
 # set $bgx and $bgy
 eval `bgsize -v | sed 's/^d/bg/'`
@@ -61,6 +62,14 @@ else
 fi
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+if [ -z "$shade" ]
+then
+  if [ $X11_COMPOSITE ]
+  then  shade=100
+  else  shade=50
+  fi
+fi
 
 ##########################################
 # Multiple images - assemble into montage.
