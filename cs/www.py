@@ -1,11 +1,14 @@
-import sys
-import os
 import atexit
-import string
 import cgi
-import cgitb; cgitb.enable()
+import cgitb; ##cgitb.enable()
+import os
+import os.path
 import re
+import string
+import sys
 import types
+import urllib
+from urlparse import urljoin
 import cs.hier
 from cs.misc import extend, warn
 
@@ -256,3 +259,102 @@ class TableTR(Tag):
     td=Tag('TD',*args)
     self.tokens.append(td)
     return td
+
+from htmllib import HTMLParser
+from formatter import NullFormatter
+
+class htmlparse(HTMLParser):
+  def __init__(self,attr=None,tags=None):
+    if attr is None: attr='href'
+    if tags is None: tags=('a',)
+    self.__attr=attr
+    self.__tags=tags
+    self.__P=HTMLParser(NullFormatter())
+    self.__saved=[]
+    self.__tagHandlers={}
+    warn("__tags =", tags)
+
+  def __getattr__(self,a):
+    if a[:6] != "start_":
+      return getattr(self.__P,a)
+
+    tag=a[6:]
+    if tag in self.__tagHandlers:
+      return self.__tagHandlers[tag]
+
+    def handler(attrs):
+      if tag in self.__tags:
+        for (attr,value) in attrs:
+          if attr == self.__attr:
+            self.__saved.append(value)
+
+      try:
+        return getattr(self.__P,a)(attrs)
+      except AttributeError:
+        pass
+
+    self.__tagHandlers[tag]=handler
+
+    return handler
+
+  def anchor_bgn(self,href,name,type):
+    if href: self.__saved.append(href)
+
+  def getSavedValues(self,doFlush=False):
+    saved=self.__saved[:]
+    if doFlush: self.__saved=[]
+    return saved
+
+class URL:
+  def __init__(self,url):
+    self.__url=url
+
+  def info(self):
+    return urllib.urlopen(self.__url).info()
+
+  def images(self,absolute=None,attr=None,tags=None):
+    if attr is None: attr='src'
+    if tags is None: tags=('img',)
+    return self.links(absolute=absolute,attr=attr, tags=tags)
+
+  def links(self,absolute=False,attr=None,tags=None):
+    ''' Yield each link in the document.
+    '''
+    U=urllib.urlopen(self.__url)
+    fullurl=U.geturl()
+    I=U.info()
+    if I.type == 'text/html':
+      ##P=openURLParser(U)
+      P=htmlparse(attr=attr,tags=tags)
+      for line in U:
+        P.feed(line)
+        for link in P.getSavedValues(True):
+          if absolute: link=urljoin(fullurl,link)
+          yield link
+      P.close()
+      for link in P.getSavedValues(True):
+        if absolute: link=urljoin(fullurl,link)
+        yield link
+
+  def open(self):
+    return urllib.urlopen(self.__url)
+
+def saveURL(url,dir=None):
+  U=URL(url).open()
+  filename=os.path.basename(U.geturl())
+  if len(filename) == 0: filename="index.html"
+  print "filename =", filename
+  F=file(filename,"w")
+  data=U.read(8192)
+  while len(data) > 0:
+    F.write(data)
+    data=U.read(8192)
+  F.close()
+
+def rget(url,path):
+  if len(path) == 0:
+    saveURL(url)
+    return
+
+  task=path.pop(0)
+  ##if task == 'src':
