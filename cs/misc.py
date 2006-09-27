@@ -38,9 +38,20 @@ if 'DEBUG' in os.environ \
    and os.environ['DEBUG'] != "0":
     debug_level=3
 
+def ifdebug(level):
+  ''' Tests if the debug_level is above the specified threshold.
+  '''
+  return debug_level >= level
+
 def debugif(level,*args):
+  ''' Emits the specified warning if the debug_level is above the specified
+      threshold.
+  '''
   if debug_level >= level:
     warn(*args)
+
+def ifprogress(): return ifdebug(1)
+def ifverbose():  return ifdebug(2)
 
 def progress(*args): debugif(1,*args)
 def verbose(*args):  debugif(2,*args)
@@ -51,6 +62,10 @@ def cmderr(*args):
   sys.stderr.write(cmd)
   sys.stderr.write(": ")
   warn(*args)
+
+def die(*args):
+  cmderr(*args)
+  sys.exit(1)
 
 _seq=0
 def seq():
