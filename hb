@@ -12,13 +12,15 @@ cmd=`basename "$0"` || cmd=$0
 usage="Usage: $cmd [--ipod] [handbrake-options...]"
 
 hbopts="-2"
-[ -t 2 ] && hbopts="-v $hbopts"
 
 badopts=
 
 while [ $# -gt 0 ]
 do
   case $1 in
+    --dvd2mp4)
+                hbopts="$hbopts -f mp4 -E faac -w 640 -l 480 -b 1000 -a 1 -R 48000 -B 160"
+		;;
     --ipod)	hbopts="$hbopts -f mp4 -E faac -w 320 -l 240 -b 400 -a 1 -R 48000 -B 160"
 		;;
     -[v2dg] \
