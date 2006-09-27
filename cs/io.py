@@ -38,6 +38,19 @@ class ContLineFile(file):
     if not nline: raise StopIteration
     return nline
 
+def pread(f,size,pos,whence=0,norestore=False):
+  ''' Read a chunk of data from an arbitrary position in a file.
+      Restores the file pointer after the read unless norestore is True.
+  '''
+  if type(f) is string:
+    f=file(f)
+  if not norestore:
+    here=f.tell()
+  f.seek(pos,whence)
+  data=f.read(size)
+  f.seek(here)
+  return data
+
 class BaseFileWrapper:
   """ base class for wrapping a file
       expects to be extended by IFileWrapper or OFileWrapper
