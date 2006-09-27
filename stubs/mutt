@@ -24,8 +24,19 @@ case "$TERM" in
 	;;
 esac
 
-for mutt in /opt/mutt-1.5.8-header-cache.29-fc3/bin/mutt /opt/mutt-1.5.6i-headercache-fc2/bin/mutt /opt/mutt-1.5.6i-headercache-rh9/bin/mutt /opt/mutt-1.5.5.1-nntp.vvv/bin/mutt /opt/mutt-1.4i-patched/bin/mutt /opt/mutt-cvs/bin/mutt /opt/mutt/bin/mutt /usr/bin/mutt
-do  [ -f "$mutt" ] && { set -x; exec "$mutt" ${1+"$@"}; }
+for muttdir in \
+	/opt/mutt-1.5.13-fc4 \
+	/opt/mutt-1.5.8-header-cache.29-fc3 \
+	/opt/mutt-1.5.6i-headercache-fc2 \
+	/opt/mutt-1.5.6i-headercache-rh9 \
+	/opt/mutt-1.5.5.1-nntp.vvv \
+	/opt/mutt-1.4i-patched \
+	/opt/mutt-cvs \
+	/opt/mutt \
+	/usr
+do
+  mutt=$muttdir/bin/mutt
+  [ -f "$mutt" ] && { set -x; exec "$mutt" ${1+"$@"}; }
 done
 
 echo "$0: can't find a mutt installation!" >&2
