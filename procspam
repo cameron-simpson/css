@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/sh -u
 #
 # Process the mail item on stdin as spam.
 #	- Cameron Simpson <cs@zip.com.au>
@@ -6,7 +6,20 @@
 
 : ${LOGDIR:=$HOME/var/log}
 : ${ALERTLOG:=$LOGDIR/alert}
+: ${TMPDIR:=/tmp}
 
-exec 3<&0 >>"$ALERTLOG" 2>&1
-bogof -Ns <&3 3<&- &
+tmpf=$TMPDIR/procspam$$
+trap 'rm -f "$tmpf"' 0 1 2 13 15
+cat >"$tmpf" || exit 1
+exec </dev/null
+
+bogof -Ns <"$tmpf"
+bogof <"$tmpf" \
+|| { # not spam yet? file for recount
+     exec 3<"$tmpf"
+     ( exec <&3 3<&- >>"$ALERTLOG" 2>&1
+       filemailitem +spam-redo
+     ) &
+   }
+
 exit 0
