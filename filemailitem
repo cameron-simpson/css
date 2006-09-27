@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/sh -u
 #
 # Read mail item from stdin, file in a folder.
 # Tries to be pretty fast.
@@ -39,6 +39,14 @@ fi
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
+tmpf=$TMPDIR/fmi$$
+trap 'rm -f "$tmpf"' 0 1 2 13 15
+cat >"$tmpf" || exit 1
+[ -s "$tmpf" ] || exit 1
+exec <"$tmpf"
+rm -f "$tmpf" || exit 1
+# $tmpf now available for reuse
+
 fpath=
 
 # figure out the folder type if asked to guess
@@ -59,7 +67,7 @@ then
     fi
 fi
 
-# compute fpath if meeded
+# compute fpath if needed
 [ -n "$fpath" ] || [ "x$mode" = xmh ] \
 || { fpath=`mailfolderpath "$folder"` || exit 1
      [ -n "$fpath" ] \
@@ -77,16 +85,13 @@ case "$mode" in
 	;;
     maildir)
 	maildir "$fpath" || exit 1
-	tmpf=$TMPDIR/prc$$
-	cat >"$tmpf" <<X || { rm -f "$tmpf"; exit 1; }
+	cat >"$tmpf" <<X || exit 1
 	MAILDIR=$MAILDIR
 	DEFAULT=$fpath/
 	LOGFILE=$LOGDIR/procmail
 X
 	procmail "$tmpf"
-	xit=$?
-	rm -f "$tmpf"
-	exit $xit
+	exit $?
 	;;
     *)	echo "$cmd: unsupported mode: $mode" >&2
 	exit 2
