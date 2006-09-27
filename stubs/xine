@@ -1,7 +1,7 @@
 #!/bin/sh
 
-##xine=/opt/xine/bin/xine
-xine=/usr/bin/xine
+xine=/opt/xine/bin/xine
+##xine=/usr/bin/xine
 
 if mkdir test$$
 then snapdir=`pwd`
