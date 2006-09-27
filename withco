@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/sh -u
 #
 # Make a scratch checkout, run a command, throw the checkout away.
 # Runs:
@@ -11,6 +11,8 @@
 # to run command _in_ the checkout.
 # - Cameron Simpson <cs@zip.com.au> 04jul2003
 #
+
+: ${TMPDIR:=/tmp}
 
 cmd=`basename "$0"`
 usage="Usage: $cmd [-f] [-r rev] module command [args...]
@@ -62,7 +64,7 @@ fi
 exec 3>&1 1>&2
 
 trap '[ -z "$dir" ] || rm -rf "$dir"' 0 1 2 13 15
-dir=`mkdirn "${TMPDIR:-/tmp}/$cmd"` || exit 1
+dir=`mkdirn "$TMPDIR/$cmd"` || exit 1
 
 ( cd "$dir" || exit 1
   cvs -Q co $coopts "$module" >&2 || exit 1
