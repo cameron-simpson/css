@@ -4,6 +4,14 @@
 #	- Cameron Simpson <cs@zip.com.au> 18jan2006
 #
 
+uid=`id -u` || exit 1
+if [ "x$uid" != x0 ]
+then
+  shcmd=". /opt/css/env.sh; "`shqstr "$0" ${1+"$@"}`
+  set -x
+  exec sudo sh -xc "$shcmd"
+fi
+
 : ${VARRUN:=$HOME/var/run}
 
 cf=$HOME/rc/ssh/config-pf
