@@ -31,9 +31,11 @@ fi
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
+thisdesk=`currentdesk` || exit 1
+
 cmdesk=
 case "$desk" in
-  ''|.)	desk=`currentdesk` || exit 1 ;;
+  ''|.)	desk=$thisdesk || exit 1 ;;
   -)	desk=1 ;;
 esac
 
@@ -46,26 +48,25 @@ fi
 
 # transmute args to cache filenames
 srcargs=$*
-first=1
-for arg
-do
-  [ $first ] && { set --; first=; }
-  cached=`filecache "$arg"` || cached=$arg
-  set -- ${1+"$@"} "$cached"
-done
 
-# compute new background
-rootbg=`mkwall "$@"` || exit 1
+# Compute new background.
+# We only store the cached PNG version of the image,
+# unless there is more than one - then we make a collage of the images
+# and store that.
+if [ $# = 1 ]
+then rootbg=`pngof "$1"`
+else rootbg=`mkwall "$@"`
+fi || exit 1
 
 # note supplied images
-if [ $doit ]
-then
-  ( desktop "$desk" rootbg "$*"
-    desktop "$desk" rootbg_src "$srcargs"
-  ) &
-fi
+[ $doit ] || exit 0
 
-# apply new background, set desktop to use it
-cset=`expr 1024 + $desk` || exit 1
-$towm "ColorSet $cset Pixmap $rootbg"
-[ $desk = 1 ] || $towm "*FvwmBacker: Command (Desk $desk) colorset $cset"
+( desktop "$desk" rootbg "$rootbg"
+  desktop "$desk" rootbg_src "$srcargs"
+) &
+
+[ $desk = $thisdesk ] && fvwm-root -r --no-dither "$rootbg"
+##### apply new background, set desktop to use it
+####cset=`expr 1024 + $desk` || exit 1
+####$towm "ColorSet $cset Pixmap $rootbg"
+####[ $desk = 1 ] || $towm "*FvwmBacker: Command (Desk $desk) colorset $cset"
