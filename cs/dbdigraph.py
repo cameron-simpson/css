@@ -1,37 +1,50 @@
 import string
-from cs.misc import warn
-from cs.db import dosql, SQLQuery, sqlise
+import re
+from cs.misc import cmderr, debug, warn, die, uniq
+from cs.hier import flavour
+from cs.db import dosql, SQLQuery, sqlise, today
 
-def typeTest(*types):
+NodeCoreAttributes=('NAME','TYPE')
+
+def SQLtypeTest(*types):
   assert len(types) > 0
   if len(types) == 1:
     return "TYPE = "+sqlise(types[0])
-  warn("types =", `types`)
   return "TYPE IN ("+string.join([ sqlise(type) for type in types ], ",")+")"
 
+CapWord_re = re.compile(r'^[A-Z][A-Z_]*[A-Z]$')
+
+def testAllCaps(s):
+  return CapWord_re.match(s)
+
 class DBDiGraph:
-  def __init__(self,nodeTable,edgeTable,attrTable):
+  def __init__(self,nodeTable,attrTable):
     self.nodes=nodeTable
-    self.edges=edgeTable
-    self.attrs=DBDiGraphAttrs(attrTable,self)
+    self.attrs=attrTable
     self.__nodeCache={}
     self.__selectIdsBaseQuery='SELECT ID FROM '+self.nodes.name
 
-  def preload(self):
-    self.nodes.preload()
-    self.edges.preload()
-    self.attrs.preload()
-
-  def selectIds(self,where):
-    query=self.__selectIdsBaseQuery
-    if where is not None: query=query+' WHERE '+where
-    warn("query =", query)
-    return [ row[0] for row in SQLQuery(self.nodes.conn,query) ]
-
   def keys(self):
-    return self.selectIds()
+    return self.nodeidsWhere()
+
+  def createNode(self,name,type,multipleNamesOk=False):
+    ''' Creates a new node with the specified name and type.
+        Returns the ID of the new node.
+    '''
+    if not multipleNamesOk and self.nodeByNameAndType(name,type):
+      die("createNode(name="+str(name)+", type="+type+"): already exists")
+
+    self.nodes.insert({'NAME': name, 'TYPE': type});
+    return self.nodeByNameAndType(name,type)
+
+  def addAnonNode(self):
+    maxNodeId=[row[0] for row in SQLQuery(self.nodes.conn,'SELECT MAX(ID) FROM NODES')][0]
+    return self.createNode(str(maxNodeId+1),'_NODE')
 
   def _newNode(self,nodeid):
+    ''' Constructs a new node instance associated with an id.
+        To be overridden by subclasses.
+    '''
     return DBDiGraphNode(nodeid,self)
 
   def __getitem__(self,nodeid):
@@ -39,35 +52,91 @@ class DBDiGraph:
       self.__nodeCache[nodeid]=self._newNode(nodeid)
     return self.__nodeCache[nodeid]
 
-  def nodeidsByNameAndType(self,name,*types):
-    return self.selectIds('NAME = '+sqlise(name)+' AND '+typeTest(*types)) 
-
-  def nodesByType(self,*types):
-    return [ self[id] for id in self.selectIds(typeTest(*types)) ]
-    
   def nodeByNameAndType(self,name,*types):
     node=None
     for id in self.nodeidsByNameAndType(name,*types):
       if node is None:
         node=self[id]
       else:
-        warn("multiple hits for node named", name, "- discarding id", str(id))
+        cmderr("multiple hits for node named", name, "- ignoring id", str(id))
 
     return node
+
+  def need(self,name,type):
+    node=self.nodeByNameAndType(name,type)
+    if node is None:
+      node=self.createNode(name,type)
+    return node
+
+  def nodeidsWhere(self,where):
+    query=self.__selectIdsBaseQuery
+    if where is not None: query=query+' WHERE '+where
+    debug("query =", query)
+    return [ row[0] for row in SQLQuery(self.nodes.conn,query) ]
+
+  def nodeidsByNameAndType(self,name,*types):
+    return self.nodeidsWhere('NAME = '+sqlise(name)+' AND '+SQLtypeTest(*types)) 
+
+  def nodeidsByAttr(self,attr,value):
+    return [ row[0] for row in SQLQuery(self.attrs.conn,
+                                        'SELECT DISTINCT(ID) FROM '+self.attrs.name
+                                        +' WHERE ATTR = '+sqlise(attr)+' AND VALUE = '+sqlise(value)) ]
+
+  def nodeidsByAttrs(self,attrs):
+    return [ row[0] for row in SQLQuery(self.attrs.conn,
+                                        'SELECT DISTINCT(ID) FROM '+self.attrs.name
+                                        +' WHERE ATTR = '+sqlise(attr)+' AND VALUE = '+sqlise(value)) ]
+
+  def nodeidsByType(self,*types):
+    return self.nodeidsWhere(SQLtypeTest(*types))
 
 class DBDiGraphNode:
   def __init__(self,id,digraph):
     self.id=id
     self.digraph=digraph
 
-  def _dbrow(self):
-    return self.digraph.nodes[self.id]
+  def clone(self):
+    N={}
+    for k in self.keys():
+      N[k]=self[k]
+    for k in NodeCoreAttributes:
+      N[k]=self[k]
+    return N
 
   def keys(self):
-    return self.digraph.attrs.getAttrNames(self.id)
+    return [ row[0]
+             for row in SQLQuery(self.digraph.attrs.conn,
+	     			 'SELECT DISTINCT(ATTR) FROM '+self.digraph.attrs.name
+				 +' WHERE ID_REF = '+str(self.id))
+	   ]
 
   def attrs(self):
-    return self.digraph.attrs.getAttrs(self.id)
+    return uniq(NodeCoreAttributes+self.digraph.attrs.getAttrs(self.id))
+
+  def __getattr__(self,attr):
+    if attr in self.__dict__:
+      raise AttributeError, "WTF?"
+    if attr == "id":
+      raise AttributeError, "WTF2? "+`self.__dict__`
+    if testAllCaps(attr):
+      return self.__fieldAccess(attr)
+    raise AttributeError, "node id="+str(self.id)+" has no attribute named "+attr
+
+  def __setattr__(self,attr,value):
+    if attr in self.__dict__ or attr in ('id', 'digraph'):
+      self.__dict__[attr]=value
+      return
+
+    if testAllCaps(attr):
+      self[attr]=value
+      return
+
+    raise AttributeError, "node id="+str(self.id)+" has no attribute named "+attr
+
+  def __fieldAccess(self,field,value=None):
+    if value is None:
+      return self[field]
+    self[field]=value
 
   def __getitem__(self,key):
     ''' Return the value of the specific key.
@@ -75,7 +144,10 @@ class DBDiGraphNode:
 	If one value, return the value.
 	If more values, return the list.
     '''
-    values=self.digraph.attrs.getAttr(self.id,key)
+    if key in NodeCoreAttributes:
+      return self.digraph.nodes[self.id][key]
+
+    values=self.getAttr(key)
     if len(values) == 0:
       return None
     if len(values) == 1:
@@ -83,66 +155,83 @@ class DBDiGraphNode:
     return values
 
   def __setitem__(self,key,value):
-    if type(value) is str: value=(value,)
-    self.digraph.attrs.setAttr(self.id,key,value)
+    ''' Set a new attribute.
+        If the value is an array, add all the elements.
+    '''
+    if key in NodeCoreAttributes:
+      self.digraph.nodes[self.id][key]=value
+      return
+
+    self.setAttr(key,value)
 
   def __delitem__(self,key):
-    self.digraph.attrs.delAttr(self.id,key)
+    if key in NodeCoreAttributes:
+      raise IndexError, "can't delete NodeCoreAttribute "+key
 
-  def addAttrs(self,key,values):
-    self.digraph.attrs.addAttr(self.id,key,values)
+    # TODO: recursively delete any linked hashes?
+    dosql(self.digraph.attrs.conn,
+	  'DELETE FROM '+self.digraph.attrs.name
+	  +' WHERE ID_REF = '+str(self.id)+' AND ATTR = '+sqlise(key))
 
-class DBDiGraphAttrs:
-  def __init__(self,attrTable,digraph):
-    self.table=attrTable
-    self.digraph=digraph
+  def setAttr(self,attr,values):
+    del self[attr]
+    self.addAttr(attr,values)
 
-  def preload(self):
-    self.table.preload()
+  def addAttr(self,attr,values,is_idref=0):
+    if flavour(values) != "ARRAY":
+      values=(values,)
 
-  def getAttr(self,srcid,key):
-    return [ row[0]
-             for row in SQLQuery(self.table.conn,
-	     			 'SELECT VALUE FROM '+self.table.name
-				 +' WHERE ID_REF = '+str(srcid)+' AND ATTR = '+sqlise(key))
-	   ]
-
-  def delAttr(self,srcid,attr):
-    dosql(self.table.conn,
-	  'DELETE FROM '+self.table.name
-	  +' WHERE ID_REF = '+str(srcid)+' AND ATTR = '+sqlise(attr))
-
-  def addAttr(self,srcid,attr,values):
     for value in values:
-      warn("insert(ID_REF="+str(srcid)+",ATTR="+attr+",VALUE="+`value`+")")
-      dosql(self.table.conn,
-      	    'INSERT DELAYED INTO '+self.table.name
-	    +' SET ID_REF=?, ATTR=?, VALUE=?',
-	    (srcid,attr,value))
-
-  def setAttr(self,srcid,attr,values):
-    self.delAttr(srcid,attr)
-    self.addAttr(srcid,attr,values)
-
-  def getAttrNames(self,srcid):
-    return [ row[0]
-             for row in SQLQuery(self.table.conn,
-	     			 'SELECT DISTINCT(ATTR) FROM '+self.table.name
-				 +' WHERE ID_REF = '+str(srcid))
-	   ]
-
-  def getAttrs(self,srcid):
-    attrs={}
-    for (attr,value) in SQLQuery(self.table.conn,
-	     			 'SELECT ATTR, VALUE FROM '+self.table.name
-				 +' WHERE ID_REF = '+str(srcid)):
-      if attr not in attrs:
-	attrs[attr]=[value]
+      assert is_idref == 0 or int(value) > 0, "is_idref="+`is_idref`+" and value="+`value`
+      if flavour(value) == "HASH":
+        hash=self.digraph.addAnonNode()
+        self.addAttr(attr,str(hash.id),1)
+        for k in value.keys():
+          hash[k]=value[k]
       else:
-	attrs[attr].append(value)
+        debug("insert(ID_REF="+str(self.id)+",ATTR="+attr+",VALUE="+`value`+")")
+        self.digraph.attrs.insert({'ID_REF': self.id,
+                           'ATTR': attr,
+                           'VALUE': value,
+                           'IS_IDREF': is_idref});
 
-    for attr in attrs:
-      if len(attrs[attr]) == 1:
-	attrs[attr]=attrs[attr][0]
+  def getAttr(self,attr):
+    # suck in all the rows
+    rows=[row for row
+          in SQLQuery(self.digraph.attrs.conn,
+                      'SELECT VALUE, IS_IDREF FROM '+self.digraph.attrs.name
+                      +' WHERE ID_REF = '+str(self.id)+' AND ATTR = '+sqlise(attr))]
 
-    return attrs
+    # stash the scalar values
+    values=[row[0] for row in rows if not row[1]]
+
+    # stash the nested values
+    for hashid in [int(row[0]) for row in rows if row[1]]:
+      values.append(self.digraph[hashid])
+
+    return values
+
+  def edges(self,idField='FROM_ID'):
+    ''' Returns edges running from this node.
+        Optional parameter idField defaults to ID_FROM.
+    '''
+    nodetbl=self.digraph.nodes.name
+    nodeid=nodetbl+'.ID'
+    attrtbl=self.digraph.attrs.name
+    attridref=attrtbl+'.ID_REF'
+    attrattr =attrtbl+'.ATTR'
+    attrvalue=attrtbl+'.VALUE'
+    query='SELECT DISTINCT('+attridref+') FROM '+nodetbl+' INNER JOIN '+attrtbl+' ON '+attrattr+' = '+sqlise(idField)+' AND '+attrvalue+' = '+str(self.id)
+    return [ self.digraph[row[0]] for row in SQLQuery(self.digraph.nodes.conn,query) ]
+
+  def addEdge(self,toNode,name=None):
+    if name is None:
+      # an anonymous edge
+      edge=self.digraph.addAnonNode()
+      edge.TYPE='EDGE'
+    else:
+      edge=self.digraph.createNode(name,'EDGE')
+
+    edge.FROM_ID=self.id
+    edge.TO_ID=toNode.id
+    edge.START_DATE=today()
