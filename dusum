@@ -11,7 +11,7 @@ ext=
 [ $# = 0 ] || { echo "Usage: $0 [ext]" >&2; exit 2; }
 
 out=".du-a$ext .du-s$ext"
-trap 'rm -f $out" 1 2 13 15
+trap "rm -f $out" 1 2 13 15
 
 
 dufs ${1+"$@"} \
