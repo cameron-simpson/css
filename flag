@@ -1,0 +1,73 @@
+#!/bin/sh -u
+#
+# Simple boolean states kept as files.
+#       - Cameron Simpson <cs@zip.com.au> 25sep2006
+#
+
+flagdir=$HOME/var/flags
+invert=
+
+cmd=$0
+usage="Usage: $0 [-d flagdir] [!] flagname [true|false|0|1]"
+
+badopts=
+
+[ $# -gt 0 ] && [ "x$1" = x-d ] && { flagdir=$2; shift; shift; }
+[ $# -gt 0 ] && [ "x$1" = x!  ] && { invert=1; shift; }
+
+if [ $# = 0 ]
+then
+  echo "$cmd: missing flagname" >&2
+  badopts=1
+else
+  flagname=$1
+  shift
+  case "$flagname" in
+    '' | */* | . | .. )
+      echo "$cmd: illegal flagname: $flagname" >&2
+      badopts=1
+      ;;
+  esac
+  if [ $# = 0 ]
+  then
+    setstate=
+  else
+    setstate=1
+    value=$1
+    shift
+    case "$value" in
+      true|1)   newstate=1 ;;
+      false|0)  newstate= ;;
+      *)        echo "$cmd: unsupported value: $value" >&2
+                badopts=1
+                ;;
+    esac
+    [ $invert ] && { echo "$cmd: can't use ! (invert) while setting flag" >&2
+                     badopts=1
+                   }
+    [ $# = 0 ] || { echo "$cmd: extra arguments after value: $*" >&2
+                    badopts=1
+                  }
+  fi
+fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+flagfile=$flagdir/$flagname
+
+if [ $setstate ]
+then
+  [ -d "$flagdir/." ] || needdir "$flagdir" || exit 1
+  if [ $newstate ]
+  then  echo 1 >"$flagfile" || exit 1
+  else  : >"$flagfile"      || exit 1
+  fi
+  exit 0
+fi
+
+if [ -s "$flagfile" ]
+then  [ $invert ] && exit 1
+      exit 0
+else  [ $invert ] && exit 0
+      exit 1
+fi
