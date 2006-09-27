@@ -92,7 +92,6 @@ class Maildir:
     m=_MaildirInfo_RE.search(path)
     if m:
       info=m.group(1)
-      warn("info=["+info+"]")
     progress(path, '=>', self.fullpath(self.mkname(info)))
     saferename(path,self.fullpath(self.mkname(info)))
 
