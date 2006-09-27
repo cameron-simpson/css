@@ -98,22 +98,22 @@ def sqlise(v):
   return sqlise(`v`)
 
 # (void) synonym for SQLQuery
-def dosql(conn,query,*args):
-  SQLQuery(conn,query,*args)
+def dosql(conn,query,*params):
+  SQLQuery(conn,query,*params)
   return None
 
 class SQLQuery:
   """ Iterable SQL query results.
   """
-  def __init__(self,conn,query,*args):
+  def __init__(self,conn,query,*params):
     self.__conn=conn
     self.__query=query
-    self.__args=args
+    self.__params=params
     ##debug("conn =", `conn`)
     self.__cursor=conn.cursor()
     debug('SQLQuery:', query)
-    debug("SQLQuery: args =", `args`)
-    self.__cursor.execute(query,*args)
+    debug("SQLQuery: params =", `params`)
+    self.__cursor.execute(query,params)
     ##debug("executed")
 
   def allrows(self):
@@ -131,7 +131,8 @@ class DateRangeRecord:
     return iscurrent(self,when)
 
 def sqlDatedRecordTest(when=None,startfield='START_DATE',endfield='END_DATE'):
-  """ Return SQL to test that a dated record overlaps the specified date. """
+  """ Return SQL to test that a dated record overlaps the specified date.
+  """
   if when is None: when=today()
   whensql=sqlise(when)
   return '(ISNULL('+startfield+') OR '+startfield+' <= '+whensql+')' \
@@ -373,8 +374,7 @@ class _TableRow:
   def __setitem__(self,column,value):
     # update the db
     dosql(self.table.conn,
-	  'UPDATE '+self.table.name+' SET '+column+' = %s WHERE '+self.__whereclause,
-	  (value,))
+	  'UPDATE '+self.table.name+' SET '+column+' = '+sqlise(value)+' WHERE '+self.__whereclause)
     # update the cache
     self.__getrowcache()[self.table._columnIndex(column)]=value
 
