@@ -51,7 +51,6 @@ ismaildir "$maildir" \
 # arrange default filer if none specified
 if [ $# = 0 ]
 then
-  set -- procmail "$procmailrc"
   [ -n "$procmailrc" ] || procmailrc=$maildir/.procmailrc
   case "$procmailrc" in
     /*) ;; *) procmailrc=`/bin/pwd`/$procmailrc || exit 1 ;;
@@ -60,6 +59,7 @@ then
 	  || { echo "$cmd: no procmailrc: $procmailrc" >&2
 	       badopts=1
 	     }
+  set -- procmail "$procmailrc"
 fi
 filer_shcmd=`shqstr "$@"` || exit 1
 
