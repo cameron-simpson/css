@@ -41,7 +41,7 @@ do  case $ndx in
 	*.z)	zcat <"$ndx" ;;
 	*)	cat <"$ndx" ;;
     esac | sed "s^$ndx	"
-done | sort +1 >"$ndxdata" &
+done | sort -k 2 >"$ndxdata" &
 
 wait
 
