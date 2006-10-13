@@ -118,4 +118,4 @@ done | awk '	{ words[$1]=words[$1] " " $2
 	    END	{ for (file in words)
 			{ print nwords[file] " " file words[file]
 			}
-		}' | sort +0nr +2d | cut '-d ' -f2- | sed 's/ /	/'
+		}' | sort -k 1 -nr -k 3 -d | cut '-d ' -f2- | sed 's/ /	/'
