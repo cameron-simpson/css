@@ -1,0 +1,32 @@
+#!/bin/sh -u
+#
+# Use handbrake to convert a DVD into 
+#
+
+cmd=`basename "$0"`
+usage="Usage: $cmd dvd-source [hb/handbrake options...]"
+
+trace=set-x
+fmt='t%02d-c%02d.mp4'
+
+dvd=$1
+shift
+
+handbrake -t 0 -i "$dvd" 2>&1 \
+| awk 'BEGIN \
+        { inTitle=0; inChapters=0 }
+       /^\+ title [1-9][0-9]*:/ \
+        { inTitle=1; inChapters=0; title=$3+0 }
+       inTitle && /^  \+ chapters:/ \
+        { inChapters=1 }
+       inChapters && /^    \+ [1-9][0-9]*: cells / \
+        { chapter=$2+0
+          print title, chapter, $7, $8
+        }
+      ' \
+| while read title chapter duration
+  do
+    echo "Title $title/Chapter $chapter: $duration"
+    out=`printf "$fmt" "$title" "$chapter"`
+    $trace hb --dvd2mp4 -i "$dvd" -o "$out" -t "$title" -c "$chapter" ${1+"$@"} </dev/null
+  done
