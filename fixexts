@@ -20,48 +20,48 @@ xit=0
 
 for f
 do
-    [ -f "$f" ] || { echo "$cmd: $f: not a regular file" >&2
-		     xit=1; continue;
-		   }
-    [ -s "$f" ] || { echo "$cmd: $f: empty file!" >&2
-		     xit=1; continue;
-		   }
+  [ -f "$f" ] || { echo "$cmd: $f: not a regular file" >&2
+                   xit=1; continue;
+                 }
+  [ -s "$f" ] || { echo "$cmd: $f: empty file!" >&2
+                   xit=1; continue;
+                 }
 
-    if [ -n "$itype" ]
-    then
-      type=$itype
-    else
-      type=`file2mime "$f"` || { echo "$cmd: can't deduce MIME type of \"$f\"" >&2
-				 xit=1
-				 continue
-			       }
-    fi
+  if [ -n "$itype" ]
+  then
+    type=$itype
+  else
+    type=`file2mime "$f"` || { echo "$cmd: can't deduce MIME type of \"$f\"" >&2
+                               xit=1
+                               continue
+                             }
+  fi
 
-    prefext=`mimeext "$type"` || { echo "$cmd: no preferred extension for $type" >&2
-				   xit=1
-				   continue
-				 }
+  prefext=`mimeext "$type"` || { echo "$cmd: no preferred extension for $type" >&2
+                                 xit=1
+                                 continue
+                               }
 
-    # see if ext is ok already
-    fbase=`basename "$f"`
-    case "$fbase" in
-      *".$prefext")	[ -t 1 ] || echo "$f"; continue ;;
-    esac
+  # see if ext is ok already
+  fbase=`basename "$f"`
+  case "$fbase" in
+    *".$prefext")	[ -t 1 ] || echo "$f"; continue ;;
+  esac
 
-    fdir=`dirname "$f"`
-    case "$fdir" in
-	.)	fdir= ;;
-	*)	fdir=$fdir/ ;;
-    esac
+  fdir=`dirname "$f"`
+  case "$fdir" in
+      .)	fdir= ;;
+      *)	fdir=$fdir/ ;;
+  esac
 
-    case $f in
-	*.*)	newf=$fdir`expr "x$fbase" : 'x\(.*\)\..*'`.$prefext ;;
-	*)	newf=$fdir$fbase.$prefext ;;
-    esac
+  case $f in
+      *.*)	newf=$fdir`expr "x$fbase" : 'x\(.*\)\..*'`.$prefext ;;
+      *)	newf=$fdir$fbase.$prefext ;;
+  esac
 
-    [ -t 1 ] && echo "$f -> $newf"
-    mv -i -- "$f" "$newf" || xit=1
-    [ -t 1 ] || echo "$newf"
+  [ -t 1 ] && echo "$f -> $newf"
+  mv -i -- "$f" "$newf" || xit=1
+  [ -t 1 ] || echo "$newf"
 done
 
 exit $xit
