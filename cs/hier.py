@@ -7,6 +7,7 @@ from types import *
 from cStringIO import StringIO
 from cs.lex import skipwhite, lastlinelen
 import cs.io
+from cs.misc import progress, cmderr
 
 safeChunkPtn = r'[\-+_a-zA-Z0-9./@]+'
 safeChunkRe  = re.compile(safeChunkPtn)
@@ -164,6 +165,7 @@ def load(path):
 def loaddir(dirname):
   """ Read Hier data from the named directory.
   """
+  progress("loaddir", dirname)
   dict={}
   dents=[ dirent for dirent in os.listdir(dirname) if dirent[0] != '.']
   for dent in dents:
@@ -291,7 +293,7 @@ def a2dict(s,pos=0):
       pos+=1
       break
     if ch1 == ',':
-      pos=skipwhite(s,pos+1)
+      pos+=1
     else:
       (key,pos)=tok(s,pos)
       pos=skipwhite(s,pos)
@@ -303,6 +305,8 @@ def a2dict(s,pos=0):
 	dict[key]=val
       else:
 	# XXX - syntax exception or something?
+        cmderr("a2dict: misparse at:", s[pos:], "\ndict so far is:",h2a(dict))
 	break
+    pos=skipwhite(s,pos)
 
   return (dict,pos)
