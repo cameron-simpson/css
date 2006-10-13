@@ -77,7 +77,7 @@ fi
 if [ $trustcache ] && [ -f "$saveas" -a -s "$saveas" ]
 then  :
 else
-  wget -q -O "$saveas" "$url" || exit 1
+  set-x wget -q -O "$saveas" "$url" || exit 1
   ##httpget -f -o "$saveas" "$url" || exit 1
 fi
 
