@@ -100,7 +100,7 @@ case `echo "$engine" | tr '[a-z]' '[A-Z]'` in
   PALMGEAR)	url=http://www.palmgear.com/software/searchanswer.cfm?quicksearch2=$query ;;
   PBONE)	url=http://rpm.pbone.net/index.php3?stat=3\&search=$query ;;
   PGPKEY)	url=http://wwwkeys.pgp.net:11371/pks/lookup?op=index\&search=$query ;;
-  PLANETMIRROR =>url=http://www.planetmirror.com/cgi-bin/SearchArchive.pl?query=$query\&maxlines=$maxhits\&indexdir=%2Fserver%2Fwww%2Fhtdocs%2Fglimpse%2F7%2Findex\&Go.x=22\&Go.y=12 ;;
+  PLANETMIRROR) url=http://www.planetmirror.com/cgi-bin/SearchArchive.pl?query=$query\&maxlines=$maxhits\&indexdir=%2Fserver%2Fwww%2Fhtdocs%2Fglimpse%2F7%2Findex\&Go.x=22\&Go.y=12 ;;
   RFCCONNECTED)	url=http://www.freesoft.org/Connected/cgi-bin/search.cgi?SEARCH_STRING=$query\&BASE_URL=/Connected/RFC/index.html\&DEPTH=0\&TYPE=REGEX\&CASE_INDEPENDANT=1\&WHOLE_WORD=0 ;;
   RFCNEXOR)	url=http://web.nexor.co.uk/public/rfc/index/cgi-bin/search/form?query=$query\&regexp=on\&titlefield=on\&abstractfield'=>'on\&authorfield=on\&site=Australia ;;
   ROGET)	url=http://www.thesaurus.com/roget.ihnd?KEYWORDS=$query\&HEADER='roget-english-frames-head\&FOOTER=roget-english-frames-foot\&INDEX=roget.idx\&LANGUAGE=roget-english-frames\&MAXHITS=$maxhits ;;
@@ -133,7 +133,7 @@ case `echo "$engine" | tr '[a-z]' '[A-Z]'` in
   YELLOWPAGES)	url=http://www.yellowpages.com.au/results/?N=$query\&C=\&L=\&S=\&R="11 12 13 14 15 16"\&Y=1\&SEARCH NOW=ON ;;
   YOTOSHI)	url=http://search.yotoshi.org/search.php?q=$query\&st=t ;;
   YNEWS)	url=http://search.main.yahoo.com/search/news?p=$query\&n=$maxhits ;;
-  *)		echo "$cmd: unknown engine \"$engine\"" >\&2; exit 2 ;;
+  *)		echo "$cmd: unknown engine \"$engine\"" >&2; exit 2 ;;
 esac
 
 printf "%s\n" "$url"
