@@ -97,7 +97,7 @@ noads	= $(HOME)/@/adzapper.sf/html/rc/patterns
 squid_redirect: $(noads)
 	@cd $(?DD) || exit 1 \
 	pwd; set -x \
-	exec $(MAKE) _script
+	exec $(MAKE) _scripts
 
 %.class: %.java %.class-prereqs : $(("%.class-prereqs" G?<P)).class
 	:make $(("$@-prereqs" E<P)).class
