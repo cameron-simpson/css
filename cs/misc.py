@@ -6,7 +6,7 @@ import dircache
 import string
 import time
 from StringIO import StringIO
-from cs.lex import parseline
+from cs.lex import parseline, strlist
 
 cmd=os.path.basename(sys.argv[0])
 
@@ -38,7 +38,7 @@ if 'DEBUG' in os.environ \
    and os.environ['DEBUG'] != "0":
     debug_level=3
 
-def ifdebug(level):
+def ifdebug(level=3):
   ''' Tests if the debug_level is above the specified threshold.
   '''
   return debug_level >= level
@@ -64,8 +64,7 @@ def cmderr(*args):
   warn(*args)
 
 def die(*args):
-  cmderr(*args)
-  sys.exit(1)
+  assert False, strlist(args," ")
 
 _seq=0
 def seq():
@@ -76,6 +75,18 @@ def seq():
 def isodate(when=None):
   if when is None: when=time.localtime()
   return time.strftime("%Y-%m-%d",when)
+
+def exactlyOne(list,context=None):
+  ''' Returns the first element of a list, but requires there to be exactly one.
+  '''
+  icontext="expected exactly one"
+  if context is not None:
+    icontext=icontext+" for "+context
+  if len(list) == 0:
+    raise IndexError, context+", got none"
+  if len(list) > 1:
+    raise IndexError, context+", got "+str(len(list))+": "+strlist(list)
+  return list[0]
 
 def winsize(f):
   '''	Return a (rows,columns) tuple or None for the specified file object.
