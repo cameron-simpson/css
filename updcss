@@ -33,17 +33,6 @@ fi
 
 set -x
 
-if needdir $cssdir/man
-then
-  rsync -avH \
-	--delete \
-	--delete-excluded \
-	--exclude=CVS/ \
-	--include='/man[1-9]/' \
-	--exclude='/*' \
-	$HOME/man/cs/. $cssdir/man/.
-fi
-
 if needdir $cssdir/bin
 then
   rm -f $cssdir/bin/cs
@@ -65,21 +54,6 @@ then
 	--exclude=CVS/ \
 	--exclude='defunct/' \
 	$HOME/scripts/synonyms/. $cssdir/bin/.
-fi
-
-if needdir $cssdir/cgi-bin
-then
-  rsync -aH \
-	--copy-links \
-	--copy-unsafe-links \
-	--delete \
-	--delete-excluded \
-	--exclude=CVS/ \
-	--exclude='defunct/' \
-	--include='/.cgienv.sh' \
-	--include='/*.cgi*' \
-	--exclude='/*' \
-	$HOME/scripts/cgi-bin/. $cssdir/cgi-bin/.
 fi
 
 if needdir $cssdir/lib/cs
