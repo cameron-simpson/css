@@ -6,6 +6,7 @@
 #
 
 : ${SHMFS:=/dev/shm}
+: ${USER:=`whoami || id -un`}
 
 shmbf=$SHMFS/$USER/bogofilter
 
