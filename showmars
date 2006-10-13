@@ -15,7 +15,7 @@ askcisco robinson show cam dynamic "$vlan" >"$tmpf" || exit 1
 
 <"$tmpf" \
 | sed 's/[ 	][ 	]*/ /g' \
-| sort +1 \
+| sort -k 2 \
 > "$tmpf"2
 
 ypcat ethers \
