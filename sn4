@@ -1,2 +1,2 @@
 #!/bin/sh
-exec sort -n +4 ${1+"$@"}
+exec sort -n -k 5 ${1+"$@"}
