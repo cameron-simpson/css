@@ -9,7 +9,7 @@
 lopt=
 dfopts=
 typed=
-sortcol=+3
+sortcol='-k 4'
 case $OS in
     solaris)	lopt=-l ;;
     linux)	dfopts=-TP lopt='-x nfs' ;;
