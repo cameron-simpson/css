@@ -163,7 +163,7 @@ echo "<UL>"
     | sed 's/^\([^ ]*\)  *[^ ]*/\1 HREF/'
   fi
 } \
-| sort +2 \
+| sort -k 3 \
 | while read podfile author title
   do
     if [ "x$author" = xHREF ]
