@@ -1,0 +1,8 @@
+#!/bin/sh -u
+sym=`readsymlink "$HOME/.mozilla/firefox/subdir/lock"` || exit 1
+[ -n "$sym" ] || exit 1
+pid=`expr "x$sym" : 'x.*+\([1-9][0-9]*\)$'` || exit 1
+[ -n "$pid" ] || exit 1
+kill -0 "$pid" || exit 1
+ps af|awk "\$1 == $pid {print}"
+ask "Kill $pid" && kill "$pid"
