@@ -4,24 +4,21 @@
 #	- Cameron Simpson <cs@zip.com.au> 10nov2005
 #
 
+exec </dev/null 3>&1 1>&2
+
+[ -n "$DISPLAY" ] || { echo "$0: no $DISPLAY, aborting" >&2; exit 1; }
+
 : ${LOGDIR:=$HOME/var/log}
 : ${ALERTLOG:=$LOGDIR/alert}
-: ${RXVT_SOCKET:=''}
+: ${USER:=`whoami || id -un`}
+: ${HOST:=`hostname | sed 's/\..*//'`}
+: ${RXVT_SOCKET:=/tmp/urxvtd-socket-$USER}
+export RXVT_SOCKET
 
-# socket exists? otherwise we need to make a new one
-{ [ -n "$RXVT_SOCKET" ] && ls -d "$RXVT_SOCKET" >/dev/null 2>&1
-} || RXVT_SOCKET=
+trace=set-x
+lock=urxvtd-$USER-$HOST-$DISPLAY
 
-if [ -z "$RXVT_SOCKET" ]
-then
-  user=`whoami || id -un` || exit 1
-  RXVT_SOCKET=/tmp/urxvtd-socket-$user-$DISPLAY-$$
-  export RXVT_SOCKET
-  rm -f "$RXVT_SOCKET"
-  ( set -x
-    exec urxvtd -f -o </dev/null >/dev/null 2>>"$ALERTLOG"
-  ) || exit 1
-fi
+$trace bgproc -l procmail -p "$lock" -- lock -1 "$lock" urxvtd -q 3>&-
 
-[ $# = 0 ] && exec echo "$RXVT_SOCKET"
-exec "$@"
+exec >&3 3>&-
+echo "$RXVT_SOCKET"
