@@ -5,9 +5,11 @@ import dircache
 import string
 import re
 import mailbox
+from pysqlite2 import dbapi2 as sqlite
 import cs.env
 import cs.sh
 from cs.misc import chomp
+
 
 numericRe=re.compile('^(0|[1-9][0-9]*)$')
 scalarFieldNameRe=re.compile('^[a-z][a-z0-9_]*$')
