@@ -20,7 +20,8 @@
 : ${TERMSHADE:=''}
 : ${TERMTINT:=''}
 : ${TERMOPTIONS:=''}
-: ${RXVT_SOCKET:=''}
+: ${RXVT_SOCKET:=/tmp/urxvtd-socket-$USER}
+export RXVT_SOCKET
 
 cmd=$0
 usage="Usage: $cmd [-v] [-w width] [-h height] [-x x-pos] [-y y-pos]
