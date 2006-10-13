@@ -26,7 +26,7 @@ fi
 [ -n "$menuname" ] && exec fvwm-menu -1 -t "$menuname" "$menuname" "$0" -o "$op"
 
 desktop \
-| sort +1 \
+| sort -k 2 \
 | awk '{ desks++
 	 if ($1 >=1 && $1 <= 12)
 	   print "\"" $2 "\tF" $1 "\" '"$op"' 0 " $1
