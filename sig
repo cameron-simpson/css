@@ -1,6 +1,6 @@
-#!/bin/sh
+#!/bin/sh -u
 
-SIGNATURE=${SIGNATURE:-$HOME/.signature}
+: ${SIGNATURE:=$HOME/rc/mail/signature@$SYSTEMID}
 
 cat "$SIGNATURE"
 echo
