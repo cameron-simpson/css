@@ -2,7 +2,7 @@
 #
 # Read a titled listing (such as from ps) from stdin and sort on the named
 # columns. Functions by translating column names into sort(1) arguments and
-# passing the header line through direct.
+# passing the header line through directly.
 #	- Cameron Simpson <cs@zip.com.au> 28sep2000
 #
 
@@ -46,72 +46,14 @@ my @args;
     { last ARGV;
     }
     elsif ($arg =~ /^\+/)
-    # handle +pos1 [-pos2]
-    { my $pos1 = $';
-      
-      if ($pos1 !~ /^\d+$/)
-      { $ndx = ndx($pos1);
-	if (defined $ndx)
-	{ $arg="+$ndx";
-	}
-	else
-	{ warn "$::cmd: unknown column heading \"$pos1\"\n";
-	  $badopts=1;
-	}
-      }
-
-      if (@ARGV && $ARGV[0] =~ /^-/ && defined($ndx=ndx($')))
-      { push(@args,$arg);
-	$arg="-$ndx";
-	shift(@ARGV);
-      }
-    }
-    elsif ($arg eq '-k')
-    # handle POSIX -k pos1[,pos2]
-    { push(@args,$arg);
-      $arg=shift(@ARGV);
-      if (! defined $arg)
-      { warn "$::cmd: missing argument for -k\n";
-	$badopts=1;
-	last ARGV;
-      }
-
-      my($pos1,$pos2);
-      if ($arg =~ /,/)
-      { $pos1=$`; $pos2=$';
-      }
-      else
-      { $pos1=$arg;
-      }
-
-      if ($pos1 !~ /^\d+$/)
-      {}
-      elsif (! defined ($ndx=ndx($pos1)))
-      { warn "$::cmd: -k $pos1: unknown column name \"$pos1\"\n";
-	$badopts=1;
-      }
-      else
-      { $pos1=$ndx;
-      }
-
-      if (! defined $pos2 || $pos2 !~ /^\d+$/)
-      {}
-      elsif (! defined ($ndx=ndx($pos2)))
-      { warn "$::cmd: -k $pos1,$pos2: unknown column name \"$pos2\"\n";
-	$badopts=1;
-      }
-      else
-      { $pos2=$ndx;
-      }
-
-      $arg=$pos1;
-      $arg.=",$pos2" if defined $pos2;
+    # handle +pos1
+    { my $pos = $';
+      if (defined($ndx=ndx($pos))) { $pos=$ndx; }
+      push(@args,'-k',$pos+1);
     }
     elsif ($arg =~ /^[^-]/ && defined ($ndx=ndx($arg)))
-    { $arg="+$ndx";
+    { push(@args,'-k',$ndx+1);
     }
-
-    push(@args,$arg);
   }
 }
 
