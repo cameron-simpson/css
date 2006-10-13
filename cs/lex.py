@@ -8,10 +8,14 @@ def isint(s):
   return m is not None and m.group() == s
 
 def skipwhite(s,start=0):
-  """ location of next nonwhite in string """
+  ''' Returns the location of next nonwhite in string.
+  '''
   while start < len(s) and s[start] in string.whitespace:
     start+=1
   return start
+
+def strlist(ary,sep=", "):
+  return string.join([str(a) for a in ary],sep)
 
 def lastlinelen(s):
   """ length of text after last newline in string
