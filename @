@@ -5,7 +5,6 @@
 #
 
 : ${RTERM_SSHOPTS:=''}
-: ${TERM:=vt100}
 : ${DISPLAY:=''}
 
 cmd=`basename "$0"`
@@ -16,8 +15,6 @@ usage="Usage: $cmd [login@]host[,[login@host]...] [-v] [-n name] [-o opt] {-A | 
 	-1	Use ssh protocol 1.
 	-2	Use ssh protocol 2.
 	-m msg	Log session with the supplied message.
-	-T term	Remote terminal name to use.
-		Default from \$TERM: $TERM
 	-x	Ssh option: X11 forwarding off.
 	-X	Ssh option: X11 forwarding on. NB: Turns on ForwardX11Trusted.
 	-n name	Name for window and remote screen session."
@@ -62,7 +59,6 @@ do  case $1 in
 	-m)	msg=$2; shift; nomsgopt=; doscript=1 ;;
 	-n)	name=$2; shift ;;
 	-v)	sshopts="$sshopts -v" verbose=1 ;;
-	-T)	TERM=$2; shift ;;
 	-[XY])	sshx11opt=$1 ;;
 	+X)	sshx11opt=forwardx11=no ;;
 	-[12])sshopts="$sshopts $1" ;;
@@ -129,21 +125,6 @@ do
 
     # no command? just run the preferred shell
     [ $# = 0 ] && set -- sh -c '[ -s /opt/css/env.sh ] && . /opt/css/env.sh; exec $SHELL'
-
-    if [ $doscreen ]
-    then
-    case "$TERM" in
-    rxvt*)
-      oTERM=$TERM
-      TERM=vt100
-      export TERM
-      echo "$cmd: warning: changing TERM from \"$oTERM\" to \"$TERM\" for screen" >&2
-      ;;
-    esac
-    fi
-
-    # pass envvars
-    set -- env "TERM=$TERM" "$@"
 
     [ $doscreen ] && set -- scr -e "$@"
     qcmd=exec\ `shqstr "$@"`
