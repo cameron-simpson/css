@@ -1,5 +1,8 @@
 ## :include	dir2html
 
+target  = bin
+PREFIX  = /opt/css
+
 JAVADIR	= $(ETCDIR)/www/java/classes
 java	= $(localjava) $(subjava)
 localjava= $('*.java' G)
@@ -14,7 +17,7 @@ pmsets	= cs
 pmset(set) = $('$(set)/*.pm' EG?) \
 	     $('$(set)/*/*.pm' EG?) \
 	     $('$(set)/*/*/*.pm' EG?)
-pmsetmans(set) = $(MANDIR)/$(set)/man3/$(('$(pmset($(set)))' EP s:|/|::|)).3
+pmsetmans(set) = $(MANDIR)/man3/$(('$(pmset($(set)))' EP s:|/|::|)).3
 pmsethtml(set) = $(htmandir)/$(('$(pmset($(set)))' EP s:|/|::|)).3.html
 pmmans = $('$$(pmsetmans($((pmsets))))' EE)
 pmhtml = $('$$(pmsethtml($((pmsets))))' EE)
@@ -24,7 +27,7 @@ pmFromHtml(html) = $(html FPP s:|::|/|).pm
 subdirs = $('*/.' GD)
 allscripts = $('*' G !/\./ - subdirs - "0README.txt" - "1INDEX.txt" - "INSTALL" + "synonyms" + "rc.mobile")
 
-scriptmandir = $(MANDIR)/cs/man1
+scriptmandir = $(MANDIR)/man1
 scriptmans = $(scriptmandir)/$((allscripts)).1
 scriptfromman(manf) = $(manf FP)
 
