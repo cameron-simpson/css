@@ -20,7 +20,7 @@ badopts=
 diff=diff
 arg1opts=
 
-while :
+while [ $# -gt 0 ]
 do
   case "$1" in
     -v)	silent= ;;
