@@ -1,0 +1,5 @@
+#!/bin/sh -u
+
+for id
+do  g ":$id:" /etc/passwd /etc/group
+done
