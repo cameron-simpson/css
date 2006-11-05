@@ -1,0 +1,52 @@
+#!/bin/sh -u
+#
+# Recompress a gzipped file with the specified options.
+# Written originally to recompress files with -n, so that
+# identical content creates identical compressed files.
+#       - Cameron Simpson <cs@zip.com.au> 05nov2006
+#
+
+cmd=`basename "$0"` || exit 1
+usage="Usage: $cmd [gzip-options] gzipfiles..."
+
+badopts=
+
+trace=set-x
+
+gzopts=
+
+while [ $# -gt 0 ]
+do
+  case "$1" in
+    -[nv1-9])
+        gzopts="$gzopts $1" ;;
+    --) shift; break ;;
+    -?*)echo "$cmd: unrecognised option: $1" >&2
+        badopts=1
+        ;;
+    *)  break ;;
+  esac
+  shift
+done
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+xit=0
+
+for gzf
+do
+  case "$gzf" in
+    *.gz)
+      f=`basename "$gzf" .gz` || { xit=1; continue; }
+      ;;
+    *)echo "$cmd: $gzf: no .gz, skipping" >&2
+      xit=1
+      continue
+      ;;
+  esac
+
+  $trace gunzip "$gzf" || { xit=1; continue; }
+  $trace gzip $gzopts "$f" || xit=1
+done
+
+exit $xit
