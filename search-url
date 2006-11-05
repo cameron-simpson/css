@@ -92,7 +92,7 @@ case `echo "$engine" | tr '[a-z]' '[A-Z]'` in
   MOVIECHARMALE)url=http://us.imdb.com/Character?char=$query\&gender=male\&submit4.x=1\&submit4.y=1 ;;
   MUSICMATCH)	url=http://www.mmguide.musicmatch.com/search/nm.cgi?rightere=$query ;;
   NETSCAPE)	url=http://www10.netscape.com/search-bin?NS-search-page=results\&NS-query-pat=/text/NS-advquery.pat\&NS-tocstart-pat',='/text/HTML-advquery-tocstart.pat\&NS-search-type=NS-boolean-query\&NS-collection=netscape\&NS-sort-by=\&NS-query=$query\&submit=OK\&NS-max-records=$maxhits ;;
-  NORTHERNLIGHT)	url=http://www.NorthernLight.com/nlquery.fcg?dx=1004\&qr=$query\&qt=\&pu=\&qu=\&si=\&la=All\&qc=All\&d1=\&d2=\&rv=1\&search.x=10\&search.y=10'
+  NORTHERNLIGHT) url=http://www.NorthernLight.com/nlquery.fcg?dx=1004\&qr=$query\&qt=\&pu=\&qu=\&si=\&la=All\&qc=All\&d1=\&d2=\&rv=1\&search.x=10\&search.y=10 ;;
   ODP)	url=http://search.dmoz.org/cgi-bin/osearch?search=$query\&cat=\&t=b\&fb=0\&fo=0\&all=no ;;
   OLDDEJANEWS)	url=http://xp7.dejanews.com/dnquery.xp?query=$query\&defaultOp=OR\&svcclass=dncurrent\&maxhits=$maxhits\&format=verbose\&threaded=1\&showsort=score\&agesign=1\&ageweight=1 ;;
   ONELOOK)	url=http://www.onelook.com/?w=$query\&ls=b ;;
@@ -101,9 +101,10 @@ case `echo "$engine" | tr '[a-z]' '[A-Z]'` in
   PBONE)	url=http://rpm.pbone.net/index.php3?stat=3\&search=$query ;;
   PGPKEY)	url=http://wwwkeys.pgp.net:11371/pks/lookup?op=index\&search=$query ;;
   PLANETMIRROR) url=http://www.planetmirror.com/cgi-bin/SearchArchive.pl?query=$query\&maxlines=$maxhits\&indexdir=%2Fserver%2Fwww%2Fhtdocs%2Fglimpse%2F7%2Findex\&Go.x=22\&Go.y=12 ;;
+  RETREVO)      url=http://www.retrevo.com/search?q=$query\&rt=oa\&tab=1 ;;
   RFCCONNECTED)	url=http://www.freesoft.org/Connected/cgi-bin/search.cgi?SEARCH_STRING=$query\&BASE_URL=/Connected/RFC/index.html\&DEPTH=0\&TYPE=REGEX\&CASE_INDEPENDANT=1\&WHOLE_WORD=0 ;;
   RFCNEXOR)	url=http://web.nexor.co.uk/public/rfc/index/cgi-bin/search/form?query=$query\&regexp=on\&titlefield=on\&abstractfield'=>'on\&authorfield=on\&site=Australia ;;
-  ROGET)	url=http://www.thesaurus.com/roget.ihnd?KEYWORDS=$query\&HEADER='roget-english-frames-head\&FOOTER=roget-english-frames-foot\&INDEX=roget.idx\&LANGUAGE=roget-english-frames\&MAXHITS=$maxhits ;;
+  ROGET)	url=http://www.thesaurus.com/roget.ihnd?KEYWORDS=$query\&HEADER=roget-english-frames-head\&FOOTER=roget-english-frames-foot\&INDEX=roget.idx\&LANGUAGE=roget-english-frames\&MAXHITS=$maxhits ;;
   SANITY)	url=http://www.sanity.com.au/search/search.asp?column=description\&fmt=CD\&SValue=$query\&sort=Released+Desc\&NumPerPage=100 ;;
   SCOUR)	url=http://www.scour.com/Search/Search.phtml?query=$query\&index=image\&protocol=all\&x=14\&y=2 ;;
   SOFCOMTV)	url=http://www.sofcom.com.au/cgi-bin/TV/Search.cgi?state=Sydney\&fta=1\&fox=1\&opt=1\&type=keyword\&term=$query\&searchtype=All ;;
