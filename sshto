@@ -14,8 +14,10 @@ lsshopts=
 mycfg=$HOME/.ssh/config
 [ -s "$mycfg" -a -r "$mycfg" ] && lsshopts="$lsshopts -F \"\$mycfg\""
 topt=
+fopt=
 presh=
 env_presh=': set -vx
+          exec 3<&0 4>&1 </dev/null >&2
 	  [ -s /etc/profile ] && . /etc/profile
           [ -s $HOME/.profile ] && . $HOME/.profile
 	  wSHELL=
@@ -31,6 +33,7 @@ env_presh=': set -vx
 	  [ -n "$wSHELL" ] && SHELL=$wSHELL
 	  export SHELL
 	  [ -s /opt/css/env.sh ] && . /opt/css/env.sh
+          exec <&3 3<&- >&4 4>&-
 	 '
 
 cmd=`basename "$0"` || cmd=$0
@@ -53,8 +56,9 @@ do
   case $1 in
     -t)	topt=-t ;;
     +t)	topt= ;;
+    -f) fopt=-f ;;
     -E)	presh=$env_presh ;;
-    -[aAfgknNqsTvxXYC1246])
+    -[aAgknNqsTvxXYC1246])
 	sshopts="$sshopts $1"
 	;;
     -[bceiIlmopFLRD])
@@ -113,4 +117,4 @@ do
 done
 
 ##set -x
-eval "exec $trace ssh $lsshopts $sshargv $host \"\$sshcmd\""
+eval "exec $trace ssh $fopt $lsshopts $sshargv $host \"\$sshcmd\""
