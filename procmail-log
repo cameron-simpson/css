@@ -1,0 +1,33 @@
+#!/bin/sh -u
+#
+# Recite procmail log in one-line form.
+#       - Cameron Simpson <cs@zip.com.au> 05nov2006
+#
+
+cmd=`basename "$0"` || exit 1
+usage="Usage: $cmd logfile"
+
+logfile=$1; shift
+
+subject=
+
+tail -f "$logfile" \
+| sed -e '
+    y/	/ /
+    /^ Subject: */{
+      s/^ Subject: *//
+      h
+      d
+    }
+    /^  Folder: */{
+      s/^  Folder: *//
+      /^\/dev\/null /d
+      G
+      s/\n/ /
+      s/   */ /g
+      p
+      d
+    }
+    w /dev/fd/2
+    d
+  '
