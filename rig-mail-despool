@@ -7,11 +7,8 @@ delay=5
 
 ## OBSOLETE ## bgproc -l procmail -p mail-despam -- set-x lock -1 "$MAILDIR/spool" mail-despam -d "$delay" -l "$lock" +spool +spool-in
 
-for spool in spool spool-in spool-out spool-xref
+for spool in spool spool-in spool-out spool-xref ham spam-definite
 do
   maildir=$MAILDIR/$spool
   bgproc -l procmail -p "mail-$spool" -- set-x lock -1 "$maildir" mail-despool -d "$delay" "$maildir"
 done
-
-# hand everything that lands in spool-spam to procspam
-bgproc -l procmail -p mail-enspam -- set-x lock -1 "$MAILDIR/spool-spam" mail-despool -d "$delay" "$MAILDIR/spool-spam" procspam
