@@ -22,6 +22,8 @@ do
   case "$1" in
     -[nv1-9])
         gzopts="$gzopts $1" ;;
+    --fast|--best)
+        gzopts="$gzopts $1" ;;
     --) shift; break ;;
     -?*)echo "$cmd: unrecognised option: $1" >&2
         badopts=1
@@ -34,6 +36,8 @@ done
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
 xit=0
+
+trap 'exit 1' 1 2 13 15
 
 for gzf
 do
