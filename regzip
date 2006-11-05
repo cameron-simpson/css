@@ -14,6 +14,8 @@ badopts=
 trace=set-x
 
 gzopts=
+trace=
+[ -t 2 ] && { gzopts=-v trace=set-x; }
 
 while [ $# -gt 0 ]
 do
@@ -37,7 +39,8 @@ for gzf
 do
   case "$gzf" in
     *.gz)
-      f=`basename "$gzf" .gz` || { xit=1; continue; }
+      d=`dirname "$gzf"`      || { xit=1; continue; }
+      f=$d/`basename "$gzf" .gz` || { xit=1; continue; }
       ;;
     *)echo "$cmd: $gzf: no .gz, skipping" >&2
       xit=1
