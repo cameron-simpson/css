@@ -6,14 +6,15 @@
 
 : ${MAILDIR:=$HOME/mail}
 
-trace=set-x
+trace=  ##set-x
 fmt=+%Y
 archivedir=
 
 cmd=`basename "$0"` || cmd=$0
 usage="Usage: $cmd [-d maildir] [-A archivedir] [+fmt] days [folders...]
-    -d maildir	Mail folder parent directory, default from \$MAILDIR: $MAILDIR
     -A archivedir Archive directory. Default: maildir/ARCHIVE
+    -d maildir	Mail folder parent directory, default from \$MAILDIR: $MAILDIR
+    -x          Trace subcommands.
     +fmt	Archive date folder in strftime(3) output format. Default: $fmt
     days	Minimum age in days of items to archive.
     folders	Specific folders to archive. Default: [a-z]*"
@@ -24,8 +25,9 @@ while [ $# -gt 0 ]
 do
   case "$1" in
     +?*)	fmt=$1 ;;
-    -d)		MAILDIR=$2; shift ;;
     -A)		archivedir=$2; shift ;;
+    -d)		MAILDIR=$2; shift ;;
+    -x)         trace=set-x ;;
     --)		shift; break ;;
     -?*)	echo "$cmd: unrecognised option: $1" >&2
     		badopts=1
