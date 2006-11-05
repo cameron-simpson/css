@@ -8,6 +8,7 @@ xit=0
 
 for maildir
 do
+  ismaildir "$maildir" || { xit=1; continue; }
   {  { [ ! -d "$maildir/tmp" ] || rmdir "$maildir/tmp"; } \
   && { [ ! -d "$maildir/new" ] || rmdir "$maildir/new"; } \
   && { [ ! -d "$maildir/cur" ] || rmdir "$maildir/cur"; } \
