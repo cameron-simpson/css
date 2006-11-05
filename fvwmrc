@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/sh -u
 #
 # Emit my FVWM RC file.
 #	- Cameron Simpson <cs@zip.com.au> 19aug2002
@@ -22,10 +22,25 @@ esac
 export fvwm_Transparent fvwm_RootTransparent fvwm_ParentalRelativity fvwm_OpaqueMoveSize
 
 (
-  uncurly $HOME/rc/x11/fvwm/rc-curly
+  (
+    cd $HOME/rc/x11/fvwm || exit 1
+    cat rc-curly
+    for menu in `ls menus`
+    do
+      menuf=menus/$menu
+      titlef=menus/.title.$menu
+
+      title=$menu
+      [ -s "$titlef" ] && { title=`cat "$titlef"` || title=$menu; }
+
+      echo "NewMenu $menu \"$title\""
+      sed "s/^/AddToMenu $menu /" "$menuf"
+    done
+    echo END MENUS HERE
+  ) | uncurly
   desktop-incant -
   desktop-incant-names -
   fvwm-deskkeys
   echo SwitchToDesk 1
 ) \
-| tee $HOME/tmp/fv.rc-$HOST-$DISPLAY
+| tee $HOME/tmp/fvwmrc-$HOST-$DISPLAY
