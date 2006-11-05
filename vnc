@@ -3,44 +3,48 @@
 # Wrapper for the vnc programs.
 #	- Cameron Simpson <cs@zip.com.au> 26jul1999
 #
+# Recode to act more like the "scr" script.
+#       - Cameron Simpson <cs@zip.com.au> 03nov2006
+#
 
+trace=set-x
 depth=24
-geom=1600x1200	# 1024x768
+geom=1280x1024
 
-usage="Usage: $0 :n [-d] [options...]
-	$0 host:n [options...]
-	$0 n [options...]
+usage="Usage:
+        $0              List local sessions.
+        $0 NAME         Connect to session named NAME,
+                        creating it is necessary.
+        $0 host:        List remote sessions.
+        $0 host:NAME    Connect to remote session named NAME,
+                        creating it is necessary."
+if [ $# = 0 ]
+then
+  # list sessions
+  idset -i vnc -a | sort -n
+  exit $?
+fi
 
-With :n, start a vncserver on the specified number.
-  -d	d is a number indicating depth, default $depth.
-With host:n, run a vncviewer of host:n.
-With just n, run a vncviewer of localhost:n."
+[ $# = 1 ] || { echo "$usage" >&2; exit 2; }
 
-vncspec=
-
-case $1 in
-    :[0-9]*)
-	vncnum=$1; shift
-	case $1 in
-	    -[0-9])	depth=`expr "x$1" : 'x-\(.*\)'`; shift ;;
-	esac
-	echo "starting server on $HOST$vncnum, depth $depth ..."
-	logf=$HOME/.vnc/$HOSTNAME$vncnum.log
-	[ -f "$logf" ] && mv "$logf" "$logf-`daycode`.$$"
-	exec set-x vncserver "$vncnum" -depth "$depth" -geometry "$geom" ${1+"$@"}
-	;;
-    lo:[0-9]*)
-	vncdisp=localhost:`expr "$1" : 'lo:\(.*\)'`; shift ;;
-    *:[0-9]*)
-	vncdisp=$1; shift
-	;;
-    [0-9]*)
-	vncdisp=localhost:$1; shift
-	;;
-    *)	echo "$usage" >&2
-	exit 2
-	;;
+case "$1" in
+  *:)   remote=`expr "x$1" : 'x\(.*\):'` || exit 1
+        exec envssh "$remote" vnc
+        ;;
+  *:?*) remote=`expr "x$1" : 'x\(.*\):..*'` || exit 1
+        name=`expr "x$1" : 'x.*:\(..*\)'` || exit 1
+        exec envssh +t -f -n -Y "$remote" vnc "$name"
+        ;;
 esac
 
-set -x
-ignhup vncviewer -passwd $HOME/.vnc/passwd -shared ${1+"$@"} "$vncdisp" &
+name=$1; shift
+
+id=`idset -i vnc "$name"` || exit 1
+pid=`idset -i vnc "$name" pid` || exit 1
+if [ -z "$pid" ] || not kill -0 "$pid" 2>/dev/null
+then
+  $trace vncserver ":$id" -name "$name" -geometry "$geom" -depth "$depth" &
+  idset -i vnc "$name" pid "$!" || exit 1
+fi
+
+exec $trace vncviewer ":$id"
