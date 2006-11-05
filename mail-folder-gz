@@ -1,0 +1,52 @@
+#!/bin/sh -u
+#
+# Convert a maildir into a compressed mbox file.
+# Intended for archived email.
+#       - Cameron Simpson <cs@zip.com.au> 04nov2006
+#
+
+: ${TMPDIR:=$HOME/tmp}
+
+trace=set-x
+
+cmd=`basename "$0"` || exit 1
+usage="Usage: $cmd maildirs..."
+
+[ $# = 0 ] && { echo "$usage" >&2; exit 2; }
+
+xit=0
+
+for omaildir
+do
+  obase=`basename "$omaildir"` || exit 1
+  odir=`dirname "$omaildir"`   || exit 1
+  mbox=$odir/$obase
+  tmpmaildir=$odir/$obase-$cmd$$
+  tmpmbox=$TMPDIR/$obase-$cmd$$.mbox
+
+  ismaildir "$omaildir" \
+  || { echo "$cmd: $omaildir: not a maildir" >&2
+       xit=1
+       continue
+     }
+  ismaildir "$tmpmaildir" \
+  && { echo "$cmd: $tmpmaildir: already exists" >&2
+       xit=1
+       continue
+     }
+
+  ##$trace cp -rpl "$omaildir" "$tmpmaildir" || exit 1
+  $trace mv "$omaildir" "$tmpmaildir" || { xit=1; continue; }
+  $trace touch "$tmpmbox" || { xit=1; continue; }
+
+  $trace mutt -F /dev/null \
+              -e "set sort=mailbox-order" \
+              -e "set confirmappend=no" \
+              -e "set confirmcreate=yes" \
+              -e "set delete=yes" \
+              -f "$tmpmaildir" -e "push '<tag-pattern>.<enter><tag-prefix><save-message>$tmpmbox<enter><quit>'"
+  $trace rm0maildir "$tmpmaildir"
+  $trace gzip -v -9 <"$tmpmbox" >>"$mbox.gz" || exit 1
+done
+
+exit $xit
