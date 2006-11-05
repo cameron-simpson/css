@@ -6,7 +6,7 @@
 #
 
 cmd=`basename "$0"`
-usage="Usage: $cmd [{-M | -m msg}] [-d logdir] {-u | logbase} [{-c shcmd | cmd [args...]}]"
+usage="Usage: $cmd [{-M | -m msg}] [-d logdir] {logbase | -u} [{-c shcmd | cmd [args...]}]"
 
 : ${LOGDIR:=$HOME/var/log}
 : ${SHELL:=/bin/sh}
