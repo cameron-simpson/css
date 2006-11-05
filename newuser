@@ -1,0 +1,22 @@
+#!/bin/sh -u
+#
+# Linuxish create a new user and group with specified id.
+#       - Cameron Simpson <cs@zip.com.au> 29oct2006
+#
+
+cmd=`basename "$0"` || exit 1
+usage="Usage: $cmd uid login"
+
+[ $# = 2 ] || { echo "$usage" >&2; exit 2; }
+id=$1 name=$2
+
+check=`fgrep ":$id:" /etc/passwd /etc/group`
+echo "$check"
+[ -z "$check" ] || exit 1
+
+check2=`grep "^$name:" /etc/passwd /etc/group`
+echo "$check2"
+[ -z "$check2" ] || exit 1
+
+set -x
+groupadd -g "$id" "$name" && adduser -g "$name" -u "$id" -s /bin/false "$name"
