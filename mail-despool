@@ -10,7 +10,7 @@
 cmd=`basename "$0"` || cmd=$0
 usage="Usage: $cmd [-d delay] [-f procmailrc] maildir [filer [args...]]"
 
-trace=set-x
+trace=  ##set-x
 delay=
 procmailrc=
 
