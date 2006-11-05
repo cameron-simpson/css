@@ -20,7 +20,7 @@ do
 
   eval "`syncenv $mypid`"
   : ${GM_LOGFILE:=$LOGDIR/getmail}
-  : ${GM_DELAY:=300}
+  : ${GM_DELAY:=30}
   ( if [ "x$GM_DELAY" = x0 ]
     then  set -- pause
     else  set -- sleep "$GM_DELAY"
