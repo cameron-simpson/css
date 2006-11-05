@@ -1,0 +1,52 @@
+#!/bin/sh -u
+#
+# Contruct a mairixrc(5) file.
+#	- Cameron Simpson <cs@zip.com.au> 02aug2006
+#
+
+: ${MAILDIR:=$HOME/mail}
+: ${MAIRIXRC_EXCLUDE_PATTERNS:='spam:spam-*:spool:spool-*:junk:pics*'}
+
+cmd=`basename "$0"` || cmd=$0
+usage="Usage: $cmd [-d maildir] [-e exclude]
+    -d maildir	The mail folder directory.
+    		Default from \$MAILDIR: $MAILDIR
+    -e exclude	Folder names to exclude.
+    		Default from \$MAIRIXRC_EXCLUDE_PATTERNS: $MAIRIXRC_EXCLUDE_PATTERNS"
+
+badopts=
+
+while [ $# -gt 0 ]
+do
+  case "$1" in
+    -d)	MAILDIR=$2; shift ;;
+    -e)	MAIRIXRC_EXCLUDE_PATTERNS=$2; shift ;;
+    --)	shift; break ;;
+    -?*)echo "$cmd: unrecognised option: $1" >&2
+    	badopts=1
+	;;
+    *)	break ;;
+  esac
+  shift
+done
+
+[ -d "$MAILDIR/." ] || { echo "$cmd: maildir not a directory: $MAILDIR" >&2
+			 badopts=1
+		       }
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+case "$MAILDIR" in
+  /*)	absmaildir=$MAILDIR ;;
+  *)	absmaildir=`pwd`/$MAILDIR || exit 1 ;;
+esac
+
+cat <<X
+base=$absmaildir
+maildir=[a-z]*
+mbox=*.gz
+omit=$MAIRIXRC_EXCLUDE_PATTERNS
+mfolder=~/tmp/mairix-result
+mformat=maildir
+database=$absmaildir/.mairix.db
+X
