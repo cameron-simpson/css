@@ -1,0 +1,18 @@
+#!/usr/bin/perl
+#
+# Translate Perl POD format into Wiki format (specificly that of MediaWiki).
+#       - Cameron Simpson <cs@zip.com.au> 01nov2006
+#
+
+use cs::PodWiki;
+
+$parser = new cs::PodWiki();
+if (@ARGV)
+{
+  for (@ARGV)
+  { $parser->parse_from_file($_); }
+}
+else
+{ $parser->parse_from_filehandle(\*STDIN);
+}
+
