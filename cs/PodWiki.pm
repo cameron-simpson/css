@@ -42,6 +42,15 @@ sub dotag
     }
     $pod.="[$href $ipod]";
   }
+  elsif (grep($otag eq $_, HTML, HEAD, BODY, TITLE))
+  { $pod=$ipod;
+  }
+  elsif ($otag eq 'HR')
+  {  $pod.="\n----\n";
+  }
+  elsif ($otag eq 'BR')
+  {  $pod.="<$otag>";
+  }
   elsif ($otag eq 'P')
   {  $pod.="\n\n$ipod";
   }
@@ -51,10 +60,25 @@ sub dotag
   elsif ($otag eq 'EM')
   { $pod.="''$ipod''";
   }
+  elsif ($otag eq 'TT' || $otag eq 'BLOCKQUOTE')
+  { $pod.="<$otag>$ipod</$otag>";
+  }
   elsif ($otag eq 'UL') { $listpfx=pop(@listpfx); }
   elsif ($otag eq 'OL') { $listpfx=pop(@listpfx); }
   elsif ($otag eq 'LI')
   { $pod.="\n$listpfx$ipod\n";
+  }
+  elsif ($otag eq 'TABLE')
+  { $pod.="\n{|\n$ipod|}\n";
+  }
+  elsif ($otag eq 'TH')
+  { $pod.="|+$ipod\n";
+  }
+  elsif ($otag eq 'TR')
+  { $pod.="|-$ipod\n";
+  }
+  elsif ($otag eq 'TD')
+  { $pod.="| $ipod\n";
   }
   else
   { die "unhandled tag <$otag>" unless grep($_ eq $otag, I, B);
@@ -93,8 +117,7 @@ sub html2wiki
       next HTML;
     }
 
-    if (substr($_,4) eq '<!--') { warn "[$_]"; }
-    if (/^<\s*\!--.*-->/)
+    if (/^<\s*!--.*-->/s)
     { $_=$';
       next HTML;
     }
@@ -127,15 +150,20 @@ sub html2wiki
     $_=$';
 
     if (!$closing)
-    { push(@tags,[$tag,$attrs]);
-      push(@pod,$pod); $pod="";
+    {
+      if (grep($tag == $_, BR, HR))
+      { dotag($tag,$attrs,'');
+      }
+      else
+      { push(@tags,[$tag,$attrs]);
+        push(@pod,$pod); $pod="";
 
-      if ($tag eq 'UL') { push(@listpfx,$listpfx); $listpfx.="*"; }
-      elsif ($tag eq 'OL') { push(@listpfx,$listpfx); $listpfx.="#"; }
+        if ($tag eq 'UL') { push(@listpfx,$listpfx); $listpfx.="*"; }
+        elsif ($tag eq 'OL') { push(@listpfx,$listpfx); $listpfx.="#"; }
 
-      next HTML;
+        next HTML;
+      }
     }
-
 
     CLOSE:
     while (@tags)
@@ -164,6 +192,7 @@ $_int_cmd={
         'head1' => sub { head(1,$_[0]) },
         'head2' => sub { head(2,$_[0]) },
         'head3' => sub { head(3,$_[0]) },
+        'head4' => sub { head(4,$_[0]) },
         'image' => sub { "[[Image:$_[0]]]" },
         'over'  => sub { $_last_head++;
                          "";
@@ -228,6 +257,15 @@ $_int_code={
         'C'     => sub { "<TT>$_[0]</TT>" },
         'F'     => sub { "<TT>$_[0]</TT>" },
         'I'     => sub { "<I>$_[0]</I>" },
+        'E'     => sub { if ($_[0] eq 'gt') { return ">"; }
+                         if ($_[0] eq 'lt') { return "<"; }
+                         die "unsupported INTERIOR_SEQUENCE E<$_[0]>";
+                       },
+        'L'     => sub { $_[0] =~ /|/
+                         ? "[[$'|$`]]"
+                         : "[[$_[0]]]"
+                         ;
+                       },
            };
 
 sub interior_sequence {
