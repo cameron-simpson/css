@@ -69,7 +69,7 @@ fi
 
 if [ $new ]
 then
-  [ -n "$reffile" ] && touch "$reffile"
+  [ -n "$reffile" ] && touch "$reffile" 2>/dev/null
   cat $envfiles
   echo "PATH='$PATH'; export PATH"	# just in case
 fi
