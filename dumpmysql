@@ -72,7 +72,7 @@ fi \
     squiz=$dbname.sql.gz
     rm -f "$squiz"
     $trace mysqldump -h "$host" "-u$user" "-p$password" --opt "$dbname" \
-    | gzip --fast >"$squiz"
+    | gzip -n --fast >"$squiz"
   done
 
 [ $dohistbackup ] && $trace mklinks -newer ..
