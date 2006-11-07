@@ -6,6 +6,9 @@
 #	- Cameron Simpson, January 1992
 #
 
+: ${DISPLAY:=''}
+: ${PREFTERM:=xterm}
+
 if [ -f /usr/bin/opiesu ]
 then realsu=/usr/bin/opiesu
 else if [ -f /usr/bin/su ]
@@ -27,7 +30,7 @@ badopts=
 login=
 su=root
 suargs=
-while :
+while [ $# -gt 0 ]
 do  case $1 in
       -)	login=- ;;
       -a)	suargs="-a $2"; shift ;;
@@ -73,7 +76,8 @@ DISPLAY=$DISPLAY
 PREFTERM=$PREFTERM
 PERL5LIB=$HOME/rc/perl:$PERL5LIB:/opt/perl/lib
 SCREENDIR=/tmp/screen-\$USER
-export USER EMAIL DISPLAY PERL5LIB SCREENDIR
+TMPDIR=/tmp
+export USER EMAIL DISPLAY PERL5LIB SCREENDIR TMPDIR
 [ -n "\$DISPLAY" ] || unset DISPLAY
 rm -f $tmp $env
 exec term -n '$su@$HOST'
