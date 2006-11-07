@@ -1,0 +1,3 @@
+#!/bin/sh
+unset GPG_AGENT_INFO
+exec "$@"
