@@ -31,6 +31,8 @@ sub head
 
 sub dotag
 { my($otag,$oattrs,$ipod,$listpfx)=@_;
+  $ipod =~ s/^\s+//;
+  $ipod =~ s/\s+$//;
   my $pod="";
   if ($otag eq 'A')
   { my $href = $attrs['HREF'];
@@ -45,14 +47,17 @@ sub dotag
   elsif (grep($otag eq $_, HTML, HEAD, BODY, TITLE))
   { $pod=$ipod;
   }
+  elsif ($otag eq 'IMG')
+  { $pod.="[[Image:$oattrs->{SRC}]]";
+  }
   elsif ($otag eq 'HR')
-  {  $pod.="\n----\n";
+  { $pod.="\n----\n";
   }
   elsif ($otag eq 'BR')
-  {  $pod.="<$otag>";
+  { $pod.="<$otag>";
   }
   elsif ($otag eq 'P')
-  {  $pod.="\n\n$ipod";
+  { $pod.="\n\n$ipod";
   }
   elsif ($otag =~ /^H(\d+)$/)
   { $pod.=head($1+0,$ipod);
@@ -60,25 +65,34 @@ sub dotag
   elsif ($otag eq 'EM')
   { $pod.="''$ipod''";
   }
-  elsif ($otag eq 'TT' || $otag eq 'BLOCKQUOTE')
+  elsif (grep($otag eq $_, TT, BLOCKQUOTE, PRE, CENTER))
   { $pod.="<$otag>$ipod</$otag>";
   }
   elsif ($otag eq 'UL') { $listpfx=pop(@listpfx); }
   elsif ($otag eq 'OL') { $listpfx=pop(@listpfx); }
+  elsif ($otag eq 'DL') { $listpfx=pop(@listpfx); }
   elsif ($otag eq 'LI')
   { $pod.="\n$listpfx$ipod\n";
   }
-  elsif ($otag eq 'TABLE')
-  { $pod.="\n{|\n$ipod|}\n";
+  elsif ($otag eq 'DT')
+  { $pod.="$listpfx$ipod";
   }
-  elsif ($otag eq 'TH')
-  { $pod.="|+$ipod\n";
+  elsif ($otag eq 'DD')
+  { $pod.="$listpfx : $ipod";
+  }
+  elsif ($otag eq 'TABLE')
+  { $ipod =~ s/\n\n+/\n/g;
+    $pod.="\n{| border=\"1\"\n$ipod\n|}\n";
+  }
+  elsif ($otag eq 'TBODY')
+  {
   }
   elsif ($otag eq 'TR')
-  { $pod.="|-$ipod\n";
+  { $pod.="\n|-\n$ipod\n";
   }
   elsif ($otag eq 'TD')
-  { $pod.="| $ipod\n";
+  { $ipod =~ y/\n/ /;
+    $pod.="\n| $ipod\n";
   }
   else
   { die "unhandled tag <$otag>" unless grep($_ eq $otag, I, B);
@@ -103,6 +117,30 @@ sub html2wiki
   my @pod=();
   my $listpfx="";
   my @listpfx=();
+
+  my $poptag = sub {
+                my($otag,$oattrs,$opod)=@{pop(@tags)};
+                my $ipod = $pod; $pod=$opod;
+                $pod.=dotag($otag,$oattrs,$ipod,$listpfx);
+                return ($otag,$oattrs);
+                   };
+  my $pushtag = sub{
+                push(@tags,[$_[0],$_[1],$pod]);
+                $pod="";
+                   };
+  my $popto  = sub {
+                my($totag)=@_;
+                my($otag,$oattrs);
+                POPTO:
+                while(1)
+                { ($otag,$oattrs)=&$poptag();
+                  if ($otag == $totag)
+                  { last POPTO;
+                  }
+                }
+                return ($otag,$oattrs);
+                   };
+
   HTML:
   while (length)
   { if (/^[^&<]+/)
@@ -130,9 +168,12 @@ sub html2wiki
     if (!/^((\/\s*)?)([^>\s]+)\s*/)
     { die "tag not found inside <...>: \$_=[$_]";
     }
-    my $closing=length($1);
+    my $closing=(length($1) > 0);
     my $tag=uc($3);
     $_=$';
+    if ($tag eq TH)     # we don't honour TH
+    { $tag=TD;
+    }
 
     my $attrs={};
     while (/^([^>=\s]+)(=('[^']*'|"[^"]*"|[^'">]+))?\s*/)
@@ -151,25 +192,61 @@ sub html2wiki
 
     if (!$closing)
     {
-      if (grep($tag == $_, BR, HR))
-      { dotag($tag,$attrs,'');
+      if (grep($tag eq $_, BR, HR))
+      { $pod.=dotag($tag,$attrs,'',$listpfx);
       }
       else
-      { push(@tags,[$tag,$attrs]);
-        push(@pod,$pod); $pod="";
+      {
+        if (grep($tag eq $_, TR, TD))
+        {
+          # locate most recent table tag
+          my $tableT = undef;
+          TAGSTACK:
+          for my $T (reverse @tags)
+          { if (grep($_ eq $T->[0], TABLE, TR, TD))
+            { $tableT=$T;
+              last TAGSTACK;
+            }
+          }
+          my $ttag = (defined($tableT) ? $tableT->[0] : "");
+
+          # insert missing structure, close extra structure
+          if ($tag eq TD)
+          { if ($ttag eq "")
+            { &$pushtag(TABLE,{});
+              &$pushtag(TR,{});
+            }
+            elsif ($ttag eq TD)
+            { &$popto(TD);
+            }
+            elsif ($ttag eq TABLE)
+            { &$pushtag(TR,{});
+            }
+          }
+          elsif ($tag eq TR)
+          { if ($ttag eq "")
+            { &$pushtag(TABLE,{});
+            }
+            elsif ($ttag eq TR || $ttag eq TD)
+            { &$popto(TR);
+            }
+          }
+        }
+
+        push(@tags,[$tag,$attrs,$pod]);
+        $pod="";
 
         if ($tag eq 'UL') { push(@listpfx,$listpfx); $listpfx.="*"; }
         elsif ($tag eq 'OL') { push(@listpfx,$listpfx); $listpfx.="#"; }
-
-        next HTML;
+        elsif ($tag eq 'DL') { push(@listpfx,$listpfx); $listpfx.=";"; }
       }
+
+      next HTML;
     }
 
     CLOSE:
     while (@tags)
-    { my($otag,$oattrs)=@{pop(@tags)};
-      my($ipod)=$pod; $pod=pop(@pod);
-      $pod.=dotag($otag,$oattrs,$ipod);
+    { my($otag,$oattrs)=&$poptag();
       if ($tag eq $otag)
       { last CLOSE;
       }
@@ -178,26 +255,34 @@ sub html2wiki
 
   # flush tag stack
   while (@tags)
-  { my($otag,$oattrs)=@{pop(@tags)};
-    my($ipod)=$pod; $pod=pop(@pod);
-    $pod.=dotag($otag,$oattrs,$ipod);
+  { my($otag,$oattrs)=&$poptag();
   }
 
   return $pod;
 }
 
 @_begin=();
+$_begin="";
 
 $_int_cmd={
         'head1' => sub { head(1,$_[0]) },
         'head2' => sub { head(2,$_[0]) },
         'head3' => sub { head(3,$_[0]) },
         'head4' => sub { head(4,$_[0]) },
-        'image' => sub { "[[Image:$_[0]]]" },
+        'image' => sub { my($im)=@_;
+                         $im =~ s:.*/::;
+                         "\n[[Image:$im]]\n"
+                       },
         'over'  => sub { $_last_head++;
                          "";
                        },
         'item'  => sub { my($type,$etc)=split(/\s+/,$_[0],2);
+                         ##warn "type=[$type] etc=[$etc]";
+                         if ($type ne '*')
+                         { $etc="$type $etc";
+                           $etc =~ s/ +$//;
+                           $type="*";
+                         }
                          return head($_last_head,$etc);
                        },
         'back'  => sub { $_last_head--;
@@ -210,9 +295,11 @@ $_int_cmd={
 
                          "\n<$what> [$etc]\n"
                        },
-        'begin' => sub { push(@_begin,uc($_[0]));
+        'begin' => sub { push(@_begin,$_begin=uc($_[0]));
+                         "";
                        },
-        'end'   => sub { pop(@_begin);
+        'end'   => sub { $_begin=pop(@_begin);
+                         "";
                        },
           };
 
@@ -232,6 +319,16 @@ sub command {
 
 sub verbatim {
   my ($self, $paragraph, $line_num) = @_;
+
+  if (@_begin)
+  { my($mode)=$_begin[$#_begin];
+    if ($mode eq 'HTML')
+    { $self->write(html2wiki($paragraph));
+      return;
+    }
+    die "inside unsupported =begin $mode";
+  }
+
   $self->write("\n", $paragraph);
 }
 
@@ -249,7 +346,7 @@ sub textblock {
 
   $paragraph =~ s/\r?\n/ /g;
   $paragraph =~ s/ +$//;
-  $self->expand("$paragraph\n");
+  $self->expand("\n$paragraph\n");
 }
 
 $_int_code={
@@ -261,10 +358,22 @@ $_int_code={
                          if ($_[0] eq 'lt') { return "<"; }
                          die "unsupported INTERIOR_SEQUENCE E<$_[0]>";
                        },
-        'L'     => sub { $_[0] =~ /|/
-                         ? "[[$'|$`]]"
-                         : "[[$_[0]]]"
-                         ;
+        'L'     => sub { my($link,$text);
+                         if ($_[0] =~ /\|/)
+                         { $link=$';
+                           $text=$`;
+                         }
+                         else
+                         { $link=$_[0];
+                           $text='';
+                         }
+                         if ($link =~ m;^(https?|ftp)://;i)
+                         { return length($text) ? "[$link|$text]" : $link;
+                         }
+
+                         $link =~ s/::/#/;
+
+                         return length($text) ? "[[$link|$text]]" : "[[$link]]";
                        },
            };
 
