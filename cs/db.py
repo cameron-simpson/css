@@ -496,6 +496,9 @@ class KeyedTableView(cs.cache.Cache):
   def selectRow(self,where):
     return exactlyOne(self.selectRows(where))
 
+  def selectRowsByColumn(self,column,value):
+    return self.selectRows(column+" = "+sqlise(value))
+
   class ByColumn(cs.cache.CrossReference):
     def __init__(self,table,column):
       self.table=table
@@ -504,7 +507,7 @@ class KeyedTableView(cs.cache.Cache):
       self.table.addCrossReference(self)
     def key(self,row):
       return row[self.column]
-    def fetch(self,key):
+    def byKey(self,key):
       return self.table.selectRow(self.column+" = "+sqlise(key))
 
   def addColumnIndex(self,column):
