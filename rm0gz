@@ -1,0 +1,35 @@
+#!/bin/sh -u
+#
+# Remove gzip files whose contents are zero length.
+#       - Cameron Simpson <cs@zip.com.au> 07nov2007
+#
+
+: ${TMPDIR:=/tmp}
+
+trace=echo
+
+cmd=`basename "$0"` || exit 1
+
+[ $# -gt 0 ] && [ "x$1" = x-x ] && { trace=set-x; shift; }
+
+tmpf=$TMPDIR/$cmd$$
+
+xit=0
+
+for gz
+do
+  case "$gz" in
+    *.gz)
+      size=`ls -ld -- "$gz" | awk '{print$5}'`
+      [ "x$size" = x20 -o "x$size" = x24 ] || continue
+      gunzip < "$gz" >"$tmpf" || { xit=1; continue; }
+      [ -s "$tmpf" ] && continue
+      $trace rm -- "$gz"      || xit=1
+      ;;
+    *)echo "$cmd: $gz: not a .gz file, skipped" >&2
+      xit=1
+      ;;
+  esac
+done
+
+exit $xit
