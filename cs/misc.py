@@ -72,6 +72,10 @@ def seq():
   _seq+=1
   return _seq
 
+def all(gen):
+  ''' Returns all the values from a generator as an array.
+  '''
+  return [x for x in gen]
 def isodate(when=None):
   if when is None: when=time.localtime()
   return time.strftime("%Y-%m-%d",when)
