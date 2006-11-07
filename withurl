@@ -5,6 +5,7 @@
 #
 
 : ${TMPDIR:=/tmp}
+: ${COOKIE_FILE:="$HOME/.mozilla/firefox/subdir/cookies.txt"}
 
 trace=
 
@@ -77,7 +78,7 @@ fi
 if [ $trustcache ] && [ -f "$saveas" -a -s "$saveas" ]
 then  :
 else
-  set-x wget -q -O "$saveas" "$url" || exit 1
+  set-x wget -q --load-cookies "$COOKIE_FILE" -O "$saveas" "$url" || exit 1
   ##httpget -f -o "$saveas" "$url" || exit 1
 fi
 
