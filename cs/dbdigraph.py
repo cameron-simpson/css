@@ -1,6 +1,6 @@
 import string
 import re
-from cs.misc import cmderr, debug, warn, die, uniq, exactlyOne
+from cs.misc import cmderr, debug, warn, die, uniq, exactlyOne, all
 from cs.hier import flavour
 from cs.db import dosql, SQLQuery, sqlise, today
 from cs.lex import strlist
@@ -35,10 +35,21 @@ class DBDiGraph:
     self.__selectIdsBaseQuery='SELECT DISTINCT(ID) FROM '+self.nodes.name
     self.__soleUser=False
     self.__lastid=None
+    self.__typeMap={}
+    self.__preloaded=False
 
   def preload(self):
     self.nodes.preload()
     self.attrs.preload()
+    map=self.__typeMap
+    for id in self.keys():
+      node=self[id]
+      key=(node.NAME,node.TYPE)
+      if key in map:
+        map[key].append(node)
+      else:
+        map[key]=[node]
+    self.__preloaded=True
 
   def keys(self):
     return self.nodes.keys()
@@ -81,7 +92,7 @@ class DBDiGraph:
       return self.__nodeCache[nodeid]
 
     if type(nodeid) is tuple:
-      return exactlyOne(self.nodesByNameAndType(nodeid[0],*nodeid[1:]), `tuple`)
+      return exactlyOne(self.nodesByNameAndType(nodeid[0],*nodeid[1:]), `nodeid`)
 
     raise IndexError, "invalid index "+`nodeid`
 
@@ -119,6 +130,11 @@ class DBDiGraph:
     return nodesWhere(SQLtestType(*types))
 
   def nodesByNameAndType(self,name,*types):
+    if len(types) == 1:
+      key=(name,types[0])
+      if key in self.__typeMap:
+        return tuple(self.__typeMap[key])
+
     return self.nodesWhere('NAME = '+sqlise(name)+' AND '+SQLtestType(*types))
 
   def _nodeByNameAndType(self,name,*types):
@@ -153,6 +169,8 @@ class DBDiGraphNode:
     self.digraph=digraph
 
   def clone(self,pruneFields=()):
+    ''' Returns a shallow clone of a node.
+    '''
     N={}
     for k in self.keys():
       if k not in pruneFields:
@@ -178,9 +196,11 @@ class DBDiGraphNode:
     return label
 
   def __getattr__(self,attr):
+    if attr in NodeCoreAttributes:
+      return self.digraph.nodes[self.id][attr]
     if testAllCaps(attr):
       return self.__fieldAccess(attr)
-    raise AttributeError, "node id="+str(self.id)+" has no attribute named "+attr
+    raise AttributeError, "node "+str(self)+" has no attribute named "+attr
 
   def __setattr__(self,attr,value):
     if attr in self.__dict__ or attr in ('id', 'digraph'):
@@ -197,6 +217,15 @@ class DBDiGraphNode:
     if value is None:
       return self[field]
     self[field]=value
+
+  def each(self,key):
+    ''' Generator yielding each attribute value.
+    '''
+    for v in self.getAttr(key):
+      yield v
+
+  def all(self,key):
+    return all(self.each(key))
 
   def __getitem__(self,key):
     ''' Return the value of the specific key.
@@ -240,6 +269,9 @@ class DBDiGraphNode:
   def addAttr(self,attr,values):
     self.digraph.attrs.addAttr(self.id,attr,values)
 
+  def delAttr(self,attr,value=None):
+    self.digraph.attrs[self.id].delValue(attr,value)
+
   def getAttr(self,attr):
     ##warn(str(self)+": getAttr("+`attr`+")")
     if type(attr) is not str:
@@ -247,33 +279,53 @@ class DBDiGraphNode:
     values=self.digraph.attrs[self.id]
     return values[attr]
 
+  def testFlag(self,flagname,flagField='FLAGS'):
+    return flagname in self.each(flagField)
+
+  def setFlag(self,flagname,flagField='FLAGS'):
+    if not testFlag(self,flagname,flagField=flagField):
+      self.addAttr(flagField,(flagname,))
+
+  def clearFlag(self,flagname,flagField='FLAGS'):
+    if testFlag(self,flagname,flagField=flagField):
+      self.delAttr(flagField,flagname)
+
   def referringNodeids(self):
     ''' Returns a list of node ids which refer to this node.
     '''
     return [row[0] for row in
-            SQLQuery(self.attrs.table.conn,
+            SQLQuery(self.digraph.attrs.table.conn,
                      'SELECT DISTINCT(ID_REF+0) FROM '+self.digraph.attrs.table.name \
                      +' WHERE IS_IDREF AND VALUE = '+sqlise(str(self.id)))]
 
   def edges(self,upstream=False):
     ''' Returns edges running from this node.
     '''
-    if not upstream:
-      nodes=self.EDGES
-      if nodes is None:
-        return ()
-      if type(nodes) is not tuple:
-        nodes=(nodes,)
+    if upstream:
+      return self.digraph.nodesByAttr('EDGES',self.id)
+
+    return self.all('EDGES')
+
+  def detach(self):
+    assert self.TYPE == 'EDGE', "not an EDGE: "+str(self)
+
+    # detach upstream
+    dosql(self.digraph.attrs.table.conn,
+          "DELETE FROM "+self.digraph.attrs.table.name+" WHERE IS_IDREF AND ATTR = 'EDGES' AND VALUE = "+sqlise(self.id))
+    self.digraph.attrs.table.bump()
+
+    if self.NAME is None:
+      # anonymous edge - discard the whole thing
+      self.delete()
     else:
-      nodes=self.digraph.nodesByAttr('EDGE',self.id)
+      # just detach downstream
+      del self['EDGES']
 
-    return nodes
-
-  def connectedNodes(self):
+  def connectedNodes(self,upstream=False):
     nodes=[]
-    for edge in self.edges():
+    for edge in self.edges(upstream=upstream):
       if edge.TYPE == 'EDGE':
-        nodes.extend(edge.edges())
+        nodes.extend(edge.connectedNodes(upstream=upstream))
       else:
         nodes.append(edge)
     
@@ -287,23 +339,36 @@ class DBDiGraphNode:
     elif type(edge) is str:
       edge=self.digraph.createNode(edge,'EDGE')
 
-    ##warn("addEdge "+str(self)+"->"+str(toNode))
+    warn("addEdge "+str(self)+"->"+str(toNode),"via",str(edge))
     self.addAttr('EDGES',edge)
     edge.addAttr('EDGES',toNode)
+
+  def delEdge(self,edge):
+    self.delAttr('EDGES',edge.id)
+    if edge.TYPE == 'EDGE':
+      edge.detach()
 
 class AttrTable(cs.cache.Cache):
   def __init__(self,digraph,table):
     self.__direct=DirectAttrTable(digraph,table)
     cs.cache.Cache.__init__(self,self.__direct)
+    self.__preloaded=False
 
   def preload(self):
     self.preloadForNodeids()
+    self.__preloaded=True
 
   def preloadForNodeids(self,nodeids=None):
-    NV={}
+    if self.__preloaded:
+      return
+
     where=None
     if nodeids is not None:
+      if len(nodeids) == 0:
+        return
       where="ID_REF IN ("+strlist(nodeids)+")"
+
+    NV={}
     for row in self.table.selectRows(where):
       id=row.key
       nodeid=row['ID_REF']
@@ -410,6 +475,12 @@ class AttrSet:
   def __delitem__(self,key):
     del self.values()[key]
     self.attrs.table.deleteRows('ID_REF = '+sqlise(self.nodeid)+' AND ATTR = '+sqlise(key))
+
+  def delValue(self,key,value=None):
+    if value is None:
+      del self[key]
+    else:
+      self.attrs.table.deleteRows('ID_REF = '+sqlise(self.nodeid)+' AND ATTR = '+sqlise(key)+' AND VALUE = '+sqlise(value))
 
   def addValues(self,key,values):
     A=self.values()
