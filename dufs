@@ -1,6 +1,8 @@
 #!/bin/sh -u
 #
 
+: ${OS:=`uname -s|tr '[A-Z]' '[a-z]'`}
+
 onefs=-x
 case $OS in
     solaris)	onefs=-d ;;
