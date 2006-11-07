@@ -9,7 +9,7 @@ if [ "x$uid" != x0 ]
 then
   shcmd=". /opt/css/env.sh; "`shqstr "$0" ${1+"$@"}`
   set -x
-  exec sudo sh -xc "$shcmd"
+  exec sudo sh -c "$shcmd"
 fi
 
 : ${VARRUN:=$HOME/var/run}
