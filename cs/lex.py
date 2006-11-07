@@ -1,4 +1,5 @@
 import string
+from StringIO import StringIO
 import re
 
 int_re=re.compile(r'^\d+$')
@@ -62,3 +63,46 @@ def undq(s):
       
   return result
 
+def htmlify(s,nbsp=False):
+  s=s.replace("&","&amp;")
+  s=s.replace("<","&lt;")
+  s=s.replace(">","&gt;")
+  if nbsp:
+    s=s.replace(" ","&nbsp;")
+  return s
+
+def htmlquote(s):
+  s=htmlify(s)
+  s=s.replace("\"","&dquot;")
+  return "\""+s+"\""
+
+def jsquote(s):
+  s=s.replace("\"","&dquot;")
+  return "\""+s+"\""
+
+def dict2js(d):
+  fp=StringIO()
+  fp.write("{");
+  first=True
+  for k in d.keys():
+    if first:
+      first=False
+    else:
+      fp.write(",")
+
+    fp.write(k)
+    fp.write(":")
+
+    v=d[k]
+    if v is None:
+      fp.write('null')
+    else:
+      t=type(v)
+      if t is str:
+        fp.write(jsquote(v))
+      elif t is int:
+        fp.write(str(v))
+      else:
+        fp.write(jsquote(str(v)))
+  fp.write("}")
+  return fp.getvalue()
