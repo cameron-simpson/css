@@ -1,7 +1,10 @@
 #!/bin/sh
 
-xine=/opt/xine/bin/xine
-##xine=/usr/bin/xine
+for xine in /opt/xine/bin/xine /usr/bin/xine
+do  [ -x $xine ] && break
+    xine=
+done
+[ -n "$xine" ] || exit 1
 
 if mkdir test$$
 then snapdir=`pwd`
@@ -9,6 +12,6 @@ then snapdir=`pwd`
 else snapdir=$HOME/private/im/vidcap
 fi
 
+set -x
 bsed "s^gui.snapshotdir:.*gui.snapshotdir:$snapdir" $HOME/.xine/config
-
-exec set-x "$xine" ${1+"$@"}
+exec "$xine" ${1+"$@"}
