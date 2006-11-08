@@ -33,7 +33,7 @@ if (@ARGV)
 { if ("@ARGV" =~ /^\|/)
   { $::PipeTo=$';
   }
-  elsif ("@ARGV" =~ /^\+/)
+  elsif ("@ARGV" =~ /^[+\/]/)
   { $::PipeTo="filemailitem @ARGV";
   }
   else
