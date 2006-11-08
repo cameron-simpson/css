@@ -50,6 +50,7 @@ fi \
   do  host "$host"
   done \
 | sed -e '/^Host [^ ]* not found/d' \
+      -e '/ mail is handled by /d' \
       -e 's/ is an alias for .*//' \
       -e 's/ has address / /' \
       -e 's/\.research\.canon\.com\.au//' \
