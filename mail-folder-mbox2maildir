@@ -1,0 +1,51 @@
+#!/bin/sh -u
+#
+# Convert an mbox mail folder into a maildir folder.
+#       - Cameron Simpson <cs@zip.com.au> 08nov2006
+#
+
+: ${TMPDIR:=$HOME/tmp}
+
+trace=set-x
+
+cmd=`basename "$0"` || exit 1
+usage="Usage: $cmd mboxen..."
+
+[ $# = 0 ] && { echo "$usage" >&2; exit 2; }
+
+xit=0
+
+for mbox
+do
+  [ -f "$mbox" ] || { echo "$cmd: $mbox: not a file" >&2; exit 1; }
+
+  obase=`basename "$mbox"` || exit 1
+  odir=`dirname "$mbox"`   || exit 1
+  tmpbox=$odir/tmp$$-$obase
+
+  $trace mv -- "$mbox" "$tmpbox" || { xit=1; continue; }
+
+  case "$tmpbox" in
+    *.gz)
+      base=`basename "$obase" .gz` || exit 1
+      outbox=$odir/$base
+      ;;
+    *)outbox=$odir/$obase
+  esac
+  case "$outbox" in
+    /*) ;;
+    *)  outbox=`pwd`/$outbox || exit 1 ;;
+  esac
+  $trace maildir "$outbox" || exit 1
+
+  case "$tmpbox" in
+    *.gz) gunzip < "$tmpbox" ;;
+    *)    cat < "$tmpbox" ;;
+  esac \
+  | $trace splitmbox2maildir "$outbox" \
+  || exit 1
+
+  $trace rm "$tmpbox"
+done
+
+exit $xit
