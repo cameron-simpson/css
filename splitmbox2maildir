@@ -1,0 +1,29 @@
+#!/usr/bin/python
+#
+# Read UNIX mbox format on stdin, write messages to the named maildir.
+#       - Cameron Simpson <cs@zip.com.au> 08nov2006
+#
+
+import sys
+import cs.mail
+from cs.misc import progress
+
+maildir=cs.mail.Maildir(sys.argv[1])
+fp=None
+
+for line in sys.stdin:
+  if line[:5] == "From ":
+    if fp is not None:
+      newname=fp.close()
+      progress(newname)
+    fp=maildir.newItem()
+    fp.write("From_: ")
+    fp.write(line[5:])
+  else:
+    fp.write(line)
+
+if fp is not None:
+  newname=fp.close()
+  progress(newname)
+
+sys.exit(0)
