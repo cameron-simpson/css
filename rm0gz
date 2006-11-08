@@ -21,7 +21,12 @@ do
   case "$gz" in
     *.gz)
       size=`ls -ld -- "$gz" | awk '{print$5}'`
-      [ "x$size" = x20 -o "x$size" = x24 ] || continue
+      case "$size" in
+        20|24|40|44|48)
+          ;;
+        *)continue
+          ;;
+      esac
       gunzip < "$gz" >"$tmpf" || { xit=1; continue; }
       [ -s "$tmpf" ] && continue
       $trace rm -- "$gz"      || xit=1
