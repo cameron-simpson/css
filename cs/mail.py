@@ -35,20 +35,25 @@ class Maildir:
   def __init__(self,path):
     self.__path=path
     self.__parser=email.Parser.Parser()
+    self.__hostname=None
 
-  def mkname(self,info=None):
+  def mkbasename(self):
     now=time.time()
     secs=int(now)
     subsecs=now-secs
 
     left=str(secs)
-    right=socket.gethostname().replace('/','\057').replace(':','\072')
+    if self.__hostname is None:
+      self.__hostname=socket.gethostname()
+    right=self.__hostname.replace('/','\057').replace(':','\072')
     middle='#'+str(seq())+'M'+str(subsecs*1e6)+'P'+str(os.getpid())+'Q'+str(nextDelivered())
 
-    name=string.join((left,middle,right),'.')
+    return string.join((left,middle,right),'.')
+
+  def mkname(self,info=None):
+    name=self.mkbasename()
     if info is None:
       return os.path.join('new',name)
-
     return os.path.join('cur',name+":"+info)
 
   def keys(self):
@@ -76,6 +81,9 @@ class Maildir:
   def __getitem__(self,subpath):
     return self.__parser.parse(file(self.fullpath(subpath)))
 
+  def newItem(self):
+    return MaildirNewItem(self)
+
   def headers(self,subpath):
     fp=file(self.fullpath(subpath))
     headertext=''
@@ -92,8 +100,28 @@ class Maildir:
     m=_MaildirInfo_RE.search(path)
     if m:
       info=m.group(1)
-    progress(path, '=>', self.fullpath(self.mkname(info)))
-    saferename(path,self.fullpath(self.mkname(info)))
+
+    newname=self.fullpath(self.mkname(info))
+    progress(path, '=>', newname)
+    saferename(path,newname)
+
+class MaildirNewItem:
+  def __init__(self,maildir):
+    self.__maildir=maildir
+    self.__name=maildir.mkbasename()
+    self.__tmpname=os.path.join('tmp',self.__name)
+    self.__newname=os.path.join('new',self.__name)
+    self.__fp=open(maildir.fullpath(self.__tmpname),"w")
+
+  def write(self,s):
+    self.__fp.write(s)
+
+  def close(self):
+    self.__fp.close()
+    oldname=self.__maildir.fullpath(self.__tmpname)
+    newname=self.__maildir.fullpath(self.__newname)
+    saferename(oldname,newname)
+    return newname
 
 _maildirs={}
 def openMaildir(path):
