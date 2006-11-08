@@ -22,11 +22,10 @@ do
   odir=`dirname "$omaildir"`   || exit 1
   mbox=$odir/$obase
   tmpmaildir=$odir/$obase-$cmd$$
-  tmpmbox=$TMPDIR/$obase-$cmd$$.mbox
 
   ismaildir "$omaildir" \
-  || { echo "$cmd: $omaildir: not a maildir" >&2
-       xit=1
+  || { echo "$cmd: $omaildir: not a maildir, skipped" >&2
+       : xit=1
        continue
      }
   ismaildir "$tmpmaildir" \
@@ -37,16 +36,14 @@ do
 
   ##$trace cp -rpl "$omaildir" "$tmpmaildir" || exit 1
   $trace mv "$omaildir" "$tmpmaildir" || { xit=1; continue; }
-  $trace touch "$tmpmbox" || { xit=1; continue; }
 
-  $trace mutt -F /dev/null \
-              -e "set sort=mailbox-order" \
-              -e "set confirmappend=no" \
-              -e "set confirmcreate=yes" \
-              -e "set delete=yes" \
-              -f "$tmpmaildir" -e "push '<tag-pattern>.<enter><tag-prefix><save-message>$tmpmbox<enter><quit>'"
-  $trace rm0maildir "$tmpmaildir"
-  $trace gzip -v -9 <"$tmpmbox" >>"$mbox.gz" || exit 1
+  $trace maildir-cat "$tmpmaildir" >>"$mbox" \
+  || { $trace rm "$mbox" && $trace mv "$tmpmaildir" "$mbox"
+       exit 1
+     }
+
+  $trace rm -r "$tmpmaildir" || xit=1
+  $trace gzip -v -n -9 "$mbox" || exit 1
 done
 
 exit $xit
