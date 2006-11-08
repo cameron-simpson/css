@@ -1,0 +1,48 @@
+#!/bin/sh -u
+#
+# Locate and run a preferred executable.
+#       - Cameron Simpson <cs@zip.com.au> 08nov2006
+#
+
+trace=set-x
+
+cmd=$0
+usage="Usage: $cmd exec-name paths... -- [arguments...]"
+
+name=$1; shift
+
+paths=
+while :
+do
+  case "$1" in
+    --) shift; break ;;
+    /*) paths="$paths $1" ;;
+    *)  echo "$cmd: non-absolute directory path rejected: $1" >&2
+        exit 2
+        ;;
+  esac
+  shift
+done
+
+[ -n "$paths" ] || { echo "$cmd: no paths to search, aborting" >&2
+                     exit 2
+                   }
+
+for path in $paths
+do
+  for ext in "-$VENDORRELEASE" ""
+  do
+    binary=$path$ext/bin/$name
+    [ -x "$binary" ] && exec $trace "$binary" ${1+"$@"}
+  done
+done
+
+for path in `unpath "$PATH"`
+do
+  binary=$path/$name
+  [ "x$binary" = "x$0" ] && continue
+  [ -x "$binary" ] && exec $trace "$binary" ${1+"$@"}
+done
+
+echo "$cmd: can't find executable for $name" >&2
+exit 1
