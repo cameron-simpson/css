@@ -68,9 +68,9 @@ sub dotag
   elsif (grep($otag eq $_, TT, BLOCKQUOTE, PRE, CENTER))
   { $pod.="<$otag>$ipod</$otag>";
   }
-  elsif ($otag eq 'UL') { $listpfx=pop(@listpfx); }
-  elsif ($otag eq 'OL') { $listpfx=pop(@listpfx); }
-  elsif ($otag eq 'DL') { $listpfx=pop(@listpfx); }
+  elsif ($otag eq 'UL') { $pod.=$ipod; $listpfx=pop(@listpfx); }
+  elsif ($otag eq 'OL') { $pod.=$ipod; $listpfx=pop(@listpfx); }
+  elsif ($otag eq 'DL') { $pod.=$ipod; $listpfx=pop(@listpfx); }
   elsif ($otag eq 'LI')
   { $pod.="\n$listpfx$ipod\n";
   }
@@ -85,7 +85,7 @@ sub dotag
     $pod.="\n{| border=\"1\"\n$ipod\n|}\n";
   }
   elsif ($otag eq 'TBODY')
-  {
+  { $pod.=$ipod;
   }
   elsif ($otag eq 'TR')
   { $pod.="\n|-\n$ipod\n";
@@ -120,6 +120,7 @@ sub html2wiki
 
   my $poptag = sub {
                 my($otag,$oattrs,$opod)=@{pop(@tags)};
+                ##warn "POPTAG($otag)\n";
                 my $ipod = $pod; $pod=$opod;
                 $pod.=dotag($otag,$oattrs,$ipod,$listpfx);
                 return ($otag,$oattrs);
@@ -329,6 +330,7 @@ sub verbatim {
     die "inside unsupported =begin $mode";
   }
 
+  ##warn "VERB [$paragraph]\n";
   $self->write("\n", $paragraph);
 }
 
