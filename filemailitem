@@ -20,16 +20,10 @@ badopts=
 
 [ "x$1" = x-auto ] && { mode=auto; shift; }
 
-if [ $# = 0 ]
-then
-    echo "$cmd: missing folder" >&2
-    badopts=1
-else
-    folder=$1; shift
-    [ $# = 0 ] || { echo "$cmd: extra arguments after folder: $*" >&2
-		    badopts=1
-		  }
-fi
+folder=$1; shift
+[ $# = 0 ] || { echo "$cmd: extra arguments after folder: $*" >&2
+                badopts=1
+              }
 
 if [ -t 0 ]
 then
@@ -45,17 +39,19 @@ cat >"$tmpf" || exit 1
 [ -s "$tmpf" ] || exit 1
 exec <"$tmpf"
 rm -f "$tmpf" || exit 1
-# $tmpf now available for reuse
+# $tmpf now available for reuse as procmailrc
 
-fpath=
+case "$folder" in
+  /*) fpath=$folder ;;
+  *)  fpath=`mailfolderpath "$folder"` || exit 1
+      [ -n "$fpath" ] || exit 1
+      [ -f "$fpath" -o -f "$fpath/." ] || exit 1
+      ;;
+esac
 
 # figure out the folder type if asked to guess
 if [ "x$mode" = xauto ]
 then
-    fpath=`mailfolderpath "$folder"` || exit 1
-    [ -n "$fpath" ] || { echo "$cmd: can't figure out pathname for folder \"$folder\"" >&2
-			 exit 1
-		       }
     if [ -f "$fpath" ]
     then
       mode=mbox
@@ -67,19 +63,13 @@ then
     fi
 fi
 
-# compute fpath if needed
-[ -n "$fpath" ] || [ "x$mode" = xmh ] \
-|| { fpath=`mailfolderpath "$folder"` || exit 1
-     [ -n "$fpath" ] \
-     || { echo "$cmd: can't figure out pathname for folder \"$folder\"" >&2
-	  exit 1
-	}
-   }
-
 # deliver
 case "$mode" in
     mbox)
-	exec cat >>"$fpath"
+        case "$fpath" in
+          *.gz) exec gzip -n >>"$fpath" ;;
+          *)    exec cat >>"$fpath" ;;
+        esac
 	;;
     mh)	unfrom_ | /usr/lib/nmh/rcvstore "$1" -unseen -nocreate
 	;;
