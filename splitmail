@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 #
 # Split up an ordinary mailbox (From_ separated).
-# If a mailbox is specified, uses filemail to deposit the mail.
+# If a mailbox is specified, uses filemailitem to deposit the mail.
 # If a pipeline is specified, pipes each item to that command (eg "|bgprocmail").
 # Otherwise unpacks into the current directory.
 #	- Cameron Simpson, February 1992
