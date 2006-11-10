@@ -1,0 +1,18 @@
+#!/usr/bin/python
+#
+# List the contents of a maildir folder in mbox format.
+#       - Cameron Simpson <cs@zip.com.au> 09nov2006
+#
+
+import sys
+import cs.mail
+from cs.misc import cmd, progress
+
+usage="Usage: "+cmd+" maildir"
+
+for path in sys.argv[1:]:
+  M=cs.mail.Maildir(path)
+  for msg in M:
+    print str(msg)
+
+sys.stdout.close()
