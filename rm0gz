@@ -37,4 +37,6 @@ do
   esac
 done
 
+rm -f "$tmpf"
+
 exit $xit
