@@ -8,7 +8,8 @@
 
 : ${SSHTO_OPTS:=''}
 
-trace=	##set-x
+cf=$HOME/.sshtorc
+trace=set-x
 sshopts=
 lsshopts=
 mycfg=$HOME/.ssh/config
@@ -104,6 +105,21 @@ sshcmd=$presh$*
 
 while :
 do
+  if [ -f "$cf" -a -s "$cf" ]
+  then
+    while read nick fullhost opts <&3
+    do
+      case "$nick" in
+        '' | \#* )
+          ;;
+        "$host" )
+          host=$fullhost
+          break
+          ;;
+      esac
+    done 3<"$cf"
+  fi
+
   case "$host" in
       *!*)	rhost=`expr "x$host" : 'x.*!\(.*\)'`
 		host=` expr "x$host" : 'x\(.*\)!.*'`
