@@ -15,7 +15,7 @@ compress=gzip
 
 args=
 case $compress in
-    gzip)	ext=gz  args=-9 ;;
+    gzip)	ext=gz  args='-n -9' ;;
     bzip2)	ext=bz2 args='-z -9 --repetitive-best' ;;
     compress)	ext=Z   ;;
     *)		echo "$0: $compress: unrecognised compression mode" >&2
