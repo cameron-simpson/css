@@ -2,6 +2,7 @@ import os
 import os.path
 import time
 import socket
+import mailbox as pyMailbox
 import email.Parser
 import string
 import StringIO
@@ -16,6 +17,13 @@ def ismaildir(path):
     if not os.path.isdir(os.path.join(path,subdir)):
       return False
   return True
+
+def mailbox(path):
+  if ismaildir(path):
+    return pyMailbox.Maildir(path)
+  if ismhdir(path):
+    return pyMailbox.MH(path)
+  return None
 
 def maildirify(path):
   for subdir in ('new','cur','tmp'):
@@ -74,12 +82,11 @@ class Maildir:
       yield self.fullpath(subpath)
 
   def __iter__(self):
-    P=email.Parser.Parser()
     for subpath in self.subpaths():
       yield self[subpath]
 
   def __getitem__(self,subpath):
-    return self.__parser.parse(file(self.fullpath(subpath)))
+    return self.__parser.parse(open(self.fullpath(subpath)))
 
   def newItem(self):
     return MaildirNewItem(self)
