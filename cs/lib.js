@@ -26,6 +26,18 @@ function csNode(type) {
   return document.createElement(type);
 }
 
+function csXY(x,y) {
+  return {x: x, y: y};
+}
+
+function csSize(width, height) {
+  return {width: width, height: height};
+}
+
+function box(xy, size) {
+  return {x: xy.x, y: xy.y, width: size.width, height: size.height};
+}
+
 function csDIV() {
   return csNode('DIV');
 }
@@ -34,30 +46,63 @@ function csText(str) {
   return document.createTextNode(str);
 }
 
-function csAbsOffsetTop(elem) {
-  var parent;
-  var oldParent = null;
-  var top = elem.offsetTop;
-  _log("absOffsetTop("+elem+"): start with top="+top);
-
-  parent=elem.offsetParent;
-  _log("parent of "+elem+" = "+parent);
-  while (parent && parent != elem) {
-    elem=parent;
-    top+=elem.offsetTop;
-    _log("advance top to "+top);
-    _log("elem width = "+elem.offsetWidth+", height = "+elem.offsetHeight);
-    parent=elem.offsetParent;
-  }
-  _log("doc.body ("+document.body+") width = "+document.body.offsetWidth+", height = "+document.body.offsetHeight);
-  return top;
-}
-
 function csIMG(src) {
   var img = csNode('IMG');
   img.src = src;
   img.style.border=0;
+  if (_cs_isIE) {
+    img.galleryImg = false;
+  }
   return img;
+}
+
+function csBoxInView(viewport, box) {
+  box = {x: box.x, y:box.y, width: box.width, height: box.height};
+
+  if (box.x + box.width > viewport.x + viewport.width)
+    box.x = viewport.x + viewport.wdith - box.width;
+  if (box.x < 0)
+    box.x = 0;
+
+  if (box.y + box.height > viewport.y + viewport.height)
+    box.y = viewport.y + viewport.wdith - box.height;
+  if (box.y < 0)
+    box.y = 0;
+
+  return box;
+}
+
+function csScreenXYtoDocXY(xy) {
+  var docxy = {x: xy.x, y: xy.y};
+
+  if (_cs_isIE) {
+    docxy.x -= window.screenLeft;
+    docxy.x += document.body.scrollLeft;
+    docxy.y -= window.screenTop;
+    docxy.y += document.body.scrollTop;
+  } else {
+    // BUG: doesn't account for the toolbars
+    docxy.x -= window.screenX;
+    docxy.x += window.pageXOffset;
+    docxy.y -= window.screenY;
+    docxy.y += window.pageYOffset;
+  }
+
+  return docxy;
+}
+
+function csAbsTopLeft(elem) {
+  var topLeft = csXY(elem.offsetLeft, elem.offsetTop);
+  var parent=elem.offsetParent;
+
+  while (parent && parent != elem) {
+    elem=parent;
+    topLeft.x += elem.offsetLeft;
+    topLeft.y += elem.offsetTop;
+    parent=elem.offsetParent;
+  }
+
+  return topLeft;
 }
 
 function csLogWindow(width, height) {
@@ -74,49 +119,45 @@ function csSetZIndex(elem,z) {
   elem.style.zIndex = z;
 }
 
-function csSetPosition(elem,x,y) {
+function csSetPosition(elem,xy) {
   elem.style.position='absolute';
-  elem.style.left=x;
-  elem.style.top=y;
+  elem.style.left=xy.x;
+  elem.style.top=xy.y;
 }
 
-function csSetRPosition(elem,dx,dy) {
-  var px = elem.offsetLeft + dx;
-  var py = elem.offsetTop  + dy;
-  csSetPosition(elem,px,py);
+function csSetRPosition(elem,dxy) {
+  csSetPosition(elem, csXY(elem.offsetLeft + dxy.x, elem.offsetTop + dxy.y));
 }
 
+// Set size of one element to the size of another.
 function csSetSizeFrom(elem, oElem) {
-  csSetSize(elem, oElem.offsetWidth, oElem.offsetHeight);
+  csSetSize(elem, csXY(oElem.offsetWidth, oElem.offsetHeight));
 }
 
 function csSetSize(elem,width,height) {
   elem.style.width = width;
-  _log("height = ["+height+"]");
   elem.style.height = height;
 }
 
-function csAddHotSpot(elem,node,x1,y1,x2,y2,z) {
-  var hot = new CSHotSpot(node,x1,y1,x2,y2,z);
+function csAddHotSpot(elem,meta,xy1,xy2,z) {
+  var hot = new CSHotSpot(meta,xy1,xy2,z);
   if (elem) {
     elem.appendChild(hot.element);
   }
   return hot;
 }
 
-function CSHotSpot(node,x1,y1,x2,y2,z) {
+function CSHotSpot(meta,xy1,xy2,z) {
   var me = this;
 
   if (z == null) z=1;
 
-  this.x1=x1;
-  this.y1=y1;
-  this.x2=x2;
-  this.y2=y2;
+  this.xy1=xy1;
+  this.xy2=xy2;
 
   var hotdiv = csDIV();
-  csSetPosition(hotdiv,x1,y1);
-  csSetSize(hotdiv,x2-x1,y2-y1);
+  csSetPosition(hotdiv,xy1);
+  csSetSize(hotdiv,xy2.x-xy1.x,xy2.y-xy1.y);
   csSetZIndex(hotdiv,z);
   //hotdiv.style.opacity=0.5;
 
@@ -129,27 +170,28 @@ function CSHotSpot(node,x1,y1,x2,y2,z) {
     var img = document.createElement("IMG");
     img.src="http://docs.python.org/icons/contents.png";
     csSetPosition(img,0,0);
-    csSetSize(img,x2-x1,y2-y1);
+    csSetSize(img,xy2.x-xy1.x,xy2.y-xy1.y);
     hotdiv.appendChild(img);
   }
 
-  if (node.onclick || node.attrs.href) {
+  if (meta.onclick || meta.attrs.href) {
     hotdiv.onclick = function(e) {
-        if (node.onclick) {
-          _log("calling "+node.onclick);
-          node.onclick(e,me);
-        } else if (node.attrs.href) {
-          document.location=node.attrs.href;
+        if (meta.onclick) {
+          _log("calling "+meta.onclick);
+          meta.onclick(e,me);
+        } else if (meta.attrs.href) {
+          document.location=meta.attrs.href;
         } else {
-          _log("BUG: no onclick or href in node");
+          _log("BUG: no onclick or href in meta");
         }
       }
   }
 
-  if (node.getHoverDiv) {
+  if (meta.getHoverDiv) {
     hotdiv.onmouseover = function(e) {
         _log("mouseover");
-        var popup=me.getHoverDiv();
+        if (!e) e=window.event;
+        var popup=me.getHoverDiv(e.screenX, e.screenY);
         _log("popup = "+popup);
         if (popup) {
           popup.style.display='block';
@@ -158,31 +200,49 @@ function CSHotSpot(node,x1,y1,x2,y2,z) {
 
     hotdiv.onmouseout = function(e) {
         _log("mouseout");
-        var popup=me.getHoverDiv();
+        if (!e) e=window.event;
+        var popup=me.getHoverDiv(e.screenX, e.screenY);
         if (popup) {
           popup.style.display='none';
         }
       }
-  } else if (node.attrs.title) {
-    hotdiv.title=node.attrs.title;
+  } else if (meta.attrs.title) {
+    hotdiv.title=meta.attrs.title;
     if (_cs_isIE) {
-      hotdiv.alt=node.attrs.title;
+      hotdiv.alt=meta.attrs.title;
     }
   }
 
-  this.node=node;
+  this.meta=meta;
   this.element=hotdiv;
 }
 
-CSHotSpot.prototype.getHoverDiv = function() {
+CSHotSpot.prototype.getHoverDiv = function(mouseScreenX, mouseScreenY) {
+
   if (!this.hoverDiv) {
-    if (this.node.getHoverDiv) {
-      this.hoverDiv=this.node.getHoverDiv();
-      csSetPosition(this.hoverDiv,this.x1,this.y1+2+this.element.offsetHeight);
-      this.hoverDiv.style.display='none';
-      _log("add new hoverDiv to "+this.element);
-      this.element.parentNode.appendChild(this.hoverDiv);
+    if (this.meta.getHoverDiv) {
+      var hover=this.meta.getHoverDiv();
+      hover.style.display='none';
+      document.body.appendChild(hover);
+      this.hoverDiv = hover;
     }
+  }
+
+  if (this.hoverDiv) {
+    // position the popup just below the hotspot
+    // we do this every time because the hotspot may have moved
+    var up  = this.element.parentNode;
+    var hotxy = csAbsTopLeft(up);
+    var pos = csXY(hotxy.x + this.xy1.x, hotxy.y + this.xy2.y);
+    //var pos = csScreenXYtoDocXY(csXY(mouseScreenX, mouseScreenY));
+
+    if (false && pos.x + this.hoverDiv.offsetWidth > up.offsetWidth)
+      pos.x = up.offsetWidth - this.hoverDiv.offsetWidth;
+    if (false && pos.y + this.hoverDiv.offsetHeight > up.offsetHeight) {
+      _log("UP.HEIGHT = "+up.offsetHeight+", up = "+up);
+      pos.y = up.offsetHeight - this.hoverDiv.offsetHeight;
+    }
+    csSetPosition(this.hoverDiv, pos);
   }
 
   return this.hoverDiv;
@@ -200,31 +260,35 @@ function CSPan(toPan) {
   outer.style.overflow='hidden';
 
   outer.appendChild(toPan);
-  csSetPosition(toPan,0,0);
+  csSetPosition(toPan, csXY(0,0));
   csSetZIndex(toPan,0);
 
   // Place some glass over the object to prevent drag'n'drop causing
   // trouble. Make it full size to cover the outer DIV.
   var glass = csDIV();
   outer.appendChild(glass);
-  csSetPosition(glass,0,0);
+  csSetPosition(glass, csXY(0,0));
   csSetSize(glass,"100%","100%");
   csSetZIndex(glass,1);
-  glass.style.cursor="-moz-grab";
 
   // Place another layer over the glass for hotspots.
   // We pan this layer with the toPan object to keep the hotspots aligned.
   var hotLayer = csDIV();
   outer.appendChild(hotLayer)
-  csSetPosition(hotLayer,0,0);
+  csSetPosition(hotLayer, csXY(0,0));
   csSetZIndex(hotLayer,2);
 
   var me = this;
   this.onMouseDown = function(e) { me.handleDown(e); };
   this.onMouseMove = function(e) { me.handleMove(e); };
   this.onMouseUp   = function(e) { me.handleUp(e); };
-  glass.onmousedown=this.onMouseDown;
-  //glass.addEventListener("mousedown", this.onMouseDown, false);
+  if (_cs_isIE) {
+    toPan.onmousedown=this.onMouseDown;
+    //toPan.style.cursor='move';
+  } else {
+    glass.onmousedown=this.onMouseDown;
+    if (_cs_isGecko) glass.style.cursor="-moz-grab";
+  }
 
   this.element=outer;
   this.glass=glass;
@@ -232,8 +296,8 @@ function CSPan(toPan) {
   this.toPan=toPan;
 }
 
-CSPan.prototype.addHotSpot = function(attrs,x1,y1,x2,y2,z) {
-  return csAddHotSpot(this.hotLayer,attrs,x1,y1,x2,y2,z);
+CSPan.prototype.addHotSpot = function(attrs,xy1,xy2,z) {
+  return csAddHotSpot(this.hotLayer,attrs,xy1,xy2,z);
 };
 
 CSPan.prototype.addHotSpots = function(hotspots,z) {
@@ -241,10 +305,27 @@ CSPan.prototype.addHotSpots = function(hotspots,z) {
   for (var i=0; i < hotspots.length; i++) {
     spot=hotspots[i];
     if (spot) {
-      this.addHotSpot(spot[0],spot[1],spot[2],spot[3],spot[4]);
+      this.addHotSpot(spot[0], csXY(spot[1],spot[2]), csXY(spot[3],spot[4]));
     }
   }
 };
+
+CSPan.prototype.centre = function(xy) {
+  var newTop = this.element.offsetHeight/2 - xy.y;
+  var newLeft = this.element.offsetWidth/2 - xy.x;
+  _log("centre("+xy.x+","+xy.y+"): top="+newTop+", left="+newLeft);
+  this.setPosition(csXY(newLeft, newTop));
+}
+
+CSPan.prototype.getCentre = function() {
+  return csXY(this.element.offsetWidth/2 - this.toPan.offsetLeft,
+              this.element.offsetHeight/2 - this.toPan.offsetTop);
+}
+
+CSPan.prototype.setPosition = function(topLeft) {
+  csSetPosition(this.toPan, topLeft);
+  csSetPosition(this.hotLayer, topLeft);
+}
 
 CSPan.prototype.setSize = function(width, height) {
   csSetSize(this.element, width, height);
@@ -252,52 +333,68 @@ CSPan.prototype.setSize = function(width, height) {
 
 CSPan.prototype.handleDown = function(e) {
   _log("panStart");
+  if (!e) e=window.event;
+
   this.panning=true;
-  this.mouseX = e.clientX;
-  this.mouseY = e.clientY;
-  this.toPanTop  = this.toPan.offsetTop;
-  this.toPanLeft = this.toPan.offsetLeft;
+  this.mouseXY = csXY(e.clientX, e.clientY);
+  this.toPanTopLeft = csXY(this.toPan.offsetLeft, this.toPan.offsetTop);
 
   this.glass.style.cursor="-moz-grabbing";
-  document.addEventListener("mousemove", this.onMouseMove,true);
-  document.addEventListener("mouseup",   this.onMouseUp,  true);
-  this.hotLayer.style.display='none';
+  if (document.addEventListener) {
+    document.addEventListener("mousemove", this.onMouseMove,true);
+    document.addEventListener("mouseup",   this.onMouseUp,  true);
+  } else {
+    this.toPan.attachEvent("onmousemove", this.onMouseMove);
+    this.toPan.attachEvent("onmouseup",   this.onMouseUp);
+    this.toPan.setCapture();
+  }
+  if (!_cs_isIE)
+    this.hotLayer.style.display='none';
 };
 
 CSPan.prototype.handleMove = function(e) {
   //_log("move");
+  if (!e) e=window.event;
 
   if (this.panning) {
     // current mouse position
-    var newX = e.clientX;
-    var newY = e.clientY;
+    var newMouseXY = csXY( e.clientX, e.clientY);
     // offset from original mouse down position
-    var dx = newX - this.mouseX;
-    var dy = newY - this.mouseY;
-    //_log("move("+dx+","+dy+")");
+    var dxy = csXY( newMouseXY.x - this.mouseXY.x,
+                    newMouseXY.y - this.mouseXY.y );
     // new toPan div top left
-    var newTop = this.toPanTop + dy;
-    var newLeft = this.toPanLeft + dx;
+    var newTopLeft = csXY( this.toPanTopLeft.x + dxy.x, this.toPanTopLeft.y + dxy.y );
+
     // Don't left the pan get away.
-    if (newTop+this.toPan.offsetHeight < this.element.offsetHeight) {
-      newTop=this.element.offsetHeight-this.toPan.offsetHeight;
+    if (newTopLeft.x+this.toPan.offsetWidth < this.element.offsetWidth) {
+      newTopLeft.x=this.element.offsetWidth-this.toPan.offsetWidth;
     }
-    if (newLeft+this.toPan.offsetWidth < this.element.offsetWidth) {
-      newLeft=this.element.offsetWidth-this.toPan.offsetWidth;
+    if (newTopLeft.x > 0) newTopLeft.x=Math.max(0, this.toPanTopLeft.x);
+
+    if (newTopLeft.y+this.toPan.offsetHeight < this.element.offsetHeight) {
+      newTopLeft.y=this.element.offsetHeight-this.toPan.offsetHeight;
     }
-    if (newTop  > 0) newTop =Math.max(0, this.toPanTop);
-    if (newLeft > 0) newLeft=Math.max(0, this.toPanLeft);
-    csSetPosition(this.toPan, newLeft, newTop);
-    csSetPosition(this.hotLayer, newLeft, newTop);
+    if (newTopLeft.y > 0) newTopLeft.y=Math.max(0, this.toPanTopLeft.y);
+
+    this.setPosition(newTopLeft);
   }
 };
 
 CSPan.prototype.handleUp = function(e) {
+  if (!e) e=window.event;
+
   if (this.panning) {
     this.panning=false;
     this.glass.style.cursor="-moz-grab";
-    document.removeEventListener("mousemove", this.onMouseMove, true);
-    document.removeEventListener("mouseup",   this.onMouseUp, true);
-    this.hotLayer.style.display='block';
+    if (document.removeEventListener) {
+      document.removeEventListener("mousemove", this.onMouseMove, true);
+      document.removeEventListener("mouseup",   this.onMouseUp, true);
+    } else {
+      this.toPan.detachEvent("onmousemove", this.onMouseMove);
+      this.toPan.detachEvent("onmouseup", this.onMouseMove);
+      this.toPan.releaseCapture();
+    }
+    if (!_cs_isIE)
+      this.hotLayer.style.display='block';
   }
 };
