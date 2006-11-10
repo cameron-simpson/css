@@ -44,7 +44,12 @@ case "$type" in
     *': '*'ASCII cpio archive'*)	mtype=application/x-cpio-c ;;
     *': '*'Ogg-Vorbis compressed sound file'*) mtype=application/x-ogg ;;
     *': '*'MPEG system stream data'*) mtype=video/mpeg ;;
-    *': '*'Microsoft Office Document'*) mtype=application/msword ;;
+    *': '*'Microsoft Office Document'*)
+                                        case "$file" in
+                                          *.xls) mtype=application/msexcel ;;
+                                          *)     mtype=application/msword ;;
+                                        esac
+                                        ;;
     *': '*'RIFF (little-endian) data, AVI') mtype=video/avi ;;
     *': uuencoded or xxencoded text'*)	mtype=application/x-uuencode ;;
     *': '*'PGP armored data signed message'*)
