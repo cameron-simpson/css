@@ -5,18 +5,21 @@
 # 
 
 : ${MAILDIR:=$HOME/mail}
+: ${MAIL_EXPIRE_FORMAT:='%Y-%m'}
+: ${MAIL_EXPIRE_ARCHIVE:=ARCHIVE}
 
-trace=  ##set-x
+trace=
 [ -t 2 ] && trace=set-x
-fmt=+%Y
-archivedir=
 
 cmd=`basename "$0"` || cmd=$0
 usage="Usage: $cmd [-d maildir] [-A archivedir] [+fmt] days [folders...]
-    -A archivedir Archive directory. Default: maildir/ARCHIVE
+    -A archivedir Archive directory.
+                A leading + means relative to maildir.
+                Default, from \$MAIL_EXPIRE_ARCHIVE: $MAIL_EXPIRE_ARCHIVE
     -d maildir	Mail folder parent directory, default from \$MAILDIR: $MAILDIR
     -x          Trace subcommands.
-    +fmt	Archive date folder in strftime(3) output format. Default: $fmt
+    +fmt	Archive date folder in strftime(3) output format.
+                Default, from \$MAIL_EXPIRE_FORMAT: $MAIL_EXPIRE_FORMAT
     days	Minimum age in days of items to archive.
     folders	Specific folders to archive. Default: [a-z]*"
 
@@ -25,8 +28,8 @@ badopts=
 while [ $# -gt 0 ]
 do
   case "$1" in
-    +?*)	fmt=$1 ;;
-    -A)		archivedir=$2; shift ;;
+    +?*)	MAIL_EXPIRE_FORMAT=`expr "x$1" : 'x.\(.*\)'` || exit 1 ;;
+    -A)		MAIL_EXPIRE_ARCHIVE=$2; shift ;;
     -d)		MAILDIR=$2; shift ;;
     -x)         trace=set-x ;;
     --)		shift; break ;;
@@ -56,11 +59,13 @@ fi
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
-[ -n "$archivedir" ] || archivedir=$MAILDIR/ARCHIVE
-case "$archivedir" in
+case "$MAIL_EXPIRE_ARCHIVE" in
   /*) ;;
-  *)  archivedir=`pwd`/$archivedir || exit 1 ;;
+  +*) MAIL_EXPIRE_ARCHIVE=$MAILDIR/$MAIL_EXPIRE_ARCHIVE ;;
+  *)  MAIL_EXPIRE_ARCHIVE=`pwd`/$MAIL_EXPIRE_ARCHIVE || exit 1 ;;
 esac
+
+export MAILDIR MAIL_EXPIRE_FORMAT MAIL_EXPIRE_ARCHIVE
 
 cd "$MAILDIR" || exit 1
 
@@ -68,10 +73,10 @@ cd "$MAILDIR" || exit 1
 
 xit=0
 
-for maildir
+for mailsubdir
 do
-  ismaildir "$maildir" || continue
-  $trace maildir-expire "$fmt" "$days" "$maildir" "$archivedir" || xit=1
+  ismaildir "$mailsubdir" || continue
+  $trace maildir-expire "+$MAIL_EXPIRE_FORMAT" "$days" "$mailsubdir" "$MAIL_EXPIRE_ARCHIVE" || xit=1
 done
 
 exit $xit
