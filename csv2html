@@ -1,0 +1,41 @@
+#!/usr/bin/python
+#
+# Simple minded script to read CSV input and emit an HTML table.
+#       - Cameron Simpson <cs@zip.com.au> 10nov2006
+#
+
+import sys
+import csv
+from cs.lex import htmlify
+
+args=sys.argv[1:]
+if len(args) == 0:
+  args=('-',)
+
+for path in args:
+  if path == '-':
+    fp=sys.stdin
+  else:
+    fp=open(path)
+
+  R=csv.reader(fp)
+
+  print "<TABLE BORDER=\"1\">\n"
+  first=True
+  for row in R:
+    if first:
+      print "  <THEAD>\n"
+
+    print "    <TR>\n"
+    for d in row:
+      print "      <TD>", htmlify(str(d))
+
+    if first:
+      print "  </THEAD>\n"
+      print "  <TBODY>\n"
+      first=False
+
+  if not first:
+    print "  </TBODY>\n"
+
+  print "</TABLE>"
