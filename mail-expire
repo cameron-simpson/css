@@ -6,7 +6,7 @@
 
 : ${MAILDIR:=$HOME/mail}
 : ${MAIL_EXPIRE_FORMAT:='%Y-%m'}
-: ${MAIL_EXPIRE_ARCHIVE:=ARCHIVE}
+: ${MAIL_EXPIRE_ARCHIVE:=+ARCHIVE}
 
 trace=
 [ -t 2 ] && trace=set-x
@@ -61,7 +61,7 @@ fi
 
 case "$MAIL_EXPIRE_ARCHIVE" in
   /*) ;;
-  +*) MAIL_EXPIRE_ARCHIVE=$MAILDIR/$MAIL_EXPIRE_ARCHIVE ;;
+  +*) MAIL_EXPIRE_ARCHIVE=$MAILDIR/`expr "x$MAIL_EXPIRE_ARCHIVE" : '..\(.*\)'` || exit 1 ;;
   *)  MAIL_EXPIRE_ARCHIVE=`pwd`/$MAIL_EXPIRE_ARCHIVE || exit 1 ;;
 esac
 
