@@ -1,0 +1,29 @@
+#!/bin/sh -u
+#
+# Regular email expiry action.
+#       - Cameron Simpson <cs@zip.com.au>
+#
+
+: ${MAILDIR:=$HOME/mail}
+: ${MAIL_EXPIRE_FORMAT:='%Y-%m'}
+
+if [ $# -gt 0 ]
+then
+  case "$1" in
+    +?*)
+      MAIL_EXPIRE_FORMAT=`expr "x$1" : 'x.\(.*\)'` || exit 1
+      shift
+      ;;
+  esac
+fi
+
+export MAILDIR MAIL_EXPIRE_FORMAT
+
+# roll older email directly into archives
+mail-expire "+$MAIL_EXPIRE_FORMAT" 180
+# roll deleted/saved email into archives
+mail-expire -d "$MAILDIR/ARCHIVE/PENDING" -A "$MAILDIR/ARCHIVE" "+$MAIL_EXPIRE_FORMAT" 0
+# compress maildirs into mbox.gz format
+( cd "$MAILDIR/ARCHIVE" && mail-folder-gz [12]???/* )
+# index
+echo SKIP ++ -A
