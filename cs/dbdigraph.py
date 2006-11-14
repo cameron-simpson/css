@@ -339,7 +339,7 @@ class DBDiGraphNode:
     elif type(edge) is str:
       edge=self.digraph.createNode(edge,'EDGE')
 
-    warn("addEdge "+str(self)+"->"+str(toNode),"via",str(edge))
+    ##warn("addEdge "+str(self)+"->"+str(toNode),"via",str(edge))
     self.addAttr('EDGES',edge)
     edge.addAttr('EDGES',toNode)
 
