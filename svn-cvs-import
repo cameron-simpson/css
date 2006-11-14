@@ -1,0 +1,20 @@
+#!/bin/sh -u
+#
+# Simple wrapper for single-project CVS import into SVN using cvs2svn.
+#       - Cameron Simpson <cs@zip.com.au> 10sep2006
+#
+
+: ${TMPDIR:=/tmp}
+
+trace=set-x
+
+cmd=`basename "$0"` || exit 1
+usage="Usage: $cmd [--trunk-only] CVS-repo-path SVN-path"
+
+svn2cvsopts=--existing-svnrepos
+[ $# -gt 0 ] && [ "x$1" = x--trunk-only ] && { svn2cvsopts="$svn2cvsopts $1"; shift; }
+
+cvspath=$1
+svnpath=$2
+
+$trace cvs2svn -v -s "$SVNROOT" $svn2cvsopts "--trunk=$svnpath/trunk" "--branches=$svnpath/branches" "--tags=$svnpath/tags" "$CVSROOT/$cvspath"
