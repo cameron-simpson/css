@@ -98,7 +98,7 @@ fi
 
 [ -t 0 -a -t 1 ] && topt=-t
 
-[ $# = 0 ] && set -- 'exec ${SHELL:=/bin/sh}'
+[ $# = 0 ] && set -- '[ -n "$SHELL" -a -x "$SHELL" ] || SHELL=/bin/sh; exec "$SHELL"'
 
 sshargv="$sshopts $topt"
 sshcmd=$presh$*
