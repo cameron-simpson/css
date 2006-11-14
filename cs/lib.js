@@ -22,6 +22,14 @@ document.write("appver = "+navigator.appVersion+", agent = "+navigator.userAgent
 _cs_isGecko = (_cs_agent.indexOf(" gecko/") > 0);
 _cs_isIE = (_cs_agent.indexOf(" msie ") > 0);
 
+function csPushOnresize(fn) {
+  var old = window.onresize;
+  window.onresize = function() {
+                      if (old) old();
+                      fn();
+                    };
+}
+
 function csNode(type) {
   return document.createElement(type);
 }
@@ -46,13 +54,18 @@ function csText(str) {
   return document.createTextNode(str);
 }
 
-function csIMG(src) {
+function csIMG(src,onload) {
   var img = csNode('IMG');
-  img.src = src;
+
   img.style.border=0;
+  if (onload) {
+    img.onload=onload;
+  }
   if (_cs_isIE) {
     img.galleryImg = false;
   }
+  img.src = src;
+
   return img;
 }
 
@@ -139,6 +152,31 @@ function csSetSize(elem,width,height) {
   elem.style.height = height;
 }
 
+function csHotspotsToClientMap(hotspots,mapname) {
+  var map = csNode("MAP");
+  map.name=mapname;
+
+  var h;
+  var a;
+  var meta;
+  for (var i=0; i<length(hotspots); i++) {
+    h=hotspots[i];
+    if (h) {
+      meta=h[0].attrs;
+
+      a=csNode("AREA");
+      a.title=h.title;
+      a.alt=h.title;
+      a.href=h.href;
+      a.shape="RECT";
+      a.coords=h[1]+','+h[2]+','+h[3]+','+h[4];
+      map.appendChild(a);
+    }
+  }
+
+  return map;
+}
+
 function csAddHotSpot(elem,meta,xy1,xy2,z) {
   var hot = new CSHotSpot(meta,xy1,xy2,z);
   if (elem) {
@@ -189,17 +227,14 @@ function CSHotSpot(meta,xy1,xy2,z) {
 
   if (meta.getHoverDiv) {
     hotdiv.onmouseover = function(e) {
-        _log("mouseover");
         if (!e) e=window.event;
         var popup=me.getHoverDiv(e.screenX, e.screenY);
-        _log("popup = "+popup);
         if (popup) {
           popup.style.display='block';
         }
       }
 
     hotdiv.onmouseout = function(e) {
-        _log("mouseout");
         if (!e) e=window.event;
         var popup=me.getHoverDiv(e.screenX, e.screenY);
         if (popup) {
@@ -310,29 +345,51 @@ CSPan.prototype.addHotSpots = function(hotspots,z) {
   }
 };
 
-CSPan.prototype.centre = function(xy) {
-  var newTop = this.element.offsetHeight/2 - xy.y;
-  var newLeft = this.element.offsetWidth/2 - xy.x;
-  _log("centre("+xy.x+","+xy.y+"): top="+newTop+", left="+newLeft);
+// Set centre point from fraction.
+CSPan.prototype.setCentre = function(fxy) {
+  _log("fxy="+fxy);
+  var newTop = this.element.offsetHeight/2 - fxy.y * this.toPan.offsetHeight;
+  var newLeft = this.element.offsetWidth/2 - fxy.x * this.toPan.offsetWidth;
   this.setPosition(csXY(newLeft, newTop));
+  this.centreFXY = fxy;
 }
 
+// Return centre point as fraction.
 CSPan.prototype.getCentre = function() {
-  return csXY(this.element.offsetWidth/2 - this.toPan.offsetLeft,
-              this.element.offsetHeight/2 - this.toPan.offsetTop);
+  var width = this.toPan.offsetWidth;
+  var height = this.toPan.offsetHeight;
+  if (width == 0 || height == 0) return null;
+  return csXY( (this.element.offsetWidth/2-this.toPan.offsetLeft) / width,
+               (this.element.offsetHeight/2-this.toPan.offsetTop) / height);
+}
+
+CSPan.prototype.reCentre = function() {
+  if (! this.centreFXY) {
+    this.centreFXY=this.getCentre();
+    if (this.centreFXY == null) {
+      _log("no centre yet, no reCentre");
+      return;
+    }
+  }
+  this.setCentre(this.centreFXY);
 }
 
 CSPan.prototype.setPosition = function(topLeft) {
+  if (topLeft.x > 0) topLeft.x = 0;
+  if (topLeft.y > 0) topLeft.y = 0;
   csSetPosition(this.toPan, topLeft);
   csSetPosition(this.hotLayer, topLeft);
+  this.centreFXY = null;
 }
 
 CSPan.prototype.setSize = function(width, height) {
-  csSetSize(this.element, width, height);
+  var me = this;
+  var cxy = me.getCentre();
+  csSetSize(me.element, width, height);
+  me.reCentre();
 };
 
 CSPan.prototype.handleDown = function(e) {
-  _log("panStart");
   if (!e) e=window.event;
 
   this.panning=true;
