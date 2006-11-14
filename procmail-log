@@ -7,12 +7,9 @@
 cmd=`basename "$0"` || exit 1
 usage="Usage: $cmd logfile"
 
-logfile=$1; shift
-
-subject=
-
-tail -f "$logfile" \
-| sed -e '
+if [ $# = 0 ]
+then
+  exec sed -e '
     y/	/ /
     /^ Subject: */{
       s/^ Subject: *//
@@ -31,3 +28,6 @@ tail -f "$logfile" \
     w /dev/fd/2
     d
   '
+fi
+
+tail -f "$1" | "$0"
