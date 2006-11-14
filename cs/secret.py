@@ -3,10 +3,14 @@ import os.path
 import cs.hier
 from cs.misc import debug, progress, verbose, warn
 
-def get(secret,base=None):
-  if base is None:
-    base=os.path.join(os.environ["HOME"],".secret")
-  return cs.hier.load(os.path.join(base,secret))
+def get(secret):
+  for base in (os.path.join(os.environ["HOME"],".secret"), '/opt/config/secret'):
+    try:
+      return cs.hier.load(os.path.join(base,secret))
+    except:
+      pass
+  
+  return None
 
 def mysql(secret,db=None):
   import types
@@ -15,10 +19,13 @@ def mysql(secret,db=None):
     secret=get(secret)
 
   import cs.dbi.mysql
-  return cs.dbi.mysql.Conn(host=secret['HOST'],
-			   db=db,
-			   user=secret['LOGIN'],
-			   passwd=secret['PASSWORD'])
+  host=secret['HOST']
+  if 'LOGIN' not in secret:
+    return cs.dbi.mysql.Conn(host=host, db=db)
+
+  user=secret['LOGIN']
+  passwd=secret['PASSWORD']
+  return cs.dbi.mysql.Conn(host=host, db=db, user=user, passwd=passwd)
 
 def ldap(secret,host=None,binddn=None,bindpw=None):
   # transmute secret name into structure
