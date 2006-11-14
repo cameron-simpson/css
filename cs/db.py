@@ -48,16 +48,9 @@ def mysql(secret,db=None):
 
   if secret is None:
     global MySQLServer
-    return MySQLdb.connect(host=host,db=db,user=None,passwd=None)
+    return MySQLdb.connect(host=MySQLServer,db=db,user=None,passwd=None)
 
-  if type(secret) is types.StringType or not(hasattr(secret,'__keys__') or hasattr(secret,'keys')):
-    # transmute secret name into structure
-    secret=cs.secret.get(secret)
-
-  return MySQLdb.connect(host=secret['HOST'],
-			 db=db,
-			 user=secret['LOGIN'],
-			 passwd=secret['PASSWORD'])
+  return cs.secret.mysql(secret,db=db)
 
 _cache_dbpool={}
 def dbpool(secret,dbname):
