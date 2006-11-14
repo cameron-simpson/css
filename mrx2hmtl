@@ -38,15 +38,14 @@ done
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
-mrxres=$TMPDIR/mrx$$
-
 mkdir -p "$mhonarcdir" || exit 1
-cd "$mhonarcdir" || exit 1
 
 xit=1
+mrxres=$TMPDIR/mrx$$
 
 set -x
 mairix -v -f "$rc" -o "$mrxres" $mrxopts "$@" \
+&& cd "$mhonarcdir" \
 && mhonarc "$mrxres" \
 && xit=0
 
