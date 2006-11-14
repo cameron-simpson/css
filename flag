@@ -17,38 +17,38 @@ badopts=
 
 if [ $# = 0 ]
 then
-  echo "$cmd: missing flagname" >&2
-  badopts=1
+  cd "$flagdir" || exit 1
+  exec ls
+fi
+
+flagname=$1
+shift
+case "$flagname" in
+  '' | */* | . | .. )
+    echo "$cmd: illegal flagname: $flagname" >&2
+    badopts=1
+    ;;
+esac
+if [ $# = 0 ]
+then
+  setstate=
 else
-  flagname=$1
+  setstate=1
+  value=$1
   shift
-  case "$flagname" in
-    '' | */* | . | .. )
-      echo "$cmd: illegal flagname: $flagname" >&2
-      badopts=1
-      ;;
+  case "$value" in
+    true|1)   newstate=1 ;;
+    false|0)  newstate= ;;
+    *)        echo "$cmd: unsupported value: $value" >&2
+              badopts=1
+              ;;
   esac
-  if [ $# = 0 ]
-  then
-    setstate=
-  else
-    setstate=1
-    value=$1
-    shift
-    case "$value" in
-      true|1)   newstate=1 ;;
-      false|0)  newstate= ;;
-      *)        echo "$cmd: unsupported value: $value" >&2
-                badopts=1
-                ;;
-    esac
-    [ $invert ] && { echo "$cmd: can't use ! (invert) while setting flag" >&2
-                     badopts=1
-                   }
-    [ $# = 0 ] || { echo "$cmd: extra arguments after value: $*" >&2
-                    badopts=1
-                  }
-  fi
+  [ $invert ] && { echo "$cmd: can't use ! (invert) while setting flag" >&2
+                   badopts=1
+                 }
+  [ $# = 0 ] || { echo "$cmd: extra arguments after value: $*" >&2
+                  badopts=1
+                }
 fi
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
