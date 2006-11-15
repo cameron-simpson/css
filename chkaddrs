@@ -1,0 +1,14 @@
+#!/bin/sh -u
+#
+# Check the IP addresses on a group of machines.
+# Report addresses on more than one machine.
+#       - Cameron Simpson <cs@zip.com.au> 14oct2006
+#
+
+for host
+do
+  ssh "$host" /sbin/ifconfig -a \
+  | sed -n "s/.* inet addr:\\([^ ][^ ]*\\) .*/$host \\1/p"
+done \
+| awk '$2 != "127.0.0.1"        { hosts[$2]=hosts[$2]" "$1; nh[$2]++; }
+       END                      { for (ip in hosts) { if (nh[ip] > 1) print ip hosts[ip]; } }'
