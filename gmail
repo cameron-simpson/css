@@ -1,0 +1,2 @@
+#!/bin/sh
+exec urlshow https://mail.google.com/
