@@ -3,11 +3,13 @@ import os.path
 import time
 import socket
 import mailbox as pyMailbox
+import email
 import email.Parser
+import email.FeedParser
 import string
 import StringIO
 import re
-from cs.misc import warn, progress, verbose, seq, saferename
+from cs.misc import cmderr, warn, progress, verbose, seq, saferename
 
 def ismhdir(path):
   return os.path.isfile(os.path.join(path,'.mh_sequences'))
@@ -31,8 +33,43 @@ def maildirify(path):
     if not os.path.isdir(dpath):
       os.makedirs(dpath)
 
+def readMbox(path,gzipped=None):
+  if gzipped is None:
+    gzipped=(path[-3:] == ".gz")
+  if gzipped:
+    import gzip
+    fp=gzip.open(path)
+  else:
+    fp=open(path)
+
+  parser=None
+  preline=fp.tell()
+  for mboxline in fp:
+    if mboxline[:5] == "From ":
+      if parser is not None:
+        msg=parser.close()
+        msg.set_unixfrom(from_)
+        msgSize=preline-msgStart
+        yield (msgStart, msgSize, msg)
+
+      parser=email.FeedParser.FeedParser()
+      from_=mboxline
+      msgStart=preline
+    elif parser is None:
+      cmderr(path+": skipping pre-message line:", mboxline)
+    else:
+      parser.feed(mboxline)
+
+    preline=fp.tell()
+
+  if parser is not None:
+    msg=parser.close()
+    msg.set_unixfrom(from_)
+    msgSize=preline-msgStart
+    yield (msgStart, msgSize, msg)
+
 _delivered=0
-def nextDelivered():
+def _nextDelivered():
   global _delivered
   _delivered+=1
   return _delivered
@@ -54,7 +91,7 @@ class Maildir:
     if self.__hostname is None:
       self.__hostname=socket.gethostname()
     right=self.__hostname.replace('/','\057').replace(':','\072')
-    middle='#'+str(seq())+'M'+str(subsecs*1e6)+'P'+str(os.getpid())+'Q'+str(nextDelivered())
+    middle='#'+str(seq())+'M'+str(subsecs*1e6)+'P'+str(os.getpid())+'Q'+str(_nextDelivered())
 
     return string.join((left,middle,right),'.')
 
