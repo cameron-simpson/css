@@ -118,6 +118,11 @@ function csAbsTopLeft(elem) {
   return topLeft;
 }
 
+function csElementToDocBBox(elem) {
+  var abs = csAbsTopLeft(elem);
+  return {x: abs.x, y: abs.y, width: elem.offsetWidth, height: elem.offsetHeight};
+}
+
 function csLogWindow(width, height) {
   var div = csDIV();
   div.style.overflow="auto";
@@ -281,6 +286,15 @@ CSHotSpot.prototype.getHoverDiv = function(mouseScreenX, mouseScreenY) {
   }
 
   return this.hoverDiv;
+}
+
+_cs_anims=[];
+_cs_nanim=0;
+function runanim(id, fn) {
+  var delay = fn();
+  if (delay > 0) {
+    setTimeout(function(){runanim(id,fn)}, delay);
+  }
 }
 
 /**
