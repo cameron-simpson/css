@@ -14,6 +14,7 @@ dir=.
 dohistbackup=
 keepn=14
 pcntfree=20
+bytable=
 
 cmd=$0
 usage="Usage: $cmd [-u user] [-p password] [-h host] [databases...]
@@ -21,6 +22,7 @@ usage="Usage: $cmd [-u user] [-p password] [-h host] [databases...]
 	-p password	Specify user password.
 	-h host		Specify MySQL host. Default: $host
 	-S secret	Get user/password/host from the named secret.
+        -T              Dump individual tables instead of databases.
 	-d dir		Target directory for dumps. Default: $dir
 	-H		Target directory is a histbackup directory.
 	databases	Database names to dump. Default: all of them."
@@ -39,6 +41,7 @@ do
 	host=$secretHOST
 	;;
     -d)	dir=$2; shift ;;
+    -T) bytable=1 ;;
     -H)	dohistbackup=1 ;;
     --)	shift; break ;;
     -?*)echo "$cmd: unrecognised option: $1" >&2
@@ -60,18 +63,44 @@ if [ $# = 0 ]
 then
   echo show databases \
   | mysql -h "$host" "-u$user" "-p$password" \
-  | sed 1d
+  | sed 1d \
+  | if [ $bytable ]
+    then
+      while read db
+      do
+        echo show tables \
+        | mysql -h "$host" "-u$user" "-p$password" "$db" \
+        | sed "1d; s/^/$db /"
+      done
+    else
+      cat
+    fi
 else
-  for db
-  do  echo "$db"
+  for arg
+  do
+    case "$db" in
+      *.*)
+        db=`expr "x$arg" : 'x\([^.]*\)\..*'` || exit 1
+        tbl=`expr "x$arg" : 'x[^.]*\.\(.*\)'` || exit 1
+        echo "$db $tbl"
+        ;;
+      *)
+        db=$arg
+        echo "$db"
+        ;;
+    esac
   done
 fi \
 | sort \
-| while read dbname
+| while dbname= tblname=
+        read dbname tblname
   do
-    squiz=$dbname.sql.gz
+    if [ -n "$tblname" ]
+    then  squiz=$dbname.$tblname.sql.gz
+    else  squiz=$dbname.sql.gz
+    fi
     rm -f "$squiz"
-    $trace mysqldump -h "$host" "-u$user" "-p$password" --opt "$dbname" \
+    $trace mysqldump -h "$host" "-u$user" "-p$password" --opt "$dbname" $tblname \
     | gzip -n --fast >"$squiz"
   done
 
