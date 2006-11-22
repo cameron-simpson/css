@@ -1,0 +1,41 @@
+#!/bin/sh -u
+#
+# Gzip a bunch of files.
+# If file.gz exists, gzcat|cmp to compare, discard file if the same.
+#       - Cameron Simpson <cs@zip.com.au>
+# 
+
+cmd=`basename "$0"` || exit 1
+usage="Usage: $cmd files..."
+
+trace=set-x
+gzopts=-n
+[ -t 2 ] && gzopts="$gzopts -v"
+
+[ $# = 0 ] && { echo "$usage" >&2; exit 2; }
+
+for file
+do
+  [ -f "$file" ] || { echo "$cmd: $file: not a file, skipping" >&2; continue; }
+  [ -s "$file" ] || { echo "$cmd: $file: empty file, skipping" >&2; continue; }
+  case "$file" in
+    *.gz)
+      echo "$cmd: $file: already gzipped, skipped" >&2
+      continue
+      ;;
+  esac
+
+  gz=$file.gz
+  if [ ! -f "$gz" ]
+  then
+    $trace gzip $gzopts -- "$file" || exit 1
+  else
+    if gunzip < "$gz" | cmp - "$file"
+    then
+      echo "$cmd: $file: same as $gz, discarding $file" >&2
+      $trace rm -- "$file"
+    else
+      echo "$cmd: $file: differs from $gz, skipped" >&2
+    fi
+  fi
+done
