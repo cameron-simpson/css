@@ -63,9 +63,9 @@ if [ $# = 0 ]
 then
   echo show databases \
   | mysql -h "$host" "-u$user" "-p$password" \
-  | sed 1d \
   | if [ $bytable ]
     then
+      read headline || exit 1
       while read db
       do
         echo show tables \
@@ -73,7 +73,7 @@ then
         | sed "1d; s/^/$db /"
       done
     else
-      cat
+      sed 1d
     fi
 else
   for arg
