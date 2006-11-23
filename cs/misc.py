@@ -87,9 +87,9 @@ def exactlyOne(list,context=None):
   if context is not None:
     icontext=icontext+" for "+context
   if len(list) == 0:
-    raise IndexError, context+", got none"
+    raise IndexError, icontext+", got none"
   if len(list) > 1:
-    raise IndexError, context+", got "+str(len(list))+": "+strlist(list)
+    raise IndexError, icontext+", got "+str(len(list))+": "+strlist(list)
   return list[0]
 
 def winsize(f):
