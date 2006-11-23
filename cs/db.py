@@ -469,6 +469,11 @@ class KeyedTableView(cs.cache.Cache):
     cs.cache.Cache.__init__(self,self.__direct)
     self.__columnIndices={}
 
+  def bump(self):
+    cs.cache.Cache.bump(self)
+    for colname in self.__columnIndices.keys():
+      self.__columnIndices[colname].flush()
+
   def preload(self,where=None):
     debug("preload "+self.name)
     for row in self.selectRows(where=where):
