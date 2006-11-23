@@ -104,6 +104,9 @@ class Cache:
 
 class CrossReference:
   def __init__(self):
+    self.flush()
+
+  def flush(self):
     self.__index={}
 
   def __getitem__(self,key):
