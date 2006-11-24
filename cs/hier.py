@@ -7,7 +7,7 @@ from types import *
 from cStringIO import StringIO
 from cs.lex import skipwhite, lastlinelen
 import cs.io
-from cs.misc import progress, cmderr
+from cs.misc import progress, cmderr, all
 
 safeChunkPtn = r'[\-+_a-zA-Z0-9./@]+'
 safeChunkRe  = re.compile(safeChunkPtn)
@@ -137,7 +137,9 @@ def dictEncode(fp,d,i=None):
     if dofold: nsep=",\n"
     else:      nsep=", "
 
+    if type(keys) is TupleType: keys=all(keys)
     keys.sort()
+
     for k in keys:
       fp.write(sep)
       sep=nsep
