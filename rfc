@@ -1,7 +1,7 @@
-#!/bin/sh
+#!/bin/sh -u
 #
 # Pop up an RFC.
-#	- Cameron Simpson <cs@zip.com.au> 05nov1996
+#       - Cameron Simpson <cs@zip.com.au> 05nov1996
 #
 
 [ $# = 0 ] && { echo "Usage: $0 keys..." >&2; exit 2; }
@@ -12,16 +12,17 @@ xit=0
 
 for key
 do
-    case $key in
-	[0-9]*)
-			## "http://freesoft.org/CIE/RFC/$key/index.htm"
-			urlshow "http://www.faqs.org/rfcs/rfc$key.html"
-			continue
-			;;
-	*)		rfcconnected "$key"
-			continue
-			;;
-    esac
+  case $key in
+    [0-9]*)
+      ## "http://freesoft.org/CIE/RFC/$key/index.htm"
+      ## "http://www.faqs.org/rfcs/rfc$key.html"
+      urlshow "http://tools.ietf.org/html/rfc$key" || xit=1
+      continue
+      ;;
+    *)rfcconnected "$key" || xit=1
+      continue
+      ;;
+  esac
 done
 
 exit $xit
