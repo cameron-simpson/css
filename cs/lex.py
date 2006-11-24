@@ -100,7 +100,7 @@ def dict2js(d):
       t=type(v)
       if t is str:
         fp.write(jsquote(v))
-      elif t is int:
+      elif t in (int, float):
         fp.write(str(v))
       else:
         fp.write(jsquote(str(v)))
