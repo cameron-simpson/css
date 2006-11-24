@@ -1,0 +1,2 @@
+#!/bin/sh -u
+exec search googlemaps ${1+"$@"}
