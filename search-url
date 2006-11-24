@@ -68,6 +68,7 @@ case `echo "$engine" | tr '[a-z]' '[A-Z]'` in
   GOOGLEDJ)	url=http://groups.google.com/groups?as_q=$query\&hl=en\&lr=\&safe=off\&site=groups\&num=$maxhits ;;
   GOOGLEDJMSGID)	url=http://groups.google.com/groups?safe=off\&ie=ISO-8859-1\&as_umsgid=$query\&lr=\&num=$maxhits\&hl=en ;;
   GOOGLEIMAGESEARCH)	url=http://images.google.com/images?q=$query\&num=$maxhits\&hl=en\&safe=off\&imgsafe=off ;;
+  GOOGLEMAPS)	url=http://maps.google.com/maps?q=$query\&t=h ;;
   GOOGLENEWS)	url=http://news.google.com.au/news?hl=en\&ned=au\&q=$query\&btnG=Search+News ;;
   GOOGLESUBMIT)	url=http://www.google.com/addurl?q=$query\&dq=\&submit=Add URL ;;
   GOOGLE_DE2EN)	url=http://translate.google.com/translate?u=$query\&langpair=de%7Cen\&hl=en\&ie=UTF-8\&oe=UTF-8\&prev=%2Flanguage_tools ;;
