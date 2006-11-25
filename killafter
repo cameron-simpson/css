@@ -1,0 +1,38 @@
+#!/bin/sh -u
+#
+# Run a command and then kill a process afterwards.
+#	- Cameron Simpson <cs@zip.com.au> 16sep2006
+#
+
+cmd=$0
+usage="Usage: $cmd [-x] [-signal] pid command [args...]"
+
+signal=
+trace=
+
+badopts=
+
+[ "x$1" = x-x ] && { trace=set-x; shift; }
+
+case $1 in
+  -?*)  signal=$1; shift ;;
+esac
+
+if [ $# = 0 ]
+then
+  echo "$cmd: missing pid" >&2
+  badopts=1
+else
+  pid=$1
+  shift
+  [ $# -gt 0 ] || { echo "$cmd: missing command" >&2; badopts=1; }
+fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+$trace "$@"
+xit=$?
+
+$trace kill $signal "$pid" || xit=1
+
+exit $xit
