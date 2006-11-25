@@ -15,7 +15,7 @@ numericRe=re.compile('^(0|[1-9][0-9]*)$')
 scalarFieldNameRe=re.compile('^[a-z][a-z0-9_]*$')
 
 def _dfltRoot():
-  return cs.env.dflt('CSBUG_ROOT','/home/cameron/var/csbugs',1)
+  return cs.env.dflt('CSBUG_ROOT','$HOME/var/csbug',True)
 
 class BugSet:
   def __init__(self,pathname=None):
