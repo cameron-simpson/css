@@ -1,42 +1,91 @@
 import os
 import string
+import types
+from cs.misc import warn
 
-def dflt(envvar,dfltval,doenvsub=False):
-  env=os.environ
-  if envvar in env:
-    return env[envvar]
+def getLogin(uid=None):
+  import pwd
+  if uid is None: uid=os.geteuid()
+  return pwd.getpwuid(uid)[0]
+def getHomeDir(login=None):
+  import pwd
+  if login is None: login=getLogin()
+  return pwd.getpwnam(login)[5]
 
-  if doenvsub:
-    return envsub(dfltval)
+baseEnv={
+  'USER':       getLogin,
+  'HOME':       getHomeDir,
+  'LOGDIR':     '$HOME/var/log',
+  'VARRUN':     '$HOME/var/run',
+  'TMPDIR':     '/tmp',
+}
 
-  return dfltval
+class Env:
+  def __init__(self,environ=os.environ,base=baseEnv):
+    self.__environ=environ
+    self.__base={}
+    for k in base.keys():
+      self.__base[k]=base[k]
 
-def envsub(s):
-  next=s.find('$')
-  if next < 0:
-    return s
-
-  expanded=''
-  while next >= 0:
-    expanded=expanded+s[:next]
-    s=s[next+1:]
-    endvar=0
-    while ( endvar < len(s)
-	and ( s[endvar] == '_'
-	   or s[endvar] in string.ascii_letters
-	   or (endvar > 0 and s[endvar] in string.digits)
-	    )):
-      endvar=endvar+1
-
-    if endvar == 0:
-      expanded=expanded+'$'
+  def get(self,name,dfltval=None,doenvsub=False):
+    if name in self.__environ:
+      val=self.__environ[name]
     else:
-      expanded=expanded+dflt(s[:endvar],'')
+      if dfltval is not None:
+        if doenvsub:
+          val=self.envsub(dfltval)
+        else:
+          val=dfltval
+      elif name in self.__base:
+        base=self.__base[name]
+        t=type(base)
+        if t is str:
+          val=self.envsub(base)
+        elif t is types.FunctionType:
+          val=base()
+        else:
+          assert False, "unsupported baseEnv type "+str(t)+": "+`base`
+      else:
+        raise IndexError
 
-    s=s[endvar:]
+      self.__environ[name]=val
+
+    return val
+
+  def __getitem__(self,name):
+    return self.get(name)
+
+  def envsub(self,s):
     next=s.find('$')
+    if next < 0:
+      return s
 
-  if len(s) > 0:
-    expanded=expanded+s
+    expanded=''
+    while next >= 0:
+      expanded=expanded+s[:next]
+      s=s[next+1:]
+      endvar=0
+      while ( endvar < len(s)
+          and ( s[endvar] == '_'
+             or s[endvar] in string.ascii_letters
+             or (endvar > 0 and s[endvar] in string.digits)
+              )):
+        endvar=endvar+1
 
-  return expanded
+      if endvar == 0:
+        expanded=expanded+'$'
+      else:
+        expanded=expanded+self[s[:endvar]]
+
+      s=s[endvar:]
+      next=s.find('$')
+
+    if len(s) > 0:
+      expanded=expanded+s
+
+    return expanded
+
+__dfltEnv=Env()
+
+def dflt(envvar,dfltval=None,doenvsub=False):
+  return __dfltEnv.get(envvar,dfltval=dfltval,doenvsub=doenvsub)
