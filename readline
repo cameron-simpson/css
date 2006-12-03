@@ -6,14 +6,28 @@
 #
 
 cddir=
+doblank=
 
 { [ -t 0 ] && cmd=`basename "$0"`; } || cmd=$0
 usage="Usage: readline [-d dir] prompt
+        -B      Blank out the line with some spaces first.
 	-d dir	Resolve completions in dir."
 
 badopts=
 
-[ $# -gt 0 ] && [ "x$1" = x-d ] && { cddir=$2; shift; shift; }
+while [ $# -gt 0 ]
+do
+  case "$1" in
+    -B) doblank=1 ;;
+    -d) cddir=$2; shift ;;
+    --) shift; break ;;
+    -?*)echo "$cmd: unrecognised option: $1" >&2
+        badopts=1
+        ;;
+    *)  break ;;
+  esac
+  shift
+done
 
 if [ $# = 0 ]
 then
@@ -28,13 +42,15 @@ fi
 
 [ -t 0 ] || { echo "$0: stdin must be a tty" >&2; exit 1; }
 
+[ $doblank ] && printf '\015                                                            \015' >&2
+
 if [ -x "/bin/bash" ]
 then
     export prompt
     [ -n "$cddir" ] && [ -d "$cddir/." ] && cd "$cddir"
     exec bash -c 'read -p "$prompt" -r -e line >&2 || exit 1; printf "%s\n" "$line"'
 else
-    necho "$prompt"
+    printf "%s" "$prompt" >&2
     read line || exit 1
     printf "%s\n" "$line"
 fi
