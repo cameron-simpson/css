@@ -13,10 +13,14 @@ _cs_browserVersion = parseInt(navigator.appVersion);
 _cs_agent = navigator.userAgent.toLowerCase();
 _cs_isGecko = (_cs_agent.indexOf(" gecko/") > 0);
 _cs_isIE = (_cs_agent.indexOf(" msie ") > 0);
+##_cs_isGecko = false;
+##_cs_isIE = true;
+document.write("appver = "+navigator.appVersion+", agent = "+navigator.userAgent+"<BR>\n");
+document.write("isIE="+_cs_isIE+", isGecko="+_cs_isGecko+"<BR>\n");
 
 _cs_seq = 0;
 function csSeq() {
-  return _seq++;
+  return _cs_seq++;
 }
 
 function csPushOnresize(fn) {
@@ -36,13 +40,14 @@ function csHash2a(h) {
   var first=true;
   var v;
   for (var k in h) {
-    if (k != "toString") {
-      if (first) first=false;
-      else s=s+", ";
-      v=h[k];
-      if (typeof(v) == "string") v='"'+v+'"';
-      s=s+k+": "+v;
-    }
+    if (k == "toString") continue;
+
+    if (first) first=false;
+    else s=s+", ";
+
+    v=h[k];
+    if (typeof(v) == "string") v='"'+v+'"';
+    s=s+k+": "+v;
   }
   return s+"}";
 }
@@ -165,6 +170,7 @@ function csMkLogWindow(width, height) {
   if (width == null) width="50%";
   if (height == null) height="15%";
 
+  _log("mklog1");
   var div = csDIV();
   document.body.appendChild(div);
   div.style.overflow="auto";
@@ -172,7 +178,9 @@ function csMkLogWindow(width, height) {
   csSetSize(div,width,height);
   csSetPosition(div,csXY("50%","0%"));
   csSetZIndex(div,1023);
+  _log("mklog2");
   _logTo(div);
+  _log("mklog3");
   return div;
 }
 csMkLogWindow();
@@ -214,6 +222,7 @@ function csClientMapAddHotSpot(map,hot) {
 function csHotspotsToClientMap(mapname,hotspots) {
   var map = csNode("MAP");
   map.name=mapname;
+  _log("new MAP: name="+map.name);
 
   var hslen=hotspots.length;
   _log("hs2a: "+hslen+" hotspots");
@@ -236,6 +245,7 @@ function CSHotSpot(meta,xy1,xy2,z) {
   this.xy2=xy2;
 
   var hotdiv = csDIV();
+  _log("cssp1");
   csSetPosition(hotdiv,xy1);
   _log("set hot size: "+(xy2.x-xy1.x)+"x"+(xy2.y-xy1.y));
   csSetSize(hotdiv,xy2.x-xy1.x,xy2.y-xy1.y);
@@ -318,6 +328,7 @@ CSHotSpot.prototype.getHoverDiv = function(mouseScreenX, mouseScreenY) {
       _log("UP.HEIGHT = "+up.offsetHeight+", up = "+up);
       pos.y = up.offsetHeight - this.hoverDiv.offsetHeight;
     }
+  _log("cssp2");
     csSetPosition(this.hoverDiv, pos);
   }
 
@@ -356,6 +367,7 @@ function CSPan(toPan) {
   outer.style.overflow='hidden';
 
   outer.appendChild(toPan);
+  _log("cssp3");
   csSetPosition(toPan, csXY(0,0));
   csSetZIndex(toPan,0);
 
@@ -368,7 +380,7 @@ function CSPan(toPan) {
     glass = null;
     hotLayer = null;
     mapName="_csPan_map"+csSeq();
-    map = csHotspotsToClientMap(mapname,[]);
+    map = csHotspotsToClientMap(mapName,[]);
     outer.appendChild(map);
     document.body.appendChild(map);
   } else {
@@ -397,9 +409,10 @@ function CSPan(toPan) {
   mouseElem.onmousedown = this.onMouseDown;
   if (_csPan_dragCursor) mouseElem.style.cursor=_csPan_dragCursor;
 
-  _log("hotLayer="+hotLayer);
   this.element=outer;
   this.glass=glass;
+  this.map=map;
+  this.mapName=mapName;
   this.hotLayer=hotLayer;
   this.toPan=toPan;
 }
@@ -407,7 +420,6 @@ function CSPan(toPan) {
 CSPan.prototype.addHotSpot = function(meta,z) {
 
   csStringable(meta);
-  _log("CSPan.addHotSpot: meta="+meta);
   xy1=csXY(meta.x, meta.y);
   xy2=csXY(meta.x+meta.dx, meta.y+meta.dy);
   _log("xy1="+xy1+", xy2="+xy2);
@@ -472,7 +484,7 @@ CSPan.prototype.setPosition = function(topLeft) {
   if (topLeft.x > 0) topLeft.x = 0;
   if (topLeft.y > 0) topLeft.y = 0;
   csSetPosition(this.toPan, topLeft);
-  csSetPosition(this.hotLayer, topLeft);
+  if (this.hotLayer) { csSetPosition(this.hotLayer, topLeft); }
   this.centreFXY = null;
 }
 
@@ -570,8 +582,6 @@ CSPan.prototype.handleUp = function(e) {
     if (this.hotLayer) this.hotLayer.style.display='block';
   }
 };
-document.write("appver = "+navigator.appVersion+", agent = "+navigator.userAgent+"<BR>\n");
-document.write("isIE="+_cs_isIE+", isGecko="+_cs_isGecko+"<BR>\n");
 { var vp = csViewPort();
-  document.write("viewport = "+vp.x+"x"+vp.y+", "+vp.width+"x"+vp.height);
+  _log("viewport = "+vp.x+"x"+vp.y+", "+vp.width+"x"+vp.height);
 }
