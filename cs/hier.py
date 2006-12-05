@@ -28,19 +28,19 @@ def flavour(o):
   if hasattr(o,'__iter__'): return 'ARRAY'
   return 'SCALAR'
 
-def h2a(o,i=None):
+def h2a(o,i=None,seen={}):
   """ ``Hier'' to ``ASCII''- convert an object to text.
       Return a textual representation of an object in Hier format.
       i is the indent mode, default None.
   """
   buf=StringIO()
   io=cs.io.IndentedFile(buf,i)
-  h2f(io,o)
+  h2f(io,o,seen=seen)
   e=buf.getvalue()
   buf.close()
   return e
 
-def h2f(fp,o):
+def h2f(fp,o,seen):
   """ ``Hier'' to ``ASCII''- convert an object to text.
       Transcribe a textual representation of an object in Hier format to the File fp.
       NB: fp must be a cs.io.IndentedFile
@@ -55,13 +55,17 @@ def h2f(fp,o):
   elif isinstance(o, StringTypes):
     stringEncode(fp,o)
   else:
-    fl=flavour(o)
-    if fl is 'ARRAY':
-      listEncode(fp,o)
-    elif fl is 'HASH':
-      dictEncode(fp,o)
+    if id(o) in seen:
+      stringEncode(fp,"id#"+str(id(o)))
     else:
-      h2f(fp,`o`)
+      seen[id(o)]=o
+      fl=flavour(o)
+      if fl is 'ARRAY':
+        listEncode(fp,o,seen=seen)
+      elif fl is 'HASH':
+        dictEncode(fp,o,seen=seen)
+      else:
+        h2f(fp,`o`,seen=seen)
 
 def stringEncode(fp,s):
   """ Transcribe a string to the File fp in Hier format.
@@ -101,7 +105,7 @@ def unsafeSubstringEncode(fp,s):
       else:				enc="\\u%04x" % oc
     fp.write(enc)
 
-def listEncode(fp,l):
+def listEncode(fp,l,seen):
   """ Transcribe a List to the File fp in Hier format.
   """
   fp.write("[")
@@ -117,13 +121,13 @@ def listEncode(fp,l):
     for o in l:
       fp.write(sep)
       sep=nsep
-      h2f(fp,o)
+      h2f(fp,o,seen=seen)
 
     fp.popindent()
 
   fp.write("]")
 
-def dictEncode(fp,d,i=None):
+def dictEncode(fp,d,seen,i=None):
   """ Transcribe a Dictionary to the File fp in Hier format.
   """
   fp.write("{")
@@ -143,12 +147,12 @@ def dictEncode(fp,d,i=None):
     for k in keys:
       fp.write(sep)
       sep=nsep
-      keytxt=h2a(k,0)
+      keytxt=h2a(k,0,seen={})
       fp.write(keytxt)
       fp.write(" => ")
 
       fp.adjindent(lastlinelen(keytxt)+4)	# key width + " => "
-      h2f(fp,d[k])
+      h2f(fp,d[k],seen=seen)
       fp.popindent()
 
     fp.popindent()
