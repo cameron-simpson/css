@@ -13,8 +13,8 @@ _cs_browserVersion = parseInt(navigator.appVersion);
 _cs_agent = navigator.userAgent.toLowerCase();
 _cs_isGecko = (_cs_agent.indexOf(" gecko/") > 0);
 _cs_isIE = (_cs_agent.indexOf(" msie ") > 0);
-##_cs_isGecko = false;
-##_cs_isIE = true;
+// _cs_isGecko = false;
+// _cs_isIE = true;
 document.write("appver = "+navigator.appVersion+", agent = "+navigator.userAgent+"<BR>\n");
 document.write("isIE="+_cs_isIE+", isGecko="+_cs_isGecko+"<BR>\n");
 
