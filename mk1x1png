@@ -1,0 +1,12 @@
+#!/usr/bin/python
+#
+# Construct a 1x1 PNG file.
+#       - Cameron Simpson <cs@zip.com.au> 05dec2006
+#
+
+import sys
+import Image
+
+usage="Usage: mk1x1png colour >filename.png"
+
+img=Image.new("RGB",(1,1),sys.argv[1]).save(sys.stdout,"PNG");
