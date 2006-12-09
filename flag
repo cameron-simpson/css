@@ -18,7 +18,14 @@ badopts=
 if [ $# = 0 ]
 then
   cd "$flagdir" || exit 1
-  exec ls
+  for flag in *
+  do
+    if flag "$flag"
+    then  echo "$flag	TRUE"
+    else  echo "$flag	FALSE"
+    fi
+  done
+  exit 0
 fi
 
 flagname=$1
