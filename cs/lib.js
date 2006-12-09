@@ -9,14 +9,15 @@ function _logTo(elem) {
   _logNode=elem;
 }
 
+_cs_singlePixelIMGPrefix = '';
 _cs_browserVersion = parseInt(navigator.appVersion);
 _cs_agent = navigator.userAgent.toLowerCase();
 _cs_isGecko = (_cs_agent.indexOf(" gecko/") > 0);
 _cs_isIE = (_cs_agent.indexOf(" msie ") > 0);
 // _cs_isGecko = false;
 // _cs_isIE = true;
-document.write("appver = "+navigator.appVersion+", agent = "+navigator.userAgent+"<BR>\n");
-document.write("isIE="+_cs_isIE+", isGecko="+_cs_isGecko+"<BR>\n");
+//document.write("appver = "+navigator.appVersion+", agent = "+navigator.userAgent+"<BR>\n");
+//document.write("isIE="+_cs_isIE+", isGecko="+_cs_isGecko+"<BR>\n");
 
 _cs_seq = 0;
 function csSeq() {
@@ -71,8 +72,17 @@ function box(xy, size) {
   return csStringable({x: xy.x, y: xy.y, width: size.width, height: size.height});
 }
 
-function csDIV() {
-  return csNode('DIV');
+function csDIV(colour) {
+  var div = csNode('DIV');
+  if (colour) {
+    var fillImg = csSinglePixelIMG(colour);
+    csSetSize(fillImg,"100%","100%");
+    csSetPosition(fillImg,csXY(0,0));
+    csSetZIndex(div,0);
+    csSetZIndex(fillImg,-1023);
+    div.appendChild(fillImg);
+  }
+  return div;
 }
 
 function csText(str) {
@@ -92,6 +102,14 @@ function csIMG(src,onload) {
   img.src = src;
 
   return img;
+}
+
+function csSinglePixelIMG(colour) {
+  var imgfile = colour+"-1x1.png";
+  if (_cs_singlePixelIMGPrefix) {
+    imgfile = _cs_singlePixelIMGPrefix + imgfile;
+  }
+  return csIMG(imgfile);
 }
 
 function csBoxInView(viewport, box) {
@@ -170,7 +188,6 @@ function csMkLogWindow(width, height) {
   if (width == null) width="50%";
   if (height == null) height="15%";
 
-  _log("mklog1");
   var div = csDIV();
   document.body.appendChild(div);
   div.style.overflow="auto";
@@ -178,9 +195,7 @@ function csMkLogWindow(width, height) {
   csSetSize(div,width,height);
   csSetPosition(div,csXY("50%","0%"));
   csSetZIndex(div,1023);
-  _log("mklog2");
   _logTo(div);
-  _log("mklog3");
   return div;
 }
 csMkLogWindow();
@@ -328,7 +343,6 @@ CSHotSpot.prototype.getHoverDiv = function(mouseScreenX, mouseScreenY) {
       _log("UP.HEIGHT = "+up.offsetHeight+", up = "+up);
       pos.y = up.offsetHeight - this.hoverDiv.offsetHeight;
     }
-  _log("cssp2");
     csSetPosition(this.hoverDiv, pos);
   }
 
@@ -367,7 +381,6 @@ function CSPan(toPan) {
   outer.style.overflow='hidden';
 
   outer.appendChild(toPan);
-  _log("cssp3");
   csSetPosition(toPan, csXY(0,0));
   csSetZIndex(toPan,0);
 
@@ -404,10 +417,14 @@ function CSPan(toPan) {
   this.onMouseDown = function(e) { me.handleDown(e); };
   this.onMouseMove = function(e) { me.handleMove(e); };
   this.onMouseUp   = function(e) { me.handleUp(e); };
+  this.onKeyPress  = function(e) { _log("K"); me.handleKeyPress(e); };
 
   var mouseElem = (glass ? glass : toPan);
   mouseElem.onmousedown = this.onMouseDown;
   if (_csPan_dragCursor) mouseElem.style.cursor=_csPan_dragCursor;
+
+  var keyElem = hotLayer;       //(glass ? glass : outer);
+  keyElem.onkeypress = this.onKeyPress;
 
   this.element=outer;
   this.glass=glass;
@@ -494,6 +511,15 @@ CSPan.prototype.setSize = function(width, height) {
   _log("pan.setSize(width="+width+",height="+height+")");
   csSetSize(me.element, width, height);
   me.reCentre();
+};
+
+CSPan.prototype.handleKeyPress = function(e) {
+  if (!e) e=window.event;
+
+  var keycode = (_is_IE ? e.keyCode : e.which);
+  _log("keycode = "+keycode);
+
+  return false;
 };
 
 CSPan.prototype.handleDown = function(e) {
