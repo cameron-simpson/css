@@ -116,6 +116,14 @@ class DBDiGraph:
       node=nodes[0]
     return node
 
+  def nodesFromNames(self,*names):
+    for name in names:
+      if name[0] == "@":
+        for node in self.nodesByType(name[1:]):
+          yield node
+      else:
+        yield self[name]
+
   def nodesWhere(self,where):
     return [self[row[0]] for row in self.nodes.selectRows(where)]
 
