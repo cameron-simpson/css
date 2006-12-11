@@ -65,6 +65,7 @@ case `echo "$engine" | tr '[a-z]' '[A-Z]'` in
   FROOGLE)	url=http://froogle.google.com/froogle?as_q=$query\&num=$maxhits\&btnG=Froogle+Search\&as_epq=\&as_oq=\&as_eq=\&price=under\&price0=\&price1=\&price2=\&as_occt=any\&cat=0 ;;
   FTPSEARCH)	url=http://ftpsearch.lycos.com/cgi-bin/search?form=medium\&query=$query\&doit=Search\&type=insensitive multiple substrings search\&hits=$maxhits\&matches=$maxhits\&hitsprmatch=$maxhits\&limdom=\&limpath=\&f1=Count\&f2=Mode\&f3=Size\&f4=Date\&f5=Host\&f6=Path\&header=all\&sort=date\&strlen=200 ;;
   GOOGLE)	url=http://www.google.com.au/search?q=$query ;;
+  GOOGLEBOOKMARKS) url=http://www.google.com/bookmarks/find?q=$query ;;
   GOOGLEDJ)	url=http://groups.google.com/groups?as_q=$query\&hl=en\&lr=\&safe=off\&site=groups\&num=$maxhits ;;
   GOOGLEDJMSGID)	url=http://groups.google.com/groups?safe=off\&ie=ISO-8859-1\&as_umsgid=$query\&lr=\&num=$maxhits\&hl=en ;;
   GOOGLEIMAGESEARCH)	url=http://images.google.com/images?q=$query\&num=$maxhits\&hl=en\&safe=off\&imgsafe=off ;;
