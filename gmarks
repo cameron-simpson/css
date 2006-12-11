@@ -1,0 +1,3 @@
+#!/bin/sh
+[ $# = 0 ] && exec urlshow http://www.google.com/bookmarks/
+exec search googlebookmarks "$@"
