@@ -163,135 +163,6 @@ def getTable(conn,table,keyColumns,allColumns,constraint=None):
 def getDatedTable(conn,table,keyColumns,allColumns,when=None):
   return getTable(conn,table,keyColumns,allColumns,constraint=sqlDatedRecordTest(when))
 
-##class OldKeyedTableView:
-##  """ A view of a table where each key designates a unique row.
-##      A key may span multiple table columns.
-##      Each row is indexed by a tuple of the key values.
-##      If you have a single key column (a common case),
-##      use the SingleKeyTableView class,
-##      which is a simple subclass of KeyedTableView
-##      that presents the keys directly instead of as a single element tuple.
-##  """
-##
-##  def __init__(self,conn,tablename,keyColumns,allColumns,constraint=None,doCache=False):
-##    self.conn=conn
-##    self.name=tablename
-##
-##    self.__keyColumns=keyColumns
-##
-##    self.__allColumns=allColumns
-##    self.__sqlColumns=string.join(self.__allColumns,",")	# precompute "col1,col2,..."
-##    self.__constraint=constraint
-##
-##    self.__columnmap={}
-##    for i in range(len(allColumns)):
-##      self.__columnmap[allColumns[i]]=i
-##    self.__keyindices=[self.__columnmap[column] for column in keyColumns]
-##
-##    self.__preload=None
-##
-##  def columns(self):
-##    return self.__allColumns
-##
-##  def insert(self,row,sqlised_columns=()):
-##    ''' Insert a new row into the table.
-##    '''
-##    sqlrow={}
-##
-##    for col in row.keys():
-##      v=row[col]
-##      if col not in sqlised_columns: v=sqlise(v)
-##      sqlrow[col]=v
-##
-##    self.insertSQLised(sqlrow)
-##
-##  def insertSQLised(self,row):
-##    ''' Insert a new row into the table.
-##	The row values are already in SQL syntax.
-##    '''
-##    columns=row.keys()
-##    sql='INSERT INTO '+self.name+'('+string.join(columns,',')+') VALUES ('+string.join([row[k] for k in columns],',')+')'
-##    dosql(self.conn,sql)
-##
-##  def columnMap(self):
-##    return self.__columnmap
-##
-##  def _columnIndex(self,column):
-##    return self.__columnmap[column]
-##
-##  def _selectFields(self):
-##    ''' Returns the table view columns, comma separated.
-##    '''
-##    return self.__sqlColumns
-##
-##  def rowKey(self,row):
-##    ''' Return the key values for the supplied row.
-##    '''
-##    return tuple([row[i] for i in self.__keyindices])
-##
-##  def __keyWhereClause(self,key):
-##    clause=string.join([self.__keyColumns[i]+" = "+sqlise(key[i]) for i in range(len(key))]," AND ")
-##    if self.__constraint:
-##      clause=clause+' AND ('+self.__constraint+')'
-##    return clause
-##
-##  def __rowWhereClause(self,row):
-##    return self.__keyWhereClause(self.rowKey(row))
-##
-##  # load up a table
-##  def preload(self):
-##    self.__preload={}
-##    sql='SELECT '+self.__sqlColumns+' FROM '+self.name;
-##    if self.__constraint:
-##      sql=sql+' WHERE ('+self.__constraint+')'
-##    res=SQLQuery(self.conn,sql)
-##    for row in res:
-##      self.__preload[self.rowKey(row)]=_TableRow(self,self.__rowWhereClause(row),rowdata=row)
-##
-##  def __preloaded(self,key):
-##    if self.__preload is None:
-##      return None
-##
-##    if key not in self.__preload:
-##      return None
-##
-##    return self.__preload[key]
-##
-##  def findrow(self,where):
-##    kfsqlfields=string.join(self.__keyColumns,",")
-##    sql='SELECT '+kfsqlfields+' FROM '+self.name+' WHERE '+where
-##    rows=SQLQuery(self.conn,sql).allrows()
-##    if len(rows) == 0:
-##      return None
-##    row1=rows[0]
-##    id=tuple(row1)
-##    if len(rows) > 1:
-##      warn("multiple hits in",self.name,"- choosing the first one:",kfsqlfields,'=',`id`)
-##    return KeyedTableView.__getitem__(self,id)
-##
-##  def __getitem__(self,key):
-##    row=self.__preloaded(key)
-##    if row is None:
-##      if self.__preload is None: self.__preload={}
-##      row=self.__preload[key]=_TableRow(self,self.__keyWhereClause(key))
-##    return row
-##
-##  def keys(self):
-##    if self.__preload is None:
-##      self.preload()
-##    return self.__preload.keys()
-##
-##  def __iter__(self):
-##    for key in self.keys():
-##      yield self[key]
-##
-##  def __contains__(self,key):
-##    if self.__preload is None:
-##      self.preload()
-##    return key in self.__preload
-##  def has_key(self,key):
-##    return self.__contains__(key)
-
 class DirectKeyedTableView:
   ''' An uncached view of a table where each key designates a unique row.
       A key may span multiple table columns.
@@ -360,7 +231,7 @@ class DirectKeyedTableView:
     return tuple([row[self.__columnmap[key]] for key in self.__keyColumns])
 
   def __key2where(self,key):
-    return string.join([self.__allColumns[i]+' = '+sqlise(key[i]) for i in range(len(key))], ' AND ')
+    return " AND ".join([self.__allColumns[i]+' = '+sqlise(key[i]) for i in range(len(key))])
 
   def rowWhere(self,row):
     return self.__key2where(self.rowKey(row))
@@ -456,10 +327,6 @@ class DirectTableRow:
 
     dosql(self.__table.conn,'UPDATE '+self.__table.name+' SET '+column+' = '+sqlise(value)+' WHERE '+self.__where)
     self.__values=None
-
-##  def where(self):
-##    return self.__table.key2where
-##    return self.selectRows(self.__key2where(key))[0]
 
 class KeyedTableView(cs.cache.Cache):
   ''' Caching wrapper for DirectKeyedTableView.
@@ -566,52 +433,3 @@ class TableRowWrapper:
 
   def __setitem__(self,column,value):
     self.TableRow[column]=value
-
-##class _TableRow:
-##  def __init__(self,table,whereclause,rowdata=None):
-##    assert false, "OBSOLETE _TableRow"
-##    self.table=table
-##    self.__whereclause=whereclause
-##    self.__rowcache=None
-##    if rowdata is not None:
-##      self.__setrowcache(rowdata)
-##
-##  def keys(self):
-##    return self.table.columns()
-##
-##  def __repr__(self):
-##    return '[' \
-##	 + string.join([ `k`+": "+`self[k]` for k in self.keys() ], ", ") \
-##	 + ']'
-##
-##  def whereClause(self):
-##    return self.__whereclause
-##
-##  def __setrowcache(self,rowdata):
-##    # stash copy of the supplied data
-##    self.__rowcache=[d for d in rowdata]
-##
-##  def __loadrowcache(self):
-##    self.__setrowcache(SQLQuery(self.table.conn,
-##			        'SELECT '+self.table._selectFields()+' FROM '+self.table.name+' WHERE '+self.__whereclause+' LIMIT 1',
-##			       ).allrows()[0])
-##
-##  def __getrowcache(self):
-##    if self.__rowcache is None:
-##      ## FIXME - caching for dated tables!
-##      self.__loadrowcache()
-##    return self.__rowcache
-##
-##  def __keys__(self):
-##    return keys(self.__getrowcache())
-##
-##  def __getitem__(self,column):
-##    # fetch from cache, loading it if necessary
-##    return self.__getrowcache()[self.table._columnIndex(column)]
-##
-##  def __setitem__(self,column,value):
-##    # update the db
-##    dosql(self.table.conn,
-##	  'UPDATE '+self.table.name+' SET '+column+' = '+sqlise(value)+' WHERE '+self.__whereclause)
-##    # update the cache
-##    self.__getrowcache()[self.table._columnIndex(column)]=value
