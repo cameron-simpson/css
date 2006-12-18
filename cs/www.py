@@ -10,7 +10,7 @@ import types
 import urllib
 from urlparse import urljoin
 import cs.hier
-from cs.misc import extend, warn
+from cs.misc import warn
 
 cookie_sepRe=re.compile(r'\s*;\s*')
 cookie_valRe=re.compile(r'([a-z][a-z0-9_]*)=([^;,\s]*)',re.I)
@@ -110,7 +110,7 @@ def puttok(fp,tok):
 def ht_form(action,method,*tokens):
   """ Make a <FORM> token, ready for content. """
   form=['FORM',{'ACTION': action, 'METHOD': method}]
-  extend(form,tokens)
+  form.extend(tokens)
   warn("NEW FORM =", cs.hier.h2a(form))
   return form
 
@@ -185,27 +185,27 @@ class CGI:
 
   def header(self,field,value,append=0):
     if not append:
-      lcfield=string.lower(field)
-      self.headers=[hdr for hdr in self.headers if string.lower(hdr[0]) != lcfield]
+      lcfield=field.lower()
+      self.headers=[hdr for hdr in self.headers if hdr[0].lower() != lcfield]
     self.headers.append((field,value))
 
-  def content_type(self):
-    ctype='text/html'
-    for hdr in self.headers:
-      if string.lower(hdr[0]) == 'content-type':
-	ctype=string.lower(hdr[1])
-    return ctype
+  def content_type(self,newctype=None):
+    if newctype is None:
+      ctype='text/html'
+      for hdr in self.headers:
+        if hdr[0].lower() == 'content-type':
+          ctype=hdr[1].lower()
+      return ctype
+
+    self.header('Content-Type', newctype)
 
   def markup(self,part,*tokens):
-    extend(self.tokens[part],tokens)
+    self.tokens[part].extend(tokens)
 
   def head(self,*tokens):
     self.markup('HEAD',*tokens)
 
   def out(self,*tokens):
-    warn("CGI.out() TOKENS = ...")
-    for t in tokens:
-      warn(" ", `t`)
     self.markup('BODY',*tokens)
 
   def nl(self,*tokens):
@@ -222,7 +222,7 @@ class Tag:
     self.tag=tag
     self.attrs=attrs
     self.tokens=[]
-    extend(self.tokens,tokens)
+    self.tokens.extend(tokens)
 
   def token(self):
     return (self.tag,self.attrs,self.tokens)
@@ -237,8 +237,8 @@ class Tag:
     for t in self.tokens:
       yield t
 
-  def extend(self,*tokens):
-    extend(self.tokens,tokens)
+  def extend(self,tokens):
+    self.tokens.extend(tokens)
 
 class Table(Tag):
   def __init__(self,attrs={}):
