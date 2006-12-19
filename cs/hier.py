@@ -9,6 +9,10 @@ from cs.lex import skipwhite, lastlinelen
 import cs.io
 from cs.misc import progress, cmderr, all
 
+T_SEQ='ARRAY'
+T_MAP='HASH'
+T_SCALAR='SCALAR'
+
 safeChunkPtn = r'[\-+_a-zA-Z0-9./@]+'
 safeChunkRe  = re.compile(safeChunkPtn)
 safePrefixRe = re.compile('^'+safeChunkPtn)
@@ -17,30 +21,31 @@ integerRe    = re.compile('^-?[0-9]+$')
 
 def flavour(o):
   """ Return the ``flavour'' of an object:
-      ARRAY: TupleType, ListType, objects with an __iter__ attribute.
-      HASH: DictType, DictionaryType, objects with an __keys__ or keys attribute.
-      SCALAR: Anything else.
+      T_MAP: DictType, DictionaryType, objects with an __keys__ or keys attribute.
+      T_SEQ: TupleType, ListType, objects with an __iter__ attribute.
+      T_SCALAR: Anything else.
   """
   t=type(o)
-  if t in (TupleType, ListType): return 'ARRAY'
-  if t in (DictType, DictionaryType): return 'HASH'
-  if hasattr(o,'__keys__') or hasattr(o,'keys'): return 'HASH'
-  if hasattr(o,'__iter__'): return 'ARRAY'
-  return 'SCALAR'
+  if t in (TupleType, ListType): return T_SEQ
+  if t in (DictType, DictionaryType): return T_MAP
+  if hasattr(o,'__keys__') or hasattr(o,'keys'): return T_MAP
+  if hasattr(o,'__iter__'): return T_SEQ
+  return T_SCALAR
 
-def h2a(o,i=None,seen={}):
+def h2a(o,i=None,seen=None,dictSep=None):
   """ ``Hier'' to ``ASCII''- convert an object to text.
       Return a textual representation of an object in Hier format.
       i is the indent mode, default None.
   """
+  if seen is None: seen={}
   buf=StringIO()
   io=cs.io.IndentedFile(buf,i)
-  h2f(io,o,seen=seen)
+  h2f(io,o,seen=seen,dictSep=dictSep)
   e=buf.getvalue()
   buf.close()
   return e
 
-def h2f(fp,o,seen):
+def h2f(fp,o,seen,dictSep):
   """ ``Hier'' to ``ASCII''- convert an object to text.
       Transcribe a textual representation of an object in Hier format to the File fp.
       NB: fp must be a cs.io.IndentedFile
@@ -60,9 +65,9 @@ def h2f(fp,o,seen):
     else:
       seen[id(o)]=o
       fl=flavour(o)
-      if fl is 'ARRAY':
+      if fl is T_SEQ:
         listEncode(fp,o,seen=seen)
-      elif fl is 'HASH':
+      elif fl is T_MAP:
         dictEncode(fp,o,seen=seen)
       else:
         h2f(fp,`o`,seen=seen)
@@ -214,105 +219,110 @@ def kvline(line):
   """ Parse a (key,value) pair from a line of text, return (key,value) tuple or None.
       This is the inner operation of loadfile().
   """
-  (key,pos)=tok(line)
-  (value,pos)=tok(line,pos)
-  pos=skipwhite(line,pos)
-  if pos < len(line):
-    print "unparsed data on line: \""+line[pos:]+"\""
+  oline=line
+  line=line.lstrip()
+  (key,line)=tok(line)
+  line=line.lstrip()
+  (value,line)=tok(line)
+  line=line.lstrip()
+  if len(line):
+    raise ValueError, "unparsed data on line: \""+line+"\", from original line: \""+oline+"\""
+
   return (key,value)
 
-def tok(s,pos=0):
-  """ Fetch a token from the string s, return the tuple (value,end).
-      value is the parsed value, end is the unparsed portion of the string.
+def tok(s):
+  """ Fetch a token from the string s.
+      Return the tuple (value, s) with s just past the text of the token.
   """
-  pos=skipwhite(s,pos)
-  if pos == len(s): return (None,pos)
+  s=s.lstrip()
+  if s[0] == '"' or s[0] == "'":
+    return a2str(s)
+  if s[0] == '{':
+    return a2dict(s)
+  if s[0] == '[':
+    return a2list(s)
 
-  ch1=s[pos]
-  if ch1 == '"': return a2str(s,pos)
-  if ch1 == '{': return a2dict(s,pos)
-  if ch1 == '[': return a2list(s,pos)
+  m=safePrefixRe.match(s)
+  if not m:
+    raise ValueError, "syntax error at: \""+s+"\""
 
-  match=safePrefixRe.match(s[pos:])
-  if not match: return (None,pos)
-  end=match.end()
-  str=s[pos:pos+end]
-  pos+=end
+  return (m.group(),s[m.end():])
 
-  return (str,pos)
-
-def a2str(s,pos):
-  "Read a quoted string from the opening quote, assemble into string."
-  assert s[pos] == '"', "expected '\"', found '"+s[pos]+"'"
+def a2str(s):
+  """ Read a quoted string from the opening quote, assemble into string.
+      Return (string, s) with s just past the closing quote.
+  """
   buf=StringIO()
-  pos+=1
-  while pos < len(s):
-    ch1=s[pos]
-    pos+=1
-    if ch1 == '"': break
-    if ch1 == '\\':
-      ch2=s[pos]
-      pos+=1
-      if ch2 == 't':
+  assert s[0] == '"' or s[0] == "'", "expected '\"' or \"'\", found '"+s[0]+"'"
+  q=s[0]
+  s=s[1:]
+  while s[0] != q:
+    if s[0] == '\\':
+      sloshc=s[1]
+      s=s[2:]
+      if sloshc == 't':
 	buf.write('\t')
-      elif ch2 == 'n':
+      elif sloshc == 'n':
 	buf.write('\n')
-      elif ch2 == 'x':
-	buf.write(chr(eval("0x"+s[pos:pos+2])))
-	pos+=2
+      elif sloshc == 'x':
+	buf.write(chr(eval("0x"+s[:2])))
+	s=s[2:]
       else:
-	buf.write(ch2)
+	buf.write(sloshc)
     else:
-      buf.write(ch1)
+      buf.write(s[0])
+      s=s[1:]
 
+  s=s[1:]
   str=buf.getvalue()
   buf.close();
 
-  return (str,pos)
+  return (str,s)
 
-def a2list(s,pos=0):
-  "Read text from opening left square bracket, assemble into list."
-  assert s[pos] == '[', "expected '[', found '"+s[pos]+"'"
+def a2list(s):
+  """ Read text from opening left square bracket, assemble into list.
+      Return (list,s) with s just after closing ']'.
+  """
   ary=[]
-  pos=skipwhite(s,pos+1)
-  while pos < len(s):
-    ch1=s[pos]
-    if ch1 == ']':
-      pos+=1
-      break
-    if ch1 == ',':
-      pos=skipwhite(s,pos+1)
-    else:
-      (val,pos)=tok(s,pos)
-      ary.append(val)
+  assert s[0] == '[', "expected '[', found '"+s[0]+"'"
+  s=s.lstrip()
+  while s[0] != ']':
+    if s[0] == ',':
+      # commas are optional
+      s=s[1:].lstrip()
+      continue
 
-  return (ary,pos)
+    (val,s)=tok(s)
+    ary.append(val)
+    s=s.lstrip()
 
-def a2dict(s,pos=0):
-  "Read text from opening left curly bracket, assemble into dict."
-  assert s[pos] == '{', "expected '{', found '"+s[pos]+"'"
+  return (ary,s[1:])
+
+def a2dict(s):
+  """ Read text from opening left curly bracket, assemble into dict.
+      Return (dict,s) with s just after closing '}'.
+  """
   dict={}
-  pos=skipwhite(s,pos+1)
-  while pos < len(s):
-    ch1=s[pos]
-    if ch1 == '}':
-      pos+=1
-      break
-    if ch1 == ',':
-      pos+=1
-    else:
-      (key,pos)=tok(s,pos)
-      pos=skipwhite(s,pos)
-      if  pos+2 < len(s) \
-      and s[pos] == '=' \
-      and s[pos+1] == '>':
-	pos=skipwhite(s,pos+2)
-	(val,pos)=tok(s,pos)
-	dict[key]=val
-      else:
-	# XXX - syntax exception or something?
-        cmderr("a2dict: misparse at:", s[pos:], "\ndict so far is:",h2a(dict))
-	break
-    pos=skipwhite(s,pos)
+  assert s[0] == '{', "expected '{', found '"+s[0]+"'"
+  s=s[1:].lstrip()
+  while s[0] != '}':
+    if s[0] == ',':
+      # commas are optional
+      s=s[1:].lstrip()
+      continue
 
-  return (dict,pos)
+    (key,s)=tok(s)
+    s=s.lstrip()
+    if s[0] == ':':
+      s=s[1:]
+    elif s[0:2] == '=>':
+      s=s[2:]
+    else:
+      raise ValueError, "expected \":\" or \"=>\", found: \""+s+"\""
+
+    s=s.lstrip()
+    (val,s)=tok(s)
+    dict[key]=val
+    s=s.lstrip()
+
+  return (dict,s[1:])
