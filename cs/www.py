@@ -10,6 +10,7 @@ import types
 import urllib
 from urlparse import urljoin
 import cs.hier
+from cs.hier import T_SEQ, T_MAP, T_SCALAR
 from cs.misc import warn
 
 cookie_sepRe=re.compile(r'\s*;\s*')
@@ -67,13 +68,13 @@ def puttok(fp,tok):
   """ transcribe a single token as HTML. """
   global dqAttrValSafeRe
   f=cs.hier.flavour(tok)
-  if f is 'SCALAR':
+  if f is T_SCALAR:
     # flat text
     if type(tok) is types.StringType:
       puttext(fp,tok)
     else:
       puttext(fp,`tok`)
-  elif f is 'ARRAY':
+  elif f is T_SEQ:
     # token
     if hasattr(tok,'tag'):
       # Tag class item
@@ -82,7 +83,7 @@ def puttok(fp,tok):
     else:
       # raw array [ tag[,attrs][,tokens...] ]
       tag=tok[0]; tok=tok[1:]
-      if len(tok) > 0 and cs.hier.flavour(tok[0]) is 'HASH':
+      if len(tok) > 0 and cs.hier.flavour(tok[0]) is T_MAP:
 	attrs=tok[0]; tok=tok[1:]
       else:
 	attrs={}
@@ -131,7 +132,7 @@ class CGI:
 
     self.path_info=None
     if 'PATH_INFO' in env:
-      self.path_info=[word for word in string.split(env['PATH_INFO'],'/') if len(word) > 0]
+      self.path_info=[word for word in env['PATH_INFO'].split('/') if len(word) > 0]
 
     self.cookies={}
     if 'HTTP_COOKIE' in self.env:
@@ -151,6 +152,9 @@ class CGI:
 #  def __del__(self):
 #    if self.output is not None:
 #      self.close()
+
+  def __getitem__(self,key):
+    return self.env[key]
 
   def close(self):
     self.flush()
@@ -214,6 +218,27 @@ class CGI:
 
   def prepend(self,*args):
     self.body=args+self.body
+
+class JSRPCCGI(CGI):
+  def __init__(self,input=None,output=None,env=None):
+    CGI.__init__(self,input=input,output=output,env=env)
+    self.__seq=self.path_info.pop(0);
+    self.__result={}
+    self.content_type('application/x-javascript')
+
+  def flush(self):
+    from cs.lex import dict2js
+    self.tokens['BODY']="csRPC_doCallback("+self.__seq+","+dict2js(self.__result)+");"
+    CGI.flush(self)
+
+  def __getitem__(self,key):
+    return self.__result[key]
+
+  def __setitem__(self,key,value):
+    self.__result[key]=value
+
+  def keys(self):
+    return self.__result.keys()
 
 # convenience classes for tags with complex substructure
 class Tag:
