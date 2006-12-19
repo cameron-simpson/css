@@ -1,7 +1,7 @@
 import string
 import re
 from cs.misc import cmderr, debug, warn, die, uniq, exactlyOne, all
-from cs.hier import flavour
+from cs.hier import flavour, T_SEQ, T_MAP
 from cs.db import dosql, SQLQuery, sqlise, today
 from cs.lex import strlist
 import cs.cache
@@ -411,7 +411,7 @@ class DirectAttrTable:
     self.table=table
 
   def addAttr(self,nodeid,attr,values):
-    if flavour(values) != "ARRAY":
+    if flavour(values) != T_SEQ:
       values=(values,)
     AttrSet(self,nodeid).addValues(attr,values)
 
@@ -495,11 +495,11 @@ class AttrSet:
     if key not in A:
       A[key]=[]
 
-    if flavour(values) != "ARRAY":
+    if flavour(values) != T_SEQ:
       values=(values,)
 
     for value in values:
-      if flavour(value) != "HASH":
+      if flavour(value) != T_MAP:
         is_idref=0
       else:
         is_idref=1
