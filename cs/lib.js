@@ -250,6 +250,17 @@ function csHotspotsToClientMap(mapname,hotspots) {
   return map;
 }
 
+// Create a new DIV using a meta object, with the specified corners and
+// optional z-index (default 1).
+// Meta: .onclick, function to be called with (e, CSHotSpot).
+//       .href, if no .onclick, URL to open if clicked
+//       .getHoverDiv, function to be called on mouseover which
+//                     creates a DIV to show until mouseout
+//       .title, if no .getHoverDiv, a title/alt string for the hotspot
+//
+// Return: object with .meta, the meta object
+//                     .element, the DIV
+//
 function CSHotSpot(meta,xy1,xy2,z) {
   _log("CSHotSpot(xy1="+xy1+", xy2="+xy2+")");
   var me = this;
@@ -367,6 +378,40 @@ if (_cs_isGecko) {
 }
 if (_cs_isIE) {
   _csPan_useImageMap=true;
+}
+
+///////////////////////////////////////////////////////////////////
+// CGI-based RPC infrastructure
+//
+_cs_rpc=csNode("DIV");
+_cs_rpc_script=csNode("SCRIPT");
+_cs_rpc.style.display='none';
+_cs_rpc.appendChild(_cs_rpc_script);
+document.body.appendChild(_cs_rpc);
+_cs_rpc_callbacks={};
+
+function csRPC(jscgiurl,callback,argobj) {
+  var seq = csSeq();
+  var cbk = seq+"";
+  _cs_rpc_callbacks[cbk]=callback;
+  jscgiurl+="/"+seq;
+  if (argobj) {
+    csStringable(argobj);
+    jscgiurl+="/"+argobj;
+  }
+
+  var rpc = csNode("SCRIPT");
+  _cs_rpc.replaceChild(rpc,_cs_rpc_script);
+  rpc.onload=function(){_log("RPC ONLOAD");};
+  _cs_rpc_script=rpc;
+  rpc.src=jscgiurl;
+  _log("queued RPC("+jscgiurl+")");
+}
+
+function csRPC_doCallback(seq,result) {
+  var cbk = seq+"";
+  _cs_rpc_callbacks[cbk](result);
+  delete _cs_rpc_callbacks[cbk];
 }
 
 /**
@@ -608,6 +653,7 @@ CSPan.prototype.handleUp = function(e) {
     if (this.hotLayer) this.hotLayer.style.display='block';
   }
 };
+
 { var vp = csViewPort();
   _log("viewport = "+vp.x+"x"+vp.y+", "+vp.width+"x"+vp.height);
 }
