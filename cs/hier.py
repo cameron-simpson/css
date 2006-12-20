@@ -19,20 +19,20 @@ safePrefixRe = re.compile('^'+safeChunkPtn)
 safeStringRe = re.compile('^'+safeChunkPtn+'$')
 integerRe    = re.compile('^-?[0-9]+$')
 
-def flavour(o):
+def flavour(obj):
   """ Return the ``flavour'' of an object:
       T_MAP: DictType, DictionaryType, objects with an __keys__ or keys attribute.
       T_SEQ: TupleType, ListType, objects with an __iter__ attribute.
       T_SCALAR: Anything else.
   """
-  t=type(o)
+  t=type(obj)
   if t in (TupleType, ListType): return T_SEQ
   if t in (DictType, DictionaryType): return T_MAP
-  if hasattr(o,'__keys__') or hasattr(o,'keys'): return T_MAP
-  if hasattr(o,'__iter__'): return T_SEQ
+  if hasattr(obj,'__keys__') or hasattr(obj,'keys'): return T_MAP
+  if hasattr(obj,'__iter__'): return T_SEQ
   return T_SCALAR
 
-def h2a(o,i=None,seen=None,dictSep=None):
+def h2a(obj,i=None,seen=None,dictSep=None,bareWords=True):
   """ ``Hier'' to ``ASCII''- convert an object to text.
       Return a textual representation of an object in Hier format.
       i is the indent mode, default None.
@@ -40,42 +40,43 @@ def h2a(o,i=None,seen=None,dictSep=None):
   if seen is None: seen={}
   buf=StringIO()
   io=cs.io.IndentedFile(buf,i)
-  h2f(io,o,seen=seen,dictSep=dictSep)
+  h2f(io,obj,seen=seen,dictSep=dictSep,bareWords=bareWords)
   e=buf.getvalue()
   buf.close()
   return e
 
-def h2f(fp,o,seen,dictSep):
+def h2f(fp,obj,seen,dictSep,bareWords):
   """ ``Hier'' to ``ASCII''- convert an object to text.
       Transcribe a textual representation of an object in Hier format to the File fp.
       NB: fp must be a cs.io.IndentedFile
   """
-  t=type(o)
-  if isinstance(o,int):
-    fp.write(str(o))
+  t=type(obj)
+  if isinstance(obj,int):
+    fp.write(str(obj))
   elif t is FloatType:
-    stringEncode(fp,str(o))
+    stringEncode(fp,str(obj),bareWords=bareWords)
   elif t is BooleanType:
-    fp.write(int(o))
-  elif isinstance(o, StringTypes):
-    stringEncode(fp,o)
+    fp.write(int(obj))
+  elif isinstance(obj, StringTypes):
+    stringEncode(fp,obj,bareWords=bareWords)
   else:
-    if id(o) in seen:
-      stringEncode(fp,"id#"+str(id(o)))
+    if id(obj) in seen:
+      stringEncode(fp,"id#"+str(id(obj)))
     else:
-      seen[id(o)]=o
-      fl=flavour(o)
+      seen[id(obj)]=obj
+      fl=flavour(obj)
       if fl is T_SEQ:
-        listEncode(fp,o,seen=seen)
+        listEncode(fp,obj,seen=seen,dictSep=dictSep,bareWords=bareWords)
       elif fl is T_MAP:
-        dictEncode(fp,o,seen=seen)
+        dictEncode(fp,obj,seen=seen,dictSep=dictSep,bareWords=bareWords)
       else:
-        h2f(fp,`o`,seen=seen)
+        h2f(fp,`obj`,seen=seen)
 
-def stringEncode(fp,s):
+def stringEncode(fp,s,bareWords):
   """ Transcribe a string to the File fp in Hier format.
   """
-  if safeStringRe.match(s):
+  progress("stringEncode("+`s`+",bareWords="+`bareWords`+")...")
+  if bareWords and safeStringRe.match(s):
     fp.write(s)
   else:
     fp.write('"')
@@ -110,12 +111,12 @@ def unsafeSubstringEncode(fp,s):
       else:				enc="\\u%04x" % oc
     fp.write(enc)
 
-def listEncode(fp,l,seen):
+def listEncode(fp,listobj,seen,dictSep,bareWords):
   """ Transcribe a List to the File fp in Hier format.
   """
   fp.write("[")
 
-  if len(l) > 0:
+  if len(listobj) > 0:
     fp.adjindent(1)
     dofold = fp.getindent() is not None
 
@@ -123,20 +124,22 @@ def listEncode(fp,l,seen):
     if dofold: nsep=",\n"
     else:      nsep=", "
 
-    for o in l:
+    for obj in listobj:
       fp.write(sep)
       sep=nsep
-      h2f(fp,o,seen=seen)
+      h2f(fp,obj,seen=seen,dictSep=dictSep,bareWords=bareWords)
 
     fp.popindent()
 
   fp.write("]")
 
-def dictEncode(fp,d,seen,i=None):
+def dictEncode(fp,dictobj,seen,dictSep,bareWords):
   """ Transcribe a Dictionary to the File fp in Hier format.
   """
+  if dictSep is None: dictSep=' =>'
+
   fp.write("{")
-  keys=d.keys()
+  keys=dictobj.keys()
 
   if len(keys) > 0:
     fp.adjindent(1)
@@ -152,12 +155,13 @@ def dictEncode(fp,d,seen,i=None):
     for k in keys:
       fp.write(sep)
       sep=nsep
-      keytxt=h2a(k,0,seen={})
+      keytxt=h2a(k,0,seen={},dictSep=dictSep,bareWords=bareWords)
       fp.write(keytxt)
-      fp.write(" => ")
+      fp.write(dictSep)
+      fp.write(" ")
 
-      fp.adjindent(lastlinelen(keytxt)+4)	# key width + " => "
-      h2f(fp,d[k],seen=seen)
+      fp.adjindent(lastlinelen(keytxt)+len(dictSep)+1)
+      h2f(fp,dictobj[k],seen=seen,dictSep=dictSep,bareWords=bareWords)
       fp.popindent()
 
     fp.popindent()
