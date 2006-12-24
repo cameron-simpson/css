@@ -2,7 +2,9 @@ import string
 from StringIO import StringIO
 import re
 
-int_re=re.compile(r'^\d+$')
+int_re=re.compile(r'\d+')
+float_re=re.compile(r'[\-+]?\d+(\.\d+)(e[\-+]\d+)',re.I)
+id_re =re.compile(r'[a-z_]\w*', re.I)
 
 def isint(s):
   m=int_re.match(s)
@@ -81,28 +83,5 @@ def jsquote(s):
   return "\""+s+"\""
 
 def dict2js(d):
-  fp=StringIO()
-  fp.write("{");
-  first=True
-  for k in d.keys():
-    if first:
-      first=False
-    else:
-      fp.write(",")
-
-    fp.write(k)
-    fp.write(":")
-
-    v=d[k]
-    if v is None:
-      fp.write('null')
-    else:
-      t=type(v)
-      if t is str:
-        fp.write(jsquote(v))
-      elif t in (int, float):
-        fp.write(str(v))
-      else:
-        fp.write(jsquote(str(v)))
-  fp.write("}")
-  return fp.getvalue()
+  import cs.json
+  return cs.json.json(d)
