@@ -61,7 +61,7 @@ def h2f(fp,obj,seen,dictSep,bareWords):
     stringEncode(fp,obj,bareWords=bareWords)
   else:
     if id(obj) in seen:
-      stringEncode(fp,"id#"+str(id(obj)))
+      stringEncode(fp,"id#"+str(id(obj)),bareWords=False)
     else:
       seen[id(obj)]=obj
       fl=flavour(obj)
@@ -70,38 +70,39 @@ def h2f(fp,obj,seen,dictSep,bareWords):
       elif fl is T_MAP:
         dictEncode(fp,obj,seen=seen,dictSep=dictSep,bareWords=bareWords)
       else:
-        h2f(fp,`obj`,seen=seen)
+        h2f(fp,`obj`,seen=seen,dictSep=dictSep,bareWords=bareWords)
 
-def stringEncode(fp,s,bareWords):
+def stringEncode(fp,s,bareWords,q='"'):
   """ Transcribe a string to the File fp in Hier format.
   """
   progress("stringEncode("+`s`+",bareWords="+`bareWords`+")...")
   if bareWords and safeStringRe.match(s):
     fp.write(s)
   else:
-    fp.write('"')
-    start=0
-    while start < len(s):
-      m=safeChunkRe.search(s,start)
+    fp.write(q)
+    while s:
+      m=safeChunkRe.search(s)
       if not m: break
 
-      nstart=m.start()
-      if (nstart > start):
-	unsafeSubstringEncode(fp,s[start:nstart])
+      start=m.start()
+      if start > 0:
+	unsafeSubstringEncode(fp,s[:start],q=q)
 
-      end=m.end()
-      fp.write(s[nstart:end])
-      start=end
+      fp.write(m.group())
+      s=s[m.end():]
 
-    unsafeSubstringEncode(fp,s[start:])
-    fp.write('"')
+    if s:
+      unsafeSubstringEncode(fp,s,q=q)
 
-def unsafeSubstringEncode(fp,s):
+    fp.write(q)
+
+def unsafeSubstringEncode(fp,s,q):
   """ Transcribe the characters of a string in escaped form.
       This is the inner portion of stringEncode() for unsafe strings.
   """
   for c in s:
-    if c == '\t':			enc='\\t'
+    if c == q:                          enc='\\'+q
+    elif c == '\t':			enc='\\t'
     elif c == '\n':			enc='\\n'
     elif c == '\r':			enc='\\r'
     elif c >= ' ' and c <= '~':		enc=c
