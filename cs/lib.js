@@ -36,27 +36,46 @@ function csNode(type) {
   return document.createElement(type);
 }
 
-function csHash2a(h) {
-  var s = "{";
-  var first=true;
-  var v;
-  for (var k in h) {
-    if (k == "toString") continue;
+function csObjectToString() {
+  var s;
 
-    if (first) first=false;
-    else s=s+", ";
+  if (this instanceof Array) {
+    s = "[";
+    var first = true;
+    for (var i=0; i<this.length; i++) {
+      var e = csStringable(this[i]);
+      if (first) first=false;
+      else       s += ", ";
+      s+=e;
+    }
+    s += "]";
+  } else {
+    // General object dump.
+    s = "{";
+    var first=true;
+    var v;
+    for (var k in this) {
+      if (k == "toString") continue;
+      csStringable(k)
 
-    v=h[k];
-    if (typeof(v) == "string") v='"'+v+'"';
-    s=s+k+": "+v;
+      if (first) first=false;
+      else s+=", ";
+
+      v=csStringable(this[k]);
+      s+=k+": "+v;
+    }
+    s+="}";
   }
-  return s+"}";
-}
-function csHash2aObjMethod() {
-  return csHash2a(this);
+
+  return s;
 }
 function csStringable(o) {
-  o.toString=csHash2aObjMethod;
+  if (!(o.toString === csObjectToString)) {
+    var t = typeof(o);
+    if (t != "number" && t != "string" && t != "function") {
+      o.toString=csObjectToString;
+    }
+  }
   return o;
 }
 
@@ -369,17 +388,6 @@ function runanim(id, fn) {
   }
 }
 
-_csPan_useImageMap=false;
-_csPan_dragCursor=null;
-_csPan_draggingCursor=null;
-if (_cs_isGecko) {
-  _csPan_dragCursor="-moz-grab";
-  _csPan_draggingCursor="-moz-grabbing";
-}
-if (_cs_isIE) {
-  _csPan_useImageMap=true;
-}
-
 ///////////////////////////////////////////////////////////////////
 // CGI-based RPC infrastructure
 //
@@ -389,8 +397,22 @@ _cs_rpc.style.display='none';
 _cs_rpc.appendChild(_cs_rpc_script);
 document.body.appendChild(_cs_rpc);
 _cs_rpc_callbacks={};
+_cs_rpc_max=2
+_cs_rpc_running=0
+_cs_rpc_queue=[]
 
-function csRPC(jscgiurl,callback,argobj) {
+function csRPC(jscgiurl,argobj,callback,priority) {
+  // Queue requests if too busy.
+  if (_cs_rpc_max > 0 && _cs_rpc_running >= _cs_rpc_max) {
+    _log("RPC QUEUE "+jscgiurl);
+    if (priority) {
+      _cs_rpc_queue.splice(0,0,[jscgiurl,argobj,callback]);
+    } else {
+      _cs_rpc_queue.push([jscgiurl,argobj,callback]);
+    }
+    return;
+  }
+
   var seq = csSeq();
   var cbk = seq+"";
   _cs_rpc_callbacks[cbk]=callback;
@@ -401,17 +423,99 @@ function csRPC(jscgiurl,callback,argobj) {
   }
 
   var rpc = csNode("SCRIPT");
+  // BUG: possibly, replacing a SCRIPT may abort the script load
   _cs_rpc.replaceChild(rpc,_cs_rpc_script);
-  rpc.onload=function(){_log("RPC ONLOAD");};
   _cs_rpc_script=rpc;
+
+  _log("RPC DISPATCH "+jscgiurl);
   rpc.src=jscgiurl;
-  _log("queued RPC("+jscgiurl+")");
+  _cs_rpc_running++;
 }
 
 function csRPC_doCallback(seq,result) {
+  _log("RPC RETURN SEQ = "+seq);
   var cbk = seq+"";
-  _cs_rpc_callbacks[cbk](result);
+  var cb = _cs_rpc_callbacks[cbk];
   delete _cs_rpc_callbacks[cbk];
+
+  // Dequeue pending requests up to the limit.
+  _cs_rpc_running--;
+  while ( (_cs_rpc_max == 0 || _cs_rpc_running < _cs_rpc_max)
+       && _cs_rpc_queue.length > 0
+        ) {
+    var dq = _cs_rpc_queue.shift();
+    csRPC(dq[0],dq[1],dq[2]);
+  }
+
+  cb(result);
+}
+
+function csRPCbg(jscgiurl,argobj,callback) {
+  setTimeout(function(){ csRPC(jscgiurl,argobj,callback); }, 0);
+}
+
+function csSubClass(baseClass, constructor) {
+  _log("typeof constructor="+(typeof constructor));
+  for (var k in baseClass.prototype) {
+    eval("constructor.prototype."+k+"=baseClass.prototype."+k+";");
+  }
+  return constructor;
+}
+
+//////////////////////////////////////////////////
+// An object with asyncchronous attribute methods.
+//
+function csAsyncObject() {
+  this.asyncAttrs={};
+}
+csAsyncObject.prototype.addAttr = function(attrname, rpcurl, rpcargs) {
+  if (!rpcurl) rpcurl="rpc.cgi";
+  if (!rpcargs) rpcargs={rpc: attrname, key: this.key};
+  if (!this.asyncAttrs) this.asyncAttrs={};
+
+  var attrs = this.asyncAttrs[attrname] = {};
+  attrs.rpc = [rpcurl,rpcargs];
+};
+csAsyncObject.prototype.withAttr = function(attrname, callback) {
+  var me = this;
+  var attr = me.asyncAttrs[attrname];
+  if (!attr) _log("me.asyncAttrs["+attrname+"]="+attr);
+
+  if (attr.value) {
+    callback(attr.value);
+  } else if (attr.callbacks) {
+    attr.callbacks.push(callback);
+  } else {
+    attr.callbacks=[callback];
+    csRPC(attr.rpc[0], attr.rpc[1], function(res) { me.setAttr(attrname, res); });
+  }
+};
+csAsyncObject.prototype.setAttr = function(attrname, value) {
+  var attr = this.asyncAttrs[attrname];
+  attr.value = value;
+  var callbacks = attr.callbacks;
+  if (callbacks) {
+    delete attr.callbacks;
+    for (var i=0; i<callbacks.length; i++) {
+      callbacks[i](value);
+    }
+  }
+};
+
+function csAsyncClass(constructor) {
+  if (!constructor) constructor = function(key){ this.key=key; };
+  return csSubClass(csAsyncObject, constructor);
+}
+
+_csPan_useImageMap=false;
+_csPan_dragCursor=null;
+_csPan_draggingCursor=null;
+if (_cs_isGecko) {
+  _csPan_dragCursor="-moz-grab";
+  _csPan_draggingCursor="-moz-grabbing";
+}
+if (_cs_isIE) {
+  _csPan_useImageMap=true;
 }
 
 /**
