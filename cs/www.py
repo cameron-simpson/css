@@ -115,6 +115,19 @@ def ht_form(action,method,*tokens):
   warn("NEW FORM =", cs.hier.h2a(form))
   return form
 
+def cgihtnisauth(stdout=None):
+  if stdout is None:
+    stdout=sys.stdout
+
+  auth=os.popen('cgihtnisauth')
+  output=auth.read()
+  xit=auth.close()
+  if xit:
+    stdout.write(output)
+    sys.exit(0)
+
+  return output.rstrip()
+
 class CGI:
   def __init__(self,input=None,output=None,env=None):
     if input is None: input=sys.stdin
@@ -222,23 +235,45 @@ class CGI:
 class JSRPCCGI(CGI):
   def __init__(self,input=None,output=None,env=None):
     CGI.__init__(self,input=input,output=output,env=env)
-    self.__seq=self.path_info.pop(0);
-    self.__result={}
+    self.result={}
     self.content_type('application/x-javascript')
+
+    path_info=self.env['PATH_INFO']
+    seqLen=0
+    while seqLen < len(path_info) and path_info[seqLen] == '/':
+      seqLen+=1
+
+    path_info=path_info[seqLen:]
+    while seqLen < len(path_info) and path_info[seqLen] != '/':
+      seqLen+=1
+    if seqLen == 0:
+      raise ValueError, "no sequence token at the start of PATH_INFO: "+`path_info`
+
+    self.__seq=path_info[:seqLen]
+    while seqLen < len(path_info) and path_info[seqLen] == '/':
+      seqLen+=1
+    path_info=path_info[seqLen:]
+
+    if len(path_info) == 0:
+      self.arg=None
+    else:
+      (self.arg,etc)=cs.hier.tok(path_info)
+      etc=etc.lstrip()
+      if len(etc): warn("unparsed arg: "+etc)
 
   def flush(self):
     from cs.lex import dict2js
-    self.tokens['BODY']="csRPC_doCallback("+self.__seq+","+dict2js(self.__result)+");"
+    self.tokens['BODY']="csRPC_doCallback("+self.__seq+","+dict2js(self.result)+");"
     CGI.flush(self)
 
   def __getitem__(self,key):
-    return self.__result[key]
+    return self.result[key]
 
   def __setitem__(self,key,value):
-    self.__result[key]=value
+    self.result[key]=value
 
   def keys(self):
-    return self.__result.keys()
+    return self.result.keys()
 
 # convenience classes for tags with complex substructure
 class Tag:
