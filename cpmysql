@@ -1,0 +1,209 @@
+#!/bin/sh -u
+#
+# Pull mysql databases from one mysql server to another.
+# Adapted from dumpmysql and loadmysql.
+#	- Cameron Simpson <cs@zip.com.au> 28dec2006
+#
+
+trace=eecho
+doit=
+bytable=
+
+cmd=`basename "$0"` || cmd=$0
+usage="Usage: $cmd [-T] [-x] src dst [databases...]
+  -T    Do a table based copy.
+  -x    Trace execution.
+        Default is to do nothing, and recite a plan of action.
+  src and dst may take three forms:
+    /path/to/dir
+      The path to a directory of *.sql.gz files.
+    user:password@host
+      A user,password,host tuple with which to connect to a database.
+    secret
+      The name of a secret as accessed by the secret(1cs) command.
+  databases...
+    Databases to copy.
+    Default is to copy everything except \"mysql\"."
+
+badopts=
+
+while [ $# -gt 0 ]
+do
+  case $1 in
+    -T) bytable=1 ;;
+    -x) doit=1 trace=set-x ;;
+    --)	shift; break ;;
+    -?*)echo "$cmd: unrecognised option: $1" >&2
+	badopts=1
+	;;
+    *)	break ;;
+  esac
+  shift
+done
+
+if [ $# = 0 ]
+then
+  echo "$cmd: missing src-secret" >&2
+  badopts=1
+else
+  src=$1
+  shift
+fi
+
+if [ $# = 0 ]
+then
+  echo "$cmd: missing dst-secret" >&2
+  badopts=1
+else
+  dst=$1
+  shift
+fi
+
+case "$src" in
+  /*)
+    unset src_user src_password src_host
+    [ -d "$src/." ] || { echo "$cmd: $src: not a directory" >&2; badopts=1; }
+    ;;
+  *:*@*)
+    src_user=`    expr "x$src" : 'x\(.*\):.*@.*'` || exit 1
+    src_password=`expr "x$src" : 'x.*:\(.*\)@.*'` || exit 1
+    src_host=`    expr "x$src" : 'x.*:.*@\(.*\)'` || exit 1
+    ;;
+  *)
+    src_secret=`secret "$src"` || exit 1
+    eval "$src_secret"
+    src_user=$secretLOGIN
+    src_password=$secretPASSWORD
+    src_host=$secretHOST
+    ;;
+esac
+
+case "$dst" in
+  /*)
+    unset dst_user dst_password dst_host
+    [ -d "$dst/." ] || { echo "$cmd: $dst: not a directory" >&2; badopts=1; }
+    ;;
+  *:*@*)
+    dst_user=`    expr "x$dst" : 'x\(.*\):.*@.*'` || exit 1
+    dst_password=`expr "x$dst" : 'x.*:\(.*\)@.*'` || exit 1
+    dst_host=`    expr "x$dst" : 'x.*:.*@\(.*\)'` || exit 1
+    ;;
+  *)
+    dst_secret=`secret "$dst"` || exit 1
+    eval "$dst_secret"
+    dst_user=$secretLOGIN
+    dst_password=$secretPASSWORD
+    dst_host=$secretHOST
+    ;;
+esac
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+pull_table()
+{ _pull_table_db=$1
+  _pull_table=$2
+
+  case "$src" in
+    /*)
+      $trace gzip -dc "$src/$_pull_table_db.$_pull_table.sql.gz"
+      ;;
+    *)
+      $trace mysqldump -h "$src_host" "-u$src_user" "-p$src_password" --opt "$_pull_table_db" "$_pull_table"
+      ;;
+  esac \
+  | if [ $doit ]; then if [ -t 2 ]; then prcat; else cat; fi; fi \
+  | case "$dst" in
+      /*)
+        $trace gzip -n --fast >"$dst/$_pull_table_db.$_pull_table.sql.gz"
+        ;;
+      *)
+        $trace mysql -h "$dst_host" "-u$dst_user" "-p$dst_password" "$_pull_table_db"
+        ;;
+    esac
+}
+
+pull_db()
+{ _pull_db=$1
+
+  case "$_pull_db" in
+    *.*)
+      pull_table `echo "$_pull_db" | tr . ' '`
+      return $?
+      ;;
+  esac
+
+  if [ $bytable ]
+  then
+    # pull each table individually
+    case "$src" in
+      /*)
+        ls "$src/." \
+        | sed -n "s|^$_pull_db"'\.\(.*\)\.sql\.gz$|\1|p'
+        ;;
+      *)
+        echo show tables \
+        | set-x mysql -h "$src_host" "-u$src_user" "-p$src_password" "$_pull_db" \
+        | sed 1d
+        ;;
+    esac \
+    | while read _pull_db_table
+      do
+        pull_table "$_pull_db" "$_pull_db_table" || return 1
+      done
+
+    return 0
+  fi
+
+  # pull complete database
+  case "$dst" in
+    /*) $trace rm -f "$dst/$_pull_db.sql.gz"
+        ;;
+    *)
+        $trace echo "drop database if exists $_pull_db; create database $_pull_db;" \
+        | $trace mysql -h "$dst_host" "-u$dst_user" "-p$dst_password" \
+        || return 1
+        ;;
+  esac
+
+  case "$src" in
+    /*)
+      $trace gzip -dc "$src/$_pull_db.sql.gz"
+      ;;
+    *)
+      $trace mysqldump -h "$src_host" "-u$src_user" "-p$src_password" --opt "$_pull_db"
+      ;;
+  esac \
+  | if [ $doit ]; then if [ -t 2 ]; then prcat; else cat; fi; fi \
+  | case "$dst" in
+      /*)
+        $trace gzip -n --fast >"$dst/$_pull_db.sql.gz"
+        ;;
+      *)
+        $trace mysql -h "$dst_host" "-u$dst_user" "-p$dst_password" "$_pull_db"
+        ;;
+    esac
+}
+
+if [ $# = 0 ]
+then
+  case "$src" in
+    /*)
+      ls "$src/." \
+      | sed -n 's|\(.*\)\.sql\.gz$|\1|p'
+      ;;
+    *)
+      echo show databases \
+      | set-x mysql -h "$src_host" "-u$src_user" "-p$src_password" \
+      | sed '1d; /^mysql$/d'
+      ;;
+  esac \
+  | while read db
+    do
+      pull_db "$db" || exit 1
+    done
+else
+  for db
+  do
+    pull_db "$db" || exit 1
+  done
+fi
