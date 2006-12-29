@@ -17,7 +17,7 @@ doevent()
       wid=$1
       [ $X11_COMPOSITE ] && ( set -x
 			      sleep 2
-			      transset -id "$wid" -rootChild ${X11_TRANSPARENCY:=0.75}
+			      flag DESKTOP_TRANSPARENT && transset -id "$wid" -rootChild ${X11_TRANSPARENCY:=0.75}
 			    ) &
       ;;
     enter_window|leave_window)
