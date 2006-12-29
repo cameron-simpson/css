@@ -11,7 +11,8 @@
 url=
 profile=$BROWSER_PROFILE
 ##br=/opt/firefox-1.5.0.7-enGB/firefox
-br=/opt/firefox-2.0-enGB/firefox
+##br=/opt/firefox-2.0-enGB/firefox
+br=/opt/firefox-2.0.0.1-enGB/firefox
 
 cmd=$0
 usage="Usage: $cmd [-f] [-q] [url]
