@@ -63,9 +63,9 @@ then
 	--delete-excluded \
 	--exclude=CVS/ \
 	--include='*/' \
+	--include='lib.js' \
 	--include='*.pm' \
 	--include='*.py' \
-	--include='*.pyc' \
 	--exclude='*' \
 	$HOME/scripts/cs/. $cssdir/lib/cs/.
 fi
