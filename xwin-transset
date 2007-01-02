@@ -1,0 +1,17 @@
+#!/bin/sh -u
+force=
+[ $# -gt 0 ] && [ "x$1" = x-f ] && { force=1; shift; }
+[ $# = 1 ] || { echo "Usage: $0 [-f] windowid" >&2; exit 2; }
+wid=$1; shift
+
+[ -n "$X11_COMPOSITE" ] || exit 0
+
+[ $force ] \
+|| { flag DISABLE_X11_COMPOSITE && exit 0
+     flag DESKTOP_TRANSPARENT || exit 0
+   }
+
+set --
+[ -n "$wid" ] && set -- -id "$wid" -rootChild
+
+exec transset ${1+"$@"} "${X11_TRANSPARENCY:=0.75}"
