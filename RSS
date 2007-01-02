@@ -1,0 +1,7 @@
+#!/bin/sh -u
+#
+# ps sorted on Resident Set Size (RSS).
+#	- Cameron Simpson <cs@zip.com.au>
+#
+
+psa ${1+"$@"} | sortcol -n RSS
