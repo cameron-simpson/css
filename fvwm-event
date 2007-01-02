@@ -15,10 +15,7 @@ doevent()
   case "$event" in
     add_window)
       wid=$1
-      [ $X11_COMPOSITE ] && ( set -x
-			      sleep 2
-			      flag DESKTOP_TRANSPARENT && transset -id "$wid" -rootChild ${X11_TRANSPARENCY:=0.75}
-			    ) &
+      [ $X11_COMPOSITE ] && { ( sleep 2; exec xwin-transset "$wid" ) & }
       ;;
     enter_window|leave_window)
       wid=$1; shift
