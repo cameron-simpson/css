@@ -23,7 +23,7 @@ usage="Usage: $cmd [-T] [-x] src dst [databases...]
       The name of a secret as accessed by the secret(1cs) command.
   databases...
     Databases to copy.
-    Default is to copy everything except \"mysql\"."
+    Default is to copy everything except \"mysql\" and \"information_schema\"."
 
 badopts=
 
@@ -194,7 +194,7 @@ then
     *)
       echo show databases \
       | set-x mysql -h "$src_host" "-u$src_user" "-p$src_password" \
-      | sed '1d; /^mysql$/d'
+      | sed '1d; /^mysql$/d; /^information_schema$/d'
       ;;
   esac \
   | while read db
