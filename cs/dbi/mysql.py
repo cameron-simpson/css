@@ -14,6 +14,7 @@ class Conn:
   def __init__(self,host="localhost",db=None,user="",passwd=""):
     ##print "connect to "+host+"/"+db
     self.__conn=MySQLdb.connect(host=host,db=db,user=user,passwd=passwd)
+    self.__conn.set_character_set('utf8')
     ##print "paramstyle=", MySQLdb.paramstyle
 
   def cursor(self):
