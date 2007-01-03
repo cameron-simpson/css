@@ -66,6 +66,9 @@ do
     	sshopts="$sshopts $1 "`shqstr "$2"`
 	shift
 	;;
+    -[bceiIlmopFLRD]?*)
+        sshopts=$sshopts\ `shqstr "$1"`
+	;;
     -z)	sshopts="$sshopts -o 'Compression yes'" ;;
     +z)	sshopts="$sshopts -o 'Compression no'" ;;
     [a-zA-Z]*=?*)
