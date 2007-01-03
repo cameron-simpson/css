@@ -1,24 +1,27 @@
 import os
 import os.path
 import cs.hier
-from cs.misc import debug, progress, verbose, warn
+from cs.misc import debug, ifdebug, progress, verbose, warn
 
 def get(secret):
   for base in (os.path.join(os.environ["HOME"],".secret"), '/opt/config/secret'):
-    try:
-      return cs.hier.load(os.path.join(base,secret))
-    except:
-      pass
-  
+    ##try:
+    pathname=os.path.join(base,secret)
+    return cs.hier.load(pathname)
+    ##except Exception, e:
+      ##pass
+
   return None
 
 def mysql(secret,db=None):
   import types
   if type(secret) is types.StringType or not(hasattr(secret,'__keys__') or hasattr(secret,'keys')):
     # transmute secret name into structure
+    ##debug("secret: get", `secret`)
     secret=get(secret)
 
   import cs.dbi.mysql
+  debug("secret =", `secret`)
   host=secret['HOST']
   if 'LOGIN' not in secret:
     return cs.dbi.mysql.Conn(host=host, db=db)
