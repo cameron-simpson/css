@@ -1,8 +1,10 @@
 from cStringIO import StringIO
 import cs.hier
 
-def json(obj,i=None,seen=None):
-  return cs.hier.h2a(obj,i=i,seen=seen,dictSep=':',bareWords=False)
+_JSON_HIER_OPTS = { 'dictSep': ':', 'bareWords': False }
 
-def json2f(fp,obj,seen=None):
-  cs.hier.h2f(fp,obj,seen=seen,dictSep=':',bareWords=False)
+def json(obj,i=None):
+  return cs.hier.h2a(obj,i,_JSON_HIER_OPTS)
+
+def json2f(fp,obj):
+  cs.hier.h2f(fp,obj,_JSON_HIER_OPTS)
