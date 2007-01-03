@@ -329,10 +329,10 @@ class HierInput(_Hier):
         s=s[1:]
 
     s=s[1:]
-    str=buf.getvalue()
+    str=buf.getvalue().decode(self.inputEncoding)
     buf.close();
 
-    return (str.decode(self.inputEncoding),s)
+    return (str, s)
 
   def __a2list(self,s):
     """ Read text from opening left square bracket, assemble into list.
