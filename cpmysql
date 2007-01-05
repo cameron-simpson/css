@@ -12,6 +12,8 @@ bytable=
 cmd=`basename "$0"` || cmd=$0
 usage="Usage: $cmd [-T] [-x] src dst [databases...]
   -T    Do a table based copy.
+  -q    Execute quietly.
+        Default is to do nothing, and recite a plan of action.
   -x    Trace execution.
         Default is to do nothing, and recite a plan of action.
   src and dst may take three forms:
@@ -31,6 +33,7 @@ while [ $# -gt 0 ]
 do
   case $1 in
     -T) bytable=1 ;;
+    -q) doit=1 trace= ;;
     -x) doit=1 trace=set-x ;;
     --)	shift; break ;;
     -?*)echo "$cmd: unrecognised option: $1" >&2
