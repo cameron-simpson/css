@@ -1,0 +1,34 @@
+#!/bin/sh
+#
+# Run _my_ preferred vi variant.
+# Historically I have used nvi, being an updated 8-bit clean real-vi descendant.
+# But I am succumbing to the Dark Side and using vim a lot these days.
+# I blame syntax colouring eye candy for this.
+#	- Cameron Simpson <cs@zip.com.au>
+#
+
+cmd=$0
+
+for vi in \
+        vim /usr/local/bin/vim /usr/bin/vim /bin/vim \
+        /opt/nvi-1.81.5-fc3/bin/nvi nvi /usr/bin/nvi /usr/local/bin/nvi \
+        vi /usr/bin/vi /bin/vi
+do
+  case "$vi" in
+    /*) exe=$vi ;;
+    *)  exe=`which "$vi"` || continue ;;
+  esac
+  [ -x "$exe" ] || { [ -f "$exe" && ls -ld "$exe" >&2; continue; }
+  case "$exe" in */vim)
+    case "$TERM" in xterm|rxvt-unicode)
+      TERM=rxvt
+      export TERM
+      ;;
+    esac
+    ;;
+  esac
+  exec "$exe" ${1+"$@"}
+done
+
+echo "$cmd: can't find a vi!" >&2
+exit 1
