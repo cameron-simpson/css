@@ -9,6 +9,7 @@ import types
 import cs.secret
 import cs.cache
 from cs.misc import debug, ifdebug, warn, isodate, exactlyOne
+from cs.lex import strlist
 
 def today():
   "Today's date in ISO-8601 format (YYYY-MM-DD)."
@@ -202,6 +203,12 @@ class DirectKeyedTableView:
   def __getitem__(self,key):
     return DirectTableRow(self,self.selectRowByKey(key))
 
+  def getitems(self,keylist):
+    ''' SELECT multiple table rows matching an arbitrary list of single-value keys.
+    '''
+    assert len(self.__keyColumns) == 1, "getitems("+`keylist`+") on multikey table "+self.name+"["+strlist(self.__keyColumns)+"]"
+    return self.selectRows(self.__keyColumns[0]+" IN ("+strlist([sqlise(k) for k in keylist])+")")
+
   def __setitem__(self,key,value):
     dosql(self.conn,
           'UPDATE '+self.name \
@@ -227,10 +234,14 @@ class DirectKeyedTableView:
   def keyColumns(self):
     return self.__keyColumns
 
+  def constraint(self):
+    return self.__constraint
+
   def rowKey(self,row):
     return tuple([row[self.__columnmap[key]] for key in self.__keyColumns])
 
   def __key2where(self,key):
+    if type(key[0]) is tuple: raise IndexError, "key is tuple of tuple"
     return " AND ".join([self.__allColumns[i]+' = '+sqlise(key[i]) for i in range(len(key))])
 
   def rowWhere(self,row):
@@ -243,6 +254,9 @@ class DirectKeyedTableView:
     elif self.__constraint is not None:
         where=self.__constraint
     return where
+
+  def findrowByKey(self,key):
+    return self.findrow(self.__key2where(key))
 
   def findrow(self,where):
     rows=self.selectRows(where)
@@ -336,6 +350,9 @@ class KeyedTableView(cs.cache.Cache):
     cs.cache.Cache.__init__(self,self.__direct)
     self.__columnIndices={}
 
+  def _rawTable(self):
+    return self.__direct
+
   def bump(self):
     cs.cache.Cache.bump(self)
     for colname in self.__columnIndices.keys():
@@ -382,14 +399,21 @@ class KeyedTableView(cs.cache.Cache):
   def byColumn(self,column,key):
     return self.__columnIndices[column].find(key)
 
+  def findrowByKey(self,key):
+    return cs.cache.Cache.findrowByKey(self,key)
+
 class SingleKeyTableView(KeyedTableView):
   def __init__(self,conn,tablename,keyColumn,allColumns,constraint=None):
     KeyedTableView.__init__(self,conn,tablename,(keyColumn,),allColumns,constraint)
+
+  def key(self):
+    return self.keyColumns()[0]
 
   def keys(self):
     return [k[0] for k in KeyedTableView.keys(self)]
 
   def __getitem__(self,key):
+    debug("SingleKeyTableView.__getitem__: key =", `key`)
     return KeyedTableView.__getitem__(self,(key,))
 
   def __contains__(self,key):
@@ -397,6 +421,9 @@ class SingleKeyTableView(KeyedTableView):
 
   def has_key(self,key):
     return self.__contains__(key)
+
+  def findrowByKey(self,key):
+    return KeyedTableView.findrowByKey(self,(key,))
 
 class DirectRekeyedTableView(cs.cache.Cache):
   def __init__(self,table,keyFields):
@@ -412,6 +439,13 @@ class DirectRekeyedTableView(cs.cache.Cache):
       raise IndexError, "multiple entries WHERE "+where+": "+strlist(rows)
     return rows[0]
 
+class KeyedTableSubView(KeyedTableView):
+  def __init__(self,superTable,constraint):
+    raw=superTable._rawTable()
+    if rawConstraint:
+      constraint="(%) AND (%)" % (rawConstraint, constraint)
+    KeyedTableView.__init__(self,raw.conn,raw.name,raw.keyColumns(),raw.columns(),constraint)
+
 class RekeyedTableView(cs.cache.Cache):
   def __init__(self,table,keyFields):
     self.__direct=DirectRekeyedTableView(table,keyFields)
@@ -423,7 +457,12 @@ class RekeyedTableView(cs.cache.Cache):
 
 class TableRowWrapper:
   def __init__(self,tableview,key):
+    debug("new TableRowWrapper with key =", `key`)
+    self.TableView=tableview
     self.TableRow=tableview[key]
+
+  def table(self):
+    return self.TableView
 
   def keys(self):
     return self.TableRow.keys()
