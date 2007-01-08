@@ -5,10 +5,61 @@ import re
 int_re=re.compile(r'\d+')
 float_re=re.compile(r'[\-+]?\d+(\.\d+)(e[\-+]\d+)',re.I)
 id_re =re.compile(r'[a-z_]\w*', re.I)
+ord_space=ord(' ')
 
 def isint(s):
   m=int_re.match(s)
   return m is not None and m.group() == s
+
+def unctrl(s,tabsize=8):
+  s2=''
+  sofar=0
+  for i in range(len(s)):
+    ch=s[i]
+    ch2=None
+    if ch == '\t':
+      pass
+    elif ch == '\f':
+      ch2='\\f'
+    elif ch == '\n':
+      ch2='\\n'
+    elif ch == '\r':
+      ch2='\\r'
+    elif ch == '\v':
+      ch2='\\v'
+    else:
+      o=ord(ch)
+      if o < ord_space or string.printable.find(ch) == -1:
+        if o >= 256:
+          ch2="\\u%04x"%o
+        else:
+          ch2="\\%03o"%o
+
+    if ch2 is not None:
+      import cs.misc
+      cs.misc.progress("ch2=["+ch2+"]")
+      if sofar < i:
+        s2+=s[sofar:i]
+      s2+=ch2
+      sofar=i+1
+
+  if sofar < len(s):
+    s2+=s[sofar:]
+
+  return s2.expandtabs(tabsize)
+
+def tabpadding(padlen,tabsize=8,offset=0):
+  pad=''
+  nexttab=tabsize-offset%tabsize
+  while nexttab <= padlen:
+    pad+='\t'
+    padlen-=nexttab
+    nexttab=tabsize
+
+  if padlen > 0:
+    pad+="%*s"%(padlen,' ')
+
+  return pad
 
 def skipwhite(s,start=0):
   ''' Returns the location of next nonwhite in string.
