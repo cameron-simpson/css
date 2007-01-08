@@ -5,11 +5,11 @@ from cs.misc import debug, ifdebug, progress, verbose, warn
 
 def get(secret):
   for base in (os.path.join(os.environ["HOME"],".secret"), '/opt/config/secret'):
-    ##try:
-    pathname=os.path.join(base,secret)
-    return cs.hier.load(pathname)
-    ##except Exception, e:
-      ##pass
+    try:
+      pathname=os.path.join(base,secret)
+      return cs.hier.load(pathname)
+    except Exception, e:
+      pass
 
   return None
 
