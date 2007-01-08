@@ -15,8 +15,8 @@ T_SCALAR='SCALAR'
 
 DEFAULT_OPTS={'dictSep': '=>',
               'bareWords': True,
-              'charset':   'latin1',
               'inputEncoding': 'latin1',
+              'nullToken': "\"\"",
               'quoteChar': '"',
              }
 
@@ -51,14 +51,17 @@ def tok(s,opts=None):
 class _Hier:
   def __init__(self,opts=None):
     self.seen={}
+    self.opts={}
     for k in DEFAULT_OPTS.keys():
-      debug("Hier: DFLT",`k`,"=",DEFAULT_OPTS[k])
-      setattr(self,k,DEFAULT_OPTS[k])
+      opt=DEFAULT_OPTS[k]
+      setattr(self,k,opt)
+      self.opts[k]=opt
     if opts is not None:
       for k in opts.keys():
         if k in DEFAULT_OPTS:
-          debug("Hier: OVERRIDE",`k`,"=",DEFAULT_OPTS[k])
-          setattr(self,k,opts[k])
+          opt=opts[k]
+          setattr(self,k,opt)
+          self.opts[k]=opt
 
 class HierOutput(_Hier):
   def __init__(self,opts=None):
@@ -76,38 +79,43 @@ class HierOutput(_Hier):
     buf.close()
     return e
 
-  def __h2f(self,fp,obj):
+  def __h2f(self,obj):
     """ ``Hier'' to ``ASCII''- convert an object to text.
         Transcribe a textual representation of an object in Hier format to the File fp.
         NB: fp must be a cs.io.IndentedFile
     """
-    t=type(obj)
-    if isinstance(obj,int):
-      self.fp.write(str(obj))
-    elif t is FloatType:
-      stringEncode(str(obj))
-    elif t is BooleanType:
-      self.fp.write(int(obj))
-    elif isinstance(obj, StringTypes):
-      self.stringEncode(obj)
+    if obj is None:
+      self.fp.write(self.nullToken)
     else:
-      if id(obj) in seen:
-        oBareWords=self.bareWords
-        self.bareWords=False
-        self.__stringEncode("id#"+str(id(obj)))
-        self.bareWords=oBareWords
+      t=type(obj)
+      if t is int:
+        self.fp.write("%d" % obj)
+      elif t is long:
+        self.fp.write("%ld" % obj)
+      elif t is float:
+        self.fp.write("%g" % obj)
+      elif t is bool:
+        self.fp.write(int(obj))
+      elif isinstance(obj, StringTypes):
+        self.__stringEncode(obj)
       else:
-        self.seen[id(obj)]=obj
-        fl=flavour(obj)
-        if fl is T_SEQ:
-          self.__listEncode(obj)
-        elif fl is T_MAP:
-          self.__dictEncode(obj)
+        if id(obj) in self.seen:
+          oBareWords=self.bareWords
+          self.bareWords=False
+          self.__stringEncode("id#"+str(id(obj)))
+          self.bareWords=oBareWords
         else:
-          self.__h2f(`obj`)
+          self.seen[id(obj)]=obj
+          fl=flavour(obj)
+          if fl is T_SEQ:
+            self.__listEncode(obj)
+          elif fl is T_MAP:
+            self.__dictEncode(obj)
+          else:
+            self.__h2f(`obj`)
 
   def __stringEncode(self,s):
-    """ Transcribe a string to the File fp in Hier format.
+    """ Transcribe a string to the current File in Hier format.
     """
     if self.bareWords and safeStringRe.match(s):
       self.fp.write(s)
@@ -129,7 +137,7 @@ class HierOutput(_Hier):
 
       self.fp.write(self.quoteChar)
 
-  def __unsafeSubstringEncode(s):
+  def __unsafeSubstringEncode(self,s):
     """ Transcribe the characters of a string in escaped form.
         This is the inner portion of stringEncode() for unsafe strings.
     """
@@ -143,7 +151,7 @@ class HierOutput(_Hier):
         oc=ord(c)
         if oc <= 0xff:			enc="\\x%02x" % oc
         else:				enc="\\u%04x" % oc
-      fp.write(enc)
+      self.fp.write(enc)
 
   def __listEncode(self,listobj):
     """ Transcribe a List to the File fp in Hier format.
@@ -170,14 +178,14 @@ class HierOutput(_Hier):
   def __dictEncode(self,dictobj):
     """ Transcribe a Dictionary to the File fp in Hier format.
     """
-    if dictSep is None: dictSep=' =>'
+    if self.dictSep is None: dictSep=' =>'
 
-    fp.write("{")
+    self.fp.write("{")
     keys=dictobj.keys()
 
     if len(keys) > 0:
-      fp.adjindent(1)
-      dofold = fp.getindent() is not None
+      self.fp.adjindent(1)
+      dofold = self.fp.getindent() is not None
 
       sep=""
       if dofold: nsep=",\n"
@@ -187,20 +195,20 @@ class HierOutput(_Hier):
       keys.sort()
 
       for k in keys:
-        fp.write(sep)
+        self.fp.write(sep)
         sep=nsep
-        keytxt=h2a(k,0,seen={},dictSep=dictSep,bareWords=bareWords)
-        fp.write(keytxt)
-        fp.write(dictSep)
-        fp.write(" ")
+        keytxt=h2a(k,0,self.opts)
+        self.fp.write(keytxt)
+        self.fp.write(self.dictSep)
+        self.fp.write(" ")
 
-        fp.adjindent(lastlinelen(keytxt)+len(dictSep)+1)
-        h2f(fp,dictobj[k],seen=seen,dictSep=dictSep,bareWords=bareWords)
-        fp.popindent()
+        self.fp.adjindent(lastlinelen(keytxt)+len(self.dictSep)+1)
+        self.__h2f(dictobj[k])
+        self.fp.popindent()
 
-      fp.popindent()
+      self.fp.popindent()
 
-    fp.write("}")
+    self.fp.write("}")
 
 class HierInput(_Hier):
   def __init__(self,opts=None):
