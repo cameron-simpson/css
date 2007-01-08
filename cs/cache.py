@@ -47,6 +47,7 @@ class Cache:
     return self.__hits/gets
 
   def __getattr__(self,attr):
+    ##debug("CACHE GETATTR",`attr`)
     return getattr(self.__backend,attr)
 
   def bump(self):
@@ -55,16 +56,19 @@ class Cache:
   def keys(self):
     return self.__backend.keys()
 
-  def __getitem__(self,key):
+  def getitems(self,keylist):
+    items=self.__backend.getitems(keylist)
+    for i in items:
+      self.store(i)
+    return items
+
+  def findrowByKey(self,key):
     if key in self.__cache:
       value=self.__cache[key]
       if value[0] == self.__seq:
         self.__hits+=1
         ##if ifdebug(): warn("HIT, key =", `key`, "value[] =", `value`)
-        v=value[1]
-        if v is None:
-          raise IndexError
-        return v
+        return value[1]
       # out of date - discard the cache line
       self.__flushes+=1
       del self.__cache[key]
@@ -74,24 +78,29 @@ class Cache:
     try:
       value=self.__backend[key]
     except IndexError, e:
-      self.store(None,key)
-      raise IndexError, e
+      value=None
 
-    ##warn("MISS, key =", `key`,"=",`value`)
     self.store(value,key)
-
     return value
+
+  def __getitem__(self,key):
+    # Note: we're looking up the backend, _not_ calling some subclass' findrowbykey()
+    row=Cache.findrowByKey(self,key)
+    if row is None:
+      raise IndexError, "no entry with key "+`key`
+
+    return row
 
   def store(self,value,key=None):
     if key is not None:
       assert type(key) in (tuple, int, long), "store"+`key`+"="+`value`
     else:
-      key=self.valueKey(value)
+      key=value[self.key()]
 
-    ##warn("store", `key`)
     self.__cache[key]=(self.__seq,value)
-    for xref in self.__xrefs:
-      xref.store(value)
+    if value is not None:
+      for xref in self.__xrefs:
+        xref.store(value)
 
   def __setitem__(self,key,value):
     self.__backend[key]=value
@@ -100,6 +109,7 @@ class Cache:
   def __delitem__(self,key):
     del self.__backend[key]
     if key in self.__cache:
+      # BUG: doesn't undo cross references
       del self.__cache[key]
 
 class CrossReference:
