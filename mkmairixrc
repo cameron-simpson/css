@@ -5,7 +5,7 @@
 #
 
 : ${MAILDIR:=$HOME/mail}
-: ${MAIRIXRC_EXCLUDE_PATTERNS:='spam:spam-*:spool:spool-*:junk:pics*'}
+: ${MAIRIXRC_EXCLUDE_PATTERNS:='spam:spam-*:spool:spool-*:junk'}
 
 cmd=`basename "$0"` || cmd=$0
 usage="Usage: $cmd [-d maildir] [-e exclude]
