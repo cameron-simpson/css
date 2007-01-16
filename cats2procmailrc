@@ -162,6 +162,10 @@ if desired,
 for example if the folder name or program invocation contains whitespace.
 Note that the quotes do not enclose the leading "B<+>" or "B<!>".
 
+Substrings of the form "B<{{I<WORD>}}>" are replaced with the value of
+the environment variable B<$CATS2PROCMAILRC_I<WORD>> if defined.
+I<WORD> must match the regexp B<^[A-Z][A-Z_0-9]*$>.
+
 =head2 Example Patterns
 
 The usual form is simply an address (see RFC822 and RFC2822)
@@ -173,8 +177,8 @@ If the address string lacks the local part, any localpart is accepted.
 
 I have rules like this:
 
-	!attn	Personal	cs
-	!attn	Personal	cameron@cskk.homeip.net
+	attn	Personal	cs
+	attn	Personal	cameron@cskk.homeip.net
 	attn	EFF-Cafe-News   cafe-news@eff.org
 	crypto  AUCrypto        aucrypto@suburbia.net
 
@@ -211,11 +215,23 @@ Patterns with more than one condition:
 	logs	cron	root \
 			subject:/Cron <root
 
+Example:
+
+        !me     interesting     {{ME}} \
+                                from:{{KNOWN}}
+
+This rule matches email to me from people I know, filing it with an alert action.
+The variables B<$CATS2PROCMAILRC_ME> and B<$CATS2PROCMAILRC_KNOWN> are constructed
+in advance to match these addresses; the former from my mutt B<alternates> line
+and the latter from my mail alias file.
+
 =head1 ENVIRONMENT
 
 MAILDIR, the directory containing mail folders.
 
 MAILDOMAIN, the local mail domain (eg B<cskk.homeip.net> for my home domain).
+
+CATS2PROCMAILRC_[A-Z]*, macro definitions
 
 =head1 SEE ALSO
 
@@ -407,6 +423,15 @@ sub readcats($;$)
       }
 
       next CAT;
+    }
+
+    # macro preprocessing using environment
+    for my $env (keys %::ENV) {
+      if ($env =~ /^CATS2PROCMAILRC_([A-Z][A-Z_0-9]+)$/) {
+        my $key = $1;
+        my $repl = $::ENV{$env};
+        s/\{\{$key\}\}/$repl/g;
+      }
     }
 
     # we expect "[flags]mailboxes tag rule"
