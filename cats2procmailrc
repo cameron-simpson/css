@@ -498,11 +498,11 @@ sub readcats($;$)
       else
       { $ptn=".*$ptn"; }
 
-      if ($ptn =~ /[A-Z]/)
-      { for my $hdr (@hdrs)
-        { $hdr =~ s/[a-z]/"[".uc($&)."$&]"/eg;
-        }
-      }
+      ##if ($ptn =~ /[A-Z]/)
+      ##{ for my $hdr (@hdrs)
+      ##  { $hdr =~ s/[a-z]/"[".uc($&)."$&]"/eg;
+      ##  }
+      ##}
 
       print "* ^", altre(@hdrs), ":[ 	]*$ptn\n";
     }
