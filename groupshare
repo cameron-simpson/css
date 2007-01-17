@@ -14,8 +14,8 @@ badopts=
 
 all=
 yes=
-[ "x$1" = x-a ] && { all=1; shift; }
-[ "x$1" = x-y ] && { yes=1; shift; }
+[ $# -gt 0 ] && [ "x$1" = x-a ] && { all=1; shift; }
+[ $# -gt 0 ] && [ "x$1" = x-y ] && { yes=1; shift; }
 
 if [ $# = 0 ]
 then
