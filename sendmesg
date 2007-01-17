@@ -53,7 +53,7 @@ $::Msg->WriteItem(new cs::Sink(SCALAR,\$msgtxt));
 
 $::Xit=0;
 
-if (!open(THREADS,"| bgstdin -C set-x thread-update $ENV{HOME}/rc/mail/threads/*/*"))
+if (!open(THREADS,"| bgstdin -C set-x thread-update $ENV{HOME}/var/mail/threads/*/*"))
 { warn "$::cmd: pipe to thread-update fails: $!";
   $::Xit=1;
 }
