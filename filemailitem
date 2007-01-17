@@ -18,7 +18,7 @@ usage="Usage: $cmd [-auto] folder <mailitem
 
 badopts=
 
-[ "x$1" = x-auto ] && { mode=auto; shift; }
+[ $# -gt 0 ] && [ "x$1" = x-auto ] && { mode=auto; shift; }
 
 folder=$1; shift
 [ $# = 0 ] || { echo "$cmd: extra arguments after folder: $*" >&2
