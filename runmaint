@@ -384,6 +384,7 @@ runscript()
 
   ( [ -n "$_rp_env" ] && . "$_rp_env"
     [ $_rs_merge ] && exec 2>&1
+    [ -x "$_rs" ] || { echo "$cmd: $_rs: not executable" >&2; exit 1; }
     exec sh $xflag "$_rs"
   ) \
   | case "$_rs_addrs" in
@@ -397,6 +398,7 @@ runscript()
 	  ;;
       -)  exec cat ;;
       *)  _rs_subj=$subj
+          [ -x "$_rs" ] || _rs_subj="NOT EXECUTABLE: $_rs_subj"
 	  [ -n "$_rs_subj" ] || _rs_subj=runmaint@$HOST
 	  _rs_subj="$_rs_subj $_rs $args"
 	  exec mailif -s "$_rs_subj" $_rs_addrs ;;
