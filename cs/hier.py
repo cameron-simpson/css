@@ -282,10 +282,8 @@ class HierInput(_Hier):
     """
     oline=line
     line=line.lstrip()
-    if ifdebug: debug("kvline: key tok at:", line)
     (key,line)=self.tok(line)
     line=line.lstrip()
-    if ifdebug: debug("kvline: value tok at:", line)
     (value,line)=self.tok(line)
     line=line.lstrip()
     if len(line):
