@@ -1,0 +1,12 @@
+#!/bin/sed -f
+#
+# Fold slosh-extended lines.
+#       - Cameron Simpson <cs@zip.com.au> 16jan2007
+#
+
+:top
+/\\$/{
+  N             # fetch next line
+  s/\\\n//      # remove slosh and newline
+  b top         # retest
+}
