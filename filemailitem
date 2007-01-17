@@ -45,7 +45,7 @@ case "$folder" in
   /*) fpath=$folder ;;
   *)  fpath=`mailfolderpath "$folder"` || exit 1
       [ -n "$fpath" ] || exit 1
-      [ -f "$fpath" -o -f "$fpath/." ] || exit 1
+      [ -f "$fpath" -o -d "$fpath/." ] || exit 1
       ;;
 esac
 
