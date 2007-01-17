@@ -26,7 +26,6 @@ class Cache:
     self.__backend=backend
     self.__hits=0
     self.__misses=0
-    self.__flushes=0
     self.__xrefs=[]
 
   def addCrossReference(self,xref):
@@ -35,7 +34,8 @@ class Cache:
   def inCache(self,key):
     if key not in self.__cache:
       return False
-    return self.__cache[key] is not None
+    c=self.__cache[key]
+    return c[0] == self.__seq
 
   def hitMiss(self):
     return (self.__hits, self.__misses)
@@ -57,24 +57,24 @@ class Cache:
     return self.__backend.keys()
 
   def getitems(self,keylist):
-    items=self.__backend.getitems(keylist)
-    for i in items:
-      self.store(i)
+    inKeys=[key for key in keylist if self.inCache(key)]
+    outKeys=[key for key in keylist if not self.inCache(key)]
+
+    items=[self.findrowByKey(key) for key in inKeys]
+    if outKeys:
+      outItems=self.__backend.getitems(outKeys)
+      for i in outItems:
+        self.store(i)
+      items.extend(outItems)
+
     return items
 
   def findrowByKey(self,key):
-    if key in self.__cache:
-      value=self.__cache[key]
-      if value[0] == self.__seq:
-        self.__hits+=1
-        ##if ifdebug(): warn("HIT, key =", `key`, "value[] =", `value`)
-        return value[1]
-      # out of date - discard the cache line
-      self.__flushes+=1
-      del self.__cache[key]
+    if self.inCache(key):
+      self.__hits += 1
+      return self.__cache[key][1]
 
     self.__misses+=1
-
     try:
       value=self.__backend[key]
     except IndexError, e:
