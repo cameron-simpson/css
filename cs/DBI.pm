@@ -293,7 +293,7 @@ sub findWhen($$$$;$)
 { my($dbh,$table,$field,$key,$when)=@_;
   $when = isodate() if ! defined $when;
 
-  my $sth = sql($dbh,"SELECT * FROM $table where $field = ? AND START_DATE <= ? AND (ISNULL(END_DATE) OR END_DATE >= ?)");
+  my $sth = sql($dbh,"SELECT * FROM $table where $field = ? AND START_DATE <= ? AND (ISNULL(END_DATE) OR END_DATE > ?)");
   return () if ! defined $sth;
 
   fetchall_hashref($sth,$key,$when,$when);
@@ -312,7 +312,7 @@ sub when($$;$)
 { my($dbh,$table,$when)=@_;
   $when = isodate() if ! defined $when;
 
-  my $sth = sql($dbh,"SELECT * FROM $table where START_DATE <= ? AND (ISNULL(END_DATE) OR END_DATE >= ?)");
+  my $sth = sql($dbh,"SELECT * FROM $table where START_DATE <= ? AND (ISNULL(END_DATE) OR END_DATE > ?)");
   return () if ! defined $sth;
 
   fetchall_hashref($sth,$when,$when);
@@ -485,7 +485,7 @@ sub lookupDatedIds($$$$$;$)
   $when=cs::DBI::isodate() if ! defined $when;
 
   my $sth = dosql($dbh,
-		  "SELECT $destfield FROM $table WHERE $srcfield = ? AND (ISNULL(START_DATE) OR START_DATE <= ?) AND (ISNULL(END_DATE) OR END_DATE >= ?)",
+		  "SELECT $destfield FROM $table WHERE $srcfield = ? AND (ISNULL(START_DATE) OR START_DATE <= ?) AND (ISNULL(END_DATE) OR END_DATE > ?)",
 		  $id,$when,$when);
   if (!$sth)
   { warn "$::cmd: lookupDatedIds($table,$srcfield=$id -> $destfield) fails";
@@ -520,7 +520,7 @@ sub followDatedRecords($$$$$$$;$)
 		  "SELECT t2.*
 			FROM $srctable as t1, $desttable as t2
 			WHERE t1.$srcfield = ?
-			  AND (ISNULL(t1.START_DATE) OR t1.START_DATE <= ?) AND (ISNULL(t1.END_DATE) OR t1.END_DATE >= ?)
+			  AND (ISNULL(t1.START_DATE) OR t1.START_DATE <= ?) AND (ISNULL(t1.END_DATE) OR t1.END_DATE > ?)
 			  AND t2.$desttablefield = t1.$destfield",
 		  $id,$when,$when);
 
@@ -636,7 +636,7 @@ sub datedRecordsBetween($$$$;$$)
 		? $_->{$keyfield} eq $key
 		: 1,
 	       grep( ! ( $_->{START_DATE} gt $end
-		      || (defined $_->{END_DATE} && $_->{END_DATE} lt $start)
+		      || (defined $_->{END_DATE} && $_->{END_DATE} le $start)
 		       ),
 		     @$D))
           ;
@@ -1285,7 +1285,7 @@ sub SelectDateRanges($$$;$)
 
   $when=$dbh->quote($when);
 
-  my $statement = "SELECT * FROM $table WHERE $constraint START_DATE <= $when AND ( ISNULL(END_DATE) OR END_DATE >= $when )";
+  my $statement = "SELECT * FROM $table WHERE $constraint START_DATE <= $when AND ( ISNULL(END_DATE) OR END_DATE > $when )";
   ##::debug("statement=[$statement]");
   dosql($dbh,$statement);
 }
