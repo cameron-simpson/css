@@ -4,6 +4,7 @@
 #	- Cameron Simpson <cs@zip.com.au> 23dec2005
 #
 
+import sys
 import string
 import types
 import cs.secret
@@ -263,7 +264,7 @@ class DirectKeyedTableView:
     if len(rows) == 0:
       return None
     if len(rows) > 1:
-      warn("multiple hits WHERE", where, "in", self.name, "- choosing the first one:",kfsqlfields,'=',`id`)
+      warn("multiple hits WHERE", where, "in", self.name, "- choosing the first one:",`rows[0]`)
 
     return rows[0]
 
@@ -362,7 +363,6 @@ class KeyedTableView(cs.cache.Cache):
     debug("preload "+self.name)
     for row in self.selectRows(where=where):
       key=self.rowKey(row)
-      assert self.name != 'USER_DATES' or key[0] != 315
       self.store(row,key)
 
   def insert(self,hash):
