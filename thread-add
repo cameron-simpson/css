@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/sh -u
 #
 # Add the message id of the mail item on stdin to a message-id file.
 #	- Cameron Simpson <cs@zip.com.au> 13jun2004
@@ -9,6 +9,10 @@ usage="Usage: $cmd idfile <mailitem"
 
 [ $# = 1 ] || { echo "$usage" >&2; exit 2; }
 idfile=$1; shift
+case "$idfile" in
+  ./* | /* ) ;;
+  *)         idfile=$HOME/var/mail/threads/$idfile ;;
+esac
 
 eval `mhdrs -sh | sed 's/^/HDR_/'`
 [ -n "$HDR_MESSAGE_ID" ] || exit 1
