@@ -25,14 +25,17 @@ idlist="$HDR_REFERENCES $HDR_IN_REPLY_TO"
 [ -z "$idlist" ] && exit 1	# no refs => not in a thread
 
 id="$HDR_MESSAGE_ID"
-re='^('`echo "$idlist" | tr ' ' '|'`')$'
-re=`echo "$re" | sed 's/\./\\\\./g'`
+re='^('`printf '%s\n' "$idlist" | sed 'y/ /|/; s/\./\\\\./g'`')$'
 
 ##set -x
 
 xit=1
 for idfile
 do
+  case "$idfile" in
+    ./* | /* ) ;;
+    *)         idfile=$HOME/var/mail/threads/$idfile ;;
+  esac
   [ -f "$idfile" ] || continue
   if egrep "$re" "$idfile" >/dev/null
   then
