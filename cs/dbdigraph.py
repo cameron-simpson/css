@@ -24,8 +24,8 @@ def testAllCaps(s):
   return CapWord_re.match(s)
 
 def createDB(conn,nodes='NODES',attrs='ATTRS'):
-  dosql(conn, 'CREATE TABLE '+nodes+' (ID autoincrement, NAME varchar(32), TYPE varchar(16));')
-  dosql(conn, 'CREATE TABLE '+attrs+' (ID autoincrement, ID_REF unsigned, ATTR varchar(64), VALUE varchar(255), IS_IDREF tinyint(1));')
+  dosql(conn, 'CREATE TABLE '+nodes+' (ID autoincrement, NAME varchar(32) character set utf8, TYPE varchar(16) character set utf8);')
+  dosql(conn, 'CREATE TABLE '+attrs+' (ID autoincrement, ID_REF unsigned, ATTR varchar(64) character set utf8 not null, VALUE varchar(255) character set utf8, IS_IDREF tinyint(1));')
 
 class DBDiGraph:
   def __init__(self,nodeTable,attrTable):
