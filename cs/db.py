@@ -80,11 +80,11 @@ def sqlise(v):
     return "NULL"
 
   t=type(v)
-  if t is str:
+  if t is str or t is unicode:
     # SQL escape quotes
-    if v.find("'") >= 0: v=string.join(v.split("'"),"''")
+    if v.find("'") >= 0: v="''".join(v.split("'"))
     # double % into %% because the string undergoes python % substitution
-    if v.find("%") >= 0: v=string.join(v.split("%"),"%%")
+    if v.find("%") >= 0: v="%%".join(v.split("%"))
     return "'"+v+"'"
 
   if t in (types.IntType,types.LongType,types.FloatType):
