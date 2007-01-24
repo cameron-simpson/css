@@ -49,6 +49,7 @@ def mysql(secret,db=None):
   import MySQLdb
 
   if secret is None:
+    raise IndexError
     global MySQLServer
     return MySQLdb.connect(host=MySQLServer,db=db,user=None,passwd=None)
 
