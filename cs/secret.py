@@ -8,20 +8,18 @@ def get(secret):
     try:
       pathname=os.path.join(base,secret)
       return cs.hier.load(pathname)
-    except Exception, e:
+    except IOError:
       pass
 
-  return None
+  raise IndexError, "no secret named "+secret
 
 def mysql(secret,db=None):
   import types
   if type(secret) is types.StringType or not(hasattr(secret,'__keys__') or hasattr(secret,'keys')):
     # transmute secret name into structure
-    ##debug("secret: get", `secret`)
     secret=get(secret)
 
   import cs.dbi.mysql
-  debug("secret =", `secret`)
   host=secret['HOST']
   if 'LOGIN' not in secret:
     return cs.dbi.mysql.Conn(host=host, db=db)
