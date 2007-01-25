@@ -1,13 +1,16 @@
-#!/bin/sh
+#!/bin/sh -u
 #
 # Sorted tidy recursive netgroup listing.
 #	- Cameron Simpson <cs@zip.com.au>
 #
 
+sedcmd=`printf "%s\n" "$HOSTDOMAIN" | sed 's/\./\\\\&/g'`
+sedcmd="s/\\.$sedcmd\$//"
+
 if [ "x$1" = x-a ]
 then  shift
       filt=cat
-else  filt='sed "s/\\..*//"'
+else  filt='sed "$sedcmd"'
 fi
 
 netgroup -r ${1+"$@"} \
