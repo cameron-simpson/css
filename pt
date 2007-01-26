@@ -29,6 +29,7 @@ use cs::Shell;
 
 $::Usage="Usage: $::cmd [+fmt...] [ps-args...]";
 
+$::ARGS='ARGS';
 my @PSFields=qw(USER GROUP PID PPID SID TTY  WCHAN VSZ RSS NICE TIME ARGS);
 # NB: never suppress PID or PPID
 my @PSOptFs =qw(     GROUP          SID TTY  WCHAN         NICE TIME     );
@@ -86,6 +87,12 @@ Remaining options are passed to the native ps(1) command.
 
 =cut
 
+if ($::ENV{OS} eq 'darwin') {
+  $::ARGS='COMMAND';
+  my %macfmt=(ARGS => COMMAND,
+              SID  => TPGID);
+  @PSUseFmts=map(exists $macfmt{uc($_)} ? $macfmt{uc($_)} : $_, @PSUseFmts);
+}
 my @args = ('ps',@ARGV,'-o',lc("@PSUseFmts"));
 ##warn "ps=[@args]";
 my $shcmd = cs::Shell::quote(@args);
@@ -150,7 +157,7 @@ sub pstree($;$)
     }
     print "\\_ ";
   }
-  print $P->{ARGS}, "\n";
+  print $P->{$::ARGS}, "\n";
 
   for my $subpid (sort { $a <=> $b } @{$P->{_CHILDREN}})
   { pstree($subpid,$indent+2) if $subpid != $pid;
