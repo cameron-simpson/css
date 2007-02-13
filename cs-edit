@@ -18,7 +18,7 @@ do
     /*) exe=$vi ;;
     *)  exe=`which "$vi"` || continue ;;
   esac
-  [ -x "$exe" ] || { [ -f "$exe" && ls -ld "$exe" >&2; continue; }
+  [ -x "$exe" ] || { [ -f "$exe" ] && ls -ld "$exe" >&2; continue; }
   case "$exe" in */vim)
     case "$TERM" in xterm|rxvt-unicode)
       TERM=rxvt
