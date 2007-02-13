@@ -140,12 +140,12 @@ pull_db()
     # pull each table individually
     case "$src" in
       /*)
-        ls "$src/." \
+        $trace ls "$src/." \
         | sed -n "s|^$_pull_db"'\.\(.*\)\.sql\.gz$|\1|p'
         ;;
       *)
-        echo show tables \
-        | set-x mysql -h "$src_host" "-u$src_user" "-p$src_password" "$_pull_db" \
+        $trace echo show tables \
+        | $trace mysql -h "$src_host" "-u$src_user" "-p$src_password" "$_pull_db" \
         | sed 1d
         ;;
     esac \
@@ -191,12 +191,12 @@ if [ $# = 0 ]
 then
   case "$src" in
     /*)
-      ls "$src/." \
+      $trace ls "$src/." \
       | sed -n 's|\(.*\)\.sql\.gz$|\1|p'
       ;;
     *)
-      echo show databases \
-      | set-x mysql -h "$src_host" "-u$src_user" "-p$src_password" \
+      $trace echo show databases \
+      | $trace mysql -h "$src_host" "-u$src_user" "-p$src_password" \
       | sed '1d; /^mysql$/d; /^information_schema$/d'
       ;;
   esac \
