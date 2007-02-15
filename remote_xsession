@@ -8,7 +8,7 @@ remote=$1; shift
 
 [ -n "$DISPLAY" ] || { echo "$cmd: no \$DISPLAY!" >&2; exit 1; }
 
-exec ssh -X "$remote" \
+exec ssh -Y "$remote" \
 	"LOGDIR=\$HOME/var/log; export LOGDIR
 	"[ -d \$LOGDIR/. ] || mkdir -p \$LOGDIR
 	 exec >>\$LOGDIR/console 2>&1
