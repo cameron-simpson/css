@@ -1,0 +1,65 @@
+#!/bin/sh -u
+#
+# Sequential mklinks. Iterate along a sequence of files, hardlinking
+# adjacent identical files. This is aimed at compressions sequential
+# regression or dump files, where often there may be no change between
+# sucessive runs.
+#
+# This is also useful on machines with older pythons that won't run my
+# mklinks script.
+#       - Cameron Simpson <cs@zip.com.au> 17feb2007
+#
+
+trace=set-x
+vtrace=
+
+cmd=`basename "$0"` || exit 1
+usage="Usage: $cmd files..."
+
+badopts=
+
+if [ $# -gt 0 ]
+then
+  prev=$1
+  shift
+  [ -f "$prev" ] || { echo "$cmd: warning: $prev: not a file" >&2
+                      prev=
+                    }
+else
+  echo "$cmd: missing files" >&2
+  badopts=1
+fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+xit=0
+
+for curr
+do
+  [ -f "$curr" ] || { echo "$cmd: warning: $curr: not a file" >&2
+                      continue
+                    }
+  if [ -n "$prev" ]
+  then
+    if $vtrace cmp -s "$prev" "$curr" \
+    && dir=`dirname "$curr"` \
+    && base=`basename "$curr"`
+    then
+      tmp=$dir/.$curr.$$.$cmd
+      $vtrace mv -i -- "$curr" "$tmp" || { xit=1; continue; }
+      if $trace ln -i -- "$prev" "$curr" || { xit=1; false; }
+      then
+        $vtrace rm -- "$tmp" || xit=1
+      else
+        $trace rm -f -- "$curr"
+        $trace mv -- "$tmp" "$curr"
+        xit=1
+        continue
+      fi
+    fi
+  fi
+
+  prev=$curr
+done
+
+exit $xit
