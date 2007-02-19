@@ -88,10 +88,10 @@
 # with some convenience variables
 # reflecting the date and time
 # that B<runmaint> commenced.
-# These are derived from the output of date(1), and are:
+# These are lowercase strings derived from the output of date(1), and are:
 #
-#  wday The day of the week, eg "Tue".
-#  mon  The month, eg "Apr".
+#  wday The day of the week, eg "tue".
+#  mon  The month, eg "apr".
 #  mday The month day, eg 23.
 #  hh   The hour, eg 09.
 #  mm   The minute, eg 13.
@@ -102,7 +102,7 @@
 # These are passed to any cascaded scripts intact
 # i.e. if a 6pm runmaint job kicks off and runs long enough
 # that some cascased jobs commences much later
-# the convenience variables will still be for 6pm.
+# then the convenience variables will still be for 6pm.
 #
 # Before running any script
 # B<runmaint> sources the file
