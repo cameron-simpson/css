@@ -61,6 +61,7 @@ case `echo "$engine" | tr '[a-z]' '[A-Z]'` in
   EZYDVD)	url=http://www.ezydvd.com.au/mech/search.zml?f=title\&q=$query\&x=0\&y=0 ;;
   FINDSAMETEXT)	url=http://www.findsame.com/submit.cgi?rawtext=$query ;;
   FINDSAMEURL)	url=http://www.findsame.com/submit.cgi?url=$query ;;
+  FLICKR)	url=http://flickr.com/search/?q=$query ;;
   FM|FRESHMEAT)	url=http://freshmeat.net/search/?q=$query ;;
   FROOGLE)	url=http://froogle.google.com/froogle?as_q=$query\&num=$maxhits\&btnG=Froogle+Search\&as_epq=\&as_oq=\&as_eq=\&price=under\&price0=\&price1=\&price2=\&as_occt=any\&cat=0 ;;
   FTPSEARCH)	url=http://ftpsearch.lycos.com/cgi-bin/search?form=medium\&query=$query\&doit=Search\&type=insensitive multiple substrings search\&hits=$maxhits\&matches=$maxhits\&hitsprmatch=$maxhits\&limdom=\&limpath=\&f1=Count\&f2=Mode\&f3=Size\&f4=Date\&f5=Host\&f6=Path\&header=all\&sort=date\&strlen=200 ;;
