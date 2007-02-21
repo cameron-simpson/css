@@ -42,4 +42,6 @@ done
 
 set -x
 histbackup -x --delete-excluded "$HOME/var/firefox" "$HOME/var/backup/firefox"
+bsed '/^user_pref("permissions.default.image"/d; $a\
+user_pref("permissions.default.image", 2);' "$HOME/.mozilla/firefox/subdir/prefs.js"
 acon "$br" -width "$FULLX" -height "$PIX_HIGH" -P "$profile" ${1+"$@"} &
