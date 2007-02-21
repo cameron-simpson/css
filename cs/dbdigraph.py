@@ -23,9 +23,12 @@ CapWord_re = re.compile(r'^[A-Z][A-Z_]*$')
 def testAllCaps(s):
   return CapWord_re.match(s)
 
-def createDB(conn,nodes='NODES',attrs='ATTRS'):
-  dosql(conn, 'CREATE TABLE '+nodes+' (ID autoincrement, NAME varchar(32) character set utf8, TYPE varchar(16) character set utf8);')
-  dosql(conn, 'CREATE TABLE '+attrs+' (ID autoincrement, ID_REF unsigned, ATTR varchar(64) character set utf8 not null, VALUE varchar(255) character set utf8, IS_IDREF tinyint(1));')
+def createDB(conn,nodes='NODES',attrs='ATTRS',drop=False):
+  if drop:
+    dosql(conn, 'DROP TABLE '+nodes+';')
+    dosql(conn, 'DROP TABLE '+attrs+';')
+  dosql(conn, 'CREATE TABLE '+nodes+' (ID int unsigned NOT NULL auto_increment primary key, NAME varchar(32) character set utf8, TYPE varchar(16) character set utf8);')
+  dosql(conn, 'CREATE TABLE '+attrs+' (ID int unsigned NOT NULL auto_increment primary key, ID_REF bool, ATTR varchar(64) character set utf8 not null, VALUE varchar(255) character set utf8, IS_IDREF tinyint(1));')
 
 class DBDiGraph:
   def __init__(self,nodeTable,attrTable):
@@ -37,6 +40,9 @@ class DBDiGraph:
     self.__lastid=None
     self.__typeMap={}
     self.__preloaded=False
+
+  def createDB(self,drop=False):
+    createDB(self.nodes.conn,self.nodes.name,self.attrs.table.name,drop)
 
   def preload(self):
     self.nodes.preload()
@@ -58,6 +64,12 @@ class DBDiGraph:
     ''' Creates a new node with the specified name and type.
         Returns the ID of the new node.
     '''
+    assert type is not None
+    if name is None:
+      assert len(type) == 0
+    else:
+      assert len(type) > 0
+
     if name is not None and not multipleNamesOk and self.nodeByNameAndType(name,type):
       die("createNode(name="+str(name)+", type="+type+"): already exists")
 
@@ -358,6 +370,7 @@ class DBDiGraphNode:
 
 class AttrTable(cs.cache.Cache):
   def __init__(self,digraph,table):
+    self.table=table
     self.__direct=DirectAttrTable(digraph,table)
     cs.cache.Cache.__init__(self,self.__direct)
     self.__preloaded=False
