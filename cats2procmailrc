@@ -535,6 +535,8 @@ X
       }
     }
 
+    my $pmflags;
+
     FOLDER:
     while (length($folders))
     {
@@ -577,15 +579,14 @@ X
       }
 
       # wait for delivery to programs
-      my $flags = ($deliver =~ /^\|/ ? "w" : "");
-      if (length $folders) { $flags.='c'; }
+      $pmflags = (length $folders ? 'c' : '');
 
-      print "\n  :0$flags\n  {\n";
+      print "\n  :0$pmflags\n  {\n";
 
       if ($doalert)
       { my $alertfn = $::DfltAlert;
 	$alertfn =~ s/\%/$folder/g;
-	print "    :0hc\n    | $alertfn\n\n";
+	print "    :0hwc\n    | $alertfn\n\n";
 
 	# only alert on the first folder
 	$doalert=0;
@@ -601,7 +602,8 @@ X
 	print "    :0 Wh: $cache.lock\n    | formail -D 819200 $cache\n";
       }
 
-      print "    :0\n    $deliver\n";
+      $pmflags = ($deliver =~ /^\|/ ? "w" : "");
+      print "    :0$pmflags\n    $deliver\n";
 
       print "  }\n";
     }
