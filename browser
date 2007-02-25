@@ -12,7 +12,9 @@ url=
 profile=$BROWSER_PROFILE
 ##br=/opt/firefox-1.5.0.7-enGB/firefox
 ##br=/opt/firefox-2.0-enGB/firefox
-br=/opt/firefox-2.0.0.1-enGB/firefox
+##br=/opt/firefox-2.0.0.1-enGB/firefox
+br=/opt/firefox-2.0.0.2-enGB/firefox
+prefs=$HOME/.mozilla/firefox/subdir/prefs.js
 
 cmd=$0
 usage="Usage: $cmd [-f] [-q] [url]
@@ -42,6 +44,7 @@ done
 
 set -x
 histbackup -x --delete-excluded "$HOME/var/firefox" "$HOME/var/backup/firefox"
+echo >>"$prefs"
 bsed '/^user_pref("permissions.default.image"/d; $a\
-user_pref("permissions.default.image", 2);' "$HOME/.mozilla/firefox/subdir/prefs.js"
+user_pref("permissions.default.image", 2);' "$prefs"
 acon "$br" -width "$FULLX" -height "$PIX_HIGH" -P "$profile" ${1+"$@"} &
