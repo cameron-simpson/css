@@ -1,14 +1,19 @@
 import os
 import os.path
+import pwd
 import sys
 import dircache
 import string
 import re
+import email
+import email.parser
+import time
+import socket
 import mailbox
 from pysqlite2 import dbapi2 as sqlite
 import cs.env
 import cs.sh
-from cs.misc import chomp
+from cs.misc import chomp, progress, seq
 
 
 numericRe=re.compile('^(0|[1-9][0-9]*)$')
@@ -41,6 +46,15 @@ class BugSet:
     bugdir=cs.misc.mkdirn(self.root+'/')
     return self[int(os.path.basename(bugdir))]
 
+  def log(self,bugid,field,value):
+    dblog=self.subpath('db.log.csv')
+    logfp=file(dblog,"a")
+    logfp.write(field)
+    logfp.write(',')
+    logfp.write(value)
+    logfp.write('\n')
+    logfp.close()
+
   # Perform an SQL query on the bug database.
   # Returns a generator containing the results.
   # This requires the B<sqlite> package: http://freshmeat.net/projects/sqlite/
@@ -50,6 +64,7 @@ class BugSet:
 
     if not os.path.isfile(sqldb):
       # no db? create it
+      progress("create SQLite database...")
       os.system("set -x; sqlite '"+sqldb+"' 'create table bugfields (bugnum int, field varchar(64), value varchar(16384));'")
       # populate db from raw data
       sqlpipe=cs.sh.vpopen(("sqlite",sqldb),"w")
@@ -66,6 +81,7 @@ class BugSet:
       sqlpipe.close()
     else:
       # just update the db from the log file
+      progress("sync db from log...")
       if os.path.isfile(dblog):
 	sqlpipe=cs.sh.vpopen(("sqlite",sqldb),"w")
 	dblogfp=file(dblog)
@@ -89,7 +105,7 @@ class BugSet:
 	  sqlpipe.write("\");\n")
 	sqlpipe.close()
 
-    sys.stderr.write("QUERY=["+query+"]\n")
+    progress("QUERY =", query)
     sqlpipe=cs.sh.vpopen(("sqlite","-list",sqldb,query))
     for row in sqlpipe:
       yield string.split(chomp(row),'|')
@@ -98,9 +114,11 @@ def isScalarField(fieldname):
   return len(fieldname) > 0 and fieldname[0] in string.ascii_lowercase and scalarFieldNameRe.match(fieldname)
 
 class Bug:
-  def __init__(self,bugset,bugnum,create=0):
+  def __init__(self,bugset,bugnum,create=False):
     self.bugset=bugset
     self.bugnum=bugnum
+    self.__cache={}
+    self.__mail=None
 
     if create:
       mkdir(self.path())
@@ -116,10 +134,12 @@ class Bug:
 
   def __getitem__(self,field):
     if isScalarField(field):
-      fpath=self.__fieldpath(field)
-      if not os.path.isfile(fpath):
-	return None
-      return chomp(file(fpath).read())
+      if field not in self.__cache:
+        fpath=self.__fieldpath(field)
+        if not os.path.isfile(fpath):
+          return None
+        self.__cache[field]=chomp(file(fpath).read())
+      return self.__cache[field]
 
     if field == "MAIL":
       return self.bugmail()
@@ -131,17 +151,22 @@ class Bug:
       fpath=self.__fieldpath(field)
       if os.path.isfile(fpath):
 	os.remove(fpath)
+      if field in self.__cache:
+        del self.__cache[field]
       return
 
     raise IndexError
 
   def __setitem__(self,field,value):
     if isScalarField(field):
+      value=str(value).replace('\n','\\n')
       fpath=self.__fieldpath(field)
       fp=file(fpath,'w')
       fp.write(value)
       fp.write('\n')
       fp.close()
+      self.bugset.log(self.bugnum,field,value)
+      self.__cache[field]=value
       return
 
     raise IndexError
@@ -154,21 +179,36 @@ class Bug:
     return v
 
   def bugmail(self):
-    return BugMail(self)
+    if self.__mail is None:
+      self.__mail=BugMail(self)
+    return self.__mail
 
 class BugMail(mailbox.Maildir):
   def __init__(self,bug):
     self.__bug=bug
+    self.__fpParser=email.parser.Parser()
     mailbox.Maildir.__init__(self,self.path())
 
   def path(self):
     return os.path.join(self.__bug.path(),'MAIL')
 
-def test():
-  bugs=Bugset()
-  print "bugs.root =", bugs.root
-  buglist=[bugnum for bugnum in bugs.bugnums()]
-  print "bugnums =", `buglist`
-  for bugnum in buglist:
-    bug=bugs[bugnum]
-    print bugnum, bug['hacker'], bug['headline']
+  def addmsgFromFile(self,fp):
+    self.addmsg(self.__fpParser.parse(fp))
+
+  def addmsg(self,msg):
+    if 'from' not in msg:
+      pw=pwd.getpwuid(os.geteuid())
+      gecos=pw[4]
+      cpos=gecos.find(',')
+      if cpos >= 0: gecos=gecos[:cpos]
+      msg['From']="%s <%s>" % (gecos,pw[0])
+
+    if 'date' not in msg:
+      # RFC822 time
+      # FIXME: locale likely to break this?
+      msg['Date']=time.strftime("%a, %d %b %Y %H:%M:%S +0000", time.gmtime())
+
+    if 'message-id' not in msg:
+      msg['Message-ID']='<%d.%d.%d@%s>' % (time.time(), os.getpid(), seq(), socket.gethostname())
+
+    self.add(msg)
