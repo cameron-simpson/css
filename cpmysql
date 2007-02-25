@@ -197,9 +197,9 @@ then
     *)
       $trace echo show databases \
       | $trace mysql -h "$src_host" "-u$src_user" "-p$src_password" \
-      | sed '1d; /^mysql$/d; /^information_schema$/d'
       ;;
   esac \
+  | sed '1d; /^mysql$/d; /^information_schema$/d' \
   | while read db
     do
       pull_db "$db" || exit 1
