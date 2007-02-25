@@ -1,0 +1,56 @@
+#!/usr/bin/python
+
+import os
+import sys
+from cs.misc import cmd, cmderr, strlist
+import cs.csbug
+
+usage="Usage:\t"+cmd+'''\tReport this help message.
+\taddmsg bugid < rfc2822-message\n\t\tAdd a message to the bug discussion.
+\tlist\tList Current bugs.
+\tnew headline...\n\t\tCreate a new bug.'''
+
+def dieUsage():
+  sys.stderr.write(usage)
+  sys.stderr.write('\n')
+  sys.exit(2)
+
+if len(sys.argv) < 2:
+  print usage
+  sys.exit(0)
+
+bugs=cs.csbug.BugSet()
+
+op=sys.argv[1]
+args=sys.argv[2:]
+
+if op == "addmsg":
+  bugid=int(args[0])
+  if len(args) > 1:
+    cmderr("extra arguments after bugid:", *args)
+    dieUsage()
+  bug=bugs[bugid]
+  bug.bugmail().addmsgFromFile(sys.stdin)
+  sys.exit(0)
+
+if op == "list":
+  bugids=bugs.keys()
+  bugids.sort()
+  for i in bugids:
+    bug=bugs[i]
+    headline=bug.value('headline','?')
+    print str(i)+"\t"+headline
+  sys.exit(0)
+
+if op == "new":
+  if len(args) == 0:
+    cmderr("no headline for new bug")
+    dieUsage()
+
+  bug=bugs.newbug()
+  bug['headline']=" ".join(args)
+  print bug.bugnum
+  sys.exit(0)
+
+cmderr("unsupported operation:", op)
+dieUsage()
