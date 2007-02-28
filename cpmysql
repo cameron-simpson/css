@@ -8,19 +8,23 @@
 trace=eecho
 doit=
 bytable=
+dfltport=3306
 
 cmd=`basename "$0"` || cmd=$0
 usage="Usage: $cmd [-T] [-x] src dst [databases...]
-  -T    Do a table based copy.
   -q    Execute quietly.
         Default is to do nothing, and recite a plan of action.
+  -T    Do a table based copy.
   -x    Trace execution.
         Default is to do nothing, and recite a plan of action.
   src and dst may take three forms:
     /path/to/dir
       The path to a directory of *.sql.gz files.
-    user:password@host
+    user:password@host[:port]
       A user,password,host tuple with which to connect to a database.
+      An optional :port may be used instead of the default $dfltport.
+    user:password@/socket-path
+      A user,password,socket tuple with which to connect to a database.
     secret
       The name of a secret as accessed by the secret(1cs) command.
   databases...
@@ -32,8 +36,8 @@ badopts=
 while [ $# -gt 0 ]
 do
   case $1 in
-    -T) bytable=1 ;;
     -q) doit=1 trace= ;;
+    -T) bytable=1 ;;
     -x) doit=1 trace=set-x ;;
     --)	shift; break ;;
     -?*)echo "$cmd: unrecognised option: $1" >&2
@@ -64,43 +68,95 @@ fi
 
 case "$src" in
   /*)
-    unset src_user src_password src_host
+    unset src_user src_password src_host src_port src_socket
     [ -d "$src/." ] || { echo "$cmd: $src: not a directory" >&2; badopts=1; }
     ;;
   *:*@*)
-    src_user=`    expr "x$src" : 'x\(.*\):.*@.*'` || exit 1
-    src_password=`expr "x$src" : 'x.*:\(.*\)@.*'` || exit 1
-    src_host=`    expr "x$src" : 'x.*:.*@\(.*\)'` || exit 1
+    src_upart=`   expr "x$src" : 'x\(.*\)@.*'` || exit 1
+    src_hpart=`   expr "x$src" : 'x.*@\(.*\)'` || exit 1
+    src_user=`    expr "x$src_upart" : 'x\([^:]*\):.*'` || exit 1
+    src_password=`expr "x$src_upart" : 'x[^:]*:\(.*\)'` || exit 1
+    src_socket=
+    src_host=
+    src_port=
+    case "$src_hpart" in
+      /*)
+        src_socket=$src_hpart
+        ;;
+      *:*)
+        src_host=`expr "x$src_hpart" : 'x\(.*\):.*'` || exit 1
+        src_port=`expr "x$src_hpart" : 'x.*:\(.*\)'` || exit 1
+        ;;
+      *)src_host=$src_hpart
+        src_port=$dfltport
+        ;;
+    esac
     ;;
   *)
     src_secret=`secret "$src"` || exit 1
     eval "$src_secret"
     src_user=$secretLOGIN
     src_password=$secretPASSWORD
-    src_host=$secretHOST
+    src_host=${secretHOST:-''}
+    src_port=${secretPORT:-$dfltport}
+    src_socket=${secretSOCKET:-''}
     ;;
 esac
 
 case "$dst" in
   /*)
-    unset dst_user dst_password dst_host
+    unset dst_user dst_password dst_host dst_port dst_socket
     [ -d "$dst/." ] || { echo "$cmd: $dst: not a directory" >&2; badopts=1; }
     ;;
   *:*@*)
-    dst_user=`    expr "x$dst" : 'x\(.*\):.*@.*'` || exit 1
-    dst_password=`expr "x$dst" : 'x.*:\(.*\)@.*'` || exit 1
-    dst_host=`    expr "x$dst" : 'x.*:.*@\(.*\)'` || exit 1
+    dst_upart=`   expr "x$dst" : 'x\(.*\)@.*'` || exit 1
+    dst_hpart=`   expr "x$dst" : 'x.*@\(.*\)'` || exit 1
+    dst_user=`    expr "x$dst_upart" : 'x\([^:]*\):.*'` || exit 1
+    dst_password=`expr "x$dst_upart" : 'x[^:]*:\(.*\)'` || exit 1
+    dst_socket=
+    dst_host=
+    dst_port=
+    case "$dst_hpart" in
+      /*)
+        dst_socket=$dst_hpart
+        ;;
+      *:*)
+        dst_host=`expr "x$dst_hpart" : 'x\(.*\):.*'` || exit 1
+        dst_port=`expr "x$dst_hpart" : 'x.*:\(.*\)'` || exit 1
+        ;;
+      *)dst_host=$dst_hpart
+        dst_port=$dfltport
+        ;;
+    esac
     ;;
   *)
     dst_secret=`secret "$dst"` || exit 1
     eval "$dst_secret"
     dst_user=$secretLOGIN
     dst_password=$secretPASSWORD
-    dst_host=$secretHOST
+    dst_host=${secretHOST:-''}
+    dst_port=${secretPORT:-$dfltport}
+    dst_socket=${secretSOCKET:-''}
     ;;
 esac
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+_mysqlcmd()
+{ mc_user=$1 mc_pass=$2 mc_h=$3 mc_p=$4 mc_s=$5 mc_cmd=$6
+  shift; shift; shift; shift; shift; shift
+  if [ -n "$mc_h" ]
+  then  set -- -u "$mc_user" "-p$mc_pass" -h "$mc_h" -P "$mc_p" ${1+"$@"}
+  else  set -- -u "$mc_user" "-p$mc_pass" -S "$mc_s"            ${1+"$@"}
+  fi
+  $trace "$mc_cmd" "$@"
+}
+mysqlcmd_src()
+{ _mysqlcmd "$src_user" "$src_password" "$src_host" "$src_port" "$src_socket" "$@"
+}
+mysqlcmd_dst()
+{ _mysqlcmd "$dst_user" "$dst_password" "$dst_host" "$dst_port" "$dst_socket" "$@"
+}
 
 pull_table()
 { _pull_table_db=$1
@@ -111,7 +167,7 @@ pull_table()
       $trace gzip -dc "$src/$_pull_table_db.$_pull_table.sql.gz"
       ;;
     *)
-      $trace mysqldump -h "$src_host" "-u$src_user" "-p$src_password" --opt "$_pull_table_db" "$_pull_table"
+      mysqlcmd_src mysqldump --opt "$_pull_table_db" "$_pull_table"
       ;;
   esac \
   | if [ $doit ]; then if [ -t 2 ]; then prcat; else cat; fi; fi \
@@ -120,7 +176,7 @@ pull_table()
         $trace gzip -n --fast >"$dst/$_pull_table_db.$_pull_table.sql.gz"
         ;;
       *)
-        $trace mysql -h "$dst_host" "-u$dst_user" "-p$dst_password" "$_pull_table_db"
+        mysqlcmd_dst mysql "$_pull_table_db"
         ;;
     esac
 }
@@ -145,7 +201,7 @@ pull_db()
         ;;
       *)
         $trace echo show tables \
-        | $trace mysql -h "$src_host" "-u$src_user" "-p$src_password" "$_pull_db" \
+        | mysqlcmd_src mysql "$_pull_db" \
         | sed 1d
         ;;
     esac \
@@ -163,7 +219,7 @@ pull_db()
         ;;
     *)
         $trace echo "drop database if exists $_pull_db; create database $_pull_db;" \
-        | $trace mysql -h "$dst_host" "-u$dst_user" "-p$dst_password" \
+        | mysqlcmd_dst mysql \
         || return 1
         ;;
   esac
@@ -173,7 +229,7 @@ pull_db()
       $trace gzip -dc "$src/$_pull_db.sql.gz"
       ;;
     *)
-      $trace mysqldump -h "$src_host" "-u$src_user" "-p$src_password" --opt "$_pull_db"
+      mysqlcmd_src mysqldump --opt "$_pull_db"
       ;;
   esac \
   | if [ $doit ]; then if [ -t 2 ]; then prcat; else cat; fi; fi \
@@ -182,7 +238,7 @@ pull_db()
         $trace gzip -n --fast >"$dst/$_pull_db.sql.gz"
         ;;
       *)
-        $trace mysql -h "$dst_host" "-u$dst_user" "-p$dst_password" "$_pull_db"
+        mysqlcmd_dst mysql "$_pull_db"
         ;;
     esac
 }
@@ -196,7 +252,7 @@ then
       ;;
     *)
       $trace echo show databases \
-      | $trace mysql -h "$src_host" "-u$src_user" "-p$src_password" \
+      | mysqlcmd_src mysql \
       ;;
   esac \
   | sed '1d; /^mysql$/d; /^information_schema$/d' \
