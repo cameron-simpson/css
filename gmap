@@ -1,2 +1,15 @@
 #!/bin/sh -u
-exec search googlemaps ${1+"$@"}
+case "$*" in
+  *' to '*)
+    set -- $*
+    [ "x$1" = xfrom ] && shift
+    lh=`expr "x$*" : 'x\(.*\) to .*' | tr ' ' +` || exit 1
+    case "$lh" in *\ au) ;; *) lh="$lh au" ;; esac
+    rh=`expr "x$*" : 'x.* to \(.*\)' | tr ' ' +` || exit 1
+    case "$rh" in *\ au) ;; *) rh="$rh au" ;; esac
+    exec urlshow "http://maps.google.com/maps?saddr=$lh&daddr=$rh&f=l&t=h"
+    ;;
+  *)
+    exec search googlemaps ${1+"$@"}
+    ;;
+esac
