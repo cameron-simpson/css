@@ -1,0 +1,67 @@
+#!/bin/sh -u
+
+cmd=`basename "$0"`
+usage="Usage: $cmd dl URL"
+
+: ${DISPLAY:=''}
+
+badopts=
+
+if [ $# = 0 ]
+then
+  echo "$cmd: missing op" >&2
+  badopts=1
+else
+  op=$1
+  shift
+
+  [ $# = 0 ] && [ -t 2 ] && [ -n "$DISPLAY" ] && { set -- `xclip -o` || exit 1; }
+  url=$1; shift
+
+  [ $# = 0 ] || { echo "$cmd: extra arguments: $*" >&2; badopts=1; }
+fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+url2imgids()
+{
+  for _u2i
+  do
+    pageurls "$_u2i"
+  done \
+  | sed 's|^http://www\.flickr\.com/photos//*||
+         t ok
+         :bad
+         d
+         :ok
+         /^[^\/]*\/[0-9]/!b bad
+         s|/in/[^/][^/]*/$||
+         s|^[^/]*/||
+        '
+}
+
+imgid2page()
+{ for _i2p
+  do  echo "http://www.flickr.com/photo_zoom.gne?id=$_i2p&size=o"
+  done
+}
+
+imgids2imgs()
+{ for _i2i_id
+  do
+    _i2i_pg=`imgid2page "$1"`
+    pageurls -i "$_i2i_pg"
+  done | grep '_o.jpg$'
+}
+
+case "$op" in
+  img_urls)
+    url2imgids "$url" \
+    | while read id
+      do  imgids2imgs "$id"
+      done
+      ;;
+  dl)
+    "$0" img_urls | xxargs set-x wget
+    ;;
+esac
