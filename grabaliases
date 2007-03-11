@@ -5,7 +5,6 @@
 #
 
 : ${TMPDIR:=/tmp}
-
 mailcfg=$HOME/rc/mail
 aliasfile=$mailcfg/aliases
 
@@ -101,4 +100,4 @@ set -- "$EDITOR" "$tmpaliases"
 [ $useterm ] && set -- term -e "$@"
 [ $quick ] || "$@" || exit 1
 
-rewriteif "$aliasfile" <"$tmpaliases" && { [ -z "$domyke" ] || { cd "$mailcfg" && myke; }; }
+rewriteif "$aliasfile" <"$tmpaliases" && mutt-refile
