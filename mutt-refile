@@ -1,0 +1,33 @@
+#!/bin/sh -u
+#
+# Make procmailrcs up to date, make mail filing folders, queue pending
+# mail for refiling.
+#       - Cameron Simpson <cs@zip.com.au>
+# 
+
+: ${MAILDIR:=$HOME/mail}
+mailcfg=$HOME/rc/mail
+
+cd "$mailcfg" || exit 1
+
+sed -n 's/^\([^# \t][^# \t]*\).*/\1/p' aliases \
+| tr , '\012' \
+| sort -u \
+| sed 's:^:XREF/:' \
+| ( cd "$MAILDIR" && exec xxargs maildir )
+
+myke || exit 1
+
+xit=0
+
+# copy pending refiled messages to spool-xref for refiling
+from=$MAILDIR/spool-refile
+to=$MAILDIR/spool-xref
+for sub in cur new
+do
+  [ -d "$from/$sub/." ] || { echo "$cmd: no dir $from/sub" >&2; xit=1; continue; }
+  [ -d "$to/$sub/." ] || { echo "$cmd: no dir $to/sub" >&2; xit=1; continue; }
+  set-x overlay "$from/$sub" "$to/$sub" || xit=1
+done
+
+exit $xit
