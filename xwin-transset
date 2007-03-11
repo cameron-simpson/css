@@ -1,8 +1,30 @@
 #!/bin/sh -u
+#
+# Run transset on a window.
+#       - Cameron Simpson <cs@zip.com.au>
+#
+
+cmd=$0
+usage="Usage: $cmd [-f] windowid"
+
 force=
+badopts=
+
 [ $# -gt 0 ] && [ "x$1" = x-f ] && { force=1; shift; }
-[ $# = 1 ] || { echo "Usage: $0 [-f] windowid" >&2; exit 2; }
-wid=$1; shift
+
+if [ $# = 0 ]
+then
+  echo "$cmd: mssing windowid" >&2
+  badopts=1
+else
+  wid=$1
+  shift
+  [ $# = 0 ] || { echo "$cmd: extra arguments after windowid: $*" >&2
+                  badopts=1
+                }
+fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
 
 [ -n "$X11_COMPOSITE" ] || exit 0
 
