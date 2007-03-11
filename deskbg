@@ -65,7 +65,7 @@ fi || exit 1
   desktop "$desk" rootbg_src "$srcargs"
 ) &
 
-[ $desk = $thisdesk ] && fvwm-root -r --no-dither "$rootbg"
+[ $desk = $thisdesk ] || fvwm-root -r --no-dither "$rootbg"
 ##### apply new background, set desktop to use it
 ####cset=`expr 1024 + $desk` || exit 1
 ####$towm "ColorSet $cset Pixmap $rootbg"
