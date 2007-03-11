@@ -1,0 +1,19 @@
+#!/bin/sh -u
+#
+# Edit my aliases file, then rebuilt procmailrcs etc.
+#	- Cameron Simpson <cs@zip.com.au> 30oct2005
+#
+
+: ${EDITOR:=vi}
+: ${MAILDIR:=$HOME/mail}
+mailcfg=$HOME/rc/mail
+aliases=$mailcfg/aliases
+
+cmd=$0
+usage="Usage: $cmd"
+
+[ $# = 0 ] || { echo "$usage" >&2; exit 2; }
+
+$EDITOR "$aliases" || exit 1
+
+exec mutt-refile
