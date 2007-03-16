@@ -1,4 +1,47 @@
-_logNode=document.body;
+if (_cs_libLoaded != null) {
+  alert("multiple load of cs/lib.js");
+else {
+  _cs_libLoaded=True;
+
+  _logNode=null;  //document.body;
+  _cs_seq = 0;
+
+  _cs_singlePixelIMGPrefix = '';
+  _cs_browserVersion = parseInt(navigator.appVersion);
+  _cs_agent = navigator.userAgent.toLowerCase();
+  _cs_isGecko = (_cs_agent.indexOf(" gecko/") > 0);
+  _cs_isIE = (_cs_agent.indexOf(" msie ") > 0);
+  _cs_isOpera = (_cs_agent.indexOf("opera/") == 0);
+  // _cs_isGecko = false;
+  // _cs_isIE = true;
+  //document.write("appver = "+navigator.appVersion+", agent = "+navigator.userAgent+"<BR>\n");
+  //document.write("isIE="+_cs_isIE+", isGecko="+_cs_isGecko+"<BR>\n");
+
+  _cs_anims=[];
+  _cs_nanim=0;
+
+  _cs_rpc=csNode("DIV");
+  _cs_rpc.style.display='none';
+  _cs_rpc_dflt_cgi="rpc.cgi";
+  document.body.appendChild(_cs_rpc);
+  _cs_rpc_callbacks={};
+  _cs_rpc_max=2
+  _cs_rpc_running=0
+  _cs_rpc_queue=[]
+
+  _csPan_useImageMap=false;
+  _csPan_dragCursor=null;
+  _csPan_draggingCursor=null;
+  if (_cs_isGecko) {
+    _csPan_dragCursor="-moz-grab";
+    _csPan_draggingCursor="-moz-grabbing";
+  }
+  if (_cs_isIE) {
+    _csPan_useImageMap=true;
+  }
+
+}
+
 function _log(str) {
   if (_logNode != null) {
     _logNode.appendChild(document.createTextNode(str));
@@ -9,17 +52,6 @@ function _logTo(elem) {
   _logNode=elem;
 }
 
-_cs_singlePixelIMGPrefix = '';
-_cs_browserVersion = parseInt(navigator.appVersion);
-_cs_agent = navigator.userAgent.toLowerCase();
-_cs_isGecko = (_cs_agent.indexOf(" gecko/") > 0);
-_cs_isIE = (_cs_agent.indexOf(" msie ") > 0);
-// _cs_isGecko = false;
-// _cs_isIE = true;
-//document.write("appver = "+navigator.appVersion+", agent = "+navigator.userAgent+"<BR>\n");
-//document.write("isIE="+_cs_isIE+", isGecko="+_cs_isGecko+"<BR>\n");
-
-_cs_seq = 0;
 function csSeq() {
   return _cs_seq++;
 }
@@ -70,10 +102,15 @@ function csObjectToString() {
   return s;
 }
 function csStringable(o) {
-  if (!(o.toString === csObjectToString)) {
-    var t = typeof(o);
-    if (t != "number" && t != "string" && t != "function") {
-      o.toString=csObjectToString;
+  if (o == null) {
+    _log("csStringable(null) called from "+arguments.callee.caller);
+  }
+  else {
+    if (!(o.toString === csObjectToString)) {
+      var t = typeof(o);
+      if (t != "number" && t != "string" && t != "function") {
+        o.toString=csObjectToString;
+      }
     }
   }
   return o;
@@ -129,6 +166,50 @@ function csSinglePixelIMG(colour) {
     imgfile = _cs_singlePixelIMGPrefix + imgfile;
   }
   return csIMG(imgfile);
+}
+
+function csTok(tok) {
+  var node;
+
+  if (tok == null) {
+    node=csText("[NULL]");
+  } else {
+    var t = typeof(tok);
+    if (t == "number" || t == "string") {
+      node = csText(tok+"");
+    } else {
+      var node = csNode(tok[0]);
+      var attrs= tok[1];
+      if (attrs) {
+        for (var attr in attrs) {
+          eval("node."+attr.toLowerCase()+"=attrs[attr]");
+        }
+      }
+      for (var j=2; j<tok.length; j++) {
+        node.appendChild(csTok(tok[j]));
+      }
+    }
+  }
+
+  return node;
+}
+
+function csTok2Span(tokens) {
+  if (tokens.length == 1)
+    return csTok(tokens[0]);
+
+  var span = csNode("SPAN");
+  for (var i=0; i<tokens.length; i++) {
+    span.appendChild(csTok(tokens[i]));
+  }
+  return span;
+}
+
+function csTokMAILTO(addr,text) {
+  if (text == null || text == "") {
+    text=addr;
+  }
+  return ["A", {"HREF": "mailto:"+addr}, text];
 }
 
 function csBoxInView(viewport, box) {
@@ -203,21 +284,34 @@ function csElementToDocBBox(elem) {
   return csStringable({x: abs.x, y: abs.y, width: elem.offsetWidth, height: elem.offsetHeight});
 }
 
+function csMoveIntoView(div) {
+  var vp = csViewPort();
+  var box = csElementToDocBBox(div);
+  var xy0 = {x: box.x, y: box.y};
+  csBoxInView(vp, box);
+  var xy1 = {x: box.x, y: box.y};
+  var dxy = {x: xy1.x-xy0.x, y: xy1.y - xy0.y};
+  if (dxy.x || dxy.y) {
+    _log("move div: dx="+dxy.x+", dy="+dxy.y);
+    csSetRPosition(div,dxy);
+  }
+}
+
 function csMkLogWindow(width, height) {
   if (width == null) width="50%";
-  if (height == null) height="15%";
+  if (height == null) height="40%";
 
   var div = csDIV();
   document.body.appendChild(div);
   div.style.overflow="auto";
   div.style.borderWidth=1;
   csSetSize(div,width,height);
-  csSetPosition(div,csXY("50%","0%"));
+  csSetPosition(div,csXY("50%","80%"));
   csSetZIndex(div,1023);
   _logTo(div);
   return div;
 }
-csMkLogWindow();
+//csMkLogWindow();
 
 function csSetZIndex(elem,z) {
   elem.style.zIndex = z;
@@ -244,11 +338,13 @@ function csSetSize(elem,width,height) {
 }
 
 function csClientMapAddHotSpot(map,hot) {
+  _log("csClientMapAddHotSpot("+hot+")");
   var a = csNode("AREA");
   a.title=hot.title;
   a.alt=hot.title;
   a.href=hot.href;
   a.shape="RECT";
+  //a.onmouseover="_log('OVER')";
   a.coords=hot.x+','+hot.y+','+(hot.x+hot.dx)+','+(hot.y+hot.dy);
   map.appendChild(a);
 }
@@ -281,7 +377,7 @@ function csHotspotsToClientMap(mapname,hotspots) {
 //                     .element, the DIV
 //
 function CSHotSpot(meta,xy1,xy2,z) {
-  _log("CSHotSpot(xy1="+xy1+", xy2="+xy2+")");
+  //_log("CSHotSpot(xy1="+xy1+", xy2="+xy2+")");
   var me = this;
 
   if (z == null) z=1;
@@ -290,9 +386,8 @@ function CSHotSpot(meta,xy1,xy2,z) {
   this.xy2=xy2;
 
   var hotdiv = csDIV();
-  _log("cssp1");
   csSetPosition(hotdiv,xy1);
-  _log("set hot size: "+(xy2.x-xy1.x)+"x"+(xy2.y-xy1.y));
+  //_log("set hot size: "+(xy2.x-xy1.x)+"x"+(xy2.y-xy1.y));
   csSetSize(hotdiv,xy2.x-xy1.x,xy2.y-xy1.y);
   csSetZIndex(hotdiv,z);
   //hotdiv.style.opacity=0.5;
@@ -379,8 +474,6 @@ CSHotSpot.prototype.getHoverDiv = function(mouseScreenX, mouseScreenY) {
   return this.hoverDiv;
 }
 
-_cs_anims=[];
-_cs_nanim=0;
 function runanim(id, fn) {
   var delay = fn();
   if (delay > 0) {
@@ -388,88 +481,111 @@ function runanim(id, fn) {
   }
 }
 
+function csSetPositionBelow(above,elem) {
+  var bbox = csElementToDocBBox(above);
+  _log("BBOX="+bbox);
+  csSetPosition(elem,csXY(bbox.x,bbox.y+bbox.dy));
+  _log("new offsetLeft = "+elem.offsetLeft);
+  _log("new offsetTop = "+elem.offsetTop);
+}
+
 ///////////////////////////////////////////////////////////////////
 // CGI-based RPC infrastructure
 //
-_cs_rpc=csNode("DIV");
-_cs_rpc_script=csNode("SCRIPT");
-_cs_rpc.style.display='none';
-_cs_rpc.appendChild(_cs_rpc_script);
-document.body.appendChild(_cs_rpc);
-_cs_rpc_callbacks={};
-_cs_rpc_max=2
-_cs_rpc_running=0
-_cs_rpc_queue=[]
 
 function csRPC(jscgiurl,argobj,callback,priority) {
   // Queue requests if too busy.
-  if (_cs_rpc_max > 0 && _cs_rpc_running >= _cs_rpc_max) {
-    _log("RPC QUEUE "+jscgiurl);
-    if (priority) {
-      _cs_rpc_queue.splice(0,0,[jscgiurl,argobj,callback]);
-    } else {
-      _cs_rpc_queue.push([jscgiurl,argobj,callback]);
+  if (priority) {
+    _cs_rpc_queue.splice(0,0,[jscgiurl,argobj,callback]);
+  } else {
+    _cs_rpc_queue.push([jscgiurl,argobj,callback]);
+  }
+
+  csRPCflushQueue();
+}
+
+function csRPCflushQueue() {
+  var dq;
+  var jscgiurl;
+  var argobj;
+  var callback;
+  while (
+         _cs_rpc_queue.length > 0
+//    && ( _cs_rpc_max < 1 || _cs_rpc_running < _cs_rpc_max )
+        ) {
+    _cs_rpc_running++;
+    dq = _cs_rpc_queue.shift();
+    jscgiurl=dq[0];
+    argobj=dq[1];
+    callback=dq[2];
+
+    var seq = csSeq();
+    var cbk = seq+"";
+    _cs_rpc_callbacks[cbk]=callback;
+    jscgiurl+="/"+seq;
+    if (argobj) {
+      csStringable(argobj);
+      jscgiurl+="/"+argobj;
     }
-    return;
+
+    var rpc = csNode("SCRIPT");
+    _cs_rpc.appendChild(rpc);
+    csRPCdispatch(rpc,jscgiurl);
   }
 
-  var seq = csSeq();
-  var cbk = seq+"";
-  _cs_rpc_callbacks[cbk]=callback;
-  jscgiurl+="/"+seq;
-  if (argobj) {
-    csStringable(argobj);
-    jscgiurl+="/"+argobj;
-  }
+  _log("RPC: "+_cs_rpc_queue.length+" items left");
+}
 
-  var rpc = csNode("SCRIPT");
-  // BUG: possibly, replacing a SCRIPT may abort the script load
-  _cs_rpc.replaceChild(rpc,_cs_rpc_script);
-  _cs_rpc_script=rpc;
-
-  _log("RPC DISPATCH "+jscgiurl);
-  rpc.src=jscgiurl;
-  _cs_rpc_running++;
+function csRPCdispatch(scriptnode,url) {
+  //scriptnode.src=url; _log("RPC:"+url);
+  //window.window.setTimeout(function(){ scriptnode.src=url; _log("RPC:"+url);}, 1);
 }
 
 function csRPC_doCallback(seq,result) {
-  _log("RPC RETURN SEQ = "+seq);
+  if (result == null) {
+    _log("RPC CALLBACK: result=null");
+  } else {
+    csStringable(result);
+    var pres = result.toString();
+    if (pres.length > 20) pres=pres.substr(0,20)+"...";
+    _log("RPC RETURN SEQ = "+seq+", result="+pres);
+  }
   var cbk = seq+"";
   var cb = _cs_rpc_callbacks[cbk];
   delete _cs_rpc_callbacks[cbk];
-
-  // Dequeue pending requests up to the limit.
   _cs_rpc_running--;
-  while ( (_cs_rpc_max == 0 || _cs_rpc_running < _cs_rpc_max)
-       && _cs_rpc_queue.length > 0
-        ) {
-    var dq = _cs_rpc_queue.shift();
-    csRPC(dq[0],dq[1],dq[2]);
+
+  // run the callback
+  if (typeof(cb) != "function") {
+    _log("BAD CALLBACK seq="+seq+": "+cb);
+  } else {
+    cb(result);
   }
 
-  cb(result);
+  // queue up more RPCs if waiting
+  csRPCflushQueue();
 }
 
 function csRPCbg(jscgiurl,argobj,callback) {
   setTimeout(function(){ csRPC(jscgiurl,argobj,callback); }, 0);
 }
 
-function csSubClass(baseClass, constructor) {
-  _log("typeof constructor="+(typeof constructor));
-  for (var k in baseClass.prototype) {
-    eval("constructor.prototype."+k+"=baseClass.prototype."+k+";");
+function csAddSuperClass(base,sup) {
+  //_log("csAddSuperClass("+base+","+sup+")");
+  var assign;
+  for (var k in sup.prototype) {
+    base.prototype[k]=sup.prototype[k];
   }
-  return constructor;
 }
 
 //////////////////////////////////////////////////
-// An object with asyncchronous attribute methods.
+// An object with asynchronous attribute methods.
 //
 function csAsyncObject() {
   this.asyncAttrs={};
 }
 csAsyncObject.prototype.addAttr = function(attrname, rpcurl, rpcargs) {
-  if (!rpcurl) rpcurl="rpc.cgi";
+  if (!rpcurl) rpcurl=this.rpcurl;
   if (!rpcargs) rpcargs={rpc: attrname, key: this.key};
   if (!this.asyncAttrs) this.asyncAttrs={};
 
@@ -492,6 +608,9 @@ csAsyncObject.prototype.withAttr = function(attrname, callback) {
 };
 csAsyncObject.prototype.setAttr = function(attrname, value) {
   var attr = this.asyncAttrs[attrname];
+  if (!attr) {
+    attr = this.asyncAttrs[attrname] = {};
+  }
   attr.value = value;
   var callbacks = attr.callbacks;
   if (callbacks) {
@@ -502,53 +621,38 @@ csAsyncObject.prototype.setAttr = function(attrname, value) {
   }
 };
 
-function csAsyncClass(constructor) {
-  if (!constructor) constructor = function(key){ this.key=key; };
-  return csSubClass(csAsyncObject, constructor);
-}
-
-_csPan_useImageMap=false;
-_csPan_dragCursor=null;
-_csPan_draggingCursor=null;
-if (_cs_isGecko) {
-  _csPan_dragCursor="-moz-grab";
-  _csPan_draggingCursor="-moz-grabbing";
-}
-if (_cs_isIE) {
-  _csPan_useImageMap=true;
-}
-
 /**
  * Controls a DIV containing the specified element with a mouse handler
  * to pan it.
  */
 function CSPan(toPan) {
-  _log("new pan div, toPan = "+toPan);
+  _log("new pan div, toPan = "+toPan+", src="+toPan.src);
 
   var outer = csDIV();
   outer.style.position='relative';
   outer.style.overflow='hidden';
-
-  outer.appendChild(toPan);
-  csSetPosition(toPan, csXY(0,0));
-  csSetZIndex(toPan,0);
 
   var glass = null;
   var hotLayer = null;
   var map = null;
   var mapName = null;
 
+  outer.appendChild(toPan);
+  csSetPosition(toPan, csXY(0,0));
+  csSetZIndex(toPan,0);
+
   if (_csPan_useImageMap) {
-    glass = null;
-    hotLayer = null;
-    mapName="_csPan_map"+csSeq();
-    map = csHotspotsToClientMap(mapName,[]);
-    outer.appendChild(map);
-    document.body.appendChild(map);
+    _log("CSPan: want image map - skipping self-made one");
+    //mapName="_csPan_map"+csSeq();
+    //map = csHotspotsToClientMap(mapName,[]);
+    //_log("map = "+map);
+    //outer.appendChild(map);
+
+    //document.body.appendChild(map);
   } else {
     // Place some glass over the object to prevent drag'n'drop causing
     // trouble. Make it full size to cover the outer DIV.
-    var glass = csDIV();
+    glass = csDIV();
     outer.appendChild(glass);
     csSetPosition(glass, csXY(0,0));
     csSetSize(glass,"100%","100%");
@@ -573,7 +677,9 @@ function CSPan(toPan) {
   if (_csPan_dragCursor) mouseElem.style.cursor=_csPan_dragCursor;
 
   var keyElem = hotLayer;       //(glass ? glass : outer);
-  keyElem.onkeypress = this.onKeyPress;
+  if (keyElem) {
+    keyElem.onkeypress = this.onKeyPress;
+  }
 
   this.element=outer;
   this.glass=glass;
@@ -588,7 +694,7 @@ CSPan.prototype.addHotSpot = function(meta,z) {
   csStringable(meta);
   xy1=csXY(meta.x, meta.y);
   xy2=csXY(meta.x+meta.dx, meta.y+meta.dy);
-  _log("xy1="+xy1+", xy2="+xy2);
+  //_log("xy1="+xy1+", xy2="+xy2);
 
   var hot = new CSHotSpot(meta, xy1, xy2, z);
 
@@ -598,7 +704,7 @@ CSPan.prototype.addHotSpot = function(meta,z) {
 
   if (this.hotLayer) {
     var div = hot.element;
-    _log("add hot div: "+div+" width="+(xy2.x-xy1.x));
+    //_log("add hot div: "+div+" width="+(xy2.x-xy1.x));
     csSetPosition(div,xy1);
     csSetSize(div, xy2.x-xy1.x, xy2.y-xy1.y);
     if (z != null) csSetZIndex(div, z);
