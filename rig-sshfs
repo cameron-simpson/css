@@ -1,0 +1,8 @@
+#!/bin/sh -x
+sshfs -o reconnect \
+      -o intr \
+      -o compression=no \
+      -o follow_symlinks \
+      -o cipher=blowfish \
+      -o hard_remove \
+      home.local: $HOME/mnt/home.local
