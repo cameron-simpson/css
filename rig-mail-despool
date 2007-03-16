@@ -1,5 +1,7 @@
 #!/bin/sh -u
 
+cmd=`basename "$0"`
+
 : ${MAILDIR:=$HOME/mail}
 
 lock=mail-io
@@ -7,8 +9,20 @@ delay=5
 
 ## OBSOLETE ## bgproc -l procmail -p mail-despam -- set-x lock -1 "$MAILDIR/spool" mail-despam -d "$delay" -l "$lock" +spool +spool-in
 
-for spool in spool spool-in spool-out spool-xref ham spam-definite
+xit=0
+
+## spool-xref
+for spool in spool spool-in spool-out ham spam-definite
 do
   maildir=$MAILDIR/$spool
+  if locked "$maildir"
+  then
+    echo "$cmd: lock $maildir already taken" >&2
+    xit=1
+    continue
+  fi
+
   bgproc -l procmail -p "mail-$spool" -- set-x lock -1 "$maildir" mail-despool -d "$delay" "$maildir"
 done
+
+exit $xit
