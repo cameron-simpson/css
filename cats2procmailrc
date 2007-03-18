@@ -430,6 +430,7 @@ sub readcats($;$)
       if ($env =~ /^CATS2PROCMAILRC_([A-Z][A-Z_0-9]+)$/) {
         my $key = $1;
         my $repl = $::ENV{$env};
+        $repl =~ s/\\\././g;    # HACK: this gets done lower down anyway
         s/\{\{$key\}\}/$repl/g;
       }
     }
