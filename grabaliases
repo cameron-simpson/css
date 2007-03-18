@@ -100,4 +100,4 @@ set -- "$EDITOR" "$tmpaliases"
 [ $useterm ] && set -- term -e "$@"
 [ $quick ] || "$@" || exit 1
 
-rewriteif "$aliasfile" <"$tmpaliases" && mutt-refile
+rewriteif "$aliasfile" <"$tmpaliases" && { [ $quick ] || mutt-refile; }
