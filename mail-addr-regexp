@@ -1,0 +1,9 @@
+#!/bin/sh -u
+#
+# Read email addresses from stdin, emit matching regexp on stdout.
+#       - Cameron Simpson <cs@zip.com.au> 18mar2007
+#
+
+printf '('
+echo `cat` | sed 's/\./\\&/g' | tr ' ' '|' | tr -d '\012'
+printf ')\n'
