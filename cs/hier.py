@@ -7,7 +7,7 @@ from types import *
 from cStringIO import StringIO
 from cs.lex import skipwhite, lastlinelen
 import cs.io
-from cs.misc import progress, cmderr, all, debug, ifdebug
+from cs.misc import progress, cmderr, all, debug, ifdebug, warn
 
 T_SEQ='ARRAY'
 T_MAP='HASH'
@@ -243,6 +243,7 @@ class HierInput(_Hier):
 
     for line in fp:
       kv=self.kvline(line,charset=charset)
+      if ifdebug(): warn("KVLINE:", kv)
       dict[kv[0]]=kv[1]
     fp.close()
 
