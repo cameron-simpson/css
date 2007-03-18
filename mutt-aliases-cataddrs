@@ -1,0 +1,26 @@
+#!/bin/sh -u
+#
+# Emit all the addresses for a particular category.
+#       - Cameron Simpson <cs@zip.com.au> 18mar2007
+#
+
+[ $# = 0 ] && { echo "Usage: $0 categories..." >&2; exit 2; }
+
+for cat
+do
+  while read cats alias addr
+  do
+    if [ "x$cat" = 'x*' ]
+    then
+      echo "$addr"
+    else
+      case ",$cats," in
+        *,"$cat",*)
+          echo "$addr"
+          ;;
+      esac
+    fi
+  done < "$HOME/rc/mail/aliases"
+done \
+| sed -n 's/.*<\([^>@]*@[^>]*\)>.*/\1/p' \
+| sort -u
