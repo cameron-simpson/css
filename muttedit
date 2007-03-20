@@ -16,7 +16,7 @@ filename=$1; shift
 [ -s "$filename" ] || { echo "$cmd: expected non-empty file, got: $filename" >&2; exit 2; }
 
 now=`date '+%d%b%Y-%H:%M'|tr '[A-Z]' '[a-z]'`
-subj=`sed -n -e '/^$/q; /^[Ss]ubject:/{ s/^[^:]*:[ 	]*//; s/[^a-zA-Z0-9]/_/g; s/___*/_/g; p; q; }' <"$filename"`
+subj=`sed -n -e '/^$/q; /^[Ss]ubject:/{ s/^[^:]*:[ 	]*//; s/[^a-zA-Z0-9]/_/g; s/___*/_/g; p; q; }' <"$filename" | cut -c1-20`
 
 set -x
 exec screen -m -S "mutt-$now $subj" mutt -F "$HOME/rc/mail/mutt" -e 'set editor=$EDITOR' -e 'unset signature' -H "$filename"
