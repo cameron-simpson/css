@@ -1,7 +1,7 @@
-if (_cs_libLoaded != null) {
-  alert("multiple load of cs/lib.js");
-else {
-  _cs_libLoaded=True;
+if (this._cs_libLoaded) {
+  _log("ERROR: multiple load of cs/lib.js");
+} else {
+  _cs_libLoaded=true;
 
   _logNode=null;  //document.body;
   _cs_seq = 0;
@@ -25,6 +25,7 @@ else {
   _cs_rpc_dflt_cgi="rpc.cgi";
   document.body.appendChild(_cs_rpc);
   _cs_rpc_callbacks={};
+  _cs_rpc_nodes={};
   _cs_rpc_max=2
   _cs_rpc_running=0
   _cs_rpc_queue=[]
@@ -56,6 +57,10 @@ function csSeq() {
   return _cs_seq++;
 }
 
+function csSeqId() {
+  return "_cs_id_"+csSeq();
+}
+
 function csPushOnresize(fn) {
   var old = window.onresize;
   window.onresize = function() {
@@ -66,6 +71,15 @@ function csPushOnresize(fn) {
 
 function csNode(type) {
   return document.createElement(type);
+}
+
+// Insert a node at the current location using document.write()
+// and return a reference to it.
+function csNodeHere(type) {
+  if (type == null) type="span";
+  var id = csSeqId();
+  document.write("<"+type+" id=\""+id+"\"></"+type+">");
+  return document.getElementById(id);
 }
 
 function csObjectToString() {
@@ -511,7 +525,7 @@ function csRPCflushQueue() {
   var callback;
   while (
          _cs_rpc_queue.length > 0
-//    && ( _cs_rpc_max < 1 || _cs_rpc_running < _cs_rpc_max )
+      && ( _cs_rpc_max < 1 || _cs_rpc_running < _cs_rpc_max )
         ) {
     _cs_rpc_running++;
     dq = _cs_rpc_queue.shift();
@@ -529,16 +543,15 @@ function csRPCflushQueue() {
     }
 
     var rpc = csNode("SCRIPT");
+    _cs_rpc_nodes[seq]=rpc;
     _cs_rpc.appendChild(rpc);
     csRPCdispatch(rpc,jscgiurl);
   }
-
-  _log("RPC: "+_cs_rpc_queue.length+" items left");
 }
 
 function csRPCdispatch(scriptnode,url) {
   //scriptnode.src=url; _log("RPC:"+url);
-  //window.window.setTimeout(function(){ scriptnode.src=url; _log("RPC:"+url);}, 1);
+  window.window.setTimeout(function(){ scriptnode.src=url; _log("RPC:"+url);}, 1);
 }
 
 function csRPC_doCallback(seq,result) {
@@ -564,6 +577,10 @@ function csRPC_doCallback(seq,result) {
 
   // queue up more RPCs if waiting
   csRPCflushQueue();
+
+  // drop junk from the document
+  _cs_rpc.removeChild(_cs_rpc_nodes[seq]);
+  delete _cs_rpc_nodes[seq];
 }
 
 function csRPCbg(jscgiurl,argobj,callback) {
