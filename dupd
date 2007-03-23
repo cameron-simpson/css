@@ -1,18 +1,40 @@
-#!/bin/sh
+#!/bin/sh -u
 #
 # Notice changes in disc usage.
 #	- Cameron Simpson <cs@zip.com.au>
 #
 # Timestamping.	- cameron, 21mar1999
+# Async multidir mode. - cameron 23mar2007
 #
 
+cmd=$0
+usage="Usage: $cmd [-a] [dirs...]"
+
+async=
+[ $# -gt 0 ] && [ "x$1" = x-a ] && { async=1; shift; }
+
+[ $# = 0 ] && set -- .
+
 now=`datecode`
-dusum "$now"
 
->>.du-a
->>.du-s
-dudiff .du-a ".du-a.$now" > .du-a.diff
-dudiff .du-s ".du-s.$now" > .du-s.diff
+xit=0
 
-rm .du-a;ln -s ".du-a.$now" .du-a
-rm .du-s;ln -s ".du-s.$now" .du-s
+for dir
+do
+  ( cd "$dir" || exit 1
+    dusum "$now"
+
+    >>.du-a
+    >>.du-s
+    dudiff .du-a ".du-a.$now" > .du-a.diff
+    dudiff .du-s ".du-s.$now" > .du-s.diff
+
+    rm .du-a;ln -s ".du-a.$now" .du-a
+    rm .du-s;ln -s ".du-s.$now" .du-s
+  ) &
+  [ $async ] || wait
+done
+
+wait
+
+exit $xit
