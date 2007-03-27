@@ -337,7 +337,7 @@ if
       $echo "existing backup: linking $lastbackup to $thisbackup ..."
       ( cd "$dest" || exit 1
         mklinktree "$lastbackup" "$thisbackup" \
-        || { rm -rf "$thisbackup"; false; }
+        || { $trace rm -rf "$thisbackup"; false; }
       ) \
       && \
       {
