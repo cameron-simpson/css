@@ -207,10 +207,10 @@ do
 
     # =item -v, --verbose
     #
-    # Turn on verbose mode.
-    # Also passes B<-v> to rsync.
+    # Turn on verbose mode;
+    # also passes B<-v> to rsync.
     #
-    -v|--verbose) verbose=1 rsopts="$rsopts -v" ;;
+    -v|--verbose) verbose=1 ;;
 
     # =item -P
     #
@@ -232,6 +232,9 @@ do
   esac
   shift
 done
+
+[ $verbose ] && { rsopts="$rsopts -v"; [ -t 2 ] && rsopts="$rsopts -P"; }
+
 #
 # =back
 #
@@ -300,7 +303,7 @@ fi
 # If the file I<backupdir>/F<.hbinclude> is present
 # the option B<"--include-from=>I<backupdir>/F<.hbinclude>
 # will be added to the I<rsync> command invocation.
-# In this way the content backed up may be tuned.
+# In this way the content to be backed up may be tuned.
 # See rsync(1).
 #
 hbinclude=$dest/.hbinclude
@@ -328,56 +331,60 @@ fi
 
 xit=0
 
-if [ -n "$lastbackup" -a -d "$dest/$lastbackup/." ]
+if
+  if [ -n "$lastbackup" -a -d "$dest/$lastbackup/." ]
+  then
+      $echo "existing backup: linking $lastbackup to $thisbackup ..."
+      ( cd "$dest" || exit 1
+        mklinktree "$lastbackup" "$thisbackup"
+      ) \
+      && \
+      {
+        if [ $linkonly ]
+        then
+            echo "$thisbackup" >&3
+        else
+            $echo "updating $thisbackup from $src ..."
+            $trace rsync $rsopts -aH $delete --rsync-path "$rrsync" ${1+"$@"} "$src/." "$dest/$thisbackup/."
+        fi
+      }
+  else
+      if [ $linkonly ]
+      then
+          echo "$cmd: $dest: no subdirectory to link from" >&2
+          ls -la "$dest" >&2
+          false
+      else
+          $echo "fresh backup, just copying source ..."
+          use_rsync=
+          case "$src" in
+              *:*) # probably remote directory - use rsync
+                   use_rsync=1
+                   ;;
+              *)   # check if they supplied rsync options
+                   [ $# = 0 ] || use_rsync=1
+                   ;;
+          esac
+          if [ $use_rsync ]
+          then
+              $trace mkdir "$dest/$thisbackup" \
+              && $trace rsync $rsopts -aH --rsync-path "$rrsync" ${1+"$@"} "$src/." "$dest/$thisbackup/."
+          else
+              cpr "$src" "$dest/$thisbackup"
+          fi
+      fi
+  fi
 then
-    $echo "existing backup: linking $lastbackup to $thisbackup ..."
-    ( cd "$dest" || exit 1
-      mklinktree "$lastbackup" "$thisbackup"
-    ) \
-    || echo "$cmd: warning: mklinktree $dest/$lastbackup $dest/$thisbackup fails" >&2
-
-    if [ $linkonly ]
-    then
-	echo "$thisbackup" >&3
-    else
-	$echo "updating $thisbackup from $src ..."
-	$trace rsync $rsopts -aH $delete --rsync-path "$rrsync" ${1+"$@"} "$src/." "$dest/$thisbackup/."
-	xit=$?
-    fi
+  if [ -d "$dest/$thisbackup/." -a -n "$symlink" ]
+  then
+      ( cd "$dest" || exit 1
+        rm -f "$symlink"
+        $trace ln -s "$thisbackup" "$symlink"
+      ) || xit=1
+  fi
 else
-    if [ $linkonly ]
-    then
-	echo "$cmd: $dest: no subdirectory to link from" >&2
-	ls -la "$dest" >&2
-	exit 1
-    else
-	$echo "fresh backup, just copying source ..."
-	use_rsync=
-	case "$src" in
-	    *:*) # probably remote directory - use rsync
-		 use_rsync=1
-		 ;;
-	    *)   # check if they supplied rsync options
-		 [ $# = 0 ] || use_rsync=1
-		 ;;
-	esac
-	if [ $use_rsync ]
-	then
-	    $trace mkdir "$dest/$thisbackup" || exit 1
-	    $trace rsync $rsopts -aH --rsync-path "$rrsync" ${1+"$@"} "$src/." "$dest/$thisbackup/."
-	else
-	    cpr "$src" "$dest/$thisbackup"
-	fi
-	xit=$?
-    fi
-fi
-
-if [ -d "$dest/$thisbackup/." -a -n "$symlink" ]
-then
-    ( cd "$dest" || exit 1
-      rm -f "$symlink"
-      ln -s "$thisbackup" "$symlink"
-    )
+  echo "$cmd: update fails, symlink \"$symlink\" not made" >&2
+  xit=1
 fi
 
 exit $xit
