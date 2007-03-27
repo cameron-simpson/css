@@ -48,7 +48,7 @@ class FileInfo:
       linkto(self.path,path)
 
     # discard mention of other
-    sizeinfo[self.size].remove(other)
+    if other in sizeinfo[self.size]: sizeinfo[self.size].remove(other)
     identinfo[other.ident]=self.path
 
 # fetch md5 hash of first 8192 bytes of the file
@@ -118,16 +118,17 @@ def do(path):
     ##warn("cmp", path, "vs", other.path)
     if md5 == other.getmd5pfx() and filecmp.cmp(path,other.path):
       # same contents
-      ##progress("match with", other.path)
-      if info.mtime < other.mtime:
-	# we are older - discard newer file
-	##progress("I am older, subsume", other.path)
-	info.subsume(other)
-	return
+      # keep newest file
+      if info.mtime >= other.mtime:
+        # we are newer (or as new)
+        # push us to the front of the comparison list
+        # discard the older file
+        sizeinfo[size].insert(0,info)
+        info.subsume(other)
+        return
 
-      # we are newer - let the older file subsume us
-      ##progress("I am younger, subsume", path)
-      sizeinfo[size].insert(0,info)
+      # we are older - keep newer file
+      ##progress("I am older, subsume", other.path)
       other.subsume(info)
       return
 
