@@ -331,61 +331,63 @@ fi
 
 xit=0
 
-if
-  if [ -n "$lastbackup" -a -d "$dest/$lastbackup/." ]
-  then
-      $echo "existing backup: linking $lastbackup to $thisbackup ..."
-      ( cd "$dest" || exit 1
-        mklinktree "$lastbackup" "$thisbackup" \
-        || { $trace rm -rf "$thisbackup"; false; }
-      ) \
-      && \
-      {
-        if [ $linkonly ]
-        then
-            echo "$thisbackup" >&3
-        else
-            $echo "updating $thisbackup from $src ..."
-            $trace rsync $rsopts -aH $delete --rsync-path "$rrsync" ${1+"$@"} "$src/." "$dest/$thisbackup/."
-        fi
-      }
-  else
+dolink=1
+if [ -n "$lastbackup" -a -d "$dest/$lastbackup/." ]
+then
+    $echo "existing backup: linking $lastbackup to $thisbackup ..."
+    ( cd "$dest" || exit 1
+      mklinktree "$lastbackup" "$thisbackup" \
+      || { dolink=; $trace rm -rf "$thisbackup"; false; }
+    ) \
+    && \
+    {
       if [ $linkonly ]
       then
-          echo "$cmd: $dest: no subdirectory to link from" >&2
-          ls -la "$dest" >&2
-          false
+          echo "$thisbackup" >&3
       else
-          $echo "fresh backup, just copying source ..."
-          use_rsync=
-          case "$src" in
-              *:*) # probably remote directory - use rsync
-                   use_rsync=1
-                   ;;
-              *)   # check if they supplied rsync options
-                   [ $# = 0 ] || use_rsync=1
-                   ;;
-          esac
-          if [ $use_rsync ]
-          then
-              $trace mkdir "$dest/$thisbackup" \
-              && $trace rsync $rsopts -aH --rsync-path "$rrsync" ${1+"$@"} "$src/." "$dest/$thisbackup/."
-          else
-              cpr "$src" "$dest/$thisbackup"
-          fi
+          $echo "updating $thisbackup from $src ..."
+          $trace rsync $rsopts -aH $delete --rsync-path "$rrsync" ${1+"$@"} "$src/." "$dest/$thisbackup/."
       fi
-  fi
-then
-  if [ -d "$dest/$thisbackup/." -a -n "$symlink" ]
-  then
-      ( cd "$dest" || exit 1
-        rm -f "$symlink"
-        $trace ln -s "$thisbackup" "$symlink"
-      ) || xit=1
-  fi
+    }
 else
-  echo "$cmd: update fails, symlink \"$symlink\" not made" >&2
-  xit=1
+    if [ $linkonly ]
+    then
+        echo "$cmd: $dest: no subdirectory to link from" >&2
+        ls -la "$dest" >&2
+        false
+    else
+        $echo "fresh backup, just copying source ..."
+        use_rsync=
+        case "$src" in
+            *:*) # probably remote directory - use rsync
+                 use_rsync=1
+                 ;;
+            *)   # check if they supplied rsync options
+                 [ $# = 0 ] || use_rsync=1
+                 ;;
+        esac
+        if [ $use_rsync ]
+        then
+            $trace mkdir "$dest/$thisbackup" \
+            && $trace rsync $rsopts -aH --rsync-path "$rrsync" ${1+"$@"} "$src/." "$dest/$thisbackup/."
+        else
+            cpr "$src" "$dest/$thisbackup"
+        fi
+    fi
+fi || xit=1
+
+if [ -n "$symlink" -a -d "$dest/$thisbackup/." ]
+then
+  if [ $dolink ]
+  then
+    ( cd "$dest" || exit 1
+      rm -f "$symlink"
+      $trace ln -s "$thisbackup" "$symlink"
+    ) || xit=1
+  else
+    echo "$cmd: new directory worse than old, symlink \"$symlink\" not made" >&2
+    xit=1
+  fi
 fi
 
 exit $xit
