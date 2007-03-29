@@ -32,7 +32,7 @@ xit=0
 for host
 do
   pfx "$host" \
-  rsync -avHP --delete "$dir/." "$host:$dir/." \
+  rsync -avHPC --delete "$dir/." "$host:$dir/." \
   &
 done
 wait
