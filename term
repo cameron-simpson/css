@@ -111,27 +111,27 @@ done
 [ -n "$title" ] || title=$*
 
 # suppress lock if none needed
-dolock=
-[ -n "$lock" ] && dolock="lock $lock1 \"\$lock\""
-
-termcmd='ttysane $dolock "$@"'
-if [ -n "$WINJOB" ]
-then
-  qWINJOB=`shqstr "$WINJOB"`
-  termcmd="winjob $qWINJOB $termcmd"
-fi
+[ -n "$lock" ] && set -- lock $lock1 "$lock" -- "$@"
+set -- ttysane "$@"
+[ -n "$WINJOB" ] && set -- winjob "$WINJOB" "$@"
 
 case "$TERM,$DISPLAY" in
     *,?*)
+        if [ -n "$X11_COMPOSITE" ]
+        then
+          qcmd=`shqstr "$@"`
+          set -- sh -c "( exec >/dev/null; sleep 2; xwin-transset \"\$WINDOWID\" ) & exec $qcmd"
+        fi
 	case "$PREFTERM" in
-	  gnome-terminal)	termopts="$termopts --title \"\$title\"" ;;
-	  *)			termopts="$termopts -title \"\$title\"" ;;
+	  gnome-terminal)
+              termopts="$termopts --title \"\$title\"" ;;
+	  *)  termopts="$termopts -title \"\$title\"" ;;
 	esac
 	case "$PREFTERM" in
-	  aterm)	;;
-	  *)		termopts="$termopts $xrmopts" ;;
+	  aterm);;
+	  *)	termopts="$termopts $xrmopts" ;;
 	esac
-	[ -n "$f" ] && termopts="$termopts -fn \"\$f\""
+	[ -n "$f" ] && termopts="$termopts -fn \"\$f\" -fb \"$f\""
 
 	case $x in +*|-*) ;; *) x=+$x ;; esac
 	case $y in +*|-*) ;; *) y=+$y ;; esac
@@ -190,8 +190,9 @@ case "$TERM,$DISPLAY" in
 	esac
 
 	case "$PREFTERM" in
-	  gnome-terminal) termcmd="$PREFTERM $termopts -x $termcmd" ;;
-	  *)		  termcmd="$PREFTERM $termopts -e $termcmd" ;;
+	  gnome-terminal)
+              eval "set -- \$PREFTERM $termopts -x \"\$@\"" ;;
+	  *)  eval "set -- \$PREFTERM $termopts -e \"\$@\"" ;;
 	esac
 	;;
 
@@ -200,8 +201,7 @@ case "$TERM,$DISPLAY" in
 	[ -n "$x$y" ] && set -- -p "$x,$y" "$@"
 	[ -n "$w$h" ] && set -- -s "$w,$h" "$@"
 	[ -n "$title" ] && set -- -t "$title" -n "$title" "$@"
-
-	termcmd="wsh -v $termcmd"
+        set -- wsh -v "$@"
 	;;
     *)	async=
 	detach=
@@ -212,8 +212,5 @@ esac
 eval "$detach"
 eval "$closefds"
 ##exec 2>>$HOME/var/log/alert
-if [ $async ]
-then termcmd="bgproc -p - -- $termcmd"
-else termcmd="exec $termcmd"
-fi
-eval "$termcmd"
+[ $async ] && set -- bgproc -p - -- "$@"
+exec "$@"
