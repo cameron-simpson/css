@@ -7,14 +7,14 @@
 import sys
 import string
 import types
+import datetime
 import cs.secret
 import cs.cache
 from cs.misc import debug, ifdebug, warn, isodate, exactlyOne
 from cs.lex import strlist
 
 def today():
-  "Today's date in ISO-8601 format (YYYY-MM-DD)."
-  return isodate()
+  return datetime.date.today()
 
 def iscurrent(row,when=None,startndx='START_DATE',endndx='END_DATE',inclusive=False):
   """ Test if a row object is ``current''.
@@ -80,7 +80,12 @@ def sqlise(v):
   if v is None:
     return "NULL"
 
+  # turn datetime.date into str
   t=type(v)
+  if t is datetime.date:
+    v=str(v)
+    t=type(v)
+
   if t is str or t is unicode:
     # SQL escape quotes
     if v.find("'") >= 0: v="''".join(v.split("'"))
