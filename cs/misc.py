@@ -77,8 +77,14 @@ def all(gen):
   '''
   return [x for x in gen]
 def isodate(when=None):
-  if when is None: when=time.localtime()
-  return time.strftime("%Y-%m-%d",when)
+  from time import localtime, strftime
+  if when is None: when=localtime()
+  return strftime("%Y-%m-%d",when)
+
+def a2date(s):
+  from date import date
+  from time import strptime
+  return date(*strptime(s, "%Y-%m-%d")[0:3])
 
 def exactlyOne(list,context=None):
   ''' Returns the first element of a list, but requires there to be exactly one.
