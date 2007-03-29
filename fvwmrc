@@ -42,5 +42,6 @@ export fvwm_Transparent fvwm_RootTransparent fvwm_ParentalRelativity fvwm_Opaque
   desktop-incant-names -
   fvwm-deskkeys
   echo SwitchToDesk 1
+  [ "$FULLX" = 1600 ] && echo Function Keys4x1
 ) \
 | tee $HOME/tmp/fvwmrc-$HOST-$DISPLAY
