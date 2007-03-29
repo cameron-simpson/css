@@ -1,5 +1,17 @@
 from cs.lex import unctrl, tabpadding
 
+_defaultUpd=None
+def default():
+  global _defaultUpd
+  if _defaultUpd is None:
+    import sys
+    _defaultUpd=Upd(sys.stderr)
+  return _defaultUpd
+
+def nl(line):    default().nl(line)
+def out(line):   default().out(line)
+def close(line): default().close(line)
+
 class Upd:
   def __init__(self,backend,mode=None):
     self.__backend=backend
@@ -45,10 +57,10 @@ class Upd:
 
   def nl(self,txt,noStrip=False):
     old=self.__buf
-    out('',noStrip=noStrip)
+    self.out('',noStrip=noStrip)
     self.__backend.write(txt)
     self.__backend.write('\n')
-    out(old,noStrip=True)
+    self.out(old,noStrip=True)
 
   def close(self):
     self.out('')
