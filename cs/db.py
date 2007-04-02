@@ -277,11 +277,13 @@ class DirectKeyedTableView:
   def selectRowByKey(self,key):
     return self.selectRows(self.__key2where(key))[0]
 
-  def selectRows(self,where=None):
-    where=self.whereClause(where)
+  def selectRows(self,where=None,modifiers=None):
+    where=self.whereClause(where=where)
     sql=self.__selectRow
     if where is not None:
       sql+=' WHERE '+where
+    if modifiers is not None:
+      sql+=' '+modifiers
 
     return [DirectTableRow(self,row) for row in SQLQuery(self.conn,sql)]
 
@@ -375,8 +377,8 @@ class KeyedTableView(cs.cache.Cache):
     self.__direct.insert(hash)
     self.bump()
 
-  def selectRows(self,where=None):
-    rows=self.__direct.selectRows(where)
+  def selectRows(self,where=None,modifiers=None):
+    rows=self.__direct.selectRows(where=where,modifiers=modifiers)
     for row in rows:
       self.store(row, row.key)
     return rows
