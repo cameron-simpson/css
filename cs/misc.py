@@ -10,8 +10,16 @@ from cs.lex import parseline, strlist
 
 cmd=os.path.basename(sys.argv[0])
 
+usingUpd=False
+
 # print to stderr
 def warn(*args):
+  if usingUpd:
+    import cs.upd
+    upd=cs.upd.default()
+    oldUpd=upd.state()
+    upd.out('')
+
   first=True
   for arg in args:
     if first:
@@ -24,6 +32,9 @@ def warn(*args):
 
   sys.stderr.write("\n")
   sys.stderr.flush()
+
+  if usingUpd:
+    upd.out(oldUpd)
 
 # debug_level:
 #   0 - quiet
