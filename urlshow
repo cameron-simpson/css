@@ -13,6 +13,7 @@
 
 : ${BROWSER_DISPLAY:=$DISPLAY}
 : ${DISPLAY:=$BROWSER_DISPLAY}
+: ${URLSHOW_FILTER:=cat}
 export DISPLAY
 
 cmd=`basename "$0"`
@@ -82,7 +83,8 @@ then
     exit $?
 fi
 
-cleanurllist \
+eval "$URLSHOW_FILTER" \
+| cleanurllist \
 | \
 { exec 3>&1 1>&2
   while read url
