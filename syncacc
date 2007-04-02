@@ -23,6 +23,6 @@ pwd
 
 set -x
 exec \
-  rsync -rlptHvPC --delete --exclude=CVS/ \
+  rsync -rlptHvPC --delete --exclude=CVS/ --exclude=\*.swp --exclude=\*~ \
 	"--include-from=$syncset" \
 	"$from." "$to."
