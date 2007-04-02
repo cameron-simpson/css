@@ -9,13 +9,12 @@ from StringIO import StringIO
 from cs.lex import parseline, strlist
 
 cmd=os.path.basename(sys.argv[0])
-
-usingUpd=False
+cmd_=cmd+':'
 
 # print to stderr
 def warn(*args):
-  if usingUpd:
-    import cs.upd
+  import cs.upd
+  if cs.upd.active:
     upd=cs.upd.default()
     oldUpd=upd.state()
     upd.out('')
@@ -33,7 +32,7 @@ def warn(*args):
   sys.stderr.write("\n")
   sys.stderr.flush()
 
-  if usingUpd:
+  if cs.upd.active:
     upd.out(oldUpd)
 
 # debug_level:
@@ -69,10 +68,10 @@ def verbose(*args):  debugif(2,*args)
 def debug(*args):    debugif(3,*args)
 
 def cmderr(*args):
-  global cmd
+  global cmd_
   sys.stderr.write(cmd)
   sys.stderr.write(": ")
-  warn(*args)
+  warn(*[cmd_]+list(args))
 
 def die(*args):
   assert False, strlist(args," ")
