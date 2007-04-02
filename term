@@ -123,13 +123,15 @@ case "$TERM,$DISPLAY" in
           set -- sh -c "( exec >/dev/null; sleep 2; xwin-transset \"\$WINDOWID\" ) & exec $qcmd"
         fi
 	case "$PREFTERM" in
-	  gnome-terminal)
-              termopts="$termopts --title \"\$title\"" ;;
-	  *)  termopts="$termopts -title \"\$title\"" ;;
-	esac
-	case "$PREFTERM" in
-	  aterm);;
-	  *)	termopts="$termopts $xrmopts" ;;
+	  gnome-terminal) termopts="$termopts --title \"\$title\" $xrmopts" ;;
+	  aterm)          termopts="$termopts -title \"\$title\"" ;;
+          urxvt*)         termopts="$termopts -title \"\$title\" $xrmopts"
+                          case "$f" in
+                            '' | [0-9]x* | [1-9][0-9]x* | -* ) ;;
+                            *)  f=xft:$f ;;
+                          esac
+                          ;;
+	  *)              termopts="$termopts -title \"\$title\" $xrmopts" ;;
 	esac
 	[ -n "$f" ] && termopts="$termopts -fn \"\$f\" -fb \"$f\""
 
