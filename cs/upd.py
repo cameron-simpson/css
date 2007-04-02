@@ -1,6 +1,10 @@
 from cs.lex import unctrl, tabpadding
+import cs.misc
+
+active=False
 
 _defaultUpd=None
+
 def default():
   global _defaultUpd
   if _defaultUpd is None:
@@ -16,6 +20,11 @@ class Upd:
   def __init__(self,backend,mode=None):
     self.__backend=backend
     self.__buf=''
+    global active
+    active=True
+
+  def state(self):
+    return self.__buf
 
   def out(self,txt,noStrip=False):
     if not noStrip:
@@ -23,36 +32,37 @@ class Upd:
     txt=unctrl(txt)
 
     txtlen=len(txt)
-    pfxlen=0
-    for i in range(min(txtlen,len(self.__buf))):
+    buflen=len(self.__buf)
+    pfxlen=min(txtlen,buflen)
+    for i in range(pfxlen):
       if txt[i] != self.__buf[i]:
-        pfxlen=i-1
+        pfxlen=i
         break
 
     # Rewrites take one of two forms:
-    #   Backspace to end of common prefix, overwrite new string, erase
-    #    trailing extent if any
+    #   Backspace to end of common prefix, overwrite with the differing tail
+    #     of the new string, erase trailing extent if any.
     #   Return to start of line with carriage return, overwrite with new
-    #    string, erase trailing extent if any
+    #    string, erase trailing extent if any.
+    # Therefore compare backspaces against cr+pfxlen.
     #
-    if len(self.__buf)-pfxlen + txtlen-pfxlen < txtlen+1:
-      for i in range(len(self.__buf)-pfxlen):
-        self.__backend.write('\b')
-      self.__backend.write(txt[pfxlen:])
+    patch=''
+    if buflen-pfxlen < 1+pfxlen:
+      for i in range(buflen-pfxlen):
+        patch+='\b'
+      patch+=txt[pfxlen:]
     else:
-      self.__backend.write('\r')
-      self.__backend.write(txt)
+      patch='\r'+txt
 
-    extlen=len(self.__buf)-txtlen
+    extlen=buflen-txtlen
     if extlen > 0:
-      self.__backend.write(tabpadding(extlen,offset=txtlen))
-      if extlen < txtlen+1:
-        for i in range(extlen):
-          self.__backend.write('\b')
-      else:
-        self.__backend.write('\r')
-        self.__backend.write(txt)
+      ##patch+=tabpadding(extlen,offset=txtlen)
+      patch+="%*s" % (extlen, ' ')
+      for i in range(extlen):
+        patch+='\b'
 
+    self.__backend.write(patch)
+    self.__backend.flush()
     self.__buf=txt
 
   def nl(self,txt,noStrip=False):
