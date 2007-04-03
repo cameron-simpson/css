@@ -463,11 +463,18 @@ class RekeyedTableView(cs.cache.Cache):
 # Database Table Rows
 #
 
+class NoSuchRowError(IndexError):
+  ''' Thrown if the row cannot be found.
+  '''
+
 class TableRowWrapper:
   def __init__(self,tableview,key):
-    debug("new TableRowWrapper with key =", `key`)
+    if ifdebug(): warn("new TableRowWrapper with key =", `key`)
     self.TableView=tableview
-    self.TableRow=tableview[key]
+    try:
+      self.TableRow=tableview[key]
+    except IndexError, e:
+      raise NoSuchRowError("no row with id "+str(id)+": "+`e`)
 
   def table(self):
     return self.TableView
