@@ -53,6 +53,9 @@ while (<STDIN>)
       if (/^dimensions:\s*(\d+)x(\d+)/)
       { &pr("x=$1", "y=$2");
       }
+      elsif (/^resolution:\s*(\d+)x(\d+) dots per inch/)
+      { &pr("dpix=$1", "dpiy=$2");
+      }
       elsif (/^preallocated pixels:/)
       { while (/\s*(\w+)\s+(\d+),?/)
 	{ &pr("pixel_$1=$2");
