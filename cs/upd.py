@@ -15,6 +15,7 @@ def default():
 def nl(line):    default().nl(line)
 def out(line):   default().out(line)
 def close(line): default().close(line)
+def state():     return default().state()
 
 class Upd:
   def __init__(self,backend,mode=None):
