@@ -42,7 +42,10 @@ def warn(*args):
 #   3 or more - more verbose, and activates the debug() function
 #
 debug_level=0
-if sys.stderr.isatty(): debug_level=1
+if sys.stderr.isatty():
+  debug_level=1
+  import cs.upd
+  cs.upd.default()
 if 'DEBUG' in os.environ \
    and len(os.environ['DEBUG']) > 0 \
    and os.environ['DEBUG'] != "0":
@@ -66,6 +69,14 @@ def ifverbose():  return ifdebug(2)
 def progress(*args): debugif(1,*args)
 def verbose(*args):  debugif(2,*args)
 def debug(*args):    debugif(3,*args)
+def out(*args):
+  import cs.upd
+  if ifdebug(1):
+    if cs.upd.active:
+      if len(*args) > 0:
+        cs.upd.out(" ".join(args))
+    else:
+      warn(*args)
 
 def cmderr(*args):
   global cmd_
