@@ -11,8 +11,6 @@ usage="Usage: $cmd [-f]"
 
 trace=set-x
 
-eval `setvar -x -n -f SQUID_PEERS`
-
 force=
 [ $# -gt 0 ] && [ "x$1" = x-f ] && { force=1; shift; }
 
