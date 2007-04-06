@@ -5,7 +5,7 @@
 #	- Cameron Simpson <cs@zip.com.au> 22jun2003
 #
 
-trace=eecho
+trace=echo
 pcnt=5
 onepass=
 keepn=7
@@ -19,7 +19,7 @@ usage="Usage: $cmd [-% pcnt] [-1rfnx] [-k keep] dirs...
                 Default: remove until free space achieved or no more choices.
         -k n    Keep at least 'n' backups (default: $keepn.
 	-r	Repeat - remove backups until free threshold reached.
-	-n	No action (default). Report proposed actions.
+	-n	No action (default). Report proposed actions to stdout.
 	-q	Quiet: remove directories but don't trace execution.
 	-x	Trace execution. Show actions as dispatched."
 
@@ -75,7 +75,6 @@ done \
 | { # resort so to oldest-to-youngest
     sort
   } \
-| tee /dev/tty \
 | \
 { # then start removing directories until we have enough space or there are no more candi
   xit=0
