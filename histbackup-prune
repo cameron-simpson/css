@@ -5,22 +5,23 @@
 #	- Cameron Simpson <cs@zip.com.au> 22jun2003
 #
 
-trace=set-x
+trace=eecho
 pcnt=5
-onepass=1
-keepn=1
+onepass=
+keepn=7
 force=
 myperms=u
 
 cmd=`basename "$0"`
-usage="Usage: $cmd [-% pcnt] [-1rfnx] [-k keep] dir
+usage="Usage: $cmd [-% pcnt] [-1rfnx] [-k keep] dirs...
+	-% pcnt	Desires free disc percentage. Default: $pcnt
 	-1	One pass - remove at most one backup.
+                Default: remove until free space achieved or no more choices.
+        -k n    Keep at least 'n' backups (default: $keepn.
 	-r	Repeat - remove backups until free threshold reached.
 	-n	No action (default). Report proposed actions.
-	-q	Don't trace execution.
-	-x	Trace execution. Show actions as dispatched.
-	-% pcnt	Desires free disc percentage. Default: $pcnt
-	-k keep	Keep at least this many backups. Default: $keepn"
+	-q	Quiet: remove directories but don't trace execution.
+	-x	Trace execution. Show actions as dispatched."
 
 badopts=
 
@@ -37,7 +38,7 @@ do
 	shift
 	;;
     -r)	onepass= ;;
-    -n) trace=echo ;;
+    -n) trace=eecho ;;
     -q) trace= ;;
     -x) trace=set-x ;;
     --) shift; break ;;
@@ -48,42 +49,54 @@ do
 done
 
 if [ $# = 0 ]
-then  echo "$cmd: missing dir" >&2; badopts=1
+then
+  echo "$cmd: missing dirs..." >&2
+  badopts=1
 else
-  dir=$1; shift
-  [ -d "$dir/." ] || { echo "$cmd: $dir: not a directory" >&2
-		       badopts=1
-		     }
-  [ $# = 0 ] || { echo "$cmd: extra arguments: $*" >&2
-		  badopts=1
-		}
+  for dir
+  do
+    [ -d "$dir/." ] || { echo "$cmd: $dir: not a directory" >&2
+                         badopts=1
+                       }
+  done
 fi
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
-cd "$dir" || exit 1
+for dir
+do
+  # list backup dirs in reverse chronological time (ls|grep),
+  # strip the most recent and up to $keepn for security,
+  # append the source directory
+  ls -r "$dir/." \
+  | grep '^[12][0-9][0-9][0-9]-[01][0-9]-[0123][0-9]' \
+  | sed "1,${keepn}d; s|\$| $dir|"
+done \
+| { # resort so to oldest-to-youngest
+    sort
+  } \
+| tee /dev/tty \
+| \
+{ # then start removing directories until we have enough space or there are no more candi
+  xit=0
+  while read date dir
+  do
+    subdir=$dir/$date
 
-# list backup dirs, but never the last one
-ls -r \
-| grep '^[12][0-9][0-9][0-9]-[01][0-9]-[0123][0-9]' \
-| sed "1,${keepn}d" \
-| sort \
-| { xit=0
-    while read subdir
-    do
-      # check free space - abort if this fails
-      free=`dfree -% .` || exit 1
+    # check free space where the subdir is - abort if this fails
+    free=`dfree -% "$subdir/."` || exit 1
 
-      # abort if enough free space
-      [ "$free" -lt "$pcnt" ] || break
+    # skip if there's enough space
+    # we don't abort because this stuff may be on multiple filesystems
+    [ "$free" -lt "$pcnt" ] || continue
 
-      # remove a tree
-      [ -n "$myperms" ] \
-	&& find "./$subdir" -type d ! -perm -700 -exec $trace chmod "$myperms+rwx" {} ';'
-      $trace rm -r "./$subdir" || xit=1
+    # remove a tree
+    [ -n "$myperms" ] \
+      && $trace find "$subdir" -type d ! -perm -700 -exec $trace chmod "$myperms+rwx" {} ';'
+    $trace rm -r "$subdir" || xit=1
 
-      # abort if only trying once
-      [ $onepass ] && break
-    done
-    exit $xit
-  }
+    # abort if only trying once
+    [ $onepass ] && break
+  done
+  exit $xit
+}
