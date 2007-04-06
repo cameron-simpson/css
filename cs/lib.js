@@ -333,8 +333,8 @@ function csSetZIndex(elem,z) {
 
 function csSetPosition(elem,xy) {
   elem.style.position='absolute';
-  elem.style.left=xy.x;
-  elem.style.top=xy.y;
+  elem.style.left=xy.x+"px";
+  elem.style.top=xy.y+"px";
 }
 
 function csSetRPosition(elem,dxy) {
