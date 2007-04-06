@@ -11,12 +11,16 @@ onepass=
 keepn=7
 force=
 myperms=u
+dfdir=
 
 cmd=`basename "$0"`
 usage="Usage: $cmd [-% pcnt] [-1rfnx] [-k keep] dirs...
 	-% pcnt	Desires free disc percentage. Default: $pcnt
 	-1	One pass - remove at most one backup.
                 Default: remove until free space achieved or no more choices.
+        -D dfdir Directory to use for df information; cease prune when ok.
+                This lets us df a single place once; otherwise we must
+                do a df for every candidate directory.
         -k n    Keep at least 'n' backups (default: $keepn.
 	-r	Repeat - remove backups until free threshold reached.
 	-n	No action (default). Report proposed actions to stdout.
@@ -30,6 +34,7 @@ do
   case $1 in
     -%)	pcnt=$2; shift ;;
     -1) onepass=1 ;;
+    -D) dfdir=$2; shift ;;
     -k) if [ 0 -lt "$2" ]
 	then  keepn=$2
 	else  echo "$cmd: bad -k argument ($2): must be positive integer" >&2
@@ -63,6 +68,16 @@ fi
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
+if [ -n "$dfdir" ]
+then
+  dfdirpcnt=`dfree -% "$dfdir/."` || exit 1
+  if [ "$dfdirpcnt" -ge "$pcnt" ]
+  then
+    echo "$cmd: $dfdirpcnt% free on $dfdir already, not pruning"
+    exit 0
+  fi
+fi
+
 for dir
 do
   # list backup dirs in reverse chronological time (ls|grep),
@@ -82,17 +97,30 @@ done \
   do
     subdir=$dir/$date
 
-    # check free space where the subdir is - abort if this fails
-    free=`dfree -% "$subdir/."` || exit 1
+    if [ -z "$dfdir" ]
+    then
+      # check free space where the subdir is - abort if this fails
+      free=`dfree -% "$subdir/."` || exit 1
 
-    # skip if there's enough space
-    # we don't abort because this stuff may be on multiple filesystems
-    [ "$free" -lt "$pcnt" ] || continue
+      # skip if there's enough space
+      # we don't abort because this stuff may be on multiple filesystems
+      [ "$free" -lt "$pcnt" ] || continue
+    fi
 
     # remove a tree
     [ -n "$myperms" ] \
       && $trace find "$subdir" -type d ! -perm -700 -exec $trace chmod "$myperms+rwx" {} ';'
     $trace rm -r "$subdir" || xit=1
+
+    if [ -n "$dfdir" ]
+    then
+      dfdirpcnt=`dfree -% "$dfdir/."` || exit 1
+      if [ "$dfdirpcnt" -ge "$pcnt" ]
+      then
+        echo "$cmd: $dfdirpcnt% now free on $dfdir already, not pruning"
+        exit 0
+      fi
+    fi
 
     # abort if only trying once
     [ $onepass ] && break
