@@ -38,7 +38,7 @@ do
 	shift
 	;;
     -r)	onepass= ;;
-    -n) trace=eecho ;;
+    -n) trace=echo ;;
     -q) trace= ;;
     -x) trace=set-x ;;
     --) shift; break ;;
