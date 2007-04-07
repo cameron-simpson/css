@@ -54,8 +54,8 @@ do
   (
     echo "X-URL: $url"
     echo "X-Fetch-Date: `date`"
-    unhdr "$tmpf" | html-title | sed -n '1s/^/Subject: /p'
-    exec cat "$tmpf"
+    unhdr "$tmpf" | html-title | sed -n 's/*$//; 1s/^/Subject: /p'
+    exec sed '1,/^*$/s/*$//' "$tmpf"
   ) \
   | filemailitem "$folder" \
   || xit=1
