@@ -111,10 +111,8 @@ eval "$URLSHOW_FILTER" \
 } \
 | case "$browser" in
     mozilla)
-      set -x
       exec urlshow-mozilla $tflag ;;
     opera)
-      set -x
       exec urlshow-opera $tflag -n "$name"
       ;;
     *)
