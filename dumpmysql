@@ -6,8 +6,9 @@
 
 set -u
 
-trace=set-x
-user=
+trace=
+quiet=
+user=backup
 password=
 host=localhost
 dir=.
@@ -17,14 +18,16 @@ pcntfree=20
 bytable=
 
 cmd=$0
-usage="Usage: $cmd [-u user] [-p password] [-h host] [databases...]
-	-u user		Specify user name.
-	-p password	Specify user password.
-	-h host		Specify MySQL host. Default: $host
-	-S secret	Get user/password/host from the named secret.
-        -T              Dump individual tables instead of databases.
-	-d dir		Target directory for dumps. Default: $dir
+usage="Usage: $cmd [-u user] [-p password] [-h host] [opts...] [databases...]
 	-H		Target directory is a histbackup directory.
+	-S secret	Get user/password/host from the named secret.
+	-d dir		Target directory for dumps. Default: $dir
+	-h host		Specify MySQL host. Default: $host
+	-p password	Specify user password.
+	-u user		Specify user name. Default: $user
+        -T              Dump individual tables instead of databases.
+        -q              Quiet. No trace, no progress reporting.
+        -x              Trace execution. WARNING: shows passwords.
 	databases	Database names to dump. Default: all of them."
 
 badopts=
@@ -34,6 +37,8 @@ do
   case $1 in
     -u)	user=$2; shift ;;
     -p)	password=$2; shift ;;
+    -x) trace=set-x ;;
+    -q) quiet= trace= ;;
     -h)	host=$2; shift ;;
     -S)	eval `secret "$2"` || exit 1; shift
 	user=$secretLOGIN
@@ -100,6 +105,7 @@ fi \
     else  squiz=$dbname.sql.gz
     fi
     rm -f "$squiz"
+    [ $quiet ] || echo mysqldump -h "$host" "-u..." "-p..." --opt "$dbname" $tblname
     $trace mysqldump -h "$host" "-u$user" "-p$password" --opt "$dbname" $tblname \
     | gzip -n --fast >"$squiz"
   done
