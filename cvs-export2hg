@@ -1,0 +1,122 @@
+#!/bin/sh -u
+#
+
+trace=set-x
+
+cmd=`basename "$0"` || exit 1
+usage="Usage: $cmd [-d cvsroot] cvssubdir newhgdir
+        -d cvsroot      CVS repository root, default from \$CVSROOT."
+
+badopts=
+
+while [ $# -gt 0 ]
+do
+  case "$1" in
+    -d) CVSROOT=$2; shift ;;
+    --) shift; break ;;
+    -?*)echo "$cmd: unrecognised option: $1" >&2
+        badopts=1
+        ;;
+    *)  break ;;
+  esac
+  shift
+done
+[ $# -gt 0 ] && [ "x$1" = x-d ] && { CVSROOT=$2; shift; shift; }
+
+export CVSROOT
+echo "CVSROOT=$CVSROOT" >&2
+
+case "$CVSROOT" in
+  /*)   ;;
+  *)    echo "$cmd: invalid cvsroot: $CVSROOT: must be a directory path" >&2
+        badopts=1
+        ;;
+esac
+
+if [ $# = 0 ]
+then
+  echo "$cmd: missing cvssubdir" >&2
+  badopts=1
+else
+  subdir=$1
+  shift
+fi
+
+if [ $# = 0 ]
+then
+  echo "$cmd: missing newhgdir" >&2
+  badopts=1
+else
+  newhgdir=$1
+  shift
+fi
+
+[ $# = 0 ] || { echo "$cmd: extra arguments after newhgdir: $*" >&2
+                badopts=1
+              }
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+set -e
+
+$trace mkdir "$newhgdir"
+newhgdir=`cd "$newhgdir" && pwd`
+
+_cvs()
+{ $trace cvs "$@"
+}
+_hg()
+{ ( cd "$newhgdir"
+    exec $trace hg "$@"
+  )
+}
+
+_hg init
+
+( cd "$CVSROOT/$subdir"
+  exec find . \( -type d -name Attic -prune \) -o \( -type f -name '*,v' -print \)
+) \
+| sed -n 's|^\./||; s/,v$//p' \
+| while read -r cvsfile
+  do
+    cvsfile-revs < "$CVSROOT/$subdir/$cvsfile,v" | sed "s;^;$cvsfile	;"
+  done \
+| sort '-t	' -k 3 -k 1 \
+| \
+{
+  wkdir=`mkdirn "$TMPDIR/$cmd."`
+  cd "$wkdir"
+  wkdir=`pwd`                   
+  ##trap 'set -x; rm -r "$wkdir"' 1 2 13 15
+  mkdir -p "$subdir"
+  cd "$subdir"
+  pwd
+
+  while read -r file rev date author rev2
+  do
+    cvspath=$subdir/$file
+    fdir=`dirname "$file"`
+    fbase=`basename "$file"`
+
+    if [ -f "$file" ]
+    then
+      ls -ld "$file"
+      _cvs update -r "$rev" "$file"
+      $trace cp -p "$file" "$newhgdir/$fdir/."
+    else
+      $trace [ -d "$fdir" ] || $trace mkdir -p "$fdir" "$newhgdir/$fdir"
+      ( cd "$wkdir" && pwd && _cvs co -r "$rev" "$subdir/$file" )
+      $trace cp -p "$file" "$newhgdir/$fdir/."
+      _hg add "$file"
+    fi
+
+    ##echo "$date"
+    date=`echo "$date" | tr _ ' '`
+    date -d "$date Z"
+    log=`cvs log -l -N "-r$rev:$rev" "$file" | sed '1,/^date:/d; $d'`
+    _hg commit -d "$date UTC" -m "[CVS rev $rev, $date UTC]
+$log" "$file"
+    ls -ld "$file"
+    [ "x$rev" = x1.1 ] || _hg log "$file"
+  done
+}
