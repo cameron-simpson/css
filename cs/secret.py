@@ -15,18 +15,19 @@ def get(secret):
 
 def mysql(secret,db=None):
   import types
+  import MySQLdb
   if type(secret) is types.StringType or not(hasattr(secret,'__keys__') or hasattr(secret,'keys')):
     # transmute secret name into structure
     secret=get(secret)
 
-  import cs.dbi.mysql
   host=secret['HOST']
-  if 'LOGIN' not in secret:
-    return cs.dbi.mysql.Conn(host=host, db=db)
+  user=None
+  passwd=None
+  if 'LOGIN' in secret:
+    user=secret['LOGIN']
+    passwd=secret['PASSWORD']
 
-  user=secret['LOGIN']
-  passwd=secret['PASSWORD']
-  return cs.dbi.mysql.Conn(host=host, db=db, user=user, passwd=passwd)
+  return MySQLdb.connect(host=host,db=db,user=user,passwd=passwd)
 
 def ldap(secret,host=None,binddn=None,bindpw=None):
   # transmute secret name into structure
