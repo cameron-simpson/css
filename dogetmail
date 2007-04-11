@@ -6,6 +6,10 @@
 
 : ${LOGDIR:=$HOME/var/log}
 : ${VARRUN:=$HOME/var/run}
+: ${PYTHONPATH:=/opt/python_local}
+PYTHONPATH=$PYTHONPATH`set -- /opt/getmail/lib/python*/site-packages
+                       for d; do [ -d "$d/." ] && printf ":%s" "$d"; done`
+export PYTHONPATH
 
 gmlog=$LOGDIR/getmail
 timeout=1800
