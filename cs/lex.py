@@ -69,7 +69,7 @@ def skipwhite(s,start=0):
   return start
 
 def strlist(ary,sep=", "):
-  return string.join([str(a) for a in ary],sep)
+  return sep.join([str(a) for a in ary])
 
 def lastlinelen(s):
   """ length of text after last newline in string
