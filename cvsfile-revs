@@ -1,0 +1,29 @@
+#!/bin/sed -nf
+#
+# Report revision, date, author, antecedant directly from CVS RCS files.
+#       - Cameron Simpson <cs@zip.com.au> 08apr2007
+#
+
+/^[1-9][0-9]*\.[1-9]/{
+  h
+  :inrev
+  n
+  /^$/{
+    x
+    s/\n/\t/g
+    p
+    /\t$/q
+    b endrev
+  }
+  /^date\t/{
+    s/^date\t\([12][0-9][0-9][0-9]\)\.\([01][0-9]\)\.\([0-3][0-9]\)\.\([0-2][0-9]\)\.\([0-5][0-9]\)\.\([0-5][0-9]\);\tauthor \([^;]*\);.*/\1-\2-\3_\4:\5:\6 \7/
+    H
+  }
+  /^next\t/{
+    s/^next\t\([^;]*\);.*/\1/
+    H
+  }
+  b inrev
+}
+:endrev
+d
