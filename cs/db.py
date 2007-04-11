@@ -51,9 +51,18 @@ def mysql(secret,db=None):
   if secret is None:
     raise IndexError
     global MySQLServer
-    return MySQLdb.connect(host=MySQLServer,db=db,user=None,passwd=None)
+    conn=MySQLdb.connect(host=MySQLServer,db=db,user=None,passwd=None)
+  else:
+    conn=cs.secret.mysql(secret,db=db)
 
-  return cs.secret.mysql(secret,db=db)
+  if hasattr(conn,"set_character_set"):
+    conn.set_character_set('utf8')
+  else:
+    cmderr("mysql://%s@%s/%s: no UTF8 support on this MySQL connection" % (user,host,db))
+
+  debug("paramstyle =", MySQLdb.paramstyle)
+
+  return conn
 
 _cache_dbpool={}
 def dbpool(secret,dbname):
