@@ -10,7 +10,7 @@ import types
 import datetime
 import cs.secret
 import cs.cache
-from cs.misc import debug, ifdebug, warn, isodate, exactlyOne
+from cs.misc import cmderr, debug, ifdebug, warn, isodate, exactlyOne
 from cs.lex import strlist
 
 def today():
@@ -41,6 +41,8 @@ def sqlite(filename):
   from pysqlite2 import dbapi2
   return dbapi2.connect(filename)
 
+_warned_MYSQL_NO_UTF8=False
+
 # attach to a MySQL database, return normal python db handle
 def mysql(secret,db=None):
   """ Attach to a MySQL database, return normal python db handle.
@@ -58,7 +60,10 @@ def mysql(secret,db=None):
   if hasattr(conn,"set_character_set"):
     conn.set_character_set('utf8')
   else:
-    cmderr("mysql://%s@%s/%s: no UTF8 support on this MySQL connection" % (user,host,db))
+    global _warned_MYSQL_NO_UTF8
+    if not _warned_MYSQL_NO_UTF8:
+      cmderr("mysql: no UTF8 support")
+      _warned_MYSQL_NO_UTF8=True
 
   debug("paramstyle =", MySQLdb.paramstyle)
 
