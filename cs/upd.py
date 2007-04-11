@@ -1,5 +1,4 @@
 from cs.lex import unctrl, tabpadding
-import cs.misc
 
 active=False
 
