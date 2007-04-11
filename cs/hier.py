@@ -7,7 +7,7 @@ from types import *
 from cStringIO import StringIO
 from cs.lex import skipwhite, lastlinelen
 import cs.io
-from cs.misc import progress, cmderr, all, debug, ifdebug, warn
+from cs.misc import out, cmderr, all, debug, ifdebug, warn
 
 T_SEQ='ARRAY'
 T_MAP='HASH'
@@ -226,7 +226,7 @@ class HierInput(_Hier):
   def loaddir(self,dirname):
     """ Read Hier data from the named directory.
     """
-    progress("loaddir", dirname)
+    out("loaddir "+dirname)
     dict={}
 
     dents=[ dirent for dirent in os.listdir(dirname) if dirent[0] != '.']
