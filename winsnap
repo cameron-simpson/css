@@ -45,5 +45,5 @@ file=$dir/xwd`datecode`.$fmt
 [ -s "$file" ] && { echo "$cmd: already exists: $file" >&2; exit 1; }
 
 eval "xwd $args $post >\"\$file\"" || exit 1
-echo "$file" |xclip &
+echo "$file" | bgstdin xclip >/dev/null 2>&1
 echo "$file"
