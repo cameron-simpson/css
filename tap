@@ -1,11 +1,18 @@
-#!/bin/sh
+#!/bin/sh -u
 #
 # Run a logged script session attached to the specified serial port.
 #	- Cameron Simpson <cs@zip.com.au> 17may2002
 #
 
+: ${TAP_DEV:=/dev/ttyS0}
+
+trace=set-x
+dolog=1
+doscr=1
+
 cmd=`basename "$0"`
 usage="Usage: $cmd [ttydev]"
+
 [ $# -gt 1 ] && { echo "$usage" >&2; exit 2; }
 
 dev=${1:-${TAP_DEV:-"/dev/ttyS0"}}
@@ -19,5 +26,8 @@ dev_=`echo "$dev" | tr -s / _`
 lock=tap$dev_
 session=$lock
 
-set -x
-exec scr "logscript-$dev" set-x logscript "$session" screen "$dev" "$speed,cs8,-ixoff"
+set -- screen "$dev" "$speed,cs8,-ixoff"
+[ $dolog ] && set -- logscript -M "$session" "$@"
+[ $doscr ] && set -- scr "screen-$dev" "$@"
+
+exec $trace "$@"
