@@ -203,51 +203,27 @@ class CanonicalSeq:
 
     return False
 
-class CanonicalDict:
+class CanonicalDict(dict):
   def __init__(self,map,canonical=None):
+    dict.__init__(self)
     self.__canon=canonical
-    self.__dict={}
-    if map is not None:
-      self.update(map)
-
-  def __repr__(self):
-    d={}
-    for k in self.keys():
-      d[k]=self[k]
-    return `d`
 
   def __canonical(self,key):
     if self.__canon is None:
       return key
     return self.__canon(key)
 
-  def __len__(self):
-    return len(self.__dict)
-
-  def keys(self):
-    return [self.__dict[self.__canonical(k)][0] for k in self.__dict.keys()]
-
-  def update(self,map):
-    for k in map.keys():
-      self[k]=map[k]
-
   def __getitem__(self,key):
-    return self.__dict[self.__canonical(key)][1]
+    return dict.__getitem__(self,self.__canonical(key))
 
   def __setitem__(self,key,value):
-    self.__dict[self.__canonical(key)]=(key,value)
-
-  def __iter__(self):
-    for k in self.__dict.keys():
-      yield k
-  def iterkeys(self):
-    return self.__iter__()
+    dict.__setitem__(self,self.__canonical(key),value)
 
   def __delitem__(self,key):
-    del self.__dict[self.__canonical(key)]
+    dict.__delitem__(self,self.__canonical(key))
 
   def __contains__(self,key):
-    return self.__canonical(key) in self.__dict
+    dict.__continas__(self,self.__canonical(key))
 
 class LCDict(CanonicalDict):
   def __init__(self,dict):
@@ -321,12 +297,14 @@ def mkdirn(path):
     newpath=path+str(newn)
     try:
       os.mkdir(newpath)
-      if len(opath) == 0:
-	newpath=os.path.basename(newpath)
-      return newpath
     except OSError:
       if sys.exc_value[0] == errno.EACCES:
 	return None
+      else:
+        continue
+    if len(opath) == 0:
+      newpath=os.path.basename(newpath)
+    return newpath
 
 def tmpdir():
   if 'TMPDIR' in os.environ:
