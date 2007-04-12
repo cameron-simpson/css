@@ -16,11 +16,23 @@ def out(line):   default().out(line)
 def close(line): default().close(line)
 def state():     return default().state()
 
+instances=[]
+
+def cleanupAtExit():
+  global instances
+  for i in instances:
+    i.close()
+  instances=()
+
+import atexit
+atexit.register(cleanupAtExit)
+
 class Upd:
   def __init__(self,backend,mode=None):
     self.__backend=backend
     self.__buf=''
-    global active
+    global active, instances
+    instances.append(self)
     active=True
 
   def state(self):
@@ -73,5 +85,6 @@ class Upd:
     self.out(old,noStrip=True)
 
   def close(self):
-    self.out('')
-    self.__backend=None
+    if self.__backend is not None:
+      self.out('')
+      self.__backend=None
