@@ -21,12 +21,11 @@ def mysql(secret,db=None):
     secret=get(secret)
 
   host=secret['HOST']
-  user=None
-  passwd=None
-  if 'LOGIN' in secret:
-    user=secret['LOGIN']
-    passwd=secret['PASSWORD']
+  if 'LOGIN' not in secret:
+    return MySQLdb.connect(host=host,db=db)
 
+  user=secret['LOGIN']
+  passwd=secret['PASSWORD']
   return MySQLdb.connect(host=host,db=db,user=user,passwd=passwd)
 
 def ldap(secret,host=None,binddn=None,bindpw=None):
