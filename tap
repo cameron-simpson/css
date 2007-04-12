@@ -13,21 +13,27 @@ doscr=1
 cmd=`basename "$0"`
 usage="Usage: $cmd [ttydev]"
 
-[ $# -gt 1 ] && { echo "$usage" >&2; exit 2; }
+badopts=
 
-dev=${1:-${TAP_DEV:-"/dev/ttyS0"}}
-case "$dev" in /*) ;; *) dev=/dev/$dev ;; esac
+[ $# -gt 0 ] && { TAP_DEV=$1; shift; }
+[ $# = 0 ] || { echo "$cmd: extra arguments after ttydev $TAP_DEV: $*" >&2
+                badopts=1
+              }
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+case "$TAP_DEV" in /*) ;; *) TAP_DEV=/dev/$TAP_DEV ;; esac
 
 speed=9600
 parity=none
 
-dev_=`echo "$dev" | tr -s / _`
+dev_=`echo "$TAP_DEV" | tr -s / _`
 
 lock=tap$dev_
 session=$lock
 
-set -- screen "$dev" "$speed,cs8,-ixoff"
+set -- screen "$TAP_DEV" "$speed,cs8,-ixoff"
 [ $dolog ] && set -- logscript -M "$session" "$@"
-[ $doscr ] && set -- scr "screen-$dev" "$@"
+[ $doscr ] && set -- scr "screen-$TAP_DEV" "$@"
 
 exec $trace "$@"
