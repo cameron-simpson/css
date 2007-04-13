@@ -55,8 +55,7 @@ PATH=$PATH:$fv/bin
 PYTHONPATH=$PYTHONPATH:$HOME/rc/python/Fvwmpy
 export PATH PYTHONPATH
 
-exec >$LOGDIR/wm.out 2>$LOGDIR/wm.err
-exec "$fvwm" -cmd "PipeRead fvwmrc" ${1+"$@"}
+exec bgproc -s -p wm -l x11 -- "$fvwm" -cmd "PipeRead fvwmrc" ${1+"$@"}
 
 ### set up FVWM log/fifo vars
 ##eval `rigfvwmvars`
