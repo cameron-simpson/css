@@ -51,6 +51,19 @@ if 'DEBUG' in os.environ \
    and os.environ['DEBUG'] != "0":
     debug_level=3
 
+debug_level_stack=[]
+def pushDebug(newlevel=True):
+  global debug_level, debug_level_stack
+  if type(newlevel) is bool:
+    if newlevel: newlevel=3
+    else:        newlevel=debug_level
+  debug_level_stack.append(debug_level)
+  debug_level=newlevel
+
+def popDebug():
+  global debug_level, debug_level_stack
+  debug_level=debug_level_stack.pop()
+
 def ifdebug(level=3):
   ''' Tests if the debug_level is above the specified threshold.
   '''
@@ -204,14 +217,20 @@ class CanonicalSeq:
     return False
 
 class CanonicalDict(dict):
-  def __init__(self,map,canonical=None):
+  def __init__(self,map=None,canonical=None):
     dict.__init__(self)
     self.__canon=canonical
+    if map is not None:
+      for k in map.keys():
+        self[k]=map[k]
 
   def __canonical(self,key):
     if self.__canon is None:
       return key
-    return self.__canon(key)
+
+    ckey=self.__canon(key)
+    debug("CanonicalDict: %s => %s" % (key, ckey))
+    return ckey
 
   def __getitem__(self,key):
     return dict.__getitem__(self,self.__canonical(key))
@@ -223,7 +242,11 @@ class CanonicalDict(dict):
     dict.__delitem__(self,self.__canonical(key))
 
   def __contains__(self,key):
-    dict.__continas__(self,self.__canonical(key))
+    ckey=self.__canonical(key)
+    yep=dict.__contains__(self,ckey)
+    if ifdebug():
+      warn("CanonicalDict: __contains__(%s(%s)) = %s" % (key,ckey,`yep`))
+    return yep
 
 class LCDict(CanonicalDict):
   def __init__(self,dict):
