@@ -3,6 +3,7 @@
 # Log an action via buglog.
 #	- Cameron Simpson <cs@zip.com.au> 06sep2004
 #
+
 : ${BUGSYSTEMS:=dlog}
 
 case " $BUGSYSTEMS " in
@@ -11,4 +12,4 @@ case " $BUGSYSTEMS " in
 esac
 export BUGSYSTEMS
 
-exec bgproc -p /dev/null buglog -n -- "$*"
+exec bgproc -p /dev/null -l buglog buglog -n -- "$*"
