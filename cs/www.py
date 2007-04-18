@@ -88,6 +88,12 @@ def puttok(fp,tok):
       else:
 	attrs={}
 
+    isSCRIPT=(tag.upper() == 'SCRIPT')
+
+    if isSCRIPT:
+      if 'LANGUAGE' not in [a.upper() for a in attrs.keys()]:
+        attrs['language']='JavaScript'
+
     fp.write('<')
     fp.write(tag)
     for k in attrs:
@@ -99,8 +105,12 @@ def puttok(fp,tok):
 	hexify(str(v),fp,dqAttrValSafeRe)
 	fp.write('"')
     fp.write('>')
+    if isSCRIPT:
+      fp.write("<!--\n")
     for t in tok:
       puttok(fp,t)
+    if isSCRIPT:
+      fp.write("\n-->")
     fp.write('</')
     fp.write(tag)
     fp.write('>')
