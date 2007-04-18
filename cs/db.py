@@ -8,6 +8,7 @@ import sys
 import string
 import types
 import datetime
+from sets import Set
 import cs.secret
 import cs.cache
 from cs.misc import cmderr, debug, ifdebug, warn, isodate, exactlyOne
@@ -98,6 +99,9 @@ def sqlise(v):
   t=type(v)
   if t is datetime.date:
     v=str(v)
+    t=type(v)
+  elif t is Set:
+    v=" ".join(v)
     t=type(v)
 
   if t is str or t is unicode:
