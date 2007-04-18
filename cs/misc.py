@@ -490,25 +490,34 @@ class HasFlags:
     self.__flagfield=flagfield
 
   def __flaglist(self):
+    from sets import Set
     flagv=self[self.__flagfield]
     if flagv is None:
-      return ()
+      flagv=Set(())
+    else:
+      if type(flagv) is not Set:
+        flagv=Set(flagv)
 
-    return string.split(flagv)
+    return flagv
 
   def testFlag(self,flag):
-    flags=self.__flaglist()
-    return flag in flags
+    return flag in self.__flaglist()
 
   def setFlag(self,flag):
-    if not self.testFlags(flag):
-      flagv=self[self.__flagfield]
-      if flagv is None: flagv=''
-      self[self.__flagfield]=flagv+' '+flag
+    if not self.testFlag(flag):
+      flagv=self.__flaglist()
+      flagv.add(flag)
+      if type(self[self.__flagfield]) is str:
+        flagv=" ".join(flagv)
+      self[self.__flagfield]=flagv
 
   def clearFlag(self,flag):
     if self.testFlag(flag):
-      self[self.__flagfield]=string.join([f for f in self.__flaglist() if f != flag])
+      flagv=self.__flaglist()
+      flagv.remove(flag)
+      if type(self[self.__flagfield]) is str:
+        flagv=" ".join(flagv)
+      self[self.__flagfield]=flagv
 
 def saferename(oldpath,newpath):
   ''' Rename a path using os.rename(), but raise an exception if the target
