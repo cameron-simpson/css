@@ -36,6 +36,7 @@
 : ${NAME:=''}
 : ${CDRIP_TRACKFMT:='%02d - %s'}	# track number then title
 : ${CDRIP_DEV:=/dev/cdrom}
+: ${CDRIP_DIR:=.}
 : ${CDRIP_ENC:=ogg}			# comma separated list of ogg,mp3,flac
 : ${CDRIP_BPS:=192}
 : ${CDRIP_QUAL=6}
@@ -63,6 +64,7 @@ usage="Usage: $cmd [-q qual] [-b bps] [-d device] [-e enclist] [-l lock] [-j job
 	-b kbps		Fixed bitrate kilobits per second for the encoding.
 			Default: variable bit rate using quality.
 	-d device	Device holding the CD. Default: $CDRIP_DEV
+        -D dir          Change working directory.
 	-e enclist	Select encoding(s), comma separated.
 			Supported: ogg,mp3,flac. Default: $CDRIP_ENC
         -f              Force; rip audio even if the desired file already
@@ -103,6 +105,12 @@ do
 	# Default: B</dev/cdrom> or the value of B<$CDRIP_DEV>.
 	#
 	-d)	CDRIP_DEV=$2 ;shift ;;
+	# =item B<-D> I<dir>
+	#
+	# Change working directory to I<dir> before ripping.
+	# Default: B<.> or the value of B<$CDRIP_DIR>.
+	#
+	-D)	CDRIP_DIR=$2 ;shift ;;
 	# =item B<-e> I<encodings>
 	#
 	# Comma separated list of encoding formats to produce.
@@ -191,7 +199,7 @@ case "$lock" in
 esac
 
 [ $# = 0 ] || { echo "$cmd: extra arguments: $* ">&2
-		abdopts=1
+		badopts=1
 	      }
 
 enclist=
@@ -208,6 +216,8 @@ do
 done
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+cd "$CDRIP_DIR" || exit 1
 
 if [ "$jobs" -gt 1 -a -z "$lock" ]
 then
