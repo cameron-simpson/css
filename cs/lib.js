@@ -638,6 +638,35 @@ csAsyncObject.prototype.setAttr = function(attrname, value) {
   }
 };
 
+function csHotSpan(inner,makePopup,makeArg) {
+  var span = csNode("SPAN");
+  span.style.textDecoration='underline';
+  if (typeof(inner) == "string") {
+    inner=[csText(inner)];
+  }
+  for (var i=0; i<inner.length; i++) {
+    span.appendChild(inner[i]);
+  }
+
+  var popup = null;
+  span.onmouseover=function(e) {
+                      if (!e) e=window.event;
+                      if (!popup) {
+                        popup=makePopup(makeArg);
+                        popup.style.visibility='hidden';
+                        popup.style.display='block';
+                        span.appendChild(popup);
+                        span.onmouseout=function(e) {
+                          popup.style.visibility='hidden';
+                        };
+                      }
+                      csSetPosition(popup,csXY(span.offsetLeft,
+                                               span.offsetTop+span.offsetHeight));
+                      popup.style.visibility='visible';
+                    };
+  return span;
+}
+
 /**
  * Controls a DIV containing the specified element with a mouse handler
  * to pan it.
