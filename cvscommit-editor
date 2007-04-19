@@ -22,8 +22,8 @@ export EDITOR
 $EDITOR "$report"
 xit=$?
 
-# toss blank lines
-bsed -s -e '/^CVS:/d' -e '/^[ 	]*$/d' "$report"
+# toss blank lines ad CVS: comments
+bsed -s '/^CVS:/d; /^[ 	]*$/d' "$report"
 
 if [ -s "$report" ]
 then
