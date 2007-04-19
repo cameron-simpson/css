@@ -1,20 +1,33 @@
-#!/bin/sh
+#!/bin/sh -u
 #
-# Commit changes, using commit-editor to make the log more helpful to its author.
-#	- Cameron Simpson <cs@zip.com.au> 12apr1997
+# Commit changes, using commit-editor to make the log more helpful to its
+# author. - Cameron Simpson <cs@zip.com.au> 12apr1997
 #
+
+cmd=$0
+usage="Usage: $cmd [files...]"
 
 : ${TMPDIR:=/tmp}
+: ${EDITOR:=vi}
 
-diffs=$TMPDIR/cvd$$
-CVS_COMMIT_DIFFS=$diffs
-CVS_COMMIT_FILES=$*
+CVS_COMMIT_DIFFS=$TMPDIR/cvd$$
 CVS_COMMIT_EDITOR=$EDITOR
 EDITOR=$0-editor
-export CVS_COMMIT_FILES CVS_COMMIT_EDITOR CVS_COMMIT_DIFFS EDITOR
+export CVS_COMMIT_EDITOR CVS_COMMIT_DIFFS EDITOR
 
-trap 'rm -f "$diffs"' 0 1 2 13 15
-cvs -q diff $CVS_COMMIT_FILES >$diffs 2>&1
+trap 'rm -f "$CVS_COMMIT_DIFFS"' 0 1 2 13 15
+
+cvs -q diff ${1+"$@"} >"$CVS_COMMIT_DIFFS"
+
+egrep '^(-|\+)' "$CVS_COMMIT_DIFFS" >/dev/null \
+|| \
+{ echo "No diffs. Listing named files."
+  echo "Filenames: $*"
+  echo
+  grep -r . /dev/null ${1+"$@"}
+} >>"$CVS_COMMIT_DIFFS"
+
 
 cvs commit -l ${1+"$@"}
+
 exit $?
