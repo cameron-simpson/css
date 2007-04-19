@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/sh -u
 #
 # Wrapper for $EDITOR for cvs commits to append the changes for inquisition
 # in the change report.
@@ -7,25 +7,14 @@
 
 : ${TMPDIR:=/tmp}
 
-[ -n "$CVS_COMMIT_FILES" ] || { echo "$0: \$CVS_COMMIT_FILES not set!" >&2
-				exit 1
-			      }
-[ -n "$CVS_COMMIT_EDITOR" ] || { echo "$0: \$CVS_COMMIT_EDITOR not set!" >&2
-				 exit 1
-			       }
-[ -n "$CVS_COMMIT_DIFFS" ] || { echo "$0: \$CVS_COMMIT_DIFFS not set!" >&2
-				 exit 1
-			       }
 [ -f "$CVS_COMMIT_DIFFS" ] || { echo "$0: \$CVS_COMMIT_DIFFS ($CVS_COMMIT_DIFFS) missing!" >&2
 				 exit 1
 			       }
 [ $# = 1 ] || { echo "Usage: $0 filename (argv=[$*])" >&2; exit 2; }
 
-report=$1
-if egrep '^(-|\+)' "$CVS_COMMIT_DIFFS" >/dev/null
-then cat "$CVS_COMMIT_DIFFS"
-else grep . /dev/null $CVS_COMMIT_FILES
-fi | sed 's/^/CVS: /' >>"$report"
+report=$1; shift
+
+sed 's/^/CVS: /' "$CVS_COMMIT_DIFFS" >>"$report"
 
 EDITOR=$CVS_COMMIT_EDITOR
 export EDITOR
