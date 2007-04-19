@@ -1,8 +1,6 @@
 if (this._cs_libLoaded) {
   _log("ERROR: multiple load of cs/lib.js");
 } else {
-  _cs_libLoaded=true;
-
   _logNode=null;  //document.body;
   _cs_seq = 0;
 
@@ -19,16 +17,6 @@ if (this._cs_libLoaded) {
 
   _cs_anims=[];
   _cs_nanim=0;
-
-  _cs_rpc=csNode("DIV");
-  _cs_rpc.style.display='none';
-  _cs_rpc_dflt_cgi="rpc.cgi";
-  document.body.appendChild(_cs_rpc);
-  _cs_rpc_callbacks={};
-  _cs_rpc_nodes={};
-  _cs_rpc_max=2
-  _cs_rpc_running=0
-  _cs_rpc_queue=[]
 
   _csPan_useImageMap=false;
   _csPan_dragCursor=null;
@@ -506,6 +494,16 @@ function csSetPositionBelow(above,elem) {
 ///////////////////////////////////////////////////////////////////
 // CGI-based RPC infrastructure
 //
+if (!this._cs_libLoaded) {
+  _cs_rpc=csNodeHere();
+  _cs_rpc.style.display='none';
+  _cs_rpc_dflt_cgi="rpc.cgi";
+  _cs_rpc_callbacks={};
+  _cs_rpc_nodes={};
+  _cs_rpc_max=2
+  _cs_rpc_running=0
+  _cs_rpc_queue=[]
+}
 
 function csRPC(jscgiurl,argobj,callback,priority) {
   // Queue requests if too busy.
@@ -649,6 +647,7 @@ function csHotSpan(inner,makePopup,makeArg) {
   }
 
   var popup = null;
+  var popupState = null;
   span.onmouseover=function(e) {
                       if (!e) e=window.event;
                       if (!popup) {
@@ -657,12 +656,23 @@ function csHotSpan(inner,makePopup,makeArg) {
                         popup.style.display='block';
                         span.appendChild(popup);
                         span.onmouseout=function(e) {
-                          popup.style.visibility='hidden';
+                          if (popupState == null) {
+                            popup.style.visibility='hidden';
+                          }
                         };
                       }
                       csSetPosition(popup,csXY(span.offsetLeft,
                                                span.offsetTop+span.offsetHeight));
                       popup.style.visibility='visible';
+                    };
+  span.onclick=function(e) {
+                      if (!e) e=window.event;
+                      if (popupState == null) {
+                        popupState="clicked";
+                      } else if (popupState == "clicked") {
+                        popupState=null;
+                        popup.style.visibility='hidden';
+                      }
                     };
   return span;
 }
@@ -913,3 +923,5 @@ CSPan.prototype.handleUp = function(e) {
 { var vp = csViewPort();
   _log("viewport = "+vp.x+"x"+vp.y+", "+vp.width+"x"+vp.height);
 }
+
+_cs_libLoaded=true;
