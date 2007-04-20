@@ -1,11 +1,21 @@
 #!/bin/sh -u
 #
+# Export a CVS repository tree to Mercurial.
+# Doesn't understand branches.
+#       - Cameron Simpson <cs@zip.com.au> 20apr2007
+#
 
 trace=set-x
+perfile=
 
 cmd=`basename "$0"` || exit 1
-usage="Usage: $cmd [-d cvsroot] cvssubdir newhgdir
-        -d cvsroot      CVS repository root, default from \$CVSROOT."
+usage="Usage: $cmd [-d cvsroot] cvssubdir [newhgdir]
+        -d cvsroot      CVS repository root, default from \$CVSROOT.
+        --perfile       Make a new changeset per file revision instead of
+                        bundling all simultaneous file revisions into
+                        a single changeset.
+        newhgdir        The new Mercurial work area.
+                        Default: basename of cvssubdir."
 
 badopts=
 
@@ -13,6 +23,8 @@ while [ $# -gt 0 ]
 do
   case "$1" in
     -d) CVSROOT=$2; shift ;;
+    --perfile)
+        perfile=1 ;;
     --) shift; break ;;
     -?*)echo "$cmd: unrecognised option: $1" >&2
         badopts=1
@@ -44,8 +56,7 @@ fi
 
 if [ $# = 0 ]
 then
-  echo "$cmd: missing newhgdir" >&2
-  badopts=1
+  newhgdir=`basename "$subdir"` || exit 1
 else
   newhgdir=$1
   shift
@@ -59,8 +70,15 @@ fi
 
 set -e
 
+logf="$TMPDIR/$cmd.$$.logmsg"
+wkdir=`mkdirn "$TMPDIR/$cmd."`
+trap 'set -x; rm -rf "$logf" "$wkdir"' 1 2 13 15
+
 $trace mkdir "$newhgdir"
 newhgdir=`cd "$newhgdir" && pwd`
+
+cd "$wkdir"
+wkdir=`pwd`                   
 
 _cvs()
 { $trace cvs "$@"
@@ -81,42 +99,84 @@ _hg init
   do
     cvsfile-revs < "$CVSROOT/$subdir/$cvsfile,v" | sed "s;^;$cvsfile	;"
   done \
-| sort '-t	' -k 3 -k 1 \
-| \
-{
-  wkdir=`mkdirn "$TMPDIR/$cmd."`
-  cd "$wkdir"
-  wkdir=`pwd`                   
-  ##trap 'set -x; rm -r "$wkdir"' 1 2 13 15
-  mkdir -p "$subdir"
-  cd "$subdir"
-  pwd
+| if [ $perfile ]
+  then
+    sort '-t	' -k 3 -k 1 \
+    | \
+    {
+      ##trap 'set -x; rm -r "$wkdir"' 1 2 13 15
+      mkdir -p "$subdir"
+      cd "$subdir"
+      pwd
 
-  while read -r file rev date author rev2
-  do
-    cvspath=$subdir/$file
-    fdir=`dirname "$file"`
-    fbase=`basename "$file"`
+      while read -r file rev date author rev2
+      do
+        [ "x$rev" = x1.1 ] || continue
 
-    if [ -f "$file" ]
-    then
-      ls -ld "$file"
-      _cvs update -r "$rev" "$file"
-      $trace cp -p "$file" "$newhgdir/$fdir/."
-    else
-      $trace [ -d "$fdir" ] || $trace mkdir -p "$fdir" "$newhgdir/$fdir"
-      ( cd "$wkdir" && pwd && _cvs co -r "$rev" "$subdir/$file" )
-      $trace cp -p "$file" "$newhgdir/$fdir/."
-      _hg add "$file"
-    fi
+        cvspath=$subdir/$file
+        fdir=`dirname "$file"`
+        fbase=`basename "$file"`
 
-    ##echo "$date"
-    date=`echo "$date" | tr _ ' '`
-    date -d "$date Z"
-    log=`cvs log -l -N "-r$rev:$rev" "$file" | sed '1,/^date:/d; $d'`
-    _hg commit -d "$date UTC" -m "[CVS rev $rev, $date UTC]
-$log" "$file"
-    ls -ld "$file"
-    [ "x$rev" = x1.1 ] || _hg log "$file"
-  done
-}
+        if [ -f "$file" ]
+        then
+          ##ls -ld "$file"
+          _cvs update -r "$rev" "$file"
+          $trace cp -p "$file" "$newhgdir/$fdir/."
+        else
+          $trace [ -d "$fdir" ] || $trace mkdir -p "$fdir" "$newhgdir/$fdir"
+          ( cd "$wkdir" && pwd && _cvs co -r "$rev" "$subdir/$file" )
+          $trace cp -p "$file" "$newhgdir/$fdir/."
+          _hg add "$file"
+        fi
+
+        ##echo "$date"
+        date=`echo "$date" | tr _ ' '`
+        ##date -d "$date Z"
+        log=`cvs log -l -N "-r$rev:$rev" "$file" | sed '1,/^date:/d; $d'`
+        _hg commit -d "$date UTC" -m "$log
+[CVS rev $rev, $date UTC]" "$file"
+        ##ls -ld "$file"
+        ##[ "x$rev" = x1.1 ] || _hg log "$file"
+      done
+    }
+  else
+    awk '{print$2}' \
+    | sed 's/_/ /; s/$/ UTC/' \
+    | sort -u \
+    | \
+    {
+      first=1
+      while read -r date
+      do
+        if [ $first ]
+        then
+          _cvs -q co -D "$date" "$subdir"
+          cd "$subdir"
+        else
+          _cvs -q update -D "$date"
+        fi
+
+        # update the files
+        $trace rsync -a --exclude=CVS/ --exclude=.hg/ --delete . "$newhgdir/."
+
+        if [ $first ]
+        then  daterange="<=$date"
+        else  odate1=`date -d "$odate 1 second"`
+              daterange="$odate1<=$date"
+        fi
+        _cvs -q log -S -N "-d$daterange" \
+        | sed '/^Working file:/,/^---------------------------/d
+               /^=============================================================================/d
+               /^ *$/d' \
+        > "$logf"
+
+        ls -ld "$logf"
+        [ -s "$logf" ]
+        cat "$logf"
+        _hg commit -A -d "$date" -l "$logf" </dev/null
+
+        first=
+        odate=$date
+      done
+    }
+  fi
