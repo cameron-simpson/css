@@ -19,21 +19,33 @@ cookie_valRe=re.compile(r'([a-z][a-z0-9_]*)=([^;,\s]*)',re.I)
 hexSafeRe=re.compile(r'[-=.\w:@/?~#+&]+')
 dqAttrValSafeRe=re.compile(r'[-=. \w:@/?~#+&]+')
 
-def hexify(str,fp,safeRe=None):
+def hexify(s,fp,safeRe=None):
   """ Percent encode a string, transcribing to a file.
       safeRe is a regexp matching a non-empty seqeunce of characters that do not need encoding.
       FIXME: percent encoding for Unicode?
   """
   if safeRe is None: safeRe=hexSafeRe
-  while len(str):
-    m=safeRe.match(str)
+  while len(s):
+    m=safeRe.match(s)
     if m:
       safetext=m.group(0)
       fp.write(safetext)
-      str=str[len(safetext):]
+      s=s[len(safetext):]
     else:
-      fp.write("%%%02x"%ord(str[0]))
-      str=str[1:]
+      fp.write("%%%02x"%ord(s[0]))
+      s=s[1:]
+
+def unhexify(s):
+  ''' Turn %xx sequences inside a string into characters.
+  '''
+  hexchars='0123456789abcdefABCDEF'
+  pcndx=s.find('%')
+  while pcndx >= 0 \
+    and hexchars.find(s[pcndx+1]) >= 0 \
+    and hexchars.find(s[pcndx+2]) >= 0:
+    s=s[:pcndx]+eval("chr(0x%s)" % s[pcndx+1:pcndx+3])+s[pcndx+3:]
+    pcndx=s.find('%',pcndx+1)
+  return s
 
 textSafeRe=re.compile(r'[^<>&]+')
 
