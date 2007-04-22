@@ -1,0 +1,114 @@
+#!/bin/sh
+#
+# Take the .du-s file from dusum and produce a report of disc usage by user
+# and category.	- Cameron Simpson, 23jun1994
+#
+
+progress=
+[ -t 1 ] && progress=1
+
+[ $progress ] && echo "reading user disc usage ..." >&2
+users=
+while read du user junk
+do case "$user" in
+       *[!a-z0-9]*)	continue;;
+   esac
+   eval "du_$user=$du"
+   users="$users $user"
+done
+
+tmp=/tmp/$cmd.$$
+trap "rm -f $tmp; exit 1" 1 2 3 15
+
+[ $progress ] && echo "getting user classes ..." >&2
+for u in $users
+do echo $u
+done | pv '%L	%C' - > $tmp
+
+for u in $users
+do eval "cl_$u='<UnKnown>'"
+done
+
+{ exec < $tmp
+  while read user classes
+  do eval "cl_$user=\$classes"
+  done
+}
+
+[ $progress ] && echo "tallying disc usage by category ..." >&2
+for u in $users
+do eval "echo \"$u	\$du_$u	,\$cl_$u,\""
+done \
+  | tr '[A-Z]' '[a-z]' \
+  | sed ':tidy
+	 s/,group\.[a-z][a-z_0-9]*,/,/g
+	 t tidy
+	 s/,$//
+	 s/	,/	/' \
+  | { while read user du cl
+      do # These are listed in priority, so that various
+	 # classes categorise before others.
+	 case ,$cl, in
+	   *,wheel,*|*,compfac_programming,*|*,compfac_technical,*)
+						cat=CompFac ;;
+	   *,system,*|*_utility,*)		cat=Utility ;;
+	   *,cse_teaching,*)			cat=Teaching ;;
+	   *,cse_support,*|*,cse_technical,*|*,ai_technical,*)
+						cat=Support ;;
+	   *,cseoffice_admin,*|*,cse_secretarial,*|*,cse_admin,*|*,compfac_secretarial,*)
+						cat=Admin ;;
+	   *,cse_thesis,*|*,ai_thesis,*|*,formalmethods_thesis,*|*,serg_thesis,*)
+						cat=COMP_Thesis ;;
+	   *,ee_teaching,*|*,power_teaching,*|*,syscon_teaching,*|*,comms_teaching,*)
+						cat=ELEC_Teaching ;;
+	   *,ee_support,*|*,power_support,*|*,syscon_support,*|*,comms_support,*)
+						cat=ELEC_Support ;;
+	   *,ee_technical,*|*,power_technical,*|*,syscon_technical,*|*,comms_technical,*)
+						cat=ELEC_Support ;;
+	   *,vast_thesis,*)			cat=VaST_Thesis ;;
+	   *,ee_thesis,*|*,power_thesis,*|*,syscon_thesis,*|*,comms_thesis,*)
+						cat=ELEC_Thesis ;;
+	   *,cse_research,*|*,ai_research,*|*,serg_research,*)
+						cat=Research ;;
+	   *,comp[0-9][0-9][0-9][0-9]_tutor,*)	cat=COMP_Tutor ;;
+	   *,elec[0-9][0-9][0-9][0-9]_tutor,*)	cat=ELEC_Tutor ;;
+	   *,comp[0-9][0-9][0-9][0-9]_admin,*|*,ance[0-9][0-9][0-9][0-9]_admin,*)
+						cat=COMP_Admin ;;
+	   *,elec[0-9][0-9][0-9][0-9]_admin,*)	cat=ELEC_Admin ;;
+	   *,comp[0-9][0-9][0-9][0-9]_student,*|*,lab.comp[0-9][0-9][0-9][0-9]-*|*,ance[0-9][0-9][0-9][0-9]_student,*)
+						cat=COMP_Student ;;
+	   *,elec[0-9][0-9][0-9][0-9]_student,*)cat=ELEC_Student ;;
+	   *,CompFac_Slaves,*)			cat=CompFac ;;
+	   *,cse_visitor,*|*,ai_visitor,*)	cat=CSE_Visitor ;;
+	   *,cse_courtesy,*|*,ai_courtesy,*)	cat=CSE_Courtesy ;;
+	   *,ee_visitor,*|*,power_visitor,*|*,syscon_visitor,*|*,comms_visitor,*)
+						cat=ELEC_Visitor ;;
+	   *,_visitor,*)			cat=Other_Visitor ;;
+	   *_courtesy,*)			cat=Other_Courtesy ;;
+	   *_student,*)				cat=Other_Student ;;
+	   ,,|,transit,|,defunct,)		cat=Expired ;;
+	   *)					cat=Other ;;
+	 esac
+	 eval "cat_seen=\$cat_${cat}_seen
+	       cat_du=\$cat_${cat}_du
+	       cat_${cat}_seen=1
+	       cat_$user=\$cat
+	       cl_$user=\$cl"
+	 [ $cat_seen ] || { cat_du=0
+	 		    cats="$cats $cat"
+			  }
+	 cat_du=`expr $cat_du + $du`
+	 eval "cat_${cat}_du=\$cat_du"
+      done
+      for cat in $cats
+      do eval "echo \"$cat	\$cat_${cat}_du\""
+      done | sort -r +1n +0d \
+	   | awk '{ printf("%-15s %7d\n",$1,$2); }'
+      echo
+      for u in $users
+      do eval "echo \"$u	\$du_$u	\$cat_$u	\$cl_$u\""
+      done | sort +2d -3 +1n -2 +0 -1 \
+	   | awk '{ printf("%-15s %7d %-15s %s\n",$1,$2,$3,$4); }'
+    }
+
+rm $tmp

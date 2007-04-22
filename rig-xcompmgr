@@ -1,0 +1,12 @@
+#!/bin/sh -u
+#
+# Start up xcompmgr.
+#       - Cameron Simpson <cs@zip.com.au> 13apr2007
+#
+
+: ${X11_COMPOSITE:=''}
+
+[ $# -gt 0 ] && [ "x$1" = x-f ] && { X11_COMPOSITE=1; shift; }
+
+# -f and -F probably trigger a memory leak
+[ $X11_COMPOSITE ] && bgproc -p xcompmgr -l x11 xcompmgr -cfF -r0 -D5 -I0.01 -O0.02

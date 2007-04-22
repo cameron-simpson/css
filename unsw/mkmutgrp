@@ -1,0 +1,68 @@
+#!/bin/sh
+#
+# mkmutgrp expiry members...
+#
+
+cmd=`basename "$0"`
+usage="Usage: $cmd expiry members..."
+badopts=
+
+if [ $# -lt 1 ]
+then echo "$cmd: missing expiry date" >&2
+     badopts=1
+else
+  expiry=$1; shift
+  case "$expiry" in
+     forever|session|[0-9][0-9][0-9][0-9][0-9][0-9])
+	;;
+     *)	echo "$cmd: $expiry: bad expiry date" >&2
+	badopts=1
+	;;
+  esac
+  if [ $# -lt 2 ]
+  then echo "$cmd: missing members" >&2
+       badopts=1
+  else
+       for member
+       do
+     	case "$member" in
+	    [a-z]*);;
+	    *)	echo "$0: $member: bad member name" >&2
+		badopts=1
+		;;
+     	esac
+       done
+  fi
+fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+ok=1
+for group
+do
+    echo "group.$group 65536"
+done | initacc
+
+( for group
+  do
+    echo "lim classes+group[forever] group.$group"
+    gid=`pv '%U' "$group"`
+    if [ $? != 0 -o "x$gid" = x ]
+    then
+	echo "$0: can't compute gid for group.$group" >&2
+    else
+	echo "lim numbers[2]=$gid group.$group"
+    fi
+  done
+
+  for member
+  do
+      for group
+      do
+	  if [ "x$member" != "x$group" ]
+	  then
+	      echo "lim classes+group.$group[$expiry] $member"
+	  fi
+      done
+  done
+) | lim -- -l

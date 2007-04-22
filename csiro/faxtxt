@@ -1,0 +1,151 @@
+#!/bin/sh
+#
+# Dispatch text to the FAX service.
+#	- Cameron Simpson <cs@zip.com.au> 12apr95
+#
+
+cmd=$0
+usage="Usage: $cmd -w fax-who -n fax-number -s subject [-o fax-org] [-q] \\
+		[-v fax-voice] [textfiles...]
+	-n fax-number	Fax number.
+	-o fax-org	Their organisation title.
+	-O output	Write to output.cover and output.body, don't send.
+	-q		Query; display fax sheets via xvshow, don't send.
+	-s subject	Topic of fax.
+	-w fax-who	Who the fax is for.
+	-v fax-voice	Their voice telephone number."
+
+FAXCOVER=${FAXCOVER-/usr/local/lib/fax/dapcover.ps}
+FAXSERVER=${FAXSERVER-swifty}
+TELNO=${TELNO-'+61 2 413 7211'}	# site switch
+FAXNO=${FAXNO-'+61 2 413 7631'}	# site FAX
+ORGANIZATION=${ORGANIZATION-'CSIRO Division of Applied Physics'}
+export FAXCOVER FAXSERVER FAXNO TELNO ORGANIZATION
+
+who=
+who_org=
+who_voice=
+number=
+subject=
+noaction=
+output=
+
+badopts=
+while :
+do  case "$1" in
+	-n)	number=$2; shift ;;
+	-o)	who_org=$2; shift ;;
+	-O)	output=$2; shift; noaction=1 ;;
+	-q)	noaction=1 ;;
+	-s)	subject=$2; shift ;;
+	-w)	who=$2; shift ;;
+	-v)	who_voice=$2; shift ;;
+	--)	shift; break ;;
+	-?*)	echo "$cmd: unrecognised option: $1" >&2
+		badopts=1
+		;;
+	*)	break ;;
+    esac
+    shift
+done
+
+if [ -z "$who" ]
+then	echo "$cmd: missing recipient name (fax-who)" >&2
+	badopts=1
+fi
+
+if [ -z "$number" ]
+then	echo "$cmd: missing recipient fax number (fax-number)" >&2
+	badopts=1
+fi
+
+if [ -z "$subject" ]
+then	echo "$cmd: missing fax subject" >&2
+	badopts=1
+fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+tmp=/tmp/fax.$$
+cover=$tmp.cover
+body=$tmp.body
+
+tidy="rm -f \$cover \$body"
+trap "$tidy; exit 1" 1 2 15		# HUP INT TERM
+trap "$tidy; exit \$xit" 0		# EXIT
+
+# convert to PostScript
+# set -x
+cat ${1+"$@"} | aps -T "$subject" >$body \
+	|| { echo "$cmd: aps fails, aborting" >&2; exit 1; }
+
+ToName="/ToName ($who) def"
+ToCompany="/ToCompany ($who_org) def"
+ToPhone="/ToPhone ($who_voice) def"
+ToFax="/ToFax ($number) def"
+Faxnum=$number
+FromName="/FromName ($NAME) def"
+FromCompany="/FromCompany ($ORGANIZATION) def"
+FromPhone="/FromPhone ($TELNO) def"
+FromFax="/FromFax ($FAXNO) def"
+Subject="/Subject ($subject) def"
+
+pages=`grep '^%%Page: [1-9]' $body|wc -l`	# message pages
+pages=`expr $pages + 1`				# + cover sheet
+if [ $pages = 1 ]
+then	NumPages="/NumPages (1 page) def"
+else	NumPages="/NumPages ($pages pages) def"
+fi
+
+Date="/Date (Sent `date '+%B %d, %Y'`) def"
+
+# Create the Postscript Prologue
+
+( echo "%!PS-Adobe-2.0"
+  echo $ToName
+  echo $ToCompany
+  echo $ToPhone
+  echo $ToFax
+  echo $FromName
+  echo $FromCompany
+  echo $FromPhone
+  echo $FromFax
+  echo $Subject
+  echo $NumPages
+  echo $Date
+  cat $FAXCOVER
+  echo grestore
+  echo showpage
+) | { ps2fax -o $cover && [ -s $cover ]; } \
+	|| { echo "$cmd: can't convert cover to FAX format" >&2; exit 1; }
+
+######
+# cp $body BODY.raw
+# sed 's|^\(/[^ ]*font /[^ ]*\)  *\([^ ][^ ]*\)  *getfont def|\1 findfont \2 scalefont def|' < $body \
+######
+
+{ ps2fax -o $tmp <$body \
+  && [ -s $tmp ] && mv $tmp $body; } \
+	|| { echo "$cmd: can't convert body to FAX format" >&2
+	     rm -f $tmp
+	     exit 1
+	   }
+
+if [ $noaction ]
+then
+    if [ -n "$output" ]
+    then
+	cp $cover $output.cover
+	cp $body $output.body
+    else
+	set -x
+	xvshow $cover
+	sleep 20
+	xvshow $body
+    fi
+else
+    sendfax -s A4 -D -m -n -d "$Faxnum" $cover $body
+    xit=$?
+fi
+
+exit $xit

@@ -1,0 +1,25 @@
+#!/bin/sh -u
+#
+# Log an email to dlog and the timesheets.
+#       - Cameron Simpson <cs@zip.com.au> 18mar2007
+#
+
+: ${TMPDIR:=/tmp}
+
+cmd=`basename "$0"` || exit 1
+usage="Usage: $cmd < email"
+
+tmpf=$TMPDIR/$cmd$$
+trap 'rm -f "$tmpf"' 0 1 2 13 15
+
+cat >"$tmpf" || exit 1
+
+eval `mhdrs -sh < "$tmpf" | sed 's/^/hdr_/'`
+xit=0
+set -x
+DLOG_WHEN=$hdr_DATE dlog "BOS: $hdr_SUBJECT"    || xit=1
+( set -- $hdr_to $hdr_cc
+  bos-tslog -d "$hdr_DATE" "EMAIL->$*: $hdr_SUBJECT"
+) || xit=1
+
+exit $xit

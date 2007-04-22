@@ -1,0 +1,245 @@
+#!/usr/bin/perl
+#
+# Usage: fixd_users machines...
+#
+# Each machine is translated:
+#	H-machine	-> machine
+#	L-lab		-> machines in lab
+#	machine		-> machine
+# A file d_users/machine is created per machine.
+#
+
+$m='';
+if ($ARGV[$[] eq '-m')
+	{ $m=shift;
+	}
+
+@machines=();
+for (@ARGV)
+	{ if (/^[Ll]-/)
+		{ push(@machines,grep(/^[Hh]-/,&printc(1,0,$_)));
+		}
+	  else
+	  { push(@machines,$_);
+	  }
+	}
+
+for (@machines)
+	{ s/^[Hh]-//;
+	}
+
+@H_machines=@machines;
+for (@H_machines)
+	{ s/^/H-/;
+	}
+
+open(PV,"pv $m '%L %owner' @H_machines|") || die "can't pipe from pv: $!\n";
+while (<PV>)
+	{ chop;
+	  next unless ($h,$o)=/^H-([-\w]+) "(\w+)"$/;
+	  $owner{$h}=$o;
+	}
+close(PV);
+
+open(LABS,"printc $m host-labs|") || die "can't pipe from printc: $!\n";
+@labs=grep(/^l-/i,<LABS>);
+close(@LABS);
+for (@labs)
+	{ chop;
+	  s/^l-//i;
+	}
+
+for (&printc(1,0,'L-Telnet-Server'))
+	{ if (/^h-/i)
+		{ $telnet_server{$'}=1;
+		}
+	}
+
+for $machine (@machines)
+	{ print STDERR "$machine ...";
+	  undef %d_users;
+
+	  if ($telnet_server{$machine})
+		{ &add_users(&isect('CSE','Teaching'));
+		  &add_users(&isect('CSE','Courtesy'));
+		  &add_users(&isect('CSE','Thesis'));
+		  &add_users(&isect('CSE','Research'));
+		  &add_users(&isect('CSE','Society'));
+		  &add_users(&isect('External','Courtesy'));
+		  &add_users(&isect('CompFac','Support'));
+		  &add_users(&isect('EE','Thesis'));
+		  &add_users(&isect('CourseWork','Admin'));
+		}
+
+	  @classes=split(/[,\s]+/,`pv '%C' H-$machine`);
+	  print STDERR "classes($machine)=@classes\n";
+	  for $class (@classes)
+		{ for $lab (@labs)
+			{ if ($class =~ /^l-$lab$/i)
+			  	{ &add_users(&rclasslist("$lab-inet-login"));
+				}
+			}
+
+		  if ($class =~ /^l-(AI|VaST)$/i)
+			{ &add_users(&isect('CSE','Teaching'));
+			  &add_users(&isect('CSE','Courtesy'));
+			  &add_users(&isect('External','Courtesy'));
+			  &add_users(&isect('CSE','Thesis'));
+			  &add_users(&isect('CSE','Research'));
+			  &add_users(&isect('CourseWork','Admin'));
+			}
+
+		  for $dept (('ai','comms','power','syscon','VaST',
+				'InfoScience'))
+			{ if ($class =~ /^l-$dept$/i)
+				{ &add_users(&isect($dept,'teaching'));
+				  &add_users(&isect($dept,'thesis'));
+				  &add_users(&isect($dept,'research'));
+				  &add_users(&isect($dept,'courtesy'));
+				  &add_users(&isect($dept,'visitor'));
+				  &add_users(&isect($dept,'support'));
+			  	  &add_users(&rclasslist("$dept-lab-login"));
+				}
+			}
+		}
+
+	  if (!defined($owner{$machine}))
+		{ print STDERR "warning: no owner recorded for host $machine\n";
+		}
+	  else
+	  { $owner=$owner{$machine};
+	    if ($owner ne '' && $owner ne 'root')
+		{ &add_users($owner);
+		  $dot_d_users=&home($owner)."/.d_users";
+		  if (-f $dot_d_users)
+			{ if (!open(F,"< $dot_d_users\0"))
+				{ print STDERR "can't open $dot_d_users: $!\n";
+				}
+			  else
+			  { while (<F>)
+				{ if (($not,$who)=/\s*(!?)\s*([,\w_]+)\s*(#.*)?$/)
+					{ local(@who)=&isect(grep(length,(split(/[,\s]+/,$who))));
+
+					  if (length($not))
+						{ &del_users(@who);
+						}
+					  else
+					  { &add_users(@who);
+					  }
+					}
+				  else
+				  { print STDERR "$dot_d_users: rejecting: $_\n";
+				  }
+				}
+
+			    close(F);
+			  }
+			}
+		}
+	  }
+
+	  &del_users(&rclasslist('NoLogin'));
+	  &add_users(&rclasslist('CompFac_Programming'));
+	  &add_users(&rclasslist('Wheel'));
+	  &del_users('root');
+
+	  if (!open(D_USERS,"> d_users/$machine\0"))
+		{ print STDERR "can't open d_users/$machine: $!\n";
+		}
+	  else
+	  { print STDERR " >d_users/$machine";
+	    for (sort grep($d_users{$_},keys %d_users))
+		{ print D_USERS "$_\n";
+		}
+
+	    close(D_USERS);
+	  }
+
+	  print STDERR "\n";
+	}
+
+sub add_users	# (@users)
+	{ for (@_)
+		{ $d_users{$_}=1;
+		}
+	}
+
+sub del_users	# (@users)
+	{ for (@_)
+		{ $d_users{$_}=0;
+		}
+	}
+
+sub classlist	# (@classes)
+	{ &printc(0,1,@_);
+	}
+
+sub rclasslist	# (@classes)
+	{ &printc(1,1,@_);
+	}
+
+sub printc	# (recurse,mortal,,@classes)
+	{ local($recurse)=shift;
+	  local($mortal)=shift;
+	  local($flags)='-'.($recurse ? 'r' : '')
+			   .($mortal  ? 'C' : 'c');
+	  local(@them);
+
+	  for (@_)
+		{ if ($recurse
+			? defined($rclasslist{$_})
+			: defined($classlist{$_}))
+			{ push(@them,split(' ',$recurse
+						? $rclasslist{$_}
+						: $classlist{$_}));
+			}
+		  else
+		  { print STDERR " @$_";
+		    local(@printc)=split(/\s+/,`printc $m $flags $_ 2>/dev/null`);
+		    push(@them,@printc);
+		    if ($recurse)
+			{ $rclasslist{$_}="@printc";
+			}
+		    else
+		    { $classlist{$_}="@printc";
+		    }
+		  }
+		}
+
+	  @them;
+	}
+
+sub isect	# (@classes)
+	{ local(%set,%them);
+	  local($_)=shift;
+
+	  for (&rclasslist($_))
+		{ $set{$_}=1;
+		}
+
+	  for (@_)
+		{ undef %them;
+		  for (&rclasslist($_))
+			{ $them{$_}=1;
+			}
+
+		  for (keys %set)
+			{ if ($set{$_} && !defined($them{$_}))
+				{ $set{$_}=0;
+				}
+			}
+		}
+
+	  grep($set{$_},keys %set);
+	}
+
+sub home	# (user)
+	{ if (defined($home{$_[0]}))
+		{ $home{$_[0]};
+		}
+	  else
+	  { local(@pp)=getpwnam($_[0]);
+
+	    $home{$_[0]}=$pp[7];
+	  }
+	}
