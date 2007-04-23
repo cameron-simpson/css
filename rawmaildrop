@@ -28,7 +28,7 @@ done
 [ -n "$echoit" ] && echo "$f" >&3
 [ -n "$logit" ] || exit 0
 
-( PATH=$HOME/bins:$PATH:/opt/script:/opt/bin
+( PATH=$HOME/bin:$PATH:/opt/script:/opt/bin
   log=$LOGDIR/filemail
   [ -s "$log" ] && echo "$f $mbox" >>"$log"
 ) </dev/null >/dev/null 2>&1 &

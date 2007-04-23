@@ -13,7 +13,7 @@ for remote
 do
   [ $first ] && { set x; shift; }
 
-  slcmd="ssh '$remote' \${RSLAVES_RIGENV:-./bins/rigenv} shell -i"
+  slcmd="ssh '$remote' \${RSLAVES_RIGENV:-./bin/rigenv} shell -i"
   set x ${1+"$@"} "$slcmd"; shift
 
   first=

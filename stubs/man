@@ -7,4 +7,4 @@ realman=/usr/bin/man
 
 PAGER='less "-PM$MANFILE, line %bt:"'
 export PAGER
-exec $HOME/bins/man ${1+"$@"}
+exec $HOME/bin/man ${1+"$@"}

@@ -11,5 +11,5 @@ rsync -rptvPL --copy-unsafe-links --delete $HOME/rc/usb/. "$dest/."
 cd $HOME/rc || exit 1
 tar cf - shell env | gzip -v -9 >"$dest/rc.tgz"
 cd $HOME/there/home
-tar cf - scripts | gzip -v -9 >"$dest/bins.tgz"
+tar cf - scripts | gzip -v -9 >"$dest/bin.tgz"
 tar cf - s | gzip -v -9 >"$dest/s.tgz"
