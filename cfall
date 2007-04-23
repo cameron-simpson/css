@@ -1,6 +1,6 @@
 #!/bin/sh
 
-PATH=/u/cameron/scripts:$PATH; export PATH
+PATH=/u/cameron/bins:$PATH; export PATH
 
 iflag=
 case $1 in

@@ -1,8 +1,8 @@
 #!/bin/sh
 #
 
-vm=$HOME/scripts/vm
+vm=$HOME/bins/vm
 
-PATH=$HOME/private/scripts:$PATH; export PATH
+PATH=$HOME/private/bins:$PATH; export PATH
 
 exec term -n "VM $* [`timecode`]" -e ignhup "$vm" ${1+"$@"}

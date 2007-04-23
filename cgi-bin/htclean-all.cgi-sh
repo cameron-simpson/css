@@ -32,7 +32,7 @@ else
     [ -n "$QUERY_STRING" ] && url=$QUERY_STRING
 fi
 
-PATH=/u/cameron/scripts:/opt/bin:$PATH
+PATH=/u/cameron/bins:/opt/bin:$PATH
 PERL5LIB=/u/cameron/rc/perl:$PERL5LIB
 
 urlHost=`expr "x$url" : 'x[a-z]*://\([^/]*\).*'`

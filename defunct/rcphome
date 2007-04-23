@@ -68,5 +68,5 @@ chgrp "$base" "$base"
 pwd
 echo "requesting $pathname ..."
 echo "$pathname" \
-	| $HOME/scripts/pl/tcpio -P1000 "$host" fulldump \
+	| $HOME/bins/pl/tcpio -P1000 "$host" fulldump \
 	| pax -ro$vflag

@@ -23,7 +23,7 @@ umask 22
 
 if [ -z "$quick" ]
 then
-    ( cd $HOME/scripts || exit 1
+    ( cd $HOME/bins || exit 1
       exec myke
     ) || exit 1
     ( cd "$cssweb" || exit 1
@@ -46,14 +46,14 @@ then
 	--include=/CHANGELOG.txt \
 	--include=/CHANGELOG.html \
 	--exclude='/*/' \
-	$HOME/scripts/. $cssdir/bin/.
+	$HOME/bins/. $cssdir/bin/.
 
   rsync -aH \
 	--copy-links \
 	--copy-unsafe-links \
 	--exclude=CVS/ \
 	--exclude='defunct/' \
-	$HOME/scripts/synonyms/. $cssdir/bin/.
+	$HOME/bins/synonyms/. $cssdir/bin/.
 fi
 
 if needdir $cssdir/lib/cs
@@ -67,7 +67,7 @@ then
 	--include='*.pm' \
 	--include='*.py' \
 	--exclude='*' \
-	$HOME/scripts/cs/. $cssdir/lib/cs/.
+	$HOME/bins/cs/. $cssdir/lib/cs/.
 fi
 
 ##if needdir $cssdir/lib

@@ -14,4 +14,4 @@ olog=${3-"$log.real"}
 rm -f $log || exit $?
 /usr/etc/mknod $log p
 
-( /u/cameron/scripts/trimout $size <$log ) >$olog
+( /u/cameron/bins/trimout $size <$log ) >$olog

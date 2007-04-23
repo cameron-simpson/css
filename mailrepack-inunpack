@@ -18,7 +18,7 @@ do  [ -s "$f" ] || cat "$f" >>"$hdrs"
 done
 
 # construct the mutt command
-set mutt -H "$hdrs" -e "set sendmail=$HOME/scripts/send2procmail"
+set mutt -H "$hdrs" -e "set sendmail=$HOME/bins/send2procmail"
 
 for f in `find . -type f -print`
 do  [ -s "$f" ] || { echo "$cmd: skipping \"$f\"" >&2; continue; }

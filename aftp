@@ -1,2 +1,2 @@
 #!/bin/sh
-exec term -n "AFTP $*" -e ncftp ${1+"$@"} ## $HOME/scripts/anonftp ${1+"$@"}
+exec term -n "AFTP $*" -e ncftp ${1+"$@"} ## $HOME/bins/anonftp ${1+"$@"}

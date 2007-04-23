@@ -29,7 +29,7 @@ exit $xit
 
 $trace \
 pfx work:opt/redhat.x86.linux \
-rsync -avHP --rsync-path='$HOME/scripts/rrsync kaper' /u/syncopt/redhat.x86.linux/HOME/. work:/cameron/opt-HOME/. &
+rsync -avHP --rsync-path='$HOME/bins/rrsync kaper' /u/syncopt/redhat.x86.linux/HOME/. work:/cameron/opt-HOME/. &
 [ $sync ] && wait
 
 ( # prepare the way
