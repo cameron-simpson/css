@@ -7,6 +7,18 @@
 : ${TMPDIR:=/tmp}
 : ${SHELL:=/bin/sh}
 : ${SCR_PREARGV='ssh-agent'}
+: ${LANG:=en_US.UTF-8}
+
+new=
+detached=
+rcfile=$HOME/.screenrc
+tmprc=
+screen=screen
+case "$LANG" in
+  *.[Uu][Tt][Ff]*)
+    screen="$screen -U"
+    ;;
+esac
 
 cmd=$0
 usage="Usage:
@@ -14,23 +26,24 @@ usage="Usage:
 	List sessions.
     $cmd -A [[!]regexp...]
 	Put up terms for all matching screen sessions.
-    $cmd [-c scrcmd]... [-l logfile] -e cmd [args...
+    $cmd [-c scrcmd]... [-l logfile] [-dm] -e cmd [args...]
 	Start new session running the supplied command.
-    $cmd [-c scrcmd]... [-l logfile] session [cmd [args...]]
+    $cmd [-c scrcmd]... [-l logfile] [-dm] session [cmd [args...]]
 	Join named session, creating it if missing.
+        -dm         Start the session detached.
 	-c scrcmd  Run the supplied screen command in addition to the .screenrc
 	-l logfile Log session to the named file.
 		   You still need to turn logging on _in_ the session:-("
 
 # nothing? list active sessions
 [ $# = 0 ] \
-    && { screen -ls \
-	 | sed -e '/^	/!d' -e 's/^	\([^	]*\).*/\1/' \
+    && { $screen -ls \
+	 | sed '/^	/!d; s/^	\([^	]*\).*/\1/' \
 	 | awk '{ print NR, $0 }'	## printf("%d %s\n",NR,$0) }'
 	 exit 0
        }
 
-# catch "all" mode early
+# catch the "all sessions" mode early
 if [ "x$1" = x-A ]
 then
     shift
@@ -64,10 +77,6 @@ fi
 
 badopts=
 
-new=
-rcfile=$HOME/.screenrc
-tmprc=
-
 addscrcmds()
 { for scrcmd
   do
@@ -88,6 +97,7 @@ while [ $# -gt 0 ]
 do
   case $1 in
     -c)	addscrcmds "$2"; shift ;;
+    -dm)detached=1 ;;
     -e)	shift
 	havecmd=1
 	[ $# = 0 ] && { echo "$cmd: -e: missing command" >&2
@@ -115,16 +125,18 @@ fi
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
-if [ ! -f /usr/bin/screen ] && [ ! -f /opt/bin/screen ]
-then
-  echo "$cmd: no /usr/bin/screen or /opt/bin/screen, just running: $*" >&2
-  set -x
-  exec "$@"
-fi
+which screen >/dev/null \
+|| { [ $detached ] && set -- acon "$@"
+     echo "$cmd: no screen command? just running: $*" >&2
+     set -x
+     exec "$@"
+   }
 
 case "$TERM" in
   rxvt-*) TERM=rxvt ;;
 esac
+
+[ $detached ] && screen="$screen -d -m"
 
 (
   # look for matching session if supplied
@@ -139,7 +151,7 @@ esac
 			     exit 1
 			   }
 	# matched - join the session
-	exec screen -c "$rcfile" -x "$nsess"
+	exec $screen -c "$rcfile" -x "$nsess"
 	;;
     esac
 
@@ -155,17 +167,20 @@ esac
       *)sessre=$sess
 	;;
     esac
-    match=`scr | sed -e "/^ *[1-9][0-9]* [1-9][0-9]*\\.$sessre\$/!d" -e 's/^ *[1-9][0-9]*  *//' -e q`
+    match=`scr | sed "/^ *[1-9][0-9]* [1-9][0-9]*\\.$sessre\$/!d;"'s/^ *[1-9][0-9]*  *//; q'`
 
     # match found - join it
-    [ -n "$match" ] && exec screen -c "$rcfile" -x "$sess"
+    [ -n "$match" ] && exec $screen -c "$rcfile" -x "$sess"
   else
     sess=$*
     case "$sess" in */*) sess=`printf "%s" "$sess" | tr / _` ;; esac
   fi
 
   # start new session
-  exec screen -S "$sess" -c "$rcfile" -- "$@"
+  exec $screen -S "$sess" -c "$rcfile" -- "$@"
 )
+xit=$?
 
-[ -n "$tmprc" ] && rm "$tmprc"
+[ -z "$tmprc" ] || rm "$tmprc" || xit=1
+
+exit $xit

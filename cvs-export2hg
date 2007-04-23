@@ -5,7 +5,7 @@
 #       - Cameron Simpson <cs@zip.com.au> 20apr2007
 #
 
-trace=set-x
+dotrace=1
 perfile=
 
 cmd=`basename "$0"` || exit 1
@@ -14,6 +14,7 @@ usage="Usage: $cmd [-d cvsroot] cvssubdir [newhgdir]
         --perfile       Make a new changeset per file revision instead of
                         bundling all simultaneous file revisions into
                         a single changeset.
+        cvssubdir       The CVS repository directory to export.
         newhgdir        The new Mercurial work area.
                         Default: basename of cvssubdir."
 
@@ -35,16 +36,6 @@ do
 done
 [ $# -gt 0 ] && [ "x$1" = x-d ] && { CVSROOT=$2; shift; shift; }
 
-export CVSROOT
-echo "CVSROOT=$CVSROOT" >&2
-
-case "$CVSROOT" in
-  /*)   ;;
-  *)    echo "$cmd: invalid cvsroot: $CVSROOT: must be a directory path" >&2
-        badopts=1
-        ;;
-esac
-
 if [ $# = 0 ]
 then
   echo "$cmd: missing cvssubdir" >&2
@@ -52,6 +43,14 @@ then
 else
   subdir=$1
   shift
+  case "$CVSROOT" in
+    /*) ;;
+    *)  echo "$cmd: \$CVSROOT is not a local path: $CVSROOT" >&2
+        badopts=1
+        ;;
+  esac
+  export CVSROOT
+  echo "CVSROOT=$CVSROOT" >&2
 fi
 
 if [ $# = 0 ]
@@ -74,18 +73,22 @@ logf="$TMPDIR/$cmd.$$.logmsg"
 wkdir=`mkdirn "$TMPDIR/$cmd."`
 trap 'set -x; rm -rf "$logf" "$wkdir"' 1 2 13 15
 
-$trace mkdir "$newhgdir"
+trace()
+{ ( set -x; exec "$@" )
+}
+
+trace mkdir "$newhgdir"
 newhgdir=`cd "$newhgdir" && pwd`
 
 cd "$wkdir"
 wkdir=`pwd`                   
 
 _cvs()
-{ $trace cvs "$@"
+{ trace cvs "$@"
 }
 _hg()
 { ( cd "$newhgdir"
-    exec $trace hg "$@"
+    trace hg "$@"
   )
 }
 
@@ -111,21 +114,24 @@ _hg init
 
       while read -r file rev date author rev2
       do
-        [ "x$rev" = x1.1 ] || continue
-
-        cvspath=$subdir/$file
-        fdir=`dirname "$file"`
-        fbase=`basename "$file"`
-
         if [ -f "$file" ]
         then
           ##ls -ld "$file"
           _cvs update -r "$rev" "$file"
-          $trace cp -p "$file" "$newhgdir/$fdir/."
+          if [ -f "$file" ]
+          then
+            fdir=`dirname "$file"`
+            trace cp -p "$file" "$newhgdir/$fdir/."
+          else
+            # a "cvs rm" !
+            _hg remove "$file"
+            trace rm -f "$newhgdir/$file"
+          fi
         else
-          $trace [ -d "$fdir" ] || $trace mkdir -p "$fdir" "$newhgdir/$fdir"
-          ( cd "$wkdir" && pwd && _cvs co -r "$rev" "$subdir/$file" )
-          $trace cp -p "$file" "$newhgdir/$fdir/."
+          fdir=`dirname "$file"`
+          trace [ -d "$fdir" ] || trace mkdir -p "$fdir" "$newhgdir/$fdir"
+          ( cd "$wkdir" && _cvs co -r "$rev" "$subdir/$file" )
+          trace cp -p "$file" "$newhgdir/$fdir/."
           _hg add "$file"
         fi
 
@@ -133,8 +139,11 @@ _hg init
         date=`echo "$date" | tr _ ' '`
         ##date -d "$date Z"
         log=`cvs log -l -N "-r$rev:$rev" "$file" | sed '1,/^date:/d; $d'`
-        _hg commit -d "$date UTC" -m "$log
-[CVS rev $rev, $date UTC]" "$file"
+        if [ -n "$log" ]
+        then  log="$log [CVS rev $rev]"
+        else  log="[CVS rev $rev]"
+        fi
+        _hg commit -d "$date UTC" -m "$log" "$file"
         ##ls -ld "$file"
         ##[ "x$rev" = x1.1 ] || _hg log "$file"
       done
@@ -157,7 +166,7 @@ _hg init
         fi
 
         # update the files
-        $trace rsync -a --exclude=CVS/ --exclude=.hg/ --delete . "$newhgdir/."
+        trace rsync -a --exclude=CVS/ --exclude=.hg/ --delete . "$newhgdir/."
 
         if [ $first ]
         then  daterange="<=$date"

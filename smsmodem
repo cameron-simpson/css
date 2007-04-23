@@ -1,0 +1,81 @@
+#!/bin/sh
+#
+# Dispatch a message to an attached SMS modem.
+#	- Cameron Simpson <cs@zip.com.au> 15may2003
+#
+
+device=/dev/modem
+pin=
+
+cmd=`basename "$0"`
+usage="Usage: $0 [-d device] [-p pin] phone-number sms-text..."
+
+badopts=
+while :
+do  case $1 in
+      -d)	device=$2; shift ;;
+      -p)	pin=$2; shift ;;
+      -?*)	echo "$cmd: unrecognised option: $1" >&2; badopts=1 ;;
+      --)	shift; break ;;
+      *)	break ;;
+    esac
+    shift
+done
+
+if [ $# = 0 ]
+then  echo "$cmd: missing phone-number" >&2; badopts=1
+else
+  phone=$1; shift
+  [ $# = 0 ] && { echo "$cmd: missing sms-text" >&2; badopts=1; }
+fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+exec >"$device"
+exec <"$device"
+stty sane
+stty 9600 -echo igncr
+
+>smsmodem.log
+  { 
+    sleep 1
+
+    echo ""; sleep 1
+
+    echo
+
+    ATcmd "" || exit 1
+
+    if [ -n "$pin" ]
+    then
+	# unlock SIM with PIN if supplied
+	ATcmd "+CPIN=$pin" || exit 1
+    fi
+
+    # set SMS text mode
+    ATcmd "+CMGF=1" || exit 1
+
+    # shut up so text content can't interfere with expect
+    ATcmd "E0" || exit 1
+
+    # send message
+    tmpf=$TMPDIR/expect$$
+    cat >"$tmpf" <<-X
+	set timeout 60
+	stty raw < $device
+	send "AT+CMGS=$phone\r"
+	expect {
+	  -re "ERROR"	{exit 1}
+	  -re "> "	{exit 0}
+	  timeout	{exit 1}
+	}
+X
+    cat "$tmpf" >&2
+    expect -f "$tmpf" || exit 1
+
+    # send message text
+    echo "$*"
+
+    sleep 5
+    exit 0
+  }
