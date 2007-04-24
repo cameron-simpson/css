@@ -1,4 +1,4 @@
-#!/bin/sh -uex
+#!/bin/sh -ue
 #
 # Yet another 3 way merge/edit tool.
 #       - Cameron Simpson <cs@zip.com.au> 24apr2007
@@ -26,25 +26,25 @@ shift; shift; shift
 tmpf=$TMPDIR/$cmd.$$
 trap 'rm -f "$tmpf"' 0 1 2 13 15
 
-if diff3 -m "$local" "$older" "$other" >"$tmpf"
-then
-  # successful automerge
-  choices='a d e s'
-else
-  if [ $? = 1 ]
-  then
-    # conflicts
-    choices='d e s'
-  else
-    echo "$cmd: diff3 failed, aborting" >&2
-    exit 1
-  fi
-fi
-set -- $choices
-
-dohelp=
+dohelp=1
 while :
 do
+  if diff3 -L LOCAL -L 'ROOT ' -L OTHER -m "$local" "$older" "$other" >"$tmpf"
+  then
+    # successful automerge
+    choices='a d e s'
+  else
+    if [ $? = 1 ]
+    then
+      # conflicts
+      choices='d e s'
+    else
+      echo "$cmd: diff3 failed, aborting" >&2
+      exit 1
+    fi
+  fi
+  set -- $choices
+
   if [ $dohelp ]
   then
     for choice
@@ -63,9 +63,20 @@ do
   fi
   read ch || exit 1
   case "$ch" in
-    a)  exec mv "$tmpf" "$local" ;;
-    d)  diff3 -L LOCAL -L 'ROOT ' -L OTHER "$local" "$older" "$other" ;;
-    e)  $EDITOR "$tmpf" ;;
+    a)  ( set -x; exec cp "$tmpf" "$local" )
+        exit $?
+        ;;
+    d)  ( set -x
+          exec diff3 -L LOCAL -L 'ROOT ' -L OTHER \
+                     -m "$local" "$older" "$other"
+        ) || [ $? = 1 ] ;;
+    e)  if $EDITOR "$tmpf"
+        then
+          ( set -x; exec cp "$tmpf" "$local" )
+        else
+          echo "$cmd: editor fails" >&2
+        fi
+        ;;
     s)  exit 0 ;;
     *)  echo "$cmd: unrecognised choice: $ch"
         dohelp=1
