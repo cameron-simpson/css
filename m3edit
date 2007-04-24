@@ -1,0 +1,74 @@
+#!/bin/sh -uex
+#
+# Yet another 3 way merge/edit tool.
+#       - Cameron Simpson <cs@zip.com.au> 24apr2007
+#
+
+: ${EDITOR:=vi}
+: ${TMPDIR:=/tmp}
+export EDITOR TMPDIR
+
+cmd=`basename "$0"`
+usage="Usage: $cmd local older other"
+
+badopts=
+
+local=$1 older=$2 other=$3
+shift; shift; shift
+[ -f "$local" ] || { echo "$cmd: not a file: $local" >&2; badopts=1; }
+[ -f "$older" ] || { echo "$cmd: not a file: $older" >&2; badopts=1; }
+[ -f "$other" ] || { echo "$cmd: not a file: $other" >&2; badopts=1; }
+
+[ $# = 0 ] || { echo "$cmd: extra arguments: $*" >&2; badopts=1; }
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+tmpf=$TMPDIR/$cmd.$$
+trap 'rm -f "$tmpf"' 0 1 2 13 15
+
+if diff3 -m "$local" "$older" "$other" >"$tmpf"
+then
+  # successful automerge
+  choices='a d e s'
+else
+  if [ $? = 1 ]
+  then
+    # conflicts
+    choices='d e s'
+  else
+    echo "$cmd: diff3 failed, aborting" >&2
+    exit 1
+  fi
+fi
+set -- $choices
+
+dohelp=
+while :
+do
+  if [ $dohelp ]
+  then
+    for choice
+    do
+      case "$choice" in
+        a)  echo "a - Accept merged changes." ;;
+        d)  echo "d - Show diff." ;;
+        e)  echo "e - Edit merged file." ;;
+        s)  echo "s - Skip file." ;;
+        *)  echo "$0: unhandled choice: $choice, aborting" >&2
+            exit 1
+            ;;
+      esac
+    done
+    dohelp=
+  fi
+  read ch || exit 1
+  case "$ch" in
+    a)  exec mv "$tmpf" "$local" ;;
+    d)  diff3 -L LOCAL -L 'ROOT ' -L OTHER "$local" "$older" "$other" ;;
+    e)  $EDITOR "$tmpf" ;;
+    s)  exit 0 ;;
+    *)  echo "$cmd: unrecognised choice: $ch"
+        dohelp=1
+        ;;
+  esac
+done
