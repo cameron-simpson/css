@@ -5,8 +5,12 @@ import cs.www
 from cs.misc import cmderr
 
 class JSONRPC(HTTPServer):
-  def __init__(self):
-    HTTPServer.__init__(self,('127.0.0.1',8089),JSONRPCHandler)
+  def __init__(self,bindaddr=None,base=None):
+    if bindaddr is None: bindaddr=('127.0.0.1',8089)
+    if base is None: base='/'
+    self.rpcBaseURL=base
+
+    HTTPServer.__init__(self,bindaddr,JSONRPCHandler)
 
 class JSONRPCHandler(BaseHTTPRequestHandler):
   def __init__(self,rq,cliaddr,srv):
@@ -17,17 +21,26 @@ class JSONRPCHandler(BaseHTTPRequestHandler):
                    % (code,complaint,code,complaint))
 
   def do_GET(self):
-    qndx=self.path.find('?')
-    if qndx < 0:
-      self.reject(500,"No QUERY_STRING part.")
+    cmderr("path =", `self.path`)
+    path=self.path
+    root=self.server.rpcBaseURL
+    if path[:len(root)] != root:
+      self.reject(500,"path not inside root prefix: "+root)
       return
-      
-    self.wfile.write("200 OK\r\nContent-Type: text/plain\r\n\r\n")
-    jsontxt=self.path[qndx+1:]
+
+    path=path[len(root):]
+    slndx=path.find('/')
+    if slndx < 1 or not path[:slndx].isdigit():
+      self.reject(500,"missing sequence")
+      return
+
+    seq=int(path[:slndx])
+    self.headers['Content-Type']="application/x-javascript\r\n"
+    jsontxt=path[slndx+1:]
+    cmderr("jsontxt0 =", `jsontxt`)
     jsontxt=cs.www.unhexify(jsontxt)
+    cmderr("jsontxt1 =", `jsontxt`)
     (args,unparsed)=cs.hier.tok(jsontxt)
+    cmderr("args =", `args`, "unparsed =", `unparsed`)
     (cb,result)=self.server.rpc(args)
-    self.wfile.write(cb)
-    self.wfile.write("(")
-    self.wfile.write(cs.json.json(result))
-    self.wfile.write(");\r\n")
+    self.wfile.write("%s(%d,%s);\r\n" % (cb,seq,cs.json.json(result)))
