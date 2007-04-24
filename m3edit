@@ -1,6 +1,7 @@
 #!/bin/sh -uex
 #
 # Yet another 3 way merge/edit tool.
+# Dummy edit at home.
 #       - Cameron Simpson <cs@zip.com.au> 24apr2007
 #
 
