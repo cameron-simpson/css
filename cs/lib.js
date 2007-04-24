@@ -31,10 +31,11 @@ if (this._cs_libLoaded) {
 
 }
 
-function _log(str) {
-  if (_logNode != null) {
-    _logNode.appendChild(document.createTextNode(str));
-    _logNode.appendChild(document.createElement("BR"));
+function _log(str,node) {
+  if (node == null) node=_logNode;
+  if (node != null) {
+    node.appendChild(document.createTextNode(str));
+    node.appendChild(document.createElement("BR"));
   }
 }
 function _logTo(elem) {
@@ -68,6 +69,10 @@ function csNodeHere(type) {
   var id = csSeqId();
   document.write("<"+type+" id=\""+id+"\"></"+type+">");
   return document.getElementById(id);
+}
+
+if (!this._cs_libLoaded) {
+  _cs_loadedNode=csNodeHere("SPAN");
 }
 
 function csObjectToString() {
@@ -500,9 +505,9 @@ if (!this._cs_libLoaded) {
   _cs_rpc_dflt_cgi="rpc.cgi";
   _cs_rpc_callbacks={};
   _cs_rpc_nodes={};
-  _cs_rpc_max=2
-  _cs_rpc_running=0
-  _cs_rpc_queue=[]
+  _cs_rpc_max=0;
+  _cs_rpc_running=0;
+  _cs_rpc_queue=[];
 }
 
 function csRPC(jscgiurl,argobj,callback,priority) {
@@ -532,36 +537,40 @@ function csRPCflushQueue() {
     callback=dq[2];
 
     var seq = csSeq();
-    var cbk = seq+"";
+    var cbk = "cb"+seq;
     _cs_rpc_callbacks[cbk]=callback;
     jscgiurl+="/"+seq;
     if (argobj) {
       csStringable(argobj);
-      jscgiurl+="/"+argobj;
+      jscgiurl+="/"+escape(argobj.toString());
     }
 
     var rpc = csNode("SCRIPT");
-    _cs_rpc_nodes[seq]=rpc;
+    _cs_rpc_nodes["node"+seq]=rpc;
     _cs_rpc.appendChild(rpc);
     csRPCdispatch(rpc,jscgiurl);
   }
 }
 
 function csRPCdispatch(scriptnode,url) {
-  //scriptnode.src=url; _log("RPC:"+url);
-  window.window.setTimeout(function(){ scriptnode.src=url; _log("RPC:"+url);}, 1);
+  window.setTimeout(
+        function() {
+          scriptnode.src=url;
+          //_log("RPC:"+url,_cs_loadedNode);
+        }, 1);
 }
 
 function csRPC_doCallback(seq,result) {
+  //_log("doCallback: seq="+seq, _cs_loadedNode);
   if (result == null) {
     _log("RPC CALLBACK: result=null");
   } else {
     csStringable(result);
     var pres = result.toString();
     if (pres.length > 20) pres=pres.substr(0,20)+"...";
-    _log("RPC RETURN SEQ = "+seq+", result="+pres);
+    //_log("RPC RETURN SEQ = "+seq+", result="+pres, _cs_loadedNode);
   }
-  var cbk = seq+"";
+  var cbk = "cb"+seq;
   var cb = _cs_rpc_callbacks[cbk];
   delete _cs_rpc_callbacks[cbk];
   _cs_rpc_running--;
@@ -577,8 +586,8 @@ function csRPC_doCallback(seq,result) {
   csRPCflushQueue();
 
   // drop junk from the document
-  _cs_rpc.removeChild(_cs_rpc_nodes[seq]);
-  delete _cs_rpc_nodes[seq];
+  _cs_rpc.removeChild(_cs_rpc_nodes["node"+seq]);
+  delete _cs_rpc_nodes["node"+seq];
 }
 
 function csRPCbg(jscgiurl,argobj,callback) {
