@@ -572,7 +572,7 @@ function csRPC_doCallback(seq,result) {
   }
   var cbk = "cb"+seq;
   var cb = _cs_rpc_callbacks[cbk];
-  ////lete _cs_rpc_callbacks[cbk];
+  delete _cs_rpc_callbacks[cbk];
   _cs_rpc_running--;
 
   // run the callback
@@ -587,7 +587,7 @@ function csRPC_doCallback(seq,result) {
 
   // drop junk from the document
   _cs_rpc.removeChild(_cs_rpc_nodes["node"+seq]);
-  ////delete _cs_rpc_nodes["node"+seq];
+  delete _cs_rpc_nodes["node"+seq];
 }
 
 function csRPCbg(jscgiurl,argobj,callback) {
