@@ -1,0 +1,50 @@
+#!/bin/sh -ue
+#
+# Do simple things with revision controlled source.
+#       - Cameron Simpson <cs@zip.com.au> 25apr2007
+#
+
+cmd=`basename "$0"`
+usage="usage: $cmd [-V vc] [command [args...]]"
+
+vc=
+
+badopts=
+
+while [ $# -gt 0 ]
+do
+  case "$1" in
+    -V) vc=$2; shift ;;
+    --) shift; break ;;
+    -?*)echo "$cmd: unrecognised option: $1" >&2
+        badopts=1
+        ;;
+    *)  break ;;
+  esac
+  shift
+done
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+if [ -z "$vc" ]
+then
+  if [ -d CVS/. ]
+  then
+    vc=cvs
+  else
+    vc=
+    odir=
+    dir=`pwd`
+    while [ "x$dir" != "x$odir" -a -z "$vc" ]
+    do
+      [ -d "$dir/.hg/." ] && { vc=hg; break; }
+      odir=$dir
+      dir=`dirname "$dir"`
+    done
+  fi
+
+  [ -n "$vc" ] || { echo "$cmd: can't guess vc, aborting" >&2; exit 1; }
+fi
+
+# no args? report vc
+[ $# = 0 ] && exec echo "$vc"
