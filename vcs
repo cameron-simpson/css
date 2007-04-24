@@ -13,7 +13,7 @@ badopts=
 
 while [ $# -gt 0 ]
 do
-  case "$1" in
+  case $1 in
     -V) vc=$2; shift ;;
     --) shift; break ;;
     -?*)echo "$cmd: unrecognised option: $1" >&2
@@ -48,3 +48,22 @@ fi
 
 # no args? report vc
 [ $# = 0 ] && exec echo "$vc"
+
+_cvs()
+{ ( set -x; exec cvs ${1+"$@"} )
+}
+_hg()
+{ ( set -x; exec hg ${1+"$@"} )
+}
+
+op=$1
+shift
+
+case $op in
+  diff)
+    _$vc diff ${1+"$@"} ;;
+  *)
+    echo "$cmd: unsupported command: $op" >&2
+    exit 2
+    ;;
+esac
