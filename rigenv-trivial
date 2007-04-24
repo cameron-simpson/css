@@ -1,5 +1,5 @@
 #!/bin/sh
 [ $# = 0 ] && { echo "Usage: $0 cmd [args...]" >&2; exit 2; }
-PATH=$HOME/scripts:$HOME/scripts/synonyms:$PATH:/sbin:/usr/sbin
+PATH=$HOME/bin:$HOME/bin/synonyms:$PATH:/sbin:/usr/sbin
 export PATH
 exec "$@"

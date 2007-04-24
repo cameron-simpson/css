@@ -24,4 +24,4 @@ host=$1; shift
 		set 'exec $SHELL'
 	      }
 
-eval "exec ssh $sshopts \"\$host\" 'PATH=\$HOME/scripts:\$HOME/bin:/opt/css/bin:/opt/bin:/usr/bin:/bin:$PATH; export PATH; $*'"
+eval "exec ssh $sshopts \"\$host\" 'PATH=\$HOME/bin:\$HOME/bin:/opt/css/bin:/opt/bin:/usr/bin:/bin:$PATH; export PATH; $*'"

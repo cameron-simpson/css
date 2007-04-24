@@ -4,8 +4,8 @@ csHOME=/u/cameron
 
 PERLLIB=$csHOME/etc/pl:$PERLLIB
 PERL5LIB=$csHOME/etc/pl:$PERL5LIB
-PATH=$csHOME/scripts:$PATH
+PATH=$csHOME/bin:$PATH
 export PERLLIB PERL5LIB PATH
 
 cmd=`basename "$0"`
-exec "$csHOME/scripts/$cmd" ${1+"$@"}
+exec "$csHOME/bin/$cmd" ${1+"$@"}

@@ -9,4 +9,4 @@ rsync -avHP --delete --delete-excluded --exclude=CVS/ \
 	--include=search.cgi \
 	--include=search.cgi-pl \
 	--exclude='*' \
-	$HOME/scripts/cgi-bin/. $ezos/cgi-bin/.
+	$HOME/bin/cgi-bin/. $ezos/cgi-bin/.

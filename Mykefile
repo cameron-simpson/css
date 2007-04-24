@@ -37,7 +37,7 @@ _home:
                 --include=cs/ \\
                 --include=stubs/ \\
                 --include=synonyms/ \\
-                --exclude=\*/ \\
+                --exclude=/\*/ \\
                 . $(HOME)/bin/.
 
 _all: squid_redirect 1INDEX.txt _submakes _man _cvslog

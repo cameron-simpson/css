@@ -46,7 +46,7 @@ fi
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
-for wrapdir in .. /opt/css/bin $HOME/scripts
+for wrapdir in .. /opt/css/bin $HOME/bin
 do  wrapper=$wrapdir/cgiwrap-stub
     [ -s "$wrapper" ] && break
     wrapper=

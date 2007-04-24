@@ -1,0 +1,85 @@
+#!/bin/sh -u
+#
+# Log a line to a BOS timesheet.
+#       - Cameron Simpson <cs@zip.com.au> 19feb2007
+#
+
+: ${TMPDIR:=/tmp}
+: ${USER:=`id -un`} || exit 1
+
+cmd=`basename "$0"` || exit 1
+usage="Usage: $cmd [-d datespec] headline"
+
+when=
+tsdir=/home/cskk/bos/timesheets
+
+badopts=
+
+while [ $# -gt 0 ]
+do
+  case "$1" in
+    -d) when=$2; shift ;;
+    --) shift; break ;;
+    -?*)echo "$cmd: unexpected argument: $1" >&2
+        badopts=1
+        ;;
+    *)  break ;;
+  esac
+  shift
+done
+
+if [ $# = 0 ]
+then
+  echo "$cmd: missing headline" >&2
+  badopts=1
+else
+  headline=$*
+fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+cd "$tsdir" || exit 1
+pwd
+[ -d .bak ] || mkdir .bak || exit 1
+
+now=`datecode`                      || exit 1
+wday=`date -d "$when" +%A`          || exit 1
+hhmm=`date -d "$when" +%H:%M`       || exit 1
+monday=`monday "$when"`             || exit 1
+tsfile=ts$monday
+
+tmpf=$TMPDIR/$cmd.$$
+trap 'rm -f "$tmpf"' 0 1 2 13 15
+printf "%s\n" "$headline" >>"$tmpf"        || exit 1
+bsed -s "s/^/      $hhmm $USER: /" "$tmpf" || exit 1
+cat "$tmpf"
+
+if [ ! -s "$tsfile" ]
+then
+  echo "Creating $tsdir/$tsfile ..."
+  ( date -d "$monday" '+%d.%m.%Y' || exit 1
+    cat .template
+  ) >>"$tsfile"      || exit 1
+fi
+
+cp -i "$tsfile" ".bak/$tsfile-$now" || exit 1
+
+bsed -s \
+ "
+  :top
+  /^  $wday\$/b today
+  p
+  d
+  :today
+  /^ *\$/{
+    s/.*\\n//
+    r $tmpf
+    a\\
+
+    d
+  }
+  n
+  b today
+ " "$tsfile" || exit 1
+
+grep "^  $wday\$" "$tsfile" >/dev/null || { echo "$cmd: WARNING: no $wday in $tsdir/$tsfile"; exit 1; }

@@ -7,7 +7,7 @@
 # STUBURL envvar for image.			- cameron, 02apr99
 #
 
-script=$HOME/scripts/squid_redirect
+script=$HOME/bin/squid_redirect
 patterns=$HOME/rc/noads
 zappedad=http://web/ad-zap.gif
 them='alan@fromorbit.com jar@rmb.com.au cs@zip.com.au'
