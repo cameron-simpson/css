@@ -1,9 +1,0 @@
-#!/usr/bin/perl
-#
-# Inscribe text on an image.
-#	- Cameron Simpson <cs@zip.com.au> 13sep2000
-#
-
-use GD;
-
-
