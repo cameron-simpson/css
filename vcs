@@ -4,6 +4,9 @@
 #       - Cameron Simpson <cs@zip.com.au> 25apr2007
 #
 
+: ${TMPDIR:=/tmp}
+: ${EDITOR:=vi}
+
 cmd=`basename "$0"`
 usage="usage: $cmd [-V vc] [command [args...]]"
 
@@ -50,7 +53,7 @@ fi
 [ $# = 0 ] && exec echo "$vc"
 
 _cvs()
-{ ( set -x; exec cvs ${1+"$@"} )
+{ ( set -x; exec cvs -q ${1+"$@"} )
 }
 _hg()
 { ( set -x; exec hg ${1+"$@"} )
@@ -59,9 +62,52 @@ _hg()
 op=$1
 shift
 
+tmpbase=$TMPDIR/$cmd.$$
+trap 'rm -f "$tmpbase".*' 0 1 2 13 15
+
 case $op in
   diff)
     _$vc diff ${1+"$@"} ;;
+
+  commit)
+    diffs=$tmpbase.diffs
+    if [ $# = 0 ]
+    then  files=`"$0" manifest`
+    else  files=$*
+    fi
+    _$vc diff >"$diffs"
+    [ -s "$diffs" ] || { echo "No diffs."
+                         echo "Listing opening comments of named files."
+                         echo
+                         for f in $files
+                         do  sed "/^#/!{d;q}; s;^;$f:;" "$f"
+                         done
+                       } >>"$diffs"
+    diffpfx=`echo "$vc" | tr '[a-z]' '[A-Z]'`' '
+    bsed -q "s;^;$diffpfx;" "$diffs"
+
+
+    VCS_COMMIT_DIFFS=$diffs
+    VCS_COMMIT_EDITOR=$EDITOR
+    VCS_COMMIT_FILES=$files
+    VCS_COMMIT_PREFIX=$diffpfx
+    EDITOR=$0-commit-editor
+    export EDITOR VCS_COMMIT_DIFFS VCS_COMMIT_EDITOR VCS_COMMIT_FILES VCS_COMMIT_PREFIX
+    _$vc commit ${1+"$@"}
+    ;;
+
+  manifest)
+    case $vc in
+      hg)
+        _hg manifest
+        ;;
+
+      *)
+        echo "$cmd: unsupported manifest for VC $vc" >&2
+        exit 1
+        ;;
+    esac
+    ;;
   *)
     echo "$cmd: unsupported command: $op" >&2
     exit 2
