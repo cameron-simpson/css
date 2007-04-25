@@ -1,4 +1,4 @@
-#!/bin/sh -ue
+#!/bin/sh -uex
 #
 # Do simple things with revision controlled source.
 #       - Cameron Simpson <cs@zip.com.au> 25apr2007
@@ -84,7 +84,7 @@ case $op in
                          done
                        } >>"$diffs"
     diffpfx=`echo "$vc" | tr '[a-z]' '[A-Z]'`' '
-    bsed -q "s;^;$diffpfx;" "$diffs"
+    bsed -s "s;^;$diffpfx;" "$diffs"
 
 
     VCS_COMMIT_DIFFS=$diffs

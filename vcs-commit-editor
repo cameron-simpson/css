@@ -16,19 +16,23 @@ cat "$VCS_COMMIT_DIFFS" >>"$report"
 EDITOR=$VCS_COMMIT_EDITOR
 export EDITOR
 
-$EDITOR "$report" || exit 1
+xit=0
 
-# toss blank lines and CVS: comments
-bsed -s "/^$VCS_COMMIT_PREFIX */d; /^[ 	]*\$/d" "$report"
-
-if [ -s "$report" ]
+if $EDITOR "$report"
 then
-    headline=`sed 1q "$report"`
-    ( cat "$report"
-      echo
-      cat "$VCS_COMMIT_DIFFS"
-    ) \
-    | buglog "commit: $headline" &
+  # toss blank lines and CVS: comments
+  bsed -s "/^$VCS_COMMIT_PREFIX */d; /^[ 	]*\$/d" "$report" || xit=1
+  if [ -s "$report" ]
+  then
+      headline=`sed 1q "$report"`
+      ( cat "$report"
+        echo
+        cat "$VCS_COMMIT_DIFFS"
+      ) \
+      | buglog "commit: $headline" &
+  fi
+else
+  xit=1
 fi
 
 exit $xit
