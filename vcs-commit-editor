@@ -18,6 +18,7 @@ export EDITOR
 
 xit=0
 
+exec 2>>~/err.out
 set -x
 if $EDITOR "$report"
 then
