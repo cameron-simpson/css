@@ -18,6 +18,7 @@ export EDITOR
 
 xit=0
 
+set -x
 if $EDITOR "$report"
 then
   # toss blank lines and CVS: comments

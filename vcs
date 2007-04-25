@@ -70,11 +70,12 @@ case $op in
     _$vc diff ${1+"$@"} ;;
 
   commit)
-    diffs=$tmpbase.diffs
     if [ $# = 0 ]
     then  files=`"$0" manifest`
     else  files=$*
     fi
+
+    diffs=$tmpbase.diffs
     _$vc diff >"$diffs"
     [ -s "$diffs" ] || { echo "No diffs."
                          echo "Listing opening comments of named files."
