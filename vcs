@@ -1,4 +1,4 @@
-#!/bin/sh -uex
+#!/bin/sh -ue
 #
 # Do simple things with revision controlled source.
 #       - Cameron Simpson <cs@zip.com.au> 25apr2007

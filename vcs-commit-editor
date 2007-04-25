@@ -1,4 +1,4 @@
-#!/bin/sh -uex
+#!/bin/sh -ue
 #
 # Wrapper for $EDITOR for vcs commits to append the changes for inquisition
 # while composing the change report.
