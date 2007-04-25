@@ -1,0 +1,40 @@
+#!/bin/sh -ue
+#
+# Wrapper for $EDITOR for vcs commits to append the changes for inquisition
+# while composing the change report.
+#	- Cameron Simpson <cs@zip.com.au> 09mar2002
+#
+
+cmd=$0
+usage="usage: $cmd editfile"
+
+report=$1
+shift
+
+cat "$VCS_COMMIT_DIFFS" >>"$report"
+
+EDITOR=$VCS_COMMIT_EDITOR
+export EDITOR
+
+xit=0
+
+set -x
+if $EDITOR "$report"
+then
+  # toss blank lines and CVS: comments
+  bsed -s "/^$VCS_COMMIT_PREFIX */d; /^[ 	]*\$/d" "$report" || xit=1
+  if [ -s "$report" ]
+  then
+      headline=`sed 1q "$report"`
+      ( cat "$report"
+        echo
+        cat "$VCS_COMMIT_DIFFS"
+      ) \
+      | buglog "commit: $headline" &
+  fi
+else
+  xit=1
+fi
+
+exit $xit
+
