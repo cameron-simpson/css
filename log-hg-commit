@@ -1,0 +1,11 @@
+#!/bin/sh -ue
+#
+# Record a Mercurial commit.
+#       - Cameron Simpson <cs@zip.com.au> 25apr2007
+#
+
+hg log -r "$HGNODE" --limit 1 \
+| sed '1,/^description:/d; s/\t/ /g; s/\r$//; /^ *$/d' \
+| { read -r headline
+    exec buglog "commit $HGNODE: $headline"
+  }
