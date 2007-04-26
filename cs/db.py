@@ -225,6 +225,10 @@ class DirectKeyedTableView:
       sql=sql+' WHERE '+where
     return [tuple(row) for row in SQLQuery(self.conn, sql)]
 
+  def __iter__(self):
+    for k in self.keys():
+      yield self[k]
+
   def __getitem__(self,key):
     return DirectTableRow(self,self.selectRowByKey(key))
 
@@ -438,8 +442,12 @@ class SingleKeyTableView(KeyedTableView):
   def keys(self):
     return [k[0] for k in KeyedTableView.keys(self)]
 
+  def __iter__(self):
+    for k in self.keys():
+      yield self[k]
+
   def __getitem__(self,key):
-    debug("SingleKeyTableView.__getitem__: key =", `key`)
+    ##debug("SingleKeyTableView.__getitem__: key =", `key`)
     return KeyedTableView.__getitem__(self,(key,))
 
   def __contains__(self,key):
