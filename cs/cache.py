@@ -27,6 +27,10 @@ class Cache:
     self.__hits=0
     self.__misses=0
     self.__xrefs=[]
+    self.__preloaded=False
+
+  def preloaded(self,status=True):
+    self.__preloaded=status
 
   def addCrossReference(self,xref):
     self.__xrefs.append(xref)
@@ -54,6 +58,8 @@ class Cache:
     self.__seq+=1
 
   def keys(self):
+    if self.__preloaded:
+      return self.__cache.keys()
     return self.__backend.keys()
 
   def getitems(self,keylist):
