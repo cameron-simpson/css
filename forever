@@ -1,0 +1,63 @@
+#!/bin/sh -ue
+#
+# Run a command forever, optionally until failure.
+#       - Cameron Simpson <cs@zip.com.au> 27apr2007
+#
+
+cmd=`basename "$0"`
+usage="Usage: $cmd [-d delay] [-e] [-n num] command [args...]
+  -d delay      Delay this many seconds before the next invocation.
+  -e            Exit on error.
+  -n num        Run this many times. Default: forever.
+  -x            Trace execution."
+
+delay=0
+failok=1
+max=0
+dotrace=
+
+badopts=
+
+while [ $# -gt 0 ]
+do
+  case $1 in
+    -d) delay=$2; shift ;;
+    -e) failok= ;;
+    -n) max=$2; shift ;;
+    -x) dotrace=1 ;;
+    --) shift; break ;;
+    -?*)echo "$cmd: unrecognised option: $1" >&2
+        badopts=1
+        ;;
+    *)  break ;;
+  esac
+  shift
+done
+
+[ $# -gt 0 ] || { echo "$cmd: missing command" >&2
+                  badopts=1
+                }
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+n=0
+while :
+do
+  ( set +e
+    [ $dotrace ] && set -x
+    exec "$@"
+  ) \
+  || [ $failok ] \
+  || exit 1
+
+  if [ "x$max" != x0 ]
+  then
+    n=`expr $n + 1`
+    [ "$n" -lt "$max" ] || exit 0
+  fi
+
+  [ "x$delay" = x0 ] || ( set +e
+                          [ $dotrace ] && set -x
+                          exec sleep "$delay"
+                        )
+done
