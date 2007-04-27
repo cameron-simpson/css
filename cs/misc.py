@@ -10,6 +10,7 @@ from cs.lex import parseline, strlist
 
 cmd=os.path.basename(sys.argv[0])
 cmd_=cmd+':'
+cmd__=cmd_+' '
 
 # print to stderr
 def warn(*args):
@@ -93,12 +94,29 @@ def out(*args):
 
 def cmderr(*args):
   global cmd_
-  sys.stderr.write(cmd)
-  sys.stderr.write(": ")
   warn(*[cmd_]+list(args))
 
 def die(*args):
   assert False, strlist(args," ")
+
+def tb():
+  import traceback
+  import cs.upd
+  global cmd_
+  if cs.upd.active:
+    upd=cs.upd.default()
+    oldUpd=upd.state()
+    upd.out('')
+
+  for elem in traceback.format_list(traceback.extract_stack())[:-1]:
+    for line in elem.split("\n"):
+      if len(line) > 0:
+        sys.stderr.write(cmd__)
+        sys.stderr.write(line)
+        sys.stderr.write("\n")
+
+  if cs.upd.active:
+    upd.out(oldUpd)
 
 _seq=0
 def seq():
