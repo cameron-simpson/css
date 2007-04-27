@@ -4,17 +4,21 @@
 #       - Cameron Simpson <cs@zip.com.au> 27apr2007
 #
 
+: ${VARRUN:=$HOME/var/run}
+
 cmd=`basename "$0"`
 usage="Usage: $cmd [-d delay] [-e] [-n num] command [args...]
   -d delay      Delay this many seconds before the next invocation.
   -e            Exit on error.
   -n num        Run this many times. Default: forever.
+  -p pidfile    Record main pid in file.
   -x            Trace execution."
 
 delay=0
 failok=1
 max=0
 dotrace=
+pidfile=
 
 badopts=
 
@@ -24,6 +28,12 @@ do
     -d) delay=$2; shift ;;
     -e) failok= ;;
     -n) max=$2; shift ;;
+    -p) pidfile=$2; shift
+        case $pidfile in
+          /* | ./* ) ;;
+          *)    pidfile=$VARRUN/$pidfile ;;
+        esac
+        ;;
     -x) dotrace=1 ;;
     --) shift; break ;;
     -?*)echo "$cmd: unrecognised option: $1" >&2
@@ -40,6 +50,12 @@ done
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
+if [ -n "$pidfile" ]
+then
+  echo $$ >"$pidfile"
+fi
+
+subpid=
 n=0
 while :
 do

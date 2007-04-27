@@ -1,20 +1,19 @@
-#!/bin/sh
+#!/bin/sh -ue
 #
 # Establish ssh tunnels as needed.
 #	- Cameron Simpson <cs@zip.com.au> 05may2004
 #
 
-case "$HOST.$SYSTEMID@$LOCATION" in
-  newt.home@cisra|kirsty.home@cisra|zoob.home@cisra)
-    ##tcpio -a work.local:6001 rnc -l cisra -u sshtunnels -i /home/sshtunnels/.ssh/2x11 kaper localhost x11 &
-    alog alert lock -1 kaper-alert-log ssh kaper tail -f var/log/alert
-    envssh -f peter env DISPLAY=$HOST:0 xddts
-    ;;
+: ${LOCATION:=$SYSTEMID}
+
+case $HOST@$LOCATION in
+  $HOMEHOST@home) ;;
+  *@home)       dest=$HOMEHOST ;;
+  *)            dest=home ;;
 esac
 
-case "$HOST.$SYSTEMID" in
-  zoob.home)
-    alog alert lock -1 janus-alert-log ssh home.local exec tail -f var/log/alert ;;
-  *)
-    alog alert lock -1 janus-alert-log ssh home exec tail -f var/log/alert ;;
-esac
+exec \
+  alog alert \
+    lock -1 home-alert-log \
+      forever -p portfwd -d 10 \
+        ssh "$dest" exec tail -f var/log/alert
