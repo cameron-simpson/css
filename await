@@ -1,88 +1,9 @@
 #!/bin/sh
 #
 # Await some condition, then exit.
-#	- Cameron Simpson, 05nov93
+#	- Cameron Simpson, 05nov1993
+#
+# Turned into wrapper for forever.
 #
 
-period=10
-
-cmd=`basename "$0"`
-usage="Usage: $cmd [period] [-s] [-x] {[-e] command | -c command} [args...]
-	period	Number of seconds between tests (default $period).
-	!	Not. Wait for the test to fail.
-	-s	Silent. Redirect command's output to /dev/null.
-	-m max	Maximum number of tests before giving up.
-	-x	Trace execution of tests.
-	-e command [args]
-		Run command with arguments as test.
-	-c command
-		Run shell command as test.
-	args...	Arguments for -e or \$* for -c."
-
-exec 9>&1	# will be stdout for subcommand
-
-badopts=
-execargs=
-shellcmd=
-not=
-x=:
-max=0
-while :
-do
-    case "$1" in
-	[1-9]|[1-9][0-9]|[1-9][0-9][0-9]|[1-9][0-9][0-9][0-9])
-	    period=$1 ;;
-	!)  not=1 ;;
-	--) shift; break ;;
-	-e) execargs=1; shift; break ;;
-	-c) shellcmd=$2; shift; shift; break ;;
-	-s) exec 9>/dev/null ;;
-	-m) max=$2; shift ;;
-	-x) x='set -x' ;;
-	-*) echo "$cmd: $1: unrecognised option" >&2
-	    badopts=1
-	    ;;
-	*)  execargs=1; break ;;
-    esac
-    shift
-done
-
-[ $execargs ] && [ $# -lt 1 ] && { echo "$cmd: missing command" >&2
-				   badopts=1
-				 }
-
-[ $badopts ] && { echo "$usage" >&2; exit 2; }
-
-sleepfor=1	# initial sleep is just 1 second
-undone=$max
-while :
-do
-    ok=
-    if [ $execargs ]
-    then
-	( exec >&9 9>&-
-	  $x
-	  exec "$@"
-	) && ok=1
-    else
-	( exec >&9 9>&-
-	  eval "$x; $shellcmd"
-	) && ok=1
-    fi
-    case "$not,$ok" in
-	,1)	break ;;
-	1,)	break ;;
-    esac
-    case "$undone" in
-	0)	;;
-	1)	echo "$cmd: giving up after $max attempts" >&2
-		exit 1
-		;;
-	*)	undone=`exec expr $undone - 1` || exit $?
-		;;
-    esac
-    sleep $sleepfor || { echo "$cmd: sleep returns $?" >&2; exit 1; }
-    sleepfor=$period
-done
-
-exit 0
+exec forever -E '!' ${1+"$@"}
