@@ -11,7 +11,7 @@ bytable=
 dfltport=3306
 
 cmd=`basename "$0"` || cmd=$0
-usage="Usage: $cmd [-T] [-x] src dst [databases...]
+usage="Usage: $cmd [-q] [-T] [-x] src dst [databases...]
   -q    Execute quietly.
         Default is to do nothing, and recite a plan of action.
   -T    Do a table based copy.
@@ -66,79 +66,85 @@ else
   shift
 fi
 
-case "$src" in
-  /*)
-    unset src_user src_password src_host src_port src_socket
-    [ -d "$src/." ] || { echo "$cmd: $src: not a directory" >&2; badopts=1; }
-    ;;
-  *:*@*)
-    src_upart=`   expr "x$src" : 'x\(.*\)@.*'` || exit 1
-    src_hpart=`   expr "x$src" : 'x.*@\(.*\)'` || exit 1
-    src_user=`    expr "x$src_upart" : 'x\([^:]*\):.*'` || exit 1
-    src_password=`expr "x$src_upart" : 'x[^:]*:\(.*\)'` || exit 1
-    src_socket=
-    src_host=
-    src_port=
-    case "$src_hpart" in
-      /*)
-        src_socket=$src_hpart
-        ;;
-      *:*)
-        src_host=`expr "x$src_hpart" : 'x\(.*\):.*'` || exit 1
-        src_port=`expr "x$src_hpart" : 'x.*:\(.*\)'` || exit 1
-        ;;
-      *)src_host=$src_hpart
-        src_port=$dfltport
-        ;;
-    esac
-    ;;
-  *)
-    src_secret=`secret "$src"` || exit 1
-    eval "$src_secret"
-    src_user=$secretLOGIN
-    src_password=$secretPASSWORD
-    src_host=${secretHOST:-''}
-    src_port=${secretPORT:-$dfltport}
-    src_socket=${secretSOCKET:-''}
-    ;;
-esac
+if [ -n "${src:-}" ]
+then
+  case $src in
+    /*)
+      unset src_user src_password src_host src_port src_socket
+      [ -d "$src/." ] || { echo "$cmd: $src: not a directory" >&2; badopts=1; }
+      ;;
+    *:*@*)
+      src_upart=`   expr "x$src" : 'x\(.*\)@.*'` || exit 1
+      src_hpart=`   expr "x$src" : 'x.*@\(.*\)'` || exit 1
+      src_user=`    expr "x$src_upart" : 'x\([^:]*\):.*'` || exit 1
+      src_password=`expr "x$src_upart" : 'x[^:]*:\(.*\)'` || exit 1
+      src_socket=
+      src_host=
+      src_port=
+      case "$src_hpart" in
+        /*)
+          src_socket=$src_hpart
+          ;;
+        *:*)
+          src_host=`expr "x$src_hpart" : 'x\(.*\):.*'` || exit 1
+          src_port=`expr "x$src_hpart" : 'x.*:\(.*\)'` || exit 1
+          ;;
+        *)src_host=$src_hpart
+          src_port=$dfltport
+          ;;
+      esac
+      ;;
+    *)
+      src_secret=`secret "$src"` || exit 1
+      eval "$src_secret"
+      src_user=$secretLOGIN
+      src_password=$secretPASSWORD
+      src_host=${secretHOST:-''}
+      src_port=${secretPORT:-$dfltport}
+      src_socket=${secretSOCKET:-''}
+      ;;
+  esac
+fi
 
-case "$dst" in
-  /*)
-    unset dst_user dst_password dst_host dst_port dst_socket
-    [ -d "$dst/." ] || { echo "$cmd: $dst: not a directory" >&2; badopts=1; }
-    ;;
-  *:*@*)
-    dst_upart=`   expr "x$dst" : 'x\(.*\)@.*'` || exit 1
-    dst_hpart=`   expr "x$dst" : 'x.*@\(.*\)'` || exit 1
-    dst_user=`    expr "x$dst_upart" : 'x\([^:]*\):.*'` || exit 1
-    dst_password=`expr "x$dst_upart" : 'x[^:]*:\(.*\)'` || exit 1
-    dst_socket=
-    dst_host=
-    dst_port=
-    case "$dst_hpart" in
-      /*)
-        dst_socket=$dst_hpart
-        ;;
-      *:*)
-        dst_host=`expr "x$dst_hpart" : 'x\(.*\):.*'` || exit 1
-        dst_port=`expr "x$dst_hpart" : 'x.*:\(.*\)'` || exit 1
-        ;;
-      *)dst_host=$dst_hpart
-        dst_port=$dfltport
-        ;;
-    esac
-    ;;
-  *)
-    dst_secret=`secret "$dst"` || exit 1
-    eval "$dst_secret"
-    dst_user=$secretLOGIN
-    dst_password=$secretPASSWORD
-    dst_host=${secretHOST:-''}
-    dst_port=${secretPORT:-$dfltport}
-    dst_socket=${secretSOCKET:-''}
-    ;;
-esac
+if [ -n "${dst:-}" ]
+then
+  case $dst in
+    /*)
+      unset dst_user dst_password dst_host dst_port dst_socket
+      [ -d "$dst/." ] || { echo "$cmd: $dst: not a directory" >&2; badopts=1; }
+      ;;
+    *:*@*)
+      dst_upart=`   expr "x$dst" : 'x\(.*\)@.*'` || exit 1
+      dst_hpart=`   expr "x$dst" : 'x.*@\(.*\)'` || exit 1
+      dst_user=`    expr "x$dst_upart" : 'x\([^:]*\):.*'` || exit 1
+      dst_password=`expr "x$dst_upart" : 'x[^:]*:\(.*\)'` || exit 1
+      dst_socket=
+      dst_host=
+      dst_port=
+      case "$dst_hpart" in
+        /*)
+          dst_socket=$dst_hpart
+          ;;
+        *:*)
+          dst_host=`expr "x$dst_hpart" : 'x\(.*\):.*'` || exit 1
+          dst_port=`expr "x$dst_hpart" : 'x.*:\(.*\)'` || exit 1
+          ;;
+        *)dst_host=$dst_hpart
+          dst_port=$dfltport
+          ;;
+      esac
+      ;;
+    *)
+      dst_secret=`secret "$dst"` || exit 1
+      eval "$dst_secret"
+      dst_user=$secretLOGIN
+      dst_password=$secretPASSWORD
+      dst_host=${secretHOST:-''}
+      dst_port=${secretPORT:-$dfltport}
+      dst_socket=${secretSOCKET:-''}
+      ;;
+  esac
+fi
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
