@@ -78,8 +78,6 @@ class RawStore(dict):
     if h in self:
       verbose(self.__path,"already contains",hex(h))
     else:
-      print "new block", hex(h)
-      print "["+block+"]"
       zblock=compress(block)
       self.__fp.seek(0,2)
       self.__fp.write(str(len(zblock)))
@@ -120,12 +118,23 @@ class RawStore(dict):
   def blocksink(self):
     return BlockSink(self)
 
+  def datasink(self):
+    return Sink(self)
+
   def cat(self,h,fp=None):
     if fp is None:
       import sys
       fp=sys.stdout
     for block in self.blocklist(h):
       fp.write(block)
+
+  def storeFile(self,fp):
+    sink=self.datasink()
+    buf=fp.read()
+    while len(buf) > 0:
+      sink.write(buf)
+      buf=fp.read()
+    return sink.close()
 
 class Store(RawStore):
   pass
@@ -279,12 +288,15 @@ class CodeDataSink(ManualDataSink):
       if found > MAX_BLOCKSIZE:
         return MAX_BLOCKSIZE
 
-      # python top level things
-      if q[found+1:found+5] == "def " \
-      or q[found+1:found+7] == "class ":
+      # UNIX mbox file
+      # python/perl top level things
+      if q[found+1:found:6] == "From " \
+      or q[found+1:found+5] == "def " \
+      or q[found+1:found+7] == "class " \
+      or q[found+1:found+9] == "package ":
         return found+1
 
-      # C/C++ etc end of function
+      # C/C++/perl etc end of function
       if q[found+1:found+3] == "}\n":
         return found+3
 
@@ -292,3 +304,6 @@ class CodeDataSink(ManualDataSink):
       found=q.find('\n',start)
 
     return 0
+
+class Sink(CodeDataSink):
+  pass
