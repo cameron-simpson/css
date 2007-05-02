@@ -19,6 +19,8 @@ from zlib import compress, decompress
 ## NOTE: migrate to hashlib sometime when python 2.5 more common
 import sha
 from cs.misc import warn, progress, verbose
+import cs.hier
+from cs.lex import unctrl
 
 def hash_sha(block):
   ''' Returns the SHA-1 checksum for the supplied block.
@@ -70,7 +72,7 @@ class RawStore(dict):
   def store(self,block):
     h=self.hash(block)
     if h in self:
-      progress(self.__path,"already contains",hex(h))
+      verbose(self.__path,"already contains",hex(h))
     else:
       zblock=compress(block)
       self.__fp.seek(0,2)
@@ -108,6 +110,92 @@ class RawStore(dict):
 
 class Store(RawStore):
   pass
+
+MAX_SUBBLOCKS=16
+
+class BlockList:
+  def __init__(self,S,h=None):
+    self.__store=S
+    self.__blocks=[]
+    if h is not None:
+      print "load iblock: h =", hex(h)
+      iblock=S[h]
+      while len(iblock) > 0:
+        isIndirect=bool(ord(iblock[0]))
+        hlen=ord(iblock[1])
+        h=iblock[2:2+hlen]
+        print "load: indir = %s (%d) %s" %(`isIndirect`, ord(iblock[0]), hex(h))
+        self.append(h,isIndirect)
+        iblock=iblock[2+hlen:]
+
+  def __len__(self):
+    return len(self.__blocks)
+
+  def append(self,h,isIndirect):
+    self.__blocks.append((isIndirect,h))
+
+  def __getitem__(self,i):
+    return self.__blocks[i]
+
+  def pack(self):
+    ##warn("pack", cs.hier.h2a(self.__blocks))
+    return "".join([chr(int(sb[0]))+chr(len(sb[1]))+sb[1] for sb in self.__blocks])
+
+  def __iter__(self):
+    S=self.__store
+    for (isIndirect,h) in self.__blocks:
+      if isIndirect:
+        for subblock in BlockList(S,h):
+          yield subblock
+      else:
+        yield S[h]
+
+class BlockSink:
+  def __init__(self,S):
+    self.__store=S
+    self.__lists=[BlockList(S)]
+  
+  def append(self,block,isIndirect=False):
+    S=self.__store
+    level=0
+    h0=h=S.store(block)
+    while True:
+      bl=self.__lists[level]
+      ##print "append: bl =", `bl`
+      if len(bl) < MAX_SUBBLOCKS:
+        bl.append(h,isIndirect)
+        return h0
+
+      # pack up full block for storage at next indirection level
+      fullblock=bl.pack()
+      # prepare fresh empty block at this level
+      bl=self.__lists[level]=BlockList(S)
+      # store the current block in the fresh indirect block
+      bl.append(h,isIndirect)
+      # advance to the next level of indirection and repeat
+      # to store the full indirect block
+      level+=1
+      isIndirect=True
+      block=fullblock
+      h=S.store(block)
+      if level == len(self.__lists):
+        print "new indir level", level
+        self.__lists.append(BlockList(S))
+
+  def close(self):
+    ''' Store all the outstanding indirect blocks.
+        Return the hash of the top level block.
+    '''
+    S=self.__store
+    # record the lower level indirect blocks in their parents
+    while len(self.__lists) > 1:
+      bl=self.__lists.pop(0)
+      self.append(bl.pack(),True)
+
+    # stash and return the topmost indirect block
+    h=S.store(self.__lists[0].pack())
+    self.__lists=None
+    return h
 
 class _Sink:
   ''' A File-like class that supplies only write, close, flush.
