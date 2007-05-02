@@ -22,6 +22,10 @@ from cs.misc import warn, progress, verbose
 import cs.hier
 from cs.lex import unctrl
 
+HASH_SIZE=20    # size of SHA-1 hash
+MAX_BLOCKSIZE=65536
+MAX_SUBBLOCKS=MAX_BLOCKSIZE/(HASH_SIZE+2)
+
 def hash_sha(block):
   ''' Returns the SHA-1 checksum for the supplied block.
   '''
@@ -74,6 +78,8 @@ class RawStore(dict):
     if h in self:
       verbose(self.__path,"already contains",hex(h))
     else:
+      print "new block", hex(h)
+      print "["+block+"]"
       zblock=compress(block)
       self.__fp.seek(0,2)
       self.__fp.write(str(len(zblock)))
@@ -108,23 +114,32 @@ class RawStore(dict):
     assert number.isdigit()
     return (fp.tell(), int(number))
 
+  def blocklist(self,h=None):
+    return BlockList(self,h)
+
+  def blocksink(self):
+    return BlockSink(self)
+
+  def cat(self,h,fp=None):
+    if fp is None:
+      import sys
+      fp=sys.stdout
+    for block in self.blocklist(h):
+      fp.write(block)
+
 class Store(RawStore):
   pass
-
-MAX_SUBBLOCKS=16
 
 class BlockList:
   def __init__(self,S,h=None):
     self.__store=S
     self.__blocks=[]
     if h is not None:
-      print "load iblock: h =", hex(h)
       iblock=S[h]
       while len(iblock) > 0:
         isIndirect=bool(ord(iblock[0]))
         hlen=ord(iblock[1])
         h=iblock[2:2+hlen]
-        print "load: indir = %s (%d) %s" %(`isIndirect`, ord(iblock[0]), hex(h))
         self.append(h,isIndirect)
         iblock=iblock[2+hlen:]
 
@@ -138,8 +153,10 @@ class BlockList:
     return self.__blocks[i]
 
   def pack(self):
-    ##warn("pack", cs.hier.h2a(self.__blocks))
-    return "".join([chr(int(sb[0]))+chr(len(sb[1]))+sb[1] for sb in self.__blocks])
+    return "".join( [ chr(int(sb[0]))+chr(len(sb[1]))+sb[1] 
+                      for sb in self.__blocks
+                    ]
+                  )
 
   def __iter__(self):
     S=self.__store
@@ -197,7 +214,7 @@ class BlockSink:
     self.__lists=None
     return h
 
-class _Sink:
+class ManualDataSink:
   ''' A File-like class that supplies only write, close, flush.
       Returned by the sink() method of Store.
       Write(), close() and flush() return the hash code for flushed data.
@@ -205,73 +222,73 @@ class _Sink:
       flushes some data and returns the hash.
       Flush() may return None if there is no queued data.
   '''
-  def __init__(self,store):
+  def __init__(self,S):
     ''' Arguments: fp, the writable File object to encapsulate.
-                   store, a cs.venti.Store compatible object.
+                   S, a cs.venti.Store compatible object.
     '''
-    self.__store=store
-    self.__q=''
+    self.__bsink=S.blocksink()
+    self._q=''
 
   def close(self):
     ''' Close the file. Return the hash code of the unreported data.
     '''
-    return self.flush()
+    self.flush()
+    return self.__bsink.close()
 
   def write(self,data):
     ''' Queue data for writing.
     '''
-    self.__q+=data
-    return None
+    self._q+=data
+
+    # flush complete blocks to the store
+    edgendx=self.findEdge()
+    while edgendx > 0:
+      self.__bsink.append(self._q[:edgendx])
+      self._q=self._q[edgendx:]
+      edgendx=self.findEdge()
+
+  def findEdge(self):
+    ''' Return offset of next block start, if present.
+    '''
+    global MAX_BLOCKSIZE
+    if len(self._q) >= MAX_BLOCKSIZE:
+      return MAX_BLOCKSIZE
+    return 0
 
   def flush(self):
     ''' Like flush(), but returns the hash code of the data since the last
         flush. It may return None if there is nothing to flush.
     '''
-    if len(self.__q) == 0:
+    if len(self._q) == 0:
       return None
 
-    hash=self.__store.store(self.__q)
-    self.__q=''
-    return hash
+    h=self.__bsink.append(self._q)
+    self._q=''
+    return h
 
-class SaveFile:
-  ''' A File-like class for serialising data to the store as a "file".
-      It only supports write() and close().
-      close() returns the hash of the top indirect block.
-  ''' 
-  def __init__(self,store,findEdge=None):
-    if findEdge is None: findEdge=self.__findEdge
-    self.__store=store
-    self.__findEdge=self.__dfltFindEdge
-    self.__q=''
-  def __dfltFindEdge(self,buf):
-    if len(buf) >= DFLT_BUF:
-      return DFLT_BUF
-    return -1
-  def NO_FIND_EDGE(self):
-    ''' Edge function to completely disable automatic edge finding.
-    '''
-    return -1
-  def write(self,data):
-    ''' Queue data for the store.
-    '''
-    self.__q+=data
-    edge=self.__findEdge(self.__q)
-    assert edge != 0, "edge function should never return 0; return -1 for 'no edge'"
-    if edge >= 0:
-      newhash=self.__store.store(self.__q[:edge])
-      self.__appendHash(newhash)
-      self.__q=self.__q[edge:]
+# make patch friendly blocks
+class CodeDataSink(ManualDataSink):
+  def __init__(self,S):
+    ManualDataSink.__init__(self,S)
 
-def stashCode(store,fp):
-  ''' Save C-like or Python-like code to the block store as a file.
-      Returns the hash to the top indirect block.
-  '''
-  S=store.fileSink()
-  for line in fp:
-    if line[:4] == "def " or line[:6] == "class ":
-      S.flush()
-    S.write(line)
-    if line[0] == "}":
-      S.flush()
-  return S.close()
+  def findEdge(self):
+    q=self._q
+    start=0
+    found=q.find('\n')
+    while found >= 0:
+      if found > MAX_BLOCKSIZE:
+        return MAX_BLOCKSIZE
+
+      # python top level things
+      if q[found+1:found+5] == "def " \
+      or q[found+1:found+7] == "class ":
+        return found+1
+
+      # C/C++ etc end of function
+      if q[found+1:found+3] == "}\n":
+        return found+3
+
+      start=found+1
+      found=q.find('\n',start)
+
+    return 0
