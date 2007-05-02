@@ -63,10 +63,8 @@ class RawStore(dict):
 
   def __getitem__(self,key):
     v=dict.__getitem__(self,key)
-    if v[2] is None:
-      self.__fp.seek(v[0])
-      v[2]=decompress(self.__fp.read(v[1]))
-    return v[2]
+    self.__fp.seek(v[0])
+    return decompress(self.__fp.read(v[1]))
 
   def hash(self,block):
     ''' Compute the hash for a block.
@@ -84,7 +82,7 @@ class RawStore(dict):
       self.__fp.write("\n")
       offset=self.__fp.tell()
       self.__fp.write(zblock)
-      dict.__setitem__(self,h,[offset,len(zblock),block])
+      dict.__setitem__(self,h,(offset,len(zblock)))
 
     return h
 
@@ -99,7 +97,7 @@ class RawStore(dict):
       zblock=fp.read(zsize)
       block=decompress(zblock)
       h=self.hash(block)
-      dict.__setitem__(self,h,[offset,zsize,None])
+      dict.__setitem__(self,h,(offset,zsize))
 
   def __loadEntryHead(self,fp,offset=None):
     if offset is not None:
@@ -136,7 +134,70 @@ class RawStore(dict):
       buf=fp.read()
     return sink.close()
 
-class Store(RawStore):
+MAX_LRU=1024
+class LRUCacheStore(RawStore):
+  def __init__(self,path,maxCache=None):
+    print "new LRUCacheStore"
+    if maxCache is None: maxCache=MAX_LRU
+    RawStore.__init__(self,path)
+    self.__max=maxCache
+    self.__index={}
+    self.__first=None
+    self.__last=None
+    self.__len=0
+
+  def store(self,block):
+    h=RawStore.store(self,block)
+    if h in self.__index:
+      self.__hitBlock(h)
+    else:
+      self.__newBlock(h,block)
+
+    return h
+
+  def __hitBlock(self,h):
+    node=self.__index[h]
+    prev=node[2]
+    if prev is not None:
+      # swap with the node to the left
+      print "LRU bubble up"
+      prev[3]=node[3]
+      node[2]=prev[2]
+      prev[2]=node
+      node[3]=prev
+
+  def __newBlock(self,h,block):
+    print "LRU new"
+    oldfirst=self.__first
+    node=[h,block,None,oldfirst]
+    self.__first=node
+    if oldfirst is None:
+      # first node - is also the last
+      self.__last=node
+    else:
+      # prepend to old first node
+      oldfirst[2]=node
+
+    self.__len+=1
+    if self.__len > self.__max:
+      # remove the last node
+      print "LRU pop"
+      newlast=self.__last[2]
+      newlast[3]=None
+      self.__last=newlast
+
+  def __getitem__(self,h):
+    if h in self.__index:
+      block=self.__index[h][1]
+      self.__hitBlock(h)
+    else:
+      # new block - load it up at the front
+      block=RawStore.__getitem__(self,h)
+      self.__newBlock(h,block)
+
+    return block
+
+class Store(LRUCacheStore):
   pass
 
 class BlockList:
