@@ -368,3 +368,140 @@ class CodeDataSink(ManualDataSink):
 
 class Sink(CodeDataSink):
   pass
+
+def fuse(backfs,store):
+  ''' Run a FUSE filesystem with the specified basefs backing store
+      and Venti storage.
+      This is a separate function to defer the imports.
+  '''
+
+  from fuse import Fuse
+  from errno import ENOSYS
+  class FuseStore(Fuse):
+    def __init__(self, *args, **kw):
+      Fuse.__init__(self, *args, **kw)
+
+      # TODO: get this from kw?
+      backfs='/home/cameron/tmp/venti/fsdir'
+      store='/home/cameron/tmp/venti/store'
+
+      import os.path
+      assert os.path.isdir(backfs)
+      self.__backfs=backfs
+
+      if type(store) is str:
+        store=Store(store)
+      self.__store=store
+
+      self.file_class=self.__File
+
+    def __abs(self, path):
+      return os.path.join(self.__backfs, path)
+
+    def getattr(self,path):
+      return os.lstat(self.__abs(path))
+    def readlink(self, path):
+      return os.readlink(self.__abs(path))
+    def readdir(self, path, offset):
+      for e in os.listdir(self.__abs(path)):
+        yield fuse.Direntry(e)
+    def unlink(self, path):
+      os.unlink(self.__abs(path))
+    def rmdir(self, path):
+      os.rmdir(self.__abs(path))
+    def symlink(self, path, path1):
+      os.symlink(path, self.__abs(path1))
+    def rename(self, path, path1):
+      os.rename(self.__abs(path), self.__abs(path1))
+    def link(self, path, path1):
+      os.link(self.__abs(path), self.__abs(path1))
+    def chmod(self, path, mode):
+      os.chmod(self.__abs(path), mode)
+    def chown(self, path, user, group):
+      os.chown(self.__abs(path), user, group)
+    def truncate(self, path, len):
+      return -ENOSYS
+    def mknod(self, path, mode, dev):
+      os.mknod(self.__abs(path), mode, dev)
+    def mkdir(self, path, mode):
+      os.mkdir(self.__abs(path), mode)
+    def utime(self, path, times):
+      os.utime(self.__abs(path), times)
+    def access(self, path, mode):
+      if not os.access(self.__abs(path), mode):
+        return -EACCES
+    def statfs(self):
+      return os.statvfs(self.__basefs)
+
+    class __File(object):
+      def __init__(self, path, flags, *mode):
+        if flags == os.O_RDONLY:
+          
+          self.file = os.fdopen(os.open("." + path, flags, *mode),
+                                flag2mode(flags))
+          self.fd = self.file.fileno()
+
+      def read(self, length, offset):
+          self.file.seek(offset)
+          return self.file.read(length)
+
+      def write(self, buf, offset):
+          self.file.seek(offset)
+          self.file.write(buf)
+          return len(buf)
+
+      def release(self, flags):
+          self.file.close()
+
+      def fsync(self, isfsyncfile):
+          if isfsyncfile and hasattr(os, 'fdatasync'):
+              os.fdatasync(self.fd)
+          else:
+              os.fsync(self.fd)
+
+      def flush(self):
+          self.file.flush()
+          # cf. xmp_flush() in fusexmp_fh.c
+          os.close(os.dup(self.fd))
+
+      def fgetattr(self):
+          return os.fstat(self.fd)
+
+      def ftruncate(self, len):
+          self.file.truncate(len)
+
+  def main(self, *a, **kw):
+
+      self.file_class = self.XmpFile
+
+      return Fuse.main(self, *a, **kw)
+
+return FuseStore(backfs,store)
+
+def main():
+
+  usage = """
+Userspace nullfs-alike: mirror the filesystem tree from some point on.
+
+""" + Fuse.fusage
+
+  server = Xmp(version="%prog " + fuse.__version__,
+               usage=usage,
+               dash_s_do='setsingle')
+
+  server.parser.add_option(mountopt="root", metavar="PATH", default='/',
+                           help="mirror filesystem from under PATH [default: %default]")
+  server.parse(values=server, errex=1)
+
+  try:
+      if server.fuse_args.mount_expected():
+          os.chdir(server.root)
+  except OSError:
+      print >> sys.stderr, "can't enter root of underlying filesystem"
+      sys.exit(1)
+
+  server.main()
+
+
+if __name__ == '__main__':
+  main()
