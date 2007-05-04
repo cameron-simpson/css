@@ -43,7 +43,9 @@ done
 [ -n "$url" ] && set -- "$url"
 
 set -x
-histbackup -x --delete-excluded "$HOME/var/firefox" "$HOME/var/backup/firefox"
+histbackup -x --delete-excluded \
+        "$HOME/var/firefox" "$HOME/var/backup/firefox" \
+        '--exclude=/*/Cache' '--exclude=/*/*.mfasl' '--exclude=/*/urlclassifier2.sqlite'
 echo >>"$prefs"
 bsed '/^user_pref("permissions.default.image"/d
       /^user_pref("javascript.enabled"/d
