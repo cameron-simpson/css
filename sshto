@@ -33,6 +33,7 @@ env_presh=': set -vx
 	  done
 	  [ -n "$wSHELL" ] && SHELL=$wSHELL
 	  export SHELL
+          tput colors >/dev/null 2>&1 || { TERM=vt100; export TERM; }
 	  [ -s /opt/css/env.sh ] && . /opt/css/env.sh
           exec <&3 3<&- >&4 4>&-
 	 '
