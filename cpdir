@@ -18,7 +18,7 @@ to=$2
 [ -d "$to/." ] && { echo "$cmd: $to already exists!" >&2; exit 1; }
 [ -d "$from/." ] || { echo "$cmd: $from missing!" >&2; exit 1; }
 
-case $ARCH in
+case ${ARCH:-} in
     *.*.domainos) # preserve ACLs
 	exec /com/cpt "$from" "$to" -pdt -sacl -ld
 	;;
