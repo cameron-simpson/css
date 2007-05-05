@@ -557,3 +557,28 @@ def trysaferename(oldpath,newpath):
   except:
     return False
   return True
+
+def fromBS(s):
+  ''' Read a extensible value from the front of a string.
+      Continuation octets have their high bit set.
+      The value is big-endian.
+  '''
+  o=ord(s[0])
+  n=o&0x7f
+  used=1
+  while o & 0x80:
+    o=ord(s[used])
+    used+=1
+    n=(n<<7)|(o&0x7f)
+  return (n,s[used:])
+
+def toBS(n):
+  ''' Encode a value as an entensible octet sequence for decode by
+      getExtensibleOctets().
+  '''
+  s=chr(n&0x7f)
+  n>>=7
+  while n > 0:
+    s=chr(0x80|(n&0x7f))+s
+    n>>=7
+  return s
