@@ -572,6 +572,17 @@ def fromBS(s):
     n=(n<<7)|(o&0x7f)
   return (n,s[used:])
 
+def fromBSfp(fp):
+  s=c=fp.read(1)
+  if len(s) == 0:
+    return None
+  while ord(c)&0x80:
+    c=fp.read(1)
+    s+=c
+  (n,s)=fromBS(s)
+  assert len(s) == 0
+  return n
+
 def toBS(n):
   ''' Encode a value as an entensible octet sequence for decode by
       getExtensibleOctets().
