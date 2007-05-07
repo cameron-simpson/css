@@ -29,4 +29,3 @@ do
   sshb -n -F "$cf" "$host" "while echo .; do sleep $delay; done" 1>/dev/null &
   echo $! >>"$pidfile"
 done
-sleep 2
