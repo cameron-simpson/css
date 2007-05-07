@@ -11,51 +11,59 @@ die $usage if @ARGV < 1 || @ARGV > 2;
 
 $old=shift(@ARGV);
 if (! defined($new=shift(@ARGV)))
-	{ $new='-'; }
+{ $new='-'; }
 
 $ok=1;
 
-if (! open(OLD,($old eq '-' ? '<&STDIN' : "< $old\0")))
-	{ print STDERR "$cmd: can't open $old: $!\n";
-	  $ok=0;
-	}
+if (! open(OLD,( $old eq '-'
+               ? '<&STDIN'
+               : $old =~ /\.gz$/
+                 ? "gunzip < '$old' |"
+                 : "< $old\0")))
+{ print STDERR "$cmd: can't open $old: $!\n";
+  $ok=0;
+}
 
-if (! open(NEW,($new eq '-' ? '<&STDIN' : "< $new\0")))
-	{ print STDERR "$cmd: can't open $new: $!\n";
-	  $ok=0;
-	}
+if (! open(NEW,( $new eq '-'
+               ? '<&STDIN'
+               : $new =~ /\.gz$/
+                 ? "gunzip < '$new' |"
+                 : "< $new\0")))
+{ print STDERR "$cmd: can't open $new: $!\n";
+  $ok=0;
+}
 
 die unless $ok;
 
 while (<OLD>)
-	{ if (/^\s*(\d+)\s+(.*)/)
-		{ $old{$2}=$1+0;
-		}
-	  else
-	  { print STDERR "$cmd: $old, line $.: bad input", $_;
-	  }
-	}
+{ if (/^\s*(\d+)\s+(.*)/)
+  { $old{$2}=$1+0;
+  }
+  else
+  { print STDERR "$cmd: $old, line $.: bad input", $_;
+  }
+}
 close(OLD);
 
 while (<NEW>)
-	{ if (/^\s*(\d+)\s+(.*)/)
-		{ $new{$2}=$1+0;
-		}
-	  else
-	  { print STDERR "$cmd: $new, line $.: bad input", $_;
-	  }
-	}
+{ if (/^\s*(\d+)\s+(.*)/)
+  { $new{$2}=$1+0;
+  }
+  else
+  { print STDERR "$cmd: $new, line $.: bad input", $_;
+  }
+}
 close(NEW);
 
 for ((keys %old, keys %new))
-	{ $o=(defined($old{$_}) ? $old{$_} : 0);
-	  $n=(defined($new{$_}) ? $new{$_} : 0);
+{ $o=(defined($old{$_}) ? $old{$_} : 0);
+  $n=(defined($new{$_}) ? $new{$_} : 0);
 
-	  $diff{$_}=$n-$o;
-	}
+  $diff{$_}=$n-$o;
+}
 
 for (sort keys %diff)
-	{ print "$diff{$_}\t$_\n" if $diff{$_};
-	}
+{ print "$diff{$_}\t$_\n" if $diff{$_};
+}
 
 exit ($ok ? 0 : 1);
