@@ -8,7 +8,7 @@
 : ${TMPDIR:=/tmp}
 
 cmd=$0
-usage="Usage: $cmd {host|@ng|!host|!ng}..."
+usage="Usage: $cmd [!]{host|@ng}..."
 
 [ $# = 0 ] && { echo "$cmd: missing hosts" >&2
 		echo "$usage" >&2
