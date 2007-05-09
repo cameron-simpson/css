@@ -54,7 +54,7 @@ for ngr
 do
   if grep "^$ngr[ 	]" /etc/netgroup >/dev/null 2>&1
   then
-    unslosh < /etc/netgroup | sed -n "y/	/ /; /^$ngr /{s/^$ngr  *//p;q}"
+    unslosh < /etc/netgroup | sed -n "y/	/ /; /^$ngr /{s/^$ngr  *//p;q;}"
   else
     ypmatch "$ngr" netgroup
   fi
