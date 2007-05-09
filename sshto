@@ -9,7 +9,7 @@
 : ${SSHTO_OPTS:=''}
 
 cf=$HOME/.sshtorc
-trace=set-x
+trace=  ##set-x
 sshopts=
 lsshopts=
 mycfg=$HOME/.ssh/config
