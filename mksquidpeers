@@ -158,3 +158,9 @@ pr_peer_vars "$@" \
       pr_via "$opeer" | awk -v "peer=$peer" -v "opeer=$opeer" '{ print "cache_peer_access", peer, "deny VIA_" opeer NR }'
     done
   done
+
+if [ $# = 0 ]
+then
+  echo always_direct allow all
+  echo never_direct deny all
+fi

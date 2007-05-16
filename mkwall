@@ -12,6 +12,9 @@
 : ${XINERAMA:=''}
 : ${X11_COMPOSITE:=''}
 
+gm=gm
+[ -n "${PREFER_IMAGEMAGICK:-}" ] && gm=
+
 # set $bgx and $bgy
 eval `bgsize -v | sed 's/^d/bg/'`
 
@@ -80,16 +83,16 @@ then
 		    exit 2
 		  }
     hx=`expr $bgx / 2` || exit 1
-    bg1=`mkwall +a -g "${hx}x${bgy}" "$1"` || exit 1
+    bg1=`sh -x mkwall +a -g "${hx}x${bgy}" "$1"` || exit 1
 
     if [ "x$1" = "x$2" ]
     then  bg2=$bg1
-    else  bg2=`mkwall +a -g "${hx}x${bgy}" "$2"` || exit 1
+    else  bg2=`sh -x mkwall +a -g "${hx}x${bgy}" "$2"` || exit 1
     fi
 
     tmpf=$TMPDIR/$cmd$$.png
     # +label
-    gm montage \
+    $gm montage \
 		-tile 2x1 \
 		+label \
 		-resize "${bgx}x${bgy}" \
@@ -121,7 +124,7 @@ eval `imsize-gm "$imagefile" | awk '{print "ix="$1 " iy="$2}'`
 	|| { echo "$cmd: can't deduce source image size" >&2; exit 1; }
 
 convname=pngof
-set gm convert "$imagefile"
+set $gm convert "$imagefile"
 
 convname=$convname/sh$shade
 if [ "x$shade" != x100 ]

@@ -6,6 +6,10 @@
 
 : ${TMPDIR:=/tmp}
 
+# FC7 hack - GM use segfaulting for me just now
+gm=     ##gm
+[ -n "${PREFER_IMAGEMAGICK:-}" ] && gm=
+
 cmd=$0
 usage="Usage: $cmd imagefile"
 
@@ -15,4 +19,5 @@ imagefile=$1; shift
 imtype=`file2mime "$imagefile"` || exit 1
 [ "x$imtype" = 'ximage/png' ] && exec echo "$imagefile"
 
-exec convof -C pngof -discard -x "$imagefile" gm convert "$imagefile" "png:-"
+gm=
+exec convof -C pngof -discard -x "$imagefile" $gm convert "$imagefile" "png:-"
