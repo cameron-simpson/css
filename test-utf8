@@ -1,0 +1,8 @@
+#!/bin/sh
+#
+# Handy test printf from Alain Bench <veronatif@free.fr>
+# to test UTF-8 vs single byte rendering in a terminal.
+#       - Cameron Simpson <cs@zip.com.au> 16may2007
+#
+
+printf "L1: won\xB4t \xA8reply\xA8\nU8: won\xC2\xB4t \xC2\xA8reply\xC2\xA8\n"   
