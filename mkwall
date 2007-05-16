@@ -21,7 +21,16 @@ eval `bgsize -v | sed 's/^d/bg/'`
 doauto=1
 
 cmd=`basename "$0"`
-usage="Usage: $cmd [-g geom] [-bg bg-colour] imagefiles..."
+usage="Usage: $cmd [+a] [-g geom] [-bg bg-colour] [-sh shade] imagefiles...
+        +a      No automatics; don't double the image on Xinerama displays.
+        -g geom Use this target geometry instead of the display pixel size.
+        -bg bg-colour
+                Background colour to use for padding. Default is black,
+                overridding by the envvar \$BG.
+        -sh shading
+                Shade (dim) the wallpaper to this percentage of full brightness.
+                Default 100 on \$X11_COMPOSITE displays and 50 on others.
+                Overridden by the envvar \$WALLPAPER_SHADE."
 
 badopts=
 
