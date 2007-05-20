@@ -1,6 +1,6 @@
 #!/usr/bin/python
 
-''' A data store patterned after the Venti scheme:
+''' A data store after the style of the Venti scheme:
       http://library.pantek.com/general/plan9.documents/venti/venti.html
     but supporting variable sized blocks.
     See also the Plan 9 Venti support manual pages:
@@ -8,23 +8,36 @@
     and the Wikipedia entry:
       http://en.wikipedia.org/wiki/Venti
 
-    TODO:
-      Compress the data chunks in the data file.
-      MetaFS interface using real files for metadata and their contents
-	as hashes.
+    TODO: rolling hash
+            augment with assorted recognition strings by hash
+            pushable parser for nested data
+          optional compression in store
+          extend directory blockref:
+            flags:
+              1: indirect
+              2: inode ref
+          inode chunk:
+            flags
+            [meta] (if flags&0x01)
+            blockref
+          generic LRUCache class
+          caching store - fetch&store locally
+          store priority queue - tuples=pool
+          remote store: http? multifetch? udp?
+          argument order: always ({h|block}, indirect, span)
 '''
 
 import os.path
 from zlib import compress, decompress
 ## NOTE: migrate to hashlib sometime when python 2.5 more common
 import sha
-from cs.misc import warn, progress, verbose
+from cs.misc import warn, progress, verbose, fromBS, toBS, fromBSfp
 import cs.hier
 from cs.lex import unctrl
 
-HASH_SIZE=20    # size of SHA-1 hash
-MAX_BLOCKSIZE=65536
-MAX_SUBBLOCKS=MAX_BLOCKSIZE/(HASH_SIZE+2)
+HASH_SIZE=20                                    # size of SHA-1 hash
+MAX_BLOCKSIZE=16383                             # fits in 2 octets BS-encoded
+MAX_SUBBLOCKS=MAX_BLOCKSIZE/(HASH_SIZE+4)       # flags(1)+span(2)+hlen(1)+hash
 
 def hash_sha(block):
   ''' Returns the SHA-1 checksum for the supplied block.
@@ -56,13 +69,15 @@ class RawStore(dict):
     self.__path=path
     progress("indexing", path)
     self.__fp=open(path,"a+b")
-    self.loadIndex()
+    self.__loadIndex()
 
-  def __setitem__(self,key,value):
+  def __setitem__(self,h,value):
     raise IndexError
 
-  def __getitem__(self,key):
-    v=dict.__getitem__(self,key)
+  def __getitem__(self,h):
+    ''' Return block for hash, or raise IndexError if not in store.
+    '''
+    v=dict.__getitem__(self,h)
     self.__fp.seek(v[0])
     return decompress(self.__fp.read(v[1]))
 
@@ -72,72 +87,75 @@ class RawStore(dict):
     return hash_sha(block)
 
   def store(self,block):
+    ''' Store a block, return the hash.
+    '''
     h=self.hash(block)
     if h in self:
       verbose(self.__path,"already contains",hex(h))
     else:
       zblock=compress(block)
       self.__fp.seek(0,2)
-      self.__fp.write(str(len(zblock)))
-      self.__fp.write("\n")
+      self.__fp.write(toBS(len(zblock)))
       offset=self.__fp.tell()
       self.__fp.write(zblock)
       dict.__setitem__(self,h,(offset,len(zblock)))
 
     return h
 
-  def loadIndex(self):
+  def fetch(self,h):
+    ''' Return block for hash, or None if not present in store.
+    '''
+    if h not in self:
+      return None
+    return self[h]
+
+  def __loadIndex(self):
     fp=self.__fp
     fp.seek(0)
     while True:
-      e=self.__loadEntryHead(fp)
-      if e is None:
+      zsize=fromBSfp(fp)
+      if zsize is None:
         break
-      (offset, zsize)=e
+      offset=fp.tell()
       zblock=fp.read(zsize)
       block=decompress(zblock)
       h=self.hash(block)
       dict.__setitem__(self,h,(offset,zsize))
 
-  def __loadEntryHead(self,fp,offset=None):
-    if offset is not None:
-      fp.seek(offset)
-    line=fp.readline()
-    if len(line) == 0:
-      return None
-    assert len(line) > 1 and line[-1] == '\n'
-    number=line[:-1]
-    assert number.isdigit()
-    return (fp.tell(), int(number))
-
-  def blocklist(self,h=None):
-    return BlockList(self,h)
-
-  def blocksink(self):
-    return BlockSink(self)
-
-  def datasink(self):
-    return Sink(self)
-
-  def cat(self,h,fp=None):
+  def cat(self,bref,fp=None):
     if fp is None:
       import sys
       fp=sys.stdout
-    for block in self.blocklist(h):
-      fp.write(block)
+    print "cat", hex(bref.h), "indir =", `bref.indirect`
+    for b in bref.leaves(self):
+      fp.write(b)
 
-  def storeFile(self,fp):
-    sink=self.datasink()
-    buf=fp.read()
+  def readOpen(self,bref):
+    ''' Open a BlockRef for read.
+    '''
+    return ReadFile(self,bref)
+
+  def writeOpen(self):
+    ''' Open a file for write, close returns a BlockRef.
+    '''
+    return WriteFile(self)
+
+  def storeFile(self,ifp,rsize=8192):
+    ofp=self.writeOpen()
+    buf=ifp.read(rsize)
     while len(buf) > 0:
-      sink.write(buf)
-      buf=fp.read()
-    return sink.close()
+      ofp.write(buf)
+      buf=ifp.read(rsize)
+    return ofp.close()
 
 MAX_LRU=1024
 class LRUCacheStore(RawStore):
+  ''' A subclass of RawStore that keeps an LRU cache of referenced blocks.
+      TODO: Recode to take an arbitrary Store backend.
+            This will let me put Store pools behind a single cache.
+  '''
   def __init__(self,path,maxCache=None):
-    print "new LRUCacheStore"
+    ##print "new LRUCacheStore"
     if maxCache is None: maxCache=MAX_LRU
     RawStore.__init__(self,path)
     self.__max=maxCache
@@ -160,14 +178,14 @@ class LRUCacheStore(RawStore):
     prev=node[2]
     if prev is not None:
       # swap with the node to the left
-      print "LRU bubble up"
+      ##print "LRU bubble up"
       prev[3]=node[3]
       node[2]=prev[2]
       prev[2]=node
       node[3]=prev
 
   def __newBlock(self,h,block):
-    print "LRU new"
+    ##print "LRU new"
     oldfirst=self.__first
     node=[h,block,None,oldfirst]
     self.__first=node
@@ -181,7 +199,7 @@ class LRUCacheStore(RawStore):
     self.__len+=1
     if self.__len > self.__max:
       # remove the last node
-      print "LRU pop"
+      ##print "LRU pop"
       newlast=self.__last[2]
       newlast[3]=None
       self.__last=newlast
@@ -198,176 +216,430 @@ class LRUCacheStore(RawStore):
     return block
 
 class Store(LRUCacheStore):
+  ''' Default Store is a RawStore with a cache.
+  '''
   pass
 
-class BlockList:
+def encodeBlockRef(flags,span,h):
+    ''' Encode a blockref for storage.
+    '''
+    return toBS(flags)+toBS(span)+toBS(len(h))+h
+
+def decodeBlockRef(iblock):
+  ''' Decode a block ref from an indirect block.
+      It consist of:
+        flags: BSencoded ordinal
+        span:  BSencoded ordinal
+        hashlen: BSencoded ordinal
+        hash:  raw hash
+      Return (BlockRef,unparsed) where unparsed is remaining data.
+  '''
+  (flags,iblock)=fromBS(iblock)
+  indirect=bool(flags&0x01)
+  (span,iblock)=fromBS(iblock)
+  (hlen,iblock)=fromBS(iblock)
+  h=iblock[:hlen]
+  iblock=iblock[hlen:]
+  print "decode: flags=%x, span=%d, h=%s" % (flags,span,hex(h))
+  return (BlockRef(h,indirect,span), iblock)
+
+def decodeBlockRefFP(fp):
+  ''' Decode a block ref from an indirect block.
+      It consist of:
+        flags: BSencoded ordinal
+        span:  BSencoded ordinal
+        hashlen: BSencoded ordinal
+        hash:  raw hash
+      Return (BlockRef,unparsed) where unparsed is remaining data.
+  '''
+  (flags,iblock)=fromBSfp(fp)
+  indirect=bool(flags&0x01)
+  (span,iblock)=fromBSfp(fp)
+  (hlen,iblock)=fromBSfp(fp)
+  h=fp.read(hlen)
+  assert len(h) == hlen
+  print "decodefp: flags=%x, span=%d, h=%s" % (flags,span,hex(h))
+  return BlockRef(h,indirect,span)
+
+class BlockRef:
+  ''' A reference to a file consisting of a hash and an indirect flag.
+      Tiny files are not indirect, and the hash is the block holding
+      their content. For larger files indirect is True and the hash
+      refers to their top indirect block.
+  '''
+  def __init__(self,h,indirect,span):
+    self.h=h
+    self.indirect=indirect
+    self.span=span
+  def flags(self):
+    return 0x01 & int(self.indirect)
+  def __len__(self):
+    return self.span
+  def blocklist(self,S):
+    assert self.indirect
+    return BlockList(S,self.h)
+  def encode(self):
+    ''' Return an encoded BlockRef for storage, inverse of decodeBlockRef().
+    '''
+    h=self.h
+    return encodeBlockRef(self.flags(),self.span,self.h)
+  def leaves(self,S):
+    if self.indirect:
+      for b in self.blocklist(S).leaves():
+        yield b
+    else:
+      yield S[self.h]
+
+class BlockList(list):
+  ''' An in-memory BlockList, used to store or retrieve sequences of
+      data blocks.
+  '''
   def __init__(self,S,h=None):
+    ''' Create a new blocklist.
+        This will be empty initially unless the hash of a top level
+        indirect block is supplied, in which case it is loaded and
+        decoded into BlockRefs.
+    '''
     self.__store=S
-    self.__blocks=[]
     if h is not None:
       iblock=S[h]
       while len(iblock) > 0:
-        isIndirect=bool(ord(iblock[0]))
-        hlen=ord(iblock[1])
-        h=iblock[2:2+hlen]
-        self.append(h,isIndirect)
-        iblock=iblock[2+hlen:]
-
-  def __len__(self):
-    return len(self.__blocks)
-
-  def append(self,h,isIndirect):
-    self.__blocks.append((isIndirect,h))
-
-  def __getitem__(self,i):
-    return self.__blocks[i]
+        (bref, iblock)=decodeBlockRef(iblock)
+        self.append(bref)
 
   def pack(self):
-    return "".join( [ chr(int(sb[0]))+chr(len(sb[1]))+sb[1] 
-                      for sb in self.__blocks
-                    ]
-                  )
+    return "".join([bref.encode() for bref in self])
 
-  def __iter__(self):
+  def span(self):
+    return self.offsetTo(len(self))
+
+  def offsetTo(self,ndx):
+    ''' Offset to start of blocks under entry ndx.
+    '''
+    return sum([bref.span for bref in self])
+
+  def seekToBlock(self,offset):
+    ''' Seek to a leaf block.
+        Return the block hash and the offset within the block of the target.
+        If the seek is beyond the end of the blocklist, return None and the
+        remaining offset.
+    '''
+    for bref in self:
+      if offset < bref.span:
+        if bref.indirect:
+          return bref.blocklist(self.__store).seekToBlock(offset)
+        return (bref.h,offset)
+      offset-=bref.span
+    return (None,offset)
+
+  def leaves(self):
+    ''' Iterate over the leaf blocks.
+    '''
     S=self.__store
-    for (isIndirect,h) in self.__blocks:
-      if isIndirect:
-        for subblock in BlockList(S,h):
-          yield subblock
+    for bref in self:
+      for b in bref.leaves(S):
+        yield b
+
+class ReadFile:
+  ''' A file interface supporting seek(), read() and tell() methods.
+  '''
+  def __init__(self,S,bref):
+    self.__store=S
+    self.__blist=bref.blocklist(S)
+    self.__pos=0
+    
+  def seek(self,offset,whence=0):
+    if whence == 1:
+      offset+=self.tell()
+    elif whence == 2:
+      offset+=self.span()
+    self.__pos=offset
+
+  def tell(self):
+    return self.__pos
+
+  def readShort(self):
+    (h,offset)=self.__blist.seekToBlock(self.tell())
+    if h is None:
+      return ''
+    b=self.__store[h]
+    self.__pos+=len(b)-offset
+    return b[offset:]
+
+  def read(self,size=None):
+    buf=''
+    while size is None or size > 0:
+      chunk=self.readShort()
+      if len(chunk) == 0:
+        break
+      if size is None:
+        buf+=chunk
+      elif size <= len(chunk):
+        buf+=chunk[:size]
+        size=0
       else:
-        yield S[h]
+        buf+=chunk
+        size-=len(chunk)
+    return buf
+
+  def readline(self,size=None):
+    line=''
+    while size is None or size > 0:
+      chunk=self.readShort()
+      nlndx=chunk.find('\n')
+      if nlndx >= 0:
+        # there is a NL
+        if size is None or nlndx < size:
+          # NL in the available chunk
+          line+=chunk[:nlndx+1]
+        else:
+          # NL not available - ergo size not None and inside chunk
+          line+=chunk[:size]
+        break
+
+      if size is None or size >= len(chunk):
+        # we can suck in the whole chunk
+        line+=chunk
+        if size is not None:
+          size-=len(chunk)
+      else:
+        # take its prefix and quit
+        line+=chunk[:size]
+        break
+
+    return line
+
+  def readlines(self,sizehint=None):
+    lines=[]
+    byteCount=0
+    while sizehint is None or byteCount < sizehint:
+      line=self.readline()
+      if len(line) == 0:
+        break
+      lines.append(line)
+      byteCount+=len(line)
+
+    return lines
 
 class BlockSink:
   def __init__(self,S):
     self.__store=S
     self.__lists=[BlockList(S)]
-  
-  def append(self,block,isIndirect=False):
+
+  def appendBlock(self,block):
+    ''' Append a block to the BlockSink.
+    '''
+    self.appendBlockRef(BlockRef(self.__store.store(block),False,len(block)))
+
+  def appendBlockRef(self,bref):
+    ''' Append a BlockRef to the BlockSink.
+    '''
     S=self.__store
     level=0
-    h0=h=S.store(block)
     while True:
-      bl=self.__lists[level]
-      ##print "append: bl =", `bl`
-      if len(bl) < MAX_SUBBLOCKS:
-        bl.append(h,isIndirect)
-        return h0
+      blist=self.__lists[level]
+      ##print "append: blist =", `blist`
+      if len(blist) < MAX_SUBBLOCKS:
+        blist.append(bref)
+        return
 
-      # pack up full block for storage at next indirection level
-      fullblock=bl.pack()
-      # prepare fresh empty block at this level
-      bl=self.__lists[level]=BlockList(S)
-      # store the current block in the fresh indirect block
-      bl.append(h,isIndirect)
-      # advance to the next level of indirection and repeat
-      # to store the full indirect block
+      # The blocklist is full.
+      # Make a BlockRef to refer to the stored version.
+      # We will store it at the next level of indirection.
+      nbref=BlockRef(S.store(blist.pack()),True,blist.span())
+
+      # Prepare fresh empty block at this level.
+      # and add the old bref to it instead.
+      blist=self.__lists[level]=BlockList(S)
+      blist.append(bref)
+
+      # Advance to the next level of indirection and repeat
+      # to store the just produced full indirect block.
       level+=1
-      isIndirect=True
-      block=fullblock
-      h=S.store(block)
+      bref=nbref
       if level == len(self.__lists):
         print "new indir level", level
         self.__lists.append(BlockList(S))
 
   def close(self):
-    ''' Store all the outstanding indirect blocks.
-        Return the hash of the top level block.
+    ''' Store all the outstanding indirect blocks (if they've more than one etry).
+        Return the top blockref.
     '''
     S=self.__store
+
     # record the lower level indirect blocks in their parents
     while len(self.__lists) > 1:
-      bl=self.__lists.pop(0)
-      self.append(bl.pack(),True)
+      blist=self.__lists.pop(0)
+      assert len(blist) > 0
+      if len(blist) == 1:
+        # discard block with just one pointer - keep the pointer
+        bref=blist[0]
+      else:
+        # store and record the indirect block
+        bref=BlockRef(S.store(blist.pack()),True,blist.span())
+      self.appendBlockRef(bref)
 
-    # stash and return the topmost indirect block
-    h=S.store(self.__lists[0].pack())
+    # There's just one top block now.
+    # Pull it and disable the blocklist stack.
+    assert len(self.__lists) == 1
+    blist=self.__lists[0]
     self.__lists=None
-    return h
 
-class ManualDataSink:
-  ''' A File-like class that supplies only write, close, flush.
-      Returned by the sink() method of Store.
-      Write(), close() and flush() return the hash code for flushed data.
-      Write() usually returns None unless too much is queued; then it
-      flushes some data and returns the hash.
-      Flush() may return None if there is no queued data.
+    assert len(blist) > 0
+    if len(blist) == 1:
+      # The top block has only one BlockRef - return the BlockRef.
+      bref=blist[0]
+    else:
+      # stash the top block
+      bref=BlockRef(S.store(blist.pack()),True,blist.span())
+
+    return bref
+
+# Assorted findEdge functions.
+#
+def findEdgeDumb(block):
+  ''' Find edge for unstructured data.
   '''
-  def __init__(self,S):
-    ''' Arguments: fp, the writable File object to encapsulate.
-                   S, a cs.venti.Store compatible object.
-    '''
-    self.__bsink=S.blocksink()
-    self._q=''
+  global MAX_BLOCKSIZE
+  if len(self.__q) >= MAX_BLOCKSIZE:
+    return MAX_BLOCKSIZE
+  return 0
+
+def findEdgeCode(block):
+  ''' Find edge for UNIX mbox files and code.
+  '''
+  start=0
+  found=block.find('\n')
+  while found >= 0:
+    if found > MAX_BLOCKSIZE:
+      return MAX_BLOCKSIZE
+
+    # UNIX mbox file
+    # python/perl top level things
+    if block[found+1:found:6] == "From " \
+    or block[found+1:found+5] == "def " \
+    or block[found+1:found+7] == "class " \
+    or block[found+1:found+9] == "package ":
+      return found+1
+
+    # C/C++/perl etc end of function
+    if block[found+1:found+3] == "}\n":
+      return found+3
+
+    start=found+1
+    found=block.find('\n',start)
+
+  return 0
+
+class WriteFile:
+  ''' A File-like class that supplies only write, close, flush.
+      flush() forces any unstored data to the store.
+      close() flushes all data and returns a BlockRef for the whole file.
+  '''
+  def __init__(self,S,findEdge=None):
+    if findEdge is None:
+      findEdge=findEdgeCode
+
+    self.__sink=BlockSink(S)
+    self.__findEdge=findEdge
+    self.__q=''
 
   def close(self):
-    ''' Close the file. Return the hash code of the unreported data.
+    ''' Close the file. Return the hash code of the top indirect block.
     '''
     self.flush()
-    return self.__bsink.close()
+    return self.__sink.close()
+
+  def flush(self):
+    ''' Force any remaining data to the store.
+    '''
+    if len(self.__q) > 0:
+      self.__dequeue()
+      if len(self.__q) > 0:
+        self.__sink.appendBlock(self.__q)
+        self.__q=''
 
   def write(self,data):
     ''' Queue data for writing.
     '''
-    self._q+=data
+    self.__q+=data
+    self.__dequeue()
 
-    # flush complete blocks to the store
-    edgendx=self.findEdge()
+  def __dequeue(self):
+    ''' Flush complete blocks to the store.
+    '''
+    edgendx=self.__findEdge(self.__q)
     while edgendx > 0:
-      self.__bsink.append(self._q[:edgendx])
-      self._q=self._q[edgendx:]
-      edgendx=self.findEdge()
+      self.__sink.appendBlock(self.__q[:edgendx])
+      self.__q=self.__q[edgendx:]
+      edgendx=self.__findEdge(self.__q)
 
-  def findEdge(self):
-    ''' Return offset of next block start, if present.
+def decodeDirent(fp):
+    namelen=fromBSfp(fp)
+    if namelen is None:
+      return (None,None)
+    assert namelen > 0
+    name=fp.read(namelen)
+    assert len(name) == namelen, \
+            "expected %d chars, got %d (%s)" % (namelen,len(name),`name`)
+
+    flags=fromBSfp(fp)
+    isdir=bool(flags&0x01)
+    hasmeta=bool(flags&0x02)
+    if hasmeta:
+      metalen=fromBSfp(fp)
+      assert metalen > 1
+      meta=fp.read(metalen)
+      assert len(meta) == metalen
+    else:
+      meta=None
+    bref=decodeBlockRefFP(fp)
+
+    return (name,Dirent(bref,isdir,meta))
+
+def encodeDirent(fp,name,dent):
+  assert len(name) > 0
+  fp.write(toBS(len(name)))
+  fp.write(name)
+  hasmeta=dent.meta is not None
+  flags=int(dent.isdir)|(0x02*int(hasmeta))
+  fp.write(toBS(flags))
+  if hasmeta:
+    menc=dent.encodeMeta()
+    fp.write(toBS(len(menc)))
+    fp.write(menc)
+  fp.write(dent.bref.encode())
+
+class Dirent:
+  def __init__(self,bref,isdir,meta=None):
+    self.bref=bref
+    self.isdir=isdir
+    self.meta=meta
+  def encodeMeta(self):
+    return meta
+
+class Dir(dict):
+  def __init__(self,S,parent,dirref=None):
+    self.__store=S
+    self.__parent=paret
+    if dirref is not None:
+      fp=S.readFile(dirref)
+      (name,dent)=decodeDirent(fp)
+      while name is not None:
+        self[name]=det
+        (name,dent)=decodeDirent(fp)
+
+  def sync(self):
+    ''' Encode dir to store, return blockref of encode.
     '''
-    global MAX_BLOCKSIZE
-    if len(self._q) >= MAX_BLOCKSIZE:
-      return MAX_BLOCKSIZE
-    return 0
+    fp=self.__store.writeFile()
+    for name in self:
+      encodeDirent(fp,name,self[name])
+    return fp.close()
 
-  def flush(self):
-    ''' Like flush(), but returns the hash code of the data since the last
-        flush. It may return None if there is nothing to flush.
-    '''
-    if len(self._q) == 0:
-      return None
-
-    h=self.__bsink.append(self._q)
-    self._q=''
-    return h
-
-# make patch friendly blocks
-class CodeDataSink(ManualDataSink):
-  def __init__(self,S):
-    ManualDataSink.__init__(self,S)
-
-  def findEdge(self):
-    q=self._q
-    start=0
-    found=q.find('\n')
-    while found >= 0:
-      if found > MAX_BLOCKSIZE:
-        return MAX_BLOCKSIZE
-
-      # UNIX mbox file
-      # python/perl top level things
-      if q[found+1:found:6] == "From " \
-      or q[found+1:found+5] == "def " \
-      or q[found+1:found+7] == "class " \
-      or q[found+1:found+9] == "package ":
-        return found+1
-
-      # C/C++/perl etc end of function
-      if q[found+1:found+3] == "}\n":
-        return found+3
-
-      start=found+1
-      found=q.find('\n',start)
-
-    return 0
-
-class Sink(CodeDataSink):
-  pass
+# horrible hack because the Fuse class doesn't seem to tell fuse file
+# objects which class instantiation they belong to
+mainFuseStore=None
 
 def fuse(backfs,store):
   ''' Run a FUSE filesystem with the specified basefs backing store
@@ -375,133 +647,127 @@ def fuse(backfs,store):
       This is a separate function to defer the imports.
   '''
 
-  from fuse import Fuse
+  from fuse import Fuse, Direntry
   from errno import ENOSYS
   class FuseStore(Fuse):
     def __init__(self, *args, **kw):
-      Fuse.__init__(self, *args, **kw)
+      global mainFuseStore
+      assert mainFuseStore is None, "multiple instantiations of FuseStore forbidden"
 
-      # TODO: get this from kw?
-      backfs='/home/cameron/tmp/venti/fsdir'
-      store='/home/cameron/tmp/venti/store'
+      print "FuseStore:"
+      print "  args =", `args`
+      print "  kw =", `kw`
+      Fuse.__init__(self, *args, **kw)
 
       import os.path
       assert os.path.isdir(backfs)
       self.__backfs=backfs
-
-      if type(store) is str:
-        store=Store(store)
       self.__store=store
 
+      # HACK: record fuse class object for use by files :-(
+      mainFuseStore=self
       self.file_class=self.__File
 
     def __abs(self, path):
-      return os.path.join(self.__backfs, path)
+      assert path[0] == '/'
+      return os.path.join(self.__backfs, path[1:])
 
     def getattr(self,path):
+      print "getattr", path
       return os.lstat(self.__abs(path))
     def readlink(self, path):
+      print "readlink", path
       return os.readlink(self.__abs(path))
     def readdir(self, path, offset):
+      print "readdir", path
+      yield Direntry('.')
+      yield Direntry('..')
       for e in os.listdir(self.__abs(path)):
-        yield fuse.Direntry(e)
+        print "readdir yield"
+        yield Direntry(e)
     def unlink(self, path):
+      print "unlink", path
       os.unlink(self.__abs(path))
     def rmdir(self, path):
+      print "rmdir", path
       os.rmdir(self.__abs(path))
     def symlink(self, path, path1):
+      print "symlink", path
       os.symlink(path, self.__abs(path1))
     def rename(self, path, path1):
+      print "rename", path, path1
       os.rename(self.__abs(path), self.__abs(path1))
     def link(self, path, path1):
+      print "link", path, path1
       os.link(self.__abs(path), self.__abs(path1))
     def chmod(self, path, mode):
+      print "chmod 0%03o %s" % (mode,path)
       os.chmod(self.__abs(path), mode)
     def chown(self, path, user, group):
+      print "chown %d:%d %s" % (user,group,path)
       os.chown(self.__abs(path), user, group)
     def truncate(self, path, len):
+      print "truncate", path, len
       return -ENOSYS
     def mknod(self, path, mode, dev):
+      print "mknod", path, mode, dev
       os.mknod(self.__abs(path), mode, dev)
     def mkdir(self, path, mode):
+      print "mkdir 0%03o %s" % (mode,path)
       os.mkdir(self.__abs(path), mode)
     def utime(self, path, times):
+      print "utime", path
       os.utime(self.__abs(path), times)
     def access(self, path, mode):
+      print "access", path, mode
       if not os.access(self.__abs(path), mode):
         return -EACCES
     def statfs(self):
+      print "statfs"
       return os.statvfs(self.__basefs)
 
     class __File(object):
       def __init__(self, path, flags, *mode):
-        if flags == os.O_RDONLY:
-          
-          self.file = os.fdopen(os.open("." + path, flags, *mode),
-                                flag2mode(flags))
-          self.fd = self.file.fileno()
+        print "new __File: path =", path, "flags =", `flags`, "mode =", `mode`
+        global mainFuseStore
+        assert mainFuseStore is not None
+        self.__Fuse=mainFuseStore
+        self.file = os.fdopen(os.open("." + path, flags, *mode),
+                              flag2mode(flags))
+        self.fd = self.file.fileno()
 
       def read(self, length, offset):
-          self.file.seek(offset)
-          return self.file.read(length)
+        self.file.seek(offset)
+        return self.file.read(length)
 
       def write(self, buf, offset):
-          self.file.seek(offset)
-          self.file.write(buf)
-          return len(buf)
+        self.file.seek(offset)
+        self.file.write(buf)
+        return len(buf)
 
       def release(self, flags):
-          self.file.close()
+        self.file.close()
 
       def fsync(self, isfsyncfile):
-          if isfsyncfile and hasattr(os, 'fdatasync'):
-              os.fdatasync(self.fd)
-          else:
-              os.fsync(self.fd)
+        if isfsyncfile and hasattr(os, 'fdatasync'):
+            os.fdatasync(self.fd)
+        else:
+            os.fsync(self.fd)
 
       def flush(self):
-          self.file.flush()
-          # cf. xmp_flush() in fusexmp_fh.c
-          os.close(os.dup(self.fd))
+        self.file.flush()
+        # cf. xmp_flush() in fusexmp_fh.c
+        os.close(os.dup(self.fd))
 
       def fgetattr(self):
-          return os.fstat(self.fd)
+        return os.fstat(self.fd)
 
       def ftruncate(self, len):
-          self.file.truncate(len)
+        self.file.truncate(len)
 
-  def main(self, *a, **kw):
+  FS=FuseStore()
+  FS.parser.add_option(mountopt="root", metavar="PATH",
+                       help='file system adjunct to store')
+  FS.parse(values=FS, errex=1)
+  FS.main()
 
-      self.file_class = self.XmpFile
-
-      return Fuse.main(self, *a, **kw)
-
-return FuseStore(backfs,store)
-
-def main():
-
-  usage = """
-Userspace nullfs-alike: mirror the filesystem tree from some point on.
-
-""" + Fuse.fusage
-
-  server = Xmp(version="%prog " + fuse.__version__,
-               usage=usage,
-               dash_s_do='setsingle')
-
-  server.parser.add_option(mountopt="root", metavar="PATH", default='/',
-                           help="mirror filesystem from under PATH [default: %default]")
-  server.parse(values=server, errex=1)
-
-  try:
-      if server.fuse_args.mount_expected():
-          os.chdir(server.root)
-  except OSError:
-      print >> sys.stderr, "can't enter root of underlying filesystem"
-      sys.exit(1)
-
-  server.main()
-
-
-if __name__ == '__main__':
-  main()
