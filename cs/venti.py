@@ -27,11 +27,12 @@
           argument order: always ({h|block}, indirect, span)
 '''
 
+import os
 import os.path
 from zlib import compress, decompress
 ## NOTE: migrate to hashlib sometime when python 2.5 more common
 import sha
-from cs.misc import warn, progress, verbose, fromBS, toBS, fromBSfp
+from cs.misc import cmderr, warn, progress, verbose, fromBS, toBS, fromBSfp
 import cs.hier
 from cs.lex import unctrl
 
@@ -123,16 +124,19 @@ class RawStore(dict):
       dict.__setitem__(self,h,(offset,zsize))
 
   def cat(self,bref,fp=None):
+    if type(bref) is str:
+      bref=str2BlockRef(bref)
     if fp is None:
       import sys
       fp=sys.stdout
-    print "cat", hex(bref.h), "indir =", `bref.indirect`
     for b in bref.leaves(self):
       fp.write(b)
 
   def readOpen(self,bref):
     ''' Open a BlockRef for read.
     '''
+    if type(bref) is str:
+      bref=str2BlockRef(bref)
     return ReadFile(self,bref)
 
   def writeOpen(self):
@@ -147,6 +151,39 @@ class RawStore(dict):
       ofp.write(buf)
       buf=ifp.read(rsize)
     return ofp.close()
+
+  def storeDir(self,path):
+    subdirs={}
+    for (dirpath, dirs, files) in os.walk(path,topdown=False):
+      progress("storeDir", dirpath)
+      assert dirpath not in subdirs
+      D=Dir(self,None)
+      for dir in dirs:
+        subpath=os.path.join(dirpath,dir)
+        subD=subdirs[subpath]
+        del subdirs[subpath]
+        D.add(dir,subD.sync(),True)
+      for subfile in files:
+        filepath=os.path.join(dirpath,subfile)
+        progress("storeDir: storeFile", filepath)
+        try:
+          D.add(subfile,self.storeFile(open(filepath)),False)
+        except IOError, e:
+          cmderr("%s: can't store: %s" % (filepath, `e`))
+      subdirs[dirpath]=D
+
+    topdirs=subdirs.keys()
+    assert len(topdirs) == 1, "expected one top dir, got "+`topdirs`
+    return subdirs[topdirs[0]].sync()
+
+  def opendir(self,dirref):
+    ''' Open a BlockRef that refers to a directory.
+    '''
+    return Dir(self,None,dirref)
+
+  def walk(self,dirref):
+    for i in self.opendir(dirref).walk():
+      yield i
 
 MAX_LRU=1024
 class LRUCacheStore(RawStore):
@@ -243,6 +280,11 @@ def decodeBlockRef(iblock):
   print "decode: flags=%x, span=%d, h=%s" % (flags,span,hex(h))
   return (BlockRef(h,indirect,span), iblock)
 
+def str2BlockRef(s):
+  (bref,etc)=decodeBlockRef(s)
+  assert len(etc) == 0
+  return bref
+
 def decodeBlockRefFP(fp):
   ''' Decode a block ref from an indirect block.
       It consist of:
@@ -252,13 +294,12 @@ def decodeBlockRefFP(fp):
         hash:  raw hash
       Return (BlockRef,unparsed) where unparsed is remaining data.
   '''
-  (flags,iblock)=fromBSfp(fp)
+  flags=fromBSfp(fp)
   indirect=bool(flags&0x01)
-  (span,iblock)=fromBSfp(fp)
-  (hlen,iblock)=fromBSfp(fp)
+  span=fromBSfp(fp)
+  hlen=fromBSfp(fp)
   h=fp.read(hlen)
   assert len(h) == hlen
-  print "decodefp: flags=%x, span=%d, h=%s" % (flags,span,hex(h))
   return BlockRef(h,indirect,span)
 
 class BlockRef:
@@ -345,9 +386,13 @@ class ReadFile:
   '''
   def __init__(self,S,bref):
     self.__store=S
-    self.__blist=bref.blocklist(S)
+    if bref.indirect:
+      self.__blist=bref.blocklist(S)
+    else:
+      self.__blist=BlockList(S)
+      self.__blist.append(bref)
     self.__pos=0
-    
+
   def seek(self,offset,whence=0):
     if whence == 1:
       offset+=self.tell()
@@ -367,6 +412,7 @@ class ReadFile:
     return b[offset:]
 
   def read(self,size=None):
+    opos=self.__pos
     buf=''
     while size is None or size > 0:
       chunk=self.readShort()
@@ -380,9 +426,12 @@ class ReadFile:
       else:
         buf+=chunk
         size-=len(chunk)
+
+    self.seek(opos+len(buf))
     return buf
 
   def readline(self,size=None):
+    opos=self.__pos
     line=''
     while size is None or size > 0:
       chunk=self.readShort()
@@ -407,6 +456,7 @@ class ReadFile:
         line+=chunk[:size]
         break
 
+    self.seek(opos+len(line))
     return line
 
   def readlines(self,sizehint=None):
@@ -466,6 +516,10 @@ class BlockSink:
         Return the top blockref.
     '''
     S=self.__store
+
+    # special case - empty file
+    if len(self.__lists) == 1 and len(self.__lists[0]) == 0:
+      return BlockRef(S.store(''),False,0)
 
     # record the lower level indirect blocks in their parents
     while len(self.__lists) > 1:
@@ -621,21 +675,66 @@ class Dirent:
 class Dir(dict):
   def __init__(self,S,parent,dirref=None):
     self.__store=S
-    self.__parent=paret
+    self.__parent=parent
     if dirref is not None:
-      fp=S.readFile(dirref)
+      fp=S.readOpen(dirref)
       (name,dent)=decodeDirent(fp)
       while name is not None:
-        self[name]=det
+        dict.__setitem__(self,name,dent)
         (name,dent)=decodeDirent(fp)
+
+  def __setitem__(self,key,value):
+    raise IndexError
+  def add(self,name,bref,isdir,meta=None):
+    dict.__setitem__(self,name,Dirent(bref,isdir,meta))
 
   def sync(self):
     ''' Encode dir to store, return blockref of encode.
     '''
-    fp=self.__store.writeFile()
+    fp=self.__store.writeOpen()
     for name in self:
       encodeDirent(fp,name,self[name])
     return fp.close()
+
+  def dirs(self):
+    return [name for name in self.keys() if self[name].isdir]
+
+  def files(self):
+    return [name for name in self.keys() if not self[name].isdir]
+
+  def ancestry(self):
+    ''' Return parent directories, closest first.
+    '''
+    p=self.__parent
+    while p is not None:
+      yield p
+      p=p.__parent
+
+  def walk(self,topdown=True):
+    dirs=self.dirs()
+    files=self.files()
+    if topdown:
+      yield (self,dirs,files)
+    for subD in [Dir(self.__store,D,self[name].bref) for name in dirs]:
+      for i in subD.walk(topdown=topdown):
+        yield i
+    if not topdown:
+      yield (self,dirs,files)
+
+  def unpack(self,basepath):
+    progress("mkdir "+basepath)
+    os.mkdir(basepath)
+    for f in self.files():
+      fpath=os.path.join(basepath,f)
+      progress("create file", fpath)
+      ofp=open(fpath, "w")
+      ifp=S.openRead(self[f].bref)
+      buf=ifp.readShort()
+      while len(buf) > 0:
+        ofp.write(buf)
+        buf=ifp.readShort()
+    for d in self.dirs():
+      Dir(S,self,dirref=self[d].bref).unpack(os.path.join(basepath,d))
 
 # horrible hack because the Fuse class doesn't seem to tell fuse file
 # objects which class instantiation they belong to

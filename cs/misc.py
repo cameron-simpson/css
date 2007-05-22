@@ -8,9 +8,13 @@ import time
 from StringIO import StringIO
 from cs.lex import parseline, strlist
 
-cmd=os.path.basename(sys.argv[0])
-cmd_=cmd+':'
-cmd__=cmd_+' '
+def setcmd(ncmd):
+  global cmd, cmd_, cmd__
+  cmd=ncmd
+  cmd_=cmd+':'
+  cmd__=cmd_+' '
+
+setcmd(os.path.basename(sys.argv[0]))
 
 # print to stderr
 def warn(*args):
@@ -559,7 +563,7 @@ def trysaferename(oldpath,newpath):
   return True
 
 def fromBS(s):
-  ''' Read a extensible value from the front of a string.
+  ''' Read an extensible value from the front of a string.
       Continuation octets have their high bit set.
       The value is big-endian.
   '''
@@ -573,11 +577,14 @@ def fromBS(s):
   return (n,s[used:])
 
 def fromBSfp(fp):
+  ''' Read an extensible value from a file.
+  '''
   s=c=fp.read(1)
   if len(s) == 0:
     return None
   while ord(c)&0x80:
     c=fp.read(1)
+    assert len(c) == 1, "unexpected EOF"
     s+=c
   (n,s)=fromBS(s)
   assert len(s) == 0
