@@ -36,8 +36,8 @@ def unctrl(s,tabsize=8):
           ch2="\\%03o"%o
 
     if ch2 is not None:
-      import cs.misc
-      cs.misc.progress("ch2=["+ch2+"]")
+      ##import cs.misc
+      ##cs.misc.progress("ch2=["+ch2+"]")
       if sofar < i:
         s2+=s[sofar:i]
       s2+=ch2

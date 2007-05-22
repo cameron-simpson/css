@@ -95,7 +95,7 @@ class HierOutput(_Hier):
       elif t is float:
         self.fp.write("%g" % obj)
       elif t is bool:
-        self.fp.write(int(obj))
+        self.fp.write(str(int(obj)))
       elif isinstance(obj, StringTypes):
         self.__stringEncode(obj)
       else:

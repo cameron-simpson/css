@@ -1,0 +1,91 @@
+#!/usr/bin/python
+#
+# Test script for venti implementation.
+#       - Cameron Simpson <cs@zip.com.au> 01may2007
+#
+
+from sys import argv, exit, stderr, stdout
+import os
+import os.path
+from cs.venti import hex, unhex, Store, fuse, decodeBlockRef
+import cs.misc
+from cs.misc import cmd, cmderr, setcmd, warn
+
+usage='''Usage:
+  %s store pathnames...
+  %s cat filerefs...
+  %s ls [-R] dirrefs...
+  %s unpack dirref
+''' % (cmd,cmd,cmd,cmd)
+
+badopts=False
+
+args=argv[1:]
+if len(args) < 1:
+  cmderr("missing command")
+  badopts=True
+else:
+  op=args.pop(0)
+  setcmd("%s: %s" % (cmd,op))
+  if op == "store":
+    if len(args) < 1:
+      cmderr("missing pathnames")
+      badopts=True
+  elif op == "cat":
+    if len(args) < 1:
+      cmderr("missing filerefs")
+      badopts=True
+  elif op == "ls":
+    recurse=False
+    if len(args) > 0 and args[0] == "-R":
+      recurse=True
+      args.pop(0)
+    if len(args) < 1:
+      cmderr("missing dirrefs")
+      badopts=True
+  elif op == "unpack":
+    if len(args) != 1:
+      cmderr("expected exactly one dirref")
+      badopts=True
+  else:
+    cmderr("unrecognised command")
+    badopts=True
+
+if badopts:
+  stderr.write(usage)
+  exit(2)
+
+S=Store("/home/cameron/tmp/venti/store")
+
+if op == "store":
+  for path in args:
+    if os.path.isdir(path):
+      ref=S.storeDir(path)
+    else:
+      ref=S.storeFile(open(path))
+
+    warn("ref =", `ref`)
+    stdout.write(hex(ref.encode()))
+    if len(args) > 1:
+      stdout.write('\t')
+      stdout.write(path)
+    stdout.write('\n')
+elif op == "cat":
+  for hexarg in args:
+    S.cat(unhex(hexarg))
+elif op == "ls":
+  for hexarg in args:
+    D=S.opendir(unhex(hexarg))
+    if not recurse:
+      dirs=D.dirs(); dirs.sort()
+      files=D.files(); files.sort()
+      for f in files:
+        print f
+      for d in dirs:
+        print "%s/"%d
+    print "recurse =", `recurse`
+elif op == "unpack":
+  S.opendir(unhex(args[0])).unpack('.')
+else:
+  cmderr("unsupported command")
+  exit(2)
