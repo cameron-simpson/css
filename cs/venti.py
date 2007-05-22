@@ -722,19 +722,21 @@ class Dir(dict):
       yield (self,dirs,files)
 
   def unpack(self,basepath):
-    progress("mkdir "+basepath)
-    os.mkdir(basepath)
+    S=self.__store
     for f in self.files():
       fpath=os.path.join(basepath,f)
       progress("create file", fpath)
       ofp=open(fpath, "w")
-      ifp=S.openRead(self[f].bref)
+      ifp=S.readOpen(self[f].bref)
       buf=ifp.readShort()
       while len(buf) > 0:
         ofp.write(buf)
         buf=ifp.readShort()
     for d in self.dirs():
-      Dir(S,self,dirref=self[d].bref).unpack(os.path.join(basepath,d))
+      dirpath=os.path.join(basepath,d)
+      progress("mkdir", dirpath)
+      os.mkdir(dirpath)
+      Dir(S,self,dirref=self[d].bref).unpack(dirpath)
 
 # horrible hack because the Fuse class doesn't seem to tell fuse file
 # objects which class instantiation they belong to

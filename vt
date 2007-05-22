@@ -85,7 +85,7 @@ elif op == "ls":
         print "%s/"%d
     print "recurse =", `recurse`
 elif op == "unpack":
-  S.opendir(undex(args[0])).unpack('.')
+  S.opendir(unhex(args[0])).unpack('.')
 else:
   cmderr("unsupported command")
   exit(2)
