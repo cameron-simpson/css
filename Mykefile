@@ -37,6 +37,7 @@ _home:
                 --include=cs/ \\
                 --include=stubs/ \\
                 --include=synonyms/ \\
+                --exclude=*.swp \\
                 --exclude=/\*/ \\
                 . $(HOME)/bin/.
 
