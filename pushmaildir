@@ -11,6 +11,8 @@ usage="Usage: $cmd from-maildir to-maildir"
 
 badopts=
 
+[ $# = 2 ] || { echo "$usage" >&2; exit 2; }
+
 from=$1 to=$2
 shift; shift
 
