@@ -21,6 +21,8 @@
             [meta] (if flags&0x01)
             blockref
           generic LRUCache class
+          multiple store files in store n.vtd
+          store index index.dbm: h => (n, offset, zsize)
           caching store - fetch&store locally
           store priority queue - tuples=pool
           remote store: http? multifetch? udp?
@@ -64,13 +66,61 @@ def writehex(fp,data):
   for w in genHex(data):
     fp.write(w)
 
-class RawStore(dict):
+class RawStoreIndexGDBM(dict):
   def __init__(self,path):
     dict.__init__(self)
+    self.__db=gdbm.open(os.path.join(path,"index"),"cf")
+  def sync(self):
+    self.__db.sync()
+  def __setitem__(self,h,noz):
+    dict.__setitem__(self,h,toBS(noz[0])+toBS(noz[1])+toBS(noz[2]))
+  def __getitem__(self,h):
+    noz=dict.__getitem__(self,h)
+    (n,noz)=fromBS(noz)
+    (offset,noz)=fromBS(noz)
+    (zsize,noz)=fromBS(noz)
+    assert len(noz) == 0
+    return (n,offset,zsize)
+    
+class RawStore(dict):
+  def __init__(self,path,doindex=False):
+    dict.__init__(self)
     self.__path=path
-    progress("indexing", path)
-    self.__fp=open(path,"a+b")
-    self.__loadIndex()
+    stores=[ (int(name[:-4],name)
+             for name in os.listdir(path):
+             if len(name) > 4
+                and name[-4:] == '.vtd'
+                and name[:-4].isdigit()
+           ]
+    self.__open={}
+    for n in stores:
+      self.__open[n]=None
+    self.__opened=[]    # dumb FIFO of open files
+    self.__index=RawStoreIndexGDBM(path)
+    if doindex:
+      for n in stores:
+        self.__loadIndex(n)
+      self.sync()
+
+  def sync(self):
+    self.__index.sync()
+    for n in self.__open:
+      fp=self.__open[n]
+      if fp:
+        fp.flush()
+
+  def __storeOpen(self,n):
+    name=str(n)+'.vtd':
+    if self.__open[name] is None:
+      # flush an older file
+      if len(self.__openStores) >= 16:
+        oldn=self.__opened.pop(0)
+        oldfp=self.__open[n]
+        oldfp.close()
+        self.__open[n]=None
+      self.__open[n]=newfp=open(os.path.join(self.__path,name),"a+b")
+      self.__opened.append(newfp)
+    return self.__stores[n]
 
   def __setitem__(self,h,value):
     raise IndexError
@@ -78,9 +128,14 @@ class RawStore(dict):
   def __getitem__(self,h):
     ''' Return block for hash, or raise IndexError if not in store.
     '''
-    v=dict.__getitem__(self,h)
-    self.__fp.seek(v[0])
-    return decompress(self.__fp.read(v[1]))
+    dbent=self.__db[h]
+    (dbent,n)=fromBS(dbent)
+    (dbent,offset)=fromBS(dbent)
+    (dbent,zsize)=fromBS(dbent)
+    assert len(dbent) == 0
+    fp=self.__storeOpen(n)
+    fp.seek(offset)
+    return decompress(fp.read(zsize))
 
   def hash(self,block):
     ''' Compute the hash for a block.
@@ -110,9 +165,9 @@ class RawStore(dict):
       return None
     return self[h]
 
-  def __loadIndex(self):
-    fp=self.__fp
-    fp.seek(0)
+  def __loadIndex(self,n):
+    progress("load index from store", str(n))
+    fp=self.__storeOpen(n)
     while True:
       zsize=fromBSfp(fp)
       if zsize is None:
@@ -121,7 +176,7 @@ class RawStore(dict):
       zblock=fp.read(zsize)
       block=decompress(zblock)
       h=self.hash(block)
-      dict.__setitem__(self,h,(offset,zsize))
+      self.__db[h]=toBS(n)+toBS(offset)+toBS(zsize)
 
   def cat(self,bref,fp=None):
     if type(bref) is str:
