@@ -14,7 +14,7 @@ from cs.misc import cmd, cmderr, setcmd, warn
 usage='''Usage:
   %s store pathnames...
   %s cat filerefs...
-  %s catblock hashcodes...
+  %s catblock [-i] hashcodes...
   %s ls [-R] dirrefs...
   %s unpack dirref
 ''' % (cmd,cmd,cmd,cmd,cmd)
@@ -37,6 +37,10 @@ else:
       cmderr("missing filerefs")
       badopts=True
   elif op == "catblock":
+    indirect=False
+    if len(args) > 0 and args[0] == "-i":
+      indirect=True
+      args.pop(0)
     if len(args) < 1:
       cmderr("missing hashcodes")
       badopts=True
@@ -65,7 +69,7 @@ S=Store("/home/cameron/tmp/venti")
 def ls(path,bref,recurse,fp=None):
   if fp is None:
     fp=stdout
-  warn("ls %s: bref=%s"%(path,("s:"+hex(bref) if type(bref) is str else "bref:"+hex(bref.h))))
+  ##warn("ls %s: bref=%s"%(path,("s:"+hex(bref) if type(bref) is str else "bref.h:"+hex(bref.h))))
   D=S.opendir(bref)
   fp.write(path)
   fp.write(":\n")
@@ -74,17 +78,16 @@ def ls(path,bref,recurse,fp=None):
     names.sort()
     for name in names:
       E=D[name]
-      ##warn("%s: E.isdir=%s, E.bref.span=%s, E.bref=%s"%(name,E.isdir,`E.bref.span`,`E.bref`))
       fp.write("%c %-41s %-6d %s\n" % (('d' if E.isdir else 'f'), hex(E.bref.encode()), E.bref.span, name))
   else:
     dirs=D.dirs(); dirs.sort()
     files=D.files(); files.sort()
     for name in files:
       E=D[name]
-      ##warn("%s: E.isdir=%s, E.bref.span=%s, E.bref=%s"%(name,E.isdir,`E.bref.span`,`E.bref`))
       fp.write("%c %-41s %-6d %s\n" % (('d' if E.isdir else 'f'), hex(E.bref.encode()), E.bref.span, name))
       assert not E.isdir, name+" should not be a directory!"
     for name in dirs:
+      E=D[name]
       fp.write("\n")
       ls(os.path.join(path,name),E.bref,recurse,fp)
 
@@ -95,7 +98,7 @@ if op == "store":
     else:
       ref=S.storeFile(open(path))
 
-    warn("ref =", `ref`)
+    S.sync()
     stdout.write(hex(ref.encode()))
     if len(args) > 1:
       stdout.write('\t')
@@ -103,10 +106,15 @@ if op == "store":
     stdout.write('\n')
 elif op == "cat":
   for hexarg in args:
-    S.cat(unhex(hexarg))
+    E=S.namei(hexarg)
+    assert not E.isdir, "%s: %s: expected file, not directory"%(cmd,hexarg)
+    S.cat(E.bref)
 elif op == "catblock":
   for hexarg in args:
-    stdout.write(S[unhex(hexarg)])
+    if indirect:
+      bl
+    else:
+      stdout.write(S[unhex(hexarg)])
 elif op == "ls":
   first=True
   for hexarg in args:
@@ -115,7 +123,9 @@ elif op == "ls":
     else:
       print
     print "ls", hexarg, "..."
-    ls(hexarg,unhex(hexarg),recurse,stdout)
+    E=S.namei(hexarg+'/')
+    assert E.isdir, "%s: %s: expected directory, not file"%(cmd,hexarg)
+    ls(hexarg,E.bref,recurse,stdout)
 elif op == "unpack":
   S.opendir(unhex(args[0])).unpack('.')
 else:

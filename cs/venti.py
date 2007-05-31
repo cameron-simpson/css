@@ -34,7 +34,7 @@ import os.path
 from zlib import compress, decompress
 ## NOTE: migrate to hashlib sometime when python 2.5 more common
 import sha
-from cs.misc import cmderr, warn, progress, verbose, fromBS, toBS, fromBSfp
+from cs.misc import cmderr, warn, progress, verbose, out, fromBS, toBS, fromBSfp
 import cs.hier
 from cs.lex import unctrl
 
@@ -94,9 +94,8 @@ class RawStoreIndexGDBM:
     for h in self.__db:
       yield h
 
-class RawStore(dict):
+class RawStore:
   def __init__(self,path,doindex=False):
-    dict.__init__(self)
     self.__path=path
     stores=[ int(name[:-4])
              for name in os.listdir(path)
@@ -116,6 +115,28 @@ class RawStore(dict):
       for n in stores:
         self.__loadIndex(n)
       self.sync()
+
+  def hash(self,block):
+    ''' Compute the hash for a block.
+    '''
+    return hash_sha(block)
+
+  def store(self,block):
+    ''' Store a block, return the hash.
+    '''
+    h=self.hash(block)
+    if h in self:
+      verbose(self.__path,"already contains",hex(h))
+    else:
+      zblock=compress(block)
+      fp=self.__storeOpen(self.__newStore)
+      fp.seek(0,2)
+      fp.write(toBS(len(zblock)))
+      offset=fp.tell()
+      fp.write(zblock)
+      self.__index[h]=(self.__newStore,offset,len(zblock))
+
+    return h
 
   def sync(self):
     self.__index.sync()
@@ -148,34 +169,15 @@ class RawStore(dict):
     fp.seek(offset)
     return decompress(fp.read(zsize))
 
-  def hash(self,block):
-    ''' Compute the hash for a block.
-    '''
-    return hash_sha(block)
-
-  def store(self,block):
-    ''' Store a block, return the hash.
-    '''
-    h=self.hash(block)
-    if h in self:
-      verbose(self.__path,"already contains",hex(h))
-    else:
-      zblock=compress(block)
-      fp=self.__storeOpen(self.__newStore)
-      fp.seek(0,2)
-      fp.write(toBS(len(zblock)))
-      offset=fp.tell()
-      fp.write(zblock)
-      self.__index[h]=(self.__newStore,offset,len(zblock))
-
-    return h
-
-  def fetch(self,h):
+  def get(self,h):
     ''' Return block for hash, or None if not present in store.
     '''
     if h not in self:
       return None
     return self[h]
+
+  def __contains__(self,h):
+    return h in self.__index
 
   def __loadIndex(self,n):
     progress("load index from store", str(n))
@@ -232,7 +234,7 @@ class RawStore(dict):
         D.add(dir,subD.sync(),True)
       for subfile in files:
         filepath=os.path.join(dirpath,subfile)
-        progress("storeDir: storeFile", filepath)
+        verbose("storeDir: storeFile "+filepath)
         try:
           D.add(subfile,self.storeFile(open(filepath)),False)
         except IOError, e:
@@ -248,6 +250,27 @@ class RawStore(dict):
     '''
     return Dir(self,None,dirref)
 
+  def namei(self,hexarg):
+    ''' Given a path of the form
+          hexarg/sub1/sub2/...
+        return the Dirent for the end of the path, or None.
+        hexarg is a hex(bref.encode()) as used by "vt cat" or "vt ls".
+    '''
+    slash=hexarg.find('/')
+    if slash < 0:
+      # no slash - presume file reference
+      return Dirent(str2BlockRef(unhex(hexarg)),False)
+
+    subpath=[p for p in hexarg[slash+1:].split('/') if len(p)]
+    if len(subpath) == 0:
+      return Dirent(str2BlockRef(unhex(hexarg[:slash])), hexarg[-1] == '/')
+
+    hexarg=hexarg[:slash]
+    D=self.opendir(unhex(hexarg))
+    while len(subpath) > 1:
+      D=D.subdir(subpath.pop(0))
+    return D[subpath[0]]
+
   def walk(self,dirref):
     for i in self.opendir(dirref).walk():
       yield i
@@ -259,7 +282,6 @@ class LRUCacheStore(RawStore):
             This will let me put Store pools behind a single cache.
   '''
   def __init__(self,path,maxCache=None):
-    ##print "new LRUCacheStore"
     if maxCache is None: maxCache=MAX_LRU
     RawStore.__init__(self,path)
     self.__max=maxCache
@@ -282,14 +304,12 @@ class LRUCacheStore(RawStore):
     prev=node[2]
     if prev is not None:
       # swap with the node to the left
-      ##print "LRU bubble up"
       prev[3]=node[3]
       node[2]=prev[2]
       prev[2]=node
       node[3]=prev
 
   def __newBlock(self,h,block):
-    ##print "LRU new"
     oldfirst=self.__first
     node=[h,block,None,oldfirst]
     self.__first=node
@@ -303,7 +323,6 @@ class LRUCacheStore(RawStore):
     self.__len+=1
     if self.__len > self.__max:
       # remove the last node
-      ##print "LRU pop"
       newlast=self.__last[2]
       newlast[3]=None
       self.__last=newlast
@@ -344,7 +363,6 @@ def decodeBlockRef(iblock):
   (hlen,iblock)=fromBS(iblock)
   h=iblock[:hlen]
   iblock=iblock[hlen:]
-  print "decode: flags=%x, span=%d, h=%s" % (flags,span,hex(h))
   return (BlockRef(h,indirect,span), iblock)
 
 def str2BlockRef(s):
@@ -573,9 +591,7 @@ class BlockSink:
     S=self.__store
     level=0
     while True:
-      print "appendBlockRef: level=%d, bref=%s"%(level,hex(bref.h))
       blist=self.__lists[level]
-      ##print "append: blist =", `blist`
       if len(blist) < MAX_SUBBLOCKS:
         blist.append(bref)
         return
@@ -595,14 +611,12 @@ class BlockSink:
       level+=1
       bref=nbref
       if level == len(self.__lists):
-        print "new indir level", level
         self.__lists.append(BlockList(S))
 
   def close(self):
     ''' Store all the outstanding indirect blocks (if they've more than one etry).
         Return the top blockref.
     '''
-    print "BlockSink.close()..."
     S=self.__store
 
     # special case - empty file
@@ -737,7 +751,19 @@ def decodeDirent(fp):
       meta=None
     bref=decodeBlockRefFP(fp)
 
+    assert flags&~0x03 == 0
+
     return (name,Dirent(bref,isdir,meta))
+
+def debuggingEncodeDirent(fp,name,dent):
+  from StringIO import StringIO
+  sfp=StringIO()
+  realEncodeDirent(sfp,name,dent)
+  enc=sfp.getvalue()
+  nsfp=StringIO(enc)
+  decName, decEnt = decodeDirent(nsfp)
+  assert nsfp.tell() == len(enc) and decName == name, "len(enc)=%d len(decenc)=%d, name=%s, decname=%s"%(len(enc),nsfp.tell(),name,decName)
+  fp.write(enc)
 
 def encodeDirent(fp,name,dent):
   assert len(name) > 0
@@ -773,6 +799,7 @@ class Dir(dict):
 
   def __setitem__(self,key,value):
     raise IndexError
+
   def add(self,name,bref,isdir,meta=None):
     dict.__setitem__(self,name,Dirent(bref,isdir,meta))
 
@@ -780,7 +807,9 @@ class Dir(dict):
     ''' Encode dir to store, return blockref of encode.
     '''
     fp=self.__store.writeOpen()
-    for name in self:
+    names=self.keys()
+    names.sort()
+    for name in names:
       encodeDirent(fp,name,self[name])
     return fp.close()
 
