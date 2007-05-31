@@ -8,20 +8,20 @@ import time
 from StringIO import StringIO
 from cs.lex import parseline, strlist
 
-def setcmd(ncmd):
-  global cmd, cmd_, cmd__
-  cmd=ncmd
-  cmd_=cmd+':'
-  cmd__=cmd_+' '
+cmd=os.path.basename(sys.argv[0])
+cmd_=cmd+':'
+cmd__=cmd_+' '
 
-setcmd(os.path.basename(sys.argv[0]))
+warnFlushesUpd=True
 
 # print to stderr
 def warn(*args):
   import cs.upd
+  global warnFlushesUpd
   if cs.upd.active:
     upd=cs.upd.default()
-    oldUpd=upd.state()
+    if not warnFlushesUpd:
+      oldUpd=upd.state()
     upd.out('')
 
   first=True
@@ -37,8 +37,9 @@ def warn(*args):
   sys.stderr.write("\n")
   sys.stderr.flush()
 
-  if cs.upd.active:
-    upd.out(oldUpd)
+  if not warnFlushesUpd:
+    if cs.upd.active:
+      upd.out(oldUpd)
 
 # debug_level:
 #   0 - quiet
@@ -145,7 +146,7 @@ def a2date(s):
 def exactlyOne(list,context=None):
   ''' Returns the first element of a list, but requires there to be exactly one.
   '''
-  icontext="expected exactly one"
+  icontext="expected exactly one value"
   if context is not None:
     icontext=icontext+" for "+context
   if len(list) == 0:
