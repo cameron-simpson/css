@@ -8,9 +8,13 @@ import time
 from StringIO import StringIO
 from cs.lex import parseline, strlist
 
-cmd=os.path.basename(sys.argv[0])
-cmd_=cmd+':'
-cmd__=cmd_+' '
+def setcmd(ncmd):
+  global cmd, cmd_, cmd__
+  cmd=ncmd
+  cmd_=cmd+':'
+  cmd__=cmd_+' '
+
+setcmd(os.path.basename(sys.argv[0]))
 
 warnFlushesUpd=True
 
