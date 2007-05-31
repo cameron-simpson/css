@@ -12,16 +12,22 @@ import cs.misc
 from cs.misc import cmd, cmderr, setcmd, warn
 
 usage='''Usage:
-  %s store pathnames...
-  %s cat filerefs...
-  %s catblock [-i] hashcodes...
-  %s ls [-R] dirrefs...
-  %s unpack dirref
+  %s [-S store] store pathnames...
+  %s [-S store] cat filerefs...
+  %s [-S store] catblock [-i] hashcodes...
+  %s [-S store] ls [-R] dirrefs...
+  %s [-S store] unpack dirref
 ''' % (cmd,cmd,cmd,cmd,cmd)
 
 badopts=False
 
+S=None
+
 args=argv[1:]
+if len(args) > 0 and args[0] == '-S':
+  S=Store(args[1])
+  args=arg[2:]
+
 if len(args) < 1:
   cmderr("missing command")
   badopts=True
@@ -60,11 +66,17 @@ else:
     cmderr("unrecognised command")
     badopts=True
 
+if S is None:
+  dflt_vt_store=os.environ.get('VT_STORE')
+  if dflt_vt_store is None:
+    cmderr("no $VT_STORE and no -S option")
+    badopts=True
+  else:
+    S=Store(dflt_vt_store)
+
 if badopts:
   stderr.write(usage)
   exit(2)
-
-S=Store("/home/cameron/tmp/venti")
 
 def ls(path,bref,recurse,fp=None):
   if fp is None:
