@@ -64,4 +64,4 @@ remote "$to_remote"   ismaildir "$to" \
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
-$trace rsync -avH --ignore-existing --remove-source-files --include=/new --include=/cur '--exclude=/*' '--exclude=*/' ' "$from_pfx$from/." "$to_pfx$to/."
+$trace rsync -avH --ignore-existing --remove-source-files --include=/new --include=/cur '--exclude=/*' '--exclude=*/' "$from_pfx$from/." "$to_pfx$to/."
