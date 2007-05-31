@@ -13,7 +13,8 @@ profile=$BROWSER_PROFILE
 ##br=/opt/firefox-1.5.0.7-enGB/firefox
 ##br=/opt/firefox-2.0-enGB/firefox
 ##br=/opt/firefox-2.0.0.1-enGB/firefox
-br=/opt/firefox-2.0.0.3-enGB/firefox
+##br=/opt/firefox-2.0.0.3-enGB/firefox
+br=/opt/firefox-2.0.0.4-enGB/firefox
 prefs=$HOME/.mozilla/firefox/subdir/prefs.js
 
 cmd=$0
