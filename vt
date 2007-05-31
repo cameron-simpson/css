@@ -14,9 +14,10 @@ from cs.misc import cmd, cmderr, setcmd, warn
 usage='''Usage:
   %s store pathnames...
   %s cat filerefs...
+  %s catblock hashcodes...
   %s ls [-R] dirrefs...
   %s unpack dirref
-''' % (cmd,cmd,cmd,cmd)
+''' % (cmd,cmd,cmd,cmd,cmd)
 
 badopts=False
 
@@ -34,6 +35,10 @@ else:
   elif op == "cat":
     if len(args) < 1:
       cmderr("missing filerefs")
+      badopts=True
+  elif op == "catblock":
+    if len(args) < 1:
+      cmderr("missing hashcodes")
       badopts=True
   elif op == "ls":
     recurse=False
@@ -55,7 +60,33 @@ if badopts:
   stderr.write(usage)
   exit(2)
 
-S=Store("/home/cameron/tmp/venti/store")
+S=Store("/home/cameron/tmp/venti")
+
+def ls(path,bref,recurse,fp=None):
+  if fp is None:
+    fp=stdout
+  warn("ls %s: bref=%s"%(path,("s:"+hex(bref) if type(bref) is str else "bref:"+hex(bref.h))))
+  D=S.opendir(bref)
+  fp.write(path)
+  fp.write(":\n")
+  if not recurse:
+    names=D.dirs()+D.files()
+    names.sort()
+    for name in names:
+      E=D[name]
+      ##warn("%s: E.isdir=%s, E.bref.span=%s, E.bref=%s"%(name,E.isdir,`E.bref.span`,`E.bref`))
+      fp.write("%c %-41s %-6d %s\n" % (('d' if E.isdir else 'f'), hex(E.bref.encode()), E.bref.span, name))
+  else:
+    dirs=D.dirs(); dirs.sort()
+    files=D.files(); files.sort()
+    for name in files:
+      E=D[name]
+      ##warn("%s: E.isdir=%s, E.bref.span=%s, E.bref=%s"%(name,E.isdir,`E.bref.span`,`E.bref`))
+      fp.write("%c %-41s %-6d %s\n" % (('d' if E.isdir else 'f'), hex(E.bref.encode()), E.bref.span, name))
+      assert not E.isdir, name+" should not be a directory!"
+    for name in dirs:
+      fp.write("\n")
+      ls(os.path.join(path,name),E.bref,recurse,fp)
 
 if op == "store":
   for path in args:
@@ -73,17 +104,18 @@ if op == "store":
 elif op == "cat":
   for hexarg in args:
     S.cat(unhex(hexarg))
-elif op == "ls":
+elif op == "catblock":
   for hexarg in args:
-    D=S.opendir(unhex(hexarg))
-    if not recurse:
-      dirs=D.dirs(); dirs.sort()
-      files=D.files(); files.sort()
-      for f in files:
-        print f
-      for d in dirs:
-        print "%s/"%d
-    print "recurse =", `recurse`
+    stdout.write(S[unhex(hexarg)])
+elif op == "ls":
+  first=True
+  for hexarg in args:
+    if first:
+      first=False
+    else:
+      print
+    print "ls", hexarg, "..."
+    ls(hexarg,unhex(hexarg),recurse,stdout)
 elif op == "unpack":
   S.opendir(unhex(args[0])).unpack('.')
 else:
