@@ -66,32 +66,47 @@ def writehex(fp,data):
   for w in genHex(data):
     fp.write(w)
 
-class RawStoreIndexGDBM(dict):
+class RawStoreIndexGDBM:
   def __init__(self,path):
-    dict.__init__(self)
+    import gdbm
     self.__db=gdbm.open(os.path.join(path,"index"),"cf")
   def sync(self):
     self.__db.sync()
   def __setitem__(self,h,noz):
-    dict.__setitem__(self,h,toBS(noz[0])+toBS(noz[1])+toBS(noz[2]))
+    # encode then store
+    self.__db[h]=toBS(noz[0])+toBS(noz[1])+toBS(noz[2])
   def __getitem__(self,h):
-    noz=dict.__getitem__(self,h)
+    # fetch and decode
+    noz=self.__db[h]
     (n,noz)=fromBS(noz)
     (offset,noz)=fromBS(noz)
     (zsize,noz)=fromBS(noz)
     assert len(noz) == 0
     return (n,offset,zsize)
-    
+  def __contains__(self,h):
+    return h in self.__db
+  def __len__(self):
+    return len(self.__db)
+  def __iter__(self):
+    for h in self.__db:
+      yield h
+  def iterkeys(self):
+    for h in self.__db:
+      yield h
+
 class RawStore(dict):
   def __init__(self,path,doindex=False):
     dict.__init__(self)
     self.__path=path
-    stores=[ (int(name[:-4],name)
-             for name in os.listdir(path):
+    stores=[ int(name[:-4])
+             for name in os.listdir(path)
              if len(name) > 4
-                and name[-4:] == '.vtd'
+                and name.endswith('.vtd')
                 and name[:-4].isdigit()
            ]
+    if len(stores) == 0:
+      stores=[0]
+    self.__newStore=max(stores)
     self.__open={}
     for n in stores:
       self.__open[n]=None
@@ -110,17 +125,17 @@ class RawStore(dict):
         fp.flush()
 
   def __storeOpen(self,n):
-    name=str(n)+'.vtd':
-    if self.__open[name] is None:
+    name=str(n)+'.vtd'
+    if self.__open[n] is None:
       # flush an older file
-      if len(self.__openStores) >= 16:
+      if len(self.__opened) >= 16:
         oldn=self.__opened.pop(0)
-        oldfp=self.__open[n]
+        oldfp=self.__open[oldn]
         oldfp.close()
-        self.__open[n]=None
+        self.__open[oldn]=None
       self.__open[n]=newfp=open(os.path.join(self.__path,name),"a+b")
       self.__opened.append(newfp)
-    return self.__stores[n]
+    return self.__open[n]
 
   def __setitem__(self,h,value):
     raise IndexError
@@ -128,11 +143,7 @@ class RawStore(dict):
   def __getitem__(self,h):
     ''' Return block for hash, or raise IndexError if not in store.
     '''
-    dbent=self.__db[h]
-    (dbent,n)=fromBS(dbent)
-    (dbent,offset)=fromBS(dbent)
-    (dbent,zsize)=fromBS(dbent)
-    assert len(dbent) == 0
+    n,offset,zsize = self.__index[h]
     fp=self.__storeOpen(n)
     fp.seek(offset)
     return decompress(fp.read(zsize))
@@ -150,11 +161,12 @@ class RawStore(dict):
       verbose(self.__path,"already contains",hex(h))
     else:
       zblock=compress(block)
-      self.__fp.seek(0,2)
-      self.__fp.write(toBS(len(zblock)))
-      offset=self.__fp.tell()
-      self.__fp.write(zblock)
-      dict.__setitem__(self,h,(offset,len(zblock)))
+      fp=self.__storeOpen(self.__newStore)
+      fp.seek(0,2)
+      fp.write(toBS(len(zblock)))
+      offset=fp.tell()
+      fp.write(zblock)
+      self.__index[h]=(self.__newStore,offset,len(zblock))
 
     return h
 
@@ -176,7 +188,7 @@ class RawStore(dict):
       zblock=fp.read(zsize)
       block=decompress(zblock)
       h=self.hash(block)
-      self.__db[h]=toBS(n)+toBS(offset)+toBS(zsize)
+      self.__index[h]=toBS(n)+toBS(offset)+toBS(zsize)
 
   def cat(self,bref,fp=None):
     if type(bref) is str:
@@ -354,7 +366,7 @@ def decodeBlockRefFP(fp):
   span=fromBSfp(fp)
   hlen=fromBSfp(fp)
   h=fp.read(hlen)
-  assert len(h) == hlen
+  assert len(h) == hlen, "(indir=%s, span=%d): expected hlen=%d bytes, read %d bytes: %s"%(indirect,span,hlen,len(h),hex(h))
   return BlockRef(h,indirect,span)
 
 class BlockRef:
@@ -437,7 +449,8 @@ class BlockList(list):
         yield b
 
 class ReadFile:
-  ''' A file interface supporting seek(), read() and tell() methods.
+  ''' A file interface supporting seek(), read(), readline(), readlines()
+      and tell() methods.
   '''
   def __init__(self,S,bref):
     self.__store=S
@@ -461,10 +474,14 @@ class ReadFile:
   def readShort(self):
     (h,offset)=self.__blist.seekToBlock(self.tell())
     if h is None:
+      # at or past EOF - return empty read
       return ''
     b=self.__store[h]
-    self.__pos+=len(b)-offset
-    return b[offset:]
+    assert offset < len(b)
+    chunk=b[offset:]
+    assert len(chunk) > 0
+    self.seek(len(chunk),1)
+    return chunk
 
   def read(self,size=None):
     opos=self.__pos
@@ -527,6 +544,20 @@ class ReadFile:
     return lines
 
 class BlockSink:
+  ''' A BlockSink supports storing a sequence of blocks or BlockRefs,
+      assembling indirect blocks as necessary. It maintains a list of
+      BlockLists containing direct or indirect BlockRefs. As each BlockList
+      overflows its storage limit it is encoded as a block and stored and a
+      new BlockList made for further data; the encoded block is added
+      to BlockList for the next level of indirection.
+
+      On close() the BlockLists are stored.
+      As a storage optimisation, a BlockList with only one BlockRef is
+      discarded, and the BlockRef passed to the next level up.
+      When there are no more higher levels, the current blockref is
+      returned as the top level reference to the file. For small files
+      this is a direct BlockRef to the sole block of storage for the file.
+  '''
   def __init__(self,S):
     self.__store=S
     self.__lists=[BlockList(S)]
@@ -542,6 +573,7 @@ class BlockSink:
     S=self.__store
     level=0
     while True:
+      print "appendBlockRef: level=%d, bref=%s"%(level,hex(bref.h))
       blist=self.__lists[level]
       ##print "append: blist =", `blist`
       if len(blist) < MAX_SUBBLOCKS:
@@ -570,14 +602,20 @@ class BlockSink:
     ''' Store all the outstanding indirect blocks (if they've more than one etry).
         Return the top blockref.
     '''
+    print "BlockSink.close()..."
     S=self.__store
 
     # special case - empty file
     if len(self.__lists) == 1 and len(self.__lists[0]) == 0:
-      return BlockRef(S.store(''),False,0)
+      self.appendBlock('')
 
+    # Fold BlockLists into blocks and pass them up the chain until we have
+    # a single BlockRef - it becomes the file handle.
     # record the lower level indirect blocks in their parents
-    while len(self.__lists) > 1:
+    assert len(self.__lists) > 0
+
+    # Reduce the BlocList stack to one level.
+    while True:
       blist=self.__lists.pop(0)
       assert len(blist) > 0
       if len(blist) == 1:
@@ -586,21 +624,16 @@ class BlockSink:
       else:
         # store and record the indirect block
         bref=BlockRef(S.store(blist.pack()),True,blist.span())
+
+      if len(self.__lists) == 0:
+        break
+
+      # put the new blockref into the popped stack
       self.appendBlockRef(bref)
 
-    # There's just one top block now.
-    # Pull it and disable the blocklist stack.
-    assert len(self.__lists) == 1
-    blist=self.__lists[0]
+    # POST: bref if the top blockref
+    assert len(self.__lists) == 0
     self.__lists=None
-
-    assert len(blist) > 0
-    if len(blist) == 1:
-      # The top block has only one BlockRef - return the BlockRef.
-      bref=blist[0]
-    else:
-      # stash the top block
-      bref=BlockRef(S.store(blist.pack()),True,blist.span())
 
     return bref
 
