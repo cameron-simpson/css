@@ -2,7 +2,7 @@
 
 ''' A data store after the style of the Venti scheme:
       http://library.pantek.com/general/plan9.documents/venti/venti.html
-    but supporting variable sized blocks.
+    but supporting variable sized blocks and arbitrary sizes.
     See also the Plan 9 Venti support manual pages:
       http://swtch.com/plan9port/man/man7/venti.html
     and the Wikipedia entry:
@@ -12,6 +12,9 @@
             augment with assorted recognition strings by hash
             pushable parser for nested data
           optional compression in store
+          metadata O:owner u:user[+-=]srwx* g:group[+-=]srwx*
+          don't compress metadata
+          cache seek()ed block in readOpen class
           extend directory blockref:
             flags:
               1: indirect
@@ -20,13 +23,11 @@
             flags
             [meta] (if flags&0x01)
             blockref
-          generic LRUCache class
           multiple store files in store n.vtd
           store index index.dbm: h => (n, offset, zsize)
           caching store - fetch&store locally
           store priority queue - tuples=pool
           remote store: http? multifetch? udp?
-          argument order: always ({h|block}, indirect, span)
 '''
 
 import os
@@ -34,6 +35,7 @@ import os.path
 from zlib import compress, decompress
 ## NOTE: migrate to hashlib sometime when python 2.5 more common
 import sha
+from cs.cache import LRU
 from cs.misc import cmderr, warn, progress, verbose, out, fromBS, toBS, fromBSfp
 import cs.hier
 from cs.lex import unctrl
@@ -83,114 +85,50 @@ class RawStoreIndexGDBM:
     (zsize,noz)=fromBS(noz)
     assert len(noz) == 0
     return (n,offset,zsize)
+  def get(self,h,default=None):
+    try:
+      return self[h]
+    except KeyError:
+      return default
   def __contains__(self,h):
-    return h in self.__db
+    noz=self.get(h)
+    return noz is not None
   def __len__(self):
     return len(self.__db)
+  def keys(self):
+    k = self.__db.firstkey()
+    while k is not None:
+      yield k
+      k = self.__db.nextkey()
   def __iter__(self):
-    for h in self.__db:
+    for h in self.__db.keys():
       yield h
   def iterkeys(self):
-    for h in self.__db:
+    for h in self.__db.keys():
       yield h
 
-class RawStore:
-  def __init__(self,path,doindex=False):
-    self.__path=path
-    stores=[ int(name[:-4])
-             for name in os.listdir(path)
-             if len(name) > 4
-                and name.endswith('.vtd')
-                and name[:-4].isdigit()
-           ]
-    if len(stores) == 0:
-      stores=[0]
-    self.__newStore=max(stores)
-    self.__open={}
-    for n in stores:
-      self.__open[n]=None
-    self.__opened=[]    # dumb FIFO of open files
-    self.__index=RawStoreIndexGDBM(path)
-    if doindex:
-      for n in stores:
-        self.__loadIndex(n)
-      self.sync()
-
-  def hash(self,block):
-    ''' Compute the hash for a block.
-    '''
-    return hash_sha(block)
-
-  def store(self,block):
-    ''' Store a block, return the hash.
-    '''
-    h=self.hash(block)
-    if h in self:
-      verbose(self.__path,"already contains",hex(h))
-    else:
-      zblock=compress(block)
-      fp=self.__storeOpen(self.__newStore)
-      fp.seek(0,2)
-      fp.write(toBS(len(zblock)))
-      offset=fp.tell()
-      fp.write(zblock)
-      self.__index[h]=(self.__newStore,offset,len(zblock))
-
-    return h
-
-  def sync(self):
-    self.__index.sync()
-    for n in self.__open:
-      fp=self.__open[n]
-      if fp:
-        fp.flush()
-
-  def __storeOpen(self,n):
-    name=str(n)+'.vtd'
-    if self.__open[n] is None:
-      # flush an older file
-      if len(self.__opened) >= 16:
-        oldn=self.__opened.pop(0)
-        oldfp=self.__open[oldn]
-        oldfp.close()
-        self.__open[oldn]=None
-      self.__open[n]=newfp=open(os.path.join(self.__path,name),"a+b")
-      self.__opened.append(newfp)
-    return self.__open[n]
-
-  def __setitem__(self,h,value):
-    raise IndexError
-
-  def __getitem__(self,h):
-    ''' Return block for hash, or raise IndexError if not in store.
-    '''
-    n,offset,zsize = self.__index[h]
-    fp=self.__storeOpen(n)
-    fp.seek(offset)
-    return decompress(fp.read(zsize))
-
-  def get(self,h):
+class GenericStore:
+  ''' Store methods implemented entirely in terms of other public methods,
+      or common to all (eg hash()).
+  '''
+  def get(self,h,default=None):
     ''' Return block for hash, or None if not present in store.
     '''
     if h not in self:
       return None
     return self[h]
 
-  def __contains__(self,h):
-    return h in self.__index
+  def hash(self,block):
+    ''' Compute the hash for a block.
+    '''
+    return hash_sha(block)
 
-  def __loadIndex(self,n):
-    progress("load index from store", str(n))
-    fp=self.__storeOpen(n)
-    while True:
-      zsize=fromBSfp(fp)
-      if zsize is None:
-        break
-      offset=fp.tell()
-      zblock=fp.read(zsize)
-      block=decompress(zblock)
-      h=self.hash(block)
-      self.__index[h]=toBS(n)+toBS(offset)+toBS(zsize)
+  # compatibility wrapper for __setitem__
+  # does a store() and then ensures the hashes match
+  def __setitem__(self,h,block):
+    stored=self.store(block)
+    assert h == stored
+    return block
 
   def cat(self,bref,fp=None):
     if type(bref) is str:
@@ -213,7 +151,8 @@ class RawStore:
     '''
     return WriteFile(self)
 
-  def storeFile(self,ifp,rsize=8192):
+  def storeFile(self,ifp,rsize=None):
+    if rsize is None: rsize=8192
     ofp=self.writeOpen()
     buf=ifp.read(rsize)
     while len(buf) > 0:
@@ -275,73 +214,115 @@ class RawStore:
     for i in self.opendir(dirref).walk():
       yield i
 
+class StoreWrapper(GenericStore):
+  def __init__(self,S):
+    self.__S=S
+  def hash(self,block):               return self.__S.hash(block)
+  def store(self,block):              return self.__S.store(block)
+  def sync(self):                     return self.__S.sync()
+  def __getitem__(self,h):            return self.__S[h]
+  def __contains__(self,h):           return h in self.__S
+
+class RawStore(GenericStore):
+  def __init__(self,path,doindex=False):
+    self.__path=path
+    stores=[ int(name[:-4])
+             for name in os.listdir(path)
+             if len(name) > 4
+                and name.endswith('.vtd')
+                and name[:-4].isdigit()
+           ]
+    if len(stores) == 0:
+      stores=[0]
+    self.__newStore=max(stores)
+    self.__open={}
+    for n in stores:
+      self.__open[n]=None
+    self.__opened=[]    # dumb FIFO of open files
+    self.__index=RawStoreIndexGDBM(path)
+    if doindex:
+      for n in stores:
+        self.__loadIndex(n)
+      self.sync()
+
+  def store(self,block):
+    ''' Store a block, return the hash.
+    '''
+    h=self.hash(block)
+    if h in self:
+      verbose(self.__path,"already contains",hex(h))
+    else:
+      zblock=compress(block)
+      fp=self.__storeOpen(self.__newStore)
+      fp.seek(0,2)
+      fp.write(toBS(len(zblock)))
+      offset=fp.tell()
+      fp.write(zblock)
+      self.__index[h]=(self.__newStore,offset,len(zblock))
+
+    return h
+
+  def sync(self):
+    self.__index.sync()
+    for n in self.__open:
+      fp=self.__open[n]
+      if fp:
+        fp.flush()
+
+  def __storeOpen(self,n):
+    name=str(n)+'.vtd'
+    if self.__open[n] is None:
+      # flush an older file
+      if len(self.__opened) >= 16:
+        oldn=self.__opened.pop(0)
+        oldfp=self.__open[oldn]
+        oldfp.close()
+        self.__open[oldn]=None
+      self.__open[n]=newfp=open(os.path.join(self.__path,name),"a+b")
+      self.__opened.append(newfp)
+    return self.__open[n]
+
+  def __getitem__(self,h):
+    ''' Return block for hash, or raise IndexError if not in store.
+    '''
+    n,offset,zsize = self.__index[h]
+    fp=self.__storeOpen(n)
+    fp.seek(offset)
+    return decompress(fp.read(zsize))
+
+  def __contains__(self,h):
+    return h in self.__index
+
+  def __loadIndex(self,n):
+    progress("load index from store", str(n))
+    fp=self.__storeOpen(n)
+    while True:
+      zsize=fromBSfp(fp)
+      if zsize is None:
+        break
+      offset=fp.tell()
+      zblock=fp.read(zsize)
+      block=decompress(zblock)
+      h=self.hash(block)
+      self.__index[h]=toBS(n)+toBS(offset)+toBS(zsize)
+
 MAX_LRU=1024
-class LRUCacheStore(RawStore):
+class LRUCacheStore(LRU,StoreWrapper):
   ''' A subclass of RawStore that keeps an LRU cache of referenced blocks.
       TODO: Recode to take an arbitrary Store backend.
             This will let me put Store pools behind a single cache.
   '''
-  def __init__(self,path,maxCache=None):
+  def __init__(self,backstore,max=None):
     if maxCache is None: maxCache=MAX_LRU
-    RawStore.__init__(self,path)
-    self.__max=maxCache
-    self.__index={}
-    self.__first=None
-    self.__last=None
-    self.__len=0
+    LRU.__init__(self,backstore,max)
+    StoreWrapper.__init__(self,backstore)
 
-  def store(self,block):
-    h=RawStore.store(self,block)
-    if h in self.__index:
-      self.__hitBlock(h)
-    else:
-      self.__newBlock(h,block)
-
-    return h
-
-  def __hitBlock(self,h):
-    node=self.__index[h]
-    prev=node[2]
-    if prev is not None:
-      # swap with the node to the left
-      prev[3]=node[3]
-      node[2]=prev[2]
-      prev[2]=node
-      node[3]=prev
-
-  def __newBlock(self,h,block):
-    oldfirst=self.__first
-    node=[h,block,None,oldfirst]
-    self.__first=node
-    if oldfirst is None:
-      # first node - is also the last
-      self.__last=node
-    else:
-      # prepend to old first node
-      oldfirst[2]=node
-
-    self.__len+=1
-    if self.__len > self.__max:
-      # remove the last node
-      newlast=self.__last[2]
-      newlast[3]=None
-      self.__last=newlast
-
-  def __getitem__(self,h):
-    if h in self.__index:
-      block=self.__index[h][1]
-      self.__hitBlock(h)
-    else:
-      # new block - load it up at the front
-      block=RawStore.__getitem__(self,h)
-      self.__newBlock(h,block)
-
-    return block
-
-class Store(LRUCacheStore):
-  ''' Default Store is a RawStore with a cache.
-  '''
-  pass
+class Store(StoreWrapper):
+  def __init__(self,S):
+    if type(S) is str:
+      if S[0] == '/':
+        S=RawStore(S)
+    StoreWrapper.__init__(self,S)
 
 def encodeBlockRef(flags,span,h):
     ''' Encode a blockref for storage.
@@ -747,6 +728,7 @@ def decodeDirent(fp):
       assert metalen > 1
       meta=fp.read(metalen)
       assert len(meta) == metalen
+      meta=decodeMetaData(meta)
     else:
       meta=None
     bref=decodeBlockRefFP(fp)
@@ -754,6 +736,82 @@ def decodeDirent(fp):
     assert flags&~0x03 == 0
 
     return (name,Dirent(bref,isdir,meta))
+
+def MetaData(dict):
+  def __init__(self,isdir,meta=None):
+    dict.__init__(self)
+    self.isdir=isdir
+    self.__encoded=meta
+
+  def __init(self):
+    if self.__encoded is not None:
+      self['OWNER']=None
+      self['ACL']=[]
+      for melem in decompress(self.__encoded).split():
+        if melem.startswidth("o:"):
+          self['OWNER']=melem[2:]
+        else:
+          self['ACL'].append(melem)
+      self.__encoded=None
+
+  def encode(self):
+    self.__init()
+    m=[]
+    o=self['OWNER']
+    if o is not None:
+      m.append("o:"+o)
+    for ac in self['ACL']:
+      m.append(ac)
+    return compress(" ".join(m))
+
+  def chown(self,user):
+    self['OWNER']=user
+
+  def ACL(self):
+    acl=self.get('ACL')
+    if acl is None:
+      acl=()
+    return acl
+
+  def UNIXstat(self):
+    import stat
+    owner=None
+    mode=0
+
+    o=self.get('OWNER')
+    if o is not None:
+      owner=o
+      tag="u:"+o+":"
+      acl=self.acl()
+      acl.reverse()
+      for ac in [a for a in self.acl() if a.startswith(tag)]:
+        perms=ac[len(tag):]
+        if perms[:1] == '-':
+          for p in perms[1:]:
+            if p == '*':
+              mode &= ~0700
+            elif p == 'r':
+              mode &= ~0400
+            elif p == 'w':
+              mode &= ~0200
+            elif p == 'x':
+              mode &= ~0100
+        else:
+          for p in perms:
+            if p == '*':
+              mode |= 0700
+            elif p == 'r':
+              mode |= 0400
+            elif p == 'w':
+              mode |= 0200
+            elif p == 'x':
+              mode |= 0100
+
+    ##group=None
+    ##for ac in [a for a in self.acl() if a.startswith("g:")]:
+    ##  if group is None:
+
+    return None
 
 def debuggingEncodeDirent(fp,name,dent):
   from StringIO import StringIO
@@ -784,7 +842,7 @@ class Dirent:
     self.isdir=isdir
     self.meta=meta
   def encodeMeta(self):
-    return meta
+    return meta.encode()
 
 class Dir(dict):
   def __init__(self,S,parent,dirref=None):
