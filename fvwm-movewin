@@ -1,0 +1,126 @@
+#!/usr/bin/python
+#
+# Emit a raise/resize/[animated]move as specified.
+#       - Cameron Simpson <cs@zip.com.au> 01jun2007
+#
+
+from sys import argv, stderr
+from os import popen, environ
+from string import lowercase
+
+cmd=argv[0]
+usage="Usage %s wid px py dx dy" % cmd
+
+wid=argv[1]
+if wid[:2] == '0x':
+  wid=int(wid[2:],16)
+else:
+  wid=int(wid[1])
+
+def parsepos(s):
+  base=None
+  bunits=None
+  sign=None
+  offset=None
+  ounits=None
+  sign=s.find("+")
+  if sign >= 0:
+    base=s[:sign]
+    offset=s[sign+1:]
+    sign=1
+  else:
+    sign=s.find("-")
+    if sign >= 0:
+      base=s[:sign]
+      offset=s[sign+1:]
+      sign=-1
+    else:
+      base=s
+      sign=None
+
+  base, bunits = parsenum(base)
+  if offset is not None:
+    offset, ounits = parsenum(offset)
+
+  return (base,bunits,sign,offset,ounits)
+
+def parsenum(s):
+  num=None
+  units=None
+  if len(s) > 0 and s[-1] in lowercase:
+    units=s[-1]
+    s=s[:-1]
+  if s[:2] == '0x':
+    num=int(s[2:],16)
+  elif s.isdigit():
+    num=int(s)
+  else:
+    point=s.find('.')
+    if point >= 0 and s[:point].isdigit() and s[point+1:].isdigit():
+      num=float(s)
+    else:
+      if len(s) > 0:
+        global cmd
+        stderr.write("%s: bad number: %s\n" % (cmd,s))
+
+  return (num, units)
+
+def wininfo(wid):
+  wfp=popen("xwininfo -id %d" % wid)
+  for line in wfp:
+    line=line.lstrip()
+    if line.startswith("Absolute upper-left X:"):
+      wx=int(line[22:])
+    elif line.startswith("Absolute upper-left Y:"):
+      wy=int(line[22:])
+    elif line.startswith("Width:"):
+      wdx=int(line[6:])
+    elif line.startswith("Height:"):
+      wdy=int(line[7:])
+  return (wx,wy,wdx,wdy)
+
+ox, oxu, oxoffs, oxoff, oxoffu = parsepos(argv[2])
+oy, oyu, oyoffs, oyoff, oyoffu = parsepos(argv[3])
+dx, dxu, dxoffs, dxoff, dxoffu = parsepos(argv[4])
+dy, dyu, dyoffs, dyoff, dyoffu = parsepos(argv[5])
+
+wx, wy, wdx, wdy = wininfo(wid)
+
+def scale(n, u, isx):
+  if u is not None:
+    if u == 'p':
+      pass
+    elif u == 'w':
+      if isx:
+        global wdx
+        n *= wdx
+      else:
+        global wdy
+        n *= wdy
+    elif u == 's':
+      if isx:
+        n *= int(environ['X11_X'])
+      else:
+        n *= int(environ['X11_Y'])
+    else:
+      stderr.write("%s: bad units: %s\n"%(cmd,u))
+  return n
+
+px=(wx if ox is None else scale(ox, oxu, True))
+if oxoff is not None:
+  px += oxoffs * scale(oxoff, oxoffu, True)
+py=(wy if oy is None else scale(oy, oyu, False))
+if oyoff is not None:
+  py += oyoffs * scale(oyoff, oyoffu, False)
+
+dx=(wdx if dx is None else scale(dx, dxu, True))
+if dxoff is not None:
+  dx += dxoffs * scale(dxoff, dxoffu, True)
+dy=(wdy if dy is None else scale(dy, dyu, False))
+if dyoff is not None:
+  dy += dyoffs * scale(dyoff, dyoffu, False)
+
+print "Raise"
+print "Resize %dp %dp" % (dx, dy)
+print "AnimatedMove %dp %dp" % (px, py)
+print "WarpToWindow 10 10"
