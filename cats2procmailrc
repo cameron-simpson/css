@@ -245,7 +245,7 @@ import stat
 from getopt import getopt, GetoptError
 import string
 import re
-from cs.misc import cmd, cmderr
+from cs.misc import cmd, cmderr, warn
 import cs.sh
 
 trackRules=True         # add X-Cats2Procmailrc line to show rule
@@ -301,15 +301,14 @@ for opt, arg in opts:
 if len(dfltDomains) == 0:
   dfltDomains=(os.environ['MAILDOMAIN'],)
 
-if len(argv):
-  cmderr("extra arguments after options:", " ".join(argv))
-  badopts=True
+if len(argv) == 0:
+  argv='-'
 
 if badopts:
   sys.stderr.write(usage)
   sys.exit(2)
 
-assign_re=re.compile(r'[a-z]\w+=')
+assign_re=re.compile(r'[a-z]\w+=', re.I)
 target_re=re.compile(r'("[^"]*"|[^"\s]+)')
 hdrlist_re=re.compile(r'([a-z][\-a-z0-9]*(,[a-z][\-a-z0-9]*)*):', re.I)
 subnames=[v[16:] for v in os.environ.keys() if v.startswith('CATS2PROCMAILRC_')]
@@ -319,6 +318,37 @@ else:
   subnames.sort()
   curly=r'\{\{('+'|'.join(subnames)+r')\}\}'
   curly_re=re.compile(curly)
+
+def resolveTarget(target):
+  if target[0] == '"':
+    target=target[1:-1]
+  if target[0] != '|':
+    # not a pipe-to-command
+    if target.find('@') > 0:
+      # forward to address
+      target='!'+target
+    else:
+      # presume it is a mail folder
+      if target[0] != '/':
+        target=os.path.join(os.environ['MAILDIR'],target)
+        ftype=dfltType
+        if os.path.isfile(target):
+          ftype='UNIX'
+        elif os.path.isdir(target):
+          if os.path.isfile(os.path.join(target,'.mh_sequences')):
+            ftype='MH'
+          else:
+            ftype='MAILDIR'
+      if ftype == 'UNIX':
+        pass
+      elif ftype == 'MAILDIR':
+        target+='/'
+      elif ftype == 'MH':
+        target+='/.'
+      else:
+        assert False, '%s: %d: unsupported folder type: %s'%(ifp.name,lineno,ftype)
+    
+    return target
 
 def c2p(ifp,ofp):
   global xit, assign_re, target_re, hdrlist_re, curly_re
@@ -349,7 +379,6 @@ def c2p(ifp,ofp):
       continue
 
     ruledesc="%s, line %d: %s" % (ifp.name, lineno, line.replace('\n','; '))
-    ofp.write('# %s\n' % ruledesc)
 
     if curly_re:
       curlies=[m for m in curly_re.finditer(line)]
@@ -365,6 +394,8 @@ def c2p(ifp,ofp):
      ofp.write(line)
      ofp.write('\n')
      continue
+
+    ofp.write('# %s\n' % ruledesc)
 
     # inclusions
     if line[0] == '<':
@@ -464,12 +495,14 @@ def c2p(ifp,ofp):
         pattern=pattern[m.end():]
 
       if pattern[0] == '/':
+        # pure regexp
         pattern=pattern[1:]
         if pattern[0] == '^':
           pattern=' *'+pattern[1:]
         else:
           pattern='.*'+pattern
       else:
+        # email addresses
         if pattern.find('@') < 0:
           pattern='('+'|'.join(["%s@%s"%(pattern,dom) for dom in dfltDomains])+')'
         pattern='.*\\<'+pattern.replace('.','\\.')+'\\>'
@@ -482,64 +515,34 @@ def c2p(ifp,ofp):
 
       ofp.write('* %s\n'%pattern)
 
-    needBrackets=(len(targets) > 1 or tag is not None or trackRules)
-    if needBrackets:
+    needBrackets=(len(targets) > 1 or trackRules or tag is not None)
+    if not needBrackets:
+      ofp.write('%s\n' % resolveTarget(targets[0]))
+    else:
       ofp.write('{\n');
 
-    if trackRules:
-      ofp.write('  :0whf\n  | formail -f -A %s\n' % cs.sh.quotestr('X-Cats2Procmailrc-Rule: '+ruledesc))
+      if trackRules:
+        ofp.write('  :0whf\n  | formail -f -A %s\n' % cs.sh.quotestr('X-Cats2Procmailrc-Rule: '+ruledesc))
 
-    if tag is not None:
-      if useXLabel:
-        pipe='formail -f -A %s' % cs.sh.quotestr('X-Label: '+tag)
-      else:
-        sedtag=tag.replace('/','\\/')
-        pipe="sed -e %s" % cs.sh.quotestr('s/^[Ss][Uu][Bb][Jj][Ee][Cc][Tt]: */& ['+sedtag+'] /')
-      ofp.write('  :0whf\n  | %s\n' % pipe)
-
-    while len(targets) > 0:
-      target=targets.pop(0)
-      if target[0] == '"':
-        target=target[1:-1]
-      if target[0] == '|':
-        pass
-      elif target.find('@') > 0:
-        # forward to address
-        target='!'+target
-      else:
-        # presume it is a mail folder
-        if target[0] != '/':
-          target=os.path.join(os.environ['MAILDIR'],target)
-          ftype=dfltType
-          if os.path.isfile(target):
-            ftype='UNIX'
-          elif os.path.isdir(target):
-            if os.path.isfile(os.path.join(target,'.mh_sequences')):
-              ftype='MH'
-            else:
-              ftype='MAILDIR'
-
-        if ftype == 'UNIX':
-          pass
-        elif ftype == 'MAILDIR':
-          target+='/'
-        elif ftype == 'MH':
-          target+='/.'
+      if tag is not None:
+        if useXLabel:
+          pipe='formail -f -A %s' % cs.sh.quotestr('X-Label: '+tag)
         else:
-          assert False, '%s: %d: unsupported folder type: %s'%(ifp.name,lineno,ftype)
+          sedtag=tag.replace('/','\\/')
+          pipe="sed -e %s" % cs.sh.quotestr('s/^[Ss][Uu][Bb][Jj][Ee][Cc][Tt]: */& ['+sedtag+'] /')
+        ofp.write('  :0whf\n  | %s\n' % pipe)
 
-        if needBrackets:
-          ofp.write('  ')
-        ofp.write(':0')
+      while len(targets) > 0:
+        target=resolveTarget(targets.pop(0))
+        ofp.write('  :0')
         if len(targets) > 0:
           ofp.write('c')
         ofp.write('\n')
-        if needBrackets:
-          ofp.write('  ')
-        ofp.write('%s\n'%target)
+        ofp.write('  %s\n'%target)
 
-    if needBrackets:
       ofp.write('}\n');
+
+    ofp.write('\n')
 
   if oline is not None:
     cmderr("%s: %d: unexpected EOF in slosh-extended line"%(ifp.name,lineno))
@@ -549,6 +552,10 @@ def c2p(ifp,ofp):
 
 xit=0
 
-c2p(sys.stdin,sys.stdout)
+for arg in argv:
+  if arg == '-':
+    c2p(sys.stdin, sys.stdout)
+  else:
+    c2p(open(arg), sys.stdout)
 
 sys.exit(xit)
