@@ -245,7 +245,7 @@ import stat
 from getopt import getopt, GetoptError
 import string
 import re
-from cs.misc import cmd, cmderr, warn
+from cs.misc import cmd, cmderr, warn, progress, out
 import cs.sh
 
 trackRules=True         # add X-Cats2Procmailrc line to show rule
@@ -348,9 +348,10 @@ def resolveTarget(target):
       else:
         assert False, '%s: %d: unsupported folder type: %s'%(ifp.name,lineno,ftype)
     
-    return target
+  return target
 
 def c2p(ifp,ofp):
+  progress('convert '+ifp.name)
   global xit, assign_re, target_re, hdrlist_re, curly_re
   lineno=0
   oline=None
@@ -378,6 +379,7 @@ def c2p(ifp,ofp):
     if len(line) == 0 or line[0] == '#':
       continue
 
+    line0=line
     ruledesc="%s, line %d: %s" % (ifp.name, lineno, line.replace('\n','; '))
 
     if curly_re:
@@ -396,6 +398,7 @@ def c2p(ifp,ofp):
      continue
 
     ofp.write('# %s\n' % ruledesc)
+    ##out(line0)
 
     # inclusions
     if line[0] == '<':
@@ -515,7 +518,7 @@ def c2p(ifp,ofp):
 
       ofp.write('* %s\n'%pattern)
 
-    needBrackets=(len(targets) > 1 or trackRules or tag is not None)
+    needBrackets=(len(targets) > 1 or trackRules or tag is not None or doAlert)
     if not needBrackets:
       ofp.write('%s\n' % resolveTarget(targets[0]))
     else:
@@ -532,6 +535,13 @@ def c2p(ifp,ofp):
           pipe="sed -e %s" % cs.sh.quotestr('s/^[Ss][Uu][Bb][Jj][Ee][Cc][Tt]: */& ['+sedtag+'] /')
         ofp.write('  :0whf\n  | %s\n' % pipe)
 
+      if doAlert:
+        if alertCommand is None:
+          cmderr("%s: %d: alert rule but not alert command - see -a option")
+          xit=1
+        else:
+          ofp.write('  :0hwc\n| %s\n' % alertCommand)
+
       while len(targets) > 0:
         target=resolveTarget(targets.pop(0))
         ofp.write('  :0')
@@ -543,6 +553,8 @@ def c2p(ifp,ofp):
       ofp.write('}\n');
 
     ofp.write('\n')
+
+  out('')
 
   if oline is not None:
     cmderr("%s: %d: unexpected EOF in slosh-extended line"%(ifp.name,lineno))
