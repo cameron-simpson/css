@@ -1,658 +1,554 @@
-#!/usr/bin/perl -w
+#!/usr/bin/python
 #
 # Convert my categories file to procmail recipes.
 #	- Cameron Simpson <cs@zip.com.au> 02mar2001
 #
 # Release version: 1.6.1
 #
-
-=head1 NAME
-
-cats2procmailrc - generate a procmail recipe from my mail categories file
-
-=head1 SYNOPSIS
-
-cats2procmailrc [B<-D>] [B<-L>] [B<-a> I<alert>] [B<-m> I<maildomains>] [B<-t> I<type>] [B<-T>] E<lt>categories E<gt>procmailrc
-
-=head1 DESCRIPTION
-
-I<cats2procmailrc> reads a human friendly mail category description file
-and emits a matching procmail(1) recipe to implement it.
-The intent is to have an extremely succinct file
-of easily editable one line rules,
-generally of the form:
-
-	folder	tag	pattern
-
-I build my B<.procmailrc> like this:
-
-	cats2procmailrc \
-		-a 'announce-email "+%"' \
-		-t maildir -L \
-		-m cskk.homeip.net \
-		<categories >$HOME/.procmailrc
-
-=head1 OPTIONS
-
-=over 4
-
-=item B<-a> I<alert>
-
-Specify a shell command to run as the alert function (see L<FILE FORMAT> below),
-such as mailblink(1).
-The character percent (B<'%'>) is replaced by the I<folder> name.
-
-=item B<-D>
-
-Insert a variation on the standard formail(1) recipe for deleting duplicates
-on a per-folder basis.
-For MH and Maildir folders, use a B<.msgid.cache> file within the folder,
-otherwise use the file B<MAILDIR/.msgid.cache-I<folder>>.
-
-=item B<-L>
-
-Put the tag into the B<X-Label> header field
-instead of as a prefix to the subject line.
-
-=item B<-m> I<maildomains>
-
-Specify the default mail domain for rule addresses lacking an B<@I<domain>>.
-The default comes from the environment variable B<$MAILDOMAIN>.
-In fact this may be a list of domains if you have some equvalents,
-separated by commas.
-
-=item B<-t> I<type>
-
-Specify the default mailbox type.
-If the mailbox exists the type is deduced automatically,
-but otherwise uses this default, which may be one of
-B<unix>, B<maildir> or B<mh>.
-The default is B<unix>.
-
-=item B<-T>
-
-Don't track rule matches.
-Normally a C<X-Cats2Procmailrc-Matching-Rule> header
-is inserted describing the match rule.
-This is done with formail
-and so can incur a noticable penalty if slow machines
-with lots of messages.
-If you're using the B<-L> option
-the labels will mostly track stuff for you anyway.
-
-=back
-
-=head1 FILE FORMAT
-
-=head2 LINE FORMAT
-
-Lines ending in a slosh ('\\') are continued to the next line,
-keeping the newline and discarding the slosh.
-
-Blank lines and lines beginning with an octothorpe ('#') are ignored.
-
-Lines of the form:
-
-	VARIABLE=value
-
-are passed through unchanged.
-
-Lines of the form:
-
-	< filename
-
-interpolate raw procmailrc files.
-
-Lines of the form:
-
-	<< filename
-
-interpolate category files.
-
-Other lines are of the form:
-
-	[+][!]target[,target...] tag pattern [newline pattern...]
-
-where each target has the form:
-
-	folder
-	who@where
-	|progname
-
-Multiple targets may be specified to file the message
-to multiple places for this rule.
-
-A leading plus sign (B<'+'>) means that this rule should be a continue rule,
-and not abort processing.
-
-A leading exclaimation mark (B<'!'>) means that mail items matching this rule
-should generate an alert.
-The alert can be any action you desire, such as the mailblink(1) command;
-see the B<-a> option.
-For me, this means a single line summary of the mail item
-appears in yellow in a small log window
-I have at the top of my screen for mail items I should read I<now>.
-
-The I<folder> names the folder in which to place the mail item.
-Normal UNIX mail files,
-MH style directories and Maildir style directories are autodetetected.
-If the I<folder> contains an "at" (B<@>) character
-it is considered an email address
-and the mail item is forwarded to that address instead of being dropped in a folder.
-
-If instead of a I<folder>
-a pipe (`B<|>') and a program name are used
-then the message is piped to the specified program.
-The I<tag> is supplied as the sole command line argument to the I<progname>,
-unless the I<tag> is "B<.>" in which case it is omitted.
-
-The I<tag> is placed at the start of the mail's B<Subject> line for ready recognition in mixed folders
-unless the B<-L> option is used,
-in which case it is placed in the B<X-Label:> header line.
-The special tag dot (".") suppresses this action.
-
-The I<pattern>s select the mail items.
-All the patterns in a rule must match the mail item for the rule to apply.
-The special pattern "B<.>" always matches.
-It's intended as a placeholder for ``continue'' rules that should always fire,
-typically to feed every mail item to a program.
-
-The I<folder> or I<who@where> or I<|progname> may be enclosed in double quotes
-if desired,
-for example if the folder name or program invocation contains whitespace.
-Note that the quotes do not enclose the leading "B<+>" or "B<!>".
-
-Substrings of the form "B<{{I<WORD>}}>" are replaced with the value of
-the environment variable B<$CATS2PROCMAILRC_I<WORD>> if defined.
-I<WORD> must match the regexp B<^[A-Z][A-Z_0-9]*$>.
-
-=head2 Example Patterns
-
-The usual form is simply an address (see RFC822 and RFC2822)
-to be present in the B<To>, B<CC> or B<BCC> header lines.
-If the address string lacks an at ("@") then an at ("@")
-and the value of the environment variable B<$MAILDOMAIN>
-is appended.
-If the address string lacks the local part, any localpart is accepted.
-
-I have rules like this:
-
-	attn	Personal	cs
-	attn	Personal	cameron@cskk.homeip.net
-	attn	EFF-Cafe-News   cafe-news@eff.org
-	crypto  AUCrypto        aucrypto@suburbia.net
-
-matching B<cs@zip.com.au>, B<cameron@cskk.homeip.net>, B<cafe-news@eff.org>
-and B<aucrypto@suburbia.net> respectively. The "Personal" items generate an alert.
-
-It is also possible to select on a different header line
-by prefixing the I<pattern> string with a header name, viz:
-
-	applix  ApplixWare      sender:owner-applixware-list@applix.com
-
-which selects for an address in the B<Sender> header line.
-
-The I<pattern> may also be an arbitrary regular expression in egrep(1) syntax.
-In this case the I<pattern> starts with a slash ("/")
-and optionally ends in a slash, viz:
-
-	!adzap  AdZap           subject:/(noads|add?[-  s]*zap|squid_?redir|zapp(er|ing)|wrapzap)/
-
-which matches mail items with subjects probably regarding my adzap program.
-A leading "^.*" is added to the regexp unless it already starts with a "^".
-
-A typical use of the "at" sign is in conjunction with the plus sign above
-to copy particular mail items to another account while still delivering locally.
-For example:
-
-	+fred@that.isp.com . fred@this.isp.com
-	fredmail Fred fred@this.isp.com
-
-to accept mail aimed at B<fred@this.isp.com> and also copy it to B<fred@that.isp.com>.
-
-Patterns with more than one condition:
-
-	logs	cron	root \
-			subject:/Cron <root
-
-Example:
-
-        !me     interesting     {{ME}} \
-                                from:{{KNOWN}}
-
-This rule matches email to me from people I know, filing it with an alert action.
-The variables B<$CATS2PROCMAILRC_ME> and B<$CATS2PROCMAILRC_KNOWN> are constructed
-in advance to match these addresses; the former from my mutt B<alternates> line
-and the latter from my mail alias file.
-
-=head1 ENVIRONMENT
-
-MAILDIR, the directory containing mail folders.
-
-MAILDOMAIN, the local mail domain (eg B<cskk.homeip.net> for my home domain).
-
-CATS2PROCMAILRC_[A-Z]*, macro definitions
-
-=head1 SEE ALSO
-
-procmail(1), procmailrc(1), procmailex(1), egrep(1)
-
-=head1 AUTHOR
-
-Cameron Simpson E<lt>cs@zip.com.auE<gt>
-
-=cut
-
-##BEGIN { use cs::DEBUG; cs::DEBUG::using(__FILE__);
-##      }
-
-use strict qw(vars);
-use Getopt::Std;
-
-sub readcats($;$);
-
-$::TrackRules=1;
-$::X_Label=0;
-$::FolderDups=0;
-$::DfltSfx="";		# unix style by default
-$::DfltType=UNIX;	# unix style by default
-@::DfltDom=$ENV{MAILDOMAIN};
-undef $::DfltAlert;
-##$::RcvStore='/usr/lib/nmh/rcvstore';	# path to MH rcvstore command
-
-($::cmd=$0) =~ s:.*/::;
-$::Usage="Usage: $::cmd [-a alert] [-m domains] [-t {unix|mh|maildir}] <categories >procmailrc
-	-L		Use X-Label: header instead of Subject: for tag.
+# =head1 NAME
+#
+# cats2procmailrc - generate a procmail recipe from my mail categories file
+#
+# =head1 SYNOPSIS
+#
+# cats2procmailrc [B<-L>] [B<-a> I<alert>] [B<-m> I<maildomains>] [B<-t> I<type>] [B<-T>] E<lt>categories E<gt>procmailrc
+#
+# =head1 DESCRIPTION
+#
+# I<cats2procmailrc> reads a human friendly mail category description file
+# and emits a matching procmail(1) recipe to implement it.
+# The intent is to have an extremely succinct file
+# of easily editable one line rules,
+# generally of the form:
+#
+# 	folder	tag	pattern
+#
+# Raw procmailrc(5) clauses are also supported for less trivial rules and also an inclusion syntax.
+#
+# I build my B<.procmailrc> like this:
+#
+# 	cats2procmailrc \
+# 		-a 'announce-email "+%"' \
+# 		-t maildir -L \
+# 		-m cskk.homeip.net \
+# 		<categories >$HOME/.procmailrc
+#
+# =head1 OPTIONS
+#
+# =over 4
+#
+# =item B<-a> I<alert>
+#
+# Specify a shell command to run as the alert function (see L<FILE FORMAT> below),
+# such as mailblink(1).
+# The character percent (B<'%'>) is replaced by the I<folder> name.
+#
+# =item B<-L>
+#
+# Put the tag into the B<X-Label> header field
+# instead of as a prefix to the subject line.
+#
+# =item B<-m> I<maildomains>
+#
+# Specify the default mail domain for rule addresses lacking an B<@I<domain>>.
+# The default comes from the environment variable B<$MAILDOMAIN>.
+# In fact this may be a list of domains if you have some equvalents,
+# separated by commas.
+#
+# =item B<-t> I<type>
+#
+# Specify the default mailbox type.
+# If the mailbox exists the type is deduced automatically,
+# but otherwise uses this default, which may be one of
+# B<unix>, B<maildir> or B<mh>.
+# The default is B<unix>.
+#
+# =item B<-T>
+#
+# Don't track rule matches.
+# Normally a C<X-Cats2Procmailrc-Matching-Rule> header
+# is inserted describing the match rule.
+# This is done with formail
+# and so can incur a noticable penalty if slow machines
+# with lots of messages.
+# If you're using the B<-L> option
+# the labels will mostly track stuff for you anyway.
+#
+# =back
+#
+# =head1 FILE FORMAT
+#
+# =head2 LINE FORMAT
+#
+# Lines ending in a slosh ('\\') are continued to the next line,
+# keeping the newline and discarding the slosh.
+#
+# Blank lines and lines beginning with an octothorpe ('#') are ignored.
+#
+# Lines of the form:
+#
+# 	VARIABLE=value
+#
+# are passed through unchanged.
+#
+# Lines of the form:
+#
+# 	< filename
+#
+# interpolate raw procmailrc files.
+#
+# Lines of the form:
+#
+# 	<< filename
+#
+# interpolate category files.
+#
+# Other lines are of the form:
+#
+# 	[+][!]target[,target...] tag pattern [newline pattern...]
+#
+# where each target has the form:
+#
+# 	folder
+# 	who@where
+# 	|progname
+#
+# Multiple targets may be specified to file the message
+# to multiple places for this rule.
+#
+# A leading plus sign (B<'+'>) means that this rule should be a continue rule,
+# and not abort processing.
+#
+# A leading exclaimation mark (B<'!'>) means that mail items matching this rule
+# should generate an alert.
+# The alert can be any action you desire, such as the mailblink(1) command;
+# see the B<-a> option.
+# For me, this means a single line summary of the mail item
+# appears in yellow in a small log window
+# I have at the top of my screen for mail items I should read I<now>.
+#
+# The I<folder> names the folder in which to place the mail item.
+# Normal UNIX mail files,
+# MH style directories and Maildir style directories are autodetetected.
+# If the I<folder> contains an "at" (B<@>) character
+# it is considered an email address
+# and the mail item is forwarded to that address instead of being dropped in a folder.
+#
+# If instead of a I<folder>
+# a pipe (`B<|>') and a program name are used
+# then the message is piped to the specified program.
+# The I<tag> is supplied as the sole command line argument to the I<progname>,
+# unless the I<tag> is "B<.>" in which case it is omitted.
+#
+# The I<tag> is placed at the start of the mail's B<Subject> line for ready recognition in mixed folders
+# unless the B<-L> option is used,
+# in which case it is placed in the B<X-Label:> header line.
+# The special tag dot (".") suppresses this action.
+#
+# The I<pattern>s select the mail items.
+# All the patterns in a rule must match the mail item for the rule to apply.
+# The special pattern "B<.>" always matches.
+# It's intended as a placeholder for ``continue'' rules that should always fire,
+# typically to feed every mail item to a program.
+#
+# The I<folder> or I<who@where> or I<|progname> may be enclosed in double quotes
+# if desired,
+# for example if the folder name or program invocation contains whitespace.
+# Note that the quotes do not enclose the leading "B<+>" or "B<!>".
+#
+# Substrings of the form "B<{{I<WORD>}}>" are replaced with the value of
+# the environment variable B<$CATS2PROCMAILRC_I<WORD>> if defined.
+# I<WORD> must match the regexp B<^[A-Z][A-Z_0-9]*$>.
+#
+# =head2 Example Patterns
+#
+# The usual form is simply an address (see RFC822 and RFC2822)
+# to be present in the B<To>, B<CC> or B<BCC> header lines.
+# If the address string lacks an at ("@") then an at ("@")
+# and the value of the environment variable B<$MAILDOMAIN>
+# is appended.
+# If the address string lacks the local part, any localpart is accepted.
+#
+# I have rules like this:
+#
+# 	attn	Personal	cs
+# 	attn	Personal	cameron@cskk.homeip.net
+# 	attn	EFF-Cafe-News   cafe-news@eff.org
+# 	crypto  AUCrypto        aucrypto@suburbia.net
+#
+# matching B<cs@zip.com.au>, B<cameron@cskk.homeip.net>, B<cafe-news@eff.org>
+# and B<aucrypto@suburbia.net> respectively. The "Personal" items generate an alert.
+#
+# It is also possible to select on a different header line
+# by prefixing the I<pattern> string with a header name, viz:
+#
+# 	applix  ApplixWare      sender:owner-applixware-list@applix.com
+#
+# which selects for an address in the B<Sender> header line.
+#
+# The I<pattern> may also be an arbitrary regular expression in egrep(1) syntax.
+# In this case the I<pattern> starts with a slash ("/")
+# and optionally ends in a slash, viz:
+#
+# 	!adzap  AdZap           subject:/(noads|add?[-  s]*zap|squid_?redir|zapp(er|ing)|wrapzap)/
+#
+# which matches mail items with subjects probably regarding my adzap program.
+# A leading "^.*" is added to the regexp unless it already starts with a "^".
+#
+# A typical use of the "at" sign is in conjunction with the plus sign above
+# to copy particular mail items to another account while still delivering locally.
+# For example:
+#
+# 	+fred@that.isp.com . fred@this.isp.com
+# 	fredmail Fred fred@this.isp.com
+#
+# to accept mail aimed at B<fred@this.isp.com> and also copy it to B<fred@that.isp.com>.
+#
+# Patterns with more than one condition:
+#
+# 	logs	cron	root \
+# 			subject:/Cron <root
+#
+# Example:
+#
+#         !me     interesting     {{ME}} \
+#                                 from:{{KNOWN}}
+#
+# This rule matches email to me from people I know, filing it with an alert action.
+# The variables B<$CATS2PROCMAILRC_ME> and B<$CATS2PROCMAILRC_KNOWN> are constructed
+# in advance to match these addresses; the former from my mutt B<alternates> line
+# and the latter from my mail alias file.
+#
+# =head1 ENVIRONMENT
+#
+# MAILDIR, the directory containing mail folders.
+#
+# MAILDOMAIN, the local mail domain (eg B<cskk.homeip.net> for my home domain).
+#
+# CATS2PROCMAILRC_[A-Z]*, macro definitions
+#
+# =head1 SEE ALSO
+#
+# procmail(1), procmailrc(1), procmailex(1), egrep(1)
+#
+# =head1 AUTHOR
+#
+# Cameron Simpson E<lt>cs@zip.com.auE<gt>
+#
+# =cut
+#
+
+import sys
+import os
+import os.path
+import stat
+from getopt import getopt, GetoptError
+import string
+import re
+from cs.misc import cmd, cmderr
+import cs.sh
+
+trackRules=True         # add X-Cats2Procmailrc line to show rule
+useXLabel=False         # put tag in X-Label header instead of subject
+alertComand=None        # command to display alerts
+dfltType='UNIX'         # UNIX mbox folders by default
+dfltDomains=()          # default email domain
+includePath=()          # where else to look for relative included files
+
+usage='''Usage: %s [-a alert] [-d dir] [-L] [-m domains] [-t {unix|mh|maildir}] -T <categories >procmailrc
 	-a alert	Command line to generate the alert.
 			The mail item is present on standard input.
+        -d dirpath      Look for relative included files in these directories.
+	-L		Use X-Label: header instead of Subject: for tag.
 	-m domains	Select default mail domain(s).
-			Default from \$MAILDOMAIN: @::DfltDom
+			Default from $MAILDOMAIN.
 	-t type		Select default mailbox type.
-			Default: $::DfltType
+			Default: %s
 	-T		Don't track rule matches by inserting an
 			X-Cats2Procmailrc-Matching-Rule header.
-";
-
-{ my $badopts=0;
-
-  undef $::opt_a;
-  undef $::opt_D;
-  undef $::opt_L;
-  undef $::opt_t;
-  undef $::opt_T;
-  undef $::opt_m;
-  if (! getopts("a:DLm:t:T"))
-  { warn "$::cmd: bad options\n";
-    $badopts=1;
-  }
-
-  if (defined $::opt_D)
-  { $::FolderDups=1;
-  }
-
-  if (defined $::opt_L)
-  { $::X_Label=1;
-  }
-
-  if (defined $::opt_T)
-  { $::TrackRules=0;
-  }
-
-  if (defined $::opt_a)
-  { $::DfltAlert=$::opt_a;
-  }
-
-  if (defined $::opt_m)
-  { @::DfltDom=grep(length,split(/[\s,|]+/, $::opt_m));
-  }
-
-  if (defined $::opt_t)
-  { $::DfltType = uc($::opt_t);
-
-    if ($::DfltType eq UNIX)
-    { $::DfltSfx='';
-    }
-    elsif ($::DfltType eq MAILDIR)
-    { $::DfltSfx='/';
-    }
-    elsif ($::DfltType eq MH)
-    { $::DfltSfx='/.';
-    }
-    else
-    { warn "$::cmd: -t: bad mailbox type \"$::DfltType\"\n\tI know: UNIX MAILBOX MH.\n";
-      $badopts=1;
-    }
-  }
-
-  if (@ARGV)
-  { warn "$::cmd: extra arguments: @ARGV\n";
-    $badopts=1;
-  }
-
-  die $::Usage if $badopts;
-}
-
-$::_INCHANDLE="INCLUDE0";
-
-$::Xit=0;
-readcats(STDIN);
-exit $::Xit;
-
-sub readcats($;$)
-{ my($FILE,$fname)=@_;
-
-  local($_);
-
-  my $rule;
-  my $hasnl=0;
-
-  CAT:
-  while (<$FILE>)
-  {
-    chomp;
-
-    # glom backslashed lines together
-    while (/\\$/)
-    { $_=$`."\n".<$FILE>;
-      chomp;
-    }
-
-    s/^\s+//;
-
-    # pass blanks and comments through almost unchanged
-    if (!length || /^#/)
-    { print "$_\n";
-      next CAT;
-    }
-
-    s/\s+$//;
-
-    $rule=$_;
-
-    # VARIABLE=value
-    if (/^[a-z]\w*=/i)
-    { print "$_\n";
-      next CAT;
-    }
-
-    # << filename
-    if (/^<<\s*/)
-    { $_=$';
-      s/\s+$//;
-
-      if (!m:^/: && defined $fname)
-      { $_=pathdir($fname)."/".$_;
-      }
-
-      my $incfh = ++$::_INCHANDLE;
-
-      if (! open($incfh, "< $_\0"))
-      { warn "$::cmd: line $.: can't open \"$_\": $!\n";
-	$::Xit=1;
-      }
-      else
-      {
-	readcats($incfh,$_);
-	close($incfh);
-      }
-
-      next CAT;
-    }
-
-    # < filename
-    if (/^<\s*/)
-    { $_=$';
-      s/\s+$//;
-
-      if (!m:^/: && defined $fname)
-      { $_=pathdir($fname)."/".$_;
-      }
-
-      if (! open(INCLUDE, "< $_\0"))
-      { warn "$::cmd: line $.: can't open \"$_\": $!\n";
-	$::Xit=1;
-      }
-      else
-      {
-	print "\n";
-	while (defined($_=<INCLUDE>))
-	{ print;
-	}
-	close(INCLUDE);
-	print "\n";
-      }
-
-      next CAT;
-    }
-
-    # macro preprocessing using environment
-    for my $env (keys %::ENV) {
-      if ($env =~ /^CATS2PROCMAILRC_([A-Z][A-Z_0-9]+)$/) {
-        my $key = $1;
-        my $repl = $::ENV{$env};
-        $repl =~ s/\\\././g;    # HACK: this gets done lower down anyway
-        s/\{\{$key\}\}/$repl/g;
-      }
-    }
-
-    # we expect "[flags]mailboxes tag rule"
-    #       1      23                  4 5                        6       7
-    if (! /^([+!]*)(("[^"]*"|[^\s"]\S*)(,("[^"]*"|[^\s"]\S*))*)\s+(\S+)\s+(\S)/)
-    { warn "$::cmd: stdin, line $.: bad line: $_\n";
-      $::Xit=1;
-      next CAT;
-    }
-
-    my($flags,$folders,$key)=($1,$2,$6);
-    $_=$7.$';
-
-    # leading "+" means continue after rule
-    my $cont = (index($flags,'+') >= 0 ? 'c' : '');
-
-    # leading "!" means alert this message
-    my $doalert = (index($flags,'!') >= 0);
-    if ($doalert
-     && (! defined $::DfltAlert || ! length $::DfltAlert)
-       )
-    { warn "$::cmd: line $.: no alert shell command defined!\n";
-      $doalert=0;
-    }
-
-    print "\n: 0$cont\n";
-
-    my @hdrs;
-
-    PATTERN:
-    for my $ptn (split(/\n[ \t]*/))
-    { $ptn =~ s/\s+$//;
-   
-      next PATTERN if $ptn eq '' || $ptn eq '.';
-
-      if ($ptn =~ /^(\w[-,\w]*):/)
-      { $ptn=$';
-	@hdrs=split(/,+/, $1);
-      }
-      else
-      { @hdrs=('to','cc','bcc');
-      }
-
-      if ($ptn =~ m:^/(.*?)/?$:)
-      { $ptn=$1;
-      }
-      else
-      { if ($ptn !~ /\@./)
-	# no @? add domains
-	{ $ptn =~ s/\@?$/"\@.*".altre(@::DfltDom)/e;
-	}
-	# no localpart? add wildcard prefix
-	elsif ($ptn =~ /^@/)
-	{ $ptn="[^>\@]+$ptn";
-	}
-
-	$ptn="\\<$ptn\\>";
-      }
-
-      $ptn =~ s/\.[^*]/\\$&/g;
-      $ptn =~ s/\+/\\$&/g;
-      if ($ptn =~ /^\^/)
-      { $ptn=$'; }
-      else
-      { $ptn=".*$ptn"; }
-
-      ##if ($ptn =~ /[A-Z]/)
-      ##{ for my $hdr (@hdrs)
-      ##  { $hdr =~ s/[a-z]/"[".uc($&)."$&]"/eg;
-      ##  }
-      ##}
-
-      print "* ^", altre(@hdrs), ":[ 	]*$ptn\n";
-    }
-
-    print "{\n";
-
-    if ($::TrackRules)
-    { print "  :0whf\n  | formail -f -A 'X-Cats2Procmailrc-Matching-Rule: $rule'\n";
-    }
-
-    if ($key ne '.')
-    # note that we strip the typical mailing list [tag] stuff if using our own key
-    {
-      if ($::X_Label)
-      {
-	print <<X
-
-  :0whf
-  | formail -f -A 'X-Label: $key'
-X
-	;
-      }
-      else
-      {
-	print <<X
-  :0whf
-  | sed -e 's/^Subject: *\\[[^ ]*\\] */Subject: /' -e 's/^Subject: *[Rr][Ee] *: *\\[[^ ]*\\] */Subject: Re: /' -e 's/^Subject:/& [$key]/'
-X
-	;
-      }
-    }
-
-    my $pmflags;
-
-    FOLDER:
-    while (length($folders))
-    {
-      my $folder;
-
-      if ($folders =~ /^"([^"]*)",*/)
-      { $folder=$1;
-	$folders=$';
-      }
-      elsif ($folders =~ /^([^,\s"]+),*/)
-      { $folder=$1;
-	$folders=$';
-      }
-      else
-      { $folders =~ /^([^,]*),*/;
-	$folder=$1;
-	$folders=$';
-	if (length $folder)
-	{ warn "$::cmd: unparsable folder: $folder\n";
-	}
-	next FOLDER;
-      }
-      # transmute "." into "attn"
-      $folder='attn' if $folder eq '.';
-
-      my $deliver;
-      my $type;
-
-      if ($folder =~ /^\|/)
-      { $type=PIPE;
-	$deliver=($key eq '.' ? $folder : "$folder '$key'");
-      }
-      elsif ($folder =~ /\@/)
-      { $type=EMAIL;
-	$deliver="! $folder";
-      }
-      else
-      { $type=foldertype($folder);
-	$deliver=$folder.typesfx($type);
-      }
-
-      # wait for delivery to programs
-      $pmflags = (length $folders ? 'c' : '');
-
-      print "\n  :0$pmflags\n  {\n";
-
-      if ($doalert)
-      { my $alertfn = $::DfltAlert;
-	$alertfn =~ s/\%/$folder/g;
-	print "    :0hwc\n    | $alertfn\n\n";
-
-	# only alert on the first folder
-	$doalert=0;
-      }
-
-      # duplicate stripping
-      if ($::FolderDups && $type ne PIPE)
-      {
-	my $cache = ( $type eq MH || $type eq MAILDIR
-		    ? "$ENV{MAILDIR}/$folder/.msgid.cache"
-		    : "$ENV{MAILDIR}/.msgid.cache-$folder"
-		    );
-	print "    :0 Wh: $cache.lock\n    | formail -D 819200 $cache\n";
-      }
-
-      $pmflags = ($deliver =~ /^\|/ ? "w" : "");
-      print "    :0$pmflags\n    $deliver\n";
-
-      print "  }\n";
-    }
-
-    print "}\n";
-  }
-}
-
-sub typesfx
-{ my($type)=@_;
-
-  if ($type eq UNIX)	{ return ""; }
-  if ($type eq MAILDIR)	{ return "/"; }
-  if ($type eq MH)	{ return "/."; }
-  die "$0: can't determine folder suffix for type \"$type\"";
-}
-
-sub foldertype
-{ my($folder)=@_;
-
-  $folder="$ENV{MAILDIR}/$folder" unless $folder =~ m:^/:;
-  if (! stat($folder))
-  { return $::DfltType;
-  }
-
-  if (! -d _)
-  { return UNIX;
-  }
-
-  if (-e "$folder/.mh_sequences")
-  { return MH;
-  }
-
-  return MAILDIR;
-}
-
-sub pathdir
-{ local($_)=@_;
-  return "." unless m:/:;
-  s:/[^/]*$::;
-  return $_;
-}
-
-sub altre
-{ if (! @_)
-  { my@c=caller;
-    die "altere() with no args from [@c]";
-  }
-  return $_[0] if @_ == 1;
-  return '('.join('|',@_).')';
-}
+''' % (cmd, dfltType)
+
+badopts=False
+
+opts=()
+argv=sys.argv[1:]
+try:
+  opts, argv = getopt(argv, 'a:d:Lm:t:T')
+except GetoptError, e:
+  cmderr("bad options:", str(e))
+  badopts=True
+
+for opt, arg in opts:
+  if opt == '-a':
+    alertCommand=arg
+  elif opt == '-d':
+    includePath=arg.split(':')
+  elif opt == '-L':
+    useXLabel=True
+  elif opt == '-m':
+    dfltDomains=arg.split(',')
+  elif opt == '-t':
+    dfltType=arg.upper()
+    if dfltType not in ('UNIX', 'MH', 'MAILDIR'):
+      cmderr("invalid mailbox type (%s), expected one of unix, mh or maildir" % arg)
+      badopts=True
+  elif opt == '-T':
+    trackRules=False
+  else:
+    cmderr("unhandled option:", opt)
+    badopts=True
+
+if len(dfltDomains) == 0:
+  dfltDomains=(os.environ['MAILDOMAIN'],)
+
+if len(argv):
+  cmderr("extra arguments after options:", " ".join(argv))
+  badopts=True
+
+if badopts:
+  sys.stderr.write(usage)
+  sys.exit(2)
+
+assign_re=re.compile(r'[a-z]\w+=')
+target_re=re.compile(r'("[^"]*"|[^"\s]+)')
+hdrlist_re=re.compile(r'([a-z][\-a-z0-9]*(,[a-z][\-a-z0-9]*)*):', re.I)
+subnames=[v[16:] for v in os.environ.keys() if v.startswith('CATS2PROCMAILRC_')]
+if len(subnames) == 0:
+  curly_re=None
+else:
+  subnames.sort()
+  curly=r'\{\{('+'|'.join(subnames)+r')\}\}'
+  curly_re=re.compile(curly)
+
+def c2p(ifp,ofp):
+  global xit, assign_re, target_re, hdrlist_re, curly_re
+  lineno=0
+  oline=None
+  while True:
+    line=ifp.readline()
+    if len(line) == 0:
+      break
+
+    lineno+=1
+    if line[-1:] != '\n':
+      cmderr("%s: %d: unexpected EOF (no newline)"%(ifp.name,lineno))
+      xit=1
+      return
+
+    if oline is not None:
+      line=oline+'\n'+line
+      oline=None
+
+    line=line[:-1]
+    if line[-1:] == '\\':
+      oline=line[:-1]
+      continue
+
+    line=line.strip()
+    if len(line) == 0 or line[0] == '#':
+      continue
+
+    ruledesc="%s, line %d: %s" % (ifp.name, lineno, line.replace('\n','; '))
+    ofp.write('# %s\n' % ruledesc)
+
+    if curly_re:
+      curlies=[m for m in curly_re.finditer(line)]
+      if curlies:
+        curlies.reverse()
+        for m in curlies:
+          envvar='CATS2PROCMAILRC_'+m.group()[2:-2]
+          line=line[:m.start()]+os.environ[envvar]+line[m.end():]
+
+    # assignments
+    m=assign_re.match(line)
+    if m:
+     ofp.write(line)
+     ofp.write('\n')
+     continue
+
+    # inclusions
+    if line[0] == '<':
+      for filename in line[1:].split():
+        if not os.path.isabs(filename):
+          inc=[i for i in includePath]
+          if ifp.name[0] != '<':        # <stdin> etc
+            here=os.path.dirname(ifp.name)
+          else:
+            here='.'
+          inc.insert(0,here)
+          for path in inc:
+            nfilename=os.path.join(path,filename)
+            if os.path.isfile(nfilename):
+              filename=nfilename
+              break
+        try:
+          fp=open(filename)
+        except IOError, e:
+          cmderr("%s: %d: %s: cannot open: %s"%(ifp.name, lineno, filename, str(e)))
+          xit=1
+          continue
+        c2p(fp,ofp)
+      continue
+
+    # recipes - copy until ^}
+    if line[0] == ':':
+      ofp.write(line)
+      ofp.write('\n')
+      while True:
+        line=ifp.readline()
+        lineno+=1
+        if line[-1:] != '\n':
+          cmderr("%s: %d: unexpected EOF (no newline)"%(ifp.name,lineno))
+          xit=1
+          break
+
+        ofp.write(line)
+        if line[0] == '}':
+          break
+      continue
+
+    # a cats2procmailrc rule!
+    doAlert=False
+    doContinue=False
+    while line[0] in ('!','+'):
+      if line[0] == '!':
+        doAlert=True
+      elif line[0] == '+':
+        doContinue=True
+      else:
+        assert "unhandled !/+ flag: "+line[0]
+      line=line[1:]
+
+    ofp.write(':0')
+    if doContinue: ofp.write('c')
+    ofp.write('\n')
+
+    if len(line) == 0 or line[0] in string.whitespace:
+      cmderr("%s: %d: missing targets"%(ifp.name,lineno))
+      xit=1
+      continue
+
+    targets=[]
+    m=target_re.match(line)
+    while m is not None:
+      target=m.group(0)
+      line=line[len(target):]
+      targets.append(target)
+      if line[:1] != ',':
+        break
+      line=line[1:]
+
+    if len(targets) == 0:
+      cmderr("%s: %d: no targets!"%(ifp.name,lineno))
+      xit=1
+      continue
+
+    if len(line) == 0 or line[0] not in string.whitespace:
+      cmderr("%s: %d: missing tag"%(ifp.name,lineno))
+      xit=1
+      continue
+
+    tag, patterns = line.lstrip().split(None,1)
+    if tag == '.':
+      tag=None
+
+    for pattern in [p.lstrip() for p in patterns.split('\n')]:
+      if pattern == '.':
+        continue
+
+      m=hdrlist_re.match(pattern)
+      if not m:
+        hdrs=('to','cc','bcc')
+      else:
+        hdrs=[h.lower() for h in m.group(1).split(',')]
+        pattern=pattern[m.end():]
+
+      if pattern[0] == '/':
+        pattern=pattern[1:]
+        if pattern[0] == '^':
+          pattern=' *'+pattern[1:]
+        else:
+          pattern='.*'+pattern
+      else:
+        if pattern.find('@') < 0:
+          pattern='('+'|'.join(["%s@%s"%(pattern,dom) for dom in dfltDomains])+')'
+        pattern='.*\\<'+pattern.replace('.','\\.')+'\\>'
+
+      if len(hdrs) == 1:
+        hdrs=hdrs[0]
+      else:
+        hdrs='('+'|'.join(hdrs)+')'
+      pattern='^'+hdrs+':'+pattern
+
+      ofp.write('* %s\n'%pattern)
+
+    needBrackets=(len(targets) > 1 or tag is not None or trackRules)
+    if needBrackets:
+      ofp.write('{\n');
+
+    if trackRules:
+      ofp.write('  :0whf\n  | formail -f -A %s\n' % cs.sh.quotestr('X-Cats2Procmailrc-Rule: '+ruledesc))
+
+    if tag is not None:
+      if useXLabel:
+        pipe='formail -f -A %s' % cs.sh.quotestr('X-Label: '+tag)
+      else:
+        sedtag=tag.replace('/','\\/')
+        pipe="sed -e %s" % cs.sh.quotestr('s/^[Ss][Uu][Bb][Jj][Ee][Cc][Tt]: */& ['+sedtag+'] /')
+      ofp.write('  :0whf\n  | %s\n' % pipe)
+
+    while len(targets) > 0:
+      target=targets.pop(0)
+      if target[0] == '"':
+        target=target[1:-1]
+      if target[0] == '|':
+        pass
+      elif target.find('@') > 0:
+        # forward to address
+        target='!'+target
+      else:
+        # presume it is a mail folder
+        if target[0] != '/':
+          target=os.path.join(os.environ['MAILDIR'],target)
+          ftype=dfltType
+          if os.path.isfile(target):
+            ftype='UNIX'
+          elif os.path.isdir(target):
+            if os.path.isfile(os.path.join(target,'.mh_sequences')):
+              ftype='MH'
+            else:
+              ftype='MAILDIR'
+
+        if ftype == 'UNIX':
+          pass
+        elif ftype == 'MAILDIR':
+          target+='/'
+        elif ftype == 'MH':
+          target+='/.'
+        else:
+          assert False, '%s: %d: unsupported folder type: %s'%(ifp.name,lineno,ftype)
+
+        if needBrackets:
+          ofp.write('  ')
+        ofp.write(':0')
+        if len(targets) > 0:
+          ofp.write('c')
+        ofp.write('\n')
+        if needBrackets:
+          ofp.write('  ')
+        ofp.write('%s\n'%target)
+
+    if needBrackets:
+      ofp.write('}\n');
+
+  if oline is not None:
+    cmderr("%s: %d: unexpected EOF in slosh-extended line"%(ifp.name,lineno))
+    xit=1
+
+  return
+
+xit=0
+
+c2p(sys.stdin,sys.stdout)
+
+sys.exit(xit)
