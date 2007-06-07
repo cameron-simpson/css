@@ -11,7 +11,7 @@
 #
 # =head1 SYNOPSIS
 #
-# cats2procmailrc [B<-a> I<alert>] [B<-D> I<subst>B<=>I<val>] [B<-L>] [B<-m> I<maildomains>] [-S] [B<-t> I<type>] [B<-T>] [category-files...] E<gt>procmailrc
+# cats2procmailrc [B<-a> I<alert>] [B<-d> I<dirpath>] [B<-D> I<subst>B<=>I<val>] [B<-L>] [B<-m> I<maildomains>] [-S] [B<-t> I<type>] [B<-T>] [category-files...] E<gt>procmailrc
 #
 # =head1 DESCRIPTION
 #
