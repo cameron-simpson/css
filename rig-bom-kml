@@ -1,0 +1,26 @@
+#!/bin/sh -u
+#
+# Generate current BOM rainfall KML.
+#       - Cameron Simpson <cs@zip.com.au> 16jan2007
+#
+
+if [ "x$SYSTEMID" = xhome ]
+then ez=ezos
+else ez=ezosh
+fi
+
+umask 2
+set -eux
+
+cmd=`basename "$0"`
+wd=`mkdirn "$TMPDIR/$cmd"`
+
+cd "$wd"
+
+bom-sydney-radar-128 >bom128.png &
+bom-sydney-radar-128 IDR032.gif >bom256.png &
+kml-bom-128km >bom3.kml &
+wait
+cat bom3.kml
+L bom128.png bom256.png
+rsync -av bom128.png bom256.png bom3.kml $ez:public_html/cs/test/.

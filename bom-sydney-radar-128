@@ -1,0 +1,55 @@
+#!/bin/sh -u
+#
+# Output the latest BOM 128km rain radar image.
+#       - Cameron Simpson <cs@zip.com.au> 15jan2007
+#
+
+: ${TMPDIR:=/tmp}
+
+img=IDR033.gif
+dotrans=1
+
+cmd=`basename "$0"` || exit 1
+usage="usage: $cmd [-notrans] [img]
+        -notrans        Do not create transparency of the sea and land.
+        img             Image to fetch. Default: $img"
+
+[ $# -gt 0 ] && [ "x$1" = x-notrans ] && { dotrans=; shift; }
+[ $# -gt 0 ] && { img=$1; shift; }
+[ $# -gt 0 ] && { echo "$usage" >&2; exit 2; }
+
+if [ $dotrans ]
+then
+  tmpf=$TMPDIR/$cmd$$.png
+  trap 'rm -f "$tmpf"' 0 1 2 13 15
+else
+  tmpf=png:-
+fi
+
+wget -q -O - "http://mirror.bom.gov.au/radar/$img?x" | gm convert GIF:- -crop 512x496+6+22 "$tmpf" || exit 1
+[ $dotrans ] || exit 0
+
+python -c '
+import sys
+from PIL import Image
+import cs.hier
+im=sys.argv[1]
+raw=Image.open(im)
+IM=Image.new("RGBA",(512,496))
+IM.paste(raw, None)
+for x in range(512):
+  for y in range(496):
+    p=IM.getpixel((x,y))
+    rgb=p[:3]
+    if rgb in (
+                (195, 217, 235),
+                (210, 161, 85),
+                (216, 178, 100),
+                (221, 198, 118),
+                (226, 203, 140),
+                (231, 220, 189),
+              ):
+      IM.putpixel((x,y),(0,0,0,0))
+
+IM.save("/dev/fd/1","PNG")
+          ' "$tmpf"
