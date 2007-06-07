@@ -536,7 +536,7 @@ def c2p(ifp,ofp):
         # email addresses
         if pattern.find('@') < 0:
           pattern='('+'|'.join(["%s@%s"%(pattern,dom) for dom in dfltDomains])+')'
-        pattern='.*\\<'+pattern.replace('.','\\.')+'\\>'
+        pattern='.*\\<'+pattern.replace('.','\\.').replace('+','\\+')+'\\>'
 
       if len(hdrs) == 1:
         hdrs=hdrs[0]
