@@ -24,7 +24,7 @@ umask 22
 if [ -z "$quick" ]
 then
     ( cd $HOME/bin || exit 1
-      exec myke
+      exec myke _all
     ) || exit 1
     ( cd "$cssweb" || exit 1
       exec myke
