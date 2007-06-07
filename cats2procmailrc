@@ -55,6 +55,13 @@
 # In fact this may be a list of domains if you have some equvalents,
 # separated by commas.
 #
+# =item B<-S>
+#
+# Synchronous. All continue rules will use a lock file.
+# This constrains procmail(1) from becoming a fork bomb
+# if there are many continue rules,
+# such as may occur in a cross-referencing rule list.
+#
 # =item B<-t> I<type>
 #
 # Specify the default mailbox type.
@@ -254,26 +261,34 @@ alertComand=None        # command to display alerts
 dfltType='UNIX'         # UNIX mbox folders by default
 dfltDomains=()          # default email domain
 includePath=()          # where else to look for relative included files
+substitutions={}        # replace {{foo}} in rules
+syncRules=False         # let procmail be fork happy on continue/copy rules
 
-usage='''Usage: %s [-a alert] [-d dir] [-L] [-m domains] [-t {unix|mh|maildir}] -T <categories >procmailrc
+usage='''Usage: %s [-a alert] [-d dir] [-L] [-m domains] [-S] [-t {unix|mh|maildir}] -T <categories >procmailrc
 	-a alert	Command line to generate the alert.
 			The mail item is present on standard input.
         -d dirpath      Look for relative included files in these directories.
+        -D subst=val    Add a macro definition just as $CATS2PROCMAILRC_subst=val does.
 	-L		Use X-Label: header instead of Subject: for tag.
 	-m domains	Select default mail domain(s).
 			Default from $MAILDOMAIN.
+        -S              Synchronous. Use a lock on all continue/copy rules.
 	-t type		Select default mailbox type.
 			Default: %s
 	-T		Don't track rule matches by inserting an
 			X-Cats2Procmailrc-Matching-Rule header.
 ''' % (cmd, dfltType)
 
+assign_re=re.compile(r'[a-z]\w+=', re.I)
+target_re=re.compile(r'("[^"]*"|[^"\s]+)')
+hdrlist_re=re.compile(r'([a-z][\-a-z0-9]*(,[a-z][\-a-z0-9]*)*):', re.I)
+
 badopts=False
 
 opts=()
 argv=sys.argv[1:]
 try:
-  opts, argv = getopt(argv, 'a:d:Lm:t:T')
+  opts, argv = getopt(argv, 'a:d:D:Lm:S:t:T')
 except GetoptError, e:
   cmderr("bad options:", str(e))
   badopts=True
@@ -283,10 +298,19 @@ for opt, arg in opts:
     alertCommand=arg
   elif opt == '-d':
     includePath=arg.split(':')
+  elif opt == '-D':
+    m=assign_re.match(arg)
+    if not m:
+      cmderr("invalid subst=val argument to -D:", arg)
+      badopts=True
+    else:
+      substitutions[arg[:m.end()-1]]=arg[m.end():]
   elif opt == '-L':
     useXLabel=True
   elif opt == '-m':
     dfltDomains=arg.split(',')
+  elif opt == '-S':
+    syncRules=True
   elif opt == '-t':
     dfltType=arg.upper()
     if dfltType not in ('UNIX', 'MH', 'MAILDIR'):
@@ -308,10 +332,11 @@ if badopts:
   sys.stderr.write(usage)
   sys.exit(2)
 
-assign_re=re.compile(r'[a-z]\w+=', re.I)
-target_re=re.compile(r'("[^"]*"|[^"\s]+)')
-hdrlist_re=re.compile(r'([a-z][\-a-z0-9]*(,[a-z][\-a-z0-9]*)*):', re.I)
-subnames=[v[16:] for v in os.environ.keys() if v.startswith('CATS2PROCMAILRC_')]
+for subname in [v[16:] for v in os.environ.keys() if v.startswith('CATS2PROCMAILRC_')]:
+  if subname not in substitutions:
+    substitutions[subname]=os.environ['CATS2PROCMAILRC_'+subname]
+
+subnames=substitutions.keys()
 if len(subnames) == 0:
   curly_re=None
 else:
@@ -387,8 +412,7 @@ def c2p(ifp,ofp):
       if curlies:
         curlies.reverse()
         for m in curlies:
-          envvar='CATS2PROCMAILRC_'+m.group()[2:-2]
-          line=line[:m.start()]+os.environ[envvar]+line[m.end():]
+          line=line[:m.start()]+substitutions[m.group()[2:-2]]+line[m.end():]
 
     # assignments
     m=assign_re.match(line)
@@ -454,7 +478,10 @@ def c2p(ifp,ofp):
       line=line[1:]
 
     ofp.write(':0')
-    if doContinue: ofp.write('c')
+    if doContinue:
+      ofp.write('c')
+      if syncRules:
+        ofp.write(':.lock-global-procmail')
     ofp.write('\n')
 
     if len(line) == 0 or line[0] in string.whitespace:
@@ -505,6 +532,7 @@ def c2p(ifp,ofp):
         else:
           pattern='.*'+pattern
       else:
+        pattern=pattern.strip()
         # email addresses
         if pattern.find('@') < 0:
           pattern='('+'|'.join(["%s@%s"%(pattern,dom) for dom in dfltDomains])+')'
@@ -535,15 +563,15 @@ def c2p(ifp,ofp):
           pipe="sed -e %s" % cs.sh.quotestr('s/^[Ss][Uu][Bb][Jj][Ee][Cc][Tt]: */& ['+sedtag+'] /')
         ofp.write('  :0whf\n  | %s\n' % pipe)
 
-      if doAlert:
-        if alertCommand is None:
-          cmderr("%s: %d: alert rule but not alert command - see -a option")
-          xit=1
-        else:
-          ofp.write('  :0hwc\n| %s\n' % alertCommand)
-
       while len(targets) > 0:
-        target=resolveTarget(targets.pop(0))
+        target0=targets.pop(0)
+        if doAlert:
+          if alertCommand is None:
+            cmderr("%s: %d: alert rule found but no alert command - see -a option")
+            xit=1
+          else:
+            ofp.write('  :0hwc\n| %s\n' % alertCommand.replace('%',target0))
+        target=resolveTarget(target0)
         ofp.write('  :0')
         if len(targets) > 0:
           ofp.write('c')
