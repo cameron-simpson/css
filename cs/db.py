@@ -79,6 +79,20 @@ def dbpool(secret,dbname):
 
   return _cache_dbpool[secret,dbname]
 
+# allow an environment variable of the form [db].[table] to override a db,table pair
+def dbtablenames(envvar,dbname,tablename):
+  import os
+  if envvar in os.environ:
+    dbt=os.environ[envvar]
+    cpos=dbt.find('.')
+    if cpos >= 0:
+      ed, et = dbt.split(':',1)
+      if len(ed): dbname=ed
+      if len(et): tablename=et
+    else:
+      dbname=dbt
+  return (dbname,tablename)
+
 # convert DateTime objects into strings
 # trim DateTime strings that are exact days to just the date
 # this make naive string comparisons behave well
