@@ -26,7 +26,6 @@ killpidfile -w "$pidfile"
 >"$pidfile"
 for host
 do
-  sshb -n -F "$cf" "$host" "while echo .; do sleep $delay; done" 1>/dev/null &
+  sshb -n -F "$cf" "$host" "set -e; while echo .; do sleep $delay; done" 1>/dev/null &
   echo $! >>"$pidfile"
 done
-sleep 2

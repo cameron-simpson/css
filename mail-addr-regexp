@@ -4,6 +4,9 @@
 #       - Cameron Simpson <cs@zip.com.au> 18mar2007
 #
 
+escapeDots=1
+[ $# -gt 0 ] && [ "x$1" = x-r ] && escapeDots=
+
 printf '('
-echo `cat` | sed 's/\./\\&/g' | tr ' ' '|' | tr -d '\012'
+echo `cat` | if [ $escapeDots ]; then sed 's/\./\\&/g'; else cat; fi | tr ' ' '|' | tr -d '\012'
 printf ')\n'

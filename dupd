@@ -5,11 +5,13 @@
 #
 # Timestamping.	- cameron, 21mar1999
 # Async multidir mode. - cameron 23mar2007
+# .gz mode. - cameron 07may2007
 #
 
 cmd=$0
 usage="Usage: $cmd [-a] [dirs...]"
 
+zmode=gz
 async=
 [ $# -gt 0 ] && [ "x$1" = x-a ] && { async=1; shift; }
 
@@ -24,13 +26,28 @@ do
   ( cd "$dir" || exit 1
     dusum "$now"
 
-    >>.du-a
-    >>.du-s
-    dudiff .du-a ".du-a.$now" > .du-a.diff
-    dudiff .du-s ".du-s.$now" > .du-s.diff
+    dua=.du-a.$now.gz
 
-    rm .du-a;ln -s ".du-a.$now" .du-a
-    rm .du-s;ln -s ".du-s.$now" .du-s
+    if [ -f .du-a.gz ]
+    then olddua=.du-a.gz
+    elif [ -f .du-a ]
+    then olddua=.du-a
+    else olddua=/dev/null
+    fi
+    rm -f .du-a.diff
+    dudiff "$olddua" "$dua" | gzip --fast > .du-a.diff.gz
+    rm -f .du-a .du-a.gz;ln -s "$dua" .du-a.gz
+
+    dus=.du-s.$now.gz
+    if [ -f .du-s.gz ]
+    then olddus=.du-s.gz
+    elif [ -f .du-s ]
+    then olddus=.du-s
+    else olddus=/dev/null
+    fi
+    rm -f .du-s.diff
+    dudiff "$olddus" "$dus" | gzip --fast > .du-s.diff.gz
+    rm -f .du-s .du-s.gz;ln -s "$dua" .du-s.gz
   ) &
   [ $async ] || wait
 done

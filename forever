@@ -1,0 +1,104 @@
+#!/bin/sh -ue
+#
+# Run a command forever, optionally until failure.
+#       - Cameron Simpson <cs@zip.com.au> 27apr2007
+#
+
+: ${VARRUN:=$HOME/var/run}
+
+cmd=`basename "$0"`
+usage="Usage:
+  $cmd [!] [-d delay] [-E] [-n num] command [args...]
+  $cmd [!] [-d delay] [-E] [-n num] -c shcmd
+    !           Invert exit status for \"error\" - used by await(1cs).
+    -c shcmd    Use shell command shcmd instead of argument list.
+    -d delay    Delay this many seconds before the next invocation.
+    -E          Exit on error.
+    -n num      Run this many times. Default: forever.
+    -p pidfile  Record main pid in file.
+    -x          Trace execution."
+
+doshcmd=
+shcmd=
+delay=0
+failok=1
+max=0
+dotrace=
+pidfile=
+not=
+
+badopts=
+
+while [ $# -gt 0 ]
+do
+  case $1 in
+    !)  not=1 ;;
+    -c) doshcmd=1 shcmd=$2; shift ;;
+    -d) delay=$2; shift ;;
+    -E) failok= ;;
+    -n) max=$2; shift ;;
+    -p) pidfile=$2; shift
+        case $pidfile in
+          /* | ./* ) ;;
+          *)    pidfile=$VARRUN/$pidfile ;;
+        esac
+        ;;
+    -x) dotrace=1 ;;
+    --) shift; break ;;
+    -?*)echo "$cmd: unrecognised option: $1" >&2
+        badopts=1
+        ;;
+    *)  break ;;
+  esac
+  shift
+done
+
+if [ $doshcmd ]
+then
+  if [ $# = 0 ]
+  then
+    set -- sh -c "$shcmd"
+  else
+    echo "$cmd: extra arguments after options with -c: $*" >&2
+    badopts=1
+  fi
+else
+  [ $# -gt 0 ] || { echo "$cmd: missing command and no -c" >&2
+                    badopts=1
+                  }
+fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+[ $not ] && set -- not "$@"
+
+if [ -n "$pidfile" ]
+then
+  echo $$ >"$pidfile"
+fi
+
+subpid=
+n=0
+while :
+do
+  ( set +e
+    [ $dotrace ] && set -x
+    exec "$@"
+  ) \
+  || [ $failok ] \
+  || if [ $not ]
+     then  exit 0
+     else  exit 1
+     fi
+
+  if [ "x$max" != x0 ]
+  then
+    n=`expr $n + 1`
+    [ "$n" -lt "$max" ] || exit 0
+  fi
+
+  [ "x$delay" = x0 ] || ( set +e
+                          [ $dotrace ] && set -x
+                          exec sleep "$delay"
+                        )
+done

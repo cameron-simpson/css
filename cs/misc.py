@@ -8,15 +8,24 @@ import time
 from StringIO import StringIO
 from cs.lex import parseline, strlist
 
-cmd=os.path.basename(sys.argv[0])
-cmd_=cmd+':'
+def setcmd(ncmd):
+  global cmd, cmd_, cmd__
+  cmd=ncmd
+  cmd_=cmd+':'
+  cmd__=cmd_+' '
+
+setcmd(os.path.basename(sys.argv[0]))
+
+warnFlushesUpd=True
 
 # print to stderr
 def warn(*args):
   import cs.upd
+  global warnFlushesUpd
   if cs.upd.active:
     upd=cs.upd.default()
-    oldUpd=upd.state()
+    if not warnFlushesUpd:
+      oldUpd=upd.state()
     upd.out('')
 
   first=True
@@ -32,8 +41,9 @@ def warn(*args):
   sys.stderr.write("\n")
   sys.stderr.flush()
 
-  if cs.upd.active:
-    upd.out(oldUpd)
+  if not warnFlushesUpd:
+    if cs.upd.active:
+      upd.out(oldUpd)
 
 # debug_level:
 #   0 - quiet
@@ -93,12 +103,29 @@ def out(*args):
 
 def cmderr(*args):
   global cmd_
-  sys.stderr.write(cmd)
-  sys.stderr.write(": ")
   warn(*[cmd_]+list(args))
 
 def die(*args):
   assert False, strlist(args," ")
+
+def tb():
+  import traceback
+  import cs.upd
+  global cmd_
+  if cs.upd.active:
+    upd=cs.upd.default()
+    oldUpd=upd.state()
+    upd.out('')
+
+  for elem in traceback.format_list(traceback.extract_stack())[:-1]:
+    for line in elem.split("\n"):
+      if len(line) > 0:
+        sys.stderr.write(cmd__)
+        sys.stderr.write(line)
+        sys.stderr.write("\n")
+
+  if cs.upd.active:
+    upd.out(oldUpd)
 
 _seq=0
 def seq():
@@ -123,7 +150,7 @@ def a2date(s):
 def exactlyOne(list,context=None):
   ''' Returns the first element of a list, but requires there to be exactly one.
   '''
-  icontext="expected exactly one"
+  icontext="expected exactly one value"
   if context is not None:
     icontext=icontext+" for "+context
   if len(list) == 0:
@@ -539,3 +566,42 @@ def trysaferename(oldpath,newpath):
   except:
     return False
   return True
+
+def fromBS(s):
+  ''' Read an extensible value from the front of a string.
+      Continuation octets have their high bit set.
+      The value is big-endian.
+  '''
+  o=ord(s[0])
+  n=o&0x7f
+  used=1
+  while o & 0x80:
+    o=ord(s[used])
+    used+=1
+    n=(n<<7)|(o&0x7f)
+  return (n,s[used:])
+
+def fromBSfp(fp):
+  ''' Read an extensible value from a file.
+  '''
+  s=c=fp.read(1)
+  if len(s) == 0:
+    return None
+  while ord(c)&0x80:
+    c=fp.read(1)
+    assert len(c) == 1, "unexpected EOF"
+    s+=c
+  (n,s)=fromBS(s)
+  assert len(s) == 0
+  return n
+
+def toBS(n):
+  ''' Encode a value as an entensible octet sequence for decode by
+      getExtensibleOctets().
+  '''
+  s=chr(n&0x7f)
+  n>>=7
+  while n > 0:
+    s=chr(0x80|(n&0x7f))+s
+    n>>=7
+  return s

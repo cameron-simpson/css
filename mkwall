@@ -12,13 +12,25 @@
 : ${XINERAMA:=''}
 : ${X11_COMPOSITE:=''}
 
+gm=gm
+[ -n "${PREFER_IMAGEMAGICK:-}" ] && gm=
+
 # set $bgx and $bgy
 eval `bgsize -v | sed 's/^d/bg/'`
 
 doauto=1
 
 cmd=`basename "$0"`
-usage="Usage: $cmd [-g geom] [-bg bg-colour] imagefiles..."
+usage="Usage: $cmd [+a] [-g geom] [-bg bg-colour] [-sh shade] imagefiles...
+        +a      No automatics; don't double the image on Xinerama displays.
+        -g geom Use this target geometry instead of the display pixel size.
+        -bg bg-colour
+                Background colour to use for padding. Default is black,
+                overridding by the envvar \$BG.
+        -sh shading
+                Shade (dim) the wallpaper to this percentage of full brightness.
+                Default 100 on \$X11_COMPOSITE displays and 50 on others.
+                Overridden by the envvar \$WALLPAPER_SHADE."
 
 badopts=
 
@@ -80,16 +92,16 @@ then
 		    exit 2
 		  }
     hx=`expr $bgx / 2` || exit 1
-    bg1=`mkwall +a -g "${hx}x${bgy}" "$1"` || exit 1
+    bg1=`sh -x mkwall +a -g "${hx}x${bgy}" "$1"` || exit 1
 
     if [ "x$1" = "x$2" ]
     then  bg2=$bg1
-    else  bg2=`mkwall +a -g "${hx}x${bgy}" "$2"` || exit 1
+    else  bg2=`sh -x mkwall +a -g "${hx}x${bgy}" "$2"` || exit 1
     fi
 
     tmpf=$TMPDIR/$cmd$$.png
     # +label
-    gm montage \
+    $gm montage \
 		-tile 2x1 \
 		+label \
 		-resize "${bgx}x${bgy}" \
@@ -121,7 +133,7 @@ eval `imsize-gm "$imagefile" | awk '{print "ix="$1 " iy="$2}'`
 	|| { echo "$cmd: can't deduce source image size" >&2; exit 1; }
 
 convname=pngof
-set gm convert "$imagefile"
+set $gm convert "$imagefile"
 
 convname=$convname/sh$shade
 if [ "x$shade" != x100 ]

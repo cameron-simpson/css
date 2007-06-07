@@ -1,3 +1,0 @@
-#!/bin/sh
-
-exec term -n "cvs-VI [$dirname]@$HOST" -e cvsedit ${1+"$@"}

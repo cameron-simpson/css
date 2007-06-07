@@ -1,4 +1,4 @@
 #!/bin/sh
 ##set -x
 exec sshb zip exec nc -q 5 mail.zipworld.com.au 110
-##exec sshb zip exec ./scripts/rigenv-trivial lock -1 mail.zip.com.au nc -q 5 mail.zip.com.au 110
+##exec sshb zip exec ./bin/rigenv-trivial lock -1 mail.zip.com.au nc -q 5 mail.zip.com.au 110

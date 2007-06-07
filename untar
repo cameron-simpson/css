@@ -1,189 +1,158 @@
-#!/usr/bin/perl
+#!//bin/sh -ue
 #
 # Run tar extract with tidier verbose mode.
 #	- Cameron Simpson <cs@zip.com.au>
 #
 
-use cs::Upd;
-use cs::Units;
+bsize=20
+file=-
 
-($cmd=$0) =~ s,.*/,,;
-$usage="Usage: $cmd [-o] [-O] [-f file] [--] [targets...]
-	-f file	File to use rather than stdin.
-	-o	Keep file owner from archive.
-	-O	Use extractor's uid for ownership.
-";
+cmd=`basename "$0"`
+usage="Usage: $cmd [-b bsize] [-f file] [--] [targets...]
+        -b bsize Tar blocksize. Default: $bsize
+	-f file	File to use rather than stdin."
 
-$badopts=0;
-$tar='tar';
-$gnutar=1;
-$tarflags='xv';
-$suser=($> == 0);
-$keepowner='';	##($suser ? '' : 'o');	# use extractor's uid
-$tarf='-';
-@tarargs=();
-while (@ARGV && $ARGV[0] =~ /^-/)
-{ $_ = shift @ARGV;
-  last if ($_ eq '--');
+badopts=
 
-  if ($_ eq '-f')
-  { if (! @ARGV)
-    { err("$cmd: missing argument for -f\n");
-      $badopts=1;
-    }
-    else
-    { $tarf=shift(@ARGV);
-    }
-  }
-  elsif ($_ eq '-o')	{ $keepuser='o'; }
-  elsif ($_ eq '-O')	{ $keepuser=''; }
-  else
-  { err("$cmd: bad option '$_'\n");
-    $badopts=1;
-  }
-}
+while [ $# -gt 0 ]
+do
+  case $1 in
+    -b) bsize=$2; shift ;;
+    -f) file=$2; shift ;;
+    --) shift; break ;;
+    -?*)echo "$cmd: unrecognised option: $1" >&2
+        badopts=1
+        ;;
+    *)  break ;;
+  esac
+  shift
+done
 
-$tarflags.=$keepowner;
-$tarflags.='f';
-push(@tarargs,$tarf);
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
 
-die $usage if $badopts;
+case $ARCH in
+  *.linux)
+    # GNU tar - ick!
+    set -- tar -x -v -B -b "$bsize" -f "$file" ${1+"$@"} ;;
+  *)
+    # real tar
+    set -- tar xvBbf "$bsize" "$file" ${1+"$@"} ;;
+esac
 
-$start=time;
-$bytes=0;
-undef $lastfile;
-undef $lastfilesize;
+"$@" 2>&1 \
+| perl -e '
 
-pipe(READEND,WRITEEND)	|| die "$cmd: can't make pipe: $!\n";
-my $pid = fork;
-die "$cmd: fork: $!\n" if ! defined $pid;
+    use cs::Upd;
+    use cs::Units;
 
-if ($pid == 0)
-# child, redirect then exec tar
-{ close(READEND);
+    $gnutar=($ENV{ARCH} =~ /\.linux$/);
+    $start=time;
+    $bytes=0;
+    undef $lastfile;
+    undef $lastfilesize;
+    undef $oldline;
+    undef $dir;
+    while (<STDIN>)
+    { chop;
 
-  open(STDERR,'>&WRITEEND')
-	  || die "$cmd: can't dup write end of pipe to STDERR: $!\n";
-
-  open(STDOUT,'>&WRITEEND')
-	  || die "$cmd: can't dup write end of pipe to STDOUT: $!\n";
-
-  close(WRITEEND);
-
-  @e=($tar,$tarflags,@tarargs,@ARGV);
-  warn "exec(@e)\n";
-  exec(@e);
-  die "exec(@e): $!";
-}
-
-# child, monitor tar output
-close(WRITEEND);
-open(STDIN,'<&READEND')
-      || die "$cmd: can't dup read end of pipe: $!\n";
-close(READEND);
-
-undef $oldline;
-undef $dir;
-while (<STDIN>)
-{ chop;
-
-  if ($gnutar && /^gnutar:\s/)
-  { $type='e';
-  }
-  elsif (/^x (.*), \d+ bytes?, \d+ (tape )?blocks?$/)
-  # extract file
-  { $_=$1; $type='.';
-  }
-  elsif (/^x (.*) symbolic link to (.*)/)
-  # extract symlink
-  { $_=$1; $type='s'; $l=$2;
-  }
-  elsif (/^(.*) linked to (.*)/)
-  # hard link
-  { $_=$1; $type='l'; $l=$2;
-  }
-  elsif (/^x (.*)\/$/)
-  # extract directory
-  { $_=$1; $type='d';
-  }
-  elsif ($gnutar)
-  { $type='.';
-  }
-  else
-  { $type='e';
-  }
-
-  if ($type eq 'e')
-  { $d=''; $b='';
-  }
-  else
-  { if (/(.*)\//)
-    { $d=$1; $b=$';
-    }
-    else
-    { $d='.'; $b=$_;
-    }
-  }
-
-  if ($type eq 'e')
-  # error, display and restart
-  { err($_,"\n");
-  }
-  else
-  {
-    if ($type eq '.')
-    { if (defined $lastfile)
-      # restat preceeding file to see how big it ended up
-      { if (@s=lstat($lastfile))
-	{ if ($s[3] == 1)
-	  { $bytes+=$s[7]-$lastsize;
-	  }
-	}
+      if ($gnutar && /^gnutar:\s/)
+      { $type="e";
+      }
+      elsif (/^x (.*), \d+ bytes?, \d+ (tape )?blocks?$/)
+      # extract file
+      { $_=$1; $type=".";
+      }
+      elsif (/^x (.*) symbolic link to (.*)/)
+      # extract symlink
+      { $_=$1; $type="s"; $l=$2;
+      }
+      elsif (/^(.*) linked to (.*)/)
+      # hard link
+      { $_=$1; $type="l"; $l=$2;
+      }
+      elsif (/^x (.*)\/$/)
+      # extract directory
+      { $_=$1; $type="d";
+      }
+      elsif ($gnutar)
+      { $type=".";
+      }
+      else
+      { $type="e";
       }
 
-      $lastfile=$_;
-      $lastsize=0;
-      if (@s=lstat)
-      { if ($s[3] == 1)
-	{ $lastsize=$s[7];
-	  $bytes+=$lastsize;
-	}
+      if ($type eq "e")
+      { $d=""; $b="";
+      }
+      else
+      { if (/(.*)\//)
+        { $d=$1; $b=$'\'';
+        }
+        else
+        { $d="."; $b=$_;
+        }
+      }
+
+      if ($type eq "e")
+      # error, display and restart
+      { err($_,"\n");
+      }
+      else
+      {
+        if ($type eq ".")
+        { if (defined $lastfile)
+          # restat preceeding file to see how big it ended up
+          { if (@s=lstat($lastfile))
+            { if ($s[3] == 1)
+              { $bytes+=$s[7]-$lastsize;
+              }
+            }
+          }
+
+          $lastfile=$_;
+          $lastsize=0;
+          if (@s=lstat)
+          { if ($s[3] == 1)
+            { $lastsize=$s[7];
+              $bytes+=$lastsize;
+            }
+          }
+        }
+
+        $elapsed=time-$start;
+        $hb=cs::Units::bytes2human($bytes,1);
+        $Bps=($elapsed > 0 ? cs::Units::bytes2human($bytes/$elapsed,1)."/s" : "");
+        $line=sprintf("%7s %s",$Bps,"$d/$b");
+
+        if ($_ eq "l")	{ $line.=" == $l"; }
+        elsif ($_ eq "s")	{ $line.=" -> $l"; }
+
+        if (! defined($dir) || $dir ne $d)
+        # new directory, emit
+        { nl(sprintf("%7s %s",$hb,$d));
+          $dir=$d;
+        }
+
+        out($line);
+      }
+    }
+
+    waitpid($pid,0);
+    $::Xit=1 if $? != 0;
+    if (defined $lastfile)
+    # restat preceeding file to see how big it ended up
+    { if (@s=lstat($lastfile))
+      { if ($s[3] == 1 )
+        { $bytes+=$s[7]-$lastsize;
+        }
       }
     }
 
     $elapsed=time-$start;
-    $hb=cs::Units::bytes2human($bytes,1);
-    $Bps=($elapsed > 0 ? cs::Units::bytes2human($bytes/$elapsed,1)."/s" : "");
-    $line=sprintf("%7s %s",$Bps,"$d/$b");
+    $Bps=($elapsed > 0 ? cs::Units::bytes2human($bytes/$elapsed,1)."/s average, " : "");
 
-    if ($_ eq 'l')	{ $line.=" == $l"; }
-    elsif ($_ eq 's')	{ $line.=" -> $l"; }
+    out("");
+    nl($Bps.cs::Units::bytes2human($bytes,1)." bytes total in ".cs::Units::sec2human($elapsed));
 
-    if (! defined($dir) || $dir ne $d)
-    # new directory, emit
-    { nl(sprintf("%7s %s",$hb,$d));
-      $dir=$d;
-    }
-
-    out($line);
-  }
-}
-
-waitpid($pid,0);
-$::Xit=1 if $? != 0;
-if (defined $lastfile)
-# restat preceeding file to see how big it ended up
-{ if (@s=lstat($lastfile))
-  { if ($s[3] == 1 )
-    { $bytes+=$s[7]-$lastsize;
-    }
-  }
-}
-
-$elapsed=time-$start;
-$Bps=($elapsed > 0 ? cs::Units::bytes2human($bytes/$elapsed,1)."/s average, " : "");
-
-out('');
-nl($Bps.cs::Units::bytes2human($bytes,1)." bytes total in ".cs::Units::sec2human($elapsed));
-
-exit $::Xit;
+    exit $::Xit;
+    '

@@ -4,7 +4,7 @@
 #	- Cameron Simpson <cs@zip.com.au> 02sep98
 #
 
-cd $HOME/scripts || exit $?
+cd $HOME/bin || exit $?
 
 f=`	for f
 	do  echo "$f"

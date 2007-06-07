@@ -22,8 +22,8 @@ tpltenv=$FILEDIR/.tplt
 
 DIRBASE=`basename "$FILEDIR"`
 case $FILE in
-    /*/scripts/*/*)
-	PFX=`expr "x$FILEPATH" : 'x.*/scripts/\(.*\)/.*'`
+    /*/bin/*/*)
+	PFX=`expr "x$FILEPATH" : 'x.*/bin/\(.*\)/.*'`
 	;;
     /*/s/java/*)
 	classtail=`expr "x$FILEPATH" : 'x.*/s/java/\\(.*\\)/.*'|tr / .`

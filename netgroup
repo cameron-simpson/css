@@ -1,9 +1,9 @@
-#!/bin/sh
+#!/bin/sh -u
 #
 # Added -r & -R flags.
 # Sent usage to stderr.
 # Hmm, added usage!
-#	- cameron 03jun96
+#	- cameron 03jun1996
 #
 
 cmd=`basename "$0"`
@@ -50,19 +50,27 @@ sedf="$sedf
 		  s/^/$parg/
 		  s/\$/$sarg/"
 
-ypmatch "$@" netgroup |
-tr ' ' '\012' |
-if [ $recurse ]
-then  while read g
+for ngr
+do
+  if grep "^$ngr[ 	]" /etc/netgroup >/dev/null 2>&1
+  then
+    unslosh < /etc/netgroup | sed -n "y/	/ /; /^$ngr /{s/^$ngr  *//p;q;}"
+  else
+    ypmatch "$ngr" netgroup
+  fi
+done \
+| tr ' ' '\012' \
+| if [ $recurse ]
+  then  while read g
       do  case $g in
 	    '')		;;
 	    \(*)	echo "$g" ;;
-	    *)		netgroup -r -R "$g" ;;
+	    *)		"$0" -r -R "$g" ;;
 	  esac
       done
-else
+  else
       exec sed '/^$/d'
-fi |
-sed "$sedf"
+  fi \
+| sed "$sedf"
 
 exit 0

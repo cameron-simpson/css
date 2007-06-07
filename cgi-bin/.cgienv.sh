@@ -7,7 +7,7 @@
 
 # figure out where we are
 wd=`pwd`
-wdscripts=`dirname "$wd"`	## probably in ~/scripts/cgi-bin
+wdscripts=`dirname "$wd"`	## probably in ~/bin/cgi-bin
 
 case "$HOSTNAME" in
   sweet.research.canon.com.au)
@@ -30,7 +30,7 @@ case "$HOSTNAME" in
 	ARCH=redhat.x86.linux
 	SYSTEMID=ezos
 	HOME=$DOCUMENT_ROOT/cs
-	wdscripts=$HOME/scripts
+	wdscripts=$HOME/bin
 	;;
 
       /home/kaper/cameron/* | /a/kaper/home/cameron/* )
@@ -78,7 +78,7 @@ SCRIPT_URL=${SCRIPT_URL:-$SCRIPT_NAME}
 SCRIPT_URI=${SCRIPT_URI:-"http://$HTTP_HOST$SCRIPT_URL"}
 http_proxy=$WEBPROXY
 ftp_proxy=$WEBPROXY
-PATH=$wdscripts/stubs:$wdscripts:$HOME/scripts/stubs:$HOME/scripts:$HOME/bin/$ARCH:$PATH:/opt/script:/opt/bin:/usr/local/bin
+PATH=$wdscripts/stubs:$wdscripts:$HOME/bin/stubs:$HOME/bin:$HOME/bin/$ARCH:$PATH:/opt/bin:/opt/bin:/usr/local/bin
 PERL5LIB=$HOME/rc/perl:${PERL5LIB:-'/opt/perl/lib:/usr/lib/perl5'}
 export HOME ARCH SYSTEMID HOME WEBPROXY http_proxy ftp_proxy PATH PERL5LIB
 export SCRIPT_URL SCRIPT_URI CS_WRAPPER

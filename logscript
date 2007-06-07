@@ -75,7 +75,7 @@ then
   popSHELL=$SHELL
   popSHELLcmd=
   popSHELLpath=
-  for d in `dirname "$0"` /opt/css/bin $HOME/scripts
+  for d in `dirname "$0"` /opt/css/bin $HOME/bin
   do  [ -x "$d/popSHELL" ] && { popSHELLpath=$d/popSHELL; break; }
   done
   [ -n "$popSHELLpath" ] || { echo "$cmd: can't find popSHELL script" >&2; exit 1; }

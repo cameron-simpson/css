@@ -1,0 +1,145 @@
+#!/usr/bin/python
+#
+# Command script for venti-ish implementation.
+#       - Cameron Simpson <cs@zip.com.au> 01may2007
+#
+
+from sys import argv, exit, stderr, stdout
+import os
+import os.path
+from cs.venti import hex, unhex, Store, fuse, decodeBlockRef
+import cs.misc
+from cs.misc import cmd, cmderr, setcmd, warn
+
+usage='''Usage:
+  %s [-S store] store pathnames...
+  %s [-S store] cat filerefs...
+  %s [-S store] catblock [-i] hashcodes...
+  %s [-S store] ls [-R] dirrefs...
+  %s [-S store] unpack dirref
+''' % (cmd,cmd,cmd,cmd,cmd)
+
+badopts=False
+
+S=None
+
+args=argv[1:]
+if len(args) > 0 and args[0] == '-S':
+  S=Store(args[1])
+  args=arg[2:]
+
+if len(args) < 1:
+  cmderr("missing command")
+  badopts=True
+else:
+  op=args.pop(0)
+  setcmd("%s: %s" % (cmd,op))
+  if op == "store":
+    if len(args) < 1:
+      cmderr("missing pathnames")
+      badopts=True
+  elif op == "cat":
+    if len(args) < 1:
+      cmderr("missing filerefs")
+      badopts=True
+  elif op == "catblock":
+    indirect=False
+    if len(args) > 0 and args[0] == "-i":
+      indirect=True
+      args.pop(0)
+    if len(args) < 1:
+      cmderr("missing hashcodes")
+      badopts=True
+  elif op == "ls":
+    recurse=False
+    if len(args) > 0 and args[0] == "-R":
+      recurse=True
+      args.pop(0)
+    if len(args) < 1:
+      cmderr("missing dirrefs")
+      badopts=True
+  elif op == "unpack":
+    if len(args) != 1:
+      cmderr("expected exactly one dirref")
+      badopts=True
+  else:
+    cmderr("unrecognised command")
+    badopts=True
+
+if S is None:
+  dflt_vt_store=os.environ.get('VT_STORE')
+  if dflt_vt_store is None:
+    cmderr("no $VT_STORE and no -S option")
+    badopts=True
+  else:
+    S=Store(dflt_vt_store)
+
+if badopts:
+  stderr.write(usage)
+  exit(2)
+
+def ls(path,bref,recurse,fp=None):
+  if fp is None:
+    fp=stdout
+  ##warn("ls %s: bref=%s"%(path,("s:"+hex(bref) if type(bref) is str else "bref.h:"+hex(bref.h))))
+  D=S.opendir(bref)
+  fp.write(path)
+  fp.write(":\n")
+  if not recurse:
+    names=D.dirs()+D.files()
+    names.sort()
+    for name in names:
+      E=D[name]
+      fp.write("%c %-41s %-6d %s\n" % (('d' if E.isdir else 'f'), hex(E.bref.encode()), E.bref.span, name))
+  else:
+    dirs=D.dirs(); dirs.sort()
+    files=D.files(); files.sort()
+    for name in files:
+      E=D[name]
+      fp.write("%c %-41s %-6d %s\n" % (('d' if E.isdir else 'f'), hex(E.bref.encode()), E.bref.span, name))
+      assert not E.isdir, name+" should not be a directory!"
+    for name in dirs:
+      E=D[name]
+      fp.write("\n")
+      ls(os.path.join(path,name),E.bref,recurse,fp)
+
+if op == "store":
+  for path in args:
+    if os.path.isdir(path):
+      ref=S.storeDir(path)
+    else:
+      ref=S.storeFile(open(path))
+
+    S.sync()
+    stdout.write(hex(ref.encode()))
+    if len(args) > 1:
+      stdout.write('\t')
+      stdout.write(path)
+    stdout.write('\n')
+elif op == "cat":
+  for hexarg in args:
+    E=S.namei(hexarg)
+    assert not E.isdir, "%s: %s: expected file, not directory"%(cmd,hexarg)
+    S.cat(E.bref)
+elif op == "catblock":
+  for hexarg in args:
+    if indirect:
+      bl
+    else:
+      stdout.write(S[unhex(hexarg)])
+elif op == "ls":
+  first=True
+  for hexarg in args:
+    if first:
+      first=False
+    else:
+      print
+    print "ls", hexarg, "..."
+    E=S.namei(hexarg+'/')
+    assert E.isdir, "%s: %s: expected directory, not file"%(cmd,hexarg)
+    ls(hexarg,E.bref,recurse,stdout)
+elif op == "unpack":
+  S.opendir(unhex(args[0])).unpack('.')
+else:
+  cmderr("unsupported command")
+  exit(2)

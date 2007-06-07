@@ -6,6 +6,9 @@
 # Extensions and usage.	- cameron, 21mar1999
 #
 
+cmd=`basename "$0"`
+
+zmode=gz
 ext=
 [ $# -gt 0 ] && { ext=.$1; shift; }
 [ $# = 0 ] || { echo "Usage: $0 [ext]" >&2; exit 2; }
@@ -13,8 +16,28 @@ ext=
 out=".du-a$ext .du-s$ext"
 trap "rm -f $out" 1 2 13 15
 
-
 dufs ${1+"$@"} \
 | sed 's/^\([0-9][0-9]*\)	\.\/\/*/\1	/' \
-| tee .du-a$ext \
-| fgrep -v / > .du-s$ext
+| \
+{ dua=.du-a$ext
+  case "$zmode" in
+    '') tee "$dua" ;;
+    gz) exec 3>&1
+        fdtee 3 | gzip --fast >"$dua.gz"
+        ;;
+    *)  echo "$cmd: unsupported zmode: $zmode" >&2
+        exit 1
+        ;;
+  esac
+} \
+| \
+{ dus=.du-s$ext
+  set -- fgrep -v /
+  case "$zmode" in
+    '') exec "$@" >"$dus" ;;
+    gz) "$@" | gzip --fast >"$dus.gz" ;;
+    *)  echo "$cmd: unsupported zmode: $zmode" >&2
+        exit 1
+        ;;
+  esac
+}

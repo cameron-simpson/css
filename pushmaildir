@@ -1,0 +1,67 @@
+#!/bin/sh -ue
+#
+# Rsync a maildir, removing the originals after sync.
+#       - Cameron Simpson <cs@zip.com.au> 27apr2007
+#
+
+trace=set-x
+
+cmd=$0
+usage="Usage: $cmd from-maildir to-maildir"
+
+badopts=
+
+[ $# = 2 ] || { echo "$usage" >&2; exit 2; }
+
+from=$1 to=$2
+shift; shift
+
+from_remote=
+from_pfx=
+case $from in
+  /* | ./* ) ;;
+  *?:*) from_remote=`expr "x$from" : 'x\(.[^:]*\):.*'`
+        from=`expr "x$from" : 'x.[^:]*:\(.*\)'`
+        from_pfx=$from_remote:
+        ;;
+esac
+
+to_remote=
+to_pfx=
+case $to in
+  /* | ./* ) ;;
+  *?:*) to_remote=`expr "x$to" : 'x\(.[^:]*\):.*'`
+        to=`expr "x$to" : 'x.[^:]*:\(.*\)'`
+        to_pfx=$to_remote:
+        ;;
+esac
+
+if [ -n "$from_remote" -a -n "$to_remote" ]
+then
+  echo "$cmd: one of from-maildir and to-maildir must be local" >&2
+  badopts=1
+fi
+
+remote()
+{ _remote=$1; shift
+  if [ -n "$_remote" ]
+  then
+    _remote_shcmd=`shqstr "$@"`
+    $trace envssh "$_remote" "$_remote_shcmd"
+  else
+    $trace "$@"
+  fi
+}
+
+remote "$from_remote" ismaildir "$from" \
+        || { echo "$cmd: $from: not a maildir" >&2
+             badopts=1
+           }
+remote "$to_remote"   ismaildir "$to" \
+        || { echo "$cmd: $to: not a maildir" >&2
+             badopts=1
+           }
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+$trace rsync -avH --ignore-existing --remove-source-files --include=/new --include=/cur '--exclude=/*' '--exclude=*/' "$from_pfx$from/." "$to_pfx$to/."

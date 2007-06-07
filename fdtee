@@ -4,17 +4,18 @@
 @fds=();
 $n=0;
 ARGV:
-  for (@ARGV)
-	{ /^\d+/ || die "arguments must be file descriptors";
-	  open("F$n",">&$_") || die "can't attach to fd $_";
-	  push(@fds,"F$n");
-	  $n++;
-	}
+for (@ARGV)
+{ /^\d+/ || die "arguments must be file descriptors";
+  open("F$n",">&$_") || die "can't attach to fd $_";
+  push(@fds,"F$n");
+  $n++;
+}
 
 READ:
-  while (defined($n=read(STDIN,$_,8192)))
-	{ if ($n == 0)	{ last READ; }
-	  else	{ for $F (@fds)	{ print $F $_; } }
-	}
+while (defined($n=read(STDIN,$_,8192)))
+{ last READ if $n == 0;
+  for $F (@fds)
+  { print $F $_; }
+}
 
 exit 0;

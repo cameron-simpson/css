@@ -20,7 +20,7 @@ rm -f "$sync"
 copt="$pre; >'$sync'; $post"
 xterm ${1+"$@"} -e /bin/sh -c "$copt" &
 
-await 2 -m 30 -c "[ -f '$sync' ]"
+await -d 2 -m 30 -c "[ -f '$sync' ]"
 xit=$?
 rm -f "$sync"
 exit $xit

@@ -1,4 +1,4 @@
-#!/bin/sh -u
+#!/bin/sh -ue
 #
 # Emit cache_peer and never_direct directives for insertion into a squid.conf.
 #	- Cameron Simpson <cs@zip.com.au> 26dec2004
@@ -50,6 +50,8 @@ if [ $# = 0 ]
 then
   echo "$cmd: no squid peers!" >&2
   exit 1
+else
+  [ "x$*" = xNONE ] && set --
 fi
 
 # the direct no-peer ACLs
@@ -156,3 +158,9 @@ pr_peer_vars "$@" \
       pr_via "$opeer" | awk -v "peer=$peer" -v "opeer=$opeer" '{ print "cache_peer_access", peer, "deny VIA_" opeer NR }'
     done
   done
+
+if [ $# = 0 ]
+then
+  echo always_direct allow all
+  echo never_direct deny all
+fi

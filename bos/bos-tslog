@@ -71,12 +71,10 @@ bsed -s \
   p
   d
   :today
-  /^ *\$/{
-    s/.*\\n//
+  /^ *offsite /{
     r $tmpf
-    a\\
-
-    d
+    n
+    b top
   }
   n
   b today

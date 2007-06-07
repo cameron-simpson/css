@@ -18,6 +18,75 @@ def overallHitRatio():
 
   return hits/total
 
+class LRU(dict):
+  ''' An simple minded LRU cache wrapper for a mapping.
+      Internally it uses a heap; semanticly this is like using
+      an array of recent key usage, but updates are O(log max)
+      when the cache is full instead of O(max).
+  '''
+  def __init__(self,backend,max=None):
+    if max is None: max=1024
+    assert max > 0
+    self.__backend=backend
+    self.__max=max
+    self.__heap=[]
+    self.__seq=0
+
+  def __cache(self,key,value):
+    if self.__max < 1:
+      return
+
+    while self.__max < len(self.__heap):
+      oldelem=heapq.heappop(self.__heap)
+      dict.__delitem__(self,oldelem[1])
+
+    seq=self.__seq
+    self.__seq+=1
+    newelem=(seq,key)
+
+    if self.__max == len(self.__heap):
+      oldelem=heapq.heapreplace(self.__heap,newelem)
+      dict.__delitem__(self,oldelem[1])
+    else:
+      heapq.heappush(self.__heap,newelem)
+
+    dict.__setitem__(self,key,value)
+
+  def keys():
+    return self.__backend.keys()
+
+  def __contains__(self,key):
+    return dict.__contains__(self,key) or key in self.__backend
+
+  def __getitem__(self,key):
+    if dict.__contains__(self,key):
+      value=dict.__getitem__(self,key)
+    else:
+      value=self.__backend[key]
+
+    self.__cache(key,value)
+    return value
+
+  def get(self,key,default=None):
+    if dict.__contains__(self,key):
+      value=dict.__getitem__(self,key)
+    elif key in self.__backend:
+      value=self.__backend[key]
+    else:
+      return default
+
+    self.__cache(key,value)
+    return value
+
+  def __setitem__(self,key,value):
+    self.__backend[key]=value
+    self.__cache(key,value)
+    return value
+
+  def __iter__(self):
+    for k in self.keys():
+      return k
+ 
 class Cache:
   def __init__(self,backend):
     _caches.append(self)
@@ -27,6 +96,10 @@ class Cache:
     self.__hits=0
     self.__misses=0
     self.__xrefs=[]
+    self.__preloaded=False
+
+  def preloaded(self,status=True):
+    self.__preloaded=status
 
   def addCrossReference(self,xref):
     self.__xrefs.append(xref)
@@ -54,6 +127,8 @@ class Cache:
     self.__seq+=1
 
   def keys(self):
+    if self.__preloaded:
+      return self.__cache.keys()
     return self.__backend.keys()
 
   def getitems(self,keylist):

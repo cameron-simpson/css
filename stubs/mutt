@@ -33,6 +33,7 @@ for muttdir in \
 	/opt/mutt-1.4i-patched \
 	/opt/mutt-cvs \
 	/opt/mutt \
+        /usr/local \
 	/usr
 do
   for sfx in "-$VENDORRELEASE" ''

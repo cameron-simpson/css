@@ -6,25 +6,33 @@
 #
 
 cmd=`basename "$0"` || exit 1
-####buffer="buffer -m 1M"	# just use "cat" if you lack buffer
 
-[ $# = 2 ] || { echo "Usage: $cmd fromdir todir" >&2
+bsize=20
+[ $# -gt 0 ] && [ "x$1" = x-b ] && { bsize=$2; shift; shift; }
+
+[ $# = 2 ] || { echo "Usage: $cmd [-b bsize] fromdir todir" >&2
 		exit 2
 	      }
-
 from=$1
 to=$2
 
-[ -d "$to/." ] && { echo "$cmd: $to already exists!" >&2; exit 1; }
+[ -d "$to/."   ] && { echo "$cmd: $to already exists!" >&2; exit 1; }
 [ -d "$from/." ] || { echo "$cmd: $from missing!" >&2; exit 1; }
 
 case $ARCH in
     *.*.domainos) # preserve ACLs
 	exec /com/cpt "$from" "$to" -pdt -sacl -ld
 	;;
-    *)	( cd "$from/." && tar -cf - .
+    *)	( cd "$from/." || exit 1
+          case $ARCH in
+            *.linux)
+              exec tar -c -B -b "$bsize" -f - .
+              ;;
+            *)exec tar cBbf "$bsize" - .
+              ;;
+          esac
 	) \
-	| ( mkdir "$to" && cd "$to" && untar )
+	| ( mkdir "$to" && cd "$to" && untar -b "$bsize" )
 	;;
 esac
 

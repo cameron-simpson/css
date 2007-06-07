@@ -1,5 +1,0 @@
-#!/bin/sh
-#
-# Default cvs diff run.	- Cameron Simpson <cs@zip.com.au> 09mar2002
-# 
-exec pageif cvs -q diff ${1+"$@"}

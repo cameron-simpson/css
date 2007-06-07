@@ -31,6 +31,16 @@ scriptmandir = $(MANDIR)/man1
 scriptmans = $(scriptmandir)/$((allscripts)).1
 scriptfromman(manf) = $(manf FP)
 
+_home:
+        rsync -av --delete \\
+                --include=bos/ \\
+                --include=cs/ \\
+                --include=stubs/ \\
+                --include=synonyms/ \\
+                --exclude=*.swp \\
+                --exclude=/\*/ \\
+                . $(HOME)/bin/.
+
 _all: squid_redirect 1INDEX.txt _submakes _man _cvslog
 
 _cvslog: CHANGELOG.txt CHANGELOG.html

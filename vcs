@@ -1,0 +1,116 @@
+#!/bin/sh -ue
+#
+# Do simple things with revision controlled source.
+#       - Cameron Simpson <cs@zip.com.au> 25apr2007
+#
+
+: ${TMPDIR:=/tmp}
+: ${EDITOR:=vi}
+
+cmd=`basename "$0"`
+usage="usage: $cmd [-V vc] [command [args...]]"
+
+vc=
+
+badopts=
+
+while [ $# -gt 0 ]
+do
+  case $1 in
+    -V) vc=$2; shift ;;
+    --) shift; break ;;
+    -?*)echo "$cmd: unrecognised option: $1" >&2
+        badopts=1
+        ;;
+    *)  break ;;
+  esac
+  shift
+done
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+if [ -z "$vc" ]
+then
+  if [ -d CVS/. ]
+  then
+    vc=cvs
+  else
+    vc=
+    odir=
+    dir=`pwd`
+    while [ "x$dir" != "x$odir" -a -z "$vc" ]
+    do
+      [ -d "$dir/.hg/." ] && { vc=hg; break; }
+      odir=$dir
+      dir=`dirname "$dir"`
+    done
+  fi
+
+  [ -n "$vc" ] || { echo "$cmd: can't guess vc, aborting" >&2; exit 1; }
+fi
+
+# no args? report vc
+[ $# = 0 ] && exec echo "$vc"
+
+_cvs()
+{ ( set -x; exec cvs -q ${1+"$@"} )
+}
+_hg()
+{ ( set -x; exec hg ${1+"$@"} )
+}
+
+op=$1
+shift
+
+tmpbase=$TMPDIR/$cmd.$$
+trap 'rm -f "$tmpbase".*' 0 1 2 13 15
+
+case $op in
+  diff)
+    _$vc diff ${1+"$@"} ;;
+
+  commit)
+    if [ $# = 0 ]
+    then  files=`"$0" manifest`
+    else  files=$*
+    fi
+
+    diffs=$tmpbase.diffs
+    _$vc diff >"$diffs"
+    [ -s "$diffs" ] || { echo "No diffs."
+                         echo "Listing opening comments of named files."
+                         echo
+                         for f in $files
+                         do  sed "/^#/!{d;q}; s;^;$f:;" "$f"
+                         done
+                       } >>"$diffs"
+    diffpfx=`echo "$vc" | tr '[a-z]' '[A-Z]'`' '
+    bsed -s "s;^;$diffpfx;" "$diffs"
+
+
+    VCS_COMMIT_DIFFS=$diffs
+    VCS_COMMIT_EDITOR=$EDITOR
+    VCS_COMMIT_FILES=$files
+    VCS_COMMIT_PREFIX=$diffpfx
+    EDITOR=$0-commit-editor
+    export EDITOR VCS_COMMIT_DIFFS VCS_COMMIT_EDITOR VCS_COMMIT_FILES VCS_COMMIT_PREFIX
+    _$vc commit ${1+"$@"}
+    ;;
+
+  manifest)
+    case $vc in
+      hg)
+        _hg manifest
+        ;;
+
+      *)
+        echo "$cmd: unsupported manifest for VC $vc" >&2
+        exit 1
+        ;;
+    esac
+    ;;
+  *)
+    echo "$cmd: unsupported command: $op" >&2
+    exit 2
+    ;;
+esac

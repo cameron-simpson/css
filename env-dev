@@ -1,0 +1,55 @@
+#!/bin/sh -ue
+#
+# Run command in development environment.
+#       - Cameron Simpson <cs@zip.com.au> 25apr2007
+#
+
+: ${ENV_DEV_DIR:=$HOME/devel}
+
+cmd=`basename "$0"`
+usage="Usage: $cmd [-d develdir] [command [args...]]
+        -d develdir     Development source dir. Default from \$ENV_DEV_DIR."
+
+badopts=
+
+while [ $# -gt 0 ]
+do
+  case $1 in
+    -d) ENV_DEV_DIR=$2; shift ;;
+    --) shift; break ;;
+    -?*)echo "$cmd: unrecognised option: $1" >&2
+        badopts=1
+        ;;
+    *)  break ;;
+  esac
+  shift
+done
+
+[ -d "$ENV_DEV_DIR/." ] || { echo "$cmd: not a directory: $ENV_DEV_DIR" >&2
+                             badopts=1
+                           }
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+export ENV_DEV_DIR
+
+if [ -f "$ENV_DEV_DIR/.env.sh" ]
+then
+  . "$ENV_DEV_DIR/.env.sh"
+else
+  PYTHONPATH=$DEVELDIR/lib:$PYTHONPATH
+  PERL5LIB=$DEVELDIR/lib:$PERL5LIB
+  MANPATH=$ENV_DEV_DIR/man:$MANPATH
+  LD_LIBRARY_PATH=$ENV_DEV_DIR/lib:$LD_LIBRARY_PATH
+  PATH=$ENV_DEV_DIR/bin:$PATH
+  export PYTHONPATH PERL5LIB MANPATH LD_LIBRARY_PATH PATH
+fi
+
+if [ $# = 0 ]
+then
+  env | sort
+  exit
+fi
+
+set -x
+exec "$@"

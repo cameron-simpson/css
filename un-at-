@@ -1,0 +1,8 @@
+#!/usr/bin/perl
+#
+
+for (<>)
+{
+  s/(\S) at (([-\w]+\.)(net|com|biz|org|info|[a-z][a-z]))\b/$1\@$2/ig;
+  print;
+}

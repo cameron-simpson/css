@@ -79,6 +79,20 @@ def dbpool(secret,dbname):
 
   return _cache_dbpool[secret,dbname]
 
+# allow an environment variable of the form [db].[table] to override a db,table pair
+def dbtablenames(envvar,dbname,tablename):
+  import os
+  if envvar in os.environ:
+    dbt=os.environ[envvar]
+    cpos=dbt.find('.')
+    if cpos >= 0:
+      ed, et = dbt.split(':',1)
+      if len(ed): dbname=ed
+      if len(et): tablename=et
+    else:
+      dbname=dbt
+  return (dbname,tablename)
+
 # convert DateTime objects into strings
 # trim DateTime strings that are exact days to just the date
 # this make naive string comparisons behave well
@@ -204,13 +218,13 @@ class DirectKeyedTableView:
     self.name=tablename
 
     self.__keyColumns=tuple(keyColumns)
-    self.__sqlKeyColumns=string.join(self.__keyColumns,",")	# precompute "col1,col2,..."
+    self.__sqlKeyColumns=','.join(self.__keyColumns)	# precompute "col1,col2,..."
     self.__selectKeys='SELECT '+self.__sqlKeyColumns+' FROM '+self.name
 
     self.__allColumns=tuple(allColumns)
     self.__constraint=constraint
 
-    self.__sqlColumns=string.join(self.__allColumns,",")	# precompute "col1,col2,..."
+    self.__sqlColumns=','.join(self.__allColumns)	# precompute "col1,col2,..."
     self.__selectRow='SELECT '+self.__sqlColumns+' FROM '+self.name
 
     self.__columnmap={}
@@ -224,6 +238,10 @@ class DirectKeyedTableView:
     if where is not None:
       sql=sql+' WHERE '+where
     return [tuple(row) for row in SQLQuery(self.conn, sql)]
+
+  def __iter__(self):
+    for k in self.keys():
+      yield self[k]
 
   def __getitem__(self,key):
     return DirectTableRow(self,self.selectRowByKey(key))
@@ -390,6 +408,7 @@ class KeyedTableView(cs.cache.Cache):
     for row in self.selectRows(where=where):
       key=self.rowKey(row)
       self.store(row,key)
+    self.preloaded()
 
   def insert(self,hash):
     self.__direct.insert(hash)
@@ -438,8 +457,12 @@ class SingleKeyTableView(KeyedTableView):
   def keys(self):
     return [k[0] for k in KeyedTableView.keys(self)]
 
+  def __iter__(self):
+    for k in self.keys():
+      yield self[k]
+
   def __getitem__(self,key):
-    debug("SingleKeyTableView.__getitem__: key =", `key`)
+    ##debug("SingleKeyTableView.__getitem__: key =", `key`)
     return KeyedTableView.__getitem__(self,(key,))
 
   def __contains__(self,key):
@@ -487,7 +510,6 @@ class NoSuchRowError(IndexError):
 
 class TableRowWrapper:
   def __init__(self,tableview,key):
-    if ifdebug(): warn("new TableRowWrapper with key =", `key`)
     self.TableView=tableview
     try:
       self.TableRow=tableview[key]
