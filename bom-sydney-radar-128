@@ -26,7 +26,6 @@ else
   tmpf=png:-
 fi
 
-set -x
 wget -q -O - "http://mirror.bom.gov.au/radar/$img?x" | gm convert GIF:- -crop 512x496+6+22 "$tmpf" || exit 1
 [ $dotrans ] || exit 0
 
