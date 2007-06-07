@@ -277,9 +277,8 @@ import os.path
 import stat
 from getopt import getopt, GetoptError
 import string
+from cStringIO import StringIO
 import re
-from cs.misc import cmd, cmderr, warn, progress, out
-import cs.sh
 
 trackRules=True         # add X-Cats2Procmailrc line to show rule
 useXLabel=False         # put tag in X-Label header instead of subject
@@ -290,6 +289,7 @@ includePath=()          # where else to look for relative included files
 substitutions={}        # replace {{foo}} in rules
 syncRules=False         # let procmail be fork happy on continue/copy rules
 
+cmd=os.path.basename(sys.argv[0])
 usage='''Usage: %s [-a alert] [-d dir] [-L] [-m domains] [-S] [-t {unix|mh|maildir}] -T <categories >procmailrc
 	-a alert	Command line to generate the alert.
 			The mail item is present on standard input.
@@ -310,6 +310,12 @@ target_re=re.compile(r'("[^"]*"|[^"\s]+)')
 hdrlist_re=re.compile(r'([a-z][\-a-z0-9]*(,[a-z][\-a-z0-9]*)*):', re.I)
 
 badopts=False
+
+def cmderr(*args):
+  sys.stderr.write("%s:"%cmd)
+  for arg in args:
+    sys.stderr.write(" %s"%str(arg))
+  sys.stderr.write("\n")
 
 opts=()
 argv=sys.argv[1:]
@@ -402,8 +408,19 @@ def resolveTarget(target):
     
   return target
 
+# Pulled fro cs/sh.py.
+def quotestr(s):
+  qs=StringIO()
+  qs.write("'")
+  for c in s:
+    if c == "'":
+      qs.write("'\\''")
+    else:
+      qs.write(c)
+  qs.write("'")
+  return qs.getvalue()
+
 def c2p(ifp,ofp):
-  progress('convert '+ifp.name)
   global xit, assign_re, target_re, hdrlist_re, curly_re
   lineno=0
   oline=None
@@ -449,7 +466,6 @@ def c2p(ifp,ofp):
      continue
 
     ofp.write('# %s\n' % ruledesc)
-    ##out(line0)
 
     # inclusions
     if line[0] == '<':
@@ -580,14 +596,14 @@ def c2p(ifp,ofp):
       ofp.write('{\n');
 
       if trackRules:
-        ofp.write('  :0whf\n  | formail -f -A %s\n' % cs.sh.quotestr('X-Cats2Procmailrc-Rule: '+ruledesc))
+        ofp.write('  :0whf\n  | formail -f -A %s\n' % quotestr('X-Cats2Procmailrc-Rule: '+ruledesc))
 
       if tag is not None:
         if useXLabel:
-          pipe='formail -f -A %s' % cs.sh.quotestr('X-Label: '+tag)
+          pipe='formail -f -A %s' % quotestr('X-Label: '+tag)
         else:
           sedtag=tag.replace('/','\\/')
-          pipe="sed -e %s" % cs.sh.quotestr('s/^[Ss][Uu][Bb][Jj][Ee][Cc][Tt]: */& ['+sedtag+'] /')
+          pipe="sed -e %s" % quotestr('s/^[Ss][Uu][Bb][Jj][Ee][Cc][Tt]: */& ['+sedtag+'] /')
         ofp.write('  :0whf\n  | %s\n' % pipe)
 
       while len(targets) > 0:
@@ -608,8 +624,6 @@ def c2p(ifp,ofp):
       ofp.write('}\n');
 
     ofp.write('\n')
-
-  out('')
 
   if oline is not None:
     cmderr("%s: %d: unexpected EOF in slosh-extended line"%(ifp.name,lineno))
