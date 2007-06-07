@@ -3,7 +3,7 @@
 # Convert my categories file to procmail recipes.
 #	- Cameron Simpson <cs@zip.com.au> 02mar2001
 #
-# Release version: 1.6.1
+# Release version: 2.0
 #
 # =head1 NAME
 #
@@ -11,11 +11,11 @@
 #
 # =head1 SYNOPSIS
 #
-# cats2procmailrc [B<-L>] [B<-a> I<alert>] [B<-m> I<maildomains>] [B<-t> I<type>] [B<-T>] E<lt>categories E<gt>procmailrc
+# cats2procmailrc [B<-a> I<alert>] [B<-D> I<subst>B<=>I<val>] [B<-L>] [B<-m> I<maildomains>] [-S] [B<-t> I<type>] [B<-T>] [category-files...] E<gt>procmailrc
 #
 # =head1 DESCRIPTION
 #
-# I<cats2procmailrc> reads a human friendly mail category description file
+# I<cats2procmailrc> reads human friendly mail category description files
 # and emits a matching procmail(1) recipe to implement it.
 # The intent is to have an extremely succinct file
 # of easily editable one line rules,
@@ -43,6 +43,17 @@
 # such as mailblink(1).
 # The character percent (B<'%'>) is replaced by the I<folder> name.
 #
+# =item B<-d> I<dirpath>
+#
+# If a relative filename is used in a '<' include line,
+# look for it in the directories specified by I<dirpath>
+# in addition to the current input directory.
+# I<dirpath> is a colon (':') separated directory list.
+#
+# =item B<-D> I<subst>=I<val>
+#
+# Add a macro definition.
+#
 # =item B<-L>
 #
 # Put the tag into the B<X-Label> header field
@@ -50,10 +61,8 @@
 #
 # =item B<-m> I<maildomains>
 #
-# Specify the default mail domain for rule addresses lacking an B<@I<domain>>.
+# A comma separated list of default mail domain for rule addresses lacking an B<@I<domain>>.
 # The default comes from the environment variable B<$MAILDOMAIN>.
-# In fact this may be a list of domains if you have some equvalents,
-# separated by commas.
 #
 # =item B<-S>
 #
@@ -83,6 +92,8 @@
 #
 # =back
 #
+# If no I<category-files> are supplied, standard input is used.
+#
 # =head1 FILE FORMAT
 #
 # =head2 LINE FORMAT
@@ -90,7 +101,7 @@
 # Lines ending in a slosh ('\\') are continued to the next line,
 # keeping the newline and discarding the slosh.
 #
-# Blank lines and lines beginning with an octothorpe ('#') are ignored.
+# Blank lines and lines beginning with an octothorpe ('#') are passed through unchanged.
 #
 # Lines of the form:
 #
@@ -98,30 +109,33 @@
 #
 # are passed through unchanged.
 #
+# Lines beginning with a colon (':') introduce a raw procmail recipe,
+# and this line through to the first line commencing with a closing curly bracket ('}')
+# are passed through unchanged.
+#
 # Lines of the form:
 #
 # 	< filename
 #
-# interpolate raw procmailrc files.
-#
-# Lines of the form:
-#
-# 	<< filename
-#
-# interpolate category files.
+# include the specified file.
+# Relative filenames are sought in the directory containing the current input file
+# (taken to be the current working directory if the current input is stdin)
+# and then in the list of directories specified by the B<-d> option.
 #
 # Other lines are of the form:
 #
 # 	[+][!]target[,target...] tag pattern [newline pattern...]
 #
-# where each target has the form:
+# where each I<target> has the form:
 #
 # 	folder
 # 	who@where
 # 	|progname
 #
-# Multiple targets may be specified to file the message
+# Multiple I<targets> may be specified to file the message
 # to multiple places for this rule.
+#
+# A I<target> may be enclosed in double quotes ('"').
 #
 # A leading plus sign (B<'+'>) means that this rule should be a continue rule,
 # and not abort processing.
@@ -134,20 +148,22 @@
 # appears in yellow in a small log window
 # I have at the top of my screen for mail items I should read I<now>.
 #
-# The I<folder> names the folder in which to place the mail item.
-# Normal UNIX mail files,
-# MH style directories and Maildir style directories are autodetetected.
-# If the I<folder> contains an "at" (B<@>) character
-# it is considered an email address
-# and the mail item is forwarded to that address instead of being dropped in a folder.
-#
-# If instead of a I<folder>
-# a pipe (`B<|>') and a program name are used
-# then the message is piped to the specified program.
-# The I<tag> is supplied as the sole command line argument to the I<progname>,
+# A I<target> commencing with a pipe symbol ('|')
+# is considered a shell command to which to feed the message.
+# The I<tag> is appended to the shell command
 # unless the I<tag> is "B<.>" in which case it is omitted.
 #
-# The I<tag> is placed at the start of the mail's B<Subject> line for ready recognition in mixed folders
+# Otherwise, if the I<target> contains an "at" (B<@>) character
+# it is considered an email address
+# and the mail item is forwarded to that address.
+#
+# Otherwise the I<target> names a mail folder in which to place the mail item.
+# Normal UNIX mail files,
+# MH style directories and Maildir style directories are autodetetected.
+# If the folder does not yet exist, the folder type specified by the B<-m> option is used.
+# Relative folder names are considered to be in the directory specified by the B<$MAILDIR> environment variable.
+#
+# The I<tag> is placed at the start of the message's B<Subject> line for ready recognition in mixed folders
 # unless the B<-L> option is used,
 # in which case it is placed in the B<X-Label:> header line.
 # The special tag dot (".") suppresses this action.
@@ -155,17 +171,18 @@
 # The I<pattern>s select the mail items.
 # All the patterns in a rule must match the mail item for the rule to apply.
 # The special pattern "B<.>" always matches.
-# It's intended as a placeholder for ``continue'' rules that should always fire,
-# typically to feed every mail item to a program.
 #
-# The I<folder> or I<who@where> or I<|progname> may be enclosed in double quotes
+# The I<folder> or I<who@where> or I<|shell-command> may be enclosed in double quotes
 # if desired,
 # for example if the folder name or program invocation contains whitespace.
-# Note that the quotes do not enclose the leading "B<+>" or "B<!>".
+# Note that the quotes must not enclose the leading "B<+>" or "B<!>".
 #
-# Substrings of the form "B<{{I<WORD>}}>" are replaced with the value of
-# the environment variable B<$CATS2PROCMAILRC_I<WORD>> if defined.
+# Substrings of the form "B<{{I<WORD>}}>" are replaced
+# with macro values of the same name if defined.
+# Any environment variable of the form B<$CATS2PROCMAILRC_>I<WORD>
+# prepopulates the macros a macro called I<WORD> containing the value of the environment variable.
 # I<WORD> must match the regexp B<^[A-Z][A-Z_0-9]*$>.
+# Further or overriding macros may be specified with the B<-D> option.
 #
 # =head2 Example Patterns
 #
@@ -178,8 +195,8 @@
 #
 # I have rules like this:
 #
-# 	attn	Personal	cs
-# 	attn	Personal	cameron@cskk.homeip.net
+# 	!attn	Personal	cs
+# 	!attn	Personal	cameron@cskk.homeip.net
 # 	attn	EFF-Cafe-News   cafe-news@eff.org
 # 	crypto  AUCrypto        aucrypto@suburbia.net
 #
@@ -210,6 +227,9 @@
 # 	fredmail Fred fred@this.isp.com
 #
 # to accept mail aimed at B<fred@this.isp.com> and also copy it to B<fred@that.isp.com>.
+# This could also be written:
+#
+# 	+fred@that.isp.com,fredmail . fred@this.isp.com
 #
 # Patterns with more than one condition:
 #
@@ -225,6 +245,12 @@
 # The variables B<$CATS2PROCMAILRC_ME> and B<$CATS2PROCMAILRC_KNOWN> are constructed
 # in advance to match these addresses; the former from my mutt B<alternates> line
 # and the latter from my mail alias file.
+#
+# A pattern that always fires:
+#
+#       +all-mail       .       .
+#
+# to copy everything into the "all-mail" folder, and continue processing.
 #
 # =head1 ENVIRONMENT
 #
@@ -333,6 +359,7 @@ if badopts:
   sys.exit(2)
 
 for subname in [v[16:] for v in os.environ.keys() if v.startswith('CATS2PROCMAILRC_')]:
+  # -D trumps envvars
   if subname not in substitutions:
     substitutions[subname]=os.environ['CATS2PROCMAILRC_'+subname]
 
@@ -354,7 +381,7 @@ def resolveTarget(target):
       target='!'+target
     else:
       # presume it is a mail folder
-      if target[0] != '/':
+      if not os.path.isabs(target):
         target=os.path.join(os.environ['MAILDIR'],target)
         ftype=dfltType
         if os.path.isfile(target):
