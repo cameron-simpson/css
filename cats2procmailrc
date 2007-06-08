@@ -613,7 +613,7 @@ def c2p(ifp,ofp):
             cmderr("%s: %d: alert rule found but no alert command - see -a option")
             xit=1
           else:
-            ofp.write('  :0hwc\n| %s\n' % alertCommand.replace('%',target0))
+            ofp.write('  :0hwc\n  | %s\n' % alertCommand.replace('%',target0))
         target=resolveTarget(target0)
         ofp.write('  :0')
         if len(targets) > 0:
