@@ -2,7 +2,6 @@ import os
 import os.path
 import errno
 import sys
-import dircache
 import string
 import time
 from StringIO import StringIO
@@ -316,8 +315,8 @@ def mkdirn(path):
   if len(path) == 0:
     path='.'+os.sep
 
-  if path[-1:] == os.sep:
-    dir=path[:-1]
+  if path.endswith(os.sep):
+    dir=path[:-len(os.sep)]
     pfx=''
   else:
     dir=os.path.dirname(path)
@@ -327,31 +326,30 @@ def mkdirn(path):
   if not os.path.isdir(dir):
     return None
 
+  # do a quick scan of the directory to find
+  # if any names of the desired form already exist
+  # in order to start after them
+  import dircache
   maxn=0
   pfxlen=len(pfx)
-  for base in dircache.listdir(dir):
-    if len(base) > pfxlen and base[:pfxlen] == pfx:
-      numeric=True
-      for c in base[pfxlen:]:
-	if c not in string.digits:
-	  numeric=False
-	  break
-      if numeric:
-	sfxval=int(base[pfxlen:])
-	if sfxval > maxn:
-	  maxn=sfxval
+  for tail in [ e[pfxlen:] for e in dircache.listdir(dir)
+                if len(e) > pfxlen and e.startswith(pfx)
+              ]:
+      if tail.isdigit():
+        maxn=max(maxn,int(tail))
 
   newn=maxn
   while True:
-    newn=newn+1
+    newn += 1
     newpath=path+str(newn)
     try:
       os.mkdir(newpath)
-    except OSError:
-      if sys.exc_value[0] == errno.EACCES:
-	return None
-      else:
+    except OSError, e:
+      if sys.exc_value[0] == errno.EEXIST:
+        # taken, try new value
         continue
+      cmderr("mkdir(%s): %s" % (newpath,e))
+      return None
     if len(opath) == 0:
       newpath=os.path.basename(newpath)
     return newpath
