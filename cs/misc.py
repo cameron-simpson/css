@@ -376,8 +376,8 @@ def mailsubj(addrs,subj,body):
 def netgroup(*names):
   ''' Return hosts in a netgroup. Requires the 'ngr' script.
   '''
-  import cs.sh
-  return [chomp(line) for line in cs.sh.vpopen(('ngr',)+names, mode="r")]
+  from cs.sh import vpopen
+  return [ chomp(line) for line in vpopen(('ngr',)+names, mode="r") ]
 
 def runCommandPrompt(fnmap,prompt=None):
   ''' Accept a dict of the for key->(fn, help_string)
