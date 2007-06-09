@@ -355,11 +355,9 @@ def mkdirn(path):
     return newpath
 
 def tmpdir():
-  if 'TMPDIR' in os.environ:
-    tmpdir=os.environ['TMPDIR']
-    if len(tmpdir) > 0:
-      return tmpdir
-
+  tmpdir=os.environ.getdefault('TMPDIR','')
+  if len(tmpdir) == 0:
+    tmpdir='/tmp'
   return '/tmp'
 
 def tmpdirn(tmp=None):
