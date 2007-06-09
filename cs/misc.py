@@ -310,6 +310,29 @@ def dict2ary(d,keylist=None):
   if keylist is None: keylist=sort(keys(d))
   return [ [k,d[k]] for k in keylist ]
 
+def maxFilenameSuffix(dir,pfx):
+  from dircache import listdir
+  maxn=None
+  pfxlen=len(pfx)
+  for tail in [ e[pfxlen:] for e in listdir(dir)
+                if len(e) > pfxlen and e.startswith(pfx)
+              ]:
+    if tail.isdigit():
+      n=int(tail)
+      if maxn is None:
+        maxn=n
+      elif maxn < n:
+        maxn=n
+  return maxn
+
+def tmpfilename(dir=None):
+  if dir is None:
+    dir=tmpdir()
+  pfx = ".%s.%d." % (cmd,os.getpid())
+  n=maxFilenameSuffix(dir,pfx)
+  if n is None: n=0
+  return "%s%d" % (pfx,n)
+
 def mkdirn(path):
   opath=path
   if len(path) == 0:
@@ -329,16 +352,12 @@ def mkdirn(path):
   # do a quick scan of the directory to find
   # if any names of the desired form already exist
   # in order to start after them
-  import dircache
-  maxn=0
-  pfxlen=len(pfx)
-  for tail in [ e[pfxlen:] for e in dircache.listdir(dir)
-                if len(e) > pfxlen and e.startswith(pfx)
-              ]:
-      if tail.isdigit():
-        maxn=max(maxn,int(tail))
+  maxn=maxFilenameSuffix(dir,pfx)
+  if maxn is None:
+    newn=0
+  else:
+    newn=maxn
 
-  newn=maxn
   while True:
     newn += 1
     newpath=path+str(newn)
