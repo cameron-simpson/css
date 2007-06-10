@@ -64,7 +64,7 @@ def linkto(srcpath,dstpath):
     tmpf=tmpfilename(dstdir)
     ##assert not os.path.lexists(tmpf) # not in python 2.3 :-)
     try:
-      lstat(tmpf)
+      os.lstat(tmpf)
     except OSError:
       pass
     else:
