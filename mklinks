@@ -62,7 +62,13 @@ def linkto(srcpath,dstpath):
   global noAction
   if not noAction:
     tmpf=tmpfilename(dstdir)
-    assert not os.path.lexists(tmpf)
+    ##assert not os.path.lexists(tmpf) # not in python 2.3 :-)
+    try:
+      lstat(tmpf)
+    except OSError:
+      pass
+    else:
+      assert False, "%s: already exists!" % tmpf
     os.link(srcpath,tmpf)
     os.rename(tmpf,dstpath)
   pathinfo[srcpath].addpath(dstpath)
