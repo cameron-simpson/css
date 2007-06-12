@@ -16,7 +16,7 @@ usage="Usage: $cmd [login@]host[,[login@host]...] [-v] [-n name] [-o opt] {-A | 
 	-2	Use ssh protocol 2.
 	-m msg	Log session with the supplied message.
 	-x	Ssh option: X11 forwarding off.
-	-X	Ssh option: X11 forwarding on. NB: Turns on ForwardX11Trusted.
+	-X	Ssh option: X11 forwarding on. NB: Turns on ForwardX11Trusted, like ssh -Y.
 	-n name	Name for window and remote screen session."
 
 badopts=

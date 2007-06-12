@@ -1,2 +1,2 @@
 #!/bin/sh
-exec xterm -geometry 80x24-0-0 ${1+"$@"}
+exec xterm -geometry 80x24+0-0 ${1+"$@"}
