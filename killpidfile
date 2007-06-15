@@ -43,8 +43,29 @@ done
 
 if [ $# = 0 ]
 then
-  echo "$cmd: missing pidfiles" >&2
-  badopts=1
+  # nothing named? list choices
+  cd "$VARRUN" || exit 1
+  set -- *
+  [ $# = 1 -a "x$1" = 'x*' ] && [ ! -f "$1" ] && exit 0
+  for pidfile in *
+  do
+    exec 3<&0
+    grep '^[0-9][0-9]*$' <"$pidfile" \
+    | \
+    { ok=1
+      while read pid
+      do  if kill -0 "$pid" 2>/dev/null
+          then
+            echo "$pidfile	$pid"
+          else
+            echo "$pidfile	$pid MISSING"
+            ok=
+          fi
+      done
+      [ $ok ] || { ask "Remove $pidfile" <&3 && rm "./$pidfile"; }
+    }
+  done
+  exit 0
 fi
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
