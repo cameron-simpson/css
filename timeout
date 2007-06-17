@@ -1,4 +1,4 @@
-#!/bin/sh -u
+#!/bin/sh -ue
 #
 # Run a command with a real-time timeout.
 #	- Cameron Simpson <cs@zip.com.au>
@@ -19,25 +19,23 @@ timeout=$1
 shift
 
 case "$timeout" in
-	[0-9]*)	;;	# dodgy bros syntax check since [!0-9] fails
-	*)	echo "$0: timeout must be an integer" >&2
+	[1-9]*)	;;	# dodgy bros syntax check since [!0-9] fails
+	*)	echo "$0: timeout must be a positive integer" >&2
 		echo "$usage" >&2
 		exit 2
 		;;
 esac
 
-mypid=$$
-xit=1		# assume timed out
+cmdpid=$$
 
-"$@" &
-cmdpid=$!
-
-( { exec </dev/null >/dev/null	## keep stderr
-
+( # close stdin, send stdout to stderr
+  exec </dev/null >&2
+  (
     left=$timeout
-    while [ $left -ge 5 ]
+    while [ $left -ge 1 ]
     do  kill -0 "$cmdpid" 2>/dev/null || exit 0
-	sleep 5; left=`expr $left - 5`
+	sleep 1
+        left=`expr $left - 1`
     done
     [ $left -gt 0 ] \
       && { kill -0 "$cmdpid" 2>/dev/null || exit 0; sleep $left; }
@@ -47,12 +45,8 @@ cmdpid=$!
 	echo "$0: timed out after $timeout seconds: $*" >&2
 	exec 2>/dev/null
 	kill $sigopt $cmdpid && { sleep 2; kill -9 $cmdpid; }
-	kill $mypid
     fi
-  } &
+  ) &
 )
 
-wait
-xit=$?
-
-exit $xit
+exec "$@"
