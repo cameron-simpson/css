@@ -1,4 +1,4 @@
-#!/bin/sh -u
+#!/bin/sh -ue
 #
 # Process all messages in a maildir or MH dir against the dir's .procmailrc.
 #	- Cameron Simpson <cs@zip.com.au> 30oct2005
@@ -61,7 +61,7 @@ then
 	  || { echo "$cmd: no procmailrc: $procmailrc" >&2
 	       badopts=1
 	     }
-  set -- procmail "$procmailrc"
+  set -- procmail -p "$procmailrc"
 fi
 [ -n "$procmailtimeout" ] && set -- timeout "$procmailtimeout" "$@"
 filer_shcmd=`shqstr "$@"` || exit 1
@@ -70,6 +70,7 @@ filer_shcmd=`shqstr "$@"` || exit 1
 
 
 cd "$maildir" || exit 1
+maildir=`pwd`
 
 busyflag=$TMPDIR/mail-despool.$$busy
 
@@ -101,7 +102,13 @@ do
     for f
     do
       [ -s "$f" ] || continue
-      { eval "$trace $filer_shcmd" <"$f" && $trace rm -- "$f" && touch "$busyflag"; } || xit=1
+      ( ##set -x
+        MAIL_DESPOOL_FILE=$maildir/$f
+        export MAIL_DESPOOL_FILE
+        eval "$trace $filer_shcmd" <"$f" \
+        && $trace rm -- "$f" \
+        && touch "$busyflag"
+      ) || xit=1
     done
   fi
 
