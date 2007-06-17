@@ -12,7 +12,7 @@
 mode=maildir
 
 cmd=$0
-usage="Usage: $cmd [-auto] folder <mailitem
+usage="Usage: $cmd [-auto] folders... <mailitem
 	-auto	Figure out the folder type.
 		Default: $mode"
 
@@ -20,8 +20,7 @@ badopts=
 
 [ $# -gt 0 ] && [ "x$1" = x-auto ] && { mode=auto; shift; }
 
-folder=$1; shift
-[ $# = 0 ] || { echo "$cmd: extra arguments after folder: $*" >&2
+[ $# = 0 ] && { echo "$cmd: missing folders" >&2
                 badopts=1
               }
 
@@ -34,60 +33,65 @@ fi
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
 tmpf=$TMPDIR/fmi$$
-trap 'rm -f "$tmpf"' 0 1 2 13 15
-cat >"$tmpf" || exit 1
-[ -s "$tmpf" ] || exit 1
-exec <"$tmpf"
-rm -f "$tmpf" || exit 1
-# $tmpf now available for reuse as procmailrc
+trap 'rm -f "$tmpf".*' 0 1 2 13 15
+msg=$tmpf.msg
+prc=$tmpf.prc
 
-case "$folder" in
-  /*) fpath=$folder ;;
-  *)  fpath=`mailfolderpath "$folder"` || exit 1
-      [ -n "$fpath" ] || exit 1
-      [ -f "$fpath" -o -d "$fpath/." ] \
-      || maildir "$fpath" \
-      || exit 1
-      ;;
-esac
+cat >"$msg"   || exit 1
+[ -s "$msg" ] || exit 1
+exec </dev/null
 
-# figure out the folder type if asked to guess
-if [ "x$mode" = xauto ]
-then
-    if [ -f "$fpath" ]
-    then
-      mode=mbox
-    else
-      if maildir "$fpath"
-      then mode=maildir
-      else mode=mh
+xit=0
+
+for folder
+do
+  case "$folder" in
+    /*) fpath=$folder ;;
+    *)  fpath=`mailfolderpath "$folder"` || exit 1
+        [ -n "$fpath" ] || exit 1
+        [ -f "$fpath" -o -d "$fpath/." ] \
+        || maildir "$fpath" \
+        || { xit=1; continue; }
+        ;;
+  esac
+
+  # figure out the folder type if asked to guess
+  if [ "x$mode" = xauto ]
+  then
+      if [ -f "$fpath" ]
+      then
+        mode=mbox
+      else
+        if maildir "$fpath"
+        then mode=maildir
+        else mode=mh
+        fi
       fi
-    fi
-fi
+  fi
 
-# deliver
-case "$mode" in
-    mbox)
-        case "$fpath" in
-          *.gz) exec gzip -n >>"$fpath" ;;
-          *)    exec cat >>"$fpath" ;;
-        esac
-	;;
-    mh)	unfrom_ | /usr/lib/nmh/rcvstore "$1" -unseen -nocreate
-	;;
-    maildir)
-	maildir "$fpath" || exit 1
-	cat >"$tmpf" <<X || exit 1
-	MAILDIR=$MAILDIR
-	DEFAULT=$fpath/
-	LOGFILE=$LOGDIR/procmail
+  # deliver
+  case "$mode" in
+      mbox)
+          case "$fpath" in
+            *.gz) gzip -n <"$msg" >>"$fpath" ;;
+            *)    cat <"$msg" >>"$fpath" ;;
+          esac
+          ;;
+      mh) unfrom_ <"$msg" | /usr/lib/nmh/rcvstore "$1" -unseen -nocreate
+          ;;
+      maildir)
+          maildir "$fpath" || { xit=1; continue; }
+          cat >"$prc" <<X || { xit=1; continue; }
+          MAILDIR=$MAILDIR
+          DEFAULT=$fpath/
+          LOGFILE=$LOGDIR/procmail
 X
-	procmail "$tmpf"
-	exit $?
-	;;
-    *)	echo "$cmd: unsupported mode: $mode" >&2
-	exit 2
-	;;
-esac
+          procmail -p "$prc" <"$msg" || xit=1
+          ;;
+      *)  echo "$cmd: $folder: unsupported mode: $mode" >&2
+          exit 1
+          ;;
+  esac || xit=1
+done
 
-exit $?
+exit $xit
