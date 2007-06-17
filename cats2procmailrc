@@ -11,7 +11,7 @@
 #
 # =head1 SYNOPSIS
 #
-# cats2procmailrc [B<-a> I<alert>] [B<-d> I<dirpath>] [B<-D> I<subst>B<=>I<val>] [B<-L>] [B<-m> I<maildomains>] [-S] [B<-t> I<type>] [B<-T>] [category-files...] E<gt>procmailrc
+# cats2procmailrc [B<-a> I<alert>] [B<-d> I<dirpath>] [B<-D> I<subst>B<=>I<val>] [B<-L>] [B<-m> I<maildomains>] [-S] [B<-t> I<type>] [B<-T>] [LOG=value] [category-files...] E<gt>procmailrc
 #
 # =head1 DESCRIPTION
 #
@@ -91,6 +91,9 @@
 # the labels will mostly track stuff for you anyway.
 #
 # =back
+#
+# The optional argument B<LOG=>I<value> will be prepended to the start of recipe actions.
+# This can be a useful adjunct to the LOGABSTRACT facility in procmail.
 #
 # If no I<category-files> are supplied, standard input is used.
 #
@@ -288,6 +291,7 @@ dfltDomains=()          # default email domain
 includePath=()          # where else to look for relative included files
 substitutions={}        # replace {{foo}} in rules
 syncRules=False         # let procmail be fork happy on continue/copy rules
+logline=None            # optional LOG= line for recipes
 
 cmd=os.path.basename(sys.argv[0])
 usage='''Usage: %s [-a alert] [-d dir] [-L] [-m domains] [-S] [-t {unix|mh|maildir}] -T <categories >procmailrc
@@ -356,6 +360,9 @@ for opt, arg in opts:
 
 if len(dfltDomains) == 0:
   dfltDomains=(os.environ['MAILDOMAIN'],)
+
+if len(argv) > 0 and argv[0].startswith("LOG="):
+  logline=argv.pop(0)
 
 if len(argv) == 0:
   argv='-'
@@ -589,11 +596,14 @@ def c2p(ifp,ofp):
 
       ofp.write('* %s\n'%pattern)
 
-    needBrackets=(len(targets) > 1 or trackRules or tag is not None or doAlert)
+    needBrackets=(len(targets) > 1 or trackRules or tag is not None or doAlert or logline is not None)
     if not needBrackets:
       ofp.write('%s\n' % resolveTarget(targets[0]))
     else:
       ofp.write('{\n');
+
+      if logline is not None:
+        ofp.write("  %s\n" % logline)
 
       if trackRules:
         ofp.write('  :0whf\n  | formail -f -A %s\n' % quotestr('X-Cats2Procmailrc-Rule: '+ruledesc))
