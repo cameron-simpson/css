@@ -85,7 +85,7 @@
 # Normally a C<X-Cats2Procmailrc-Matching-Rule> header
 # is inserted describing the match rule.
 # This is done with formail
-# and so can incur a noticable penalty if slow machines
+# and so can incur a noticable penalty on slow machines
 # with lots of messages.
 # If you're using the B<-L> option
 # the labels will mostly track stuff for you anyway.
@@ -294,7 +294,10 @@ syncRules=False         # let procmail be fork happy on continue/copy rules
 logline=None            # optional LOG= line for recipes
 
 cmd=os.path.basename(sys.argv[0])
-usage='''Usage: %s [-a alert] [-d dir] [-L] [-m domains] [-S] [-t {unix|mh|maildir}] -T <categories >procmailrc
+# cats2procmailrc [B<-a> I<alert>] [B<-d> I<dirpath>] [B<-D> I<subst>B<=>I<val>] [B<-L>] [B<-m> I<maildomains>] [-S] [B<-t> I<type>] [B<-T>] [LOG=value] [category-files...] E<gt>procmailrc
+usage='''Usage: %s [-a alert] [-d dir] [-D subst=val] [-L] [-m domains] [-S] \\
+                [-t {unix|mh|maildir}] -T [LOG=value] [category-files...] \\
+                >procmailrc
 	-a alert	Command line to generate the alert.
 			The mail item is present on standard input.
         -d dirpath      Look for relative included files in these directories.
@@ -324,7 +327,7 @@ def cmderr(*args):
 opts=()
 argv=sys.argv[1:]
 try:
-  opts, argv = getopt(argv, 'a:d:D:Lm:S:t:T')
+  opts, argv = getopt(argv, 'a:d:D:Lm:St:T')
 except GetoptError, e:
   cmderr("bad options:", str(e))
   badopts=True
@@ -527,13 +530,6 @@ def c2p(ifp,ofp):
         assert "unhandled !/+ flag: "+line[0]
       line=line[1:]
 
-    ofp.write(':0')
-    if doContinue:
-      ofp.write('c')
-      if syncRules:
-        ofp.write(':.lock-global-procmail')
-    ofp.write('\n')
-
     if len(line) == 0 or line[0] in string.whitespace:
       cmderr("%s: %d: missing targets"%(ifp.name,lineno))
       xit=1
@@ -562,6 +558,8 @@ def c2p(ifp,ofp):
     tag, patterns = line.lstrip().split(None,1)
     if tag == '.':
       tag=None
+
+    ofp.write(':0\n')
 
     for pattern in [p.lstrip() for p in patterns.split('\n')]:
       if pattern == '.':
@@ -596,11 +594,18 @@ def c2p(ifp,ofp):
 
       ofp.write('* %s\n'%pattern)
 
-    needBrackets=(len(targets) > 1 or trackRules or tag is not None or doAlert or logline is not None)
+    needBrackets=(doContinue or len(targets) > 1 or tag is not None or logline is not None or trackRules or doAlert)
+
     if not needBrackets:
       ofp.write('%s\n' % resolveTarget(targets[0]))
     else:
       ofp.write('{\n');
+
+      if doContinue:
+        ofp.write(' :0c')
+        if syncRules:
+          ofp.write(':.lock-global-procmail')
+        ofp.write('\n {\n')
 
       if logline is not None:
         ofp.write("  %s\n" % logline)
@@ -628,8 +633,13 @@ def c2p(ifp,ofp):
         ofp.write('  :0')
         if len(targets) > 0:
           ofp.write('c')
+        if syncRules and target0.startswith('|'):
+          ofp.write(':.lock-global-procmail-pipe')
         ofp.write('\n')
         ofp.write('  %s\n'%target)
+
+      if doContinue:
+        ofp.write(' }\n')
 
       ofp.write('}\n');
 
