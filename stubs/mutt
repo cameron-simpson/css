@@ -25,6 +25,7 @@ case "$TERM" in
 esac
 
 for muttdir in \
+        /opt/mutt-1.5.16-gentoo \
 	/opt/mutt-1.5.13 \
 	/opt/mutt-1.5.8-header-cache.29 \
 	/opt/mutt-1.5.6i-headercache \
