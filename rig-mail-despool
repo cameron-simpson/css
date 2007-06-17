@@ -7,12 +7,13 @@ cmd=`basename "$0"`
 lock=mail-io
 delay=5
 
+[ $# -gt 0 ] || set -- spool spool-in spool-out spool-xref ham spam-definite
+
 ## OBSOLETE ## bgproc -l procmail -p mail-despam -- set-x lock -1 "$MAILDIR/spool" mail-despam -d "$delay" -l "$lock" +spool +spool-in
 
 xit=0
 
-## spool-xref
-for spool in spool spool-in spool-out ham spam-definite
+for spool
 do
   maildir=$MAILDIR/$spool
   if locked "$maildir"

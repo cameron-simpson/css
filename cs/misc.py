@@ -2,7 +2,6 @@ import os
 import os.path
 import errno
 import sys
-import dircache
 import string
 import time
 from StringIO import StringIO
@@ -311,13 +310,36 @@ def dict2ary(d,keylist=None):
   if keylist is None: keylist=sort(keys(d))
   return [ [k,d[k]] for k in keylist ]
 
+def maxFilenameSuffix(dir,pfx):
+  from dircache import listdir
+  maxn=None
+  pfxlen=len(pfx)
+  for tail in [ e[pfxlen:] for e in listdir(dir)
+                if len(e) > pfxlen and e.startswith(pfx)
+              ]:
+    if tail.isdigit():
+      n=int(tail)
+      if maxn is None:
+        maxn=n
+      elif maxn < n:
+        maxn=n
+  return maxn
+
+def tmpfilename(dir=None):
+  if dir is None:
+    dir=tmpdir()
+  pfx = ".%s.%d." % (cmd,os.getpid())
+  n=maxFilenameSuffix(dir,pfx)
+  if n is None: n=0
+  return "%s%d" % (pfx,n)
+
 def mkdirn(path):
   opath=path
   if len(path) == 0:
     path='.'+os.sep
 
-  if path[-1:] == os.sep:
-    dir=path[:-1]
+  if path.endswith(os.sep):
+    dir=path[:-len(os.sep)]
     pfx=''
   else:
     dir=os.path.dirname(path)
@@ -327,41 +349,34 @@ def mkdirn(path):
   if not os.path.isdir(dir):
     return None
 
-  maxn=0
-  pfxlen=len(pfx)
-  for base in dircache.listdir(dir):
-    if len(base) > pfxlen and base[:pfxlen] == pfx:
-      numeric=True
-      for c in base[pfxlen:]:
-	if c not in string.digits:
-	  numeric=False
-	  break
-      if numeric:
-	sfxval=int(base[pfxlen:])
-	if sfxval > maxn:
-	  maxn=sfxval
+  # do a quick scan of the directory to find
+  # if any names of the desired form already exist
+  # in order to start after them
+  maxn=maxFilenameSuffix(dir,pfx)
+  if maxn is None:
+    newn=0
+  else:
+    newn=maxn
 
-  newn=maxn
   while True:
-    newn=newn+1
+    newn += 1
     newpath=path+str(newn)
     try:
       os.mkdir(newpath)
-    except OSError:
-      if sys.exc_value[0] == errno.EACCES:
-	return None
-      else:
+    except OSError, e:
+      if sys.exc_value[0] == errno.EEXIST:
+        # taken, try new value
         continue
+      cmderr("mkdir(%s): %s" % (newpath,e))
+      return None
     if len(opath) == 0:
       newpath=os.path.basename(newpath)
     return newpath
 
 def tmpdir():
-  if 'TMPDIR' in os.environ:
-    tmpdir=os.environ['TMPDIR']
-    if len(tmpdir) > 0:
-      return tmpdir
-
+  tmpdir=os.environ.getdefault('TMPDIR','')
+  if len(tmpdir) == 0:
+    tmpdir='/tmp'
   return '/tmp'
 
 def tmpdirn(tmp=None):
@@ -380,8 +395,8 @@ def mailsubj(addrs,subj,body):
 def netgroup(*names):
   ''' Return hosts in a netgroup. Requires the 'ngr' script.
   '''
-  import cs.sh
-  return [chomp(line) for line in cs.sh.vpopen(('ngr',)+names, mode="r")]
+  from cs.sh import vpopen
+  return [ chomp(line) for line in vpopen(('ngr',)+names, mode="r") ]
 
 def runCommandPrompt(fnmap,prompt=None):
   ''' Accept a dict of the for key->(fn, help_string)

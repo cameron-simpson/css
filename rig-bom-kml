@@ -1,6 +1,7 @@
-#!/bin/sh -u
+#!/bin/sh -ue
 #
 # Generate current BOM rainfall KML.
+# All radars from http://mirror.bom.gov.au/weather/radar/
 #       - Cameron Simpson <cs@zip.com.au> 16jan2007
 #
 
@@ -8,19 +9,39 @@ if [ "x$SYSTEMID" = xhome ]
 then ez=ezos
 else ez=ezosh
 fi
+upload=$ez:public_html/cs/test
+urlbase=http://www.cskk.ezoshosting.com/cs/test
+kml=bom-radars.kml
 
 umask 2
-set -eux
 
 cmd=`basename "$0"`
 wd=`mkdirn "$TMPDIR/$cmd"`
 
 cd "$wd"
 
-bom-sydney-radar-128 >bom128.png &
-bom-sydney-radar-128 IDR032.gif >bom256.png &
-kml-bom-128km >bom3.kml &
-wait
-cat bom3.kml
-L bom128.png bom256.png
-rsync -av bom128.png bom256.png bom3.kml $ez:public_html/cs/test/.
+( exec 3>&1 1>&2
+
+  files=
+  while read img short W E S N title
+  do
+    png=bom-radar-$short.png
+    pngurl=$urlbase/$png
+    bom-radar-png "$img" >"$png" &
+    echo | kml-go "$title" "$pngurl" "$W" "$E" "$S" "$N" >&3
+  done
+  wait
+) <<'X' | kml cat >"$kml"
+IDR033.gif sydney      149.51 152.25 -35.41 -33.12 BOM Sydney 128km Radar
+IDR043.gif newcastle   150.65 153.39 -33.88 -31.65 BOM Newcastle 128km Radar
+IDR553.gif wagga-wagga 146.07 148.86 -36.31 -34.09 BOM Wagga Wagga 128km Radar
+IDR403.gif canberra    148.1  150.92 -36.81 -34.59 BOM Canberra 128km Radar
+IDR663.gif brisbane    151.98 154.53 -28.85 -26.67 BOM Brisbane (Mt Stapylton) 128km Radar
+IDR573.gif east-sale   145.67 148.59 -39.26 -37.04 BOM East Sale 128km Radar
+IDR023.gif melbourne-airport 143.39 146.28 -38.81 -36.6 BOM Melbourne Airport 128km Radar
+X
+
+cat "$kml"
+L
+
+rsync -rptv . "$upload/."

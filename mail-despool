@@ -8,11 +8,12 @@
 : ${TMPDIR:=/tmp}
 
 cmd=`basename "$0"` || cmd=$0
-usage="Usage: $cmd [-d delay] [-f procmailrc] maildir [filer [args...]]"
+usage="Usage: $cmd [-d delay] [-f procmailrc] [-t timeout] maildir [filer [args...]]"
 
 trace=  ##set-x
 delay=
 procmailrc=
+procmailtimeout=
 
 badopts=
 
@@ -21,6 +22,7 @@ do
   case $1 in
     -d)	delay=$2; shift ;;
     -f)	procmailrc=$2; shift ;;
+    -t) procmailtimeout=$2; shift ;;
     --)	shift; break ;;
     -?*)echo "$cmd: unrecognised option: $1" >&2
 	badopts=1
@@ -61,6 +63,7 @@ then
 	     }
   set -- procmail "$procmailrc"
 fi
+[ -n "$procmailtimeout" ] && set -- timeout "$procmailtimeout" "$@"
 filer_shcmd=`shqstr "$@"` || exit 1
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }

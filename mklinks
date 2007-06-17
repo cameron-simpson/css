@@ -11,7 +11,7 @@ import os.path
 import stat
 import filecmp
 import md5
-from cs.misc import progress, warn, verbose, debug, chomp, tmpdirn
+from cs.misc import progress, warn, verbose, debug, chomp, tmpdirn, tmpfilename
 
 sizeinfo={}
 identinfo={}
@@ -58,10 +58,20 @@ def md5pfx(path,size=8192):
 
 def linkto(srcpath,dstpath):
   progress(srcpath,"=>",dstpath)
-  pathinfo[srcpath].addpath(dstpath)
+  dstdir=os.path.dirname(dstpath)
   global noAction
-  noAction or os.unlink(dstpath)
-  noAction or os.link(srcpath,dstpath)
+  if not noAction:
+    tmpf=tmpfilename(dstdir)
+    ##assert not os.path.lexists(tmpf) # not in python 2.3 :-)
+    try:
+      os.lstat(tmpf)
+    except OSError:
+      pass
+    else:
+      assert False, "%s: already exists!" % tmpf
+    os.link(srcpath,tmpf)
+    os.rename(tmpf,dstpath)
+  pathinfo[srcpath].addpath(dstpath)
 
 def do(path):
   ''' Process each file in the directory tree.

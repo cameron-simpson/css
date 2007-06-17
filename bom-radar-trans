@@ -1,0 +1,31 @@
+#!/usr/bin/python
+#
+# Read a BOM radar GIF named on the command line, emit a transparent
+# PNG on standard output - suppress sea, land and the lightest rainfall.
+#       - Cameron Simpson <cs@zip.com.au>
+#
+
+import sys
+from PIL import Image
+import cs.hier
+im=sys.argv[1]
+raw=Image.open(im)
+IM=Image.new("RGBA",(512,496))
+IM.paste(raw, None)
+for x in range(512):
+  for y in range(496):
+    p=IM.getpixel((x,y))
+    rgb=p[:3]
+    if rgb in (
+                (  0,   0,   0),
+                (245, 245, 255),
+                (195, 217, 235),
+                (210, 161, 85),
+                (216, 178, 100),
+                (221, 198, 118),
+                (226, 203, 140),
+                (231, 220, 189),
+              ):
+      IM.putpixel((x,y),(0,0,0,0))
+
+IM.save("/dev/fd/1","PNG")

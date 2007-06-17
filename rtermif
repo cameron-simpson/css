@@ -7,6 +7,6 @@
 [ $# = 0 ] || { echo "Usage: $0"; exit 2; }
 
 if [ -n "$REMOTE_XSESSION_HOST" ]
-then  @ "$REMOTE_XSESSION_HOST"
-else  term
+then  exec @ "$REMOTE_XSESSION_HOST"
+else  exec term
 fi
