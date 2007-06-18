@@ -16,7 +16,7 @@ def overallHitRatio():
   if total == 0:
     return None
 
-  return hits/total
+  return float(hits)/float(total)
 
 class LRU(dict):
   ''' An simple minded LRU cache wrapper for a mapping.
@@ -117,7 +117,7 @@ class Cache:
     gets=self.__hits+self.__misses
     if gets == 0:
       return None
-    return self.__hits/gets
+    return float(self.__hits)/float(gets)
 
   def __getattr__(self,attr):
     ##debug("CACHE GETATTR",`attr`)
