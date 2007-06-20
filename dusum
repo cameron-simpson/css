@@ -9,35 +9,77 @@
 cmd=`basename "$0"`
 
 zmode=gz
-ext=
-[ $# -gt 0 ] && { ext=.$1; shift; }
-[ $# = 0 ] || { echo "Usage: $0 [ext]" >&2; exit 2; }
+base=
+[ $# -gt 0 ] && { base=$1; shift; }
+[ $# = 0 ] || { echo "Usage: $0 [base]" >&2; exit 2; }
 
-out=".du-a$ext .du-s$ext"
+case $zmode in
+  gz)   sfx=.gz ;;
+  '')   sfx= ;;
+  *)    echo "$cmd: unsupported zmode: $zmode" >&2
+        exit 1
+        ;;
+esac
+
+case $base in
+  '')
+    dua=.du-a/CURRENT$sfx
+    dus=.du-s/CURRENT$sfx
+    ;;
+  NOW)
+    for dua in ".du-a/`daycode`$sfx" ".du-a/`datecode`$sfx" ''
+    do
+      if [ -n "$dua" ]
+      then
+        [ -f "$dua" ] || break
+      fi
+    done
+    [ -n "$dua" ] || { echo "$cmd: can't choose .du-a output filename" >&2
+                       exit 1
+                     }
+    for dus in ".du-s/`daycode`$sfx" ".du-s/`datecode`$sfx" ''
+    do
+      if [ -n "$dus" ]
+      then
+        [ -f "$dus" ] || break
+      fi
+    done
+    [ -n "$dus" ] || { echo "$cmd: can't choose .du-s output filename" >&2
+                       exit 1
+                     }
+    ;;
+  *)dua=.du-a/$base$sfx
+    dus=.du-s/$base$sfx
+    ;;
+esac
+
+duad=`dirname "$dua"` && needdir "$duad" || exit 1
+dusd=`dirname "$dus"` && needdir "$dusd" || exit 1
+
+out="$dua $dus"
 trap "rm -f $out" 1 2 13 15
 
 dufs ${1+"$@"} \
 | sed 's/^\([0-9][0-9]*\)	\.\/\/*/\1	/' \
-| \
-{ dua=.du-a$ext
-  case "$zmode" in
+| case "$zmode" in
     '') tee "$dua" ;;
     gz) exec 3>&1
-        fdtee 3 | gzip --fast >"$dua.gz"
+        fdtee 3 | gzip --fast >"$dua"
         ;;
-    *)  echo "$cmd: unsupported zmode: $zmode" >&2
-        exit 1
-        ;;
-  esac
-} \
+  esac \
 | \
-{ dus=.du-s$ext
+{
   set -- fgrep -v /
   case "$zmode" in
     '') exec "$@" >"$dus" ;;
-    gz) "$@" | gzip --fast >"$dus.gz" ;;
-    *)  echo "$cmd: unsupported zmode: $zmode" >&2
-        exit 1
-        ;;
+    gz) "$@" | gzip --fast >"$dus" ;;
   esac
 }
+
+duab=`basename "$dua"` || exit 1
+rm -f "$duad/LATEST$sfx"; ln -s "$duab" "$duad/LATEST$sfx"
+dusb=`basename "$dus"` || exit 1
+rm -f "$dusd/LATEST$sfx"; ln -s "$dusb" "$dusd/LATEST$sfx"
+
+echo "$dua"
+echo "$dus"

@@ -6,6 +6,7 @@
 # Timestamping.	- cameron, 21mar1999
 # Async multidir mode. - cameron 23mar2007
 # .gz mode. - cameron 07may2007
+# Expect .du-a,.du-s subdirs, get new files from dusum output. - cameron 20jun2007
 #
 
 cmd=$0
@@ -24,30 +25,20 @@ xit=0
 for dir
 do
   ( cd "$dir" || exit 1
-    dusum "$now"
 
-    dua=.du-a.$now.gz
+    # locate older du summaries
+    olddua=`ls -ldt .du-a/* | sed -n 's/^-.* //p' | sed 1q`
+    [ -n "$olddua" ] || olddua=/dev/null
+    olddus=`ls -ldt .du-s/* | sed -n 's/^-.* //p' | sed 1q`
+    [ -n "$olddus" ] || olddus=/dev/null
 
-    if [ -f .du-a.gz ]
-    then olddua=.du-a.gz
-    elif [ -f .du-a ]
-    then olddua=.du-a
-    else olddua=/dev/null
-    fi
-    rm -f .du-a.diff
-    dudiff "$olddua" "$dua" | gzip --fast > .du-a.diff.gz
-    rm -f .du-a .du-a.gz;ln -s "$dua" .du-a.gz
-
-    dus=.du-s.$now.gz
-    if [ -f .du-s.gz ]
-    then olddus=.du-s.gz
-    elif [ -f .du-s ]
-    then olddus=.du-s
-    else olddus=/dev/null
-    fi
-    rm -f .du-s.diff
-    dudiff "$olddus" "$dus" | gzip --fast > .du-s.diff.gz
-    rm -f .du-s .du-s.gz;ln -s "$dua" .du-s.gz
+    dusum NOW \
+    | \
+    { read -r dua || exit 1
+      read -r dus || exit 1
+      dudiff "$olddua" "$dua" | gzip --fast >.du-a/diff.gz
+      dudiff "$olddus" "$dus" | gzip --fast >.du-s/diff.gz
+    }
   ) &
   [ $async ] || wait
 done
