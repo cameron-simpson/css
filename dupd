@@ -27,9 +27,9 @@ do
   ( cd "$dir" || exit 1
 
     # locate older du summaries
-    olddua=`ls -ldt .du-a/* | sed -n 's/^-.* //p' | sed 1q`
+    olddua=`ls -ldt .du-a/* 2>/dev/null | sed -n 's/^-.* //p' | sed 1q`
     [ -n "$olddua" ] || olddua=/dev/null
-    olddus=`ls -ldt .du-s/* | sed -n 's/^-.* //p' | sed 1q`
+    olddus=`ls -ldt .du-s/* 2>/dev/null | sed -n 's/^-.* //p' | sed 1q`
     [ -n "$olddus" ] || olddus=/dev/null
 
     dusum NOW \
