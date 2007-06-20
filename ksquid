@@ -3,28 +3,4 @@
 # HUP my squid. - Cameron Simpson <cs@zip.com.au> 13jul2005
 #
 
-cmd=$0
-usage="Usaqge: $cmd [-sig] [pidfile]"
-
-pidfile=squid.pid
-sig=-HUP
-
-badopts=
-
-if [ $# -gt 0 ]
-then
-  case "$1" in
-    -[0-9A-Z]*)	sig=$1; shift ;;
-  esac
-fi
-
-[ $# -gt 0 ] && { pidfile=$1; shift; }
-
-[ $# = 0 ] || { echo "$cmd: extra arguments after pidfile: $*" >&2
-		badopts=1
-	      }
-
-[ $badopts ] && { echo "$usage" >&2; exit 2; }
-
-pid=`ifpid -v "$pidfile"` || exit 1
-exec set-x kill "$sig" "$pid"
+exec killpidfile -HUP ${1+"$@"} squid.pid
