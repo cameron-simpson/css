@@ -4,20 +4,23 @@
 #	- Cameron Simpson <cs@zip.com.au> 18jan2006
 #
 
-uid=`id -u` || exit 1
-if [ "x$uid" != x0 ]
-then
-  shcmd=". /opt/css/env.sh; "`shqstr "$0" ${1+"$@"}`
-  set -x
-  exec sudo sh -c "$shcmd"
-fi
-
 : ${VARRUN:=$HOME/var/run}
 
 cf=$HOME/rc/ssh/config-pf
 delay=120
 
 [ $# -gt 0 ] || set -- $SSHPF_DFLT
+
+uid=`id -u` || exit 1
+if [ "x$uid" != x0 ]
+then
+  qvarrun=`shqstr "$VARRUN"`
+  qhome=`shqstr "$HOME"`
+  qcmd=`shqstr "$0" ${1+"$@"}`
+  shcmd=". /opt/css/env.sh; HOME=$qhome; VARRUN=$qvarrun; export HOME VARRUN; exec $qcmd"
+  set -x
+  exec sudo sh -c "$shcmd"
+fi
 
 pidfile=$VARRUN/sshpf.pid
 
@@ -26,6 +29,6 @@ killpidfile -w "$pidfile"
 >"$pidfile"
 for host
 do
-  sshb -n -F "$cf" "$host" "set -e; while echo .; do sleep $delay; done" 1>/dev/null &
+  pfx "$host" sshb -n -F "$cf" "$host" "set -e; while echo .; do sleep $delay; done" 1>/dev/null &
   echo $! >>"$pidfile"
 done
