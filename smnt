@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/sh -ue
 #
 # Quick mount of PC share for archiving.
 #	- Cameron Simpson <cs@zip.com.au> 10jan2003
@@ -6,12 +6,12 @@
 
 mnt=
 needdir=
-user=`who am i | sed -e 's/[ 	].*//' -e 's/.*!//'`
-[ -n "$user" ] || user=${LOGNAME:-$USER}
+fstype=cifs
+user=`who am i | sed -e 's/[ 	].*//' -e 's/.*!//'` || user=${USER:-$LOGNAME}
 : ${WORKGROUP:=$SYSTEMID}
 
 cmd=`basename "$0"`
-usage="Usage: $cmd [-d dir] [-u user] [-w workgroup] //pc/share"
+usage="Usage: $cmd [-t {cifs|smbfs}] [-d dir] [-u user] [-w workgroup] //pc/share"
 
 badopts=
 
@@ -58,5 +58,14 @@ fi
 
 set -x
 [ $needdir ] && { needdir "$mnt" || exit 1; }
-mount -t smbfs -o "username=$user,workgroup=$WORKGROUP,uid=$user,fmask=644,dmask=755" "$share" "$mnt" || exit 1
+case $fstype in
+  smbfs)
+    mount -t smbfs -o "username=$user,workgroup=$WORKGROUP,uid=$user,fmask=644,dmask=755" "$share" "$mnt" ;;
+  cifs)
+    mount -t cifs -o "user=$user,workgroup=$WORKGROUP,uid=$user,file_mode=0644,dir_mode=0755" "$share" "$mnt" ;;
+  *)
+    echo "$cmd: unsupported -t option: $fstype" >&2
+    exit 2
+    ;;
+esac
 L "$mnt"
