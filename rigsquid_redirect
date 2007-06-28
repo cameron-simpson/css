@@ -7,12 +7,14 @@
 : ${VARRUN:=$HOME/var/run}
 
 cmd=$0
-usage="Usage: $cmd [-f]"
+usage="Usage: $cmd [-f] [peers]"
 
 trace=set-x
 
 force=
 [ $# -gt 0 ] && [ "x$1" = x-f ] && { force=1; shift; }
+
+[ $# = 0 ] || { SQUID_PEERS=$*; export SQUID_PEERS; }
 
 $trace killpidfile -w squid.pid
 
