@@ -1,0 +1,58 @@
+#!/bin/sh -ue
+#
+# Take a Sydney bus route name and plot it inbound and/or outbound.
+#       - Cameron Simpson <cs@zip.com.au> 28jun2007
+#
+
+tty=/dev/fd/2
+dir=outbound
+date=
+doit=1
+
+cmd=`basename "$0"`
+usage="Usage: $cmd [-n] [-d when] route [{inbound|outbound}...]"
+
+[ $# -gt 0 ] && [ "x$1" = x-n ] && { doit=; shift; }
+[ $# -gt 0 ] && [ "x$1" = x-d ] && { date=$2; shift; shift; }
+route=$1; shift
+[ $# = 0 ] && set -- inbound outbound
+
+[ -n "$date" ] || date=`date '+%d/%m/%Y'`
+
+opturl="http://www.131500.info/realtime/timetableIndex.asp?RouteWC=${route}&transMode1=Bus&Date=${date}&Vehicle=Bus"
+
+options=`wget -q -O - "$opturl"`
+
+for dir
+do
+  printf "%s" "$options" \
+  | sed -n "s/.* href=\"\\(publicTimetable.asp?TimetableKey=[^\"]*&Direction=${dir}\\)\".*/\\1/p" \
+  | while read -r url
+    do
+      tturl=http://www.131500.info/realtime/$url
+      mapurl=`
+              wget -q -O - "$tturl" \
+              | sed 's/<tr/\n&/g' \
+              | sed -n '/ class="loc"/!d
+                        :loc
+                        s/.* class="loc">\([^<]*\)<.*/\1/p
+                        n
+                        / class="loc"/b loc
+                        q' \
+              | tee /dev/tty \
+              | sydney-busses2gmap \
+              | tee /dev/tty \
+              | sed -n '/ and .*,/{ s/  *and  *\([^,]*[^, ]\) *, */|\1|/p;d; }
+                        s/,/||/p
+                       ' \
+              | tee "$tty" \
+              | gmap-plot-cross-streets -n`
+      if [ $doit ]
+      then set-x urlshow "$opturl" "$tturl" "$mapurl"
+      else echo "Sydney Busses Route $route $dir"
+           echo "Options   $opturl"
+           echo "Timetable $tturl"
+           echo "Map       $mapurl"
+      fi
+    done
+done

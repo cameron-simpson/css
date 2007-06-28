@@ -1,0 +1,37 @@
+#!/bin/sed -f
+#
+# An assortment of hacks to translate Sydney Busses locations into Google
+# Maps locations.
+#       - Cameron Simpson <cs@zip.com.au> 28jun2007
+#
+
+y/	/ /
+s/   */ /g
+s/^ *\([^,]*[^, ]\) *, *\(.*[^ ]\)  *[Nn]r  *\(.*[^ ]\) */\2 and \3,\1/
+s/^ *\([^,]*[^, ]\) *, *\(.*[^ ]\)  *[Oo]pp  *\(.*[^ ]\) */\2 and \3,\1/
+s/Boronia Park$/Hunters Hill/
+s/Herring Rd and Ivanhoe Pl,Macquarie Park/Herring Rd and Windsor Dr,Macquarie Park/
+s/Coxs Rd and Holy Spirit Primary,North Ryde/Coxs Rd and Lane Cove Rd,North Ryde/
+s/Coxs Rd and North Ryde Primary,North Ryde/Coxs Rd and Wicks Rd,North Ryde/
+s/Circular Quay, Stand C/Alfred St and Loftus St,2000/
+s/Gladesville Rd and Pitt St/Gladesville Rd and Howard Pl/
+s/Circular Quay Loftus St Set Down/Loftus St and Alfred St,Circular Quay/
+s/Circular Quay, Phillip St Set Down/Phillip St and Alfred St,Circular Quay/
+s/George St and QVB,Sydney/George St and Market St,2000/
+s/QVB Stand C, York St/York St and Mullins St,2000/
+s/Macquarie Centre Stand .*/Herring Rd and Innovation Rd/
+s/North Sydney Station, Blue St.*/Blue St and Miller Street,North Sydney/
+s/Epping Rd and Mowbray Rd West,Lane Cove North/Epping Rd and Mowbray Rd,Lane Cove North/
+s/Epping Interchange,.*/Cambridge St and Pembroke St,Epping/
+s/Crows Nest, Pacific Hwy N Of Shirley St/Pacific Hwy and Shirley Rd,Crows Nest/
+s/St Leonards Station, Pacific Hwy.*/Pacific Hwy and Lithgow St,St Leonards/
+/Longueville Rd and Pacific Hwy/d
+/Sam Johnson Way,Lane Cove North/d
+s/Cambridge St and Epping Station,Epping/Cambridge St and Pembroke St,Epping/
+s/Macquarie University, Set Down Terminus/Epping Rd and Balaclava Rd,Marsfield/
+/Macquarie University, Macquarie Dr\./d
+/Macquarie University, University Ave\./d
+s/Marsfield, Busaco Rd Terminus.*/Busaco Rd,Marsfield/
+s/Mortlake, Whittaker St Terminus/Whittaker St and Hilly St,Mortlake/
+s/Wynyard Set Down Terminus, York St/York St and Erskine St,Sydney 2000/
+s/York St and Market St,QVB/York St and Market St,2000/

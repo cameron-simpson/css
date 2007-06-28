@@ -1,0 +1,76 @@
+#!/bin/sh -ue
+#
+# Read |-separated cross street locations on stdin, plot map.
+#       - Cameron Simpson <cs@zip.com.au> 28jun2007
+#
+
+sep=\|
+debug=eecho
+trace=set-x
+nopt=
+
+[ $# -gt 0 ] && [ "x$1" = x-n ] && { trace= nopt=$1; shift; }
+
+gmap=
+pfx=from
+skipped=
+st1=
+point=
+while
+  ost1=$st1 opoint=$point
+  IFS=$sep read -r st1 st2 suburb
+do
+##  # shorten the suburb to a postcode if possible
+##  case $suburb in
+##    [Ss][Yy][Dd][Nn][Ee][Yy])
+##      ;;
+##    *)
+##      if pcode=`postcode-au "$suburb"`
+##      then
+##        suburb="$pcode au"
+##      fi
+##      ;;
+##  esac
+
+  case $st1 in
+    *\ [Cc]r) st1="${st1}escent" ;;
+  esac
+  case $st2 in
+    *\ [Cc]r) st2="${st2}escent" ;;
+  esac
+
+  if [ -n "$st2" ]
+  then point="$st1 and $st2 $suburb"
+  else point="$st1 $suburb"
+  fi
+
+  # skip points on the same street
+  if [ "x$st1" = "x$ost1" ]
+  then
+    ##$debug "SKIP $point"
+    skipped=1
+    continue
+  fi
+
+  # changed street - include the corner
+  if [ $skipped ]
+  then
+    $debug "RE-ADD $opoint"
+    gmap="$gmap $pfx $opoint"
+    pfx=to
+    skipped=
+  fi
+
+  $debug "ADD $point"
+  gmap="$gmap $pfx $point"
+  pfx=to
+done
+
+# always show the end point
+if [ $skipped ]
+then
+  $debug "RE-ADD $opoint"
+  gmap="$gmap $pfx $opoint"
+fi
+
+exec $trace gmap $nopt $gmap

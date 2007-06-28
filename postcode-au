@@ -1,0 +1,10 @@
+#!/bin/sh -ue
+#
+# Translate place name into Australian postcode.
+#       - Cameron Simpson <cs@zip.com.au> 28jun2007
+#
+
+where=\"`printf "%s\n" "$*" | tr '[a-z]' '[A-Z]'`\"
+set -- `awk -F, -v "where=$where" '$2 == where {print$1}' "$HOME/rc/postcodes.csv" | tr -d \"`
+[ $# = 1 ]
+echo "$1"

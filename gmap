@@ -1,15 +1,57 @@
-#!/bin/sh -u
-case "$*" in
-  *' to '*)
-    set -- $*
-    [ "x$1" = xfrom ] && shift
-    lh=`expr "x$*" : 'x\(.*\) to .*' | tr ' ' +` || exit 1
-    case "$lh" in *\ au) ;; *) lh="$lh au" ;; esac
-    rh=`expr "x$*" : 'x.* to \(.*\)' | tr ' ' +` || exit 1
-    case "$rh" in *\ au) ;; *) rh="$rh au" ;; esac
-    exec urlshow "http://maps.google.com/maps?saddr=$lh&daddr=$rh&f=l&t=h"
-    ;;
-  *)
-    exec search googlemaps ${1+"$@"}
+#!/bin/sh -ue
+#
+# Pop up a google map.
+#       - Cameron Simpson <cs@zip.com.au>
+#
+
+doit=1
+[ $# -gt 0 ] && [ "x$1" = x-n ] && { doit=; shift; }
+
+case $* in
+  from\ *)
+    set -- `expr "$*" : 'from \(.*\)'`
     ;;
 esac
+
+# gather "to foo" parts
+to=
+while :
+do
+  case "$*" in
+    *\ to\ *)
+      lh=`expr "x$*" : 'x\(.*\) to .*'`
+      rh=`expr "x$*" : 'x.* to \(.*\)' | tr ' ' +`
+      case $rh in
+        *\+au) ;; *) rh="$rh+au" ;;
+      esac
+      if [ -n "$to" ]
+      then  to="$rh+to:$to"
+      else  to=$rh
+      fi
+      set -- "$lh"
+      ;;
+    *)
+      break
+      ;;
+  esac
+done
+
+from=$*
+case $from in
+  *\ au) ;; *) from="$from+au" ;;
+esac
+from=`printf "%s\n" "$from" | tr ' ' +`
+
+if [ -n "$to" ]
+then
+  url="http://maps.google.com/maps?saddr=$from&daddr=$to&f=l&t=h"
+  if [ $doit ]
+  then  exec set-x urlshow "$url"
+  else  printf '%s\n' "$url"
+  fi
+else
+  if [ $doit ]
+  then exec set-x search googlemaps ${1+"$@"}
+  else exec search-url   googlemaps ${1+"$@"}
+  fi
+fi
