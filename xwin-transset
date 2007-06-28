@@ -4,17 +4,29 @@
 #       - Cameron Simpson <cs@zip.com.au>
 #
 
+: ${X11_TRANSPARENCY:=0.75}
+
 cmd=$0
-usage="Usage: $cmd [-f] windowid"
+usage="Usage: $cmd [-f] [alpha] windowid"
 
 force=
 badopts=
 
 [ $# -gt 0 ] && [ "x$1" = x-f ] && { force=1; shift; }
 
+if [ $# -gt 0 ]
+then
+  case $1 in
+    [01].*)
+      X11_TRANSPARENCY=$1
+      shift
+      ;;
+  esac
+fi
+
 if [ $# = 0 ]
 then
-  echo "$cmd: mssing windowid" >&2
+  echo "$cmd: missing windowid" >&2
   badopts=1
 else
   wid=$1
