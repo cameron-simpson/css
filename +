@@ -4,6 +4,7 @@
 #	- Cameron Simpson <cs@zip.com.au>
 #
 
+: ${MUTTPPREFIX:=/usr}
 : ${MAILHOMEHOST:=$HOMEHOST}
 : ${DISPLAY:=''}
 : ${LOGDIR:=$HOME/var/log}
@@ -104,7 +105,7 @@ do  eval "vf=\$${var}_FOLDER"
 done
 export DELETE_FOLDER SAVE_FOLDER
 
-muttcmd="mutt -f '$mfolder' -e 'fcc-hook . $mfolder' $muttopts"
+muttcmd="$MUTTPREFIX/bin/mutt -f '$mfolder' -e 'fcc-hook . $mfolder' $muttopts"
 
 if [ -n "$fpath" ]
 then
