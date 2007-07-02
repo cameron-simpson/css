@@ -1,7 +1,7 @@
 #!/usr/bin/python
 #
 # Access a gzipped header index file.
-#	- Cameron Simpson <cs@zip.com.au>
+#       - Cameron Simpson <cs@zip.com.au>
 #
 
 import os
@@ -15,29 +15,29 @@ def iter(path):
     while True:
       key=fp.readline()
       if len(key) == 0:
-	break
+        break
 
       if key[-1] != "\n":
-	cmderr(path+": incomplete key line at EOF")
-	break
+        cmderr(path+": incomplete key line at EOF")
+        break
 
       key=key[:-1]
 
       lines=[]
       while True:
-	line=fp.readline()
-	if len(line) == 0 or line[-1] != "\n":
-	  cmderr(path+": EOF during headers for key: "+key)
-	  key=None
-	  break
+        line=fp.readline()
+        if len(line) == 0 or line[-1] != "\n":
+          cmderr(path+": EOF during headers for key: "+key)
+          key=None
+          break
 
-	if line == "\n":
-	  break
+        if line == "\n":
+          break
 
-	lines.append(line)
+        lines.append(line)
 
       if key is None:
-	break
+        break
 
       yield (key,lines)
 

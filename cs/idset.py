@@ -17,7 +17,7 @@ class IdSet:
   def keys(self):
     for id in dircache.listdir(self._path):
       if numeric_re.match(id):
-	yield int(id)
+        yield int(id)
 
   def _newEntry(self,id):
     return _IdSetEntry(self,id)
@@ -53,7 +53,7 @@ class IdSet:
     for id in self.keys():
       E=self[id]
       if key in E.keys() and E[key] == value:
-	return id
+        return id
     return None
 
   def entryByKey(self,key,value):
@@ -74,7 +74,7 @@ class _IdSetEntry:
   def keys(self):
     for id in dircache.listdir(self.__path):
       if self.__validkey(id):
-	yield id
+        yield id
 
   def _keypath(self,key):
     if not self.__validkey(key):

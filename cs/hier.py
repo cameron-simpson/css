@@ -143,14 +143,14 @@ class HierOutput(_Hier):
     """
     for c in s:
       if c == self.quoteChar:                          enc='\\'+self.quoteChar
-      elif c == '\t':			enc='\\t'
-      elif c == '\n':			enc='\\n'
-      elif c == '\r':			enc='\\r'
-      elif c >= ' ' and c <= '~':		enc=c
+      elif c == '\t':                   enc='\\t'
+      elif c == '\n':                   enc='\\n'
+      elif c == '\r':                   enc='\\r'
+      elif c >= ' ' and c <= '~':               enc=c
       else:
         oc=ord(c)
-        if oc <= 0xff:			enc="\\x%02x" % oc
-        else:				enc="\\u%04x" % oc
+        if oc <= 0xff:                  enc="\\x%02x" % oc
+        else:                           enc="\\u%04x" % oc
       self.fp.write(enc)
 
   def __listEncode(self,listobj):

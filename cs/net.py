@@ -26,7 +26,7 @@ def tcp_listening(localport,localaddr=None,nocache=False):
       line=chomp(line)
       fields=line.split()
       if len(fields) == 6 and fields[0] == "tcp" and fields[5] == "LISTEN":
-	(laddr,lport)=fields[3].split(':',1)
-	_cache_tcp_listens[laddr,lport]=1
+        (laddr,lport)=fields[3].split(':',1)
+        _cache_tcp_listens[laddr,lport]=1
 
   return (localport,localaddr) in _cache_tcp_listens

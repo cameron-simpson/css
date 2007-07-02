@@ -69,41 +69,41 @@ class BugSet:
       # populate db from raw data
       sqlpipe=cs.sh.vpopen(("sqlite",sqldb),"w")
       for bugnum in self.keys():
-	bug=self[bugnum]
-	for field in bug.keys():
-	  sqlpipe.write("insert into bugfields values(")
-	  sqlpipe.write(bugnum)
-	  sqlpipe.write(",'")
-	  sqlpipe.write(field)
-	  sqlpipe.write("','")
-	  sqlpipe.write(bug[field])
-	  sqlpipe.write("';\n")
+        bug=self[bugnum]
+        for field in bug.keys():
+          sqlpipe.write("insert into bugfields values(")
+          sqlpipe.write(bugnum)
+          sqlpipe.write(",'")
+          sqlpipe.write(field)
+          sqlpipe.write("','")
+          sqlpipe.write(bug[field])
+          sqlpipe.write("';\n")
       sqlpipe.close()
     else:
       # just update the db from the log file
       progress("sync db from log...")
       if os.path.isfile(dblog):
-	sqlpipe=cs.sh.vpopen(("sqlite",sqldb),"w")
-	dblogfp=file(dblog)
-	os.unlink(dblog)
-	for csvline in dblogfp:
-	  csvf=split(csvline,",",2)
-	  bugnum=csvf[0]
-	  field=csvf[1]
-	  value=csvf[2]
-	  sqlpipe.write("delete from bugfields where bugnum = ")
-	  sqlpipe.write(str(bugnum))
-	  sqlpipe.write(" and field = \"")
-	  sqlpipe.write(field)
-	  sqlpipe.write("\";\n")
-	  sqlpipe.write("insert into bugfields values (")
-	  sqlpipe.write(str(bugnum))
-	  sqlpipe.write(",\"")
-	  sqlpipe.write(field)
-	  sqlpipe.write("\",\"")
-	  sqlpipe.write(value)
-	  sqlpipe.write("\");\n")
-	sqlpipe.close()
+        sqlpipe=cs.sh.vpopen(("sqlite",sqldb),"w")
+        dblogfp=file(dblog)
+        os.unlink(dblog)
+        for csvline in dblogfp:
+          csvf=split(csvline,",",2)
+          bugnum=csvf[0]
+          field=csvf[1]
+          value=csvf[2]
+          sqlpipe.write("delete from bugfields where bugnum = ")
+          sqlpipe.write(str(bugnum))
+          sqlpipe.write(" and field = \"")
+          sqlpipe.write(field)
+          sqlpipe.write("\";\n")
+          sqlpipe.write("insert into bugfields values (")
+          sqlpipe.write(str(bugnum))
+          sqlpipe.write(",\"")
+          sqlpipe.write(field)
+          sqlpipe.write("\",\"")
+          sqlpipe.write(value)
+          sqlpipe.write("\");\n")
+        sqlpipe.close()
 
     progress("QUERY =", query)
     sqlpipe=cs.sh.vpopen(("sqlite","-list",sqldb,query))
@@ -150,7 +150,7 @@ class Bug:
     if isScalarField(field):
       fpath=self.__fieldpath(field)
       if os.path.isfile(fpath):
-	os.remove(fpath)
+        os.remove(fpath)
       if field in self.__cache:
         del self.__cache[field]
       return

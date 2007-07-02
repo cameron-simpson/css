@@ -159,9 +159,9 @@ def exactlyOne(list,context=None):
   return list[0]
 
 def winsize(f):
-  '''	Return a (rows,columns) tuple or None for the specified file object.
+  '''   Return a (rows,columns) tuple or None for the specified file object.
   '''
-  fd=os.dup(f.fileno())	# obtain fresh fd to pass to the shell
+  fd=os.dup(f.fileno()) # obtain fresh fd to pass to the shell
   sttycmd="stty -a <&"+str(fd)+" 2>/dev/null"
   stty=os.popen(sttycmd).read()
   os.close(fd)
@@ -238,7 +238,7 @@ class CanonicalSeq:
     cv=self.__canonical(value)
     for v in self.__seq:
       if self.__canonical(v) == cv:
-	return True
+        return True
 
     return False
 

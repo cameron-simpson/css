@@ -249,9 +249,9 @@ class DBDiGraphNode:
 
   def __getitem__(self,key):
     ''' Return the value of the specific key.
-	If no values, return None.
-	If one value, return the value.
-	If more values, return the list.
+        If no values, return None.
+        If one value, return the value.
+        If more values, return the list.
     '''
     if key in NodeCoreAttributes:
       return self.digraph.nodes[self.id][key]

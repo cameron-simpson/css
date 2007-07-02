@@ -12,9 +12,9 @@ def quote(args):
       qarg="''"
     else:
       if sh_unsafe_re.search(arg):
-	qarg=quotestr(arg)
+        qarg=quotestr(arg)
       else:
-	qarg=arg
+        qarg=arg
 
     quoted.append(qarg)
 

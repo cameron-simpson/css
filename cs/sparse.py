@@ -17,8 +17,8 @@ class SparseSeq:
 
       # pull in a big chunk if slice is dense enough
       if stride >= -2 and stride <= 2:
-	if stride < 0: self.preload(end,start)
-	else:          self.preload(start,end)
+        if stride < 0: self.preload(end,start)
+        else:          self.preload(start,end)
 
       return [self.__getitem__(i) for i in range(start,end,stride)]
 
@@ -57,15 +57,15 @@ class SparseSeq:
       debug("    loop: lch =", lch, "p =", p, "rch =", rch)
       chunk=cache[p]
       if chunk[0] > ndx:
-	# chunk strictly above sought ndx, bring rch down
-	rch=p-1
+        # chunk strictly above sought ndx, bring rch down
+        rch=p-1
       elif chunk[1] <= ndx:
-	# chunk strictly below sought ndx, bring lch up (p was > lch)
-	lch=p+1
+        # chunk strictly below sought ndx, bring lch up (p was > lch)
+        lch=p+1
       else:
-	# chunk includes the index
-	debug("    loop: found ndx at p =", p)
-	return p
+        # chunk includes the index
+        debug("    loop: found ndx at p =", p)
+        return p
 
     debug("  ndx not found, returning lch =", lch)
     return lch
@@ -79,22 +79,22 @@ class SparseSeq:
     debug("  while", low, "<", high, "p =", p)
     while low < high:
       if p >= len(cache):
-	debug("  append[", low, ":", high, "]")
-	cache.append((low,high,list(self.__seq[low:high])))
-	low=high
+        debug("  append[", low, ":", high, "]")
+        cache.append((low,high,list(self.__seq[low:high])))
+        low=high
       else:
-	chunk=cache[p]
+        chunk=cache[p]
         if low < chunk[0]:
-	  chhigh=chunk[0]
-	  debug("  insert[", low, ":", chhigh, "]")
-	  cache.insert(p,(low,chhigh,list(self.__seq[low:chhigh])))
-	  # skip in-range chunk
-	  low=chunk[1]
-	  p+=2
-	else:
-	  debug("skip existing chunk")
-	  low=chunk[1]
-	  p+=1
+          chhigh=chunk[0]
+          debug("  insert[", low, ":", chhigh, "]")
+          cache.insert(p,(low,chhigh,list(self.__seq[low:chhigh])))
+          # skip in-range chunk
+          low=chunk[1]
+          p+=2
+        else:
+          debug("skip existing chunk")
+          low=chunk[1]
+          p+=1
 
     debug("preload done")
 
@@ -104,12 +104,12 @@ class SparseSeq:
     if type(ndx) is slice:
       (start,end,stride)=ndx.indices(self.__len__())
       if stride == 1:
-	self.forget(start,end)
+        self.forget(start,end)
       elif stride == -1:
-	self.forget(end+1,start)
+        self.forget(end+1,start)
       else:
-	for i in range(start,end,stride):
-	  self.forget(i)
+        for i in range(start,end,stride):
+          self.forget(i)
     else:
       forget(ndx)
 
@@ -124,43 +124,43 @@ class SparseSeq:
     while low < high:
       debug("  low =", low, "p =", p)
       if p >= len(cache):
-	return
+        return
 
       chunk=cache[p]
       if low < chunk[0]:
-	# low is too low, advance to chunk
-	low=chunk[0]
+        # low is too low, advance to chunk
+        low=chunk[0]
       elif low == chunk[0]:
-	# low matches start of chunk
-	if high >= chunk[1]:
-	  # drop chunk entirely
-	  debug("  drop", chunk[0], ":", chunk[1])
-	  low=chunk[1]
-	  del cache[p]
-	else:
-	  # drop leading portion of chunk
-	  debug("  drop chunk[", chunk[0], ":", high, "]")
-	  chiplen=high-low
-	  del chunk[2][:chiplen]
-	  chunk[0]+=chiplen
-	  chunk[1]+=chiplen
-	  low=high
+        # low matches start of chunk
+        if high >= chunk[1]:
+          # drop chunk entirely
+          debug("  drop", chunk[0], ":", chunk[1])
+          low=chunk[1]
+          del cache[p]
+        else:
+          # drop leading portion of chunk
+          debug("  drop chunk[", chunk[0], ":", high, "]")
+          chiplen=high-low
+          del chunk[2][:chiplen]
+          chunk[0]+=chiplen
+          chunk[1]+=chiplen
+          low=high
       else:
-	# low lies in the chunk, remove portion or tail
-	if high >= chunk[1]:
-	  # drop tail
-	  debug("  drop", low, ":", chunk[1])
-	  chiplen=chunk[1]-low
-	  del chunk[2][-chiplen:]
-	  low=chunk[1]
-	  chunk[1]-=chiplen
-	  p+=1
-	else:
-	  # drop portion within chunk, split it in two
-	  debug("  drop", low, ":", high)
-	  frontlen=low-chunk[0]
-	  cache.insert(p,(chunk[0],low,chunk[2][:frontlen]))
-	  frontlen=high-chunk[0]
-	  chunk[0]=high
-	  del chunk[2][:frontlen]
-	  low=high
+        # low lies in the chunk, remove portion or tail
+        if high >= chunk[1]:
+          # drop tail
+          debug("  drop", low, ":", chunk[1])
+          chiplen=chunk[1]-low
+          del chunk[2][-chiplen:]
+          low=chunk[1]
+          chunk[1]-=chiplen
+          p+=1
+        else:
+          # drop portion within chunk, split it in two
+          debug("  drop", low, ":", high)
+          frontlen=low-chunk[0]
+          cache.insert(p,(chunk[0],low,chunk[2][:frontlen]))
+          frontlen=high-chunk[0]
+          chunk[0]=high
+          del chunk[2][:frontlen]
+          low=high

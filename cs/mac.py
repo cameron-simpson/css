@@ -1,7 +1,7 @@
 #!/usr/bin/python
 #
 # MacOSX related facilities.
-#	- Cameron Simpson <cs@zip.com.au> 09may2006
+#       - Cameron Simpson <cs@zip.com.au> 09may2006
 #
 
 import unicodedata
@@ -19,7 +19,7 @@ def nfd(name,srcencoding='iso8859-1'):
   ''' Convert a name from another encoding (default ISO8859-1, Latin-1)
       into MacOSX HFS friendly UTF-8 Normal Form D.
   '''
-  uf=unicode(name,srcencoding)		# get Unicode version
-  nfduf=unicodedata.normalize('NFD',uf)	# transform to Normal Form D
-  utf8f=nfduf.encode('utf8')		# transcribe to UTF-8
+  uf=unicode(name,srcencoding)          # get Unicode version
+  nfduf=unicodedata.normalize('NFD',uf) # transform to Normal Form D
+  utf8f=nfduf.encode('utf8')            # transcribe to UTF-8
   return utf8f

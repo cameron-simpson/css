@@ -1,7 +1,7 @@
 #!/usr/bin/python
 #
 # Assorted database routines and classes.
-#	- Cameron Simpson <cs@zip.com.au> 23dec2005
+#       - Cameron Simpson <cs@zip.com.au> 23dec2005
 #
 
 import sys
@@ -218,13 +218,13 @@ class DirectKeyedTableView:
     self.name=tablename
 
     self.__keyColumns=tuple(keyColumns)
-    self.__sqlKeyColumns=','.join(self.__keyColumns)	# precompute "col1,col2,..."
+    self.__sqlKeyColumns=','.join(self.__keyColumns)    # precompute "col1,col2,..."
     self.__selectKeys='SELECT '+self.__sqlKeyColumns+' FROM '+self.name
 
     self.__allColumns=tuple(allColumns)
     self.__constraint=constraint
 
-    self.__sqlColumns=','.join(self.__allColumns)	# precompute "col1,col2,..."
+    self.__sqlColumns=','.join(self.__allColumns)       # precompute "col1,col2,..."
     self.__selectRow='SELECT '+self.__sqlColumns+' FROM '+self.name
 
     self.__columnmap={}
@@ -337,15 +337,15 @@ class DirectKeyedTableView:
 
     for f in row.keys():
       if f in sqlised_columns:
-	sqlrow[f]=row[f]
+        sqlrow[f]=row[f]
       else:
-	sqlrow[f]=sqlise(row[f])
+        sqlrow[f]=sqlise(row[f])
 
     self.insertSQLised(sqlrow)
 
   def insertSQLised(self,row):
     """ Insert a new row into the table.
-	The row values are already in SQL syntax.
+        The row values are already in SQL syntax.
     """
     columns=row.keys()
     sql='INSERT INTO '+self.name+'('+string.join(columns,',')+') VALUES ('+string.join([row[k] for k in columns],',')+')'
@@ -368,8 +368,8 @@ class DirectTableRow:
 
   def __repr__(self):
     return '{' \
-	 + string.join([ `k`+": "+`self[k]` for k in self.keys() ], ", ") \
-	 + '}'
+         + string.join([ `k`+": "+`self[k]` for k in self.keys() ], ", ") \
+         + '}'
 
   def __getitem__(self,column):
     if self.__values is None:

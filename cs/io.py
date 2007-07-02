@@ -22,8 +22,8 @@ def readcontline(fp):
       nline=fp.readline()
       if not nline: break
       if nline[0] != ' ' and nline[0] != '\t':
-	fp.seek(oldpos)
-	break
+        fp.seek(oldpos)
+        break
       contlines.write(nline)
 
     line=line+contlines.getvalue()
@@ -123,8 +123,8 @@ class IndentedFile(OFileWrapper):
       off=0
       nl=s.find('\n')
       while nl >= 0:
-	OFileWrapper.write(self,s[off:nl+1])
-	OFileWrapper.write(self,' '*self.indent)
-	off=nl+1
-	nl=s.find('\n',off)
+        OFileWrapper.write(self,s[off:nl+1])
+        OFileWrapper.write(self,' '*self.indent)
+        off=nl+1
+        nl=s.find('\n',off)
       OFileWrapper.write(self,s[off:])

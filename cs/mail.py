@@ -109,7 +109,7 @@ class Maildir:
       subpath=os.path.join(self.__path,subdir)
       for name in os.listdir(subpath):
         if len(name) > 0 and name[0] != '.':
-	  yield os.path.join(subdir,name)
+          yield os.path.join(subdir,name)
 
   def fullpath(self,subpath):
     return os.path.join(self.__path,subpath)

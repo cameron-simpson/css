@@ -3,7 +3,7 @@
 import string
 import os.path
 import cs.treemodel
-import rfc822		# basic syntax of a BMK file
+import rfc822           # basic syntax of a BMK file
 import cs.sh
 
 class BMK:
@@ -14,11 +14,11 @@ class BMK:
   def __probe(self):
     if self.title is None:
       if os.path.isdir(self.pathname):
-	self.title=self.pathname
+        self.title=self.pathname
       else:
-	msg=rfc822.Message(file(self.pathname))
-	self.title=msg.getheader('Subject')
-	self.url=msg.getheader('URL')
+        msg=rfc822.Message(file(self.pathname))
+        self.title=msg.getheader('Subject')
+        self.url=msg.getheader('URL')
   def isdir(self):
     self.__probe()
     return self.url is None

@@ -12,8 +12,8 @@ int_re      =re.compile(r'^(0|[1-9][0-9]*)$')
 
 # read a win.ini file, return a dictionary of dictionaries
 def load(fp,parseInts=False):
-  contents={}	# empty clause dictionary
-  clause=None	# no current clause
+  contents={}   # empty clause dictionary
+  clause=None   # no current clause
 
   for line in fp:
 
@@ -24,8 +24,8 @@ def load(fp,parseInts=False):
 
     # skip blank lines and comments
     line=string.strip(line)
-    if len(line) == 0: continue	# blank line
-    if line[0] == '#': continue	# comment
+    if len(line) == 0: continue # blank line
+    if line[0] == '#': continue # comment
 
     # look for [foo]
     match=clausehdr_re.match(line)
@@ -45,8 +45,8 @@ def load(fp,parseInts=False):
     if match is not None:
       value=match.group(2)
       if parseInts:
-	valmatch=int_re.match(value)
-	if valmatch is not None: value=int(value)
+        valmatch=int_re.match(value)
+        if valmatch is not None: value=int(value)
       clause[match.group(1)]=value
       continue
 

@@ -61,13 +61,13 @@ def puttext(fp,str,safeRe=None):
       str=str[len(safetext):]
     else:
       if str[0] == '<':
-	fp.write('&lt;')
+        fp.write('&lt;')
       elif str[0] == '>':
-	fp.write('&gt;')
+        fp.write('&gt;')
       elif str[0] == '&':
-	fp.write('&amp;')
+        fp.write('&amp;')
       else:
-	fp.write('&#%d;'%ord(str[0]))
+        fp.write('&#%d;'%ord(str[0]))
 
       str=str[1:]
 
@@ -96,9 +96,9 @@ def puttok(fp,tok):
       # raw array [ tag[,attrs][,tokens...] ]
       tag=tok[0]; tok=tok[1:]
       if len(tok) > 0 and cs.hier.flavour(tok[0]) is T_MAP:
-	attrs=tok[0]; tok=tok[1:]
+        attrs=tok[0]; tok=tok[1:]
       else:
-	attrs={}
+        attrs={}
 
     isSCRIPT=(tag.upper() == 'SCRIPT')
 
@@ -113,9 +113,9 @@ def puttok(fp,tok):
       fp.write(k)
       v=attrs[k]
       if v is not None:
-	fp.write('="')
-	hexify(str(v),fp,dqAttrValSafeRe)
-	fp.write('"')
+        fp.write('="')
+        hexify(str(v),fp,dqAttrValSafeRe)
+        fp.write('"')
     fp.write('>')
     if isSCRIPT:
       fp.write("<!--\n")
@@ -160,7 +160,7 @@ class CGI:
     self.output=output
     self.env=env
     self.qs=None
-    self.headers=[]	# HTTP headers
+    self.headers=[]     # HTTP headers
     self.tokens={'HEAD': [], 'BODY': []}
     if 'QUERY_STRING' in env:
       self.qs=cgi.parse_qs(env['QUERY_STRING'])
@@ -172,7 +172,7 @@ class CGI:
     self.cookies={}
     if 'HTTP_COOKIE' in self.env:
       for m in cookie_valRe.finditer(env['HTTP_COOKIE']):
-	self.cookies[m.group(1)]=m.group(2)
+        self.cookies[m.group(1)]=m.group(2)
 
     self.uri=None
     if 'REQUEST_URI' in env:
@@ -203,23 +203,23 @@ class CGI:
       self.ishtml=(ctype == 'text/html')
       self.header('Content-Type',ctype)
       for hdr in self.headers:
-	self.output.write(hdr[0])
-	self.output.write(': ')
-	self.output.write(hdr[1])
-	self.output.write('\n')
+        self.output.write(hdr[0])
+        self.output.write(': ')
+        self.output.write(hdr[1])
+        self.output.write('\n')
       self.output.write('\n')
       self.headers=None
 
     if not self.ishtml:
       for b in self.tokens['BODY']:
-	self.output.write(b)
+        self.output.write(b)
     else:
       puthtml(self.output,
-	      ['!DOCTYPE',{'HTML': None,'PUBLIC': None, '-//W3C//DTD HTML 4.01 Transitional//EN': None}],
-	      ['HTML',
-	       ['HEAD']+self.tokens['HEAD'],
-	       ['BODY']+self.tokens['BODY'],
-	      ])
+              ['!DOCTYPE',{'HTML': None,'PUBLIC': None, '-//W3C//DTD HTML 4.01 Transitional//EN': None}],
+              ['HTML',
+               ['HEAD']+self.tokens['HEAD'],
+               ['BODY']+self.tokens['BODY'],
+              ])
     self.tokens={'HEAD': [], 'BODY': []}
 
   def header(self,field,value,append=0):
