@@ -1,9 +1,9 @@
-#!/usr/bin/python
+#!/usr/bin/python -tt
 #
 # Read my aliases file, which has the form:
-#	key,... aliasname name <address>
+#       key,... aliasname name <address>
 # and generate aggregate lines with regexps for massaging into cats lines.
-#	- Cameron Simpson <cs@zip.com.au> 30oct2005
+#       - Cameron Simpson <cs@zip.com.au> 30oct2005
 #
 
 import sys

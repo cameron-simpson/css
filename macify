@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/python -tt
 #
 # Prepare filenames for transport to a MacOSX machine # by converting Latin-1
 # encoded filenames into UTF-8 Normal Form D encoded filenames.
@@ -22,7 +22,7 @@
 # hard link from the original made.
 #
 # Example:
-#	macify my-unix-music-dir my-mac-dir-for-copying
+#       macify my-unix-music-dir my-mac-dir-for-copying
 #
 # - Cameron Simpson <cs@zip.com.au> 09may2006
 #
@@ -78,8 +78,8 @@ def macifydir(srcdir,macdir,srcencoding='iso8859-1'):
       s1=os.lstat(path)
       s2=os.lstat(macpath)
       if os.path.samestat(s1,s2):
-	print "samestat", path, macpath
-	continue
+        print "samestat", path, macpath
+        continue
 
       print "unlink", macpath
       os.unlink(macpath)

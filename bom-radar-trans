@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/python -tt
 #
 # Read a BOM radar GIF named on the command line, emit a transparent
 # PNG on standard output - suppress sea, land and the lightest rainfall.

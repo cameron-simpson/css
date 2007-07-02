@@ -1,7 +1,7 @@
-#!/usr/bin/python
+#!/usr/bin/python -tt
 #
 # Convert my categories file to procmail recipes.
-#	- Cameron Simpson <cs@zip.com.au> 02mar2001
+#       - Cameron Simpson <cs@zip.com.au> 02mar2001
 #
 # Release version: 2.0
 #
@@ -21,17 +21,17 @@
 # of easily editable one line rules,
 # generally of the form:
 #
-# 	folder	tag	pattern
+#       folder  tag     pattern
 #
 # Raw procmailrc(5) clauses are also supported for less trivial rules and also an inclusion syntax.
 #
 # I build my B<.procmailrc> like this:
 #
-# 	cats2procmailrc \
-# 		-a 'announce-email "+%"' \
-# 		-t maildir -L \
-# 		-m cskk.homeip.net \
-# 		<categories >$HOME/.procmailrc
+#       cats2procmailrc \
+#               -a 'announce-email "+%"' \
+#               -t maildir -L \
+#               -m cskk.homeip.net \
+#               <categories >$HOME/.procmailrc
 #
 # =head1 OPTIONS
 #
@@ -108,7 +108,7 @@
 #
 # Lines of the form:
 #
-# 	VARIABLE=value
+#       VARIABLE=value
 #
 # are passed through unchanged.
 #
@@ -118,7 +118,7 @@
 #
 # Lines of the form:
 #
-# 	< filename
+#       < filename
 #
 # include the specified file.
 # Relative filenames are sought in the directory containing the current input file
@@ -127,13 +127,13 @@
 #
 # Other lines are of the form:
 #
-# 	[+][!]target[,target...] tag pattern [newline pattern...]
+#       [+][!]target[,target...] tag pattern [newline pattern...]
 #
 # where each I<target> has the form:
 #
-# 	folder
-# 	who@where
-# 	|progname
+#       folder
+#       who@where
+#       |progname
 #
 # Multiple I<targets> may be specified to file the message
 # to multiple places for this rule.
@@ -198,10 +198,10 @@
 #
 # I have rules like this:
 #
-# 	!attn	Personal	cs
-# 	!attn	Personal	cameron@cskk.homeip.net
-# 	attn	EFF-Cafe-News   cafe-news@eff.org
-# 	crypto  AUCrypto        aucrypto@suburbia.net
+#       !attn   Personal        cs
+#       !attn   Personal        cameron@cskk.homeip.net
+#       attn    EFF-Cafe-News   cafe-news@eff.org
+#       crypto  AUCrypto        aucrypto@suburbia.net
 #
 # matching B<cs@zip.com.au>, B<cameron@cskk.homeip.net>, B<cafe-news@eff.org>
 # and B<aucrypto@suburbia.net> respectively. The "Personal" items generate an alert.
@@ -209,7 +209,7 @@
 # It is also possible to select on a different header line
 # by prefixing the I<pattern> string with a header name, viz:
 #
-# 	applix  ApplixWare      sender:owner-applixware-list@applix.com
+#       applix  ApplixWare      sender:owner-applixware-list@applix.com
 #
 # which selects for an address in the B<Sender> header line.
 #
@@ -217,7 +217,7 @@
 # In this case the I<pattern> starts with a slash ("/")
 # and optionally ends in a slash, viz:
 #
-# 	!adzap  AdZap           subject:/(noads|add?[-  s]*zap|squid_?redir|zapp(er|ing)|wrapzap)/
+#       !adzap  AdZap           subject:/(noads|add?[-  s]*zap|squid_?redir|zapp(er|ing)|wrapzap)/
 #
 # which matches mail items with subjects probably regarding my adzap program.
 # A leading "^.*" is added to the regexp unless it already starts with a "^".
@@ -226,18 +226,18 @@
 # to copy particular mail items to another account while still delivering locally.
 # For example:
 #
-# 	+fred@that.isp.com . fred@this.isp.com
-# 	fredmail Fred fred@this.isp.com
+#       +fred@that.isp.com . fred@this.isp.com
+#       fredmail Fred fred@this.isp.com
 #
 # to accept mail aimed at B<fred@this.isp.com> and also copy it to B<fred@that.isp.com>.
 # This could also be written:
 #
-# 	+fred@that.isp.com,fredmail . fred@this.isp.com
+#       +fred@that.isp.com,fredmail . fred@this.isp.com
 #
 # Patterns with more than one condition:
 #
-# 	logs	cron	root \
-# 			subject:/Cron <root
+#       logs    cron    root \
+#                       subject:/Cron <root
 #
 # Example:
 #
@@ -298,18 +298,18 @@ cmd=os.path.basename(sys.argv[0])
 usage='''Usage: %s [-a alert] [-d dir] [-D subst=val] [-L] [-m domains] [-S] \\
                 [-t {unix|mh|maildir}] -T [LOG=value] [category-files...] \\
                 >procmailrc
-	-a alert	Command line to generate the alert.
-			The mail item is present on standard input.
+        -a alert        Command line to generate the alert.
+                        The mail item is present on standard input.
         -d dirpath      Look for relative included files in these directories.
         -D subst=val    Add a macro definition just as $CATS2PROCMAILRC_subst=val does.
-	-L		Use X-Label: header instead of Subject: for tag.
-	-m domains	Select default mail domain(s).
-			Default from $MAILDOMAIN.
+        -L              Use X-Label: header instead of Subject: for tag.
+        -m domains      Select default mail domain(s).
+                        Default from $MAILDOMAIN.
         -S              Synchronous. Use a lock on all continue/copy rules.
-	-t type		Select default mailbox type.
-			Default: %s
-	-T		Don't track rule matches by inserting an
-			X-Cats2Procmailrc-Matching-Rule header.
+        -t type         Select default mailbox type.
+                        Default: %s
+        -T              Don't track rule matches by inserting an
+                        X-Cats2Procmailrc-Matching-Rule header.
 ''' % (cmd, dfltType)
 
 assign_re=re.compile(r'[a-z]\w+=', re.I)

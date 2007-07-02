@@ -1,8 +1,8 @@
-#!/usr/bin/python
+#!/usr/bin/python -tt
 #
 # Roll messages older than "days" from maildir
 # into archivedir/date/`basename maildir`.
-#	- Cameron Simpson <cs@zip.com.au> 05aug2006
+#       - Cameron Simpson <cs@zip.com.au> 05aug2006
 #
 
 import sys
@@ -79,8 +79,8 @@ for subpath in M.subpaths():
     continue
 
   savefolder=os.path.join(archivedir,
-  			  time.strftime(fmt,time.localtime(when)),
-			  base)
+                          time.strftime(fmt,time.localtime(when)),
+                          base)
   if savefolder not in savedirs:
     cs.mail.maildirify(savefolder)
     savedirs[savefolder]=1

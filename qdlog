@@ -1,7 +1,7 @@
-#!/usr/bin/python
+#!/usr/bin/python -tt
 #
 # Query my dlog.
-#	- Cameron Simpson <cs@zip.com.au> 14dec2005
+#       - Cameron Simpson <cs@zip.com.au> 14dec2005
 #
 
 import os
@@ -23,9 +23,9 @@ relist=[]
 lastremode=False
 
 usage="""Usage: """+cmd+""" [-i incre]... [-e excre]... prefix
-	-i	Include lines matching the regexp incre.
-	-e	Exclude lines matching the regexp excre.
-	The default is the inverse of the last include/exclude."""
+        -i      Include lines matching the regexp incre.
+        -e      Exclude lines matching the regexp excre.
+        The default is the inverse of the last include/exclude."""
 
 badopts=False
 
@@ -105,11 +105,11 @@ def flushemail():
       msgs=[topic[msgid] for msgid in topic]
       msgs.sort(cmpmsgs)
       for msg in msgs:
-	rpt=msg['HHMM']+": "
-	if 'FROM' in msg: rpt=rpt+string.join(cs.misc.uniq(msg['FROM']),', ')
-	if 'TO' in msg:   rpt=rpt+'->'+string.join(cs.misc.uniq(msg['TO']),', ')
-	print pfx, rpt	##  msg['MSGID']
-	pfx='   '
+        rpt=msg['HHMM']+": "
+        if 'FROM' in msg: rpt=rpt+string.join(cs.misc.uniq(msg['FROM']),', ')
+        if 'TO' in msg:   rpt=rpt+'->'+string.join(cs.misc.uniq(msg['TO']),', ')
+        print pfx, rpt  ##  msg['MSGID']
+        pfx='   '
     email={}
 
 def noteEmail(subj,msgid,hhmm,attr,value):

@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/python -tt
 #
 # Command script for venti-ish implementation.
 #       - Cameron Simpson <cs@zip.com.au> 01may2007

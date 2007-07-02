@@ -1,8 +1,8 @@
-#!/usr/bin/python
+#!/usr/bin/python -tt
 #
 # Recode of mklinks in Python, partly for the exercise and partly to
 # improve the algorithm.
-#	- Cameron Simpson <cs@zip.com.au> 21may2006
+#       - Cameron Simpson <cs@zip.com.au> 21may2006
 #
 
 import sys
@@ -76,16 +76,16 @@ def linkto(srcpath,dstpath):
 def do(path):
   ''' Process each file in the directory tree.
       If a file is known by dev:ino,
-	if another file is preferred,
-	  replace with other file
-	  add this path to other file list
-	else
-	  add this path to this file list
+        if another file is preferred,
+          replace with other file
+          add this path to other file list
+        else
+          add this path to this file list
       else
-	if this is the first file of this size
-	  stash it, but don't open it for prefix md5
-	else
-	  o
+        if this is the first file of this size
+          stash it, but don't open it for prefix md5
+        else
+          o
   '''
   ##progress("DO", path)
   try:
@@ -189,17 +189,17 @@ for path in sys.argv[1:]:
       if splitMode:
         scatter(line)
       else:
-	do(line)
+        do(line)
   else:
     for dirpath, dirnames, filenames in os.walk(path):
       progress(dirpath)
       filenames.sort()
       for name in filenames:
-	subpath=os.path.join(dirpath,name)
-	if splitMode:
-	  scatter(subpath)
-	else:
-	  do(subpath)
+        subpath=os.path.join(dirpath,name)
+        if splitMode:
+          scatter(subpath)
+        else:
+          do(subpath)
       dirnames.sort()
 
 if splitMode:
@@ -207,7 +207,7 @@ if splitMode:
     if slotfile:
       slotfile.close()
 
-  slotpaths.reverse()	# do big files first
+  slotpaths.reverse()   # do big files first
   for path in slotpaths:
     if path:
       progress("mklinks - <"+path)

@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/python -tt
 #
 # Construct a 1x1 PNG file.
 #       - Cameron Simpson <cs@zip.com.au> 05dec2006
