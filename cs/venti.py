@@ -885,12 +885,15 @@ class Dir(dict):
       yield p
       p=p.__parent
 
+  def subdir(self,name):
+    return Dir(self.__store,self,self[name].bref)
+
   def walk(self,topdown=True):
     dirs=self.dirs()
     files=self.files()
     if topdown:
       yield (self,dirs,files)
-    for subD in [Dir(self.__store,D,self[name].bref) for name in dirs]:
+    for subD in [self.subdir(name) for name in dirs]:
       for i in subD.walk(topdown=topdown):
         yield i
     if not topdown:
