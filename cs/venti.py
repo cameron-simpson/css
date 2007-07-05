@@ -72,8 +72,10 @@ class RawStoreIndexGDBM:
   def __init__(self,path):
     import gdbm
     self.__db=gdbm.open(os.path.join(path,"index"),"cf")
+
   def sync(self):
     self.__db.sync()
+
   def __setitem__(self,h,noz):
     # encode then store
     self.__db[h]=toBS(noz[0])+toBS(noz[1])+toBS(noz[2])
@@ -111,6 +113,17 @@ class GenericStore:
   ''' Store methods implemented entirely in terms of other public methods,
       or common to all (eg hash()).
   '''
+  def __init__(self):
+    self.logfp=None
+
+  def log(self,msg):
+    import time
+    if self.logfp is None:
+      import sys
+      self.logfp=sys.stderr
+    now=time.time()
+    self.logfp.write("%d %s %s\n" % (now, time.strftime("%Y-%m-%d_%H:%M:%S",time.localtime(now)), msg))
+
   def get(self,h,default=None):
     ''' Return block for hash, or None if not present in store.
     '''
@@ -122,6 +135,10 @@ class GenericStore:
     ''' Compute the hash for a block.
     '''
     return hash_sha(block)
+
+  def sync(self):
+    if self.logfp is not None:
+      self.logfp.flush()
 
   # compatibility wrapper for __setitem__
   # does a store() and then ensures the hashes match
@@ -158,7 +175,9 @@ class GenericStore:
     while len(buf) > 0:
       ofp.write(buf)
       buf=ifp.read(rsize)
-    return ofp.close()
+    ref=ofp.close()
+    self.log("store file %s %s" % (hex(ref.encode()), ifp.name))
+    return ref
 
   def storeDir(self,path):
     subdirs={}
@@ -170,7 +189,9 @@ class GenericStore:
         subpath=os.path.join(dirpath,dir)
         subD=subdirs[subpath]
         del subdirs[subpath]
-        D.add(dir,subD.sync(),True)
+        ref=subD.sync()
+        self.log("store dir %s %s" % (hex(ref.encode()), subpath))
+        D.add(dir,ref,True)
       for subfile in files:
         filepath=os.path.join(dirpath,subfile)
         verbose("storeDir: storeFile "+filepath)
@@ -182,7 +203,9 @@ class GenericStore:
 
     topdirs=subdirs.keys()
     assert len(topdirs) == 1, "expected one top dir, got "+`topdirs`
-    return subdirs[topdirs[0]].sync()
+    ref=subdirs[topdirs[0]].sync()
+    self.log("store dir %s %s" % (hex(ref.encode()), path))
+    return ref
 
   def opendir(self,dirref):
     ''' Open a BlockRef that refers to a directory.
@@ -216,7 +239,9 @@ class GenericStore:
 
 class StoreWrapper(GenericStore):
   def __init__(self,S):
+    GenericStore.__init__(self)
     self.__S=S
+
   def hash(self,block):               return self.__S.hash(block)
   def store(self,block):              return self.__S.store(block)
   def sync(self):                     return self.__S.sync()
@@ -225,7 +250,9 @@ class StoreWrapper(GenericStore):
 
 class RawStore(GenericStore):
   def __init__(self,path,doindex=False):
+    GenericStore.__init__(self)
     self.__path=path
+    self.logfp=open(os.path.join(path,"log"),"a")
     stores=[ int(name[:-4])
              for name in os.listdir(path)
              if len(name) > 4
@@ -263,6 +290,7 @@ class RawStore(GenericStore):
     return h
 
   def sync(self):
+    GenericStore.sync(self)
     self.__index.sync()
     for n in self.__open:
       fp=self.__open[n]
