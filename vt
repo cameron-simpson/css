@@ -7,7 +7,7 @@
 from sys import argv, exit, stderr, stdout
 import os
 import os.path
-from cs.venti import hex, unhex, Store, fuse, decodeBlockRef
+from cs.venti import tohex, fromhex
 import cs.misc
 from cs.misc import cmd, cmderr, setcmd, warn
 
@@ -72,6 +72,7 @@ if S is None:
     cmderr("no $VT_STORE and no -S option")
     badopts=True
   else:
+    from cs.venti.store import Store
     S=Store(dflt_vt_store)
 
 if badopts:
@@ -81,7 +82,7 @@ if badopts:
 def ls(path,bref,recurse,fp=None):
   if fp is None:
     fp=stdout
-  ##warn("ls %s: bref=%s"%(path,("s:"+hex(bref) if type(bref) is str else "bref.h:"+hex(bref.h))))
+  ##warn("ls %s: bref=%s"%(path,("s:"+tohex(bref) if type(bref) is str else "bref.h:"+tohex(bref.h))))
   D=S.opendir(bref)
   fp.write(path)
   fp.write(":\n")
@@ -90,13 +91,13 @@ def ls(path,bref,recurse,fp=None):
     names.sort()
     for name in names:
       E=D[name]
-      fp.write("%c %-41s %-6d %s\n" % (('d' if E.isdir else 'f'), hex(E.bref.encode()), E.bref.span, name))
+      fp.write("%c %-41s %-6d %s\n" % (('d' if E.isdir else 'f'), tohex(E.bref.encode()), E.bref.span, name))
   else:
     dirs=D.dirs(); dirs.sort()
     files=D.files(); files.sort()
     for name in files:
       E=D[name]
-      fp.write("%c %-41s %-6d %s\n" % (('d' if E.isdir else 'f'), hex(E.bref.encode()), E.bref.span, name))
+      fp.write("%c %-41s %-6d %s\n" % (('d' if E.isdir else 'f'), tohex(E.bref.encode()), E.bref.span, name))
       assert not E.isdir, name+" should not be a directory!"
     for name in dirs:
       E=D[name]
@@ -111,7 +112,7 @@ if op == "store":
       ref=S.storeFile(open(path))
 
     S.sync()
-    stdout.write(hex(ref.encode()))
+    stdout.write(tohex(ref.encode()))
     if len(args) > 1:
       stdout.write('\t')
       stdout.write(path)
@@ -126,7 +127,7 @@ elif op == "catblock":
     if indirect:
       bl
     else:
-      stdout.write(S[unhex(hexarg)])
+      stdout.write(S[fromhex(hexarg)])
 elif op == "ls":
   first=True
   for hexarg in args:
@@ -139,7 +140,7 @@ elif op == "ls":
     assert E.isdir, "%s: %s: expected directory, not file"%(cmd,hexarg)
     ls(hexarg,E.bref,recurse,stdout)
 elif op == "unpack":
-  S.opendir(unhex(args[0])).unpack('.')
+  S.opendir(fromhex(args[0])).unpack('.')
 else:
   cmderr("unsupported command")
   exit(2)
