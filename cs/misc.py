@@ -537,6 +537,8 @@ class HasFlags:
     if flagv is None:
       flagv=Set(())
     else:
+      if type(flagv) is str:
+        flagv=flagv.split(',')
       if type(flagv) is not Set:
         flagv=Set(flagv)
 
