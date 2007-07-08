@@ -1,20 +1,22 @@
-#!/bin/sh
+#!/bin/sh -ue
 #
 # Highlight content matching sed regexps with a colour.
-#	- Cameron Simpson <cs@zip.com.au> 22sep99
+#	- Cameron Simpson <cs@zip.com.au> 22sep1999
 #
 
 usage="Usage: $0 colour regexps..."
 
 [ $# -ge 2 ] || { echo "missing regexps" >&2; echo "$usage" >&2; exit 2; }
-
 colour=$1; shift
-eval "in=\$tty_$colour out=\$tty_normal"
 
 sedf=
+repl=`with-colour "$colour" necho '&'` \
+|| repl=`with-colour bold necho '&'` \
+|| repl='&'
+
 for regexp
 do  sedf="$sedf
-          s$regexp$in&$outg"
+          s$regexp$replg"
 done
 
 exec sed "$sedf"

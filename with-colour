@@ -1,0 +1,69 @@
+#!/bin/sh -ue
+#
+# Perform command with output in particular colour.
+#       - Cameron Simpson <cs@zip.com.au> 08jul2007
+#
+
+: ${WITH_COLOUR_ON:=''}
+
+cmd=$0
+usage="Usage: $cmd colour command [args...]"
+
+badopts=
+
+if [ $# = 0 ]
+then
+  echo "$cmd: missing colour" >&2
+  badopts=1
+else
+  colour=$1
+  shift
+
+  if [ $# = 0 ]
+  then
+    echo "$cmd: missing command" >&2
+    badopts=1
+  fi
+fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+on= off=
+case $colour in
+  normal)
+    on= off= ;;
+  reverse|standout|bold)
+    on=`tput smso` && off=`tput rmso` ;;
+  it|italic)
+    on=`tput sitm` && off=`tput ritm` ;;
+  ul|underline)
+    on=`tput smul` && off=`tput rmul` ;;
+  black)
+    on=`tput setaf 0 || tput setf 0` && off=`tput op` ;;
+  red)
+    on=`tput setaf 1 || tput setf 4` && off=`tput op` ;;
+  green)
+    on=`tput setaf 2 || tput setf 2` && off=`tput op` ;;
+  yellow)
+    on=`tput setaf 3 || tput setf 6` && off=`tput op` ;;
+  blue)
+    on=`tput setaf 4 || tput setf 1` && off=`tput op` ;;
+  magenta)
+    on=`tput setaf 5 || tput setf 5` && off=`tput op` ;;
+  cyan)
+    on=`tput setaf 6 || tput setf 3` && off=`tput op` ;;
+  white)
+    on=`tput setaf 7 || tput setf 7` && off=`tput op` ;;
+  *)
+    echo "$cmd: unsupported colour \"$colour\"" >&2
+    ;;
+esac
+
+# no sequence? just run the command
+[ -n "$on" ] || exec "$@"
+
+xit=0
+printf "%s" "$on"
+env "WITH_COLOUR_ON=$on" "$@" || xit=$?
+printf "%s%s" "$off$WITH_COLOUR_ON"
+exit $xit

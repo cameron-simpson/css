@@ -1,24 +1,12 @@
-#!/bin/sh
-
-. $HOME/rc/shell/colour_ansi
+#!/bin/sh -ue
+#
+# Echo in colour.       - Cameron Simpson <cs@zip.com.au>
+#
 
 case $1 in
     -n)	echo=necho; shift ;;
     *)	echo=echo ;;
 esac
-
-case $1 in
-    normal|reverse|ul|bold|black|red|green|cyan|magenta|yellow|blue|white)
-	colour=$1; shift
-	;;
-    underline)
-	colour=ul; shift
-	;;
-    *)	echo "$0: unknown colour \"$1\"" >&2
-	echo "	I know: normal reverse ul bold underline" >&2
-	echo "		black red green cyan magenta yellow blue white underline" >&2
-	exit 2
-	;;
-esac
-
-eval "$echo \"\$tty_$colour\$*\$tty_normal\""
+colour=$1
+shift
+exec with-colour "$colour" "$echo" ${1+"$@"}

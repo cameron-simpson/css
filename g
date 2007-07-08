@@ -1,5 +1,7 @@
 #!/bin/sh
 
+: ${COLOUR_HIGHLIGHT:=cyan}
+
 cmd=$0
 usage="Usage: $cmd [-g grep] [-l] [-v] string [files...]"
 
@@ -35,4 +37,4 @@ fi
 		      }
 
 [ -t 1 ] || exec "$grep" -in $flags "$ptn" ${1+"$@"}
-"$grep" -in $flags "$ptn" ${1+"$@"} | colour_highlight cyan "$ptn"
+"$grep" -in $flags "$ptn" ${1+"$@"} | colour_highlight "$COLOUR_HIGHLIGHT" "$ptn"
