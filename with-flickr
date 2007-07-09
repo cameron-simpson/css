@@ -55,12 +55,15 @@ imgids2imgs()
 }
 
 case "$op" in
+  oimg)
+    pageurls -i "$url" | sed -n 's/\.jpg?v=.*/_o.jpg/p'
+    ;;
   img_urls)
     url2imgids "$url" \
     | while read id
       do  imgids2imgs "$id"
       done
-      ;;
+    ;;
   dl)
     "$0" img_urls | xxargs set-x wget
     ;;
