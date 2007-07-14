@@ -1,0 +1,109 @@
+#!/bin/sh -ue
+#
+# Run and stall a command with a configurable duty cycle.
+#       - Cameron Simpson <cs@zip.com.au> 14jul2007
+#
+
+between=
+trace=
+
+cmd=`basename "$0"`
+usage="Usage: $cmd [-e between [args...] --] [-x] [--] runtime pausetime \\
+                command [args...]
+  -e between args...  Run the specified command \"between\" while the command
+                      is paused.
+  -x                  Trace execution.
+  runtime             Seconds the command runs before being paused.
+  pausetime           Seconds the command is paused before running again."
+
+badopts=
+
+while [ $# -gt 0 ]
+do
+  case $1 in
+    -e)
+        shift
+        between=` exec 3>&1 1>&2
+                  first=1
+                  for arg
+                  do
+                    if [ $first ]
+                    then
+                      set --
+                      first=
+                    fi
+                    [ "x$arg" = x-- ] && break
+                    set -- ${1+"$@"} "$arg"
+                  done
+                  exec >&3 3>&-
+                  exec shqstr "$@"
+                `
+        hadendarg=
+        while [ $# -gt 0 ]
+        do
+          arg=$1
+          shift
+          if [ "x$arg" = x-- ]
+          then
+            hadendarg=1
+            break
+          fi
+        done
+        [ $hadendarg ] || { echo "$cmd: -e missing -- to end the between command" >&2
+                            badopts=1
+                          }
+        continue
+        ;;
+    -x) trace=set-x
+        ;;
+    --) shift
+        break
+        ;;
+    -?*)echo "$cmd: unrecognised option: $1" >&2
+        badopts=1
+        ;;
+    *)  break
+        ;;
+  esac
+  shift
+done
+
+if [ $# = 0 ]
+then
+  echo "$cmd: missing runtime" >&2
+  badopts=1
+else
+  runtime=$1
+  shift
+  if [ $# = 0 ]
+  then
+    echo "$cmd: missing pausetime" >&2
+    badopts=1
+  else
+    pausetime=$1
+    shift
+    if [ $# = 0 ]
+    then
+      echo "$cmd: missing command" >&2
+      badopts=1
+    fi
+  fi
+fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+cmdpid=$$
+
+(
+  set -u
+  sleep "$runtime"
+  while kill -STOP "$cmdpid" 2>/dev/null
+  do
+    [ -z "$between" ] || $trace sh -c "$between"
+    sleep "$pausetime"
+    kill -CONT "$cmdpid" 2>/dev/null || break
+    sleep "$runtime"
+  done
+) &
+
+exec $trace "$@"
