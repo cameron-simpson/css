@@ -16,7 +16,7 @@ sed -n 's/^\([^# \t][^# \t]*\).*/\1/p' aliases \
 | sed 's:^:XREF/:' \
 | ( cd "$MAILDIR" && exec xxargs maildir )
 
-myke || exit 1
+myke _rcs || exit 1
 
 xit=0
 
