@@ -10,15 +10,17 @@
 trace=set-x
 
 cmd=`basename "$0"` || cmd=$0
-usage="Usage: $cmd -j jukeslot [-t tapedev] command [args...]"
+usage="Usage: $cmd [-f filenum] -j jukeslot [-t tapedev] command [args...]"
 
 jukeslot=
+filenum=0
 
 badopts=
 
 while [ $# -gt 0 ]
 do
   case $1 in
+    -f) filenum=$2; shift ;;
     -j)	jukeslot=$2; shift ;;
     -t)	TAPE=$2; shift ;;
     --)	shift; break ;;
@@ -46,7 +48,8 @@ xit=1
 
 if $trace mover mv "s$jukeslot" d0
 then
-  if mt rewind
+  if $trace mt rewind \
+  && { [ "$filenum" -le 0 ] || $trace mt fsf "$filenum"; }
   then
     $trace "$@"
     xit=$?
