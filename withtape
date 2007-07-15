@@ -10,7 +10,10 @@
 trace=set-x
 
 cmd=`basename "$0"` || cmd=$0
-usage="Usage: $cmd [-f filenum] -j jukeslot [-t tapedev] command [args...]"
+usage="Usage: $cmd [-f filenum] -j jukeslot [-t tapedev] command [args...]
+  -f filenum    Advance the tape to this file position. Default: 0
+  -j jukeslot   Load the tape from this jukebox slot.
+                \"NONE\" means no jukebox actions."
 
 jukeslot=
 filenum=0
@@ -36,6 +39,7 @@ done
 
 case "$jukeslot" in
   '')		echo "$cmd: missing jukeslot" >&2; badopts=1 ;;
+  NONE)         jukeslot= ;;
   [0-9]*)	;;
   *)		echo "$cmd: bad jukeslot \"$jukeslot\"" >&2; badopts=1 ;;
 esac
@@ -46,17 +50,17 @@ export TAPE
 
 xit=1
 
-if $trace mover mv "s$jukeslot" d0
+if [ -z "$jukeslot" ] || $trace mover mv "s$jukeslot" d0
 then
   if $trace mt rewind \
-  && { [ "$filenum" -le 0 ] || $trace mt fsf "$filenum"; }
+  && { [ -z "$filenum" ] || [ "$filenum" -le 0 ] || $trace mt fsf "$filenum"; }
   then
     $trace "$@"
     xit=$?
     $trace mt rewind || xit=1
     $trace mt offline || xit=1
   fi
-  $trace mover mv d0 "s$jukeslot" || xit=1
+  [ -z "$jukeslot" ] || $trace mover mv d0 "s$jukeslot" || xit=1
 fi
 
 exit $xit
