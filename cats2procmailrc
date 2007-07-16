@@ -313,7 +313,7 @@ usage='''Usage: %s [-a alert] [-d dir] [-D subst=val] [-L] [-m domains] [-S] \\
 ''' % (cmd, dfltType)
 
 assign_re=re.compile(r'[a-z]\w+=', re.I)
-target_re=re.compile(r'("[^"]*"|[^"\s]+)')
+target_re=re.compile(r'("[^"]*"|[^",\s]+)')
 hdrlist_re=re.compile(r'([a-z][\-a-z0-9]*(,[a-z][\-a-z0-9]*)*):', re.I)
 
 badopts=False
@@ -501,7 +501,7 @@ def c2p(ifp,ofp):
         c2p(fp,ofp)
       continue
 
-    # recipes - copy until ^}
+    # recipes - copy from ^: until ^}
     if line[0] == ':':
       ofp.write(line)
       ofp.write('\n')
@@ -544,6 +544,7 @@ def c2p(ifp,ofp):
       if line[:1] != ',':
         break
       line=line[1:]
+      m=target_re.match(line)
 
     if len(targets) == 0:
       cmderr("%s: %d: no targets!"%(ifp.name,lineno))
@@ -594,7 +595,13 @@ def c2p(ifp,ofp):
 
       ofp.write('* %s\n'%pattern)
 
-    needBrackets=(doContinue or len(targets) > 1 or tag is not None or logline is not None or trackRules or doAlert)
+    needBrackets=( doContinue
+                or len(targets) > 1
+                or tag is not None
+                or logline is not None
+                or trackRules
+                or doAlert
+                 )
 
     if not needBrackets:
       ofp.write('%s\n' % resolveTarget(targets[0]))
@@ -621,14 +628,15 @@ def c2p(ifp,ofp):
           pipe="sed -e %s" % quotestr('s/^[Ss][Uu][Bb][Jj][Ee][Cc][Tt]: */& ['+sedtag+'] /')
         ofp.write('  :0whf\n  | %s\n' % pipe)
 
+      if doAlert:
+        if alertCommand is None:
+          cmderr("%s: %d: alert rule found but no alert command - see -a option")
+          xit=1
+        else:
+          ofp.write('  :0hwc\n  | %s\n' % alertCommand.replace('%',','.join(targets)))
+
       while len(targets) > 0:
         target0=targets.pop(0)
-        if doAlert:
-          if alertCommand is None:
-            cmderr("%s: %d: alert rule found but no alert command - see -a option")
-            xit=1
-          else:
-            ofp.write('  :0hwc\n  | %s\n' % alertCommand.replace('%',target0))
         target=resolveTarget(target0)
         ofp.write('  :0')
         if len(targets) > 0:
