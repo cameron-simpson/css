@@ -18,9 +18,11 @@ def open(S,path=None,mode="r"):
     else:
       bref=path
     return ReadFile(S,bref)
+
   if mode == "w":
     assert path is None
     return WriteFile(S)
+
   assert False, "open(path=%s, mode=%s): unsupported mode" % (path,mode)
 
 def storeFile(S,ifp,rsize=None,findEdge=None):
@@ -77,6 +79,7 @@ class ReadFile:
       readlines() and tell() methods.
   '''
   def __init__(self,S,bref):
+    self.isdir=False
     self.__store=S
     if bref.indirect:
       self.__blist=bref.blocklist(S)
@@ -173,6 +176,7 @@ class WriteFile:
       close() flushes all data and returns a BlockRef for the whole file.
   '''
   def __init__(self,S,findEdge=None):
+    self.isdir=False
     if findEdge is None:
       findEdge=findEdgeCode
 

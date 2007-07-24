@@ -6,10 +6,12 @@
 import os
 from cs.misc import progress, verbose, toBS, fromBSfp
 from cs.venti import tohex
-from cs.venti.blocks import decodeBlockRefFP
+from cs.venti.blocks import BlockRef, decodeBlockRefFP
+from cs.venti.file import ReadFile, WriteFile
 
 def storeDir(S,path):
-  ''' Store a directory tree in a Store, return the top dir ref.
+  ''' storeDir(Store,path) -> Dir
+      Store a directory tree in a Store, return the top Dir.
   '''
   subdirs={}
   for (dirpath, dirs, files) in os.walk(path,topdown=False):
@@ -20,23 +22,19 @@ def storeDir(S,path):
       subpath=os.path.join(dirpath,dir)
       subD=subdirs[subpath]
       del subdirs[subpath]
-      ref=subD.sync()
-      S.log("store dir %s %s" % (tohex(ref.encode()), subpath))
-      D.add(dir,ref,True)
+      D.link(dir,subD)
     for subfile in files:
       filepath=os.path.join(dirpath,subfile)
       verbose("storeDir: storeFile "+filepath)
       try:
-        D.add(subfile,S.storeFile(open(filepath)),False)
+        D.link(subfile,S.storeFile(open(filepath)))
       except IOError, e:
         cmderr("%s: can't store: %s" % (filepath, `e`))
     subdirs[dirpath]=D
 
   topdirs=subdirs.keys()
   assert len(topdirs) == 1, "expected one top dir, got "+`topdirs`
-  ref=subdirs[topdirs[0]].sync()
-  S.log("store dir %s %s" % (tohex(ref.encode()), path))
-  return ref
+  return subdirs[topdirs[0]]
 
 class Dirent:
   def __init__(self,bref,isdir,meta=None):
@@ -97,7 +95,11 @@ def decodeDirent(fp):
   return (name,Dirent(bref,isdir,meta))
 
 class Dir(dict):
+  ''' A directory object using a Store.
+  '''
   def __init__(self,S,parent,dirref=None):
+    self.isdir=True
+    self.meta=None
     self.__store=S
     self.__parent=parent
     if dirref is not None:
@@ -111,8 +113,16 @@ class Dir(dict):
   def __setitem__(self,key,value):
     raise IndexError
 
-  def add(self,name,bref,isdir,meta=None):
-    dict.__setitem__(self,name,Dirent(bref,isdir,meta))
+  def link(self,name,dent,meta=None):
+    assert name not in self
+    if isinstance(dent, BlockRef):
+      dent=Dirent(dent, False)
+    else:
+      assert type(dent) in (Dirent, Dir, WriteFile), "dent = %s" % `dent`
+    dict.__setitem__(self,name,dent)
+
+  def unlink(self,name):
+    del self[name]
 
   def sync(self):
     ''' Encode dir to store, return blockref of encode.
@@ -122,7 +132,16 @@ class Dir(dict):
     names=self.keys()
     names.sort()
     for name in names:
-      encodeDirent(fp,name,self[name])
+      dent=self[name]
+      if isinstance(dent, Dir):
+        # convert open Dir to static Dirent
+        dent=Dirent(dent.sync(),True)
+      elif isinstance(dent, WriteFile):
+        # convert open WriteFile to static Dirent
+        dent=Dirent(dent.close(),False)
+      else:
+        assert isinstance(dent, Dirent), "dent = %s" % `dent`
+      encodeDirent(fp,name,dent)
     return fp.close()
 
   def dirs(self):
@@ -139,15 +158,39 @@ class Dir(dict):
       yield p
       p=p.__parent
 
-  def subdir(self,name):
-    return Dir(self.__store,self,self[name].bref)
+  def chdir(self,name):
+    dent=self[name]
+    if type(dent) is not Dir:
+      # convert static Dirent into open Dir
+      dent=Dir(self.__store,self,dent.bref)
+    return dent
+
+  def mkdir(self,name):
+    assert name not in self, "mkdir(%s): already exists" % name
+    dent=Dir(self.__store,self)
+    dict.__setitem__(self,name,dent)
+    return dent
+
+  def open(self,name,mode="r"):
+    if mode == "r":
+      dent=self[name]
+      assert not dent.isdir, "%s: is a directory" % name
+      assert type(dent) is Dirent
+      return ReadFile(self.__store, dent.bref)
+
+    if mode == "w":
+      dent=WriteFile(self.__store)
+      self.link(name, dent)
+      return dent
+
+    assert False, "open(%s,mode=%s): unsupported mode" % (name,mode)
 
   def walk(self,topdown=True):
     dirs=self.dirs()
     files=self.files()
     if topdown:
       yield (self,dirs,files)
-    for subD in [self.subdir(name) for name in dirs]:
+    for subD in [self.chdir(name) for name in dirs]:
       for i in subD.walk(topdown=topdown):
         yield i
     if not topdown:
