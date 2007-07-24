@@ -13,12 +13,16 @@ mayuseparent=
 badopts=
 
 if [ $# = 0 ]
-then  echo "$cmd: missing dir" >&2; badopts=1
+then
+  echo "$cmd: missing dir" >&2
+  badopts=1
 else
   dir=$1; shift
   [ "x$1" = x-p ] && { mayuseparent=1; shift; }
   if [ $# = 0 ]
-  then  echo "$cmd: missing command" >&2; badopts=1
+  then
+    echo "$cmd: missing command" >&2
+    badopts=1
   fi
 fi
 
@@ -31,5 +35,5 @@ then
 fi
 
 cd "$dir" || exit 1
-[ -t 2 ] && set -x
+##[ -t 2 ] && set -x
 exec "$@"
