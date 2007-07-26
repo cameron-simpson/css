@@ -13,7 +13,7 @@ cmd=$0
 usage="Usage: $cmd [login password [crypt]]"
 
 case $# in
-    0)	set x $HTTP_AUTHORIZATION
+    0)	set -- $HTTP_AUTHORIZATION
 	case $# in
 	    3)	type=$2 b64=$3 ;;
 	    *)	echo "$cmd: unrecognised Authorization header \"$HTTP_AUTHORIZATION\"" >&2
