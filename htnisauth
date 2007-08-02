@@ -16,6 +16,7 @@ case $# in
     0)	set -- $HTTP_AUTHORIZATION
 	case $# in
 	    3)	type=$2 b64=$3 ;;
+	    2)	type=$1 b64=$2 ;;
 	    *)	echo "$cmd: unrecognised Authorization header \"$HTTP_AUTHORIZATION\"" >&2
 		exit 1
 		;;
