@@ -51,14 +51,14 @@ else
   esac
   export CVSROOT
   echo "CVSROOT=$CVSROOT" >&2
-fi
 
-if [ $# = 0 ]
-then
-  newhgdir=`basename "$subdir"` || exit 1
-else
-  newhgdir=$1
-  shift
+  if [ $# = 0 ]
+  then
+    newhgdir=`basename "$subdir"` || exit 1
+  else
+    newhgdir=$1
+    shift
+  fi
 fi
 
 [ $# = 0 ] || { echo "$cmd: extra arguments after newhgdir: $*" >&2
