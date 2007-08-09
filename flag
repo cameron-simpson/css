@@ -44,11 +44,13 @@ else
   value=$1
   shift
   case "$value" in
-    true|1)   newstate=1 ;;
-    false|0)  newstate= ;;
-    *)        echo "$cmd: unsupported value: $value" >&2
-              badopts=1
-              ;;
+    [Tt][Rr]Uu][Ee]|1)
+        newstate=1 ;;
+    [Ff][Aa][Ll][Ss][Ee]|0)
+        newstate= ;;
+    *)  echo "$cmd: unsupported value: $value" >&2
+        badopts=1
+        ;;
   esac
   [ $invert ] && { echo "$cmd: can't use ! (invert) while setting flag" >&2
                    badopts=1
