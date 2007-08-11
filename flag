@@ -44,7 +44,7 @@ else
   value=$1
   shift
   case "$value" in
-    [Tt][Rr]Uu][Ee]|1)
+    [Tt][Rr][Uu][Ee]|1)
         newstate=1 ;;
     [Ff][Aa][Ll][Ss][Ee]|0)
         newstate= ;;
