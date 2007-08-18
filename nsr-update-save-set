@@ -43,17 +43,24 @@ necho() { printf "%s" "$*"; }
 (
   echo "print type: NSR client; name: $client"
   first=1
-  for dir
+  while [ $# -gt 0 ]
   do
+    dir=$1; shift
+    if [ "x$dir" = x- ]
+    then
+      set -- `cat` ${1+"$@"}
+      continue
+    fi
     if [ $first ]
     then
-      necho "update save set: "
+      necho "update save set:"
     else
-      necho ", "
+      echo ","
     fi
-    necho "\"$dir\""
+    necho " \"$dir\""
     first=
   done
   echo ";"
 ) \
+| tee /dev/fd/2 \
 | nsradmin -s "$nsrserver" -i -
