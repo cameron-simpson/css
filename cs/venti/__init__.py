@@ -12,6 +12,10 @@
             augment with assorted recognition strings by hash
             pushable parser for nested data
           optional compression in store?
+          make metadata plain old iblockref to "inode" file
+          sync() operation for blocklists
+            close() collapses and sync()s ?
+          BlockSink take ibref initialiser?
           metadata O:owner u:user[+-=]srwx* g:group[+-=]srwx*
           don't compress metadata
           cache seek()ed block in readOpen class
