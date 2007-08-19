@@ -45,9 +45,10 @@ do
   $trace rm -r "$tmpmaildir" || xit=1
   $trace gzip -v -n -9 "$tmpmbox" || exit 1
 
-  { [ ! -f "$mbox.gz" ] && $trace mv "$tmpmbox.gz" "$mbox.gz"; } \
-  || { $trace cat "$tmpmbox.gz" >>"$mbox.gz" && $trace rm "$tmpmbox.gz"; } \
-  || exit 1
+  if [ -f "$mbox.gz" ]
+  then $trace cat "$tmpmbox.gz" >>"$mbox.gz" && $trace rm "$tmpmbox.gz"
+  else $trace mv "$tmpmbox.gz" "$mbox.gz"
+  fi || exit 1
 done
 
 exit $xit

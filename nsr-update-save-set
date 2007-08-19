@@ -1,0 +1,66 @@
+#!/bin/sh -ue
+#
+# Overwrite the save set for a client.
+#       - Cameron Simpson <cs@zip.com.au> 10aug2007
+#
+
+nsrserver=nsrhost
+unset client
+
+cmd=`basename "$0"`
+usage="Usage: $cmd [-s nsrhost] client saveset-dirs..."
+
+badopts=
+
+if [ $# -gt 0 ] && [ "x$1" = x-s ]
+then
+  shift
+  if [ $# = 0 ]
+  then
+    echo "$cmd: -s: missing nsrhost" >&2
+    badopts=1
+  else
+    nsrserver=$1
+    shift
+  fi
+fi
+
+if [ $# = 0 ]
+then
+  echo "$cmd: missing client" >&2
+  badopts=1
+else
+  client=$1
+  shift
+fi
+
+[ $# -gt 0 ] || { echo "$cmd: missing saveset-dirs" >&2; badopts=1; }
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+necho() { printf "%s" "$*"; }
+
+(
+  echo "print type: NSR client; name: $client"
+  first=1
+  while [ $# -gt 0 ]
+  do
+    dir=$1; shift
+    if [ "x$dir" = x- ]
+    then
+      set -- `cat` ${1+"$@"}
+      continue
+    fi
+    if [ $first ]
+    then
+      necho "update save set:"
+    else
+      echo ","
+    fi
+    necho " \"$dir\""
+    first=
+  done
+  echo ";"
+) \
+| tee /dev/fd/2 \
+| nsradmin -s "$nsrserver" -i -

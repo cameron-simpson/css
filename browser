@@ -14,7 +14,7 @@ profile=$BROWSER_PROFILE
 ##br=/opt/firefox-2.0-enGB/firefox
 ##br=/opt/firefox-2.0.0.1-enGB/firefox
 ##br=/opt/firefox-2.0.0.3-enGB/firefox
-br=${FIREFOX_BIN:-/opt/firefox-2.0.0.4-enGB/firefox}
+br=${FIREFOX_BIN:-/opt/firefox-2.0.0.6-enGB/firefox}
 prefs=$HOME/.mozilla/firefox/subdir/prefs.js
 
 cmd=$0
