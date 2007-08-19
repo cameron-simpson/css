@@ -4,7 +4,7 @@
 #       - Cameron Simpson <cs@zip.com.au> 01may2007
 #
 
-from sys import argv, exit, stderr, stdout
+from sys import argv, exit, stderr, stdout, exit
 import os
 import os.path
 from cs.venti import tohex, fromhex
@@ -12,12 +12,13 @@ import cs.misc
 from cs.misc import cmd, cmderr, setcmd, warn
 
 usage='''Usage:
-  %s [-S store] store pathnames...
   %s [-S store] cat filerefs...
   %s [-S store] catblock [-i] hashcodes...
   %s [-S store] ls [-R] dirrefs...
+  %s [-S store] mount dirref mountpoint
+  %s [-S store] store pathnames...
   %s [-S store] unpack dirref
-''' % (cmd,cmd,cmd,cmd,cmd)
+''' % (cmd,cmd,cmd,cmd,cmd,cmd)
 
 badopts=False
 
@@ -57,6 +58,10 @@ else:
       args.pop(0)
     if len(args) < 1:
       cmderr("missing dirrefs")
+      badopts=True
+  elif op == "mount":
+    if len(args) != 2:
+      cmderr("expected dirref and mountpoint")
       badopts=True
   elif op == "unpack":
     if len(args) != 1:
@@ -104,19 +109,22 @@ def ls(path,bref,recurse,fp=None):
       fp.write("\n")
       ls(os.path.join(path,name),E.bref,recurse,fp)
 
+def storePath(path):
+  if os.path.isdir(path):
+    ref=S.storeDir(path).sync()
+  else:
+    ref=S.storeFile(open(path))
+  return ref
+
 if op == "store":
   for path in args:
-    if os.path.isdir(path):
-      ref=S.storeDir(path)
-    else:
-      ref=S.storeFile(open(path))
-
-    S.sync()
+    ref=storePath(path)
     stdout.write(tohex(ref.encode()))
     if len(args) > 1:
       stdout.write('\t')
       stdout.write(path)
     stdout.write('\n')
+  S.sync()
 elif op == "cat":
   for hexarg in args:
     E=S.namei(hexarg)
@@ -139,6 +147,15 @@ elif op == "ls":
     E=S.namei(hexarg+'/')
     assert E.isdir, "%s: %s: expected directory, not file"%(cmd,hexarg)
     ls(hexarg,E.bref,recurse,stdout)
+elif op == "mount":
+  print "mount", args[0], args[1], "..."
+  if not os.path.isdir(args[1]):
+    cmderr("mountpoint is not a directory")
+    exit(1)
+  E=S.namei(args[0]+'/')
+  assert E.isdir, "%s: %s: expected directory, not file"%(cmd,args[0])
+  import cs.venti.fs
+  cs.venti.fs.fusemount(S,args[1])
 elif op == "unpack":
   S.opendir(fromhex(args[0])).unpack('.')
 else:
