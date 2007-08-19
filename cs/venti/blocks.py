@@ -185,7 +185,7 @@ class BlockSink:
         self.__lists.append(BlockList(S))
 
   def close(self):
-    ''' Store all the outstanding indirect blocks (if they've more than one etry).
+    ''' Store all the outstanding indirect blocks (if they've more than one entry).
         Return the top BlockRef.
     '''
     S=self.__store
