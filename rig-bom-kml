@@ -45,3 +45,5 @@ cat "$kml"
 L
 
 rsync -rptv . "$upload/."
+
+echo $urlbase/$kml
