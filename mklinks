@@ -61,7 +61,7 @@ def linkto(srcpath,dstpath):
   dstdir=os.path.dirname(dstpath)
   global noAction
   if not noAction:
-    tmpf=tmpfilename(dstdir)
+    tmpf=os.path.join(dstdir,tmpfilename(dstdir))
     ##assert not os.path.lexists(tmpf) # not in python 2.3 :-)
     try:
       os.lstat(tmpf)
