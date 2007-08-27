@@ -97,7 +97,7 @@ rrsync=rsync
 includefile=
 rsopts=
 verbose=
-[ -t 1 ] && verbose=1
+##[ -t 1 ] && verbose=1
 
 cmd=`basename "$0"`
 usage="Usage:
