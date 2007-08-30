@@ -1,0 +1,98 @@
+#!/usr/bin/python -tt
+#
+# Merge (currently 2) Apache access logs named on the command line.
+#       - Cameron Simpson <cs@zip.com.au> 30aug2007
+#
+
+import sys
+from datetime import datetime, timedelta
+from cs.misc import cmd
+
+usage="Usage: %s logfile1 logfile2\n" % cmd
+
+if len(sys.argv) != 3:
+  sys.stderr.write(usage)
+  sys.exit(2)
+
+f1=sys.argv[1]
+f2=sys.argv[2]
+
+zones={}
+def aptime(logline):
+  humantime, tzinfo = logline.split(' ')[3:5]
+
+  assert len(humantime) == 21 and humantime.startswith('['), \
+        "bad human time (%s) in log line: %s" % (humantime, logline)
+  dt=datetime.strptime(humantime, "[%d/%b/%Y:%H:%M:%S")
+
+  global zones
+  if tzinfo not in zones:
+    assert len(tzinfo) == 6 \
+           and tzinfo[0] in '+-' \
+           and tzinfo[1:5].isdigit() \
+           and tzinfo.endswith(']'), \
+          "bad timezone offset (%s) in log line: %s" % (humantime, logline)
+    tzoff=(int(tzinfo[1:3])*60+int(tzinfo[3:5]))*60
+    if tzinfo[0] == '+':
+      tzoff = -tzoff
+    zones[tzinfo]=timedelta(0,tzoff)
+
+  tzoff=zones[tzinfo]
+  dt += tzoff
+
+  ##print "%s %s => %s" % (humantime, tzinfo, dt.isoformat())
+
+  return dt
+
+class LogFile:
+  def __init__(self,filename):
+    self.filename=filename
+    self.fp=open(filename)
+    self.lineno=0
+
+  def lines(self):
+    global cmd
+    olddt=None
+    for line in self.fp:
+      self.lineno+=1
+      assert line[-1] == '\n', \
+            "%s: %s, line %d: unexpected EOF: %s" % (cmd, self.filename, self.lineno, line)
+      line=line[:-1]
+
+      dt=aptime(line)
+      assert olddt is None or olddt <= dt, \
+            "%s: %s, line %d: out of order timestamps: %s" % (cmd, self.pathname, self.lineno, line)
+      olddt=dt
+
+      yield line, dt
+
+L1=LogFile(f1)
+L2=LogFile(f2)
+
+I1=L1.lines()
+I2=L2.lines()
+
+try:
+  line2, dt2 = I2.next()
+except StopIteration:
+  line2=None
+  I2=None
+
+for line1, dt1 in I1:
+  # print lines from file2 that preceed line1
+  while line2 is not None and dt2 < dt1:
+    print line2
+    try:
+      line2, dt2 = I2.next()
+    except StopIteration:
+      line2=None
+      I2=None
+
+  # print line1, proceed
+  print line1
+
+# recite tail of file2, if any
+if line2 is not None:
+  print line2
+  for line2, dt2 in I2:
+    print line2
