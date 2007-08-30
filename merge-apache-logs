@@ -56,12 +56,14 @@ class LogFile:
     for line in self.fp:
       self.lineno+=1
       assert line[-1] == '\n', \
-            "%s: %s, line %d: unexpected EOF: %s" % (cmd, self.filename, self.lineno, line)
+            "%s: %s, line %d: unexpected EOF: %s" \
+            % (cmd, self.filename, self.lineno, line)
       line=line[:-1]
 
       dt=aptime(line)
       assert olddt is None or olddt <= dt, \
-            "%s: %s, line %d: out of order timestamps: %s" % (cmd, self.pathname, self.lineno, line)
+            "%s: %s, line %d: out of order timestamps: %s" \
+            % (cmd, self.filename, self.lineno, line)
       olddt=dt
 
       yield line, dt
