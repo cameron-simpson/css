@@ -24,7 +24,7 @@ export RXVT_SOCKET LC_CTYPE
 trace=set-x
 lock=urxvtd-$USER-$HOST-$DISPLAY
 
-$trace bgproc -l procmail -p "$lock" -- lock -1 "$lock" urxvtd -q 3>&-
+$trace bgproc -l alert -p "$lock" -- incd / lock -1 "$lock" urxvtd -q 3>&-
 
 exec >&3 3>&-
 echo "$RXVT_SOCKET"
