@@ -8,14 +8,20 @@ import sys
 from datetime import datetime, timedelta
 from cs.misc import cmd
 
-usage="Usage: %s logfile1 logfile2\n" % cmd
+usage="Usage: %s [-O] logfile1 logfile2\n  -O    Require strict ordering in the input log files.\n" % cmd
 
-if len(sys.argv) != 3:
+requireOrdering=False
+
+args=sys.argv[1:]
+if len(args) > 0 and args[0] == '-O':
+  args=args[1:]
+  requireOrdering=True
+
+if len(args) != 2:
   sys.stderr.write(usage)
   sys.exit(2)
 
-f1=sys.argv[1]
-f2=sys.argv[2]
+f1, f2 = args
 
 zones={}
 def aptime(logline):
@@ -51,7 +57,7 @@ class LogFile:
     self.lineno=0
 
   def lines(self):
-    global cmd
+    global cmd, requireOrdering
     olddt=None
     for line in self.fp:
       self.lineno+=1
@@ -61,9 +67,10 @@ class LogFile:
       line=line[:-1]
 
       dt=aptime(line)
-      assert olddt is None or olddt <= dt, \
-            "%s: %s, line %d: out of order timestamps: %s" \
-            % (cmd, self.filename, self.lineno, line)
+      if requireOrdering:
+        assert olddt is None or olddt <= dt, \
+              "%s: %s, line %d: out of order timestamps: %s" \
+              % (cmd, self.filename, self.lineno, line)
       olddt=dt
 
       yield line, dt
