@@ -8,7 +8,9 @@ import sys
 from datetime import datetime, timedelta
 from cs.misc import cmd
 
-usage="Usage: %s [-O] logfile1 logfile2\n  -O    Require strict ordering in the input log files.\n" % cmd
+usage='''Usage: %s [-O] logfile1 logfile2
+  -O    Require strict ordering in the input log files.
+''' % cmd
 
 requireOrdering=False
 
@@ -53,7 +55,11 @@ def aptime(logline):
 class LogFile:
   def __init__(self,filename):
     self.filename=filename
-    self.fp=open(filename)
+    if filename.endswith('.gz'):
+      import gzip
+      self.fp=gzip.open(filename)
+    else:
+      self.fp=open(filename)
     self.lineno=0
 
   def lines(self):
