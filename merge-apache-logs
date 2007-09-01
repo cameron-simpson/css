@@ -5,25 +5,43 @@
 #
 
 import sys
+from getopt import getopt, GetoptError
 from datetime import datetime, timedelta
-from cs.misc import cmd
+from cs.misc import cmd, cmderr
 
 usage='''Usage: %s [-O] logfile1 logfile2
+  -M    Accept multiple leading IP addresses on a line, emit the last.
   -O    Require strict ordering in the input log files.
 ''' % cmd
 
 requireOrdering=False
+multiAddrs=False
+badopts=False
 
-args=sys.argv[1:]
-if len(args) > 0 and args[0] == '-O':
-  args=args[1:]
-  requireOrdering=True
+try:
+  opts, args = getopt(sys.argv[1:], 'MO')
+except GetoptError, e:
+  cmderr(e)
+  badopts=True
 
-if len(args) != 2:
+if not badopts:
+  for opt, value in opts:
+    if opt == '-M':
+      multiAddrs=True
+    elif opt == '-O':
+      requireOrdering=True
+    else:
+      assert True, "%s: unhandled option: %s" % (cmd, opt)
+
+  if len(args) == 2:
+    f1, f2 = args
+  else:
+    cmderr("expected logfile1, logfile2, got: %s" % " ".join(args))
+    badopts=True
+
+if badopts:
   sys.stderr.write(usage)
   sys.exit(2)
-
-f1, f2 = args
 
 zones={}
 def aptime(logline):
@@ -63,7 +81,11 @@ class LogFile:
     self.lineno=0
 
   def lines(self):
-    global cmd, requireOrdering
+    global cmd, requireOrdering, multiAddrs
+    if multiAddrs:
+      import re
+      leadingAddrRe = re.compile(r'[^ ,]+, *')
+
     olddt=None
     for line in self.fp:
       self.lineno+=1
@@ -71,6 +93,12 @@ class LogFile:
             "%s: %s, line %d: unexpected EOF: %s" \
             % (cmd, self.filename, self.lineno, line)
       line=line[:-1]
+
+      if multiAddrs:
+        m=leadingAddrRe.match(line)
+        while m is not None:
+          line=line[m.end():]
+          m=leadingAddrRe.match(line)
 
       dt=aptime(line)
       if requireOrdering:
