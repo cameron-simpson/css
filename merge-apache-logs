@@ -50,7 +50,12 @@ def aptime(logline):
   if len(humantime) != 21 or not humantime.startswith('['):
     cmderr("bad human time (%s) in log line: %s" % (humantime, logline))
     return None
-  dt=datetime.strptime(humantime, "[%d/%b/%Y:%H:%M:%S")
+
+  try:
+    dt=datetime.strptime(humantime, "[%d/%b/%Y:%H:%M:%S")
+  except ValueError, e:
+    cmderr(str(e))
+    return None
 
   global zones
   if tzinfo not in zones:
