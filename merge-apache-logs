@@ -43,8 +43,12 @@ if badopts:
 
 zones={}
 def aptime(logline):
-  humantime, tzinfo = logline.split(' ')[3:5]
+  fields = logline.split(' ')
+  if len(fields) < 5:
+    cmderr("bad log line: %s" % logline)
+    return None
 
+  humanime, tzinfo = fields[3:5]
   if len(humantime) != 21 or not humantime.startswith('['):
     cmderr("bad human time (%s) in log line: %s" % (humantime, logline))
     return None
