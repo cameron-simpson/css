@@ -68,6 +68,7 @@ fi
 
 if [ -n "${src:-}" ]
 then
+  src_pfx=$src
   case $src in
     /*)
       unset src_user src_password src_host src_port src_socket
@@ -93,6 +94,7 @@ then
           src_port=$dfltport
           ;;
       esac
+      src_pfx=${src_user}@${src_hpart}
       ;;
     *)
       src_secret=`secret "$src"` || exit 1
@@ -108,6 +110,7 @@ fi
 
 if [ -n "${dst:-}" ]
 then
+  dst_pfx=$dst
   case $dst in
     /*)
       unset dst_user dst_password dst_host dst_port dst_socket
@@ -133,6 +136,7 @@ then
           dst_port=$dfltport
           ;;
       esac
+      dst_pfx=${dst_user}@${dst_hpart}
       ;;
     *)
       dst_secret=`secret "$dst"` || exit 1
@@ -155,13 +159,13 @@ _mysqlcmd()
   then  set -- -u "$mc_user" "-p$mc_pass" -h "$mc_h" -P "$mc_p" ${1+"$@"}
   else  set -- -u "$mc_user" "-p$mc_pass" -S "$mc_s"            ${1+"$@"}
   fi
-  $trace "$mc_cmd" "$@"
+  tag_fd 2 "$mysqlcmd_pfx:$mc_cmd" $trace "$mc_cmd" "$@"
 }
 mysqlcmd_src()
-{ _mysqlcmd "$src_user" "$src_password" "$src_host" "$src_port" "$src_socket" "$@"
+{ mysqlcmd_pfx=$src_pfx _mysqlcmd "$src_user" "$src_password" "$src_host" "$src_port" "$src_socket" "$@"
 }
 mysqlcmd_dst()
-{ _mysqlcmd "$dst_user" "$dst_password" "$dst_host" "$dst_port" "$dst_socket" "$@"
+{ mysqlcmd_pfx=$dst_pfx _mysqlcmd "$dst_user" "$dst_password" "$dst_host" "$dst_port" "$dst_socket" "$@"
 }
 
 pull_table()
