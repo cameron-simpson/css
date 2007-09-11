@@ -24,11 +24,13 @@ fi
 
 pidfile=$VARRUN/sshpf.pid
 
-set -x
 killpidfile -w "$pidfile"
->"$pidfile"
+>"$pidfile" || :
 for host
 do
-  pfx "$host" sshb -n -F "$cf" "$host" "set -e; while echo .; do sleep $delay; done" 1>/dev/null &
-  echo $! >>"$pidfile"
+  while printf " " && sleep "$delay"; do :; done \
+  | ( exec 3<&0
+      pfx "$host" sshb -F "$cf" "$host" 'exec cat' >/dev/null <&3 3<&- &
+      echo $! >>"$pidfile"
+    ) &
 done
