@@ -5,7 +5,7 @@
 #
 
 : ${MAILDIR:=$HOME/mail}
-: ${MAIL_EXPIRE_FORMAT:='%Y-%m'}
+: ${MAIL_EXPIRE_FORMAT:='%Y'}
 
 if [ $# -gt 0 ]
 then
