@@ -16,7 +16,7 @@ from cs.misc import cmd, cmderr, warn
 
 fmt='%Y'
 
-usage="Usage: "+cmd+" [+fmt] days maildir archivedir"
+usage="Usage: %s [+fmt] days maildir archivedir" % cmd
 
 badopts=False
 argv=sys.argv[1:]
@@ -26,9 +26,10 @@ if len(argv) > 0 and argv[0][:1] == '+':
   argv.pop(0)
 
 if len(argv) != 3:
+  cmderr("expected days maildir archivedir, found: %s" % " ".join(argv))
   badopts=True
 else:
-  (daysarg,maildir,archivedir)=argv
+  daysarg, maildir, archivedir = argv
   try:
     days=int(daysarg)
   except ValueError:
