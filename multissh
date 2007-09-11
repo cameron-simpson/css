@@ -16,10 +16,12 @@ cmd=`basename "$0"`
 usage="Usage: $cmd [options...] command...
 	-1, -2, -v	Passed to ssh.
 	-n		No action; recite actions.
-	-x		Trace execution.
 	-d delay	Delay this many seconds between ssh invocations.
 			Default: no delay.
 	-h hostspec	Specify hosts: host, @netgroup and !host, !@netgroup.
+        -n              No action. Recite actions to stderr.
+        -q              Do it, no tracing.
+	-x		Do it, trace execution.
 	-t timeout	Specify timeout before giving up on ssh authentication.
 			Default: $timeout
 	-u asuser	Specify the user as which to connect to each host.
@@ -32,8 +34,9 @@ do
     -[12v]) sshopts="$sshopts $1" ;;
     -d)	delay=$2; shift ;;
     -h)	hostspec="$hostspec $2"; shift ;;
+    -q) trace= ;;
     -u)	userpfx=$2@; shift ;;
-    -n)	trace=echo ;;
+    -n)	trace=eecho ;;
     -t)	timeout=$2; shift ;;
     -x)	trace=set-x ;;
     --)	shift; break ;;

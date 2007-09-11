@@ -109,7 +109,7 @@ usage="Usage: $cmd [-n] [-f] [l] [-R rsync-path] [-x] [-v] [items...]
 	-x	Force action with tracing.
 	-v	Verbose."
 
-trace=echo	# set-x	# set to nothing when debugged
+trace=eecho	# set-x	# set to nothing when debugged
 localise=
 
 vflag=
@@ -130,7 +130,7 @@ do  case $1 in
 	# The default action is to change nothing,
 	# merely reciting the actions which would be performed.
 	#
-	-f)	trace= ;;
+	-f)	hadmode=1 trace= ;;
 	# =item B<-x>
 	#
 	# Trace execution. Implies B<-f>.
@@ -169,7 +169,7 @@ do  case $1 in
 	# No action. This is the default.
 	# Merely recite the actions which would be performed.
 	#
-	-n)	hadmode=1 trace=echo ;;
+	-n)	hadmode=1 trace=eecho ;;
 	# =item B<-R> I<rsync-path>
 	#
 	# Path to the rsync(1) command.
@@ -211,7 +211,7 @@ then
     badopts=1
 fi
 
-[ $hadmode ] || { echo "$cmd: no mode supplied; one of -n or -x required" >&2
+[ $hadmode ] || { echo "$cmd: no mode supplied; one of -f, -n or -x required" >&2
 		  badopts=1
 		}
 
