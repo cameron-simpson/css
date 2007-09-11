@@ -56,18 +56,13 @@ done
 
 for h in `ngexpand $hostspec`
 do
-
-  pfx=$userpfx$h
-  case "$pfx" in
-    */*)	qpfx=`printf "%s\n" "$pfx" | sed 's:/:\\&:g'` ;;
-    *)		qpfx=$pfx ;;
-  esac
-  command="( $* ) 2>&1 | sed 's/^/$qpfx: /'"
-
-  $trace timeout -- "$timeout" sshto -f +t StrictHostKeyChecking=no PasswordAuthentication=no $sshopts "$userpfx$h" "$command" </dev/null
+  pfx "$userpfx$h" \
+    $trace \
+      timeout -- "$timeout" \
+      sshb -f StrictHostKeyChecking=no $sshopts "$userpfx$h" "$*" </dev/null &
   if [ -n "$delay" ] && [ "$delay" -gt 0 ]
-  then $trace sleep "$delay"
-  else wait
+  then  $trace sleep "$delay"
+  else  wait
   fi
 done
 
