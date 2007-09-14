@@ -72,7 +72,8 @@ fi
 echo "dbs = $*"
 
 tmpf=$TMPDIR/$cmd$$.sql
-trap 'echo SKIP rm -f "$tmpf"' 0 1 2 13 15
+trap 'echo SKIP rm -f "$tmpf"' 0
+trap 'echo SKIP rm -f "$tmpf"; exit 1' 1 2 13 15
 
 for db
 do

@@ -69,7 +69,8 @@ fi
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
 attachment=$TMPDIR/bugids$$
-trap 'rm -f "$attachment"' 0 1 2 13 15
+trap 'rm -f "$attachment"' 0
+trap 'rm -f "$attachment"; exit 1' 1 2 13 15
 >>"$attachment"
 
 if [ $# -gt 0 ]

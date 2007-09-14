@@ -76,7 +76,8 @@ esac
 
 # collect lines to add
 tmpf=$TMPDIR/$cmd.$$
-trap 'rm -f "$tmpf"' 0 1 2 13 15
+trap 'rm -f "$tmpf"' 0
+trap 'rm -f "$tmpf"; exit 1' 1 2 13 15
 if [ $# = 0 ]
 then cat
 else for line

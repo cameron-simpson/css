@@ -38,6 +38,7 @@ done \
 | sed -e 's/^ *<br>$/<P>/' \
 | unhtml
 
-trap 'rm "$tmpf"; exit $xit' 0 1 2 13 15
+trap 'rm "$tmpf"; exit $xit' 0
+trap 'rm "$tmpf"; exit 1' 1 2 13 15
 
 exit $xit

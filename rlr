@@ -54,7 +54,8 @@ esac
 
 ok=1
 
-trap 'rm -f "$front" "$back"' 0 1 2 13 15
+trap 'rm -f "$front" "$back"' 0
+trap 'rm -f "$front" "$back"; exit 1' 1 2 13 15
 
 exec 3<&0	# save stdin
 

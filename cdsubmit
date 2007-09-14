@@ -76,7 +76,8 @@ xit=0
 desc=$TMPDIR/cdsub$$d
 tmp=$TMPDIR/cdsub$$t
 cddb=$TMPDIR/cdsub$$c
-trap 'rm -f $desc $cddb $tmp' 0 1 15
+trap 'rm -f $desc $cddb $tmp' 0
+trap 'rm -f $desc $cddb $tmp; exit 1' 1 15
 
 # gather basic disc info
 cddiscinfo ${CDRIP_DEV:-/dev/cdrom} >"$tmp" || exit 1

@@ -35,7 +35,8 @@ done
 eval "`syncenv -`"
 
 tmpf=$TMPDIR/$cmd.$$.txt
-trap 'rm -f "$tmpf"' 0 1 2 13 15
+trap 'rm -f "$tmpf"' 0
+trap 'rm -f "$tmpf"; exit 1' 1 2 13 15
 
 for var; do echo "$var"; done \
 | sort -u \

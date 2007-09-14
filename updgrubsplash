@@ -99,7 +99,8 @@ case "$splash" in
 esac
 
 tmpf=$TMPDIR/ugs$$.xpm.gz
-trap 'rm -f "$tmpf"' 0 1 2 13 15
+trap 'rm -f "$tmpf"' 0
+trap 'rm -f "$tmpf"; exit 1' 1 2 13 15
 
 $trace mkgrubsplash "$imagefile" >"$tmpf" || exit 1
 if [ $ask ]

@@ -30,7 +30,8 @@ case "$archive" in
 esac
 
 dir=`mkdirn "${TMPDIR:-/tmp}/inx"` || exit 1
-trap 'rm -rf "$dir"' 0 1 2 13 15
+trap 'rm -rf "$dir"' 0
+trap 'rm -rf "$dir"; exit 1' 1 2 13 15
 cd "$dir" || exit 1
 x "$archive" || exit 1
 "$@"

@@ -35,7 +35,8 @@ case "$url" in
 esac
 
 wkdir=
-trap '[ -n "$wkdir" ] && [ -d "$wkdir/." ] && rm -r "$wkdir"' 0 1 2 13 15
+trap '[ -n "$wkdir" ] && [ -d "$wkdir/." ] && rm -r "$wkdir"' 0
+trap '[ -n "$wkdir" ] && [ -d "$wkdir/." ] && rm -r "$wkdir"; exit 1' 1 2 13 15
 wkdir=`mkdirn "${TMPDIR:-/tmp}/$cmd"` || exit 1
 cd "$wkdir" || exit 1
 

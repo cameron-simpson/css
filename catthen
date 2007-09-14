@@ -12,7 +12,8 @@
 cmd=$0
 [ $# = 0 ] && { echo "Usage: $cmd command [args...] < stdin" >&2; exit 2; }
 
-trap 'rm -f $"$tmpf"' 0 1 2 13 15
+trap 'rm -f $"$tmpf"' 0
+trap 'rm -f $"$tmpf"; exit 1' 1 2 13 15
 tmpf=$TMPDIR/catthen$$
 cat >"$tmpf" || exit 1
 exec <"$tmpf"

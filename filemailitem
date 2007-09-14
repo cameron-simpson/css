@@ -33,7 +33,8 @@ fi
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
 tmpf=$TMPDIR/fmi$$
-trap 'rm -f "$tmpf".*' 0 1 2 13 15
+trap 'rm -f "$tmpf".*' 0
+trap 'rm -f "$tmpf".*; exit 1' 1 2 13 15
 msg=$tmpf.msg
 prc=$tmpf.prc
 

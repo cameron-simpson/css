@@ -63,7 +63,8 @@ fi
 [ $usetty ] && exec </dev/tty >/dev/tty 2>&1
 
 tmpaliases=$TMPDIR/$cmd$$aliases
-trap 'rm -f "$tmpaliases"' 0 1 2 13 15
+trap 'rm -f "$tmpaliases"' 0
+trap 'rm -f "$tmpaliases"; exit 1' 1 2 13 15
 
 ( sed -n 's/.*<\([^<>@]*@[^<>]*\)>.*/\1/p' "$aliasfile"
   echo NEW

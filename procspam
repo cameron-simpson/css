@@ -9,7 +9,8 @@
 : ${TMPDIR:=/tmp}
 
 tmpf=$TMPDIR/procspam$$
-trap 'rm -f "$tmpf"' 0 1 2 13 15
+trap 'rm -f "$tmpf"' 0
+trap 'rm -f "$tmpf"; exit 1' 1 2 13 15
 cat >"$tmpf" || exit 1
 exec </dev/null
 

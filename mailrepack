@@ -13,7 +13,8 @@ TMPDIR=${TMPDIR:-/tmp}
 
 msg=$TMPDIR/$cmd$$m
 draft=$TMPDIR/$cmd$$h
-trap 'rm -f "$msg" "$draft"' 0 1 2 13 15
+trap 'rm -f "$msg" "$draft"' 0
+trap 'rm -f "$msg" "$draft"; exit 1' 1 2 13 15
 
 # grab message, stripping leading "From ", if any
 unfrom_ >"$msg" || exit 1

@@ -45,7 +45,8 @@ fi
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
 copy=$TMPDIR/$cmd$$
-trap 'rm -f -- "$copy"' 0 1 2 13 15
+trap 'rm -f -- "$copy"' 0
+trap 'rm -f -- "$copy"; exit 1' 1 2 13 15
 
 cp -p -- "$filename" "$copy" || exit 1
 # no exec so the trap cleans up

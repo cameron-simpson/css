@@ -9,7 +9,8 @@ useterm=
 [ $# = 0 ] && { echo "$usage" >&2; exit 2; }
 
 wkdir=
-trap 'rm -rf "$wkdir"' 0 1 2 13 15
+trap 'rm -rf "$wkdir"' 0
+trap 'rm -rf "$wkdir"; exit 1' 1 2 13 15
 wkdir=`mkdirn "/tmp/$cmd"` || exit 1
 
 # set up pipes

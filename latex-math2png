@@ -21,7 +21,8 @@ cmd=`basename "$0"` || cmd=$0
 usage="Usage: $cmd [dvipng-options...]"
 
 unset mkdir
-trap 'rm -rf "$wkdir"' 0 1 2 13 15
+trap 'rm -rf "$wkdir"' 0
+trap 'rm -rf "$wkdir"; exit 1' 1 2 13 15
 wkdir=`mkdirn "$TMPDIR/latex-math2png."` || exit 1
 cd "$wkdir" || exit 1
 

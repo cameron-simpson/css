@@ -8,7 +8,8 @@ tmpf=${TMPDIR:-/tmp}/rpmof$$
 names=${tmpf}n
 rpmout=${tmpf}r
 
-trap 'rm -f "$names" "$rpmout"; exit $xit' 0 1 2 13 15
+trap 'rm -f "$names" "$rpmout"; exit $xit' 0
+trap 'rm -f "$names" "$rpmout"; exit 1' 1 2 13 15
 
 [ $# = 0 ] && set .
 

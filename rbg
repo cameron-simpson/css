@@ -8,7 +8,8 @@
 : ${RBG_PICKIM:='-w -x "$HALFX" -y "$HALFY"'}
 
 tmppfx=$TMPDIR/rbg$$
-trap 'rm -f "$tmppfx".*' 0 1 2 13 15
+trap 'rm -f "$tmppfx".*' 0
+trap 'rm -f "$tmppfx".*; exit 1' 1 2 13 15
 
 cmd=$0
 usage="Usage: $cmd [-1] [-d desk] [-n] [-xpl] [[imagefile [imagefile] | imlist-search-args... | -xpl [xpl-args...]}

@@ -273,7 +273,8 @@ issymlink()
 }
 
 tmppfx=$TMPDIR/$cmd$$
-trap 'rm -f "$tmppfx"*' 0 1 2 13 15
+trap 'rm -f "$tmppfx"*' 0
+trap 'rm -f "$tmppfx"*; exit 1' 1 2 13 15
 
 # obtain list of names if none supplied
 if [ $# = 0 ]

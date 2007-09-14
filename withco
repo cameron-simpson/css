@@ -63,7 +63,8 @@ fi
 # point intermediate stdout to stderr so we don't plug the subcommand's output
 exec 3>&1 1>&2
 
-trap '[ -z "$dir" ] || rm -rf "$dir"' 0 1 2 13 15
+trap '[ -z "$dir" ] || rm -rf "$dir"' 0
+trap '[ -z "$dir" ] || rm -rf "$dir"; exit 1' 1 2 13 15
 dir=`mkdirn "$TMPDIR/$cmd"` || exit 1
 
 ( cd "$dir" || exit 1

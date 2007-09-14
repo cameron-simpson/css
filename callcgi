@@ -59,7 +59,8 @@ fi
 
 tmpf=${TMPDIR:-/tmp}/$cmd$$
 
-trap 'rm -f "$tmpf"' 0 1 2 13 15
+trap 'rm -f "$tmpf"' 0
+trap 'rm -f "$tmpf"; exit 1' 1 2 13 15
 
 set -x
 "./$cgibase" >"$tmpf" || exit 1

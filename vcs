@@ -63,7 +63,8 @@ op=$1
 shift
 
 tmpbase=$TMPDIR/$cmd.$$
-trap 'rm -f "$tmpbase".*' 0 1 2 13 15
+trap 'rm -f "$tmpbase".*' 0
+trap 'rm -f "$tmpbase".*; exit 1' 1 2 13 15
 
 case $op in
   diff)

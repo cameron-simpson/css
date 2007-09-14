@@ -42,7 +42,8 @@ usage="Usage: $cmd [xplanet-options...] [config=value...]
 			Added to the clause named by the most recent -body,
 			-target or -clause. Initially, to the [default] clause."
 
-trap 'rm -f "$TMPDIR/$cmd$$".*' 0 1 2 13 15
+trap 'rm -f "$TMPDIR/$cmd$$".*' 0
+trap 'rm -f "$TMPDIR/$cmd$$".*; exit 1' 1 2 13 15
 
 tmpconfig=$TMPDIR/$cmd$$.cfg
 

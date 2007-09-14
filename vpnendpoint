@@ -11,7 +11,8 @@
 log=var/log/alert
 pids=
 
-trap 'kill -9 $pids; exit 1' 0 1 2 13 15
+trap 'kill -9 $pids; exit 1' 0
+trap 'kill -9 $pids; exit 1' 1 2 13 15
 
 # ensure log exists before commencing
 >>"$log"

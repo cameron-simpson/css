@@ -13,7 +13,8 @@ usage="Usage: $0 [trackfile...] [+folder...] <mailitem"
 [ $# = 0 ] && { echo "$usage" >&2; exit 2; }
 
 tmpf=$TMPDIR/tmi$$
-trap 'rm -f "$tmpf"' 0 1 2 13 15
+trap 'rm -f "$tmpf"' 0
+trap 'rm -f "$tmpf"; exit 1' 1 2 13 15
 
 cat >"$tmpf" || exit 1
 exec </dev/null

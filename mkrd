@@ -79,7 +79,8 @@ fi
 
 xit=1
 tidy='[ $xit = 0 ] || rm -f "$imagefile"'
-trap 'eval "$tidy"; exit $xit' 0 1 2 13 15
+trap 'eval "$tidy"; exit $xit' 0
+trap 'eval "$tidy"; exit 1' 1 2 13 15
 
 ################################################
 # Construct filesystem.

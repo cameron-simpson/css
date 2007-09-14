@@ -21,7 +21,8 @@ time=
 [ -t 2 ] && time=time
 
 xit=1
-trap 'rm -f $tmp' 0 1 2 13 15
+trap 'rm -f $tmp' 0
+trap 'rm -f $tmp; exit 1' 1 2 13 15
 
 ( umask 077
   set -x
