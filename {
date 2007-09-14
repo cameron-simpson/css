@@ -1,0 +1,149 @@
+#!/usr/bin/python -tt
+#
+# {...} meta command for nesting quoted stuff.
+#       - Cameron Simpson <cs@zip.com.au> 14sep2007
+#
+# TODO: && vs || vs ; precedence
+#
+
+import os
+import stat
+import os.path
+import sys
+
+cmd=os.path.basename(sys.argv[0])
+usage="Usage: %s [-n] [-x] { ... }\n" % cmd
+
+SUBCOMMAND_TOKEN={}
+
+def gather(args):
+  ''' Gather up arguments within {...}.
+      Return tuple (extra-args, [(doif, command),...]).
+      Each command is a tuple of strings
+      or a subcommand list if command[0] is SUBCOMMAND_TOKEN.
+  '''
+  commandList=[]
+  doif=None
+  command=[]
+  needSep=False
+  while len(args) > 0:
+    arg=args[0]
+    ##print "arg = %s, command = %s" % (arg, command)
+    if arg == '}':
+      break
+
+    args.pop(0)
+    isSep=(arg in (';', '&&', '||'))
+
+    if isSep:
+      needSep=False
+      assert len(command) > 0, \
+             "%s: unexpected separator after empty command at: %s" % (cmd, [arg]+args)
+      commandList.append((doif, command))
+      command=[]
+      if arg == ';':
+        doif=None
+      elif arg == '&&':
+        doif=True
+      elif arg == '||':
+        doif=False
+      else:
+        assert False, \
+               "%s: unhandled separator at: %s" % (cmd, [arg]+args)
+      continue
+
+    assert not needSep, \
+           "%s: expected separator at: %s" % (cmd, [arg]+args)
+
+    if arg == '{':
+      assert len(command) == 0, \
+             "%s: missing separator before subcommand at: %s" % (cmd, [arg]+args)
+      nargs, subcommands = gather(args)
+      assert len(nargs) > 0 and nargs[0] == '}', \
+             "%s: missing closing brace for sequence: %s" % (cmd, args[:len(args)-len(nargs)])
+      args=nargs[1:]
+      commandList.append((doif, (SUBCOMMAND_TOKEN, subcommands)))
+      needSep=True
+      continue
+
+    command.append(arg)
+
+  if len(command) > 0:
+    commandList.append((doif, command))
+    ##command=[]
+
+  return args, commandList
+
+needClose=(cmd == '{')
+args=sys.argv[1:]
+args, commands = gather(args)
+if needClose:
+  assert len(args) == 1 and args[0] == '}', \
+         "%s: expected final closing brace, found: %s" % (cmd, args)
+else:
+  assert len(args) == 0, \
+         "%s: unexpected arguments at end of command: %s" % (cmd, args)
+
+##print `commands`
+
+def executable(file):
+  try:
+    s=os.stat(file)
+  except OSError:
+    return False
+
+  mode=s[0]
+
+  uid=s[4]
+  if uid == os.geteuid():
+    return (mode&stat.S_IXUSR) != 0
+
+  gid=s[5]
+  if gid == os.getegid() or gid in os.getgroups():
+    return (mode&stat.S_IXGRP) != 0
+
+  return (mode&stat.S_IXOTH) != 0
+
+def which(exe):
+  if exe.startswith('/') or exe.startswith('./') or exe.startswith('../'):
+    choices=(exe,)
+  else:
+    choices=[os.path.join(path,exe) for path in os.environ['PATH'].split(':')]
+
+  for choice in choices:
+    if executable(choice):
+      return choice
+
+  return None
+
+def run(commandList):
+  ''' Execute a command list.
+      Return success or failure.
+  '''
+  ok=None
+  for doif, command in commandList:
+    if doif is None \
+    or (doif and ok) \
+    or (not doif and not ok):
+      if command[0] is SUBCOMMAND_TOKEN:
+        assert len(command) == 2
+        ##print "SUBCOMMAND: %s" % command[1]
+        ok=run(command[1])
+      else:
+        ##print "spawn: %s" % command
+        exe=which(command[0])
+        if exe is None:
+          sys.stderr.write("%s: command not found: %s\n" % (cmd, command[0]))
+          ok=False
+        else:
+          xit=os.spawnv(os.P_WAIT, exe, command)
+          ok=(xit == 0)
+      ##print "ok = %s" % ok
+    else:
+      pass
+      ##print "doif = %s, skipping command: %s" % (doif, command)
+
+ok=run(commands)
+if ok:
+  sys.exit(0)
+sys.exit(1)
