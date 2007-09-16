@@ -347,7 +347,7 @@ class DirectKeyedTableView:
         The row values are already in SQL syntax.
     """
     columns=row.keys()
-    sql='INSERT INFO %s(%s) VALUES (%s)' \
+    sql='INSERT INTO %s(%s) VALUES (%s)' \
         % (self.name,
            ",".join(columns),
            ",".join([row[k] for k in columns]))
