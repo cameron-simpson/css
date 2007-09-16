@@ -69,8 +69,8 @@ res=`mkdirn $TMPDIR/mairix` || exit 1
 trap 'rm -rf -- "$res"' 1 2 13 15
 maildir "$res" || exit 1
 
+# save old arguments because we trash $@
 qargs=`shqstr "$@"` || exit 1
-
 if [ $alldirs ]
 then set -- "$MAILDIR" "$MAILDIR/ARCHIVE/"[0-9]*
 else set -- "$MAILDIR"
@@ -87,7 +87,7 @@ do
   eval "$trace mairix -f '$rc' -o '$res' -a $tflag $qargs" || xit=1
 done
 
-+ +t -f "$res" || xit=1
++ -e "set header_cache=$res" +t -f "$res" || xit=1
 
 rm -r "$res"
 
