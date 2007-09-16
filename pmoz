@@ -1,2 +1,2 @@
 #!/bin/sh
-psa|eg '(mozilla|phoenix|firefox)'
+psu|eg '(mozilla|phoenix|firefox)'
