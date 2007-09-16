@@ -64,6 +64,8 @@ then
   set -- procmail -p "$procmailrc"
 fi
 [ -n "$procmailtimeout" ] && set -- timeout "$procmailtimeout" "$@"
+
+# save the command since we eat $@ inside the main loop
 filer_shcmd=`shqstr "$@"` || exit 1
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }

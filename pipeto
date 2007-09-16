@@ -10,7 +10,7 @@ cmd=`basename "$0"` || cmd=pipeto
 : ${TMPDIR:=/tmp}
 PIPETO_PIPENAME=$TMPDIR/$cmd$$
 
-usage="Usage: $cmd [-fd n] [-p pipename] command [commandargs...]
+usage="Usage: $cmd [-fd n] [-p pipename] command [command-args...]
 	-fd n	Emit shell to attach the pipe to file descriptor n
 		instead of emitting the name of the pipe.
 	-p pipename

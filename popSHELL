@@ -3,7 +3,7 @@
 # Restore $SHELL from saved setting then run $popSHELLcmd.
 # This is really an ugly hack to get the script(1) command
 # to run something arbitrary rather than the user's shell
-# since for some unknown reason is just execs $SHELL.
+# since for some unknown reason it just execs $SHELL.
 # Sad but true. Hence this script.
 #	- Cameron Simpson <cs@zip.com.au> 18may2002
 #
