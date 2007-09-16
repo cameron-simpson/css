@@ -1,6 +1,7 @@
 #!/usr/bin/perl
 #
 # Highlist (by overstriking) text matching a regexp in the input.
+# On a terminal you probably want colour_highlight instead of this.
 #	- Cameron Simpson <cs@zip.com.au>
 #
 
@@ -21,9 +22,9 @@ $ic=$opt_i if defined $opt_i;
 $subword=$opt_w if defined $opt_w;
 
 if (! defined($regexp=shift))
-	{ print STDERR "$cmd: missing regexp\n";
-	  $badopts=1;
-	}
+{ print STDERR "$cmd: missing regexp\n";
+  $badopts=1;
+}
 
 $regexp="\\w*($regexp)\\w*" if $subword;
 
