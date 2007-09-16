@@ -1,6 +1,6 @@
 #!/bin/sh -u
 #
-# Filter an output filedescriptor.
+# Filter an output file descriptor through an arbitrary shell command.
 #	- Cameron Simpson <cs@zip.com.au> 06may1999
 #
 # Multiple fds. - cameron, 23may1999
@@ -15,32 +15,32 @@ badopts=
 
 # unfold multiple fds into separate invocations
 case $1 in
-    *,*)
-		[ $# -gt 1 ] || { echo "$cmd: missing filter\n" >&2
-				  echo "$usage" >&2
-				  exit 2
-				}
-    		fds=$1 filter=$2
-		shift; shift
-		# rewrite the command line
-    		for fd in `echo "$fds" | tr , ' '`
-    		do set -- "$0" "$fd" "$filter" ${1+"$@"}
-		done
-		# rerun
-		exec "$@"
-		;;
+  *,*)
+    [ $# -gt 1 ] || { echo "$cmd: missing filter\n" >&2
+                      echo "$usage" >&2
+                      exit 2
+                    }
+    fds=$1 filter=$2
+    shift; shift
+    # rewrite the command line
+    for fd in `echo "$fds" | tr , ' '`
+    do set -- "$0" "$fd" "$filter" ${1+"$@"}
+    done
+    # rerun
+    exec "$@"
+    ;;
 esac
 
 fd=
 filter=
 case $1 in
-    [0-7])	fd=$1; shift ;;
-    8|9)	echo "$cmd: sorry, fds 8 and 9 are trashed by $0" >&2
-		badopts=1
-		;;
-    *)		echo "$cmd: bad fd - should be numeric" >&2
-		badopts=1
-		;;
+  [0-7])fd=$1; shift ;;
+  8|9)	echo "$cmd: sorry, fds 8 and 9 are trashed by $0" >&2
+        badopts=1
+        ;;
+  *)	echo "$cmd: bad fd - should be numeric" >&2
+        badopts=1
+        ;;
 esac
 
 if [ -n "$fd" ]
@@ -75,12 +75,12 @@ xitcode=$TMPDIR/xit.$$
       ( exec <&3 3<&-	# reconnect stdin
 	exec 9>&-	## we don't need 9 in this half
 	exec 1>&8 8>&-
-	case "$filter" in
-	  *\ *)	eval "$filter" ;;
-	  *)	exec "$filter" ;;
-	esac
+        eval "$filter"
       ) &
     )
+
+# close stdout, repoint to stderr just in case
+exec 1>&2
 
 # collect exit status
 while [ ! -s $xitcode ]; do sleep 1; done
