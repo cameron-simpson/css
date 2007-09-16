@@ -8,6 +8,7 @@
 cmd=`basename "$0"`
 usage="Usage: $cmd [{-M | -m msg}] [-d logdir] {logbase | -u} [{-c shcmd | cmd [args...]}]"
 
+: ${OPTCSS:=/opt/css}
 : ${LOGDIR:=$HOME/var/log}
 : ${SHELL:=/bin/sh}
 : ${TMPDIR:=/tmp}
@@ -75,7 +76,7 @@ then
   popSHELL=$SHELL
   popSHELLcmd=
   popSHELLpath=
-  for d in `dirname "$0"` /opt/css/bin $HOME/bin
+  for d in `dirname "$0"` "$OPTCSS/bin" "$HOME/bin"
   do  [ -x "$d/popSHELL" ] && { popSHELLpath=$d/popSHELL; break; }
   done
   [ -n "$popSHELLpath" ] || { echo "$cmd: can't find popSHELL script" >&2; exit 1; }
