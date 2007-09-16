@@ -4,6 +4,7 @@
 #	- Cameron Simpson <cs@zip.com.au> 18jan2006
 #
 
+: ${OPTCSS:=/opt/css}
 : ${VARRUN:=$HOME/var/run}
 
 cf=$HOME/rc/ssh/config-pf
@@ -14,12 +15,9 @@ delay=120
 uid=`id -u` || exit 1
 if [ "x$uid" != x0 ]
 then
-  qvarrun=`shqstr "$VARRUN"`
-  qhome=`shqstr "$HOME"`
   qcmd=`shqstr "$0" ${1+"$@"}`
-  shcmd=". /opt/css/env.sh; HOME=$qhome; VARRUN=$qvarrun; export HOME VARRUN; exec $qcmd"
   set -x
-  exec sudo sh -c "$shcmd"
+  exec sudo env "OPTCSS=$OPTCSS" "HOME=$HOME" "VARRUN=$VARRUN" sh -c ". \"\$OPTCSS/env.sh\"; exec $qcmd"
 fi
 
 pidfile=$VARRUN/sshpf.pid
