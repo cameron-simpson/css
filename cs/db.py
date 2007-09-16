@@ -12,7 +12,6 @@ from sets import Set
 import cs.secret
 import cs.cache
 from cs.misc import cmderr, debug, ifdebug, warn, isodate, exactlyOne
-from cs.lex import strlist
 
 def today():
   return datetime.date.today()
@@ -249,15 +248,15 @@ class DirectKeyedTableView:
   def getitems(self,keylist):
     ''' SELECT multiple table rows matching an arbitrary list of single-value keys.
     '''
-    assert len(self.__keyColumns) == 1, "getitems("+`keylist`+") on multikey table "+self.name+"["+strlist(self.__keyColumns)+"]"
-    return self.selectRows(self.__keyColumns[0]+" IN ("+strlist([sqlise(k) for k in keylist])+")")
+    assert len(self.__keyColumns) == 1, "getitems("+`keylist`+") on multikey table "+self.name+"["+",".join(self.__keyColumns)+"]"
+    return self.selectRows(self.__keyColumns[0]+" IN ("+",".join([sqlise(k) for k in keylist])+")")
 
   def __setitem__(self,key,value):
     dosql(self.conn,
           'UPDATE '+self.name \
-          +' SET '+string.join([ self.__allColumns[i]+' = '+sqlise(value[i])
-                                 for i in range(len(value))
-                               ], ', ') \
+          +' SET '+', '.join([ self.__allColumns[i]+' = '+sqlise(value[i])
+                               for i in range(len(value))
+                             ]) \
           +' WHERE '+self.whereClause(self.__key2where(key)))
 
   def __delitem__(self,key):
@@ -348,7 +347,10 @@ class DirectKeyedTableView:
         The row values are already in SQL syntax.
     """
     columns=row.keys()
-    sql='INSERT INTO '+self.name+'('+string.join(columns,',')+') VALUES ('+string.join([row[k] for k in columns],',')+')'
+    sql='INSERT INFO %s(%s) VALUES (%s)' \
+        % (self.name,
+           ",".join(columns),
+           ",".join([row[k] for k in columns]))
     dosql(self.conn,sql)
 
 class DirectTableRow:
@@ -368,7 +370,7 @@ class DirectTableRow:
 
   def __repr__(self):
     return '{' \
-         + string.join([ `k`+": "+`self[k]` for k in self.keys() ], ", ") \
+         + ', '.join([ `k`+": "+`self[k]` for k in self.keys() ]) \
          + '}'
 
   def __getitem__(self,column):
@@ -480,12 +482,12 @@ class DirectRekeyedTableView(cs.cache.Cache):
     self.keyFields=tuple(keyFields)
 
   def __getitem__(self,key):
-    where=string.join(" AND ",[self.keyFields[i]+" = "+sqlise(key[i]) for i in range(len(self.keyFields))])
+    where=' AND '.join([self.keyFields[i]+" = "+sqlise(key[i]) for i in range(len(self.keyFields))])
     rows=self.table.selectRows(where)
     if len(rows) == 0:
       raise IndexError, "no entries WHERE "+where
     if len(rows) > 1:
-      raise IndexError, "multiple entries WHERE "+where+": "+strlist(rows)
+      raise IndexError, "multiple entries WHERE "+where+": "+",".join(rows)
     return rows[0]
 
 class KeyedTableSubView(KeyedTableView):
