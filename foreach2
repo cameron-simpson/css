@@ -30,7 +30,7 @@ do  case $1 in
 	-i)	asinput=1 ;;
 	-n)	max=$2; shift ;;
 	--)	shift; break ;;
-	-?*)	echo "$cmd: unreconised option: $1" >&2; badopts=1 ;;
+	-?*)	echo "$cmd: unrecognised option: $1" >&2; badopts=1 ;;
 	*)	break ;;
     esac
     shift
@@ -48,7 +48,7 @@ mknod "$pipe" p || exit 1
 
 exec 3<"$pipe"
 exec 4>"$pipe"
-sed 1 $max >"$pipe" &
+seq 1 $max >"$pipe" &
 
 n=0
 while read line
