@@ -32,7 +32,10 @@ scriptmans = $(scriptmandir)/$((allscripts)).1
 scriptfromman(manf) = $(manf FP)
 
 _home:
+        skip=`hg status | sed -n 's:^? \(.*\):--exclude=/\1:p'` \
+        set-x \\
         rsync -av --delete \\
+                $$skip \\
                 --include=bos/ \\
                 --include=cs/ \\
                 --include=stubs/ \\
