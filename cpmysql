@@ -172,6 +172,11 @@ pull_table()
 { _pull_table_db=$1
   _pull_table=$2
 
+  if [ -z "$trace" ] && [ -t 2 ]
+  then
+    eecho "pull_table $* ..."
+  fi
+
   case "$src" in
     /*)
       $trace gzip -dc "$src/$_pull_table_db.$_pull_table.sql.gz"
@@ -180,7 +185,7 @@ pull_table()
       mysqlcmd_src mysqldump --opt "$_pull_table_db" "$_pull_table"
       ;;
   esac \
-  | if [ $doit ]; then if [ -t 2 ]; then prcat; else cat; fi; fi \
+  | if [ $doit ]; then if [ -n "$trace" ] && [ -t 2 ]; then prcat; else cat; fi; fi \
   | case "$dst" in
       /*)
         $trace gzip -n --fast >"$dst/$_pull_table_db.$_pull_table.sql.gz"
@@ -242,7 +247,7 @@ pull_db()
       mysqlcmd_src mysqldump --opt "$_pull_db"
       ;;
   esac \
-  | if [ $doit ]; then if [ -t 2 ]; then prcat; else cat; fi; fi \
+  | if [ $doit ]; then if [ -n "$trace" ] && [ -t 2 ]; then prcat; else cat; fi; fi \
   | case "$dst" in
       /*)
         $trace gzip -n --fast >"$dst/$_pull_db.sql.gz"
@@ -255,24 +260,24 @@ pull_db()
 
 if [ $# = 0 ]
 then
-  case "$src" in
-    /*)
-      $trace ls "$src/." \
-      | sed -n 's|\(.*\)\.sql\.gz$|\1|p'
-      ;;
-    *)
-      $trace echo show databases \
-      | mysqlcmd_src mysql \
-      ;;
-  esac \
-  | sed '1d; /^mysql$/d; /^information_schema$/d' \
-  | while read db
-    do
-      pull_db "$db" || exit 1
-    done
-else
-  for db
-  do
-    pull_db "$db" || exit 1
-  done
+  set -- `case "$src" in
+            /*)
+              $trace ls "$src/." \
+              | sed -n 's|\(.*\)\.sql\.gz$|\1|p' \
+              | sed 's/\..*//' \
+              | sort -u
+              ;;
+            *)
+              $trace echo show databases \
+              | mysqlcmd_src mysql \
+              | sed 1d
+              ;;
+          esac \
+          | sed '/^mysql$/d; /^information_schema$/d'
+         `
 fi
+
+for db
+do
+  pull_db "$db" || exit 1
+done
