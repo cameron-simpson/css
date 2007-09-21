@@ -75,17 +75,24 @@ if (!this._cs_libLoaded) {
   _cs_loadedNode=csNodeHere("SPAN");
 }
 
-function csObjectToString() {
+function csThisToString() {
+  return csObjectToString(this);
+}
+
+function csObjectToString(obj) {
   var s;
 
-  if (this instanceof Array) {
+  if (obj == null) {
+    s='null';
+  } else if (typeof(obj) == "string") {
+    s='"'+obj+'"';
+  } else if (obj instanceof Array) {
     s = "[";
     var first = true;
-    for (var i=0; i<this.length; i++) {
-      var e = csStringable(this[i]);
+    for (var i=0; i<obj.length; i++) {
       if (first) first=false;
       else       s += ", ";
-      s+=e;
+      s+=csObjectToString(obj[i]);
     }
     s += "]";
   } else {
@@ -93,15 +100,13 @@ function csObjectToString() {
     s = "{";
     var first=true;
     var v;
-    for (var k in this) {
+    for (var k in obj) {
       if (k == "toString") continue;
-      csStringable(k)
-
       if (first) first=false;
       else s+=", ";
-
-      v=csStringable(this[k]);
-      s+=k+": "+v;
+      s+=csObjectToString(k);
+      v=obj[k];
+      s+=": "+csObjectToString(v);
     }
     s+="}";
   }
@@ -113,10 +118,10 @@ function csStringable(o) {
     _log("csStringable(null) called from "+arguments.callee.caller);
   }
   else {
-    if (!(o.toString === csObjectToString)) {
+    if (!(o.toString === csThisToString)) {
       var t = typeof(o);
       if (t != "number" && t != "string" && t != "function") {
-        o.toString=csObjectToString;
+        o.toString=csThisToString;
       }
     }
   }
@@ -148,7 +153,20 @@ function csDIV(colour) {
   return div;
 }
 
-function csText(str) {
+function csText(str,nbsp) {
+  if (nbsp) {
+    // loop to work around firefox replace() bug:-(
+    var ostr=str;
+    var left="";
+    var spos;
+    while ((spos=str.indexOf(" ")) >= 0) {
+      left+=str.substr(0,spos)+"\u00A0";
+      //_log("left="+left);
+      str=str.substr(spos+1);
+    }
+    str=left+str;
+    //_log(ostr+"->"+str);
+  }
   return document.createTextNode(str);
 }
 
@@ -175,7 +193,27 @@ function csSinglePixelIMG(colour) {
   return csIMG(imgfile);
 }
 
-function csTok(tok) {
+/**
+ * Set the innerHTML of an element to the supplied string or element-list.
+ */
+function csSetInnerElements(outer, newElements, nbsp) {
+  if (typeof(newElements) == "string") {
+    newElements=[newElements];
+  }
+  outer.innerHTML="";
+  for (var i=0; i<newElements.length; i++) {
+    var e = newElements[i];
+    if (typeof(e) == "string") {
+      e=csText(e,nbsp);
+    }
+    outer.appendChild(e);
+  }
+}
+
+/**
+ * Convert a token into an HTMLElement.
+ */
+function csTok(tok,nbsp) {
   var node;
 
   if (tok == null) {
@@ -183,7 +221,7 @@ function csTok(tok) {
   } else {
     var t = typeof(tok);
     if (t == "number" || t == "string") {
-      node = csText(tok+"");
+      node = csText(tok+"",nbsp);
     } else {
       var node = csNode(tok[0]);
       var attrs= tok[1];
@@ -193,7 +231,7 @@ function csTok(tok) {
         }
       }
       for (var j=2; j<tok.length; j++) {
-        node.appendChild(csTok(tok[j]));
+        node.appendChild(csTok(tok[j],nbsp));
       }
     }
   }
@@ -201,18 +239,21 @@ function csTok(tok) {
   return node;
 }
 
-function csTok2Span(tokens) {
+/**
+ * Convert a list of tokens into a SPAN of HTMLElements.
+ */
+function csTok2Span(tokens,nbsp) {
   if (tokens.length == 1)
-    return csTok(tokens[0]);
+    return csTok(tokens[0],nbsp);
 
   var span = csNode("SPAN");
   for (var i=0; i<tokens.length; i++) {
-    span.appendChild(csTok(tokens[i]));
+    span.appendChild(csTok(tokens[i],nbsp));
   }
   return span;
 }
 
-function csTokMAILTO(addr,text) {
+function csTokMAILTO(addr, text) {
   if (text == null || text == "") {
     text=addr;
   }
@@ -332,6 +373,12 @@ function csSetPosition(elem,xy) {
 
 function csSetRPosition(elem,dxy) {
   csSetPosition(elem, csXY(elem.offsetLeft + dxy.x, elem.offsetTop + dxy.y));
+}
+
+function csAddNodeBelow(elem, aboveElem) {
+  aboveElem.style.position='relative';
+  csSetPosition(elem, csXY(0, aboveElem.height));
+  aboveElem.appendChild(elem);
 }
 
 // Set size of one element to the size of another.
@@ -488,14 +535,6 @@ function runanim(id, fn) {
   }
 }
 
-function csSetPositionBelow(above,elem) {
-  var bbox = csElementToDocBBox(above);
-  _log("BBOX="+bbox);
-  csSetPosition(elem,csXY(bbox.x,bbox.y+bbox.dy));
-  _log("new offsetLeft = "+elem.offsetLeft);
-  _log("new offsetTop = "+elem.offsetTop);
-}
-
 ///////////////////////////////////////////////////////////////////
 // CGI-based RPC infrastructure
 //
@@ -541,8 +580,7 @@ function csRPCflushQueue() {
     _cs_rpc_callbacks[cbk]=callback;
     jscgiurl+="/"+seq;
     if (argobj) {
-      csStringable(argobj);
-      jscgiurl+="/"+escape(argobj.toString());
+      jscgiurl+="/"+escape(csObjectToString(argobj));
     }
 
     var rpc = csNode("SCRIPT");
@@ -683,6 +721,50 @@ function csHotSpan(inner,makePopup,makeArg) {
                         popup.style.visibility='hidden';
                       }
                     };
+  return span;
+}
+
+/**
+ * Create a "hot" <SPAN>, calling the control object
+ * on various events.
+ * inner: string for inner text, or array of HTMLElements.
+ * control: the control object.
+ */
+function csHotSpan2(inner, control) {
+  var span = csNode("SPAN");
+  span.style.textDecoration='underline';
+  if (typeof(inner) == "string") {
+    inner=[csText(inner)];
+  }
+  for (var i=0; i<inner.length; i++) {
+    span.appendChild(inner[i]);
+  }
+
+  span.onmouseover=function(e) {
+                     if (control.onmouseover) {
+                       if (!e) e=window.event;
+                       control.onmouseover(span, e);
+                       span.onmouseout=function() {
+                                         if (control.onmouseout) {
+                                           if (!e) e=window.event;
+                                           control.onmouseout(span, e);
+                                         }
+                                       }
+                     }
+                   };
+  span.onclick=function(e) {
+                 if (control.onclick) {
+                   if (!e) e=window.event;
+                   control.onclick(span, e);
+                 }
+               };
+  span.ondblclick=function(e) {
+                    if (control.ondblclick) {
+                      if (!e) e=window.event;
+                      control.ondblclick(span, e);
+                    }
+                  };
+
   return span;
 }
 
@@ -927,6 +1009,57 @@ CSPan.prototype.handleUp = function(e) {
 
     if (this.hotLayer) this.hotLayer.style.display='block';
   }
+};
+
+function CSFolder(control) {
+
+  this.control=control;
+
+  var table = csNode("TABLE");
+  table.border=1;
+  table.width="100%";
+
+  var titleRow = table.insertRow(0);
+
+  var toggleCell = titleRow.insertCell(0);
+  toggleCell.rowSpan = 2;
+  toggleCell.style.align='center';
+  toggleCell.style.vAlign='top';
+  this.toggleButton=csIMG();
+
+  var titleCell = titleRow.insertCell(1);
+  titleCell.style.align='left';
+  titleCell.style.vAlign='top';
+
+  var innerRow = table.insertRow(1);
+  var innerCell = innerRow.insertCell(0);
+  titleCell.style.align='left';
+  titleCell.style.vAlign='top';
+
+  this.table=table;
+  this.titleCell=titleCell;
+  this.innerRow=innerRow;
+  this.innerCell=innerCell;
+  this.isOpen=false;
+}
+
+CSFolder.prototype.setTitle = function(newtitle) {
+  csSetInnerElements(this.titleCell, newtitle);
+}
+
+CSFolder.prototype.setOpen = function(openMode) {
+  if (openMode) {
+    if (!this.isOpen) {
+      this.control.onopen(this);
+    }
+  } else {
+    if (this.isOpen) {
+      this.control.onclose(this);
+    }
+  }
+  this.innerRow.style.display = (openMode ? 'block' : 'none');
+  this.open=openMode;
+  this.toggleButton.src = (openMode ? 'minus.png' : 'plus.png');
 };
 
 { var vp = csViewPort();
