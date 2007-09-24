@@ -6,7 +6,13 @@
 
 : ${X11_COMPOSITE:=''}
 
-[ $# -gt 0 ] && [ "x$1" = x-f ] && { X11_COMPOSITE=1; shift; }
+force=
+[ $# -gt 0 ] && [ "x$1" = x-f ] && { force=1; shift; }
 
 # -f and -F probably trigger a memory leak
-[ $X11_COMPOSITE ] && bgproc -p xcompmgr -l x11 xcompmgr -cfF -r0 -D5 -I0.01 -O0.02
+if [ $force ] || { [ $X11_COMPOSITE ] && not flag DISABLE_X11_COMPOSITE; }
+then
+  ifpid xcompmgr || bgproc -p xcompmgr -l x11 xcompmgr -cfF -r0 -D5 -I0.01 -O0.02
+else
+  ifpid xcompmgr && killpidfile xcompmgr
+fi
