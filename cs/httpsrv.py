@@ -5,6 +5,7 @@ import cs.www
 from cs.misc import cmderr, debug
 import base64
 import re
+import sys
 
 class JSONRPC(HTTPServer):
   def __init__(self,bindaddr,base=None):
@@ -19,16 +20,15 @@ class JSONRPC(HTTPServer):
 basic_authorization_re=re.compile(r'^\s*basic\s+(\S+)',re.I)
 
 def testAuthPWNam(user, password):
-  import posix
+  import pwd
   try:
-    pw=posix.getpwnam(user)
+    pw=pwd.getpwnam(user)
   except KeyError:
     return False
 
-  from crypt import crypt
+  import crypt
   pwcrypt = pw[1]
   salt = pwcrypt[:2]
-  cmderr("testauth: user=%s, crypt=%s, salt=%s, passwd=%s" % (user, pwcrypt, salt, password))
   return crypt.crypt(password, salt) == pwcrypt
 
 class RequestHandler(BaseHTTPRequestHandler):
@@ -37,9 +37,10 @@ class RequestHandler(BaseHTTPRequestHandler):
 
   def getAuth(self, testAuth=None):
     if testAuth is None:
-      testAUth=testAuthPWNam
+      global testAuthPWNam
+      testAuth=testAuthPWNam
 
-    authhdr=self.get('AUTHORIZATION')
+    authhdr=self.headers.get('AUTHORIZATION')
     if authhdr is None:
       return None
 
@@ -59,11 +60,8 @@ class RequestHandler(BaseHTTPRequestHandler):
 
     return userid
 
-# || { echo "Status: 401"
-#      echo "WWW-Authenticate: Basic realm=\"$realm\""
-#      echo "Content-Type: text/plain"
-#      echo
-#      echo "Authorisation needed for realm \"$realm\"."
+  def needAuth(self,realm):
+    self.wfile.write("HTTP/1.0 401 Auth needed.\r\nContent-Type: text/plain\r\nWWW-Authenticate: Basic realm=\"TestAuth\"\r\nConnection: close\r\n\r\nTesting.\r\n")
 
 class JSONRPCHandler(RequestHandler):
   def __init__(self,rq,cliaddr,srv):
@@ -84,7 +82,7 @@ class JSONRPCHandler(RequestHandler):
 
     slndx=path.find('/')
     if slndx < 1 or not path[:slndx].isdigit():
-      self.reject(500,"missing sequence number")
+      self.reject(500, "missing sequence number")
       return
 
     seq=int(path[:slndx])
@@ -95,7 +93,10 @@ class JSONRPCHandler(RequestHandler):
     cmderr("jsontxt1 =", `jsontxt`)
     (args,unparsed)=cs.hier.tok(jsontxt)
     cmderr("args =", `args`, "unparsed =", `unparsed`)
-    (cb,result)=self.server.rpc(args)
+    rpcres=self.server.rpc(self,args)
+    if rpcres is None:
+      return
+    cb, result = rpcres
     jscode="%s(%d,%s);\r\n" % (cb,seq,cs.json.json(result));
     debug("JSCODE:\n"+jscode);
     self.wfile.write(jscode);
