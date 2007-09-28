@@ -170,7 +170,7 @@ function csText(str,nbsp) {
   return document.createTextNode(str);
 }
 
-function csIMG(src,onload) {
+function csIMG(src, onload) {
   var img = csNode('IMG');
 
   img.style.border=0;
@@ -375,10 +375,28 @@ function csSetRPosition(elem,dxy) {
   csSetPosition(elem, csXY(elem.offsetLeft + dxy.x, elem.offsetTop + dxy.y));
 }
 
-function csAddNodeBelow(elem, aboveElem) {
+function csAddNodeBelow(elem, aboveElem, zindex) {
   aboveElem.style.position='relative';
-  csSetPosition(elem, csXY(0, aboveElem.height));
+  elem.style.position='absolute';
+  elem.style.left="0px";
+  elem.style.top=belowElem.offsetHeight+"px";
+  if (zindex != null) {
+    elem.style.zIndex=zindex;
+  }
   aboveElem.appendChild(elem);
+}
+
+function csAddNodeAbove(elem, belowElem, zindex) {
+  belowElem.style.position='relative';
+  _logTo(belowElem);
+  elem.onresize=function() { _logTo(belowElem); _log("RESIZE"); };
+  elem.style.position='absolute';
+  elem.style.left="0px";
+  elem.style.bottom=belowElem.offsetHeight+"px";
+  if (zindex != null) {
+    elem.style.zIndex=zindex;
+  }
+  belowElem.appendChild(elem);
 }
 
 // Set size of one element to the size of another.
@@ -654,7 +672,18 @@ csAsyncObject.prototype.addAttr = function(attrname, rpcurl, rpcargs) {
   var attrs = this.asyncAttrs[attrname] = {};
   attrs.rpc = [rpcurl,rpcargs];
 };
-csAsyncObject.prototype.withAttr = function(attrname, callback) {
+csAsyncObject.prototype.withAttr = function(attrname, args, callback) {
+  if (typeof(args) != "function") {
+    // assume 3-arg call - (attr, {params}, callback) - rpc func, params, callback
+    csRPC(this.rpcurl,
+          {rpc: attrname, key: this.key, params: args},
+          callback);
+    return;
+  }
+
+  // assume 2-args call - (attr, callback) - static attribute with callback
+  callback=args;
+
   var me = this;
   var attr = me.asyncAttrs[attrname];
   if (!attr) _log("me.asyncAttrs["+attrname+"]="+attr);
@@ -681,6 +710,9 @@ csAsyncObject.prototype.setAttr = function(attrname, value) {
       callbacks[i](value);
     }
   }
+};
+csAsyncObject.prototype.delAttr = function(attrname) {
+  this.setAttr(attrname, null);
 };
 
 function csHotSpan(inner,makePopup,makeArg) {
@@ -1011,23 +1043,16 @@ CSPan.prototype.handleUp = function(e) {
   }
 };
 
-function CSFolder(control) {
-
+function CSFolder(control, startOpen) {
+  var me = this;
   this.control=control;
 
   var table = csNode("TABLE");
   table.border=1;
-  table.width="100%";
 
   var titleRow = table.insertRow(0);
 
-  var toggleCell = titleRow.insertCell(0);
-  toggleCell.rowSpan = 2;
-  toggleCell.style.align='center';
-  toggleCell.style.vAlign='top';
-  this.toggleButton=csIMG();
-
-  var titleCell = titleRow.insertCell(1);
+  var titleCell = titleRow.insertCell(0);
   titleCell.style.align='left';
   titleCell.style.vAlign='top';
 
@@ -1035,31 +1060,45 @@ function CSFolder(control) {
   var innerCell = innerRow.insertCell(0);
   titleCell.style.align='left';
   titleCell.style.vAlign='top';
+  var titleSpan = csNode("SPAN");
+  titleSpan.style.textDecoration='underline';
+  titleCell.appendChild(titleSpan);
+  titleSpan.onclick=function(cell, e) {
+                      me.setOpen(!me.isOpen);
+                    };
 
   this.table=table;
   this.titleCell=titleCell;
+  this.titleSpan=titleSpan;
   this.innerRow=innerRow;
   this.innerCell=innerCell;
   this.isOpen=false;
+  this.innerRow.style.visibility='collapse';
+  this.setOpen(startOpen);
 }
 
 CSFolder.prototype.setTitle = function(newtitle) {
-  csSetInnerElements(this.titleCell, newtitle);
+  csSetInnerElements(this.titleSpan, newtitle);
 }
 
 CSFolder.prototype.setOpen = function(openMode) {
   if (openMode) {
     if (!this.isOpen) {
-      this.control.onopen(this);
+      this.isOpen=true;
+      if (this.control.onopen) {
+        this.control.onopen(this);
+      }
+      this.innerRow.style.visibility='visible';
     }
   } else {
     if (this.isOpen) {
-      this.control.onclose(this);
+      this.isOpen=false;
+      this.innerRow.style.visibility='collapse';
+      if (this.control.onclose) {
+        this.control.onclose(this);
+      }
     }
   }
-  this.innerRow.style.display = (openMode ? 'block' : 'none');
-  this.open=openMode;
-  this.toggleButton.src = (openMode ? 'minus.png' : 'plus.png');
 };
 
 { var vp = csViewPort();
