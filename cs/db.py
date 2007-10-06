@@ -175,6 +175,50 @@ def sqlDatedRecordTest(when=None,startColumn='START_DATE',endColumn='END_DATE'):
   return '(ISNULL('+startColumn+') OR '+startColumn+' <= '+whensql+')' \
        + ' AND (ISNULL('+endColumn+') OR '+endColumn+' > '+whensql+')'
 
+def mergeDatedRecords(table,keyFields,idField=None,constraint=None, doit=False):
+  for sql in mergeDatedRecordsSQL(table,keyFields,idField=idField,constraint=constraint):
+    if doit:
+      dosql(table.conn, sql)
+    else:
+      print sql
+
+def mergeDatedRecordsSQL(table,keyFields,idField=None,constraint=None):
+  if type(keyFields) is str:
+    keyFields=(keyFields,)
+  if idField is None:
+    idField='ID'
+
+  oldRows={}
+  for row in table.selectRows(where=constraint, modifiers='ORDER BY START_DATE, END_DATE, '+idField):
+    start, end = row['START_DATE'], row['END_DATE']
+    if start is not None and end is not None and start >= end:
+      print `row`
+      yield 'DELETE FROM %s WHERE %s = %s' % (table.name, idField, sqlise(row[idField]))
+      continue
+
+    key=tuple([ row[f] for f in keyFields ])
+    if key not in oldRows:
+      oldRows[key]=row
+      continue
+
+    oldrow=oldRows[key]
+    if start is not None \
+    and oldrow['END_DATE'] is not None \
+    and oldrow['END_DATE'] < start:
+      # no overlap; update "old" to be latest row
+      oldRows[key]=row
+      continue
+
+    # overlap; advance END_DATE in old, toss new
+    print "OLD:", `oldrow`
+    print "NEW:", `row`
+    if oldrow['END_DATE'] is not None \
+    and (end is None or end > oldrow['END_DATE']):
+      yield 'UPDATE %s SET END_DATE = %s WHERE %s = %s' \
+             % (table.name, sqlise(end), idField, sqlise(oldrow[idField]))
+    yield 'DELETE FROM %s WHERE %s = %s' \
+          % (table.name, idField, sqlise(row[idField]))
+
 ###############################################################################
 # Database Tables
 #
