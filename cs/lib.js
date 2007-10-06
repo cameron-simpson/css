@@ -84,31 +84,36 @@ function csObjectToString(obj) {
 
   if (obj == null) {
     s='null';
-  } else if (typeof(obj) == "string") {
-    s='"'+obj+'"';
-  } else if (obj instanceof Array) {
-    s = "[";
-    var first = true;
-    for (var i=0; i<obj.length; i++) {
-      if (first) first=false;
-      else       s += ", ";
-      s+=csObjectToString(obj[i]);
-    }
-    s += "]";
   } else {
-    // General object dump.
-    s = "{";
-    var first=true;
-    var v;
-    for (var k in obj) {
-      if (k == "toString") continue;
-      if (first) first=false;
-      else s+=", ";
-      s+=csObjectToString(k);
-      v=obj[k];
-      s+=": "+csObjectToString(v);
+      var t = typeof(obj);
+      if (t == "number") {
+      s=""+obj;
+    } else if (typeof(obj) == "string") {
+      s='"'+obj+'"';
+    } else if (obj instanceof Array) {
+      s = "[";
+      var first = true;
+      for (var i=0; i<obj.length; i++) {
+        if (first) first=false;
+        else       s += ", ";
+        s+=csObjectToString(obj[i]);
+      }
+      s += "]";
+    } else {
+      // General object dump.
+      s = "{";
+      var first=true;
+      var v;
+      for (var k in obj) {
+        if (k == "toString") continue;
+        if (first) first=false;
+        else s+=", ";
+        s+=csObjectToString(k);
+        v=obj[k];
+        s+=": "+csObjectToString(v);
+      }
+      s+="}";
     }
-    s+="}";
   }
 
   return s;
@@ -140,15 +145,19 @@ function box(xy, size) {
   return csStringable({x: xy.x, y: xy.y, width: size.width, height: size.height});
 }
 
-function csDIV(colour) {
+function csDIV(colour, zindex) {
   var div = csNode('DIV');
   if (colour) {
     var fillImg = csSinglePixelIMG(colour);
     csSetSize(fillImg,"100%","100%");
     csSetPosition(fillImg,csXY(0,0));
-    csSetZIndex(div,0);
     csSetZIndex(fillImg,-1023);
     div.appendChild(fillImg);
+  }
+  if (zindex == null) {
+    csSetZIndex(div, 0);
+  } else {
+    csSetZIndex(div, zindex);
   }
   return div;
 }
@@ -327,6 +336,19 @@ function csAbsTopLeft(elem) {
   return topLeft;
 }
 
+function csRelToLastAbsoluteTopLeft(elem) {
+  var topLeft = csXY(elem.offsetLeft, elem.offsetTop);
+  var parent=elem.offsetParent;
+
+  while (parent && parent != elem && parent.style.position != "absolute") {
+    topLeft.x += parent.offsetLeft;
+    topLeft.y += parent.offsetTop;
+    parent=parent.offsetParent;
+  }
+
+  return topLeft;
+}
+
 function csElementToDocBBox(elem) {
   var abs = csAbsTopLeft(elem);
   return csStringable({x: abs.x, y: abs.y, width: elem.offsetWidth, height: elem.offsetHeight});
@@ -375,28 +397,26 @@ function csSetRPosition(elem,dxy) {
   csSetPosition(elem, csXY(elem.offsetLeft + dxy.x, elem.offsetTop + dxy.y));
 }
 
-function csAddNodeBelow(elem, aboveElem, zindex) {
-  aboveElem.style.position='relative';
+function csPosNodeRight(elem, leftElem, zindex) {
+  var leftPos = csRelToLastAbsoluteTopLeft(leftElem);
   elem.style.position='absolute';
-  elem.style.left="0px";
-  elem.style.top=belowElem.offsetHeight+"px";
+  elem.style.top=leftPos.y+"px";
+  elem.style.left=(leftPos.x+leftElem.offsetWidth)+"px";
+  if (zindex != null) {
+    elem.style.zIndex=zindex;
+  }
+  leftElem.appendChild(elem);
+}
+
+function csPosNodeBelow(elem, aboveElem, zindex) {
+  var abovePos = csRelToLastAbsoluteTopLeft(aboveElem);
+  elem.style.position='absolute';
+  elem.style.left=abovePos.x+"px";
+  elem.style.top=(abovePos.y+aboveElem.offsetHeight)+"px";
   if (zindex != null) {
     elem.style.zIndex=zindex;
   }
   aboveElem.appendChild(elem);
-}
-
-function csAddNodeAbove(elem, belowElem, zindex) {
-  belowElem.style.position='relative';
-  _logTo(belowElem);
-  elem.onresize=function() { _logTo(belowElem); _log("RESIZE"); };
-  elem.style.position='absolute';
-  elem.style.left="0px";
-  elem.style.bottom=belowElem.offsetHeight+"px";
-  if (zindex != null) {
-    elem.style.zIndex=zindex;
-  }
-  belowElem.appendChild(elem);
 }
 
 // Set size of one element to the size of another.
@@ -756,15 +776,23 @@ function csHotSpan(inner,makePopup,makeArg) {
   return span;
 }
 
+function csHotSpan2(inner, control) {
+  _log("OBSOLETE CALL TO HOTSPAN2");
+  return new CSHotSpan(inner, control).span;
+}
 /**
  * Create a "hot" <SPAN>, calling the control object
  * on various events.
  * inner: string for inner text, or array of HTMLElements.
  * control: the control object.
  */
-function csHotSpan2(inner, control) {
+function CSHotSpan(inner, control) {
+  var me = this;
+
   var span = csNode("SPAN");
   span.style.textDecoration='underline';
+  me.span=span;
+
   if (typeof(inner) == "string") {
     inner=[csText(inner)];
   }
@@ -775,11 +803,11 @@ function csHotSpan2(inner, control) {
   span.onmouseover=function(e) {
                      if (control.onmouseover) {
                        if (!e) e=window.event;
-                       control.onmouseover(span, e);
+                       control.onmouseover(me, e);
                        span.onmouseout=function() {
                                          if (control.onmouseout) {
                                            if (!e) e=window.event;
-                                           control.onmouseout(span, e);
+                                           control.onmouseout(me, e);
                                          }
                                        }
                      }
@@ -787,17 +815,15 @@ function csHotSpan2(inner, control) {
   span.onclick=function(e) {
                  if (control.onclick) {
                    if (!e) e=window.event;
-                   control.onclick(span, e);
+                   control.onclick(me, e);
                  }
                };
   span.ondblclick=function(e) {
                     if (control.ondblclick) {
                       if (!e) e=window.event;
-                      control.ondblclick(span, e);
+                      control.ondblclick(me, e);
                     }
                   };
-
-  return span;
 }
 
 /**
@@ -1048,7 +1074,7 @@ function CSFolder(control, startOpen) {
   this.control=control;
 
   var table = csNode("TABLE");
-  table.border=1;
+  //table.border=1;
 
   var titleRow = table.insertRow(0);
 
