@@ -106,13 +106,25 @@ class HierOutput(_Hier):
           self.bareWords=oBareWords
         else:
           self.seen[id(obj)]=obj
-          fl=flavour(obj)
-          if fl is T_SEQ:
-            self.__listEncode(obj)
-          elif fl is T_MAP:
-            self.__dictEncode(obj)
+          import datetime
+          if t is datetime.date:
+            self.__stringEncode(obj.isoformat())
+          elif t is datetime.datetime:
+            y,m,d = obj.year, obj.month, obj.day
+            hh,mm,ss,usec = obj.hour, obj.minute, obj.second, obj.microsecond
+            if hh or mm or ss or usec:
+              ds=obj.isoformat()
+            else:
+              ds="%04d-%02d-%02d" % (y,m,d)
+            self.__stringEncode(ds)
           else:
-            self.__h2f(`obj`)
+            fl=flavour(obj)
+            if fl is T_SEQ:
+              self.__listEncode(obj)
+            elif fl is T_MAP:
+              self.__dictEncode(obj)
+            else:
+              self.__h2f(`obj`)
 
   def __stringEncode(self,s):
     """ Transcribe a string to the current File in Hier format.
@@ -308,7 +320,11 @@ class HierInput(_Hier):
     if not m:
       raise ValueError, "syntax error at: \""+s+"\""
 
-    return (m.group(),s[m.end():])
+    safeTok = m.group()
+    if safeTok.isdigit():
+      safeTok=int(safeTok)
+
+    return (safeTok, s[m.end():])
 
   def __a2str(self,s):
     """ Read a quoted string from the opening quote, assemble into string.
