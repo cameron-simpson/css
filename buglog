@@ -159,7 +159,7 @@ do
 
 	( qsvals=`query_string2sh "$args"`
 	  eval "$qsvals"
-	  [ -n "$PARAM_subject" ] && subj="$PARAM_subject: $subj"
+	  [ -n "${PARAM_subject:-}" ] && subj="$PARAM_subject: $subj"
 
 	  echo "To: $addr"
 	  echo "Subject: $subj"
