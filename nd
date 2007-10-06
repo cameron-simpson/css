@@ -5,7 +5,8 @@
 #
 
 cmd=$0
-usage="Usage: $cmd [-r] [desktop]"
+usage="Usage: $cmd [-r] [desktop]
+  -r    Remove named desktop."
 
 rmdesk=
 [ "x$1" = x-r ] && { rmdesk=1; shift; }
@@ -13,7 +14,7 @@ rmdesk=
 if [ $# = 0 ]
 then
     if [ $rmdesk ]
-    then echo "$cmd: must supply desktop with -r" >&2
+    then echo "$cmd: you must supply desktop with -r" >&2
 	 echo "$usage" >&2
 	 exit 2
     else deskname=`lastvalue desktop-$HOST-previous`
