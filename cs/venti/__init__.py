@@ -49,6 +49,8 @@ def hash_sha(block):
   hash=sha.new(block)
   return hash.digest()
 
+hash=hash_sha
+
 def fromhex(hexstr):
   ''' Return raw byte array from hexadecimal string.
   '''

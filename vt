@@ -155,7 +155,7 @@ elif op == "mount":
   E=S.namei(args[0]+'/')
   assert E.isdir, "%s: %s: expected directory, not file"%(cmd,args[0])
   import cs.venti.fs
-  cs.venti.fs.fusemount(S,args[1])
+  cs.venti.fs.fusemount(args[1],S,E)
 elif op == "unpack":
   S.opendir(fromhex(args[0])).unpack('.')
 else:

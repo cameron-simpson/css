@@ -60,6 +60,7 @@ class BlockRef:
       refers to their top indirect block.
   '''
   def __init__(self,h,indirect,span):
+    assert h is not None
     self.h=h
     self.indirect=indirect
     self.span=span
