@@ -61,7 +61,7 @@ class RequestHandler(BaseHTTPRequestHandler):
     return userid
 
   def needAuth(self,realm):
-    self.wfile.write("HTTP/1.0 401 Auth needed.\r\nContent-Type: text/plain\r\nWWW-Authenticate: Basic realm=\"TestAuth\"\r\nConnection: close\r\n\r\nTesting.\r\n")
+    self.wfile.write("HTTP/1.0 401 Auth needed.\r\nContent-Type: text/plain\r\nWWW-Authenticate: Basic realm=\"%s\"\r\nConnection: close\r\n\r\nTesting.\r\n" % realm)
 
 class JSONRPCHandler(RequestHandler):
   def __init__(self,rq,cliaddr,srv):
