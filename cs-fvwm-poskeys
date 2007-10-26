@@ -1,0 +1,114 @@
+#!/usr/bin/python -tt
+#
+# Emit positioning key bindings.
+#       - Cameron Simpson <cs@zip.com.au> 20oct2007
+#
+
+from cs.misc import cmd, cmderr
+import cs.x11
+import sys
+
+usage="Usage: %s"
+
+width=None
+height=None
+
+topy=67
+charx=5
+mintty=charx*80
+
+D=cs.x11.Display()
+
+##import cs.hier
+##print cs.hier.h2a(D,1)
+
+dx=D.SCREENS[0].DX
+dy=D.SCREENS[0].DY
+
+if len(sys.argv) > 1:
+  dx=int(sys.argv[1])
+
+ttyheight=dy-topy
+ttyheight2=ttyheight/2
+
+print "#", dx, dy
+xy="%dx%d" % (dx,dy)
+aspect=float(dx)/float(dy)
+print "#", aspect
+
+def slice(dx):
+  dx2=dx/2              # display midpoint
+  fat=dx%mintty         # padding for the wide terminal
+  px=0
+  while px < dx:
+    if px < dx2 and px+mintty+fat > dx2:
+      wx=mintty+fat
+    else:
+      wx=mintty
+    yield (wx,px)
+    px += wx
+
+if dx == 3840 or dx == 3200 or dx == 2560:
+  dx2=dx/2
+  slices=(dx2,dx2)
+elif dx == 5120:
+  slices=(1600,1920,1600)
+else:
+  slices=(dx,)
+
+slots=[]
+rightmon=[]
+ox=0
+slicenum=0
+for sx in slices:
+  mslots=[]
+  for wx, px in slice(sx):
+    geom=(ox+px, wx)
+    slots.append(geom)
+    mslots.append(geom)
+  rightmon.append(mslots)
+  ox+=sx
+  slicenum+=1
+
+print "#", slots, mslots
+
+# middle monitor
+leftmon=[]
+while len(leftmon)+2 < len(rightmon):
+  leftmon.append(rightmon.pop(0))
+
+print "#", leftmon
+print "#", rightmon
+
+def numPos(monitors):
+  monitors=monitors[:]
+  mslots=monitors.pop(0)
+  for n in 1, 2, 3, 4, 5, 6, 7, 8, 9, 0:
+    if len(mslots) == 0:
+      if len(monitors) == 0:
+        break
+      mslots=monitors.pop(0)
+    s=mslots.pop(0)
+    yield n, s[0], s[1]
+
+print '''
+  DestroyFunc MoveWinFixed
+  AddToFunc MoveWinFixed
+   + I Raise
+    + I Resize $2 $3
+     + I AnimatedMove $0 $1 Warp
+     '''
+
+poslist=[pos for pos in numPos(rightmon)]
+npos=len(poslist)
+for n, px, wx in poslist:
+  print "Key %d W %s MoveWinFixed %dp -0p %dp %dp" % (n, "M", px, wx, ttyheight)
+  if npos < 4:
+    print "Key %d W %s MoveWinFixed %dp -%dp %dp %dp" % (n+npos, "M", px, ttyheight2, wx, ttyheight2)
+    print "Key %d W %s MoveWinFixed %dp -0p %dp %dp" % (n+npos+npos, "M", px, wx, ttyheight2)
+
+if len(leftmon) > 0:
+  poslist=[pos for pos in numPos(leftmon)]
+  npos=len(poslist)
+  for n, px, wx in poslist:
+    print "Key %d WS %s MoveWinFixed %dp -0p %dp %dp" % (n, "M", px, wx, ttyheight)
