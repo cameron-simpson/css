@@ -1,0 +1,50 @@
+#!/bin/sh -u
+#
+# Emit my FVWM RC file.
+#	- Cameron Simpson <cs@zip.com.au> 19aug2002
+#
+
+. $HOME/rc/x11/xenv.sh
+
+: ${X11_COMPOSITE:=''}
+case "$X11_COMPOSITE" in
+  '')	fvwm_Transparent=Transparent
+	fvwm_RootTransparent=RootTransparent
+	fvwm_ParentalRelativity=ParentalRelativity
+	fvwm_OpaqueMoveSize=0
+	;;
+  *)	fvwm_Transparent=
+	fvwm_RootTransparent=
+	fvwm_ParentalRelativity=
+	fvwm_OpaqueMoveSize=100
+	;;
+esac
+export fvwm_Transparent fvwm_RootTransparent fvwm_ParentalRelativity fvwm_OpaqueMoveSize
+
+(
+  (
+    cd $HOME/rc/x11/fvwm || exit 1
+    cat rc-curly
+    for menu in `ls menus`
+    do
+      menuf=menus/$menu
+      titlef=menus/.title.$menu
+
+      title=$menu
+      [ -s "$titlef" ] && { title=`cat "$titlef"` || title=$menu; }
+
+      echo "NewMenu $menu \"$title\""
+      sed "s/^/AddToMenu $menu /" "$menuf"
+    done
+    echo END MENUS HERE
+  ) | MOVE=AnimatedMove uncurly
+  desktop-incant -
+  desktop-incant-names -
+  fvwm-deskkeys
+  echo SwitchToDesk 1
+  if [ "$FULLX" = 1600 ]
+  then  echo Function Keys4x1
+  else  echo Function Keys2x2
+  fi
+) \
+| tee $HOME/tmp/fvwmrc-$HOST-$DISPLAY
