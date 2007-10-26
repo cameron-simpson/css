@@ -205,6 +205,17 @@ def uniq(ary,canonical=None):
 
   return u
 
+class DictUCAttrs(dict):
+  def __getattr__(self,attr):
+    if attr.isalpha() and attr.isupper():
+      return self[attr]
+    return dict.__getattr__(self,attr)
+  def __setattr__(self,attr,value):
+    if attr.isalpha() and attr.isupper():
+      self[attr]=value
+      return
+    dict.__setattr__(self,attr,value)
+
 class CanonicalSeq:
   def __init__(self,seq,canonical=None):
     self.__canon=canonical
