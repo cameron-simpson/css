@@ -92,12 +92,12 @@ def numPos(monitors):
     yield n, s[0], s[1]
 
 print '''
-  DestroyFunc MoveWinFixed
-  AddToFunc MoveWinFixed
-   + I Raise
-    + I Resize $2 $3
-     + I AnimatedMove $0 $1 Warp
-     '''
+DestroyFunc MoveWinFixed
+AddToFunc MoveWinFixed
++ I Raise
++ I Resize $2 $3
++ I AnimatedMove $0 $1 Warp
+'''
 
 poslist=[pos for pos in numPos(rightmon)]
 npos=len(poslist)
