@@ -205,7 +205,10 @@ def uniq(ary,canonical=None):
 
   return u
 
-class DictUCAttrs(dict):
+class DictUCAttrs(dict, WithUCAttrs):
+  pass
+
+class WithUCAttrs:
   def __getattr__(self,attr):
     if attr.isalpha() and attr.isupper():
       return self[attr]
