@@ -205,9 +205,6 @@ def uniq(ary,canonical=None):
 
   return u
 
-class DictUCAttrs(dict, WithUCAttrs):
-  pass
-
 class WithUCAttrs:
   def __getattr__(self,attr):
     if attr.isalpha() and attr.isupper():
@@ -218,6 +215,9 @@ class WithUCAttrs:
       self[attr]=value
       return
     dict.__setattr__(self,attr,value)
+
+class DictUCAttrs(dict, WithUCAttrs):
+  pass
 
 class CanonicalSeq:
   def __init__(self,seq,canonical=None):
