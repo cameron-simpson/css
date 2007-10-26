@@ -214,7 +214,7 @@ class WithUCAttrs:
     if attr.isalpha() and attr.isupper():
       self[attr]=value
       return
-    dict.__setattr__(self,attr,value)
+    self.__dict__[attr]=value
 
 class DictUCAttrs(dict, WithUCAttrs):
   pass
