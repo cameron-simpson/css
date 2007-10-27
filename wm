@@ -16,6 +16,7 @@ then
 fi
 
 for fv in \
+        $FVWM_BINARY \
 	2.5.21-fc6 \
 	2.5.17-fc4 \
 	2.5.15-fc4 \
