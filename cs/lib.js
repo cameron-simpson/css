@@ -147,7 +147,8 @@ function box(xy, size) {
 
 function csDIV(colour, zindex) {
   var div = csNode('DIV');
-  if (colour) {
+  if (colour != "TRANSPARENT") {
+    if (!colour) colour=document.bgColor;
     var fillImg = csSinglePixelIMG(colour);
     csSetSize(fillImg,"100%","100%");
     csSetPosition(fillImg,csXY(0,0));
@@ -195,6 +196,9 @@ function csIMG(src, onload) {
 }
 
 function csSinglePixelIMG(colour) {
+  if (colour.substr(0,1) == "#") {
+    colour="%23"+colour.substr(1);
+  }
   var imgfile = colour+"-1x1.png";
   if (_cs_singlePixelIMGPrefix) {
     imgfile = _cs_singlePixelIMGPrefix + imgfile;
@@ -477,7 +481,7 @@ function CSHotSpot(meta,xy1,xy2,z) {
   this.xy1=xy1;
   this.xy2=xy2;
 
-  var hotdiv = csDIV();
+  var hotdiv = csDIV("TRANSPARENT");
   csSetPosition(hotdiv,xy1);
   //_log("set hot size: "+(xy2.x-xy1.x)+"x"+(xy2.y-xy1.y));
   csSetSize(hotdiv,xy2.x-xy1.x,xy2.y-xy1.y);
@@ -681,10 +685,10 @@ function csAddSuperClass(base,sup) {
 //////////////////////////////////////////////////
 // An object with asynchronous attribute methods.
 //
-function csAsyncObject() {
+function CSAsyncObject() {
   this.asyncAttrs={};
 }
-csAsyncObject.prototype.addAttr = function(attrname, rpcurl, rpcargs) {
+CSAsyncObject.prototype.addAttr = function(attrname, rpcurl, rpcargs) {
   if (!rpcurl) rpcurl=this.rpcurl;
   if (!rpcargs) rpcargs={rpc: attrname, key: this.key};
   if (!this.asyncAttrs) this.asyncAttrs={};
@@ -692,7 +696,7 @@ csAsyncObject.prototype.addAttr = function(attrname, rpcurl, rpcargs) {
   var attrs = this.asyncAttrs[attrname] = {};
   attrs.rpc = [rpcurl,rpcargs];
 };
-csAsyncObject.prototype.withAttr = function(attrname, args, callback) {
+CSAsyncObject.prototype.withAttr = function(attrname, args, callback) {
   if (typeof(args) != "function") {
     // assume 3-arg call - (attr, {params}, callback) - rpc func, params, callback
     csRPC(this.rpcurl,
@@ -717,7 +721,7 @@ csAsyncObject.prototype.withAttr = function(attrname, args, callback) {
     csRPC(attr.rpc[0], attr.rpc[1], function(res) { me.setAttr(attrname, res); });
   }
 };
-csAsyncObject.prototype.setAttr = function(attrname, value) {
+CSAsyncObject.prototype.setAttr = function(attrname, value) {
   var attr = this.asyncAttrs[attrname];
   if (!attr) {
     attr = this.asyncAttrs[attrname] = {};
@@ -731,11 +735,12 @@ csAsyncObject.prototype.setAttr = function(attrname, value) {
     }
   }
 };
-csAsyncObject.prototype.delAttr = function(attrname) {
+CSAsyncObject.prototype.delAttr = function(attrname) {
   this.setAttr(attrname, null);
 };
 
 function csHotSpan(inner,makePopup,makeArg) {
+  _log("CALL TO OLD non-class csHotSpan(inner=["+inner+"],...)");
   var span = csNode("SPAN");
   span.style.textDecoration='underline';
   if (typeof(inner) == "string") {
@@ -776,18 +781,18 @@ function csHotSpan(inner,makePopup,makeArg) {
   return span;
 }
 
-function csHotSpan2(inner, control) {
-  _log("OBSOLETE CALL TO HOTSPAN2");
-  return new CSHotSpan(inner, control).span;
-}
 /**
  * Create a "hot" <SPAN>, calling the control object
  * on various events.
  * inner: string for inner text, or array of HTMLElements.
- * control: the control object.
+ * control: the control object which may supply the following methods:
+ *              .onmouseover, .onmouseout
+ *              .onclick(hotspan, e)
  */
-function CSHotSpan(inner, control) {
+function CSHotSpan(inner, control, context) {
   var me = this;
+  me.context=context;
+  //_log("new CSHotSPan: context="+context);
 
   var span = csNode("SPAN");
   span.style.textDecoration='underline';
@@ -857,7 +862,7 @@ function CSPan(toPan) {
   } else {
     // Place some glass over the object to prevent drag'n'drop causing
     // trouble. Make it full size to cover the outer DIV.
-    glass = csDIV();
+    glass = csDIV("TRANSPARENT");
     outer.appendChild(glass);
     csSetPosition(glass, csXY(0,0));
     csSetSize(glass,"100%","100%");
@@ -865,7 +870,7 @@ function CSPan(toPan) {
 
     // Place another layer over the glass for hotspots.
     // We pan this layer with the toPan object to keep the hotspots aligned.
-    hotLayer = csDIV();
+    hotLayer = csDIV("TRANSPARENT");
     outer.appendChild(hotLayer)
     csSetPosition(hotLayer, csXY(0,0));
     csSetZIndex(hotLayer,2);
@@ -1126,6 +1131,202 @@ CSFolder.prototype.setOpen = function(openMode) {
     }
   }
 };
+
+// A textfield for entering a string, with an accompanying list of helper choices.
+// The control object needs to provide the following methods:
+//   .onchange(), to apply an entered string
+//   .withChoices(), to call a function with the available entry choice strings
+function CSEntry(control, prefix) {
+  var me = this;
+  me.control=control;
+  me.value=''
+  me.span=csNode('SPAN');
+  me.text=csNode('INPUT');
+  me.text.type='TEXT';
+  me.text.value='';
+  me.text.size=10;
+  me.text.maxlength=16;
+  me.text.onfocus=function() { me.hasFocus=true;  me.showPrefix(); }
+  me.text.onblur=function()  { me.hasFocus=false; me.showPrefix(); }
+  me.text.onchange=function() { me.choose(me.text.value); return false; };
+  me.text.onkeypress=function(e) {
+                       var caught=false;
+                       if (!e) e=window.event;
+                       var keycode = e.which || e.keyCode;
+                       _log("keycode="+keycode);
+                       if (e.modifiers) {
+                         _log("modifiers="+e.modifiers);
+                       }
+                       if (keycode >= 32) {
+                         caught=true;
+                         me.set(me.value+String.fromCharCode(keycode));
+                       } else if (keycode == 13) {
+                         // enter/return
+                         caught=true;
+                         me.set(me.value);
+                         me.control.choose(me.value);
+                       } else if (keycode == 8) {
+                         // backspace
+                         caught=true;
+                         if (me.value.length > 0) {
+                           me.set(me.value.substr(0,me.value.length-1));
+                         }
+                       } else if (keycode == 9) {
+                         // TAB completion
+                         caught=true;
+                         if (me.value.length) {
+                           me.control.withChoices(
+                             function(choices) {
+                               var pfx=me.value;
+                               var nchoices=choices.length;
+                               while (true) {
+                                 var nextch=null;
+                                 for (var i=0; i<nchoices; i++) {
+                                   var choice=choices[i];
+                                   if (choice.length > pfx.length
+                                    && choice.substr(0,pfx.length) == pfx) {
+                                     var nnextch = choice.substr(pfx.length, 1);
+                                     if (nextch == null) {
+                                       nextch=nnextch;
+                                     } else if (nnextch != nextch) {
+                                       nextch=null;
+                                       break;
+                                     }
+                                   }
+                                 }
+                                 if (nextch == null) {
+                                   break;
+                                  }
+                                  pfx+=nextch;
+                               }
+                               me.set(pfx);
+                             });
+                         }
+                       }
+
+                       me.text.value=me.value;
+                       if (_cs_isIE) Event.returnValue=!caught;
+                       return !caught;
+                     };
+  me.span.appendChild(me.text);
+}
+CSEntry.prototype.setTooltip = function(tip) {
+  this.text.title=tip;
+};
+CSEntry.prototype.showPopup = function(doShow) {
+  if (this.popup) {
+    if (doShow) {
+      csPosNodeBelow(this.popup, this.span);
+    }
+    this.popup.style.display=(doShow ? 'block' : 'none');
+  }
+};
+CSEntry.prototype.showPrefix = function() {
+  var me=this;
+  if (!me.popup) {
+    me.popup=csDIV(null, 1);
+    me.popup.onmouseover=function(){ _log("mouseover popup"); me.inPopup=true; };
+    me.popup.onmouseout =function(){ _log("mouseout  popup"); me.inPopup=false; };
+    me.showPopup(false);
+    me.control.withChoices(
+      function(choices) {
+        _log("make new vlist: choices="+choices);
+        me.vlist=new CSVList(
+                       choices,
+                       { choose:
+                           function(choice) {
+                             me.set(choice);
+                             me.control.choose(me.value);
+                           },
+                         mkChoiceLabel:
+                           function(choice) {
+                             if (me.control.mkChoiceLabel) {
+                               return me.control.mkChoiceLabel(choice, me);
+                             }
+                             return new CSHotSpan(
+                                          choice,
+                                          { onclick: function(hotspan) {
+                                                       me.set(hotspan.context);
+                                                       me.control.choose(hotspan.context);
+                                                     }
+                                          }, choice).span;
+                           }
+                       },
+                       me.value);
+        me._showPrefix();
+        me.popup.appendChild(me.vlist.table);
+      });
+    me.span.appendChild(me.popup);
+  } else {
+    me._showPrefix();
+  }
+};
+CSEntry.prototype._showPrefix = function() {
+  _log("_showpfx("+this.value+")");
+  if (this.value.length == 0 || (!this.inPopup && this.hasFocus != null && !this.hasFocus)) {
+    this.showPopup(false);
+  } else {
+    if (this.vlist) {
+      this.vlist.showPrefix(this.value);
+      this.showPopup(true);
+    }
+  }
+};
+CSEntry.prototype.reset = function() {
+  this.set('');
+};
+CSEntry.prototype.set = function(value) {
+  this.text.value=value;
+  this.value=value;
+  this.showPrefix();
+};
+CSEntry.prototype.choose = function(value) {
+  this.set(value);
+  this.control.choose(value);
+};
+
+// A table for selecting from a list of choices.
+// The control supplies these methods:
+//   .choose(choice)              Called when a choice is selected.
+//   .mkChoiceLabel(choice, this) Optional, returns an in-line element to use
+//                                for the choice label. If it catches clicks,
+//                                it must call this.choose(choice).
+function CSVList(choices, control, prefix) {
+  var me=this;
+  me.control=control;
+  me.table=new csNode('TABLE');
+  //me.table.border=1;
+  me.table.style.borderCollapse='collapse';
+  me.rowMap={};
+  var nrows=0;
+  for (var i=0; i<choices.length; i++) {
+    var choice = choices[i];
+    var row = me.table.insertRow(nrows++);
+    me.rowMap[choice]=row;
+    var cell = row.insertCell(0);
+    var labelSpan = control.mkChoiceLabel(choice);
+    cell.appendChild(labelSpan);
+  }
+
+  if (prefix && prefix.length) {
+    me.showPrefix(prefix);
+  }
+}
+CSVList.prototype.choose = function(choice) {
+  this.control.choose(choice);
+};
+CSVList.prototype.onclick = function(hotspan, e) {
+  this.choose(hotspan.context);
+};
+CSVList.prototype.showPrefix = function(prefix) {
+  for (var choice in this.rowMap) {
+    this.rowMap[choice].style.visibility
+      = ( choice.length >= prefix.length && choice.substr(0, prefix.length) == prefix )
+        ? 'visible'
+        : 'collapse'
+        ;
+  }
+}
 
 { var vp = csViewPort();
   _log("viewport = "+vp.x+"x"+vp.y+", "+vp.width+"x"+vp.height);

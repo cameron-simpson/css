@@ -41,6 +41,15 @@ def sqlite(filename):
   from pysqlite2 import dbapi2
   return dbapi2.connect(filename)
 
+class ConnWrapper:
+  def __init__(self,getConn,*args):
+    self.getConn=getConn
+    self.getConnArgs=args
+    self.conn=getConn(*args)
+  def attachConn(self):
+    self.conn=self.getConn(*self.getConnArgs)
+    return self.conn
+
 _warned_MYSQL_NO_UTF8=False
 
 # attach to a MySQL database, return normal python db handle
@@ -71,10 +80,13 @@ def mysql(secret,db=None):
 
 _cache_dbpool={}
 def dbpool(secret,dbname):
-  """ Cache for sharing database connections for a specific secret and db name. """
+  """ Cache for sharing database connections for a specific secret and db name.
+      Returns a ConnWrapper, whose .conn field is a db connection.
+      ConnWrapper.attachConn() can be called to try to reattach the connection.
+  """
   global _cache_dbpool
   if (secret,dbname) not in _cache_dbpool:
-    _cache_dbpool[secret,dbname]=mysql(secret,dbname)
+    _cache_dbpool[secret,dbname]=ConnWrapper(mysql,secret,dbname)
 
   return _cache_dbpool[secret,dbname]
 
@@ -148,11 +160,18 @@ class SQLQuery:
     self.__conn=conn
     self.__query=query
     self.__params=params
-    self.__cursor=conn.cursor()
+    self.__cursor=conn.conn.cursor()
     if ifdebug():
       warn('SQLQuery:', query)
       if len(params) > 0: warn("SQLQuery: params =", `params`)
-    self.__cursor.execute(query,params)
+    try:
+      self.__cursor.execute(query,params)
+    except:
+      cmderr("SQL failure for: %s (params=%s)" % (query,params))
+      warn("\tRetry with new db connection...")
+      conn.attachConn()
+      self.__cursor=conn.conn.cursor()
+      self.__cursor.execute(query,params)
 
   def allrows(self):
     return [row for row in self]

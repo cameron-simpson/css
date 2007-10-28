@@ -7,7 +7,7 @@
 cmd=$0
 usage="Usage: $cmd [command [args...]]"
 
-have-ssh-agent -h || rig-ssh-agent -f || exit 1
+have-ssh-agent -h || rig-ssh-agent || exit 1
 eval `get-ssh-agent -h` || exit 1
 
 [ $# = 0 ] && exec get-ssh-agent -h

@@ -1,0 +1,22 @@
+#!/usr/bin/python
+#
+# Unpack the contents of a dbm file to stdout.
+#       - Cameron Simpson <cs@zip.com.au> 15aug2007
+#
+
+import anydbm
+import sys
+
+usage="Usage: %s dbmfile [keys...]" % sys.argv[0]
+
+assert len(sys.argv) >= 2, usage
+dbmfile=sys.argv[1]
+keylist=sys.argv[2:]
+
+db=anydbm.open(dbmfile,'r')
+if len(keylist) == 0:
+  keylist=db.keys()
+  keylist.sort()
+
+for k in keylist:
+  print "%s: %s" % (k, db[k])

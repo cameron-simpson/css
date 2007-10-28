@@ -321,7 +321,7 @@ class HierInput(_Hier):
       raise ValueError, "syntax error at: \""+s+"\""
 
     safeTok = m.group()
-    if safeTok.isdigit():
+    if safeTok.isdigit() and (len(safeTok) == 1 or safeTok[0] != '0'):
       safeTok=int(safeTok)
 
     return (safeTok, s[m.end():])
