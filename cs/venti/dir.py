@@ -4,7 +4,7 @@
 #
 
 import os
-from cs.misc import progress, verbose, toBS, fromBSfp
+from cs.misc import warn, progress, verbose, toBS, fromBSfp
 from cs.venti import tohex
 from cs.venti.blocks import BlockRef, decodeBlockRefFP
 from cs.venti.file import ReadFile, WriteFile
@@ -37,6 +37,11 @@ def storeDir(S,path):
   return subdirs[topdirs[0]]
 
 class Dirent:
+  ''' A Dirent represents a directory entry.
+        .bref   A BlockRef to the entry's data.
+        .isdir  Whether the entry is a directory.
+        .meta   Meta data, if any.
+  '''
   def __init__(self,bref,isdir,meta=None):
     self.bref=bref
     self.isdir=isdir
@@ -107,6 +112,7 @@ class Dir(dict):
       fp=open(S,dirref,"r")
       (name,dent)=decodeDirent(fp)
       while name is not None:
+        ##warn("%s: load %s" % (dirref,name))
         dict.__setitem__(self,name,dent)
         (name,dent)=decodeDirent(fp)
 

@@ -7,7 +7,7 @@
 #
 
 from cs.misc import toBS, fromBS, fromBSfp
-from cs.venti import MAX_SUBBLOCKS
+from cs.venti import MAX_SUBBLOCKS, tohex
 
 def encodeBlockRef(flags,span,h):
     ''' Encode a blockref for storage.
@@ -68,6 +68,8 @@ class BlockRef:
     return 0x01 & int(self.indirect)
   def __len__(self):
     return self.span
+  def __str__(self):
+    return tohex(self.encode())
   def blocklist(self,S):
     assert self.indirect
     return BlockList(S,self.h)
