@@ -112,7 +112,9 @@ export CURRENT_FOLDER DELETE_FOLDER
 prc=$DELETE_FOLDER/.procmailrc
 arch=$MAILDIR/ARCHIVE/`date "+$MAIL_EXPIRE_FORMAT"`/$fbase
 maildir "$DELETE_FOLDER" "$arch"
-echo "spool-xref,$arch . ." | cats2procmailrc -t maildir -T >"$prc"
+( echo "LOGFILE=$HOME/var/log/procmail"
+  echo "spool-xref,$arch . ."
+) | cats2procmailrc -t maildir -T >"$prc"
 rig-mail-despool "$DELETE_FOLDER"
 
 set sh -c "exec $muttcmd"
