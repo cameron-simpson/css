@@ -399,14 +399,14 @@ def resolveTarget(target):
       # presume it is a mail folder
       if not os.path.isabs(target):
         target=os.path.join(os.environ['MAILDIR'],target)
-        ftype=dfltType
-        if os.path.isfile(target):
-          ftype='UNIX'
-        elif os.path.isdir(target):
-          if os.path.isfile(os.path.join(target,'.mh_sequences')):
-            ftype='MH'
-          else:
-            ftype='MAILDIR'
+      ftype=dfltType
+      if os.path.isfile(target):
+        ftype='UNIX'
+      elif os.path.isdir(target):
+        if os.path.isfile(os.path.join(target,'.mh_sequences')):
+          ftype='MH'
+        else:
+          ftype='MAILDIR'
       if ftype == 'UNIX':
         pass
       elif ftype == 'MAILDIR':
