@@ -22,13 +22,10 @@ do
     */*)                flatspool=`printf "%s\n" "$spool" | tr / _` ;;
     *)                  flatspool=$spool ;;
   esac
-  set -- bgproc -l procmail -p "mail-despool-$flatspool" -- set-x lock -1 "$maildir" nice nice mail-despool -d "$delay" -t "$timeout" "$maildir"
-  if locked "$maildir"
-  then
-    echo "$cmd: lock $maildir taken: skipping: $*" >&2
-  else
-    "$@" || xit=1
-  fi
+
+  locked "$maildir" \
+  || bgproc -l procmail -p "mail-despool-$flatspool" -- set-x lock -1 "$maildir" nice nice mail-despool -d "$delay" -t "$timeout" "$maildir" \
+  || xit=1
 done
 
 exit $xit
