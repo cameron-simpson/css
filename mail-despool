@@ -82,7 +82,7 @@ while :
 do
   # locate new items
   havenew=
-  if ismaildir .
+  if [ -d new/. ]
   then
     havenew=1
     set -- cur/* new/*
@@ -98,7 +98,7 @@ do
     fi
   fi
 
-  rm -f "$busyflag"
+  [ ! -f "$busyflag" ] || rm -f "$busyflag"
   if [ $havenew ]
   then
     for f
