@@ -29,6 +29,7 @@ cmd=$0
 usage="Usage: $0 [+a] [+s] [+t] [-f] [some-mutt-options...] [mutt-folder]"
 
 mfolder=+me
+delay=300
 muttopts=
 anyhost=
 use_term=	## 1; case "$DISPLAY" in localhost:[1-9]*) use_term= ;; esac
@@ -115,7 +116,7 @@ export CURRENT_FOLDER DELETE_FOLDER
   ( echo "LOGFILE=$HOME/var/log/procmail"
     echo "spool-xref,$arch . ."
   ) | cats2procmailrc -t maildir -T >"$prc"
-  exec rig-mail-despool "$DELETE_FOLDER"
+  exec rig-mail-despool -d "$delay" "$DELETE_FOLDER"
 ) &
 
 set sh -c "exec $muttcmd"

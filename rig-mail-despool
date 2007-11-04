@@ -8,6 +8,12 @@ usage="Usage: $cmd [spoolnames..."
 delay=5
 timeout=60
 
+if [ $# -gt 0 ] && [ "x$1" = x-d ]
+then
+  delay=$2
+  shift
+  shift
+fi
 [ $# -gt 0 ] || set -- spool spool-in spool-out spool-xref ham spam-definite
 
 xit=0
