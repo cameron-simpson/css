@@ -1164,7 +1164,8 @@ function CSEntry(control, prefix) {
   me.text.maxlength=16;
   me.text.onfocus=function() { me.hasFocus=true;  me.showPrefix(); }
   me.text.onblur=function()  { me.hasFocus=false; me.showPrefix(); }
-  me.text.onchange=function() { me.choose(me.text.value); return false; };
+  //Done by the keypress stuff below.
+  //me.text.onchange=function() { me.choose(me.text.value); return false; };
   me.text.onkeypress=function(e) {
                        var caught=false;
                        if (!e) e=window.event;
