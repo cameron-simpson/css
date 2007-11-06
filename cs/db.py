@@ -11,7 +11,7 @@ import datetime
 from sets import Set
 import cs.secret
 import cs.cache
-from cs.misc import cmderr, debug, ifdebug, warn, isodate, exactlyOne
+from cs.misc import cmderr, debug, ifdebug, warn, isodate, exactlyOne, WithUC_Attrs
 
 def today():
   return datetime.date.today()
@@ -416,7 +416,7 @@ class DirectKeyedTableView:
            ",".join([row[k] for k in columns]))
     dosql(self.conn,sql)
 
-class DirectTableRow:
+class DirectTableRow(WithUC_Attrs):
   ''' Direct access to a table row.
   '''
   def __init__(self,table,values):
@@ -573,7 +573,7 @@ class NoSuchRowError(IndexError):
   ''' Thrown if the row cannot be found.
   '''
 
-class TableRowWrapper:
+class TableRowWrapper(WithUC_Attrs):
   def __init__(self,tableview,key):
     self.TableView=tableview
     try:
