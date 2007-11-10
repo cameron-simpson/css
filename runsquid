@@ -10,7 +10,7 @@ set -ue
 : ${SQUID_CONFIG:=/etc/squid/squid.conf}
 
 cmd=`basename "$0"`
-usage="Usage: $cmd [-f config] [-S squid] [-x] {flushall|start|stop}"
+usage="Usage: $cmd [-f config] [-S squid] [-x] {flushall|start|stop|restart}"
 
 trace=eecho     ##set-x
 xopt=
@@ -60,6 +60,10 @@ case $op in
       $trace mkdir "$cache_dir"
       $trace chown squid:squid "$cache_dir"
       $trace "$SQUID_BINARY" -f "$SQUID_CONFIG" -z
+      $trace "$0" $xopt -S "$SQUID_BINARY" -f "$SQUID_CONFIG" start
+      ;;
+  restart)
+      $trace "$0" $xopt -S "$SQUID_BINARY" -f "$SQUID_CONFIG" stop
       $trace "$0" $xopt -S "$SQUID_BINARY" -f "$SQUID_CONFIG" start
       ;;
   start)
