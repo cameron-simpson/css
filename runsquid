@@ -1,0 +1,103 @@
+#!/bin/sh -ue
+#
+# Perform various tasks with a squid cache.
+#       - Cameron Simpson <cs@zip.com.au> 07nov2007
+#
+
+set -ue
+
+: ${SQUID_BINARY:=squid}
+: ${SQUID_CONFIG:=/etc/squid/squid.conf}
+
+cmd=`basename "$0"`
+usage="Usage: $cmd [-f config] [-S squid] [-x] {flushall|start|stop|restart}"
+
+trace=eecho     ##set-x
+xopt=
+
+badopts=
+
+while [ $# -gt 0 ]
+do
+  case $1 in
+    -f) SQUID_CONFIG=$2; shift ;;
+    -S) SQUID_BINARY=$2; shift ;;
+    -x) trace=set-x xopt=-x ;;
+    --) shift; break ;;
+    -?*)echo "$cmd: unrecognised option: $1" >&2
+        badopts=1
+        ;;
+    *)  break ;;
+  esac
+  shift
+done
+
+if [ $# = 0 ]
+then
+  echo "$cmd: missing operation" >&2
+  badopts=1
+else
+  op=$1; shift
+  if [ $# -gt 0 ]
+  then
+    echo "$cmd: extra arguments after \"$op\": $*" >&2
+    badopts=1
+  fi
+fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+case $op in
+  flushall)
+      cache_dir=`awk '$1 == "cache_dir" { print $3 }' "$SQUID_CONFIG"`
+      if [ ! -d "$cache_dir/." ]
+      then
+        echo "$cmd: $op: no cache_dir: $cache_dir" >&2
+        exit 1
+      fi
+      $trace "$0" $xopt -S "$SQUID_BINARY" -f "$SQUID_CONFIG" stop
+      $trace rmr "$cache_dir"
+      $trace mkdir "$cache_dir"
+      $trace chown squid:squid "$cache_dir"
+      $trace "$SQUID_BINARY" -f "$SQUID_CONFIG" -z
+      $trace "$0" $xopt -S "$SQUID_BINARY" -f "$SQUID_CONFIG" start
+      ;;
+  restart)
+      $trace "$0" $xopt -S "$SQUID_BINARY" -f "$SQUID_CONFIG" stop
+      $trace "$0" $xopt -S "$SQUID_BINARY" -f "$SQUID_CONFIG" start
+      ;;
+  start)
+      $trace "$SQUID_BINARY" -f "$SQUID_CONFIG"
+      ;;
+  stop)
+      pid_filename=`awk '$1 == "pid_filename" { print $2 }' "$SQUID_CONFIG"`
+      if [ ! -s "$pid_filename" ]
+      then
+        echo "$cmd: $op: missing pid file: $pid_filename" >&2
+        exit 1
+      fi
+      pid=`cat "$pid_filename"`
+      if [ -z "$pid" ] || not kill -0 "$pid"
+      then
+        echo "$cmd: $op: no process: $pid" >&2
+        exit 1
+      fi
+      $trace "$SQUID_BINARY" -f "$SQUID_CONFIG" -k kill
+      waiting=
+      while kill -0 "$pid" 2>/dev/null
+      do
+        if [ $waiting ]
+        then
+          necho .
+        else
+          necho "$cmd: waiting for squid ($pid) to exit ..."
+          waiting=1
+        fi
+        sleep 1
+      done
+      echo
+      ;;
+  *)  echo "$cmd: unsupported operation: $op" >&2
+      exit 1
+      ;;
+esac

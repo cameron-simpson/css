@@ -15,6 +15,12 @@ if (this._cs_libLoaded) {
   //document.write("appver = "+navigator.appVersion+", agent = "+navigator.userAgent+"<BR>\n");
   //document.write("isIE="+_cs_isIE+", isGecko="+_cs_isGecko+"<BR>\n");
 
+  if (_cs_isIE) {
+    self.onerror = function(err, url, line) {
+                     _log(err+" at "+url+":"+line);
+                   };
+  }
+
   _cs_anims=[];
   _cs_nanim=0;
 
@@ -32,7 +38,9 @@ if (this._cs_libLoaded) {
 }
 
 function _log(str,node) {
-  if (node == null) node=_logNode;
+  if (node == null) {
+    node=_logNode;
+  }
   if (node != null) {
     node.appendChild(document.createTextNode(str));
     node.appendChild(document.createElement("BR"));
@@ -1104,7 +1112,7 @@ function CSFolder(control, startOpen) {
   this.innerRow=innerRow;
   this.innerCell=innerCell;
   this.isOpen=false;
-  this.innerRow.style.visibility='collapse';
+  csShowTableElem(this.innerRow, false);
   this.setOpen(startOpen);
 }
 
@@ -1119,18 +1127,26 @@ CSFolder.prototype.setOpen = function(openMode) {
       if (this.control.onopen) {
         this.control.onopen(this);
       }
-      this.innerRow.style.visibility='visible';
+      csShowTableElem(this.innerRow, true);
     }
   } else {
     if (this.isOpen) {
       this.isOpen=false;
-      this.innerRow.style.visibility='collapse';
+      csShowTableElem(this.innerRow, false);
       if (this.control.onclose) {
         this.control.onclose(this);
       }
     }
   }
 };
+
+function csShowTableElem(elem, showit) {
+  if (_cs_isIE) {
+    elem.style.display=( showit ? 'table-row' : 'none' );
+  } else {
+    elem.style.visibility=(showit ? 'visible' : 'collapse' );
+  }
+}
 
 // A textfield for entering a string, with an accompanying list of helper choices.
 // The control object needs to provide the following methods:
@@ -1148,7 +1164,8 @@ function CSEntry(control, prefix) {
   me.text.maxlength=16;
   me.text.onfocus=function() { me.hasFocus=true;  me.showPrefix(); }
   me.text.onblur=function()  { me.hasFocus=false; me.showPrefix(); }
-  me.text.onchange=function() { me.choose(me.text.value); return false; };
+  //Done by the keypress stuff below.
+  //me.text.onchange=function() { me.choose(me.text.value); return false; };
   me.text.onkeypress=function(e) {
                        var caught=false;
                        if (!e) e=window.event;

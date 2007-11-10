@@ -45,6 +45,7 @@
 : ${CDDBSERVER:=au.freedb.org:8880}
 export CDDBSERVER
 
+anon=
 trace=
 force=
 bps=$CDRIP_BPS
@@ -60,7 +61,9 @@ nice=10
 cdpara_noise=-q
 
 cmd=`basename "$0"` || exit 1
-usage="Usage: $cmd [-q qual] [-b bps] [-d device] [-e enclist] [-l lock] [-j jobs] [-K]
+usage="Usage: $cmd [-A] [-q qual] [-b bps] [-d device] [-e enclist] [-l lock] [-j jobs] [-K]
+        -A              Anonymous; don't consult CDDB. Useful for personal
+                        discs with unpublished content.
 	-b kbps		Fixed bitrate kilobits per second for the encoding.
 			Default: variable bit rate using quality.
 	-d device	Device holding the CD. Default: $CDRIP_DEV
@@ -80,7 +83,7 @@ usage="Usage: $cmd [-q qual] [-b bps] [-d device] [-e enclist] [-l lock] [-j job
 	-v		Verbose.
         -x              Trace execution."
 
-set x -b "$bps" -q "$qual" $CDRIP_OPTS ${1+"$@"}; shift
+set -- -b "$bps" -q "$qual" $CDRIP_OPTS ${1+"$@"}
 
 #
 # =head1 OPTIONS
@@ -91,6 +94,12 @@ badopts=
 while [ $# -gt 0 ]
 do
     case $1 in
+	#
+	# =item B<-A>
+	#
+	# Anonymous. Do not expect or obtain a table of contents for this disc.
+        #
+        -A)     anon=1 ;;
 	#
 	# =item B<-b> I<kbps>
 	#

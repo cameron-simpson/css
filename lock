@@ -158,23 +158,23 @@ else
 
 $::Xit=0;
 
+undef $::Pid;
+
 ## BUG: We don't want to do this if these signals are ignored
 ##      but AFAIK you can't test that in Perl. That sucks. Big time.
 $SIG{HUP}=\&slap;
 $SIG{INT}=\&slap;
 $SIG{TERM}=\&slap;
 
-my $pid;
-
 if ($::Async)
 {
-  if (! defined ($pid=fork))
+  if (! defined ($::Pid=fork))
   {
     tidy();
     exit 1;
   }
 
-  if ($pid != 0)
+  if ($::Pid != 0)
   # mainline program
   { $::Lock->{TAKEN}=0;	# don't tidy up after fork
     exit 0;
@@ -185,12 +185,12 @@ if ($::Async)
 }
 
 # now the for-real fork/wait
-$pid = fork;
-if (! defined $pid)
+$::Pid = fork;
+if (! defined $::Pid)
 { warn "$::cmd: can't fork: $!\n";
   $::Xit=1;
 }
-elsif ($pid == 0)
+elsif ($::Pid == 0)
 # child - run command
 { $::Lock->{TAKEN}=0; # don't tidy up after fork
   exec @ARGV;
@@ -205,16 +205,16 @@ else
   if (defined $::Lock)
   { $::Pidfile=$::Lock->Path().'/pid' if ! defined $::Pidfile;
     if (! open(PIDFILE,"> $::Pidfile\0"))
-    { warn "$::cmd: can't save pid ($pid) in file \"$::Pidfile\": $!\n";
+    { warn "$::cmd: can't save pid ($::Pid) in file \"$::Pidfile\": $!\n";
       $::Xit=1;
     }
     else
-    { print PIDFILE "$pid\n";
+    { print PIDFILE "$::Pid\n";
       close(PIDFILE);
     }
   }
 
-  waitpid($pid, 0);
+  waitpid($::Pid, 0);
   $::Xit=1 if $? != 0;
 }
 
@@ -228,6 +228,9 @@ sub slap
 }
 
 sub tidy
-{ undef $::Lock;
+{ if (defined($::Pid) && $::Pid > 0)
+  { kill(15, $::Pid);
+  }
+  undef $::Lock;
   exit $::Xit;
 }

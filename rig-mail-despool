@@ -8,6 +8,12 @@ usage="Usage: $cmd [spoolnames..."
 delay=5
 timeout=60
 
+if [ $# -gt 0 ] && [ "x$1" = x-d ]
+then
+  delay=$2
+  shift
+  shift
+fi
 [ $# -gt 0 ] || set -- spool spool-in spool-out spool-xref ham spam-definite
 
 xit=0
@@ -22,13 +28,10 @@ do
     */*)                flatspool=`printf "%s\n" "$spool" | tr / _` ;;
     *)                  flatspool=$spool ;;
   esac
-  set -- bgproc -l procmail -p "mail-despool-$spool" -- set-x lock -1 "$maildir" mail-despool -d "$delay" -t "$timeout" "$maildir"
-  if locked "$maildir"
-  then
-    echo "$cmd: lock $maildir taken: skipping: $*" >&2
-  else
-    "$@" || xit=1
-  fi
+
+  locked "$maildir" \
+  || bgproc -l procmail -p "mail-despool-$flatspool" -- set-x lock -1 "$maildir" nice nice mail-despool -d "$delay" -t "$timeout" "$maildir" \
+  || xit=1
 done
 
 exit $xit
