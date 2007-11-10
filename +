@@ -1,14 +1,19 @@
-#!/bin/sh -u
+#!/bin/sh -ue
 #
 # Read a mail folder with mutt.
 #	- Cameron Simpson <cs@zip.com.au>
 #
+
+set -ue
 
 : ${MUTTPPREFIX:=/usr}
 : ${MAILHOMEHOST:=$HOMEHOST}
 : ${DISPLAY:=''}
 : ${LOGDIR:=$HOME/var/log}
 : ${ALERTLOG:=$LOGDIR/alert}
+: ${MAILDIR:=$HOME/mail}
+: ${MAIL_EXPIRE_FORMAT:='%Y'}           # versus, say, %Y-%m
+: ${MAIL_EXPIRE_ARCHIVE:=+ARCHIVE}
 
 needhost "$MAILHOMEHOST@$SYSTEMID" \
 || { case "$LOCATION" in
@@ -24,6 +29,7 @@ cmd=$0
 usage="Usage: $0 [+a] [+s] [+t] [-f] [some-mutt-options...] [mutt-folder]"
 
 mfolder=+me
+delay=5
 muttopts=
 anyhost=
 use_term=	## 1; case "$DISPLAY" in localhost:[1-9]*) use_term= ;; esac
@@ -73,6 +79,7 @@ fi
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
 fpath=`mailfolderpath "$mfolder"` || exit 1
+muttcmd="$MUTTPREFIX/bin/mutt -f '$mfolder' -e 'fcc-hook . $mfolder' $muttopts"
 
 # where to take copies - presumes sendmail=sendmesg-fcc in muttrc
 SENDMESG_FCC="$fpath +spool-out"
@@ -80,58 +87,54 @@ export SENDMESG_FCC
 
 if [ -z "$fpath" ]
 then
-    DELETE_FOLDER=+DELETED/misc
-    SAVE_FOLDER=+SAVED/misc
-    maildir "$MAILDIR/SAVED/misc"
+  fbase=misc
 else
-    ismaildir "$fpath" \
-    || ismhdir "$fpath" \
-    || { echo "$cmd: $fpath: not Maildir or MH folder" >&2
-	 exit 1
-       }
+  fbase=`basename "$fpath"`
+  ismaildir "$fpath" \
+  || ismhdir "$fpath" \
+  || { echo "$cmd: $fpath: not Maildir or MH folder" >&2
+       exit 1
+     }
 
-    fbase=`basename "$fpath"` || exit 1
-    DELETE_FOLDER=+DELETED/$fbase
-    SAVE_FOLDER=+SAVED/$fbase
-
-    CURRENT_FOLDER=$fpath
-    export CURRENT_FOLDER
-fi
-
-for var in DELETE SAVE
-do  eval "vf=\$${var}_FOLDER"
-    vf=`mailfolderpath "$vf"` || exit 1
-    eval "${var}_FOLDER=\$vf"
-done
-export DELETE_FOLDER SAVE_FOLDER
-
-muttcmd="$MUTTPREFIX/bin/mutt -f '$mfolder' -e 'fcc-hook . $mfolder' $muttopts"
-
-if [ -n "$fpath" ]
-then
   mutthcache=$HOME/var/mutt/header-cache
-  needdir "$mutthcache" && muttcmd="$muttcmd -e 'set header_cache=$mutthcache'"
+  { needdir "$mutthcache" \
+    && muttcmd="$muttcmd -e 'set header_cache=$mutthcache'"
+  } || :
 
   fmuttrc=$fpath/.muttrc
   [ -s "$fmuttrc" ] && muttcmd="$muttcmd -e 'source $fmuttrc'"
-
-  if ismaildir "$fpath"
-  then maildir "$DELETE_FOLDER" "$SAVE_FOLDER"
-  else mhdir "$DELETE_FOLDER" "$SAVE_FOLDER"
-  fi
 fi
+
+DELETE_FOLDER=$MAILDIR/DELETED/$fbase
+CURRENT_FOLDER=$fpath
+export CURRENT_FOLDER DELETE_FOLDER
+
+# arrange archiving of deleted email
+(
+  lock=$DELETE_FOLDER
+  if locked "$lock"
+  then exit 0
+  fi
+
+  prc=$DELETE_FOLDER/.procmailrc
+  arch=$MAILDIR/ARCHIVE/`date "+$MAIL_EXPIRE_FORMAT"`/$fbase
+  maildir "$DELETE_FOLDER" "$arch"
+  ( echo "LOGFILE=$HOME/var/log/procmail"
+    echo "spool-xref,$arch . ."
+  ) | cats2procmailrc -t maildir -T >"$prc"
+
+  exec lock -1 "$lock" mail-despool -d "$delay" -t 60 "$DELETE_FOLDER"
+) &
+despool=$!
+
 set sh -c "exec $muttcmd"
 
 [ $use_screen ] && set scr "mutt_$mfolder" "$@"
 [ $use_term   ] && set term -j email $termopts -n "mutt $mfolder" "$@"
 
-[ -z "$preshcmd" -a -z "$postshcmd" ] && exec "$@"
-
-if eval "$preshcmd"
-then
-  "$@"
-  xit=$?
-  ( cd $HOME/rc/mail && myke ) || xit=1
-  eval "$postshcmd" || xit=1
-  exit $xit
-fi
+[ -z "$preshcmd" ] || eval "$preshcmd"
+"$@"
+xit=$?
+kill "$despool"
+[ -z "$postshcmd" ] || eval "$postshcmd" || xit=1
+exit $xit

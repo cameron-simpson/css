@@ -16,6 +16,7 @@ then
 fi
 
 for fv in \
+        $FVWM_BINARY \
 	2.5.21-fc6 \
 	2.5.17-fc4 \
 	2.5.15-fc4 \
@@ -55,7 +56,7 @@ PATH=$PATH:$fv/bin
 PYTHONPATH=$PYTHONPATH:$HOME/rc/python/Fvwmpy
 export PATH PYTHONPATH
 
-exec bgproc -s -p wm -l x11 -- "$fvwm" -cmd "PipeRead fvwmrc" ${1+"$@"}
+exec bgproc -s -p wm -l x11 -- "$fvwm" -cmd "PipeRead cs-fvwmrc" ${1+"$@"}
 
 ### set up FVWM log/fifo vars
 ##eval `rigfvwmvars`

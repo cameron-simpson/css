@@ -46,7 +46,7 @@ done
 set -x
 histbackup -x --delete-excluded \
         "$HOME/var/firefox" "$HOME/var/backup/firefox" \
-        '--exclude=/*/Cache' '--exclude=/*/*.mfasl' '--exclude=/*/urlclassifier2.sqlite'
+        '--exclude=/*/Cache' '--exclude=/*/browserstate-logs' '--exclude=/*/*.mfasl' '--exclude=/*/urlclassifier2.sqlite'
 echo >>"$prefs"
 bsed '/^user_pref("permissions.default.image"/d
       /^user_pref("extensions.tabmix.progressMeter"/d

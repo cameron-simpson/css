@@ -5,7 +5,6 @@
 #
 
 : ${MAILDIR:=$HOME/mail}
-: ${TMPDIR:=/tmp}
 
 cmd=`basename "$0"` || cmd=$0
 usage="Usage: $cmd [-d delay] [-f procmailrc] [-t timeout] maildir [filer [args...]]"
@@ -37,11 +36,12 @@ then
   echo "$cmd: missing maildir" >&2
   badopts=1
 else
-  maildir=$1; shift
+  maildir=$1
+  shift
 fi
 
 case "$maildir" in
-  +*) maildir=$MAILDIR/`expr "x$maildir" : 'x.\(.*\)'` || exit 1 ;;
+  +*) maildir=$MAILDIR/`expr "x$maildir" : 'x.\(.*\)'` ;;
 esac
 
 ismaildir "$maildir" \
@@ -74,51 +74,61 @@ filer_shcmd=`shqstr "$@"` || exit 1
 cd "$maildir" || exit 1
 maildir=`pwd`
 
-busyflag=$TMPDIR/mail-despool.$$busy
-
 xit=0
 
 while :
 do
   # locate new items
+  busy=
   havenew=
-  if ismaildir .
+  if [ -d new/. ]
   then
-    havenew=1
     set -- cur/* new/*
-    [ $# = 2 ] && [ "x$1" = 'xcur/*' -a "x$2" = 'xnew/*' ] && havenew=
+    if [ $# = 2 ] && [ "x$1" = 'xcur/*' -a "x$2" = 'xnew/*' ]
+    then havenew=
+    else havenew=1
+    fi
   else
     if ismhdir .
     then
-      havenew=1
       set -- [1-9]*
-      [ $# = 1 ] && [ "x$1" = 'x[1-9]*' ] && havenew=
+      if [ $# = 1 ] && [ "x$1" = 'x[1-9]*' ]
+      then havenew=
+      else havenew=1
+      fi
     else
       set --
+      ## ABORT HERE?
     fi
   fi
 
-  rm -f "$busyflag"
   if [ $havenew ]
   then
-    for f
-    do
-      [ -s "$f" ] || continue
-      ( ##set -x
-        MAIL_DESPOOL_FILE=$maildir/$f
-        export MAIL_DESPOOL_FILE
-        eval "$trace $filer_shcmd" <"$f" \
-        && $trace rm -- "$f" \
-        && touch "$busyflag"
-      ) || xit=1
-    done
-  fi
+    (
+      busy=1
+      for f
+      do
+        [ -s "$f" ] || continue
+        ( ##set -x
+          MAIL_DESPOOL_FILE=$maildir/$f
+          export MAIL_DESPOOL_FILE
+          eval "$trace $filer_shcmd" <"$f"
+          $trace rm -- "$f" \
+        ) || { busy= xit=1; }
+      done
 
-  [ -n "$delay" ] || break
-  if [ -f "$busyflag" ]
-  then $trace sleep 1
-  else sleep "$delay"
+      if [ -n "$delay" ]
+      then
+        if [ $busy ]
+        then $trace sleep 1
+        else sleep "$delay"
+        fi
+      fi
+    )
+  else
+    [ -z "$delay" ] || sleep "$delay"
   fi
+  [ -n "$delay" ] || break
 done
 
 exit $xit

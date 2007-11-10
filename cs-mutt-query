@@ -1,0 +1,8 @@
+#!/bin/sh
+echo "Searching ..."
+grep -i "$*" <$HOME/rc/mail/aliases \
+| sed -n 's/\t/ /g
+         s/   */ /g
+         s/^\([^ ][^ ]*\) \([^ ][^ ]*\) \(.*\)<\([^@]*@[^>]*\)>,*/\4\t\3 \1 \2/p
+        ' \
+| sort -u

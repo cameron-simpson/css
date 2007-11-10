@@ -11,7 +11,7 @@ import datetime
 from sets import Set
 import cs.secret
 import cs.cache
-from cs.misc import cmderr, debug, ifdebug, warn, isodate, exactlyOne
+from cs.misc import cmderr, debug, ifdebug, warn, isodate, exactlyOne, WithUC_Attrs
 
 def today():
   return datetime.date.today()
@@ -40,6 +40,15 @@ def iscurrent(row,when=None,startndx='START_DATE',endndx='END_DATE',inclusive=Fa
 def sqlite(filename):
   from pysqlite2 import dbapi2
   return dbapi2.connect(filename)
+
+class ConnWrapper:
+  def __init__(self,getConn,*args):
+    self.getConn=getConn
+    self.getConnArgs=args
+    self.conn=getConn(*args)
+  def attachConn(self):
+    self.conn=self.getConn(*self.getConnArgs)
+    return self.conn
 
 _warned_MYSQL_NO_UTF8=False
 
@@ -71,10 +80,13 @@ def mysql(secret,db=None):
 
 _cache_dbpool={}
 def dbpool(secret,dbname):
-  """ Cache for sharing database connections for a specific secret and db name. """
+  """ Cache for sharing database connections for a specific secret and db name.
+      Returns a ConnWrapper, whose .conn field is a db connection.
+      ConnWrapper.attachConn() can be called to try to reattach the connection.
+  """
   global _cache_dbpool
   if (secret,dbname) not in _cache_dbpool:
-    _cache_dbpool[secret,dbname]=mysql(secret,dbname)
+    _cache_dbpool[secret,dbname]=ConnWrapper(mysql,secret,dbname)
 
   return _cache_dbpool[secret,dbname]
 
@@ -148,11 +160,18 @@ class SQLQuery:
     self.__conn=conn
     self.__query=query
     self.__params=params
-    self.__cursor=conn.cursor()
+    self.__cursor=conn.conn.cursor()
     if ifdebug():
       warn('SQLQuery:', query)
       if len(params) > 0: warn("SQLQuery: params =", `params`)
-    self.__cursor.execute(query,params)
+    try:
+      self.__cursor.execute(query,params)
+    except:
+      cmderr("SQL failure for: %s (params=%s)" % (query,params))
+      warn("\tRetry with new db connection...")
+      conn.attachConn()
+      self.__cursor=conn.conn.cursor()
+      self.__cursor.execute(query,params)
 
   def allrows(self):
     return [row for row in self]
@@ -327,7 +346,10 @@ class DirectKeyedTableView:
     return tuple([row[self.__columnmap[key]] for key in self.__keyColumns])
 
   def __key2where(self,key):
-    if type(key[0]) is tuple: raise IndexError, "key is tuple of tuple"
+    if type(key) is not tuple:
+      key=(key,)
+    if type(key[0]) is tuple:
+      raise IndexError, "key is tuple of tuple: %s" % `key`
     return " AND ".join([self.__allColumns[i]+' = '+sqlise(key[i]) for i in range(len(key))])
 
   def rowWhere(self,row):
@@ -397,7 +419,7 @@ class DirectKeyedTableView:
            ",".join([row[k] for k in columns]))
     dosql(self.conn,sql)
 
-class DirectTableRow:
+class DirectTableRow(WithUC_Attrs):
   ''' Direct access to a table row.
   '''
   def __init__(self,table,values):
@@ -554,7 +576,7 @@ class NoSuchRowError(IndexError):
   ''' Thrown if the row cannot be found.
   '''
 
-class TableRowWrapper:
+class TableRowWrapper(WithUC_Attrs):
   def __init__(self,tableview,key):
     self.TableView=tableview
     try:
