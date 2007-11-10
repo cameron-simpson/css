@@ -346,7 +346,10 @@ class DirectKeyedTableView:
     return tuple([row[self.__columnmap[key]] for key in self.__keyColumns])
 
   def __key2where(self,key):
-    if type(key[0]) is tuple: raise IndexError, "key is tuple of tuple"
+    if type(key) is not tuple:
+      key=(key,)
+    if type(key[0]) is tuple:
+      raise IndexError, "key is tuple of tuple: %s" % `key`
     return " AND ".join([self.__allColumns[i]+' = '+sqlise(key[i]) for i in range(len(key))])
 
   def rowWhere(self,row):
