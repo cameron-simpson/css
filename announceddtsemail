@@ -1,0 +1,20 @@
+#!/bin/sh
+#
+# Announce the arrival of a new DDTS request.
+#	- Cameron Simpson <cs@zip.com.au> 05dec2001
+#
+
+sed -n '1,/^$/{
+	  /^Subject:/p
+	}
+        /^$/,${
+	  s/^ *" *\(.*\)" *$/\1/p
+	}' \
+| { read subject project defect id arrived || exit 1
+    read title || exit 1
+    alert -c yellow "New $id: $title"
+    isjob "$id" || newjob "$id" "$title" &
+    cat >/dev/null
+  }
+
+exit 0
