@@ -13,7 +13,7 @@ T_SEQ='ARRAY'
 T_MAP='HASH'
 T_SCALAR='SCALAR'
 
-DEFAULT_OPTS={'dictSep': '=>',
+DEFAULT_OPTS={'dictSep': ' =>',
               'bareWords': True,
               'inputEncoding': 'latin1',
               'nullToken': "\"\"",
@@ -190,7 +190,9 @@ class HierOutput(_Hier):
   def __dictEncode(self,dictobj):
     """ Transcribe a Dictionary to the File fp in Hier format.
     """
-    if self.dictSep is None: dictSep=' =>'
+    if self.dictSep is None:
+      global DEFAULT_OPTS
+      dictSep=DEFAULT_OPTS['dictSep']
 
     self.fp.write("{")
     keys=dictobj.keys()

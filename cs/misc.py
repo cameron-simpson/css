@@ -223,7 +223,8 @@ class DictUCAttrs(dict, WithUCAttrs):
   ''' A dict where access to obj.FOO accesses obj['FOO']
       if FOO is all upper case.
   '''
-  pass
+  def __init__(self,fill=None):
+    dict.__init__(self,fill)
 
 class WithUC_Attrs:
   ''' An object where access to obj.FOO accesses obj['FOO']
@@ -254,7 +255,10 @@ class DictUC_Attrs(dict, WithUC_Attrs):
   ''' A dict where access to obj.FOO accesses obj['FOO']
       if FOO matches ^[A-Z][_A-Z0-9]*.
   '''
-  pass
+  def __init__(self,fill=None):
+    if fill is None:
+      fill=()
+    dict.__init__(self,fill)
 
 class CanonicalSeq:
   def __init__(self,seq,canonical=None):
