@@ -1,6 +1,6 @@
 import string
 import re
-from cs.misc import cmderr, debug, warn, die, uniq, exactlyOne, all
+from cs.misc import cmderr, debug, warn, die, uniq, exactlyOne, all, DictUC_Attrs
 from cs.hier import flavour, T_SEQ, T_MAP
 from cs.db import dosql, SQLQuery, sqlise, today
 from cs.lex import strlist
@@ -191,7 +191,7 @@ class DBDiGraphNode:
   def clone(self,pruneFields=()):
     ''' Returns a shallow clone of a node.
     '''
-    N={}
+    N=DictUC_Attrs()
     for k in self.keys():
       if k not in pruneFields:
         N[k]=self[k]
@@ -215,6 +215,11 @@ class DBDiGraphNode:
 
     return label
 
+  def __contains__(self, key):
+    return key in self.keys()
+  def has_key(self, key):
+    return key in self.keys()
+
   def __getattr__(self,attr):
     if attr in NodeCoreAttributes:
       return self.digraph.nodes[self.id][attr]
@@ -228,23 +233,27 @@ class DBDiGraphNode:
       return
 
     if testAllCaps(attr):
-      self[attr]=value
+      self.__fieldAccess(attr,value)
       return
 
     raise AttributeError, "node id="+str(self.id)+" has no attribute named "+attr
 
   def __fieldAccess(self,field,value=None):
+    ''' Get or set the value of an attribute.
+    '''
     if value is None:
       return self[field]
     self[field]=value
 
   def each(self,key):
-    ''' Generator yielding each attribute value.
+    ''' Return a generator yielding each attribute value.
     '''
     for v in self.getAttr(key):
       yield v
 
   def all(self,key):
+    ''' Return a list of all the values for an attribute.
+    '''
     return all(self.each(key))
 
   def __getitem__(self,key):
@@ -341,7 +350,11 @@ class DBDiGraphNode:
       # just detach downstream
       del self['EDGES']
 
-  def connectedNodes(self,upstream=False):
+  def connectedNodes(self,type=None,upstream=False):
+    ''' Return the nodes connected to the current node in the specified
+        direction (downstream by default), of the specified type (any type by
+        default).
+    '''
     nodes=[]
     for edge in self.edges(upstream=upstream):
       if edge.TYPE == 'EDGE':
@@ -349,6 +362,10 @@ class DBDiGraphNode:
       else:
         nodes.append(edge)
     
+    # constrain by type if specified
+    if type is not None:
+      nodes=[N for N in nodes if N.TYPE == type]
+
     return nodes
 
   def addEdge(self,toNode,edge=None):
