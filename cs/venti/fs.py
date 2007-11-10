@@ -25,6 +25,11 @@ mainFuseStore=None
 
 class FuseStore(Fuse):
   def __init__(self, mnt, store, E, *args, **kw):
+    ''' Class to manage a FUSE mountpoint.
+        mnt: the mountpoint
+        store: the Store to hold data
+        E: the root directory reference
+    '''
     # HACK: record fuse class object for use by files :-(
     global mainFuseStore
     assert mainFuseStore is None, "multiple instantiations of FuseStore forbidden"
@@ -51,7 +56,7 @@ class FuseStore(Fuse):
 
   def __OUT(self,*args):
     if self.__out is None:
-      self.__out=open("/dev/pts/19","w")
+      self.__out=open("/dev/pts/57","w")
       sys.stdout=self.__out
       sys.stderr=self.__out
       if len(args):
@@ -61,8 +66,14 @@ class FuseStore(Fuse):
     assert path[0] == '/'
     return os.path.join('/u/cameron/tmp', path[1:])
 
+  def __namei(self,path):
+    return self.__store.namei(path,self.__root.bref)
+
   def getattr(self,path):
     self.__OUT("getattr", path)
+    E=self.__namei(path)
+    if E is None:
+      return None
     return os.lstat(self.__abs(path))
   def readlink(self, path):
     self.__OUT("readlink", path)

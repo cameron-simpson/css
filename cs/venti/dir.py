@@ -4,7 +4,7 @@
 #
 
 import os
-from cs.misc import progress, verbose, toBS, fromBSfp
+from cs.misc import warn, progress, verbose, toBS, fromBSfp, DictAttrs
 from cs.venti import tohex
 from cs.venti.blocks import BlockRef, decodeBlockRefFP
 from cs.venti.file import ReadFile, WriteFile
@@ -37,6 +37,11 @@ def storeDir(S,path):
   return subdirs[topdirs[0]]
 
 class Dirent:
+  ''' A Dirent represents a directory entry.
+        .bref   A BlockRef to the entry's data.
+        .isdir  Whether the entry is a directory.
+        .meta   Meta data, if any.
+  '''
   def __init__(self,bref,isdir,meta=None):
     self.bref=bref
     self.isdir=isdir
@@ -44,6 +49,19 @@ class Dirent:
   def encodeMeta(self):
     assert False, "encode self.meta instead?"
     return meta.encode()
+  def lstat(self,S):
+    import stat
+    s=DictAttrs({ st_ino: id(self),
+                  st_nlink: 1,
+                  st_uid: os.geteuid(),
+                  st_gid: os.getegid(),
+                  st_size: open(S,self.bref,"r").span(),
+                })
+    if self.isdir:
+      s.st_mode=stat.S_IFDIR|0755
+    else:
+      s.st_mode=stat.S_IFREG|0644
+    return s
 
 def debuggingEncodeDirent(fp,name,dent):
   from StringIO import StringIO
@@ -107,6 +125,7 @@ class Dir(dict):
       fp=open(S,dirref,"r")
       (name,dent)=decodeDirent(fp)
       while name is not None:
+        ##warn("%s: load %s" % (dirref,name))
         dict.__setitem__(self,name,dent)
         (name,dent)=decodeDirent(fp)
 

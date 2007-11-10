@@ -89,35 +89,45 @@ class Store:
     return cs.venti.dir.storeDir(self,path)
 
   def opendir(self,dirref):
-    ''' Open a BlockRef that refers to a directory.
+    ''' Open a BlockRef that refers to a directory,
+        returns a cs.venti.dir.Dir.
     '''
     import cs.venti.dir
     return cs.venti.dir.Dir(self,None,dirref)
 
-  def namei(self,hexarg):
-    ''' Given a path of the form
-          hexarg/sub1/sub2/...
+  def namei(self,path,bref=None):
+    ''' Given a path and an optional BlockRef,
         return the Dirent for the end of the path, or None.
         hexarg is a tohex(bref.encode()) as used by "vt cat" or "vt ls".
     '''
-    from cs.venti import fromhex
-    from cs.venti.dir import Dirent
+    from cs.venti import fromhex, tohex
+    from cs.venti.dir import Dirent, Dir
     from cs.venti.blocks import str2BlockRef
-    slash=hexarg.find('/')
-    if slash < 0:
-      # no slash - presume file reference
-      return Dirent(str2BlockRef(fromhex(hexarg)),False)
+    if bref is None:
+      slash=path.find('/')
+      if slash < 0:
+        return Dirent(str2BlockRef(fromhex(path)), False)
+      bref=str2BlockRef(fromhex(path[:slash]))
+      warn("bref="+str(bref))
+      path=path[slash+1:]
 
-    subpath=[p for p in hexarg[slash+1:].split('/') if len(p)]
-    if len(subpath) == 0:
-      return Dirent(str2BlockRef(fromhex(hexarg[:slash])), hexarg[-1] == '/')
+    E=Dirent(bref, True)
+    parent=None
+    while len(path) > 0:
+      if not E.isdir:
+        return None
+      D=Dir(self,parent,E.bref)
+      slash=path.find('/')
+      if slash < 0:
+        head=path
+        path=''
+      else:
+        head=path[:slash]
+        tail=path[slash+1:]
+      E=D[head]
+      parent=D
 
-    hexarg=hexarg[:slash]
-    D=self.opendir(fromhex(hexarg))
-    while len(subpath) > 1:
-      D=D.subdir(subpath.pop(0))
-    return D[subpath[0]]
+    return E
 
   def walk(self,dirref):
-    for i in self.opendir(dirref).walk():
-      yield i
+    return self.opendir(dirref).walk()

@@ -96,6 +96,10 @@ class GDBMStore:
 
   def store(self,block):
     ''' Store a block, return the hash.
+        Appends to the end of the store:
+        - toBS(len(zblock))
+        - zblock (compressed block)
+        Notes the offset to the zblock and the zsize in the GDBM index.
     '''
     h=hash(block)
     if h in self:

@@ -260,6 +260,18 @@ class DictUC_Attrs(dict, WithUC_Attrs):
       fill=()
     dict.__init__(self,fill)
 
+class DictAttrs(dict):
+  def __init__(self,d=None):
+    dict.__init__()
+    if d is not None:
+      for k in d.keys():
+        self[k]=d[k]
+
+  def __getattr__(self,attr):
+    return self[attr]
+  def __setattr__(self,attr,value):
+    self[attr]=value
+
 class CanonicalSeq:
   def __init__(self,seq,canonical=None):
     self.__canon=canonical
