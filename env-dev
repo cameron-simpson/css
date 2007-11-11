@@ -4,7 +4,7 @@
 #       - Cameron Simpson <cs@zip.com.au> 25apr2007
 #
 
-: ${ENV_DEV_DIR:=$HOME/devel}
+: ${ENV_DEV_DIR:=$HOME/dev}
 
 cmd=`basename "$0"`
 usage="Usage: $cmd [-d develdir] [command [args...]]
