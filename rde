@@ -2,4 +2,4 @@
 : ${RDESKTOP_HOST:=windows}
 [ $# = 0 ] && set -- "$RDESKTOP_HOST"
 case "$DISPLAY" in :*) set -- -x l "$@" ;; esac
-rdesktop -K -g "${X11_BGX}x${X11_Y}" "$@" &
+rdesktop -K -g "${X11_MONLEFT_DX}x${X11_Y}+${X11_MONLEFT_X}-0" "$@" &
