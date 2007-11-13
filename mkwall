@@ -15,14 +15,8 @@
 gm=gm
 [ -n "${PREFER_IMAGEMAGICK:-}" ] && gm=
 
-# set $bgx and $bgy
-eval `bgsize -v | sed 's/^d/bg/'`
-
-doauto=1
-
 cmd=`basename "$0"`
-usage="Usage: $cmd [+a] [-g geom] [-bg bg-colour] [-sh shade] imagefiles...
-        +a      No automatics; don't double the image on Xinerama displays.
+usage="Usage: $cmd [-g geom] [-bg bg-colour] [-sh shade] imagefiles...
         -g geom Use this target geometry instead of the display pixel size.
         -bg bg-colour
                 Background colour to use for padding. Default is black,
@@ -34,23 +28,15 @@ usage="Usage: $cmd [+a] [-g geom] [-bg bg-colour] [-sh shade] imagefiles...
 
 badopts=
 
+geom=
 shade=$WALLPAPER_SHADE
 
 while [ $# -gt 0 ]
 do
   case "$1" in
-    +a)	doauto= ;;
     -bg)BG=$2; shift ;;
     -sh)shade=$2; shift ;;
-    -g)	geom=$2; shift
-	ok=1
-	bgx=`expr "x$geom" : 'x\([1-9][0-9]*\)x[1-9][0-9]*$'` || ok=
-	bgy=`expr "x$geom" : 'x[1-9][0-9]*x\([1-9][0-9]*\)$'` || ok=
-	[ $ok ] \
-	    || { echo "$cmd: bad geometry for -g: expected XxY, found \"$geom\"" >&2
-		 badopts=1
-	       }
-	;;
+    -g)	geom=$2; shift ;;
     --)	shift; break ;;
     -?*)echo "$cmd: unrecognised option: $1" >&2; badopts=1 ;;
     *)	break ;;
@@ -60,20 +46,13 @@ done
 
 if [ $# = 0 ]
 then
-  echo "$cmd: missing imagefile" >&2
+  echo "$cmd: missing imagefiles" >&2
   badopts=1
-else
-  if [ $doauto ] && [ $# -eq 1 ] && [ $XINERAMA ]
-  then  set -- "$1" "$1"
-	bgx=`expr "$bgx" '*' "$XINERAMA_NX"` || exit 1
-  fi
-  if [ $# -eq 1 ]
-  then montage=
-  else montage=1
-  fi
 fi
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+set -ue
 
 if [ -z "$shade" ]
 then
@@ -83,40 +62,48 @@ then
   fi
 fi
 
+if [ $# = 1 ]
+then
+  # replicate, one per monitor
+  imagefile=$1
+  set --
+  for width in $X11_MONITOR_WIDTHS
+  do set -- ${1+"$@"} "$imagefile"
+  done
+fi
+
 ##########################################
 # Multiple images - assemble into montage.
-if [ $montage ]
+if [ $# -gt 1 ]
 then
-    xit=0
-    [ $# = 2 ] || { echo "$cmd: only two images supported at present" >&2
-		    exit 2
-		  }
-    hx=`expr $bgx / 2` || exit 1
-    bg1=`sh -x mkwall +a -g "${hx}x${bgy}" "$1"` || exit 1
-
-    if [ "x$1" = "x$2" ]
-    then  bg2=$bg1
-    else  bg2=`sh -x mkwall +a -g "${hx}x${bgy}" "$2"` || exit 1
-    fi
-
+    wide=0
+    for width in $X11_MONITOR_WIDTHS
+    do
+      wide=`expr $wide + $width`
+    done
+    append="$gm convert +append"  ## -resize '${wide}x${X11_Y}'"
+    n=0
+    for width in $X11_MONITOR_WIDTHS
+    do
+      n=`expr $n + 1`
+      eval "imagefile=\$$n"
+      newimage=`X11_MONITOR_WIDTHS=$width "$0" -sh 100 "$imagefile"`
+      append="$append '$newimage'"
+    done
     tmpf=$TMPDIR/$cmd$$.png
-    # +label
-    $gm montage \
-		-tile 2x1 \
-		+label \
-		-resize "${bgx}x${bgy}" \
-		-geometry "${hx}x${bgy}+0+0" "$bg1" \
-		-geometry "${hx}x${bgy}+0+0" "$bg2" \
-		"png:$tmpf" || exit 1
-    montage=`filecache "$tmpf"` || exit 1
+    eval "$append 'png:$tmpf'"
+    imagefile=`filecache "$tmpf"`
     rm "$tmpf"
-    echo "$montage"
-    exit $xit
+    exec ls -d -- "$imagefile"
 fi
 
 ##########################################
 # Single image - scale to fit.
-imagefile=$1; shift
+imagefile=$1
+shift
+
+bgx=`set -- $X11_MONITOR_WIDTHS; echo "$1"`
+bgy=$X11_Y
 
 # if stdin-ish name, fetch and convert to PNG
 case "$imagefile" in
@@ -133,7 +120,7 @@ eval `imsize-gm "$imagefile" | awk '{print "ix="$1 " iy="$2}'`
 	|| { echo "$cmd: can't deduce source image size" >&2; exit 1; }
 
 convname=pngof
-set $gm convert "$imagefile"
+set -- $gm convert "$imagefile"
 
 convname=$convname/sh$shade
 if [ "x$shade" != x100 ]
