@@ -192,26 +192,36 @@ for n, slot in numPos(leftmon+rightmon):
   print "AddToFunc MoveToSlice%d" % n
   print "+ I MoveWinFixed %dp -0p %dp %dp" % (px, wx, ttyheight)
 
-# full and half screen for first monitor
-mainmon=rightmon[0]
-if len(leftmon) > 0:
-  leftmon=leftmon[-1]
-else:
-  leftmon=mainmon
+# monitors of interest
+monMain=rightmon[0]
+monAlt=monMain
+monLeft=monMain
+monRight=monMain
 if len(rightmon) > 1:
-  rightmon=rightmon[1]
-else:
-  rightmon=mainmon
+  monRight=rightmon[1]
+  monAlt=monRight
+if len(leftmon) > 0:
+  monLeft=leftmon[-1]
+  monAlt=monLeft
 
-print "Key Up W M MoveWinFixed %dp -0p %dp %dp" % (mainmon.X, mainmon.DX, ttyheight)
-setenv("HALFX", mainmon.LEFTWIDTH)
-print "Key Down W M MoveWinFixed %dp -0p %dp %dp" % (mainmon.X, mainmon.LEFTWIDTH, ttyheight)
-print "Key Down W MS MoveWinFixed %dp -0p %dp %dp" % (mainmon.X+mainmon.LEFTWIDTH, mainmon.RIGHTWIDTH, ttyheight)
-print "Key Left W M MoveWinFixed %dp -0p %dp %dp" % (leftmon.X, leftmon.LEFTWIDTH, ttyheight)
-print "Key Left W MS MoveWinFixed %dp -0p %dp %dp" % (leftmon.X+leftmon.LEFTWIDTH, leftmon.RIGHTWIDTH, ttyheight)
-print "Key Right W M MoveWinFixed %dp -0p %dp %dp" % (rightmon.X, rightmon.LEFTWIDTH, ttyheight)
-print "Key Right W MS MoveWinFixed %dp -0p %dp %dp" % (rightmon.X+rightmon.LEFTWIDTH, rightmon.RIGHTWIDTH, ttyheight)
+setenv("X11_MONMAIN_X", monMain.X)
+setenv("X11_MONMAIN_DX", monMain.DX)
+setenv("X11_MONALT_X", monAlt.X)
+setenv("X11_MONALT_DX", monAlt.DX)
+setenv("X11_MONLEFT_X", monLeft.X)
+setenv("X11_MONLEFT_DX", monLeft.DX)
+setenv("X11_MONRIGHT_X", monRight.X)
+setenv("X11_MONRIGHT_DX", monRight.DX)
+
+print "Key Up W M MoveWinFixed %dp -0p %dp %dp" % (monMain.X, monMain.DX, ttyheight)
+setenv("HALFX", monMain.LEFTWIDTH)
+print "Key Down W M MoveWinFixed %dp -0p %dp %dp" % (monMain.X, monMain.LEFTWIDTH, ttyheight)
+print "Key Down W MS MoveWinFixed %dp -0p %dp %dp" % (monMain.X+monMain.LEFTWIDTH, monMain.RIGHTWIDTH, ttyheight)
+print "Key Left W M MoveWinFixed %dp -0p %dp %dp" % (monLeft.X, monLeft.LEFTWIDTH, ttyheight)
+print "Key Left W MS MoveWinFixed %dp -0p %dp %dp" % (monLeft.X+monLeft.LEFTWIDTH, monLeft.RIGHTWIDTH, ttyheight)
+print "Key Right W M MoveWinFixed %dp -0p %dp %dp" % (monRight.X, monRight.LEFTWIDTH, ttyheight)
+print "Key Right W MS MoveWinFixed %dp -0p %dp %dp" % (monRight.X+monRight.LEFTWIDTH, monRight.RIGHTWIDTH, ttyheight)
   
-setenv("FULLX", mainmon.X)
-setenv("HALFX", mainmon.X+mainmon.LEFTWIDTH)
+setenv("FULLX", monMain.X)
+setenv("HALFX", monMain.X+monMain.LEFTWIDTH)
 
