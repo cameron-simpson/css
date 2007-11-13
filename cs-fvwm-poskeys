@@ -46,6 +46,14 @@ def setenv(var,value):
   open("%s/var/env.sh"%os.environ['HOME'],mode='a').write("%s=%s; export %s\n" % (var,qvalue,var))
   print "SetEnv %s %s" % (var,qvalue)
 
+def settabenv(tabnum, px, wx):
+  global charx
+  if type(tabnum) is int:
+    tabnum=str(tabnum)
+  setenv("X11_TAB%s_X"%tabnum, px)
+  setenv("X11_TAB%s_DX"%tabnum, wx)
+  setenv("X11_TAB%s_DXC"%tabnum, wx/charx)
+
 ttyheight=dy-topy
 ttyheight2=ttyheight/2
 setenv("PIX_HIGH", ttyheight)
@@ -81,6 +89,8 @@ elif dx == 5120:
 else:
   # one monitor
   slices=(dx,)
+
+setenv("X11_MONITOR_WIDTHS", " ".join(str(sl) for sl in slices))
 
 # slice up each monitor into strips
 slots=[]
@@ -170,8 +180,7 @@ for n, slot in poslist:
   if npos < 4:
     print "Key %d W %s MoveWinFixed %dp -%dp %dp %dp" % (n+npos, "M", px, ttyheight2, wx, ttyheight2)
     print "Key %d W %s MoveWinFixed %dp -0p %dp %dp" % (n+npos+npos, "M", px, wx, ttyheight2)
-  setenv("X11_TAB%d_X"%tabnum, px)
-  setenv("X11_TAB%d_DX"%tabnum, wx)
+  settabenv(tabnum, px, wx)
   tabnum+=1
 
 if len(leftmon) > 0:
@@ -181,8 +190,7 @@ if len(leftmon) > 0:
     px=slot.X
     wx=slot.DX
     print "Key %d W %s MoveWinFixed %dp -0p %dp %dp" % (n, "MS", px, wx, ttyheight)
-    setenv("X11_TAB%d_X"%tabnum, px)
-    setenv("X11_TAB%d_DX"%tabnum, wx)
+    settabenv(tabnum, px, wx)
     tabnum+=1
 
 slicenum=0
@@ -203,6 +211,9 @@ if len(rightmon) > 1:
 if len(leftmon) > 0:
   monLeft=leftmon[-1]
   monAlt=monLeft
+
+middleSlot=monMain.SLOTS[(len(monMain.SLOTS)-1)/2]
+settabenv("MIDDLE", middleSlot.X, middleSlot.DX)
 
 setenv("X11_MONMAIN_X", monMain.X)
 setenv("X11_MONMAIN_DX", monMain.DX)
