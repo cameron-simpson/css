@@ -36,7 +36,7 @@ use_term=	## 1; case "$DISPLAY" in localhost:[1-9]*) use_term= ;; esac
 use_screen=
 preshcmd=
 postshcmd=
-termopts=
+termopts='-g M'
 
 badopts=
 while [ $# -gt 0 ]
