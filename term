@@ -94,7 +94,15 @@ do
     -small)	sized=1 x=$smallx y=$smally w=$smallw h=$smallh f=$smallf ;;
     -keepio)	detach= ;;
     -xauthhack)	xauthhack=1 ;;
-    -g|-geometry)sized=1 geometry=$2; shift ;;
+    -g|-geometry)sized=1 geometry=$2; shift
+                case "$geometry" in
+                  # specify tab
+                  M)
+                    geometry=${X11_TABMIDDLE_DXC}x${TTY_HIGH}+${X11_TABMIDDLE_X}-0 ;;
+                  [0-9])
+                    eval "geometry=\${X11_TAB${geometry}_DXC}x\${TTY_HIGH}+\${X11_TAB${geometry}_X}-0" ;;
+                esac
+                ;;
     -xrm)	xrmopts="$xrmopts $1 "`shqstr "$2"`; shift ;;
     --)		shift; break ;;
     -?*)	echo "$cmd: unrecognised option: $1" >&2
