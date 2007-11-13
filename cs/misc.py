@@ -224,6 +224,8 @@ class DictUCAttrs(dict, WithUCAttrs):
       if FOO is all upper case.
   '''
   def __init__(self,fill=None):
+    if fill is None:
+      fill=()
     dict.__init__(self,fill)
 
 class WithUC_Attrs:
