@@ -4,22 +4,23 @@
 #	- Cameron Simpson <cs@zip.com.au> 09sep2003
 #
 
+: ${IMAP_SERVICE:=default}
+
 cmd=`basename "$0"`
 usage="Usage: $cmd [[user:pass@]server]"
 
-server=zipworld-direct
 fmrc=$HOME/.fetchmailrc
 trace=set-x
 
-[ $# = 0 ] || { server=$1; shift; }
+[ $# = 0 ] || { IMAP_SERVICE=$1; shift; }
 
 sv_user=
 sv_pass=
-case "$server" in
+case "$IMAP_SERVICE" in
   *:*@*)
-    sv_user=`expr "x$server" : 'x\([^:]*\):.*'`
-    sv_pass=`expr "x$server" : 'x[^:]*:\([^@]*\)@.*'`
-    server=`expr "x$server" : 'x[^:]*:[^@]*@\(.*\)'`
+    sv_user=`expr "x$IMAP_SERVICE" : 'x\([^:]*\):.*'`
+    sv_pass=`expr "x$IMAP_SERVICE" : 'x[^:]*:\([^@]*\)@.*'`
+    IMAP_SERVICE=`expr "x$IMAP_SERVICE" : 'x[^:]*:[^@]*@\(.*\)'`
     ;;
 esac
 
@@ -27,11 +28,14 @@ esac
 
 fm_user=
 fm_pass=
-fm_host=$server
-eval `fetchmailclause -f "$fmrc" "$server" | detab | sed -n 's/^\([^ ][^ ]*\) /sv_\1=/p'`
+fm_host=$IMAP_SERVICE
+eval `fetchmailclause -f "$fmrc" "$IMAP_SERVICE" | sed -n 'y/	/ /; s/^\([^ ][^ ]*\) /sv_\1=/p'`
 [ -n "${sv_user:=}" ] && fm_user=$sv_user
 [ -n "${sv_pass:=}" ] && fm_pass=$sv_pass
 [ -n "${sv_via:=}"  ] && fm_host=$sv_via
+
+IMAP_FOLDERROOT=imaps://$fm_user@$fm_host/INBOX
+export IMAP_FOLDER
 
 exec $trace + +s +t \
 	-e "set imap_pass=\"$fm_pass\"" \
