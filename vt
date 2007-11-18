@@ -145,7 +145,8 @@ elif op == "ls":
       print
     print "ls", hexarg, "..."
     E=S.namei(hexarg)
-    assert E.isdir, "%s: %s: expected directory, not file"%(cmd,hexarg)
+    E.isdir=True
+    ##assert E.isdir, "%s: %s: expected directory, not file: dirent=%s"%(cmd,hexarg,E)
     ls(hexarg,E.bref,recurse,stdout)
 elif op == "mount":
   print "mount", args[0], args[1], "..."

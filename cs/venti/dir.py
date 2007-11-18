@@ -46,6 +46,8 @@ class Dirent:
     self.bref=bref
     self.isdir=isdir
     self.meta=meta
+  def __str__(self):
+    return `{ 'bref': str(self.bref), 'isdir': self.isdir, 'meta': self.meta }`
   def encodeMeta(self):
     assert False, "encode self.meta instead?"
     return meta.encode()

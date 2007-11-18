@@ -48,6 +48,10 @@ class FuseStore(Fuse):
     Fuse.__init__(self, fuse_args=fargs, **kw)
     self.flags=0
     self.multithreaded=0
+    ''' Keep a mapping of blockref (raw) to nlinks.
+        We will preserve the ones with nlinks > 1 or file permissions.
+    '''
+    self.__inodes={}
     self.__mountpoint=mnt
     self.__store=store
     self.__root=E
@@ -56,7 +60,7 @@ class FuseStore(Fuse):
 
   def __OUT(self,*args):
     if self.__out is None:
-      self.__out=open("/dev/pts/57","w")
+      self.__out=open("/dev/pts/39","w")
       sys.stdout=self.__out
       sys.stderr=self.__out
       if len(args):
