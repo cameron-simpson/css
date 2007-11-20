@@ -11,6 +11,7 @@ from zlib import compress, decompress
 from cs.cache import LRU
 from cs.misc import cmderr, warn, progress, verbose, ifverbose, out, fromBS, toBS, fromBSfp, tb
 from cs.venti import tohex, hash
+from cs.venti.daemon import DaemonicStore
 
 class GDBMIndex:
   ''' A GDBM index for a GDBMStore.
@@ -64,7 +65,7 @@ class GDBMIndex:
     for h in self.__db.keys():
       yield h
 
-class GDBMStore:
+class GDBMStore(DaemonicStore):
   def __init__(self,path,doindex=False):
     self.__path=path
     self.logfp=open(os.path.join(path,"log"),"a")
@@ -86,6 +87,22 @@ class GDBMStore:
       for n in stores:
         self.__loadIndex(n)
       self.sync()
+    self.__daemon=None
+
+  def daemon_op(self,op,backCh,*args):
+    result=None
+    if op == DaemonicStore.OP_SYNC:
+      assert len(args) == 0
+      self.__store.sync()
+    elif op == DaemonicStore.OP_STORE_BLOCK:
+      assert len(args) == 1
+      result=self.__store.store(args[0])
+    elif op == DaemonicStore.OP_CONTAINS_HASH:
+      assert len(args) == 1
+      result=args[0] in self.__store
+    else
+      assert False, "unsupported daemon op %s %s" % (op, tuple(args))
+    backCh.write(result)
 
   def sync(self):
     self.__index.sync()
