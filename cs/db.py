@@ -246,6 +246,11 @@ __tableCache={}
 def getTable(conn,table,keyColumns,allColumns,constraint=None):
   if isinstance(keyColumns,str):
     keyColumns=(keyColumns,)
+  elif not isinstance(keyColumns,tuple):
+    keyColumns=tuple(keyColumns)
+
+  if not isinstance(allColumns,tuple):
+    allColumns=tuple(allColumns)
 
   cacheKey=(conn,table,keyColumns,allColumns,constraint)
 
