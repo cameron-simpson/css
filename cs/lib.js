@@ -747,47 +747,47 @@ CSAsyncObject.prototype.delAttr = function(attrname) {
   this.setAttr(attrname, null);
 };
 
-function csHotSpan(inner,makePopup,makeArg) {
-  _log("CALL TO OLD non-class csHotSpan(inner=["+inner+"],...)");
-  var span = csNode("SPAN");
-  span.style.textDecoration='underline';
-  if (typeof(inner) == "string") {
-    inner=[csText(inner)];
-  }
-  for (var i=0; i<inner.length; i++) {
-    span.appendChild(inner[i]);
-  }
-
-  var popup = null;
-  var popupState = null;
-  span.onmouseover=function(e) {
-                      if (!e) e=window.event;
-                      if (!popup) {
-                        popup=makePopup(makeArg);
-                        popup.style.visibility='hidden';
-                        popup.style.display='block';
-                        span.appendChild(popup);
-                        span.onmouseout=function(e) {
-                          if (popupState == null) {
-                            popup.style.visibility='hidden';
-                          }
-                        };
-                      }
-                      csSetPosition(popup,csXY(span.offsetLeft,
-                                               span.offsetTop+span.offsetHeight));
-                      popup.style.visibility='visible';
-                    };
-  span.onclick=function(e) {
-                      if (!e) e=window.event;
-                      if (popupState == null) {
-                        popupState="clicked";
-                      } else if (popupState == "clicked") {
-                        popupState=null;
-                        popup.style.visibility='hidden';
-                      }
-                    };
-  return span;
-}
+##function csHotSpan(inner,makePopup,makeArg) {
+##  _log("CALL TO OLD non-class csHotSpan(inner=["+inner+"],...)");
+##  var span = csNode("SPAN");
+##  span.style.textDecoration='underline';
+##  if (typeof(inner) == "string") {
+##    inner=[csText(inner)];
+##  }
+##  for (var i=0; i<inner.length; i++) {
+##    span.appendChild(inner[i]);
+##  }
+##
+##  var popup = null;
+##  var popupState = null;
+##  span.onmouseover=function(e) {
+##                      if (!e) e=window.event;
+##                      if (!popup) {
+##                        popup=makePopup(makeArg);
+##                        popup.style.visibility='hidden';
+##                        popup.style.display='block';
+##                        span.appendChild(popup);
+##                        span.onmouseout=function(e) {
+##                          if (popupState == null) {
+##                            popup.style.visibility='hidden';
+##                          }
+##                        };
+##                      }
+##                      csSetPosition(popup,csXY(span.offsetLeft,
+##                                               span.offsetTop+span.offsetHeight));
+##                      popup.style.visibility='visible';
+##                    };
+##  span.onclick=function(e) {
+##                      if (!e) e=window.event;
+##                      if (popupState == null) {
+##                        popupState="clicked";
+##                      } else if (popupState == "clicked") {
+##                        popupState=null;
+##                        popup.style.visibility='hidden';
+##                      }
+##                    };
+##  return span;
+##}
 
 /**
  * Create a "hot" <SPAN>, calling the control object
