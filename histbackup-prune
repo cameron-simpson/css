@@ -5,7 +5,7 @@
 #	- Cameron Simpson <cs@zip.com.au> 22jun2003
 #
 
-trace=echo
+trace=eecho
 pcnt=5
 onepass=
 keepn=7
@@ -110,7 +110,7 @@ done \
     # remove a tree
     [ -n "$myperms" ] \
       && $trace find "$subdir" -type d ! -perm -700 -exec $trace chmod "$myperms+rwx" {} ';'
-    $trace rm -r "$subdir" || xit=1
+    set-x rm -r "$subdir" || xit=1
 
     if [ -n "$dfdir" ]
     then
