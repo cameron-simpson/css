@@ -61,31 +61,60 @@ fi
 
 ## echo "$cmd:: fd=$fd, filter=[$filter], *=[$*]" >&2
 
+# 9 goes to the original stdout
+# 8 goes to the fd to filter
 eval "exec 9>&1 8>&$fd"
 
-xitcode=$TMPDIR/xit.$$
->$xitcode
+# Find a free exit status file
+# This is a bit racey, except that there should be no other
+# clients with our pid while we do our polling.
+xitbase=$TMPDIR/xit.$$
+n=0
+while xitcode=$xitbase.$n
+      [ -f "$xitcode" ]
+do
+  n=`expr $n + 1` || exit 1
+done
 
-( exec 8>&-	## we don't need 8 in this half
-  [ $fd != 1 ] && eval "exec $fd>&1 1>&9"
+# empty the xit code file
+>"$xitcode"
+
+(
+  # here we have stdout connected to the pipe
+  exec 8>&-	# we don't need 8 in this half
+  # If we're filtering something other than stdout,
+  # point the something at the pipe, and point our
+  # stdout at the original stdout.
+  [ $fd = 1 ] || eval "exec $fd>&1 1>&9"
+  # ok, don't need fd 9 now either
   exec 9>&-
   "$@"
   echo $? >$xitcode
-) | ( exec 3<&0		# save stdin to protect from bg disconnect
-      ( exec <&3 3<&-	# reconnect stdin
-	exec 9>&-	## we don't need 9 in this half
-	exec 1>&8 8>&-
-        eval "$filter"
-      ) &
-    )
+) \
+| \
+(
+  # here we have stdin attached to the pipe
+  # we want to filter this
+  # However, if the subprogram forks we want to wait only for the main
+  # program, but still keep filtering the output of the fork. So we
+  # background the filter so as not to wait for it.
+  exec 3>&0         # save stdin because bg closes it
+  ( exec 0<&3 3<&-  # restore stdin
+    exec 9>&-	    # we don't need 9 in this half
+    exec 1>&8 8>&-  # send filter's stdout to where $fd went
+    eval "$filter"
+  ) &
+)
 
 # close stdout, repoint to stderr just in case
 exec 1>&2
 
 # collect exit status
-while [ ! -s $xitcode ]; do sleep 1; done
-xit=`cat $xitcode` || xit=1
-rm -f $xitcode
+# wait for the sub process to write the exit status to the file
+# hope it's atomic
+while [ ! -s "$xitcode" ]; do sleep 1; done
+xit=`cat "$xitcode"` || xit=1
+rm -f "$xitcode"
 
 [ -n "$xit" ] || { echo "$cmd: can't get exit code for $*" >&2
 		   xit=1
