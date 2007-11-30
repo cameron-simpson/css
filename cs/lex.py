@@ -2,14 +2,7 @@ import string
 from StringIO import StringIO
 import re
 
-int_re=re.compile(r'\d+')
-float_re=re.compile(r'[\-+]?\d+(\.\d+)(e[\-+]\d+)',re.I)
-id_re =re.compile(r'[a-z_]\w*', re.I)
 ord_space=ord(' ')
-
-def isint(s):
-  m=int_re.match(s)
-  return m is not None and m.group() == s
 
 def unctrl(s,tabsize=8):
   s2=''
@@ -36,8 +29,6 @@ def unctrl(s,tabsize=8):
           ch2="\\%03o"%o
 
     if ch2 is not None:
-      ##import cs.misc
-      ##cs.misc.progress("ch2=["+ch2+"]")
       if sofar < i:
         s2+=s[sofar:i]
       s2+=ch2

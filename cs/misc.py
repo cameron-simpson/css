@@ -147,16 +147,29 @@ def a2date(s):
   return date(*strptime(s, "%Y-%m-%d")[0:3])
 
 def exactlyOne(list,context=None):
-  ''' Returns the first element of a list, but requires there to be exactly one.
+  cmderr("OBSOLETE CALL TO cs.misc.exactlyOne(), use the() instead")
+  tb()
+  return the(list,context)
+
+def the(list,context=None):
+  ''' Returns the first element of an iterable, but requires there to be exactly one.
   '''
   icontext="expected exactly one value"
   if context is not None:
     icontext=icontext+" for "+context
-  if len(list) == 0:
-    raise IndexError, icontext+", got none"
-  if len(list) > 1:
-    raise IndexError, icontext+", got "+str(len(list))+": "+strlist(list)
-  return list[0]
+
+  first=True
+  for elem in list:
+    if first:
+      it=elem
+      first=False
+    else:
+      raise IndexError, "%s: more than one element" % icontext
+
+  if first:
+    raise IndexError, "%s: no elements" % icontext
+    
+  return it
 
 def winsize(f):
   '''   Return a (rows,columns) tuple or None for the specified file object.
@@ -171,12 +184,11 @@ def winsize(f):
     return None
   return (int(m.group(1)),int(m.group(2)))
 
-# trim trailing newline if present, a la the perl func of the same name
+# trim trailing newline, returning trimmied line
+# unlike perl, requires the newline to be present
 def chomp(s):
-  slen=len(s)
-  if slen > 0 and s[-1:] == '\n':
-    return s[:-1]
-  return s
+  assert s[-1] == '\n'
+  return s[:-1]
 
 def extend(arr,items):
   warn("replace use of cs.misc.extend with array extend builtin")

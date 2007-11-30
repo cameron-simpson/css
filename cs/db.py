@@ -11,7 +11,7 @@ import datetime
 from sets import Set
 import cs.secret
 import cs.cache
-from cs.misc import cmderr, debug, ifdebug, warn, isodate, exactlyOne, WithUC_Attrs
+from cs.misc import cmderr, debug, ifdebug, warn, isodate, the, WithUC_Attrs
 
 def today():
   return datetime.date.today()
@@ -494,7 +494,7 @@ class KeyedTableView(cs.cache.Cache):
     return rows
 
   def selectRow(self,where):
-    return exactlyOne(self.selectRows(where))
+    return the(self.selectRows(where))
 
   def selectRowsByColumn(self,column,value):
     return self.selectRows(column+" = "+sqlise(value))

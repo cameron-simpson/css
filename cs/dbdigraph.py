@@ -1,9 +1,8 @@
 import string
 import re
-from cs.misc import cmderr, debug, warn, die, uniq, exactlyOne, all, DictUC_Attrs
+from cs.misc import cmderr, debug, warn, die, uniq, the, all, DictUC_Attrs
 from cs.hier import flavour, T_SEQ, T_MAP
 from cs.db import dosql, SQLQuery, sqlise, today
-from cs.lex import strlist
 import cs.cache
 
 NodeCoreAttributes=('NAME','TYPE')
@@ -104,7 +103,7 @@ class DBDiGraph:
       return self.__nodeCache[nodeid]
 
     if type(nodeid) is tuple:
-      return exactlyOne(self.nodesByNameAndType(nodeid[0],*nodeid[1:]), `nodeid`)
+      return the(self.nodesByNameAndType(nodeid[0],*nodeid[1:]), `nodeid`)
 
     raise IndexError, "invalid index "+`nodeid`
 
@@ -113,7 +112,7 @@ class DBDiGraph:
     warn("refids =", `refids`)
     if len(refids) > 0:
       node=self[nodeid]
-      raise IndexError, "node "+str(node)+" has referring nodes: "+strlist([self[id] for id in refids])
+      raise IndexError, "node %s has referring nodes: %s" % (node, ", ".join(self[id] for id in refids))
 
     del self.attrs[nodeid]
     del self.nodes[nodeid]
@@ -121,7 +120,7 @@ class DBDiGraph:
   def need(self,name,type):
     nodes=self.nodesByNameAndType(name,type)
     if len(nodes) > 1:
-      raise IndexError, "multiple nodes with index "+`(name,type)`+": "+strlist(nodes)
+      raise IndexError, "multiple nodes with index %s: %s" % (`(name,type)`, ", ".join(str(n) for n in nodes))
     if len(nodes) == 0:
       node=self.createNode(name,type)
     else:
@@ -144,7 +143,7 @@ class DBDiGraph:
       return ()
     if len(nodeids) == 1:
       return (self[nodeids[0]],)
-    return self.nodesWhere("ID IN ("+strlist(nodeids)+")")
+    return self.nodesWhere("ID IN (%s)" % (",".join(nodeids)))
 
   def nodesByType(self,*types):
     return nodesWhere(SQLtestType(*types))
@@ -158,7 +157,7 @@ class DBDiGraph:
     return self.nodesWhere('NAME = '+sqlise(name)+' AND '+SQLtestType(*types))
 
   def _nodeByNameAndType(self,name,*types):
-    return exactlyOne(self.nodesByNameAndType(name,*types), `(name,types)`)
+    return the(self.nodesByNameAndType(name,*types), `(name,types)`)
 
   def nodeByNameAndType(self,name,*types):
     try:
@@ -404,7 +403,7 @@ class AttrTable(cs.cache.Cache):
     if nodeids is not None:
       if len(nodeids) == 0:
         return
-      where="ID_REF IN ("+strlist(nodeids)+")"
+      where="ID_REF IN (%s)" % ",".join(nodeids)
 
     NV={}
     for row in self.table.selectRows(where):

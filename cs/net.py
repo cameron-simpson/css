@@ -1,11 +1,9 @@
 import os
 import socket
-from cs.misc import chomp
-from cs.lex import isint
 
 def portnum(port,proto='tcp'):
   if isinstance(port,int): return port
-  if isint(port): return int(port)
+  if port.isdigit(): return int(port)
   return socket.getservbyname(port,proto)
 
 def hostaddrs(host):
@@ -22,6 +20,7 @@ def tcp_listening(localport,localaddr=None,nocache=False):
   if nocache or _cache_tcp_listens is None:
     netstat=os.popen("netstat -nl")
     _cache_tcp_listens={}
+    from cs.misc import chomp
     for line in netstat:
       line=chomp(line)
       fields=line.split()

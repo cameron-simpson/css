@@ -5,7 +5,7 @@ import os
 import os.path
 from types import *
 from cStringIO import StringIO
-from cs.lex import skipwhite, lastlinelen
+from cs.lex import lastlinelen
 import cs.io
 from cs.misc import out, cmderr, all, debug, ifdebug, warn
 
