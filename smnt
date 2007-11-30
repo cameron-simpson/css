@@ -7,20 +7,20 @@
 mnt=
 needdir=
 fstype=cifs
-user=`who am i | sed -e 's/[ 	].*//' -e 's/.*!//'` || user=${USER:-$LOGNAME}
-: ${WORKGROUP:=$SYSTEMID}
+user=`who am i | sed -e 's/[ 	].*//' -e 's/.*!//'` || user=${USER:-${LOGNAME:=`id -un`}}
+: ${WORKGROUP:=${SYSTEMID:=WORKGROUP}}
 
 cmd=`basename "$0"`
 usage="Usage: $cmd [-t {cifs|smbfs}] [-d dir] [-u user] [-w workgroup] //pc/share"
 
 badopts=
 
-while :
+while [ $# -gt 0 ]
 do
   case $1 in
     -d)	mnt=$2; shift ;;
     -u)	user=$2; shift ;;
-    -u)	WORKGROUP=$2; shift ;;
+    -w)	WORKGROUP=$2; shift ;;
     --)	shift; break ;;
     -?*)echo "$cmd: unrecognised option: $1" >&2; badopts=1 ;;
     *)	break ;;
