@@ -6,15 +6,16 @@
 
 : ${TMPDIR:=/tmp}
 
+diffopts=-ubBdt
+
 usage="Usage:	$0 [!]/regexp/ file1 file2
 	$0 [diffargs...]"
 
 case "$1" in
-    /*/)	vflag=   ptn=`expr "x$1" : 'x/\(.*\)/$'` ;;
-    !/*/)	vflag=-v ptn=`expr "x$1" : 'x./\(.*\)/$'` ;;
-    *)		exec pageif diff -u ${1+"$@"} ;;
+    /*/)	vflag=   ptn=`expr "x$1" : 'x/\(.*\)/$'`;  shift ;;
+    !/*/)	vflag=-v ptn=`expr "x$1" : 'x./\(.*\)/$'`; shift ;;
+    *)		exec pageif diff $diffopts ${1+"$@"} ;;
 esac
-shift
 
 [ $# = 2 ] || { echo "$0: I expected file1 and file2" >&2
 		echo "$usage" >&2
@@ -32,7 +33,7 @@ trap 'rm -f $t1 $t2; exit 1' 1 2 13 15
 egrep $vflag "$ptn" "$f1" >"$t1"
 egrep $vflag "$ptn" "$f2" >"$t2"
 
-pageif diff -u "$t1" "$t2"
+pageif diff $diffopts "$t1" "$t2"
 xit=$?
 
 exit $xit
