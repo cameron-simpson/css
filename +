@@ -105,36 +105,19 @@ else
   [ -s "$fmuttrc" ] && muttcmd="$muttcmd -e 'source $fmuttrc'"
 fi
 
-DELETE_FOLDER=$MAILDIR/DELETED/$fbase
 CURRENT_FOLDER=$fpath
+DELETE_FOLDER=$MAILDIR/ARCHIVE/`date "+$MAIL_EXPIRE_FORMAT"`/$fbase
+export DELETE_FOLDER
 export CURRENT_FOLDER DELETE_FOLDER
+maildir "$DELETE_FOLDER"
 
-# arrange archiving of deleted email
-(
-  lock=$DELETE_FOLDER
-  if locked "$lock"
-  then exit 0
-  fi
-
-  prc=$DELETE_FOLDER/.procmailrc
-  arch=$MAILDIR/ARCHIVE/`date "+$MAIL_EXPIRE_FORMAT"`/$fbase
-  maildir "$DELETE_FOLDER" "$arch"
-  ( echo "LOGFILE=$HOME/var/log/procmail"
-    echo "spool-xref,$arch . ."
-  ) | cats2procmailrc -t maildir -T >"$prc"
-
-  exec lock -1 "$lock" mail-despool -d "$delay" -t 60 "$DELETE_FOLDER"
-) &
-despool=$!
-
-set sh -c "exec $muttcmd"
-
-[ $use_screen ] && set scr "mutt_$mfolder" "$@"
-[ $use_term   ] && set term -j email $termopts -n "mutt $mfolder" "$@"
+set -- sh -c "exec $muttcmd"
+[ $use_screen ] && set -- scr "mutt_$mfolder" "$@"
+[ $use_term   ] && set -- term -j email $termopts -n "mutt $mfolder" "$@"
 
 [ -z "$preshcmd" ] || eval "$preshcmd"
 "$@"
 xit=$?
-kill "$despool"
 [ -z "$postshcmd" ] || eval "$postshcmd" || xit=1
+
 exit $xit
