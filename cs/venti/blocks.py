@@ -6,13 +6,24 @@
 #               An indirect block is a list of encoded BlockRefs.
 #
 
-from cs.misc import toBS, fromBS, fromBSfp
+from cs.misc import toBS, fromBS, fromBSfp, warn
 from cs.venti import MAX_SUBBLOCKS, tohex
+import cs.venti.store
 
 def encodeBlockRef(flags,span,h):
-    ''' Encode a blockref for storage.
+    ''' Encode a blockref for storage:
+        Format is:
+          BS(flags)
+          BS(span)
+          BS(hashlen)
+          hash
     '''
     return toBS(flags)+toBS(span)+toBS(len(h))+h
+
+def str2BlockRef(s):
+  (bref,etc)=decodeBlockRef(s)
+  assert len(etc) == 0, "left over data from \"%s\": \"%s\"" % (s,etc)
+  return bref
 
 def decodeBlockRef(iblock):
   ''' Decode a block ref from an indirect block.
@@ -31,24 +42,25 @@ def decodeBlockRef(iblock):
   iblock=iblock[hlen:]
   return (BlockRef(h,indirect,span), iblock)
 
-def str2BlockRef(s):
-  (bref,etc)=decodeBlockRef(s)
-  assert len(etc) == 0, "left over data from \"%s\": \"%s\"" % (s,etc)
-  return bref
-
 def decodeBlockRefFP(fp):
-  ''' Decode a block ref from an indirect block.
+  ''' Decode a block ref from a file.
       It consist of:
         flags: BSencoded ordinal
         span:  BSencoded ordinal
         hashlen: BSencoded ordinal
         hash:  raw hash
       Return (BlockRef,unparsed) where unparsed is remaining data.
+      Return None at EOF.
   '''
   flags=fromBSfp(fp)
+  if flags is None:
+    return None
   indirect=bool(flags&0x01)
+  assert (flags&~0x01) == 0, "unexpected flags: 0x%x" % flags
   span=fromBSfp(fp)
+  assert span is not None, "unexpected EOF"
   hlen=fromBSfp(fp)
+  assert hlen is not None, "unexpected EOF"
   h=fp.read(hlen)
   assert len(h) == hlen, "(indir=%s, span=%d): expected hlen=%d bytes, read %d bytes: %s"%(indirect,span,hlen,len(h),tohex(h))
   return BlockRef(h,indirect,span)
@@ -103,7 +115,7 @@ class BlockList(list):
         self.append(bref)
 
   def pack(self):
-    return "".join([bref.encode() for bref in self])
+    return "".join(bref.encode() for bref in self)
 
   def span(self):
     return self.offsetTo(len(self))
@@ -111,7 +123,7 @@ class BlockList(list):
   def offsetTo(self,ndx):
     ''' Offset to start of blocks under entry ndx.
     '''
-    return sum([bref.span for bref in self])
+    return sum(bref.span for bref in self)
 
   def seekToBlock(self,offset):
     ''' Seek to a leaf block.
@@ -151,13 +163,16 @@ class BlockSink:
       this is a direct BlockRef to the sole block of storage for the file.
   '''
   def __init__(self,S):
+    import cs.venti.store
+    assert isinstance(S, cs.venti.store.Store), "type=%s S=%s"%(type(S),S)
     self.__store=S
     self.__lists=[BlockList(S)]
 
   def appendBlock(self,block):
     ''' Append a block to the BlockSink.
     '''
-    self.appendBlockRef(BlockRef(self.__store.store(block),False,len(block)))
+    S=self.__store
+    self.appendBlockRef(BlockRef(S.store(block),False,len(block)))
 
   def appendBlockRef(self,bref):
     ''' Append a BlockRef to the BlockSink.

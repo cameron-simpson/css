@@ -9,7 +9,7 @@ import os.path
 import time
 from zlib import compress, decompress
 from cs.cache import LRU
-from cs.misc import cmderr, warn, progress, verbose, ifverbose, out, fromBS, toBS, fromBSfp, tb
+from cs.misc import cmderr, warn, progress, verbose, ifverbose, out, fromBS, toBS, fromBSfp, tb, the
 from cs.venti import tohex, hash
 from cs.venti.daemon import DaemonicStore
 
@@ -95,12 +95,12 @@ class GDBMStore(DaemonicStore):
       assert len(args) == 0
       self.__store.sync()
     elif op == DaemonicStore.OP_STORE_BLOCK:
-      assert len(args) == 1
-      result=self.__store.store(args[0])
+      arg=the(args)
+      result=self.__store.store(arg)
     elif op == DaemonicStore.OP_CONTAINS_HASH:
-      assert len(args) == 1
-      result=args[0] in self.__store
-    else
+      arg=the(args)
+      result=arg in self.__store
+    else:
       assert False, "unsupported daemon op %s %s" % (op, tuple(args))
     backCh.write(result)
 

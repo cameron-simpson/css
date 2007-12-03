@@ -17,8 +17,9 @@ usage='''Usage:
   %s [-S store] ls [-R] dirrefs...
   %s [-S store] mount dirref mountpoint
   %s [-S store] store pathnames...
+  %s [-S store] update [-o file.vt] path
   %s [-S store] unpack dirref
-''' % (cmd,cmd,cmd,cmd,cmd,cmd)
+''' % (cmd,cmd,cmd,cmd,cmd,cmd,cmd)
 
 badopts=False
 
@@ -38,6 +39,17 @@ else:
   if op == "store":
     if len(args) < 1:
       cmderr("missing pathnames")
+      badopts=True
+  elif op == "update":
+    archive=None
+    if len(args) >= 2 and args[0] == "-o":
+      archive=args[1]
+      args=args[2:]
+    if len(args) == 0:
+      cmderr("missing path")
+      badopts=True
+    elif len(args) > 1:
+      cmderr("extra arguments after path: %s" % " ".join(args[1:]))
       badopts=True
   elif op == "cat":
     if len(args) < 1:
@@ -84,11 +96,45 @@ if badopts:
   stderr.write(usage)
   exit(2)
 
-def ls(path,bref,recurse,fp=None):
+def gethexarg(path):
+  slash=path.find('/')
+  if slash < 0:
+    hexarg=path
+    path=''
+  else:
+    hexarg=path[:slash]
+    slash+=1
+    while slash < len(path) and path[slash] == '/':
+      slash+=1
+    path=path[slash:]
+  from cs.venti.blocks import str2BlockRef
+  bref=str2BlockRef(fromhex(hexarg))
+  return bref, path
+
+def resolve(path, domkdir=False):
+  bref, path = gethexarg(path)
+  from cs.venti.fs import FS
+  return FS(S,bref).root.resolve(path,domkdir)
+
+def path2bref(path):
+  bref, path = gethexarg(path)
+  if len(path) > 0:
+    D, name = FS(S,bref).root.resolve(path,domkdir)
+    return D.name2bref(name)
+  return bref
+
+def vtopen(path, mode='r', domkdir=False):
+  bref, path = gethexarg(path)
+  if len(path) > 0:
+    D, name = FS(S,bref).root.resolve(path,domkdir)
+    return D.open(name,mode)
+  import cs.venti.file
+  return cs.venti.file.open(S,mode,bref)
+
+def ls(path,D,recurse,fp=None):
   if fp is None:
     fp=stdout
   ##warn("ls %s: bref=%s"%(path,("s:"+tohex(bref) if type(bref) is str else "bref.h:"+tohex(bref.h))))
-  D=S.opendir(bref)
   fp.write(path)
   fp.write(":\n")
   if not recurse:
@@ -96,25 +142,36 @@ def ls(path,bref,recurse,fp=None):
     names.sort()
     for name in names:
       E=D[name]
-      fp.write("%c %-41s %-6d %s\n" % (('d' if E.isdir else 'f'), tohex(E.bref.encode()), E.bref.span, name))
+      bref=E.bref()
+      fp.write("%c %-41s %-6d %s\n" % (('d' if D.isdir(name) else 'f'), bref, bref.span, name))
   else:
     dirs=D.dirs(); dirs.sort()
     files=D.files(); files.sort()
     for name in files:
       E=D[name]
-      fp.write("%c %-41s %-6d %s\n" % (('d' if E.isdir else 'f'), tohex(E.bref.encode()), E.bref.span, name))
-      assert not E.isdir, name+" should not be a directory!"
+      bref=E.bref()
+      fp.write("%c %-41s %-6d %s\n" % (('d' if D.isdir(name) else 'f'), bref, bref.span, name))
+      assert not D.isdir(name), name+" should not be a directory!"
     for name in dirs:
-      E=D[name]
       fp.write("\n")
-      ls(os.path.join(path,name),E.bref,recurse,fp)
+      ls(os.path.join(path,name),D.chdir1(name),recurse,fp)
 
-def storePath(path):
-  if os.path.isdir(path):
-    ref=S.storeDir(path).sync()
-  else:
-    ref=S.storeFile(open(path))
-  return ref
+def cat(path,fp=None):
+  if fp is None:
+    fp=stdout
+  bref=path2bref(path)
+  for b in bref.leaves(S):
+    fp.write(b)
+
+def storePath(path,targetRef=None,ignoreTimes=False,deleteMissing=False,overWrite=False):
+  from cs.venti.fs import FS
+  import cs.venti.store
+  assert type(S) is not cs.venti.store.Store, "S=%s"%S
+  D=FS(S,targetRef).updateDir(path,
+                    ignoreTimes=ignoreTimes,
+                    deleteMissing=deleteMissing,
+                    overWrite=overWrite)
+  return D.sync()
 
 if op == "store":
   for path in args:
@@ -125,29 +182,52 @@ if op == "store":
       stdout.write(path)
     stdout.write('\n')
   S.sync()
+
+elif op == "update":
+  from cs.venti.blocks import str2BlockRef
+  import datetime
+  path=args[0]
+  if archive is None:
+    archive="%s.vt" % os.path.basename(path)
+  target=None
+  if os.path.isfile(archive):
+    hexarg=None
+    for line in open(archive):
+      assert line[-1] == '\n'
+      words=line[:-1].strip().split(' ')
+      if len(words) == 0:
+        continue
+      if words[0].startswith("#"):
+        continue
+      hexarg=words[0]
+    if hexarg is not None:
+      target=str2BlockRef(fromhex(hexarg))
+  saved=storePath(path,targetRef=target,ignoreTimes=False,deleteMissing=True,overWrite=True)
+  open(archive,mode='a').write("%s %s\n" % (saved, datetime.datetime.now()))
+
 elif op == "cat":
-  for hexarg in args:
-    E=S.namei(hexarg)
-    assert not E.isdir, "%s: %s: expected file, not directory"%(cmd,hexarg)
-    S.cat(E.bref)
+  for path in args:
+    cat(path)
+
 elif op == "catblock":
   for hexarg in args:
     if indirect:
       bl
     else:
       stdout.write(S[fromhex(hexarg)])
+
 elif op == "ls":
   first=True
-  for hexarg in args:
+  for path in args:
     if first:
       first=False
     else:
       print
-    print "ls", hexarg, "..."
-    E=S.namei(hexarg)
-    E.isdir=True
-    ##assert E.isdir, "%s: %s: expected directory, not file: dirent=%s"%(cmd,hexarg,E)
-    ls(hexarg,E.bref,recurse,stdout)
+    print "ls", path, "..."
+    D, name = resolve(path)
+    D=D.chdir1(name)
+    ls(path,D,recurse,stdout)
+
 elif op == "mount":
   print "mount", args[0], args[1], "..."
   if not os.path.isdir(args[1]):
@@ -155,10 +235,29 @@ elif op == "mount":
     exit(1)
   E=S.namei(args[0]+'/')
   assert E.isdir, "%s: %s: expected directory, not file"%(cmd,args[0])
-  import cs.venti.fs
-  cs.venti.fs.fusemount(args[1],S,E)
+  import cs.venti.vtfuse
+  cs.venti.vtfuse.fusemount(args[1],S,E)
+
 elif op == "unpack":
-  S.opendir(fromhex(args[0])).unpack('.')
+  for path in args:
+    D, name = resolve(path)
+    if len(name) > 0:
+      D=D.chdir1(name)
+    for subD, dirs, files in D.walk(topdown=True):
+      if len(subD.path) > 0 and not os.path.isdir(subD.path):
+        print "mkdir", subD.path
+        os.makedirs(subD.path)
+      files.sort()
+      for fname in files:
+        assert len(fname) > 0 and fname != '.' and fname != '..' and fname.find('/') < 0, \
+          "%s: unpack: %s: illegal filename \"%s\"" % (cmd, subD.path, fname)
+        fpath=os.path.join(subD.path,fname)
+        print "extract", fpath
+        outfp=open(fpath,mode='w')
+        for b in subD[fname].bref().leaves(S):
+          outfp.write(b)
+        outfp.close()
+
 else:
   cmderr("unsupported command")
   exit(2)

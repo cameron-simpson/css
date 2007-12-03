@@ -681,6 +681,7 @@ def fromBS(s):
 
 def fromBSfp(fp):
   ''' Read an extensible value from a file.
+      Return None at EOF.
   '''
   s=c=fp.read(1)
   if len(s) == 0:

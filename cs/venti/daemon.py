@@ -35,7 +35,6 @@ class DaemonicStore:
       def run(self):
         global opMap
         for rq, backCh in self.channel:
-          cmderr(
           op=rq[0]
           args=rq[1:]
           self.daemon_op(op, backCh, *args)

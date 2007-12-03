@@ -6,23 +6,14 @@
 from cs.venti import MAX_BLOCKSIZE, hash_sha, tohex
 from cs.venti.blocks import BlockList
 
-def open(S,path=None,mode="r"):
+def open(S,mode="r",bref=None):
   ''' Obtain a file object open for read or write.
   '''
   if mode == "r":
-    assert path is not None
-    if type(path) is str:
-      # TODO: make this namei() ?
-      from cs.venti.blocks import str2BlockRef
-      bref=str2BlockRef(path)
-    else:
-      bref=path
     return ReadFile(S,bref)
-
   if mode == "w":
     assert path is None
     return WriteFile(S)
-
   assert False, "open(path=%s, mode=%s): unsupported mode" % (path,mode)
 
 def storeFile(S,ifp,rsize=None,findEdge=None):
@@ -65,7 +56,7 @@ def findEdgeCode(block):
     or block[found+1:found+9] == "package ":
       return found+1
 
-    # C/C++/perl etc end of function
+    # C/C++/perl/js etc end of function
     if block[found+1:found+3] == "}\n":
       return found+3
 
@@ -181,6 +172,8 @@ class WriteFile:
       findEdge=findEdgeCode
 
     from cs.venti.blocks import BlockSink
+    import cs.venti.store
+    assert isinstance(S, cs.venti.store.Store), "S=%s"%S
     self.__sink=BlockSink(S)
     self.__findEdge=findEdge
     self.__q=''
