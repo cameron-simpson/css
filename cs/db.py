@@ -49,6 +49,8 @@ class ConnWrapper:
   def attachConn(self):
     self.conn=self.getConn(*self.getConnArgs)
     return self.conn
+  def __getattr__(self,attr):
+    return getattr(self.conn,attr)
 
 _warned_MYSQL_NO_UTF8=False
 
@@ -57,10 +59,9 @@ def mysql(secret,db=None):
   """ Attach to a MySQL database, return normal python db handle.
       Secret is either a dict after the style of cs.secret, or a secret name.
   """
-  import MySQLdb
-
   if secret is None:
     raise IndexError
+    import MySQLdb
     global MySQLServer
     conn=MySQLdb.connect(host=MySQLServer,db=db,user=None,passwd=None)
   else:
@@ -74,19 +75,22 @@ def mysql(secret,db=None):
       cmderr("mysql: no UTF8 support")
       _warned_MYSQL_NO_UTF8=True
 
-  debug("paramstyle =", MySQLdb.paramstyle)
-
   return conn
 
+def mssql(secret,db=None):
+  return cs.secret.mssql(secret,db=db)
+
 _cache_dbpool={}
-def dbpool(secret,dbname):
+def dbpool(secret,dbname,doConn=None):
   """ Cache for sharing database connections for a specific secret and db name.
       Returns a ConnWrapper, whose .conn field is a db connection.
       ConnWrapper.attachConn() can be called to try to reattach the connection.
   """
+  if doConn is None:
+    doConn=mysql
   global _cache_dbpool
   if (secret,dbname) not in _cache_dbpool:
-    _cache_dbpool[secret,dbname]=ConnWrapper(mysql,secret,dbname)
+    _cache_dbpool[secret,dbname]=ConnWrapper(doConn,secret,dbname)
 
   return _cache_dbpool[secret,dbname]
 
@@ -244,6 +248,9 @@ def mergeDatedRecordsSQL(table,keyFields,idField=None,constraint=None):
 
 __tableCache={}
 def getTable(conn,table,keyColumns,allColumns,constraint=None):
+  ''' Return a SingleKeyTableView or KeyedTableView from
+      a cache of open tables, opening a new one as needed.
+  '''
   if isinstance(keyColumns,str):
     keyColumns=(keyColumns,)
   elif not isinstance(keyColumns,tuple):
@@ -316,16 +323,17 @@ class DirectKeyedTableView:
   def getitems(self,keylist):
     ''' SELECT multiple table rows matching an arbitrary list of single-value keys.
     '''
-    assert len(self.__keyColumns) == 1, "getitems("+`keylist`+") on multikey table "+self.name+"["+",".join(self.__keyColumns)+"]"
-    return self.selectRows(self.__keyColumns[0]+" IN ("+",".join([sqlise(k) for k in keylist])+")")
+    assert len(self.__keyColumns) == 1, \
+      "getitems("+`keylist`+") on multikey table "+self.name+"["+",".join(self.__keyColumns)+"]"
+    return self.selectRows("%s IN (%s)" \
+                           % (self.__keyColumns[0], 
+                              ",".join(sqlise(k) for k in keylist)))
 
   def __setitem__(self,key,value):
-    dosql(self.conn,
-          'UPDATE '+self.name \
-          +' SET '+', '.join([ self.__allColumns[i]+' = '+sqlise(value[i])
-                               for i in range(len(value))
-                             ]) \
-          +' WHERE '+self.whereClause(self.__key2where(key)))
+    self.dosql(
+          "UPDATE %s SET %s WHERE %s"
+          % (", ".join(self.__allColumns[i]+' = '+sqlise(value[i]) for i in range(len(value))),
+             self.whereClause(self.__key2where(key))))
 
   def __delitem__(self,key):
     self.deleteRows(self.__key2where(key))
@@ -355,7 +363,7 @@ class DirectKeyedTableView:
       key=(key,)
     if type(key[0]) is tuple:
       raise IndexError, "key is tuple of tuple: %s" % `key`
-    return " AND ".join([self.__allColumns[i]+' = '+sqlise(key[i]) for i in range(len(key))])
+    return " AND ".join(self.__allColumns[i]+' = '+sqlise(key[i]) for i in range(len(key)))
 
   def rowWhere(self,row):
     return self.__key2where(self.rowKey(row))
@@ -363,7 +371,7 @@ class DirectKeyedTableView:
   def whereClause(self,where=None):
     if where is not None:
       if self.__constraint is not None:
-        where='('+where+') AND ('+self.__constraint+')'
+        where="(%s) AND (%s)" % (where, self.__constraint)
     elif self.__constraint is not None:
         where=self.__constraint
     return where
@@ -383,6 +391,9 @@ class DirectKeyedTableView:
   def selectRowByKey(self,key):
     return self.selectRows(self.__key2where(key))[0]
 
+  def dosql(self,sql):
+    return SQLQuery(self.conn,sql)
+
   def selectRows(self,where=None,modifiers=None):
     where=self.whereClause(where=where)
     sql=self.__selectRow
@@ -391,14 +402,14 @@ class DirectKeyedTableView:
     if modifiers is not None:
       sql+=' '+modifiers
 
-    return [DirectTableRow(self,row) for row in SQLQuery(self.conn,sql)]
+    return [DirectTableRow(self,row) for row in self.dosql(sql)]
 
   def deleteRows(self,where=None):
     where=self.whereClause(where)
     sql='DELETE FROM '+self.name
     if where is not None:
       sql+=' WHERE '+where
-    dosql(self.conn,sql)
+    self.dosql(sql)
 
 
   def insert(self,row,sqlised_columns=()):
@@ -467,6 +478,9 @@ class KeyedTableView(cs.cache.Cache):
     self.__direct=DirectKeyedTableView(conn,tablename,keyColumns,allColumns,constraint)
     cs.cache.Cache.__init__(self,self.__direct)
     self.__columnIndices={}
+
+  def __getattr__(self,attr):
+    return getattr(self.__direct,attr)
 
   def _rawTable(self):
     return self.__direct

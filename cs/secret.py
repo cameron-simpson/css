@@ -13,10 +13,9 @@ def get(secret):
 
   raise IndexError, "no secret named "+secret
 
-def mysql(secret,db=None):
-  import types
+def mysql(secret,db):
   import MySQLdb
-  if type(secret) is types.StringType or not(hasattr(secret,'__keys__') or hasattr(secret,'keys')):
+  if type(secret) is str or not(hasattr(secret,'__keys__') or hasattr(secret,'keys')):
     # transmute secret name into structure
     secret=get(secret)
 
@@ -27,6 +26,34 @@ def mysql(secret,db=None):
   user=secret['LOGIN']
   passwd=secret['PASSWORD']
   return MySQLdb.connect(host=host,db=db,user=user,passwd=passwd)
+
+def mssql(secret,db=None):
+  import pymssql
+  if type(secret) is str or not(hasattr(secret,'__keys__') or hasattr(secret,'keys')):
+    # transmute secret name into structure
+    secret=get(secret)
+
+  print "secret =", `secret`
+  host=secret['HOST']
+  port=secret['PORT']
+  database=secret['DATABASE']
+  user=secret['LOGIN']
+  passwd=secret['PASSWORD']
+
+  from os import environ as env
+  ohost=env.get('TDSHOST'); env['TDSHOST']=host
+  oport=env.get('TDSPORT'); env['TDSPORT']=str(port)
+  conn=pymssql.connect(user=user,password=passwd,database=database)
+  if ohost is None:
+    del env['TDSHOST']
+  else:
+    env['TDSHOST']=ohost
+  if oport is None:
+    del env['TDSPORT']
+  else:
+    env['TDSPORT']=oport
+
+  return conn
 
 def ldap(secret,host=None,binddn=None,bindpw=None):
   # transmute secret name into structure
