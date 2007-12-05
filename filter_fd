@@ -112,7 +112,8 @@ exec 1>&2
 # collect exit status
 # wait for the sub process to write the exit status to the file
 # hope it's atomic
-while [ ! -s "$xitcode" ]; do sleep 1; done
+# if the xitcode file gets removed, exit non-zero
+while [ ! -s "$xitcode" ]; do [ -f "$xitcode" ] || exit 1; sleep 1; done
 xit=`cat "$xitcode"` || xit=1
 rm -f "$xitcode"
 
