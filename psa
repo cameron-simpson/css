@@ -1,7 +1,7 @@
-#!/bin/sh
+#!/bin/sh -ue
 
 ptopts=
-while :
+while [ $# -gt 0 ]
 do  case $1 in
       +?*)	ptopts="$ptopts $1" ;;
       *)	break ;;
@@ -9,12 +9,12 @@ do  case $1 in
     shift
 done
 
-case $ARCH in
-    *.solaris)	        exec pt -e  $ptopts ;;
-    *.darwin|*bsd|*.linux) exec pt wwwax $ptopts ;;
-    *.ultrix|*.domainos|*.*.sunos)
+case $OS in
+    solaris)	        exec pt -e  $ptopts ;;
+    darwin|*bsd|linux)  exec pt wwwax $ptopts ;;
+    ultrix|domainos|sunos)
 			exec ps agxuww ;;
-    *)			echo "$0: don't know how to psa when ARCH=\"$ARCH\"" >&2
+    *)			echo "$0: don't know how to psa when OS=\"$OS\"" >&2
 			exit 1
 			;;
 esac \
