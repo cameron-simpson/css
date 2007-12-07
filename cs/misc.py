@@ -1,3 +1,4 @@
+from __future__ import with_statement
 import os
 import os.path
 import errno
@@ -5,6 +6,7 @@ import sys
 import string
 import time
 from StringIO import StringIO
+from threading import BoundedSemaphore
 from cs.lex import parseline, strlist
 
 def setcmd(ncmd):
@@ -126,11 +128,13 @@ def tb():
   if cs.upd.active:
     upd.out(oldUpd)
 
-_seq=0
+__seq=0
+__seqLock=BoundedSemaphore(1)
 def seq():
-  global _seq
-  _seq+=1
-  return _seq
+  with __seqLock:
+    __seq+=1
+    n=__seq
+  return n
 
 def all(gen):
   ''' Returns all the values from a generator as an array.
