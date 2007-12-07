@@ -131,6 +131,7 @@ def tb():
 __seq=0
 __seqLock=BoundedSemaphore(1)
 def seq():
+  global __seq
   with __seqLock:
     __seq+=1
     n=__seq
