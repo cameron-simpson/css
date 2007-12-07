@@ -14,12 +14,13 @@ from cs.misc import cmd, cmderr, setcmd, warn
 usage='''Usage:
   %s [-S store] cat filerefs...
   %s [-S store] catblock [-i] hashcodes...
+  %s [-S store] listen port
   %s [-S store] ls [-R] dirrefs...
   %s [-S store] mount dirref mountpoint
   %s [-S store] store pathnames...
   %s [-S store] update [-o file.vt] path
   %s [-S store] unpack dirref
-''' % (cmd,cmd,cmd,cmd,cmd,cmd,cmd)
+''' % (cmd,cmd,cmd,cmd,cmd,cmd,cmd,cmd)
 
 badopts=False
 
@@ -62,6 +63,10 @@ else:
       args.pop(0)
     if len(args) < 1:
       cmderr("missing hashcodes")
+      badopts=True
+  elif op == "listen":
+    if len(args) != 1:
+      cmderr("expected a port")
       badopts=True
   elif op == "ls":
     recurse=False
@@ -215,6 +220,12 @@ elif op == "catblock":
       bl
     else:
       stdout.write(S[fromhex(hexarg)])
+
+elif op == "listen":
+  from cs.venti.tcp import Server
+  assert len(args) == 1
+  srv=Server(('127.0.0.1',int(args[0])),S)
+  srv.serve_forever()
 
 elif op == "ls":
   first=True
