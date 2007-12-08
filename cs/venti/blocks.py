@@ -18,6 +18,7 @@ def encodeBlockRef(flags,span,h):
           BS(hashlen)
           hash
     '''
+    assert type(h) is str, "h=%s"%h
     return toBS(flags)+toBS(span)+toBS(len(h))+h
 
 def str2BlockRef(s):
@@ -113,6 +114,7 @@ class BlockList(list):
       while len(iblock) > 0:
         (bref, iblock)=decodeBlockRef(iblock)
         self.append(bref)
+    self.__pos=None
 
   def pack(self):
     return "".join(bref.encode() for bref in self)
@@ -131,6 +133,18 @@ class BlockList(list):
         If the seek is beyond the end of the blocklist, return None and the
         remaining offset.
     '''
+    # seek into most recent block?
+    if self.__pos is not None:
+      b_h, b_offset, b_size = self.__pos
+      if b_offset <= offset and b_offset+b_size > offset:
+        return b_h, offset-b_offset
+
+    b_h, roffset = self.__seekToBlock(offset)
+    if b_h is not None:
+      self.__pos=(b_h, offset-roffset, len(self.__store[b_h]))
+    return b_h, roffset
+
+  def __seekToBlock(self,offset):
     for bref in self:
       if offset < bref.span:
         if bref.indirect:
