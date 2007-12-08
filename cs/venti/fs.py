@@ -4,8 +4,8 @@
 #       - Cameron Simpson <cs@zip.com.au> 01dec2007
 #
 
-from cs.misc import toBS, fromBS, fromBSfp, progress, verbose, warn
-from cs.venti.file import ReadFile, WriteFile
+from cs.misc import toBS, fromBS, fromBSfp, progress, verbose, warn, cmderr, debug
+from cs.venti.file import ReadFile, WriteFile, storeFile
 from cs.venti.blocks import decodeBlockRefFP
 
 T_FILE=0
@@ -27,11 +27,11 @@ class FS:
     ''' Update the target from the real file tree at source.
         Return the top Dir (target).
     '''
-    from cs.venti.file import storeFile
     if target is None:
       T=self.root
     else:
       T=self.root.chdir(target,True)
+    debug("updateDir(source=%s,target=%s,ignoreTimes=%s,...)"%(source,target,ignoreTimes))
 
     import os
     for (dirpath, dirs, files) in os.walk(source,topdown=False):
@@ -44,21 +44,30 @@ class FS:
         filepath=os.path.join(dirpath,subfile)
         try:
           st=os.stat(filepath)
-          if subfile in D:
-            if not overWrite:
-              progress("%s: not overwriting" % filepath)
-              continue
-            if not ignoreTimes:
-              E=D[subfile]
-              if st.st_size == E.size() and st.st_mtime == int(E.mtime()):
-                verbose("%s: same size and mtime, skipping" % filepath)
-                continue
-
-          M=Meta()
-          M['mtime']=st.st_mtime
-          D[subfile]=Dirent(T_FILE,storeFile(self.store,open(filepath)),M)
         except IOError, e:
-          cmderr("%s: can't store: %s" % (filepath, `e`))
+          cmderr("%s: stat: %s" % (filepath,e))
+          continue
+        if subfile in D:
+          if not overWrite:
+            progress("%s: not overwriting" % filepath)
+            continue
+          if not ignoreTimes:
+            E=D[subfile]
+            if st.st_size == E.size() and st.st_mtime == int(E.mtime()):
+              verbose("%s: same size and mtime, skipping" % filepath)
+              continue
+            else:
+              verbose("%s: differing size/mtime, storing" % filepath)
+          else:
+            verbose("IGNORETIMES=True")
+        else:
+          verbose("%s not in dir"%subfile)
+
+        M=Meta()
+        M['mtime']=st.st_mtime
+        fp=open(filepath)
+        ##debug("fp(%s)=%s" % (filepath,fp))
+        D[subfile]=Dirent(T_FILE,storeFile(self.store,fp),M)
 
     return T
 
@@ -319,6 +328,14 @@ def decodeMeta(s):
   return M
 
 class Meta(dict):
+  ''' Metadata:
+        mtime:unix-seconds(int or float)
+        u:login:perms-perms
+        g:group:perms-perms
+        *:perms-perms
+        acl:hash-of-encoded-Meta
+        acl:/path/to/encoded-Meta
+  '''
   def __str__(self):
     return "[%s]" % self.encode().replace('\n',';')
 
