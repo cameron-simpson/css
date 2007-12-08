@@ -23,7 +23,7 @@ class Channel:
     self.__writable.release()
     self.__readable.acquire()
     value=self._value
-    self.delattr(_value)
+    delattr(self,'_value')
     return value
 
   def write(self,value):
@@ -80,7 +80,7 @@ class JobQueue:
     else:
       doRelease=False
     with self.lock:
-      assert n not in self, "\"%s\" already queued"
+      assert n not in self.q, "\"%s\" already queued"
       self.q[n]=(ch,doRelease)
     return ch
   
@@ -112,18 +112,28 @@ def returnChannel(ch):
   with __channelsLock:
     __channels.append(ch)
 
-def bgReturn(result):
-  ''' Class to return an asynchronous result.
-      Takes the result, returns a channel from which to read it back.
-      The caller must call returnChannel() on the returned channel after use.
+def bgCall(func,args,ch=None):
+  ''' Spawn a thread to call the supplied function with the supplied
+      args. Return a channel on which the function return value may be read. 
+      A channel may be supplied by the caller; if not then the returned
+      channel must be release with returnChannel().
   '''
-  bg=_BGReturn(result)
-  ch=bg.ch
+  if ch is None:
+    ch=getChannel()
+  bg=Thread(target=_bgFunc,args=(func,args,ch))
+  ##bg.setDaemon(True)
+  bg.setName("bgCall(func=%s, args=%s)" % (func, args))
   bg.start()
   return ch
-class _BGReturn(Thread):
-  def __init__(self,result):
-    self.result=result
-    self.ch=getChannel()
-  def run(self):
-    self.ch.write(result)
+def _bgFunc(func,args,ch):
+  result=func(*args)
+  ch.write(result)
+def _bgReturn(args,ch):
+  ch.write(args)
+def bgReturn(result,ch=None):
+  ''' Return an asynchronous result.
+      Takes the result, returns a channel from which to read it back.
+      A channel may be supplied by the caller; if not then the returned
+      channel must be release with returnChannel().
+  '''
+  return bgCall(_bgReturn,(result,))
