@@ -3,6 +3,8 @@
 # Stream protocol for vt stores.
 #       - Cameron Simpson <cs@zip.com.au> 06dec2007
 #
+# TODO: T_SYNC, to wait for pending requests before returning
+#
 
 from __future__ import with_statement
 from threading import Thread, BoundedSemaphore
@@ -40,6 +42,8 @@ class StreamDaemon:
     self.replyFP=replyFP
     self.jobs={}
     self.jobsLock=BoundedSemaphore(1)
+    self.njobs=0
+    self.jobsClosing=False
     self.resultsCH=getChannel()
     self.upstreamCH=getChannel()
     self.readerThread=_StreamDaemonReader(self)
@@ -47,13 +51,20 @@ class StreamDaemon:
     self.resultsThread=_StreamDaemonResults(self)
     self.resultsThread.start()
 
+  def close(self):
+    with self.jobsLock:
+      self.jobsCLosing=True
+  def closing(self):
+    with self.jobsLock:
+      cl=self.jobsCloosing
+    return cl
+
 class _StreamDaemonReader(Thread):
   ''' Read requests from the request stream,
       dispatch asynchronously to the backend Store.
   '''
   def __init__(self,daemon):
     Thread.__init__(self)
-    self.setDaemon(True)
     self.setName("_StreamDaemonReader")
     self.daemon=daemon
   def run(self):
@@ -68,6 +79,7 @@ class _StreamDaemonReader(Thread):
       with jobsLock:
         assert n not in jobs, "token %d already in jobs" % n
         jobs[n]=rqType
+        self.daemon.njobs+=1
       if rqType == T_STORE:
         S.store_a(arg,n,resultsCH)
       elif rqType == T_FETCH:
@@ -78,6 +90,7 @@ class _StreamDaemonReader(Thread):
         S.sync_a(n,resultsCH)
       else:
         assert False, "unhandled rqType(%d) for request #%d" % (rqType, n)
+    self.daemon.close()
 
 def decodeStream(fp):
   ''' Generator that yields (rqTag, rqType, arg) from the request stream.
@@ -113,7 +126,6 @@ class _StreamDaemonResults(Thread):
   '''
   def __init__(self,daemon):
     Thread.__init__(self)
-    self.setDaemon(True)
     self.setName("_StreamDaemonResults")
     self.daemon=daemon
   def run(self):
@@ -127,6 +139,7 @@ class _StreamDaemonResults(Thread):
       with jobsLock:
         rqType=jobs[rqTag]
         del jobs[rqTag]
+        self.daemon.njobs-=1
       debug("report result upstream: tqTag=%s rqType=%d results=%s" % (rqTag,rqType,result))
       replyFP.write(toBS(rqTag))
       replyFP.write(toBS(rqType))
@@ -140,6 +153,11 @@ class _StreamDaemonResults(Thread):
       else:
         assert False, "unhandled rqType(%d)" % rqType
       replyFP.flush()
+      if self.daemon.closing():
+        with jobsLock:
+          jobsDone=(self.daemon.njobs == 0)
+        if jobsDone:
+          break
 
 def encodeStore(fp,rqTag,block):
   ##if ifdebug(): dbgfp(fp,"encodeStore(rqTag=%d,%d bytes)" % (rqTag,len(block)))
@@ -241,7 +259,6 @@ class StreamStore(BasicStore):
 class _StreamClientReader(Thread):
   def __init__(self,client):
     Thread.__init__(self)
-    self.setDaemon(True)
     self.setName("_StreamClientReader")
     self.client=client
   def run(self):
