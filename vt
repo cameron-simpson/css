@@ -4,7 +4,7 @@
 #       - Cameron Simpson <cs@zip.com.au> 01may2007
 #
 
-from sys import argv, exit, stderr, stdout, exit
+from sys import argv, exit, stdin, stderr, stdout, exit
 import os
 import os.path
 from cs.venti import tohex, fromhex
@@ -222,10 +222,24 @@ elif op == "catblock":
       stdout.write(S[fromhex(hexarg)])
 
 elif op == "listen":
-  from cs.venti.tcp import Server
   assert len(args) == 1
-  srv=Server(('127.0.0.1',int(args[0])),S)
-  srv.serve_forever()
+  arg=args[0]
+  if arg == '-':
+    from cs.venti.stream import StreamDaemon
+    StreamDaemon(S,stdin,stdout)
+  else:
+    cpos=arg.rfind(':')
+    if cpos >= 0:
+      host=arg[:cpos]
+      port=arg[cpos+1:]
+      if len(host) == 0:
+        host='127.0.0.1'
+      port=int(port)
+      srv=Server((host,port),S)
+      srv.serve_forever()
+    else:
+      cmderr("invalid listen argument, I expect \"-\" or \"[host]:port\", got \"%s\"" % arg)
+      exit(1)
 
 elif op == "ls":
   first=True
