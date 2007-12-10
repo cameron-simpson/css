@@ -78,7 +78,7 @@ runplayer()
 			$trace ogg123 -d oss "$auf" &
 			subproc=$! ;;
 		*.mp3)	dodelay=1
-			$trace mpg123 -v -b 2048 "$auf" &
+			$trace mpg123 -b 2048 "$auf" &
 			subproc=$! ;;
 		*)	echo "$cmd: how to play $auf ?" >&2
 			continue
@@ -124,14 +124,14 @@ do
     case "$op" in
 	:help | '?')
 		echo "Help:"
-		echo "  ?	This help message."
-		echo "  -	Stop the player."
-		echo "  .	Select with an empty pattern (pick anything)."
-		echo "  n	Set main volume to n, from 0-100."
-		echo "  blank line: Skip to next selection from current criteria."
-		echo "  \"random\" Choose matching items random."
-		echo "  \"seq\"	Choose matching items sequentially."
-		echo "  keywords Select tracks using the supplied keywords."
+		echo "  ?	        This help message."
+		echo "  -	        Stop the player."
+		echo "  .	        Select with an empty pattern (pick anything)."
+		echo "  n	        Set main volume to n, from 0-100."
+		echo "  blank line:     Skip to next selection from current criteria."
+		echo "  \":random\"     Choose matching items random."
+		echo "  \":seq\"	Choose matching items sequentially."
+		echo "  keywords        Select tracks using the supplied keywords."
 		;;
 	:n | :next | '')
 		bumpplayer
