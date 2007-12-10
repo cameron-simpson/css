@@ -9,8 +9,7 @@ import os
 import os.path
 from cs.venti import tohex, fromhex
 from cs.venti.store import Store
-import cs.misc
-from cs.misc import cmd, cmderr, setcmd, warn
+from cs.misc import cmd, cmderr, setcmd, warn, debug
 
 usage='''Usage:
   %s [-S store] cat filerefs...
@@ -99,7 +98,15 @@ if S is None:
 
 if badopts:
   stderr.write(usage)
+  if S is not None:
+    S.close()
   exit(2)
+
+dflt_cache=os.environ.get('VT_STORE_CACHE')
+if dflt_cache is not None:
+  C=Store(dflt_cache)
+  from cs.venti.cache import CacheStore
+  S=CacheStore(S,C)
 
 def gethexarg(path):
   slash=path.find('/')
@@ -239,6 +246,8 @@ elif op == "listen":
       srv.serve_forever()
     else:
       cmderr("invalid listen argument, I expect \"-\" or \"[host]:port\", got \"%s\"" % arg)
+      if S is not None:
+        S.close()
       exit(1)
 
 elif op == "ls":
@@ -257,6 +266,8 @@ elif op == "mount":
   print "mount", args[0], args[1], "..."
   if not os.path.isdir(args[1]):
     cmderr("%s: mountpoint is not a directory" % args[1])
+    if S is not None:
+      S.close()
     exit(1)
   E=S.namei(args[0]+'/')
   assert E.isdir, "%s: %s: expected directory, not file"%(cmd,args[0])
@@ -285,4 +296,9 @@ elif op == "unpack":
 
 else:
   cmderr("unsupported command")
+  if S is not None:
+    S.close()
   exit(2)
+
+S.close()
+debug("%s; exit main command"%cmd)
