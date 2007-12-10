@@ -6,6 +6,7 @@
 
 from __future__ import with_statement
 from threading import Thread, BoundedSemaphore
+from Queue import Queue
 
 class Channel:
   ''' A zero-storage data passage.
@@ -96,6 +97,30 @@ class JobQueue:
     ch.write((n,result))
     if doRelease:
       returnChannel(ch)
+
+class FuncQueue(Queue):
+  ''' A Queue of function calls to make, processed serially.
+      New functions queued as .put((func,args)).
+      Queue shut down with .close().
+  '''
+  def __init__(self,size=None):
+    Queue.__init__(self,size)
+    self.__closing=False
+    Thread(target=self.__runQueue).start()
+  def close(self):
+    self.__closing=True
+    self.put((None,None))
+  def __runQueue(self):
+    ''' A thread to process queue items serially.
+        This exists to permit easy or default implementation if the *_a()
+        methods, and is better suited to fast low latency stores.
+        A highly parallel or high latency store will want its own
+        thread scheme to manage multiple *_a() operations.
+    '''
+    while not self.__closing or not self.empty():
+      func, args = self.get(True,None)
+      if func is not None:
+        func(*args)
 
 ''' A pool of Channels.
 '''
