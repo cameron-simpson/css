@@ -173,7 +173,7 @@ class WriteFile:
 
     from cs.venti.blocks import BlockSink
     import cs.venti.store
-    assert isinstance(S, cs.venti.store.Store), "S=%s"%S
+    assert isinstance(S, cs.venti.store.BasicStore), "S=%s"%S
     self.__sink=BlockSink(S)
     self.__findEdge=findEdge
     self.__q=''
