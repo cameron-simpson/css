@@ -178,7 +178,7 @@ class BlockSink:
   '''
   def __init__(self,S):
     import cs.venti.store
-    assert isinstance(S, cs.venti.store.Store), "type=%s S=%s"%(type(S),S)
+    assert isinstance(S, cs.venti.store.BasicStore), "type=%s S=%s"%(type(S),S)
     self.__store=S
     self.__lists=[BlockList(S)]
 
