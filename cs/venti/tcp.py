@@ -22,7 +22,9 @@ class _RequestHandler(StreamRequestHandler):
 
   def handle(self):
     SD=StreamDaemon(self.S,self.rfile,self.wfile)
+    debug("tcp.handle: waiting for StreamDaemon.resultsThread")
     SD.resultsThread.join()
+    debug("tcp.handle: waited for StreamDaemon.resultsThread")
 
 class TCPStore(StreamStore):
   def __init__(self,bindaddr):
