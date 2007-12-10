@@ -17,6 +17,7 @@ from cs.venti.store import BasicStore
 
 class GDBMStore(BasicStore):
   def __init__(self,path,doindex=False):
+    BasicStore.__init__(self)
     self.__path=path
     self.logfp=open(os.path.join(path,"log"),"a")
     stores=[ int(name[:-4])
