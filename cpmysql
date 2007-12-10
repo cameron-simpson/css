@@ -250,7 +250,7 @@ pull_db()
   | if [ $doit ]; then if [ -n "$trace" ] && [ -t 2 ]; then prcat; else cat; fi; fi \
   | case "$dst" in
       /*)
-        $trace gzip -n --fast >"$dst/$_pull_db.sql.gz"
+        $trace sed '${/^-- Dump completed on /d;}' | $trace gzip -n --fast >"$dst/$_pull_db.sql.gz"
         ;;
       *)
         mysqlcmd_dst mysql "$_pull_db"

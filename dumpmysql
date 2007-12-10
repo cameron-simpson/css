@@ -107,6 +107,7 @@ fi \
     rm -f "$squiz"
     [ $quiet ] || echo mysqldump -h "$host" "-u..." "-p..." --opt "$dbname" $tblname
     $trace mysqldump -h "$host" "-u$user" "-p$password" --opt "$dbname" $tblname \
+    | sed '${/^-- Dump completed on /d;}' \
     | gzip -n --fast >"$squiz"
   done
 
