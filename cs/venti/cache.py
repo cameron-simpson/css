@@ -4,42 +4,67 @@
 #       - Cameron Simpson <cs@zip.com.au> 07dec2007
 #
 
+from cs.misc import seq
+from cs.threads import getChannel, FuncQueue
 from cs.venti.store import BasicStore
-from cs.threads import getChannel
+import sys
 
 class CacheStore(BasicStore):
   def __init__(self,backend,cache):
+    BasicStore.__init__(self)
     self.backend=backend
     self.cache=cache
+    self.backQ=FuncQueue()
 
-  def haveyou_a(self,h):
-    ch=getChannel()
-    Thread(target=self.store_bg,kw={'self':self, 'ch':ch, 'block':block}).start()
-    return ch
-  def haveyou_bg(self,ch,h):
-    if h in self.cache:
-      ch.write(True)
-    else:
-      ch.write(h in self.backend)
+  def close(self):
+    self.backend.close()
+    self.cache.close()
+    self.backQ.close()
+    BasicStore.close(self)
 
-  def store_a(self,block):
-    ch=getChannel()
-    Thread(target=self.store_bg,kw={'self':self, 'ch':ch, 'block':block}).start()
+  def store_a(self,block,tag=None,ch=None):
+    if tag is None: tag=seq()
+    if ch is None: ch=getChannel()
+    self.Q.put((self.__store_bg,(tag,block,ch)))
     return ch
-  def store_bg(self,ch,block):
+  def __store_bg(self,tag,block,ch):
     h=self.cache.store(block)
-    ch.write(h)
+    ch.write((tag,h))
+    self.backQ.put((self.__store_bg2,(h,block)))
+  def __store_bg2(self,h,block):
     if h not in self.backend:
-      self.backend.store(h)
+      self.backend.store(block)
 
-  def fetch_a(self,h):
-    ch=getChannel()
-    Thread(target=self.fetch_bg,kw={'self':self, 'ch':ch, 'h':h}).start()
+  def fetch_a(self,h,tag=None,ch=None):
+    if tag is None: tag=seq()
+    if ch is None: ch=getChannel()
+    self.Q.put((self.__fetch_bg,(tag,h,ch)))
     return ch
-  def fetch_bg(self,ch,h):
+  def __fetch_bg(self,tag,h,ch):
     if h in self.cache:
-      ch.write(self.cache[h])
+      block=self.cache[h]
     else:
       block=self.backend[h]
-      ch.write(block)
-      self.cache.store(block)
+    ch.write((tag,block))
+
+  def haveyou_a(self,h,tag=None,ch=None):
+    if tag is None: tag=seq()
+    if ch is None: ch=getChannel()
+    self.Q.put((self.__haveyou_bg,(tag,h,ch)))
+    return ch
+  def __haveyou_bg(self,tag,h,ch):
+    if h in self.cache:
+      yesno=True
+    else:
+      yesno=self.backend[h]
+    ch.write((tag,yesno))
+
+  def sync_a(self,tag=None,ch=None):
+    if tag is None: tag=seq()
+    if ch is None: ch=getChannel()
+    self.Q.put((self.__sync_bg,(tag,ch)))
+    return ch
+  def __sync_bg(self,tag,ch):
+    self.cache.sync()
+    self.backend.sync()
+    ch.write((tag,None))
