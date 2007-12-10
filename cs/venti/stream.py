@@ -68,7 +68,7 @@ class _StreamDaemonReader(Thread):
     self.setName("_StreamDaemonReader")
     self.daemon=daemon
   def run(self):
-    debug("running _StreamDaemonReader")
+    debug("RUN _StreamDaemonReader")
     jobs=self.daemon.jobs
     jobsLock=self.daemon.jobsLock
     resultsCH=self.daemon.resultsCH
@@ -91,6 +91,7 @@ class _StreamDaemonReader(Thread):
       else:
         assert False, "unhandled rqType(%d) for request #%d" % (rqType, n)
     self.daemon.close()
+    debug("END _StreamDaemonReader")
 
 def decodeStream(fp):
   ''' Generator that yields (rqTag, rqType, arg) from the request stream.
@@ -129,7 +130,7 @@ class _StreamDaemonResults(Thread):
     self.setName("_StreamDaemonResults")
     self.daemon=daemon
   def run(self):
-    debug("running _StreamDaemonResults")
+    debug("RUN _StreamDaemonResults")
     jobs=self.daemon.jobs
     jobsLock=self.daemon.jobsLock
     replyFP=self.daemon.replyFP
@@ -158,6 +159,7 @@ class _StreamDaemonResults(Thread):
           jobsDone=(self.daemon.njobs == 0)
         if jobsDone:
           break
+    debug("END _StreamDaemonResults")
 
 def encodeStore(fp,rqTag,block):
   ##if ifdebug(): dbgfp(fp,"encodeStore(rqTag=%d,%d bytes)" % (rqTag,len(block)))
@@ -197,6 +199,7 @@ class StreamStore(BasicStore):
   ''' A Store connected to a StreamDaemon backend.
   '''
   def __init__(self,requestFP,replyFP):
+    BasicStore.__init__(self)
     self.requestFP=requestFP
     self.replyFP=replyFP
     self.pending=JobQueue()
@@ -204,6 +207,7 @@ class StreamStore(BasicStore):
     self.lastBlock=None
     self.lastBlockLock=BoundedSemaphore(1)
     _StreamClientReader(self).start()
+
   def store_a(self,block,rqTag=None,ch=None):
     debug("StreamStore: store_a(%d bytes)..." % len(block))
     if rqTag is None: rqTag=seq()
@@ -262,7 +266,7 @@ class _StreamClientReader(Thread):
     self.setName("_StreamClientReader")
     self.client=client
   def run(self):
-    debug("running _StreamClientReader")
+    debug("RUN _StreamClientReader")
     replyFP=self.client.replyFP
     pending=self.client.pending
     debug("_StreamClientReader: replyFP=%s" % replyFP)
@@ -294,3 +298,5 @@ class _StreamClientReader(Thread):
 
       # fetch next result
       rqTag=fromBSfp(replyFP)
+    self.client.close()
+    debug("END _StreamClientReader")
