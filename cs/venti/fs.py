@@ -193,7 +193,7 @@ class Dir(dict):
     ''' Sync directory to store, return BlockRef.
     '''
     import cs.venti.store
-    assert isinstance(self.fs.store, cs.venti.store.Store), "self.fs.store=%s, self.fs=%s"%(self.fs.store,self.fs)
+    assert isinstance(self.fs.store, cs.venti.store.BasicStore), "self.fs.store=%s, self.fs=%s"%(self.fs.store,self.fs)
     F=WriteFile(self.fs.store)
     names=self.keys()
     names.sort()
