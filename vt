@@ -242,7 +242,8 @@ elif op == "listen":
       if len(host) == 0:
         host='127.0.0.1'
       port=int(port)
-      srv=Server((host,port),S)
+      import cs.venti.tcp
+      srv=cs.venti.tcp.Server((host,port),S)
       srv.serve_forever()
     else:
       cmderr("invalid listen argument, I expect \"-\" or \"[host]:port\", got \"%s\"" % arg)
