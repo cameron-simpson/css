@@ -40,19 +40,16 @@ done
 [ -n "$url" ] && set -- "$url"
 
 echo >>"$prefs"
-exec scr "$br" \
-  { \
-    histbackup -x --delete-excluded \
-            "$HOME/var/firefox" "$HOME/var/backup/firefox" \
-            '--exclude=/*/Cache' '--exclude=/*/browserstate-logs' '--exclude=/*/*.mfasl' '--exclude=/*/urlclassifier2.sqlite' \
-    \; \
-    bsed '/^user_pref("permissions.default.image"/d
-          /^user_pref("extensions.tabmix.progressMeter"/d
-          /^user_pref("javascript.enabled"/d
-    $a\
-    user_pref("javascript.enabled", false);\
-    user_pref("extensions.tabmix.progressMeter", false);\
-    user_pref("permissions.default.image", 2);' "$prefs" \
-    \; \
-    "$br" -width "$FULLX" -height "$PIX_HIGH" -P "$profile" ${1+"$@"} \
-  }
+histbackup -x --delete-excluded \
+        "$HOME/var/firefox" "$HOME/var/backup/firefox" \
+        '--exclude=/*/Cache' '--exclude=/*/browserstate-logs' '--exclude=/*/*.mfasl' '--exclude=/*/urlclassifier2.sqlite'
+
+bsed '/^user_pref("permissions.default.image"/d
+      /^user_pref("extensions.tabmix.progressMeter"/d
+      /^user_pref("javascript.enabled"/d
+$a\
+user_pref("javascript.enabled", false);\
+user_pref("extensions.tabmix.progressMeter", false);\
+user_pref("permissions.default.image", 2);' "$prefs"
+
+exec "$br" -width "$FULLX" -height "$PIX_HIGH" -P "$profile" ${1+"$@"}
