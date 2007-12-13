@@ -1,4 +1,3 @@
-from __future__ import with_statement
 import os
 import os.path
 import errno
@@ -132,9 +131,11 @@ __seq=0
 __seqLock=BoundedSemaphore(1)
 def seq():
   global __seq
-  with __seqLock:
-    __seq+=1
-    n=__seq
+  global __seqLock
+  __seqLock.acquire()
+  __seq+=1
+  n=__seq
+  __seqLock.release()
   return n
 
 def all(gen):
