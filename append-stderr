@@ -1,0 +1,19 @@
+#!/bin/sh -ue
+#
+# Run a command, squirell away the stderr.
+# Append to stdout when the command finishes.
+# Written to wrap mailcap commands for mutt.
+#       - Cameron Simpson <cs@zip.com.au> 17dec2007
+#
+
+: ${TMPDIR:=/tmp}
+
+tmpf=$TMPDIR/err$$
+
+"$@" 2>"$tmpf"
+xit=$?
+
+cat "$tmpf" || xit=1
+rm -f "$tmpf"
+
+exit $xit
