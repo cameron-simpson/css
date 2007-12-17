@@ -16,6 +16,7 @@
 : ${APPHELPER_DOVIEW:=''}
 : ${APPHELPER_EXTRACT_GLOBS:=''}
 : ${APPHELPER_OPTS:=''}
+: ${APPHELPER_PREOPTS:=''}
 : ${APPHELPER_LASTVALUE:=savedir}
 
 cmd=`basename "$0"`
@@ -99,16 +100,21 @@ badopts=
 # Specify the title of the fresh terminal in which to run apphelper.
 # Implies the B<-t> option.
 #
+set -x
+set -- $APPHELPER_PREOPTS ${1+"$@"}
+set +x
 ttyopts=
-if [ $# -gt 0 ]
-then
+doterm=; [ -t 0 -a -t 1 ] || doterm=1
+while [ $# -gt 0 ]
+do
   case $1 in
-    -t)	shift; doterm=1; ttyopts="$ttyopts $1" ;;
-    -T)	shift; termname=$1; shift; doterm=1 ;;
-    +t)	shift; doterm=; ttyopts="$ttyopts $1" ;;
-    *)	doterm=; [ -t 0 -a -t 1 ] || doterm=1 ;;
+    -t)	doterm=1; ttyopts="$ttyopts $1" ;;
+    -T)	termname=$2; shift; doterm=1 ;;
+    +t)	doterm=; ttyopts="$ttyopts $1" ;;
+    *)  break ;;
   esac
-fi
+  shift
+done
 
 # =back
 #
