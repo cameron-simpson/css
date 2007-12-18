@@ -399,10 +399,11 @@ class URL:
     if tags is None: tags=('img',)
     return self.links(absolute=absolute,attr=attr, tags=tags)
 
-  def links(self,absolute=False,attr=None,tags=None):
+  def links(self,absolute=False,attr=None,tags=None,U=None):
     ''' Yield each link in the document.
     '''
-    U=urllib.urlopen(self.__url)
+    if U is None:
+      U=urllib.urlopen(self.__url)
     fullurl=U.geturl()
     I=U.info()
     if I.type == 'text/html':
