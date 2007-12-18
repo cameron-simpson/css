@@ -4,6 +4,7 @@
 #       - Cameron Simpson <cs@zip.com.au> 18dec2007
 #
 
+from cs.misc import debug
 import cs.www
 import urllib
 
@@ -22,7 +23,7 @@ class FlickrURL(cs.www.URL):
            "short flickr URL: %s" % url
     if words[0] == 'photos':
       self.userid=words[1]
-      print "userid=%s" % self.userid
+      debug("userid=%s" % self.userid)
       if len(words) == 2:
         self.type='HOME'
       elif words[2] == 'favorites':
@@ -30,7 +31,7 @@ class FlickrURL(cs.www.URL):
       else:
         self.type='PHOTO'
         self.photoid=words[2]
-        print "photoid=%s" % self.photoid
+        debug("photoid=%s" % self.photoid)
     else:
       assert False, \
              "unsupported flickr URL: %s" % url
@@ -41,18 +42,17 @@ class FlickrURL(cs.www.URL):
         imsizes='olblmst'
       for imsize in imsizes:
         imurl="http://www.flickr.com/photo_zoom.gne?id=%s&size=%s" % (self.photoid, imsize)
-        print "trying imsize=%s, imurl=%s" % (imsize,imurl)
+        debug("trying imsize=%s, imurl=%s" % (imsize,imurl))
         U=urllib.urlopen(imurl)
         goturl=U.geturl()
         if goturl.endswith("&size=%s" % imsize):
           for link in self.links(U=U):
-            print "link=%s" % link
+            debug("link=%s" % link)
             if link.endswith("_d.jpg"):
               return link
-        print "reject imsize=%s, goturl=%s" % (imsize, goturl)
+        debug("reject imsize=%s, goturl=%s" % (imsize, goturl))
       assert False, \
              "can't find image URL for %s" % self.url
-      return None
     else:
       assert False, \
              "unsupported type %s for URL %s" % (self.type, self.url)
