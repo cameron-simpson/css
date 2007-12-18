@@ -354,7 +354,6 @@ class htmlparse(HTMLParser):
     self.__P=HTMLParser(NullFormatter())
     self.__saved=[]
     self.__tagHandlers={}
-    warn("__tags =", tags)
 
   def __getattr__(self,a):
     if a[:6] != "start_":
