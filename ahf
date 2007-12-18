@@ -1,0 +1,14 @@
+#!/bin/sh
+if [ "x$*" = x- ]
+then
+  while url=`readline 'Flickr-URL> '`
+  do  if imurl=`with-flickr imurl "$url"`
+      then  set-x ah "$imurl"
+      fi
+  done
+  exit 0
+else
+  for imurl in `with-flickr imurl ${1+"$@"}`
+  do  set-x ah "$imurl"
+  done
+fi
