@@ -51,6 +51,9 @@ class FlickrURL(cs.www.URL):
             if link.endswith("_d.jpg"):
               return link
         debug("reject imsize=%s, goturl=%s" % (imsize, goturl))
+      for imurl in self.images():
+        if imurl.endswith(".jpg?v=0"):
+          return imurl
       assert False, \
              "can't find image URL for %s" % self.url
     else:
