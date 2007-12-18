@@ -1,70 +1,38 @@
-#!/bin/sh -u
+#!/usr/bin/python -tt
+#
+# Flickr tool.
+#       - Cameron Simpson <cs@zip.com.au> 18dec2007
+#
 
-cmd=`basename "$0"`
-usage="Usage: $cmd dl URL"
+from cs.flickr import FlickrURL
+from cs.misc import cmd, cmderr
+import sys
 
-: ${DISPLAY:=''}
+usage="Usage: %s imurl photo-page-URLs\n" % cmd
 
-badopts=
+badopts=False
 
-if [ $# = 0 ]
-then
-  echo "$cmd: missing op" >&2
-  badopts=1
-else
-  op=$1
-  shift
+args=sys.argv[1:]
+if len(args) == 0:
+  cmderr("missing operator")
+  badopts=True
+else:
+  op=args.pop(0)
+  if op == "imurl":
+    if len(args) == 0:
+      cmderr("%s: missing photo-page-URLs" % op)
+      badopts=True
+  else:
+    cmderr("unsupported operator: %s" % op)
+    badopts=True
 
-  [ $# = 0 ] && [ -t 2 ] && [ -n "$DISPLAY" ] && { set -- `xclip -o` || exit 1; }
-  url=$1; shift
+if badopts:
+  sys.stderr.write(usage)
+  sys.exit(2)
 
-  [ $# = 0 ] || { echo "$cmd: extra arguments: $*" >&2; badopts=1; }
-fi
-
-[ $badopts ] && { echo "$usage" >&2; exit 2; }
-
-url2imgids()
-{
-  for _u2i
-  do
-    pageurls "$_u2i"
-  done \
-  | sed 's|^http://www\.flickr\.com/photos//*||
-         t ok
-         :bad
-         d
-         :ok
-         /^[^\/]*\/[0-9]/!b bad
-         s|/in/[^/][^/]*/$||
-         s|^[^/]*/||
-        '
-}
-
-imgid2page()
-{ for _i2p
-  do  echo "http://www.flickr.com/photo_zoom.gne?id=$_i2p&size=o"
-  done
-}
-
-imgids2imgs()
-{ for _i2i_id
-  do
-    _i2i_pg=`imgid2page "$1"`
-    pageurls -i "$_i2i_pg"
-  done | grep '_o.jpg$'
-}
-
-case "$op" in
-  oimg)
-    pageurls -i "$url" | sed -n 's/\.jpg?v=.*/_o.jpg/p'
-    ;;
-  img_urls)
-    url2imgids "$url" \
-    | while read id
-      do  imgids2imgs "$id"
-      done
-    ;;
-  dl)
-    "$0" img_urls | xxargs set-x wget
-    ;;
-esac
+if op == "imurl":
+  for photoPageURL in args:
+    print FlickrURL(photoPageURL).imageURL()
+else:
+  assert False, \
+         "unhandled operator: %s" % op
