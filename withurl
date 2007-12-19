@@ -78,8 +78,15 @@ fi
 if [ $trustcache ] && [ -f "$saveas" -a -s "$saveas" ]
 then  :
 else
-  set-x wget -q --load-cookies "$COOKIE_FILE" -O "$saveas" "$url" || exit 1
-  ##httpget -f -o "$saveas" "$url" || exit 1
+  ( set -- -q -O "$saveas" "$url"
+    case "$COOKIE_FILE" in
+      *.txt)
+        set -- --load-cookies "$COOKIE_FILE" "$@" ;;
+    esac
+    set -x
+    wget "$@"
+    ##httpget -f -o "$saveas" "$url" || exit 1
+  ) || exit 1
 fi
 
 $trace env "WITHURL_URL=$url" "WITHURL_FILE=$saveas" arg1 $arg1opts -- "$saveas" "$@"
