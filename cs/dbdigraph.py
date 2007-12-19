@@ -403,7 +403,7 @@ class AttrTable(cs.cache.Cache):
     if nodeids is not None:
       if len(nodeids) == 0:
         return
-      where="ID_REF IN (%s)" % ",".join(sqlise(id) for id in nodeids))
+      where="ID_REF IN (%s)" % ",".join(sqlise(id) for id in nodeids)
 
     NV={}
     for row in self.table.selectRows(where):
