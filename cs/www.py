@@ -7,11 +7,57 @@ import re
 import string
 import sys
 import types
-import urllib
+from urllib2 import urlopen, HTTPCookieProcessor, build_opener, install_opener
+from cookielib import MozillaCookieJar, Cookie
 from urlparse import urljoin
 import cs.hier
 from cs.hier import T_SEQ, T_MAP, T_SCALAR
 from cs.misc import warn
+
+cookieHandler = HTTPCookieProcessor()
+if 'COOKIE_FILE' in os.environ:
+  cookieHandler.cookiejar=MozillaCookieJar()
+  cookieFile=os.environ['COOKIE_FILE']
+  if not cookieFile.endswith('.sqlite'):
+    # presume older mozilla cookie file
+    cookieHandler.cookiejar.load(cookieFile)
+  else:
+    import sqlite3
+    import time
+    now = time.time()
+    db=sqlite3.connect(cookieFile)
+    cursor=db.cursor()
+    cursor.execute('select id, name, value, host, path, expiry, isSecure, isHttpOnly from moz_cookies')
+    for id, name, value, host, path, expiry, isSecure, isHttpOnly in cursor:
+      isSecure=bool(isSecure)
+      isHttpOnly=bool(isHttpOnly)
+      if name == "":
+        # cookies.txt regards 'Set-Cookie: foo' as a cookie
+        # with no name, whereas cookielib regards it as a
+        # cookie with no value.
+        name = value
+        value = None
+      initial_dot = host.startswith(".")
+      domain_specified = initial_dot
+      discard = False
+      if expiry == "":
+        expiry = None
+        discard = True
+      # assume path_specified is false
+      c = Cookie(0, name, value,
+                 None, False,
+                 host, domain_specified, initial_dot,
+                 path, False,
+                 isSecure,
+                 expiry,
+                 discard,
+                 None,
+                 None,
+                 {})
+      if c.is_expired(now):
+          continue
+      cookieHandler.cookiejar.set_cookie(c)
+install_opener(build_opener(cookieHandler))
 
 cookie_sepRe=re.compile(r'\s*;\s*')
 cookie_valRe=re.compile(r'([a-z][a-z0-9_]*)=([^;,\s]*)',re.I)
@@ -391,7 +437,7 @@ class URL:
     self.__url=url
 
   def info(self):
-    return urllib.urlopen(self.__url).info()
+    return urlopen(self.__url).info()
 
   def images(self,absolute=None,attr=None,tags=None):
     if attr is None: attr='src'
@@ -402,7 +448,7 @@ class URL:
     ''' Yield each link in the document.
     '''
     if U is None:
-      U=urllib.urlopen(self.__url)
+      U=urlopen(self.__url)
     fullurl=U.geturl()
     I=U.info()
     if I.type == 'text/html':
@@ -419,7 +465,7 @@ class URL:
         yield link
 
   def open(self):
-    return urllib.urlopen(self.__url)
+    return urlopen(self.__url)
 
 def saveURL(url,dir=None):
   U=URL(url).open()
