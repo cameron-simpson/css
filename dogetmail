@@ -4,6 +4,8 @@
 #	- Cameron Simpson <cs@zip.com.au> 18mar2006
 #
 
+eval "`syncenv -`"
+: ${GM_OPTS:=-v}
 : ${LOGDIR:=$HOME/var/log}
 : ${VARRUN:=$HOME/var/run}
 : ${PYTHONPATH:=/opt/python_local}
@@ -19,14 +21,12 @@ trace=set-x
 cmd=`basename "$0"` || cmd=$0
 usage="Usage: $cmd [getmail-options...]"
 
-eval "`syncenv -`"
-: ${GM_OPTS:=-v}
-
 for acct in $GM_ACCOUNTS
 do
   set -- -r "$acct" ${1+"$@"}
 done
 
+##echo $PYTHONPATH
 timeout "$timeout" getmail ${1+"$@"}
 xit=$?
 
