@@ -412,7 +412,7 @@ or failing that B<$HOME/.netscape/cookies.txt>.
 sub getCookies()
 { my($file)=@_;
   if (! defined $file)
-  { $file = (exists $ENV{COOKIE_FILE} && $ENV{COOKIE_FILE} =~ /\.txt$/
+  { $file = (exists $ENV{COOKIE_FILE} && $ENV{COOKIE_FILE} =~ /\.txt$/)
 	  ? $file=$ENV{COOKIE_FILE}
 	  : "$ENV{HOME}/.netscape/cookies.txt"
 	  ;
