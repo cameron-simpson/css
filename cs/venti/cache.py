@@ -15,12 +15,10 @@ class CacheStore(BasicStore):
     BasicStore.__init__(self)
     self.backend=backend
     self.cache=cache
-    self.backQ=FuncQueue()
 
   def close(self):
     self.backend.close()
     self.cache.close()
-    self.backQ.close()
     BasicStore.close(self)
 
   def store_a(self,block,tag=None,ch=None):
@@ -32,7 +30,7 @@ class CacheStore(BasicStore):
   def __store_bg(self,tag,block,ch):
     h=self.cache.store(block)
     ch.write((tag,h))
-    self.backQ.put((self.__store_bg2,(h,block)))
+    self.Q.put((self.__store_bg2,(h,block)))
   def __store_bg2(self,h,block):
     if h not in self.backend:
       self.backend.store(block)
@@ -75,6 +73,7 @@ class MemCacheStore(BasicStore):
   ''' A lossy store that keeps an in-memory cache of recent blocks.
   '''
   def __init__(self,max=1024):
+    BasicStore.__init__(self)
     assert max > 1
     self.max=max
     self.heap=[]
