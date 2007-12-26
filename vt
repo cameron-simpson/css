@@ -9,6 +9,7 @@ import os
 import os.path
 from cs.venti import tohex, fromhex
 from cs.venti.store import Store
+from cs.venti.cache import CacheStore, MemCacheStore
 from cs.misc import cmd, cmderr, setcmd, warn, debug
 
 usage='''Usage:
@@ -105,8 +106,10 @@ if badopts:
 dflt_cache=os.environ.get('VT_STORE_CACHE')
 if dflt_cache is not None:
   C=Store(dflt_cache)
-  from cs.venti.cache import CacheStore
   S=CacheStore(S,C)
+else:
+  # put an in-memory cache in front of the main cache
+  S=CacheStore(S,MemCacheStore())
 
 def gethexarg(path):
   slash=path.find('/')
@@ -302,4 +305,4 @@ else:
   exit(2)
 
 S.close()
-debug("%s; exit main command"%cmd)
+debug("%s: exit main command"%cmd)
