@@ -5,6 +5,7 @@
 #
 
 import sys
+import os
 import os.path
 import time
 from zlib import compress, decompress
@@ -24,6 +25,7 @@ class BasicStore:
     self.Q=FuncQueue()
 
   def close(self):
+    self.closing=True
     self.Q.close()
 
   def hash(self,block):
@@ -34,6 +36,7 @@ class BasicStore:
   def store(self,block):
     ''' Store a block, return its hash.
     '''
+    assert not self.closing
     ch=self.store_a(block)
     tag, h = ch.read()
     assert type(h) is str and type(tag) is int, "h=%s, tag=%s"%(h,tag)
@@ -43,6 +46,7 @@ class BasicStore:
     ''' Queue a block for storage, return Channel from which to read the hash.
     '''
     assert type(block) is str and type(tag) is int, "block=%s, tag=%s"%(block,tag)
+    assert not self.closing
     if ch is None: ch=getChannel()
     self.Q.put((self.__store_bg,(block,tag,ch)))
     return ch
@@ -52,6 +56,7 @@ class BasicStore:
   def fetch(self,h):
     ''' Fetch a block given its hash.
     '''
+    assert not self.closing
     ch=self.fetch_a(h,None)
     tag, block = ch.read()
     returnChannel(ch)
@@ -60,8 +65,9 @@ class BasicStore:
     ''' Request a block from its hash.
         Return a Channel from which to read the block.
     '''
+    assert not self.closing
     if ch is None: ch=getChannel()
-    self.Q.put((self.__fetch_bg,(block,tag,ch)))
+    self.Q.put((self.__fetch_bg,(h,tag,ch)))
     return ch
   def __fetch_bg(self,h,tag,ch):
     block=self.fetch(h)
@@ -69,6 +75,7 @@ class BasicStore:
   def haveyou(self,h):
     ''' Test if a hash is present in the store.
     '''
+    assert not self.closing
     ch=self.haveyou_a(h)
     tag, yesno = ch.read()
     returnChannel(ch)
@@ -77,6 +84,7 @@ class BasicStore:
     ''' Query whether a hash is in the store.
         Return a Channel from which to read the answer.
     '''
+    assert not self.closing
     if ch is None: ch=getChannel()
     self.Q.put((self.__haveyou_bg,(block,tag,ch)))
     return ch
@@ -86,6 +94,7 @@ class BasicStore:
   def sync(self):
     ''' Return when the store is synced.
     '''
+    assert not self.closing
     ch=self.sync_a()
     tag, dummy = ch.read()
     returnChannel(ch)
@@ -93,6 +102,7 @@ class BasicStore:
     ''' Request that the store be synced.
         Return a Channel from which to read the answer.
     '''
+    assert not self.closing
     if ch is None: ch=getChannel()
     self.Q.put((self.__sync_bg,(tag,ch)))
     return ch
@@ -126,6 +136,10 @@ class Store(BasicStore):
       if S[0] == '/':
         from cs.venti.gdbmstore import GDBMStore
         S=GDBMStore(S)
+      elif S[0] == '|':
+        toChild, fromChild = os.popen2(S[1:])
+        from cs.venti.stream import StreamStore
+        S=StreamStore(toChild,fromChild)
       elif S.startswith("tcp:"):
         from cs.venti.tcp import TCPStore
         host, port = S[4:].rsplit(':',1)
