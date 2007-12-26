@@ -11,12 +11,14 @@
     TODO: rolling hash
             augment with assorted recognition strings by hash
             pushable parser for nested data
+          flat file cache for blocks: make temp unlinked, trunc, append,
+                  rewind at threashold
           optional compression in store?
-          make metadata plain old iblockref to "inode" file
+          metadata O:owner u:user[srwx]-[srwx] g:group[srwx]-[srwx] o:[srwx]-[srwx] mtime:unixtime
+          metadata: inline text in dir, with i: field to indirect to a blockref
           sync() operation for blocklists
             close() collapses and sync()s ?
           BlockSink take ibref initialiser?
-          metadata O:owner u:user[+-=]srwx* g:group[+-=]srwx*
           don't compress metadata
           cache seek()ed block in readOpen class
           extend directory blockref:
@@ -27,13 +29,7 @@
             flags
             [meta] (if flags&0x01)
             blockref
-          caching store - fetch&store locally
           store priority queue - tuples=pool
-          remote store: http? multifetch? udp?
-          proto:
-            fetch hash -> block or None
-            offer hash -> "got it" boolean
-            send block -> hash
 '''
 
 ## NOTE: migrate to hashlib sometime when python 2.5 more common
