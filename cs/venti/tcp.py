@@ -30,5 +30,8 @@ class TCPStore(StreamStore):
   def __init__(self,bindaddr):
     self.sock=socket()
     self.sock.connect(bindaddr)
-    fd=self.sock.fileno()
-    StreamStore.__init__(self,os.fdopen(fd,'wb'),os.fdopen(fd,'rb'))
+    self.fd=self.sock.fileno()
+    fd2=os.dup(fd)
+    StreamStore.__init__(self,os.fdopen(fd,'wb'),os.fdopen(fd2,'rb'))
+
+  def close(self):

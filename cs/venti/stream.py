@@ -56,7 +56,7 @@ class StreamDaemon:
       self.jobsCLosing=True
   def closing(self):
     with self.jobsLock:
-      cl=self.jobsCloosing
+      cl=self.jobsClosing
     return cl
 
 class _StreamDaemonReader(Thread):
@@ -206,7 +206,11 @@ class StreamStore(BasicStore):
     self.sendLock=BoundedSemaphore(1)
     self.lastBlock=None
     self.lastBlockLock=BoundedSemaphore(1)
-    _StreamClientReader(self).start()
+    self.client=_StreamClientReader(self).start()
+
+  def close(self):
+    self.requestFP.close()
+    BasicStore.close(self)
 
   def store_a(self,block,rqTag=None,ch=None):
     debug("StreamStore: store_a(%d bytes)..." % len(block))
@@ -261,14 +265,15 @@ class StreamStore(BasicStore):
     return ch
 
 class _StreamClientReader(Thread):
-  def __init__(self,client):
+  def __init__(self,daemon):
     Thread.__init__(self)
     self.setName("_StreamClientReader")
-    self.client=client
+    self.daemon=daemon
+
   def run(self):
     debug("RUN _StreamClientReader")
-    replyFP=self.client.replyFP
-    pending=self.client.pending
+    replyFP=self.daemon.replyFP
+    pending=self.daemon.pending
     debug("_StreamClientReader: replyFP=%s" % replyFP)
     rqTag=fromBSfp(replyFP)
     while rqTag is not None:
@@ -298,5 +303,7 @@ class _StreamClientReader(Thread):
 
       # fetch next result
       rqTag=fromBSfp(replyFP)
-    self.client.close()
+
+    self.daemon.replyFP.close()
+    self.daemon.close()
     debug("END _StreamClientReader")
