@@ -29,6 +29,7 @@ atexit.register(cleanupAtExit)
 
 class Upd:
   def __init__(self,backend,mode=None):
+    assert backend is not None
     self.__backend=backend
     self.__buf=''
     global active, instances
