@@ -7,6 +7,7 @@
 from __future__ import with_statement
 from threading import Thread, BoundedSemaphore
 from Queue import Queue
+from cs.misc import debug, ifdebug, tb
 
 class Channel:
   ''' A zero-storage data passage.
@@ -17,7 +18,7 @@ class Channel:
     self.__writable=BoundedSemaphore(1)
     self.__writable.acquire()
 
-  def read(self):
+  def get(self):
     ''' Read a value from the Channel.
         Blocks until someone writes to the Channel.
     '''
@@ -27,7 +28,7 @@ class Channel:
     delattr(self,'_value')
     return value
 
-  def write(self,value):
+  def put(self,value):
     ''' Write a value to the Channel.
         Blocks until a corresponding read occurs.
     '''
@@ -39,20 +40,20 @@ class Channel:
     ''' Iterator for daemons that operate on tasks arriving via this Channel.
     '''
     while True:
-      yield self.read()
+      yield self.get()
 
   def call(self,value,backChannel):
     ''' Asynchronous call to daemon via channel.
-        Daemon should reply by .write()ing to the backChannel.
+        Daemon should reply by .put()ing to the backChannel.
     '''
-    self.write((value,backChannel))
+    self.put((value,backChannel))
 
   def call_s(self,value):
     ''' Synchronous call to daemon via channel.
     '''
     ch=getChannel()
     self.call(value,ch)
-    result=ch.read()
+    result=ch.get()
     returnChannel(ch)
     return result
 
@@ -61,42 +62,42 @@ class JobQueue:
       Q.queue(token) -> channel
       Q.dequeue(token, result) -> sends result to channel, releases channel
   '''
-  def __init__(self,maxq=None):
+  def __init__(self,maxq=None,useQueue=True):
     self.q={}
     self.lock=BoundedSemaphore(1)
     self.maxq=maxq
+    self.useQueue=useQueue
     if maxq is not None:
       assert maxq > 0
       self.maxsem=BoundedSemaphore(maxq)
 
-  def enqueue(self,n,ch=None):
+  def enqueue(self,n,ch=None,useQueue=None):
     ''' Queue a token, return a channel to recent the job completion.
-        Allocate a channel for the result if none supplied.
+        Allocate a single-use channel for the result if none supplied.
     '''
     if self.maxq is not None:
       self.maxsem.acquire()
     if ch is None:
-      ch=getChannel()
-      doRelease=True
-    else:
-      doRelease=False
+      if useQueue is None:
+        useQueue=self.useQueue
+      ch=Q1(useQueue=useQueue)
+      debug("enqueue: using allocated channel %s" % ch)
     with self.lock:
       assert n not in self.q, "\"%s\" already queued"
-      self.q[n]=(ch,doRelease)
+      debug("enqueue: q[%d]=%s" % (n, ch))
+      ##if ifdebug(): tb()
+      self.q[n]=ch
     return ch
   
   def dequeue(self,n,result):
     ''' Dequeue a token, send the result and token down the channel allocated.
-        Release the channel if we allocated it.
     '''
     with self.lock:
-      ch, doRelease = self.q[n]
+      ch = self.q[n]
       del self.q[n]
     if self.maxq is not None:
       self.maxsem.release()
-    ch.write((n,result))
-    if doRelease:
-      returnChannel(ch)
+    ch.put((n,result))
 
 class FuncQueue(Queue):
   ''' A Queue of function calls to make, processed serially.
@@ -106,6 +107,8 @@ class FuncQueue(Queue):
   def __init__(self,size=None):
     Queue.__init__(self,size)
     self.__closing=False
+    import atexit
+    atexit.register(self.close)
     Thread(target=self.__runQueue).start()
   def close(self):
     self.__closing=True
@@ -130,12 +133,64 @@ def getChannel():
   with __channelsLock:
     if len(__channels) == 0:
       ch=Channel()
+      debug("getChannel: allocated %s" % ch)
+      tb()
     else:
       ch=__channels.pop(-1)
   return ch
-def returnChannel(ch):
+def _returnChannel(ch):
+  debug("returnChannel: releasing %s" % ch)
   with __channelsLock:
+    assert ch not in __channels
     __channels.append(ch)
+
+''' A pool of Queues of maxsize == 1.
+'''
+__queues=[]
+__queuesLock=BoundedSemaphore(1)
+def getQ1():
+  with __queuesLock:
+    if len(__queues) == 0:
+      Q=Queue(1)
+    else:
+      Q=__queues.pop(-1)
+  return Q
+def _returnQ1(Q):
+  assert Q.empty()
+  with __queuesLock:
+    __queues.append(Q)
+
+class Q1:
+  def __init__(self,useQueue=True,name=None):
+    ''' Return a single-use blocking Channel or Queue(1) (if useQueue is True)
+        from the pool. The Channel/Queue is returned to the pool on .get().
+    '''
+    if name is None:
+      import traceback
+      name="Q1:[%s]" % (traceback.format_list(traceback.extract_stack()[-3:-1])[0].strip().replace("\n",", "))
+    self.name=name
+    self.isQueue=useQueue
+    if useQueue:
+      self.Q=getQ1()
+    else:
+      self.Q=getChannel()
+    self.didput=False
+    self.didget=False
+  def __str__(self):
+    return self.name
+  def put(self,item):
+    self.Q.put(item)
+    assert not self.didput
+    self.didput=True
+  def get(self):
+    assert not self.didget
+    self.didget=True
+    item=self.Q.get()
+    if self.isQueue:
+      _returnQ1(self.Q)
+    else:
+      _returnChannel(self.Q)
+    return item
 
 def bgCall(func,args,ch=None):
   ''' Spawn a thread to call the supplied function with the supplied
@@ -152,9 +207,9 @@ def bgCall(func,args,ch=None):
   return ch
 def _bgFunc(func,args,ch):
   result=func(*args)
-  ch.write(result)
+  ch.put(result)
 def _bgReturn(args,ch):
-  ch.write(args)
+  ch.put(args)
 def bgReturn(result,ch=None):
   ''' Return an asynchronous result.
       Takes the result, returns a channel from which to read it back.
