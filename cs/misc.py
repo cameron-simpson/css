@@ -108,7 +108,7 @@ def cmderr(*args):
 def die(*args):
   assert False, strlist(args," ")
 
-def tb():
+def tb(limit=None):
   import traceback
   import cs.upd
   global cmd_
@@ -117,12 +117,17 @@ def tb():
     oldUpd=upd.state()
     upd.out('')
 
+  n=0
   for elem in traceback.format_list(traceback.extract_stack())[:-1]:
     for line in elem.split("\n"):
       if len(line) > 0:
         sys.stderr.write(cmd__)
         sys.stderr.write(line)
         sys.stderr.write("\n")
+    if limit is not None:
+      n+=1
+      if n >= limit:
+        break
 
   if cs.upd.active:
     upd.out(oldUpd)
@@ -689,14 +694,19 @@ def fromBSfp(fp):
   ''' Read an extensible value from a file.
       Return None at EOF.
   '''
+  ##debug("fromBSfp: reading first BS byte...")
   s=c=fp.read(1)
+  ##debug("fromBSfp: c=0x%02x" % ord(c))
   if len(s) == 0:
     return None
   while ord(c)&0x80:
+    ##debug("fromBSfp: reading another BS byte...")
     c=fp.read(1)
     assert len(c) == 1, "unexpected EOF"
+    ##debug("fromBSfp: c=0x%02x" % ord(c))
     s+=c
   (n,s)=fromBS(s)
+  ##debug("fromBSfp: n==%d" % n)
   assert len(s) == 0
   return n
 
