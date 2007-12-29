@@ -180,6 +180,8 @@ class BlockSink:
       this is a direct BlockRef to the sole block of storage for the file.
   '''
   def __init__(self,S):
+    ''' Construct a new BlockSink attached to the specified Store 'S'.
+    '''
     import cs.venti.store
     assert isinstance(S, cs.venti.store.BasicStore), "type=%s S=%s"%(type(S),S)
     self.__store=S

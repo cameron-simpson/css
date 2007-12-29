@@ -108,7 +108,7 @@ if badopts:
   exit(2)
 
 dflt_cache=os.environ.get('VT_STORE_CACHE')
-if False and dflt_cache is not None:
+if dflt_cache is not None:
   progress("push cache store %s" % dflt_cache)
   C=Store(dflt_cache)
   S=CacheStore(S,C)

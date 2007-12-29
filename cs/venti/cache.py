@@ -31,7 +31,7 @@ class CacheStore(BasicStore):
   def __store_bg(self,tag,block,ch):
     h=self.cache.store(block)
     ch.put((tag,h))
-    progress("stored %s in cache")
+    progress("stored %s in cache" % tohex(h))
     if h not in self.backend:
       self.backend.store(block)
 

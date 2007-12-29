@@ -92,7 +92,7 @@ class BasicStore:
     '''
     assert not self.closing
     if ch is None: ch=Q1()
-    self.Q.put((self.__haveyou_bg,(block,tag,ch)))
+    self.Q.put((self.__haveyou_bg,(h,tag,ch)))
     return ch
   def __haveyou_bg(self,h,tag,ch):
     yesno = self.haveyou(h)
