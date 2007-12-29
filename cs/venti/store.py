@@ -144,7 +144,7 @@ class Store(BasicStore):
       elif S[0] == '|':
         toChild, fromChild = os.popen2(S[1:])
         from cs.venti.stream import StreamStore
-        S=StreamStore(toChild,fromChild)
+        S=StreamStore(S,toChild,fromChild)
       elif S.startswith("tcp:"):
         from cs.venti.tcp import TCPStore
         host, port = S[4:].rsplit(':',1)

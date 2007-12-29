@@ -71,8 +71,10 @@ class GDBMStore(BasicStore):
     return h
 
   def fetch(self,h):
-    ''' Return block for hash, or raise IndexError if not in store.
+    ''' Return block for hash, or None if not present.
     '''
+    if h not in self.__index:
+      return None
     n,offset,zsize = self.__index[h]
     fp=self.__storeOpen(n)
     fp.seek(offset)
