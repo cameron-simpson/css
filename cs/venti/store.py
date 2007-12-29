@@ -11,13 +11,14 @@ import time
 from zlib import compress, decompress
 from cs.misc import cmderr, debug, warn, progress, verbose, out, fromBS, toBS, fromBSfp, tb, seq
 from cs.threads import FuncQueue, Q1
+from cs.venti import tohex
 from threading import Thread
 from Queue import Queue
 
 class BasicStore:
   ''' Core functions provided by all Stores.
-      For each of the core operations (store, fetch, haveyou) a subclass must
-      define at least one of the op or op_a methods.
+      For each of the core operations (store, fetch, haveyou, sync)
+      a subclass must define at least one of the op or op_a methods.
   '''
   def __init__(self,name):
     self.name=name
@@ -48,9 +49,11 @@ class BasicStore:
     assert type(h) is str and type(tag) is int, "h=%s, tag=%s"%(h,tag)
     return h
   def store_a(self,block,tag=None,ch=None):
-    ''' Queue a block for storage, return Channel from which to read the hash.
+    ''' Queue a block for storage, return a cs.threads.Q1 from which to
+        read the hash when stored.
     '''
-    assert type(block) is str and type(tag) is int, "block=%s, tag=%s"%(block,tag)
+    assert type(block) is str and type(tag) is int, \
+           "block=%s, tag=%s"%(block,tag)
     assert not self.closing
     if ch is None: ch=Q1()
     self.Q.put((self.__store_bg,(block,tag,ch)))
@@ -67,7 +70,7 @@ class BasicStore:
     return block
   def fetch_a(self,h,tag=None,ch=None):
     ''' Request a block from its hash.
-        Return a Channel from which to read the block.
+        Return a cs.threads.Q1 from which to read the block.
     '''
     assert not self.closing
     if ch is None: ch=Q1()
@@ -85,7 +88,7 @@ class BasicStore:
     return yesno
   def haveyou_a(self,h,tag=None,ch=None):
     ''' Query whether a hash is in the store.
-        Return a Channel from which to read the answer.
+        Return a cs.threads.Q1 from which to read the answer.
     '''
     assert not self.closing
     if ch is None: ch=Q1()
@@ -105,7 +108,7 @@ class BasicStore:
     debug("store.sync: response: tag=%s, dummy=%s" % (tag, dummy))
   def sync_a(self,tag=None,ch=None):
     ''' Request that the store be synced.
-        Return a Channel from which to read the answer.
+        Return a cs.threads.Q1 from which to read the answer.
     '''
     assert not self.closing
     if ch is None: ch=Q1()
@@ -115,9 +118,18 @@ class BasicStore:
     self.sync()
     ch.put((tag,None))
   def __contains__(self, h):
+    ''' Wrapper for haveyou().
+    '''
     return self.haveyou(h)
   def __getitem__(self,h):
-    return self.fetch(h)
+    ''' Wrapper for fetch(h).
+    '''
+    if h not in self:
+      raise KeyError, "%s: %s not in store" % (self, tohex(h))
+    block=self.fetch(h)
+    if block is None:
+      raise KeyError, "%s: fetch(%s) returned None" % (self, tohex(h))
+    return block
   def get(self,h,default=None):
     ''' Return block for hash, or None if not present in store.
     '''
@@ -133,9 +145,15 @@ class BasicStore:
     fp.write("%d %s %s\n" % (now, time.strftime("%Y-%m-%d_%H:%M:%S",time.localtime(now)), msg))
 
 class Store(BasicStore):
-  ''' A block store connected to a backend BlockStore..
+  ''' A store connected to a backend store or a type designated by a string.
   '''
   def __init__(self,S):
+    ''' Trivial wrapper for another store.
+        If 'S' is a string:
+          /path/to/store designates a GDBMStore.
+          |shell-command designates a command to connect to a StreamStore.
+          tcp:addr:port designates a TCP target serving a StreamStore.
+    '''
     BasicStore.__init__(self,str(S))
     if type(S) is str:
       if S[0] == '/':

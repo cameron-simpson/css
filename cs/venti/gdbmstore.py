@@ -16,6 +16,24 @@ from cs.venti import tohex, hash
 from cs.venti.store import BasicStore
 
 class GDBMStore(BasicStore):
+  ''' A Store attached to a GDBM indexed bunch of files.
+      'path' is the pathname of a directory containing files named
+      'n.vtd' when n is a natural number (IN0).
+      These files contain byte sequences of the form:
+        BS(zlength)
+        zblock
+      where zblock is the zlib.compress()ed form of the stored block
+      and zlength is the byte length of the zblock.
+      The cs.misc.toBS() function is used to represent the length
+      as a byte sequence.
+      There is also a file 'index' in this directory, which is
+      a GDBM file mapping block hash codes (20 byte SHA-1 hashes)
+      to (n, offset, zlength) tuples, where 'n' indicated the 'n.vtd'
+      file, offset is the offset within that file of the zblock
+      and zlength is the length of the zblock.
+      This is stored in the GDBM file as the concatenation of the BS()
+      encodings of n, offset and zlength respectively.
+  '''
   def __init__(self,path,doindex=False):
     BasicStore.__init__(self,"gdbm:%s"%path)
     self.__path=path
@@ -42,6 +60,10 @@ class GDBMStore(BasicStore):
     self.poolLock=BoundedSemaphore(1)
 
   def sync(self):
+    ''' Sync(0 the store.
+        Calls the GDBM sync() function and flsuh()es any open
+        .vtd files.
+    '''
     self.__index.sync()
     for n in self.__open:
       fp=self.__open[n]
@@ -81,6 +103,8 @@ class GDBMStore(BasicStore):
     return decompress(fp.read(zsize))
 
   def haveyou(self,h):
+    ''' Test if the hash 'h' is present in the store.
+    '''
     return h in self.__index
 
   def __storeOpen(self,n):
@@ -113,7 +137,6 @@ class GDBMStore(BasicStore):
 class GDBMIndex:
   ''' A GDBM index for a GDBMStore.
   '''
-
   def __init__(self,path):
     import gdbm
     self.lock=BoundedSemaphore(1)

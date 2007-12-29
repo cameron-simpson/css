@@ -11,6 +11,8 @@ from cs.venti.stream import StreamDaemon, StreamStore
 from cs.misc import debug
 
 class Server(ThreadingTCPServer):
+  ''' A ThreadingTCPServer that accepts connections by StreamStore clients.
+  '''
   def __init__(self,bindaddr,S):
     ThreadingTCPServer.__init__(self,bindaddr,_RequestHandler)
     self.S=S
@@ -31,6 +33,8 @@ class _RequestHandler(StreamRequestHandler):
     debug("tcp.handle: closed connections to client")
 
 class TCPStore(StreamStore):
+  ''' A Store attached to a StreamDaemon served on the specified 'bindaddr'.
+  '''
   def __init__(self,bindaddr):
     self.sock=socket()
     self.sock.connect(bindaddr)

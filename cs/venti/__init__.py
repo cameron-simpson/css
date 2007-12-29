@@ -10,12 +10,16 @@
 
     TODO:
           BUG: MemCacheStore leaks! dict never cleaned up?
+          StreamDaemon: defer fp.flush() to main loop, conditional on
+            no pending requests.
+          Prefetch multiple blocks, eg from an iblock.
+            Scatter/gather wrapper?
           sync() on stream/tcp close
           rolling hash
             augment with assorted recognition strings by hash
             pushable parser for nested data
           flat file cache for blocks: make temp unlinked, trunc, append,
-                  rewind at threashold
+                  rewind at thrashold
           optional compression in store?
             test space cost of compress of compressed data
           metadata O:owner u:user[srwx]-[srwx] g:group[srwx]-[srwx] o:[srwx]-[srwx] mtime:unixtime
@@ -31,7 +35,6 @@
             [meta] (if flags&0x01)
             blockref
           store priority queue - tuples=pool
-
 '''
 
 ## NOTE: migrate to hashlib sometime when python 2.5 more common
@@ -59,6 +62,8 @@ def genHex(data):
     yield '%02x'%ord(c)
 
 def tohex(data):
+  ''' Represent a byte sequence as a hex string.
+  '''
   return "".join(genHex(data))
 
 def writetohex(fp,data):

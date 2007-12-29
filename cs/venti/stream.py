@@ -14,6 +14,8 @@ from cs.venti import tohex
 from cs.venti.store import BasicStore
 
 class RqType(int):
+  ''' Debugging wrapper for int, reporting symbolic names of op codes.
+  '''
   def __str__(self):
     if self == T_STORE:     s="T_STORE"
     elif self == T_FETCH:   s="T_FETCH"
@@ -49,6 +51,9 @@ class StreamDaemon:
       store.
   '''
   def __init__(self,S,recvRequestFP,sendReplyFP):
+    ''' Read Store requests from 'recvRequestFP', apply to the Store 'S',
+        report results upstream via 'sendReplyFP'.
+    '''
     self.S=S
     self.recvRequestFP=recvRequestFP
     self.sendReplyFP=sendReplyFP
@@ -61,10 +66,15 @@ class StreamDaemon:
     self.resultsThread=_StreamDaemonResultsSender(self)
 
   def start(self):
+    ''' Start the control threads that read from recvRequestFP and write
+        to sendReplyFP.
+    '''
     self.readerThread.start()
     self.resultsThread.start()
 
   def join(self):
+    ''' Wait for the control threads to terminate.
+    '''
     self.readerThread.join()    # wait for requests to cease
     self.resultsThread.join()   # wait for results to drain
 
@@ -195,6 +205,8 @@ class _StreamDaemonResultsSender(Thread):
     debug("END _StreamDaemonResultsSender")
 
 def encodeStore(fp,rqTag,block):
+  ''' Write store(block) to stream.
+  '''
   debug(fp,"encodeStore(rqTag=%d,%d bytes)" % (rqTag,len(block)))
   global enc_STORE
   fp.write(toBS(rqTag))
@@ -204,6 +216,8 @@ def encodeStore(fp,rqTag,block):
   fp.flush()
 
 def encodeFetch(fp,rqTag,h):
+  ''' Write fetch(h) to stream.
+  '''
   debug(fp,"encodeFetch(rqTag=%d,h=%s" % (rqTag,tohex(h)))
   global enc_FETCH
   fp.write(toBS(rqTag))
@@ -213,6 +227,8 @@ def encodeFetch(fp,rqTag,h):
   fp.flush()
 
 def encodeHaveYou(fp,rqTag,h):
+  ''' Write haveyou(h) to stream.
+  '''
   debug(fp,"encodeHaveYou(rqTag=%d,h=%s" % (rqTag,tohex(h)))
   global enc_HAVEYOU
   fp.write(toBS(rqTag))
@@ -222,20 +238,17 @@ def encodeHaveYou(fp,rqTag,h):
   fp.flush()
 
 def encodeSync(fp,rqTag):
+  ''' Write sync() to stream.
+  '''
   debug(fp,"encodeSync(rqTag=%d)" % rqTag)
   global enc_SYNC
   fp.write(toBS(rqTag))
   fp.write(enc_SYNC)
   fp.flush()
 
-def encodeSync(fp,rqTag):
-  debug(fp,"encodeSync(rqTag=%d" % rqTag)
-  global enc_SYNC
-  fp.write(toBS(rqTag))
-  fp.write(enc_SYNC)
-  fp.flush()
-
 def encodeQuit(fp,rqTag):
+  ''' Write T_QUIT to stream.
+  '''
   debug(fp,"encodeQuit(rqTag=%d" % rqTag)
   global enc_QUIT
   fp.write(toBS(rqTag))
@@ -246,6 +259,8 @@ class StreamStore(BasicStore):
   ''' A Store connected to a StreamDaemon backend.
   '''
   def __init__(self,name,sendRequestFP,recvReplyFP):
+    ''' Connect to the StreamDaemon via sendRequestFP and recvReplyFP.
+    '''
     BasicStore.__init__(self,"StreamStore:%s"%name)
     self.sendRequestFP=sendRequestFP
     self.recvReplyFP=recvReplyFP
@@ -257,6 +272,8 @@ class StreamStore(BasicStore):
     self.client.start()
 
   def close(self):
+    ''' Close the StreamStore.
+    '''
     debug("StreamStore.close: close()...")
     if self.closing:
       debug("StreamStore.close: already closed, doing nothing")
@@ -325,6 +342,9 @@ class StreamStore(BasicStore):
     return ch
 
 class _StreamClientReader(Thread):
+  ''' Class to read from the StreamDaemon's responseFP and report to
+      asynchronous callers.
+  '''
   def __init__(self,daemon):
     Thread.__init__(self)
     self.setName("_StreamClientReader")

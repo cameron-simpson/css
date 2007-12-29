@@ -120,6 +120,9 @@ class BlockList(list):
     return "".join(bref.encode() for bref in self)
 
   def span(self):
+    ''' Return the number of bytes in the leave blocks spanned by this
+        BlockList.
+    '''
     return self.offsetTo(len(self))
 
   def offsetTo(self,ndx):
@@ -183,7 +186,7 @@ class BlockSink:
     self.__lists=[BlockList(S)]
 
   def appendBlock(self,block):
-    ''' Append a block to the BlockSink.
+    ''' Append a data block to the BlockSink.
     '''
     S=self.__store
     self.appendBlockRef(BlockRef(S.store(block),False,len(block)))
