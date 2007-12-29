@@ -91,6 +91,7 @@ class Dir(dict):
     '''
     D=self
     names=path.split('/')
+    debug("resolve(self=%s,path=%s): names=%s"%(self,path,names))
     while len(names) > 1:
       name=names.pop(0)
       if len(name) == 0:

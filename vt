@@ -7,10 +7,12 @@
 from sys import argv, exit, stdin, stderr, stdout, exit
 import os
 import os.path
+import atexit
 from cs.venti import tohex, fromhex
 from cs.venti.store import Store
 from cs.venti.cache import CacheStore, MemCacheStore
-from cs.misc import cmd, cmderr, setcmd, warn, debug
+from cs.misc import cmd, cmderr, setcmd, warn, debug, progress
+import cs.upd; cs.upd.default()
 
 usage='''Usage:
   %s [-S store] cat filerefs...
@@ -26,6 +28,10 @@ usage='''Usage:
 badopts=False
 
 S=None
+def closeStore():
+  if S is not None:
+    S.close()
+atexit.register(closeStore)
 
 args=argv[1:]
 if len(args) > 0 and args[0] == '-S':
@@ -99,17 +105,17 @@ if S is None:
 
 if badopts:
   stderr.write(usage)
-  if S is not None:
-    S.close()
   exit(2)
 
 dflt_cache=os.environ.get('VT_STORE_CACHE')
-if dflt_cache is not None:
+if False and dflt_cache is not None:
+  progress("push cache store %s" % dflt_cache)
   C=Store(dflt_cache)
   S=CacheStore(S,C)
-else:
-  # put an in-memory cache in front of the main cache
-  S=CacheStore(S,MemCacheStore())
+
+# put an in-memory cache in front of the main cache
+##S=CacheStore(S,MemCacheStore())
+progress("S=%s"%S)
 
 def gethexarg(path):
   slash=path.find('/')
@@ -123,7 +129,9 @@ def gethexarg(path):
       slash+=1
     path=path[slash:]
   from cs.venti.blocks import str2BlockRef
-  bref=str2BlockRef(fromhex(hexarg))
+  debug("fromhex(%s)..." % hexarg)
+  fhex=fromhex(hexarg)
+  bref=str2BlockRef(fhex)
   return bref, path
 
 def resolve(path, domkdir=False):
@@ -131,10 +139,17 @@ def resolve(path, domkdir=False):
   from cs.venti.fs import FS
   return FS(S,bref).root.resolve(path,domkdir)
 
-def path2bref(path):
+def path2bref(path,domkdir=False):
   bref, path = gethexarg(path)
+  debug("bref=%s, path=%s"%(bref,path))
   if len(path) > 0:
-    D, name = FS(S,bref).root.resolve(path,domkdir)
+    from cs.venti.fs import FS
+    F=FS(S,bref)
+    debug("F=%s, F.root=%s" % (F,F.root))
+    D, name = F.root.resolve(path,domkdir)
+    if D is None or name not in D:
+      debug("resolve fails")
+      return None
     return D.name2bref(name)
   return bref
 
@@ -175,8 +190,11 @@ def cat(path,fp=None):
   if fp is None:
     fp=stdout
   bref=path2bref(path)
-  for b in bref.leaves(S):
-    fp.write(b)
+  if bref is None:
+    cmderr("%s: no such file or directory" % path)
+  else:
+    for b in bref.leaves(S):
+      fp.write(b)
 
 def storePath(path,targetRef=None,ignoreTimes=False,deleteMissing=False,overWrite=False):
   from cs.venti.fs import FS
@@ -218,7 +236,7 @@ elif op == "update":
     if hexarg is not None:
       target=str2BlockRef(fromhex(hexarg))
   saved=storePath(path,targetRef=target,ignoreTimes=False,deleteMissing=True,overWrite=True)
-  open(archive,mode='a').write("%s %s\n" % (saved, datetime.datetime.now()))
+  open(archive,mode='a').write("%s %s %s\n" % (saved, datetime.datetime.now(), path))
 
 elif op == "cat":
   for path in args:
@@ -236,7 +254,9 @@ elif op == "listen":
   arg=args[0]
   if arg == '-':
     from cs.venti.stream import StreamDaemon
-    StreamDaemon(S,stdin,stdout)
+    daemon=StreamDaemon(S,stdin,stdout)
+    daemon.start()
+    daemon.join()
   else:
     cpos=arg.rfind(':')
     if cpos >= 0:
@@ -250,8 +270,6 @@ elif op == "listen":
       srv.serve_forever()
     else:
       cmderr("invalid listen argument, I expect \"-\" or \"[host]:port\", got \"%s\"" % arg)
-      if S is not None:
-        S.close()
       exit(1)
 
 elif op == "ls":
@@ -270,8 +288,6 @@ elif op == "mount":
   print "mount", args[0], args[1], "..."
   if not os.path.isdir(args[1]):
     cmderr("%s: mountpoint is not a directory" % args[1])
-    if S is not None:
-      S.close()
     exit(1)
   E=S.namei(args[0]+'/')
   assert E.isdir, "%s: %s: expected directory, not file"%(cmd,args[0])
@@ -300,8 +316,6 @@ elif op == "unpack":
 
 else:
   cmderr("unsupported command")
-  if S is not None:
-    S.close()
   exit(2)
 
 S.close()

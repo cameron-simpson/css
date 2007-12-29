@@ -9,19 +9,31 @@
 from __future__ import with_statement
 from threading import Thread, BoundedSemaphore
 from cs.misc import seq, toBS, fromBSfp, debug, ifdebug, tb
-from cs.threads import getChannel, returnChannel, JobQueue
+from cs.threads import JobQueue, getChannel
 from cs.venti import tohex
 from cs.venti.store import BasicStore
 
-T_STORE=0       # block->hash
-T_FETCH=1       # hash->block
-T_HAVEYOU=2     # hash->boolean
-T_SYNC=3        # no args
+class RqType(int):
+  def __str__(self):
+    if self == T_STORE:     s="T_STORE"
+    elif self == T_FETCH:   s="T_FETCH"
+    elif self == T_HAVEYOU: s="T_HAVEYOU"
+    elif self == T_SYNC:    s="T_SYNC"
+    elif self == T_QUIT:    s="T_QUIT"
+    else:                   s="UNKNOWN"
+    return "%s(%d)" % (s, self)
+
+T_STORE=RqType(0)       # block->hash
+T_FETCH=RqType(1)       # hash->block
+T_HAVEYOU=RqType(2)     # hash->boolean
+T_SYNC=RqType(3)        # no args
+T_QUIT=RqType(4)        # put to put queues into drain-and-quit mode
 # encode tokens once for performance
 enc_STORE=toBS(T_STORE)
 enc_FETCH=toBS(T_FETCH)
 enc_HAVEYOU=toBS(T_HAVEYOU)
 enc_SYNC=toBS(T_SYNC)
+enc_QUIT=toBS(T_QUIT)
 
 def dbgfp(fp,context=None):
   fd=fp.fileno()
@@ -36,69 +48,75 @@ class StreamDaemon:
   ''' A daemon to handle requests from a stream and apply them to a backend
       store.
   '''
-  def __init__(self,S,requestFP,replyFP):
+  def __init__(self,S,recvRequestFP,sendReplyFP):
     self.S=S
-    self.requestFP=requestFP
-    self.replyFP=replyFP
+    self.recvRequestFP=recvRequestFP
+    self.sendReplyFP=sendReplyFP
     self.jobs={}
     self.jobsLock=BoundedSemaphore(1)
     self.njobs=0
     self.jobsClosing=False
     self.resultsCH=getChannel()
-    self.upstreamCH=getChannel()
-    self.readerThread=_StreamDaemonReader(self)
+    self.readerThread=_StreamDaemonRequestReader(self)
+    self.resultsThread=_StreamDaemonResultsSender(self)
+
+  def start(self):
     self.readerThread.start()
-    self.resultsThread=_StreamDaemonResults(self)
     self.resultsThread.start()
 
-  def close(self):
-    with self.jobsLock:
-      self.jobsCLosing=True
-  def closing(self):
-    with self.jobsLock:
-      cl=self.jobsClosing
-    return cl
+  def join(self):
+    self.readerThread.join()    # wait for requests to cease
+    self.resultsThread.join()   # wait for results to drain
 
-class _StreamDaemonReader(Thread):
+class _StreamDaemonRequestReader(Thread):
   ''' Read requests from the request stream,
       dispatch asynchronously to the backend Store.
   '''
   def __init__(self,daemon):
     Thread.__init__(self)
-    self.setName("_StreamDaemonReader")
+    self.setName("_StreamDaemonRequestReader")
     self.daemon=daemon
   def run(self):
-    debug("RUN _StreamDaemonReader")
+    debug("RUN _StreamDaemonRequestReader")
     jobs=self.daemon.jobs
     jobsLock=self.daemon.jobsLock
     resultsCH=self.daemon.resultsCH
-    upstreamCH=self.daemon.upstreamCH
     S=self.daemon.S
-    for n, rqType, arg in decodeStream(self.daemon.requestFP):
-      debug("StreamDaemon: rq=(%d, %d, %s)" % (n, rqType, arg))
+    for n, rqType, arg in decodeStream(self.daemon.recvRequestFP):
+      debug("StreamDaemon: rq=(%d, %s, %s)" % (n, rqType, arg))
       with jobsLock:
         assert n not in jobs, "token %d already in jobs" % n
         jobs[n]=rqType
         self.daemon.njobs+=1
+      if rqType == T_QUIT:
+        debug("_StreamDaemonRequestReader: T_QUIT")
+        resultsCH.put((n,None))
+        break
       if rqType == T_STORE:
+        debug("_StreamDaemonRequestReader: T_STORE")
         S.store_a(arg,n,resultsCH)
       elif rqType == T_FETCH:
+        debug("_StreamDaemonRequestReader: T_FETCH")
         S.fetch_a(arg,n,resultsCH)
       elif rqType == T_HAVEYOU:
+        debug("_StreamDaemonRequestReader: T_HAVEYOU")
         S.haveyou_a(arg,n,resultsCH)
       elif rqType == T_SYNC:
+        debug("_StreamDaemonRequestReader: T_SYNC")
         S.sync_a(n,resultsCH)
       else:
-        assert False, "unhandled rqType(%d) for request #%d" % (rqType, n)
-    self.daemon.close()
-    debug("END _StreamDaemonReader")
+        assert False, "unhandled rqType(%s) for request #%d" % (rqType, n)
+    debug("END _StreamDaemonRequestReader")
 
 def decodeStream(fp):
   ''' Generator that yields (rqTag, rqType, arg) from the request stream.
   '''
+  debug("decodeStream: reading first tag...")
   rqTag=fromBSfp(fp)
   while rqTag is not None:
-    rqType=fromBSfp(fp)
+    debug("decodeStream: reading rqType...")
+    rqType=RqType(fromBSfp(fp))
+    debug("decodeStream: read request: rqTag=%d, rqType=%s" % (rqTag, rqType))
     if rqType == T_STORE:
       size=fromBSfp(fp)
       assert size >= 0, "negative size(%d) for T_STORE" % size
@@ -111,58 +129,73 @@ def decodeStream(fp):
     elif rqType == T_FETCH or rqType == T_HAVEYOU:
       hlen=fromBSfp(fp)
       assert hlen > 0, \
-             "nonpositive hash length(%d) for rqType=%d" % (hlen, rqType)
+             "nonpositive hash length(%d) for rqType=%s" % (hlen, rqType)
       hash=fp.read(hlen)
       assert len(hash) == hlen, \
-             "short read(%d) for rqType=%d, expected %d bytes" % (len(hash), rqType, hlen)
+             "short read(%d) for rqType=%s, expected %d bytes" % (len(hash), rqType, hlen)
       yield rqTag, rqType, hash
-    elif rqType == T_SYNC:
+    elif rqType == T_SYNC or rqType == T_QUIT:
+      debug("decodeStream: rqType=%s" % rqType)
       yield rqTag, rqType, None
     else:
-      assert False, "unsupported request type (%d)" % rqType
+      assert False, "unsupported request type (%s)" % rqType
+    debug("decodeStream: reading next tag...")
     rqTag=fromBSfp(fp)
+  debug("decodeStream: tag was None, exiting generator")
 
-class _StreamDaemonResults(Thread):
+class _StreamDaemonResultsSender(Thread):
   ''' Collect results from asynchronous Store calls, report upstream.
   '''
   def __init__(self,daemon):
     Thread.__init__(self)
-    self.setName("_StreamDaemonResults")
+    self.setName("_StreamDaemonResultsSender")
     self.daemon=daemon
   def run(self):
-    debug("RUN _StreamDaemonResults")
+    debug("RUN _StreamDaemonResultsSender")
     jobs=self.daemon.jobs
     jobsLock=self.daemon.jobsLock
-    replyFP=self.daemon.replyFP
+    sendReplyFP=self.daemon.sendReplyFP
+    draining=False
     for rqTag, result in self.daemon.resultsCH:
       assert (result is None or type(result) is str) and type(rqTag) is int, "result=%s, rqTag=%s"%(result,rqTag)
       debug("StreamDaemon: return result (%s, %s)" % (rqTag, result))
       with jobsLock:
         rqType=jobs[rqTag]
-        del jobs[rqTag]
-        self.daemon.njobs-=1
-      debug("report result upstream: tqTag=%s rqType=%d results=%s" % (rqTag,rqType,result))
-      replyFP.write(toBS(rqTag))
-      replyFP.write(toBS(rqType))
-      if rqType == T_STORE or rqType == T_FETCH:
-        replyFP.write(toBS(len(result)))
-        replyFP.write(result)
+      debug("report result upstream: tqTag=%s rqType=%s results=%s" % (rqTag,rqType,result))
+      sendReplyFP.write(toBS(rqTag))
+      sendReplyFP.write(toBS(rqType))
+      if rqType == T_QUIT:
+        debug("T_QUIT received, draining...")
+        assert not draining
+        quitTag=rqTag
+        draining=True
+      elif rqType == T_STORE or rqType == T_FETCH:
+        sendReplyFP.write(toBS(len(result)))
+        sendReplyFP.write(result)
       elif rqType == T_HAVEYOU:
-        replyFP.write(toBS(1 if result else 0))
+        sendReplyFP.write(toBS(1 if result else 0))
       elif rqType == T_SYNC:
         pass
       else:
-        assert False, "unhandled rqType(%d)" % rqType
-      replyFP.flush()
-      if self.daemon.closing():
+        assert False, "unhandled rqType(%s)" % rqType
+      sendReplyFP.flush()
+      debug("_StreamDaemonResultsSender: dequeue job %d" % rqTag)
+      with jobsLock:
+        del jobs[rqTag]
+        self.daemon.njobs-=1
+      if draining:
+        debug("draining: %d jobs still in play" % self.daemon.njobs)
         with jobsLock:
-          jobsDone=(self.daemon.njobs == 0)
-        if jobsDone:
-          break
-    debug("END _StreamDaemonResults")
+          if self.daemon.njobs == 0:
+            break
+          jobTags=jobs.keys()
+          jobTags.sort()
+          for tag in jobTags:
+            debug("  jobs[%d]=%s" % (tag, jobs[tag]))
+    debug("END _StreamDaemonResultsSender")
 
 def encodeStore(fp,rqTag,block):
-  ##if ifdebug(): dbgfp(fp,"encodeStore(rqTag=%d,%d bytes)" % (rqTag,len(block)))
+  debug(fp,"encodeStore(rqTag=%d,%d bytes)" % (rqTag,len(block)))
   global enc_STORE
   fp.write(toBS(rqTag))
   fp.write(enc_STORE)
@@ -171,7 +204,7 @@ def encodeStore(fp,rqTag,block):
   fp.flush()
 
 def encodeFetch(fp,rqTag,h):
-  ##if ifdebug(): dbgfp(fp,"encodeFetch(rqTag=%d,h=%s" % (rqTag,tohex(h)))
+  debug(fp,"encodeFetch(rqTag=%d,h=%s" % (rqTag,tohex(h)))
   global enc_FETCH
   fp.write(toBS(rqTag))
   fp.write(enc_FETCH)
@@ -180,7 +213,7 @@ def encodeFetch(fp,rqTag,h):
   fp.flush()
 
 def encodeHaveYou(fp,rqTag,h):
-  ##if ifdebug(): dbgfp(fp,"encodeHaveYou(rqTag=%d,h=%s" % (rqTag,tohex(h)))
+  debug(fp,"encodeHaveYou(rqTag=%d,h=%s" % (rqTag,tohex(h)))
   global enc_HAVEYOU
   fp.write(toBS(rqTag))
   fp.write(enc_HAVEYOU)
@@ -189,35 +222,62 @@ def encodeHaveYou(fp,rqTag,h):
   fp.flush()
 
 def encodeSync(fp,rqTag):
-  ##if ifdebug(): dbgfp(fp,"encodeSync(rqTag=%d" % rqTag)
+  debug(fp,"encodeSync(rqTag=%d)" % rqTag)
   global enc_SYNC
   fp.write(toBS(rqTag))
   fp.write(enc_SYNC)
   fp.flush()
 
+def encodeSync(fp,rqTag):
+  debug(fp,"encodeSync(rqTag=%d" % rqTag)
+  global enc_SYNC
+  fp.write(toBS(rqTag))
+  fp.write(enc_SYNC)
+  fp.flush()
+
+def encodeQuit(fp,rqTag):
+  debug(fp,"encodeQuit(rqTag=%d" % rqTag)
+  global enc_QUIT
+  fp.write(toBS(rqTag))
+  fp.write(enc_QUIT)
+  fp.flush()
+
 class StreamStore(BasicStore):
   ''' A Store connected to a StreamDaemon backend.
   '''
-  def __init__(self,requestFP,replyFP):
-    BasicStore.__init__(self)
-    self.requestFP=requestFP
-    self.replyFP=replyFP
+  def __init__(self,name,sendRequestFP,recvReplyFP):
+    BasicStore.__init__(self,"StreamStore:%s"%name)
+    self.sendRequestFP=sendRequestFP
+    self.recvReplyFP=recvReplyFP
     self.pending=JobQueue()
     self.sendLock=BoundedSemaphore(1)
     self.lastBlock=None
     self.lastBlockLock=BoundedSemaphore(1)
-    self.client=_StreamClientReader(self).start()
+    self.client=_StreamClientReader(self)
+    self.client.start()
 
   def close(self):
-    self.requestFP.close()
-    BasicStore.close(self)
+    debug("StreamStore.close: close()...")
+    if self.closing:
+      debug("StreamStore.close: already closed, doing nothing")
+    else:
+      self.closing=True
+      rqTag=seq()
+      ch=self.pending.enqueue(rqTag)
+      debug("StreamStore.close: queued rqTag=%s, got channel=%s" % (rqTag, ch))
+      with self.sendLock:
+        debug("StreamStore.close: sending T_QUIT...")
+        encodeQuit(self.sendRequestFP,rqTag)
+        debug("StreamStore.close: sent T_QUIT")
+      x=ch.get()
+      debug("StreamStore.close: got result from channel: %s" % (x,))
 
   def store_a(self,block,rqTag=None,ch=None):
     debug("StreamStore: store_a(%d bytes)..." % len(block))
     if rqTag is None: rqTag=seq()
     ch=self.pending.enqueue(rqTag,ch)
     with self.sendLock:
-      encodeStore(self.requestFP,rqTag,block)
+      encodeStore(self.sendRequestFP,rqTag,block)
     return ch
   def lastFetch(self,h):
     with self.lastBlockLock:
@@ -247,21 +307,21 @@ class StreamStore(BasicStore):
     if rqTag is None: rqTag=seq()
     ch=self.pending.enqueue(rqTag,ch)
     with self.sendLock:
-      encodeFetch(self.requestFP,rqTag,h)
+      encodeFetch(self.sendRequestFP,rqTag,h)
     return ch
   def haveyou_a(self,h,rqTag=None,ch=None):
     debug("StreamStore: haveyou_a(%s)..." % tohex(h))
     if rqTag is None: rqTag=seq()
     ch=self.pending.enqueue(rqTag,ch)
     with self.sendLock:
-      encodeHaveYou(self.requestFP,rqTag,h)
+      encodeHaveYou(self.sendRequestFP,rqTag,h)
     return ch
   def sync_a(self,rqTag=None,ch=None):
     debug("StreamStore: sync_a()...")
     if rqTag is None: rqTag=seq()
     ch=self.pending.enqueue(rqTag,ch)
     with self.sendLock:
-      encodeSync(self.requestFP,rqTag)
+      encodeSync(self.sendRequestFP,rqTag)
     return ch
 
 class _StreamClientReader(Thread):
@@ -272,38 +332,42 @@ class _StreamClientReader(Thread):
 
   def run(self):
     debug("RUN _StreamClientReader")
-    replyFP=self.daemon.replyFP
+    recvReplyFP=self.daemon.recvReplyFP
     pending=self.daemon.pending
-    debug("_StreamClientReader: replyFP=%s" % replyFP)
-    rqTag=fromBSfp(replyFP)
+    debug("_StreamClientReader: recvReplyFP=%s" % recvReplyFP)
+    rqTag=fromBSfp(recvReplyFP)
     while rqTag is not None:
-      rqType=fromBSfp(replyFP)
+      rqType=fromBSfp(recvReplyFP)
+      debug("_StreamClientReader: result header: tag=%d, type=%s" % (rqTag, rqType))
+      if rqType == T_QUIT:
+        debug("received T_QUIT from daemon")
+        pending.dequeue(rqTag,None)
+        debug("dequeued T_QUIT from daemon")
+        break
       if rqType == T_STORE:
-        hlen=fromBSfp(replyFP)
+        hlen=fromBSfp(recvReplyFP)
         assert hlen > 0
-        h=replyFP.read(hlen)
+        h=recvReplyFP.read(hlen)
         assert len(h) == hlen
         pending.dequeue(rqTag,h) # send has instead?
       elif rqType == T_FETCH:
-        blen=fromBSfp(replyFP)
+        blen=fromBSfp(recvReplyFP)
         assert blen >= 0
         if blen == 0:
           block=''
         else:
-          block=replyFP.read(blen)
+          block=recvReplyFP.read(blen)
           assert len(block) == blen
         pending.dequeue(rqTag,block)
       elif rqType == T_HAVEYOU:
-        yesno=bool(fromBSfp(replyFP))
+        yesno=bool(fromBSfp(recvReplyFP))
         pending.dequeue(rqTag,yesno)
       elif rqType == T_SYNC:
         pending.dequeue(rqTag,None)
       else:
-        assert False, "unhandled reply type %d" % rqType
+        assert False, "unhandled reply type %s" % rqType
 
       # fetch next result
-      rqTag=fromBSfp(replyFP)
+      rqTag=fromBSfp(recvReplyFP)
 
-    self.daemon.replyFP.close()
-    self.daemon.close()
     debug("END _StreamClientReader")

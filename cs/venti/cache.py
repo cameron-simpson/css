@@ -4,52 +4,58 @@
 #       - Cameron Simpson <cs@zip.com.au> 07dec2007
 #
 
-from cs.misc import seq
-from cs.threads import getChannel, FuncQueue
+from cs.misc import seq, progress, verbose
+from cs.threads import FuncQueue, Q1
+from cs.venti import tohex
 from cs.venti.store import BasicStore
 from heapq import heappush, heappop
 import sys
 
 class CacheStore(BasicStore):
   def __init__(self,backend,cache):
-    BasicStore.__init__(self)
+    BasicStore.__init__(self,"Cache(cache=%s,backend=%s)"%(cache,backend))
     self.backend=backend
     self.cache=cache
 
   def close(self):
+    BasicStore.close(self)
     self.backend.close()
     self.cache.close()
-    BasicStore.close(self)
 
   def store_a(self,block,tag=None,ch=None):
     assert block is not None
     if tag is None: tag=seq()
-    if ch is None: ch=getChannel()
+    if ch is None: ch=Q1()
     self.Q.put((self.__store_bg,(tag,block,ch)))
     return ch
   def __store_bg(self,tag,block,ch):
     h=self.cache.store(block)
-    ch.write((tag,h))
-    self.Q.put((self.__store_bg2,(h,block)))
-  def __store_bg2(self,h,block):
+    ch.put((tag,h))
+    progress("stored %s in cache")
     if h not in self.backend:
       self.backend.store(block)
 
   def fetch_a(self,h,tag=None,ch=None):
     if tag is None: tag=seq()
-    if ch is None: ch=getChannel()
+    if ch is None: ch=Q1()
     self.Q.put((self.__fetch_bg,(tag,h,ch)))
     return ch
   def __fetch_bg(self,tag,h,ch):
-    if h in self.cache:
+    inCache=(h in self.cache)
+    if inCache:
+      verbose("fetch %s from cache %s"%(tohex(h), self.cache))
       block=self.cache[h]
     else:
+      progress("fetch %s from backend %s"%(tohex(h),self.backend))
       block=self.backend[h]
-    ch.write((tag,block))
+    ch.put((tag,block))
+    if not inCache:
+      progress("fetch: cache %s in %s"%(tohex(h),self.cache))
+      self.cache.store(block)
 
   def haveyou_a(self,h,tag=None,ch=None):
     if tag is None: tag=seq()
-    if ch is None: ch=getChannel()
+    if ch is None: ch=Q1()
     self.Q.put((self.__haveyou_bg,(tag,h,ch)))
     return ch
   def __haveyou_bg(self,tag,h,ch):
@@ -57,58 +63,68 @@ class CacheStore(BasicStore):
       yesno=True
     else:
       yesno=self.backend[h]
-    ch.write((tag,yesno))
+    ch.put((tag,yesno))
 
   def sync_a(self,tag=None,ch=None):
     if tag is None: tag=seq()
-    if ch is None: ch=getChannel()
+    if ch is None: ch=Q1()
     self.Q.put((self.__sync_bg,(tag,ch)))
     return ch
   def __sync_bg(self,tag,ch):
+    backCH=self.backend.sync_a()
     self.cache.sync()
-    self.backend.sync()
-    ch.write((tag,None))
+    backCH.get()
+    ch.put((tag,None))
 
 class MemCacheStore(BasicStore):
   ''' A lossy store that keeps an in-memory cache of recent blocks.
   '''
   def __init__(self,max=1024):
-    BasicStore.__init__(self)
+    BasicStore.__init__(self,"MemCacheStore")
     assert max > 1
     self.max=max
     self.heap=[]
     self.hmap={}
-    self.rawmap={}
+    self.hcount={}
 
   def _stash(self,hits,h,block):
     assert hits >= 0
     assert h is not None
     assert block is not None
     heap=self.heap
+    hmap=self.hmap
 
     # make room
-    while len(heap) > max:
-      heappop(heap)
+    while len(heap) >= max:
+      tup=heappop(heap)
+      th=tup[1]
+      count=self.hcount[th]
+      if count == 1:
+        del hmap[th]
+      else:
+        self.hcount[th]=count-1
 
     hits+=1
     tup=(hits, h, block)
     self.hmap[h]=tup
-    self.rawmap[block]=tup
-    if len(heap) == max:
-      heapreplace(heap, tup)
+    heappush(heap, tup)
+    if h in self.hcount:
+      self.hcount[h]+=1
     else:
-      heappush(heap, tup)
+      self.hcount[h]=1
     
   def store(self,block):
-    rawmap=self.rawmap
-    if block in rawmap:
-      hits, h, mblock = self.rawmap[block]
+    hmap=self.hmap
+    h=self.hash(block)
+    if h in hmap:
+      hits, mh, mblock = self.hmap[h]
+      assert h == mh
       assert block == mblock
     else:
       hits=0
-      h=self.hash(block)
+      mh=h
       mblock=block
-    self._stash(hits, h, mblock)
+    self._stash(hits, mh, mblock)
 
   def haveyou(self,h):
     if h not in self.hmap:
