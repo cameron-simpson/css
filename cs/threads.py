@@ -80,7 +80,7 @@ class JobQueue:
     if ch is None:
       if useQueue is None:
         useQueue=self.useQueue
-      ch=Q1(useQueue=useQueue)
+      ch=Q1()
       debug("enqueue: using allocated channel %s" % ch)
     with self.lock:
       assert n not in self.q, "\"%s\" already queued"
@@ -134,7 +134,7 @@ def getChannel():
     if len(__channels) == 0:
       ch=Channel()
       debug("getChannel: allocated %s" % ch)
-      tb()
+      ##tb()
     else:
       ch=__channels.pop(-1)
   return ch
@@ -144,52 +144,49 @@ def _returnChannel(ch):
     assert ch not in __channels
     __channels.append(ch)
 
-''' A pool of Queues of maxsize == 1.
+''' A pool of Q1 objects (single use Queue(1)s).
 '''
 __queues=[]
 __queuesLock=BoundedSemaphore(1)
 def getQ1():
   with __queuesLock:
     if len(__queues) == 0:
-      Q=Queue(1)
+      Q=Q1()
     else:
       Q=__queues.pop(-1)
+      Q.didget=False
+      Q.didput=False
   return Q
 def _returnQ1(Q):
   assert Q.empty()
+  assert Q.didget
+  assert Q.didput
   with __queuesLock:
     __queues.append(Q)
 
-class Q1:
-  def __init__(self,useQueue=True,name=None):
-    ''' Return a single-use blocking Channel or Queue(1) (if useQueue is True)
-        from the pool. The Channel/Queue is returned to the pool on .get().
+class Q1(Queue):
+  def __init__(self,name=None):
+    ''' Return a single-use Queue(1) from the pool. The Queue is returned to the pool on .get().
     '''
+    Queue.__init__(self,1)
     if name is None:
       import traceback
       name="Q1:[%s]" % (traceback.format_list(traceback.extract_stack()[-3:-1])[0].strip().replace("\n",", "))
     self.name=name
-    self.isQueue=useQueue
-    if useQueue:
-      self.Q=getQ1()
-    else:
-      self.Q=getChannel()
     self.didput=False
     self.didget=False
   def __str__(self):
     return self.name
   def put(self,item):
-    self.Q.put(item)
+    # racy but it's just a sanity check
     assert not self.didput
     self.didput=True
+    Queue.put(self,item)
   def get(self):
     assert not self.didget
     self.didget=True
-    item=self.Q.get()
-    if self.isQueue:
-      _returnQ1(self.Q)
-    else:
-      _returnChannel(self.Q)
+    item=Queue.get(self)
+    _returnQ1(self)
     return item
 
 def bgCall(func,args,ch=None):
