@@ -8,12 +8,13 @@ from __future__ import with_statement
 import sys
 import os.path
 import time
-from zlib import compress, decompress
+from zlib import compress
 from threading import BoundedSemaphore
 from cs.cache import LRU
 from cs.misc import cmderr, warn, progress, verbose, ifverbose, out, fromBS, toBS, fromBSfp, tb, the
 from cs.venti import tohex, hash
 from cs.venti.store import BasicStore
+from cs.venti.datafile import scanFile, getBlock, addBlock
 
 class GDBMStore(BasicStore):
   ''' A Store attached to a GDBM indexed bunch of files.
@@ -26,6 +27,8 @@ class GDBMStore(BasicStore):
       and zlength is the byte length of the zblock.
       The cs.misc.toBS() function is used to represent the length
       as a byte sequence.
+      See cs.venti.dataFile for access functions.
+
       There is also a file 'index' in this directory, which is
       a GDBM file mapping block hash codes (20 byte SHA-1 hashes)
       to (n, offset, zlength) tuples, where 'n' indicated the 'n.vtd'
@@ -61,7 +64,7 @@ class GDBMStore(BasicStore):
 
   def sync(self):
     ''' Sync(0 the store.
-        Calls the GDBM sync() function and flsuh()es any open
+        Calls the GDBM sync() function and flush()es any open
         .vtd files.
     '''
     self.__index.sync()
@@ -79,16 +82,14 @@ class GDBMStore(BasicStore):
     '''
     h=hash(block)
     if h in self:
-      if ifverbose(): warn(self.__path,"already contains",tohex(h))
+      if ifverbose():
+        warn(self.__path,"already contains",tohex(h))
       return h
 
     zblock=compress(block)
     fp=self.__storeOpen(self.__newStore)
     with self.ioLock:
-      fp.seek(0,2)
-      fp.write(toBS(len(zblock)))
-      offset=fp.tell()
-      fp.write(zblock)
+      offset, zsize = addBlock(fp,zblock,True)
     self.__index[h]=(self.__newStore,offset,len(zblock))
     return h
 
@@ -98,9 +99,7 @@ class GDBMStore(BasicStore):
     if h not in self.__index:
       return None
     n,offset,zsize = self.__index[h]
-    fp=self.__storeOpen(n)
-    fp.seek(offset)
-    return decompress(fp.read(zsize))
+    return getBlock(self.__storeOpen(n),offset,zsize)
 
   def haveyou(self,h):
     ''' Test if the hash 'h' is present in the store.
@@ -123,16 +122,9 @@ class GDBMStore(BasicStore):
 
   def __loadIndex(self,n):
     progress("load index from store", str(n))
-    fp=self.__storeOpen(n)
-    while True:
-      zsize=fromBSfp(fp)
-      if zsize is None:
-        break
-      offset=fp.tell()
-      zblock=fp.read(zsize)
-      block=decompress(zblock)
-      h=hash(block)
-      self.__index[h]=toBS(n)+toBS(offset)+toBS(zsize)
+    bsn=toBS(n)
+    for h, offset, zsize in scanFile(self.__storeOpen(n)):
+      self.__index[h]=bsn+toBS(offset)+toBS(zsize)
 
 class GDBMIndex:
   ''' A GDBM index for a GDBMStore.
