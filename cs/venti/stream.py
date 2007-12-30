@@ -8,7 +8,8 @@
 
 from __future__ import with_statement
 from threading import Thread, BoundedSemaphore
-from cs.misc import seq, toBS, fromBSfp, debug, ifdebug, tb
+from cs.misc import seq, toBS, fromBSfp, debug, ifdebug, tb, warn
+from cs.lex import unctrl
 from cs.threads import JobQueue, getChannel
 from cs.venti import tohex
 from cs.venti.store import BasicStore
@@ -93,7 +94,14 @@ class _StreamDaemonRequestReader(Thread):
     resultsCH=self.daemon.resultsCH
     S=self.daemon.S
     for n, rqType, arg in decodeStream(self.daemon.recvRequestFP):
-      debug("StreamDaemon: rq=(%d, %s, %s)" % (n, rqType, arg))
+      if ifdebug():
+        if arg is None:
+          varg=None
+        elif rqType == T_HAVEYOU or rqType == T_FETCH:
+          varg=tohex(arg)
+        else:
+          varg=unctrl(arg)
+        warn("StreamDaemon: rq=(%d, %s, %s)" % (n, rqType, varg))
       with jobsLock:
         assert n not in jobs, "token %d already in jobs" % n
         jobs[n]=rqType
@@ -167,11 +175,19 @@ class _StreamDaemonResultsSender(Thread):
     sendReplyFP=self.daemon.sendReplyFP
     draining=False
     for rqTag, result in self.daemon.resultsCH:
-      assert (result is None or type(result) is str) and type(rqTag) is int, "result=%s, rqTag=%s"%(result,rqTag)
       debug("StreamDaemon: return result (%s, %s)" % (rqTag, result))
       with jobsLock:
         rqType=jobs[rqTag]
-      debug("report result upstream: tqTag=%s rqType=%s results=%s" % (rqTag,rqType,result))
+      if ifdebug():
+        if result is None:
+          vresult=None
+        elif rqType == T_STORE:
+          vresult=tohex(result)
+        elif type(result) is str:
+          vresult=unctrl(result)
+        else:
+          vresult=result
+        warn("report result upstream: rqTag=%s rqType=%s results=%s" % (rqTag,rqType,vresult))
       sendReplyFP.write(toBS(rqTag))
       sendReplyFP.write(toBS(rqType))
       if rqType == T_QUIT:
@@ -266,8 +282,6 @@ class StreamStore(BasicStore):
     self.recvReplyFP=recvReplyFP
     self.pending=JobQueue()
     self.sendLock=BoundedSemaphore(1)
-    self.lastBlock=None
-    self.lastBlockLock=BoundedSemaphore(1)
     self.client=_StreamClientReader(self)
     self.client.start()
 
@@ -296,38 +310,21 @@ class StreamStore(BasicStore):
     with self.sendLock:
       encodeStore(self.sendRequestFP,rqTag,block)
     return ch
-  def lastFetch(self,h):
-    with self.lastBlockLock:
-      LB=self.lastBlock
-    if LB is not None:
-      Lh, Lblock = LB
-      if Lh == h:
-        return Lblock
-    return None
-
-  def fetch(self,h):
-    block=self.lastFetch(h)
-    if block is not None:
-      return block
-    block=BasicStore.fetch(self,h)
-    with self.lastBlockLock:
-      self.lastBlock=(h,block)
-    return block
-    
   def fetch_a(self,h,rqTag=None,ch=None):
     debug("StreamStore: fetch_a(%s)..." % tohex(h))
-    block=self.lastFetch(h)
-    if block is not None:
-      return bgReturn((None,Lblock))
-
     ##if ifdebug(): tb()
     if rqTag is None: rqTag=seq()
     ch=self.pending.enqueue(rqTag,ch)
-    with self.sendLock:
-      encodeFetch(self.sendRequestFP,rqTag,h)
+    block=self.lastFetch(h)
+    if block is not None:
+      ch.put((None,block))
+    else:
+      with self.sendLock:
+        encodeFetch(self.sendRequestFP,rqTag,h)
     return ch
   def haveyou_a(self,h,rqTag=None,ch=None):
-    debug("StreamStore: haveyou_a(%s)..." % tohex(h))
+    debug("%s: haveyou_a(%s)..." % (self,tohex(h)))
+    ##tb()
     if rqTag is None: rqTag=seq()
     ch=self.pending.enqueue(rqTag,ch)
     with self.sendLock:
