@@ -30,8 +30,9 @@ class CacheStore(BasicStore):
     return ch
   def __store_bg(self,tag,block,ch):
     h=self.cache.store(block)
+    assert h is not None
     ch.put((tag,h))
-    progress("stored %s in cache" % tohex(h))
+    ##progress("stored %s in cache" % tohex(h))
     if h not in self.backend:
       self.backend.store(block)
 
@@ -43,14 +44,14 @@ class CacheStore(BasicStore):
   def __fetch_bg(self,tag,h,ch):
     inCache=(h in self.cache)
     if inCache:
-      verbose("fetch %s from cache %s"%(tohex(h), self.cache))
+      ##verbose("fetch %s from cache %s"%(tohex(h), self.cache))
       block=self.cache[h]
     else:
-      progress("fetch %s from backend %s"%(tohex(h),self.backend))
+      ##progress("fetch %s from backend %s"%(tohex(h),self.backend))
       block=self.backend[h]
     ch.put((tag,block))
     if not inCache:
-      progress("fetch: cache %s in %s"%(tohex(h),self.cache))
+      ##progress("fetch: cache %s in %s"%(tohex(h),self.cache))
       self.cache.store(block)
 
   def haveyou_a(self,h,tag=None,ch=None):
@@ -62,7 +63,7 @@ class CacheStore(BasicStore):
     if h in self.cache:
       yesno=True
     else:
-      yesno=self.backend[h]
+      yesno=(h in self.backend)
     ch.put((tag,yesno))
 
   def sync_a(self,tag=None,ch=None):
@@ -125,6 +126,7 @@ class MemCacheStore(BasicStore):
       mh=h
       mblock=block
     self._stash(hits, mh, mblock)
+    return h
 
   def haveyou(self,h):
     if h not in self.hmap:
