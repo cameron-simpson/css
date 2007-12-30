@@ -4,6 +4,7 @@
 #       - Cameron Simpson <cs@zip.com.au>
 #
 
+from __future__ import with_statement
 import sys
 import os
 import os.path
@@ -12,7 +13,7 @@ from zlib import compress, decompress
 from cs.misc import cmderr, debug, warn, progress, verbose, out, fromBS, toBS, fromBSfp, tb, seq
 from cs.threads import FuncQueue, Q1
 from cs.venti import tohex
-from threading import Thread
+from threading import Thread, BoundedSemaphore
 from Queue import Queue
 
 class BasicStore:
@@ -25,6 +26,8 @@ class BasicStore:
     self.logfp=None
     self.closing=False
     self.Q=FuncQueue()
+    self.lastBlock=None
+    self.lastBlockLock=BoundedSemaphore(1)
 
   def __str__(self):
     return "Store(%s)" % self.name
@@ -65,20 +68,37 @@ class BasicStore:
     ''' Fetch a block given its hash.
     '''
     assert not self.closing
+    block=self.lastFetch(h)
+    if block is not None:
+      return block
     ch=self.fetch_a(h,None)
     tag, block = ch.get()
+    with self.lastBlockLock:
+      self.lastBlock=(h,block)
     return block
   def fetch_a(self,h,tag=None,ch=None):
     ''' Request a block from its hash.
         Return a cs.threads.Q1 from which to read the block.
     '''
     assert not self.closing
-    if ch is None: ch=Q1()
-    self.Q.put((self.__fetch_bg,(h,tag,ch)))
+    if ch is None: ch=Q1(useQueue=True)
+    block=self.lastFetch(h)
+    if block is not None:
+      ch.put((tag,block))
+    else:
+      self.Q.put((self.__fetch_bg,(h,tag,ch)))
     return ch
   def __fetch_bg(self,h,tag,ch):
     block=self.fetch(h)
     ch.put((tag,block))
+  def lastFetch(self,h):
+    with self.lastBlockLock:
+      LB=self.lastBlock
+    if LB is not None:
+      Lh, Lblock = LB
+      if Lh == h:
+        return Lblock
+    return None
   def haveyou(self,h):
     ''' Test if a hash is present in the store.
     '''
@@ -178,7 +198,7 @@ class Store(BasicStore):
   def fetch(self,h):
     return self.S.fetch(h)
   def haveyou(self,h):
-    return h in self.S
+    return self.S.haveyou(h)
   def sync(self):
     self.S.sync()
     if self.logfp is not None:
