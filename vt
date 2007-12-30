@@ -21,9 +21,11 @@ usage='''Usage:
   %s [options...] listen port
   %s [options...] ls [-R] dirrefs...
   %s [options...] mount dirref mountpoint
-  %s [options...] store pathnames...
-  %s [options...] update [-o file.vt] path
-  %s [options...] unpack dirref
+  %s [options...] scan datafile
+  %s [options...] pack paths...
+  %s [options...] pack -o file.vt path
+  %s [options...] unpack -
+  %s [options...] unpack file.vt
   Options:
     -C store    Use this as a front end cache store.
                 "-" means no front end cache.
@@ -32,7 +34,7 @@ usage='''Usage:
                   /path/to/dir  GDBMStore
                   tcp:host:port TCPStore
                   |sh-command   StreamStore via sh-command
-''' % (cmd,cmd,cmd,cmd,cmd,cmd,cmd,cmd)
+''' % (cmd,cmd,cmd,cmd,cmd,cmd,cmd,cmd,cmd,cmd)
 
 badopts=False
 
@@ -65,10 +67,6 @@ for (opt,val) in opts:
   else:
     assert False, "unsupported option: %s" % opt
 
-if dflt_vt_store is None:
-  cmderr("no $VT_STORE and no -S option")
-  badopts=True
-
 if len(args) < 1:
   cmderr("missing command")
   badopts=True
@@ -79,16 +77,19 @@ else:
     if len(args) < 1:
       cmderr("missing pathnames")
       badopts=True
-  elif op == "update":
-    archive=None
-    if len(args) >= 2 and args[0] == "-o":
-      archive=args[1]
-      args=args[2:]
-    if len(args) == 0:
-      cmderr("missing path")
-      badopts=True
-    elif len(args) > 1:
-      cmderr("extra arguments after path: %s" % " ".join(args[1:]))
+  elif op == "pack":
+    if len(args) > 0 and args[0] == "-o":
+      if len(args) < 2:
+        cmderr("-o: missing file.vt")
+        badopts=True
+      elif len(args) < 3:
+        cmderr("missing path")
+        badopts=True
+      elif len(args) > 3:
+        cmderr("extra arguments after path: %s" % " ".join(args[3:]))
+        badopts=True
+    elif len(args) < 1:
+      cmderr("missing paths")
       badopts=True
   elif op == "cat":
     if len(args) < 1:
@@ -101,6 +102,10 @@ else:
       args.pop(0)
     if len(args) < 1:
       cmderr("missing hashcodes")
+      badopts=True
+  elif op == "scan":
+    if len(args) != 1:
+      cmderr("missing datafile")
       badopts=True
   elif op == "listen":
     if len(args) != 1:
@@ -124,6 +129,11 @@ else:
       badopts=True
   else:
     cmderr("unrecognised command")
+    badopts=True
+
+if dflt_vt_store is None:
+  if op != "scan":
+    cmderr("no $VT_STORE and no -S option")
     badopts=True
 
 if badopts:
@@ -232,37 +242,37 @@ def storePath(path,targetRef=None,ignoreTimes=False,deleteMissing=False,overWrit
                     overWrite=overWrite)
   return D.sync()
 
-if op == "store":
-  for path in args:
-    ref=storePath(path)
-    stdout.write(tohex(ref.encode()))
-    if len(args) > 1:
-      stdout.write('\t')
-      stdout.write(path)
-    stdout.write('\n')
-  S.sync()
-
-elif op == "update":
-  from cs.venti.blocks import str2BlockRef
-  import datetime
-  path=args[0]
-  if archive is None:
-    archive="%s.vt" % os.path.basename(path)
-  target=None
-  if os.path.isfile(archive):
-    hexarg=None
-    for line in open(archive):
-      assert line[-1] == '\n'
-      words=line[:-1].strip().split(' ')
-      if len(words) == 0:
-        continue
-      if words[0].startswith("#"):
-        continue
-      hexarg=words[0]
-    if hexarg is not None:
-      target=str2BlockRef(fromhex(hexarg))
-  saved=storePath(path,targetRef=target,ignoreTimes=False,deleteMissing=True,overWrite=True)
-  open(archive,mode='a').write("%s %s %s\n" % (saved, datetime.datetime.now(), path))
+if op == "pack":
+  if len(args) == 0 or args[0] != '-o':
+    for path in args:
+      ref=storePath(path)
+      stdout.write(tohex(ref.encode()))
+      if len(args) > 1:
+        stdout.write('\t')
+        stdout.write(path)
+      stdout.write('\n')
+  else:
+    archive=args[1]
+    path=args[2]
+    from cs.venti.blocks import str2BlockRef
+    import datetime
+    if archive is None:
+      archive="%s.vt" % os.path.basename(path)
+    target=None
+    if os.path.isfile(archive):
+      hexarg=None
+      for line in open(archive):
+        assert line[-1] == '\n'
+        words=line[:-1].strip().split(' ')
+        if len(words) == 0:
+          continue
+        if words[0].startswith("#"):
+          continue
+        hexarg=words[0]
+      if hexarg is not None:
+        target=str2BlockRef(fromhex(hexarg))
+    saved=storePath(path,targetRef=target,ignoreTimes=False,deleteMissing=True,overWrite=True)
+    open(archive,mode='a').write("%s %s %s\n" % (saved, datetime.datetime.now(), path))
 
 elif op == "cat":
   for path in args:
@@ -274,6 +284,11 @@ elif op == "catblock":
       bl
     else:
       stdout.write(S[fromhex(hexarg)])
+
+elif op == "scan":
+  from cs.venti.datafile import scanFile
+  for h, offset, zsize in scanFile(open(args[0])):
+    print tohex(h), offset, zsize
 
 elif op == "listen":
   assert len(args) == 1
