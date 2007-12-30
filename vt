@@ -8,6 +8,7 @@ from sys import argv, exit, stdin, stderr, stdout, exit
 import os
 import os.path
 import atexit
+from getopt import getopt, GetoptError
 from cs.venti import tohex, fromhex
 from cs.venti.store import Store
 from cs.venti.cache import CacheStore, MemCacheStore
@@ -15,17 +16,29 @@ from cs.misc import cmd, cmderr, setcmd, warn, debug, progress
 import cs.upd; cs.upd.default()
 
 usage='''Usage:
-  %s [-S store] cat filerefs...
-  %s [-S store] catblock [-i] hashcodes...
-  %s [-S store] listen port
-  %s [-S store] ls [-R] dirrefs...
-  %s [-S store] mount dirref mountpoint
-  %s [-S store] store pathnames...
-  %s [-S store] update [-o file.vt] path
-  %s [-S store] unpack dirref
+  %s [options...] cat filerefs...
+  %s [options...] catblock [-i] hashcodes...
+  %s [options...] listen port
+  %s [options...] ls [-R] dirrefs...
+  %s [options...] mount dirref mountpoint
+  %s [options...] store pathnames...
+  %s [options...] update [-o file.vt] path
+  %s [options...] unpack dirref
+  Options:
+    -C store    Use this as a front end cache store.
+                "-" means no front end cache.
+    -M          Don't use an additional MemCacheStore front end.
+    -S store    Specify the store to use:
+                  /path/to/dir  GDBMStore
+                  tcp:host:port TCPStore
+                  |sh-command   StreamStore via sh-command
 ''' % (cmd,cmd,cmd,cmd,cmd,cmd,cmd,cmd)
 
 badopts=False
+
+dflt_cache=os.environ.get('VT_STORE_CACHE')
+dflt_vt_store=os.environ.get('VT_STORE')
+useMemCache=True
 
 S=None
 def closeStore():
@@ -33,10 +46,28 @@ def closeStore():
     S.close()
 atexit.register(closeStore)
 
-args=argv[1:]
-if len(args) > 0 and args[0] == '-S':
-  S=Store(args[1])
-  args=args[2:]
+try:
+  (opts,args)=getopt(argv[1:],'C:MS:')
+except GetoptError, e:
+  cmderr("unrecognised option: %s: %s"% (e.opt, e.msg))
+  badopts=True
+
+for (opt,val) in opts:
+  if opt == '-C':
+    if val == '-':
+      dflt_cache=None
+    else:
+      dflt_cache=val
+  elif opt == '-M':
+    useMemCache=False
+  elif opt == '-S':
+    dflt_vt_store=val
+  else:
+    assert False, "unsupported option: %s" % opt
+
+if dflt_vt_store is None:
+  cmderr("no $VT_STORE and no -S option")
+  badopts=True
 
 if len(args) < 1:
   cmderr("missing command")
@@ -95,27 +126,22 @@ else:
     cmderr("unrecognised command")
     badopts=True
 
-if S is None:
-  dflt_vt_store=os.environ.get('VT_STORE')
-  if dflt_vt_store is None:
-    cmderr("no $VT_STORE and no -S option")
-    badopts=True
-  else:
-    S=Store(dflt_vt_store)
-
 if badopts:
   stderr.write(usage)
   exit(2)
 
-dflt_cache=os.environ.get('VT_STORE_CACHE')
+S=Store(dflt_vt_store)
+
 if dflt_cache is not None:
-  progress("push cache store %s" % dflt_cache)
+  ##progress("push cache store %s" % dflt_cache)
   C=Store(dflt_cache)
   S=CacheStore(S,C)
 
 # put an in-memory cache in front of the main cache
-##S=CacheStore(S,MemCacheStore())
-progress("S=%s"%S)
+if useMemCache:
+  S=CacheStore(S,MemCacheStore())
+
+##progress("S=%s"%S)
 
 def gethexarg(path):
   slash=path.find('/')
