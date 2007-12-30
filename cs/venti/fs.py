@@ -44,6 +44,9 @@ class FS:
         filepath=os.path.join(dirpath,subfile)
         try:
           st=os.stat(filepath)
+        except OSError, e:
+          cmderr("%s: stat: %s" % (filepath,e))
+          continue
         except IOError, e:
           cmderr("%s: stat: %s" % (filepath,e))
           continue
