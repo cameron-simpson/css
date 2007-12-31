@@ -110,6 +110,9 @@ class FuncQueue(Queue):
     import atexit
     atexit.register(self.close)
     Thread(target=self.__runQueue).start()
+  def put(self,item):
+    assert not self.__closing
+    Queue.put(self,item)
   def close(self):
     self.__closing=True
     self.put((None,None))
