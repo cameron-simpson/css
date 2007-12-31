@@ -16,9 +16,12 @@ class CacheStore(BasicStore):
     BasicStore.__init__(self,"Cache(cache=%s,backend=%s)"%(cache,backend))
     self.backend=backend
     self.cache=cache
+    # secondary queue to process background self.backend operations
+    self.backQ=FuncQueue()
 
   def close(self):
     BasicStore.close(self)
+    self.backQ.close()
     self.backend.close()
     self.cache.close()
 
@@ -34,7 +37,9 @@ class CacheStore(BasicStore):
     ch.put((tag,h))
     ##progress("stored %s in cache" % tohex(h))
     if h not in self.backend:
-      self.backend.store(block)
+      self.backQ.put(self.__store_bg2,(block,))
+  def __store_bg2(self,block):
+    self.backend.store(block)
 
   def fetch_a(self,h,tag=None,ch=None):
     if tag is None: tag=seq()
@@ -51,8 +56,10 @@ class CacheStore(BasicStore):
       block=self.backend[h]
     ch.put((tag,block))
     if not inCache:
-      ##progress("fetch: cache %s in %s"%(tohex(h),self.cache))
-      self.cache.store(block)
+      self.backQ.put(self.__fetch_bg2,(block,))
+  def __fetch_bg2(self,block):
+    ##progress("fetch: cache %s in %s"%(tohex(h),self.cache))
+    self.cache.store(block)
 
   def haveyou_a(self,h,tag=None,ch=None):
     if tag is None: tag=seq()
