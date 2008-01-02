@@ -506,7 +506,7 @@ else:
 S.close()
 debug("%s: exit main command"%cmd)
 
-# =head1
+# =head1 EXAMPLES
 #
 # Run a daemon for a master store:
 #
@@ -535,7 +535,8 @@ debug("%s: exit main command"%cmd)
 #  export VT_STORE VT_STORE_CACHE
 #  vt command...
 #
-# This last is more efficient, but has the downside that only one command can
+# This last has more efficient operations at the price of a larger startup
+# latency (the ssh connection) and the downside that only one command can
 # use the cache store at a time because it is not a sharable data structure
 # except via a vt daemon.
 #
@@ -544,7 +545,7 @@ debug("%s: exit main command"%cmd)
 # The in-memory cache leaks.
 # The TODO list is very long.
 # The command does not cope well with an incomplete store if it traverses into the missing portion;
-# one example is using the cache without the more complete backend master store.
+# one example is using a cache without the more complete backend master store.
 #
 # =head1 ENVIRONMENT VARIABLES
 #
