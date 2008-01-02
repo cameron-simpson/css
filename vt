@@ -17,8 +17,7 @@
 #   vt [options...] scan datafile
 #   vt [options...] pack paths...
 #   vt [options...] pack -o file.vt path
-#   vt [options...] unpack -
-#   vt [options...] unpack file.vt
+#   vt [options...] unpack dirrefs...
 #
 # =head1 DESCRIPTION
 #
@@ -85,7 +84,7 @@ for (opt,val) in opts:
   # =item B<-C> I<store>
   #
   # Specify a caching store.
-  # The special name "-" means no caching stope should be used.
+  # The special name "-" means no caching store should be used.
   # If B<-C> is not used
   # the environment variable B<VT_STORE_CACHE> may specify the caching store.
   #
@@ -184,9 +183,9 @@ else:
     #
     # Start a vt daemon.
     #
-    # The argument "-" specifie a single use daemon reading vt requests from
+    # The argument "-" specifies a single use daemon reading vt requests from
     # its standard input and writing replies to its standard output,
-    # as it might run from inetd(8) or xinetd(8).
+    # as it might run from inetd(8) or xinetd(8), or directly from a proxy shell command.
     #
     # An argument of the form I<host>B<:>I<port> specifies that the daemon
     # should listen on the specified I<host> address and I<port> for connections.
@@ -507,6 +506,46 @@ else:
 S.close()
 debug("%s: exit main command"%cmd)
 
+# =head1
+#
+# Run a daemon for a master store:
+#
+#  vt -C - -M -S /var/spool/venti listen :9999
+#
+# Store a directory in that store:
+#
+#  vt -S tcp:127.0.0.1:9999 vt pack directory-name
+#
+# Run a local store on a roaming laptop with internet connectivity,
+# pushing updates back to the master store, keeping a local on-disc cache
+# in B<~/.venti/store>:
+#
+#  vt -C ~/.venti/store -M -S '|exec ssh home-server exec nc 127.0.0.1 9999' listen 9999
+#
+# Use the store on the roaming laptop via the local daemon:
+#
+#  VT_STORE=tcp:127.0.0.1:9999
+#  export VT_STORE
+#  vt command...
+#
+# Use the remote store and local cache without an intermediate daemon:
+#
+#  VT_STORE='|exec ssh home-server exec nc 127.0.0.1 9999'
+#  VT_STORE_CACHE=$HOME/.venti/store
+#  export VT_STORE VT_STORE_CACHE
+#  vt command...
+#
+# This last is more efficient, but has the downside that only one command can
+# use the cache store at a time because it is not a sharable data structure
+# except via a vt daemon.
+#
+# =head1 BUGS
+#
+# The in-memory cache leaks.
+# The TODO list is very long.
+# The command does not cope well with an incomplete store if it traverses into the missing portion;
+# one example is using the cache without the more complete backend master store.
+#
 # =head1 ENVIRONMENT VARIABLES
 #
 # B<VT_STORE>, the default store to use.
