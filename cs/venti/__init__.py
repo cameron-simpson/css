@@ -12,8 +12,12 @@
           BUG: MemCacheStore leaks! dict never cleaned up?
           StreamDaemon: defer fp.flush() to main loop, conditional on
             no pending requests.
+          "vt push targetStore"
+          "vt pull sourceStore"
           Prefetch multiple blocks, eg from an iblock.
             Scatter/gather wrapper?
+            With progressive yeild of blocks in order
+          "vt scan" - don't open -S/-C stores
           sync() on stream/tcp close
           rolling hash
             augment with assorted recognition strings by hash
