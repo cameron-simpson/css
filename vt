@@ -48,8 +48,7 @@ usage='''Usage:
   %s [options...] scan datafile
   %s [options...] pack paths...
   %s [options...] pack -o file.vt path
-  %s [options...] unpack -
-  %s [options...] unpack file.vt
+  %s [options...] unpack dirrefs...
   Options:
     -C store    Use this as a front end cache store.
                 "-" means no front end cache.
@@ -58,7 +57,7 @@ usage='''Usage:
                   /path/to/dir  GDBMStore
                   tcp:host:port TCPStore
                   |sh-command   StreamStore via sh-command
-''' % (cmd,cmd,cmd,cmd,cmd,cmd,cmd,cmd,cmd,cmd)
+''' % (cmd,cmd,cmd,cmd,cmd,cmd,cmd,cmd,cmd)
 
 badopts=False
 
@@ -117,7 +116,7 @@ for (opt,val) in opts:
 #
 # =head1 Store Names
 #
-# Three store names are supported at present:
+# Three of four planned store names are supported at present:
 #
 # =over 4
 #
@@ -189,7 +188,7 @@ else:
     # its standard input and writing replies to its standard output,
     # as it might run from inetd(8) or xinetd(8).
     #
-    # An argument of the form I<host>B:>I<port> specifies that the daemon
+    # An argument of the form I<host>B<:>I<port> specifies that the daemon
     # should listen on the specified I<host> address and I<port> for connections.
     # if I<host> is omitted it defaults to B<127.0.0.1>.
     #
@@ -507,3 +506,18 @@ else:
 
 S.close()
 debug("%s: exit main command"%cmd)
+
+# =head1 ENVIRONMENT VARIABLES
+#
+# B<VT_STORE>, the default store to use.
+#
+# B<VT_STORE_CACHE>, a default cache store.
+#
+# =head1 SEE ALSO
+#
+# The Venti file storage system: http://en.wikipedia.org/wiki/Venti
+#
+# =head1 AUTHOR
+#
+# Cameron Simpson E<lt>cs@zip.com.auE<gt>
+#
