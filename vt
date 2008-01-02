@@ -3,6 +3,30 @@
 # Command script for venti-ish implementation.
 #       - Cameron Simpson <cs@zip.com.au> 01may2007
 #
+# =head1 NAME
+#
+# vt - access vt stores, a venti-like content addressed storage pool
+#
+# =head1 SYNOPSIS
+#
+#   vt [options...] cat filerefs...
+#   vt [options...] catblock [-i] hashcodes...
+#   vt [options...] listen port
+#   vt [options...] ls [-R] dirrefs...
+#   vt [options...] mount dirref mountpoint
+#   vt [options...] scan datafile
+#   vt [options...] pack paths...
+#   vt [options...] pack -o file.vt path
+#   vt [options...] unpack -
+#   vt [options...] unpack file.vt
+#
+# =head1 DESCRIPTION
+#
+# I<vt> is a command accessing vt stores in various ways.
+#
+# A store is a content addressed pool of blocks
+# with a filesystem abstraction layered on top of it.
+#
 
 from sys import argv, exit, stdin, stderr, stdout, exit
 import os
@@ -54,30 +78,163 @@ except GetoptError, e:
   cmderr("unrecognised option: %s: %s"% (e.opt, e.msg))
   badopts=True
 
+# =head1 OPTIONS
+#
+# =over 4
+#
 for (opt,val) in opts:
+  # =item B<-C> I<store>
+  #
+  # Specify a caching store.
+  # The special name "-" means no caching stope should be used.
+  # If B<-C> is not used
+  # the environment variable B<VT_STORE_CACHE> may specify the caching store.
+  #
   if opt == '-C':
     if val == '-':
       dflt_cache=None
     else:
       dflt_cache=val
+  # =item B<-M>
+  #
+  # Do not use the in-memory caching store.
+  # Default is to place an in-memory cache ahead of the other stores.
+  #
   elif opt == '-M':
     useMemCache=False
+  # =item B<-S> I<store>
+  #
+  # Use the specified I<store>.
+  # If B<-S> is not used
+  # the environment variable B<VT_STORE> specifies the store.
+  #
   elif opt == '-S':
     dflt_vt_store=val
   else:
     assert False, "unsupported option: %s" % opt
 
+# =back
+#
+# =head1 Store Names
+#
+# Three store names are supported at present:
+#
+# =over 4
+#
+# =item B</>I<pathname>
+#
+# A full path to a directory specifies a local filesystem store
+# in the directory B</>I<pathname>.
+#
+# =item B<tcp:>I<host>B<:>I<port>
+#
+# A name commencing with B<tcp:> specifies a TCP connection to a vt daemon
+# listening on the specified I<host> and I<port>.
+#
+# =item B<unix:/>I<pathname>
+#
+# B<UNIMPLEMENTED>.
+# A name commencing with B<unix:> specifies the pathname of a UNIX domain socket
+# on which a vt daemon is listening.
+#
+# =item B<|>I<shell-command>
+#
+# A name commencing with shell pipe symbol specifies a proxy command
+# to connect to a vt daemon. The command string is handed to B</bin/sh>
+# and should accept vt requests on standard input and write vt responses to
+# standard output.
+#
+# =back
+#
+
 if len(args) < 1:
   cmderr("missing command")
   badopts=True
 else:
+  # =head1 COMMANDS
+  #
+  # =over 4
+  #
   op=args.pop(0)
   setcmd("%s: %s" % (cmd,op))
-  if op == "store":
+  if op == "cat":
+    # =item B<cat> I<filerefs...>
+    #
+    # Emit the data content of the supplied I<filerefs> on the standard output.
+    #
     if len(args) < 1:
-      cmderr("missing pathnames")
+      cmderr("missing filerefs")
+      badopts=True
+  elif op == "catblock":
+    # =item B<catblock> [B<-i>] I<hashcodes...>
+    #
+    # Emit the content of the blocks specified by the supplied I<hashcodes>.
+    # If the B<-i> (indirect) option is supplied,
+    # consider the hashcode to specify an indirect block and emit
+    # the data content of the leaf blocks.
+    #
+    indirect=False
+    if len(args) > 0 and args[0] == "-i":
+      indirect=True
+      args.pop(0)
+    if len(args) < 1:
+      cmderr("missing hashcodes")
+      badopts=True
+  elif op == "listen":
+    # =item B<listen> {B<->|[I<host>]B<:>I<port>}
+    #
+    # Start a vt daemon.
+    #
+    # The argument "-" specifie a single use daemon reading vt requests from
+    # its standard input and writing replies to its standard output,
+    # as it might run from inetd(8) or xinetd(8).
+    #
+    # An argument of the form I<host>B:>I<port> specifies that the daemon
+    # should listen on the specified I<host> address and I<port> for connections.
+    # if I<host> is omitted it defaults to B<127.0.0.1>.
+    #
+    if len(args) != 1:
+      cmderr("expected a port")
+      badopts=True
+  elif op == "ls":
+    # =item B<ls> [B<-R>] I<dirrefs...>
+    #
+    # Do a directory listing of the specified I<dirrefs>.
+    # The B<-R> (recursive) option requests a recurive directory listing.
+    #
+    recurse=False
+    if len(args) > 0 and args[0] == "-R":
+      recurse=True
+      args.pop(0)
+    if len(args) < 1:
+      cmderr("missing dirrefs")
+      badopts=True
+  elif op == "mount":
+    # =item B<mount> I<dirref> I<mountpoint>
+    #
+    # B<INCOMPLETE>.
+    # Mount the specified I<dirref> as on the specified I<mountpoint> directory.
+    # Requires FUSE support.
+    #
+    if len(args) != 2:
+      cmderr("expected dirref and mountpoint")
       badopts=True
   elif op == "pack":
+    # =item B<pack> {B<-o> I<file.vt> I<pathname> | I<pathnames...>}
+    #
+    # Store each specified I<pathname> in the store.
+    #
+    # With the B<-o> (output) option, store a single pathname
+    # in the store and record the resulting I<dirref> in the file I<file.vt>.
+    # If the file I<file.vt> already exists,
+    # do an incremental store against the last I<dirref> currently stored in the I<file.vt>;
+    # files with the same size and mtime in I<pathname> as in their copies in the store
+    # are not opened - they are presumed to be unchanged.
+    # This is similar to the vac(1) command in the Venti system.
+    #
+    # Without the B<-o> option,
+    # each I<pathname> is stored and the resulting I<dirref> reported on the standard output.
+    #
     if len(args) > 0 and args[0] == "-o":
       if len(args) < 2:
         cmderr("-o: missing file.vt")
@@ -91,45 +248,34 @@ else:
     elif len(args) < 1:
       cmderr("missing paths")
       badopts=True
-  elif op == "cat":
-    if len(args) < 1:
-      cmderr("missing filerefs")
-      badopts=True
-  elif op == "catblock":
-    indirect=False
-    if len(args) > 0 and args[0] == "-i":
-      indirect=True
-      args.pop(0)
-    if len(args) < 1:
-      cmderr("missing hashcodes")
-      badopts=True
   elif op == "scan":
+    # =item B<scan> I<datafile>
+    #
+    # Read the specified I<datafile> as a vt block storage file,
+    # a sequence of compressed data blocks.
+    # Report on standard output
+    # the block hashcode, I<datafile> file offset and compressed size.
+    #
     if len(args) != 1:
       cmderr("missing datafile")
       badopts=True
-  elif op == "listen":
-    if len(args) != 1:
-      cmderr("expected a port")
-      badopts=True
-  elif op == "ls":
-    recurse=False
-    if len(args) > 0 and args[0] == "-R":
-      recurse=True
-      args.pop(0)
+  elif op == "unpack":
+    # =item B<unpack> I<dirrefs...>
+    #
+    # Unpack the directory specified by each I<dirref> into the current working directory.
+    # This is the inverse of the B<pack> command.
+    # Currently, to unpack a B<.vt> file the most succinct command is this:
+    #
+    #   vt unpack `awk '{ hash=$1 } END { print hash }' file.vt`
+    #
     if len(args) < 1:
       cmderr("missing dirrefs")
-      badopts=True
-  elif op == "mount":
-    if len(args) != 2:
-      cmderr("expected dirref and mountpoint")
-      badopts=True
-  elif op == "unpack":
-    if len(args) != 1:
-      cmderr("expected exactly one dirref")
       badopts=True
   else:
     cmderr("unrecognised command")
     badopts=True
+  # =back
+  #
 
 if dflt_vt_store is None:
   if op != "scan":
