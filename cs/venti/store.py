@@ -62,8 +62,10 @@ class BasicStore:
     self.Q.put((self.__store_bg,(block,tag,ch)))
     return ch
   def __store_bg(self,block,tag,ch):
-    h=self.store(block)
+    h=self.hash(block)
     ch.put((tag,h))
+    h2=self.store(block)
+    assert h == h2, "hash(block)=%s, %s.store() returns %s" % (h, self, h2)
   def fetch(self,h):
     ''' Fetch a block given its hash.
     '''

@@ -37,7 +37,7 @@ class CacheStore(BasicStore):
     ch.put((tag,h))
     ##progress("stored %s in cache" % tohex(h))
     if h not in self.backend:
-      self.backQ.put(self.__store_bg2,(block,))
+      self.backQ.put((self.__store_bg2,(block,)))
   def __store_bg2(self,block):
     self.backend.store(block)
 
@@ -56,7 +56,7 @@ class CacheStore(BasicStore):
       block=self.backend[h]
     ch.put((tag,block))
     if not inCache:
-      self.backQ.put(self.__fetch_bg2,(block,))
+      self.backQ.put((self.__fetch_bg2,(block,)))
   def __fetch_bg2(self,block):
     ##progress("fetch: cache %s in %s"%(tohex(h),self.cache))
     self.cache.store(block)

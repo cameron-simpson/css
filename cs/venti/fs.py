@@ -4,13 +4,22 @@
 #       - Cameron Simpson <cs@zip.com.au> 01dec2007
 #
 
-from cs.misc import toBS, fromBS, fromBSfp, progress, verbose, warn, cmderr, debug
+from pwd import getpwnam
+from grp import getgrnam
+import stat
+from cs.misc import toBS, fromBS, fromBSfp, progress, verbose, warn, cmderr, debug, seq
 from cs.venti.file import ReadFile, WriteFile, storeFile
 from cs.venti.blocks import decodeBlockRefFP
 
 T_FILE=0
 T_DIR=1
 T_SYMLINK=2
+
+try:             uid_nobody=getpwnam('nobody')[2]
+except KeyError: uid_nobody=65534
+
+try:             gid_nogroup=getgrnam('nogroup')[2]
+except KeyError: gid_nogroup=65534
 
 class FS:
   def __init__(self,S,rootBref=None):
@@ -274,7 +283,7 @@ def decodeDirent(fp):
   else:
     mencode=fp.read(metalen)
     assert len(mencode) == metalen
-    meta=decodeMeta(mencode)
+    meta=Meta(mencode)
   if type == T_FILE or type == T_DIR:
     dref=decodeBlockRefFP(fp)
     assert dref is not None, \
@@ -289,6 +298,7 @@ class Dirent:
     self.d_type=type
     self.d_dref=dataRef
     self.d_meta=meta
+    self.d_ino=None
 
   def __str__(self):
     return "<%s %s %s>" \
@@ -306,42 +316,77 @@ class Dirent:
   def bref(self):
     return self.d_dref
 
+  def meta(self):
+    if self.d_meta is None:
+      self.d_meta=Meta()
+    return self.d_meta
+
   def size(self):
     return self.bref().span
 
   def mtime(self,newtime=None):
     if newtime is not None:
-      if self.d_meta is None:
-        self.d_meta=Meta()
-      self.d_meta['mtime']=newtime
+      self.meta()['mtime']=newtime
       return
     if self.d_meta is None:
       return 0
     return self.d_meta.get('mtime',0)
 
-def decodeMeta(s):
-  M=Meta()
-  for line in s.split('\n'):
-    line=line.strip()
-    if len(line) == 0 or line[0] == '#':
-      continue
-    k,v = line.split(':',1)
-    if k in ('mtime',):
-      v=float(v)
-    M[k]=v
-  return M
+  def stat(self):
+    meta=self.meta()
+    user, group, unixmode = meta.unixPerms()
+    if user is None:
+      uid=uid_nobody
+    else:
+      try:             uid=getpwnam(user)[2]
+      except KeyError: uid=uid_nobody
+
+    if group is None:
+      gid=gid_nogroup
+    else:
+      try:             gid=getpwnam(user)[2]
+      except KeyError: gid=gid_nogroup
+
+    if self.d_type == T_DIR:
+      unixmode|=stat.S_IFDIR
+    else:
+      unixmode|=stat.S_IFREG
+
+    if self.d_ino is None:
+      self.d_ino=seq()
+    ino=self.d_ino
+
+    dev=0       # FIXME: we're not hooked to a FS?
+    nlink=1
+    size=self.size()
+    atime=0
+    mtime=self.mtime()
+    ctime=0
+
+    return (unixmode, ino, dev, nlink, uid, gid, size, atime, mtime, ctime)
 
 class Meta(dict):
   ''' Metadata:
         mtime:unix-seconds(int or float)
-        u:login:perms-perms
-        g:group:perms-perms
-        *:perms-perms
-        acl:hash-of-encoded-Meta
-        acl:/path/to/encoded-Meta
+        acl:ac,...
+          ac:
+            u:login:perms-perms
+            g:group:perms-perms
+            *:perms-perms
+        ? acl:hash-of-encoded-Meta
+        ? acl:/path/to/encoded-Meta
   '''
-  def __str__(self):
-    return "[%s]" % self.encode().replace('\n',';')
+  def __init__(self,s=None):
+    if s is not None:
+      for line in s.split('\n'):
+        line=line.strip()
+        if len(line) == 0 or line[0] == '#':
+          continue
+        if line.find(':') < 1:
+          cmderr("bad metadata line (no colon): %s" % line)
+        else:
+          k,v = line.split(':',1)
+          self[k]=v
 
   def encode(self):
     from StringIO import StringIO
@@ -350,9 +395,76 @@ class Meta(dict):
     return fp.getvalue()
 
   def encodeFP(self,fp):
-    for t in ('mtime',):
-      if t in self:
-        fp.write("%s:%d\n" % (t, self[t]))
-    for k in self.keys():
-      if k not in ('mtime',):
-        fp.write("%s:%s\n" % (k, self[k]))
+    for var, val in self:
+      fp.write("%s:%s\n" % (var,val))
+
+  def unixPerms(self):
+    ''' Return (user,group,unix-mode-bits).
+        The user and group are strings, not uid/gid.
+        For ACLs with more than one user or group this is only an approximation,
+        keeping the permissions for the frontmost user and group.
+    '''
+    user=None
+    uperms=0
+    group=None
+    gperms=0
+    operms=0
+    acl=[self['acl'].split(',') if 'acl' in self else ()]
+    acl.reverse()
+    for ac in acl:
+      if len(ac) > 0:
+        if ac.startswith('u:'):
+          login, perms = ac[2:].split(':',1)
+          if login != user:
+            user=login
+            uperms=0
+          if '-' in perms:
+            add, sub = perms.split('-',1)
+          else:
+            add, sub = perms, ''
+          for a in add:
+            if a == 'r':   uperms|=4
+            elif a == 'w': uperms|=2
+            elif a == 'x': uperms|=1
+            elif a == 's': uperms|=32
+          for s in sub:
+            if s == 'r':   uperms&=~4
+            elif s == 'w': uperms&=~2
+            elif s == 'x': uperms&=~1
+            elif s == 's': uperms&=~32
+        elif ac.startswith('g:'):
+          gname, perms = ac[2:].split(':',1)
+          if gname != group:
+            group=gname
+            gperms=0
+          if '-' in perms:
+            add, sub = perms.split('-',1)
+          else:
+            add, sub = perms, ''
+          for a in add:
+            if a == 'r':   gperms|=4
+            elif a == 'w': gperms|=2
+            elif a == 'x': gperms|=1
+            elif a == 's': gperms|=128
+          for s in sub:
+            if s == 'r':   gperms&=~4
+            elif s == 'w': gperms&=~2
+            elif s == 'x': gperms&=~1
+            elif s == 's': gperms&=~128
+        elif ac.startswith('*:'):
+          perms = ac[2:]
+          if '-' in perms:
+            add, sub = perms.split('-',1)
+          else:
+            add, sub = perms, ''
+          for a in add:
+            if a == 'r':   operms|=4
+            elif a == 'w': operms|=2
+            elif a == 'x': operms|=1
+            elif a == 't': operms|=512
+          for s in sub:
+            if s == 'r':   operms&=~4
+            elif s == 'w': operms&=~2
+            elif s == 'x': operms&=~1
+            elif s == 't': operms&=~512
+    return (user,group,(uperms<<6)+(gperms<<3)+operms)

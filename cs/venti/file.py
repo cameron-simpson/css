@@ -5,6 +5,7 @@
 
 from cs.venti import MAX_BLOCKSIZE, hash_sha, tohex
 from cs.venti.blocks import BlockList
+from cs.misc import debug
 
 def open(S,mode="r",bref=None):
   ''' Obtain a file object open for read or write.
@@ -20,12 +21,18 @@ def storeFile(S,ifp,rsize=None,findEdge=None):
   ''' Store the data from ifp, return BlockRef.
   '''
   if rsize is None: rsize=8192
+  debug("1")
   ofp=WriteFile(S,findEdge)
+  debug("2")
   buf=ifp.read(rsize)
+  debug("2a: buf=[%s]" % buf)
   while len(buf) > 0:
     ofp.write(buf)
     buf=ifp.read(rsize)
+    debug("2b: buf=[%s]" % buf)
+  debug("3")
   ref=ofp.close()
+  debug("stored, ref=%s" % ref)
   S.log("store file %s %s" % (tohex(ref.encode()), ifp.name))
   return ref
 

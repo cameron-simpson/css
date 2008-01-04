@@ -5,7 +5,7 @@
 #
 # =head1 NAME
 #
-# vt - access vt stores, a venti-like content addressed storage pool
+# vt - access vt stores, a Venti-like content addressed storage pool
 #
 # =head1 SYNOPSIS
 #
@@ -32,6 +32,7 @@ import os
 import os.path
 import atexit
 from getopt import getopt, GetoptError
+import datetime
 from cs.venti import tohex, fromhex
 from cs.venti.store import Store
 from cs.venti.cache import CacheStore, MemCacheStore
@@ -341,6 +342,20 @@ def vtopen(path, mode='r', domkdir=False):
   import cs.venti.file
   return cs.venti.file.open(S,mode,bref)
 
+def lsDirent(fp,E,name):
+  bref=E.bref()
+  st=E.stat()
+  print "st=%s" % (st,)
+  st_mode, st_ino, st_dev, st_nlink, st_uid, st_gid, st_size, \
+    st_atime, st_mtime, st_ctime = st
+  print "st_mtime=%s" % `st_mtime`
+  print "st_size=%s" % `st_size`
+  print "name=%s" % `name`
+  t=datetime.datetime.fromtimestamp(int(st_mtime))
+  fp.write("%c %-41s %s %-6d %s\n" \
+           % (('d' if D.isdir(name) else 'f'),
+              bref, t, st_size, name))
+
 def ls(path,D,recurse,fp=None):
   if fp is None:
     fp=stdout
@@ -352,15 +367,13 @@ def ls(path,D,recurse,fp=None):
     names.sort()
     for name in names:
       E=D[name]
-      bref=E.bref()
-      fp.write("%c %-41s %-6d %s\n" % (('d' if D.isdir(name) else 'f'), bref, bref.span, name))
+      lsDirent(fp,E,name)
   else:
     dirs=D.dirs(); dirs.sort()
     files=D.files(); files.sort()
     for name in files:
       E=D[name]
-      bref=E.bref()
-      fp.write("%c %-41s %-6d %s\n" % (('d' if D.isdir(name) else 'f'), bref, bref.span, name))
+      lsDirent(fp,E,name)
       assert not D.isdir(name), name+" should not be a directory!"
     for name in dirs:
       fp.write("\n")
@@ -376,7 +389,7 @@ def cat(path,fp=None):
     for b in bref.leaves(S):
       fp.write(b)
 
-def storePath(path,targetRef=None,ignoreTimes=False,deleteMissing=False,overWrite=False):
+def storeDir(path,targetRef=None,ignoreTimes=False,deleteMissing=False,overWrite=False):
   from cs.venti.fs import FS
   import cs.venti.store
   assert isinstance(S, cs.venti.store.BasicStore), "S=%s"%S
@@ -388,8 +401,12 @@ def storePath(path,targetRef=None,ignoreTimes=False,deleteMissing=False,overWrit
 
 if op == "pack":
   if len(args) == 0 or args[0] != '-o':
+    from cs.venti.file import storeFile
     for path in args:
-      ref=storePath(path)
+      if os.path.isdir(path):
+        ref=storeDir(path)
+      else:
+        ref=storeFile(S,open(path)).sync()
       stdout.write(tohex(ref.encode()))
       if len(args) > 1:
         stdout.write('\t')
@@ -415,7 +432,8 @@ if op == "pack":
         hexarg=words[0]
       if hexarg is not None:
         target=str2BlockRef(fromhex(hexarg))
-    saved=storePath(path,targetRef=target,ignoreTimes=False,deleteMissing=True,overWrite=True)
+    assert os.path.isdir(path)
+    saved=storeDir(path,targetRef=target,ignoreTimes=False,deleteMissing=True,overWrite=True)
     open(archive,mode='a').write("%s %s %s\n" % (saved, datetime.datetime.now(), path))
 
 elif op == "cat":

@@ -114,8 +114,8 @@ class FuncQueue(Queue):
     assert not self.__closing
     Queue.put(self,item)
   def close(self):
-    self.__closing=True
-    self.put((None,None))
+    if not self.__closing:
+      self.put((None,None))
   def __runQueue(self):
     ''' A thread to process queue items serially.
         This exists to permit easy or default implementation if the *_a()
@@ -125,8 +125,11 @@ class FuncQueue(Queue):
     '''
     while not self.__closing or not self.empty():
       func, args = self.get(True,None)
-      if func is not None:
-        func(*args)
+      if func is None:
+        self.__closing=True
+        break
+      func(*args)
+    assert self.empty()
 
 ''' A pool of Channels.
 '''

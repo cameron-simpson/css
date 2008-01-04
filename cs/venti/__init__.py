@@ -3,6 +3,8 @@
 ''' A data store after the style of the Venti scheme:
       http://library.pantek.com/general/plan9.documents/venti/venti.html
     but supporting variable sized blocks and arbitrary sizes.
+    Man page:
+      http://www.cskk.ezoshosting.com/cs/css/manuals/vt.1.html
     See also the Plan 9 Venti support manual pages:
       http://swtch.com/plan9port/man/man7/venti.html
     and the Wikipedia entry:

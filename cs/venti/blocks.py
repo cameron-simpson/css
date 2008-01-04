@@ -6,7 +6,7 @@
 #               An indirect block is a list of encoded BlockRefs.
 #
 
-from cs.misc import toBS, fromBS, fromBSfp, warn
+from cs.misc import toBS, fromBS, fromBSfp, warn, cmderr
 from cs.venti import MAX_SUBBLOCKS, tohex
 import cs.venti.store
 
@@ -144,6 +144,11 @@ class BlockList(list):
 
     b_h, roffset = self.__seekToBlock(offset)
     if b_h is not None:
+      try:
+        blk = self.__store[b_h]
+      except KeyError, e:
+        cmderr("%s: not in store %s" % (tohex(b_h), self.__store))
+        return None, offset-roffset
       self.__pos=(b_h, offset-roffset, len(self.__store[b_h]))
     return b_h, roffset
 
