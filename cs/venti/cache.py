@@ -4,7 +4,9 @@
 #       - Cameron Simpson <cs@zip.com.au> 07dec2007
 #
 
-from cs.misc import seq, progress, verbose
+from __future__ import with_statement
+from threading import BoundedSemaphore
+from cs.misc import seq, progress, verbose, debug
 from cs.threads import FuncQueue, Q1
 from cs.venti import tohex
 from cs.venti.store import BasicStore
@@ -94,41 +96,51 @@ class MemCacheStore(BasicStore):
     self.low=0                    # offset to oldest hash
     self.used=0
     self.hmap={}                  # cached h->(count,block) tuples
+    self.memCacheLock=BoundedSemaphore(1)
 
   def _hit(self,h,block):
+    assert type(h) is str, "_hit(%s) - not a string" % h
     hmap=self.hmap
     hlist=self.hashlist
     hlen=len(hlist)
+
     if self.used >= hlen:
       # empty a slot
-      h=self.hashlist[self.low]
-      hits=hmap[h][0]
+      oldh=self.hashlist[self.low]
+      assert oldh in hmap, "%s not in hmap" % tohex(h)
+      hits=hmap[oldh][0]
       if hits <= 1:
-        del hmap[h]
+        del hmap[oldh]
       else:
-        hmap[h][0]-=1
+        hmap[oldh][0]-=1
       self.low=(self.low+1)%len(hlist)
       self.used-=1
+
     if h in self.hmap:
       self.hmap[h][0]+=1
     else:
       self.hmap[h]=[1,block]
-    high=(self.low+self.used)%hlen
     self.used+=1
+    high=(self.low+self.used)%hlen
+    hlist[high]=h
 
   def store(self,block):
-    h=self.hash(block)
-    self._hit(h,block)
+    with self.memCacheLock:
+      h=self.hash(block)
+      self._hit(h,block)
     return h
 
   def haveyou(self,h):
-    return h in self.hmap
+    with self.memCacheLock:
+      yesno=h in self.hmap
+    return yesno
 
   def fetch(self,h):
     if h not in self:
       return None
-    block=self.hmap[h][1]
-    self._hit(h,block)
+    with self.memCacheLock:
+      block=self.hmap[h][1]
+      self._hit(h,block)
     return block
 
   def sync(self):
