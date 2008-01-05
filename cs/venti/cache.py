@@ -90,60 +90,46 @@ class MemCacheStore(BasicStore):
   def __init__(self,max=1024):
     BasicStore.__init__(self,"MemCacheStore")
     assert max > 1
-    self.max=max
-    self.heap=[]
-    self.hmap={}
-    self.hcount={}
+    self.hashlist=[None for i in range(max)]
+    self.low=0                    # offset to oldest hash
+    self.used=0
+    self.hmap={}                  # cached h->(count,block) tuples
 
-  def _stash(self,hits,h,block):
-    assert hits >= 0
-    assert h is not None
-    assert block is not None
-    heap=self.heap
+  def _hit(self,h,block):
     hmap=self.hmap
-
-    # make room
-    while len(heap) >= max:
-      tup=heappop(heap)
-      th=tup[1]
-      count=self.hcount[th]
-      if count == 1:
-        del hmap[th]
+    hlist=self.hashlist
+    hlen=len(hlist)
+    if self.used >= hlen:
+      # empty a slot
+      h=self.hashlist[self.low]
+      hits=hmap[h][0]
+      if hits <= 1:
+        del hmap[h]
       else:
-        self.hcount[th]=count-1
+        hmap[h][0]-=1
+      self.low=(self.low+1)%len(hlist)
+      self.used-=1
+    if h in self.hmap:
+      self.hmap[h][0]+=1
+    else:
+      self.hmap[h]=[1,block]
+    high=(self.low+self.used)%hlen
+    self.used+=1
 
-    hits+=1
-    tup=(hits, h, block)
-    self.hmap[h]=tup
-    heappush(heap, tup)
-    if h in self.hcount:
-      self.hcount[h]+=1
-    else:
-      self.hcount[h]=1
-    
   def store(self,block):
-    hmap=self.hmap
     h=self.hash(block)
-    if h in hmap:
-      hits, mh, mblock = self.hmap[h]
-      assert h == mh
-      assert block == mblock
-    else:
-      hits=0
-      mh=h
-      mblock=block
-    self._stash(hits, mh, mblock)
+    self._hit(h,block)
     return h
 
   def haveyou(self,h):
-    if h not in self.hmap:
-      return False
-    hits, h, mblock = self.hmap[h]
-    self._stash(hits, h, mblock)
-    return True
+    return h in self.hmap
 
   def fetch(self,h):
-    return self.hmap[h][2]
+    if h not in self:
+      return None
+    block=self.hmap[h][1]
+    self._hit(h,block)
+    return block
 
   def sync(self):
     pass
