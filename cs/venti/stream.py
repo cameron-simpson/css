@@ -8,7 +8,8 @@
 
 from __future__ import with_statement
 from threading import Thread, BoundedSemaphore
-from cs.misc import seq, toBS, fromBSfp, debug, ifdebug, tb, warn
+from Queue import Queue
+from cs.misc import seq, toBS, fromBSfp, debug, ifdebug, tb, warn, progress
 from cs.lex import unctrl
 from cs.threads import JobQueue, getChannel
 from cs.venti import tohex
@@ -62,7 +63,7 @@ class StreamDaemon:
     self.jobsLock=BoundedSemaphore(1)
     self.njobs=0
     self.jobsClosing=False
-    self.resultsCH=getChannel()
+    self.resultsCH=Queue(16)
     self.readerThread=_StreamDaemonRequestReader(self)
     self.resultsThread=_StreamDaemonResultsSender(self)
 
@@ -174,7 +175,13 @@ class _StreamDaemonResultsSender(Thread):
     jobsLock=self.daemon.jobsLock
     sendReplyFP=self.daemon.sendReplyFP
     draining=False
-    for rqTag, result in self.daemon.resultsCH:
+    written=0
+    while True:
+      if self.daemon.resultsCH.empty():
+        progress("flush sendReplyFP with %d requests" % written)
+        sendReplyFP.flush()
+        written=0
+      rqTag, result = self.daemon.resultsCH.get()
       debug("StreamDaemon: return result (%s, %s)" % (rqTag, result))
       with jobsLock:
         rqType=jobs[rqTag]
@@ -204,7 +211,7 @@ class _StreamDaemonResultsSender(Thread):
         pass
       else:
         assert False, "unhandled rqType(%s)" % rqType
-      sendReplyFP.flush()
+      written+=1
       debug("_StreamDaemonResultsSender: dequeue job %d" % rqTag)
       with jobsLock:
         del jobs[rqTag]
@@ -218,6 +225,8 @@ class _StreamDaemonResultsSender(Thread):
           jobTags.sort()
           for tag in jobTags:
             debug("  jobs[%d]=%s" % (tag, jobs[tag]))
+    progress("flush sendReplyFP")
+    sendReplyFP.flush()
     debug("END _StreamDaemonResultsSender")
 
 def encodeStore(fp,rqTag,block):
