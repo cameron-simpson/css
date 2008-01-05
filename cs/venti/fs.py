@@ -395,8 +395,8 @@ class Meta(dict):
     return fp.getvalue()
 
   def encodeFP(self,fp):
-    for var, val in self:
-      fp.write("%s:%s\n" % (var,val))
+    for var in self:
+      fp.write("%s:%s\n" % (var,self[var]))
 
   def unixPerms(self):
     ''' Return (user,group,unix-mode-bits).
