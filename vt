@@ -345,13 +345,13 @@ def vtopen(path, mode='r', domkdir=False):
 def lsDirent(fp,E,name):
   bref=E.bref()
   st=E.stat()
-  print "st=%s" % (st,)
+  ##print "st=%s" % (st,)
   st_mode, st_ino, st_dev, st_nlink, st_uid, st_gid, st_size, \
     st_atime, st_mtime, st_ctime = st
-  print "st_mtime=%s" % `st_mtime`
-  print "st_size=%s" % `st_size`
-  print "name=%s" % `name`
-  t=datetime.datetime.fromtimestamp(int(st_mtime))
+  ##print "st_mtime=%s" % `st_mtime`
+  ##print "st_size=%s" % `st_size`
+  ##print "name=%s" % `name`
+  t=datetime.datetime.fromtimestamp(int(float(st_mtime)))
   fp.write("%c %-41s %s %-6d %s\n" \
            % (('d' if D.isdir(name) else 'f'),
               bref, t, st_size, name))
@@ -376,7 +376,7 @@ def ls(path,D,recurse,fp=None):
       lsDirent(fp,E,name)
       assert not D.isdir(name), name+" should not be a directory!"
     for name in dirs:
-      fp.write("\n")
+      ##fp.write("\n")
       ls(os.path.join(path,name),D.chdir1(name),recurse,fp)
 
 def cat(path,fp=None):
