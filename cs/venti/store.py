@@ -11,7 +11,7 @@ import os.path
 import time
 from zlib import compress, decompress
 from cs.misc import cmderr, debug, warn, progress, verbose, out, fromBS, toBS, fromBSfp, tb, seq
-from cs.threads import FuncQueue, Q1
+from cs.threads import FuncQueue, Q1, DictMonitor
 from cs.venti import tohex
 from threading import Thread, BoundedSemaphore
 from Queue import Queue
@@ -19,7 +19,7 @@ from Queue import Queue
 class BasicStore:
   ''' Core functions provided by all Stores.
       For each of the core operations (store, fetch, haveyou, sync)
-      a subclass must define at least one of the op or op_bg methods.
+      a subclass must implement at least one of each of the op or op_bg methods.
   '''
   def __init__(self,name):
     self.name=name
@@ -31,13 +31,6 @@ class BasicStore:
 
   def __str__(self):
     return "Store(%s)" % self.name
-
-  def pullFrom(self,S2):
-    # TODO: write silky smooth async pull
-    for h in S2.scan():
-      if not self.haveyou(h):
-        warn("pull %s" % tohex(h))
-        self.store(S2.fetch(h))
 
   def close(self):
     if not self.closing:
@@ -127,11 +120,9 @@ class BasicStore:
     '''
     assert not self.closing
     ch=Q1()
-    debug("BS: haveyou_a calls self.haveyou_ch(h=%s,ch=%s)" % (h,ch))
     self.haveyou_ch(h,ch)
     return ch
   def haveyou_ch(self,h,ch,tag=None):
-    debug("BS: haveyou_ch(h=%s,ch=%s,tag=%s)" % (h,ch,tag))
     assert not self.closing
     if tag is None: tag=seq()
     self.Q.qfunc(self.haveyou_bg,h,tag,ch)
@@ -234,3 +225,74 @@ class Store(BasicStore):
     self.S.sync()
     if self.logfp is not None:
       self.logfp.flush()
+
+from cs.upd import out, nl
+
+def pullFromSerial(S1,S2):
+  asked=0
+  for h in S2.scan():
+    asked+=1
+    out("%d %s" % (asked,tohex(h)))
+    if not S1.haveyou(h):
+      S1.store(S2.fetch(h))
+def pullFrom(S1,S2):
+  haveyou_ch=Queue()
+  fetch_ch=Queue()
+  pending=DictMonitor()
+  watcher=Thread(target=_pullWatcher,args=(S1,S2,haveyou_ch,pending,fetch_ch))
+  watcher.start()
+  fetcher=Thread(target=_pullFetcher,args=(S1,fetch_ch))
+  fetcher.start()
+  asked=0
+  for h in S2.scan():
+    asked+=1
+    out("%d %s" % (asked,tohex(h)))
+    tag=seq()
+    pending[tag]=h
+    S1.haveyou_ch(h,haveyou_ch,tag)
+  nl('draining haveyou queue...')
+  haveyou_ch.put((None,asked))
+  watcher.join()
+  nl('draining fetch queue...')
+  fetcher.join()
+  out('')
+
+def _pullWatcher(S1,S2,ch,pending,fetch_ch):
+  closing=False
+  answered=0
+  fetches=0
+  while not closing or asked > answered:
+    tag, yesno = ch.get()
+    if tag is None:
+      asked=yesno
+      closing=True
+      continue
+    answered+=1
+    if closing:
+      left=asked-answered
+      if left % 10 == 0:
+        out(str(left))
+    h=pending[tag]
+    if not yesno:
+      fetches+=1
+      S2.fetch_ch(h,fetch_ch)
+      warn("requested %s" % tohex(h))
+    del pending[tag]
+  fetch_ch.put((None,fetches))
+
+def _pullFetcher(S1,ch):
+  closing=False
+  fetched=0
+  while not closing or fetches > fetched:
+    tag, block = ch.get()
+    if tag is None:
+      fetches=block
+      closing=True
+      continue
+    if closing:
+      left=fetches-fetched
+      if left % 10 == 0:
+        out(str(left))
+    fetched+=1
+    h=S1.store(block)
+    warn("stored %s" % tohex(h))

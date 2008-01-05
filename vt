@@ -35,7 +35,7 @@ import atexit
 from getopt import getopt, GetoptError
 import datetime
 from cs.venti import tohex, fromhex
-from cs.venti.store import Store
+from cs.venti.store import Store, pullFrom
 from cs.venti.cache import CacheStore, MemCacheStore
 from cs.misc import cmd, cmderr, setcmd, warn, debug, progress
 import cs.upd; cs.upd.default()
@@ -467,7 +467,7 @@ elif op == "scan":
 
 elif op == "pull":
   for arg in args:
-    S.pullFrom(Store(arg))
+    pullFrom(S,Store(arg))
 
 elif op == "listen":
   assert len(args) == 1

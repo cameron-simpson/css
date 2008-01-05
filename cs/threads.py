@@ -7,7 +7,7 @@
 from __future__ import with_statement
 from threading import Thread, BoundedSemaphore
 from Queue import Queue
-from cs.misc import debug, ifdebug, tb, cmderr
+from cs.misc import debug, ifdebug, tb, cmderr, warn
 
 class Channel:
   ''' A zero-storage data passage.
@@ -200,6 +200,26 @@ class Q1(Queue):
     item=Queue.get(self)
     _returnQ1(self)
     return item
+
+class DictMonitor(dict):
+  def __init__(self,I={}):
+    dict.__init__(self,I)
+    self.lock=BoundedSemaphore(1)
+  def __getitem__(self,k):
+    with self.lock:
+      v=dict.__getitem__(self,k)
+    return v
+  def __delitem__(self,k):
+    with self.lock:
+      v=dict.__delitem__(self,k)
+    return v
+  def __setitem__(self,k,v):
+    with self.lock:
+      dict.__setitem__(self,k,v)
+  def keys(self):
+    with self.lock:
+      ks = dict.keys(self)
+    return ks
 
 def bgCall(func,args,ch=None):
   ''' Spawn a thread to call the supplied function with the supplied
