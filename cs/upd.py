@@ -89,3 +89,6 @@ class Upd:
     if self.__backend is not None:
       self.out('')
       self.__backend=None
+
+  def closed(self):
+    return self.__backend == None

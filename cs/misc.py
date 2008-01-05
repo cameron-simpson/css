@@ -24,9 +24,10 @@ def warn(*args):
   global warnFlushesUpd
   if cs.upd.active:
     upd=cs.upd.default()
-    if not warnFlushesUpd:
-      oldUpd=upd.state()
-    upd.out('')
+    if not upd.closed():
+      if not warnFlushesUpd:
+        oldUpd=upd.state()
+      upd.out('')
 
   first=True
   for arg in args:
@@ -34,16 +35,15 @@ def warn(*args):
       first=False
     else:
       sys.stderr.write(' ')
-
     sys.stderr.write(str(arg))
-    sys.stderr.flush()
 
   sys.stderr.write("\n")
   sys.stderr.flush()
 
   if not warnFlushesUpd:
     if cs.upd.active:
-      upd.out(oldUpd)
+      if not upd.closed():
+        upd.out(oldUpd)
 
 # debug_level:
 #   0 - quiet
@@ -712,7 +712,7 @@ def fromBSfp(fp):
 
 def toBS(n):
   ''' Encode a value as an entensible octet sequence for decode by
-      getExtensibleOctets().
+      fromBS().
   '''
   s=chr(n&0x7f)
   n>>=7
