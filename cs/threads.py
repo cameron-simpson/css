@@ -7,7 +7,7 @@
 from __future__ import with_statement
 from threading import Thread, BoundedSemaphore
 from Queue import Queue
-from cs.misc import debug, ifdebug, tb
+from cs.misc import debug, ifdebug, tb, cmderr
 
 class Channel:
   ''' A zero-storage data passage.
@@ -118,8 +118,9 @@ class FuncQueue(Queue):
       self.put((None,None))
   def __runQueue(self):
     ''' A thread to process queue items serially.
-        This exists to permit easy or default implementation if the *_a()
-        methods, and is better suited to fast low latency stores.
+        This exists to permit easy or default implementation of the
+        cs.venti.store *_a() methods, and is better suited to fast
+        low latency stores.
         A highly parallel or high latency store will want its own
         thread scheme to manage multiple *_a() operations.
     '''
@@ -129,7 +130,10 @@ class FuncQueue(Queue):
         self.__closing=True
         break
       func(*args)
-    assert self.empty()
+    while not self.empty():
+      func, args = self.get(True,None)
+      if func is not None:
+        cmderr("warning: drained FuncQueue item after close: %s" % ((func, args),))
 
 ''' A pool of Channels.
 '''
