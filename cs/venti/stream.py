@@ -324,7 +324,6 @@ class StreamStore(BasicStore):
     return ch
   def haveyou_a(self,h,rqTag=None,ch=None):
     debug("%s: haveyou_a(%s)..." % (self,tohex(h)))
-    ##tb()
     if rqTag is None: rqTag=seq()
     ch=self.pending.enqueue(rqTag,ch)
     with self.sendLock:
