@@ -36,7 +36,7 @@ class CacheStore(BasicStore):
     self.backend.close()
     self.cache.close()
 
-  def store_bg(self,tag,block,ch):
+  def store_bg(self,block,tag,ch):
     h=self.cache.store(block)
     assert h is not None
     ch.put((tag,h))
@@ -46,7 +46,7 @@ class CacheStore(BasicStore):
   def __store_bg2(self,block):
     self.backend.store(block)
 
-  def fetch_bg(self,tag,h,ch):
+  def fetch_bg(self,h,tag,ch):
     inCache=(h in self.cache)
     if inCache:
       ##verbose("fetch %s from cache %s"%(tohex(h), self.cache))
@@ -61,7 +61,7 @@ class CacheStore(BasicStore):
     ##progress("fetch: cache %s in %s"%(tohex(h),self.cache))
     self.cache.store(block)
 
-  def haveyou_bg(self,tag,h,ch):
+  def haveyou_bg(self,h,tag,ch):
     if h in self.cache:
       yesno=True
     else:

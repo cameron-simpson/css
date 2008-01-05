@@ -62,8 +62,8 @@ class BasicStore:
     ''' Queue a block for storage, return a cs.threads.Q1 from which to
         read (tag,hash) when stored.
     '''
-    assert type(block) is str and type(tag) is int, \
-           "block=%s, tag=%s"%(block,tag)
+    assert type(block) is str, \
+           "block=%s"%(block,tag)
     assert not self.closing
     ch=Q1()
     self.store_ch(block,ch)
@@ -127,9 +127,11 @@ class BasicStore:
     '''
     assert not self.closing
     ch=Q1()
+    debug("BS: haveyou_a calls self.haveyou_ch(h=%s,ch=%s)" % (h,ch))
     self.haveyou_ch(h,ch)
     return ch
   def haveyou_ch(self,h,ch,tag=None):
+    debug("BS: haveyou_ch(h=%s,ch=%s,tag=%s)" % (h,ch,tag))
     assert not self.closing
     if tag is None: tag=seq()
     self.Q.qfunc(self.haveyou_bg,h,tag,ch)
@@ -209,6 +211,8 @@ class Store(BasicStore):
       elif S.startswith("tcp:"):
         from cs.venti.tcp import TCPStore
         host, port = S[4:].rsplit(':',1)
+        if len(host) == 0:
+          host='127.0.0.1'
         S=TCPStore((host, int(port)))
       else:
         assert False, "unhandled Store name \"%s\"" % S

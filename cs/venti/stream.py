@@ -315,7 +315,7 @@ class StreamStore(BasicStore):
     with self.sendLock:
       encodeFetch(self.sendRequestFP,rqTag,h)
   def haveyou_bg(self,h,rqTag,ch):
-    debug("%s: haveyou_bg(%s)..." % (self,tohex(h)))
+    debug("%s: haveyou_bg(%s,%s,%s)..." % (self,h,rqTag,ch))
     self.pending.enqueue(rqTag,ch)
     with self.sendLock:
       encodeHaveYou(self.sendRequestFP,rqTag,h)

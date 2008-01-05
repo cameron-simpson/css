@@ -57,7 +57,7 @@ usage='''Usage:
     -M          Don't use an additional MemCacheStore front end.
     -S store    Specify the store to use:
                   /path/to/dir  GDBMStore
-                  tcp:host:port TCPStore
+                  tcp:[host]:port TCPStore
                   |sh-command   StreamStore via sh-command
 ''' % (cmd,cmd,cmd,cmd,cmd,cmd,cmd,cmd,cmd,cmd)
 
@@ -127,10 +127,11 @@ for (opt,val) in opts:
 # A full path to a directory specifies a local filesystem store
 # in the directory B</>I<pathname>.
 #
-# =item B<tcp:>I<host>B<:>I<port>
+# =item B<tcp:>[I<host>]B<:>I<port>
 #
 # A name commencing with B<tcp:> specifies a TCP connection to a vt daemon
 # listening on the specified I<host> and I<port>.
+# If I<host> is omitted, B<127.0.0.1> is assumed.
 #
 # =item B<unix:/>I<pathname>
 #
@@ -544,7 +545,7 @@ debug("%s: exit main command"%cmd)
 #
 # Run a daemon for a master store:
 #
-#  vt -C - -M -S /var/spool/venti listen :9999
+#  vt -C - -S /var/spool/venti listen :9999
 #
 # Store a directory in that store:
 #
