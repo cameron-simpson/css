@@ -93,6 +93,8 @@ class BasicStore:
   def __fetch_bg(self,h,tag,ch):
     block=self.fetch(h)
     ch.put((tag,block))
+    with self.lastBlockLock:
+      self.lastBlock=(h,block)
   def lastFetch(self,h):
     with self.lastBlockLock:
       LB=self.lastBlock
@@ -100,11 +102,16 @@ class BasicStore:
       Lh, Lblock = LB
       if Lh == h:
         return Lblock
+      else:
+        progress("lastFetch: mismatch h=%s vs last-h=%s" % (tohex(h), tohex(Lh)))
     return None
   def haveyou(self,h):
     ''' Test if a hash is present in the store.
     '''
     assert not self.closing
+    B=self.lastFetch(h)
+    if B is not None:
+      return True
     ch=self.haveyou_a(h)
     tag, yesno = ch.get()
     return yesno
@@ -117,7 +124,11 @@ class BasicStore:
     self.Q.put((self.__haveyou_bg,(h,tag,ch)))
     return ch
   def __haveyou_bg(self,h,tag,ch):
-    yesno = self.haveyou(h)
+    B=self.lastFetch(h)
+    if B is not None:
+      yesno=True
+    else:
+      yesno=self.haveyou(h)
     ch.put((tag, yesno))
   def sync(self):
     ''' Return when the store is synced.
@@ -146,6 +157,9 @@ class BasicStore:
   def __getitem__(self,h):
     ''' Wrapper for fetch(h).
     '''
+    block=self.lastFetch(h)
+    if block is not None:
+      return block
     if h not in self:
       raise KeyError, "%s: %s not in store" % (self, tohex(h))
     block=self.fetch(h)
