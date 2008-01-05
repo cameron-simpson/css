@@ -20,7 +20,10 @@ def scanFile(fp):
       break
     offset=fp.tell()
     zblock=fp.read(zsize)
-    block=decompress(zblock)
+    try:
+      block=decompress(zblock)
+    except:
+      continue
     h=hash(block)
     yield h, offset, zsize
 

@@ -32,6 +32,13 @@ class BasicStore:
   def __str__(self):
     return "Store(%s)" % self.name
 
+  def pullFrom(self,S2):
+    # TODO: write silky smooth async pull
+    for h in S2.scan():
+      if not self.haveyou(h):
+        warn("pull %s" % tohex(h))
+        self.store(S2.fetch(h))
+
   def close(self):
     if not self.closing:
       self.sync()
@@ -206,6 +213,10 @@ class Store(BasicStore):
       else:
         assert False, "unhandled Store name \"%s\"" % S
     self.S=S
+  def scan(self):
+    if hasattr(self.S,'scan'):
+      for h in self.S.scan():
+        yield h
   def close(self):
     BasicStore.close(self)
     self.S.close()

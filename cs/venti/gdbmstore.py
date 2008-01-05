@@ -41,12 +41,7 @@ class GDBMStore(BasicStore):
     BasicStore.__init__(self,"gdbm:%s"%path)
     self.__path=path
     self.logfp=open(os.path.join(path,"log"),"a")
-    stores=[ int(name[:-4])
-             for name in os.listdir(path)
-             if len(name) > 4
-                and name.endswith('.vtd')
-                and name[:-4].isdigit()
-           ]
+    stores=[ int(name[:-4]) for name in self.dataFileBasenames() ]
     if len(stores) == 0:
       stores=[0]
     self.__newStore=max(stores)
@@ -61,6 +56,21 @@ class GDBMStore(BasicStore):
       self.sync()
     self.ioLock=BoundedSemaphore(1)
     self.poolLock=BoundedSemaphore(1)
+
+  def dataFileBasenames(self):
+     return [ name
+              for name in os.listdir(self.__path)
+              if len(name) > 4
+                 and name.endswith('.vtd')
+                 and name[:-4].isdigit()
+            ]
+
+  def scan(self):
+    ''' Generator that yields all the hashes in this store.
+    '''
+    for base in self.dataFileBasenames():
+      for h, offset, zsize in scanFile(open(os.path.join(self.__path,base))):
+        yield h
 
   def sync(self):
     ''' Sync(0 the store.

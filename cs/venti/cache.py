@@ -21,6 +21,15 @@ class CacheStore(BasicStore):
     # secondary queue to process background self.backend operations
     self.backQ=FuncQueue()
 
+  def scan(self):
+    if hasattr(self.cache,'scan'):
+      for h in self.cache.scan():
+        yield h
+    if hasattr(self.backend,'scan'):
+      for h in self.backend.scan():
+        if h not in cache:
+          yield h
+
   def close(self):
     BasicStore.close(self)
     self.backQ.close()
@@ -97,6 +106,9 @@ class MemCacheStore(BasicStore):
     self.used=0
     self.hmap={}                  # cached h->(count,block) tuples
     self.memCacheLock=BoundedSemaphore(1)
+
+  def scan(self):
+    return self.hmap.keys()
 
   def _hit(self,h,block):
     assert type(h) is str, "_hit(%s) - not a string" % h

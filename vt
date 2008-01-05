@@ -17,6 +17,7 @@
 #   vt [options...] scan datafile
 #   vt [options...] pack paths...
 #   vt [options...] pack -o file.vt path
+#   vt [options...] pull stores...
 #   vt [options...] unpack dirrefs...
 #
 # =head1 DESCRIPTION
@@ -48,6 +49,7 @@ usage='''Usage:
   %s [options...] scan datafile
   %s [options...] pack paths...
   %s [options...] pack -o file.vt path
+  %s [options...] pull stores...
   %s [options...] unpack dirrefs...
   Options:
     -C store    Use this as a front end cache store.
@@ -57,7 +59,7 @@ usage='''Usage:
                   /path/to/dir  GDBMStore
                   tcp:host:port TCPStore
                   |sh-command   StreamStore via sh-command
-''' % (cmd,cmd,cmd,cmd,cmd,cmd,cmd,cmd,cmd)
+''' % (cmd,cmd,cmd,cmd,cmd,cmd,cmd,cmd,cmd,cmd)
 
 badopts=False
 
@@ -246,6 +248,16 @@ else:
         badopts=True
     elif len(args) < 1:
       cmderr("missing paths")
+      badopts=True
+  elif op == "pull":
+    # =item B<pull> I<stores...>
+    #
+    # Update our store with all the available content from the specified I<stores>.
+    # Note that some stores will not list all their content, or any.
+    # This is mostly useful for updating a master store from a store which has been updated offline.
+    #
+    if len(args) < 1:
+      cmderr("missing stores")
       badopts=True
   elif op == "scan":
     # =item B<scan> I<datafile>
@@ -452,6 +464,10 @@ elif op == "scan":
   for h, offset, zsize in scanFile(open(args[0])):
     print tohex(h), offset, zsize
 
+elif op == "pull":
+  for arg in args:
+    S.pullFrom(Store(arg))
+
 elif op == "listen":
   assert len(args) == 1
   arg=args[0]
@@ -560,7 +576,6 @@ debug("%s: exit main command"%cmd)
 #
 # =head1 BUGS
 #
-# The in-memory cache leaks.
 # The TODO list is very long.
 # The command does not cope well with an incomplete store if it traverses into the missing portion;
 # one example is using a cache without the more complete backend master store.
