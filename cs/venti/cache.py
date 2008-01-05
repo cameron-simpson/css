@@ -36,13 +36,7 @@ class CacheStore(BasicStore):
     self.backend.close()
     self.cache.close()
 
-  def store_a(self,block,tag=None,ch=None):
-    assert block is not None
-    if tag is None: tag=seq()
-    if ch is None: ch=Q1()
-    self.Q.qfunc(self.__store_bg,tag,block,ch)
-    return ch
-  def __store_bg(self,tag,block,ch):
+  def store_bg(self,tag,block,ch):
     h=self.cache.store(block)
     assert h is not None
     ch.put((tag,h))
@@ -52,12 +46,7 @@ class CacheStore(BasicStore):
   def __store_bg2(self,block):
     self.backend.store(block)
 
-  def fetch_a(self,h,tag=None,ch=None):
-    if tag is None: tag=seq()
-    if ch is None: ch=Q1()
-    self.Q.qfunc(self.__fetch_bg,tag,h,ch)
-    return ch
-  def __fetch_bg(self,tag,h,ch):
+  def fetch_bg(self,tag,h,ch):
     inCache=(h in self.cache)
     if inCache:
       ##verbose("fetch %s from cache %s"%(tohex(h), self.cache))
@@ -72,28 +61,18 @@ class CacheStore(BasicStore):
     ##progress("fetch: cache %s in %s"%(tohex(h),self.cache))
     self.cache.store(block)
 
-  def haveyou_a(self,h,tag=None,ch=None):
-    if tag is None: tag=seq()
-    if ch is None: ch=Q1()
-    self.Q.qfunc(self.__haveyou_bg,tag,h,ch)
-    return ch
-  def __haveyou_bg(self,tag,h,ch):
+  def haveyou_bg(self,tag,h,ch):
     if h in self.cache:
       yesno=True
     else:
       yesno=(h in self.backend)
     ch.put((tag,yesno))
 
-  def sync_a(self,tag=None,ch=None):
-    if tag is None: tag=seq()
-    if ch is None: ch=Q1()
-    self.Q.qfunc(self.__sync_bg,tag,ch)
-    return ch
-  def __sync_bg(self,tag,ch):
-    backCH=self.backend.sync_a()
-    self.cache.sync()
-    backCH.get()
-    ch.put((tag,None))
+  def sync_bg(self,tag,ch):
+    backCH=self.backend.sync_a()        # queue the backend
+    self.cache.sync()                   # sync the frontend
+    backCH.get()                        # wait for the backend
+    ch.put((tag,None))                  # report completion
 
 class MemCacheStore(BasicStore):
   ''' A lossy store that keeps an in-memory cache of recent blocks.

@@ -112,16 +112,16 @@ class _StreamDaemonRequestReader(Thread):
         break
       if rqType == T_STORE:
         debug("_StreamDaemonRequestReader: T_STORE")
-        S.store_a(arg,n,resultsCH)
+        S.store_ch(arg,resultsCH,n)
       elif rqType == T_FETCH:
         debug("_StreamDaemonRequestReader: T_FETCH")
-        S.fetch_a(arg,n,resultsCH)
+        S.fetch_ch(arg,resultsCH,n)
       elif rqType == T_HAVEYOU:
         debug("_StreamDaemonRequestReader: T_HAVEYOU")
-        S.haveyou_a(arg,n,resultsCH)
+        S.haveyou_ch(arg,resultsCH,n)
       elif rqType == T_SYNC:
         debug("_StreamDaemonRequestReader: T_SYNC")
-        S.sync_a(n,resultsCH)
+        S.sync_ch(resultsCH,n)
       else:
         assert False, "unhandled rqType(%s) for request #%d" % (rqType, n)
     debug("END _StreamDaemonRequestReader")
@@ -303,39 +303,27 @@ class StreamStore(BasicStore):
       x=ch.get()
       debug("StreamStore.close: got result from channel: %s" % (x,))
 
-  def store_a(self,block,rqTag=None,ch=None):
-    debug("StreamStore: store_a(%d bytes)..." % len(block))
-    if rqTag is None: rqTag=seq()
-    ch=self.pending.enqueue(rqTag,ch)
+  def store_bg(self,block,rqTag,ch):
+    debug("StreamStore: store_bg(%d bytes)..." % len(block))
+    self.pending.enqueue(rqTag,ch)
     with self.sendLock:
       encodeStore(self.sendRequestFP,rqTag,block)
-    return ch
-  def fetch_a(self,h,rqTag=None,ch=None):
-    debug("StreamStore: fetch_a(%s)..." % tohex(h))
+  def fetch_bg(self,h,rqTag,ch):
+    debug("StreamStore: fetch_bg(%s)..." % tohex(h))
     ##if ifdebug(): tb()
-    if rqTag is None: rqTag=seq()
-    ch=self.pending.enqueue(rqTag,ch)
-    block=self.lastFetch(h)
-    if block is not None:
-      ch.put((None,block))
-    else:
-      with self.sendLock:
-        encodeFetch(self.sendRequestFP,rqTag,h)
-    return ch
-  def haveyou_a(self,h,rqTag=None,ch=None):
-    debug("%s: haveyou_a(%s)..." % (self,tohex(h)))
-    if rqTag is None: rqTag=seq()
-    ch=self.pending.enqueue(rqTag,ch)
+    self.pending.enqueue(rqTag,ch)
+    with self.sendLock:
+      encodeFetch(self.sendRequestFP,rqTag,h)
+  def haveyou_bg(self,h,rqTag,ch):
+    debug("%s: haveyou_bg(%s)..." % (self,tohex(h)))
+    self.pending.enqueue(rqTag,ch)
     with self.sendLock:
       encodeHaveYou(self.sendRequestFP,rqTag,h)
-    return ch
-  def sync_a(self,rqTag=None,ch=None):
-    debug("StreamStore: sync_a()...")
-    if rqTag is None: rqTag=seq()
-    ch=self.pending.enqueue(rqTag,ch)
+  def sync_bg(self,rqTag,ch):
+    debug("StreamStore: sync_bg()...")
+    self.pending.enqueue(rqTag,ch)
     with self.sendLock:
       encodeSync(self.sendRequestFP,rqTag)
-    return ch
 
 class _StreamClientReader(Thread):
   ''' Class to read from the StreamDaemon's responseFP and report to

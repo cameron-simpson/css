@@ -19,7 +19,7 @@ from Queue import Queue
 class BasicStore:
   ''' Core functions provided by all Stores.
       For each of the core operations (store, fetch, haveyou, sync)
-      a subclass must define at least one of the op or op_a methods.
+      a subclass must define at least one of the op or op_bg methods.
   '''
   def __init__(self,name):
     self.name=name
@@ -58,17 +58,29 @@ class BasicStore:
     tag, h = ch.get()
     assert type(h) is str and type(tag) is int, "h=%s, tag=%s"%(h,tag)
     return h
-  def store_a(self,block,tag=None,ch=None):
+  def store_a(self,block):
     ''' Queue a block for storage, return a cs.threads.Q1 from which to
-        read the hash when stored.
+        read (tag,hash) when stored.
     '''
     assert type(block) is str and type(tag) is int, \
            "block=%s, tag=%s"%(block,tag)
     assert not self.closing
-    if ch is None: ch=Q1()
-    self.Q.qfunc(self.__store_bg,block,tag,ch)
+    ch=Q1()
+    self.store_ch(block,ch)
     return ch
-  def __store_bg(self,block,tag,ch):
+  def store_ch(self,block,ch,tag=None):
+    ''' Given a block, a channel/Queue and an optional tag,
+        queue the block for storage and return the tag.
+        If the tag is None or missing, one is generated.
+    '''
+    assert not self.closing
+    if tag is None: tag=seq()
+    self.Q.qfunc(self.store_bg,block,tag,ch)
+    return tag
+  def store_bg(self,block,tag,ch):
+    ''' Accept a block for storage, report the hash code on the supplied channel/queue.
+        Then store the block synchronously.
+    '''
     h=self.hash(block)
     ch.put((tag,h))
     h2=self.store(block)
@@ -80,15 +92,26 @@ class BasicStore:
     ch=self.fetch_a(h,None)
     tag, block = ch.get()
     return block
-  def fetch_a(self,h,tag=None,ch=None):
+  def fetch_a(self,h):
     ''' Request a block from its hash.
-        Return a cs.threads.Q1 from which to read the block.
+        Return a cs.threads.Q1 from which to read (tag,block).
     '''
     assert not self.closing
-    if ch is None: ch=Q1(useQueue=True)
-    self.Q.qfunc(self.__fetch_bg,h,tag,ch)
+    ch=Q1()
+    self.fetch_ch(h,ch)
     return ch
-  def __fetch_bg(self,h,tag,ch):
+  def fetch_ch(self,h,ch,tag=None):
+    ''' Given a hash, a channel/Queue and an optional tag,
+        queue the hash for retrieval and return the tag.
+        If the tag is None or missing, one is generated.
+    '''
+    assert not self.closing
+    if tag is None: tag=seq()
+    self.Q.qfunc(self.__fetch_bg,h,tag,ch)
+    return tag
+  def fetch_bg(self,h,tag,ch):
+    ''' Accept a hash, report the matching block on the supplied channel/queue.
+    '''
     block=self.fetch(h)
     ch.put((tag,block))
   def haveyou(self,h):
@@ -98,15 +121,20 @@ class BasicStore:
     ch=self.haveyou_a(h)
     tag, yesno = ch.get()
     return yesno
-  def haveyou_a(self,h,tag=None,ch=None):
+  def haveyou_a(self,h):
     ''' Query whether a hash is in the store.
-        Return a cs.threads.Q1 from which to read the answer.
+        Return a cs.threads.Q1 from which to read (tag, yesno).
     '''
     assert not self.closing
-    if ch is None: ch=Q1()
-    self.Q.qfunc(self.__haveyou_bg,h,tag,ch)
+    ch=Q1()
+    self.haveyou_ch(h,ch)
     return ch
-  def __haveyou_bg(self,h,tag,ch):
+  def haveyou_ch(self,h,ch,tag=None):
+    assert not self.closing
+    if tag is None: tag=seq()
+    self.Q.qfunc(self.haveyou_bg,h,tag,ch)
+    return tag
+  def haveyou_bg(self,h,tag,ch):
     ch.put((tag, self.haveyou(h)))
   def sync(self):
     ''' Return when the store is synced.
@@ -117,15 +145,19 @@ class BasicStore:
     debug("store.sync: waiting for response on %s" % ch)
     tag, dummy = ch.get()
     debug("store.sync: response: tag=%s, dummy=%s" % (tag, dummy))
-  def sync_a(self,tag=None,ch=None):
+  def sync_a(self):
     ''' Request that the store be synced.
-        Return a cs.threads.Q1 from which to read the answer.
+        Return a cs.threads.Q1 from which to read the answer on completion.
     '''
     assert not self.closing
-    if ch is None: ch=Q1()
-    self.Q.qfunc(self.__sync_bg,tag,ch)
+    ch=Q1()
+    self.sync_ch(ch)
     return ch
-  def __sync_bg(self,tag,ch):
+  def sync_ch(self,ch,tag=None):
+    if tag is None: tag=seq()
+    self.Q.qfunc(self.sync_bg,tag,ch)
+    return tag
+  def sync_bg(self,tag,ch):
     self.sync()
     ch.put((tag,None))
   def __contains__(self, h):
