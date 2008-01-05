@@ -66,7 +66,7 @@ class BasicStore:
            "block=%s, tag=%s"%(block,tag)
     assert not self.closing
     if ch is None: ch=Q1()
-    self.Q.put((self.__store_bg,(block,tag,ch)))
+    self.Q.qfunc(self.__store_bg,block,tag,ch)
     return ch
   def __store_bg(self,block,tag,ch):
     h=self.hash(block)
@@ -95,7 +95,7 @@ class BasicStore:
     if block is not None:
       ch.put((tag,block))
     else:
-      self.Q.put((self.__fetch_bg,(h,tag,ch)))
+      self.Q.qfunc(self.__fetch_bg,h,tag,ch)
     return ch
   def __fetch_bg(self,h,tag,ch):
     block=self.fetch(h)
@@ -128,7 +128,7 @@ class BasicStore:
     '''
     assert not self.closing
     if ch is None: ch=Q1()
-    self.Q.put((self.__haveyou_bg,(h,tag,ch)))
+    self.Q.qfunc(self.__haveyou_bg,h,tag,ch)
     return ch
   def __haveyou_bg(self,h,tag,ch):
     B=self.lastFetch(h)
@@ -152,7 +152,7 @@ class BasicStore:
     '''
     assert not self.closing
     if ch is None: ch=Q1()
-    self.Q.put((self.__sync_bg,(tag,ch)))
+    self.Q.qfunc(self.__sync_bg,tag,ch)
     return ch
   def __sync_bg(self,tag,ch):
     self.sync()

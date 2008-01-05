@@ -40,7 +40,7 @@ class CacheStore(BasicStore):
     assert block is not None
     if tag is None: tag=seq()
     if ch is None: ch=Q1()
-    self.Q.put((self.__store_bg,(tag,block,ch)))
+    self.Q.qfunc(self.__store_bg,tag,block,ch)
     return ch
   def __store_bg(self,tag,block,ch):
     h=self.cache.store(block)
@@ -55,7 +55,7 @@ class CacheStore(BasicStore):
   def fetch_a(self,h,tag=None,ch=None):
     if tag is None: tag=seq()
     if ch is None: ch=Q1()
-    self.Q.put((self.__fetch_bg,(tag,h,ch)))
+    self.Q.qfunc(self.__fetch_bg,tag,h,ch)
     return ch
   def __fetch_bg(self,tag,h,ch):
     inCache=(h in self.cache)
@@ -75,7 +75,7 @@ class CacheStore(BasicStore):
   def haveyou_a(self,h,tag=None,ch=None):
     if tag is None: tag=seq()
     if ch is None: ch=Q1()
-    self.Q.put((self.__haveyou_bg,(tag,h,ch)))
+    self.Q.qfunc(self.__haveyou_bg,tag,h,ch)
     return ch
   def __haveyou_bg(self,tag,h,ch):
     if h in self.cache:
@@ -87,7 +87,7 @@ class CacheStore(BasicStore):
   def sync_a(self,tag=None,ch=None):
     if tag is None: tag=seq()
     if ch is None: ch=Q1()
-    self.Q.put((self.__sync_bg,(tag,ch)))
+    self.Q.qfunc(self.__sync_bg,tag,ch)
     return ch
   def __sync_bg(self,tag,ch):
     backCH=self.backend.sync_a()

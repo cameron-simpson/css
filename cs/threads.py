@@ -101,7 +101,7 @@ class JobQueue:
 
 class FuncQueue(Queue):
   ''' A Queue of function calls to make, processed serially.
-      New functions queued as .put((func,args)).
+      New functions queued as .put((func,args)) or as .qfunc(func,args...).
       Queue shut down with .close().
   '''
   def __init__(self,size=None):
@@ -110,6 +110,8 @@ class FuncQueue(Queue):
     import atexit
     atexit.register(self.close)
     Thread(target=self.__runQueue).start()
+  def qfunc(self,func,*args):
+    self.put((func,args))
   def put(self,item):
     assert not self.__closing
     Queue.put(self,item)
