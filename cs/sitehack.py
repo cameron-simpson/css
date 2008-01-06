@@ -1,35 +1,23 @@
 #!/usr/bin/python -tt
 #
-# Flickr convenience classes.
+# Basis for manipulating web sites through their URLs.
+# See cs/flickr.py and cs/librarything.py for examples.
 #       - Cameron Simpson <cs@zip.com.au> 18dec2007
 #
 
-import urllib
-from cs.sitehack import SiteHack
 from cs.misc import debug
+import cs.www
+import urllib
 
-flickrPrefix='http://www.flickr.com/'
-
-class FlickrURL(SiteHack):
-  def __init__(self,url):
-    SiteHack.__init__(self,url,flickrPrefix)
-    words=self.words
-    assert len(words) > 0, \
-           "short URL: %s" % url
-    if words[0] == 'photos':
-      self.userid=words[1]
-      debug("userid=%s" % self.userid)
-      if len(words) == 2:
-        self.type='HOME'
-      elif words[2] == 'favorites':
-        self.type='FAVORITES'
-      else:
-        self.type='PHOTO'
-        self.photoid=words[2]
-        debug("photoid=%s" % self.photoid)
-    else:
-      assert False, \
-             "unsupported flickr URL: %s" % url
+class SiteHack(cs.www.URL):
+  def __init__(self,url,sitePrefix):
+    cs.www.URL.__init__(self,url)
+    self.url=url
+    self.type=None
+    assert url.startswith(sitePrefix), \
+           "bad URL: %s, should start with %s" % (url, sitePrefix)
+    tail=url[len(sitePrefix):]
+    self.words=[word for word in tail.split('/') if len(word) > 0]
 
   def imageURL(self,imsizes=None):
     if self.type == 'PHOTO':
