@@ -63,6 +63,7 @@ cookie_sepRe=re.compile(r'\s*;\s*')
 cookie_valRe=re.compile(r'([a-z][a-z0-9_]*)=([^;,\s]*)',re.I)
 
 hexSafeRe=re.compile(r'[-=.\w:@/?~#+&]+')
+qsSafeRe=re.compile(r'[-=. :@/~#]+')
 dqAttrValSafeRe=re.compile(r'[-=. \w:@/?~#+&]+')
 
 def hexify(s,fp,safeRe=None):
@@ -92,6 +93,9 @@ def unhexify(s):
     s=s[:pcndx]+eval("chr(0x%s)" % s[pcndx+1:pcndx+3])+s[pcndx+3:]
     pcndx=s.find('%',pcndx+1)
   return s
+
+def toqs(s):
+  return hexify(qsSafeRe).replace(' ','+')
 
 textSafeRe=re.compile(r'[^<>&]+')
 
