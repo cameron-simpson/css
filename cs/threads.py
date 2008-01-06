@@ -182,8 +182,11 @@ class Q1(Queue):
     '''
     Queue.__init__(self,1)
     if name is None:
-      import traceback
-      name="Q1:[%s]" % (traceback.format_list(traceback.extract_stack()[-3:-1])[0].strip().replace("\n",", "))
+      if ifdebug():
+        import traceback
+        name="Q1:[%s]" % (traceback.format_list(traceback.extract_stack()[-3:-1])[0].strip().replace("\n",", "))
+      else:
+        name="Q1:%d" % id(self)
     self.name=name
     self.didput=False
     self.didget=False
