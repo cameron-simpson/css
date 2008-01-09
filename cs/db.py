@@ -198,14 +198,38 @@ def sqlDatedRecordTest(when=None,startColumn='START_DATE',endColumn='END_DATE'):
   return '(ISNULL('+startColumn+') OR '+startColumn+' <= '+whensql+')' \
        + ' AND (ISNULL('+endColumn+') OR '+endColumn+' > '+whensql+')'
 
-def mergeDatedRecords(table,keyFields,idField=None,constraint=None, doit=False):
-  for sql in mergeDatedRecordsSQL(table,keyFields,idField=idField,constraint=constraint):
+def mergeDatedRecords(table,keyFields,idField=None,constraint=None,cropOverlaps=False,doit=False):
+  for sql in mergeDatedRecordsSQL(table,keyFields,idField=idField,constraint=constraint,cropOverlaps=cropOverlaps):
     if doit:
-      dosql(table.conn, sql)
+      table.dosql(sql)
     else:
       print sql
 
-def mergeDatedRecordsSQL(table,keyFields,idField=None,constraint=None):
+def mergeDatedRecordsSQL(table,keyFields,idField=None,constraint=None,cropOverlaps=False):
+  ''' mergeDatedRecordsSQL() is a generator that yields SQL statements to
+      tidy up cruft in DatedRecord tables. It is passed a TableView
+      reference, a list of fields that consitute a comparison key, and
+      idField that should unqiuely identify a row (default 'ID'),
+      an optional SQL constraint and an operation mode (cropOverlaps, default
+      False).  
+
+      When cropOverlaps is False, overlapping identical records, as
+      determined from the keyFields tuple, are merged.
+
+      When cropOverlaps is True, if two records overlap then the earlier
+      record has its END_DATE cropped so as not to overlap the later
+      record.
+
+      A DatedRecord table has a date range expressed by the fields START_DATE
+      and END_DATE and one or more value fields that apply during the date
+      range. The first usage mode (cropOverlaps == False) is used to merge
+      identical records; keyFields should include START_DATE, END_DATE and
+      the complete set of value fields. The second usage mode (cropOverlaps
+      == True) is used to tidy up overlapping values; keyFields should
+      inclide START_DATE, END_DATE and value fields that identify the scope
+      of the record (such as a reference to an entity to which the other
+      values apply) but _not_ value fields that are "just values".  
+  '''
   if type(keyFields) is str:
     keyFields=(keyFields,)
   if idField is None:
@@ -213,34 +237,46 @@ def mergeDatedRecordsSQL(table,keyFields,idField=None,constraint=None):
 
   oldRows={}
   for row in table.selectRows(where=constraint, modifiers='ORDER BY START_DATE, END_DATE, '+idField):
-    start, end = row['START_DATE'], row['END_DATE']
+    start, end = row.START_DATE, row.END_DATE
     if start is not None and end is not None and start >= end:
       print `row`
+      print "HUH - DELET RECORD WITH EMPTY DATE RANGE"
       yield 'DELETE FROM %s WHERE %s = %s' % (table.name, idField, sqlise(row[idField]))
       continue
 
-    key=tuple([ row[f] for f in keyFields ])
+    key=tuple(row[f] for f in keyFields)
     if key not in oldRows:
+      # new row key - note for later
       oldRows[key]=row
       continue
 
     oldrow=oldRows[key]
     if start is not None \
-    and oldrow['END_DATE'] is not None \
-    and oldrow['END_DATE'] < start:
+    and oldrow.END_DATE is not None \
+    and oldrow.END_DATE <= start:
       # no overlap; update "old" to be latest row
       oldRows[key]=row
       continue
 
-    # overlap; advance END_DATE in old, toss new
-    print "OLD:", `oldrow`
-    print "NEW:", `row`
-    if oldrow['END_DATE'] is not None \
-    and (end is None or end > oldrow['END_DATE']):
-      yield 'UPDATE %s SET END_DATE = %s WHERE %s = %s' \
-             % (table.name, sqlise(end), idField, sqlise(oldrow[idField]))
-    yield 'DELETE FROM %s WHERE %s = %s' \
-          % (table.name, idField, sqlise(row[idField]))
+    # identical overlap
+    if cropOverlaps:
+      if start is None \
+      or oldrow.END_DATE is None \
+      or oldrow.END_DATE > start:
+        # crop earlier record to start of later record
+        if start is None:
+          cmderr("warning: START_DATE is NULL, can't fix overlap\n\tOLD: %s\n\tNEW: %s" % (oldrow, row))
+        else:
+          yield 'UPDATE %s SET END_DATE = %s WHERE %s = %s' \
+                 % (table.name, sqlise(start), idField, sqlise(oldrow[idField]))
+    else:
+      # advance END_DATE in old, toss new
+      if oldrow.END_DATE is not None \
+      and (end is None or end > oldrow['END_DATE']):
+        yield 'UPDATE %s SET END_DATE = %s WHERE %s = %s' \
+               % (table.name, sqlise(end), idField, sqlise(oldrow[idField]))
+      yield 'DELETE FROM %s WHERE %s = %s' \
+            % (table.name, idField, sqlise(row[idField]))
 
 ###############################################################################
 # Database Tables
