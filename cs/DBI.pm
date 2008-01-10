@@ -293,7 +293,7 @@ sub findWhen($$$$;$)
 { my($dbh,$table,$field,$key,$when)=@_;
   $when = isodate() if ! defined $when;
 
-  my $sth = sql($dbh,"SELECT * FROM $table where $field = ? AND START_DATE <= ? AND (ISNULL(END_DATE) OR END_DATE > ?)");
+  my $sth = sql($dbh,"SELECT * FROM $table where $field = ? AND (ISNULL(START_DATE) OR START_DATE <= ?) AND (ISNULL(END_DATE) OR END_DATE > ?)");
   return () if ! defined $sth;
 
   fetchall_hashref($sth,$key,$when,$when);
