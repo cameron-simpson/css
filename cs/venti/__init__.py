@@ -11,14 +11,14 @@
       http://en.wikipedia.org/wiki/Venti
 
     TODO:
-          BUG: MemCacheStore leaks! dict never cleaned up?
+          prefetch mode for fetch? noFlush parameter? caveats!
+          Prefetch multiple blocks, eg from an iblock.
+            Scatter/gather wrapper?
+            With progressive yeild of blocks in order
           StreamDaemon: defer fp.flush() to main loop, conditional on
             no pending requests.
           "vt push targetStore"
           "vt pull sourceStore"
-          Prefetch multiple blocks, eg from an iblock.
-            Scatter/gather wrapper?
-            With progressive yeild of blocks in order
           "vt scan" - don't open -S/-C stores
           sync() on stream/tcp close
           rolling hash
@@ -28,7 +28,7 @@
                   rewind at thrashold
           optional compression in store?
             test space cost of compress of compressed data
-          metadata O:owner u:user[srwx]-[srwx] g:group[srwx]-[srwx] o:[srwx]-[srwx] mtime:unixtime
+          metadata O:owner u:user:[srwx]-[srwx] g:group:[srwx]-[srwx] o:[srwx]-[srwx] mtime:unixtime
           metadata: inline text in dir, with i: field to indirect to a blockref
           sync() operation for blocklists
             close() collapses and sync()s ?

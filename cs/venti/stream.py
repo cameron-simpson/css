@@ -11,7 +11,7 @@ from threading import Thread, BoundedSemaphore
 from Queue import Queue
 from cs.misc import seq, toBS, fromBSfp, debug, ifdebug, tb, warn, progress
 from cs.lex import unctrl
-from cs.threads import JobQueue, getChannel
+from cs.threads import JobQueue, getChannel, nullCH
 from cs.venti import tohex
 from cs.venti.store import BasicStore
 
@@ -229,7 +229,7 @@ class _StreamDaemonResultsSender(Thread):
     sendReplyFP.flush()
     debug("END _StreamDaemonResultsSender")
 
-def encodeStore(fp,rqTag,block):
+def encodeStore(fp,rqTag,block,noFlush=False):
   ''' Write store(block) to stream.
   '''
   debug(fp,"encodeStore(rqTag=%d,%d bytes)" % (rqTag,len(block)))
@@ -238,9 +238,10 @@ def encodeStore(fp,rqTag,block):
   fp.write(enc_STORE)
   fp.write(toBS(len(block)))
   fp.write(block)
-  fp.flush()
+  if not noFlush:
+    fp.flush()
 
-def encodeFetch(fp,rqTag,h):
+def encodeFetch(fp,rqTag,h,noFlush=False):
   ''' Write fetch(h) to stream.
   '''
   debug(fp,"encodeFetch(rqTag=%d,h=%s" % (rqTag,tohex(h)))
@@ -249,9 +250,10 @@ def encodeFetch(fp,rqTag,h):
   fp.write(enc_FETCH)
   fp.write(toBS(len(h)))
   fp.write(h)
-  fp.flush()
+  if not noFlush:
+    fp.flush()
 
-def encodeHaveYou(fp,rqTag,h):
+def encodeHaveYou(fp,rqTag,h,noFlush=False):
   ''' Write haveyou(h) to stream.
   '''
   debug(fp,"encodeHaveYou(rqTag=%d,h=%s" % (rqTag,tohex(h)))
@@ -260,25 +262,28 @@ def encodeHaveYou(fp,rqTag,h):
   fp.write(enc_HAVEYOU)
   fp.write(toBS(len(h)))
   fp.write(h)
-  fp.flush()
+  if not noFlush:
+    fp.flush()
 
-def encodeSync(fp,rqTag):
+def encodeSync(fp,rqTag,noFlush=False):
   ''' Write sync() to stream.
   '''
   debug(fp,"encodeSync(rqTag=%d)" % rqTag)
   global enc_SYNC
   fp.write(toBS(rqTag))
   fp.write(enc_SYNC)
-  fp.flush()
+  if not noFlush:
+    fp.flush()
 
-def encodeQuit(fp,rqTag):
+def encodeQuit(fp,rqTag,noFlush=False):
   ''' Write T_QUIT to stream.
   '''
   debug(fp,"encodeQuit(rqTag=%d" % rqTag)
   global enc_QUIT
   fp.write(toBS(rqTag))
   fp.write(enc_QUIT)
-  fp.flush()
+  if not noFlush:
+    fp.flush()
 
 class StreamStore(BasicStore):
   ''' A Store connected to a StreamDaemon backend.
@@ -317,12 +322,24 @@ class StreamStore(BasicStore):
     self.pending.enqueue(rqTag,ch)
     with self.sendLock:
       encodeStore(self.sendRequestFP,rqTag,block)
-  def fetch_bg(self,h,rqTag,ch):
+  def fetch_bg(self,h,rqTag,ch,noFlush=False):
     debug("StreamStore: fetch_bg(%s)..." % tohex(h))
     ##if ifdebug(): tb()
     self.pending.enqueue(rqTag,ch)
     with self.sendLock:
       encodeFetch(self.sendRequestFP,rqTag,h)
+  def prefetch(self,hs):
+    ''' Prefetch the blocks associated with hs, an iterable returning hashes.
+    '''
+    sink=nullCH()
+    lastH=None
+    for h in hs:
+      if lastH is not None:
+        self.fetch_bg(lastH,seq(),sink,noFlush=True)
+      lastH=h
+    if lastH is not None:
+      self.fetch_bg(lastH,seq(),sink)
+
   def haveyou_bg(self,h,rqTag,ch):
     debug("%s: haveyou_bg(%s,%s,%s)..." % (self,h,rqTag,ch))
     self.pending.enqueue(rqTag,ch)
