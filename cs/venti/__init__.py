@@ -11,12 +11,9 @@
       http://en.wikipedia.org/wiki/Venti
 
     TODO:
-          prefetch mode for fetch? noFlush parameter? caveats!
           Prefetch multiple blocks, eg from an iblock.
             Scatter/gather wrapper?
             With progressive yeild of blocks in order
-          StreamDaemon: defer fp.flush() to main loop, conditional on
-            no pending requests.
           "vt push targetStore"
           "vt pull sourceStore"
           "vt scan" - don't open -S/-C stores
