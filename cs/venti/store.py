@@ -85,18 +85,30 @@ class BasicStore:
     ch=self.fetch_a(h,None)
     tag, block = ch.get()
     return block
-  def fetch_a(self,h):
+  def fetch_a(self,h,noFlush=False):
     ''' Request a block from its hash.
         Return a cs.threads.Q1 from which to read (tag,block).
+        The hint noFlush, if specified and True, suggests that streaming
+        store connections need not flush the request stream because another
+        request will follow immediately after this request. This allows
+        for more efficient use of streams. Users of this flag must
+        ensure that a "normal" flushing request follows any noFlush
+        requests promptly, otherwise deadlocks may ensue.
     '''
     assert not self.closing
     ch=Q1()
     self.fetch_ch(h,ch)
     return ch
-  def fetch_ch(self,h,ch,tag=None):
+  def fetch_ch(self,h,ch,tag=None,noFlush=False):
     ''' Given a hash, a channel/Queue and an optional tag,
         queue the hash for retrieval and return the tag.
         If the tag is None or missing, one is generated.
+        The hint noFlush, if specified and True, suggests that streaming
+        store connections need not flush the request stream because another
+        request will follow immediately after this request. This allows
+        for more efficient use of streams. Users of this flag must
+        ensure that a "normal" flushing request follows any noFlush
+        requests promptly, otherwise deadlocks may ensue.
     '''
     assert not self.closing
     if tag is None: tag=seq()
@@ -107,6 +119,15 @@ class BasicStore:
     '''
     block=self.fetch(h)
     ch.put((tag,block))
+  def prefetch(self,hs):
+    ''' Prefetch the blocks associated with hs, an iterable returning hashes.
+        This is intended to hint that these blocks will be wanted soon,
+        and so implementors should probably queue the fetches on an
+        "idle" queue so as not to penalise other store users.
+        This default implementation does nothing, which may be perfectly
+        legitimate for some stores.
+    '''
+    pass
   def haveyou(self,h):
     ''' Test if a hash is present in the store.
     '''

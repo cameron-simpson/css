@@ -204,6 +204,24 @@ class Q1(Queue):
     _returnQ1(self)
     return item
 
+__nullCH=None
+__nullCHlock=BoundedSemaphore(1)
+def nullCH():
+  with __nullCHlock:
+    if __nullCH is None:
+      __nullCH=NullCH()
+  return __nullCH
+class NullCH(Queue):
+  def __init__(self):
+    Queue.__init__(self,8)
+    self.__closing=False
+    sink=Thread(target=self.__runQueue)
+    sink.setDaemon(True)
+    sink.start()
+  def __runQueue(self):
+    while True:
+      self.get()
+
 class DictMonitor(dict):
   def __init__(self,I={}):
     dict.__init__(self,I)

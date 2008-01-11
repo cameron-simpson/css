@@ -61,6 +61,16 @@ class CacheStore(BasicStore):
     ##progress("fetch: cache %s in %s"%(tohex(h),self.cache))
     self.cache.store(block)
 
+  def __missingHashes(self,hs):
+    for h in hs:
+      if h not in self.cache:
+        yield h
+  def prefetch(self,hs):
+    ''' Request from the backend those hashes from 'hs'
+        which do not occur in the cache.
+    '''
+    self.backend.prefetch(self.__missingHashes(hs))
+
   def haveyou_bg(self,h,tag,ch):
     if h in self.cache:
       yesno=True
