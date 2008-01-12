@@ -178,7 +178,7 @@ class _StreamDaemonResultsSender(Thread):
     written=0
     while True:
       if self.daemon.resultsCH.empty():
-        progress("flush sendReplyFP with %d requests" % written)
+        progress("flush sendReplyFP after %d requests" % written)
         sendReplyFP.flush()
         written=0
       rqTag, result = self.daemon.resultsCH.get()
