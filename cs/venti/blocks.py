@@ -120,7 +120,7 @@ class BlockList(list):
     return "".join(bref.encode() for bref in self)
 
   def span(self):
-    ''' Return the number of bytes in the leave blocks spanned by this
+    ''' Return the number of bytes in the leaf blocks spanned by this
         BlockList.
     '''
     return self.offsetTo(len(self))
@@ -128,7 +128,7 @@ class BlockList(list):
   def offsetTo(self,ndx):
     ''' Offset to start of blocks under entry ndx.
     '''
-    return sum(bref.span for bref in self)
+    return sum(bref.span for bref in self[:ndx])
 
   def seekToBlock(self,offset):
     ''' Seek to a leaf block.
