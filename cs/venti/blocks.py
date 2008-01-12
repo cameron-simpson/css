@@ -165,6 +165,7 @@ class BlockList(list):
     ''' Iterate over the leaf blocks.
     '''
     S=self.__store
+    S.prefetch(bref.h for bref in self)
     for bref in self:
       for b in bref.leaves(S):
         yield b
