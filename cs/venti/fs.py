@@ -330,7 +330,7 @@ class Dirent:
       return
     if self.d_meta is None:
       return 0
-    return self.d_meta.get('mtime',0)
+    return float(self.d_meta.get('mtime',0))
 
   def stat(self):
     meta=self.meta()
