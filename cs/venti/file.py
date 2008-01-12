@@ -150,16 +150,23 @@ class ReadFile:
     self.seek(opos+len(line))
     return line
 
+  def __iter__(self):
+    while True:
+      line=self.readline()
+      if len(line) == 0:
+        break
+      yield line
+
   def readlines(self,sizehint=None):
     lines=[]
     byteCount=0
-    while sizehint is None or byteCount < sizehint:
-      line=self.readline()
+    for line in self:
       if len(line) == 0:
         break
       lines.append(line)
       byteCount+=len(line)
-
+      if sizehint is not None and byteCount >= sizehint:
+        break
     return lines
 
 class WriteFile:
