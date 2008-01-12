@@ -112,7 +112,7 @@ class BasicStore:
     '''
     assert not self.closing
     if tag is None: tag=seq()
-    self.Q.qfunc(self.__fetch_bg,h,tag,ch)
+    self.Q.qfunc(self.fetch_bg,h,tag,ch)
     return tag
   def fetch_bg(self,h,tag,ch):
     ''' Accept a hash, report the matching block on the supplied channel/queue.
