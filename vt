@@ -74,10 +74,11 @@ def closeStore():
 atexit.register(closeStore)
 
 try:
-  (opts,args)=getopt(argv[1:],'C:MS:')
+  opts, args = getopt(argv[1:],'C:MS:')
 except GetoptError, e:
   cmderr("unrecognised option: %s: %s"% (e.opt, e.msg))
   badopts=True
+  opts, args = (), ()
 
 # =head1 OPTIONS
 #
@@ -152,6 +153,7 @@ for (opt,val) in opts:
 if len(args) < 1:
   cmderr("missing command")
   badopts=True
+  op=None
 else:
   # =head1 COMMANDS
   #
