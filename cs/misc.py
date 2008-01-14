@@ -146,7 +146,7 @@ def seq():
 def all(gen):
   ''' Returns all the values from a generator as an array.
   '''
-  return [x for x in gen]
+  assert False, "all() is a python builtin meaning 'is every item true?', use list() or tuple()"
 def isodate(when=None):
   from time import localtime, strftime
   if when is None: when=localtime()

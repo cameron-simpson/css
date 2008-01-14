@@ -1,6 +1,6 @@
 import string
 import re
-from cs.misc import cmderr, debug, warn, die, uniq, the, all, DictUC_Attrs
+from cs.misc import cmderr, debug, warn, die, uniq, the, DictUC_Attrs
 from cs.hier import flavour, T_SEQ, T_MAP
 from cs.db import dosql, SQLQuery, sqlise, today
 import cs.cache
@@ -253,7 +253,7 @@ class DBDiGraphNode:
   def all(self,key):
     ''' Return a list of all the values for an attribute.
     '''
-    return all(self.each(key))
+    return list(self.each(key))
 
   def __getitem__(self,key):
     ''' Return the value of the specific key.

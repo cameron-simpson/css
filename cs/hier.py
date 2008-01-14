@@ -205,7 +205,8 @@ class HierOutput(_Hier):
       if dofold: nsep=",\n"
       else:      nsep=", "
 
-      if type(keys) is TupleType: keys=all(keys)
+      if type(keys) is TupleType:
+        keys=list(keys)
       keys.sort()
 
       for k in keys:
