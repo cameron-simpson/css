@@ -240,7 +240,7 @@ def mergeDatedRecordsSQL(table,keyFields,idField=None,constraint=None,cropOverla
     start, end = row.START_DATE, row.END_DATE
     if start is not None and end is not None and start >= end:
       print `row`
-      print "HUH - DELET RECORD WITH EMPTY DATE RANGE"
+      print "HUH - DELETE RECORD WITH EMPTY DATE RANGE"
       yield 'DELETE FROM %s WHERE %s = %s' % (table.name, idField, sqlise(row[idField]))
       continue
 
