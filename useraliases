@@ -1,11 +1,20 @@
-#!/bin/sh
+#!/bin/sh -ue
+#
+# List the aliases containing the supplied username.
+#       - Cameron Simpson <cs@zip.com.au>
+#
 
-[ $# = 1 ] || { echo "Usage: $0 user" >&2; exit 2; }
+aliasfile=
+[ $# -gt 0 ] && [ "x$1" = x-f ] && { aliasfile=$2; shift; shift; }
+[ $# = 1 ] || { echo "Usage: $0 [-f aliasfile] user" >&2; exit 2; }
 
 user=$1
 case "$user" in */*)	echo "$0: bad user \"$user\"" >&2; exit 2 ;; esac
 
-ypcat -k aliases \
+if [ -n "$aliasfile" ]
+then sed -n '/^[^#]/s/: */ /p' "$aliasfile"
+else ypcat -k aliases
+fi \
 | sed -e 's/ \(.*\)/ ,\1,/' \
       -e "/, *$user *,/!d" \
       -e 's/ .*//'
