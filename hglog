@@ -1,0 +1,29 @@
+#!/bin/sh -ue
+#
+# Emit more succinct Mercurial change log.
+#       - Cameron Simpson <cs@zip.com.au> 15jan2008
+#
+
+template='{date|shortdate} {author|email} {files}\n\t{desc|strip|fill68|tabindent}\n'
+
+hg log --template "$template" ${1+"$@"} \
+| awk '
+        START   { lastdate=""; lastauthor="" }
+        /[0-9]/ { date=$1; author=$2
+                  files=$3
+                  for (i=4; i<=NF; i++) {
+                    files=files" "$i
+                  }
+                  if (date != lastdate) {
+                    print date
+                    lastdate=date
+                    lastauthor=""
+                  }
+                  if (author != lastauthor) {
+                    print "  " author
+                    lastauthor=author
+                  }
+                  print "    " files
+                }
+        /^[^0-9]/{ print }
+      '
