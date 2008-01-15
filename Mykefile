@@ -32,9 +32,11 @@ scriptmans = $(scriptmandir)/$((allscripts)).1
 scriptfromman(manf) = $(manf FP)
 
 _home:
+        :make CHANGELOG.txt
         skip=`hg status | sed -n 's:^? \(.*\):--exclude=/\1:p'` \
         set-x \\
         rsync -av --delete \\
+                --include=/CHANGELOG.txt \\
                 $$skip \\
                 --include=bos/ \\
                 --include=cs/ \\
@@ -45,15 +47,16 @@ _home:
                 --exclude=/\*/ \\
                 . $(HOME)/bin/.
 
-_all: squid_redirect 1INDEX.txt _submakes _man _cvslog
-
-_cvslog: CHANGELOG.txt CHANGELOG.html
+_all: squid_redirect 1INDEX.txt _submakes _man
 
 CHANGELOG.txt:	_always
-	hglog | sed 's/[Cc][Ii][Ss][Rr][Aa]/work/g' >$@
+	hglog | rewriteif $@ sed 's/[Cc][Ii][Ss][Rr][Aa]/work/g'
 
 CHANGELOG.html:	_always
-	cvslog2html -O . | sed 's/[Cc][Ii][Ss][Rr][Aa]/work/g' >$@
+	cvslog2html -O . | rewriteif $@ sed 's/[Cc][Ii][Ss][Rr][Aa]/work/g'
+
+1INDEX.txt: $(allscripts)
+	@echo make $@; rewriteif $@ mkscriptndx `ls -d $(allscripts) | sort`
 
 _test:
 	echo $(pmmans)
@@ -105,9 +108,6 @@ $(scriptmandir)/%.1: %
 		;; \
 	 esac \
 	 chmod 644 $@ $$htman
-
-1INDEX.txt: $(allscripts)
-	@echo make $@; mkscriptndx `ls -d $(allscripts) | sort` >$@
 
 noads	= $(HOME)/@/adzapper.sf/html/rc/patterns
 
