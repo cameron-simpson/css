@@ -50,7 +50,7 @@ _all: squid_redirect 1INDEX.txt _submakes _man _cvslog
 _cvslog: CHANGELOG.txt CHANGELOG.html
 
 CHANGELOG.txt:	_always
-	cvslog -O . | sed 's/[Cc][Ii][Ss][Rr][Aa]/work/g' >$@
+	hglog | sed 's/[Cc][Ii][Ss][Rr][Aa]/work/g' >$@
 
 CHANGELOG.html:	_always
 	cvslog2html -O . | sed 's/[Cc][Ii][Ss][Rr][Aa]/work/g' >$@
