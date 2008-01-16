@@ -8,7 +8,7 @@
 : ${MAILDIR:=$HOME/mail}
 export MAILDIR
 
-folder=+SAVED/web
+folder=+ARCHIVE/`date +%Y`/web
 
 cmd=$0
 usage="Usage: $cmd [+folder] [{-|URL}...]
