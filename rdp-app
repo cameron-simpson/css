@@ -1,0 +1,27 @@
+#!/bin/sh -ue
+#
+# Run a windows app on its own via the SeamlessRDP extension.
+#       - Cameron Simpson <cs@zip.com.au> 17jan2008
+#
+
+: ${RDESKTOP_HOST:=windows}
+: ${USER:=`whoami`}
+: ${SEAMLESSRDPSHELL:='seamlessrdpshell'}
+
+cmd=`basename "$0"`
+usage="Usage: $cmd [-h host] app [app-args...]"
+
+[ $# -gt 0 ] && [ "x$1" = x-h ] && { RDESKTOP_HOST=$2; shift; shift; }
+
+if [ $# = 0 ]
+then
+  echo "$cmd: missing app" >&2
+  echo "$usage" >&2
+  exit 2
+fi
+
+case "$DISPLAY" in
+  :*) experience=l ;;
+  *)  experience=b ;;
+esac
+exec rdesktop -K -x "$experience" -u "$USER" -p - -A -s "$SEAMLESSRDPSHELL $*" "$RDESKTOP_HOST"
