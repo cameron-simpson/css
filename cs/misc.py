@@ -466,10 +466,10 @@ def mkdirn(path):
     return newpath
 
 def tmpdir():
-  tmpdir=os.environ.getdefault('TMPDIR','')
+  tmpdir=os.environ.setdefault('TMPDIR','')
   if len(tmpdir) == 0:
     tmpdir='/tmp'
-  return '/tmp'
+  return tmpdir
 
 def tmpdirn(tmp=None):
   if tmp is None: tmp=tmpdir()
