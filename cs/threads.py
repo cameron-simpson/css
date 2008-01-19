@@ -156,16 +156,19 @@ def _returnChannel(ch):
     assert ch not in __channels
     __channels.append(ch)
 
-''' A pool of Q1 objects (single use Queue(1)s).
+''' A pool of _Q1 objects (single use Queue(1)s).
 '''
 __queues=[]
 __queuesLock=BoundedSemaphore(1)
-def getQ1():
+def Q1(name=None):
+  ''' Obtain a _Q1 object (single use Queue(1), self disposing).
+  '''
   with __queuesLock:
     if len(__queues) == 0:
-      Q=Q1()
+      Q=_Q1()
     else:
       Q=__queues.pop(-1)
+      Q._reset(name=name)
       Q.didget=False
       Q.didput=False
   return Q
@@ -176,11 +179,14 @@ def _returnQ1(Q):
   with __queuesLock:
     __queues.append(Q)
 
-class Q1(Queue):
+class _Q1(Queue):
   def __init__(self,name=None):
-    ''' Return a single-use Queue(1) from the pool. The Queue is returned to the pool on .get().
+    ''' Initialise a single-use Queue(1).
+        The Queue returns itself to 
     '''
     Queue.__init__(self,1)
+    self.reset(name=name)
+  def _reset(self,name):
     if name is None:
       if ifdebug():
         import traceback
@@ -193,7 +199,7 @@ class Q1(Queue):
   def __str__(self):
     return self.name
   def put(self,item):
-    # racy but it's just a sanity check
+    # racy (maybe not - GIL?) but it's just a sanity check
     assert not self.didput
     self.didput=True
     Queue.put(self,item)

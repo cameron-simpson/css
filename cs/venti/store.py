@@ -128,6 +128,22 @@ class BasicStore:
         legitimate for some stores.
     '''
     pass
+  def multifetch(self,hs):
+    ''' Generator returning a bunch of blocks in sequence corresponding to
+        the iterable hashes 'hs'.
+    '''
+    qs=[]
+    lasth=None
+    for h in hs:
+      if lasth is not None:
+        qs.append(self.fetch_a(lasth),noFlush=True)
+      lasth=h
+    if lasth is not None:
+      qs.append(self.fetch_a(lasth))
+    for q in qs:
+      tag, block = q.get()
+      yield block
+
   def haveyou(self,h):
     ''' Test if a hash is present in the store.
     '''
@@ -150,6 +166,12 @@ class BasicStore:
     return tag
   def haveyou_bg(self,h,tag,ch):
     ch.put((tag, self.haveyou(h)))
+  def missing(self,hs):
+    ''' Yield hashcodes that are not in the store from an iterable hash code list.
+    '''
+    for h in hs:
+      if h not in self.cache:
+        yield h
   def sync(self):
     ''' Return when the store is synced.
     '''
