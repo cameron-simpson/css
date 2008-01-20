@@ -10,8 +10,9 @@
 
 url=
 profile=$BROWSER_PROFILE
-br=${FIREFOX_BIN:-/opt/firefox/firefox}
+br=${FIREFOX_BIN:-/usr/bin/firefox}
 prefs=$HOME/.mozilla/firefox/subdir/prefs.js
+ffopts=
 
 cmd=$0
 usage="Usage: $cmd [-f] [-q] [url]
@@ -24,6 +25,8 @@ while [ $# -gt 0 ]
 do
   case "$1" in
     -P)	profile=$2; shift ;;
+    -no-remote)
+        ffopts="$ffopts $1" ;;
     --)	shift; break ;;
     -?*)echo "$cmd: unrecognised option: $1" >&2; badopts=1 ;;
     *)	break ;;
@@ -55,4 +58,4 @@ user_pref("permissions.default.image", 2);' "$prefs"
 APPHELPER_PREOPTS=-t
 export APPHELPER_PREOPTS
 
-exec "$br" -width "$FULLX" -height "$PIX_HIGH" -P "$profile" ${1+"$@"}
+exec "$br" -width "$FULLX" -height "$PIX_HIGH" $ffopts -P "$profile" ${1+"$@"}
