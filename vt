@@ -421,7 +421,10 @@ if op == "pack":
       if os.path.isdir(path):
         ref=storeDir(path)
       else:
-        ref=storeFile(S,open(path)).sync()
+        ##import cProfile
+        ##cProfile.run("global ref; ref=storeFile(S,open(path))")
+        ##print "ref=%s" % ref
+        ref=storeFile(S,open(path))
       stdout.write(tohex(ref.encode()))
       if len(args) > 1:
         stdout.write('\t')

@@ -44,6 +44,7 @@
 import sha
 
 HASH_SIZE=20                                    # size of SHA-1 hash
+MIN_BLOCKSIZE=80                                # less than this seems silly
 MAX_BLOCKSIZE=16383                             # fits in 2 octets BS-encoded
 MAX_SUBBLOCKS=int(MAX_BLOCKSIZE/(HASH_SIZE+4))  # flags(1)+span(2)+hlen(1)+hash
 

@@ -17,11 +17,11 @@ def open(S,mode="r",bref=None):
     return WriteFile(S)
   assert False, "open(path=%s, mode=%s): unsupported mode" % (path,mode)
 
-def storeFile(S,ifp,rsize=None,findEdge=None):
+def storeFile(S,ifp,rsize=None):
   ''' Store the data from ifp, return BlockRef.
   '''
   if rsize is None: rsize=8192
-  ofp=WriteFile(S,findEdge)
+  ofp=WriteFile(S)
   buf=ifp.read(rsize)
   while len(buf) > 0:
     ofp.write(buf)
@@ -174,44 +174,30 @@ class WriteFile:
       flush() forces any unstored data to the store.
       close() flushes all data and returns a BlockRef for the whole file.
   '''
-  def __init__(self,S,findEdge=None):
+  def __init__(self,S):
+    import cs.venti.store; assert isinstance(S, cs.venti.store.BasicStore), "S=%s"%S
+    self.__store=S
     self.isdir=False
-    if findEdge is None:
-      findEdge=findEdgeCode
+    from cs.venti.encode import Blocker
+    self.__blocker=Blocker()
+    from threading import Thread
+    self.__storeThread=Thread(target=self.__storeBlocks)
+    self.__storeThread.start()
 
-    from cs.venti.blocks import BlockSink
-    import cs.venti.store
-    assert isinstance(S, cs.venti.store.BasicStore), "S=%s"%S
-    self.__sink=BlockSink(S)
-    self.__findEdge=findEdge
-    self.__q=''
+  def __storeBlocks(self):
+    from cs.venti.encode import blocks2bref
+    self.bref=blocks2bref(self.__store,self.__blocker.Q)
 
   def close(self):
     ''' Close the file. Return the hash code of the top indirect block.
     '''
     self.flush()
-    return self.__sink.close()
+    self.__blocker.close()
+    self.__storeThread.join()
+    return self.bref
 
   def flush(self):
-    ''' Force any remaining data to the store.
-    '''
-    if len(self.__q) > 0:
-      self.__dequeue()
-      if len(self.__q) > 0:
-        self.__sink.appendBlock(self.__q)
-        self.__q=''
+    pass
 
   def write(self,data):
-    ''' Queue data for writing.
-    '''
-    self.__q+=data
-    self.__dequeue()
-
-  def __dequeue(self):
-    ''' Flush complete blocks to the store.
-    '''
-    edgendx=self.__findEdge(self.__q)
-    while edgendx > 0:
-      self.__sink.appendBlock(self.__q[:edgendx])
-      self.__q=self.__q[edgendx:]
-      edgendx=self.__findEdge(self.__q)
+    self.__blocker.put(data)

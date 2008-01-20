@@ -118,6 +118,8 @@ class FuncQueue(Queue):
   def close(self):
     if not self.__closing:
       self.put((None,None))
+      self.__closing=True
+      ##tb()
   def __runQueue(self):
     ''' A thread to process queue items serially.
         This exists to permit easy or default implementation of the
@@ -180,10 +182,10 @@ def _returnQ1(Q):
     __queues.append(Q)
 
 class _Q1(Queue):
+  ''' Q _Q1 is a single use, resetable Queue(1).
+      The Queue returns itself to a pool on get(), ready for reuse.
+  '''
   def __init__(self,name=None):
-    ''' Initialise a single-use Queue(1).
-        The Queue returns itself to 
-    '''
     Queue.__init__(self,1)
     self.reset(name=name)
   def _reset(self,name):
@@ -209,6 +211,29 @@ class _Q1(Queue):
     item=Queue.get(self)
     _returnQ1(self)
     return item
+
+class PreQueue(Queue):
+  ''' A Queue with push-back and iteration.
+      Bug: the push back doesn't play nice with pending get()s.
+  '''
+  def __init__(self,maxsize=None):
+    Queue.__init__(self,maxsize)
+    self.__preQ=[]
+    self.__preQLock=BoundedSemaphore(1)
+  def get(self,block=True,timeout=None):
+    with self.__preQLock:
+      if len(self.__preQ) > 0:
+        return self.__preQ.pop(-1)
+    return Queue.get(self,block,timeout)
+  def next(self):
+    return self.get()
+  def unget(self,item):
+    # TODO: if pending gets, call put()? How to tell?
+    with self.__preQLock:
+      self.__preQ.append(item)
+  def __iter__(self):
+    while True:
+      yield self.get()
 
 __nullCH=None
 __nullCHlock=BoundedSemaphore(1)
