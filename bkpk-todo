@@ -1,0 +1,32 @@
+#!/bin/sh -ue
+#
+# Log a todo item to a backpackit web page by email.
+#       - Cameron Simpson <cs@zip.com.au> 21jan2008
+#
+
+: ${TMPDIR:=/tmp}
+: ${USER:=`id -un`} || exit 1
+
+cmd=`basename "$0"` || exit 1
+usage="Usage: $cmd tag: headline"
+
+for bkpk in $BACKPACKIT_PAGES
+do
+  pfx=`expr "x$bkpk" : 'x\([^:]*:\).*'` \
+  || { echo "$cmd: \$BACKPACKIT_PAGES: skip \"$bkpk\"" >&2
+       continue
+     }
+
+  case "$*" in
+    "$pfx"*)
+      addr=`expr "x$bkpk" : 'x[^:]*:\(.*\)'`
+      word1=$1; shift
+      word1=`expr "x$word1" : 'x[^:]*:\(.*\)' || :`
+      [ -z "$word1" ] || set -- "$word1" ${1+"$@"}
+      exec bug -B "mailto:$addr" "todo:$*"
+      ;;
+  esac
+done
+
+echo "$cmd: nothing in \$BACKPACKIT_PAGES matching $1" >&2
+exit 1

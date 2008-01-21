@@ -1,7 +1,8 @@
 #!/bin/sh -u
 #
 # Log a fresh bug in the specified bug system.
-# Default: the first supported bug in the $BUGSYSTEMS envvar, defaulting to mailto:$USER.
+# Default: the first supported bug in the $BUGSYSTEMS envvar, defaulting
+# to mailto:$USER.
 #	- Cameron Simpson <cs@zip.com.au>
 #
 
@@ -13,7 +14,6 @@ sev=2
 cmd=$0
 usage="Usage: $cmd [-B bugsystem] [-S severity] title-words...
 	-B bugsystem	Specify the bugsystem.
-			Supported: ddts, mailto:addr.
 	-S severity	A number in the range 1-5. Default: $sev"
 
 badopts=
@@ -43,7 +43,7 @@ exec 3>&1
   then
       echo
   else
-      [ -t 3 ] && echo "Reading bug details from stdin ..." >&3
+      [ -t 0 -a -t 3 ] && echo "Reading bug details from stdin ..." >&3
       exec cat
   fi
 ) \
@@ -52,17 +52,20 @@ exec 3>&1
   xit=1
   for bugsystem in $BUGSYSTEMS "mailto:$USER"
   do
-
     case "$bugsystem" in
       /?*/?*)
 	pfxre=`expr "$bugsystem" : '/\([^/][^/]*\)/.*'` || { xit=1; continue; }
 	sfxbugsys=`expr "$bugsystem" : '/[^/][^/]*/\(.*\)'` || { xit=1; continue; }
-	expr "x$headline" : "x$pfxre" >/dev/null || continue
+	expr "x$*" : "x$pfxre.*" >/dev/null || continue
 	bugsystem=$sfxbugsys
 	;;
     esac
 
     case "$bugsystem" in
+      \|*)
+        command=`expr "x$bugsystem" : 'x.\(.*\)'`
+        exec "$command" "$*" </dev/null
+        ;;
       csbug)
 	bugnum=`csbug NEW "$@" </dev/null` || exit 1
 	( echo "From: $EMAIL"
@@ -80,8 +83,9 @@ exec 3>&1
 	exec td --add "$*"
 	;;
       mailto:*)
-	exec env BUGSYSTEMS=$bugsystem buglog "new bug: $*"
+	exec env BUGSYSTEMS=$bugsystem buglog "$*"
 	;;
+      *)echo "FAIL $bugsystem" >&2 ;;
     esac
   done
   exit 1
