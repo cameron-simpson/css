@@ -8,7 +8,7 @@
 
 case " $BUGSYSTEMS " in
   *' dlog '*) ;;
-  *)  BUGSYSTEMS="dlog BUGSYSTEMS" ;;
+  *)  BUGSYSTEMS="dlog $BUGSYSTEMS" ;;
 esac
 export BUGSYSTEMS
 
