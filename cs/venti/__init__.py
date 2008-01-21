@@ -9,35 +9,8 @@
       http://swtch.com/plan9port/man/man7/venti.html
     and the Wikipedia entry:
       http://en.wikipedia.org/wiki/Venti
-
-    TODO:
-          Prefetch multiple blocks, eg from an iblock.
-            Scatter/gather wrapper?
-            With progressive yeild of blocks in order
-          "vt push targetStore"
-          "vt pull sourceStore"
-          "vt scan" - don't open -S/-C stores
-          sync() on stream/tcp close
-          rolling hash
-            augment with assorted recognition strings by hash
-            pushable parser for nested data
-          flat file cache for blocks: make temp unlinked, trunc, append,
-                  rewind at thrashold
-          optional compression in store?
-            test space cost of compress of compressed data
-          metadata O:owner u:user:[srwx]-[srwx] g:group:[srwx]-[srwx] o:[srwx]-[srwx] mtime:unixtime
-          metadata: inline text in dir, with i: field to indirect to a blockref
-          sync() operation for blocklists
-            close() collapses and sync()s ?
-            sync collapses?
-          BlockSink take ibref initialiser?
-          don't compress metadata
-          cache seek()ed block in readOpen class
-          inode chunk:
-            flags
-            [meta] (if flags&0x01)
-            blockref
-          store priority queue - tuples=pool
+    To do list now at:
+      http://csbp.backpackit.com/pub/1356606
 '''
 
 ## NOTE: migrate to hashlib sometime when python 2.5 more common

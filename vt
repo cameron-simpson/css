@@ -582,7 +582,10 @@ debug("%s: exit main command"%cmd)
 #
 # =head1 BUGS
 #
-# The TODO list is very long.
+# The TODO list is very long, see:
+#
+#  http://csbp.backpackit.com/pub/1356606
+#
 # The command does not cope well with an incomplete store if it traverses into the missing portion;
 # one example is using a cache without the more complete backend master store.
 #
