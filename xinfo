@@ -89,11 +89,11 @@ while (<STDIN>)
 	  $scope=$oldscope;
 	}
       }
-    }
 
-    &pr("visual=$defvis");
-    &pr("depth=$defdepth");
-    &pr("class=$defclass");
+      &pr("visual=$defvis");
+      &pr("depth=$defdepth");
+      &pr("class=$defclass");
+    }
 
     $scope=$oldscope;
   }
