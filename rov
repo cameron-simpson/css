@@ -1,0 +1,19 @@
+#!/bin/sh -ue
+#
+# Overlay one dir on another, except for conflicts.
+#       - Cameron Simpson <cs@zip.com.au> 27apr2007
+#
+
+trace=set-x
+
+cmd=$0
+usage="Usage: $cmd fromdir rhost:todir [rsync-opts...]"
+
+badopts=
+
+[ $# -ge 2 ] || { echo "$usage" >&2; exit 2; }
+
+from=$1 to=$2
+shift; shift
+
+exec $trace rsync -avH --ignore-existing --remove-source-files ${1+"$@"} "$from/" "$to/"
