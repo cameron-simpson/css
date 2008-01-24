@@ -83,7 +83,7 @@ addscrcmds()
     if [ -z "$tmprc" ]
     then
       tmprc=$TMPDIR/screenrc$$
-      cat "$rcfile" >"$tmprc" 2>/dev/null
+      [ ! -s "$rcfile" ] || cat "$rcfile" >"$tmprc" 2>/dev/null
       rcfile=$tmprc
     fi
     echo "$scrcmd" >>"$tmprc"
@@ -137,6 +137,7 @@ case "$TERM" in
 esac
 
 [ $detached ] && screen="$screen -d -m"
+[ -s "$rcfile" ] || >>"$rcfile"
 
 (
   # look for matching session if supplied
