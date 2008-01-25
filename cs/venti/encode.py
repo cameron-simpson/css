@@ -92,7 +92,7 @@ class Blocker:
       self.matchIndex=makeMatchIndex(matches)
 
     if outQ is None:
-      outQ=PreQueue()
+      outQ=PreQueue(size=256)
       
     self.closed=False
     self.pending=[]     # list of uncollated input blocks
@@ -119,34 +119,45 @@ class Blocker:
     for c in s:
       off+=1
       h=rh.addChar(c)
-      if h in I:
-        # hashcode match on vocabulary hash
-        for ms, moff, subI in I[h]:
-          if off < len(ms):
-            # TODO: grab chars from pending blocks
-            pass
-          else:
-            if s[off-len(ms):off] == ms:
-              # matched
-              ##print "match on %s at [%s...]" % (unctrl(ms), unctrl(s[off-len(ms):off+20]))
-              matchOff=off-len(ms)+moff
-              break
-      if matchOff is None \
-      and off%8 == 0 \
-      and self.pendlen >= MIN_BLOCKSIZE \
-      and h == HASH_MAGIC:
-        ##print "match in magic(%d) at [%s...]" % (rh.value, unctrl(s[off:off+20]))
+      if self.pendlen < MIN_BLOCKSIZE:
+        continue
+
+      if self.pendlen >= MAX_BLOCKSIZE:
         matchOff=off
+      else:
+        if h in I:
+          # hashcode match on vocabulary hash
+          for ms, moff, subI in I[h]:
+            if off < len(ms):
+              # TODO: grab chars from pending blocks
+              pass
+            else:
+              if s[off-len(ms):off] == ms:
+                # matched
+                ##print "match on %s at [%s...]" % (unctrl(ms), unctrl(s[off-len(ms):off+20]))
+                matchOff=off-len(ms)+moff
+                break
+        if matchOff is None \
+        and off%8 == 0 \
+        and h == HASH_MAGIC:
+          ##print "match in magic(%d) at [%s...]" % (rh.value, unctrl(s[off:off+20]))
+          matchOff=off
+
       if matchOff is not None:
-        # dispatch this block
+        # dispatch this block, start afresh with tail of string
         self.pending.append(s[:matchOff])
         self.flush()
+        rh=RollingHash()
         s=s[matchOff:]
-        off-=matchOff
+        off=0
         matchOff=None
+
     if len(s) > 0:
       self.pending.append(s)
       self.pendlen+=len(s)
+
+    # save the hash object - may be new
+    self.rhash=rh
 
   def flush(self):
     if len(self.pending) > 0:
