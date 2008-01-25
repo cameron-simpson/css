@@ -25,7 +25,7 @@ class BasicStore:
     self.name=name
     self.logfp=None
     self.closing=False
-    self.Q=FuncQueue()
+    self.Q=FuncQueue(size=256)  # arbitrary limit on queue length
     self.lastBlock=None
     self.lastBlockLock=BoundedSemaphore(1)
 
@@ -279,8 +279,8 @@ def pullFromSerial(S1,S2):
     if not S1.haveyou(h):
       S1.store(S2.fetch(h))
 def pullFrom(S1,S2):
-  haveyou_ch=Queue()
-  fetch_ch=Queue()
+  haveyou_ch=Queue(size=256)
+  fetch_ch=Queue(size=256)
   pending=DictMonitor()
   watcher=Thread(target=_pullWatcher,args=(S1,S2,haveyou_ch,pending,fetch_ch))
   watcher.start()

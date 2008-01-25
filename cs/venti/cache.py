@@ -19,7 +19,7 @@ class CacheStore(BasicStore):
     self.backend=backend
     self.cache=cache
     # secondary queue to process background self.backend operations
-    self.backQ=FuncQueue()
+    self.backQ=FuncQueue(size=256)
 
   def scan(self):
     if hasattr(self.cache,'scan'):

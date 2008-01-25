@@ -216,8 +216,8 @@ class PreQueue(Queue):
   ''' A Queue with push-back and iteration.
       Bug: the push back doesn't play nice with pending get()s.
   '''
-  def __init__(self,maxsize=None):
-    Queue.__init__(self,maxsize)
+  def __init__(self,size=None):
+    Queue.__init__(self,size)
     self.__preQ=[]
     self.__preQLock=BoundedSemaphore(1)
   def get(self,block=True,timeout=None):

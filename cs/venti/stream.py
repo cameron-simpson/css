@@ -63,7 +63,7 @@ class StreamDaemon:
     self.jobsLock=BoundedSemaphore(1)
     self.njobs=0
     self.jobsClosing=False
-    self.resultsCH=Queue(16)
+    self.resultsCH=Queue(size=256)
     self.readerThread=_StreamDaemonRequestReader(self)
     self.resultsThread=_StreamDaemonResultsSender(self)
 
