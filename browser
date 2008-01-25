@@ -15,7 +15,7 @@ prefs=$HOME/.mozilla/firefox/subdir/prefs.js
 ffopts=
 
 cmd=$0
-usage="Usage: $cmd [-f] [-q] [url]
+usage="Usage: $cmd [-P profile] [-no-remote]
 	-P profile	Select desired profile.
 			Default from \$BROWSER_PROFILE: $profile"
 
@@ -58,4 +58,8 @@ user_pref("permissions.default.image", 2);' "$prefs"
 APPHELPER_PREOPTS=-t
 export APPHELPER_PREOPTS
 
-exec "$br" -width "$FULLX" -height "$PIX_HIGH" $ffopts -P "$profile" ${1+"$@"}
+sync
+"$br" -width "$X11_MONITOR0_DX" -height "$PIX_HIGH" $ffopts -P "$profile" ${1+"$@"}
+xit=$?
+sync
+exit $xit
