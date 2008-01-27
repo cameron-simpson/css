@@ -38,6 +38,8 @@ case $colour in
     on=`tput sitm` && off=`tput ritm` ;;
   ul|underline)
     on=`tput smul` && off=`tput rmul` ;;
+  sl|status)
+    on=`tput tsl` && off=`tput fsl` ;;
   black)
     on=`tput setaf 0 || tput setf 0` && off=`tput op` ;;
   red)
