@@ -56,7 +56,7 @@ CHANGELOG.html:	_always
 	cvslog2html -O . | rewriteif $@ sed 's/[Cc][Ii][Ss][Rr][Aa]/work/g'
 
 1INDEX.txt: $(allscripts)
-	@echo make $@; rewriteif $@ mkscriptndx `ls -d $(allscripts) | sort`
+	@echo make $@; mkscriptndx `ls -d $(allscripts) | sort` >$@
 
 _test:
 	echo $(pmmans)
