@@ -12,11 +12,17 @@ import urllib
 class SiteHack(cs.www.URL):
   def __init__(self,url,sitePrefix):
     cs.www.URL.__init__(self,url)
+    if type(siteprefix) is str:
+      sitePrefix=(siteprefix,)
     self.url=url
     self.type=None
-    assert url.startswith(sitePrefix), \
-           "bad URL: %s, should start with %s" % (url, sitePrefix)
-    tail=url[len(sitePrefix):]
+    ok=False
+    for pfx in sitePrefix:
+      if url.startswith(pfx):
+        ok=True
+        tail=url[len(pfx):]
+        break
+    assert ok, "bad URL: %s, should start with %s" % (url, sitePrefix)
     self.words=[word for word in tail.split('/') if len(word) > 0]
 
   def imageURL(self,imsizes=None):

@@ -8,7 +8,7 @@ import urllib
 from cs.sitehack import SiteHack
 from cs.misc import debug
 
-flickrPrefix='http://www.flickr.com/'
+flickrPrefix=('http://www.flickr.com/', 'http://flickr.com/')
 
 class FlickrURL(SiteHack):
   def __init__(self,url):
