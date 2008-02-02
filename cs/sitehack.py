@@ -12,8 +12,8 @@ import urllib
 class SiteHack(cs.www.URL):
   def __init__(self,url,sitePrefix):
     cs.www.URL.__init__(self,url)
-    if type(siteprefix) is str:
-      sitePrefix=(siteprefix,)
+    if type(sitePrefix) is str:
+      sitePrefix=(sitePrefix,)
     self.url=url
     self.type=None
     ok=False
