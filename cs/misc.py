@@ -644,7 +644,8 @@ class HasFlags:
       flagv=self.__flaglist()
       flagv.add(flag)
       if type(self[self.__flagfield]) is str:
-        flagv=" ".join(flagv)
+        flagv=",".join(flagv)
+      warn("%s.%s=\"%s\"" % (self,self.__flagfield,flagv))
       self[self.__flagfield]=flagv
 
   def clearFlag(self,flag):
