@@ -505,9 +505,7 @@ def runCommandPrompt(fnmap,prompt=None):
     if line is None:
       return ok
    
-    line=chomp(line)
-   
-    line=string.lstrip(chomp(line))
+    line=string.lstrip(line)
     if len(line) == 0 or line[0] == "#":
       continue
    
