@@ -599,12 +599,13 @@ if (!this._cs_libLoaded) {
   _cs_rpc_queue=[];
 }
 
-function csRPC(jscgiurl,argobj,callback,priority) {
+function csRPC(jscgiurl,rpcop,argobj,callback,priority) {
   // Queue requests if too busy.
+  var qitem = [jscgiurl,rpcop,argobj,callback];
   if (priority) {
-    _cs_rpc_queue.splice(0,0,[jscgiurl,argobj,callback]);
+    _cs_rpc_queue.splice(0,0,qitem);
   } else {
-    _cs_rpc_queue.push([jscgiurl,argobj,callback]);
+    _cs_rpc_queue.push(qitem);
   }
 
   csRPCflushQueue();
@@ -622,15 +623,16 @@ function csRPCflushQueue() {
     _cs_rpc_running++;
     dq = _cs_rpc_queue.shift();
     jscgiurl=dq[0];
-    argobj=dq[1];
-    callback=dq[2];
+    rpcop=dq[1];
+    argobj=dq[2];
+    callback=dq[3];
 
     var seq = csSeq();
     var cbk = "cb"+seq;
     _cs_rpc_callbacks[cbk]=callback;
-    jscgiurl+="/"+seq;
+    jscgiurl+="/"+rpcop+"/"+seq;
     if (argobj) {
-      jscgiurl+="/"+escape(csObjectToString(argobj));
+      jscgiurl+="/csRPC_doCallback/"+escape(csObjectToString(argobj));
     }
 
     var rpc = csNode("SCRIPT");
@@ -678,8 +680,8 @@ function csRPC_doCallback(seq,result) {
   delete _cs_rpc_nodes["node"+seq];
 }
 
-function csRPCbg(jscgiurl,argobj,callback) {
-  setTimeout(function(){ csRPC(jscgiurl,argobj,callback); }, 0);
+function csRPCbg(jscgiurl,rpcop,argobj,callback) {
+  setTimeout(function(){ csRPC(jscgiurl,rpcop,argobj,callback); }, 0);
 }
 
 function csAddSuperClass(base,sup) {
@@ -693,22 +695,42 @@ function csAddSuperClass(base,sup) {
 //////////////////////////////////////////////////
 // An object with asynchronous attribute methods.
 //
+// Access to the asynchronous attribute is done via the
+// withAttr(attrname, closure(value) { ... }) method.
+// The first caller kicks off a csRPC to obtain 'value'.
+// Return from the RPC calls the closure.
+// Subsequent callers either get called directly with the 'value'
+// if it has been obtained or queued to be called when the rpc returns.
+//
 function CSAsyncObject() {
   this.asyncAttrs={};
 }
-CSAsyncObject.prototype.addAttr = function(attrname, rpcurl, rpcargs) {
+// Declares an async attribute named 'attrname'.
+// Users is an async attribute usually use it thus:
+//   OBJ.withAttr(attrname, closure(value) { ... });
+// So, addAttr() sets up the state to do a csRPC() and call the closure.
+// The full argument list is:
+//   attrname   The name of the attribute.
+//   rpcurl     The base URL of the RPC handler. Default is this.rpcurl.
+//   rpcop      The RPC method name. Default is attrname.
+//   rpcargs    The arguments for the RPC call, a dict.
+//              Default: {key: this.key}, to identify the source object.
+//
+CSAsyncObject.prototype.addAttr = function(attrname, rpcurl, rpcop, rpcargs) {
   if (!rpcurl) rpcurl=this.rpcurl;
-  if (!rpcargs) rpcargs={rpc: attrname, key: this.key};
+  if (!rpcop) rpcop=attrname;
+  if (!rpcargs) rpcargs={key: this.key};
   if (!this.asyncAttrs) this.asyncAttrs={};
 
   var attrs = this.asyncAttrs[attrname] = {};
-  attrs.rpc = [rpcurl,rpcargs];
+  attrs.rpc = [rpcurl,rpcop,rpcargs];
 };
 CSAsyncObject.prototype.withAttr = function(attrname, args, callback) {
   if (typeof(args) != "function") {
     // assume 3-arg call - (attr, {params}, callback) - rpc func, params, callback
     csRPC(this.rpcurl,
-          {rpc: attrname, key: this.key, params: args},
+          attrname,
+          {key: this.key, params: args},
           callback);
     return;
   }
@@ -726,7 +748,7 @@ CSAsyncObject.prototype.withAttr = function(attrname, args, callback) {
     attr.callbacks.push(callback);
   } else {
     attr.callbacks=[callback];
-    csRPC(attr.rpc[0], attr.rpc[1], function(res) { me.setAttr(attrname, res); });
+    csRPC(attr.rpc[0], attr.rpc[1], attr.rpc[2], function(res) { me.setAttr(attrname, res); });
   }
 };
 CSAsyncObject.prototype.setAttr = function(attrname, value) {
