@@ -4,6 +4,7 @@
 #       - Cameron Simpson <cs@zip.com.au> 23dec2005
 #
 
+from __future__ import with_statement
 import sys
 import string
 import types
@@ -11,7 +12,8 @@ import datetime
 from sets import Set
 import cs.secret
 import cs.cache
-from cs.misc import cmderr, debug, ifdebug, warn, isodate, the, WithUC_Attrs
+from cs.misc import cmderr, debug, ifdebug, pushDebug, popDebug, warn, isodate, the, WithUC_Attrs
+from threading import BoundedSemaphore
 
 def today():
   return datetime.date.today()
@@ -45,7 +47,9 @@ class ConnWrapper:
   def __init__(self,getConn,*args):
     self.getConn=getConn
     self.getConnArgs=args
-    self.conn=getConn(*args)
+    self.lock=BoundedSemaphore(1)
+    with self.lock:
+      self.conn=getConn(*args)
   def attachConn(self):
     self.conn=self.getConn(*self.getConnArgs)
     return self.conn
@@ -164,18 +168,20 @@ class SQLQuery:
     self.__conn=conn
     self.__query=query
     self.__params=params
-    self.__cursor=conn.conn.cursor()
     if ifdebug():
       warn('SQLQuery:', query)
       if len(params) > 0: warn("SQLQuery: params =", `params`)
-    try:
-      self.__cursor.execute(query,params)
-    except:
-      cmderr("SQL failure for: %s (params=%s)" % (query,params))
-      warn("\tRetry with new db connection...")
-      conn.attachConn()
+
+    with conn.lock:
       self.__cursor=conn.conn.cursor()
-      self.__cursor.execute(query,params)
+      try:
+        self.__cursor.execute(query,params)
+      except:
+        cmderr("SQL failure for: %s (params=%s)" % (query,params))
+        warn("\tRetry with new db connection...")
+        conn.attachConn()
+        self.__cursor=conn.conn.cursor()
+        self.__cursor.execute(query,params)
 
   def allrows(self):
     return [row for row in self]
@@ -504,7 +510,9 @@ class DirectTableRow(WithUC_Attrs):
     if type(column) is not str:
       column=self.__table.index2column(column)
 
+    ##pushDebug(True)
     dosql(self.__table.conn,'UPDATE '+self.__table.name+' SET '+column+' = '+sqlise(value)+' WHERE '+self.__where)
+    ##popDebug()
     self.__values=None
 
 class KeyedTableView(cs.cache.Cache):
