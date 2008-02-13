@@ -492,6 +492,9 @@ class DirectTableRow(WithUC_Attrs):
   def keys(self):
     return self.__table.columns()
 
+  def flush(self):
+    self.__values=None
+
   def __repr__(self):
     return '{' \
          + ', '.join([ `k`+": "+`self[k]` for k in self.keys() ]) \
@@ -652,6 +655,12 @@ class TableRowWrapper(WithUC_Attrs):
 
   def keys(self):
     return self.TableRow.keys()
+
+  def flush(self):
+    self.TableRow.flush()
+
+  def __getattr__(self,attr):
+    return getattr(self.TableRow,attr)
 
   def __getitem__(self,column):
     return self.TableRow[column]
