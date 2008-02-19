@@ -5,6 +5,7 @@
 #
 
 import sys
+import time
 from getopt import getopt, GetoptError
 from datetime import datetime, timedelta
 from cs.misc import cmd, cmderr
@@ -42,32 +43,64 @@ if badopts:
   sys.exit(2)
 
 zones={}
+defaultZone=None
+
 def aptime(logline):
   fields = logline.split(' ')
   if len(fields) < 5:
     ##cmderr("bad log line: %s" % logline)
     return None
 
-  humantime, tzinfo = fields[3:5]
-  if len(humantime) != 21 or not humantime.startswith('['):
-    cmderr("bad human time (%s) in log line: %s" % (humantime, logline))
-    return None
-
-  try:
-    dt=datetime.strptime(humantime, "[%d/%b/%Y:%H:%M:%S")
-  except ValueError, e:
-    cmderr(str(e))
-    return None
+  #######################################################
+  # try for desired "[DD/Mon/YYYY:HH:MM:SS +hhmm]" format
+  humantime, tzinfo = fields[3], fields[4]
+  if len(humantime) == 21 \
+  and humantime.startswith('[') \
+  and tzinfo.endswith(']'):
+    try:
+      dt=datetime.strptime(humantime, "[%d/%b/%Y:%H:%M:%S")
+    except ValueError, e:
+      cmderr(str(e))
+      return None
+    tzinfo=tzinfo[:-1]
+  else:
+    ###################################################
+    # try for undesired "[DD/Mon/YYYY HH:MM:SS]" format
+    humantime=" ".join(fields[3:5])
+    if len(humantime) == 22 \
+    and humantime.startswith('[') \
+    and humantime.endswith(']'):
+      try:
+        dt=datetime.strptime(humantime, "[%d/%b/%Y %H:%M:%S]")
+      except ValueError, e:
+        cmderr(str(e))
+        return None
+      global defaultZone
+      if defaultZone is None:
+        tm=time.localtime()
+        if tm[8]:
+          tzoff=time.altzone
+        else:
+          tzoff=time.timezone
+        if tzoff < 0:
+          zoneSign='+'
+          tzoff = -tzoff
+        else:
+          zoneSign='-'
+        defaultZone = "%s%02d%02d" % (zoneSign, int(tzoff/3600), int( int(tzoff/60) % 60))
+      tzinfo=defaultZone
+    else:
+      ###################################################
+      cmderr("bad human time (%s) in log line: %s" % (humantime, logline))
+      return None
 
   global zones
   if tzinfo not in zones:
-    if len(tzinfo) != 6 \
+    if len(tzinfo) != 5 \
     or tzinfo[0] not in '+-' \
-    or not tzinfo[1:5].isdigit() \
-    or not tzinfo.endswith(']'):
+    or not tzinfo[1:5].isdigit():
       cmderr("bad timezone offset (%s) in log line: %s" % (humantime, logline))
       return None
-
     tzoff=(int(tzinfo[1:3])*60+int(tzinfo[3:5]))*60
     if tzinfo[0] == '+':
       tzoff = -tzoff
