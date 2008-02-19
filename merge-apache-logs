@@ -45,7 +45,7 @@ zones={}
 def aptime(logline):
   fields = logline.split(' ')
   if len(fields) < 5:
-    cmderr("bad log line: %s" % logline)
+    ##cmderr("bad log line: %s" % logline)
     return None
 
   humantime, tzinfo = fields[3:5]

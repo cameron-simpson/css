@@ -58,6 +58,7 @@ user_pref("permissions.default.image", 2);' "$prefs"
 APPHELPER_PREOPTS=-t
 export APPHELPER_PREOPTS
 
+set -x
 sync
 "$br" -width "$X11_MONITOR0_DX" -height "$PIX_HIGH" $ffopts -P "$profile" ${1+"$@"}
 xit=$?

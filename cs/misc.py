@@ -643,7 +643,6 @@ class HasFlags:
       flagv.add(flag)
       if type(self[self.__flagfield]) is str:
         flagv=",".join(flagv)
-      warn("%s.%s=\"%s\"" % (self,self.__flagfield,flagv))
       self[self.__flagfield]=flagv
 
   def clearFlag(self,flag):
@@ -651,7 +650,7 @@ class HasFlags:
       flagv=self.__flaglist()
       flagv.remove(flag)
       if type(self[self.__flagfield]) is str:
-        flagv=" ".join(flagv)
+        flagv=",".join(flagv)
       self[self.__flagfield]=flagv
 
 def saferename(oldpath,newpath):

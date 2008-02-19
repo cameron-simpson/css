@@ -233,7 +233,7 @@ do
   shift
 done
 
-[ $verbose ] && { rsopts="$rsopts -v"; [ -t 2 ] && rsopts="$rsopts -P"; }
+[ $verbose ] && rsopts="$rsopts -v"
 
 #
 # =back

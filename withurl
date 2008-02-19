@@ -84,7 +84,10 @@ else
         set -- --load-cookies "$COOKIE_FILE" "$@" ;;
     esac
     set -x
-    wget "$@"
+    wget \
+      -e "http_proxy = $http_proxy" \
+      -e "http_proxy = $ftp_proxy" \
+      "$@"
     ##httpget -f -o "$saveas" "$url" || exit 1
   ) || exit 1
 fi

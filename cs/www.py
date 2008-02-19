@@ -12,7 +12,7 @@ from cookielib import MozillaCookieJar, Cookie
 from urlparse import urljoin
 import cs.hier
 from cs.hier import T_SEQ, T_MAP, T_SCALAR
-from cs.misc import warn
+from cs.misc import warn, debug, ifdebug
 
 cookieHandler = HTTPCookieProcessor()
 if 'COOKIE_FILE' in os.environ:
@@ -25,6 +25,7 @@ if 'COOKIE_FILE' in os.environ:
     import sqlite3
     import time
     now = time.time()
+    debug("SQLITE3 cookie file: %s" % cookieFile)
     db=sqlite3.connect(cookieFile)
     cursor=db.cursor()
     cursor.execute('select id, name, value, host, path, expiry, isSecure, isHttpOnly from moz_cookies')
@@ -55,7 +56,9 @@ if 'COOKIE_FILE' in os.environ:
                  None,
                  {})
       if c.is_expired(now):
-          continue
+        if ifdebug(): warn("skip expired cookie: name=%s, host=%s, path=%s" % (name,host,path))
+        continue
+      if ifdebug(): warn("add cookie: name=%s, host=%s, path=%s" % (name,host,path))
       cookieHandler.cookiejar.set_cookie(c)
 install_opener(build_opener(cookieHandler))
 
