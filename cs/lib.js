@@ -3,6 +3,7 @@ if (this._cs_libLoaded) {
 } else {
   _logNode=null;  //document.body;
   _cs_seq = 0;
+  _cs_DEBUG = false;
 
   _cs_singlePixelIMGPrefix = '';
   _cs_browserVersion = parseInt(navigator.appVersion);
@@ -725,18 +726,22 @@ CSAsyncObject.prototype.addAttr = function(attrname, rpcurl, rpcop, rpcargs) {
   var attrs = this.asyncAttrs[attrname] = {};
   attrs.rpc = [rpcurl,rpcop,rpcargs];
 };
-CSAsyncObject.prototype.withAttr = function(attrname, args, callback) {
-  if (typeof(args) != "function") {
+CSAsyncObject.prototype.withAttr = function(attrname, params, callback) {
+  if (typeof(params) != "function") {
     // assume 3-arg call - (attr, {params}, callback) - rpc func, params, callback
+    rpcargs={key: this.key}
+    for (param in params) {
+      rpcargs[param]=params[param];
+    }
     csRPC(this.rpcurl,
           attrname,
-          {key: this.key, params: args},
+          rpcargs,
           callback);
     return;
   }
 
   // assume 2-args call - (attr, callback) - static attribute with callback
-  callback=args;
+  callback=params;
 
   var me = this;
   var attr = me.asyncAttrs[attrname];
@@ -1163,10 +1168,12 @@ CSFolder.prototype.setOpen = function(openMode) {
 };
 
 function csShowTableElem(elem, showit) {
-  if (_cs_isIE) {
-    elem.style.display=( showit ? 'table-row' : 'none' );
-  } else {
-    elem.style.visibility=(showit ? 'visible' : 'collapse' );
+  if (elem) {
+    if (_cs_isIE) {
+      elem.display=( showit ? 'table-row' : 'none' );
+    } else {
+      elem.style.visibility=(showit ? 'visible' : 'collapse' );
+    }
   }
 }
 
@@ -1244,7 +1251,7 @@ function CSEntry(control, prefix) {
                        }
 
                        me.text.value=me.value;
-                       if (_cs_isIE) Event.returnValue=!caught;
+                       if (_cs_isIE) event.returnValue=!caught;
                        return !caught;
                      };
   me.span.appendChild(me.text);
@@ -1253,6 +1260,10 @@ CSEntry.prototype.setTooltip = function(tip) {
   this.text.title=tip;
 };
 CSEntry.prototype.showPopup = function(doShow) {
+  if (_cs_isIE) {
+    // FIXME: find out how to hide table rows in IE
+    doShow=false;
+  }
   if (this.popup) {
     if (doShow) {
       csPosNodeBelow(this.popup, this.span);
@@ -1359,11 +1370,15 @@ CSVList.prototype.onclick = function(hotspan, e) {
 };
 CSVList.prototype.showPrefix = function(prefix) {
   for (var choice in this.rowMap) {
-    this.rowMap[choice].style.visibility
-      = ( choice.length >= prefix.length && choice.substr(0, prefix.length) == prefix )
-        ? 'visible'
-        : 'collapse'
-        ;
+    vis = ( choice.length >= prefix.length && choice.substr(0, prefix.length) == prefix )
+          ? 'visible'
+          : 'collapse'
+          ;
+    if (_cs_isIE) {
+      this.rowMap[choice].visibility=vis;
+    } else {
+      this.rowMap[choice].style.visibility=vis;
+    }
   }
 }
 
