@@ -102,27 +102,33 @@ def toqs(s):
 
 textSafeRe=re.compile(r'[^<>&]+')
 
-def puttext(fp,str,safeRe=None):
+def text2html(s):
+  from cStringIO import StringIO
+  io=StringIO()
+  puttext(io,s)
+  return io.getvalue()
+
+def puttext(fp,s,safeRe=None):
   """ Transcribe plain text in HTML safe form.
   """
   if safeRe is None: safeRe=textSafeRe
-  while len(str):
-    m=safeRe.match(str)
+  while len(s):
+    m=safeRe.match(s)
     if m:
       safetext=m.group(0)
       fp.write(safetext)
-      str=str[len(safetext):]
+      s=s[len(safetext):]
     else:
-      if str[0] == '<':
+      if s[0] == '<':
         fp.write('&lt;')
-      elif str[0] == '>':
+      elif s[0] == '>':
         fp.write('&gt;')
-      elif str[0] == '&':
+      elif s[0] == '&':
         fp.write('&amp;')
       else:
-        fp.write('&#%d;'%ord(str[0]))
+        fp.write('&#%d;'%ord(s[0]))
 
-      str=str[1:]
+      s=s[1:]
 
 def puthtml(fp,*args):
   """ Transcribe tokens as HTML. """
