@@ -45,7 +45,7 @@ _home:
                 --exclude=squid_redirect \\
                 --exclude=*.swp \\
                 --exclude=/\*/ \\
-                . $(HOME)/bin/.
+                bin/. $(HOME)/bin/.
 
 _all: squid_redirect 1INDEX.txt _submakes _man
 
