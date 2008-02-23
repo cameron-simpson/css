@@ -206,6 +206,37 @@ do
       } || xit=1
       ;;
 
+    # =item B<infra>
+    #
+    # Submit the I<description>
+    # as an attachment called "log.txt" to any Infra bug identifiers
+    # (as identified by the infraids(1) script)
+    # mentioned in the headline.
+    # For example,
+    # we routinely commit trivial CVS changes with headlines like:
+    #
+    #	moved user home dir from here to there [infra12345]
+    #
+    # which would add an attachment to Infra bug B<12345>.
+    #
+    infra)
+      infraids=`echo "$headline" | infraids`
+      if [ -n "$infraids" ]
+      then
+        if wkdir=`mkdirn "$TMPDIR/$cmd."`
+        then
+          ( set -uex
+            unctrl <"$attachment" >"$wkdir/log.txt"
+            cd "$wkdir"
+            mutt -F /dev/null -s "$headline" -a log.txt cameron $infraids </dev/null
+          ) || xit=1
+          rm -r "$wkdir"
+        else
+          xit=1
+        fi
+      fi
+      ;;
+
     # =item B<logger>
     #
     # Submit the I<headline> alone

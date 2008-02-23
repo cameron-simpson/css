@@ -39,13 +39,19 @@ _home:
                 --include=/CHANGELOG.txt \\
                 $$skip \\
                 --include=bos/ \\
-                --include=cs/ \\
                 --include=stubs/ \\
                 --include=synonyms/ \\
                 --exclude=squid_redirect \\
                 --exclude=*.swp \\
                 --exclude=/\*/ \\
-                . $(HOME)/bin/.
+                bin/. $(HOME)/bin/. \
+        set-x \\
+        rsync -av --delete \\
+                --include=/CHANGELOG.txt \\
+                $$skip \\
+                --exclude=*.swp \\
+                --exclude=/\*/ \\
+                lib/cs/. $(HOME)/lib/cs/.
 
 _all: squid_redirect 1INDEX.txt _submakes _man
 
@@ -56,7 +62,7 @@ CHANGELOG.html:	_always
 	cvslog2html -O . | rewriteif $@ sed 's/[Cc][Ii][Ss][Rr][Aa]/work/g'
 
 1INDEX.txt: $(allscripts)
-	@echo make $@; rewriteif $@ mkscriptndx `ls -d $(allscripts) | sort`
+	@echo make $@; mkscriptndx `ls -d $(allscripts) | sort` >$@
 
 _test:
 	echo $(pmmans)

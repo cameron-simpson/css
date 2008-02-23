@@ -9,10 +9,13 @@
 force=
 [ $# -gt 0 ] && [ "x$1" = x-f ] && { force=1; shift; }
 
+pidtag=xcompmgr-$DISPLAY
+
 # -f and -F probably trigger a memory leak
 if [ $force ] || { [ $X11_COMPOSITE ] && not flag DISABLE_X11_COMPOSITE; }
 then
-  ifpid xcompmgr || bgproc -p xcompmgr -l x11 xcompmgr -cfF -r0 -D5 -I0.01 -O0.02
+  ifpid "$pidtag" \
+  || bgproc -p "$pidtag" -l x11 xcompmgr -cfF -r0 -D5 -I0.01 -O0.02
 else
-  ifpid xcompmgr && killpidfile xcompmgr
+  ifpid "$pidtag" && killpidfile "$pidtag"
 fi

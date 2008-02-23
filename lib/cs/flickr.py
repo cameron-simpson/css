@@ -8,7 +8,7 @@ import urllib
 from cs.sitehack import SiteHack
 from cs.misc import debug
 
-flickrPrefix='http://www.flickr.com/'
+flickrPrefix=('http://www.flickr.com/', 'http://flickr.com/')
 
 class FlickrURL(SiteHack):
   def __init__(self,url):
@@ -36,12 +36,12 @@ class FlickrURL(SiteHack):
       if imsizes is None:
         imsizes='olblmst'
       for imsize in imsizes:
-        imurl="http://www.flickr.com/photo_zoom.gne?id=%s&size=%s" % (self.photoid, imsize)
+        imurl="http://www.flickr.com/photos/%s/%s/sizes/%s/" % (self.userid, self.photoid, imsize)
         debug("trying imsize=%s, imurl=%s" % (imsize,imurl))
         U=urllib.urlopen(imurl)
         goturl=U.geturl()
-        if goturl.endswith("&size=%s" % imsize):
-          for link in self.links(U=U):
+        if goturl.endswith("/sizes/%s/" % imsize):
+          for link in self.links(U=U,attr="src"):
             debug("link=%s" % link)
             if link.endswith("_d.jpg"):
               return link

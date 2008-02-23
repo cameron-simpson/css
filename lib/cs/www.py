@@ -12,7 +12,7 @@ from cookielib import MozillaCookieJar, Cookie
 from urlparse import urljoin
 import cs.hier
 from cs.hier import T_SEQ, T_MAP, T_SCALAR
-from cs.misc import warn
+from cs.misc import warn, debug, ifdebug
 
 cookieHandler = HTTPCookieProcessor()
 if 'COOKIE_FILE' in os.environ:
@@ -25,6 +25,7 @@ if 'COOKIE_FILE' in os.environ:
     import sqlite3
     import time
     now = time.time()
+    debug("SQLITE3 cookie file: %s" % cookieFile)
     db=sqlite3.connect(cookieFile)
     cursor=db.cursor()
     cursor.execute('select id, name, value, host, path, expiry, isSecure, isHttpOnly from moz_cookies')
@@ -55,7 +56,9 @@ if 'COOKIE_FILE' in os.environ:
                  None,
                  {})
       if c.is_expired(now):
-          continue
+        if ifdebug(): warn("skip expired cookie: name=%s, host=%s, path=%s" % (name,host,path))
+        continue
+      if ifdebug(): warn("add cookie: name=%s, host=%s, path=%s" % (name,host,path))
       cookieHandler.cookiejar.set_cookie(c)
 install_opener(build_opener(cookieHandler))
 
@@ -99,27 +102,33 @@ def toqs(s):
 
 textSafeRe=re.compile(r'[^<>&]+')
 
-def puttext(fp,str,safeRe=None):
+def text2html(s):
+  from cStringIO import StringIO
+  io=StringIO()
+  puttext(io,s)
+  return io.getvalue()
+
+def puttext(fp,s,safeRe=None):
   """ Transcribe plain text in HTML safe form.
   """
   if safeRe is None: safeRe=textSafeRe
-  while len(str):
-    m=safeRe.match(str)
+  while len(s):
+    m=safeRe.match(s)
     if m:
       safetext=m.group(0)
       fp.write(safetext)
-      str=str[len(safetext):]
+      s=s[len(safetext):]
     else:
-      if str[0] == '<':
+      if s[0] == '<':
         fp.write('&lt;')
-      elif str[0] == '>':
+      elif s[0] == '>':
         fp.write('&gt;')
-      elif str[0] == '&':
+      elif s[0] == '&':
         fp.write('&amp;')
       else:
-        fp.write('&#%d;'%ord(str[0]))
+        fp.write('&#%d;'%ord(s[0]))
 
-      str=str[1:]
+      s=s[1:]
 
 def puthtml(fp,*args):
   """ Transcribe tokens as HTML. """

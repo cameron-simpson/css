@@ -34,8 +34,8 @@ muttopts=
 anyhost=
 use_term=	## 1; case "$DISPLAY" in localhost:[1-9]*) use_term= ;; esac
 use_screen=
-preshcmd=
-postshcmd=
+preshcmd=:
+postshcmd=:
 termopts='-g M'
 
 badopts=
@@ -102,7 +102,13 @@ else
   } || :
 
   fmuttrc=$fpath/.muttrc
-  [ -s "$fmuttrc" ] && muttcmd="$muttcmd -e 'source $fmuttrc'"
+  [ ! -s "$fmuttrc" ] || muttcmd="$muttcmd -e 'source $fmuttrc'"
+
+  fpremutt=$fpath/.preshcmd
+  [ ! -s "$fpremutt" ] || preshcmd="$preshcmd; . $fpremutt"
+
+  fpostmutt=$fpath/.postshcmd
+  [ ! -s "$fpostmutt" ] || postshcmd="$postshcmd; . $fpostmutt"
 fi
 
 CURRENT_FOLDER=$fpath

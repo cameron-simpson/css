@@ -27,12 +27,21 @@ charx=5
 mintty=charx*80
 
 D=cs.x11.Display()
+screen=0
+display=D.DISPLAY
+displayBase=display
+dotpos=display.rfind('.')
+if dotpos >= 0:
+  displayBase=display[:dotpos]
+  if display[dotpos+1:].isdigit():
+    screen=int(display[dotpos+1:])
 
 ##import cs.hier
 ##print cs.hier.h2a(D,1)
 
-dx=D.SCREENS[0].DX
-dy=D.SCREENS[0].DY
+dx=D.SCREENS[screen].DX
+dy=D.SCREENS[screen].DY
+##cmderr("choose screen %d: %dx%d" % (screen,dx,dy))
 
 if len(sys.argv) > 1:
   dx=int(sys.argv[1])
@@ -43,7 +52,7 @@ def setenv(var,value):
     value=str(value)
   os.environ[var]=value
   qvalue=cs.sh.quotestr(value)
-  open("%s/var/env.sh"%os.environ['HOME'],mode='a').write("%s=%s; export %s\n" % (var,qvalue,var))
+  open("%s/var/env-%s.sh"%(os.environ['HOME'],D.DISPLAY),mode='a').write("%s=%s; export %s\n" % (var,qvalue,var))
   print "SetEnv %s %s" % (var,qvalue)
 
 def settabenv(tabnum, px, wx):
@@ -80,9 +89,12 @@ def slice(dx):
 
 # infer physical monitors from display dimensions
 if dx == 3840 or dx == 3200 or dx == 2560:
-  # two minotors
+  # two monitors
   dx2=dx/2
   slices=(dx2,dx2)
+elif dx == 3520:
+  # two monitors
+  slices=(1920,1600)
 elif dx == 5120:
   # three monitors
   slices=(1600,1920,1600)

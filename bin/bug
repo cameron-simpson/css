@@ -75,6 +75,9 @@ exec 3>&1
 	) | csbug -b "$bugnum" COMMENT
 	exit $?
 	;;
+      infra)
+	exec mkinfrarq -- "$*"
+	;;
       ddts)
 	pro=sa.maintenance
 	exec mkddtsrq -S "$sev" -p "$pro" -- "$*"
