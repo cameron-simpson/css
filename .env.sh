@@ -13,9 +13,8 @@
 : ${SITENAME:=$HOSTDOMAIN}
 : ${MAILDOMAIN:=$SITENAME}
 : ${EMAIL:="$USER@$MAILDOMAIN"}
-: ${MANPATH:=/usr/man:/usr/share/man}
 : ${PATH:=/usr/bin:/bin}
-: ${PERL5LIB:=/usr/lib/perl5}
+: ${MANPATH:=/usr/man:/usr/share/man}
 : ${CLASSPATH:=/usr/lib/jre/lib}
 
 : ${OS:=''}
@@ -27,8 +26,8 @@ esac
 
 PATH=$PATH:$OPTCSS/bin:/sbin:/usr/sbin
 MANPATH=$MANPATH:$OPTCSS/man
-PERL5LIB=$PERL5LIB:$OPTCSS/lib
-CLASSPATH=$CLASSPATH:$OPTCSS/lib/au.com.zip.cs.jar
+PERL5LIB=${PERL5LIB:+"$PERL5LIB:"}$OPTCSS/lib
+CLASSPATH=${CLASSPATH:+"$CLASSPATH:"}$OPTCSS/lib/au.com.zip.cs.jar
 PYTHONPATH=${PYTHONPATH:+"$PYTHONPATH:"}$OPTCSS/lib
 
 export PATH MANPATH PERL5LIB HOST HOSTNAME HOSTDOMAIN MAILDOMAIN USER SITENAME EMAIL CLASSPATH PYTHONPATH OS

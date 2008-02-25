@@ -42,7 +42,9 @@ Installing my scripts:
     Several of the scripts expect the following shell environment variables:
 
 	$HOST		Your machine's short name.
+                        Defaults to $HOSTNAME without the trailing components.
 	$HOSTNAME	Your machine's fully qualified domain name.
+                        Defaults to `hostname`.
 	$ARCH		Your architecure, in the form vendor.cpu.os,
 			eg sun.sparc.solaris or sgi.mips.irix.
 	$SYSTEMID	A name for your machines' administrative domain
