@@ -29,6 +29,9 @@ trap '[ ! -d "$tmpdir" ] || rm -rf $tmpdir' 0
 trap '[ ! -d "$tmpdir" ] || rm -rf $tmpdir; exit 1' 1 2 13 15
 tmpdir=`mkdirn "$TMPDIR/$cmd"`
 
+mkdir "$tmpdir/man"
+myke "MANDIR=$tmpdir/man" _man || echo myke _man fails, ignoring...
+
 ( 
   hg manifest \
   | sed '/^bin/b ok
@@ -40,6 +43,8 @@ tmpdir=`mkdirn "$TMPDIR/$cmd"`
 | cpio -pmd "$tmpdir"
 
 hglog | sed 's/[Cc][Ii][Ss][Rr][Aa]/work/g' >"$tmpdir/CHANGELOG.txt"
+
+( cd bin; mkscriptndx * | sort ) >"$tmpdir/1INDEX.txt"
 
 rsync -avH --delete "$tmpdir/." "$OPTCSS/."
 

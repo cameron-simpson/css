@@ -1,7 +1,6 @@
 ## :include	dir2html
 
 target  = bin
-PREFIX  = /opt/css
 
 JAVADIR	= $(ETCDIR)/www/java/classes
 java	= $(localjava) $(subjava)
@@ -25,14 +24,13 @@ pmFromMan(manf) = $(manf FP s:|::|/|).pm
 pmFromHtml(html) = $(html FPP s:|::|/|).pm
 
 subdirs = $('*/.' GD)
-allscripts = $('*' G !/\./ - subdirs - "0README.txt" - "1INDEX.txt" - "INSTALL" + "synonyms" + "rc.mobile")
+allscripts = $('bin/*' GF !/\./ + "rc.mobile")
 
 scriptmandir = $(MANDIR)/man1
 scriptmans = $(scriptmandir)/$((allscripts)).1
 scriptfromman(manf) = $(manf FP)
 
 _home:
-        :make CHANGELOG.txt
         skip=`hg status | sed -n 's:^? \(.*\):--exclude=/\1:p'` \
         set-x \\
         rsync -av --delete \\
@@ -88,11 +86,11 @@ $(pmmans):	$(pmFromMan($@))
 
 _scriptmans:
 	@echo make $@ ... \
-	egrep -l '^(# *)?=head1 NAME' $(allscripts) \\
+        ( cd bin; exec egrep -l '^(# *)?=head1 NAME' $(allscripts) ) \\
 	| sed 's|.*|$(scriptmandir)/&.1|' \\
-	| xxargs set-x $(MAKE)
+	| xxargs set-x $(MAKE) MANDIR=$(MANDIR)
 
-$(scriptmandir)/%.1: %
+$(scriptmandir)/%.1: bin/%
 	:make $(@D)/.
 	@htman=$(htmandir)/$(@F).html \
 	 case "`sed 1q <$?`" in \
