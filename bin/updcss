@@ -1,15 +1,18 @@
-#!/bin/sh -u
+#!/bin/sh -ue
 #
 # Rebuild css from my development copy.
 #	- Cameron Simpson <cs@zip.com.au> 09apr1997
 #
+
+: ${TMPDIR:=/tmp}
+: ${OPTCSS:=/opt/css}
 
 cssweb=$HOME/@/ezos/html/cs/css
 cssdir=/opt/css
 dosync=1
 quick=
 
-cmd=$0
+cmd=`basename "$0"`
 usage="Usage: $cmd [-q] [-n] [pushhosts...]"
 
 xit=0
@@ -20,6 +23,29 @@ umask 22
 
 [ $# -gt 0 ] && [ "x$1" = x-q ] && { quick=1; shift; }
 [ $# -gt 0 ] && [ "x$1" = x-n ] && { dosync=; shift; }
+
+unset tmpdir
+trap '[ ! -d "$tmpdir" ] || rm -rf $tmpdir' 0
+trap '[ ! -d "$tmpdir" ] || rm -rf $tmpdir; exit 1' 1 2 13 15
+tmpdir=`mkdirn "$TMPDIR/$cmd"`
+
+( 
+  hg manifest \
+  | sed '/^bin/b ok
+         /^lib/b ok
+         /\//d
+         :ok'
+  echo lib/au.com.zip.cs.jar
+) \
+| cpio -pd "$tmpdir"
+
+hglog | sed 's/[Cc][Ii][Ss][Rr][Aa]/work/g' >"$tmpdir/CHANGELOG.txt"
+
+rsync -avH --delete "$tmpdir/." "$OPTCSS/."
+
+exit 0
+
+subdirs=
 
 if [ -z "$quick" ]
 then
