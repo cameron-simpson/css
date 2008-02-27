@@ -37,7 +37,7 @@ tmpdir=`mkdirn "$TMPDIR/$cmd"`
          :ok'
   echo lib/au.com.zip.cs.jar
 ) \
-| cpio -pd "$tmpdir"
+| cpio -pmd "$tmpdir"
 
 hglog | sed 's/[Cc][Ii][Ss][Rr][Aa]/work/g' >"$tmpdir/CHANGELOG.txt"
 
