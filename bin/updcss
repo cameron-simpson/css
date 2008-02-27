@@ -42,11 +42,19 @@ myke "MANDIR=$tmpdir/man" _man || echo myke _man fails, ignoring...
 ) \
 | cpio -pmd "$tmpdir"
 
+cp $HOME/rc/java/au.com.zip.cs.jar "$tmpdir/lib/."
+
 hglog | sed 's/[Cc][Ii][Ss][Rr][Aa]/work/g' >"$tmpdir/CHANGELOG.txt"
 
 ( cd bin; mkscriptndx * | sort ) >"$tmpdir/1INDEX.txt"
 
-rsync -avH --delete "$tmpdir/." "$OPTCSS/."
+rsync -avH --delete \
+        --include=CHANGELOG.txt \
+        --include=/bin \
+        --include=/lib \
+        --include=/man \
+        '--exclude=/*' \
+        "$tmpdir/." "$OPTCSS/."
 
 exit 0
 
