@@ -1,6 +1,6 @@
 #!/bin/sh -ue
 #
-# Rebuild css from my development copy.
+# Install and publish css from my development copy.
 #	- Cameron Simpson <cs@zip.com.au> 09apr1997
 #
 
@@ -8,6 +8,7 @@
 : ${OPTCSS:=/opt/css}
 
 cssweb=$HOME/@/ezos/html/cs/css
+adzapweb=$HOME/@/adzapper.sf/html/scripts
 cssdir=/opt/css
 dosync=1
 quick=
@@ -29,12 +30,11 @@ trap '[ ! -d "$tmpdir" ] || rm -rf $tmpdir' 0
 trap '[ ! -d "$tmpdir" ] || rm -rf $tmpdir; exit 1' 1 2 13 15
 tmpdir=`mkdirn "$TMPDIR/$cmd"`
 
-mkdir "$tmpdir/man"
-myke "MANDIR=$tmpdir/man" _man || echo myke _man fails, ignoring...
-
 ( 
   hg manifest \
-  | sed '/^bin/b ok
+  | sed '
+         /^bin\/synonyms\//d
+         /^bin/b ok
          /^lib/b ok
          /\//d
          :ok'
@@ -42,11 +42,23 @@ myke "MANDIR=$tmpdir/man" _man || echo myke _man fails, ignoring...
 ) \
 | cpio -pmd "$tmpdir"
 
+L "$tmpdir"
+
+rsync -avHL --ignore-existing bin/synonyms/. "$tmpdir/bin/."
+
+for f in squid_redirect testpageurls testzap
+do cp "$adzapweb/$f" "$tmpdir/bin/."
+   chmod a+rx "$tmpdir/bin/$f"
+done
+
 cp $HOME/rc/java/au.com.zip.cs.jar "$tmpdir/lib/."
 
 hglog | sed 's/[Cc][Ii][Ss][Rr][Aa]/work/g' >"$tmpdir/CHANGELOG.txt"
 
 ( cd bin; mkscriptndx * | sort ) >"$tmpdir/1INDEX.txt"
+
+mkdir "$tmpdir/man"
+myke "MANDIR=$tmpdir/man" _man || echo myke _man fails, ignoring...
 
 rsync -avH --delete \
         --include=CHANGELOG.txt \
