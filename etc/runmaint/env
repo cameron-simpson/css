@@ -1,0 +1,5 @@
+# global env setup - hack to suit your system
+. /etc/profile
+PATH=$PATH:/opt/script:/opt/bin
+export PATH
+[ -s /opt/css/env.sh ] && . /opt/css/env.sh
