@@ -6,12 +6,12 @@
 #
 
 cmd=$0
-usage="Usage: $cmd from to"
+usage="Usage: $cmd from to [rsync-options...]"
 
 syncset=acc
 
-[ $# = 2 ] || { echo "$usage" >&2; exit 2; }
-from=$1 to=$2
+[ $# -ge 2 ] || { echo "$usage" >&2; exit 2; }
+from=$1 to=$2; shift; shift
 
 case "$syncset" in
   /* | ./* | ../* ) ;;
@@ -23,6 +23,7 @@ pwd
 
 set -x
 exec \
-  rsync -rlptHvPC --delete --exclude=CVS/ --exclude=\*.swp --exclude=\*~ \
+  rsync -rlptHvC --delete --exclude=CVS/ --exclude=\*.swp --exclude=\*~ \
 	"--include-from=$syncset" \
+        ${1+"$@"} \
 	"$from." "$to."
