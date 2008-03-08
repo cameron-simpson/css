@@ -328,6 +328,16 @@ sub setvar
       next VAR;
     }
 
+    if (/^insprefix\s+/)
+    { $_=$';
+      for my $pfx (map(estring($_), grep(length,split(/\s+/))))
+      { $pfx="/opt/$pfx" unless $pfx =~ /^\//;
+	setenv(PATH,"$pfx/bin:$pfx/sbin:$::ENV{PATH}");
+        setenv(MANPATH,"$pfx/man:$pfx/catman:$pfx/info:$::ENV{MANPATH}");
+      }
+      next VAR;
+    }
+
     if (/^([a-z_]\w*)=/i)
     { my($var,$val)=($1,$');
       setenv($var,estring($val,$missok));
@@ -597,10 +607,18 @@ sub useline($)
   }
   elsif (/^addprefix\s+/)
   { $_=$';
-    for my $pfx (grep(length,split(/\s+/)))
+    for my $pfx (map(estring($_,0),grep(length,split(/\s+/))))
     { $pfx="/opt/$pfx" unless $pfx =~ /^\//;
       setenv(PATH,"$::ENV{PATH}:$pfx/bin:$pfx/sbin");
       setenv(MANPATH,"$::ENV{MANPATH}:$pfx/man:$pfx/catman:$pfx/info");
+    }
+  }
+  elsif (/^insprefix\s+/)
+  { $_=$';
+    for my $pfx (map(estring($_,0),grep(length,split(/\s+/))))
+    { $pfx="/opt/$pfx" unless $pfx =~ /^\//;
+      setenv(PATH,"$pfx/bin:$pfx/sbin:$::ENV{PATH}");
+      setenv(MANPATH,"$pfx/man:$pfx/catman:$pfx/info:$::ENV{MANPATH}");
     }
   }
   elsif (/^final\s+/)
