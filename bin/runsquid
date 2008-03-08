@@ -55,7 +55,7 @@ case $op in
         echo "$cmd: $op: no cache_dir: $cache_dir" >&2
         exit 1
       fi
-      $trace "$0" $xopt -S "$SQUID_BINARY" -f "$SQUID_CONFIG" stop
+      $trace "$0" $xopt -S "$SQUID_BINARY" -f "$SQUID_CONFIG" stop || :
       $trace rmr "$cache_dir"
       $trace mkdir "$cache_dir"
       $trace chown squid:squid "$cache_dir"
