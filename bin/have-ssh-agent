@@ -25,7 +25,6 @@ done
 
 if [ $perhost ]
 then
-  shift
   statefile=`ssh-agent-statefile` || exit 1
   [ -f "$statefile" -a -s "$statefile" ] || exit 1
   . "$statefile"
