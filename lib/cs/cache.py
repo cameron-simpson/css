@@ -18,6 +18,37 @@ def overallHitRatio():
 
   return float(hits)/float(total)
 
+class RingBuffer(list):
+  def __init__(self,size):
+    assert size > 0
+    list.__init__( None for i in range(size) )
+    self.__off=0
+
+  def __len__(self):
+    return len(self.__buf)
+
+  def __getitem__(self, i):
+    assert i >= 0, "i < 0 (%d)" % i
+    blen=len(self.__buf)
+    assert i < blen, "i >= buflen (%d >= %d)" % (i, blen)
+    i=(i+self.__off) % blen
+    return self.__buf[i]
+
+  def __setitem__(self, i, v):
+    assert i >= 0, "i < 0 (%d)" % i
+    blen=len(self.__buf)
+    assert i < blen, "i >= buflen (%d >= %d)" % (i, blen)
+    i=(i+self.__off) % blen
+    self.__buf[i]=v
+
+  def append(self, v):
+    i=self.__off
+    self.__buf[i]=v
+    i+=1
+    if i >= len(self.__buf):
+      i=0
+    self.__off=i
+
 class LRU(dict):
   ''' An simple minded LRU cache wrapper for a mapping.
       Internally it uses a heap; semanticly this is like using
