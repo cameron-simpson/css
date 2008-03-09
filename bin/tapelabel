@@ -1,0 +1,57 @@
+#!/bin/sh -ue
+#
+# Report the tape label of the specified jukebox slot,
+# or the reverse.
+#       - Cameron Simpson <cs@zip.com.au> 09mar2008
+#
+
+cmd=`basename "$0"`
+usage="Usage: $cmd slotnum
+       $cmd -r label"
+
+badopts=
+reverse=
+
+if [ $# -gt 0 ] && [ "x$1" = x-r ]
+then
+  reverse=1
+  shift
+  if [ $# = 0 ]
+  then
+    echo "$cmd: missing label" >&2
+    badopts=1
+  else
+    label=$1
+    shift
+    if [ $# -gt 0 ]
+    then
+      echo "$cmd: extra arguments after label: $*" >&2
+      badopts=1
+    fi
+  fi
+else
+  if [ $# = 0 ]
+  then
+    echo "$cmd: missing slotnum" >&2
+    badopts=1
+  else
+    slotnum=$1
+    shift
+    if [ $# -gt 0 ]
+    then
+      echo "$cmd: extra arguments after slotnum: $*" >&2
+      badopts=1
+    fi
+  fi
+fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+mover \
+| sed -n 's/^ *\([0-9][0-9]*\): .*\ttag: '\''\([^'\'']*\)'\'' *$/\1 \2/p' \
+| if [ $reverse ]
+  then
+    awk -v "label=$label" '$2 == label { print $1 }'
+  else
+    awk -v "slotnum=$slotnum" '$1 == slotnum { print $2 }'
+  fi
