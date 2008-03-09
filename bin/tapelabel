@@ -7,10 +7,12 @@
 
 cmd=`basename "$0"`
 usage="Usage: $cmd slotnum
-       $cmd -r label"
+       $cmd -r label
+       $cmd -a"
 
 badopts=
 reverse=
+all=
 
 if [ $# -gt 0 ] && [ "x$1" = x-r ]
 then
@@ -30,17 +32,28 @@ then
     fi
   fi
 else
-  if [ $# = 0 ]
+  if [ $# -gt 0 ] && [ "x$1" = x-a ]
   then
-    echo "$cmd: missing slotnum" >&2
-    badopts=1
-  else
-    slotnum=$1
+    all=1
     shift
     if [ $# -gt 0 ]
     then
-      echo "$cmd: extra arguments after slotnum: $*" >&2
+      echo "$cmd: extra arguments: $*" >&2
       badopts=1
+    fi
+  else
+    if [ $# = 0 ]
+    then
+      echo "$cmd: missing slotnum" >&2
+      badopts=1
+    else
+      slotnum=$1
+      shift
+      if [ $# -gt 0 ]
+      then
+        echo "$cmd: extra arguments after slotnum: $*" >&2
+        badopts=1
+      fi
     fi
   fi
 fi
@@ -49,9 +62,14 @@ fi
 
 mover \
 | sed -n 's/^ *\([0-9][0-9]*\): .*\ttag: '\''\([^'\'']*\)'\'' *$/\1 \2/p' \
-| if [ $reverse ]
+| if [ $all ]
   then
-    awk -v "label=$label" '$2 == label { print $1 }'
+    cat
   else
-    awk -v "slotnum=$slotnum" '$1 == slotnum { print $2 }'
+    if [ $reverse ]
+    then
+      awk -v "label=$label" '$2 == label { print $1 }'
+    else
+      awk -v "slotnum=$slotnum" '$1 == slotnum { print $2 }'
+    fi
   fi
