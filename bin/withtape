@@ -54,6 +54,8 @@ export TAPE
 
 xit=1
 
+[ -z "$logfile" ] || label=`[ -z "$jukeslot" ] || tapelabel "$jukeslot"`
+
 if [ -z "$jukeslot" ] || $trace mover mv "s$jukeslot" d0
 then
   if $trace mt rewind \
@@ -61,11 +63,7 @@ then
   then
     $trace "$@"
     xit=$?
-    if [ -n "$logfile" ]
-    then
-      label=`[ -z "$jukeslot" ] || tapelabel "$jukeslot"`
-      echo "`date --iso` jukeslot $jukeslot ($label) tape $TAPE file $filenum: $*" >>"$logfile"
-    fi
+    [ -z "$logfile" ] || echo "`date --iso` jukeslot $jukeslot ($label) tape $TAPE file $filenum: $*" >>"$logfile"
     $trace mt rewind || xit=1
     $trace mt offline || xit=1
   fi
