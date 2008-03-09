@@ -7,7 +7,7 @@
 ezos=$HOME/@/ezos
 
 set -x
-exec rsync -rptHv --delete --delete-excluded \
+exec rsync -rptlHv --delete --delete-excluded \
 	--exclude=CVS/ \
 	--include='/mail' \
 	--include='/mail/mailcap' \
