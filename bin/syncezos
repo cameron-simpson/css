@@ -14,7 +14,7 @@ set -x
 
 syncezos-rc
 
-rsync -avHPW --delete \
+rsync -rptHv --delete \
 		--exclude=CVS/ \
 		--include=/cs --exclude=/cs/test/ \
 		--include=/fay \
