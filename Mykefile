@@ -48,7 +48,6 @@ _home:
                 --include=/CHANGELOG.txt \\
                 $$skip \\
                 --exclude=*.swp \\
-                --exclude=/\*/ \\
                 lib/cs/. $(HOME)/lib/cs/.
 
 _all: squid_redirect 1INDEX.txt _submakes _man
