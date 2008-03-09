@@ -64,7 +64,7 @@ then
     if [ -n "$logfile" ]
     then
       label=`[ -z "$jukeslot" ] || tapelabel "$jukeslot"`
-      echo "`date --iso` jukeslot $jukeslot ($label) tape $TAPE file $file: $*" >>"$logfile"
+      echo "`date --iso` jukeslot $jukeslot ($label) tape $TAPE file $filenum: $*" >>"$logfile"
     fi
     $trace mt rewind || xit=1
     $trace mt offline || xit=1
