@@ -330,7 +330,7 @@ sub setvar
 
     if (/^insprefix\s+/)
     { $_=$';
-      for my $pfx (map(estring($_), grep(length,split(/\s+/))))
+      for my $pfx (reverse(map(estring($_), grep(length,split(/\s+/)))))
       { $pfx="/opt/$pfx" unless $pfx =~ /^\//;
 	setenv(PATH,"$pfx/bin:$pfx/sbin:$::ENV{PATH}");
         setenv(MANPATH,"$pfx/man:$pfx/catman:$pfx/info:$::ENV{MANPATH}");
@@ -615,7 +615,7 @@ sub useline($)
   }
   elsif (/^insprefix\s+/)
   { $_=$';
-    for my $pfx (map(estring($_,0),grep(length,split(/\s+/))))
+    for my $pfx (reverse(map(estring($_,0),grep(length,split(/\s+/)))))
     { $pfx="/opt/$pfx" unless $pfx =~ /^\//;
       setenv(PATH,"$pfx/bin:$pfx/sbin:$::ENV{PATH}");
       setenv(MANPATH,"$pfx/man:$pfx/catman:$pfx/info:$::ENV{MANPATH}");
