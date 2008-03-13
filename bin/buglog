@@ -85,6 +85,8 @@ else
   [ $readstdin ] && cat >"$attachment"
 fi
 
+exec </dev/null
+
 [ -s "$attachment" ] && filteredit -s "$attachment" sh -c 'detab | unbs | unctrl'
 
 xit=0
@@ -133,6 +135,7 @@ do
     #
     dlog)
       dlog "$headline" || xit=1
+      buglog-daily "$headline"
       ;;
 
     # =item B<mailto:>I<email-address>[B<?subject=>I<prefix>]
