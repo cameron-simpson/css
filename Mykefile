@@ -44,6 +44,8 @@ _home:
                 --exclude=/\*/ \\
                 bin/. $(HOME)/bin/. \
         set-x \\
+        rsync -av bos/. $(HOME)/bin/.
+        set-x \\
         rsync -av --delete \\
                 --include=/CHANGELOG.txt \\
                 $$skip \\
