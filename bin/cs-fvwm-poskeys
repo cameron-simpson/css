@@ -25,6 +25,10 @@ height=None
 topy=67
 charx=5
 chary=11
+if 'FONT_X' in os.environ:
+  charx=int(os.environ['FONT_X'])
+if 'FONT_Y' in os.environ:
+  chary=int(os.environ['FONT_Y'])
 
 mintty=charx*80
 
