@@ -1,0 +1,31 @@
+#!/bin/sh -ue
+#
+# Emit a timesheet based on my daily logs.
+#       - Cameron Simpson <cs@zip.com.au> 14mar2008
+#
+
+: ${LOGDIR:=$HOME/var/log}
+
+cat=BOS
+when=today
+
+cmd=`basename "$0"`
+usage="Usage: $cmd [-d when]"
+
+badopts=
+
+if [ $# -gt 0 ] && [ "x$1" = x-d ]
+then
+  when=$2; shift; shift
+fi
+
+day=`monday "$when"`
+
+for n in 0 1 2 3 4 5 6
+do
+  ymd=`date -d "$day" '+%Y-%m-%d'`
+  log=$LOGDIR/daily/$ymd/$cat
+  echo "$ymd"
+  [ -s "$log" ] && sed 's/^/  /' "$log"
+  day=`date -d "$ymd tomorrow"`
+done
