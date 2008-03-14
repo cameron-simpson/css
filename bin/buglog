@@ -134,7 +134,7 @@ do
     # The headline alone is passed to my I<dlog> command.
     #
     dlog)
-      dlog "$headline" || xit=1
+      ##dlog "$headline" || xit=1
       buglog-daily "$headline"
       ;;
 
