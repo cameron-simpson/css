@@ -323,7 +323,9 @@ sub setvar
       for my $pfx (map(estring($_), grep(length,split(/\s+/))))
       { $pfx="/opt/$pfx" unless $pfx =~ /^\//;
 	setenv(PATH,"$::ENV{PATH}:$pfx/bin:$pfx/sbin");
-        setenv(MANPATH,"$::ENV{MANPATH}:$pfx/man:$pfx/catman:$pfx/info");
+        for my $mpfx ($pfx, "$pfx/share") {
+          setenv(MANPATH,"$::ENV{MANPATH}:$mpfx/man:$mpfx/catman:$mpfx/info");
+        }
       }
       next VAR;
     }
@@ -333,7 +335,9 @@ sub setvar
       for my $pfx (reverse(map(estring($_), grep(length,split(/\s+/)))))
       { $pfx="/opt/$pfx" unless $pfx =~ /^\//;
 	setenv(PATH,"$pfx/bin:$pfx/sbin:$::ENV{PATH}");
-        setenv(MANPATH,"$pfx/man:$pfx/catman:$pfx/info:$::ENV{MANPATH}");
+        for my $mpfx ($pfx, "$pfx/share") {
+          setenv(MANPATH,"$mpfx/man:$mpfx/catman:$mpfx/info:$::ENV{MANPATH}");
+        }
       }
       next VAR;
     }
@@ -610,7 +614,9 @@ sub useline($)
     for my $pfx (map(estring($_,0),grep(length,split(/\s+/))))
     { $pfx="/opt/$pfx" unless $pfx =~ /^\//;
       setenv(PATH,"$::ENV{PATH}:$pfx/bin:$pfx/sbin");
-      setenv(MANPATH,"$::ENV{MANPATH}:$pfx/man:$pfx/catman:$pfx/info");
+      for my $mpfx ($pfx, "$pfx/share") {
+        setenv(MANPATH,"$::ENV{MANPATH}:$mpfx/man:$mpfx/catman:$mpfx/info");
+      }
     }
   }
   elsif (/^insprefix\s+/)
@@ -618,7 +624,9 @@ sub useline($)
     for my $pfx (reverse(map(estring($_,0),grep(length,split(/\s+/)))))
     { $pfx="/opt/$pfx" unless $pfx =~ /^\//;
       setenv(PATH,"$pfx/bin:$pfx/sbin:$::ENV{PATH}");
-      setenv(MANPATH,"$pfx/man:$pfx/catman:$pfx/info:$::ENV{MANPATH}");
+      for my $mpfx ($pfx, "$pfx/share") {
+        setenv(MANPATH,"$mpfx/man:$mpfx/catman:$mpfx/info:$::ENV{MANPATH}");
+      }
     }
   }
   elsif (/^final\s+/)
