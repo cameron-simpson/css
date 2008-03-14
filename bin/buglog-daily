@@ -53,6 +53,6 @@ then
   sfx=` expr "x$*" : 'x[A-Z][A-Z_0-9,]*: *\(.*\)'`
   for xtra in `printf "%s\n" "$pfx" | tr , ' '`
   do
-    printf "%s %s" "$hhmm" "$sfx" >>"$logdir/$xtra"
+    printf "%s %s\n" "$hhmm" "$sfx" >>"$logdir/$xtra"
   done
 fi
