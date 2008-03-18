@@ -32,6 +32,7 @@ done
 if [ $# -gt 0 ]
 then
   case $1 in
+    /*) secret=$1; shift ;;
     @*) secret=mysql-root$1; shift ;;
     *@*)secret=mysql-$1; shift ;;
   esac
