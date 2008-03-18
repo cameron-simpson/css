@@ -1,41 +1,58 @@
-#!/bin/sh -u
+#!/bin/sh -ue
 #
 # Connect to default MySQL database.
 #	- Cameron Simpson <cs@zip.com.au>
 #
 
-cmd=$0
+cmd=`basename "$0"`
 usage="Usage: $cmd [-x] [@where] [dbname]"
 
 PATH=$PATH:/usr/local/mysql/bin
 export PATH
 
 trace=
-pfx=root
+secret=mysql-root@$SYSTEMID
 db=
-where=
 
-[ $# -gt 0 ] && [ "x$1" = x-x ] && { shift; trace=set-x; }
+badopts=
+
+while [ $# -gt 0 ]
+do
+  case $1 in
+    -x) trace=set-x ;;
+    --) shift; break ;;
+    -?*)echo "$cmd: unrecognised option: $1" >&2
+        badopts=1
+        ;;
+    *)  break ;;
+  esac
+  shift
+done
 
 if [ $# -gt 0 ]
 then
-  case "$1" in
-    @*)	where=$1; shift ;;
+  case $1 in
+    @*) secret=mysql-root$1; shift ;;
+    *@*)secret=mysql-$1; shift ;;
   esac
 fi
 
-[ $# = 0 ] || { db=$1; shift; }
-[ $# = 0 ] || { echo "$usage" >&2; exit 2; }
-
-if [ -n "$where" ]
+if [ $# -gt 0 ]
 then
-  eval `secret "$pfx-mysql$where"` \
-  || exit 1
-else
-  secret=`secret "$pfx-mysql@$HOST.$SYSTEMID"` \
-  || secret=`secret "$pfx-mysql@$SYSTEMID"` \
-  || exit 1
-  eval "$secret" || exit 1
+  case $1 in
+    [a-zA-Z]*)
+      db=$1; shift ;;
+  esac
 fi
 
+if [ $# -gt 0 ]
+then
+  echo "$cmd: extra arguments: $*" >&2
+  badopts=1
+fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+secret=`secret "$secret"` || exit 1
+eval "$secret" || exit 1
 exec $trace mysql "-h$secretHOST" "-u$secretLOGIN" "-p$secretPASSWORD" $db
