@@ -7,7 +7,7 @@ from types import *
 from cStringIO import StringIO
 from cs.lex import lastlinelen
 import cs.io
-from cs.misc import out, cmderr, all, debug, ifdebug, warn
+from cs.misc import out, cmderr, all, debug, ifdebug, warn, DictUC_Attrs
 
 T_SEQ='ARRAY'
 T_MAP='HASH'
@@ -242,27 +242,27 @@ class HierInput(_Hier):
     """ Read Hier data from the named directory.
     """
     out("loaddir "+dirname)
-    dict={}
+    D=DictUC_Attrs()
 
     dents=[ dirent for dirent in os.listdir(dirname) if dirent[0] != '.']
     for dent in dents:
-      dict[dent]=self.load(os.path.join(dirname,dent))
+      D[dent]=self.load(os.path.join(dirname,dent))
 
-    return dict
+    return D
 
   def loadfile(self,filename,charset=None):
     """ Read Hier data from the named file.
     """
     fp=cs.io.ContLineFile(filename)
-    dict={}
+    D=DictUC_Attrs()
 
     for line in fp:
       kv=self.kvline(line,charset=charset)
       if ifdebug(): warn("KVLINE:", kv)
-      dict[kv[0]]=kv[1]
+      D[kv[0]]=kv[1]
     fp.close()
 
-    return dict
+    return D
 
   def savefile(self,dict,filename):
     """ Write a Dictionary to the named file in Hier format.
