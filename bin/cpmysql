@@ -11,10 +11,10 @@ bytable=
 dfltport=3306
 
 cmd=`basename "$0"` || cmd=$0
-usage="Usage: $cmd [-q] [-T] [-x] src dst [databases...]
+usage="Usage: $cmd -T [-q] [-x] src dst [databases...]
+  -T    Do a table based copy. Now mandatory.
   -q    Execute quietly.
         Default is to do nothing, and recite a plan of action.
-  -T    Do a table based copy.
   -x    Trace execution.
         Default is to do nothing, and recite a plan of action.
   src and dst may take three forms:
@@ -27,6 +27,7 @@ usage="Usage: $cmd [-q] [-T] [-x] src dst [databases...]
       A user,password,socket tuple with which to connect to a database.
     secret
       The name of a secret as accessed by the secret(1cs) command.
+      This includes /path/to/file (vs /path/to/dir above).
   databases...
     Databases to copy.
     Default is to copy everything except \"mysql\" and \"information_schema\"."
@@ -47,6 +48,10 @@ do
   esac
   shift
 done
+
+[ $bytable ] || { echo "$cmd: -T option now required" >&2
+                  badopts=1
+                }
 
 if [ $# = 0 ]
 then
@@ -72,7 +77,25 @@ then
   case $src in
     /*)
       unset src_user src_password src_host src_port src_socket
-      [ -d "$src/." ] || { echo "$cmd: $src: not a directory" >&2; badopts=1; }
+      if [ -d "$src/." ]
+      then
+        :
+      else
+        if [ -f "$src" ]
+        then
+          src_secret=`secret "$src"` || exit 1
+          eval "$src_secret"
+          src_user=$secretLOGIN
+          src_password=$secretPASSWORD
+          src_host=${secretHOST:-''}
+          src_port=${secretPORT:-$dfltport}
+          src_socket=${secretSOCKET:-''}
+          src=
+        else
+          echo "$cmd: src $src: neither a directory (db dump) nor file (secret)" >&2
+          badopts=1
+        fi
+      fi
       ;;
     *:*@*)
       src_upart=`   expr "x$src" : 'x\(.*\)@.*'` || exit 1
@@ -114,7 +137,25 @@ then
   case $dst in
     /*)
       unset dst_user dst_password dst_host dst_port dst_socket
-      [ -d "$dst/." ] || { echo "$cmd: $dst: not a directory" >&2; badopts=1; }
+      if [ -d "$dst/." ]
+      then
+        :
+      else
+        if [ -f "$dst" ]
+        then
+          dst_secret=`secret "$dst"` || exit 1
+          eval "$dst_secret"
+          dst_user=$secretLOGIN
+          dst_password=$secretPASSWORD
+          dst_host=${secretHOST:-''}
+          dst_port=${secretPORT:-$dfltport}
+          dst_socket=${secretSOCKET:-''}
+          dst=
+        else
+          echo "$cmd: dst $dst: neither a directory (db dump) nor file (secret)" >&2
+          badopts=1
+        fi
+      fi
       ;;
     *:*@*)
       dst_upart=`   expr "x$dst" : 'x\(.*\)@.*'` || exit 1
@@ -152,6 +193,7 @@ fi
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
+# run mysql command (mysqldump etc) using the supplied user/pass/host/port/sock
 _mysqlcmd()
 { mc_user=$1 mc_pass=$2 mc_h=$3 mc_p=$4 mc_s=$5 mc_cmd=$6
   shift; shift; shift; shift; shift; shift
@@ -161,16 +203,24 @@ _mysqlcmd()
   fi
   tag_fd 2 "$mysqlcmd_pfx:$mc_cmd" $trace "$mc_cmd" "$@"
 }
+# run a mysql command against the source database
 mysqlcmd_src()
-{ mysqlcmd_pfx=$src_pfx _mysqlcmd "$src_user" "$src_password" "$src_host" "$src_port" "$src_socket" "$@"
+{ mysqlcmd_pfx=$src_pfx \
+    _mysqlcmd "$src_user" "$src_password" \
+              "$src_host" "$src_port" "$src_socket" "$@"
 }
+# run a mysql command against the destination database
 mysqlcmd_dst()
-{ mysqlcmd_pfx=$dst_pfx _mysqlcmd "$dst_user" "$dst_password" "$dst_host" "$dst_port" "$dst_socket" "$@"
+{ mysqlcmd_pfx=$dst_pfx \
+    _mysqlcmd "$dst_user" "$dst_password" \
+              "$dst_host" "$dst_port" "$dst_socket" "$@"
 }
 
+# pull_table srcdb dstdb tablename
 pull_table()
-{ _pull_table_db=$1
-  _pull_table=$2
+{ _pull_table_srcdb=$1
+  _pull_table_dstdb=$2
+  _pull_table=$3
 
   if [ -z "$trace" ] && [ -t 2 ]
   then
@@ -179,96 +229,82 @@ pull_table()
 
   case "$src" in
     /*)
-      $trace gzip -dc "$src/$_pull_table_db.$_pull_table.sql.gz"
+      $trace gzip -dc "$src/$_pull_table_srcdb.$_pull_table.sql.gz"
       ;;
     *)
-      mysqlcmd_src mysqldump --opt "$_pull_table_db" "$_pull_table"
+      mysqlcmd_src mysqldump --opt "$_pull_table_srcdb" "$_pull_table"
       ;;
   esac \
-  | if [ $doit ]; then if [ -n "$trace" ] && [ -t 2 ]; then prcat; else cat; fi; fi \
+  | if [ $doit ]
+    then
+      if [ -n "$trace" ] && [ -t 2 ]
+      then prcat
+      else cat
+      fi
+    fi \
   | case "$dst" in
       /*)
-        $trace gzip -n --fast >"$dst/$_pull_table_db.$_pull_table.sql.gz"
+        $trace sed '${/^-- Dump completed on /d;}' \
+        | $trace gzip -n --fast >"$dst/$_pull_table_dstdb.$_pull_table.sql.gz"
         ;;
       *)
-        mysqlcmd_dst mysql "$_pull_table_db"
+        mysqlcmd_dst mysql "$_pull_table_dstdb"
         ;;
     esac
 }
 
 pull_db()
 { _pull_db=$1
-
-  case "$_pull_db" in
-    *.*)
-      pull_table `echo "$_pull_db" | tr . ' '`
-      return $?
+  case $_pull_db in
+    ?*:?*)
+      _pull_srcdb=`expr "x$_pull_db" : 'x\([^:]*\):.*'`
+      _pull_dstdb=`expr "x$_pull_db" : 'x[^:]*:\(.*\)'`
+      ;;
+    *)
+      _pull_srcdb=$_pull_db
+      _pull_dstdb=$_pull_db
       ;;
   esac
 
-  if [ $bytable ]
-  then
-    # pull each table individually
-    case "$src" in
-      /*)
-        $trace ls "$src/." \
-        | sed -n "s|^$_pull_db"'\.\(.*\)\.sql\.gz$|\1|p'
-        ;;
-      *)
-        $trace echo show tables \
-        | mysqlcmd_src mysql "$_pull_db" \
-        | sed 1d
-        ;;
-    esac \
-    | while read _pull_db_table
-      do
-        pull_table "$_pull_db" "$_pull_db_table" || return 1
-      done
-
-    return 0
-  fi
-
-  # pull complete database
-  case "$dst" in
-    /*) $trace rm -f "$dst/$_pull_db.sql.gz"
-        ;;
-    *)
-        $trace echo "drop database if exists $_pull_db; create database $_pull_db;" \
-        | mysqlcmd_dst mysql \
-        || return 1
-        ;;
+  case "$_pull_srcdb" in
+    *.*)
+      echo "$0: UNHANDLED pull_db db.table argument: $_pull_srcdb" >&2
+      exit 1
+      ########
+      ##pull_table `echo "$_pull_db" | tr . ' '`
+      ##return $?
+      ;;
   esac
 
+  # pull each table individually
   case "$src" in
     /*)
-      $trace gzip -dc "$src/$_pull_db.sql.gz"
+      ls "$src/." \
+      | sed -n "s|^$_pull_srcdb"'\.\(.*\)\.sql\.gz$|\1|p'
       ;;
     *)
-      mysqlcmd_src mysqldump --opt "$_pull_db"
+      echo show tables \
+      | mysqlcmd_src mysql "$_pull_srcdb" \
+      | sed 1d
       ;;
   esac \
-  | if [ $doit ]; then if [ -n "$trace" ] && [ -t 2 ]; then prcat; else cat; fi; fi \
-  | case "$dst" in
-      /*)
-        $trace sed '${/^-- Dump completed on /d;}' | $trace gzip -n --fast >"$dst/$_pull_db.sql.gz"
-        ;;
-      *)
-        mysqlcmd_dst mysql "$_pull_db"
-        ;;
-    esac
+  | while read _pull_srcdb_table
+    do
+      pull_table "$_pull_srcdb" "$_pull_dstdb" "$_pull_srcdb_table"
+    done
 }
 
 if [ $# = 0 ]
 then
   set -- `case "$src" in
             /*)
-              $trace ls "$src/." \
+              ls "$src/." \
               | sed -n 's|\(.*\)\.sql\.gz$|\1|p' \
               | sed 's/\..*//' \
               | sort -u
               ;;
             *)
-              $trace echo show databases \
+              echo show databases \
               | mysqlcmd_src mysql \
               | sed 1d
               ;;
