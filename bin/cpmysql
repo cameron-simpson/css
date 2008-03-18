@@ -29,8 +29,10 @@ usage="Usage: $cmd -T [-q] [-x] src dst [databases...]
       The name of a secret as accessed by the secret(1cs) command.
       This includes /path/to/file (vs /path/to/dir above).
   databases...
-    Databases to copy.
-    Default is to copy everything except \"mysql\" and \"information_schema\"."
+    Databases to copy. These may take the form db1:db2 to copy tables
+    from src.db1 to dst.db2.
+    Default is to copy everything except \"mysql\" and \"information_schema\"
+    from the db on src to the same named db on dst."
 
 badopts=
 
