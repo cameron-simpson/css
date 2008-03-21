@@ -1,0 +1,21 @@
+#!/usr/bin/awk -f
+#
+# Collapse repeated messages much as syslog does.
+#       - Cameron Simpson <cs@zip.com.au> 22mar2008
+#
+
+                { if ($0 == lastline) {
+                    rpts++;
+                  } else {
+                    if (rpts > 0) {
+                      print "Last message repeated", rpts, "times."
+                      rpts=0
+                    }
+                    print
+                  }
+                  lastline=$0
+                }
+END             { if (rpts > 0) {
+                    print "Last message repeated", rpts, "times."
+                  }
+                }
