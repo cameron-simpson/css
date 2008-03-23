@@ -4,18 +4,32 @@
 #	- Cameron Simpson <cs@zip.com.au> 05dec2005
 #
 
+cmd=`basename "$0"`
+usage="Usage: $cmd [-q] files..."
+
 xit=0
 
 quiet=
 
 [ $# -gt 0 ] && [ "x$1" = x-q ] && { quiet=1; shift; }
 
+if [ $# = 0 ]
+then
+  echo "$cmd: missing files" >&2
+  echo "$usage" >&2
+  exit 2
+fi
+
 for f
 do
+  [ -f "$f" ] || { echo "$cmd: $f: not a file" >&2
+                   xit=1
+                   continue
+                 }
+
   [ $quiet ] || ls -ld -- "$f" || { xit=1; continue; }
 
-  [  ! -f "$f" ] \
-  || [ -s "$f" ] \
+  [ -s "$f" ] \
   || ( [ $quiet ] || set -x; rm -- "$f" ) \
   || xit=1
 done
