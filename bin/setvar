@@ -222,22 +222,19 @@ sub envstuff
     my @extlist=
 	 grep(length,
 	 (
-	  "$::ENV{HOST}\@$::ENV{LOCATION}",
-	  "$::ENV{HOST}.$::ENV{SYSTEMID}",
-	  "$::ENV{SYSTEMID}.$::ENV{ARCH}",
 	  "\@$::ENV{LOCATION}",
-	  $::ENV{HOSTNAME},
-	  $::ENV{HOST},
-	  $::ENV{SYSTEMID},
-	  $::ENV{HOSTDOMAIN},
-	  $::ENV{OS},
-	  $::ENV{ARCH},
+	  "\@$::ENV{HOSTNAME}",
+	  "\@$::ENV{HOST}",
+	  "\@$::ENV{SYSTEMID}",
+	  "\@$::ENV{HOSTDOMAIN}",
+	  ".$::ENV{ARCH}",
+	  ".$::ENV{OS}",
 	 ))
 	 ;
 
     for my $ext (@extlist, '')
     {
-      my $key = ( $ext =~ /^[^\.@]/ ? "$var.$ext" : "$var$ext" );
+      my $key = "$var$ext";
 
       ##warn "try $key";
       if (exists $envpath{$key})
