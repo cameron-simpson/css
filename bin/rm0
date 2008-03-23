@@ -6,13 +6,17 @@
 
 xit=0
 
+quiet=
+
+[ $# -gt 0 ] && [ "x$1" = x-q ] && { quiet=1; shift; }
+
 for f
 do
-  ls -ld -- "$f" || { xit=1; continue; }
+  [ $quiet ] || ls -ld -- "$f" || { xit=1; continue; }
 
   [  ! -f "$f" ] \
   || [ -s "$f" ] \
-  || (set -x; rm -- "$f" ) \
+  || ( [ $quiet ] || set -x; rm -- "$f" ) \
   || xit=1
 done
 
