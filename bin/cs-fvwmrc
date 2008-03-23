@@ -4,6 +4,8 @@
 #	- Cameron Simpson <cs@zip.com.au> 19aug2002
 #
 
+: ${XSESSIONMODE:=''}
+
 . $HOME/rc/x11/xenv.sh
 
 : ${X11_COMPOSITE:=''}

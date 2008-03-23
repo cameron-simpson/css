@@ -1,6 +1,6 @@
 #!/bin/sh
 
 case $1 in
-    -[0-9]*)	tail=$1; shift; L -tr ${1+"$@"} | tail "$tail" ;;
-    *)		exec L -tr ${1+"$@"} ;;
+    -[0-9]*)	tail=$1; shift; ls -latr ${1+"$@"} | tail "$tail" ;;
+    *)		exec ls -latr ${1+"$@"} ;;
 esac
