@@ -46,7 +46,7 @@ def bootvar(var):
     cpu=os.uname()[4]
     return cpu
   if var == "HOME":
-    return pwd.getpwuid(os.geteuid())[6]
+    return pwd.getpwuid(os.geteuid())[5]
   if var == "HOST":
     hostname=env("HOSTNAME")
     if '.' in hostname:
@@ -62,12 +62,12 @@ def bootvar(var):
     import socket
     return socket.getfqdn()
   if var == "OS":
-    os=os.uname()[0].lower()
-    if os == "sunos":
-      os='solaris'
-    return os
+    opsys=os.uname()[0].lower()
+    if opsys == "sunos":
+      opsys='solaris'
+    return opsys
   if var == "USER":
-    return os.getpwuid(os.geteuid())[0]
+    return pwd.getpwuid(os.geteuid())[0]
   if var == "VENDOR":
     vendor=None
     if os.path.isfile('/etc/fedora-release'):
@@ -77,8 +77,8 @@ def bootvar(var):
     elif os.path.isfile('/etc/gentoo-release'):
       vendor='gentoo'
     else:
-      os=env("OS")
-      if os == "darwin":
+      opsys=env("OS")
+      if opsys == "darwin":
         vendor="apple"
     return vendor
   return None
