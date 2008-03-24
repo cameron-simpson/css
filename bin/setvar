@@ -43,7 +43,9 @@ def bootvar(var):
   ''' Compute the value of a variety of variable from scratch.
   '''
   if var == "CPU":
-    cpu=os.uname()[4]
+    cpu=os.uname()[4].lower()
+    if cpu == 'power macintosh':
+      cpu='ppc'
     return cpu
   if var == "HOME":
     return pwd.getpwuid(os.geteuid())[5]
@@ -103,6 +105,7 @@ def filevarexts():
 doingFilevar=Set()
 def filevar(var):
   if var in doingFilevar:
+    debug("recursion in filevar(%s)" % var)
     return None
   doingFilevar.add(var)
   global filevars
@@ -113,7 +116,7 @@ def filevar(var):
       evar=var+ext
     if evar in filevars:
       doingFilevar.remove(var)
-      return filevars[evar]
+      return paramsubst(filevars[evar])
 
   doingFilevar.remove(var)
   return None
@@ -160,11 +163,13 @@ def loadfilevars(path):
   debug("load %s" % path)
   for line in open(path):
     assert line[-1:] == '\n', "%s: unexpected EOF" % path
+    if line[0] == '#' or line[0] == '\n':
+      continue
     line=line[:-1]
     eqpos=line.find('=')
     assert eqpos > 0, "%s: bad line: %s" % (path, line)
     var, val = line.split('=', 1)
-    filevars[var]=paramsubst(val)
+    filevars[var]=val
 
 def listfilevars():
   global filevars
