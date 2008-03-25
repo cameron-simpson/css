@@ -18,6 +18,7 @@ import os
 import pwd
 import sys
 from sets import Set
+import cs.misc
 from cs.misc import debug, cmderr
 
 force=False     # don't reset existing variables
@@ -70,6 +71,8 @@ def bootvar(var):
     return opsys
   if var == "USER":
     return pwd.getpwuid(os.geteuid())[0]
+  if var == "PYTHON_VV":
+    return "%s.%s" % sys.version_info[:2]
   if var == "VENDOR":
     vendor=None
     if os.path.isfile('/etc/fedora-release'):
@@ -184,6 +187,83 @@ def listfilevars():
     V.add(v)
   return V
 
+def doCommand(argv):
+  debug("doCommand %s" % argv)
+  op=argv[0]
+  argv=argv[1:]
+  if op == "addprefix":
+    for arg in argv:
+      arg=paramsubst(arg)
+      if not os.path.isabs(arg):
+        arg=os.path.join('/opt',arg)
+      setvar('PATH',"%s:%s/bin:%s/sbin" % (os.environ['PATH'], arg, arg))
+      setvar('MANPATH',"%s:%s/man:%s/share/man" % (os.environ['MANPATH'], arg, arg))
+      setvar('PERL5LIB',"%s: %s/lib/perl5" % (os.environ['PERL5LIB'], arg))
+      setvar('PYTHONPATH',"%s:%s/lib/python%s" % (os.environ['PYTHONPATH'], arg, env('PYTHON_VV')))
+  elif op == "insprefix":
+    argv.reverse()
+    for arg in argv:
+      arg=paramsubst(arg)
+      if not os.path.isabs(arg):
+        arg=os.path.join('/opt',arg)
+      setvar('PATH',"%s/bin:%s/sbin:%s" % (arg, arg, os.environ['PATH']))
+      setvar('MANPATH',"%s/man:%s/share/man:%s" % (arg, arg, os.environ['MANPATH']))
+      setvar('PERL5LIB',"%s/lib/perl5:%s" % (arg, os.environ['PERL5LIB']))
+      setvar('PYTHONPATH',"%s/lib/python%s:%s" % (arg, env('PYTHON_VV'), os.environ['PYTHONPATH']))
+  elif op == "python":
+    exec " ".join(argv)
+  elif op == "use":
+    global envpath
+    for arg in argv:
+      if os.path.isabs(arg):
+        doFile(arg)
+      else:
+        for path in envpath:
+          fpath=os.path.join(path,arg)
+          if os.path.isfile(fpath):
+            doFile(fpath)
+            break
+  elif op == "var":
+    for arg in argv:
+      if arg == "*":
+        for var in listfilevars():
+          setvar(var)
+      else:
+        for var in paramsubst(arg).split(' '):
+          setvar(var)
+  else:
+    cmderr("unsupported operation: %s" % op)
+
+def doFile(path):
+  debug(`path`)
+  ocmd=cs.misc.cmd
+  cs.misc.cmd="%s: %s" % (ocmd, path)
+  oline=""
+  for line in open(path):
+    if line[-1:] != '\n':
+      cmderr("unexpected EOF")
+      break
+    line=line[:-1]
+    if len(line) == 0 or line[-1] != '\\':
+      oline+=line
+      argv=oline.split()
+      if len(argv) > 0 and argv[0][0] != '#':
+        doCommand(argv)
+      oline=""
+    else:
+      oline+=" "+line[:-2]
+  if len(oline) > 0:
+    cmderr("unterminated slosh line")
+  cs.misc.cmd=ocmd
+
+def cleanpath(*vars):
+  for var in vars:
+    keep=[]
+    for path in os.environ[var].split(':'):
+      if len(path) > 0 and os.path.exists(path):
+        keep.append(path)
+    os.environ[var]=":".join(keep)
+
 opts, args = getopt(sys.argv[1:], 'fn')
 debug("args=%s" % args)
 for opt, val in opts:
@@ -197,23 +277,28 @@ for opt, val in opts:
 
 envpath=os.environ.get('ENVPATH')
 if envpath is None:
-  envpath='%s/.setvarrc:/etc/setvarrc' % env('HOME')
-renvpath=envpath.split(':')
+  envpath='%s/.setvar:/etc/setvar' % env('HOME')
+envpath=envpath.split(':')
+renvpath=envpath[:]
 renvpath.reverse()
 
 for path in renvpath:
-  if os.path.isfile(path):
-    loadfilevars(path)
+  varfile=os.path.join(path,'var')
+  if os.path.isfile(varfile):
+    loadfilevars(varfile)
 
 setvar("HOSTNAME")
 setvar("SYSTEMID")
 
-if len(args) > 0:
-  for arg in args:
+if len(args) == 0:
+  args=('var *',)
+for arg in args:
+  if ' ' in arg:
+    doCommand(arg.split())
+  else:
     setvar(arg)
-else:
-  for v in listfilevars():
-    setvar(v)
+
+cleanpath('PATH','MANPATH','PYTHONPATH','PERL5LIB')
 
 if noAction:
   import cs.sh
