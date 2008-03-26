@@ -19,16 +19,16 @@ import pwd
 import sys
 from sets import Set
 import cs.misc
-from cs.misc import debug, cmderr
+from cs.misc import debug, ifdebug, cmderr
 
 force=False     # don't reset existing variables
 noAction=False  # don't exec command, recite var assignments on stdout
 isset=Set()
 filevars={}
 
-def env(var):
+def env(var,dflt=''):
   ''' Obtain the value of an environment variable.
-      Returns None if the value cannot be determined.
+      Returns None (or default) if the value cannot be determined.
   '''
   global force, isset
   if (not force or var in isset) and var in os.environ:
@@ -38,6 +38,8 @@ def env(var):
     val=bootvar(var)
   if val is not None:
     setvar(var,val)
+  if val is None:
+    val=dflt
   return val
 
 def bootvar(var):
@@ -85,6 +87,8 @@ def bootvar(var):
       opsys=env("OS")
       if opsys == "darwin":
         vendor="apple"
+      else:
+        cmderr("unknown VENDOR for OS=%s" % opsys)
     return vendor
   return None
 
@@ -105,12 +109,12 @@ def filevarexts():
     yield ".%s" % arch
   yield None
 
-doingFilevar=Set()
+doingFilevar=[]
 def filevar(var):
   if var in doingFilevar:
-    debug("recursion in filevar(%s)" % var)
+    if ifdebug(): cmderr("recursion in filevar(%s): %s" % (var, doingFilevar))
     return None
-  doingFilevar.add(var)
+  doingFilevar.append(var)
   global filevars
   for ext in filevarexts():
     if ext is None:
@@ -118,10 +122,10 @@ def filevar(var):
     else:
       evar=var+ext
     if evar in filevars:
-      doingFilevar.remove(var)
+      doingFilevar.pop()
       return paramsubst(filevars[evar])
 
-  doingFilevar.remove(var)
+  doingFilevar.pop()
   return None
 
 def setvar(var,val=None):
@@ -135,7 +139,7 @@ def setvar(var,val=None):
   if val is None:
     debug("failed to setvar(%s)" % var)
   else:
-    debug("%s=%s" % (var, val))
+    if ifdebug(): cmderr("%s=%s" % (var, val))
     os.environ[var]=val
     isset.add(var)
   return val
@@ -177,13 +181,11 @@ def loadfilevars(path):
 def listfilevars():
   global filevars
   V=Set()
-  debug("filevars=%s" % filevars)
   for v in filevars.keys():
     if '.' in v:
       v, v2 = v.split('.',1)
     if '@' in v:
       v, v2 = v.split('@',1)
-    debug("filevar %s" % v)
     V.add(v)
   return V
 
@@ -196,10 +198,10 @@ def doCommand(argv):
       arg=paramsubst(arg)
       if not os.path.isabs(arg):
         arg=os.path.join('/opt',arg)
-      setvar('PATH',"%s:%s/bin:%s/sbin" % (os.environ['PATH'], arg, arg))
-      setvar('MANPATH',"%s:%s/man:%s/share/man" % (os.environ['MANPATH'], arg, arg))
-      setvar('PERL5LIB',"%s: %s/lib/perl5" % (os.environ['PERL5LIB'], arg))
-      setvar('PYTHONPATH',"%s:%s/lib/python%s" % (os.environ['PYTHONPATH'], arg, env('PYTHON_VV')))
+      setvar('PATH',"%s:%s/bin:%s/sbin" % (env('PATH',''), arg, arg))
+      setvar('MANPATH',"%s:%s/man:%s/share/man" % (env('MANPATH',''), arg, arg))
+      setvar('PERL5LIB',"%s: %s/lib/perl5" % (env('PERL5LIB',''), arg))
+      setvar('PYTHONPATH',"%s:%s/lib/python%s" % (env('PYTHONPATH',''), arg, env('PYTHON_VV')))
   elif op == "insprefix":
     argv.reverse()
     for arg in argv:
@@ -235,7 +237,6 @@ def doCommand(argv):
     cmderr("unsupported operation: %s" % op)
 
 def doFile(path):
-  debug(`path`)
   ocmd=cs.misc.cmd
   cs.misc.cmd="%s: %s" % (ocmd, path)
   oline=""
@@ -265,14 +266,13 @@ def cleanpath(*vars):
         if path not in keep:
           keep.append(path)
       else:
-        debug("%s: discard %s" % (var, path))
+        if ifdebug(): cmderr("%s: discard %s" % (var, path))
     nval=":".join(keep)
     if oval != nval:
-      debug("%s\n  %s\n  %s" % (var, oval, nval))
+      if ifdebug(): cmderr("%s\n  %s\n  %s" % (var, oval, nval))
       os.environ[var]=nval
 
 opts, args = getopt(sys.argv[1:], 'fn')
-debug("args=%s" % args)
 for opt, val in opts:
   if opt == '-f':
     force=True
