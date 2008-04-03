@@ -56,4 +56,5 @@ fi
 
 secret=`secret "$secret"` || exit 1
 eval "$secret" || exit 1
+[ -n "$db" ] || db=${secretDATABASE:-''}
 exec $trace mysql "-h$secretHOST" "-u$secretLOGIN" "-p$secretPASSWORD" $db
