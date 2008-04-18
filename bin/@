@@ -126,7 +126,7 @@ do
     # no command? just run the preferred shell
     [ $# = 0 ] && set -- sh -c '[ -s /opt/css/env.sh ] && . /opt/css/env.sh; exec $SHELL'
 
-    [ $doscreen ] && set -- scr -e "$@"
+    [ $doscreen ] && set -- scr '_$$' "$@"
     qcmd=exec\ `shqstr "$@"`
     set -- envssh $RTERM_SSHOPTS $sshx11opt $sshopts -- "$target" "$qcmd"
     [ $doscript ] && set -- logscript -m "$name: $msg" $nomsgopt -- "$name" "$@"
