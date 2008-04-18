@@ -47,6 +47,16 @@ def mysql(secret,db):
   passwd=secret['PASSWORD']
   return MySQLdb.connect(host=host,db=db,user=user,passwd=passwd)
 
+def sqlAlchemy(secret,scheme,login,password,host,database):
+  import sqlalchemy
+  return sqlalchemy.create_engine(
+           '%s://%s:%s@%s/%s' % (scheme,
+                                 secret.LOGIN,
+                                 secret.PASSWORD,
+                                 secret.HOST,
+                                 secret.DATABASE),
+           echo=ifdebug())
+
 def mssql(secret,db=None):
   import pymssql
   if type(secret) is str or not(hasattr(secret,'__keys__') or hasattr(secret,'keys')):
