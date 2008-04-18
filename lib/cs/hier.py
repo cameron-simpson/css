@@ -3,15 +3,11 @@
 import re
 import os
 import os.path
-from types import *
 from cStringIO import StringIO
 from cs.lex import lastlinelen
 import cs.io
-from cs.misc import out, cmderr, all, debug, ifdebug, warn, DictUC_Attrs
-
-T_SEQ='ARRAY'
-T_MAP='HASH'
-T_SCALAR='SCALAR'
+from cs.misc import out, cmderr, debug, ifdebug, warn, DictUC_Attrs, \
+                    T_SEQ, T_MAP, T_SCALAR, objFlavour as flavour
 
 DEFAULT_OPTS={'dictSep': ' =>',
               'bareWords': True,
@@ -25,19 +21,6 @@ safeChunkRe  = re.compile(safeChunkPtn)
 safePrefixRe = re.compile('^'+safeChunkPtn)
 safeStringRe = re.compile('^'+safeChunkPtn+'$')
 integerRe    = re.compile('^-?[0-9]+$')
-
-def flavour(obj):
-  """ Return the ``flavour'' of an object:
-      T_MAP: DictType, DictionaryType, objects with an __keys__ or keys attribute.
-      T_SEQ: TupleType, ListType, objects with an __iter__ attribute.
-      T_SCALAR: Anything else.
-  """
-  t=type(obj)
-  if t in (TupleType, ListType): return T_SEQ
-  if t in (DictType, DictionaryType): return T_MAP
-  if hasattr(obj,'__keys__') or hasattr(obj,'keys'): return T_MAP
-  if hasattr(obj,'__iter__'): return T_SEQ
-  return T_SCALAR
 
 def h2a(obj,i=None,opts=None):
   return HierOutput(opts).h2a(obj,i=i)

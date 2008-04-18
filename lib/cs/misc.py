@@ -1,3 +1,4 @@
+from types import *
 import os
 import os.path
 import errno
@@ -60,6 +61,7 @@ if 'DEBUG' in os.environ \
    and len(os.environ['DEBUG']) > 0 \
    and os.environ['DEBUG'] != "0":
     debug_level=3
+isdebug=(debug_level >= 3)
 
 debug_level_stack=[]
 def pushDebug(newlevel=True):
@@ -131,6 +133,22 @@ def tb(limit=None):
 
   if cs.upd.active:
     upd.out(oldUpd)
+
+T_SEQ='ARRAY'
+T_MAP='HASH'
+T_SCALAR='SCALAR'
+def objFlavour(obj):
+  """ Return the ``flavour'' of an object:
+      T_MAP: DictType, DictionaryType, objects with an __keys__ or keys attribute.
+      T_SEQ: TupleType, ListType, objects with an __iter__ attribute.
+      T_SCALAR: Anything else.
+  """
+  t=type(obj)
+  if t in (TupleType, ListType): return T_SEQ
+  if t in (DictType, DictionaryType): return T_MAP
+  if hasattr(obj,'__keys__') or hasattr(obj,'keys'): return T_MAP
+  if hasattr(obj,'__iter__'): return T_SEQ
+  return T_SCALAR
 
 __seq=0
 __seqLock=BoundedSemaphore(1)
