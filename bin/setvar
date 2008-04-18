@@ -208,10 +208,10 @@ def doCommand(argv):
       arg=paramsubst(arg)
       if not os.path.isabs(arg):
         arg=os.path.join('/opt',arg)
-      setvar('PATH',"%s/bin:%s/sbin:%s" % (arg, arg, os.environ['PATH']))
-      setvar('MANPATH',"%s/man:%s/share/man:%s" % (arg, arg, os.environ['MANPATH']))
-      setvar('PERL5LIB',"%s/lib/perl5:%s" % (arg, os.environ['PERL5LIB']))
-      setvar('PYTHONPATH',"%s/lib/python%s:%s" % (arg, env('PYTHON_VV'), os.environ['PYTHONPATH']))
+      setvar('PATH',"%s/bin:%s/sbin:%s" % (arg, arg, env('PATH')))
+      setvar('MANPATH',"%s/man:%s/share/man:%s" % (arg, arg, env('MANPATH')))
+      setvar('PERL5LIB',"%s/lib/perl5:%s" % (arg, env('PERL5LIB')))
+      setvar('PYTHONPATH',"%s/lib/python%s:%s" % (arg, env('PYTHON_VV'), env('PYTHONPATH')))
   elif op == "python":
     exec " ".join(argv)
   elif op == "use":
@@ -260,6 +260,9 @@ def doFile(path):
 def cleanpath(*vars):
   for var in vars:
     keep=[]
+    if var not in os.environ:
+      cmderr("warning: cleanpath(%s): no such envvar" % var)
+      continue
     oval=os.environ[var]
     for path in oval.split(':'):
       if len(path) > 0 and os.path.exists(path):
