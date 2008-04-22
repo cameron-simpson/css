@@ -19,13 +19,26 @@ then
   when=$2; shift; shift
 fi
 
+[ $# = 0 ] || { echo "$cmd: extra arguments: $*" >&2; badopts=1; }
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
 day=`monday "$when"`
 
 for n in 0 1 2 3 4 5 6
 do
   ymd=`date -d "$day" '+%Y-%m-%d'`
+  wday=`date -d "$day" '+%A'`
   log=$LOGDIR/daily/$ymd/$cat
-  echo "$ymd"
+  echo "$ymd $wday"
   [ -s "$log" ] && sed 's/^/  /' "$log"
   day=`date -d "$ymd tomorrow"`
 done
+
+cat <<'X'
+
+Totals:
+  00.0  hours         @ $ 95 $ 0000.00
+  GST                        $  000.00
+  Total                      $ 0000.00
+X
