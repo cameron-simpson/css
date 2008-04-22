@@ -17,18 +17,14 @@ def lather(obj,tc=None):
     tc=obj.typecode
   IO=StringIO()
   S=SoapWriter(IO)
-  debug("S.serialze=%s" % S.serialize)
   S.serialize(obj,tc)
-  xml=str(S)
-  if ifdebug():
-    debug("===========")
-    print >>sys.stderr, xml
-  return xml
+  return str(S)
 
 def rinse(soap,tc):
   ''' Turn SOAP into a python object.
   '''
-  return ParsedSoap(soap).Parse(tc)
+  return reportElapsedTime("parse SOAP into %s object" % (tc,),
+                           ParsedSoap(soap).Parse,tc)
 
 def autoObjectify(O):
   ''' Recurse down an object, return a transformation of it with
