@@ -19,6 +19,10 @@ then
   when=$2; shift; shift
 fi
 
+[ $# = 0 ] || { echo "$cmd: extra arguments: $*" >&2; badopts=1; }
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
 day=`monday "$when"`
 
 for n in 0 1 2 3 4 5 6
