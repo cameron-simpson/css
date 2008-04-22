@@ -134,6 +134,27 @@ def tb(limit=None):
   if cs.upd.active:
     upd.out(oldUpd)
 
+def elapsedTime(func,*args,**kw):
+  ''' Call a function with the supplied arguments.
+      Return start time, end time and return value.
+  '''
+  t0=time.time()
+  result=func(*args,**kw)
+  t1=time.time()
+  return t0, t1, result
+
+def reportElapsedTime(tag,func,*args,**kw):
+  ''' Call a function with the supplied arguments.
+      Return its return value.
+      If isdebug, report elapsed time for the function.
+  '''
+  if not isdebug:
+    return func(*args,**kw)
+  print >>sys.stderr, cmd_, tag, "..."
+  t0, t1, result = elapsedTime(func, *args, **kw)
+  print >>sys.stderr, cmd_, tag, "%s seconds" % (t1-t0,)
+  return result
+
 T_SEQ='ARRAY'
 T_MAP='HASH'
 T_SCALAR='SCALAR'
@@ -164,7 +185,8 @@ def seq():
 def all(gen):
   ''' Returns all the values from a generator as an array.
   '''
-  assert False, "all() is a python builtin meaning 'is every item true?', use list() or tuple()"
+  assert False, "OBSOLETE: all() is a python builtin meaning 'is every item true?', use list() or tuple()"
+
 def isodate(when=None):
   from time import localtime, strftime
   if when is None: when=localtime()
@@ -199,6 +221,13 @@ def the(list,context=None):
     raise IndexError, "%s: no elements" % icontext
     
   return it
+
+def eachOf(gs):
+  ''' Return all the instances from a list of generators as a single generator.
+  '''
+  for g in gs:
+    for i in g:
+      yield i
 
 def winsize(f):
   '''   Return a (rows,columns) tuple or None for the specified file object.
