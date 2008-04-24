@@ -19,12 +19,14 @@ import pwd
 import sys
 from sets import Set
 import cs.misc
-from cs.misc import debug, ifdebug, cmderr
+from cs.misc import debug, isdebug, cmderr
 
 force=False     # don't reset existing variables
 noAction=False  # don't exec command, recite var assignments on stdout
 isset=Set()
 filevars={}
+doingFilevar=Set()
+bootVal={}
 
 def env(var,dflt=''):
   ''' Obtain the value of an environment variable.
@@ -33,7 +35,10 @@ def env(var,dflt=''):
   global force, isset
   if (not force or var in isset) and var in os.environ:
     return os.environ[var]
-  val=filevar(var)
+  if var not in doingFilevar:
+    val=filevar(var)
+  else:
+    val=None
   if val is None:
     val=bootvar(var)
   if val is not None:
@@ -45,37 +50,40 @@ def env(var,dflt=''):
 def bootvar(var):
   ''' Compute the value of a variety of variable from scratch.
   '''
+  if var in bootVal:
+    return bootVal[var]
+  val=None
   if var == "CPU":
     cpu=os.uname()[4].lower()
     if cpu == 'power macintosh':
       cpu='ppc'
-    return cpu
-  if var == "HOME":
-    return pwd.getpwuid(os.geteuid())[5]
-  if var == "HOST":
+    val=cpu
+  elif var == "HOME":
+    val=pwd.getpwuid(os.geteuid())[5]
+  elif var == "HOST":
     hostname=env("HOSTNAME")
     if '.' in hostname:
       host, hostdomain = hostname.split('.',1)
     else:
       host = hostname
-    return host
-  if var == "HOSTDOMAIN":
+    val=host
+  elif var == "HOSTDOMAIN":
     hostname=env("HOSTNAME")
     host, hostdomain = hostname.split('.',1)
-    return hostdomain
-  if var == "HOSTNAME":
+    val=hostdomain
+  elif var == "HOSTNAME":
     import socket
-    return socket.getfqdn()
-  if var == "OS":
+    val=socket.getfqdn()
+  elif var == "OS":
     opsys=os.uname()[0].lower()
     if opsys == "sunos":
       opsys='solaris'
-    return opsys
-  if var == "USER":
-    return pwd.getpwuid(os.geteuid())[0]
-  if var == "PYTHON_VV":
-    return "%s.%s" % sys.version_info[:2]
-  if var == "VENDOR":
+    val=opsys
+  elif var == "USER":
+    val=pwd.getpwuid(os.geteuid())[0]
+  elif var == "PYTHON_VV":
+    val="%s.%s" % sys.version_info[:2]
+  elif var == "VENDOR":
     vendor=None
     if os.path.isfile('/etc/fedora-release'):
       vendor='fedora'
@@ -89,8 +97,9 @@ def bootvar(var):
         vendor="apple"
       else:
         cmderr("unknown VENDOR for OS=%s" % opsys)
-    return vendor
-  return None
+    val=vendor
+  bootVal[var]=val
+  return val
 
 def filevarexts():
   hostname=env("HOSTNAME")
@@ -109,12 +118,11 @@ def filevarexts():
     yield ".%s" % arch
   yield None
 
-doingFilevar=[]
 def filevar(var):
   if var in doingFilevar:
-    if ifdebug(): cmderr("recursion in filevar(%s): %s" % (var, doingFilevar))
+    if isdebug: cmderr("recursion in filevar(%s): %s" % (var, doingFilevar))
     return None
-  doingFilevar.append(var)
+  doingFilevar.add(var)
   global filevars
   for ext in filevarexts():
     if ext is None:
@@ -122,10 +130,10 @@ def filevar(var):
     else:
       evar=var+ext
     if evar in filevars:
-      doingFilevar.pop()
+      doingFilevar.remove(var)
       return paramsubst(filevars[evar])
 
-  doingFilevar.pop()
+  doingFilevar.remove(var)
   return None
 
 def setvar(var,val=None):
@@ -139,7 +147,7 @@ def setvar(var,val=None):
   if val is None:
     debug("failed to setvar(%s)" % var)
   else:
-    if ifdebug(): cmderr("%s=%s" % (var, val))
+    if isdebug: cmderr("%s=%s" % (var, val))
     os.environ[var]=val
     isset.add(var)
   return val
@@ -269,10 +277,10 @@ def cleanpath(*vars):
         if path not in keep:
           keep.append(path)
       else:
-        if ifdebug(): cmderr("%s: discard %s" % (var, path))
+        if isdebug: cmderr("%s: discard %s" % (var, path))
     nval=":".join(keep)
     if oval != nval:
-      if ifdebug(): cmderr("%s\n  %s\n  %s" % (var, oval, nval))
+      if isdebug: cmderr("%s\n  %s\n  %s" % (var, oval, nval))
       os.environ[var]=nval
 
 opts, args = getopt(sys.argv[1:], 'fn')
