@@ -6,8 +6,9 @@
 
 import sys
 from ZSI import SoapWriter, ParsedSoap, TC
+import ZSI.wstools.Utility
 from StringIO import StringIO
-from cs.misc import ifdebug, debug, objFlavour, T_MAP, T_SEQ
+from cs.misc import isdebug, ifdebug, debug, objFlavour, T_MAP, T_SEQ, reportElapsedTime
 
 def lather(obj,tc=None):
   ''' Serial a python object into SOAP, return the SOAP.
@@ -25,6 +26,28 @@ def rinse(soap,tc):
   '''
   return reportElapsedTime("parse SOAP into %s object" % (tc,),
                            ParsedSoap(soap).Parse,tc)
+
+class BigElementProxy(ZSI.wstools.Utility.ElementProxy):
+  ''' An ElementProxy with its canonicalize method
+      replaces with out that uses a chunkyString.
+      The ZSI default uses StringIO, which scales very badly
+      to large strings; I'm constructing SOAP packets over
+      10MB in size:-(
+  '''
+  def __init__(self, *args, **kw):
+    print >>sys.stderr, "BigElementProxy.__init__(%s,%s)" % (args,kw)
+    ZSI.wstools.Utility.ElementProxy.__init__(self,*args,**kw)
+
+  def canonicalize(self):
+    from cs.chunkyString import ChunkyString
+    cs=ChunkyString()
+    cs.write(' ')       # HACK: work around bug in ZSI.wstools.c14n
+    reportElapsedTime("BigElementProxy.canonicalize()",
+                      ZSI.wstools.Utility.Canonicalize,
+                      self.node,output=cs)
+    cs=str(cs)
+    ##if isdebug: print >>sys.stderr, "BigElementProxy.canonicalize: XML=[%s]" % cs
+    return cs
 
 def autoObjectify(O):
   ''' Recurse down an object, return a transformation of it with
