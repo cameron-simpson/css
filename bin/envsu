@@ -58,7 +58,8 @@ case "$DISPLAY" in
     ;;
 esac
 case "$PREFTERM" in
-  urxvtc)	PREFTERM=urxvt ;;
+  urxvtc)
+    PREFTERM=urxvt ;;
 esac
 
 # If some dickheads didn't use csh for root this would be much simpler.
@@ -79,7 +80,7 @@ SCREENDIR=/tmp/screen-\$USER
 TMPDIR=/tmp
 export USER EMAIL DISPLAY PERL5LIB SCREENDIR TMPDIR
 [ -n "\$DISPLAY" ] || unset DISPLAY
-rm -f $tmp $env
+rm -f $tmp ##$env
 exec term -n '$su@$HOST'
 ##exec pushttylabel -exec '$su@$HOST' term -n '$su@$HOST'
 SU
