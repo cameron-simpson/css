@@ -10,16 +10,16 @@
 
 use cs::Shell;
 
-$dumpmode='sh';
+$dumpmode=SH;
 $force=0;
 ARGV:
-  while (@ARGV)
-	{ if ($ARGV[0] eq '-csh')	{ $dumpmode=CSH; shift(@ARGV); }
-	  elsif ($ARGV[0] eq '-sh')	{ $dumpmode=SH; shift(@ARGV); }
-	  elsif ($ARGV[0] eq '-persist'){ $dumpmode=PERSIST; shift(@ARGV); }
-	  elsif ($ARGV[0] eq '-f')	{ $force=1; shift(@ARGV); }
-	  else				{ last ARGV; }
-	}
+while (@ARGV)
+{ if ($ARGV[0] eq '-csh')       { $dumpmode=CSH; shift(@ARGV); }
+  elsif ($ARGV[0] eq '-sh')     { $dumpmode=SH; shift(@ARGV); }
+  elsif ($ARGV[0] eq '-persist'){ $dumpmode=PERSIST; shift(@ARGV); }
+  elsif ($ARGV[0] eq '-f')      { $force=1; shift(@ARGV); }
+  else                          { last ARGV; }
+}
 
 cs::Shell::putvars($force,$dumpmode);
 
