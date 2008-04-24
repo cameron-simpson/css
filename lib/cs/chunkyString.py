@@ -2,6 +2,7 @@
 #
 
 import sys
+from time import time
 from cs.misc import isdebug, reportElapsedTime
 
 class ChunkyString(str):
@@ -10,10 +11,11 @@ class ChunkyString(str):
       It is intended for large "data" chunks that seem prohibitive to
       assemble into a real string.
   '''
-  def __init__(self):
+  def __init__(self,minChunk=128):
     self.__strs=[]
     self.__len=0
     self.__rewind()
+    self.__minChunk=minChunk
 
   def __rewind(self):
     self.__offset=0
@@ -74,15 +76,36 @@ class ChunkyString(str):
     return rs
 
   def __str__(self):
+    if isdebug: print >>sys.stderr, "ChunkyString.__str__: %d bytes in %d strings" % (self.__len, len(self.__strs))
+    t0=time()
     s=''.join(self.__strs)
+    if isdebug:
+      print >>sys.stderr, "ChunkString.__str__() took %s seconds" % (time()-t0)
     assert len(s) == self.__len
     return s
+
+  def getvalue(self):
+    return str(self)
 
   def __nonzero__(self):
     return self.__len > 0
 
   def write(self,s):
-    self.__strs.append(s)
+    ##if isdebug: print >>sys.stderr, "ChunkyString.write(%s)" % s
+    if self.__minChunk is not None \
+    and len(s) < self.__minChunk \
+    and len(self.__strs) > 0 \
+    and len(self.__strs[-1]) < self.__minChunk:
+      # SoapWriter's serialisation stuff writes a lot of very small strings.
+      # We'll string small stuff together until it reaches the chunk size
+      # to reduce the space waste and the __str__() cost in the End Times.
+      ##sys.stderr.write('+')
+      self.__strs[-1]=self.__strs[-1]+s
+    else:
+      ##sys.stderr.write('.')
+      self.__strs.append(s)
+      ##if len(self.__strs) % 78 == 0:
+      ##  sys.stderr.write('\n')
     self.__len+=len(s)
 
   def __getattr__(self,attr,*args,**kw):
