@@ -152,7 +152,7 @@ esac
 			     exit 1
 			   }
 	# matched - join the session
-	exec $screen -c "$rcfile" -x "$nsess"
+	exec $screen -c "$rcfile" -Aax "$nsess"
 	;;
     esac
 
@@ -171,14 +171,14 @@ esac
     match=`scr | sed "/^ *[1-9][0-9]* [1-9][0-9]*\\.$sessre\$/!d;"'s/^ *[1-9][0-9]*  *//; q'`
 
     # match found - join it
-    [ -n "$match" ] && exec $screen -c "$rcfile" -x "$sess"
+    [ -n "$match" ] && exec $screen -c "$rcfile" -Aax "$sess"
   else
     sess=$*
     case "$sess" in */*) sess=`printf "%s" "$sess" | tr / _` ;; esac
   fi
 
   # start new session
-  exec $screen -S "$sess" -c "$rcfile" -- "$@"
+  exec $screen -a -S "$sess" -c "$rcfile" -- "$@"
 )
 xit=$?
 
