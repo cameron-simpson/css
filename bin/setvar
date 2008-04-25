@@ -255,9 +255,15 @@ def doFile(path):
     line=line[:-1]
     if len(line) == 0 or line[-1] != '\\':
       oline+=line
-      argv=oline.split()
-      if len(argv) > 0 and argv[0][0] != '#':
-        doCommand(argv)
+      oline=oline.strip()
+      if len(oline) > 0 and oline[0] != '#':
+        eqpos=oline.find('=')
+        if eqpos > 0 \
+        and oline[0].isalpha() \
+        and all(c.isalnum() or c == '_' for c in oline[1:eqpos]):
+          setvar(oline[:eqpos], paramsubst(oline[eqpos+1:]))
+        else:
+          doCommand(oline.split())
       oline=""
     else:
       oline+=" "+line[:-2]
