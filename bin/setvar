@@ -260,7 +260,7 @@ def doFile(path):
         eqpos=oline.find('=')
         if eqpos > 0 \
         and oline[0].isalpha() \
-        and all(c.isalnum() or c == '_' for c in oline[1:eqpos]):
+        and sum([ c.isalnum() or c == '_' for c in oline[1:eqpos] ]) == eqpos-1:        # all() not available in 2.3
           setvar(oline[:eqpos], paramsubst(oline[eqpos+1:]))
         else:
           doCommand(oline.split())
