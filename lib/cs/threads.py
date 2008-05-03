@@ -5,9 +5,53 @@
 #
 
 from __future__ import with_statement
-from threading import Thread, BoundedSemaphore
+from threading import Thread, Semaphore, BoundedSemaphore
 from Queue import Queue
-from cs.misc import debug, ifdebug, tb, cmderr, warn
+from cs.misc import debug, ifdebug, tb, cmderr, warn, reportElapsedTime
+
+class AdjustableSemaphore:
+  ''' A semaphore whose value may be tuned at runtime.
+  '''
+  def __init__(self,value=1,name="AdjustableSemaphore"):
+    self.__sem=Semaphore(value)
+    self.__value=value
+    self.__name=name
+    self.__lock=BoundedSemaphore()
+  def __enter__(self):
+    return reportElapsedTime("%s(%d).__enter__: acquire" % (self.__name,self.__value),self.acquire)
+  def __exit__(self,exc_type,exc_value,traceback):
+    self.release()
+    return False
+  def release(self):
+    self.__sem.release()
+  def acquire(self,blocking=True):
+    ''' The acquire() method calls the base acquire() method if not blocking.
+        If blocking is true, the base acquire() is called inside a lock to
+        avoid competing with a reducing adjust().
+    '''
+    if not blocking:
+      return self.__sem.acquire(blocking)
+    with self.__lock:
+      self.__sem.acquire(blocking)
+    return True
+  def adjust(self,newvalue):
+    ''' The adjust(newvalue) method calls release() or acquire() an
+        appropriate number of times.  If newvalue lowers the semaphore
+        capacity then adjust() may block until the overcapacity is
+        drained.
+    '''
+    assert newvalue > 0
+    with self__lock:
+      n=newvalue-self.__value
+      if n > 0:
+        while n > 0:
+          self.__sem.release()
+          n-=1
+      else:
+        while n < 0:
+          self.__sem.acquire(True)
+          n+=1
+      self.__value=newvalue
 
 class Channel:
   ''' A zero-storage data passage.
@@ -57,6 +101,17 @@ class Channel:
     returnChannel(ch)
     return result
 
+class IterableQueue(Queue): 
+  ''' A Queue obeying the iterator protocol.
+  '''
+  def __iter__(self):
+    return self
+  def next(self):
+    ##print "IterabeQueue.next()..."
+    I=self.get()
+    ##print "IterabeQueue.next() gets [%s]" % (I,)
+    return I
+
 class JobQueue:
   ''' A job queue.
       Q.queue(token) -> channel
@@ -98,6 +153,58 @@ class JobQueue:
     if self.maxq is not None:
       self.maxsem.release()
     ch.put((n,result))
+
+class JobCounter:
+  ''' A class to count and wait for outstanding jobs.
+      As jobs are queued, JobCounter.inc() is called.
+      When everything is dispatched, calling JobCounter.whenDone()
+      queues a function to execute on completion of all the jobs.
+  '''
+  def __init__(self):
+    self.__lock=Semaphore(1)
+    self.__sem=Semaphore()
+    self.__n=0
+    self.__onDone=None
+
+  def inc(self):
+    ''' Note that there is another job for which to wait.
+    '''
+    with self.__lock:
+      self.__n+=1
+
+  def dec(self):
+    ''' Report the completion of a job.
+    '''
+    self.__sem.release()
+
+  def _wait1(self):
+    ''' Wait for a single job to complete.
+        Return False is no jobs remain.
+        Report True is a job remained and we waited.
+    '''
+    with self.__lock:
+      if self.__n == 0:
+        return False
+    self.__sem.acquire()
+    with self.__lock:
+      self.__n-=1
+    return True
+
+  def _waitAll(self):
+    while self._wait1():
+      pass
+
+  def _waitThenDo(self,*args,**kw):
+    self._waitAll()
+    return self.__onDone(*args,**kw)
+
+  def whenDone(self,func,*args,**kw):
+    ''' Queue an action to occur when the jobs are done.
+    '''
+    with self.__lock:
+      assert self.__onDone is None
+      self.__onDone=func
+      Thread(target=self._waitThenDo,args=args,kwargs=kw).start()
 
 class FuncQueue(Queue):
   ''' A Queue of function calls to make, processed serially.
