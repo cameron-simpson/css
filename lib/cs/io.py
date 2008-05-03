@@ -2,6 +2,19 @@ import os
 import string
 from StringIO import StringIO
 
+def readn(fp,n):
+  ''' Read n bytes from a file, coping with short reads.
+  '''
+  s=''
+  while n > len(s):
+    s2=fp.read(n-len(s))
+    if len(s2) == 0:
+      cmderr("readn(%s,%d): unexpected EOF after %d bytes"
+             % (fp,n,len(s)))
+      return None
+    s+=s2
+  return s
+
 def lastline(fp):
   last=None
   for line in fp:

@@ -1,2 +1,0 @@
-#!/bin/sh
-exec xv -maxpect ${1+"$@"}

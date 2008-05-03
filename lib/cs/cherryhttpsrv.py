@@ -63,3 +63,45 @@ class RPC:
     jscode=self._RPCreturn(cb,seq,result)
     cherrypy.response.headers.update({ 'Content-Type': "application/x-javascript"})
     return jscode+"\r\n                                                                                      "
+
+def _tableRows(htmlCells):
+  return "\n".join( "\n  ".join( ["<TR>",] + ["<TD>"+cell for cell in R] )
+                    for R in htmlCells
+                  )
+
+class DBBrowse:
+  def __init__(self,conn):
+    self.__conn=conn
+
+  @cherrypy.expose
+  def default(self, *words):
+    cmderr("words=[%s]" % (words,))
+    words=list(words)
+    if len(words) == 0:
+      dbs=[ R[0] for R in self.__conn.execute('show databases') ]
+      dbs.sort()
+      return "<TABLE>\n" \
+           + _tableRows( ( "<a href=\"%s/\">%s/</a>" % (dbname, dbname), "[database]" )
+                         for dbname in dbs
+                       ) \
+           + "</TABLE>"
+
+    dbname=words.pop(0)
+    self.__conn.execute('use %s' % dbname)
+    if len(words) == 0:
+      tbs=[ R[0] for R in self.__conn.execute('show tables') ]
+      tbs.sort()
+      return '<H1>Database %s</H1>\n' % dbname \
+           + "<TABLE>\n" \
+           + _tableRows( ( "<a href=\"%s/\">%s.%s/</a>" % (tbname,dbname,tbname), "[table]")
+                         for tbname in tbs
+                       ) \
+           + "</TABLE>"
+
+    tbname=words.pop(0)
+    return '<H1>Table %s.%s</H1>' % (dbname,tbname) \
+         + "<TABLE>\n" \
+         + _tableRows( [ ("Column", "Type", "Default" ), ]
+                     + [ ( R[0], R[1], "NULL" if R[4] is None else str(R[4]) ) for R in self.__conn.execute('describe %s' % tbname) ]
+                     ) \
+         + "</TABLE>"

@@ -7,8 +7,9 @@
 #
 
 : ${SSHTO_OPTS:=''}
+: ${SSHTO_CONFIG:=$HOME/.sshtorc}
 
-cf=$HOME/.sshtorc
+cf=$SSHTO_CONFIG
 trace=  ##set-x
 sshopts=
 lsshopts=

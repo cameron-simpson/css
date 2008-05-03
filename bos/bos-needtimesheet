@@ -1,0 +1,7 @@
+#!/bin/sh -ue
+
+[ $# = 1 ] || { echo "Usage: $0 date" >&2; exit 2; }
+tsdate=`monday "$1"`
+tsdir=$HOME/bos/timesheets
+tsfile=$tsdir/$tsdate
+[ -s "$tsfile" ] || ( set -x; exec bos-mktimesheet -d "$tsdate" >>"$tsfile")

@@ -10,13 +10,16 @@
 trace=set-x
 
 cmd=`basename "$0"` || cmd=$0
-usage="Usage: $cmd [-f filenum] -j jukeslot [-t tapedev] command [args...]
+usage="Usage: $cmd [-f filenum] -j jukeslot [-l logfile] [-t tapedev] command [args...]
   -f filenum    Advance the tape to this file position. Default: 0
   -j jukeslot   Load the tape from this jukebox slot.
-                \"NONE\" means no jukebox actions."
+                \"NONE\" means no jukebox actions.
+  -l logfile    Log the command to a log file.
+  -t tapedev    Specify the tape device. Default from \$TAPE: $TAPE"
 
 jukeslot=
 filenum=0
+logfile=
 
 badopts=
 
@@ -25,6 +28,7 @@ do
   case $1 in
     -f) filenum=$2; shift ;;
     -j)	jukeslot=$2; shift ;;
+    -l) logfile=$2; shift ;;
     -t)	TAPE=$2; shift ;;
     --)	shift; break ;;
     -?*)echo "$cmd: unrecognised option: $1" >&2
@@ -50,6 +54,8 @@ export TAPE
 
 xit=1
 
+[ -z "$logfile" ] || label=`[ -z "$jukeslot" ] || tapelabel "$jukeslot"`
+
 if [ -z "$jukeslot" ] || $trace mover mv "s$jukeslot" d0
 then
   if $trace mt rewind \
@@ -57,6 +63,7 @@ then
   then
     $trace "$@"
     xit=$?
+    [ -z "$logfile" ] || echo "`date --iso` jukeslot $jukeslot ($label) tape $TAPE file $filenum: $*" >>"$logfile"
     $trace mt rewind || xit=1
     $trace mt offline || xit=1
   fi

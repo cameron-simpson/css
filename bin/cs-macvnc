@@ -1,0 +1,44 @@
+#!/bin/sh -ue
+#
+# Fire up COTVNC viewer, and matching vncserver if necessary.
+#       - Cameron Simpson <cs@zip.com.au> 14mar2008
+#
+
+geom=1440x900
+depth=24
+display=:1
+vc='/Applications/Chicken of the VNC.app/Contents/MacOS/Chicken of the VNC'
+
+cmd=`basename "$0"`
+usage="Usage: $cmd [-g geom] [-depth depth] [:n]"
+
+badopts=
+
+while [ $# -gt 0 ]
+do
+  case $1 in
+    -g|-geom|-geometry)
+        geom=$2; shift ;;
+    -depth)
+        depth=$2; shift ;;
+    --) shift; break ;;
+    -?*)echo "$cmd: unrecognised option: $1" >&2
+        badopts=1
+        ;;
+    *)  break ;;
+  esac
+  shift
+done
+
+if [ $# -gt 0 ]
+then
+  case $1 in
+    :[0-9]) display=$1; shift ;;
+  esac
+fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 1; }
+
+set -x
+vncserver -depth "$depth" -geometry "$geom" "$display" || :
+"$vc" "127.0.0.1$display" ${1+"$@"} &

@@ -1,5 +1,0 @@
-#!/bin/sh
-case $ILK in
-    *bsd*)	exec ls -lga ${1+"$@"} ;;
-    *)		exec ls -la ${1+"$@"} ;;
-esac

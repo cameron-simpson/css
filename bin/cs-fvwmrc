@@ -4,6 +4,8 @@
 #	- Cameron Simpson <cs@zip.com.au> 19aug2002
 #
 
+: ${XSESSIONMODE:=''}
+
 . $HOME/rc/x11/xenv.sh
 
 : ${X11_COMPOSITE:=''}
@@ -37,7 +39,14 @@ export fvwm_Transparent fvwm_RootTransparent fvwm_ParentalRelativity fvwm_Opaque
       sed "s/^/AddToMenu $menu /" "$menuf"
     done
     echo END MENUS HERE
-  ) | MOVE=AnimatedMove uncurly
+  ) \
+  | \
+  { case $XSESSIONMODE in
+      vnc)      MOVE=Move ;;
+      *)        MOVE=AnimatedMove ;;
+    esac
+    exec env MOVE=$MOVE uncurly
+  }
   desktop-incant -
   desktop-incant-names -
   fvwm-deskkeys

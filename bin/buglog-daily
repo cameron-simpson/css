@@ -1,0 +1,58 @@
+#!/bin/sh -ue
+#
+# Log to daily log files.
+#       - Cameron Simpson <cs@zip.com.au> 13mar2008
+#
+
+exec </dev/null
+
+: ${LOGDIR:=$HOME/var/log}
+
+cmd=`basename "$0"`
+usage="Usage: $cmd [-D when] [-d logdir] headline"
+
+when=today
+logdir=$LOGDIR/daily
+
+badopts=
+
+while [ $# -gt 0 ]
+do
+  case $1 in
+    -D) when=$2; shift ;;
+    -d) logdir=$2; shift ;;
+    --) shift; break ;;
+    -?*)echo "$cmd: unrecognised option: $1" >&2
+        badopts=1
+        ;;
+    *)  break ;;
+  esac
+  shift
+done
+
+[ -d "$logdir/." ] || mkdir -- "$logdir" || badopts=1
+
+if [ $# = 0 ]
+then
+  echo "$cmd: missing headline" >&2
+  badopts=1
+fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+daycode=`date -d "$when" "+%Y-%m-%d"`
+hhmm=`date -d "$when" "+%H:%M"`
+logdir=$logdir/$daycode
+
+[ -d "$logdir/." ] || mkdir -- "$logdir"
+
+printf "%s %s\n" "$hhmm" "$*" >>"$logdir/ALL"
+
+if pfx=`expr "x$*" : 'x\([A-Z][A-Z_0-9,]*\):.*'`
+then
+  sfx=` expr "x$*" : 'x[A-Z][A-Z_0-9,]*: *\(.*\)'`
+  for xtra in `printf "%s\n" "$pfx" | tr , ' '`
+  do
+    printf "%s %s\n" "$hhmm" "$sfx" >>"$logdir/$xtra"
+  done
+fi

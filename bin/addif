@@ -70,7 +70,8 @@ os=`uname -s` || exit 1
 
 if [ -z "$netmask" ]
 then
-  netmask=`ifconfig "$baseif" | sed -n 's/.* Mask:\([^ ]*\).*/\1/p'`
+  netmask=`ifconfig "$baseif" | sed -n 's/.* Mask:\([^ ]*\).*/\1/p' | sed 1q`
+  [ -n "$netmask" ] || netmask=`ifconfig "$baseif" | sed -n 's/.* netmask \(0x[0-9a-f]*\).*/\1/p' | sed 1q`
   [ -n "$netmask" ] || { echo "$cmd: can't deduce netmask for $baseif" >&2
 			 exit 1
 		       }
@@ -89,7 +90,7 @@ do
   for ipaddr
   do
     case "$os" in
-      OpenBSD)
+      OpenBSD|Darwin)
 	# no silly :n logical interfaces for BSD!
 	( set -x; $trace ifconfig "$baseif" alias "$ipaddr" netmask "$netmask" ) || xit=1
 	;;

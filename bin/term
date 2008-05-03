@@ -21,9 +21,9 @@
 : ${TERMTINT:=''}
 : ${TERMOPTIONS:=''}
 : ${RXVT_SOCKET:=/tmp/urxvtd-socket-$USER}
-export RXVT_SOCKET
+export RXVT_SOCKET TMPDIR
 
-cmd=$0
+cmd=`basename "$0"`
 usage="Usage: $cmd [-v] [-w width] [-h height] [-x x-pos] [-y y-pos]
 		[-l lock] [-1 lock] [-j job]
 		[-f font] [-n name] [-big] [-small] [-keepio] [-xauthhack]
@@ -50,7 +50,12 @@ lock=
 lock1=
 iconic=
 
-[ -s $HOME/.termenv -a -r $HOME/.termenv ] && { set +u; . $HOME/.termenv; set -u; }
+if [ -s "$HOME/.termenv" -a -r "$HOME/.termenv" ]
+then
+  set +u
+  . "$HOME/.termenv"
+  set -u
+fi
 
 badopts=
 
@@ -61,10 +66,10 @@ while [ $# -gt 0 ]
 do
   case "$#,$1" in
     1,-[ceglwhxyns] | 1,-xrm | 1,-geometry)
-		echo "$cmd: $1 needs an argument" >&2
-		badopts=1
-		shift; break
-		;;
+      echo "$cmd: $1 needs an argument" >&2
+      badopts=1
+      shift; break
+      ;;
   esac
   case $1 in
     --)		shift; break ;;
@@ -116,106 +121,132 @@ set -- ttysane "$@"
 [ -n "$WINJOB" ] && set -- winjob "$WINJOB" "$@"
 
 case "$TERM,$DISPLAY" in
-    *,?*)
-        if [ -n "$X11_COMPOSITE" ]
-        then
-          qcmd=`shqstr "$@"`
-          set -- sh -c "( exec >/dev/null; sleep 2; xwin-transset \"\$WINDOWID\" ) & exec $qcmd"
-        fi
-	case "$PREFTERM" in
-	  gnome-terminal) termopts="$termopts --title \"\$title\" $xrmopts" ;;
-	  aterm)          termopts="$termopts -title \"\$title\"" ;;
-          urxvt*)         termopts="$termopts -title \"\$title\" $xrmopts"
-                          case "$f" in
-                            '' | [0-9]x* | [1-9][0-9]x* | -* ) ;;
-                            *)  f=xft:$f ;;
-                          esac
-                          ;;
-	  *)              termopts="$termopts -title \"\$title\" $xrmopts" ;;
-	esac
-	[ -n "$f" ] && termopts="$termopts -fn \"\$f\" -fb \"$f\""
+  *,?*)
+    if [ -n "$X11_COMPOSITE" ]
+    then
+      qcmd=`shqstr "$@"`
+      set -- sh -c "( exec >/dev/null; sleep 2; xwin-transset \"\$WINDOWID\" ) & exec $qcmd"
+    fi
+    case "$PREFTERM" in
+      gnome-terminal) termopts="$termopts --title \"\$title\" $xrmopts" ;;
+      aterm)          termopts="$termopts -title \"\$title\"" ;;
+      urxvt*)         termopts="$termopts -title \"\$title\" $xrmopts"
+                      case "$f" in
+                        '' | [0-9]x* | [1-9][0-9]x* | -* ) ;;
+                        *)  f=xft:$f ;;
+                      esac
+                      ;;
+      *)              termopts="$termopts -title \"\$title\" $xrmopts" ;;
+    esac
+    [ -n "$f" ] && termopts="$termopts -fn \"\$f\" -fb \"$f\""
 
-	case $x in +*|-*) ;; *) x=+$x ;; esac
-	case $y in +*|-*) ;; *) y=+$y ;; esac
-	if [ $sized ]
-	then
-          case "$geometry" in
-            # specify tab
-            M)
-              geometry=${X11_TABMIDDLE_DXC}x${TTY_HIGH}+${X11_TABMIDDLE_X}-0 ;;
-            [0-9])
-              eval "geometry=\${X11_TAB${geometry}_DXC}x\${TTY_HIGH}+\${X11_TAB${geometry}_X}-0" ;;
-            '')
-              geometry=${w}x${h}$x$y ;;
-          esac
-	  termopts="$termopts -geometry \"\$geometry\""
-	fi
+    case $x in +*|-*) ;; *) x=+$x ;; esac
+    case $y in +*|-*) ;; *) y=+$y ;; esac
+    if [ $sized ]
+    then
+      case "$geometry" in
+        # specify tab
+        M)
+          geometry=${X11_TABMIDDLE_DXC}x${TTY_HIGH}+${X11_TABMIDDLE_X}-0 ;;
+        [0-9])
+          eval "geometry=\${X11_TAB${geometry}_DXC}x\${TTY_HIGH}+\${X11_TAB${geometry}_X}-0" ;;
+        '')
+          geometry=${w}x${h}$x$y ;;
+      esac
+      termopts="$termopts -geometry \"\$geometry\""
+    fi
 
-	[ -n "$xauthhack" -a -n "$XAUTHORITY" -a -r "$XAUTHORITY" ] &&
-		{ # Fight with NFS/xterm brain damage.
-		  xauth=$TMPDIR/$cmd.$$
-		  exec 4>$xauth
-		  chmod 600 $xauth
-		  cat <"$XAUTHORITY" >&4
-		  exec 4>&-
-		  XAUTHORITY=$xauth
-		  export XAUTHORITY
-		}
+    if [ -n "$xauthhack" -a -n "$XAUTHORITY" -a -r "$XAUTHORITY" ]
+    then
+      # Fight with NFS/xterm brain damage.
+      xauth=$TMPDIR/$cmd.$$
+      exec 4>$xauth
+      chmod 600 $xauth
+      cat <"$XAUTHORITY" >&4
+      exec 4>&-
+      XAUTHORITY=$xauth
+      export XAUTHORITY
+    fi
 
-	case "$PREFTERM" in
-	    rxvt)	if [ $dotrans ]
-			then termopts="$termopts -ip"
-			else termopts="$termopts +ip"
-			fi
-			;;
-	    urxvt*)	if [ $dotrans ]
-			then
-			  termopts="$termopts -ip"
-			  [ -n "$tint" ] && termopts="$termopts -tint $tint"
-			  [ -n "$shade" ] && termopts="$termopts -sh $shade"
-			else
-			  termopts="$termopts +ip"
-			fi
-	    		[ $async ] || PREFTERM=urxvt	# gotta be synchronous
-			case "$PREFTERM" in
-			  urxvtc)
-			    if [ -n "$RXVT_SOCKET" ] || RXVT_SOCKET=`rig-urxvtd`
-			    then
-			      export RXVT_SOCKET
-			    else
-			      PREFTERM=urxvt
-			    fi
-			    ;;
-			esac
-			;;
-	    aterm)	# -fade 90
-			if [ $dotrans ]
-			then
-			  termopts="$termopts -tr"
-			  [ -n "$shade" ] && termopts="$termopts -sh $shade"
-			else
-			  termopts="$termopts +tr"
-			fi
-			;;
-	esac
+    case "$PREFTERM" in
+      rxvt)     if [ $dotrans ]
+                then termopts="$termopts -ip"
+                else termopts="$termopts +ip"
+                fi
+                ;;
+      urxvt*)   if [ $dotrans ]
+                then
+                  termopts="$termopts -ip"
+                  [ -n "$tint" ] && termopts="$termopts -tint $tint"
+                  [ -n "$shade" ] && termopts="$termopts -sh $shade"
+                else
+                  termopts="$termopts +ip"
+                fi
+                [ $async ] || PREFTERM=urxvt  # gotta be synchronous
+                case "$PREFTERM" in
+                  urxvtc)
+                    if [ -n "$RXVT_SOCKET" ] || RXVT_SOCKET=`rig-urxvtd`
+                    then
+                      export RXVT_SOCKET
+                    else
+                      PREFTERM=urxvt
+                    fi
+                    ;;
+                esac
+                ;;
+      aterm)    # -fade 90
+                if [ $dotrans ]
+                then
+                  termopts="$termopts -tr"
+                  [ -n "$shade" ] && termopts="$termopts -sh $shade"
+                else
+                  termopts="$termopts +tr"
+                fi
+                ;;
+    esac
 
-	case "$PREFTERM" in
-	  gnome-terminal)
-              eval "set -- \$PREFTERM $termopts -x \"\$@\"" ;;
-	  *)  eval "set -- \$PREFTERM $termopts -e \"\$@\"" ;;
-	esac
-	;;
+    case "$PREFTERM" in
+      gnome-terminal)
+          eval "set -- \$PREFTERM $termopts -x \"\$@\"" ;;
+      *)  eval "set -- \$PREFTERM $termopts -e \"\$@\"" ;;
+    esac
+    ;;
 
-    iris-ansi*,*)
-	[ -n "$f" ] && set -- -f "$f" "$@"
-	[ -n "$x$y" ] && set -- -p "$x,$y" "$@"
-	[ -n "$w$h" ] && set -- -s "$w,$h" "$@"
-	[ -n "$title" ] && set -- -t "$title" -n "$title" "$@"
-        set -- wsh -v "$@"
-	;;
-    *)	async=
-	detach=
-	;;
+  iris-ansi*,*)
+    [ -n "$f" ] && set -- -f "$f" "$@"
+    [ -n "$x$y" ] && set -- -p "$x,$y" "$@"
+    [ -n "$w$h" ] && set -- -s "$w,$h" "$@"
+    [ -n "$title" ] && set -- -t "$title" -n "$title" "$@"
+    set -- wsh -v "$@"
+    ;;
+  *)
+    if [ "x$OS" = xdarwin ]
+    then
+      runme=$TMPDIR/$cmd.$$.sh
+      qrunme=`shqstr "$runme"`
+      qcmd=`shqstr "$@"`
+      ( echo '#!/bin/sh'
+        dumpenv -f -sh
+        printf "%s\n" ": set -x; rm -f $qrunme; exec $qcmd"
+      ) >"$runme"
+      chmod u+rx "$runme"
+      set -- \
+        osascript \
+          -e 'tell app "iTerm"
+                activate
+                set myterm to (make new terminal)
+                tell myterm
+                  set mysession to (make new session at the end of sessions)
+                  tell mysession
+                    exec command "'"$runme"'"
+                  end tell
+                end tell
+              end tell' 
+    else
+      async=
+      detach=
+    fi
+    ;;
 esac
 
 ##set -x

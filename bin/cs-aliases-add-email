@@ -1,0 +1,9 @@
+#!/bin/sh -ue
+#
+# Add new email addresses from a mail message.
+#       - Cameron Simpson <cs@zip.com.au> 26apr2008
+#
+
+[ $# = 1 ] || { echo "Usage: $0 category <message" >&2; exit 2; }
+: ${CS_ALIASES=$HOME/rc/mail/aliases2}
+cs-aliases -f "$CS_ALIASES" new | sed "s/^/$1 /" >>"$CS_ALIASES"

@@ -23,7 +23,13 @@ width=None
 height=None
 
 topy=67
-charx=5
+charx=int(os.environ.get('FONT_X',5))
+chary=int(os.environ.get('FONT_Y',11))
+if os.environ.get('XSESSIONMODE','') == 'vnc':
+  fvMove='Move'
+else:
+  fvMove='AnimatedMove'
+
 mintty=charx*80
 
 D=cs.x11.Display()
@@ -65,8 +71,10 @@ def settabenv(tabnum, px, wx):
 
 ttyheight=dy-topy
 ttyheight2=ttyheight/2
+ttycheight=ttyheight/chary
 setenv("PIX_HIGH", ttyheight)
 setenv("PIX_HIGH2", ttyheight2)
+setenv("TTY_HIGH", ttycheight)
 
 print "#", dx, dy
 xy="%dx%d" % (dx,dy)
@@ -179,8 +187,8 @@ DestroyFunc MoveWinFixed
 AddToFunc MoveWinFixed
 + I Raise
 + I Resize $2 $3
-+ I AnimatedMove $0 $1 Warp
-'''
++ I %s $0 $1 Warp
+''' % fvMove
 
 poslist=[pos for pos in numPos(rightmon)]
 npos=len(poslist)
@@ -237,14 +245,9 @@ setenv("X11_MONRIGHT_X", monRight.X)
 setenv("X11_MONRIGHT_DX", monRight.DX)
 
 print "Key Up W M MoveWinFixed %dp -0p %dp %dp" % (monMain.X, monMain.DX, ttyheight)
-setenv("HALFX", monMain.LEFTWIDTH)
 print "Key Down W M MoveWinFixed %dp -0p %dp %dp" % (monMain.X, monMain.LEFTWIDTH, ttyheight)
 print "Key Down W MS MoveWinFixed %dp -0p %dp %dp" % (monMain.X+monMain.LEFTWIDTH, monMain.RIGHTWIDTH, ttyheight)
 print "Key Left W M MoveWinFixed %dp -0p %dp %dp" % (monLeft.X, monLeft.LEFTWIDTH, ttyheight)
 print "Key Left W MS MoveWinFixed %dp -0p %dp %dp" % (monLeft.X+monLeft.LEFTWIDTH, monLeft.RIGHTWIDTH, ttyheight)
 print "Key Right W M MoveWinFixed %dp -0p %dp %dp" % (monRight.X, monRight.LEFTWIDTH, ttyheight)
 print "Key Right W MS MoveWinFixed %dp -0p %dp %dp" % (monRight.X+monRight.LEFTWIDTH, monRight.RIGHTWIDTH, ttyheight)
-  
-setenv("FULLX", monMain.X)
-setenv("HALFX", monMain.X+monMain.LEFTWIDTH)
-

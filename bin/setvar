@@ -1,4 +1,4 @@
-#!/usr/bin/perl
+#!/usr/bin/python -tt
 #
 # Script to compute various environment parameters.
 # Must be sourced, and defines the shell function setvar() as a consequence.
@@ -10,671 +10,329 @@
 # You don't source it anymore. - cameron, 07jan1994
 # Added -f to force resetting variables. - cameron, 11jan1994
 # Generalisation. - cameron, 02dec1998
+# Python recode, syntax change, bootstrap. - cameron 23mar2008
 #
 
-use strict qw(vars);
-
-use Cwd;
-use cs::Glob;
-use cs::Misc;
-use cs::Upd;
-use cs::Net;
-use cs::Shell;
-use cs::Source;
-use cs::Pathname;
-use cs::Hier;
-
-undef %::did;
-
-# bootstrap some values
-chomp($_=`pwd`);			setenv(PWD,$_);
-chomp($_=`hostname`);			setenv(HOSTNAME,$_);
-($_=$::ENV{HOSTNAME}) =~ s/\..*//;	setenv(HOST,$_);
-($_=$::ENV{HOSTNAME}) =~ s/^[^.]*\.//;	setenv(HOSTDOMAIN,$_);
-$_=(length($::ENV{HOME}) ? $::ENV{HOME} : userdir('cameron')); setenv(HOME,$_);
-
-@::ENVPATH=( length $::ENV{::ENVPATH}
-	 ? grep(length,split(/:+/,$::ENV{::ENVPATH}))
-	 : ("$::ENV{HOME}/.setvar", "/opt/shell/env")
-	 );
-
-$::Usage="Usage:\t$::cmd [-f] varnames command [args...]
-	$::cmd [-f] -n varnames...
-	-c		Emit assignments in csh syntax.
-	-d dir		Env dir (default: $::ENV{ENVPATH}).
-	-f		Force. Rebuild variables even if set.
-	-n		No exec, print shell assignments suitable for eval.
-	-N file		No exec, print shell assignments suitable for eval to named file.
-	-s		Silent. No non-fatal errors.
-	-v		Verbose.
-	-x		Turn on tracing in no-exec mode.
-	varnames	Space separated list of environment variables needed.
-";
-
-$::Force=0;
-my $noexec=0;
-my $trace=0;
-my $verbose = -t STDOUT;
-my $silent  = ! $verbose;
-my $CshMode=0;
-my $badopts=0;
-my $outfile;
-my $keepOutfile=0;
-ARGV:
-while (@ARGV)
-{ $_=shift(@ARGV);
-  last ARGV if $_ eq '--';
-  (unshift(@ARGV,$_), last ARGV) unless /^-./;
-
-  if ($_ eq '-n')	{ $noexec=1; $outfile="/tmp/$::cmd.$$"; }
-  elsif ($_ eq '-N')	{ $noexec=1; $outfile=shift(@ARGV); $keepOutfile=1; }
-  elsif ($_ eq '-f')	{ $::Force=1; }
-  elsif ($_ eq '-d')	{ unshift(@::ENVPATH,shift(@ARGV)); }
-  elsif ($_ eq '-s')	{ $silent=1; $verbose=0; }
-  elsif ($_ eq '-v')	{ $silent=0; $verbose=1; }
-  elsif ($_ eq '-x')	{ $trace=1; }
-  elsif ($_ eq '-c')	{ $CshMode=1; }
-  else
-  { err("$::cmd: $_: unrecognised option\n");
-    $badopts=1;
-  }
-}
-
-my(@vars)=();
-
-if ($noexec)
-{ @vars=@ARGV;
-}
-elsif (!defined($_=shift(@ARGV)))
-{ err "$::cmd: missing varnames\n";
-  $badopts=1;
-}
-else
-{
-  if (!/^\s*[_\w]+(\s+[_\w]+)*\s*$/)
-  { err "$::cmd: $_: bad varname list\n";
-    $badopts=1;
-  }
-  else
-  { @vars=grep(length,split(/,+/));
-  }
-
-  if (@ARGV)
-  { err "$::cmd: extra arguments after varnames: @ARGV\n";
-    $badopts=1;
-  }
-}
-
-die $::Usage if $badopts;
-
-$::UseExtant=0;
-
-envstuff();
-
-if (! $noexec)
-{
-  setvar(0,@vars);
-  finalvars();
-  strippaths();
-  exec @ARGV;
-  exit 1;
-}
-
-if (defined($outfile))
-{ if (!open(OUTFILE,"> $outfile\0"))
-  { err "$::cmd: can't write to $outfile: $!\n";
-    undef $outfile;
-  }
-  else
-  { chmod(0755,$outfile);
-    select(OUTFILE);
-  }
-}
-
-# FIXME: csh mode for -vx if ever restored
-# print "set -vx\n" if $trace;
-
-setvar(0,@vars);
-# print "set +vx\n" if $trace;
-finalvars();
-strippaths();
-putvars();
-
-if (defined($outfile))
-{
-  close(OUTFILE);
-
-  if ($CshMode)
-  { print STDOUT "source '$outfile'";
-  }
-  else
-  { print STDOUT ". '$outfile'";
-  }
-
-  if (! $keepOutfile)
-  { print STDOUT "; /bin/rm -f '$outfile'";
-  }
-
-  print STDOUT "\n";
-
-  stat($outfile) || warn "$::cmd: stat($outfile): $!\n";
-  # system("exec >&2; ls -ld $outfile; cat $outfile");
-}
-
-exit $::Xit;
-
-sub envstuff
-{
-  my %envpath=();
-
-  sub loadenvpath()
-  {
-    for my $dir (@::ENVPATH)
-    { my $vardir="$dir/var";
-
-      if (-d "$vardir/.")
-      # get files from dir
-      {
-	for my $f (cs::Pathname::dirents($vardir))
-	{ $envpath{$f}="<$vardir/$f" if ! exists $::ENV{$f};
-	}
-      }
-      else
-      # load file
-      { ##warn "open($vardir)";
-	if (open(LOADENV,"< $vardir\0"))
-	{ local($_);
-
-	  ENVLINE:
-	  while (defined($_=<LOADENV>))
-	  { chomp;
-	    s/^\s+//;
-	    s/^#.*//;
-	    next ENVLINE if ! length;
-
-	    if (! /^([^=]+)=/)
-	    { warn "$::cmd: $vardir, line $.: bad format: $_\n";
-	    }
-	    else
-	    { if (! exists $envpath{$1})
-	      { $envpath{$1}=$';
-		##warn "preloadenv: $1=\"$'";
-	      }
-	    }
-	  }
-
-	  close(LOADENV);
-	}
-      }
-    }
-  }
-
-  sub needenv($)
-  { my($var)=@_;
-    return if defined($::ENV{$var}) && length($::ENV{$var});
-    setvar(1,$var);
-  }
-
-  sub fetchenv($;$)
-  { my($var,$missok)=@_;
-    $missok=0 if ! defined $missok;
-
-    my @extlist=
-	 grep(length,
-	 (
-	  "$::ENV{HOST}\@$::ENV{LOCATION}",
-	  "$::ENV{HOST}.$::ENV{SYSTEMID}",
-	  "$::ENV{SYSTEMID}.$::ENV{ARCH}",
-	  "\@$::ENV{LOCATION}",
-	  $::ENV{HOSTNAME},
-	  $::ENV{HOST},
-	  $::ENV{SYSTEMID},
-	  $::ENV{HOSTDOMAIN},
-	  $::ENV{OS},
-	  $::ENV{ARCH},
-	 ))
-	 ;
-
-    for my $ext (@extlist, '')
-    {
-      my $key = ( $ext =~ /^[^\.@]/ ? "$var.$ext" : "$var$ext" );
-
-      ##warn "try $key";
-      if (exists $envpath{$key})
-      {
-	my $val = $envpath{$key};
-	##warn "hit on $key [$val]";
-	my $type = substr($val,$[,1);
-
-	if ($type eq '<')
-	{ $val=efromfile(substr($val,1));
-	}
-	else
-	{ $val=estring($val,$missok);
-	}
-
-	return $val;
-      }
-    }
-
-    if (! $missok)
-    { warn "$::cmd: can't fetchenv(\$$var)\n";
-    }
-    return undef;
-  }
-
-  sub envkeys()
-  { ::uniq(map((s/[^\w_].*//, $_), keys %envpath));
-  }
-
-  loadenvpath();
-  for my $needvar (OS,ARCH,SYSTEMID)
-  { needenv($needvar);
-  }
-}
-
-# first arg numeric => OR( [0,1] => missok, [0,2] => noforce )
-sub setvar
-{
-  my(@vars)=@_;
-
-  my $force=$::Force;
-  my $missok=0;
-
-  if (@vars && $vars[0] =~ /^\d/)
-  { my $mask=shift(@vars)+0;
-    $missok=($mask&0x01);
-    $force=0 if $mask&0x02;
-  }
-
-  return undef if ! @vars;
-
-  my $lastvar = $vars[$#vars];
-
-  local($_);
-  local($::cmd)="$::cmd: setvar(@vars)";
-
-  VAR:
-  while (@vars)
-  {
-    $_=shift(@vars);
-
-    $trace && out $_;
-
-    if ($_ eq '*')
-    { unshift(@vars, envkeys());
-      next VAR;
-    }
-
-    if (/^use\s+/)
-    { $_=$';
-      map(usefile($_,0),grep(length,split(/\s+/)));
-      next VAR;
-    }
-
-    if (/^try\s+/)
-    { $_=$';
-      map(usefile($_,1),grep(length,split(/\s+/)));
-      next VAR;
-    }
-
-    if (/^addprefix\s+/)
-    { $_=$';
-      for my $pfx (map(estring($_), grep(length,split(/\s+/))))
-      { $pfx="/opt/$pfx" unless $pfx =~ /^\//;
-	setenv(PATH,"$::ENV{PATH}:$pfx/bin:$pfx/sbin");
-        setenv(MANPATH,"$::ENV{MANPATH}:$pfx/man:$pfx/catman:$pfx/info");
-      }
-      next VAR;
-    }
-
-    if (/^([a-z_]\w*)=/i)
-    { my($var,$val)=($1,$');
-      setenv($var,estring($val,$missok));
-      $::did{$var}=1;
-      next VAR;
-    }
-
-    next VAR if $::did{$_};
-    $::did{$_}=1;
-
-    if (!$force && defined($::ENV{$_}) && length($::ENV{$_}))
-    # already set
-    { ##warn "skip $_ because already set and !force";
-      next VAR;
-    }
-
-    $trace && out "$_=";
-
-    my $val = fetchenv($_,$missok);
-    if (defined $val)
-    { setenv($_,$val);
-    }
-  }
-
-  return $::ENV{$lastvar};
-}
-
-sub fromfile
-{ ## warn "fromfile(@_)";
-  if (!open(FROMFILE,"< $_[0]\0"))
-  { warn "$::cmd: can't open $_[0] for read: $!\n";
-    return undef;
-  }
-
-  warn "$::cmd; $_[0] is not a file" unless -f FROMFILE;
-  local($_)=join('',<FROMFILE>);
-  close(FROMFILE);
-  chomp;
-
-  warn "fromfile($_[0])=[$_]" if /\n/;
-
-  $_;
-}
-
-sub untilde($)
-{ local($_)=@_;
-
-  s;\~(\w*);(! length($`) || substr($`,-1,1) eq ':')
-		? (length($1) ? userdir($1) : $::ENV{HOME})
-		: $&;eg;
-
-  $_;
-}
-
-sub efromfile($$)
-{ my($file,$missok)=@_;
-  estring(fromfile($file),$missok);
-}
-
-sub estring($$)
-{ my($str,$missok)=@_;
-  $str =~ s;\$(\$|[_\w]+|\{[_\w]+\});varval($1,$missok);eg;
-  return untilde($str);
-}
-
-sub varval($$)
-{ my($var,$missok)=@_;
-
-  return '$' if $var eq '$';
-
-  local($::UseExtant)=1;
-  
-  /^\{(.*)\}$/
-  ? setvar($missok,$1)
-  : setvar($missok,$var)
-  ;
-}
-
-sub shfile
-{ my($shfile)=@_;
-
-  if (!open(SHFILE,"< $shfile\0"))
-  { warn "$::cmd: can't open $shfile for read: $!\n";
-    return undef;
-  }
-
-  SHFILE:
-    while (<SHFILE>)
-    { chomp;
-      next SHFILE if /^#/;
-      if (/^\s*([a-zA-Z_][_\w]*)='([^']*)'/
-       || /^\s*([a-zA-Z_][_\w]*)=(\S*)/
-	 )
-      { warn "\$::ENV{$1}=$2";
-        $::ENV{$1}=$2;
-      }
-      else
-      { warn "$::cmd: $shfile, line $.: can't parse: $_\n";
-      }
-    }
-
-  close(SHFILE);
-}
-
-sub forget
-{ warn "\nforget [@_]\n";
-  for (@_)
-  { $::did{$_}=$_;
-    $::ENV{$_}='';
-  }
-}
-
-sub paths
-{ my($pathvar)=@_;
-
-  my @m=();
-
-  for my $c (map(untilde($_), split(/:/,$pathvar)))
-  {
-    if ($c =~ /\*/)
-    { push(@m,sort &cs::Glob::glob($c)); }
-    else
-    { push(@m,$c); }
-  }
-
-  @m;
-}
-
-sub strippaths
-{ my(@vars)=@_;
-  @vars=grep(/PATH$/, keys %::ENV) if ! @vars;
-
-  for my $var (@vars)
-  { my $stripped = cs::Shell::statpath(paths($::ENV{$var}));
-    if ($stripped ne $::ENV{$var})
-    { setenv($var,$stripped);
-    }
-  }
-}
-
-sub userdir
-{ my($u)=shift;
-  my(@pw);
-
-  if (! defined $::_PW{$u})
-  { $::_PW{$u}=[ getpwnam($u) ];
-    if (! @{$::_PW{$u}})
-    { ## warn "$::cmd: userdir($u): who is $u?\n";
-      return undef;
-    }
-  }
-
-  @pw=@{$::_PW{$u}};
-
-  return undef unless @pw;
-
-  $pw[7];
-}
-
-sub usefile($;$)
-{ my($ufile,$missok)=@_;
-  $missok=0 if ! defined $missok;
-
-  $trace && out("use $ufile");
-
-  if (substr($ufile,0,1) ne '/')
-  { my $found = 0;
-
-   FINDIT:
-    for my $udir (@::ENVPATH)
-    { if (stat "$udir/$ufile" && -f _ && -r _)
-      { $ufile="$udir/$ufile";
-	$ufile="$::ENV{PWD}/$ufile" if substr($ufile,0,1) ne '/';
-	$found=1;
-	last FINDIT;
-      }
-      elsif (stat "$udir/$ufile/STANDARD" && -f _ && -r _)
-      { $ufile="$udir/$ufile/STANDARD";
-	$ufile="$::ENV{PWD}/$ufile" if substr($ufile,0,1) ne '/';
-	$found=1;
-	last FINDIT;
-      }
-    }
-
-    if (! $found)
-    { if (! $missok)
-      { warn "$::cmd: can't find file for \"use $ufile\" in @::ENVPATH\n";
-      }
-      return;
-    }
-  }
-
-  $trace && out("use $ufile");
-
-  if ($::using{$ufile})
-  { warn "$::cmd: use recursion aborted for use \"$ufile\"\n";
-  }
-  else
-  { $::using{$ufile}=1;
-
-    my $s = cs::Source::open($ufile);
-    if (! defined $s)
-    { warn "$::cmd: use $ufile: $!\n";
-    }
-    else
-    {
-      local $_;
-      local($::cmd)="$::cmd: use($ufile)";
-
-      # hack to make local paths work
-      local @::ENVPATH = (cs::Pathname::dirname($ufile), @::ENVPATH);
-
-      while (defined ($_=$s->GetContLine()) && length)
-      { chomp;
-	s/^\s+//;
-	s/^#.*//;
-	next if ! length;
-	useline($_)
-	  || warn "$::cmd: $ufile: syntax error: $_\n";
-      }
-    }
-
-    $::using{$ufile}=0;
-  }
-}
-
-sub useline($)
-{ local($_)=@_;
-  local($::cmd)="$::cmd:\n  $_:\n  ";
-
-  if (/^eval\s+/)
-  { $_=$';
-    eval;
-    warn "$::cmd: $@" if $@;
-  }
-  elsif (/^use\s+/)
-  { $_=$';
-    map(usefile($_,0),
-	grep(length,
-	     split(/\s+/,
-		   estring($_,0))));
-  }
-  elsif (/^try\s+/)
-  { $_=$';
-    map(usefile($_,1),
-	grep(length,
-	     split(/\s+/,
-		   estring($_,1))));
-  }
-  elsif (/^var\s+/)
-  { $_=$';
-    setvar(0,grep(length,
-		split(/\s+/,
-		      estring($_,0))));
-  }
-  elsif (/^dflt\s+/)
-  { $_=$';
-    setvar(2,grep(length,
-		split(/\s+/,
-		      estring($_,0))));
-  }
-  elsif (/^tryvar\s+/)
-  { $_=$';
-    setvar(1,grep(length,
-		split(/\s+/,
-		      estring($_,0))));
-  }
-  elsif (/^addprefix\s+/)
-  { $_=$';
-    for my $pfx (grep(length,split(/\s+/)))
-    { $pfx="/opt/$pfx" unless $pfx =~ /^\//;
-      setenv(PATH,"$::ENV{PATH}:$pfx/bin:$pfx/sbin");
-      setenv(MANPATH,"$::ENV{MANPATH}:$pfx/man:$pfx/catman:$pfx/info");
-    }
-  }
-  elsif (/^final\s+/)
-  { push(@::final,$');
-  }
-  elsif (/^perl\s+([_\w]+)\s+/)
-  { my $var = $1;
-    my @value = eval $';
-    if ($@)
-    { warn "$@ in:\n$'";
-      $::Xit=1;
-    }
-    else
-    { setenv($var,join(' ', @value));
-    }
-  }
-  elsif (/^csh\s+/)
-  {
-    my $cshcmd = $';
-    my $shcmd = cs::Shell::quote(
-		  'tcsh','-c',
-		  "$cshcmd; /opt/script/dumpenv -f -persist");
-    ## warn "shcmd=[$shcmd]";
-    strippaths();
-    if (! open(CSH," set -x; exec $shcmd |"))
-    { warn "$::cmd: popen-csh($cshcmd): $!\n";
-      $::Xit=1;
-    }
-    else
-    { my $csh = new cs::Source (FILE,::CSH);
-      my $var; my $value;
-      while ( ($var,$value)=cs::Hier::getKVLine($csh) )
-      { setenv($var,$value);
-	warn "read $var from csh\n";
-      }
-      close(CSH);
-    }
-  }
-  elsif (/^([_\w]+)(\??)=/)
-  { (! length $2 || ! length $::ENV{$1}) && setenv($1,estring($',1));
-  }
-  else
-  { return 0;
-  }
-
-  1;
-}
-
-sub setenv($$)
-{ my($var,$val)=@_;
-
-  ##warn "setenv($var,$val)";
-  $::ENV{$var}=$val;
-  $::did{$var}=1;
-  $trace && nl("setenv $var=$val");
-  ##warn "post setenv($var,$val): ENV{$var}=$::ENV{$var}";
-
-  return $val;
-}
-
-sub finalvars
-{ for (@::final)
-  { useline($_)
-	  || warn "$::cmd: final: syntax error: $_\n";
-  }
-}
-
-sub putvars
-{ my(@vars)=@_;
-  @vars=keys %::did if ! @vars;
-
-  @vars=grep($_ ne PWD, @vars);	# a r/o variable in some shells :-(
-
-  ##for my $v (@vars) { warn "putvar($v [$::ENV{$v}]"; }
-
-  cs::Shell::putvars($::Force,$CshMode ? CSH : SH,@vars);
-}
+from getopt import getopt, GetoptError
+import os
+import pwd
+import sys
+from sets import Set
+import cs.misc
+from cs.misc import debug, isdebug, cmderr
+
+force=False     # don't reset existing variables
+noAction=False  # don't exec command, recite var assignments on stdout
+isset=Set()
+filevars={}
+doingFilevar=Set()
+bootVal={}
+
+def env(var,dflt=''):
+  ''' Obtain the value of an environment variable.
+      Returns None (or default) if the value cannot be determined.
+  '''
+  global force, isset
+  if (not force or var in isset) and var in os.environ:
+    return os.environ[var]
+  if var not in doingFilevar:
+    val=filevar(var)
+  else:
+    val=None
+  if val is None:
+    val=bootvar(var)
+  if val is not None:
+    setvar(var,val)
+  if val is None:
+    val=dflt
+  return val
+
+def bootvar(var):
+  ''' Compute the value of a variety of variable from scratch.
+  '''
+  if var in bootVal:
+    return bootVal[var]
+  val=None
+  if var == "CPU":
+    cpu=os.uname()[4].lower()
+    if cpu == 'power macintosh':
+      cpu='ppc'
+    val=cpu
+  elif var == "HOME":
+    val=pwd.getpwuid(os.geteuid())[5]
+  elif var == "HOST":
+    hostname=env("HOSTNAME")
+    if '.' in hostname:
+      host, hostdomain = hostname.split('.',1)
+    else:
+      host = hostname
+    val=host
+  elif var == "HOSTDOMAIN":
+    hostname=env("HOSTNAME")
+    host, hostdomain = hostname.split('.',1)
+    val=hostdomain
+  elif var == "HOSTNAME":
+    ##import socket
+    ##val=socket.getfqdn()
+    val=os.popen('exec hostname').read()
+    assert len(val) > 1 and val[-1] == '\n'
+    val=val[:-1]
+  elif var == "OS":
+    opsys=os.uname()[0].lower()
+    if opsys == "sunos":
+      opsys='solaris'
+    val=opsys
+  elif var == "USER":
+    val=pwd.getpwuid(os.geteuid())[0]
+  elif var == "PYTHON_VV":
+    val="%s.%s" % sys.version_info[:2]
+  elif var == "VENDOR":
+    vendor=None
+    if os.path.isfile('/etc/fedora-release'):
+      vendor='fedora'
+    elif os.path.isfile('/etc/redhat-release'):
+      vendor='redhat'
+    elif os.path.isfile('/etc/gentoo-release'):
+      vendor='gentoo'
+    else:
+      opsys=env("OS")
+      if opsys == "darwin":
+        vendor="apple"
+      else:
+        cmderr("unknown VENDOR for OS=%s" % opsys)
+    val=vendor
+  bootVal[var]=val
+  return val
+
+def filevarexts():
+  hostname=env("HOSTNAME")
+  if hostname is not None:
+    yield "@%s" % hostname
+  host=env("HOST")
+  systemid=env("SYSTEMID")
+  if host is not None:
+    if systemid is not None:
+      yield "@%s.%s" % (host, systemid)
+    yield "@%s" % host
+  if systemid is not None:
+    yield "@%s" % systemid
+  arch=env("ARCH")
+  if arch is not None:
+    yield ".%s" % arch
+  yield None
+
+def filevar(var):
+  if var in doingFilevar:
+    if isdebug: cmderr("recursion in filevar(%s): %s" % (var, doingFilevar))
+    return None
+  doingFilevar.add(var)
+  global filevars
+  for ext in filevarexts():
+    if ext is None:
+      evar=var
+    else:
+      evar=var+ext
+    if evar in filevars:
+      doingFilevar.remove(var)
+      return paramsubst(filevars[evar])
+
+  doingFilevar.remove(var)
+  return None
+
+def setvar(var,val=None):
+  if val is not None:
+    if os.environ.get(var) != val:
+      os.environ[var]=val
+      isset.add(var)
+    return val
+
+  val=env(var)
+  if val is None:
+    debug("failed to setvar(%s)" % var)
+  else:
+    if isdebug: cmderr("%s=%s" % (var, val))
+    os.environ[var]=val
+    isset.add(var)
+  return val
+
+def paramsubst(val):
+  newval=''
+  while '$' in val:
+    val0, val1 = val.split('$',1)
+    newval+=val0
+    pos=0
+    while pos < len(val1) and (val1[pos].isalnum() or val1[pos] == '_'):
+      pos+=1
+    val=val1[pos:]
+    subvar=val1[:pos]
+
+    subval=env(subvar)
+    if subval is None:
+      debug("can't look up $%s" % subvar)
+    else:
+      newval+=subval
+
+  newval+=val
+
+  return newval
+
+def loadfilevars(path):
+  global filevars
+  debug("load %s" % path)
+  for line in open(path):
+    assert line[-1:] == '\n', "%s: unexpected EOF" % path
+    if line[0] == '#' or line[0] == '\n':
+      continue
+    line=line[:-1]
+    eqpos=line.find('=')
+    assert eqpos > 0, "%s: bad line: %s" % (path, line)
+    var, val = line.split('=', 1)
+    filevars[var]=val
+
+def listfilevars():
+  global filevars
+  V=Set()
+  for v in filevars.keys():
+    if '.' in v:
+      v, v2 = v.split('.',1)
+    if '@' in v:
+      v, v2 = v.split('@',1)
+    V.add(v)
+  return V
+
+def doCommand(argv):
+  debug("doCommand %s" % argv)
+  op=argv[0]
+  argv=argv[1:]
+  if op == "addprefix":
+    for arg in argv:
+      arg=paramsubst(arg)
+      if not os.path.isabs(arg):
+        arg=os.path.join('/opt',arg)
+      setvar('PATH',"%s:%s/bin:%s/sbin" % (env('PATH',''), arg, arg))
+      setvar('MANPATH',"%s:%s/man:%s/share/man" % (env('MANPATH',''), arg, arg))
+      setvar('PERL5LIB',"%s:%s/lib/perl5:%s/lib/perl5/vendor_perl" % (env('PERL5LIB',''), arg, arg))
+      setvar('PYTHONPATH',"%s:%s/lib/python%s" % (env('PYTHONPATH',''), arg, env('PYTHON_VV')))
+  elif op == "insprefix":
+    argv.reverse()
+    for arg in argv:
+      arg=paramsubst(arg)
+      if not os.path.isabs(arg):
+        arg=os.path.join('/opt',arg)
+      setvar('PATH',"%s/bin:%s/sbin:%s" % (arg, arg, env('PATH')))
+      setvar('MANPATH',"%s/man:%s/share/man:%s" % (arg, arg, env('MANPATH')))
+      setvar('PERL5LIB',"%s/lib/perl5:%s/lib/perl5/vendor_perl:%s" % (arg, arg, env('PERL5LIB')))
+      setvar('PYTHONPATH',"%s/lib/python%s:%s" % (arg, env('PYTHON_VV'), env('PYTHONPATH')))
+  elif op == "python":
+    exec " ".join(argv)
+  elif op == "use":
+    global envpath
+    for arg in argv:
+      if os.path.isabs(arg):
+        doFile(arg)
+      else:
+        for path in envpath:
+          fpath=os.path.join(path,arg)
+          if os.path.isfile(fpath):
+            doFile(fpath)
+            break
+  elif op == "var":
+    for arg in argv:
+      if arg == "*":
+        for var in listfilevars():
+          setvar(var)
+      else:
+        for var in paramsubst(arg).split(' '):
+          setvar(var)
+  else:
+    cmderr("unsupported operation: %s" % op)
+
+def doFile(path):
+  ocmd=cs.misc.cmd
+  cs.misc.cmd="%s: %s" % (ocmd, path)
+  oline=""
+  for line in open(path):
+    if line[-1:] != '\n':
+      cmderr("unexpected EOF")
+      break
+    line=line[:-1]
+    if len(line) == 0 or line[-1] != '\\':
+      oline+=line
+      oline=oline.strip()
+      if len(oline) > 0 and oline[0] != '#':
+        eqpos=oline.find('=')
+        if eqpos > 0 \
+        and oline[0].isalpha() \
+        and sum([ c.isalnum() or c == '_' for c in oline[1:eqpos] ]) == eqpos-1:        # all() not available in 2.3
+          setvar(oline[:eqpos], paramsubst(oline[eqpos+1:]))
+        else:
+          doCommand(oline.split())
+      oline=""
+    else:
+      oline+=" "+line[:-2]
+  if len(oline) > 0:
+    cmderr("unterminated slosh line")
+  cs.misc.cmd=ocmd
+
+def cleanpath(*vars):
+  for var in vars:
+    keep=[]
+    if var not in os.environ:
+      cmderr("warning: cleanpath(%s): no such envvar" % var)
+      continue
+    oval=os.environ[var]
+    for path in oval.split(':'):
+      if len(path) > 0 and os.path.exists(path):
+        if path not in keep:
+          keep.append(path)
+      else:
+        if isdebug: cmderr("%s: discard %s" % (var, path))
+    nval=":".join(keep)
+    if oval != nval:
+      if isdebug: cmderr("%s\n  %s\n  %s" % (var, oval, nval))
+      os.environ[var]=nval
+
+opts, args = getopt(sys.argv[1:], 'fn')
+for opt, val in opts:
+  if opt == '-f':
+    force=True
+  elif opt == '-n':
+    noAction=True
+  else:
+    cmderr("unimplemented option: %s" % opt)
+    sys.exit(2)
+
+envpath=os.environ.get('ENVPATH')
+if envpath is None:
+  envpath='%s/.setvar:/etc/setvar' % env('HOME')
+envpath=envpath.split(':')
+renvpath=envpath[:]
+renvpath.reverse()
+
+for path in renvpath:
+  varfile=os.path.join(path,'var')
+  if os.path.isfile(varfile):
+    loadfilevars(varfile)
+
+setvar("HOSTNAME")
+setvar("SYSTEMID")
+
+if len(args) == 0:
+  args=('var *',)
+for arg in args:
+  if ' ' in arg:
+    doCommand(arg.split())
+  else:
+    setvar(arg)
+
+cleanpath('PATH','MANPATH','PYTHONPATH','PERL5LIB')
+
+if noAction:
+  import cs.sh
+  vars=list(isset)
+  vars.sort()
+  for var in vars:
+    print "%s=%s; export %s;" % (var, cs.sh.quotestr(os.environ[var]), var)
+else:
+  cmderr("action mode not supported")
+  sys.exit(1)

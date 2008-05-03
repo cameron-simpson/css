@@ -11,7 +11,7 @@ cmd=`basename "$0"` || exit 1
 usage="Usage: $cmd [-d datespec] headline"
 
 when=
-tsdir=/home/cskk/bos/timesheets
+tsdir=${BOS_TIMESHEETS:-/home/cskk/bos/timesheets}
 
 badopts=
 

@@ -3,15 +3,11 @@
 import re
 import os
 import os.path
-from types import *
 from cStringIO import StringIO
 from cs.lex import lastlinelen
 import cs.io
-from cs.misc import out, cmderr, all, debug, ifdebug, warn
-
-T_SEQ='ARRAY'
-T_MAP='HASH'
-T_SCALAR='SCALAR'
+from cs.misc import out, cmderr, debug, ifdebug, warn, DictUC_Attrs, \
+                    T_SEQ, T_MAP, T_SCALAR, objFlavour as flavour
 
 DEFAULT_OPTS={'dictSep': ' =>',
               'bareWords': True,
@@ -25,19 +21,6 @@ safeChunkRe  = re.compile(safeChunkPtn)
 safePrefixRe = re.compile('^'+safeChunkPtn)
 safeStringRe = re.compile('^'+safeChunkPtn+'$')
 integerRe    = re.compile('^-?[0-9]+$')
-
-def flavour(obj):
-  """ Return the ``flavour'' of an object:
-      T_MAP: DictType, DictionaryType, objects with an __keys__ or keys attribute.
-      T_SEQ: TupleType, ListType, objects with an __iter__ attribute.
-      T_SCALAR: Anything else.
-  """
-  t=type(obj)
-  if t in (TupleType, ListType): return T_SEQ
-  if t in (DictType, DictionaryType): return T_MAP
-  if hasattr(obj,'__keys__') or hasattr(obj,'keys'): return T_MAP
-  if hasattr(obj,'__iter__'): return T_SEQ
-  return T_SCALAR
 
 def h2a(obj,i=None,opts=None):
   return HierOutput(opts).h2a(obj,i=i)
@@ -242,27 +225,27 @@ class HierInput(_Hier):
     """ Read Hier data from the named directory.
     """
     out("loaddir "+dirname)
-    dict={}
+    D=DictUC_Attrs()
 
     dents=[ dirent for dirent in os.listdir(dirname) if dirent[0] != '.']
     for dent in dents:
-      dict[dent]=self.load(os.path.join(dirname,dent))
+      D[dent]=self.load(os.path.join(dirname,dent))
 
-    return dict
+    return D
 
   def loadfile(self,filename,charset=None):
     """ Read Hier data from the named file.
     """
     fp=cs.io.ContLineFile(filename)
-    dict={}
+    D=DictUC_Attrs()
 
     for line in fp:
       kv=self.kvline(line,charset=charset)
       if ifdebug(): warn("KVLINE:", kv)
-      dict[kv[0]]=kv[1]
+      D[kv[0]]=kv[1]
     fp.close()
 
-    return dict
+    return D
 
   def savefile(self,dict,filename):
     """ Write a Dictionary to the named file in Hier format.

@@ -1,2 +1,2 @@
 #!/bin/sh
-exec L -t ${1+"$@"}
+exec ls -lat ${1+"$@"}

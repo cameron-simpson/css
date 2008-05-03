@@ -1,7 +1,6 @@
 ## :include	dir2html
 
 target  = bin
-PREFIX  = /opt/css
 
 JAVADIR	= $(ETCDIR)/www/java/classes
 java	= $(localjava) $(subjava)
@@ -13,26 +12,25 @@ html	= $('*.html' G)
 
 htdocs	= $(HOME)/@/ezos/html/cs
 htmandir = $(htdocs)/css/manuals
-pmsets	= cs
+pmsets	= lib/cs
 pmset(set) = $('$(set)/*.pm' EG?) \
 	     $('$(set)/*/*.pm' EG?) \
 	     $('$(set)/*/*/*.pm' EG?)
-pmsetmans(set) = $(MANDIR)/man3/$(('$(pmset($(set)))' EP s:|/|::|)).3
-pmsethtml(set) = $(htmandir)/$(('$(pmset($(set)))' EP s:|/|::|)).3.html
+pmsetmans(set) = $(MANDIR)/man3/$(('$(pmset($(set)))' Es[/]P s:|/|::|)).3
+pmsethtml(set) = $(htmandir)/$(('$(pmset($(set)))' Es[/]P s:|/|::|)).3.html
 pmmans = $('$$(pmsetmans($((pmsets))))' EE)
 pmhtml = $('$$(pmsethtml($((pmsets))))' EE)
-pmFromMan(manf) = $(manf FP s:|::|/|).pm
-pmFromHtml(html) = $(html FPP s:|::|/|).pm
+pmFromMan(manf) = lib/$(manf FP s:|::|/|).pm
+pmFromHtml(html) = lib/$(html FPP s:|::|/|).pm
 
 subdirs = $('*/.' GD)
-allscripts = $('*' G !/\./ - subdirs - "0README.txt" - "1INDEX.txt" - "INSTALL" + "synonyms" + "rc.mobile")
+allscripts = $('bin/*' GF !/\./ + "rc.mobile")
 
 scriptmandir = $(MANDIR)/man1
 scriptmans = $(scriptmandir)/$((allscripts)).1
 scriptfromman(manf) = $(manf FP)
 
 _home:
-        :make CHANGELOG.txt
         skip=`hg status | sed -n 's:^? \(.*\):--exclude=/\1:p'` \
         set-x \\
         rsync -av --delete \\
@@ -46,11 +44,12 @@ _home:
                 --exclude=/\*/ \\
                 bin/. $(HOME)/bin/. \
         set-x \\
+        rsync -av bos/. $(HOME)/bin/.
+        set-x \\
         rsync -av --delete \\
                 --include=/CHANGELOG.txt \\
                 $$skip \\
                 --exclude=*.swp \\
-                --exclude=/\*/ \\
                 lib/cs/. $(HOME)/lib/cs/.
 
 _all: squid_redirect 1INDEX.txt _submakes _man
@@ -88,11 +87,11 @@ $(pmmans):	$(pmFromMan($@))
 
 _scriptmans:
 	@echo make $@ ... \
-	egrep -l '^(# *)?=head1 NAME' $(allscripts) \\
+        ( cd bin; exec egrep -l '^(# *)?=head1 NAME' $(allscripts) ) \\
 	| sed 's|.*|$(scriptmandir)/&.1|' \\
-	| xxargs set-x $(MAKE)
+	| xxargs set-x $(MAKE) MANDIR=$(MANDIR)
 
-$(scriptmandir)/%.1: %
+$(scriptmandir)/%.1: bin/%
 	:make $(@D)/.
 	@htman=$(htmandir)/$(@F).html \
 	 case "`sed 1q <$?`" in \

@@ -4,7 +4,11 @@ import cs.hier
 from cs.misc import debug, ifdebug, progress, verbose, warn
 
 def get(secret):
-  for base in (os.path.join(os.environ["HOME"],".secret"), '/opt/config/secret'):
+  if os.path.isabs(secret):
+    return cs.hier.load(secret)
+
+  for base in os.path.join(os.environ["HOME"],".secret"), \
+              '/opt/config/secret':
     try:
       pathname=os.path.join(base,secret)
       return cs.hier.load(pathname)
@@ -13,6 +17,22 @@ def get(secret):
 
   raise IndexError, "no secret named "+secret
 
+def list():
+  import os
+  ss={}
+  for base in '/opt/config/secret', \
+              os.path.join(os.environ["HOME"],".secret"):
+    try:
+      names=os.listdir(base)
+    except OSError:
+      continue
+    for name in names:
+      if len(name) > 0 and name[0] != '.':
+        ss[name]=base
+  ks=ss.keys()
+  ks.sort()
+  return ks
+  
 def mysql(secret,db):
   import MySQLdb
   if type(secret) is str or not(hasattr(secret,'__keys__') or hasattr(secret,'keys')):
@@ -26,6 +46,16 @@ def mysql(secret,db):
   user=secret['LOGIN']
   passwd=secret['PASSWORD']
   return MySQLdb.connect(host=host,db=db,user=user,passwd=passwd)
+
+def sqlAlchemy(secret,scheme,login,password,host,database):
+  import sqlalchemy
+  return sqlalchemy.create_engine(
+           '%s://%s:%s@%s/%s' % (scheme,
+                                 secret.LOGIN,
+                                 secret.PASSWORD,
+                                 secret.HOST,
+                                 secret.DATABASE),
+           echo=ifdebug())
 
 def mssql(secret,db=None):
   import pymssql

@@ -85,6 +85,8 @@ else
   [ $readstdin ] && cat >"$attachment"
 fi
 
+exec </dev/null
+
 [ -s "$attachment" ] && filteredit -s "$attachment" sh -c 'detab | unbs | unctrl'
 
 xit=0
@@ -132,7 +134,8 @@ do
     # The headline alone is passed to my I<dlog> command.
     #
     dlog)
-      dlog "$headline" || xit=1
+      ##dlog "$headline" || xit=1
+      buglog-daily "$headline"
       ;;
 
     # =item B<mailto:>I<email-address>[B<?subject=>I<prefix>]
@@ -221,20 +224,7 @@ do
     #
     infra)
       infraids=`echo "$headline" | infraids`
-      if [ -n "$infraids" ]
-      then
-        if wkdir=`mkdirn "$TMPDIR/$cmd."`
-        then
-          ( set -uex
-            unctrl <"$attachment" >"$wkdir/log.txt"
-            cd "$wkdir"
-            mutt -F /dev/null -s "$headline" -a log.txt cameron $infraids </dev/null
-          ) || xit=1
-          rm -r "$wkdir"
-        else
-          xit=1
-        fi
-      fi
+      [ -z "$infraids" ] || buglog-infra "$headline" <"$attachement" || xit=1
       ;;
 
     # =item B<logger>

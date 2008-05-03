@@ -556,7 +556,12 @@ def c2p(ifp,ofp):
       xit=1
       continue
 
-    tag, patterns = line.lstrip().split(None,1)
+    try:
+      tag, patterns = line.lstrip().split(None,1)
+    except ValueError:
+      cmderr("%s: %d: missing patterns"%(ifp.name,lineno))
+      xit=1
+      continue
     if tag == '.':
       tag=None
 

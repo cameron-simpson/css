@@ -79,6 +79,7 @@ use cs::Misc;
 require 'flush.pl';
 
 # hard exported to main
+no warnings 'redefine';
 sub out		{ if (@_ && ! defined $_[0])
 		  { my@c=caller;warn "\@_ && ! defined \$_[0] from [@c]";
 		  }

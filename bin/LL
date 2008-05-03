@@ -1,2 +1,2 @@
 #!/bin/sh
-exec L -L ${1+"$@"}
+exec ls -lLa ${1+"$@"}

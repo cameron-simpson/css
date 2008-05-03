@@ -1,0 +1,184 @@
+#!/usr/bin/python -tt
+#
+# Tool to manipulte my email address table.
+#       - Cameron Simpson <cs@zip.com.au> 26apr2008
+#
+
+import sys
+import re
+import string
+from os import environ
+import os.path
+import cs.sh
+from email.parser import Parser
+from email.utils import parseaddr, getaddresses, formataddr
+from cs.misc import cmd, cmderr, verbose
+
+aliases=environ.get('CS_ALIASES')
+if aliases is None:
+  aliases=os.path.join(environ['HOME'],'rc','mail','aliases2')
+re_syntax='TEXT'
+re_prefix='cs_aliases'
+new_syntax='MAILITEM'
+
+usage='''Usage:
+  $cmd [-f aliasfile]
+    Recite categories and core addresses.
+  $cmd [-f aliasfile] new <addresses"
+    Print new addresses.
+  $cmd [-f aliasfile] re [-sh] [categories...]
+    Print categories and regular expressions.
+      -sh               Use /bin/sh syntax.
+  Options:
+    -f aliasfile        Specify alias file. Default: %s, from $CS_ALIASES.''' \
+  % aliases
+
+xit=0
+
+byCategory={}
+byAddress={}
+
+def addressKey(addr):
+  name, core = parseaddr(addr)
+  if len(name) == 0 and len(core) == 0:
+    return None
+  return core.lower()
+
+def loadAliases(aliases,catmap=byCategory,addrmap=byAddress):
+  lineno=0
+  for line in open(aliases):
+    lineno+=1
+    if line[-1] != '\n':
+      cmderr("%s, line %d: missing newline (unexpected EOF)"
+             % (aliases, lineno))
+      xit=1
+      break
+
+    line=line.strip()
+    if len(line) == 0 or line[0] == '#':
+      continue
+
+    cats, addr = line.split(None,1)
+    if addr.startswith('mailto:'):
+      addr=addr[7:]
+    cats=cats.split(',')
+    addrkey=addressKey(addr)
+    if addrkey is None:
+      verbose("%s, line %d: can't parse address \"%s\""
+             % (aliases, lineno, addr))
+      xit=1
+      continue
+
+    if addrkey in addrmap:
+      verbose("%s, line %d: repeated address \"%s\" (%s)"
+              % (aliases, lineno, addr, addrkey))
+      continue
+    cats.sort()
+    addrmap[addrkey]=(addr,addrkey,cats)
+
+    for cat in cats:
+      catmap.setdefault(cat,{})[addrkey]=addr
+
+badopts=False
+argv=sys.argv[1:]
+if len(argv) > 0 and argv[0] == '-f':
+  if len(argv) < 2:
+    cmderr("missing 'aliases' argument to -f")
+    badopts=True
+    argv=argv[1:]
+  else:
+    aliases=argv[1]
+    argv=argv[2:]
+
+if len(argv) < 1:
+  op=None
+else:
+  op=argv[0]
+  argv=argv[1:]
+  if op == 'new':
+    if len(argv) > 0:
+      cmderr("extra arguments after \"%s\" operation: %s"
+             % (op, " ".join(argv)))
+      badopts=True
+  elif op == 're':
+    # regular expressions
+    if len(argv) > 0 and argv[0] == '-sh':
+      re_syntax='SH'
+      argv=argv[1:]
+  else:
+    cmderr("unsupported operation \"%s\", remaining arguments: %s"
+           % (op, " ".join(argv)))
+    badopts=True
+
+if badopts:
+  print >>sys.stderr, usage
+  sys.exit(2)
+
+loadAliases(aliases)
+cats=byCategory.keys()
+cats.sort()
+
+if op is None:
+  addrlist=[]
+  for addr in byAddress:
+    A=byAddress[addr]
+    addrlist.append( (A[2], A[0]) )
+  addrlist.sort()
+  for A in addrlist:
+    print "%-23s %s" % ( ",".join(A[0]), A[1] )
+elif op == "new":
+  if new_syntax == 'PLAIN':
+    # Raw email addresses.
+    lineno=0
+    for line in sys.stdin:
+      lineno+=1
+      if line[-1] != '\n':
+        cmderr("stdin: unexpected EOF")
+        sys.exit(1)
+      addr=line[:-1].strip()
+      if len(addr) == 0:
+        continue
+      addrkey=addressKey(addr)
+      if addrkey is None:
+        cmderr("stdin, line %d: unparsed address: %s" % (lineno, addr))
+        xit=1
+      elif addrkey not in byAddress:
+        print "%s %s" % (addr, parseaddr(addr))
+  elif new_syntax == 'MAILITEM':
+    # A mail message.
+    M=Parser().parse(sys.stdin,True)
+    seen=[]
+    for hdr in 'from', 'sender', 'to', 'cc', 'bcc', 'return-path':
+      values=M.get_all(hdr)
+      if values is not None:
+        for name, coreaddr in getaddresses(values):
+          addrkey=coreaddr.lower()
+          if addrkey not in byAddress and addrkey not in seen:
+            seen.append(addrkey)
+            print formataddr((name,coreaddr))
+  else:
+    cmderr("unimplemented new input syntax \"%s\"" % new_syntax)
+    sys.exit(1)
+elif op == "re":
+  if len(argv) > 0:
+    cats=argv
+  for cat in cats:
+    C=byCategory[cat]
+    addrkeys=C.keys()
+    addrkeys.sort()
+    re='\<(%s)\>' \
+       % '|'.join(addrkey.replace('.', '\\.')
+                  for addrkey in addrkeys)
+    if re_syntax == 'TEXT':
+      print cat, re
+    elif re_syntax == 'SH':
+      print "%s_%s=%s; export %s_%s" \
+            % (re_prefix, cat, cs.sh.quotestr(re), re_prefix, cat)
+    else:
+      cmderr("unimplemented re syntax \"%s\", aborting" % re_syntax)
+      sys.exit(1)
+else:
+  cmderr("unimplemented operation \"%s\"" % op)
+  xit=1
+
+sys.exit(xit)

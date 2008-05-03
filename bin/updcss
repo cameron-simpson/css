@@ -1,15 +1,19 @@
-#!/bin/sh -u
+#!/bin/sh -ue
 #
-# Rebuild css from my development copy.
+# Install and publish css from my development copy.
 #	- Cameron Simpson <cs@zip.com.au> 09apr1997
 #
 
+: ${TMPDIR:=/tmp}
+: ${OPTCSS:=/opt/css}
+
 cssweb=$HOME/@/ezos/html/cs/css
+adzapweb=$HOME/@/adzapper.sf/html/scripts
 cssdir=/opt/css
 dosync=1
 quick=
 
-cmd=$0
+cmd=`basename "$0"`
 usage="Usage: $cmd [-q] [-n] [pushhosts...]"
 
 xit=0
@@ -20,6 +24,55 @@ umask 22
 
 [ $# -gt 0 ] && [ "x$1" = x-q ] && { quick=1; shift; }
 [ $# -gt 0 ] && [ "x$1" = x-n ] && { dosync=; shift; }
+
+unset tmpdir
+trap '[ ! -d "$tmpdir" ] || rm -rf $tmpdir' 0
+trap '[ ! -d "$tmpdir" ] || rm -rf $tmpdir; exit 1' 1 2 13 15
+tmpdir=`mkdirn "$TMPDIR/$cmd"`
+
+set -xue
+
+( 
+  hg manifest \
+  | sed '
+         /^bin\/synonyms\//d
+         /^bin\//b ok
+         /^etc\//b ok
+         /^lib\//b ok
+         /\//d
+         :ok'
+) \
+| cpio -pmd "$tmpdir"
+
+rsync -avHL --ignore-existing bin/synonyms/. "$tmpdir/bin/."
+
+cp $HOME/rc/java/au.com.zip.cs.jar "$tmpdir/lib/."
+for f in squid_redirect testpageurls testzap
+do cp "$adzapweb/$f" "$tmpdir/bin/."
+   chmod a+rx "$tmpdir/bin/$f"
+done
+
+cp $HOME/rc/java/au.com.zip.cs.jar "$tmpdir/lib/."
+
+hglog | sed 's/[Cc][Ii][Ss][Rr][Aa]/work/g' >"$tmpdir/CHANGELOG.txt"
+
+( cd bin; mkscriptndx * | sort ) >"$tmpdir/1INDEX.txt"
+
+mkdir "$tmpdir/man"
+myke "MANDIR=$tmpdir/man" _man || echo myke _man fails, ignoring...
+
+rsync -avH --delete --delete-excluded \
+        --include=CHANGELOG.txt \
+        --include=/bin \
+        --include=/etc \
+        --include=/lib \
+        --include=/man \
+        '--exclude=/*/' \
+        "$tmpdir/." "$OPTCSS/."
+
+exit 0
+
+subdirs=
 
 if [ -z "$quick" ]
 then

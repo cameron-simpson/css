@@ -1,0 +1,25 @@
+#!/bin/sh -ue
+#
+# Update a directory with a flat listing of symlinks to pictures.
+#       - Cameron Simpson <cs@zip.com.au> 24mar2008
+#
+
+trace=  ##eecho
+
+flatdir=$HOME/Pictures/im-flat  # for a Mac
+srcdirs=$HOME/im
+
+cd "$flatdir" || exit 1
+
+find $srcdirs \
+        -type d -name .\* -prune \
+     -o -type f \( -name \*.jpg -o -name \*.png \) -print \
+| sort \
+| while read -r im
+  do
+    im2=`printf "%s" "$im" | entilde | sed 's|^~\/||' | tr / -`
+    [ -n "$im2" ] || continue
+    $trace rm -f -- "$im2" \
+    && $trace ln -s "$im" "$im2" \
+    && ls -ldL "$im2"
+  done
