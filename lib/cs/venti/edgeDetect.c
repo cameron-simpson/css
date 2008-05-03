@@ -6,11 +6,12 @@
 
 /*
  * Struct to hold a vocabulary word.
+ * When we recognise the hash for the tail of the word, if the preceeding
+ * buffer content matches the word it is considered a hit.
  */
 typedef struct vocab {
   char     *word;          /* match string */
-  int      offset;         /* offset from start of word of edge point */
-  PyObject *subvocab;      /* subvocabulary introduced by this word, if any */
+  int      offset;         /* offset of edge point from start of word */
   int      hash;           /* hash code for tail of string */
 } vocab;
 
@@ -163,7 +164,7 @@ rhash_makevocab(PyObject *args)
   for (i=0; i<nwords; i++) {
     vocab *vp = *vpp++;
     PyObject *vwordTuple = PySequence_Fast_GET_ITEM(vseq, i);
-    if (!PyArg_ParseTuple(vwordTuple, "siO", &vp->word, &vp->offset, &vp->subvocab)) {
+    if (!PyArg_ParseTuple(vwordTuple, "si", &vp->word, &vp->offset)) {
       /* FIXME: complain about errors, raise exception? */
       vpp--;
       continue;
@@ -210,7 +211,7 @@ statichere PyTypeObject rhash_type = {
  * Add a character to the rolling hash state, return the new hash value.
  */
 static int
-rollingHash(struct rhash *rhp, char *cp)
+rollingHash(rolling_hash *rhp, const char *cp)
 {
   int offset = rhp->offset;
   int rh = rhp->hash;
@@ -239,37 +240,8 @@ rhash(PyObject *self)
   return (PyObject *)rhash_create();
 }
 
-/*
- * Locate next edge in the supplied (rhp, s, offset, pendlen, minblock, maxblock).
- * rhp: rolling hash context object.
- * s: new str to consider.
- * offset: start point for consideration.
- * pendlen: length of buffer preceeding s.
- * minblock: minimum value for pendlen+edge.
- * maxblock: maximum value for pendlen+edge.
- * Return edge offset, or 0.
- */
-static PyObject *
-findEdge(PyObject *self, PyObject *args)
-{
-  rolling_hash *rhp;
-  const char *s;
-  int  offset;
-  int  pendlen;
-  int minblock;
-  int maxblock;
-  if (!PyArg_ParseTuple(args, "Osiiii", &rhp, &s, &offset, &pendlen, &minblock, &maxblock)) {
-    /* FIXME: bad args? */
-    return 0;
-  }
-  
-  int edge = findEdgeNative(rolling_hash *rhp, char *s, int offset, int pendlen, int minblock, int maxblock);
-  /* FIXME: convert to Py int and return */
-  x x x x
-}
-
 static int
-findEdgeNative(rolling_hash *rhp, char *s, int offset, int pendlen, int minblock, int maxblock)
+findEdgeNative(rolling_hash *rhp, const char *s, int offset, int pendlen, int minblock, int maxblock)
 {
   assert(offset >= 0);
   assert(offset <= strlen(s));
@@ -277,7 +249,8 @@ findEdgeNative(rolling_hash *rhp, char *s, int offset, int pendlen, int minblock
   assert(minblock < maxblock);
 
   int len=pendlen+offset;
-  char *cp;
+  const char *cp;
+  int h;
   for (cp=s+offset; *cp; cp++) {
     h=rollingHash(rhp,cp);
     len++;
@@ -298,8 +271,39 @@ findEdgeNative(rolling_hash *rhp, char *s, int offset, int pendlen, int minblock
     for (vpp=rhp->words; *vpp; vpp++) {
       if (h == (*vpp)->hash && rhash_checktail(rhp, (*vpp)->word))
         /* adjust offset to match desired point in matched word */
-        offset += (*vpp)->offset-strlen((*vpp)->word)
+        offset += (*vpp)->offset-strlen((*vpp)->word);
         return offset;
     }
   }
+}
+
+/*
+ * Locate next edge in the supplied (rhp, s, offset, pendlen, minblock, maxblock).
+ * rhp: rolling hash context object.
+ * s: new str to consider.
+ * offset: start point for consideration.
+ * pendlen: length of buffer preceeding s.
+ * minblock: minimum value for pendlen+edge.
+ * maxblock: maximum value for pendlen+edge.
+ * Return edge offset, or 0.
+ */
+static PyObject *
+findEdge(PyObject *self, PyObject *args)
+{
+  rolling_hash *rhp;
+  const char   *s;
+  int          offset;
+  int          pendlen;
+  int          minblock;
+  int          maxblock;
+  int          edge;
+
+  if (!PyArg_ParseTuple(args, "Osiiii", &rhp, &s, &offset, &pendlen, &minblock, &maxblock)) {
+    /* FIXME: bad args? */
+    return 0;
+  }
+  
+  edge = findEdgeNative(rhp, s, offset, pendlen, minblock, maxblock);
+
+  return PyInt_FromLong((long)edge);
 }
