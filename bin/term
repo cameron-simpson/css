@@ -50,10 +50,10 @@ lock=
 lock1=
 iconic=
 
-if [ -s $HOME/.termenv -a -r $HOME/.termenv ]
+if [ -s "$HOME/.termenv" -a -r "$HOME/.termenv" ]
 then
   set +u
-  . $HOME/.termenv
+  . "$HOME/.termenv"
   set -u
 fi
 
@@ -66,10 +66,10 @@ while [ $# -gt 0 ]
 do
   case "$#,$1" in
     1,-[ceglwhxyns] | 1,-xrm | 1,-geometry)
-		echo "$cmd: $1 needs an argument" >&2
-		badopts=1
-		shift; break
-		;;
+      echo "$cmd: $1 needs an argument" >&2
+      badopts=1
+      shift; break
+      ;;
   esac
   case $1 in
     --)		shift; break ;;
@@ -225,21 +225,23 @@ case "$TERM,$DISPLAY" in
       runme=$TMPDIR/$cmd.$$.sh
       qrunme=`shqstr "$runme"`
       qcmd=`shqstr "$@"`
-      ( dumpenv -f -sh
+      ( echo '#!/bin/sh'
+        dumpenv -f -sh
         printf "%s\n" ": set -x; rm -f $qrunme; exec $qcmd"
       ) >"$runme"
-      osascript \
-        -e 'tell app "iTerm"
-              activate
-              set myterm to (make new terminal)
-              tell myterm
-                set mysession to (make new session at the end of sessions)
-                tell mysession
-                  exec command "/bin/sh"
-                  write text "'". $qrunme"'"
+      chmod u+rx "$runme"
+      set -- \
+        osascript \
+          -e 'tell app "iTerm"
+                activate
+                set myterm to (make new terminal)
+                tell myterm
+                  set mysession to (make new session at the end of sessions)
+                  tell mysession
+                    exec command "'"$runme"'"
+                  end tell
                 end tell
-              end tell
-            end tell' 
+              end tell' 
     else
       async=
       detach=
