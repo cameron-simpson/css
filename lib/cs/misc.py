@@ -5,6 +5,7 @@ import errno
 import sys
 import string
 import time
+import cs.upd; from cs.upd import nl, out
 from StringIO import StringIO
 from threading import BoundedSemaphore
 from cs.lex import parseline, strlist
@@ -21,7 +22,6 @@ warnFlushesUpd=True
 
 # print to stderr
 def warn(*args):
-  import cs.upd
   global warnFlushesUpd
   if cs.upd.active:
     upd=cs.upd.default()
@@ -107,6 +107,12 @@ def cmderr(*args):
   global cmd_
   warn(*[cmd_]+list(args))
 
+def TODO(msg):
+  verbose("TODO: "+msg)
+
+def FIXME(msg):
+  cmderr("FIXME: "+msg)
+
 def die(*args):
   assert False, strlist(args," ")
 
@@ -150,9 +156,12 @@ def reportElapsedTime(tag,func,*args,**kw):
   '''
   if not isdebug:
     return func(*args,**kw)
-  print >>sys.stderr, cmd_, tag, "..."
+  old=cs.upd.state()
+  out(" ".join((cmd_,tag,"...")))
   t0, t1, result = elapsedTime(func, *args, **kw)
-  print >>sys.stderr, cmd_, tag, "%s seconds" % (t1-t0,)
+  t=t1-t0
+  if t > 1: nl(" ".join((cmd_,tag,"%s seconds"%t)))
+  out(old)
   return result
 
 T_SEQ='ARRAY'
