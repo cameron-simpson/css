@@ -47,29 +47,33 @@ nomsgopt=-M
 
 gotargs=
 while [ $# -gt 0 ]
-do  case $1 in
-	-A)	doscreen=1 allscreens=1 ;;
-	-c)	shift; set -- sh -c "$1"; break ;;
-	-e)	shift
-		[ $# = 0 ] && { echo "$cmd: -e: missing command" >&2
-				badopts=1
-			      }
-		break
-		;;
-	-m)	msg=$2; shift; nomsgopt=; doscript=1 ;;
-	-n)	name=$2; shift ;;
-	-v)	sshopts="$sshopts -v" verbose=1 ;;
-	-[XY])	sshx11opt=$1 ;;
-	+X)	sshx11opt=forwardx11=no ;;
-	-[12])sshopts="$sshopts $1" ;;
-	-ip|+ip)termopts="$termopts $1" ;;
-	-s)	doscreen=1 ;;
-	+s)	doscreen= ;;
-	--)	shift; break ;;
-	-?*)	echo "$cmd: unrecognised option: $1" >&2; badopts=1 ;;
-	*)	break ;;
-    esac
-    shift
+do
+  case $1 in
+    -A)	doscreen=1 allscreens=1 ;;
+    -c)	shift; set -- sh -c "$1"; break ;;
+    -e)	shift
+        [ $# = 0 ] && { echo "$cmd: -e: missing command" >&2
+                        badopts=1
+                      }
+        break
+        ;;
+    -m)	msg=$2; shift; nomsgopt=; doscript=1 ;;
+    -n)	name=$2; shift ;;
+    -v)	sshopts="$sshopts -v" verbose=1 ;;
+    -[XY])
+        sshx11opt=$1 ;;
+    +X)	sshx11opt=forwardx11=no ;;
+    -[12])
+        sshopts="$sshopts $1" ;;
+    -ip|+ip)
+        termopts="$termopts $1" ;;
+    -s)	doscreen=1 ;;
+    +s)	doscreen= ;;
+    --)	shift; break ;;
+    -?*)echo "$cmd: unrecognised option: $1" >&2; badopts=1 ;;
+    *)	break ;;
+  esac
+  shift
 done
 
 [ $allscreens ] \
@@ -86,6 +90,13 @@ xit=0
 lastbase=
 for target in `printf "%s\n" "$targets" | tr , ' '`
 do
+  scrname=
+  case "$target" in
+    */*)
+      scrname=`expr "x$target" : 'x.*/\(.*\)'`
+      target=` expr "x$target" : 'x\(.*\)/.*'`
+      ;;
+  esac
   case "$target" in
     [0-9])
       [ -n "$lastbase" ] \
@@ -102,6 +113,12 @@ do
 
   (
     [ -n "$name" ] || name=$target
+
+    if [ -n "$scrname" ]
+    then
+      exec term -n "$name/$scrname" \
+                -e envssh $RTERM_SSHOPTS $sshopts -- "$target" "exec scr $scrname"
+    fi
 
     if [ $allscreens ]
     then
