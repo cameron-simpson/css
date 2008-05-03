@@ -1,6 +1,6 @@
 from distutils.core import setup, Extension
  
-edgeDetect = Extension('cs.venti.edgeDetect', sources = ['cs/venti/edgeDetect.c'])
+edgeDetect = Extension('cs.venti.edgeDetect', sources = ['lib/cs/venti/edgeDetect.c'])
 
 setup (name = 'cs.venti.edgeDetect',
        version = '0.1',
