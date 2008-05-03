@@ -256,7 +256,7 @@ else:
     # =item B<pull> I<stores...>
     #
     # Update our store with all the available content from the specified I<stores>.
-    # Note that some stores will not list all their content, or any.
+    # Note that some stores may not list all their content, or any.
     # This is mostly useful for updating a master store from a store which has been updated offline.
     #
     if len(args) < 1:
