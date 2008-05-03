@@ -102,8 +102,8 @@ class ChunkyString(str):
       ##sys.stderr.write('+')
       self.__strs[-1]=self.__strs[-1]+s
     else:
-      ##sys.stderr.write('.')
       self.__strs.append(s)
+      ##sys.stderr.write('.')
       ##if len(self.__strs) % 78 == 0:
       ##  sys.stderr.write('\n')
     self.__len+=len(s)
