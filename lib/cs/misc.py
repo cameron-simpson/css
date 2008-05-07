@@ -5,7 +5,7 @@ import errno
 import sys
 import string
 import time
-import cs.upd; from cs.upd import nl, out
+import cs.upd; from cs.upd import nl, out, without as withoutUpd
 from StringIO import StringIO
 from threading import BoundedSemaphore
 from cs.lex import parseline, strlist
@@ -18,33 +18,15 @@ def setcmd(ncmd):
 
 setcmd(os.path.basename(sys.argv[0]))
 
-warnFlushesUpd=True
-
 # print to stderr
 def warn(*args):
   global warnFlushesUpd
+  msg=" ".join(str(s) for s in args)
   if cs.upd.active:
-    upd=cs.upd.default()
-    if not upd.closed():
-      if not warnFlushesUpd:
-        oldUpd=upd.state()
-      upd.out('')
-
-  first=True
-  for arg in args:
-    if first:
-      first=False
-    else:
-      sys.stderr.write(' ')
-    sys.stderr.write(str(arg))
-
-  sys.stderr.write("\n")
-  sys.stderr.flush()
-
-  if not warnFlushesUpd:
-    if cs.upd.active:
-      if not upd.closed():
-        upd.out(oldUpd)
+    nl(msg)
+  else:
+    print >>sys.stderr, msg
+    sys.stderr.flush()
 
 # debug_level:
 #   0 - quiet
@@ -55,7 +37,6 @@ def warn(*args):
 debug_level=0
 if sys.stderr.isatty():
   debug_level=1
-  import cs.upd
   cs.upd.default()
 if 'DEBUG' in os.environ \
    and len(os.environ['DEBUG']) > 0 \
@@ -95,13 +76,11 @@ def progress(*args): debugif(1,*args)
 def verbose(*args):  debugif(2,*args)
 def debug(*args):    debugif(3,*args)
 def out(*args):
-  import cs.upd
   if ifdebug(1):
     if cs.upd.active:
       if len(*args) > 0:
-        cs.upd.out(" ".join(args))
-    else:
-      warn(*args)
+        return cs.upd.out(" ".join(args))
+    return warn(*args)
 
 def cmderr(*args):
   global cmd_
@@ -118,7 +97,6 @@ def die(*args):
 
 def tb(limit=None):
   import traceback
-  import cs.upd
   global cmd_
   if cs.upd.active:
     upd=cs.upd.default()
@@ -156,11 +134,10 @@ def reportElapsedTime(tag,func,*args,**kw):
   '''
   if not isdebug:
     return func(*args,**kw)
-  old=cs.upd.state()
-  out(" ".join((cmd_,tag,"...")))
+  old=out("%.100s" % " ".join((cmd_,tag,"...")))
   t0, t1, result = elapsedTime(func, *args, **kw)
   t=t1-t0
-  if t > 1: nl(" ".join((cmd_,tag,"%s seconds"%t)))
+  if True or t > 1: nl(" ".join((cmd_,tag,"%6.4f seconds"%t)))
   out(old)
   return result
 
