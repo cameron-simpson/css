@@ -7,7 +7,8 @@
 from __future__ import with_statement
 from threading import Thread, Semaphore, BoundedSemaphore
 from Queue import Queue
-from cs.misc import debug, ifdebug, tb, cmderr, warn, reportElapsedTime
+from cs.misc import debug, ifdebug, isdebug, tb, cmderr, warn, reportElapsedTime
+from cs.upd import nl, out
 
 class AdjustableSemaphore:
   ''' A semaphore whose value may be tuned at runtime.
@@ -103,14 +104,29 @@ class Channel:
 
 class IterableQueue(Queue): 
   ''' A Queue obeying the iterator protocol.
+      Note: Iteration stops when a None comes off the Queue.
   '''
+  def __init__(self,*args,**kw):
+    Queue.__init__(self,*args,**kw)
+    self.__closed=False
+  def put(self,item,*args,**kw):
+    assert not self.__closed, "put() on closed IterableQueue"
+    assert item is not None, "put(None) on IterableQueue"
+    return Queue.put(self,item,*args,**kw)
+  def close(self):
+    assert not self.__closed, "close() on closed IterableQueue"
+    self.__closed=True
+    ##nl("IterableQueue.close(): putting None on Queue")
+    Queue.put(self,None)
   def __iter__(self):
     return self
   def next(self):
-    ##print "IterabeQueue.next()..."
-    I=self.get()
-    ##print "IterabeQueue.next() gets [%s]" % (I,)
-    return I
+    item=self.get()
+    if item is None:
+      ##nl("IterableQueue.next(): got None, exiting iteration")
+      Queue.put(self,None)      # for another iterator
+      raise StopIteration
+    return item
 
 class JobQueue:
   ''' A job queue.
@@ -160,34 +176,40 @@ class JobCounter:
       When everything is dispatched, calling JobCounter.whenDone()
       queues a function to execute on completion of all the jobs.
   '''
-  def __init__(self):
+  def __init__(self,name):
+    self.__name=name
     self.__lock=Semaphore(1)
-    self.__sem=Semaphore()
+    self.__sem=Semaphore(0)
     self.__n=0
     self.__onDone=None
 
   def inc(self):
     ''' Note that there is another job for which to wait.
     '''
+    debug("%s: inc()" % self.__name)
     with self.__lock:
       self.__n+=1
 
   def dec(self):
     ''' Report the completion of a job.
     '''
+    debug("%s: dec()" % self.__name)
     self.__sem.release()
 
   def _wait1(self):
     ''' Wait for a single job to complete.
-        Return False is no jobs remain.
-        Report True is a job remained and we waited.
+        Return False if no jobs remain.
+        Report True if a job remained and we waited.
     '''
+    debug("%s: wait1()..." % self.__name)
     with self.__lock:
       if self.__n == 0:
+        debug("%s: wait1(): nothing to wait for" % self.__name)
         return False
     self.__sem.acquire()
     with self.__lock:
       self.__n-=1
+    debug("%s: wait1(): waited" % self.__name)
     return True
 
   def _waitAll(self):
@@ -195,15 +217,22 @@ class JobCounter:
       pass
 
   def _waitThenDo(self,*args,**kw):
+    debug("%s: _waitThenDo()..." % self.__name)
     self._waitAll()
-    return self.__onDone(*args,**kw)
+    debug("%s: _waitThenDo(): waited: calling __onDone()..." % self.__name)
+    return self.__onDone[0](*self.__onDone[1],**self.__onDone[2])
+
+  def doInstead(self,func,*args,**kw):
+    with self.__lock:
+      assert self.__onDone is not None
+      self.__onDone=(func,args,kw)
 
   def whenDone(self,func,*args,**kw):
     ''' Queue an action to occur when the jobs are done.
     '''
     with self.__lock:
       assert self.__onDone is None
-      self.__onDone=func
+      self.__onDone=(func,args,kw)
       Thread(target=self._waitThenDo,args=args,kwargs=kw).start()
 
 class FuncQueue(Queue):
