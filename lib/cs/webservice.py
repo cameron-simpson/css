@@ -8,6 +8,7 @@ import sys
 from ZSI import SoapWriter, ParsedSoap, TC
 import ZSI.wstools.Utility
 from StringIO import StringIO
+import urllib2
 from cs.misc import isdebug, ifdebug, debug, objFlavour, T_MAP, T_SEQ, reportElapsedTime
 
 def lather(obj,tc=None):
@@ -26,6 +27,28 @@ def rinse(soap,tc):
   '''
   return reportElapsedTime("parse SOAP into %s object" % (tc,),
                            ParsedSoap(soap).Parse,tc)
+
+def xml2pyobj(xml,typecode):
+  return ParsedSoap(xml).Parse(typecode)
+
+def callSOAP(url,action,xml,retAction,retTypecode):
+  ''' Call the specified web services URL with an action and SOAP XML string.
+      Return the parsed response, which should have the action retAction
+      and be of type retTypecode.
+  '''
+  rq=urllib2.Request(url,xml)
+  rq.add_header('Accept-Encoding', 'identity')
+  rq.add_header('Soapaction', '"%s"'%action)
+  rq.add_header('Content-Type', 'text/xml; charset="utf-8"')
+  U=reportElapsedTime('call %s with %d bytes of XML'%(url,len(xml)),
+                      urllib2.urlopen,rq)
+  I=U.info()
+  assert I.type == 'text/xml', \
+         "%s: did not get XML back from %s:%s" % (cmd,url,action)
+  retxml=''.join(U.readlines())
+  ret=reportElapsedTime('decode %d bytes of %s response'%(len(retxml),retAction),
+                        xml2pyobj,retxml,retTypecode)
+  return ret
 
 class BigElementProxy(ZSI.wstools.Utility.ElementProxy):
   ''' An ElementProxy with its canonicalize method
