@@ -4,6 +4,16 @@ import re
 
 ord_space=ord(' ')
 
+__strs={}
+def str1(s):
+  ''' A persistent cache for heavily used strings.
+  '''
+  global __strs
+  if s in __strs:
+    return __strs[s]
+  __strs[s]=s
+  return s
+
 def unctrl(s,tabsize=8):
   s2=''
   sofar=0
