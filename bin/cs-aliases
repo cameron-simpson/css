@@ -10,8 +10,7 @@ import string
 from os import environ
 import os.path
 import cs.sh
-from email.parser import Parser
-from email.utils import parseaddr, getaddresses, formataddr
+from cs.mailAddresses import addressKey, loadAddresses, addrsRegexp
 from cs.misc import cmd, cmderr, verbose
 
 aliases=environ.get('CS_ALIASES')
@@ -34,50 +33,6 @@ usage='''Usage:
   % aliases
 
 xit=0
-
-byCategory={}
-byAddress={}
-
-def addressKey(addr):
-  name, core = parseaddr(addr)
-  if len(name) == 0 and len(core) == 0:
-    return None
-  return core.lower()
-
-def loadAliases(aliases,catmap=byCategory,addrmap=byAddress):
-  lineno=0
-  for line in open(aliases):
-    lineno+=1
-    if line[-1] != '\n':
-      cmderr("%s, line %d: missing newline (unexpected EOF)"
-             % (aliases, lineno))
-      xit=1
-      break
-
-    line=line.strip()
-    if len(line) == 0 or line[0] == '#':
-      continue
-
-    cats, addr = line.split(None,1)
-    if addr.startswith('mailto:'):
-      addr=addr[7:]
-    cats=cats.split(',')
-    addrkey=addressKey(addr)
-    if addrkey is None:
-      verbose("%s, line %d: can't parse address \"%s\""
-             % (aliases, lineno, addr))
-      xit=1
-      continue
-
-    if addrkey in addrmap:
-      verbose("%s, line %d: repeated address \"%s\" (%s)"
-              % (aliases, lineno, addr, addrkey))
-      continue
-    cats.sort()
-    addrmap[addrkey]=(addr,addrkey,cats)
-
-    for cat in cats:
-      catmap.setdefault(cat,{})[addrkey]=addr
 
 badopts=False
 argv=sys.argv[1:]
@@ -114,7 +69,9 @@ if badopts:
   print >>sys.stderr, usage
   sys.exit(2)
 
-loadAliases(aliases)
+byCategory={}
+byAddress={}
+loadAddresses(aliases,catmap=byCategory,addrmap=byAddress)
 cats=byCategory.keys()
 cats.sort()
 
@@ -163,12 +120,7 @@ elif op == "re":
   if len(argv) > 0:
     cats=argv
   for cat in cats:
-    C=byCategory[cat]
-    addrkeys=C.keys()
-    addrkeys.sort()
-    re='\<(%s)\>' \
-       % '|'.join(addrkey.replace('.', '\\.')
-                  for addrkey in addrkeys)
+    re=addrsRegexp(byCategory[cat].keys())
     if re_syntax == 'TEXT':
       print cat, re
     elif re_syntax == 'SH':

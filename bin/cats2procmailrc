@@ -11,7 +11,7 @@
 #
 # =head1 SYNOPSIS
 #
-# cats2procmailrc [B<-a> I<alert>] [B<-d> I<dirpath>] [B<-D> I<subst>B<=>I<val>] [B<-L>] [B<-m> I<maildomains>] [-S] [B<-t> I<type>] [B<-T>] [LOG=value] [category-files...] E<gt>procmailrc
+# cats2procmailrc [B<-a> I<alert>] [B<-A> I<addresses>] [B<-d> I<dirpath>] [B<-D> I<subst>B<=>I<val>] [B<-L>] [B<-m> I<maildomains>] [-S] [B<-t> I<type>] [B<-T>] [LOG=value] [category-files...] E<gt>procmailrc
 #
 # =head1 DESCRIPTION
 #
@@ -29,6 +29,7 @@
 #
 #       cats2procmailrc \
 #               -a 'announce-email "+%"' \
+#               -A "$HOME/rc/mail/aliases" \
 #               -t maildir -L \
 #               -m cskk.homeip.net \
 #               <categories >$HOME/.procmailrc
@@ -42,6 +43,15 @@
 # Specify a shell command to run as the alert function (see L<FILE FORMAT> below),
 # such as mailblink(1).
 # The character percent (B<'%'>) is replaced by the I<folder> name.
+#
+# =item B<-A> I<addresses>
+#
+# Read the file I<addresses> expecting lines of the form:
+#
+#  cat[,cat...] rfc2822-address
+#
+# and define macros named B<cat_>I<cat> for each category
+# that contain regexps to match all the addresses in each category I<cat>.
 #
 # =item B<-d> I<dirpath>
 #
@@ -300,6 +310,7 @@ usage='''Usage: %s [-a alert] [-d dir] [-D subst=val] [-L] [-m domains] [-S] \\
                 >procmailrc
         -a alert        Command line to generate the alert.
                         The mail item is present on standard input.
+        -A addresses    Read address categories from file, make category macros.
         -d dirpath      Look for relative included files in these directories.
         -D subst=val    Add a macro definition just as $CATS2PROCMAILRC_subst=val does.
         -L              Use X-Label: header instead of Subject: for tag.
@@ -327,7 +338,7 @@ def cmderr(*args):
 opts=()
 argv=sys.argv[1:]
 try:
-  opts, argv = getopt(argv, 'a:d:D:Lm:St:T')
+  opts, argv = getopt(argv, 'a:A:d:D:Lm:St:T')
 except GetoptError, e:
   cmderr("bad options:", str(e))
   badopts=True
@@ -335,6 +346,14 @@ except GetoptError, e:
 for opt, arg in opts:
   if opt == '-a':
     alertCommand=arg
+  elif opt == '-A':
+    from cs.mailAddresses import loadAddresses, addrsRegexp
+    cats, addrs = loadAddresses(arg)
+    for cat in cats.keys():
+      retext=addrsRegexp(cats[cat].keys())
+      if retext.startswith('\<') and retext.endswith('\>'):
+        retext=retext[2:-2]
+      substitutions["cat_%s" % cat]=retext
   elif opt == '-d':
     includePath=arg.split(':')
   elif opt == '-D':
@@ -375,7 +394,7 @@ if badopts:
   sys.exit(2)
 
 for subname in [v[16:] for v in os.environ.keys() if v.startswith('CATS2PROCMAILRC_')]:
-  # -D trumps envvars
+  # -A and -D trump envvars
   if subname not in substitutions:
     substitutions[subname]=os.environ['CATS2PROCMAILRC_'+subname]
 
@@ -384,7 +403,7 @@ if len(subnames) == 0:
   curly_re=None
 else:
   subnames.sort()
-  curly=r'\{\{('+'|'.join(subnames)+r')\}\}'
+  curly=r'\{\{(%s)\}\}' % '|'.join(subnames)
   curly_re=re.compile(curly)
 
 def resolveTarget(target):
