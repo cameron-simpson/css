@@ -357,10 +357,6 @@ for opt, arg in opts:
       if retext.startswith('\<') and retext.endswith('\>'):
         retext=retext[2:-2]
       substitutions["cat_%s" % cat]=retext
-    retext=addrsRegexp(alladdrs)
-    if retext.startswith('\<') and retext.endswith('\>'):
-      retext=retext[2:-2]
-    substitutions["cat_ALL"]=retext
   elif opt == '-d':
     includePath=arg.split(':')
   elif opt == '-D':
@@ -404,6 +400,12 @@ for subname in [v[16:] for v in os.environ.keys() if v.startswith('CATS2PROCMAIL
   # -A and -D trump envvars
   if subname not in substitutions:
     substitutions[subname]=os.environ['CATS2PROCMAILRC_'+subname]
+
+# uber category for all known categories
+substitutions["cat_ALL"]="|".join( substitutions[cat]
+                                   for cat in substitutions.keys()
+                                   if cat.startswith('cat_')
+                                 )
 
 subnames=substitutions.keys()
 if len(subnames) == 0:
