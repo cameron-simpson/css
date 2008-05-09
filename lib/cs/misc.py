@@ -87,10 +87,11 @@ def cmderr(*args):
   warn(*[cmd_]+list(args))
 
 def TODO(msg):
-  verbose("TODO: "+msg)
+  if ifverbose():
+    logFnLine(msg, frame=sys._getframe(1), prefix="TODO(%s)"%cmd)
 
 def FIXME(msg):
-  cmderr("FIXME: "+msg)
+  logFnLine(msg, frame=sys._getframe(1), prefix="FIXME(%s)"%cmd)
 
 def die(*args):
   assert False, strlist(args," ")
@@ -118,6 +119,33 @@ def tb(limit=None):
   if cs.upd.active:
     upd.out(oldUpd)
 
+_logPath=None
+_logFP=sys.stderr
+def logTo(logpath):
+  TODO("port cs.misc.logTo() etc to logger module")
+  global _logPath, _logFP
+  _logFP=open(logpath,"a")
+  _logPath=logpath
+def _logline(line):
+  global _logPath, _logFP
+  print >>_logFP, "%d: %s" % (time.time(), line)
+  _logFP.flush()
+  if isdebug and _logFP is not sys.stderr:
+    print line
+def logLine(line):
+  return withoutUpd(_logline,line)
+def logFnLine(line,frame=None,prefix=None):
+  ''' Log a line citing the calling function.
+  '''
+  if frame is None:
+    frame=sys._getframe(1)
+  line="%s [%s(), %s:%d]" \
+       % (line, frame.f_code.co_name, frame.f_code.co_filename, frame.f_lineno)
+  if prefix is not None:
+    line=prefix+": "+line
+  return logLine(line)
+
+
 def elapsedTime(func,*args,**kw):
   ''' Call a function with the supplied arguments.
       Return start time, end time and return value.
@@ -137,7 +165,7 @@ def reportElapsedTime(tag,func,*args,**kw):
   old=out("%.100s" % " ".join((cmd_,tag,"...")))
   t0, t1, result = elapsedTime(func, *args, **kw)
   t=t1-t0
-  if True or t > 1: nl(" ".join((cmd_,tag,"%6.4f seconds"%t)))
+  if True or t > 1: logLine("%6.4gs %s"%(t,tag))
   out(old)
   return result
 
