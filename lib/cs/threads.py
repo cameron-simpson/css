@@ -43,15 +43,15 @@ class AdjustableSemaphore:
     '''
     assert newvalue > 0
     with self__lock:
-      n=newvalue-self.__value
-      if n > 0:
-        while n > 0:
+      delta=newvalue-self.__value
+      if delta > 0:
+        while delta > 0:
           self.__sem.release()
-          n-=1
+          delta-=1
       else:
-        while n < 0:
+        while delta < 0:
           self.__sem.acquire(True)
-          n+=1
+          delta+=1
       self.__value=newvalue
 
 class Channel:
