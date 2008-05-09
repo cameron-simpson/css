@@ -349,11 +349,18 @@ for opt, arg in opts:
   elif opt == '-A':
     from cs.mailAddresses import loadAddresses, addrsRegexp
     cats, addrs = loadAddresses(arg)
+    alladdrs=[]
     for cat in cats.keys():
-      retext=addrsRegexp(cats[cat].keys())
+      addrs=cats[cat].keys()
+      alladdrs.extend(addrs)
+      retext=addrsRegexp(addrs)
       if retext.startswith('\<') and retext.endswith('\>'):
         retext=retext[2:-2]
       substitutions["cat_%s" % cat]=retext
+    retext=addrsRegexp(alladdrs)
+    if retext.startswith('\<') and retext.endswith('\>'):
+      retext=retext[2:-2]
+    substitutions["cat_ALL"]=retext
   elif opt == '-d':
     includePath=arg.split(':')
   elif opt == '-D':
