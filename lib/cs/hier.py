@@ -241,7 +241,6 @@ class HierInput(_Hier):
 
     for line in fp:
       kv=self.kvline(line,charset=charset)
-      if ifdebug(): warn("KVLINE:", kv)
       D[kv[0]]=kv[1]
     fp.close()
 
