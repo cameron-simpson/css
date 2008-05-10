@@ -225,9 +225,11 @@ case "$TERM,$DISPLAY" in
       runme=$TMPDIR/$cmd.$$.sh
       qrunme=`shqstr "$runme"`
       qcmd=`shqstr "$@"`
+      wd=`/bin/pwd`
+      qwd=`shqstr "$wd"`
       ( echo '#!/bin/sh'
         dumpenv -f -sh
-        printf "%s\n" ": set -x; rm -f $qrunme; exec $qcmd"
+        printf "%s\n" ": set -x; rm -f $qrunme; cd $qwd; exec $qcmd"
       ) >"$runme"
       chmod u+rx "$runme"
       set -- \
