@@ -21,6 +21,7 @@
 : ${TERMTINT:=''}
 : ${TERMOPTIONS:=''}
 : ${RXVT_SOCKET:=/tmp/urxvtd-socket-$USER}
+: ${OS:=`uname -s | tr '[A-Z]' '[a-z]'`}
 export RXVT_SOCKET TMPDIR
 
 cmd=`basename "$0"`
