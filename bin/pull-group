@@ -13,6 +13,7 @@ usage="Usage: $cmd [user]@host group..."
 
 trace=eecho
 lgroup=/etc/group
+ssh=ssho
 
 remote=
 
@@ -59,13 +60,13 @@ getgid()
 { awk -F: -v "group=$1" '$1 == group { print $3 }' "$2"
 }
 getmembers()
-{ set-x awk -F: -v "group=$1" '$1 == group { print $4 }' "$2" | tr , ' '
+{ awk -F: -v "group=$1" '$1 == group { print $4 }' "$2" | tr , ' '
 }
 
 rgroup=$TMPDIR/$cmd.$$
 trap 'rm -f "$rgroup"' 0
 trap 'rm -f "$rgroup"; exit 1' 1 2 13 15
-set-x ssh "$remote" cat /etc/group >"$rgroup"
+$ssh "$remote" cat /etc/group >"$rgroup"
 
 for group
 do
@@ -88,15 +89,18 @@ do
 
   lmembers=`getmembers "$group" "$lgroup"`
   rmembers=`getmembers "$group" "$rgroup"`
-  echo "lmembers=[$lmembers]" >&2
-  echo "rmembers=[$rmembers]" >&2
   for member in $rmembers
   do
     case " $lmembers " in
       *" $member "*)
         ;;
-      *)$trace bsed "/^$group:/{ /:\$/!s/\$/,/; s/\$/$member/; }" "$lgroup"
+      *)$trace bsed -s "/^$group:/{ /:\$/!s/\$/,/; s/\$/$member/; }" "$lgroup"
         ;;
     esac
   done
+done
+
+for group
+do
+  grep "^$group:" "$lgroup"
 done
