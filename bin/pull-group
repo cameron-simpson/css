@@ -1,0 +1,102 @@
+#!/bin/sh -ue
+#
+# Pull named groups and members from remote /etc/groups file.
+#       - Cameron Simpson <cs@zip.com.au> 12may2008
+#
+
+. /opt/css/env.sh
+
+: ${TMPDIR:=/tmp}
+
+cmd=`basename "$0"`
+usage="Usage: $cmd [user]@host group..."
+
+trace=eecho
+lgroup=/etc/group
+
+remote=
+
+badopts=
+
+while [ $# -gt 0 ]
+do
+  case $1 in
+    -x) trace=set-x ;;
+    --) shift; break ;;
+    -?*)echo "$cmd: unrecognised option: $1" >&2
+        badopts=1
+        ;;
+    *)  break ;;
+  esac
+  shift
+done
+
+if [ $# = 0 ]
+then
+  echo "$cmd: missing user@host" >&2
+  badopts=1
+else
+  remote=$1
+  shift
+  case "$remote" in
+    @?*) remote=`expr "x$remote" : 'x.\(.*\)'` ;;
+    *@?*);;
+    *)  echo "$cmd: invalue user@host: $remote" >&2
+        badopts=1
+        ;;
+  esac
+fi
+
+if [ $# = 0 ]
+then
+  echo "$cmd: missing groups" >&2
+  badopts=1
+fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+getgid()
+{ awk -F: -v "group=$1" '$1 == group { print $3 }' "$2"
+}
+getmembers()
+{ set-x awk -F: -v "group=$1" '$1 == group { print $4 }' "$2" | tr , ' '
+}
+
+rgroup=$TMPDIR/$cmd.$$
+trap 'rm -f "$rgroup"' 0
+trap 'rm -f "$rgroup"; exit 1' 1 2 13 15
+set-x ssh "$remote" cat /etc/group >"$rgroup"
+
+for group
+do
+  lgid=`getgid "$group" "$lgroup"`
+  rgid=`getgid "$group" "$rgroup"`
+  if [ -z "$rgid" ]
+  then
+    echo "$cmd: $group: no remote group" >&2
+    exit 1
+  fi
+  if [ -z "$lgid" ]
+  then
+    $trace groupadd -g "$rgid" "$group"
+  else
+    if [ "x$lgid" != "x$rgid" ]
+    then
+      echo "$cmd: $group: warning: local gid ($lgid) != remote ($rgid)" >&2
+    fi
+  fi
+
+  lmembers=`getmembers "$group" "$lgroup"`
+  rmembers=`getmembers "$group" "$rgroup"`
+  echo "lmembers=[$lmembers]" >&2
+  echo "rmembers=[$rmembers]" >&2
+  for member in $rmembers
+  do
+    case " $lmembers " in
+      *" $member "*)
+        ;;
+      *)$trace bsed "/^$group:/{ /:\$/!s/\$/,/; s/\$/$member/; }" "$lgroup"
+        ;;
+    esac
+  done
+done
