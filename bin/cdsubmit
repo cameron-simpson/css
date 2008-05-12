@@ -12,6 +12,7 @@ cmd=`basename "$0"`
 version=1.0
 
 cachedir=$HOME/.cddb
+categories='blues classical country data folk jazz misc newage raggae rock soundtrack'
 
 realsubmit=freedb-submit@freedb.org
 testsubmit=test-submit@freedb.org
@@ -22,6 +23,7 @@ doedit=
 note=
 
 usage="Usage: $cmd [-entf] [-m addr] category
+        \"category\" one of: $categories
 	-e	Invoke editor to enter information.
 	-n	No action. Emit submission email on standard output.
 		Don't make cache entry.
@@ -57,11 +59,11 @@ then
   badopts=1
 else
   category=$1; shift
-  case $category in
-    blues|classical|country|data|folk|jazz|misc|newage|raggae|rock|soundtrack)
+  case " $categories " in
+    *" $category "*)
       ;;
     *)
-      echo "$cmd: unsupported category \"$category\"" >&2
+      echo "$cmd: unsupported category \"$category\"; I know: $categories" >&2
       badopts=1
       ;;
   esac
