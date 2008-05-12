@@ -1,0 +1,93 @@
+#!/bin/sh -ue
+#
+# Pull named users from remote /etc/passwd file.
+#       - Cameron Simpson <cs@zip.com.au> 12may2008
+#
+
+. /opt/css/env.sh
+
+: ${TMPDIR:=/tmp}
+
+cmd=`basename "$0"`
+usage="Usage: $cmd [user]@host user..."
+
+trace=eecho
+xflag=
+lpasswd=/etc/passwd
+ssh=ssho
+
+remote=
+
+badopts=
+
+while [ $# -gt 0 ]
+do
+  case $1 in
+    -x) trace=set-x xflag=-x ;;
+    --) shift; break ;;
+    -?*)echo "$cmd: unrecognised option: $1" >&2
+        badopts=1
+        ;;
+    *)  break ;;
+  esac
+  shift
+done
+
+if [ $# = 0 ]
+then
+  echo "$cmd: missing user@host" >&2
+  badopts=1
+else
+  remote=$1
+  shift
+  case "$remote" in
+    @?*) remote=`expr "x$remote" : 'x.\(.*\)'` ;;
+    *@?*);;
+    *)  echo "$cmd: invalue user@host: $remote" >&2
+        badopts=1
+        ;;
+  esac
+fi
+
+if [ $# = 0 ]
+then
+  echo "$cmd: missing users" >&2
+  badopts=1
+fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+getuid()
+{ awk -F: -v "user=$1" '$1 == user { print $3 }' "$2"
+}
+
+rpasswd=$TMPDIR/$cmd.$$
+trap 'rm -f "$rpasswd"' 0
+trap 'rm -f "$rpasswd"; exit 1' 1 2 13 15
+$ssh "$remote" cat /etc/passwd >"$rpasswd"
+
+for user
+do
+  luid=`getuid "$user" "$lpasswd"`
+  ruid=`getuid "$user" "$rpasswd"`
+  if [ -z "$ruid" ]
+  then
+    echo "$cmd: $user: no remote user" >&2
+    exit 1
+  fi
+  if [ -z "$luid" ]
+  then
+    $trace pull-group $xflag "$remote" "$user"
+    $trace adduser -u "$ruid" -g "$user" "$user"
+  else
+    if [ "x$luid" != "x$ruid" ]
+    then
+      echo "$cmd: $user: warning: local uid ($luid) != remote ($ruid)" >&2
+    fi
+  fi
+done
+
+for user
+do
+  grep "^$user:" "$lpasswd"
+done

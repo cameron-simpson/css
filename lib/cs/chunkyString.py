@@ -3,6 +3,7 @@
 
 import sys
 from time import time
+from cs.upd import nl, out
 from cs.misc import isdebug, reportElapsedTime
 
 class ChunkyString(str):
@@ -76,11 +77,10 @@ class ChunkyString(str):
     return rs
 
   def __str__(self):
-    if isdebug: print >>sys.stderr, "ChunkyString.__str__: %d bytes in %d strings" % (self.__len, len(self.__strs))
+    if isdebug:
+      nl("ChunkyString.__str__: %d bytes in %d strings" % (self.__len, len(self.__strs)))
     t0=time()
     s=''.join(self.__strs)
-    if isdebug:
-      print >>sys.stderr, "ChunkString.__str__() took %s seconds" % (time()-t0)
     assert len(s) == self.__len
     return s
 
