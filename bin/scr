@@ -39,9 +39,9 @@ usage="Usage:
 if [ $# = 0 ]
 then
   $screen -ls \
-  | sed '/^	/!d; s/^	\([^	]*\).*/\1/' \
-  | sort -t. -k 2 \
-  | awk '{ printf("%2d %s\n",NR,$0); }'
+  | sed '/^	/!d; s/^	\([^	.]*\)\.\([^	]*\).*/\1 \2/' \
+  | sort -k 2 \
+  | awk '{ printf("%5d %7d.%s\n",NR,$1,$2); }'
   exit 0
 fi
 
@@ -172,7 +172,7 @@ esac
       *)sessre=$sess
         ;;
     esac
-    match=`"$0" | sed "/^ *[1-9][0-9]* [1-9][0-9]*\\.$sessre\$/!d;"'s/^ *[1-9][0-9]*  *//; q'`
+    match=`"$0" | sed "/^ *[1-9][0-9]*  *[1-9][0-9]*\\.$sessre\$/!d;"'s/^ *[1-9][0-9]*  *//; q'`
 
     # match found - join it
     [ -n "$match" ] && exec $screen -c "$rcfile" -Aax "$sess"
