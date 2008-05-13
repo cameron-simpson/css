@@ -237,7 +237,8 @@ case "$TERM,$DISPLAY" in
         osascript \
           -e 'tell app "iTerm"
                 activate
-                set myterm to (make new terminal)
+                ##set myterm to (make new terminal)
+                set myterm to (current terminal)
                 tell myterm
                   set mysession to (make new session at the end of sessions)
                   tell mysession
