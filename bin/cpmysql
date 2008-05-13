@@ -197,16 +197,26 @@ fi
 
 # run mysql command (mysqldump etc) using the supplied user/pass/host/port/sock
 _mysqlcmd()
-{ mc_user=$1 mc_pass=$2 mc_h=$3 mc_p=$4 mc_s=$5 mc_cmd=$6
-  shift; shift; shift; shift; shift; shift
+{ mc_user=$1 mc_pass=$2 mc_h=$3 mc_p=$4 mc_s=$5
+  shift; shift; shift; shift; shift
+  mc_odoit=$doit
+  if [ "x$1" = x-f ]
+  then  doit=1
+        shift
+  fi
+  mc_cmd=$1
+  shift
   if [ -n "$mc_h" ]
-  then  set -- -u "$mc_user" "-p$mc_pass"  -h "$mc_h" -P "$mc_p" ${1+"$@"}
-        mc_trace="$mc_cmd -u $mc_user -p.. -h $mc_h -P $mc_P $*"
-  else  set -- -u "$mc_user" "-p$mc_pass"  -S "$mc_s"            ${1+"$@"}
-        mc_trace="$mc_cmd -u $mc_user -p.. -S $mc_s $*"
+  then
+    mc_trace="$mc_cmd -u $mc_user -p.. -h $mc_h   -P $mc_p $*"
+    set -- -u "$mc_user" "-p$mc_pass"  -h "$mc_h" -P "$mc_p" ${1+"$@"}
+  else
+    mc_trace="$mc_cmd -u $mc_user -p.. -S $mc_s $*"
+    set -- -u "$mc_user" "-p$mc_pass"  -S "$mc_s"            ${1+"$@"}
   fi
   [ -z "$trace" ] || eecho "$mc_trace"  # conceals the password string
-  tag_fd 2 "$mysqlcmd_pfx:$mc_cmd" "$mc_cmd" "$@"
+  [ -z "$doit" ] || tag_fd 2 "$mysqlcmd_pfx:$mc_cmd" "$mc_cmd" "$@"
+  doit=$mc_odoit
 }
 # run a mysql command against the source database
 mysqlcmd_src()
@@ -289,7 +299,7 @@ pull_db()
       ;;
     *)
       echo show tables \
-      | mysqlcmd_src mysql "$_pull_srcdb" \
+      | mysqlcmd_src -f mysql "$_pull_srcdb" \
       | sed 1d
       ;;
   esac \
@@ -310,7 +320,7 @@ then
               ;;
             *)
               echo show databases \
-              | mysqlcmd_src mysql \
+              | mysqlcmd_src -f mysql \
               | sed 1d
               ;;
           esac \
