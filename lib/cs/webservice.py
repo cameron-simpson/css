@@ -52,7 +52,7 @@ def callSOAP(url,action,xml,retAction,retTypecode):
 
 class BigElementProxy(ZSI.wstools.Utility.ElementProxy):
   ''' An ElementProxy with its canonicalize method
-      replaces with out that uses a chunkyString.
+      replaced with one that uses a chunkyString.
       The ZSI default uses StringIO, which scales very badly
       to large strings; I'm constructing SOAP packets over
       10MB in size:-(
