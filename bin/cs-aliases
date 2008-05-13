@@ -9,6 +9,7 @@ import re
 import string
 from os import environ
 import os.path
+from email.parser import Parser
 import cs.sh
 from cs.mailAddresses import addressKey, loadAddresses, addrsRegexp
 from cs.misc import cmd, cmderr, verbose
