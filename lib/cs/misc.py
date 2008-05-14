@@ -133,7 +133,7 @@ def _logline(line,mark):
   print >>_logFP, "%d [%s] %s" % (time.time(), mark, line)
   _logFP.flush()
   if isdebug and _logFP is not sys.stderr:
-    print mark, line
+    cmderr("[%s] %s" % (mark, line))
 def logLine(line,mark=None):
   if mark is None:
     mark=cmd
