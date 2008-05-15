@@ -16,10 +16,7 @@ set -ue
 : ${MAIL_EXPIRE_ARCHIVE:=+ARCHIVE}
 
 needhost "$MAILHOMEHOST@$SYSTEMID" \
-|| { case "$LOCATION" in
-       $SYSTEMID) rhost=$MAILHOMEHOST ;;
-       *)	  rhost=$SYSTEMID!$MAILHOMEHOST ;;
-     esac
+|| { rhost=$SYSTEMID    # sshto clause to deliver to system home host
      qargv=`shqstr "$@"`
      set -x
      exec envssh -t "$rhost" "+ $qargv"
