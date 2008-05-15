@@ -98,15 +98,9 @@ do
   do
     tpfx=`expr "x$target" : 'x\([^,/]*\).*'` || :
     tsfx=`expr "x$target" : 'x[^,/]*\(.*\)'` || :
-    ##echo "1: tpfx=[$tpfx], tsfx=[$tsfx]" >&2
+    ##echo "1: target=[$target], tpfx=[$tpfx], tsfx=[$tsfx]" >&2
     # skip empty stuff
     case $tsfx in
-      # comma - skip null entry
-      ,*)
-        ##echo "SKIP COMMA" >&2
-        tpfx=
-        tsfx=`expr "x$tsfx" : 'x,,*\(.*\)'`
-        ;;
       # /{scr1,scr2,...}
       /{*}*)
         ##echo "/{...}" >&2
@@ -124,9 +118,11 @@ do
         scrlist=
         ;;
     esac
-    target=$tsfx
-    ##echo "2: tpfx=[$tpfx], tsfx=[$tsfx], scrlist=[$scrlist]" >&2
+    # prepare target for next loop iteration
+    target=`expr "x$tsfx" : 'x,*\(.*\)'` || :
+    ##echo "2: tpfx=[$tpfx], tsfx=[$tsfx], scrlist=[$scrlist], target=[$target]" >&2
     [ -n "$tpfx" ] || continue
+
     case "$tpfx" in
       [0-9])
         [ -n "$lastbase" ] \
