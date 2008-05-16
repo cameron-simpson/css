@@ -166,9 +166,13 @@ class LogLine:
     if frame is None:
       frame=sys._getframe(1)
     logFnLine(line,mark=self.logmark(mark),frame=frame)
-  def logTime(self,tag,func,*args,**kw):
+  def logTime2(self,tag,func,*args,**kw):
     global reportElapsedTimeTo
     return reportElapsedTimeTo(self.log,tag,func,*args,**kw)
+  def logTime(self,tag,func,*args,**kw):
+    global reportElapsedTimeTo
+    t, result = self.logTime2(tag,func,*args,**kw)
+    return result
 
 def elapsedTime(func,*args,**kw):
   ''' Call a function with the supplied arguments.
@@ -180,7 +184,8 @@ def elapsedTime(func,*args,**kw):
   return t0, t1, result
 
 def reportElapsedTime(tag,func,*args,**kw):
-  return reportElapsedTimeTo(logLine,tag,func,*args,**kw)
+  t, result = reportElapsedTimeTo(None,tag,func,*args,**kw)
+  return result
 def reportElapsedTimeTo(logfunc,tag,func,*args,**kw):
   ''' Call a function with the supplied arguments.
       Return its return value.
@@ -188,13 +193,15 @@ def reportElapsedTimeTo(logfunc,tag,func,*args,**kw):
   '''
   if not isdebug:
     return func(*args,**kw)
+  if logfunc is None:
+    logfunc=logLine
   old=out("%.100s" % " ".join((cmd_,tag,"...")))
   t0, t1, result = elapsedTime(func, *args, **kw)
   t=t1-t0
   if t >= 0.01:
     logfunc("%6.4fs %s"%(t,tag))
   out(old)
-  return result
+  return t, result
 
 T_SEQ='ARRAY'
 T_MAP='HASH'
