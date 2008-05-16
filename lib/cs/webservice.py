@@ -9,7 +9,7 @@ from ZSI import SoapWriter, ParsedSoap, TC
 import ZSI.wstools.Utility
 from StringIO import StringIO
 import urllib2
-from cs.misc import isdebug, ifdebug, debug, objFlavour, T_MAP, T_SEQ, reportElapsedTime
+from cs.misc import cmd, isdebug, ifdebug, debug, objFlavour, T_MAP, T_SEQ, reportElapsedTime
 
 def lather(obj,tc=None):
   ''' Serial a python object into SOAP, return the SOAP.
