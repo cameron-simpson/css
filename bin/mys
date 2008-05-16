@@ -11,7 +11,9 @@ PATH=$PATH:/usr/local/mysql/bin
 export PATH
 
 trace=
-secret=mysql-root@$SYSTEMID
+secretLOGIN=root
+secretHOST=$SYSTEMID
+secret=mysql-$secretLOGIN@$secretHOST
 db=
 
 badopts=
@@ -33,8 +35,14 @@ if [ $# -gt 0 ]
 then
   case $1 in
     /*) secret=$1; shift ;;
-    @*) secret=mysql-root$1; shift ;;
-    *@*)secret=mysql-$1; shift ;;
+    @*) secret=mysql-root$1; shift
+        secretLOGIN=root
+        secretHOST=` expr "x$1" : 'x.*@\(.*\)'`
+        ;;
+    *@*)secret=mysql-$1; shift
+        secretLOGIN=`expr "x$1" : 'x\(.*\)@.*'`
+        secretHOST=` expr "x$1" : 'x.*@\(.*\)'`
+        ;;
   esac
 fi
 
