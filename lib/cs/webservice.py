@@ -9,7 +9,7 @@ from ZSI import SoapWriter, ParsedSoap, TC
 import ZSI.wstools.Utility
 from StringIO import StringIO
 import urllib2
-from cs.misc import isdebug, ifdebug, debug, objFlavour, T_MAP, T_SEQ, reportElapsedTime
+from cs.misc import cmd, isdebug, ifdebug, debug, objFlavour, T_MAP, T_SEQ, reportElapsedTime
 
 def lather(obj,tc=None):
   ''' Serial a python object into SOAP, return the SOAP.
@@ -52,7 +52,7 @@ def callSOAP(url,action,xml,retAction,retTypecode):
 
 class BigElementProxy(ZSI.wstools.Utility.ElementProxy):
   ''' An ElementProxy with its canonicalize method
-      replaces with out that uses a chunkyString.
+      replaced with one that uses a chunkyString.
       The ZSI default uses StringIO, which scales very badly
       to large strings; I'm constructing SOAP packets over
       10MB in size:-(

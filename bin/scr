@@ -36,43 +36,48 @@ usage="Usage:
 		   You still need to turn logging on _in_ the session:-("
 
 # nothing? list active sessions
-[ $# = 0 ] \
-    && { $screen -ls \
-	 | sed '/^	/!d; s/^	\([^	]*\).*/\1/' \
-	 | awk '{ print NR, $0 }'	## printf("%d %s\n",NR,$0) }'
-	 exit 0
-       }
+if [ $# = 0 ]
+then
+  $screen -ls \
+  | tr -s '	' ' ' \
+  | sed '/^ /!d; s/^ \([^ .]*\)\.\([^ ]*\).*/\1 \2/' \
+  | sort -k 2 \
+  | awk '{ printf("%5d %7d.%s\n",NR,$1,$2); }'
+  exit 0
+fi
 
 # catch the "all sessions" mode early
 if [ "x$1" = x-A ]
 then
-    shift
-    [ -n "$DISPLAY" ] || { echo "$cmd: no \$DISPLAY!" >&2; exit 1; }
-    grepfor=
-    grepnot=
-    for re
-    do  case "$re" in
-	  !*)	re=`expr "x$re" : 'x.\(.*\)'`
-		if [ -n "$grepnot" ]
-		then  grepnot="$grepnot|$re"
-		else  grepnot=$re
-		fi
-		;;
-	  *)	if [ -n "$grepfor" ]
-		then  grepfor="$grepfor|$re"
-		else  grepfor=$re
-		fi
-		;;
-	esac
-    done
-    choose=scr
-    [ -n "$grepnot" ] && choose="$choose | egrep -iv \"\$grepnot\""
-    [ -n "$grepfor" ] && choose="$choose | egrep -i \"\$grepfor\""
-    xit=0
-    for scr in `eval "$choose" | awk '{print$1}'`
-    do  term -iconic -e scr "$scr" || xit=1
-    done
-    exit $xit
+  shift
+  [ -n "$DISPLAY" ] || { echo "$cmd: no \$DISPLAY!" >&2; exit 1; }
+  grepfor=
+  grepnot=
+  for re
+  do
+    case "$re" in
+      !*)re=`expr "x$re" : 'x.\(.*\)'`
+        if [ -n "$grepnot" ]
+        then  grepnot="$grepnot|$re"
+        else  grepnot=$re
+        fi
+        ;;
+      *)if [ -n "$grepfor" ]
+        then  grepfor="$grepfor|$re"
+        else  grepfor=$re
+        fi
+        ;;
+    esac
+  done
+  choose=$0
+  [ -n "$grepnot" ] && choose="$choose | egrep -iv \"\$grepnot\""
+  [ -n "$grepfor" ] && choose="$choose | egrep -i \"\$grepfor\""
+  xit=0
+  for scr in `eval "$choose" | awk '{print $1}'`
+  do
+    term -iconic -e "$0" "$scr" || xit=1
+  done
+  exit $xit
 fi
 
 badopts=
@@ -96,21 +101,21 @@ havecmd=
 while [ $# -gt 0 ]
 do
   case $1 in
-    -c)	addscrcmds "$2"; shift ;;
+    -c) addscrcmds "$2"; shift ;;
     -dm)detached=1 ;;
-    -e)	shift
-	havecmd=1
-	[ $# = 0 ] && { echo "$cmd: -e: missing command" >&2
-			badopts=1
-		      }
-	break
-	;;
-    -l)	addscrcmds "logfile $2" "logfile flush 1" "log on"; shift ;;
-    --)	shift; break ;;
+    -e) shift
+        havecmd=1
+        [ $# = 0 ] && { echo "$cmd: -e: missing command" >&2
+                        badopts=1
+                      }
+        break
+        ;;
+    -l) addscrcmds "logfile $2" "logfile flush 1" "log on"; shift ;;
+    --) shift; break ;;
     -?*)echo "$cmd: unrecognised option: $1" >&2
-	badopts=1
-	;;
-    *)	break ;;
+        badopts=1
+        ;;
+    *)  break ;;
   esac
   shift
 done
@@ -146,14 +151,14 @@ esac
     # otherwise convert $sess into session name to join
     case "$sess" in
       [1-9]|[1-9][0-9]|[1-9][0-9][0-9])
-	# numeric - pull name from listing
-	nsess=`scr | sed -n "s/^ *$sess //p"`
-	[ -n "$nsess" ] || { echo "$cmd: no screen numbered $sess" >&2
-			     exit 1
-			   }
-	# matched - join the session
-	exec $screen -c "$rcfile" -Aax "$nsess"
-	;;
+        # numeric - pull name from listing
+        nsess=`"$0" | sed -n "s/^ *$sess  *//p"`
+        [ -n "$nsess" ] || { echo "$cmd: no screen numbered $sess" >&2
+                             exit 1
+                           }
+        # matched - join the session
+        exec $screen -c "$rcfile" -Aax "$nsess"
+        ;;
     esac
 
     # not numeric - look up in listing
@@ -163,12 +168,12 @@ esac
 
     case "$sess" in
       *[\\.]*)
-	sessre=`printf "%s" "$sess" | sed 's/[\\.]/\\&/g'`
-	;;
+        sessre=`printf "%s" "$sess" | sed 's/[\\.]/\\&/g'`
+        ;;
       *)sessre=$sess
-	;;
+        ;;
     esac
-    match=`scr | sed "/^ *[1-9][0-9]* [1-9][0-9]*\\.$sessre\$/!d;"'s/^ *[1-9][0-9]*  *//; q'`
+    match=`"$0" | sed "/^ *[1-9][0-9]*  *[1-9][0-9]*\\.$sessre\$/!d;"'s/^ *[1-9][0-9]*  *//; q'`
 
     # match found - join it
     [ -n "$match" ] && exec $screen -c "$rcfile" -Aax "$sess"

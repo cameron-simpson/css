@@ -1,4 +1,3 @@
-from email.parser import Parser
 from email.utils import parseaddr, getaddresses, formataddr
 from cs.misc import cmderr, verbose
 

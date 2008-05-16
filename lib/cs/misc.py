@@ -121,20 +121,24 @@ def tb(limit=None):
 
 _logPath=None
 _logFP=sys.stderr
-def logTo(logpath):
-  TODO("port cs.misc.logTo() etc to logger module")
+def logTo(logpath=None):
   global _logPath, _logFP
+  if logpath is None:
+    return _logFP
+  TODO("port cs.misc.logTo() etc to logger module")
   _logFP=open(logpath,"a")
   _logPath=logpath
-def _logline(line):
+def _logline(line,mark):
   global _logPath, _logFP
-  print >>_logFP, "%d: %s" % (time.time(), line)
+  print >>_logFP, "%d [%s] %s" % (time.time(), mark, line)
   _logFP.flush()
   if isdebug and _logFP is not sys.stderr:
-    print line
-def logLine(line):
-  return withoutUpd(_logline,line)
-def logFnLine(line,frame=None,prefix=None):
+    cmderr("[%s] %s" % (mark, line))
+def logLine(line,mark=None):
+  if mark is None:
+    mark=cmd
+  return withoutUpd(_logline,line,mark)
+def logFnLine(line,frame=None,prefix=None,mark=None):
   ''' Log a line citing the calling function.
   '''
   if frame is None:
@@ -143,8 +147,32 @@ def logFnLine(line,frame=None,prefix=None):
        % (line, frame.f_code.co_name, frame.f_code.co_filename, frame.f_lineno)
   if prefix is not None:
     line=prefix+": "+line
-  return logLine(line)
+  return logLine(line,mark=mark)
 
+class LogLine:
+  ''' Base class for things that will use the above functions.
+  '''
+  def __init__(self,mark):
+    self.__logMark=cmd+"."+mark
+  def logmark(self,mark=None):
+    if mark is None:
+      mark=self.__logMark
+    else:
+      mark=self.__logMark+"."+mark
+    return mark
+  def log(self,line,mark=None):
+    logLine(line,mark=self.logmark(mark))
+  def logfn(self,line,mark=None,frame=None):
+    if frame is None:
+      frame=sys._getframe(1)
+    logFnLine(line,mark=self.logmark(mark),frame=frame)
+  def logTime2(self,tag,func,*args,**kw):
+    global reportElapsedTimeTo
+    return reportElapsedTimeTo(self.log,tag,func,*args,**kw)
+  def logTime(self,tag,func,*args,**kw):
+    global reportElapsedTimeTo
+    t, result = self.logTime2(tag,func,*args,**kw)
+    return result
 
 def elapsedTime(func,*args,**kw):
   ''' Call a function with the supplied arguments.
@@ -156,18 +184,24 @@ def elapsedTime(func,*args,**kw):
   return t0, t1, result
 
 def reportElapsedTime(tag,func,*args,**kw):
+  t, result = reportElapsedTimeTo(None,tag,func,*args,**kw)
+  return result
+def reportElapsedTimeTo(logfunc,tag,func,*args,**kw):
   ''' Call a function with the supplied arguments.
       Return its return value.
       If isdebug, report elapsed time for the function.
   '''
   if not isdebug:
     return func(*args,**kw)
+  if logfunc is None:
+    logfunc=logLine
   old=out("%.100s" % " ".join((cmd_,tag,"...")))
   t0, t1, result = elapsedTime(func, *args, **kw)
   t=t1-t0
-  if True or t > 1: logLine("%6.4gs %s"%(t,tag))
+  if t >= 0.01:
+    logfunc("%6.4fs %s"%(t,tag))
   out(old)
-  return result
+  return t, result
 
 T_SEQ='ARRAY'
 T_MAP='HASH'

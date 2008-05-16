@@ -37,9 +37,8 @@ done
 [ $force ] || needhost $HOMEHOST@home || exit 1
 
 cd || exit 1
-set -x
 for host
-do pfx "$host" syncacc '' "$host:" &
+do pfx "$cmd $host" syncacc '' "$host:" &
    [ $async ] || wait
 done
 wait

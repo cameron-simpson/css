@@ -8,14 +8,15 @@
 : ${DISPLAY:=''}
 
 cmd=`basename "$0"`
-usage="Usage: $cmd [login@]host[,[login@host]...] [-v] [-n name] [-o opt] {-A | [-c sh-command] | [[--] command [args...]]}
+usage="Usage: $cmd [login@]host[/screen,...][,[login@host[/screen,...]]...] [-v] [-n name] [-o opt] {-A | [-c sh-command] | [[--] command [args...]]}
 	-A	Pop up terminals for all screens on the remote host.
 	-ip +ip	Passed to term.
 	-v	Verbose.
 	-1	Use ssh protocol 1.
 	-2	Use ssh protocol 2.
 	-m msg	Log session with the supplied message.
-	-x	Ssh option: X11 forwarding off.
+        -x      Trace term invocations.
+	+X	Ssh option: X11 forwarding off.
 	-X	Ssh option: X11 forwarding on. NB: Turns on ForwardX11Trusted, like ssh -Y.
 	-n name	Name for window and remote screen session."
 
@@ -26,7 +27,7 @@ then
   targets=$1
   shift
 else
-  echo "$cmd: missing host[@systemid]" >&2
+  echo "$cmd: missing host" >&2
   badopts=1
 fi
 
@@ -44,6 +45,7 @@ doscreen=
 allscreens=
 msg=
 nomsgopt=-M
+trace=
 
 gotargs=
 while [ $# -gt 0 ]
@@ -62,6 +64,7 @@ do
     -v)	sshopts="$sshopts -v" verbose=1 ;;
     -[XY])
         sshx11opt=$1 ;;
+    -x) trace=set-x ;;
     +X)	sshx11opt=forwardx11=no ;;
     -[12])
         sshopts="$sshopts $1" ;;
@@ -88,68 +91,114 @@ done
 xit=0
 
 lastbase=
-for target in `printf "%s\n" "$targets" | tr , ' '`
+lasthost=
+for target in $targets ##`printf "%s\n" "$targets" | tr , ' '`
 do
-  scrname=
-  case "$target" in
-    */*)
-      scrname=`expr "x$target" : 'x.*/\(.*\)'`
-      target=` expr "x$target" : 'x\(.*\)/.*'`
-      ;;
-  esac
-  case "$target" in
-    [0-9])
-      [ -n "$lastbase" ] \
-      || { echo "$cmd: no previous hostN name, skipping: $target" >&2
-	   xit=1
-	   continue
-	 }
-      target=$lastbase$target
-      ;;
-    [a-z]*[0-9])
-      lastbase=`expr "x$target" : 'x\(.*[^0-9]\)[0-9]*'` || xit=1
-      ;;
-  esac
+  while [ -n "$target" ]
+  do
+    tpfx=`expr "x$target" : 'x\([^,/]*\).*'` || :
+    tsfx=`expr "x$target" : 'x[^,/]*\(.*\)'` || :
+    ##echo "1: target=[$target], tpfx=[$tpfx], tsfx=[$tsfx]" >&2
+    # skip empty stuff
+    case $tsfx in
+      # /{scr1,scr2,...}
+      /{*}*)
+        ##echo "/{...}" >&2
+        scrlist=`expr "x$tsfx" : 'x..\([^}]*\)}.*'`
+        tsfx=`   expr "x$tsfx" : 'x..[^}]*}\(.*\)'`
+        ;;
+      # /scr1
+      /*)
+        ##echo "/scr" >&2
+        scrlist=`expr "x$tsfx" : 'x.\([^,]*\).*'`
+        tsfx=`   expr "x$tsfx" : 'x.[^,]*\(.*\)'`
+        ;;
+      *)
+        ##echo "no /scr" >&2
+        scrlist=
+        ;;
+    esac
+    # prepare target for next loop iteration
+    target=`expr "x$tsfx" : 'x,*\(.*\)'` || :
+    ##echo "2: tpfx=[$tpfx], tsfx=[$tsfx], scrlist=[$scrlist], target=[$target]" >&2
+    [ -n "$tpfx" ] || continue
 
-  (
-    [ -n "$name" ] || name=$target
+    case "$tpfx" in
+      [0-9])
+        [ -n "$lastbase" ] \
+        || { echo "$cmd: no previous hostN name, skipping: $tpfx" >&2
+             xit=1
+             continue
+           }
+        host=$lastbase$tpfx
+        ;;
+      [a-z]*[0-9])
+        host=$tpfx
+        lastbase=`expr "x$tpfx" : 'x\(.*[^0-9]\)[0-9]*'` || xit=1
+        ;;
+      *)host=$tpfx
+        lastbase=
+        ;;
+    esac
+    lasthost=$host
 
-    if [ -n "$scrname" ]
+    if [ -z "$scrlist" ] && [ $allscreens ]
     then
-      exec term -n "$name/$scrname" \
-                -e envssh $RTERM_SSHOPTS $sshopts -- "$target" "exec scr $scrname"
+      scrlist='*'
+    fi
+    if [ -n "$scrlist" ]
+    then
+      case "$scrlist" in
+        *\**) 
+          rscrlist=`envssh $RTERM_SSHOPTS $sshopts -- "$host" exec scr | sed -n 's/^ *[1-9][0-9]*  *[1-9][0-9]*\.\([^_].*\)/\1/p' | sort -u`
+          ;;
+      esac
     fi
 
-    if [ $allscreens ]
-    then
-      envssh $RTERM_SSHOPTS $sshopts -- "$target" exec scr \
-      | { xit=0
-	  hit=
-	  while read n title
-	  do  
-	    hit=1
-	    term -n "$name: $title" -e envssh $RTERM_SSHOPTS $sshopts -- "$target" "exec scr $n" \
-		  || xit=1
-	  done
-	  [ $hit ] || { echo "$cmd: no remote screens on $target, starting new session" >&2
-			set -x
-			exec "$0" $sshopts $termopts "$target"
-		      }
-	  exit $xit
-	}
-      exit $?
-    fi
+    (
+      [ -n "$name" ] || name=$host
 
-    # no command? just run the preferred shell
-    [ $# = 0 ] && set -- sh -c '[ -s /opt/css/env.sh ] && . /opt/css/env.sh; exec $SHELL'
+      if [ -n "$scrlist" ]
+      then
+        xit=0
+        for scrptn in `printf "%s\n" "$scrlist" | tr , ' '`
+        do
+          set --
+          case "$scrptn" in
+            *\**)
+              for rscr in $rscrlist
+              do
+                eval 'case "$rscr" in '"$scrptn"') set -- ${1+"$@"} "$rscr" ;; esac'
+              done
+              if [ $# = 0 ]
+              then
+                echo "$cmd: warning: no screens at \$host matching \"$scrptn\"" >&2
+              fi
+              ;;
+            *)set -- ${1+"$@"} "$scrptn"
+              ;;
+          esac
+          for scr
+          do
+            $trace term -n "$name/$scr" \
+                 -e envssh $RTERM_SSHOPTS $sshopts -- "$host" "exec scr $scr" \
+            || xit=1
+          done
+        done
+        exit $xit
+      fi
 
-    [ $doscreen ] && set -- scr '_$$' "$@"
-    qcmd=exec\ `shqstr "$@"`
-    set -- envssh $RTERM_SSHOPTS $sshx11opt $sshopts -- "$target" "$qcmd"
-    [ $doscript ] && set -- logscript -m "$name: $msg" $nomsgopt -- "$name" "$@"
+      # no command? just run the preferred shell
+      [ $# = 0 ] && set -- sh -c '[ -s /opt/css/env.sh ] && . /opt/css/env.sh; exec $SHELL'
 
-    exec term $termopts -n "$name" -e "$@"
-  ) || xit=1
+      [ $doscreen ] && set -- scr '_$$' "$@"
+      qcmd=exec\ `shqstr "$@"`
+      set -- envssh $RTERM_SSHOPTS $sshx11opt $sshopts -- "$host" "$qcmd"
+      [ $doscript ] && set -- logscript -m "$name: $msg" $nomsgopt -- "$name" "$@"
+
+      exec $trace term $termopts -n "$name" -e "$@"
+    ) || xit=1
+  done
 done
 
 exit $xit
