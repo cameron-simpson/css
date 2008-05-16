@@ -4,13 +4,13 @@
 #	- Cameron Simpson <cs@zip.com.au> 18jan2004
 #
 
-cmd=$0
+cmd=`basename "$0"` || cmd=$0
 async=1
 [ $# = 0 ] && { echo "Usage: $cmd hosts..." >&2; exit 2; }
 
 ( for host
   do
-    pfx "$host" set-x rsync -avH --delete /opt/css/. "$host:/opt/css/." &
+    pfx "$cmd $host" set-x rsync -avH --delete /opt/css/. "$host:/opt/css/." &
     [ $async ] || wait
   done
   wait

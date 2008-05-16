@@ -3,6 +3,8 @@
 # Update my ezoshosting web site.
 #	- Cameron Simpson <cs@zip.com.au> 11jan2003
 
+cmd=`basename "$0"`
+
 needhost $HOMEHOST@home
 
 ezos=$HOME/@/ezos
@@ -10,11 +12,10 @@ ezoscgi=$ezos/cgi-bin
 ezoshtml=$ezos/html
 ezoscss=$ezoshtml/cs/css
 
-set -x
-
 syncezos-rc
 
-rsync -rptlHv --delete \
+pfx "$cmd ezos:public_html" \
+  rsync -rptlHv --delete \
 		--exclude=CVS/ \
 		--include=/cs --exclude=/cs/test/ \
 		--include=/fay \
