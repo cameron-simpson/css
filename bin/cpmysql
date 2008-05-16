@@ -7,11 +7,14 @@
 
 trace=eecho
 doit=
+dorewriteif=
 bytable=
 dfltport=3306
 
 cmd=`basename "$0"` || cmd=$0
 usage="Usage: $cmd -T [-q] [-x] src dst [databases...]
+  -R    Use rewriteif to rewrite dump files.
+        This avoids a date change if there is no data change.
   -T    Do a table based copy. Now mandatory.
   -q    Execute quietly.
         Default is to do nothing, and recite a plan of action.
@@ -40,6 +43,7 @@ while [ $# -gt 0 ]
 do
   case $1 in
     -q) doit=1 trace= ;;
+    -R) dorewriteif=1 ;;
     -T) bytable=1 ;;
     -x) doit=1 trace=set-x ;;
     --)	shift; break ;;
@@ -260,7 +264,14 @@ pull_table()
   | case "$dst" in
       /*)
         $trace sed '${/^-- Dump completed on /d;}' \
-        | $trace gzip -n --fast >"$dst/$_pull_table_dstdb.$_pull_table.sql.gz"
+        | \
+        { gzout=$dst/$_pull_table_dstdb.$_pull_table.sql.gz
+          set -- gzip -n --fast
+          if [ $dorewriteif ]
+          then $trace rewriteif "$gzout" "$@"
+          else $trace "$@" >"$gzout"
+          fi
+        }
         ;;
       *)
         mysqlcmd_dst mysql "$_pull_table_dstdb"

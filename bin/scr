@@ -39,7 +39,8 @@ usage="Usage:
 if [ $# = 0 ]
 then
   $screen -ls \
-  | sed '/^	/!d; s/^	\([^	.]*\)\.\([^	]*\).*/\1 \2/' \
+  | tr -s '	' ' ' \
+  | sed '/^ /!d; s/^ \([^ .]*\)\.\([^ ]*\).*/\1 \2/' \
   | sort -k 2 \
   | awk '{ printf("%5d %7d.%s\n",NR,$1,$2); }'
   exit 0
@@ -100,21 +101,21 @@ havecmd=
 while [ $# -gt 0 ]
 do
   case $1 in
-    -c)	addscrcmds "$2"; shift ;;
+    -c) addscrcmds "$2"; shift ;;
     -dm)detached=1 ;;
-    -e)	shift
+    -e) shift
         havecmd=1
         [ $# = 0 ] && { echo "$cmd: -e: missing command" >&2
                         badopts=1
                       }
         break
         ;;
-    -l)	addscrcmds "logfile $2" "logfile flush 1" "log on"; shift ;;
-    --)	shift; break ;;
+    -l) addscrcmds "logfile $2" "logfile flush 1" "log on"; shift ;;
+    --) shift; break ;;
     -?*)echo "$cmd: unrecognised option: $1" >&2
         badopts=1
         ;;
-    *)	break ;;
+    *)  break ;;
   esac
   shift
 done
@@ -151,7 +152,7 @@ esac
     case "$sess" in
       [1-9]|[1-9][0-9]|[1-9][0-9][0-9])
         # numeric - pull name from listing
-        nsess=`"$0" | sed -n "s/^ *$sess //p"`
+        nsess=`"$0" | sed -n "s/^ *$sess  *//p"`
         [ -n "$nsess" ] || { echo "$cmd: no screen numbered $sess" >&2
                              exit 1
                            }
