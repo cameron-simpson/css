@@ -68,6 +68,8 @@ rsync -avH --delete --delete-excluded \
         '--exclude=/*/' \
         "$tmpdir/." "$OPTCSS/."
 
+# ok, $OPTCSS now ready, use it to update the web stuff
+
 rsync -avH --delete \
     --include=/1INDEX.txt \
     --include=/CHANGELOG.txt \
