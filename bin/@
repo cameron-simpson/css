@@ -142,17 +142,17 @@ do
     esac
     lasthost=$host
 
+    if [ -z "$scrlist" ] && [ $allscreens ]
+    then
+      scrlist='*'
+    fi
     if [ -n "$scrlist" ]
     then
-      scrlist=`printf "%s\n" "$scrlist" | tr , ' '`
-    else
-      if [ $allscreens ]
-      then
-        scrlist=`envssh $RTERM_SSHOPTS $sshopts -- "$host" exec scr | awk '!/\._/ {print $2}'`
-        [ -n "$scrlist" ] || { echo "$cmd: no screens at host $host, skipped" >&2
-                               continue
-                             }
-      fi
+      case "$scrlist" in
+        *\**) 
+          rscrlist=`envssh $RTERM_SSHOPTS $sshopts -- "$host" exec scr | sed -n 's/^ *[1-9][0-9]*  *[1-9][0-9]*\.\([^_].*\)/\1/p' | sort -u`
+          ;;
+      esac
     fi
 
     (
@@ -161,11 +161,29 @@ do
       if [ -n "$scrlist" ]
       then
         xit=0
-        for scr in $scrlist
+        for scrptn in `printf "%s\n" "$scrlist" | tr , ' '`
         do
-          $trace term -n "$name/$scr" \
-               -e envssh $RTERM_SSHOPTS $sshopts -- "$host" "exec scr $scr" \
-          || xit=1
+          set --
+          case "$scrptn" in
+            *\**)
+              for rscr in $rscrlist
+              do
+                eval 'case "$rscr" in '"$scrptn"') set -- ${1+"$@"} "$rscr" ;; esac'
+              done
+              if [ $# = 0 ]
+              then
+                echo "$cmd: warning: no screens at \$host matching \"$scrptn\"" >&2
+              fi
+              ;;
+            *)set -- ${1+"$@"} "$scrptn"
+              ;;
+          esac
+          for scr
+          do
+            $trace term -n "$name/$scr" \
+                 -e envssh $RTERM_SSHOPTS $sshopts -- "$host" "exec scr $scr" \
+            || xit=1
+          done
         done
         exit $xit
       fi
