@@ -34,14 +34,18 @@ done
 if [ $# -gt 0 ]
 then
   case $1 in
-    /*) secret=$1; shift ;;
-    @*) secret=mysql-root$1; shift
+    /*) secret=$1
+        shift
+        ;;
+    @*) secret=mysql-root$1
         secretLOGIN=root
         secretHOST=` expr "x$1" : 'x.*@\(.*\)'`
+        shift
         ;;
-    *@*)secret=mysql-$1; shift
+    *@*)secret=mysql-$1
         secretLOGIN=`expr "x$1" : 'x\(.*\)@.*'`
         secretHOST=` expr "x$1" : 'x.*@\(.*\)'`
+        shift
         ;;
   esac
 fi
