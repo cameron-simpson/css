@@ -10,7 +10,6 @@
 cssweb=$HOME/@/ezos/html/cs/css
 adzapweb=$HOME/@/adzapper.sf/html/scripts
 cssdir=/opt/css
-dosync=1
 quick=
 
 cmd=`basename "$0"`
@@ -23,7 +22,6 @@ needhost $HOMEHOST@home || exit 2
 umask 22
 
 [ $# -gt 0 ] && [ "x$1" = x-q ] && { quick=1; shift; }
-[ $# -gt 0 ] && [ "x$1" = x-n ] && { dosync=; shift; }
 
 unset tmpdir
 trap '[ ! -d "$tmpdir" ] || rm -rf $tmpdir' 0
@@ -70,96 +68,30 @@ rsync -avH --delete --delete-excluded \
         '--exclude=/*/' \
         "$tmpdir/." "$OPTCSS/."
 
-exit 0
-
-subdirs=
-
-if [ -z "$quick" ]
-then
-    ( cd $HOME/bin || exit 1
-      exec myke _all
-    ) || exit 1
-    ( cd "$cssweb" || exit 1
-      exec myke
-    )
-fi
-
-set -x
-
-if needdir $cssdir/bin
-then
-  rm -f $cssdir/bin/cs
-  rsync -aH \
-	--copy-links \
-	--copy-unsafe-links \
-	--delete \
-	--delete-excluded \
-	--exclude=CVS/ \
-	--include=/0README.txt \
-	--include=/CHANGELOG.txt \
-	--include=/CHANGELOG.html \
-	--exclude='/*/' \
-	$HOME/bin/. $cssdir/bin/.
-
-  rsync -aH \
-	--copy-links \
-	--copy-unsafe-links \
-	--exclude=CVS/ \
-	--exclude='defunct/' \
-	$HOME/bin/synonyms/. $cssdir/bin/.
-fi
-
-if needdir $cssdir/lib/cs
-then
-  rsync -avH \
-	--delete \
-	--delete-excluded \
-	--exclude=CVS/ \
-	--include='*/' \
-	--include='lib.js' \
-	--include='*.pm' \
-	--include='*.py' \
-	--exclude='*' \
-	$HOME/bin/cs/. $cssdir/lib/cs/.
-fi
-
-##if needdir $cssdir/lib
-##then
-##  rsync -avW $HOME/rc/java/au.com.zip.cs.jar $cssdir/lib/.
-##fi
-
-wait
+rsync -avH --delete \
+    --include=/1INDEX.txt \
+    --include=/CHANGELOG.txt \
+    --include=/INSTALL \
+    --include=/bin \
+    --include=/lib \
+    --include=/man \
+    --exclude=/* \
+    "$OPTCSS/." "$cssweb/."
 
 if [ -d "$cssweb" ]
 then
+  ( cd "$cssweb" || exit 1
     if [ -z "$quick" ]
     then
       ( cd $cssdir/.. || exit 1
-	set -- `find -H css -type f -print`
-	[ $# = 0 ] && { echo "NO ARGS!" >&2; ls -ld css >&2; exit 1; }
-	ls -tdr "$@" | tar chTf - - | gzip -v -n -9 >$cssweb/css.tar.gz
+        set -- `find -H css -type f -print`
+        [ $# = 0 ] && { echo "NO ARGS!" >&2; ls -ld css >&2; exit 1; }
+        ls -tdr "$@" | tar chTf - - | gzip -v -n -9 >$cssweb/css.tar.gz
       )
-      for d in man bin lib
-      do
-	rsync -avH --delete $cssdir/$d/. $cssweb/$d/.
-      done
       ( cd "$cssweb/bin" || exit 1
-	ln -s ../lib/cs .
+        ln -s ../lib/cs .
       )
-      ( cd "$cssweb" || exit 1
-	myke _all
-      )
+      myke _all
     fi
+  )
 fi
-
-wait
-
-if [ $dosync ]
-then
-  syncezos &
-  for host
-  do  pfx "$host:/opt/css" putcss "$host" &
-  done
-fi
-
-wait
