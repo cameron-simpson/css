@@ -170,7 +170,6 @@ class LogLine:
     global reportElapsedTimeTo
     return reportElapsedTimeTo(self.log,tag,func,*args,**kw)
   def logTime(self,tag,func,*args,**kw):
-    global reportElapsedTimeTo
     t, result = self.logTime2(tag,func,*args,**kw)
     return result
 
@@ -192,7 +191,7 @@ def reportElapsedTimeTo(logfunc,tag,func,*args,**kw):
       If isdebug, report elapsed time for the function.
   '''
   if not isdebug:
-    return func(*args,**kw)
+    return None, func(*args,**kw)
   if logfunc is None:
     logfunc=logLine
   old=out("%.100s" % " ".join((cmd_,tag,"...")))
