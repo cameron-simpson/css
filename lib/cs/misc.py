@@ -190,16 +190,15 @@ def reportElapsedTimeTo(logfunc,tag,func,*args,**kw):
       Return its return value.
       If isdebug, report elapsed time for the function.
   '''
-  if not isdebug:
-    return None, func(*args,**kw)
-  if logfunc is None:
-    logfunc=logLine
-  old=out("%.100s" % " ".join((cmd_,tag,"...")))
+  if isdebug:
+    old=out("%.100s" % " ".join((cmd_,tag,"...")))
   t0, t1, result = elapsedTime(func, *args, **kw)
   t=t1-t0
-  if t >= 0.01:
+  if isdebug and t >= 0.01:
+    if logfunc is None:
+      logfunc=logLine
     logfunc("%6.4fs %s"%(t,tag))
-  out(old)
+    out(old)
   return t, result
 
 T_SEQ='ARRAY'
