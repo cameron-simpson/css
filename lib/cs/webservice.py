@@ -9,7 +9,7 @@ from ZSI import SoapWriter, ParsedSoap, TC
 import ZSI.wstools.Utility
 from StringIO import StringIO
 import urllib2
-from cs.misc import cmd, isdebug, ifdebug, debug, objFlavour, T_MAP, T_SEQ, reportElapsedTime
+from cs.misc import cmd, cmderr, isdebug, ifdebug, debug, objFlavour, T_MAP, T_SEQ, reportElapsedTime
 
 def lather(obj,tc=None):
   ''' Serial a python object into SOAP, return the SOAP.
@@ -31,11 +31,13 @@ def rinse(soap,tc):
 def xml2pyobj(xml,typecode):
   return ParsedSoap(xml).Parse(typecode)
 
+cmderr("\n\n\n\nDEFINING CALLSOAP\n\n\n\n")
 def callSOAP(url,action,xml,retAction,retTypecode):
   ''' Call the specified web services URL with an action and SOAP XML string.
       Return the parsed response, which should have the action retAction
       and be of type retTypecode.
   '''
+  cmderr("\n\n\n\ncallSOAP: action=[%s], url=[%s]\n\n\n\n" % (action,url))
   rq=urllib2.Request(url,xml)
   rq.add_header('Accept-Encoding', 'identity')
   rq.add_header('Soapaction', '"%s"'%action)
@@ -44,7 +46,8 @@ def callSOAP(url,action,xml,retAction,retTypecode):
                       urllib2.urlopen,rq)
   I=U.info()
   assert I.type == 'text/xml', \
-         "%s: did not get XML back from %s:%s" % (cmd,url,action)
+         "%s: expected text/xml, got \"%s\" from %s %s" % (cmd,I.type,action,url)
+  cmderr("I.__dict__ = %s" % `I.__dict__`)
   retxml=''.join(U.readlines())
   ret=reportElapsedTime('decode %d bytes of %s response'%(len(retxml),retAction),
                         xml2pyobj,retxml,retTypecode)
