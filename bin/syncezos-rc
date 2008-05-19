@@ -6,8 +6,10 @@
 
 ezos=$HOME/@/ezos
 
-set -x
-exec rsync -rptlHv --delete --delete-excluded \
+rrcpath=$ezos/html/cs/rc
+
+pfx "$rrcpath" \
+  rsync -rptlHv --delete --delete-excluded \
 	--exclude=CVS/ \
 	--include='/mail' \
 	--include='/mail/mailcap' \
@@ -27,4 +29,4 @@ exec rsync -rptlHv --delete --delete-excluded \
 	--include='/x11/fvwm' \
 	--include='/x11/fvwm/rc' \
 	--exclude='*' \
-	$HOME/rc/. $ezos/html/cs/rc/.
+	$HOME/rc/. "$rrcpath/."

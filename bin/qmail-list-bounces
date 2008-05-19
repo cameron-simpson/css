@@ -1,0 +1,8 @@
+#!/bin/sh -ue
+#
+# List qmail message numbers of queued bounces.
+#       - Cameron Simpson <cs@zip.com.au> 19may2008
+#
+
+qmail-qread \
+| sed -n 's/^[0-9].* GMT  *#\([0-9][0-9]*\) .* <> *$/\1/p'
