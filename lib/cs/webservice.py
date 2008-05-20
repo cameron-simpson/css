@@ -31,23 +31,23 @@ def rinse(soap,tc):
 def xml2pyobj(xml,typecode):
   return ParsedSoap(xml).Parse(typecode)
 
-cmderr("\n\n\n\nDEFINING CALLSOAP\n\n\n\n")
 def callSOAP(url,action,xml,retAction,retTypecode):
   ''' Call the specified web services URL with an action and SOAP XML string.
       Return the parsed response, which should have the action retAction
       and be of type retTypecode.
   '''
-  cmderr("\n\n\n\ncallSOAP: action=[%s], url=[%s]\n\n\n\n" % (action,url))
   rq=urllib2.Request(url,xml)
   rq.add_header('Accept-Encoding', 'identity')
   rq.add_header('Soapaction', '"%s"'%action)
   rq.add_header('Content-Type', 'text/xml; charset="utf-8"')
-  U=reportElapsedTime('call %s with %d bytes of XML'%(url,len(xml)),
+  U=reportElapsedTime('call action %s at %s with %d bytes of XML'
+                        % (action,url,len(xml)),
                       urllib2.urlopen,rq)
   I=U.info()
-  assert I.type == 'text/xml', \
+  assert I.type in ('text/xml', 'application/soap+xml'), \
          "%s: expected text/xml, got \"%s\" from %s %s" % (cmd,I.type,action,url)
-  cmderr("I.__dict__ = %s" % `I.__dict__`)
+  if isdebug:
+    cmderr("I.__dict__ = %s" % `I.__dict__`)
   retxml=''.join(U.readlines())
   ret=reportElapsedTime('decode %d bytes of %s response'%(len(retxml),retAction),
                         xml2pyobj,retxml,retTypecode)
