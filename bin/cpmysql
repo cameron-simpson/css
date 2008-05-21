@@ -49,7 +49,7 @@ do
     -q) doit=1 trace= ;;
     -R) dorewriteif=1 ;;
     -T) bytable=1 ;;
-    -x) doit=1 trace=set-x ;;
+    -x) doit=1 trace=set-x rwflags="$rwflags -x" ;;
     --)	shift; break ;;
     -?*)echo "$cmd: unrecognised option: $1" >&2
 	badopts=1
