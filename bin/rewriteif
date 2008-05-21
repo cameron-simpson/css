@@ -11,12 +11,20 @@ cmd=`basename "$0"`
 usage="Usage: $cmd [-0] [-v] filename [command args...]
 	-0	Rewrite the file even if the input is empty.
 	-d	Do a diff of the file changes.
-	-v	Verbose."
+        -n      No action. Recite underlying commands.
+        -N      Make a new file if the content is different.
+                This means \"mv tempfile filename\" instead of
+                \"cat tempfile >filename\".
+	-v	Verbose.
+        -x      trace execution f underlying commands."
 
+trace=
 rw0=
+doit=1
 dodiff=
 verbose=
 diff=diff
+newfile=
 
 badopts=
 
@@ -25,7 +33,10 @@ do
   case "$1" in
     -0)	rw0=1 ;;
     -d)	dodiff=1 ;;
+    -n) trace=eecho doit= dodiff= ;;
+    -N) newfile=1 ;;
     -v)	verbose=1 ;;
+    -x) trace=set-x ;;
     --)	shift; break ;;
     -?*)echo "$cmd: unrecognised option: $1" >&2
 	badopts=1
@@ -49,23 +60,32 @@ fi
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
-tmp=$TMPDIR/rwi$$
+if [ $newfile ]
+then  tmp=`dirname "$file"`/.rwi$$
+else  tmp=$TMPDIR/rwi$$
+fi
 trap 'rm "$tmp"' 1 2 13 15
 
-"$@" >"$tmp" || { rm -f "$tmp"; exit 1; }
+( [ $doit ] && exec >"$tmp"
+  exec $trace "$@"
+) \
+|| { $trace rm -f "$tmp"; exit 1; }
 
 [ $rw0 ] || [ -s "$tmp" ] || { echo "$cmd: empty input, rewrite aborted" >&2
-			       rm -f "$tmp"
+			       $trace rm -f "$tmp"
 			       exit 1
 			     }
 
-cmp -s "$tmp" "$file" && { rm "$tmp"; exit 0; }
+$trace cmp -s "$tmp" "$file" && { $trace rm "$tmp"; exit 0; }
 
 [ $verbose ] && echo "rewrite $file"
 [ $dodiff  ] && $diff $DIFFOPTS "$file" "$tmp"
-if cat "$tmp" >"$file"
+if if [ $newfile ]
+   then  $trace mv "$tmp" "$file"
+   else  $trace cat "$tmp" >"$file"
+   fi
 then
-    rm "$tmp"
+    [ $newfile ] || $trace rm "$tmp"
     exit 0
 else
     echo "$cmd: rewrite of $file fails, probably damaged" >&2
