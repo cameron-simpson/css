@@ -9,7 +9,7 @@
 : ${TMPDIR:=/tmp}
 
 cmd=`basename "$0"`
-usage="Usage: $cmd [user]@host group..."
+usage="Usage: $cmd [-x] [user]@host group..."
 
 trace=eecho
 lgroup=/etc/group
