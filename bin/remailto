@@ -1,0 +1,48 @@
+#!/bin/sh -ue
+#
+# Resend the mail item on stdin to the specified addresses,
+# rewriting the To: header to show the target address.
+# This is really so I can filter it at GMail, which has
+# rather primitive filter rules.
+#       - Cameron Simpson <cs@zip.com.au> 24may2008
+#
+
+: ${TMPDIR:=/tmp}
+
+cmd=`basename "$0"`
+usage="Usage: $cmd addresses... <mailitem"
+
+badopts=
+
+if [ $# = 0 ]
+then
+  echo "$cmd: missing addresses" >&2
+  badopts=1
+else
+  for addr
+  do
+    case "$addr" in
+      *?@?*) ;;
+      *)  echo "$cmd: invalid address: $addr" >&2
+          badopts=1
+          ;;
+    esac
+  done
+fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+tmpf=$TMPDIR/$cmd.$$
+
+trap 'rm -f "$tmpf"' 0
+trap 'rm -f "$tmp"; exit 1' 1 2 13 15
+
+cat >"$tmpf"
+
+xit=0
+for addr
+do
+  formail -i "To: $addr" <"$tmpf" | sendmail -oi "$addr" || xit=1
+done
+
+exit $xit
