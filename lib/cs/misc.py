@@ -99,7 +99,7 @@ def die(*args):
 
 def tb(limit=None):
   import traceback
-  global cmd_
+  global cmd__
   if cs.upd.active:
     upd=cs.upd.default()
     oldUpd=upd.state()
@@ -131,14 +131,24 @@ def logTo(logpath=None):
   _logPath=logpath
 def _logline(line,mark):
   global _logPath, _logFP
-  print >>_logFP, "%d [%s] %s" % (time.time(), mark, line)
+  when=time.time()
+  pfx="%d [%s] " % (when, mark)
+  print >>_logFP, pfx, line.replace("\n", "\n%*s" % (len(pfx)+1, " "))
   _logFP.flush()
   if isdebug and _logFP is not sys.stderr:
-    cmderr("[%s] %s" % (mark, line))
+    pfx="%s: %s:" % (cmd, mark)
+    print >>sys.stderr, pfx, line.replace("\n", "\n%*s" % (len(pfx)+1, " "))
 def logLine(line,mark=None):
   if mark is None:
     mark=cmd
-  return withoutUpd(_logline,line,mark)
+  retval=None
+  try:
+    retval=withoutUpd(_logline,line,mark)
+  except:
+    print >>sys.stderr, "%s: exception during log:" % cmd
+    print >>sys.stderr, "  line: %s" % line
+    print >>sys.stderr, "  exception: %s" % e
+  return retval
 def logFnLine(line,frame=None,prefix=None,mark=None):
   ''' Log a line citing the calling function.
   '''
@@ -204,10 +214,11 @@ def reportElapsedTimeTo(logfunc,tag,func,*args,**kw):
     old=out("%.100s" % " ".join((cmd_,tag,"...")))
   t0, t1, result = elapsedTime(func, *args, **kw)
   t=t1-t0
-  if isdebug and t >= 0.01:
-    if logfunc is None:
-      logfunc=logLine
-    logfunc("%6.4fs %s"%(t,tag))
+  if isdebug:
+    if t >= 0.01:
+      if logfunc is None:
+        logfunc=logLine
+      logfunc("%6.4fs %s"%(t,tag))
     out(old)
   return t, result
 
