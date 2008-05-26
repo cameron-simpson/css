@@ -13,11 +13,11 @@ from cs.upd import nl, out
 class AdjustableSemaphore:
   ''' A semaphore whose value may be tuned at runtime.
   '''
-  def __init__(self,value=1,name="AdjustableSemaphore"):
+  def __init__(self, value=1, name="AdjustableSemaphore"):
     self.__sem=Semaphore(value)
     self.__value=value
     self.__name=name
-    self.__lock=BoundedSemaphore()
+    self.__lock=BoundedSemaphore(1)
   def __enter__(self):
     return reportElapsedTime("%s(%d).__enter__: acquire" % (self.__name,self.__value),self.acquire)
   def __exit__(self,exc_type,exc_value,traceback):
@@ -39,10 +39,10 @@ class AdjustableSemaphore:
     ''' The adjust(newvalue) method calls release() or acquire() an
         appropriate number of times.  If newvalue lowers the semaphore
         capacity then adjust() may block until the overcapacity is
-        drained.
+        released.
     '''
     assert newvalue > 0
-    with self__lock:
+    with self.__lock:
       delta=newvalue-self.__value
       if delta > 0:
         while delta > 0:
@@ -50,7 +50,7 @@ class AdjustableSemaphore:
           delta-=1
       else:
         while delta < 0:
-          self.__sem.acquire(True)
+          reportElapsedTime("AdjustableSemaphore(%s): acquire excess capacity"%self.__name,self.__sem.acquire,True)
           delta+=1
       self.__value=newvalue
 
@@ -235,45 +235,56 @@ class JobCounter:
       self.__onDone=(func,args,kw)
       Thread(target=self._waitThenDo,args=args,kwargs=kw).start()
 
-class FuncQueue(Queue):
+class FuncQueue:
   ''' A Queue of function calls to make, processed serially.
       New functions queued as .put((func,args)) or as .qfunc(func,args...).
       Queue shut down with .close().
   '''
-  def __init__(self,size=None):
-    Queue.__init__(self,size)
+  def __init__(self,size=None,parallelism=1):
+    assert parallelism > 0
+    self.__Q=IterableQueue(size)
     self.__closing=False
     import atexit
-    atexit.register(self.close)
-    Thread(target=self.__runQueue).start()
-  def qfunc(self,func,*args):
-    self.put((func,args))
-  def put(self,item):
+    atexit.register(self.__Q.close)
+    for n in range(parallelism):
+      Thread(target=self.__runQueue).start()
+  def callback(self,retQ,func,args=(),kwargs=None):
+    ''' Queue a function for dispatch.
+        The function return value will be .put() on retQ.
+    '''
     assert not self.__closing
-    Queue.put(self,item)
+    if kwargs is None: kwargs={}
+    if retQ is None: retQ=Q1()
+    self.__Q.put((Q,func,args,kwargs))
+  def call(self,func,args=(),kwargs=None):
+    ''' Synchronously call the supplied func via the FuncQueue.
+        Return the function result.
+    '''
+    Q=Q1()
+    self.callback(Q,func,args,kwargs)
+    return Q.get()
+  def qfunc(self,func,*args,**kwargs):
+    ''' Asynchronously call the supplied func via the FuncQueue.
+    '''
+    self.callback(None,func,args,kwargs)
   def close(self):
+    ''' Close the FuncQueue.
+        Any remaining uncalled function are consumed but not called.
+    '''
     if not self.__closing:
-      self.put((None,None))
       self.__closing=True
-      ##tb()
+      self.__Q.close()
   def __runQueue(self):
     ''' A thread to process queue items serially.
-        This exists to permit easy or default implementation of the
-        cs.venti.store *_a() methods, and is better suited to fast
-        low latency stores.
-        A highly parallel or high latency store will want its own
-        thread scheme to manage multiple *_a() operations.
     '''
-    while not self.__closing or not self.empty():
-      func, args = self.get(True,None)
-      if func is None:
-        self.__closing=True
-        break
-      func(*args)
-    while not self.empty():
-      func, args = self.get(True,None)
-      if func is not None:
-        cmderr("warning: drained FuncQueue item after close: %s" % ((func, args),))
+    for retQ, func, args, kwargs in self.__Q:
+      if self.__closing:
+        debug("FuncQueue closing, skipping call of %s, returning None" % func)
+        ret=None
+      else:
+        ret=func(*args,**kwargs)
+      if retQ:
+        retQ.put(ret)
 
 ''' A pool of Channels.
 '''
