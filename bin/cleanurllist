@@ -1,4 +1,4 @@
-#!/bin/sed -f
+#!/usr/bin/sed -f
 #
 # Clean up an input stream supposedly containing URLs.
 # Code lifted from urlshow cleaning pass.
