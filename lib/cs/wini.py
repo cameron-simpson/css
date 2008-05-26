@@ -1,3 +1,4 @@
+import string
 import sys
 import re
 
