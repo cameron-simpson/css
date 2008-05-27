@@ -6,7 +6,6 @@
 
 set -ue
 
-: ${MUTTPPREFIX:=/usr}
 : ${MAILHOMEHOST:=$HOMEHOST}
 : ${DISPLAY:=''}
 : ${LOGDIR:=$HOME/var/log}
@@ -76,7 +75,7 @@ fi
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
 fpath=`mailfolderpath "$mfolder"` || exit 1
-muttcmd="$MUTTPREFIX/bin/mutt -f '$mfolder' -e 'fcc-hook . $mfolder' $muttopts"
+muttcmd="$HOME/bin-local/mutt -f '$mfolder' -e 'fcc-hook . $mfolder' $muttopts"
 
 # where to take copies - presumes sendmail=sendmesg-fcc in muttrc
 SENDMESG_FCC="$fpath +spool-out"
