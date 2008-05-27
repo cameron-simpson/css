@@ -9,7 +9,7 @@ from ZSI import SoapWriter, ParsedSoap, TC
 import ZSI.wstools.Utility
 from StringIO import StringIO
 import urllib2
-from cs.misc import cmd, cmderr, isdebug, ifdebug, debug, objFlavour, T_MAP, T_SEQ, reportElapsedTime
+from cs.misc import cmd, cmderr, isdebug, ifdebug, debug, objFlavour, T_MAP, T_SEQ, reportElapsedTime, logLine
 
 def lather(obj,tc=None):
   ''' Serial a python object into SOAP, return the SOAP.
@@ -49,9 +49,19 @@ def callSOAP(url,action,xml,retAction,retTypecode):
   if isdebug:
     cmderr("I.__dict__ = %s" % `I.__dict__`)
   retxml=''.join(U.readlines())
-  ret=reportElapsedTime('decode %d bytes of %s response'%(len(retxml),retAction),
+  ret=reportElapsedTime('decode %d bytes of %s response'
+                          % (len(retxml),retAction),
                         xml2pyobj,retxml,retTypecode)
   return ret
+
+def logHTTPError(e,mark=None):
+  logLine("HTTPError:\n  url = %s\n  Response: %s %s\n  %s\nContent:\n%s" \
+            % (e.filename,
+               e.code,
+               e.msg,
+               str(e.hdrs).replace("\n","\n  "),
+               e.fp.read().replace("\n","\n  ")),
+          mark)
 
 class BigElementProxy(ZSI.wstools.Utility.ElementProxy):
   ''' An ElementProxy with its canonicalize method
