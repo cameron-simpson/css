@@ -32,6 +32,12 @@ do
   shift
 done
 
+if [ ! -s "$SQUID_CONFIG" ]
+then
+  echo "$cmd: no squid config: $SQUID_CONFIG" >&2
+  badopts=1
+fi
+
 if [ $# = 0 ]
 then
   echo "$cmd: missing operation" >&2
