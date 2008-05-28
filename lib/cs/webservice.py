@@ -31,11 +31,21 @@ def rinse(soap,tc):
 def xml2pyobj(xml,typecode):
   return ParsedSoap(xml).Parse(typecode)
 
-def callSOAP(url,action,xml,retAction,retTypecode):
+def callSOAP(url,action,xml,retAction,retTypecode,onerror=None):
   ''' Call the specified web services URL with an action and SOAP XML string.
       Return the parsed response, which should have the action retAction
       and be of type retTypecode.
   '''
+  if onerror is not None:
+    ret=None
+    try:
+      ret=callSOAP(url,action,xml,retAction,retTypecode,onerror=None)
+    except urllib2.HTTPError, e:
+      onerror(action,xml,e)
+    except AssertionError, e:
+      onerror(action,xml,e)
+    return ret
+
   rq=urllib2.Request(url,xml)
   rq.add_header('Accept-Encoding', 'identity')
   rq.add_header('Soapaction', '"%s"'%action)
@@ -54,14 +64,17 @@ def callSOAP(url,action,xml,retAction,retTypecode):
                         xml2pyobj,retxml,retTypecode)
   return ret
 
-def logHTTPError(e,mark=None):
-  logLine("HTTPError:\n  url = %s\n  Response: %s %s\n  %s\nContent:\n%s" \
+def HTTPError2str(e):
+  return "HTTPError:\n  url = %s\n  Response: %s %s\n  %s\nContent:\n%s" \
             % (e.filename,
                e.code,
                e.msg,
                str(e.hdrs).replace("\n","\n  "),
-               e.fp.read().replace("\n","\n  ")),
-          mark)
+               e.fp.read().replace("\n","\n  ")
+              )
+
+def logHTTPError(e,mark=None):
+  logLine(HTTPError2str(e),mark)
 
 class BigElementProxy(ZSI.wstools.Utility.ElementProxy):
   ''' An ElementProxy with its canonicalize method
