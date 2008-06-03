@@ -9,7 +9,7 @@ import sys
 import os.path
 import time
 from zlib import compress
-from threading import BoundedSemaphore
+from thread import allocate_lock
 from cs.cache import LRU
 from cs.misc import cmderr, warn, progress, verbose, ifverbose, out, fromBS, toBS, fromBSfp, tb, the
 from cs.venti import tohex, hash
@@ -54,8 +54,8 @@ class GDBMStore(BasicStore):
       for n in stores:
         self.__loadIndex(n)
       self.sync()
-    self.ioLock=BoundedSemaphore(1)
-    self.poolLock=BoundedSemaphore(1)
+    self.ioLock=allocate_lock()
+    self.poolLock=allocate_lock()
 
   def dataFileBasenames(self):
      return [ name
@@ -141,7 +141,7 @@ class GDBMIndex:
   '''
   def __init__(self,path):
     import gdbm
-    self.lock=BoundedSemaphore(1)
+    self.lock=allocate_lock()
     self.__db=gdbm.open(os.path.join(path,"index"),"cf")
 
   def sync(self):

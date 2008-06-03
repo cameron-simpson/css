@@ -5,7 +5,8 @@
 #
 
 from __future__ import with_statement
-from threading import Thread, Semaphore, BoundedSemaphore
+from thread import allocate_lock
+from threading import Semaphore
 from Queue import Queue
 from cs.misc import debug, ifdebug, isdebug, tb, cmderr, warn, reportElapsedTime
 from cs.upd import nl, out
@@ -17,9 +18,11 @@ class AdjustableSemaphore:
     self.__sem=Semaphore(value)
     self.__value=value
     self.__name=name
-    self.__lock=BoundedSemaphore(1)
+    self.__lock=allocate_lock()
   def __enter__(self):
-    return reportElapsedTime("%s(%d).__enter__: acquire" % (self.__name,self.__value),self.acquire)
+    return reportElapsedTime("%s(%d).__enter__: acquire" \
+                               % (self.__name,self.__value),
+                             self.acquire)
   def __exit__(self,exc_type,exc_value,traceback):
     self.release()
     return False
@@ -58,9 +61,9 @@ class Channel:
   ''' A zero-storage data passage.
   '''
   def __init__(self):
-    self.__readable=BoundedSemaphore(1)
+    self.__readable=allocate_lock()
     self.__readable.acquire()
-    self.__writable=BoundedSemaphore(1)
+    self.__writable=allocate_lock()
     self.__writable.acquire()
 
   def get(self):
@@ -135,7 +138,7 @@ class JobQueue:
   '''
   def __init__(self,maxq=None,useQueue=True):
     self.q={}
-    self.lock=BoundedSemaphore(1)
+    self.lock=allocate_lock()
     self.maxq=maxq
     self.useQueue=useQueue
     if maxq is not None:
@@ -178,7 +181,7 @@ class JobCounter:
   '''
   def __init__(self,name):
     self.__name=name
-    self.__lock=Semaphore(1)
+    self.__lock=allocate_lock()
     self.__sem=Semaphore(0)
     self.__n=0
     self.__onDone=None
@@ -289,7 +292,7 @@ class FuncQueue:
 ''' A pool of Channels.
 '''
 __channels=[]
-__channelsLock=BoundedSemaphore(1)
+__channelsLock=allocate_lock()
 def getChannel():
   with __channelsLock:
     if len(__channels) == 0:
@@ -308,7 +311,7 @@ def _returnChannel(ch):
 ''' A pool of _Q1 objects (single use Queue(1)s).
 '''
 __queues=[]
-__queuesLock=BoundedSemaphore(1)
+__queuesLock=allocate_lock()
 def Q1(name=None):
   ''' Obtain a _Q1 object (single use Queue(1), self disposing).
   '''
@@ -366,7 +369,7 @@ class PreQueue(Queue):
   def __init__(self,maxsize=None):
     Queue.__init__(self,maxsize)
     self.__preQ=[]
-    self.__preQLock=BoundedSemaphore(1)
+    self.__preQLock=allocate_lock()
   def get(self,block=True,timeout=None):
     with self.__preQLock:
       if len(self.__preQ) > 0:
@@ -383,7 +386,7 @@ class PreQueue(Queue):
       yield self.get()
 
 __nullCH=None
-__nullCHlock=BoundedSemaphore(1)
+__nullCHlock=allocate_lock()
 def nullCH():
   with __nullCHlock:
     if __nullCH is None:
@@ -403,20 +406,20 @@ class NullCH(Queue):
 class DictMonitor(dict):
   def __init__(self,I={}):
     dict.__init__(self,I)
-    self.lock=BoundedSemaphore(1)
+    self.__lock=allocate_lock()
   def __getitem__(self,k):
-    with self.lock:
+    with self.__lock:
       v=dict.__getitem__(self,k)
     return v
   def __delitem__(self,k):
-    with self.lock:
+    with self.__lock:
       v=dict.__delitem__(self,k)
     return v
   def __setitem__(self,k,v):
-    with self.lock:
+    with self.__lock:
       dict.__setitem__(self,k,v)
   def keys(self):
-    with self.lock:
+    with self.__lock:
       ks = dict.keys(self)
     return ks
 

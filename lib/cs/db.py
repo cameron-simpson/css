@@ -13,7 +13,7 @@ from sets import Set
 import cs.secret
 import cs.cache
 from cs.misc import cmderr, debug, ifdebug, pushDebug, popDebug, warn, isodate, the, WithUC_Attrs
-from threading import BoundedSemaphore
+from thread import allocate_lock
 
 def today():
   return datetime.date.today()
@@ -47,7 +47,7 @@ class ConnWrapper:
   def __init__(self,getConn,*args):
     self.getConn=getConn
     self.getConnArgs=args
-    self.lock=BoundedSemaphore(1)
+    self.lock=allocate_lock()
     with self.lock:
       self.conn=getConn(*args)
   def attachConn(self):

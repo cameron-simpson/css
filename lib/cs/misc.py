@@ -8,7 +8,7 @@ import string
 import time
 import cs.upd; from cs.upd import nl, out, without as withoutUpd
 from StringIO import StringIO
-from threading import BoundedSemaphore
+from thread import allocate_lock
 from cs.lex import parseline, strlist
 
 def setcmd(ncmd):
@@ -194,7 +194,7 @@ def elapsedTime(func,*args,**kw):
   return t0, t1, result
 
 timelogs={}
-_timelogs_lock=BoundedSemaphore(1)
+_timelogs_lock=allocate_lock()
 def logTime(tag,t):
   with _timelogs_lock:
     if tag in timelogs:
@@ -239,7 +239,7 @@ def objFlavour(obj):
   return T_SCALAR
 
 __seq=0
-__seqLock=BoundedSemaphore(1)
+__seqLock=allocate_lock()
 def seq():
   global __seq
   global __seqLock

@@ -7,7 +7,8 @@
 #
 
 from __future__ import with_statement
-from threading import Thread, BoundedSemaphore
+from thread import allocate_lock
+from threading import Thread
 from Queue import Queue
 from cs.misc import seq, toBS, fromBSfp, debug, ifdebug, tb, warn, progress
 from cs.lex import unctrl
@@ -60,7 +61,7 @@ class StreamDaemon:
     self.recvRequestFP=recvRequestFP
     self.sendReplyFP=sendReplyFP
     self.jobs={}
-    self.jobsLock=BoundedSemaphore(1)
+    self.jobsLock=allocate_lock()
     self.njobs=0
     self.jobsClosing=False
     self.resultsCH=Queue(16)
@@ -295,7 +296,7 @@ class StreamStore(BasicStore):
     self.sendRequestFP=sendRequestFP
     self.recvReplyFP=recvReplyFP
     self.pending=JobQueue()
-    self.sendLock=BoundedSemaphore(1)
+    self.sendLock=allocate_lock()
     self.client=_StreamClientReader(self)
     self.client.start()
 
