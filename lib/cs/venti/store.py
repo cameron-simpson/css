@@ -13,7 +13,7 @@ from zlib import compress, decompress
 from cs.misc import cmderr, debug, warn, progress, verbose, out, fromBS, toBS, fromBSfp, tb, seq
 from cs.threads import FuncQueue, Q1, DictMonitor
 from cs.venti import tohex
-from threading import Thread, BoundedSemaphore
+import thread
 from Queue import Queue
 
 class BasicStore:
@@ -26,8 +26,6 @@ class BasicStore:
     self.logfp=None
     self.closing=False
     self.Q=FuncQueue()
-    self.lastBlock=None
-    self.lastBlockLock=BoundedSemaphore(1)
 
   def __str__(self):
     return "Store(%s)" % self.name
