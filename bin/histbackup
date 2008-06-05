@@ -1,4 +1,4 @@
-#!/bin/sh -u
+#!/bin/sh -ue
 #
 # Freshmeat release: 2004-09-21
 #
@@ -99,7 +99,6 @@ verbose=
 cmd=`basename "$0"`
 usage="Usage:
 	$cmd [options...] [host:]source backupdir [rsyncopts...]
-	$cmd [options...] --inplace parent [rsyncopts...]
 	$cmd [options...] --no-rsync parent
 
 	-x		Trace execution. Recite linktree and rsync invocations.
@@ -292,10 +291,6 @@ then
 	echo "$cmd: $dest/$today and $dest/$now already exist, aborting" >&2
 	exit 1
     fi
-fi
-
-if [ $mono ]; then delete=
-              else delete=--delete
 fi
 
 xit=0
