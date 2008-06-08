@@ -16,9 +16,9 @@ set -ue
 
 needhost "$MAILHOMEHOST@$SYSTEMID" \
 || { rhost=$SYSTEMID    # sshto clause to deliver to system home host
-     qargv=`shqstr "$@"`
+     qargv=`shqstr scr "_mutt_$*" + "$@"`
      set -x
-     exec envssh -t "$rhost" "+ $qargv"
+     exec envssh -t "$rhost" "$qargv"
    }
 
 cmd=$0
