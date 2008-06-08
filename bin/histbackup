@@ -104,6 +104,7 @@ usage="Usage:
 	-x		Trace execution. Recite linktree and rsync invocations.
 	-v, --verbose	Verbose. Also passed to rsync.
 	--no-delete     Don't pass --delete to rsync.
+        --delete        Pass --delete to rsync.
 	--delete-excluded
 			Pass --delete --delete-excluded to rsync.
         --no-hbinclude  Do not honour the .hbinclude file in the backup directory.
@@ -152,12 +153,20 @@ do
       rsdelete=
       ;;
 
+    # =item --delete
+    #
+    # Passed to rsync.
+    #
+    --delete)
+      rsdelete="$rsdelete --delete"
+      ;;
+
     # =item --delete-excluded
     #
     # Passed to rsync. Also implies --delete.
     #
     --delete-excluded)
-      rsdelete='--delete --deete-=excluded'
+      rsdelete='--delete --delete-excluded'
       ;;
 
     # =item --no-hbinclude
