@@ -235,27 +235,21 @@ class JobCounter:
       self.__onDone=(func,args,kw)
       Thread(target=self._waitThenDo,args=args,kwargs=kw).start()
 
-class FuncQueue(Queue):
-  ''' A Queue of function calls to make, processed serially.
-      New functions queued as .put((func,args)) or as .qfunc(func,args...).
-      Queue shut down with .close().
+class FuncQueue(IterableQueue):
+  ''' An IterableQueue of function calls to make, processed serially.
+      New functions queued as .call(func,args...,kwargs...)
+      or .callback(callbackfunc,func,args...,kwargs...).
   '''
   def __init__(self,size=None):
-    Queue.__init__(self,size)
-    self.__closing=False
-    import atexit
-    atexit.register(self.close)
-    Thread(target=self.__runQueue).start()
-  def qfunc(self,func,*args):
-    self.put((func,args))
-  def put(self,item):
-    assert not self.__closing
-    Queue.put(self,item)
-  def close(self):
-    if not self.__closing:
-      self.put((None,None))
-      self.__closing=True
-      ##tb()
+    IterableQueue.__init__(self,size)
+    T=Thread(target=self.__runQueue)
+    T.start()
+  def put(self,*args):
+    assert False, "don't put() to a FuncQueue, use call() or callback()"
+  def call(self,func,*args,**kw):
+    IterableQueue.put(self,(func,args,kw,None))
+  def callback(self,cb,func,*args,**kw):
+    IterableQueue.put(self,(func,args,kw,cb))
   def __runQueue(self):
     ''' A thread to process queue items serially.
         This exists to permit easy or default implementation of the
@@ -264,16 +258,10 @@ class FuncQueue(Queue):
         A highly parallel or high latency store will want its own
         thread scheme to manage multiple *_a() operations.
     '''
-    while not self.__closing or not self.empty():
-      func, args = self.get(True,None)
-      if func is None:
-        self.__closing=True
-        break
-      func(*args)
-    while not self.empty():
-      func, args = self.get(True,None)
-      if func is not None:
-        cmderr("warning: drained FuncQueue item after close: %s" % ((func, args),))
+    for func, args, kwargs, cb in self:
+      ret=func(*args,**kwargs)
+      if cb is not None:
+        cb(ret)
 
 ''' A pool of Channels.
 '''
@@ -323,7 +311,7 @@ class _Q1(Queue):
   '''
   def __init__(self,name=None):
     Queue.__init__(self,1)
-    self.reset(name=name)
+    self._reset(name=name)
   def _reset(self,name):
     if name is None:
       if ifdebug():
