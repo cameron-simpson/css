@@ -3,80 +3,32 @@
 # File interfaces.      - Cameron Simpson <cs@zip.com.au>
 #
 
-from cs.venti import MAX_BLOCKSIZE, hash_sha, tohex
+from cs.venti.dir import FileDirent
+from cs.venti.meta import Meta
 from cs.venti.blocks import BlockList
-from cs.misc import debug
+from cs.venti.blockify import topBlockRefFP
+from threading import Thread
+from cs.threads import IterableQueue
+from cs.misc import debug, TODO, FIXME
 
-def open(S,mode="r",bref=None):
-  ''' Obtain a file object open for read or write.
+def storeFile(ifp,rsize=None,S=None):
+  ''' Store the data from ifp, return Dirent.
   '''
-  if mode == "r":
-    return ReadFile(S,bref)
-  if mode == "w":
-    assert path is None
-    return WriteFile(S)
-  assert False, "open(path=%s, mode=%s): unsupported mode" % (path,mode)
-
-def storeFile(S,ifp,rsize=None):
-  ''' Store the data from ifp, return BlockRef.
-  '''
-  if rsize is None: rsize=8192
-  ofp=WriteFile(S)
-  buf=ifp.read(rsize)
-  while len(buf) > 0:
-    ofp.write(buf)
-    buf=ifp.read(rsize)
-  ref=ofp.close()
-  S.log("store file %s %s" % (tohex(ref.encode()), ifp.name))
-  return ref
-
-# Assorted findEdge functions.
-#
-def findEdgeDumb(block):
-  ''' Find edge for unstructured data.
-  '''
-  global MAX_BLOCKSIZE
-  if len(self.__q) >= MAX_BLOCKSIZE:
-    return MAX_BLOCKSIZE
-  return 0
-
-def findEdgeCode(block):
-  ''' Find edge for UNIX mbox files and code.
-  '''
-  start=0
-  found=block.find('\n')
-  while found >= 0:
-    if found > MAX_BLOCKSIZE:
-      return MAX_BLOCKSIZE
-
-    # UNIX mbox file
-    # python/perl top level things
-    if block[found+1:found:6] == "From " \
-    or block[found+1:found+5] == "def " \
-    or block[found+1:found+7] == "class " \
-    or block[found+1:found+9] == "package ":
-      return found+1
-
-    # C/C++/perl/js etc end of function
-    if block[found+1:found+3] == "}\n":
-      return found+3
-
-    start=found+1
-    found=block.find('\n',start)
-
-  return 0
+  M=Meta()
+  bref=topBlockRefFP(ifp,rsize=None,S=S)
+  TODO("set M.mtime from ifp.fstat()")
+  return FileDirent(None,M,bref)
 
 class ReadFile:
   ''' A read-only file interface supporting seek(), read(), readline(),
       readlines() and tell() methods.
   '''
-  def __init__(self,S,bref):
+  def __init__(self,bref):
     self.isdir=False
-    self.__store=S
     if bref.indirect:
-      self.__blist=bref.blocklist(S)
+      self.__blist=bref.blocklist(S=S)
     else:
-      self.__blist=BlockList(S)
+      self.__blist=BlockList()
       self.__blist.append(bref)
     self.__pos=0
 
@@ -169,35 +121,40 @@ class ReadFile:
         break
     return lines
 
-class WriteFile:
+class WriteNewFile:
   ''' A File-like class that supplies only write, close, flush.
       flush() forces any unstored data to the store.
       close() flushes all data and returns a BlockRef for the whole file.
   '''
-  def __init__(self,S):
-    import cs.venti.store; assert isinstance(S, cs.venti.store.BasicStore), "S=%s"%S
-    self.__store=S
-    self.isdir=False
-    from cs.venti.encode import Blocker
-    self.__blocker=Blocker()
-    from threading import Thread
-    self.__storeThread=Thread(target=self.__storeBlocks)
-    self.__storeThread.start()
+  def __init__(self,S=None):
+    self.__sink=IterableQueue(1)
+    self.__topRef=Q1()
+    self.__closed=False
+    self.__drain=Thread(target=self.__storeBlocks,kwargs={'S':S})
+    self.__drain.start()
+    atexit.register(self.__cleanup)
 
-  def __storeBlocks(self):
-    from cs.venti.encode import blocks2bref
-    self.bref=blocks2bref(self.__store,self.__blocker.Q)
-
-  def close(self):
-    ''' Close the file. Return the hash code of the top indirect block.
-    '''
-    self.flush()
-    self.__blocker.close()
-    self.__storeThread.join()
-    return self.bref
-
-  def flush(self):
-    pass
+  def __cleanup(self):
+    if not self.__closed:
+      self.close()
 
   def write(self,data):
-    self.__blocker.put(data)
+    self.__sink.put(data)
+
+  def flush(self):
+    TODO("flush unimplemented, should get an intermediate topblockref")
+    return None
+
+  def close(self):
+    assert not self.__closed
+    self.__closed=True
+    self.__sink.close()
+    return self.__topRef.get()
+
+  def __storeBlocks(self,S=None):
+    self.__topRef.put(topBlockRef(blocksOf(self.__sink),S=S),S=S)
+
+class WriteOverFile:
+  ''' A File-like class that overwrites an existing 
+  '''
+  FIXME("WriteOverFile() UNIMPLEMENTED")
