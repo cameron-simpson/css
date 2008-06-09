@@ -1,0 +1,83 @@
+#!/bin/sh -ue
+#
+# Move designated messages out of the qmail queue.
+# It is probably a god idea to have the qmail system itself down while
+# you do this.
+#       - Cameron Simpson <cs@zip.com.au> 19may2008
+#
+
+trace=setx
+queuedir=/var/qmail/queue
+
+cmd=`basename "$0"`
+usage="Usage: $cmd - <queueids
+       $cmd queueids...
+       $cmd"
+
+eecho()
+{ printf "%s\n" "$*" >&2
+}
+setx()
+{ ( set -x; exec "$@" )
+}
+
+cd "$queuedir" || exit 1
+
+if [ $# = 0 ]
+then
+  setx qmail-list-bounces \
+  | setx xargs "$0"
+  ##| while read qnum; do setx "$0" "$qnum" || exit 1; done
+  exit 0
+fi
+
+if [ "x$*" = x- ]
+then
+  exec xargs "$0"
+fi
+
+needdir=1
+moveto=$queuedir-REMOVED-`date +%Y-%m-%d`
+
+xit=0
+
+for qnum
+do
+  set -- mess/*/"$qnum"
+
+  if [ $# != 1 ]
+  then
+    echo "$cmd: multiple hits for $qnum: $*" >&2
+    xit=1
+    continue
+  fi
+
+  d=`dirname "$1"`
+  mid=`basename "$d"`
+  mess=$1
+  info=info/$mid/$qnum
+  remote=remote/$mid/$qnum
+
+  ok=1
+  for f in "$mess" "$info" "$remote"
+  do
+    [ -s "$f" ] || { echo "$cmd: expected non-empty file at $f" >&2; ok=; }
+  done
+  [ $ok ] || { xit=1; continue; }
+
+  if [ $needdir ]
+  then
+    $trace mkdir -p "$moveto" || exit 1
+    needdir=
+  fi
+
+  for middir in "$moveto/mess/$mid" "$moveto/info/$mid" "$moveto/remote/$mid"
+  do
+    [ -d "$middir/." ] || $trace mkdir -p "$middir" || exit 1
+  done
+  $trace mv "$mess" "$moveto/mess/$mid/." || exit 1
+  $trace mv "$info" "$moveto/info/$mid/." || exit 1
+  $trace mv "$remote" "$moveto/remote/$mid/." || exit 1
+done
+
+exit $xit

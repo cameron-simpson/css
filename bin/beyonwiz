@@ -1,0 +1,110 @@
+#!/usr/bin/python -tt
+#
+# Utility to handle Beyonwiz TVWiz files.
+#       - Cameron Simpson <cs@zip.com.au> 08jun2008
+#
+
+import sys
+import os.path
+import struct
+from cs.misc import cmd, cmderr, LogLine
+
+usage="Usage: %s cat tvwizdirs..." % cmd
+
+class Trunc:
+  ''' A parser for the "trunc" file in a TVWiz directory.
+      It is iterable, yielding tuples:
+        wizOffset, fileNum, flags, offset, size
+      as described at:
+        http://openwiz.org/wiki/Recorded_Files#trunc_file
+  '''
+  def __init__(self,path):
+    self.__path=path
+
+  def __iter__(self):
+    ''' The iterator to yield record tuples.
+    '''
+    fp=open(self.__path)
+    while True:
+      buf=fp.read(24)
+      if len(buf) == 0:
+        break
+      assert len(buf) == 24
+      yield struct.unpack("<QHHQL", buf)
+
+class TVWiz(LogLine):
+  def __init__(self,wizdir):
+    LogLine.__init__(self,"TVWiz(%s)"%wizdir)
+    self.__dir=wizdir
+
+  def trunc(self):
+    ''' Obtain a Trunc object for this TVWiz dir.
+    '''
+    return Trunc(os.path.join(self.__dir,"trunc"))
+
+  def data(self):
+    ''' Return a generator that yields MPEG2 data from the stream.
+    '''
+    T=self.trunc()
+    lastFileNum=None
+    for wizOffset, fileNum, flags, offset, size in T:
+      if lastFileNum is None or lastFileNum != fileNum:
+        if lastFileNum is not None:
+          fp.close()
+        fp=open(os.path.join(self.__dir,"%04d"%fileNum))
+        filePos=0
+        lastFileNum=fileNum
+      if filePos != offset:
+        fp.seek(offset)
+      while size > 0:
+        rsize=min(size,8192)
+        buf=fp.read(rsize)
+        assert len(buf) <= rsize
+        if len(buf) == 0:
+          self.logfn("unexpected EOF on %s" % fp)
+          break
+        yield buf
+        size-=len(buf)
+    if lastFileNum is not None:
+      fp.close()
+
+  def copyto(self,output):
+    ''' Transcribe the uncropped content to a file named by output.
+    '''
+    out=open(output,"w")
+    self.catto(out)
+    out.close()
+
+  def catto(self,fp):
+    ''' Transcribe the uncropped content to a file.
+    '''
+    for buf in self.data():
+      fp.write(buf)
+
+badopts=False
+
+args=sys.argv[1:]
+if len(args) < 1:
+  cmderr("missing operation")
+  badopts=True
+else:
+  op=sys.argv[1]
+  args=sys.argv[2:]
+  if op == "cat":
+    if len(args) < 1:
+      cmderr("%s: missing tvwizdirs" % op)
+      badopts=True
+  else:
+    cmderr("unrecognised operation: %s" % op)
+    badopts=True
+
+if badopts:
+  print >>sys.stderr, usage
+  sys.exit(2)
+
+if op == "cat":
+  for arg in args:
+    TVWiz(arg).catto(sys.stdout)
+else:
+  cmderr("unsupported operation: %s" % op)
+  sys.exit(1)

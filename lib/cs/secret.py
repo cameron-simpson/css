@@ -9,11 +9,11 @@ def get(secret):
 
   for base in os.path.join(os.environ["HOME"],".secret"), \
               '/opt/config/secret':
+    pathname=os.path.join(base,secret)
     try:
-      pathname=os.path.join(base,secret)
       return cs.hier.load(pathname)
     except IOError:
-      pass
+      continue
 
   raise IndexError, "no secret named "+secret
 

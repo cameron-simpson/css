@@ -1,4 +1,4 @@
-#!/bin/sh -u
+#!/bin/sh -ue
 #
 # Freshmeat release: 2004-09-21
 #
@@ -10,8 +10,6 @@
 #
 # histbackup [options...] [host:]source backupdir [rsyncopts...]
 #
-# histbackup [options...] --inplace parent [rsyncopts...]
-#
 # histbackup [options...] --no-rsync parent
 #
 # =head1 DESCRIPTION
@@ -20,12 +18,12 @@
 # makes incremental backups of a directory tree
 # in a set of directories named by dates, or date-time if the date already exists.
 # The new backup is prepopulated by hardlinks of each file from the previous backup
-# and then updates with rsync(1).
+# and then updated with rsync(1).
 # This arranges that the only new content of each new backup is fresh copies of the changed files.
 # In this way each backup directory is a full copy of the source directory
 # but the disc space cost is that of an incremental backup.
 # Because it uses rsync,
-# it is possible to efficient backup remote directories in this manner.
+# it is possible efficiently to backup remote directories in this manner.
 # The companion script I<histbackup-prune> keeps the growth under control.
 #
 # =head1 SETUP AND USE
@@ -90,32 +88,27 @@ trace=
 symlink=LATEST
 src=
 dest=
-mono=
-inplace=
 linkonly=
 rrsync=rsync
-includefile=
+usehbinclude=1
 rsopts=
+rsdelete=--delete
 verbose=
 ##[ -t 1 ] && verbose=1
 
 cmd=`basename "$0"`
 usage="Usage:
 	$cmd [options...] [host:]source backupdir [rsyncopts...]
-	$cmd [options...] --inplace parent [rsyncopts...]
 	$cmd [options...] --no-rsync parent
 
 	-x		Trace execution. Recite linktree and rsync invocations.
-	-v, --verbose	Verbose. Passed to rsync.
-	--inplace	In addition to the dated subdirectories in the backupdir,
-			take the source to be backupdir/current.
-			Turns off --symlink.
-	--no-delete, --mono
-			Monotonic growth - don't pass --delete to the rsync pass.
-	--delete, --delete-excluded
-			Passed to rsync.
-	--no-rsync, --linkonly
-			Don't do the rsync pass - just set up the new link tree
+	-v, --verbose	Verbose. Also passed to rsync.
+	--no-delete     Don't pass --delete to rsync.
+        --delete        Pass --delete to rsync.
+	--delete-excluded
+			Pass --delete --delete-excluded to rsync.
+        --no-hbinclude  Do not honour the .hbinclude file in the backup directory.
+	--no-rsync      Don't do the rsync pass - just set up the new link tree
 			and report its basename.
 	--rsync-path rrsync Execute the command \"rrsync\" as the remote rsync.
 			Passed to rsync.
@@ -152,48 +145,45 @@ while [ $# -gt 0 ]
 do
   case $1 in
 
-    # =item --inplace
+    # =item --no-delete
     #
-    # Specify the parent of the source directory;
-    # backs up B<I<parent>/current> to B<I<parent>/I<datestamp>>.
+    # Suppress passing the B<--delete> or B<--delete-excluded> option to rsync.
     #
-    --inplace)	inplace=1 symlink= ;;
-
-    # =item --no-delete, --mono
-    #
-    # Monotonic growth.
-    # Suppresses passing the B<--delete> option to rsync.
-    #
-    --no-delete|--mono)
-		mono=1 ;;
+    --no-delete)
+      rsdelete=
+      ;;
 
     # =item --delete
     #
     # Passed to rsync.
     #
+    --delete)
+      rsdelete="$rsdelete --delete"
+      ;;
+
     # =item --delete-excluded
     #
-    # Passed to rsync.
+    # Passed to rsync. Also implies --delete.
     #
-    --delete|--delete-excluded)
-		mono= rsopts="$rsopts $1" ;;
+    --delete-excluded)
+      rsdelete='--delete --delete-excluded'
+      ;;
 
-    # =item --no-rsync, --linkonly
+    # =item --no-hbinclude
     #
-    # Specify the parent backup directory only and omit the rsync.
-    # Emits the backup directory linktree subdirectory name on standard output.
+    # Do not honour the .hbinclude file in the backup directory.
     # 
-    --no-rsync|--linkonly)
-		linkonly=1
-		exec 3>&1 1>&2	# ensure clean stdout
-		;;
+    --no-hbinclude)
+      usehbinclude=1
+      ;;
 
     # =item --rsync-path rrsync
     #
     # Passed to rsync.
     # Specifies the pathname to the remote rsync executable.
     #
-    --rsync-path) rrsync=$2; shift ;;
+    --rsync-path)
+      rrsync=$2; shift ;;
 
     # =item --symlink name
     #
@@ -203,20 +193,17 @@ do
     # backup without having to figure out its name.
     # Eg: B<--symlink LATEST>.
     #
-    --symlink)	symlink=$2; shift ;;
+    --symlink)
+      symlink=$2; shift ;;
 
     # =item -v, --verbose
     #
     # Turn on verbose mode;
     # also passes B<-v> to rsync.
     #
-    -v|--verbose) verbose=1 ;;
-
-    # =item -P
-    #
-    # Passes B<-P> to rsync.
-    #
-    -P) rsopts="$rsopts -P" ;;
+    -v|--verbose)
+      verbose=1
+      ;;
 
     # =item -x
     #
@@ -250,32 +237,19 @@ then
 	shift
     fi
 else
-    if [ $inplace ]
+    if [ $# -lt 2 ]
     then
-	# src is the "current" subdir of the supplied dest
-	if [ $# -lt 1 ]
-	then
-	    echo "$cmd: missing parent" >&2
-	    badopts=1
-	else
-	    src=$1/current dest=$1
-	    shift
-	fi
+        echo "$cmd: missing source or backupdir" >&2
+        badopts=1
     else
-	if [ $# -lt 2 ]
-	then
-	    echo "$cmd: missing source or backupdir" >&2
-	    badopts=1
-	else
-	    src=$1 dest=$2
-	    shift; shift
-	fi
+        src=$1 dest=$2
+        shift; shift
     fi
 fi
 
 if [ $linkonly ] && [ $# -gt 0 ]
 then
-    echo "$cmd: --linkonly: extra arguments after parent: $*" >&2
+    echo "$cmd: --no-rsync: extra arguments after parent: $*" >&2
     badopts=1
 fi
 
@@ -306,8 +280,11 @@ fi
 # In this way the content to be backed up may be tuned.
 # See rsync(1).
 #
-hbinclude=$dest/.hbinclude
-[ -s "$hbinclude" ] && set -- ${1+"$@"} "--include-from=$hbinclude"
+if [ $usehbinclude ]
+then
+  hbinclude=$dest/.hbinclude
+  [ -s "$hbinclude" ] && set -- ${1+"$@"} "--include-from=$hbinclude"
+fi
 
 # locate to most recent backup, if any
 lastbackup=`cd "$dest" || exit 1; ls -dr [0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]* 2>/dev/null | sed 1q`
@@ -323,10 +300,6 @@ then
 	echo "$cmd: $dest/$today and $dest/$now already exist, aborting" >&2
 	exit 1
     fi
-fi
-
-if [ $mono ]; then delete=
-              else delete=--delete
 fi
 
 xit=0
@@ -346,7 +319,7 @@ then
           echo "$thisbackup" >&3
       else
           $echo "updating $thisbackup from $src ..."
-          $trace rsync $rsopts -aH $delete --rsync-path "$rrsync" ${1+"$@"} "$src/." "$dest/$thisbackup/."
+          $trace rsync $rsopts -aH $rsdelete --rsync-path "$rrsync" ${1+"$@"} "$src/." "$dest/$thisbackup/."
       fi
     }
 else

@@ -5,7 +5,7 @@
 #
 
 from __future__ import with_statement
-from threading import BoundedSemaphore
+from thread import allocate_lock
 from cs.misc import seq, progress, verbose, debug
 from cs.threads import FuncQueue, Q1
 from cs.venti import tohex
@@ -106,7 +106,7 @@ class MemCacheStore(BasicStore):
     self.low=0                    # offset to oldest hash
     self.used=0
     self.hmap={}                  # cached h->(count,block) tuples
-    self.memCacheLock=BoundedSemaphore(1)
+    self.memCacheLock=allocate_lock()
 
   def scan(self):
     return self.hmap.keys()

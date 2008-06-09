@@ -5,7 +5,7 @@ usage="Usage: $cmd [spoolnames..."
 
 : ${MAILDIR:=$HOME/mail}
 
-delay=5
+delay=15
 timeout=60
 
 if [ $# -gt 0 ] && [ "x$1" = x-d ]

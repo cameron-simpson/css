@@ -9,12 +9,24 @@
 : ${TMPDIR:=/tmp}
 
 cmd=`basename "$0"`
-usage="Usage: $cmd [user]@host group..."
+usage="Usage: $cmd [-x] [-G group-override] [-R] [user]@host group...
+  [user]@host
+        Specify remote user and host to query for group information.
+        With no user, take the user from \`who am i\`.
+  -A    Add missing members.
+  -G group-override
+        A local group file to override group memberships.
+        Format:
+          group:member,member,...
+  -R    Remove extra members.
+  -x    Trace execution. Default is to recent planned actions."
 
 trace=eecho
 lgroup=/etc/group
 ssh=ssho
-
+groupoverride=
+addmembers=
+removemembers=
 remote=
 
 badopts=
@@ -22,6 +34,9 @@ badopts=
 while [ $# -gt 0 ]
 do
   case $1 in
+    -A) addmembers=1 ;;
+    -G) groupoverride=$2 ;;
+    -R) removemembers=1 ;;
     -x) trace=set-x ;;
     --) shift; break ;;
     -?*)echo "$cmd: unrecognised option: $1" >&2
@@ -40,9 +55,16 @@ else
   remote=$1
   shift
   case "$remote" in
-    @?*) remote=`expr "x$remote" : 'x.\(.*\)'` ;;
+    @?*)if whoami=`who am i | awk '{print $1}'` && [ -n "$whoami" ]
+        then
+          remote=$whoami$remote
+        else
+          echo "$cmd: $remote: can't infer user from \`who am i\`" >&2
+          badopts=1
+        fi
+        ;;
     *@?*);;
-    *)  echo "$cmd: invalue user@host: $remote" >&2
+    *)  echo "$cmd: invalid user@host: $remote" >&2
         badopts=1
         ;;
   esac
@@ -54,6 +76,12 @@ then
   badopts=1
 fi
 
+if [ -n "$groupoverride" ] && [ ! -f "$groupoverride" ]
+then
+  echo "$cmd: missing group override file: $groupoverride" >&2
+  badopts=1
+fi
+
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
 getgid()
@@ -62,45 +90,99 @@ getgid()
 getmembers()
 { awk -F: -v "group=$1" '$1 == group { print $4 }' "$2" | tr , ' '
 }
+rcmd()
+{ _rcmd_qargs=`shqstr "$@"`
+  set-x $ssh "$remote" "$_rcmd_qargs"
+}
 
 rgroup=$TMPDIR/$cmd.$$
 trap 'rm -f "$rgroup"' 0
 trap 'rm -f "$rgroup"; exit 1' 1 2 13 15
-$ssh "$remote" cat /etc/group >"$rgroup"
+rcmd cat /etc/group >"$rgroup"
 
-for group
+modgroups=
+for grouparg
 do
-  lgid=`getgid "$group" "$lgroup"`
-  rgid=`getgid "$group" "$rgroup"`
-  if [ -z "$rgid" ]
-  then
-    echo "$cmd: $group: no remote group" >&2
-    exit 1
-  fi
-  if [ -z "$lgid" ]
-  then
-    $trace groupadd -g "$rgid" "$group"
-  else
-    if [ "x$lgid" != "x$rgid" ]
-    then
-      echo "$cmd: $group: warning: local gid ($lgid) != remote ($rgid)" >&2
-    fi
-  fi
+  case $grouparg in
+    [1-9]*-[1-9]*)
+      lrgid=`expr "x$grouparg" : 'x\([1-9][0-9]*\).*'`
+      hrgid=`expr "x$grouparg" : 'x[1-9][0-9]*-\([1-9][0-9]*\).*'`
+      awkprg="\$3 >= $lrgid && \$3 <= $hrgid { print \$1 }"
+      groups=`rcmd awk -F: "$awkprg" /etc/group`
+      ;;
+    [1-9]*)
+      lrgid=`expr "x$grouparg" : 'x\([1-9][0-9]*\).*'`
+      awkprg="\$3 == $lrgid { print \$1 }"
+      groups=`rcmd awk -F: "$awkprg" /etc/group`
+      ;;
+    *)  
+      groups=$grouparg
+      ;;
+  esac
 
-  lmembers=`getmembers "$group" "$lgroup"`
-  rmembers=`getmembers "$group" "$rgroup"`
-  for member in $rmembers
+  for group in $groups
   do
-    case " $lmembers " in
-      *" $member "*)
-        ;;
-      *)$trace bsed -s "/^$group:/{ /:\$/!s/\$/,/; s/\$/$member/; }" "$lgroup"
-        ;;
-    esac
+    didmod=
+    lgid=`getgid "$group" "$lgroup"`
+    rgid=`getgid "$group" "$rgroup"`
+    if [ -z "$rgid" ]
+    then
+      echo "$cmd: $group: no remote group" >&2
+      exit 1
+    fi
+    if [ -z "$lgid" ]
+    then
+      $trace groupadd -g "$rgid" "$group"
+      didmod=1
+    else
+      if [ "x$lgid" != "x$rgid" ]
+      then
+        echo "$cmd: $group: warning: local gid ($lgid) != remote ($rgid)" >&2
+      fi
+    fi
+
+    if [ $addmembers$removemembers ]
+    then
+      lmembers=`getmembers "$group" "$lgroup"`
+      if [ -n "$groupoverride" ] && grep '^$group:' "$groupoverride" >/dev/null
+      then  rmembers=`sed '/^$group:/!d; y/,/ /' "$groupoverride"`
+      else  rmembers=`getmembers "$group" "$rgroup"`
+      fi
+
+      if [ $addmembers ]
+      then
+        for member in $rmembers
+        do
+          case " $lmembers " in
+            *" $member "*)
+              ;;
+            *)$trace bsed -s "/^$group:/{ /:\$/!s/\$/,/; s/\$/$member/; }" "$lgroup"
+              didmod=1
+              ;;
+          esac
+        done
+      fi
+
+      if [ $removemembers ]
+      then
+        for member in $lmembers
+        do
+          case " $rmembers " in
+            *" $member "*)
+              ;;
+            *)$trace bsed -s "/^$group:/{ s/:/:,/; s/\$/,/; s/,$member,/,/; s/,$//; s/:,/:/; }" "$lgroup"
+              didmod=1
+              ;;
+          esac
+        done
+      fi
+    fi
+
+    [ $didmod ] && modgroups="$modgroups $group"
   done
 done
 
-for group
+for group in $modgroups
 do
   grep "^$group:" "$lgroup"
 done

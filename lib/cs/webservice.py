@@ -9,7 +9,7 @@ from ZSI import SoapWriter, ParsedSoap, TC
 import ZSI.wstools.Utility
 from StringIO import StringIO
 import urllib2
-from cs.misc import cmd, isdebug, ifdebug, debug, objFlavour, T_MAP, T_SEQ, reportElapsedTime
+from cs.misc import cmd, cmderr, isdebug, ifdebug, debug, objFlavour, T_MAP, T_SEQ, reportElapsedTime, logLine
 
 def lather(obj,tc=None):
   ''' Serial a python object into SOAP, return the SOAP.
@@ -31,24 +31,52 @@ def rinse(soap,tc):
 def xml2pyobj(xml,typecode):
   return ParsedSoap(xml).Parse(typecode)
 
-def callSOAP(url,action,xml,retAction,retTypecode):
+def callSOAP(url,action,xml,retAction,retTypecode,onerror=None):
   ''' Call the specified web services URL with an action and SOAP XML string.
       Return the parsed response, which should have the action retAction
       and be of type retTypecode.
   '''
+  if onerror is not None:
+    ret=None
+    try:
+      ret=callSOAP(url,action,xml,retAction,retTypecode,onerror=None)
+    except urllib2.HTTPError, e:
+      onerror(action,xml,e)
+    except urllib2.URLError, e:
+      onerror(action,xml,e)
+    except AssertionError, e:
+      onerror(action,xml,e)
+    return ret
+
   rq=urllib2.Request(url,xml)
   rq.add_header('Accept-Encoding', 'identity')
   rq.add_header('Soapaction', '"%s"'%action)
   rq.add_header('Content-Type', 'text/xml; charset="utf-8"')
-  U=reportElapsedTime('call %s with %d bytes of XML'%(url,len(xml)),
+  U=reportElapsedTime('call action %s at %s with %d bytes of XML'
+                        % (action,url,len(xml)),
                       urllib2.urlopen,rq)
   I=U.info()
-  assert I.type == 'text/xml', \
-         "%s: did not get XML back from %s:%s" % (cmd,url,action)
+  assert I.type in ('text/xml', 'application/soap+xml'), \
+         "%s: expected text/xml, got \"%s\" from %s %s" % (cmd,I.type,action,url)
+  if isdebug:
+    cmderr("I.__dict__ = %s" % `I.__dict__`)
   retxml=''.join(U.readlines())
-  ret=reportElapsedTime('decode %d bytes of %s response'%(len(retxml),retAction),
+  ret=reportElapsedTime('decode %d bytes of %s response'
+                          % (len(retxml),retAction),
                         xml2pyobj,retxml,retTypecode)
   return ret
+
+def HTTPError2str(e):
+  return "HTTPError:\n  url = %s\n  Response: %s %s\n  %s\nContent:\n%s" \
+            % (e.filename,
+               e.code,
+               e.msg,
+               str(e.hdrs).replace("\n","\n  "),
+               e.fp.read().replace("\n","\n  ")
+              )
+
+def logHTTPError(e,mark=None):
+  logLine(HTTPError2str(e),mark)
 
 class BigElementProxy(ZSI.wstools.Utility.ElementProxy):
   ''' An ElementProxy with its canonicalize method

@@ -1,3 +1,4 @@
+from __future__ import with_statement
 from types import *
 import os
 import os.path
@@ -7,7 +8,7 @@ import string
 import time
 import cs.upd; from cs.upd import nl, out, without as withoutUpd
 from StringIO import StringIO
-from threading import BoundedSemaphore
+from thread import allocate_lock
 from cs.lex import parseline, strlist
 
 def setcmd(ncmd):
@@ -98,7 +99,7 @@ def die(*args):
 
 def tb(limit=None):
   import traceback
-  global cmd_
+  global cmd__
   if cs.upd.active:
     upd=cs.upd.default()
     oldUpd=upd.state()
@@ -130,14 +131,24 @@ def logTo(logpath=None):
   _logPath=logpath
 def _logline(line,mark):
   global _logPath, _logFP
-  print >>_logFP, "%d [%s] %s" % (time.time(), mark, line)
+  when=time.time()
+  pfx="%d [%s] " % (when, mark)
+  print >>_logFP, pfx, line.replace("\n", "\n%*s" % (len(pfx)+1, " "))
   _logFP.flush()
   if isdebug and _logFP is not sys.stderr:
-    cmderr("[%s] %s" % (mark, line))
+    pfx="%s: %s:" % (cmd, mark)
+    print >>sys.stderr, pfx, line.replace("\n", "\n%*s" % (len(pfx)+1, " "))
 def logLine(line,mark=None):
   if mark is None:
     mark=cmd
-  return withoutUpd(_logline,line,mark)
+  retval=None
+  try:
+    retval=withoutUpd(_logline,line,mark)
+  except:
+    print >>sys.stderr, "%s: exception during log:" % cmd
+    print >>sys.stderr, "  line: %s" % line
+    print >>sys.stderr, "  exception: %s" % e
+  return retval
 def logFnLine(line,frame=None,prefix=None,mark=None):
   ''' Log a line citing the calling function.
   '''
@@ -170,7 +181,6 @@ class LogLine:
     global reportElapsedTimeTo
     return reportElapsedTimeTo(self.log,tag,func,*args,**kw)
   def logTime(self,tag,func,*args,**kw):
-    global reportElapsedTimeTo
     t, result = self.logTime2(tag,func,*args,**kw)
     return result
 
@@ -183,6 +193,15 @@ def elapsedTime(func,*args,**kw):
   t1=time.time()
   return t0, t1, result
 
+timelogs={}
+_timelogs_lock=allocate_lock()
+def logTime(tag,t):
+  with _timelogs_lock:
+    if tag in timelogs:
+      timelogs[tag]+=t
+    else:
+      timelogs[tag]=t
+
 def reportElapsedTime(tag,func,*args,**kw):
   t, result = reportElapsedTimeTo(None,tag,func,*args,**kw)
   return result
@@ -191,16 +210,16 @@ def reportElapsedTimeTo(logfunc,tag,func,*args,**kw):
       Return its return value.
       If isdebug, report elapsed time for the function.
   '''
-  if not isdebug:
-    return func(*args,**kw)
-  if logfunc is None:
-    logfunc=logLine
-  old=out("%.100s" % " ".join((cmd_,tag,"...")))
+  if isdebug:
+    old=out("%.100s" % " ".join((cmd_,tag,"...")))
   t0, t1, result = elapsedTime(func, *args, **kw)
   t=t1-t0
-  if t >= 0.01:
-    logfunc("%6.4fs %s"%(t,tag))
-  out(old)
+  if isdebug:
+    if t >= 0.01:
+      if logfunc is None:
+        logfunc=logLine
+      logfunc("%6.4fs %s"%(t,tag))
+    out(old)
   return t, result
 
 T_SEQ='ARRAY'
@@ -220,7 +239,7 @@ def objFlavour(obj):
   return T_SCALAR
 
 __seq=0
-__seqLock=BoundedSemaphore(1)
+__seqLock=allocate_lock()
 def seq():
   global __seq
   global __seqLock

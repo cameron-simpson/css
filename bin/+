@@ -6,7 +6,6 @@
 
 set -ue
 
-: ${MUTTPPREFIX:=/usr}
 : ${MAILHOMEHOST:=$HOMEHOST}
 : ${DISPLAY:=''}
 : ${LOGDIR:=$HOME/var/log}
@@ -17,9 +16,9 @@ set -ue
 
 needhost "$MAILHOMEHOST@$SYSTEMID" \
 || { rhost=$SYSTEMID    # sshto clause to deliver to system home host
-     qargv=`shqstr "$@"`
+     qargv=`shqstr scr "_mutt_$*" + "$@"`
      set -x
-     exec envssh -t "$rhost" "+ $qargv"
+     exec envssh -t "$rhost" "$qargv"
    }
 
 cmd=$0
@@ -76,7 +75,7 @@ fi
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
 fpath=`mailfolderpath "$mfolder"` || exit 1
-muttcmd="$MUTTPREFIX/bin/mutt -f '$mfolder' -e 'fcc-hook . $mfolder' $muttopts"
+muttcmd="$HOME/bin-local/mutt -f '$mfolder' -e 'fcc-hook . $mfolder' $muttopts"
 
 # where to take copies - presumes sendmail=sendmesg-fcc in muttrc
 SENDMESG_FCC="$fpath +spool-out"
@@ -93,7 +92,7 @@ else
        exit 1
      }
 
-  mutthcache=$HOME/var/mutt/header-cache
+  mutthcache=$HOME/var/mutt/header-cache/$fbase
   { needdir "$mutthcache" \
     && muttcmd="$muttcmd -e 'set header_cache=$mutthcache'"
   } || :

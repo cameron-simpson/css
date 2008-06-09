@@ -1,0 +1,32 @@
+#!/bin/sh -ue
+#
+# Run vmstat with date(1) output interleaved.
+#       - Cameron Simpson <cs@zip.com.au> 29may2008
+#
+
+cmd=`basename "$0"`
+usage="Usage: $cmd -D date-delay vmstat-options..."
+
+badopts=
+
+if [ $# -lt 2 ] || [ "x$1" != x-D ]
+then
+  echo "$cmd: missing -D option" >&2
+  badopts=1
+else
+  datedelay=$2
+  shift
+  shift
+fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+me=$$
+
+date
+while kill -0 "$me" 2>/dev/null
+do
+  sleep "$datedelay" || exit 1
+  date
+done &
+exec vmstat ${1+"$@"}

@@ -11,9 +11,11 @@
 # Switch to mozilla-xremote-client.	cameron 26aug2002
 # 
 
+: ${DISPLAY:=''}
 : ${BROWSER_DISPLAY:=$DISPLAY}
 : ${DISPLAY:=$BROWSER_DISPLAY}
 : ${URLSHOW_FILTER:=cat}
+: ${URLSHOW_BROWSER:=firefox}
 export DISPLAY
 
 cmd=`basename "$0"`
@@ -30,9 +32,6 @@ doclean=
 doanon=
 name=
 tflag=
-
-browser=opera	## mozilla
-browser=mozilla
 
 badopts=
 
@@ -62,8 +61,6 @@ do
 done
 
 [ $badopts ] && { echo "$usage" >&2; exit 1; }
-
-[ -n "$BROWSER_DISPLAY" ] || { echo "$cmd: no \$BROWSER_DISPLAY!" >&2; exit 1; }
 
 if [ $doanon ]; then anonpfx=http://anon.free.anonymizer.com/
               else anonpfx=
@@ -109,14 +106,19 @@ eval "$URLSHOW_FILTER" \
     printf "%s\n" "$url" >&3
   done \
 } \
-| case "$browser" in
-    mozilla)
-      exec urlshow-mozilla $tflag ;;
-    opera)
-      exec urlshow-opera $tflag -n "$name"
-      ;;
-    *)
-      echo "$0: unsupported browser \"$browser\"" >&2
-      exit 2
-      ;;
-  esac
+| \
+case "$OS,$BROWSER_DISPLAY,$URLSHOW_BROWSER" in
+  darwin,,*)
+    open -a "$URLSHOW_BROWSER" `cat`
+    ;;
+  *,mozilla | *,firefox)
+    exec urlshow-mozilla $tflag
+    ;;
+  *,opera)
+    exec urlshow-opera $tflag -n "$name"
+    ;;
+  *)
+    echo "$0: unsupported browser \"$URLSHOW_BROWSER\"" >&2
+    exit 2
+    ;;
+esac

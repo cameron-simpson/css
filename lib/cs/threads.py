@@ -5,7 +5,8 @@
 #
 
 from __future__ import with_statement
-from threading import Thread, Semaphore, BoundedSemaphore
+from thread import allocate_lock
+from threading import Semaphore
 from Queue import Queue
 from cs.misc import debug, ifdebug, isdebug, tb, cmderr, warn, reportElapsedTime
 from cs.upd import nl, out
@@ -13,13 +14,15 @@ from cs.upd import nl, out
 class AdjustableSemaphore:
   ''' A semaphore whose value may be tuned at runtime.
   '''
-  def __init__(self,value=1,name="AdjustableSemaphore"):
+  def __init__(self, value=1, name="AdjustableSemaphore"):
     self.__sem=Semaphore(value)
     self.__value=value
     self.__name=name
-    self.__lock=BoundedSemaphore()
+    self.__lock=allocate_lock()
   def __enter__(self):
-    return reportElapsedTime("%s(%d).__enter__: acquire" % (self.__name,self.__value),self.acquire)
+    return reportElapsedTime("%s(%d).__enter__: acquire" \
+                               % (self.__name,self.__value),
+                             self.acquire)
   def __exit__(self,exc_type,exc_value,traceback):
     self.release()
     return False
@@ -39,10 +42,10 @@ class AdjustableSemaphore:
     ''' The adjust(newvalue) method calls release() or acquire() an
         appropriate number of times.  If newvalue lowers the semaphore
         capacity then adjust() may block until the overcapacity is
-        drained.
+        released.
     '''
     assert newvalue > 0
-    with self__lock:
+    with self.__lock:
       delta=newvalue-self.__value
       if delta > 0:
         while delta > 0:
@@ -50,7 +53,7 @@ class AdjustableSemaphore:
           delta-=1
       else:
         while delta < 0:
-          self.__sem.acquire(True)
+          reportElapsedTime("AdjustableSemaphore(%s): acquire excess capacity"%self.__name,self.__sem.acquire,True)
           delta+=1
       self.__value=newvalue
 
@@ -58,9 +61,9 @@ class Channel:
   ''' A zero-storage data passage.
   '''
   def __init__(self):
-    self.__readable=BoundedSemaphore(1)
+    self.__readable=allocate_lock()
     self.__readable.acquire()
-    self.__writable=BoundedSemaphore(1)
+    self.__writable=allocate_lock()
     self.__writable.acquire()
 
   def get(self):
@@ -135,7 +138,7 @@ class JobQueue:
   '''
   def __init__(self,maxq=None,useQueue=True):
     self.q={}
-    self.lock=BoundedSemaphore(1)
+    self.lock=allocate_lock()
     self.maxq=maxq
     self.useQueue=useQueue
     if maxq is not None:
@@ -178,7 +181,7 @@ class JobCounter:
   '''
   def __init__(self,name):
     self.__name=name
-    self.__lock=Semaphore(1)
+    self.__lock=allocate_lock()
     self.__sem=Semaphore(0)
     self.__n=0
     self.__onDone=None
@@ -235,21 +238,45 @@ class JobCounter:
       self.__onDone=(func,args,kw)
       Thread(target=self._waitThenDo,args=args,kwargs=kw).start()
 
-class FuncQueue(IterableQueue):
-  ''' An IterableQueue of function calls to make, processed serially.
-      New functions queued as .call(func,args...,kwargs...)
-      or .callback(callbackfunc,func,args...,kwargs...).
+class FuncQueue:
+  ''' A Queue of function calls to make, processed serially.
+      New functions queued as .put((func,args)) or as .qfunc(func,args...).
+      Queue shut down with .close().
   '''
-  def __init__(self,size=None):
-    IterableQueue.__init__(self,size)
-    T=Thread(target=self.__runQueue)
-    T.start()
-  def put(self,*args):
-    assert False, "don't put() to a FuncQueue, use call() or callback()"
-  def call(self,func,*args,**kw):
-    IterableQueue.put(self,(func,args,kw,None))
-  def callback(self,cb,func,*args,**kw):
-    IterableQueue.put(self,(func,args,kw,cb))
+  def __init__(self,size=None,parallelism=1):
+    assert parallelism > 0
+    self.__Q=IterableQueue(size)
+    self.__closing=False
+    import atexit
+    atexit.register(self.__Q.close)
+    for n in range(parallelism):
+      Thread(target=self.__runQueue).start()
+  def callback(self,retQ,func,args=(),kwargs=None):
+    ''' Queue a function for dispatch.
+        The function return value will be .put() on retQ.
+    '''
+    assert not self.__closing
+    if kwargs is None: kwargs={}
+    if retQ is None: retQ=Q1()
+    self.__Q.put((Q,func,args,kwargs))
+  def call(self,func,args=(),kwargs=None):
+    ''' Synchronously call the supplied func via the FuncQueue.
+        Return the function result.
+    '''
+    Q=Q1()
+    self.callback(Q,func,args,kwargs)
+    return Q.get()
+  def qfunc(self,func,*args,**kwargs):
+    ''' Asynchronously call the supplied func via the FuncQueue.
+    '''
+    self.callback(None,func,args,kwargs)
+  def close(self):
+    ''' Close the FuncQueue.
+        Any remaining uncalled function are consumed but not called.
+    '''
+    if not self.__closing:
+      self.__closing=True
+      self.__Q.close()
   def __runQueue(self):
     ''' A thread to process queue items serially.
         This exists to permit easy or default implementation of the
@@ -258,15 +285,19 @@ class FuncQueue(IterableQueue):
         A highly parallel or high latency store will want its own
         thread scheme to manage multiple *_a() operations.
     '''
-    for func, args, kwargs, cb in self:
-      ret=func(*args,**kwargs)
-      if cb is not None:
-        cb(ret)
+    for retQ, func, args, kwargs in self.__Q:
+      if self.__closing:
+        debug("FuncQueue closing, skipping call of %s, returning None" % func)
+        ret=None
+      else:
+        ret=func(*args,**kwargs)
+      if retQ:
+        retQ.put(ret)
 
 ''' A pool of Channels.
 '''
 __channels=[]
-__channelsLock=BoundedSemaphore(1)
+__channelsLock=allocate_lock()
 def getChannel():
   with __channelsLock:
     if len(__channels) == 0:
@@ -285,7 +316,7 @@ def _returnChannel(ch):
 ''' A pool of _Q1 objects (single use Queue(1)s).
 '''
 __queues=[]
-__queuesLock=BoundedSemaphore(1)
+__queuesLock=allocate_lock()
 def Q1(name=None):
   ''' Obtain a _Q1 object (single use Queue(1), self disposing).
   '''
@@ -343,7 +374,7 @@ class PreQueue(Queue):
   def __init__(self,size=None):
     Queue.__init__(self,size)
     self.__preQ=[]
-    self.__preQLock=BoundedSemaphore(1)
+    self.__preQLock=allocate_lock()
   def get(self,block=True,timeout=None):
     with self.__preQLock:
       if len(self.__preQ) > 0:
@@ -360,7 +391,7 @@ class PreQueue(Queue):
       yield self.get()
 
 __nullCH=None
-__nullCHlock=BoundedSemaphore(1)
+__nullCHlock=allocate_lock()
 def nullCH():
   with __nullCHlock:
     if __nullCH is None:
@@ -380,20 +411,20 @@ class NullCH(Queue):
 class DictMonitor(dict):
   def __init__(self,I={}):
     dict.__init__(self,I)
-    self.lock=BoundedSemaphore(1)
+    self.__lock=allocate_lock()
   def __getitem__(self,k):
-    with self.lock:
+    with self.__lock:
       v=dict.__getitem__(self,k)
     return v
   def __delitem__(self,k):
-    with self.lock:
+    with self.__lock:
       v=dict.__delitem__(self,k)
     return v
   def __setitem__(self,k,v):
-    with self.lock:
+    with self.__lock:
       dict.__setitem__(self,k,v)
   def keys(self):
-    with self.lock:
+    with self.__lock:
       ks = dict.keys(self)
     return ks
 

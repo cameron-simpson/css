@@ -58,7 +58,11 @@ def setenv(var,value):
     value=str(value)
   os.environ[var]=value
   qvalue=cs.sh.quotestr(value)
-  open("%s/var/env-%s.sh"%(os.environ['HOME'],D.DISPLAY),mode='a').write("%s=%s; export %s\n" % (var,qvalue,var))
+  envfiles=os.environ.get('ENVFILES','').split()
+  if len(envfiles) > 0:
+    fp=open(envfiles[-1],"a")
+    fp.write("%s=%s; export %s\n" % (var,qvalue,var))
+    fp.close()
   print "SetEnv %s %s" % (var,qvalue)
 
 def settabenv(tabnum, px, wx):
