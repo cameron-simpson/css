@@ -10,21 +10,22 @@ import os
 import os.path
 import time
 from zlib import compress, decompress
-from cs.misc import cmderr, debug, warn, progress, verbose, out, fromBS, toBS, fromBSfp, tb, seq
+from cs.misc import cmderr, debug, warn, progress, verbose, out, fromBS, toBS, fromBSfp, tb, seq, LogLine
 from cs.threads import FuncQueue, Q1, DictMonitor
 from cs.venti import tohex
 from threading import Thread, BoundedSemaphore
 from Queue import Queue
 
-class BasicStore:
+class BasicStore(LogLine):
   ''' Core functions provided by all Stores.
       For each of the core operations (store, fetch, haveyou, sync)
       a subclass must implement at least one of each of the op or op_bg methods.
   '''
   def __init__(self,name):
+    LogLine.__init__(self,name)
     self.name=name
     self.logfp=None
-    self.closing=False
+    self.__closing=False
     self.Q=FuncQueue(size=256)  # arbitrary limit on queue length
     self.lastBlock=None
     self.lastBlockLock=BoundedSemaphore(1)
@@ -33,20 +34,20 @@ class BasicStore:
     return "Store(%s)" % self.name
 
   def close(self):
-    if not self.closing:
-      self.sync()
-    self.closing=True
+    assert not self.__closing, "close on closed BasicStore"
+    self.sync()
+    self.__closing=True
     self.Q.close()
 
   def hash(self,block):
     ''' Compute the hash for a block.
     '''
-    from cs.venti import hash_sha
+    from cs.venti.hash import hash_sha
     return hash_sha(block)
   def store(self,block):
     ''' Store a block, return its hash.
     '''
-    assert not self.closing
+    assert not self.__closing
     ch=self.store_a(block)
     tag, h = ch.get()
     assert type(h) is str and type(tag) is int, "h=%s, tag=%s"%(h,tag)
@@ -57,7 +58,7 @@ class BasicStore:
     '''
     assert type(block) is str, \
            "block=%s"%(block,tag)
-    assert not self.closing
+    assert not self.__closing
     ch=Q1()
     self.store_ch(block,ch)
     return ch
@@ -66,9 +67,9 @@ class BasicStore:
         queue the block for storage and return the tag.
         If the tag is None or missing, one is generated.
     '''
-    assert not self.closing
+    assert not self.__closing
     if tag is None: tag=seq()
-    self.Q.qfunc(self.store_bg,block,tag,ch)
+    self.Q.call(self.store_bg,block,tag,ch)
     return tag
   def store_bg(self,block,tag,ch):
     ''' Accept a block for storage, report the hash code on the supplied channel/queue.
@@ -81,7 +82,7 @@ class BasicStore:
   def fetch(self,h):
     ''' Fetch a block given its hash.
     '''
-    assert not self.closing
+    assert not self.__closing
     ch=self.fetch_a(h,None)
     tag, block = ch.get()
     return block
@@ -95,7 +96,7 @@ class BasicStore:
         ensure that a "normal" flushing request follows any noFlush
         requests promptly, otherwise deadlocks may ensue.
     '''
-    assert not self.closing
+    assert not self.__closing
     ch=Q1()
     self.fetch_ch(h,ch)
     return ch
@@ -110,9 +111,9 @@ class BasicStore:
         ensure that a "normal" flushing request follows any noFlush
         requests promptly, otherwise deadlocks may ensue.
     '''
-    assert not self.closing
+    assert not self.__closing
     if tag is None: tag=seq()
-    self.Q.qfunc(self.fetch_bg,h,tag,ch)
+    self.Q.call(self.fetch_bg,h,tag,ch)
     return tag
   def fetch_bg(self,h,tag,ch):
     ''' Accept a hash, report the matching block on the supplied channel/queue.
@@ -147,7 +148,7 @@ class BasicStore:
   def haveyou(self,h):
     ''' Test if a hash is present in the store.
     '''
-    assert not self.closing
+    assert not self.__closing
     ch=self.haveyou_a(h)
     tag, yesno = ch.get()
     return yesno
@@ -155,14 +156,14 @@ class BasicStore:
     ''' Query whether a hash is in the store.
         Return a cs.threads.Q1 from which to read (tag, yesno).
     '''
-    assert not self.closing
+    assert not self.__closing
     ch=Q1()
     self.haveyou_ch(h,ch)
     return ch
   def haveyou_ch(self,h,ch,tag=None):
-    assert not self.closing
+    assert not self.__closing
     if tag is None: tag=seq()
-    self.Q.qfunc(self.haveyou_bg,h,tag,ch)
+    self.Q.call(self.haveyou_bg,h,tag,ch)
     return tag
   def haveyou_bg(self,h,tag,ch):
     ch.put((tag, self.haveyou(h)))
@@ -185,13 +186,13 @@ class BasicStore:
     ''' Request that the store be synced.
         Return a cs.threads.Q1 from which to read the answer on completion.
     '''
-    assert not self.closing
+    assert not self.__closing
     ch=Q1()
     self.sync_ch(ch)
     return ch
   def sync_ch(self,ch,tag=None):
     if tag is None: tag=seq()
-    self.Q.qfunc(self.sync_bg,tag,ch)
+    self.Q.call(self.sync_bg,tag,ch)
     return tag
   def sync_bg(self,tag,ch):
     self.sync()
@@ -215,13 +216,6 @@ class BasicStore:
     if h not in self:
       return None
     return self[h]
-
-  def log(self,msg):
-    now=time.time()
-    fp=self.logfp
-    if fp is None:
-      fp=sys.stderr
-    fp.write("%d %s %s\n" % (now, time.strftime("%Y-%m-%d_%H:%M:%S",time.localtime(now)), msg))
 
 class Store(BasicStore):
   ''' A store connected to a backend store or a type designated by a string.
