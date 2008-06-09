@@ -37,6 +37,8 @@ import datetime
 from cs.venti import tohex, fromhex
 from cs.venti.store import Store, pullFrom
 from cs.venti.cache import CacheStore, MemCacheStore
+from cs.venti.archive import archive2bref, archiveAppend
+from cs.venti.dir import Dir, storeDir, decodeDirent
 from cs.misc import cmd, cmderr, setcmd, warn, debug, progress
 import cs.upd; cs.upd.default()
 
@@ -280,7 +282,7 @@ else:
     # This is the inverse of the B<pack> command.
     # Currently, to unpack a B<.vt> file the most succinct command is this:
     #
-    #   vt unpack `awk '{ hash=$1 } END { print hash }' file.vt`
+    #   vt unpack `awk '{ dirref=$1 } END { print dirref }' file.vt`
     #
     if len(args) < 1:
       cmderr("missing dirrefs")
@@ -324,16 +326,25 @@ def gethexarg(path):
     while slash < len(path) and path[slash] == '/':
       slash+=1
     path=path[slash:]
-  from cs.venti.blocks import str2BlockRef
   debug("fromhex(%s)..." % hexarg)
   fhex=fromhex(hexarg)
-  bref=str2BlockRef(fhex)
-  return bref, path
+  D=decodeDirent(fhex,justone=True)
+  return D, path
 
 def resolve(path, domkdir=False):
-  bref, path = gethexarg(path)
-  from cs.venti.fs import FS
-  return FS(S,bref).root.resolve(path,domkdir)
+  D, subpath = gethexarg(path)
+  debug("resolve: D=%s, subpath=%s" % (D, subpath))
+  subpath = [s for s in subpath.split('/') if len(s) > 0]
+  debug("resolve2: D=%s, subpath=%s" % (D, subpath))
+  if len(subpath) == 0:
+    return D, '.'
+  for i in range(0,len(subpath)-1):
+    s=subpath[i]
+    if domkdir:
+      D=D.mkdir(s)
+    else:
+      D=D.chdir1(s)
+  return D, subpath[-1]
 
 def path2bref(path,domkdir=False):
   bref, path = gethexarg(path)
@@ -358,7 +369,7 @@ def vtopen(path, mode='r', domkdir=False):
   return cs.venti.file.open(S,mode,bref)
 
 def lsDirent(fp,E,name):
-  bref=E.bref()
+  bref=E.getBref()
   st=E.stat()
   ##print "st=%s" % (st,)
   st_mode, st_ino, st_dev, st_nlink, st_uid, st_gid, st_size, \
@@ -404,55 +415,28 @@ def cat(path,fp=None):
     for b in bref.leaves(S):
       fp.write(b)
 
-def storeDir(path,targetRef=None,ignoreTimes=False,deleteMissing=False,overWrite=False):
-  from cs.venti.fs import FS
-  import cs.venti.store
-  assert isinstance(S, cs.venti.store.BasicStore), "S=%s"%S
-  D=FS(S,targetRef).updateDir(path,
-                    ignoreTimes=ignoreTimes,
-                    deleteMissing=deleteMissing,
-                    overWrite=overWrite)
-  return D.sync()
-
 if op == "pack":
   if len(args) == 0 or args[0] != '-o':
     from cs.venti.file import storeFile
     for path in args:
       if os.path.isdir(path):
-        ref=storeDir(path)
+        bref=storeDir(path,S=S)
       else:
-        ##import cProfile
-        ##cProfile.run("global ref; ref=storeFile(S,open(path))")
-        ##print "ref=%s" % ref
-        ref=storeFile(S,open(path))
-      stdout.write(tohex(ref.encode()))
-      if len(args) > 1:
-        stdout.write('\t')
-        stdout.write(path)
-      stdout.write('\n')
+        bref=storeFile(open(path),S=S)
+      archiveAppend(stdout,bref,None,path)
   else:
     archive=args[1]
     path=args[2]
-    from cs.venti.blocks import str2BlockRef
-    import datetime
-    if archive is None:
-      archive="%s.vt" % os.path.basename(path)
-    target=None
-    if os.path.isfile(archive):
-      hexarg=None
-      for line in open(archive):
-        assert line[-1] == '\n'
-        words=line[:-1].strip().split(' ')
-        if len(words) == 0:
-          continue
-        if words[0].startswith("#"):
-          continue
-        hexarg=words[0]
-      if hexarg is not None:
-        target=str2BlockRef(fromhex(hexarg))
     assert os.path.isdir(path)
-    saved=storeDir(path,targetRef=target,ignoreTimes=False,deleteMissing=True,overWrite=True)
-    open(archive,mode='a').write("%s %s %s\n" % (saved, datetime.datetime.now(), path))
+    D=Dir(path,S)
+    target=archive2bref(archive)
+    if target is not None:
+      D.overlayBlockRef(target)
+    D.updateFrom(path,
+                 ignoreTimes=False,
+                 deleteMissing=True,
+                 overWrite=True)
+    archiveAppend(archive,D,None,path)
 
 elif op == "cat":
   for path in args:
@@ -506,6 +490,7 @@ elif op == "ls":
       print
     print "ls", path, "..."
     D, name = resolve(path)
+    print "resolve(%s) -> %s, %s" % (path, D, name)
     D=D.chdir1(name)
     ls(path,D,recurse,stdout)
 
@@ -543,8 +528,8 @@ else:
   cmderr("unsupported command")
   exit(2)
 
-S.close()
 debug("%s: exit main command"%cmd)
+exit(0)
 
 # =head1 EXAMPLES
 #
