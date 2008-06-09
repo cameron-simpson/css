@@ -6,79 +6,24 @@
 #               An indirect block is a list of encoded BlockRefs.
 #
 
-from cs.misc import toBS, fromBS, fromBSfp, warn, cmderr, TODO, FIXME
+from cs.misc import toBS, fromBS, fromBSfp, warn, cmderr, TODO, FIXME, isdebug
+from cs.io import readn
 from cs.venti import MAX_SUBBLOCKS, tohex
-import cs.venti.store
-
-def encodeBlockRef(flags,span,h):
-    ''' Encode a blockref for storage:
-        Format is:
-          BS(flags)
-          BS(span)
-          BS(hashlen)
-          hash
-    '''
-    assert type(h) is str, "h=%s"%h
-    return toBS(flags)+toBS(span)+toBS(len(h))+h
-
-def str2BlockRef(s):
-  (bref,etc)=decodeBlockRef(s)
-  assert len(etc) == 0, "left over data from \"%s\": \"%s\"" % (s,etc)
-  return bref
-
-def decodeBlockRef(iblock):
-  ''' Decode a block ref from an indirect block.
-      It consist of:
-        flags: BSencoded ordinal
-        span:  BSencoded ordinal
-        hashlen: BSencoded ordinal
-        hash:  raw hash
-      Return (BlockRef,unparsed) where unparsed is remaining data.
-  '''
-  (flags,iblock)=fromBS(iblock)
-  indirect=bool(flags&0x01)
-  (span,iblock)=fromBS(iblock)
-  (hlen,iblock)=fromBS(iblock)
-  h=iblock[:hlen]
-  iblock=iblock[hlen:]
-  return (BlockRef(h,indirect,span), iblock)
-
-def decodeBlockRefFP(fp):
-  ''' Decode a block ref from a file.
-      It consist of:
-        flags: BSencoded ordinal
-        span:  BSencoded ordinal
-        hashlen: BSencoded ordinal
-        hash:  raw hash
-      Return (BlockRef,unparsed) where unparsed is remaining data.
-      Return None at EOF.
-  '''
-  flags=fromBSfp(fp)
-  if flags is None:
-    return None
-  indirect=bool(flags&0x01)
-  assert (flags&~0x01) == 0, "unexpected flags: 0x%x" % flags
-  span=fromBSfp(fp)
-  assert span is not None, "unexpected EOF"
-  hlen=fromBSfp(fp)
-  assert hlen is not None, "unexpected EOF"
-  h=fp.read(hlen)
-  assert len(h) == hlen, "(indir=%s, span=%d): expected hlen=%d bytes, read %d bytes: %s"%(indirect,span,hlen,len(h),tohex(h))
-  return BlockRef(h,indirect,span)
+from cs.venti.hash import HASH_SIZE_DEFAULT
 
 class BlockRef:
-  ''' A reference to a file consisting of a hash and an indirect flag.
-      Tiny files are not indirect, and the hash is the block holding
-      their content. For larger files indirect is True and the hash
+  ''' A reference to a "file" (block sequence) consisting of a hash and an
+      indirect flag. Tiny files are not indirect, and the hash is the block
+      holding their content. For larger files indirect is True and the hash
       refers to their top indirect block.
   '''
+  F_INDIRECT=0x01
+  F_HAS_HASH_SIZE=0x02
   def __init__(self,h,indirect,span):
     assert h is not None
     self.h=h
     self.indirect=indirect
     self.span=span
-  def flags(self):
-    return 0x01 & int(self.indirect)
   def __len__(self):
     return self.span
   def __str__(self):
@@ -86,37 +31,90 @@ class BlockRef:
   def blocklist(self,S):
     assert self.indirect
     return BlockList(S,self.h)
-  def encode(self):
-    ''' Return an encoded BlockRef for storage, inverse of decodeBlockRef().
+  @classmethod
+  def decode(cls, s, justone=False):
+    ''' Decode a blockref and return it.
+        Format is:
+          BS(flags)
+            0x01 indirect blockref
+            0x02 len(hash) != HASH_SIZE_DEFAULT
+          BS(span)
+          [BS(hashlen)]
+          hash
     '''
+    s0=s
+    flags, s = fromBS(s)
+    assert flags&~(BlockRef.F_INDIRECT|BlockRef.F_HAS_HASH_SIZE) == 0, \
+           "unexpected flags value (%02x), s=%s" % (flags, tohex(s0))
+    span, s = fromBS(s)
+    indirect=bool(flags & BlockRef.F_INDIRECT)
+    if flags & BlockRef.F_HAS_HASH_SIZE:
+      hlen, s = fromBS(s)
+    else:
+      hlen = HASH_SIZE_DEFAULT
+    assert len(s) >= hlen, \
+           "expected %d bytes of hash, only %d bytes in string: %s" \
+           % (hlen, len(s), tohex(s))
+    h=s[:hlen]
+    s=s[hlen:]
+    bref=BlockRef(h,indirect,span)
+    if justone:
+      assert len(s) == 0, "extra stuff after blockref: %s" % tohex(s)
+      return bref
+    return bref, s
+      
+  def encode(self):
+    ''' Encode a blockref for storage:
+        Format is:
+          BS(flags)
+            0x01 indirect blockref
+            0x02 len(hash) != HASH_SIZE_DEFAULT
+          BS(span)
+          [BS(hashlen)]
+          hash
+    '''
+    flags=0
+    if self.indirect:
+      flags|=BlockRef.F_INDIRECT
     h=self.h
-    return encodeBlockRef(self.flags(),self.span,self.h)
+    if len(h) != HASH_SIZE_DEFAULT:
+      flags|=BlockRef.F_HAS_HASH_SIZE
+      hlen=toBS(len(h))
+    else:
+      hlen=""
+    brefEnc=toBS(flags)+toBS(self.span)+hlen+h
+    if isdebug:
+      import sys; print >>sys.stderr, "brefEnc=[%s]" % tohex(brefEnc)
+    return brefEnc
+
   def leaves(self,S):
     if self.indirect:
-      for b in self.blocklist(S).leaves():
+      for b in self.blocklist().leaves(S):
         yield b
     else:
       yield S[self.h]
+
+decodeBlockRef=BlockRef.decode
 
 class BlockList(list):
   ''' An in-memory BlockList, used to store or retrieve sequences of
       data blocks.
   '''
-  def __init__(self,S,h=None):
-    ''' Create a new blocklist.
-        This will be empty initially unless the hash of a top level
-        indirect block is supplied, in which case it is loaded and
-        decoded into BlockRefs.
+  def __init__(self,iblock=None):
+    ''' Create a new blocklist, initially empty, which is a subclass
+        if "list" containing BlockRefs.
+        If the optional argument "iblock" is supplied it is treated as an
+        indirect block from which a list of BlockRefs is read to initialise
+        the BlockList.
     '''
-    self.__store=S
-    if h is not None:
-      iblock=S[h]
+    list.__init__(self)
+    if iblock is not None:
       while len(iblock) > 0:
         (bref, iblock)=decodeBlockRef(iblock)
         self.append(bref)
     self.__pos=None
 
-  def pack(self):
+  def encode(self):
     return "".join(bref.encode() for bref in self)
 
   def span(self):
@@ -130,42 +128,45 @@ class BlockList(list):
     '''
     return sum(bref.span for bref in self[:ndx])
 
-  def seekToBlock(self,offset):
+  def seekToBlock(self,offset,S=None):
     ''' Seek to a leaf block.
         Return the block hash and the offset within the block of the target.
         If the seek is beyond the end of the blocklist, return None and the
         remaining offset.
     '''
+    if S is None:
+      S=__main__.S
     # seek into most recent block?
     if self.__pos is not None:
       b_h, b_offset, b_size = self.__pos
       if b_offset <= offset and b_offset+b_size > offset:
         return b_h, offset-b_offset
 
-    b_h, roffset = self.__seekToBlock(offset)
+    b_h, roffset = self.__seekToBlock(offset,S)
     if b_h is not None:
       try:
-        blk = self.__store[b_h]
+        blk = S[b_h]
       except KeyError, e:
-        cmderr("%s: not in store %s" % (tohex(b_h), self.__store))
+        cmderr("%s: not in store %s" % (tohex(b_h), S))
         return None, offset-roffset
-      self.__pos=(b_h, offset-roffset, len(self.__store[b_h]))
+      self.__pos=(b_h, offset-roffset, len(S[b_h]))
     return b_h, roffset
 
-  def __seekToBlock(self,offset):
+  def __seekToBlock(self,offset,S):
     for bref in self:
       if offset < bref.span:
         if bref.indirect:
-          return bref.blocklist(self.__store).seekToBlock(offset)
+          return bref.blocklist().seekToBlock(offset,S=S)
         return (bref.h,offset)
       offset-=bref.span
     return (None,offset)
 
-  def leaves(self):
+  def leaves(self,S=None):
     ''' Iterate over the leaf blocks.
     '''
-    S=self.__store
+    if S is None:
+      S=__main__.S
     S.prefetch(bref.h for bref in self)
     for bref in self:
-      for b in bref.leaves(S):
+      for b in bref.leaves(S=S):
         yield b
