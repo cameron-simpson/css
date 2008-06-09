@@ -13,21 +13,7 @@
       http://csbp.backpackit.com/pub/1356606
 '''
 
-## NOTE: migrate to hashlib sometime when python 2.5 more common
-import sha
-
-HASH_SIZE=20                                    # size of SHA-1 hash
-MIN_BLOCKSIZE=80                                # less than this seems silly
-MAX_BLOCKSIZE=16383                             # fits in 2 octets BS-encoded
-MAX_SUBBLOCKS=int(MAX_BLOCKSIZE/(HASH_SIZE+4))  # flags(1)+span(2)+hlen(1)+hash
-
-def hash_sha(block):
-  ''' Returns the SHA-1 checksum for the supplied block.
-  '''
-  hash=sha.new(block)
-  return hash.digest()
-
-hash=hash_sha
+from cs.venti.hash import hash, HASH_T, MIN_BLOCKSIZE, MAX_BLOCKSIZE, MAX_SUBBLOCKS
 
 def fromhex(hexstr):
   ''' Return raw byte array from hexadecimal string.
