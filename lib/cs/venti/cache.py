@@ -29,6 +29,7 @@ class CacheStore(BasicStore):
     self.cache=cache
     # secondary queue to process background self.backend operations
     self.backQ=FuncQueue(size=256)
+    self.__closing=False
 
   def scan(self):
     if hasattr(self.cache,'scan'):
@@ -40,7 +41,11 @@ class CacheStore(BasicStore):
           yield h
 
   def close(self):
+    assert not self.__closing, "close() on closed CacheStore, previously closed by %s" % self.__closeCaller
+    frame=sys._getframe(1)
+    self.__closeCaller="%s()@%s:%d" % (frame.f_code.co_name, frame.f_code.co_filename, frame.f_lineno)
     BasicStore.close(self)
+    self.__closing=True
     self.backQ.close()
     self.backend.close()
     self.cache.close()
@@ -51,7 +56,7 @@ class CacheStore(BasicStore):
     ch.put((tag,h))
     ##progress("stored %s in cache" % tohex(h))
     if h not in self.backend:
-      self.backQ.put((self.__store_bg2,(block,)))
+      self.backQ.call(self.__store_bg2,block)
   def __store_bg2(self,block):
     self.backend.store(block)
 
@@ -65,7 +70,7 @@ class CacheStore(BasicStore):
       block=self.backend[h]
     ch.put((tag,block))
     if not inCache:
-      self.backQ.put((self.__fetch_bg2,(block,)))
+      self.backQ.call(self.__fetch_bg2,block)
   def __fetch_bg2(self,block):
     ##progress("fetch: cache %s in %s"%(tohex(h),self.cache))
     self.cache.store(block)
