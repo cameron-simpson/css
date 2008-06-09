@@ -27,29 +27,31 @@ def loadfile(path):
 def readcontline(fp):
   """ read a line which may be continued with leading whitespace """
   line=fp.readline()
-  if len(line) > 0:
-    contlines=StringIO()
+  if len(line) == 0:
+    return line
+  assert line[-1] == '\n', "%s: unterminated line"%fp
 
-    while 1:
-      oldpos=fp.tell()
-      nline=fp.readline()
-      if not nline: break
-      if nline[0] != ' ' and nline[0] != '\t':
-        fp.seek(oldpos)
-        break
-      contlines.write(nline)
+  lines=[line]
+  while True:
+    oldpos=fp.tell()
+    line=fp.readline()
+    if len(line) == 0:
+      break
+    assert line[-1] == '\n', "%s: unterminated line"%fp
+    if line[0] != ' ' and line[0] != '\t':
+      fp.seek(oldpos)
+      break
+    lines.append(line)
 
-    line=line+contlines.getvalue()
-    contlines.close()
-
-  return line
+  return "".join(lines)
 
 class ContLineFile(file):
   """ a file object whose iterator returns contlines """
   def next(self):
-    nline=readcontline(self)
-    if not nline: raise StopIteration
-    return nline
+    line=readcontline(self)
+    if len(line) == 0:
+      raise StopIteration
+    return line
 
 def pread(f,size,pos,whence=0,norestore=False):
   ''' Read a chunk of data from an arbitrary position in a file.
