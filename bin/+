@@ -16,7 +16,7 @@ set -ue
 
 needhost "$MAILHOMEHOST@$SYSTEMID" \
 || { rhost=$SYSTEMID    # sshto clause to deliver to system home host
-     qargv=`shqstr scr "_mutt_$*" + "$@"`
+     qargv=`shqstr + -s "$@"`
      set -x
      exec envssh -t "$rhost" "$qargv"
    }
@@ -114,7 +114,7 @@ export CURRENT_FOLDER DELETE_FOLDER
 maildir "$DELETE_FOLDER"
 
 set -- sh -c "exec $muttcmd"
-[ $use_screen ] && set -- scr "mutt_$mfolder" "$@"
+[ $use_screen ] && set -- scr "MUTT_$mfolder" "$@"
 [ $use_term   ] && set -- term -j email $termopts -n "mutt $mfolder" "$@"
 
 [ -z "$preshcmd" ] || eval "$preshcmd"
