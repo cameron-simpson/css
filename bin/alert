@@ -23,3 +23,7 @@ if [ -n "$colour" ]
 then  colour_echo "$colour" "$*"
 else  echo "$*"
 fi
+case $ARCH in
+  apple.*.darwin)
+    growlnotify -m "$*" ;;
+esac
