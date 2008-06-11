@@ -133,22 +133,18 @@ def _logline(line,mark):
   global _logPath, _logFP
   when=time.time()
   pfx="%d [%s] " % (when, mark)
-  print >>_logFP, pfx, line.replace("\n", "\n%*s" % (len(pfx)+1, " "))
-  _logFP.flush()
-  if isdebug and _logFP is not sys.stderr:
-    pfx="%s: %s:" % (cmd, mark)
-    print >>sys.stderr, pfx, line.replace("\n", "\n%*s" % (len(pfx)+1, " "))
+  try:
+    print >>_logFP, pfx, line.replace("\n", "\n%*s" % (len(pfx)+1, " "))
+    _logFP.flush()
+    if isdebug and _logFP is not sys.stderr:
+      pfx="%s: %s:" % (cmd, mark)
+      print >>sys.stderr, pfx, line.replace("\n", "\n%*s" % (len(pfx)+1, " "))
+  except IOError:
+    pass
 def logLine(line,mark=None):
   if mark is None:
     mark=cmd
-  retval=None
-  try:
-    retval=withoutUpd(_logline,line,mark)
-  except:
-    print >>sys.stderr, "%s: exception during log:" % cmd
-    print >>sys.stderr, "  line: %s" % line
-    print >>sys.stderr, "  exception: %s" % e
-  return retval
+  return withoutUpd(_logline,line,mark)
 def logFnLine(line,frame=None,prefix=None,mark=None):
   ''' Log a line citing the calling function.
   '''
@@ -160,7 +156,7 @@ def logFnLine(line,frame=None,prefix=None,mark=None):
     line=prefix+": "+line
   return logLine(line,mark=mark)
 
-class LogLine:
+class Loggable:
   ''' Base class for things that will use the above functions.
   '''
   def __init__(self,mark):
