@@ -8,7 +8,7 @@ from __future__ import with_statement
 from thread import allocate_lock
 from threading import Semaphore
 from Queue import Queue
-from cs.misc import debug, ifdebug, isdebug, tb, cmderr, warn, reportElapsedTime
+from cs.misc import debug, ifdebug, isdebug, tb, cmderr, warn, logFnLine, reportElapsedTime
 from cs.upd import nl, out
 
 class AdjustableSemaphore:
@@ -117,10 +117,11 @@ class IterableQueue(Queue):
     assert item is not None, "put(None) on IterableQueue"
     return Queue.put(self,item,*args,**kw)
   def close(self):
-    assert not self.__closed, "close() on closed IterableQueue"
-    self.__closed=True
-    ##nl("IterableQueue.close(): putting None on Queue")
-    Queue.put(self,None)
+    if self.__closed:
+      logFnLine("close() on closed IterableQueue")
+    else:
+      self.__closed=True
+      Queue.put(self,None)
   def __iter__(self):
     return self
   def next(self):
