@@ -5,10 +5,11 @@
 #
 
 from __future__ import with_statement
+import sys
 from thread import allocate_lock
-from threading import Semaphore
+from threading import Semaphore, Thread
 from Queue import Queue
-from cs.misc import debug, ifdebug, isdebug, tb, cmderr, warn, reportElapsedTime
+from cs.misc import debug, ifdebug, isdebug, tb, cmderr, warn, reportElapsedTime, logFnLine
 from cs.upd import nl, out
 
 class AdjustableSemaphore:
@@ -116,7 +117,11 @@ class IterableQueue(Queue):
     assert not self.__closed, "put() on closed IterableQueue"
     assert item is not None, "put(None) on IterableQueue"
     return Queue.put(self,item,*args,**kw)
+  def _closeAtExit(self):
+    if not self.__closed:
+      self.close()
   def close(self):
+    ##logFnLine("%s.close()"%(self,),frame=sys._getframe(1))
     assert not self.__closed, "close() on closed IterableQueue"
     self.__closed=True
     ##nl("IterableQueue.close(): putting None on Queue")
@@ -247,8 +252,6 @@ class FuncQueue:
     assert parallelism > 0
     self.__Q=IterableQueue(size)
     self.__closing=False
-    import atexit
-    atexit.register(self.__Q.close)
     for n in range(parallelism):
       Thread(target=self.__runQueue).start()
   def callback(self,retQ,func,args=(),kwargs=None):
@@ -256,9 +259,12 @@ class FuncQueue:
         The function return value will be .put() on retQ.
     '''
     assert not self.__closing
-    if kwargs is None: kwargs={}
+    if kwargs is None:
+      kwargs={}
+    else:
+      assert type(kwargs) is dict
     if retQ is None: retQ=Q1()
-    self.__Q.put((Q,func,args,kwargs))
+    self.__Q.put((retQ,func,args,kwargs))
   def call(self,func,args=(),kwargs=None):
     ''' Synchronously call the supplied func via the FuncQueue.
         Return the function result.
@@ -290,6 +296,7 @@ class FuncQueue:
         debug("FuncQueue closing, skipping call of %s, returning None" % func)
         ret=None
       else:
+        debug("func=%s, args=%s, kwargs=%s"%(func,args,kwargs))
         ret=func(*args,**kwargs)
       if retQ:
         retQ.put(ret)
