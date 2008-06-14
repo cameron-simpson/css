@@ -316,6 +316,9 @@ if useMemCache:
 ##progress("S=%s"%S)
 
 def gethexarg(path):
+  ''' Take a path with a hex string on the front.
+      Return a Dirent decoded from the hex string and the trailing path.
+  '''
   slash=path.find('/')
   if slash < 0:
     hexarg=path
@@ -332,41 +335,24 @@ def gethexarg(path):
   return D, path
 
 def resolve(path, domkdir=False):
+  ''' Take a path with a hex string on the front.
+      Decode the hex string with gethexarg() and walk down the remaining
+      path, except for the last component. Return the final Dirent and the
+      last path componenet, or None if there was no final path component.
+  '''
   D, subpath = gethexarg(path)
   debug("resolve: D=%s, subpath=%s" % (D, subpath))
   subpath = [s for s in subpath.split('/') if len(s) > 0]
   debug("resolve2: D=%s, subpath=%s" % (D, subpath))
   if len(subpath) == 0:
-    return D, '.'
-  for i in range(0,len(subpath)-1):
-    s=subpath[i]
+    return D, None
+  while len(subpath) > 1:
+    s=subpath.pop(0)
     if domkdir:
       D=D.mkdir(s)
     else:
       D=D.chdir1(s)
-  return D, subpath[-1]
-
-def path2bref(path,domkdir=False):
-  bref, path = gethexarg(path)
-  debug("bref=%s, path=%s"%(bref,path))
-  if len(path) > 0:
-    from cs.venti.fs import FS
-    F=FS(S,bref)
-    debug("F=%s, F.root=%s" % (F,F.root))
-    D, name = F.root.resolve(path,domkdir)
-    if D is None or name not in D:
-      debug("resolve fails")
-      return None
-    return D.name2bref(name)
-  return bref
-
-def vtopen(path, mode='r', domkdir=False):
-  bref, path = gethexarg(path)
-  if len(path) > 0:
-    D, name = FS(S,bref).root.resolve(path,domkdir)
-    return D.open(name,mode)
-  import cs.venti.file
-  return cs.venti.file.open(S,mode,bref)
+  return D, subpath[0]
 
 def lsDirent(fp,E,name):
   bref=E.getBref()
@@ -408,12 +394,12 @@ def ls(path,D,recurse,fp=None):
 def cat(path,fp=None):
   if fp is None:
     fp=stdout
-  bref=path2bref(path)
-  if bref is None:
-    cmderr("%s: no such file or directory" % path)
-  else:
-    for b in bref.leaves(S):
-      fp.write(b)
+  D, name = resolve(path)
+  if name is not None:
+    D=D[name]
+  bref=D.getBref()
+  for b in bref.leaves(S):
+    fp.write(b)
 
 if op == "pack":
   if len(args) == 0 or args[0] != '-o':
