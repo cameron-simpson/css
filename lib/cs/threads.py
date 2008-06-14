@@ -122,10 +122,11 @@ class IterableQueue(Queue):
       self.close()
   def close(self):
     ##logFnLine("%s.close()"%(self,),frame=sys._getframe(1))
-    assert not self.__closed, "close() on closed IterableQueue"
-    self.__closed=True
-    ##nl("IterableQueue.close(): putting None on Queue")
-    Queue.put(self,None)
+    if self.__closed:
+      logFnLine("close() on closed IterableQueue")
+    else:
+      self.__closed=True
+      Queue.put(self,None)
   def __iter__(self):
     return self
   def next(self):
