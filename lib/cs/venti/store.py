@@ -25,7 +25,7 @@ class BasicStore(LogLine):
     LogLine.__init__(self,name)
     self.name=name
     self.logfp=None
-    self.closing=False
+    self.__closing=False
     self.Q=FuncQueue()
 
   def __str__(self):
@@ -67,7 +67,7 @@ class BasicStore(LogLine):
     '''
     assert not self.__closing
     if tag is None: tag=seq()
-    self.Q.call(self.store_bg,block,tag,ch)
+    self.Q.qfunc(self.store_bg,block,tag,ch)
     return tag
   def store_bg(self,block,tag,ch):
     ''' Accept a block for storage, report the hash code on the supplied channel/queue.
@@ -111,7 +111,7 @@ class BasicStore(LogLine):
     '''
     assert not self.__closing
     if tag is None: tag=seq()
-    self.Q.call(self.fetch_bg,h,tag,ch)
+    self.Q.qfunc(self.fetch_bg,(h,tag,ch))
     return tag
   def fetch_bg(self,h,tag,ch):
     ''' Accept a hash, report the matching block on the supplied channel/queue.
@@ -161,7 +161,7 @@ class BasicStore(LogLine):
   def haveyou_ch(self,h,ch,tag=None):
     assert not self.__closing
     if tag is None: tag=seq()
-    self.Q.call(self.haveyou_bg,h,tag,ch)
+    self.Q.qfunc(self.haveyou_bg,(h,tag,ch))
     return tag
   def haveyou_bg(self,h,tag,ch):
     ch.put((tag, self.haveyou(h)))
@@ -174,7 +174,7 @@ class BasicStore(LogLine):
   def sync(self):
     ''' Return when the store is synced.
     '''
-    ##assert not self.closing
+    assert not self.__closing
     debug("store.sync: calling sync_a...")
     ch=self.sync_a()
     debug("store.sync: waiting for response on %s" % ch)
@@ -190,7 +190,7 @@ class BasicStore(LogLine):
     return ch
   def sync_ch(self,ch,tag=None):
     if tag is None: tag=seq()
-    self.Q.call(self.sync_bg,tag,ch)
+    self.Q.qfunc(self.sync_bg,(tag,ch))
     return tag
   def sync_bg(self,tag,ch):
     self.sync()
