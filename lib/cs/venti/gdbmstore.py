@@ -11,7 +11,7 @@ import time
 from zlib import compress
 from thread import allocate_lock
 from cs.cache import LRU
-from cs.misc import cmderr, warn, progress, verbose, ifverbose, out, fromBS, toBS, fromBSfp, tb, the
+from cs.misc import cmderr, warn, progress, verbose, isverbose, out, fromBS, toBS, fromBSfp, tb, the
 from cs.venti import tohex, hash
 from cs.venti.store import BasicStore
 from cs.venti.datafile import scanFile, getBlock, addBlock
@@ -77,6 +77,7 @@ class GDBMStore(BasicStore):
         Calls the GDBM sync() function and flush()es any open
         .vtd files.
     '''
+    self.log("sync")
     self.__index.sync()
     for n in self.__open:
       fp=self.__open[n]
@@ -90,9 +91,11 @@ class GDBMStore(BasicStore):
         - zblock (compressed block)
         Notes the offset to the zblock and the zsize in the GDBM index.
     '''
+    assert False, "GDBMStore store!!"
+    self.log("store %d bytes" % len(block))
     h=hash(block)
     if h in self:
-      if ifverbose():
+      if isverbose:
         warn(self.__path,"already contains",tohex(h))
       return h
 
@@ -106,6 +109,7 @@ class GDBMStore(BasicStore):
   def fetch(self,h):
     ''' Return block for hash, or None if not present.
     '''
+    ##self.log("fetch %s" % tohex(h))
     if h not in self.__index:
       return None
     n,offset,zsize = self.__index[h]
@@ -114,6 +118,7 @@ class GDBMStore(BasicStore):
   def haveyou(self,h):
     ''' Test if the hash 'h' is present in the store.
     '''
+    ##self.log("haveyou %s" % tohex(h))
     return h in self.__index
 
   def __storeOpen(self,n):

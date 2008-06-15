@@ -10,7 +10,7 @@ from __future__ import with_statement
 from thread import allocate_lock
 from threading import Thread
 from Queue import Queue
-from cs.misc import seq, toBS, fromBSfp, debug, ifdebug, tb, warn, progress
+from cs.misc import seq, toBS, fromBSfp, debug, isdebug, tb, warn, progress
 from cs.lex import unctrl
 from cs.threads import JobQueue, getChannel, nullCH
 from cs.venti import tohex
@@ -96,7 +96,7 @@ class _StreamDaemonRequestReader(Thread):
     resultsCH=self.daemon.resultsCH
     S=self.daemon.S
     for n, rqType, arg in decodeStream(self.daemon.recvRequestFP):
-      if ifdebug():
+      if isdebug:
         if arg is None:
           varg=None
         elif rqType == T_HAVEYOU or rqType == T_FETCH:
@@ -186,7 +186,7 @@ class _StreamDaemonResultsSender(Thread):
       debug("StreamDaemon: return result (%s, %s)" % (rqTag, result))
       with jobsLock:
         rqType=jobs[rqTag]
-      if ifdebug():
+      if isdebug:
         if result is None:
           vresult=None
         elif rqType == T_STORE:
@@ -230,8 +230,9 @@ class _StreamDaemonResultsSender(Thread):
     sendReplyFP.flush()
     debug("END _StreamDaemonResultsSender")
 
-def encodeStore(fp,rqTag,block,noFlush=False):
+def encodeStore(fp,rqTag,block):
   ''' Write store(block) to stream.
+      Does not .flush() the stream.
   '''
   debug(fp,"encodeStore(rqTag=%d,%d bytes)" % (rqTag,len(block)))
   global enc_STORE
@@ -239,11 +240,10 @@ def encodeStore(fp,rqTag,block,noFlush=False):
   fp.write(enc_STORE)
   fp.write(toBS(len(block)))
   fp.write(block)
-  if not noFlush:
-    fp.flush()
 
-def encodeFetch(fp,rqTag,h,noFlush=False):
+def encodeFetch(fp,rqTag,h):
   ''' Write fetch(h) to stream.
+      Does not .flush() the stream.
   '''
   debug(fp,"encodeFetch(rqTag=%d,h=%s" % (rqTag,tohex(h)))
   global enc_FETCH
@@ -251,11 +251,10 @@ def encodeFetch(fp,rqTag,h,noFlush=False):
   fp.write(enc_FETCH)
   fp.write(toBS(len(h)))
   fp.write(h)
-  if not noFlush:
-    fp.flush()
 
-def encodeHaveYou(fp,rqTag,h,noFlush=False):
+def encodeHaveYou(fp,rqTag,h):
   ''' Write haveyou(h) to stream.
+      Does not .flush() the stream.
   '''
   debug(fp,"encodeHaveYou(rqTag=%d,h=%s" % (rqTag,tohex(h)))
   global enc_HAVEYOU
@@ -263,28 +262,24 @@ def encodeHaveYou(fp,rqTag,h,noFlush=False):
   fp.write(enc_HAVEYOU)
   fp.write(toBS(len(h)))
   fp.write(h)
-  if not noFlush:
-    fp.flush()
 
-def encodeSync(fp,rqTag,noFlush=False):
+def encodeSync(fp,rqTag):
   ''' Write sync() to stream.
+      Does not .flush() the stream.
   '''
   debug(fp,"encodeSync(rqTag=%d)" % rqTag)
   global enc_SYNC
   fp.write(toBS(rqTag))
   fp.write(enc_SYNC)
-  if not noFlush:
-    fp.flush()
 
-def encodeQuit(fp,rqTag,noFlush=False):
+def encodeQuit(fp,rqTag):
   ''' Write T_QUIT to stream.
+      Does not .flush() the stream.
   '''
   debug(fp,"encodeQuit(rqTag=%d" % rqTag)
   global enc_QUIT
   fp.write(toBS(rqTag))
   fp.write(enc_QUIT)
-  if not noFlush:
-    fp.flush()
 
 class StreamStore(BasicStore):
   ''' A Store connected to a StreamDaemon backend.
@@ -295,62 +290,111 @@ class StreamStore(BasicStore):
     BasicStore.__init__(self,"StreamStore:%s"%name)
     self.sendRequestFP=sendRequestFP
     self.recvReplyFP=recvReplyFP
-    self.pending=JobQueue()
-    self.sendLock=allocate_lock()
+    self.__sendLock=allocate_lock()
+    self.__tagmapLock=allocate_lock()
+    self.__tagmap={}
     self.client=_StreamClientReader(self)
     self.client.start()
+
+  def _flush(self):
+    with self.__sendLock:
+      self.sendRequestFP.flush()
 
   def close(self):
     ''' Close the StreamStore.
     '''
-    debug("StreamStore.close: close()...")
+    if isdebug: self.log("close()")
     if self.closing:
-      debug("StreamStore.close: already closed, doing nothing")
+      if isdebug:
+        self.logfn("already closed, doing nothing","close")
     else:
       self.closing=True
-      rqTag=seq()
-      ch=self.pending.enqueue(rqTag)
-      debug("StreamStore.close: queued rqTag=%s, got channel=%s" % (rqTag, ch))
-      with self.sendLock:
-        debug("StreamStore.close: sending T_QUIT...")
-        encodeQuit(self.sendRequestFP,rqTag)
-        debug("StreamStore.close: sent T_QUIT")
+      tag, ch = self._tagch()
+      self.__maptag(tag,ch)
+      with self.__sendLock:
+        if isdebug: self.log("sending T_QUIT...","close")
+        encodeQuit(self.sendRequestFP,tag)
+        if isdebug: self.log("sent T_QUIT","close")
       x=ch.get()
-      debug("StreamStore.close: got result from channel: %s" % (x,))
+      if isdebug: self.log("got result from channel: %s" % (x,), "close")
 
-  def store_bg(self,block,rqTag,ch):
-    debug("StreamStore: store_bg(%d bytes)..." % len(block))
-    self.pending.enqueue(rqTag,ch)
-    with self.sendLock:
-      encodeStore(self.sendRequestFP,rqTag,block)
-  def fetch_bg(self,h,rqTag,ch,noFlush=False):
-    debug("StreamStore: fetch_bg(%s)..." % tohex(h))
-    ##if ifdebug(): tb()
-    self.pending.enqueue(rqTag,ch)
-    with self.sendLock:
-      encodeFetch(self.sendRequestFP,rqTag,h)
+  def store_bg(self,block,noFlush=False,ch=None):
+    tag, ch = self._tagch(ch)
+    self._dispatch(tag,ch,self.__store_bg2,(block,tag,noFlush))
+    return ch, tag
+  def __store_bg2(self,block,tag,noFlush)
+    self.log("store %d bytes" % len(block))
+    with self.__sendLock:
+      encodeStore(self.sendRequestFP,tag,block)
+    if not noFlush:
+      self._flush()
+
+  def fetch_bg(self,h,ch=None,noFlush=False):
+    tag, ch = self._tagch(ch)
+    self._dispatch(tag,ch,self.__fetch_bg2,(h,tag,noFlush))
+    return ch, tag
+  def __fetch_bg2(self,h,tag,noFlush)
+    self.log("fetch h=%s" % tohex(h))
+    with self.__sendLock:
+      encodeFetch(self.sendRequestFP,tag,h)
+    if not noFlush:
+      self._flush()
   def prefetch(self,hs):
     ''' Prefetch the blocks associated with hs, an iterable returning hashes.
     '''
     sink=nullCH()
-    lastH=None
     for h in hs:
-      if lastH is not None:
-        self.fetch_bg(lastH,seq(),sink,noFlush=True)
-      lastH=h
-    if lastH is not None:
-      self.fetch_bg(lastH,seq(),sink)
+      self.fetch_bg(h,ch=sink,noFlush=True)
+    self._flush()
 
-  def haveyou_bg(self,h,rqTag,ch):
-    debug("%s: haveyou_bg(%s,%s,%s)..." % (self,h,rqTag,ch))
-    self.pending.enqueue(rqTag,ch)
-    with self.sendLock:
-      encodeHaveYou(self.sendRequestFP,rqTag,h)
-  def sync_bg(self,rqTag,ch):
-    debug("StreamStore: sync_bg()...")
-    self.pending.enqueue(rqTag,ch)
-    with self.sendLock:
-      encodeSync(self.sendRequestFP,rqTag)
+  def haveyou_bg(self,h,ch=None,noFlush=False):
+    tag, ch = self._tagch(ch)
+    self._dispatch(tag,ch,self.__haveyou_bg2,(h,tag,noFlush))
+    return ch, tag
+  def __haveyou_bg2(self,h,tag,noFlush):
+    with self.__sendLock:
+      encodeHaveYou(self.sendRequestFP,tag,h)
+    if not noFlush:
+      self._flush()
+  def sync_bg(self,noFlush=False,ch=None):
+    tag, ch = self._tagch(ch)
+    self._dispatch(tag,ch,self.__sync_bg2,(tag,noFlush))
+    return tag, ch
+  def __sync_bg2(self,tag,noFlush):
+    with self.__sendLock:
+      encodeSync(self.sendRequestFP,tag)
+    if not noFlush:
+      self._flush()
+
+  def __maptag(self,tag,ch):
+    with self.__tagmapLock:
+      self.__tagmap[tag]=ch
+    if isdebug:
+      self.log("map tag %d -> %s" % (tag,ch))
+
+  def __unmaptag(self,tag)
+    with self.__tagmapLock:
+      ch=self.__tagmap.pop(tag)
+    if isdebug:
+      self.log("unmap tag %d -> %s" % (tag,ch))
+    return ch
+
+  def _dispatch(self,tag,ch,func,args=(),kwargs=None):
+    ''' Accept a tag, channel and function-and-arguments.
+        Record the tag->channel mapping.
+        Queue the function to be called.
+        Later the ._respond() method will return a result via the channel.
+    '''
+    if isdebug: self.log("tag=%d, func=%s" % (tag,func), "_dispatch")
+    self.__maptag(tag,ch)
+    self.funcQ.dispatch(func,args,kwargs)
+
+  def _respond(self,tag,result):
+    ''' Accept a tag and the associated result, .put() the tuple (tag,result)
+        onto the matching channel and discard the tag->channel map entry.
+    '''
+    if isdebug: self.log("tag=%d, result=%s" % (tag,result), "_respond")
+    self.__unmaptag(tag).put((tag,result))
 
 class _StreamClientReader(Thread):
   ''' Class to read from the StreamDaemon's responseFP and report to
@@ -364,7 +408,7 @@ class _StreamClientReader(Thread):
   def run(self):
     debug("RUN _StreamClientReader")
     recvReplyFP=self.daemon.recvReplyFP
-    pending=self.daemon.pending
+    respond=self.daemon._respond
     debug("_StreamClientReader: recvReplyFP=%s" % recvReplyFP)
     rqTag=fromBSfp(recvReplyFP)
     while rqTag is not None:
@@ -372,16 +416,17 @@ class _StreamClientReader(Thread):
       debug("_StreamClientReader: result header: tag=%d, type=%s" % (rqTag, rqType))
       if rqType == T_QUIT:
         debug("received T_QUIT from daemon")
-        pending.dequeue(rqTag,None)
-        debug("dequeued T_QUIT from daemon")
+        respond(rqTag,None)
         break
       if rqType == T_STORE:
         hlen=fromBSfp(recvReplyFP)
         assert hlen > 0
         h=recvReplyFP.read(hlen)
-        assert len(h) == hlen
-        pending.dequeue(rqTag,h) # send has instead?
-      elif rqType == T_FETCH:
+        assert len(h) == hlen, "%s: read %d bytes, expected %d" \
+                                 % (recvReplyFP, len(h), hlen)
+        respond(rqTag,h)
+        continue
+      if rqType == T_FETCH:
         blen=fromBSfp(recvReplyFP)
         assert blen >= 0
         if blen == 0:
@@ -389,14 +434,16 @@ class _StreamClientReader(Thread):
         else:
           block=recvReplyFP.read(blen)
           assert len(block) == blen
-        pending.dequeue(rqTag,block)
-      elif rqType == T_HAVEYOU:
+        respond(rqTag, block)
+        continue
+      if rqType == T_HAVEYOU:
         yesno=bool(fromBSfp(recvReplyFP))
-        pending.dequeue(rqTag,yesno)
-      elif rqType == T_SYNC:
-        pending.dequeue(rqTag,None)
-      else:
-        assert False, "unhandled reply type %s" % rqType
+        respond(rqTag, yesno)
+        continue
+      if rqType == T_SYNC:
+        respond(rqTag, None)
+        continue
+      assert False, "unhandled reply type %s" % rqType
 
       # fetch next result
       rqTag=fromBSfp(recvReplyFP)

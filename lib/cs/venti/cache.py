@@ -5,13 +5,13 @@
 #
 
 from __future__ import with_statement
+import sys
 from thread import allocate_lock
+from Queue import Queue
 from cs.misc import seq, progress, verbose, debug
 from cs.threads import FuncQueue, Q1
 from cs.venti import tohex
 from cs.venti.store import BasicStore
-from heapq import heappush, heappop
-import sys
 
 class CacheStore(BasicStore):
   ''' A CacheStore is a Store front end to a pair of other Stores, a backend
@@ -19,7 +19,7 @@ class CacheStore(BasicStore):
       the cache store is normally a faster and possibly lossy store such as a
       MemCacheStore or a local disc store.
       
-      A block read is satisfied from the cache is possible, otherwise from
+      A block read is satisfied from the cache if possible, otherwise from
       the backend. A block store is stored to the cache and then
       asynchronously to the backend.
   '''
@@ -30,6 +30,10 @@ class CacheStore(BasicStore):
     # secondary queue to process background self.backend operations
     self.backQ=FuncQueue(size=256)
     self.__closing=False
+
+  def flush(self):
+    self.cache._flush()
+    self.backend._flush()
 
   def scan(self):
     if hasattr(self.cache,'scan'):
@@ -50,17 +54,21 @@ class CacheStore(BasicStore):
     self.backend.close()
     self.cache.close()
 
-  def store_bg(self,block,tag,ch):
-    h=self.cache.store(block)
-    assert h is not None
-    ch.put((tag,h))
-    ##progress("stored %s in cache" % tohex(h))
+  def store_bg(self,block,ch=None):
+    tag, ch = self._tagch(ch)
+    self.backQ.dispatch(self.__store_bg2,(block,ch,tag))
+    return tag, ch
+  def __store_bg2(self,block,ch,tag):
+    h = self.cache.store(block)
+    ch.put((tag, h))
     if h not in self.backend:
-      self.backQ.call(self.__store_bg2,block)
-  def __store_bg2(self,block):
-    self.backend.store(block)
+      self.backend.store(block)
 
-  def fetch_bg(self,h,tag,ch):
+  def fetch_bg(self,h,noFlush=False,ch=None):
+    tag, ch = self._tagch(ch)
+    self.backQ.dispatch(self.__fetch_bg2,(h,ch,tag))
+    return tag, ch
+  def __fetch_bg2(self,h,ch,tag):
     inCache=(h in self.cache)
     if inCache:
       ##verbose("fetch %s from cache %s"%(tohex(h), self.cache))
@@ -70,10 +78,7 @@ class CacheStore(BasicStore):
       block=self.backend[h]
     ch.put((tag,block))
     if not inCache:
-      self.backQ.call(self.__fetch_bg2,block)
-  def __fetch_bg2(self,block):
-    ##progress("fetch: cache %s in %s"%(tohex(h),self.cache))
-    self.cache.store(block)
+      self.cache.store(block)
 
   def prefetch(self,hs):
     ''' Request from the backend those hashes from 'hs'
@@ -81,18 +86,17 @@ class CacheStore(BasicStore):
     '''
     self.backend.prefetch(self.missing(hs))
 
-  def haveyou_bg(self,h,tag,ch):
+  def haveyou(self,h):
     if h in self.cache:
-      yesno=True
-    else:
-      yesno=(h in self.backend)
-    ch.put((tag,yesno))
+      return True
+    return h in self.backend
 
-  def sync_bg(self,tag,ch):
-    backCH=self.backend.sync_a()        # queue the backend
-    self.cache.sync()                   # sync the frontend
-    backCH.get()                        # wait for the backend
-    ch.put((tag,None))                  # report completion
+  def sync(self):
+    Q=Queue(2)
+    tag, ch = self.cache.sync_bg(ch=Q)
+    tag, ch = self.backend.sync_bg(ch=Q)
+    Q.get()
+    Q.get()
 
 class MemCacheStore(BasicStore):
   ''' A lossy store that keeps an in-memory cache of recent blocks.  It may

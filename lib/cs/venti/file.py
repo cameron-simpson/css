@@ -9,7 +9,8 @@ from cs.venti.blocks import BlockList
 from cs.venti.blockify import topBlockRefFP
 from threading import Thread
 from cs.threads import IterableQueue
-from cs.misc import debug, TODO, FIXME
+from cs.misc import debug, TODO, FIXME, tb
+import __main__
 
 def storeFile(ifp,rsize=None,S=None):
   ''' Store the data from ifp, return Dirent.
@@ -23,7 +24,7 @@ class ReadFile:
   ''' A read-only file interface supporting seek(), read(), readline(),
       readlines() and tell() methods.
   '''
-  def __init__(self,bref):
+  def __init__(self,bref,S=None):
     self.isdir=False
     if bref.indirect:
       self.__blist=bref.blocklist(S=S)
@@ -42,12 +43,14 @@ class ReadFile:
   def tell(self):
     return self.__pos
 
-  def readShort(self):
-    (h,offset)=self.__blist.seekToBlock(self.tell())
+  def readShort(self,S=None):
+    if S is None:
+      S=__main__.S
+    (h,offset)=self.__blist.seekToBlock(self.tell(),S=S)
     if h is None:
       # at or past EOF - return empty read
       return ''
-    b=self.__store[h]
+    b=S[h]
     assert offset < len(b)
     chunk=b[offset:]
     assert len(chunk) > 0
@@ -157,4 +160,6 @@ class WriteNewFile:
 class WriteOverFile:
   ''' A File-like class that overwrites an existing 
   '''
-  FIXME("WriteOverFile() UNIMPLEMENTED")
+  def __init__(self):
+    FIXME("WriteOverFile() UNIMPLEMENTED")
+    tb()

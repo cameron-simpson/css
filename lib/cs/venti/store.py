@@ -4,29 +4,54 @@
 #       - Cameron Simpson <cs@zip.com.au>
 #
 
+''' Basic Store classes.
+
+    Throughout these classes the term 'channel' means an object with a .get()
+    method and usually a .put() method (unless it is instantiated with a
+    pre-queued value for the .get()). It may be a Queue, Q1, Channel, Get1
+    or any similar object for delivery of a result "later".
+'''
+
 from __future__ import with_statement
 import sys
 import os
 import os.path
 import time
-from zlib import compress, decompress
-from cs.misc import cmderr, debug, warn, progress, verbose, out, fromBS, toBS, fromBSfp, tb, seq, LogLine
-from cs.threads import FuncQueue, Q1, DictMonitor
-from cs.venti import tohex
 import thread
 from Queue import Queue
+from cs.misc import cmderr, debug, warn, progress, verbose, out, fromBS, toBS, fromBSfp, tb, seq, Loggable
+from cs.threads import FuncQueue, Q1, DictMonitor
+from cs.venti import tohex
 
-class BasicStore(LogLine):
+class BasicStore(Loggable):
   ''' Core functions provided by all Stores.
       For each of the core operations (store, fetch, haveyou, sync)
       a subclass must implement at least one of each of the op or op_bg methods.
+      The methods here are written in terms of each other.
+
+      With respect to the op_bg methods, these return a (tag, channel) pair.
+      In normal use the caller will care only about the channel or the tag,
+      rarely both. If no channel is presupplied then the return channel is
+      a single use channel on which only relevant (tag, result) response will
+      be seen, so the tag is superfluous. In the case where a channel is
+      presupplied it is possible for responses to requests to arrive in
+      arbitrary order, so the tag is needed to identify the response with the
+      calling request; however the caller already knows the channel.
+
+      The hint noFlush, if specified and True, suggests that streaming
+      store connections need not flush the request stream because another
+      request will follow very soon after this request. This allows
+      for more efficient use of streams. Users who set this hint to True
+      must ensure that a "normal" flushing request, or a call of the
+      ._flush() method, follows any noFlush requests promptly otherwise
+      deadlocks may ensue.
   '''
   def __init__(self,name):
-    LogLine.__init__(self,name)
+    Loggable.__init__(self,name)
     self.name=name
     self.logfp=None
     self.__closing=False
-    self.Q=FuncQueue()
+    self.funcQ=FuncQueue()
 
   def __str__(self):
     return "Store(%s)" % self.name
@@ -35,170 +60,106 @@ class BasicStore(LogLine):
     assert not self.__closing, "close on closed BasicStore"
     self.sync()
     self.__closing=True
-    self.Q.close()
+    self.funcQ.close()
 
   def hash(self,block):
     ''' Compute the hash for a block.
     '''
     from cs.venti.hash import hash_sha
     return hash_sha(block)
+
+  def _tagch(self,ch=None):
+    ''' Allocate a tag and a (optionally) channel.
+    '''
+    if ch is None: ch=Q1()
+    return seq(), ch
+
+  def _flush(self):
+    pass
+
   def store(self,block):
     ''' Store a block, return its hash.
     '''
+    ##self.log("store %d bytes" % len(block))
     assert not self.__closing
-    ch=self.store_a(block)
-    tag, h = ch.get()
-    assert type(h) is str and type(tag) is int, "h=%s, tag=%s"%(h,tag)
+    tag, ch = self.store_bg(block)
+    assert type(tag) is int
+    tag2, h = ch.get()
+    assert type(h) is str and type(tag2) is int, "h=%s, tag2=%s"%(h,tag2)
+    assert tag == tag2
     return h
-  def store_a(self,block):
-    ''' Queue a block for storage, return a cs.threads.Q1 from which to
-        read (tag,hash) when stored.
+
+  def store_bg(self,block,noFlush=False,ch=None):
+    ''' Accept a block for storage, return a channel and tag for the completion.
+        The optional ch parameter may specify the channel.
+        On completion, a (tag, hashcode) tuple is put on the channel.
     '''
-    assert type(block) is str, \
-           "block=%s"%(block,tag)
-    assert not self.__closing
-    ch=Q1()
-    self.store_ch(block,ch)
-    return ch
-  def store_ch(self,block,ch,tag=None):
-    ''' Given a block, a channel/Queue and an optional tag,
-        queue the block for storage and return the tag.
-        If the tag is None or missing, one is generated.
-    '''
-    assert not self.__closing
-    if tag is None: tag=seq()
-    self.Q.qfunc(self.store_bg,block,tag,ch)
-    return tag
-  def store_bg(self,block,tag,ch):
-    ''' Accept a block for storage, report the hash code on the supplied channel/queue.
-        Then store the block synchronously.
-    '''
-    h=self.hash(block)
-    ch.put((tag,h))
-    h2=self.store(block)
-    assert h == h2, "hash(block)=%s, %s.store() returns %s" % (h, self, h2)
+    tag, ch = self._tagch(ch)
+    self.funcQ.dispatch(self.__store_bg2,(block,ch,tag))
+    return tag, ch
+  def __store_bg2(self,block,ch,tag):
+    ch.put(tag, self.store(block))
+
   def fetch(self,h):
     ''' Fetch a block given its hash.
     '''
+    ##self.log("fetch %s" % tohex(h))
     assert not self.__closing
-    ch=self.fetch_a(h,None)
+    tag, ch = self.fetch_bg(h)
+    assert type(tag) is int
     tag, block = ch.get()
     return block
-  def fetch_a(self,h,noFlush=False):
-    ''' Request a block from its hash.
-        Return a cs.threads.Q1 from which to read (tag,block).
-        The hint noFlush, if specified and True, suggests that streaming
-        store connections need not flush the request stream because another
-        request will follow immediately after this request. This allows
-        for more efficient use of streams. Users of this flag must
-        ensure that a "normal" flushing request follows any noFlush
-        requests promptly, otherwise deadlocks may ensue.
+  def fetch_bg(self,h,noFlush=False,ch=None):
+    ''' Request a block from its hash, return a channel and tag for the
+        completion. The optional ch parameter may specify the channel.
+        On completion, a (tag, block) tuple is put on the channel.
     '''
-    assert not self.__closing
-    ch=Q1()
-    self.fetch_ch(h,ch)
-    return ch
-  def fetch_ch(self,h,ch,tag=None,noFlush=False):
-    ''' Given a hash, a channel/Queue and an optional tag,
-        queue the hash for retrieval and return the tag.
-        If the tag is None or missing, one is generated.
-        The hint noFlush, if specified and True, suggests that streaming
-        store connections need not flush the request stream because another
-        request will follow immediately after this request. This allows
-        for more efficient use of streams. Users of this flag must
-        ensure that a "normal" flushing request follows any noFlush
-        requests promptly, otherwise deadlocks may ensue.
-    '''
-    assert not self.__closing
-    if tag is None: tag=seq()
-    self.Q.qfunc(self.fetch_bg,(h,tag,ch))
-    return tag
-  def fetch_bg(self,h,tag,ch):
-    ''' Accept a hash, report the matching block on the supplied channel/queue.
-    '''
-    block=self.fetch(h)
-    ch.put((tag,block))
-  def prefetch(self,hs):
-    ''' Prefetch the blocks associated with hs, an iterable returning hashes.
-        This is intended to hint that these blocks will be wanted soon,
-        and so implementors should probably queue the fetches on an
-        "idle" queue so as not to penalise other store users.
-        This default implementation does nothing, which may be perfectly
-        legitimate for some stores.
-    '''
-    pass
-  def multifetch(self,hs):
-    ''' Generator returning a bunch of blocks in sequence corresponding to
-        the iterable hashes 'hs'.
-    '''
-    qs=[]
-    lasth=None
-    for h in hs:
-      if lasth is not None:
-        qs.append(self.fetch_a(lasth),noFlush=True)
-      lasth=h
-    if lasth is not None:
-      qs.append(self.fetch_a(lasth))
-    for q in qs:
-      tag, block = q.get()
-      yield block
+    tag, ch = self._tagch(ch)
+    self.funcQ.dispatch(self.__fetch_bg2,(h,ch,tag))
+    return tag, ch
+  def __fetch_bg2(self,h,ch,tag):
+    ch.put((tag,self.fetch(h)))
 
   def haveyou(self,h):
     ''' Test if a hash is present in the store.
     '''
+    ##self.log("haveyou %s" % tohex(h))
     assert not self.__closing
-    ch=self.haveyou_a(h)
+    tag, ch = self.haveyou_bg(h)
     tag, yesno = ch.get()
     return yesno
-  def haveyou_a(self,h):
+  def haveyou_bg(self,h,noFlush=False,ch=None):
     ''' Query whether a hash is in the store.
-        Return a cs.threads.Q1 from which to read (tag, yesno).
+        Return a (tag, channel). A .get() on the channel will return
+        (tag, yesno).
     '''
     assert not self.__closing
-    ch=Q1()
-    self.haveyou_ch(h,ch)
-    return ch
-  def haveyou_ch(self,h,ch,tag=None):
-    assert not self.__closing
-    if tag is None: tag=seq()
-    self.Q.qfunc(self.haveyou_bg,(h,tag,ch))
-    return tag
-  def haveyou_bg(self,h,tag,ch):
-    ch.put((tag, self.haveyou(h)))
-  def missing(self,hs):
-    ''' Yield hashcodes that are not in the store from an iterable hash code list.
-    '''
-    for h in hs:
-      if h not in self.cache:
-        yield h
+    tag, ch = self._tagch(ch)
+    self.funcQ.dispatch(self.__haveyou_bg2,(h,tag,ch))
+    return tag, ch
+  def __haveyou_bg2(self,h,tag,ch):
+    ch.put((tag,self.haveyou(h)))
+
   def sync(self):
     ''' Return when the store is synced.
     '''
+    self.log("sync")
     assert not self.__closing
-    debug("store.sync: calling sync_a...")
-    ch=self.sync_a()
-    debug("store.sync: waiting for response on %s" % ch)
+    tag, ch = self.sync_bg()
     tag, dummy = ch.get()
-    debug("store.sync: response: tag=%s, dummy=%s" % (tag, dummy))
-  def sync_a(self):
-    ''' Request that the store be synced.
-        Return a cs.threads.Q1 from which to read the answer on completion.
-    '''
-    assert not self.__closing
-    ch=Q1()
-    self.sync_ch(ch)
-    return ch
-  def sync_ch(self,ch,tag=None):
-    if tag is None: tag=seq()
-    self.Q.qfunc(self.sync_bg,(tag,ch))
-    return tag
-  def sync_bg(self,tag,ch):
+  def sync_bg(self,noFlush=False,ch=None):
+    tag, ch = self._tagch(ch)
+    self.funcQ.dispatch(self.__sync_bg2,(tag,ch))
+    return tag, ch
+  def __sync_bg2(self,tag,ch):
     self.sync()
     ch.put((tag,None))
+
   def __contains__(self, h):
     ''' Wrapper for haveyou().
     '''
     return self.haveyou(h)
+
   def __getitem__(self,h):
     ''' Wrapper for fetch(h).
     '''
@@ -208,12 +169,78 @@ class BasicStore(LogLine):
     if block is None:
       raise KeyError, "%s: fetch(%s) returned None" % (self, tohex(h))
     return block
+
   def get(self,h,default=None):
     ''' Return block for hash, or None if not present in store.
     '''
     if h not in self:
       return None
     return self[h]
+
+  def missing(self,hs):
+    ''' Yield hashcodes that are not in the store from an iterable hash
+        code list.
+    '''
+    for h in hs:
+      if h not in self.cache:
+        yield h
+
+  def prefetch(self,hs):
+    ''' Prefetch the blocks associated with hs, an iterable returning hashes.
+        This is intended to hint that these blocks will be wanted soon,
+        and so implementors might queue the fetches on an "idle" queue so as
+        not to penalise other store users.
+        This default implementation does nothing, which may be perfectly
+        legitimate for some stores.
+    '''
+    pass
+
+  def multifetch(self,hs):
+    ''' Generator returning a bunch of blocks in sequence corresponding to
+        the iterable hashes 'hs'.
+    '''
+    # dispatch a thread to request the blocks
+    tagQ=Queue(0)       # the thread echoes tags for eash hash in hs
+    FQ=Queue(0)         # and returns (tag,block) on FQ, possibly out of order
+    Thread(target=self.__multifetch_rq,args=(hs,tagQ,FQ)).start()
+
+    waiting={}  # map of blocks that arrived out of order
+    frontTag=None
+    while True:
+      if frontTag is not None:
+        # we're waiting for a particular tag
+        tag, block = FQ.get()
+        if tag == frontTag:
+          # it is the one desired, return it
+          yield block
+          frontTag = None
+        else:
+          # not what we wanted - save it for later
+          waiting[tag]=block
+      # get the next desired tag whose block has not yet arrived
+      while frontTag is None:
+        # get the next desired tag
+        frontTag = tagQ.get()
+        if frontTag is None:
+          # end of tag stream
+          break
+        if frontTag in waiting:
+          # has this tag already arrived?
+          yield waiting.pop(frontTag)
+          frontTag = None
+    assert len(waiting.keys()) == 0
+
+  def __multifetch_rq(self,hs,tagQ,FQ):
+    h0=None
+    for h in hs:
+      tag, ch = self._tagch(FQ)
+      self.fetch_bg(h,noFlush=True,ch=FQ)
+      tagQ.put(tag)
+      h0=h
+    if h0 is not None:
+      # dummy request to flush stream
+      self.haveyou_bg(h0,ch=Get1())
+    tagQ.put(None)
 
 class Store(BasicStore):
   ''' A store connected to a backend store or a type designated by a string.
@@ -224,6 +251,7 @@ class Store(BasicStore):
           /path/to/store designates a GDBMStore.
           |shell-command designates a command to connect to a StreamStore.
           tcp:addr:port designates a TCP target serving a StreamStore.
+        Otherwise 'S' is presumed already to be a store.
     '''
     BasicStore.__init__(self,str(S))
     if type(S) is str:

@@ -10,6 +10,7 @@ from cs.misc import toBS, fromBS, fromBSfp, warn, cmderr, TODO, FIXME, isdebug
 from cs.io import readn
 from cs.venti import MAX_SUBBLOCKS, tohex
 from cs.venti.hash import HASH_SIZE_DEFAULT
+import __main__
 
 class BlockRef:
   ''' A reference to a "file" (block sequence) consisting of a hash and an
@@ -28,9 +29,11 @@ class BlockRef:
     return self.span
   def __str__(self):
     return tohex(self.encode())
-  def blocklist(self,S):
+  def blocklist(self,S=None):
     assert self.indirect
-    return BlockList(S,self.h)
+    if S is None:
+      S=__main__.S
+    return BlockList(S[self.h])
   @classmethod
   def decode(cls, s, justone=False):
     ''' Decode a blockref and return it.
@@ -83,8 +86,6 @@ class BlockRef:
     else:
       hlen=""
     brefEnc=toBS(flags)+toBS(self.span)+hlen+h
-    if isdebug:
-      import sys; print >>sys.stderr, "brefEnc=[%s]" % tohex(brefEnc)
     return brefEnc
 
   def leaves(self,S):

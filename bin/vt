@@ -39,7 +39,7 @@ from cs.venti.store import Store, pullFrom
 from cs.venti.cache import CacheStore, MemCacheStore
 from cs.venti.archive import archive2bref, archiveAppend
 from cs.venti.dir import Dir, storeDir, decodeDirent
-from cs.misc import cmd, cmderr, setcmd, warn, debug, progress
+from cs.misc import cmd, cmderr, setcmd, warn, debug, progress, logTo
 import cs.upd; cs.upd.default()
 
 usage='''Usage:
@@ -67,6 +67,7 @@ badopts=False
 
 dflt_cache=os.environ.get('VT_STORE_CACHE')
 dflt_vt_store=os.environ.get('VT_STORE')
+dflt_log=os.environ.get('VT_LOGFILE')
 useMemCache=True
 
 S=None
@@ -162,7 +163,7 @@ else:
   # =over 4
   #
   op=args.pop(0)
-  setcmd("%s: %s" % (cmd,op))
+  setcmd("%s-%s" % (cmd,op))
   if op == "cat":
     # =item B<cat> I<filerefs...>
     #
@@ -302,6 +303,9 @@ if badopts:
   stderr.write(usage)
   exit(2)
 
+if dflt_log is not None:
+  logTo(dflt_log)
+
 S=Store(dflt_vt_store)
 
 if dflt_cache is not None:
@@ -365,19 +369,21 @@ def lsDirent(fp,E,name):
   ##print "name=%s" % `name`
   t=datetime.datetime.fromtimestamp(int(st_mtime))
   fp.write("%c %-41s %s %-6d %s\n" \
-           % (('d' if D.isdir(name) else 'f'),
+           % (('d' if E.isdir() else 'f'),
               bref, t, st_size, name))
 
 def ls(path,D,recurse,fp=None):
   if fp is None:
     fp=stdout
-  ##warn("ls %s: bref=%s"%(path,("s:"+tohex(bref) if type(bref) is str else "bref.h:"+tohex(bref.h))))
   fp.write(path)
   fp.write(":\n")
   if not recurse:
+    debug("ls(): getting dirs and files...")
     names=D.dirs()+D.files()
+    debug("ls(): got dirs and files = %s" % (names,))
     names.sort()
     for name in names:
+      debug("ls(): D=%s (%s), name=%s" % (D,type(D),name))
       E=D[name]
       lsDirent(fp,E,name)
   else:
@@ -386,7 +392,7 @@ def ls(path,D,recurse,fp=None):
     for name in files:
       E=D[name]
       lsDirent(fp,E,name)
-      assert not D.isdir(name), name+" should not be a directory!"
+      assert not E.isdir(), name+" should not be a directory!"
     for name in dirs:
       ##fp.write("\n")
       ls(os.path.join(path,name),D.chdir1(name),recurse,fp)
@@ -406,10 +412,10 @@ if op == "pack":
     from cs.venti.file import storeFile
     for path in args:
       if os.path.isdir(path):
-        bref=storeDir(path,S=S)
+        E=storeDir(path,S=S)
       else:
-        bref=storeFile(open(path),S=S)
-      archiveAppend(stdout,bref,None,path)
+        E=storeFile(open(path),S=S)
+      archiveAppend(stdout,E,None,path)
   else:
     archive=args[1]
     path=args[2]
@@ -474,10 +480,11 @@ elif op == "ls":
       first=False
     else:
       print
-    print "ls", path, "..."
+    ##print "ls", path, "..."
     D, name = resolve(path)
-    print "resolve(%s) -> %s, %s" % (path, D, name)
-    D=D.chdir1(name)
+    ##print "resolve(%s) -> %s, %s" % (path, D, name)
+    if name is not None:
+      D=D.chdir1(name)
     ls(path,D,recurse,stdout)
 
 elif op == "mount":
