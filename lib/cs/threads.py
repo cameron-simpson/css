@@ -9,11 +9,12 @@ import sys
 from thread import allocate_lock
 from threading import Semaphore, Thread
 from Queue import Queue
-from cs.misc import debug, ifdebug, isdebug, tb, cmderr, warn, reportElapsedTime, logFnLine
+from collections import deque
+from cs.misc import debug, isdebug, tb, cmderr, warn, reportElapsedTime, logFnLine
 from cs.upd import nl, out
 
 class AdjustableSemaphore:
-  ''' A semaphore whose value may be tuned at runtime.
+  ''' A semaphore whose value may be tuned after instantiation.
   '''
   def __init__(self, value=1, name="AdjustableSemaphore"):
     self.__sem=Semaphore(value)
@@ -137,48 +138,6 @@ class IterableQueue(Queue):
       raise StopIteration
     return item
 
-class JobQueue:
-  ''' A job queue.
-      Q.queue(token) -> channel
-      Q.dequeue(token, result) -> sends result to channel, releases channel
-  '''
-  def __init__(self,maxq=None,useQueue=True):
-    self.q={}
-    self.lock=allocate_lock()
-    self.maxq=maxq
-    self.useQueue=useQueue
-    if maxq is not None:
-      assert maxq > 0
-      self.maxsem=BoundedSemaphore(maxq)
-
-  def enqueue(self,n,ch=None,useQueue=None):
-    ''' Queue a token, return a channel to recent the job completion.
-        Allocate a single-use channel for the result if none supplied.
-    '''
-    if self.maxq is not None:
-      self.maxsem.acquire()
-    if ch is None:
-      if useQueue is None:
-        useQueue=self.useQueue
-      ch=Q1()
-      debug("enqueue: using allocated channel %s" % ch)
-    with self.lock:
-      assert n not in self.q, "\"%s\" already queued"
-      debug("enqueue: q[%d]=%s" % (n, ch))
-      ##if ifdebug(): tb()
-      self.q[n]=ch
-    return ch
-  
-  def dequeue(self,n,result):
-    ''' Dequeue a token, send the result and token down the channel allocated.
-    '''
-    with self.lock:
-      ch = self.q[n]
-      del self.q[n]
-    if self.maxq is not None:
-      self.maxsem.release()
-    ch.put((n,result))
-
 class JobCounter:
   ''' A class to count and wait for outstanding jobs.
       As jobs are queued, JobCounter.inc() is called.
@@ -257,7 +216,7 @@ class FuncQueue:
       Thread(target=self.__runQueue).start()
   def callback(self,retQ,func,args=(),kwargs=None):
     ''' Queue a function for dispatch.
-        The function return value will be .put() on retQ.
+        If retQ is not None, the function return value will be .put() on retQ.
     '''
     assert not self.__closing
     if kwargs is None:
@@ -266,24 +225,24 @@ class FuncQueue:
       assert type(kwargs) is dict
     if retQ is None: retQ=Q1()
     self.__Q.put((retQ,func,args,kwargs))
+  def callbg(self,func,args=(),kwargs=None):
+    ''' Asynchronously call the supplied func via the FuncQueue.
+        Returns a Q1 from which the result may be .get().
+    '''
+    retQ=Q1()
+    self.callback(retQ,func,args,kwargs)
+    return retQ
   def call(self,func,args=(),kwargs=None):
     ''' Synchronously call the supplied func via the FuncQueue.
         Return the function result.
     '''
-    Q=Q1()
-    self.callback(Q,func,args,kwargs)
-    return Q.get()
-  def qfunc(self,func,*args,**kwargs):
+    return self.callbg(func,args,kwargs).get()
+  def dispatch(self,func,args=(),kwargs=None):
     ''' Asynchronously call the supplied func via the FuncQueue.
     '''
     self.callback(None,func,args,kwargs)
   def close(self):
-    ''' Close the FuncQueue.
-        Any remaining uncalled function are consumed but not called.
-    '''
-    if not self.__closing:
-      self.__closing=True
-      self.__Q.close()
+    self.__Q.close()
   def __runQueue(self):
     ''' A thread to process queue items serially.
         This exists to permit easy or default implementation of the
@@ -293,13 +252,9 @@ class FuncQueue:
         thread scheme to manage multiple *_a() operations.
     '''
     for retQ, func, args, kwargs in self.__Q:
-      if self.__closing:
-        debug("FuncQueue closing, skipping call of %s, returning None" % func)
-        ret=None
-      else:
-        debug("func=%s, args=%s, kwargs=%s"%(func,args,kwargs))
-        ret=func(*args,**kwargs)
-      if retQ:
+      ##debug("func=%s, args=%s, kwargs=%s"%(func,args,kwargs))
+      ret=func(*args,**kwargs)
+      if retQ is not None:
         retQ.put(ret)
 
 ''' A pool of Channels.
@@ -307,15 +262,16 @@ class FuncQueue:
 __channels=[]
 __channelsLock=allocate_lock()
 def getChannel():
+  ''' Obtain a Channel object.
+  '''
   with __channelsLock:
     if len(__channels) == 0:
-      ch=Channel()
-      debug("getChannel: allocated %s" % ch)
-      ##tb()
+      ch=_Channel()
+      if isdebug: warn("getChannel: allocated %s" % ch)
     else:
       ch=__channels.pop(-1)
   return ch
-def _returnChannel(ch):
+def returnChannel(ch):
   debug("returnChannel: releasing %s" % ch)
   with __channelsLock:
     assert ch not in __channels
@@ -330,12 +286,10 @@ def Q1(name=None):
   '''
   with __queuesLock:
     if len(__queues) == 0:
-      Q=_Q1()
+      Q=_Q1(name=name)
     else:
       Q=__queues.pop(-1)
       Q._reset(name=name)
-      Q.didget=False
-      Q.didput=False
   return Q
 def _returnQ1(Q):
   assert Q.empty()
@@ -353,7 +307,7 @@ class _Q1(Queue):
     self._reset(name=name)
   def _reset(self,name):
     if name is None:
-      if ifdebug():
+      if isdebug:
         import traceback
         name="Q1:[%s]" % (traceback.format_list(traceback.extract_stack()[-3:-1])[0].strip().replace("\n",", "))
       else:
@@ -374,6 +328,21 @@ class _Q1(Queue):
     item=Queue.get(self)
     _returnQ1(self)
     return item
+
+class Get1:
+  ''' A single use storage container with a .get() method,
+      so it looks like a Channel or a Q1.
+      It is intended for functions with an asynchronous calling interface
+      (i.e. a function that returns a "channel" from which to read the result)
+      but synchronous internals - the result is obtained and wrapped in a
+      Get1() for retrieval.
+  '''
+  def __init__(self,value):
+    self.__value=value
+  def put(self,value):
+    self.__value=value
+  def get(self):
+    return self.__value
 
 class PreQueue(Queue):
   ''' A Queue with push-back and iteration.
