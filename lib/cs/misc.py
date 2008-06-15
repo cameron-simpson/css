@@ -44,6 +44,8 @@ if 'DEBUG' in os.environ \
    and os.environ['DEBUG'] != "0":
     debug_level=3
 isdebug=(debug_level >= 3)
+isverbose=(debug_level >= 2)
+isprogress=(debug_level >= 1)
 
 debug_level_stack=[]
 def pushDebug(newlevel=True):
