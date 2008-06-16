@@ -191,15 +191,6 @@ def elapsedTime(func,*args,**kw):
   t1=time.time()
   return t0, t1, result
 
-timelogs={}
-_timelogs_lock=allocate_lock()
-def logTime(tag,t):
-  with _timelogs_lock:
-    if tag in timelogs:
-      timelogs[tag]+=t
-    else:
-      timelogs[tag]=t
-
 def reportElapsedTime(tag,func,*args,**kw):
   t, result = reportElapsedTimeTo(None,tag,func,*args,**kw)
   return result
