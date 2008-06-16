@@ -1,4 +1,4 @@
-#!/usr/bin/python -tt
+#!/usr/bin/env python2.5
 #
 # Make the next directory in a sequence.
 #       - Cameron Simpson <cs@zip.com.au> 28jun2000
