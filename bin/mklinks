@@ -1,4 +1,4 @@
-#!/usr/bin/python -tt
+#!/usr/bin/env python2.5
 #
 # Recode of mklinks in Python, partly for the exercise and partly to
 # improve the algorithm.
