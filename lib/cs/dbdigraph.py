@@ -69,8 +69,10 @@ class DBDiGraph:
     else:
       assert len(type) > 0
 
-    if name is not None and not multipleNamesOk and self.nodeByNameAndType(name,type):
-      die("createNode(name="+str(name)+", type="+type+"): already exists")
+    assert name is None \
+        or multipleNamesOk \
+        or self.nodeByNameAndType(name,type) is None, \
+           "(name=%s, type=%s): already exists" % (name,type)
 
     if not self.__soleUser or self.__lastid is None:
       newId=[row[0] for row in SQLQuery(self.nodes.conn,'SELECT MAX(ID) FROM NODES')][0]

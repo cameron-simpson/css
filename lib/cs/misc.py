@@ -96,9 +96,6 @@ def TODO(msg):
 def FIXME(msg):
   logFnLine(msg, frame=sys._getframe(1), prefix="FIXME(%s)"%cmd)
 
-def die(*args):
-  assert False, strlist(args," ")
-
 def tb(limit=None):
   import traceback
   global cmd__
