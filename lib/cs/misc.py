@@ -5,7 +5,6 @@ import errno
 import sys
 import string
 import time
-import cs.upd; from cs.upd import nl, out, without as withoutUpd
 from StringIO import StringIO
 from thread import allocate_lock
 from cs.lex import parseline, strlist
@@ -18,15 +17,17 @@ def setcmd(ncmd):
 
 setcmd(os.path.basename(sys.argv[0]))
 
+_defaultUpd=None
+
 # print to stderr
 def warn(*args):
-  global warnFlushesUpd
   msg=" ".join(str(s) for s in args)
-  if cs.upd.active:
-    nl(msg)
-  else:
+  global _defaultUpd
+  if _defaultUpd is None:
     print >>sys.stderr, msg
     sys.stderr.flush()
+  else:
+    _defaultUpd.nl(msg)
 
 # debug_level:
 #   0 - quiet
@@ -37,7 +38,6 @@ def warn(*args):
 debug_level=0
 if sys.stderr.isatty():
   debug_level=1
-  cs.upd.default()
 if 'DEBUG' in os.environ \
    and len(os.environ['DEBUG']) > 0 \
    and os.environ['DEBUG'] != "0":
@@ -79,9 +79,10 @@ def verbose(*args):  debugif(2,*args)
 def debug(*args):    debugif(3,*args)
 def out(*args):
   if ifdebug(1):
-    if cs.upd.active:
+    global _defaultUpd
+    if _defaultUpd is not None:
       if len(*args) > 0:
-        return cs.upd.out(" ".join(args))
+        return _defaultUpd.out(" ".join(args))
     return warn(*args)
 
 def cmderr(*args):
@@ -101,8 +102,9 @@ def die(*args):
 def tb(limit=None):
   import traceback
   global cmd__
-  if cs.upd.active:
-    upd=cs.upd.default()
+  global _defaultUpd
+  upd=_defaultUpd
+  if upd is not None:
     oldUpd=upd.state()
     upd.out('')
 
@@ -118,7 +120,7 @@ def tb(limit=None):
       if n >= limit:
         break
 
-  if cs.upd.active:
+  if upd is not None:
     upd.out(oldUpd)
 
 _logPath=None

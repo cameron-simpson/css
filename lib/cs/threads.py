@@ -11,7 +11,6 @@ from threading import Semaphore, Thread
 from Queue import Queue
 from collections import deque
 from cs.misc import debug, isdebug, tb, cmderr, warn, reportElapsedTime, logFnLine
-from cs.upd import nl, out
 
 class AdjustableSemaphore:
   ''' A semaphore whose value may be tuned after instantiation.
@@ -133,7 +132,6 @@ class IterableQueue(Queue):
   def next(self):
     item=self.get()
     if item is None:
-      ##nl("IterableQueue.next(): got None, exiting iteration")
       Queue.put(self,None)      # for another iterator
       raise StopIteration
     return item
