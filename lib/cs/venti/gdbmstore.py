@@ -91,7 +91,6 @@ class GDBMStore(BasicStore):
         - zblock (compressed block)
         Notes the offset to the zblock and the zsize in the GDBM index.
     '''
-    assert False, "GDBMStore store!!"
     self.log("store %d bytes" % len(block))
     h=hash(block)
     if h in self:
