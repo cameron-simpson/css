@@ -12,7 +12,7 @@ import datetime
 from sets import Set
 import cs.secret
 import cs.cache
-from cs.misc import cmderr, debug, ifdebug, pushDebug, popDebug, warn, isodate, the, WithUC_Attrs
+from cs.misc import cmderr, debug, ifdebug, warn, isodate, the, WithUC_Attrs
 from thread import allocate_lock
 
 def today():
@@ -512,10 +512,7 @@ class DirectTableRow(WithUC_Attrs):
   def __setitem__(self,column,value):
     if type(column) is not str:
       column=self.__table.index2column(column)
-
-    ##pushDebug(True)
     dosql(self.__table.conn,'UPDATE '+self.__table.name+' SET '+column+' = '+sqlise(value)+' WHERE '+self.__where)
-    ##popDebug()
     self.__values=None
 
 class KeyedTableView(cs.cache.Cache):

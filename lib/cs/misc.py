@@ -35,29 +35,49 @@ def warn(*args):
 #   2 - verbose progress reporting
 #   3 or more - more verbose, and activates the debug() function
 #
-debug_level=0
-if sys.stderr.isatty():
-  debug_level=1
-if 'DEBUG' in os.environ \
-   and len(os.environ['DEBUG']) > 0 \
-   and os.environ['DEBUG'] != "0":
-    debug_level=3
-isdebug=(debug_level >= 3)
-isverbose=(debug_level >= 2)
-isprogress=(debug_level >= 1)
+def setDebug(newlevel):
+  if newlevel is None:
+    newlevel=0
+    if sys.stderr.isatty():
+      newlevel=1
+    env=os.environ.get('DEBUG_LEVEL','')
+    if len(env) > 0 and env.isdigit():
+      newlevel=int(env)
+    else:
+      env=os.environ.get('DEBUG','')
+      if len(env) > 0 and env != "0":
+        newlevel=3
+  if newlevel > 0:
+    cs.upd.default()
+  global debug_level, isdebug, isverbose, isprogress
+  debug_level=newlevel
+  isdebug=(debug_level >= 3)
+  isverbose=(debug_level >= 2)
+  isprogress=(debug_level >= 1)
+
+setDebug(None)
 
 debug_level_stack=[]
-def pushDebug(newlevel=True):
+def pushDebug(newlevel):
   global debug_level, debug_level_stack
-  if type(newlevel) is bool:
-    if newlevel: newlevel=3
-    else:        newlevel=debug_level
   debug_level_stack.append(debug_level)
-  debug_level=newlevel
+  setDebug(newlevel)
 
 def popDebug():
   global debug_level, debug_level_stack
-  debug_level=debug_level_stack.pop()
+  setDebug(debug_level_stack.pop())
+
+class DebugLevel:
+  def __init__(self,level=None):
+    global debug_level
+    if level is None:
+      level=debug_level
+    self.level=level
+  def __enter__(self):
+    pushDebug(self.level)
+  def __exit__(self,exc_type,exc_value,traceback):
+    popDebug()
+    return False
 
 def ifdebug(level=3):
   ''' Tests if the debug_level is above the specified threshold.
