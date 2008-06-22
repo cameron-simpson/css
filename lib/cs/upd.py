@@ -11,7 +11,6 @@ def default():
   if _defaultUpd is None:
     import sys
     _defaultUpd=Upd(sys.stderr)
-    cs.misc._defaultUpd=_defaultUpd
   return _defaultUpd
 
 def nl(line):    return default().nl(line)

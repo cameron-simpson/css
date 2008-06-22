@@ -48,7 +48,9 @@ def setDebug(newlevel):
       if len(env) > 0 and env != "0":
         newlevel=3
   if newlevel > 0:
-    cs.upd.default()
+    global _defaultUpd
+    import cs.upd
+    _defaultUpd=cs.upd.default()
   global debug_level, isdebug, isverbose, isprogress
   debug_level=newlevel
   isdebug=(debug_level >= 3)
