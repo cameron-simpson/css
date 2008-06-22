@@ -1,9 +1,11 @@
 #!/usr/bin/python
 
+import os
 from datetime import datetime
-from cs.venti import tohex
+from cs.venti import tohex, fromhex
+from cs.venti.dir import decodeDirent
 
-def archive2bref(archive):
+def archive2dir(archive):
   ''' Open an archive file, return the last dirent mentioned.
       TODO: accept timestamp or something to retrieve older snapshots.
   '''

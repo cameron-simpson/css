@@ -37,7 +37,7 @@ import datetime
 from cs.venti import tohex, fromhex
 from cs.venti.store import Store, pullFrom
 from cs.venti.cache import CacheStore, MemCacheStore
-from cs.venti.archive import archive2bref, archiveAppend
+from cs.venti.archive import archive2dir, archiveAppend
 from cs.venti.dir import Dir, storeDir, decodeDirent
 from cs.misc import cmd, cmderr, setcmd, warn, debug, progress, logTo
 import cs.upd; cs.upd.default()
@@ -420,10 +420,10 @@ if op == "pack":
     archive=args[1]
     path=args[2]
     assert os.path.isdir(path)
-    D=Dir(path,S)
-    target=archive2bref(archive)
-    if target is not None:
-      D.overlayBlockRef(target)
+    D=archive2dir(archive)
+    if D is None:
+      D=Dir(path)
+    print "archive=%s, D=%s" % (archive,D)
     D.updateFrom(path,
                  ignoreTimes=False,
                  deleteMissing=True,
