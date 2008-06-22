@@ -377,9 +377,9 @@ class Dir(Dirent):
             if st.st_size == E.size() and st.st_mtime == int(E.mtime()):
               verbose("%s: same size and mtime, skipping" % filepath)
               continue
-            verbose("%s: differing size/mtime, storing" % filepath)
+            verbose("%s: differing size/mtime" % filepath)
           else:
-            verbose("IGNORETIMES=True")
+            verbose("%s: IGNORETIMES=True" % filepath)
         else:
           verbose("%s not in dir"%subfile)
 
