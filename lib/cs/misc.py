@@ -21,7 +21,7 @@ _defaultUpd=None
 
 # print to stderr
 def warn(*args):
-  msg=" ".join(str(s) for s in args)
+  msg=" ".join([str(s) for s in args])
   global _defaultUpd
   if _defaultUpd is None:
     print >>sys.stderr, msg
