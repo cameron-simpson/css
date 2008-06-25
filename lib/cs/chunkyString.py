@@ -3,8 +3,7 @@
 
 import sys
 from time import time
-from cs.upd import nl, out
-from cs.misc import isdebug, reportElapsedTime
+from cs.misc import isdebug, warn, reportElapsedTime
 
 class ChunkyString(str):
   ''' An object that looks like a char array with eough string functionality
@@ -78,7 +77,7 @@ class ChunkyString(str):
 
   def __str__(self):
     if isdebug:
-      nl("ChunkyString.__str__: %d bytes in %d strings" % (self.__len, len(self.__strs)))
+      warn("ChunkyString.__str__: %d bytes in %d strings" % (self.__len, len(self.__strs)))
     t0=time()
     s=''.join(self.__strs)
     assert len(s) == self.__len

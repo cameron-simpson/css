@@ -1,0 +1,183 @@
+#!/bin/sh -ue
+#
+# Walk a tree applying a permissions/ownership template.
+#       - Cameron Simpson <cs@zip.com.au> 21jun2008
+#
+
+config=
+trace=
+verbose=
+[ -t 1 ] && verbose=1
+prels=
+postls=
+
+cmd=`basename "$0"`
+usage="Usage: $cmd -f config [-n] [-v] [-x] dir
+  -f config     Specify configuration file. \"-\" designates standard input.
+  -n            No action. Recite planned fixes.
+  -v            List file state before change.
+  -x            Trace execution. Show chown/chgrp/chmod commands.
+Config file format:
+  Blank lines and lines commencing '#' ignored.
+  Other lines:
+    path user group perms globs"
+
+badopts=
+
+while [ $# -gt 0 ]
+do
+  case $1 in
+    -f) config=$2; shift ;;
+    -n) verbose=1 trace=eecho ;;
+    -v) verbose=1 ;;
+    -x) trace=set-x ;;
+    --) shift; break ;;
+    -?*)echo "$cmd: unrecognised option: $1" >&2
+        badopts=1
+        ;;
+    *)  break ;;
+  esac
+  shift
+done
+
+case "$config" in
+  '')
+    echo "$cmd: missing -f option" >&2
+    badopts=1
+    ;;
+  -);;
+  *)
+    if [ ! -f "$config" -o ! -s "$config" ]
+    then
+      echo "$cmd: config $config: not a non-empty file" >&2
+      badopts=1
+    fi
+    ;;
+esac
+
+if [ $# = 0 ]
+then
+  echo "$cmd: missing dir" >&2
+  badopts=1
+else
+  dir=$1
+  shift
+  if [ $# -gt 0 ]
+  then
+    echo "$cmd: extra arguments after dir: $*" >&2
+    badopts=1
+  fi
+fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+if [ $verbose ]
+then
+  prels=-ls
+  ##postls=-ls
+fi
+
+if [ "x$config" = x- ]
+then  exec 3<&0
+else  exec 3<"$config"
+fi
+exec 0</dev/null
+
+xit=0
+
+lineno=0
+while read path user group perms globs <&3
+do
+  lineno=`expr $lineno + 1`
+
+  ok=1
+
+  case "/$path/" in
+    / | /\#*)
+      # blank lines and comments
+      continue
+      ;;
+    //*)
+      echo "$cmd: $config, line $lineno: rejecting absolute path: $path" >&2
+      ok=
+      ;;
+    /.)
+      ;;
+    */./* | */../* )
+      echo "$cmd: $config, line $lineno: . and .. forbidden in path: $path" >&2
+      ok=
+      ;;
+  esac
+  findpath=$dir/$path
+  if [ ! -d "$findpath/." -a ! -f "$findpath" ]
+  then
+    echo "$cmd: $config, line $lineno: path $path: not a directory or file: $findpath" >&2
+    ok=
+  fi
+
+  if [ -z "$globs" ]
+  then
+    echo "$cmd: $config, line $lineno: missing globs" >&2
+    ok=
+  else
+    # this contortion is to break globs into words
+    # without doing pattern matching
+    printf "%s\n" "$globs" \
+    | tr ' ' '\012' \
+    | \
+    (
+      globargs=
+      while read -r glob
+      do
+        case "$glob" in
+          /* | */?* | *\'*)
+            echo "$cmd: $config, line $lineno: invalid glob: $glob" >&2
+            ok=
+            continue
+            ;;
+          '*')
+            nglobargs='-type f'
+            ;;
+          '*/')
+            nglobargs='-type d'
+            ;;
+          */)
+            glob=`expr "x$glob" : 'x\(.*\).'`
+            nglobargs="-type d -name '$glob'"
+            ;;
+          *)nglobargs="-type f -name '$glob'"
+            ;;
+        esac
+        if [ -z "$globargs" ]
+        then
+          globargs=$nglobargs
+        else
+          globargs="$globargs -o $nglobargs"
+        fi
+      done
+      [ $ok ] || exit 1
+
+      xit=0
+      eval "set -- find \"\$findpath\" \\( $globargs \\)"
+      $trace "$@" -print
+
+      [ "x$user" = x- ] \
+      || set-x "$@" ! -user "$user" $prels -exec $trace chown "$user" {} ';' $postls \
+      || xit=1
+
+      [ "x$group" = x- ] \
+      || set-x "$@" ! -group "$group" $prels -exec $trace chgrp "$user" {} ';' $postls \
+      || xit=1
+
+      [ "x$perms" = x- ] \
+      || set-x "$@" ! -perm "$perms" $prels -exec $trace chmod "$perms" {} ';' $postls \
+      || xit=1
+
+      exit $xit
+    ) || ok=
+  fi
+
+  [ $ok ] || xit=1
+done
+
+exit $xit

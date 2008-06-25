@@ -91,10 +91,7 @@ then
       ( cd $cssdir/.. || exit 1
         set -- `find -H css -type f -print`
         [ $# = 0 ] && { echo "NO ARGS!" >&2; ls -ld css >&2; exit 1; }
-        ls -tdr "$@" | tar chTf - - | gzip -v -n -9 >$cssweb/css.tar.gz
-      )
-      ( cd "$cssweb/bin" || exit 1
-        ln -s ../lib/cs .
+        ls -tdr "$@" | tar chTf - - | rewriteif "$cssweb/css.tar.gz" gzip -v -n -9
       )
       myke _all
     fi
