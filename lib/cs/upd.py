@@ -1,6 +1,8 @@
 from __future__ import with_statement
 from threading import RLock
-from cs.lex import unctrl, tabpadding
+from contextlib import contextmanager
+import atexit
+from cs.lex import unctrl       ##, tabpadding
 
 active=False
 
@@ -11,6 +13,7 @@ def default():
   if _defaultUpd is None:
     import sys
     _defaultUpd=Upd(sys.stderr)
+    import cs.misc
     cs.misc._defaultUpd=_defaultUpd
   return _defaultUpd
 
@@ -19,7 +22,9 @@ def out(line):   return default().out(line)
 def close(line): return default().close(line)
 def state():     return default().state()
 def without(func,*args,**kw):
-                 return default().without(func,*args,**kw)
+                 if _defaultUpd is None:
+                   return func(*args,**kw)
+                 return _defaultUpd.without(func,*args,**kw)
 
 instances=[]
 
@@ -29,7 +34,6 @@ def cleanupAtExit():
     i.close()
   instances=()
 
-import atexit
 atexit.register(cleanupAtExit)
 
 class Upd:
@@ -91,18 +95,6 @@ class Upd:
   def nl(self,txt,noStrip=False):
     self.without(self.__backend.write,txt+'\n',noStrip=noStrip)
 
-  def without(self,func,*args,**kw):
-    if 'noStrip' in kw:
-      noStrip=kw['noStrip']
-      del kw['noStrip']
-    else:
-      noStrip=False
-    with self.__lock:
-      old=self.out('',noStrip=noStrip)
-      ret=func(*args,**kw)
-      self.out(old,noStrip=True)
-    return ret
-
   def close(self):
     if self.__backend is not None:
       self.out('')
@@ -110,3 +102,31 @@ class Upd:
 
   def closed(self):
     return self.__backend == None
+
+  def without(self,func,*args,**kw):
+    if 'noStrip' in kw:
+      noStrip=kw['noStrip']
+      del kw['noStrip']
+    else:
+      noStrip=False
+    with self._withoutContext(noStrip):
+      ret=func(*args,**kw)
+    return ret
+
+  @contextmanager
+  def _withoutContext(self,noStrip=False):
+    with self.__lock:
+      old=self.out('',noStrip=noStrip)
+      yield
+      self.out(old,noStrip=True)
+
+@contextmanager
+def __dummyNoUpd():
+  yield
+
+def noupd(U=None):
+  if U is None:
+    if _defaultUpd is None:
+      return __dummyNoUpd()
+    U=_defaultUpd
+  return U._withoutContext()
