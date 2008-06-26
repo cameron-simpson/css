@@ -17,17 +17,30 @@ def setcmd(ncmd):
 
 setcmd(os.path.basename(sys.argv[0]))
 
-_defaultUpd=None
+class _NoUpd:
+  def out(self,s):
+    if len(s) > 0:
+      print >>sys.stderr, s
+      sys.stderr.flush()
+    return ''
+  def nl(self,s):
+    print >>sys.stderr, s
+    sys.stderr.flush()
+    return ''
+  def state(self):
+    return ''
+  def close(self):
+    pass
+  def closed(self):
+    return False
+  def without(self,func,*args,**kw):
+    return func(*args,**kw)
+_defaultUpd=_NoUpd()
 
 # print to stderr
 def warn(*args):
-  msg=" ".join(str(s) for s in args)
   global _defaultUpd
-  if _defaultUpd is None:
-    print >>sys.stderr, msg
-    sys.stderr.flush()
-  else:
-    _defaultUpd.nl(msg)
+  return _defaultUpd.nl(" ".join([str(s) for s in args]))
 
 # debug_level:
 #   0 - quiet
@@ -100,12 +113,10 @@ def progress(*args): debugif(1,*args)
 def verbose(*args):  debugif(2,*args)
 def debug(*args):    debugif(3,*args)
 def out(*args):
-  if ifdebug(1):
-    global _defaultUpd
-    if _defaultUpd is not None:
-      if len(*args) > 0:
-        return _defaultUpd.out(" ".join(args))
-    return warn(*args)
+  global _defaultUpd
+  if len(args) > 0 and ifdebug(1):
+    return _defaultUpd.out(" ".join(args))
+  return _defaultUpd.state()
 
 def cmderr(*args):
   global cmd_
@@ -118,17 +129,12 @@ def TODO(msg):
 def FIXME(msg):
   logFnLine(msg, frame=sys._getframe(1), prefix="FIXME(%s)"%cmd)
 
-def die(*args):
-  assert False, strlist(args," ")
-
 def tb(limit=None):
   import traceback
   global cmd__
   global _defaultUpd
   upd=_defaultUpd
-  if upd is not None:
-    oldUpd=upd.state()
-    upd.out('')
+  oldUpd=upd.out('')
 
   n=0
   for elem in traceback.format_list(traceback.extract_stack())[:-1]:
@@ -142,8 +148,7 @@ def tb(limit=None):
       if n >= limit:
         break
 
-  if upd is not None:
-    upd.out(oldUpd)
+  upd.out(oldUpd)
 
 _logPath=None
 _logFP=sys.stderr
@@ -169,7 +174,7 @@ def _logline(line,mark):
 def logLine(line,mark=None):
   if mark is None:
     mark=cmd
-  return withoutUpd(_logline,line,mark)
+  return _defaultUpd.without(_logline,line,mark)
 def logFnLine(line,frame=None,prefix=None,mark=None):
   ''' Log a line citing the calling function.
   '''

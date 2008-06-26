@@ -1,0 +1,131 @@
+#!/usr/bin/python -tt
+#
+# Append standard input to a log file.
+# Rotate the file on receiving SIGHUP.
+#       - Cameron Simpson <cs@zip.com.au> 12jun2008
+#
+
+import sys
+import time
+from signal import signal, SIGHUP
+from time import localtime, strftime
+import os
+import os.path
+from getopt import getopt, GetoptError
+from threading import Thread
+from Queue import Queue
+
+rotext='%Y-%m-%dT%H:%M:%S'
+pidfile=None
+preRotate=False
+verbose=False
+
+cmd=os.path.basename(sys.argv[0])
+usage='''Usage: %s [-p pidfile] [-r] [-v] logfile [rotext]
+  -p pidfile    Record process id in this file.
+  -r            Rotate an existing logfile at startup.
+  -v            Verbose. Report the names of rotated log files.
+  rotext        Rotation file suffix in strftime(3) format.
+                Default: %s''' \
+  % (cmd, rotext)
+
+badopts=False
+
+try:
+  opts, args = getopt(sys.argv[1:], 'p:rv')
+except GetoptError, e:
+  print >>sys.stderr, "%s: %s" % (cmd, e.msg)
+  print >>sys.stderr, usage
+  sys.exit(2)
+
+for opt, value in opts:
+  if opt == '-p':
+    pidfile=value
+  elif opt == '-r':
+    preRotate=True
+  elif opt == '-v':
+    verbose=True
+  else:
+    assert False, "%s: unsupported option %s %s" % (cmd, opt, value)
+    badopts=True
+
+if len(args) == 0:
+  print >>sys.stderr, "%s: missing logfile" % cmd
+  badopts=True
+else:
+  logfile=args.pop(0)
+  if len(args) > 0:
+    rotext=args.pop(0)
+    if len(args) > 0:
+      print >>sys.stderr, "%s: extra arguments after rotext: %s" \
+                            % (cmd, " ".join(args))
+      badopts=True
+
+if badopts:
+  print >>sys.stderr, usage
+  sys.exit(2)
+
+hupped=False
+def onhup(signum,frame):
+  hupped=True
+  global Q
+  Q.put("")
+
+def runQ(Q,fp,logfile,rotext):
+  while True:
+    line=Q.get()
+    if line is None:
+      break
+    if len(line) == 0:
+      fp.close()
+      rotate(logfile,rotext)
+      fp=open(logfile,"a")
+    else:
+      fp.write(line)
+      fp.flush()
+
+def rotate(logfile,rotext):
+  if not os.path.exists(logfile):
+    print >>sys.stderr, \
+          "%s: rotate logfile: logfile missing: %s" % (cmd, logfile)
+    return
+  nlogfile="%s.%s" % (logfile, strftime(rotext, localtime()))
+  if os.path.exists(nlogfile):
+    n=1
+    while True:
+      nnfile="%s.%d" % (nlogfile,n)
+      if not os.path.exists(nnfile):
+        nlogfile=nnfile
+        break
+      n+=1
+  os.rename(logfile,nlogfile)
+  if verbose:
+    print nlogfile
+    sys.stdout.flush()
+
+if pidfile is not None:
+  fp=open(pidfile, "w")
+  print >>fp, os.getpid()
+  fp.close()
+
+if preRotate and os.path.exists(logfile):
+  rotate(logfile,rotext)
+
+Q=Queue(32)
+fp=open(logfile,"a")
+T=Thread(target=runQ,args=(Q,fp,logfile,rotext))
+T.setDaemon(True)
+T.start()
+signal(SIGHUP,onhup)
+
+while True:
+  try:
+    line=sys.stdin.readline()
+  except IOError, e:
+    # happens on receiving SIGHUP
+    continue
+  if len(line) == 0:
+    break
+  Q.put(line)
+
+Q.put(None)
