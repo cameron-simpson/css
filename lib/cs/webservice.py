@@ -58,8 +58,6 @@ def callSOAP(url,action,xml,retAction,retTypecode,onerror=None):
   I=U.info()
   assert I.type in ('text/xml', 'application/soap+xml'), \
          "%s: expected text/xml, got \"%s\" from %s %s" % (cmd,I.type,action,url)
-  if isdebug:
-    cmderr("I.__dict__ = %s" % `I.__dict__`)
   retxml=''.join(U.readlines())
   ret=reportElapsedTime('decode %d bytes of %s response'
                           % (len(retxml),retAction),
