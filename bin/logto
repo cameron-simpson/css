@@ -32,7 +32,7 @@ usage='''Usage: %s [-p pidfile] [-r] [-v] logfile [rotext]
 badopts=False
 
 try:
-  opts, args = getopt(sys.argv[1:], 'p:r')
+  opts, args = getopt(sys.argv[1:], 'p:rv')
 except GetoptError, e:
   print >>sys.stderr, "%s: %s" % (cmd, e.msg)
   print >>sys.stderr, usage
@@ -43,6 +43,8 @@ for opt, value in opts:
     pidfile=value
   elif opt == '-r':
     preRotate=True
+  elif opt == '-v':
+    verbose=True
   else:
     assert False, "%s: unsupported option %s %s" % (cmd, opt, value)
     badopts=True
