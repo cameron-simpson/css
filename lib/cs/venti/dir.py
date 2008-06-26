@@ -389,4 +389,6 @@ class Dir(Dirent):
         stored=storeFile(open(filepath),S=S)
         stored.name=subfile
         stored.meta=M
+        if subfile in D:
+          del D[subfile]
         D[subfile]=stored
