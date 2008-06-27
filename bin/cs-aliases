@@ -10,6 +10,7 @@ import string
 from os import environ
 import os.path
 from email.parser import Parser
+from email.utils import getaddresses, formataddr
 import cs.sh
 from cs.mailAddresses import addressKey, loadAddresses, addrsRegexp
 from cs.misc import cmd, cmderr, verbose
@@ -22,16 +23,16 @@ re_prefix='cs_aliases'
 new_syntax='MAILITEM'
 
 usage='''Usage:
-  $cmd [-f aliasfile]
+  %s [-f aliasfile]
     Recite categories and core addresses.
-  $cmd [-f aliasfile] new <addresses"
+  %s [-f aliasfile] new <addresses"
     Print new addresses.
-  $cmd [-f aliasfile] re [-sh] [categories...]
+  %s [-f aliasfile] re [-sh] [categories...]
     Print categories and regular expressions.
       -sh               Use /bin/sh syntax.
   Options:
     -f aliasfile        Specify alias file. Default: %s, from $CS_ALIASES.''' \
-  % aliases
+  % (cmd,cmd,cmd,aliases)
 
 xit=0
 
@@ -107,13 +108,11 @@ elif op == "new":
     M=Parser().parse(sys.stdin,True)
     seen=[]
     for hdr in 'from', 'sender', 'to', 'cc', 'bcc', 'return-path':
-      values=M.get_all(hdr)
-      if values is not None:
-        for name, coreaddr in getaddresses(values):
-          addrkey=coreaddr.lower()
-          if addrkey not in byAddress and addrkey not in seen:
-            seen.append(addrkey)
-            print formataddr((name,coreaddr))
+      for name, coreaddr in getaddresses(M.get_all(hdr,[])):
+        addrkey=coreaddr.lower()
+        if addrkey not in byAddress and addrkey not in seen:
+          seen.append(addrkey)
+          print formataddr((name,coreaddr))
   else:
     cmderr("unimplemented new input syntax \"%s\"" % new_syntax)
     sys.exit(1)
