@@ -11,7 +11,7 @@ import time
 from zlib import compress
 from thread import allocate_lock
 from cs.cache import LRU
-from cs.misc import cmderr, warn, progress, verbose, isverbose, out, fromBS, toBS, fromBSfp, tb, the
+from cs.misc import cmderr, warn, progress, verbose, isverbose, isdebug, out, fromBS, toBS, fromBSfp, tb, the
 from cs.venti import tohex, hash
 from cs.venti.store import BasicStore
 from cs.venti.datafile import scanFile, getBlock, addBlock
@@ -92,6 +92,7 @@ class GDBMStore(BasicStore):
         Notes the offset to the zblock and the zsize in the GDBM index.
     '''
     self.log("store %d bytes" % len(block))
+    ##tb()
     h=hash(block)
     if h in self:
       if isverbose:
@@ -99,6 +100,8 @@ class GDBMStore(BasicStore):
       return h
 
     zblock=compress(block)
+    if isdebug:
+      sys.stderr.write("GDBM(%d>%d)" % (len(block),len(zblock)))
     fp=self.__storeOpen(self.__newStore)
     with self.ioLock:
       offset, zsize = addBlock(fp,zblock,True)
