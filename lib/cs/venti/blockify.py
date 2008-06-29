@@ -1,8 +1,11 @@
 #!/usr/bin/python -tt
 
+import sys
+from struct import unpack_from
 from cs.venti.blocks import BlockList, BlockRef
 from cs.venti.hash import MIN_BLOCKSIZE, MAX_BLOCKSIZE, MAX_SUBBLOCKS
 from cs.misc import isdebug, debug
+from cs.lex import unctrl
 import __main__
 
 def blocksOfFP(fp,rsize=None):
@@ -80,64 +83,18 @@ def topBlockRefFP(fp,rsize=None,S=None):
 def topBlockRefString(s,S=None):
   return topBlockRef(blockrefsOf(blocksOf([s]),S=S),S=S)
 
-def blocksOfOLD(dataSource,vocab=None):
-  ''' A generator that reads data from an iterable dataSource
-      and yields it as blocks at appropriate edge points.
-  '''
-  if vocab is None:
-    global DFLT_VOCAB
-    vocab=DFLT_VOCAB
-  buf=[]
-  buflen=0
-  RH=RollingHash()
-  # invariant: all the bytes in buf[]
-  # have been fed to the rolling hash
-  for data in dataSource:
-    doff=0
-    lastdoff=0
-    for c in data:
-      RH.add(ord(c))
-      doff+=1
-      if buflen+doff < MIN_BLOCKSIZE:
-        continue
-      isEdge=False
-      endoff=None
-      rh=RH.value
-      if buflen+doff >= MAX_BLOCKSIZE or rh == HASH_MAGIC:
-        isEdge=True
-        endoff=doff
-      elif rh == HASH_MAGIC:
-        isEdge=True
-        endoff=doff
-      elif rh in vocab:
-        chkWord=data[:doff]
-        for word, offset, subVocab in vocab[rh]:
-          if chkWord.endswith(word):
-            isEdge=True
-            endoff=doff-len(word)+offset
-      if isEdge:
-        assert buflen+doff >= MIN_BLOCKSIZE and buflen+doff <= MAX_BLOCKSIZE
-        buf.append(data[lastdoff:endoff])
-        yield "".join(buf)
-        lastdoff=endoff
-        buf=[]
-        buflen=0
-        RH.reset()
-    if lastdoff < len(data):
-      buf.append(data[lastdoff:])
-      buflen+=len(data)-lastdoff
-  if len(buf) > 0:
-    yield "".join(buf)
-
 class strlist:
   def __init__(self):
     self.reset()
   def reset(self):
     self.buf=[]
     self.len=0
-  def append(self,s):
-    self.buf.append(s)
-    self.len+=len(s)
+  def take(self,s,slen):
+    assert slen > 0 and slen <= len(s), "slen=%d, len(s)=%d" % (slen, len(s))
+    right=buffer(s,slen)
+    self.buf.append(buffer(s,0,slen))
+    self.len+=slen
+    return right
   def __len__(self):
     return self.len
   def __str__(self):
@@ -150,42 +107,55 @@ def blocksOf(dataSource,vocab=None):
   ''' A generator that reads data from an iterable dataSource
       and yields it as blocks at appropriate edge points.
   '''
-  debug("blocksOf()...")
   if vocab is None:
     global DFLT_VOCAB
     vocab=DFLT_VOCAB
   vhs=vocab.keys()      # hashes liked by the vocab
+
+  datalen=0
+  yieldlen=0
 
   buf=strlist()
   RH=RollingHash()
   # invariant: all the bytes in buf[]
   # have been fed to the rolling hash
   for data in dataSource:
-    skip=MIN_BLOCKSIZE-len(buf)
-    if skip > 0:
-      if skip >= len(data):
-        RH.addString(data)
-        buf.append(data)
-        continue
-      left, data = cut(data,skip)
-      RH.addString(left)
-      buf.append(left)
-
+    datalen+=len(data)
+    sys.stderr.write("D")
     while len(data) > 0:
+      skip=MIN_BLOCKSIZE-len(buf)
+      if skip > 0:
+        if skip >= len(data):
+          RH.addString(data)
+          data=buf.take(data, len(data))
+          continue
+        left, data = cut(data,skip)
+        RH.addString(left)
+        buf.take(left, len(left))
+
       maxlen=MAX_BLOCKSIZE-len(buf)
+      ##debug("len(buf)=%d, MAX_BLOCKSIZE=%d, maxlen=%d" % (len(buf), MAX_BLOCKSIZE,maxlen))
+      assert maxlen > 0, \
+                "maxlen <= 0 (%d), MAX_BLOCKSIZE=%d, len(buf)=%d" \
+                % (maxlen, MAX_BLOCKSIZE, len(buf))
       h, off = RH.findEdge(data,maxlen,vhs)
       assert off > 0 and off <= len(data), \
              "off=%d, len(data)=%d" % (off, len(data))
       if h is None:
         # no edge found
+        ##debug("h is None: off=%d, maxlen=%d, len(data)=%d, len(buf)=%d" % (off,maxlen,len(data),len(buf)))
         assert off == min(maxlen,len(data))
-        if off < len(data):
-          left, data = cut(data, off)
+        data = buf.take(data, off)
+        ##debug("h is None: after take(data,off=%d): len(data)=%d, len(buf)=%d" % (off,len(data),len(buf)))
+        if len(buf) == MAX_BLOCKSIZE:
+          sys.stderr.write("Y")
+          y=str(buf)
+          yieldlen+=len(y)
+          yield y
+          buf.reset()
         else:
-          left, data = data, ''
-        buf.append(left)
-        yield str(buf)
-        buf.reset()
+          assert len(buf) < MAX_BLOCKSIZE, \
+                 "off=%d,len(buf)=%d, MAX_BLOCKSIZE=%d, maxlen=%d" % (off,len(buf), MAX_BLOCKSIZE,maxlen)
         continue
 
       if h in vocab:
@@ -193,39 +163,52 @@ def blocksOf(dataSource,vocab=None):
         # Check that it is a vocab word, and figure out the desired cut point.
         # Because the hash is computed up to the offset, prefill the new buf
         # with the text from the cut point to the hash/offset.
-        ds=str(data)
+        ds=str(data[:off])
         for word, woffset, subVocab in vocab[h]:
           if ds.endswith(word):
+            # update for new vocabuary, if any
             if subVocab is not None:
-              # update for new vocabuary
               vocab=subVocab
               vhs=vocab.keys()
-            # put the left part of the match word into the buffer
-            # and yield it
-            buffer.append(word[:woffset])
-            left, right = cut(data,off-len(word)+woffset)
-            debug("blocksOf: matched \"%s\" at \"%.20s\"" % (word, right))
-            buf.append(left)
-            yield str(buf)
+            # put the desired part of the data into the buffer
+            # and yield the buffer
+            data = buf.take(data, off-len(word)+woffset)
+            sys.stderr.write("Y")
+            y=str(buf)
+            yieldlen+=len(y)
+            yield y
             buf.reset()
-            # prefill the buffer with the right part of the match word
-            buf.append(word[woffset:])
-            # crop data and proceed
-            data = buffer(data,off)
-            continue
-        ##debug("h=%d, but no vocab match" % h)
+            # put the undesired tail of the word into the buffer
+            data = buf.take(data, len(word)-woffset)
+            off=None
+            break
+        if off is None:
+          continue
 
-      left, data = cut(data, off)
-      buf.append(left)
-      if h == HASH_MAGIC:
-        yield str(buf)
+      assert off <= len(data), "off=%d, len(data)=%d" % (off,len(data))
+      data = buf.take(data, off)
+      if len(buf) >= MAX_BLOCKSIZE:
+        sys.stderr.write("Y")
+        y=str(buf)
+        yieldlen+=len(y)
+        yield y
+        buf.reset()
+      elif h == HASH_MAGIC:
+        sys.stderr.write("Y")
+        y=str(buf)
+        yieldlen+=len(y)
+        yield y
         buf.reset()
 
     assert len(data) == 0
 
   if len(buf) > 0:
-    yield str(buf)
+    sys.stderr.write("Y")
+    y=str(buf)
+    yieldlen+=len(y)
+    yield y
 
+  assert yieldlen == datalen, "yieldlen(%d) != datalen(%d)" % (yieldlen,datalen)
 
 HASH_MAGIC=511
 class RollingHash:
@@ -236,9 +219,13 @@ class RollingHash:
     self.reset()
 
   def reset(self):
-    self.value=0
-    self.__window=[0,0,0,0]
-    self.__woff=0       # offset to next storage place
+    self.buf=[0,0,0,0]
+    self.n=0
+
+  def value(self):
+    buf = self.buf
+    n = self.n
+    return unpack_from("<L","".join(buf[n:]+buf[:n]))[0]
 
   def findEdge(self,data,maxlen,hashcodes):
     ''' Add characters from data to the rolling hash until maxlen characters
@@ -252,32 +239,23 @@ class RollingHash:
     global HASH_MAGIC
     assert maxlen > 0
     maxlen=min(maxlen,len(data))
+    n=self.n
     for i in range(maxlen):
-      self.add(ord(data[i]))
-      if self.value == HASH_MAGIC or self.value in hashcodes:
+      self.buf[n]=data[i]
+      self.n=n=(n+1)%4
+      v=self.value()
+      if v%16381 == HASH_MAGIC or v in hashcodes:
         ##debug("edge found, returning (hashcode=%d, offset=%d)" % (self.value,i+1))
-        return self.value, i+1
-    debug("no edge found, hash now %d, returning (None, %d)" % (self.value,maxlen))
+        return v, i+1
+    ##debug("no edge found, hash now %d, returning (None, %d)" % (self.value(),maxlen))
     return None, maxlen
 
-  def add(self,oc):
-    rh=self.value
-    w=self.__window
-    woff=self.__woff
-    c2 = w[woff]
-    rh -= c2
-    ##c2 = ((oc%16)<<4) + (oc/16)
-    c2=oc
-    rh += c2
-    w[woff]=c2
-    woff=(woff+1)%4
-    self.__woff=woff
-    self.value=rh
-    return rh
-
   def addString(self,s):
+    n=self.n
     for c in s:
-      self.add(ord(c))
+      self.buf[n]=c
+      n=(n+1)%4
+    self.n=n
 
 class Vocabulary(dict):
   ''' A class for representing match vocabuaries.
@@ -297,12 +275,14 @@ class Vocabulary(dict):
       subVocab=Vocabulary(subVocab)
     RH=RollingHash()
     RH.addString(word)
-    rh=RH.value
+    rh=RH.value()
     self.setdefault(rh,[]).append((word,offset,subVocab))
 
 # TODO: reform as list of (str, offset, sublist).
 DFLT_VOCAB=Vocabulary({
                 "\ndef ": 1,          # python top level function
+                "\n  def ": 1,        # python class method, 2 space indent
+                "\n    def ": 1,      # python class method, 4 space indent
                 "\nclass ": 1,        # python top level class
                 "\npackage ": 1,      # perl package
                 "\n}\n\n": 3,         # C-ish function ending
