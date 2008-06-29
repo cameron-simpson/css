@@ -423,7 +423,7 @@ if op == "pack":
     D=archive2dir(archive)
     if D is None:
       D=Dir(path)
-    print "archive=%s, D=%s" % (archive,D)
+    ##print "archive=%s, D=%s" % (archive,D)
     D.updateFrom(path,
                  ignoreTimes=False,
                  deleteMissing=True,

@@ -57,7 +57,7 @@ def archiveAppend(archive,E,when=None,path=None):
     fp.write("%s %s\n"
              % (tohex(E.encode(noname=True)), datetime.now()))
   else:
-    import sys; print >>sys.stderr, "E=%s" % E
+    ##import sys; print >>sys.stderr, "E=%s" % E
     fp.write("%s %s %s\n"
            % (tohex(E.encode(noname=True)), datetime.now(), path))
   if fp is not archive:

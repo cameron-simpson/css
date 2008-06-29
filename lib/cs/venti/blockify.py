@@ -121,7 +121,7 @@ def blocksOf(dataSource,vocab=None):
   # have been fed to the rolling hash
   for data in dataSource:
     datalen+=len(data)
-    sys.stderr.write("D")
+    ##sys.stderr.write("D")
     while len(data) > 0:
       skip=MIN_BLOCKSIZE-len(buf)
       if skip > 0:
@@ -148,7 +148,7 @@ def blocksOf(dataSource,vocab=None):
         data = buf.take(data, off)
         ##debug("h is None: after take(data,off=%d): len(data)=%d, len(buf)=%d" % (off,len(data),len(buf)))
         if len(buf) == MAX_BLOCKSIZE:
-          sys.stderr.write("Y")
+          ##sys.stderr.write("Y")
           y=str(buf)
           yieldlen+=len(y)
           yield y
@@ -173,7 +173,7 @@ def blocksOf(dataSource,vocab=None):
             # put the desired part of the data into the buffer
             # and yield the buffer
             data = buf.take(data, off-len(word)+woffset)
-            sys.stderr.write("Y")
+            ##sys.stderr.write("Y")
             y=str(buf)
             yieldlen+=len(y)
             yield y
@@ -188,13 +188,13 @@ def blocksOf(dataSource,vocab=None):
       assert off <= len(data), "off=%d, len(data)=%d" % (off,len(data))
       data = buf.take(data, off)
       if len(buf) >= MAX_BLOCKSIZE:
-        sys.stderr.write("Y")
+        ##sys.stderr.write("Y")
         y=str(buf)
         yieldlen+=len(y)
         yield y
         buf.reset()
       elif h == HASH_MAGIC:
-        sys.stderr.write("Y")
+        ##sys.stderr.write("Y")
         y=str(buf)
         yieldlen+=len(y)
         yield y
@@ -203,7 +203,7 @@ def blocksOf(dataSource,vocab=None):
     assert len(data) == 0
 
   if len(buf) > 0:
-    sys.stderr.write("Y")
+    ##sys.stderr.write("Y")
     y=str(buf)
     yieldlen+=len(y)
     yield y
