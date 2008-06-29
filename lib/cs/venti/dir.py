@@ -374,10 +374,10 @@ class Dir(Dirent):
             continue
           if not ignoreTimes:
             E=D[subfile]
-            if st.st_size == E.size() and st.st_mtime == int(E.mtime()):
+            if st.st_size == E.size() and int(st.st_mtime) == int(E.mtime()):
               verbose("%s: same size and mtime, skipping" % filepath)
               continue
-            verbose("%s: differing size/mtime" % filepath)
+            verbose("%s: differing size(%s:%s)/mtime(%s:%s)" % (filepath,st.st_size,E.size(),int(st.st_mtime),int(E.mtime())))
           else:
             verbose("%s: IGNORETIMES=True" % filepath)
         else:
