@@ -1,0 +1,210 @@
+
+=head1 NAME
+
+vt - data structures used in the vt(1) Venti-like system
+
+=head1 DESCRIPTION
+
+The vt(1cs) command provides access to data stored in a Venti-like
+content addressed data store.
+This manual entry describes the data structures used.
+
+=head1 BASIC ENCODINGS
+
+=head2 Binary Sequential (BS) Encoding
+
+BS encoding is used throughout where non-negative integers are stored,
+allowing values of arbitrary size to be represented.
+BS encoding transcribes a non-negative integer into a big endian byte
+(octet) sequence of arbitrary length.
+The most significant bit of each byte is a continuation bit;
+if it is 1 then there is a following byte in the sequence,
+if it is 0 then it is the final byte in the sequence.
+The 7 lower order bits contribute to the value.
+The value starts at zero
+and as each byte is gathered from the sequence
+the value is right shifted 7 places (a multiplication of 128)
+and the 7 low order bits of the new byte are added to the value.
+
+=head2 Hex Encoding
+
+Raw byte sequences are sometimes encoded as hexadecimal sequences
+where textual representation is required,
+such as on the command line or in B<.vt> archive files.
+These sequences represent each byte as a pair of hexadecimal characters
+as would be printed by the B<%02x> printf(3) format specifier.
+
+=head1 DATA STORAGE FORMATS
+
+=head2 On Disc Block Store
+
+The on disc content is stored in flat files consisting of a sequence
+of I<size>/I<zblock> chunks.
+The I<size> is a BS encoded value specifying the number of bytes in the
+zblock segment.
+The I<zblock> segment is a ZLib compressed version of the raw data block as
+returned from Python's zlib.compress() function.
+
+A data store managed by the cs.venti.gdbmstore.GDBStore class
+consists of a directory holding several of the flat files
+described above, named B<I<n>.vtd> where I<n> is a number counting from 0.
+The contents of the store are indexed by a GDBM file named B<index>
+which is a mapping from block hash value (an SHA1 hash)
+to a 3-tuple of (I<n>, I<offset>, I<zsize>)
+where I<n> references a particular B<I<n>.vtd> file,
+I<offset> specifies the byte offset of the start of the I<zblock>
+and I<zsize> is the length of the I<zblock>.
+This tuple is stored as the concatenation of the BS encodings of these
+three values.
+
+=head2 Filesystem Structure
+
+When files or directories are archived to the store
+their content is encoded as follows.
+
+=head3 Block References (BlockRefs)
+
+A BlockRef consists of a tuple (I<indirect>, I<span>, I<hashcode>).
+I<indirect> is a Boolean value;
+0 means false and indicates that the BlockRef refers to a data block,
+1 means true and indicates that the BlockRef refers to an "indirect" block
+whose content is a sequence of BlockRefs.
+The I<span> is the number of data bytes encompassed by the data to which the BlockRef refers;
+for a direct BlockRef it will be the size of the data block,
+for an indirect BlockRef it will be the sum of the I<span>s of the BlockRefs
+stored in the indirect block.
+The I<hashcode> is the SHA1 hash of the data block or indirect block.
+
+The on disc storage of a BlockRef consists of a BS encoded I<flags> value,
+the BS encoded I<span> value, a possible BS encoded I<hashtype>,
+a possible BS encoded I<hashlen>,
+and the hashcode.
+
+The I<flags> value is a bitmap.
+Bit 0 is the I<indirect> value: 0 for direct, 1 for indirect.
+Bit 1 is to support other hash schemes than SHA1;
+none is yet implemented.
+If bit 1 is 0 then the hash type is SHA1
+and the I<hashtype> value is omitted.
+If bit 1 is 1 then the I<hashtype> value is present;
+hashtype vaue 0 is reserved to designate SHA1
+and no other types are yet implemented.
+If the length of the hash code is not fixed by the hash type
+then the I<hashlen> value is present;
+for SHA1 this length is fixed and this value is not present.
+
+=head3 Data Files
+
+A data file is a sequence of data blocks.
+It is indicated by a BlockRef which refers to the data blocks.
+
+=head3 Directories
+
+Directories are stored as data files
+whose content is a sequence of Directory Entries.
+
+=head3 Directory Entries (Dirents)
+
+A Dirent consists of a tuple of (I<type>, I<meta>, I<name>, I<blockref>).
+I<Type> has the value 0 for a data file and 1 for a directory.
+I<Meta> contains metadata for the stored object.
+I<Name> is the name of the stored object within the directory.
+I<blockref> is a BlockRef for the content of the stored object.
+
+The on disc storage of a Dirent consists of the BS encoded I<type>,
+a BS encoded I<flags> bitmap,
+an optional I<meta> chunk,
+an optional I<name> chunk
+and a BlockRef.
+The I<flags> bitmap has bit 0 for I<hasmeta> and bit 1 for I<hasname>
+which indicate the presence of I<meta> and I<name> chunks respectively.
+If present, the I<meta> chunk encodes Meta Data (see below).
+If present, the I<name> is a byte sequence containing the Dirent name,
+consisting of a BS encoded I<namelen> and I<namelen> bytes containing the I<name>.
+
+=head3 Meta Data
+
+Meta Data consists set of (I<attribute>, I<value>) tuples
+representing various object attributes
+such as modification time, access control lists, etc.
+
+The on disc storage of Meta Data consists of a BS encoded I<metalen>
+and I<metalen> bytes containing the text encoding of the Meta Data.
+The text encoding of Meta Data consists of a sequence of newline ('\n')
+terminated records of the form:
+
+  attribute:value
+
+The following I<attributes> are currently implemented:
+
+=over 4
+
+=item B<m> - modification time
+
+The B<m> attribute specifies the last modification time of the object
+in seconds since the UNIX epoch.
+
+On disc the value is encoded as a decimal integer or float.
+
+Example: a current timestamp would be encoded as:
+
+  m:1214727144
+
+or
+
+  m:1214727144.0
+
+
+=item B<a> - Access Control List (ACL)
+
+The value is a sequence of access controls
+each of which is a tuple of (I<type>, I<qualifier>, I<allow>, I<deny>).
+The first applicable control is used to govern access.
+I<who> designates the applicability of the control;
+a B<user> control applies if the accessing user matches the I<qualifier>,
+a B<group> control applies if the accessing user is a member of the group designates by the I<qualifier>,
+an B<other> control applies to any accessing user.
+If the control applies, the rights listed in I<allow> are granted
+and the rights listed in I<deny> are forbidden.
+
+On disc, the B<acl> I<value> consists of a comma separated list of
+encoded controls.
+A B<user> control commences with the sequence B<u:>I<user>B<:>,
+a B<group> control commences with the sequence B<g:>I<group>B<:>
+and an B<other> control commences with the sequence B<*:>.
+The I<allow> and I<deny> lists consist of a sequence of right designators
+and are separated from each other by a dash ('B<->').
+The dash may be omitted if the I<deny> list is empty.
+The following right designations are supported:
+B<r> - read,
+B<w> - write,
+B<x> - execute,
+B<s> - for a B<user> ACL this is the UNIX setuid bit
+and for a B<group> ACL this is the UNIX setgid bit,
+B<t> - for an B<other> ACL this is the UNIX sticky bit.
+
+Example: a typical UNIX 750 file permission would be represented as:
+
+  a:u:cameron:rwx,g:staff:rx-w,*:-rwx
+
+=back
+
+=head2 VT Archive Files (.vt)
+
+VT archive files are text files with one line per archive action.
+By convention their names end in B<.vt>.
+Each line is of the form I<dirent> I<date> I<time> I<comment>.
+I<dirent> is a hex encoded representation of a Dirent on disc encoding.
+I<date> has the form I<YYYY>B<->I<MM>B<->I<DD>.
+I<time> has the form I<HH>B<:>I<MM>B<:>I<SS>B<.>I<s...>.
+The comment contains arbitrary text and conventionally is the name of
+the object that was archived.
+
+=head1 SEE ALSO
+
+vt(1cs)
+
+=head1 AUTHOR
+
+Cameron Simpson E<lt>cs@zip.com.auE<gt>
+

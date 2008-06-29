@@ -1,13 +1,15 @@
 class Meta(dict):
   ''' Metadata:
-        mtime:unix-seconds(int or float)
-        acl:ac,...
-          ac:
-            u:login:perms-perms
-            g:group:perms-perms
-            *:perms-perms
-        ? acl:blockref of encoded Meta
-        ? acl:/path/to/encoded-Meta
+        Modification time:
+          m:unix-seconds(int or float)
+        Access Control List:
+          a:ac,...
+            ac:
+              u:user:perms-perms
+              g:group:perms-perms
+              *:perms-perms
+          ? a:blockref of encoded Meta
+          ? a:/path/to/encoded-Meta
   '''
   def __init__(self,s=None):
     if s is not None:
@@ -26,8 +28,10 @@ class Meta(dict):
     ks.sort()
     return "".join("%s:%s\n" % (k, self[k]) for k in ks)
 
-  def mtime(self):
-    return self.get('mtime',0)
+  def mtime(self,when=None):
+    if when is None:
+      return float(self.get('m',0))
+    self['m']=float(when)
 
   def unixPerms(self):
     ''' Return (user,group,unix-mode-bits).
@@ -40,7 +44,7 @@ class Meta(dict):
     group=None
     gperms=0
     operms=0
-    acl=[self['acl'].split(',') if 'acl' in self else ()]
+    acl=[ ac for ac in self.get('a','').split(',') if len(ac) > 0 ]
     acl.reverse()
     for ac in acl:
       if len(ac) > 0:

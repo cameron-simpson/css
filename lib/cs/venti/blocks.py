@@ -9,7 +9,7 @@
 from cs.misc import toBS, fromBS, fromBSfp, warn, cmderr, TODO, FIXME, isdebug
 from cs.io import readn
 from cs.venti import MAX_SUBBLOCKS, tohex
-from cs.venti.hash import HASH_SIZE_DEFAULT
+from cs.venti.hash import HASH_SIZE_SHA1, HASH_SHA1_T
 import __main__
 
 class BlockRef:
@@ -19,7 +19,7 @@ class BlockRef:
       refers to their top indirect block.
   '''
   F_INDIRECT=0x01
-  F_HAS_HASH_SIZE=0x02
+  F_NON_SHA1_HASH=0x02
   def __init__(self,h,indirect,span):
     assert h is not None
     self.h=h
@@ -40,21 +40,27 @@ class BlockRef:
         Format is:
           BS(flags)
             0x01 indirect blockref
-            0x02 len(hash) != HASH_SIZE_DEFAULT
+            0x02 non-SHA1 hashcode
           BS(span)
-          [BS(hashlen)]
+          [BS(hashtype)[BS(hashlen)]]
           hash
     '''
     s0=s
     flags, s = fromBS(s)
-    assert flags&~(BlockRef.F_INDIRECT|BlockRef.F_HAS_HASH_SIZE) == 0, \
+    assert flags&~(BlockRef.F_INDIRECT|BlockRef.F_NON_SHA1_HASH) == 0, \
            "unexpected flags value (%02x), s=%s" % (flags, tohex(s0))
     span, s = fromBS(s)
     indirect=bool(flags & BlockRef.F_INDIRECT)
-    if flags & BlockRef.F_HAS_HASH_SIZE:
-      hlen, s = fromBS(s)
+    if flags & BlockRef.F_NON_SHA1_HASH:
+      hashtype, s = fromBS(s)
+      assert False, "F_NON_SHA1_HASH (hashtype=0x%02x) not supported" % hashtype
     else:
-      hlen = HASH_SIZE_DEFAULT
+      hashtype = HASH_SHA1_T
+    if hashtype == HASH_SHA1_T:
+      hlen = HASH_SIZE_SHA1
+    else:
+      assert False, "unsupported hash type 0x%02x" % hashtype
+      # will read hlen here for some hash types
     assert len(s) >= hlen, \
            "expected %d bytes of hash, only %d bytes in string: %s" \
            % (hlen, len(s), tohex(s))
@@ -71,21 +77,27 @@ class BlockRef:
         Format is:
           BS(flags)
             0x01 indirect blockref
-            0x02 len(hash) != HASH_SIZE_DEFAULT
+            0x02 hashtype != HASH_SHA1_T
           BS(span)
-          [BS(hashlen)]
+          [BS(hashtype)[BS(hashlen)]]
           hash
     '''
     flags=0
     if self.indirect:
       flags|=BlockRef.F_INDIRECT
     h=self.h
-    if len(h) != HASH_SIZE_DEFAULT:
-      flags|=BlockRef.F_HAS_HASH_SIZE
+    hashtype=HASH_SHA1_T
+    assert len(h) == HASH_SIZE_SHA1, \
+           "len(h)=%d, expected HASH_SIZE_SHA1:%d" % (len(h), HASH_SIZE_SHA1)
+    if hashtype != HASH_SHA1_T:
+      flags|=BlockRef.F_NON_SHA1_HASH
+      htype=toBS(hashtype)
+      assert False, "unsupported hash type 0x%02x" % hashtype
       hlen=toBS(len(h))
     else:
-      hlen=""
-    brefEnc=toBS(flags)+toBS(self.span)+hlen+h
+      htype=''
+      hlen=''
+    brefEnc=toBS(flags)+toBS(self.span)+htype+hlen+h
     return brefEnc
 
   def leaves(self,S):

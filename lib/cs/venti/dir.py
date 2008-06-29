@@ -102,12 +102,11 @@ class Dirent:
     return self.getBref().span
 
   def mtime(self,newtime=None):
-    if newtime is not None:
-      self.meta()['mtime']=newtime
-      return
-    if self.meta is None:
-      return 0
-    return float(self.meta.get('mtime',0))
+    if newtime is None:
+      if self.meta is None:
+        return 0.0
+      return self.meta.mtime()
+    self.meta().mtime(newtime)
 
   def stat(self):
     meta=self.meta
@@ -284,7 +283,6 @@ class Dir(Dirent):
   def getBref(self):
     ''' Return the top BlockRef referring to an encoding of this Dir.
     '''
-    debug("Dir.getBref...")
     names=self.keys()
     names.sort()
     s="".join( self[name].encode()
@@ -350,10 +348,10 @@ class Dir(Dirent):
     '''
     from cs.venti.file import storeFile
     import os
-    debug("osdir=%s" % (osdir,))
+    ##debug("osdir=%s" % (osdir,))
     osdirpfx=os.path.join(osdir,'')
     for dirpath, dirs, files in os.walk(osdir,topdown=False):
-      debug("dirpath=%s" % dirpath)
+      ##debug("dirpath=%s" % dirpath)
       if dirpath == osdir:
         D=self
       else:
@@ -395,7 +393,7 @@ class Dir(Dirent):
 
         debug("storing %s ..." % subfile)
         M=Meta()
-        M['mtime']=st.st_mtime
+        M.mtime(st.st_mtime)
         stored=storeFile(open(filepath),S=S)
         stored.name=subfile
         stored.meta=M
