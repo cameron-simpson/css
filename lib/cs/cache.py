@@ -1,4 +1,4 @@
-from cs.misc import warn, debug, ifdebug, die
+from cs.misc import warn, debug, ifdebug
 
 _caches=[]
 def overallHitRatio():
