@@ -220,7 +220,6 @@ class Dir(Dirent):
     while len(iblock) > 0:
       oiblock=iblock
       E, iblock = decodeDirent(iblock)
-      ##debug("decodeDirent gave %s" % (E,))
       assert len(iblock) < len(oiblock) and oiblock.endswith(iblock)
       if E.name is None or len(E.name) == 0:
         FIXME("skip unnamed dirent")
@@ -228,7 +227,6 @@ class Dir(Dirent):
       if E.name == '.' or E.name == '..':
         FIXME("skip \"%s\"" % E.name)
         continue
-      ##print "overlayBlockRef: %s" % E.name
       if E.isdir():
         E.parent=self
       self.__content[E.name]=E
@@ -245,14 +243,18 @@ class Dir(Dirent):
 
   def get(self,name,dflt=None,S=None):
     self.__needContent(S=S)
-    if name not in self.__content:
+    if name not in self:
       return dflt
-    return self.__content[name]
+    return self[name]
 
   def keys(self,S=None):
     return self.__needContent(S=S).keys()
 
   def __contains__(self,name):
+    if name == '.':
+      return True
+    if name == '..':
+      return self.parent is not None
     self.__needContent()
     return name in self.__content
 
@@ -348,9 +350,17 @@ class Dir(Dirent):
     '''
     from cs.venti.file import storeFile
     import os
-    debug("osdir=%s"%(osdir,))
+    debug("osdir=%s" % (osdir,))
+    osdirpfx=os.path.join(osdir,'')
     for dirpath, dirs, files in os.walk(osdir,topdown=False):
-      D=self.makedirs(dirpath)
+      debug("dirpath=%s" % dirpath)
+      if dirpath == osdir:
+        D=self
+      else:
+        assert dirpath.startswith(osdirpfx), \
+                "dirpath=%s, osdirpfx=%s" % (dirpath, osdirpfx)
+        subdirpath=dirpath[len(osdirpfx):]
+        D=self.makedirs(subdirpath)
 
       for dir in dirs:
         if dir in D:
