@@ -158,7 +158,7 @@ def logTo(logpath=None):
 def _logline(line,mark):
   global _logPath, _logFP
   when=time.time()
-  pfx="%d [%s] " % (when, mark)
+  pfx="%d [%s]" % (when, mark)
   try:
     print >>_logFP, pfx, line.replace("\n", "\n%*s" % (len(pfx)+1, " "))
     _logFP.flush()
@@ -227,11 +227,11 @@ def reportElapsedTimeTo(logfunc,tag,func,*args,**kw):
     old=out("%.100s" % " ".join((cmd_,tag,"...")))
   t0, t1, result = elapsedTime(func, *args, **kw)
   t=t1-t0
+  if t >= 0.01:
+    if logfunc is None:
+      logfunc=logLine
+    logfunc("TIME %6.4fs %s"%(t,tag))
   if isdebug:
-    if t >= 0.01:
-      if logfunc is None:
-        logfunc=logLine
-      logfunc("%6.4fs %s"%(t,tag))
     out(old)
   return t, result
 
