@@ -67,6 +67,12 @@ def setDebug(newlevel):
   isprogress=(debug_level >= 1)
 
 setDebug(None)
+if isdebug:
+  def D(fmt,*args):
+    sys.stderr.write(fmt % args)
+else:
+  def D(*args):
+    pass
 
 debug_level_stack=[]
 def pushDebug(newlevel):

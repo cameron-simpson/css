@@ -73,11 +73,11 @@ class GDBMStore(BasicStore):
         yield h
 
   def sync(self):
-    ''' Sync(0 the store.
+    ''' Sync the store.
         Calls the GDBM sync() function and flush()es any open
         .vtd files.
     '''
-    self.log("sync")
+    ##self.log("sync")
     self.__index.sync()
     for n in self.__open:
       fp=self.__open[n]
@@ -91,7 +91,7 @@ class GDBMStore(BasicStore):
         - zblock (compressed block)
         Notes the offset to the zblock and the zsize in the GDBM index.
     '''
-    self.log("store %d bytes" % len(block))
+    ##self.log("store %d bytes" % len(block))
     ##tb()
     h=hash(block)
     if h in self:
