@@ -4,7 +4,7 @@ from cs.venti.blockify import topBlockRefString
 from cs.venti.meta import Meta
 from cs.venti import tohex
 from cs.lex import unctrl
-from cs.misc import seq, toBS, fromBS, fromBSfp, verbose, isdebug, debug, cmderr
+from cs.misc import seq, toBS, fromBS, fromBSfp, verbose, isdebug, debug, cmderr, progress
 
 uid_nobody = -1
 gid_nogroup = -1
@@ -391,7 +391,7 @@ class Dir(Dirent):
         else:
           verbose("%s not in dir"%subfile)
 
-        debug("storing %s ..." % subfile)
+        progress("store %s" % subfile)
         M=Meta()
         M.mtime(st.st_mtime)
         stored=storeFile(open(filepath),S=S)
