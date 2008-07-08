@@ -29,8 +29,10 @@ cmd=`basename "$0"`
 usage="Usage: $cmd [-v] [-w width] [-h height] [-x x-pos] [-y y-pos]
 		[-l lock] [-1 lock] [-j job]
 		[-f font] [-n name] [-big] [-small] [-keepio] [-xauthhack]
+                [-tab] [-window]
 		[{-c shellcmd}/{-e exec-list}/{-- raw-args}]"
 
+windowmode=tab
 trace=
 termopts=
 xrmopts=
@@ -101,6 +103,8 @@ do
     -small)	sized=1 x=$smallx y=$smally w=$smallw h=$smallh f=$smallf ;;
     -keepio)	detach= ;;
     -xauthhack)	xauthhack=1 ;;
+    -tab)       windowmode=tab ;;
+    -window)    windowmode=window ;;
     -g|-geometry)sized=1 geometry=$2; shift ;;
     -xrm)	xrmopts="$xrmopts $1 "`shqstr "$2"`; shift ;;
     --)		shift; break ;;
@@ -234,12 +238,18 @@ case "$TERM,$DISPLAY" in
         printf "%s\n" ": set -x; rm -f $qrunme; cd $qwd; exec $qcmd"
       ) >"$runme"
       chmod u+rx "$runme"
+      case $windowmode in
+        tab)    itermterm='current terminal' ;;
+        window) itermterm='make new terminal' ;;
+        *)      echo "$cmd: unsupported windowmode \"$windowmode\"" >&2
+                exit 2
+                ;;
+      esac
       set -- \
         osascript \
           -e 'tell app "iTerm"
                 activate
-                ##set myterm to (make new terminal)
-                set myterm to (current terminal)
+                set myterm to ('"$itermterm"')
                 tell myterm
                   set mysession to (make new session at the end of sessions)
                   tell mysession

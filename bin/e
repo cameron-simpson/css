@@ -16,6 +16,7 @@ fi
 
 exec \
 term $asyncopt \
+     -window \
      -g M \
      -n "E [$dirname]@$HOST $*" \
      -e edit ${1+"$@"}
