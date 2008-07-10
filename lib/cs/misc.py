@@ -18,6 +18,9 @@ def setcmd(ncmd):
 setcmd(os.path.basename(sys.argv[0]))
 
 class _NoUpd:
+  ''' A dummy class with the same duck type as cs.upd.Upd
+      used when cs.upd has not be instantiated by a program.
+  '''
   def out(self,s):
     if len(s) > 0:
       print >>sys.stderr, s
