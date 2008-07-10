@@ -1,0 +1,9 @@
+#!/bin/sh -ue
+#
+# Editor wrapper for the It's All Text! firefox extension.
+# Updated for MacOSX/iTerm environment here and in the "e" and "term" scripts.
+#       - Cameron Simpson <cs@zip.com.au> 08jul2008
+#
+
+[ -n "${didRIGENV:-}" ] || . $HOME/rc/shell/rigenv
+exec e +a ${1+"$@"}

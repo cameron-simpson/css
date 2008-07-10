@@ -20,8 +20,11 @@ pmsetmans(set) = $(MANDIR)/man3/$(('$(pmset($(set)))' Es[/]P s:|/|::|)).3
 pmsethtml(set) = $(htmandir)/$(('$(pmset($(set)))' Es[/]P s:|/|::|)).3.html
 pmmans = $('$$(pmsetmans($((pmsets))))' EE)
 pmhtml = $('$$(pmsethtml($((pmsets))))' EE)
+podman(podf) = $(MANDIR)/man$(podf FPS)/$(podf FP)
+podmans = $('$$(podman($(("man/*.pod" G))))' EE)
 pmFromMan(manf) = lib/$(manf FP s:|::|/|).pm
 pmFromHtml(html) = lib/$(html FPP s:|::|/|).pm
+podFromMan(manf) = man/$(manf F).pod
 
 subdirs = $('*/.' GD)
 allscripts = $('bin/*' GF !/\./ + "rc.mobile")
@@ -67,7 +70,17 @@ CHANGELOG.html:	_always
 _test:
 	echo $(pmmans)
 
-_man: _pmmans _scriptmans
+_man: _pmmans _scriptmans _podmans
+
+_podmans: $(podmans)
+
+$(podmans):     $(podFromMan($@))
+        :make $(@D)/.
+        rewriteif -v $@ pod2man --center="Cameron Simpson Scripts: $?" $?
+        chmod 644 $@
+        htman=$(htmandir)/$(@F).html
+        rewriteif -v $$htman pod2html --title="Cameron Simpson Scripts: $?" $?
+        chmod 644 $$htman
 
 _pmmans: $(pmmans)
 

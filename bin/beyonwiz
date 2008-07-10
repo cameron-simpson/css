@@ -7,7 +7,7 @@
 import sys
 import os.path
 import struct
-from cs.misc import cmd, cmderr, LogLine
+from cs.misc import cmd, cmderr, Loggable
 
 usage="Usage: %s cat tvwizdirs..." % cmd
 
@@ -32,9 +32,9 @@ class Trunc:
       assert len(buf) == 24
       yield struct.unpack("<QHHQL", buf)
 
-class TVWiz(LogLine):
+class TVWiz(Loggable):
   def __init__(self,wizdir):
-    LogLine.__init__(self,"TVWiz(%s)"%wizdir)
+    Loggable.__init__(self,"TVWiz(%s)"%wizdir)
     self.__dir=wizdir
 
   def trunc(self):
