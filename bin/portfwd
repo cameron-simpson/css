@@ -1,19 +1,120 @@
 #!/bin/sh -ue
 #
-# Establish ssh tunnels as needed.
-#	- Cameron Simpson <cs@zip.com.au> 05may2004
+# Run named port forwards indefinitely.
+#       - Cameron Simpson <cs@zip.com.au> 08jul2008
 #
 
-: ${LOCATION:=$SYSTEMID}
+: ${VARRUN:=$HOME/var/run}
 
-case $HOST@$LOCATION in
-  $HOMEHOST@home) ;;
-  *@home)       dest=$HOMEHOST ;;
-  *)            dest=home ;;
-esac
+once=
+if=en0
+stop=
+sshcfg=$HOME/rc/ssh/config-pf
 
-exec \
-  alog alert \
-    lock -1 home-alert-log \
-      forever -p portfwd -d 10 \
-        ssh "$dest" exec tail -f var/log/alert
+cmd=`basename "$0"`
+usage="Usage: $cmd [-1] [-stop] targets...
+  -1    Once. Do not restart the tunnel if it dies.
+  -stop Stop named port forwards instead of starting them.
+  -F    Ssh configuration file with clause for target-pf.
+If targets is \"ALL\" then if -stop it means all running portforwards
+otherwise it means all clauses named *-pf in the ssh configuration file."
+
+badopts=
+
+while [ $# -gt 0 ]
+do
+  case $1 in
+    -1) once=1 ;;
+    -F) sshcfg=$2; shift ;;
+    -stop)
+        stop=1 ;;
+    --) shift; break ;;
+    -?*)echo "$cmd: unrecognised option: $1" >&2
+        badopts=1
+        ;;
+    *)  break ;;
+  esac
+  shift
+done
+
+if [ $# = 0 ]
+then
+  echo "$cmd: missing targets" >&2
+  badopts=1
+fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+# send SIGTERM to a process and wait for it to exit
+synckill()
+{ _synckill_verbose=
+  if [ "x$1" = x-v ]
+  then  shift
+        _synckill_verbose=1
+  fi
+  kill "$1"
+  while kill -0 "$1" 2>/dev/null && sleep 1
+  do  [ -z "$_synckill_verbose" ] || printf .
+  done
+  [ -z "$_synckill_verbose" ] || echo
+}
+
+testif="ifconfig '$if' | grep '	inet [1-9]' >/dev/null"
+
+if [ "x$*" = xALL ]
+then
+  if [ $stop ]
+  then  set -- `ls "$VARRUN/." | sed -n 's/^portfwd\.//p'`
+  else  set -- `sed -n 'y/	/ /
+                        s/$/ /
+                        s/^[Hh][Oo][Ss][Tt]  *\([^ ][^ ]*\)-pf .*/\1/p' "$sshcfg"`
+  fi
+fi
+
+for target
+do
+  pidfile=$VARRUN/portfwd.$target
+  opid=`[ ! -s "$pidfile" ] || cat "$pidfile"`
+  [ -z "$opid" ] || kill -0 "$opid" 2>/dev/null || opid=
+  if [ -n "$opid" ]
+  then
+    printf "%s" "$cmd: stopping $target, pid $opid "
+    synckill -v "$opid"
+    >"$pidfile"
+  fi
+
+  if [ -z "$stop" ]
+  then
+    ( sshpid=
+      trap 'if [ -n "$sshpid" ]
+            then
+              printf "%s" "$cmd: $target: SIGTERM received, killing ssh "
+              synckill -v "$sshpid"
+            fi
+            exit 1
+           ' 1 15
+      first=1
+      while :
+      do
+        pfx "$target" \
+          sshto -n -F "$sshcfg" "$target-pf" \
+            'while sleep 61; do echo . ;done' \
+            &
+        sshpid=$!
+        [ $first ] || alert "RESTARTED: sshpf $target" &
+        while kill -0 "$sshpid" && sh -c "$testif"
+        do  sleep 2
+        done
+        synckill "$sshpid"
+        sshpid=
+        alert "KILLED: sshpf $target" &
+        [ $once ] && break
+        [ -z "$if" ] \
+        || await -d 2 -c "$testif"
+        first=
+      done
+    ) </dev/null 1>&2 &
+    echo $! >"$pidfile"
+    pfx "$target" cat "$pidfile"
+  fi
+done
