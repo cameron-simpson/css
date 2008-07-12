@@ -96,10 +96,9 @@ do
       first=1
       while :
       do
-        pfx "$target" \
-          sshto -n -F "$sshcfg" "$target-pf" \
-            'while sleep 61; do echo . ;done' \
-            &
+        sshto -n -F "$sshcfg" "$target-pf" \
+          'while sleep 61 && echo .; do :; done' \
+          >/dev/null &
         sshpid=$!
         [ $first ] || alert "RESTARTED: sshpf $target" &
         while kill -0 "$sshpid" && sh -c "$testif"
