@@ -1,0 +1,22 @@
+#!/bin/sh -ue
+#
+# Add user/group with specified name and id.
+#       - Cameron Simpson <cs@zip.com.au> 14jul2008
+#
+
+cmd=$0
+usage="Usage: $cmd name id"
+
+set -ue
+
+[ $# = 2 ] || { echo "$usage" >&2; exit 2; }
+name=$1
+id=$2
+
+hits=`pgid "$id"` || :
+[ -z "$hits" ] || { echo "$cmd: id $id taken:" >&2; echo "$hits" >&2; exit 1; }
+
+set -x
+groupadd -g "$id" "$name"
+adduser -g "$name" -u "$id" "$name"
+pgid "$id"
