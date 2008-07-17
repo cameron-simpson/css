@@ -37,6 +37,7 @@ set -ue
          /^bin\//b ok
          /^etc\//b ok
          /^lib\//b ok
+         /^man\//b ok
          /\//d
          :ok'
 ) \
@@ -55,10 +56,12 @@ cp $HOME/rc/java/au.com.zip.cs.jar "$tmpdir/lib/."
 hglog >"$tmpdir/CHANGELOG.txt"
 
 ( cd bin; mkscriptndx * | sort ) >"$tmpdir/1INDEX.txt"
+set -x
 
-mkdir "$tmpdir/man"
 rsync -aH "$OPTCSS/man/." "$tmpdir/man/."
 myke "MANDIR=$tmpdir/man" _man || echo myke _man fails, ignoring...
+
+exit 1
 
 pfx "$OPTCSS" \
   rsync -avH --delete --delete-excluded \
