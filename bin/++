@@ -52,7 +52,7 @@ then
   if [ $# = 0 ]
   then
     if [ $alldirs ]
-    then set -- "$MAILDIR" "$MAILDIR/ARCHIVE/"[0-9]*
+    then set -- "$MAILDIR" "$MAILDIR/OLD/"[0-9]*
     else set -- "$MAILDIR"
     fi
   fi
@@ -72,7 +72,7 @@ maildir "$res" || exit 1
 # save old arguments because we trash $@
 qargs=`shqstr "$@"` || exit 1
 if [ $alldirs ]
-then set -- "$MAILDIR" "$MAILDIR/ARCHIVE/"[0-9]*
+then set -- "$MAILDIR" "$MAILDIR/OLD/"[0-9]*
 else set -- "$MAILDIR"
 fi
 

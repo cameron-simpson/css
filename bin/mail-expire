@@ -6,7 +6,7 @@
 
 : ${MAILDIR:=$HOME/mail}
 : ${MAIL_EXPIRE_FORMAT:='%Y'}           # versus, say, %Y-%m
-: ${MAIL_EXPIRE_ARCHIVE:=+ARCHIVE}
+: ${MAIL_EXPIRE_ARCHIVE:=+OLD}
 
 trace=
 [ -t 2 ] && trace=set-x
