@@ -140,8 +140,8 @@ _hg init
         ##date -d "$date Z"
         log=`cvs log -l -N "-r$rev:$rev" "$file" | sed '1,/^date:/d; $d'`
         if [ -n "$log" ]
-        then  log="$log [CVS rev $rev]"
-        else  log="[CVS rev $rev]"
+        then  log="$log [CVS:$rev]"
+        else  log="[CVS:$rev]"
         fi
         _hg commit -d "$date UTC" -m "$log" "$file"
         ##ls -ld "$file"
