@@ -21,8 +21,8 @@ def load(fp,parseInts=False):
     lineno+=1
 
     # trim newline
-    assert line[-1:] == '\n', \
-           "%s, line $d: missing newline" % (fp, lineno)
+    assert line[-1] == '\n', \
+           "%s, line %d: missing newline" % (fp, lineno)
     line=line[:-1]
 
     # skip blank lines and comments
@@ -38,7 +38,7 @@ def load(fp,parseInts=False):
       continue
 
     assert clause is not None, \
-        "%s, line $d: unexpected data outside of [clause]: %s" \
+        "%s, line %d: unexpected data outside of [clause]: %s" \
           % (fp, lineno, line)
 
     # look for var=value
