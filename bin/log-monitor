@@ -1,0 +1,60 @@
+#!/usr/bin/python -tt
+#
+# Monitor log files.
+#       - Cameron Simpson <cs@zip.com.au> 18jul2008
+#
+
+from __future__ import with_statement
+
+import sys
+import re
+from thread import allocate_lock
+from threading import Thread
+import cs.wini
+from cs.tail import Tail
+from cs.misc import cmd
+
+usage="Usage: %s log.cfg" % cmd
+
+ioLock=allocate_lock()
+
+def watchfile(path, monitors):
+  global ioLock
+  for line in Tail(path):
+    assert line[-1] == '\n'
+    line=line[:-1]
+    for name, regexp, action in monitors:
+      m=regexp.search(line)
+      if m is not None:
+        with ioLock:
+          sys.stdout.write("%s %s %s\n" % (path, name, action))
+          sys.stdout.flush()
+
+args=sys.argv[1:]
+if len(args) != 1:
+  print >>sys.stderr, usage
+  sys.exit(2)
+cfg=cs.wini.load(open(args[0]))
+
+paths=cfg.keys()
+paths.sort()
+monitors={}
+for path in paths:
+  M=monitors[path]=[]
+  C=cfg[path]
+  for name in C.keys():
+    regexp, action = C[name].split(' ',1)
+    regexp = re.compile(regexp)
+    M.append( (name, regexp, action) )
+
+ts=[]
+for path in paths:
+  T=Thread(target=watchfile,args=(path,monitors[path]))
+  T.setDaemon(True)
+  T.start()
+  ts.append(T)
+
+for T in ts:
+  T.join()
+
+sys.exit(0)
