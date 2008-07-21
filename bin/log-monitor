@@ -8,53 +8,133 @@ from __future__ import with_statement
 
 import sys
 import re
+import os
+import time
 from thread import allocate_lock
 from threading import Thread
 import cs.wini
 from cs.tail import Tail
-from cs.misc import cmd
+from cs.misc import cmd, DictUC_Attrs
 
 usage="Usage: %s log.cfg" % cmd
 
 ioLock=allocate_lock()
 
-def watchfile(path, monitors):
-  global ioLock
-  for line in Tail(path):
-    assert line[-1] == '\n'
-    line=line[:-1]
-    for name, regexp, action in monitors:
-      m=regexp.search(line)
-      if m is not None:
-        with ioLock:
-          sys.stdout.write("%s %s %s\n" % (path, name, action))
-          sys.stdout.flush()
-
 args=sys.argv[1:]
 if len(args) != 1:
   print >>sys.stderr, usage
   sys.exit(2)
-cfg=cs.wini.load(open(args[0]))
 
-paths=cfg.keys()
-paths.sort()
-monitors={}
-for path in paths:
-  M=monitors[path]=[]
-  C=cfg[path]
-  for name in C.keys():
-    regexp, action = C[name].split(' ',1)
-    regexp = re.compile(regexp)
-    M.append( (name, regexp, action) )
+class Monitor(object):
+  def __init__(self,cfg):
+    ''' Monitor initialisation: the argument cfg is either a mapping to
+        mapping to string, or a string contaning the pathname of a .ini file
+        to load.
+    '''
+    if type(cfg) is str:
+      import cs.wini
+      cfg=cs.wini.load(open(cfg))
+    self.regexps={}
+    self.paths={}
+    self.outfiles={}
+    self.threads=[]
 
-ts=[]
-for path in paths:
-  T=Thread(target=watchfile,args=(path,monitors[path]))
-  T.setDaemon(True)
-  T.start()
-  ts.append(T)
+    # divide config file into regexp definitions and log file paths
+    paths={}
+    matches={}
+    for k in cfg.keys():
+      if k.startswith('/'):
+        paths[k]=cfg[k]
+      else:
+        assert k[0].islower(), "bad match clause name \"%s\"" % k
+        matches[k]=cfg[k]
 
-for T in ts:
-  T.join()
+    # collect named regexps for use by path monitors
+    for m in matches.keys():
+      # allocate a regular expression and a lock for it
+      self.regexps[m]=(allocate_lock(), re.compile(matches[m]['re']))
 
+    # collect log file paths to monitor
+    for path in paths.keys():
+      class pathObj:
+        pass
+      pathObj.PATH=path
+      pathObj.TAIL=Tail(path)
+
+      # make a map of tests indexed by regexp name
+      pathObj.TESTS={}
+      for testName in paths[path].keys():
+        regexpName, action = paths[path][testName].split(' ', 1)
+        action=action.strip()
+        class test:
+          pass
+        test.NAME=testName
+        test.REGEXP=regexpName
+        test.ACTION=action
+        if action.startswith('>>'):
+          test.ACTION_TYPE='FILE'
+          outfilename=action[2:].lstrip()
+          if outfilename not in self.outfiles:
+            self.outfiles[outfilename]=open(outfilename,"a")
+          test.ACTION_FILE=self.outfiles[outfilename]
+        elif action.startswith('!'):
+          test.ACTION_TYPE='SHCMD'
+          test.ACTION_SHCMD="read when dmy hms test logfile line; "+action[1:].lstrip()
+        elif action.startswith('|'):
+          test.ACTION_TYPE='PIPE'
+          test.ACTION_PIPE=os.popen(action[1:].lstrip(),"w")
+        else:
+          assert False, "unsupported action \"%s\"" % action
+        pathObj.TESTS.setdefault(regexpName,[]).append(test)
+
+      self.paths[path]=pathObj
+
+    # dispatch monitor threads
+    for path in self.paths.keys():
+      T=Thread(target=self.__runMonitor,args=(path,))
+      T.setDaemon(True)
+      T.start()
+      self.threads.append(T)
+
+  def join(self):
+    for T in self.threads:
+      T.join()
+
+  def __runMonitor(self,path):
+    global ioLock
+    tests=self.paths[path].TESTS
+    for line in Tail(path):
+      assert line[-1] == '\n'
+      line=line[:-1]
+      for regexpName in tests.keys():
+        reLock, reObj = self.regexps[regexpName]
+        with reLock:
+          m=reObj.search(line)
+        if m is not None:
+          now=time.time()
+          ltime=time.localtime(now)
+          dmy=time.strftime("%Y-%m-%d", ltime)
+          hms=time.strftime("%H:%M:%S", ltime)
+          for test in tests[regexpName]:
+            report="%f %s %s %s %s %s\n" \
+                   % (time.time(), dmy, hms, test.NAME, path, line)
+            if test.ACTION_TYPE == 'FILE':
+              # ACTION_FILEs are shared - use lock
+              with ioLock:
+                test.ACTION_FILE.write(report)
+                test.ACTION_FILE.flush()
+            elif test.ACTION_TYPE == 'PIPE':
+              # ACTION_PIPEs are per-test, no lock
+              test.ACTION_PIPE.write(report)
+              test.ACTION_PIPE.flush()
+            elif test.ACTION_TYPE == 'SHCMD':
+              # ACTION_PIPEs are per-test, no lock
+              reportfp=os.popen(test.ACTION_SHCMD,"w")
+              reportfp.write(report)
+              reportfp.close()
+            else:
+              assert False, "unhandled ACTION_TYPE \"%s\"" % test.ACTION_TYPE
+
+M=Monitor(args[0])
+M.join()
 sys.exit(0)

@@ -1,0 +1,111 @@
+
+=head1 NAME
+
+log-monitor - configuration file syntax
+
+=head1 DESCRIPTION
+
+The configuration file for the log-monitor(1cs) command is very
+similar to a Windows B<.ini> file, with the following clauses and field
+meanings.
+Field values have leading and trailing white space stripped from them.
+
+=head2 Match Clauses
+
+A clause whose name commences with a lower case letter
+specifies a match rule that may be used in monitoring a file.
+Currently the only supported field is "B<re>" which specifies a regular
+expression.
+Example:
+
+  [ sshd ]
+  re = sshd\[[0-9]+\]:
+
+This clause matches typical sshd(8) messages in a syslog(5) file.
+
+=head2 Log FIle Clauses
+
+A clause whose name commences with a slash ('/')
+specifies a log file to monitor for matches.
+Each field in the clause specifies a test with a match rule and an action.
+Each field name must be distinct within the clause.
+The field value consists of a word naming a match clause
+and an action to take when it occurs.
+
+When a line matches, a report is composed of the form:
+
+  unixtime YYYY-MM-DD HH:MM:SS testname logfile line
+
+consisting of the UNIX time (seconds since the start of 1970, a float),
+the date (year, month, day) and time (hours, minutes, seconds) in local time,
+the name of the test (the field name),
+the pathname of the log file (the clause name)
+and the text of the matches line.
+
+The following actions are supported:
+
+=over 2
+
+=item B<&gt;&gt;> I<pathname>
+
+The report line is appended to the file specified by I<pathname>.
+
+=item B<|> I<shell command>
+
+When log-monitor(1cs) starts
+a pipe is opened to an instance of the I<shell command>.
+Matching lines cause the report line to be written to this pipe.
+
+=item B<!> I<shell command>
+
+Matching lines are written to the shell command:
+
+  read when dmy hms test logfile line; shell command
+
+The I<shell command> may thus make use of the report content via the shell
+variables B<$when>, B<$dmy>, B<$hms>, B<$test>, B<$logfile>, B<$line>.
+
+This form should only be used for infrequent matches because a subshell
+(and its subcommands in turn) is spawned for each match.
+
+=back
+
+Example:
+
+  [ /var/log/messages ]
+  cron = cron >>/var/log/cron-lines
+  sshd1 = sshd >>/var/log/sshd-lines
+  sshd2 = sshd ! echo "$logfile: $line" >>/var/log/terser-sshd-lines
+
+This clause monitors the file B</var/log/messages> for distinctive lines.
+The first field (B<cron>) watches for lines
+matching the clause named "B<cron>" (not shown)
+and the corresponding report lines appended to the file B</var/log/cron-lines>.
+The second and third fields (B<ssh1> and B<ssh2>) both watch for lines
+matching the clause named "B<sshd>".
+The former (B<ssh1>) appends report lines to the file B</var/log/sshd-lines>.
+The latter (B<sshd2>) appends lines of the form:
+
+  logfile matched-line
+
+to the file B</var/log/terser-sshd-lines> using a shell B<echo(1)> command.
+
+=back
+
+=head1 BUGS
+
+There should be a way to cause a reread of the configuration file and
+a reconfigure.
+
+There should be a way to send syslog messages,
+though the logger(1) command may be used with B<!> actions to achieve this.
+(Maybe "@..." notation, as in syslogd.conf(5)).
+
+=head1 SEE ALSO
+
+log-monitor(1cs), tail(1), logger(1)
+
+=head1 AUTHOR
+
+Cameron Simpson E<lt>cs@zip.com.auE<gt>
+
