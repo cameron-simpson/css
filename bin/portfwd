@@ -52,7 +52,7 @@ synckill()
   then  shift
         _synckill_verbose=1
   fi
-  kill "$1"
+  kill "$1" || return 1
   while kill -0 "$1" 2>/dev/null && sleep 1
   do  [ -z "$_synckill_verbose" ] || printf .
   done
@@ -104,9 +104,14 @@ do
         while kill -0 "$sshpid" && sh -c "$testif"
         do  sleep 2
         done
-        synckill "$sshpid"
-        sshpid=
-        alert "KILLED: sshpf $target" &
+        if synckill "$sshpid"
+        then
+          sshpid=
+          alert "KILLED: sshpf $target" &
+        else
+          sshpid=
+          alert "EXITED: sshpf $target" &
+        fi
         [ $once ] && break
         [ -z "$if" ] \
         || await -d 2 -c "$testif"
