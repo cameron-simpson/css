@@ -23,7 +23,7 @@ Example:
 
 This clause matches typical sshd(8) messages in a syslog(5) file.
 
-=head2 Log FIle Clauses
+=head2 Log File Clauses
 
 A clause whose name commences with a slash ('/')
 specifies a log file to monitor for matches.
@@ -46,7 +46,7 @@ The following actions are supported:
 
 =over 2
 
-=item B<&gt;&gt;> I<pathname>
+=item B<E<gt>E<gt>> I<pathname>
 
 The report line is appended to the file specified by I<pathname>.
 
