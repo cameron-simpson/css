@@ -86,7 +86,7 @@ matching the clause named "B<sshd>".
 The former (B<ssh1>) appends report lines to the file B</var/log/sshd-lines>.
 The latter (B<sshd2>) appends lines of the form:
 
-  logfile matched-line
+  /var/log/messages: matched-line
 
 to the file B</var/log/terser-sshd-lines> using a shell B<echo(1)> command.
 
