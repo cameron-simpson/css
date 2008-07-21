@@ -73,10 +73,7 @@ class Monitor(object):
         test.ACTION=action
         if action.startswith('>>'):
           test.ACTION_TYPE='FILE'
-          outfilename=action[2:].lstrip()
-          if outfilename not in self.outfiles:
-            self.outfiles[outfilename]=open(outfilename,"a")
-          test.ACTION_FILE=self.outfiles[outfilename]
+          test.ACTION_FILENAME=action[2:].lstrip()
         elif action.startswith('!'):
           test.ACTION_TYPE='SHCMD'
           test.ACTION_SHCMD="read when dmy hms test logfile line; "+action[1:].lstrip()
@@ -101,6 +98,7 @@ class Monitor(object):
       T.join()
 
   def __runMonitor(self,path):
+    global cmd
     global ioLock
     tests=self.paths[path].TESTS
     for line in Tail(path):
@@ -120,9 +118,20 @@ class Monitor(object):
                    % (time.time(), dmy, hms, test.NAME, path, line)
             if test.ACTION_TYPE == 'FILE':
               # ACTION_FILEs are shared - use lock
-              with ioLock:
-                test.ACTION_FILE.write(report)
-                test.ACTION_FILE.flush()
+              fp=None
+              try:
+                fp=open(test.ACTION_FILENAME,"a")
+                with ioLock:
+                  fp.write(report)
+                  fp.close()
+              except IOError, e:
+                print >>sys.stderr, \
+                      "%s: %s: %s" % (cmd, test.ACTION_FILENAME, e)
+              if fp is not None:
+                try:
+                  fp.close()
+                except IOError, e:
+                  pass
             elif test.ACTION_TYPE == 'PIPE':
               # ACTION_PIPEs are per-test, no lock
               test.ACTION_PIPE.write(report)
