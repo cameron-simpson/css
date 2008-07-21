@@ -90,8 +90,6 @@ The latter (B<sshd2>) appends lines of the form:
 
 to the file B</var/log/terser-sshd-lines> using a shell B<echo(1)> command.
 
-=back
-
 =head1 BUGS
 
 There should be a way to cause a reread of the configuration file and
