@@ -1,4 +1,4 @@
-#!/usr/bin/python -tt
+#!/usr/bin/env python2.5
 #
 # Monitor log files.
 #       - Cameron Simpson <cs@zip.com.au> 18jul2008
@@ -16,7 +16,7 @@ import cs.wini
 from cs.tail import Tail
 from cs.misc import cmd, DictUC_Attrs
 
-usage="Usage: %s log.cfg" % cmd
+usage="Usage: %s configuration-file" % cmd
 
 ioLock=allocate_lock()
 
@@ -28,7 +28,7 @@ if len(args) != 1:
 class Monitor(object):
   def __init__(self,cfg):
     ''' Monitor initialisation: the argument cfg is either a mapping to
-        mapping to string, or a string contaning the pathname of a .ini file
+        mapping to string, or a string containing the pathname of a .ini file
         to load.
     '''
     if type(cfg) is str:
