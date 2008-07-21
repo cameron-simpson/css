@@ -61,11 +61,11 @@ set -x
 rsync -aH "$OPTCSS/man/." "$tmpdir/man/."
 myke "MANDIR=$tmpdir/man" _man || echo myke _man fails, ignoring...
 
-( cd "$tmpdir"
-  /bin/pwd
-  set -x
-  $SHELL
-)
+##( cd "$tmpdir"
+##  /bin/pwd
+##  set -x
+##  $SHELL
+##)
 
 pfx "$OPTCSS" \
   rsync -avH --delete --delete-excluded \
