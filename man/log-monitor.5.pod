@@ -58,7 +58,7 @@ Matching lines cause the report line to be written to this pipe.
 
 =item B<!> I<shell command>
 
-Matching lines are written to the shell command:
+Matching lines cause the report to be written to the shell command:
 
   read when dmy hms test logfile line; shell command
 
@@ -67,6 +67,21 @@ variables B<$when>, B<$dmy>, B<$hms>, B<$test>, B<$logfile>, B<$line>.
 
 This form should only be used for infrequent matches because a subshell
 (and its subcommands in turn) is spawned for each match.
+
+=item B<SYSLOG> [B<@>I<host>] I<facility> I<level>
+
+Matching lines cause the report:
+
+  testname logfile line
+
+to be delivered to syslog.
+If the optional word B<@>I<host> is present then the remote syslog
+on the specified host receives the packet
+otherwise it is delivered to the local syslog service.
+
+I<facility> is one of the words B<kern>, B<user>, B<mail daemon>, B<auth>, B<lpr>, B<news>, B<uucp>, B<cron> or B<local[0-7]>.
+
+I<level> is one of the words B<emerg>, B<alert>, B<crit>, B<err>, B<warning>, B<notice>, B<info> or B<debug>.
 
 =back
 

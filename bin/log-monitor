@@ -10,6 +10,7 @@ import sys
 import re
 import os
 import time
+import syslog
 from thread import allocate_lock
 from threading import Thread
 import cs.wini
@@ -24,6 +25,45 @@ args=sys.argv[1:]
 if len(args) != 1:
   print >>sys.stderr, usage
   sys.exit(2)
+
+syslogFacilities={ 'kern':      syslog.LOG_KERN,
+                   'user':      syslog.LOG_USER,
+                   'mail':      syslog.LOG_MAIL,
+                   'daemon':    syslog.LOG_DAEMON,
+                   'auth':      syslog.LOG_AUTH,
+                   'lpr':       syslog.LOG_LPR,
+                   'news':      syslog.LOG_NEWS,
+                   'uucp':      syslog.LOG_UUCP,
+                   'cron':      syslog.LOG_CRON,
+                   'local0':    syslog.LOG_LOCAL0,
+                   'local1':    syslog.LOG_LOCAL1,
+                   'local2':    syslog.LOG_LOCAL2,
+                   'local3':    syslog.LOG_LOCAL3,
+                   'local4':    syslog.LOG_LOCAL4,
+                   'local5':    syslog.LOG_LOCAL5,
+                   'local6':    syslog.LOG_LOCAL6,
+                   'local7':    syslog.LOG_LOCAL7,
+                 }
+syslogPriorities={ 'emerg':     syslog.LOG_EMERG,
+                   'alert':     syslog.LOG_ALERT,
+                   'crit':      syslog.LOG_CRIT,
+                   'err':       syslog.LOG_ERR,
+                   'warning':   syslog.LOG_WARNING,
+                   'notice':    syslog.LOG_NOTICE,
+                   'info':      syslog.LOG_INFO,
+                   'debug':     syslog.LOG_DEBUG,
+                 }
+
+def prepSyslog(words):
+  if words[0].startswith('@'):
+    host=words.pop(0)[1:]
+  else:
+    host=None
+  assert len(words) == 2
+  facility, level = words
+  facility=syslogFacilities[facility]
+  level=syslogPriorities[level]
+  return host, facility, level
 
 class Monitor(object):
   def __init__(self,cfg):
@@ -80,6 +120,15 @@ class Monitor(object):
         elif action.startswith('|'):
           test.ACTION_TYPE='PIPE'
           test.ACTION_PIPE=os.popen(action[1:].lstrip(),"w")
+        elif action.startswith('SYSLOG') and action[6:7].isspace():
+          test.ACTION_TYPE='SYSLOG'
+          host, facility, level = prepSyslog(action[7:].split())
+          if host is not None:
+            import netsyslog
+            NSL=netsyslog.Logger()
+            NSL.add_host(host)
+            host=NSL
+          test.ACTION_SYSLOG = (host, facility, level)
         else:
           assert False, "unsupported action \"%s\"" % action
         pathObj.TESTS.setdefault(regexpName,[]).append(test)
@@ -114,35 +163,43 @@ class Monitor(object):
           dmy=time.strftime("%Y-%m-%d", ltime)
           hms=time.strftime("%H:%M:%S", ltime)
           for test in tests[regexpName]:
-            report="%f %s %s %s %s %s\n" \
-                   % (time.time(), dmy, hms, test.NAME, path, line)
-            if test.ACTION_TYPE == 'FILE':
-              # ACTION_FILEs are shared - use lock
-              fp=None
-              try:
-                fp=open(test.ACTION_FILENAME,"a")
-                with ioLock:
-                  fp.write(report)
-                  fp.close()
-              except IOError, e:
-                print >>sys.stderr, \
-                      "%s: %s: %s" % (cmd, test.ACTION_FILENAME, e)
-              if fp is not None:
-                try:
-                  fp.close()
-                except IOError, e:
-                  pass
-            elif test.ACTION_TYPE == 'PIPE':
-              # ACTION_PIPEs are per-test, no lock
-              test.ACTION_PIPE.write(report)
-              test.ACTION_PIPE.flush()
-            elif test.ACTION_TYPE == 'SHCMD':
-              # ACTION_PIPEs are per-test, no lock
-              reportfp=os.popen(test.ACTION_SHCMD,"w")
-              reportfp.write(report)
-              reportfp.close()
+            if test.ACTION_TYPE == 'SYSLOG':
+              report="%s %s %s" % (test.NAME, path, line)
+              host, facility, level = test.ACTION_SYSLOG
+              if host is None:
+                syslog.syslog( facility | level, report)
+              else:
+                host.log(facility, level, report)
             else:
-              assert False, "unhandled ACTION_TYPE \"%s\"" % test.ACTION_TYPE
+              report="%f %s %s %s %s %s\n" \
+                     % (time.time(), dmy, hms, test.NAME, path, line)
+              if test.ACTION_TYPE == 'FILE':
+                # ACTION_FILEs are shared - use lock
+                fp=None
+                try:
+                  fp=open(test.ACTION_FILENAME,"a")
+                  with ioLock:
+                    fp.write(report)
+                    fp.close()
+                except IOError, e:
+                  print >>sys.stderr, \
+                        "%s: %s: %s" % (cmd, test.ACTION_FILENAME, e)
+                if fp is not None:
+                  try:
+                    fp.close()
+                  except IOError, e:
+                    pass
+              elif test.ACTION_TYPE == 'PIPE':
+                # ACTION_PIPEs are per-test, no lock
+                test.ACTION_PIPE.write(report)
+                test.ACTION_PIPE.flush()
+              elif test.ACTION_TYPE == 'SHCMD':
+                # ACTION_PIPEs are per-test, no lock
+                reportfp=os.popen(test.ACTION_SHCMD,"w")
+                reportfp.write(report)
+                reportfp.close()
+              else:
+                assert False, "unhandled ACTION_TYPE \"%s\"" % test.ACTION_TYPE
 
 M=Monitor(args[0])
 M.join()
