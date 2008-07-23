@@ -212,7 +212,7 @@ def doCommand(argv):
       setvar('PATH',"%s:%s/bin:%s/sbin" % (env('PATH',''), arg, arg))
       setvar('MANPATH',"%s:%s/man:%s/share/man" % (env('MANPATH',''), arg, arg))
       setvar('PERL5LIB',"%s:%s/lib/perl5:%s/lib/perl5/vendor_perl" % (env('PERL5LIB',''), arg, arg))
-      setvar('PYTHONPATH',"%s:%s/lib/python%s" % (env('PYTHONPATH',''), arg, env('PYTHON_VV')))
+      setvar('PYTHONPATH',"%s:%s/lib/python%s/site-packages:%s/lib/python%s" % (env('PYTHONPATH',''), arg, env('PYTHON_VV'), arg, env('PYTHON_VV')))
   elif op == "insprefix":
     argv.reverse()
     for arg in argv:
