@@ -50,7 +50,7 @@
 #
 #  cat[,cat...] rfc2822-address
 #
-# and define macros named B<cat_>I<cat> for each category
+# and define macros named B<re_>I<cat> for each category
 # that contain regexps to match all the addresses in each category I<cat>.
 #
 # =item B<-d> I<dirpath>
@@ -292,6 +292,7 @@ from getopt import getopt, GetoptError
 import string
 from cStringIO import StringIO
 import re
+from sets import Set
 
 trackRules=True         # add X-Cats2Procmailrc line to show rule
 useXLabel=False         # put tag in X-Label header instead of subject
@@ -326,6 +327,7 @@ usage='''Usage: %s [-a alert] [-d dir] [-D subst=val] [-L] [-m domains] [-S] \\
 assign_re=re.compile(r'[a-z]\w+=', re.I)
 target_re=re.compile(r'("[^"]*"|[^",\s]+)')
 hdrlist_re=re.compile(r'([a-z][\-a-z0-9]*(,[a-z][\-a-z0-9]*)*):', re.I)
+alladdrs=Set()
 
 badopts=False
 
@@ -348,15 +350,16 @@ for opt, arg in opts:
     alertCommand=arg
   elif opt == '-A':
     from cs.mailAddresses import loadAddresses, addrsRegexp
-    cats, addrs = loadAddresses(arg)
-    alladdrs=[]
-    for cat in cats.keys():
-      addrs=cats[cat].keys()
-      alladdrs.extend(addrs)
+    catmap, addrmap = loadAddresses(arg)
+    for cat in catmap.keys():
+      addrs=catmap[cat].keys()
+      assert all(addr.find('@') > 0 for addr in addrs), \
+             "bad address in %s" % addrs
+      alladdrs.update(addrs)
       retext=addrsRegexp(addrs)
-      if retext.startswith('\<') and retext.endswith('\>'):
-        retext=retext[2:-2]
-      substitutions["cat_%s" % cat]=retext
+      ##print >>sys.stderr, "re[%s]=%s" % (cat, retext)
+      assert not retext.startswith('\<') and not retext.endswith('\>')
+      substitutions["re_%s" % cat]='\\<('+retext+')\\>'
   elif opt == '-d':
     includePath=arg.split(':')
   elif opt == '-D':
@@ -402,10 +405,8 @@ for subname in [v[16:] for v in os.environ.keys() if v.startswith('CATS2PROCMAIL
     substitutions[subname]=os.environ['CATS2PROCMAILRC_'+subname]
 
 # uber category for all known categories
-substitutions["cat_ALL"]="|".join( substitutions[cat]
-                                   for cat in substitutions.keys()
-                                   if cat.startswith('cat_')
-                                 )
+substitutions["re_ALL"]='\\<('+addrsRegexp(alladdrs)+')\\>'
+##print >>sys.stderr, "ALL=%s" % substitutions["re_ALL"]
 
 subnames=substitutions.keys()
 if len(subnames) == 0:
@@ -488,8 +489,8 @@ def c2p(ifp,ofp):
 
     line0=line
     ruledesc="%s, line %d: %s" % (ifp.name, lineno, line.replace('\n','; '))
-    if len(ruledesc) > 70:
-      ruledesc=ruledesc[:67]+'...'
+    if len(ruledesc) > 200:
+      ruledesc=ruledesc[:197]+'...'
 
     if curly_re:
       curlies=[m for m in curly_re.finditer(line)]
@@ -616,11 +617,12 @@ def c2p(ifp,ofp):
         else:
           pattern='.*'+pattern
       else:
-        pattern=pattern.strip()
         # email addresses
+        pattern=pattern.strip()
         if pattern.find('@') < 0:
-          pattern='('+'|'.join(["%s@%s"%(pattern,dom) for dom in dfltDomains])+')'
-        pattern='.*\\<'+pattern.replace('.','\\.').replace('+','\\+')+'\\>'
+          # no "@" - permute across dfltDomains
+          pattern='%s@(%s)' % (pattern, '|'.join(dfltDomains))
+        pattern='.*\\<('+pattern.replace('.','\\.').replace('+','\\+')+')\\>'
 
       if len(hdrs) == 1:
         hdrs=hdrs[0]
