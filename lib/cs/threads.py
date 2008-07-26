@@ -266,7 +266,8 @@ class FuncQueue:
     self.__closing=False
     self.__threads=[]
     for n in range(parallelism):
-      T=Thread(target=self.__runQueue).start()
+      T=Thread(target=self.__runQueue)
+      T.start()
       self.__threads.append(T)
 
   def __runQueue(self):
@@ -286,9 +287,9 @@ class FuncQueue:
   def close(self,dojoin=False):
     self.__Q.close()
     if dojoin:
-      self._join()
+      self.join()
 
-  def _join(self):
+  def join(self):
     for T in self.__threads:
       T.join()
 
