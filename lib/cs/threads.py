@@ -264,37 +264,11 @@ class FuncQueue:
     assert parallelism > 0
     self.__Q=IterableQueue(size)
     self.__closing=False
+    self.__threads=[]
     for n in range(parallelism):
-      Thread(target=self.__runQueue).start()
-  def callback(self,retQ,func,args=(),kwargs=None):
-    ''' Queue a function for dispatch.
-        If retQ is not None, the function return value will be .put() on retQ.
-    '''
-    assert not self.__closing
-    if kwargs is None:
-      kwargs={}
-    else:
-      assert type(kwargs) is dict
-    if retQ is None: retQ=Q1()
-    self.__Q.put((retQ,func,args,kwargs))
-  def callbg(self,func,args=(),kwargs=None):
-    ''' Asynchronously call the supplied func via the FuncQueue.
-        Returns a Q1 from which the result may be .get().
-    '''
-    retQ=Q1()
-    self.callback(retQ,func,args,kwargs)
-    return retQ
-  def call(self,func,args=(),kwargs=None):
-    ''' Synchronously call the supplied func via the FuncQueue.
-        Return the function result.
-    '''
-    return self.callbg(func,args,kwargs).get()
-  def dispatch(self,func,args=(),kwargs=None):
-    ''' Asynchronously call the supplied func via the FuncQueue.
-    '''
-    self.callback(None,func,args,kwargs)
-  def close(self):
-    self.__Q.close()
+      T=Thread(target=self.__runQueue).start()
+      self.__threads.append(T)
+
   def __runQueue(self):
     ''' A thread to process queue items serially.
         This exists to permit easy or default implementation of the
@@ -308,6 +282,46 @@ class FuncQueue:
       ret=func(*args,**kwargs)
       if retQ is not None:
         retQ.put(ret)
+
+  def close(self,dojoin=False):
+    self.__Q.close()
+    if dojoin:
+      self._join()
+
+  def _join(self):
+    for T in self.__threads:
+      T.join()
+
+  def callback(self,retQ,func,args=(),kwargs=None):
+    ''' Queue a function for dispatch.
+        If retQ is not None, the function return value will be .put() on retQ.
+    '''
+    assert not self.__closing
+    if kwargs is None:
+      kwargs={}
+    else:
+      assert type(kwargs) is dict
+    if retQ is None: retQ=Q1()
+    self.__Q.put((retQ,func,args,kwargs))
+
+  def callbg(self,func,args=(),kwargs=None):
+    ''' Asynchronously call the supplied func via the FuncQueue.
+        Returns a Q1 from which the result may be .get().
+    '''
+    retQ=Q1()
+    self.callback(retQ,func,args,kwargs)
+    return retQ
+
+  def call(self,func,args=(),kwargs=None):
+    ''' Synchronously call the supplied func via the FuncQueue.
+        Return the function result.
+    '''
+    return self.callbg(func,args,kwargs).get()
+
+  def dispatch(self,func,args=(),kwargs=None):
+    ''' Asynchronously call the supplied func via the FuncQueue.
+    '''
+    self.callback(None,func,args,kwargs)
 
 ''' A pool of Channels.
 '''
