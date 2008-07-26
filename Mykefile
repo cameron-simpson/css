@@ -2,6 +2,8 @@
 
 target  = bin
 
+rewrite = rewriteif -0 -v
+
 JAVADIR	= $(ETCDIR)/www/java/classes
 java	= $(localjava) $(subjava)
 localjava= $('*.java' G)
@@ -20,8 +22,11 @@ pmsetmans(set) = $(MANDIR)/man3/$(('$(pmset($(set)))' Es[/]P s:|/|::|)).3
 pmsethtml(set) = $(htmandir)/$(('$(pmset($(set)))' Es[/]P s:|/|::|)).3.html
 pmmans = $('$$(pmsetmans($((pmsets))))' EE)
 pmhtml = $('$$(pmsethtml($((pmsets))))' EE)
+podman(podf) = $(MANDIR)/man$(podf FPS)/$(podf FP)
+podmans = $('$$(podman($(("man/*.pod" G))))' EE)
 pmFromMan(manf) = lib/$(manf FP s:|::|/|).pm
 pmFromHtml(html) = lib/$(html FPP s:|::|/|).pm
+podFromMan(manf) = man/$(manf F).pod
 
 subdirs = $('*/.' GD)
 allscripts = $('bin/*' GF !/\./ + "rc.mobile")
@@ -55,10 +60,10 @@ _home:
 _all: squid_redirect 1INDEX.txt _submakes _man
 
 CHANGELOG.txt:	_always
-	rewriteif -v $@ hglog
+	>>$@; $(rewrite) $@ hglog
 
 CHANGELOG.html:	_always
-	rewriteif -v $@ cvslog2html -O .
+	>>$@; $(rewrite) $@ cvslog2html -O .
 
 1INDEX.txt: $(allscripts)
 	@echo make $@ \
@@ -67,7 +72,20 @@ CHANGELOG.html:	_always
 _test:
 	echo $(pmmans)
 
-_man: _pmmans _scriptmans
+_man:
+        :make _podmans
+        :make _pmmans
+        :make _scriptmans
+
+_podmans: $(podmans)
+
+$(podmans):     $(podFromMan($@))
+        :make $(@D)/.
+        >>$@; $(rewrite) $@ pod2man --center="Cameron Simpson Scripts: $?" $?
+        chmod 644 $@
+        set -uex; htman=$(htmandir)/$(@F).html \
+        >>$$htman; $(rewrite) $$htman pod2html --title="Cameron Simpson Scripts: $?" $? \
+        chmod 644 $$htman
 
 _pmmans: $(pmmans)
 
@@ -75,10 +93,10 @@ $(pmmans):	$(pmFromMan($@))
 	:make $(@D)/.
 	@if grep '^=head1 NAME' <$? >/dev/null \
 	then \
-	    rewriteif -v $@ pod2man --center="Cameron Simpson Scripts: $?" $? \
+	    >>$@; $(rewrite) $@ pod2man --center="Cameron Simpson Scripts: $?" $? \
 	    chmod 644 $@ \
 	    htman=$(htmandir)/$(@F).html \
-	    rewriteif -v $$htman pod2html --title="Cameron Simpson Scripts: $?" $? \
+	    >>$$htman; $(rewrite) $$htman pod2html --title="Cameron Simpson Scripts: $?" $? \
 	    chmod 644 $$htman \
 	else \
 	    : \
@@ -96,15 +114,15 @@ $(scriptmandir)/%.1: bin/%
 	 case "`sed 1q <$?`" in \
 	    '#!/usr/bin/perl'*) \
 		grep '^=head1 NAME' <$? >/dev/null || exit 0 \
-		rewriteif -v $@ pod2man --release=CSS --section=1cs --center="Cameron Simpson's Scripts" $? \
-		rewriteif -v $$htman pod2html --title="Cameron Simpson's Scripts: $?" $? \
+		>>$@; $(rewrite) $@ pod2man --release=CSS --section=1cs --center="Cameron Simpson's Scripts" $? \
+		>>$$htman; $(rewrite) $$htman pod2html --title="Cameron Simpson's Scripts: $?" $? \
 		;; \
 	    *) \
 		grep '^# *=head1 NAME' <$? >/dev/null || exit 0 \
 		tmp=$${TMPDIR:-/tmp}/$(@F).$$ \
 		unhashpod <$? >$$tmp \
-		rewriteif -v $@ pod2man --section=1cs --center="Cameron Simpson's Scripts" $$tmp \
-		rewriteif -v $$htman pod2html --title="Cameron Simpson's Scripts: $?" $$tmp \
+		>>$@; $(rewrite) $@ pod2man --section=1cs --center="Cameron Simpson's Scripts" $$tmp \
+		>>$$htman; $(rewrite) $$htman pod2html --title="Cameron Simpson's Scripts: $?" $$tmp \
 		rm $$tmp \
 		;; \
 	 esac \

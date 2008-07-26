@@ -1,0 +1,77 @@
+#!/bin/sh -ue
+#
+# Wrapper for filter_fd that runs a sed script filter.
+#       - Cameron Simpson <cs@zip.com.au> 18jul2008
+#
+
+cmd=$0
+usage="Usage: $cmd fd[,fd...] {sed-command|{-e sed-command}...|-f sed-script} command [args...]"
+
+badopts=
+
+if [ $# = 0 ]
+then
+  echo "$cmd: missing fds" >&2
+  badopts=1
+else
+  fds=$1
+  shift
+  if [ $# = 0 ]
+  then
+    echo "$cmd: missing sed-command" >&2
+    badopts=1
+  else
+    sedcommand=
+    sedsep=
+    while :
+    do
+      case "$1" in
+        -e) sedcommand="$sedcommand$sedsep$2"
+            sedsep=';'
+            shift
+            ;;
+        -f) sedf=$2
+            shift
+            shift
+            if [ -n "$sedcommand" ]
+            then
+              echo "$cmd: -f $sedf: forbidden after -e" >&2
+              badopts=1
+            else
+              sedargv='sed -f '`shqstr "$sedf"`
+            fi
+            break
+            ;;
+        -?*)echo "$cmd: unrecognised option: $1" >&2
+            badopts=1
+            ;;
+        '') echo "$cmd: empty sed-command forbidden" >&2
+            badopts=1
+            shift
+            break
+            ;;
+        *)  if [ -z "$sedcommand" ]
+            then
+              sedcommand=$1
+              shift
+            fi
+            break
+            ;;
+      esac
+      shift
+    done
+    if [ -n "$sedcommand" ]
+    then
+      sedargv='sed -e '`shqstr "$sedcommand"`
+    fi
+    if [ $# = 0 ]
+    then
+      echo "$cmd: missing command" >&2
+      badopts=1
+    fi
+  fi
+fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+exec filter_fd "$fds" "$sedargv" "$@"

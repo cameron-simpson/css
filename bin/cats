@@ -1,5 +1,6 @@
 #!/bin/sh
 cd $HOME/rc/mail || exit 1
+[ -d cats ] || exit 1
 case $# in
   0)	cvsedit "cats.$SYSTEMID" ;;
   1)	$EDITOR "cats/$1" ;;

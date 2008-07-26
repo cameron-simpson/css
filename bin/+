@@ -12,7 +12,6 @@ set -ue
 : ${ALERTLOG:=$LOGDIR/alert}
 : ${MAILDIR:=$HOME/mail}
 : ${MAIL_EXPIRE_FORMAT:='%Y'}           # versus, say, %Y-%m
-: ${MAIL_EXPIRE_ARCHIVE:=+ARCHIVE}
 
 needhost "$MAILHOMEHOST@$SYSTEMID" \
 || { rhost=$SYSTEMID    # sshto clause to deliver to system home host
@@ -108,7 +107,7 @@ else
 fi
 
 CURRENT_FOLDER=$fpath
-DELETE_FOLDER=$MAILDIR/ARCHIVE/`date "+$MAIL_EXPIRE_FORMAT"`/$fbase
+DELETE_FOLDER=$MAILDIR/OLD/`date "+$MAIL_EXPIRE_FORMAT"`/$fbase
 export DELETE_FOLDER
 export CURRENT_FOLDER DELETE_FOLDER
 maildir "$DELETE_FOLDER"

@@ -52,7 +52,7 @@ if (! @ARGV)
   { die "$::cmd: no newsgroups! catch up mode can only be used with explicit groups\n";
   }
 
-  @ARGV=sort grep(/\@$::Server$/ && $::RC->Subscribe($_), $::RC->Groups());
+  @ARGV=sort grep(/^[^#]/ && /\@$::Server$/ && $::RC->Subscribe($_), $::RC->Groups());
   if (! @ARGV)
   { warn "$::cmd: no subscribed groups known for server \"$::Server\"\n";
   }

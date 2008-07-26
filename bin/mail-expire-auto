@@ -22,8 +22,8 @@ export MAILDIR MAIL_EXPIRE_FORMAT
 # roll older email directly into archives
 mail-expire "+$MAIL_EXPIRE_FORMAT" 180
 # roll deleted/saved email into archives
-mail-expire -d "$MAILDIR/ARCHIVE/PENDING" -A "$MAILDIR/ARCHIVE" "+$MAIL_EXPIRE_FORMAT" 0
+mail-expire -d "$MAILDIR/OLD/PENDING" -A "$MAILDIR/OLD" "+$MAIL_EXPIRE_FORMAT" 0
 # compress maildirs into mbox.gz format
-( cd "$MAILDIR/ARCHIVE" && mail-folder-gz [12]???-??/* )
+( cd "$MAILDIR/OLD" && mail-folder-gz [12]???-??/* )
 # index
 echo SKIP ++ -A
