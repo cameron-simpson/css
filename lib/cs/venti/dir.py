@@ -1,4 +1,5 @@
 import stat
+from sets import Set
 from cs.venti.blocks import decodeBlockRef, BlockRef
 from cs.venti.blockify import topBlockRefString
 from cs.venti.meta import Meta
@@ -43,7 +44,6 @@ class Dirent:
     assert isinstance(meta,Meta), "meta=%s"%(meta,)
     self.meta=meta
     self.d_ino=None
-    ##print "META=%s" % meta
     assert meta is not None
 
   def __str__(self):
@@ -359,6 +359,15 @@ class Dir(Dirent):
                 "dirpath=%s, osdirpfx=%s" % (dirpath, osdirpfx)
         subdirpath=dirpath[len(osdirpfx):]
         D=self.makedirs(subdirpath)
+
+      if deleteMissing:
+        names=Set(dirs)
+        names.update(files)
+        Dnames=list(D.keys())
+        for name in Dnames:
+          if name not in names:
+            progress("%s: delete %s" % (cmd,name))
+            del D[name]
 
       for dir in dirs:
         if dir in D:

@@ -146,7 +146,6 @@ def blockify(dataSource,vocab,Q):
   for data in dataSource:
     D("D")
     datalen+=len(data)
-    ##D("D")
     while len(data) > 0:
       # pad buffer if less than minimum block size
       ##D("d(%d)", len(data))
