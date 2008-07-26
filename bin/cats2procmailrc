@@ -488,6 +488,8 @@ def c2p(ifp,ofp):
 
     line0=line
     ruledesc="%s, line %d: %s" % (ifp.name, lineno, line.replace('\n','; '))
+    if len(ruledesc) > 70:
+      ruledesc=ruledesc[:67]+'...'
 
     if curly_re:
       curlies=[m for m in curly_re.finditer(line)]
