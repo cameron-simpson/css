@@ -1,0 +1,3 @@
+#!/usr/bin/python -tt
+from signal import pause
+pause()
