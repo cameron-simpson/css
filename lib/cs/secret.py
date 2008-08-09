@@ -19,27 +19,26 @@ def dfltpath():
 class Secret(dict):
   def __init__(self,secret,path=None):
     if os.path.isabs(secret):
-      secret=cs.hier.load(pathname)
+      S=cs.hier.load(secret)
     else:
       if path is None:
         path=dfltpath()
-      secret=None
+      S=None
       for base in path:
         pathname=os.path.join(base,secret)
         try:
-          secret=cs.hier.load(pathname)
+          S=cs.hier.load(pathname)
         except IOError:
           continue
-      if secret is None:
+      if S is None:
         raise IOError
-    dict.__init__(self,secret)
+    dict.__init__(self,S)
 
 def list(path=None):
   if path is None:
     path=dfltpath()
   path=[ p for p in path ]      # because list() taken :-(
   path.reverse()
-  print "path =", `path`
   ss={}
   for base in path:
     try:
