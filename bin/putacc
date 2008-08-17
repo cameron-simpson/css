@@ -5,7 +5,7 @@
 #
 
 cmd=`basename "$0"` || cmd=$0
-usage="Usage: $cmd [-s] [-f] [login@]hostname..."
+usage="Usage: $cmd [-s] [-f] [login@]hostname[/subpath]..."
 
 hARCH=$ARCH
 
@@ -38,7 +38,17 @@ done
 
 cd || exit 1
 for host
-do pfx "$cmd $host" syncacc '' "$host:" &
-   [ $async ] || wait
+do
+  pfx="$cmd $host"
+  case "$host" in
+    */?*)
+      subpath=`expr "x$host" : 'x[^/]*/\(..*\)'`/
+      host=`expr "x$host" : 'x\([^/]*\)/..*'`
+      ;;
+    *)subpath=
+      ;;
+  esac
+  pfx "$cmd $host" syncacc '' "$host:$subpath" &
+  [ $async ] || wait
 done
 wait
