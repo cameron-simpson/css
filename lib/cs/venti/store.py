@@ -20,10 +20,10 @@ import time
 import thread
 from Queue import Queue
 from cs.misc import cmderr, debug, isdebug, warn, progress, verbose, out, fromBS, toBS, fromBSfp, tb, seq, Loggable
-from cs.threads import FuncQueue, Q1, DictMonitor
+from cs.threads import FuncQueue, Q1, DictMonitor, NestingOpenClose
 from cs.venti import tohex
 
-class BasicStore(Loggable):
+class BasicStore(Loggable,NestingOpenClose):
   ''' Core functions provided by all Stores.
       For each of the core operations (store, fetch, haveyou, sync)
       a subclass must implement at least one of each of the op or op_bg methods.
@@ -48,44 +48,20 @@ class BasicStore(Loggable):
   '''
   def __init__(self,name):
     Loggable.__init__(self,name)
+    NestingOpenClose.__init__(self)
     self.name=name
     self.logfp=None
-    self.closed=False
     self.__funcQ=FuncQueue()
-    self.nopen=0
-    self.__lock=thread.allocate_lock()
-    self.open()
+    self.__funcQ.open()
 
   def __str__(self):
     return "Store(%s)" % self.name
 
-  def open(self):
-    ''' Open the store. Returns the store.
+  def shutdown(self):
+    ''' Called by final NestingOpenClose.close().
     '''
-    with self.__lock:
-      self.nopen+=1
-    return self
-
-  def close(self,dojoin=False):
-    ''' Close the store.
-        The last close shuts the store down.
-        If dojoin is True, wait for the background queue to complete.
-        Return True if this was the final close, disabling the store.
-    '''
-    if isdebug:
-      self.log("close()")
-    with self.__lock:
-      assert not self.closed, "close on closed BasicStore"
-      assert self.nopen > 0
-      self.nopen-=1
-      nopen=self.nopen
-      if nopen > 0:
-        return False
-      self.closed=True
-
     self.sync()
-    self.__funcQ.close(dojoin=dojoin)
-    return True
+    self.__funcQ.close()
 
   def hash(self,block):
     ''' Compute the hash for a block.
@@ -106,7 +82,6 @@ class BasicStore(Loggable):
     ''' Store a block, return its hash.
     '''
     ##self.log("store %d bytes" % len(block))
-    assert not self.closed
     tag, ch = self.store_bg(block)
     assert type(tag) is int
     tag2, h = ch.get()
@@ -129,7 +104,6 @@ class BasicStore(Loggable):
     ''' Fetch a block given its hash.
     '''
     ##self.log("fetch %s" % tohex(h))
-    assert not self.closed
     tag, ch = self.fetch_bg(h)
     assert type(tag) is int
     tag, block = ch.get()
@@ -158,7 +132,6 @@ class BasicStore(Loggable):
         Return a (tag, channel). A .get() on the channel will return
         (tag, yesno).
     '''
-    assert not self.closed
     tag, ch = self._tagch(ch)
     self.__funcQ.dispatch(self.__haveyou_bg2,(h,tag,ch))
     return tag, ch
@@ -169,7 +142,6 @@ class BasicStore(Loggable):
     ''' Return when the store is synced.
     '''
     self.log("sync")
-    assert not self.closed
     tag, ch = self.sync_bg()
     tag, dummy = ch.get()
 
@@ -296,24 +268,30 @@ class Store(BasicStore):
         S=TCPStore((host, int(port)))
       else:
         assert False, "unhandled Store name \"%s\"" % S
-    self.S=S
     S.open()
+    self.S=S
+
   def scan(self):
     if hasattr(self.S,'scan'):
       for h in self.S.scan():
         yield h
-  def close(self,dojoin=False):
-    BasicStore.close(self,dojoin=dojoin)
-    self.S.close(dojoin=dojoin)
+  def shutdown(self):
+    self.S.close()
+    BasicStore.shutdown(self)
+
   def join(self):
     BasicStore.join(self)
     self.S.join()
+
   def store(self,block):
     return self.S.store(block)
+
   def fetch(self,h):
     return self.S.fetch(h)
+
   def haveyou(self,h):
     return self.S.haveyou(h)
+
   def sync(self):
     self.S.sync()
     if self.logfp is not None:

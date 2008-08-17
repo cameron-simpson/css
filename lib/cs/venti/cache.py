@@ -25,11 +25,20 @@ class CacheStore(BasicStore):
   '''
   def __init__(self,backend,cache):
     BasicStore.__init__(self,"Cache(cache=%s,backend=%s)"%(cache,backend))
+    backend.open()
     self.backend=backend
+    cache.open()
     self.cache=cache
     # secondary queue to process background self.backend operations
     self.backQ=FuncQueue(size=256)
+    self.backQ.open()
     self.__closing=False
+
+  def shutdown(self):
+    self.cache.close()
+    self.backQ.close()
+    self.backend.close()
+    BasicStore.shutdown(self)
 
   def flush(self):
     self.cache._flush()
@@ -43,12 +52,6 @@ class CacheStore(BasicStore):
       for h in self.backend.scan():
         if h not in cache:
           yield h
-
-  def close(self,dojoin=False):
-    BasicStore.close(self,dojoin=dojoin)
-    self.backQ.close(dojoin=dojoin)
-    self.backend.close(dojoin=dojoin)
-    self.cache.close(dojoin=dojoin)
 
   def store_bg(self,block,ch=None):
     tag, ch = self._tagch(ch)

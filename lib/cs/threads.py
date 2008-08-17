@@ -255,12 +255,52 @@ class JobCounter:
       self.__onDone=(func,args,kw)
       Thread(target=self._waitThenDo,args=args,kwargs=kw).start()
 
-class FuncQueue:
+class NestingOpenClose(object):
+  ''' A context manager class to assist with with-statement based
+      automatic shutdown.
+      A count of active open()s is kept, and on the last close()
+      the object's .shutdown() method is called.
+      Use via the with-statement calls open()/close() for __enter__()
+      and __exit__().
+      Multithread safe.
+  '''
+  def __init__(self):
+    self.__count=0
+    self.__lock=allocate_lock()
+
+  def open(self):
+    ''' Increment the open count.
+    '''
+    with self.__lock:
+      self.__count+=1
+    return self
+
+  def __enter__(self):
+    self.open()
+
+  def close(self):
+    ''' Decrement the open count.
+        If the count goes to zero, call self.shutdown().
+    '''
+    with self.__lock:
+      count=self.__count
+      assert count > 0, "self.count (%s) <= 0" % count
+      count-=1
+      if count == 0:
+        self.shutdown()
+      self.__count=count
+
+  def __exit__(self, exc_type, exc_value, traceback):
+    self.close()
+    return False
+
+class FuncQueue(NestingOpenClose):
   ''' A Queue of function calls to make, processed serially.
       New functions queued as .put((func,args)) or as .qfunc(func,args...).
       Queue shut down with .close().
   '''
   def __init__(self,size=None,parallelism=1):
+    NestingOpenClose.__init__(self)
     assert parallelism > 0
     self.__Q=IterableQueue(size)
     self.__closing=False
@@ -278,16 +318,16 @@ class FuncQueue:
         A highly parallel or high latency store will want its own
         thread scheme to manage multiple *_a() operations.
     '''
+    self.open()
     for retQ, func, args, kwargs in self.__Q:
       ##debug("func=%s, args=%s, kwargs=%s"%(func,args,kwargs))
       ret=func(*args,**kwargs)
       if retQ is not None:
         retQ.put(ret)
+    self.close()
 
-  def close(self,dojoin=False):
+  def shutdown(self):
     self.__Q.close()
-    if dojoin:
-      self.join()
 
   def join(self):
     for T in self.__threads:
@@ -497,37 +537,3 @@ def bgReturn(result,ch=None):
       channel must be release with returnChannel().
   '''
   return bgCall(_bgReturn,(result,))
-
-class NestingOpenClose(object):
-  ''' A context manager class to assist with with-statement based
-      automatic shutdown.
-      A count of active open()s is kept, and on the last close()
-      the object's .shutdown() method is called.
-      Use via the with-statement calls open()/close() for __enter__()
-      and __exit__().
-      Multithread safe.
-  '''
-  def __init__(self):
-    self.count=0
-    self.lock=allocate_lock()
-  def open(self):
-    ''' Increment the open count.
-    '''
-    with self.lock:
-      self.__nocOpen+=1
-  def __enter__(self):
-    self.open()
-  def close(self):
-    ''' Decrement the open count.
-        If the count goes to zero, call self.shutdown().
-    '''
-    with self.lock:
-      count=self.count
-      assert count > 0, "self.count (%s) <= 0" % count
-      count-=1
-      if count == 0:
-        self.shutdown()
-      self.count=count
-  def __exit__(self, exc_type, exc_value, traceback):
-    self.close()
-    return False

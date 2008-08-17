@@ -9,13 +9,18 @@ from socket import socket, SHUT_WR, SHUT_RD
 from SocketServer import ThreadingTCPServer, StreamRequestHandler
 from cs.venti.stream import StreamDaemon, StreamStore
 from cs.misc import debug
+from cs.threads import NestingOpenClose
 
-class Server(ThreadingTCPServer):
+class Server(ThreadingTCPServer,NestingOpenClose):
   ''' A ThreadingTCPServer that accepts connections by StreamStore clients.
   '''
   def __init__(self,bindaddr,S):
     ThreadingTCPServer.__init__(self,bindaddr,_RequestHandler)
+    S.open()
     self.S=S
+
+  def shutdown(self):
+    self.S.close()
 
 class _RequestHandler(StreamRequestHandler):
   def __init__(self, request, client_address, server):
