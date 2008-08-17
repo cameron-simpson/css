@@ -39,7 +39,7 @@ from cs.venti.store import Store, pullFrom
 from cs.venti.cache import CacheStore, MemCacheStore
 from cs.venti.archive import archive2dir, archiveAppend
 from cs.venti.dir import Dir, storeDir, decodeDirent
-from cs.misc import cmd, cmderr, setcmd, warn, debug, progress, logTo
+from cs.misc import cmd, cmderr, setcmd, warn, debug, progress, logTo, reportElapsedTime
 import cs.upd; cs.upd.default()
 
 usage='''Usage:
@@ -73,7 +73,7 @@ useMemCache=True
 S=None
 def closeStore():
   if S is not None:
-    S.close()
+    reportElapsedTime("closing %s" % (S,), S.close, True)
 atexit.register(closeStore)
 
 try:

@@ -74,7 +74,7 @@ def topBlockRef(blockrefs,S=None):
       # just one blockref - return it
       break
     # reapply to the next layer of indirection
-    blockrefs=eachOf(([bref,bref2],blockrefs))
+    blockrefs=fullBlockRefsOf(eachOf(([bref,bref2],blockrefs)))
   return bref
 
 def topBlockRefFP(fp,rsize=None,S=None):

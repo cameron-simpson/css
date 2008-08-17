@@ -19,7 +19,7 @@ import os.path
 import time
 import thread
 from Queue import Queue
-from cs.misc import cmderr, debug, warn, progress, verbose, out, fromBS, toBS, fromBSfp, tb, seq, Loggable
+from cs.misc import cmderr, debug, isdebug, warn, progress, verbose, out, fromBS, toBS, fromBSfp, tb, seq, Loggable
 from cs.threads import FuncQueue, Q1, DictMonitor
 from cs.venti import tohex
 
@@ -50,17 +50,42 @@ class BasicStore(Loggable):
     Loggable.__init__(self,name)
     self.name=name
     self.logfp=None
-    self.__closing=False
-    self.funcQ=FuncQueue()
+    self.closed=False
+    self.__funcQ=FuncQueue()
+    self.nopen=0
+    self.__lock=thread.allocate_lock()
+    self.open()
 
   def __str__(self):
     return "Store(%s)" % self.name
 
-  def close(self):
-    assert not self.__closing, "close on closed BasicStore"
+  def open(self):
+    ''' Open the store. Returns the store.
+    '''
+    with self.__lock:
+      self.nopen+=1
+    return self
+
+  def close(self,dojoin=False):
+    ''' Close the store.
+        The last close shuts the store down.
+        If dojoin is True, wait for the background queue to complete.
+        Return True if this was the final close, disabling the store.
+    '''
+    if isdebug:
+      self.log("close()")
+    with self.__lock:
+      assert not self.closed, "close on closed BasicStore"
+      assert self.nopen > 0
+      self.nopen-=1
+      nopen=self.nopen
+      if nopen > 0:
+        return False
+      self.closed=True
+
     self.sync()
-    self.__closing=True
-    self.funcQ.close()
+    self.__funcQ.close(dojoin=dojoin)
+    return True
 
   def hash(self,block):
     ''' Compute the hash for a block.
@@ -81,7 +106,7 @@ class BasicStore(Loggable):
     ''' Store a block, return its hash.
     '''
     ##self.log("store %d bytes" % len(block))
-    assert not self.__closing
+    assert not self.closed
     tag, ch = self.store_bg(block)
     assert type(tag) is int
     tag2, h = ch.get()
@@ -95,7 +120,7 @@ class BasicStore(Loggable):
         On completion, a (tag, hashcode) tuple is put on the channel.
     '''
     tag, ch = self._tagch(ch)
-    self.funcQ.dispatch(self.__store_bg2,(block,ch,tag))
+    self.__funcQ.dispatch(self.__store_bg2,(block,ch,tag))
     return tag, ch
   def __store_bg2(self,block,ch,tag):
     ch.put(tag, self.store(block))
@@ -104,7 +129,7 @@ class BasicStore(Loggable):
     ''' Fetch a block given its hash.
     '''
     ##self.log("fetch %s" % tohex(h))
-    assert not self.__closing
+    assert not self.closed
     tag, ch = self.fetch_bg(h)
     assert type(tag) is int
     tag, block = ch.get()
@@ -115,7 +140,7 @@ class BasicStore(Loggable):
         On completion, a (tag, block) tuple is put on the channel.
     '''
     tag, ch = self._tagch(ch)
-    self.funcQ.dispatch(self.__fetch_bg2,(h,ch,tag))
+    self.__funcQ.dispatch(self.__fetch_bg2,(h,ch,tag))
     return tag, ch
   def __fetch_bg2(self,h,ch,tag):
     ch.put((tag,self.fetch(h)))
@@ -124,7 +149,7 @@ class BasicStore(Loggable):
     ''' Test if a hash is present in the store.
     '''
     ##self.log("haveyou %s" % tohex(h))
-    assert not self.__closing
+    assert not self.closed
     tag, ch = self.haveyou_bg(h)
     tag, yesno = ch.get()
     return yesno
@@ -133,9 +158,9 @@ class BasicStore(Loggable):
         Return a (tag, channel). A .get() on the channel will return
         (tag, yesno).
     '''
-    assert not self.__closing
+    assert not self.closed
     tag, ch = self._tagch(ch)
-    self.funcQ.dispatch(self.__haveyou_bg2,(h,tag,ch))
+    self.__funcQ.dispatch(self.__haveyou_bg2,(h,tag,ch))
     return tag, ch
   def __haveyou_bg2(self,h,tag,ch):
     ch.put((tag,self.haveyou(h)))
@@ -144,12 +169,13 @@ class BasicStore(Loggable):
     ''' Return when the store is synced.
     '''
     self.log("sync")
-    assert not self.__closing
+    assert not self.closed
     tag, ch = self.sync_bg()
     tag, dummy = ch.get()
+
   def sync_bg(self,noFlush=False,ch=None):
     tag, ch = self._tagch(ch)
-    self.funcQ.dispatch(self.__sync_bg2,(tag,ch))
+    self.__funcQ.dispatch(self.__sync_bg2,(tag,ch))
     return tag, ch
   def __sync_bg2(self,tag,ch):
     self.sync()
@@ -271,13 +297,17 @@ class Store(BasicStore):
       else:
         assert False, "unhandled Store name \"%s\"" % S
     self.S=S
+    S.open()
   def scan(self):
     if hasattr(self.S,'scan'):
       for h in self.S.scan():
         yield h
-  def close(self):
-    BasicStore.close(self)
-    self.S.close()
+  def close(self,dojoin=False):
+    BasicStore.close(self,dojoin=dojoin)
+    self.S.close(dojoin=dojoin)
+  def join(self):
+    BasicStore.join(self)
+    self.S.join()
   def store(self,block):
     return self.S.store(block)
   def fetch(self,h):

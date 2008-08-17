@@ -44,15 +44,11 @@ class CacheStore(BasicStore):
         if h not in cache:
           yield h
 
-  def close(self):
-    assert not self.__closing, "close() on closed CacheStore, previously closed by %s" % self.__closeCaller
-    frame=sys._getframe(1)
-    self.__closeCaller="%s()@%s:%d" % (frame.f_code.co_name, frame.f_code.co_filename, frame.f_lineno)
-    BasicStore.close(self)
-    self.__closing=True
-    self.backQ.close()
-    self.backend.close()
-    self.cache.close()
+  def close(self,dojoin=False):
+    BasicStore.close(self,dojoin=dojoin)
+    self.backQ.close(dojoin=dojoin)
+    self.backend.close(dojoin=dojoin)
+    self.cache.close(dojoin=dojoin)
 
   def store_bg(self,block,ch=None):
     tag, ch = self._tagch(ch)
@@ -110,7 +106,7 @@ class MemCacheStore(BasicStore):
     self.low=0                    # offset to oldest hash
     self.used=0
     self.hmap={}                  # cached h->(count,block) tuples
-    self.memCacheLock=allocate_lock()
+    self.__memCacheLock=allocate_lock()
 
   def scan(self):
     return self.hmap.keys()
@@ -142,20 +138,20 @@ class MemCacheStore(BasicStore):
     hlist[high]=h
 
   def store(self,block):
-    with self.memCacheLock:
+    with self.__memCacheLock:
       h=self.hash(block)
       self._hit(h,block)
     return h
 
   def haveyou(self,h):
-    with self.memCacheLock:
+    with self.__memCacheLock:
       yesno=h in self.hmap
     return yesno
 
   def fetch(self,h):
     if h not in self:
       return None
-    with self.memCacheLock:
+    with self.__memCacheLock:
       block=self.hmap[h][1]
       self._hit(h,block)
     return block

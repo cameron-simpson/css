@@ -300,23 +300,22 @@ class StreamStore(BasicStore):
     with self.__sendLock:
       self.sendRequestFP.flush()
 
-  def close(self):
+  def close(self,dojoin=False):
     ''' Close the StreamStore.
     '''
-    if isdebug: self.log("close()")
-    if self.closing:
-      if isdebug:
-        self.logfn("already closed, doing nothing","close")
-    else:
-      self.closing=True
+    BasicStore.close(self,dojoin=dojoin)
+    if self.closed:
       tag, ch = self._tagch()
       self.__maptag(tag,ch)
       with self.__sendLock:
-        if isdebug: self.log("sending T_QUIT...","close")
+        if isdebug:
+          self.log("sending T_QUIT...","close")
         encodeQuit(self.sendRequestFP,tag)
-        if isdebug: self.log("sent T_QUIT","close")
+        if isdebug:
+          self.log("sent T_QUIT","close")
       x=ch.get()
-      if isdebug: self.log("got result from channel: %s" % (x,), "close")
+      if isdebug:
+        self.log("got result from channel: %s" % (x,), "close")
 
   def store_bg(self,block,noFlush=False,ch=None):
     tag, ch = self._tagch(ch)
