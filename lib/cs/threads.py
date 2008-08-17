@@ -482,3 +482,37 @@ def bgReturn(result,ch=None):
       channel must be release with returnChannel().
   '''
   return bgCall(_bgReturn,(result,))
+
+class NestingOpenClose(object):
+  ''' A context manager class to assist with with-statement based
+      automatic shutdown.
+      A count of active open()s is kept, and on the last close()
+      the object's .shutdown() method is called.
+      Use via the with-statement calls open()/close() for __enter__()
+      and __exit__().
+      Multithread safe.
+  '''
+  def __init__(self):
+    self.count=0
+    self.lock=allocate_lock()
+  def open(self):
+    ''' Increment the open count.
+    '''
+    with self.lock:
+      self.__nocOpen+=1
+  def __enter__(self):
+    self.open()
+  def close(self):
+    ''' Decrement the open count.
+        If the count goes to zero, call self.shutdown().
+    '''
+    with self.lock:
+      count=self.count
+      assert count > 0, "self.count (%s) <= 0" % count
+      count-=1
+      if count == 0:
+        self.shutdown()
+      self.count=count
+  def __exit__(self, exc_type, exc_value, traceback):
+    self.close()
+    return False
