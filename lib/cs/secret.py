@@ -3,25 +3,44 @@ import os.path
 import cs.hier
 from cs.misc import debug, ifdebug, progress, verbose, warn
 
-def get(secret):
-  if os.path.isabs(secret):
-    return cs.hier.load(secret)
+def get(secret,path=None):
+  return Secret(secret,path=path)
 
-  for base in os.path.join(os.environ["HOME"],".secret"), \
-              '/opt/config/secret':
-    pathname=os.path.join(base,secret)
-    try:
-      return cs.hier.load(pathname)
-    except IOError:
-      continue
+def dfltpath():
+  path=os.environ.get('SECRETPATH',None)
+  if path is None:
+    path=( os.path.join(os.environ["HOME"], ".secret"),
+           '/opt/config/secret',
+         )
+  else:
+    path=path.split(':')
+  return path
 
-  raise IndexError, "no secret named "+secret
+class Secret(dict):
+  def __init__(self,secret,path=None):
+    if os.path.isabs(secret):
+      S=cs.hier.load(secret)
+    else:
+      if path is None:
+        path=dfltpath()
+      S=None
+      for base in path:
+        pathname=os.path.join(base,secret)
+        try:
+          S=cs.hier.load(pathname)
+        except IOError:
+          continue
+      if S is None:
+        raise IOError
+    dict.__init__(self,S)
 
-def list():
-  import os
+def list(path=None):
+  if path is None:
+    path=dfltpath()
+  path=[ p for p in path ]      # because list() taken :-(
+  path.reverse()
   ss={}
-  for base in '/opt/config/secret', \
-              os.path.join(os.environ["HOME"],".secret"):
+  for base in path:
     try:
       names=os.listdir(base)
     except OSError:

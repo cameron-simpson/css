@@ -120,7 +120,7 @@ elif op == "re":
   if len(argv) > 0:
     cats=argv
   for cat in cats:
-    re=addrsRegexp(byCategory[cat].keys())
+    re='\\<('+addrsRegexp(byCategory[cat].keys())+')\\>'
     if re_syntax == 'TEXT':
       print cat, re
     elif re_syntax == 'SH':

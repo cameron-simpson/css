@@ -5,5 +5,26 @@
 #       - Cameron Simpson <cs@zip.com.au> 08jul2008
 #
 
+: ${LOGDIR:=$HOME/var/log}
+
+iatlogdir=$LOGDIR/iat
+editbuf=$1
+
+exec >>"$LOGDIR/iat.log" 2>&1
+
+echo
+date
 [ -n "${didRIGENV:-}" ] || . $HOME/rc/shell/rigenv
-exec e +a ${1+"$@"}
+
+set -x
+e +a ${1+"$@"}
+xit=$?
+
+# save the edit buffer in case we want it again
+if [ -s "$editbuf" ] && mkdir -p "$iatlogdir"
+then
+  saveas=$iatlogdir/`datecode`-`basename "$editbuf"`
+  cp "$editbuf" "$saveas"
+fi
+
+exit $xit

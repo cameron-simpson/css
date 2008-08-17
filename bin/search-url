@@ -105,6 +105,7 @@ case `echo "$engine" | tr '[a-z]' '[A-Z]'` in
   PGPKEY)	url=http://wwwkeys.pgp.net:11371/pks/lookup?op=index\&search=$query ;;
   PLANETMIRROR) url=http://www.planetmirror.com/cgi-bin/SearchArchive.pl?query=$query\&maxlines=$maxhits\&indexdir=%2Fserver%2Fwww%2Fhtdocs%2Fglimpse%2F7%2Findex\&Go.x=22\&Go.y=12 ;;
   RETREVO)      url=http://www.retrevo.com/search?q=$query\&rt=oa\&tab=1 ;;
+  RFC|RFCIETFTOOLS) url=http://tools.ietf.org/html/rfc$query ;;
   RFCCONNECTED)	url=http://www.freesoft.org/Connected/cgi-bin/search.cgi?SEARCH_STRING=$query\&BASE_URL=/Connected/RFC/index.html\&DEPTH=0\&TYPE=REGEX\&CASE_INDEPENDANT=1\&WHOLE_WORD=0 ;;
   RFCNEXOR)	url=http://web.nexor.co.uk/public/rfc/index/cgi-bin/search/form?query=$query\&regexp=on\&titlefield=on\&abstractfield'=>'on\&authorfield=on\&site=Australia ;;
   ROGET)	url=http://www.thesaurus.com/roget.ihnd?KEYWORDS=$query\&HEADER=roget-english-frames-head\&FOOTER=roget-english-frames-foot\&INDEX=roget.idx\&LANGUAGE=roget-english-frames\&MAXHITS=$maxhits ;;

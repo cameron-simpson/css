@@ -1,0 +1,15 @@
+#!/usr/bin/env python2.5
+
+import hashlib
+import sys
+
+for path in sys.argv[1:]:
+  H=hashlib.sha1()
+  fp=open(path)
+  while True:
+    s=fp.read(16384)
+    if len(s) == 0:
+      break
+    H.update(s)
+  fp.close()
+  print ''.join("%02x" % ord(c) for c in H.digest()), path

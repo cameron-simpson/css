@@ -8,6 +8,7 @@
 
 : ${SSHTO_OPTS:=''}
 : ${SSHTO_CONFIG:=$HOME/.sshtorc}
+: ${SSHTO_PREFIX:=''}
 
 cf=$SSHTO_CONFIG
 trace=  ##set-x
@@ -168,6 +169,7 @@ split_target()
 }
 
 hostpath=`expand_hostpath "$host"`
+[ -z "$SSHTO_PREFIX" ] || hostpath="$SSHTO_PREFIX!$hostpath"
 ##echo "[$host] -> [$hostpath]" >&2
 if [ $oldstyle ]
 then

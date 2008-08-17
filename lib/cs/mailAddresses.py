@@ -12,8 +12,8 @@ def addressKey(addr):
 def addrsRegexp(addrkeys):
   addrkeys=list(addrkeys)
   addrkeys.sort()
-  retext='\<(%s)\>' \
-         % '|'.join(addrkey.replace('.', '\\.') for addrkey in addrkeys)
+  retext='|'.join(addrkey.replace('.', '\\.').replace('+','\\+')
+                  for addrkey in addrkeys)
   return retext
 
 def loadAddresses(addresses,catmap=None,addrmap=None):
@@ -53,6 +53,8 @@ def loadAddresses(addresses,catmap=None,addrmap=None):
       verbose("%s, line %d: repeated address \"%s\" (%s)"
               % (addresses, lineno, addr, addrkey))
       continue
+
+    assert addrkey.find("@") > 0, "%s, line %d: no \"@\" in \"%s\"" % (addresses, lineno, addrkey)
     cats.sort()
     addrmap[addrkey]=(addr,addrkey,cats)
 

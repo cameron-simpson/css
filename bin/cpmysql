@@ -5,6 +5,9 @@
 #	- Cameron Simpson <cs@zip.com.au> 28dec2006
 #
 
+: ${USER:=`id -un`}
+: ${MYSQL_LOGIN:=$USER}
+
 trace=eecho
 doit=
 dorewriteif=
@@ -31,6 +34,8 @@ usage="Usage: $cmd [-N] [-q] [-R] -T [-x] src dst [databases...]
       An optional :port may be used instead of the default $dfltport.
     user:password@/socket-path
       A user,password,socket tuple with which to connect to a database.
+    @host
+      Shorthand for naming the secret \"mysql-\$MYSQL_LOGIN@host\".
     secret
       The name of a secret as accessed by the secret(1cs) command.
       This includes /path/to/file (vs /path/to/dir above).
@@ -129,6 +134,15 @@ then
       esac
       src_pfx=${src_user}@${src_hpart}
       ;;
+    @*)
+      src_secret=`secret "mysql-$MYSQL_LOGIN$src"` || exit 1
+      eval "$src_secret"
+      src_user=$secretLOGIN
+      src_password=$secretPASSWORD
+      src_host=${secretHOST:-''}
+      src_port=${secretPORT:-$dfltport}
+      src_socket=${secretSOCKET:-''}
+      ;;
     *)
       src_secret=`secret "$src"` || exit 1
       eval "$src_secret"
@@ -188,6 +202,15 @@ then
           ;;
       esac
       dst_pfx=${dst_user}@${dst_hpart}
+      ;;
+    @*)
+      dst_secret=`secret "mysql-$MYSQL_LOGIN@$dst"` || exit 1
+      eval "$dst_secret"
+      dst_user=$secretLOGIN
+      dst_password=$secretPASSWORD
+      dst_host=${secretHOST:-''}
+      dst_port=${secretPORT:-$dfltport}
+      dst_socket=${secretSOCKET:-''}
       ;;
     *)
       dst_secret=`secret "$dst"` || exit 1
