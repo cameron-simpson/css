@@ -9,12 +9,10 @@ from errno import ENOSYS
 import sys
 import os
 
-def fusemount(mnt,S,E):
-  ''' Run a FUSE filesystem with the specified basefs backing store
-      and Venti storage.
+def fusemount(mnt,D,S):
+  ''' Run a FUSE filesystem with Dirent and backing Store.
   '''
-
-  FS=FuseStore(mnt,S,E)
+  FS=FuseStore(mnt,D,E)
   sys.stderr.write("calling FS.main...\n")
   FS.main()
 
@@ -24,11 +22,11 @@ def fusemount(mnt,S,E):
 mainFuseStore=None
 
 class FuseStore(Fuse):
-  def __init__(self, mnt, store, E, *args, **kw):
+  def __init__(self, mnt, D, S, *args, **kw):
     ''' Class to manage a FUSE mountpoint.
         mnt: the mountpoint
-        store: the Store to hold data
-        E: the root directory reference
+        D: the root directory reference
+        S: the Store to hold data
     '''
     # HACK: record fuse class object for use by files :-(
     global mainFuseStore
@@ -54,7 +52,7 @@ class FuseStore(Fuse):
     self.__inodes={}
     self.__mountpoint=mnt
     self.__store=store
-    self.__root=E
+    self.__root=D
     self.file_class=self.__File
     self.__out=None
 
