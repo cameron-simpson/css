@@ -1,20 +1,36 @@
-#!/bin/sh -u
+#!/bin/sh -ue
 #
 # Test that a process exists (and may be signalled).
 #	- Cameron Simpson <cs@zip.com.au> 28mar2005
 #
 
+: ${VARRUN:=$HOME/var/run}
+
 cmd=$0
 usage="Usage: $cmd [-v] [!] {pid|pidfile}
+        -q      Quiet. Don't complain about missing pid file etc.
 	-v	Verbose. Print pid if real.
-	!	Test that the process does not exist."
+	!	Test that the process does not exist.
+        pidfile Path to a file containing a pid.
+                A relative path will be looked for in $VARRUN (from \$VARRUN)."
 
 badopts=
 
+quiet=
 verbose=
-if [ $# -gt 0 ] && [ "x$1" = "x-v" ]
-then  verbose=1; shift
-fi
+while [ $# -gt 0 ]
+do
+  case $1 in
+    -q) quiet=1 ;;
+    -v) verbose=1 ;;
+    --) shift; break ;;
+    -?*)echo "$cmd: unrecognised option: $1" >&2
+        badopts=1
+        ;;
+    *)  break ;;
+  esac
+  shift
+done
 
 yes=0 no=1
 if [ $# -gt 0 ] && [ "x$1" = "x!" ]
@@ -30,16 +46,19 @@ else
     [0-9]|[0-9][0-9]|[0-9][0-9][0-9]|[0-9][0-9][0-9][0-9]|[0-9][0-9][0-9][0-9][0-9])
 			pidfile= pid=$1 ;;
     /*|./*|../*)	pidfile=$1 ;;
-    *)			pidfile=$HOME/var/run/$1 ;;
+    *)			pidfile=$VARRUN/$1 ;;
   esac
   shift
 
   if [ -n "$pidfile" ]
   then
     {
-       read pid etc <"$pidfile" \
+       [ -s "$pidfile" ] \
+    && read pid etc <"$pidfile" \
     && [ -n "$pid" ]
-    } || { echo "$cmd: can't read pid from file \"$pidfile\"" >&2; exit 1; }
+    } || { [ $quiet ] || echo "$cmd: can't read pid from file \"$pidfile\"" >&2
+           exit 1
+         }
   fi
 fi
 
