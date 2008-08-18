@@ -9,7 +9,7 @@
 : ${TMPDIR:=/tmp}
 
 cmd=`basename "$0"`
-usage="Usage: $cmd [user]@host user..."
+usage="Usage: $cmd [-x] [user]@host user..."
 
 trace=eecho
 xflag=
@@ -41,7 +41,14 @@ else
   remote=$1
   shift
   case "$remote" in
-    @?*) remote=`expr "x$remote" : 'x.\(.*\)'` ;;
+    @?*)if whoami=`who am i | awk '{print $1}'` && [ -n "$whoami" ]
+        then
+          remote=$whoami$remote
+        else
+          echo "$cmd: $remote: can't infer user from \`who am i\`" >&2
+          badopts=1
+        fi
+        ;;
     *@?*);;
     *)  echo "$cmd: invalue user@host: $remote" >&2
         badopts=1
