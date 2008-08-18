@@ -1,19 +1,21 @@
-from types import *
 import os
 import os.path
 import errno
 import sys
 import string
 import time
+from types import TupleType, ListType, DictType, DictionaryType
 from StringIO import StringIO
 from thread import allocate_lock
 from cs.lex import parseline, strlist
 
 def setcmd(ncmd):
+  ''' Set the cs.misc.cmd string and friends.
+  '''
   global cmd, cmd_, cmd__
-  cmd=ncmd
-  cmd_=cmd+':'
-  cmd__=cmd_+' '
+  cmd = ncmd
+  cmd_ = cmd + ':'
+  cmd__ = cmd_ + ' '
 
 setcmd(os.path.basename(sys.argv[0]))
 
@@ -21,12 +23,12 @@ class _NoUpd:
   ''' A dummy class with the same duck type as cs.upd.Upd
       used when cs.upd has not be instantiated by a program.
   '''
-  def out(self,s):
+  def out(self, s):
     if len(s) > 0:
       print >>sys.stderr, s
       sys.stderr.flush()
     return ''
-  def nl(self,s):
+  def nl(self, s):
     print >>sys.stderr, s
     sys.stderr.flush()
     return ''
@@ -36,12 +38,14 @@ class _NoUpd:
     pass
   def closed(self):
     return False
-  def without(self,func,*args,**kw):
-    return func(*args,**kw)
-_defaultUpd=_NoUpd()
+  def without(self, func, *args, **kw):
+    return func(*args, **kw)
+_defaultUpd = _NoUpd()
 
 # print to stderr
 def warn(*args):
+  ''' "Complaint" error message.
+  '''
   global _defaultUpd
   return _defaultUpd.nl(" ".join([str(s) for s in args]))
 
@@ -52,50 +56,62 @@ def warn(*args):
 #   3 or more - more verbose, and activates the debug() function
 #
 def setDebug(newlevel):
+  ''' Set the debug level and associated flags.
+  '''
   if newlevel is None:
-    newlevel=0
+    newlevel = 0
     if sys.stderr.isatty():
-      newlevel=1
-    env=os.environ.get('DEBUG_LEVEL','')
+      newlevel = 1
+    env = os.environ.get('DEBUG_LEVEL', '')
     if len(env) > 0 and env.isdigit():
-      newlevel=int(env)
+      newlevel = int(env)
     else:
-      env=os.environ.get('DEBUG','')
+      env = os.environ.get('DEBUG', '')
       if len(env) > 0 and env != "0":
-        newlevel=3
+        newlevel = 3
   global debug_level, isdebug, isverbose, isprogress
-  debug_level=newlevel
-  isdebug=(debug_level >= 3)
-  isverbose=(debug_level >= 2)
-  isprogress=(debug_level >= 1)
+  debug_level = newlevel
+  isdebug = (debug_level >= 3)
+  isverbose = (debug_level >= 2)
+  isprogress = (debug_level >= 1)
 
 setDebug(None)
 if isdebug:
-  def D(fmt,*args):
+  def D(fmt, *args):
+    ''' Print formatted debug string.
+    '''
     sys.stderr.write(fmt % args)
 else:
   def D(*args):
+    ''' No-op debug hook.
+    '''
     pass
 
-debug_level_stack=[]
+debug_level_stack = []
 def pushDebug(newlevel):
+  ''' Push the current debug level onto a stack, set a new one.
+  '''
   global debug_level, debug_level_stack
   debug_level_stack.append(debug_level)
   setDebug(newlevel)
 
 def popDebug():
+  ''' Restore the previous debug level from the stack.
+  '''
   global debug_level, debug_level_stack
   setDebug(debug_level_stack.pop())
 
 class DebugLevel:
-  def __init__(self,level=None):
+  ''' A context manager for debug levels.
+  '''
+  def __init__(self, level=None):
     global debug_level
     if level is None:
-      level=debug_level
-    self.level=level
+      level = debug_level
+    self.level = level
   def __enter__(self):
     pushDebug(self.level)
-  def __exit__(self,exc_type,exc_value,traceback):
+  def __exit__(self, exc_type, exc_value, traceback):
     popDebug()
     return False
 
@@ -104,7 +120,7 @@ def ifdebug(level=3):
   '''
   return debug_level >= level
 
-def debugif(level,*args):
+def debugif(level, *args):
   ''' Emits the specified warning if the debug_level is above the specified
       threshold.
   '''
@@ -114,9 +130,9 @@ def debugif(level,*args):
 def ifprogress(): return ifdebug(1)
 def ifverbose():  return ifdebug(2)
 
-def progress(*args): debugif(1,*args)
-def verbose(*args):  debugif(2,*args)
-def debug(*args):    debugif(3,*args)
+def progress(*args): debugif(1, *args)
+def verbose(*args):  debugif(2, *args)
+def debug(*args):    debugif(3, *args)
 def out(*args):
   global _defaultUpd
   if len(args) > 0 and ifdebug(1):
@@ -124,24 +140,32 @@ def out(*args):
   return _defaultUpd.state()
 
 def cmderr(*args):
+  ''' Convenience function for printing error messages.
+  '''
   global cmd_
   warn(*[cmd_]+list(args))
 
 def TODO(msg):
+  ''' Marker for missing features.
+  '''
   if ifverbose():
     logFnLine(msg, frame=sys._getframe(1), prefix="TODO(%s)"%cmd)
 
 def FIXME(msg):
+  ''' Marker for outstanding bugs.
+  '''
   logFnLine(msg, frame=sys._getframe(1), prefix="FIXME(%s)"%cmd)
 
 def tb(limit=None):
+  ''' Print a stack backtrace.
+  '''
   import traceback
   global cmd__
   global _defaultUpd
-  upd=_defaultUpd
-  oldUpd=upd.out('')
+  upd = _defaultUpd
+  oldUpd = upd.out('')
 
-  n=0
+  n = 0
   for elem in traceback.format_list(traceback.extract_stack())[:-1]:
     for line in elem.split("\n"):
       if len(line) > 0:
@@ -149,150 +173,178 @@ def tb(limit=None):
         sys.stderr.write(line)
         sys.stderr.write("\n")
     if limit is not None:
-      n+=1
+      n += 1
       if n >= limit:
         break
 
   upd.out(oldUpd)
 
-_logPath=None
-_logFP=sys.stderr
+_logPath = None
+_logFP = sys.stderr
 def logTo(logpath=None):
+  ''' Cause logging to go to the specified filename.
+      If logpath is omitted or None, return the current
+      log file object, which starts as sys.stderr.
+  '''
   global _logPath, _logFP
   if logpath is None:
     return _logFP
   TODO("port cs.misc.logTo() etc to logger module")
-  _logFP=open(logpath,"a")
-  _logPath=logpath
-def _logline(line,mark):
+  _logFP = open(logpath, "a")
+  _logPath = logpath
+def _logline(line, mark):
+  ''' Log a line with a prefix mark.
+  '''
   global _logPath, _logFP
-  when=time.time()
-  pfx="%d [%s]" % (when, mark)
+  when = time.time()
+  pfx = "%d [%s]" % (when, mark)
   try:
     print >>_logFP, pfx, line.replace("\n", "\n%*s" % (len(pfx)+1, " "))
     _logFP.flush()
     if isdebug and _logFP is not sys.stderr:
-      pfx="%s: %s:" % (cmd, mark)
+      pfx = "%s: %s:" % (cmd, mark)
       print >>sys.stderr, pfx, line.replace("\n", "\n%*s" % (len(pfx)+1, " "))
   except IOError:
     pass
-def logLine(line,mark=None):
+
+def logLine(line, mark=None):
+  ''' Log a line, with optional prefix mark.
+  '''
   if mark is None:
-    mark=cmd
-  return _defaultUpd.without(_logline,line,mark)
-def logFnLine(line,frame=None,prefix=None,mark=None):
+    mark = cmd
+  return _defaultUpd.without(_logline, line, mark)
+
+def logFnLine(line, frame=None, prefix=None, mark=None):
   ''' Log a line citing the calling function.
   '''
   if frame is None:
-    frame=sys._getframe(1)
-  line="%s [%s(), %s:%d]" \
-       % (line, frame.f_code.co_name, frame.f_code.co_filename, frame.f_lineno)
+    frame = sys._getframe(1)
+  line = "%s [%s(), %s:%d]" \
+         % (line, frame.f_code.co_name, frame.f_code.co_filename, frame.f_lineno)
   if prefix is not None:
-    line=prefix+": "+line
-  return logLine(line,mark=mark)
+    line = prefix+": "+line
+  return logLine(line, mark=mark)
 
-class Loggable:
-  ''' Base class for things that will use the above functions.
-  '''
-  def __init__(self,mark):
-    self.__logMark=cmd+"."+mark
-  def logmark(self,mark=None):
-    if mark is None:
-      mark=self.__logMark
-    else:
-      mark=self.__logMark+"."+mark
-    return mark
-  def log(self,line,mark=None):
-    logLine(line,mark=self.logmark(mark))
-  def logfn(self,line,mark=None,frame=None):
-    if frame is None:
-      frame=sys._getframe(1)
-    logFnLine(line,mark=self.logmark(mark),frame=frame)
-  def logTime2(self,tag,func,*args,**kw):
-    global reportElapsedTimeTo
-    return reportElapsedTimeTo(self.log,tag,func,*args,**kw)
-  def logTime(self,tag,func,*args,**kw):
-    t, result = self.logTime2(tag,func,*args,**kw)
-    return result
-
-def elapsedTime(func,*args,**kw):
+def elapsedTime(func, *args, **kw):
   ''' Call a function with the supplied arguments.
       Return start time, end time and return value.
   '''
-  t0=time.time()
-  result=func(*args,**kw)
-  t1=time.time()
+  t0 = time.time()
+  result = func(*args, **kw)
+  t1 = time.time()
   return t0, t1, result
 
-def reportElapsedTime(tag,func,*args,**kw):
-  t, result = reportElapsedTimeTo(None,tag,func,*args,**kw)
+def reportElapsedTime(tag, func, *args, **kw):
+  ''' Call a function with the supplied arguments.
+      Return its return value.
+      If isdebug, report elapsed time for the function.
+  '''
+  t, result = reportElapsedTimeTo(None, tag, func, *args, **kw)
   return result
-def reportElapsedTimeTo(logfunc,tag,func,*args,**kw):
+
+def reportElapsedTimeTo(logfunc, tag, func, *args, **kw):
   ''' Call a function with the supplied arguments.
       Return its return value.
       If isdebug, report elapsed time for the function.
   '''
   if isdebug:
-    old=out("%.100s" % " ".join((cmd_,tag,"...")))
+    old = out("%.100s" % " ".join((cmd_, tag, "...")))
   t0, t1, result = elapsedTime(func, *args, **kw)
-  t=t1-t0
+  t = t1-t0
   if t >= 0.01:
     if logfunc is None:
-      logfunc=logLine
-    logfunc("TIME %6.4fs %s"%(t,tag))
+      logfunc = logLine
+    logfunc("TIME %6.4fs %s"%(t, tag))
   if isdebug:
     out(old)
   return t, result
 
-T_SEQ='ARRAY'
-T_MAP='HASH'
-T_SCALAR='SCALAR'
+class Loggable:
+  ''' Base class for things that will use the above functions.
+  '''
+  def __init__(self, mark):
+    self.__logMark = cmd+"."+mark
+
+  def logmark(self, mark=None):
+    ''' Set the log line prefix mark.
+    '''
+    if mark is None:
+      mark = self.__logMark
+    else:
+      mark = self.__logMark+"."+mark
+    return mark
+
+  def log(self, line, mark=None):
+    ''' Log a line with optional prefix mark.
+    '''
+    logLine(line, mark=self.logmark(mark))
+
+  def logfn(self, line, mark=None, frame=None):
+    ''' Log a line with optional prefix mark, along with the calling function.
+    '''
+    if frame is None:
+      frame = sys._getframe(1)
+    logFnLine(line, mark=self.logmark(mark), frame=frame)
+
+  def logTime2(self, tag, func, *args, **kw):
+    global reportElapsedTimeTo
+    return reportElapsedTimeTo(self.log, tag, func, *args, **kw)
+
+  def logTime(self, tag, func, *args, **kw):
+    t, result = self.logTime2(tag, func, *args, **kw)
+    return result
+
+T_SEQ = 'ARRAY'
+T_MAP = 'HASH'
+T_SCALAR = 'SCALAR'
 def objFlavour(obj):
   """ Return the ``flavour'' of an object:
       T_MAP: DictType, DictionaryType, objects with an __keys__ or keys attribute.
       T_SEQ: TupleType, ListType, objects with an __iter__ attribute.
       T_SCALAR: Anything else.
   """
-  t=type(obj)
-  if t in (TupleType, ListType): return T_SEQ
-  if t in (DictType, DictionaryType): return T_MAP
-  if hasattr(obj,'__keys__') or hasattr(obj,'keys'): return T_MAP
-  if hasattr(obj,'__iter__'): return T_SEQ
+  t = type(obj)
+  if t in (TupleType, ListType):
+    return T_SEQ
+  if t in (DictType, DictionaryType):
+    return T_MAP
+  if hasattr(obj, '__keys__') or hasattr(obj, 'keys'):
+    return T_MAP
+  if hasattr(obj, '__iter__'):
+    return T_SEQ
   return T_SCALAR
 
-__seq=0
-__seqLock=allocate_lock()
+__seq = 0
+__seqLock = allocate_lock()
 def seq():
+  ''' Allocate a new sequential number.
+      Useful for creating unique tokens.
+  '''
   global __seq
   global __seqLock
   __seqLock.acquire()
-  __seq+=1
-  n=__seq
+  __seq += 1
+  n = __seq
   __seqLock.release()
   return n
 
-def all(gen):
-  ''' Returns all the values from a generator as an array.
-  '''
-  assert False, "OBSOLETE: all() is a python builtin meaning 'is every item true?', use list() or tuple()"
-
 def isodate(when=None):
+  ''' Return a date in ISO8601 YYYY-MM-DD format.
+  '''
   from time import localtime, strftime
   if when is None: when=localtime()
-  return strftime("%Y-%m-%d",when)
+  return strftime("%Y-%m-%d", when)
 
 def a2date(s):
+  ''' Create a date object from an ISO8601 YYYY-MM-DD date string.
+  '''
   from date import date
   from time import strptime
   return date(*strptime(s, "%Y-%m-%d")[0:3])
 
-def exactlyOne(list,context=None):
-  cmderr("OBSOLETE CALL TO cs.misc.exactlyOne(), use the() instead")
-  tb()
-  return the(list,context)
-
-def the(list,context=None):
-  ''' Returns the first element of an iterable, but requires there to be exactly one.
+def the(list, context=None):
+  ''' Returns the first element of an iterable, but requires there to be
+      exactly one.
   '''
   icontext="expected exactly one value"
   if context is not None:
@@ -319,17 +371,17 @@ def eachOf(gs):
       yield i
 
 def winsize(f):
-  '''   Return a (rows,columns) tuple or None for the specified file object.
+  '''   Return a (rows, columns) tuple or None for the specified file object.
   '''
-  fd=os.dup(f.fileno()) # obtain fresh fd to pass to the shell
-  sttycmd="stty -a <&"+str(fd)+" 2>/dev/null"
-  stty=os.popen(sttycmd).read()
+  fd = os.dup(f.fileno()) # obtain fresh fd to pass to the shell
+  sttycmd = "stty -a <&" + str(fd) + " 2>/dev/null"
+  stty = os.popen(sttycmd).read()
   os.close(fd)
   import re
-  m=re.compile(r' rows (\d+); columns (\d+)').search(stty)
+  m = re.compile(r' rows (\d+); columns (\d+)').search(stty)
   if not m:
     return None
-  return (int(m.group(1)),int(m.group(2)))
+  return (int(m.group(1)), int(m.group(2)))
 
 # trim trailing newline, returning trimmied line
 # unlike perl, requires the newline to be present
@@ -337,19 +389,19 @@ def chomp(s):
   assert s[-1] == '\n'
   return s[:-1]
 
-def extend(arr,items):
+def extend(arr, items):
   warn("replace use of cs.misc.extend with array extend builtin")
   for i in items:
     arr.append(i)
 
-def index(seq,val):
+def index(seq, val):
   warn("replace use of cs.misc.index with array index/find builtin")
   for i in xrange(len(seq)-1):
     if val == seq[i]:
       return i
   return -1
 
-def uniq(ary,canonical=None):
+def uniq(ary, canonical=None):
   u=[]
   d={}
   for a in ary:
@@ -368,11 +420,11 @@ class WithUCAttrs:
   ''' An object where access to obj.FOO accesses obj['FOO']
       if FOO is all upper case.
   '''
-  def __getattr__(self,attr):
+  def __getattr__(self, attr):
     if attr.isalpha() and attr.isupper():
       return self[attr]
-    return dict.__getattr__(self,attr)
-  def __setattr__(self,attr,value):
+    return dict.__getattr__(self, attr)
+  def __setattr__(self, attr, value):
     if attr.isalpha() and attr.isupper():
       self[attr]=value
       return
@@ -382,16 +434,16 @@ class DictUCAttrs(dict, WithUCAttrs):
   ''' A dict where access to obj.FOO accesses obj['FOO']
       if FOO is all upper case.
   '''
-  def __init__(self,fill=None):
+  def __init__(self, fill=None):
     if fill is None:
       fill=()
-    dict.__init__(self,fill)
+    dict.__init__(self, fill)
 
 class WithUC_Attrs:
   ''' An object where access to obj.FOO accesses obj['FOO']
       if FOO matches ^[A-Z][_A-Z0-9]*.
   '''
-  def __uc_(self,s):
+  def __uc_(self, s):
     if s.isalpha() and s.isupper():
       return True
     if len(s) < 1:
@@ -402,11 +454,11 @@ class WithUC_Attrs:
       if c != '_' and (not c.isupper() or c.isdigit()):
         return False
     return True
-  def __getattr__(self,attr):
+  def __getattr__(self, attr):
     if self.__uc_(attr):
       return self[attr]
-    return dict.__getattr__(self,attr)
-  def __setattr__(self,attr,value):
+    return dict.__getattr__(self, attr)
+  def __setattr__(self, attr, value):
     if self.__uc_(attr):
       self[attr]=value
       return
@@ -416,29 +468,29 @@ class DictUC_Attrs(dict, WithUC_Attrs):
   ''' A dict where access to obj.FOO accesses obj['FOO']
       if FOO matches ^[A-Z][_A-Z0-9]*.
   '''
-  def __init__(self,fill=None):
+  def __init__(self, fill=None):
     if fill is None:
       fill=()
-    dict.__init__(self,fill)
+    dict.__init__(self, fill)
 
 class DictAttrs(dict):
-  def __init__(self,d=None):
+  def __init__(self, d=None):
     dict.__init__()
     if d is not None:
       for k in d.keys():
         self[k]=d[k]
 
-  def __getattr__(self,attr):
+  def __getattr__(self, attr):
     return self[attr]
-  def __setattr__(self,attr,value):
+  def __setattr__(self, attr, value):
     self[attr]=value
 
 class CanonicalSeq:
-  def __init__(self,seq,canonical=None):
+  def __init__(self, seq, canonical=None):
     self.__canon=canonical
     self.__seq=seq
 
-  def __canonical(self,key):
+  def __canonical(self, key):
     if self.__canon is None:
       return key
     return self.__canon(key)
@@ -449,20 +501,20 @@ class CanonicalSeq:
   def __len__(self):
     return len(self.__seq)
 
-  def __getitem__(self,ndx):
+  def __getitem__(self, ndx):
     return self.__seq[ndx]
 
-  def __setitem__(self,ndx,value):
+  def __setitem__(self, ndx, value):
     self.__seq[ndx]=value
 
   def __iter__(self):
     for i in self.__seq:
       yield i
 
-  def __delitem__(self,ndx):
+  def __delitem__(self, ndx):
     del self.__seq[ndx]
 
-  def __contains__(self,value):
+  def __contains__(self, value):
     cv=self.__canonical(value)
     for v in self.__seq:
       if self.__canonical(v) == cv:
@@ -471,14 +523,14 @@ class CanonicalSeq:
     return False
 
 class CanonicalDict(dict):
-  def __init__(self,map=None,canonical=None):
+  def __init__(self, map=None, canonical=None):
     dict.__init__(self)
     self.__canon=canonical
     if map is not None:
       for k in map.keys():
         self[k]=map[k]
 
-  def __canonical(self,key):
+  def __canonical(self, key):
     if self.__canon is None:
       return key
 
@@ -486,32 +538,32 @@ class CanonicalDict(dict):
     debug("CanonicalDict: %s => %s" % (key, ckey))
     return ckey
 
-  def __getitem__(self,key):
-    return dict.__getitem__(self,self.__canonical(key))
+  def __getitem__(self, key):
+    return dict.__getitem__(self, self.__canonical(key))
 
-  def __setitem__(self,key,value):
-    dict.__setitem__(self,self.__canonical(key),value)
+  def __setitem__(self, key, value):
+    dict.__setitem__(self, self.__canonical(key), value)
 
-  def __delitem__(self,key):
-    dict.__delitem__(self,self.__canonical(key))
+  def __delitem__(self, key):
+    dict.__delitem__(self, self.__canonical(key))
 
-  def __contains__(self,key):
+  def __contains__(self, key):
     ckey=self.__canonical(key)
-    yep=dict.__contains__(self,ckey)
+    yep=dict.__contains__(self, ckey)
     if ifdebug():
-      warn("CanonicalDict: __contains__(%s(%s)) = %s" % (key,ckey,`yep`))
+      warn("CanonicalDict: __contains__(%s(%s)) = %s" % (key, ckey, `yep`))
     return yep
 
 class LCDict(CanonicalDict):
-  def __init__(self,dict):
-    CanonicalDict.__init__(self,dict,canonical=string.lower)
+  def __init__(self, dict):
+    CanonicalDict.__init__(self, dict, canonical=string.lower)
 
 class LCSeq(CanonicalSeq):
-  def __init__(self,seq):
-    CanonicalSeq.__init__(self,seq,canonical=string.lower)
+  def __init__(self, seq):
+    CanonicalSeq.__init__(self, seq, canonical=string.lower)
 
 # fill out an array with None to be at least "length" elements long
-def padlist(l,length):
+def padlist(l, length):
   if len(l) < length:
     l+=[None]*(length-len(l))
 
@@ -534,11 +586,11 @@ def listpermute(lol):
   pright=listpermute(right)
   return [[item]+ritem for item in left for ritem in pright]
 
-def dict2ary(d,keylist=None):
+def dict2ary(d, keylist=None):
   if keylist is None: keylist=sort(keys(d))
-  return [ [k,d[k]] for k in keylist ]
+  return [ [k, d[k]] for k in keylist ]
 
-def maxFilenameSuffix(dir,pfx):
+def maxFilenameSuffix(dir, pfx):
   from dircache import listdir
   maxn=None
   pfxlen=len(pfx)
@@ -556,10 +608,10 @@ def maxFilenameSuffix(dir,pfx):
 def tmpfilename(dir=None):
   if dir is None:
     dir=tmpdir()
-  pfx = ".%s.%d." % (cmd,os.getpid())
-  n=maxFilenameSuffix(dir,pfx)
+  pfx = ".%s.%d." % (cmd, os.getpid())
+  n=maxFilenameSuffix(dir, pfx)
   if n is None: n=0
-  return "%s%d" % (pfx,n)
+  return "%s%d" % (pfx, n)
 
 def mkdirn(path):
   opath=path
@@ -580,7 +632,7 @@ def mkdirn(path):
   # do a quick scan of the directory to find
   # if any names of the desired form already exist
   # in order to start after them
-  maxn=maxFilenameSuffix(dir,pfx)
+  maxn=maxFilenameSuffix(dir, pfx)
   if maxn is None:
     newn=0
   else:
@@ -595,25 +647,25 @@ def mkdirn(path):
       if sys.exc_value[0] == errno.EEXIST:
         # taken, try new value
         continue
-      cmderr("mkdir(%s): %s" % (newpath,e))
+      cmderr("mkdir(%s): %s" % (newpath, e))
       return None
     if len(opath) == 0:
       newpath=os.path.basename(newpath)
     return newpath
 
 def tmpdir():
-  tmpdir=os.environ.setdefault('TMPDIR','')
+  tmpdir=os.environ.setdefault('TMPDIR', '')
   if len(tmpdir) == 0:
     tmpdir='/tmp'
   return tmpdir
 
 def tmpdirn(tmp=None):
   if tmp is None: tmp=tmpdir()
-  return mkdirn(os.path.join(tmp,os.path.basename(sys.argv[0])))
+  return mkdirn(os.path.join(tmp, os.path.basename(sys.argv[0])))
 
-def mailsubj(addrs,subj,body):
+def mailsubj(addrs, subj, body):
   import cs.sh
-  pipe=cs.sh.vpopen(('set-x','mailsubj','-s',subj)+addrs,mode="w")
+  pipe=cs.sh.vpopen(('set-x', 'mailsubj', '-s', subj)+addrs, mode="w")
   pipe.write(body)
   if len(body) > 0 and body[-1] != '\n':
     pipe.write('\n')
@@ -624,9 +676,9 @@ def netgroup(*names):
   ''' Return hosts in a netgroup. Requires the 'ngr' script.
   '''
   from cs.sh import vpopen
-  return [ chomp(line) for line in vpopen(('ngr',)+names, mode="r") ]
+  return [ chomp(line) for line in vpopen(('ngr', )+names, mode="r") ]
 
-def runCommandPrompt(fnmap,prompt=None):
+def runCommandPrompt(fnmap, prompt=None):
   ''' Accept a dict of the for key->(fn, help_string)
       and perform entered commands.
   '''
@@ -654,7 +706,7 @@ def runCommandPrompt(fnmap,prompt=None):
     op=words[0]
     words=words[1:]
     if op in fnmap:
-      if not fnmap[op][0](op,words):
+      if not fnmap[op][0](op, words):
         ok=False
       continue
    
@@ -663,11 +715,11 @@ def runCommandPrompt(fnmap,prompt=None):
     ops=fnmap.keys()
     ops.sort()
     for op in ops:
-      warn("  %-7s %s" % (op,fnmap[op][1]))
+      warn("  %-7s %s" % (op, fnmap[op][1]))
 
 # trivial wrapper for extension in subclasses
 class SeqWrapper:
-  def __init__(self,seq):
+  def __init__(self, seq):
     self.__seq=seq
 
   def getSeq(self):
@@ -676,13 +728,13 @@ class SeqWrapper:
   def __len__(self):
     return len(self.__seq)
 
-  def __getitem__(self,key):
+  def __getitem__(self, key):
     return self.__seq[key]
 
-  def __setitem__(self,key,value):
+  def __setitem__(self, key, value):
     self.__seq[key]=value
 
-  def __delitem__(self,key):
+  def __delitem__(self, key):
     del(self.__seq[key])
 
   def __iter__(self):
@@ -690,7 +742,7 @@ class SeqWrapper:
 #    for i in self.__seq:
 #      yield i
 
-  def _updateAllValues(self,newvalues):
+  def _updateAllValues(self, newvalues):
     self.__seq=newvalues
 
   def __repr__(self):
@@ -699,13 +751,13 @@ class SeqWrapper:
 """ an object with an ordered set of keys eg SQL table row
 """
 class OrderedKeys:
-  def __init__(self,names=None):
+  def __init__(self, names=None):
     if names is not None:
       self.setKeyOrder(names)
 
-  def setKeyOrder(self,names):
+  def setKeyOrder(self, names):
     # compute column name index
-    ##print "SETKEYORDER: ",`names`
+    ##print "SETKEYORDER: ", `names`
     self.__keys=names
     self.__keyIndex={}
     i=0
@@ -713,13 +765,13 @@ class OrderedKeys:
       self.__keyIndex[name]=i
       i+=1
 
-  def keyIndex(self,key=None):
+  def keyIndex(self, key=None):
     if key is None:
       return self.__keyIndex
     return self.__keyIndex[key]
 
   def keys(self):
-    ##print "ORDEREDKEYS.keys()=",`self.__keys`
+    ##print "ORDEREDKEYS.keys()=", `self.__keys`
     return self.__keys
 
   def __iterkeys__(self):
@@ -727,34 +779,34 @@ class OrderedKeys:
 #    for k in self.keys():
 #      yield k
 
-class IndexedSeqWrapper(OrderedKeys,SeqWrapper):
-  def __init__(self,seq,names=None):
+class IndexedSeqWrapper(OrderedKeys, SeqWrapper):
+  def __init__(self, seq, names=None):
     ##print "init IndexedSeqWrapper"
-    ##print "  seq=",`seq`
-    ##print "  keys=",`names`
-    SeqWrapper.__init__(self,seq)
-    OrderedKeys.__init__(self,names)
+    ##print "  seq=", `seq`
+    ##print "  keys=", `names`
+    SeqWrapper.__init__(self, seq)
+    OrderedKeys.__init__(self, names)
 
-  def __getitem__(self,key):
+  def __getitem__(self, key):
     if type(key) is not int:
       key=self.keyIndex(key)
-    return SeqWrapper.__getitem__(self,key)
+    return SeqWrapper.__getitem__(self, key)
 
-  def __setitem__(self,key,value):
+  def __setitem__(self, key, value):
     if type(key) is not int:
       key=self.keyIndex(key)
-    return SeqWrapper.__setitem__(self,key,value)
+    return SeqWrapper.__setitem__(self, key, value)
 
   def __repr__(self):
     d={}
     okeys=self.keys()
-    for i in xrange(0,len(okeys)):
+    for i in xrange(0, len(okeys)):
       d[okeys[i]]=self[i]
     return `d`
 
 class HasFlags:
   """ A collection of strings whose presence may be tested. """
-  def __init__(self,flagfield='FLAGS'):
+  def __init__(self, flagfield='FLAGS'):
     self.__flagfield=flagfield
 
   def __flaglist(self):
@@ -770,10 +822,10 @@ class HasFlags:
 
     return flagv
 
-  def testFlag(self,flag):
+  def testFlag(self, flag):
     return flag in self.__flaglist()
 
-  def setFlag(self,flag):
+  def setFlag(self, flag):
     if not self.testFlag(flag):
       flagv=self.__flaglist()
       flagv.add(flag)
@@ -781,7 +833,7 @@ class HasFlags:
         flagv=",".join(flagv)
       self[self.__flagfield]=flagv
 
-  def clearFlag(self,flag):
+  def clearFlag(self, flag):
     if self.testFlag(flag):
       flagv=self.__flaglist()
       flagv.remove(flag)
@@ -789,7 +841,7 @@ class HasFlags:
         flagv=",".join(flagv)
       self[self.__flagfield]=flagv
 
-def saferename(oldpath,newpath):
+def saferename(oldpath, newpath):
   ''' Rename a path using os.rename(), but raise an exception if the target
       path already exists. Slightly racey.
   '''
@@ -799,13 +851,13 @@ def saferename(oldpath,newpath):
   except OSError, e:
     if e.errno != errno.ENOENT:
       raise e
-    os.rename(oldpath,newpath)
+    os.rename(oldpath, newpath)
 
-def trysaferename(oldpath,newpath):
+def trysaferename(oldpath, newpath):
   ''' A saferename() that returns True on success, False on failure.
   '''
   try:
-    saferename(oldpath,newpath)
+    saferename(oldpath, newpath)
   except:
     return False
   return True
@@ -822,7 +874,7 @@ def fromBS(s):
     o=ord(s[used])
     used+=1
     n=(n<<7)|(o&0x7f)
-  return (n,s[used:])
+  return (n, s[used:])
 
 def fromBSfp(fp):
   ''' Read an extensible value from a file.
@@ -839,7 +891,7 @@ def fromBSfp(fp):
     assert len(c) == 1, "unexpected EOF"
     ##debug("fromBSfp: c=0x%02x" % ord(c))
     s+=c
-  (n,s)=fromBS(s)
+  n, s = fromBS(s)
   ##debug("fromBSfp: n==%d" % n)
   assert len(s) == 0
   return n
