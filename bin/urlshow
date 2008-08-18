@@ -16,6 +16,7 @@
 : ${DISPLAY:=$BROWSER_DISPLAY}
 : ${URLSHOW_FILTER:=cat}
 : ${URLSHOW_BROWSER:=firefox}
+: ${OS:=`uname -s|tr '[A-Z]' '[a-z]'`}
 export DISPLAY
 
 cmd=`basename "$0"`

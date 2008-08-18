@@ -1,23 +1,29 @@
-#!/bin/sh
+#!/bin/sh -ue
 
-user=${USER:-`whoami`}
+: ${OS:=`uname -s|tr '[A-Z]' '[a-z]'`}
+: ${USER:=`whoami`}
+
+user=$USER
 ptopts=
-case "$1" in [a-zA-Z0-9_.]*) user=$1; shift ;; esac
-while :
-do  case $1 in
-      +?*)		ptopts="$ptopts $1" ;;
-      [a-zA-Z0-9_.]*)	user=$1 ;;
-      *)		break ;;
-    esac
-    shift
+
+while [ $# -gt 0 ]
+do
+  case $1 in
+    +?*)
+      ptopts="$ptopts $1" ;;
+    [a-zA-Z0-9_.]*)
+      user=$1 ;;
+    *)break ;;
+  esac
+  shift
 done
 
-case $ARCH in
+case $OS in
     *bsd)
 	exec pt ww -U "$user" ${1+"$@"} ;;
-    sun.*.sunos|dec.*.ultrix|apollo.*.domainos)
+    sunos|ultrix|domainos)
     	exec ps xww${1+"$@"} ;;
-    *.*.linux)
+    linux)
 	exec pt $ptopts w x ${1+"$@"} ;;
     # sysv
     *)	exec pt $ptopts "-u$user" ${1+"$@"} ;;

@@ -9,6 +9,7 @@
 #
 
 : ${DISPLAY:=''}
+: ${OS:=`uname -s|tr '[A-Z]' '[a-z]'`}
 
 case "$OS,$DISPLAY" in
   darwin, | *,?*) ;;

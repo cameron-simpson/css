@@ -1,12 +1,15 @@
 #!/bin/sh -ue
 
+: ${OS:=`uname -s|tr '[A-Z]' '[a-z]'`}
+
 ptopts=
 while [ $# -gt 0 ]
-do  case $1 in
-      +?*)	ptopts="$ptopts $1" ;;
-      *)	break ;;
-    esac
-    shift
+do
+  case $1 in
+    +?*)ptopts="$ptopts $1" ;;
+    *)	break ;;
+  esac
+  shift
 done
 
 case $OS in
@@ -14,7 +17,7 @@ case $OS in
     darwin|*bsd|linux)  exec pt wwwax $ptopts ;;
     ultrix|domainos|sunos)
 			exec ps agxuww ;;
-    *)			echo "$0: don't know how to psa when OS=\"$OS\"" >&2
+    *)			echo "$0: don't know how to psa when \$OS=\"$OS\"" >&2
 			exit 1
 			;;
 esac \
