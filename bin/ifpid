@@ -7,17 +7,22 @@
 : ${VARRUN:=$HOME/var/run}
 
 cmd=$0
-usage="Usage: $cmd [-v] [!] {pid|pidfile}
-        -q      Quiet. Don't complain about missing pid file etc.
-	-v	Verbose. Print pid if real.
-	!	Test that the process does not exist.
-        pidfile Path to a file containing a pid.
-                A relative path will be looked for in $VARRUN (from \$VARRUN)."
+usage="Usage: $cmd [-v] [!] {pid|pidfile} [match-regexp]
+  -q      Quiet. Don't complain about missing pid file etc.
+  -v	Verbose. Print pid if real.
+  !	Test that the process does not exist.
+  pidfile
+        Path to a file containing a pid.
+        A relative path will be looked for in $VARRUN
+        Default from \$VARRUN.
+  match-regexp
+        Additional grep(1) check on the pid - must appear in ps line."
 
 badopts=
 
 quiet=
 verbose=
+match=
 while [ $# -gt 0 ]
 do
   case $1 in
@@ -60,9 +65,37 @@ else
            exit 1
          }
   fi
+
+  if [ $# -gt 0 ]
+  then
+    match=$1
+    shift
+    [ $# = 0 ] || { echo "$cmd: extra arguments after match-regexp: $*" >&2
+                    badopts=1
+                  }
+  fi
 fi
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
-kill -0 "$pid" 2>/dev/null && { [ $verbose ] && echo "$pid"; exit $yes; }
+if kill -0 "$pid" 2>/dev/null
+then
+  if [ -n "$match" ]
+  then
+    psline=`ps ax | awk "\\\$1 == $pid {print}"`
+    [ -n "$psline" ] || { echo "$cmd: can't find pid $pid in ps output" >&2
+                          exit $no
+                        }
+    psline=`printf '%s\n' "$psline" | grep -- "$match"` || psline=
+    if [ -z "$psline" ]
+    then
+      [ $quiet ] \
+      || printf '%s\n' "$cmd: pid $pid does not match regexp: $match" >&2
+      exit $no
+    fi
+  fi
+  [ $verbose ] && echo "$pid"
+  exit $yes
+fi
+
 exit $no
