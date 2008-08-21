@@ -135,6 +135,6 @@ while True:
   Q.put(line)
 
 Q.put(None)
-
+T.join()
 if postRotate and os.path.exists(logfile):
   rotate(logfile,rotext)
