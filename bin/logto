@@ -22,7 +22,7 @@ postRotate=False
 verbose=False
 
 cmd=os.path.basename(sys.argv[0])
-usage='''Usage: %s [-E rotext] [-p pidfile] [-r] [-R] [-v] logfile
+usage='''Usage: %s [-E rotext] [-p pidfile] [-r] [-R] [-v] logfile [command [args...]]
   -E rotext     Rotation file suffix in strftime(3) format.
                 Default: %s
   -p pidfile    Record process id in this file.
@@ -60,10 +60,7 @@ if len(args) == 0:
   badopts=True
 else:
   logfile=args.pop(0)
-  if len(args) > 0:
-    print >>sys.stderr, "%s: extra arguments after logfile: %s" \
-                        % (cmd, " ".join(args))
-    badopts=True
+  cmdargv=args
 
 if badopts:
   print >>sys.stderr, usage
@@ -123,6 +120,25 @@ T=Thread(target=runQ,args=(Q,fp,logfile,rotext))
 T.setDaemon(True)
 T.start()
 signal(SIGHUP,onhup)
+
+if len(cmdargv) > 0:
+  rfd, wfd = os.pipe()
+  pid=os.fork()
+  if pid == 0:
+    # child
+    os.close(rfd)
+    if wfd != 1:
+      os.dup2(wfd,1)
+      os.close(wfd)
+    os.execvp(cmdargv[0], cmdargv)
+    assert False
+  # parent
+  os.close(wfd)
+  if rfd != 0:
+    sys.stdin.close()
+    os.dup2(rfd,0)
+    os.close(rfd)
+  sys.stdin=os.fdopen(0)
 
 while True:
   try:
