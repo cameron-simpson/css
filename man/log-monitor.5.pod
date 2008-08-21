@@ -98,7 +98,7 @@ matching the clause named "B<cron>" (not shown)
 and the corresponding report lines appended to the file B</var/log/cron-lines>.
 The second and third fields (B<ssh1> and B<ssh2>) both watch for lines
 matching the clause named "B<sshd>".
-The former (B<ssh1>) appends report lines to the file B</var/log/sshd-lines>.
+The former (B<sshd1>) appends report lines to the file B</var/log/sshd-lines>.
 The latter (B<sshd2>) appends lines of the form:
 
   /var/log/messages: matched-line
@@ -110,13 +110,9 @@ to the file B</var/log/terser-sshd-lines> using a shell B<echo(1)> command.
 There should be a way to cause a reread of the configuration file and
 a reconfigure.
 
-There should be a way to send syslog messages,
-though the logger(1) command may be used with B<!> actions to achieve this.
-(Maybe "@..." notation, as in syslogd.conf(5)).
-
 =head1 SEE ALSO
 
-log-monitor(1cs), tail(1), logger(1)
+log-monitor(1cs), tail(1), logger(1), logto(1cs)
 
 =head1 AUTHOR
 
