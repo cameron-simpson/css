@@ -5,11 +5,13 @@
 #
 
 : ${VARRUN:=$HOME/var/run}
+: ${LOGDIR:=$HOME/var/log}
 
 once=
 if=en0
 stop=
 sshcfg=$HOME/rc/ssh/config-pf
+fwdcfg=$HOME/rc/ssh/portfwd
 
 cmd=`basename "$0"`
 usage="Usage: $cmd [-1] [-stop] targets...
@@ -73,14 +75,26 @@ fi
 
 for target
 do
-  pidfile=$VARRUN/portfwd.$target
-  opid=`[ ! -s "$pidfile" ] || cat "$pidfile"`
-  [ -z "$opid" ] || kill -0 "$opid" 2>/dev/null || opid=
-  if [ -n "$opid" ]
+  cfg_pidfile=portfwd.$target.pid
+  cfg_command=:
+  cfg_outlog=/dev/null
+  cfg_monitor=
+  if [ -s "$fwdcfg" ]
+  then
+    wcv=`winclausevars "$fwdcfg" "$target-pf" cfg`
+    eval "$wcv"
+  fi
+  case $cfg_pidfile in
+    /*) ;; *) cfg_pidfile=$VARRUN/$cfg_pidfile ;;
+  esac
+  case $cfg_outlog in
+    /*) ;; *) cfg_outlog=$LOGDIR/$cfg_outlog ;;
+  esac
+  if opid=`ifpid -q -v "$cfg_pidfile"`
   then
     printf "%s" "$cmd: stopping $target, pid $opid "
     synckill -v "$opid"
-    >"$pidfile"
+    >"$cfg_pidfile"
   fi
 
   if [ -z "$stop" ]
@@ -97,10 +111,27 @@ do
       while :
       do
         sshto -n -F "$sshcfg" "$target-pf" \
-          'while sleep 61 && echo .; do :; done' \
-          >/dev/null &
+          "( $cfg_command ) &
+         "'exec 1>&2
+           exec 3<&0
+           cat <&3 >/dev/null &
+           catpid=$$
+           exec 3<&-
+           while sleep 61 && echo . && kill -0 "$catpid" 2>/dev/null
+           do :
+           done
+           kill "$catpid" 2>/dev/null
+          ' \
+          >>"$cfg_outlog" 2>/dev/null &
         sshpid=$!
         [ $first ] || alert "RESTARTED: sshpf $target" &
+        if [ -n "$cfg_monitor" ]
+        then
+          sh -c "$cfg_monitor" &
+          monpid=$!
+        else
+          monpid=
+        fi
         while kill -0 "$sshpid" && sh -c "$testif"
         do  sleep 2
         done
@@ -112,13 +143,14 @@ do
           sshpid=
           alert "EXITED: sshpf $target" &
         fi
+        [ -z "$monpid" ] || kill "$monpid" 2>/dev/null
         [ $once ] && break
         [ -z "$if" ] \
         || await -d 2 -c "$testif"
         first=
       done
     ) </dev/null 1>&2 &
-    echo $! >"$pidfile"
-    pfx "$target" cat "$pidfile"
+    echo $! >"$cfg_pidfile"
+    echo "$target: $cfg_pidfile: $!"
   fi
 done
