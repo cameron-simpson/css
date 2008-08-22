@@ -1,0 +1,69 @@
+#!/bin/sh -ue
+#
+# Poll a log file regularly.
+# If not empty, rotate it and summarise to external command.
+# This implies that whatever writes to the log will make a new file
+# if the existing log moves sideways, as log-monitor does.
+#
+# Example:
+#   Monitor a busy log for important stuff with log-monitor,
+#     copying the important lines to "foo.log".
+#   Poll foo.log every 60 seconds. If anything is found,
+#     email the first 100 lines to "them".
+#       log-grabber -i 60 foo.log sh -c 'sed 100q | mail -s 100-lines them'
+#
+# - Cameron Simpson <cs@zip.com.au> 22aug2008
+#
+
+interval=60
+rotext=%Y-%m-%dT%H:%M:%S
+
+cmd=`basename "$0"`
+usage="Usage: $cmd [-i interval] [-E rotext] logfile report-command [args...]
+  -i interval   Delay this many seconds between checks of the file.
+                Default: $interval
+  -E rotext     Rotation file suffix in strftime(3) format.
+                Default: $rotext"
+
+badopts=
+
+while [ $# -gt 0 ]
+do
+  case $1 in
+    -i) interval=$2; shift ;;
+    -E) rotext=$2; shift ;;
+    --) shift; break ;;
+    -?*)echo "$cmd: unrecognised option: $1" >&2
+        badopts=1
+        ;;
+    *)  break ;;
+  esac
+  shift
+done
+
+if [ $# = 0 ]
+then
+  echo "$cmd: missing logfile" >&2
+  badopts=1
+else
+  logfile=$1
+  shift
+  if [ $# = 0 ]
+  then
+    echo "$cmd: missing report-command" >&2
+    badopts=1
+  fi
+fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+while :
+do
+  if [ -s "$logfile" ]
+  then
+    rotlog=$logfile.`date "+$rotext"`
+    mv -- "$logfile" "$rotlog"
+    set-x "$@" < "$rotlog"
+  fi
+  sleep "$interval"
+done
