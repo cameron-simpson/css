@@ -132,7 +132,7 @@ do
     fi
     if [ -z "$lgid" ]
     then
-      $trace groupadd -g "$rgid" "$group"
+      pfx "$group" $trace groupadd -g "$rgid" "$group"
       didmod=1
     else
       if [ "x$lgid" != "x$rgid" ]
@@ -156,7 +156,7 @@ do
           case " $lmembers " in
             *" $member "*)
               ;;
-            *)$trace bsed -s "/^$group:/{ /:\$/!s/\$/,/; s/\$/$member/; }" "$lgroup"
+            *)pfx "$group" $trace bsed -s "/^$group:/{ /:\$/!s/\$/,/; s/\$/$member/; }" "$lgroup"
               didmod=1
               ;;
           esac
@@ -170,7 +170,7 @@ do
           case " $rmembers " in
             *" $member "*)
               ;;
-            *)$trace bsed -s "/^$group:/{ s/:/:,/; s/\$/,/; s/,$member,/,/; s/,$//; s/:,/:/; }" "$lgroup"
+            *)pfx "$group" $trace bsed -s "/^$group:/{ s/:/:,/; s/\$/,/; s/,$member,/,/; s/,$//; s/:,/:/; }" "$lgroup"
               didmod=1
               ;;
           esac
