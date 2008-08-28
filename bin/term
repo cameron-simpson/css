@@ -245,9 +245,10 @@ case "$TERM,$DISPLAY" in
                 exit 2
                 ;;
       esac
+      app=Terminal      ## iTerm
       set -- \
         osascript \
-          -e 'tell app "iTerm"
+          -e 'tell app "'"$app"'"
                 activate
                 set myterm to ('"$itermterm"')
                 tell myterm
