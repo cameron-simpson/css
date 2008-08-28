@@ -12,6 +12,7 @@ if=en0
 stop=
 sshcfg=$HOME/rc/ssh/config-pf
 fwdcfg=$HOME/rc/ssh/portfwd
+testif=do-portfwd
 
 cmd=`basename "$0"`
 usage="Usage: $cmd [-1] [-stop] targets...
@@ -60,8 +61,6 @@ synckill()
   done
   [ -z "$_synckill_verbose" ] || echo
 }
-
-testif="ifconfig '$if' | grep '	inet [1-9]' >/dev/null"
 
 if [ "x$*" = xALL ]
 then

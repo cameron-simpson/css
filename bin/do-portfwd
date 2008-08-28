@@ -1,0 +1,10 @@
+#!/bin/sh -ue
+#
+# Whether to run a portfwd.
+#       - Cameron Simpson <cs@zip.com.au> 28aug2008
+#
+
+flag PORTFWD_ANYWAY && exit 0
+flag PORTFWD || exit 1
+netstat -rn | grep '^default ' >/dev/null || exit 1
+exit 0
