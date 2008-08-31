@@ -98,6 +98,8 @@ def bootvar(var):
       opsys=env("OS")
       if opsys == "darwin":
         vendor="apple"
+      elif opsys == "openbsd":
+        vendor="openbsd"
       else:
         cmderr("unknown VENDOR for OS=%s" % opsys)
     val=vendor
