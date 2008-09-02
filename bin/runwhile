@@ -1,0 +1,52 @@
+#!/bin/sh -ue
+#
+# Run a command while a condition holds true.
+#       - Cameron Simpson <cs@zip.com.au> 02sep2008
+#
+
+testcmd=
+delay=5
+
+cmd=`basename "$0"`
+usage="Usage: $cmd -c test-cmd command [args...]
+  -c test-cmd   Shell command to test condition."
+
+badopts=
+
+while [ $# -gt 0 ]
+do
+  case $1 in
+    -c) testcmd=$2; shift ;;
+    --) shift; break ;;
+    -?*)echo "$cmd: unrecognised option: $1" >&2
+        badopts=1
+        ;;
+    *)  break ;;
+  esac
+  shift
+done
+
+[ -n "$testcmd" ] || { echo "$cmd: missing -c test-cmd option" >&2
+                       badopts=1
+                     }
+
+if [ $# = 0 ]
+then
+  echo "$cmd: missing command" >&2
+  badopts=1
+fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+( # fork to ensure no unknown children
+  "$@" &
+  pid=$!
+
+  while sh -c "$testcmd"
+  do
+    sleep $delay
+  done
+
+  kill "$pid" 2>/dev/null
+  wait
+)
