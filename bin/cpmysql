@@ -296,6 +296,7 @@ pull_table()
           set -- gzip -n --fast
           if [ $dorewriteif ]
           then
+            [ -f "$gzout" ] || >>"$gzout"
             $trace rewriteif $rwflags "$gzout" "$@"
           else
             if [ $newfile ]
