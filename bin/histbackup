@@ -153,6 +153,14 @@ do
       rsdelete=
       ;;
 
+    # =item --no-rsync
+    #
+    # Skip the rsync step; just create the new link tree.
+    #
+    --no-rsync)
+      linkonly=1
+      ;;
+
     # =item --delete
     #
     # Passed to rsync.
@@ -267,6 +275,11 @@ esac
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
+if [ $linkonly ]
+then
+  exec 3>&1 1>&2
+fi
+
 if [ $verbose ]
 then  echo=echo
 else  echo=:
@@ -316,7 +329,7 @@ then
     {
       if [ $linkonly ]
       then
-          echo "$thisbackup" >&3
+          echo "$dest/$thisbackup" >&3
       else
           $echo "updating $thisbackup from $src ..."
           $trace rsync $rsopts -aH $rsdelete --rsync-path "$rrsync" ${1+"$@"} "$src/." "$dest/$thisbackup/."
