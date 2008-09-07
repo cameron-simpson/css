@@ -290,7 +290,7 @@ pull_table()
     fi \
   | case "$dst" in
       /*)
-        $trace sed '${/^-- Dump completed on /d;}' \
+        $trace sed '1{/^-- MySQL dump [0-9]/d;};${/^-- Dump completed on /d;}' \
         | \
         { gzout=$dst/$_pull_table_dstdb.$_pull_table.sql.gz
           set -- gzip -n --fast
