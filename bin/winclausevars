@@ -12,6 +12,10 @@ file=$1
 clause=$2
 prefix=$3
 
+[ -s "$file" ] || { echo "$cmd: expected non-empty file: $file" >&2
+                    exit 1
+                  }
+
 case "$prefix" in
   ''|*[!a-zA-Z]*)
     echo "$cmd: bad prefix \"$prefix\" - must be [a-zA-Z]+" >&2
