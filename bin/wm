@@ -16,6 +16,7 @@ then
 fi
 
 for fv in \
+        $HOME/bin-local/fvwm \
         $FVWM_PREFIX \
 	2.5.21-fc6 \
 	2.5.17-fc4 \
@@ -46,7 +47,10 @@ do
     fvwm-*)	fv=/opt/$fv ;;
     *)		fv=/opt/fvwm-$fv ;;
   esac
-  fvwm=$fv/bin/fvwm
+  if [ -f "$fv" ]
+  then  fvwm=$fv
+  else  fvwm=$fv/bin/fvwm
+  fi
   [ -f "$fvwm" ] && break
 done
 
