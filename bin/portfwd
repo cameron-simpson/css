@@ -6,7 +6,9 @@
 
 : ${VARRUN:=$HOME/var/run}
 : ${LOGDIR:=$HOME/var/log}
+: ${PORTFWD_TARGETS:-''}
 
+trace=set-x
 once=
 if=en0
 stop=
@@ -42,8 +44,13 @@ done
 
 if [ $# = 0 ]
 then
-  echo "$cmd: missing targets" >&2
-  badopts=1
+  if [ -n "$PORTFWD_TARGETS" ]
+  then
+    set -- $PORTFWD_TARGETS
+  else
+    echo "$cmd: missing targets and no \$PORTFWD_TARGETS envvar" >&2
+    badopts=1
+  fi
 fi
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
@@ -109,19 +116,20 @@ do
       first=1
       while :
       do
-        sshto -n -F "$sshcfg" "$target-pf" \
-          "( $cfg_command ) &
-         "'exec 1>&2
-           exec 3<&0
-           cat <&3 >/dev/null &
-           catpid=$$
-           exec 3<&-
-           while sleep 61 && echo . && kill -0 "$catpid" 2>/dev/null
-           do :
-           done
-           kill "$catpid" 2>/dev/null
-          ' \
-          >>"$cfg_outlog" 2>/dev/null &
+        $trace \
+          sshto -n -F "$sshcfg" "$target-pf" \
+            "( $cfg_command ) &
+           "'exec 1>&2
+             exec 3<&0
+             cat <&3 >/dev/null &
+             catpid=$$
+             exec 3<&-
+             while sleep 61 && echo . && kill -0 "$catpid" 2>/dev/null
+             do :
+             done
+             kill "$catpid" 2>/dev/null
+            ' \
+          >>"$cfg_outlog" &
         sshpid=$!
         [ $first ] || alert "RESTARTED: sshpf $target" &
         if [ -n "$cfg_monitor" ]
