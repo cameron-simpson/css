@@ -1,6 +1,7 @@
 #!/usr/bin/python -tt
 #
-# Apply a configuration patch to a file.
+# Apply a configuration patch to a file, writing the patched config
+# to the standard output.
 # The patch file contains lines of the form:
 #       keyword value
 # - Cameron Simpson <cs@zip.com.au> 18sep2008
@@ -59,6 +60,11 @@ else:
             "%s: extra arguments after patchfile: %s" % (cmd, args)
       badopts=True
 
+if configFile == '-' and patchFile == '-':
+  print >>sys.stderr, \
+        "%s: configfile and patchfile cannot both be standard input"
+  badopts=True
+
 if badopts:
   print >>sys.stderr, usage
   sys.exit(2)
@@ -81,10 +87,7 @@ for line in patchData:
     keyword=keyword.lower()
   keywords[keyword]=None
 
-if len(keywords.keys()) == 0:
-  print "%s: no keywords in patchfile \"%s\", not modifying \"%s\"" \
-        % (cmd, patchFile, configFile)
-  sys.exit(0)
+patchData.close()
 
 # prepare resulting data
 outLines=[]
@@ -92,7 +95,12 @@ outLines=[]
 if insert:
   outLines.extend(patchLines)
 
-for line in open(configFile):
+if configFile == '-':
+  configData=sys.stdin
+else:
+  configData=open(configFile)
+
+for line in configData:
   assert line[-1] == '\n'
   words=line[:-1].strip().split()
   if len(words) > 0:
@@ -110,7 +118,6 @@ for line in open(configFile):
 if not insert:
   outLines.extend(patchLines)
 
-out=open(configFile,'w')
 for line in outLines:
-  out.write(line)
-out.close()
+  sys.stdout.write(line)
+sys.stdout.close()
