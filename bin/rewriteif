@@ -16,7 +16,7 @@ usage="Usage: $cmd [-0] [-v] filename [command args...]
                 This means \"mv tempfile filename\" instead of
                 \"cat tempfile >filename\".
 	-v	Verbose.
-        -x      trace execution f underlying commands."
+        -x      Trace execution of underlying commands."
 
 trace=
 rw0=
