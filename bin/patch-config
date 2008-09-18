@@ -1,0 +1,116 @@
+#!/usr/bin/python -tt
+#
+# Apply a configuration patch to a file.
+# The patch file contains lines of the form:
+#       keyword value
+# - Cameron Simpson <cs@zip.com.au> 18sep2008
+#
+
+import sys
+import os.path
+import getopt
+
+cmd=os.path.basename(sys.argv[0])
+
+usage='''Usage: %s [options...] configfile [patchfile]
+  -#    Comment out old keyword lines.
+  -A    Append new keywords to the end of the file.
+  -D    Delete old keyword lines.
+  -I    Insert new keywords at the start of the file.
+  -i    Match keywords on a case-insensitive basis.''' % cmd
+
+badopts=False
+
+insert=False
+commentOut=True
+useRewriteif=False
+caseSensitive=True
+
+opts, args = getopt.getopt(sys.argv[1:],'#ADIRi')
+
+for opt, val in opts:
+  if opt == '-#':
+    commentOut=True
+  elif opt == '-A':
+    insert=False
+  elif opt == '-D':
+    commentOut=False
+  elif opt == '-I':
+    insert=True
+  elif opt == '-R':
+    useRewriteif=True
+  elif opt == '-i':
+    caseSensitive=True
+  else:
+    print >>sys.stderr, "%s: unimplemented option: %s" % (cmd, opt)
+    badopts=True
+
+if len(args) < 1:
+  print >>sys.stderr, "%s: missing configfile" % cmd
+  badopts=True
+else:
+  configFile=args.pop(0)
+  if len(args) == 0:
+    patchFile='-'
+  else:
+    patchFile=args.pop(0)
+    if len(args) > 0:
+      print >>sys.stderr, \
+            "%s: extra arguments after patchfile: %s" % (cmd, args)
+      badopts=True
+
+if badopts:
+  print >>sys.stderr, usage
+  sys.exit(2)
+
+if patchFile == '-':
+  patchData=sys.stdin
+else:
+  patchData=open(patchFile)
+
+patchLines=[]
+keywords={}
+for line in patchData:
+  assert line[-1] == '\n'
+  patchLines.append(line)
+  line=line[:-1].strip()
+  if len(line) == 0 or line[0] == '#':
+    continue
+  keyword=line.split()[0]
+  if not caseSensitive:
+    keyword=keyword.lower()
+  keywords[keyword]=None
+
+if len(keywords.keys()) == 0:
+  print "%s: no keywords in patchfile \"%s\", not modifying \"%s\"" \
+        % (cmd, patchFile, configFile)
+  sys.exit(0)
+
+# prepare resulting data
+outLines=[]
+
+if insert:
+  outLines.extend(patchLines)
+
+for line in open(configFile):
+  assert line[-1] == '\n'
+  words=line[:-1].strip().split()
+  if len(words) > 0:
+    word1=words[0]
+    if not caseSensitive:
+      word1=word1.lower()
+    if word1 in keywords:
+      if commentOut:
+        line='#'+line
+      else:
+        # discard line
+        continue
+  outLines.append(line)
+
+if not insert:
+  outLines.extend(patchLines)
+
+out=open(configFile,'w')
+for line in outLines:
+  out.write(line)
+out.close()
