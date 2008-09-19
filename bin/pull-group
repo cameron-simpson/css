@@ -4,8 +4,7 @@
 #       - Cameron Simpson <cs@zip.com.au> 12may2008
 #
 
-. /opt/css/env.sh
-
+. ${OPTCSS:-/opt/css}/env.sh
 : ${TMPDIR:=/tmp}
 
 cmd=`basename "$0"`

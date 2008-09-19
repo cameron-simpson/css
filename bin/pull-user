@@ -4,12 +4,11 @@
 #       - Cameron Simpson <cs@zip.com.au> 12may2008
 #
 
-. /opt/css/env.sh
-
+. ${OPTCSS:-/opt/css}/env.sh
 : ${TMPDIR:=/tmp}
 
 cmd=`basename "$0"`
-usage="Usage: $cmd [-x] {/path/to/passwd|[user]@host} user..."
+usage="Usage: $cmd [-g /path/to/group] [-x] {/path/to/passwd|[user]@host} user..."
 
 trace=eecho
 xflag=
@@ -26,8 +25,7 @@ badopts=
 while [ $# -gt 0 ]
 do
   case $1 in
-    -g) rgroup=$2; shift
-        ;;
+    -g) rgroup=$2; shift ;;
     -x) trace=set-x xflag=-x ;;
     --) shift; break ;;
     -?*)echo "$cmd: unrecognised option: $1" >&2
