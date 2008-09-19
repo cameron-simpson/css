@@ -9,7 +9,7 @@
 : ${TMPDIR:=/tmp}
 
 cmd=`basename "$0"`
-usage="Usage: $cmd [-x] [user]@host user..."
+usage="Usage: $cmd [-x] {/path/to/passwd|[user]@host} user..."
 
 trace=eecho
 xflag=
@@ -18,12 +18,16 @@ ssh=ssho
 shell=/bin/false
 
 remote=
+rpasswd=
+rgroup=
 
 badopts=
 
 while [ $# -gt 0 ]
 do
   case $1 in
+    -g) rgroup=$2; shift
+        ;;
     -x) trace=set-x xflag=-x ;;
     --) shift; break ;;
     -?*)echo "$cmd: unrecognised option: $1" >&2
@@ -42,6 +46,15 @@ else
   remote=$1
   shift
   case "$remote" in
+    /*) rpasswd=$remote
+        if [ ! -s "$rpasswd" ]
+        then
+          echo "$cmd: $rpasswd: need non-empty file" >&2
+          badopts=1
+        else
+          [ -n "$rgroup" ] || rgroup=`dirname "$rpasswd"`/group
+        fi
+        ;;
     @?*)if whoami=`who am i | awk '{print $1}'` && [ -n "$whoami" ]
         then
           remote=$whoami$remote
@@ -57,6 +70,17 @@ else
   esac
 fi
 
+if [ -n "$rgroup" ]
+then
+  if [ ! -s "$rgroup" ]
+  then
+    echo "$cmd: $rgroup: need non-empty file" >&2
+    badopts=1
+  fi
+else
+  rgroup=$remote
+fi
+
 if [ $# = 0 ]
 then
   echo "$cmd: missing users" >&2
@@ -69,10 +93,13 @@ getuid()
 { awk -F: -v "user=$1" '$1 == user { print $3 }' "$2"
 }
 
-rpasswd=$TMPDIR/$cmd.$$
-trap 'rm -f "$rpasswd"' 0
-trap 'rm -f "$rpasswd"; exit 1' 1 2 13 15
-$ssh "$remote" cat /etc/passwd >"$rpasswd"
+if [ -z "$rpasswd" ]
+then
+  rpasswd=$TMPDIR/$cmd.$$
+  trap 'rm -f "$rpasswd"' 0
+  trap 'rm -f "$rpasswd"; exit 1' 1 2 13 15
+  $ssh "$remote" cat /etc/passwd >"$rpasswd"
+fi
 
 modusers=
 for user
@@ -86,7 +113,7 @@ do
   fi
   if [ -z "$luid" ]
   then
-    $trace pull-group $xflag "$remote" "$user"
+    $trace pull-group $xflag "$rgroup" "$user"
     pfx "$user" $trace adduser -s "$shell" -u "$ruid" -g "$user" "$user"
     modusers="$modusers $user"
   else

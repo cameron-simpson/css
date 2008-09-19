@@ -9,7 +9,7 @@
 : ${TMPDIR:=/tmp}
 
 cmd=`basename "$0"`
-usage="Usage: $cmd [-x] [-G group-override] [-R] [user]@host group...
+usage="Usage: $cmd [-x] [-G group-override] [-R] {/path/to/group|[user]@host} group...
   [user]@host
         Specify remote user and host to query for group information.
         With no user, take the user from \`who am i\`.
@@ -28,6 +28,7 @@ groupoverride=
 addmembers=
 removemembers=
 remote=
+rgroup=
 
 badopts=
 
@@ -55,6 +56,13 @@ else
   remote=$1
   shift
   case "$remote" in
+    /*) rgroup=$remote
+        if [ ! -s "$rgroup" ]
+        then
+          echo "$cmd: $rgroup: need non-empty file" >&2
+          badopts=1
+        fi
+        ;;
     @?*)if whoami=`who am i | awk '{print $1}'` && [ -n "$whoami" ]
         then
           remote=$whoami$remote
@@ -95,10 +103,13 @@ rcmd()
   set-x $ssh "$remote" "$_rcmd_qargs"
 }
 
-rgroup=$TMPDIR/$cmd.$$
-trap 'rm -f "$rgroup"' 0
-trap 'rm -f "$rgroup"; exit 1' 1 2 13 15
-rcmd cat /etc/group >"$rgroup"
+if [ -z "$group" ]
+then
+  rgroup=$TMPDIR/$cmd.$$
+  trap 'rm -f "$rgroup"' 0
+  trap 'rm -f "$rgroup"; exit 1' 1 2 13 15
+  rcmd cat /etc/group >"$rgroup"
+fi
 
 modgroups=
 for grouparg
