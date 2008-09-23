@@ -102,7 +102,7 @@ rcmd()
   set-x $ssh "$remote" "$_rcmd_qargs"
 }
 
-if [ -z "$group" ]
+if [ -z "$rgroup" ]
 then
   rgroup=$TMPDIR/$cmd.$$
   trap 'rm -f "$rgroup"' 0
