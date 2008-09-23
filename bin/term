@@ -245,7 +245,7 @@ case "$TERM,$DISPLAY" in
                 exit 2
                 ;;
       esac
-      app=Terminal      ## iTerm
+      app=iTerm
       set -- \
         osascript \
           -e 'tell app "'"$app"'"
