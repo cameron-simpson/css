@@ -1,0 +1,61 @@
+#!/bin/sh -ue
+#
+# Like htsave, but prepare plain HTML as RFC2822.
+#       - Cameron Simpson <cs@zip.com.au> 26sep2008
+# 
+
+cmd=`basename "$0"`
+usage="Usage: $cmd [-d date] [-s subj] [-u url] html-file"
+
+date=
+url=
+subj=
+
+badopts=
+
+while [ $# -gt 0 ]
+do
+  case $1 in
+    -d) date=$2; shift ;;
+    -s) subj=$2; shift ;;
+    -u) url=$2; shift ;;
+    --) shift; break ;;
+    -?*)echo "$cmd: unrecognised option: $1" ?&2
+        badopts=1
+        ;;
+    *)  break ;;
+  esac
+  shift
+done
+
+if [ $# = 0 ]
+then
+  echo "$cmd: missing html-file" >&2
+  badopts=1
+else
+  file=$1
+  shift
+  if [ $# -gt 0 ]
+  then
+    echo "$cmd: extra arguments after html-file: $*" >&2
+    badopts=1
+  fi
+fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+st=`stat -s "$file"` || exit 1
+eval "$st"
+
+if [ -z "$subj" ]
+then
+  subj=`html-title <"$file"`
+  : ${subj:="${url:-$file}"}
+fi
+
+[ -z "$subj" ] || echo "Subject: $subj"
+date -r "$st_mtime" '+Date: %a, %d %b %Y %H:%M:%S %z'
+echo "X-Filename: $file"
+echo "Content-Type: text/html"
+echo
+cat <"$file"
