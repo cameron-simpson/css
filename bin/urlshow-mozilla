@@ -15,7 +15,7 @@ usage="Usage: $cmd [-t] < url-list
 popnew=1
 [ $# -gt 0 ] && [ "x$1" = x-t ] && { popnew=; shift; }
 
-mozremote=/opt/firefox/mozilla-xremote-client
+mozremote=mozilla-xremote-client
 LD_LIBRARY_PATH=/opt/firefox
 export LD_LIBRARY_PATH
 
