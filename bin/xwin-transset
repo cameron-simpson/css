@@ -45,7 +45,13 @@ fi
      flag DESKTOP_TRANSPARENT || exit 0
    }
 
-set --
-[ -n "$wid" ] && set -- -id "$wid" -rootChild
+if flag TRANSSET_DF
+then
+  set -- transset-df
+  [ -n "$wid" ] && set -- "$@" -i "$wid"
+else
+  set -- transset
+  [ -n "$wid" ] && set -- "$@" -id "$wid" -rootChild
+fi
 
-exec transset ${1+"$@"} "${X11_TRANSPARENCY:=0.75}"
+exec "$@" "${X11_TRANSPARENCY:=0.75}"
