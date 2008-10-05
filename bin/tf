@@ -61,7 +61,7 @@ done
 if [ $multitail ]
 then
   ntitle=${title:="TAIL $lognames"}
-  exec term -n "$ntitle" -small $termopts \
+  exec term -n "$ntitle" $termopts \
 	    -e multitail -M 10240 -b 8 -x 'MTAIL %t %f' "$@"
 fi
 
@@ -71,7 +71,7 @@ for log
 do
   logname=`echo "$log" | entilde`
   ntitle=${title:="TAIL $logname"}
-  term -n "$ntitle" -small $termopts -e tail -f "$log" || xit=1
+  term -n "$ntitle" $termopts -e tail -f "$log" || xit=1
 done
 
 exit $xit

@@ -28,7 +28,7 @@ export RXVT_SOCKET TMPDIR
 cmd=`basename "$0"`
 usage="Usage: $cmd [-v] [-w width] [-h height] [-x x-pos] [-y y-pos]
 		[-l lock] [-1 lock] [-j job]
-		[-f font] [-n name] [-big] [-small] [-keepio] [-xauthhack]
+		[-f font] [-n name] [-keepio] [-xauthhack]
                 [-tab] [-window]
 		[{-c shellcmd}/{-e exec-list}/{-- raw-args}]"
 
@@ -41,9 +41,7 @@ detach='exec >/dev/null </dev/null'
 closefds='for fd in 3 4 5 6 7 8 9; do eval "exec $fd>&-"; done'
 keepio=
 title= f=
-smallx=0 smally=103 smallw=80 smallh=24 smallf=
 x= y= w= h=
-bigx=0 bigy=-0 bigw=80 bigh=61 bigf=6x13
 geometry=
 sized=
 tint=$TERMTINT
@@ -99,8 +97,6 @@ do
     -n|-T)	title=$2 ; shift ;;
     -f)		f=$2 ; shift ;;
     -env)	exec genv TERMOPTIONS TERMTINT TERMSHADE ;;
-    -big)	sized=1 x=$bigx y=$bigy w=$bigw h=$bigh f=$bigf ;;
-    -small)	sized=1 x=$smallx y=$smally w=$smallw h=$smallh f=$smallf ;;
     -keepio)	detach= ;;
     -xauthhack)	xauthhack=1 ;;
     -tab)       windowmode=tab ;;
@@ -126,8 +122,42 @@ done
 set -- ttysane "$@"
 [ -n "$WINJOB" ] && set -- winjob "$WINJOB" "$@"
 
-case "$TERM,$DISPLAY" in
-  *,?*)
+case "$OS,$TERM,$DISPLAY" in
+  darwin,*,/?* | darwin,*, )
+    runme=$TMPDIR/$cmd.$$.sh
+    qrunme=`shqstr "$runme"`
+    qcmd=`shqstr "$@"`
+    wd=`/bin/pwd`
+    qwd=`shqstr "$wd"`
+    ( echo '#!/bin/sh'
+      dumpenv -f -sh
+      printf "%s\n" ": set -x; rm -f $qrunme; cd $qwd; exec $qcmd"
+    ) >"$runme"
+    chmod u+rx "$runme"
+    case $windowmode in
+      tab)    itermterm='current terminal' ;;
+      window) itermterm='make new terminal' ;;
+      *)      echo "$cmd: unsupported windowmode \"$windowmode\"" >&2
+              exit 2
+              ;;
+    esac
+    app=iTerm
+    set -- \
+      osascript \
+        -e 'tell app "'"$app"'"
+              activate
+              set myterm to ('"$itermterm"')
+              tell myterm
+                set mysession to (make new session at the end of sessions)
+                tell mysession
+                  set name to "'"$title"'"
+                  exec command "'"$runme"'"
+                end tell
+              end tell
+            end tell' 
+    ;;
+
+  *,*,?*)
     if [ -n "$X11_COMPOSITE" ]
     then
       qcmd=`shqstr "$@"`
@@ -218,51 +248,15 @@ case "$TERM,$DISPLAY" in
     esac
     ;;
 
-  iris-ansi*,*)
+  irix,iris-ansi*,*)
     [ -n "$f" ] && set -- -f "$f" "$@"
     [ -n "$x$y" ] && set -- -p "$x,$y" "$@"
     [ -n "$w$h" ] && set -- -s "$w,$h" "$@"
     [ -n "$title" ] && set -- -t "$title" -n "$title" "$@"
     set -- wsh -v "$@"
     ;;
-  *)
-    if [ "x$OS" = xdarwin ]
-    then
-      runme=$TMPDIR/$cmd.$$.sh
-      qrunme=`shqstr "$runme"`
-      qcmd=`shqstr "$@"`
-      wd=`/bin/pwd`
-      qwd=`shqstr "$wd"`
-      ( echo '#!/bin/sh'
-        dumpenv -f -sh
-        printf "%s\n" ": set -x; rm -f $qrunme; cd $qwd; exec $qcmd"
-      ) >"$runme"
-      chmod u+rx "$runme"
-      case $windowmode in
-        tab)    itermterm='current terminal' ;;
-        window) itermterm='make new terminal' ;;
-        *)      echo "$cmd: unsupported windowmode \"$windowmode\"" >&2
-                exit 2
-                ;;
-      esac
-      app=iTerm
-      set -- \
-        osascript \
-          -e 'tell app "'"$app"'"
-                activate
-                set myterm to ('"$itermterm"')
-                tell myterm
-                  set mysession to (make new session at the end of sessions)
-                  tell mysession
-                    set name to "'"$title"'"
-                    exec command "'"$runme"'"
-                  end tell
-                end tell
-              end tell' 
-    else
-      async=
-      detach=
-    fi
+  *,*,)
+    async=
     ;;
 esac
 

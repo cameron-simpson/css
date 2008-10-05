@@ -23,14 +23,14 @@ do
   if [ $useterm ]
   then
     pipecmd='exec <"$PIPECMD_PIPENAME"; '$pipecmd
-    pipe=`TMPDIR=$wkdir pipecmd term +a -small -c "$pipecmd"` || exit 1
+    pipe=`TMPDIR=$wkdir pipecmd term +a -c "$pipecmd"` || exit 1
   else
 
     pipe=`TMPDIR=$wkdir pipecmd sh -c "$pipecmd"` || exit 1
   fi
 
   eval "exec $pipefd>\"\$pipe\""
-  set $* $pipefd	## we know they're all just numbers
+  set -- $* $pipefd	## we know they're all just numbers
   pipefd=`expr $pipefd + 1`
 
   first=
