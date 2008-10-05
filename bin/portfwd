@@ -20,9 +20,9 @@ cmd=`basename "$0"`
 usage="Usage: $cmd [-1] [-stop] targets...
   -1    Once. Do not restart the tunnel if it dies.
   -stop Stop named port forwards instead of starting them.
-  -F    Ssh configuration file with clause for target-pf.
+  -F    Ssh configuration file with clause for target.
 If targets is \"ALL\" then if -stop it means all running portforwards
-otherwise it means all clauses named *-pf in the ssh configuration file."
+otherwise it means all clauses named *-ALL in the ssh configuration file."
 
 badopts=
 
@@ -75,7 +75,9 @@ then
   then  set -- `ls "$VARRUN/." | sed -n 's/^portfwd\.//p'`
   else  set -- `sed -n 'y/	/ /
                         s/$/ /
-                        s/^[Hh][Oo][Ss][Tt]  *\([^ ][^ ]*\)-pf .*/\1/p' "$sshcfg"`
+                        s/^  *//
+                        s/  */  /g
+                        s/^[Hh][Oo][Ss][Tt] .* \([^ ][^ ]*-ALL\) .*/\1/p' "$sshcfg"`
   fi
 fi
 
@@ -87,7 +89,7 @@ do
   cfg_monitor=
   if [ -s "$fwdcfg" ]
   then
-    wcv=`winclausevars "$fwdcfg" "$target-pf" cfg`
+    wcv=`winclausevars "$fwdcfg" "$target" cfg`
     eval "$wcv"
   fi
   case $cfg_pidfile in
@@ -117,7 +119,7 @@ do
       while :
       do
         $trace \
-          sshto -n -F "$sshcfg" "$target-pf" \
+          sshto -n -F "$sshcfg" "$target" \
             "( $cfg_command ) &
            "'exec 1>&2
              exec 3<&0
