@@ -14,8 +14,8 @@ pidtag=xcompmgr-$DISPLAY
 # -f and -F probably trigger a memory leak
 if [ $force ] || { [ $X11_COMPOSITE ] && not flag DISABLE_X11_COMPOSITE; }
 then
-  ifpid "$pidtag" \
+  ifpid -q "$pidtag" xcompmgr \
   || bgproc -p "$pidtag" -l x11 xcompmgr -cfF -r0 -D5 -I0.01 -O0.02
 else
-  ifpid "$pidtag" && killpidfile "$pidtag"
+  ifpid -q "$pidtag" xcompmgr && killpidfile "$pidtag"
 fi
