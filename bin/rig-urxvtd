@@ -23,6 +23,7 @@ export RXVT_SOCKET LC_CTYPE
 
 trace=set-x
 lock=urxvtd-$USER-$HOST-$DISPLAY
+case "$lock" in */*) lock=`echo "$lock" | tr / _` ;; esac
 
 $trace bgproc -l alert -p "$lock" -- incd / lock -1 "$lock" urxvtd -q 3>&-
 
