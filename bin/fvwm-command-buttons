@@ -1,0 +1,94 @@
+#!/bin/sh -ue
+#
+# Generate FVWM input to run up an FVWMButtons module with the
+# commands read from stdin.
+#       - Cameron Simpson <cs@zip.com.au> 07oct2008
+#
+
+: ${TMPDIR:=/tmp}
+
+delay=4 # delay before command to avoid overwriting title
+doit=
+geom=800x800-0-0
+ncols=2
+
+cmd=`basename "$0"`
+usage="Usage: $cmd [options...] <commands >fvwm-config
+  -c cols       Use ncols columns. Default: $ncols
+  -d delay      Delay before executing command. Default: $delay
+  -g geom       Geometry of buttons window. Default: $geom
+  -x            Execute the buttons instead of just emitting config."
+
+badopts=
+
+while [ $# -gt 0 ]
+do
+  case $1 in
+    -c) ncols=$2; shift ;;
+    -d) delay=$2; shift ;;
+    -g) geom=$2; shift ;;
+    -x) doit=1 ;;
+    --) shift; break ;;
+    -?*)echo "$cmd: unrecognised option: $1" >&2
+        badopts=1
+        ;;
+    *)  break ;;
+  esac
+  shift
+done
+
+[ $# = 0 ] || { echo "$cmd: extra arguments: $*" >&2; badopts=1; }
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+if [ $doit ]
+then
+  "$0" -c "$ncols" -d "$delay" -g "$geom" | fvwmcmd
+  exit $?
+fi
+
+name=CB$$
+
+tmpf=$TMPDIR/$cmd.$$
+trap 'rm -f "$tmpf"' 0
+trap 'rm -f "$tmpf"; exit 1' 1 15
+
+grep '^ *[^# ]' >"$tmpf" || :
+[ -s "$tmpf" ] || { echo "$cmd: empty input, aborting" >&2; exit 1; }
+
+ncmds=`wc -l <"$tmpf"`
+nrows=`expr \( $ncmds + 1 \) / $ncols`
+
+( echo Back    ${BG:-black}
+  echo BoxSize fixed
+  echo Geometry $geom
+  echo Colorset 1
+  echo ##ButtonGeometry  16x16
+  echo Columns $ncols
+  echo Rows    $nrows
+  echo Fore    ${FG:-green}
+  echo Frame   0
+  echo Padding 0 0
+  echo Pixmap  none
+  cmdnum=0
+  xpos=0
+  ypos=0
+  exec 3<"$tmpf"
+  while read -r cmdline <&3
+  do
+    cmdnum=`expr $cmdnum + 1`
+    qcmdline=`shqstr "sleep 5; $cmdline"`
+    qexecstr=`shqstr "Exec term -n ${name}_${cmdnum} -c $qcmdline &"`
+    echo "(1x1+$xpos+$ypos, Swallow (SwallowNew, Close, NoHints) ${name}_${cmdnum} $qexecstr"
+    ypos=`expr $ypos + 1`
+    if [ $ypos = $nrows ]
+    then
+      ypos=0
+      xpos=`expr $xpos + 1`
+    fi
+  done
+  exec 3<&-
+) \
+| sed "s/^/*$name: /"
+
+echo Module FvwmButtons $name
