@@ -4,6 +4,7 @@
 #	- Cameron Simpson <cs@zip.com.au> 25jun2005
 #
 
+: ${TMPDIR:=/tmp}
 trace=set-x
 
 cmd=`basename "$0"` || cmd=$0
@@ -46,12 +47,19 @@ do
   fi
   iface=$1; shift
 
+  ocfg=$TMPDIR/delif.$$
   case "$os" in
     OpenBSD)
+      ifconfig -A >"$ocfg"
       $trace ifconfig "$iface" -alias "$ipaddr" || xit=1
+      ifconfig -a | diff -u "$ocfg" -
+      rm "$ocfg"
       ;;
     *)
+      ifconfig -a >"$ocfg"
       $trace ifconfig "$iface" down || xit=1
+      ifconfig -a | diff -u "$ocfg" -
+      rm "$ocfg"
       ;;
   esac
 done
