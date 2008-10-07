@@ -18,12 +18,9 @@ case "$syncset" in
   *)  syncset=$HOME/rc/sync/$syncset ;;
 esac
 
-cd
-pwd
-
-set -x
-exec \
-  rsync -rlptHvC --delete --exclude=CVS/ --exclude=\*.swp --exclude=\*~ \
-	"--include-from=$syncset" \
-        ${1+"$@"} \
-	"$from." "$to."
+cd || exit 1
+rsync -rlptHvC --delete --exclude=CVS/ --exclude=\*.swp --exclude=\*~ \
+      "--include-from=$syncset" \
+      ${1+"$@"} \
+      "$from." "$to." \
+| sed -n '/[^/]$/p'
