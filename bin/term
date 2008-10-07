@@ -261,8 +261,11 @@ case "$OS,$TERM,$DISPLAY" in
 esac
 
 ##set -x
-eval "$detach"
-eval "$closefds"
-##exec 2>>$HOME/var/log/alert
-[ $async ] && set -- bgproc -p - -- "$@"
+if [ $async ]
+then
+  eval "$detach"
+  eval "$closefds"
+  ##exec 2>>$HOME/var/log/alert
+  set -- bgproc -p - -- "$@"
+fi
 exec "$@"
