@@ -1,0 +1,27 @@
+#!/bin/sh -ue
+#
+# Dump an RSS feed for a Mercurial repository.
+#       - Cameron Simpson <cs@zip.com.au> 07oct2008
+#
+# TODO: Control port number.
+#       Surely there is a non-socket mode for this?
+#
+
+: ${TMPDIR:=/tmp}
+
+cmd=`basename "$0"`
+tmppid=$TMPDIR/$cmd.$$.pid
+port=`expr 32768 + $$ % 16384`  # pick an arbitrary port :-(
+
+if hg serve -d --pid-file "$tmppid" --port "$port"
+then
+  ( echo GET /rss-log HTTP/1.0
+    echo
+  ) \
+  | nc 127.0.0.1 "$port" \
+  | sed '1,/^$/d'
+fi
+
+pid=`cat "$tmppid"`
+rm "$tmppid"
+kill "$pid"
