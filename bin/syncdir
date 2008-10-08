@@ -32,8 +32,9 @@ xit=0
 for host
 do
   pfx "$host" \
-  rsync -avHPC --exclude=\*.swp --exclude=\*~ --delete "$dir/." "$host:$dir/." \
-  &
+    qrsync -aHPC --exclude=\*.swp --exclude=\*~ --delete \
+      "$dir/." "$host:$dir/." \
+      &
 done
 wait
 

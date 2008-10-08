@@ -36,7 +36,7 @@ then
     myke _all || exit 1
 fi
 
-rsync -avHPW --delete --exclude=CVS/ $zapdir/html/. sf:adzapper/htdocs/.
+qrsync -aHPW --delete --exclude=CVS/ $zapdir/html/. sf:adzapper/htdocs/.
 
 if [ $dopost ]
 then

@@ -43,7 +43,7 @@ set -ue
 ) \
 | cpio -pmd "$tmpdir"
 
-rsync -avHL --ignore-existing bin/synonyms/. "$tmpdir/bin/."
+qrsync -aHL --ignore-existing bin/synonyms/. "$tmpdir/bin/."
 
 cp $HOME/rc/java/au.com.zip.cs.jar "$tmpdir/lib/."
 for f in squid_redirect testpageurls testzap

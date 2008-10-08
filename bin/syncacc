@@ -19,8 +19,7 @@ case "$syncset" in
 esac
 
 cd || exit 1
-rsync -rlptHvC --delete --exclude=CVS/ --exclude=\*.swp --exclude=\*~ \
+qrsync -rlptHC --delete --exclude=CVS/ --exclude=\*.swp --exclude=\*~ \
       "--include-from=$syncset" \
       ${1+"$@"} \
-      "$from." "$to." \
-| sed -n '/[^/]$/p'
+      "$from." "$to."

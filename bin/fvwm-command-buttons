@@ -9,7 +9,7 @@
 
 delay=4 # delay before command to avoid overwriting title
 doit=
-geom=800x800-0-0
+geom=${X11_MONLEFT_DX}x${PIX_HIGH}+0-0
 ncols=2
 
 cmd=`basename "$0"`
@@ -77,8 +77,8 @@ nrows=`expr \( $ncmds + 1 \) / $ncols`
   while read -r cmdline <&3
   do
     cmdnum=`expr $cmdnum + 1`
-    qcmdline=`shqstr "sleep 5; $cmdline"`
-    qexecstr=`shqstr "Exec term -n ${name}_${cmdnum} -c $qcmdline &"`
+    qcmdline=`shqstr "sleep $delay; $cmdline"`
+    qexecstr=`shqstr "Exec sleep 5; term -n ${name}_${cmdnum} -c $qcmdline"`
     echo "(1x1+$xpos+$ypos, Swallow (SwallowNew, Close, NoHints) ${name}_${cmdnum} $qexecstr"
     ypos=`expr $ypos + 1`
     if [ $ypos = $nrows ]

@@ -3,7 +3,7 @@ set -x
 ezos=$HOME/@/ezos
 
 # copy active CGIs to live cgi dir
-rsync -rptlHv --delete --delete-excluded --exclude=CVS/ \
+qrsync -rptlH --delete --delete-excluded --exclude=CVS/ \
 	--include=.cgienv.sh \
 	--include=debug.cgi \
 	--include=search.cgi \

@@ -15,13 +15,13 @@ ezoscss=$ezoshtml/cs/css
 syncezos-rc
 
 pfx "$cmd ezos:public_html" \
-  rsync -rptlHv --delete \
+  qrsync -rptlH --delete \
 		--exclude=CVS/ \
 		--include=/cs --exclude=/cs/test/ \
 		--include=/fay \
 		--exclude=/* $ezoshtml/. ezos:public_html/.
 
 ##syncezos-cgi
-##rsync -avHPW --delete --exclude=CVS/ $ezoscgi/. ezos:cgi-bin/.
+##qrsync -aHPW --delete --exclude=CVS/ $ezoscgi/. ezos:cgi-bin/.
 
 putacc ezos
