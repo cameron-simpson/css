@@ -54,6 +54,7 @@ done
 cp $HOME/rc/java/au.com.zip.cs.jar "$tmpdir/lib/."
 
 hglog >"$tmpdir/CHANGELOG.txt"
+hg-rss >"$tmpdir/CHANGELOG.rss"
 
 ( cd bin; mkscriptndx * | sort ) >"$tmpdir/1INDEX.txt"
 set -x
