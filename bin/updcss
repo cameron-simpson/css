@@ -59,7 +59,7 @@ hg-rss >"$tmpdir/CHANGELOG.rss"
 ( cd bin; mkscriptndx * | sort ) >"$tmpdir/1INDEX.txt"
 set -x
 
-rsync -aH "$OPTCSS/man/." "$tmpdir/man/."
+qrsync -aH "$OPTCSS/man/." "$tmpdir/man/."
 myke "MANDIR=$tmpdir/man" _man || echo myke _man fails, ignoring...
 
 ##( cd "$tmpdir"
@@ -69,7 +69,7 @@ myke "MANDIR=$tmpdir/man" _man || echo myke _man fails, ignoring...
 ##)
 
 pfx "$OPTCSS" \
-  rsync -avH --delete --delete-excluded \
+  qrsync -aH --delete --delete-excluded \
         --include=CHANGELOG.txt \
         --include=/bin \
         --include=/etc \
@@ -81,7 +81,7 @@ pfx "$OPTCSS" \
 # ok, $OPTCSS now ready, use it to update the web stuff
 
 pfx "$cssweb" \
-  rsync -avH --delete \
+  qrsync -aH --delete \
     --include=/1INDEX.txt \
     --include=/CHANGELOG.txt \
     --include=/INSTALL \
