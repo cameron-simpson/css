@@ -84,6 +84,7 @@ pfx "$cssweb" \
   qrsync -aH --delete \
     --include=/1INDEX.txt \
     --include=/CHANGELOG.txt \
+    --include=/CHANGELOG.rss \
     --include=/INSTALL \
     --include=/bin \
     --include=/lib \
