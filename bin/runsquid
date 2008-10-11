@@ -82,10 +82,9 @@ case $op in
         echo "$cmd: $op: missing pid file: $pid_filename" >&2
         exit 1
       fi
-      pid=`cat "$pid_filename"`
-      if [ -z "$pid" ] || not kill -0 "$pid"
+      if not ifpid -q "$pid_filename" squid
       then
-        echo "$cmd: $op: no process: $pid" >&2
+        echo "$cmd: $op: no squid process for $pid_filename" >&2
         exit 1
       fi
       $trace "$SQUID_BINARY" -f "$SQUID_CONFIG" -k kill
