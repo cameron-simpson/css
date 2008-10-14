@@ -10,11 +10,9 @@
 
 trace=set-x
 once=
-if=en0
 stop=
 sshcfg=$HOME/rc/ssh/config-pf
 fwdcfg=$HOME/rc/ssh/portfwd
-testif=do-portfwd
 
 cmd=`basename "$0"`
 usage="Usage: $cmd [-1] [-stop] targets...
@@ -54,6 +52,21 @@ then
 fi
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+not()
+{ "$@" || return 0
+  return 1
+}
+
+ok2portfwd()
+{
+  flag PORTFWD_ANYWAY && return 0
+  flag PORTFWD_DISABLE && return 1
+  ssh-add -l >/dev/null || return 1
+  netstat -rn | grep '^default  *[1-9]' >/dev/null || return 1
+  [ -x "$HOME/bin-local/do-portfwd" ] || return 0
+  "$HOME/bin-local/do-portfwd"
+}
 
 # send SIGTERM to a process and wait for it to exit
 synckill()
@@ -141,7 +154,7 @@ do
         else
           monpid=
         fi
-        while kill -0 "$sshpid" && sh -c "$testif"
+        while kill -0 "$sshpid" && ok2portfwd
         do  sleep 2
         done
         if synckill "$sshpid"
@@ -154,8 +167,9 @@ do
         fi
         [ -z "$monpid" ] || kill "$monpid" 2>/dev/null
         [ $once ] && break
-        [ -z "$if" ] \
-        || await -d 2 -c "$testif"
+        while not ok2portfwd
+        do sleep 2
+        done
         first=
       done
     ) </dev/null 1>&2 &
