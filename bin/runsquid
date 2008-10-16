@@ -69,7 +69,7 @@ case $op in
       $trace "$0" $xopt -S "$SQUID_BINARY" -f "$SQUID_CONFIG" start
       ;;
   restart)
-      $trace "$0" $xopt -S "$SQUID_BINARY" -f "$SQUID_CONFIG" stop
+      $trace "$0" $xopt -S "$SQUID_BINARY" -f "$SQUID_CONFIG" stop || :
       $trace "$0" $xopt -S "$SQUID_BINARY" -f "$SQUID_CONFIG" start
       ;;
   start)
@@ -86,21 +86,23 @@ case $op in
       then
         echo "$cmd: $op: no squid process for $pid_filename" >&2
         exit 1
+      else
+        pid=`cat "$pid_filename"`
+        $trace "$SQUID_BINARY" -f "$SQUID_CONFIG" -k kill
+        waiting=
+        while kill -0 "$pid" 2>/dev/null
+        do
+          if [ $waiting ]
+          then
+            necho .
+          else
+            necho "$cmd: waiting for squid ($pid) to exit ..."
+            waiting=1
+          fi
+          sleep 1
+        done
+        echo
       fi
-      $trace "$SQUID_BINARY" -f "$SQUID_CONFIG" -k kill
-      waiting=
-      while kill -0 "$pid" 2>/dev/null
-      do
-        if [ $waiting ]
-        then
-          necho .
-        else
-          necho "$cmd: waiting for squid ($pid) to exit ..."
-          waiting=1
-        fi
-        sleep 1
-      done
-      echo
       ;;
   *)  echo "$cmd: unsupported operation: $op" >&2
       exit 1
