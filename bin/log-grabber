@@ -62,8 +62,14 @@ do
   if [ -s "$logfile" ]
   then
     rotlog=$logfile.`date "+$rotext"`
-    mv -- "$logfile" "$rotlog"
-    set-x "$@" < "$rotlog"
+    if mv -- "$logfile" "$rotlog"
+    then
+      ( set -x
+        LOG_GRABBER_INPUT_FILE=$rotlog
+        export LOG_GRABBER_INPUT_FILE
+        exec "$@" < "$rotlog"
+      )
+    fi
   fi
   sleep "$interval"
 done
