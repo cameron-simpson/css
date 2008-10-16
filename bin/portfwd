@@ -63,7 +63,7 @@ ok2portfwd()
   flag PORTFWD_ANYWAY && return 0
   flag PORTFWD_DISABLE && return 1
   ssh-add -l >/dev/null || return 1
-  netstat -rn | grep '^default  *[1-9]' >/dev/null || return 1
+  netstat -rn | egrep '^(default|0\.0\.0\.0) +[1-9]' >/dev/null || return 1
   [ -x "$HOME/bin-local/do-portfwd" ] || return 0
   "$HOME/bin-local/do-portfwd"
 }
