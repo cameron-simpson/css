@@ -64,14 +64,14 @@ do
     rotlog=$logfile.`date "+$rotext"`
     if mv -- "$logfile" "$rotlog"
     then
-      ( set -x
+      ( ##set -x
         LOG_GRABBER_INPUT_FILE=$rotlog
         export LOG_GRABBER_INPUT_FILE
         exec "$@" < "$rotlog"
       ) || :
     fi
   else
-    ( set -x
+    ( ##set -x
       LOG_GRABBER_INPUT_FILE=$logfile
       export LOG_GRABBER_INPUT_FILE
       exec "$@" < /dev/null
