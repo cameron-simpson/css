@@ -10,7 +10,7 @@ async=1
 
 ( for host
   do
-    pfx "$cmd $host" set-x rsync -avH --delete /opt/css/. "$host:/opt/css/." &
+    pfx "$cmd $host" set-x qrsync -aH --delete /opt/css/. "$host:/opt/css/." &
     [ $async ] || wait
   done
   wait
