@@ -1,7 +1,7 @@
 import os
 import os.path
 import cs.hier
-from cs.misc import debug, ifdebug, progress, verbose, warn
+from cs.misc import debug, ifdebug, progress, verbose, warn, DictUC_Attrs
 
 def get(secret,path=None):
   return Secret(secret,path=path)
@@ -16,7 +16,7 @@ def dfltpath():
     path=path.split(':')
   return path
 
-class Secret(dict):
+class Secret(DictUC_Attrs):
   def __init__(self,secret,path=None):
     if os.path.isabs(secret):
       S=cs.hier.load(secret)
