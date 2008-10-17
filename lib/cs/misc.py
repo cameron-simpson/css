@@ -294,6 +294,28 @@ class Loggable:
     t, result = self.logTime2(tag, func, *args, **kw)
     return result
 
+class NoExceptions(object):
+  ''' A context manager to catch _all_ exceptions and log them.
+      Arguably this should be a bare try...except but that's syntacticly
+      noisy and separates the catch from the top.
+  '''
+  def __init__(self,handleException):
+    ''' Initialse the NoExceptions context manager.
+        The handleException is a callable which
+        expects (exc_type, exc_value, traceback)
+        and returns True or False for the __exit__
+        method of the manager.
+        If handleException is None, the __exit__ method
+        always returns True (exception suppressed).
+    '''
+    self.__handler=handleException
+  def __enter__(self):
+    pass
+  def __exit__(self, exc_type, exc_value, traceback):
+    if self.__handler is None:
+      return True
+    return self.__handler(exc_type, exc_value, traceback)
+
 T_SEQ = 'ARRAY'
 T_MAP = 'HASH'
 T_SCALAR = 'SCALAR'
