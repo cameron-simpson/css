@@ -8,7 +8,7 @@ cmd=$0
 usage="Usage: $cmd [-c colour] [echo-args...]"
 
 : ${LOGDIR:=$HOME/var/log}
-: ${ALERTLOG:=$LOGDIR/alert}
+: ${ALERTLOG:=$LOGDIR/alert-local}
 exec >>"$ALERTLOG"
 badopts=
 colour=
