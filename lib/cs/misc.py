@@ -251,7 +251,7 @@ def reportElapsedTimeTo(logfunc, tag, func, *args, **kw):
     old = out("%.100s" % " ".join((cmd_, tag, "...")))
   t0, t1, result = elapsedTime(func, *args, **kw)
   t = t1-t0
-  if t >= 0.01:
+  if True: ##t >= 0.01:
     if logfunc is None:
       logfunc = logLine
     logfunc("TIME %6.4fs %s"%(t, tag))
