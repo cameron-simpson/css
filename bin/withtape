@@ -8,13 +8,15 @@
 : ${TAPE:='/dev/tape'}
 
 trace=set-x
+echo=echo
 
 cmd=`basename "$0"` || cmd=$0
-usage="Usage: $cmd [-f filenum] -j jukeslot [-l logfile] [-t tapedev] command [args...]
+usage="Usage: $cmd -j jukeslot [options...] command [args...]
   -f filenum    Advance the tape to this file position. Default: 0
   -j jukeslot   Load the tape from this jukebox slot.
                 \"NONE\" means no jukebox actions.
   -l logfile    Log the command to a log file.
+  -n            No action. Recite planned actions.
   -t tapedev    Specify the tape device. Default from \$TAPE: $TAPE"
 
 jukeslot=
@@ -28,6 +30,7 @@ do
   case $1 in
     -f) filenum=$2; shift ;;
     -j)	jukeslot=$2; shift ;;
+    -n) trace=eecho echo=eecho ;;
     -l) logfile=$2; shift ;;
     -t)	TAPE=$2; shift ;;
     --)	shift; break ;;
@@ -63,7 +66,7 @@ then
   then
     $trace "$@"
     xit=$?
-    [ -z "$logfile" ] || echo "`date --iso` jukeslot $jukeslot ($label) tape $TAPE file $filenum: $*" >>"$logfile"
+    [ -z "$logfile" ] || $echo "`date --iso` jukeslot $jukeslot ($label) tape $TAPE file $filenum: $*" >>"$logfile"
     $trace mt rewind || xit=1
     $trace mt offline || xit=1
   fi
