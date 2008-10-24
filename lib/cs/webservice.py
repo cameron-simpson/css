@@ -52,15 +52,15 @@ def callSOAP(url,action,xml,retAction,retTypecode,onerror=None):
   rq.add_header('Accept-Encoding', 'identity')
   rq.add_header('Soapaction', '"%s"'%action)
   rq.add_header('Content-Type', 'text/xml; charset="utf-8"')
-  U=reportElapsedTime('call action %s at %s with %d bytes of XML'
+  U=reportElapsedTime('callSOAP(%s): call %s with %d bytes of XML'
                         % (action,url,len(xml)),
                       urllib2.urlopen,rq)
   I=U.info()
   assert I.type in ('text/xml', 'application/soap+xml'), \
          "%s: expected text/xml, got \"%s\" from %s %s" % (cmd,I.type,action,url)
   retxml=''.join(U.readlines())
-  ret=reportElapsedTime('decode %d bytes of %s response'
-                          % (len(retxml),retAction),
+  ret=reportElapsedTime('callSOAP(%s): decode %d bytes of %s response'
+                          % (action,len(retxml),retAction),
                         xml2pyobj,retxml,retTypecode)
   return ret
 
