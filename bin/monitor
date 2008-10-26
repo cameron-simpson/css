@@ -13,28 +13,29 @@ $WINDOW=5;
 $CHECKFN=sub { /error/i; };
 
 ARGV:
-  while (@ARGV)
-	{ $_=shift(@ARGV);
-	  if (/^\d+$/)			{ $WINDOW=$_+0; }
-	  elsif (m:^/: && m:/[io]*$:)	{ $CHECKFN=eval "sub { $_; }";
-					  die $@ if $@;
-					}
-	  else
-	  { unshift(@ARGV,$_);
-	    last ARGV;
-	  }
-	}
+while (@ARGV)
+{ $_=shift(@ARGV);
+  if (/^\d+$/)			{ $WINDOW=$_+0; }
+  elsif (m:^/: && m:/[io]*$:)	{ $CHECKFN=eval "sub { $_; }";
+                                  die $@ if $@;
+                                }
+  else
+  { unshift(@ARGV,$_);
+    last ARGV;
+  }
+}
 
 $file=shift(@ARGV);
 
 if (! defined $file || $file eq '-')
-	{ $s=new cs::Source FILE, STDIN;
-	}
+{ $s=new cs::Source FILE, STDIN;
+}
 elsif (! -f "$file")
-	{ die "$file is not a regular file";
-	}
-else	{ $s=new cs::Source TAIL, $file;
-	}
+{ die "$file is not a regular file";
+}
+else
+{ $s=new cs::Source TAIL, $file;
+}
 
 die "can't attach to \"$file\"" if ! defined $s;
 
@@ -43,40 +44,40 @@ $m=new cs::Monitor $s, $CHECKFN, $WINDOW;
 die "can't make monitor for $file" if ! defined $m;
 
 LINE:
-  while (defined ($p=$m->Poll()))
-	{ if (! ref $p)
-		# uninteresting
-		{ # EOF
-		  if (! length $p)
-			{ sleep 1;
-			  next LINE;
-			}
+while (defined ($p=$m->Poll()))
+{ if (! ref $p)
+  # uninteresting
+  { # EOF
+    if (! length $p)
+          { sleep 1;
+            next LINE;
+          }
 
-		  chomp($p);
-		  $p =~ s/\s+$//;
+    chomp($p);
+    $p =~ s/\s+$//;
 
-		  # tail end of context?
-		  if ($m->{INTERESTING} > 0)
-			{ nl('  ', $p); }
-		  else	{ out('  ', $p); }
+    # tail end of context?
+    if ($m->{INTERESTING} > 0)
+          { nl('  ', $p); }
+    else	{ out('  ', $p); }
 
-		  next LINE;
-		}
+    next LINE;
+  }
 
-	  if ($p->{SKIPPED} > 0)
-		{ nl('');
-		  nl("[skipped ", $p->{SKIPPED}, " lines]");
-		}
+  if ($p->{SKIPPED} > 0)
+  { nl('');
+    nl("[skipped ", $p->{SKIPPED}, " lines]");
+  }
 
-	  for $b (@{$p->{BEFORE}})
-		{ chomp($b);
-		  $b =~ s/\s+$//;
-		  nl('  ', $b);
-		}
+  for $b (@{$p->{BEFORE}})
+  { chomp($b);
+    $b =~ s/\s+$//;
+    nl('  ', $b);
+  }
 
-	  $_=$p->{LINE};
-	  chomp;
-	  s/\s+$//;
+  $_=$p->{LINE};
+  chomp;
+  s/\s+$//;
 
-	  nl('> ', $_);
-	}
+  nl('> ', $_);
+}
