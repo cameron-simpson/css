@@ -306,15 +306,17 @@ class NoExceptions(object):
         and returns True or False for the __exit__
         method of the manager.
         If handleException is None, the __exit__ method
-        always returns True (exception suppressed).
+        always returns True, suppressing any exception.
     '''
     self.__handler=handleException
   def __enter__(self):
     pass
   def __exit__(self, exc_type, exc_value, traceback):
-    if self.__handler is None:
-      return True
-    return self.__handler(exc_type, exc_value, traceback)
+    if self.__handler is not None:
+      return self.__handler(exc_type, exc_value, traceback)
+    if exc_type is not None:
+      print >>sys.stderr, "ignore %s" % (exc_type,)
+    return True
 
 T_SEQ = 'ARRAY'
 T_MAP = 'HASH'
