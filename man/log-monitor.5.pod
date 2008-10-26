@@ -27,7 +27,7 @@ This clause matches typical sshd(8) messages in a syslog(5) file.
 
 A clause whose name commences with a slash ('/')
 specifies a log file to monitor for matches.
-Each field in the clause specifies a test with a match rule and an action.
+Each field in the clause specifies a test with a match clause name and an action.
 Each field name must be distinct within the clause.
 The field value consists of a word naming a match clause
 and an action to take when it occurs.
