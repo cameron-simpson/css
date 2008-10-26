@@ -1,0 +1,90 @@
+#!/usr/bin/python -tt
+#
+# Read lines from the standard input. On a periodic basis, pipe them to
+# a subsidiary command.
+#       - Cameron Simpson <cs@zip.com.au> 26oct2008
+#
+
+from __future__ import with_statement
+import sys
+import time
+from thread import allocate_lock
+from threading import Thread
+from cs.misc import NoExceptions
+from cs.sh import vpopen
+
+delay=300
+
+cmd=sys.argv[0]
+usage="Usage: %s [-d delay] report-command..." % cmd
+
+args=sys.argv[1:]
+if len(args) > 0 and args[0] == '-d':
+  args.pop(0)
+  delay=int(args.pop(0))
+if len(args) < 1:
+  print >>sys.stderr, "%s: missing report-command" % cmd
+  print >>sys.stderr, usage
+  sys.exit(2)
+
+lines=[]
+lines_lock=allocate_lock()
+lines_limit=None
+lines_count=0
+
+def _reset_lines():
+  # Note: does _not_ take the lock.
+  global lines
+  global lines_count
+  lines=[]
+  lines_count=0
+
+def grab_lines():
+  global lines
+  global lines_lock
+  with lines_lock:
+    glines=lines
+    gcount=lines_count
+    _reset_lines()
+  return glines, gcount
+
+def save_line(line):
+  global lines
+  global lines_lock
+  global lines_limit
+  global lines_count
+  with lines_lock:
+    if lines_limit is None or len(lines) < lines_limit:
+      lines.append(line)
+    lines_count+=1
+
+periodic_running=True
+def periodic(period,argv,reportEmpty=False):
+  global periodic_running
+  while periodic_running:
+    ##with NoExceptions(None):
+    if True:
+      print >>sys.stderr, "sleep(%d)..." % period
+      time.sleep(period)
+      rlines, rcount = grab_lines()
+      print >>sys.stderr, "len(rlines)=%d, rcount=%d" % (len(rlines), rcount)
+      if reportEmpty or len(rlines) > 0:
+        print >>sys.stderr, "vpopen(%s)" % (argv,)
+        fp=vpopen(argv,"w")
+        print >>sys.stderr, "fp=%s" % (`fp`,)
+        fp.write("%d\n" % rcount)
+        for line in rlines:
+          fp.write(line)
+        fp.close()
+
+P=Thread(target=periodic, args=(delay, args, False))
+P.start()
+
+while True:
+  line=sys.stdin.readline()
+  if len(line) == 0:
+    break
+  save_line(line)
+
+periodic_running=False
+P.join()
