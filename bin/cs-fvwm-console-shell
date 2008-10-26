@@ -1,0 +1,7 @@
+#!/bin/sh
+#
+# Run a shell and tell FVWM that it is the "console" shell.
+#       - Cameron Simpson <cs@zip.com.au> 18oct2008
+#
+fvwmcmd "SetEnv _FVWM_CONSOLE_WINDOWID $WINDOWID" &
+exec ${SHELL:-sh}
