@@ -27,9 +27,13 @@ while len(args) > 0:
   if args[0] == '-0':
     args.pop(0)
     reportEmpty=True
+    continue
   if args[0] == '-d':
     args.pop(0)
     delay=int(args.pop(0))
+    continue
+  break
+
 if len(args) < 1:
   print >>sys.stderr, "%s: missing report-command" % cmd
   print >>sys.stderr, usage
