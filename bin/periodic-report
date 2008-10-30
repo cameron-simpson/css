@@ -14,14 +14,22 @@ from cs.misc import NoExceptions
 from cs.sh import vpopen
 
 delay=300
+reportEmpty=False
 
 cmd=sys.argv[0]
-usage="Usage: %s [-d delay] report-command..." % cmd
+usage='''Usage: %s [-0] [-d delay] report-command...
+  -0            Run the report-command even if there have been no input lines.
+  -d delay      Run the report-command every 'delay' seconds. Default: %d''' \
+  % (cmd, delay)
 
 args=sys.argv[1:]
-if len(args) > 0 and args[0] == '-d':
-  args.pop(0)
-  delay=int(args.pop(0))
+while len(args) > 0:
+  if args[0] == '-0':
+    args.pop(0)
+    reportEmpty=True
+  if args[0] == '-d':
+    args.pop(0)
+    delay=int(args.pop(0))
 if len(args) < 1:
   print >>sys.stderr, "%s: missing report-command" % cmd
   print >>sys.stderr, usage
@@ -64,20 +72,16 @@ def periodic(period,argv,reportEmpty=False):
   while periodic_running:
     ##with NoExceptions(None):
     if True:
-      print >>sys.stderr, "sleep(%d)..." % period
       time.sleep(period)
       rlines, rcount = grab_lines()
-      print >>sys.stderr, "len(rlines)=%d, rcount=%d" % (len(rlines), rcount)
       if reportEmpty or len(rlines) > 0:
-        print >>sys.stderr, "vpopen(%s)" % (argv,)
         fp=vpopen(argv,"w")
-        print >>sys.stderr, "fp=%s" % (`fp`,)
         fp.write("%d\n" % rcount)
         for line in rlines:
           fp.write(line)
         fp.close()
 
-P=Thread(target=periodic, args=(delay, args, False))
+P=Thread(target=periodic, args=(delay, args, reportEmpty))
 P.start()
 
 while True:
