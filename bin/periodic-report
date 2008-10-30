@@ -1,4 +1,4 @@
-#!/usr/bin/python -tt
+#!/usr/bin/env python2.5
 #
 # Read lines from the standard input. On a periodic basis, pipe them to
 # a subsidiary command.
