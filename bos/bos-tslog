@@ -6,12 +6,13 @@
 
 : ${TMPDIR:=/tmp}
 : ${USER:=`id -un`} || exit 1
+basedir=/home/cskk/bos/timesheets
 
 cmd=`basename "$0"` || exit 1
-usage="Usage: $cmd [-d datespec] headline"
+usage="Usage: $cmd [-d datespec] [-u user] headline"
 
 when=
-tsdir=${BOS_TIMESHEETS:-/home/cskk/bos/timesheets}
+tsdir=${BOS_TIMESHEETS:-$basedir/$USER}
 
 badopts=
 
@@ -19,6 +20,7 @@ while [ $# -gt 0 ]
 do
   case "$1" in
     -d) when=$2; shift ;;
+    -u) tsdir=$basedir/$2; shift ;;
     --) shift; break ;;
     -?*)echo "$cmd: unexpected argument: $1" >&2
         badopts=1
