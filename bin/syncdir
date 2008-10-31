@@ -32,7 +32,7 @@ xit=0
 for host
 do
   pfx "$host" \
-    qrsync -aHPC --exclude=\*.swp --exclude=\*~ --delete \
+    qrsync -aHC --exclude=\*.swp --exclude=\*~ --delete \
       "$dir/." "$host:$dir/." \
       &
 done
