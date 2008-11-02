@@ -92,113 +92,74 @@ xit=0
 
 lastbase=
 lasthost=
-for target in $targets ##`printf "%s\n" "$targets" | tr , ' '`
+for target in `hostlist "$targets"`
 do
-  while [ -n "$target" ]
-  do
-    tpfx=`expr "x$target" : 'x\([^,/]*\).*'` || :
-    tsfx=`expr "x$target" : 'x[^,/]*\(.*\)'` || :
-    ##echo "1: target=[$target], tpfx=[$tpfx], tsfx=[$tsfx]" >&2
-    # skip empty stuff
-    case $tsfx in
-      # /{scr1,scr2,...}
-      /{*}*)
-        ##echo "/{...}" >&2
-        scrlist=`expr "x$tsfx" : 'x..\([^}]*\)}.*'`
-        tsfx=`   expr "x$tsfx" : 'x..[^}]*}\(.*\)'`
-        ;;
-      # /scr1
-      /*)
-        ##echo "/scr" >&2
-        scrlist=`expr "x$tsfx" : 'x.\([^,]*\).*'`
-        tsfx=`   expr "x$tsfx" : 'x.[^,]*\(.*\)'`
-        ;;
-      *)
-        ##echo "no /scr" >&2
-        scrlist=
+  case "$target" in
+    */*)
+      host=`   expr "x$target" : 'x\(.*\)/.*'`
+      scrlist=`expr "x$target" : 'x.*/\(.*\)'`
+      ;;
+    *)host=$target
+      scrlist=
+      ;;
+  esac
+
+  if [ -z "$scrlist" ] && [ $allscreens ]
+  then
+    scrlist='*'
+  fi
+  if [ -n "$scrlist" ]
+  then
+    case "$scrlist" in
+      *\**) 
+        rscrlist=`envssh $RTERM_SSHOPTS $sshopts -- "$host" exec scr | sed -n 's/^ *[1-9][0-9]*  *[1-9][0-9]*\.\([^_].*\)/\1/p' | sort -u`
         ;;
     esac
-    # prepare target for next loop iteration
-    target=`expr "x$tsfx" : 'x,*\(.*\)'` || :
-    ##echo "2: tpfx=[$tpfx], tsfx=[$tsfx], scrlist=[$scrlist], target=[$target]" >&2
-    [ -n "$tpfx" ] || continue
+  fi
 
-    case "$tpfx" in
-      [0-9])
-        [ -n "$lastbase" ] \
-        || { echo "$cmd: no previous hostN name, skipping: $tpfx" >&2
-             xit=1
-             continue
-           }
-        host=$lastbase$tpfx
-        ;;
-      [a-z]*[0-9])
-        host=$tpfx
-        lastbase=`expr "x$tpfx" : 'x\(.*[^0-9]\)[0-9]*'` || xit=1
-        ;;
-      *)host=$tpfx
-        lastbase=
-        ;;
-    esac
-    lasthost=$host
+  (
+    [ -n "$name" ] || name=$host
 
-    if [ -z "$scrlist" ] && [ $allscreens ]
-    then
-      scrlist='*'
-    fi
     if [ -n "$scrlist" ]
     then
-      case "$scrlist" in
-        *\**) 
-          rscrlist=`envssh $RTERM_SSHOPTS $sshopts -- "$host" exec scr | sed -n 's/^ *[1-9][0-9]*  *[1-9][0-9]*\.\([^_].*\)/\1/p' | sort -u`
-          ;;
-      esac
+      xit=0
+      for scrptn in `printf "%s\n" "$scrlist" | tr , ' '`
+      do
+        set --
+        case "$scrptn" in
+          *\**)
+            for rscr in $rscrlist
+            do
+              eval 'case "$rscr" in '"$scrptn"') set -- ${1+"$@"} "$rscr" ;; esac'
+            done
+            if [ $# = 0 ]
+            then
+              echo "$cmd: warning: no screens at \$host matching \"$scrptn\"" >&2
+            fi
+            ;;
+          *)set -- ${1+"$@"} "$scrptn"
+            ;;
+        esac
+        for scr
+        do
+          $trace term -n "$name/$scr" \
+               -e envssh $RTERM_SSHOPTS $sshopts -- "$host" "exec scr $scr" \
+          || xit=1
+        done
+      done
+      exit $xit
     fi
 
-    (
-      [ -n "$name" ] || name=$host
+    # no command? just run the preferred shell
+    [ $# = 0 ] && set -- sh -c '[ -s /opt/css/env.sh ] && . /opt/css/env.sh; exec $SHELL'
 
-      if [ -n "$scrlist" ]
-      then
-        xit=0
-        for scrptn in `printf "%s\n" "$scrlist" | tr , ' '`
-        do
-          set --
-          case "$scrptn" in
-            *\**)
-              for rscr in $rscrlist
-              do
-                eval 'case "$rscr" in '"$scrptn"') set -- ${1+"$@"} "$rscr" ;; esac'
-              done
-              if [ $# = 0 ]
-              then
-                echo "$cmd: warning: no screens at \$host matching \"$scrptn\"" >&2
-              fi
-              ;;
-            *)set -- ${1+"$@"} "$scrptn"
-              ;;
-          esac
-          for scr
-          do
-            $trace term -n "$name/$scr" \
-                 -e envssh $RTERM_SSHOPTS $sshopts -- "$host" "exec scr $scr" \
-            || xit=1
-          done
-        done
-        exit $xit
-      fi
+    [ $doscreen ] && set -- scr '_$$' "$@"
+    qcmd=exec\ `shqstr "$@"`
+    set -- envssh $RTERM_SSHOPTS $sshx11opt $sshopts -- "$host" "$qcmd"
+    [ $doscript ] && set -- logscript -m "$name: $msg" $nomsgopt -- "$name" "$@"
 
-      # no command? just run the preferred shell
-      [ $# = 0 ] && set -- sh -c '[ -s /opt/css/env.sh ] && . /opt/css/env.sh; exec $SHELL'
-
-      [ $doscreen ] && set -- scr '_$$' "$@"
-      qcmd=exec\ `shqstr "$@"`
-      set -- envssh $RTERM_SSHOPTS $sshx11opt $sshopts -- "$host" "$qcmd"
-      [ $doscript ] && set -- logscript -m "$name: $msg" $nomsgopt -- "$name" "$@"
-
-      exec $trace term $termopts -n "$name" -e "$@"
-    ) || xit=1
-  done
+    exec $trace term $termopts -n "$name" -e "$@"
+  ) || xit=1
 done
 
 exit $xit

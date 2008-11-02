@@ -1,0 +1,69 @@
+#!/bin/sh -ue
+#
+# Convert a list of hosts with sequential shorthand into long list.
+# This syntax is lifted from the "@" command, and supports a /tag
+# suffix to indicate connection to a remote screen session.
+#
+# Supports the following syntax:
+#  host         A hostname.
+#  hostN,M,...  A series of hostnames with numeric suffices numbered N, M, etc.
+#  host/tag or host/{tag,...}
+#               Optional tags which are preserved.
+#               On some shells the { will need escaping by the caller.
+# - Cameron Simpson <cs@zip.com.au> 02nov2008
+#
+
+for target
+do
+  while [ -n "$target" ]
+  do
+    tpfx=`expr "x$target" : 'x\([^,/]*\).*'` || :
+    tsfx=`expr "x$target" : 'x[^,/]*\(.*\)'` || :
+    ##echo "1: target=[$target], tpfx=[$tpfx], tsfx=[$tsfx]" >&2
+    # skip empty stuff
+    case $tsfx in
+      # /{scr1,scr2,...}
+      /{*}*)
+        ##echo "/{...}" >&2
+        scrlist=`expr "x$tsfx" : 'x..\([^}]*\)}.*'`
+        tsfx=`   expr "x$tsfx" : 'x..[^}]*}\(.*\)'`
+        ;;
+      # /scr1
+      /*)
+        ##echo "/scr" >&2
+        scrlist=`expr "x$tsfx" : 'x.\([^,]*\).*'`
+        tsfx=`   expr "x$tsfx" : 'x.[^,]*\(.*\)'`
+        ;;
+      *)
+        ##echo "no /scr" >&2
+        scrlist=
+        ;;
+    esac
+    # prepare target for next loop iteration
+    target=`expr "x$tsfx" : 'x,*\(.*\)'` || :
+    ##echo "2: tpfx=[$tpfx], tsfx=[$tsfx], scrlist=[$scrlist], target=[$target]" >&2
+    [ -n "$tpfx" ] || continue
+
+    case "$tpfx" in
+      [0-9]|[1-9][0-9])
+        [ -n "$lastbase" ] \
+        || { echo "$cmd: no previous hostN name, skipping: $tpfx" >&2
+             xit=1
+             continue
+           }
+        host=$lastbase$tpfx
+        ;;
+      [a-z]*[0-9])
+        host=$tpfx
+        lastbase=`expr "x$tpfx" : 'x\(.*[^0-9]\)[0-9]*'` || xit=1
+        ;;
+      *)host=$tpfx
+        lastbase=
+        ;;
+    esac
+    lasthost=$host
+
+    [ -z "$scrlist" ] || host=$host/$scrlist
+    echo "$host"
+  done
+done
