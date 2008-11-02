@@ -1,7 +1,15 @@
 #!/bin/sh -ue
 
+: ${USER:=`id -un`}
+
 [ $# = 1 ] || { echo "Usage: $0 date" >&2; exit 2; }
 tsdate=`monday "$1"`
-tsdir=$HOME/bos/timesheets
+tsdir=$HOME/bos/timesheets/$USER
 tsfile=$tsdir/$tsdate
-[ -s "$tsfile" ] || ( set -x; exec bos-mktimesheet -d "$tsdate" >>"$tsfile")
+if [ ! -s "$tsfile" ]
+then
+  ( set -x
+    bos-mktimesheet -d "$tsdate" >>"$tsfile"
+    cat "$tsfile"
+  ) | mailsubj -s "new timesheet file at $tsfile" "$USER"
+fi
