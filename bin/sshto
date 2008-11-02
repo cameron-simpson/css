@@ -20,6 +20,14 @@ mycfg=$HOME/.ssh/config
 topt=
 fopt=
 presh=
+
+cmd=`basename "$0"` || cmd=$0
+usage="Usage: $cmd [ssh-options...] [sshcfg=value...] [user@]host[![user2@]host2...] [command ...]
+	ssh-options...	Passed to all ssh commands.
+	sshcfg=value	Transmuted to -o 'sshcfg value' and added to ssh-option.
+	-z, +z		Pass -o Compression yes/no to ssh.
+	-E		Run login setup at far end."
+
 env_presh=': set -vx
            exec 3<&0 4>&1 </dev/null >&2
 	   [ -s /etc/profile ] && . /etc/profile
@@ -40,13 +48,6 @@ env_presh=': set -vx
 	   [ -s /opt/css/env.sh ] && . /opt/css/env.sh
            exec <&3 3<&- >&4 4>&-
 	  '
-
-cmd=`basename "$0"` || cmd=$0
-usage="Usage: $cmd [ssh-options...] [sshcfg=value...] [user@]host[![user2@]host2...] [command ...]
-	ssh-options...	Passed to all ssh commands.
-	sshcfg=value	Transmuted to -o 'sshcfg value' and added to ssh-option.
-	-z, +z		Pass -o Compression yes/no to ssh.
-	-E		Run login setup at far end."
 
 set -- $SSHTO_OPTS ${1+"$@"}
 
