@@ -488,7 +488,7 @@ def c2p(ifp,ofp):
       continue
 
     line0=line
-    ruledesc="%s, line %d: %s" % (ifp.name, lineno, line.replace('\n','; '))
+    ruledesc="%s: %s" % (ifp.name, line.replace('\n','; '))
     if len(ruledesc) > 200:
       ruledesc=ruledesc[:197]+'...'
 
