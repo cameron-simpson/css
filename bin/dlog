@@ -8,4 +8,5 @@ case "$logname" in /*) ;; *) logname=$LOGDIR/$logname ;; esac
 
 ts=`date -d "$DLOG_WHEN" '+%Y-%m-%d-%H:%M:%S'`
 echo "$ts $*" >>"$LOGDIR/dlog-quick"
-exec note -d "$DLOG_WHEN" "$logname" "$*"
+##exec note -d "$DLOG_WHEN" "$logname" "$*"
+exec buglog -B dlog "$*"
