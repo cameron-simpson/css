@@ -8,7 +8,7 @@ cmd=`basename "$0"` || cmd=$0
 async=1
 [ $# = 0 ] && { echo "Usage: $cmd hosts..." >&2; exit 2; }
 
-( for host
+( for host in `hostlist "$@"`
   do
     pfx "$cmd $host" set-x qrsync -aH --delete /opt/css/. "$host:/opt/css/." &
     [ $async ] || wait
