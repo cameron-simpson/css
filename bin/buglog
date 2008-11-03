@@ -24,7 +24,11 @@
 readstdin=1
 
 cmd=`basename "$0"`
-usage="Usage: $cmd [-B bugsystems] [-n] headline < description"
+usage="Usage: $cmd [-B bugsystems] [-n] headline < description
+  -B bugsystems Space separated list of bugsystems to consider.
+                Default from \$BUGSYSTEMS or \`bugsystems\`:
+                $BUGSYSTEMS
+  -n            No description on input."
 
 badopts=
 
