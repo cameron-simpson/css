@@ -8,7 +8,7 @@
 : ${DIFFOPTS='-c'}
 
 cmd=`basename "$0"`
-usage="Usage: $cmd [-0] [-v] filename [command args...]
+usage="Usage: $cmd [options...] [--] filename [command args...]
 	-0	Rewrite the file even if the input is empty.
 	-d	Do a diff of the file changes.
         -n      No action. Recite underlying commands.
