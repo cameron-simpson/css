@@ -1,0 +1,58 @@
+#!/bin/sh -ue
+#
+# Decode/edit/recode/rewriteif chain to filter things like gzipped files.
+# "decco": inverse of "codec".
+# This is faster and uses less disc space than decco-edit, but less flexible.
+#       - Cameron Simpson <cs@zip.com.au> 05nov2008
+#
+
+: ${TMPDIR:=/tmp}
+
+cmd=`basename "$0"`
+usage="Usage: $cmd filename filter-command..."
+
+trace=set-x
+filename=
+
+badopts=
+
+if [ $# = 0 ]
+then
+  echo "$cmd: missing filename" >&2
+  badopts=
+else
+  filename=$1
+  shift
+  if [ $# = 0 ]
+  then
+    echo "$cmd: missing filter-command" >&2
+    badopts=1
+  fi
+fi
+
+case "$filename" in
+  *.gz) decode=gunzip encode='gzip -n' ;;
+  *.Z)  decode=uncompress encode='compress' ;;
+  *.gpg): ${GPGID:=$EMAIL}; export GPGID
+        decode='gpg -d' encode='gpg -e -r "$GPGID"'
+        ;;
+  *)    echo "$cmd: $filename: I don't know how to decode/encode this" >&2
+        badopts=1
+        ;;
+esac
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+if [ ! -f "$filename" -o ! -r "$filename" -o ! -s "$filename" ]
+then
+  ls -ld -- "$filename" >&2 || :
+  echo "$cmd: $filename: expected readble non-empty file, aborting" >&2
+  exit 1
+fi
+
+tmpf=$TMPDIR/$cmd.$$
+trap 'rm -f "$tmpf".*' 0
+trap 'rm -f "$tmpf".*; exit 1' 1 2 13 15
+
+$trace sh -c "$decode" <"$filename" | $trace "$@" >"$tmpf.filter"
+$trace rewriteif -- "$filename" sh -c "$encode" <"$tmpf.filter"

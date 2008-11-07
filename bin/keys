@@ -1,16 +1,21 @@
-#!/bin/sh -u
-base=
-usage="Usage: $0 [base]"
-[ $# = 0 ] || { base=$1; shift; }
-[ $# = 0 ] || { echo "$usage" >&2; exit 2; }
-[ -n "$base" ] || base=`basename "$0"`
+#!/bin/sh -ue
+#
+# Open the specified GPG file for editing.
+#       - Cameron Simpson <cs@zip.com.au>
+#
+
+cmd=$0
+usage="Usage: $cmd [base]"
+
+trace=set-x
+file=$HOME/rc/secret-gpg/keys.gpg
+
+TMPDIR=$HOME/private/tmp
+export TMPDIR
 umask 077
-case "$base" in
-  /* | ./* | ../* ) file=$base ;;
-  *)		    file=$HOME/rc/secret-gpg/$base ;;
-esac
-case "$file" in
-  *.gpg) ;;
-  *)	 file=$file.gpg ;;
-esac
-exec e "$file"
+[ -d "$TMPDIR/." ] || mkdir -p "$TMPDIR"
+
+[ $# = 0 ] || { file=$1; shift; }
+[ $# = 0 ] || { echo "$usage" >&2; exit 2; }
+[ -s "$file" ] || { echo "$cmd: $file: missing/empty file" >&2; exit 1; }
+exec $trace decco-edit "$file" "${EDITOR:-vi}"
