@@ -1,3 +1,4 @@
+import sys
 from email.utils import parseaddr, getaddresses, formataddr
 from cs.misc import cmderr, verbose
 
@@ -38,7 +39,12 @@ def loadAddresses(addresses,catmap=None,addrmap=None):
     if len(line) == 0 or line[0] == '#':
       continue
 
-    cats, addr = line.split(None,1)
+    try:
+      cats, addr = line.split(None,1)
+    except ValueError:
+      print >>sys.stderr, "%s: %s: %d: bad syntax: %s" % (sys.argv[0], addresses, lineno, line)
+      continue
+
     if addr.startswith('mailto:'):
       addr=addr[7:]
     cats=cats.split(',')
