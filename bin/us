@@ -12,7 +12,7 @@
 : ${OS:=`uname -s|tr '[A-Z]' '[a-z]'`}
 
 case "$OS,$DISPLAY" in
-  darwin, | *,?*) ;;
+  darwin,* | *,?*) ;;
   *) echo "$0: no \$DISPLAY!" >&2; exit 1 ;;
 esac
 

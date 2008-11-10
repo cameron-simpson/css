@@ -109,7 +109,7 @@ eval "$URLSHOW_FILTER" \
 } \
 | \
 case "$OS,$BROWSER_DISPLAY,$URLSHOW_BROWSER" in
-  darwin,,*)
+  darwin,*,*)
     open -a "$URLSHOW_BROWSER" `cat`
     ;;
   *,mozilla | *,firefox)
