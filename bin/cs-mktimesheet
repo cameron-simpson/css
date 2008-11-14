@@ -1,0 +1,49 @@
+#!/bin/sh -ue
+#
+# Emit a timesheet based on my daily logs.
+#       - Cameron Simpson <cs@zip.com.au> 14mar2008
+#
+
+: ${LOGDIR:=$HOME/var/log}
+
+when=today
+
+cmd=`basename "$0"`
+usage="Usage: $cmd [-d when] category"
+
+badopts=
+
+if [ $# -gt 0 ] && [ "x$1" = x-d ]
+then
+  when=$2; shift; shift
+fi
+
+if [ $# = 0 ]
+then
+  echo "$cmd: missing category" >&2
+  badopts=1
+else
+  category=$1
+  shift
+  rcdir=$HOME/private/rc/timesheets/$category
+  footer=$rcdir/footer.txt
+  [ -s "$footer" ] || { echo "$cmd: missing $footer" >&2; badopts=1; }
+fi
+
+[ $# = 0 ] || { echo "$cmd: extra arguments: $*" >&2; badopts=1; }
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+day=`monday "$when"`
+
+for n in 0 1 2 3 4 5 6
+do
+  ymd=`date -d "$day" '+%Y-%m-%d'`
+  wday=`date -d "$day" '+%A'`
+  log=$LOGDIR/daily/$ymd/$category
+  echo "$ymd $wday"
+  [ -s "$log" ] && sed 's/^/  /' "$log"
+  day=`date -d "$ymd tomorrow"`
+done
+
+cat "$footer"
