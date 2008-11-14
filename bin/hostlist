@@ -13,6 +13,8 @@
 # - Cameron Simpson <cs@zip.com.au> 02nov2008
 #
 
+cmd=`basename "$0"`
+
 for target
 do
   while [ -n "$target" ]
