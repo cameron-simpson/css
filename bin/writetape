@@ -1,0 +1,102 @@
+#!/bin/sh -ue
+#
+# Write a data file to a tape, archive its table of contents.
+#       - Cameron Simpson <cs@zip.com.au> 
+#
+
+set -ue
+
+: ${TAPE:=/dev/nst0}
+: ${TAPE_BLOCKSIZE:=262144}        # LTO-3: 262144, DLT-IV: 131072
+: ${TAPE_INDEX:=$HOME/var/log/tapedumps}
+: ${TMPDIR:=/tmp}
+export TAPE TMPDIR
+
+trace=set-x
+datefmt='+%Y-%m-%d-%H:%M:%S'
+filenum=
+jukeslot=
+
+cmd=`basename "$0"`
+usage="Usage: $cmd [-f filenum] -j jukeslot [-t tapedev] data-file data-toc
+  -f filenum    Specify tape file number.
+                Default: one more than the most recent archived TOC file.
+  -j jukeslot   Load the tape from this jukebox slot.
+                \"NONE\" means no jukebox actions.
+  -t tapedev    Specify tape device. Default from \$TAPE: $TAPE"
+
+badopts=
+
+while [ $# -gt 0 ]
+do
+  case $1 in
+    -f) filenum=$2; shift ;;
+    -j) jukeslot=$2; shift ;;
+    -t) TAPE=$2; shift ;;
+    --) shift; break ;;
+    -?*)echo "$cmd: unrecognised option: $1" >&2
+        badopts=1
+        ;;
+    *)  break ;;
+  esac
+  shift
+done
+
+[ -n "$jukeslot" ] || { echo "$cmd: missing -j jukeslot" >&2
+                        badopts=1
+                      }
+
+if [ $# = 0 ]
+then
+  echo "$cmd: missing data-file" >&2
+  badopts=1
+else
+  datafile=$1
+  shift
+  if [ ! -f "$datafile" -o ! -s "$datafile" ]
+  then
+    echo "$cmd: invalid data-file: $datafile" >&2
+    badopts=1
+  fi
+  if [ $# = 0 ]
+  then
+    echo "$cmd: missing data-toc" >&2
+    badopts=1
+  else
+    datatoc=$1
+    shift
+    if [ ! -f "$datatoc" -o ! -s "$datatoc" ]
+    then
+      echo "$cmd: invalid data-toc: $datatoc" >&2
+      badopts=1
+    fi
+    [ $# = 0 ] || { echo "$cmd: extra arguments after data-toc: $*" >&2
+                    badopts=1
+                  }
+  fi
+fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+case $jukeslot in
+  NONE) tapeindex=$TAPE_INDEX ;;
+  *)    tapeindex=$TAPE_INDEX/$jukeslot ;;
+esac
+
+# make index directory if missing
+[ -d "$tapeindex/." ] || $trace mkdir "$tapeindex"
+
+# compute tape filenum if unspecified
+if [ -z "$filenum" ]
+then
+  filenum=`cd "$tapeindex"; ls -dt toc-[0-9]* | sed -n '1s/^toc-\([0-9][0-9]*\).*/\1/p'`
+  if [ -n "$filenum" ]
+  then  filenum=`expr "$filenum" + 1`
+  else  filenum=0
+  fi
+fi
+
+newtoc=$tapeindex/toc-$filenum-`date "$datefmt"`-`basename "$datatoc"`
+time $trace withtape -j "$jukeslot" -f "$filenum" -l "$TAPE_INDEX/tapedumps.log" dd "if=$datafile" "of=$TAPE" "bs=$TAPE_BLOCKSIZE"
+$trace cp "$datatoc" "$newtoc"
+$trace gzip -v -9 "$newtoc"
