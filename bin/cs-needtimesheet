@@ -1,0 +1,30 @@
+#!/bin/sh -ue
+#
+# Require timesheet to exit. Email if we create it.
+#       - Cameron Simpson <cs@zip.com.au>
+#
+
+: ${USER:=`id -un`}
+
+cmd=`basename "$0"`
+
+[ $# = 2 ] || { echo "Usage: $0 date category" >&2; exit 2; }
+when=$1
+category=$2
+
+lccat=`printf "%s\n" "$category" | tr '[A-Z]' '[a-z]'`
+uccat=`printf "%s\n" "$category" | tr '[a-z]' '[A-Z]'`
+tsdate=`monday "$1"`
+tsdir=$HOME/$lccat/timesheets/$USER
+[ -d "$tsdir/." ] || { echo "$cmd: missing timesheet dir: $tsdir" >&2
+                       exit 1
+                     }
+
+tsfile=$tsdir/$tsdate
+if [ ! -s "$tsfile" ]
+then
+  ( set -x
+    cs-mktimesheet -d "$tsdate" "$category" >>"$tsfile"
+    cat "$tsfile"
+  ) | mailsubj -s "new timesheet file at $tsfile" "$USER"
+fi
