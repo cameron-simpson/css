@@ -8,7 +8,10 @@
 
 cmd=`basename "$0"`
 
-[ $# = 2 ] || { echo "Usage: $0 date category" >&2; exit 2; }
+force=
+
+[ $# -gt 0 ] && [ "x$1" = x-f ] && { force=1; shift; }
+[ $# = 2 ] || { echo "Usage: $0 [-f] date category" >&2; exit 2; }
 when=$1
 category=$2
 
@@ -23,6 +26,7 @@ tsdir=$HOME/$lccat/timesheets/$USER
 tsfile=$tsdir/$tsdate
 if [ ! -s "$tsfile" ]
 then
+  [ $force ] || { [ -t 0 ] && ask "create $tsfile"; } || exit 1
   ( set -x
     cs-mktimesheet -d "$tsdate" "$category" >>"$tsfile"
     cat "$tsfile"
