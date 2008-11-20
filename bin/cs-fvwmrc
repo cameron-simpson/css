@@ -13,7 +13,7 @@ case "$X11_COMPOSITE" in
   '')	fvwm_Transparent=Transparent
 	fvwm_RootTransparent=RootTransparent
 	fvwm_ParentalRelativity=ParentalRelativity
-	fvwm_OpaqueMoveSize=0
+	fvwm_OpaqueMoveSize=100 ## 0
 	;;
   *)	fvwm_Transparent=
 	fvwm_RootTransparent=
