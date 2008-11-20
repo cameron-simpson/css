@@ -1,0 +1,72 @@
+#!/bin/sh -ue
+#
+# Eject a tape and move its index into the EXPORTED subdirectory.
+#       - Cameron Simpson <cs@zip.com.au> 
+#
+
+set -ue
+
+: ${TAPE_INDEX:=$HOME/var/log/tapedumps}
+: ${TMPDIR:=/tmp}
+export TMPDIR
+
+trace=set-x
+datefmt='+%Y-%m-%d'
+jukeslot=
+
+cmd=`basename "$0"`
+usage="Usage: $cmd -j jukeslot tapename
+  -j jukeslot   Load the tape from this jukebox slot.
+                \"NONE\" means no jukebox actions.
+  tapename      An indicator of the tape content, such as \"cskk-tar-FULL\"."
+
+badopts=
+
+while [ $# -gt 0 ]
+do
+  case $1 in
+    -j) jukeslot=$2; shift ;;
+    --) shift; break ;;
+    -?*)echo "$cmd: unrecognised option: $1" >&2
+        badopts=1
+        ;;
+    *)  break ;;
+  esac
+  shift
+done
+
+if [ -n "$jukeslot" ]
+then
+  if [ ! -d "$TAPE_INDEX/$jukeslot" ]
+  then
+    echo "$cmd: mo tape index for jukeslot: $TAPE_INDEX/$jukeslot" >&2
+    badopts=1
+  fi
+else
+  echo "$cmd: missing -j jukeslot" >&2
+  badopts=1
+fi
+
+if [ $# = 0 ]
+then
+  echo "$cmd: missing tapename" >&2
+  badopts=1
+else
+  tapename=$1
+  shift
+  [ $# = 0 ] || { echo "$cmd: extra arguments after tapename: $*" >&2
+                  badopts=1
+                }
+fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+label=`tapelabel "$jukeslot"`
+[ -n "$label" ] || label=$jukeslot
+when=`date "$datefmt"`
+
+if $trace mover mv "s$jukeslot" e0
+then
+  $trace mv "$TAPE_INDEX/$jukeslot" "$TAPE_INDEX/EXPORTED/$label-$when-$tapename"
+  $trace mkdir "$TAPE_INDEX/$jukeslot"
+fi
