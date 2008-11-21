@@ -1,0 +1,38 @@
+#!/bin/sh -ue
+#
+# Read a data file produced by vmstat-log and write a CSV file.
+#       - Cameron Simpson <cs@zip.com.au> 21nov2008
+#
+
+step=900
+
+cmd=$0
+usage="Usage: $cmd [-D step] [vmstat-log]"
+
+if [ $# -gt 0 ] && [ "x$1" = x-D ]
+then
+  step=$2
+  shift
+  shift
+fi
+[ $# -gt 1 ] && { echo "$usage" >&2; exit 2; }
+
+cat ${1+"$@"} \
+| \
+{ read startdate; unixtime=`date +%s -d "$startdate"`
+  read title1
+  read title2; echo unixtime $title2 | tr ' ' ,
+  grep '^ *[0-9]' \
+  | awk -v "unixtime=$unixtime" -v "step=$step" \
+     'BEGIN     { OFS="," }
+                { 
+                  for (i=NF; i>0; i--) {
+                    j=i+1
+                    $j=$i
+                  }
+                  $1=unixtime
+                  print
+                  unixtime+=step
+                }
+     '
+}
