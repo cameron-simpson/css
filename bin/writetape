@@ -21,6 +21,10 @@ cmd=`basename "$0"`
 usage="Usage: $cmd [-f filenum] -j jukeslot [-t tapedev] data-file data-toc
   -f filenum    Specify tape file number.
                 Default: one more than the most recent archived TOC file.
+                \"maxN\" means to compute one more than the most recent
+                archived TOC file, but if that exceeds N, presume tape full
+                and use file 0. \"Nor0\" means to write to file N, but if
+                that fails, presume tape full and write to file 0.
   -j jukeslot   Load the tape from this jukebox slot.
                 \"NONE\" means no jukebox actions.
   -t tapedev    Specify tape device. Default from \$TAPE: $TAPE"
@@ -86,15 +90,48 @@ esac
 # make index directory if missing
 [ -d "$tapeindex/." ] || $trace mkdir "$tapeindex"
 
-# compute tape filenum if unspecified
-if [ -z "$filenum" ]
-then
-  filenum=`cd "$tapeindex"; ls -dt toc-[0-9]* | sed -n '1s/^toc-\([0-9][0-9]*\).*/\1/p'`
-  if [ -n "$filenum" ]
-  then  filenum=`expr "$filenum" + 1`
-  else  filenum=0
+computeFilenum()
+{
+  _cf_num=`cd "$tapeindex"; ls -dt toc-[0-9]* | sed -n '1s/^toc-\([0-9][0-9]*\).*/\1/p'`
+  if [ -n "$_cf_num" ]
+  then  _cf_num=`expr "$_cf_num" + 1`
+  else  _cf_num=0
   fi
-fi
+  echo "$_cf_num"
+}
+# handle special filenums
+case "$filenum" in
+  '')
+    filenum=`computeFilenum`
+    ;;
+  max[0-9]|max[1-9][0-9])
+    max=`expr "$filenum" : 'max\([0-9][0-9]*\).*'` || [ -n "$max" ]
+    filenum=`computeFilenum`
+    [ "$filenum" -le "$max" ] || filenum=0
+    ;;
+  or0)
+    filenum=`computeFilenum`
+    if [ "$filenum" -gt 0 ]
+    then
+      $trace "$0" -f "$filenum" -j "$jukeslot" -t "$TAPE" \
+                  -- "$datafile" "$datatoc" \
+      || $trace "$0" -f 0 -j "$jukeslot" -t "$TAPE" \
+                     -- "$datafile" "$datatoc"
+      exit $?
+    fi
+    ;;
+  [0-9]or0|[1-9][0-9]or0)
+    filenum=`expr "x$filenum" : 'x\([0-9]*\)or0'` || [ -n "$filenum" ]
+    if [ "$filenum" -gt 0 ]
+    then
+      $trace "$0" -f "$filenum" -j "$jukeslot" -t "$TAPE" \
+                  -- "$datafile" "$datatoc" \
+      || $trace "$0" -f 0 -j "$jukeslot" -t "$TAPE" \
+                     -- "$datafile" "$datatoc"
+      exit $?
+    fi
+    ;;
+esac
 
 newtoc=$tapeindex/toc-$filenum-`date "$datefmt"`-`basename "$datatoc"`
 time $trace withtape -j "$jukeslot" -f "$filenum" -l "$TAPE_INDEX/tapedumps.log" dd "if=$datafile" "of=$TAPE" "bs=$TAPE_BLOCKSIZE"
