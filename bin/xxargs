@@ -1,7 +1,8 @@
 #!/usr/bin/perl
 #
 # Having pretty much had it with xargs, which is a busted piece of crap due
-# to its quoting/whitepsace problems, here is a less featured but more robust one.
+# to its quoting/whitepsace problems, here is a less featured but more robust
+# one.
 #	- Cameron Simpson <cs@zip.com.au> 20dec2001
 #
 
