@@ -11,8 +11,8 @@ if needdir "$evlogdir"
 then
     evlog=$evlogdir/wm-eventlog-$XESSIONID
     rm -f "$evlog"
-    >"$evlog"
-    ( tail -f "$evlog" | fvwm-event - & )
+    ##>"$evlog"
+    ##( tail -f "$evlog" | fvwm-event - & )
 fi
 
 for fv in \
