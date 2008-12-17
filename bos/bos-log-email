@@ -18,8 +18,8 @@ eval `mhdrs -sh < "$tmpf" | sed 's/^/hdr_/'`
 xit=0
 set -x
 DLOG_WHEN=$hdr_DATE dlog "BOS: $hdr_SUBJECT"    || xit=1
-( set -- $hdr_to $hdr_cc
-  bos-tslog -d "$hdr_DATE" "EMAIL->$*: $hdr_SUBJECT"
-) || xit=1
+##( set -- $hdr_to $hdr_cc
+##  bos-tslog -d "$hdr_DATE" "EMAIL->$*: $hdr_SUBJECT"
+##) || xit=1
 
 exit $xit
