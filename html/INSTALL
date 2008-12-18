@@ -1,0 +1,81 @@
+Overview documentation for some of these scripts may be found here:
+
+	http://www.cskk.ezoshosting.com/cs/css/
+
+and manual entries in HTML format here:
+
+	http://www.cskk.ezoshosting.com/cs/man/
+
+An autoindex of the scripts is in the file 1INDEX.txt.
+
+Installing my scripts:
+
+    Unpack the tarball:
+
+	http://www.cskk.ezoshosting.com/cs/css/css.tar.gz
+
+    into a suitable directory (eg "/opt/css", which I will assume for the
+    sake of example below).
+
+    Configure your environment to use the scripts:
+
+	. /opt/css/env.sh
+
+    That line should be in your .profile or other environment setup script.
+    It's pretty simple; it adds the css components to the END of your PATHs
+    (so no css script name preempt anything you already have).
+
+    It mostly does this:
+
+	PATH=$PATH:/opt/css/bin
+	PERL5LIB=$PERL5LIB:/opt/css/lib
+	MANPATH=$MANPATH:/opt/css/man
+	export PATH PERL5LIB MANPATH
+
+    The aim with $PERL5LIB is that "use cs::blah" will find the module
+    /opt/css/lib/cs/blah.pm. Alternatively (for Perl) you could just symlink
+    from your site_perl dir:
+
+	cd /usr/lib/perl5/site_perl
+	ln -s /opt/css/lib/cs .
+
+    Several of the scripts expect the following shell environment variables:
+
+	$HOST		Your machine's short name.
+                        Defaults to $HOSTNAME without the trailing components.
+	$HOSTNAME	Your machine's fully qualified domain name.
+                        Defaults to `hostname`.
+	$ARCH		Your architecure, in the form vendor.cpu.os,
+			eg sun.sparc.solaris or sgi.mips.irix.
+	$SYSTEMID	A name for your machines' administrative domain
+			(eg: I use "home" for my home LAN
+			and "zip" for my ISP: zip.com.au).
+	$USER		Your login name.
+	$SITENAME	Your email domain (eg zip.com.au for me).
+	$EMAIL		Your email address (just "who@where", no "<>"s);
+			normally $USER@$SITENAME.
+
+    There are some others, but those cover the common stuff.
+
+Licence:
+
+    You're free to use, modify and redistribute these scripts provided that:
+
+	- you leave my code marked as mine and your modifications (if any)
+	  marked as yours
+
+	- you make recipients aware that the scripts can be obtained for
+	  free from my own web page
+
+Warrantee:
+
+    None whatsoever!
+
+    These scripts work for me, but any of them may have bugs or be
+    arbitrarily dependent on my own login environment.  While I try to
+    make most of them usable by others (and am happy to hear suggestions
+    or bug reports), they're for my use and may well not meet your needs.
+    But feel free to hack them to meet your needs.
+
+- Cameron Simpson <cs@zip.com.au>
+  http://www.cskk.ezoshosting.com/cs/

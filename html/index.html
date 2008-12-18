@@ -1,0 +1,359 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+<HEAD>
+<meta http-equiv="Content-Type" content="text/html; charset=ISO-8859-1">
+<TITLE>CSS: Cameron Simpson's Scripts</TITLE>
+<LINK REL=Made HREF="mailto:cs@zip.com.au">
+<LINK REL=Home HREF="http://www.cskk.ezoshosting.com/cs/">
+</HEAD>
+<BODY>
+<H1>Cameron Simpson's Scripts</H1>
+[ <A HREF="http://freshmeat.net/projects/css-cameronsimpsonsscripts/">Freshmeat Record</A>
+| <A HREF="manuals/">Manuals</A>
+| Download: <A HREF="css.tar.gz">css.tar.gz</A>
+| <A HREF="INSTALL">Install</A>
+| <A HREF="1INDEX.txt">README</A>
+| <A HREF="CHANGELOG.txt">Changelog</A>
+| <A HREF="http://csbp.backpackit.com/pub/1230103">TODO</A>
+| Browse:
+	<A HREF="bin/">directory</A>
+	(or <A HREF="bin/?M=D">in date order</A>)
+	and <A HREF="#autoindex">by category</A>
+| Java (<A HREF="../au.com.zip.cs/au.com.zip.cs.jar">au.com.zip.cs.jar</A>,
+	<A HREF="../au.com.zip.cs/">API Doco</A>)
+]
+<P>
+This page supplies download for all my scripts, and documentation for some.
+<P>
+Many of these scripts are written in Bourne shell.
+Of the scripts written in Perl or Python, most depend on my modules.
+These modules are included in the above tarball (<A HREF="css.tar.gz">css.tar.gz</A>)
+in the <TT>cs/</TT> subdirectory.
+You can inspect these modules individually in
+<A HREF="lib/cs/">the <TT>lib/cs</TT> directory</A>.
+<P>
+Some of these scripts (eg <A HREF="info2pod.html">info2pod/info2man</A>)
+come with little kit tarballs
+to supply <EM>only</EM> that script and its needed modules.
+<P>
+Don't forget to see the <TT><A HREF="bin/1INDEX.txt">index</A></TT>
+for the complete autolist
+(only a few scripts are described below)
+and the <A HREF="bin/CHANGELOG.html">Change Log</A>
+for a feel for what's recent.
+<HR>
+<A NAME="autoindex"></A>
+<!--BEGIN AUTOPODINDEX-->
+<SCRIPT><!--
+var displaymode;
+function tersify()
+{
+  if (displaymode == "none")
+    displaymode="inline";
+  else
+    displaymode="none";
+  bquotes=document.getElementsByTagName("SPAN");
+  for (i=0; i<bquotes.length; i++)
+  { el=bquotes[i];
+    if (el.className == "overview-para")
+      el.style.display=displaymode;
+  }
+}
+document.write("[&nbsp;<A HREF=\"javascript:tersify()\">Terse</A>&nbsp;]<BR>\n");
+--></SCRIPT>
+<A HREF="#key-automation">automation</A>
+ - Automation and scripting
+<BR>
+<A HREF="#key-cd">cd</A>
+ - CD-ROM tools
+<BR>
+<A HREF="#key-desktop">desktop</A>
+ - Desktop utilities
+<BR>
+<A HREF="#key-dev">dev</A>
+ - Development tools
+<BR>
+<A HREF="#key-doc">doc</A>
+ - Documentation and formatting tools
+<BR>
+<A HREF="#key-edit">edit</A>
+ - File editing tools
+<BR>
+<A HREF="#key-files">files</A>
+ - File manipulation
+<BR>
+<A HREF="#key-graphics">graphics</A>
+ - Graphics and images
+<BR>
+<A HREF="#key-printing">printing</A>
+<BR>
+<A HREF="#key-sysadmin">sysadmin</A>
+ - System administration
+<BR>
+<P>
+<H2><A NAME="key-automation">automation</A>
+ - Automation and scripting
+</H2>
+<UL>
+    <LI><A HREF="ssh.html">SSH automation tools</A>
+<SPAN CLASS="overview-para"><BR><SMALL>An assortment of useful scripts
+for working with ssh(1).
+</SMALL></SPAN>
+    <LI><A HREF="lock.html">lock - obtain a lock then run a command - NFS-safe</A>
+<SPAN CLASS="overview-para"><BR><SMALL><code><a href="bin/lock">lock</a></code>
+(manual: <code><a href="manuals/lock.1.html">lock.1.html</a></code>)
+obtains a lock and then runs a command.
+Multihost and NFS-safe, orignally done entirely in shell,
+now in perl because high lock contention used to blow the load
+average through the roof with the mkdir fork/exec load.
+The script <code><a href="bin/note">note</a></code> uses this to ensure atomic
+access to the log files it writes.
+</SMALL></SPAN>
+    <LI><A HREF="necho.html">necho - echo without newline</A>
+<SPAN CLASS="overview-para"><BR><SMALL><code><a href="bin/necho">necho</a></code>: echo without newline.
+Just a simple wrapper to make the correct system-dependent
+<code>echo(1)</code> incantation for a prompt or progress remark.
+Now all my scripts use necho instead of embedding some
+non-portable incantation all through them.
+</SMALL></SPAN>
+</UL>
+<H2><A NAME="key-cd">cd</A>
+ - CD-ROM tools
+</H2>
+<UL>
+    <LI><A HREF="cdsubmit.html">cvsubmit and cddiscinfo</A>
+<SPAN CLASS="overview-para"><BR><SMALL><code><a href="bin/cdsubmit">cdsubmit</a></code>
+and its subsidiary <code><a href="bin/cddiscinfo">cddiscinfo</a></code>
+are used for submitting audio CD descriptions
+to FreeDB <a href="http://www.freedb.org/">http://www.freedb.org/</a>.
+</SMALL></SPAN>
+    <LI><A HREF="mkcd.html">mkcd and mkiso - easy to use CD burning scripts</A>
+<SPAN CLASS="overview-para"><BR><SMALL><code><a href="bin/mkcd">mkcd</a></code>
+and its precursor <code><a href="bin/mkiso">mkiso</a></code>
+comprise a simple no-brainer data CD burning kit
+for those of us who love the command line.
+</SMALL></SPAN>
+</UL>
+<H2><A NAME="key-desktop">desktop</A>
+ - Desktop utilities
+</H2>
+<UL>
+    <LI><A HREF="wallpaper.html">Wallpaper / Desktop Background</A>
+<SPAN CLASS="overview-para"><BR><SMALL><code><a href="bin/mkwall">mkwall</a></code>, to produce a scaled wallpaper from an image.
+<code><a href="bin/rootbg">rootbg</a></code>, to set the root background from an image.
+<code><a href="bin/rbg">rbg</a></code>, to set a root backdrop from an image, keywords or via xplanet.
+<code><a href="bin/xpl">xpl</a></code>, a wrapper for xplanet that may be used to set the root background.
+<code><a href="bin/pickim">pickim</a></code> and <code><a href="bin/imlist-search">imlist-search</a></code>,
+to choose an image from a collection by keyword.
+</SMALL></SPAN>
+</UL>
+<H2><A NAME="key-dev">dev</A>
+ - Development tools
+</H2>
+<UL>
+    <LI><A HREF="cvs.html">CVS Tools</A>
+<SPAN CLASS="overview-para"><BR><SMALL><code><a href="bin/cvsedit">cvsedit</a></code>, for making single changes to CVS files.
+<code><a href="bin/cvslog2html">cvslog2html</a></code>,
+which transcribes the CVS change log to HTML or plain text
+(example: <code><a href="bin/CHANGELOG.html">CHANGELOG.html</a></code>).
+<code><a href="bin/cvslog">cvslog</a></code>, to view the change log at the command prompt.
+</SMALL></SPAN>
+    <LI><A HREF="../myke/">Myke</A>, my make replacement
+</UL>
+<H2><A NAME="key-doc">doc</A>
+ - Documentation and formatting tools
+</H2>
+<UL>
+    <LI><A HREF="info2pod.html">info2pod and info2man</A>
+<SPAN CLASS="overview-para"><BR><SMALL><code><a href="bin/info2pod">info2pod</a></code> converts GNU info data
+to POD format [<a href="http://www.perldoc.com/perl5.6/pod/perlpod.html">http://www.perldoc.com/perl5.6/pod/perlpod.html</a>]
+for easy transcription to various formats like HTML.
+<code><a href="bin/info2man">info2man</a></code> is a wrapper for <code>info2pod</code> to convert info files
+into <code>nroff -man</code> format.
+</SMALL></SPAN>
+    <LI><A HREF="man.html">man - my manual entry reader</A>
+<SPAN CLASS="overview-para"><BR><SMALL><code><a href="bin/man">man</a></code>
+is a replacement for the standard <code>man(1)</code> command
+that also knows how to present info files
+in the conventional flat-page view,
+using <em>info2pod</em>.
+</SMALL></SPAN>
+</UL>
+<H2><A NAME="key-edit">edit</A>
+ - File editing tools
+</H2>
+<UL>
+    <LI><A HREF="bsed.html">BSED - batch mode sed wrapper</A>
+<SPAN CLASS="overview-para"><BR><SMALL><code><a href="bin/bsed">bsed</a></code> is ``batch sed'',
+a wrapper for sed which batch edits multiple files,
+optionally reporting changes and making backups.
+</SMALL></SPAN>
+    <LI><A HREF="cvs.html">CVS Tools</A>
+<SPAN CLASS="overview-para"><BR><SMALL><code><a href="bin/cvsedit">cvsedit</a></code>, for making single changes to CVS files.
+<code><a href="bin/cvslog2html">cvslog2html</a></code>,
+which transcribes the CVS change log to HTML or plain text
+(example: <code><a href="bin/CHANGELOG.html">CHANGELOG.html</a></code>).
+<code><a href="bin/cvslog">cvslog</a></code>, to view the change log at the command prompt.
+</SMALL></SPAN>
+    <LI><A HREF="rlr.html">rlr - replace line range</A>
+<SPAN CLASS="overview-para"><BR><SMALL><code><a href="bin/rlr">rlr</a></code> replaces a range of lines in a file
+with data from another file or stdin.
+The range is delimited by a pair of distinctive lines,
+typically specially formatted comment lines in the file to be edited.
+</SMALL></SPAN>
+</UL>
+<H2><A NAME="key-files">files</A>
+ - File manipulation
+</H2>
+<UL>
+    <LI><A HREF="apphelper.html">apphelper - file viewer and saver</A>
+<SPAN CLASS="overview-para"><BR><SMALL><code><a href="bin/apphelper">apphelper</a></code>
+is a general purpose handler for files downloaded from the web
+or presented as email attachments.
+I routinely use it with
+my mail reader
+(mutt <a href="http://freshmeat.net/projects/mutt/">http://freshmeat.net/projects/mutt/</a>) for most attachments
+and my web browser
+(firefox <a href="http://www.mozilla.org/products/firefox/">http://www.mozilla.org/products/firefox/</a>)
+for things I wish to box view and keep, such as PDFs.
+</SMALL></SPAN>
+    <LI><A HREF="bin/cpdir">cpdir</A>, a directory copying command with progress reporting
+    <LI><A HREF="bin/entar">entar</A>, create a tar file with progress reporting
+    <LI><A HREF="lock.html">lock - obtain a lock then run a command - NFS-safe</A>
+<SPAN CLASS="overview-para"><BR><SMALL><code><a href="bin/lock">lock</a></code>
+(manual: <code><a href="manuals/lock.1.html">lock.1.html</a></code>)
+obtains a lock and then runs a command.
+Multihost and NFS-safe, orignally done entirely in shell,
+now in perl because high lock contention used to blow the load
+average through the roof with the mkdir fork/exec load.
+The script <code><a href="bin/note">note</a></code> uses this to ensure atomic
+access to the log files it writes.
+</SMALL></SPAN>
+    <LI><A HREF="mailcap.html">mailcap, file2mime, ext2mime, fixexts - handle file types</A>
+<SPAN CLASS="overview-para"><BR><SMALL><code><a href="bin/mailcap">mailcap</a></code>: return the mailcap action for the supplied MIME type.
+<code><a href="bin/file2mime">file2mime</a></code>: return the MIME type for a file by parsing the output of file(1).
+<code><a href="bin/ext2mime">ext2mime</a></code>: infer MIME type from file extension.
+<code><a href="bin/fixexts">fixexts</a></code>: correct file extension based on MIME type.
+</SMALL></SPAN>
+    <LI><A HREF="bin/note">note</A>, record a timestamped entry in a file
+    <LI><A HREF="bin/prcat">prcat</A>, a cat(1) commands with progress reporting
+    <LI><A HREF="tvx.html">t, v, x - TOC, view and extract files</A>
+<SPAN CLASS="overview-para"><BR><SMALL><code><a href="bin/t">t</a></code>: do a table of contents of an archive file.
+<code><a href="bin/synonyms/v">v</a></code>: view a file using the viewer in the mailcap(5).
+<code><a href="bin/synonyms/x">x</a></code>: extract an archive file.
+</SMALL></SPAN>
+    <LI><A HREF="bin/untar">untar</A>, a tar unpacker with progress reporting
+</UL>
+<H2><A NAME="key-graphics">graphics</A>
+ - Graphics and images
+</H2>
+<UL>
+    <LI><A HREF="wallpaper.html">Wallpaper / Desktop Background</A>
+<SPAN CLASS="overview-para"><BR><SMALL><code><a href="bin/mkwall">mkwall</a></code>, to produce a scaled wallpaper from an image.
+<code><a href="bin/rootbg">rootbg</a></code>, to set the root background from an image.
+<code><a href="bin/rbg">rbg</a></code>, to set a root backdrop from an image, keywords or via xplanet.
+<code><a href="bin/xpl">xpl</a></code>, a wrapper for xplanet that may be used to set the root background.
+<code><a href="bin/pickim">pickim</a></code> and <code><a href="bin/imlist-search">imlist-search</a></code>,
+to choose an image from a collection by keyword.
+</SMALL></SPAN>
+</UL>
+<H2><A NAME="key-printing">printing</A>
+</H2>
+<UL>
+    <LI><A HREF="lz.html">lz and multips - PostScript printing tools</A>
+<SPAN CLASS="overview-para"><BR><SMALL><code><a href="bin/lz">lz</a></code>
+is a wrapper for <code>lp(1)</code> or <code>lpr(1)</code> or whatever
+print facility is native to your system
+and accepts text, postscript and PDF as input,
+converting all to postscript and delivering to printers
+via the native print subsystem.
+<code><a href="bin/multips">multips</a></code> is called internally by <code>lz</code>
+to layout multiple logical sheets to a physical sheet.
+</SMALL></SPAN>
+</UL>
+<H2><A NAME="key-sysadmin">sysadmin</A>
+ - System administration
+</H2>
+<UL>
+    <LI><A HREF="http://adzapper.sourceforge.net/">Ad Zapping With Squid</A>
+    <LI><A HREF="runmaint.html">Runmaint</A>
+<SPAN CLASS="overview-para"><BR><SMALL><code><a href="bin/runmaint">runmaint</a></code>
+is a wrapper for cron jobs which puts meaningful subject lines on
+email containing the output, provides a more complete
+environment than cron's fairly spartan one,
+and knows about host and frequency specific sub-scripts.
+This lets you write a very simple crontab
+and move all the complexity into a <em>~/.maint</em> directory
+for easy manipulation.
+</SMALL></SPAN>
+    <LI><A HREF="ssh.html">SSH automation tools</A>
+<SPAN CLASS="overview-para"><BR><SMALL>An assortment of useful scripts
+for working with ssh(1).
+</SMALL></SPAN>
+    <LI><A HREF="bin/dlog">dlog</A>, make a note in my daily log using <A HREF="bin/note">note</A>
+    <LI><A HREF="rc.mobile.html">rc.mobile - configurable startup for mobile hosts</A>
+<SPAN CLASS="overview-para"><BR><SMALL><code><a href="bin/rc.mobile">rc.mobile</a></code>
+this is a startup script
+mostly aimed at mobile machines which are booted in different places.
+It takes a simple config file
+that specifies the services desired and any config files to customise.
+Typical use prompts for the current location early in the boot sequence.
+</SMALL></SPAN>
+    <LI><A HREF="rsmirror.html">rsmirror</A>
+<SPAN CLASS="overview-para"><BR><SMALL><code><a href="bin/rsmirror">rsmirror</a></code> maintains a mirror of a set of rsync repositories.
+</SMALL></SPAN>
+    <LI><A HREF="syncopt.html">syncopt - A Flexible and Simple Approach to Package Install</A>
+<SPAN CLASS="overview-para"><BR><SMALL>The <code><a href="bin/syncopt">syncopt</a></code> script and its associated work practices
+are yet another approach to the standard sysadmin problem
+of keeping multiple machines' software installations
+up to date.
+It is independent of the vendor's packaging scheme
+and thus you can use either your vendor's system or syncopt, or both!
+</SMALL></SPAN>
+</UL>
+<!--END AUTOPODINDEX-->
+<H2><A NAME=s-misc>Miscellaneous Tools</A></H2>
+<UL>
+    <LI><A HREF="bin/timer">timer</A>,
+	<A HREF="bin/jobtimer">jobtimer</A>,
+	<A HREF="bin/job">job</A>,
+	<A HREF="bin/isjob">isjob</A>,
+	<A HREF="bin/newjob">newjob</A>,
+	<A HREF="bin/jobtype">jobtype</A>,
+	<A HREF="bin/withjob">withjob</A>,
+	<A HREF="bin/jobreport">jobreport</A>,
+	<A HREF="bin/deskjob">deskjob</A>,
+	<A HREF="bin/dfltjob">dfltjob</A>,
+	<A HREF="bin/fvwm-menu-jobs">fvwm-menu-jobs</A><BR>
+	Job tracking scripts.
+	These are all based on <A HREF="bin/idset">idset</A>s
+	and are simple system to track time spent on various jobs.
+	The core script is <TT>timer</TT>,
+	which does time logging using an idset.
+	<TT>jobtimer</TT> is the trivial wrapper that points at the idset for jobs.
+	<TT>job</TT> starts logging time to a named job.
+	<TT>newjob</TT> creates a new job.
+	<TT>jobtype</TT> assigns a job to a category.
+	<TT>jobreport</TT> produces a summary of time so far, group jobs by category.
+    <LI><TT>*otpad*</TT>:
+	Various scripts associated with David Madore's
+	<A HREF="http://www.eleves.ens.fr:8080/home/madore/misc/freespeech.html">A method of free speech on the Internet: random pads</A>
+	<BR>
+	See: <A HREF="http://www.zip.com.au/~cs/pads/">http://www.zip.com.au/~cs/pads/</A>
+    <LI><A HREF="bin/ring">ring</A>:
+	look up my phonelist.
+	In fact, ring will look up any text file.
+	It expects multiline records where new records are introduced
+	by a line with a non-whitespace leading character.
+	So the simple act of indenting the second
+	and following lines of the record
+	is enough markup, and leaves you with a human readable phonelist.
+    <LI>The <TT>un*</TT> scripts:
+	General cleaning and unobfuscating scripts;
+	decoders for various formats.
+    <LI><TT>md5*</TT>:
+	various file location/index/comparison stuff based on MD5 hashes.
+	<TT><A HREF="bin/dcmp">dcmp</A></TT> uses these.
+</UL>
+</BODY>
+</HTML>
