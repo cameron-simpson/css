@@ -7,6 +7,8 @@
 #       - Cameron Simpson <cs@zip.com.au> 23dec2008
 #
 
+: ${SHELL:=/bin/sh}
+
 cmd=$0
 haveenv=
 
@@ -36,5 +38,6 @@ qcmd=
 for arg
 do  qcmd=$qcmd`printf " %q" "$arg"`
 done
-export _WITH_LOGIN_ENV_QUOTED_COMMAND=$qcmd
+_WITH_LOGIN_ENV_QUOTED_COMMAND=$qcmd
+export _WITH_LOGIN_ENV_QUOTED_COMMAND
 exec -l "$SHELL" -c "exec '$ecmd' --have-login-env"
