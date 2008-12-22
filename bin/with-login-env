@@ -1,0 +1,40 @@
+#!/bin/bash -ue
+#
+# Run an arbitrary command with user user's login environment.
+# Based on discussions with Martin Costabel, Peter O'Gorman and
+# Harald Hanche-Olsen.
+# Uses bash instead of sh for "printf %q" and "exec -l".
+#       - Cameron Simpson <cs@zip.com.au> 23dec2008
+#
+
+cmd=$0
+haveenv=
+
+usage="Usage: $cmd {--have-login-env | command [args...]|"
+
+if [ $# -gt 0 ] && [ "x$1" = x--have-login-env ]
+then
+  haveenv=1
+  shift
+fi
+
+[ $# -gt 0 ] || set -- env
+
+if [ $haveenv ]
+then
+  eval "set -- $_WITH_LOGIN_ENV_QUOTED_COMMAND"
+  unset _WITH_LOGIN_ENV_QUOTED_COMMAND
+  exec "$@"
+fi
+
+case "$0" in
+  *\'*) ecmd=`printf '%s\n' "$0" | sed "s/'/'\\''/g"` ;;
+  *)    ecmd=$0 ;;
+esac
+
+qcmd=
+for arg
+do  qcmd=$qcmd`printf " %q" "$arg"`
+done
+export _WITH_LOGIN_ENV_QUOTED_COMMAND=$qcmd
+exec -l "$SHELL" -c "exec '$ecmd' --have-login-env"
