@@ -1,0 +1,65 @@
+=head1 mkcd and mkiso - easy to use CD burning scripts
+
+=keywords cd
+
+=head2 Overview
+
+L<./bin/mkcd>
+and its precursor L<./bin/mkiso>
+comprise a simple no-brainer data CD burning kit
+for those of us who love the command line.
+
+Also see their manual entries:
+L<./manuals/mkcd.1.html> and L<./manuals/mkiso.1.html>.
+
+=head2 Usage
+
+Typical usage is:
+
+=over 4
+
+=item * Create directory for the CD contents
+
+Its name should normally match desired the CD volume label.
+Set it up
+with everything you want for the CD laid out as you desire.
+We'll pretend it's called I<dirname> below.
+
+=item * Burn the CD:
+
+	$ mkcd dirname
+
+=back
+
+Because you've pointed C<mkcd> at a directory it will call C<mkiso>
+automatically to make an ISO9660 CDROM image.
+If you wish you can exert finer control over things by making the ISO image
+yourself with C<mkiso>.
+
+B<Note>:
+C<mkiso>
+(and thus C<mkcd> if used as above)
+make the ISO9660 image in the current directory
+unless you use the B<-o> option.
+In C<mkcd>'s case
+this is primarily because generic places like F</tmp>
+often don't have CD-sized amounts of free space.
+
+These scripts have a few options
+but are deliberately short on knobs to twiddle.
+They're are naturally just wrappers for
+Jörg Schilling's [L<http://www.fokus.gmd.de/research/cc/glone/employees/joerg.schilling/>
+excellent
+mkisofs and cdrecord utilites [L<http://www.fokus.gmd.de/research/cc/glone/employees/joerg.schilling/private/mkisofs.html>],
+which have a great many knobs.
+
+=head2 Installation
+
+These are just scripts.
+Install them in your execution C<$PATH>.
+It will be necessary to tell C<mkcd>
+your CD burner's SCSI id.
+You can also specify the CD burner
+through the environment variable C<$MKCDDEV>
+or the F</etc/mkcdrc> or C<$HOME/.mkcdrc> files;
+see the manual entries for details.

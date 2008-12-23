@@ -1,0 +1,483 @@
+=head1 syncopt - A Flexible and Simple Approach to Package Install
+
+=keywords sysadmin
+
+=head2 Overview
+
+The L<./bin/syncopt> script and its associated work practices
+are yet another approach to the standard sysadmin problem
+of keeping multiple machines' software installations
+up to date.
+It is independent of the vendor's packaging scheme
+and thus you can use either your vendor's system or syncopt, or both!
+
+Also see the manual entry: L<./manuals/syncopt.1.html>.
+
+The core notion is that the install is done once
+on a central machine
+and then syncopt takes care of attaching that to every client,
+often via cron.
+
+Like most such solutions,
+syncopt has to achieve a few goals:
+
+=over 4
+
+=item * easy to use
+
+=item * flexible enough to permit control
+	of what is installed locally on a machine
+	and what is served remotely from a central server
+	(for disc space or other reasons)
+
+=item * keep out of the way of the "vendor's namespace",
+	to avoid treading on the vendor's install
+	and conversely to protect our additions from
+	damage by vendor upgrades and patches
+
+=back
+
+As implemented,
+syncopt achieves this with the following advantages:
+
+=over 4
+
+=item lightweight
+
+If a package is not to be installed local to a client
+then the burden is usually just two symlinks on the client.
+
+=item optional
+
+You can install packages with syncopt or with the vendor's
+packaging scheme,
+or both!
+
+=item permits trial installs
+
+Under syncopt you can install multiple versions
+of the same package for trial or legacy purposes.
+
+=item centralised
+
+The default package version is controlled
+by a symlink on the master host; change that and
+all the clients will follow suit next time they run syncopt.
+
+=item customisable
+
+Clients can control which packages are local
+and also override which version is their default for
+a given package.
+
+=back
+
+It presumes you have a "large" main machine
+which can have an instance of everything installed on it
+and that your other machines generally have mostly-local
+core installs of the OS and main packages
+and probably run most of the optional stuff from the main server
+via NFS or other network filesystem.
+
+=head2 Naming Issues
+
+We will approach the last criterion first,
+since it's crucial to having things work smoothly in the long run.
+The vendor namespace tends to be F</usr>
+and its children - F</usr/bin>, etc.
+So, we elect not to install there.
+Likewise, the "user namespace" or "local customisation namespace"
+tends to be F</usr/local> and its children.
+Although our users could use a F</opt>
+style scheme, F</usr/local> is familiar
+and has its own conventions.
+
+Accordingly, I've taken a leaf out of Sun's book L<http://www.sun.com/>
+and used F</opt>
+for my syncopt scheme.
+This doesn't actually fly in the face of Sun,
+as Solaris packages are installed with names
+of the form C<[A-Z]+[a-z0-9]+>.
+Syncopt generally uses names of the form C<[a-z][a-z0-9]*-I<version>>,
+so we can play happily in Sun's field without conflict.
+
+=head2 File Tree Organisation
+
+That decision made,
+here is how we have things arranged at my workplace:
+
+=over 4
+
+=item F</u/syncopt>
+
+We have a special user called "syncopt" to store the master copies
+of everything to install in F</opt>.
+That way we can put the master repository wherever we like.
+
+Under that directory is a subdirectory called F<common>
+for the architecture independent stuff
+(config file, image/icon archives, scripts etc)
+and a subdirectory matching the C<$ARCH> environment variable
+for the architecture dependent stuff
+(pretty well everything that gets compiled).
+
+Here's the directory listing from ours:
+
+	% ls -la /u/syncopt/.
+	total 48
+	drwxr-xr-x    8 root     bin          8192 Oct 12 14:45 .
+	drwxr-xr-x   14 root     root         8192 Oct 11 15:05 ..
+	drwxrwsr-x   17 root     technic      8192 Oct 14 11:56 common
+	drwxrwsr-x    5 cameron  technic      8192 Sep  3 11:55 freebsd.x86.freebsd
+	drwxrwsr-x    2 root     geeks          96 Jul 20  2000 redhat.ppc.linux
+	drwxrwsr-x  184 cameron  geeks        8192 Oct 15 10:11 redhat.x86.linux
+	drwxrwsr-x  155 root     geeks        8192 Sep 20 11:36 sun.sparc.solaris
+	drwxrwsr-x    4 root     technic        96 Mar 13  2000 sun.sparc.sunos
+
+=item F</opt>
+
+F</opt>
+is a real, local, directory on every client machine.
+On machines which get most things from the server,
+this is a forest of symlinks
+pointing at the central copies
+in F</u/syncopt>.
+On machines with local copies of some things
+the local copies are real directories,
+exact images of those in the central F<opt>
+directory and the non-local things are,
+of course,
+symlinks.
+
+=back
+
+The purpose of the syncopt script itself is to make the F</opt> directory
+correctly configured with respect to F</u/syncopt>.
+
+The core algorithm is simple and conservative:
+for every subdirectory found in F</u/syncopt/I<arch>>
+or F</u/syncopt/common>,
+check the matching name in F</opt>.
+If it is missing,
+make it a symlink to the matching central item.
+If it is a directory, ensure the contents are an exact
+match for the central item,
+using rsync(1) L<http://rsync.samba.org/>.
+
+This behaviour can be overridden
+with the F<L<"/opt/.syncopt">>
+configuration file as described below.
+
+=head2 Using syncopt
+
+=head3 Local Package Install
+
+As a consequence, to make an instance of something local
+to a client machine (let's call it I<pkg>, release I<version>),
+remove the local symlink:
+
+	$ rm /opt/pkg-version
+
+Make a stub directory:
+
+	$ mkdir /opt/pkg-version
+
+Alternatively, just edit the F<.syncopt> file and add this line:
+
+	pkg-version local
+
+Run syncopt:
+
+	$ syncopt -x
+
+That syncs everything. You can just do the new package like this:
+
+	$ syncopt -x pkg pkg-version
+
+which syncs the generic (unversioned) link and the version specific
+local directory.
+
+=head3 Undoing a Local Package Install
+
+To make a once-local copy remote,
+remove the local copy:
+
+	$ rm -rf /opt/pkg-version
+
+Also, if you edited the F<.syncopt> file as above,
+remove that line.
+
+Run syncopt:
+
+	$ syncopt -x pkg pkg-version
+
+=head3 Bringing a Client into Sync after a New Package Install
+
+To set up a new client's F</opt> directory
+after a fresh install:
+
+	$ mkdir /opt	# if necessary
+	$ syncopt -x
+
+=head3 /opt/.syncopt
+
+The behaviour deduced from the presence or absence of a directory
+can be overridden with the F</opt/.syncopt> file,
+which contains line of the form:
+
+	pkg version
+
+to make I<version> the default package version
+on this particular machine,
+or
+
+	pkg local
+
+to force a package to be local on this machine,
+or
+
+	pkg-version local
+
+to make a particular version local,
+or
+
+	pkg nosync
+
+to not run syncopt on it at all.
+
+=head2 Installing packages for use with the syncopt scheme
+
+A scheme such as this is naturally not useful without things to install
+this way.
+
+For very small packages
+(usually only a single command and matching manual entry)
+it's often not worth bothering with F</opt>,
+instead installing them in the traditional way with the executable in
+F</opt/bin>
+and the manual in F</opt/man>
+and so forth.
+
+For larger packages
+(netscape, emacs, vmware, the pbmtools, elm, mh, etc)
+the F</opt> comes into its own.
+
+When building the package from source or installing a binary distribution,
+tell the package to install in
+F</opt/I<package>-I<version>>.
+
+Usually I<version> is the release version,
+but occasionally I tack extra info into it, such as the build platform
+where C<$ARCH> is too vague.
+For example, I use B<redhat.x86.linux> for RedHat Linux platforms.
+Unfortunately, these are not always binary compatible
+and so I might make the version be C<I<version>-rh9> to indicate
+it was built on RedHat 9.
+In this way I can choose, say, a C<-rh7> build for RedHat 7 boxes.
+
+For packages built with GNU autoconf
+[L<http://sourceware.cygnus.com/autoconf/>]
+this usually is as simple as adding the C<--prefix> option
+to the C<configure> run:
+
+	$ ./configure --prefix=/opt/package-version
+
+Do the build as normal.
+If it is successful,
+set your umask to 2 for the install.
+This presumes a group exists with write privileges in F</u/syncopt>
+(ours is called "C<geeks>"),
+then make the master directory and link it to the local F</opt>:
+
+	$ umask 2
+	$ mkdir /u/syncopt/arch/pkg-version
+	$ ln -s /u/syncopt/arch/pkg-version /opt/.
+
+then install as normal:
+
+	$ make install
+
+Then adjust the permissions on the master to prevent
+accidental damage in the future:
+
+	$ cd /opt/pkg-version	# should take you into /u/syncopt
+	$ chmod -R a-w .
+
+If that goes well, and this is to be the "default" version of the package,
+add the generic symlink:
+
+	$ cd /u/syncopt/arch
+	$ rm -f pkg
+	$ ln -s pkg-version pkg
+
+Then run syncopt
+or just make the same symlink in the local F</opt> by hand.
+In this way you can now talk about a generic F</opt/I<package>>
+in shell scripts, F</opt/I<pkg>/bin> in C<$PATH>
+and so forth
+without having these things know about the version.
+
+This has the added advantage that upgrades are done by
+installing the new version
+and switching the symlink in F</u/syncopt>.
+This way you can keep multiple versions around without conflict,
+which is often quite handy with unstable or experimental upgrades
+or for legacy uses.
+
+It is quite important to never mention F</u/syncopt>
+outside of this scheme - by having the package and everything which uses it
+believe firmly in F</opt>,
+making things local or shuffling versions "just works".
+
+Having done the central install in this way,
+saying:
+
+	$ mkdir /opt
+	$ syncopt -x
+
+on every client machine suffices to finish things off.
+This can be put in a nightly cron job
+on each machine if you desire.
+
+=head2 Complication
+
+It all seemed so easy, didn't it?
+Well, I've glossed over a few issues.
+Let's peel back the paint:
+
+=head3 What about $PATH?
+
+Everything you've installed in F</opt>
+will most likely not be in your users' C<$PATH>
+or C<$MANPATH>,
+so they won't be able to simply type the name of the package
+and have it work.
+
+There are three main approaches to correcting this situation:
+
+=over 4
+
+=item Add a special path to C<$PATH>
+
+Edit your main C</etc/profile>
+to insert the relevant bits into your users'
+environment variables, eg:
+
+	PATH=$PATH:/opt/package/bin
+	export PATH
+
+To keep central control of this kind of thing,
+here we keep this stuff a file in F</opt/config/shell>
+and simply source that from the F</etc/profile>.
+That way,
+aside from the initial edit of F</etc/profile>
+on each client machine (to add the source line),
+future package installs need only involve editing the central
+file in F</u/syncopt/common/config/shell> and rerunning syncopt.
+
+=item Supply a small wrapper script
+
+Another class of package is the package with one main command
+and a bunch of utility commands
+used only during a run of the main command.
+ELM [L<http://www.cis.ohio-state.edu/hypertext/faq/usenet/elm/FAQ/faq.html>]
+and MH [L<http://www.faqs.org/faqs/mail/mh-faq/part1/preamble.html>]
+are classic cases of this;
+users usually run the main command (elm or mh or xmh)
+and the many little utilities are run within the system.
+Nevertheless the "stock" install puts innumerable utility
+executables in the main F<bin>
+directory of the victi^Wtarget machine, many with horribly
+generic names like "next" or "forward".
+It is far better that these packages keep their utilities squirrelled away
+in places like F</opt/elm/bin>.
+Instead, we put a single wrapper script in C</opt/bin>
+which inserts the C</opt/I<package>/bin>
+directory at the front of the C<$PATH>
+and then execs the real executable.
+In this way the main package is accessible as normal
+and the general utility names do not pollute the default
+command namespace.
+For example, the my elm wrapper:
+
+	#!/bin/sh
+	PATH=/opt/elm/bin:$PATH
+	MANPATH=/opt/elm/man:$MANPATH
+	export PATH MANPATH
+	exec /opt/elm/bin/elm ${1+"$@"}
+
+It is installed as F</opt/bin/elm>.
+
+Note: users who truly wish the package's utilities in their default C<$PATH>
+can naturally add F</opt/I<package>/bin>
+to their own path in their C<.profile> file.
+
+=item Populate F</opt/bin> etc with links
+
+Some packages have a single executable
+(like netscape)
+or genuinely have several executables with nice distinctive names
+(like netpbm [L<http://freshmeat.net/projects/netpbm/>]).
+In that case the natural thing to do is to go to C</opt/bin>
+and add symlinks to the executable(s) and matching symlinks for
+the manual entries, eg:
+
+	$ cd /opt/bin
+	$ ln -s /opt/netscape/netscape
+	$ ln -s /opt/netscape-4.79/netscape netscape-4.79
+
+or
+
+	$ cd /opt/bin
+	$ ln -s /opt/netpbm/bin/* .
+	$ cd /opt/netpbm-10.17/bin
+	$ for bin in *
+	> do ln -s /opt/netpbm-10.17/bin/$bin /opt/bin/$bin-10.17
+	> done
+
+Notice that we make both unversioned and version links
+so that users can run the default app or a specific version if needed.
+
+=back
+
+=head3 What about per-machine dynamic files?
+
+Some packages include their dynamic components in the install.
+For example,
+NNTPCache [L<http://www.nntpcache.org/>]
+includes a C<var> subdirectory
+to hold its news spool.
+
+My approach with these is to make a matching
+F</var/I<package>> subdirectory
+(or F</var/spool/I<package>> is appropriate)
+on the client machines which will run the package,
+and to make the C<var> subdirectory
+in the install directory a symlink to F</var/I<package>>.
+This means that the package can continue to believe in its "normal"
+install structure
+and still correctly access the local, dynamic files.
+It also protects those files from syncopt by shifting
+them out of the C</opt> area.
+
+if there's significant structure to the "var" directory
+I tend to move it sideways in the install tree:
+
+	$ cd /u/syncopt/redhat.x86.linux/nntpcache-3.0.1
+	$ mv var var.dist
+	$ ln -s /var/spool/nntpcache var
+
+Then on any client machine that will actually run it:
+
+	$ mkdir /var/spool/nntpcache
+	$ rsync -avHP /opt/nntpcache/var.dist/. /var/spool/nntpcache/.
+
+and it's ready to go.
+
+=head2 See Also
+
+RedHat [L<http://www.redhat.com/>]'s RPM [L<http://www.rpm.org/>].
+
+Debian [L<http://www.debian.org/.debian>'s apt [L<http://www.debian.org/doc/manuals/apt-howto/index>].
+
+Sun Solaris [L<http://www.sun.com/software/solaris/>]' pkgadd [L<http://docs.sun.com/ab2/coll.47.8/SYSADV1/%40Ab2PageView/25509?DwebQuery=pkgadd&oqt=pkgadd&Ab2Lang=C&Ab2Enc=iso-8859-1>].

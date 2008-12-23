@@ -1,0 +1,27 @@
+=head1 apphelper - file viewer and saver
+
+=keywords files
+
+=head2 Overview
+
+L<./bin/apphelper>
+is a general purpose handler for files downloaded from the web
+or presented as email attachments.
+I routinely use it with
+my mail reader
+(mutt L<http://freshmeat.net/projects/mutt/>) for most attachments
+and my web browser
+(firefox L<http://www.mozilla.org/products/firefox/>)
+for things I wish to box view and keep, such as PDFs.
+
+C<Apphelper> both offers to view the file with your usual viewing program
+but also offers to save the file after viewing.
+I cobbled this up in frustration,
+as usually you get only one or the other choice.
+It remembers the last save location for reuse
+and helpfully makes needed subdirectories if you're filing vigorously.
+It uses GNU readline for pathname completion.
+
+=head2 See Also
+
+The manual: L<./manuals/apphelper.1.html>.

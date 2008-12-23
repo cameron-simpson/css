@@ -1,0 +1,46 @@
+=head1 CVS Tools
+
+=keywords dev edit
+
+=head2 Overview
+
+L<./bin/cvsedit>, for making single changes to CVS files.
+L<./bin/cvslog2html>,
+which transcribes the CVS change log to HTML or plain text
+(example: L<./bin/CHANGELOG.html>).
+L<./bin/cvslog>, to view the change log at the command prompt.
+
+=head2 cvsedit
+
+Common CVS practice is to edit several files
+and then when ready, commit them all as a single change.
+However, there are circumstances when your workflow
+is to make a single well defined change to a single file
+and commit that as a change,
+for example to edit a DNS zone file
+to add an entry
+or to edit a system control file.
+C<cvsedit> is for that use.
+
+Interactively,
+cvsedit prompts for a single line change description,
+updates and locks the file in your checkout,
+runs your default editor on the file,
+then commits the file with your change comment.
+This prevents races in shared checkouts
+and does the tedious C<cvs update>...C<cvs commit>
+sequence.
+
+In batch mode
+C<cvsedit> can be used to programmaticly
+edit a file and commit the change.
+Example:
+
+	$ cvsedit -m "change foo to bar" bsed 's/foo/bar/'
+
+=head2 cvslog2html and cvslog
+
+I use C<cvslog2html> to write CHANGELOG files.
+It produces a quite readable list of change comments
+and the files to which they apply.
+C<cvslog> is used interactively to pop that log up for convenient perusal.

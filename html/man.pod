@@ -1,0 +1,11 @@
+=head1 man - my manual entry reader
+
+=keywords doc
+
+=head2 Overview
+
+L<./bin/man>
+is a replacement for the standard man(1) command
+that also knows how to present info files
+in the conventional flat-page view,
+using L<info2pod|info2pod>.

@@ -1,0 +1,14 @@
+=head1 mailcap, file2mime, ext2mime, fixexts - handle file types
+
+=keywords files
+
+=head2 Overview
+
+L<./bin/mailcap>: return the mailcap action for the supplied MIME type.
+L<./bin/file2mime>: return the MIME type for a file by parsing the output of file(1).
+L<./bin/ext2mime>: infer MIME type from file extension.
+L<./bin/fixexts>: correct file extension based on MIME type.
+
+=head2 See Also
+
+L<apphelper|apphelper>

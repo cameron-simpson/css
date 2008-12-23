@@ -1,0 +1,53 @@
+=head1 info2pod and info2man
+
+=keywords doc
+
+=head2 Overview
+
+L<./bin/info2pod> converts GNU info data
+to POD format [L<http://www.perldoc.com/perl5.6/pod/perlpod.html>]
+for easy transcription to various formats like HTML.
+L<./bin/info2man> is a wrapper for C<info2pod> to convert info files
+into C<nroff -man> format.
+
+My personal L<man command|man>
+knows to use this on info files to pretend they're
+part of the normal UNIX man documentation.
+I just add the info directories to my C<$MANPATH> and go!
+
+=head2 Download
+
+The L<./info2man.tar.gz> tarball
+contains the two scripts and the necessary Perl modules.
+
+=head2 Rant
+
+Why info2pod?
+
+=over 4
+
+=item info's too stupid to read stdin
+
+So incorporating it into other tools sucks.
+
+=item I want my ordinary "man" command to find info files
+
+And now it does, presenting the info files nicely paged
+with my I<preferred> pager
+rather than info's baroque viewer.
+
+=item Many GNU manual pages are insultingly empty
+
+Many GNU people seem to be arrogant scum
+in that they produce farces of manual entries,
+each prefaced with "we like info,
+so we don't maintain this page, and it's probably
+a pack of lies - go read the info file".
+
+Of course,
+the only way to do that is to fire up emacs or to
+use their weird info tool, which doesn't act much
+like a pager at all and violates the "use my preferred pager"
+approach people should be able to expect.
+
+=back

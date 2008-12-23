@@ -1,0 +1,17 @@
+=head1 histbackup and histbackup-prune
+
+=head2 Overview
+
+L<./bin/histbackup>
+makes datestamped snapshots of a directory
+(possibly remote)
+with incremental cost for each extra snapshot.
+
+See also: the manual L<./manuals/histbackup.1.html>.
+
+L<./bin/histbackup-prune>
+removes older snapshots from the archive
+if the free space in the filesystem is below a threshold,
+keeping a certain minimum number of snapshots regardless.
+
+Uses rsync [L<http://freshmeat.net/projects/rsync/">].

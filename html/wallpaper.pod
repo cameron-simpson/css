@@ -1,0 +1,57 @@
+=head1 Wallpaper / Desktop Background
+
+=keywords desktop graphics
+
+=head2 Overview
+
+L<./bin/mkwall>, to produce a scaled wallpaper from an image.
+L<./bin/rootbg>, to set the root background from an image.
+L<./bin/rbg>, to set a root backdrop from an image, keywords or via xplanet.
+L<./bin/xpl>, a wrapper for xplanet that may be used to set the root background.
+L<./bin/pickim> and L<./bin/imlist-search>,
+to choose an image from a collection by keyword.
+
+=head2 mkwall
+
+I<mkwall> takes an image file
+and returns the pathname of an image sizes suitably
+for use as a wallpaper.
+If the image is already the right size its own path is returned.
+Otherwise a cached scaled image is returned.
+
+=head2 rootbg
+
+I<rootbg> takes an image file,
+scales it with mkwall,
+and sets the root backdrop from it.
+
+=head2 rbg
+
+I<rbg> is the script I usually invoke to adjust the root background.
+It can set the default root background or a per-desktop one.
+Most simply it can be handed an image file to use for this.
+Alternatively it can be handed keywords,
+choosing images with I<pickim> below,
+and issue a menu to select one
+or simply list them to standard output.
+It can also run I<xplanet> via the I<xpl> wrapper (below).
+
+=head2 xpl
+
+This is a wrapper for the cool I<xplanet> http://freshmeat.net/projects/xplanet/
+that supplies extra convenience;
+see the manual [L<./manuals/xpl.1.html>] for details.
+Two notable additions are facility to set an configuration file value
+on the command line
+and to more flexible image search facilities.
+
+=head2 pickim and imlist-search
+
+Chooses image pathnames from image collections.
+Generally used to pick images for wallpaper,
+of can be told to choose wide or tall images
+(eg for wallpaper or menu backgrounds),
+images over a certain resolution
+(which improves the offerings for wallpaper),
+select or reject by pathname keywords
+and chooses larger images more often than small ones.

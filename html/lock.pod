@@ -1,0 +1,14 @@
+=head1 lock - obtain a lock then run a command - NFS-safe
+
+=keywords files automation
+
+=head2 Overview
+
+L<./bin/lock>
+(manual: L<./manuals/lock.1.html>)
+obtains a lock and then runs a command.
+Multihost and NFS-safe, orignally done entirely in shell,
+now in perl because high lock contention used to blow the load
+average through the roof with the mkdir fork/exec load.
+The script L<./bin/note> uses this to ensure atomic
+access to the log files it writes.

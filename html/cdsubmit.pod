@@ -1,0 +1,10 @@
+=head1 cvsubmit and cddiscinfo
+
+=keywords cd
+
+=head2 Overview
+
+L<./bin/cdsubmit>
+and its subsidiary L<./bin/cddiscinfo>
+are used for submitting audio CD descriptions
+to FreeDB L<http://www.freedb.org/>.

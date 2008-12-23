@@ -1,0 +1,189 @@
+=head1 SSH automation tools
+
+=keywords sysadmin automation
+
+=head2 Overview
+
+An assortment of useful scripts
+for working with ssh(1).
+
+=head2 sshto - bang-style ssh to do multihop ssh
+
+Sometimes it is necessary to ssh to one host
+and then ssh again to another to do your intended work.
+A typical example is sshing into a firewalled environment
+where ssh delivers you to some terminus machine for outsiders,
+and thus an extra hop is needed to deliver you to your required
+machine within the LAN.
+L<./bin/sshto>
+performs this for you for an arbitrary number of hops,
+utilising the venerable UUCPlike bang syntax, eg:
+
+	sshto somewhere!host2!host3 command
+
+which would run I<command> on C<host3>,
+reached by sshing to C<somewhere>, then to C<host2>, then to C<host3>.
+Shells with bang style command history substitution may need to escape
+the bangs:
+
+	sshto somewhere\!host2\!host3 command
+
+As with C<ssh>,
+I<command> is a piece of shell.
+It is suitably escaped by C<sshto> to run unscathed on the final host.
+
+This lets you do nifty things like:
+
+	rsync -e sshto somewhere!host2:/blah/. /blah/.
+
+In addition to accepting the usual C<ssh> options
+C<sshto> also accepts arguments of the form
+C<I<confgi>=I<value>>
+and creates C<-o 'I<config> I<value>'> options
+because it has long narked me that C<ssh> itself does not do this.
+
+=head2 bgssh - background ssh with tagged output
+
+L<./bin/bgssh>
+runs an ssh command in the background and prefixes the output with a tag.
+This is especially useful when I'm doing things to many hosts in parallel:
+
+	for h in list-of-hosts...
+	do  bgssh "$h" command...
+	done
+
+That way if something interesting happens (or blows up)
+you know which host had the problem.
+
+An alternative approach is:
+
+	for h in list-of-hosts...
+	do  pfx "$h" ssh -f "$h" command...
+	done
+
+See also C<ngssh> below
+and L<./bin/pfx>.
+
+=head2 ngssh - netgroup-wide bgssh
+
+L<./bin/ngssh>
+does a C<bgssh> to the members of a netgroup.
+Example:
+
+	ngssh unix /opt/script/syncopt -x
+
+to run L<syncopt|syncopt>
+on all unix hosts after an install on the central server.
+
+=head2 no-ssh-agent - run command without prevailing ssh-agent settings
+
+L<./bin/no-ssh-agent>
+runs a command or a shell without an C<ssh-agent>.
+I find this necessary when doing passphraseless VPN stuff with ssh
+because ssh happily ignores the B<-i> flag
+on the command line if you have an active ssh-agent,
+which is most undesirable.
+See also C<nphssh>, below.
+
+=head2 nphssh - no-passphrase ssh invocation
+
+L<./bin/nphssh>
+runs an agentless ssh with a passphraseless key file,
+typically for making a VPN or other special purpose connection.
+See also C<vpnssh>, below.
+
+=head2 rig-ssh-agent - rig up a permanent ssh-agent
+
+L<./bin/rig-ssh-agent> and L<./bin/get-ssh-agent>
+set up a daemonised ssh-agent process to keep ssh keys across login
+sessions.
+C<rig-ssh-agent> establishes an ssh-agent for this purpose
+if one is not already present.
+C<rig-ssh-agent> emits shell commands to attach to this agent,
+and is thus used:
+
+	eval `get-ssh-agent`
+
+B<Note well>:
+this is a weakening of security
+because the agent is there and accessible even when you are
+away from your machine.
+However, I can live with this because I am normally logged in with
+an agent most of the time anyway, and that agent is no more secure
+than the daemonised one.
+You must make your own evaluation on this score.
+
+=head2 hotfwd - on-demand remote netcat via ssh tunnel
+
+I have a system in use on my laptop
+for location independent VPN-like access to remote TCP services
+that is based on ssh port forwards.
+
+My scheme is to
+bring up logical interfaces on C<lo:1>, C<lo:2> etc
+numbered 127.0.0.2, 127.0.0.3 etc
+at boot.
+For mnemonic purposes I have matching entiries in my C</etc/hosts> file
+mapping these numbers to C<zip.local> and so forth,
+naming the various locations to which I desire tunnels.
+
+For each remote site there is an ssh invocation ready to hand
+to bring up an ssh connection
+to that site, with port forwards bound to the appproriate logical interface.
+In this way the same port/service can be offered for various remote locations
+without juggling conflicting port numbers and inventing tedious numering schemes.
+
+Previous incarnations of this scheme used B<rnc> (below),
+and ran a B<tcpio>
+listening on the appropriate port on the C<lo:X> interface associated with that location,
+that invoked an ssh connection that ran B<netcat>
+to connection to the service.
+This upside to that was that setup was simple
+and a persistent connection (that could then die during coinnection dificulties or changes)
+was not made.
+The downside of this was that service connection required a fresh ssh connection.
+That is unduly burdensome to the remote host
+(especially if multiple connections were in use at once)
+and also introduced annoying latency (no big deal for, say, outgoing SMTP traffic
+but very irritating for something like a web proxy connection).
+
+The B<hotfwd> scheme uses only one ssh connection for a given remote site.
+
+=head2 rnc - remote netcat
+
+[Superceded by B<hotfwd>.]
+L<./bin/rnc>
+runs a netcat on a remote host
+using ssh to get there if necessary.
+
+I usually use it in conjunction with L<./bin/tcpio>
+to set up local access to remote services
+as described under B<hotfwd>, above.
+
+Using this scheme I have things like this:
+
+	! tcpio -a zip.local:smtp rnc -u vpn -i /home/vpn/.ssh/2smtp zip smtp smtp &
+	! tcpio -a zip.local:pop3 rnc -u vpn -i /home/vpn/.ssh/2pop zip pop pop3 &
+
+in my L<rc.mobile> configuration.
+Those two lines set up C<tcpio>s listening on the SMTP and POP3 ports
+on the C<zip.local> interface.
+Connectioning to one of these spawns an C<rnc> command that connects to C<zip>
+and thence via C<nc> to the desired service,
+and so the same service appears transparently on my local machine,
+securely tunnels from C<zip>.
+I can then, for example, collect my email by pointing C<fetchmail>
+directly at the C<pop3> port on the C<zip.local> interface.
+
+=head2 vpnssh and portfwd - crude VPN-like facilities
+
+[Superceded by B<rnc>, in turn superceded by B<hotfwd>.]
+L<./bin/vpnssh> and L<./bin/portfwd>
+are what I used to use for setting up VPNs between home and work and my ISP.
+Well, actually long running background ssh sessions with port forwards,
+not true VPNs.
+C<Portfwd> just knows what sshes and port forwardings to do
+based on my locale,
+and calls C<vpnssh> suitably to set things up.
+
+I now mostly use L<./bin/tcpio> and L<rnc|nc - remote netcat> above.

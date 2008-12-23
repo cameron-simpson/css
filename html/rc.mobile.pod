@@ -1,0 +1,162 @@
+=head1 rc.mobile - configurable startup for mobile hosts
+
+=keywords sysadmin
+
+=head2 Overview
+
+L<./bin/rc.mobile>
+this is a startup script
+mostly aimed at mobile machines which are booted in different places.
+It takes a simple config file
+that specifies the services desired and any config files to customise.
+Typical use prompts for the current location early in the boot sequence.
+
+Also see the manual: L<./manuals/rc.mobile.1.html>.
+
+It runs startup scripts in parallel
+which results in significantly faster bootup
+than the usual sequential startup
+and has facilities for waiting for prerequisite services
+where timimg dependencies do exist.
+
+Because it runs the startup files as shipped from your vendor,
+setup requires very little customisation of your system.
+
+=head2 Example configuration file
+
+As examples,
+here is the F</etc/rc.mobile.conf> file for my RedHat 9 laptop "C<newt>":
+L<./rc.mobile.conf-newt>,
+and for my Fedora Core 2 laptop "C<kirsty>":
+L<./rc.mobile.conf-kirsty>.
+Even on C<newt>,
+with its 233MHz processor, slow disc and 96MB of RAM,
+startup is much faster than the normal sequential startup
+of standard machines.
+
+=head2 Installation
+
+Installation is as follows:
+
+=over 4
+
+=item Make the file C</etc/rc.mobile.conf>,
+
+Use the example [L<./newt-rc.mobile.conf>] as a template.
+
+=item Make sure F</opt/css/bin> is available after F</etc/rc.sysinit> has run.
+
+If F</opt/css> is part of the root filesystem you'll be fine.
+On RedHat systems you should also be fine because the local filesystems
+are mounted by F</etc/rc.sysinit>.
+
+=item Run C<rc.mobile> from F</etc/rc.local>
+
+Add the line:
+
+	/opt/css/bin/rc.mobile start
+
+to the F</etc/rc.local> file.
+
+Note: the script prompts for you current location,
+offering a choice of all the rc.mobile.conf clauses
+whose names start with an @.
+The default clause name comes from
+from the environment variable C<$SYSTEMID>,
+falling back to "C<home>" if this is not set.
+So if you are usually elsewhere
+you may want to make the invocation:
+
+	SYSTEMID=where /opt/css/bin/rc.mobile start
+
+setting I<where> to the name of the location clause you would usually use
+(without the leading ``C<@>'').
+
+=item Disable most startup services
+
+Because C<rc.mobile> will be starting these
+according to your instructions in the F</etc/rc.mobile.conf> file
+the normal service startups should be disabled.
+
+For a RedHat system walk through the startup services listed by:
+
+	chkconfig --list | grep :on
+
+making sure that
+(a) you want them
+and (b) they're named in the C<rc.mobile.conf> file
+in the appropriate clauses.
+Of course in some locations you will want different services.
+
+For each such service (except for C<keytable>),
+add it to the config file
+and turn it off in the default startup:
+
+	chkconfig --level 2345 service off
+
+where I<service> is the service to disable.
+
+=back
+
+When you're finished the chkconfig(8) command should
+look nice and spartan:
+
+	[~]@newt*> chkconfig --list | grep :on
+	keytable        0:off   1:on    2:off   3:off   4:off   5:off   6:off
+	[~]@newt*> 
+
+Isn't that nice!
+
+I left C<keytable> in there for two reasons.
+Firstly it seemed one of basics needed to make your console sane.
+And secondly when I was testing C<rc.mobile> on an "up"
+laptop with an X11 desktop running
+it totally trashed the keyboard mapping.
+Had to power cycle!
+
+There are five types of lines in the config file:
+
+=over 4
+
+=item F</path/to/file>
+
+This copies the file F</path/to/file.I<where>>
+to the named file.
+
+=item C</path/to/dir/>
+
+This copies the directory F</path/to/dir.I<where>>
+to the named directory using rsync(1).
+
+=item C<use I<clause>>>
+
+Run the named I<clause>.
+
+=item C<svc I<service>...>
+
+Dispatch the named services in parallel.
+Don't wait for them.
+This is done by running the command:
+
+      /etc/init.d/service start
+
+B<Note>:
+service names must be valid shell identifiers
+(letters, underscores and digits).
+If some startup file is I<not> named like that,
+make a suitably named symlink to it and use that.
+
+=item C<need I<service>...>
+
+Wait for the named C<services> to start up before proceeding.
+If they haven't been dispatched already,
+dispatch them as with C<svc>.
+
+=item C<! I<shcmd>>
+
+Run the shell command I<shcmd>.
+Wait for it to finish.
+Naturally,
+put an ``&'' on the end if you don't want to wait.
+
+=back

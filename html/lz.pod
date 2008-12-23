@@ -1,0 +1,35 @@
+=head1 lz and multips - PostScript printing tools
+
+=keywords printing
+
+=head2 Overview
+
+L<./bin/lz>
+is a wrapper for lp(1) or lpr(1) or whatever
+print facility is native to your system
+and accepts text, postscript and PDF as input,
+converting all to postscript and delivering to printers
+via the native print subsystem.
+L<./bin/multips> is called internally by C<lz>
+to layout multiple logical sheets to a physical sheet.
+
+I wrote C<lz> for a heterogeneoussystem
+to save users remembering which print commands were
+native to the system they're on, and to remove the data format
+dependence of these commands.
+It accepts many options,
+passing them to C<multips>, the print commands, and the
+intermediate filters as appropriate.
+(In fact, some people use it instead of C<multips>
+with a print target of "C<-P->", which means stdout.)
+
+As an example, I routinely use "C<lz -4 -C -dv>"
+as my print command from netscape/mozilla/firefox.
+
+C<multips> is a postscript filter which puts multiple
+logical postscript pages on a single sheet
+with optional dividers and handles landscape/portrait mode choices
+and tumblemode control.
+It is based on C<multi.ps>,
+a groovy piece of PostScript written by
+Ross Cartlidge [L<//www-personal.usyd.edu.au/~rossc/> L<mailto:rcartlid@cisco.com>].

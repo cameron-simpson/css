@@ -1,0 +1,15 @@
+=head1 necho - echo without newline
+
+=keywords automation
+
+=head2 Overview
+
+L<./bin/necho>: echo without newline.
+Just a simple wrapper to make the correct system-dependent
+echo(1) incantation for a prompt or progress remark.
+Now all my scripts use necho instead of embedding some
+non-portable incantation all through them.
+
+=head2 See Also
+
+L<./bin/ask>

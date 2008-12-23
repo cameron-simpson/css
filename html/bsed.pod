@@ -1,0 +1,17 @@
+=head1 BSED - batch mode sed wrapper
+
+=keywords edit
+
+=head2 Overview
+
+L<./bin/bsed> is "batch sed",
+a wrapper for sed which batch edits multiple files,
+optionally reporting changes and making backups.
+
+Unlike "perl -i" and some other tools,
+bsed takes care to overwrite the original
+instead of making a new one in its place,
+thus preserving permissions, ownership and links.
+
+Usage is pretty much just like sed
+except that the named files are edited in place.

@@ -1,0 +1,22 @@
+=head1 t, v, x - TOC, view and extract files
+
+=keywords files
+
+=head2 Overview
+
+L<./bin/t>: do a table of contents of an archive file.
+L<./bin/synonyms/v>: view a file using the viewer in the mailcap(5).
+L<./bin/synonyms/x>: extract an archive file.
+
+This saves I<much> hacking about with complicated command lines
+as they embody all the decompression and decryption incantations
+automatically.
+In fact their knowledge comes from the mailcap(5) file,
+extracted with the L<mailcap|mailcap> script.
+
+You may also be interested in L<./bin/fixexts>
+which uses the C<file(1)> command to correct the extensions on
+mislabelled files
+(which I find quite useful with netscape downloads because it
+has a tendency to, say, decompress compressed downloads but
+not rip off the .gz extension, etc).

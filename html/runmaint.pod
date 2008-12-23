@@ -1,0 +1,16 @@
+=head1 Runmaint
+
+=keywords sysadmin
+
+=head2 Overview
+
+L<./bin/runmaint>
+is a wrapper for cron jobs which puts meaningful subject lines on
+email containing the output, provides a more complete
+environment than cron's fairly spartan one,
+and knows about host and frequency specific sub-scripts.
+This lets you write a very simple crontab
+and move all the complexity into a F<~/.maint> directory
+for easy manipulation.
+
+See the manual L<./manuals/runmaint.1.html> for detail.

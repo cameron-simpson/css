@@ -1,0 +1,17 @@
+=head1 rsmirror
+
+=keywords sysadmin
+
+=head2 Overview
+
+L<./bin/rsmirror> maintains a mirror of a set of rsync repositories.
+
+Also see the manual entry: L<./manuals/rsmirror.1.html>.
+
+=head2 Installation
+
+It's just a script - put it in your command C<$PATH>.
+It requires rsync(1) for rsync repositories
+and wget(1) for http repositories.
+If you use the B<-t> timeout option
+you will need my L<./bin/timeout> script as well.
