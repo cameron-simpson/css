@@ -38,7 +38,7 @@ scriptfromman(manf) = $(manf FP)
 _home:
         skip=`hg status | sed -n 's:^? \(.*\):--exclude=/\1:p'` \
         set-x \\
-        rsync -av --delete \\
+        qrsync -a --delete \\
                 --include=/CHANGELOG.txt \\
                 $$skip \\
                 --include=bos/ \\
@@ -49,9 +49,9 @@ _home:
                 --exclude=/\*/ \\
                 bin/. $(HOME)/bin/. \
         set-x \\
-        rsync -av bos/. $(HOME)/bin/.
+        qrsync -a bos/. $(HOME)/bin-bos/.
         set-x \\
-        rsync -av --delete \\
+        qrsync -a --delete \\
                 --include=/CHANGELOG.txt \\
                 $$skip \\
                 --exclude=*.swp \\
@@ -106,7 +106,7 @@ _scriptmans:
 	@echo make $@ ... \
         ( cd bin; exec egrep -l '^(# *)?=head1 NAME' $(allscripts) ) \\
 	| sed 's|.*|$(scriptmandir)/&.1|' \\
-	| xxargs set-x $(MAKE) MANDIR=$(MANDIR)
+	| xxargs $(MAKE) MANDIR=$(MANDIR)
 
 $(scriptmandir)/%.1: bin/%
 	:make $(@D)/.
