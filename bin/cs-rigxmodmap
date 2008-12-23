@@ -29,6 +29,7 @@
   echo add control = Caps_Lock
 
   echo add mod1 = Meta_L Meta_R Alt_L
+  echo clear mod2
 ) | xmodmap -
 
 xptr132
