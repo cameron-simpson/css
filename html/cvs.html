@@ -1,0 +1,75 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+<title>cvs - CSS</title>
+<link rev="made" href="mailto:root@localhost" />
+</head>
+
+<body style="background-color: white">
+<a href="./">&lt;= back to main index<p>
+
+<p><a name="__index__"></a></p>
+<!-- INDEX BEGIN -->
+
+<ul>
+
+	<li><a href="#cvs_tools">CVS Tools</a></li>
+	<ul>
+
+		<li><a href="#overview">Overview</a></li>
+		<li><a href="#cvsedit">cvsedit</a></li>
+		<li><a href="#cvslog2html_and_cvslog">cvslog2html and cvslog</a></li>
+	</ul>
+
+</ul>
+<!-- INDEX END -->
+
+<hr />
+<p>
+</p>
+<h1><a name="cvs_tools">CVS Tools</a></h1>
+<SMALL>Last modified: Apr 11 10:38</SMALL><BR><p>
+</p>
+<h2><a name="overview">Overview</a></h2>
+<p><code><a href="bin/cvsedit">cvsedit</a></code>, for making single changes to CVS files.
+<code><a href="bin/cvslog2html">cvslog2html</a></code>,
+which transcribes the CVS change log to HTML or plain text
+(example: <code><a href="bin/CHANGELOG.html">CHANGELOG.html</a></code>).
+<code><a href="bin/cvslog">cvslog</a></code>, to view the change log at the command prompt.</p>
+<p>
+</p>
+<h2><a name="cvsedit">cvsedit</a></h2>
+<p>Common CVS practice is to edit several files
+and then when ready, commit them all as a single change.
+However, there are circumstances when your workflow
+is to make a single well defined change to a single file
+and commit that as a change,
+for example to edit a DNS zone file
+to add an entry
+or to edit a system control file.
+<code>cvsedit</code> is for that use.</p>
+<p>Interactively,
+cvsedit prompts for a single line change description,
+updates and locks the file in your checkout,
+runs your default editor on the file,
+then commits the file with your change comment.
+This prevents races in shared checkouts
+and does the tedious <code>cvs update</code>...<code>cvs commit</code>
+sequence.</p>
+<p>In batch mode
+<code>cvsedit</code> can be used to programmaticly
+edit a file and commit the change.
+Example:</p>
+<pre>
+        $ cvsedit -m &quot;change foo to bar&quot; bsed 's/foo/bar/'</pre>
+<p>
+</p>
+<h2><a name="cvslog2html_and_cvslog">cvslog2html and cvslog</a></h2>
+<p>I use <code>cvslog2html</code> to write CHANGELOG files.
+It produces a quite readable list of change comments
+and the files to which they apply.
+<code>cvslog</code> is used interactively to pop that log up for convenient perusal.</p>
+
+</body>
+
+</html>

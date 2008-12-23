@@ -1,0 +1,91 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+<title>wallpaper - CSS</title>
+<link rev="made" href="mailto:root@localhost" />
+</head>
+
+<body style="background-color: white">
+<a href="./">&lt;= back to main index<p>
+
+<p><a name="__index__"></a></p>
+<!-- INDEX BEGIN -->
+
+<ul>
+
+	<li><a href="#wallpaper___desktop_background">Wallpaper / Desktop Background</a></li>
+	<ul>
+
+		<li><a href="#overview">Overview</a></li>
+		<li><a href="#mkwall">mkwall</a></li>
+		<li><a href="#rootbg">rootbg</a></li>
+		<li><a href="#rbg">rbg</a></li>
+		<li><a href="#xpl">xpl</a></li>
+		<li><a href="#pickim_and_imlistsearch">pickim and imlist-search</a></li>
+	</ul>
+
+</ul>
+<!-- INDEX END -->
+
+<hr />
+<p>
+</p>
+<h1><a name="wallpaper___desktop_background">Wallpaper / Desktop Background</a></h1>
+<SMALL>Last modified: Jul 18 17:43</SMALL><BR><p>
+</p>
+<h2><a name="overview">Overview</a></h2>
+<p><code><a href="bin/mkwall">mkwall</a></code>, to produce a scaled wallpaper from an image.
+<code><a href="bin/rootbg">rootbg</a></code>, to set the root background from an image.
+<code><a href="bin/rbg">rbg</a></code>, to set a root backdrop from an image, keywords or via xplanet.
+<code><a href="bin/xpl">xpl</a></code>, a wrapper for xplanet that may be used to set the root background.
+<code><a href="bin/pickim">pickim</a></code> and <code><a href="bin/imlist-search">imlist-search</a></code>,
+to choose an image from a collection by keyword.</p>
+<p>
+</p>
+<h2><a name="mkwall">mkwall</a></h2>
+<p><em>mkwall</em> takes an image file
+and returns the pathname of an image sizes suitably
+for use as a wallpaper.
+If the image is already the right size its own path is returned.
+Otherwise a cached scaled image is returned.</p>
+<p>
+</p>
+<h2><a name="rootbg">rootbg</a></h2>
+<p><em>rootbg</em> takes an image file,
+scales it with mkwall,
+and sets the root backdrop from it.</p>
+<p>
+</p>
+<h2><a name="rbg">rbg</a></h2>
+<p><em>rbg</em> is the script I usually invoke to adjust the root background.
+It can set the default root background or a per-desktop one.
+Most simply it can be handed an image file to use for this.
+Alternatively it can be handed keywords,
+choosing images with <em>pickim</em> below,
+and issue a menu to select one
+or simply list them to standard output.
+It can also run <em>xplanet</em> via the <em>xpl</em> wrapper (below).</p>
+<p>
+</p>
+<h2><a name="xpl">xpl</a></h2>
+<p>This is a wrapper for the cool <em>xplanet</em> <a href="http://freshmeat.net/projects/xplanet/">http://freshmeat.net/projects/xplanet/</a>
+that supplies extra convenience;
+see the manual [<code><a href="manuals/xpl.1.html">xpl.1.html</a></code>] for details.
+Two notable additions are facility to set an configuration file value
+on the command line
+and to more flexible image search facilities.</p>
+<p>
+</p>
+<h2><a name="pickim_and_imlistsearch">pickim and imlist-search</a></h2>
+<p>Chooses image pathnames from image collections.
+Generally used to pick images for wallpaper,
+of can be told to choose wide or tall images
+(eg for wallpaper or menu backgrounds),
+images over a certain resolution
+(which improves the offerings for wallpaper),
+select or reject by pathname keywords
+and chooses larger images more often than small ones.</p>
+
+</body>
+
+</html>

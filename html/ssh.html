@@ -1,0 +1,210 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+<title>ssh - CSS</title>
+<link rev="made" href="mailto:root@localhost" />
+</head>
+
+<body style="background-color: white">
+<a href="./">&lt;= back to main index<p>
+
+<p><a name="__index__"></a></p>
+<!-- INDEX BEGIN -->
+
+<ul>
+
+	<li><a href="#ssh_automation_tools">SSH automation tools</a></li>
+	<ul>
+
+		<li><a href="#overview">Overview</a></li>
+		<li><a href="#sshto__bangstyle_ssh_to_do_multihop_ssh">sshto - bang-style ssh to do multihop ssh</a></li>
+		<li><a href="#bgssh__background_ssh_with_tagged_output">bgssh - background ssh with tagged output</a></li>
+		<li><a href="#ngssh__netgroupwide_bgssh">ngssh - netgroup-wide bgssh</a></li>
+		<li><a href="#nosshagent__run_command_without_prevailing_sshagent_settings">no-ssh-agent - run command without prevailing ssh-agent settings</a></li>
+		<li><a href="#nphssh__nopassphrase_ssh_invocation">nphssh - no-passphrase ssh invocation</a></li>
+		<li><a href="#rigsshagent__rig_up_a_permanent_sshagent">rig-ssh-agent - rig up a permanent ssh-agent</a></li>
+		<li><a href="#hotfwd__ondemand_remote_netcat_via_ssh_tunnel">hotfwd - on-demand remote netcat via ssh tunnel</a></li>
+		<li><a href="#rnc__remote_netcat">rnc - remote netcat</a></li>
+		<li><a href="#vpnssh_and_portfwd__crude_vpnlike_facilities">vpnssh and portfwd - crude VPN-like facilities</a></li>
+	</ul>
+
+</ul>
+<!-- INDEX END -->
+
+<hr />
+<p>
+</p>
+<h1><a name="ssh_automation_tools">SSH automation tools</a></h1>
+<SMALL>Last modified: Aug 26 12:49</SMALL><BR><p>
+</p>
+<h2><a name="overview">Overview</a></h2>
+<p>An assortment of useful scripts
+for working with ssh(1).</p>
+<p>
+</p>
+<h2><a name="sshto__bangstyle_ssh_to_do_multihop_ssh">sshto - bang-style ssh to do multihop ssh</a></h2>
+<p>Sometimes it is necessary to ssh to one host
+and then ssh again to another to do your intended work.
+A typical example is sshing into a firewalled environment
+where ssh delivers you to some terminus machine for outsiders,
+and thus an extra hop is needed to deliver you to your required
+machine within the LAN.
+<code><a href="bin/sshto">sshto</a></code>
+performs this for you for an arbitrary number of hops,
+utilising the venerable UUCPlike bang syntax, eg:</p>
+<pre>
+        sshto somewhere!host2!host3 command</pre>
+<p>which would run <em>command</em> on <code>host3</code>,
+reached by sshing to <code>somewhere</code>, then to <code>host2</code>, then to <code>host3</code>.
+Shells with bang style command history substitution may need to escape
+the bangs:</p>
+<pre>
+        sshto somewhere\!host2\!host3 command</pre>
+<p>As with <code>ssh</code>,
+<em>command</em> is a piece of shell.
+It is suitably escaped by <code>sshto</code> to run unscathed on the final host.</p>
+<p>This lets you do nifty things like:</p>
+<pre>
+        rsync -e sshto somewhere!host2:/blah/. /blah/.</pre>
+<p>In addition to accepting the usual <code>ssh</code> options
+<code>sshto</code> also accepts arguments of the form
+<code>confgi=value</code>
+and creates <code>-o 'config value'</code> options
+because it has long narked me that <code>ssh</code> itself does not do this.</p>
+<p>
+</p>
+<h2><a name="bgssh__background_ssh_with_tagged_output">bgssh - background ssh with tagged output</a></h2>
+<p><code><a href="bin/bgssh">bgssh</a></code>
+runs an ssh command in the background and prefixes the output with a tag.
+This is especially useful when I'm doing things to many hosts in parallel:</p>
+<pre>
+        for h in list-of-hosts...
+        do  bgssh &quot;$h&quot; command...
+        done</pre>
+<p>That way if something interesting happens (or blows up)
+you know which host had the problem.</p>
+<p>An alternative approach is:</p>
+<pre>
+        for h in list-of-hosts...
+        do  pfx &quot;$h&quot; ssh -f &quot;$h&quot; command...
+        done</pre>
+<p>See also <code>ngssh</code> below
+and <code><a href="bin/pfx">pfx</a></code>.</p>
+<p>
+</p>
+<h2><a name="ngssh__netgroupwide_bgssh">ngssh - netgroup-wide bgssh</a></h2>
+<p><code><a href="bin/ngssh">ngssh</a></code>
+does a <code>bgssh</code> to the members of a netgroup.
+Example:</p>
+<pre>
+        ngssh unix /opt/script/syncopt -x</pre>
+<p>to run <a href="././syncopt.html">syncopt</a>
+on all unix hosts after an install on the central server.</p>
+<p>
+</p>
+<h2><a name="nosshagent__run_command_without_prevailing_sshagent_settings">no-ssh-agent - run command without prevailing ssh-agent settings</a></h2>
+<p><code><a href="bin/no-ssh-agent">no-ssh-agent</a></code>
+runs a command or a shell without an <code>ssh-agent</code>.
+I find this necessary when doing passphraseless VPN stuff with ssh
+because ssh happily ignores the <strong>-i</strong> flag
+on the command line if you have an active ssh-agent,
+which is most undesirable.
+See also <code>nphssh</code>, below.</p>
+<p>
+</p>
+<h2><a name="nphssh__nopassphrase_ssh_invocation">nphssh - no-passphrase ssh invocation</a></h2>
+<p><code><a href="bin/nphssh">nphssh</a></code>
+runs an agentless ssh with a passphraseless key file,
+typically for making a VPN or other special purpose connection.
+See also <code>vpnssh</code>, below.</p>
+<p>
+</p>
+<h2><a name="rigsshagent__rig_up_a_permanent_sshagent">rig-ssh-agent - rig up a permanent ssh-agent</a></h2>
+<p><code><a href="bin/rig-ssh-agent">rig-ssh-agent</a></code> and <code><a href="bin/get-ssh-agent">get-ssh-agent</a></code>
+set up a daemonised ssh-agent process to keep ssh keys across login
+sessions.
+<code>rig-ssh-agent</code> establishes an ssh-agent for this purpose
+if one is not already present.
+<code>rig-ssh-agent</code> emits shell commands to attach to this agent,
+and is thus used:</p>
+<pre>
+        eval `get-ssh-agent`</pre>
+<p><strong>Note well</strong>:
+this is a weakening of security
+because the agent is there and accessible even when you are
+away from your machine.
+However, I can live with this because I am normally logged in with
+an agent most of the time anyway, and that agent is no more secure
+than the daemonised one.
+You must make your own evaluation on this score.</p>
+<p>
+</p>
+<h2><a name="hotfwd__ondemand_remote_netcat_via_ssh_tunnel">hotfwd - on-demand remote netcat via ssh tunnel</a></h2>
+<p>I have a system in use on my laptop
+for location independent VPN-like access to remote TCP services
+that is based on ssh port forwards.</p>
+<p>My scheme is to
+bring up logical interfaces on <code>lo:1</code>, <code>lo:2</code> etc
+numbered 127.0.0.2, 127.0.0.3 etc
+at boot.
+For mnemonic purposes I have matching entiries in my <code>/etc/hosts</code> file
+mapping these numbers to <code>zip.local</code> and so forth,
+naming the various locations to which I desire tunnels.</p>
+<p>For each remote site there is an ssh invocation ready to hand
+to bring up an ssh connection
+to that site, with port forwards bound to the appproriate logical interface.
+In this way the same port/service can be offered for various remote locations
+without juggling conflicting port numbers and inventing tedious numering schemes.</p>
+<p>Previous incarnations of this scheme used <strong>rnc</strong> (below),
+and ran a <strong>tcpio</strong>
+listening on the appropriate port on the <code>lo:X</code> interface associated with that location,
+that invoked an ssh connection that ran <strong>netcat</strong>
+to connection to the service.
+This upside to that was that setup was simple
+and a persistent connection (that could then die during coinnection dificulties or changes)
+was not made.
+The downside of this was that service connection required a fresh ssh connection.
+That is unduly burdensome to the remote host
+(especially if multiple connections were in use at once)
+and also introduced annoying latency (no big deal for, say, outgoing SMTP traffic
+but very irritating for something like a web proxy connection).</p>
+<p>The <strong>hotfwd</strong> scheme uses only one ssh connection for a given remote site.</p>
+<p>
+</p>
+<h2><a name="rnc__remote_netcat">rnc - remote netcat</a></h2>
+<p>[Superceded by <strong>hotfwd</strong>.]
+<code><a href="bin/rnc">rnc</a></code>
+runs a netcat on a remote host
+using ssh to get there if necessary.</p>
+<p>I usually use it in conjunction with <code><a href="bin/tcpio">tcpio</a></code>
+to set up local access to remote services
+as described under <strong>hotfwd</strong>, above.</p>
+<p>Using this scheme I have things like this:</p>
+<pre>
+        ! tcpio -a zip.local:smtp rnc -u vpn -i /home/vpn/.ssh/2smtp zip smtp smtp &amp;
+        ! tcpio -a zip.local:pop3 rnc -u vpn -i /home/vpn/.ssh/2pop zip pop pop3 &amp;</pre>
+<p>in my <a href="././rc.mobile.html">the rc.mobile manpage</a> configuration.
+Those two lines set up <code>tcpio</code>s listening on the SMTP and POP3 ports
+on the <code>zip.local</code> interface.
+Connectioning to one of these spawns an <code>rnc</code> command that connects to <code>zip</code>
+and thence via <code>nc</code> to the desired service,
+and so the same service appears transparently on my local machine,
+securely tunnels from <code>zip</code>.
+I can then, for example, collect my email by pointing <code>fetchmail</code>
+directly at the <code>pop3</code> port on the <code>zip.local</code> interface.</p>
+<p>
+</p>
+<h2><a name="vpnssh_and_portfwd__crude_vpnlike_facilities">vpnssh and portfwd - crude VPN-like facilities</a></h2>
+<p>[Superceded by <strong>rnc</strong>, in turn superceded by <strong>hotfwd</strong>.]
+<code><a href="bin/vpnssh">vpnssh</a></code> and <code><a href="bin/portfwd">portfwd</a></code>
+are what I used to use for setting up VPNs between home and work and my ISP.
+Well, actually long running background ssh sessions with port forwards,
+not true VPNs.
+<code>Portfwd</code> just knows what sshes and port forwardings to do
+based on my locale,
+and calls <code>vpnssh</code> suitably to set things up.</p>
+<p>I now mostly use <code><a href="bin/tcpio">tcpio</a></code> and <a href="#nc_remote_netcat">rnc</a> above.</p>
+
+</body>
+
+</html>

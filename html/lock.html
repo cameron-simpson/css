@@ -1,0 +1,43 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+<title>lock - CSS</title>
+<link rev="made" href="mailto:root@localhost" />
+</head>
+
+<body style="background-color: white">
+<a href="./">&lt;= back to main index<p>
+
+<p><a name="__index__"></a></p>
+<!-- INDEX BEGIN -->
+
+<ul>
+
+	<li><a href="#lock__obtain_a_lock_then_run_a_command__nfssafe">lock - obtain a lock then run a command - NFS-safe</a></li>
+	<ul>
+
+		<li><a href="#overview">Overview</a></li>
+	</ul>
+
+</ul>
+<!-- INDEX END -->
+
+<hr />
+<p>
+</p>
+<h1><a name="lock__obtain_a_lock_then_run_a_command__nfssafe">lock - obtain a lock then run a command - NFS-safe</a></h1>
+<SMALL>Last modified: Apr 11 10:29</SMALL><BR><p>
+</p>
+<h2><a name="overview">Overview</a></h2>
+<p><code><a href="bin/lock">lock</a></code>
+(manual: <code><a href="manuals/lock.1.html">lock.1.html</a></code>)
+obtains a lock and then runs a command.
+Multihost and NFS-safe, orignally done entirely in shell,
+now in perl because high lock contention used to blow the load
+average through the roof with the mkdir fork/exec load.
+The script <code><a href="bin/note">note</a></code> uses this to ensure atomic
+access to the log files it writes.</p>
+
+</body>
+
+</html>

@@ -1,0 +1,518 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+<title>syncopt - CSS</title>
+<link rev="made" href="mailto:root@localhost" />
+</head>
+
+<body style="background-color: white">
+<a href="./">&lt;= back to main index<p>
+
+<p><a name="__index__"></a></p>
+<!-- INDEX BEGIN -->
+
+<ul>
+
+	<li><a href="#syncopt__a_flexible_and_simple_approach_to_package_install">syncopt - A Flexible and Simple Approach to Package Install</a></li>
+	<ul>
+
+		<li><a href="#overview">Overview</a></li>
+		<li><a href="#naming_issues">Naming Issues</a></li>
+		<li><a href="#file_tree_organisation">File Tree Organisation</a></li>
+		<li><a href="#using_syncopt">Using syncopt</a></li>
+		<ul>
+
+			<li><a href="#local_package_install">Local Package Install</a></li>
+			<li><a href="#undoing_a_local_package_install">Undoing a Local Package Install</a></li>
+			<li><a href="#bringing_a_client_into_sync_after_a_new_package_install">Bringing a Client into Sync after a New Package Install</a></li>
+			<li><a href="#/opt/.syncopt">/opt/.syncopt</a></li>
+		</ul>
+
+		<li><a href="#installing_packages_for_use_with_the_syncopt_scheme">Installing packages for use with the syncopt scheme</a></li>
+		<li><a href="#complication">Complication</a></li>
+		<ul>
+
+			<li><a href="#what_about_$path">What about $PATH?</a></li>
+			<li><a href="#what_about_permachine_dynamic_files">What about per-machine dynamic files?</a></li>
+		</ul>
+
+		<li><a href="#see_also">See Also</a></li>
+	</ul>
+
+</ul>
+<!-- INDEX END -->
+
+<hr />
+<p>
+</p>
+<h1><a name="syncopt__a_flexible_and_simple_approach_to_package_install">syncopt - A Flexible and Simple Approach to Package Install</a></h1>
+<SMALL>Last modified: Jun 4 11:03</SMALL><BR><p>
+</p>
+<h2><a name="overview">Overview</a></h2>
+<p>The <code><a href="bin/syncopt">syncopt</a></code> script and its associated work practices
+are yet another approach to the standard sysadmin problem
+of keeping multiple machines' software installations
+up to date.
+It is independent of the vendor's packaging scheme
+and thus you can use either your vendor's system or syncopt, or both!</p>
+<p>Also see the manual entry: <code><a href="manuals/syncopt.1.html">syncopt.1.html</a></code>.</p>
+<p>The core notion is that the install is done once
+on a central machine
+and then syncopt takes care of attaching that to every client,
+often via cron.</p>
+<p>Like most such solutions,
+syncopt has to achieve a few goals:</p>
+<ul>
+<li><strong><a name="item_easy_to_use">easy to use</a></strong><br />
+</li>
+<li><strong><a name="item_server">flexible enough to permit control
+	of what is installed locally on a machine
+	and what is served remotely from a central server
+	(for disc space or other reasons)</a></strong><br />
+</li>
+<li><strong><a name="item_keep_out_of_the_way_of_the_%22vendor%27s_namespace">keep out of the way of the ``vendor's namespace'',
+	to avoid treading on the vendor's install
+	and conversely to protect our additions from
+	damage by vendor upgrades and patches</a></strong><br />
+</li>
+</ul>
+<p>As implemented,
+syncopt achieves this with the following advantages:</p>
+<dl>
+<dt><strong><a name="item_lightweight">lightweight</a></strong><br />
+</dt>
+<dd>
+If a package is not to be installed local to a client
+then the burden is usually just two symlinks on the client.
+</dd>
+<p></p>
+<dt><strong><a name="item_optional">optional</a></strong><br />
+</dt>
+<dd>
+You can install packages with syncopt or with the vendor's
+packaging scheme,
+or both!
+</dd>
+<p></p>
+<dt><strong><a name="item_permits_trial_installs">permits trial installs</a></strong><br />
+</dt>
+<dd>
+Under syncopt you can install multiple versions
+of the same package for trial or legacy purposes.
+</dd>
+<p></p>
+<dt><strong><a name="item_centralised">centralised</a></strong><br />
+</dt>
+<dd>
+The default package version is controlled
+by a symlink on the master host; change that and
+all the clients will follow suit next time they run syncopt.
+</dd>
+<p></p>
+<dt><strong><a name="item_customisable">customisable</a></strong><br />
+</dt>
+<dd>
+Clients can control which packages are local
+and also override which version is their default for
+a given package.
+</dd>
+<p></p></dl>
+<p>It presumes you have a ``large'' main machine
+which can have an instance of everything installed on it
+and that your other machines generally have mostly-local
+core installs of the OS and main packages
+and probably run most of the optional stuff from the main server
+via NFS or other network filesystem.</p>
+<p>
+</p>
+<h2><a name="naming_issues">Naming Issues</a></h2>
+<p>We will approach the last criterion first,
+since it's crucial to having things work smoothly in the long run.
+The vendor namespace tends to be <em>/usr</em>
+and its children - <em>/usr/bin</em>, etc.
+So, we elect not to install there.
+Likewise, the ``user namespace'' or ``local customisation namespace''
+tends to be <em>/usr/local</em> and its children.
+Although our users could use a <em>/opt</em>
+style scheme, <em>/usr/local</em> is familiar
+and has its own conventions.</p>
+<p>Accordingly, I've taken a leaf out of Sun's book <a href="http://www.sun.com/">http://www.sun.com/</a>
+and used <em>/opt</em>
+for my syncopt scheme.
+This doesn't actually fly in the face of Sun,
+as Solaris packages are installed with names
+of the form <code>[A-Z]+[a-z0-9]+</code>.
+Syncopt generally uses names of the form <code>[a-z][a-z0-9]*-version</code>,
+so we can play happily in Sun's field without conflict.</p>
+<p>
+</p>
+<h2><a name="file_tree_organisation">File Tree Organisation</a></h2>
+<p>That decision made,
+here is how we have things arranged at my workplace:</p>
+<dl>
+<dt><strong><a name="item_%2fu%2fsyncopt"><em>/u/syncopt</em></a></strong><br />
+</dt>
+<dd>
+We have a special user called ``syncopt'' to store the master copies
+of everything to install in <em>/opt</em>.
+That way we can put the master repository wherever we like.
+</dd>
+<dd>
+<p>Under that directory is a subdirectory called <em>common</em>
+for the architecture independent stuff
+(config file, image/icon archives, scripts etc)
+and a subdirectory matching the <code>$ARCH</code> environment variable
+for the architecture dependent stuff
+(pretty well everything that gets compiled).</p>
+</dd>
+<dd>
+<p>Here's the directory listing from ours:</p>
+</dd>
+<dd>
+<pre>
+        % ls -la /u/syncopt/.
+        total 48
+        drwxr-xr-x    8 root     bin          8192 Oct 12 14:45 .
+        drwxr-xr-x   14 root     root         8192 Oct 11 15:05 ..
+        drwxrwsr-x   17 root     technic      8192 Oct 14 11:56 common
+        drwxrwsr-x    5 cameron  technic      8192 Sep  3 11:55 freebsd.x86.freebsd
+        drwxrwsr-x    2 root     geeks          96 Jul 20  2000 redhat.ppc.linux
+        drwxrwsr-x  184 cameron  geeks        8192 Oct 15 10:11 redhat.x86.linux
+        drwxrwsr-x  155 root     geeks        8192 Sep 20 11:36 sun.sparc.solaris
+        drwxrwsr-x    4 root     technic        96 Mar 13  2000 sun.sparc.sunos</pre>
+</dd>
+<p></p>
+<dt><strong><a name="item_%2fopt"><em>/opt</em></a></strong><br />
+</dt>
+<dd>
+<em>/opt</em>
+is a real, local, directory on every client machine.
+On machines which get most things from the server,
+this is a forest of symlinks
+pointing at the central copies
+in <em>/u/syncopt</em>.
+On machines with local copies of some things
+the local copies are real directories,
+exact images of those in the central <em>opt</em>
+directory and the non-local things are,
+of course,
+symlinks.
+</dd>
+<p></p></dl>
+<p>The purpose of the syncopt script itself is to make the <em>/opt</em> directory
+correctly configured with respect to <em>/u/syncopt</em>.</p>
+<p>The core algorithm is simple and conservative:
+for every subdirectory found in <em>/u/syncopt/<em>arch</em></em>
+or <em>/u/syncopt/common</em>,
+check the matching name in <em>/opt</em>.
+If it is missing,
+make it a symlink to the matching central item.
+If it is a directory, ensure the contents are an exact
+match for the central item,
+using <code>rsync(1)</code> <a href="http://rsync.samba.org/">http://rsync.samba.org/</a>.</p>
+<p>This behaviour can be overridden
+with the <em><a href="#/opt/.syncopt">/opt/.syncopt</a></em>
+configuration file as described below.</p>
+<p>
+</p>
+<h2><a name="using_syncopt">Using syncopt</a></h2>
+<p>
+</p>
+<h3><a name="local_package_install">Local Package Install</a></h3>
+<p>As a consequence, to make an instance of something local
+to a client machine (let's call it <em>pkg</em>, release <em>version</em>),
+remove the local symlink:</p>
+<pre>
+        $ rm /opt/pkg-version</pre>
+<p>Make a stub directory:</p>
+<pre>
+        $ mkdir /opt/pkg-version</pre>
+<p>Alternatively, just edit the <em>.syncopt</em> file and add this line:</p>
+<pre>
+        pkg-version local</pre>
+<p>Run syncopt:</p>
+<pre>
+        $ syncopt -x</pre>
+<p>That syncs everything. You can just do the new package like this:</p>
+<pre>
+        $ syncopt -x pkg pkg-version</pre>
+<p>which syncs the generic (unversioned) link and the version specific
+local directory.</p>
+<p>
+</p>
+<h3><a name="undoing_a_local_package_install">Undoing a Local Package Install</a></h3>
+<p>To make a once-local copy remote,
+remove the local copy:</p>
+<pre>
+        $ rm -rf /opt/pkg-version</pre>
+<p>Also, if you edited the <em>.syncopt</em> file as above,
+remove that line.</p>
+<p>Run syncopt:</p>
+<pre>
+        $ syncopt -x pkg pkg-version</pre>
+<p>
+</p>
+<h3><a name="bringing_a_client_into_sync_after_a_new_package_install">Bringing a Client into Sync after a New Package Install</a></h3>
+<p>To set up a new client's <em>/opt</em> directory
+after a fresh install:</p>
+<pre>
+        $ mkdir /opt    # if necessary
+        $ syncopt -x</pre>
+<p>
+</p>
+<h3><a name="/opt/.syncopt">/opt/.syncopt</a></h3>
+<p>The behaviour deduced from the presence or absence of a directory
+can be overridden with the <em>/opt/.syncopt</em> file,
+which contains line of the form:</p>
+<pre>
+        pkg version</pre>
+<p>to make <em>version</em> the default package version
+on this particular machine,
+or</p>
+<pre>
+        pkg local</pre>
+<p>to force a package to be local on this machine,
+or</p>
+<pre>
+        pkg-version local</pre>
+<p>to make a particular version local,
+or</p>
+<pre>
+        pkg nosync</pre>
+<p>to not run syncopt on it at all.</p>
+<p>
+</p>
+<h2><a name="installing_packages_for_use_with_the_syncopt_scheme">Installing packages for use with the syncopt scheme</a></h2>
+<p>A scheme such as this is naturally not useful without things to install
+this way.</p>
+<p>For very small packages
+(usually only a single command and matching manual entry)
+it's often not worth bothering with <em>/opt</em>,
+instead installing them in the traditional way with the executable in
+<em>/opt/bin</em>
+and the manual in <em>/opt/man</em>
+and so forth.</p>
+<p>For larger packages
+(netscape, emacs, vmware, the pbmtools, elm, mh, etc)
+the <em>/opt</em> comes into its own.</p>
+<p>When building the package from source or installing a binary distribution,
+tell the package to install in
+<em>/opt/<em>package</em>-<em>version</em></em>.</p>
+<p>Usually <em>version</em> is the release version,
+but occasionally I tack extra info into it, such as the build platform
+where <code>$ARCH</code> is too vague.
+For example, I use <strong>redhat.x86.linux</strong> for RedHat Linux platforms.
+Unfortunately, these are not always binary compatible
+and so I might make the version be <code>version-rh9</code> to indicate
+it was built on RedHat 9.
+In this way I can choose, say, a <code>-rh7</code> build for RedHat 7 boxes.</p>
+<p>For packages built with GNU autoconf
+[<a href="http://sourceware.cygnus.com/autoconf/">http://sourceware.cygnus.com/autoconf/</a>]
+this usually is as simple as adding the <code>--prefix</code> option
+to the <code>configure</code> run:</p>
+<pre>
+        $ ./configure --prefix=/opt/package-version</pre>
+<p>Do the build as normal.
+If it is successful,
+set your umask to 2 for the install.
+This presumes a group exists with write privileges in <em>/u/syncopt</em>
+(ours is called ``<code>geeks</code>''),
+then make the master directory and link it to the local <em>/opt</em>:</p>
+<pre>
+        $ umask 2
+        $ mkdir /u/syncopt/arch/pkg-version
+        $ ln -s /u/syncopt/arch/pkg-version /opt/.</pre>
+<p>then install as normal:</p>
+<pre>
+        $ make install</pre>
+<p>Then adjust the permissions on the master to prevent
+accidental damage in the future:</p>
+<pre>
+        $ cd /opt/pkg-version   # should take you into /u/syncopt
+        $ chmod -R a-w .</pre>
+<p>If that goes well, and this is to be the ``default'' version of the package,
+add the generic symlink:</p>
+<pre>
+        $ cd /u/syncopt/arch
+        $ rm -f pkg
+        $ ln -s pkg-version pkg</pre>
+<p>Then run syncopt
+or just make the same symlink in the local <em>/opt</em> by hand.
+In this way you can now talk about a generic <em>/opt/<em>package</em></em>
+in shell scripts, <em>/opt/<em>pkg</em>/bin</em> in <code>$PATH</code>
+and so forth
+without having these things know about the version.</p>
+<p>This has the added advantage that upgrades are done by
+installing the new version
+and switching the symlink in <em>/u/syncopt</em>.
+This way you can keep multiple versions around without conflict,
+which is often quite handy with unstable or experimental upgrades
+or for legacy uses.</p>
+<p>It is quite important to never mention <em>/u/syncopt</em>
+outside of this scheme - by having the package and everything which uses it
+believe firmly in <em>/opt</em>,
+making things local or shuffling versions ``just works''.</p>
+<p>Having done the central install in this way,
+saying:</p>
+<pre>
+        $ mkdir /opt
+        $ syncopt -x</pre>
+<p>on every client machine suffices to finish things off.
+This can be put in a nightly cron job
+on each machine if you desire.</p>
+<p>
+</p>
+<h2><a name="complication">Complication</a></h2>
+<p>It all seemed so easy, didn't it?
+Well, I've glossed over a few issues.
+Let's peel back the paint:</p>
+<p>
+</p>
+<h3><a name="what_about_$path">What about $PATH?</a></h3>
+<p>Everything you've installed in <em>/opt</em>
+will most likely not be in your users' <code>$PATH</code>
+or <code>$MANPATH</code>,
+so they won't be able to simply type the name of the package
+and have it work.</p>
+<p>There are three main approaches to correcting this situation:</p>
+<dl>
+<dt><strong><a name="item_add_a_special_path_to_%24path">Add a special path to <code>$PATH</code></a></strong><br />
+</dt>
+<dd>
+Edit your main <code>/etc/profile</code>
+to insert the relevant bits into your users'
+environment variables, eg:
+</dd>
+<dd>
+<pre>
+        PATH=$PATH:/opt/package/bin
+        export PATH</pre>
+</dd>
+<dd>
+<p>To keep central control of this kind of thing,
+here we keep this stuff a file in <em>/opt/config/shell</em>
+and simply source that from the <em>/etc/profile</em>.
+That way,
+aside from the initial edit of <em>/etc/profile</em>
+on each client machine (to add the source line),
+future package installs need only involve editing the central
+file in <em>/u/syncopt/common/config/shell</em> and rerunning syncopt.</p>
+</dd>
+<p></p>
+<dt><strong><a name="item_supply_a_small_wrapper_script">Supply a small wrapper script</a></strong><br />
+</dt>
+<dd>
+Another class of package is the package with one main command
+and a bunch of utility commands
+used only during a run of the main command.
+ELM [<a href="http://www.cis.ohio-state.edu/hypertext/faq/usenet/elm/FAQ/faq.html">http://www.cis.ohio-state.edu/hypertext/faq/usenet/elm/FAQ/faq.html</a>]
+and MH [<a href="http://www.faqs.org/faqs/mail/mh-faq/part1/preamble.html">http://www.faqs.org/faqs/mail/mh-faq/part1/preamble.html</a>]
+are classic cases of this;
+users usually run the main command (elm or mh or xmh)
+and the many little utilities are run within the system.
+Nevertheless the ``stock'' install puts innumerable utility
+executables in the main <em>bin</em>
+directory of the victi^Wtarget machine, many with horribly
+generic names like ``next'' or ``forward''.
+It is far better that these packages keep their utilities squirrelled away
+in places like <em>/opt/elm/bin</em>.
+Instead, we put a single wrapper script in <code>/opt/bin</code>
+which inserts the <code>/opt/package/bin</code>
+directory at the front of the <code>$PATH</code>
+and then execs the real executable.
+In this way the main package is accessible as normal
+and the general utility names do not pollute the default
+command namespace.
+For example, the my elm wrapper:
+</dd>
+<dd>
+<pre>
+        #!/bin/sh
+        PATH=/opt/elm/bin:$PATH
+        MANPATH=/opt/elm/man:$MANPATH
+        export PATH MANPATH
+        exec /opt/elm/bin/elm ${1+&quot;$@&quot;}</pre>
+</dd>
+<dd>
+<p>It is installed as <em>/opt/bin/elm</em>.</p>
+</dd>
+<dd>
+<p>Note: users who truly wish the package's utilities in their default <code>$PATH</code>
+can naturally add <em>/opt/<em>package</em>/bin</em>
+to their own path in their <code>.profile</code> file.</p>
+</dd>
+<p></p>
+<dt><strong><a name="item_populate_%2fopt%2fbin_etc_with_links">Populate <em>/opt/bin</em> etc with links</a></strong><br />
+</dt>
+<dd>
+Some packages have a single executable
+(like netscape)
+or genuinely have several executables with nice distinctive names
+(like netpbm [<a href="http://freshmeat.net/projects/netpbm/">http://freshmeat.net/projects/netpbm/</a>]).
+In that case the natural thing to do is to go to <code>/opt/bin</code>
+and add symlinks to the <code>executable(s)</code> and matching symlinks for
+the manual entries, eg:
+</dd>
+<dd>
+<pre>
+        $ cd /opt/bin
+        $ ln -s /opt/netscape/netscape
+        $ ln -s /opt/netscape-4.79/netscape netscape-4.79</pre>
+</dd>
+<dd>
+<p>or</p>
+</dd>
+<dd>
+<pre>
+        $ cd /opt/bin
+        $ ln -s /opt/netpbm/bin/* .
+        $ cd /opt/netpbm-10.17/bin
+        $ for bin in *
+        &gt; do ln -s /opt/netpbm-10.17/bin/$bin /opt/bin/$bin-10.17
+        &gt; done</pre>
+</dd>
+<dd>
+<p>Notice that we make both unversioned and version links
+so that users can run the default app or a specific version if needed.</p>
+</dd>
+<p></p></dl>
+<p>
+</p>
+<h3><a name="what_about_permachine_dynamic_files">What about per-machine dynamic files?</a></h3>
+<p>Some packages include their dynamic components in the install.
+For example,
+NNTPCache [<a href="http://www.nntpcache.org/">http://www.nntpcache.org/</a>]
+includes a <code>var</code> subdirectory
+to hold its news spool.</p>
+<p>My approach with these is to make a matching
+<em>/var/<em>package</em></em> subdirectory
+(or <em>/var/spool/<em>package</em></em> is appropriate)
+on the client machines which will run the package,
+and to make the <code>var</code> subdirectory
+in the install directory a symlink to <em>/var/<em>package</em></em>.
+This means that the package can continue to believe in its ``normal''
+install structure
+and still correctly access the local, dynamic files.
+It also protects those files from syncopt by shifting
+them out of the <a href="#item_%2fopt"><code>/opt</code></a> area.</p>
+<p>if there's significant structure to the ``var'' directory
+I tend to move it sideways in the install tree:</p>
+<pre>
+        $ cd /u/syncopt/redhat.x86.linux/nntpcache-3.0.1
+        $ mv var var.dist
+        $ ln -s /var/spool/nntpcache var</pre>
+<p>Then on any client machine that will actually run it:</p>
+<pre>
+        $ mkdir /var/spool/nntpcache
+        $ rsync -avHP /opt/nntpcache/var.dist/. /var/spool/nntpcache/.</pre>
+<p>and it's ready to go.</p>
+<p>
+</p>
+<h2><a name="see_also">See Also</a></h2>
+<p>RedHat [<a href="http://www.redhat.com/">http://www.redhat.com/</a>]'s RPM [<a href="http://www.rpm.org/">http://www.rpm.org/</a>].</p>
+<p>Debian [<a href="http://www.debian.org/.debian">http://www.debian.org/.debian</a>'s apt [<a href="http://www.debian.org/doc/manuals/apt-howto/index">http://www.debian.org/doc/manuals/apt-howto/index</a>].</p>
+<p>Sun Solaris [<a href="http://www.sun.com/software/solaris/">http://www.sun.com/software/solaris/</a>]' pkgadd [<a href="http://docs.sun.com/ab2/coll.47.8/SYSADV1/%40Ab2PageView/25509?DwebQuery=pkgadd&oqt=pkgadd&Ab2Lang=C&Ab2Enc=iso-8859-1">http://docs.sun.com/ab2/coll.47.8/SYSADV1/%40Ab2PageView/25509</a>].</p>
+
+</body>
+
+</html>

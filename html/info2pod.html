@@ -1,0 +1,87 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+<title>info2pod - CSS</title>
+<link rev="made" href="mailto:root@localhost" />
+</head>
+
+<body style="background-color: white">
+<a href="./">&lt;= back to main index<p>
+
+<p><a name="__index__"></a></p>
+<!-- INDEX BEGIN -->
+
+<ul>
+
+	<li><a href="#info2pod_and_info2man">info2pod and info2man</a></li>
+	<ul>
+
+		<li><a href="#overview">Overview</a></li>
+		<li><a href="#download">Download</a></li>
+		<li><a href="#rant">Rant</a></li>
+	</ul>
+
+</ul>
+<!-- INDEX END -->
+
+<hr />
+<p>
+</p>
+<h1><a name="info2pod_and_info2man">info2pod and info2man</a></h1>
+<SMALL>Last modified: Apr 11 09:19</SMALL><BR><p>
+</p>
+<h2><a name="overview">Overview</a></h2>
+<p><code><a href="bin/info2pod">info2pod</a></code> converts GNU info data
+to POD format [<a href="http://www.perldoc.com/perl5.6/pod/perlpod.html">http://www.perldoc.com/perl5.6/pod/perlpod.html</a>]
+for easy transcription to various formats like HTML.
+<code><a href="bin/info2man">info2man</a></code> is a wrapper for <code>info2pod</code> to convert info files
+into <code>nroff -man</code> format.</p>
+<p>My personal <a href="././man.html">man command</a>
+knows to use this on info files to pretend they're
+part of the normal UNIX man documentation.
+I just add the info directories to my <code>$MANPATH</code> and go!</p>
+<p>
+</p>
+<h2><a name="download">Download</a></h2>
+<p>The <code><a href="info2man.tar.gz">info2man.tar.gz</a></code> tarball
+contains the two scripts and the necessary Perl modules.</p>
+<p>
+</p>
+<h2><a name="rant">Rant</a></h2>
+<p>Why info2pod?</p>
+<dl>
+<dt><strong><a name="item_info%27s_too_stupid_to_read_stdin">info's too stupid to read stdin</a></strong><br />
+</dt>
+<dd>
+So incorporating it into other tools sucks.
+</dd>
+<p></p>
+<dt><strong><a name="item_i_want_my_ordinary_%22man%22_command_to_find_info_">I want my ordinary ``man'' command to find info files</a></strong><br />
+</dt>
+<dd>
+And now it does, presenting the info files nicely paged
+with my <em>preferred</em> pager
+rather than info's baroque viewer.
+</dd>
+<p></p>
+<dt><strong><a name="item_many_gnu_manual_pages_are_insultingly_empty">Many GNU manual pages are insultingly empty</a></strong><br />
+</dt>
+<dd>
+Many GNU people seem to be arrogant scum
+in that they produce farces of manual entries,
+each prefaced with ``we like info,
+so we don't maintain this page, and it's probably
+a pack of lies - go read the info file''.
+</dd>
+<dd>
+<p>Of course,
+the only way to do that is to fire up emacs or to
+use their weird info tool, which doesn't act much
+like a pager at all and violates the ``use my preferred pager''
+approach people should be able to expect.</p>
+</dd>
+<p></p></dl>
+
+</body>
+
+</html>

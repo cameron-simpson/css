@@ -1,0 +1,48 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+<title>rlr - CSS</title>
+<link rev="made" href="mailto:root@localhost" />
+</head>
+
+<body style="background-color: white">
+<a href="./">&lt;= back to main index<p>
+
+<p><a name="__index__"></a></p>
+<!-- INDEX BEGIN -->
+
+<ul>
+
+	<li><a href="#rlr__replace_line_range">rlr - replace line range</a></li>
+	<ul>
+
+		<li><a href="#overview">Overview</a></li>
+	</ul>
+
+</ul>
+<!-- INDEX END -->
+
+<hr />
+<p>
+</p>
+<h1><a name="rlr__replace_line_range">rlr - replace line range</a></h1>
+<SMALL>Last modified: Apr 11 09:19</SMALL><BR><p>
+</p>
+<h2><a name="overview">Overview</a></h2>
+<p><code><a href="bin/rlr">rlr</a></code> replaces a range of lines in a file
+with data from another file or stdin.
+The range is delimited by a pair of distinctive lines,
+typically specially formatted comment lines in the file to be edited.</p>
+<p>For example, the main index for this css package
+is maintained with this incantation:</p>
+<pre>
+        mkpodindex -k -l hrefs \
+        | rlr -f '&lt;!--BEGIN AUTOPODINDEX--&gt;' \
+              -t '&lt;!--END AUTOPODINDEX--&gt;' \
+              -i index.html -o index.html -</pre>
+<p>that places the output of <code>mkpodindex</code>
+into the middle of the <em>index.html</em> file.</p>
+
+</body>
+
+</html>

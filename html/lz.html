@@ -1,0 +1,61 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+<title>lz - CSS</title>
+<link rev="made" href="mailto:root@localhost" />
+</head>
+
+<body style="background-color: white">
+<a href="./">&lt;= back to main index<p>
+
+<p><a name="__index__"></a></p>
+<!-- INDEX BEGIN -->
+
+<ul>
+
+	<li><a href="#lz_and_multips__postscript_printing_tools">lz and multips - PostScript printing tools</a></li>
+	<ul>
+
+		<li><a href="#overview">Overview</a></li>
+	</ul>
+
+</ul>
+<!-- INDEX END -->
+
+<hr />
+<p>
+</p>
+<h1><a name="lz_and_multips__postscript_printing_tools">lz and multips - PostScript printing tools</a></h1>
+<SMALL>Last modified: Apr 11 09:19</SMALL><BR><p>
+</p>
+<h2><a name="overview">Overview</a></h2>
+<p><code><a href="bin/lz">lz</a></code>
+is a wrapper for <code>lp(1)</code> or <code>lpr(1)</code> or whatever
+print facility is native to your system
+and accepts text, postscript and PDF as input,
+converting all to postscript and delivering to printers
+via the native print subsystem.
+<code><a href="bin/multips">multips</a></code> is called internally by <code>lz</code>
+to layout multiple logical sheets to a physical sheet.</p>
+<p>I wrote <code>lz</code> for a heterogeneoussystem
+to save users remembering which print commands were
+native to the system they're on, and to remove the data format
+dependence of these commands.
+It accepts many options,
+passing them to <code>multips</code>, the print commands, and the
+intermediate filters as appropriate.
+(In fact, some people use it instead of <code>multips</code>
+with a print target of ``<code>-P-</code>'', which means stdout.)</p>
+<p>As an example, I routinely use ``<code>lz -4 -C -dv</code>''
+as my print command from netscape/mozilla/firefox.</p>
+<p><code>multips</code> is a postscript filter which puts multiple
+logical postscript pages on a single sheet
+with optional dividers and handles landscape/portrait mode choices
+and tumblemode control.
+It is based on <code>multi.ps</code>,
+a groovy piece of PostScript written by
+Ross Cartlidge [<a href="#/wwwpersonal.usyd.edu.au/~rossc/">/www-personal.usyd.edu.au/~rossc/</a> <em><a href="mailto:mailto:rcartlid@cisco.com">mailto:rcartlid@cisco.com</a></em>].</p>
+
+</body>
+
+</html>

@@ -1,0 +1,218 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+<title>rc.mobile - CSS</title>
+<link rev="made" href="mailto:root@localhost" />
+</head>
+
+<body style="background-color: white">
+<a href="./">&lt;= back to main index<p>
+
+<p><a name="__index__"></a></p>
+<!-- INDEX BEGIN -->
+
+<ul>
+
+	<li><a href="#rc_mobile__configurable_startup_for_mobile_hosts">rc.mobile - configurable startup for mobile hosts</a></li>
+	<ul>
+
+		<li><a href="#overview">Overview</a></li>
+		<li><a href="#example_configuration_file">Example configuration file</a></li>
+		<li><a href="#installation">Installation</a></li>
+	</ul>
+
+</ul>
+<!-- INDEX END -->
+
+<hr />
+<p>
+</p>
+<h1><a name="rc_mobile__configurable_startup_for_mobile_hosts">rc.mobile - configurable startup for mobile hosts</a></h1>
+<SMALL>Last modified: Nov 28 21:47</SMALL><BR><p>
+</p>
+<h2><a name="overview">Overview</a></h2>
+<p><code><a href="bin/rc.mobile">rc.mobile</a></code>
+this is a startup script
+mostly aimed at mobile machines which are booted in different places.
+It takes a simple config file
+that specifies the services desired and any config files to customise.
+Typical use prompts for the current location early in the boot sequence.</p>
+<p>Also see the manual: <code><a href="manuals/rc.mobile.1.html">rc.mobile.1.html</a></code>.</p>
+<p>It runs startup scripts in parallel
+which results in significantly faster bootup
+than the usual sequential startup
+and has facilities for waiting for prerequisite services
+where timimg dependencies do exist.</p>
+<p>Because it runs the startup files as shipped from your vendor,
+setup requires very little customisation of your system.</p>
+<p>
+</p>
+<h2><a name="example_configuration_file">Example configuration file</a></h2>
+<p>As examples,
+here is the <em>/etc/rc.mobile.conf</em> file for my RedHat 9 laptop ``<code>newt</code>'':
+<code><a href="rc.mobile.conf-newt">rc.mobile.conf-newt</a></code>,
+and for my Fedora Core 2 laptop ``<code>kirsty</code>'':
+<code><a href="rc.mobile.conf-kirsty">rc.mobile.conf-kirsty</a></code>.
+Even on <code>newt</code>,
+with its 233MHz processor, slow disc and 96MB of RAM,
+startup is much faster than the normal sequential startup
+of standard machines.</p>
+<p>
+</p>
+<h2><a name="installation">Installation</a></h2>
+<p>Installation is as follows:</p>
+<dl>
+<dt><strong><a name="item_make_the_file__2fetc_2frc_2emobile_2econf_2c">Make the file <code>/etc/rc.mobile.conf</code>,</a></strong><br />
+</dt>
+<dd>
+Use the example [<code><a href="newt-rc.mobile.conf">newt-rc.mobile.conf</a></code>] as a template.
+</dd>
+<p></p>
+<dt><strong><a name="item_make_sure__2fopt_2fcss_2fbin_is_available_after__2">Make sure <em>/opt/css/bin</em> is available after <em>/etc/rc.sysinit</em> has run.</a></strong><br />
+</dt>
+<dd>
+If <em>/opt/css</em> is part of the root filesystem you'll be fine.
+On RedHat systems you should also be fine because the local filesystems
+are mounted by <em>/etc/rc.sysinit</em>.
+</dd>
+<p></p>
+<dt><strong><a name="item_run_rc_2emobile_from__2fetc_2frc_2elocal">Run <code>rc.mobile</code> from <em>/etc/rc.local</em></a></strong><br />
+</dt>
+<dd>
+Add the line:
+</dd>
+<dd>
+<pre>
+        /opt/css/bin/rc.mobile start</pre>
+</dd>
+<dd>
+<p>to the <em>/etc/rc.local</em> file.</p>
+</dd>
+<dd>
+<p>Note: the script prompts for you current location,
+offering a choice of all the rc.mobile.conf clauses
+whose names start with an @.
+The default clause name comes from
+from the environment variable <code>$SYSTEMID</code>,
+falling back to ``<code>home</code>'' if this is not set.
+So if you are usually elsewhere
+you may want to make the invocation:</p>
+</dd>
+<dd>
+<pre>
+        SYSTEMID=where /opt/css/bin/rc.mobile start</pre>
+</dd>
+<dd>
+<p>setting <em>where</em> to the name of the location clause you would usually use
+(without the leading ``<code>@</code>'').</p>
+</dd>
+<p></p>
+<dt><strong><a name="item_disable_most_startup_services">Disable most startup services</a></strong><br />
+</dt>
+<dd>
+Because <code>rc.mobile</code> will be starting these
+according to your instructions in the <em>/etc/rc.mobile.conf</em> file
+the normal service startups should be disabled.
+</dd>
+<dd>
+<p>For a RedHat system walk through the startup services listed by:</p>
+</dd>
+<dd>
+<pre>
+        chkconfig --list | grep :on</pre>
+</dd>
+<dd>
+<p>making sure that
+(a) you want them
+and (b) they're named in the <code>rc.mobile.conf</code> file
+in the appropriate clauses.
+Of course in some locations you will want different services.</p>
+</dd>
+<dd>
+<p>For each such service (except for <code>keytable</code>),
+add it to the config file
+and turn it off in the default startup:</p>
+</dd>
+<dd>
+<pre>
+        chkconfig --level 2345 service off</pre>
+</dd>
+<dd>
+<p>where <em>service</em> is the service to disable.</p>
+</dd>
+<p></p></dl>
+<p>When you're finished the <code>chkconfig(8)</code> command should
+look nice and spartan:</p>
+<pre>
+        [~]@newt*&gt; chkconfig --list | grep :on
+        keytable        0:off   1:on    2:off   3:off   4:off   5:off   6:off
+        [~]@newt*&gt;</pre>
+<p>Isn't that nice!</p>
+<p>I left <code>keytable</code> in there for two reasons.
+Firstly it seemed one of basics needed to make your console sane.
+And secondly when I was testing <code>rc.mobile</code> on an ``up''
+laptop with an X11 desktop running
+it totally trashed the keyboard mapping.
+Had to power cycle!</p>
+<p>There are five types of lines in the config file:</p>
+<dl>
+<dt><strong><a name="item__2fpath_2fto_2ffile"><em>/path/to/file</em></a></strong><br />
+</dt>
+<dd>
+This copies the file <em>/path/to/file.<em>where</em></em>
+to the named file.
+</dd>
+<p></p>
+<dt><strong><a name="item__2fpath_2fto_2fdir_2f"><code>/path/to/dir/</code></a></strong><br />
+</dt>
+<dd>
+This copies the directory <em>/path/to/dir.<em>where</em></em>
+to the named directory using rsync(1).
+</dd>
+<p></p>
+<dt><strong><a name="item_use_clause_3e"><code>use clause</code>&gt;</a></strong><br />
+</dt>
+<dd>
+Run the named <em>clause</em>.
+</dd>
+<p></p>
+<dt><strong><a name="item_svc_service_2e_2e_2e"><code>svc service...</code></a></strong><br />
+</dt>
+<dd>
+Dispatch the named services in parallel.
+Don't wait for them.
+This is done by running the command:
+</dd>
+<dd>
+<pre>
+      /etc/init.d/service start</pre>
+</dd>
+<dd>
+<p><strong>Note</strong>:
+service names must be valid shell identifiers
+(letters, underscores and digits).
+If some startup file is <em>not</em> named like that,
+make a suitably named symlink to it and use that.</p>
+</dd>
+<p></p>
+<dt><strong><a name="item_need_service_2e_2e_2e"><code>need service...</code></a></strong><br />
+</dt>
+<dd>
+Wait for the named <code>services</code> to start up before proceeding.
+If they haven't been dispatched already,
+dispatch them as with <code>svc</code>.
+</dd>
+<p></p>
+<dt><strong><a name="item__21_shcmd"><code>! shcmd</code></a></strong><br />
+</dt>
+<dd>
+Run the shell command <em>shcmd</em>.
+Wait for it to finish.
+Naturally,
+put an ``&amp;'' on the end if you don't want to wait.
+</dd>
+<p></p></dl>
+
+</body>
+
+</html>

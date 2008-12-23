@@ -1,0 +1,90 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+<title>mkcd - CSS</title>
+<link rev="made" href="mailto:root@localhost" />
+</head>
+
+<body style="background-color: white">
+<a href="./">&lt;= back to main index<p>
+
+<p><a name="__index__"></a></p>
+<!-- INDEX BEGIN -->
+
+<ul>
+
+	<li><a href="#mkcd_and_mkiso__easy_to_use_cd_burning_scripts">mkcd and mkiso - easy to use CD burning scripts</a></li>
+	<ul>
+
+		<li><a href="#overview">Overview</a></li>
+		<li><a href="#usage">Usage</a></li>
+		<li><a href="#installation">Installation</a></li>
+	</ul>
+
+</ul>
+<!-- INDEX END -->
+
+<hr />
+<p>
+</p>
+<h1><a name="mkcd_and_mkiso__easy_to_use_cd_burning_scripts">mkcd and mkiso - easy to use CD burning scripts</a></h1>
+<SMALL>Last modified: Apr 11 10:34</SMALL><BR><p>
+</p>
+<h2><a name="overview">Overview</a></h2>
+<p><code><a href="bin/mkcd">mkcd</a></code>
+and its precursor <code><a href="bin/mkiso">mkiso</a></code>
+comprise a simple no-brainer data CD burning kit
+for those of us who love the command line.</p>
+<p>Also see their manual entries:
+<code><a href="manuals/mkcd.1.html">mkcd.1.html</a></code> and <code><a href="manuals/mkiso.1.html">mkiso.1.html</a></code>.</p>
+<p>
+</p>
+<h2><a name="usage">Usage</a></h2>
+<p>Typical usage is:</p>
+<ul>
+<li><strong><a name="item_create_directory_for_the_cd_contents">Create directory for the CD contents</a></strong><br />
+</li>
+Its name should normally match desired the CD volume label.
+Set it up
+with everything you want for the CD laid out as you desire.
+We'll pretend it's called <em>dirname</em> below.
+<p></p>
+<li><strong><a name="item_burn_the_cd%3a">Burn the CD:</a></strong><br />
+</li>
+<pre>
+        $ mkcd dirname</pre>
+</ul>
+<p>Because you've pointed <code>mkcd</code> at a directory it will call <code>mkiso</code>
+automatically to make an ISO9660 CDROM image.
+If you wish you can exert finer control over things by making the ISO image
+yourself with <code>mkiso</code>.</p>
+<p><strong>Note</strong>:
+<code>mkiso</code>
+(and thus <code>mkcd</code> if used as above)
+make the ISO9660 image in the current directory
+unless you use the <strong>-o</strong> option.
+In <code>mkcd</code>'s case
+this is primarily because generic places like <em>/tmp</em>
+often don't have CD-sized amounts of free space.</p>
+<p>These scripts have a few options
+but are deliberately short on knobs to twiddle.
+They're are naturally just wrappers for
+Jörg Schilling's [<a href="http://www.fokus.gmd.de/research/cc/glone/employees/joerg.schilling/">http://www.fokus.gmd.de/research/cc/glone/employees/joerg.schilling/</a>
+excellent
+mkisofs and cdrecord utilites [<a href="http://www.fokus.gmd.de/research/cc/glone/employees/joerg.schilling/private/mkisofs.html">http://www.fokus.gmd.de/research/cc/glone/employees/joerg.schilling/private/mkisofs.html</a>],
+which have a great many knobs.</p>
+<p>
+</p>
+<h2><a name="installation">Installation</a></h2>
+<p>These are just scripts.
+Install them in your execution <code>$PATH</code>.
+It will be necessary to tell <code>mkcd</code>
+your CD burner's SCSI id.
+You can also specify the CD burner
+through the environment variable <code>$MKCDDEV</code>
+or the <em>/etc/mkcdrc</em> or <code>$HOME/.mkcdrc</code> files;
+see the manual entries for details.</p>
+
+</body>
+
+</html>
