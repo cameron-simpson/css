@@ -4,13 +4,18 @@
 #	- Cameron Simpson <cs@zip.com.au> 18jan2004
 #
 
+: ${OPTCSS:=/opt/css}
+
 cmd=`basename "$0"` || cmd=$0
 async=1
-[ $# = 0 ] && { echo "Usage: $cmd hosts..." >&2; exit 2; }
+srcdir=$OPTCSS
+dstdir=$OPTCSS
+[ $# -gt 0 ] && [ "x$1" = x-d ] && { dstdir=$2; shift; shift; }
+[ $# = 0 ] && { echo "Usage: $cmd [-d dstdir] hosts..." >&2; exit 2; }
 
 ( for host in `hostlist "$@"`
   do
-    pfx "$cmd $host" set-x qrsync -aH --delete /opt/css/. "$host:/opt/css/." &
+    pfx "$cmd $host" set-x qrsync -aH --delete "$srcdir/." "$host:$dstdir/." &
     [ $async ] || wait
   done
   wait

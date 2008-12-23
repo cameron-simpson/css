@@ -17,9 +17,10 @@ syncezos-rc
 pfx "$cmd ezos:public_html" \
   qrsync -rptlH --delete \
 		--exclude=CVS/ \
-		--include=/cs --exclude=/cs/test/ \
+		--include=/cs --exclude=/cs/test/ --exclude=/cs/css/optcss \
 		--include=/fay \
 		--exclude=/* $ezoshtml/. ezos:public_html/.
+putcss -d optcss ezos
 
 ##syncezos-cgi
 ##qrsync -aHPW --delete --exclude=CVS/ $ezoscgi/. ezos:cgi-bin/.
