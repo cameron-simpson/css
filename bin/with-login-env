@@ -29,6 +29,19 @@ then
   exec "$@"
 fi
 
+# direct methods for known shells
+case "$SHELL" in
+  */ksh | */sh | */zsh)
+    exec -l "$SHELL" -c 'exec "$@"' - "$@" ;;
+  */csh | */tcsh)
+    exec -l "$SHELL" -c 'exec $argv:q' "$@" ;;
+  */es | */rc)
+    exec "$SHELL" -l -c 'exec $*' "$@" ;;
+  */bash)
+    exec bash --login -c 'exec "$@"' - "$@" ;;
+esac
+
+# otherwise use generic method with a conservative command
 case "$0" in
   *\'*) ecmd=`printf '%s\n' "$0" | sed "s/'/'\\''/g"` ;;
   *)    ecmd=$0 ;;
