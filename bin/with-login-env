@@ -1,8 +1,8 @@
 #!/bin/bash -ue
 #
 # Run an arbitrary command with user user's login environment.
-# Based on discussions with Martin Costabel, Peter O'Gorman and
-# Harald Hanche-Olsen.
+# Based on discussions with Martin Costabel, Peter O'Gorman,
+# Harald Hanche-Olsen and Jeremy Huddleston.
 # Uses bash instead of sh for "printf %q" and "exec -l".
 #       - Cameron Simpson <cs@zip.com.au> 23dec2008
 #
@@ -30,15 +30,12 @@ then
 fi
 
 # direct methods for known shells
-case "$SHELL" in
-  */ksh | */sh | */zsh)
-    exec -l "$SHELL" -c 'exec "$@"' - "$@" ;;
-  */csh | */tcsh)
-    exec -l "$SHELL" -c 'exec $argv:q' "$@" ;;
-  */es | */rc)
-    exec "$SHELL" -l -c 'exec $*' "$@" ;;
-  */bash)
-    exec bash --login -c 'exec "$@"' - "$@" ;;
+bshell=`basename "$SHELL"`
+case "$bshell" in
+  bash)         exec    "${SHELL}" --login -c 'exec "${@}"' - "${@}" ;;
+  ksh|sh|zsh)   exec -l "${SHELL}" -c 'exec "${@}"' - "${@}" ;;
+  csh|tcsh)     exec -l "${SHELL}" -c 'exec $argv:q' "${@}" ;;
+  es|rc)        exec -l "${SHELL}" -c 'exec $*' "${@}" ;;
 esac
 
 # otherwise use generic method with a conservative command
