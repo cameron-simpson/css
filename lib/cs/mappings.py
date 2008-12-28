@@ -49,7 +49,15 @@ class SeqMapUC_Attrs(object):
     self.keepEmpty=keepEmpty
 
   def __str__(self):
-    return str(self.__M)
+    kv=[]
+    for k, value in self.__M.items():
+      if isUC_(k):
+        if len(value) != 1:
+          k=k+'s'
+        else:
+          value=value[0]
+      kv.append((k,value))
+    return '{%s}' % (", ".join([ "%s: %s" % (k, `value`) for k, value in kv ]))
 
   def __hasattr__(self,attr):
     k, plural = parseUC_sAttr(attr)
@@ -70,7 +78,6 @@ class SeqMapUC_Attrs(object):
   def __setattr__(self,attr,value):
     k, plural = parseUC_sAttr(attr)
     if k is None:
-      print >>sys.stderr, "attr=%s, k=%s, plural=%s" % (attr,k,plural)
       self.__dict__[attr]=value
       return
     if plural:
@@ -81,7 +88,6 @@ class SeqMapUC_Attrs(object):
       else:
         self.__M[k]=tuple(value)
     else:
-      print >>sys.stderr, "set %s=(%s,)" % (k,value)
       self.__M[k]=(value,)
 
   def __delattr__(self,attr):
