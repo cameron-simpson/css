@@ -5,6 +5,7 @@
 #
 
 from cs.mappings import SeqMapUC_Attrs, isUC_
+from cs.misc import the
 import sqlalchemy
 from sqlalchemy import create_engine, \
                        MetaData, Table, Column, Integer, String, \
@@ -107,6 +108,7 @@ class Node(object):
   def __init__(self,_node,nodedb):
     self.__dict__['_node']=_node
     self.__dict__['_attrs']=SeqMapUC_Attrs(AttrMap(_node,nodedb))
+    self.__dict__['_nodedb']=nodedb
     nodedb.nodeMap[_node.ID]=self
 
   def __str__(self):
@@ -141,7 +143,10 @@ class Node(object):
 
 # TODO: make __enter__/__exit__ for running a session?
 class NodeDB(object):
-  def __init__(self,engine,metadata,nodes='NODES',attrs='ATTRS'):
+  def __init__(self,engine,nodes='NODES',attrs='ATTRS'):
+    if type(engine) is str:
+      engine = create_engine(engine, echo=True)
+    metadata=MetaData()
     if nodes is None or type(nodes) is str:
       nodes=NODESTable(metadata,name=nodes)
     self.nodes=nodes
@@ -174,11 +179,16 @@ class NodeDB(object):
     mapper(_Node, nodes)
     self._Node=_Node
 
+  def _newNode(self,_node,nodedb=None):
+    if nodedb is None:
+      nodedb=self
+    return Node(_node,nodedb)
+
   def createNode(self,name,type):
     N=self._Node(name,type)
     self.session.add(N)
     self.session.flush()
-    return Node(N,self)
+    return self._newNode(N,self)
 
   def _NodeById(self,id):
     return the(self.session.query(self._Node).filter_by(ID=id).all())
@@ -196,6 +206,9 @@ class NodeDB(object):
     Ns.extend([ Node(_node,self) for _node in _NodesByIds(missing) ])
     return Ns
 
+  def nodeByNameType(self,name,type):
+    return self.nodeById(the(self.session.query(self._Node).filter_by(NAME=name,TYPE=type).all()).ID)
+
   def __getitem__(self,id):
     N=self.nodeById(id)
     if N is None:
@@ -204,9 +217,7 @@ class NodeDB(object):
 
 if __name__ == '__main__':
   print sqlalchemy.__version__
-  engine = create_engine('sqlite:///:memory:', echo=True)
-  metadata = MetaData()
-  db=NodeDB(engine,metadata)
+  db=NodeDB('sqlite:///:memory:')
   N=db.createNode('host1','HOST')
   db.session.flush()
   print str(N)
