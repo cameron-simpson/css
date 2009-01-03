@@ -69,14 +69,17 @@ class AttrMap(dict):
   ''' A dictionary to manage node attributes.
       It applies changes to the db and then mirrors them in the in-memory dict.
   '''
-  def __init__(self,node,nodedb):
+  def __init__(self,node,nodedb,attrs=None):
     dict.__init__(self)
     self.__node=node
     self.__nodedb=nodedb
     session=nodedb.session
     self.__attrObjs={}
     # load up the attributes
-    for attrObj in session.query(nodedb._Attr).filter_by(NODE_ID=node.ID):
+    if attrs is None:
+      attrs=session.query(nodedb._Attr).filter_by(NODE_ID=node.ID).all()
+      session.add_all(attrs)
+    for attrObj in attrs:
       A.__addAttrObj(attrObj)
   def __addAttr(self,attrObj):
     attr=attrObj.ATTR
@@ -105,11 +108,13 @@ class Node(object):
       Other uppercase attributes are node attributes presented via the
       cs.mappings.SeqMapUC_Attrs interface.
   '''
-  def __init__(self,_node,nodedb):
+  def __init__(self,_node,nodedb,attrs):
     self.__dict__['_node']=_node
-    self.__dict__['_attrs']=SeqMapUC_Attrs(AttrMap(_node,nodedb))
+    self.__dict__['_attrs']=SeqMapUC_Attrs(AttrMap(_node,nodedb,attrs))
     self.__dict__['_nodedb']=nodedb
-    nodedb.nodeMap[_node.ID]=self
+    id=_node.ID
+    assert id not in nodedb.nodeMap
+    nodedb.nodeMap[id]=self
 
   def __str__(self):
     return "%s:%s#%d%s" % (self.NAME,self.TYPE,self.ID,self._attrs)
@@ -179,35 +184,81 @@ class NodeDB(object):
     mapper(_Node, nodes)
     self._Node=_Node
 
-  def _newNode(self,_node,nodedb=None):
-    if nodedb is None:
-      nodedb=self
-    return Node(_node,nodedb)
+  def _newNode(self,_node,attrs):
+    return Node(_node,self,attrs)
 
   def createNode(self,name,type):
-    N=self._Node(name,type)
-    self.session.add(N)
+    ''' Create a new Node in the database.
+    '''
+    _node=self._Node(name,type)
+    self.session.add(_node)
     self.session.flush()
-    return self._newNode(N,self)
+    assert _node.ID is not None
+    return self._newNode(_node,())
 
-  def _NodeById(self,id):
-    return the(self.session.query(self._Node).filter_by(ID=id).all())
   def _NodesByIds(self,ids):
-    return self.session.query(self._Node).filter_by(fieldInValues('ID',ids)).all()
-  def nodeById(self,id):
-    if id not in self.nodeMap:
-      Node(self._NodeById(id), self)
-    return self.nodeMap[id]
+    ''' Take some NODES.ID values and return _Node objects.
+    '''
+    _nodes=self.session.query(self._Node).filter(fieldInValues('ID',ids)).all()
+    self.session.add_all(_nodes)
+    return _nodes
+
+  def _NodesByNameAndType(self,name,type):
+    _nodes=self.session.query(self._Node).filter_by(NAME=name,TYPE=type).all()
+    self.session.add_all(_nodes)
+    return _nodes
+
+  def _NodesByType(self,type):
+    _nodes=self.session.query(self._Node).filter_by(TYPE=type).all()
+    self.session.add_all(_nodes)
+    return _nodes
+
+  def _Nodes2Nodes(self,_nodes,checkMap):
+    ''' Take some _Node objects and return Nodes.
+    '''
+    ids=list(N.ID for N in _nodes)
+    if checkMap:
+      nodeMap=self.nodeMap
+      # load of the Nodes we already know about
+      Ns=[ nodeMap[id] for id in ids if id in nodeMap ]
+      # get the NODES.ID values of the nodes not yet cached
+      missingIds=list(id for id in ids if id not in nodeMap)
+    else:
+      Ns=[]
+      missingIds=ids
+
+    if len(missingIds) > 0:
+      # obtain the attributes of the missing nodes
+      nodeAttrs={}
+      attrs=self.session.query(nodedb._Attr) \
+                        .filter(fieldInValues('NODE_ID',missingIds)) \
+                        .all()
+      self.session.add_all(attrs)
+      for attr in attrs:
+        nodeAttrs.setdefault(attr.NODE_ID,[]).append(attr)
+      # create the missing Node objects
+      Ns.extend([ self._newNode(_node,self,nodeAttrs.get(_node.ID,()))
+                  for _node in self._nodesByIds(missingIds)
+                ])
+
+    return Ns
 
   def nodesByIds(self,ids):
     nodeMap=self.nodeMap
     Ns=[ nodeMap[id] for id in ids if id in nodeMap ]
-    missing=[ id for id in ids if id not in nodeMap ]
-    Ns.extend([ Node(_node,self) for _node in _NodesByIds(missing) ])
+    missingIds=list(id for id in ids if id not in nodeMap)
+    if len(missingIds) > 0:
+      Ns.extend(self._Nodes2Nodes(self._NodesByIds(missingIds),checkMap=False))
     return Ns
 
-  def nodeByNameType(self,name,type):
-    return self.nodeById(the(self.session.query(self._Node).filter_by(NAME=name,TYPE=type).all()).ID)
+  def nodeById(self,id):
+    return the(self.nodesByIds((id,)))
+
+  def nodeByNameAndType(self,name,type):
+    return the(self._Nodes2Nodes(self._NodesByNameAndType(name,type),checkMap=True))
+
+  def nodesByType(self,type):
+    return self._Nodes2Nodes(self._NodesByType(type),checkMap=True)
 
   def __getitem__(self,id):
     N=self.nodeById(id)
