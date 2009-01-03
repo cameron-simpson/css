@@ -53,6 +53,8 @@ class WiringNode(Node):
   def __setattr__(self,attr,value):
     k, plural = parseUC_sAttr(attr)
     if k is not None:
+      if k.endswith('_OF') or k.endswith('_OF_ID'):
+        raise AttributeError, "illegal assignment to .%s" % attr
       t=self.TYPE
       kid=self.idField(k)
       if kid is not None:
@@ -64,6 +66,8 @@ class WiringNode(Node):
   def __delattr__(self,attr):
     k, plural = parseUC_sAttr(attr)
     if k is not None:
+      if k.endswith('_OF') or k.endswith('_OF_ID'):
+        raise AttributeError, "illegal del of .%s" % attr
       t=self.TYPE
       kid=self.idField(k)
       if kid is not None:
