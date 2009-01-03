@@ -196,24 +196,24 @@ class NodeDB(object):
     assert _node.ID is not None
     return self._newNode(_node,())
 
-  def _NodesByIds(self,ids):
+  def _nodesByIds(self,ids):
     ''' Take some NODES.ID values and return _Node objects.
     '''
     _nodes=self.session.query(self._Node).filter(fieldInValues('ID',ids)).all()
     self.session.add_all(_nodes)
     return _nodes
 
-  def _NodesByNameAndType(self,name,type):
+  def _nodesByNameAndType(self,name,type):
     _nodes=self.session.query(self._Node).filter_by(NAME=name,TYPE=type).all()
     self.session.add_all(_nodes)
     return _nodes
 
-  def _NodesByType(self,type):
+  def _nodesByType(self,type):
     _nodes=self.session.query(self._Node).filter_by(TYPE=type).all()
     self.session.add_all(_nodes)
     return _nodes
 
-  def _Nodes2Nodes(self,_nodes,checkMap):
+  def _nodes2Nodes(self,_nodes,checkMap):
     ''' Take some _Node objects and return Nodes.
     '''
     ids=list(N.ID for N in _nodes)
@@ -248,17 +248,17 @@ class NodeDB(object):
     Ns=[ nodeMap[id] for id in ids if id in nodeMap ]
     missingIds=list(id for id in ids if id not in nodeMap)
     if len(missingIds) > 0:
-      Ns.extend(self._Nodes2Nodes(self._NodesByIds(missingIds),checkMap=False))
+      Ns.extend(self._nodes2Nodes(self._nodesByIds(missingIds),checkMap=False))
     return Ns
 
   def nodeById(self,id):
     return the(self.nodesByIds((id,)))
 
   def nodeByNameAndType(self,name,type):
-    return the(self._Nodes2Nodes(self._NodesByNameAndType(name,type),checkMap=True))
+    return the(self._nodes2Nodes(self._nodesByNameAndType(name,type),checkMap=True))
 
   def nodesByType(self,type):
-    return self._Nodes2Nodes(self._NodesByType(type),checkMap=True)
+    return self._nodes2Nodes(self._nodesByType(type),checkMap=True)
 
   def __getitem__(self,id):
     N=self.nodeById(id)
