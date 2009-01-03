@@ -21,7 +21,7 @@ class WiringNode(Node):
     return None
 
   def _idf2nodes(self,field):
-    return [ self._nodedb.NodeById(int(v)) for v in getattr(self,field+'s') ]
+    return list(self._nodedb.NodeById(int(v)) for v in getattr(self,field+'s'))
   def __hasattr__(self,attr):
     k, plural = parseUC_sAttr(attr)
     if k is not None:
@@ -34,14 +34,24 @@ class WiringNode(Node):
     if k is not None:
       if k == 'TYPE':
         return Node.__getattr__(self,'TYPE')
-      t=self.TYPE
+      if k.endswith('_OF'):
+        return list(
+                 self._nodedb.nodesByIds(
+                                int(id) for id in getattr(self,k+'_IDs')))
+      if k.endswith('_OF_ID'):
+        nodedb=self._nodedb
+        session=nodedb.session
+        return list( attrObj.NODE_ID
+                     for attrObj in session
+                                    .query(nodedb._Attr)
+                                    .filter_by(ATTR=k[:-6]+'_ID',
+                                               VALUE=str(self.ID)))
       kid=self.idField(k)
       if kid is not None:
         return self._idf2nodes(kid)
     return Node.__getattr__(self,attr)
   def __setattr__(self,attr,value):
     k, plural = parseUC_sAttr(attr)
-    print >>sys.stderr, "WN.setattr(%s/%s,%s)" % (k,plural,value)
     if k is not None:
       t=self.TYPE
       kid=self.idField(k)
@@ -65,41 +75,25 @@ class WiringDB(NodeDB):
   def __init__(self,engine,nodes=None,attrs=None):
     NodeDB.__init__(self,engine=engine,nodes=nodes,attrs=attrs)
 
-  def _newNode(self,_node,nodedb=None):
-    if nodedb is None:
-      nodedb=self
-    return WiringNode(_node,nodedb)
+  def _newNode(self,_node,attrs):
+    return WiringNode(_node,self,attrs)
 
   def __getitem__(self,k):
     if type(k) is int:
       return self.nodeById(k)
     if type(k) is str:
       k=(k, 'HOST')
-    return self.nodeByNameType(k[0], k[1])
+    return self.nodeByNameAndType(k[0], k[1])
 
 if __name__ == '__main__':
   import sqlalchemy; print sqlalchemy.__version__
   db=WiringDB('sqlite:///:memory')
   N=db.createNode('host1','HOST')
-  db.session.flush()
-  print str(N)
-  N.ATTR1=3
-  print str(N)
-  ##db.session.flush()
-  N.ATTR1=4
-  print str(N)
-  ##db.session.flush()
-  N.NAME='newname'
-  db.session.flush()
-  print str(N)
-  N.ATTR2=5
-  N.ATTR3s=[5,6,7]
-  N.ATTR2=7
-  print str(N)
-  db.session.flush()
-  N2=db['newname']
-  print "N2=%s" % (N2,)
-  print "N.ATTRXs=%s" % (N.ATTRXs,)
-  print "N.ATTR2=%s" % N.ATTR2
-  print "N.ATTR3es=%s" % (N.ATTR3es,)
-  sys.stdout.flush()
+  NIC=db.createNode(None,'NIC')
+  N.NIC=NIC
+  print "N=",str(N)
+  print "NIC=",str(NIC)
+  Hs=NIC.NIC_OFs
+  print "NIC_OF(NIC)s=",[str(H) for H in Hs]
+  HIDs=NIC.NIC_OF_IDs
+  print "NIC_OF_ID(NIC)s=",HIDs
