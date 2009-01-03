@@ -69,16 +69,12 @@ class AttrMap(dict):
   ''' A dictionary to manage node attributes.
       It applies changes to the db and then mirrors them in the in-memory dict.
   '''
-  def __init__(self,node,nodedb,attrs=None):
+  def __init__(self,node,nodedb,attrs):
     dict.__init__(self)
     self.__node=node
     self.__nodedb=nodedb
     session=nodedb.session
     self.__attrObjs={}
-    # load up the attributes
-    if attrs is None:
-      attrs=session.query(nodedb._Attr).filter_by(NODE_ID=node.ID).all()
-      session.add_all(attrs)
     for attrObj in attrs:
       A.__addAttrObj(attrObj)
   def __addAttr(self,attrObj):
