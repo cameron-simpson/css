@@ -1,0 +1,78 @@
+#!/usr/bin/python -tt
+#
+# Do DNS lookups in parallel.
+#       - Cameron Simpson <cs@zip.com.au> 04jan2009
+#
+
+from multiprocessing import Process, Queue
+from socket import gethostbyname_ex, gethostbyaddr
+import sys
+
+def lookup(rq):
+  if rq[0].isdigit():
+    # IP addr to name
+    fqdn, aliases, addrs = gethostbyaddr(rq)
+    rsp = (fqdn, addrs)
+  else:
+    fqdn, aliases, addrs = gethostbyname_ex(rq)
+    rsp = (fqdn, addrs)
+  return rsp
+
+def dolookups(rqQ,rspQ):
+  while True:
+    rq=rqQ.get()
+    if rq is None:
+      break
+    rsp=lookup(rq)
+    rspQ.put((rq,results))
+  rqQ.put(None)         # dispatch None for next reader to see
+  outQ.put(None)        # report termination to parent
+
+def qlookup(rq):
+  rq=rq.lower() # normalise
+  if rq not in cache:
+    outQueue.put(rq)
+    cache[rq]=None
+
+def runargs(args):
+  for arg in args:
+    if arg == '-':
+      for line in sys.stdin:
+        assert line[-1] == '\n'
+        qlookup(line[:-1])
+    else:
+      qlookup(line[:-1])
+  outQueue.put((None,None))
+
+if __name__ == '__main__':
+  nproc=10
+  cache={}
+
+  inQueue=Queue(1)
+  outQueue=Queue(nproc)
+  subprocs=[]
+  for n in range(nproc):
+    P=Process(target=dolookups,args=(outQueue,inQueue))
+    subprocs.append(P)
+    P.start()
+
+  args=sys.argv[1:]
+  if len(args) == 0:
+    args=['-',]
+
+  T=Thread(target=runargs,args=(args,))
+  T.start()
+
+  nrunning=nproc
+  while nrunning > 0:
+    rq, rsp = outQueue.get()
+    if rq is None:
+      nrunning -= 1
+    else:
+      assert rq in cache, "answer not requested: %s->%s" % (rq, rsp)
+      ##cache[rq]=rsp
+      print rq, '->', rsp
+
+  print >>sys.stderr, "waiting..."
+  for P in subProc:
+    P.join()
