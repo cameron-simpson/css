@@ -30,6 +30,10 @@ done
 [ -n "$statefile" ] || statefile=`ssh-agent-statefile` || exit 1
 eval `get-ssh-agent "$statefile" || echo false` && exit 0
 
+# some machines don't have an ssh-agent:-(
+agent=`which ssh-agent` || exit 1
+[ -x "$agent" ] || exit 1
+
 export statefile
 exec bgproc \
   rmthen -f "$statefile" \
