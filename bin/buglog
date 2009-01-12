@@ -135,7 +135,7 @@ do
 
     # =item B<dlog>
     #
-    # The headline alone is passed to my I<dlog> command.
+    # The headline alone is passed to my I<buglog-daily> command.
     #
     dlog)
       ##dlog "$headline" || xit=1
