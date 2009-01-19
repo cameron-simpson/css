@@ -27,7 +27,7 @@ tsfile=$tsdir/$tsdate
 if [ ! -s "$tsfile" ]
 then
   [ $force ] || { [ -t 0 ] && ask "create $tsfile"; } || exit 1
-  ( set -x
+  ( ##set -x
     cs-mktimesheet -d "$tsdate" "$category" >>"$tsfile"
     cat "$tsfile"
   ) | mailsubj -s "new timesheet file at $tsfile" "$USER"
