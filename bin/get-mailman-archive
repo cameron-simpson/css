@@ -1,0 +1,18 @@
+#!/bin/sh -ue
+#
+# Download mailman archive into a UNIX mbox file.
+#       - Cameron Simpson <cs@zip.com.au> 19jan2009
+#
+
+trace=set-x
+
+for url
+do
+  pageurls "$url" \
+  | grep '\.gz$' \
+  | while read gzurl
+    do
+      $trace wget -O - "$gzurl" | gunzip
+    done
+done \
+| un-at-
