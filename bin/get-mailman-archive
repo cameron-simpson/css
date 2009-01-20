@@ -15,4 +15,5 @@ do
       $trace wget -O - "$gzurl" | gunzip
     done
 done \
+| fix-mail-dates --mbox \
 | un-at-
