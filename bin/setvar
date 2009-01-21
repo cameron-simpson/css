@@ -1,4 +1,4 @@
-#!/usr/bin/python -tt
+#!/usr/bin/env python
 #
 # Script to compute various environment parameters.
 # Must be sourced, and defines the shell function setvar() as a consequence.
