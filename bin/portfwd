@@ -135,14 +135,7 @@ do
           sshto ServerAliveInterval=37 -n -F "$sshcfg" "$target" \
             "( $cfg_command ) </dev/null &
            "'exec 1>&2
-             me=$$
-             ( while sleep 61 && printf " " && kill -0 "$me" 2>/dev/null
-               do :
-               done
-             ) &
-             bgpid=$!
-             cat
-             kill -9 "$bgpid"
+             while sleep 61 && printf " "; do :; done
             ' \
           >>"$cfg_outlog" &
         sshpid=$!
@@ -154,7 +147,7 @@ do
         else
           monpid=
         fi
-        while kill -0 "$sshpid" && ok2portfwd
+        while pfx "ssh-$target" kill -0 "$sshpid" && ok2portfwd
         do  sleep 2
         done
         if synckill "$sshpid"
