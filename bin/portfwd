@@ -98,7 +98,7 @@ for target
 do
   cfg_pidfile=portfwd.$target.pid
   cfg_command=:
-  cfg_outlog=/dev/null
+  cfg_outlog=portfwd-$target    # /dev/null
   cfg_monitor=
   if [ -s "$fwdcfg" ]
   then
@@ -132,17 +132,17 @@ do
       while :
       do
         $trace \
-          sshto -n -F "$sshcfg" "$target" \
-            "( $cfg_command ) &
+          sshto ServerAliveInterval=37 -n -F "$sshcfg" "$target" \
+            "( $cfg_command ) </dev/null &
            "'exec 1>&2
-             exec 3<&0
-             cat <&3 >/dev/null &
-             catpid=$$
-             exec 3<&-
-             while sleep 61 && echo . && kill -0 "$catpid" 2>/dev/null
-             do :
-             done
-             kill "$catpid" 2>/dev/null
+             me=$$
+             ( while sleep 61 && printf " " && kill -0 "$me" 2>/dev/null
+               do :
+               done
+             ) &
+             bgpid=$!
+             cat
+             kill -9 "$bgpid"
             ' \
           >>"$cfg_outlog" &
         sshpid=$!
