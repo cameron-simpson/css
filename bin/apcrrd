@@ -1,0 +1,136 @@
+#!/bin/sh -ue
+#
+# Use apcaccess(1) and rrdtool(1) to monitor and graph APC UPS status.
+#       - Cameron Simpson <cs@zip.com.au> 23jan2009
+#
+
+trace=set-x     ##eecho
+poll=300
+
+cmd=$0
+usage="Usage:
+  $cmd [-n] create rrdfile [rrdtool-create-options...]
+  $cmd [-n] update rrdfile
+  $cmd [-n] {graph|sparkline} rrdfile fields... [rrdtool-graph-options...] >output.png"
+
+mod=
+
+badopts=
+
+while [ $# -gt 0 ]
+do
+  case $1 in
+    -n) trace=eecho ;;
+    --) shift; break ;;
+    -?*)echo "$cmd: unrecognised leading option: $1" >&2
+        badopts=1
+        ;;
+    *)  break ;;
+  esac
+  shift
+done
+
+if [ $# = 0 ]
+then
+  echo "$cmd: missing mode (create, update, graph)" >&2
+  badopts=1
+else
+  rrdmode=$1
+  shift
+  case $rrdmode in
+    create|update|graph|sparkline)
+      ;;
+    *)
+      echo "$cmd: unsupport mode: $rrdmode" >&2
+      badopts=1
+      ;;
+  esac
+  if [ $# = 0 ]
+  then
+    echo "$cmd: missing rrdfile" >&2
+    badopts=1
+  else
+    rrdfile=$1
+    shift
+  fi
+fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+hb=`expr $poll \* 2`
+
+case $rrdmode in
+  create)
+    dslist=
+    for field in `apcaccess | awk '{print $1}'`
+    do
+      ds=
+      case $field in
+        BATTV)  ds=DS:$field:GAUGE:$hb:0:42 ;;
+        LINEV)  ds=DS:$field:GAUGE:$hb:0:300 ;;
+        OUTPUTV)ds=DS:$field:GAUGE:$hb:0:300 ;;
+        LOADPCT)ds=DS:$field:GAUGE:$hb:0:120 ;;
+        ITEMP)  ds=DS:$field:GAUGE:$hb:0:100 ;;
+        NUMXFERS)ds=DS:$field:COUNTER:$hb:0:100 ;;
+        CUMONBATT)ds=DS:$field:COUNTER:$hb:0:10000 ;;
+      esac
+      [ -z "$ds" ] || dslist="$dslist $ds"
+    done
+    $trace rrdtool create "$rrdfile" ${1+"$@"} \
+                $dslist \
+                RRA:AVERAGE:0.5:1:9216 RRA:AVERAGE:0.1:12:16800 RRA:AVERAGE:0.01:288:3600 \
+                RRA:MIN:0.1:1:9216 RRA:MIN:0.1:12:16800 RRA:MIN:0.0001:288:3600 \
+                RRA:MAX:0.1:1:9216 RRA:MAX:0.1:12:16800 RRA:MAX:0.0001:288:3600
+    ;;
+  update)
+    apcaccess \
+    | \
+    {
+      dslist=
+      dssep=
+      dsvalues=N
+      while read field colon value etc
+      do
+        case $field in
+          BATTV|LINEV|OUTPUTV|LOADPCT|ITEMP|NUMXFERS|CUMONBATT)
+            dslist="$dslist$dssep$field"
+            dssep=:
+            dsvalues="$dsvalues:$value"
+            ;;
+        esac
+      done
+      $trace rrdtool updatev "$rrdfile" -t "$dslist" $dsvalues
+    }
+    ;;
+  graph|sparkline)
+    case $rrdmode in
+      graph)    w=800 h=100 jopt= ;;
+      sparkline)w=64 h=16 jopt=-j ;;
+      *)        echo "$cmd: warning: unhandled rrdmode=$rrdmode" >&2
+                exit 1
+                ;;
+    esac
+    graph=
+    nlines=0
+    while [ $# -gt 0 ]
+    do
+      case $1 in
+        BATTV)          title='Battery Voltage (min)' mode=MIN ;;
+        LINEV)          title='Line Voltage (min)' mode=MIN ;;
+        OUTPUTV)        title='Output Voltage (min)' mode=min ;;
+        LOADPCT)        title='Percent Load Capacity (max)' mode=MAX ;;
+        ITEMP)          title='Internal Temperature (max)' mode=MAX ;;
+        CUMONBATT)      title='Cumulative Time on Battery' mode=AVERAGE ;;
+        [A-Z]*)         title=$1 mode=AVERAGE ;;
+        *)              break ;;
+      esac
+      nlines=`expr $nlines + 1`
+      graph="$graph DEF:$1=$rrdfile:$1:$mode \"LINE$nlines:$1#000080:\$title\""
+      shift
+    done
+    eval "\$trace rrdtool graph - -a PNG -l 0 -w $w -h $h $jopt \${1+\"\$@\"} --title=\"\$title\" $graph"
+    ;;
+  *)echo "$cmd: unimplemented mode: $rrdmode" >&2
+    exit 1
+    ;;
+esac
