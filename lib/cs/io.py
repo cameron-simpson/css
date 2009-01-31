@@ -63,7 +63,8 @@ def pread(f,size,pos,whence=0,norestore=False):
     here=f.tell()
   f.seek(pos,whence)
   data=f.read(size)
-  f.seek(here)
+  if not norestore:
+    f.seek(here)
   return data
 
 class BaseFileWrapper:
