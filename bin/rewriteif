@@ -5,7 +5,7 @@
 #
 
 : ${TMPDIR:=/tmp}
-: ${DIFFOPTS='-c'}
+: ${DIFFOPTS='-u'}
 
 cmd=`basename "$0"`
 usage="Usage: $cmd [options...] [--] filename [command args...]

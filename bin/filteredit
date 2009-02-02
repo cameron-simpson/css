@@ -6,7 +6,7 @@
 #
 
 : ${TMPDIR:=/tmp}
-: ${DIFFOPTS='-c'}
+: ${DIFFOPTS='-u'}
 
 cmd=$0
 usage="Usage: $cmd [-v] [-s] [arg1-options...] [--] file filter [filterargs...]
