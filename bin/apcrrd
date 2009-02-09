@@ -61,6 +61,7 @@ hb=`expr $poll \* 2`
 
 case $rrdmode in
   create)
+    [ -s "$rrdfile" ] && { echo "$cmd: RRD file alredy exists: $rrdfile" >&2; exit 1; }
     dslist=
     for field in `apcaccess | awk '{print $1}'`
     do
@@ -83,6 +84,7 @@ case $rrdmode in
                 RRA:MAX:0.1:1:9216 RRA:MAX:0.1:12:16800 RRA:MAX:0.0001:288:3600
     ;;
   update)
+    [ -s "$rrdfile" ] || { echo "$cmd: no RRD file: $rrdfile" >&2; exit 1; }
     apcaccess \
     | \
     {
@@ -103,6 +105,7 @@ case $rrdmode in
     }
     ;;
   graph|sparkline)
+    [ -s "$rrdfile" ] || { echo "$cmd: no RRD file: $rrdfile" >&2; exit 1; }
     case $rrdmode in
       graph)    w=800 h=100 jopt= ;;
       sparkline)w=64 h=16 jopt=-j ;;
