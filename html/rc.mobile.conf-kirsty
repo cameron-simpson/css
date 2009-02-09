@@ -1,0 +1,226 @@
+[GLOBAL]
+PATH=$PATH:/opt/css/bin
+PERL5LIB=/opt/css/lib
+SYSTEMID=home
+LOCATION=alone
+SQUID=localhost:8080
+GATEWAY=0.0.0.0
+NTPSERVER=
+need microcode_ctl
+use sysctl
+##!swapon /home/SWAPFILE0 &
+!hdparm -S 72 /dev/hda			# 6 minute idle spin down
+!echo 1 > /proc/sys/vm/laptop_mode	# defer writes until buffers full
+!ifup lo
+need syslog
+##need kudzu
+svc sysstat
+svc cpuspeed
+svc pcmcia
+svc gpm
+svc random rawdevices
+svc smartd
+svc apmd acpid
+svc atd crond anacron
+svc xfs xinetd
+use postfix
+svc atop
+svc messagebus
+use mysql
+svc ifplugd
+##svc IIim
+
+[mysql]
+! /usr/bin/mysqld_safe --datadir=/var/lib/mysql --pid-file=/var/lib/mysql/kirsty.cskk.homeip.net.pid --bind-address=127.0.0.1 &
+
+[FINAL]
+use adzapper
+use ntpd
+! su cameron -c '/opt/css/bin/runmaint BOOT' &
+
+[tunnels]
+! ifconfig lo:2 127.0.0.2; ifconfig lo:3 127.0.0.3; ifconfig lo:4 127.0.0.4
+
+# tunnels to zip
+! tcpio -a zip.local:smtp rnc -u sshtunnels -i /home/sshtunnels/.ssh/2smtp zip smtp smtp &
+! tcpio -a zip.local:pop3 rnc -u sshtunnels -i /home/sshtunnels/.ssh/2pop zip pop pop3 &
+! tcpio -a zip.local:imap rnc -u sshtunnels -i /home/sshtunnels/.ssh/2imap zip imap imap &
+! tcpio -a zip.local:nntp rnc -u sshtunnels -i /home/sshtunnels/.ssh/2nntp zip news nntp &
+
+# tunnels to optus
+! tcpio -a optus.local:pop3 rnc -l home -u sshtunnels -i /home/sshtunnels/.ssh/2pop home mail-optushome.optusnet.com.au pop3 &
+! tcpio -a optus.local:smtp rnc -l home -u sshtunnels -i /home/sshtunnels/.ssh/2smtp home mail-optushome.optusnet.com.au smtp &
+! tcpio -a optus.local:nntp rnc -l home -u sshtunnels -i /home/sshtunnels/.ssh/2nntp home news-vip.optusnet.com.au nntp &
+
+# tunnels to work
+! tcpio -a work.local:mysql rnc -l home -u sshtunnels -i /home/sshtunnels/.ssh/2mysql work mysql mysql &
+
+[@home-wifi]
+LOCATION=home
+NET=wifi
+use on-net
+use ntp_home
+
+[@home]
+LOCATION=home
+NET=home-lan
+use on-net
+use ntp_home
+use tftpd
+! ( fw-tcp-in 6000 ALL; fw-tcp-out 8080 pan-static ; fw-udp-out syslog pan-static ) &
+#use nfs
+#svc autofs
+use zap_home
+svc snmpd
+
+# BOS co-lo
+[@bos]
+NET=bos-colo
+use on-net
+use tftpd
+
+[@sco]
+LOCATION=sco
+use online
+use dhcp
+! route add default gw 10.10.2.2
+! ( fw-tcp-out 92 jabba; fw-tcp-in 6000 galadriel) &
+
+[@cisra]
+NET=cisra
+use on-net
+use cisra_svc
+
+[postfix]
+svc postfix
+
+[@cleanroom]
+NET=cisra-cleanroom
+use on-net
+use cisra_svc
+
+[cisra_svc]
+use ntp_cisra
+use zap_cisra
+! ( fw-tcp-in 6000 kaper ; fw-tcp-out 6000 kaper ; fw-tcp-in imap kaper) &
+use nfs
+svc ypbind
+
+[adzapper]
+! [ -n "$SQUID" ] || exit 0; fw-tcp-in 8080 ALL; set -- `echo $SQUID | tr : ' '`; fw-tcp-out "$SQUID_PARENT_PORT" "$SQUID_PARENT_HOST"
+##set -x; iptables -t nat -I OUTPUT -p tcp --dport 80 -j DNAT --to-destination 127.0.0.1:8080
+
+[zap_cisra]
+SQUID_PARENT_HOST=squid.research.canon.com.au
+SQUID_PARENT_PORT=3128
+
+[zap_home]
+SQUID_PARENT_HOST=proxy.nsw.optushome.com.au
+SQUID_PARENT_PORT=8080
+
+[@cisra-wireless]
+use online
+
+[@dhcp]
+/etc/sysconfig/network-scripts/ifcfg-eth0 /etc/mobile/dhcp/ifcfg-eth0
+use online
+
+[nfs]
+/etc/exports
+need portmap
+need rpcidmapd rpcgssd rpcsvcgssd
+svc nfs nfslock
+# fw rules to allow NFS-in?
+
+[ntpd]
+! [ -n "$NTPSERVER" ] || exit 0; ( sed "s/{{NTPSERVER}}/$NTPSERVER/g" </etc/ntp.conf.tplt >/etc/ntp.conf; fw-ntp.conf; ntpdate `ntpservers`; ntpd ) &
+
+[tftpd]
+! ( fw-udp-in tftp ALL ) & /usr/sbin/in.tftpd -c -l -s /tftpboot &
+
+[ntp_home]
+NTPSERVER=ntp.optusnet.com.au
+
+[ntp_cisra]
+NTPSERVER=10.10.0.1
+
+[sysctl]
+## static ## /etc/sysctl.conf
+!sysctl -e -p /etc/sysctl.conf
+
+[@offline]
+
+[on-net]
+use net-$NET
+use online-cfg
+use online-svc
+
+[online-svc]
+! /etc/firewall/init.sh start
+use tunnels
+svc sshd
+use ntpd
+##svc rhnsd
+##svc snortd
+svc spamassassin
+
+[online-cfg]
+##/etc/sysconfig/network
+/etc/resolv.conf
+/etc/nsswitch.conf
+##need pcmcia
+##!modprobe 8139too orinoco_cs; ifup eth0
+
+[online-static]
+##/etc/sysconfig/network-scripts/ifcfg-eth0
+! set -x; modprobe eth0; ifconfig eth0 "$IPADDR" netmask "$NETMASK" up; route add default gw "$GATEWAY" || echo IFCONFIG FAILS
+
+[online_dhcp]
+!ifs=${DHCP_IFLIST:-eth0}; set -x; for i in $ifs; do ifconfig $i up; done; dhclient $ifs
+
+[net-dhcp]
+use online_dhcp
+
+[net-home-lan]
+LOCATION=home
+IPADDR=172.16.1.39
+NETMASK=255.255.255.0
+##d-link##GATEWAY=172.16.1.3
+# Soekris M0n0wall
+GATEWAY=172.16.1.1
+use online-static
+
+[net-cisra-cleanroom]
+LOCATION=cisra
+IPADDR=10.9.0.34
+NETMASK=255.255.0.0
+GATEWAY=10.9.0.2
+use online-static
+
+[net-cisra]
+LOCATION=cisra
+IPADDR=10.11.1.182
+NETMASK=255.255.0.0
+GATEWAY=10.11.0.1
+use online-static
+
+[net-mysql-course]
+LOCATION=mys
+IPADDR=10.2.0.14
+NETMASK=255.255.0.0
+GATEWAY=20.2.0.1
+use online-static
+
+[net-home]
+LOCATION=home
+IPADDR=172.16.1.39
+NETMASK=255.255.255.0
+GATEWAY=172.16.1.3
+use online-static
+
+[net-bos-colo]
+LOCATION=bos
+IPADDR=203.222.143.17
+NETMASK=255.255.255.0
+GATEWAY=203.222.143.1
+use online-static

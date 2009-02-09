@@ -1,0 +1,193 @@
+[GLOBAL]
+use env_all
+use svc_all
+
+[FINAL]
+##! nsswitch hosts $NSSWITCH_HOSTS ## always running a local dns now
+! su cameron -c '/opt/css/bin/runmaint BOOT' &
+! case "$LOCATION" in home|home-wifi) htarget=janus ;; *) htarget=home ;; esac; sshpf "${HOST}2${htarget}-pf ${HOST}2scorpius-pf ${HOST}2moya-pf" &
+
+[env_all]
+NSSWITCH_HOSTS=files
+SYSTEMID=home
+HOST=zoob
+HOSTNAME=$HOST.cskk.homeip.net
+BUGSYSTEMS='logger dlog mailto:cameron@cskk.homeip.net'
+LOCATION=offline
+GATEWAY=0.0.0.0
+NTPSERVER=au.pool.ntp.org
+FW_CHAIN_INPUT=FW_INPUT
+FW_CHAIN_OUTPUT=FW_OUTPUT
+FW_CHAIN_FORWARD=FW_FORWARD
+. /opt/css/env.sh
+
+[svc_all]
+need microcode_ctl
+! sysctl -e -p /etc/sysctl.conf
+##!swapon /home/SWAPFILE0 &
+! hdparm -S 72 -c1 /dev/hda		# 6 minute idle spin down, 32-bit PCI bus data xfer
+! echo 1 > /proc/sys/vm/laptop_mode	# defer writes until buffers full
+! echo performance > /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor
+##svc cpuspeed
+! ifconfig lo 127.0.0.1 up
+need syslog
+svc ulogd
+##need kudzu
+need irqbalance
+svc lm_sensors
+svc sysstat
+svc pcmcia
+svc gpm
+##svc random rawdevices
+##svc smartd
+svc apmd acpid
+svc atd crond anacron
+svc xfs xinetd
+! postfix start &
+##svc atop
+svc messagebus
+##svc mysql
+##svc httpd
+##svc wine
+##svc vmware
+##svc ifplugd
+##svc IIim
+! for n in `seq 2 9` 31; do ifconfig lo:$n 127.0.0.$n; done
+
+[@home]
+NET_IF=eth0
+LOCATION=home
+IPADDR=172.16.1.9
+NETMASK=255.255.255.0
+GATEWAY=172.16.1.1
+NTPSERVER=janus.home
+use online
+
+[@offline]
+LOCATION=offline
+
+# generic wifi using dhcp
+[@wifi]
+NET_IF=eth1
+LOCATION=wifi
+DHCP_IFLIST=$NET_IF
+use online
+
+# generic dhcp on the wired LAN
+[@dhcp]
+NET_IF=eth0
+LOCATION=dhcp
+DHCP_IFLIST=$NET_IF
+use online
+
+[@home-wifi]
+NET_IF=eth1
+LOCATION=home
+NTPSERVER=janus.home
+DHCP_IFLIST=eth1
+! ssid=`cat /etc/rc.mobile/ssid.$NET` || exit 1; iwconfig eth1 essid "$ssid"
+use online
+
+[@cisra]
+NET_IF=eth0
+LOCATION=cisra
+IPADDR=10.11.0.12
+NETMASK=255.255.0.0
+GATEWAY=10.11.0.1
+NTPSERVER=10.10.0.1
+use online
+
+[@t-mobile]
+NET_IF=eth1
+LOCATION=wifi
+NTPSERVER=pool.ntp.org
+LOCATION=wifi
+! ssid=`cat /etc/rc.mobile/ssid.$NET` || exit 1; iwconfig eth1 essid "$ssid"
+use online
+
+# BOS Fujitsu co-lo
+[@fujitsu]
+NET_IF=eth0
+LOCATION=fujitsu
+IPADDR=202.125.174.175
+NETMASK=255.255.255.128
+GATEWAY=202.125.174.129
+NTPSERVER=scorpius
+use online
+
+# BOS Ultimo co-lo
+[@ultimo]
+NET_IF=eth0
+LOCATION=ultimo
+IPADDR=203.222.130.74
+NETMASK=255.255.255.248
+GATEWAY=203.222.130.73
+use online
+
+[@sco]
+NET_IF=eth0
+LOCATION=sco
+DHCP_IFLIST=eth0
+use online
+! route add default gw 10.10.2.2
+##! ( fw-tcp-out 92 jabba; fw-tcp-in 6000 galadriel) &
+
+[cisra-cleanroom]
+NET_IF=eth0
+LOCATION=cisra
+IPADDR=10.9.0.12
+NETMASK=255.255.0.0
+GATEWAY=10.9.0.2
+use online
+
+[nfs]
+/etc/exports
+need portmap
+need rpcidmapd rpcgssd rpcsvcgssd
+svc nfs nfslock
+# fw rules to allow NFS-in?
+
+[ntpd]
+need named
+! [ -n "$NTPSERVER" ] || exit 0; \
+  ( pf=/var/run/ntpd.pid; \
+    killpidfile -u -w "$pf"; \
+    sed "s/{{NTPSERVER}}/$NTPSERVER/g" </etc/ntp.conf.tplt >/etc/ntp.conf; \
+    fw-ntp.conf; \
+    ntpdate `ntpservers`; \
+    ntpd -p "$pf" \
+  ) &
+
+[tftpd]
+! ( fw-udp-in tftp ALL ) & /usr/sbin/in.tftpd -c -l -s /tftpboot &
+
+[sshd]
+! /usr/sbin/sshd -p 22 -o "ListenAddress 127.0.0.1" -o "PidFile /var/run/sshd-lo.pid"
+
+[online]
+! set -xu; \
+  if [ -n "$IPADDR" ]; \
+  then \
+    modprobe "$NET_IF"; \
+    ifconfig "$NET_IF" "$IPADDR" netmask "$NETMASK" up; \
+    route add default gw "$GATEWAY"; \
+  else \
+    ifs=${DHCP_IFLIST:-$NET_IF}; \
+    fw-udp-out 67 ALL; fw-udp-out 68 ALL; \
+    for i in $ifs; \
+    do \
+      modprobe "$i"; \
+      ifconfig $i up; \
+      pf=/var/run/dhclient-$i.pid; \
+      killpidfile -w "$pf"; dhclient -pf "$pf" $i; \
+    done; \
+  fi
+! /etc/firewall/init.sh start
+IPADDR=`ifconfig-info -i "$NET_IF" address`
+! /usr/sbin/sshd -p 22 -o "ListenAddress $IPADDR" -o "PidFile /var/run/sshd-$NET_IF.pid"
+/etc/resolv.conf
+! fw-resolv.conf
+! rig-named.conf && { bsed '/nameserver/d' /etc/resolv.conf; echo nameserver 127.0.0.1 >>/etc/resolv.conf; }
+! killpidfile -w /var/run/named.pid
+need named
+use ntpd

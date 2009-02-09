@@ -1,0 +1,128 @@
+[GLOBAL]
+LOCATION=alone
+POSTFIX_RELAYHOST=
+/etc/sysconfig/network
+/etc/sysconfig/network-scripts/ifcfg-eth0
+/etc/resolv.conf
+/etc/exports
+/etc/nsswitch.conf
+!swapon /home/SWAPFILE0 &
+!ifup lo
+need syslog
+svc pcmcia
+svc gpm
+svc random rawdevices
+svc apmd
+svc atd crond anacron
+svc xfs xinetd
+! /usr/bin/spamd -d -L -H /tmp/spamd &
+
+[@home-wifi]
+LOCATION=home
+use online
+
+[@home-lan]
+LOCATION=home
+use online
+! ( fw-tcp-in 6000 ALL; fw-tcp-out 222 alpha ; fw-tcp-out 8080 pan ; fw-udp-out syslog pan ; fw-REJECT ) &
+#use nfs
+#svc autofs
+#POSTFIX_RELAYHOST=amadeus.home
+use postfix_home
+use zap_home
+svc snmpd
+
+[@home-noalpha]
+LOCATION=home
+use online
+! ( fw-tcp-in 6000 jekyll-static; fw-tcp-out 8080 pan-static ; fw-udp-out syslog pan-static ; fw-REJECT ) &
+#use nfs
+#svc autofs
+#POSTFIX_RELAYHOST=amadeus.home
+use postfix_home
+use zap_home
+svc snmpd
+
+[postfix_home]
+POSTFIX_RELAYHOST=mail.optusnet.com.au
+use postfix
+
+# BOS co-lo
+[@bos]
+LOCATION=bos
+use online
+use tftpd
+
+[@sco]
+LOCATION=sco
+use online
+use dhcp
+! route add default gw 10.10.2.2
+use postfix_sco
+! ( fw-tcp-out 92 jabba; fw-tcp-in 6000 galadriel; fw-REJECT ) &
+
+[postfix_sco]
+POSTFIX_RELAYHOST=mail.socialchange.net.au
+use postfix
+
+[@cisra]
+LOCATION=cisra
+use online
+use dhcp
+use postfix_cisra
+use zap_cisra
+! ( fw-tcp-in 6000 kaper ; fw-tcp-out 6000 kaper ; fw-REJECT ) &
+use nfs
+svc ypbind
+
+[@cisra_pprp]
+LOCATION=cisra
+use online
+use postfix_cisra
+! ( fw-tcp-in 6000 kaper ; fw-tcp-out 6000 kaper ; fw-REJECT ) &
+
+[postfix_cisra]
+POSTFIX_RELAYHOST=smtp.research.canon.com.au
+use postfix
+
+[adzapper]
+! ( fw-tcp-in 8080 ALL; set -- `echo $SQUID | tr : ' '`; fw-tcp-out $2 $1; fw-REJECT ) &
+! exec >>/var/log/adzapper 2>&1; su cameron -c 'exec env STUBURL_PRINT=1 /u/cameron/scripts/squid_redirect -P "8080:$SQUID"' &
+
+[zap_cisra]
+SQUID=squid:3128
+use adzapper
+
+[zap_home]
+SQUID=proxy.nsw.optushome.com.au:8080
+use adzapper
+
+[@cisra-wireless]
+use online
+
+[@dhcp]
+use online
+
+[postfix]
+! ( [ -n "$POSTFIX_RELAYHOST" ] || exit 0; cd /etc/postfix || exit 1; set -x; sed "s/{POSTFIX_RELAYHOST}/$POSTFIX_RELAYHOST/g" <main.cf-tplt >main.cf && postfix start ) &
+
+[nfs]
+need portmap
+svc nfs nfslock
+
+[online]
+need pcmcia
+!modprobe 8139too orinoco_cs; ifup eth0
+!/etc/firewall/init.sh start
+use ntpd
+svc sshd
+
+[@offline]
+
+[tftpd]
+! ( fw-udp-in tftp ALL; fw-REJECT ) & /usr/sbin/in.tftpd -c -l -s /tftpboot &
+
+[ntpd]
+/etc/ntp.conf
+! fw-ntp.conf; fw-REJECT
+svc ntpd
