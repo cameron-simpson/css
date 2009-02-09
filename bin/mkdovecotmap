@@ -1,0 +1,59 @@
+#!/bin/sh -ue
+#
+# Mutt names local mail folders exactly like their logical names.
+# Dovecot wants names like .folder and .subdirfolder so this script is
+# to maintain a symlink map from a dovecot-ready directory to a mutt
+# maildir folder collection.
+#       - Cameron Simpson <cs@zip.com.au> 09feb2009
+#
+
+trace=eecho
+trace=set-x
+
+cmd=`basename "$0"`
+usage="Usage: $cmd mutt mutt-folder dovecot-dir"
+
+badopts=
+
+if [ $# != 2 ]
+then
+  badopts=1
+else
+  muttdir=$1
+  dovecotdir=$2
+  shift
+  shift
+  [ -d "$muttdir/." ] || { echo "$cmd: $muttdir: not a directory" >&2
+                           badopts=1
+                         }
+  case "$muttdir" in
+    /*) absmuttdir=$muttdir ;;
+    *)  absmuttdir=`cd "$muttdir"; pwd`/$muttdir ;;
+  esac
+fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+[ -d "$dovecotdir/." ] || mkdir "$dovecotdir" || exit 1
+
+( cd "$muttdir" || exit 1
+  exec find * -type d -exec ismaildir {} ';' -print -prune
+) \
+| \
+( cd "$dovecotdir"
+  while read muttpath
+  do
+    : "muttpath=$muttpath"
+    absmuttpath=$absmuttdir/$muttpath
+    dovecotpath=.`printf "%s\n" "$muttpath" | tr / .`
+    if [ -d "$dovecotpath/." ] \
+    && sympath=`readsymlink "$dovecotpath"` \
+    && [ "x$sympath" = "x$absmuttpath" ]
+    then
+      :
+    else
+      $trace rm -f "$dovecotpath"
+      $trace ln -s "$absmuttpath" "$dovecotpath"
+    fi
+  done
+)
