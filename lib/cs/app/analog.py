@@ -6,6 +6,7 @@
 
 from thread import allocate_lock
 from os import O_RDONLY, O_CREAT, O_EXCL
+import os
 import sys
 
 dnscache='/var/spool/analog/dnscache'
@@ -30,12 +31,14 @@ def rmlockfile(lockfile,fd):
 def cacheEntries(cachefile=dnscache,lockfile=dnscachelock):
   ''' A generator that yields the contents of analog's DNS cache file as a
       sequence of:
-        (unixtime, ipaddr, list-of-names)
+        (unixtime, ipaddr, name)
   '''
   fp=open(cachefile)
   for line in fp:
-    mins, ipaddr, names = line[:-1].split(" ",2)
-    yield mins*60, ipaddr, names.split(" ")
+    mins, ipaddr, name = line[:-1].split(" ",2)
+    if name == '*':
+      name = None
+    yield mins*60, ipaddr, name
   fp.close()
 
 def addCacheEntries(entries,cachefile=dnscache,lockfile=dnscachelock):
@@ -46,8 +49,8 @@ def addCacheEntries(entries,cachefile=dnscache,lockfile=dnscachelock):
   if fd is None:
     return False
   fp=open(cachefile,"a")
-  for when, ipaddr, names in entries:
-    fp.write("%d %s %s\n" % (when/60, ipaddr, " ".join(names)))
+  for when, ipaddr, name in entries:
+    fp.write("%d %s %s\n" % (when/60, ipaddr, name))
   fp.close()
   rmlockfile(lockfile,fd)
   return True

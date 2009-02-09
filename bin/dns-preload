@@ -1,58 +1,83 @@
 #!/usr/bin/python -tt
 #
-# Do DNS lookups in parallel.
+# Do multiple DNS lookups in parallel.
 #       - Cameron Simpson <cs@zip.com.au> 04jan2009
 #
 
+from threading import Thread
 from multiprocessing import Process, Queue
 from socket import gethostbyname_ex, gethostbyaddr
 import sys
+import cs.app.analog as analog
+import cs.app.webalizer as webalizer
 
 def lookup(rq):
+  ''' Look up a single IP address or hostname.
+      Return (fqdn, addrs).
+  '''
+  print >>sys.stderr, "lookup", `rq`
+  rsp=(rq, ())
   if rq[0].isdigit():
     # IP addr to name
-    fqdn, aliases, addrs = gethostbyaddr(rq)
+    try:
+      fqdn, aliases, addrs = gethostbyaddr(rq)
+    except:
+      return rsp
     rsp = (fqdn, addrs)
   else:
-    fqdn, aliases, addrs = gethostbyname_ex(rq)
+    try:
+      fqdn, aliases, addrs = gethostbyname_ex(rq)
+    except:
+      return rsp
     rsp = (fqdn, addrs)
   return rsp
 
 def dolookups(rqQ,rspQ):
+  ''' Get items to resolve from rqQ, return results on rspQ.
+  '''
   while True:
     rq=rqQ.get()
     if rq is None:
       break
     rsp=lookup(rq)
-    rspQ.put((rq,results))
+    rspQ.put((rq,rsp))
   rqQ.put(None)         # dispatch None for next reader to see
-  outQ.put(None)        # report termination to parent
+  rspQ.put((None,None)) # report termination to parent
 
-def qlookup(rq):
+def qlookup(rqQ,rq):
+  ''' Queue something to be resolved if it's not in the cache.
+      Put None in the cache to prevent later requests.
+  '''
+  print >>sys.stderr, "rq =", `rq`
   rq=rq.lower() # normalise
   if rq not in cache:
-    outQueue.put(rq)
+    rqQ.put(rq)
     cache[rq]=None
 
-def runargs(args):
+def runargs(rqQ,args):
+  ''' Iterate over the supplied arguments, queuing them for lookup.
+      The argument '-' means queue items from stdin.
+      Queue a None after the arguments to indicate end of queue.
+  '''
   for arg in args:
     if arg == '-':
       for line in sys.stdin:
         assert line[-1] == '\n'
-        qlookup(line[:-1])
+        qlookup(rqQ,line[:-1])
     else:
-      qlookup(line[:-1])
-  outQueue.put((None,None))
+      qlookup(rqQ,arg)
+  # signal end of arguments
+  rqQ.put(None)
 
 if __name__ == '__main__':
-  nproc=10
+  nproc=100
   cache={}
 
-  inQueue=Queue(1)
-  outQueue=Queue(nproc)
+  rspQueue=Queue(1)
+  rqQueue=Queue(nproc)
   subprocs=[]
   for n in range(nproc):
-    P=Process(target=dolookups,args=(outQueue,inQueue))
+    P=Process(target=dolookups,args=(rqQueue,rspQueue))
     subprocs.append(P)
     P.start()
 
@@ -60,19 +85,19 @@ if __name__ == '__main__':
   if len(args) == 0:
     args=['-',]
 
-  T=Thread(target=runargs,args=(args,))
+  T=Thread(target=runargs,args=(rqQueue,args,))
   T.start()
 
   nrunning=nproc
   while nrunning > 0:
-    rq, rsp = outQueue.get()
+    rq, rsp = rspQueue.get()
     if rq is None:
       nrunning -= 1
-    else:
-      assert rq in cache, "answer not requested: %s->%s" % (rq, rsp)
-      ##cache[rq]=rsp
-      print rq, '->', rsp
+      continue
+    assert rq in cache, "answer not requested: %s->%s" % (rq, rsp)
+    ##cache[rq]=rsp
+    print rq, '->', `rsp`
 
   print >>sys.stderr, "waiting..."
-  for P in subProc:
+  for P in subprocs:
     P.join()
