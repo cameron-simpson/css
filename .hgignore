@@ -1,2 +1,3 @@
 syntax: regexp
 ^html/manuals/
+\.tar\.gz$
