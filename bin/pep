@@ -1,0 +1,16 @@
+#!/bin/sh -u
+#
+# Pop up a Python PEP.
+#       - Cameron Simpson <cs@zip.com.au> 16feb2009
+#
+
+[ $# = 0 ] && { echo "Usage: $0 keys..." >&2; exit 2; }
+
+xit=0
+
+for key
+do
+  urlshow "http://www.python.org/dev/peps/pep-$key/" || xit=1
+done
+
+exit $xit
