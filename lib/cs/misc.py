@@ -299,8 +299,8 @@ class NoExceptions(object):
       Arguably this should be a bare try...except but that's syntacticly
       noisy and separates the catch from the top.
   '''
-  def __init__(self,handleException):
-    ''' Initialse the NoExceptions context manager.
+  def __init__(self, handleException):
+    ''' Initialise the NoExceptions context manager.
         The handleException is a callable which
         expects (exc_type, exc_value, traceback)
         and returns True or False for the __exit__
@@ -308,7 +308,7 @@ class NoExceptions(object):
         If handleException is None, the __exit__ method
         always returns True, suppressing any exception.
     '''
-    self.__handler=handleException
+    self.__handler = handleException
   def __enter__(self):
     pass
   def __exit__(self, exc_type, exc_value, traceback):
