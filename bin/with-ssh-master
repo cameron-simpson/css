@@ -1,0 +1,40 @@
+#!/bin/sh -ue
+#
+# Run a command using an ssh control master to tunnel connections.
+# It starts a control ssh, runs the target command, then exits.
+# The control socket path is placed in the environment variable
+# $SSH_MASTER_CONTROL_PATH
+#       - Cameron Simpson <cs@zip.com.au> 22feb2009
+#
+
+cmd=`basename "$0"`
+usage="Usage: $cmd target command [args...]"
+
+socket=$HOME/.$cmd-$$
+
+badopts=
+
+if [ $# = 0 ]
+then
+  echo "$cmd: missing target" >&2
+  badopts=1
+else
+  target=$1
+  shift
+fi
+
+if [ $# = 0 ]
+then
+  echo "$cmd: missing command" >&2
+  badopts=1
+fi
+
+ssh -o ControlMaster=yes -o "ControlPath=$socket" -o ExitOnForwardFailure=yes \
+  -N -f "$target" || exit 1
+
+env "SSH_MASTER_CONTROL_PATH=$socket" "$@"
+xit=$?
+
+ssh -o ControlMaster=no -o "ControlPath=$socket" -O exit localhost : || xit=1
+
+exit $xit
