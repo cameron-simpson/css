@@ -22,77 +22,60 @@ umask 22
 
 [ $# -gt 0 ] && [ "x$1" = x-q ] && { quick=1; shift; }
 
+set -ue
+
 unset tmpdir
 trap '[ ! -d "$tmpdir" ] || rm -rf $tmpdir' 0
 trap '[ ! -d "$tmpdir" ] || rm -rf $tmpdir; exit 1' 1 2 13 15
 tmpdir=`mkdirn "$TMPDIR/$cmd"`
-cssdatedir=css-`date +%Y%m%d`
+
+lastrelease=`cs-release lastrelease`
+lasttag=release-$lastrelease
+cssdatedir=css-$lastrelease
 dstdir=$tmpdir/$cssdatedir
-mkdir "$dstdir"
 
-set -ue
+hg archive -t files -r "$lasttag" "$dstdir"
 
-echo HG tree...
-( 
-  hg manifest \
-  | sed '
-         /^bin\/synonyms\//d
-         /^bin\//b ok
-         /^etc\//b ok
-         /^lib\//b ok
-         /^man\//b ok
-         /^html\//b ok
-         /\//d
-         :ok'
-) \
-| cpio -pmd "$dstdir"
+( cd "$dstdir"
 
-echo synonyms...
-rsync -aHL --ignore-existing bin/synonyms/. "$dstdir/bin/."
+  rsync -aHL --ignore-existing bin/synonyms/ bin/
+  rm -rf bin/synonyms bos csiro defunct hacks misc stubs unsw
 
-echo au.com.zip.cs.jar...
-cp $HOME/rc/java/au.com.zip.cs.jar "$dstdir/lib/."
+  cp $HOME/rc/java/au.com.zip.cs.jar lib/
 
-echo adzapper...
-for f in squid_redirect testpageurls testzap
-do cp "$adzapweb/$f" "$dstdir/bin/."
-   chmod a+rx "$dstdir/bin/$f"
-done
+  echo adzapper...
+  for f in squid_redirect testpageurls testzap
+  do cp "$adzapweb/$f" bin/
+     chmod a+rx "bin/$f"
+  done
 
-echo CHANGELOG.txt...
-hglog >"$dstdir/CHANGELOG.txt"
+  echo CHANGELOG.txt...
+  hglog -r "$lasttag" >CHANGELOG.txt
 
-echo 1INDEX.txt...
-( cd bin; tag_fd 2 1INDEX.txt mkscriptndx * | sort ) >"$dstdir/1INDEX.txt"
+  echo 1INDEX.txt...
+  ( cd bin; tag_fd 2 1INDEX.txt mkscriptndx * | sort ) >1INDEX.txt
 
-echo man...
-rsync -aH "$OPTCSS/man/." "$dstdir/man/."
-myke "MANDIR=$dstdir/man" _man || echo myke _man fails, ignoring...
+  echo man...
+  rsync -aH "$OPTCSS/man/." man/
+  myke "MANDIR=$dstdir/man" _man || echo myke _man fails, ignoring...
+)
 
 # deploy to local production
 echo "update $OPTCSS..."
 pfx "$OPTCSS" \
-  rsync -aH --delete \
-        --include=CHANGELOG.txt \
-        --include=/bin \
-        --include=/etc \
-        --include=/html \
-        --include=/lib \
-        --include=/man \
-        '--exclude=/*/' \
-        "$dstdir/." "$OPTCSS/."
+  rsync -aH --delete "$dstdir/" "$OPTCSS/"
 ln -s .. "$OPTCSS/html/optcss"
 
 # update the web tree
-echo css.tar.gz...
+echo css-$lastrelease.tar.gz...
 ( cd "$tmpdir"
-  set -- `find -H "$cssdatedir" -type f -print`
-  [ $# = 0 ] && { echo "NO ARGS!" >&2; ls -ld "$cssdatedir" >&2; exit 1; }
-  cp "$cssweb/css.tar.gz" "$dstdir/html/."
-  ls -tdr "$@" | tar chTf - - | rewriteif "$dstdir/html/css.tar.gz" gzip -v -n -9
+  tar cf "$cssweb/$cssdatedir.tar.gz" "$cssdatedir"
+  rm -f "$cssweb/css.tar.gz"
+  ln -s "$cssdatedir.tar.gz" "$cssweb/css.tar.gz"
 )
+
 echo CHANGELOG.rss...
 hg-rss >"$dstdir/html/CHANGELOG.rss"
 
 echo "update $cssweb..."
-pfx "$cssweb" qrsync -a --exclude=/optcss "$dstdir/html/." "$cssweb/."
+pfx "$cssweb" qrsync -a --exclude=/optcss "$dstdir/html/" "$cssweb/"
