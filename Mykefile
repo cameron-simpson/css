@@ -1,5 +1,8 @@
 ## :include	dir2html
 
+PREFIX          = /opt/css
+weblocal        = $(HOME)/@/ezos/html/cs/css
+
 target  = bin
 
 rewrite = rewriteif -0 -v
@@ -58,6 +61,21 @@ _home:
                 lib/cs/. $(HOME)/lib/cs/.
 
 _all: squid_redirect 1INDEX.txt _submakes _man
+
+_deploy:
+        :make _home
+        OPTCSS=$(PREFIX) updcss
+
+_publish:
+        :make _deploy
+        syncezos
+
+# mark the tip as a new release
+_release:
+        cs-release addrelease
+
+_freshmeat:
+        cs-release freshmeat-submit
 
 CHANGELOG.txt:	_always
 	>>$@; $(rewrite) $@ hglog
