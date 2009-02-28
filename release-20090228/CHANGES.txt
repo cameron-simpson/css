@@ -1,0 +1,130 @@
+changeset:   7260:11c273dffb11
+tag:         release-20090202.7
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Mon Feb 02 15:35:52 2009 +1100
+files:       .hgtags
+description:
+Added tag release-20090202.6 for changeset a221d22d49ea
+
+
+changeset:   7261:5659e877440c
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Mon Feb 02 15:36:13 2009 +1100
+files:       .hgtags
+description:
+Added tag release-20090202.7 for changeset 11c273dffb11
+
+
+changeset:   7262:9947d0b6bff1
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Mon Feb 09 12:12:23 2009 +1100
+files:       bin/rigsquid_redirect
+description:
+More conservative squid startup.
+
+
+changeset:   7263:cd61b1aae947
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Mon Feb 09 12:15:01 2009 +1100
+files:       bin/dns-preload bin/nslookup-parallel lib/cs/app/analog.py lib/cs/app/webalizer.py
+description:
+dns-preload: more progress on web log analyser DNS support tool.
+
+
+changeset:   7264:52c5d1e20c89
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Mon Feb 09 12:15:49 2009 +1100
+files:       bin/apcrrd
+description:
+apcrrd: add some sanity checks on the RRD file.
+
+
+changeset:   7265:5b1f75ec06d7
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Mon Feb 09 12:21:27 2009 +1100
+files:       html/keywords
+description:
+html/keywords: map for categories and descriptions.
+
+
+changeset:   7266:5e597a15ac7d
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Mon Feb 09 12:22:47 2009 +1100
+files:       .hgignore
+description:
+Ignore more stuff in hg status.
+
+
+changeset:   7267:8f96a8f7998f
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Mon Feb 09 12:23:24 2009 +1100
+files:       html/rc.mobile.conf-kirsty html/rc.mobile.conf-newt html/rc.mobile.conf-zoob
+description:
+Example rc.mobile configurations.
+
+
+changeset:   7268:7d6e15cfaedb
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Mon Feb 09 12:23:56 2009 +1100
+files:       .hgignore
+description:
+Ignore tarballs.
+
+
+changeset:   7269:cc279f841a63
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Mon Feb 09 12:37:38 2009 +1100
+files:       libexec/css-nextversion
+description:
+Emit the next version number, updating the status file.
+
+
+changeset:   7270:d37a8705b03c
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Mon Feb 09 13:46:00 2009 +1100
+files:       bin/mkdovecotmap
+description:
+mkdovecotmap: prepare a dovecot ready directory with symlinks to normal folders.
+
+
+changeset:   7271:607ee84cc831
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Mon Feb 16 15:55:44 2009 +1100
+files:       bin/pep
+description:
+pep: command line shortcut to display a PEP.
+
+
+changeset:   7272:6e2595599a32
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Thu Feb 19 08:37:38 2009 +1100
+files:       lib/cs/misc.py
+description:
+Trivial changes to NoException().
+
+
+changeset:   7273:85e109f99815
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sun Feb 22 17:50:50 2009 +1100
+files:       bin/with-ssh-master
+description:
+with-ssh-master: run command with an available ssh master.
+
+
+changeset:   7274:306faa7b8c96
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sat Feb 28 15:07:12 2009 +1100
+files:       version.log
+description:
+We don't use version.log to track releases any more.
+
+
+changeset:   7275:d002105295ec
+tag:         release-20090228
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sat Feb 28 17:58:38 2009 +1100
+files:       .freshmeatrc
+description:
+Add a .freshmeatrc for doing releases.
+
+
