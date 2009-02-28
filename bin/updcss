@@ -50,7 +50,7 @@ hg archive -t files -r "$lasttag" "$dstdir"
   done
 
   echo CHANGELOG.txt...
-  hglog -r "$lasttag" >CHANGELOG.txt
+  hglog -r "$lasttag:0" >CHANGELOG.txt
 
   echo 1INDEX.txt...
   ( cd bin; tag_fd 2 1INDEX.txt mkscriptndx * | sort ) >1INDEX.txt
