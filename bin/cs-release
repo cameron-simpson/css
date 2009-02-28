@@ -1,0 +1,136 @@
+#!/bin/sh -ue
+#
+# General release stuff for packages.
+#       - Cameron Simpson <cs@zip.com.au> 28feb2009
+#
+
+trace=set-x
+
+cmd=`basename "$0"`
+usage="Usage: $cmd op [args...]
+  op:
+    addrelease  Issue a new release.
+    lastrelease Report last release issued.
+    newrelease  Generate a new release number.
+    log         Changelog from last release to now."
+
+badopts=
+
+if [ $# = 0 ]
+then
+  echo "$cmd: missing op" >&2
+  badopts=1
+else
+  op=$1
+  shift
+fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+case $op in
+  lastrelease)
+    lastrelease=`$trace hg tags | sed -n '/^release-[1-9][01][0-9][0-9][01][0-9][0-3][0-9]/{s/^release-//; s/ .*//; p; q;}'`
+    [ -n "$lastrelease" ] || exit 1
+    printf "%s\n" "$lastrelease"
+    exit 0
+    ;;
+  newrelease)
+    lastrelease=`$trace "$0" lastrelease`
+    [ -n "$lastrelease" ] || exit 1
+    today=`date +%Y%m%d`
+    if [ "x$lastrelease" '<' "x$today" ]
+    then
+      release=$today
+    else 
+      if [ "x$lastrelease" = "x$today" ]
+      then
+        release=${today}.2
+      else
+        case "$lastrelease" in
+          "$today".[1-9] )
+            sfx=`expr "x$lastrelease" : "x$today".'\([1-9][0-9]*\).*'`
+            release=$today.`expr "$sfx" + 1`
+            ;;
+          *)
+            echo "$cmd: can't compute next release from \"$lastrelease\"" >&2
+            exit 1
+            ;;
+        esac
+      fi
+    fi
+    printf "%s\n" "$release"
+    exit 0
+    ;;
+  log)
+    lastrelease=`$trace "$0" lastrelease`
+    $trace hg log -r "release-$lastrelease:" \
+                  --template '{files}: {desc|firstline}\n' \
+    | $trace sed '/^\.hg/d; /^CHANGELOG/d; /^release-/d'
+    ;;
+  addrelease)
+    lastrelease=`$trace "$0" lastrelease`
+    log=`$trace "$0" log`
+    [ -n "$log" ] || exit 1
+    uncommited=`$trace hg status | grep -v '^?'`
+    if [ -n "$uncommited" ]
+    then
+      echo "Uncommited changes exist:"
+      printf "%s\n" "$uncommited"
+      echo "These changes will not be included in the release."
+      ask "Proceed anyway" || exit 1
+    fi
+    echo "Changes since $lastrelease:"
+    "$0" log
+    echo
+    echo "Enter short change summary since $lastrelease."
+    changefile=$TMPDIR/$cmd.$$.changes
+    readdottext >"$changefile"
+    [ -s "$changefile" ] || exit 1
+    while echo
+          cat "$changefile"
+          echo
+          ask "Edit the changes"
+    do
+      "$EDITOR" "$changefile"
+    done
+    [ -s "$changefile" ] || exit 1
+    newrelease=`$trace "$0" newrelease`
+    [ -n "$newrelease" ] || exit 1
+    echo
+    ask "Ok to mark release as $newrelease" || exit 1
+    newtag=release-$newrelease
+    reldir=$newtag
+    $trace mkdir "$reldir"
+    $trace hg tag "$newtag"
+    printf "%s\n" "$newtag" >"$reldir/release-tag.txt"
+    $trace mv "$changefile" "$reldir/SUMMARY.txt"
+    $trace hg log -r "release-$lastrelease:$newtag" >"$reldir/CHANGES.txt"
+    $trace hg add "$reldir"
+    $trace hg commit -m "Release information for $newtag." "$reldir"
+    ;;
+  freshmeat-submit)
+    unset fm_project \
+          fm_url_home \
+          fm_url_tarball \
+          fm_url_changelog
+    cf=.freshmeatrc
+    [ -s "$cf" ] || { echo "$cmd: missing $cf" >&2; exit 1; }
+    eval `winclausevars "$cf" freshmeat fm`
+    lastrelease=`$trace "$0" lastrelease`
+    [ -n "$lastrelease" ] || exit 1
+    summary=`$trace cat release-$lastrelease/SUMMARY.txt`
+    [ -n "$summary" ] || exit 1
+    printf "%s\n" "$summary"
+    ask "Confirm freshmeat-submit of release $lastrelease to project $fm_project"
+    $trace freshmeat-submit -V \
+                         -p "$fm_project" -v "$lastrelease" \
+                         -x Y -c "$summary" -r 4 \
+                         -H "$fm_url_home" \
+                         -G "$fm_url_tarball" \
+                         -C "$fm_url_changelog" \
+           </dev/null
+    ;;
+  *)echo "$cmd: unimplemented op \"$op\"" >&2
+    exit 2
+    ;;
+esac
