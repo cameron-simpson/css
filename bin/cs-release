@@ -12,7 +12,8 @@ usage="Usage: $cmd op [args...]
     addrelease  Issue a new release.
     lastrelease Report last release issued.
     newrelease  Generate a new release number.
-    log         Changelog from last release to now."
+    log         Changelog from last release to now.
+    freshmeat-submit Announce last release to freshmeat."
 
 badopts=
 
@@ -122,7 +123,7 @@ case $op in
     [ -n "$summary" ] || exit 1
     printf "%s\n" "$summary"
     ask "Confirm freshmeat-submit of release $lastrelease to project $fm_project"
-    $trace freshmeat-submit -V \
+    $trace freshmeat-submit \
                          -p "$fm_project" -v "$lastrelease" \
                          -x Y -c "$summary" -r 4 \
                          -H "$fm_url_home" \
