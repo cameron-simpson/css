@@ -1,6 +1,7 @@
 #!/bin/sh -u
 #
-# Kick of a port forward ssh.
+# Kick of port forward sshes; each ssh backgrounds itself and logs its pid to
+# a file. Loss of connectivity will break the sshes.
 #	- Cameron Simpson <cs@zip.com.au> 18jan2006
 #
 
@@ -10,10 +11,10 @@
 cf=${SSHPF_SSH_CONFIG:-$HOME/rc/ssh/config-pf}
 delay=120
 force=
+pidfile=$VARRUN/sshpf.pid
 
 cmd=$0
-usage="Usage: $cmd [-f] [-F config] [targets...]
-  -f            Force. No sudo.
+usage="Usage: $cmd [-F config] [targets...]
   -F config     Specify ssh configuration file to use.
                 Default: \$SSHPF_SSH_CONFIG, or \$HOME/rc/ssh/config-pf
   targets       Host clause names from config.
@@ -24,7 +25,6 @@ badopts=
 while [ $# -gt 0 ]
 do
   case $1 in
-    -f) force=1 ;;
     -F) cf=$2; shift ;;
     --) shift; break ;;
     -?*)echo "$cmd: unrecognised option: $1" >&2
@@ -41,27 +41,16 @@ done
 
 [ $# -gt 0 ] || set -- $SSHPF_DFLT
 
-if [ -z "$force" ]
-then
-  # become root if not root already
-  uid=`id -u` || exit 1
-  if [ "x$uid" != x0 ]
-  then
-    qcmd=`shqstr "$0" ${1+"$@"}`
-    set -x
-    exec sudo env "OPTCSS=$OPTCSS" "HOME=$HOME" "VARRUN=$VARRUN" sh -c ". \"\$OPTCSS/env.sh\"; exec $qcmd"
-  fi
-fi
-
-pidfile=$VARRUN/sshpf.pid
-
 killpidfile -w "$pidfile"
 >"$pidfile" || :
 for host
 do
-  while printf " " && sleep "$delay"; do :; done \
+  # we generate data at both ends so that a connectivity loss will break
+  # both ends of the ssh tunnel
+  while echo . && sleep "$delay"; do :; done \
   | ( exec 3<&0
-      pfx "$host" sshb -F "$cf" "$host" 'exec cat' >/dev/null <&3 3<&- &
+      sshb ServerAliveInterval=31 -F "$cf" "$host" \
+        'me=$$; ( exec </dev/null; while kill -0 $me && echo . && sleep $delay; do :; done; kill $me ) & exec cat' >/dev/null <&3 3<&- &
       echo $! >>"$pidfile"
     ) &
 done
