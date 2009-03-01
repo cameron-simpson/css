@@ -160,8 +160,10 @@ do
         fi
         [ -z "$monpid" ] || kill "$monpid" 2>/dev/null
         [ $once ] && break
-        while not ok2portfwd
-        do sleep 2
+        while :
+        do
+          ok2portfwd && break
+          sleep 2
         done
         first=
       done
