@@ -9,11 +9,12 @@ trace=set-x
 cmd=`basename "$0"`
 usage="Usage: $cmd op [args...]
   op:
-    addrelease  Issue a new release.
-    lastrelease Report last release issued.
-    newrelease  Generate a new release number.
+    add         Issue a new release.
+    last        Report last release issued.
+    next        Generate a new release number.
     log         Changelog from last release to now.
-    freshmeat-submit Announce last release to freshmeat."
+    freshmeat-submit
+                Announce last release to freshmeat."
 
 badopts=
 
@@ -29,14 +30,14 @@ fi
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
 case $op in
-  lastrelease)
+  last)
     lastrelease=`$trace hg tags | sed -n '/^release-[1-9][01][0-9][0-9][01][0-9][0-3][0-9]/{s/^release-//; s/ .*//; p; q;}'`
     [ -n "$lastrelease" ] || exit 1
     printf "%s\n" "$lastrelease"
     exit 0
     ;;
-  newrelease)
-    lastrelease=`$trace "$0" lastrelease`
+  next)
+    lastrelease=`$trace "$0" last`
     [ -n "$lastrelease" ] || exit 1
     today=`date +%Y%m%d`
     if [ "x$lastrelease" '<' "x$today" ]
@@ -63,16 +64,16 @@ case $op in
     exit 0
     ;;
   log)
-    lastrelease=`$trace "$0" lastrelease`
+    lastrelease=`$trace "$0" last`
     $trace hg log -r "release-$lastrelease:" \
                   --template '{files}: {desc|firstline}\n' \
     | $trace sed '/^\.hg/d; /^CHANGELOG/d; /^release-/d'
     ;;
-  addrelease)
-    lastrelease=`$trace "$0" lastrelease`
+  add)
+    lastrelease=`$trace "$0" last`
     log=`$trace "$0" log`
     [ -n "$log" ] || exit 1
-    uncommited=`$trace hg status | grep -v '^?'`
+    uncommited=`$trace hg status | grep -v '^?' || :`
     if [ -n "$uncommited" ]
     then
       echo "Uncommited changes exist:"
@@ -95,7 +96,7 @@ case $op in
       "$EDITOR" "$changefile"
     done
     [ -s "$changefile" ] || exit 1
-    newrelease=`$trace "$0" newrelease`
+    newrelease=`$trace "$0" next`
     [ -n "$newrelease" ] || exit 1
     echo
     ask "Ok to mark release as $newrelease" || exit 1
@@ -117,7 +118,7 @@ case $op in
     cf=.freshmeatrc
     [ -s "$cf" ] || { echo "$cmd: missing $cf" >&2; exit 1; }
     eval `winclausevars "$cf" freshmeat fm`
-    lastrelease=`$trace "$0" lastrelease`
+    lastrelease=`$trace "$0" last`
     [ -n "$lastrelease" ] || exit 1
     summary=`$trace cat release-$lastrelease/SUMMARY.txt`
     [ -n "$summary" ] || exit 1

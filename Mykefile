@@ -70,7 +70,7 @@ _publish:
 
 # mark the tip as a new release
 _release:
-        cs-release addrelease
+        cs-release add
 
 _freshmeat:
         cs-release freshmeat-submit
