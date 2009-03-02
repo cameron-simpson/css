@@ -7,12 +7,30 @@
 #       - Cameron Simpson <cs@zip.com.au> 22feb2009
 #
 
+sshopts=
+
 cmd=`basename "$0"`
-usage="Usage: $cmd target command [args...]"
+usage="Usage: $cmd [ssh-options...] target command [args...]
+  Note: ssh-options must survive unquoted.
+        For example, the -o option should take the form -o option-value."
 
 socket=$HOME/.$cmd-$$
 
 badopts=
+
+while [ $# -gt 0 ]
+do
+  case $1 in
+    -[Fio])
+        sshopts="$sshopts $1 $2" ;;
+    --) shift; break ;;
+    -?*)echo "$cmd: unrecognised option: $1" &2
+        badopts=1
+        ;;
+    *)  break ;;
+  esac
+  shift
+done
 
 if [ $# = 0 ]
 then
@@ -29,12 +47,13 @@ then
   badopts=1
 fi
 
-ssh -o ControlMaster=yes -o "ControlPath=$socket" -o ExitOnForwardFailure=yes \
+ssh $sshopts \
+  -o ControlMaster=yes -o "ControlPath=$socket" -o ExitOnForwardFailure=yes \
   -N -f "$target" || exit 1
 
 env "SSH_MASTER_CONTROL_PATH=$socket" "$@"
 xit=$?
 
-ssh -o ControlMaster=no -o "ControlPath=$socket" -O exit localhost : || xit=1
+ssh $sshopts -o ControlMaster=no -o "ControlPath=$socket" -O exit localhost : || xit=1
 
 exit $xit
