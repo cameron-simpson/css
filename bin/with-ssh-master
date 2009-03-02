@@ -22,7 +22,7 @@ while [ $# -gt 0 ]
 do
   case $1 in
     -[Fio])
-        sshopts="$sshopts $1 $2" ;;
+        sshopts="$sshopts $1 $2"; shift ;;
     --) shift; break ;;
     -?*)echo "$cmd: unrecognised option: $1" &2
         badopts=1
