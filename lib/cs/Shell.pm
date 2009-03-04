@@ -27,6 +27,8 @@ package cs::Shell;
 
 =head1 FUNCTIONS
 
+=over 4
+
 =item quote(I<args...>)
 
 The function takes an array of I<args>
