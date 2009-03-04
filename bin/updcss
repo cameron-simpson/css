@@ -5,22 +5,60 @@
 #
 
 : ${TMPDIR:=/tmp}
-: ${OPTCSS:=/opt/css}
 
+optcss=${OPTCSS:-/opt/css}
 cssweb=$HOME/@/ezos/html/cs/css
 adzapweb=$HOME/@/adzapper.sf/html/scripts
-quick=
+rev=
+updateweb=1
 
 cmd=`basename "$0"`
-usage="Usage: $cmd [-q] [-n] [pushhosts...]"
+usage="Usage: $cmd [-r rev] [target-dir]"
+
+badopts=
+
+while [ $# -gt 0 ]
+do
+  case $1 in
+    -r) rev=$2; updateweb=; shift ;;
+    --) shift; break ;;
+    -?*)echo "$cmd: unrecognised option: $1" >&2
+        badopts=1
+        ;;
+    *)  break ;;
+  esac
+  shift
+done
+
+if [ $# -gt 0 ]
+then
+  optcss=$1
+  shift
+  [ -d "$optcss/." ] || { echo "$cmd: $optcss: not a directory" >&2
+                          badopts=1
+                        }
+fi
+
+[ $# = 0 ] || { echo "$cmd: extra arguments after target-dir: $*" >&2
+                badopts=1
+              }
+
+if [ -n "$rev" ]
+then
+  cssdatedir=css-$rev
+else
+  rev=`cs-release last`
+  cssdatedir=css-$rev
+  rev=release-$rev
+fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
 
 xit=0
 
 needhost $HOMEHOST@home || exit 2
 
 umask 22
-
-[ $# -gt 0 ] && [ "x$1" = x-q ] && { quick=1; shift; }
 
 set -ue
 
@@ -29,12 +67,9 @@ trap '[ ! -d "$tmpdir" ] || rm -rf $tmpdir' 0
 trap '[ ! -d "$tmpdir" ] || rm -rf $tmpdir; exit 1' 1 2 13 15
 tmpdir=`mkdirn "$TMPDIR/$cmd"`
 
-lastrelease=`cs-release lastrelease`
-lasttag=release-$lastrelease
-cssdatedir=css-$lastrelease
 dstdir=$tmpdir/$cssdatedir
 
-hg archive -t files -r "$lasttag" "$dstdir"
+hg archive -t files -r "$rev" "$dstdir"
 
 ( cd "$dstdir"
 
@@ -49,33 +84,38 @@ hg archive -t files -r "$lasttag" "$dstdir"
      chmod a+rx "bin/$f"
   done
 
-  echo CHANGELOG.txt...
-  hglog -r "$lasttag:0" >CHANGELOG.txt
-
   echo 1INDEX.txt...
   ( cd bin; tag_fd 2 1INDEX.txt mkscriptndx * | sort ) >1INDEX.txt
 
   echo man...
-  rsync -aH "$OPTCSS/man/." man/
+  mkdir -p "$optcss/man"
+  rsync -aH "$optcss/man/" man/
   myke "MANDIR=$dstdir/man" _man || echo myke _man fails, ignoring...
 )
 
+echo CHANGELOG.txt...
+hglog -r "$rev:0" >CHANGELOG.txt
+
 # deploy to local production
-echo "update $OPTCSS..."
-pfx "$OPTCSS" \
-  rsync -aH --delete "$dstdir/" "$OPTCSS/"
-ln -s .. "$OPTCSS/html/optcss"
+echo "update $optcss..."
+pfx "$optcss" \
+  rsync -aH --exclude-from=deploy.rsync-include --delete --delete-excluded \
+    "$dstdir/" "$optcss/"
+ln -s .. "$optcss/html/optcss"
 
-# update the web tree
-echo css-$lastrelease.tar.gz...
-( cd "$tmpdir"
-  tar cf "$cssweb/$cssdatedir.tar.gz" "$cssdatedir"
-  rm -f "$cssweb/css.tar.gz"
-  ln -s "$cssdatedir.tar.gz" "$cssweb/css.tar.gz"
-)
+if [ $updateweb ]
+then
+  # update the web tree
+  echo $cssdatedir.tar.gz...
+  ( cd "$tmpdir"
+    tar cf "$cssweb/$cssdatedir.tar.gz" "$cssdatedir"
+    rm -f "$cssweb/css.tar.gz"
+    ln -s "$cssdatedir.tar.gz" "$cssweb/css.tar.gz"
+  )
 
-echo CHANGELOG.rss...
-hg-rss >"$dstdir/html/CHANGELOG.rss"
+  echo CHANGELOG.rss...
+  hg-rss >"$dstdir/html/CHANGELOG.rss"
 
-echo "update $cssweb..."
-pfx "$cssweb" qrsync -a --exclude=/optcss "$dstdir/html/" "$cssweb/"
+  echo "update $cssweb..."
+  pfx "$cssweb" qrsync -a --exclude=/optcss "$dstdir/html/" "$cssweb/"
+fi
