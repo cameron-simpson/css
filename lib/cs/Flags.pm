@@ -164,6 +164,8 @@ sub TestAll
   $this->Intersect(@_) == @_;
 }
 
+=back
+
 =head1 CAVEATS
 
 Flag strings must not contain NULs ("B<\0>").
