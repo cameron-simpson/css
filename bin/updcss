@@ -94,7 +94,7 @@ hg archive -t files -r "$rev" "$dstdir"
 )
 
 echo CHANGELOG.txt...
-hglog -r "$rev:0" >CHANGELOG.txt
+hglog -r "$rev:0" >"$dstdir/CHANGELOG.txt"
 
 # deploy to local production
 echo "update $optcss..."
