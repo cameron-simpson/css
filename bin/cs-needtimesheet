@@ -65,11 +65,16 @@ tsdate=`monday "$when"`
                      }
 
 tsfile=$tsdir/$tsdate
+tsconf=$tsdir/$uccat.conf.sh
+[ -s "$tsconf" ] || { echo "$cmd: missing config file: $tsconf" >&2
+                      exit 1
+                    }
+
 if [ ! -s "$tsfile" ]
 then
   [ $force ] || { [ -t 0 ] && ask "create $tsfile"; } || exit 1
   ( ##set -x
-    cs-mktimesheet -d "$tsdate" "$category" >>"$tsfile"
+    cs-mktimesheet -c "$tsconf" -d "$tsdate" "$category" >>"$tsfile"
     cat "$tsfile"
   ) | mailsubj -s "new timesheet file at $tsfile" "$USER"
 fi

@@ -7,16 +7,26 @@
 : ${LOGDIR:=$HOME/var/log}
 
 when=today
+cfg=
 
 cmd=`basename "$0"`
-usage="Usage: $cmd [-d when] category"
+usage="Usage: $cmd [-c config] [-d when] category"
 
 badopts=
 
-if [ $# -gt 0 ] && [ "x$1" = x-d ]
-then
-  when=$2; shift; shift
-fi
+while [ $# -gt 0 ]
+do
+  case $1 in
+    -c) cfg=$2; shift ;;
+    -d) when=$2; shift ;;
+    --) shift; break ;;
+    -?*)echo "$cmd: unrecognised option: $1" >&2
+        badopts=1
+        ;;
+    *)  break ;;
+  esac
+  shift
+done
 
 if [ $# = 0 ]
 then
@@ -25,25 +35,32 @@ then
 else
   category=$1
   shift
-  rcdir=$HOME/private/rc/timesheets/$category
-  footer=$rcdir/footer.txt
-  [ -s "$footer" ] || { echo "$cmd: missing $footer" >&2; badopts=1; }
 fi
 
 [ $# = 0 ] || { echo "$cmd: extra arguments: $*" >&2; badopts=1; }
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
+[ -z "$cfg" ] || . "$cfg"
+: ${TSDATEFMT_HEADER:=''}
+: ${TSDATEFMT_DAYHEADER:='%Y-%m-%d %A\n'}
+: ${TSDATEFMT_FOOTER:=''}
+
 day=`monday "$when"`
 
+ymd=`date -d "$day" '+%Y-%m-%d'`
+date2printf=`date -d "$ymd" "+$TSDATEFMT_HEADER"`
+printf "$date2printf"
 for n in 0 1 2 3 4 5 6
 do
   ymd=`date -d "$day" '+%Y-%m-%d'`
   wday=`date -d "$day" '+%A'`
   log=$LOGDIR/daily/$ymd/$category
-  echo "$ymd $wday"
+  date2printf=`date -d "$ymd" "+$TSDATEFMT_DAYHEADER"`
+  printf "$date2printf"
   [ -s "$log" ] && sed 's/^/  /' "$log"
   day=`date -d "$ymd tomorrow"`
 done
 
-cat "$footer"
+date2printf=`date -d "$ymd" "+$TSDATEFMT_FOOTER"`
+printf "$date2printf"
