@@ -44,6 +44,8 @@ fi
 [ -z "$cfg" ] || . "$cfg"
 : ${TSDATEFMT_HEADER:=''}
 : ${TSDATEFMT_DAYHEADER:='%Y-%m-%d %A\n'}
+: ${TSDATEFMT_DAYFOOTER:='%Y-%m-%d %A\n'}
+: ${TSDATEFMT_DAYINDENT:='  '}
 : ${TSDATEFMT_FOOTER:=''}
 
 day=`monday "$when"`
@@ -58,7 +60,11 @@ do
   log=$LOGDIR/daily/$ymd/$category
   date2printf=`date -d "$ymd" "+$TSDATEFMT_DAYHEADER"`
   printf "$date2printf"
-  [ -s "$log" ] && sed 's/^/  /' "$log"
+  date2printf=`date -d "$ymd" "+$TSDATEFMT_DAYINDENT"`
+  indent=`printf "$date2printf"`
+  [ ! -s "$log" ] || while read -r logline; do printf "$TSDATEFMT_DAYINDENT%s\n" "$logline"; done <"$log"
+  date2printf=`date -d "$ymd" "+$TSDATEFMT_DAYFOOTER"`
+  printf "$date2printf"
   day=`date -d "$ymd tomorrow"`
 done
 
