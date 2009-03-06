@@ -6,19 +6,60 @@
 
 : ${USER:=`id -un`}
 
-cmd=`basename "$0"`
-
+tsdir=
 force=
 
-[ $# -gt 0 ] && [ "x$1" = x-f ] && { force=1; shift; }
-[ $# = 2 ] || { echo "Usage: $0 [-f] date category" >&2; exit 2; }
-when=$1
-category=$2
+cmd=`basename "$0"`
+usage="Usage: $0 [-f] [-T timesheet-dir] date category"
+
+badopts=
+
+while [ $# -gt 0 ]
+do
+  case $1 in
+    -f) force=1 ;;
+    -T) tsdir=$2; shift
+        [ -d "$tsdir/." ] || { echo "$cmd: -T $tsdir: not a directory" >&2
+                               badopts=1
+                             }
+        ;;
+    --) shift; break ;;
+    -?*)echo "$cmd: unrecognised option: $1" >&2
+        badopts=1
+        ;;
+    *)  break ;;
+  esac
+  shift
+done
+
+if [ $# = 0 ]
+then
+  echo "$cmd: missing date" >&2
+  badopts=1
+else
+  when=$1
+  shift
+fi
+
+if [ $# = 0 ]
+then
+  echo "$cmd: missing category" >&2
+  badopts=1
+else
+  category=$1
+  shift
+fi
+
+[ $# = 0 ] || { echo "$cmd: extra arguments after category: $*" >&2
+                badopts=1
+              }
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
 
 lccat=`printf "%s\n" "$category" | tr '[A-Z]' '[a-z]'`
 uccat=`printf "%s\n" "$category" | tr '[a-z]' '[A-Z]'`
-tsdate=`monday "$1"`
-tsdir=$HOME/$lccat/timesheets/$USER
+tsdate=`monday "$when"`
+[ -n "$tsdir" ] || tsdir=$HOME/$lccat/timesheets/$USER
 [ -d "$tsdir/." ] || { echo "$cmd: missing timesheet dir: $tsdir" >&2
                        exit 1
                      }
