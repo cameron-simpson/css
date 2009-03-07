@@ -76,8 +76,8 @@ class AttrMap(dict):
     session=nodedb.session
     self.__attrObjs={}
     for attrObj in attrs:
-      A.__addAttrObj(attrObj)
-  def __addAttr(self,attrObj):
+      self.__addAttrObj(attrObj)
+  def __addAttrObj(self,attrObj):
     attr=attrObj.ATTR
     self.__attrObjs.setdefault(attr,[]).append(attrObj)
     if attr not in self:
