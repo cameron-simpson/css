@@ -73,23 +73,22 @@ class AttrMap(dict):
     dict.__init__(self)
     self.__node=node
     self.__nodedb=nodedb
-    session=nodedb.session
-    self.__attrObjs={}
-    for attrObj in attrs:
-      self.__addAttrObj(attrObj)
-  def __addAttrObj(self,attrObj):
-    attr=attrObj.ATTR
-    self.__attrObjs.setdefault(attr,[]).append(attrObj)
-    if attr not in self:
-      dict.__setitem__(self,attr,[])
-    dict.__getitem__(self,attr).append(attrObj.VALUE)
+    self.__attrObjs=dict([ (A.ATTR, A) for A in attrs ])
+    dict.__init__(self, [ (A.ATTR, tuple(A.VALUE)) for A in attrs ])
+
   def __setitem__(self,attr,value):
+    ''' Set the attribute 'attr' to 'value'.
+    '''
     if attr in self:
       del self[attr]
-    self.__attrObjs[attr]=[ self.__node.newattr(attr,v) for v in value ]
+    self.__attrObjs[attr]=[ self.__node.newattr(attr, v) for v in value ]
     self.__nodedb.session.add_all(self.__attrObjs[attr])
-    dict.__setitem__(self,attr,value)
+    # store a tuple so that we can't do append()s etc
+    dict.__setitem__(self, attr, tuple(value))
+
   def __delitem__(self,attr):
+    ''' Remove the named attibute.
+    '''
     self.__nodedb.session.flush()
     for attrObj in self.__attrObjs[attr]:
       self.__nodedb.session.delete(attrObj)
