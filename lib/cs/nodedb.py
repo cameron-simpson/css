@@ -195,7 +195,6 @@ class NodeDB(object):
     ''' Take some NODES.ID values and return _Node objects.
     '''
     filter=fieldInValues(self.nodes.c.ID,ids)
-    #print >>sys.stderr, "filter=%s" % (filter,)
     _nodes=self.session.query(self._Node).filter(filter).all()
     self.session.add_all(_nodes)
     return _nodes
@@ -248,14 +247,13 @@ class NodeDB(object):
     if len(missingIds) > 0:
       # obtain the attributes of the missing nodes
       nodeAttrs={}
-      attrs=self.session.query(nodedb._Attr) \
-                        .filter(fieldInValues('NODE_ID',missingIds)) \
-                        .all()
+      filter=fieldInValues(self.attrs.c.NODE_ID,missingIds)
+      attrs=self.session.query(self._Attr).filter(filter).all()
       self.session.add_all(attrs)
       for attr in attrs:
         nodeAttrs.setdefault(attr.NODE_ID,[]).append(attr)
       # create the missing Node objects
-      Ns.extend([ self._newNode(_node,self,nodeAttrs.get(_node.ID,()))
+      Ns.extend([ self._newNode(_node,nodeAttrs.get(_node.ID,()))
                   for _node in self._nodesByIds(missingIds)
                 ])
 
