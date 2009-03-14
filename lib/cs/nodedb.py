@@ -194,7 +194,9 @@ class NodeDB(object):
   def _nodesByIds(self,ids):
     ''' Take some NODES.ID values and return _Node objects.
     '''
-    _nodes=self.session.query(self._Node).filter(fieldInValues('ID',ids)).all()
+    filter=fieldInValues(self.nodes.c.ID,ids)
+    #print >>sys.stderr, "filter=%s" % (filter,)
+    _nodes=self.session.query(self._Node).filter(filter).all()
     self.session.add_all(_nodes)
     return _nodes
 
@@ -202,6 +204,27 @@ class NodeDB(object):
     _nodes=self.session.query(self._Node).filter_by(NAME=name,TYPE=type).all()
     self.session.add_all(_nodes)
     return _nodes
+
+  def _toNode(self,*keys):
+    ''' Flexible get-a-node function.
+        (int) -> nodeById(int)
+        ("#id") -> nodeById(int("id"))
+        (name,type) -> nodeByNameAndType(name,type)
+        ("TYPE:name") -> nodeByNameAndType(name,type)
+    '''
+    if len(keys) == 1:
+      key = keys[0]
+      if type(key) is int:
+        return self.nodeById(key)
+      if type(key) is str:
+        if key[0] == '#':
+          return self.nodeById(int(key[1:]))
+        if key[0].isupper():
+          t, n = key.split(':',1)
+          return self.nodeByNameAndType(n, t)
+    elif len(keys) == 2:
+      return self.nodeByNameAndType(*keys)
+    raise ValueError, "can't map %s to Node" % (keys,)
 
   def _nodesByType(self,type):
     _nodes=self.session.query(self._Node).filter_by(TYPE=type).all()
@@ -255,10 +278,16 @@ class NodeDB(object):
   def nodesByType(self,type):
     return self._nodes2Nodes(self._nodesByType(type),checkMap=True)
 
-  def __getitem__(self,id):
-    N=self.nodeById(id)
-    if N is None:
-      raise IndexError
+  def __contains__(self,key):
+    try:
+      N=self[key]
+    except IndexError:
+      return False
+    return True
+  def __getitem__(self,key):
+    N=self._toNode(key)
+    # should not happen, but the code tested for it
+    assert N is not None
     return N
 
 if __name__ == '__main__':
@@ -281,6 +310,14 @@ if __name__ == '__main__':
   N.ATTR2=7
   print str(N)
   db.session.flush()
+  print "N.ID=%d" % N.ID
+  print "1 in db: %s" % (1 in db)
+  print "1 in db: %s" % (1 in db)
+  print "9 in db: %s" % (9 in db)
+  print db._toNode(1)
+  print db._toNode("#1")
+  print db._toNode("newname","HOST")
+  print db._toNode("HOST:newname")
   print "N.ATTRXs=%s" % (N.ATTRXs,)
   print "N.ATTR2=%s" % N.ATTR2
   print "N.ATTR3es=%s" % (N.ATTR3es,)
