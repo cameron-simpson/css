@@ -69,6 +69,7 @@ tmpdir=`mkdirn "$TMPDIR/$cmd"`
 
 dstdir=$tmpdir/$cssdatedir
 
+echo archive revision $rev ...
 hg archive -t files -r "$rev" "$dstdir"
 
 ( cd "$dstdir"
