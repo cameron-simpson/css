@@ -76,18 +76,8 @@ class WiringNode(Node):
     Node.__delattr__(self,attr)
 
 class WiringDB(NodeDB):
-  def __init__(self,engine,nodes=None,attrs=None):
-    NodeDB.__init__(self,engine=engine,nodes=nodes,attrs=attrs)
-
   def _newNode(self,_node,attrs):
     return WiringNode(_node,self,attrs)
-
-  def __getitem__(self,k):
-    if type(k) is int:
-      return self.nodeById(k)
-    if type(k) is str:
-      k=(k, 'HOST')
-    return self.nodeByNameAndType(k[0], k[1])
 
 if __name__ == '__main__':
   import sqlalchemy; print sqlalchemy.__version__
