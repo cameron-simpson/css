@@ -22,15 +22,16 @@ usage="Usage: $cmd [-1] [-stop] targets...
 If targets is \"ALL\" then if -stop it means all running portforwards
 otherwise it means all clauses named *-ALL in the ssh configuration file."
 
+opts=
 badopts=
 
 while [ $# -gt 0 ]
 do
   case $1 in
-    -1) once=1 ;;
-    -F) sshcfg=$2; shift ;;
+    -1) once=1 opts="$opts $1" ;;
+    -F) sshcfg=$2 opts="$opts $1 $2"; shift ;;
     -stop)
-        stop=1 ;;
+        stop=1 opts="$opts $1" ;;
     --) shift; break ;;
     -?*)echo "$cmd: unrecognised option: $1" >&2
         badopts=1
@@ -94,81 +95,92 @@ then
   fi
 fi
 
-for target
-do
-  cfg_pidfile=portfwd.$target.pid
-  cfg_command=:
-  cfg_outlog=portfwd-$target    # /dev/null
-  cfg_monitor=
-  if [ -s "$fwdcfg" ]
-  then
-    wcv=`winclausevars "$fwdcfg" "$target" cfg`
-    eval "$wcv"
-  fi
-  case $cfg_pidfile in
-    /*) ;; *) cfg_pidfile=$VARRUN/$cfg_pidfile ;;
-  esac
-  case $cfg_outlog in
-    /*) ;; *) cfg_outlog=$LOGDIR/$cfg_outlog ;;
-  esac
-  if opid=`ifpid -q -v "$cfg_pidfile"`
-  then
-    printf "%s" "$cmd: stopping $target, pid $opid "
-    synckill -v "$opid"
-    >"$cfg_pidfile"
-  fi
+if [ $# -gt 1 ]
+then
+  xit=0
+  set -x
+  for target
+  do
+    "$0" $opts -- "$target" || xit=1
+  done
+  exit $xit
+fi
 
-  if [ -z "$stop" ]
-  then
-    ( sshpid=
-      trap 'if [ -n "$sshpid" ]
-            then
-              printf "%s" "$cmd: $target: SIGTERM received, killing ssh "
-              synckill -v "$sshpid"
-            fi
-            exit 1
-           ' 1 15
-      first=1
+target=$1
+shift
+
+cfg_pidfile=portfwd.$target.pid
+cfg_command=:
+cfg_outlog=portfwd-$target    # /dev/null
+cfg_monitor=
+if [ -s "$fwdcfg" ]
+then
+  wcv=`winclausevars "$fwdcfg" "$target" cfg`
+  eval "$wcv"
+fi
+case $cfg_pidfile in
+  /*) ;; *) cfg_pidfile=$VARRUN/$cfg_pidfile ;;
+esac
+case $cfg_outlog in
+  /*) ;; *) cfg_outlog=$LOGDIR/$cfg_outlog ;;
+esac
+if opid=`ifpid -q -v "$cfg_pidfile"`
+then
+  printf "%s" "$cmd: stopping $target, pid $opid "
+  synckill -v "$opid"
+  >"$cfg_pidfile"
+fi
+
+if [ -z "$stop" ]
+then
+  ( sshpid=
+    trap 'if [ -n "$sshpid" ]
+          then
+            printf "%s" "$cmd: $target: SIGTERM received, killing ssh "
+            synckill -v "$sshpid"
+          fi
+          exit 1
+         ' 1 15
+    first=1
+    while :
+    do
+      $trace \
+        sshto ServerAliveInterval=37 -n -F "$sshcfg" "$target" \
+          "( $cfg_command ) </dev/null &
+         "'exec 1>&2
+           while sleep 61 && printf " "; do :; done
+          ' \
+        >>"$cfg_outlog" &
+      sshpid=$!
+      [ $first ] || alert "RESTARTED: sshpf $target" &
+      if [ -n "$cfg_monitor" ]
+      then
+        sh -c "$cfg_monitor" &
+        monpid=$!
+      else
+        monpid=
+      fi
+      while pfx "ssh-$target" kill -0 "$sshpid" && ok2portfwd
+      do  sleep 2
+      done
+      if synckill "$sshpid"
+      then
+        sshpid=
+        alert "KILLED: sshpf $target" &
+      else
+        sshpid=
+        alert "EXITED: sshpf $target" &
+      fi
+      [ -z "$monpid" ] || kill "$monpid" 2>/dev/null
+      [ $once ] && break
       while :
       do
-        $trace \
-          sshto ServerAliveInterval=37 -n -F "$sshcfg" "$target" \
-            "( $cfg_command ) </dev/null &
-           "'exec 1>&2
-             while sleep 61 && printf " "; do :; done
-            ' \
-          >>"$cfg_outlog" &
-        sshpid=$!
-        [ $first ] || alert "RESTARTED: sshpf $target" &
-        if [ -n "$cfg_monitor" ]
-        then
-          sh -c "$cfg_monitor" &
-          monpid=$!
-        else
-          monpid=
-        fi
-        while pfx "ssh-$target" kill -0 "$sshpid" && ok2portfwd
-        do  sleep 2
-        done
-        if synckill "$sshpid"
-        then
-          sshpid=
-          alert "KILLED: sshpf $target" &
-        else
-          sshpid=
-          alert "EXITED: sshpf $target" &
-        fi
-        [ -z "$monpid" ] || kill "$monpid" 2>/dev/null
-        [ $once ] && break
-        while :
-        do
-          ok2portfwd && break
-          sleep 2
-        done
-        first=
+        ok2portfwd && break
+        sleep 2
       done
-    ) </dev/null 1>&2 &
-    echo $! >"$cfg_pidfile"
-    echo "$target: $cfg_pidfile: $!"
-  fi
-done
+      first=
+    done
+  ) </dev/null 1>&2 &
+  echo $! >"$cfg_pidfile"
+  echo "$target: $cfg_pidfile: $!"
+fi
