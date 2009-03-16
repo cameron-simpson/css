@@ -2,13 +2,16 @@
 
 from cs.nodedb import NodeDB, Node
 from cs.mappings import parseUC_sAttr
+from cs.misc import the
 import sys
 
 class WiringNode(Node):
   ''' A WiringNode is a subclass of cs.nodedb.Node.
-      In addition to the normal pluralisable fields particular node types map
-      FOO to FOO_ID. Accessing FOO dereferences the field FOO_ID and returns
-      the corresponding nodes.
+      Accessing FOO_OF returns the nodes whose FOO_ID value references
+      this node's ID.
+      Accessing FOO_OF_ID returns the IDs of nodes whose FOO_ID value
+      references this node's ID.
+      Accessing FOO  returns the nodes specified by the ID values in FOO_ID.
   '''
   _idFields={ 'HOST': ('NIC','RACK',),
               'SWITCHPORT': ('VLAN','SWITCH','RACK',),
@@ -22,57 +25,75 @@ class WiringNode(Node):
 
   def _idf2nodes(self,field):
     return list(self._nodedb.NodeById(int(v)) for v in getattr(self,field+'s'))
+
   def __hasattr__(self,attr):
+    if Node.__hasattr__(self,attr):
+      return True
     k, plural = parseUC_sAttr(attr)
-    if k is not None:
-      kid=self.idField(k)
-      if kid is not None:
-        return hasattr(self,kid)
-    return Node.__getattr__(self,attr)
+    if k is None:
+      return False
+    if k.endswith('_ID'):
+      return hasattr(self._attrs,k)
+    kid=k+'_ID'
+    if hasattr(self._attrs,kid):
+      return True
+    return hasattr(self._attrs,k)
+
   def __getattr__(self,attr):
+    if attr == 'TYPE' or attr == 'NAME' or attr == 'ID':
+      return Node.__getattr__(self,attr)
     k, plural = parseUC_sAttr(attr)
-    if k is not None:
-      if k == 'TYPE':
-        return Node.__getattr__(self,'TYPE')
-      if k.endswith('_OF'):
-        return list(
+    if k is None:
+      return Node.__getattr__(self,attr)
+    values=()
+    if k.endswith('_OF'):
+      values = list(
                  self._nodedb.nodesByIds(
-                                int(id) for id in getattr(self,k+'_IDs')))
-      if k.endswith('_OF_ID'):
-        nodedb=self._nodedb
-        session=nodedb.session
-        return list( attrObj.NODE_ID
-                     for attrObj in session
-                                    .query(nodedb._Attr)
-                                    .filter_by(ATTR=k[:-6]+'_ID',
-                                               VALUE=str(self.ID)))
-      kid=self.idField(k)
-      if kid is not None:
-        return self._idf2nodes(kid)
-    return Node.__getattr__(self,attr)
+                              int(id) for id in getattr(self,k+'_IDs')))
+    elif k.endswith('_OF_ID'):
+      nodedb=self._nodedb
+      session=nodedb.session
+      values = list( attrObj.NODE_ID
+                   for attrObj in session
+                                  .query(nodedb._Attr)
+                                  .filter_by(ATTR=k[:-6]+'_ID',
+                                             VALUE=str(self.ID)))
+    elif not k.endswith("_ID"):
+      kid=k+"_ID"
+      if hasattr(self._attrs,kid):
+        values = self._nodedb.nodesByIds(getattr(self,kid))
+    elif self._hasattr(k):
+      values = list(self._attrs[k])
+
+    if plural:
+      return values
+    print >>sys.stderr, "WiringNode.__getattr__(attr=%s): k=%s, plural=%s, values=%s" % (attr,k,plural,values)
+    return the(values)
+
   def __setattr__(self,attr,value):
     k, plural = parseUC_sAttr(attr)
-    if k is not None:
-      if k.endswith('_OF') or k.endswith('_OF_ID'):
-        raise AttributeError, "illegal assignment to .%s" % attr
-      t=self.TYPE
-      kid=self.idField(k)
-      if kid is not None:
-        if not plural:
-          value=(value,)
-        setattr(self,kid+'s',[ N.ID for N in value ])
-        return
-    Node.__setattr__(self,attr,value)
+    if k is None:
+      Node.__setattr__(self,attr,value)
+      return
+    if k.endswith('_OF') or k.endswith('_OF_ID'):
+      raise AttributeError, "illegal assignment to .%s" % attr
+    if not k.endswith('_ID') and hasattr(self._attrs,k+'_ID'):
+      setattr(k+'_IDs', [ N.ID for N in value ])
+      return
+    if not plural:
+      value=(value,)
+    Node.__setattr__(self,k+'s', list(value))
+
   def __delattr__(self,attr):
     k, plural = parseUC_sAttr(attr)
-    if k is not None:
-      if k.endswith('_OF') or k.endswith('_OF_ID'):
-        raise AttributeError, "illegal del of .%s" % attr
-      t=self.TYPE
-      kid=self.idField(k)
-      if kid is not None:
-        delattr(self,kid)
-        return
+    if k is None:
+      Node.__delattr__(self,attr)
+      return
+    if k.endswith('_OF') or k.endswith('_OF_ID'):
+      raise AttributeError, "illegal del of .%s" % attr
+    if not attr.endswith('_ID') and self.hasattr(k+'_ID'):
+      del self[k+'_ID']
+      return
     Node.__delattr__(self,attr)
 
 class WiringDB(NodeDB):
