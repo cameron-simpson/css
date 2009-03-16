@@ -114,10 +114,12 @@ class Node(object):
   def __str__(self):
     return "%s:%s#%d%s" % (self.NAME,self.TYPE,self.ID,self._attrs)
 
+  def _hasattr(self,attr):
+    return hasattr(self._attrs,attr)
   def __hasattr__(self,attr):
     if attr in ('ID', 'NAME', 'TYPE'):
       return True
-    return hasattr(self._attrs,attr)
+    return self._hasattr(attr)
 
   def __getattr__(self,attr):
     if attr == 'ID':
@@ -182,14 +184,27 @@ class NodeDB(object):
   def _newNode(self,_node,attrs):
     return Node(_node,self,attrs)
 
-  def createNode(self,name,type):
+  def createNode(self,name,type,attrs=None):
     ''' Create a new Node in the database.
     '''
+    attrlist=[]
+    if attrs is not None:
+      for k, vs in attrs.items():
+        if isUC_(k):
+          attrlist.append( (k, [v for v in vs]) )
+        else:
+          raise ValueError, "invalid key \"%s\"" % k
+
     _node=self._Node(name,type)
     self.session.add(_node)
     self.session.flush()
     assert _node.ID is not None
-    return self._newNode(_node,())
+
+    N=self._newNode(_node,())
+    for k, vs in attrlist:
+      setattr(N,k+"s",vs)
+
+    return N
 
   def _nodesByIds(self,ids):
     ''' Take some NODES.ID values and return _Node objects.
