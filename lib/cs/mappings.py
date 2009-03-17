@@ -1,6 +1,7 @@
 #!/usr/bin/python -tt
 
 from cs.misc import the
+from types import StringTypes
 import sys
 
 def isUC_(s):
@@ -81,12 +82,14 @@ class SeqMapUC_Attrs(object):
       self.__dict__[attr]=value
       return
     if plural:
+      if type(value) in StringTypes:
+        raise ValueError("invalid string %s assigned to plural attribute \"%s\"" % (`value`, attr))
       T=tuple(value)
       if len(T) == 0 and not self.keepEmpty:
         if k in self.__M:
           del self.__M[k]
       else:
-        self.__M[k]=tuple(value)
+        self.__M[k]=T
     else:
       self.__M[k]=(value,)
 

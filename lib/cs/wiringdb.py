@@ -61,13 +61,12 @@ class WiringNode(Node):
     elif not k.endswith("_ID"):
       kid=k+"_ID"
       if hasattr(self._attrs,kid):
-        values = self._nodedb.nodesByIds(getattr(self,kid))
+        values = self._nodedb.nodesByIds(getattr(self,kid+'s'))
     elif self._hasattr(k):
-      values = list(self._attrs[k])
+      values = list(getattr(self._attrs,k+'s'))
 
     if plural:
       return values
-    print >>sys.stderr, "WiringNode.__getattr__(attr=%s): k=%s, plural=%s, values=%s" % (attr,k,plural,values)
     return the(values)
 
   def __setattr__(self,attr,value):
@@ -82,7 +81,7 @@ class WiringNode(Node):
       return
     if not plural:
       value=(value,)
-    Node.__setattr__(self,k+'s', list(value))
+    Node.__setattr__(self,k+'s', value)
 
   def __delattr__(self,attr):
     k, plural = parseUC_sAttr(attr)

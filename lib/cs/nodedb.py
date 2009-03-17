@@ -70,11 +70,23 @@ class AttrMap(dict):
       It applies changes to the db and then mirrors them in the in-memory dict.
   '''
   def __init__(self,node,nodedb,attrs):
+    ''' Initialise an AttrMap.
+        We are supplied:
+          node, the enclosing Node object
+          nodedb, the associated NodeDB object
+          attrs, a sequence of sqlalchemy row objects in the ATTRS table
+        We must still collate the attrs into ATTR->(VALUE,...) pairs
+        for storage in the dict.
+    '''
     dict.__init__(self)
     self.__node=node
     self.__nodedb=nodedb
     self.__attrObjs=dict([ (A.ATTR, A) for A in attrs ])
-    dict.__init__(self, [ (A.ATTR, tuple(A.VALUE)) for A in attrs ])
+    # collate the attrs by ATTR value
+    attrs_map={}
+    for A in attrs:
+      attrs_map.setdefault(A.ATTR,[]).append(A.VALUE)
+    dict.__init__(self, attrs_map.items())
 
   def __setitem__(self,attr,value):
     ''' Set the attribute 'attr' to 'value'.
@@ -104,11 +116,18 @@ class Node(object):
       cs.mappings.SeqMapUC_Attrs interface.
   '''
   def __init__(self,_node,nodedb,attrs):
+    ''' Initialise a new Node.
+        We are supplied:
+          _node, an sqlalchemy row object in the NODES table
+          nodedb, the NodeDB with which this Node is associated
+          attrs, a sequence of sqlalchemy row objects in the ATTRS table
+    '''
     self.__dict__['_node']=_node
     self.__dict__['_attrs']=SeqMapUC_Attrs(AttrMap(_node,nodedb,attrs))
     self.__dict__['_nodedb']=nodedb
     id=_node.ID
-    assert id not in nodedb.nodeMap
+    assert id not in nodedb.nodeMap, \
+        "WARNING: replacing %s with %s" % (nodedb.nodeMap[id],self)
     nodedb.nodeMap[id]=self
 
   def __str__(self):
@@ -261,13 +280,17 @@ class NodeDB(object):
 
     if len(missingIds) > 0:
       # obtain the attributes of the missing nodes
-      nodeAttrs={}
+      # obtain and track all the attribute rows for the nodes specified
+      # by missingIds
       filter=fieldInValues(self.attrs.c.NODE_ID,missingIds)
       attrs=self.session.query(self._Attr).filter(filter).all()
       self.session.add_all(attrs)
+      # collate the attribute rows by NODE_ID
+      nodeAttrs={}
       for attr in attrs:
         nodeAttrs.setdefault(attr.NODE_ID,[]).append(attr)
       # create the missing Node objects
+      # and add them to the Ns list of Nodes
       Ns.extend([ self._newNode(_node,nodeAttrs.get(_node.ID,()))
                   for _node in self._nodesByIds(missingIds)
                 ])
@@ -276,7 +299,7 @@ class NodeDB(object):
 
   def nodesByIds(self,ids):
     nodeMap=self.nodeMap
-    Ns=[ nodeMap[id] for id in ids if id in nodeMap ]
+    Ns=list(nodeMap[id] for id in ids if id in nodeMap)
     missingIds=list(id for id in ids if id not in nodeMap)
     if len(missingIds) > 0:
       Ns.extend(self._nodes2Nodes(self._nodesByIds(missingIds),checkMap=False))
