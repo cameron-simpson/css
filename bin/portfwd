@@ -175,8 +175,8 @@ then
       [ $once ] && break
       while :
       do
-        ok2portfwd && break
         sleep 2
+        ok2portfwd && break
       done
       first=
     done
