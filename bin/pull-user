@@ -91,6 +91,10 @@ getuid()
 { awk -F: -v "user=$1" '$1 == user { print $3 }' "$2"
 }
 
+getgecos()
+{ awk -F: -v "user=$1" '$1 == user { print $5 }' "$2"
+}
+
 if [ -z "$rpasswd" ]
 then
   rpasswd=$TMPDIR/$cmd.$$
@@ -102,6 +106,7 @@ fi
 modusers=
 for user
 do
+  muser=
   luid=`getuid "$user" "$lpasswd"`
   ruid=`getuid "$user" "$rpasswd"`
   if [ -z "$ruid" ]
@@ -113,13 +118,42 @@ do
   then
     $trace pull-group $xflag "$rgroup" "$user"
     pfx "$user" $trace adduser -s "$shell" -u "$ruid" -g "$user" "$user"
-    modusers="$modusers $user"
+    muser=$user
   else
     if [ "x$luid" != "x$ruid" ]
     then
       echo "$cmd: $user: warning: local uid ($luid) != remote ($ruid)" >&2
     fi
   fi
+  lgecos=`getgecos "$user" "$lpasswd"`
+  rgecos=`getgecos "$user" "$rpasswd"`
+  ( oIFS=$IFS
+    IFS=,
+    set -- $lgecos
+    name=${1:-''}
+    office=${2:-''}
+    ophone=${3:-''}
+    hphone=${4:-''}
+    set -- $rgecos
+    IFS=$oIFS
+    dochfn=
+    set +u
+    [ -z "$1" ] || [ "x$name"   = "x$1" ] || { name=$1;   dochfn=1; }
+    [ -z "$2" ] || [ "x$office" = "x$2" ] || { office=$2; dochfn=1; }
+    [ -z "$3" ] || [ "x$ophone" = "x$3" ] || { ophone=$3; dochfn=1; }
+    [ -z "$4" ] || [ "x$hphone" = "x$4" ] || { hphone=$4; dochfn=1; }
+    set -u
+    if [ $dochfn ]
+    then
+      pfx "$user" $trace chfn -f "$name" \
+                              -o "$office" \
+                              -p "$ophone" \
+                              -h "$hphone" \
+                              "$user"
+      muser=$user
+    fi
+  )
+  modusers="$modusers $muser"
 done
 
 for user in $modusers
