@@ -1,0 +1,315 @@
+changeset:   7275:d002105295ec
+tag:         release-20090228
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sat Feb 28 17:58:38 2009 +1100
+files:       .freshmeatrc
+description:
+Add a .freshmeatrc for doing releases.
+
+
+changeset:   7276:e6436dd6cb1c
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sat Feb 28 18:07:09 2009 +1100
+files:       .hgtags
+description:
+Added tag release-20090228 for changeset d002105295ec
+
+
+changeset:   7277:0f3d109d007d
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sat Feb 28 18:07:10 2009 +1100
+files:       release-20090228/CHANGES.txt release-20090228/SUMMARY.txt release-20090228/release-tag.txt
+description:
+Release information for release-20090228.
+
+
+changeset:   7278:b13efbadc586
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sat Feb 28 20:26:20 2009 +1100
+files:       bin/cs-release
+description:
+cs-release: manage project releases using Mercurial and date-based version numbers.
+
+
+changeset:   7279:c053d01bc3a2
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sat Feb 28 20:28:56 2009 +1100
+files:       Mykefile
+description:
+Initial release hooks using cs-release.
+
+
+changeset:   7280:6bcab5795173
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sun Mar 01 09:09:27 2009 +1100
+files:       libexec/css-nextversion
+description:
+css-nextversion: obsoleted by cs-release.
+
+
+changeset:   7281:9ce235a1f3f7
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sun Mar 01 09:27:16 2009 +1100
+files:       bin/updcss
+description:
+Big cleanup for updcss.
+
+
+changeset:   7282:cb4d03b19842
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sun Mar 01 10:06:09 2009 +1100
+files:       bin/cs-release
+description:
+Add freshmeat-submit to usage, remove -V from freshmeat-submit options.
+
+
+changeset:   7283:0b3ce0356beb
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sun Mar 01 10:08:11 2009 +1100
+files:       bin/updcss
+description:
+Write changelog from last change to first.
+
+
+changeset:   7284:4cebd1423524
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sun Mar 01 13:26:08 2009 +1100
+files:       bin/portfwd
+description:
+Fix call to ok2portfwd function.
+
+
+changeset:   7285:8ceab9d06f00
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sun Mar 01 13:48:39 2009 +1100
+files:       Mykefile
+description:
+remove old junk
+
+
+changeset:   7286:f99e001b4231
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sun Mar 01 13:50:12 2009 +1100
+files:       bin/noads
+description:
+noads now a personal shell function.
+
+
+changeset:   7287:13424c204ea5
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sun Mar 01 19:11:36 2009 +1100
+files:       Mykefile bin/cs-release
+description:
+Shorten cs-release incantations.
+
+
+changeset:   7288:7367f0efc95c
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sun Mar 01 19:14:09 2009 +1100
+files:       bin/sshpf
+description:
+Remove bogus -f option, improve batch mode ssh incantation.
+
+
+changeset:   7289:6d897ba3a69f
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Mon Mar 02 12:38:01 2009 +1100
+files:       bin/with-ssh-master
+description:
+Add some ssh-option support to with-ssh-master.
+
+
+changeset:   7290:1957e7325803
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Tue Mar 03 08:47:19 2009 +1100
+files:       bin/with-ssh-master
+description:
+Fix option parsing.
+
+
+changeset:   7291:f9289869eb42
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Wed Mar 04 11:12:54 2009 +1100
+files:       lib/cs/Flags.pm
+description:
+Flags.pm: end list in POD doco.
+
+
+changeset:   7292:a980b3ee0fb3
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Wed Mar 04 11:13:45 2009 +1100
+files:       lib/cs/Shell.pm
+description:
+Shell.pm: open list in POD doco.
+
+
+changeset:   7293:9a12052b62e0
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Wed Mar 04 11:15:03 2009 +1100
+files:       bin/updcss deploy.rsync-include
+description:
+Make it easy to deploy an arbitrary revision to an arbitrary target dir.
+
+
+changeset:   7294:b896afb3759f
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Wed Mar 04 11:17:38 2009 +1100
+files:       CHANGELOG-release.txt bin/updcss
+description:
+updcss: write CHANGELOG.txt to correct place, toss obsolete CHANGELOG-release.txt.
+
+
+changeset:   7295:ee8c8a947ec5
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Fri Mar 06 12:25:55 2009 +1100
+files:       bin/cs-needtimesheet
+description:
+Upgrade option parsing, add -T tsdir option.
+
+
+changeset:   7296:be1668fbca27
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Fri Mar 06 12:54:32 2009 +1100
+files:       bin/cs-mktimesheet bin/cs-needtimesheet
+description:
+cs-*timesheet: upgrade option parsing, move formatting into config file.
+
+
+changeset:   7297:28b206895bb2
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Fri Mar 06 16:01:55 2009 +1100
+files:       bin/cs-mktimesheet
+description:
+Add DAYFOOTER and DAYINDENT date/printf format strings.
+
+
+changeset:   7298:c0b2990447d7
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sat Mar 07 17:20:34 2009 +1100
+files:       lib/cs/nodedb.py
+description:
+Bugfix AttrMap initialiser.
+
+
+changeset:   7299:644d9b4c8e9d
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sat Mar 07 18:31:57 2009 +1100
+files:       lib/cs/nodedb.py
+description:
+Store tuples in AttrMaps to avoid .append() etc. Streamline its initialiser.
+
+
+changeset:   7300:58b43a8c57d7
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sat Mar 14 18:32:24 2009 +1100
+files:       lib/cs/nodedb.py
+description:
+Add flexible nodedb._toNode() method and use it in __contains__ and __getitem__.
+
+
+changeset:   7301:55aef22b8dcf
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sat Mar 14 21:12:31 2009 +1100
+files:       lib/cs/wiringdb.py
+description:
+Make a WiringDB a much simpler subclass of NodeDB; the smarts are in the WiringNode objects.
+
+
+changeset:   7302:1fa058064c75
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sat Mar 14 22:42:05 2009 +1100
+files:       lib/cs/nodedb.py
+description:
+Fix up some fieldInValues() constructions.
+
+
+changeset:   7303:e805c0762da1
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sat Mar 14 22:57:39 2009 +1100
+files:       bin/updcss
+description:
+Add progress message.
+
+
+changeset:   7304:682542f93a6d
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Mon Mar 16 15:33:08 2009 +1100
+files:       bin/portfwd
+description:
+Arrange for portfwd to call itself to get identifiable shell processings in ps.
+
+
+changeset:   7305:c7e2f9d03787
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Mon Mar 16 15:34:09 2009 +1100
+files:       lib/cs/nodedb.py
+description:
+createNode: permit initialisation attribute list. Add _hasattr method.
+
+
+changeset:   7306:de5fc2fd1fb9
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Mon Mar 16 15:35:06 2009 +1100
+files:       lib/cs/wiringdb.py
+description:
+Big rework of __getattr__ et al to avoid _ID special knowledge.
+
+
+changeset:   7307:e240b1a9ce04
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Tue Mar 17 16:20:21 2009 +1100
+files:       lib/cs/mappings.py lib/cs/nodedb.py lib/cs/wiringdb.py
+description:
+NodeDB: correctly store the node attributes in Node object AttrMaps.
+
+
+changeset:   7308:4dbb1f41e4b2
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Tue Mar 24 13:32:23 2009 +1100
+files:       bin/pull-user
+description:
+pull-user: pull GECOS information for users.
+
+
+changeset:   7309:9102c4d72af0
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Tue Mar 24 13:32:57 2009 +1100
+files:       bin/portfwd
+description:
+portfwd: after a tunnel goes down, always delay briefly before trying again.
+
+
+changeset:   7310:4ed6d4f35ab3
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Thu Mar 26 14:02:18 2009 +1100
+files:       bin/cs-t bin/cs-v bin/t bin/v
+description:
+Move single letter commands sideways, use personal aliases instead.
+
+
+changeset:   7311:f0a6cf54da86
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Thu Mar 26 14:22:08 2009 +1100
+files:       bin/@-all bin/@@ bin/@X bin/LL bin/bx bin/cs bin/cs-newdesk bin/cs-wm bin/eg bin/fb bin/fsp bin/gh bin/gz bin/gzif bin/handbrake-wrapper bin/hb bin/hl bin/k0 bin/lt bin/ltr bin/md bin/mp bin/nd bin/oo bin/otp bin/ph bin/pring bin/sn bin/t2 bin/td bin/tdl-wrapper bin/tk bin/wm bin/xth bin/xvbw defunct/fsp defunct/oo defunct/otp defunct/t2
+description:
+Clean out or rename a lot of very short command names.
+Those renamed to longer names I now use via personal convenience shell aliases.
+
+
+changeset:   7312:d401513ee04b
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Thu Mar 26 16:43:10 2009 +1100
+files:       bin/cs
+description:
+cs symlink; looks like one of my bootstrap scripts unwittingly relies on it:-(
+
+
+changeset:   7313:214f6f887759
+tag:         release-20090326
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Thu Mar 26 17:02:12 2009 +1100
+files:       Mykefile
+description:
+Mykefile: add "_help" default target.
+
+
