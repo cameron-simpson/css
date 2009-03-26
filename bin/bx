@@ -1,2 +1,0 @@
-#!/bin/sh
-exec BitchX -H zip.com.au -n cs -a ${1+"$@"}

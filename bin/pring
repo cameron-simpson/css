@@ -1,3 +1,0 @@
-#!/bin/sh
-
-exec ring -p ${1+"$@"}
