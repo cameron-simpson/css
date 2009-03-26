@@ -36,6 +36,13 @@ scriptmandir = $(MANDIR)/man1
 scriptmans = $(scriptmandir)/$((allscripts)).1
 scriptfromman(manf) = $(manf FP)
 
+_help:
+        @echo '_home      - deploy scripts to ~/bin etc'
+        @echo '_deploy    - deploy current release to /opt/css'
+        @echo '_publish   - deploy current release to /opt/css and ezos'
+        @echo '_release   - mark tip as new release'
+        @echo '_freshmeat - announce current release to freshmeat'
+
 _home:
         skip=`hg status | sed -n 's:^? \(.*\):--exclude=/\1:p'` \
         set-x \\
