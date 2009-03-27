@@ -1,9 +1,11 @@
-#!/usr/bin/perl
+#!/usr/bin/python
 #
 # Emit the arguments suitably quoted for passing via the shell.
 #	- Cameron Simpson <cs@zip.com.au> 22apr2001
 #
+# Trivial python recode; some places don't have perl. - cameron 27mar2009
+#
 
-use cs::Shell;
-
-print cs::Shell::quote(@ARGV)."\n";
+import cs.sh
+import sys
+print " ".join(cs.sh.quote(sys.argv[1:]))
