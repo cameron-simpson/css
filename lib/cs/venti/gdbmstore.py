@@ -11,7 +11,8 @@ import time
 from zlib import compress
 from thread import allocate_lock
 from cs.cache import LRU
-from cs.misc import cmderr, warn, progress, verbose, isverbose, isdebug, out, fromBS, toBS, fromBSfp, tb, the
+from cs.misc import cmderr, warn, progress, verbose, isverbose, isdebug, out, tb, the
+from cs.serialise import toBS, fromBS, fromBSfp
 from cs.venti import tohex, hash
 from cs.venti.store import BasicStore
 from cs.venti.datafile import scanFile, getBlock, addBlock

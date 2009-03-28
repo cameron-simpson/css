@@ -1,7 +1,7 @@
 #!/usr/bin/python -tt
 
 from zlib import compress, decompress
-from cs.misc import toBS, fromBSfp
+from cs.serialise import toBS, fromBSfp
 from cs.venti import hash
 
 def scanFile(fp):

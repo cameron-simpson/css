@@ -5,7 +5,8 @@ from cs.venti.blockify import topBlockRefString
 from cs.venti.meta import Meta
 from cs.venti import tohex
 from cs.lex import unctrl
-from cs.misc import seq, toBS, fromBS, fromBSfp, verbose, isdebug, debug, cmderr, progress
+from cs.misc import seq, verbose, isdebug, debug, cmderr, progress
+from cs.serialise import toBS, fromBS, fromBSfp
 
 uid_nobody = -1
 gid_nogroup = -1

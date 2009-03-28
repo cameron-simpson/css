@@ -10,7 +10,8 @@ from __future__ import with_statement
 from thread import allocate_lock
 from threading import Thread
 from Queue import Queue
-from cs.misc import seq, toBS, fromBSfp, debug, isdebug, tb, warn, progress
+from cs.misc import seq, debug, isdebug, tb, warn, progress
+from cs.serialise import toBS, fromBSfp
 from cs.lex import unctrl
 from cs.threads import JobQueue, getChannel, nullCH
 from cs.venti import tohex

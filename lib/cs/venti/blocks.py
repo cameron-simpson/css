@@ -6,7 +6,8 @@
 #               An indirect block is a list of encoded BlockRefs.
 #
 
-from cs.misc import toBS, fromBS, fromBSfp, warn, cmderr, TODO, FIXME, isdebug
+from cs.misc import warn, cmderr, TODO, FIXME, isdebug
+from cs.serialise import toBS, fromBS, fromBSfp
 from cs.io import readn
 from cs.venti import MAX_SUBBLOCKS, tohex
 from cs.venti.hash import HASH_SIZE_SHA1, HASH_SHA1_T

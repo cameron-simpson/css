@@ -19,7 +19,8 @@ import os.path
 import time
 import thread
 from Queue import Queue
-from cs.misc import cmderr, debug, isdebug, warn, progress, verbose, out, fromBS, toBS, fromBSfp, tb, seq, Loggable
+from cs.misc import cmderr, debug, isdebug, warn, progress, verbose, out, tb, seq, Loggable
+from cs.serialise import toBS, fromBS, fromBSfp
 from cs.threads import FuncQueue, Q1, DictMonitor, NestingOpenClose
 from cs.venti import tohex
 
