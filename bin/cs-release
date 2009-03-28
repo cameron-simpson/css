@@ -103,12 +103,12 @@ case $op in
     newtag=release-$newrelease
     reldir=$newtag
     $trace mkdir "$reldir"
-    $trace hg tag "$newtag"
     printf "%s\n" "$newtag" >"$reldir/release-tag.txt"
     $trace mv "$changefile" "$reldir/SUMMARY.txt"
-    $trace hg log -r "release-$lastrelease:$newtag" >"$reldir/CHANGES.txt"
+    $trace hg log -r "release-$lastrelease:$tip" >"$reldir/CHANGES.txt"
     $trace hg add "$reldir"
     $trace hg commit -m "Release information for $newtag." "$reldir"
+    $trace hg tag "$newtag"
     ;;
   freshmeat-submit)
     unset fm_project \
