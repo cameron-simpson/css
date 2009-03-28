@@ -40,9 +40,9 @@ class FuseStore(Fuse):
     kw['usage']="Usage Message";
 
     print "FuseStore:"
-    print "  args =", `args`
-    print "  kw =", `kw`
-    print "  fargs =", `fargs`
+    print "  args =", repr(args)
+    print "  kw =", repr(kw)
+    print "  fargs =", repr(fargs)
     Fuse.__init__(self, fuse_args=fargs, **kw)
     self.flags=0
     self.multithreaded=0
@@ -85,7 +85,7 @@ class FuseStore(Fuse):
     yield Direntry('.')
     yield Direntry('..')
     for e in os.listdir(self.__abs(path)):
-      self.__OUT("readdir yield %s" % `e`)
+      self.__OUT("readdir yield %s" % repr(e))
       yield Direntry(e)
   def unlink(self, path):
     self.__OUT("unlink", path)
@@ -133,7 +133,7 @@ class FuseStore(Fuse):
       global mainFuseStore
       assert mainFuseStore is not None
       self.__Fuse=mainFuseStore
-      print "new __File: path =", path, "flags =", `flags`, "mode =", `mode`
+      print "new __File: path =", path, "flags =", repr(flags), "mode =", repr(mode)
       self.file = os.fdopen(os.open("." + path, flags, *mode),
                             flag2mode(flags))
       self.fd = self.file.fileno()

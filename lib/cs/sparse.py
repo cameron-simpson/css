@@ -8,10 +8,10 @@ class SparseSeq:
     self.__lastchunk=None
 
   def __len__(self):  return len(self.__seq)
-  def __repr__(self): return `self.__seq`
+  def __repr__(self): return repr(self.__seq)
 
   def __getitem__(self,ndx):
-    debug("__getitem__", `ndx`)
+    debug("__getitem__", repr(ndx))
     if type(ndx) is slice:
       (start,end,stride)=ndx.indices(self.__len__())
 
@@ -29,7 +29,7 @@ class SparseSeq:
       self.__lastchunk=chunk
 
     offset=ndx-chunk[0]
-    debug("  ndx =", ndx, "chunk =", `chunk`, "offset =", offset)
+    debug("  ndx =", ndx, "chunk =", repr(chunk), "offset =", offset)
     return chunk[2][offset]
 
   def getChunk(self,ndx):
@@ -45,7 +45,7 @@ class SparseSeq:
   def findChunkIndex(self,ndx):
     debug("findChunkIndex", ndx)
     cache=self.__cache
-    debug("  cache =", `cache`)
+    debug("  cache =", repr(cache))
 
     # pre: lch <= loc(ndx)
     #      rch > loc(ndx)

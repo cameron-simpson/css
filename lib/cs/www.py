@@ -144,7 +144,7 @@ def puttok(fp,tok):
     if type(tok) is types.StringType:
       puttext(fp,tok)
     else:
-      puttext(fp,`tok`)
+      puttext(fp,repr(tok))
   elif f is T_SEQ:
     # token
     if hasattr(tok,'tag'):
@@ -328,7 +328,7 @@ class JSRPCCGI(CGI):
     while seqLen < len(path_info) and path_info[seqLen] != '/':
       seqLen+=1
     if seqLen == 0:
-      raise ValueError, "no sequence token at the start of PATH_INFO: "+`path_info`
+      raise ValueError, "no sequence token at the start of PATH_INFO: "+repr(path_info)
 
     self.__seq=path_info[:seqLen]
     while seqLen < len(path_info) and path_info[seqLen] == '/':

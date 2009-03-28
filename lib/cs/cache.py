@@ -151,7 +151,7 @@ class Cache:
     return float(self.__hits)/float(gets)
 
   def __getattr__(self,attr):
-    ##debug("CACHE GETATTR",`attr`)
+    ##debug("CACHE GETATTR",repr(attr))
     return getattr(self.__backend,attr)
 
   def bump(self):
@@ -193,13 +193,13 @@ class Cache:
     # Note: we're looking up the backend, _not_ calling some subclass' findrowbykey()
     row=Cache.findrowByKey(self,key)
     if row is None:
-      raise IndexError, "no entry with key "+`key`
+      raise IndexError, "no entry with key "+repr(key)
 
     return row
 
   def store(self,value,key=None):
     if key is not None:
-      assert type(key) in (tuple, int, long), "store"+`key`+"="+`value`
+      assert type(key) in (tuple, int, long), "store"+repr(key)+"="+repr(value)
     else:
       key=value[self.key()]
 

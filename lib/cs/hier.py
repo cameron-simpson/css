@@ -107,7 +107,7 @@ class HierOutput(_Hier):
             elif fl is T_MAP:
               self.__dictEncode(obj)
             else:
-              self.__h2f(`obj`)
+              self.__h2f(repr(obj))
 
   def __stringEncode(self,s):
     """ Transcribe a string to the current File in Hier format.

@@ -520,7 +520,7 @@ class CanonicalSeq:
     return self.__canon(key)
 
   def __repr__(self):
-    return `self.__seq`
+    return repr(self.__seq)
 
   def __len__(self):
     return len(self.__seq)
@@ -575,7 +575,7 @@ class CanonicalDict(dict):
     ckey=self.__canonical(key)
     yep=dict.__contains__(self, ckey)
     if ifdebug():
-      warn("CanonicalDict: __contains__(%s(%s)) = %s" % (key, ckey, `yep`))
+      warn("CanonicalDict: __contains__(%s(%s)) = %s" % (key, ckey, repr(yep)))
     return yep
 
 class LCDict(CanonicalDict):
@@ -770,7 +770,7 @@ class SeqWrapper:
     self.__seq=newvalues
 
   def __repr__(self):
-    return `self.__seq`
+    return repr(self.__seq)
 
 """ an object with an ordered set of keys eg SQL table row
 """
@@ -781,7 +781,7 @@ class OrderedKeys:
 
   def setKeyOrder(self, names):
     # compute column name index
-    ##print "SETKEYORDER: ", `names`
+    ##print "SETKEYORDER: ", repr(names)
     self.__keys=names
     self.__keyIndex={}
     i=0
@@ -795,7 +795,7 @@ class OrderedKeys:
     return self.__keyIndex[key]
 
   def keys(self):
-    ##print "ORDEREDKEYS.keys()=", `self.__keys`
+    ##print "ORDEREDKEYS.keys()=", repr(self.__keys)
     return self.__keys
 
   def __iterkeys__(self):
@@ -806,8 +806,8 @@ class OrderedKeys:
 class IndexedSeqWrapper(OrderedKeys, SeqWrapper):
   def __init__(self, seq, names=None):
     ##print "init IndexedSeqWrapper"
-    ##print "  seq=", `seq`
-    ##print "  keys=", `names`
+    ##print "  seq=", repr(seq)
+    ##print "  keys=", repr(names)
     SeqWrapper.__init__(self, seq)
     OrderedKeys.__init__(self, names)
 
@@ -826,7 +826,7 @@ class IndexedSeqWrapper(OrderedKeys, SeqWrapper):
     okeys=self.keys()
     for i in xrange(0, len(okeys)):
       d[okeys[i]]=self[i]
-    return `d`
+    return repr(d)
 
 class HasFlags:
   """ A collection of strings whose presence may be tested. """

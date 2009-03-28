@@ -105,13 +105,13 @@ class DBDiGraph:
       return self.__nodeCache[nodeid]
 
     if type(nodeid) is tuple:
-      return the(self.nodesByNameAndType(nodeid[0],*nodeid[1:]), `nodeid`)
+      return the(self.nodesByNameAndType(nodeid[0],*nodeid[1:]), repr(nodeid))
 
-    raise IndexError, "invalid index "+`nodeid`
+    raise IndexError, "invalid index "+repr(nodeid)
 
   def __delitem__(self,nodeid):
     refids=self[nodeid].referringNodeids()
-    warn("refids =", `refids`)
+    warn("refids =", repr(refids))
     if len(refids) > 0:
       node=self[nodeid]
       raise IndexError, "node %s has referring nodes: %s" % (node, ", ".join(self[id] for id in refids))
@@ -122,7 +122,7 @@ class DBDiGraph:
   def need(self,name,type):
     nodes=self.nodesByNameAndType(name,type)
     if len(nodes) > 1:
-      raise IndexError, "multiple nodes with index %s: %s" % (`(name,type)`, ", ".join(str(n) for n in nodes))
+      raise IndexError, "multiple nodes with index %s: %s" % (repr((name,type)), ", ".join(str(n) for n in nodes))
     if len(nodes) == 0:
       node=self.createNode(name,type)
     else:
@@ -159,7 +159,7 @@ class DBDiGraph:
     return self.nodesWhere('NAME = '+sqlise(name)+' AND '+SQLtestType(*types))
 
   def _nodeByNameAndType(self,name,*types):
-    return the(self.nodesByNameAndType(name,*types), `(name,types)`)
+    return the(self.nodesByNameAndType(name,*types), repr((name,types)))
 
   def nodeByNameAndType(self,name,*types):
     try:
@@ -303,9 +303,9 @@ class DBDiGraphNode:
     self.digraph.attrs[self.id].delValue(attr,value)
 
   def getAttr(self,attr):
-    ##warn(str(self)+": getAttr("+`attr`+")")
+    ##warn(str(self)+": getAttr("+repr(attr)+")")
     if type(attr) is not str:
-      raise IndexError, "non-string attr: "+`attr`
+      raise IndexError, "non-string attr: "+repr(attr)
     values=self.digraph.attrs[self.id]
     return values[attr]
 

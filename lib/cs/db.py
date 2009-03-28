@@ -154,7 +154,7 @@ def sqlise(v):
     return 'FALSE'
 
   # FIXME: awful hack - throw exception?
-  return sqlise(`v`)
+  return sqlise(repr(v))
 
 # (void) synonym for SQLQuery
 def dosql(conn,query,*params):
@@ -170,7 +170,7 @@ class SQLQuery:
     self.__params=params
     if ifdebug():
       warn('SQLQuery:', query)
-      if len(params) > 0: warn("SQLQuery: params =", `params`)
+      if len(params) > 0: warn("SQLQuery: params =", repr(params))
 
     with conn.lock:
       self.__cursor=conn.conn.cursor()
@@ -245,7 +245,7 @@ def mergeDatedRecordsSQL(table,keyFields,idField=None,constraint=None,cropOverla
   for row in table.selectRows(where=constraint, modifiers='ORDER BY START_DATE, END_DATE, '+idField):
     start, end = row.START_DATE, row.END_DATE
     if start is not None and end is not None and start >= end:
-      print `row`
+      print repr(row)
       print "HUH - DELETE RECORD WITH EMPTY DATE RANGE"
       yield 'DELETE FROM %s WHERE %s = %s' % (table.name, idField, sqlise(row[idField]))
       continue
@@ -366,7 +366,7 @@ class DirectKeyedTableView:
     ''' SELECT multiple table rows matching an arbitrary list of single-value keys.
     '''
     assert len(self.__keyColumns) == 1, \
-      "getitems("+`keylist`+") on multikey table "+self.name+"["+",".join(self.__keyColumns)+"]"
+      "getitems("+repr(keylist)+") on multikey table "+self.name+"["+",".join(self.__keyColumns)+"]"
     return self.selectRows("%s IN (%s)" \
                            % (self.__keyColumns[0], 
                               ",".join(sqlise(k) for k in keylist)))
@@ -404,7 +404,7 @@ class DirectKeyedTableView:
     if type(key) is not tuple:
       key=(key,)
     if type(key[0]) is tuple:
-      raise IndexError, "key is tuple of tuple: %s" % `key`
+      raise IndexError, "key is tuple of tuple: %s" % repr(key)
     return " AND ".join(self.__allColumns[i]+' = '+sqlise(key[i]) for i in range(len(key)))
 
   def rowWhere(self,row):
@@ -426,7 +426,7 @@ class DirectKeyedTableView:
     if len(rows) == 0:
       return None
     if len(rows) > 1:
-      warn("multiple hits WHERE", where, "in", self.name, "- choosing the first one:",`rows[0]`)
+      warn("multiple hits WHERE", where, "in", self.name, "- choosing the first one:",repr(rows[0]))
 
     return rows[0]
 
@@ -497,7 +497,7 @@ class DirectTableRow(WithUC_Attrs):
 
   def __repr__(self):
     return '{' \
-         + ', '.join([ `k`+": "+`self[k]` for k in self.keys() ]) \
+         + ', '.join([ repr(k)+": "+repr(self[k]) for k in self.keys() ]) \
          + '}'
 
   def __getitem__(self,column):
@@ -593,7 +593,7 @@ class SingleKeyTableView(KeyedTableView):
       yield self[k]
 
   def __getitem__(self,key):
-    ##debug("SingleKeyTableView.__getitem__: key =", `key`)
+    ##debug("SingleKeyTableView.__getitem__: key =", repr(key))
     return KeyedTableView.__getitem__(self,(key,))
 
   def __contains__(self,key):
@@ -645,7 +645,7 @@ class TableRowWrapper(WithUC_Attrs):
     try:
       self.TableRow=tableview[key]
     except IndexError, e:
-      raise NoSuchRowError("no row with id "+str(id)+": "+`e`)
+      raise NoSuchRowError("no row with id "+str(id)+": "+repr(e))
 
   def table(self):
     return self.TableView

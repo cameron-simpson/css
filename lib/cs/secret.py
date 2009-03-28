@@ -82,7 +82,7 @@ def mssql(secret,db=None):
     # transmute secret name into structure
     secret=get(secret)
 
-  print "secret =", `secret`
+  print "secret =", repr(secret)
   host=secret['HOST']
   port=secret['PORT']
   database=secret['DATABASE']
@@ -111,7 +111,7 @@ def ldap(secret,host=None,binddn=None,bindpw=None):
     verbose("lookup secret:", secret)
     secret=cs.secret.get(secret)
 
-  debug("LDAP secret =", `secret`)
+  debug("LDAP secret =", repr(secret))
   ldap_host=secret['HOST']
   if host is not None:   ldap_host=host
   ldap_binddn=secret['BINDDN']
@@ -120,9 +120,9 @@ def ldap(secret,host=None,binddn=None,bindpw=None):
   if bindpw is not None: ldap_bindpw=bindpw
 
   import ldap
-  debug("ldap_host =", `ldap_host`)
-  debug("ldap_binddn =", `ldap_binddn`)
-  debug("ldap_bindpw =", `ldap_bindpw`)
+  debug("ldap_host =", repr(ldap_host))
+  debug("ldap_binddn =", repr(ldap_binddn))
+  debug("ldap_bindpw =", repr(ldap_bindpw))
   L=ldap.open(ldap_host)
   L.simple_bind_s(ldap_binddn,ldap_bindpw)
   return L

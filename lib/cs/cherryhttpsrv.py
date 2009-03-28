@@ -44,7 +44,7 @@ class RPC:
   def _RPCargs(self,jsontxt):
     jsontxt=cs.www.unhexify(jsontxt)
     (args,unparsed)=cs.json.tok(jsontxt)
-    if ifdebug(): cmderr("args =", `args`, "unparsed =", `unparsed`)
+    if ifdebug(): cmderr("args =", repr(args), "unparsed =", repr(unparsed))
     return args
 
   def _RPCreturn(self,cb,seq,result):

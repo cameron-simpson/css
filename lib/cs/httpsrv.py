@@ -72,7 +72,7 @@ class JSONRPCHandler(RequestHandler):
                      % (code,complaint,code,complaint))
 
   def do_GET(self):
-    cmderr("path =", `self.path`)
+    cmderr("path =", repr(self.path))
     path=self.path
     root=self.server.rpcBaseURL
     if not path.startswith(root):
@@ -88,11 +88,11 @@ class JSONRPCHandler(RequestHandler):
     seq=int(path[:slndx])
     self.headers['Content-Type']="application/x-javascript\r\n"
     jsontxt=path[slndx+1:]
-    cmderr("jsontxt0 =", `jsontxt`)
+    cmderr("jsontxt0 =", repr(jsontxt))
     jsontxt=cs.www.unhexify(jsontxt)
-    cmderr("jsontxt1 =", `jsontxt`)
+    cmderr("jsontxt1 =", repr(jsontxt))
     (args,unparsed)=cs.hier.tok(jsontxt)
-    cmderr("args =", `args`, "unparsed =", `unparsed`)
+    cmderr("args =", repr(args), "unparsed =", repr(unparsed))
     rpcres=self.server.rpc(self,args)
     if rpcres is None:
       return

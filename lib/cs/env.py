@@ -44,7 +44,7 @@ class Env:
         elif t is types.FunctionType:
           val=base()
         else:
-          assert False, "unsupported baseEnv type "+str(t)+": "+`base`
+          assert False, "unsupported baseEnv type "+str(t)+": "+repr(base)
       else:
         raise IndexError
 
