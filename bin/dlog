@@ -1,6 +1,12 @@
 #!/bin/sh -u
+#
+# Log an action to $LOGDIR/dlog-quick and also via buglog's dlog facility,
+# which uses buglog-daily.      - Cameron Simpson <cs@zip.com.au>
+# 
+
 : ${LOGDIR:=$HOME/var/log}
 : ${DLOG_WHEN:=`date`}
+
 logname=dlog
 [ $# -gt 0 ] && [ "x$1" = x-l ] && { logname=$2; shift; shift; }
 case "$logname" in /*) ;; *) logname=$LOGDIR/$logname ;; esac
@@ -8,5 +14,4 @@ case "$logname" in /*) ;; *) logname=$LOGDIR/$logname ;; esac
 
 ts=`date -d "$DLOG_WHEN" '+%Y-%m-%d-%H:%M:%S'`
 echo "$ts $*" >>"$LOGDIR/dlog-quick"
-##exec note -d "$DLOG_WHEN" "$logname" "$*"
 exec buglog -B dlog "$*"
