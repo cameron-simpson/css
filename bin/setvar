@@ -48,7 +48,7 @@ def env(var,dflt=''):
   return val
 
 def bootvar(var):
-  ''' Compute the value of a variety of variable from scratch.
+  ''' Compute the value of a variety of variables from scratch.
   '''
   if var in bootVal:
     return bootVal[var]
@@ -94,6 +94,8 @@ def bootvar(var):
       vendor='redhat'
     elif os.path.isfile('/etc/gentoo-release'):
       vendor='gentoo'
+    elif os.path.isfile('/etc/debian_version'):
+      vendor='debian'
     else:
       opsys=env("OS")
       if opsys == "darwin":
