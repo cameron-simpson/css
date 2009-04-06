@@ -145,7 +145,6 @@ case "$OS,$TERM,$DISPLAY" in
     set -- \
       osascript \
         -e 'tell app "'"$app"'"
-              activate
               set myterm to ('"$itermterm"')
               tell myterm
                 set mysession to (make new session at the end of sessions)
