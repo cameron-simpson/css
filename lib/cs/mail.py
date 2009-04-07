@@ -9,12 +9,16 @@ import email.FeedParser
 import string
 import StringIO
 import re
-from cs.misc import cmderr, warn, progress, verbose, seq, saferename
+from cs.misc import cmderr, progress, verbose, seq, saferename
 
 def ismhdir(path):
+  ''' Test if 'path' points at an MH directory.
+  '''
   return os.path.isfile(os.path.join(path,'.mh_sequences'))
 
 def ismaildir(path):
+  ''' Test if 'path' points at a Maildir directory.
+  '''
   for subdir in ('new','cur','tmp'):
     if not os.path.isdir(os.path.join(path,subdir)):
       return False
@@ -28,14 +32,24 @@ def mailbox(path):
   return None
 
 def maildirify(path):
+  ''' Make sure 'path' is a Maildir directory.
+      If 'path' is missing it will be made, but not its antecedants.
+  '''
+  assert os.path.isdir(path) or os.mkdir(path)
   for subdir in ('new','cur','tmp'):
     dpath=os.path.join(path,subdir)
     if not os.path.isdir(dpath):
-      os.makedirs(dpath)
+      os.mkdir(dpath)
 
-def readMbox(path,gzipped=None):
+def readMbox(path, gzipped=None):
+  ''' Return a generator that reads a UNIX mailbox file and yields Messages.
+      The optional argument 'gzipped' may be a boolean indicating whether
+      the input is gzip compressed. If 'gzipped' is missing or None,
+      readMbox() decides based on the path ending in '.gz'.
+      TODO: accept a file-like object.
+  '''
   if gzipped is None:
-    gzipped=(path[-3:] == ".gz")
+    gzipped=path.endswith('.gz')
   if gzipped:
     import gzip
     fp=gzip.open(path)
@@ -45,7 +59,7 @@ def readMbox(path,gzipped=None):
   parser=None
   preline=fp.tell()
   for mboxline in fp:
-    if mboxline[:5] == "From ":
+    if mboxline.startswith('From '):
       if parser is not None:
         msg=parser.close()
         msg.set_unixfrom(from_)
