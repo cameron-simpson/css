@@ -18,6 +18,9 @@ def dfltpath():
 
 class Secret(DictUC_Attrs):
   def __init__(self,secret,path=None):
+    ''' Initialise a Secret object from the named secret.
+        Raises IOError if no such file can be accessed.
+    '''
     if os.path.isabs(secret):
       S=cs.hier.load(secret)
     else:
@@ -31,7 +34,7 @@ class Secret(DictUC_Attrs):
         except IOError:
           continue
       if S is None:
-        raise IOError
+        raise IOError, "can't locate secret file for \"%s\"" % (secret,)
     dict.__init__(self,S)
 
 def list(path=None):
