@@ -5,7 +5,7 @@
 #
 
 cmd=`basename "$0"`
-usage="Usage: $cmd [-x] [@where] [dbname]"
+usage="Usage: $cmd [-n] [-x] [[user]@where] [dbname]"
 
 PATH=$PATH:/usr/local/mysql/bin
 export PATH
@@ -21,6 +21,7 @@ badopts=
 while [ $# -gt 0 ]
 do
   case $1 in
+    -n) trace=eecho ;;
     -x) trace=set-x ;;
     --) shift; break ;;
     -?*)echo "$cmd: unrecognised option: $1" >&2
