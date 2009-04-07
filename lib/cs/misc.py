@@ -380,7 +380,8 @@ def the(list, context=None):
       it=elem
       first=False
     else:
-      raise IndexError, "%s: got more than one element" % icontext
+      raise IndexError, "%s: got more than one element (%s, %s, ...)" \
+                        % (icontext, it, elem)
 
   if first:
     raise IndexError, "%s: got no elements" % icontext

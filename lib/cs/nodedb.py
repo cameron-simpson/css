@@ -4,8 +4,8 @@
 #       - Cameron Simpson <cs@zip.com.au> 25dec2008
 #
 
-from cs.mappings import SeqMapUC_Attrs, isUC_
-from cs.misc import the
+from cs.mappings import isUC_, parseUC_sAttr
+from cs.misc import the, uniq
 import sqlalchemy
 from sqlalchemy import create_engine, \
                        MetaData, Table, Column, Integer, String, \
@@ -14,6 +14,8 @@ from sqlalchemy.orm import mapper, sessionmaker
 from sqlalchemy.sql import and_, or_, not_
 from weakref import WeakValueDictionary
 import sys
+import os
+import unittest
 
 def NODESTable(metadata, name=None):
   if name is None:
@@ -112,9 +114,14 @@ class Node(object):
         ID, the db id
         NAME, the node name
         TYPE, the node type
-      Other uppercase attributes are node attributes presented via the
-      cs.mappings.SeqMapUC_Attrs interface.
+      Other uppercase attributes are node attributes.
   '''
+
+  _MODE_DIRECT = 0              # FOO is just a cigar
+  _MODE_BY_ID = 1               # node where node.ID in self.FOO_IDs
+  _MODE_PARENT_BY_ID = 2        # node where self.ID in node.FOO_IDs
+  _MODE_PARENT_ID_BY_ID = 3     # node.ID where self.ID in node.FOO_IDs
+
   def __init__(self,_node,nodedb,attrs):
     ''' Initialise a new Node.
         We are supplied:
@@ -123,7 +130,7 @@ class Node(object):
           attrs, a sequence of sqlalchemy row objects in the ATTRS table
     '''
     self.__dict__['_node']=_node
-    self.__dict__['_attrs']=SeqMapUC_Attrs(AttrMap(_node,nodedb,attrs))
+    self.__dict__['_attrs']=AttrMap(_node,nodedb,attrs)
     self.__dict__['_nodedb']=nodedb
     id=_node.ID
     assert id not in nodedb.nodeMap, \
@@ -133,40 +140,115 @@ class Node(object):
   def __str__(self):
     return "%s:%s#%d%s" % (self.NAME,self.TYPE,self.ID,self._attrs)
 
-  def _hasattr(self,attr):
-    return hasattr(self._attrs,attr)
-  def __hasattr__(self,attr):
-    if attr in ('ID', 'NAME', 'TYPE'):
-      return True
-    return self._hasattr(attr)
-
   def __getattr__(self,attr):
-    if attr == 'ID':
-      return self._node.ID
-    if attr == 'NAME':
-      return self._node.NAME
-    if attr == 'TYPE':
-      return self._node.TYPE
-    return getattr(self._attrs,attr)
+    mode, k, plural = self._parseAttr(attr)
+    if mode is None:
+      return getattr(self._node, attr)
+    if mode == Node._MODE_DIRECT:
+      values=self._attrs[k]
+    elif mode == Node._MODE_BY_ID:
+      values=self._nodedb.nodesByIds(self._attrs[k+"_ID"])
+    elif mode == Node._MODE_PARENT_BY_ID:
+      values=self._nodedb.nodesByAttrValue(k+"_ID", str(self.ID))
+    elif mode == Node._MODE_PARENT_ID_BY_ID:
+      values=[ node.ID for node in self._nodedb.nodesByAttrValue(k+"_ID", str(self.ID)) ]
+    else:
+      assert False, " unimplemented mode %s (attr=%s: k=%s, plural=%s)" \
+                        % (mode, attr, k, plural)
+    if plural:
+      return tuple(values)
+    return the(values)
+
+  def __hasattr__(self,attr):
+    mode, k, plural = self._parseAttr(attr)
+    if mode is None:
+      return attr in ('ID', 'NAME', 'TYPE')
+
+    if mode == Node._MODE_DIRECT:
+      ks = self._attrs.get(k, ())
+      return len(ks) > 0
+    if mode == Node._MODE_BY_ID:
+      return True
+    return False
 
   def __setattr__(self,attr,value):
-    assert attr != 'ID'
-    if attr == 'NAME':
-      self._node.NAME=value
-    elif attr == 'TYPE':
-      self._node.TYPE=value
+    mode, k, plural = self._parseAttr(attr)
+    if mode is None:
+      assert k != 'ID', "cannot set node.ID"
+      if k == 'NAME':
+        self._node.NAME=value
+      elif attr == 'TYPE':
+        self._node.TYPE=value
+      else:
+        assert False, "setattr(Node.%s): invalid attribute" % attr
+      return
+
+    if not plural:
+      value=(value,)
     else:
-      setattr(self._attrs,attr,value)
+      value=tuple(value)
+
+    if mode == Node._MODE_DIRECT:
+      if len(value) > 0 and hasattr(value[0], 'ID'):
+        assert not k.endswith('_ID'), \
+               "setattr(Node.%s): can't assign Nodes to _ID attributes" \
+               % attr
+        self._attrs[k+'_ID']=tuple( v.ID for v in value )
+      else:
+        self._attrs[k]=value
+      return
+
+    assert False, "setattr(Node.%s): unsupported mode: %s" % (attr, mode)
 
   def __delattr__(self,attr):
-    assert attr not in ('ID','NAME','TYPE')
-    delattr(self._attrs,attr)
+    mode, k, plural = self._parseAttr(attr)
+    assert mode is not None and mode == Node._MODE_DIRECT
+    del self._attrs[k]
+
+  def _parseAttr(self,attr):
+    ''' Parse an attribute name and return mode, name, plural
+          Non-intercepted name (bah): None, attr, None
+          attr => k, plural
+          FOO_OF: _MODE_PARENT_BY_ID, k, plural
+            node where self.ID in node.FOO_IDs
+          FOO_OF_ID: _MODE_PARENT_ID_BY_ID, k, plural
+            node.ID where self.ID in node.FOO_IDs
+          FOO: if len(FOO) > 0:    _MODE_DIRECT, k, plural
+               if len(FOO_ID) > 0, _MODE_BY_ID, k, plural
+                                   node where node.ID in self.FOO_IDs
+               return FOO          _MODE_DIRECT, k, plural
+          FOO_ID:                  _MODE_DIRECT, k, plural
+    '''
+    k, plural = parseUC_sAttr(attr)
+    if k is None \
+    or k == 'TYPE' or k == 'NAME' or k == 'ID':
+      # raw attr, not to be intercepted
+      return None, attr, None
+    if k.endswith('_OF'):
+      # node where self.ID in node.FOO_IDs
+      return Node._MODE_PARENT_BY_ID, k, plural
+    if k.endswith('_OF_ID'):
+      # node.ID where self.ID in node.FOO_IDs
+      return Node._MODE_PARENT_ID_BY_ID, k, plural
+    if k.endswith('_ID'):
+      return Node._MODE_DIRECT, k, plural
+    _attrs=self._attrs
+    ks = _attrs.get(k, ())
+    if len(ks) > 0:
+      # FOO really exists, use it
+      return Node._MODE_DIRECT, k, plural
+    k_IDs = _attrs.get(k+"_ID", ())
+    if len(k_IDs) > 0:
+      # node where node.ID in self.FOO_IDs
+      return Node._MODE_BY_ID, k, plural
+    # no FOO, no FOO_ID, use FOO directly
+    return Node._MODE_DIRECT, k, plural
 
 # TODO: make __enter__/__exit__ for running a session?
 class NodeDB(object):
   def __init__(self,engine,nodes='NODES',attrs='ATTRS'):
     if type(engine) is str:
-      engine = create_engine(engine, echo=True)
+      engine = create_engine(engine, echo=len(os.environ.get('DEBUG','')) > 0)
     metadata=MetaData()
     if nodes is None or type(nodes) is str:
       nodes=NODESTable(metadata,name=nodes)
@@ -314,47 +396,63 @@ class NodeDB(object):
   def nodesByType(self,type):
     return self._nodes2Nodes(self._nodesByType(type),checkMap=True)
 
+  def nodesByAttrValue(self,attr,value):
+    ''' Return nodes with an attribute value as specified.
+    '''
+    return self.nodesByIds(
+             uniq(
+               self.session.query(self._Attr)
+                   .filter_by(ATTR=attr, VALUE=value)
+                   .all()))
+
   def __contains__(self,key):
     try:
       N=self[key]
     except IndexError:
       return False
     return True
+
   def __getitem__(self,key):
     N=self._toNode(key)
-    # should not happen, but the code tested for it
+    # should not happen, but the code tested for it :-(
     assert N is not None
     return N
 
+class TestAll(unittest.TestCase):
+  def setUp(self):
+    db=self.db=NodeDB('sqlite:///:memory:')
+    self.host1=db.createNode('host1','HOST')
+    self.host2=db.createNode('host2','HOST')
+    db.session.flush()
+
+  def testAssign(self):
+    db=self.db
+    host1=self.host1
+    host1.ATTR1=3
+    self.assertEqual(host1.ATTR1s, (3,))
+    host1.ATTR2s=[5,6,7]
+    self.assertEqual(host1.ATTR2s, (5,6,7))
+    self.assertRaises(IndexError, getattr, host1, 'ATTR2')
+
+  def testAssignNode(self):
+    db=self.db
+    self.host1.HOST=self.host2
+    self.assertEqual(self.host1.HOST_ID, self.host2.ID)
+    self.assertEqual(self.host1.HOST.ID, self.host2.ID)
+
+  def testRename(self):
+    db=self.db
+    self.host1.NAME='newname'
+    db.session.flush()
+    self.assertEqual(db.nodeByNameAndType('newname','HOST').ID, self.host1.ID)
+
+  def testToNode(self):
+    db=self.db
+    self.assertEqual(db._toNode(1).ID, 1)
+    self.assertEqual(db._toNode("#1").ID, 1)
+    self.assertEqual(db._toNode("host2","HOST").ID, 2)
+    self.assertEqual(db._toNode("HOST:host2").ID, 2)
+
 if __name__ == '__main__':
-  print sqlalchemy.__version__
-  db=NodeDB('sqlite:///:memory:')
-  N=db.createNode('host1','HOST')
-  db.session.flush()
-  print str(N)
-  N.ATTR1=3
-  print str(N)
-  ##db.session.flush()
-  N.ATTR1=4
-  print str(N)
-  ##db.session.flush()
-  N.NAME='newname'
-  db.session.flush()
-  print str(N)
-  N.ATTR2=5
-  N.ATTR3s=[5,6,7]
-  N.ATTR2=7
-  print str(N)
-  db.session.flush()
-  print "N.ID=%d" % N.ID
-  print "1 in db: %s" % (1 in db)
-  print "1 in db: %s" % (1 in db)
-  print "9 in db: %s" % (9 in db)
-  print db._toNode(1)
-  print db._toNode("#1")
-  print db._toNode("newname","HOST")
-  print db._toNode("HOST:newname")
-  print "N.ATTRXs=%s" % (N.ATTRXs,)
-  print "N.ATTR2=%s" % N.ATTR2
-  print "N.ATTR3es=%s" % (N.ATTR3es,)
-  print "N.ATTR3=%s" % N.ATTR3
+  print 'SQLAlchemy version =', sqlalchemy.__version__
+  unittest.main()
