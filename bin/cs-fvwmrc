@@ -52,5 +52,4 @@ export fvwm_Transparent fvwm_RootTransparent fvwm_ParentalRelativity fvwm_Opaque
   fvwm-deskkeys
   echo SwitchToDesk 1
   cs-fvwm-poskeys
-) \
-| tee $HOME/tmp/fvwmrc-$HOST-$DISPLAY
+)

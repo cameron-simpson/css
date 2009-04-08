@@ -1,6 +1,8 @@
 #!/bin/sh
 
 : ${LOGDIR:=$HOME/var/log}
+: ${XSESSIONID:=''}
+: ${FVWM_PREFIX:=''}
 
 cd
 . $HOME/rc/x11/xenv.sh
@@ -9,11 +11,17 @@ cd
 evlogdir=$LOGDIR/lastvalue
 if needdir "$evlogdir"
 then
-    evlog=$evlogdir/wm-eventlog-$XESSIONID
+    evlog=$evlogdir/wm-eventlog-$XSESSIONID
     rm -f "$evlog"
     ##>"$evlog"
     ##( tail -f "$evlog" | fvwm-event - & )
 fi
+
+case "$OS,$DISPLAY" in
+  darwin,/* | darwin,:0 | darwin,:0.* )
+    ( quartz-wm --only-proxy & )
+    ;;
+esac
 
 for fv in \
         $HOME/bin-local/fvwm \
@@ -60,7 +68,8 @@ PATH=$PATH:$fv/bin
 PYTHONPATH=$PYTHONPATH:$HOME/rc/python/Fvwmpy
 export PATH PYTHONPATH
 
-exec bgproc -s -p wm -l x11 -- "$fvwm" -cmd "PipeRead cs-fvwmrc" ${1+"$@"}
+set -x
+exec "$fvwm" -cmd "PipeRead cs-fvwmrc" ${1+"$@"}
 
 ### set up FVWM log/fifo vars
 ##eval `rigfvwmvars`
