@@ -246,7 +246,11 @@ class Node(object):
 
 # TODO: make __enter__/__exit__ for running a session?
 class NodeDB(object):
-  def __init__(self,engine,nodes='NODES',attrs='ATTRS'):
+  def __init__(self, engine, nodes=None, attrs=None):
+    if nodes is None:
+      nodes = 'NODES'
+    if attrs is None:
+      attrs = 'ATTRS'
     if type(engine) is str:
       engine = create_engine(engine, echo=len(os.environ.get('DEBUG','')) > 0)
     metadata=MetaData()
@@ -390,8 +394,11 @@ class NodeDB(object):
   def nodeById(self,id):
     return the(self.nodesByIds((id,)))
 
-  def nodeByNameAndType(self,name,type):
-    return the(self._nodes2Nodes(self._nodesByNameAndType(name,type),checkMap=True))
+  def nodeByNameAndType(self,name,type,doCreate=False):
+    nodes = self._nodes2Nodes(self._nodesByNameAndType(name,type),checkMap=True)
+    if len(nodes) > 0:
+      return the(nodes)
+    return self.createNode(name, type)
 
   def nodesByType(self,type):
     return self._nodes2Nodes(self._nodesByType(type),checkMap=True)
