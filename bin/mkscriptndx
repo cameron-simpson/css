@@ -27,5 +27,11 @@ for f
 do  [ -f "$f" ] || continue
     [ -s "$f" ] || continue
     egrep "^(# *)?$f - [a-z]" <"$f" \
-    || sed -n -e '/^$$/q' -e '/^[^#]/q' -e "s/^#/$f: #/p" <"$f"
+    || sed -n \
+           -e 'y/	/ /' \
+           -e '/^$/q' \
+           -e '/^[^#]/q' \
+           -e '/^# *$/d' \
+           -e '/^# *- /d' \
+           -e "s/^#/$f: #/p" <"$f" 
 done
