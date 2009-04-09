@@ -119,8 +119,6 @@ class Node(object):
 
   _MODE_DIRECT = 0              # FOO is just a cigar
   _MODE_BY_ID = 1               # node where node.ID in self.FOO_IDs
-  _MODE_PARENT_BY_ID = 2        # node where self.ID in node.FOO_IDs
-  _MODE_PARENT_ID_BY_ID = 3     # node.ID where self.ID in node.FOO_IDs
 
   def __init__(self,_node,nodedb,attrs):
     ''' Initialise a new Node.
@@ -148,16 +146,19 @@ class Node(object):
       values=self._attrs[k]
     elif mode == Node._MODE_BY_ID:
       values=self._nodedb.nodesByIds(self._attrs[k+"_ID"])
-    elif mode == Node._MODE_PARENT_BY_ID:
-      values=self._nodedb.nodesByAttrValue(k+"_ID", str(self.ID))
-    elif mode == Node._MODE_PARENT_ID_BY_ID:
-      values=[ node.ID for node in self._nodedb.nodesByAttrValue(k+"_ID", str(self.ID)) ]
     else:
       assert False, " unimplemented mode %s (attr=%s: k=%s, plural=%s)" \
                         % (mode, attr, k, plural)
     if plural:
       return tuple(values)
     return the(values)
+
+  def parentsByAttr(self,attr):
+    ''' Return parent Nodes whose .attr field mentions this Node.
+    '''
+    if not attr.endswith('_ID'):
+      attr += '_ID'
+    return self._nodedb.nodesByAttrValue(attr, str(self.ID))
 
   def __hasattr__(self,attr):
     mode, k, plural = self._parseAttr(attr)
@@ -209,10 +210,6 @@ class Node(object):
     ''' Parse an attribute name and return mode, name, plural
           Non-intercepted name (bah): None, attr, None
           attr => k, plural
-          FOO_OF: _MODE_PARENT_BY_ID, k, plural
-            node where self.ID in node.FOO_IDs
-          FOO_OF_ID: _MODE_PARENT_ID_BY_ID, k, plural
-            node.ID where self.ID in node.FOO_IDs
           FOO: if len(FOO) > 0:    _MODE_DIRECT, k, plural
                if len(FOO_ID) > 0, _MODE_BY_ID, k, plural
                                    node where node.ID in self.FOO_IDs
@@ -224,12 +221,6 @@ class Node(object):
     or k == 'TYPE' or k == 'NAME' or k == 'ID':
       # raw attr, not to be intercepted
       return None, attr, None
-    if k.endswith('_OF'):
-      # node where self.ID in node.FOO_IDs
-      return Node._MODE_PARENT_BY_ID, k, plural
-    if k.endswith('_OF_ID'):
-      # node.ID where self.ID in node.FOO_IDs
-      return Node._MODE_PARENT_ID_BY_ID, k, plural
     if k.endswith('_ID'):
       return Node._MODE_DIRECT, k, plural
     _attrs=self._attrs
@@ -406,11 +397,12 @@ class NodeDB(object):
   def nodesByAttrValue(self,attr,value):
     ''' Return nodes with an attribute value as specified.
     '''
-    return self.nodesByIds(
-             uniq(
-               self.session.query(self._Attr)
-                   .filter_by(ATTR=attr, VALUE=value)
-                   .all()))
+    nodeids = [ A.NODE_ID
+                for A in self.session.query(self._Attr)
+                                     .filter_by(ATTR=attr, VALUE=value)
+                                     .all()
+              ]
+    return self.nodesByIds(uniq(nodeids))
 
   def __contains__(self,key):
     try:
@@ -459,6 +451,11 @@ class TestAll(unittest.TestCase):
     self.assertEqual(db._toNode("#1").ID, 1)
     self.assertEqual(db._toNode("host2","HOST").ID, 2)
     self.assertEqual(db._toNode("HOST:host2").ID, 2)
+
+  def testParentsByAttr(self):
+    self.host1.SUBHOST=self.host2
+    parents=self.host2.parentsByAttr('SUBHOST')
+    self.assertEqual(the(parents).ID, self.host1.ID)
 
 if __name__ == '__main__':
   print 'SQLAlchemy version =', sqlalchemy.__version__
