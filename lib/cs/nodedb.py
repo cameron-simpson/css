@@ -83,12 +83,14 @@ class AttrMap(dict):
     dict.__init__(self)
     self.__node=node
     self.__nodedb=nodedb
-    self.__attrObjs=dict([ (A.ATTR, A) for A in attrs ])
     # collate the attrs by ATTR value
-    attrs_map={}
+    values_map={}
+    attrobjs_map={}
     for A in attrs:
-      attrs_map.setdefault(A.ATTR,[]).append(A.VALUE)
-    dict.__init__(self, attrs_map.items())
+      values_map.setdefault(A.ATTR,[]).append(A.VALUE)
+      attrobjs_map.setdefault(A.ATTR,[]).append(A)
+    dict.__init__(self, values_map.items())
+    self.__attrObjs=dict(attrobjs_map.items())
 
   def __setitem__(self,attr,value):
     ''' Set the attribute 'attr' to 'value'.
@@ -168,8 +170,10 @@ class Node(object):
     if mode == Node._MODE_DIRECT:
       ks = self._attrs.get(k, ())
       return len(ks) > 0
+
     if mode == Node._MODE_BY_ID:
       return True
+
     return False
 
   def __setattr__(self,attr,value):
@@ -197,6 +201,10 @@ class Node(object):
         self._attrs[k+'_ID']=tuple( v.ID for v in value )
       else:
         self._attrs[k]=value
+      return
+
+    if mode == Node._MODE_BY_ID:
+      self._attrs[k+'_ID']=tuple( v.ID for v in value )
       return
 
     assert False, "setattr(Node.%s): unsupported mode: %s" % (attr, mode)
@@ -264,6 +272,10 @@ class NodeDB(object):
         self.NODE_ID=node_id
         self.ATTR=attr
         self.VALUE=value
+      def __str__(self):
+        return "_Attr:{NODE_ID: %s, ATTR: %s, VALUE: %s}" \
+               % (self.NODE_ID, self.ATTR, self.VALUE)
+      __repr__=__str__
     mapper(_Attr, attrs)
     self._Attr=_Attr
     class _Node(object):
