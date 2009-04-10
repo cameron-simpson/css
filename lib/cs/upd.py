@@ -130,3 +130,23 @@ def noupd(U=None):
       return __dummyNoUpd()
     U=_defaultUpd
   return U._withoutContext()
+
+class ExceptionPrefix(object):
+  ''' A context manager to prefix exception complaints.
+  '''
+
+  def __init__(self,prefix):
+    self.__prefix=prefix
+
+  def __enter__(self):
+    pass
+
+  def __exit__(self, exc_type, exc_value, tb):
+    if exc_type is not None:
+      upd_state = state()
+      if len(upd_state) > 0:
+        pfx = upd_state+": "+self.__prefix
+      else:
+        pfx = self.__prefix
+      raise exc_type, pfx+": "+exc_value, tb
+    return False

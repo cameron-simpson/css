@@ -4,11 +4,13 @@ import time
 import socket
 import mailbox as pyMailbox
 import email
+from email.parser import HeaderParser, FeedParser
 import email.Parser
 import email.FeedParser
 import string
 import StringIO
 import re
+from contextlib import closing
 from cs.misc import cmderr, progress, verbose, seq, saferename
 
 def ismhdir(path):
@@ -24,12 +26,81 @@ def ismaildir(path):
       return False
   return True
 
+def ismbox(path):
+  ''' Open path and check that its first line begins with "From ".
+  '''
+  fp=None
+  try:
+    fp=open(path)
+    from_ = fp.read(5)
+  except IOError:
+    if fp is not None:
+      fp.close()
+    return False
+  fp.close()
+  return from_ == 'From '
+
 def mailbox(path):
   if ismaildir(path):
     return pyMailbox.Maildir(path)
   if ismhdir(path):
     return pyMailbox.MH(path)
   return None
+
+def messagesFromPath(path):
+  if ismaildir(path):
+    return messagesFromMaildir(path)
+  elif ismbox(path):
+    return messagesFromMBox(path)
+  elif os.path.ispath(path):
+    return messagesFromMailFile(path)
+  else:
+    raise ValueError, "%s: not a recognised mail store" % (path,)
+
+def _messageFromMailFile(mailfp):
+  return HeaderParser().parse(mailfp)
+
+def messagesFromMailFile(mailfp):
+  yield _messageFromMailFile(mailfp)
+
+def messagesFromMBox(mbox):
+  ''' Generator that reads a UNIX mailbox and yields Message objects.
+      TODO: do we still want readMBox()?
+  '''
+  needClose = False
+  if type(mbox) in StringTypes:
+    mbox = open(mbox)
+    needClose = True
+
+  P = None
+  for line in mbox:
+    assert line[-1] == '\n', "short line in %s" % (mbox,)
+    if line.startswith('From '):
+      if P is not None:
+        yield P.close()
+      P = FeedParser()
+    elif P is None:
+      raise ValueError, "line in UNIX mailbox before first From_ line"
+    else:
+      P.feed(line)
+  if P is not None:
+    yield P.close()
+
+  if needClose:
+    mbox.close()
+
+def messagesFromMaildir(maildir):
+  ''' Generator that reads from a Maildir and yields Message header objects.
+  '''
+  for subdir in 'cur', 'new':
+    subdirpath = os.path.join(maildir, subdir)
+    for subpath in os.listdir(subdirpath):
+      if subpath .startswith('.'):
+        continue
+      msgpath = os.path.join(subdirpath, subpath)
+      if os.path.isfile(msgpath):
+        with closing(open(msgpath)) as fp:
+          yield _messageFromMailFile(fp)
 
 def maildirify(path):
   ''' Make sure 'path' is a Maildir directory.
