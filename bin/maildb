@@ -1,0 +1,73 @@
+#!/usr/bin/python -tt
+#
+# Use or update email state info.
+#       - Cameron Simpson <cs@zip.com.au> 04apr2009
+#
+
+from __future__ import with_statement
+from cs.misc import cmd
+from cs.app.maildb import MailDB
+from cs.mail import messagesFromMailFile
+from getopt import getopt, GetoptError
+from contextlib import closing
+import sys
+import os
+
+usage='''Usage:
+  %s [opts...] addmessage [files...]
+    Import information from named message files or standard input.
+  Options:
+    -d maildb   l
+''' % (cmd,)
+
+badopts=False
+
+try:
+  opts, args = getopt(sys.argv[1:], 'd:')
+except GetoptError, e:
+  print >>sys.stderr, "%s: %s" % (cmd, e)
+  badopts=True
+  opts, args = (), ()
+
+for opt, val in opts:
+  if opt == '-d':
+    DBPATH=opt
+  else:
+    print >>sys.stderr, "%s: unsupported option: %s" % (cmd, opt)
+    badopts=True
+
+if len(args) == 0:
+  print >>sys.stderr, "%s: missing operator" % cmd
+  badopts=True
+else:
+  op = args.pop(0)
+  if op == "addmessage":
+    if len(args) == 0:
+      args = ('-', )
+  else:
+    print >>sys.stderr, "%s: unrecognised operation: %s" % (cmd, op)
+    badopts=True
+
+if badopts:
+  sys.stderr.write(usage)
+  sys.exit(2)
+
+DB=MailDB()
+
+xit=0
+
+if op == 'addmessage':
+  for arg in args:
+    if arg == '-':
+      for M in messagesFromMailFile(sys.stdin):
+        DB.importMessage(M)
+    else:
+      DB.importPath(arg)
+else:
+  print >>sys.stderr, "%s: unimplemented operation: %s" % (cmd, op)
+  xit=1
+
+os.system('set -x; lsof -p %d' % os.getpid())
+DB.session.commit()
+
+sys.exit(xit)
