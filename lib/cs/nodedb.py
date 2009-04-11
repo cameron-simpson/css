@@ -398,10 +398,20 @@ class NodeDB(object):
     return the(self.nodesByIds((id,)))
 
   def nodeByNameAndType(self,name,type,doCreate=False):
+    ''' Return the node of the specified name and type.
+        The optional parameter doCreate defaults to False.
+        If there is no such node and doCreate is None, return None.
+        If there is no such node and doCreate is true, create the node and return it.
+        Otherwise raise IndexError.
+    '''
     nodes = self._nodes2Nodes(self._nodesByNameAndType(name,type),checkMap=True)
     if len(nodes) > 0:
       return the(nodes)
-    return self.createNode(name, type)
+    if doCreate is None:
+      return None
+    if doCreate:
+      return self.createNode(name, type)
+    raise IndexError, "no node matching NAME=%s and TYPE=%s" % (name, type)
 
   def nodesByType(self,type):
     return self._nodes2Nodes(self._nodesByType(type),checkMap=True)
