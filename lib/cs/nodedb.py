@@ -9,7 +9,7 @@ import cs.sh
 from cs.misc import the, uniq
 import sqlalchemy
 from sqlalchemy import create_engine, \
-                       MetaData, Table, Column, Integer, String, \
+                       MetaData, Table, Column, Index, Integer, String, \
                        select
 from sqlalchemy.orm import mapper, sessionmaker
 from sqlalchemy.sql import and_, or_, not_
@@ -40,40 +40,40 @@ def ATTRSTable(metadata, name=None):
     name='ATTRS'
   return Table(name, metadata,
                Column('ID', Integer, primary_key=True, nullable=False),
-               Column('NODE_ID', Integer, nullable=False),
-               Column('ATTR', String(64), nullable=False),
+               Column('NODE_ID', Integer, nullable=False, index=True),
+               Column('ATTR', String(64), nullable=False, index=True),
                Column('VALUE', String(1024)),
               )
 
-def fieldInValues(field,values):
-  # return an SQLAlchemy condition that tests a field
+def fieldInValues(column, values):
+  # return an SQLAlchemy condition that tests a column
   # for integral values
   assert len(values) > 0
   if not isinstance(values,list):
-    values=values[:]
+    values = values[:]
 
   # trivial case with one value
   if len(values) == 1:
     return field == values[0]
 
-  vmin=min(values)
-  vmax=max(values)
-  cond="%s between %d and %d" % (field, vmin, vmax)
+  vmin = min(values)
+  vmax = max(values)
+  cond = column.between(vmin, vmax)
 
   # maybe it is a contiguous range
   # if so, we can return just the between clause
   if vmax-vmin+1 == len(values):
-    contiguous=True
+    contiguous = True
     values.sort()
     for i in xrange(len(values)):
       if values[i] != vmin+i:
-        contiguous=False
+        contiguous = False
         break
     if contiguous:
       return cond
 
   # the complicated case: select by range and check membership
-  cond=and_(cond, "%s in (%s)" % (field, ",".join(str(v) for v in values)))
+  cond = and_(cond, "%s in (%s)" % (field, ",".join(str(v) for v in values)))
   return cond
 
 class AttrMap(dict):
@@ -90,23 +90,23 @@ class AttrMap(dict):
         for storage in the dict.
     '''
     dict.__init__(self)
-    self.__node=node
-    self.__nodedb=nodedb
+    self.__node = node
+    self.__nodedb = nodedb
     # collate the attrs by ATTR value
-    values_map={}
-    attrobjs_map={}
+    values_map = {}
+    attrobjs_map = {}
     for A in attrs:
       values_map.setdefault(A.ATTR,[]).append(A.VALUE)
       attrobjs_map.setdefault(A.ATTR,[]).append(A)
     dict.__init__(self, values_map.items())
-    self.__attrObjs=dict(attrobjs_map.items())
+    self.__attrObjs = dict(attrobjs_map.items())
 
   def __setitem__(self,attr,value):
     ''' Set the attribute 'attr' to 'value'.
     '''
     if attr in self:
       del self[attr]
-    self.__attrObjs[attr]=[ self.__node.newattr(attr, v) for v in value ]
+    self.__attrObjs[attr] = [ self.__node.newattr(attr, v) for v in value ]
     self.__nodedb.session.add_all(self.__attrObjs[attr])
     # store a tuple so that we can't do append()s etc
     dict.__setitem__(self, attr, tuple(value))
@@ -366,12 +366,14 @@ class NodeDB(object):
     if type(engine) is str:
       engine = create_engine(engine, echo=len(os.environ.get('DEBUG','')) > 0)
     metadata=MetaData()
-    if nodes is None or type(nodes) is str:
+    if type(nodes) is str:
       nodes=NODESTable(metadata,name=nodes)
     self.nodes=nodes
-    if attrs is None or type(attrs) is str:
+    Index('nametype', nodes.c.NAME, nodes.c.TYPE)
+    if type(attrs) is str:
       attrs=ATTRSTable(metadata,name=attrs)
     self.attrs=attrs
+    Index('attrvalue', attrs.c.ATTR, attrs.c.VALUE)
     self.engine=engine
     self.conn=engine.connect()
     metadata.create_all(engine)
