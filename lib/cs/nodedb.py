@@ -5,6 +5,7 @@
 #
 
 from cs.mappings import isUC_, parseUC_sAttr
+import cs.sh
 from cs.misc import the, uniq
 import sqlalchemy
 from sqlalchemy import create_engine, \
@@ -13,9 +14,15 @@ from sqlalchemy import create_engine, \
 from sqlalchemy.orm import mapper, sessionmaker
 from sqlalchemy.sql import and_, or_, not_
 from weakref import WeakValueDictionary
+from contextlib import closing
+import tempfile
 import sys
 import os
 import unittest
+import json
+import re
+
+re_NODEREF = re.compile(r'([^:#]+):([A-Z]+)#([0-9]+)')
 
 def NODESTable(metadata, name=None):
   if name is None:
@@ -253,6 +260,73 @@ class Node(object):
     # no FOO, no FOO_ID, use FOO directly
     return Node._MODE_DIRECT, k, plural
 
+  def textdump(self, ofp):
+    ofp.write("# %s\n" % (repr(self),))
+    attrnames = self._attrs.keys()
+    attrnames.sort()
+    for attr in attrnames:
+      for value in self._attrs[attr]:
+        if attr.endswith('_ID'):
+          value = repr(self._nodedb.nodeById(int(value)))
+          attr = attr[:-3]
+        else:
+          value = json.dumps(value)
+        ofp.write('%s %s\n' % (attr, value))
+
+  def textload(self, ifp):
+    attrs = {}
+    for line in ifp:
+      assert line[-1] == '\n', "%s: unexpected EOF" % (str(ifp),)
+      if line[0] == '#':
+        continue
+      attr, value = line[:-1].split(None, 1)
+      assert isUC_(attr), "%s: invalid attribute name \"%s\"" % (str(ifp), attr)
+      value = value.strip()
+      m = re_NODEREF.match(value)
+      if m is not None:
+        assert not attr.endswith('_ID')
+        value = int(m.group(3))
+        attr += '_ID'
+      else:
+        try:
+          jvalue = json.loads(value)
+        except ValueError, e:
+          print >>sys.stderr, "JSON.loads(%s) error: %s" % (value,e,)
+          raise e
+        t = type(jvalue)
+        if t is int:
+          value = str(jvalue)
+        elif type(jvalue) in StringTypes:
+          value = jvalue
+        else:
+          raise ValueError, "%s: %s: invalid JSON expression: %s" % (str(ifp), attr, value)
+      attrs.setdefault(attr, []).append(value)
+
+    oldattrnames = self._attrs.keys()
+    oldattrnames.sort()
+    for attr in oldattrnames:
+      attrs.setdefault(attr, ())
+    attrnames = attrs.keys()
+    attrnames.sort()
+    for attr in attrnames:
+      plattr = attr+'s'
+      value = attrs[attr]
+      ovalue = getattr(self, plattr)
+      if ovalue != value:
+        print >>sys.stderr, "change .%s: %s -> %s" % (plattr, ovalue, value)
+        setattr(self, plattr, value)
+
+  def edit(self, editor=None):
+    if editor is None:
+      editor = os.environ.get('EDITOR', 'vi')
+    T = tempfile.NamedTemporaryFile(delete=False)
+    self.textdump(T)
+    T.close()
+    qname = cs.sh.quotestr(T.name)
+    os.system("set -x; %s %s" % (editor, qname))
+    with closing(open(T.name)) as ifp:
+      self.textload(ifp)
+
 # TODO: make __enter__/__exit__ for running a session?
 class NodeDB(object):
   def __init__(self, engine, nodes=None, attrs=None):
@@ -488,6 +562,15 @@ class TestAll(unittest.TestCase):
     self.host1.SUBHOST=self.host2
     parents=self.host2.parentsByAttr('SUBHOST')
     self.assertEqual(the(parents).ID, self.host1.ID)
+
+  def testTextDump(self):
+    self.host1.SUBHOST=self.host2
+    self.host1.textdump(sys.stdout)
+
+  def testTextEdit(self):
+    self.host1.SUBHOST=self.host2
+    self.host1.edit()
+    self.host1.textdump(sys.stdout)
 
 if __name__ == '__main__':
   print 'SQLAlchemy version =', sqlalchemy.__version__
