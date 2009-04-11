@@ -145,7 +145,10 @@ class Node(object):
     if mode is None:
       return getattr(self._node, attr)
     if mode == Node._MODE_DIRECT:
-      values=self._attrs[k]
+      if k not in self._attrs:
+        values=()
+      else:
+        values=self._attrs[k]
     elif mode == Node._MODE_BY_ID:
       values=self._nodedb.nodesByIds(self._attrs[k+"_ID"])
     else:
