@@ -139,6 +139,8 @@ class Node(object):
 
   def __str__(self):
     return "%s:%s#%d%s" % (self.NAME,self.TYPE,self.ID,self._attrs)
+  def __repr__(self):
+    return "%s:%s#%d" % (self.NAME,self.TYPE,self.ID)
 
   def __getattr__(self,attr):
     mode, k, plural = self._parseAttr(attr)
@@ -158,12 +160,17 @@ class Node(object):
       return tuple(values)
     return the(values)
 
-  def parentsByAttr(self,attr):
+  def parentsByAttr(self, attr, type=None):
     ''' Return parent Nodes whose .attr field mentions this Node.
+        The optional parameter 'type' constrains the result to nodes
+        of the specified TYPE.
     '''
     if not attr.endswith('_ID'):
       attr += '_ID'
-    return self._nodedb.nodesByAttrValue(attr, str(self.ID))
+    nodes = self._nodedb.nodesByAttrValue(attr, str(self.ID))
+    if type is not None:
+      nodes = [ N for N in nodes if N.TYPE == type ]
+    return nodes
 
   def __hasattr__(self,attr):
     mode, k, plural = self._parseAttr(attr)
