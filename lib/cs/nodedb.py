@@ -22,7 +22,7 @@ import unittest
 import json
 import re
 
-re_NODEREF = re.compile(r'([^:#]+):([A-Z]+)#([0-9]+)')
+re_NODEREF = re.compile(r'([A-Z]+):([^:#]+)(#([0-9]+))?')
 
 def NODESTable(metadata, name=None):
   if name is None:
@@ -144,10 +144,12 @@ class Node(object):
         print >>sys.stderr, "WARNING: Node.__init__: replacing %s with %s" % (nodedb.nodeMap[id],self)
     nodedb.nodeMap[id]=self
 
+  def __eq__(self,other):
+    return self.ID == other.ID
   def __str__(self):
-    return "%s:%s#%d%s" % (self.NAME,self.TYPE,self.ID,self._attrs)
+    return "%s:%s" % (self.TYPE,self.NAME)
   def __repr__(self):
-    return "%s:%s#%d" % (self.NAME,self.TYPE,self.ID)
+    return "%s:%s#%d" % (self.TYPE,self.NAME,self.ID)
 
   def __getattr__(self,attr):
     mode, k, plural = self._parseAttr(attr)
@@ -264,56 +266,80 @@ class Node(object):
     ofp.write("# %s\n" % (repr(self),))
     attrnames = self._attrs.keys()
     attrnames.sort()
+    opattr = None
     for attr in attrnames:
+      pattr = attr
       for value in self._attrs[attr]:
+        pvalue = value
         if attr.endswith('_ID'):
-          value = repr(self._nodedb.nodeById(int(value)))
-          attr = attr[:-3]
+          pvalue = str(self._nodedb.nodeById(int(value)))
+          pattr = attr[:-3]
         else:
-          value = json.dumps(value)
-        ofp.write('%s %s\n' % (attr, value))
+          pvalue = json.dumps(value)
+        if opattr is not None and opattr == pattr:
+          pattr = ''
+        else:
+          opattr = pattr
+        ofp.write('%-15s %s\n' % (pattr, pvalue))
 
   def textload(self, ifp):
     attrs = {}
+    prev_attr = None
     for line in ifp:
       assert line[-1] == '\n', "%s: unexpected EOF" % (str(ifp),)
-      if line[0] == '#':
+      line = line[:-1].rstrip()
+      if len(line) == 0:
         continue
-      attr, value = line[:-1].split(None, 1)
-      assert isUC_(attr), "%s: invalid attribute name \"%s\"" % (str(ifp), attr)
-      value = value.strip()
-      m = re_NODEREF.match(value)
-      if m is not None:
-        assert not attr.endswith('_ID')
-        value = int(m.group(3))
-        attr += '_ID'
+      ch1 = line[0]
+      if ch1 == '#':
+        continue
+      if ch1.isspace():
+        assert prev_attr is not None, "%s: unexpected indented line" % (str(ifp),)
+        attr = prev_attr
+        value = line.lstrip()
       else:
-        try:
-          jvalue = json.loads(value)
-        except ValueError, e:
-          print >>sys.stderr, "JSON.loads(%s) error: %s" % (value,e,)
-          raise e
-        t = type(jvalue)
-        if t is int:
-          value = str(jvalue)
-        elif type(jvalue) in StringTypes:
-          value = jvalue
+        attr, value = line.split(None, 1)
+        prev_attr = attr
+        assert isUC_(attr), "%s: invalid attribute name \"%s\"" % (str(ifp), attr)
+      ovalue = value
+      if attr.endswith('_ID'):
+        # node.ID
+        value = self._nodedb.nodeById(int(ovalue))
+        attr = attr[:-3]
+      else:
+        m = re_NODEREF.match(ovalue)
+        if m is not None:
+          # node ref
+          node_key = ":".join( (m.group(1), m.group(2)) )
+          value = self._nodedb[node_key]
         else:
-          raise ValueError, "%s: %s: invalid JSON expression: %s" % (str(ifp), attr, value)
+          # 
+          try:
+            value = json.loads(ovalue)
+          except ValueError, e:
+            print >>sys.stderr, "json.loads(%s) error: %s" % (ovalue,e,)
+            raise ValueError, e
+          t = type(value)
+          if t is int:
+            value = str(value)
+          elif type(value) not in StringTypes:
+            raise ValueError, "%s: %s: forbidden JSON expression (not int or str): %s" % (str(ifp), attr, value)
+
       attrs.setdefault(attr, []).append(value)
 
     oldattrnames = self._attrs.keys()
     oldattrnames.sort()
     for attr in oldattrnames:
+      if attr.endswith('_ID'):
+        attr = attr[:-3]
       attrs.setdefault(attr, ())
     attrnames = attrs.keys()
     attrnames.sort()
     for attr in attrnames:
       plattr = attr+'s'
-      value = attrs[attr]
+      value = tuple(attrs[attr])
       ovalue = getattr(self, plattr)
       if ovalue != value:
-        print >>sys.stderr, "change .%s: %s -> %s" % (plattr, ovalue, value)
         setattr(self, plattr, value)
 
   def edit(self, editor=None):
@@ -323,9 +349,10 @@ class Node(object):
     self.textdump(T)
     T.close()
     qname = cs.sh.quotestr(T.name)
-    os.system("set -x; %s %s" % (editor, qname))
+    os.system("%s %s" % (editor, qname))
     with closing(open(T.name)) as ifp:
       self.textload(ifp)
+    os.remove(T.name)
 
 # TODO: make __enter__/__exit__ for running a session?
 class NodeDB(object):
@@ -563,12 +590,12 @@ class TestAll(unittest.TestCase):
     parents=self.host2.parentsByAttr('SUBHOST')
     self.assertEqual(the(parents).ID, self.host1.ID)
 
-  def testTextDump(self):
+  def _dont_testTextDump(self):
     self.host1.SUBHOST=self.host2
     self.host1.textdump(sys.stdout)
 
-  def testTextEdit(self):
-    self.host1.SUBHOST=self.host2
+  def _dont_testTextEdit(self):
+    self.host1.SUBHOSTs=(self.host2, self.host1)
     self.host1.edit()
     self.host1.textdump(sys.stdout)
 
