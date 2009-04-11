@@ -133,8 +133,8 @@ class Node(object):
     self.__dict__['_attrs']=AttrMap(_node,nodedb,attrs)
     self.__dict__['_nodedb']=nodedb
     id=_node.ID
-    assert id not in nodedb.nodeMap, \
-        "WARNING: replacing %s with %s" % (nodedb.nodeMap[id],self)
+    if id in nodedb.nodeMap:
+        print >>sys.stderr, "WARNING: Node.__init__: replacing %s with %s" % (nodedb.nodeMap[id],self)
     nodedb.nodeMap[id]=self
 
   def __str__(self):
