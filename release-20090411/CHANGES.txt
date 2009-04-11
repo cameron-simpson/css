@@ -1,0 +1,227 @@
+changeset:   7313:214f6f887759
+tag:         release-20090326
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Thu Mar 26 17:02:12 2009 +1100
+files:       Mykefile
+description:
+Mykefile: add "_help" default target.
+
+
+changeset:   7314:30c437b98b25
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Thu Mar 26 17:05:00 2009 +1100
+files:       .hgtags
+description:
+Added tag release-20090326 for changeset 214f6f887759
+
+
+changeset:   7315:1cd3b2d848b8
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Thu Mar 26 17:05:01 2009 +1100
+files:       release-20090326/CHANGES.txt release-20090326/SUMMARY.txt release-20090326/release-tag.txt
+description:
+Release information for release-20090326.
+
+
+changeset:   7316:99d607751ad1
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Fri Mar 27 13:18:53 2009 +1100
+files:       bin/shqstr
+description:
+Move shqstr from perl to python (no perl on my iPhone).
+
+
+changeset:   7317:7a9a0fd3aca2
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sat Mar 28 13:20:39 2009 +1100
+files:       lib/cs/cache.py lib/cs/cherryhttpsrv.py lib/cs/db.py lib/cs/dbdigraph.py lib/cs/env.py lib/cs/hier.py lib/cs/httpsrv.py lib/cs/mappings.py lib/cs/misc.py lib/cs/secret.py lib/cs/sparse.py lib/cs/venti/vtfuse.py lib/cs/www.py
+description:
+*.py: convert `foo` into repr(foo) across the board.
+
+
+changeset:   7318:51d2c851320b
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sat Mar 28 13:29:58 2009 +1100
+files:       lib/cs/venti/blocks.py lib/cs/venti/datafile.py lib/cs/venti/dir.py lib/cs/venti/gdbmstore.py lib/cs/venti/store.py lib/cs/venti/stream.py
+description:
+toBS/fromBS/fromBSfp now live in serialise.py.
+
+
+changeset:   7319:87e87e233697
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sat Mar 28 16:02:42 2009 +1100
+files:       bin/cs-release
+description:
+cs-release: make sure the release includes the release change info files.
+
+
+changeset:   7320:2fd25ae54937
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Fri Apr 03 14:41:44 2009 +1100
+files:       bin/dl bin/dlog
+description:
+Obsolete "dl" into shell alias, prettify dlog.
+
+
+changeset:   7321:11a5b0a11cb4
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sun Apr 05 09:09:48 2009 +1000
+files:       bin/setvar
+description:
+setvar: recognise Debian systems.
+
+
+changeset:   7322:0082e5e64a1e
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Mon Apr 06 18:57:21 2009 +1000
+files:       bin/term
+description:
+term: macosx: don't activate the terminal, no need.
+
+
+changeset:   7323:4bf7f01fd215
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Tue Apr 07 12:45:02 2009 +1000
+files:       bin/secret lib/cs/secret.py
+description:
+Improve the secret command's error reporting.
+
+
+changeset:   7324:e05068141d2a
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Tue Apr 07 12:45:52 2009 +1000
+files:       bin/mys
+description:
+bin/mys: add -n (no action) mode.
+
+
+changeset:   7325:7b682ca1349b
+parent:      7320:2fd25ae54937
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Tue Apr 07 19:02:55 2009 +1000
+files:       lib/cs/misc.py
+description:
+cs/misc.py: Improve the() exception message.
+
+
+changeset:   7326:980594316bf0
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Tue Apr 07 19:04:02 2009 +1000
+files:       lib/cs/mail.py
+description:
+cs/mail.py: docstrings and trivial changes.
+
+
+changeset:   7327:69fc195f4161
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Tue Apr 07 19:05:31 2009 +1000
+files:       lib/cs/nodedb.py lib/cs/wiringdb.py
+description:
+Merge wiringdb.py FOO_OF and FOO_OF_ID facility into nodedb.py, junk wiringdb.py.
+
+
+changeset:   7328:2e86f8adff2c
+parent:      7324:e05068141d2a
+parent:      7327:69fc195f4161
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Tue Apr 07 19:06:50 2009 +1000
+files:       lib/cs/wiringdb.py
+description:
+Sync with nodedb dev tree.
+
+
+changeset:   7329:7623b4a3744b
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Wed Apr 08 16:38:50 2009 +1000
+files:       bin/cs-fvwmrc bin/cs-wm
+description:
+Hacks to work with X11 on MacOSX.
+
+
+changeset:   7330:748c3e130f19
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Fri Apr 10 08:30:48 2009 +1000
+files:       bin/mkscriptndx
+description:
+mkscriptndx: clean up the output.
+
+
+changeset:   7331:e308f48bbfc4
+parent:      7329:7623b4a3744b
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Fri Apr 10 08:33:21 2009 +1000
+files:       lib/cs/nodedb.py
+description:
+Improve NodeDB initialiser defaults, add doCreate option to nodeByNameAndType().
+
+
+changeset:   7332:a357125d7dd8
+parent:      7330:748c3e130f19
+parent:      7331:e308f48bbfc4
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Fri Apr 10 08:34:02 2009 +1000
+description:
+Sync with dev/css-nodedb.
+
+
+changeset:   7333:54889a1e8769
+parent:      7331:e308f48bbfc4
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Fri Apr 10 09:08:17 2009 +1000
+files:       lib/cs/nodedb.py
+description:
+Replace FOO_OF and FOO_OF_ID pseudo attributes with .parentsByAttr() method.
+
+
+changeset:   7334:f001e0f6ee37
+parent:      7332:a357125d7dd8
+parent:      7333:54889a1e8769
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Fri Apr 10 09:08:44 2009 +1000
+description:
+Sync with dv/css-nodedb.
+
+
+changeset:   7335:f803e7ca103f
+parent:      7333:54889a1e8769
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Fri Apr 10 15:17:09 2009 +1000
+files:       lib/cs/upd.py
+description:
+cs.upd: add ExceptionPrefix context manager.
+
+
+changeset:   7336:fde7919df35d
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Fri Apr 10 21:11:28 2009 +1000
+files:       lib/cs/nodedb.py
+description:
+lib/cs/nodedb.py: bugfix AttrMap and Node.__setattr__.
+
+
+changeset:   7337:c5e8f4106112
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Fri Apr 10 21:12:39 2009 +1000
+files:       bin/maildb lib/cs/app/maildb.py lib/cs/mail.py
+description:
+Basic mail metadata import support.
+
+
+changeset:   7338:07fdc5e1eca0
+parent:      7334:f001e0f6ee37
+parent:      7337:c5e8f4106112
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Fri Apr 10 21:13:47 2009 +1000
+description:
+Sync with dev/css-nodedb.
+
+
+changeset:   7339:2323e63253dc
+tag:         tip
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sat Apr 11 11:52:53 2009 +1000
+files:       bin/cs-release
+description:
+cs-release: bugfix variable typo.
+
+
