@@ -15,6 +15,7 @@ from sqlalchemy.orm import mapper, sessionmaker
 from sqlalchemy.sql import and_, or_, not_
 from weakref import WeakValueDictionary
 from contextlib import closing
+from types import StringTypes
 import tempfile
 import sys
 import os
@@ -22,6 +23,7 @@ import unittest
 import json
 import re
 
+# regexp to match TYPE:name with optional #id suffix
 re_NODEREF = re.compile(r'([A-Z]+):([^:#]+)(#([0-9]+))?')
 
 def NODESTable(metadata, name=None):
@@ -400,6 +402,9 @@ class NodeDB(object):
     mapper(_Node, nodes)
     self._Node=_Node
 
+  def commit(self):
+    self.session.commit()
+
   def _newNode(self,_node,attrs):
     return Node(_node,self,attrs)
 
@@ -525,7 +530,7 @@ class NodeDB(object):
     raise IndexError, "no node matching NAME=%s and TYPE=%s" % (name, type)
 
   def nodesByType(self,type):
-    return self._nodes2Nodes(self._nodesByType(type),checkMap=True)
+    return self._nodes2Nodes(self._nodesByType(type), checkMap=True)
 
   def nodesByAttrValue(self,attr,value):
     ''' Return nodes with an attribute value as specified.
