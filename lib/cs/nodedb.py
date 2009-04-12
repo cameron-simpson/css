@@ -315,12 +315,10 @@ class Node(object):
           node_key = ":".join( (m.group(1), m.group(2)) )
           value = self._nodedb[node_key]
         else:
-          # 
           try:
             value = json.loads(ovalue)
           except ValueError, e:
-            print >>sys.stderr, "json.loads(%s) error: %s" % (ovalue,e,)
-            raise ValueError, e
+            value = ovalue
           t = type(value)
           if t is int:
             value = str(value)
