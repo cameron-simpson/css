@@ -292,7 +292,7 @@ from getopt import getopt, GetoptError
 import string
 from cStringIO import StringIO
 import re
-from sets import Set
+if sys.hexversion < 0x02060000: from sets import Set as set
 
 trackRules=True         # add X-Cats2Procmailrc line to show rule
 useXLabel=False         # put tag in X-Label header instead of subject
@@ -327,7 +327,7 @@ usage='''Usage: %s [-a alert] [-d dir] [-D subst=val] [-L] [-m domains] [-S] \\
 assign_re=re.compile(r'[a-z]\w+=', re.I)
 target_re=re.compile(r'("[^"]*"|[^",\s]+)')
 hdrlist_re=re.compile(r'([a-z][\-a-z0-9]*(,[a-z][\-a-z0-9]*)*):', re.I)
-alladdrs=Set()
+alladdrs=set()
 
 badopts=False
 

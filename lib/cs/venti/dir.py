@@ -1,5 +1,6 @@
 import stat
-from sets import Set
+import sys
+if sys.hexversion < 0x02060000: from sets import Set as set
 from cs.venti.blocks import decodeBlockRef, BlockRef
 from cs.venti.blockify import topBlockRefString
 from cs.venti.meta import Meta
@@ -362,7 +363,7 @@ class Dir(Dirent):
         D=self.makedirs(subdirpath)
 
       if deleteMissing:
-        names=Set(dirs)
+        names=set(dirs)
         names.update(files)
         Dnames=list(D.keys())
         for name in Dnames:

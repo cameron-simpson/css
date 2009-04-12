@@ -17,15 +17,15 @@ from getopt import getopt, GetoptError
 import os
 import pwd
 import sys
-from sets import Set
+if sys.hexversion < 0x02060000: from sets import Set as set
 import cs.misc
 from cs.misc import debug, isdebug, cmderr
 
 force=False     # don't reset existing variables
 noAction=False  # don't exec command, recite var assignments on stdout
-isset=Set()
+isset=set()
 filevars={}
-doingFilevar=Set()
+doingFilevar=set()
 bootVal={}
 
 def env(var,dflt=''):
@@ -195,7 +195,7 @@ def loadfilevars(path):
 
 def listfilevars():
   global filevars
-  V=Set()
+  V=set()
   for v in filevars.keys():
     if '.' in v:
       v, v2 = v.split('.',1)

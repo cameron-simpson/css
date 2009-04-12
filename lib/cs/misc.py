@@ -7,6 +7,7 @@ import time
 from types import TupleType, ListType, DictType, DictionaryType
 from StringIO import StringIO
 from thread import allocate_lock
+if sys.hexversion < 0x02060000: from sets import Set as set
 from cs.lex import parseline, strlist
 
 def setcmd(ncmd):
@@ -835,15 +836,14 @@ class HasFlags:
     self.__flagfield=flagfield
 
   def __flaglist(self):
-    from sets import Set
     flagv=self[self.__flagfield]
     if flagv is None:
-      flagv=Set(())
+      flagv=set(())
     else:
       if type(flagv) is str:
         flagv=flagv.split(',')
-      if type(flagv) is not Set:
-        flagv=Set(flagv)
+      if type(flagv) is not set:
+        flagv=set(flagv)
 
     return flagv
 
