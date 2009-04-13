@@ -25,6 +25,10 @@ import re
 
 # regexp to match TYPE:name with optional #id suffix
 re_NODEREF = re.compile(r'([A-Z]+):([^:#]+)(#([0-9]+))?')
+# regexp to match name(, name)*
+re_NAMELIST = re.compile(r'([a-z][a-z0-9]+)(\s*,\s*([a-z][a-z0-9]+))*')
+# regexp to do comma splits
+re_COMMASEP = re.compile(r'\s*,\s*')
 
 def NODESTable(metadata, name=None):
   if name is None:
@@ -315,6 +319,18 @@ class Node(object):
           node_key = ":".join( (m.group(1), m.group(2)) )
           value = self._nodedb[node_key]
         else:
+          m = re_NAMELIST.match(ovalue)
+          if m is not None:
+            # name list
+            if attr == ("SUB%s"%self.TYPE):
+              for name in re_COMMASEP.split(ovalue):
+                value = self._nodedb["%s:%s" % (self.TYPE,name)]
+                attrs.setdefault(attr, []).append(value)
+            else:
+              for name in re_COMMASEP.split(ovalue):
+                value = self._nodedb["%s:%s" % (attr,name)]
+                attrs.setdefault(attr, []).append(value)
+            continue
           try:
             value = json.loads(ovalue)
           except ValueError, e:
@@ -454,7 +470,7 @@ class NodeDB(object):
       key = keys[0]
       if type(key) is int:
         return self.nodeById(key)
-      if type(key) is str:
+      if type(key) in StringTypes:
         if key[0] == '#':
           return self.nodeById(int(key[1:]))
         if key[0].isupper():
@@ -594,6 +610,18 @@ class TestAll(unittest.TestCase):
     self.host1.SUBHOST=self.host2
     parents=self.host2.parentsByAttr('SUBHOST')
     self.assertEqual(the(parents).ID, self.host1.ID)
+
+  def testTextload(self):
+    from StringIO import StringIO
+    nic1 = self.db.createNode('nic1', 'NIC')
+    nic2 = self.db.createNode('nic2', 'NIC')
+    self.db.commit()
+    H = self.host1
+    text = StringIO("".join( (
+              'SUBHOST        host1, host2\n',
+              'NIC            nic1, nic2\n', ) ))
+    H.textload(text)
+    H.textdump(sys.stdout)
 
   def _dont_testTextDump(self):
     self.host1.SUBHOST=self.host2
