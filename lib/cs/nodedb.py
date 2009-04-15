@@ -135,21 +135,29 @@ class Node(object):
   _MODE_DIRECT = 0              # FOO is just a cigar
   _MODE_BY_ID = 1               # node where node.ID in self.FOO_IDs
 
-  def __init__(self,_node,nodedb,attrs):
+  def __init__(self,_node,nodedb,attrs=None):
     ''' Initialise a new Node.
         We are supplied:
           _node, an sqlalchemy row object in the NODES table
           nodedb, the NodeDB with which this Node is associated
           attrs, a sequence of sqlalchemy row objects in the ATTRS table
+                 This may be None, in which case the setup is deferred.
     '''
-    self.__dict__['_node']=_node
-    self.__dict__['_attrs']=AttrMap(_node,nodedb,attrs)
-    self.__dict__['_nodedb']=nodedb
+    self.__dict__['_node'] = _node
+    if attrs is not None:
+      self.__dict__['_attrs'] = AttrMap(_node,nodedb,attrs)
+    self.__dict__['_nodedb'] = nodedb
     id=_node.ID
     if id in nodedb.nodeMap:
         print >>sys.stderr, "WARNING: Node.__init__: replacing %s with %s" % (nodedb.nodeMap[id],self)
     nodedb.nodeMap[id]=self
 
+  def __get_attrs(self):
+    nodedb = self._nodedb
+    attrs = nodedb.session.query(nodedb._Attr).filter(nodedb._Attr.NODE_ID == self.ID).all()
+    nodedb.session.add_all(attrs)
+    _attrs = self.__dict__['_attrs'] = AttrMap(self._node, nodedb,attrs)
+    return _attrs
   def __eq__(self,other):
     return self.ID == other.ID
   def __str__(self):
@@ -158,6 +166,8 @@ class Node(object):
     return "%s:%s#%d" % (self.TYPE,self.NAME,self.ID)
 
   def __getattr__(self,attr):
+    if attr == '_attrs':
+      return self.__get_attrs()
     mode, k, plural = self._parseAttr(attr)
     if mode is None:
       return getattr(self._node, attr)
@@ -421,7 +431,7 @@ class NodeDB(object):
   def commit(self):
     self.session.commit()
 
-  def _newNode(self,_node,attrs):
+  def _newNode(self,_node,attrs=None):
     return Node(_node,self,attrs)
 
   def createNode(self,name,type,attrs=None):
@@ -440,7 +450,7 @@ class NodeDB(object):
     self.session.flush()
     assert _node.ID is not None
 
-    N=self._newNode(_node,())
+    N=self._newNode(_node)
     for k, vs in attrlist:
       setattr(N,k+"s",vs)
 
@@ -512,7 +522,7 @@ class NodeDB(object):
         nodeAttrs.setdefault(attr.NODE_ID,[]).append(attr)
       # create the missing Node objects
       # and add them to the Ns list of Nodes
-      Ns.extend([ self._newNode(_node,nodeAttrs.get(_node.ID,()))
+      Ns.extend([ self._newNode(_node, nodeAttrs.get(_node.ID, ()))
                   for _node in self._nodesByIds(missingIds)
                 ])
 
