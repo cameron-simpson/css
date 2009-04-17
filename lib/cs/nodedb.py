@@ -204,7 +204,7 @@ class Node(object):
         print >>sys.stderr, "WARNING: Node.__init__: replacing %s with %s" % (nodedb.nodeMap[id],self)
     nodedb.nodeMap[id]=self
 
-  def __get_attrs(self):
+  def __load_attrs(self):
     nodedb = self._nodedb
     attrs = nodedb.session.query(nodedb._Attr).filter(nodedb._Attr.NODE_ID == self.ID).all()
     nodedb.session.add_all(attrs)
@@ -231,7 +231,7 @@ class Node(object):
     sys.stderr.flush()
     # fetch _attrs on demand
     if attr == '_attrs':
-      return self.__get_attrs()
+      return self.__load_attrs()
     k, plural = parseUC_sAttr(attr)
     assert k is not None, "no attribute \"%s\"" % (attr,)
     if k in ('ID','TYPE','NAME'):
@@ -265,6 +265,14 @@ class Node(object):
     k, plural = parseUC_sAttr(attr)
     assert k is not None and k not in ('ID', 'TYPE', 'NAME')
     del self._attrs[k]
+
+  def keys(self):
+    ''' Node attribute names, excluding ID, NAME, TYPE.
+    '''
+    return self._attrs.keys()
+
+  def get(self, attr, dflt):
+    return self._attrs.get(attr, dflt)
 
   def parentsByAttr(self, attr, type=None):
     ''' Return parent Nodes whose .attr field mentions this Node.
@@ -435,6 +443,8 @@ class NodeDB(object):
   def createNode(self,name,type,attrs=None):
     ''' Create a new Node in the database.
     '''
+    assert (name, type) not in self, "node %s:%s already exists" % (type, name)
+
     attrlist=[]
     if attrs is not None:
       for k, vs in attrs.items():
@@ -467,26 +477,24 @@ class NodeDB(object):
     self.session.add_all(_nodes)
     return _nodes
 
-  def _toNode(self,*keys):
+  def _toNode(self,key):
     ''' Flexible get-a-node function.
-        (int) -> nodeById(int)
-        ("#id") -> nodeById(int("id"))
+        int -> nodeById(int)
+        "#id" -> nodeById(int("id"))
         (name,type) -> nodeByNameAndType(name,type)
-        ("TYPE:name") -> nodeByNameAndType(name,type)
+        "TYPE:name" -> nodeByNameAndType(name,type)
     '''
-    if len(keys) == 1:
-      key = keys[0]
-      if type(key) is int:
-        return self.nodeById(key)
-      if type(key) in StringTypes:
-        if key[0] == '#':
-          return self.nodeById(int(key[1:]))
-        if key[0].isupper():
-          t, n = key.split(':',1)
-          return self.nodeByNameAndType(n, t)
-    elif len(keys) == 2:
-      return self.nodeByNameAndType(*keys)
-    raise ValueError, "can't map %s to Node" % (keys,)
+    if type(key) is int:
+      return self.nodeById(key)
+    if type(key) in StringTypes:
+      if key[0] == '#':
+        return self.nodeById(int(key[1:]))
+      if key[0].isupper():
+        t, n = key.split(':',1)
+        return self.nodeByNameAndType(n, t)
+    elif len(key) == 2:
+      return self.nodeByNameAndType(*key)
+    raise ValueError, "can't map %s to Node" % (key,)
 
   def _nodesByType(self,type):
     _nodes=self.session.query(self._Node).filter_by(TYPE=type).all()
@@ -602,7 +610,7 @@ class TestAll(unittest.TestCase):
     db=self.db
     self.assertEqual(db._toNode(1).ID, 1)
     self.assertEqual(db._toNode("#1").ID, 1)
-    self.assertEqual(db._toNode("host2","HOST").ID, 2)
+    self.assertEqual(db._toNode(("host2","HOST")).ID, 2)
     self.assertEqual(db._toNode("HOST:host2").ID, 2)
 
   def testParentsByAttr(self):
