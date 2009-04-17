@@ -6,10 +6,10 @@
 
 cmd=$0
 
-quiet=
-[ "x$1" = "x-q" ] && { quiet=1; shift; }
+quiet=1
+[ "x$1" = "x-v" ] && { quiet=; shift; }
 
-[ $# -gt 0 ] || { echo "Usage: $cmd { host | [host]@systemid }..." >&2; exit 2; }
+[ $# -gt 0 ] || { echo "Usage: $cmd [-v] { host | [host]@systemid }..." >&2; exit 2; }
 
 for target
 do
