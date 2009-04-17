@@ -4,6 +4,7 @@
 #       - Cameron Simpson <cs@zip.com.au> 25dec2008
 #
 
+from __future__ import with_statement
 from cs.mappings import isUC_, parseUC_sAttr
 import cs.sh
 from cs.misc import the, uniq
