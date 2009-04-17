@@ -58,7 +58,7 @@ def fieldInValues(column, values):
 
   # trivial case with one value
   if len(values) == 1:
-    return field == values[0]
+    return column == values[0]
 
   vmin = min(values)
   vmax = max(values)
@@ -77,7 +77,7 @@ def fieldInValues(column, values):
       return cond
 
   # the complicated case: select by range and check membership
-  cond = and_(cond, "%s in (%s)" % (field, ",".join(str(v) for v in values)))
+  cond = and_(cond, "%s in (%s)" % (column, ",".join(str(v) for v in values)))
   return cond
 
 class AttrMap(dict):
@@ -493,7 +493,7 @@ class NodeDB(object):
     self.session.add_all(_nodes)
     return _nodes
 
-  def _nodes2Nodes(self,_nodes,checkMap):
+  def _nodes2Nodes(self, _nodes, checkMap):
     ''' Take some _Node objects and return Nodes.
     '''
     ids=list(N.ID for N in _nodes)
@@ -508,19 +508,7 @@ class NodeDB(object):
       missingIds=ids
 
     if len(missingIds) > 0:
-      # obtain the attributes of the missing nodes
-      # obtain and track all the attribute rows for the nodes specified
-      # by missingIds
-      filter=fieldInValues(self.attrs.c.NODE_ID,missingIds)
-      attrs=self.session.query(self._Attr).filter(filter).all()
-      self.session.add_all(attrs)
-      # collate the attribute rows by NODE_ID
-      nodeAttrs={}
-      for attr in attrs:
-        nodeAttrs.setdefault(attr.NODE_ID,[]).append(attr)
-      # create the missing Node objects
-      # and add them to the Ns list of Nodes
-      Ns.extend([ self._newNode(_node, nodeAttrs.get(_node.ID, ()))
+      Ns.extend([ self._newNode(_node)
                   for _node in self._nodesByIds(missingIds)
                 ])
 
@@ -534,7 +522,7 @@ class NodeDB(object):
     Ns=list(nodeMap[id] for id in ids if id in nodeMap)
     missingIds=list(id for id in ids if id not in nodeMap)
     if len(missingIds) > 0:
-      Ns.extend(self._nodes2Nodes(self._nodesByIds(missingIds),checkMap=False))
+      Ns.extend(self._nodes2Nodes(self._nodesByIds(missingIds), checkMap=False))
     return Ns
 
   def nodeById(self,id):
