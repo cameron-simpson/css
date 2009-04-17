@@ -304,7 +304,7 @@ class Node(object):
           opattr = pattr
         ofp.write('%-15s %s\n' % (pattr, pvalue))
 
-  def textload(self, ifp):
+  def textload(self, ifp, createSubNodes=False):
     attrs = {}
     prev_attr = None
     for line in ifp:
@@ -333,18 +333,18 @@ class Node(object):
         if m is not None:
           # node ref
           node_key = ":".join( (m.group(1), m.group(2)) )
-          value = self._nodedb[node_key]
+          value = self._nodedb.nodeByNameAndType(m.group(2), m.group(1), doCreate=createSubNodes)
         else:
           m = re_NAMELIST.match(ovalue)
           if m is not None:
             # name list
             if attr == ("SUB%s"%self.TYPE):
               for name in re_COMMASEP.split(ovalue):
-                value = self._nodedb["%s:%s" % (self.TYPE,name)]
+                value = self._nodedb.nodeByNameAndType(name, self.TYPE, doCreate=createSubNodes)
                 attrs.setdefault(attr, []).append(value)
             else:
               for name in re_COMMASEP.split(ovalue):
-                value = self._nodedb["%s:%s" % (attr,name)]
+                value = self._nodedb.nodeByNameAndType(name,attr,doCreate=createSubNodes)
                 attrs.setdefault(attr, []).append(value)
             continue
           try:
@@ -374,7 +374,7 @@ class Node(object):
       if ovalue != value:
         setattr(self, plattr, value)
 
-  def edit(self, editor=None):
+  def edit(self, editor=None, createSubNodes=False):
     if editor is None:
       editor = os.environ.get('EDITOR', 'vi')
     T = tempfile.NamedTemporaryFile(delete=False)
@@ -383,7 +383,7 @@ class Node(object):
     qname = cs.sh.quotestr(T.name)
     os.system("%s %s" % (editor, qname))
     with closing(open(T.name)) as ifp:
-      self.textload(ifp)
+      self.textload(ifp, createSubNodes=createSubNodes)
     os.remove(T.name)
 
 # TODO: make __enter__/__exit__ for running a session?
