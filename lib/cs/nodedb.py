@@ -85,43 +85,98 @@ class AttrMap(dict):
       It applies changes to the db and then mirrors them in the in-memory dict.
   '''
   def __init__(self,node,nodedb,attrs):
-    ''' Initialise an AttrMap.
+    ''' Initialise an AttrMap, a mapping from attribute name to attribute
+        names to a list of attribute values.
         We are supplied:
           node, the enclosing Node object
           nodedb, the associated NodeDB object
           attrs, a sequence of sqlalchemy row objects in the ATTRS table
-        We must still collate the attrs into ATTR->(VALUE,...) pairs
-        for storage in the dict.
+        We keep the matching list of ATTRS row objects so that changes to the
+        attributes can be effected in the database.
+        There is one complication in the mix: 
+          For attribute values named FOO_ID, we keep the values indexed
+          under FOO, as direct Node links.
     '''
     dict.__init__(self)
     self.__node = node
     self.__nodedb = nodedb
+
+    # prefetch any Nodes with a single query
+    idlist = []
+    for A in attrs:
+      if A.ATTR.endswith('_ID'):
+        idlist.append(int(A.VALUE))
+    idmap = dict( [ (N.ID, N) for N in nodedb.nodesByIds(idlist) ] )
+
     # collate the attrs by ATTR value
     values_map = {}
     attrobjs_map = {}
     for A in attrs:
-      values_map.setdefault(A.ATTR,[]).append(A.VALUE)
-      attrobjs_map.setdefault(A.ATTR,[]).append(A)
+      attr = A.ATTR
+      attrobjs_map.setdefault(attr, []).append(A)
+      if attr.endswith('_ID'):
+        values_map.setdefault(attr[:-3],[]).append(idmap[int(A.VALUE)])
+      else:
+        values_map.setdefault(attr,[]).append(A.VALUE)
     dict.__init__(self, values_map.items())
     self.__attrObjs = dict(attrobjs_map.items())
 
-  def __setitem__(self,attr,value):
-    ''' Set the attribute 'attr' to 'value'.
-    '''
-    if attr in self:
-      del self[attr]
-    self.__attrObjs[attr] = [ self.__node.newattr(attr, v) for v in value ]
-    self.__nodedb.session.add_all(self.__attrObjs[attr])
-    # store a tuple so that we can't do append()s etc
-    dict.__setitem__(self, attr, tuple(value))
+  def __delobjs(self, attr):
+    objs = self.__attrObjs
+    for attrObj in objs[attr]:
+      self.__nodedb.session.delete(attrObj)
+    del objs[attr]
 
-  def __delitem__(self,attr):
+  def __contains__(self, attr):
+    if attr.endswith('_ID'):
+      return attr[:-3] in self
+    return dict.__contains__(self, attr)
+
+  def __getitem__(self, attr):
+    ''' Get the values stored for 'attr'.
+    '''
+    if attr.endswith('_ID'):
+      vs = [ v.ID for v in self[attr[:-3]] ]
+    else:
+      vs = dict.__getitem__(self,attr)
+    return vs
+
+  def __setitem__(self, attr, values):
+    ''' Set the attribute 'attr' to 'values'.
+    '''
+    if attr.endswith('_ID'):
+      # assign list of ints to FOO_ID
+      self[attr[:-3]] = [ self.__nodedb.nodeById(ID) for ID in values ]
+      return
+
+    objs = self.__attrObjs
+    idattr = attr+'_ID'
+    if idattr in objs:
+      assert attr not in self, "both %s and %s exist" % (attr, objattr)
+      self.__delobjs(idattr)
+    elif attr in objs:
+      self.__delobjs(attr)
+
+    if len(values) == 0:
+      return
+
+    if hasattr(values[0], 'ID'):
+      objattr = idattr
+      newobjs = [ self.__node.newattr(objattr, v.ID) for v in values ]
+    else:
+      objattr = attr
+      newobjs = [ self.__node.newattr(attr, v) for v in values ]
+
+    self.__nodedb.session.add_all(newobjs)
+    self.__attrObjs[objattr] = newobjs
+
+    # store a tuple so that we can't do append()s etc
+    dict.__setitem__(self, attr, tuple(values))
+
+  def __delitem__(self, attr):
     ''' Remove the named attibute.
     '''
-    self.__nodedb.session.flush()
-    for attrObj in self.__attrObjs[attr]:
-      self.__nodedb.session.delete(attrObj)
-    dict.__delitem__(self,attr)
+    self.__setitem__(attr, ())
 
 class Node(object):
   ''' A node in the node db.
@@ -131,9 +186,6 @@ class Node(object):
         TYPE, the node type
       Other uppercase attributes are node attributes.
   '''
-
-  _MODE_DIRECT = 0              # FOO is just a cigar
-  _MODE_BY_ID = 1               # node where node.ID in self.FOO_IDs
 
   def __init__(self,_node,nodedb,attrs=None):
     ''' Initialise a new Node.
@@ -156,34 +208,63 @@ class Node(object):
     nodedb = self._nodedb
     attrs = nodedb.session.query(nodedb._Attr).filter(nodedb._Attr.NODE_ID == self.ID).all()
     nodedb.session.add_all(attrs)
-    _attrs = self.__dict__['_attrs'] = AttrMap(self._node, nodedb,attrs)
+    _attrs = self.__dict__['_attrs'] = AttrMap(self._node, nodedb, attrs)
     return _attrs
   def __eq__(self,other):
     return self.ID == other.ID
   def __str__(self):
-    return "%s:%s" % (self.TYPE,self.NAME)
+    return "%s:%s" % (self.TYPE, self.NAME)
   def __repr__(self):
-    return "%s:%s#%d" % (self.TYPE,self.NAME,self.ID)
+    return "%s:%s#%d" % (self.TYPE, self.NAME, self.ID)
+
+  def __hasattr__(self,attr):
+    k, plural = parseUC_sAttr(attr)
+    if k is None:
+      return False
+    if k in ('ID', 'NAME', 'TYPE'):
+      return not plural
+    if k.endswith('_ID'):
+      return k[:-3] in self._attrs
+    return k in self._attrs
 
   def __getattr__(self,attr):
+    sys.stderr.flush()
+    # fetch _attrs on demand
     if attr == '_attrs':
       return self.__get_attrs()
-    mode, k, plural = self._parseAttr(attr)
-    if mode is None:
-      return getattr(self._node, attr)
-    if mode == Node._MODE_DIRECT:
-      if k not in self._attrs:
-        values=()
-      else:
-        values=self._attrs[k]
-    elif mode == Node._MODE_BY_ID:
-      values=self._nodedb.nodesByIds(self._attrs[k+"_ID"])
+    k, plural = parseUC_sAttr(attr)
+    assert k is not None, "no attribute \"%s\"" % (attr,)
+    if k in ('ID','TYPE','NAME'):
+      assert not plural, "can't pluralise .%s" % (k,)
+      return getattr(self._node, k)
+    if k not in self._attrs:
+      values=()
     else:
-      assert False, " unimplemented mode %s (attr=%s: k=%s, plural=%s)" \
-                        % (mode, attr, k, plural)
+      values=self._attrs[k]
     if plural:
       return tuple(values)
+    if len(values) != 1:
+      raise IndexError, "k=%s, plural=%s, values=%s" % (k,plural,values)
     return the(values)
+
+  def __setattr__(self,attr,value):
+    k, plural = parseUC_sAttr(attr)
+    assert k is not None and k != 'ID', "refusing to set .%s" % (k,)
+    if k == 'NAME':
+      assert not plural
+      self._node.NAME=value
+    elif attr == 'TYPE':
+      assert not plural
+      self._node.TYPE=value
+    else:
+      if not plural:
+        value=(value,)
+      self._attrs[k]=value
+
+  def __delattr__(self,attr):
+    k, plural = parseUC_sAttr(attr)
+    assert k is not None and k not in ('ID', 'TYPE', 'NAME')
+    del self._attrs[k]
 
   def parentsByAttr(self, attr, type=None):
     ''' Return parent Nodes whose .attr field mentions this Node.
@@ -197,87 +278,6 @@ class Node(object):
       nodes = [ N for N in nodes if N.TYPE == type ]
     return nodes
 
-  def __hasattr__(self,attr):
-    mode, k, plural = self._parseAttr(attr)
-    if mode is None:
-      return attr in ('ID', 'NAME', 'TYPE')
-
-    if mode == Node._MODE_DIRECT:
-      ks = self._attrs.get(k, ())
-      return len(ks) > 0
-
-    if mode == Node._MODE_BY_ID:
-      return True
-
-    return False
-
-  def __setattr__(self,attr,value):
-    mode, k, plural = self._parseAttr(attr)
-    if mode is None:
-      assert k != 'ID', "cannot set node.ID"
-      if k == 'NAME':
-        self._node.NAME=value
-      elif attr == 'TYPE':
-        self._node.TYPE=value
-      else:
-        assert False, "setattr(Node.%s): invalid attribute" % attr
-      return
-
-    if not plural:
-      value=(value,)
-    else:
-      value=tuple(value)
-
-    if mode == Node._MODE_DIRECT:
-      if len(value) > 0 and hasattr(value[0], 'ID'):
-        assert not k.endswith('_ID'), \
-               "setattr(Node.%s): can't assign Nodes to _ID attributes" \
-               % attr
-        self._attrs[k+'_ID']=tuple( v.ID for v in value )
-      else:
-        self._attrs[k]=value
-      return
-
-    if mode == Node._MODE_BY_ID:
-      self._attrs[k+'_ID']=tuple( v.ID for v in value )
-      return
-
-    assert False, "setattr(Node.%s): unsupported mode: %s" % (attr, mode)
-
-  def __delattr__(self,attr):
-    mode, k, plural = self._parseAttr(attr)
-    assert mode is not None and mode == Node._MODE_DIRECT
-    del self._attrs[k]
-
-  def _parseAttr(self,attr):
-    ''' Parse an attribute name and return mode, name, plural
-          Non-intercepted name (bah): None, attr, None
-          attr => k, plural
-          FOO: if len(FOO) > 0:    _MODE_DIRECT, k, plural
-               if len(FOO_ID) > 0, _MODE_BY_ID, k, plural
-                                   node where node.ID in self.FOO_IDs
-               return FOO          _MODE_DIRECT, k, plural
-          FOO_ID:                  _MODE_DIRECT, k, plural
-    '''
-    k, plural = parseUC_sAttr(attr)
-    if k is None \
-    or k == 'TYPE' or k == 'NAME' or k == 'ID':
-      # raw attr, not to be intercepted
-      return None, attr, None
-    if k.endswith('_ID'):
-      return Node._MODE_DIRECT, k, plural
-    _attrs=self._attrs
-    ks = _attrs.get(k, ())
-    if len(ks) > 0:
-      # FOO really exists, use it
-      return Node._MODE_DIRECT, k, plural
-    k_IDs = _attrs.get(k+"_ID", ())
-    if len(k_IDs) > 0:
-      # node where node.ID in self.FOO_IDs
-      return Node._MODE_BY_ID, k, plural
-    # no FOO, no FOO_ID, use FOO directly
-    return Node._MODE_DIRECT, k, plural
-
   def textdump(self, ofp):
     ofp.write("# %s\n" % (repr(self),))
     attrnames = self._attrs.keys()
@@ -286,10 +286,8 @@ class Node(object):
     for attr in attrnames:
       pattr = attr
       for value in self._attrs[attr]:
-        pvalue = value
-        if attr.endswith('_ID'):
-          pvalue = str(self._nodedb.nodeById(int(value)))
-          pattr = attr[:-3]
+        if hasattr(value,'ID'):
+          pvalue=str(value)
         else:
           pvalue = json.dumps(value)
         if opattr is not None and opattr == pattr:
@@ -529,6 +527,9 @@ class NodeDB(object):
     return Ns
 
   def nodesByIds(self,ids):
+    ''' Return the Nodes from the corresponding list if Node.ID values.
+        Note: the returned nodes may not be in the same order as the ids.
+    '''
     nodeMap=self.nodeMap
     Ns=list(nodeMap[id] for id in ids if id in nodeMap)
     missingIds=list(id for id in ids if id not in nodeMap)
