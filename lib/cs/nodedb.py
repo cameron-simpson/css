@@ -304,9 +304,18 @@ class Node(object):
       pattr = attr
       for value in self._attrs[attr]:
         if hasattr(value,'ID'):
-          pvalue=str(value)
+          if attr == "SUB"+self.TYPE and value.TYPE == self.TYPE:
+            pvalue = value.NAME
+          elif attr == value.TYPE:
+            pvalue = value.NAME
+          else:
+            pvalue = str(value)
         else:
-          pvalue = json.dumps(value)
+          m = re_BAREURL.match(value)
+          if m is not None and m.end() == len(value):
+            pvalue = value
+          else:
+            pvalue = json.dumps(value)
         if opattr is not None and opattr == pattr:
           pattr = ''
         else:
@@ -340,10 +349,8 @@ class Node(object):
                                              doCreate=createSubNodes)
       return value, valuetxt[m.end():]
 
-    print >>sys.stderr, "try re_NAME against \"%s\"" % (valuetxt,)
     m = re_NAME.match(valuetxt)
     if m is not None:
-      print >>sys.stderr, "re_NAME matched \"%s\"" % (m.group(),)
       if attr == "SUB"+self.TYPE:
         value = self._nodedb.nodeByNameAndType(m.group(),
                                                self.TYPE,
@@ -353,8 +360,6 @@ class Node(object):
                                                attr,
                                                doCreate=createSubNodes)
       return value, valuetxt[m.end():]
-    else:
-      print >>sys.stderr, "re_NAME FAILED at \"%s\"" % (valuetxt,)
 
     raise ValueError, "can't tokenise: %s" % (valuetxt,)
 
@@ -366,7 +371,6 @@ class Node(object):
         valuetxt = valuetxt[1:]
       else:
         value, valuetxt = self.gettoken(attr, valuetxt, createSubNodes=createSubNodes)
-        print >>sys.stderr, "tokenise: got %s/%s" % (value, valuetxt)
         values.append(value)
       valuetxt = valuetxt.lstrip()
     return values
@@ -667,7 +671,7 @@ class TestAll(unittest.TestCase):
     H.textload(text)
     H.textdump(sys.stdout)
 
-  def _dont_testTextDump(self):
+  def testTextDump(self):
     self.host1.SUBHOST=self.host2
     self.host1.textdump(sys.stdout)
 
