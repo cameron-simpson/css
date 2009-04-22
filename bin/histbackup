@@ -91,6 +91,7 @@ dest=
 linkonly=
 rrsync=rsync
 usehbinclude=1
+usehbfiles=1
 rsopts=
 rsdelete=--delete
 verbose=
@@ -107,6 +108,7 @@ usage="Usage:
         --delete        Pass --delete to rsync.
 	--delete-excluded
 			Pass --delete --delete-excluded to rsync.
+        --no-hbfiles    Do not honour the .hbfiles file in the backup directory.
         --no-hbinclude  Do not honour the .hbinclude file in the backup directory.
 	--no-rsync      Don't do the rsync pass - just set up the new link tree
 			and report its basename.
@@ -175,6 +177,14 @@ do
     #
     --delete-excluded)
       rsdelete='--delete --delete-excluded'
+      ;;
+
+    # =item --no-hbfiles
+    #
+    # Do not honour the .hbfiles file in the backup directory.
+    # 
+    --no-hbfiles)
+      usehbfiles=1
       ;;
 
     # =item --no-hbinclude
@@ -285,7 +295,20 @@ then  echo=echo
 else  echo=:
 fi
 
-# =head1 CUSTOMISATION FILE
+# =head1 CUSTOMISATION FILES
+#
+# If the file I<backupdir>/F<.hfiles> is present
+# the options B<"-r --files-from=>I<backupdir>/F<.hbinclude>
+# will be added to the I<rsync> command invocation.
+# In this way specific contents may be backed up.
+# See rsync(1).
+#
+if [ $usehbfiles ]
+then
+  hbfiles=$dest/.hbfiles
+  [ -s "$hbfiles" ] && set -- ${1+"$@"} -r "--files-from=$hbfiles"
+fi
+
 #
 # If the file I<backupdir>/F<.hbinclude> is present
 # the option B<"--include-from=>I<backupdir>/F<.hbinclude>
