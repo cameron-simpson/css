@@ -26,6 +26,14 @@ import re
 
 # regexp to match TYPE:name with optional #id suffix
 re_NODEREF = re.compile(r'([A-Z]+):([^:#]+)(#([0-9]+))?')
+# regexp to match a bareword name
+re_NAME = re.compile(r'[a-z][a-z0-9]*(?![a-zA-Z0-9_])')
+# JSON string expression, lenient
+re_STRING = re.compile(r'"([^"\\]|\\.)*"')
+# JSON simple integer
+re_INT = re.compile(r'-?[0-9]+')
+# "bare" URL
+re_BAREURL = re.compile(r'[a-z]+://[-a-z0-9.]+/[-a-z0-9_.]+')
 # regexp to match name(, name)*
 re_NAMELIST = re.compile(r'([a-z][a-z0-9]+)(\s*,\s*([a-z][a-z0-9]+))*')
 # regexp to do comma splits
@@ -47,7 +55,7 @@ def ATTRSTable(metadata, name=None):
                Column('ID', Integer, primary_key=True, nullable=False),
                Column('NODE_ID', Integer, nullable=False, index=True),
                Column('ATTR', String(64), nullable=False, index=True),
-               Column('VALUE', String(1024)),
+               Column('VALUE', String(900)), # mysql max index key len is 1000
               )
 
 def fieldInValues(column, values):
@@ -296,14 +304,76 @@ class Node(object):
       pattr = attr
       for value in self._attrs[attr]:
         if hasattr(value,'ID'):
-          pvalue=str(value)
+          if attr == "SUB"+self.TYPE and value.TYPE == self.TYPE:
+            pvalue = value.NAME
+          elif attr == value.TYPE:
+            pvalue = value.NAME
+          else:
+            pvalue = str(value)
         else:
-          pvalue = json.dumps(value)
+          m = re_BAREURL.match(value)
+          if m is not None and m.end() == len(value):
+            pvalue = value
+          else:
+            pvalue = json.dumps(value)
         if opattr is not None and opattr == pattr:
           pattr = ''
         else:
           opattr = pattr
         ofp.write('%-15s %s\n' % (pattr, pvalue))
+
+  def gettoken(self, attr, valuetxt, createSubNodes=False):
+    ''' Method to extract a token from the start of a string.
+        It is intended to be subclassed to add recognition for
+        such things as IP addresses, etc.
+    '''
+    m = re_STRING.match(valuetxt)
+    if m is not None:
+      value = json.loads(m.group())
+      return value, valuetxt[m.end():]
+
+    m = re_INT.match(valuetxt)
+    if m is not None:
+      value = int(m.group())
+      return value, valuetxt[m.end():]
+
+    m = re_BAREURL.match(valuetxt)
+    if m is not None:
+      value = m.group()
+      return value, valuetxt[m.end():]
+
+    m = re_NODEREF.match(valuetxt)
+    if m is not None:
+      value = self._nodedb.nodeByNameAndType(m.group(2),
+                                             m.group(1),
+                                             doCreate=createSubNodes)
+      return value, valuetxt[m.end():]
+
+    m = re_NAME.match(valuetxt)
+    if m is not None:
+      if attr == "SUB"+self.TYPE:
+        value = self._nodedb.nodeByNameAndType(m.group(),
+                                               self.TYPE,
+                                               doCreate=createSubNodes)
+      else:
+        value = self._nodedb.nodeByNameAndType(m.group(),
+                                               attr,
+                                               doCreate=createSubNodes)
+      return value, valuetxt[m.end():]
+
+    raise ValueError, "can't tokenise: %s" % (valuetxt,)
+
+  def tokenise(self, attr, valuetxt, createSubNodes=False):
+    values = []
+    valuetxt = valuetxt.strip()
+    while len(valuetxt) > 0:
+      if valuetxt[0] == ',':
+        valuetxt = valuetxt[1:]
+      else:
+        value, valuetxt = self.gettoken(attr, valuetxt, createSubNodes=createSubNodes)
+        values.append(value)
+      valuetxt = valuetxt.lstrip()
+    return values
 
   def textload(self, ifp, createSubNodes=False):
     attrs = {}
@@ -324,41 +394,11 @@ class Node(object):
         attr, value = line.split(None, 1)
         prev_attr = attr
         assert isUC_(attr), "%s: invalid attribute name \"%s\"" % (str(ifp), attr)
-      ovalue = value
-      if attr.endswith('_ID'):
-        # node.ID
-        value = self._nodedb.nodeById(int(ovalue))
-        attr = attr[:-3]
-      else:
-        m = re_NODEREF.match(ovalue)
-        if m is not None:
-          # node ref
-          node_key = ":".join( (m.group(1), m.group(2)) )
-          value = self._nodedb.nodeByNameAndType(m.group(2), m.group(1), doCreate=createSubNodes)
-        else:
-          m = re_NAMELIST.match(ovalue)
-          if m is not None:
-            # name list
-            if attr == ("SUB%s"%self.TYPE):
-              for name in re_COMMASEP.split(ovalue):
-                value = self._nodedb.nodeByNameAndType(name, self.TYPE, doCreate=createSubNodes)
-                attrs.setdefault(attr, []).append(value)
-            else:
-              for name in re_COMMASEP.split(ovalue):
-                value = self._nodedb.nodeByNameAndType(name,attr,doCreate=createSubNodes)
-                attrs.setdefault(attr, []).append(value)
-            continue
-          try:
-            value = json.loads(ovalue)
-          except ValueError, e:
-            value = ovalue
-          t = type(value)
-          if t is int:
-            value = str(value)
-          elif type(value) not in StringTypes:
-            raise ValueError, "%s: %s: forbidden JSON expression (not int or str): %s" % (str(ifp), attr, value)
+      assert not attr.endswith('_ID'), "%s: invalid attribute name \"%s\" - foo_ID forbidden" % (str(ifp), attr)
 
-      attrs.setdefault(attr, []).append(value)
+      ovalue = value
+      for value in self.tokenise(attr, ovalue, createSubNodes=createSubNodes):
+        attrs.setdefault(attr, []).append(value)
 
     oldattrnames = self._attrs.keys()
     oldattrnames.sort()
@@ -631,7 +671,7 @@ class TestAll(unittest.TestCase):
     H.textload(text)
     H.textdump(sys.stdout)
 
-  def _dont_testTextDump(self):
+  def testTextDump(self):
     self.host1.SUBHOST=self.host2
     self.host1.textdump(sys.stdout)
 
