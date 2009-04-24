@@ -128,7 +128,7 @@ class Attr(object):
       if _attr is None:
         print >>sys.stderr, "==> make new _Attr"
         assert value.ID is not None
-        _A = self.node.nodedb._Attr(self.node.ID, self.NAME+'_ID', value.ID)
+        _A = self.node.nodedb._Attr(self.node.ID, self.NAME+'_ID', str(value.ID))
         self.node.nodedb.session.add(_A)
         self.__set_attr(_A)
       else:
