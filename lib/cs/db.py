@@ -9,7 +9,7 @@ import sys
 import string
 import types
 import datetime
-from sets import Set
+if sys.hexversion < 0x02060000: from sets import Set as set
 import cs.secret
 import cs.cache
 from cs.misc import cmderr, debug, ifdebug, warn, isodate, the, WithUC_Attrs
@@ -133,7 +133,7 @@ def sqlise(v):
   if t is datetime.date:
     v=str(v)
     t=type(v)
-  elif t is Set:
+  elif t is set:
     v=" ".join(v)
     t=type(v)
 

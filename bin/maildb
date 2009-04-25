@@ -67,7 +67,6 @@ else:
   print >>sys.stderr, "%s: unimplemented operation: %s" % (cmd, op)
   xit=1
 
-os.system('set -x; lsof -p %d' % os.getpid())
 DB.session.commit()
 
 sys.exit(xit)
