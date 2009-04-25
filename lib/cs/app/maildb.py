@@ -13,8 +13,10 @@ import os
 AddressNode=Node
 PersonNode=Node
 class MessageNode(Node):
-  def message_id(self):
-    return self.MESSAGEID
+  def references(self):
+    return [ N for N in self.parentsByAttr('FOLLOWUPS') if N.TYPE == 'MESSAGE' ]
+  def followups(self):
+    return self.FOLLOWUPS
 
 TypeFactory = { 'MESSAGE':      MessageNode,
                 'PERSON':       PersonNode,
