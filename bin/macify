@@ -32,7 +32,7 @@ import os.path
 import sys
 import unicodedata
 from cs.misc import cmd, cmderr
-import cs.mac
+import cs.macosx
 
 SrcEncoding='iso8859-1'
 
@@ -42,7 +42,7 @@ if len(sys.argv) == 1:
   for line in sys.stdin:
     name=cs.misc.chomp(line)
     print name
-    print cs.mac.nfd(name,SrcEncoding)
+    print cs.macosx.nfd(name,SrcEncoding)
   sys.exit(0)
 
 if len(sys.argv) != 3:
@@ -73,7 +73,7 @@ def macifydir(srcdir,macdir,srcencoding='iso8859-1'):
 
   for name in files:
     path=os.path.join(srcdir,name)
-    macpath=os.path.join(macdir,cs.mac.nfd(name,srcencoding))
+    macpath=os.path.join(macdir,cs.macosx.nfd(name,srcencoding))
     if os.path.isfile(macpath):
       s1=os.lstat(path)
       s2=os.lstat(macpath)
@@ -93,7 +93,7 @@ def macifydir(srcdir,macdir,srcencoding='iso8859-1'):
 
   for name in dirs:
     path=os.path.join(srcdir,name)
-    macpath=os.path.join(macdir,cs.mac.nfd(name,srcencoding))
+    macpath=os.path.join(macdir,cs.macosx.nfd(name,srcencoding))
     macifydir(path,macpath,srcencoding)
 
 macifydir(srcdir,macdir)
