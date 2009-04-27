@@ -840,6 +840,7 @@ class TestAll(unittest.TestCase):
 
   def testToNode(self):
     db=self.db
+    db.apply()  # no node IDs until we do this, so _toNode(1) is nonsense
     self.assertEqual(db._toNode(1).ID, 1)
     self.assertEqual(db._toNode("#1").ID, 1)
     self.assertEqual(db._toNode(("host2","HOST")).ID, 2)
