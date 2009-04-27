@@ -58,13 +58,14 @@ def ATTRSTable(metadata, name=None):
                Column('ID', Integer, primary_key=True, nullable=False),
                Column('NODE_ID', Integer, nullable=False, index=True),
                Column('ATTR', String(64), nullable=False, index=True),
-               Column('VALUE', String(900)), # mysql max index key len is 1000
+               # mysql max index key len is 1000, so VALUE only 900
+               Column('VALUE', String(900), index=True),
               )
 
-def fieldInValues(column, values):
+def columnInValues(column, values):
   # return an SQLAlchemy condition that tests a column
   # for integral values
-  assert len(values) > 0, "fieldInValues(%s, %s) with no values" % (column, values)
+  assert len(values) > 0, "columnInValues(%s, %s) with no values" % (column, values)
   if not isinstance(values,list):
     values = values[:]
 
@@ -120,19 +121,16 @@ class Attr(object):
     ''' Apply pending changes to the backend.
         Does not imply a commit to the database.
     '''
-    print >>sys.stderr, "==> apply %s" % (self,)
     value = self.VALUE
     _attr = self._attr
     assert _attr is not INVALID, "apply called on discarded Attr(%s)" % (self,)
     if hasattr(value, 'ID'):
       if _attr is None:
-        print >>sys.stderr, "==> make new _Attr"
         assert value.ID is not None
         _A = self.node.nodedb._Attr(self.node.ID, self.NAME+'_ID', str(value.ID))
         self.node.nodedb.session.add(_A)
         self.__set_attr(_A)
       else:
-        print >>sys.stderr, "==> update _attr.VALUE from %s to %s?" % (_attr.VALUE, value.ID)
         assert _attr.NAME == self.NAME+'_ID'
         if _attr.VALUE != value.ID:
           _attr.VALUE = value.ID
@@ -163,8 +161,6 @@ class AttrMap(dict):
         dict.__setitem__(self, attr, values)
 
   def __setitem__(self, attr, values):
-    if attr.startswith('SUBHOST'):
-      print >>sys.stderr, "*** setitem[%s]=%s" % (attr, values)
     dict.__setitem__(self, attr,
                      [ Attr(self.__node, attr, v) for v in values ]
                     )
@@ -199,7 +195,6 @@ class Node(object):
     ''' Apply pending changes to the database.
         Does not do a database commit.
     '''
-    print >>sys.stderr, "****** apply(%s)" % (self,)
     _node = self._node
     if _node is None:
       _node = self.__load_node()
@@ -209,7 +204,6 @@ class Node(object):
       if _node.TYPE != self.TYPE:
         _node.TYPE = self.TYPE
     for attr, values in self.attrs.items():
-      print >>sys.stderr, "****** %s: apply %s=%s" % (self, attr, values)
       for v in values:
         v.apply()
     self.nodedb._applied(self)
@@ -330,7 +324,6 @@ class Node(object):
       return
     if not plural:
       value=(value,)
-    print >>sys.stderr, "*** Node.setattr(k=%s, value=%s)" % (k,value)
     self.attrs[k]=value
 
   def __delattr__(self,attr):
@@ -345,7 +338,6 @@ class Node(object):
 
   def get(self, attr, dflt):
     return self.attrs.get(attr, dflt)
-
 
   def parentsByAttr(self, attr, nodetype=None):
     ''' Return parent Nodes whose .attr field mentions this Node.
@@ -548,17 +540,8 @@ class NodeDB(object):
     '''
     id = N.ID
     nodeMap = self._nodeMap
-    if id in nodeMap:
-      print >>sys.stderr, "id %d already in nodeMap: %s (self=%s)" % (id, nodeMap[id], N)
-      assert False
-    if id in nodeMap:
-      N2 = nodeMap[id]
-      if N is N2:
-        print >>sys.stderr, "repeated _noteNodeID of %s" % (N,)
-      else:
-        print >>sys.stderr, "N=%s, N2=%s (id=%d)" % (N, N2, id)
-    else:
-      nodeMap[id] = N
+    assert id not in nodeMap
+    nodeMap[id] = N
 
   def _noteNodeNameAndType(self, N):
     name, nodetype = N.NAME, N.TYPE
@@ -640,7 +623,7 @@ class NodeDB(object):
   def _nodesByIds(self, ids):
     ''' Take some NODES.ID values and return _Node objects.
     '''
-    filter=fieldInValues(self.nodes.c.ID,ids)
+    filter=columnInValues(self.nodes.c.ID, ids)
     _nodes=self.session.query(self._Node).filter(filter).all()
     self.session.add_all(_nodes)
     return _nodes
@@ -719,7 +702,7 @@ class NodeDB(object):
     raise IndexError, "no node matching NAME=%s and TYPE=%s" % (name, nodetype)
 
   def nodesByType(self, nodetype):
-    return self._nodes2Nodes(self._nodesByType(nodetype), checkMap=True)
+    return self._nodes2Nodes(self._nodesByType(nodetype))
 
   def nodesByAttrValue(self,attr,value):
     ''' Return nodes with an attribute value as specified.
@@ -782,7 +765,6 @@ class TestAll(unittest.TestCase):
     self.host1.SUBHOST=self.host2
     parents=self.host2.parentsByAttr('SUBHOST')
     parents=list(parents)
-    print >>sys.stderr, "====== parents = %s" % (parents,)
     self.assertEqual(the(parents).ID, self.host1.ID)
 
   def testTextload(self):
