@@ -19,10 +19,13 @@ from contextlib import closing
 from types import StringTypes
 import tempfile
 import sys
-if sys.hexversion < 0x02060000: from sets import Set as set
+if sys.hexversion < 0x02060000:
+  from sets import Set as set
+  import simplejson as json
+else:
+  import json
 import os
 import unittest
-import json
 import re
 
 INVALID = "INVALID"     # sentinel, distinct from None
@@ -108,6 +111,9 @@ class Attr(object):
   def __set_attr(self, _A):
     self._attr = _A
     ##self.node.nodedb._setAttrBy_Attr(self, _A)
+    if _A is not None:
+      # record mapping from _Attr to Attr
+      self.node.nodedb._note_Attr(_A, self)
 
   def _changed(self):
     self.node._changed()
@@ -146,10 +152,9 @@ class Attr(object):
   def discard(self):
     ''' Mark this attribute as invalid.
     '''
-    assert self._attr is INVALID, "repeated call to discard(%s)" % (self,)
+    assert self._attr is not INVALID, "repeated call to discard(%s)" % (self,)
     if self._attr is not None:
-      raise NotImplementedError, \
-        "need to DELETE %s from database" % (self._attr,)
+      self.node.nodedb.session.delete(self._attr)
     self._attr = INVALID
 
 class AttrMap(dict):
@@ -161,6 +166,9 @@ class AttrMap(dict):
         dict.__setitem__(self, attr, values)
 
   def __setitem__(self, attr, values):
+    if attr in self:
+      for A in dict.__getitem__(self, attr):
+        A.discard()
     dict.__setitem__(self, attr,
                      [ Attr(self.__node, attr, v) for v in values ]
                     )
@@ -248,16 +256,16 @@ class Node(object):
                              .all()
       nodedb.session.add_all(_attrs)
       for _A in _attrs:
-        attr = nodedb.getAttrBy_Attr(_A, None)
+        attr = nodedb.getAttrBy_Attr(self, _A, None)
         if attr is None:
-          name = _A.NAME
+          name = _A.ATTR
           value = _A.VALUE
           if name.endswith('_ID'):
             name_id = name
             name = name[:-3]
             value = nodedb.nodeById(int(value))
           attr = Attr(self, name, value, _A)
-        attrs.setdefault(name,[]).append(value)
+        attrs.setdefault(name,[]).append(attr)
       attrs = AttrMap(self, attrs)
     self.__dict__['attrs'] = attrs
     return attrs
@@ -426,13 +434,24 @@ class Node(object):
     values = []
     valuetxt = valuetxt.strip()
     while len(valuetxt) > 0:
-      if valuetxt[0] == ',':
-        valuetxt = valuetxt[1:]
-      else:
-        value, valuetxt = self.gettoken(attr, valuetxt, createSubNodes=createSubNodes)
-        values.append(value)
+      value, valuetxt = self.gettoken(attr, valuetxt, createSubNodes=createSubNodes)
+      values.append(value)
       valuetxt = valuetxt.lstrip()
+      assert len(valuetxt) == 0 or valuetxt.startswith(','), \
+        "expected comma, got \"%s\"" % (valuetxt,)
+      if valuetxt.startswith(','):
+        valuetxt = valuetxt[1:].lstrip()
+      assert len(valuetxt) == 0 or not valuetxt.startswith(','), \
+        "unexpected second comma at \"%s\"" % (valuetxt,)
     return values
+
+  def assign(self, assignment, createSubNodes=False):
+    ''' Take a string of the form ATTR=values and apply it.
+    '''
+    attr, valuetxt = assignment.split('=', 1)
+    assert isUC_(attr), "invalid attribute name \"%s\"" % (attr, )
+    values = self.tokenise(attr, valuetxt, createSubNodes=createSubNodes)
+    setattr(self, attr+'s', values)
 
   def textload(self, ifp, createSubNodes=False):
     attrs = {}
@@ -477,14 +496,18 @@ class Node(object):
   def edit(self, editor=None, createSubNodes=False):
     if editor is None:
       editor = os.environ.get('EDITOR', 'vi')
-    T = tempfile.NamedTemporaryFile(delete=False)
+    if sys.hexversion < 0x02060000:
+      T = tempfile.NamedTemporaryFile()
+    else:
+      T = tempfile.NamedTemporaryFile(delete=False)
     self.textdump(T)
-    T.close()
+    T.flush()
     qname = cs.sh.quotestr(T.name)
     os.system("%s %s" % (editor, qname))
     with closing(open(T.name)) as ifp:
       self.textload(ifp, createSubNodes=createSubNodes)
     os.remove(T.name)
+    T.close()
 
 # TODO: make __enter__/__exit__ for running a session?
 class NodeDB(object):
@@ -510,6 +533,7 @@ class NodeDB(object):
     self.__Session=sessionmaker(bind=engine)
     session=self.session=self.__Session()
     self._nodeMap=WeakValueDictionary()
+    self._attrMap=WeakValueDictionary()
     self._changedNodes = set()
     class _Attr(object):
       ''' An object mapper class for a single attribute row.
@@ -534,6 +558,18 @@ class NodeDB(object):
         return _Attr(self.ID,attr,value)
     mapper(_Node, nodes)
     self._Node=_Node
+
+  def _note_Attr(self, _A, attr):
+    assert _A.ID not in self._attrMap
+    self._attrMap[_A.ID] = attr
+
+  def getAttrBy_Attr(self, N, _A, doCreate=False):
+    if _A.ID not in self._attrMap:
+      if doCreate is None:
+        return doCreate
+      if doCreate:
+        attr = Attr(N, _A.NAME, _A.VALUE, _A)
+    return self._attrMap[_A.ID]
 
   def _noteNodeID(self, N):
     ''' Record the database NODE_ID->Node mapping in the nodeMap.
@@ -742,6 +778,11 @@ class TestAll(unittest.TestCase):
     host1.ATTR2s=[5,6,7]
     self.assertEqual(host1.ATTR2s, (5,6,7))
     self.assertRaises(IndexError, getattr, host1, 'ATTR2')
+
+  def testTextAssign(self):
+    self.host1.assign("IPADDR=\"172.10.0.1\"")
+    self.assertEqual(self.host1.IPADDR, "172.10.0.1")
+    self.host1.textdump(sys.stdout); sys.stdout.flush()
 
   def testAssignNode(self):
     db=self.db
