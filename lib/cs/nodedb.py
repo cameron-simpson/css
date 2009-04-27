@@ -25,6 +25,7 @@ if sys.hexversion < 0x02060000:
 else:
   import json
 import os
+import os.path
 import unittest
 import re
 
@@ -44,6 +45,11 @@ re_BAREURL = re.compile(r'[a-z]+://[-a-z0-9.]+/[-a-z0-9_.]+')
 re_NAMELIST = re.compile(r'([a-z][a-z0-9]+)(\s*,\s*([a-z][a-z0-9]+))*')
 # regexp to do comma splits
 re_COMMASEP = re.compile(r'\s*,\s*')
+
+def isNode(N):
+  ''' Test is an object is duck-typed like a Node.
+  '''
+  return hasattr(N, 'NAME') and hasattr(N, 'TYPE')
 
 def NODESTable(metadata, name=None):
   if name is None:
@@ -102,11 +108,16 @@ class Attr(object):
     '''
     self.node = N
     self.NAME = name
-    self.VALUE = value
+    if value is not None:
+      self.VALUE = value
     self.__set_attr(_A)
 
   def __str__(self):
-    return "Attr:%s=%s" % (self.NAME, self.VALUE)
+    if hasattr(self, 'VALUE'):
+      value = self.VALUE
+    else:
+      value = '?VALUE?'
+    return "Attr:%s=%s" % (self.NAME, value)
 
   def __set_attr(self, _A):
     self._attr = _A
@@ -117,6 +128,15 @@ class Attr(object):
 
   def _changed(self):
     self.node._changed()
+
+  def __getattr__(self, attr):
+    if attr == 'VALUE':
+      nodedb = self.node.nodedb
+      _A = self._attr
+      assert _A.ATTR == self.NAME+'_ID'
+      value = self.__dict__[attr] = nodedb.nodeById(int(_A.VALUE))
+      return value
+    raise AttributeError("'Attr' has no attribute '%s'" % (attr,))
 
   def __setattr__(self, attr, value):
     if attr == 'NAME' or attr == 'VALUE':
@@ -130,14 +150,14 @@ class Attr(object):
     value = self.VALUE
     _attr = self._attr
     assert _attr is not INVALID, "apply called on discarded Attr(%s)" % (self,)
-    if hasattr(value, 'ID'):
+    if isNode(value):
       if _attr is None:
         assert value.ID is not None
         _A = self.node.nodedb._Attr(self.node.ID, self.NAME+'_ID', str(value.ID))
         self.node.nodedb.session.add(_A)
         self.__set_attr(_A)
       else:
-        assert _attr.NAME == self.NAME+'_ID'
+        assert _attr.ATTR == self.NAME+'_ID'
         if _attr.VALUE != value.ID:
           _attr.VALUE = value.ID
     else:
@@ -199,28 +219,6 @@ class Node(object):
     self.__set_node(_node)
     self.nodedb._noteNodeNameAndType(self)
 
-  def apply(self):
-    ''' Apply pending changes to the database.
-        Does not do a database commit.
-    '''
-    _node = self._node
-    if _node is None:
-      _node = self.__load_node()
-    else:
-      if _node.NAME != self.NAME:
-        _node.NAME = self.NAME
-      if _node.TYPE != self.TYPE:
-        _node.TYPE = self.TYPE
-    for attr, values in self.attrs.items():
-      for v in values:
-        v.apply()
-    self.nodedb._applied(self)
-
-  def _changed(self):
-    ''' Record this node as needing sync to backing store.
-    '''
-    self.nodedb._changed(self)
-
   def __set_node(self, _node):
     if _node is None:
       assert '_node' not in self.__dict__, \
@@ -232,9 +230,10 @@ class Node(object):
                 "_node already set: %s" % (self.__dict__['_node'],)
       assert self.NAME == _node.NAME and self.TYPE == _node.TYPE
       self.__dict__['_node'] = _node
-      id = _node.ID
-      self.__dict__['ID'] = id
-      self.nodedb._noteNodeID(self)
+      nodeid = _node.ID
+      if nodeid is not None:
+        self.__dict__['ID'] = nodeid
+        self.nodedb._noteNodeID(self)
 
   def __load_node(self):
     _node = self.nodedb._Node(self.NAME, self.TYPE)
@@ -251,9 +250,9 @@ class Node(object):
     else:
       attrs = {}
       nodedb = self.nodedb
-      _attrs = nodedb.session.query(nodedb._Attr) \
-                             .filter(nodedb._Attr.NODE_ID == _node.ID) \
-                             .all()
+      attrQuery = nodedb.session.query(nodedb._Attr) \
+                             .filter(nodedb._Attr.NODE_ID == _node.ID)
+      _attrs = attrQuery.all()
       nodedb.session.add_all(_attrs)
       for _A in _attrs:
         attr = nodedb.getAttrBy_Attr(self, _A, None)
@@ -263,14 +262,41 @@ class Node(object):
           if name.endswith('_ID'):
             name_id = name
             name = name[:-3]
-            value = nodedb.nodeById(int(value))
+            value = None
           attr = Attr(self, name, value, _A)
-        attrs.setdefault(name,[]).append(attr)
+        else:
+          name = attr.NAME
+        attrs.setdefault(name, []).append(attr)
       attrs = AttrMap(self, attrs)
     self.__dict__['attrs'] = attrs
     return attrs
 
-  def __eq__(self,other):
+  def apply(self):
+    ''' Apply pending changes to the database.
+        Does not do a database commit.
+    '''
+    _node = self._node
+    if _node is None:
+      _node = self.__load_node()
+    else:
+      if _node.NAME != self.NAME:
+        _node.NAME = self.NAME
+      if _node.TYPE != self.TYPE:
+        _node.TYPE = self.TYPE
+    if hasattr(self, 'attrs'):
+      for attr, values in self.attrs.items():
+        for v in values:
+          v.apply()
+    self.nodedb._applied(self)
+
+  def _changed(self):
+    ''' Record this node as needing sync to backing store.
+    '''
+    self.nodedb._changed(self)
+
+  def __eq__(self, other):
+    if not isNode(other):
+      return False
     return self.NAME == other.NAME \
        and self.TYPE == other.TYPE \
        and self.attrs == other.attrs
@@ -282,7 +308,8 @@ class Node(object):
   def __hasattr__(self,attr):
     k, plural = parseUC_sAttr(attr)
     if k is None:
-      return False
+      return k in self.__dict__
+      ##return False
     if k in ('ID', 'NAME', 'TYPE'):
       return not plural
     if k.endswith('_ID'):
@@ -370,7 +397,7 @@ class Node(object):
     for attr in attrnames:
       pattr = attr
       for value in self.attrs[attr]:
-        if hasattr(value,'ID'):
+        if isNode(value):
           if attr == "SUB"+self.TYPE and value.TYPE == self.TYPE:
             pvalue = value.NAME
           elif attr == value.TYPE:
@@ -382,7 +409,10 @@ class Node(object):
           if m is not None and m.end() == len(value):
             pvalue = value
           else:
-            pvalue = json.dumps(value)
+            if value.isdigit() and str(int(value)) == value:
+              pvalue = int(value)
+            else:
+              pvalue = json.dumps(value)
         if opattr is not None and opattr == pattr:
           pattr = ''
         else:
@@ -488,9 +518,9 @@ class Node(object):
     attrnames.sort()
     for attr in attrnames:
       plattr = attr+'s'
-      value = tuple(attrs[attr])
+      value = tuple(str(v) if type(v) is int else v for v in attrs[attr])
       ovalue = getattr(self, plattr)
-      if ovalue != value:
+      if value != ovalue:
         setattr(self, plattr, value)
 
   def edit(self, editor=None, createSubNodes=False):
@@ -506,8 +536,9 @@ class Node(object):
     os.system("%s %s" % (editor, qname))
     with closing(open(T.name)) as ifp:
       self.textload(ifp, createSubNodes=createSubNodes)
-    os.remove(T.name)
     T.close()
+    if os.path.exists(T.name):
+      os.remove(T.name)
 
 # TODO: make __enter__/__exit__ for running a session?
 class NodeDB(object):
@@ -560,7 +591,12 @@ class NodeDB(object):
     self._Node=_Node
 
   def _note_Attr(self, _A, attr):
-    assert _A.ID not in self._attrMap
+    if _A.ID is None:
+      self.session.commit()
+      assert _A.ID is not None
+    ##or self._attrMap[_A.ID] is _A,
+    assert _A.ID not in self._attrMap, \
+        "_A = %s, self._attrMap[%d] = %s" % (_A, _A.ID, self._attrMap[_A.ID])
     self._attrMap[_A.ID] = attr
 
   def getAttrBy_Attr(self, N, _A, doCreate=False):
@@ -574,10 +610,10 @@ class NodeDB(object):
   def _noteNodeID(self, N):
     ''' Record the database NODE_ID->Node mapping in the nodeMap.
     '''
-    id = N.ID
+    nodeid = N.ID
     nodeMap = self._nodeMap
-    assert id not in nodeMap
-    nodeMap[id] = N
+    assert nodeid not in nodeMap
+    nodeMap[nodeid] = N
 
   def _noteNodeNameAndType(self, N):
     name, nodetype = N.NAME, N.TYPE
@@ -656,20 +692,26 @@ class NodeDB(object):
       return self.nodeByNameAndType(*key)
     raise ValueError, "can't map %s to Node" % (key,)
 
-  def _nodesByIds(self, ids):
+  def _nodesByIds(self, nodeids):
     ''' Take some NODES.ID values and return _Node objects.
     '''
-    filter=columnInValues(self.nodes.c.ID, ids)
-    _nodes=self.session.query(self._Node).filter(filter).all()
-    self.session.add_all(_nodes)
+    nodeMap = self._nodeMap
+    _nodes = []
+    missingIds = []
+    for nodeid in nodeids:
+      if nodeid in nodeMap and hasattr(nodeMap[nodeid], '_node'):
+        _nodes.append(nodeMap[nodeid]._node)
+      else:
+        missingIds.append(nodeid)
+    if len(missingIds) > 0:
+      filter=columnInValues(self.nodes.c.ID, missingIds)
+      _nodes.extend(self.session.query(self._Node).filter(filter).all())
     return _nodes
 
   def _nodesByNameAndType(self, name, nodetype):
     ''' Return database _Node objects.
     '''
-    _nodes=self.session.query(self._Node).filter_by(NAME=name, TYPE=nodetype).all()
-    self.session.add_all(_nodes)
-    return _nodes
+    return self.session.query(self._Node).filter_by(NAME=name, TYPE=nodetype).all()
 
   def _nodesByType(self,nodetype):
     _nodes=self.session.query(self._Node).filter_by(TYPE=nodetype).all()
@@ -681,8 +723,10 @@ class NodeDB(object):
     '''
     nodeMap = self._nodeMap
     nodeid = _node.ID
+    assert nodeid is not None
     if nodeid in nodeMap:
       return nodeMap[nodeid]
+    self.session.add(_node)
     name, nodetype = _node.NAME, _node.TYPE
     if (name, nodetype) in nodeMap:
       N = nodeMap[name, nodetype]
@@ -696,26 +740,25 @@ class NodeDB(object):
     '''
     return [ self._node2Node(_node) for _node in _nodes ]
 
-  def nodesByIds(self, ids):
+  def nodesByIds(self, nodeids):
     ''' Return the Nodes from the corresponding list if Node.ID values.
         Note: the returned nodes may not be in the same order as the ids.
     '''
     missingIds = []
     nodeMap=self._nodeMap
-    for id in ids:
-      if id in nodeMap:
-        yield nodeMap[id]
+    for nodeid in nodeids:
+      if nodeid in nodeMap:
+        yield nodeMap[nodeid]
       else:
-        missingIds.append(id)
+        missingIds.append(nodeid)
     if len(missingIds) > 0:
-      self.apply()
       for _node in self._nodesByIds(missingIds):
         # we examine the cache because it can get populated by our caller
         # between yields
         yield self._node2Node(_node)
 
-  def nodeById(self, id):
-    return the(self.nodesByIds((id,)))
+  def nodeById(self, nodeid):
+    return the(self.nodesByIds((nodeid,)))
 
   def nodeByNameAndType(self, name, nodetype, doCreate=False):
     ''' Return the node of the specified name and nodetype.
