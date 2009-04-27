@@ -339,7 +339,6 @@ class Node(object):
   def get(self, attr, dflt):
     return self.attrs.get(attr, dflt)
 
-
   def parentsByAttr(self, attr, nodetype=None):
     ''' Return parent Nodes whose .attr field mentions this Node.
         The optional parameter 'nodetype' constrains the result to nodes
