@@ -1,0 +1,12 @@
+#!/usr/bin/python
+#
+# Read little endian UTF-16 from stdin, default encoding (typically utf8)
+# to stdout.
+# Handy to decode Windows text for use by the rest of the planet.
+#       - Cameron Simpson <cs@zip.com.au> 01may2009
+#
+
+import sys
+
+sys.stdout.write(unicode(sys.stdin.read(), 'utf16'))
+sys.stdout.close()
