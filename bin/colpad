@@ -61,7 +61,6 @@ do
   munge=1
   if [ -n "$glob" ]
   then
-    mu
     case "$efields $etc" in
       $glob)	[ $inc ] || munge= ;;
       *)	[ $inc ] && munge= ;;
