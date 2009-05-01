@@ -10,7 +10,8 @@ xit=0
 
 for key
 do
-  urlshow "http://www.python.org/dev/peps/pep-$key/" || xit=1
+  url=`printf "http://www.python.org/dev/peps/pep-%04d/" "$key"`
+  urlshow "$url" || xit=1
 done
 
 exit $xit
