@@ -62,6 +62,7 @@ _home:
         qrsync -a --delete \\
                 --include=/CHANGELOG.txt \\
                 $$skip \\
+                --exclude=*.pyc \\
                 --exclude=*.swp \\
                 lib/cs/. $(HOME)/lib/cs/.
 
