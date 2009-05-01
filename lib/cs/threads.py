@@ -110,25 +110,38 @@ class IterableQueue(Queue):
   ''' A Queue obeying the iterator protocol.
       Note: Iteration stops when a None comes off the Queue.
   '''
-  def __init__(self,*args,**kw):
-    Queue.__init__(self,*args,**kw)
+
+  def __init__(self, *args, **kw):
+    ''' Initialise the queue.
+    '''
+    Queue.__init__(self, *args, **kw)
     self.__closed=False
-  def put(self,item,*args,**kw):
+
+  def put(self, item, *args, **kw):
+    ''' Put an item on the queue.
+    '''
     assert not self.__closed, "put() on closed IterableQueue"
     assert item is not None, "put(None) on IterableQueue"
-    return Queue.put(self,item,*args,**kw)
+    return Queue.put(self, item, *args, **kw)
+
   def _closeAtExit(self):
     if not self.__closed:
       self.close()
+
   def close(self):
     ##logFnLine("%s.close()"%(self,),frame=sys._getframe(1))
     if self.__closed:
-      logFnLine("close() on closed IterableQueue")
+      # this should be a real log message
+      print >>sys.stderr, "close() on closed IterableQueue"
     else:
       self.__closed=True
       Queue.put(self,None)
+
   def __iter__(self):
+    ''' Iterable interface for the queue.
+    '''
     return self
+
   def next(self):
     item=self.get()
     if item is None:
