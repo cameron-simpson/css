@@ -10,6 +10,11 @@ trace=setx
 queuedir=/var/qmail/queue
 
 cmd=`basename "$0"`
+case $0 in
+  /*)   cmdpath=$0 ;;
+  *)    cmdpath=`pwd`/$0 ;;
+esac
+  
 usage="Usage: $cmd - <queueids
        $cmd queueids...
        $cmd"
@@ -26,14 +31,14 @@ cd "$queuedir" || exit 1
 if [ $# = 0 ]
 then
   setx qmail-list-bounces \
-  | setx xargs "$0"
-  ##| while read qnum; do setx "$0" "$qnum" || exit 1; done
+  | setx xargs "$cmdpath"
+  ##| while read qnum; do setx "$cmdpath" "$qnum" || exit 1; done
   exit 0
 fi
 
 if [ "x$*" = x- ]
 then
-  exec xargs "$0"
+  exec xargs "$cmdpath"
 fi
 
 needdir=1
