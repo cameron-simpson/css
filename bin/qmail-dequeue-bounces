@@ -1,7 +1,7 @@
 #!/bin/sh -ue
 #
 # Move designated messages out of the qmail queue.
-# It is probably a god idea to have the qmail system itself down while
+# It is probably a good idea to have the qmail system itself down while
 # you do this.
 #       - Cameron Simpson <cs@zip.com.au> 19may2008
 #
