@@ -1,0 +1,12 @@
+#!/usr/bin/python -tt
+#
+# Read mysqlbinlog(1) output from standard input and report on standard output.
+#       - Cameron Simpson <cs@zip.com.au> 01may2009
+#
+
+from cs.app.mysql import BinLogParser
+import sys
+
+P=BinLogParser()
+P.parse(sys.stdin)
+P.report()
