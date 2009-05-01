@@ -12,7 +12,7 @@ sshopts=
 cmd=`basename "$0"`
 usage="Usage: $cmd [ssh-options...] target command [args...]
   Note: ssh-options must survive unquoted.
-        For example, the -o option should take the form -o option-value."
+        For example, the -o option should take the form -o option=value."
 
 socket=$HOME/.$cmd-$$
 
