@@ -8,6 +8,7 @@ from __future__ import with_statement
 from cs.mappings import isUC_, parseUC_sAttr
 import cs.sh
 from cs.misc import the, uniq, seq
+from cs.upd import ExceptionPrefix
 import sqlalchemy
 from sqlalchemy import create_engine, \
                        MetaData, Table, Column, Index, Integer, String, \
@@ -196,7 +197,7 @@ class AttrMap(dict):
   def __getitem__(self, attr):
     return [ A.VALUE for A in dict.__getitem__(self, attr) ]
 
-class Node(object):
+class Node(ExceptionPrefix):
   ''' A node in the node db.
       A node has the following attributes:
         ID, the db id - made at need; try to avoid using it
@@ -218,6 +219,7 @@ class Node(object):
     self.__dict__['TYPE'] = nodetype
     self.__set_node(_node)
     self.nodedb._noteNodeNameAndType(self)
+    ExceptionPrefix.__init__(self, str(self))
 
   def __set_node(self, _node):
     if _node is None:
@@ -341,9 +343,12 @@ class Node(object):
     return the(values)
 
   def __setattr__(self, attr, value):
+    if attr.startswith('_'):
+      self.__dict__[attr] = value
+      return
     k, plural = parseUC_sAttr(attr)
     assert k is not None and k not in ('ID', 'TYPE'), \
-                "refusing to set .%s" % (k,)
+                "refusing to set .%s" % (attr,)
     if k == 'NAME':
       assert not plural
       name = self.NAME
