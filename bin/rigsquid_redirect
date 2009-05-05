@@ -18,6 +18,7 @@ esac
 
 rc=$HOME/tmp/squid.conf
 pidf=$VARRUN/squid.pid
+tplt=$HOME/rc/squid/tplt
 
 [ $# = 0 ] || { SQUID_PEERS=$*; export SQUID_PEERS; }
 
@@ -26,10 +27,12 @@ $trace killpidfile -w "$pidf"
 ## old proxy-mode standalone redirector
 ##exec alog squid_redirect squid_redirect -P "8080:$SQUID"
 
-env SQUID_PIDFILE=$pidf envsub -p '\{\{([A-Z]\w*)\}\}' <"$HOME/rc/squid/tplt" \
-| patch-config -i "$dfltrc" \
+( grep '^acl ' <"$dfltrc"
+  env SQUID_PIDFILE=$pidf envsub -p '\{\{([A-Z]\w*)\}\}' <"$tplt" \
+  | patch-config -i "$dfltrc"
+) \
 > "$rc"
-mksquidpeers |grep '^cache_peer' >>"$rc"
+mksquidpeers >>"$rc"
 echo url_rewrite_program $HOME/bin/squid_redirect >>"$rc"
 echo url_rewrite_children 2 >>"$rc"
 
