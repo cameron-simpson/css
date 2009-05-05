@@ -135,8 +135,8 @@ class ExceptionPrefix(object):
   ''' A context manager to prefix exception complaints.
   '''
 
-  def __init__(self,prefix):
-    self.__prefix=prefix
+  def __init__(self, prefix):
+    self.__prefix = prefix
 
   def __enter__(self):
     pass
@@ -145,8 +145,8 @@ class ExceptionPrefix(object):
     if exc_type is not None:
       upd_state = state()
       if len(upd_state) > 0:
-        pfx = upd_state+": "+self.__prefix
+        pfx = upd_state + ": " + self.__prefix
       else:
         pfx = self.__prefix
-      raise exc_type, pfx+": "+exc_value, tb
+      raise exc_type, pfx + ": "+exc_value, tb
     return False
