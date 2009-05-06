@@ -148,5 +148,5 @@ class ExceptionPrefix(object):
         pfx = upd_state + ": " + self.__prefix
       else:
         pfx = self.__prefix
-      raise exc_type, pfx + ": "+exc_value, tb
+      raise exc_type, pfx + ": " + str(exc_value), tb
     return False
