@@ -109,7 +109,7 @@ then
   # update the web tree
   echo $cssdatedir.tar.gz...
   ( cd "$tmpdir"
-    tar cf "$cssweb/$cssdatedir.tar.gz" "$cssdatedir"
+    tar czf "$cssweb/$cssdatedir.tar.gz" "$cssdatedir"
     rm -f "$cssweb/css.tar.gz"
     ln -s "$cssdatedir.tar.gz" "$cssweb/css.tar.gz"
   )
