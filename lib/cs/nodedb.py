@@ -377,7 +377,9 @@ class Node(ExceptionPrefix):
     return self.attrs.keys()
 
   def get(self, attr, dflt):
-    return self.attrs.get(attr, dflt)
+    if not hasattr(self, attr):
+      return dflt
+    return getattr(self, attr)
 
   def parentsByAttr(self, attr, nodetype=None):
     ''' Return parent Nodes whose .attr field mentions this Node.
