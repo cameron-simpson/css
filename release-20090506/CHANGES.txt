@@ -1,0 +1,471 @@
+changeset:   7340:66402cdac3d1
+tag:         release-20090411
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sat Apr 11 11:54:04 2009 +1000
+files:       release-20090411/CHANGES.txt release-20090411/SUMMARY.txt release-20090411/release-tag.txt
+description:
+Release information for release-20090411.
+
+
+changeset:   7341:4a4c6d73949c
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sat Apr 11 11:54:05 2009 +1000
+files:       .hgtags
+description:
+Added tag release-20090411 for changeset 66402cdac3d1
+
+
+changeset:   7342:da38214bae6b
+parent:      7337:c5e8f4106112
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sat Apr 11 12:13:12 2009 +1000
+files:       lib/cs/nodedb.py
+description:
+NodeDB.nodeByNameAndType: if no match, doCreate=False raises IndexError, None returns None, true creates the node.
+
+
+changeset:   7343:f667e48dab6a
+parent:      7341:4a4c6d73949c
+parent:      7342:da38214bae6b
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sat Apr 11 12:13:54 2009 +1000
+description:
+Sync with dev/css-nodedb.
+
+
+changeset:   7344:8ec00c9a6436
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sat Apr 11 12:27:31 2009 +1000
+files:       bin/env-dev
+description:
+env-dev: simpler and more usable.
+
+
+changeset:   7345:0ef997ac9db9
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sat Apr 11 12:31:03 2009 +1000
+files:       lib/cs/nodedb.py
+description:
+nodedb.py: __getattr__ of missing attribute should return ().
+
+
+changeset:   7346:6c5638558d56
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sat Apr 11 12:34:20 2009 +1000
+files:       lib/cs/nodedb.py
+description:
+Replace sanity check assertion with warning.
+
+
+changeset:   7347:97cbd55b092b
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sat Apr 11 13:10:07 2009 +1000
+files:       lib/cs/nodedb.py
+description:
+nodedb.py: add optional type parameter to parentsByAttr().
+
+
+changeset:   7348:c14efd2b7f68
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sat Apr 11 16:21:39 2009 +1000
+files:       lib/cs/cs_json.py lib/cs/json.py lib/cs/nodedb.py
+description:
+Add dump/load/edit methods for nodes.
+
+
+changeset:   7349:858b3b1fe522
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sat Apr 11 19:23:49 2009 +1000
+files:       lib/cs/nodedb.py
+description:
+nodedb.py: debug textdump/textload/edit, add continued dump lines.
+
+
+changeset:   7350:940ae4a2001e
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sat Apr 11 21:17:54 2009 +1000
+files:       lib/cs/nodedb.py
+description:
+nodedb.py: add commit() method to commit the session.
+
+
+changeset:   7351:3d3cc197ff22
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sun Apr 12 08:45:22 2009 +1000
+files:       lib/cs/nodedb.py
+description:
+Add table indices. Improve fieldInValues() (unested).
+
+
+changeset:   7352:b6cd8c99fdbd
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sun Apr 12 11:28:00 2009 +1000
+files:       bin/cats2procmailrc bin/setvar lib/cs/misc.py lib/cs/venti/dir.py
+description:
+Move to Python 2.6's set() builtin, compatibility import for older pythons.
+
+
+changeset:   7353:202ca4ec3592
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sun Apr 12 20:11:08 2009 +1000
+files:       lib/cs/nodedb.py
+description:
+nodedb.py: textload(): keep unparsable JSON in unparsed form.
+
+
+changeset:   7354:9933e90c21df
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Mon Apr 13 20:09:20 2009 +1000
+files:       lib/cs/nodedb.py
+description:
+textload: short name support: SUB{TYPE}->TYPE:name, otherwise attr:name.
+
+
+changeset:   7355:6e7cc9cd0a30
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Wed Apr 15 18:20:22 2009 +1000
+files:       lib/cs/nodedb.py
+description:
+nodedb.py: Node: defer fetch of attributes until needed, setting the way for
+storing direct Nodes in the _attrs instead of NODE_IDs.
+
+
+changeset:   7356:1a4ce4114152
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Fri Apr 17 14:17:14 2009 +1000
+files:       lib/cs/nodedb.py
+description:
+nodedb.py: move the whole FOO_ID punning into the AttrMap.
+
+
+changeset:   7357:0b1e6c99bcef
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Fri Apr 17 14:18:15 2009 +1000
+files:       bin/needhost
+description:
+needhost: be quiet in normal use.
+
+
+changeset:   7358:d68d77af4b8e
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Fri Apr 17 15:03:06 2009 +1000
+files:       lib/cs/nodedb.py
+description:
+nodedb.py: Fix recursion in _nodes2Nodes(). Fix variable name.
+
+
+changeset:   7359:f82343e1f91f
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Fri Apr 17 16:21:57 2009 +1000
+files:       lib/cs/nodedb.py
+description:
+nodedb.py: Node: add keys() and get() methods. Make createNode() check for collisions.
+
+
+changeset:   7360:10241660dfe1
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Fri Apr 17 17:15:24 2009 +1000
+files:       lib/cs/nodedb.py
+description:
+nodedb.py: Node: textload()/edit() createSubNodes parameter to autocreate nodes by name.
+
+
+changeset:   7361:d64b5c403bdc
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Fri Apr 17 20:10:40 2009 +1000
+files:       lib/cs/nodedb.py
+description:
+nodedb.py: import with statement.
+
+
+changeset:   7362:6966e0603d5b
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Wed Apr 22 12:43:39 2009 +1000
+files:       bin/histbackup
+description:
+histbackup: support .hbfiles -> --files-from config file.
+
+
+changeset:   7363:675e3cbe58c3
+parent:      7361:d64b5c403bdc
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sun Apr 19 11:42:37 2009 +1000
+files:       lib/cs/nodedb.py
+description:
+nodedb.py: Node: present gettoken() parser method for subclasses, add more token types.
+
+
+changeset:   7364:dd2ab1797d81
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sun Apr 19 12:57:39 2009 +1000
+files:       lib/cs/nodedb.py
+description:
+nodedb.py: Node.textdump(): pretty print more values.
+
+
+changeset:   7365:2e5cf32bcea5
+parent:      7362:6966e0603d5b
+parent:      7364:dd2ab1797d81
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Wed Apr 22 12:44:46 2009 +1000
+description:
+Merge changes from css-nodedb.
+
+
+changeset:   7366:e3faa595b04f
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Thu Apr 23 16:33:27 2009 +1000
+files:       bin/dosync bin/rrsync defunct/dosync defunct/rrsync
+description:
+Obsolete dosync and rrsync.
+
+
+changeset:   7367:71aaa9f1cb88
+branch:      nodedb-splitbackend
+parent:      7365:2e5cf32bcea5
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Wed Apr 22 21:35:46 2009 +1000
+files:       bin/maildb
+description:
+Remove debug.
+
+
+changeset:   7368:057f534adcd3
+parent:      7365:2e5cf32bcea5
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Wed Apr 22 21:37:11 2009 +1000
+files:       lib/cs/app/maildb.py
+description:
+Discard message_id(), add references() and followups().
+
+
+changeset:   7369:e29ebc03506e
+branch:      nodedb-splitbackend
+parent:      7367:71aaa9f1cb88
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Fri Apr 24 15:56:09 2009 +1000
+files:       lib/cs/db.py
+description:
+db.py: update set type import for python 2.6.
+
+
+changeset:   7370:12094fe1eb38
+branch:      nodedb-splitbackend
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sat Apr 25 09:16:19 2009 +1000
+files:       lib/cs/nodedb.py
+description:
+Defer database instantiation as much as possible.
+
+
+changeset:   7371:2f4d559dd3a7
+branch:      nodedb-splitbackend
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sat Apr 25 09:19:39 2009 +1000
+files:       lib/cs/nodedb.py
+description:
+Convert number to string explicitly.
+
+
+changeset:   7372:f9dcf1752abe
+branch:      nodedb-splitbackend
+parent:      7371:2f4d559dd3a7
+parent:      7368:057f534adcd3
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sat Apr 25 14:01:13 2009 +1000
+description:
+Merge from mainline.
+
+
+changeset:   7373:c2ae20bd60df
+parent:      7368:057f534adcd3
+parent:      7372:f9dcf1752abe
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sat Apr 25 14:08:48 2009 +1000
+description:
+Merge nodedb-splitbackend into default.
+
+
+changeset:   7374:863407405aec
+parent:      7373:c2ae20bd60df
+parent:      7366:e3faa595b04f
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sat Apr 25 14:18:25 2009 +1000
+files:       bin/dosync bin/rrsync
+description:
+Automated merge with file:///app2/home/cameron/dev/css-nodedb
+
+
+changeset:   7375:b31476906d9b
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sun Apr 26 16:29:27 2009 +1000
+files:       bin/macify lib/cs/mac.py lib/cs/macosx.py
+description:
+Rename cs.mac ro cs.macosx, add plist functions from cs/apple.py.
+
+
+changeset:   7376:7a0b31525725
+parent:      7374:863407405aec
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sat Apr 25 14:36:17 2009 +1000
+files:       lib/cs/nodedb.py
+description:
+Add index on ATTRS.VALUE. Remove stray checkMap= parameter. Remove debugging.
+
+
+changeset:   7377:b6161e70b7ea
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Mon Apr 27 13:47:43 2009 +1000
+files:       lib/cs/nodedb.py
+description:
+Whitespace change.
+
+
+changeset:   7378:466b755cbe84
+parent:      7375:b31476906d9b
+parent:      7377:b6161e70b7ea
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Mon Apr 27 13:47:52 2009 +1000
+description:
+Automated merge with file:///app2/home/cameron/hg/css
+
+
+changeset:   7379:1a1cb54dde07
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Mon Apr 27 15:53:39 2009 +1000
+files:       lib/cs/nodedb.py
+description:
+Python 2.5 backport. Add Node.assign() method. Track Attr<->_Attr. Small bug fixes.
+
+
+changeset:   7380:fba2d775032d
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Mon Apr 27 21:25:02 2009 +1000
+files:       lib/cs/nodedb.py
+description:
+Fix infinite regress. Defer fetch of Node attributes. Pretty print ints.
+
+
+changeset:   7381:2604a7019e58
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Mon Apr 27 21:28:48 2009 +1000
+files:       lib/cs/nodedb.py
+description:
+Bugfix testToNode.
+
+
+changeset:   7382:c2ac51bcd573
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Fri May 01 15:15:26 2009 +1000
+files:       lib/cs/threads.py
+description:
+Tidy up IterableQUeue for publication.
+
+
+changeset:   7383:ce1960186be3
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Fri May 01 15:23:26 2009 +1000
+files:       bin/qmail-dequeue-bounces
+description:
+qmail-dequeue-bounces: turn $0 into full path for reuse by xargs.
+
+
+changeset:   7384:5153fd1d9f97
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Fri May 01 15:23:52 2009 +1000
+files:       bin/pep
+description:
+pep: zero pad the PEP number.
+
+
+changeset:   7385:b73870dec3ec
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Fri May 01 15:24:09 2009 +1000
+files:       bin/colpad
+description:
+colpad: remove typo.
+
+
+changeset:   7386:c909dd49b389
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Fri May 01 15:24:46 2009 +1000
+files:       bin/qmail-dequeue-bounces
+description:
+Good god!
+
+
+changeset:   7387:4feb30027f82
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Fri May 01 15:25:09 2009 +1000
+files:       bin/with-ssh-master
+description:
+Fix typo.
+
+
+changeset:   7388:c29328d871d2
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Fri May 01 15:51:00 2009 +1000
+files:       bin/utf16to8
+description:
+utf16to8: convert UTF-16 text input to default encoding on output.
+
+
+changeset:   7389:dc42d6c96be6
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Fri May 01 17:28:32 2009 +1000
+files:       bin/mysqlbinlog-parse lib/cs/app/mysql.py
+description:
+Simple stats reporter for MySQL binlog transcripts.
+
+
+changeset:   7390:047c26d01a33
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Fri May 01 17:49:06 2009 +1000
+files:       Mykefile
+description:
+Mykefile: _home: don't push .pyc files.
+
+
+changeset:   7391:82d23a4d28e9
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Tue May 05 21:22:33 2009 +1000
+files:       bin/rigsquid_redirect
+description:
+Pull ACLs from system squid.conf.
+
+
+changeset:   7392:d887cc92a3db
+parent:      7390:047c26d01a33
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Tue May 05 21:19:18 2009 +1000
+files:       lib/cs/upd.py
+description:
+upd.py: whitespace changes in ExceptionPrefix.
+
+
+changeset:   7393:cf83f3c87a51
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Tue May 05 21:20:30 2009 +1000
+files:       lib/cs/nodedb.py
+description:
+Make a Node a subclass of ExceptionPrefix for easy debugging. Fix an assertion message.
+
+
+changeset:   7394:a52b19248631
+parent:      7393:cf83f3c87a51
+parent:      7391:82d23a4d28e9
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Tue May 05 21:22:44 2009 +1000
+description:
+Automated merge with file:///app2/home/cameron/dev/css-nodedb
+
+
+changeset:   7395:f3a15b714c16
+tag:         tip
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Wed May 06 12:48:18 2009 +1000
+files:       lib/cs/nodedb.py
+description:
+Bugfix for Node.get().
+
+
