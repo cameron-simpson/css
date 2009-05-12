@@ -1,0 +1,58 @@
+changeset:   7396:0760789c1e49
+tag:         release-20090506
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Wed May 06 12:51:11 2009 +1000
+files:       release-20090506/CHANGES.txt release-20090506/SUMMARY.txt release-20090506/release-tag.txt
+description:
+Release information for release-20090506.
+
+
+changeset:   7397:22a1bf88e210
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Wed May 06 12:51:12 2009 +1000
+files:       .hgtags
+description:
+Added tag release-20090506 for changeset 0760789c1e49
+
+
+changeset:   7398:0f346e35b214
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Wed May 06 13:31:17 2009 +1000
+files:       bin/updcss
+description:
+Tar needs the 'z' option to gzip:-( Report from Donald Cooley.
+
+
+changeset:   7399:b7d5fa51da6a
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Wed May 06 13:58:30 2009 +1000
+files:       lib/cs/upd.py
+description:
+ExceptionPrefix: str(exc_value) - it seems this needn't be a string.
+
+
+changeset:   7400:203701abd0f1
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sun May 10 19:38:19 2009 +1000
+files:       bin/un-at-
+description:
+un-at-: update regexp for other domains; report from Marco Fioretti.
+
+
+changeset:   7401:eb8f71629228
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Tue May 12 11:23:13 2009 +1000
+files:       bin/cs-mutt-per-folder
+description:
+Emit mutt configuration based on the current folder name.
+
+
+changeset:   7402:f381bfe81c8f
+tag:         tip
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Tue May 12 11:23:49 2009 +1000
+files:       bin/+
+description:
+header_cache stuff now static again.
+
+
