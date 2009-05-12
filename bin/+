@@ -91,11 +91,6 @@ else
        exit 1
      }
 
-  mutthcache=$HOME/var/mutt/header-cache/$fbase
-  { needdir "$mutthcache" \
-    && muttcmd="$muttcmd -e 'set header_cache=$mutthcache'"
-  } || :
-
   fmuttrc=$fpath/.muttrc
   [ ! -s "$fmuttrc" ] || muttcmd="$muttcmd -e 'source $fmuttrc'"
 
