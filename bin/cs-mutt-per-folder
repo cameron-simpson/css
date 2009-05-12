@@ -1,0 +1,39 @@
+#!/bin/sh -ue
+#
+# Emit mutt configuration based on the current folder name.
+#       - Cameron Simpson <cs@zip.com.au> 10may2009
+#
+
+lsof -p $$ >$HOME/mutt.lsof
+
+cmd=$0  ##`basename "$0"`
+usage="Usage: $cmd folder-name"
+
+[ $# = 1 ] || { echo "$usage" >&2; exit 2; }
+folder=$1
+shift
+
+unset base rpath
+case "$folder" in
+  $HOME/*)
+    rpath=`expr "x$folder" : 'x$HOME/\(.*\)'`
+    ;;
+  =?*)
+    rpath=`expr "x$folder" : 'x=\(.*\)'`
+    ;;
+esac
+case "$rpath" in
+  */*)  base=`basename "$rpath"` rpath_=`echo "$rpath" | tr / _` ;;
+  *)    base=$rpath              rpath_=$rpath ;;
+esac
+
+(
+  delete_folder=$MAILDIR/O/$base
+  maildir "$delete_folder"
+  echo "set my_folder_delete='$MAILDIR/O/$base'"
+  echo "unhook save-hook; save-hook . \"\$my_folder_delete\""
+
+  # This happens after mutt has read the folder, so too late.
+  ##mutthcache=$HOME/var/mutt/header-cache/$rpath_
+  ##needdir "$mutthcache" && echo "set header_cache='$mutthcache'"
+) | tee -a $HOME/var/log/mutt/per-folder | tr '\012' ';'
