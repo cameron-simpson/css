@@ -124,7 +124,9 @@ class Upd:
 def __dummyNoUpd():
   yield
 
-def noupd(U=None):
+def NoUpd(U=None):
+  ''' Return a context manager to disable the current Upd for the duration.
+  '''
   if U is None:
     if _defaultUpd is None:
       return __dummyNoUpd()
