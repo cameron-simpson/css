@@ -295,11 +295,17 @@ class Loggable:
     t, result = self.logTime2(tag, func, *args, **kw)
     return result
 
+  def logException(self, exc_type, exc_value, traceback, doSimpleExceptionReport=False):
+    self.logfn("EXCEPTION: %s(%s)" % (exc_type, exc_value))
+    if doSimpleExceptionReport:
+      NoExceptions.simpleExceptionReport(exc_type, exc_value, traceback, mark=self.__logMark)
+
 class NoExceptions(object):
   ''' A context manager to catch _all_ exceptions and log them.
       Arguably this should be a bare try...except but that's syntacticly
       noisy and separates the catch from the top.
   '''
+
   def __init__(self, handleException):
     ''' Initialise the NoExceptions context manager.
         The handleException is a callable which
@@ -310,13 +316,26 @@ class NoExceptions(object):
         always returns True, suppressing any exception.
     '''
     self.__handler = handleException
+
   def __enter__(self):
     pass
+
   def __exit__(self, exc_type, exc_value, traceback):
-    if self.__handler is not None:
-      return self.__handler(exc_type, exc_value, traceback)
     if exc_type is not None:
+      if self.__handler is not None:
+        return self.__handler(exc_type, exc_value, traceback)
       print >>sys.stderr, "ignore %s" % (exc_type,)
+    return True
+
+  @staticmethod
+  def simpleExceptionReport(exc_type, exc_value, traceback, mark=None):
+    ''' Convenience method to report exceptions to standard error.
+    '''
+    if mark is None:
+      mark=cmd
+    else:
+      mark="%s: %s" % (cmd, mark)
+    print >>sys.stderr, "%s: EXCEPTION: %s: %s [%s]" % (mark, exc_type, exc_value, traceback)
     return True
 
 T_SEQ = 'ARRAY'
