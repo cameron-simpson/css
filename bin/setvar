@@ -123,6 +123,9 @@ def filevarexts():
   arch=env("ARCH")
   if arch is not None:
     yield ".%s" % arch
+  osname=env("OS")
+  if osname is not None:
+    yield ".%s" % osname
   yield None
 
 def filevar(var):
