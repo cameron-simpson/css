@@ -1,0 +1,13 @@
+#!/bin/sh -ue
+#
+# Prefix a path to $PATH et al then run a command.
+#       - Cameron Simpson <cs@zip.com.au> 18may2009
+#
+
+prefix=$1; shift
+
+PATH=$prefix/bin:$PATH
+MANPATH=$prefix/man:$prefix/share/man:$MANPATH
+export PATH MANPATH
+
+exec "$@"
