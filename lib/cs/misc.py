@@ -327,7 +327,6 @@ class NoExceptions(object):
       print >>sys.stderr, "ignore %s" % (exc_type,)
     return True
 
-  @staticmethod
   def simpleExceptionReport(exc_type, exc_value, traceback, mark=None):
     ''' Convenience method to report exceptions to standard error.
     '''
@@ -337,6 +336,7 @@ class NoExceptions(object):
       mark="%s: %s" % (cmd, mark)
     print >>sys.stderr, "%s: EXCEPTION: %s: %s [%s]" % (mark, exc_type, exc_value, traceback)
     return True
+  simpleExceptionReport = staticmethod(simpleExceptionReport)
 
 T_SEQ = 'ARRAY'
 T_MAP = 'HASH'
