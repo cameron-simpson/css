@@ -622,7 +622,8 @@ def c2p(ifp,ofp):
         if pattern.find('@') < 0:
           # no "@" - permute across dfltDomains
           pattern='%s@(%s)' % (pattern, '|'.join(dfltDomains))
-        pattern='.*\\<('+pattern.replace('.','\\.').replace('+','\\+')+')\\>'
+        # skip replace('.','\\.')
+        pattern='.*\\<('+pattern.replace('+','\\+')+')\\>'
 
       if len(hdrs) == 1:
         hdrs=hdrs[0]
