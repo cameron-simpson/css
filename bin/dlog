@@ -4,8 +4,17 @@
 # which uses buglog-daily.      - Cameron Simpson <cs@zip.com.au>
 # 
 
+cmd=$0
+usage="Usage: $cmd [-l {log|logfile}] [remark...]"
+
 : ${LOGDIR:=$HOME/var/log}
 : ${DLOG_WHEN:=`date`}
+
+if [ "x$HOST" != "x$HOMEHOST" ]
+then
+  qcmd=`shqstr ./bin/with-login-env dlog ${1+"$@"}`
+  exec pfx "dlog@$HOSTHOST" ssh "$HOMEHOST" "$qcmd"
+fi
 
 logname=dlog
 [ $# -gt 0 ] && [ "x$1" = x-l ] && { logname=$2; shift; shift; }
