@@ -1,0 +1,29 @@
+#!/bin/sh -ue
+#
+# Try to set up the css env, then run a command.
+#       - Cameron Simpson <cs@zip.com.au> 22may2009
+#
+
+: ${OPTCSS:=''}
+
+[ $# -gt 0 ] || set -- env
+
+if [ -z "$OPTCSS" ]
+then
+  bindir=`dirname "$0"`
+  bindir=`cd "$bindir"; pwd`
+  OPTCSS=`dirname "$bindir"`
+  if [ ! -s "$OPTCSS/env.sh" ]
+  then
+    if [ -s /opt/css/env.sh ]
+    then
+      OPTCSS=/opt/css
+    else
+      exec $bindir/with-prefix "$OPTCSS" "$@"
+    fi
+  fi
+fi
+
+export OPTCSS
+. "$OPTCSS/env.sh"
+exec "$@"
