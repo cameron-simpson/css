@@ -1,5 +1,5 @@
 from __future__ import with_statement
-from threading import RLock
+import threading
 from contextlib import contextmanager
 import atexit
 from cs.lex import unctrl       ##, tabpadding
@@ -39,7 +39,7 @@ atexit.register(cleanupAtExit)
 class Upd:
   def __init__(self,backend,mode=None):
     assert backend is not None
-    self.__lock=RLock()
+    self.__lock=threading.RLock()
     self.__backend=backend
     self.__buf=''
     global active, instances
@@ -133,6 +133,15 @@ def NoUpd(U=None):
     U=_defaultUpd
   return U._withoutContext()
 
+_ExceptionPrefixState = threading.local()
+
+class _PrefixedException(StandardError):
+  def __init__(self, prefix, exc_value):
+    self.prefix = prefix
+    self.exc_value = exc_value
+  def __str__(self):
+    return "%s: %s" % (self.prefix, self.exc_value)
+
 class ExceptionPrefix(object):
   ''' A context manager to prefix exception complaints.
   '''
@@ -141,14 +150,27 @@ class ExceptionPrefix(object):
     self.__prefix = prefix
 
   def __enter__(self):
-    pass
+    prefix = self.__prefix
+    global _ExceptionPrefixState
+    if hasattr(_ExceptionPrefixState, 'prefix'):
+      oldprefix = _ExceptionPrefixState.prefix
+      if oldprefix is not None:
+        prefix = oldprefix + ': ' + prefix
+    else:
+      oldprefix = None
+    self.__oldprefix = oldprefix
+    _ExceptionPrefixState.prefix = prefix
 
   def __exit__(self, exc_type, exc_value, tb):
-    if exc_type is not None:
+    _ExceptionPrefixState.prefix = self.__oldprefix
+    if exc_type is None:
+      return False
+    prefix = self.__prefix
+    if self.__oldprefix is None:
       upd_state = state()
       if len(upd_state) > 0:
-        pfx = upd_state + ": " + self.__prefix
-      else:
-        pfx = self.__prefix
-      raise exc_type, pfx + ": " + str(exc_value), tb
-    return False
+        prefix = upd_state + ": " + prefix
+    if exc_type is _PrefixedException:
+      exc_value.prefix = prefix + ": " + exc_value.prefix
+      return False
+    raise _PrefixedException(prefix, exc_value), None, tb
