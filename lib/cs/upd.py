@@ -174,3 +174,14 @@ class ExceptionPrefix(object):
       exc_value.prefix = prefix + ": " + exc_value.prefix
       return False
     raise _PrefixedException(prefix, exc_value), None, tb
+
+class ShortExceptions(object):
+  def __enter__(self):
+    pass
+  def __exit__(self, exc_type, exc_value, tb):
+    import cs.misc
+    if exc_type is None or exc_type is SystemExit or cs.misc.isdebug:
+      return False
+    import sys
+    print >>sys.stderr, str(exc_value)
+    sys.exit(1)
