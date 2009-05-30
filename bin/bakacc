@@ -1,0 +1,24 @@
+#!/bin/sh -ue
+#
+# Back up relevant files from remote account.
+#       - Cameron Simpson <cs@zip.com.au> 30may2009
+#
+
+cmd=`basename "$0"`
+
+bakdir=$HOME/backup
+trace=set-x     ##eecho
+
+for host
+do
+  hostbak=$bakdir/$host
+  [ -d "$hostbak/." ] || { echo "$cmd: missing $hostbak" >&2; exit 1; }
+  if [ ! -s "$hostbak/.hbinclude" ]
+  then
+    echo "create $hostbak/.hbinclude" >&2
+    { echo '+ /*-local'
+      echo '- /*'
+    } >>"$hostbak/.hbinclude"
+  fi
+  $trace histbackup -x --delete "$host:." "$hostbak"
+done
