@@ -34,7 +34,7 @@ done
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
-[ $force ] || needhost $HOMEHOST@home || exit 1
+[ $force ] || needhost -v $HOMEHOST@home || exit 1
 
 cd || exit 1
 for host in `hostlist "$@"`
