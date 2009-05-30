@@ -36,4 +36,4 @@ esac
   # This happens after mutt has read the folder, so too late.
   ##mutthcache=$HOME/var/mutt/header-cache/$rpath_
   ##needdir "$mutthcache" && echo "set header_cache='$mutthcache'"
-) | tee -a $HOME/var/log/mutt/per-folder | tr '\012' ';'
+) | tee -a $HOME/var/log/mutt/per-folder | tr '\012' ';'; echo
