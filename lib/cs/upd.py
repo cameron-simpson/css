@@ -136,11 +136,17 @@ def NoUpd(U=None):
 _ExceptionPrefixState = threading.local()
 
 class _PrefixedException(StandardError):
-  def __init__(self, prefix, exc_value):
+  def __init__(self, prefix, inner_text):
     self.prefix = prefix
-    self.exc_value = exc_value
+    self.inner_text = inner_text
   def __str__(self):
-    return "%s: %s" % (self.prefix, self.exc_value)
+    return "%s: %s" % (self.prefix, self.inner_text)
+
+def _summarise_exception(exc_value):
+  summary = str(exc_value)
+  if len(summary) == 0:
+    summary = `exc_value`
+  return summary
 
 class ExceptionPrefix(object):
   ''' A context manager to prefix exception complaints.
@@ -173,15 +179,18 @@ class ExceptionPrefix(object):
     if exc_type is _PrefixedException:
       exc_value.prefix = prefix + ": " + exc_value.prefix
       return False
-    raise _PrefixedException(prefix, exc_value), None, tb
+    raise _PrefixedException(prefix, _summarise_exception(exc_value)), None, tb
 
 class ShortExceptions(object):
   def __enter__(self):
     pass
   def __exit__(self, exc_type, exc_value, tb):
     import cs.misc
-    if exc_type is None or exc_type is SystemExit or cs.misc.isdebug:
+    if exc_type is None \
+    or exc_type is SystemExit \
+    or exc_type is AssertionError \
+    or cs.misc.isdebug:
       return False
     import sys
-    print >>sys.stderr, str(exc_value)
+    print >>sys.stderr, _summarise_exception(exc_value)
     sys.exit(1)
