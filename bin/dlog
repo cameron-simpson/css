@@ -13,7 +13,7 @@ usage="Usage: $cmd [-l {log|logfile}] [remark...]"
 if [ "x$HOST" != "x$HOMEHOST" ]
 then
   qcmd=`shqstr ./bin/with-login-env dlog ${1+"$@"}`
-  exec pfx "dlog@$HOSTHOST" ssh "$HOMEHOST" "$qcmd"
+  exec pfx "dlog@$HOMEHOST" ssh "$HOMEHOST" "$qcmd"
 fi
 
 logname=dlog
