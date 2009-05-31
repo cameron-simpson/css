@@ -4,8 +4,6 @@
 #       - Cameron Simpson <cs@zip.com.au> 10may2009
 #
 
-lsof -p $$ >$HOME/mutt.lsof
-
 cmd=$0  ##`basename "$0"`
 usage="Usage: $cmd folder-name"
 
@@ -21,6 +19,17 @@ case "$folder" in
   =?*)
     rpath=`expr "x$folder" : 'x=\(.*\)'`
     ;;
+  imap://* | imaps://* )
+    rpath=`expr "x$folder" : 'ximaps*://[^/]*//*\(.*\)'`
+    ;;
+  *)echo "$cmd: unsupported folder name: $folder" >&2
+    rpath=$folder
+    ;;
+esac
+case "$rpath" in
+  /*) echo "$cmd: $rpath not relative, stripping" >&2
+      rpath=`expr "x$rpath" : 'x//*\(.*\)'`
+      ;;
 esac
 case "$rpath" in
   */*)  base=`basename "$rpath"` rpath_=`echo "$rpath" | tr / _` ;;
