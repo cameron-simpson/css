@@ -10,9 +10,8 @@ case "$X11_DEPTH,$X11_CLASS" in
 esac
 
 cd $HOME/rc/x11 || exit $?
-uncurly `ls -d dflt/* | grep -v '^dflt/CVS$'` >$HOME/.Xdefaults
 
-exec xrdb -nocpp -load $HOME/.Xdefaults
+uncurly `ls -d dflt/* | grep -v '^dflt/CVS$'` \
+| xrdb -nocpp -load -
 
-dpp ${1+"$@"} $X11/xinfo.dpp $X11/defaults \
-      | xrdb -load -nocpp
+##dpp ${1+"$@"} $X11/xinfo.dpp $X11/defaults | xrdb -load -nocpp
