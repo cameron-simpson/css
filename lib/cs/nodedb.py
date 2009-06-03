@@ -73,8 +73,8 @@ def ATTRSTable(metadata, name=None):
               )
 
 def columnInValues(column, values):
-  # return an SQLAlchemy condition that tests a column
-  # for integral values
+  ''' Return an SQLAlchemy condition that tests a column for integral values.
+  '''
   assert len(values) > 0, "columnInValues(%s, %s) with no values" % (column, values)
   if not isinstance(values,list):
     values = values[:]
@@ -121,6 +121,8 @@ class Attr(object):
     return "Attr:%s=%s" % (self.NAME, value)
 
   def __set_attr(self, _A):
+    ''' Set the backing store _Attr object for this Attr.
+    '''
     self._attr = _A
     ##self.node.nodedb._setAttrBy_Attr(self, _A)
     if _A is not None:
@@ -196,6 +198,13 @@ class AttrMap(dict):
 
   def __getitem__(self, attr):
     return [ A.VALUE for A in dict.__getitem__(self, attr) ]
+
+  def add(self, attr, value):
+    ''' Append a new value to the existing attribute values.
+    '''
+    attrs = dict.get(self, attr, [])
+    attrs.append(Attr(self.__node, attr, value))
+    dict.__setitem__(self, attr, attrs)
 
 class Node(ExceptionPrefix):
   ''' A node in the node db.
@@ -318,7 +327,7 @@ class Node(ExceptionPrefix):
       return k[:-3] in self.attrs
     return k in self.attrs
 
-  def __getattr__(self,attr):
+  def __getattr__(self, attr):
     # fetch attrs on demand
     if attr == 'attrs':
       return self.__loadattrs()
@@ -333,14 +342,16 @@ class Node(ExceptionPrefix):
         return _node.ID
       assert False, "__getattr__(%s), but %s should exist!" % (attr, attr)
     if k not in self.attrs:
-      values=()
+      values = ()
     else:
-      values=self.attrs[k]
+      values = self.attrs[k]
     if plural:
       return tuple(values)
-    if len(values) != 1:
-      raise IndexError, "k=%s, plural=%s, values=%s" % (k,plural,values)
-    return the(values)
+    if len(values) == 0:
+      raise AttributeError, "no attribute .%s" % (k,)
+    if len(values) > 1:
+      raise AttributeError, "multiple values for attribute .%s" % (k,)
+    return values[0]
 
   def __setattr__(self, attr, value):
     if attr.startswith('_'):
@@ -377,9 +388,23 @@ class Node(ExceptionPrefix):
     return self.attrs.keys()
 
   def get(self, attr, dflt):
-    if not hasattr(self, attr):
-      return dflt
-    return getattr(self, attr)
+    ''' Get attribute if present, otherwise default.
+        For uppercase attributes, normal Pythonic behaviour.
+        For lowercase pseudo-attributes, try to return self.attr().
+    '''
+    if hasattr(self, attr):
+      return getattr(self, attr)
+    if attr.islower():
+      return self.get_lcattr(attr, dflt)
+    return dflt
+
+  def add(self, attr, value):
+    ''' Append an extra value to an existing attribute list.
+    '''
+    k, plural = parseUC_sAttr(attr)
+    assert k is not None and k not in ('ID', 'TYPE', 'NAME'), \
+                "refusing to add to .%s" % (attr,)
+    self.attrs.add(k, value)
 
   def parentsByAttr(self, attr, nodetype=None):
     ''' Return parent Nodes whose .attr field mentions this Node.
@@ -485,10 +510,28 @@ class Node(ExceptionPrefix):
   def assign(self, assignment, createSubNodes=False):
     ''' Take a string of the form ATTR=values and apply it.
     '''
-    attr, valuetxt = assignment.split('=', 1)
-    assert isUC_(attr), "invalid attribute name \"%s\"" % (attr, )
-    values = self.tokenise(attr, valuetxt, createSubNodes=createSubNodes)
-    setattr(self, attr+'s', values)
+    with ExceptionPrefix(assignment):
+      attr, valuetxt = assignment.split('=', 1)
+      if attr.islower():
+        # "computed" convenience attributes
+        self.set_lcattr(attr, valuetxt)
+      else:
+        assert isUC_(attr), "invalid attribute name \"%s\"" % (attr, )
+        values = self.tokenise(attr, valuetxt, createSubNodes=createSubNodes)
+        setattr(self, attr+'s', values)
+
+  def set_lcattr(self, attr, value):
+    ''' Set a lowercase attribute value; a "computed" value.
+    '''
+    func = "set_%s" % (attr,)
+    with ExceptionPrefix(func):
+      getattr(self, func)(value)
+
+  def get_lcattr(self, attr, dflt):
+    func = "get_%s"
+    if hasattr(self, func):
+      return self.func()
+    return dflt
 
   def textload(self, ifp, createSubNodes=False):
     attrs = {}
@@ -649,7 +692,8 @@ class NodeDB(object):
         Does not imply a database commit.
     '''
     for N in self._changedNodes.copy():
-      N.apply()
+      with ExceptionPrefix("apply(%s)" % (N,)):
+        N.apply()
 
   def commit(self):
     ''' Apply all outstanding changes and do a database commit.
@@ -765,7 +809,9 @@ class NodeDB(object):
         yield self._node2Node(_node)
 
   def nodeById(self, nodeid):
-    return the(self.nodesByIds((nodeid,)))
+    nodes = list(self.nodesByIds((nodeid,)))
+    assert len(nodes) == 1, "expected 1 but got nodesByIds((%d,))=%s" % (nodeid, nodes)
+    return nodes[0]
 
   def nodeByNameAndType(self, name, nodetype, doCreate=False):
     ''' Return the node of the specified name and nodetype.
