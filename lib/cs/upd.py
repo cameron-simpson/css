@@ -153,7 +153,7 @@ class ExceptionPrefix(object):
   '''
 
   def __init__(self, prefix):
-    self.__prefix = prefix
+    self.__prefix = str(prefix)
 
   def __enter__(self):
     prefix = self.__prefix
