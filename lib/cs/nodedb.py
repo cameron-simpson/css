@@ -7,7 +7,7 @@
 from __future__ import with_statement
 from cs.mappings import isUC_, parseUC_sAttr
 import cs.sh
-from cs.misc import the, uniq, seq
+from cs.misc import the, seq
 from cs.upd import ExceptionPrefix
 import sqlalchemy
 from sqlalchemy import create_engine, \
@@ -305,14 +305,18 @@ class Node(ExceptionPrefix):
     '''
     self.nodedb._changed(self)
 
+  def __hash__(self):
+    return hash( (self.NAME, self.TYPE) )
+
   def __eq__(self, other):
     if not isNode(other):
       return False
     return self.NAME == other.NAME \
-       and self.TYPE == other.TYPE \
-       and self.attrs == other.attrs
+       and self.TYPE == other.TYPE
+
   def __str__(self):
     return "%s:%s" % (self.TYPE, self.NAME)
+
   def __repr__(self):
     return "%s:%s#%s" % (self.TYPE, self.NAME, self.ID)
 
@@ -332,9 +336,9 @@ class Node(ExceptionPrefix):
     if attr == 'attrs':
       return self.__loadattrs()
     k, plural = parseUC_sAttr(attr)
-    assert k is not None, "no attribute \"%s\"" % (attr,)
+    assert k is not None, "%s: no attribute \"%s\"" % (self,attr,)
     if k in ('ID','TYPE','NAME'):
-      assert not plural, "can't pluralise .%s" % (k,)
+      assert not plural, "%s: can't pluralise .%s" % (self,k,)
       if k == 'ID':
         _node = self._node
         if _node is None:
@@ -348,9 +352,9 @@ class Node(ExceptionPrefix):
     if plural:
       return tuple(values)
     if len(values) == 0:
-      raise AttributeError, "no attribute .%s" % (k,)
+      raise AttributeError, "%s: no attribute .%s" % (self,k,)
     if len(values) > 1:
-      raise AttributeError, "multiple values for attribute .%s" % (k,)
+      raise AttributeError, "%s: multiple values for attribute .%s" % (self,k,)
     return values[0]
 
   def __setattr__(self, attr, value):
@@ -358,21 +362,8 @@ class Node(ExceptionPrefix):
       self.__dict__[attr] = value
       return
     k, plural = parseUC_sAttr(attr)
-    assert k is not None and k not in ('ID', 'TYPE'), \
+    assert k is not None and k not in ('ID', 'TYPE', 'NAME'), \
                 "refusing to set .%s" % (attr,)
-    if k == 'NAME':
-      assert not plural
-      name = self.NAME
-      if name != value:
-        nodetype = self.TYPE
-        nodedb = self.nodedb
-        assert value is None or (value, nodetype) not in nodedb, \
-                "%s:%s already exists in nodedb" % (nodetype, value)
-        self.__dict__['NAME'] = value
-        self.nodedb._changeNodeNameAndType(self, name, nodetype)
-        if self._node is not None:
-          self._node.NAME = value
-      return
     if not plural:
       value=(value,)
     self.attrs[k]=value
@@ -724,7 +715,7 @@ class NodeDB(object):
           raise ValueError, "invalid key \"%s\"" % k
     return N
 
-  def _toNode(self, key):
+  def _toNode(self, key, doCreate=False):
     ''' Flexible get-a-node function.
         int -> nodeById(int)
         "#id" -> nodeById(int("id"))
@@ -738,9 +729,9 @@ class NodeDB(object):
         return self.nodeById(int(key[1:]))
       if key[0].isupper():
         nodetype, name = key.split(':',1)
-        return self.nodeByNameAndType(name, nodetype)
+        return self.nodeByNameAndType(name, nodetype, doCreate=doCreate)
     elif len(key) == 2:
-      return self.nodeByNameAndType(*key)
+      return self.nodeByNameAndType(key[0], key[1], doCreate=doCreate)
     raise ValueError, "can't map %s to Node" % (key,)
 
   def _nodesByIds(self, nodeids):
@@ -833,7 +824,14 @@ class NodeDB(object):
       return self.createNode(name, nodetype)
     raise IndexError, "no node matching NAME=%s and TYPE=%s" % (name, nodetype)
 
+  def make(self, name, nodetype):
+    ''' Return the node with specified name and type, creating it if necessary.
+    '''
+    return self.nodeByNameAndType(name, nodetype, doCreate=True)
+
   def nodesByType(self, nodetype):
+    ''' Return all nodes if the specified type.
+    '''
     return self._nodes2Nodes(self._nodesByType(nodetype))
 
   def nodesByAttrValue(self,attr,value):
@@ -844,9 +842,11 @@ class NodeDB(object):
                                      .filter_by(ATTR=attr, VALUE=value)
                                      .all()
               ]
-    return self.nodesByIds(uniq(nodeids))
+    return self.nodesByIds(set(nodeids))
 
-  def __contains__(self,key):
+  def __contains__(self, key):
+    ''' Test if the db contains the specified key.
+    '''
     try:
       N=self[key]
     except IndexError:
@@ -858,6 +858,12 @@ class NodeDB(object):
     # should not happen, but the code tested for it :-(
     assert N is not None
     return N
+
+  def get(self, key, dflt=None):
+    try:
+      return self[key]
+    except IndexError:
+      return dflt
 
 class TestAll(unittest.TestCase):
   def setUp(self):
