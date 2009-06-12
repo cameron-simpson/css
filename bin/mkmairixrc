@@ -8,18 +8,23 @@
 : ${MAIRIXRC_EXCLUDE_PATTERNS:='spam:spam-*:spool:spool-*:junk'}
 
 cmd=`basename "$0"` || cmd=$0
-usage="Usage: $cmd [-d maildir] [-e exclude]
+usage="Usage: $cmd [-d maildir] [--db mairixdbpath] [-e exclude]
     -d maildir	The mail folder directory.
     		Default from \$MAILDIR: $MAILDIR
+    --db mairixdbpath
+                Location of the mairix database file.
     -e exclude	Folder names to exclude.
     		Default from \$MAIRIXRC_EXCLUDE_PATTERNS: $MAIRIXRC_EXCLUDE_PATTERNS"
 
 badopts=
 
+dbpath=
+
 while [ $# -gt 0 ]
 do
   case "$1" in
     -d)	MAILDIR=$2; shift ;;
+    --db)dbpath=$2; shift ;;
     -e)	MAIRIXRC_EXCLUDE_PATTERNS=$2; shift ;;
     --)	shift; break ;;
     -?*)echo "$cmd: unrecognised option: $1" >&2
@@ -34,12 +39,15 @@ done
 			 badopts=1
 		       }
 
+[ $# = 0 ] || { echo "$cmd: extra arguments: $*" >&2; badopts=1; }
+
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
 case "$MAILDIR" in
   /*)	absmaildir=$MAILDIR ;;
   *)	absmaildir=`pwd`/$MAILDIR || exit 1 ;;
 esac
+[ -n "$dbpath" ] || dbpath=$absmaildir/.mairix.db
 
 cat <<X
 base=$absmaildir
@@ -48,5 +56,5 @@ mbox=*.gz
 omit=$MAIRIXRC_EXCLUDE_PATTERNS
 mfolder=~/tmp/mairix-result
 mformat=maildir
-database=$absmaildir/.mairix.db
+database=$dbpath
 X
