@@ -22,6 +22,8 @@ do
         badopts=1
         ;;
     *)  break ;;
+  esac
+  shift
 done
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
