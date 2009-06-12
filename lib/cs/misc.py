@@ -455,6 +455,7 @@ def index(seq, val):
   return -1
 
 def uniq(ary, canonical=None):
+  assert False, "uniq() should be superceded by set()"
   u=[]
   d={}
   for a in ary:

@@ -1,6 +1,7 @@
 import string
 import re
-from cs.misc import cmderr, debug, warn, die, uniq, the, DictUC_Attrs
+if sys.hexversion < 0x02060000: from sets import Set as set
+from cs.misc import cmderr, debug, warn, die, the, DictUC_Attrs
 from cs.hier import flavour, T_SEQ, T_MAP
 from cs.db import dosql, SQLQuery, sqlise, today
 import cs.cache
@@ -178,7 +179,8 @@ class DBDiGraph:
     return self.nodesWhere(likewhere)
 
   def nodesByAttr(self,attr,value):
-    nodeids=uniq([row['ID_REF'] for row in self.attrs.table.selectRows("ATTR = "+sqlise(attr)+" AND VALUE = "+sqlise(str(value)))])
+    nodeids = set( row['ID_REF']
+                   for row in self.attrs.table.selectRows("ATTR = "+sqlise(attr)+" AND VALUE = "+sqlise(str(value))) )
     return self.nodesFromIds(nodeids)
 
   def nodesByType(self,*types):
@@ -205,7 +207,7 @@ class DBDiGraphNode:
     return self.digraph.attrs[self.id].keys()
 
   def attrs(self):
-    return uniq(NodeCoreAttributes+self.digraph.attrs.getAttrs(self.id))
+    return set(NodeCoreAttributes+self.digraph.attrs.getAttrs(self.id))
 
   def __str__(self):
     ''' Returns "NAME(TYPE#id)".
