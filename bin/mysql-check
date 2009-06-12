@@ -28,10 +28,13 @@ done
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
+ok=1
 stty -echo
-necho "Password for $dbuser: "
-read -r dbpass
-stty echo
+necho "Password for $dbuser: " >&2
+read -r dbpass || ok=
+stty echo || ok=
+echo >&2
+[ $ok ]
 
 [ $# -gt 0 ] || set -- `echo show databases | mysql $db "-u$dbuser" "-p$dbpass" | sed 1d | sort`
 
