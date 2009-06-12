@@ -1,0 +1,43 @@
+#!/bin/sh -ue
+#
+# Emit commands to check all the tables in all the databases.
+#       - Cameron Simpson <cs@zip.com.au> 12jun2009
+#
+
+unset db dbpass
+dbuser=backup
+
+cmd=`basename "$0"`
+usage="Usage: $cmd [-u user] {-h host|-S socket} [dbnames...]"
+
+badopts=
+
+while [ $# -gt 0 ]
+do
+  case $1 in
+    -u) dbuser=$2; shift ;;
+    -h|-S) db="$1 $2"; shift ;;
+    --) shift; break ;;
+    -?*)echo "$cmd: $1: unrecognised option" >&2
+        badopts=1
+        ;;
+    *)  break ;;
+done
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+stty -echo
+necho "Password for $dbuser: "
+read -r dbpass
+stty echo
+
+[ $# -gt 0 ] || set -- `echo show databases | mysql $db "-u$dbuser" "-p$dbpass" | sed 1d | sort`
+
+for dbname
+do
+  echo show tables \
+  | mysql $db "-u$dbuser" "-p$dbpass" "$dbname" \
+  | sed 1d \
+  | sort \
+  | sed "s:.*:check table $dbname.& quick;:"
+done
