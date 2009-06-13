@@ -1,0 +1,294 @@
+changeset:   7403:abded67fb11f
+tag:         release-20090512
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Tue May 12 11:24:44 2009 +1000
+files:       release-20090512/CHANGES.txt release-20090512/SUMMARY.txt release-20090512/release-tag.txt
+description:
+Release information for release-20090512.
+
+
+changeset:   7404:359dafd00760
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Tue May 12 11:24:45 2009 +1000
+files:       .hgtags
+description:
+Added tag release-20090512 for changeset abded67fb11f
+
+
+changeset:   7405:ff68c63d6404
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Wed May 13 14:57:03 2009 +1000
+files:       lib/cs/upd.py
+description:
+upd.py: NoUpd is a factory function; capitalise it like a class.
+
+
+changeset:   7406:48bb81055dd5
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Wed May 13 14:58:49 2009 +1000
+files:       lib/cs/misc.py
+description:
+NoExceptions: don't call handler if no exception; add simpleExceptionReporter convenience handler.
+Loggable: add logException method which may call NoExceptions.simpleExceptionReporter.
+
+
+changeset:   7407:be1173bb8d66
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Fri May 15 16:32:59 2009 +1000
+files:       bin/setvar
+description:
+Consider var.$OS as possible setting.
+
+
+changeset:   7408:e56062985f4b
+parent:      7375:b31476906d9b
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sat May 16 09:12:13 2009 +1000
+files:       lib/cs/macosx.py
+description:
+Bundle the iPhone SpringBoard icon parser into a class and clean up the
+internals for later use.
+
+
+changeset:   7409:16484ad0e71a
+parent:      7407:be1173bb8d66
+parent:      7408:e56062985f4b
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sat May 16 09:12:22 2009 +1000
+description:
+Automated merge with file:///app2/home/cameron/hg/css
+
+
+changeset:   7410:7ae9a70581e4
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Mon May 18 13:25:45 2009 +1000
+files:       bin/with-prefix
+description:
+Prefix a path to $PATH et al then run a command.
+
+
+changeset:   7411:095cadecdd84
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Wed May 20 15:37:13 2009 +1000
+files:       bin/cats2procmailrc
+description:
+Don't escape . into \. in patterns; presume already ok.
+
+
+changeset:   7412:faf32781452c
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Wed May 20 15:37:49 2009 +1000
+files:       bin/dlog
+description:
+Ssh to $HOMEHOST if not already there. Add (unused) usage message.
+
+
+changeset:   7413:55633200d954
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Wed May 20 15:59:44 2009 +1000
+files:       lib/cs/misc.py
+description:
+Used old Python 2.3 staticmethod incantion for RHEL4 boxen.
+
+
+changeset:   7414:1ccea6ea1922
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Fri May 22 10:38:43 2009 +1000
+files:       bin/with-opt-css
+description:
+Executable get-css-env-then-run-command.
+
+
+changeset:   7415:43ed88c5dbd4
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Fri May 22 16:29:34 2009 +1000
+files:       bin/xt24 bin/xtdemo bin/xtn bin/xtn24
+description:
+Toss obsolete xt* xterm wrapper scripts.
+
+
+changeset:   7416:b7f3c2c89e63
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Thu May 28 12:50:42 2009 +1000
+files:       lib/cs/upd.py
+description:
+ExceptionPrefix: thread-safe prefix nesting, inner Exception agnosticism.
+
+
+changeset:   7417:802e76bc837f
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Thu May 28 15:23:48 2009 +1000
+files:       lib/cs/upd.py
+description:
+Add ShortExceptions: catch most exceptions and print tersely, unless $DEBUG.
+
+
+changeset:   7418:5b94730eb28a
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sat May 30 17:52:55 2009 +1000
+files:       bin/cs-mutt-per-folder
+description:
+cs-mutt-per-folder: add trailing newline to output.
+
+
+changeset:   7419:5e03bd63d7d1
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sat May 30 17:53:17 2009 +1000
+files:       bin/dlog
+description:
+dlog: fix variable name typo.
+
+
+changeset:   7420:49cca706880e
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sat May 30 17:53:45 2009 +1000
+files:       bin/putacc
+description:
+Putacc: pass -v to needhost to say why we refuse to play.
+
+
+changeset:   7421:9920a5e9c3f0
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sat May 30 17:54:15 2009 +1000
+files:       lib/cs/upd.py
+description:
+Improve exception reporting.
+
+
+changeset:   7422:d29a673bed73
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sat May 30 18:17:03 2009 +1000
+files:       bin/bakacc
+description:
+bakacc: backup *-local from remote host.
+
+
+changeset:   7423:420fc530a067
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Mon Jun 01 08:51:36 2009 +1000
+files:       bin/cs-mutt-per-folder
+description:
+cs-mutt-per-folder: handle imap folders. Discard some debugging.
+
+
+changeset:   7424:45dd23f35a83
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Wed Jun 03 12:54:47 2009 +1000
+files:       bin/xrdb_load
+description:
+xrdb_load: don't write ~/.Xdefaults - causes trouble.
+
+
+changeset:   7425:044a8f1af044
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Wed Jun 03 12:56:47 2009 +1000
+files:       lib/cs/upd.py
+description:
+upd.py: str-ise the ExceptionPrefix.
+
+
+changeset:   7426:af24a003a72e
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Wed Jun 03 12:57:48 2009 +1000
+files:       lib/cs/nodedb.py
+description:
+nodedb.py: lowercase attrs -> Node.attr() func, add .add() method, other small improvements.
+
+
+changeset:   7427:8b929e17027d
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Fri Jun 12 10:34:13 2009 +1000
+files:       bin/mysql-check
+description:
+Generate mysql table check commands.
+
+
+changeset:   7428:043fdfeb83e9
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Fri Jun 12 10:38:13 2009 +1000
+files:       bin/mysql-check
+description:
+Syntax fix.
+
+
+changeset:   7429:630466a17a8f
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Fri Jun 12 11:06:16 2009 +1000
+files:       bin/mysql-check
+description:
+Tidy up the password query.
+
+
+changeset:   7430:fb6213659a16
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Fri Jun 12 15:45:29 2009 +1000
+files:       lib/cs/misc.py
+description:
+cs.misc: add get0(): Return first element of a sequence, or the default.
+
+
+changeset:   7431:22597be986a3
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Fri Jun 12 17:50:08 2009 +1000
+files:       lib/cs/nodedb.py
+description:
+Node: make __eq__ test only NAME and TYPE, forbid setting .NAME, give _toNode doCreate, add __hash__, make, get.
+
+
+changeset:   7432:647b4b3e4465
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Fri Jun 12 17:50:47 2009 +1000
+files:       lib/cs/dbdigraph.py lib/cs/misc.py
+description:
+Obsolete cs.misc.uniq() in favour of set().
+
+
+changeset:   7433:f086801b62a1
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sat Jun 13 09:13:31 2009 +1000
+files:       bin/mkmairixrc
+description:
+mkmairixrc: add --db option to specify mairix db path.
+
+
+changeset:   7434:8d3241d117a5
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sat Jun 13 10:30:28 2009 +1000
+files:       bin/get-jrun-pid
+description:
+Convenience script to report the running jrun instance's pid.
+
+
+changeset:   7435:9e25637bea80
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sat Jun 13 10:31:06 2009 +1000
+files:       bin/++
+description:
+Handle new mairix.db locations.
+
+
+changeset:   7436:1ce58bc040d3
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sun Jun 14 08:13:12 2009 +1000
+files:       bin/un-at-
+description:
+un-at-: bugfix regexp, apply only to headers. Report from George Davidovich.
+
+
+changeset:   7437:75a3ecf1d2fa
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sun Jun 14 08:14:30 2009 +1000
+files:       bin/++
+description:
+Search mode: remove check for existence of mairix rc/db.
+
+
+changeset:   7438:39fdb221e864
+tag:         tip
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sun Jun 14 08:17:47 2009 +1000
+files:       Mykefile
+description:
+Mykefile: add _pending target
+
+
