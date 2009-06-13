@@ -59,7 +59,17 @@ then
   xit=0
   for dir
   do  rc=$dir/.mairixrc
-      [ -s "$rc" ] || mkmairixrc -d "$dir" >"$rc" || { xit=1; continue; }
+      case "$dir" in
+        "$MAILDIR")     dbdir=$HOME/var/mairix ;;
+        "$MAILDIR"/*)   dbdir=$HOME/var/mairix/`expr "x$dir" : "x$MAILDIR"'/\(.*\)'` ;;
+        *)              echo "$cmd: unsupported mail dir path: $dir" >&2
+                        xit=1
+                        continue
+                        ;;
+      esac
+      [ -d "$dir/." ] || $trace mkdir -p "$dir" || { xit=1; continue; }
+      dbpath=$dbdir/mairix.db
+      [ -s "$rc" ] || mkmairixrc -d "$dir" --db "$dbpath" >"$rc" || { xit=1; continue; }
       $trace mairix $vflag -f "$rc" || xit=1
   done
   exit $xit
