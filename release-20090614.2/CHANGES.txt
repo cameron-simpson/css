@@ -1,0 +1,26 @@
+changeset:   7439:99975fb694cb
+tag:         release-20090614
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sun Jun 14 08:30:05 2009 +1000
+files:       release-20090614/CHANGES.txt release-20090614/SUMMARY.txt release-20090614/release-tag.txt
+description:
+Release information for release-20090614.
+
+
+changeset:   7440:0d35add43887
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sun Jun 14 08:30:07 2009 +1000
+files:       .hgtags
+description:
+Added tag release-20090614 for changeset 99975fb694cb
+
+
+changeset:   7441:9320b3f2a475
+tag:         tip
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sun Jun 14 08:47:07 2009 +1000
+files:       bin/un-at-
+description:
+un-at-: revert default behaviour to unmunging the whole message.
+
+
