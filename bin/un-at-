@@ -1,8 +1,20 @@
 #!/usr/bin/perl
 #
+# Convert "foo at bar.dom" into "foo@bar.dom".
+# This undoes the obfuscation used in Mailman mail archives.
+#       - Cameron Simpson <cs@zip.com.au>
+#
+
+$all = 0;
+if ($ARGV[0] == '-a') {
+  shift(@ARGV);
+  $all = 1;
+}
 
 for (<>)
 {
-  s/(\S) at (([-\w]+\.)(net|com|biz|org|info|edu|mil|int|[a-z][a-z]))\b/$1\@$2/ig;
+  if ( $all || (/^From /../^$/) ) {
+    s/(\S) at (([-\w]+\.)+(net|com|biz|org|info|edu|mil|int|[a-z][a-z]))\b/$1\@$2/ig;
+  }
   print;
 }
