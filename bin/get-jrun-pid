@@ -1,0 +1,16 @@
+#!/bin/sh
+#
+# Convenience script to report the running jrun instance's pid.
+#       - Cameron Simpson <cs@zip.com.au> 13jun2009
+#
+
+cmd=`basename "$0"`
+usage="Usage: $cmd instance-name"
+
+[ $# = 1 ] || { echo "$usage" >&2; exit 2; }
+instance=$1
+shift
+
+set -- `ps ax | awk "/jrun -[s]tart $instance/ { print \\\$1 }"`
+[ $# = 1 ] || { echo "$cmd: expected one pid, found: $*" >&2; exit 1; }
+echo "$1"
