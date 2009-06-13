@@ -40,6 +40,7 @@ _help:
         @echo '_home      - deploy scripts to ~/bin etc'
         @echo '_deploy    - deploy current release to /opt/css'
         @echo '_publish   - deploy current release to /opt/css and ezos'
+        @echo '_pending   - report unreleased changelog and [M]odified files'
         @echo '_release   - mark tip as new release'
         @echo '_freshmeat - announce current release to freshmeat'
 
@@ -79,6 +80,10 @@ _publish:
 # mark the tip as a new release
 _release:
         cs-release add
+
+_pending:
+        cs-release log
+        hg status | grep '^[^?]'
 
 _freshmeat:
         cs-release freshmeat-submit
