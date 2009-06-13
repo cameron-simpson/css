@@ -5,10 +5,11 @@
 #       - Cameron Simpson <cs@zip.com.au>
 #
 
-$all = 0;
-if ($ARGV[0] == '-a') {
+$all = 1;
+if ($ARGV[0] == '-h') {
+  # header section only
   shift(@ARGV);
-  $all = 1;
+  $all = 0;
 }
 
 for (<>)
