@@ -90,10 +90,6 @@ xit=0
 for dir
 do
   rc=$dir/.mairixrc
-  db=$dir/.mairix.db
-  [ -s "$rc" -a -s "$db" ] || { echo "$cmd: skipping $dir: missing $rc or $db" >&2
-  				continue
-			      }
   eval "$trace mairix -f '$rc' -o '$res' -a $tflag $qargs" || xit=1
 done
 
