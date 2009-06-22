@@ -50,13 +50,14 @@ sedf='	# collate continuation lines
 	/^$/q
 
 	# start new line
+        s/://
 	h
        '
 
 [ $shmode ] || exec sed -n "$sedf"
 
 sed -n "$sedf" \
-| sed '	s/:*[ 	][ 	]*/\n/' \
+| sed 's/[ 	][ 	]*/\n/' \
 | sed -n \
       '	y/abcdefghijklmnopqrstuvwxyz/ABCDEFGHIJKLMNOPQRSTUVWXYZ/
 	s/[^0-9ABCDEFGHIJKLMNOPQRSTUVWXYZ__]/_/g
