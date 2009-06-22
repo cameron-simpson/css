@@ -36,7 +36,7 @@ name=
 verbose=
 farhost=
 newflag=
-sshopts=
+sshopts="-o ControlMaster=auto -o ControlPath=~/.sshctrl-%r@%h.%p"
 sshx11opt=
 ##[ -n "$DISPLAY" ] && sshx11opt=-Y
 termopts='-g M'
