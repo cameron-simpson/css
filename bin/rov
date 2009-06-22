@@ -19,4 +19,4 @@ vopt=
 from=$1 to=$2
 shift; shift
 
-exec $trace rsync -aH $vopt --ignore-existing --remove-source-files ${1+"$@"} "$from/" "$to/"
+exec $trace smv -aH $vopt ${1+"$@"} "$from/" "$to/"
