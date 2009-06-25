@@ -75,7 +75,7 @@ hg archive -t files -r "$rev" "$dstdir"
 ( cd "$dstdir"
 
   rsync -aHL --ignore-existing bin/synonyms/ bin/
-  rm -rf bin/synonyms bos csiro defunct hacks misc stubs unsw
+  rm -rf bin/synonyms bos csiro defunct hacks make-into-shell-functions misc stubs unsw
 
   cp $HOME/rc/java/au.com.zip.cs.jar lib/
 
