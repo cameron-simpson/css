@@ -57,8 +57,8 @@ _home:
                 --exclude=*.swp \\
                 --exclude=/\*/ \\
                 bin/. $(HOME)/bin/. \
-        set-x \\
-        qrsync -a bos/. $(HOME)/bin-bos/.
+        set-x qrsync -a bos/. $(HOME)/bin-bos/. \
+        set-x qrsync -a bin-cs/. $(HOME)/bin-cs/. \
         set-x \\
         qrsync -a --delete \\
                 --include=/CHANGELOG.txt \\
