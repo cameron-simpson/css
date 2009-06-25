@@ -117,7 +117,8 @@ do
   if [ -z "$luid" ]
   then
     $trace pull-group $xflag "$rgroup" "$user"
-    pfx "$user" $trace adduser -s "$shell" -u "$ruid" -g "$user" "$user"
+    usergid=`awk -F: "\$1 == \"$user\" { print \$3 }" /etc/group`
+    pfx "$user" $trace adduser --shell "$shell" --uid "$ruid" --gid "$usergid" "$user"
     muser=$user
   else
     if [ "x$luid" != "x$ruid" ]
