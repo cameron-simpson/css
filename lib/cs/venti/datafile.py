@@ -2,7 +2,7 @@
 
 from zlib import compress, decompress
 from cs.serialise import toBS, fromBSfp
-from cs.venti import hash
+from cs.venti.hash import hash
 
 def scanFile(fp):
   ''' A generator that reads a file storing data blocks.

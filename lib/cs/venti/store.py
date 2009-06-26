@@ -18,13 +18,16 @@ import os
 import os.path
 import time
 import thread
+import threading
 from Queue import Queue
 from cs.misc import cmderr, debug, isdebug, warn, progress, verbose, out, tb, seq, Loggable
 from cs.serialise import toBS, fromBS, fromBSfp
 from cs.threads import FuncQueue, Q1, DictMonitor, NestingOpenClose
-from cs.venti import tohex
+from cs.venti import tohex, defaults
+from cs.venti.block import Block
+from cs.upd import out, nl
 
-class BasicStore(Loggable,NestingOpenClose):
+class BasicStore(Loggable, NestingOpenClose):
   ''' Core functions provided by all Stores.
       For each of the core operations (store, fetch, haveyou, sync)
       a subclass must implement at least one of each of the op or op_bg methods.
@@ -55,6 +58,14 @@ class BasicStore(Loggable,NestingOpenClose):
     self.__funcQ=FuncQueue()
     self.__funcQ.open()
 
+  def __enter__(self):
+    NestingOpenClose.__enter__(self)
+    defaults.pushStore(self)
+
+  def __exit__(self, exc_type, exc_value, traceback):
+    defaults.popStore()
+    return NestingOpenClose.__exit__(self, exc_type, exc_value, traceback)
+
   def __str__(self):
     return "Store(%s)" % self.name
 
@@ -67,8 +78,8 @@ class BasicStore(Loggable,NestingOpenClose):
   def hash(self,block):
     ''' Compute the hash for a block.
     '''
-    from cs.venti.hash import hash_sha
-    return hash_sha(block)
+    from cs.venti.hash import hash_sha1
+    return hash_sha1(block)
 
   def _tagch(self,ch=None):
     ''' Allocate a tag and a (optionally) channel.
@@ -79,18 +90,26 @@ class BasicStore(Loggable,NestingOpenClose):
   def _flush(self):
     pass
 
-  def store(self,block):
-    ''' Store a block, return its hash.
+  def storeBlock(self, block):
+    ''' Store a Block object's data.
+        TODO: storeBlock_bg(), noFlush, etc ?
     '''
-    ##self.log("store %d bytes" % len(block))
-    tag, ch = self.store_bg(block)
+    assert hasattr(block, data), "block with no .data"
+    if not self.haveyou(block.h):
+      self.store(block.data)
+
+  def store(self, data, noFlush=False):
+    ''' Store a block of data, return hashcode.
+    '''
+    ##self.log("store %d bytes" % len(data))
+    tag, ch = self.store_bg(data)
     assert type(tag) is int
     tag2, h = ch.get()
-    assert type(h) is str and type(tag2) is int, "h=%s, tag2=%s"%(h,tag2)
+    assert type(h) is str and type(tag2) is int, "h=%s, tag2=%s" % (h, tag2)
     assert tag == tag2
     return h
 
-  def store_bg(self,block,noFlush=False,ch=None):
+  def store_bg(self,data,noFlush=False,ch=None):
     ''' Accept a block for storage, return a channel and tag for the completion.
         The optional ch parameter may specify the channel.
         On completion, a (tag, hashcode) tuple is put on the channel.
@@ -101,7 +120,7 @@ class BasicStore(Loggable,NestingOpenClose):
   def __store_bg2(self,block,ch,tag):
     ch.put(tag, self.store(block))
 
-  def fetch(self,h):
+  def fetch(self, h):
     ''' Fetch a block given its hash.
     '''
     ##self.log("fetch %s" % tohex(h))
@@ -109,6 +128,7 @@ class BasicStore(Loggable,NestingOpenClose):
     assert type(tag) is int
     tag, block = ch.get()
     return block
+
   def fetch_bg(self,h,noFlush=False,ch=None):
     ''' Request a block from its hash, return a channel and tag for the
         completion. The optional ch parameter may specify the channel.
@@ -128,7 +148,8 @@ class BasicStore(Loggable,NestingOpenClose):
     tag, ch = self.haveyou_bg(h)
     tag, yesno = ch.get()
     return yesno
-  def haveyou_bg(self,h,noFlush=False,ch=None):
+
+  def haveyou_bg(self, h,noFlush=False,ch=None):
     ''' Query whether a hash is in the store.
         Return a (tag, channel). A .get() on the channel will return
         (tag, yesno).
@@ -242,9 +263,9 @@ class BasicStore(Loggable,NestingOpenClose):
     tagQ.put(None)
 
 class Store(BasicStore):
-  ''' A store connected to a backend store or a type designated by a string.
+  ''' A store connected to a backend Store or a Store designated by a string.
   '''
-  def __init__(self,S):
+  def __init__(self, S):
     ''' Trivial wrapper for another store.
         If 'S' is a string:
           /path/to/store designates a GDBMStore.
@@ -256,24 +277,24 @@ class Store(BasicStore):
     if type(S) is str:
       if S[0] == '/':
         from cs.venti.gdbmstore import GDBMStore
-        S=GDBMStore(S)
+        S = GDBMStore(S)
       elif S[0] == '|':
         toChild, fromChild = os.popen2(S[1:])
         from cs.venti.stream import StreamStore
-        S=StreamStore(S,toChild,fromChild)
+        S = StreamStore(S,toChild,fromChild)
       elif S.startswith("tcp:"):
         from cs.venti.tcp import TCPStore
         host, port = S[4:].rsplit(':',1)
         if len(host) == 0:
-          host='127.0.0.1'
-        S=TCPStore((host, int(port)))
+          host = '127.0.0.1'
+        S = TCPStore((host, int(port)))
       else:
         assert False, "unhandled Store name \"%s\"" % S
     S.open()
-    self.S=S
+    self.S = S
 
   def scan(self):
-    if hasattr(self.S,'scan'):
+    if hasattr(self.S, 'scan'):
       for h in self.S.scan():
         yield h
   def shutdown(self):
@@ -298,29 +319,28 @@ class Store(BasicStore):
     if self.logfp is not None:
       self.logfp.flush()
 
-from cs.upd import out, nl
-
-def pullFromSerial(S1,S2):
-  asked=0
+def pullFromSerial(S1, S2):
+  asked = 0
   for h in S2.scan():
     asked+=1
     out("%d %s" % (asked,tohex(h)))
     if not S1.haveyou(h):
       S1.store(S2.fetch(h))
+
 def pullFrom(S1,S2):
-  haveyou_ch=Queue(size=256)
-  fetch_ch=Queue(size=256)
-  pending=DictMonitor()
-  watcher=Thread(target=_pullWatcher,args=(S1,S2,haveyou_ch,pending,fetch_ch))
+  haveyou_ch = Queue(size=256)
+  fetch_ch = Queue(size=256)
+  pending = DictMonitor()
+  watcher = Thread(target=_pullWatcher,args=(S1,S2,haveyou_ch,pending,fetch_ch))
   watcher.start()
-  fetcher=Thread(target=_pullFetcher,args=(S1,fetch_ch))
+  fetcher = Thread(target=_pullFetcher,args=(S1,fetch_ch))
   fetcher.start()
-  asked=0
+  asked = 0
   for h in S2.scan():
     asked+=1
     out("%d %s" % (asked,tohex(h)))
-    tag=seq()
-    pending[tag]=h
+    tag = seq()
+    pending[tag] = h
     S1.haveyou_ch(h,haveyou_ch,tag)
   nl('draining haveyou queue...')
   haveyou_ch.put((None,asked))
@@ -330,21 +350,21 @@ def pullFrom(S1,S2):
   out('')
 
 def _pullWatcher(S1,S2,ch,pending,fetch_ch):
-  closing=False
-  answered=0
-  fetches=0
+  closing = False
+  answered = 0
+  fetches = 0
   while not closing or asked > answered:
     tag, yesno = ch.get()
     if tag is None:
-      asked=yesno
-      closing=True
+      asked = yesno
+      closing = True
       continue
     answered+=1
     if closing:
-      left=asked-answered
+      left = asked-answered
       if left % 10 == 0:
         out(str(left))
-    h=pending[tag]
+    h = pending[tag]
     if not yesno:
       fetches+=1
       S2.fetch_ch(h,fetch_ch)
@@ -353,18 +373,18 @@ def _pullWatcher(S1,S2,ch,pending,fetch_ch):
   fetch_ch.put((None,fetches))
 
 def _pullFetcher(S1,ch):
-  closing=False
-  fetched=0
+  closing = False
+  fetched = 0
   while not closing or fetches > fetched:
     tag, block = ch.get()
     if tag is None:
-      fetches=block
-      closing=True
+      fetches = block
+      closing = True
       continue
     if closing:
-      left=fetches-fetched
+      left = fetches-fetched
       if left % 10 == 0:
         out(str(left))
     fetched+=1
-    h=S1.store(block)
+    h = S1.store(block)
     warn("stored %s" % tohex(h))
