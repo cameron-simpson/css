@@ -9,8 +9,8 @@
 from cs.misc import warn, cmderr, TODO, FIXME, isdebug
 from cs.serialise import toBS, fromBS, fromBSfp
 from cs.io import readn
-from cs.venti import MAX_SUBBLOCKS, tohex
-from cs.venti.hash import HASH_SIZE_SHA1, HASH_SHA1_T
+from cs.venti import tohex
+from cs.venti.hash import MAX_SUBBLOCKS, HASH_SIZE_SHA1, HASH_SHA1_T
 import __main__
 
 class BlockRef:
@@ -19,15 +19,17 @@ class BlockRef:
       holding their content. For larger files indirect is True and the hash
       refers to their top indirect block.
   '''
-  F_INDIRECT=0x01
-  F_NON_SHA1_HASH=0x02
-  def __init__(self,h,indirect,span):
+  F_INDIRECT = 0x01
+  F_NON_SHA1_HASH = 0x02
+
+  def __init__(self, block, indirect, span):
     assert h is not None
-    self.h=h
     self.indirect=indirect
     self.span=span
+
   def __len__(self):
     return self.span
+
   def __str__(self):
     return tohex(self.encode())
   def blocklist(self,S=None):

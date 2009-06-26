@@ -1,4 +1,8 @@
 #!/usr/bin/python -tt
+#
+# Utility routines for blocks and BlockRefs.
+#       - Cameron Simpson <cs@zip.com.au>
+#
 
 import sys
 from struct import unpack_from
@@ -10,7 +14,7 @@ from cs.misc import isdebug, debug, D, eachOf
 from cs.lex import unctrl
 import __main__
 
-def blocksOfFP(fp,rsize=None):
+def blocksOfFP(fp, rsize=None):
   ''' A generator that reads data from a file and yields blocks.
   '''
   return blocksOf(filedata(fp,rsize))
