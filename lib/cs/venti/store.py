@@ -25,6 +25,7 @@ from cs.serialise import toBS, fromBS, fromBSfp
 from cs.threads import FuncQueue, Q1, DictMonitor, NestingOpenClose
 from cs.venti import tohex, defaults
 from cs.venti.block import Block
+from cs.venti.hash import Hash_SHA1
 from cs.upd import out, nl
 
 class BasicStore(Loggable, NestingOpenClose):
@@ -57,6 +58,7 @@ class BasicStore(Loggable, NestingOpenClose):
     self.logfp=None
     self.__funcQ=FuncQueue()
     self.__funcQ.open()
+    self.hashtype = Hash_SHA1
 
   def __enter__(self):
     NestingOpenClose.__enter__(self)
@@ -69,17 +71,16 @@ class BasicStore(Loggable, NestingOpenClose):
   def __str__(self):
     return "Store(%s)" % self.name
 
+  def hash(self, data):
+    ''' Compute the hash for a chunk of data.
+    '''
+    return self.hashtype(data=data)
+
   def shutdown(self):
     ''' Called by final NestingOpenClose.close().
     '''
     self.sync()
     self.__funcQ.close()
-
-  def hash(self,block):
-    ''' Compute the hash for a block.
-    '''
-    from cs.venti.hash import hash_sha1
-    return hash_sha1(block)
 
   def _tagch(self,ch=None):
     ''' Allocate a tag and a (optionally) channel.
