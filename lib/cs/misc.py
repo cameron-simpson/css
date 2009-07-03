@@ -418,10 +418,9 @@ def eachOf(gs):
 def get0(seq, dflt=None):
   ''' Return first element of a sequence, or the default.
   '''
-  try:
-    return seq[0]
-  except IndexError:
-    return dflt
+  for i in seq:
+    return i
+  return dflt
 
 def winsize(f):
   '''   Return a (rows, columns) tuple or None for the specified file object.
