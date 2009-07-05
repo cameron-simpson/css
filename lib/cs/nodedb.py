@@ -389,6 +389,17 @@ class Node(ExceptionPrefix):
       return self.get_lcattr(attr, dflt)
     return dflt
 
+  def __getitem__(self, attr):
+    ''' Get uppercase attribute value.
+    '''
+    k, plural = parseUC_sAttr(attr)
+    if k is None:
+      raise KeyError, attr
+    value = self.get(attr, None)
+    if value is None:
+      raise KeyError, attr
+    return value
+
   def add(self, attr, value):
     ''' Append an extra value to an existing attribute list.
     '''
