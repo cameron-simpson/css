@@ -423,6 +423,27 @@ class Node(ExceptionPrefix):
       nodes = [ N for N in nodes if N.TYPE == nodetype ]
     return nodes
 
+  def attrValueText(self, attr, value):
+    ''' Return "printable" form of a an attribute value.
+    '''
+    if isNode(value):
+      if attr == "SUB"+self.TYPE and value.TYPE == self.TYPE:
+        pvalue = value.NAME
+      elif attr == value.TYPE:
+        pvalue = value.NAME
+      else:
+        pvalue = str(value)
+    else:
+      m = re_BAREURL.match(value)
+      if m is not None and m.end() == len(value):
+        pvalue = value
+      else:
+        if value.isdigit() and str(int(value)) == value:
+          pvalue = int(value)
+        else:
+          pvalue = json.dumps(value)
+    return pvalue
+
   def textdump(self, ofp):
     ofp.write("# %s\n" % (repr(self),))
     attrnames = self.attrs.keys()
@@ -431,22 +452,7 @@ class Node(ExceptionPrefix):
     for attr in attrnames:
       pattr = attr
       for value in self.attrs[attr]:
-        if isNode(value):
-          if attr == "SUB"+self.TYPE and value.TYPE == self.TYPE:
-            pvalue = value.NAME
-          elif attr == value.TYPE:
-            pvalue = value.NAME
-          else:
-            pvalue = str(value)
-        else:
-          m = re_BAREURL.match(value)
-          if m is not None and m.end() == len(value):
-            pvalue = value
-          else:
-            if value.isdigit() and str(int(value)) == value:
-              pvalue = int(value)
-            else:
-              pvalue = json.dumps(value)
+        pvalue = self.attrValueText(self, attr, value)
         if opattr is not None and opattr == pattr:
           pattr = ''
         else:
