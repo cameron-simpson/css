@@ -5,8 +5,9 @@
 #
 
 import re
+import sys
 import urllib
-from types import StringTypes
+from types import StringTypes, IntType, LongType, FloatType
 
 # Characters safe to transcribe unescaped.
 textSafeRe = re.compile(r'[^<>&]+')
@@ -15,57 +16,58 @@ dqAttrValSafeRe = re.compile(r'[-=. \w:@/?~#+&]+')
 
 def puttok(fp, tok):
   ''' Transcribe a token to HTML text.
-      A token is either a string or a sequence.
+      A token is a string, a sequence or a Tag object.
       A string is safely transcribed as flat text.
-      A sequence has 
+      A sequence has:
+        [0] the tag name
+        [1] optionally a mapping of attribute values
+        Further elements are tokens contained within this token.
   '''
+  print >>sys.stderr, "puttok: tok =", `tok`
   toktype = type(tok)
   if toktype in StringTypes:
     return puttext(fp, tok)
+  if toktype in (IntType, LongType, FloatType):
+    return puttext(fp, str(tok))
 
-  elif f is T_SEQ:
-    # token
-    if hasattr(tok, 'tag'):
-      # Tag class item
-      tag=tok.tag
-      attrs=tok.attrs
-    else:
-      # raw array [ tag[, attrs][, tokens...] ]
-      tag=tok[0]; tok=tok[1:]
-      if len(tok) > 0 and cs.hier.flavour(tok[0]) is T_MAP:
-        attrs=tok[0]; tok=tok[1:]
-      else:
-        attrs={}
-
-    isSCRIPT=(tag.upper() == 'SCRIPT')
-
-    if isSCRIPT:
-      if 'LANGUAGE' not in [a.upper() for a in attrs.keys()]:
-        attrs['language']='JavaScript'
-
-    fp.write('<')
-    fp.write(tag)
-    for k in attrs:
-      fp.write(' ')
-      fp.write(k)
-      v=attrs[k]
-      if v is not None:
-        fp.write('="')
-        fp.write(urllib.quote(str(v)))
-        fp.write('"')
-    fp.write('>')
-    if isSCRIPT:
-      fp.write("<!--\n")
-    for t in tok:
-      puttok(fp, t)
-    if isSCRIPT:
-      fp.write("\n-->")
-    fp.write('</')
-    fp.write(tag)
-    fp.write('>')
+  # token
+  if hasattr(tok, 'tag'):
+    # Tag class item
+    tag = tok.tag
+    attrs = tok.attrs
   else:
-    # unexpected
-    raise TypeError
+    # raw array [ tag[, attrs][, tokens...] ]
+    tag = tok.pop(0)
+    if len(tok) > 0 and hasattr(tok[0], 'keys'):
+      attrs = tok.pop(0)
+    else:
+      attrs={}
+
+  isSCRIPT=(tag.upper() == 'SCRIPT')
+  if isSCRIPT:
+    if 'LANGUAGE' not in [a.upper() for a in attrs.keys()]:
+      attrs['language']='JavaScript'
+
+  fp.write('<')
+  fp.write(tag)
+  for k in attrs:
+    fp.write(' ')
+    fp.write(k)
+    v=attrs[k]
+    if v is not None:
+      fp.write('="')
+      fp.write(urllib.quote(str(v)))
+      fp.write('"')
+  fp.write('>')
+  if isSCRIPT:
+    fp.write("<!--\n")
+  for t in tok:
+    puttok(fp, t)
+  if isSCRIPT:
+    fp.write("\n-->")
+  fp.write('</')
+  fp.write(tag)
+  fp.write('>')
 
 def puttext(fp, s, safeRe=None):
   ''' Transcribe plain text in HTML safe form.
