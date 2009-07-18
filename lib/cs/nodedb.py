@@ -452,7 +452,7 @@ class Node(ExceptionPrefix):
     for attr in attrnames:
       pattr = attr
       for value in self.attrs[attr]:
-        pvalue = self.attrValueText(self, attr, value)
+        pvalue = self.attrValueText(attr, value)
         if opattr is not None and opattr == pattr:
           pattr = ''
         else:
