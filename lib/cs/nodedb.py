@@ -48,7 +48,7 @@ re_NAMELIST = re.compile(r'([a-z][a-z0-9]+)(\s*,\s*([a-z][a-z0-9]+))*')
 re_COMMASEP = re.compile(r'\s*,\s*')
 
 def isNode(N):
-  ''' Test is an object is duck-typed like a Node.
+  ''' Test if an object is duck-typed like a Node.
   '''
   return hasattr(N, 'NAME') and hasattr(N, 'TYPE')
 
@@ -149,7 +149,10 @@ class Attr(object):
   def apply(self):
     ''' Apply pending changes to the backend.
         Does not imply a commit to the database.
+        A no-op if the db is in read-only mode.
     '''
+    if self.node.nodedb.readonly:
+      return
     value = self.VALUE
     _attr = self._attr
     assert _attr is not INVALID, "apply called on discarded Attr(%s)" % (self,)
@@ -285,7 +288,10 @@ class Node(ExceptionPrefix):
   def apply(self):
     ''' Apply pending changes to the database.
         Does not do a database commit.
+        A no-op if the database is in readonly mode.
     '''
+    if self.nodedb.readonly:
+      return
     _node = self._node
     if _node is None:
       _node = self.__load_node()
@@ -600,7 +606,8 @@ class Node(ExceptionPrefix):
 
 # TODO: make __enter__/__exit__ for running a session?
 class NodeDB(object):
-  def __init__(self, engine, nodes=None, attrs=None):
+  def __init__(self, engine, nodes=None, attrs=None, readonly=False):
+    self.readonly = readonly
     if nodes is None:
       nodes = 'NODES'
     if attrs is None:
@@ -698,14 +705,20 @@ class NodeDB(object):
   def apply(self):
     ''' Apply all outstanding updates.
         Does not imply a database commit.
+        A no-op if the database is in readonly mode.
     '''
+    if self.readonly:
+      return
     for N in self._changedNodes.copy():
       with ExceptionPrefix("apply(%s)" % (N,)):
         N.apply()
 
   def commit(self):
     ''' Apply all outstanding changes and do a database commit.
+        A no-op if the database is in readonly mode.
     '''
+    if self.readonly:
+      return
     self.apply()
     self.session.commit()
 
