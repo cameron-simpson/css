@@ -1,6 +1,6 @@
 #!/bin/bash -ue
 #
-# Run an arbitrary command with user user's login environment.
+# Run an arbitrary command with a user's login environment.
 # Based on discussions with Martin Costabel, Peter O'Gorman,
 # Harald Hanche-Olsen and Jeremy Huddleston.
 # Uses bash instead of sh for "printf %q" and "exec -l".
