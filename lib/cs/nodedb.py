@@ -15,6 +15,7 @@ from sqlalchemy import create_engine, \
                        select
 from sqlalchemy.orm import mapper, sessionmaker
 from sqlalchemy.sql import and_, or_, not_
+from sqlalchemy.sql.expression import distinct
 from weakref import WeakValueDictionary
 from contextlib import closing
 from types import StringTypes
@@ -384,7 +385,7 @@ class Node(ExceptionPrefix):
     '''
     return self.attrs.keys()
 
-  def get(self, attr, dflt):
+  def get(self, attr, dflt=None):
     ''' Get attribute if present, otherwise default.
         For uppercase attributes, normal Pythonic behaviour.
         For lowercase pseudo-attributes, try to return self.attr().
@@ -616,11 +617,11 @@ class NodeDB(object):
       engine = create_engine(engine, echo=len(os.environ.get('DEBUG','')) > 0)
     metadata=MetaData()
     if type(nodes) in StringTypes:
-      nodes=NODESTable(metadata,name=nodes)
+      nodes=NODESTable(metadata, name=nodes)
     self.nodes=nodes
     Index('nametype', nodes.c.NAME, nodes.c.TYPE)
     if type(attrs) is str:
-      attrs=ATTRSTable(metadata,name=attrs)
+      attrs=ATTRSTable(metadata, name=attrs)
     self.attrs=attrs
     Index('attrvalue', attrs.c.ATTR, attrs.c.VALUE)
     self.engine=engine
@@ -811,6 +812,12 @@ class NodeDB(object):
         Note that yielded Nodes may not be in the same order as the _Nodes.
     '''
     return [ self._node2Node(_node) for _node in _nodes ]
+
+  def types(self):
+    ''' Return the TYPEs present in the database.
+    '''
+    typesquery = select(columns=[distinct(self.nodes.c.TYPE)])
+    return [ R[0] for R in self.conn.execute(typesquery) ]
 
   def nodesByIds(self, nodeids):
     ''' Return the Nodes from the corresponding list if Node.ID values.
