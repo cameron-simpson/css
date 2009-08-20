@@ -61,7 +61,7 @@ def puttok(fp, tok):
     v=attrs[k]
     if v is not None:
       fp.write('="')
-      fp.write(urllib.quote(str(v)))
+      fp.write(urllib.quote(str(v), '/#:'))
       fp.write('"')
   fp.write('>')
   if isSCRIPT:
