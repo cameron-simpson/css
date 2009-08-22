@@ -114,11 +114,16 @@ shift
 xit=0
 monpid=
 sshpid=
-trap 'if [ -n "$sshpid" ]
+trap ': trap on 1 2 and 15 ...
+      if [ -n "$sshpid" ]
       then
         printf "%s" "$cmd: $target: SIGTERM received, killing ssh ($sshpid) "
         synckill -v "$sshpid"
-        [ -n "$monpid" ] && synckill -v "$monpid"
+        if [ -n "$monpid" ]
+        then
+          printf "%s" "$cmd: $target: SIGTERM received, also killing monitor ($monpid) "
+          synckill -v "$monpid"
+        fi
       fi
       exit 1
      ' 1 2 15
@@ -145,7 +150,7 @@ do
   if opid=`ifpid -q -v "$cfg_pidfile"`
   then
     printf "%s" "$cmd: stopping $target, pid $opid "
-    synckill -v "$opid"
+    synckill -v "$opid" || :
     >"$cfg_pidfile"
   else
     if [ "$stop" ]
@@ -155,9 +160,6 @@ do
 
   [ $stop ] && exit 0
 
-  echo $$ >"$cfg_pidfile"
-  echo "$target: $cfg_pidfile: $$"
-
   $trace \
     sshto ServerAliveInterval=37 -n -F "$sshcfg" "$target" \
       "( $cfg_command ) </dev/null &
@@ -166,6 +168,8 @@ do
       ' \
     >>"$cfg_outlog" </dev/null &
   sshpid=$!
+  echo "$sshpid" >"$cfg_pidfile"
+  echo "$target: $cfg_pidfile: $sshpid"
   [ $first ] || alert "RESTARTED: sshpf $target" &
 
   # start monitor
