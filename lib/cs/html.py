@@ -22,7 +22,7 @@ def puttok(fp, tok):
         [0] the tag name
         [1] optionally a mapping of attribute values
         Further elements are tokens contained within this token.
-      BUG: destorys tok. Recode to do no damage.
+      BUG: destroys tok. Recode to do no damage.
   '''
   print >>sys.stderr, "puttok: tok =", `tok`
   toktype = type(tok)
