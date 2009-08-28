@@ -22,6 +22,7 @@ def puttok(fp, tok):
         [0] the tag name
         [1] optionally a mapping of attribute values
         Further elements are tokens contained within this token.
+      BUG: destroys tok. Recode to do no damage.
   '''
   print >>sys.stderr, "puttok: tok =", `tok`
   toktype = type(tok)
@@ -36,6 +37,10 @@ def puttok(fp, tok):
     tag = tok.tag
     attrs = tok.attrs
   else:
+    # [ "&ent;" ] is an HTML character entity
+    if len(tok) == 1 and tok[0].startswith('&'):
+      fp.write(tok[0])
+      return
     # raw array [ tag[, attrs][, tokens...] ]
     tag = tok.pop(0)
     if len(tok) > 0 and hasattr(tok[0], 'keys'):
@@ -56,7 +61,7 @@ def puttok(fp, tok):
     v=attrs[k]
     if v is not None:
       fp.write('="')
-      fp.write(urllib.quote(str(v)))
+      fp.write(urllib.quote(str(v), '/#:'))
       fp.write('"')
   fp.write('>')
   if isSCRIPT:
