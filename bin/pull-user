@@ -119,7 +119,8 @@ do
     $trace pull-group $xflag "$rgroup" "$user"
     awkf="\$1 == \"$user\" { print \$3 }"
     usergid=`awk -F: "$awkf" /etc/group`
-    pfx "$user" $trace adduser --shell "$shell" --uid "$ruid" --gid "$usergid" "$user"
+    ##pfx "$user" $trace adduser --shell "$shell" --uid "$ruid" --gid "$usergid" "$user"
+    pfx "$user" $trace adduser -s "$shell" -u "$ruid" -g "$usergid" "$user"
     muser=$user
   else
     if [ "x$luid" != "x$ruid" ]
