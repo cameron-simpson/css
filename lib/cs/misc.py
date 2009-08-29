@@ -2,6 +2,7 @@ import os
 import os.path
 import errno
 import sys
+import logging
 import string
 import time
 from types import TupleType, ListType, DictType, DictionaryType
@@ -70,11 +71,21 @@ def setDebug(newlevel):
       env = os.environ.get('DEBUG', '')
       if len(env) > 0 and env != "0":
         newlevel = 3
-  global debug_level, isdebug, isverbose, isprogress
+
+  global debug_level, isdebug, isverbose, isprogress, logging_level
   debug_level = newlevel
   isdebug = (debug_level >= 3)
   isverbose = (debug_level >= 2)
   isprogress = (debug_level >= 1)
+
+  logging_level = logging.ERROR
+  if debug_level >= 3:
+    logging_level = logging.DEBUG
+  elif debug_level >= 2:
+    logging_level = logging.INFO
+  elif debug_level >= 1:
+    logging_level = logging.WARNING
+  logging.getLogger().setLevel(logging_level)
 
 setDebug(None)
 if isdebug:
