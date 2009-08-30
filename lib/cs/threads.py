@@ -22,7 +22,7 @@ class AdjustableSemaphore:
     self.__name=name
     self.__lock=allocate_lock()
   def __enter__(self):
-    with LogElapsedTime("%s(%d).__enter__: acquire" % (self.__name,self.__value)):
+    with LogTime("%s(%d).__enter__: acquire" % (self.__name,self.__value)):
       self.acquire()
   def __exit__(self,exc_type,exc_value,traceback):
     self.release()
@@ -54,7 +54,7 @@ class AdjustableSemaphore:
           delta-=1
       else:
         while delta < 0:
-          with LogElapsedTime("AdjustableSemaphore(%s): acquire excess capacity" % (self.__name,)):
+          with LogTime("AdjustableSemaphore(%s): acquire excess capacity" % (self.__name,)):
             self.__sem.acquire(True)
           delta+=1
       self.__value=newvalue

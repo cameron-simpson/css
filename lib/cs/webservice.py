@@ -26,7 +26,7 @@ def lather(obj,tc=None):
 def rinse(soap,tc):
   ''' Turn SOAP into a python object.
   '''
-  with LogElapsedTime("parse SOAP into %s object" % (tc,)):
+  with LogTime("parse SOAP into %s object" % (tc,)):
     parse = ParsedSoap(soap).Parse(tc)
   return parse
 
@@ -54,14 +54,14 @@ def callSOAP(url,action,xml,retAction,retTypecode,onerror=None):
   rq.add_header('Accept-Encoding', 'identity')
   rq.add_header('Soapaction', '"%s"'%action)
   rq.add_header('Content-Type', 'text/xml; charset="utf-8"')
-  with LogElapsedTime('callSOAP(%s): call %s with %d bytes of XML'
+  with LogTime('callSOAP(%s): call %s with %d bytes of XML'
                       % (action,url,len(xml))):
     U = urllib2.urlopen(rq)
   I=U.info()
   assert I.type in ('text/xml', 'application/soap+xml'), \
          "%s: expected text/xml, got \"%s\" from %s %s" % (cmd,I.type,action,url)
   retxml=''.join(U.readlines())
-  with LogElapsedTime('callSOAP(%s): decode %d bytes of %s response'
+  with LogTime('callSOAP(%s): decode %d bytes of %s response'
                       % (action,len(retxml),retAction)):
     ret = xml2pyobj(retxml,retTypecode)
   return ret
@@ -93,7 +93,7 @@ class BigElementProxy(ZSI.wstools.Utility.ElementProxy):
     from cs.chunkyString import ChunkyString
     cs=ChunkyString()
     cs.write(' ')       # HACK: work around bug in ZSI.wstools.c14n
-    with LogElapsedTime("BigElementProxy.canonicalize()"):
+    with LogTime("BigElementProxy.canonicalize()"):
       ZSI.wstools.Utility.Canonicalize(self.node,output=cs)
     cs=str(cs)
     ##if isdebug: print >>sys.stderr, "BigElementProxy.canonicalize: XML=[%s]" % cs
