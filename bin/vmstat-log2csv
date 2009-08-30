@@ -4,10 +4,12 @@
 #       - Cameron Simpson <cs@zip.com.au> 21nov2008
 #
 
-step=900
+step=
 
 cmd=$0
-usage="Usage: $cmd [-D step] [vmstat-log]"
+usage="Usage: $cmd -D step [vmstat-log]"
+
+badopts=
 
 if [ $# -gt 0 ] && [ "x$1" = x-D ]
 then
@@ -15,7 +17,10 @@ then
   shift
   shift
 fi
-[ $# -gt 1 ] && { echo "$usage" >&2; exit 2; }
+
+[ -n "$step" ] || { echo "$cmd: missing -D option" >&2; badopts=1; }
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
 
 cat ${1+"$@"} \
 | \
