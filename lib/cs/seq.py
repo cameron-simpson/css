@@ -5,6 +5,7 @@
 #
 
 import bisect
+import unittest
 
 class Range(list):
   def __init__(self,values=(),step=1):
@@ -86,3 +87,50 @@ def NamedTuple(fields,iter=()):
       Useful for one-off tuples/lists.
   '''
   return NamedTupleClassFactory(*fields)(iter)
+
+def imerge(*seqs):
+  ''' Merge a list of sequences in order.
+      It relies on the source sequences being ordered and their elements
+      being comparable, through slightly misordered sequences (for example,
+      as extracted from web server logs) will produce slightly misordered
+      results, as the merging is done on the basis of the front elements
+      of each sequence.
+  '''
+  #TODO: don't pop(), iterate
+  seqs = list( iter(s) for s in seqs )
+
+  # prime the list of head elements
+  heads = list(None for i in range(len(seqs)))
+  i=0
+  while i < len(seqs):
+    try:
+      heads[i] = seqs[i].next()
+    except StopIteration:
+      seqs.pop(i)
+      heads.pop(i)
+      continue
+    i += 1
+
+  # yield leading items in order
+  while len(heads) > 0:
+    choice = 0
+    head = heads[0]
+    for i in range(1, len(seqs)):
+      if heads[i] < head:
+        choice = i
+        head = heads[i]
+    yield head
+    try:
+      heads[choice] = seqs[choice].next()
+    except StopIteration:
+      heads.pop(choice)
+      seqs.pop(choice)
+
+class TestAll(unittest.TestCase):
+  def testIMerge(self):
+    self.assertEqual( list(imerge([1,2,3],[1,4,7],[2,5,6])),
+                      [1,1,2,2,3,4,5,6,7]
+                    )
+ 
+if __name__ == '__main__':
+  unittest.main()
