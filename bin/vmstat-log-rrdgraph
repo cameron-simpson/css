@@ -1,0 +1,144 @@
+#!/usr/bin/python
+#
+# Generate graphs from an RRD file made from vmstat-log data.
+#       - Cameron Simpson <cs@zip.com.au> 31aug2009
+#
+
+import getopt
+import os
+import os.path
+import sys
+if sys.hexversion < 0x02060000: from sets import Set as set
+
+cmd = sys.argv[0]
+usage = "Usage: %s -o graph-file.png [-s start] [-e end] rrd-file [RPN:*...] [-]host*_hdr..." % (cmd,)
+
+# hand a date string off to GNU date for decoding
+def unixtime(humandate):
+  fp = os.popen("date +%%s -d '%s'" % (humandate,))
+  s = fp.read()
+  fp.close()
+  assert s.endswith('\n')
+  return int(s[:-1])
+
+rrdfile = None
+imgout = None
+rrdgopts = []
+rrdgopts_pass = [ "-j", "--only-graph",
+                  "-D", "--full-size-mode",
+                ]
+rrdgopts_pass_opt = [ "-w", "--width",
+                      "-h", "--height",
+                    ]
+
+badopts = False
+
+opts = ()
+try:
+  opts, args = getopt.getopt(sys.argv[1:], 'o:s:e:w:h:jD',
+                             ["width", "height", "only-graph", "full-size-mode"])
+except getopt.GetoptError, e:
+  print >>sys.stderr, "%s: bad option: %s" % (cmd,e)
+  badopts = True
+
+for opt, arg in opts:
+  if opt == '-o':
+    # output image filename
+    imgout = arg
+  elif opt == '-s' or opt == '-e':
+    # start and end times
+    rrdgopts.extend( (opt, str(unixtime(arg))) )
+  elif opt in rrdgopts_pass:
+    rrdgopts.append(opt)
+  elif opt in rrdgopts_pass_opt:
+    rrdgopts.extend( (opt, arg) )
+  else:
+    assert False, "unimplemented option: %s" % (opt,)
+
+if imgout is None:
+  print >>sys.stderr, "%s: missing -o option" % (cmd,)
+  badopts = True
+elif os.path.exists(imgout):
+  print >>sys.stderr, "%s: %s: file exists" % (cmd,imgout,)
+  badopts = True
+
+if len(args) == 0:
+  print >>sys.stderr, "%s: missing rrd-file" % (cmd,)
+  badopts = True
+else:
+  rrdfile = args.pop(0)
+  if not os.path.exists(rrdfile):
+    print >>sys.stderr, "%s: %s: missing RRD file" % (cmd,rrdfile,)
+    badopts = True
+  if len(args) == 0:
+    print >>sys.stderr, "%s: missing host*-hdr items" % (cmd,)
+    badopts = True
+
+# gather data source names from RRD file
+expr = None
+dsexpr = {}
+dsset = set()
+if rrdfile is not None:
+  for rrdinfo in os.popen("rrdtool info %s" % (rrdfile,)):
+    if rrdinfo.startswith('ds['):
+      ds = rrdinfo[3:].split(']',1)[0]
+      dsset.add(ds)
+
+  # choose data sources
+  dsgraph = set()
+  for hostitem in args:
+    if hostitem.startswith('RPN:'):
+      # RPN expression for following items
+      expr = hostitem[4:]
+      if len(expr) == 0:
+        expr = None
+      continue
+
+    ohostitem = hostitem
+    reject = False
+    if hostitem.startswith('-'):
+      reject = True
+      hostitem = hostitem[1:]
+    if '*' in hostitem:
+      left, right = hostitem.split('*')
+      minlen = len(left)+len(right)+1
+      matches = [ ds for ds in dsset if len(ds) >= minlen and ds.startswith(left) and ds.endswith(right) ]
+      if len(matches) == 0:
+        print >>sys.stderr, "%s: %s: no matches in RRD file" % (cmd,ohostitem)
+        badopts = True
+        continue
+    elif hostitem not in dsset:
+      print >>sys.stderr, "%s: %s: not in RRD file" % (cmd,ohostitem)
+      badopts = True
+      continue
+    else:
+      matches = [hostitem]
+    if reject:
+      dsgraph.difference_update(matches)
+    else:
+      dsgraph.update(matches)
+      for match in matches:
+        dsexpr[match] = expr
+
+  dsgraph = list(dsgraph)
+  dsgraph.sort()
+
+if badopts:
+  print >>sys.stderr, usage
+  sys.exit(2)
+
+# emit graphing command
+colours = ("00ff00", "0000ff", "ff0000", "ffff00", "ff00ff", "000000")
+print "rrdtool graph %s %s" % (imgout, " ".join(rrdgopts)),
+for ds in dsgraph:
+  print " DEF:%s=%s:%s:MAX" % (ds, rrdfile, ds),
+ncolours = list(colours)
+for ds in dsgraph:
+  expr = dsexpr[ds]
+  if expr is None:
+    dsname = ds
+  else:
+    dsname = "expr_"+ds
+    print " CDEF:%s=%s" % (dsname,expr.replace('%s',ds)),
+  print " LINE:%s#%s:%s" % (dsname, ncolours.pop(0), ds,),
+print

@@ -1,0 +1,128 @@
+#!/usr/bin/python
+#
+# Merge vmstat-log files into a single RRD file.
+#       - Cameron Simpson <cs@zip.com.au> 31aug2009
+# 
+
+import getopt
+import os
+import os.path
+import sys
+if sys.hexversion < 0x02060000: from sets import Set as set
+import cs.seq
+
+cmd = sys.argv[0]
+usage='''Usage: %s -D delay rrd-file vmstat-*.log...
+  -D delay      Specify interline delay of the vmstat data.
+  rrd-file      Output RRD file.
+  vmstat-*.log  vmstat-log output files.''' % (cmd,)
+
+class VMstatLog(object):
+  def __init__(self, filename, tag):
+    self.filename = filename
+    self.fp = os.popen("vmstat-log2csv -D 15 '%s'" % (filename,))
+    self.tag = tag
+    hdrs = self.fp.readline()
+    assert hdrs.endswith('\n'), "%s: no headers" % (filename,)
+    self.hdrs = hdrs[:-1].split(',')
+    timecol = self.hdrs.pop(0)
+    self.dslist = [ "%s_%s" % (tag, hdr) for hdr in self.hdrs ]
+    assert timecol == "unixtime", "%s: expected unixtime, got: %s" % (filename,timecol,)
+    self.start, self.data0 = self._data(self.fp.readline())
+
+  def _data(self, line):
+      assert line.endswith('\n'), "%s: unexpected EOF" % (self.filename,)
+      values = [ int(F) for F in line[:-1].split(',') ]
+      when = values.pop(0)
+      return when, dict(zip(self.dslist, values))
+
+  def __iter__(self):
+    yield self.start, self.data0
+    for line in self.fp:
+      yield self._data(line)
+
+badopts = False
+
+try:
+  opts, args = getopt.getopt(sys.argv[1:], 'D:')
+except getopt.GetoptError, e:
+  print >>sys.stderr, "%s: bad option: %s" % (cmd,e)
+  badopts = True
+opts = dict(opts)
+Dopt = opts.get('-D')
+if Dopt is None:
+  print >>sys.stderr, "%s: missing -D option" % (cmd,)
+  badopts = True
+elif not Dopt.isdigit():
+  print >>sys.stderr, "%s: -D %s: expected an integer" % (cmd,Dopt)
+  badopts = True
+else:
+  delay = int(Dopt)
+
+if len(args) == 0:
+  print >>sys.stderr, "%s: missing rrd-file" % (cmd,)
+  badopts = True
+else:
+  rrdfile = args.pop(0)
+  assert rrdfile.endswith('.rrd'), "%s: RRD file must end in .rrd: %s" % (cmd, rrdfile)
+  assert not os.path.exists(rrdfile), "%s: file exists: %s" % (cmd, rrdfile)
+  rrdbase = rrdfile.rsplit('.', 1)[0]
+  if len(args) == 0:
+    print >>sys.stderr, "%s: missing vmstat-*.log files" % (cmd,)
+    badopts = True
+  else:
+    # sanity check log file names
+    for logfile in args:
+      if not logfile.startswith('vmstat-') or not logfile.endswith('.log'):
+        print >>sys.stderr, "%s: %s: expected vmstat-*.log" % (cmd,logfile,)
+        badopts = True
+      elif not os.path.exists(logfile):
+        print >>sys.stderr, "%s: %s: missing log file" % (cmd,logfile,)
+        badopts = True
+
+if badopts:
+  print >>sys.stderr, usage
+  sys.exit(2)
+
+files = []
+start = None
+fields = set()
+hdrsets = {}
+for logfile in args:
+  tag = logfile[7:-4]
+  F = VMstatLog(logfile, tag)
+  files.append(F)
+  fields.update( "%s_%s" % (tag, hdr) for hdr in F.hdrs )
+  for hdr in F.hdrs:
+    hdrsets.setdefault(hdr, set()).add("%s_%s" % (tag, hdr))
+  if start is None or F.start < start:
+    start = F.start
+
+# generate a 100 hour RRD file with 10 second slots
+print "rrdtool create %s --start %d -s 10" % (rrdfile,start-1,),
+for hdr in fields:
+  print " DS:%s:GAUGE:30:0:U" % (hdr,),
+print " RRA:MAX:0.3:1:3600 RRA:AVERAGE:0.3:1:36000"
+sys.stdout.flush()
+
+def printnow(when, data):
+  dslist = data.keys()
+  print "rrdtool update %s -t %s %d:%s" \
+        % (rrdfile,
+           ":".join(dslist),
+           when,
+           ":".join( str(data[ds]) for ds in dslist )
+              )
+
+now = None
+nowdata = None
+for when, data in cs.seq.imerge(*files):
+  if now is None or now != when:
+    if now is not None:
+      assert now < when, "%s: out of order: now=%d, when=%d" % (cmd, now, when)
+      printnow(now, nowdata)
+    now = when
+    nowdata = {}
+  nowdata.update(data)
+if now is not None:
+  printnow(now, nowdata)
