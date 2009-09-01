@@ -185,6 +185,12 @@ class ExceptionPrefix(object):
     raise _PrefixedException(prefix, exc_value), None, tb
 
 class ShortExceptions(object):
+  ''' Wrapper to catch exceptions and abort with a short error message.
+      This is really only intended for use as an outermost wrapper for a main
+      program to produce more user friendly messages.
+      Setting cs.misc.debug passes exceptions out unharmed, eg:
+        DEBUG=1 the-program ...
+  '''
   def __enter__(self):
     pass
   def __exit__(self, exc_type, exc_value, tb):
