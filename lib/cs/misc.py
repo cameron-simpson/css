@@ -2,6 +2,8 @@ import os
 import os.path
 import errno
 import sys
+import logging
+info = logging.info
 import string
 import time
 from types import TupleType, ListType, DictType, DictionaryType
@@ -70,11 +72,21 @@ def setDebug(newlevel):
       env = os.environ.get('DEBUG', '')
       if len(env) > 0 and env != "0":
         newlevel = 3
-  global debug_level, isdebug, isverbose, isprogress
+
+  global debug_level, isdebug, isverbose, isprogress, logging_level
   debug_level = newlevel
   isdebug = (debug_level >= 3)
   isverbose = (debug_level >= 2)
   isprogress = (debug_level >= 1)
+
+  logging_level = logging.ERROR
+  if debug_level >= 3:
+    logging_level = logging.DEBUG
+  elif debug_level >= 2:
+    logging_level = logging.INFO
+  elif debug_level >= 1:
+    logging_level = logging.WARNING
+  logging.getLogger().setLevel(logging_level)
 
 setDebug(None)
 if isdebug:
@@ -324,18 +336,19 @@ class NoExceptions(object):
     if exc_type is not None:
       if self.__handler is not None:
         return self.__handler(exc_type, exc_value, traceback)
-      print >>sys.stderr, "ignore %s" % (exc_type,)
+      info("ignore "+str(exc_type))
     return True
 
-  def simpleExceptionReport(exc_type, exc_value, traceback, mark=None):
-    ''' Convenience method to report exceptions to standard error.
+  def simpleExceptionReport(exc_type, exc_value, traceback, mark=None, loglevel=logging.WARNING):
+    ''' Convenience method to log exceptions to standard error.
     '''
     if mark is None:
       mark=cmd
     else:
       mark="%s: %s" % (cmd, mark)
-    print >>sys.stderr, "%s: EXCEPTION: %s: %s [%s]" % (mark, exc_type, exc_value, traceback)
+    log("%s: EXCEPTION: %s: %s [%s]" % (mark, exc_type, exc_value, traceback), level=loglevel)
     return True
+  # backward compatible static method arrangement
   simpleExceptionReport = staticmethod(simpleExceptionReport)
 
 T_SEQ = 'ARRAY'

@@ -10,7 +10,8 @@ from thread import allocate_lock
 from threading import Semaphore, Thread
 from Queue import Queue
 from collections import deque
-from cs.misc import seq, debug, isdebug, tb, cmderr, warn, reportElapsedTime, logFnLine
+from cs.misc import seq, debug, isdebug, tb, cmderr, warn
+from cs.logutils import LogElapsedTime
 
 class AdjustableSemaphore:
   ''' A semaphore whose value may be tuned after instantiation.
@@ -21,9 +22,8 @@ class AdjustableSemaphore:
     self.__name=name
     self.__lock=allocate_lock()
   def __enter__(self):
-    return reportElapsedTime("%s(%d).__enter__: acquire" \
-                               % (self.__name,self.__value),
-                             self.acquire)
+    with LogTime("%s(%d).__enter__: acquire" % (self.__name,self.__value)):
+      self.acquire()
   def __exit__(self,exc_type,exc_value,traceback):
     self.release()
     return False
@@ -54,7 +54,8 @@ class AdjustableSemaphore:
           delta-=1
       else:
         while delta < 0:
-          reportElapsedTime("AdjustableSemaphore(%s): acquire excess capacity"%self.__name,self.__sem.acquire,True)
+          with LogTime("AdjustableSemaphore(%s): acquire excess capacity" % (self.__name,)):
+            self.__sem.acquire(True)
           delta+=1
       self.__value=newvalue
 
@@ -129,7 +130,6 @@ class IterableQueue(Queue):
       self.close()
 
   def close(self):
-    ##logFnLine("%s.close()"%(self,),frame=sys._getframe(1))
     if self.__closed:
       # this should be a real log message
       print >>sys.stderr, "close() on closed IterableQueue"
