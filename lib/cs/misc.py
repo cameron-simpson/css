@@ -22,7 +22,7 @@ def setcmd(ncmd):
 
 setcmd(os.path.basename(sys.argv[0]))
 
-class _NoUpd:
+class _NullUpd:
   ''' A dummy class with the same duck type as cs.upd.Upd
       used when cs.upd has not be instantiated by a program.
   '''
@@ -43,7 +43,7 @@ class _NoUpd:
     return False
   def without(self, func, *args, **kw):
     return func(*args, **kw)
-_defaultUpd = _NoUpd()
+_defaultUpd = _NullUpd()
 
 # print to stderr
 def warn(*args):
@@ -161,13 +161,12 @@ def cmderr(*args):
 def TODO(msg):
   ''' Marker for missing features.
   '''
-  if ifverbose():
-    logFnLine(msg, frame=sys._getframe(1), prefix="TODO(%s)"%cmd)
+  info("TODO: %s" % (msg,))
 
 def FIXME(msg):
   ''' Marker for outstanding bugs.
   '''
-  logFnLine(msg, frame=sys._getframe(1), prefix="FIXME(%s)"%cmd)
+  warn("WARNING: %s" % (msg,))
 
 def tb(limit=None):
   ''' Print a stack backtrace.
@@ -232,6 +231,8 @@ def logFnLine(line, frame=None, prefix=None, mark=None):
   '''
   if frame is None:
     frame = sys._getframe(1)
+  elif type(frame) is int:
+    frame = sys._getframe(frame)
   line = "%s [%s(), %s:%d]" \
          % (line, frame.f_code.co_name, frame.f_code.co_filename, frame.f_lineno)
   if prefix is not None:
