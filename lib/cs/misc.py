@@ -4,6 +4,7 @@ import errno
 import sys
 import logging
 info = logging.info
+warning = logging.warning
 import string
 import time
 from types import TupleType, ListType, DictType, DictionaryType
@@ -50,7 +51,7 @@ def warn(*args):
   ''' "Complaint" error message.
   '''
   global _defaultUpd
-  return _defaultUpd.nl(" ".join([str(s) for s in args]))
+  _defaultUpd.without(warning, " ".join(str(s) for s in args))
 
 # debug_level:
 #   0 - quiet
