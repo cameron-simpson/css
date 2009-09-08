@@ -104,10 +104,10 @@ def seq():
 def getrefs(M):
   for hdr in M.get_all('references', ()):
     for R in hdr.split(','):
-      yield r.strip()
+      yield R.strip()
   for hdr in M.get_all('in-reply-to', ()):
     for R in hdr.split(','):
-      yield r.strip()
+      yield R.strip()
 
 if __name__ == "__main__":
   sys.exit(main(sys.argv))
