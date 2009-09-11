@@ -8,7 +8,7 @@ from __future__ import with_statement
 from cs.mappings import isUC_, parseUC_sAttr
 import cs.sh
 from cs.misc import the, seq
-from cs.upd import ExceptionPrefix
+from cs.logutils import Pfx
 import sqlalchemy
 from sqlalchemy import create_engine, \
                        MetaData, Table, Column, Index, Integer, String, \
@@ -206,7 +206,7 @@ class AttrMap(dict):
     attrs.append(Attr(self.__node, attr, value))
     dict.__setitem__(self, attr, attrs)
 
-class Node(ExceptionPrefix):
+class Node(object):
   ''' A node in the node db.
       A node has the following attributes:
         ID, the db id - made at need; try to avoid using it
@@ -228,7 +228,13 @@ class Node(ExceptionPrefix):
     self.__dict__['TYPE'] = nodetype
     self.__set_node(_node)
     self.nodedb._noteNodeNameAndType(self)
-    ExceptionPrefix.__init__(self, str(self))
+    self.__dict__['_pfx'] = Pfx(str(self))
+
+  def __enter__(self):
+    self._pfx.enter()
+
+  def __exit__(self, exc_type, exc_value, traceback):
+    self._pfx.exit(exc_type, exc_value, traceback)
 
   def __set_node(self, _node):
     if _node is None:
@@ -325,6 +331,10 @@ class Node(ExceptionPrefix):
     return self.NAME == other.NAME \
        and self.TYPE == other.TYPE
 
+  def name(self):
+    return "%s:%s" % (self.TYPE, self.NAME)
+
+  # not straight __str__ = name because we want to follow subclasses
   def __str__(self):
     return "%s:%s" % (self.TYPE, self.NAME)
 
@@ -536,7 +546,7 @@ class Node(ExceptionPrefix):
   def assign(self, assignment, createSubNodes=False):
     ''' Take a string of the form ATTR=values and apply it.
     '''
-    with ExceptionPrefix(assignment):
+    with Pfx(assignment):
       attr, valuetxt = assignment.split('=', 1)
       if attr.islower():
         # "computed" convenience attributes
@@ -550,7 +560,7 @@ class Node(ExceptionPrefix):
     ''' Set a lowercase attribute value; a "computed" value.
     '''
     func = "set_%s" % (attr,)
-    with ExceptionPrefix(func):
+    with Pfx(func):
       getattr(self, func)(value)
 
   def get_lcattr(self, attr, dflt):
@@ -727,7 +737,7 @@ class NodeDB(object):
     if self.readonly:
       return
     for N in self._changedNodes.copy():
-      with ExceptionPrefix("apply(%s)" % (N,)):
+      with Pfx("apply(%s)" % (N,)):
         N.apply()
 
   def commit(self):
