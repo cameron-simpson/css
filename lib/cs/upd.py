@@ -3,6 +3,7 @@ import threading
 from contextlib import contextmanager
 import atexit
 from cs.lex import unctrl       ##, tabpadding
+from cs.logutils import Pfx
 
 active=False
 
@@ -138,51 +139,6 @@ def _summarise_exception(exc_value):
   if len(summary) == 0:
     summary = `exc_value`
   return summary
-
-_ExceptionPrefixState = threading.local()
-
-class _PrefixedException(StandardError):
-  def __init__(self, prefix, inner_exception, inner_text=None):
-    self.prefix = prefix
-    self.inner_exception = inner_exception
-    if inner_text is None:
-      inner_text = _summarise_exception(inner_exception)
-    self.inner_text = inner_text
-  def __str__(self):
-    return "%s: %s" % (self.prefix, self.inner_text)
-
-class ExceptionPrefix(object):
-  ''' A context manager to prefix exception complaints.
-  '''
-
-  def __init__(self, prefix):
-    self.__prefix = str(prefix)
-
-  def __enter__(self):
-    prefix = self.__prefix
-    global _ExceptionPrefixState
-    if hasattr(_ExceptionPrefixState, 'prefix'):
-      oldprefix = _ExceptionPrefixState.prefix
-      if oldprefix is not None:
-        prefix = oldprefix + ': ' + prefix
-    else:
-      oldprefix = None
-    self.__oldprefix = oldprefix
-    _ExceptionPrefixState.prefix = prefix
-
-  def __exit__(self, exc_type, exc_value, tb):
-    _ExceptionPrefixState.prefix = self.__oldprefix
-    if exc_type is None or exc_type is SystemExit:
-      return False
-    prefix = self.__prefix
-    if self.__oldprefix is None:
-      upd_state = state()
-      if len(upd_state) > 0:
-        prefix = upd_state + ": " + prefix
-    if exc_type is _PrefixedException:
-      exc_value.prefix = prefix + ": " + exc_value.prefix
-      return False
-    raise _PrefixedException(prefix, exc_value), None, tb
 
 class ShortExceptions(object):
   ''' Wrapper to catch exceptions and abort with a short error message.

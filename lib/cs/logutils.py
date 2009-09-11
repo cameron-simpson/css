@@ -6,6 +6,7 @@
 
 from __future__ import with_statement
 import logging
+import sys
 import time
 import threading
 import cs.misc
@@ -13,23 +14,45 @@ import cs.misc
 class _PrefixState(threading.local):
   def __init__(self):
     self.current = cs.misc.cmd
+    self.raise_prefix = None
     self.prior = []
 _prefix = _PrefixState()
 
 class Pfx(object):
-  def __enter__(self, mark, absolute=False):
+  ''' A context manager to maintain a per-thread stack of message prefices.
+      The function current_prefix() returns the current prefix value.
+  '''
+  def __init__(self, mark, absolute=False):
     global _prefix
     if absolute:
-      new = mark
+      newmark = mark
     else:
-      new = self.current + ': ' + mark
-    self.prior.append(self.current)
-    self.current = new
+      newmark = _prefix.current + ': ' + str(mark)
+    self.mark = newmark
+  def __enter__(self):
+    global _prefix
+    _prefix.prior.append( (_prefix.current, _prefix.raise_prefix) )
+    _prefix.current = self.mark
+    _prefix.raise_prefix = self.mark
   def __exit__(self, exc_type, exc_value, traceback):
-    self.current = self.prior.pop()
+    global _prefix
+    pfx = _prefix.raise_prefix
+    if pfx is not None:
+      if exc_value is not None:
+        print >>sys.stderr, "Pfx.__exit__: exc_value = %s" % (`exc_value`,)
+        exc_value.args = [pfx + ": " + exc_value.args[0]] \
+                       + list(exc_value.args[1:])
+        pfx = None
+    _prefix.current, _prefix.raise_prefix = _prefix.prior.pop()
+    if pfx is None:
+      _prefix.raise_prefix = None
     return False
+  enter = __enter__
+  exit = __exit__
 
 def current_prefix():
+  ''' Return the current prefix value as used by the Pfx class.
+  '''
   global _prefix
   return _prefix.current
 
