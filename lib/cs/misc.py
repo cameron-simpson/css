@@ -51,7 +51,7 @@ def warn(*args):
   ''' "Complaint" error message.
   '''
   global _defaultUpd
-  _defaultUpd.without(warning, " ".join(str(s) for s in args))
+  _defaultUpd.without(warning, " ".join([str(s) for s in args]))
 
 # debug_level:
 #   0 - quiet
