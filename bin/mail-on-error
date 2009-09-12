@@ -1,0 +1,58 @@
+#!/bin/sh -ue
+#
+# Run command. Send standard error by email if it fails.
+#       - Cameron Simpson <cs@zip.com.au> 13sep2009
+#
+
+: ${TMPDIR:=/tmp}
+
+cmd=`basename "$0"`
+usage="Usage: $cmd -s subject addresses command [args...]"
+
+subj=
+
+badopts=
+
+while [ $# -gt 0 ]
+do
+  case $1 in
+    -s) subj=$2; shift ;;
+    --) shift; break ;;
+    -?*)echo "$cmd: unrecognised option: $1" >&2
+        badopts=1
+        ;;
+    *)  break ;;
+  esac
+  shift
+done
+
+if [ -z "$subj" ]
+then
+  echo "$cmd: missing -s subject" >&2
+  badopts=1
+fi
+
+if [ $# = 0 ]
+then
+  echo "$cmd: missing addresses" >&2
+  badopts=
+else
+  addrs=$1
+  shift
+fi
+
+if [ $# = 0 ]
+then
+  echo "$cmd: missing command" >&2
+  badopts=1
+fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+tmp=$TMPDIR/$cmd.err.$$
+trap 'rm -f "$tmp"' 0 1 2 3 15
+
+"$@" 2>"$tmp" && exit 0
+xit=$?
+mailsubj -s "$subj" "$addrs" <"$tmp"
+exit $xit
