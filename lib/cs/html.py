@@ -22,7 +22,6 @@ def puttok(fp, tok):
         [0] the tag name
         [1] optionally a mapping of attribute values
         Further elements are tokens contained within this token.
-      BUG: destroys tok. Recode to do no damage.
   '''
   print >>sys.stderr, "puttok: tok =", `tok`
   toktype = type(tok)
@@ -42,6 +41,7 @@ def puttok(fp, tok):
       fp.write(tok[0])
       return
     # raw array [ tag[, attrs][, tokens...] ]
+    tok = list(tok)
     tag = tok.pop(0)
     if len(tok) > 0 and hasattr(tok[0], 'keys'):
       attrs = tok.pop(0)
