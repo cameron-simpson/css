@@ -23,12 +23,22 @@ hg log --template "$template" ${1+"$@"} \
                     lastauthor=author
                     lastfiles=""
                   }
+                }
+        /^\t/   {
+                  desc=$1
+                  for (i=2; i<=NF; i++) {
+                    desc = desc" "$i
+                  }
                   if (files != lastfiles) {
                     if (length(files) > 0) {
-                      print "    " files
+                      print "   " files
                     }
                     lastfiles=files
                   }
+                  if (length(files) > 0) {
+                      print "      " desc
+                  } else {
+                      print "    " desc
+                  }
                 }
-        /^[^0-9]/{ print }
       '
