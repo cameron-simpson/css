@@ -10,11 +10,12 @@
 : ${SSHTO_CONFIG:=$HOME/.sshtorc}
 : ${SSHTO_PREFIX:=''}
 
+oldstyle=
 cf=$SSHTO_CONFIG
 trace=  ##set-x
-sshopts=
-lsshopts=
-oldstyle=
+sshopts=        # options for each ssh invocation
+lsshopts=       # options for the outermost ssh invocation
+                # this will include $sshopts
 mycfg=$HOME/.ssh/config
 [ -s "$mycfg" -a -r "$mycfg" ] && lsshopts="$lsshopts -F \"\$mycfg\""
 topt=
@@ -58,13 +59,15 @@ havehost=
 first=1
 while [ $# -gt 0 ]
 do
-  ##echo "sshto: *=[$*]" >&2
   case $1 in
     -t)	topt=-t ;;
     +t)	topt= ;;
     -f) fopt=-f ;;
     -E)	presh=$env_presh ;;
-    -[aAgknNqsTvxXYC1246])
+    -v) trace=set-x
+	sshopts="$sshopts $1"
+	;;
+    -[aAgknNqsTxXYC1246])
 	sshopts="$sshopts $1"
 	;;
     -[bceiIlmopFLRD])
@@ -192,7 +195,6 @@ split_target()
 
 hostpath=`expand_hostpath "$host"`
 [ -z "$SSHTO_PREFIX" ] || hostpath="$SSHTO_PREFIX!$hostpath"
-##echo "[$host] -> [$hostpath]" >&2
 if [ $oldstyle ]
 then
   host=$hostpath
@@ -204,7 +206,6 @@ then
         host=` expr "x$host" : 'x\(.*\)!.*'`
         osshcmd=$sshcmd
         sshcmd="exec ssh $sshargv "`shqstr "$rhost" "$sshcmd"`
-        ##echo "[$osshcmd] -> [$sshcmd]" >&2
         ;;
       *)
         break
@@ -222,5 +223,4 @@ else
   fi
 fi
 
-##set -x
 eval "exec $trace ssh $fopt $lsshopts $sshargv $host \"\$sshcmd\""
