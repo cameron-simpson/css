@@ -113,6 +113,13 @@ sshcmd=$presh$*
 
 expand_host()
 { _xph_host=$1
+  # pull off the login for reuse at the final component
+  _xph_loginpfx=
+  case "$_xph_host" in
+    *@*)
+      _xph_loginpfx=`expr "x$_xph_host" : 'x\(.*\)@.*'`
+      _xph_host=`    expr "x$_xph_host" : 'x.*@\(.*\)'`
+  esac
   if [ -f "$cf" -a -s "$cf" ]
   then
     _xph_changed=
@@ -136,6 +143,20 @@ expand_host()
           ;;
       esac
     done 3<"$cf"
+  fi
+  # restore the login if any
+  if [ -n "$_xph_loginpfx" ]
+  then
+    case "$_xph_host" in
+      *\!*)
+        _xph_left=` expr "x$_xph_host" : 'x\(.*\)!.*'`
+        _xph_right=`expr "x$_xph_host" : 'x.*!\(.*\)'`
+        case "$_xph_right" in
+          *@*)  _xph_right=`expr 'x$_xph_right' : 'x.*@\(.*\)'` ;;
+        esac
+        _xph_host=$_xph_left!$_xph_loginpfx@$_xph_right
+        ;;
+    esac
   fi
   printf '%s\n' "$_xph_host"
 }
