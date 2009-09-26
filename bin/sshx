@@ -15,7 +15,7 @@ badopts=
 while [ $# -gt 0 ]
 do
   case "$1" in
-    -[aAgknNqstTxXYC1246])
+    -[aAfgknNqstTxXYC1246])
 	sshopts="$sshopts $1"
 	;;
     -[bceiIlmopFLRD])
