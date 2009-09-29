@@ -184,7 +184,7 @@ do
     # Do not honour the .hbfiles file in the backup directory.
     # 
     --no-hbfiles)
-      usehbfiles=1
+      usehbfiles=
       ;;
 
     # =item --no-hbinclude
@@ -306,7 +306,12 @@ fi
 if [ $usehbfiles ]
 then
   hbfiles=$dest/.hbfiles
-  [ -s "$hbfiles" ] && set -- ${1+"$@"} -r "--files-from=$hbfiles"
+  if [ ! -s "$hbfiles" ]
+  then
+    echo "$cmd: $hbfiles: expected non-empty file, aborting" >&2
+    exit 1
+  fi
+  set -- ${1+"$@"} -r "--files-from=$hbfiles"
 fi
 
 #
