@@ -227,6 +227,7 @@ fi
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
 # run mysql command (mysqldump etc) using the supplied user/pass/host/port/sock
+# Usage: _mysqlcmd user password host port socket [-f] command [args...]
 _mysqlcmd()
 { mc_user=$1 mc_pass=$2 mc_h=$3 mc_p=$4 mc_s=$5
   shift; shift; shift; shift; shift
@@ -239,14 +240,14 @@ _mysqlcmd()
   shift
   if [ -n "$mc_h" ]
   then
-    mc_trace="$mc_cmd -u $mc_user -p.. -h $mc_h   -P $mc_p $*"
+    mc_trace="$mc_cmd -u $mc_user -p.. -h $mc_h   -P $mc_p ${1+$*}"
     set -- -u "$mc_user" "-p$mc_pass"  -h "$mc_h" -P "$mc_p" ${1+"$@"}
   else
     mc_trace="$mc_cmd -u $mc_user -p.. -S $mc_s $*"
     set -- -u "$mc_user" "-p$mc_pass"  -S "$mc_s"            ${1+"$@"}
   fi
   [ -z "$trace" ] || eecho "$mc_trace"  # conceals the password string
-  [ -z "$doit" ] || tag_fd 2 "$mysqlcmd_pfx:$mc_cmd" "$mc_cmd" "$@"
+  [ -z "$doit" ] || tag_fd 2 "$mysqlcmd_pfx:$mc_cmd" "$mc_cmd" ${1+"$@"}
   doit=$mc_odoit
 }
 # run a mysql command against the source database
