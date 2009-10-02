@@ -11,7 +11,7 @@ from threading import Semaphore, Thread
 from Queue import Queue
 from collections import deque
 from cs.misc import seq, debug, isdebug, tb, cmderr, warn
-from cs.logutils import LogElapsedTime
+from cs.logutils import LogTime
 
 class AdjustableSemaphore:
   ''' A semaphore whose value may be tuned after instantiation.
