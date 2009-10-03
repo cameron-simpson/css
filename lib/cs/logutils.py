@@ -39,9 +39,12 @@ class Pfx(object):
     pfx = _prefix.raise_prefix
     if pfx is not None:
       if exc_value is not None:
-        print >>sys.stderr, "Pfx.__exit__: exc_value = %s" % (`exc_value`,)
-        exc_value.args = [pfx + ": " + exc_value.args[0]] \
-                       + list(exc_value.args[1:])
+        if hasattr(exc_value, 'args'):
+          exc_value.args = [pfx + ": " + str(exc_value.args[0])] \
+                         + list(exc_value.args[1:])
+        else:
+          # we can't modify this - at least report the current prefix state
+          print >>sys.stderr, "%s: Pfx.__exit__: exc_value = %s" % (pfx, `exc_value`,)
         pfx = None
     _prefix.current, _prefix.raise_prefix = _prefix.prior.pop()
     if pfx is None:
