@@ -306,12 +306,15 @@ fi
 if [ $usehbfiles ]
 then
   hbfiles=$dest/.hbfiles
-  if [ ! -s "$hbfiles" ]
+  if [ -f "$hbfiles" ]
   then
-    echo "$cmd: $hbfiles: expected non-empty file, aborting" >&2
-    exit 1
+    if [ ! -s "$hbfiles" ]
+    then
+      echo "$cmd: $hbfiles: expected non-empty file, aborting" >&2
+      exit 1
+    fi
+    set -- ${1+"$@"} -r "--files-from=$hbfiles"
   fi
-  set -- ${1+"$@"} -r "--files-from=$hbfiles"
 fi
 
 #
