@@ -159,6 +159,9 @@ expand_host()
         esac
         _xph_host=$_xph_left!$_xph_loginpfx@$_xph_right
         ;;
+      *)
+        _xph_host=$_xph_loginpfx@$_xph_host
+        ;;
     esac
   fi
   printf '%s\n' "$_xph_host"
