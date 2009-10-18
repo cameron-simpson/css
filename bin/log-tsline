@@ -1,0 +1,108 @@
+#!/bin/sh -ue
+#
+# Insert a timesheet line into my timesheet file.
+# used as a backend to buglog and dlog.
+#       - Cameron Simpson <cs@zip.com.au> 14mar2008
+#
+
+set -ue
+
+: ${LOGDIR:=$HOME/var/log}
+
+when=now
+cfg=
+tsdir=
+
+cmd=`basename "$0"`
+usage="Usage: $cmd [-c config] [-d when] [-T tsdir] category log-line..."
+
+badopts=
+
+while [ $# -gt 0 ]
+do
+  case $1 in
+    -c) cfg=$2; shift ;;
+    -d) when=$2; shift ;;
+    -T) tsdir=$2; shift ;;
+    --) shift; break ;;
+    -?*)echo "$cmd: unrecognised option: $1" >&2
+        badopts=1
+        ;;
+    *)  break ;;
+  esac
+  shift
+done
+
+if [ $# = 0 ]
+then
+  echo "$cmd: missing category" >&2
+  badopts=1
+else
+  category=$1
+  shift
+fi
+
+##[ $# = 0 ] || { echo "$cmd: extra arguments: $*" >&2; badopts=1; }
+[ $# -gt 0 ] || { echo "$cmd: missing log-line" >&2; badopts=1; }
+
+lccat=`printf "%s\n" "$category" | tr '[A-Z]' '[a-z]'`
+uccat=`printf "%s\n" "$category" | tr '[a-z]' '[A-Z]'`
+[ -n "$tsdir" ] || tsdir=$HOME/$lccat/timesheets/$USER
+[ -d "$tsdir/." ] || { echo "$cmd: missing timesheet dir: $tsdir" >&2; badopts=1; }
+[ -n "$cfg" ] || cfg=$tsdir/$uccat.conf.sh
+[ -s "$cfg" ] || { echo "$cmd: missing config: $cfg" >&2; badopts=1; }
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+. "$cfg"
+: ${TSDATEFMT_FILENAME:=$tsdir/'%Y-%m-%d'}
+: ${TSDATEFMT_HEADER:=''}
+: ${TSDATEFMT_DAYHEADER:='%Y-%m-%d %A\n'}
+: ${TSDATEFMT_DAYFOOTER:=}
+: ${TSDATEFMT_DAYINDENT:='  %H:%M '}
+: ${TSDATEFMT_FOOTER:=''}
+
+day=`monday "$when"`
+tsfile=`date -d "$day" "+$TSDATEFMT_FILENAME"`
+
+if [ ! -s "$tsfile" ]
+then
+  {
+    ymd=`date -d "$day" '+%Y-%m-%d'`
+    date2printf=`date -d "$ymd" "+$TSDATEFMT_HEADER"`
+    printf "$date2printf"
+    for n in 0 1 2 3 4 5 6
+    do
+      ymd=`date -d "$day" '+%Y-%m-%d'`
+      wday=`date -d "$day" '+%A'`
+      date2printf=`date -d "$ymd" "+$TSDATEFMT_DAYHEADER"`
+      printf "$date2printf"
+      [ -z "$TSDATEFMT_DAYFOOTER" ] || {
+        date2printf=`date -d "$ymd" "+$TSDATEFMT_DAYFOOTER"`
+        printf "$date2printf"
+      }
+      echo
+      day=`date -d "$ymd tomorrow"`
+    done
+  } >>"$tsfile"
+fi
+
+# addline tsfile when line...
+addline()
+{ _al_tsfile=$1
+  _al_when=$2
+  shift; shift
+  _al_date2printf=`date -d "$_al_when" "+$TSDATEFMT_DAYHEADER"`
+  _al_dayheader=`printf "$_al_date2printf" | sed -n '$p'`
+  _al_date2printf=`date -d "$_al_when" "+$TSDATEFMT_DAYINDENT"`
+  _al_line=`printf "$_al_date2printf%s" "$*"`
+  _al_sedf="/^$_al_dayheader\$/{
+  :inday
+  /^$/!{ n; b inday; }
+  i\\
+$_al_line
+}"
+  bsed -s "$_al_sedf" "$_al_tsfile"
+}
+
+addline "$tsfile" "$when" "$*"
