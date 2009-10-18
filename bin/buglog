@@ -140,6 +140,15 @@ do
     dlog)
       ##dlog "$headline" || xit=1
       buglog-daily "$headline"
+      # handle FOO: headlines
+      if pfx=`expr "x$headline" : 'x\([A-Z][A-Z_0-9,]*\):.*'`
+      then
+        sfx=` expr "x$headline" : 'x[A-Z][A-Z_0-9,]*: *\(.*\)'`
+        for category in `printf "%s\n" "$pfx" | tr , ' '`
+        do
+          log-tsline -- "$category" "$sfx"
+        done
+      fi
       ;;
 
     # =item B<mailto:>I<email-address>[B<?subject=>I<prefix>]
