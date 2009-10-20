@@ -7,8 +7,13 @@
 : ${TMPDIR:=/tmp}
 
 cmd=`basename "$0"`
-usage="Usage: $cmd [-x] -s subject addresses command [args...]"
+usage="Usage: $cmd [-x] {-S | -s subject} addresses command [args...]
+  -x    Trace execution of command.
+  -s    Specify subject line for email.
+  -S    Specify that email subject line should be:
+          FAIL: command args..."
 
+autosubj=
 subj=
 trace=
 
@@ -17,7 +22,8 @@ badopts=
 while [ $# -gt 0 ]
 do
   case $1 in
-    -s) subj=$2; shift ;;
+    -s) autosubj= subj=$2; shift ;;
+    -S) autosubj=1 subj= ;;
     -x) trace=set-x ;;
     --) shift; break ;;
     -?*)echo "$cmd: unrecognised option: $1" >&2
@@ -27,12 +33,6 @@ do
   esac
   shift
 done
-
-if [ -z "$subj" ]
-then
-  echo "$cmd: missing -s subject" >&2
-  badopts=1
-fi
 
 if [ $# = 0 ]
 then
@@ -47,6 +47,17 @@ if [ $# = 0 ]
 then
   echo "$cmd: missing command" >&2
   badopts=1
+else
+  if [ $autosubj ]
+  then
+    subj="FAIL: $*"
+  else
+    if [ -z "$subj" ]
+    then
+      echo "$cmd: missing -s subject" >&2
+      badopts=1
+    fi
+  fi
 fi
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
