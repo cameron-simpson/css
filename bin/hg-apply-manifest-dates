@@ -1,0 +1,64 @@
+#!/usr/bin/python -tt
+#
+# Apply the date of last changeset for files in the manifest to the
+# corresponding files in a target directory.
+# Closely based on suggested code from Dirkjan Ochtman.
+#       - Cameron Simpson <cs@zip.com.au> 24oct2009
+#
+
+import errno
+import os
+import sys
+import time
+from getopt import getopt, GetoptError
+from mercurial import ui, hg, error as hgerror
+
+cmd = sys.argv[0]
+usage = "Usage: %s [-r rev] target-dir [subpaths...]" % (cmd,)
+
+rev = 'tip'
+
+badopts = False
+
+try:
+  opts, argv = getopt(sys.argv[1:], 'r:')
+except GetoptError, e:
+  print >>sys.stderr, "%s: unrecognised option: %s: %s" % (cmd, e.opt, e.msg)
+  badopts=True
+
+for opt, val in opts:
+  if opt == '-r':
+    rev = val
+  else:
+    print >>sys.stderr, "%s: unsupported option: %s" % (cmd, opt)
+    badopts = True
+
+if len(argv) == 0:
+  print >>sys.stderr, "%s: missing target-dir" % (cmd,)
+  badopts=True
+else:
+  target = argv.pop(0)
+  subpaths = argv
+
+if badopts:
+  print >>sys.stderr, usage
+  sys.exit(2)
+
+repo = hg.repository(ui.ui(), '.')
+ctx = repo['tip'] # or repo[None] for dirstate or whatever
+if not subpaths:
+  subpaths = ctx
+for path in subpaths:
+  try:
+    rev = ctx[path].linkrev()
+  except hgerror.LookupError, e:
+    print >>sys.stderr, "%s: %s: can't look up revision: %s" % (cmd, path, e)
+  ctxtime, tzoffset = repo[rev].date()
+  tpath = os.path.join(target, path)
+  try:
+    S = os.stat(tpath)
+  except OSError, e:
+    if e.errno == errno.ENOENT:
+      continue
+    raise e
+  os.utime(tpath, (S.ST_ATIME, ctxtime))
