@@ -61,4 +61,4 @@ for path in subpaths:
     if e.errno == errno.ENOENT:
       continue
     raise e
-  os.utime(tpath, (S.ST_ATIME, ctxtime))
+  os.utime(tpath, (S.st_atime, ctxtime))
