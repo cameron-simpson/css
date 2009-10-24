@@ -72,15 +72,7 @@ dstdir=$tmpdir/$cssdatedir
 echo archive revision $rev ...
 hg archive -t files -r "$rev" "$dstdir"
 echo update file timestamps ...
-hg log -r "0:$rev" --template '{date|isodate} {files}\n' \
-| awk '    { for (i=4; i<=NF; i++) { f=$i; dates[f]=$1" "$2" "$3; } }
-       END { for (f in dates) { print dates[f], f; } }' \
-| while read -r d1 d2 d3 path
-  do
-    dpath=$dstdir/$path
-    [ -f "$dpath" ] || continue
-    touch -d "$d1 $d2 $d3" -- "$dpath"
-  done
+hg-apply-manifest-dates -r "$rev" "$dstdir"
 
 ( cd "$dstdir"
 
