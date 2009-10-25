@@ -17,7 +17,7 @@ sshopts=        # options for each ssh invocation
 lsshopts=       # options for the outermost ssh invocation
                 # this will include $sshopts
 mycfg=$HOME/.ssh/config
-[ -s "$mycfg" -a -r "$mycfg" ] && lsshopts="$lsshopts -F \"\$mycfg\""
+[ -s "$mycfg" -a -r "$mycfg" ] && lsshopts="$lsshopts -F '$mycfg'"
 topt=
 fopt=
 presh=
@@ -67,10 +67,14 @@ do
     -v) trace=set-x
 	sshopts="$sshopts $1"
 	;;
+    -[Fil]) lsshopts="$lsshopts $1 "`shqstr "$2"`
+        shift
+        ##echo "lsshopts=[$lsshopts]" >&2
+        ;;
     -[aAgknNqsTxXYC1246])
 	sshopts="$sshopts $1"
 	;;
-    -[bceiIlmopFLRD])
+    -[bceImopLRD])
     	sshopts="$sshopts $1 "`shqstr "$2"`
 	shift
 	;;
@@ -184,12 +188,14 @@ split_target()
   _st_pcmd=
   if [ $# -gt 1 ]
   then
-    _st_sep=
     while [ $# -gt 1 ]
     do
-      _st_pcmd="$_st_pcmd${_st_sep}ssh -A -T -x -e none -o batchmode=yes -o compression=no $1"
+      if [ -z "$_st_pcmd" ]
+      then  _st_pcmd="ssh $lsshopts"
+      else  _st_pcmd="$_st_pcmd ssh"
+      fi
+      _st_pcmd="${_st_pcmd} -A -T -x -e none -o batchmode=yes -o compression=no $1"
       shift
-      _st_sep=" "
     done
     _st_pcmd="$_st_pcmd exec nc %h %p"
   fi
