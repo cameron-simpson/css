@@ -2,7 +2,6 @@ import os
 import os.path
 import pwd
 import sys
-import dircache
 import string
 import re
 import email
@@ -40,7 +39,7 @@ class BugSet:
     return self.subpath(str(bugnum))
 
   def keys(self):
-    return [int(e) for e in dircache.listdir(self.root) if numericRe.match(e) and int(e) > 0]
+    return [int(e) for e in os.listdir(self.root) if numericRe.match(e) and int(e) > 0]
 
   def newbug(self):
     bugdir=cs.misc.mkdirn(self.root+'/')
@@ -127,7 +126,7 @@ class Bug:
     return self.bugset.bugpath(self.bugnum)
 
   def keys(self):
-    return [e for e in dircache.listdir(self.path) if isScalarField(e)]
+    return [e for e in os.listdir(self.path) if isScalarField(e)]
 
   def __fieldpath(self,field):
     return os.path.join(self.path(),field)
