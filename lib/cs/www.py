@@ -11,6 +11,11 @@ import urllib
 from urllib2 import urlopen, HTTPCookieProcessor, build_opener, install_opener
 from cookielib import MozillaCookieJar, Cookie
 from urlparse import urljoin
+if sys.hexversion >= 0x03000000:
+  from html.parser import HTMLParser
+else:
+  from HTMLParser import HTMLParser
+from formatter import NullFormatter
 import cs.hier
 from cs.hier import T_SEQ, T_MAP, T_SCALAR
 from cs.html import puttok, puttext
@@ -298,9 +303,6 @@ class TableTR(Tag):
     td=Tag('TD',*args)
     self.tokens.append(td)
     return td
-
-from htmllib import HTMLParser
-from formatter import NullFormatter
 
 class htmlparse(HTMLParser):
   def __init__(self,attr=None,tags=None):

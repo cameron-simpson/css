@@ -2,7 +2,8 @@
 
 import cherrypy
 import urllib
-if if sys.hexversion < 0x02060000:
+import sys
+if sys.hexversion < 0x02060000:
   import simplejson as json
 else:
   import json

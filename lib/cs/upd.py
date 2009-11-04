@@ -137,7 +137,7 @@ def NoUpd(U=None):
 def _summarise_exception(exc_value):
   summary = str(exc_value)
   if len(summary) == 0:
-    summary = `exc_value`
+    summary = repr(exc_value)
   return summary
 
 class ShortExceptions(object):

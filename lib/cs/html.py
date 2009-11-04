@@ -23,7 +23,6 @@ def puttok(fp, tok):
         [1] optionally a mapping of attribute values
         Further elements are tokens contained within this token.
   '''
-  print >>sys.stderr, "puttok: tok =", `tok`
   toktype = type(tok)
   if toktype in StringTypes:
     return puttext(fp, tok)

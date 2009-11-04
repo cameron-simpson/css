@@ -44,7 +44,7 @@ class Pfx(object):
                          + list(exc_value.args[1:])
         else:
           # we can't modify this - at least report the current prefix state
-          print >>sys.stderr, "%s: Pfx.__exit__: exc_value = %s" % (pfx, `exc_value`,)
+          sys.stderr.write("%s: Pfx.__exit__: exc_value = %s\n" % (pfx, repr(exc_value),))
         pfx = None
     _prefix.current, _prefix.raise_prefix = _prefix.prior.pop()
     if pfx is None:

@@ -1,6 +1,5 @@
 import os
 import os.path
-import dircache
 import re
 from cs.misc import warn, mkdirn, WithUCAttrs
 
@@ -20,8 +19,7 @@ class IdSet(WithUCAttrs):
     self.__entries={}
 
   def listdir(self):
-    dircache.reset()
-    return [ e for e in dircache.listdir(self.path)
+    return [ e for e in os.listdir(self.path)
              if len(e) > 0 and e[0] != '.'
            ]
 
@@ -102,7 +100,7 @@ class IdSetEntry:
     return len(key) > 0 and key[0] != '.' and key.find(os.sep) < 0
 
   def keys(self):
-    for key in dircache.listdir(self.path):
+    for key in os.listdir(self.path):
       if is_entryKey(key):
         yield key
       else:
