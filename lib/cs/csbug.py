@@ -9,7 +9,6 @@ import email.parser
 import time
 import socket
 import mailbox
-from pysqlite2 import dbapi2 as sqlite
 import cs.env
 import cs.sh
 from cs.misc import chomp, progress, seq
