@@ -1,7 +1,7 @@
 #!/bin/sh -ue
 #
 # Insert a timesheet line into my timesheet file.
-# used as a backend to buglog and dlog.
+# Used as a backend to buglog and dlog.
 #       - Cameron Simpson <cs@zip.com.au> 14mar2008
 #
 
@@ -12,15 +12,17 @@ set -ue
 when=now
 cfg=
 tsdir=
+iftsdir=
 
 cmd=`basename "$0"`
-usage="Usage: $cmd [-c config] [-d when] [-T tsdir] category log-line..."
+usage="Usage: $cmd [-?] [-c config] [-d when] [-T tsdir] category log-line..."
 
 badopts=
 
 while [ $# -gt 0 ]
 do
   case $1 in
+    -\?)iftsdir=1 ;;
     -c) cfg=$2; shift ;;
     -d) when=$2; shift ;;
     -T) tsdir=$2; shift ;;
@@ -48,9 +50,15 @@ fi
 lccat=`printf "%s\n" "$category" | tr '[A-Z]' '[a-z]'`
 uccat=`printf "%s\n" "$category" | tr '[a-z]' '[A-Z]'`
 [ -n "$tsdir" ] || tsdir=$HOME/$lccat/timesheets/$USER
-[ -d "$tsdir/." ] || { echo "$cmd: missing timesheet dir: $tsdir" >&2; badopts=1; }
-[ -n "$cfg" ] || cfg=$tsdir/$uccat.conf.sh
-[ -s "$cfg" ] || { echo "$cmd: missing config: $cfg" >&2; badopts=1; }
+if [ ! -d "$tsdir/." ]
+then
+  [ $iftsdir ] && exit 0
+  echo "$cmd: missing timesheet dir: $tsdir" >&2
+  badopts=1
+else
+  [ -n "$cfg" ] || cfg=$tsdir/$uccat.conf.sh
+  [ -s "$cfg" ] || { echo "$cmd: missing config: $cfg" >&2; badopts=1; }
+fi
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
