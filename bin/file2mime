@@ -23,9 +23,9 @@ type=`file $lopt "$file" | tr '	' ' '` || exit 1
 mtype=
 case "$type" in
     *': '*'Bourne shell script'*)	mtype=application/x-sh ;;
-    *': '*'JPEG image data'*)		mtype=image/jpeg ;;
-    *': '*'GIF image data'*)		mtype=image/gif ;;
-    *': '*'PNG image data'*)		mtype=image/png ;;
+    *': '*'JPEG image'*)		mtype=image/jpeg ;;
+    *': '*'GIF image'*)		        mtype=image/gif ;;
+    *': '*'PNG image'*)		        mtype=image/png ;;
     *': '*'PDF document'*)		mtype=application/pdf ;;
     *': '*'Adobe Portable Document Format'*)
 					mtype=application/pdf ;;
