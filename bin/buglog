@@ -146,7 +146,7 @@ do
         sfx=` expr "x$headline" : 'x[A-Z][A-Z_0-9,]*: *\(.*\)'`
         for category in `printf "%s\n" "$pfx" | tr , ' '`
         do
-          log-tsline -- "$category" "$sfx"
+          log-tsline -\? -- "$category" "$sfx"
         done
       fi
       ;;
