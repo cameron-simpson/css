@@ -92,6 +92,9 @@ then
       echo
       day=`date -d "$ymd tomorrow"`
     done
+    ymd=`date -d "$day" '+%Y-%m-%d'`
+    date2printf=`date -d "$ymd" "+$TSDATEFMT_FOOTER"`
+    printf "$date2printf"
   } >>"$tsfile"
 fi
 
