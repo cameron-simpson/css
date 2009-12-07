@@ -6,14 +6,17 @@
 
 from __future__ import with_statement
 import sys
+from functools import partial
 from thread import allocate_lock
 from threading import Semaphore, Thread
 from Queue import Queue
 from collections import deque
+if sys.hexversion < 0x02060000: from sets import Set as set
 from cs.misc import seq, debug, isdebug, tb, cmderr, warn
 from cs.logutils import LogTime
+from cs.misc import seq
 
-class AdjustableSemaphore:
+class AdjustableSemaphore(object):
   ''' A semaphore whose value may be tuned after instantiation.
   '''
   def __init__(self, value=1, name="AdjustableSemaphore"):
@@ -61,6 +64,7 @@ class AdjustableSemaphore:
 
 class Channel:
   ''' A zero-storage data passage.
+      Unlike a Queue(1), put() blocks waiting for the matching get.
   '''
   def __init__(self):
     self.__readable=allocate_lock()
@@ -70,7 +74,7 @@ class Channel:
 
   def get(self):
     ''' Read a value from the Channel.
-        Blocks until someone writes to the Channel.
+        Blocks until someone put()s to the Channel.
     '''
     self.__writable.release()
     self.__readable.acquire()
@@ -80,7 +84,7 @@ class Channel:
 
   def put(self,value):
     ''' Write a value to the Channel.
-        Blocks until a corresponding read occurs.
+        Blocks until a corresponding get() occurs.
     '''
     self.__writable.acquire()
     self._value=value
@@ -529,7 +533,7 @@ def bgCall(func,args,ch=None):
   ''' Spawn a thread to call the supplied function with the supplied
       args. Return a channel on which the function return value may be read. 
       A channel may be supplied by the caller; if not then the returned
-      channel must be release with returnChannel().
+      channel must be released with returnChannel().
   '''
   if ch is None:
     ch=getChannel()
@@ -550,3 +554,98 @@ def bgReturn(result,ch=None):
       channel must be release with returnChannel().
   '''
   return bgCall(_bgReturn,(result,))
+
+class FuncMultiQueue(object):
+  def __init__(self, capacity):
+    assert capacity > 0
+    self._capacity = capacity
+    self.__sem = Semaphore(capacity)
+    self.closed = False
+    self.__Q = IterableQueue()
+    self.__handlers = deque()
+    self.__allHandlers = []
+    self.__main = Thread(target=self._mainloop)
+    self.__main.start()
+
+  def _mainloop(self):
+    Q = self.__Q
+    sem = self.__sem
+    hs = self.__handlers
+    for rq in Q:
+      sem.acquire()        # will be released by the handler
+      if len(hs) == 0:
+        # no available threads - make one
+        hch = Channel()
+        hargs = [None, hch]
+        T = Thread(target=self._handler, args=hargs)
+        hargs[0] = T
+        T.start()
+      else:
+        T, hch = hs.pop()
+      # dispatch request
+      hch.put(rq)
+
+  def _handler(self, T, hch):
+    sem = self.__sem
+    hs = self.__handlers
+    for func, retch in hch:
+      if func is None:
+        break
+      retch.put(func())
+      hs.append( (T, hch) )
+      sem.release()
+
+  def close(self):
+    ''' Close the queue, preventing further requests.
+        Returns when all pending functions have completed.
+    '''
+    assert not self.closed
+    self.closed = True
+    self.__Q.close()
+    for T, hch in self.__allHandlers:
+      hch.put( (None, None) )
+      T.join()
+    self.__main.join()
+
+  def bgcall(self, func, *args, **kw):
+    ''' Queue a call to func(*args, **kw).
+        Return a Channel-like object whose get() method will return
+        the function result on completion.
+    '''
+    pfunc = partial(func, *args, **kw)
+    q1 = Q1()
+    self.__Q.put( (pfunc, q1) )
+    return q1
+
+  def call(self, func, *args, **kw):
+    ''' Call func(*args, **kw) via the queue.
+        Return the function result.
+    '''
+    return self.bgcall(func, *args, **kw).get()
+
+if __name__ == '__main__':
+  import unittest
+  import time
+  def f(x):
+    return x*2
+  def delay(n):
+    time.sleep(n)
+    return n
+  class TestFuncMultiQueue(unittest.TestCase):
+    def testCall(self):
+      FQ = FuncMultiQueue(3)
+      z = FQ.call(f, 3)
+      self.assertEquals(z, 6)
+      FQ.close()
+    def testBGCall(self):
+      cap = 3
+      FQ = FuncMultiQueue(cap)
+      chs = []
+      for i in range(cap+1):
+        ch = FQ.bgcall(delay, 1)
+        chs.append(ch)
+      for ch in chs:
+        x = ch.get()
+        self.assertEquals(x, 1)
+      FQ.close()
+  unittest.main()
