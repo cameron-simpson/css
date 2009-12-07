@@ -1,4 +1,4 @@
-#!/usr/bin/env python2.5
+#!/usr/bin/env python
 #
 # Recode of mklinks in Python, partly for the exercise and partly to
 # improve the algorithm.
@@ -10,7 +10,11 @@ import os
 import os.path
 import stat
 import filecmp
-import md5
+if sys.hexversion >= 0x02050000:
+  from hashlib import md5 as hashobj
+else:
+  from md5 import md5
+  def hashobj(): return md5.new()
 from cs.misc import progress, warn, verbose, debug, chomp, tmpdirn, tmpfilename
 
 sizeinfo={}
@@ -29,7 +33,7 @@ class FileInfo:
     self.ident=st_ident(st)
     self.size=st[stat.ST_SIZE]
     self.mtime=st[stat.ST_MTIME]
-    self.md5pfx=None
+    self.digestpfx=None
     self.addpath(path)
     debug("new FileInfo ident =",self.ident,"size =",str(self.size),":",path)
 
@@ -37,10 +41,10 @@ class FileInfo:
     self.paths.append(path)
     pathinfo[path]=self
 
-  def getmd5pfx(self):
-    if self.md5pfx is None:
-      self.md5pfx=md5pfx(self.path)
-    return self.md5pfx
+  def getdigestpfx(self):
+    if self.digestpfx is None:
+      self.digestpfx=digestpfx(self.path)
+    return self.digestpfx
 
   def subsume(self,other):
     for path in other.paths:
@@ -51,10 +55,14 @@ class FileInfo:
     if other in sizeinfo[self.size]: sizeinfo[self.size].remove(other)
     identinfo[other.ident]=self.path
 
-# fetch md5 hash of first 8192 bytes of the file
-def md5pfx(path,size=8192):
-  ##progress("md5", path)
-  return md5.new(file(path).read(size)).digest()
+# fetch digest hash of first 8192 bytes of the file
+def digestpfx(path,size=8192):
+  ##progress("digest", path)
+  fp=open(path)
+  H=hashobj()
+  H.update(fp.read(size))
+  fp.close()
+  return H.digest()
 
 def linkto(srcpath,dstpath):
   progress(srcpath,"=>",dstpath)
@@ -83,7 +91,7 @@ def do(path):
           add this path to this file list
       else
         if this is the first file of this size
-          stash it, but don't open it for prefix md5
+          stash it, but don't open it for prefix digest
         else
           o
   '''
@@ -123,10 +131,10 @@ def do(path):
     return
 
   # existing size - compare against files of same size
-  md5=info.getmd5pfx()
+  digest=info.getdigestpfx()
   for other in sizeinfo[size]:
     ##warn("cmp", path, "vs", other.path)
-    if md5 == other.getmd5pfx() and filecmp.cmp(path,other.path):
+    if digest == other.getdigestpfx() and filecmp.cmp(path,other.path):
       # same contents
       # keep newest file
       if info.mtime >= other.mtime:
