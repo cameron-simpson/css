@@ -1,0 +1,454 @@
+changeset:   7501:0772f11064a0
+tag:         release-20090913
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sun Sep 13 12:15:20 2009 +1000
+files:       release-20090913/CHANGES.txt release-20090913/SUMMARY.txt release-20090913/release-tag.txt
+description:
+Release information for release-20090913.
+
+
+changeset:   7502:4b8fdf10943e
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sun Sep 13 12:15:22 2009 +1000
+files:       .hgtags
+description:
+Added tag release-20090913 for changeset 0772f11064a0
+
+
+changeset:   7503:2f3ad4a29220
+parent:      7494:13b39f824c57
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sun Sep 13 13:29:43 2009 +1000
+files:       lib/cs/html.py
+description:
+cs.html: puttok(): don't damage the caller's token list
+
+
+changeset:   7504:8ee74fbc5582
+parent:      7502:4b8fdf10943e
+parent:      7503:2f3ad4a29220
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sun Sep 13 13:29:55 2009 +1000
+description:
+Automated merge with file:///app2/home/cameron/hg/css
+
+
+changeset:   7505:9852940d48d4
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sun Sep 13 13:45:53 2009 +1000
+files:       bin/hglog
+description:
+hglog: fix up awk parser
+
+
+changeset:   7506:815e465221a9
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sun Sep 13 13:52:52 2009 +1000
+files:       bin/hglog
+description:
+hglog: improve layout
+
+
+changeset:   7507:9f63a14b540c
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Mon Sep 14 16:59:55 2009 +1000
+files:       bin/add-ganalytics
+description:
+add-ganalytics: add Google Analytics code to web pages text files if missing.
+
+
+changeset:   7508:cfb1cd1cbbfe
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Fri Sep 18 10:55:13 2009 +1000
+files:       bin/sshto
+description:
+sshto: preserve login and recognise host if handed login@host
+
+
+changeset:   7509:72106cba200a
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Fri Sep 18 18:32:35 2009 +1000
+files:       bin/sshto
+description:
+sshto: make -v option turn on some more tracing
+
+
+changeset:   7510:f321a6039e18
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sat Sep 26 11:01:32 2009 +1000
+files:       bin/sshx
+description:
+sshx: run command remotely, correctly quoted
+
+
+changeset:   7511:5d50e3f6fdc2
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sat Sep 26 12:04:12 2009 +1000
+files:       bin/sshx
+description:
+sshx: support -f ssh option
+
+
+changeset:   7512:d580c39f07f0
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sun Sep 27 16:23:02 2009 +1000
+files:       bin/scr
+description:
+scr: honour -dm if session already exists
+
+
+changeset:   7513:fe4b17d1998a
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Tue Sep 29 22:19:51 2009 +1000
+files:       bin/histbackup
+description:
+histbackup: abort on empty .hbfiles file
+
+
+changeset:   7514:7d4afd7a9384
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Fri Oct 02 08:51:58 2009 +1000
+files:       bin/cpmysql
+description:
+cpmysql: be more careful with $*/$@ - modern "bash -u" is pickier than it used to be.
+
+
+changeset:   7515:b174c4572a55
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sat Oct 03 09:47:28 2009 +1000
+files:       lib/cs/threads.py lib/cs/webservice.py
+description:
+cs.threads, cs.webservice: LogElapsedTime -> LogTime.
+
+
+changeset:   7516:2baad9136a2d
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sat Oct 03 16:16:19 2009 +1000
+files:       lib/cs/logutils.py
+description:
+cs.logutils: Pfx: cope with exceptions with no .args field.
+
+
+changeset:   7517:8ffa952f5f7b
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Wed Oct 07 14:34:58 2009 +1100
+files:       bin/dat defunct/dat
+description:
+dat: obsolete personal helper script
+
+
+changeset:   7518:b51b856eef71
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Thu Oct 08 08:06:11 2009 +1100
+files:       bin/histbackup
+description:
+histbackup: fix sanity check on .hbfiles
+
+
+changeset:   7519:86a30c29f8f4
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Thu Oct 08 08:06:59 2009 +1100
+files:       bin/sshx
+description:
+sshx: optimise remote invocation with "exec"
+
+
+changeset:   7520:73bed876be70
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Thu Oct 08 08:07:57 2009 +1100
+files:       bin/sshto
+description:
+sshto: preserve "login@" when no "!" in host path
+
+
+changeset:   7521:6e7eeaf7b94a
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Thu Oct 08 13:59:28 2009 +1100
+files:       bin/pf-tshow
+description:
+pf-tshow: Show IP addresses and their "Cleared" timestamps from a PF table.
+
+
+changeset:   7522:cacb752711f2
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sun Oct 18 14:28:11 2009 +1100
+files:       bin/log-tsline
+description:
+log-tsline: insert log line directly into timesheet file
+
+
+changeset:   7523:0ed4c99648de
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sun Oct 18 14:30:31 2009 +1100
+files:       bin/buglog
+description:
+buglog: pass dlog bugs also to log-tsline
+
+
+changeset:   7524:0c50793c19dd
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Tue Oct 20 15:09:50 2009 +1100
+files:       bin/mail-on-error
+description:
+mail-onerror: add -S option for default subject
+
+
+changeset:   7525:d527107ffc24
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Tue Oct 20 15:10:50 2009 +1100
+files:       bin/cs-rungetmail bin/rungetmail
+description:
+Poll for email less frequently, rename script.
+
+
+changeset:   7526:3ca29564ab98
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Tue Oct 20 16:22:00 2009 +1100
+files:       bin/updcss
+description:
+updcss: apply latest changeset timestamp to each file
+
+
+changeset:   7527:81a0d0500d76
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Thu Oct 22 09:38:20 2009 +1100
+files:       bin/mail-on-error
+description:
+mail-on-error: obsolete the -S option, have default subject if no -s option
+
+
+changeset:   7528:667050c98b09
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Thu Oct 22 09:47:52 2009 +1100
+files:       INSTALL
+description:
+INSTALL: mention $CLASSPATH and $PYTHONPATH
+
+
+changeset:   7529:0cdd47e1828b
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sat Oct 24 17:00:00 2009 +1100
+files:       bin/hg-apply-manifest-dates
+description:
+hg-apply-manifest-dates: apply hg manifest dates to files based on code from Dirkjan Ochtman
+
+
+changeset:   7530:1808a9cd302b
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sat Oct 24 17:02:23 2009 +1100
+files:       bin/updcss
+description:
+updcss: use hg-apply-manifest-dates to set dates in deployment
+
+
+changeset:   7531:0008dce14371
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sat Oct 24 17:05:56 2009 +1100
+files:       bin/hg-apply-manifest-dates
+description:
+hg-apply-manifest-dates: fix use of .st_atime attribute
+
+
+changeset:   7532:1420745b6a70
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sun Oct 25 12:57:09 2009 +1100
+files:       bin/sshto
+description:
+sshto: pass -F, -i, -l to local ssh, including the ProxyCommand ssh
+
+
+changeset:   7533:f4e07d0da55c
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sun Oct 25 16:10:57 2009 +1100
+files:       bin/shell defunct/shell
+description:
+obsolete bin/shell
+
+
+changeset:   7534:5927ee049e0b
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Tue Oct 27 11:07:20 2009 +1100
+files:       bin-cs/amex bin/amex
+description:
+amex: move to bin-cs
+
+
+changeset:   7535:4746ed0ec6f8
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Tue Oct 27 11:07:45 2009 +1100
+files:       bin/mkscriptndx
+description:
+mkscriptndx: shorten index significantly
+
+
+changeset:   7536:2b9cf67fa4ee
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Wed Oct 28 14:22:55 2009 +1100
+files:       bin/rig-mail-despool
+description:
+rig-mail-despool: fix usage typo
+
+
+changeset:   7537:c2c05c54dc7d
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Wed Oct 28 14:23:44 2009 +1100
+files:       bin-cs/rig-mail-despool bin/rig-mail-despool
+description:
+rig-mail-despool: move to bin-cs
+
+
+changeset:   7538:f7e63f86fdbf
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Wed Oct 28 17:28:29 2009 +1100
+files:       bin/cs-rig-getmail bin/riggetmail
+description:
+riggetmail: rename and fix for rungetmail rename
+
+
+changeset:   7539:465fd6fd2175
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Wed Oct 28 17:30:57 2009 +1100
+files:       bin-cs/dogetmail bin-cs/riggetmail bin-cs/rungetmail bin/cs-rig-getmail bin/cs-rungetmail bin/dogetmail
+description:
+getmail stuff: reshuffle
+
+
+changeset:   7540:9021b6e7c47f
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Fri Oct 30 09:39:32 2009 +1100
+files:       bin/cats2procmailrc
+description:
+cats2procmailrc: minor lint
+
+
+changeset:   7541:b7e7e0dc5044
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sun Nov 01 10:49:29 2009 +1100
+files:       bin/sshto
+description:
+sshto: turn on shell tracing if -v specific
+
+
+changeset:   7542:0bf5d4892c58
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sun Nov 01 10:59:12 2009 +1100
+files:       bin/pull-group
+description:
+pull-group: use sshx instead of ssh/shqstr
+
+
+changeset:   7543:c6e2832f2236
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Wed Nov 04 21:44:01 2009 +1100
+files:       bin/getnews
+description:
+getnews: update the .getnewsrc file every 64 articles
+
+
+changeset:   7544:b58fca6971e4
+parent:      7542:0bf5d4892c58
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Wed Nov 04 20:56:55 2009 +1100
+files:       lib/cs/csbug.py
+description:
+cs.csbug.py: 3.x fix: use os.listdir instead of dircache.listdir
+
+
+changeset:   7545:4fb935a64466
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Wed Nov 04 20:59:33 2009 +1100
+files:       lib/cs/csbug.py
+description:
+remove pysqlite2 import - missing and not what I'll use later anyway:-(
+
+
+changeset:   7546:2e5352bbb1f5
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Wed Nov 04 21:17:25 2009 +1100
+files:       lib/cs/httpsrv.py
+description:
+cs/httpsrv: update json module
+
+
+changeset:   7547:c64511d3d68b
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Wed Nov 04 21:42:50 2009 +1100
+files:       defunct/cs/bmk.py lib/cs/bmk.py lib/cs/cherryhttpsrv.py lib/cs/dbdigraph.py lib/cs/html.py lib/cs/idset.py lib/cs/logutils.py lib/cs/upd.py lib/cs/venti/hash.py lib/cs/www.py
+description:
+assorted python 3.x updates from testing with python -3 -t
+
+
+changeset:   7548:9c4168138b1a
+parent:      7547:c64511d3d68b
+parent:      7543:c6e2832f2236
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Wed Nov 04 21:44:09 2009 +1100
+description:
+Automated merge with file:///app2/home/cameron/dev/css
+
+
+changeset:   7549:a736198bfa92
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Thu Nov 19 08:09:27 2009 +1100
+files:       bin/buglog
+description:
+buglog: run log-tsline in quiet mode
+
+
+changeset:   7550:f4d6816f248c
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Thu Nov 19 08:09:54 2009 +1100
+files:       bin/file2mime
+description:
+file2mime: better image file recognition
+
+
+changeset:   7551:455c46858f6d
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Thu Nov 19 08:10:50 2009 +1100
+files:       bin/log-tsline
+description:
+log-tsline: add quiet mode for no ts dir, improve error reporting
+
+
+changeset:   7552:350415f41c83
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sun Dec 06 14:17:23 2009 +1100
+files:       bin/log-tsline
+description:
+log-tsline: add missing footer template
+
+
+changeset:   7553:1b3efb8a881f
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Mon Dec 07 14:16:54 2009 +1100
+files:       lib/cs/threads.py
+description:
+cs.threads: add FuncMultiQueue class and minor doc tweaks
+
+
+changeset:   7554:38324e58fe93
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Mon Dec 07 14:18:06 2009 +1100
+files:       bin/maildir-cat
+description:
+maildir-cat: port to mailbox.Maildir, add usage message
+
+
+changeset:   7555:c80265fdb53e
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Mon Dec 07 14:19:43 2009 +1100
+files:       bin/mklinks
+description:
+mklinks: port to hashib and python2.5, prepare for other hash functions in the future
+
+
+changeset:   7556:b9ab9452c627
+tag:         tip
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Tue Dec 08 14:05:50 2009 +1100
+files:       bin/with-REMOTEHOST
+description:
+with-REMOTEHOST: ssh back where we came from and run command with copy of local file; query from Ionel Mugurel Ciobica on mutt-users list
+
+
