@@ -71,6 +71,8 @@ dstdir=$tmpdir/$cssdatedir
 
 echo archive revision $rev ...
 hg archive -t files -r "$rev" "$dstdir"
+echo update file timestamps ...
+hg-apply-manifest-dates -r "$rev" "$dstdir"
 
 ( cd "$dstdir"
 
@@ -79,11 +81,14 @@ hg archive -t files -r "$rev" "$dstdir"
 
   cp $HOME/rc/java/au.com.zip.cs.jar lib/
 
-  echo adzapper...
-  for f in squid_redirect testpageurls testzap
-  do cp "$adzapweb/$f" bin/
-     chmod a+rx "bin/$f"
-  done
+  if false
+  then
+    echo adzapper...
+    for f in squid_redirect testpageurls testzap
+    do cp "$adzapweb/$f" bin/
+       chmod a+rx "bin/$f"
+    done
+  fi
 
   echo 1INDEX.txt...
   ( cd bin; tag_fd 2 1INDEX.txt mkscriptndx * | sort ) >1INDEX.txt

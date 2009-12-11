@@ -1,0 +1,484 @@
+changeset:   7442:0ecb4046aecc
+tag:         release-20090614.2
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sun Jun 14 08:48:14 2009 +1000
+files:       release-20090614.2/CHANGES.txt release-20090614.2/SUMMARY.txt release-20090614.2/release-tag.txt
+description:
+Release information for release-20090614.2.
+
+
+changeset:   7443:53a040877857
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sun Jun 14 08:48:16 2009 +1000
+files:       .hgtags
+description:
+Added tag release-20090614.2 for changeset 0ecb4046aecc
+
+
+changeset:   7444:0a734ec557d7
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Mon Jun 22 11:01:15 2009 +1000
+files:       bin/rov bin/smv
+description:
+smv, rov: common functionality moved to smv.
+
+
+changeset:   7445:412cd8b31150
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Mon Jun 22 11:01:56 2009 +1000
+files:       bin/mhdrs
+description:
+mhdrs: strip colon in all modes.
+
+
+changeset:   7446:32dad6aa559c
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Mon Jun 22 11:02:31 2009 +1000
+files:       bin/@
+description:
+bin/@: opportunistic ControlMaster.
+
+
+changeset:   7447:5a5ec5066e8a
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Thu Jun 25 12:11:29 2009 +1000
+files:       bin/symlink-trace
+description:
+Rename "sl" to "symlink-trace"; too easy to mistype "ls".
+
+
+changeset:   7448:c29004200baa
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Thu Jun 25 12:12:08 2009 +1000
+files:       bin/sl
+description:
+sl: renamed to symlink-trace.
+
+
+changeset:   7449:2f62522af5ec
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Thu Jun 25 12:16:24 2009 +1000
+files:       bin/+ bin/++ bin/@ bin/R@ bin/SZ bin/ah bin/e bin/et bin/g bin/hi bin/lc bin/lz bin/ml bin/mx bin/ov bin/pt bin/rg bin/rl bin/sm bin/tb bin/tf bin/x@ bin/xl bin/xq defunct/hi make-into-shell-functions/+ make-into-shell-functions/++ make-into-shell-functions/@ make-into-shell-functions/R@ make-into-shell-functions/SZ make-into-shell-functions/ah make-into-shell-functions/e make-into-shell-functions/et make-into-shell-functions/g make-into-shell-functions/lc make-into-shell-functions/lz make-into-shell-functions/ml make-into-shell-functions/mx make-into-shell-functions/ov make-into-shell-functions/pt make-into-shell-functions/rg make-into-shell-functions/rl make-into-shell-functions/sm make-into-shell-functions/tb make-into-shell-functions/tf make-into-shell-functions/x@ make-into-shell-functions/xl make-into-shell-functions/xq
+description:
+Move a lot of single and double character named scripts out of bin,
+to come back as functions or better named scripts.
+
+
+changeset:   7450:2fe44c318f1d
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Thu Jun 25 12:17:13 2009 +1000
+files:       bin/pull-user
+description:
+pull-user: more portable invocation of adduser.
+
+
+changeset:   7451:c1a8a8475ae9
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Thu Jun 25 13:06:05 2009 +1000
+files:       Mykefile bin-cs/+ bin-cs/++ bin-cs/@ bin-cs/e bin-cs/g bin-cs/pt bin-cs/rg bin-cs/xq make-into-shell-functions/+ make-into-shell-functions/++ make-into-shell-functions/@ make-into-shell-functions/e make-into-shell-functions/g make-into-shell-functions/pt make-into-shell-functions/rg make-into-shell-functions/xq
+description:
+Move a bunch of convenience single and double letter commands into bin-cs.
+
+
+changeset:   7452:e0fdcafa35ff
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Thu Jun 25 13:28:01 2009 +1000
+files:       bin/updcss
+description:
+Prune make-into-shell-functions working dir from deployment.
+
+
+changeset:   7453:43f63f08c863
+branch:      nodedb-typed-strings
+parent:      7399:b7d5fa51da6a
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sat May 09 14:54:21 2009 +1000
+description:
+New branch: nodedb-typed-strings.
+
+
+changeset:   7454:dba61825f6e0
+parent:      7443:53a040877857
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Fri Jul 03 21:39:37 2009 +1000
+files:       lib/cs/misc.py
+description:
+get0(): working implentation.
+
+
+changeset:   7455:4c6e052d2570
+parent:      7452:e0fdcafa35ff
+parent:      7454:dba61825f6e0
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Fri Jul 03 21:39:50 2009 +1000
+description:
+Automated merge with file:///app2/home/cameron/hg/css
+
+
+changeset:   7456:83c60fe55fe5
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sun Jul 05 15:44:16 2009 +1000
+files:       lib/cs/nodedb.py
+description:
+Node: add __getitem__.
+
+
+changeset:   7457:36e38603e548
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sun Jul 05 16:57:45 2009 +1000
+files:       lib/cs/cherryhttpsrv.py
+description:
+cherrypyhttpsrv.py: use standard modules instead of cs.www and cs.json.
+
+
+changeset:   7458:961c51abd071
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Mon Jul 06 16:02:43 2009 +1000
+files:       bin-cs/ah bin-cs/ahu bin/ahu make-into-shell-functions/ah
+description:
+Move ah and ahu (apphelper wrappers) into bin-cs.
+
+
+changeset:   7459:1c8899c19ae4
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Wed Jul 08 20:46:59 2009 +1000
+files:       lib/cs/html.py lib/cs/nodedb.py lib/cs/www.py
+description:
+Move lexical HTML stuff from cs.www into new cs.html.
+
+
+changeset:   7460:f1c025f27f76
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Wed Jul 15 16:32:09 2009 +1000
+files:       lib/cs/html.py
+description:
+Simplify the type sniffing in puttok().
+
+
+changeset:   7461:ae5c73337936
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Thu Jul 23 08:32:03 2009 +1000
+files:       bin/portfwd
+description:
+portfwd: recode for better process control and config reload. No longer self-backgrounds.
+
+
+changeset:   7462:4332d1a91389
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Thu Jul 23 11:27:33 2009 +1000
+files:       bin/pull-user
+description:
+pull-user: fix shell quoting issue
+
+
+changeset:   7463:46536ee6a26b
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sat Aug 08 15:44:17 2009 +1000
+files:       bin/cdsubmit
+description:
+Improve error message.
+
+
+changeset:   7464:f691d5692a7f
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Fri Aug 14 12:47:17 2009 +1000
+files:       bin/with-login-env
+description:
+Fix typo in comment.
+
+
+changeset:   7465:7c3eef6dd15b
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sat Aug 22 18:51:11 2009 +1000
+files:       bin/portfwd
+description:
+portfwd: fix foot-shooting pid bug preventing restart.
+
+
+changeset:   7466:0ce68f28a139
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Fri Aug 28 14:03:19 2009 +1000
+files:       bin/pull-user
+description:
+Revert adduser command to work on RHEL again.
+
+
+changeset:   7467:4836f7348c44
+parent:      7460:f1c025f27f76
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Fri Jul 17 12:05:24 2009 +1000
+files:       lib/cs/upd.py
+description:
+Don't prefix wrap SystemExit exceptions. Change _PrefixedException initialiser.
+
+
+changeset:   7468:9a1081891632
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sat Jul 18 12:52:02 2009 +1000
+files:       lib/cs/nodedb.py
+description:
+Fix attrValueText call.
+
+
+changeset:   7469:9f547d0e8c69
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sat Jul 18 12:52:41 2009 +1000
+files:       lib/cs/html.py
+description:
+puttok(): Add character entity support, note destructive impl for later fix.
+
+
+changeset:   7470:a86a274c20a0
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sat Jul 18 17:59:16 2009 +1000
+files:       lib/cs/nodedb.py
+description:
+Add readonly flag to NodeDB to avoid all backend db updates.
+
+
+changeset:   7471:b3fbc88b59eb
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Thu Aug 20 14:22:08 2009 +1000
+files:       lib/cs/html.py
+description:
+puttext(): allow /#: as safe chars - warning: breaks with relative URLs starting "foo:"
+
+
+changeset:   7472:7cba255e1e74
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Thu Aug 20 14:22:51 2009 +1000
+files:       lib/cs/nodedb.py
+description:
+Node.get(): default to None. Add Nodedb.types() method.
+
+
+changeset:   7473:556a0cd65284
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Mon Aug 24 14:37:18 2009 +1000
+files:       lib/cs/html.py
+description:
+Typo fix.
+
+
+changeset:   7474:1431728282bb
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Fri Aug 28 13:48:55 2009 +1000
+files:       lib/cs/nodedb.py
+description:
+Remove FOO_ID fields, encode noderefs as :#id, add db close() method, fix up self tests.
+
+
+changeset:   7475:b56caaf509dc
+parent:      7466:0ce68f28a139
+parent:      7474:1431728282bb
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Fri Aug 28 14:03:42 2009 +1000
+description:
+Automated merge with file:///app2/home/cameron/hg/css
+
+
+changeset:   7476:0f1f02111f75
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sun Aug 30 13:13:27 2009 +1000
+files:       bin/vmstat-log2csv
+description:
+vmstat-log2csv: '-D step' now mandatory
+
+
+changeset:   7477:acf82b9e53ce
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Tue Sep 01 12:26:29 2009 +1000
+files:       lib/cs/seq.py
+description:
+cs.seq: add imerge(*seqs).
+
+
+changeset:   7478:36d718a8eb33
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Tue Sep 01 16:13:04 2009 +1000
+files:       bin/vmstat-log-rrdgraph bin/vmstat-log2rrd
+description:
+Add vmstat-log2rrd to load into RRD file, vmstat-log-rrdgraph to graph from RRD file.
+
+
+changeset:   7479:a93e5080e82a
+parent:      7475:b56caaf509dc
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sun Aug 30 09:58:39 2009 +1000
+files:       lib/cs/misc.py
+description:
+Hook my debug_level to logging module's levels.
+
+
+changeset:   7480:2c87cc154dac
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sun Aug 30 10:01:27 2009 +1000
+files:       lib/cs/logutils.py
+description:
+Add cs.logutils with LogElapsedTime context manager.
+
+
+changeset:   7481:376178bfd7b4
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sun Aug 30 10:06:24 2009 +1000
+files:       lib/cs/threads.py
+description:
+cs.threads: use LogElapsedTime context manager
+
+
+changeset:   7482:e14a2298d301
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sun Aug 30 10:11:39 2009 +1000
+files:       lib/cs/webservice.py
+description:
+cs.webservice: move from reportElapsedTime to LogElapsedTime
+
+
+changeset:   7483:e3ecae9a1423
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sun Aug 30 20:41:49 2009 +1000
+files:       lib/cs/logutils.py
+description:
+cs.logutils: new Pfx context manager to push new prefix for messages
+
+
+changeset:   7484:d5f6c3fa7788
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sun Aug 30 20:43:32 2009 +1000
+files:       lib/cs/threads.py lib/cs/webservice.py
+description:
+Rename LogElapsedTime to LogTime.
+
+
+changeset:   7485:e9b1f26dfda2
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sun Aug 30 20:44:13 2009 +1000
+files:       lib/cs/misc.py
+description:
+A little more move to the logging module.
+
+
+changeset:   7486:89865008aae9
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Tue Sep 01 20:31:51 2009 +1000
+files:       lib/cs/upd.py
+description:
+cs/upd: add docstring for ShortExceptions.
+
+
+changeset:   7487:64d5c644d22a
+parent:      7478:36d718a8eb33
+parent:      7486:89865008aae9
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Tue Sep 01 20:32:01 2009 +1000
+description:
+Automated merge with file:///app2/home/cameron/hg/css
+
+
+changeset:   7488:ca9f4a8200ef
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Wed Sep 02 18:21:06 2009 +1000
+files:       lib/cs/misc.py
+description:
+Rename dummy Upd module. Change TODO() and FIXME(). Allow stack fram ecount for logFnLine.
+
+
+changeset:   7489:c32e79278c28
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Thu Sep 03 16:46:05 2009 +1000
+files:       lib/cs/misc.py
+description:
+Port warn() to logging.warning().
+
+
+changeset:   7490:5d61873eb229
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Mon Sep 07 13:21:53 2009 +1000
+files:       bin/sendmesg
+description:
+Recode sendmesg in python; shorter and simpler. Not very tested yet.
+
+
+changeset:   7491:7acf1d0d0784
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Tue Sep 08 16:48:43 2009 +1000
+files:       bin/sendmesg
+description:
+sendmesg: fix variable name typo.
+
+
+changeset:   7492:e87945cb799c
+parent:      7489:c32e79278c28
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Fri Sep 11 12:19:14 2009 +1000
+files:       lib/cs/logutils.py lib/cs/upd.py
+description:
+cs.logutils: new Pfx context manager to fiddle exception messages. cs.upd: supercede ExceptionPrefix with cs.logutils.Pfx.
+
+
+changeset:   7493:c54d0f88271f
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Fri Sep 11 12:20:09 2009 +1000
+files:       lib/cs/nodedb.py
+description:
+cs.nodedb: migrate from ExceptionPrefix to Pfx, add Node.name() method.
+
+
+changeset:   7494:13b39f824c57
+parent:      7493:c54d0f88271f
+parent:      7491:7acf1d0d0784
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Fri Sep 11 12:20:36 2009 +1000
+description:
+Automated merge with file:///app2/home/cameron/dev/css-nodedb
+
+
+changeset:   7495:acafd5a9144a
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sun Sep 13 08:06:31 2009 +1000
+files:       bin/mail-on-error
+description:
+mail-on-error: run command, dispatch stderr by email if it fails.
+
+
+changeset:   7496:4a6752970c90
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sun Sep 13 09:06:57 2009 +1000
+files:       bin/mail-on-error
+description:
+mail-on-error: report stderr to original stderr
+
+
+changeset:   7497:b5715917684e
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sun Sep 13 09:26:05 2009 +1000
+files:       bin/mail-on-error
+description:
+mail-on-error: add trace support
+
+
+changeset:   7498:96629a795624
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sun Sep 13 09:38:32 2009 +1000
+files:       bin/mail-on-error
+description:
+mail-on-error: "sh -ue" fix.
+
+
+changeset:   7499:c170b236e7b3
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sun Sep 13 09:54:19 2009 +1000
+files:       lib/cs/misc.py
+description:
+cs.misc: python 2.4 syntax fix.
+
+
+changeset:   7500:806be10ea170
+tag:         tip
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sun Sep 13 12:12:11 2009 +1000
+files:       Mykefile
+description:
+Mykefile: trivial fix for _pending target.
+
+

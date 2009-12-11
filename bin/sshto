@@ -10,16 +10,18 @@
 : ${SSHTO_CONFIG:=$HOME/.sshtorc}
 : ${SSHTO_PREFIX:=''}
 
+oldstyle=
 cf=$SSHTO_CONFIG
 trace=  ##set-x
-sshopts=
-lsshopts=
-oldstyle=
+sshopts=        # options for each ssh invocation
+lsshopts=       # options for the outermost ssh invocation
+                # this will include $sshopts
 mycfg=$HOME/.ssh/config
-[ -s "$mycfg" -a -r "$mycfg" ] && lsshopts="$lsshopts -F \"\$mycfg\""
+[ -s "$mycfg" -a -r "$mycfg" ] && lsshopts="$lsshopts -F '$mycfg'"
 topt=
 fopt=
 presh=
+setx=:
 
 cmd=`basename "$0"` || cmd=$0
 usage="Usage: $cmd [ssh-options...] [sshcfg=value...] [user@]host[![user2@]host2...] [command ...]
@@ -58,16 +60,23 @@ havehost=
 first=1
 while [ $# -gt 0 ]
 do
-  ##echo "sshto: *=[$*]" >&2
   case $1 in
     -t)	topt=-t ;;
     +t)	topt= ;;
     -f) fopt=-f ;;
     -E)	presh=$env_presh ;;
-    -[aAgknNqsTvxXYC1246])
+    -v) trace=set-x
+        setx='set -x'
 	sshopts="$sshopts $1"
 	;;
-    -[bceiIlmopFLRD])
+    -[Fil]) lsshopts="$lsshopts $1 "`shqstr "$2"`
+        shift
+        ##echo "lsshopts=[$lsshopts]" >&2
+        ;;
+    -[aAgknNqsTxXYC1246])
+	sshopts="$sshopts $1"
+	;;
+    -[bceImopLRD])
     	sshopts="$sshopts $1 "`shqstr "$2"`
 	shift
 	;;
@@ -113,6 +122,13 @@ sshcmd=$presh$*
 
 expand_host()
 { _xph_host=$1
+  # pull off the login for reuse at the final component
+  _xph_loginpfx=
+  case "$_xph_host" in
+    *@*)
+      _xph_loginpfx=`expr "x$_xph_host" : 'x\(.*\)@.*'`
+      _xph_host=`    expr "x$_xph_host" : 'x.*@\(.*\)'`
+  esac
   if [ -f "$cf" -a -s "$cf" ]
   then
     _xph_changed=
@@ -137,6 +153,23 @@ expand_host()
       esac
     done 3<"$cf"
   fi
+  # restore the login if any
+  if [ -n "$_xph_loginpfx" ]
+  then
+    case "$_xph_host" in
+      *\!*)
+        _xph_left=` expr "x$_xph_host" : 'x\(.*\)!.*'`
+        _xph_right=`expr "x$_xph_host" : 'x.*!\(.*\)'`
+        case "$_xph_right" in
+          *@*)  _xph_right=`expr 'x$_xph_right' : 'x.*@\(.*\)'` ;;
+        esac
+        _xph_host=$_xph_left!$_xph_loginpfx@$_xph_right
+        ;;
+      *)
+        _xph_host=$_xph_loginpfx@$_xph_host
+        ;;
+    esac
+  fi
   printf '%s\n' "$_xph_host"
 }
 
@@ -157,21 +190,22 @@ split_target()
   _st_pcmd=
   if [ $# -gt 1 ]
   then
-    _st_sep=
     while [ $# -gt 1 ]
     do
-      _st_pcmd="$_st_pcmd${_st_sep}ssh -A -T -x -e none -o batchmode=yes -o compression=no $1"
+      if [ -z "$_st_pcmd" ]
+      then  _st_pcmd="ssh $lsshopts"
+      else  _st_pcmd="$_st_pcmd ssh"
+      fi
+      _st_pcmd="${_st_pcmd} -A -T -x -e none -o batchmode=yes -o compression=no $1"
       shift
-      _st_sep=" "
     done
-    _st_pcmd="$_st_pcmd exec nc %h %p"
+    _st_pcmd="$_st_pcmd $setx\\; exec nc %h %p"
   fi
   printf "%s %s\n" "$1" "$_st_pcmd"
 }
 
 hostpath=`expand_hostpath "$host"`
 [ -z "$SSHTO_PREFIX" ] || hostpath="$SSHTO_PREFIX!$hostpath"
-##echo "[$host] -> [$hostpath]" >&2
 if [ $oldstyle ]
 then
   host=$hostpath
@@ -182,8 +216,7 @@ then
         rhost=`expr "x$host" : 'x.*!\(.*\)'`
         host=` expr "x$host" : 'x\(.*\)!.*'`
         osshcmd=$sshcmd
-        sshcmd="exec ssh $sshargv "`shqstr "$rhost" "$sshcmd"`
-        ##echo "[$osshcmd] -> [$sshcmd]" >&2
+        sshcmd="$setx\\; exec ssh $sshargv "`shqstr "$rhost" "$sshcmd"`
         ;;
       *)
         break
@@ -201,5 +234,4 @@ else
   fi
 fi
 
-##set -x
 eval "exec $trace ssh $fopt $lsshopts $sshargv $host \"\$sshcmd\""

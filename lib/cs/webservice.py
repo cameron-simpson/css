@@ -9,7 +9,8 @@ from ZSI import SoapWriter, ParsedSoap, TC
 import ZSI.wstools.Utility
 from StringIO import StringIO
 import urllib2
-from cs.misc import cmd, cmderr, isdebug, ifdebug, debug, objFlavour, T_MAP, T_SEQ, reportElapsedTime, logLine
+from cs.misc import cmd, cmderr, isdebug, ifdebug, debug, objFlavour, T_MAP, T_SEQ, logLine
+from cs.logutils import LogTime
 
 def lather(obj,tc=None):
   ''' Serial a python object into SOAP, return the SOAP.
@@ -25,8 +26,9 @@ def lather(obj,tc=None):
 def rinse(soap,tc):
   ''' Turn SOAP into a python object.
   '''
-  return reportElapsedTime("parse SOAP into %s object" % (tc,),
-                           ParsedSoap(soap).Parse,tc)
+  with LogTime("parse SOAP into %s object" % (tc,)):
+    parse = ParsedSoap(soap).Parse(tc)
+  return parse
 
 def xml2pyobj(xml,typecode):
   return ParsedSoap(xml).Parse(typecode)
@@ -52,16 +54,16 @@ def callSOAP(url,action,xml,retAction,retTypecode,onerror=None):
   rq.add_header('Accept-Encoding', 'identity')
   rq.add_header('Soapaction', '"%s"'%action)
   rq.add_header('Content-Type', 'text/xml; charset="utf-8"')
-  U=reportElapsedTime('callSOAP(%s): call %s with %d bytes of XML'
-                        % (action,url,len(xml)),
-                      urllib2.urlopen,rq)
+  with LogTime('callSOAP(%s): call %s with %d bytes of XML'
+                      % (action,url,len(xml))):
+    U = urllib2.urlopen(rq)
   I=U.info()
   assert I.type in ('text/xml', 'application/soap+xml'), \
          "%s: expected text/xml, got \"%s\" from %s %s" % (cmd,I.type,action,url)
   retxml=''.join(U.readlines())
-  ret=reportElapsedTime('callSOAP(%s): decode %d bytes of %s response'
-                          % (action,len(retxml),retAction),
-                        xml2pyobj,retxml,retTypecode)
+  with LogTime('callSOAP(%s): decode %d bytes of %s response'
+                      % (action,len(retxml),retAction)):
+    ret = xml2pyobj(retxml,retTypecode)
   return ret
 
 def HTTPError2str(e):
@@ -91,9 +93,8 @@ class BigElementProxy(ZSI.wstools.Utility.ElementProxy):
     from cs.chunkyString import ChunkyString
     cs=ChunkyString()
     cs.write(' ')       # HACK: work around bug in ZSI.wstools.c14n
-    reportElapsedTime("BigElementProxy.canonicalize()",
-                      ZSI.wstools.Utility.Canonicalize,
-                      self.node,output=cs)
+    with LogTime("BigElementProxy.canonicalize()"):
+      ZSI.wstools.Utility.Canonicalize(self.node,output=cs)
     cs=str(cs)
     ##if isdebug: print >>sys.stderr, "BigElementProxy.canonicalize: XML=[%s]" % cs
     return cs

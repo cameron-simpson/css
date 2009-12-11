@@ -1,7 +1,7 @@
 #!/bin/sh -ue
 
 cmd=`basename "$0"`
-usage="Usage: $cmd [spoolnames..."
+usage="Usage: $cmd [spoolnames...]"
 
 : ${MAILDIR:=$HOME/mail}
 

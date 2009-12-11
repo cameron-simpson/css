@@ -1,18 +1,22 @@
 #!/usr/bin/python -tt
 #
-# List the contents of a maildir folder in mbox format.
+# List the contents of maildir folders in mbox format.
 #       - Cameron Simpson <cs@zip.com.au> 09nov2006
 #
 
 import sys
-import cs.mail
-from cs.misc import cmd, progress
+from mailbox import Maildir
 
-usage="Usage: "+cmd+" maildir"
+usage="Usage: "+sys.argv[0]+" maildir..."
+
+if len(sys.argv) < 2:
+  print >>sys.stderr, usage
+  sys.exit(2)
 
 for path in sys.argv[1:]:
-  M=cs.mail.Maildir(path)
+  M=Maildir(path, factory=None)
   for msg in M:
-    print str(msg)
+    print msg.as_string(unixfrom=True)
 
 sys.stdout.close()
+sys.exit(0)

@@ -7,11 +7,18 @@ import re
 import string
 import sys
 import types
+import urllib
 from urllib2 import urlopen, HTTPCookieProcessor, build_opener, install_opener
 from cookielib import MozillaCookieJar, Cookie
 from urlparse import urljoin
+if sys.hexversion >= 0x03000000:
+  from html.parser import HTMLParser
+else:
+  from HTMLParser import HTMLParser
+from formatter import NullFormatter
 import cs.hier
 from cs.hier import T_SEQ, T_MAP, T_SCALAR
+from cs.html import puttok, puttext
 from cs.misc import warn, debug, ifdebug
 
 cookieHandler = HTTPCookieProcessor()
@@ -65,42 +72,14 @@ install_opener(build_opener(cookieHandler))
 cookie_sepRe=re.compile(r'\s*;\s*')
 cookie_valRe=re.compile(r'([a-z][a-z0-9_]*)=([^;,\s]*)',re.I)
 
-hexSafeRe=re.compile(r'[-=.\w:@/?~#+&]+')
-qsSafeRe=re.compile(r'[-=. :@/~#]+')
-dqAttrValSafeRe=re.compile(r'[-=. \w:@/?~#+&]+')
-
-def hexify(s,fp,safeRe=None):
-  """ Percent encode a string, transcribing to a file.
-      safeRe is a regexp matching a non-empty seqeunce of characters that do not need encoding.
-      FIXME: percent encoding for Unicode?
-  """
-  if safeRe is None: safeRe=hexSafeRe
-  while len(s):
-    m=safeRe.match(s)
-    if m:
-      safetext=m.group(0)
-      fp.write(safetext)
-      s=s[len(safetext):]
-    else:
-      fp.write("%%%02x"%ord(s[0]))
-      s=s[1:]
+def hexify(s,fp):
+  fp.write(urllib.quote(s))
 
 def unhexify(s):
-  ''' Turn %xx sequences inside a string into characters.
-  '''
-  hexchars='0123456789abcdefABCDEF'
-  pcndx=s.find('%')
-  while pcndx >= 0 \
-    and hexchars.find(s[pcndx+1]) >= 0 \
-    and hexchars.find(s[pcndx+2]) >= 0:
-    s=s[:pcndx]+eval("chr(0x%s)" % s[pcndx+1:pcndx+3])+s[pcndx+3:]
-    pcndx=s.find('%',pcndx+1)
-  return s
+  return urllib.unquote(s)
 
 def toqs(s):
-  return hexify(qsSafeRe).replace(' ','+')
-
-textSafeRe=re.compile(r'[^<>&]+')
+  return urllib.quote_plus(s)
 
 def text2html(s):
   from cStringIO import StringIO
@@ -108,86 +87,10 @@ def text2html(s):
   puttext(io,s)
   return io.getvalue()
 
-def puttext(fp,s,safeRe=None):
-  """ Transcribe plain text in HTML safe form.
-  """
-  if safeRe is None: safeRe=textSafeRe
-  while len(s):
-    m=safeRe.match(s)
-    if m:
-      safetext=m.group(0)
-      fp.write(safetext)
-      s=s[len(safetext):]
-    else:
-      if s[0] == '<':
-        fp.write('&lt;')
-      elif s[0] == '>':
-        fp.write('&gt;')
-      elif s[0] == '&':
-        fp.write('&amp;')
-      else:
-        fp.write('&#%d;'%ord(s[0]))
-
-      s=s[1:]
-
 def puthtml(fp,*args):
   """ Transcribe tokens as HTML. """
   for a in args:
     puttok(fp,a)
-
-def puttok(fp,tok):
-  """ transcribe a single token as HTML. """
-  global dqAttrValSafeRe
-  f=cs.hier.flavour(tok)
-  if f is T_SCALAR:
-    # flat text
-    if type(tok) is types.StringType:
-      puttext(fp,tok)
-    else:
-      puttext(fp,repr(tok))
-  elif f is T_SEQ:
-    # token
-    if hasattr(tok,'tag'):
-      # Tag class item
-      tag=tok.tag
-      attrs=tok.attrs
-    else:
-      # raw array [ tag[,attrs][,tokens...] ]
-      tag=tok[0]; tok=tok[1:]
-      if len(tok) > 0 and cs.hier.flavour(tok[0]) is T_MAP:
-        attrs=tok[0]; tok=tok[1:]
-      else:
-        attrs={}
-
-    isSCRIPT=(tag.upper() == 'SCRIPT')
-
-    if isSCRIPT:
-      if 'LANGUAGE' not in [a.upper() for a in attrs.keys()]:
-        attrs['language']='JavaScript'
-
-    fp.write('<')
-    fp.write(tag)
-    for k in attrs:
-      fp.write(' ')
-      fp.write(k)
-      v=attrs[k]
-      if v is not None:
-        fp.write('="')
-        hexify(str(v),fp,dqAttrValSafeRe)
-        fp.write('"')
-    fp.write('>')
-    if isSCRIPT:
-      fp.write("<!--\n")
-    for t in tok:
-      puttok(fp,t)
-    if isSCRIPT:
-      fp.write("\n-->")
-    fp.write('</')
-    fp.write(tag)
-    fp.write('>')
-  else:
-    # unexpected
-    raise TypeError
 
 def ht_form(action,method,*tokens):
   """ Make a <FORM> token, ready for content. """
@@ -400,9 +303,6 @@ class TableTR(Tag):
     td=Tag('TD',*args)
     self.tokens.append(td)
     return td
-
-from htmllib import HTMLParser
-from formatter import NullFormatter
 
 class htmlparse(HTMLParser):
   def __init__(self,attr=None,tags=None):

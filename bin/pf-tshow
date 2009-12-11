@@ -1,0 +1,38 @@
+#!/bin/sh -ue
+#
+# Show IP addresses and their "Cleared" timestamps from a PF table.
+#       - Cameron Simpson <cs@zip.com.au> 07oct2009
+#
+
+cmd=$0
+usage="Usage: $cmd table"
+
+[ $# = 1 ] || { echo "$usage" >&2; exit 2; }
+table=$1; shift
+
+pfctl -t "$table" -T show -v \
+| awk '/^ *[1-9]/ { ip=$1 }
+       /^\tCleared:/ {
+         mon=$3;
+         if (mon=="Jan") m=1;
+         else if (mon=="Feb") m=2;
+         else if (mon=="Mar") m=3;
+         else if (mon=="Apr") m=4;
+         else if (mon=="May") m=5;
+         else if (mon=="Jun") m=6;
+         else if (mon=="Jul") m=7;
+         else if (mon=="Aug") m=8;
+         else if (mon=="Sep") m=9;
+         else if (mon=="Oct") m=10;
+         else if (mon=="Nov") m=11;
+         else if (mon=="Dec") m=12;
+         else m=0;
+         date=sprintf("%04d-%02d-%02d %s", $6, m, $4, $5)
+         cleared[ip]=date
+       }
+       END {
+         for (ip in cleared) {
+           print ip "\t" cleared[ip]
+         }
+       }' \
+| sort -k 2

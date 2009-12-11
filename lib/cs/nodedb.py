@@ -8,13 +8,14 @@ from __future__ import with_statement
 from cs.mappings import isUC_, parseUC_sAttr
 import cs.sh
 from cs.misc import the, seq
-from cs.upd import ExceptionPrefix
+from cs.logutils import Pfx
 import sqlalchemy
 from sqlalchemy import create_engine, \
                        MetaData, Table, Column, Index, Integer, String, \
                        select
 from sqlalchemy.orm import mapper, sessionmaker
 from sqlalchemy.sql import and_, or_, not_
+from sqlalchemy.sql.expression import distinct
 from weakref import WeakValueDictionary
 from contextlib import closing
 from types import StringTypes
@@ -48,7 +49,7 @@ re_NAMELIST = re.compile(r'([a-z][a-z0-9]+)(\s*,\s*([a-z][a-z0-9]+))*')
 re_COMMASEP = re.compile(r'\s*,\s*')
 
 def isNode(N):
-  ''' Test is an object is duck-typed like a Node.
+  ''' Test if an object is duck-typed like a Node.
   '''
   return hasattr(N, 'NAME') and hasattr(N, 'TYPE')
 
@@ -137,6 +138,7 @@ class Attr(object):
       nodedb = self.node.nodedb
       _A = self._attr
       assert _A.ATTR == self.NAME+'_ID'
+      assert False, "does this ever run?"
       value = self.__dict__[attr] = nodedb.nodeById(int(_A.VALUE))
       return value
     raise AttributeError("'Attr' has no attribute '%s'" % (attr,))
@@ -149,28 +151,26 @@ class Attr(object):
   def apply(self):
     ''' Apply pending changes to the backend.
         Does not imply a commit to the database.
+        A no-op if the db is in read-only mode.
     '''
+    if self.node.nodedb.readonly:
+      return
     value = self.VALUE
     _attr = self._attr
     assert _attr is not INVALID, "apply called on discarded Attr(%s)" % (self,)
     if isNode(value):
-      if _attr is None:
-        assert value.ID is not None
-        _A = self.node.nodedb._Attr(self.node.ID, self.NAME+'_ID', str(value.ID))
-        self.node.nodedb.session.add(_A)
-        self.__set_attr(_A)
-      else:
-        assert _attr.ATTR == self.NAME+'_ID'
-        if _attr.VALUE != value.ID:
-          _attr.VALUE = value.ID
+      nvalue = ':#%d' % (value.ID,)
     else:
-      if _attr is None:
-        _A = self.node.nodedb._Attr(self.node.ID, self.NAME, str(value))
-        self.node.nodedb.session.add(_A)
-        self.__set_attr(_A)
-      else:
-        if _attr.VALUE != value:
-          _attr.VALUE = value
+      nvalue = str(value)
+      if nvalue.startswith(':'):
+        nvalue = ':'+nvalue
+    if _attr is None:
+      _A = self.node.nodedb._Attr(self.node.ID, self.NAME, nvalue)
+      self.node.nodedb.session.add(_A)
+      self.__set_attr(_A)
+    else:
+      if _attr.VALUE != nvalue:
+        _attr.VALUE = nvalue
 
   def discard(self):
     ''' Mark this attribute as invalid.
@@ -206,7 +206,7 @@ class AttrMap(dict):
     attrs.append(Attr(self.__node, attr, value))
     dict.__setitem__(self, attr, attrs)
 
-class Node(ExceptionPrefix):
+class Node(object):
   ''' A node in the node db.
       A node has the following attributes:
         ID, the db id - made at need; try to avoid using it
@@ -228,7 +228,13 @@ class Node(ExceptionPrefix):
     self.__dict__['TYPE'] = nodetype
     self.__set_node(_node)
     self.nodedb._noteNodeNameAndType(self)
-    ExceptionPrefix.__init__(self, str(self))
+    self.__dict__['_pfx'] = Pfx(str(self))
+
+  def __enter__(self):
+    self._pfx.enter()
+
+  def __exit__(self, exc_type, exc_value, traceback):
+    self._pfx.exit(exc_type, exc_value, traceback)
 
   def __set_node(self, _node):
     if _node is None:
@@ -270,7 +276,15 @@ class Node(ExceptionPrefix):
         if attr is None:
           name = _A.ATTR
           value = _A.VALUE
+          # decode escaped value strings
+          if value.startswith(':'):
+            if value.startswith(':#'):
+              value = nodedb.nodeById(int(value[2:]))
+            else:
+              assert value.startswith('::'), "bad value \"%s\"" % (value,)
+              value = value[2:]
           if name.endswith('_ID'):
+            assert False, "attributes named %s are forbidden during the transition" % (name,)
             name_id = name
             name = name[:-3]
             value = None
@@ -285,7 +299,10 @@ class Node(ExceptionPrefix):
   def apply(self):
     ''' Apply pending changes to the database.
         Does not do a database commit.
+        A no-op if the database is in readonly mode.
     '''
+    if self.nodedb.readonly:
+      return
     _node = self._node
     if _node is None:
       _node = self.__load_node()
@@ -314,6 +331,10 @@ class Node(ExceptionPrefix):
     return self.NAME == other.NAME \
        and self.TYPE == other.TYPE
 
+  def name(self):
+    return "%s:%s" % (self.TYPE, self.NAME)
+
+  # not straight __str__ = name because we want to follow subclasses
   def __str__(self):
     return "%s:%s" % (self.TYPE, self.NAME)
 
@@ -328,6 +349,7 @@ class Node(ExceptionPrefix):
     if k in ('ID', 'NAME', 'TYPE'):
       return not plural
     if k.endswith('_ID'):
+      assert False, "_ID names forbidden: %s" % (k,)
       return k[:-3] in self.attrs
     return k in self.attrs
 
@@ -362,8 +384,8 @@ class Node(ExceptionPrefix):
       self.__dict__[attr] = value
       return
     k, plural = parseUC_sAttr(attr)
-    assert k is not None and k not in ('ID', 'TYPE', 'NAME'), \
-                "refusing to set .%s" % (attr,)
+    if k is None or k in ('ID', 'TYPE', 'NAME'):
+      raise AttributeError("refusing to set .%s" % (attr,))
     if not plural:
       value=(value,)
     self.attrs[k]=value
@@ -378,7 +400,7 @@ class Node(ExceptionPrefix):
     '''
     return self.attrs.keys()
 
-  def get(self, attr, dflt):
+  def get(self, attr, dflt=None):
     ''' Get attribute if present, otherwise default.
         For uppercase attributes, normal Pythonic behaviour.
         For lowercase pseudo-attributes, try to return self.attr().
@@ -388,6 +410,17 @@ class Node(ExceptionPrefix):
     if attr.islower():
       return self.get_lcattr(attr, dflt)
     return dflt
+
+  def __getitem__(self, attr):
+    ''' Get uppercase attribute value.
+    '''
+    k, plural = parseUC_sAttr(attr)
+    if k is None:
+      raise KeyError, attr
+    value = self.get(attr, None)
+    if value is None:
+      raise KeyError, attr
+    return value
 
   def add(self, attr, value):
     ''' Append an extra value to an existing attribute list.
@@ -403,14 +436,41 @@ class Node(ExceptionPrefix):
         of the specified TYPE.
         WARNING: this implies a database commit.
     '''
-    if not attr.endswith('_ID'):
-      attr += '_ID'
+    nodedb = self.nodedb
+    assert not attr.endswith('_ID'), "forbidden _ID attr \"%s\"" % (attr,)
+    ##if not attr.endswith('_ID'): attr += '_ID'
     self.apply()      # should happen anyway
-    self.nodedb.commit()
-    nodes = self.nodedb.nodesByAttrValue(attr, str(self.ID))
+    nodedb.commit()
+    # select DISTINCT(NODE_ID) FROM ATTRS WHERE TYPE == nodetype AND VALUE == ':#%d' % (self.ID,)
+    attr_query \
+      = nodedb.session \
+          .query(nodedb._Attr) \
+          .filter(nodedb._Attr.VALUE == (':#%d' % (self.ID,)))
+    parents = self.nodedb.nodesByIds(_A.NODE_ID for _A in attr_query.all())
     if nodetype is not None:
-      nodes = [ N for N in nodes if N.TYPE == nodetype ]
-    return nodes
+      parents = [ P for P in parents if P.TYPE == nodetype ]
+    return parents
+
+  def attrValueText(self, attr, value):
+    ''' Return "printable" form of a an attribute value.
+    '''
+    if isNode(value):
+      if attr == "SUB"+self.TYPE and value.TYPE == self.TYPE:
+        pvalue = value.NAME
+      elif attr == value.TYPE:
+        pvalue = value.NAME
+      else:
+        pvalue = str(value)
+    else:
+      m = re_BAREURL.match(value)
+      if m is not None and m.end() == len(value):
+        pvalue = value
+      else:
+        if value.isdigit() and str(int(value)) == value:
+          pvalue = int(value)
+        else:
+          pvalue = json.dumps(value)
+    return pvalue
 
   def textdump(self, ofp):
     ofp.write("# %s\n" % (repr(self),))
@@ -420,22 +480,7 @@ class Node(ExceptionPrefix):
     for attr in attrnames:
       pattr = attr
       for value in self.attrs[attr]:
-        if isNode(value):
-          if attr == "SUB"+self.TYPE and value.TYPE == self.TYPE:
-            pvalue = value.NAME
-          elif attr == value.TYPE:
-            pvalue = value.NAME
-          else:
-            pvalue = str(value)
-        else:
-          m = re_BAREURL.match(value)
-          if m is not None and m.end() == len(value):
-            pvalue = value
-          else:
-            if value.isdigit() and str(int(value)) == value:
-              pvalue = int(value)
-            else:
-              pvalue = json.dumps(value)
+        pvalue = self.attrValueText(attr, value)
         if opattr is not None and opattr == pattr:
           pattr = ''
         else:
@@ -501,7 +546,7 @@ class Node(ExceptionPrefix):
   def assign(self, assignment, createSubNodes=False):
     ''' Take a string of the form ATTR=values and apply it.
     '''
-    with ExceptionPrefix(assignment):
+    with Pfx(assignment):
       attr, valuetxt = assignment.split('=', 1)
       if attr.islower():
         # "computed" convenience attributes
@@ -515,7 +560,7 @@ class Node(ExceptionPrefix):
     ''' Set a lowercase attribute value; a "computed" value.
     '''
     func = "set_%s" % (attr,)
-    with ExceptionPrefix(func):
+    with Pfx(func):
       getattr(self, func)(value)
 
   def get_lcattr(self, attr, dflt):
@@ -583,7 +628,8 @@ class Node(ExceptionPrefix):
 
 # TODO: make __enter__/__exit__ for running a session?
 class NodeDB(object):
-  def __init__(self, engine, nodes=None, attrs=None):
+  def __init__(self, engine, nodes=None, attrs=None, readonly=False):
+    self.readonly = readonly
     if nodes is None:
       nodes = 'NODES'
     if attrs is None:
@@ -592,11 +638,11 @@ class NodeDB(object):
       engine = create_engine(engine, echo=len(os.environ.get('DEBUG','')) > 0)
     metadata=MetaData()
     if type(nodes) in StringTypes:
-      nodes=NODESTable(metadata,name=nodes)
+      nodes=NODESTable(metadata, name=nodes)
     self.nodes=nodes
     Index('nametype', nodes.c.NAME, nodes.c.TYPE)
     if type(attrs) is str:
-      attrs=ATTRSTable(metadata,name=attrs)
+      attrs=ATTRSTable(metadata, name=attrs)
     self.attrs=attrs
     Index('attrvalue', attrs.c.ATTR, attrs.c.VALUE)
     self.engine=engine
@@ -630,6 +676,11 @@ class NodeDB(object):
         return _Attr(self.ID,attr,value)
     mapper(_Node, nodes)
     self._Node=_Node
+
+  def close(self):
+    # close database connection; feels a little dodgy
+    self.session.close()
+    self.conn.close()
 
   def _note_Attr(self, _A, attr):
     if _A.ID is None:
@@ -681,14 +732,20 @@ class NodeDB(object):
   def apply(self):
     ''' Apply all outstanding updates.
         Does not imply a database commit.
+        A no-op if the database is in readonly mode.
     '''
+    if self.readonly:
+      return
     for N in self._changedNodes.copy():
-      with ExceptionPrefix("apply(%s)" % (N,)):
+      with Pfx("apply(%s)" % (N,)):
         N.apply()
 
   def commit(self):
     ''' Apply all outstanding changes and do a database commit.
+        A no-op if the database is in readonly mode.
     '''
+    if self.readonly:
+      return
     self.apply()
     self.session.commit()
 
@@ -781,6 +838,12 @@ class NodeDB(object):
         Note that yielded Nodes may not be in the same order as the _Nodes.
     '''
     return [ self._node2Node(_node) for _node in _nodes ]
+
+  def types(self):
+    ''' Return the TYPEs present in the database.
+    '''
+    typesquery = select(columns=[distinct(self.nodes.c.TYPE)])
+    return [ R[0] for R in self.conn.execute(typesquery) ]
 
   def nodesByIds(self, nodeids):
     ''' Return the Nodes from the corresponding list if Node.ID values.
@@ -879,7 +942,7 @@ class TestAll(unittest.TestCase):
     self.assertEqual(host1.ATTR1s, (3,))
     host1.ATTR2s=[5,6,7]
     self.assertEqual(host1.ATTR2s, (5,6,7))
-    self.assertRaises(IndexError, getattr, host1, 'ATTR2')
+    self.assertRaises(AttributeError, getattr, host1, 'ATTR2')
 
   def testTextAssign(self):
     self.host1.assign("IPADDR=\"172.10.0.1\"")
@@ -893,9 +956,9 @@ class TestAll(unittest.TestCase):
 
   def testRename(self):
     db=self.db
-    self.host1.NAME='newname'
-    db.session.flush()
-    self.assertEqual(db.nodeByNameAndType('newname','HOST').ID, self.host1.ID)
+    self.assertRaises(AttributeError, setattr, self.host1, 'NAME', 'newname')
+    ##db.session.flush()
+    ##self.assertEqual(db.nodeByNameAndType('newname','HOST').ID, self.host1.ID)
 
   def testToNode(self):
     db=self.db

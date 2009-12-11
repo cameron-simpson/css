@@ -22,7 +22,6 @@ usage="Usage: $cmd [-x] [-G group-override] [-R] {/path/to/group|[user]@host} gr
 
 trace=eecho
 lgroup=/etc/group
-ssh=ssho
 groupoverride=
 addmembers=
 removemembers=
@@ -98,8 +97,7 @@ getmembers()
 { awk -F: -v "group=$1" '$1 == group { print $4 }' "$2" | tr , ' '
 }
 rcmd()
-{ _rcmd_qargs=`shqstr "$@"`
-  set-x $ssh "$remote" "$_rcmd_qargs"
+{ $trace sshx -o stricthostkeychecking=no "$remote" "$@"
 }
 
 if [ -z "$rgroup" ]

@@ -1,0 +1,56 @@
+#!/bin/sh -ue
+#
+# Run a command over ssh, quoted to preserve the argument list.
+#       - Cameron Simpson <cs@zip.com.au> 26sep2009
+#
+
+cmd=`basename "$0"`
+usage="Usage: $cmd distinct-ssh-options... [--] [login@]host command [args...]"
+
+ssh=sshto
+sshopts=
+
+badopts=
+
+while [ $# -gt 0 ]
+do
+  case "$1" in
+    -[aAfgknNqstTxXYC1246])
+	sshopts="$sshopts $1"
+	;;
+    -[bceiIlmopFLRD])
+    	sshopts="$sshopts $1 "`shqstr "$2"`
+	shift
+	;;
+    -[bceiIlmopFLRD]?*)
+        sshopts=$sshopts\ `shqstr "$1"`
+	;;
+    --) shift; break ;;
+    -?*)echo "$cmd: unrecognised option: $1" >&2
+        badopts=1
+        ;;
+    *)  break ;;
+  esac
+  shift
+done
+
+if [ $# = 0 ]
+then
+  echo "$cmd: missing [login@]host" >&2
+  badopts=1
+else
+  host=$1
+  shift
+fi
+
+if [ $# = 0 ]
+then
+  echo "$cmd: missing command" >&2
+  badopts=1
+else
+  qcmd=`shqstr "$@"`
+fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+eval "exec $ssh $sshopts \"\$host\" \"exec \$qcmd\""

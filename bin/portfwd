@@ -43,11 +43,12 @@ done
 
 if [ $# = 0 ]
 then
-  if [ -n "$PORTFWD_TARGETS" ]
+  set -- $PORTFWD_TARGETS
+  if [ $# -gt 0 ]
   then
-    set -- $PORTFWD_TARGETS
+    echo "$cmd: no targets, using \$PORTFWD_TARGETS: $*" >&2
   else
-    echo "$cmd: missing targets and no \$PORTFWD_TARGETS envvar" >&2
+    echo "$cmd: missing targets and missing/empty \$PORTFWD_TARGETS" >&2
     badopts=1
   fi
 fi
@@ -97,90 +98,115 @@ fi
 
 if [ $# -gt 1 ]
 then
-  xit=0
-  set -x
-  for target
-  do
-    "$0" $opts -- "$target" || xit=1
-  done
-  exit $xit
+  ( set -x
+    for target
+    do
+      "$0" $opts -- "$target" &
+    done
+    wait
+  )
+  exit $?
 fi
 
 target=$1
 shift
 
-cfg_pidfile=portfwd.$target.pid
-cfg_command=:
-cfg_outlog=portfwd-$target    # /dev/null
-cfg_monitor=
-if [ -s "$fwdcfg" ]
-then
-  wcv=`winclausevars "$fwdcfg" "$target" cfg`
-  eval "$wcv"
-fi
-case $cfg_pidfile in
-  /*) ;; *) cfg_pidfile=$VARRUN/$cfg_pidfile ;;
-esac
-case $cfg_outlog in
-  /*) ;; *) cfg_outlog=$LOGDIR/$cfg_outlog ;;
-esac
-if opid=`ifpid -q -v "$cfg_pidfile"`
-then
-  printf "%s" "$cmd: stopping $target, pid $opid "
-  synckill -v "$opid"
-  >"$cfg_pidfile"
-fi
+xit=0
+monpid=
+sshpid=
+trap ': trap on 1 2 and 15 ...
+      if [ -n "$sshpid" ]
+      then
+        printf "%s" "$cmd: $target: SIGTERM received, killing ssh ($sshpid) "
+        synckill -v "$sshpid"
+        if [ -n "$monpid" ]
+        then
+          printf "%s" "$cmd: $target: SIGTERM received, also killing monitor ($monpid) "
+          synckill -v "$monpid"
+        fi
+      fi
+      exit 1
+     ' 1 2 15
 
-if [ -z "$stop" ]
-then
-  ( sshpid=
-    trap 'if [ -n "$sshpid" ]
-          then
-            printf "%s" "$cmd: $target: SIGTERM received, killing ssh "
-            synckill -v "$sshpid"
-          fi
-          exit 1
-         ' 1 15
-    first=1
-    while :
-    do
-      $trace \
-        sshto ServerAliveInterval=37 -n -F "$sshcfg" "$target" \
-          "( $cfg_command ) </dev/null &
-         "'exec 1>&2
-           while sleep 61 && printf " "; do :; done
-          ' \
-        >>"$cfg_outlog" &
-      sshpid=$!
-      [ $first ] || alert "RESTARTED: sshpf $target" &
-      if [ -n "$cfg_monitor" ]
-      then
-        sh -c "$cfg_monitor" &
-        monpid=$!
-      else
-        monpid=
-      fi
-      while pfx "ssh-$target" kill -0 "$sshpid" && ok2portfwd
-      do  sleep 2
-      done
-      if synckill "$sshpid"
-      then
-        sshpid=
-        alert "KILLED: sshpf $target" &
-      else
-        sshpid=
-        alert "EXITED: sshpf $target" &
-      fi
-      [ -z "$monpid" ] || kill "$monpid" 2>/dev/null
-      [ $once ] && break
-      while :
-      do
-        sleep 2
-        ok2portfwd && break
-      done
-      first=
-    done
-  ) </dev/null 1>&2 &
-  echo $! >"$cfg_pidfile"
-  echo "$target: $cfg_pidfile: $!"
-fi
+first=1
+while :
+do
+  # reload config on every pass
+  cfg_pidfile=portfwd.$target.pid
+  cfg_command=:
+  cfg_outlog=portfwd-$target    # /dev/null
+  cfg_monitor=
+  if [ -s "$fwdcfg" ]
+  then
+    wcv=`winclausevars "$fwdcfg" "$target" cfg`
+    eval "$wcv"
+  fi
+  case $cfg_pidfile in
+    /*) ;; *) cfg_pidfile=$VARRUN/$cfg_pidfile ;;
+  esac
+  case $cfg_outlog in
+    /*) ;; *) cfg_outlog=$LOGDIR/$cfg_outlog ;;
+  esac
+  if opid=`ifpid -q -v "$cfg_pidfile"`
+  then
+    printf "%s" "$cmd: stopping $target, pid $opid "
+    synckill -v "$opid" || :
+    >"$cfg_pidfile"
+  else
+    if [ "$stop" ]
+    then  echo "$cmd: no valid pid to kill in $cfg_pidfile" >&2
+    fi
+  fi
+
+  [ $stop ] && exit 0
+
+  $trace \
+    sshto ServerAliveInterval=37 -n -F "$sshcfg" "$target" \
+      "( $cfg_command ) </dev/null &
+     "'exec 1>&2
+       while sleep 61 && printf " "; do :; done
+      ' \
+    >>"$cfg_outlog" </dev/null &
+  sshpid=$!
+  echo "$sshpid" >"$cfg_pidfile"
+  echo "$target: $cfg_pidfile: $sshpid"
+  [ $first ] || alert "RESTARTED: sshpf $target" &
+
+  # start monitor
+  if [ -n "$cfg_monitor" ]
+  then
+    sh -c "$cfg_monitor" &
+    monpid=$!
+  else
+    monpid=
+  fi
+
+  # wait for tunnel to exit or tunnel permission to expire
+  while pfx "ssh-$target" kill -0 "$sshpid" && ok2portfwd
+  do  sleep 2
+  done
+  if synckill "$sshpid"
+  then
+    sshpid=
+    alert "KILLED: sshpf $target" &
+  else
+    sshpid=
+    alert "EXITED: sshpf $target" &
+  fi
+
+  # stop monitor
+  [ -z "$monpid" ] || kill "$monpid" 2>/dev/null
+
+  [ $once ] && break
+
+  # pause before restart, and indefinitely if no tunnel permission
+  while :
+  do
+    sleep 2
+    ok2portfwd && break
+  done
+
+  first=
+done
+
+exit $xit

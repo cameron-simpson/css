@@ -1,6 +1,6 @@
 from BaseHTTPServer import HTTPServer, BaseHTTPRequestHandler
 import cs.hier
-import cs.json
+import json
 import cs.www
 from cs.misc import cmderr, debug
 import base64
@@ -97,6 +97,6 @@ class JSONRPCHandler(RequestHandler):
     if rpcres is None:
       return
     cb, result = rpcres
-    jscode="%s(%d,%s);\r\n" % (cb,seq,cs.json.json(result,4));
+    jscode="%s(%d,%s);\r\n" % (cb,seq,dumps(result,4));
     debug("JSCODE:\n"+jscode);
     self.wfile.write(jscode);

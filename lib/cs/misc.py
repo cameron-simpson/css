@@ -2,6 +2,9 @@ import os
 import os.path
 import errno
 import sys
+import logging
+info = logging.info
+warning = logging.warning
 import string
 import time
 from types import TupleType, ListType, DictType, DictionaryType
@@ -20,7 +23,7 @@ def setcmd(ncmd):
 
 setcmd(os.path.basename(sys.argv[0]))
 
-class _NoUpd:
+class _NullUpd:
   ''' A dummy class with the same duck type as cs.upd.Upd
       used when cs.upd has not be instantiated by a program.
   '''
@@ -41,14 +44,14 @@ class _NoUpd:
     return False
   def without(self, func, *args, **kw):
     return func(*args, **kw)
-_defaultUpd = _NoUpd()
+_defaultUpd = _NullUpd()
 
 # print to stderr
 def warn(*args):
   ''' "Complaint" error message.
   '''
   global _defaultUpd
-  return _defaultUpd.nl(" ".join([str(s) for s in args]))
+  _defaultUpd.without(warning, " ".join([str(s) for s in args]))
 
 # debug_level:
 #   0 - quiet
@@ -70,11 +73,21 @@ def setDebug(newlevel):
       env = os.environ.get('DEBUG', '')
       if len(env) > 0 and env != "0":
         newlevel = 3
-  global debug_level, isdebug, isverbose, isprogress
+
+  global debug_level, isdebug, isverbose, isprogress, logging_level
   debug_level = newlevel
   isdebug = (debug_level >= 3)
   isverbose = (debug_level >= 2)
   isprogress = (debug_level >= 1)
+
+  logging_level = logging.ERROR
+  if debug_level >= 3:
+    logging_level = logging.DEBUG
+  elif debug_level >= 2:
+    logging_level = logging.INFO
+  elif debug_level >= 1:
+    logging_level = logging.WARNING
+  logging.getLogger().setLevel(logging_level)
 
 setDebug(None)
 if isdebug:
@@ -149,13 +162,12 @@ def cmderr(*args):
 def TODO(msg):
   ''' Marker for missing features.
   '''
-  if ifverbose():
-    logFnLine(msg, frame=sys._getframe(1), prefix="TODO(%s)"%cmd)
+  info("TODO: %s" % (msg,))
 
 def FIXME(msg):
   ''' Marker for outstanding bugs.
   '''
-  logFnLine(msg, frame=sys._getframe(1), prefix="FIXME(%s)"%cmd)
+  warn("WARNING: %s" % (msg,))
 
 def tb(limit=None):
   ''' Print a stack backtrace.
@@ -220,6 +232,8 @@ def logFnLine(line, frame=None, prefix=None, mark=None):
   '''
   if frame is None:
     frame = sys._getframe(1)
+  elif type(frame) is int:
+    frame = sys._getframe(frame)
   line = "%s [%s(), %s:%d]" \
          % (line, frame.f_code.co_name, frame.f_code.co_filename, frame.f_lineno)
   if prefix is not None:
@@ -324,18 +338,19 @@ class NoExceptions(object):
     if exc_type is not None:
       if self.__handler is not None:
         return self.__handler(exc_type, exc_value, traceback)
-      print >>sys.stderr, "ignore %s" % (exc_type,)
+      info("ignore "+str(exc_type))
     return True
 
-  def simpleExceptionReport(exc_type, exc_value, traceback, mark=None):
-    ''' Convenience method to report exceptions to standard error.
+  def simpleExceptionReport(exc_type, exc_value, traceback, mark=None, loglevel=logging.WARNING):
+    ''' Convenience method to log exceptions to standard error.
     '''
     if mark is None:
       mark=cmd
     else:
       mark="%s: %s" % (cmd, mark)
-    print >>sys.stderr, "%s: EXCEPTION: %s: %s [%s]" % (mark, exc_type, exc_value, traceback)
+    log("%s: EXCEPTION: %s: %s [%s]" % (mark, exc_type, exc_value, traceback), level=loglevel)
     return True
+  # backward compatible static method arrangement
   simpleExceptionReport = staticmethod(simpleExceptionReport)
 
 T_SEQ = 'ARRAY'
@@ -418,10 +433,9 @@ def eachOf(gs):
 def get0(seq, dflt=None):
   ''' Return first element of a sequence, or the default.
   '''
-  try:
-    return seq[0]
-  except IndexError:
-    return dflt
+  for i in seq:
+    return i
+  return dflt
 
 def winsize(f):
   '''   Return a (rows, columns) tuple or None for the specified file object.

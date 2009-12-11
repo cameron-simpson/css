@@ -287,7 +287,6 @@
 import sys
 import os
 import os.path
-import stat
 from getopt import getopt, GetoptError
 import string
 from cStringIO import StringIO
@@ -444,7 +443,7 @@ def resolveTarget(target):
         target+='/.'
       else:
         assert False, '%s: %d: unsupported folder type: %s'%(ifp.name,lineno,ftype)
-    
+
   return target
 
 # Pulled fro cs/sh.py.

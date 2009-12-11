@@ -23,21 +23,16 @@ Installing my scripts:
 
     That line should be in your .profile or other environment setup script.
     It's pretty simple; it adds the css components to the END of your PATHs
-    (so no css script name preempt anything you already have).
+    (so no css script name preempts anything you already have).
 
     It mostly does this:
 
 	PATH=$PATH:/opt/css/bin
 	PERL5LIB=$PERL5LIB:/opt/css/lib
 	MANPATH=$MANPATH:/opt/css/man
-	export PATH PERL5LIB MANPATH
-
-    The aim with $PERL5LIB is that "use cs::blah" will find the module
-    /opt/css/lib/cs/blah.pm. Alternatively (for Perl) you could just symlink
-    from your site_perl dir:
-
-	cd /usr/lib/perl5/site_perl
-	ln -s /opt/css/lib/cs .
+        CLASSPATH=$CLASSPATH:/opt/css/lib/au.com.zip.cs.jar
+        PYTHONPATH=$PYTHONPATH:/opt/css/lib
+	export PATH PERL5LIB MANPATH CLASSPATH PYTHONPATH
 
     Several of the scripts expect the following shell environment variables:
 

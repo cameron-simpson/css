@@ -3,6 +3,7 @@ import threading
 from contextlib import contextmanager
 import atexit
 from cs.lex import unctrl       ##, tabpadding
+from cs.logutils import Pfx
 
 active=False
 
@@ -133,63 +134,28 @@ def NoUpd(U=None):
     U=_defaultUpd
   return U._withoutContext()
 
-_ExceptionPrefixState = threading.local()
-
-class _PrefixedException(StandardError):
-  def __init__(self, prefix, inner_text):
-    self.prefix = prefix
-    self.inner_text = inner_text
-  def __str__(self):
-    return "%s: %s" % (self.prefix, self.inner_text)
-
 def _summarise_exception(exc_value):
   summary = str(exc_value)
   if len(summary) == 0:
-    summary = `exc_value`
+    summary = repr(exc_value)
   return summary
 
-class ExceptionPrefix(object):
-  ''' A context manager to prefix exception complaints.
-  '''
-
-  def __init__(self, prefix):
-    self.__prefix = str(prefix)
-
-  def __enter__(self):
-    prefix = self.__prefix
-    global _ExceptionPrefixState
-    if hasattr(_ExceptionPrefixState, 'prefix'):
-      oldprefix = _ExceptionPrefixState.prefix
-      if oldprefix is not None:
-        prefix = oldprefix + ': ' + prefix
-    else:
-      oldprefix = None
-    self.__oldprefix = oldprefix
-    _ExceptionPrefixState.prefix = prefix
-
-  def __exit__(self, exc_type, exc_value, tb):
-    _ExceptionPrefixState.prefix = self.__oldprefix
-    if exc_type is None:
-      return False
-    prefix = self.__prefix
-    if self.__oldprefix is None:
-      upd_state = state()
-      if len(upd_state) > 0:
-        prefix = upd_state + ": " + prefix
-    if exc_type is _PrefixedException:
-      exc_value.prefix = prefix + ": " + exc_value.prefix
-      return False
-    raise _PrefixedException(prefix, _summarise_exception(exc_value)), None, tb
-
 class ShortExceptions(object):
+  ''' Wrapper to catch exceptions and abort with a short error message.
+      This is really only intended for use as an outermost wrapper for a main
+      program to produce more user friendly messages.
+      Setting cs.misc.debug passes exceptions out unharmed, eg:
+        DEBUG=1 the-program ...
+  '''
   def __enter__(self):
     pass
   def __exit__(self, exc_type, exc_value, tb):
-    import cs.misc
     if exc_type is None \
     or exc_type is SystemExit \
-    or exc_type is AssertionError \
-    or cs.misc.isdebug:
+    or exc_type is AssertionError:
+      return False
+    import cs.misc
+    if cs.misc.debug:
       return False
     import sys
     print >>sys.stderr, _summarise_exception(exc_value)

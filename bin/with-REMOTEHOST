@@ -1,0 +1,49 @@
+#!/bin/sh
+#
+# Ssh to the host specified by $REMOTEHOST and run a command with a copy
+# of a local file.
+#       - Cameron Simpson <cs@zip.com.au> 08dec2009
+#
+
+set -ue
+
+: ${REMOTEHOST:=`set -- $SSH_CLIENT; echo "$1"`}
+
+cmd=`basename "$0"`
+usage="Usage: $cmd local-file remote-command..."
+
+badopts=
+
+if [ $# = 0 ]
+then
+  echo "$cmd: missing local-file" >&2
+  badopts=1
+else
+  localfile=$1
+  shift
+  if [ ! -f "$localfile" ]
+  then
+    echo "$cmd: $localfile: not a regular file" >&2
+    badopts=1
+  fi
+  if [ $# = 0 ]
+  then
+    echo "$cmd: missing remote-command" >&2
+    badopts=1
+  fi
+fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+qcmd=`shqstr "$@"`
+filebase=`basename "$localfile"`
+qfilebase=`shqstr "$filebase"`
+
+ssh "$REMOTEHOST" '
+  : ${TMPDIR:=/tmp}
+  tmpf=$TMPDIR/rf$$-'"$qfilebase"'
+  cat >"$tmpf"
+'"$qcmd"' "$tmpf"
+  xit=$?
+  rm -f "$tmpf"
+  exit $xit' <"$localfile"

@@ -8,10 +8,9 @@ template='{date|shortdate} {author|email} {files}\n\t{desc|strip|fill68|tabinden
 
 hg log --template "$template" ${1+"$@"} \
 | awk '
-        START   { lastdate=""; lastauthor="" }
-        /[0-9]/ { date=$1; author=$2
-                  files=$3
-                  for (i=4; i<=NF; i++) {
+        START   { lastdate=""; lastauthor=""; lastfiles="" }
+        /^[0-9]/{ date=$1; author=$2; files=""
+                  for (i=3; i<=NF; i++) {
                     files=files" "$i
                   }
                   if (date != lastdate) {
@@ -22,8 +21,24 @@ hg log --template "$template" ${1+"$@"} \
                   if (author != lastauthor) {
                     print "  " author
                     lastauthor=author
+                    lastfiles=""
                   }
-                  print "    " files
                 }
-        /^[^0-9]/{ print }
+        /^\t/   {
+                  desc=$1
+                  for (i=2; i<=NF; i++) {
+                    desc = desc" "$i
+                  }
+                  if (files != lastfiles) {
+                    if (length(files) > 0) {
+                      print "   " files
+                    }
+                    lastfiles=files
+                  }
+                  if (length(files) > 0) {
+                      print "      " desc
+                  } else {
+                      print "    " desc
+                  }
+                }
       '

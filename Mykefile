@@ -83,7 +83,7 @@ _release:
 
 _pending:
         cs-release log
-        hg status | grep '^[^?]'
+        hg status | grep '^[^?]'; :
 
 _freshmeat:
         cs-release freshmeat-submit

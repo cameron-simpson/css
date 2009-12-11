@@ -156,7 +156,8 @@ esac
         [ -n "$nsess" ] || { echo "$cmd: no screen numbered $sess" >&2
                              exit 1
                            }
-        # matched - join the session
+        # matched - join the session unless -dm (detached) option supplied
+        [ $detached ] && exit 0
         exec $screen -c "$rcfile" -Aax "$nsess"
         ;;
     esac
@@ -175,8 +176,12 @@ esac
     esac
     match=`"$0" | sed "/^ *[1-9][0-9]*  *[1-9][0-9]*\\.$sessre\$/!d;"'s/^ *[1-9][0-9]*  *//; q'`
 
-    # match found - join it
-    [ -n "$match" ] && exec $screen -c "$rcfile" -Aax "$sess"
+    # match found - join it unless -dm (detached) option supplied
+    if [ -n "$match" ]
+    then
+      [ $detached ] && exit 0
+      exec $screen -c "$rcfile" -Aax "$sess"
+    fi
   else
     sess=$*
     case "$sess" in */*) sess=`printf "%s" "$sess" | tr / _` ;; esac

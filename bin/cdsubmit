@@ -184,7 +184,7 @@ echo "# Submitted via: $cmd $version by Cameron Simpson <cs@zip.com.au>"
 echo "#"
 
 read -r dummydiscid || exit 1
-[ "x$discid" = "x$dummydiscid" ] || { echo "$cmd: discid damaged" >&2; exit 1; }
+[ "x$discid" = "x$dummydiscid" ] || { echo "$cmd: discid damaged (\"$discid\" vs \"$dummydiscid\")" >&2; exit 1; }
 echo "Discid: $discid" >&2
 echo "DISCID=$discid"
 

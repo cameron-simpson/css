@@ -1,9 +1,12 @@
 #!/usr/bin/python -tt
 
 import cherrypy
-import cs.www
-import cs.json
-from cs.misc import ifdebug, cmderr
+import urllib
+import sys
+if sys.hexversion < 0x02060000:
+  import simplejson as json
+else:
+  import json
 
 def testAuth(rq=None):
   ''' Examine the cherrypy.request object supplied for HTTP Basic authentication,
@@ -42,13 +45,10 @@ def setNeedAuth(realm,rsp=None):
 class RPC:
 
   def _RPCargs(self,jsontxt):
-    jsontxt=cs.www.unhexify(jsontxt)
-    (args,unparsed)=cs.json.tok(jsontxt)
-    if ifdebug(): cmderr("args =", repr(args), "unparsed =", repr(unparsed))
-    return args
+    return json.loads(urllib.unquote(jsontxt))
 
-  def _RPCreturn(self,cb,seq,result):
-    return "%s(%d,%s);\r\n" % (cb,seq,cs.json.json(result,4))
+  def _RPCreturn(self,callback,seq,result):
+    return "%s(%d,%s);\r\n" % (callback,seq,json.dumps(result))
 
   @cherrypy.expose
   def default(self, *words):
@@ -75,7 +75,6 @@ class DBBrowse:
 
   @cherrypy.expose
   def default(self, *words):
-    cmderr("words=[%s]" % (words,))
     words=list(words)
     if len(words) == 0:
       dbs=[ R[0] for R in self.__conn.execute('show databases') ]
