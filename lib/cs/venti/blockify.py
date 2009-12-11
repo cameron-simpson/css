@@ -8,11 +8,13 @@ import sys
 from struct import unpack_from
 from threading import Thread
 from cs.venti.blocks import BlockList, BlockRef
-from cs.venti.hash import MIN_BLOCKSIZE, MAX_BLOCKSIZE, MAX_SUBBLOCKS
 from cs.threads import IterableQueue
 from cs.misc import isdebug, debug, D, eachOf
 from cs.lex import unctrl
 import __main__
+
+MIN_BLOCKSIZE=80                                # less than this seems silly
+MAX_BLOCKSIZE=16383                             # fits in 2 octets BS-encoded
 
 def blocksOfFP(fp, rsize=None):
   ''' A generator that reads data from a file and yields blocks.
@@ -48,8 +50,10 @@ def fullBlockRefsOf(blockrefs,S=None):
   if S is None:
     S=__main__.S
   BL=BlockList()
+  # how many subblock refs will fit in a block: flags(1)+span(2)+hash
+  max_subblocks = int(MAX_BLOCKSIZE/(3+ S.hashfunc.hashlen))
   for bref in blockrefs:
-    if len(BL) >= MAX_SUBBLOCKS:
+    if len(BL) >= max_subblocks:
       # overflow
       yield BL
       BL=BlockList()
