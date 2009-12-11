@@ -10,7 +10,7 @@ from cs.misc import warn, cmderr, TODO, FIXME, isdebug
 from cs.serialise import toBS, fromBS, fromBSfp
 from cs.io import readn
 from cs.venti import tohex
-from cs.venti.hash import MAX_SUBBLOCKS, HASH_SIZE_SHA1, HASH_SHA1_T
+from cs.venti.hash import HASH_SIZE_SHA1, HASH_SHA1_T
 import __main__
 
 class BlockRef:
