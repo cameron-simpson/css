@@ -12,9 +12,8 @@ from threading import Semaphore, Thread
 from Queue import Queue
 from collections import deque
 if sys.hexversion < 0x02060000: from sets import Set as set
-from cs.misc import seq, debug, isdebug, tb, cmderr, warn
+from cs.misc import seq, isdebug
 from cs.logutils import LogTime
-from cs.misc import seq
 
 class AdjustableSemaphore(object):
   ''' A semaphore whose value may be tuned after instantiation.
@@ -223,14 +222,12 @@ class JobCounter:
   def inc(self):
     ''' Note that there is another job for which to wait.
     '''
-    debug("%s: inc()" % self.__name)
     with self.__lock:
       self.__n+=1
 
   def dec(self):
     ''' Report the completion of a job.
     '''
-    debug("%s: dec()" % self.__name)
     self.__sem.release()
 
   def _wait1(self):
@@ -238,15 +235,12 @@ class JobCounter:
         Return False if no jobs remain.
         Report True if a job remained and we waited.
     '''
-    debug("%s: wait1()..." % self.__name)
     with self.__lock:
       if self.__n == 0:
-        debug("%s: wait1(): nothing to wait for" % self.__name)
         return False
     self.__sem.acquire()
     with self.__lock:
       self.__n-=1
-    debug("%s: wait1(): waited" % self.__name)
     return True
 
   def _waitAll(self):
@@ -254,9 +248,7 @@ class JobCounter:
       pass
 
   def _waitThenDo(self,*args,**kw):
-    debug("%s: _waitThenDo()..." % self.__name)
     self._waitAll()
-    debug("%s: _waitThenDo(): waited: calling __onDone()..." % self.__name)
     return self.__onDone[0](*self.__onDone[1],**self.__onDone[2])
 
   def doInstead(self,func,*args,**kw):
@@ -337,7 +329,6 @@ class FuncQueue(NestingOpenClose):
     '''
     self.open()
     for retQ, func, args, kwargs in self.__Q:
-      ##debug("func=%s, args=%s, kwargs=%s"%(func,args,kwargs))
       ret=func(*args,**kwargs)
       if retQ is not None:
         retQ.put(ret)
@@ -391,12 +382,10 @@ def getChannel():
   with __channelsLock:
     if len(__channels) == 0:
       ch=_Channel()
-      if isdebug: warn("getChannel: allocated %s" % ch)
     else:
       ch=__channels.pop(-1)
   return ch
 def returnChannel(ch):
-  debug("returnChannel: releasing %s" % ch)
   with __channelsLock:
     assert ch not in __channels
     __channels.append(ch)
@@ -568,10 +557,12 @@ class FuncMultiQueue(object):
     self.__main.start()
 
   def _mainloop(self):
+    print >>sys.stderr, "FuncMultiQueue._mainloop: started"
     Q = self.__Q
     sem = self.__sem
     hs = self.__handlers
     for rq in Q:
+      print >>sys.stderr, "FuncMultiQueue._mainloop: got Q item"
       sem.acquire()        # will be released by the handler
       if len(hs) == 0:
         # no available threads - make one
@@ -588,10 +579,12 @@ class FuncMultiQueue(object):
   def _handler(self, T, hch):
     sem = self.__sem
     hs = self.__handlers
-    for func, retch in hch:
+    for func, retQ, tag in hch:
       if func is None:
         break
-      retch.put(func())
+      if retQ is not None:
+        retQ.put( (tag, func()) )
+      # return this handler to the pool
       hs.append( (T, hch) )
       sem.release()
 
@@ -607,21 +600,32 @@ class FuncMultiQueue(object):
       T.join()
     self.__main.join()
 
+  def qbgcall(self, Q, func, *args, **kw):
+    ''' Queue a call to func(*args, **kw).
+        A tag value is allocated and returned.
+        The (tag, result) will be .put() on the supplied Q on completion of
+        the function. If Q is None the function result is discarded.
+    '''
+    tag = seq()
+    pfunc = partial(func, *args, **kw)
+    self.__Q.put( (pfunc, Q, tag) )
+    return tag
+
   def bgcall(self, func, *args, **kw):
     ''' Queue a call to func(*args, **kw).
-        Return a Channel-like object whose get() method will return
-        the function result on completion.
+        Return a Channel-like object whose .get() method will return
+        the a tuple (tag, result) on function completion.
     '''
     pfunc = partial(func, *args, **kw)
     q1 = Q1()
-    self.__Q.put( (pfunc, q1) )
+    self.qbgcall(q1, func, *args, **kw)
     return q1
 
   def call(self, func, *args, **kw):
     ''' Call func(*args, **kw) via the queue.
         Return the function result.
     '''
-    return self.bgcall(func, *args, **kw).get()
+    return self.bgcall(func, *args, **kw).get()[1]
 
 if __name__ == '__main__':
   import unittest
@@ -645,7 +649,7 @@ if __name__ == '__main__':
         ch = FQ.bgcall(delay, 1)
         chs.append(ch)
       for ch in chs:
-        x = ch.get()
+        tag, x = ch.get()
         self.assertEquals(x, 1)
       FQ.close()
   unittest.main()
