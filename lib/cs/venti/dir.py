@@ -1,8 +1,8 @@
 import stat
 import sys
 if sys.hexversion < 0x02060000: from sets import Set as set
-from cs.venti.blocks import decodeBlockRef, BlockRef
-from cs.venti.blockify import topBlockRefString
+from cs.venti.block import decodeBlock
+from cs.venti.blockify import blockFromString
 from cs.venti.meta import Meta
 from cs.venti import tohex
 from cs.lex import unctrl
@@ -15,15 +15,14 @@ gid_nogroup = -1
 ''' Directries (Dir, a subclass of dict) and Direory Entries (Dirent).
 '''
 
-def storeDir(path,aspath=None,S=None):
+def storeDir(path, aspath=None):
   ''' Store a real directory into a Store, return the new Dir.
   '''
   if aspath is None:
     aspath=path
   D=Dir(aspath)
-  debug("path=%s"%(path,))
+  debug("path=%s"%(path, ))
   D.updateFrom(path,
-               S=S,
                ignoreTimes=False,
                deleteMissing=True,
                overWrite=True)
@@ -38,12 +37,12 @@ F_HASNAME=0x02
 class Dirent:
   ''' Incomplete base class for Dirent objects.
   '''
-  def __init__(self,type,name,meta):
-    assert isinstance(type,int), "type=%s"%(type,)
+  def __init__(self, type, name, meta):
+    assert isinstance(type, int), "type=%s"%(type, )
     self.type=type
-    assert name is None or isinstance(name,str), "name=%s"%(name,)
+    assert name is None or isinstance(name, str), "name=%s"%(name, )
     self.name=name
-    assert isinstance(meta,Meta), "meta=%s"%(meta,)
+    assert isinstance(meta, Meta), "meta=%s"%(meta, )
     self.meta=meta
     self.d_ino=None
     assert meta is not None
@@ -66,16 +65,16 @@ class Dirent:
     '''
     return self.type == D_DIR_T
 
-  def encode(self,noname=False):
+  def encode(self, noname=False):
     ''' Serialise the dirent.
-        Output format: bs(type)bs(flags)[bs(metalen)meta][bs(namelen)name]bref
+        Output format: bs(type)bs(flags)[bs(metalen)meta][bs(namelen)name]block
     '''
     flags=0
 
     meta=self.meta
     if meta is not None:
-      ##debug("%s:META=%s"%(self.name,meta,))
-      assert isinstance(meta,Meta)
+      ##debug("%s:META=%s"%(self.name, meta, ))
+      assert isinstance(meta, Meta)
       metatxt=meta.encode()
       if len(metatxt) > 0:
         metatxt=toBS(len(metatxt))+metatxt
@@ -92,18 +91,17 @@ class Dirent:
     else:
       name=""
 
-    bref=self.getBref()
-    assert isinstance(bref,BlockRef)
+    block = self.getBlock()
     return toBS(self.type) \
          + toBS(flags) \
          + metatxt \
          + name \
-         + bref.encode()
+         + block.encode()
 
   def size(self):
-    return self.getBref().span
+    return len(self.getBlock())
 
-  def mtime(self,newtime=None):
+  def mtime(self, newtime=None):
     if newtime is None:
       if self.meta is None:
         return 0.0
@@ -146,24 +144,24 @@ class Dirent:
 class _BasicDirent(Dirent):
   ''' A _BasicDirent represents a file or directory in the store.
   '''
-  def __init__(self,type,name,meta,bref):
-    Dirent.__init__(self,type,name,meta)
-    self.__bref=bref
+  def __init__(self, type, name, meta, block):
+    Dirent.__init__(self, type, name, meta)
+    self.__block=block
 
-  def getBref(self):
-    return self.__bref
+  def getBlock(self):
+    return self.__block
 
-  def __getitem__(self,name):
+  def __getitem__(self, name):
     if self.isdir():
       return self.asdir()[name]
     raise KeyError, "\"%s\" not in %s" % (name, self)
 
-def FileDirent(name,meta,bref):
-  return _BasicDirent(D_FILE_T,name,meta,bref)
+def FileDirent(name, meta, block):
+  return _BasicDirent(D_FILE_T, name, meta, block)
 
 def decodeDirent(s, justone=False):
   ''' Unserialise a dirent, return object.
-      Input format: bs(type)bs(flags)[bs(metalen)meta][bs(namelen)name]bref
+      Input format: bs(type)bs(flags)[bs(metalen)meta][bs(namelen)name]block
   '''
   s0 = s
   type, s = fromBS(s)
@@ -183,11 +181,11 @@ def decodeDirent(s, justone=False):
     s=s[namelen:]
   else:
     name=""
-  bref, s = decodeBlockRef(s)
+  block, s = decodeBlock(s)
   if type == D_DIR_T:
-    E=Dir(name,meta=meta,parent=None,content=bref)
+    E=Dir(name, meta=meta, parent=None, content=block)
   else:
-    E=_BasicDirent(type,name,meta,bref)
+    E=_BasicDirent(type, name, meta, block)
   ##if isdebug: cmderr("decode(%s) -> %s" % (tohex(s0), E))
   if justone:
     assert len(s) == 0, \
@@ -196,15 +194,15 @@ def decodeDirent(s, justone=False):
   return E, s
 
 class Dir(Dirent):
-  def __init__(self,name,meta=None,parent=None,content=None):
+  def __init__(self, name, meta=None, parent=None, content=None):
     if meta is None:
       meta=Meta()
-    Dirent.__init__(self,D_DIR_T,name,meta)
+    Dirent.__init__(self, D_DIR_T, name, meta)
     self.parent=parent
     self.__content={}
-    self.__contentBref=content
+    self.__contentBlock=content
 
-  def isdir(self,name=None):
+  def isdir(self, name=None):
     if name is None:
       return Dirent.isdir(self)
     return self[name].isdir()
@@ -215,9 +213,9 @@ class Dir(Dirent):
   def files(self):
     return [ name for name in self.keys() if self[name].isfile() ]
 
-  def overlayBlockRef(self,bref,S=None):
+  def overlayBlockRef(self, block):
     from cs.venti.file import ReadFile
-    iblock=ReadFile(bref,S=S).read()
+    iblock=ReadFile(block).read()
     while len(iblock) > 0:
       oiblock=iblock
       E, iblock = decodeDirent(iblock)
@@ -232,26 +230,26 @@ class Dir(Dirent):
         E.parent=self
       self.__content[E.name]=E
 
-  def __validname(self,name):
+  def __validname(self, name):
     return len(name) > 0 and name.find('/') < 0
 
-  def __needContent(self,S=None):
-    if self.__contentBref is not None:
-      bref=self.__contentBref
-      self.__contentBref=None
-      self.overlayBlockRef(bref,S=S)
+  def __needContent(self):
+    if self.__contentBlock is not None:
+      block=self.__contentBlock
+      self.__contentBlock=None
+      self.overlayBlockRef(block)
     return self.__content
 
-  def get(self,name,dflt=None,S=None):
-    self.__needContent(S=S)
+  def get(self, name, dflt=None):
+    self.__needContent()
     if name not in self:
       return dflt
     return self[name]
 
-  def keys(self,S=None):
-    return self.__needContent(S=S).keys()
+  def keys(self):
+    return self.__needContent().keys()
 
-  def __contains__(self,name):
+  def __contains__(self, name):
     if name == '.':
       return True
     if name == '..':
@@ -259,63 +257,63 @@ class Dir(Dirent):
     self.__needContent()
     return name in self.__content
 
-  def __iter__(self,S=None):
-    return self.keys(S=S)
+  def __iter__(self):
+    return self.keys()
 
-  def __getitem__(self,name,S=None):
+  def __getitem__(self, name):
     if name == '.':
       return self
     if name == '..':
       return self.parent
-    return self.__needContent(S=S)[name]
+    return self.__needContent()[name]
 
-  def __setitem__(self,name,E):
-    ##debug("<%s>[%s]=%s" % (self.name,name,E))
+  def __setitem__(self, name, E):
+    ##debug("<%s>[%s]=%s" % (self.name, name, E))
     assert self.__validname(name)
     assert name not in self
-    assert isinstance(E,Dirent)
+    assert isinstance(E, Dirent)
     self.__needContent()[name]=E
 
-  def __delitem__(self,name,S=None):
+  def __delitem__(self, name):
     assert self.__validname(name)
     assert name != '.' and name != '..'
-    self.__needContent(S=S)
+    self.__needContent()
     del self.__content[name]
 
-  def getBref(self):
-    ''' Return the top BlockRef referring to an encoding of this Dir.
+  def getBlock(self):
+    ''' Return the top Block referring to an encoding of this Dir.
     '''
     names=self.keys()
     names.sort()
-    s="".join( self[name].encode()
-               for name in names
-               if name != '.' and name != '..')
-    ##debug("Dir.data = <%s>" % unctrl(s))
-    return topBlockRefString(s)
+    return blockFromString(
+            "".join( self[name].encode()
+                     for name in names
+                     if name != '.' and name != '..'
+                   ))
 
-  def rename(self,oldname, newname):
+  def rename(self, oldname, newname):
     E=self[oldname]
     del E[oldname]
     E.name=newname
     self[newname]=E
 
-  def open(self,name):
+  def open(self, name):
     from cs.venti.file import ReadFile
-    return ReadFile(self[name].getBref())
+    return ReadFile(self[name].getBlock())
 
-  def mkdir(self,name):
+  def mkdir(self, name):
     debug("<%s>.mkdir(%s)..." % (self.name, name))
-    D=self[name]=Dir(name,parent=self)
+    D=self[name]=Dir(name, parent=self)
     return D
 
-  def chdir1(self,name):
+  def chdir1(self, name):
     D=self[name]
     assert D.isdir()
-    if not isinstance(D,Dir):
-      D=self[name]=Dir(D.name,parent=self)
+    if not isinstance(D, Dir):
+      D=self[name]=Dir(D.name, parent=self)
     return D
 
-  def chdir(self,path):
+  def chdir(self, path):
     D=self
     for name in path.split('/'):
       if len(name) == 0:
@@ -323,7 +321,7 @@ class Dir(Dirent):
       D=D.chdir1(name)
     return D
 
-  def makedirs(self,path):
+  def makedirs(self, path):
     ''' Like os.makedirs(), create a directory path at need.
         Returns the bottom directory.
     '''
@@ -341,7 +339,6 @@ class Dir(Dirent):
 
   def updateFrom(self,
                  osdir,
-                 S=None,
                  ignoreTimes=False,
                  deleteMissing=False,
                  overWrite=False):
@@ -350,9 +347,9 @@ class Dir(Dirent):
     '''
     from cs.venti.file import storeFile
     import os
-    ##debug("osdir=%s" % (osdir,))
-    osdirpfx=os.path.join(osdir,'')
-    for dirpath, dirs, files in os.walk(osdir,topdown=False):
+    ##debug("osdir=%s" % (osdir, ))
+    osdirpfx=os.path.join(osdir, '')
+    for dirpath, dirs, files in os.walk(osdir, topdown=False):
       ##debug("dirpath=%s" % dirpath)
       if dirpath == osdir:
         D=self
@@ -368,7 +365,7 @@ class Dir(Dirent):
         Dnames=list(D.keys())
         for name in Dnames:
           if name not in names:
-            progress("%s: delete %s" % (cmd,name))
+            progress("%s: delete %s" % (cmd, name))
             del D[name]
 
       for dir in dirs:
@@ -378,14 +375,14 @@ class Dir(Dirent):
             D.mkdir(dir)
 
       for subfile in files:
-        filepath=os.path.join(dirpath,subfile)
+        filepath=os.path.join(dirpath, subfile)
         try:
           st=os.stat(filepath)
         except OSError, e:
-          cmderr("%s: stat: %s" % (filepath,e))
+          cmderr("%s: stat: %s" % (filepath, e))
           continue
         except IOError, e:
-          cmderr("%s: stat: %s" % (filepath,e))
+          cmderr("%s: stat: %s" % (filepath, e))
           continue
         if subfile in D:
           if not overWrite:
@@ -396,7 +393,7 @@ class Dir(Dirent):
             if st.st_size == E.size() and int(st.st_mtime) == int(E.mtime()):
               verbose("%s: same size and mtime, skipping" % filepath)
               continue
-            verbose("%s: differing size(%s:%s)/mtime(%s:%s)" % (filepath,st.st_size,E.size(),int(st.st_mtime),int(E.mtime())))
+            verbose("%s: differing size(%s:%s)/mtime(%s:%s)" % (filepath, st.st_size, E.size(), int(st.st_mtime), int(E.mtime())))
           else:
             verbose("%s: IGNORETIMES=True" % filepath)
         else:
@@ -405,7 +402,7 @@ class Dir(Dirent):
         progress("store %s" % subfile)
         M=Meta()
         M.mtime(st.st_mtime)
-        stored=storeFile(open(filepath),S=S)
+        stored=storeFile(open(filepath))
         stored.name=subfile
         stored.meta=M
         if subfile in D:

@@ -1,27 +1,57 @@
 #!/usr/bin/python -tt
 #
-# Utility routines for blocks and BlockRefs.
+# Utility routines to parse data streams into Blocks and Block streams
+# into IndirectBlocks.
 #       - Cameron Simpson <cs@zip.com.au>
 #
 
 import sys
 from struct import unpack_from
 from threading import Thread
-from cs.venti.blocks import BlockList, BlockRef
 from cs.threads import IterableQueue
 from cs.misc import isdebug, debug, D, eachOf
 from cs.lex import unctrl
-import __main__
+from cs.venti import defaults
+from cs.venti.block import Block, IndirectBlock
 
 MIN_BLOCKSIZE=80                                # less than this seems silly
 MAX_BLOCKSIZE=16383                             # fits in 2 octets BS-encoded
-
-def blocksOfFP(fp, rsize=None):
-  ''' A generator that reads data from a file and yields blocks.
+ 
+def topIndirectBlock(blockSource):
+  ''' Return a top Block for a stream of Blocks.
   '''
-  return blocksOf(filedata(fp,rsize))
+  blockSource=fullIndirectBlocks(blockSource)
+  while True:
+    try:
+      topblock=blockSource.next()
+    except StopIteration:
+      # no blocks - return the empty block - no data
+      return Block(data="")
 
-def filedata(fp,rsize=None):
+    # we have a full IndirectBlock
+    # if there are more, replace our blockSource with
+    #   fullIndirectBlocks(topblock + nexttopblock + blockSource)
+    try:
+      nexttopblock = blockSource.next()
+    except StopIteration:
+      # just one IndirectBlock - we're done
+      return topblock
+
+    # add a layer of indirection and repeat
+    print >>sys.stderr, "push new fullIndirectBlocks()"
+    blockSource = fullIndirectBlocks(eachOf(([topblock,
+                                              nexttopblock
+                                             ], blockSource)))
+
+  assert False, "not reached"
+
+def blockFromString(s):
+  return topIndirectBlock(blocksOf([s]))
+
+def blockFromFile(fp):
+  return topIndirectBlock(blocksOf(filedata(fp)))
+
+def filedata(fp, rsize=None):
   ''' A generator to yield chunks of data from a file.
   '''
   if rsize is None:
@@ -34,182 +64,112 @@ def filedata(fp,rsize=None):
       break
     yield s
 
-def blockrefsOf(blockSource,S=None):
-  ''' A generator that yields direct BlockRefs from a data source.
+def fullIndirectBlocks(blockSource):
+  ''' A generator that yields full IndirectBlocks from an iterable
+      source of Blocks, except for the last Block which need not
+      necessarily be bundled into an IndirectBlock.
   '''
-  if S is None:
-    S=__main__.S
-  for block in blockSource:
-    yield BlockRef(S.store(block),False,len(block))
-
-def fullBlockRefsOf(blockrefs,S=None):
-  ''' A generator that yields full indirect BlockRefs from an iterable
-      source of blockrefs, except for the last blockref which need not
-      necessarily be bundled into an iblock.
-  '''
-  if S is None:
-    S=__main__.S
-  BL=BlockList()
+  S = defaults.S
+  iblock = IndirectBlock()
   # how many subblock refs will fit in a block: flags(1)+span(2)+hash
-  max_subblocks = int(MAX_BLOCKSIZE/(3+ S.hashfunc.hashlen))
-  for bref in blockrefs:
-    if len(BL) >= max_subblocks:
+  max_subblocks = int(MAX_BLOCKSIZE/(3+S.hashclass.hashlen))
+  for block in blockSource:
+    if len(iblock.subblocks()) >= max_subblocks:
       # overflow
-      yield BL
-      BL=BlockList()
-    BL.append(bref)
-  if len(BL) == 0:
-    # never received any blockrefs
-    h=S.store("")
-    bref=BlockRef(S.store(""),False,0)
-  elif len(BL) == 1:
-    # one block unyielded - don't bother wrapping into an iblock
-    bref=BL[0]
-  else:
-    # wrap into iblock for return
-    bref=BlockRef(S.store(BL.encode()),True,BL.span())
-  yield bref
- 
-def topBlockRef(blockrefs,S=None):
-  ''' Return a top BlockRef for a stream of BlockRefs.
-  '''
-  blockrefs=fullBlockRefsOf(blockrefs,S=S)
-  while True:
-    bref=blockrefs.next()
-    try:
-      bref2=blockrefs.next()
-    except StopIteration:
-      # just one blockref - return it
-      break
-    # reapply to the next layer of indirection
-    blockrefs=fullBlockRefsOf(eachOf(([bref,bref2],blockrefs)))
-  return bref
+      yield iblock
+      iblock=IndirectBlock()
+    iblock.append(block)
 
-def topBlockRefFP(fp,rsize=None,S=None):
-  ''' Return a top BlockRef for the data in a file.
-  '''
-  return topBlockRef(blockrefsOf(blocksOfFP(fp,rsize),S=S),S=S)
-
-def topBlockRefString(s,S=None):
-  return topBlockRef(blockrefsOf(blocksOf([s]),S=S),S=S)
-
-class strlist:
-  def __init__(self):
-    self._flushlen=0
-    self._reset()
-  def _reset(self):
-    self.buf=[]
-    self.len=0
-  def take(self,s,slen,RH=None):
-    assert slen > 0 and slen <= len(s), "slen=%d, len(s)=%d" % (slen, len(s))
-    right=buffer(s,slen)
-    left=buffer(s,0,slen)
-    if RH is not None:
-      RH.addString(right)
-    assert len(left) == slen
-    self.buf.append(left)
-    self.len+=slen
-    return right
-  def flush(self,Q,RH):
-    s=str(self)
-    if len(s) == MAX_BLOCKSIZE:
-      D("Y")
+  # handle the termination case
+  if len(iblock) > 0:
+    if len(iblock) == 1:
+      # one block unyielded - don't bother wrapping into an iblock
+      block=iblock[0]
     else:
-      D("Y(%d)", len(s))
-    self._flushlen+=len(s)
-    Q.put(s)
-    self._reset()
-    RH.reset()
-  def __len__(self):
-    return self.len
-  def __str__(self):
-    return "".join(str(b) for b in self.buf)
+      block=iblock
+    yield block
 
-def cut(bufable,pos):
-  return buffer(bufable,0,pos), buffer(bufable,pos)
-
-def blocksOf(dataSource,vocab=None):
-  ''' Return an iterator that yields blocks from an iterable dataSource.
-  '''
-  IQ=IterableQueue(1)
-  T=Thread(target=blockify,args=(dataSource,vocab,IQ))
-  T.setDaemon(True)
-  T.start()
-  return IQ
-
-def blockify(dataSource,vocab,Q):
+def blocksOf(dataSource, vocab=None):
   ''' Collect data strings from the iterable dataSource
-      and put blocks onto the output Queue 'Q'.
-      This is usually run as a daemon thread for blockOf().
+      and yield data blocks with desirable boundaries.
   '''
   if vocab is None:
     global DFLT_VOCAB
-    vocab=DFLT_VOCAB
+    vocab = DFLT_VOCAB
 
-  datalen=0
-  buf=strlist()
-  RH=RollingHash()
+  buf = []      # list of strings-to-collate-into-a block
+  buflen = 0    # cumulative length of buf
+  RH=RollingHash() # rolling hash of contents of buf
+
   # invariant: all the bytes in buf[]
   # have been fed to the rolling hash
   for data in dataSource:
-    D("D")
-    datalen+=len(data)
+    ##print >>sys.stderr, "blockOf(data = %d bytes), buflen=%d" % (len(data),buflen)
     while len(data) > 0:
-      # pad buffer if less than minimum block size
-      ##D("d(%d)", len(data))
-      skip=max(MIN_BLOCKSIZE-len(buf),0)
+      # if buflen < MIN_BLOCKSIZE pad with stuff from data
+      skip = MIN_BLOCKSIZE - buflen
       if skip > 0:
-        if skip >= len(data):
+        if skip > len(data):
           skip = len(data)
-        data = buf.take(data, skip, RH)
+        left = data[:skip]; data = data[skip:]
+        buf.append(left); buflen += len(left)
+        RH.addString(left)
         continue
 
       # we don't like to make blocks bigger than MAX_BLOCKSIZE
-      maxlen=MAX_BLOCKSIZE-len(buf)
-      assert maxlen > 0, \
-                "maxlen <= 0 (%d), MAX_BLOCKSIZE=%d, len(buf)=%d" \
-                % (maxlen, MAX_BLOCKSIZE, len(buf))
+      probe_len = MAX_BLOCKSIZE - buflen
+      assert probe_len > 0, \
+                "probe_len <= 0 (%d), MAX_BLOCKSIZE=%d, len(buf)=%d" \
+                % (probe_len, MAX_BLOCKSIZE, len(buf))
       # don't try to look beyond the end of the data either
-      maxlen=min(maxlen,len(data))
+      probe_len = min(probe_len, len(data))
 
       # look for a vocabulary word
-      data=str(data)
-      word, woffset = vocab.findWord(data,0,maxlen)
+      word,  woffset = vocab.findWord(data, 0, probe_len)
       if word is not None:
         # word match found
         vword, voffset, vsubvocab = vocab[word]
         if vsubvocab is not None:
-          # update for new vocabuary
-          vocab=vsubvocab
+          # change vocabulary
+          vocab = vsubvocab
         # put the desired part of the data into the buffer
         # and flush the buffer
-        data = buf.take(data, woffset+voffset)
-        D("W")
-        buf.flush(Q,RH)
+        cutoff = woffset + voffset      # start of word plus offset to boundary
+        left = data[:cutoff]; data = data[cutoff:]
+        buf.append(left)
+        yield Block("".join(buf))
+        buf = []; buflen = 0
+        RH.reset()
         continue
 
       # no vocabulary word - look for the magic hash value
-      off = RH.findEdge(data,maxlen)
-      assert off == -1 or off > 0, "findEdge()=%d" % off
-      # POST: if off == -1, maxlen bytes added to RH
-      #       otherwise, off bytes added to RH
-      if off > 0:
-        data = buf.take(data, off)
-        ##D("off=%d", off)
-        buf.flush(Q,RH)
+      cutoff = RH.findEdge(data,probe_len)
+      assert cutoff == -1 or cutoff > 0, "findEdge()=%d" % (cutoff,)
+      # POST: if cutoff == -1, probe_len bytes added to RH
+      #       otherwise, cutoff bytes added to RH
+      if cutoff > 0:
+        left = data[:cutoff]; data = data[cutoff:]
+        buf.append(left)
+        yield Block("".join(buf))
+        buf = []; buflen = 0
+        RH.reset()
         continue
 
-      data = buf.take(data, maxlen)
-      assert len(buf) <= MAX_BLOCKSIZE
-      if len(buf) == MAX_BLOCKSIZE:
-        D("M")
-        buf.flush(Q,RH)
+      assert probe_len > 0
+      left = data[:probe_len]; data = data[probe_len:]
+      buf.append(left); buflen += len(left)
+      RH.addString(left)
 
-  # no more data - flush remaining buffer and close output
-  if len(buf) > 0:
-    buf.flush(Q,RH)
-  assert buf._flushlen == datalen, "buf._flushlen(%d) != datalen(%d)" % (buf._flushlen,datalen)
-  Q.close()
+      assert buflen <= MAX_BLOCKSIZE
+      if buflen == MAX_BLOCKSIZE:
+        # full block - release it
+        yield Block("".join(buf))
+        buf = []; buflen = 0
+        RH.reset()
+
+  # no more data - yield remaining buffer
+  if buflen > 0:
+    yield Block("".join(buf))
 
 class RollingHash:
   ''' Compute a rolling hash over 4 bytes of data.
@@ -224,24 +184,24 @@ class RollingHash:
   def value(self):
     return self.n
 
-  def findEdge(self,data,maxlen):       ## hashcodes):
-    ''' Add characters from data to the rolling hash until maxlen characters
+  def findEdge(self,data,probe_len):       ## hashcodes):
+    ''' Add characters from data to the rolling hash until probe_len characters
         are accumulated or the magic hash code is encountered.
         Return the offset where the match was found, or -1 if no match.
-        POST: -1: maxlen characters added to the hash.
+        POST: -1: probe_len characters added to the hash.
               >=0: offset characters added to the hash
     '''
     D("H")
-    assert maxlen > 0
-    maxlen=min(maxlen,len(data))
+    assert probe_len > 0
+    probe_len=min(probe_len,len(data))
     n=self.n
-    for i in range(maxlen):
+    for i in range(probe_len):
       self.addcode(ord(data[i]))
       if self.n%4093 == 1:
         ##debug("edge found, returning (hashcode=%d, offset=%d)" % (self.value,i+1))
         D("(self.n=%d:i+1=%d)", self.n, i+1)
         return i+1
-    ##debug("no edge found, hash now %d, returning (None, %d)" % (self.value(),maxlen))
+    ##debug("no edge found, hash now %d, returning (None, %d)" % (self.value(),probe_len))
     return -1
 
   def addcode(self,oc):

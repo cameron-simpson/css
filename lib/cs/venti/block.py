@@ -1,35 +1,22 @@
 #!/usr/bin/python
 
-from cs.venti import defaults
+import unittest
+import sys
+from cs.serialise import toBS, fromBS
+from cs.venti import defaults, tohex
 from cs.venti.hash import Hash_SHA1, HASH_SHA1_T
+from cs.venti.debug import dumpBlock
 
 F_BLOCK_INDIRECT = 0x01 # indirect block
 F_BLOCK_HASHTYPE = 0x02 # hash type explicit
 
-def encodeBlock(B):
-  ''' Encode a Block for storage:
-      Format is:
-        BS(flags)
-          0x01 indirect block
-          0x02 hashtype != HASH_SHA1_T
-        BS(span)
-        [BS(hashtype)[BS(hashlen)]]
-        hash
-  '''
-  flags=0
-  if self.indirect:
-    flags |= F_BLOCK_INDIRECT
-  hashcode = B.hashcode()
-  hashnum = hashcode.hashenum
-  if hashenum == HASH_SHA1_T:
-    hashtype_enc = bytes()
-  else:
-    hashtype_enc = toBS(hashenum)
-  hashcode_enc = hashcode.encode()
-  return toBS(flags)+toBS(len(B))+hashtype_enc+hashcode_enc
+def decodeBlocks(s):
+  while len(s) > 0:
+    B, s = decodeBlock(s)
+    yield B
 
 def decodeBlock(s, justone=False):
-  ''' Decode a Block reference and return it.
+  ''' Decode a Block reference.
       Format is:
         BS(flags)
           0x01 indirect blockref
@@ -37,11 +24,12 @@ def decodeBlock(s, justone=False):
         BS(span)
         [BS(hashtype)[BS(hashlen)]]
         hash
-      Returns a Block (or IndirectBlock) and the tail of 's'.
-      If the optional paramater 'justone' is true, check that 's'
-      is a complete Block ref encoding with nothing left over
-      and return just the Block.
+      If the optional parameter 'justone' if false, return the Block or
+      IndirectBlock, and the tail of 's'.  
+      If the optional paramater 'justone' is true, check the tail is
+      empty and return just the Block.
   '''
+  ##print >>sys.stderr, "decodeBlock: s=%d:%s" % (len(s), tohex(s))
   s0=s
   flags, s = fromBS(s)
   unknown_flags = flags & ~(F_BLOCK_INDIRECT|F_BLOCK_HASHTYPE)
@@ -51,6 +39,7 @@ def decodeBlock(s, justone=False):
   span, s = fromBS(s)
   indirect = bool(flags & F_BLOCK_INDIRECT)
   if flags & F_BLOCK_HASHTYPE:
+    assert False, "unexpected flags & F_BLOCK_HASHTYPE"
     hashenum, s = fromBS(s)
   else:
     hashenum = HASH_SHA1_T
@@ -59,29 +48,17 @@ def decodeBlock(s, justone=False):
   else:
     assert False, "unsupported hash enum %d" % (hashenum,)
     # will read hlen here for some hash types
-  assert len(s) >= hlen, \
-         "expected %d bytes of hash, only %d bytes in string: %s" \
-         % (hlen, len(s), tohex(s))
   if indirect:
-    B = IndirectBlock(hashcode=hashcode, length=span)
+    B = IndirectBlock(hashcode=hashcode, span=span)
   else:
-    B = Block(hashcode=hashcode, length=span)
+    B = Block(hashcode=hashcode, span=span)
   if justone:
     assert len(s) == 0, "extra stuff after block ref: %s" % (tohex(s),)
     return B
   return B, s
 
-class Block(object):
-  ''' A direct block.
-  '''
-  def __init__(self, data=None, hashcode=None, length=None):
-    ''' Initialise a direct block, supplying data bytes or hashcode, but not both.
-    '''
-    assert (data is None) ^ (hashcode is None)
-    self.indirect = False
-    self.data = data
-    self._hashcode = hashcode
-    self.__length = length
+class _Block(object):
+  # TODO: hashcode(), data(), blockdata() should use __getattr__
 
   def hashcode(self):
     ''' Return the hashcode for this block.
@@ -91,73 +68,177 @@ class Block(object):
         "hash only" block, the recompute has an implied fetch from the store
         using the old/wrong hashcode, so the store must support both.
     '''
-    hashtype = defaults.S.hashtype
+    S = defaults.S
+    hashclass = S.hashclass
     _hashcode = self._hashcode
-    if type(_hashcode) is not hashtype:
-      _hashcode = self._hashcode = hashtype(self.data())
+    if _hashcode is None or type(_hashcode) is not hashclass:
+      data = self.blockdata()
+      _hashcode = self._hashcode = S.add(data)
     return _hashcode
 
-  def data(self):
-    ''' Retrn the data bytes of this block.
+  def encode(self):
+    ''' Encode this Block for storage:
+        Format is:
+          BS(flags)
+            0x01 indirect block
+            0x02 has hash type (False ==> Hash_SHA1_T)
+          BS(span)
+          [BS(hashtype)]
+          hashcode.encode()     # may include hashlen prefix for some hash types
     '''
-    data = self.data
+    flags=0
+    if self.indirect:
+      flags |= F_BLOCK_INDIRECT
+    hashcode = self.hashcode()
+    if hashcode.hashenum != HASH_SHA1_T:
+      flags |= F_BLOCK_HASHTYPE
+    enc = "".join([toBS(flags), toBS(len(self)), hashcode.encode()])
+    assert len(enc) >= 22
+    return enc
+
+class Block(_Block):
+  ''' A direct block.
+  '''
+  def __init__(self, data=None, hashcode=None, span=None):
+    ''' Initialise a direct block, supplying data bytes or hashcode,
+        but not both.
+    '''
+    assert (data is None) ^ (hashcode is None)
+    self.indirect = False
+    self._data = data
+    self._hashcode = hashcode
+    self.__span = span
+    assert span is None or type(span) is int, "excepted int, got %s" % (`span`,)
+
+  def data(self):
+    ''' Return the data bytes of this block.
+    '''
+    data = self._data
     if data is None:
-      data = self.data = defaults.S[self.hashcode]
+      data = self._data = defaults.S[self.hashcode()]
     return data
+
+  ''' Return the direct content of this block.
+      For a direct Block this is the same as data().
+      For an IndirectBlock this is the encoded data that refers to the subblocks.
+  '''
+  blockdata = data
+
+  def store(self, discard=False):
+    ''' Ensure this block is stored.
+        Return the block's hashcode.
+        If discard is true, release the block's data.
+    '''
+    self._hashcode = defaults.S.add(self.blockdata())
+    if discard:
+      self._data = None
+    return self._hashcode
+
   def __getitem__(self, index):
     ''' Return specified data.
     '''
     return self.data()[index]
+
   def __len__(self):
-    ''' Return the length of the data.
+    ''' Return the length of the data encompassed by this block.
     '''
-    mylen = self.__length
+    mylen = self.__span
     if mylen is None:
-      mylen = self.__length = len(self.data())
+      mylen = self.__span = len(self.data())
     return mylen
 
-class IndirectBlock(object):
+class IndirectBlock(_Block):
   ''' An indirect block.
+      Indirect blocks come in two states, reflecting how how they are
+      initialised.
+      If initialised without parameters the block is an empty array
+      if hashcodes of subblocks.
+      The other way to initialise an IndirectBlock is with a hashcode and a
+      span indicating the length of the data encompassed by the block; this is
+      how a block is made from a directory entry or another indirect block.
+
+      An indirect block can be extended with more block hashes, even one
+      initialised from a hashcode. It is necessary to call the .store()
+      method on a block that has been extended.
+
+      TODO: allow data= initialisation, to decode raw iblock data
   '''
-  def __init__(self, hashcode=None, length=None):
+  def __init__(self, hashcode=None, span=None):
     self.indirect = True
     self._hashcode = hashcode
-    self.__length = length
     if hashcode is None:
+      assert span is None
+      self.__span = 0
       self.__subblocks = []
     else:
+      assert span is not None
+      self.__span = span
       self.__subblocks = None
 
   def __len__(self):
-    if self.__length is None:
-      self.__length = sum( len(B) for B in self.subblocks() )
-    return self.__length
+    ''' Return the length of the data encompassed by this block.
+    '''
+    if self.__span is None:
+      self.__span = sum( len(B) for B in self.subblocks() )
+    return self.__span
+
+  def __load_subblocks(self):
+    # fetch the encoded subblocks from the store
+    # and unpack into blocks
+    _subblocks = []
+    S = defaults.S
+    data = S[self._hashcode]
+    span = 0
+    for B in decodeBlocks(data):
+      span += len(B)
+      _subblocks.append(B)
+    # compute span or check against hostile store
+    if self.__span is None:
+      self.__span = span
+    else:
+      assert len(self) == span, \
+             "sum(len(subblocks))=%d but expected span=%d" \
+             % (span, self.__span)
+    self.__subblocks = _subblocks
 
   def subblocks(self):
-    ''' Return the subblocks of this indirect block.
-    '''
-    _subblocks = self.__subblocks
-    if _subblocks is None:
-      # fetch the encoded subblocks from the store
-      _subblocks = []
-      data = defaults.S[self._hashcode]
-      while len(data) > 0:
-        B, data = decodeBlock(data)
-        _subblocks.append(B)
-      # compute length or check against hostile store
-      length = sum(len(B) for B in _subblocks)
-      if self.__length is None:
-        self.__length = length
-      else:
-        assert False, "sum(len(subblocks))=%d but expected length=%d" % (length, self.__length)
-      self.__subblocks = _subblocks
-    return _subblocks
+    if self.__subblocks is None:
+      self.__load_subblocks()
+    return self.__subblocks
+
+  def append(self, block):
+    assert type(block) is not Hash_SHA1
+    self.subblocks().append(block)
+    self.__span = None
+    self._hashcode = None
+
+  def extend(self, subblocks):
+    self.subblocks().extend(subblocks)
+    self.__span = None
+    self._hashcode = None
 
   def data(self):
-    ''' Return all the data below this indirect block.
-        Probably to be discouraged if this may be very large.
+    ''' Return all the data encompassed by this indirect block.
+        Probably to be discouraged as this may be very large.
+        TODO: return some kind of buffer object that accesses self[index]
+              on demand?
     '''
     return ''.join(B.data() for B in self.leaves())
+
+  def blockdata(self):
+    ''' Return the direct content of this block.
+        For an IndirectBlock this is the encoded data that refers to
+        the subblocks.
+        For a direct Block this is the same as data().
+    '''
+    blocks = list(self.subblocks())
+    return "".join( B.encode() for B in blocks )
+
+  def store(self, discard=False):
+    data = self.blockdata()
+    self._hashcode = defaults.S.add(data)
+    return self._hashcode
+
   def leaves(self):
     ''' Return the leaf (direct) blocks.
     '''
@@ -167,14 +248,10 @@ class IndirectBlock(object):
           yield subB
       else:
         yield B
-  def append(self, subblock):
-    self.subblocks().append(subblock)
-    self.__length = None
-  def extend(self, subblocks):
-    self.subblocks().extend(subblocks)
-    self.__length = None
+
   def __rangeChunks(self, start, stop):
-    ''' Generator that yields the chunks from the subblocks that span the supplied range.
+    ''' Generator that yields the chunks from the subblocks that span
+        the supplied range.
     '''
     if stop <= start:
       return
@@ -215,6 +292,8 @@ class IndirectBlock(object):
     # a slice
     start = index.start or 0
     stop = index.stop or sys.maxint
+    if stop > mylen:
+      stop = mylen
     step = index.step or mylen
     assert step != 0, "step == 0"
     if step == 1:
@@ -226,3 +305,31 @@ class IndirectBlock(object):
       chunks.reverse()
       return ''.join(chunks)
     return ''.join( self[i] for i in xrange(start, stop, step) )
+
+class TestAll(unittest.TestCase):
+  def setUp(self):
+    import random
+    random.seed()
+  def testSHA1(self):
+    import random
+    from cs.venti.cache import MemCacheStore
+    S = MemCacheStore()
+    with S:
+      IB = IndirectBlock()
+      for i in range(10):
+        rs = ''.join( chr(random.randint(0,255)) for x in range(100) )
+        B = Block(data = rs)
+        assert len(B) == 100
+        IB.append(B)
+        assert len(IB) == (i+1) * 100
+      IB.store()
+      assert len(IB) == 1000
+      IBH = IB.hashcode()
+      IBdata = IB.data()
+      print >>sys.stderr, "IBdata = %s:%d:%s" % (type(IBdata), len(IBdata), `IBdata`,)
+      IB2data = IndirectBlock(hashcode=IBH, span=len(IBdata)).data()
+      print >>sys.stderr, "IB2data = %s:%d:%s" % (type(IB2data), len(IB2data), `IB2data`,)
+      assert IBdata == IB2data, "IB:  %s\nIB2: %s" % (tohex(IBdata), tohex(IB2data))
+
+if __name__ == '__main__':
+  unittest.main()

@@ -42,7 +42,8 @@ def fromhex(hexstr):
 
 def genHex(data):
   for c in data:
-    yield '%02x'%ord(c)
+    assert type(c) is str and len(c) == 1, "bad c: %s" % (`c`,)
+    yield '%02x' % (ord(c),)
 
 def tohex(data):
   ''' Represent a byte sequence as a hex string.

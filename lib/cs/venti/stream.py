@@ -13,7 +13,7 @@ from Queue import Queue
 from cs.misc import seq, debug, isdebug, tb, warn, progress
 from cs.serialise import toBS, fromBSfp
 from cs.lex import unctrl
-from cs.threads import JobQueue, getChannel, nullCH
+from cs.threads import Q1
 from cs.venti import tohex
 from cs.venti.store import BasicStore
 
@@ -21,23 +21,23 @@ class RqType(int):
   ''' Debugging wrapper for int, reporting symbolic names of op codes.
   '''
   def __str__(self):
-    if self == T_STORE:     s="T_STORE"
-    elif self == T_FETCH:   s="T_FETCH"
-    elif self == T_HAVEYOU: s="T_HAVEYOU"
-    elif self == T_SYNC:    s="T_SYNC"
-    elif self == T_QUIT:    s="T_QUIT"
-    else:                   s="UNKNOWN"
+    if self == T_STORE:      s="T_STORE"
+    elif self == T_GET:      s="T_GET"
+    elif self == T_CONTAINS: s="T_CONTAINS"
+    elif self == T_SYNC:     s="T_SYNC"
+    elif self == T_QUIT:     s="T_QUIT"
+    else:                    s="UNKNOWN"
     return "%s(%d)" % (s, self)
 
 T_STORE=RqType(0)       # block->hash
-T_FETCH=RqType(1)       # hash->block
-T_HAVEYOU=RqType(2)     # hash->boolean
+T_GET=RqType(1)       # hash->block
+T_CONTAINS=RqType(2)     # hash->boolean
 T_SYNC=RqType(3)        # no args
 T_QUIT=RqType(4)        # put to put queues into drain-and-quit mode
 # encode tokens once for performance
 enc_STORE=toBS(T_STORE)
-enc_FETCH=toBS(T_FETCH)
-enc_HAVEYOU=toBS(T_HAVEYOU)
+env_GET=toBS(T_GET)
+enc_CONTAINS=toBS(T_CONTAINS)
 enc_SYNC=toBS(T_SYNC)
 enc_QUIT=toBS(T_QUIT)
 
@@ -100,7 +100,7 @@ class _StreamDaemonRequestReader(Thread):
       if isdebug:
         if arg is None:
           varg=None
-        elif rqType == T_HAVEYOU or rqType == T_FETCH:
+        elif rqType == T_CONTAINS or rqType == T_GET:
           varg=tohex(arg)
         else:
           varg=unctrl(arg)
@@ -116,11 +116,11 @@ class _StreamDaemonRequestReader(Thread):
       if rqType == T_STORE:
         debug("_StreamDaemonRequestReader: T_STORE")
         S.store_ch(arg,resultsCH,n)
-      elif rqType == T_FETCH:
-        debug("_StreamDaemonRequestReader: T_FETCH")
+      elif rqType == T_GET:
+        debug("_StreamDaemonRequestReader: T_GET")
         S.fetch_ch(arg,resultsCH,n)
-      elif rqType == T_HAVEYOU:
-        debug("_StreamDaemonRequestReader: T_HAVEYOU")
+      elif rqType == T_CONTAINS:
+        debug("_StreamDaemonRequestReader: T_CONTAINS")
         S.haveyou_ch(arg,resultsCH,n)
       elif rqType == T_SYNC:
         debug("_StreamDaemonRequestReader: T_SYNC")
@@ -147,7 +147,7 @@ def decodeStream(fp):
         block=fp.read(size)
         assert len(block) == size
       yield rqTag, rqType, block
-    elif rqType == T_FETCH or rqType == T_HAVEYOU:
+    elif rqType == T_GET or rqType == T_CONTAINS:
       hlen=fromBSfp(fp)
       assert hlen > 0, \
              "nonpositive hash length(%d) for rqType=%s" % (hlen, rqType)
@@ -204,10 +204,10 @@ class _StreamDaemonResultsSender(Thread):
         assert not draining
         quitTag=rqTag
         draining=True
-      elif rqType == T_STORE or rqType == T_FETCH:
+      elif rqType == T_STORE or rqType == T_GET:
         sendReplyFP.write(toBS(len(result)))
         sendReplyFP.write(result)
-      elif rqType == T_HAVEYOU:
+      elif rqType == T_CONTAINS:
         sendReplyFP.write(toBS(1 if result else 0))
       elif rqType == T_SYNC:
         pass
@@ -247,9 +247,9 @@ def encodeFetch(fp,rqTag,h):
       Does not .flush() the stream.
   '''
   debug(fp,"encodeFetch(rqTag=%d,h=%s" % (rqTag,tohex(h)))
-  global enc_FETCH
+  global env_GET
   fp.write(toBS(rqTag))
-  fp.write(enc_FETCH)
+  fp.write(env_GET)
   fp.write(toBS(len(h)))
   fp.write(h)
 
@@ -258,9 +258,9 @@ def encodeHaveYou(fp,rqTag,h):
       Does not .flush() the stream.
   '''
   debug(fp,"encodeHaveYou(rqTag=%d,h=%s" % (rqTag,tohex(h)))
-  global enc_HAVEYOU
+  global enc_CONTAINS
   fp.write(toBS(rqTag))
-  fp.write(enc_HAVEYOU)
+  fp.write(enc_CONTAINS)
   fp.write(toBS(len(h)))
   fp.write(h)
 
@@ -286,18 +286,18 @@ class StreamStore(BasicStore):
   ''' A Store connected to a StreamDaemon backend.
   '''
   def __init__(self,name,sendRequestFP,recvReplyFP):
-    ''' Connect to the StreamDaemon via sendRequestFP and recvReplyFP.
+    ''' Connect to a StreamDaemon via sendRequestFP and recvReplyFP.
     '''
-    BasicStore.__init__(self,"StreamStore:%s"%name)
+    BasicStore.__init__(self, "StreamStore:%s"%name)
     self.sendRequestFP=sendRequestFP
     self.recvReplyFP=recvReplyFP
     self.__sendLock=allocate_lock()
     self.__tagmapLock=allocate_lock()
     self.__tagmap={}
-    self.client=_StreamClientReader(self)
-    self.client.start()
+    self.reader = Thread(target=self.readReplies)
+    self.reader.start()
 
-  def _flush(self):
+  def flush(self):
     with self.__sendLock:
       self.sendRequestFP.flush()
 
@@ -317,98 +317,67 @@ class StreamStore(BasicStore):
       self.log("got result from channel: %s" % (x,), "close")
     BasicStore.shutdown(self)
 
-  def store_bg(self,block,noFlush=False,ch=None):
-    tag, ch = self._tagch(ch)
-    self._dispatch(tag,ch,self.__store_bg2,(block,tag,noFlush))
-    return ch, tag
-  def __store_bg2(self,block,tag,noFlush)
-    self.log("store %d bytes" % len(block))
-    with self.__sendLock:
-      encodeStore(self.sendRequestFP,tag,block)
-    if not noFlush:
-      self._flush()
+  def _respond(self, tag, result):
+    with self.__tagmapLock:
+      retQ = self.__tagmap[tag]
+      del self.__tagmap[tag]
+    retQ.put(result)
 
-  def fetch_bg(self,h,ch=None,noFlush=False):
-    tag, ch = self._tagch(ch)
-    self._dispatch(tag,ch,self.__fetch_bg2,(h,tag,noFlush))
-    return ch, tag
-  def __fetch_bg2(self,h,tag,noFlush)
-    self.log("fetch h=%s" % tohex(h))
+  def _sendPacket(self, packet, tag, retQ, noFlush=False):
+    with self.__tagmapLock:
+      assert tag not in self.__tagmap
+      self.__tagmap[tag] = retQ
     with self.__sendLock:
-      encodeFetch(self.sendRequestFP,tag,h)
-    if not noFlush:
-      self._flush()
-  def prefetch(self,hs):
-    ''' Prefetch the blocks associated with hs, an iterable returning hashes.
-    '''
-    sink=nullCH()
-    for h in hs:
-      self.fetch_bg(h,ch=sink,noFlush=True)
-    self._flush()
+      sendRequestFP.write(packet)
+      if not noFlush:
+        sendRequestFP.flush()
 
-  def haveyou_bg(self,h,ch=None,noFlush=False):
-    tag, ch = self._tagch(ch)
-    self._dispatch(tag,ch,self.__haveyou_bg2,(h,tag,noFlush))
-    return ch, tag
-  def __haveyou_bg2(self,h,tag,noFlush):
-    with self.__sendLock:
-      encodeHaveYou(self.sendRequestFP,tag,h)
-    if not noFlush:
-      self._flush()
-  def sync_bg(self,noFlush=False,ch=None):
-    tag, ch = self._tagch(ch)
-    self._dispatch(tag,ch,self.__sync_bg2,(tag,noFlush))
+  def contains(self, h):
+    tag, ch = self.contains_bg(data)
+    return ch.get()
+  def contains_bg(self, h, noFlush=False):
+    if ch is None: ch = Q1()
+    tag = seq()
+    packet = encodeContains(tag, h)
+    self._sendPacket(packet, tag, ch, noFlush)
     return tag, ch
-  def __sync_bg2(self,tag,noFlush):
-    with self.__sendLock:
-      encodeSync(self.sendRequestFP,tag)
-    if not noFlush:
-      self._flush()
+  __contains__ = contains
 
-  def __maptag(self,tag,ch):
-    with self.__tagmapLock:
-      self.__tagmap[tag]=ch
-    if isdebug:
-      self.log("map tag %d -> %s" % (tag,ch))
+  def get(self, h):
+    tag, ch = self.get_bg(data)
+    return ch.get()
+  def get_bg(self, h, noFlush=False):
+    if ch is None: ch = Q1()
+    tag = seq()
+    packet = encodeGet(tag, h)
+    self._sendPacket(packet, tag, ch, noFlush)
+    return tag, ch
 
-  def __unmaptag(self,tag)
-    with self.__tagmapLock:
-      ch=self.__tagmap.pop(tag)
-    if isdebug:
-      self.log("unmap tag %d -> %s" % (tag,ch))
-    return ch
+  def add(self, data, noFlush=False):
+    tag, ch = self.add_bg(data, noFlush=noFlush)
+    return ch.get()
+  def add_bg(self, data, noFlush=False, ch=None):
+    if ch is None: ch = Q1()
+    tag = seq()
+    packet = encodeAdd(tag, data)
+    self._sendPacket(packet, tag, ch, noFlush)
+    return tag, ch
 
-  def _dispatch(self,tag,ch,func,args=(),kwargs=None):
-    ''' Accept a tag, channel and function-and-arguments.
-        Record the tag->channel mapping.
-        Queue the function to be called.
-        Later the ._respond() method will return a result via the channel.
-    '''
-    if isdebug: self.log("tag=%d, func=%s" % (tag,func), "_dispatch")
-    self.__maptag(tag,ch)
-    self.funcQ.dispatch(func,args,kwargs)
+  def sync(self):
+    tag, ch = self.sync_bg()
+    return ch.get()
+  def sync_bg(self, noFlush=False):
+    if ch is None: ch = Q1()
+    tag = seq()
+    packet = encodeSync(tag)
+    self._sendPacket(packet, tag, ch, noFlush)
+    return tag, ch
 
-  def _respond(self,tag,result):
-    ''' Accept a tag and the associated result, .put() the tuple (tag,result)
-        onto the matching channel and discard the tag->channel map entry.
-    '''
-    if isdebug: self.log("tag=%d, result=%s" % (tag,result), "_respond")
-    self.__unmaptag(tag).put((tag,result))
-
-class _StreamClientReader(Thread):
-  ''' Class to read from the StreamDaemon's responseFP and report to
-      asynchronous callers.
-  '''
-  def __init__(self,daemon):
-    Thread.__init__(self)
-    self.setName("_StreamClientReader")
-    self.daemon=daemon
-
-  def run(self):
+  def readReplies(self):
     debug("RUN _StreamClientReader")
-    recvReplyFP=self.daemon.recvReplyFP
-    respond=self.daemon._respond
-    debug("_StreamClientReader: recvReplyFP=%s" % recvReplyFP)
+    recvReplyFP=self.recvReplyFP
+    respond=self._respond
+    debug("_StreamClientReader: recvReplyFP=%s" % (recvReplyFP,))
     rqTag=fromBSfp(recvReplyFP)
     while rqTag is not None:
       rqType=fromBSfp(recvReplyFP)
@@ -425,7 +394,7 @@ class _StreamClientReader(Thread):
                                  % (recvReplyFP, len(h), hlen)
         respond(rqTag,h)
         continue
-      if rqType == T_FETCH:
+      if rqType == T_GET:
         blen=fromBSfp(recvReplyFP)
         assert blen >= 0
         if blen == 0:
@@ -435,7 +404,7 @@ class _StreamClientReader(Thread):
           assert len(block) == blen
         respond(rqTag, block)
         continue
-      if rqType == T_HAVEYOU:
+      if rqType == T_CONTAINS:
         yesno=bool(fromBSfp(recvReplyFP))
         respond(rqTag, yesno)
         continue

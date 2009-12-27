@@ -17,12 +17,13 @@ import sys
 import os
 import os.path
 import time
-import thread
+from thread import allocate_lock
 import threading
 from Queue import Queue
+from zlib import compress, decompress
 from cs.misc import cmderr, debug, isdebug, warn, progress, verbose, out, tb, seq, Loggable
 from cs.serialise import toBS, fromBS, fromBSfp
-from cs.threads import FuncQueue, Q1, DictMonitor, NestingOpenClose
+from cs.threads import FuncMultiQueue, Q1, DictMonitor, NestingOpenClose
 from cs.venti import tohex, defaults
 from cs.venti.block import Block
 from cs.venti.hash import Hash_SHA1
@@ -30,15 +31,35 @@ from cs.upd import out, nl
 
 class BasicStore(Loggable, NestingOpenClose):
   ''' Core functions provided by all Stores.
-      For each of the core operations (store, fetch, haveyou, sync)
-      a subclass must implement at least one of each of the op or op_bg methods.
-      The methods here are written in terms of each other.
 
-      With respect to the op_bg methods, these return a (tag, channel) pair.
+      A subclass should provide thread-safe implementations of the following
+      methods:
+        __contains__(sel, hashcode) -> Boolean
+        __getitem__(self, hashcode) -> data
+        add(self, data) -> hashcode
+        sync(self)
+      A convenience .lock attribute is provided for simple mutex use.
+
+      The following "op" operation methods are provided:
+        contains(hashcode) -> Boolean
+        contains_bg(hashcode[, ch]) -> (tag, ch)
+        get(hashcode) -> data
+          Unlike __getitem__, .get() returns None if the hashcode does not
+          resolve.
+        get_bg(hashcode[, ch]) -> (tag, ch)
+        add_bg(data[, ch]) -> (tag, ch)
+
+      The non-_bg forms are equivalent to __contains__, __getitem__ and add()
+      and are provided for consistency with the _bg forms.
+
+      The _bg forms accept an optional 'ch' parameter and return a (tag, ch)
+      pair. If 'ch' is not provided or None, a single use Channel is obtained.
+      A .get() from the returned channel returns the tag and the function result.
+
       In normal use the caller will care only about the channel or the tag,
       rarely both. If no channel is presupplied then the return channel is
-      a single use channel on which only relevant (tag, result) response will
-      be seen, so the tag is superfluous. In the case where a channel is
+      a single use channel on which only the relevant (tag, result) response
+      will be seen, so the tag is superfluous. In the case where a channel is
       presupplied it is possible for responses to requests to arrive in
       arbitrary order, so the tag is needed to identify the response with the
       calling request; however the caller already knows the channel.
@@ -51,14 +72,49 @@ class BasicStore(Loggable, NestingOpenClose):
       ._flush() method, follows any noFlush requests promptly otherwise
       deadlocks may ensue.
   '''
-  def __init__(self,name):
-    Loggable.__init__(self,name)
+  def __init__(self, name, capacity=None):
+    print >>sys.stderr, "BasicStore.__init__..."
+    if capacity is None:
+      capacity = 1
+    Loggable.__init__(self, name)
     NestingOpenClose.__init__(self)
     self.name=name
     self.logfp=None
-    self.__funcQ=FuncQueue()
-    self.__funcQ.open()
-    self.hashtype = Hash_SHA1
+    self.__funcQ=FuncMultiQueue(capacity)
+    self.hashclass = Hash_SHA1
+    self.lock = allocate_lock()
+
+  def hash(self, data):
+    return self.hashclass.fromData(data)
+
+  def __contains__(self, h):
+    ''' Test if the supplied hashcode is present in the store.
+    '''
+    raise NotImplementedError
+  def __getitem__(self, h):
+    ''' Return the data block associated with the supplied hashcode.
+        Raise KeyError if the hashcode is not present.
+    '''
+    raise NotImplementedError
+  def add(self, data):
+    ''' Add the supplied data block to the store.
+    '''
+    raise NotImplementedError
+  def flush(self):
+    ''' Flush outstanding I/O operations on the store.
+        This is generally discouraged because it causes less efficient
+        operation but it is sometimes necessary, for example at shutdown or
+        after *_bg() calls with the noFlush=True hint.
+        This does not imply that outstanding transactions have completed,
+        merely that they have been dispatched, for example sent down the
+        stream of a StreamStore.
+        See the sync() call for transaction completion.
+    '''
+    raise NotImplementedError
+  def sync(self):
+    ''' Flush outstanding I/O operations on the store and wait for completion.
+    '''
+    raise NotImplementedError
 
   def __enter__(self):
     NestingOpenClose.__enter__(self)
@@ -71,10 +127,8 @@ class BasicStore(Loggable, NestingOpenClose):
   def __str__(self):
     return "Store(%s)" % self.name
 
-  def hash(self, data):
-    ''' Compute the hash for a chunk of data.
-    '''
-    return self.hashtype(data=data)
+  def keys(self):
+    return ()
 
   def shutdown(self):
     ''' Called by final NestingOpenClose.close().
@@ -82,131 +136,48 @@ class BasicStore(Loggable, NestingOpenClose):
     self.sync()
     self.__funcQ.close()
 
-  def _tagch(self,ch=None):
-    ''' Allocate a tag and a (optionally) channel.
-    '''
-    if ch is None: ch=Q1()
-    return seq(), ch
+  def contains(self, h):
+    return self.__contains__(h)
 
-  def _flush(self):
-    pass
-
-  def storeBlock(self, block):
-    ''' Store a Block object's data.
-        TODO: storeBlock_bg(), noFlush, etc ?
-    '''
-    assert hasattr(block, data), "block with no .data"
-    if not self.haveyou(block.h):
-      self.store(block.data)
-
-  def store(self, data, noFlush=False):
-    ''' Store a block of data, return hashcode.
-    '''
-    ##self.log("store %d bytes" % len(data))
-    tag, ch = self.store_bg(data)
-    assert type(tag) is int
-    tag2, h = ch.get()
-    assert type(h) is str and type(tag2) is int, "h=%s, tag2=%s" % (h, tag2)
-    assert tag == tag2
-    return h
-
-  def store_bg(self,data,noFlush=False,ch=None):
-    ''' Accept a block for storage, return a channel and tag for the completion.
-        The optional ch parameter may specify the channel.
-        On completion, a (tag, hashcode) tuple is put on the channel.
-    '''
-    tag, ch = self._tagch(ch)
-    self.__funcQ.dispatch(self.__store_bg2,(block,ch,tag))
+  def contains_bg(self, h, ch=None):
+    if ch is None: ch = Q1()
+    tag = self.__funcQ.qbgcall(ch, self.contains, h)
     return tag, ch
-  def __store_bg2(self,block,ch,tag):
-    ch.put(tag, self.store(block))
 
-  def fetch(self, h):
-    ''' Fetch a block given its hash.
+  def get(self, h):
+    ''' Return the data block associated with the supplied hashcode.
+        Return None if the hashcode is not present.
     '''
-    ##self.log("fetch %s" % tohex(h))
-    tag, ch = self.fetch_bg(h)
-    assert type(tag) is int
-    tag, block = ch.get()
-    return block
-
-  def fetch_bg(self,h,noFlush=False,ch=None):
-    ''' Request a block from its hash, return a channel and tag for the
-        completion. The optional ch parameter may specify the channel.
-        On completion, a (tag, block) tuple is put on the channel.
-    '''
-    tag, ch = self._tagch(ch)
-    self.__funcQ.dispatch(self.__fetch_bg2,(h,ch,tag))
-    return tag, ch
-  def __fetch_bg2(self,h,ch,tag):
-    ch.put((tag,self.fetch(h)))
-
-  def haveyou(self,h):
-    ''' Test if a hash is present in the store.
-    '''
-    ##self.log("haveyou %s" % tohex(h))
-    assert not self.closed
-    tag, ch = self.haveyou_bg(h)
-    tag, yesno = ch.get()
-    return yesno
-
-  def haveyou_bg(self, h,noFlush=False,ch=None):
-    ''' Query whether a hash is in the store.
-        Return a (tag, channel). A .get() on the channel will return
-        (tag, yesno).
-    '''
-    tag, ch = self._tagch(ch)
-    self.__funcQ.dispatch(self.__haveyou_bg2,(h,tag,ch))
-    return tag, ch
-  def __haveyou_bg2(self,h,tag,ch):
-    ch.put((tag,self.haveyou(h)))
-
-  def sync(self):
-    ''' Return when the store is synced.
-    '''
-    self.log("sync")
-    tag, ch = self.sync_bg()
-    tag, dummy = ch.get()
-
-  def sync_bg(self,noFlush=False,ch=None):
-    tag, ch = self._tagch(ch)
-    self.__funcQ.dispatch(self.__sync_bg2,(tag,ch))
-    return tag, ch
-  def __sync_bg2(self,tag,ch):
-    self.sync()
-    ch.put((tag,None))
-
-  def __contains__(self, h):
-    ''' Wrapper for haveyou().
-    '''
-    return self.haveyou(h)
-
-  def __getitem__(self,h):
-    ''' Wrapper for fetch(h).
-    '''
-    if h not in self:
-      raise KeyError, "%s: %s not in store" % (self, tohex(h))
-    block=self.fetch(h)
-    if block is None:
-      raise KeyError, "%s: fetch(%s) returned None" % (self, tohex(h))
-    return block
-
-  def get(self,h,default=None):
-    ''' Return block for hash, or None if not present in store.
-    '''
-    if h not in self:
+    try:
+      data = self[h]
+    except KeyError:
       return None
-    return self[h]
+    return data
 
-  def missing(self,hs):
+  def get_bg(self, h, ch=None):
+    if ch is None: ch = Q1()
+    tag = self.__funcQ.qbgcall(ch, self.get, h)
+    return tag, ch
+
+  def add_bg(self, data, ch=None):
+    if ch is None: ch = Q1()
+    tag = self.__funcQ.qbgcall(ch, self.add, data)
+    return tag, ch
+
+  def sync_bg(self, ch=None):
+    if ch is None: ch = Q1()
+    tag = self.__funcQ.qbgcall(ch, self.sync)
+    return tag, ch
+
+  def missing(self, hashes):
     ''' Yield hashcodes that are not in the store from an iterable hash
         code list.
     '''
-    for h in hs:
-      if h not in self.cache:
+    for h in hashes:
+      if h not in self:
         yield h
 
-  def prefetch(self,hs):
+  def prefetch(self, hashes):
     ''' Prefetch the blocks associated with hs, an iterable returning hashes.
         This is intended to hint that these blocks will be wanted soon,
         and so implementors might queue the fetches on an "idle" queue so as
@@ -218,7 +189,8 @@ class BasicStore(Loggable, NestingOpenClose):
 
   def multifetch(self,hs):
     ''' Generator returning a bunch of blocks in sequence corresponding to
-        the iterable hashes 'hs'.
+        the iterable hashes.
+        TODO: record to just use the normal funcQ and a heap of (index, data).
     '''
     # dispatch a thread to request the blocks
     tagQ=Queue(0)       # the thread echoes tags for eash hash in hs
@@ -263,66 +235,31 @@ class BasicStore(Loggable, NestingOpenClose):
       self.haveyou_bg(h0,ch=Get1())
     tagQ.put(None)
 
-class Store(BasicStore):
-  ''' A store connected to a backend Store or a Store designated by a string.
+def Store(S):
+  ''' Factory function to return an appropriate BasicStore subclass
+      based on its argument.
   '''
-  def __init__(self, S):
-    ''' Trivial wrapper for another store.
-        If 'S' is a string:
-          /path/to/store designates a GDBMStore.
-          |shell-command designates a command to connect to a StreamStore.
-          tcp:addr:port designates a TCP target serving a StreamStore.
-        Otherwise 'S' is presumed already to be a store.
-    '''
-    BasicStore.__init__(self,str(S))
-    if type(S) is str:
-      if S[0] == '/':
-        from cs.venti.gdbmstore import GDBMStore
-        S = GDBMStore(S)
-      elif S[0] == '|':
-        toChild, fromChild = os.popen2(S[1:])
-        from cs.venti.stream import StreamStore
-        S = StreamStore(S,toChild,fromChild)
-      elif S.startswith("tcp:"):
-        from cs.venti.tcp import TCPStore
-        host, port = S[4:].rsplit(':',1)
-        if len(host) == 0:
-          host = '127.0.0.1'
-        S = TCPStore((host, int(port)))
-      else:
-        assert False, "unhandled Store name \"%s\"" % S
-    S.open()
-    self.S = S
-
-  def scan(self):
-    if hasattr(self.S, 'scan'):
-      for h in self.S.scan():
-        yield h
-  def shutdown(self):
-    self.S.close()
-    BasicStore.shutdown(self)
-
-  def join(self):
-    BasicStore.join(self)
-    self.S.join()
-
-  def store(self,block):
-    return self.S.store(block)
-
-  def fetch(self,h):
-    return self.S.fetch(h)
-
-  def haveyou(self,h):
-    return self.S.haveyou(h)
-
-  def sync(self):
-    self.S.sync()
-    if self.logfp is not None:
-      self.logfp.flush()
+  assert type(S) is str, "expected a str, got %s" % (S,)
+  if S[0] == '/':
+    # TODO: after tokyocabinet available, probe for index file name
+    from cs.venti.gdbmstore import GDBMStore
+    return GDBMStore(S)
+  if S[0] == '|':
+    # TODO: recode to use the subprocess module
+    toChild, fromChild = os.popen2(S[1:])
+    from cs.venti.stream import StreamStore
+    return StreamStore(S,toChild,fromChild)
+  if S.startswith("tcp:"):
+    from cs.venti.tcp import TCPStore
+    host, port = S[4:].rsplit(':',1)
+    if len(host) == 0:
+      host = '127.0.0.1'
+    return TCPStore((host, int(port)))
+  assert False, "unhandled Store name \"%s\"" % (S,)
 
 def pullFromSerial(S1, S2):
   asked = 0
-  for h in S2.scan():
+  for h in S2.keys():
     asked+=1
     out("%d %s" % (asked,tohex(h)))
     if not S1.haveyou(h):
@@ -337,9 +274,9 @@ def pullFrom(S1,S2):
   fetcher = Thread(target=_pullFetcher,args=(S1,fetch_ch))
   fetcher.start()
   asked = 0
-  for h in S2.scan():
+  for h in S2.keys():
     asked+=1
-    out("%d %s" % (asked,tohex(h)))
+    out("%d %s" % (asked, tohex(h)))
     tag = seq()
     pending[tag] = h
     S1.haveyou_ch(h,haveyou_ch,tag)
@@ -349,6 +286,154 @@ def pullFrom(S1,S2):
   nl('draining fetch queue...')
   fetcher.join()
   out('')
+
+F_COMPRESSED = 0x01
+
+def blockdataFromFileStoreFP(fp):
+  ''' Read a block of data from a store file.
+  '''
+  flags = fromBSfp(fp)
+  dsize = fromBSfp(fp)
+  assert dsize > 0
+  data = fp.read(dsize)
+  assert len(data) == dsize
+  if flags & F_COMPRESSED:
+    data = decompress(data)
+  assert (flags & ~F_COMPRESSED) == 0
+  return data
+
+def saveBlockData(fp, data):
+  ''' Write a data block to a store file.
+  '''
+  flags = 0
+  zdata = compress(data)
+  if len(zdata) < len(data):
+    flags |= F_COMPRESSED
+    data = zdata
+  fp.write(toBS(flags))
+  fp.write(toBS(len(data)))
+  fp.write(data)
+
+class IndexedFileStore(BasicStore):
+  ''' A file-based Store which keeps data blocks in flat files, compressed.
+      Subclasses must implement the method ._getIndex() to obtain the
+      associated index object (for examine, gdbm files) to the object.
+  '''
+  def __init__(self, dir, capacity=None):
+    ''' Initialise this IndexedFileStore.
+        'dir' specifies the directory in which the files and their index live.
+    '''
+    print >>sys.stderr, "IndexedStore.__init__..."
+    BasicStore.__init__(self, dir, capacity=capacity)
+    self.dir = dir
+    self.savefile = None
+    self.index = self._getIndex()
+    self.readfiles = {}
+    self.storeData = self.__loadStoreMap()
+    self.added = 0
+
+  def _getIndex(self): raise NotImplementedError
+
+  def __loadStoreMap(self):
+    M = {}
+    for name in os.listdir(self.dir):
+      if name.endswith('.vtd'):
+        pfx = name[:-4]
+        if pfx.isdigit():
+          pfxn = int(pfx)
+          if str(pfxn) == pfx:
+            M[pfxn] = name
+    return M
+
+  def __makeNewFile(self):
+    mapkeys = self.storeData.keys()
+    if mapkeys:
+      n = max(mapkeys)
+    else:
+      n = 0
+    n += 1
+    while True:
+      pathname = os.path.join(self.dir, "%d.vtd" % (n,))
+      if not os.path.exists(pathname):
+        open(os.path.join(self.dir, pathname), "ab").close()
+        self.storeData[n] = pathname
+        return n
+      n += 1
+
+  def _open_n(self, n, mode):
+    ''' Open the data file numbered 'n' in the specified mode.
+    '''
+    pathname = os.path.join(self.dir, "%d.vtd" % (n,))
+    print >>sys.stderr, "open(%s, %s)" % (pathname, mode)
+    return open(pathname, mode)
+
+  def _savefile(self):
+    with self.lock:
+      if self.savefile is None:
+        mapkeys = self.storeData.keys()
+        if mapkeys:
+          n = max(mapkeys)
+        else:
+          n = self.__makeNewFile()
+        self.savefile = self._open_n(n, "a+b")
+        self.savefile_n = n
+    return self.savefile
+
+  def _readfile(self, n):
+    with self.lock:
+      if n not in self.readfiles:
+        self.readfiles[n] = self._open_n(n, "rb")
+      return self.readfiles[n]
+
+  def __contains__(self, h):
+    with self.lock:
+      return h in self.index
+
+  def __getitem__(self, h):
+    n, offset = self.decodeIndexEntry(self.index[h])
+    assert n >= 0
+    assert offset >= 0
+    rf = self._readfile(n)
+    with self.lock:
+      rf.seek(offset)
+      data = blockdataFromFileStoreFP(rf)
+    return data
+
+  def addBlock(self, block, noFlush=False):
+    return self.add(block.blockdata(), noFlush=noFlush)
+
+  def add(self, data, noFlush=False):
+    assert type(data) is str, "expected str, got %s" % (`data`,)
+    h = self.hash(data)
+    sf = self._savefile()
+    if h not in self:
+      with self.lock:
+        sf.seek(0, 2)
+        offset = sf.tell()
+        saveBlockData(sf, data)
+        if not noFlush:
+          pass ## sf.flush()
+      self.index[h] = self.encodeIndexEntry(self.savefile_n, offset)
+      self.added += 1
+    return h
+
+  def flush(self):
+    if self.savefile:
+      self.savefile.flush()
+      self.index.flush()
+
+  def sync(self):
+    self.flush()
+    self.index.sync()
+
+  def decodeIndexEntry(self, noz):
+    n, noz = fromBS(noz)
+    offset, noz = fromBS(noz)
+    assert len(noz) == 0
+    return n, offset
+
+  def encodeIndexEntry(self, n, offset):
+    return toBS(n) + toBS(offset)
 
 def _pullWatcher(S1,S2,ch,pending,fetch_ch):
   closing = False

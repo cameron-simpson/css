@@ -3,31 +3,33 @@
 # File interfaces.      - Cameron Simpson <cs@zip.com.au>
 #
 
+from cs.venti import tohex
 from cs.venti.dir import FileDirent
 from cs.venti.meta import Meta
-from cs.venti.blocks import BlockList
-from cs.venti.blockify import topBlockRefFP
+from cs.venti.blockify import blockFromFile
 from threading import Thread
+import sys
 from cs.threads import IterableQueue
 from cs.misc import debug, TODO, FIXME, tb
 import __main__
 
-def storeFile(ifp,rsize=None,S=None):
+def storeFile(ifp, rsize=None):
   ''' Store the data from ifp, return Dirent.
+      TODO: set M.mtime from ifp.fstat().
   '''
   M=Meta()
-  bref=topBlockRefFP(ifp,rsize=None,S=S)
-  TODO("set M.mtime from ifp.fstat()")
-  return FileDirent(None,M,bref)
+  B=blockFromFile(ifp)
+  B.store()
+  return FileDirent(None,M,B)
 
 class ReadFile:
   ''' A read-only file interface supporting seek(), read(), readline(),
       readlines() and tell() methods.
   '''
-  def __init__(self,bref,S=None):
+  def __init__(self,bref):
     self.isdir=False
     if bref.indirect:
-      self.__blist=bref.blocklist(S=S)
+      self.__blist=bref.blocklist()
     else:
       self.__blist=BlockList()
       self.__blist.append(bref)
@@ -43,10 +45,8 @@ class ReadFile:
   def tell(self):
     return self.__pos
 
-  def readShort(self,S=None):
-    if S is None:
-      S=__main__.S
-    (h,offset)=self.__blist.seekToBlock(self.tell(),S=S)
+  def readShort(self):
+    (h,offset)=self.__blist.seekToBlock(self.tell())
     if h is None:
       # at or past EOF - return empty read
       return ''
@@ -129,7 +129,7 @@ class WriteNewFile:
       flush() forces any unstored data to the store.
       close() flushes all data and returns a BlockRef for the whole file.
   '''
-  def __init__(self,S=None):
+  def __init__(self):
     self.__sink=IterableQueue(1)
     self.__topRef=Q1()
     self.__closed=False
@@ -154,8 +154,8 @@ class WriteNewFile:
     self.__sink.close()
     return self.__topRef.get()
 
-  def __storeBlocks(self,S=None):
-    self.__topRef.put(topBlockRef(blocksOf(self.__sink),S=S),S=S)
+  def __storeBlocks(self):
+    self.__topRef.put(topIndirectBlock(blocksOf(self.__sink)))
 
 class WriteOverFile:
   ''' A File-like class that overwrites an existing 

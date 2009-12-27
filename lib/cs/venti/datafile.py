@@ -2,7 +2,7 @@
 
 from zlib import compress, decompress
 from cs.serialise import toBS, fromBSfp
-from cs.venti.hash import hash
+from cs.venti import defaults
 
 def scanFile(fp):
   ''' A generator that reads a file storing data blocks.
@@ -14,6 +14,7 @@ def scanFile(fp):
       The cs.misc.toBS() function is used to represent the length
       as a byte sequence.
   '''
+  S = defaults.S
   while True:
     zsize=fromBSfp(fp)
     if zsize is None:
@@ -24,7 +25,7 @@ def scanFile(fp):
       block=decompress(zblock)
     except:
       continue
-    h=hash(block)
+    h=S.hashFromData(block)
     yield h, offset, zsize
 
 def getBlock(fp,offset,zsize):
