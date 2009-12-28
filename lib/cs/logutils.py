@@ -16,7 +16,18 @@ class _PrefixState(threading.local):
     self.current = cs.misc.cmd
     self.raise_prefix = None
     self.prior = []
+    self.logging_handler = None
 _prefix = _PrefixState()
+
+def current_prefix():
+  ''' Return the current prefix value as used by the Pfx class.
+  '''
+  global _prefix
+  return _prefix.current
+
+class _PrefixLoggingHandler(logging.Handler):
+  def emit(self, record):
+    print >>sys.stderr, "%s: %s" % (current_prefix(), record.msg)
 
 class Pfx(object):
   ''' A context manager to maintain a per-thread stack of message prefices.
@@ -31,6 +42,11 @@ class Pfx(object):
     self.mark = newmark
   def __enter__(self):
     global _prefix
+    if not _prefix.prior:
+      # add handler
+      _prefix.logging_handler = _PrefixLoggingHandler()
+      logger = logging.getLogger()
+      logger.addHandler(_prefix.logging_handler)
     _prefix.prior.append( (_prefix.current, _prefix.raise_prefix) )
     _prefix.current = self.mark
     _prefix.raise_prefix = self.mark
@@ -47,17 +63,16 @@ class Pfx(object):
           sys.stderr.write("%s: Pfx.__exit__: exc_value = %s\n" % (pfx, repr(exc_value),))
         pfx = None
     _prefix.current, _prefix.raise_prefix = _prefix.prior.pop()
+    if not _prefix.prior:
+      # remove handler
+      logger = logging.getLogger()
+      logger.removeHandler(_prefix.logging_handler)
+      _prefix.logging_handler = None
     if pfx is None:
       _prefix.raise_prefix = None
     return False
   enter = __enter__
   exit = __exit__
-
-def current_prefix():
-  ''' Return the current prefix value as used by the Pfx class.
-  '''
-  global _prefix
-  return _prefix.current
 
 class LogTime(object):
   ''' LogTime is a content manager that logs the elapsed time of the enclosed
