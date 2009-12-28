@@ -27,7 +27,7 @@ def current_prefix():
 
 class _PrefixLoggingHandler(logging.Handler):
   def emit(self, record):
-    print >>sys.stderr, "%s: %s" % (current_prefix(), record.msg)
+    print >>sys.stderr, "%s: %s" % (current_prefix(), record.getMessage())
 
 class Pfx(object):
   ''' A context manager to maintain a per-thread stack of message prefices.
