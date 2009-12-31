@@ -524,8 +524,8 @@ def cat(path,fp=None):
   if name is not None:
     D=D[name]
   block=D.getBlock()
-  for b in block.leaves():
-    fp.write(b.data())
+  for B in block.leaves():
+    fp.write(B.blockdata())
 
 if __name__ == '__main__':
   main(sys.argv)
