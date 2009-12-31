@@ -20,7 +20,16 @@ MAX_BLOCKSIZE=16383                             # fits in 2 octets BS-encoded
 def topIndirectBlock(blockSource):
   ''' Return a top Block for a stream of Blocks.
   '''
-  blockSource=fullIndirectBlocks(blockSource)
+  blockSource = fullIndirectBlocks(blockSource)
+
+  # Fetch the first two indirect blocks from the generator.
+  # If there is none, return a single empty direct block.
+  # If there is just one, return it.
+  # Otherwise there are two (implicitly: or more):
+  # replace the blockSource with another level of fullIndirectBlocks()
+  # reading from the two fetched blocks and the tail of the surrent
+  # blockSource then lather, rinse, repeat.
+  #    
   while True:
     try:
       topblock=blockSource.next()
