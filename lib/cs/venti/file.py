@@ -26,38 +26,33 @@ class ReadFile:
   ''' A read-only file interface supporting seek(), read(), readline(),
       readlines() and tell() methods.
   '''
-  def __init__(self,bref):
+  def __init__(self, block):
     self.isdir=False
-    if bref.indirect:
-      self.__blist=bref.blocklist()
-    else:
-      self.__blist=BlockList()
-      self.__blist.append(bref)
+    self.block = block
     self.__pos=0
+
+  def __len__(self):
+    return len(self.block)
 
   def seek(self,offset,whence=0):
     if whence == 1:
-      offset+=self.tell()
+      offset += self.tell()
     elif whence == 2:
-      offset+=self.span()
-    self.__pos=offset
+      offset += len(self)
+    self.__pos = offset
 
   def tell(self):
     return self.__pos
 
-  def readShort(self):
-    (h,offset)=self.__blist.seekToBlock(self.tell())
-    if h is None:
-      # at or past EOF - return empty read
-      return ''
-    b=S[h]
-    assert offset < len(b)
-    chunk=b[offset:]
-    assert len(chunk) > 0
-    self.seek(len(chunk),1)
-    return chunk
+  def readShort(self, maxlen=None):
+    for chunk in self.block.chunks(self.tell()):
+      if maxlen is not None and len(chunk) > maxlen:
+        chunk = chunk[:maxlen]
+      self.seek(len(chunk), 1)
+      return chunk
+    return ''
 
-  def read(self,size=None):
+  def read(self, size=None):
     opos=self.__pos
     buf=''
     while size is None or size > 0:
