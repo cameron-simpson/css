@@ -9,10 +9,11 @@ import sys
 from functools import partial
 from thread import allocate_lock
 from threading import Semaphore, Thread
+from logging import debug
 from Queue import Queue
 from collections import deque
 if sys.hexversion < 0x02060000: from sets import Set as set
-from cs.misc import seq, isdebug
+from cs.misc import seq
 from cs.logutils import LogTime
 
 class AdjustableSemaphore(object):
@@ -135,7 +136,7 @@ class IterableQueue(Queue):
   def close(self):
     if self.__closed:
       # this should be a real log message
-      print >>sys.stderr, "close() on closed IterableQueue"
+      debug("close() on closed IterableQueue")
     else:
       self.__closed=True
       Queue.put(self,None)
@@ -557,12 +558,12 @@ class FuncMultiQueue(object):
     self.__main.start()
 
   def _mainloop(self):
-    print >>sys.stderr, "FuncMultiQueue._mainloop: started"
+    debug("FuncMultiQueue._mainloop: started")
     Q = self.__Q
     sem = self.__sem
     hs = self.__handlers
     for rq in Q:
-      print >>sys.stderr, "FuncMultiQueue._mainloop: got Q item"
+      debug("FuncMultiQueue._mainloop: got Q item")
       sem.acquire()        # will be released by the handler
       if len(hs) == 0:
         # no available threads - make one

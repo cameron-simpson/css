@@ -21,7 +21,8 @@ from thread import allocate_lock
 import threading
 from Queue import Queue
 from zlib import compress, decompress
-from cs.misc import cmderr, debug, isdebug, warn, progress, verbose, out, tb, seq, Loggable
+from logging import debug
+from cs.misc import out, tb, seq, Loggable
 from cs.serialise import toBS, fromBS, fromBSfp
 from cs.threads import FuncMultiQueue, Q1, DictMonitor, NestingOpenClose
 from cs.venti import tohex, defaults
@@ -80,7 +81,7 @@ class BasicStore(Loggable, NestingOpenClose):
       deadlocks may ensue.
   '''
   def __init__(self, name, capacity=None):
-    print >>sys.stderr, "BasicStore.__init__..."
+    debug("BasicStore.__init__...")
     if capacity is None:
       capacity = 1
     Loggable.__init__(self, name)
@@ -335,7 +336,7 @@ class IndexedFileStore(BasicStore):
     ''' Initialise this IndexedFileStore.
         'dir' specifies the directory in which the files and their index live.
     '''
-    print >>sys.stderr, "IndexedStore.__init__..."
+    debug("IndexedStore.__init__...")
     BasicStore.__init__(self, dir, capacity=capacity)
     self.dir = dir
     self.savefile = None
@@ -376,7 +377,7 @@ class IndexedFileStore(BasicStore):
     ''' Open the data file numbered 'n' in the specified mode.
     '''
     pathname = os.path.join(self.dir, "%d.vtd" % (n,))
-    print >>sys.stderr, "open(%s, %s)" % (pathname, mode)
+    debug("open(%s, %s)", pathname, mode)
     return open(pathname, mode)
 
   def _savefile(self):
@@ -467,7 +468,6 @@ def _pullWatcher(S1,S2,ch,pending,fetch_ch):
     if not yesno:
       fetches+=1
       S2.fetch_ch(h,fetch_ch)
-      warn("requested %s" % tohex(h))
     del pending[tag]
   fetch_ch.put((None,fetches))
 
@@ -486,4 +486,3 @@ def _pullFetcher(S1,ch):
         out(str(left))
     fetched+=1
     h = S1.store(block)
-    warn("stored %s" % tohex(h))

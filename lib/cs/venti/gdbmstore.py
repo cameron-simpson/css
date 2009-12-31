@@ -10,8 +10,8 @@ import os.path
 import time
 from zlib import compress
 from thread import allocate_lock
+from logging import debug
 from cs.cache import LRU
-from cs.misc import cmderr, warn, progress, verbose, isverbose, isdebug, out, tb, the
 from cs.serialise import toBS, fromBS, fromBSfp
 from cs.venti import tohex
 from cs.venti.store import IndexedFileStore
@@ -21,7 +21,7 @@ class GDBMStore(IndexedFileStore):
   ''' An IndexedFileStore attached to a GDBM index.
   '''
   def __init__(self, dir, capacity=None):
-    print >>sys.stderr, "GDBMStore.__init__..."
+    debug("GDBMStore.__init__...")
     IndexedFileStore.__init__(self, dir, capacity=capacity)
 
   def _getIndex(self):
@@ -39,7 +39,7 @@ class GDBMIndex(object):
     pass
 
   def sync(self):
-    print >>sys.stderr, "GDBMIndex.__db.sync()"
+    debug("GDBMIndex.__db.sync()")
     self.__db.sync()
 
   def __setitem__(self,h,noz):
