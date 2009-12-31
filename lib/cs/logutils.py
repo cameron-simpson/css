@@ -55,7 +55,7 @@ class Pfx(object):
     pfx = _prefix.raise_prefix
     if pfx is not None:
       if exc_value is not None:
-        if hasattr(exc_value, 'args'):
+        if hasattr(exc_value, 'args') and len(exc_value.args) > 0:
           exc_value.args = [pfx + ": " + str(exc_value.args[0])] \
                          + list(exc_value.args[1:])
         else:
