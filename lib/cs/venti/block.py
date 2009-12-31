@@ -120,7 +120,8 @@ class Block(_Block):
 
   ''' Return the direct content of this block.
       For a direct Block this is the same as data().
-      For an IndirectBlock this is the encoded data that refers to the subblocks.
+      For an IndirectBlock this is the encoded data that refers to the
+      subblocks.
   '''
   blockdata = data
 
@@ -133,6 +134,9 @@ class Block(_Block):
     if discard:
       self._data = None
     return self._hashcode
+
+  def leaves(self):
+    yield self
 
   def __getitem__(self, index):
     ''' Return specified data.
@@ -152,7 +156,7 @@ class IndirectBlock(_Block):
       Indirect blocks come in two states, reflecting how how they are
       initialised.
       If initialised without parameters the block is an empty array
-      if hashcodes of subblocks.
+      of subblocks.
       The other way to initialise an IndirectBlock is with a hashcode and a
       span indicating the length of the data encompassed by the block; this is
       how a block is made from a directory entry or another indirect block.
@@ -204,16 +208,20 @@ class IndirectBlock(_Block):
   def subblocks(self):
     if self.__subblocks is None:
       self.__load_subblocks()
-    return self.__subblocks
+    return list(self.__subblocks)
 
   def append(self, block):
     assert type(block) is not Hash_SHA1
-    self.subblocks().append(block)
+    if self.__subblocks is None:
+      self.__load_subblocks()
+    self.__subblocks.append(block)
     self.__span = None
     self._hashcode = None
 
   def extend(self, subblocks):
-    self.subblocks().extend(subblocks)
+    if self.__subblocks is None:
+      self.__load_subblocks()
+    self.__subblocks.extend(subblocks)
     self.__span = None
     self._hashcode = None
 
@@ -231,7 +239,7 @@ class IndirectBlock(_Block):
         the subblocks.
         For a direct Block this is the same as data().
     '''
-    blocks = list(self.subblocks())
+    blocks = self.subblocks()
     return "".join( B.encode() for B in blocks )
 
   def store(self, discard=False):
@@ -249,32 +257,61 @@ class IndirectBlock(_Block):
       else:
         yield B
 
-  def __rangeChunks(self, start, stop):
+  def chunks(self, start, stop=None):
     ''' Generator that yields the chunks from the subblocks that span
         the supplied range.
     '''
-    if stop <= start:
+    if stop is None:
+      stop = sys.maxint
+    elif stop <= start:
       return
     rangelen = stop - start
-    if rangelen <= 0:
-      return
-    subindex = 0
-    for B in self.subblocks():
-      if start >= len(B):
-        start -= len(B)
+
+    subBs = self.subblocks()
+    while start > 0 and len(subBs[0]) <= start:
+      B = subBs.pop(0)
+
+    Bs = iter(self.subblocks())
+    while True:
+      try:
+        B = Bs.next()
+      except StopIteration:
+        return
+
+      Blen = len(B)
+      if Blen <= start:
+        # too early - skip this block
+        start -= Blen
         continue
-      chunkend = start + rangelen
-      if chunkend > len(B):
-        chunkend = len(B)
-      chunk = B[start:chunkend]
-      yield chunk
-      rangelen -= len(chunk)
+
+      break
+    # post: B is a subblock spanning the start of the range
+    assert start < Blen
+
+    while rangelen > 0:
+      if B.indirect:
+        # pull chunks from the indirect block
+        for chunk in B.chunks(start, start+rangelen):
+          yield chunk
+          rangelen -= len(chunk)
+      else:
+        # grab the relevant chunk of this direct block
+        chunk = B[start:start+rangelen]
+        yield chunk
+        rangelen -= len(chunk)
       if rangelen <= 0:
         break
+      try:
+        B = Bs.next()
+      except StopIteration:
+        return
+      # we always start from the start of the next block
       start = 0
+
   def __getitem__(self, index):
     itype = type(index)
     mylen = len(self)
+
     if itype is int:
       # a simple index
       oindex = index
@@ -289,6 +326,7 @@ class IndirectBlock(_Block):
         else:
           return B[index]
       assert False, "__getitem__[%d] did not find the index in the subblocks" % (oindex,)
+
     # a slice
     start = index.start or 0
     stop = index.stop or sys.maxint
@@ -296,14 +334,17 @@ class IndirectBlock(_Block):
       stop = mylen
     step = index.step or mylen
     assert step != 0, "step == 0"
+
     if step == 1:
       # join adjacent chunks
-      return ''.join(self.__rangeChunks(start, stop))
+      return ''.join(self.chunks(start, stop))
+
     if step == -1:
       # obtain chunks, reverse, then join
-      chunks = list(self.__rangeChunks(stop, start))
+      chunks = list(self.chunks(stop, start))
       chunks.reverse()
       return ''.join(chunks)
+
     return ''.join( self[i] for i in xrange(start, stop, step) )
 
 class TestAll(unittest.TestCase):
