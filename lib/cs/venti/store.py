@@ -294,8 +294,11 @@ def blockdataFromFileStoreFP(fp):
   '''
   flags = fromBSfp(fp)
   dsize = fromBSfp(fp)
-  assert dsize > 0
-  data = fp.read(dsize)
+  if dsize == 0:
+    data = ''
+  else:
+    assert dsize > 0, "expected dsize > 0, got dsize=%s" % (dsize,)
+    data = fp.read(dsize)
   assert len(data) == dsize
   if flags & F_COMPRESSED:
     data = decompress(data)
