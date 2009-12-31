@@ -67,7 +67,8 @@ _home:
                 --exclude=*.swp \\
                 lib/cs/. $(HOME)/lib/cs/.
 
-_all: squid_redirect 1INDEX.txt _submakes _man
+# squid_redirect
+_all: 1INDEX.txt _submakes _man
 
 _deploy:
         :make _home
