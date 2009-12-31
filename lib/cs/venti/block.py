@@ -105,17 +105,31 @@ class Block(_Block):
     '''
     assert (data is None) ^ (hashcode is None)
     self.indirect = False
-    self._data = data
-    self._hashcode = hashcode
-    self.__span = span
-    assert span is None or type(span) is int, "excepted int, got %s" % (`span`,)
+    if data is None:
+      assert hashcode is not None
+      assert span is not None   # really? or should I just cope?
+      self._data = None
+      self._hashcode = hashcode
+      self.__span = span
+    else:
+      assert hashcode is None
+      if span is None:
+        span = len(data)
+      else:
+        assert type(span) is int, "excepted int, got %s" % (`span`,)
+        assert span == len(data)
+      self._data = data
+      self._hashcode = None
+      self.__span = span
 
   def data(self):
     ''' Return the data bytes of this block.
     '''
     data = self._data
     if data is None:
-      data = self._data = defaults.S[self.hashcode()]
+      S = defaults.S
+      assert not S.writeonly
+      data = self._data = S[self.hashcode()]
     return data
 
   ''' Return the direct content of this block.
@@ -130,7 +144,12 @@ class Block(_Block):
         Return the block's hashcode.
         If discard is true, release the block's data.
     '''
-    self._hashcode = defaults.S.add(self.blockdata())
+    S = defaults.S
+    if self._hashcode is None:
+      assert self._data is not None
+      self._hashcode = S.add(self.blockdata())
+    elif self._hashcode not in S:
+      self._hashcode = S.add(self.blockdata())
     if discard:
       self._data = None
     return self._hashcode

@@ -319,6 +319,7 @@ def main(argv):
 
       with S:
         if op == "pack":
+          S.writeonly = True
           if len(args) == 0 or args[0] != '-o':
             from cs.venti.file import storeFile
             for path in args:
@@ -516,7 +517,7 @@ def ls(path,D,recurse,fp=None):
       ##fp.write("\n")
       ls(os.path.join(path, name), D.chdir1(name), recurse, fp)
 
-def cat(path,fp=None):
+def cat(path, fp=None):
   S=defaults.S
   if fp is None:
     fp=sys.stdout

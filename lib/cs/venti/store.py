@@ -38,7 +38,14 @@ class BasicStore(Loggable, NestingOpenClose):
         __getitem__(self, hashcode) -> data
         add(self, data) -> hashcode
         sync(self)
+
       A convenience .lock attribute is provided for simple mutex use.
+
+      The .readonly attribute may be set to prevent writes and trap
+      surprises; it relies on assert statements.
+
+      The .writeonly attribute may be set to trap surprises when no blocks
+      are expected to be fetched; it relies on asssert statements.
 
       The following "op" operation methods are provided:
         contains(hashcode) -> Boolean
@@ -83,6 +90,8 @@ class BasicStore(Loggable, NestingOpenClose):
     self.__funcQ=FuncMultiQueue(capacity)
     self.hashclass = Hash_SHA1
     self.lock = allocate_lock()
+    self.readonly = False
+    self.writeonly = False
 
   def hash(self, data):
     return self.hashclass.fromData(data)
@@ -407,6 +416,7 @@ class IndexedFileStore(BasicStore):
 
   def add(self, data, noFlush=False):
     assert type(data) is str, "expected str, got %s" % (`data`,)
+    assert not self.readonly
     h = self.hash(data)
     sf = self._savefile()
     if h not in self:

@@ -87,6 +87,7 @@ def fullIndirectBlocks(blockSource):
       # overflow
       yield iblock
       iblock=IndirectBlock()
+    block.store(discard=True)
     iblock.append(block)
 
   # handle the termination case
