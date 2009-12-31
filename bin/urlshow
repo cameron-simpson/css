@@ -110,7 +110,8 @@ eval "$URLSHOW_FILTER" \
 | \
 case "$OS,$BROWSER_DISPLAY,$URLSHOW_BROWSER" in
   darwin,*,*)
-    open -a "$URLSHOW_BROWSER" `cat`
+    ##open -a "$URLSHOW_BROWSER" `cat`
+    open `cat`
     ;;
   *,mozilla | *,firefox)
     exec urlshow-mozilla $tflag
