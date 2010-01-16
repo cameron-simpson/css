@@ -286,23 +286,18 @@ class IndirectBlock(_Block):
       return
     rangelen = stop - start
 
-    subBs = self.subblocks()
-    while start > 0 and len(subBs[0]) <= start:
-      B = subBs.pop(0)
-
+    # skip subblocks preceeding the range
     Bs = iter(self.subblocks())
     while True:
       try:
         B = Bs.next()
       except StopIteration:
         return
-
       Blen = len(B)
       if Blen <= start:
         # too early - skip this block
         start -= Blen
         continue
-
       break
     # post: B is a subblock spanning the start of the range
     assert start < Blen
