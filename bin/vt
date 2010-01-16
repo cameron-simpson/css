@@ -46,7 +46,7 @@ from cs.venti.dir import Dir, storeDir, decodeDirent
 from cs.misc import progress, logTo, reportElapsedTime
 
 def main(argv):
-  cmd = argv[0]
+  cmd = os.path.basename(argv[0])
   with Pfx(cmd):
     usage='''Usage:
       %s [options...] cat filerefs...
@@ -479,7 +479,7 @@ def resolve(path, domkdir=False):
   return D, subpath[0]
 
 def lsDirent(fp,E,name):
-  bref=E.getBref()
+  bref=E.getBlock()
   st=E.stat()
   ##print "st=%s" % (st,)
   st_mode, st_ino, st_dev, st_nlink, st_uid, st_gid, st_size, \
