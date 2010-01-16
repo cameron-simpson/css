@@ -481,23 +481,24 @@ class PreQueue(Queue):
     while True:
       yield self.get()
 
-__nullCH=None
-__nullCHlock=allocate_lock()
-def nullCH():
-  with __nullCHlock:
-    if __nullCH is None:
-      __nullCH=NullCH()
-  return __nullCH
-class NullCH(Queue):
-  def __init__(self):
-    Queue.__init__(self,8)
-    self.__closing=False
-    sink=Thread(target=self.__runQueue)
-    sink.setDaemon(True)
-    sink.start()
-  def __runQueue(self):
-    while True:
-      self.get()
+## OBSOLETE: never used this /dev/null Queue-like object
+##__nullCH=None
+##__nullCHlock=allocate_lock()
+##def nullCH():
+##  with __nullCHlock:
+##    if __nullCH is None:
+##      __nullCH=NullCH()
+##  return __nullCH
+##class NullCH(Queue):
+##  def __init__(self):
+##    Queue.__init__(self,8)
+##    self.__closing=False
+##    sink=Thread(target=self.__runQueue)
+##    sink.setDaemon(True)
+##    sink.start()
+##  def __runQueue(self):
+##    while True:
+##      self.get()
 
 class DictMonitor(dict):
   def __init__(self,I={}):
@@ -519,36 +520,37 @@ class DictMonitor(dict):
       ks = dict.keys(self)
     return ks
 
-def bgCall(func,args,ch=None):
-  ''' Spawn a thread to call the supplied function with the supplied
-      args. Return a channel on which the function return value may be read. 
-      A channel may be supplied by the caller; if not then the returned
-      channel must be released with returnChannel().
-  '''
-  if ch is None:
-    ch=getChannel()
-  bg=Thread(target=_bgFunc,args=(func,args,ch))
-  ##bg.setDaemon(True)
-  bg.setName("bgCall(func=%s, args=%s)" % (func, args))
-  bg.start()
-  return ch
-def _bgFunc(func,args,ch):
-  result=func(*args)
-  ch.put(result)
-def _bgReturn(args,ch):
-  ch.put(args)
-def bgReturn(result,ch=None):
-  ''' Return an asynchronous result.
-      Takes the result, returns a channel from which to read it back.
-      A channel may be supplied by the caller; if not then the returned
-      channel must be release with returnChannel().
-  '''
-  return bgCall(_bgReturn,(result,))
+## OBSOLETE and never used
+##def bgCall(func,args,ch=None):
+##  ''' Spawn a thread to call the supplied function with the supplied
+##      args. Return a channel on which the function return value may be read. 
+##      A channel may be supplied by the caller; if not then the returned
+##      channel must be released with returnChannel().
+##  '''
+##  if ch is None:
+##    ch=getChannel()
+##  bg=Thread(target=_bgFunc,args=(func,args,ch))
+##  ##bg.setDaemon(True)
+##  bg.setName("bgCall(func=%s, args=%s)" % (func, args))
+##  bg.start()
+##  return ch
+##def _bgFunc(func,args,ch):
+##  result=func(*args)
+##  ch.put(result)
+##def _bgReturn(args,ch):
+##  ch.put(args)
+##def bgReturn(result,ch=None):
+##  ''' Return an asynchronous result.
+##      Takes the result, returns a channel from which to read it back.
+##      A channel may be supplied by the caller; if not then the returned
+##      channel must be release with returnChannel().
+##  '''
+##  return bgCall(_bgReturn,(result,))
 
 class FuncMultiQueue(object):
   def __init__(self, capacity):
     assert capacity > 0
-    self._capacity = capacity
+    self.capacity = capacity
     self.__sem = Semaphore(capacity)
     self.closed = False
     self.__Q = IterableQueue()
