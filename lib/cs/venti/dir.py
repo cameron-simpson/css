@@ -1,12 +1,13 @@
 import stat
 import sys
 if sys.hexversion < 0x02060000: from sets import Set as set
+from logging import debug, error, info, warn
 from cs.venti.block import decodeBlock
 from cs.venti.blockify import blockFromString
 from cs.venti.meta import Meta
 from cs.venti import tohex
 from cs.lex import unctrl
-from cs.misc import seq, verbose, isdebug, debug, cmderr, progress
+from cs.misc import seq
 from cs.serialise import toBS, fromBS, fromBSfp
 
 uid_nobody = -1
@@ -186,7 +187,6 @@ def decodeDirent(s, justone=False):
     E=Dir(name, meta=meta, parent=None, content=block)
   else:
     E=_BasicDirent(type, name, meta, block)
-  ##if isdebug: cmderr("decode(%s) -> %s" % (tohex(s0), E))
   if justone:
     assert len(s) == 0, \
            "unparsed stuff after decoding %s: %s" % (tohex(s0), tohex(s))
@@ -347,10 +347,10 @@ class Dir(Dirent):
     '''
     from cs.venti.file import storeFile
     import os
-    ##debug("osdir=%s" % (osdir, ))
+    debug("osdir=%s" % (osdir, ))
     osdirpfx=os.path.join(osdir, '')
     for dirpath, dirs, files in os.walk(osdir, topdown=False):
-      ##debug("dirpath=%s" % dirpath)
+      debug("dirpath=%s" % dirpath)
       if dirpath == osdir:
         D=self
       else:
@@ -365,7 +365,7 @@ class Dir(Dirent):
         Dnames=list(D.keys())
         for name in Dnames:
           if name not in names:
-            progress("%s: delete %s" % (cmd, name))
+            warn("%s: delete %s" % (cmd, name))
             del D[name]
 
       for dir in dirs:
@@ -379,27 +379,27 @@ class Dir(Dirent):
         try:
           st=os.stat(filepath)
         except OSError, e:
-          cmderr("%s: stat: %s" % (filepath, e))
+          error("%s: stat: %s" % (filepath, e))
           continue
         except IOError, e:
-          cmderr("%s: stat: %s" % (filepath, e))
+          error("%s: stat: %s" % (filepath, e))
           continue
         if subfile in D:
           if not overWrite:
-            progress("%s: not overwriting" % filepath)
+            warn("%s: not overwriting" % filepath)
             continue
-          if not ignoreTimes:
+          if ignoreTimes:
+            info("%s: IGNORETIMES=True" % filepath)
+          else:
             E=D[subfile]
             if st.st_size == E.size() and int(st.st_mtime) == int(E.mtime()):
-              verbose("%s: same size and mtime, skipping" % filepath)
+              info("%s: same size and mtime, skipping" % filepath)
               continue
-            verbose("%s: differing size(%s:%s)/mtime(%s:%s)" % (filepath, st.st_size, E.size(), int(st.st_mtime), int(E.mtime())))
-          else:
-            verbose("%s: IGNORETIMES=True" % filepath)
+            info("%s: differing size(%s:%s)/mtime(%s:%s)" % (filepath, st.st_size, E.size(), int(st.st_mtime), int(E.mtime())))
         else:
-          verbose("%s not in dir"%subfile)
+          info("%s not in dir"%subfile)
 
-        progress("store %s" % subfile)
+        warn("store %s" % subfile)
         M=Meta()
         M.mtime(st.st_mtime)
         stored=storeFile(open(filepath))
