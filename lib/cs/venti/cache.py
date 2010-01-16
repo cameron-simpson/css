@@ -7,8 +7,6 @@
 from __future__ import with_statement
 import sys
 from Queue import Queue
-from cs.misc import seq, progress, verbose, debug
-from cs.threads import FuncMultiQueue, Q1
 from cs.venti import tohex
 from cs.venti.store import BasicStore
 
@@ -29,12 +27,10 @@ class CacheStore(BasicStore):
     cache.open()
     self.cache=cache
     # secondary queue to process background self.backend operations
-    self.backQ=FuncMultiQueue(256)
     self.__closing=False
 
   def shutdown(self):
     self.cache.close()
-    self.backQ.close()
     self.backend.close()
     BasicStore.shutdown(self)
 
