@@ -319,8 +319,8 @@ def main(argv):
 
       with S:
         if op == "pack":
-          S.writeonly = True
           if len(args) == 0 or args[0] != '-o':
+            S.writeonly = True
             from cs.venti.file import storeFile
             for path in args:
               if os.path.isdir(path):
@@ -428,7 +428,7 @@ def main(argv):
                 fpath=os.path.join(subD.path,fname)
                 print "extract", fpath
                 outfp=open(fpath,mode='w')
-                for b in subD[fname].bref().leaves(S):
+                for b in subD[fname].getBlock().leaves(S):
                   outfp.write(b)
                 outfp.close()
 
@@ -479,7 +479,7 @@ def resolve(path, domkdir=False):
   return D, subpath[0]
 
 def lsDirent(fp,E,name):
-  bref=E.getBlock()
+  B=E.getBlock()
   st=E.stat()
   ##print "st=%s" % (st,)
   st_mode, st_ino, st_dev, st_nlink, st_uid, st_gid, st_size, \
@@ -490,7 +490,7 @@ def lsDirent(fp,E,name):
   t=datetime.datetime.fromtimestamp(int(st_mtime))
   fp.write("%c %-41s %s %-6d %s\n" \
            % (('d' if E.isdir() else 'f'),
-              bref, t, st_size, name))
+              B, t, st_size, name))
 
 def ls(path,D,recurse,fp=None):
   if fp is None:
