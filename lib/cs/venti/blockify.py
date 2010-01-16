@@ -8,8 +8,9 @@
 import sys
 from struct import unpack_from
 from threading import Thread
+from logging import debug
 from cs.threads import IterableQueue
-from cs.misc import isdebug, debug, D, eachOf
+from cs.misc import D, eachOf
 from cs.lex import unctrl
 from cs.venti import defaults
 from cs.venti.block import Block, IndirectBlock
@@ -208,10 +209,9 @@ class RollingHash:
     for i in range(probe_len):
       self.addcode(ord(data[i]))
       if self.n%4093 == 1:
-        ##debug("edge found, returning (hashcode=%d, offset=%d)" % (self.value,i+1))
-        D("(self.n=%d:i+1=%d)", self.n, i+1)
+        debug("edge found, returning (hashcode=%d, offset=%d)", self.value(), i+1)
         return i+1
-    ##debug("no edge found, hash now %d, returning (None, %d)" % (self.value(),probe_len))
+    debug("no edge found, hash now %d, returning (None, %d)", self.value(), probe_len)
     return -1
 
   def addcode(self,oc):
