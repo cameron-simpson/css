@@ -1,0 +1,149 @@
+#!/bin/sh -ue
+#
+# Update local histbackup trees from remote trees.
+#       - Cameron Simpson <cs@zip.com.au> 29jan2009
+# 
+
+cmd=`basename "$0"`
+usage="Usage: $cmd [-F notify] [-[vx]] [--symlink linkname] remote-top remote-glob
+  -e ssh-cmd
+        Used for ssh invocation and passed to histbackup for rsync.
+  -v, -x, --symlink linkname, --exclude=, --include=
+        Passed to histbackup.
+  -F fail-notify
+                Email failure error output to this address.
+  remote-top    Top of remote histbackup tree collection.
+  remote-glob   Shell glob string for use at the remote end to name
+                histbackup trees."
+
+rsync_ssh=ssh
+notify=
+hbopts=
+hbrsopts=
+symlink=LATEST
+trace=
+
+badopts=
+
+while [ $# -gt 0 ]
+do
+  case $1 in
+    -e) rsync_ssh=$2; shift ;;
+    -F) notify=$2; shift ;;
+    --symlink)
+        symlink=$2; shift ;;
+    --include=*|--exclude=*)
+        hbrsopts="$hbrsopts $1" ;;
+    -[vx])
+        trace=set-x
+        hbopts="$hbopts $1" ;;
+    --) shift; break ;;
+    -?*)echo "$cmd: unrecognised option: $1" >&2
+        badopts=1
+        ;;
+    *)  break ;;
+  esac
+  shift
+done
+
+if [ $# = 0 ]
+then
+  echo "$cmd: missing remote-top" >&2
+  badopts=1
+else
+  remote_top=$1
+  shift
+  case "$remote_top" in
+    *?:*)
+      remote_login=`expr "x$remote_top" : 'x\([^:]*\):.*'`
+      remote_path=`expr "x$remote_top" : 'x[^:]*:\(.*\)'`
+      ;;
+    *)remote_login=
+      remote_path=$remote_top
+      ;;
+  esac
+fi
+
+if [ $# = 0 ]
+then
+  echo "$cmd: missing remote-glob" >&2
+  badopts=1
+else
+  remote_glob=$1
+  shift
+fi
+
+if [ $# -gt 0 ]
+then
+  echo "$cmd: extra arguments after remote-glob: $*" >&2
+  badopts=1
+fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+qrsync_ssh=`sh -c "shqstr $rsync_ssh"`
+qremote_top=`shqstr "$remote_top"`
+qremote_path=`shqstr "$remote_path"`
+qsymlink=`shqstr "$symlink"`
+
+remote()
+{
+  [ $# = 1 ] || { echo "$cmd: remote(): expect a single shell command string" >&2
+                  return 2
+                }
+  rcmd=$1
+  if [ -z "$remote_login" ]
+  then
+    sh -c "cd $qremote_path || exit 1; $rcmd"
+  else
+    ( eval "set -- $rsync_ssh"
+      "$@" "$remote_login" "cd $qremote_path || exit 1; $rcmd"
+    )
+  fi
+}
+
+remote : \
+|| { echo "$cmd: missing $remote_top?" >&2
+     exit 1
+   }
+
+get_dirs_cmd="for dir in $remote_glob
+              do
+                if [ -d \"\$dir\"/$qsymlink/. ]
+                then
+                  echo \"\$dir\"
+                else
+                  : echo \"missing \$dir/\"$qsymlink >&2
+                fi
+              done
+             "
+
+set -- `remote "$get_dirs_cmd"` || exit 1
+[ $# -gt 0 ] || { echo "$cmd: nothing to pull?" >&2; exit 2; }
+
+xit=0
+
+for dir
+do
+  if [ ! -d "$dir/." ]
+  then
+    echo "$cmd: missing local $dir, skipping" >&2
+    xit=1
+  else
+    if ( set -- histbackup --symlink "$symlink" $hbopts "$remote_top/$dir/$symlink" "$dir" $hbrsopts -e "$rsync_ssh"
+        if [ -n "$notify" ]
+        then
+          set -- mail-on-error "$notify" "$@"
+        fi
+        set -- pfx "$remote_top/$dir" "$@"
+        $trace "$@"
+      )
+    then
+      echo "OK $dir"
+    else
+      xit=1
+    fi
+  fi
+done
+
+exit $xit
