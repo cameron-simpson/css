@@ -9,7 +9,7 @@ import sys
 from functools import partial
 from thread import allocate_lock
 from threading import Semaphore, Thread
-from logging import debug
+from logging import debug, warn
 from Queue import Queue
 from collections import deque
 if sys.hexversion < 0x02060000: from sets import Set as set
@@ -133,10 +133,13 @@ class IterableQueue(Queue):
     if not self.__closed:
       self.close()
 
+  def isclosed(self):
+    return self.__closed
+
   def close(self):
     if self.__closed:
       # this should be a real log message
-      debug("close() on closed IterableQueue")
+      warn("close() on closed IterableQueue")
     else:
       self.__closed=True
       Queue.put(self,None)
@@ -421,11 +424,8 @@ class _Q1(Queue):
     self._reset(name=name)
   def _reset(self,name):
     if name is None:
-      if isdebug:
-        import traceback
-        name="Q1:[%s]" % (traceback.format_list(traceback.extract_stack()[-3:-1])[0].strip().replace("\n",", "))
-      else:
-        name="Q1:%d" % id(self)
+      import traceback
+      name="Q1:[%s]" % (traceback.format_list(traceback.extract_stack()[-3:-1])[0].strip().replace("\n",", "))
     self.name=name
     self.didput=False
     self.didget=False
