@@ -39,6 +39,7 @@ if [ $# = 0 ]
 then
   echo "$cmd: missing category" >&2
   badopts=1
+  category=CATEGORY
 else
   category=$1
   shift
