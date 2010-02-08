@@ -2,8 +2,21 @@
 #
 # Run a command using an ssh control master to tunnel connections.
 # It starts a control ssh, runs the target command, then exits.
+# It is useful for wrapping many connections to the same ssh target.
 # The control socket path is placed in the environment variable
-# $SSH_MASTER_CONTROL_PATH
+# $SSH_MASTER_CONTROL_PATH; ssh doesn't pay any attention to that
+# so the user must make explicit use of it.
+#
+# Typical use in a script:
+#
+#  [ -n "${SSH_MASTER_CONTROL_PATH:-}" ] \
+#  || exec with-ssh-master -- ssh-target "$0" ${1+"$@"}
+#
+# and then use:
+#
+#  ssh -o ControlMaster=no -o "ControlPath=$SSH_MASTER_CONTROL_PATH" ssh-target ...
+#
+# in the script.
 #       - Cameron Simpson <cs@zip.com.au> 22feb2009
 #
 
@@ -55,5 +68,7 @@ env "SSH_MASTER_CONTROL_PATH=$socket" "$@"
 xit=$?
 
 ssh $sshopts -o ControlMaster=no -o "ControlPath=$socket" -O exit localhost : || xit=1
+
+rm -f "$socket"
 
 exit $xit
