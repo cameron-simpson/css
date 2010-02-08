@@ -6,15 +6,15 @@
 
 from __future__ import with_statement
 import sys
-from functools import partial
 from thread import allocate_lock
 from threading import Semaphore, Thread
-from logging import debug, warn
 from Queue import Queue
 from collections import deque
 if sys.hexversion < 0x02060000: from sets import Set as set
 from cs.misc import seq
 from cs.logutils import LogTime
+from logging import error, warn
+from cs.misc import seq
 
 class AdjustableSemaphore(object):
   ''' A semaphore whose value may be tuned after instantiation.
@@ -133,16 +133,15 @@ class IterableQueue(Queue):
     if not self.__closed:
       self.close()
 
-  def isclosed(self):
-    return self.__closed
-
   def close(self):
     if self.__closed:
-      # this should be a real log message
-      warn("close() on closed IterableQueue")
+      error("close() on closed IterableQueue")
     else:
       self.__closed=True
       Queue.put(self,None)
+
+  def isclosed(self):
+    return self.__closed
 
   def __iter__(self):
     ''' Iterable interface for the queue.
@@ -226,12 +225,14 @@ class JobCounter:
   def inc(self):
     ''' Note that there is another job for which to wait.
     '''
+    debug("%s: inc()" % self.__name)
     with self.__lock:
       self.__n+=1
 
   def dec(self):
     ''' Report the completion of a job.
     '''
+    debug("%s: dec()" % self.__name)
     self.__sem.release()
 
   def _wait1(self):
@@ -239,12 +240,15 @@ class JobCounter:
         Return False if no jobs remain.
         Report True if a job remained and we waited.
     '''
+    debug("%s: wait1()..." % self.__name)
     with self.__lock:
       if self.__n == 0:
+        debug("%s: wait1(): nothing to wait for" % self.__name)
         return False
     self.__sem.acquire()
     with self.__lock:
       self.__n-=1
+    debug("%s: wait1(): waited" % self.__name)
     return True
 
   def _waitAll(self):
@@ -252,7 +256,9 @@ class JobCounter:
       pass
 
   def _waitThenDo(self,*args,**kw):
+    debug("%s: _waitThenDo()..." % self.__name)
     self._waitAll()
+    debug("%s: _waitThenDo(): waited: calling __onDone()..." % self.__name)
     return self.__onDone[0](*self.__onDone[1],**self.__onDone[2])
 
   def doInstead(self,func,*args,**kw):
@@ -333,6 +339,7 @@ class FuncQueue(NestingOpenClose):
     '''
     self.open()
     for retQ, func, args, kwargs in self.__Q:
+      ##debug("func=%s, args=%s, kwargs=%s"%(func,args,kwargs))
       ret=func(*args,**kwargs)
       if retQ is not None:
         retQ.put(ret)
@@ -386,10 +393,12 @@ def getChannel():
   with __channelsLock:
     if len(__channels) == 0:
       ch=_Channel()
+      debug("getChannel: allocated %s" % ch)
     else:
       ch=__channels.pop(-1)
   return ch
 def returnChannel(ch):
+  debug("returnChannel: releasing %s" % ch)
   with __channelsLock:
     assert ch not in __channels
     __channels.append(ch)
@@ -424,8 +433,7 @@ class _Q1(Queue):
     self._reset(name=name)
   def _reset(self,name):
     if name is None:
-      import traceback
-      name="Q1:[%s]" % (traceback.format_list(traceback.extract_stack()[-3:-1])[0].strip().replace("\n",", "))
+      name="Q1:%d" % id(self)
     self.name=name
     self.didput=False
     self.didget=False
@@ -520,7 +528,6 @@ class DictMonitor(dict):
       ks = dict.keys(self)
     return ks
 
-## OBSOLETE and never used
 ##def bgCall(func,args,ch=None):
 ##  ''' Spawn a thread to call the supplied function with the supplied
 ##      args. Return a channel on which the function return value may be read. 
@@ -550,7 +557,7 @@ class DictMonitor(dict):
 class FuncMultiQueue(object):
   def __init__(self, capacity):
     assert capacity > 0
-    self.capacity = capacity
+    self._capacity = capacity
     self.__sem = Semaphore(capacity)
     self.closed = False
     self.__Q = IterableQueue()
@@ -560,17 +567,16 @@ class FuncMultiQueue(object):
     self.__main.start()
 
   def _mainloop(self):
-    debug("FuncMultiQueue._mainloop: started")
     Q = self.__Q
     sem = self.__sem
     hs = self.__handlers
     for rq in Q:
-      debug("FuncMultiQueue._mainloop: got Q item")
       sem.acquire()        # will be released by the handler
       if len(hs) == 0:
         # no available threads - make one
         hch = Channel()
         hargs = [None, hch]
+        self.__allHandlers.append(hargs)
         T = Thread(target=self._handler, args=hargs)
         hargs[0] = T
         T.start()
@@ -585,9 +591,9 @@ class FuncMultiQueue(object):
     for func, retQ, tag in hch:
       if func is None:
         break
+      ret = func()
       if retQ is not None:
-        retQ.put( (tag, func()) )
-      # return this handler to the pool
+        retQ.put( (tag, ret) )
       hs.append( (T, hch) )
       sem.release()
 
@@ -599,40 +605,42 @@ class FuncMultiQueue(object):
     self.closed = True
     self.__Q.close()
     for T, hch in self.__allHandlers:
-      hch.put( (None, None) )
+      hch.put( (None, None, None) )
       T.join()
     self.__main.join()
 
-  def qbgcall(self, Q, func, *args, **kw):
-    ''' Queue a call to func(*args, **kw).
+  def qbgcall(self, func, Q):
+    ''' Queue a call to func(), typically the result of functools.partial.
         A tag value is allocated and returned.
         The (tag, result) will be .put() on the supplied Q on completion of
         the function. If Q is None the function result is discarded.
     '''
     tag = seq()
-    pfunc = partial(func, *args, **kw)
-    self.__Q.put( (pfunc, Q, tag) )
+    self.__Q.put( (func, Q, tag) )
     return tag
 
-  def bgcall(self, func, *args, **kw):
-    ''' Queue a call to func(*args, **kw).
-        Return a Channel-like object whose .get() method will return
-        the a tuple (tag, result) on function completion.
+  def bgcall(self, func, retq=None):
+    ''' Queue a call to func(), typically the result of functools.partial.
+        Return an object whose .get() method will return
+        the tuple (tag, result) on function completion.
+        This may be prespecified by the retq parameter.
     '''
-    pfunc = partial(func, *args, **kw)
-    q1 = Q1()
-    self.qbgcall(q1, func, *args, **kw)
-    return q1
+    if retq is None:
+      retq = Q1()
+    self.qbgcall(func, retq)
+    return retq
 
-  def call(self, func, *args, **kw):
-    ''' Call func(*args, **kw) via the queue.
+  def call(self, func):
+    ''' Call func() via the queue.
+        func is typically the result of functools.partial.
         Return the function result.
     '''
-    return self.bgcall(func, *args, **kw).get()[1]
+    return self.bgcall(func).get()[1]
 
 if __name__ == '__main__':
   import unittest
   import time
+  from functools import partial
   def f(x):
     return x*2
   def delay(n):
@@ -641,18 +649,20 @@ if __name__ == '__main__':
   class TestFuncMultiQueue(unittest.TestCase):
     def testCall(self):
       FQ = FuncMultiQueue(3)
-      z = FQ.call(f, 3)
+      f3 = partial(f, 3)
+      z = FQ.call(f3)
       self.assertEquals(z, 6)
       FQ.close()
     def testBGCall(self):
       cap = 3
       FQ = FuncMultiQueue(cap)
-      chs = []
+      retq = IterableQueue()
       for i in range(cap+1):
-        ch = FQ.bgcall(delay, 1)
-        chs.append(ch)
-      for ch in chs:
-        tag, x = ch.get()
+        d1 = partial(delay, 1)
+        ch = FQ.bgcall(d1, retq)
+      for i in range(cap+1):
+        tag, x = retq.get()
         self.assertEquals(x, 1)
+      retq.close()
       FQ.close()
   unittest.main()
