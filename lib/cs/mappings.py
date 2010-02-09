@@ -99,3 +99,26 @@ class SeqMapUC_Attrs(object):
       del self.__dict__[k]
     else:
       del self.__M[k]
+
+class UC_Sequence(list):
+  ''' A tuple-of-nodes on which .ATTRs indirection can be done,
+      yielding another tuple-of-nodes or tuple-of-values.
+  '''
+  def __init__(self, Ns):
+    ''' Initialise from an iterable sequence.
+    '''
+    list.__init__(self, Ns)
+
+  def __getattr__(self, attr):
+    k, plural = parseUC_sAttr(attr)
+    if k is None or not plural:
+      return list.__getattr__(self, attr)
+    values = tuple(self.__attrvals(attr))
+    if len(values) > 0 and not isNode(values[0]):
+      return values
+    return _Nodes(values)
+
+  def __attrvals(self, attr):
+    for N in self.__nodes:
+      for v in getattr(N, attr):
+        yield v
