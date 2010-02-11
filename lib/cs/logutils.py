@@ -42,10 +42,12 @@ class Pfx(object):
     self.mark = newmark
   def __enter__(self):
     global _prefix
-    if not _prefix.prior:
+    if len(_prefix.prior) == 0:
       # add handler
       _prefix.logging_handler = _PrefixLoggingHandler()
       logger = logging.getLogger()
+      self.stashedLoggingHandlers = list(logger.handlers)
+      logger.handlers[:] = []
       logger.addHandler(_prefix.logging_handler)
     _prefix.prior.append( (_prefix.current, _prefix.raise_prefix) )
     _prefix.current = self.mark
@@ -67,6 +69,8 @@ class Pfx(object):
       # remove handler
       logger = logging.getLogger()
       logger.removeHandler(_prefix.logging_handler)
+      logger.handlers[0:0] = self.stashedLoggingHandlers
+      self.stashedLoggingHandlers = None
       _prefix.logging_handler = None
     if pfx is None:
       _prefix.raise_prefix = None
