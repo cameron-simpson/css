@@ -13,19 +13,29 @@
 #	- Cameron Simpson <cs@zip.com.au> 31mar2005
 # 
 
+logfile=/tmp/vsftpd.log
+[ -f "$logfile" ] || logfile=/dev/null
+exec 2>>"$logfile"
+##set -x
+
 cfg=/etc/vsftpd.conf
 realsftpd=/usr/libexec/openssh/sftp-server.real
 
-##logfile=/tmp/vsftpd.log
-##exec 2>>"$logfile"
+logcontext=vsftpd
+
+error()
+{ echo "$0: $*" >&2
+  logger -t vsftp -p authpriv.err "error $logcontext $*" || :
+}
+
 exec 3>&1 1>&2
 
-[ -n "$SSH_CONNECTION" ] || { echo "$0: no \$SSH_CONNECTION envvar, aborting" >&2
+[ -n "$SSH_CONNECTION" ] || { error "no \$SSH_CONNECTION envvar, aborting" >&2
 			      exit 1
 			    }
 ## ::ffff:10.11.0.12 36601 ::ffff:10.11.0.12 22
 set -- $SSH_CONNECTION
-[ $# = 4 ] || { echo "$0: malformed \$SSH_CONNECTION envvar, expected 4 words" >&2
+[ $# = 4 ] || { error "malformed \$SSH_CONNECTION envvar, expected 4 words" >&2
 		exit 1
 	      }
 srcip=$1
@@ -37,34 +47,51 @@ case "$destip" in ::ffff:?*) destip=`expr "x$destip" : 'x::ffff:\(.*\)'` ;; esac
 user=`whoami` || exit 1
 wd=
 
+logcontext="$user@$destip from $srcip"
+
+[ -x "$realsftpd" ] || { error "not executable: $realsftpd"; exit 1; }
+
 # see if this user should chdir
-while read cfuser cfip cfdir
-do
+if [ ! -s "$cfg" ]
+then
+  error "missing or empty config: $cfg"
+else
+  lineno=0
+  while read cfuser cfip cfdir
+  do
+    lineno=`expr $lineno + 1`
 
-  # skip blank lines and comments
-  case "$cfuser" in
-    '' | \#* ) continue ;;
-  esac
-  
-  # skip lines not for this host
-  [ "x$cfip" = "x$destip" ] || continue
+    # skip blank lines and comments
+    case "$cfuser" in
+      '' | \#* ) continue ;;
+    esac
+    
+    # skip lines not for this host
+    [ "x$cfip" = "x$destip" ] || continue
 
-  case ",$cfuser," in
-    *,\*,* | *",$user,"* ) ;;
-    *)	continue ;; # user not mentioned
-  esac
+    case ",$cfuser," in
+      *,\*,* | *",$user,"* ) ;;
+      *)	continue ;; # user not mentioned
+    esac
 
-  # a match - go to the target directory
-  [ -d "$cfdir/." ] || exit 1
-  cd "$cfdir"       || exit 1
-  # set umask, presuming shared work area
-  umask 2
-  wd=$cfdir
-  break
+    # a match - go to the target directory
+    if [ ! -d "$cfdir/." ]
+    then
+      error "no directory for config line $lineno: $cfuser $cfip $cfdir"
+      exit 1
+    fi
+    cd "$cfdir"       || exit 1
+    # set umask, presuming shared work area
+    umask 2
+    wd=$cfdir
+    break
 
-done <"$cfg"
+  done <"$cfg"
+fi
 
 [ -n "$wd" ] || wd=`pwd`
+logcontext="$logcontext, wd=$wd"
+
 logger -t vsftp -p authpriv.info "start $user@$destip from $srcip, wd=$wd"
 
 "$realsftpd" ${1+"$@"} 1>&3 3>&-
