@@ -199,7 +199,7 @@ split_target()
       _st_pcmd="${_st_pcmd} -A -T -x -e none -o batchmode=yes -o compression=no $1"
       shift
     done
-    _st_pcmd="$_st_pcmd $setx\\; exec nc %h %p"
+    _st_pcmd="$_st_pcmd nc %h %p"
   fi
   printf "%s %s\n" "$1" "$_st_pcmd"
 }
@@ -216,7 +216,7 @@ then
         rhost=`expr "x$host" : 'x.*!\(.*\)'`
         host=` expr "x$host" : 'x\(.*\)!.*'`
         osshcmd=$sshcmd
-        sshcmd="$setx\\; exec ssh $sshargv "`shqstr "$rhost" "$sshcmd"`
+        sshcmd="ssh $sshargv "`shqstr "$rhost" "$sshcmd"`
         ;;
       *)
         break
