@@ -334,11 +334,15 @@ class NoExceptions(object):
   def __enter__(self):
     pass
 
-  def __exit__(self, exc_type, exc_value, traceback):
+  def __exit__(self, exc_type, exc_value, tb):
     if exc_type is not None:
       if self.__handler is not None:
-        return self.__handler(exc_type, exc_value, traceback)
-      info("ignore "+str(exc_type))
+        # user supplied handler
+        return self.__handler(exc_type, exc_value, tb)
+      # report handled exception
+      warning("IGNORE "+str(exc_type)+": "+`tb`)
+      import traceback
+      traceback.print_exception(exc_type, exc_value, tb)
     return True
 
   def simpleExceptionReport(exc_type, exc_value, traceback, mark=None, loglevel=logging.WARNING):
