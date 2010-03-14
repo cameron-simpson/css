@@ -284,8 +284,6 @@ sed -e 's;//*; -- ;g' -e 's/   */ /g' \
            continue
          }
 
-      ripcomment="Ripped$byNAME with cdparanoia on `date`"
-
       if [ $force ] || [ ! -s "$raw" ]
       then
         [ -d "$dir/." ] || mkdir -p "$dir" || { xit=1; continue; }
@@ -327,8 +325,7 @@ sed -e 's;//*; -- ;g' -e 's/   */ /g' \
 	    # This fiddling is because oggenc blows up with long comments.
 	    commentf=.tmp$$c
 	    { [ -n "$xtra" ] && echo "$xtra"
-	      echo "$ripcomment"
-	      echo "Encoded$byNAME with `oggenc -v` [$oggencqual] on `date`"
+	      echo "Encoded$byNAME with `oggenc -v` [$oggencqual]"
 	    } >"$commentf"
 
 	    while read -r comment
