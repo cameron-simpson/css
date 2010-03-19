@@ -32,22 +32,11 @@ usage="Usage: $cmd [ssh-options...] [sshcfg=value...] [user@]host[![user2@]host2
 
 env_presh=': set -vx
            exec 3<&0 4>&1 </dev/null >&2
-	   [ -s /etc/profile ] && . /etc/profile
+           : ${SHELL:=/bin/sh}
+           [ -s /etc/profile ] && . /etc/profile
            [ -s $HOME/.profile ] && . $HOME/.profile
-	   wSHELL=
-	   for sh in zsh bash ksh sh $SHELL
-	   do
-	     for bin in /bin /usr/bin /usr/local/bin
-	     do
-	       case "$sh" in /*) binsh=$sh ;; *) binsh=$bin/$sh ;; esac
-	       [ -x "$binsh" ] && { wSHELL=$binsh; break; }
-	     done
-	     [ -n "$wSHELL" ] && break
-	   done
-	   [ -n "$wSHELL" ] && SHELL=$wSHELL
-	   export SHELL
            tput colors >/dev/null 2>&1 || { TERM=xterm-color; export TERM; }
-	   [ -s /opt/css/env.sh ] && . /opt/css/env.sh
+           ##[ -s /opt/css/env.sh ] && . /opt/css/env.sh
            exec <&3 3<&- >&4 4>&-
 	  '
 
