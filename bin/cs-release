@@ -107,7 +107,10 @@ case $op in
     $trace mv "$changefile" "$reldir/SUMMARY.txt"
     $trace hg log -r "release-$lastrelease:tip" >"$reldir/CHANGES.txt"
     $trace hg add "$reldir"
-    $trace hg commit -m "Release information for $newtag." "$reldir"
+    summary_text=`cat "$reldir/SUMMARY.txt"`
+    $trace hg commit -m "Release information for $newtag.
+Summary:
+$summary_text" "$reldir"
     $trace hg tag "$newtag"
     ;;
   freshmeat-submit)
