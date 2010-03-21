@@ -11,6 +11,35 @@ import time
 import threading
 import cs.misc
 
+class NullHandler(logging.Handler):
+  def emit(self, record):
+    pass
+
+''' Convenience do-nothing logging handler as suggested by:
+      http://docs.python.org/library/logging.html#configuring-logging-for-a-library
+'''
+nullHandler = NullHandler()
+
+''' Top level logger for the cs library.
+'''
+logger = logging.getLogger("cs")
+logger.addHandler(nullHandler)
+
+''' A mixin class to add logging convenience methods.
+'''
+class LoggingMixin(object):
+  def __init__(self):
+    self._logger = cs.logutils.logger
+  def info(self, *args, **kwargs):
+    self._logger.warning(*args, **kwargs)
+  def warning(self, *args, **kwargs):
+    self._logger.warning(*args, **kwargs)
+  warn = warning
+  def error(self, *args, **kwargs):
+    self._logger.error(*args, **kwargs)
+  def critical(self, *args, **kwargs):
+    self._logger.critical(*args, **kwargs)
+
 class _PrefixState(threading.local):
   def __init__(self):
     self.current = cs.misc.cmd
@@ -45,7 +74,7 @@ class Pfx(object):
     if len(_prefix.prior) == 0:
       # add handler
       _prefix.logging_handler = _PrefixLoggingHandler()
-      logger = logging.getLogger()
+      global logger
       self.stashedLoggingHandlers = list(logger.handlers)
       logger.handlers[:] = []
       logger.addHandler(_prefix.logging_handler)
@@ -67,7 +96,7 @@ class Pfx(object):
     _prefix.current, _prefix.raise_prefix = _prefix.prior.pop()
     if not _prefix.prior:
       # remove handler
-      logger = logging.getLogger()
+      global logger
       logger.removeHandler(_prefix.logging_handler)
       logger.handlers[0:0] = self.stashedLoggingHandlers
       self.stashedLoggingHandlers = None
