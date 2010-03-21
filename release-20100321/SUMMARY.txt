@@ -1,0 +1,7 @@
+Many updates to vt (cs.venti) though still alpha stage.
+Several updates the cs.threads and cs.logutils.
+Add an assortment of small scripts.
+Change cdrip to use stabler id3 tag strings, aiding reripping/merging.
+sshto improvements.
+Add cs.timeutils, very small so far.
+Robustness fix for vsftp-server, other small changes.

@@ -1,0 +1,446 @@
+changeset:   7557:83cc6818150c
+tag:         release-20091208
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Tue Dec 08 14:06:58 2009 +1100
+files:       release-20091208/CHANGES.txt release-20091208/SUMMARY.txt release-20091208/release-tag.txt
+description:
+Release information for release-20091208.
+
+
+changeset:   7558:3b9eef2c40d6
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Tue Dec 08 14:06:58 2009 +1100
+files:       .hgtags
+description:
+Added tag release-20091208 for changeset 83cc6818150c
+
+
+changeset:   7559:ec9a038b554d
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Tue Dec 08 14:11:58 2009 +1100
+files:       bin/updcss
+description:
+updcss: omit adzapper - lost in the big crash:-(
+
+
+changeset:   7560:55d46f850bad
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Thu Dec 31 15:10:18 2009 +1100
+files:       Mykefile
+description:
+Mykefile: defer building squid_redirect
+
+
+changeset:   7561:800d62f41457
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Thu Dec 31 15:11:13 2009 +1100
+files:       bin/urlshow
+description:
+urlshow: use MacOSX's native open command
+
+
+changeset:   7562:2dc9f4bc445b
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Thu Dec 31 15:11:50 2009 +1100
+files:       lib/cs/threads.py
+description:
+cs.threads: comment out some obsolete cruft
+
+
+changeset:   7563:e5ebc3569f2f
+parent:      7426:af24a003a72e
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sat Jun 06 10:49:31 2009 +1000
+files:       lib/cs/venti/hash.py
+description:
+hash.py: import sha1 portably, add trivial unit test.
+
+
+changeset:   7564:4677e826c7cb
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sat Jun 27 09:57:52 2009 +1000
+files:       lib/cs/venti/__init__.py lib/cs/venti/blockify.py lib/cs/venti/blocks.py lib/cs/venti/datafile.py lib/cs/venti/gdbmstore.py lib/cs/venti/store.py
+description:
+Make Stores context managers, that push a per-thread default-Store stack.
+Start making hash functions a bit more pluggable.
+
+
+changeset:   7565:436fb24ac180
+parent:      7452:e0fdcafa35ff
+parent:      7564:4677e826c7cb
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sat Jun 27 09:58:07 2009 +1000
+description:
+Automated merge with file:///app2/home/cameron/hg/css
+
+
+changeset:   7566:1f59c1ce67b2
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sat Jun 27 21:32:56 2009 +1000
+files:       lib/cs/venti/block.py
+description:
+Classes for direct and indirect blocks.
+
+
+changeset:   7567:1be5c3396a18
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sun Jun 28 17:27:08 2009 +1000
+files:       lib/cs/venti/hash.py
+description:
+Enclose default hash functionality in Hash_SHA1 class.
+
+
+changeset:   7568:45611626f219
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sun Jun 28 23:18:46 2009 +1000
+files:       lib/cs/venti/block.py
+description:
+Add encodeBlock() and decodeBlock(). Load-at-need subblocks if IndirectBlock
+made from hashcode.
+
+
+changeset:   7569:55a1d3860f1c
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sun Jun 28 23:19:44 2009 +1000
+files:       lib/cs/venti/store.py
+description:
+BasicStore: use Hash_SHA1 as default hash type; framework for pluggable hash types.
+
+
+changeset:   7570:09e02403fc00
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Fri Dec 11 17:00:49 2009 +1100
+files:       lib/cs/venti/blockify.py
+description:
+compute max_subblocks from hash function hash size
+
+
+changeset:   7571:23666cbcca10
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Fri Dec 11 17:01:17 2009 +1100
+files:       lib/cs/venti/blocks.py lib/cs/venti/blocks.py-OBSOLETE
+description:
+obsolete venti.blocks
+
+
+changeset:   7572:96822a593265
+parent:      7571:23666cbcca10
+parent:      7559:ec9a038b554d
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Fri Dec 11 20:30:35 2009 +1100
+files:       bin/ahu bin/amex bin/dat bin/dogetmail bin/rig-mail-despool bin/riggetmail bin/rungetmail bin/shell lib/cs/bmk.py lib/cs/venti/hash.py make-into-shell-functions/ah
+description:
+merge with mainline updates
+
+
+changeset:   7573:47246629c4a1
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sun Dec 27 14:14:11 2009 +1100
+files:       lib/cs/threads.py
+description:
+threads.py: remove some debug, make bgcalls return (tag, result)
+
+
+changeset:   7574:bbbeb6a3de93
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sun Dec 27 14:23:02 2009 +1100
+files:       bin/vt lib/cs/venti/__init__.py lib/cs/venti/block.py lib/cs/venti/blockify.py lib/cs/venti/cache.py lib/cs/venti/datafile.py lib/cs/venti/dir.py lib/cs/venti/file.py lib/cs/venti/gdbmstore.py lib/cs/venti/hash.py lib/cs/venti/store.py lib/cs/venti/stream.py
+description:
+venti: huge recode; all Store use through context manager, use Blocks in most placed instread of brefs etc
+
+
+changeset:   7575:4a521103bb00
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Mon Dec 28 16:48:32 2009 +1100
+files:       lib/cs/logutils.py
+description:
+logutils: make Pfx() add a logging handler
+
+
+changeset:   7576:0082e1240901
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Mon Dec 28 17:02:23 2009 +1100
+files:       lib/cs/logutils.py
+description:
+logutils: _PrefixLoggingHandler: use record.getMessage() instead of .msg
+
+
+changeset:   7577:7eadd435b566
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Mon Dec 28 17:03:03 2009 +1100
+files:       bin/vt
+description:
+bin/vt: use logutils.Pfx scopes
+
+
+changeset:   7578:84506c739609
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Thu Dec 31 12:53:09 2009 +1100
+files:       lib/cs/logutils.py
+description:
+logutils: further sanity check on exception structure
+
+
+changeset:   7579:95f902fbab88
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Thu Dec 31 13:04:59 2009 +1100
+files:       bin/vt
+description:
+vt: cat: use blockdata() of leaves, not data() - not a semantic change
+
+
+changeset:   7580:e3c8dbadc8f6
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Thu Dec 31 13:08:02 2009 +1100
+files:       lib/cs/venti/block.py
+description:
+venti.block: add leaves() method to direct block, make chunks() a public method and completely recode it, fix bug caused by making subblocks() return a copy
+
+
+changeset:   7581:1e997304bcc6
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Thu Dec 31 13:09:00 2009 +1100
+files:       lib/cs/venti/blockify.py
+description:
+venti.blockify: Explainitory comment.
+
+
+changeset:   7582:b9e88b70e11b
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Thu Dec 31 13:12:33 2009 +1100
+files:       lib/cs/venti/store.py
+description:
+venti.store: fix up handling the empty data block
+
+
+changeset:   7583:673e03cb6fd8
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Thu Dec 31 13:14:29 2009 +1100
+files:       lib/cs/venti/file.py
+description:
+venti.file: replace brefs with blocks, add len(), replace readShort() with impl based on block.chunks()
+
+
+changeset:   7584:7d789f2e457d
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Thu Dec 31 15:01:26 2009 +1100
+files:       bin/vt lib/cs/venti/block.py lib/cs/venti/blockify.py lib/cs/venti/store.py
+description:
+venti: put some readonly/writeonly debugging flags in, fix some spurious data refetches, reign in the memory consumption of "pack"
+
+
+changeset:   7585:3e206b505cf9
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Thu Dec 31 15:02:04 2009 +1100
+files:       lib/cs/venti/debug.py
+description:
+venti.debug: block dumping convenience function; more to follow
+
+
+changeset:   7586:efbbd2d15b93
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Thu Dec 31 15:08:48 2009 +1100
+files:       lib/cs/threads.py lib/cs/venti/gdbmstore.py lib/cs/venti/store.py
+description:
+venti: move most debugging statements to logging.debug
+
+
+changeset:   7587:f04475498b72
+parent:      7586:efbbd2d15b93
+parent:      7562:2dc9f4bc445b
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Thu Dec 31 15:11:59 2009 +1100
+files:       lib/cs/threads.py
+description:
+Automated merge with file:///app1tb/home/cameron/dev/css-venti-justblocks
+
+
+changeset:   7588:d19c0ce3ea54
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Wed Jan 06 15:04:40 2010 +1100
+files:       bin/dd-dlt4 bin/dd-lto3
+description:
+dd-lto3 dd-dlt4: dd with suitable block sizes
+
+
+changeset:   7589:c802147f1506
+parent:      7586:efbbd2d15b93
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sat Jan 16 15:15:41 2010 +1100
+files:       lib/cs/venti/block.py
+description:
+venti.block: chunks(): remove old code that was breaking the next shiny code
+
+
+changeset:   7590:e05cb0d84854
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sat Jan 16 15:19:42 2010 +1100
+files:       bin/vt
+description:
+bin/vt: trivial fixes
+
+
+changeset:   7591:5ea17dc3b014
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sat Jan 16 15:48:16 2010 +1100
+files:       bin/vt
+description:
+bin/vt: minor fixes
+
+
+changeset:   7592:c9beb7b20a4d
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sat Jan 16 15:50:47 2010 +1100
+files:       lib/cs/venti/cache.py
+description:
+venti.cache: remove some useless imports and an unused internal queue
+
+
+changeset:   7593:5f422d2fd5b8
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sat Jan 16 15:51:40 2010 +1100
+files:       lib/cs/venti/dir.py
+description:
+venti.dir: port most debugging to the logging module
+
+
+changeset:   7594:d79550b4ff68
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sat Jan 16 15:52:39 2010 +1100
+files:       lib/cs/venti/blockify.py
+description:
+venti.blockify: debugging tweaks
+
+
+changeset:   7595:ea9b51638a48
+parent:      7594:d79550b4ff68
+parent:      7588:d19c0ce3ea54
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sat Jan 16 15:55:25 2010 +1100
+description:
+Automated merge with file:///app1tb/home/cameron/dev/css-venti
+
+
+changeset:   7596:9ccaeea3d2c4
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Fri Jan 29 14:12:51 2010 +1100
+files:       bin/histbackup-pull
+description:
+histbackup-pull: sync multiple remote histbackup trees to local copies.
+
+
+changeset:   7597:c80806100cc4
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Mon Feb 01 17:53:18 2010 +1100
+files:       lib/cs/timeutils.py
+description:
+cs.timeutils: new module for timing functions
+
+
+changeset:   7598:551c2ab653fa
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Mon Feb 01 18:04:27 2010 +1100
+files:       lib/cs/threads.py
+description:
+cs.threads: add .isclosed() method to IterableQueue, tweak some debugging
+
+
+changeset:   7599:6abd00253b3c
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sun Feb 07 10:45:56 2010 +1100
+files:       bin/log-tsline
+description:
+log-tsline: cope better with missing category
+
+
+changeset:   7600:a465de5cbcf3
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Mon Feb 08 13:52:02 2010 +1100
+files:       bin/with-ssh-master
+description:
+with-ssh-master: clean up socket, add explainitory comment
+
+
+changeset:   7601:5ef371341548
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Mon Feb 08 14:25:07 2010 +1100
+files:       lib/cs/threads.py
+description:
+cs.threads.FuncMultiQueue: one bugfix and some API changes
+
+
+changeset:   7602:af69f5ac2be8
+parent:      7528:667050c98b09
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Tue Feb 09 14:20:13 2010 +1100
+files:       lib/cs/mappings.py
+description:
+cs.mappings: add UC_Sequence: A tuple-of-nodes on which .ATTRs indirection can be done, yielding another tuple-of-nodes or tuple-of-values.
+
+
+changeset:   7603:021d3cfb582a
+parent:      7601:5ef371341548
+parent:      7602:af69f5ac2be8
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Tue Feb 09 14:20:34 2010 +1100
+description:
+Automated merge with file:///app1tb/home/cameron/hg/css
+
+
+changeset:   7604:ecb8893d0727
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Thu Feb 11 12:14:52 2010 +1100
+files:       bin/vsftp-server
+description:
+vsftp-server: cope with no fd 2, send errors to syslog, cope with no config file
+
+
+changeset:   7605:609bd07a1198
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Thu Feb 11 15:48:17 2010 +1100
+files:       lib/cs/logutils.py
+description:
+cs.logutils: Pfx: push current logging handlers aside for the duration - feels very hackish but produces desired behaviour
+
+
+changeset:   7606:64e59aaa1678
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Wed Mar 03 14:47:25 2010 +1100
+files:       bin/sshto
+description:
+sshto: replace hokey "set -x; exec" stuff with simpler empty string
+
+
+changeset:   7607:86613bd6909a
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Wed Mar 03 14:48:40 2010 +1100
+files:       lib/cs/misc.py
+description:
+cs.misc: NoExceptions: better reporting of ignored exceptions
+
+
+changeset:   7608:45ae5d437eca
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sun Mar 14 15:27:13 2010 +1100
+files:       bin/cdrip
+description:
+cdrip: remote date specific stuff from tag strings.
+
+
+changeset:   7609:2ab98a8cf627
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Fri Mar 19 11:13:11 2010 +1100
+files:       bin/sshto
+description:
+sshto: simpler and saner get-login-env stuff
+
+
+changeset:   7610:16a13fed47c3
+tag:         tip
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sun Mar 21 12:42:30 2010 +1100
+files:       lib/cs/logutils.py
+description:
+cs.logutils: Add "cs" logger by default, hook Pfx up to it. Prep LoggingMixin class for use by other modules.
+
+
