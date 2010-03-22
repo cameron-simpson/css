@@ -101,7 +101,7 @@ case $op in
     echo
     ask "Ok to mark release as $newrelease" || exit 1
     newtag=release-$newrelease
-    reldir=$newtag
+    reldir=release/$newrelease
     $trace mkdir "$reldir"
     printf "%s\n" "$newtag" >"$reldir/release-tag.txt"
     $trace mv "$changefile" "$reldir/SUMMARY.txt"
