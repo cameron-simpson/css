@@ -8,7 +8,6 @@ from __future__ import with_statement
 import sys
 from thread import allocate_lock
 from threading import Semaphore, Thread
-from Queue import Queue
 if sys.hexversion < 0x03000000:
   from Queue import Queue, PriorityQueue
 else:
