@@ -46,23 +46,25 @@ _help:
 
 _home:
         skip=`hg status | sed -n 's:^? \(.*\):--exclude=/\1:p'` \
+        binskip=`hg status | sed -n 's:^? bin/\(.*\):--exclude=/\1:p'` \
         set-x \\
         qrsync -a --delete \\
                 --include=/CHANGELOG.txt \\
-                $$skip \\
-                --include=bos/ \\
-                --include=stubs/ \\
+                $$binskip \\
                 --include=synonyms/ \\
                 --exclude=squid_redirect \\
                 --exclude=*.swp \\
                 --exclude=/\*/ \\
                 bin/. $(HOME)/bin/. \
-        set-x qrsync -a bos/. $(HOME)/bin-bos/. \
-        set-x qrsync -a bin-cs/. $(HOME)/bin-cs/. \
+        bosskip=`hg status | sed -n 's:^? bin-bos/\(.*\):--exclude=/\1:p'` \
+        set-x qrsync -a $$bosskip bin-bos/. $(HOME)/bin-bos/. \
+        csskip=`hg status | sed -n 's:^? bin-cs/\(.*\):--exclude=/\1:p'` \
+        set-x qrsync -a $$csskip bin-cs/. $(HOME)/bin-cs/. \
+        libskip=`hg status | sed -n 's:^? lib/\(.*\):--exclude=/\1:p'` \
         set-x \\
         qrsync -a --delete \\
                 --include=/CHANGELOG.txt \\
-                $$skip \\
+                $$libskip \\
                 --exclude=*.pyc \\
                 --exclude=*.swp \\
                 lib/cs/. $(HOME)/lib/cs/.
