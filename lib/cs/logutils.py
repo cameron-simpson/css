@@ -25,91 +25,74 @@ nullHandler = NullHandler()
 logger = logging.getLogger("cs")
 logger.addHandler(nullHandler)
 
-''' A mixin class to add logging convenience methods.
-'''
-class LoggingMixin(object):
-  def __init__(self):
-    self._logger = cs.logutils.logger
-  def info(self, *args, **kwargs):
-    self._logger.warning(*args, **kwargs)
-  def warning(self, *args, **kwargs):
-    self._logger.warning(*args, **kwargs)
-  warn = warning
-  def error(self, *args, **kwargs):
-    self._logger.error(*args, **kwargs)
-  def critical(self, *args, **kwargs):
-    self._logger.critical(*args, **kwargs)
-
 class _PrefixState(threading.local):
   def __init__(self):
-    self.current = cs.misc.cmd
     self.raise_prefix = None
-    self.prior = []
-_prefix = _PrefixState()
-
-def current_prefix():
-  ''' Return the current prefix value as used by the Pfx class.
-  '''
-  global _prefix
-  return _prefix.current
-
-class _PrefixLoggingHandler(logging.Handler):
-  def emit(self, record):
-    print >>sys.stderr, "%s: %s" % (current_prefix(), record.getMessage())
+    self.cur = Pfx(cs.misc.cmd)
+    self.cur.prefix = cs.misc.cmd
+    self.old = []
 
 class _Pfx_LoggerAdapter(logging.LoggerAdapter):
   def process(self, msg, kwargs):
-    return "%(cs.logutils.Pfx.prefix): "+msg, kwargs
+    msg = _prefix.cur.prefix + ": " + msg
+    return msg, kwargs
 
 class Pfx(object):
   ''' A context manager to maintain a per-thread stack of message prefices.
       The function current_prefix() returns the current prefix value.
   '''
   def __init__(self, mark, absolute=False, loggers=None):
-    global _prefix
-    # compute the new message prefix
-    if absolute:
-      newmark = mark
-    else:
-      newmark = _prefix.current + ': ' + str(mark)
-    self.mark = newmark
-    # make LoggerAdapters for all the specified loggers
-    # to insert the prefix onto the messages
+    self.mark = str(mark)
+    self.absolute = absolute
     if loggers is None:
       loggers = (logging.getLogger(), )
     elif not hasattr(loggers, '__getitem__'):
       loggers = (loggers, )
-    extra = {'cs.logutils.Pfx.prefix': newmark}
-    self.loggers = ( _Pfx_LoggerAdapter(L, extra) for L in loggers )
+    self._loggers = loggers
+    self.loggers = None
+
+  def __rig_loggers(self):
+    if self.loggers is None:
+      # make LoggerAdapters for all the specified loggers
+      # to insert the prefix onto the messages
+      self.loggers = ( _Pfx_LoggerAdapter(L, {}) for L in self._loggers )
+
   def __enter__(self):
     global _prefix
-    _prefix.prior.append( (_prefix.current, _prefix.raise_prefix) )
-    _prefix.current = self.mark
-    _prefix.raise_prefix = self.mark
+    # compute the new message prefix
+    mark = self.mark
+    if not self.absolute:
+      mark = _prefix.cur.prefix + ': ' + mark
+    self.prefix = mark
+
+    _prefix.old.append(_prefix.cur)
+    _prefix.cur = self
+    self.raise_prefix = self.prefix
+
   def __exit__(self, exc_type, exc_value, traceback):
     global _prefix
-    pfx = _prefix.raise_prefix
-    if pfx is not None:
+    if _prefix.raise_prefix:
       if exc_value is not None:
         if hasattr(exc_value, 'args') and len(exc_value.args) > 0:
-          exc_value.args = [pfx + ": " + str(exc_value.args[0])] \
+          exc_value.args = [self.raise_prefix + ": " + str(exc_value.args[0])] \
                          + list(exc_value.args[1:])
         else:
           # we can't modify this - at least report the current prefix state
-          sys.stderr.write("%s: Pfx.__exit__: exc_value = %s\n" % (pfx, repr(exc_value),))
-        pfx = None
-    _prefix.current, _prefix.raise_prefix = _prefix.prior.pop()
-    if pfx is None:
+          sys.stderr.write("%s: Pfx.__exit__: exc_value = %s\n" % (self.raise_prefix, repr(exc_value),))
+      # prevent outer Pfx wrappers from hacking stuff as well
       _prefix.raise_prefix = None
+    _prefix.cur = _prefix.old.pop()
     return False
   enter = __enter__
   exit = __exit__
 
   # Logger methods
   def exception(self, msg, *args):
+    self.__rig_loggers()
     for L in self.loggers:
       L.exception(msg, *args)
   def log(self, level, msg, *args, **kwargs):
+    self.__rig_loggers()
     for L in self.loggers:
       L.log(level, msg, *args, **kwargs)
   def debug(self, msg, *args, **kwargs):
@@ -123,6 +106,31 @@ class Pfx(object):
     self.log(logging.ERROR, msg, *args, **kwargs)
   def critical(self, msg, *args, **kwargs):
     self.log(logging.CRITICAL, msg, *args, **kwargs)
+
+_prefix = _PrefixState()
+
+def current_prefix():
+  ''' Return the current prefix value as used by the Pfx class.
+  '''
+  global _prefix
+  return _prefix.current
+
+# Logger public functions
+def exception(msg, *args):
+  _prefix.cur.exception(msg, *args)
+def log(level, msg, *args, **kwargs):
+  _prefix.cur.log(level, msg, *args, **kwargs)
+def debug(msg, *args, **kwargs):
+  log(logging.DEBUG, msg, *args, **kwargs)
+def info(msg, *args, **kwargs):
+  log(logging.INFO, msg, *args, **kwargs)
+def warning(msg, *args, **kwargs):
+  log(logging.WARNING, msg, *args, **kwargs)
+warn = warning
+def error(msg, *args, **kwargs):
+  log(logging.ERROR, msg, *args, **kwargs)
+def critical(msg, *args, **kwargs):
+  log(logging.CRITICAL, msg, *args, **kwargs)
 
 class LogTime(object):
   ''' LogTime is a content manager that logs the elapsed time of the enclosed
