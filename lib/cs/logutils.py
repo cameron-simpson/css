@@ -58,26 +58,32 @@ class _PrefixLoggingHandler(logging.Handler):
   def emit(self, record):
     print >>sys.stderr, "%s: %s" % (current_prefix(), record.getMessage())
 
+class _Pfx_LoggerAdapter(logging.LoggerAdapter):
+  def process(self, msg, kwargs):
+    return "%(cs.logutils.Pfx.prefix): "+msg, kwargs
+
 class Pfx(object):
   ''' A context manager to maintain a per-thread stack of message prefices.
       The function current_prefix() returns the current prefix value.
   '''
-  def __init__(self, mark, absolute=False):
+  def __init__(self, mark, absolute=False, loggers=None):
     global _prefix
+    # compute the new message prefix
     if absolute:
       newmark = mark
     else:
       newmark = _prefix.current + ': ' + str(mark)
     self.mark = newmark
+    # make LoggerAdapters for all the specified loggers
+    # to insert the prefix onto the messages
+    if loggers is None:
+      loggers = (logging.getLogger(), )
+    elif not hasattr(loggers, '__getitem__'):
+      loggers = (loggers, )
+    extra = {'cs.logutils.Pfx.prefix': newmark}
+    self.loggers = ( _Pfx_LoggerAdapter(L, extra) for L in loggers )
   def __enter__(self):
     global _prefix
-    if len(_prefix.prior) == 0:
-      # add handler
-      _prefix.logging_handler = _PrefixLoggingHandler()
-      global logger
-      self.stashedLoggingHandlers = list(logger.handlers)
-      logger.handlers[:] = []
-      logger.addHandler(_prefix.logging_handler)
     _prefix.prior.append( (_prefix.current, _prefix.raise_prefix) )
     _prefix.current = self.mark
     _prefix.raise_prefix = self.mark
@@ -94,18 +100,30 @@ class Pfx(object):
           sys.stderr.write("%s: Pfx.__exit__: exc_value = %s\n" % (pfx, repr(exc_value),))
         pfx = None
     _prefix.current, _prefix.raise_prefix = _prefix.prior.pop()
-    if not _prefix.prior:
-      # remove handler
-      global logger
-      logger.removeHandler(_prefix.logging_handler)
-      logger.handlers[0:0] = self.stashedLoggingHandlers
-      self.stashedLoggingHandlers = None
-      _prefix.logging_handler = None
     if pfx is None:
       _prefix.raise_prefix = None
     return False
   enter = __enter__
   exit = __exit__
+
+  # Logger methods
+  def exception(self, msg, *args):
+    for L in self.loggers:
+      L.exception(msg, *args)
+  def log(self, level, msg, *args, **kwargs):
+    for L in self.loggers:
+      L.log(level, msg, *args, **kwargs)
+  def debug(self, msg, *args, **kwargs):
+    self.log(logging.DEBUG, msg, *args, **kwargs)
+  def info(self, msg, *args, **kwargs):
+    self.log(logging.INFO, msg, *args, **kwargs)
+  def warning(self, msg, *args, **kwargs):
+    self.log(logging.WARNING, msg, *args, **kwargs)
+  warn = warning
+  def error(self, msg, *args, **kwargs):
+    self.log(logging.ERROR, msg, *args, **kwargs)
+  def critical(self, msg, *args, **kwargs):
+    self.log(logging.CRITICAL, msg, *args, **kwargs)
 
 class LogTime(object):
   ''' LogTime is a content manager that logs the elapsed time of the enclosed
