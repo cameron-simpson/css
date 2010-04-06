@@ -5,13 +5,13 @@
 #
 
 import os
-from logging import info
 import os.path
 import sys
 if sys.hexversion < 0x03000000:
   import ConfigParser as configparser
 else:
   import configparser
+from cs.logutils import info
 
 class ConfigWatcher(object):
   ''' A monitor for a windows style .ini file.
@@ -43,7 +43,7 @@ class ConfigWatcher(object):
         s2 = os.stat(cfgpath)
         if s2.st_mtime == s.st_mtime and s2.st_size == s.st_size:
            self.mtime = s.st_mtime
-           info("new config loaded from %s" % cfgpath)
+           info("new config loaded from %s" % (cfgpath,))
            result = self.parser = CP
     return result
 
