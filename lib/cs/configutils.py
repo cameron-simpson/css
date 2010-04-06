@@ -5,6 +5,7 @@
 #
 
 import os
+from logging import info
 import os.path
 import sys
 if sys.hexversion < 0x03000000:
