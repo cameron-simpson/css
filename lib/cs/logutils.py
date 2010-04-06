@@ -45,7 +45,6 @@ class _PrefixState(threading.local):
     self.current = cs.misc.cmd
     self.raise_prefix = None
     self.prior = []
-    self.logging_handler = None
 _prefix = _PrefixState()
 
 def current_prefix():
