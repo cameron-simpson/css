@@ -5,9 +5,11 @@
 #
 
 from __future__ import with_statement
+from functools import partial
 import sys
+import time
 from thread import allocate_lock
-from threading import Semaphore, Thread
+from threading import Semaphore, Thread, Timer
 if sys.hexversion < 0x03000000:
   from Queue import Queue, PriorityQueue
 else:
@@ -676,7 +678,7 @@ class TimerQueue(object):
     '''
     while not self.closed or not self.Q.empty():
       when, n, func = self.Q.get()
-      debug("TimerQueue: got when=%s, n=%s, func=%s" % (when, n, func))
+      ##debug("TimerQueue: got when=%s, n=%s, func=%s" % (when, n, func))
       if when is None:
         # it should be the dummy item
         assert self.closed
