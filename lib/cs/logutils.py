@@ -55,7 +55,7 @@ class Pfx(object):
     if self.loggers is None:
       # make LoggerAdapters for all the specified loggers
       # to insert the prefix onto the messages
-      self.loggers = ( _Pfx_LoggerAdapter(L, {}) for L in self._loggers )
+      self.loggers = list( _Pfx_LoggerAdapter(L, {}) for L in self._loggers )
 
   def __enter__(self):
     global _prefix
@@ -67,20 +67,20 @@ class Pfx(object):
 
     _prefix.old.append(_prefix.cur)
     _prefix.cur = self
-    self.raise_prefix = self.prefix
+    _prefix.raise_prefix = self.prefix
 
   def __exit__(self, exc_type, exc_value, traceback):
     global _prefix
-    if _prefix.raise_prefix:
-      if exc_value is not None:
+    if exc_value is not None:
+      if _prefix.raise_prefix is not None:
         if hasattr(exc_value, 'args') and len(exc_value.args) > 0:
-          exc_value.args = [self.raise_prefix + ": " + str(exc_value.args[0])] \
+          exc_value.args = [_prefix.raise_prefix + ": " + str(exc_value.args[0])] \
                          + list(exc_value.args[1:])
         else:
           # we can't modify this - at least report the current prefix state
-          sys.stderr.write("%s: Pfx.__exit__: exc_value = %s\n" % (self.raise_prefix, repr(exc_value),))
-      # prevent outer Pfx wrappers from hacking stuff as well
-      _prefix.raise_prefix = None
+          sys.stderr.write("%s: Pfx.__exit__: exc_value = %s\n" % (_prefix.raise_prefix, repr(exc_value),))
+        # prevent outer Pfx wrappers from hacking stuff as well
+        _prefix.raise_prefix = None
     _prefix.cur = _prefix.old.pop()
     return False
   enter = __enter__
@@ -113,7 +113,7 @@ def current_prefix():
   ''' Return the current prefix value as used by the Pfx class.
   '''
   global _prefix
-  return _prefix.current
+  return _prefix.cur.prefix
 
 # Logger public functions
 def exception(msg, *args):
@@ -139,7 +139,7 @@ class LogTime(object):
   '''
   def __init__(self, tag, level=None, threshold=None):
     if level is None:
-      level = cs.misc.logging_level
+      level = logging.INFO
     self.tag = tag
     self.level = level
     self.threshold = threshold
@@ -148,7 +148,7 @@ class LogTime(object):
   def __exit__(self, exc_type, exc_value, traceback):
     now = time.time()
     elapsed = now - self.start
-    if elapsed >= self.threshold:
-      logging.log(self.level, "%s: %5.3fs" % (self.tag, elapsed))
+    if self.threshold is not None and elapsed >= self.threshold:
+      log(self.level, "%s: %5.3fs" % (self.tag, elapsed))
     self.elapsed = elapsed
     return False
