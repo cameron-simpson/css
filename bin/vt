@@ -409,7 +409,7 @@ def main(argv):
           error("%s: mountpoint is not a directory" % args[1])
           exit(1)
         E=S.namei(args[0]+'/')
-        assert E.isdir, "%s: %s: expected directory, not file"%(cmd,args[0])
+        assert E.isdir, "%s: expected directory, not file" % (args[0],)
         import cs.venti.vtfuse
         cs.venti.vtfuse.fusemount(args[1],S,E)
 

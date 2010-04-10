@@ -41,9 +41,8 @@ def archiveAppend(archive,E,when=None,path=None):
   '''
   if when is None:
     M=E.meta
-    if M is not None:
-      when=M.mtime()
-    if when is None:
+    when=M.mtime
+    if when is 0:
       when=datetime.now()
   if path is None:
     path=E.name
