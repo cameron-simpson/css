@@ -34,8 +34,8 @@ import os
 import os.path
 from getopt import getopt, GetoptError
 import datetime
-from cs.logutils import Pfx
-from logging import error, warn, debug
+import logging
+from cs.logutils import Pfx, error, warn, debug
 from cs.venti import defaults, tohex, fromhex
 from cs.venti.block import IndirectBlock, decodeBlocks
 from cs.venti.debug import dumpBlock
@@ -47,28 +47,29 @@ from cs.misc import progress, logTo, reportElapsedTime
 
 def main(argv):
   cmd = os.path.basename(argv[0])
-  with Pfx(cmd):
-    usage='''Usage:
-      %s [options...] cat filerefs...
-      %s [options...] catblock [-i] hashcodes...
-      %s [options...] listen port
-      %s [options...] ls [-R] dirrefs...
-      %s [options...] mount dirref mountpoint
-      %s [options...] scan datafile
-      %s [options...] pack paths...
-      %s [options...] pack -o file.vt path
-      %s [options...] pull stores...
-      %s [options...] unpack dirrefs...
-      Options:
-        -C store    Use this as a front end cache store.
-                    "-" means no front end cache.
-        -M          Don't use an additional MemCacheStore front end.
-        -S store    Specify the store to use:
-                      /path/to/dir  GDBMStore
-                      tcp:[host]:port TCPStore
-                      |sh-command   StreamStore via sh-command
+  logging.basicConfig(format=cmd.replace("%", "%%") + ": %(levelname)s: %(message)s")
+  usage='''Usage:
+    %s [options...] cat filerefs...
+    %s [options...] catblock [-i] hashcodes...
+    %s [options...] listen port
+    %s [options...] ls [-R] dirrefs...
+    %s [options...] mount dirref mountpoint
+    %s [options...] scan datafile
+    %s [options...] pack paths...
+    %s [options...] pack -o file.vt path
+    %s [options...] pull stores...
+    %s [options...] unpack dirrefs...
+    Options:
+      -C store    Use this as a front end cache store.
+                  "-" means no front end cache.
+      -M          Don't use an additional MemCacheStore front end.
+      -S store    Specify the store to use:
+                    /path/to/dir  GDBMStore
+                    tcp:[host]:port TCPStore
+                    |sh-command   StreamStore via sh-command
 ''' % (cmd,cmd,cmd,cmd,cmd,cmd,cmd,cmd,cmd,cmd)
 
+  with Pfx("", absolute=True):
     badopts=False
 
     dflt_cache=os.environ.get('VT_STORE_CACHE')
@@ -299,145 +300,145 @@ def main(argv):
           error("no $VT_STORE and no -S option")
           badopts=True
 
-      if badopts:
-        sys.stderr.write(usage)
-        exit(2)
+    if badopts:
+      sys.stderr.write(usage)
+      sys.exit(2)
 
-      if dflt_log is not None:
-        logTo(dflt_log)
+    if dflt_log is not None:
+      logTo(dflt_log)
 
-      S=Store(dflt_vt_store)
-      if dflt_cache is not None:
-        C=Store(dflt_cache)
-        S=CacheStore(S,C)
+    S=Store(dflt_vt_store)
+    if dflt_cache is not None:
+      C=Store(dflt_cache)
+      S=CacheStore(S,C)
 
-      # put an in-memory cache in front of the main cache
-      if useMemCache:
-        S=CacheStore(S,MemCacheStore())
+    # put an in-memory cache in front of the main cache
+    if useMemCache:
+      S=CacheStore(S,MemCacheStore())
 
-      xit=0
+    xit=0
 
-      with S:
-        if op == "pack":
-          if len(args) == 0 or args[0] != '-o':
-            S.writeonly = True
-            from cs.venti.file import storeFile
-            for path in args:
-              if os.path.isdir(path):
-                E=storeDir(path)
-              else:
-                E=storeFile(open(path))
-              archiveAppend(sys.stdout,E,None,path)
-          else:
-            archive=args[1]
-            path=args[2]
-            assert os.path.isdir(path)
-            D=archive2dir(archive)
-            if D is None:
-              D=Dir(path)
-            ##print "archive=%s, D=%s" % (archive,D)
-            D.updateFrom(path,
-                         ignoreTimes=False,
-                         deleteMissing=True,
-                         overWrite=True)
-            archiveAppend(archive,D,None,path)
-
-        elif op == "cat":
+    with S:
+      if op == "pack":
+        if len(args) == 0 or args[0] != '-o':
+          S.writeonly = True
+          from cs.venti.file import storeFile
           for path in args:
-            cat(path)
-
-        elif op == "catblock":
-          for hexarg in args:
-            data = S[fromhex(hexarg)]
-            if indirect:
-              IB = IndirectBlock()
-              IB.extend(decodeBlocks(data))
-              dumpBlock(IB)
+            if os.path.isdir(path):
+              E=storeDir(path)
             else:
-              sys.stdout.write(data)
-
-        elif op == "scan":
-          from cs.venti.datafile import scanFile
-          for h, offset, zsize in scanFile(open(args[0])):
-            print tohex(h), offset, zsize
-
-        elif op == "pull":
-          for arg in args:
-            pullFrom(S,Store(arg))
-
-        elif op == "listen":
-          assert len(args) == 1
-          arg=args[0]
-          if arg == '-':
-            from cs.venti.stream import StreamDaemon
-            daemon=StreamDaemon(S,sys.stdin,sys.stdout)
-            daemon.start()
-            daemon.join()
-          else:
-            cpos=arg.rfind(':')
-            if cpos >= 0:
-              host=arg[:cpos]
-              port=arg[cpos+1:]
-              if len(host) == 0:
-                host='127.0.0.1'
-              port=int(port)
-              import cs.venti.tcp
-              with cs.venti.tcp.Server((host,port),S) as srv:
-                srv.serve_forever()
-            else:
-              error("invalid listen argument, I expect \"-\" or \"[host]:port\", got \"%s\"" % arg)
-              exit(1)
-
-        elif op == "ls":
-          first=True
-          for path in args:
-            if first:
-              first=False
-            else:
-              print
-            ##print "ls", path, "..."
-            D, name = resolve(path)
-            ##print "resolve(%s) -> %s, %s" % (path, D, name)
-            if name is not None:
-              D=D.chdir1(name)
-            ls(path,D,recurse,sys.stdout)
-
-        elif op == "mount":
-          print "mount", args[0], args[1], "..."
-          if not os.path.isdir(args[1]):
-            error("%s: mountpoint is not a directory" % args[1])
-            exit(1)
-          E=S.namei(args[0]+'/')
-          assert E.isdir, "%s: %s: expected directory, not file"%(cmd,args[0])
-          import cs.venti.vtfuse
-          cs.venti.vtfuse.fusemount(args[1],S,E)
-
-        elif op == "unpack":
-          for path in args:
-            D, name = resolve(path)
-            if len(name) > 0:
-              D=D.chdir1(name)
-            for subD, dirs, files in D.walk(topdown=True):
-              if len(subD.path) > 0 and not os.path.isdir(subD.path):
-                print "mkdir", subD.path
-                os.makedirs(subD.path)
-              files.sort()
-              for fname in files:
-                assert len(fname) > 0 and fname != '.' and fname != '..' and fname.find('/') < 0, \
-                  "%s: unpack: %s: illegal filename \"%s\"" % (cmd, subD.path, fname)
-                fpath=os.path.join(subD.path,fname)
-                print "extract", fpath
-                outfp=open(fpath,mode='w')
-                for b in subD[fname].getBlock().leaves(S):
-                  outfp.write(b)
-                outfp.close()
-
+              E=storeFile(open(path))
+            archiveAppend(sys.stdout,E,None,path)
         else:
-          error("unsupported command")
-          xit=2
+          archive=args[1]
+          path=args[2]
+          assert os.path.isdir(path)
+          D=archive2dir(archive)
+          if D is None:
+            D=Dir(path)
+          ##print "archive=%s, D=%s" % (archive,D)
+          D.updateFrom(path,
+                       ignoreTimes=False,
+                       deleteMissing=True,
+                       overWrite=True)
+          archiveAppend(archive,D,None,path)
 
-      debug("%s: exit main command"%cmd)
-      exit(xit)
+      elif op == "cat":
+        for path in args:
+          cat(path)
+
+      elif op == "catblock":
+        for hexarg in args:
+          data = S[fromhex(hexarg)]
+          if indirect:
+            IB = IndirectBlock()
+            IB.extend(decodeBlocks(data))
+            dumpBlock(IB)
+          else:
+            sys.stdout.write(data)
+
+      elif op == "scan":
+        from cs.venti.datafile import scanFile
+        for h, offset, zsize in scanFile(open(args[0])):
+          print tohex(h), offset, zsize
+
+      elif op == "pull":
+        for arg in args:
+          pullFrom(S,Store(arg))
+
+      elif op == "listen":
+        assert len(args) == 1
+        arg=args[0]
+        if arg == '-':
+          from cs.venti.stream import StreamDaemon
+          daemon=StreamDaemon(S,sys.stdin,sys.stdout)
+          daemon.start()
+          daemon.join()
+        else:
+          cpos=arg.rfind(':')
+          if cpos >= 0:
+            host=arg[:cpos]
+            port=arg[cpos+1:]
+            if len(host) == 0:
+              host='127.0.0.1'
+            port=int(port)
+            import cs.venti.tcp
+            with cs.venti.tcp.Server((host,port),S) as srv:
+              srv.serve_forever()
+          else:
+            error("invalid listen argument, I expect \"-\" or \"[host]:port\", got \"%s\"" % arg)
+            exit(1)
+
+      elif op == "ls":
+        first=True
+        for path in args:
+          if first:
+            first=False
+          else:
+            print
+          ##print "ls", path, "..."
+          D, name = resolve(path)
+          ##print "resolve(%s) -> %s, %s" % (path, D, name)
+          if name is not None:
+            D=D.chdir1(name)
+          ls(path,D,recurse,sys.stdout)
+
+      elif op == "mount":
+        print "mount", args[0], args[1], "..."
+        if not os.path.isdir(args[1]):
+          error("%s: mountpoint is not a directory" % args[1])
+          exit(1)
+        E=S.namei(args[0]+'/')
+        assert E.isdir, "%s: %s: expected directory, not file"%(cmd,args[0])
+        import cs.venti.vtfuse
+        cs.venti.vtfuse.fusemount(args[1],S,E)
+
+      elif op == "unpack":
+        for path in args:
+          D, name = resolve(path)
+          if len(name) > 0:
+            D=D.chdir1(name)
+          for subD, dirs, files in D.walk(topdown=True):
+            if len(subD.path) > 0 and not os.path.isdir(subD.path):
+              print "mkdir", subD.path
+              os.makedirs(subD.path)
+            files.sort()
+            for fname in files:
+              assert len(fname) > 0 and fname != '.' and fname != '..' and fname.find('/') < 0, \
+                "%s: unpack: %s: illegal filename \"%s\"" % (cmd, subD.path, fname)
+              fpath=os.path.join(subD.path,fname)
+              print "extract", fpath
+              outfp=open(fpath,mode='w')
+              for b in subD[fname].getBlock().leaves(S):
+                outfp.write(b)
+              outfp.close()
+
+      else:
+        error("unsupported command")
+        xit=2
+
+    debug("%s: exit main command"%cmd)
+    exit(xit)
 
 def gethexarg(path):
   ''' Take a path with a hex string on the front.
