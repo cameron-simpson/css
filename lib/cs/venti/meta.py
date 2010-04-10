@@ -32,7 +32,7 @@ class Meta(dict):
   def mtime(self):
     return float(self.get('m', 0))
   @mtime.setter
-  def (self, when):
+  def mtime(self, when):
     self['m']=float(when)
 
   def unixPerms(self):
