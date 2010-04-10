@@ -20,7 +20,7 @@ class NullHandler(logging.Handler):
 '''
 nullHandler = NullHandler()
 
-''' Top level logger for the cs library.
+''' Top level logger for the cs library. Presently unused!
 '''
 logger = logging.getLogger("cs")
 logger.addHandler(nullHandler)
@@ -32,7 +32,7 @@ class _PrefixState(threading.local):
     self.cur.prefix = cs.misc.cmd
     self.old = []
 
-class _Pfx_LoggerAdapter(logging.LoggerAdapter):
+class Pfx_LoggerAdapter(logging.LoggerAdapter):
   def process(self, msg, kwargs):
     msg = _prefix.cur.prefix + ": " + msg
     return msg, kwargs
@@ -55,7 +55,7 @@ class Pfx(object):
     if self.loggers is None:
       # make LoggerAdapters for all the specified loggers
       # to insert the prefix onto the messages
-      self.loggers = list( _Pfx_LoggerAdapter(L, {}) for L in self._loggers )
+      self.loggers = list( Pfx_LoggerAdapter(L, {}) for L in self._loggers )
 
   def __enter__(self):
     global _prefix
