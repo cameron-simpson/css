@@ -10,7 +10,7 @@ import os.path
 import time
 from zlib import compress
 from thread import allocate_lock
-from logging import debug
+from cs.logutils import debug
 from cs.cache import LRU
 from cs.serialise import toBS, fromBS, fromBSfp
 from cs.venti import tohex

@@ -8,7 +8,7 @@
 import sys
 from struct import unpack_from
 from threading import Thread
-from logging import debug
+from cs.logutils import debug
 from cs.threads import IterableQueue
 from cs.misc import D, eachOf
 from cs.lex import unctrl

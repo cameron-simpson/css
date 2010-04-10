@@ -21,7 +21,7 @@ from thread import allocate_lock
 import threading
 from Queue import Queue
 from zlib import compress, decompress
-from logging import debug
+from cs.logutils import debug
 from cs.misc import out, tb, seq, Loggable
 from cs.serialise import toBS, fromBS, fromBSfp
 from cs.threads import FuncMultiQueue, Q1, DictMonitor, NestingOpenClose
