@@ -34,7 +34,8 @@ class _PrefixState(threading.local):
 
 class Pfx_LoggerAdapter(logging.LoggerAdapter):
   def process(self, msg, kwargs):
-    msg = _prefix.cur.prefix + ": " + msg
+    if len(_prefix.cur.prefix) > 0:
+      msg = _prefix.cur.prefix + ": " + msg
     return msg, kwargs
 
 class Pfx(object):
@@ -61,7 +62,7 @@ class Pfx(object):
     global _prefix
     # compute the new message prefix
     mark = self.mark
-    if not self.absolute:
+    if not self.absolute and len(_prefix.cur.prefix) > 0:
       mark = _prefix.cur.prefix + ': ' + mark
     self.prefix = mark
 
@@ -72,17 +73,19 @@ class Pfx(object):
   def __exit__(self, exc_type, exc_value, traceback):
     global _prefix
     if exc_value is not None:
-      if _prefix.raise_prefix is not None:
-        if hasattr(exc_value, 'args') and len(exc_value.args) > 0:
-          exc_value.args = [_prefix.raise_prefix + ": " + str(exc_value.args[0])] \
-                         + list(exc_value.args[1:])
-        else:
-          # we can't modify this - at least report the current prefix state
-          sys.stderr.write("%s: Pfx.__exit__: exc_value = %s\n" % (_prefix.raise_prefix, repr(exc_value),))
-        # prevent outer Pfx wrappers from hacking stuff as well
+      if exc_type is not SystemExit:
+        if _prefix.raise_prefix is not None:
+          if hasattr(exc_value, 'args') and len(exc_value.args) > 0:
+            exc_value.args = [_prefix.raise_prefix + ": " + str(exc_value.args[0])] \
+                           + list(exc_value.args[1:])
+          else:
+            # we can't modify this - at least report the current prefix state
+            sys.stderr.write("%s: Pfx.__exit__: exc_value = %s\n" % (_prefix.raise_prefix, repr(exc_value),))
+          # prevent outer Pfx wrappers from hacking stuff as well
         _prefix.raise_prefix = None
     _prefix.cur = _prefix.old.pop()
     return False
+
   enter = __enter__
   exit = __exit__
 
