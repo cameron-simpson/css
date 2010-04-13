@@ -17,8 +17,7 @@ else:
 from collections import deque
 if sys.hexversion < 0x02060000: from sets import Set as set
 from cs.misc import seq
-from cs.logutils import LogTime
-from logging import error, warn
+from cs.logutils import LogTime, error, warn
 from cs.misc import seq
 
 class AdjustableSemaphore(object):
@@ -67,7 +66,7 @@ class AdjustableSemaphore(object):
           delta+=1
       self.__value=newvalue
 
-class Channel:
+class Channel(object):
   ''' A zero-storage data passage.
       Unlike a Queue(1), put() blocks waiting for the matching get.
   '''
@@ -76,13 +75,28 @@ class Channel:
     self.__readable.acquire()
     self.__writable=allocate_lock()
     self.__writable.acquire()
+    self.closed = False
+
+  def __str__(self):
+    if self.__readable.locked():
+      if self.__writable.locked():
+        state="idle"
+      else:
+        state="get blocked waiting for put"
+    else:
+      if self.__writable.locked():
+        state="put just happened, get imminent"
+      else:
+        state="ERROR"
+    return "<cs.threads.Channel %s>" % (state,)
 
   def get(self):
     ''' Read a value from the Channel.
         Blocks until someone put()s to the Channel.
     '''
-    self.__writable.release()
-    self.__readable.acquire()
+    assert not self.closed, "%s: .get() on closed Channel" % (self,)
+    self.__writable.release()   # allow someone to write
+    self.__readable.acquire()   # await writer and prevent other readers
     value=self._value
     delattr(self,'_value')
     return value
@@ -91,9 +105,16 @@ class Channel:
     ''' Write a value to the Channel.
         Blocks until a corresponding get() occurs.
     '''
-    self.__writable.acquire()
+    assert not self.closed, "%s: .put() on closed Channel" % (self,)
+    self.__writable.acquire()   # prevent other writers
     self._value=value
-    self.__readable.release()
+    self.__readable.release()   # allow a reader
+
+  def close(self):
+    if self.closed:
+      warn("%s: .close() of closed Channel" % (self,))
+    else:
+      self.closed = true
 
   def __iter__(self):
     ''' Iterator for daemons that operate on tasks arriving via this Channel.
@@ -559,24 +580,25 @@ class DictMonitor(dict):
 ##  '''
 ##  return bgCall(_bgReturn,(result,))
 
+# TODO: synchronous mode for synchronous call() so we can feed from
+# a PriorityQueue
 class FuncMultiQueue(object):
   def __init__(self, capacity):
     assert capacity > 0
     self._capacity = capacity
-    self.__sem = Semaphore(capacity)
     self.closed = False
     self.__Q = IterableQueue()
-    self.__handlers = deque()
+    self.__handlers = deque()   # pool of available handlers
     self.__allHandlers = []
     self.__main = Thread(target=self._mainloop)
     self.__main.start()
 
   def _mainloop(self):
     Q = self.__Q
-    sem = self.__sem
-    hs = self.__handlers
+    hs = self.__handlers        # pool of available handlers
+    self.__sem = sem = Semaphore(self._capacity)
     for rq in Q:
-      sem.acquire()        # will be released by the handler
+      sem.acquire()             # to be released by the _handler
       if len(hs) == 0:
         # no available threads - make one
         hch = Channel()
@@ -590,16 +612,19 @@ class FuncMultiQueue(object):
       # dispatch request
       hch.put(rq)
 
-  def _handler(self, T, hch):
+  def _handler(self, T, ch):
+    assert ch is not None
     sem = self.__sem
     hs = self.__handlers
-    for func, retQ, tag in hch:
+    for func, retQ, tag in ch:
       if func is None:
+        sem.release()
         break
       ret = func()
       if retQ is not None:
         retQ.put( (tag, ret) )
-      hs.append( (T, hch) )
+      # put this Thread and Channel back on the list
+      hs.append( (T, ch) )
       sem.release()
 
   def close(self):
