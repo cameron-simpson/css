@@ -652,11 +652,24 @@ class TimerQueue(object):
     self.closed = False
     self._lock = allocate_lock()
 
-  def close(self):
+  def close(self, cancel=False):
     self.closed = True
     if self.Q.empty():
       # dummy entry to wake up the main loop
       self.Q.put( (None, None, None) )
+    if cancel:
+      self._cancel()
+
+  def _cancel(self):
+      with self._lock:
+        if self.pending:
+          T, Twhen, Tfunc = self.pending
+          self.pending[2] = None
+          self.pending = None
+          T.cancel()
+        else:
+          Twhen, Tfunc = None, None
+      return Twhen, Tfunc
 
   def add(self, when, func):
     ''' Queue a new job to be called at 'when'.
@@ -693,6 +706,7 @@ class TimerQueue(object):
           self.pending[2] = None  # prevent the function from running if racy
           T.cancel()
           self.pending = None     # nothing pending now
+          T = None                # let go of the cancelled timer
           if when < Twhen:
             # push the pending function back onto the queue, but ahead of
             # later-queued funcs with the same timestamp
