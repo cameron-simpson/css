@@ -4,6 +4,8 @@
 #       - Cameron Simpson <cs@zip.com.au> 19jan2009
 #
 
+[ $# -gt 0 ] || { echo "Usage: $0 archive-page-url >mlist.mbox" >&2; exit 2; }
+
 trace=set-x
 
 for url
