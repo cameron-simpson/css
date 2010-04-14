@@ -8,7 +8,9 @@ from __future__ import with_statement
 import logging
 import sys
 import time
+from thread import allocate_lock
 import threading
+import traceback
 import cs.misc
 
 class NullHandler(logging.Handler):
@@ -24,6 +26,16 @@ nullHandler = NullHandler()
 '''
 logger = logging.getLogger("cs")
 logger.addHandler(nullHandler)
+
+__logExLock = allocate_lock()
+def logException(exc_type, exc_value, exc_tb):
+  with __logExLock:
+    curhook = sys.excepthook
+    sys.excepthook = sys.__excepthook__
+    exception("EXCEPTION: %s:%s" % (exc_type, exc_value))
+    for line in traceback.format_exception(exc_type, exc_value, exc_tb):
+      exception("EXCEPTION> "+line)
+    sys.excepthook = curhook
 
 class _PrefixState(threading.local):
   def __init__(self):
