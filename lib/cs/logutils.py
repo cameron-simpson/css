@@ -50,6 +50,17 @@ class Pfx_LoggerAdapter(logging.LoggerAdapter):
       msg = _prefix.cur.prefix + ": " + msg
     return msg, kwargs
 
+def pfx(tag, loggers=None):
+  ''' Decorator for functions that should run inside:
+        with Pfx(tag, loggers=loggers):
+  '''
+  def wrap(func):
+    def wrapped(*args, **kwargs):
+      with Pfx(tag, loggers=loggers):
+        func(*args, **kwargs)
+    return wrapped
+  return wrap
+
 class Pfx(object):
   ''' A context manager to maintain a per-thread stack of message prefices.
       The function current_prefix() returns the current prefix value.
