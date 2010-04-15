@@ -57,18 +57,26 @@ class Pfx(object):
   def __init__(self, mark, absolute=False, loggers=None):
     self.mark = str(mark)
     self.absolute = absolute
-    if loggers is None:
-      loggers = (logging.getLogger(), )
-    elif not hasattr(loggers, '__getitem__'):
-      loggers = (loggers, )
+    if loggers is not None:
+      if not hasattr(loggers, '__getitem__'):
+        loggers = (loggers, )
     self._loggers = loggers
-    self.loggers = None
+    self._loggerAdapters = None
 
-  def __rig_loggers(self):
-    if self.loggers is None:
-      # make LoggerAdapters for all the specified loggers
-      # to insert the prefix onto the messages
-      self.loggers = list( Pfx_LoggerAdapter(L, {}) for L in self._loggers )
+  @property
+  def loggers(self):
+    if self._loggerAdapters is None:
+      _loggers = self._loggers
+      if _loggers is None:
+        # get the Logger list from an ancestor
+        for P in _prefix.old:
+          if P._loggers is not None:
+            _loggers = P._loggers
+            break
+        if _loggers is None:
+          _loggers = (logging.getLogger(),)
+      self._loggerAdapters = list( Pfx_LoggerAdapter(L, {}) for L in _loggers )
+    return self._loggerAdapters
 
   def __enter__(self):
     global _prefix
@@ -103,11 +111,9 @@ class Pfx(object):
 
   # Logger methods
   def exception(self, msg, *args):
-    self.__rig_loggers()
     for L in self.loggers:
       L.exception(msg, *args)
   def log(self, level, msg, *args, **kwargs):
-    self.__rig_loggers()
     for L in self.loggers:
       L.log(level, msg, *args, **kwargs)
   def debug(self, msg, *args, **kwargs):
