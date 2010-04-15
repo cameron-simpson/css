@@ -4,9 +4,30 @@
 #       - Cameron Simpson <cs@zip.com.au> 19jan2009
 #
 
-[ $# -gt 0 ] || { echo "Usage: $0 archive-page-url >mlist.mbox" >&2; exit 2; }
+cmd=`basename "$0"`
+usage="Usage: $cmd archive-page-url... >mlist.mbox"
 
 trace=set-x
+
+badopts=
+
+if [ $# = 0 ]
+then
+  echo "$cmd: missing archive-page-url" >&2
+  badopts=1
+fi
+
+if [ -z "$badopts" ]
+then
+  if [ -t 1 ]
+  then
+    echo "$0: Refusing to write mbox to your terminal." >&2
+    echo "    Pipe through cat(1) if you really want this." >&2
+    badopts=1
+  fi
+fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
 
 for url
 do
