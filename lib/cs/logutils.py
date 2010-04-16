@@ -29,6 +29,9 @@ logger.addHandler(nullHandler)
 
 __logExLock = allocate_lock()
 def logException(exc_type, exc_value, exc_tb):
+  ''' Replacement for sys.excepthook that reports via the cs.logutils
+      logging wrappers.
+  '''
   with __logExLock:
     curhook = sys.excepthook
     sys.excepthook = sys.__excepthook__
@@ -71,7 +74,12 @@ class Pfx(object):
     if loggers is not None:
       if not hasattr(loggers, '__getitem__'):
         loggers = (loggers, )
-    self._loggers = loggers
+    self.logto(loggers)
+
+  def logto(self, newLoggers):
+    ''' Define the Loggers anew.
+    '''
+    self._loggers = newLoggers
     self._loggerAdapters = None
 
   @property
