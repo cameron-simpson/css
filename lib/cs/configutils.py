@@ -11,7 +11,7 @@ if sys.hexversion < 0x03000000:
   import ConfigParser as configparser
 else:
   import configparser
-from cs.logutils import info
+from cs.logutils import Pfx, info
 
 class ConfigWatcher(object):
   ''' A monitor for a windows style .ini file.
@@ -89,7 +89,20 @@ class ConfigSectionWatcher(object):
     section = self.section
     if CP.has_section(section) and CP.has_option(section, item):
       return CP.get(section, item)
+    if self.defaults is None:
+      raise IndexError, "__getitem__(%s): no defaults" % (item,)
     return self.defaults[item]
+
+  def get(self, item, default):
+    with Pfx("get(%s)" % item):
+      try:
+        value = self[item]
+      except IndexError:
+        value = default
+      else:
+        if value is None:
+          value = default
+      return value
 
   def __hasitem__(self, item):
     try:
