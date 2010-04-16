@@ -33,7 +33,7 @@ class NoExceptions(object):
         # user supplied handler
         return self.__handler(exc_type, exc_value, tb)
       # report handled exception
-      exception("IGNORE "+str(exc_type)+": "+`tb`)
+      exception("IGNORE "+str(exc_type)+": "+str(exc_value)+`tb`)
     return True
 
   def simpleExceptionReport(exc_type, exc_value, traceback, mark=None, loglevel=logging.WARNING):
