@@ -87,7 +87,7 @@ def setDebug(newlevel):
     logging_level = logging.INFO
   elif debug_level >= 1:
     logging_level = logging.WARNING
-  logging.getLogger().setLevel(logging_level)
+  ##logging.getLogger().setLevel(logging_level)
 
 setDebug(None)
 if isdebug:
