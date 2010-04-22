@@ -125,7 +125,7 @@ if [ -z "$havecmd" ]
 then
   [ $# -gt 0 ] && { sess=$1; shift; }
   [ $# = 0 ] && set -- "$SHELL"
-  set -- $SCR_PREARGV "$@"
+  set -- env "PATH=$PATH" "TMPDIR=$TMPDIR" $SCR_PREARGV "$@"
 fi
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
