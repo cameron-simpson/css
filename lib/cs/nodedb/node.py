@@ -9,6 +9,7 @@ import unittest
 from cs.lex import str1
 from cs.misc import the
 from cs.mappings import parseUC_sAttr
+from cs.logutils import error
 
 class _AttrList(list):
   
@@ -137,9 +138,9 @@ class Node(dict):
       row.extend(value)
     else:
       row.append(value)
-    dict.__setitem__(self, ks, row)
     self.nodedb._backend.delAttr(self.type, self.name, k)
     self.nodedb._backend.extendAttr(self.type, self.name, k, row)
+    dict.__setitem__(self, ks, row)
 
   def __delitem__(self, item):
     k, plural = parseUC_sAttr(item)
@@ -212,6 +213,9 @@ class NodeDB(dict):
     backend.set_nodedb(self)
     self.__nodesByType = {}
 
+  def close(self):
+    self._backend.close()
+
   def _noteNode(self, N):
     ''' Update the cross reference tables for a new Node.
     '''
@@ -275,6 +279,9 @@ class Backend(object):
     assert not hasattr(self, 'nodedb')
     self.nodedb = nodedb
 
+  def close(self):
+    raise NotImplemented
+
   def newNode(self, t, name):
     raise NotImplemented
 
@@ -290,6 +297,8 @@ class Backend(object):
 class _NoBackend(Backend):
   ''' Dummy backend for emphemeral in-memory NodeDBs.
   '''
+  def close(self):
+    pass
   def newNode(self, t, name):
     pass
   def delNode(self, t, name):
@@ -309,6 +318,45 @@ class TestAll(unittest.TestCase):
     H = self.db.newNode('HOST', 'foo')
     self.assertEqual(len(H.ATTR1s), len(()) )
     self.assertRaises(AttributeError, getattr, H, 'ATTR2')
+
+class _QBackend(Backend):
+  ''' A backend to accept updates and queue them for asynchronous
+      completion via another backend.
+  '''
+
+  def __init__(self, backend, maxq=None):
+    if maxq is None:
+      maxq = 1024
+    else:
+      assert maxq > 0
+    self.backend = backend
+    self._Q = IterableQueue(maxq)
+
+  def close(self):
+    self._Q.close()
+
+  def _drain(self):
+    B =  self.backend
+    for what, args in self._Q:
+      if what == 'newNode':
+        B.newNode(*args)
+      elif what == 'delNode':
+        B.delNode(*args)
+      elif what == 'delAttr':
+        B.delAttr(*args)
+      elif what == 'extendAttr':
+        B.extendAttr(*args)
+      else:
+        error("unsupported backend request \"%s\"(%s)" % (what, args))
+
+  def newNode(self, t, name):
+    self._Q.put( ('newNode', (t, name)) )
+  def delNode(self, t, name):
+    self._Q.put( ('delNode', (t, name)) )
+  def extendAttr(self, t, name, attr, values):
+    self._Q.put( ('extendNode', (t, name, attr, values)) )
+  def delAttr(self, t, name, attr):
+    self._Q.put( ('delAttr', (t, name, attr)) )
 
 if __name__ == '__main__':
   import sqlalchemy
