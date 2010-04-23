@@ -45,13 +45,13 @@ class _AttrList(list):
     assert self.node is not None, "_detach() of unattached _AttrList: %s" % (self,)
     if not noBackend:
       N = self.node
-      self.nodedb._backend.delAttr(N.type, N.name, self.key)
+      self.nodedb._backend.delAttr(N, self.key)
     self.node = None
 
   def append(self, value, noBackend=False):
     if not noBackend:
       N = self.node
-      self.nodedb._backend.extendAttr(N.type, N.name, self.key, (value,))
+      self.nodedb._backend.extendAttr(N, self.key, (value,))
     list.append(self, self.__intern(value))
 
   def extend(self, values, noBackend=False):
@@ -60,7 +60,7 @@ class _AttrList(list):
       values = tuple(values)
     if not noBackend:
       N = self.node
-      self.nodedb._backend.extendAttr(N.type, N.name, self.key, values)
+      self.nodedb._backend.extendAttr(N, self.key, values)
     list.extend(self, [ self.__intern(value) for value in values ])
 
   def __getitem__(self, index):
@@ -71,8 +71,8 @@ class _AttrList(list):
     assert type(index) is int, "non-int indices not yet supported: "+repr(index)
     if not noBackend:
       N = self.node
-      self.nodedb._backend.delAttr(N.type, N.name, self.key)
-      self.nodedb._backend.extendAttr(N.type, N.name, self.key, self)
+      self.nodedb._backend.delAttr(N, self.key)
+      self.nodedb._backend.extendAttr(N, self.key, self)
     list.__setitem__(self, index, self.__intern(value))
 
   def __getattr__(self, attr):
@@ -135,11 +135,13 @@ class Node(dict):
     ks = k+'s'
     row = _AttrList(self, k)
     if plural:
-      row.extend(value)
+      if value:
+        row.extend(value)
     else:
       row.append(value)
-    self.nodedb._backend.delAttr(self.type, self.name, k)
-    self.nodedb._backend.extendAttr(self.type, self.name, k, row)
+    self.nodedb._backend.delAttr(self, k)
+    if row:
+      self.nodedb._backend.extendAttr(self, k, row)
     dict.__setitem__(self, ks, row)
 
   def __delitem__(self, item):
@@ -260,7 +262,7 @@ class NodeDB(dict):
   def newNode(self, *args):
     t, name = nodekey(*args)
     N = self._makeNode(t, name)
-    self._backend.newNode(t, name)
+    self._backend.newNode(N)
     return N
 
   def _makeNode(self, t, name):
@@ -280,44 +282,33 @@ class Backend(object):
     self.nodedb = nodedb
 
   def close(self):
-    raise NotImplemented
+    raise NotImplementedError
 
-  def newNode(self, t, name):
-    raise NotImplemented
+  def newNode(self, N):
+    raise NotImplementedError
 
-  def delNode(self, t, name):
-    raise NotImplemented
+  def delNode(self, N):
+    raise NotImplementedError
 
-  def extendAttr(self, t, name, attr, values):
-    raise NotImplemented
+  def extendAttr(self, N, attr, values):
+    raise NotImplementedError
 
-  def delAttr(self, t, name, attr):
-    raise NotImplemented
+  def delAttr(self, N, attr):
+    raise NotImplementedError
 
 class _NoBackend(Backend):
   ''' Dummy backend for emphemeral in-memory NodeDBs.
   '''
   def close(self):
     pass
-  def newNode(self, t, name):
+  def newNode(self, N):
     pass
-  def delNode(self, t, name):
+  def delNode(self, N):
     pass
-  def extendAttr(self, t, name, attr, values):
+  def extendAttr(self, N, attr, values):
     pass
-  def delAttr(self, t, name, attr):
+  def delAttr(self, N, attr):
     pass
-
-class TestAll(unittest.TestCase):
-
-  def setUp(self):
-    self.backend=_NoBackend()
-    self.db=NodeDB(backend=self.backend)
-
-  def test00newNode(self):
-    H = self.db.newNode('HOST', 'foo')
-    self.assertEqual(len(H.ATTR1s), len(()) )
-    self.assertRaises(AttributeError, getattr, H, 'ATTR2')
 
 class _QBackend(Backend):
   ''' A backend to accept updates and queue them for asynchronous
@@ -349,14 +340,26 @@ class _QBackend(Backend):
       else:
         error("unsupported backend request \"%s\"(%s)" % (what, args))
 
-  def newNode(self, t, name):
-    self._Q.put( ('newNode', (t, name)) )
-  def delNode(self, t, name):
-    self._Q.put( ('delNode', (t, name)) )
-  def extendAttr(self, t, name, attr, values):
-    self._Q.put( ('extendNode', (t, name, attr, values)) )
-  def delAttr(self, t, name, attr):
-    self._Q.put( ('delAttr', (t, name, attr)) )
+  def newNode(self, N):
+    self._Q.put( ('newNode', (N,)) )
+  def delNode(self, N):
+    self._Q.put( ('delNode', (N,)) )
+  def extendAttr(self, N, attr, values):
+    self._Q.put( ('extendNode', (N, attr, values)) )
+  def delAttr(self, N, attr):
+    self._Q.put( ('delAttr', (N, attr)) )
+
+class TestAll(unittest.TestCase):
+
+  def setUp(self):
+    from cs.nodedb.sqla import Backend_SQLAlchemy
+    self.backend=Backend_SQLAlchemy('sqlite:///:memory:')
+    self.db=NodeDB(backend=self.backend)
+
+  def test00newNode(self):
+    H = self.db.newNode('HOST', 'foo')
+    self.assertEqual(len(H.ATTR1s), len(()) )
+    self.assertRaises(AttributeError, getattr, H, 'ATTR2')
 
 if __name__ == '__main__':
   import sqlalchemy
