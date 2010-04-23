@@ -24,23 +24,6 @@ class _AttrList(list):
     self.key = key
     self.nodedb = node.nodedb
 
-  def __intern(self, value):
-    if isinstance(value, Node):
-      return value
-    if type(value) is str:
-      if value.startswith(':'):
-        return ':'+value
-    return value
-
-  def __extern(self, stored):
-    if type(stored) is not str:
-      return stored
-    if stored.startswith('::'):
-      return stored[1:]
-    if not stored.startswith(':'):
-      return stored
-    assert False, '":TYPE:NAME" et al not yet implemented'
-
   def _detach(self, noBackend=False):
     assert self.node is not None, "_detach() of unattached _AttrList: %s" % (self,)
     if not noBackend:
@@ -52,7 +35,7 @@ class _AttrList(list):
     if not noBackend:
       N = self.node
       self.nodedb._backend.extendAttr(N, self.key, (value,))
-    list.append(self, self.__intern(value))
+    list.append(self, value)
 
   def extend(self, values, noBackend=False):
     # turn iterator into tuple
@@ -61,11 +44,11 @@ class _AttrList(list):
     if not noBackend:
       N = self.node
       self.nodedb._backend.extendAttr(N, self.key, values)
-    list.extend(self, [ self.__intern(value) for value in values ])
+    list.extend(self, values)
 
-  def __getitem__(self, index):
-    assert type(index) is int, "non-int indices not yet supported: "+repr(index)
-    return self.__extern(list.__getitem__(self, index))
+##def __getitem__(self, index):
+##  assert type(index) is int, "non-int indices not yet supported: "+repr(index)
+##  return list.__getitem__(self, index)
 
   def __setitem__(self, index, value, noBackend=False):
     assert type(index) is int, "non-int indices not yet supported: "+repr(index)
@@ -73,7 +56,7 @@ class _AttrList(list):
       N = self.node
       self.nodedb._backend.delAttr(N, self.key)
       self.nodedb._backend.extendAttr(N, self.key, self)
-    list.__setitem__(self, index, self.__intern(value))
+    list.__setitem__(self, index, value)
 
   def __getattr__(self, attr):
     k, plural = parseUC_sAttr(attr)
@@ -197,7 +180,7 @@ def nodekey(*args):
       t, name = item
       assert type(t) is str
       assert type(name) is str
-    assert t.isupper()
+    assert t.isupper(), "TYPE should be upper case, got \"%s\"" % (t,)
     assert len(name) > 0
     k, plural = parseUC_sAttr(t)
     assert k is not None and not plural
@@ -263,6 +246,7 @@ class NodeDB(dict):
     t, name = nodekey(*args)
     N = self._makeNode(t, name)
     self._backend.newNode(N)
+    self[t, name] = N
     return N
 
   def _makeNode(self, t, name):
@@ -283,6 +267,50 @@ class Backend(object):
 
   def close(self):
     raise NotImplementedError
+
+  def nodeByTypeName(self, t, name):
+    ''' Map (type,name) to Node.
+    '''
+    return self.nodedb[t, name]
+
+  def serialise(self, value):
+    ''' Convert a value for external string storage.
+    '''
+    if isinstance(value, Node):
+      assert value.type.find(':') < 0, \
+             "illegal colon in TYPE \"%s\"" % (value.type,)
+      return ":%s:%s" % (value.type, value.name)
+    t = type(value)
+    assert t in (str,int), repr(t)+" "+repr(value)+" "+repr(Node)
+    if t is str:
+      if value.startswith(':'):
+        return ':'+value
+      return value
+    if t is int:
+      return ':#'+str(value)
+    raise ValueError, "can't serialise(%s)" % (repr(value),)
+
+  def deserialise(self, value):
+    ''' Convert a stored string into a value.
+    '''
+    if not value.startswith(':'):
+      # plain string
+      return value
+    if len(value) < 2:
+      raise ValueError, "unparsabe value \"%s\"" % (value,)
+    if value.startswith('::'):
+      # :string-with-leading-colon
+      return value[1:]
+    if value.startswith(':#'):
+      # :#int
+      return int(value[2:])
+    if value[1].isupper():
+      # TYPE:NAME
+      if value.find(':', 2) < 0:
+        raise ValueError, "bad :TYPE:NAME \"%s\"" % (value,)
+      t, name = value[1:].split(':', 1)
+      return self.nodeByTypeName(t, name)
+    raise ValueError, "unparsabe value \"%s\"" % (value,)
 
   def newNode(self, N):
     raise NotImplementedError
@@ -352,16 +380,28 @@ class _QBackend(Backend):
 class TestAll(unittest.TestCase):
 
   def setUp(self):
-    from cs.nodedb.sqla import Backend_SQLAlchemy
-    self.backend=Backend_SQLAlchemy('sqlite:///:memory:')
+    self.backend=_NoBackend()   # Backend_SQLAlchemy('sqlite:///:memory:')
     self.db=NodeDB(backend=self.backend)
 
-  def test00newNode(self):
+  def test01serialise(self):
+    H = self.db.newNode('HOST', 'foo')
+    for value in 1, 'str1', ':str2', '::', H:
+      sys.stderr.flush()
+      s = self.backend.serialise(value)
+      sys.stderr.flush()
+      assert type(s) is str
+      self.assert_(value == self.backend.deserialise(s))
+
+  def test10newNode(self):
     H = self.db.newNode('HOST', 'foo')
     self.assertEqual(len(H.ATTR1s), len(()) )
     self.assertRaises(AttributeError, getattr, H, 'ATTR2')
+    H2 = self.db['HOST:foo']
+    self.assert_(H is H2, "made HOST:foo, but retrieving it got a different object")
+
+  def test11setAttrs(self):
+    H = self.db.newNode('HOST', 'foo')
+    H.Xs = [1,2,3,4,5]
 
 if __name__ == '__main__':
-  import sqlalchemy
-  print 'SQLAlchemy version =', sqlalchemy.__version__
   unittest.main()
