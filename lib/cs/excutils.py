@@ -5,7 +5,8 @@
 #
 
 import logging
-from cs.logutils import log, warn, exception
+import traceback
+from cs.logutils import log, warn, exception, error
 
 class NoExceptions(object):
   ''' A context manager to catch _all_ exceptions and log them.
@@ -33,7 +34,9 @@ class NoExceptions(object):
         # user supplied handler
         return self.__handler(exc_type, exc_value, tb)
       # report handled exception
-      exception("IGNORE "+str(exc_type)+": "+str(exc_value)+`tb`)
+      exception("IGNORE  "+str(exc_type)+": "+str(exc_value))
+      for line in traceback.format_tb(tb):
+        error("IGNORE> "+line[:-1])
     return True
 
   def simpleExceptionReport(exc_type, exc_value, traceback, mark=None, loglevel=logging.WARNING):
