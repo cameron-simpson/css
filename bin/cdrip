@@ -37,7 +37,7 @@
 : ${CDRIP_TRACKFMT:='%02d - %s'}	# track number then title
 : ${CDRIP_DEV:=/dev/cdrom}
 : ${CDRIP_DIR:=.}
-: ${CDRIP_ENC:=ogg}			# comma separated list of ogg,mp3,flac
+: ${CDRIP_ENC:=mp3}			# comma separated list of ogg,mp3,flac
 : ${CDRIP_BPS:=192}
 : ${CDRIP_QUAL=6}
 : ${CDRIP_LOCK:=''}
