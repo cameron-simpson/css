@@ -124,6 +124,12 @@ class Node(dict):
       return row[0]
     return None
 
+  def get(self, item, default=None):
+    try:
+      return self[item]
+    except KeyError:
+      return default
+
   def __getitem__(self, item):
     k, plural = parseUC_sAttr(item)
     if k:
