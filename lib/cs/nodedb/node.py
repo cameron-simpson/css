@@ -115,6 +115,7 @@ class Node(dict):
     k, plural = parseUC_sAttr(item)
     if k is None:
       raise KeyError, repr(item)
+    assert k not in ('NAME', 'TYPE'), "forbidden ATTR \"%s\"" % (item,)
     ks = k+'s'
     row = _AttrList(self, k)
     if plural:
@@ -145,6 +146,7 @@ class Node(dict):
         return False
       return len(self[ks]) > 0
     return dict.__hasattr__(self, attr)
+
   def __getattr__(self, attr):
     k, plural = parseUC_sAttr(attr)
     if k:
@@ -152,7 +154,7 @@ class Node(dict):
       if value is None:
         raise AttributeError, attr
       return value
-    return dict.__getattr__(self, attr)
+    raise AttributeError, attr
 
   def __setattr__(self, attr, value):
     k, plural = parseUC_sAttr(attr)
@@ -160,6 +162,9 @@ class Node(dict):
       dict.__setattr__(self, attr, value)
     else:
       self[attr] = value
+
+  def parentsByAttr(self, attr, t=None):
+    return self.nodedb.nodeParentsByAttr(self, attr, t)
 
 def nodekey(*args):
   ''' Convert some sort of key to a (TYPE, NAME) tuple.
@@ -198,8 +203,29 @@ class NodeDB(dict):
     backend.set_nodedb(self)
     self.__nodesByType = {}
 
+  def _createNode(self, t, name):
+    ''' Factory method to make a new Node (or Node subclass instance).
+        Subclasses of NodeDB should use this to make Nodes of appropriate
+        types.
+    '''
+    return Node(t, name, self)
+
   def close(self):
     self._backend.close()
+
+  def nodesByType(self, t):
+    return self.__nodesByType.get(t, ())
+
+  def nodeParentsByAttr(self, N, attr, t=None):
+    # TODO: make this efficient - it's currently brute force
+    k, plural = parseUC_sAttr(attr)
+    assert k and not plural, "bad attribute name \"%s\"" % (attr,)
+    ks = k + 's'
+    if t:
+      Ps = self.values()
+    else:
+      Ps = self.nodesByType(t)
+    return [ P for P in Ps if N in P[ks] ]
 
   def _noteNode(self, N):
     ''' Update the cross reference tables for a new Node.
@@ -224,6 +250,12 @@ class NodeDB(dict):
   def __contains__(self, item):
     key = nodekey(item)
     return dict.__contains__(self, key)
+
+  def get(self, item, default=None):
+    try:
+      return self[item]
+    except KeyError:
+      return default
 
   def __getitem__(self, item):
     key = nodekey(item)
@@ -251,7 +283,7 @@ class NodeDB(dict):
 
   def _makeNode(self, t, name):
     assert (t, name) not in self, 'newNode(%s): %s already exists' % (", ".join(args), (t, name), )
-    N = self[t, name] = Node(t, name, self)
+    N = self[t, name] = self._createNode(t, name)
     return N
 
 class Backend(object):

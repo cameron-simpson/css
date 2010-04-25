@@ -118,12 +118,10 @@ class Backend_SQLAlchemy(Backend):
 
   def extendAttr(self, N, attr, values):
     nodeid = self.__IDbyTypeName[N.type, N.name]
-    print >>sys.stderr, "NODE_ID =", nodeid, "values =", values
     ins_values = [ { 'NODE_ID': nodeid,
                      'ATTR':    attr,
                      'VALUE':   self.serialise(value),
                    } for value in values ]
-    print >>sys.stderr, "ins_values =", ins_values
     self.attrs.insert().execute(ins_values)
 
   def delAttr(self, N, attr):
