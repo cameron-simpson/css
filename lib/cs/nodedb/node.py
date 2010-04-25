@@ -287,7 +287,9 @@ class Backend(object):
         return ':'+value
       return value
     if t is int:
-      return ':#'+str(value)
+      s = str(value)
+      assert s[0].isdigit()
+      return ':' + s
     raise ValueError, "can't serialise(%s)" % (repr(value),)
 
   def deserialise(self, value):
@@ -297,20 +299,21 @@ class Backend(object):
       # plain string
       return value
     if len(value) < 2:
-      raise ValueError, "unparsabe value \"%s\"" % (value,)
+      raise ValueError, "unparsable value \"%s\"" % (value,)
+    v = value[1:]
     if value.startswith('::'):
       # :string-with-leading-colon
-      return value[1:]
-    if value.startswith(':#'):
-      # :#int
-      return int(value[2:])
-    if value[1].isupper():
+      return v
+    if v[0].isdigit():
+      # :int
+      return int(v)
+    if v[0].isupper():
       # TYPE:NAME
-      if value.find(':', 2) < 0:
+      if v.find(':', 1) < 0:
         raise ValueError, "bad :TYPE:NAME \"%s\"" % (value,)
-      t, name = value[1:].split(':', 1)
+      t, name = v.split(':', 1)
       return self.nodeByTypeName(t, name)
-    raise ValueError, "unparsabe value \"%s\"" % (value,)
+    raise ValueError, "unparsable value \"%s\"" % (value,)
 
   def newNode(self, N):
     raise NotImplementedError
