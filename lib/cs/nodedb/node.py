@@ -1,15 +1,34 @@
 #!/usr/bin/python
 #
 
+import re
 import sys
 if sys.hexversion < 0x02060000:
   from sets import Set as set
+  import simplejson as json
+else:
+  import json
 import itertools
 import unittest
 from cs.lex import str1
 from cs.misc import the
 from cs.mappings import parseUC_sAttr
 from cs.logutils import error
+
+# regexp to match TYPE:name
+re_NODEREF = re.compile(r'([A-Z]+):([^:#]+)')
+# regexp to match a bareword name
+re_NAME = re.compile(r'[a-z][a-z0-9]*(?![a-zA-Z0-9_])')
+# JSON string expression, lenient
+re_STRING = re.compile(r'"([^"\\]|\\.)*"')
+# JSON simple integer
+re_INT = re.compile(r'-?[0-9]+')
+# "bare" URL
+re_BAREURL = re.compile(r'[a-z]+://[-a-z0-9.]+/[-a-z0-9_.]+')
+# regexp to match name(, name)*
+re_NAMELIST = re.compile(r'([a-z][a-z0-9]+)(\s*,\s*([a-z][a-z0-9]+))*')
+# regexp to do comma splits
+re_COMMASEP = re.compile(r'\s*,\s*')
 
 class _AttrList(list):
   
@@ -73,10 +92,11 @@ class Node(dict):
       Entries are _AttrLists, keyed by attribute name in plural form.
   '''
 
-  def __init__(self, t, name, nodedb):
+  def __init__(self, t, name, nodedb, readonly=False):
     self.type = str1(t)
     self.name = name
     self.nodedb = nodedb
+    self.readonly = readonly
 
   def __repr__(self):
     return "%s:%s:%s" % (self.type, self.name, dict.__repr__(self))
@@ -94,7 +114,8 @@ class Node(dict):
     assert k is not None
     ks = k+'s'
     if ks not in self:
-      row = self[ks] = _AttrList(self, ks)
+      row = _AttrList(self, ks)
+      dict.__setitem__(self, ks, row)
     else:
       row = dict.__getitem__(self, ks)
     if plural:
@@ -123,7 +144,8 @@ class Node(dict):
         row.extend(value)
     else:
       row.append(value)
-    self.nodedb._backend.delAttr(self, k)
+    if hasattr(self, ks):
+      self.nodedb._backend.delAttr(self, k)
     if row:
       self.nodedb._backend.extendAttr(self, k, row)
     dict.__setitem__(self, ks, row)
@@ -166,6 +188,27 @@ class Node(dict):
   def parentsByAttr(self, attr, t=None):
     return self.nodedb.nodeParentsByAttr(self, attr, t)
 
+  def attrValueText(self, attr, value):
+    ''' Return "printable" form of a an attribute value.
+    '''
+    if isinstance(value, Node):
+      if attr == "SUB"+self.type and value.type == self.type:
+        pvalue = value.name
+      elif attr == value.type:
+        pvalue = value.name
+      else:
+        pvalue = str(value)
+    else:
+      m = re_BAREURL.match(value)
+      if m is not None and m.end() == len(value):
+        pvalue = value
+      else:
+        if value.isdigit() and str(int(value)) == value:
+          pvalue = int(value)
+        else:
+          pvalue = json.dumps(value)
+    return pvalue
+
 def nodekey(*args):
   ''' Convert some sort of key to a (TYPE, NAME) tuple.
       Sanity check the values.
@@ -200,8 +243,8 @@ class NodeDB(dict):
     if backend is None:
       backend = _NoBackend(self)
     self._backend = backend
-    backend.set_nodedb(self)
     self.__nodesByType = {}
+    backend.set_nodedb(self)
 
   def _createNode(self, t, name):
     ''' Factory method to make a new Node (or Node subclass instance).
@@ -222,9 +265,9 @@ class NodeDB(dict):
     assert k and not plural, "bad attribute name \"%s\"" % (attr,)
     ks = k + 's'
     if t:
-      Ps = self.values()
-    else:
       Ps = self.nodesByType(t)
+    else:
+      Ps = self.values()
     return [ P for P in Ps if N in P[ks] ]
 
   def _noteNode(self, N):
@@ -296,6 +339,10 @@ class Backend(object):
     '''
     assert not hasattr(self, 'nodedb')
     self.nodedb = nodedb
+    self._preload()
+
+  def _preload(self):
+    raise NotImplementedError
 
   def close(self):
     raise NotImplementedError
@@ -362,6 +409,8 @@ class Backend(object):
 class _NoBackend(Backend):
   ''' Dummy backend for emphemeral in-memory NodeDBs.
   '''
+  def _preload(self):
+    pass
   def close(self):
     pass
   def newNode(self, N):

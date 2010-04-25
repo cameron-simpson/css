@@ -11,6 +11,7 @@ from sqlalchemy import create_engine, \
 from sqlalchemy.orm import mapper, sessionmaker
 from sqlalchemy.sql import and_, or_, not_
 from sqlalchemy.sql.expression import distinct
+from cs.logutils import error
 from . import NodeDB, Backend
 from .node import TestAll as NodeTestAll
 
@@ -83,40 +84,49 @@ class Backend_SQLAlchemy(Backend):
     nodes = self.nodes
     attrs = self.attrs
     byID = self.__nodesByID
-    for nodeid, t, name in nodes.select( [ nodes.c.ID,
-                                           nodes.c.TYPE,
-                                           nodes.c.NAME
-                                         ] ).execute():
+    for nodeid, t, name in select( [ nodes.c.ID,
+                                     nodes.c.TYPE,
+                                     nodes.c.NAME
+                                   ] ).execute():
       N = self.nodedb._makeNode(t, name)
       self._noteNode(N, nodeid)
-    for attrid, nodeid, attr, value in nodes.select( [ attrs.c.ID,
-                                                       attrs.c.NODE_ID,
-                                                       attrs.c.ATTR,
-                                                       attrs.c.VALUE,
-                                                     ] ).execute():
+      print >>sys.stderr, "_preloaded node %s" % (N,)
+    for attrid, nodeid, attr, value in select( [ attrs.c.ID,
+                                                 attrs.c.NODE_ID,
+                                                 attrs.c.ATTR,
+                                                 attrs.c.VALUE,
+                                               ] ).execute():
+      if nodeid not in byID:
+        error("invalid NODE_ID(%s): ignore %s=%s" % (nodeid, attr, value))
+        continue
       N = byID[nodeid]
-      N[attr+'s'].append(self.deserialise(value), noBackend=True )
+      value = self.deserialise(value)
+      N[attr+'s'].append(value, noBackend=True )
+      ##print >>sys.stderr, "%s:%s.%s + %s" % (N.type, N.name, attr, value)
 
   def deserialise(self, value):
     if value.startswith(':#'):
       # deprecated :#node_id serialisation
-      return byID[int(value[2:])]
+      return self.__nodesByID[int(value[2:])]
     return Backend.deserialise(self, value)
 
   def close(self):
     raise NotImplementedError
 
   def newNode(self, N):
+    assert not self.nodedb.readonly
     ins = self.nodes.insert().values(TYPE=N.type, NAME=N.name).execute()
     self._noteNode(N, ins.lastrowid)
 
   def delNode(self, N):
+    assert not self.nodedb.readonly
     nodeid = self.__IDbyTypeName[N.type, N.name]
     self.attrs.delete(self.attrs.c.NODE_ID == nodeid).execute()
     self.nodes.delete(self.nodes.c.NODE_ID == nodeid).execute()
     self._forgetNode(N, nodeid)
 
   def extendAttr(self, N, attr, values):
+    assert not self.nodedb.readonly
     nodeid = self.__IDbyTypeName[N.type, N.name]
     ins_values = [ { 'NODE_ID': nodeid,
                      'ATTR':    attr,
@@ -125,6 +135,7 @@ class Backend_SQLAlchemy(Backend):
     self.attrs.insert().execute(ins_values)
 
   def delAttr(self, N, attr):
+    assert not self.nodedb.readonly
     nodeid = self.__IDbyTypeName[N.type, N.name]
     self.attrs.delete(and_(self.attrs.c.NODE_ID == nodeid,
                            self.attrs.c.ATTR == attr)).execute()
