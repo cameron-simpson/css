@@ -147,7 +147,7 @@ class _AttrList(list):
       if plural:
         return list(hits)
       return the(hits)
-    raise AttributeError, repr(attr)
+    raise AttributeError, str(self)+'.'+repr(attr)
 
 class Node(dict):
   ''' A Node dictionary.
@@ -241,9 +241,9 @@ class Node(dict):
     if k:
       value = self.__get(k, plural)
       if value is None:
-        raise AttributeError, attr
+        raise AttributeError, str(self)+'.'+repr(attr)
       return value
-    raise AttributeError, attr
+    raise AttributeError, str(self)+'.'+repr(attr)
 
   def __setattr__(self, attr, value):
     k, plural = parseUC_sAttr(attr)
