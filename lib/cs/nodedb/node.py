@@ -37,6 +37,10 @@ class _AttrList(list):
         and .ATTR[s] attribute access and drives a backend.
         `node` is the node to which this _AttrList is attached.
         `key` is the _singular_ form of the attribute name.
+
+        TODO: we currently do not rely on the backend to preserve ordering so
+              lots of operations just ask the backend to totally resave the
+              attribute list.
     '''
     list.__init__(self)
     self.node = node
@@ -44,11 +48,42 @@ class _AttrList(list):
     self.nodedb = node.nodedb
 
   def _detach(self, noBackend=False):
+    assert False, "SURPRISE! call to _detach()"
     assert self.node is not None, "_detach() of unattached _AttrList: %s" % (self,)
     if not noBackend:
       N = self.node
       self.nodedb._backend.delAttr(N, self.key)
     self.node = None
+
+  def __delitem__(self, *args):
+    value = list.__delitem__(self, *args)
+    self.nodedb._backend.saveAttrs(self)
+    return value
+
+  def __delslice__(self, *args):
+    value = list.__delslice__(self, *args)
+    self.nodedb._backend.saveAttrs(self)
+    return value
+
+  def __iadd__(self, *args):
+    value = list.__iadd__(self, *args)
+    self.nodedb._backend.saveAttrs(self)
+    return value
+
+  def __imul__(self, *args):
+    value = list.__imul__(self, *args)
+    self.nodedb._backend.saveAttrs(self)
+    return value
+
+  def __setitem__(self, *args):
+    value = list.__setitem__(self, *args)
+    self.nodedb._backend.saveAttrs(self)
+    return value
+
+  def __setslice__(self, *args):
+    value = list.__setslice__(self, *args)
+    self.nodedb._backend.saveAttrs(self)
+    return value
 
   def append(self, value, noBackend=False):
     if not noBackend:
@@ -64,6 +99,33 @@ class _AttrList(list):
       N = self.node
       self.nodedb._backend.extendAttr(N, self.key, values)
     list.extend(self, values)
+
+  def insert(self, *args):
+    value = list.insert(self, *args)
+    self.nodedb._backend.saveAttrs(self)
+    return value
+
+  def pop(self, *args):
+    value = list.pop(self, *args)
+    self.nodedb._backend.saveAttrs(self)
+    return value
+
+  def remove(self, *args):
+    value = list.remove(self, *args)
+    self.nodedb._backend.saveAttrs(self)
+    return value
+
+  def reverse(self, *args):
+    value = list.reverse(self, *args)
+    if self:
+      self.nodedb._backend.saveAttrs(self)
+    return value
+
+  def sort(self, *args):
+    value = list.sort(self, *args)
+    if self:
+      self.nodedb._backend.saveAttrs(self)
+    return value
 
 ##def __getitem__(self, index):
 ##  assert type(index) is int, "non-int indices not yet supported: "+repr(index)
@@ -92,11 +154,10 @@ class Node(dict):
       Entries are _AttrLists, keyed by attribute name in plural form.
   '''
 
-  def __init__(self, t, name, nodedb, readonly=False):
+  def __init__(self, t, name, nodedb):
     self.type = str1(t)
     self.name = name
     self.nodedb = nodedb
-    self.readonly = readonly
 
   def __repr__(self):
     return "%s:%s:%s" % (self.type, self.name, dict.__repr__(self))
@@ -192,10 +253,22 @@ class Node(dict):
       self[attr] = value
 
   def parentsByAttr(self, attr, t=None):
-    return self.nodedb.nodeParentsByAttr(self, attr, t)
+    ''' Return all "parent" Nodes P where P."attr"s contains self.
+        If `t` is supplied and not None, select only parents of type `t`.
+    '''
+    # TODO: make this efficient - it's currently brute force
+    k, plural = parseUC_sAttr(attr)
+    assert k and not plural, "bad attribute name \"%s\"" % (attr,)
+    ks = k + 's'
+    if t:
+      Ps = self.nodedb.nodesByType(t)
+    else:
+      Ps = self.nodedb.values()
+    return [ P for P in Ps if self in P[ks] ]
 
   def attrValueText(self, attr, value):
-    ''' Return "printable" form of a an attribute value.
+    ''' Return "printable" form of an attribute value.
+        This is intended for use in "pretty" reports such as web pages.
     '''
     if isinstance(value, Node):
       if attr == "SUB"+self.type and value.type == self.type:
@@ -244,13 +317,14 @@ def nodekey(*args):
 
 class NodeDB(dict):
 
-  def __init__(self, backend=None):
+  def __init__(self, backend=None, readonly=False):
     dict.__init__(self)
     if backend is None:
       backend = _NoBackend(self)
     self._backend = backend
     self.__nodesByType = {}
     backend.set_nodedb(self)
+    self.readonly = readonly
 
   def _createNode(self, t, name):
     ''' Factory method to make a new Node (or Node subclass instance).
@@ -264,17 +338,6 @@ class NodeDB(dict):
 
   def nodesByType(self, t):
     return self.__nodesByType.get(t, ())
-
-  def nodeParentsByAttr(self, N, attr, t=None):
-    # TODO: make this efficient - it's currently brute force
-    k, plural = parseUC_sAttr(attr)
-    assert k and not plural, "bad attribute name \"%s\"" % (attr,)
-    ks = k + 's'
-    if t:
-      Ps = self.nodesByType(t)
-    else:
-      Ps = self.values()
-    return [ P for P in Ps if N in P[ks] ]
 
   def _noteNode(self, N):
     ''' Update the cross reference tables for a new Node.
@@ -406,10 +469,23 @@ class Backend(object):
   def delNode(self, N):
     raise NotImplementedError
 
+  def saveAttrs(self, attrs):
+    ''' Save the full contents of this attribute list.
+    '''
+    N = attrs.node
+    attr = attrs.key
+    self.delAttr(N, attr)
+    if attrs:
+      self.extendAttr(N, attr, attrs)
+
   def extendAttr(self, N, attr, values):
+    ''' Append values to the named attribute.
+    '''
     raise NotImplementedError
 
   def delAttr(self, N, attr):
+    ''' Remove all values from the named attribute.
+    '''
     raise NotImplementedError
 
 class _NoBackend(Backend):
