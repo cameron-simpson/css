@@ -28,14 +28,13 @@ def attrValueText(N, attr, value):
   ''' Return "printable" form of an attribute value.
       This is intended for use in "pretty" reports such as web pages.
   '''
+  pvalue = str(value)
   if isinstance(value, Node):
     if attr == "SUB"+N.type and value.type == N.type:
       pvalue = value.name
     elif attr == value.type:
       pvalue = value.name
-    else:
-      pvalue = str(value)
-  else:
+  elif type(value) in StringTypes:
     m = re_BAREURL.match(value)
     if m is not None and m.end() == len(value):
       pvalue = value
@@ -47,6 +46,7 @@ def attrValueText(N, attr, value):
   return pvalue
 
 def dumpNodeAttrs(N, ofp):
+  # TODO: use attrValueText() somehow
   ofp.write("# %s\n" % (N,))
   attrnames = N.keys()
   attrnames.sort()
