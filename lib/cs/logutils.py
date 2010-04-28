@@ -104,6 +104,7 @@ class Pfx(object):
     if not self.absolute and len(_prefix.cur.prefix) > 0:
       mark = _prefix.cur.prefix + ': ' + mark
     self.prefix = mark
+    ##print >>sys.stderr, "PFX.__enter__: self.prefix = %s" % (self.prefix,)
 
     _prefix.old.append(_prefix.cur)
     _prefix.cur = self
@@ -111,8 +112,10 @@ class Pfx(object):
 
   def __exit__(self, exc_type, exc_value, traceback):
     global _prefix
+    ##print >>sys.stderr, "1: raise_prefix=%s, exc_value=%s" % (_prefix.raise_prefix, exc_value)
     if exc_value is not None:
       if exc_type is not SystemExit:
+        ##print >>sys.stderr, "2: raise_prefix=%s, exc_value=%s" % (_prefix.raise_prefix, exc_value)
         if _prefix.raise_prefix is not None:
           if hasattr(exc_value, 'args') and len(exc_value.args) > 0:
             exc_value.args = [_prefix.raise_prefix + ": " + str(exc_value.args[0])] \
