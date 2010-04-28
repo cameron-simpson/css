@@ -84,13 +84,15 @@ class Backend_SQLAlchemy(Backend):
     nodes = self.nodes
     attrs = self.attrs
     byID = self.__nodesByID
+    # load Nodes
     for nodeid, t, name in select( [ nodes.c.ID,
                                      nodes.c.TYPE,
                                      nodes.c.NAME
                                    ] ).execute():
       N = self.nodedb._makeNode(t, name)
       self._noteNode(N, nodeid)
-      print >>sys.stderr, "_preloaded node %s" % (N,)
+    # load Node attributes
+    # TODO: order by NODE_ID, ATTR and use .extend in batches
     for attrid, nodeid, attr, value in select( [ attrs.c.ID,
                                                  attrs.c.NODE_ID,
                                                  attrs.c.ATTR,
@@ -102,7 +104,6 @@ class Backend_SQLAlchemy(Backend):
       N = byID[nodeid]
       value = self.deserialise(value)
       N[attr+'s'].append(value, noBackend=True )
-      ##print >>sys.stderr, "%s:%s.%s + %s" % (N.type, N.name, attr, value)
 
   def deserialise(self, value):
     if value.startswith(':#'):

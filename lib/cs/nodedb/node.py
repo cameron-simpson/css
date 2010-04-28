@@ -13,7 +13,7 @@ import unittest
 from cs.lex import str1
 from cs.misc import the
 from cs.mappings import parseUC_sAttr
-from cs.logutils import error
+from cs.logutils import Pfx, error, warn, info
 
 # regexp to match TYPE:name
 re_NODEREF = re.compile(r'([A-Z]+):([^:#]+)')
@@ -25,10 +25,6 @@ re_STRING = re.compile(r'"([^"\\]|\\.)*"')
 re_INT = re.compile(r'-?[0-9]+')
 # "bare" URL
 re_BAREURL = re.compile(r'[a-z]+://[-a-z0-9.]+/[-a-z0-9_.]+')
-# regexp to match name(, name)*
-re_NAMELIST = re.compile(r'([a-z][a-z0-9]+)(\s*,\s*([a-z][a-z0-9]+))*')
-# regexp to do comma splits
-re_COMMASEP = re.compile(r'\s*,\s*')
 
 class _AttrList(list):
   
@@ -192,6 +188,9 @@ class Node(dict):
       return default
 
   def __getitem__(self, item):
+    if item in self:
+      # fast track direct access to plural members
+      return dict.__getitem__(self, item)
     k, plural = parseUC_sAttr(item)
     if k:
       value = self.__get(k, plural)
@@ -266,27 +265,90 @@ class Node(dict):
       Ps = self.nodedb.values()
     return [ P for P in Ps if self in P[ks] ]
 
-  def attrValueText(self, attr, value):
-    ''' Return "printable" form of an attribute value.
-        This is intended for use in "pretty" reports such as web pages.
+  def gettoken(self, attr, valuetxt, createSubNodes=False):
+    ''' Method to extract a token from the start of a string.
+        It is intended to be overridden by subclasses to add recognition for
+        domain specific things such as IP addresses.
     '''
-    if isinstance(value, Node):
-      if attr == "SUB"+self.type and value.type == self.type:
-        pvalue = value.name
-      elif attr == value.type:
-        pvalue = value.name
+    # "foo"
+    m = re_STRING.match(valuetxt)
+    if m:
+      value = json.loads(m.group())
+      return value, valuetxt[m.end():]
+
+    # int
+    m = re_INT.match(valuetxt)
+    if m:
+      value = int(m.group())
+      return value, valuetxt[m.end():]
+
+    # http://foo/bah etc
+    m = re_BAREURL.match(valuetxt)
+    if m:
+      value = m.group()
+      return value, valuetxt[m.end():]
+
+    # TYPE:NAME
+    m = re_NODEREF.match(valuetxt)
+    if m:
+      value = self.nodedb.nodeByTypeName(m.group(1),
+                                         m.group(2),
+                                         doCreate=createSubNodes)
+      return value, valuetxt[m.end():]
+
+    # NAME
+    m = re_NAME.match(valuetxt)
+    if m:
+      if attr == "SUB"+self.type:
+        value = self.nodedb.nodeByTypeName(self.type,
+                                           m.group(),
+                                           doCreate=createSubNodes)
       else:
-        pvalue = str(value)
-    else:
-      m = re_BAREURL.match(value)
-      if m is not None and m.end() == len(value):
-        pvalue = value
-      else:
-        if value.isdigit() and str(int(value)) == value:
-          pvalue = int(value)
-        else:
-          pvalue = json.dumps(value)
-    return pvalue
+        value = self.nodedb.nodeByTypeName(attr,
+                                           m.group(),
+                                           doCreate=createSubNodes)
+      return value, valuetxt[m.end():]
+
+    raise ValueError, "can't gettoken: %s" % (valuetxt,)
+
+  def update(self, new_attrs, delete_missing=False):
+    with Pfx("%s.update" % (self,)):
+      # add new attributes
+      new_attr_names = new_attrs.keys()
+      new_attr_names.sort()
+      for attr in new_attr_names:
+        k, plural = parseUC_sAttr(attr)
+        if not k:
+          error("%s.applyAttrs: ignore non-ATTRs: %s" % (self, attr))
+          continue
+        ks = k+'s'
+        if ks not in self:
+          info("new .%s=%s" % (ks, new_attrs[attr]))
+          self[ks] = new_attrs[attr]
+
+      # change or possibly remove old attributes
+      old_attr_names = self.keys()
+      old_attr_names.sort()
+      for attr in old_attr_names:
+        k, plural = parseUC_sAttr(attr)
+        if not k or not plural:
+          info("%s.applyAttrs: ignore non-ATTRs old attr: %s" % (self, attr))
+          continue
+        if k.endswith('_ID'):
+          error("%s.applyAttrs: ignoring bad old ATTR_ID: %s" % (self, attr))
+          continue
+        ks = k+'s'
+        if ks in new_attrs:
+          if self[ks] != new_attrs[ks]:
+            info("set .%s=%s" % (ks, new_attrs[attr]))
+            ##print >>sys.stderr, "OLD:"
+            ##for v in self[ks]: print >>sys.stderr, repr(v)
+            ##print >>sys.stderr, "NEW:"
+            ##for v in new_attrs[attr]: print >>sys.stderr, repr(v)
+            self[ks] = new_attrs[attr]
+        elif delete_missing:
+          info("del .%s=%s" % (ks, new_attrs[attr]))
+          del self[ks]
 
 def nodekey(*args):
   ''' Convert some sort of key to a (TYPE, NAME) tuple.
@@ -338,6 +400,11 @@ class NodeDB(dict):
 
   def nodesByType(self, t):
     return self.__nodesByType.get(t, ())
+
+  def nodeByTypeName(self, t, name, doCreate=False):
+    if doCreate and (t, name) not in self:
+      return self.newNode(t, name)
+    return self[t, name]
 
   def _noteNode(self, N):
     ''' Update the cross reference tables for a new Node.
