@@ -1,0 +1,425 @@
+changeset:   7615:cf40dcfae0e0
+tag:         release-20100322
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Mon Mar 22 22:41:11 2010 +1100
+files:       release/20100322/CHANGES.txt release/20100322/SUMMARY.txt release/20100322/release-tag.txt
+description:
+Release information for release-20100322.
+Summary:
+Move release info into its own subtree.
+
+
+changeset:   7616:01134e7d2f94
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Mon Mar 22 22:41:12 2010 +1100
+files:       .hgtags
+description:
+Added tag release-20100322 for changeset cf40dcfae0e0
+
+
+changeset:   7617:e35d5d844606
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Mon Apr 05 13:30:10 2010 +1000
+files:       lib/cs/configutils.py
+description:
+Add cs.configutils: Utility functions and classes for configuration files.
+
+
+changeset:   7618:2d7f16867b8d
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Mon Apr 05 13:57:42 2010 +1000
+files:       lib/cs/threads.py
+description:
+cs.threads: add TimerQueue class, a Thread efficient multi-Timer queue.
+
+
+changeset:   7619:c8e520761c47
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Mon Apr 05 18:05:21 2010 +1000
+files:       lib/cs/threads.py
+description:
+cs.threads: remove superfluous import
+
+
+changeset:   7620:ebde8fe57df6
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Tue Apr 06 16:04:18 2010 +1000
+files:       lib/cs/threads.py
+description:
+cs.threads: add missing imports, remove debugging
+
+
+changeset:   7621:e2aec764b787
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Tue Apr 06 16:05:48 2010 +1000
+files:       lib/cs/logutils.py
+description:
+cs.logutils: Pfx: discard ugly and racy logger interception and replace with new LoggerAdapter based shininess, making Pfx look like a Logger into the bargain
+
+
+changeset:   7622:e59f4e2ba615
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Tue Apr 06 16:06:04 2010 +1000
+files:       lib/cs/configutils.py
+description:
+cs.configutils: add missing import
+
+
+changeset:   7623:39d332b3b46e
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Tue Apr 06 16:07:08 2010 +1000
+files:       lib/cs/logutils.py
+description:
+cs.logutils: Pfx: drop obsolete logging_handler slot
+
+
+changeset:   7624:47209965b8a6
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Tue Apr 06 17:08:29 2010 +1000
+files:       bin-bos/bos-log-email bin-bos/bos-mktimesheet bin-bos/bos-needtimesheet bin-bos/defunct/bos-tslog bos/bos-log-email bos/bos-mktimesheet bos/bos-needtimesheet bos/defunct/bos-tslog
+description:
+rename bos to bin-bos
+
+
+changeset:   7625:3f8d03981395
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Tue Apr 06 17:11:24 2010 +1000
+files:       Mykefile
+description:
+Mykefile: _home: fix up rsyncs, rename bos to bin-bos
+
+
+changeset:   7626:c056ad65d176
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Tue Apr 06 18:28:57 2010 +1000
+files:       lib/cs/logutils.py
+description:
+cs.logutils: discard LoggingMixin, simplify prefix stack greatly, fix up LoggerAdapter usage
+
+
+changeset:   7627:e95039574b13
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Tue Apr 06 18:29:17 2010 +1000
+files:       lib/cs/configutils.py
+description:
+cs.configutils: get info() from cs.logutils instead of logging
+
+
+changeset:   7628:d9cb1c1baa3a
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Wed Apr 07 13:11:01 2010 +1000
+files:       lib/cs/logutils.py
+description:
+cs.logutils: bugfix Pfx.loggers setup and Pfx raise_prefix state, make LogTime quieter
+
+
+changeset:   7629:830fd42c2728
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sat Apr 10 12:18:50 2010 +1000
+files:       lib/cs/logutils.py
+description:
+cs.logutils: expose Pfx_LoggerAdapter for subclassing.
+
+
+changeset:   7630:b157ca1b802f
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sat Apr 10 12:38:55 2010 +1000
+files:       lib/cs/logutils.py
+description:
+cs.logutils: Pfx: handle empty prefixes and don't intercept SystemExit
+
+
+changeset:   7631:037fbfb7adcc
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sat Apr 10 12:41:00 2010 +1000
+files:       bin/vt
+description:
+bin/vt: run error messages through cs.logutils.Pfx
+
+
+changeset:   7632:f54b4a7fc05a
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Tue Apr 13 12:04:25 2010 +1000
+files:       lib/cs/threads.py
+description:
+cs.threads: add optional cancel parameter to TimerQueue.close()
+
+
+changeset:   7633:9444b50440b6
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Tue Apr 13 14:00:32 2010 +1000
+files:       lib/cs/threads.py
+description:
+cs.threads: add .close() to Channel, iimprove handling end-of-requests in FuncMultiQueue
+
+
+changeset:   7634:4d0f38680f27
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Tue Apr 13 17:09:57 2010 +1000
+files:       bin/get-mailman-archive
+description:
+get-mailman-archive: add usage message, emit when no arguments
+
+
+changeset:   7635:0211a9f74caa
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Tue Apr 13 17:10:57 2010 +1000
+files:       lib/cs/threads.py
+description:
+cs.threads: make Channels iterable and closable, mark FuncMultiQueue.close() as buggy, add synchronous mode to FuncMultiQueue
+
+
+changeset:   7636:fa012d0307e3
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Wed Apr 14 09:08:35 2010 +1000
+files:       bin/cpmysql
+description:
+cpmysql: include mysql db in default dump list
+
+
+changeset:   7637:b0c94ca52b6f
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Wed Apr 14 16:24:33 2010 +1000
+files:       lib/cs/logutils.py
+description:
+cs.logutils: add logException, an interceptor for sys.excepthook - needs more work though
+
+
+changeset:   7638:474ef6d4a7ea
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Thu Apr 15 09:36:59 2010 +1000
+files:       bin/get-mailman-archive
+description:
+get-mailman-archive: tighter argument checking, better usage, avoid writing to terminal
+
+
+changeset:   7639:34918226c8ff
+parent:      7637:b0c94ca52b6f
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Thu Apr 15 15:23:17 2010 +1000
+files:       lib/cs/logutils.py
+description:
+cs.logutils.Pfx: inherit Logger list from enclosing Pfxs
+
+
+changeset:   7640:39168ff138e3
+parent:      7639:34918226c8ff
+parent:      7638:474ef6d4a7ea
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Thu Apr 15 15:24:21 2010 +1000
+description:
+bin/get-mailman-archive: merge changes from g4 repository
+
+
+changeset:   7641:de2a07d4f5d9
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Thu Apr 15 16:03:05 2010 +1000
+files:       lib/cs/logutils.py
+description:
+cs.logutils: add @pfx(tag) decorator for functions that should run inside a Pfx(tag)
+
+
+changeset:   7642:b5a1a3c9f298
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Fri Apr 16 12:21:02 2010 +1000
+files:       lib/cs/configutils.py
+description:
+cs.configutils.ConfigWatcher: add .get(item, default) method
+
+
+changeset:   7643:b592303203f3
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Fri Apr 16 12:22:17 2010 +1000
+files:       lib/cs/excutils.py lib/cs/misc.py
+description:
+cs.misc,cs.excutils: move NoExceptions into cs.excutils, obsolete cs.misc.logException
+
+
+changeset:   7644:77f6f910e8a9
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Fri Apr 16 12:22:51 2010 +1000
+files:       lib/cs/logutils.py
+description:
+cs.logutis.Pfx: add .logto(loggers) method
+
+
+changeset:   7645:e4ffb1cdd2ec
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Fri Apr 16 15:26:27 2010 +1000
+files:       lib/cs/misc.py
+description:
+cs.misc: omit setting global logging level - trying to debug something
+
+
+changeset:   7646:1564dd970261
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Fri Apr 16 15:27:11 2010 +1000
+files:       lib/cs/excutils.py
+description:
+cs.excutils.NoExceptions: report exception vaue when reporting ignored exception
+
+
+changeset:   7647:7c43026ee1fc
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Fri Apr 16 15:27:49 2010 +1000
+files:       lib/cs/logutils.py
+description:
+cs.logutils: comment out some junk, add listargs() convenience function
+
+
+changeset:   7648:d37f621fdf5c
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Thu Apr 22 11:46:40 2010 +1000
+files:       bin/scr
+description:
+scr: preserve $PATH and $TMPDIR for screen innner command
+
+
+changeset:   7649:87b664b8a77c
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Fri Apr 23 11:57:43 2010 +1000
+files:       lib/cs/excutils.py
+description:
+cs.excutils: NoExceptions: provide traceback for IGNORED exceptions
+
+
+changeset:   7650:b603ab34fb6f
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Fri Apr 23 20:42:45 2010 +1000
+files:       bin/cdrip
+description:
+cdrip: rip to mp3 by default; sad
+
+
+changeset:   7651:5c61b3fb4134
+parent:      7647:7c43026ee1fc
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Wed Apr 21 14:48:59 2010 +1000
+files:       lib/cs/nodedb.py lib/cs/nodedb/__init__.py lib/cs/nodedb/node.py
+description:
+cs.nodedb: initial recode for pure-dict, pure-list implementation
+
+
+changeset:   7652:115ded53e03a
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Thu Apr 22 16:28:01 2010 +1000
+files:       lib/cs/nodedb/node.py
+description:
+cs.nodedb.node: add new _QBackend async backend wrapper, untested; add .close() method to backends
+
+
+changeset:   7653:892a142696b6
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Fri Apr 23 14:11:24 2010 +1000
+files:       lib/cs/nodedb/__init__.py lib/cs/nodedb/node.py
+description:
+cs.nodedb: pass Node instead of (type,name) to backend methods, finish SQLA backend
+
+
+changeset:   7654:ad234b245546
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Fri Apr 23 17:58:00 2010 +1000
+files:       lib/cs/nodedb/node.py
+description:
+cs.nodedb: get cs.nodedb.sqla working and unit tested,and fix cs.nodedb.node unittest too
+
+
+changeset:   7655:c4cc306655af
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sun Apr 25 13:36:01 2010 +1000
+files:       lib/cs/nodedb/node.py lib/cs/nodedb/sqla.py
+description:
+cs.node.nodedb: serialise ints as :int, support deprecated :#node_id serialisation
+
+
+changeset:   7656:e2e0a8bc1627
+parent:      7650:b603ab34fb6f
+parent:      7655:c4cc306655af
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sun Apr 25 13:37:32 2010 +1000
+files:       lib/cs/nodedb.py
+description:
+Automated merge with file:///Users/cameron/hg/css-g4
+
+
+changeset:   7657:fb7fa6aebdfd
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sun Apr 25 15:03:29 2010 +1000
+files:       lib/cs/nodedb/__init__.py lib/cs/nodedb/node.py lib/cs/nodedb/sqla.py
+description:
+cs.nodedb: support operations needed by wiringdb
+
+
+changeset:   7658:407bb60d0830
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sun Apr 25 20:27:39 2010 +1000
+files:       lib/cs/nodedb/node.py lib/cs/nodedb/sqla.py
+description:
+cs.nodedb: restore missing attrValueText() function, assorted bugfixes
+
+
+changeset:   7659:0eef3d53c088
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sun Apr 25 20:39:57 2010 +1000
+files:       lib/cs/nodedb/node.py
+description:
+cs.nodedb.node.Node: implement .get() correctly
+
+
+changeset:   7660:8630137a7f60
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Tue Apr 27 17:15:11 2010 +1000
+files:       lib/cs/nodedb/node.py
+description:
+cs.nodedb: add Backend.saveAttrs method, move NodeDB.nodeParentsByAttr code into Node.parentsByAttr, add lots of proxy methods to _AttrList
+
+
+changeset:   7661:bc0a1dacea3c
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Tue Apr 27 17:59:57 2010 +1000
+files:       lib/cs/nodedb/node.py
+description:
+cs.nodedb.node: slight error report improvements
+
+
+changeset:   7662:fce7eaf45382
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Wed Apr 28 14:30:28 2010 +1000
+files:       lib/cs/logutils.py
+description:
+cs.logutils: debugging
+
+
+changeset:   7663:c3d87a5358b4
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Wed Apr 28 14:31:58 2010 +1000
+files:       lib/cs/nodedb/node.py lib/cs/nodedb/sqla.py lib/cs/nodedb/text.py
+description:
+cs.nodedb: add cs.nodedb.text load/dump/edit/tokenise support, associated changes elsewhere in cs.nodedb
+
+
+changeset:   7664:162708cf8317
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Wed Apr 28 14:41:23 2010 +1000
+files:       lib/cs/nodedb/text.py
+description:
+cs.nodedb.text: bugfix attrValueText for non-str values
+
+
+changeset:   7665:6eeec7b42289
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Thu Apr 29 19:49:54 2010 +1000
+files:       bin-cs/syncezos bin-cs/syncezos-cgi bin-cs/syncezos-kath bin-cs/syncezos-rc bin/syncezos bin/syncezos-cgi bin/syncezos-kath bin/syncezos-rc
+description:
+bin/*ezos* -> bin-cs
+
+
+changeset:   7666:9bc7e23dab01
+tag:         tip
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Fri Apr 30 12:05:31 2010 +1000
+files:       bin/rwget
+description:
+rwget: run remote wget command
+
+
