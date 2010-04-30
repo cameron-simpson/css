@@ -1,0 +1,108 @@
+#!/bin/sh
+#
+# Do remote wget. Expects .netrc file at the far end for passwords.
+#       - Cameron Simpson <cs@zip.com.au>
+#
+
+set -ue
+
+rate=20000
+continue=
+continue_mode=
+ssh=sshto
+wgetopts=
+trace=
+rtrace=
+
+cmd=$0
+usage="Usage: $cmd [-c] [-e ssh] [--limit-rate=rate] [user@]remote [wget-opts...] < urls"
+
+opts=
+while [ $# -gt 0 ]
+do
+  case $1 in
+    -c) opts="$opts $1" continue_mode=curl ;;
+    -e) ssh=$2; shift ;;
+    -x) trace=set-x rtrace=./bin/set-x ;;
+    --limit-rate=?*)
+        opts="$opts $1" rate=`expr "x$1" : 'x--limit-rate=\(.*\)'` ;;
+    --) shift; break ;;
+    -?*)echo "$cmd: unrecognised option: $1" >&2
+        badopts=1
+        ;;
+    *)  break ;;
+  esac
+  shift
+done
+
+[ $# = 1 ] || { echo "$usage" >&2; exit 2; }
+remote=$1
+shift
+
+[ -n "${SSH_MASTER_CONTROL_PATH:-}" ] \
+|| exec $trace with-ssh-master -- "$remote" "$0" $opts -- "$remote" ${1+"$@"}
+
+xit=0
+
+while read -r url
+do
+  echo "$url" >&2
+
+  case "$url" in
+    */)   out=index.html ;;
+    *)    out=`basename "$url"` ;;
+  esac
+
+  case "$continue_mode" in
+    '') if [ -f "$out" ]
+        then
+          echo "$cmd: already exists: $out" >&2
+          xit=1
+          continue
+        fi
+
+        printf "%s\n" "$url" \
+        | $trace $ssh -o ControlMaster=no \
+                     -o "ControlPath=$SSH_MASTER_CONTROL_PATH" \
+            "$remote" \
+            $rtrace \
+            wget -t 1 "--limit-rate=$rate" --progress=bar:force -O - -i - \
+            >"$out" || xit=1
+        ;;
+    wget)
+        # this won't work when reading URLs from stdin
+        # wget really needs curl's "-C offset" option in addition to -c
+        [ -f "$out" ] || { echo "$cmd: continue mode: missing: $out" >&2
+                           xit=1
+                           continue
+                         }
+
+        printf "%s\n" "$url" \
+        | $trace $ssh -o ControlMaster=no \
+                     -o "ControlPath=$SSH_MASTER_CONTROL_PATH" \
+            "$remote" \
+            $rtrace \
+            wget -c -t 1 "--limit-rate=$rate" --progress=bar:force -O - -i - \
+            >>"$out" || xit=1
+        ;;
+    curl)
+        [ -f "$out" ] || { echo "$cmd: continue mode: missing: $out" >&2
+                           xit=1
+                           continue
+                         }
+
+        size=`ls -ld -- "$out" | awk '{print$5}'`
+        $trace $ssh -n -o ControlMaster=no \
+                     -o "ControlPath=$SSH_MASTER_CONTROL_PATH" \
+          "$remote" \
+          $rtrace \
+          curl --netrc -C "$size" --limit-rate "$rate" --progress-bar -o - -- "$url" \
+        >>"$out" || xit=1
+        ;;
+    *)  echo "$cmd: unsupported continue_mode: $continue_mode" >&2
+        exit 1
+        ;;
+  esac
+done
+
+exit $xit
