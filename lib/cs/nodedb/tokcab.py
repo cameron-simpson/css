@@ -5,6 +5,7 @@
 #
 
 import os
+import os.path
 from types import StringTypes
 import unittest
 import sys
@@ -67,8 +68,25 @@ class Backend_TokyoCabinet(Backend):
 class TestAll(NodeTestAll):
 
   def setUp(self):
-    self.backend=Backend_TokyoCabinet('test.tch')
+    dbpath = 'test.tch'
+    self.dbpath = dbpath
+    if os.path.exists(dbpath):
+      os.remove(dbpath)
+    self.backend=Backend_TokyoCabinet(dbpath)
     self.db=NodeDB(backend=self.backend)
+
+  def test22persist(self):
+    N = self.db.newNode('HOST:foo1')
+    N.X=1
+    N2 = self.db.newNode('SWITCH:sw1')
+    N2.Ys=(9,8,7)
+    dbstate = str(self.db)
+    print >>sys.stderr, "test22 1:", dbstate
+    self.db.close()
+    self.db=NodeDB(backend=Backend_TokyoCabinet(self.dbpath))
+    dbstate2 = str(self.db)
+    print >>sys.stderr, "test22 2:", dbstate2
+    self.assert_(dbstate == dbstate2, "db state differs:\n\t%s\n\t%s" % (dbstate, dbstate2))
 
   def tearDown(self):
     self.db.close()
