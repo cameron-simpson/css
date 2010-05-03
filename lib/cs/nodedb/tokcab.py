@@ -23,14 +23,14 @@ class Backend_TokyoCabinet(Backend):
                   (tc.HDBOREADER if readonly else tc.HDBOWRITER | tc.HDBOCREAT))
 
   def _attrtag(self, N, attr):
-    return ':'.join( (N.type, N.name, attr) )
+    return ':'.join( (attr, N.type, N.name) )
 
   def _preload(self):
     ''' Prepopulate the NodeDB from the database.
     '''
     # load Nodes
     for attrtag, attrvalue in self.hdb.iteritems():
-      t, name, attr = attrtag.split(':')
+      attr, t, name = attrtag.split(':', 2)
       try:
         N = self._IIDByTypeName[t, name]
       except KeyError:
