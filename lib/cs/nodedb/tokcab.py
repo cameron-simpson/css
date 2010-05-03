@@ -32,7 +32,7 @@ class Backend_TokyoCabinet(Backend):
     for attrtag, attrvalue in self.hdb.iteritems():
       attr, t, name = attrtag.split(':', 2)
       try:
-        N = self._IIDByTypeName[t, name]
+        N = self.nodedb[t, name]
       except KeyError:
         N = self.nodedb._makeNode(t, name)
       values = [ self.deserialise(value) for value in attrvalue.split('\0') ]
