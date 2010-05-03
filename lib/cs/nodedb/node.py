@@ -461,7 +461,7 @@ class NodeDB(dict):
     return N
 
   def _makeNode(self, t, name):
-    assert (t, name) not in self, 'newNode(%s): %s already exists' % (", ".join(args), (t, name), )
+    assert (t, name) not in self, 'newNode(%s, %s): already exists' % (t, name)
     N = self[t, name] = self._createNode(t, name)
     return N
 
