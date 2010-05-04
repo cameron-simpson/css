@@ -13,6 +13,7 @@ usage="Usage: $cmd op [args...]
     last        Report last release issued.
     next        Generate a new release number.
     log         Changelog from last release to now.
+    export      Export release to temporary directory, report directory.
     freshmeat-submit
                 Announce last release to freshmeat."
 
@@ -36,6 +37,7 @@ case $op in
     printf "%s\n" "$lastrelease"
     exit 0
     ;;
+
   next)
     lastrelease=`$trace "$0" last`
     [ -n "$lastrelease" ] || exit 1
@@ -63,12 +65,14 @@ case $op in
     printf "%s\n" "$release"
     exit 0
     ;;
+
   log)
     lastrelease=`$trace "$0" last`
     $trace hg log -r "release-$lastrelease:" \
                   --template '{files}: {desc|firstline}\n' \
     | $trace sed '/^\.hg/d; /^CHANGELOG/d; /^release-/d'
     ;;
+
   add)
     lastrelease=`$trace "$0" last`
     log=`$trace "$0" log`
@@ -113,6 +117,56 @@ Summary:
 $summary_text" "$reldir"
     $trace hg tag "$newtag"
     ;;
+
+  export)
+    exec 3>&1 1>&2
+    rev=
+    usage="Usage: $cmd $op [-r rev]"
+    badopts=
+    while [ $# -gt 0 ]
+    do
+      case $1 in
+        -r) rev=$2; shift ;;
+        --) shift; break ;;
+        -?*)echo "$cmd: $op: unrecognised option: $1" >&2
+            badopts=1
+            ;;
+        *)  break ;;
+      esac
+      shift
+    done
+
+    [ $# = 0 ] || { echo "$cmd: extra arguments: $*" >&2
+                    badopts=1
+                  }
+
+    [ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+    if [ -z "$rev" ]
+    then
+      rev=`cs-release last`
+      rev=release-$rev
+    fi
+
+    xit=0
+
+    set -ue
+
+    unset tmpdir
+    trap '[ ! -d "$tmpdir" ] || rm -rf $tmpdir' 0
+    trap '[ ! -d "$tmpdir" ] || rm -rf $tmpdir; exit 1' 1 2 13 15
+    tmpdir=`mkdirn "$TMPDIR/$cmd"`
+
+    dstdir=$tmpdir
+    echo archive revision $rev ...
+    hg archive -t files -r "$rev" "$dstdir"
+    echo update file timestamps ...
+    hg-apply-manifest-dates -r "$rev" "$dstdir"
+
+    echo "$dstdir" >&3
+    exit $xit
+    ;;
+
   freshmeat-submit)
     unset fm_project \
           fm_url_home \
@@ -135,7 +189,9 @@ $summary_text" "$reldir"
                          -C "$fm_url_changelog" \
            </dev/null
     ;;
+
   *)echo "$cmd: unimplemented op \"$op\"" >&2
     exit 2
     ;;
+
 esac
