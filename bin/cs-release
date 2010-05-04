@@ -39,27 +39,31 @@ case $op in
     ;;
 
   next)
-    lastrelease=`$trace "$0" last`
-    [ -n "$lastrelease" ] || exit 1
+    lastrelease=`$trace "$0" last` || lastrelease=
     today=`date +%Y%m%d`
-    if [ "x$lastrelease" '<' "x$today" ]
+    if [ -z "$lastrelease" ]
     then
       release=$today
-    else 
-      if [ "x$lastrelease" = "x$today" ]
+    else
+      if [ "x$lastrelease" '<' "x$today" ]
       then
-        release=${today}.2
-      else
-        case "$lastrelease" in
-          "$today".[1-9] )
-            sfx=`expr "x$lastrelease" : "x$today".'\([1-9][0-9]*\).*'`
-            release=$today.`expr "$sfx" + 1`
-            ;;
-          *)
-            echo "$cmd: can't compute next release from \"$lastrelease\"" >&2
-            exit 1
-            ;;
-        esac
+        release=$today
+      else 
+        if [ "x$lastrelease" = "x$today" ]
+        then
+          release=${today}.2
+        else
+          case "$lastrelease" in
+            "$today".[1-9] )
+              sfx=`expr "x$lastrelease" : "x$today".'\([1-9][0-9]*\).*'`
+              release=$today.`expr "$sfx" + 1`
+              ;;
+            *)
+              echo "$cmd: can't compute next release from \"$lastrelease\"" >&2
+              exit 1
+              ;;
+          esac
+        fi
       fi
     fi
     printf "%s\n" "$release"
@@ -67,14 +71,14 @@ case $op in
     ;;
 
   log)
-    lastrelease=`$trace "$0" last`
-    $trace hg log -r "release-$lastrelease:" \
+    lastrelease=release-`$trace "$0" last` || lastrelease=0
+    $trace hg log -r "$lastrelease:" \
                   --template '{files}: {desc|firstline}\n' \
     | $trace sed '/^\.hg/d; /^CHANGELOG/d; /^release-/d'
     ;;
 
   add)
-    lastrelease=`$trace "$0" last`
+    lastrelease=release-`$trace "$0" last` || lastrelease=0
     log=`$trace "$0" log`
     [ -n "$log" ] || exit 1
     uncommited=`$trace hg status | grep -v '^?' || :`
@@ -109,7 +113,7 @@ case $op in
     $trace mkdir "$reldir"
     printf "%s\n" "$newtag" >"$reldir/release-tag.txt"
     $trace mv "$changefile" "$reldir/SUMMARY.txt"
-    $trace hg log -r "release-$lastrelease:tip" >"$reldir/CHANGES.txt"
+    $trace hg log -r "$lastrelease:tip" >"$reldir/CHANGES.txt"
     $trace hg add "$reldir"
     summary_text=`cat "$reldir/SUMMARY.txt"`
     $trace hg commit -m "Release information for $newtag.
