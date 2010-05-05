@@ -61,7 +61,7 @@ do
 	then
 	    lockedoutput "$lock" "$@" "$line" &
 	else
-	    ( set x "$@" $line; shift
+	    ( set -- "$@" $line
 	      exec lockedoutput "$lock" "$@"
 	    ) &
 	fi

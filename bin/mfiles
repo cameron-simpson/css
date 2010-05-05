@@ -29,7 +29,7 @@ fi
 first=1
 for file
 do [ $first ] && { set x; shift; first=; }
-   set x ${1+"$@"} -a "$file"; shift
+   set -- ${1+"$@"} -a "$file"
 done
 
 exec mutt -s "$subj" ${1+"$@"} "$addr"

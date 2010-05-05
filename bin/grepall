@@ -45,11 +45,11 @@ do
   esac
   case "$word" in
     !*)   word=`expr "x$word" : 'x.\(.*\)'`
-	  set x -e "/$word/d" ${1+"$@"}; shift
+	  set -- -e "/$word/d" ${1+"$@"}
 	  ;;
     *)    if [ $any ]
-	  then set x ${1+"$@"} -e "/$word/b ok"; shift
-	  else set x ${1+"$@"} -e "/$word/!d"; shift
+	  then set -- ${1+"$@"} -e "/$word/b ok"
+	  else set -- ${1+"$@"} -e "/$word/!d"
 	  fi
 	  ;;
   esac
@@ -59,11 +59,9 @@ done
 
 [ $ok ] || exit 1
 
-[ $icase ] && { set x -e h -e 'y/ABCDEFGHIJKLMNOPQRSTUVWXYZ/abcdefghijklmnopqrstuvwxyz/' ${1+"$@"}
-		shift
-	      }
-[ $any ] && { set x ${1+"$@"} -e d -e ':ok'; shift; }
-[ $icase ] && { set x ${1+"$@"} -e g; shift; }
+[ $icase ] && set -- -e h -e 'y/ABCDEFGHIJKLMNOPQRSTUVWXYZ/abcdefghijklmnopqrstuvwxyz/' ${1+"$@"}
+[ $any ] && set -- ${1+"$@"} -e d -e ':ok'
+[ $icase ] && set -- ${1+"$@"} -e g
 
 ##set -x
 exec sed "$@"

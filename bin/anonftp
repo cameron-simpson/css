@@ -49,7 +49,7 @@ password="
 password $EMAIL"
 cmds=
 
-eval "set x $AFTPARGS "'${1+"$@"}'; shift
+eval "set -- $AFTPARGS "'${1+"$@"}'
 while :
 do
     case "$#,$1" in
@@ -111,12 +111,12 @@ case "$host" in
 esac
 
 case "$target" in
-    */)	set x "cd \"$target\"" dir ${1+"$@"}; shift ;;
+    */)	set -- "cd \"$target\"" dir ${1+"$@"} ;;
     */*)targetdir=`exec dirname "$target"`
 	target=`exec basename "$target"`
-	set x "cd \"$targetdir\"" "get \"$target\"" ${1+"$@"}; shift
+	set -- "cd \"$targetdir\"" "get \"$target\"" ${1+"$@"}
 	;;
-    ?*)	set x "get \"$target\"" ${1+"$@"}; shift ;;
+    ?*)	set -- "get \"$target\"" ${1+"$@"} ;;
 esac
 
 case $# in

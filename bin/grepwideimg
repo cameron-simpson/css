@@ -6,8 +6,7 @@
 
 if [ $# = 0 -o "x$*" = x- ]
 then
-    set x `cat`
-    shift
+    set -- `cat`
 fi
 
 imsize ${1+"$@"} /dev/null 2>/dev/null \

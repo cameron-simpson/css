@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 
-set x `find ${1+"$@"} ${1-.} -type f -name '*-small.gif' -print`; shift
+set -- `find ${1+"$@"} ${1-.} -type f -name '*-small.gif' -print`
 if [ $# = 0 ]
 then
     # echo "$0: nothing to remove" >&2

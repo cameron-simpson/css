@@ -8,7 +8,7 @@ cd $HOME/var/maildrop || exit $?
 sync
 
 for pre in deleted UNFILED in
-do  set x *.+$pre; shift
+do  set -- *.+$pre
     if [ -s "$1" ]
     then  echo "+$pre..." >&2
 	  maildrop -F - -r "$@" | filemail

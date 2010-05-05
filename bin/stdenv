@@ -85,7 +85,7 @@ export PATH
 
 if [ $# = 0 ]
 then
-    set x "${SHELL:-/bin/sh}"; shift;
+    set -- "${SHELL:-/bin/sh}"
 else
     [ -t 1 ] && set colourise "$@"
 fi

@@ -16,7 +16,7 @@ doit=
 if [ $# = 0 ]
 then
     if [ -s .slideshow ]
-    then  set x `cat .slideshow`; shift
+    then  set -- `cat .slideshow`
     fi
     [ $# = 0 ] && { echo "$usage" >&2; exit 2; }
 fi

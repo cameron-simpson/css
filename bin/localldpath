@@ -4,7 +4,7 @@
 #	- Cameron Simpson <cs@zip.com.au> 01feb2000
 #
 
-[ $# = 0 ] && { set x "$SHELL"; shift; }
+[ $# = 0 ] && set -- "$SHELL"
 
 for var in LD_RUN_PATH LD_LIBRARY_PATH LDPATH
 do  eval "$var=/lib:/usr/lib:/opt/lib; export $var"

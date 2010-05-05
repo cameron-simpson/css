@@ -31,8 +31,7 @@ cf=$dummyhome/.my.cnf
 echo "[server]" >>"$cf"
 echo "datadir=$datadir" >>"$cf"
 
-set x "$inst" ${1+"$@"}
-shift
+set -- "$inst" ${1+"$@"}
 
 ( set -x
   HOME=$dummyhome "$@"

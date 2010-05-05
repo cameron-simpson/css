@@ -9,7 +9,7 @@ wkdir=${TMP:-/tmp}/$cmd.$$
 
 mkdir "$wkdir" || exit $?
 
-[ $# -gt 0 ] && { set x $HOME/private/hotlists/monthly/????; shift; }
+[ $# -gt 0 ] && set -- $HOME/private/hotlists/monthly/????
 
 cat "$@" \
   | sed 's/^[0-9][0-9]*	//' \

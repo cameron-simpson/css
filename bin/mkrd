@@ -124,7 +124,7 @@ do  hits=`ls -d $moddir/$mod.o $moddir/*/$mod.o 2>/dev/null`
 		;;
 	*\ *)	echo "$cmd: multiple hits for \"$mod\", keeping first one:" >&2
 		echo "$hits" | sed 's/^/	/' >&2
-		hits=`set x $hist; shift; echo $1`
+		hits=`set -- $hist; echo $1`
 		;;
     esac
 

@@ -48,7 +48,7 @@ do
     if [ "x$file" = x- ]
     then
 	[ $verbose ] && echo "reading filenames from stdin..."
-	set x `cat` ${1+"$@"}; shift
+	set -- `cat` ${1+"$@"}
     else
 	[ $verbose ] && echo "$file ..."
 	ok=

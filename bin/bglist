@@ -48,7 +48,7 @@ then
 fi
 
 # no dirs?
-[ $# = 0 ] && { set x `bgdirs`; shift; }
+[ $# = 0 ] && set -- `bgdirs`
 
 filter="awk '{ print \$3 }'"
 if [ $tall ]

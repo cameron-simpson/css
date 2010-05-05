@@ -34,7 +34,7 @@ case $# in
 	     exit 1
 	   }
 	eval "$settings"
-	set x "$userid" "$password"; shift
+	set -- "$userid" "$password"
 	;;
 esac
 

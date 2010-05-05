@@ -37,7 +37,7 @@ then	echo "$cmd: no filenames"
 	exit 1
 fi
 
-set x `egrep -l $egflags "$regexp" $*`; shift
+set -- `egrep -l $egflags "$regexp" $*`
 
 if [ $# -lt 1 ]
 then	echo "$cmd: no files contain the regexp \"$regexp\"" >&2

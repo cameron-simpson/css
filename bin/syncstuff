@@ -258,7 +258,7 @@ then
 	esac
 	[ -s "$list" ] \
 	&& { [ $verbose ] && cat "$list"
-	     set x ${1+"$@"} "--include-from=$list"; shift
+	     set -- ${1+"$@"} "--include-from=$list"
 	   }
     done
     if [ $backupmode ]

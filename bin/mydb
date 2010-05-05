@@ -31,12 +31,11 @@ MYSQL_UNIX_PORT=$TMPDIR/mysqld-$USER.sock
 export MYSQL_UNIX_PORT
 echo "MYSQL_UNIX_PORT=$MYSQL_UNIX_PORT"
 
-set x "$mysqld" --no-defaults \
-		--basedir="$mysqldir" \
-		--datadir="$datadir" \
-		--socket=$MYSQL_UNIX_PORT \
-		${1+"$@"}
-shift
+set -- "$mysqld" --no-defaults \
+		 --basedir="$mysqldir" \
+		 --datadir="$datadir" \
+		 --socket=$MYSQL_UNIX_PORT \
+		 ${1+"$@"}
 
 set -x
 "$@" &

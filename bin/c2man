@@ -37,7 +37,7 @@ done
 
 case "$badargv" in '') ;; *) echo "$usage" >&2; exit 2 ;; esac
 
-case $# in 0) set x *.h *.c; shift ;; esac
+case $# in 0) set -- *.h *.c ;; esac
 
 [ -n "$mandir" ] || { mandir=.; echo "$cmd: warning: mandir=$mandir" >&2; }
 

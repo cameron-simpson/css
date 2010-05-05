@@ -15,7 +15,7 @@ cols=
 clean=
 
 # load default options
-eval "set x $UNHTML_OPTS "' ${1+"$@"}'; shift
+eval "set -- $UNHTML_OPTS "' ${1+"$@"}'
 
 badopts=
 while :

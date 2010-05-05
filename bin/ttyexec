@@ -5,5 +5,5 @@
 #
 
 sane
-[ $# = 0 ] && { set x "$SHELL"; shift; }
+[ $# = 0 ] && set -- "$SHELL"
 exec pushttylabel -exec +a "$*" "$@"

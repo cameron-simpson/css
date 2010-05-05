@@ -12,7 +12,7 @@ case "$1" in
     .?*)	sfx=$1; shift ;;
 esac
 
-[ $# = 0 ] || { set x -exec "$@" {} ';'; shift; }
-[ -n "$sfx" ] && { set x -name "*$sfx" "$@"; shift; }
+[ $# = 0 ] || set -- -exec "$@" {} ';'
+[ -n "$sfx" ] && set -- -name "*$sfx" "$@"
 
 exec find . -type f "$@"

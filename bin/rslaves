@@ -14,7 +14,7 @@ do
   [ $first ] && { set x; shift; }
 
   slcmd="ssh '$remote' \${RSLAVES_RIGENV:-./bin/rigenv} shell -i"
-  set x ${1+"$@"} "$slcmd"; shift
+  set -- ${1+"$@"} "$slcmd"
 
   first=
 done

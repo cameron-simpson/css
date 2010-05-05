@@ -9,7 +9,7 @@ case $1 in -r) recurse=1; shift ;; esac
 case $1 in -a) modes=${modes}a; shift ;; esac
 
 if [ $recurse ]
-then	set x `find ${1-.} ${1+"$@"} -type f -print`; shift
+then	set -- `find ${1-.} ${1+"$@"} -type f -print`
 fi
 
 exec touch $modes 01010000$yr ${1+"$@"}

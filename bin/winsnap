@@ -15,7 +15,7 @@ quant=64	# default colour quanization
 args=		# passed to real xwd
 
 # default to PNG mode
-set x -png ${1+"$@"}; shift
+set -- -png ${1+"$@"}
 
 badopts=
 while :

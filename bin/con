@@ -44,7 +44,7 @@ case "$tty" in
 esac
 
 case $#,$dashc in
-    0,1)    set x ${SHELL-sh} -c "$copt"; shift ;;
+    0,1)    set -- ${SHELL-sh} -c "$copt" ;;
     0,)     echo "$cmd: missing -c or command" >&2
 	    badopts=1 ;;
     *,1)    echo "$cmd: can't use -c and also a command" >&2

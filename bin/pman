@@ -21,7 +21,7 @@ usage="Usage: $cmd [-Pprinter] [-1] [-a] manuals...
 badopts=
 
 # use default args from $PMANFLAGS if nothing supplied
-case $1 in -?*) ;; *) set x $PMANFLAGS ${1+"$@"}; shift ;; esac
+case $1 in -?*) ;; *) set -- $PMANFLAGS ${1+"$@"} ;; esac
 
 while :
 do  case $1 in
@@ -55,7 +55,7 @@ do  [ $tty ] && echo "Searching for $manual ..."
     fi
 
     ( xit=0
-      set x $paths; shift
+      set -- $paths
 
       if [ $# -gt 1 ]
       then

@@ -8,7 +8,7 @@ esac
 info=$QUEDIR
 long=${info}-long
 case "$1" in
-    -a)	shift; set x -f "$long" ${1+"$@"} ;;
+    -a)	shift; set -- -f "$long" ${1+"$@"} ;;
 esac
 
 exec ring -v -f "$info" ${1+"$@"}

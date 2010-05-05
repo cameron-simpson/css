@@ -10,7 +10,7 @@ case "$1" in
     -nroff)	roff=nroff ; shift ;;
 esac
 
-[ $# = 0 ] && { set x -; shift ; }
+[ $# = 0 ] && set -- -
 
 dpp '-es/\{\{(([^\}]|}[^\}])+)\}\}/\\fB\\f(Co$1\\fR/g' \
 	"$hdr" "$@" \

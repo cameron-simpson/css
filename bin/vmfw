@@ -83,10 +83,10 @@ exec >/dev/tty 2>&1
 	    then num=$num1
 	    else num=$num2
 	    fi
-	    set x $* $num; shift
+	    set -- $* $num
 	done
   else
-	  set x `find "$@" -type f -print`; shift
+	  set -- `find "$@" -type f -print`
   fi
 
   [ -z "$drop" ] && drop="fw +a $rawopt $pfx \$who"

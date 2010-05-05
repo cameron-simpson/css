@@ -60,8 +60,8 @@ done
 # get dates, in order
 [ $# = 0 ] && set 19[0-9][0-9][01][0-9][0-3][0-9]* \
 		  20[0-9][0-9][01][0-9][0-3][0-9]*
-set x `ls -d -- "$@"` $today; shift
-set x `for date in "$@"; do echo "$date"; done | sort $rflag`; shift
+set -- `ls -d -- "$@"` $today
+set -- `for date in "$@"; do echo "$date"; done | sort $rflag`
 
 xit=0
 

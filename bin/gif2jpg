@@ -38,16 +38,14 @@ then
     exit $xit
 fi
 
-[ $# = 0 ] && { case $0 in
-		    *bmp2jpg)	set x *.bmp ;;
-		    *pnm2jpg)	set x *.pnm ;;
-		    *jpg2pnm)	set x *.jpg ;;	# implemented through a hack
-		    *tif2jpg)	set x *.tif *.tiff ;;
-		    *gif2jpg)	set x *.gif ;;
-		    *png2jpg)	set x *.png ;;
-		esac
-		shift
-	      }
+[ $# = 0 ] && case $0 in
+                  *bmp2jpg)	set -- *.bmp ;;
+                  *pnm2jpg)	set -- *.pnm ;;
+                  *jpg2pnm)	set -- *.jpg ;;	# implemented through a hack
+                  *tif2jpg)	set -- *.tif *.tiff ;;
+                  *gif2jpg)	set -- *.gif ;;
+                  *png2jpg)	set -- *.png ;;
+              esac
 
 tmp=$TMPDIR/t$$
 xit=0

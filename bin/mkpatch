@@ -9,7 +9,7 @@ cmd=`exec basename "$0"`
 usage="Usage: $cmd [-c commentry] [--] olddir newdir"
 
 commentry=
-eval "set x `exec getopt -q c: $@`" ; shift
+eval "set -- `exec getopt -q c: $@`"
 while [ $# != 0 ]
 do
 	case "$1" in

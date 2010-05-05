@@ -60,7 +60,7 @@ xit=0
 
 if [ $requeue ]
 then
-    [ $# = 0 ] && { cd "$qdir" || exit $?; set x *.+*; shift; }
+    [ $# = 0 ] && { cd "$qdir" || exit $?; set -- *.+*; }
     pwd=`pwd`
     for f
     do  case $f in

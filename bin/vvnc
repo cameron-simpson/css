@@ -12,7 +12,7 @@ usage="Usage: $cmd [XxY] :n [host]:n
 badopts=
 
 # default setup if no args
-[ $# = 0 ] && { set x $VVNC_DEFAULT; shift; }
+[ $# = 0 ] && set -- $VVNC_DEFAULT
 
 geom=
 case "$1" in

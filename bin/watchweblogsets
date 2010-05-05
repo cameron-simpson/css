@@ -19,7 +19,7 @@ case $1 in
     -[fp])	wlpopts="$wlpopts $1 $2"; shift; shift ;;
 esac
 
-[ $# = 0 ] && { set x -; shift; }
+[ $# = 0 ] && set -- -
 
 while [ $# -gt 0 ]
 do
@@ -27,8 +27,7 @@ do
 
   case $reldir in
     -)	
-      set x `cat` ${1+"$@"}
-      shift
+      set -- `cat` ${1+"$@"}
       continue
       ;;
     /*)

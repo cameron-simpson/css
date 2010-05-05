@@ -3,7 +3,7 @@
 mode=
 [ "x$1" = x-t ] && { mode=-t; shift; }
 
-[ $# = 0 ] && { set x -; shift; }
+[ $# = 0 ] && set -- -
 
 if [ "x$*" = x- ]
 then urls -x

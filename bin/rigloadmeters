@@ -17,7 +17,7 @@ if [ -z "$xmhostlist" ]
 then  bgproc -p xmeter.$HOST.$DISPLAY xmeter -dv -geometry -$xmhoff+$xmvoff -h $xmdy -w $xmdx -load $HOST
 else  while read hosts
       do
-	ncols=`set x $hosts; shift; echo $#`
+	ncols=`set -- $hosts; echo $#`
 	set -x
 	bgproc -p xmeter.$HOST.$DISPLAY xmeter -dv -cols $ncols \
 						-geometry -$xmhoff+$xmvoff \

@@ -12,7 +12,7 @@ usage="Usage: $cmd [-t mimetype] [archive]"
 mtype=
 [ "x$1" = x-t ] && { mtype=$2; shift; shift; }
 
-[ $# = 0 ] && { set x -; shift; }
+[ $# = 0 ] && set -- -
 [ $# = 1 ] || { echo "$usage" >&2; exit 2; }
 file=$1; shift
 

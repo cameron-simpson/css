@@ -25,8 +25,7 @@ file=$1; shift
 		    echo "$cmd: you can't use the - option with the default editor" >&2
 		    exit 1
 		else
-		    set x "$EDITOR"
-		    shift
+		    set -- "$EDITOR"
 		fi
 	      }
 

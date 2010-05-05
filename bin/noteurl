@@ -71,5 +71,5 @@ do
     [ -n "$URLLOG" ] && echo "noteurl $pfx $url" >>"$URLLOG"
 done
 
-[ -n "$tag" ] || tag=`( set x \`date\`; shift; echo "$1 $2 $3 $6" )`
+[ -n "$tag" ] || tag=`( set -- \`date\`; echo "$1 $2 $3 $6" )`
 eval "note -t \"<H1>\$tag</H1>\" \"\$urlfile\" $urls </dev/null"

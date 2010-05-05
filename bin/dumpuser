@@ -59,8 +59,8 @@ done
 		     badopts=1
 		   }
 
-set x $LABEL; shift
-case $#
+set -- $LABEL
+case $# in
     1)	;;
     *)	echo "$cmd: label must be one word, rejecting $LABEL" >&2
 	exit 1
@@ -120,7 +120,7 @@ do
 
     necho "dumping $login ..."
 
-    set x `date`; shift
+    set -- `date`
     dow=$1 mon=$2 dom=$3 time=$4 tz=$5 year=$6
     case $dom in [0-9]) dom=0$dom ;; esac
     case $time in [0-9]:) time=0$time ;; esac

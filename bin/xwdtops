@@ -16,7 +16,7 @@ If no options are given \$XWDTOPS_ARGS is consulted for defaults."
 
 case $1 in
     -*)	;;
-    *)	set x $XWDTOPS_ARGS; shift ;;
+    *)	set -- $XWDTOPS_ARGS ;;
 esac
 
 input=
@@ -29,7 +29,7 @@ do
 	-x)	input='xwd |' ; shift ;;
 	-d|-display)
 		DISPLAY=$2; export DISPLAY
-		shift; shift; set x -x; shift
+		shift; shift; set -- -x ${1+"$@"}
 		;;
 	-P)	print="| lz -1 '-P$2'" ; shift; shift ;;
 	-P*)	print="| lz -1 '$1'" ; shift ;;

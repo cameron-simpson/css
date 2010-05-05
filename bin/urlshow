@@ -49,7 +49,7 @@ do
       -n)	name=$2; shift ;;
       -t)	tflag=-t ;;
       -i)	input=$2; shift
-		set x ${1+"$@"} "" `cat $input`; shift
+		set -- ${1+"$@"} "" `cat $input`
 		;;
       --)	shift; break ;;
       -?*)	echo "$cmd: $1: unrecognised option" >&2

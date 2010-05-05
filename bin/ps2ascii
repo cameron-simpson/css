@@ -10,6 +10,6 @@ usage="Usage: $0 [psfile [txtfile]]"
 
 [ $# = 2 -a "x$2" != x- ] && exec >"$2"
 
-[ $# = 0 ] && { set x -; shift; }
+[ $# = 0 ] && set -- -
 
 exec -q -dNODISPLAY -dNOBIND -dWRITESYSTEMDICT -dSIMPLE -c save -f ps2ascii.ps "$1" -c quit

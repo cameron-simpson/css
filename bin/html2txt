@@ -48,7 +48,7 @@ done
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
-[ $# = 0 ] && { set x -; shift; }
+[ $# = 0 ] && set -- -
 
 xit=0
 for arg

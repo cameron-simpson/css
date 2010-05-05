@@ -11,6 +11,6 @@ do
     shift
 done
 
-[ $# = 0 ] && { set x -; shift ; }
+[ $# = 0 ] && set -- -
 
 eval "exec dpp $dppargs $HOME/etc/header/man \${1+\"\$@\"}"
