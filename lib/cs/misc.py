@@ -481,7 +481,7 @@ class WithUC_Attrs:
     if not s[0].isupper():
       return False
     for c in s[1:]:
-      if c != '_' and (not c.isupper() or c.isdigit()):
+      if c != '_' and not (c.isupper() or c.isdigit()):
         return False
     return True
   def __getattr__(self, attr):
