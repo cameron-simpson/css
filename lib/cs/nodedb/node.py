@@ -9,6 +9,7 @@ if sys.hexversion < 0x02060000:
 else:
   import json
 import itertools
+from thread import allocate_lock
 import unittest
 from cs.lex import str1
 from cs.misc import the
@@ -379,6 +380,8 @@ def nodekey(*args):
 
 class NodeDB(dict):
 
+  _key = ('_', '_')     # index of metadata node
+
   def __init__(self, backend=None, readonly=False):
     dict.__init__(self)
     if backend is None:
@@ -387,6 +390,7 @@ class NodeDB(dict):
     self.__nodesByType = {}
     backend.set_nodedb(self)
     self.readonly = readonly
+    self._lock = allocate_lock()
 
   def _createNode(self, t, name):
     ''' Factory method to make a new Node (or Node subclass instance).
@@ -444,6 +448,7 @@ class NodeDB(dict):
 
   def __setitem__(self, item, N):
     assert isinstance(N, Node), "tried to store non-Node: %s" % (repr(N),)
+    assert N.nodedb is self, "tried to store foreign Node: %s" % (repr(N),)
     key = nodekey(item)
     assert key == (N.type, N.name), \
            "tried to store Node(%s:%s) as key (%s:%s)" \
@@ -464,6 +469,95 @@ class NodeDB(dict):
     assert (t, name) not in self, 'newNode(%s, %s): already exists' % (t, name)
     N = self[t, name] = self._createNode(t, name)
     return N
+
+  @property
+  def _(self):
+    ''' Obtain the metadata node, creating it if necessary.
+    '''
+    key = NodeDB._key
+    try:
+      return self[key]
+    except KeyError:
+      return newNode(key)
+
+  def seq(self):
+    ''' Obtain a new sequence number for this NodeDB.
+    '''
+    N_ = self._
+    with self._lock:
+      i = N_.get('SEQ', 0)
+      i += 1
+      N_['SEQ'] = i
+    return i
+
+  def otherDB(self, dburl):
+    ''' Take a database URL or sequence number and return:
+          ( db, seq )
+        where db is the NodeDB and seq is the sequence number
+        in this NodeDB associated with the other NodeDB.
+    '''
+    N_ = self._
+    if type(dburl) is str:
+      db = NodeDBFromURL(dburl)
+      for Ndb in N_.DBs:
+        if Ndb.URL == dburl:
+          # the dburl is known - return now
+          return db, Ndb.SEQ
+      # new URL - record it for posterity
+      Ndb = newNode('_NODEDB', str(ndb))
+      s = self.seq()
+      Ndb.URL = dburl
+      Ndb.SEQ = s
+      return db, s
+
+    # presumably we were handed an int, the db sequence number
+    s = dburl
+    for Ndb in N_.DBs:
+      if Ndb.SEQ == s:
+        return NodeDBFromURL(Ndb.URL)
+    raise ValueError, "unknown DB sequence number: %s; _.DBs = %s" % (s, N_.DBs)
+
+_NodeDBsByURL = {}
+
+def NodeDBFromURL(url, readonly=False):
+  ''' Factory method to return singleton NodeDB instances.
+  '''
+  if url in _NodeDBsByURL:
+    return _NodeDBsByURL[url]
+
+  if url.startswith('/'):
+    # filesystem pathname
+    # recognise some extensions and recurse
+    # otherwise reject
+    base = os.path.basename(url)
+    _, ext = os.path.splitext(base)
+    if ext == '.tch':
+      return NodeDBFromURL('file-tch://'+url, readonly=readonly)
+    if ext == '.sqlite':
+      return NodeDBFromURL('sqlite://'+url, readonly=readonly)
+    import sys
+    print >>sys.stderr, "ext =", ext
+    raise ValueError, "unsupported NodeDB URL: "+url
+
+  if url.startswith('file-tch://'):
+    from cs.nodedb.tokcab import Backend_TokyoCabinet
+    dbpath = url[11:]
+    backend = Backend_TokyoCabinet(dbpath, readonly=readonly)
+    db = NodeDB(backend, readonly=readonly)
+    _NodeDBsByURL[url] = db
+    return db
+
+  if url.startswith('sqlite:') or url.startswith('mysql:'):
+    # TODO: direct sqlite support, skipping SQLAlchemy?
+    from cs.nodedb.sqla import Backend_SQLAlchemy
+    dbpath = url
+    backend = Backend_SQLAlchemy(dbpath, readonly=readonly)
+    db = NodeDB(backend, readonly=readonly)
+    _NodeDBsByURL[url] = db
+    db.url = url
+    return db
+
+  raise ValueError, "unsupported NodeDB URL: "+url
 
 class Backend(object):
   ''' Base class for NodeDB backends.
@@ -494,7 +588,10 @@ class Backend(object):
     if isinstance(value, Node):
       assert value.type.find(':') < 0, \
              "illegal colon in TYPE \"%s\"" % (value.type,)
-      return ":%s:%s" % (value.type, value.name)
+      if value.nodedb is self.nodedb:
+        return ":%s:%s" % (value.type, value.name)
+      odb, s = self.nodedb.otherDB(value.nodedb.url)
+      return ":+%d:%s:%s" % (s, value.type, value.name)
     t = type(value)
     assert t in (str,int), repr(t)+" "+repr(value)+" "+repr(Node)
     if t is str:
@@ -528,6 +625,11 @@ class Backend(object):
         raise ValueError, "bad :TYPE:NAME \"%s\"" % (value,)
       t, name = v.split(':', 1)
       return self.nodeByTypeName(t, name)
+    if v[0] == '+':
+      # :+seq:TYPE:NAME
+      # obtain foreign Node from other NodeDB
+      s, t, name = v[1:].split(':', 2)
+      return self.otherDB(int(s))[t, name]
     raise ValueError, "unparsable value \"%s\"" % (value,)
 
   def newNode(self, N):
