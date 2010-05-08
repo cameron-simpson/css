@@ -211,10 +211,18 @@ class Node(dict):
         row.extend(value)
     else:
       row.append(value)
-    if hasattr(self, ks):
-      self.nodedb._backend.delAttr(self, k)
-    if row:
-      self.nodedb._backend.extendAttr(self, k, row)
+
+    # update the backend
+    if len(row) == 1 and hasattr(self, ks) and len(self[ks]) == 1:
+      # special case the common single value case
+      self.nodedb._backend.set1Attr(self, k, row[0])
+    else:
+      if hasattr(self, ks):
+        self.nodedb._backend.delAttr(self, k)
+      if row:
+        self.nodedb._backend.extendAttr(self, k, row)
+
+    # update the front end
     dict.__setitem__(self, ks, row)
 
   def __delitem__(self, item):
@@ -657,6 +665,9 @@ class Backend(object):
     '''
     raise NotImplementedError
 
+  def set1Attr(self, N, attr, value):
+    raise NotImplementedError
+
 class _NoBackend(Backend):
   ''' Dummy backend for emphemeral in-memory NodeDBs.
   '''
@@ -671,6 +682,8 @@ class _NoBackend(Backend):
   def extendAttr(self, N, attr, values):
     pass
   def delAttr(self, N, attr):
+    pass
+  def set1Attr(self, N, attr, value):
     pass
 
 class _QBackend(Backend):
@@ -700,6 +713,8 @@ class _QBackend(Backend):
         B.delAttr(*args)
       elif what == 'extendAttr':
         B.extendAttr(*args)
+      elif what == 'set1Attr':
+        B.set1Attr(*args)
       else:
         error("unsupported backend request \"%s\"(%s)" % (what, args))
 
@@ -708,7 +723,9 @@ class _QBackend(Backend):
   def delNode(self, N):
     self._Q.put( ('delNode', (N,)) )
   def extendAttr(self, N, attr, values):
-    self._Q.put( ('extendNode', (N, attr, values)) )
+    self._Q.put( ('extendAttr', (N, attr, values)) )
+  def set1Attr(self, N, attr, value):
+    self._Q.put( ('set1Attr', (N, attr, value)) )
   def delAttr(self, N, attr):
     self._Q.put( ('delAttr', (N, attr)) )
 
@@ -737,6 +754,11 @@ class TestAll(unittest.TestCase):
   def test11setAttrs(self):
     H = self.db.newNode('HOST', 'foo')
     H.Xs = [1,2,3,4,5]
+
+  def test12set1Attr(self):
+    H = self.db.newNode('HOST', 'foo')
+    H.Y = 1
+    H.Y = 2
 
 if __name__ == '__main__':
   unittest.main()

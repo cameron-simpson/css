@@ -135,6 +135,15 @@ class Backend_SQLAlchemy(Backend):
                    } for value in values ]
     self.attrs.insert().execute(ins_values)
 
+  def set1Attr(self, N, attr, value):
+    # special case, presumes there's only one VALUE
+    assert not self.nodedb.readonly
+    nodeid = self.__IDbyTypeName[N.type, N.name]
+    self.attrs.update().where(and_(self.attrs.c.NODE_ID == nodeid,
+                                   self.attrs.c.ATTR == attr)) \
+                       .values(VALUE=value) \
+                       .execute()
+
   def delAttr(self, N, attr):
     assert not self.nodedb.readonly
     nodeid = self.__IDbyTypeName[N.type, N.name]

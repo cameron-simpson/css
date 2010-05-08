@@ -60,6 +60,12 @@ class Backend_TokyoCabinet(Backend):
     else:
       self.hdb.put(attrtag, attrvalue)
 
+  def set1Attr(self, N, attr, value):
+    assert not self.nodedb.readonly
+    attrtag = self._attrtag(N, attr)
+    attrvalue = self.serialise(value)
+    self.hdb.put(attrtag, attrvalue)
+
   def delAttr(self, N, attr):
     assert not self.nodedb.readonly
     attrtag = self._attrtag(N, attr)
