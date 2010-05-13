@@ -506,9 +506,10 @@ class NodeDB(dict):
     '''
     N_ = self._
     if type(dburl) is str:
+      # a URL that attaches to a NodeDB
       db = NodeDBFromURL(dburl)
       for Ndb in N_.DBs:
-        if Ndb.URL == dburl:
+        if dburl in Ndb.URLs:
           # the dburl is known - return now
           return db, Ndb.SEQ
       # new URL - record it for posterity
@@ -518,11 +519,12 @@ class NodeDB(dict):
       Ndb.SEQ = s
       return db, s
 
-    # presumably we were handed an int, the db sequence number
-    s = dburl
+    # presume we were handed an int, the db sequence number
+    ss = (dburl,)
     for Ndb in N_.DBs:
-      if Ndb.SEQ == s:
+      if Ndb.SEQs == ss:
         return NodeDBFromURL(Ndb.URL)
+
     raise ValueError, "unknown DB sequence number: %s; _.DBs = %s" % (s, N_.DBs)
 
 _NodeDBsByURL = {}
@@ -557,6 +559,9 @@ def NodeDBFromURL(url, readonly=False):
 
   if url.startswith('sqlite:') or url.startswith('mysql:'):
     # TODO: direct sqlite support, skipping SQLAlchemy?
+    # TODO: mysql: URLs will leak user and password - strip first for key
+    assert not url.startswith('sqlite:///:memory:'), \
+           "sorry, \"%s\" isn't a singleton URL" % (url,)
     from cs.nodedb.sqla import Backend_SQLAlchemy
     dbpath = url
     backend = Backend_SQLAlchemy(dbpath, readonly=readonly)
