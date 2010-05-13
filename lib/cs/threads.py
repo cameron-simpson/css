@@ -596,7 +596,37 @@ class DictMonitor(dict):
 # TODO: synchronous mode for synchronous call() so we can feed from
 # a PriorityQueue
 class FuncMultiQueue(object):
+  ''' A FuncMultiQueue is a mechanism for processing function calls
+      asynchronously with a certain number (the `capacity`) active at any one
+      time. It can be used to perform constrained parallel use of a server
+      resource such as an HTTP or database server.  
+  '''
+
   def __init__(self, capacity, synchronous=False):
+    ''' Initialise the FuncMultiQueue.
+        `capacity` is the maximum number of active calls permitted at a time.
+        `synchronous` causes function submission to be synchronous; by default
+        this is False.
+        In the default asynchronous mode, an arbitrary number of functions may
+        be queued for dispatch.
+        In synchronous mode, the bgcall() and qbgcall() methods will block if
+        the maximum number of active functions are already in use.
+        
+        The synchronous mode exists to permit the use of a FuncMultiQueue to
+        process requests from a PriorityQueue like this:
+
+          PQ = PriorityQueue()
+          MFQ = MultiFuncQueue(4, synchronous=True)
+          while True:
+            pri, func = PQ.ghet()
+            MFQ.qbgcall(func, None)
+
+        In asynchronous mode this loop would always keep the PQ empty, and thus the
+        priority system would have no effect - it would be first come first served.
+        In synchronous mode the MFQ.qbgcall() will block if the MFQ is busy.
+        During that state multiple requests can accumulate in the PQ, ready for
+        choice according to their priority when capacity is available again on MFQ.
+    '''
     assert capacity > 0
     self._capacity = capacity
     self.closed = False
@@ -611,6 +641,9 @@ class FuncMultiQueue(object):
     self.__main.start()
 
   def _mainloop(self):
+    ''' The main loop that retrieves function calls from the queue and
+        dispatches them to available handlers.
+    '''
     Q = self.__Q
     hs = self.__handlers        # pool of available handlers
     self.__sem = sem = Semaphore(self._capacity)
@@ -636,6 +669,8 @@ class FuncMultiQueue(object):
       sem.acquire()
 
   def _handler(self, T, ch):
+    ''' The handler for a single thread of function call processing.
+    '''
     n = seq()
     assert ch is not None
     sem = self.__sem
