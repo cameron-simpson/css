@@ -1,3 +1,4 @@
 #!/usr/bin/python
 
-from cs.nodedb.node import Node, NodeDB, Backend
+import os.path
+from cs.nodedb.node import Node, NodeDB, Backend, NodeDBFromURL
