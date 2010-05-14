@@ -133,7 +133,7 @@ class Channel(object):
   def __iter__(self):
     ''' Iterator for consumers that operate on tasks arriving via this Channel.
     '''
-    while True:
+    while not self.closed:
       item = self.get()
       if item is None and self.closed:
         break
