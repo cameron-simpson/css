@@ -76,8 +76,8 @@ class Channel(object):
     self.__writable=allocate_lock()
     self.__writable.acquire()
     self.closed = False
-    self._niters = 0
     self.__lock = allocate_lock()
+    self._nreaders = 0
 
   def __str__(self):
     if self.__readable.locked():
@@ -96,62 +96,63 @@ class Channel(object):
     ''' Read a value from the Channel.
         Blocks until someone put()s to the Channel.
     '''
-    assert not self.closed, "%s: .get() on closed Channel" % (self,)
+    assert not self.closed, "%s.get() on closed Channel" % (self,)
+    with self.__lock:
+      self._nreaders += 1
     self.__writable.release()   # allow someone to write
     self.__readable.acquire()   # await writer and prevent other readers
     value=self._value
     delattr(self,'_value')
+    with self.__lock:
+      self._nreaders -= 1
     return value
 
-  def put(self,value):
+  def put(self, value):
     ''' Write a value to the Channel.
         Blocks until a corresponding get() occurs.
     '''
-    assert value is None or not self.closed, "%s: .put(%s) on closed Channel" % (self,value,)
+    if self.closed:
+      assert value is None, "%s.put(%s) on closed Channel" % (self, value, )
+    else:
+      assert value is not None, "%s.put(None) on unclosed Channel" % (self,)
     self.__writable.acquire()   # prevent other writers
     self._value=value
     self.__readable.release()   # allow a reader
 
   def close(self):
-    if self.closed:
-      warn("%s: .close() of closed Channel" % (self,))
-    else:
-      self.closed = True
-      with self.__lock:
-        niters = self._niters
-      # TODO: fix up close channel method - can hang apparently
-      ##for i in range(niters):
-      ##  self.put(None)
+    with self.__lock:
+      if self.closed:
+        warn("%s: .close() of closed Channel" % (self,))
+      else:
+        self.closed = True
+    with self.__lock:
+      nr = self._nreaders
+    for i in range(nr):
+      self.put(None)
 
   def __iter__(self):
     ''' Iterator for consumers that operate on tasks arriving via this Channel.
     '''
-    with self.__lock:
-      self._niters += 1
     while True:
-      if self.closed:
-        break
       item = self.get()
-      if item is None:
+      if item is None and self.closed:
         break
       yield item
-    with self.__lock:
-      self._niters -= 1
 
-  def call(self,value,backChannel):
-    ''' Asynchronous call to daemon via channel.
-        Daemon should reply by .put()ing to the backChannel.
-    '''
-    self.put((value,backChannel))
-
-  def call_s(self,value):
-    ''' Synchronous call to daemon via channel.
-    '''
-    ch=getChannel()
-    self.call(value,ch)
-    result=ch.get()
-    returnChannel(ch)
-    return result
+##def call(self,value,backChannel):
+##  ''' Asynchronous call to daemon via channel.
+##      Daemon should reply by .put()ing to the backChannel.
+##  '''
+##  self.put((value,backChannel))
+##
+##def call_s(self,value):
+##  ''' Synchronous call to daemon via channel.
+##  '''
+##  ch=getChannel()
+##  self.call(value,ch)
+##  result=ch.get()
+##  returnChannel(ch)
+##  return result
 
 class IterableQueue(Queue): 
   ''' A Queue obeying the iterator protocol.
@@ -621,15 +622,16 @@ class FuncMultiQueue(object):
             pri, func = PQ.ghet()
             MFQ.qbgcall(func, None)
 
-        In asynchronous mode this loop would always keep the PQ empty, and thus the
-        priority system would have no effect - it would be first come first served.
-        In synchronous mode the MFQ.qbgcall() will block if the MFQ is busy.
+        In asynchronous mode this loop would always keep the PQ empty, and
+        thus the PriorityQueue wi=ould act like a FIFO.
+        In synchronous mode the MFQ.qbgcall() will block if the MFQ is busy. 
         During that state multiple requests can accumulate in the PQ, ready for
         choice according to their priority when capacity is available again on MFQ.
     '''
     assert capacity > 0
     self._capacity = capacity
     self.closed = False
+    self.cancelPending = False  # True ==> discard pending calls after close
     if synchronous:
       self.__Q = Channel()
     else:
@@ -647,12 +649,15 @@ class FuncMultiQueue(object):
     Q = self.__Q
     hs = self.__handlers        # pool of available handlers
     self.__sem = sem = Semaphore(self._capacity)
-    sem.acquire()
+    sem.acquire()               # delay .get() until there is capacity
     while not Q.closed:
       rq = Q.get()
       if rq is None:
         sem.release()
         break
+      if self.closed and self.cancelPending:
+        # drain queue
+        continue
       if len(hs) == 0:
         # no available threads - make one
         hch = Channel()
@@ -666,7 +671,7 @@ class FuncMultiQueue(object):
         T, hch = hs.pop()
       # dispatch request
       hch.put(rq)
-      sem.acquire()
+      sem.acquire()             # delay .get() as at top of loop
 
   def _handler(self, T, ch):
     ''' The handler for a single thread of function call processing.
@@ -675,11 +680,8 @@ class FuncMultiQueue(object):
     assert ch is not None
     sem = self.__sem
     hs = self.__handlers
-    for func, retQ, tag in ch:
-      if func is None:
-        assert False, "NEVER"
-        sem.release()
-        break
+    for rq in ch:
+      func, retQ, tag = rq
       ret = func()
       if retQ is not None:
         retQ.put( (tag, ret) )
@@ -687,18 +689,20 @@ class FuncMultiQueue(object):
       hs.append( (T, ch) )
       sem.release()
 
-  def close(self):
+  def close(self, cancel=False):
     ''' Close the queue, preventing further requests.
-        Returns when all pending functions have completed.
+        Returns when all pending functions have completed unless `cancel` is
+        true, in which case the pending functions will not be called; the
+        active functions will still complete.
     '''
-    warn("%s: close of FuncMultiQueue seems to hang sometimes - avoid" % (self,))
     assert not self.closed
+    self.cancelPending = cancel
     self.closed = True
     self.__Q.close()
     for T, hch in self.__allHandlers:
       hch.close()
-      ##hch.put( (None, None, None) )
       T.join()
+    self.__sem.release()
     self.__main.join()
 
   def qbgcall(self, func, Q):
