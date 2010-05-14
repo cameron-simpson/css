@@ -206,6 +206,6 @@ class LogTime(object):
     now = time.time()
     elapsed = now - self.start
     if self.threshold is not None and elapsed >= self.threshold:
-      log(self.level, "%s: %5.3fs" % (self.tag, elapsed))
+      log(self.level, "%s: ELAPSED %5.3fs" % (self.tag, elapsed))
     self.elapsed = elapsed
     return False
