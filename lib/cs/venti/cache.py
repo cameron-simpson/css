@@ -12,9 +12,9 @@ from cs.venti.store import BasicStore
 
 class CacheStore(BasicStore):
   ''' A CacheStore is a Store front end to a pair of other Stores, a backend
-      store and a cache store. The backend store is the "main" store, while
-      the cache store is normally a faster and possibly lossy store such as a
-      MemCacheStore or a local disc store.
+      store and a cache store. The backend store is the "main" store, perhaps
+      remote or slow, while the cache store is normally a faster and possibly
+      lossy store such as a MemCacheStore or a local disc store.
       
       A block read is satisfied from the cache if possible, otherwise from
       the backend. A block store is stored to the cache and then
