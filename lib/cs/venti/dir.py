@@ -1,7 +1,7 @@
 import stat
 import sys
 if sys.hexversion < 0x02060000: from sets import Set as set
-from logging import debug, error, info, warn
+from cs.logutils import debug, error, info, warn
 from cs.venti.block import decodeBlock
 from cs.venti.blockify import blockFromString
 from cs.venti.meta import Meta
@@ -73,7 +73,7 @@ class Dirent:
     flags=0
 
     meta=self.meta
-    if meta is not None:
+    if meta:
       ##debug("%s:META=%s"%(self.name, meta, ))
       assert isinstance(meta, Meta)
       metatxt=meta.encode()
@@ -99,15 +99,16 @@ class Dirent:
          + name \
          + block.encode()
 
+  # TODO: make size a property?
   def size(self):
     return len(self.getBlock())
 
-  def mtime(self, newtime=None):
-    if newtime is None:
-      if self.meta is None:
-        return 0.0
-      return self.meta.mtime()
-    self.meta().mtime(newtime)
+  @property
+  def mtime(self):
+    return self.meta.mtime
+  @mtime.setter
+  def mtime(self, newtime):
+    self.meta.mtime = newtime
 
   def stat(self):
     meta=self.meta
@@ -137,7 +138,7 @@ class Dirent:
     nlink=1
     size=self.size()
     atime=0
-    mtime=self.mtime()
+    mtime=self.mtime
     ctime=0
 
     return (unixmode, ino, dev, nlink, uid, gid, size, atime, mtime, ctime)
@@ -167,13 +168,12 @@ def decodeDirent(s, justone=False):
   s0 = s
   type, s = fromBS(s)
   flags, s = fromBS(s)
+  meta = None
   if flags & F_HASMETA:
     metalen, s = fromBS(s)
     assert metalen < len(s)
     meta = s[:metalen]
     s=s[metalen:]
-  else:
-    meta=""
   meta=Meta(meta)
   if flags & F_HASNAME:
     namelen, s = fromBS(s)
@@ -392,16 +392,16 @@ class Dir(Dirent):
             info("%s: IGNORETIMES=True" % filepath)
           else:
             E=D[subfile]
-            if st.st_size == E.size() and int(st.st_mtime) == int(E.mtime()):
+            if st.st_size == E.size() and int(st.st_mtime) == int(E.mtime):
               info("%s: same size and mtime, skipping" % filepath)
               continue
-            info("%s: differing size(%s:%s)/mtime(%s:%s)" % (filepath, st.st_size, E.size(), int(st.st_mtime), int(E.mtime())))
+            info("%s: differing size(%s:%s)/mtime(%s:%s)" % (filepath, st.st_size, E.size(), int(st.st_mtime), int(E.mtime)))
         else:
           info("%s not in dir"%subfile)
 
         warn("store %s" % subfile)
         M=Meta()
-        M.mtime(st.st_mtime)
+        M.mtime = st.st_mtime
         stored=storeFile(open(filepath))
         stored.name=subfile
         stored.meta=M

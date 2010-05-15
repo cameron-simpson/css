@@ -11,7 +11,7 @@ class Meta(dict):
           ? a:blockref of encoded Meta
           ? a:/path/to/encoded-Meta
   '''
-  def __init__(self,s=None):
+  def __init__(self, s=None):
     if s is not None:
       for line in s.split('\n'):
         line=line.strip()
@@ -28,9 +28,11 @@ class Meta(dict):
     ks.sort()
     return "".join("%s:%s\n" % (k, self[k]) for k in ks)
 
-  def mtime(self,when=None):
-    if when is None:
-      return float(self.get('m',0))
+  @property
+  def mtime(self):
+    return float(self.get('m', 0))
+  @mtime.setter
+  def mtime(self, when):
     self['m']=float(when)
 
   def unixPerms(self):
@@ -102,4 +104,4 @@ class Meta(dict):
             elif s == 'w': operms&=~2
             elif s == 'x': operms&=~1
             elif s == 't': operms&=~512
-    return (user,group,(uperms<<6)+(gperms<<3)+operms)
+    return (user, group, (uperms<<6)+(gperms<<3)+operms)

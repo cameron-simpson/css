@@ -21,8 +21,8 @@ from thread import allocate_lock
 import threading
 from Queue import Queue
 from zlib import compress, decompress
-from logging import debug
-from cs.misc import out, tb, seq, Loggable
+from cs.logutils import debug
+from cs.misc import out, tb, seq
 from cs.serialise import toBS, fromBS, fromBSfp
 from cs.threads import FuncMultiQueue, Q1, DictMonitor, NestingOpenClose
 from cs.venti import tohex, defaults
@@ -30,7 +30,7 @@ from cs.venti.block import Block
 from cs.venti.hash import Hash_SHA1
 from cs.upd import out, nl
 
-class BasicStore(Loggable, NestingOpenClose):
+class BasicStore(NestingOpenClose):
   ''' Core functions provided by all Stores.
 
       A subclass should provide thread-safe implementations of the following
@@ -84,7 +84,6 @@ class BasicStore(Loggable, NestingOpenClose):
     debug("BasicStore.__init__...")
     if capacity is None:
       capacity = 1
-    Loggable.__init__(self, name)
     NestingOpenClose.__init__(self)
     self.name=name
     self.logfp=None
@@ -247,7 +246,10 @@ class BasicStore(Loggable, NestingOpenClose):
 
 def Store(S):
   ''' Factory function to return an appropriate BasicStore subclass
-      based on its argument.
+      based on its argument:
+        /path/to/store  A GDBMStore directory (later, tokyocabinet etc)
+        |command        A subprocess implementing the streaming protocol.
+        tcp:[host]:port Connect to a daemon implementing the streaming protocol.
   '''
   assert type(S) is str, "expected a str, got %s" % (S,)
   if S[0] == '/':

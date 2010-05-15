@@ -42,7 +42,7 @@ from cs.venti.debug import dumpBlock
 from cs.venti.store import Store, pullFrom
 from cs.venti.cache import CacheStore, MemCacheStore
 from cs.venti.archive import archive2dir, archiveAppend
-from cs.venti.dir import Dir, storeDir, decodeDirent
+from cs.venti.dir import Dir, decodeDirent
 from cs.misc import progress, logTo, reportElapsedTime
 
 def main(argv):
@@ -323,12 +323,14 @@ def main(argv):
         if len(args) == 0 or args[0] != '-o':
           S.writeonly = True
           from cs.venti.file import storeFile
+          from cs.venti.dir import storeDir
           for path in args:
             if os.path.isdir(path):
               E=storeDir(path)
             else:
               E=storeFile(open(path))
             archiveAppend(sys.stdout,E,None,path)
+            sys.stdout.flush()
         else:
           archive=args[1]
           path=args[2]
@@ -409,7 +411,7 @@ def main(argv):
           error("%s: mountpoint is not a directory" % args[1])
           exit(1)
         E=S.namei(args[0]+'/')
-        assert E.isdir, "%s: %s: expected directory, not file"%(cmd,args[0])
+        assert E.isdir, "%s: expected directory, not file" % (args[0],)
         import cs.venti.vtfuse
         cs.venti.vtfuse.fusemount(args[1],S,E)
 
