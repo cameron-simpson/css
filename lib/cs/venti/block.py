@@ -57,6 +57,9 @@ def decodeBlock(s, justone=False):
     return B
   return B, s
 
+def isBlock(o):
+  return isinstance(o, _Block)
+
 class _Block(object):
   # TODO: hashcode(), data(), blockdata() should use __getattr__
 

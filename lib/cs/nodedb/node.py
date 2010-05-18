@@ -602,11 +602,11 @@ class Backend(object):
       assert value.type.find(':') < 0, \
              "illegal colon in TYPE \"%s\"" % (value.type,)
       if value.nodedb is self.nodedb:
+        assert value.type[0].isupper(), "non-UPPER type: %s" % (value.type,)
         return ":%s:%s" % (value.type, value.name)
       odb, s = self.nodedb.otherDB(value.nodedb.url)
       return ":+%d:%s:%s" % (s, value.type, value.name)
     t = type(value)
-    assert t in (str,int), repr(t)+" "+repr(value)+" "+repr(Node)
     if t is str:
       if value.startswith(':'):
         return ':'+value
@@ -615,6 +615,10 @@ class Backend(object):
       s = str(value)
       assert s[0].isdigit()
       return ':' + s
+    from cs.venti import tohex
+    from cs.venti.block import isBlock
+    if isBlock(value):
+      return ':venti:'+tohex(value.encode())
     raise ValueError, "can't serialise(%s)" % (repr(value),)
 
   def deserialise(self, value):
@@ -638,6 +642,18 @@ class Backend(object):
         raise ValueError, "bad :TYPE:NAME \"%s\"" % (value,)
       t, name = v.split(':', 1)
       return self.nodeByTypeName(t, name)
+    if v[0].islower():
+      # scheme:info
+      if v.find(':', 1) < 0:
+        raise ValueError, "bad :scheme:info \"%s\"" % (value,)
+      scheme, info = v.split(':', 1)
+      if scheme == "venti":
+        from cs.venti import fromhex
+        D, name = resolve(path)
+        if name is not None:
+          D=D[name]
+        return D.getBlock()
+      raise ValueError, "unsupported :scheme:info \"%s\"" % (value,)
     if v[0] == '+':
       # :+seq:TYPE:NAME
       # obtain foreign Node from other NodeDB
