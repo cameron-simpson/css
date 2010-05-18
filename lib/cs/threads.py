@@ -783,6 +783,12 @@ class TimerQueue(object):
     self.mainThread = Thread(target=self.main)
     self.mainThread.start()
 
+  def join(self):
+    ''' Wait for the main loop thread to finish.
+    '''
+    assert self.mainThread is not None, "no main thread to join"
+    self.mainThread.join()
+
   def main(self):
     ''' Main loop:
         Pull requests off the queue; they will come off in time order,
