@@ -9,30 +9,39 @@ else:
   import json
 
 def testAuth(rq=None):
-  ''' Examine the cherrypy.request object supplied for HTTP Basic authentication,
-      match against UNIX getpwnam() lookup, return login if the password is correct.
-      Return None otherwise.
+  ''' Examine the cherrypy.request object supplied for HTTP Basic
+      authentication, match against UNIX getpwnam() lookup, return login if
+      the password is correct.  Return None otherwise.
+      If no request object is supplied, use cherrypy.request.
   '''
   if rq is None:
-    rq=cherrypy.request
-  if 'authorization' in rq.headers:
-    authwords = rq.headers['authorization'].split()
-    if len(authwords) == 2 and authwords[0].lower() == 'basic':
-      from base64 import b64decode
-      dec = b64decode(authwords[1]).split(':',1)
-      if len(dec) == 2:
-        login, password = dec
-        from pwd import getpwnam
-        try:
-          pw=getpwnam(login)
-        except:
-          return None
-        if pw:
-          from crypt import crypt
-          if pw[1] == crypt(password, pw[1]):
-            return login
+    rq = cherrypy.request
 
-  return None
+  if 'authorization' not in rq.headers:
+    return None
+
+  authwords = rq.headers['authorization'].split()
+  if len(authwords) != 2 or authwords[0].lower() != 'basic':
+    # not a useable Authorization header
+    return None
+
+  from base64 import b64decode
+  dec = b64decode(authwords[1]).split(':',1)
+  if len(dec) != 2:
+    return None
+  login, password = dec
+
+  from pwd import getpwnam
+  try:
+    pw = getpwnam(login)
+  except KeyError:
+    return None
+
+  from crypt import crypt
+  if pw[1] != crypt(password, pw[1]):
+    return None
+
+  return login
 
 def setNeedAuth(realm,rsp=None):
   ''' Set the supplied cherrypy.response object to require authentication.
@@ -64,9 +73,9 @@ class RPC:
     cherrypy.response.headers.update({ 'Content-Type': "application/x-javascript"})
     return jscode+"\r\n                                                                                      "
 
-def _tableRows(htmlCells):
-  return "\n".join( "\n  ".join( ["<TR>",] + ["<TD>"+cell for cell in R] )
-                    for R in htmlCells
+def _tableRows(htmlCellRows):
+  return "\n".join( "\n  ".join( ["<TR>",] + ["<TD>"+cell for cell in row] )
+                    for row in htmlCellRows
                   )
 
 class DBBrowse:
