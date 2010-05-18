@@ -742,8 +742,13 @@ class TimerQueue(object):
     self.pending = None         # or (Timer, when, func)
     self.closed = False
     self._lock = allocate_lock()
+    self.mainThread = None
+    self.mainRunning = False
 
   def close(self, cancel=False):
+    ''' Close the TimerQueue. This forbids further job submissions.
+        If `cancel` is supplied and true, cancel all pending jobs.
+    '''
     self.closed = True
     if self.Q.empty():
       # dummy entry to wake up the main loop
@@ -769,6 +774,15 @@ class TimerQueue(object):
     assert not self.closed, "add() on closed TimerQueue"
     self.Q.put( (when, seq(), func) )
 
+  def start(self):
+    ''' Dispatch the TimerQueue's main function in a separate thread.
+        The thread is available as the .mainThread attribute.
+    '''
+    assert self.mainThread is None, "main thread already started"
+    assert not self.mainRunning, "main loop already active"
+    self.mainThread = Thread(target=self.main)
+    self.mainThread.start()
+
   def main(self):
     ''' Main loop:
         Pull requests off the queue; they will come off in time order,
@@ -779,8 +793,11 @@ class TimerQueue(object):
           one.
         If it should run now, run it.
         Otherwise start a Timer to run it later.
+        The loop continues processing items until the TimerQueue is closed.
     '''
-    while not self.closed or not self.Q.empty():
+    assert not self.mainRunning, "main loop already active"
+    self.mainRunning = True
+    while not self.closed:
       when, n, func = self.Q.get()
       ##debug("TimerQueue: got when=%s, n=%s, func=%s" % (when, n, func))
       if when is None:
@@ -791,7 +808,7 @@ class TimerQueue(object):
       with self._lock:
         if self.pending:
           # Cancel the pending Timer
-          # and pick between the new job and the job the Timer served.
+          # and choose between the new job and the job the Timer served.
           # Requeue the lesser job and do or delay-via-Timer the more urgent one.
           T, Twhen, Tfunc = self.pending
           self.pending[2] = None  # prevent the function from running if racy
@@ -829,6 +846,7 @@ class TimerQueue(object):
           T = Timer(delay, partial(doit, self))
           self.pending = [ T, when, func ]
           T.start()
+    self.mainRunning = False
 
 if __name__ == '__main__':
   import unittest
