@@ -527,6 +527,73 @@ class NodeDB(dict):
 
     raise ValueError, "unknown DB sequence number: %s; _.DBs = %s" % (s, N_.DBs)
 
+  def serialise(self, value):
+    ''' Convert a value for external string storage.
+    '''
+    if isinstance(value, Node):
+      assert value.type.find(':') < 0, \
+             "illegal colon in TYPE \"%s\"" % (value.type,)
+      if value.nodedb is self:
+        # Node from local NodeDB
+        assert value.type[0].isupper(), "non-UPPER type: %s" % (value.type,)
+        return ":%s:%s" % (value.type, value.name)
+      odb, s = self.nodedb.otherDB(value.nodedb.url)
+      return ":+%d:%s:%s" % (s, value.type, value.name)
+    t = type(value)
+    if t is str:
+      if value.startswith(':'):
+        return ':'+value
+      return value
+    if t is int:
+      s = str(value)
+      assert s[0].isdigit()
+      return ':' + s
+    from cs.venti import tohex
+    from cs.venti.block import isBlock
+    if isBlock(value):
+      return ':venti:'+tohex(value.encode())
+    raise ValueError, "can't serialise(%s)" % (repr(value),)
+
+  def deserialise(self, value):
+    ''' Convert a stored string into a value.
+    '''
+    if not value.startswith(':'):
+      # plain string
+      return value
+    if len(value) < 2:
+      raise ValueError, "unparsable value \"%s\"" % (value,)
+    v = value[1:]
+    if value.startswith('::'):
+      # :string-with-leading-colon
+      return v
+    if v[0].isdigit():
+      # :int
+      return int(v)
+    if v[0].isupper():
+      # TYPE:NAME
+      if v.find(':', 1) < 0:
+        raise ValueError, "bad :TYPE:NAME \"%s\"" % (value,)
+      t, name = v.split(':', 1)
+      return self.nodeByTypeName(t, name)
+    if v[0].islower():
+      # scheme:info
+      if v.find(':', 1) < 0:
+        raise ValueError, "bad :scheme:info \"%s\"" % (value,)
+      scheme, info = v.split(':', 1)
+      if scheme == "venti":
+        from cs.venti import fromhex
+        D, name = resolve(path)
+        if name is not None:
+          D=D[name]
+        return D.getBlock()
+      raise ValueError, "unsupported :scheme:info \"%s\"" % (value,)
+    if v[0] == '+':
+      # :+seq:TYPE:NAME
+      # obtain foreign Node from other NodeDB
+      s, t, name = v[1:].split(':', 2)
+      return self.otherDB(int(s))[t, name]
+    raise ValueError, "unparsable value \"%s\"" % (value,)
+
 _NodeDBsByURL = {}
 
 def NodeDBFromURL(url, readonly=False):
@@ -587,6 +654,18 @@ class Backend(object):
   def _preload(self):
     raise NotImplementedError
 
+  def serialise(self, value):
+    ''' Hook for subclasses that might do special encoding for their backend.
+        Discouraged.
+    '''
+    return self.db.serialise(value)
+
+  def deserialise(self, value):
+    ''' Hook for subclasses that might do special decoding for their backend.
+        Discouraged.
+    '''
+    return self.db.deserialise(value)
+
   def close(self):
     raise NotImplementedError
 
@@ -594,72 +673,6 @@ class Backend(object):
     ''' Map (type,name) to Node.
     '''
     return self.nodedb[t, name]
-
-  def serialise(self, value):
-    ''' Convert a value for external string storage.
-    '''
-    if isinstance(value, Node):
-      assert value.type.find(':') < 0, \
-             "illegal colon in TYPE \"%s\"" % (value.type,)
-      if value.nodedb is self.nodedb:
-        assert value.type[0].isupper(), "non-UPPER type: %s" % (value.type,)
-        return ":%s:%s" % (value.type, value.name)
-      odb, s = self.nodedb.otherDB(value.nodedb.url)
-      return ":+%d:%s:%s" % (s, value.type, value.name)
-    t = type(value)
-    if t is str:
-      if value.startswith(':'):
-        return ':'+value
-      return value
-    if t is int:
-      s = str(value)
-      assert s[0].isdigit()
-      return ':' + s
-    from cs.venti import tohex
-    from cs.venti.block import isBlock
-    if isBlock(value):
-      return ':venti:'+tohex(value.encode())
-    raise ValueError, "can't serialise(%s)" % (repr(value),)
-
-  def deserialise(self, value):
-    ''' Convert a stored string into a value.
-    '''
-    if not value.startswith(':'):
-      # plain string
-      return value
-    if len(value) < 2:
-      raise ValueError, "unparsable value \"%s\"" % (value,)
-    v = value[1:]
-    if value.startswith('::'):
-      # :string-with-leading-colon
-      return v
-    if v[0].isdigit():
-      # :int
-      return int(v)
-    if v[0].isupper():
-      # TYPE:NAME
-      if v.find(':', 1) < 0:
-        raise ValueError, "bad :TYPE:NAME \"%s\"" % (value,)
-      t, name = v.split(':', 1)
-      return self.nodeByTypeName(t, name)
-    if v[0].islower():
-      # scheme:info
-      if v.find(':', 1) < 0:
-        raise ValueError, "bad :scheme:info \"%s\"" % (value,)
-      scheme, info = v.split(':', 1)
-      if scheme == "venti":
-        from cs.venti import fromhex
-        D, name = resolve(path)
-        if name is not None:
-          D=D[name]
-        return D.getBlock()
-      raise ValueError, "unsupported :scheme:info \"%s\"" % (value,)
-    if v[0] == '+':
-      # :+seq:TYPE:NAME
-      # obtain foreign Node from other NodeDB
-      s, t, name = v[1:].split(':', 2)
-      return self.otherDB(int(s))[t, name]
-    raise ValueError, "unparsable value \"%s\"" % (value,)
 
   def newNode(self, N):
     raise NotImplementedError
@@ -760,10 +773,10 @@ class TestAll(unittest.TestCase):
     H = self.db.newNode('HOST', 'foo')
     for value in 1, 'str1', ':str2', '::', H:
       sys.stderr.flush()
-      s = self.backend.serialise(value)
+      s = self.db.serialise(value)
       sys.stderr.flush()
       assert type(s) is str
-      self.assert_(value == self.backend.deserialise(s))
+      self.assert_(value == self.db.deserialise(s))
 
   def test10newNode(self):
     H = self.db.newNode('HOST', 'foo')
