@@ -514,10 +514,10 @@ class NodeDB(dict):
           return db, Ndb.SEQ
       # new URL - record it for posterity
       Ndb = newNode('_NODEDB', str(ndb))
-      s = self.seq()
+      seqnum = self.seq()
       Ndb.URL = dburl
-      Ndb.SEQ = s
-      return db, s
+      Ndb.SEQ = seqnum
+      return db, seqnum
 
     # presume we were handed an int, the db sequence number
     ss = (dburl,)
@@ -537,8 +537,8 @@ class NodeDB(dict):
         # Node from local NodeDB
         assert value.type[0].isupper(), "non-UPPER type: %s" % (value.type,)
         return ":%s:%s" % (value.type, value.name)
-      odb, s = self.nodedb.otherDB(value.nodedb.url)
-      return ":+%d:%s:%s" % (s, value.type, value.name)
+      odb, seqnum = self.nodedb.otherDB(value.nodedb.url)
+      return ":+%d:%s:%s" % (seqnum, value.type, value.name)
     t = type(value)
     if t is str:
       if value.startswith(':'):
@@ -590,8 +590,8 @@ class NodeDB(dict):
     if v[0] == '+':
       # :+seq:TYPE:NAME
       # obtain foreign Node from other NodeDB
-      s, t, name = v[1:].split(':', 2)
-      return self.otherDB(int(s))[t, name]
+      seqnum, t, name = v[1:].split(':', 2)
+      return self.otherDB(int(seqnum))[t, name]
     raise ValueError, "unparsable value \"%s\"" % (value,)
 
 _NodeDBsByURL = {}
