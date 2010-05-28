@@ -392,6 +392,8 @@ class NodeDB(dict):
 
   def __init__(self, backend=None, readonly=False):
     dict.__init__(self)
+    self.__type_registry = {}
+    self.__scheme_registry = {}
     if backend is None:
       backend = _NoBackend(self)
     self._backend = backend
@@ -399,6 +401,22 @@ class NodeDB(dict):
     backend.set_nodedb(self)
     self.readonly = readonly
     self._lock = allocate_lock()
+
+  class __TypeRegistration(object):
+    def __init__(self, t, scheme, serialise, deserialise):
+      self.type = t
+      self.scheme = scheme
+      self.serialise = serialise
+      self.deserialise = deserialise
+
+  def register_type(self, t, scheme, serialise, deserialise):
+    reg = self.__type_registry
+    assert t not in reg, "type %s already registered" % (t,)
+    sch = self.__scheme_registry
+    assert scheme not in sch, "scheme '%s' already registered" % (scheme,)
+    R = NodeDB.__TypeRegistration(t, scheme, serialise, deserialise)
+    reg[t] = R
+    sch[scheme] = R
 
   def _createNode(self, t, name):
     ''' Factory method to make a new Node (or Node subclass instance).
@@ -548,10 +566,12 @@ class NodeDB(dict):
       s = str(value)
       assert s[0].isdigit()
       return ':' + s
-    from cs.venti import tohex
-    from cs.venti.block import isBlock
-    if isBlock(value):
-      return ':venti:'+tohex(value.encode())
+    R = self.__type_registry.get(t, None)
+    if R:
+      scheme = R.scheme
+      assert scheme[0].islower() and scheme.find(':',1) < 0, \
+             "illegal scheme name: \"%s\"" % (scheme,)
+      return ':'+scheme+':'+R.serialise(value)
     raise ValueError, "can't serialise(%s)" % (repr(value),)
 
   def deserialise(self, value):
@@ -580,12 +600,9 @@ class NodeDB(dict):
       if v.find(':', 1) < 0:
         raise ValueError, "bad :scheme:info \"%s\"" % (value,)
       scheme, info = v.split(':', 1)
-      if scheme == "venti":
-        from cs.venti import fromhex
-        D, name = resolve(path)
-        if name is not None:
-          D=D[name]
-        return D.getBlock()
+      R = self.__scheme_registry.get(scheme, None)
+      if R:
+        return R.deserialise(info)
       raise ValueError, "unsupported :scheme:info \"%s\"" % (value,)
     if v[0] == '+':
       # :+seq:TYPE:NAME
