@@ -5,7 +5,7 @@ from cs.logutils import debug, error, info, warn
 from cs.venti.block import decodeBlock
 from cs.venti.blockify import blockFromString
 from cs.venti.meta import Meta
-from cs.venti import tohex
+from cs.venti import tohex, fromhex
 from cs.lex import unctrl
 from cs.misc import seq
 from cs.serialise import toBS, fromBS, fromBSfp
@@ -192,6 +192,45 @@ def decodeDirent(s, justone=False):
            "unparsed stuff after decoding %s: %s" % (tohex(s0), tohex(s))
     return E
   return E, s
+
+def _gethexarg(path):
+  ''' Take a path with a hex string on the front.
+      Return a Dirent decoded from the hex string and the trailing path.
+  '''
+  slash=path.find('/')
+  if slash < 0:
+    hexarg=path
+    path=''
+  else:
+    hexarg=path[:slash]
+    slash+=1
+    while slash < len(path) and path[slash] == '/':
+      slash+=1
+    path=path[slash:]
+  debug("fromhex(%s)..." % hexarg)
+  fhex=fromhex(hexarg)
+  D=decodeDirent(fhex,justone=True)
+  return D, path
+
+def resolve(path, domkdir=False):
+  ''' Take a path with a hex string on the front.
+      Decode the hex string with gethexarg() and walk down the remaining
+      path, except for the last component. Return the final Dirent and the
+      last path componenet, or None if there was no final path component.
+  '''
+  D, subpath = gethexarg(path)
+  debug("resolve: D=%s, subpath=%s" % (D, subpath))
+  subpath = [s for s in subpath.split('/') if len(s) > 0]
+  debug("resolve2: D=%s, subpath=%s" % (D, subpath))
+  if len(subpath) == 0:
+    return D, None
+  while len(subpath) > 1:
+    s=subpath.pop(0)
+    if domkdir:
+      D=D.mkdir(s)
+    else:
+      D=D.chdir1(s)
+  return D, subpath[0]
 
 class Dir(Dirent):
   def __init__(self, name, meta=None, parent=None, content=None):
