@@ -40,18 +40,7 @@ def fromhex(hexstr):
   '''
   return "".join([chr(int(hexstr[i:i+2],16)) for i in range(0,len(hexstr),2)])
 
-def genHex(data):
-  for c in data:
-    assert type(c) is str and len(c) == 1, "bad c: %s" % (`c`,)
-    yield '%02x' % (ord(c),)
-
 def tohex(data):
   ''' Represent a byte sequence as a hex string.
   '''
-  return "".join(genHex(data))
-
-def writetohex(fp,data):
-  ''' Write data in hex to file.
-  '''
-  for w in genHex(data):
-    fp.write(w)
+  return "".join( '%-02x' % ord(_) for _ in data )
