@@ -98,6 +98,9 @@ class _Block(object):
     assert len(enc) >= 22
     return enc
 
+  def textEncode(self):
+    return totext(self.encode())
+
 class Block(_Block):
   ''' A direct block.
   '''

@@ -6,7 +6,7 @@ from cs.venti.block import decodeBlock
 from cs.venti.blockify import blockFromString
 from cs.venti.meta import Meta
 from cs.venti import totext
-from cs.lex import unctrl
+from cs.lex import unctrl, hexify
 from cs.misc import seq
 from cs.serialise import toBS, fromBS, fromBSfp
 
@@ -74,7 +74,6 @@ class Dirent:
 
     meta=self.meta
     if meta:
-      ##debug("%s:META=%s"%(self.name, meta, ))
       assert isinstance(meta, Meta)
       metatxt=meta.encode()
       if len(metatxt) > 0:
@@ -98,6 +97,38 @@ class Dirent:
          + metatxt \
          + name \
          + block.encode()
+
+  def textEncode(self, noname=False):
+    ''' Serialise the dirent.
+        Output format: bs(type)bs(flags)[bs(metalen)meta][bs(namelen)name]block
+    '''
+    flags=0
+
+    meta=self.meta
+    if meta:
+      assert isinstance(meta, Meta)
+      metatxt=meta.encode()
+      if len(metatxt) > 0:
+        metatxt=hexify(toBS(len(metatxt)))+totext(metatxt)
+        flags|=F_HASMETA
+    else:
+      metatxt=""
+
+    name=self.name
+    if noname:
+      nametxt=""
+    elif name is not None and len(name) > 0:
+      nametxt=hexify(toBS(len(name)))+totext(name)
+      flags|=F_HASNAME
+    else:
+      name=""
+
+    block = self.getBlock()
+    return hexify(toBS(self.type)) \
+         + hexify(toBS(flags)) \
+         + metatxt \
+         + nametxt \
+         + block.textEncode()
 
   # TODO: make size a property?
   def size(self):
