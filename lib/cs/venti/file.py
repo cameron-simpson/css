@@ -3,7 +3,6 @@
 # File interfaces.      - Cameron Simpson <cs@zip.com.au>
 #
 
-from cs.venti import tohex
 from cs.venti.dir import FileDirent
 from cs.venti.meta import Meta
 from cs.venti.blockify import blockFromFile

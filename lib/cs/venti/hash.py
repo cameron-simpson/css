@@ -6,7 +6,7 @@ else:
 if sys.hexversion < 0x02060000:
   bytes = str
 import unittest
-from cs.venti import tohex
+from cs.lex import hexify
 
 # enums for hash types, used in encode/decode
 # TODO: use classes directly?
@@ -21,7 +21,7 @@ class Hash_SHA1(bytes):
   hashenum = HASH_SHA1_T
 
   def __repr__(self):
-    return "Hash_SHA1:"+tohex(self)
+    return "Hash_SHA1:"+hexify(self)
 
   @classmethod
   def fromData(cls, data):

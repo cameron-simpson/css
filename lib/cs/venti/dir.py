@@ -5,7 +5,7 @@ from cs.logutils import debug, error, info, warn
 from cs.venti.block import decodeBlock
 from cs.venti.blockify import blockFromString
 from cs.venti.meta import Meta
-from cs.venti import tohex, fromhex
+from cs.venti import totext
 from cs.lex import unctrl
 from cs.misc import seq
 from cs.serialise import toBS, fromBS, fromBSfp
@@ -189,39 +189,25 @@ def decodeDirent(s, justone=False):
     E=_BasicDirent(type, name, meta, block)
   if justone:
     assert len(s) == 0, \
-           "unparsed stuff after decoding %s: %s" % (tohex(s0), tohex(s))
+           "unparsed stuff after decoding %s: %s" % (totext(s0), totext(s))
     return E
   return E, s
 
-def _gethexarg(path):
-  ''' Take a path with a hex string on the front.
-      Return a Dirent decoded from the hex string and the trailing path.
-  '''
-  slash=path.find('/')
-  if slash < 0:
-    hexarg=path
-    path=''
-  else:
-    hexarg=path[:slash]
-    slash+=1
-    while slash < len(path) and path[slash] == '/':
-      slash+=1
-    path=path[slash:]
-  debug("fromhex(%s)..." % hexarg)
-  fhex=fromhex(hexarg)
-  D=decodeDirent(fhex,justone=True)
-  return D, path
-
 def resolve(path, domkdir=False):
-  ''' Take a path with a hex string on the front.
-      Decode the hex string with gethexarg() and walk down the remaining
-      path, except for the last component. Return the final Dirent and the
-      last path componenet, or None if there was no final path component.
+  ''' Take a path composed of a Direct text representation with an optional
+      "/sub/path/..." suffix.
+      Decode the Direct and walk down the remaining path, except for the last
+      component. Return the final Dirent and the last path componenet, or
+      None if there was no final path component.
   '''
-  D, subpath = gethexarg(path)
-  debug("resolve: D=%s, subpath=%s" % (D, subpath))
+  slashpos = path.find('/')
+  if slashpos < 0:
+    D = decodeDirent(fromtext(path, justone=True))
+    subpath = []
+  else:
+    Dtext, subpath = path.split('/', 1)
+    D = decodeDirent(fromtext(Dtext, justone=True))
   subpath = [s for s in subpath.split('/') if len(s) > 0]
-  debug("resolve2: D=%s, subpath=%s" % (D, subpath))
   if len(subpath) == 0:
     return D, None
   while len(subpath) > 1:

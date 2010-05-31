@@ -21,11 +21,12 @@ from thread import allocate_lock
 import threading
 from Queue import Queue
 from zlib import compress, decompress
+from cs.lex import hexify
 from cs.logutils import debug
 from cs.misc import out, tb, seq
 from cs.serialise import toBS, fromBS, fromBSfp
 from cs.threads import FuncMultiQueue, Q1, DictMonitor, NestingOpenClose
-from cs.venti import tohex, defaults
+from cs.venti import defaults
 from cs.venti.block import Block
 from cs.venti.hash import Hash_SHA1
 from cs.upd import out, nl
@@ -273,7 +274,7 @@ def pullFromSerial(S1, S2):
   asked = 0
   for h in S2.keys():
     asked+=1
-    out("%d %s" % (asked,tohex(h)))
+    out("%d %s" % (asked, totext(h)))
     if not S1.haveyou(h):
       S1.store(S2.fetch(h))
 
@@ -288,7 +289,7 @@ def pullFrom(S1,S2):
   asked = 0
   for h in S2.keys():
     asked+=1
-    out("%d %s" % (asked, tohex(h)))
+    out("%d %s" % (asked, hexify(h)))
     tag = seq()
     pending[tag] = h
     S1.haveyou_ch(h,haveyou_ch,tag)

@@ -36,7 +36,7 @@ from getopt import getopt, GetoptError
 import datetime
 import logging
 from cs.logutils import Pfx, error, warn, debug
-from cs.venti import defaults, tohex, fromhex
+from cs.venti import defaults, totext, fromtext
 from cs.venti.block import IndirectBlock, decodeBlocks
 from cs.venti.debug import dumpBlock
 from cs.venti.store import Store, pullFrom
@@ -350,8 +350,8 @@ def main(argv):
           cat(path)
 
       elif op == "catblock":
-        for hexarg in args:
-          data = S[fromhex(hexarg)]
+        for arg in args:
+          data = S[fromtext(arg)]
           if indirect:
             IB = IndirectBlock()
             IB.extend(decodeBlocks(data))
@@ -362,7 +362,7 @@ def main(argv):
       elif op == "scan":
         from cs.venti.datafile import scanFile
         for h, offset, zsize in scanFile(open(args[0])):
-          print tohex(h), offset, zsize
+          print totext(h), offset, zsize
 
       elif op == "pull":
         for arg in args:

@@ -2,7 +2,7 @@
 
 import os
 from datetime import datetime
-from cs.venti import tohex, fromhex
+from cs.venti import totext, fromtext
 from cs.venti.dir import decodeDirent
 
 def archive2dir(archive):
@@ -25,9 +25,7 @@ def archive2dir(archive):
   fp.close()
   if refword is None:
     return None
-  E, junk = decodeDirent(fromhex(refword))
-  assert len(junk) == 0, \
-         "decodeDirent(%s) failed, junk=\"%s\"" % (refword, tohex(junk))
+  E = decodeDirent(fromtext(refword), justone=True)
   if len(words) > 2 and (E.name is None or len(E.name) == 0):
     E.name=words[2]
   return E
@@ -54,10 +52,10 @@ def archiveAppend(archive,E,when=None,path=None):
 
   if path is None:
     fp.write("%s %s\n"
-             % (tohex(E.encode(noname=True)), datetime.now()))
+             % (totext(E.encode(noname=True)), datetime.now()))
   else:
     ##import sys; print >>sys.stderr, "E=%s" % E
     fp.write("%s %s %s\n"
-           % (tohex(E.encode(noname=True)), datetime.now(), path))
+           % (totext(E.encode(noname=True)), datetime.now(), path))
   if fp is not archive:
     fp.close()

@@ -13,7 +13,6 @@ from thread import allocate_lock
 from cs.logutils import debug
 from cs.cache import LRU
 from cs.serialise import toBS, fromBS, fromBSfp
-from cs.venti import tohex
 from cs.venti.store import IndexedFileStore
 from cs.venti.datafile import scanFile, getBlock, addBlock
 

@@ -3,7 +3,7 @@
 import unittest
 import sys
 from cs.serialise import toBS, fromBS
-from cs.venti import defaults, tohex
+from cs.venti import defaults, totext
 from cs.venti.hash import Hash_SHA1, HASH_SHA1_T
 from cs.venti.debug import dumpBlock
 
@@ -29,13 +29,12 @@ def decodeBlock(s, justone=False):
       If the optional paramater 'justone' is true, check the tail is
       empty and return just the Block.
   '''
-  ##print >>sys.stderr, "decodeBlock: s=%d:%s" % (len(s), tohex(s))
   s0=s
   flags, s = fromBS(s)
   unknown_flags = flags & ~(F_BLOCK_INDIRECT|F_BLOCK_HASHTYPE)
   assert unknown_flags == 0, \
          "unexpected flags value (0x%02x) with unsupported flags=0x%02x, s=%s" \
-         % (flags, unknown_flags, tohex(s0))
+         % (flags, unknown_flags, totext(s0))
   span, s = fromBS(s)
   indirect = bool(flags & F_BLOCK_INDIRECT)
   if flags & F_BLOCK_HASHTYPE:
@@ -53,7 +52,7 @@ def decodeBlock(s, justone=False):
   else:
     B = Block(hashcode=hashcode, span=span)
   if justone:
-    assert len(s) == 0, "extra stuff after block ref: %s" % (tohex(s),)
+    assert len(s) == 0, "extra stuff after block ref: %s" % (totext(s),)
     return B
   return B, s
 
@@ -387,7 +386,7 @@ class TestAll(unittest.TestCase):
       print >>sys.stderr, "IBdata = %s:%d:%s" % (type(IBdata), len(IBdata), `IBdata`,)
       IB2data = IndirectBlock(hashcode=IBH, span=len(IBdata)).data()
       print >>sys.stderr, "IB2data = %s:%d:%s" % (type(IB2data), len(IB2data), `IB2data`,)
-      assert IBdata == IB2data, "IB:  %s\nIB2: %s" % (tohex(IBdata), tohex(IB2data))
+      assert IBdata == IB2data, "IB:  %s\nIB2: %s" % (totext(IBdata), totext(IB2data))
 
 if __name__ == '__main__':
   unittest.main()

@@ -1,12 +1,12 @@
 #!/usr/bin/python
 
 import sys
-from cs.venti import tohex
+from cs.lex import hexify
 
 def dumpBlock(block, indent=''):
   print >>sys.stderr, "%s%s %s %d bytes" \
                       % (indent,
-                         tohex(block.hashcode()),
+                         hexify(block.hashcode()),
                          "indirect" if block.indirect else "direct",
                          len(block))
   if block.indirect:

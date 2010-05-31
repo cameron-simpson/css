@@ -13,6 +13,7 @@
       http://csbp.backpackit.com/pub/1356606
 '''
 
+import re
 import threading
 
 class _ventiDefaults(threading.local):
@@ -35,12 +36,14 @@ class _ventiDefaults(threading.local):
 
 defaults = _ventiDefaults()
 
-def fromhex(hexstr):
-  ''' Return raw byte array from hexadecimal string.
+def fromtext(s):
+  ''' Return raw byte array from text/hexadecimal string.
   '''
-  return "".join([chr(int(hexstr[i:i+2],16)) for i in range(0,len(hexstr),2)])
+  return untexthexify(s)
 
-def tohex(data):
-  ''' Represent a byte sequence as a hex string.
+_totext_white_re = re.compile(r'[a-zA-Z0-9_\-+.,]+')
+
+def totext(data):
+  ''' Represent a byte sequence as a hex/text string.
   '''
-  return "".join( '%-02x' % ord(_) for _ in data )
+  return texthexify(data, whitelist_re = _totext_white_re)

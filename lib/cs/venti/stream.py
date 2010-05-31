@@ -14,7 +14,7 @@ from cs.misc import seq, debug, isdebug, tb, warn, progress
 from cs.serialise import toBS, fromBSfp
 from cs.lex import unctrl
 from cs.threads import Q1
-from cs.venti import tohex
+from cs.lex import hexify
 from cs.venti.store import BasicStore
 
 class RqType(int):
@@ -101,7 +101,7 @@ class _StreamDaemonRequestReader(Thread):
         if arg is None:
           varg=None
         elif rqType == T_CONTAINS or rqType == T_GET:
-          varg=tohex(arg)
+          varg=hexify(arg)
         else:
           varg=unctrl(arg)
         warn("StreamDaemon: rq=(%d, %s, %s)" % (n, rqType, varg))
@@ -191,7 +191,7 @@ class _StreamDaemonResultsSender(Thread):
         if result is None:
           vresult=None
         elif rqType == T_STORE:
-          vresult=tohex(result)
+          vresult=hexify(result)
         elif type(result) is str:
           vresult=unctrl(result)
         else:
@@ -246,7 +246,7 @@ def encodeFetch(fp,rqTag,h):
   ''' Write fetch(h) to stream.
       Does not .flush() the stream.
   '''
-  debug(fp,"encodeFetch(rqTag=%d,h=%s" % (rqTag,tohex(h)))
+  debug(fp,"encodeFetch(rqTag=%d,h=%s" % (rqTag,hexify(h)))
   global env_GET
   fp.write(toBS(rqTag))
   fp.write(env_GET)
@@ -257,7 +257,7 @@ def encodeHaveYou(fp,rqTag,h):
   ''' Write haveyou(h) to stream.
       Does not .flush() the stream.
   '''
-  debug(fp,"encodeHaveYou(rqTag=%d,h=%s" % (rqTag,tohex(h)))
+  debug(fp,"encodeHaveYou(rqTag=%d,h=%s" % (rqTag,hexify(h)))
   global enc_CONTAINS
   fp.write(toBS(rqTag))
   fp.write(enc_CONTAINS)

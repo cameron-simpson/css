@@ -7,7 +7,7 @@
 from __future__ import with_statement
 import sys
 from Queue import Queue
-from cs.venti import tohex
+from cs.lex import hexify
 from cs.venti.store import BasicStore
 
 class CacheStore(BasicStore):
@@ -108,7 +108,7 @@ class MemCacheStore(BasicStore):
     if self.used >= hlen:
       # empty a slot
       oldh=self.hashlist[self.low]
-      assert oldh in hmap, "%s not in hmap" % tohex(h)
+      assert oldh in hmap, "%s not in hmap" % hexify(h)
       hits=hmap[oldh][0]
       if hits <= 1:
         del hmap[oldh]
