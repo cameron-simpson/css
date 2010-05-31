@@ -30,9 +30,9 @@ class CacheStore(BasicStore):
     self.__closing=False
 
   def shutdown(self):
+    BasicStore.shutdown(self)
     self.cache.close()
     self.backend.close()
-    BasicStore.shutdown(self)
 
   def flush(self):
     self.cache.flush()

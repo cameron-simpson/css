@@ -151,7 +151,7 @@ class BasicStore(NestingOpenClose):
 
   def contains_bg(self, h, ch=None):
     if ch is None: ch = Q1()
-    tag = self.__funcQ.qbgcall(ch, self.contains, h)
+    tag = self.__funcQ.qbgcall(partial(self.contains, h), ch)
     return tag, ch
 
   def get(self, h):
@@ -166,17 +166,17 @@ class BasicStore(NestingOpenClose):
 
   def get_bg(self, h, ch=None):
     if ch is None: ch = Q1()
-    tag = self.__funcQ.qbgcall(ch, self.get, h)
+    tag = self.__funcQ.qbgcall(partial(self.get, h), ch)
     return tag, ch
 
   def add_bg(self, data, ch=None):
     if ch is None: ch = Q1()
-    tag = self.__funcQ.qbgcall(ch, self.add, data)
+    tag = self.__funcQ.qbgcall(partial(self.add, data), ch)
     return tag, ch
 
   def sync_bg(self, ch=None):
     if ch is None: ch = Q1()
-    tag = self.__funcQ.qbgcall(ch, self.sync)
+    tag = self.__funcQ.qbgcall(self.sync, ch)
     return tag, ch
 
   def missing(self, hashes):
