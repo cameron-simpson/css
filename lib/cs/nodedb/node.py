@@ -403,18 +403,54 @@ class NodeDB(dict):
     self._lock = allocate_lock()
 
   class __TypeRegistration(object):
-    def __init__(self, t, scheme, serialise, deserialise):
+    ''' An object to hold a type registration, with the following attributes:
+          .type      the registered type
+          .scheme    the scheme label to use for the type
+          .totext    function to render a value as text
+          .fromtext  function to compute a value from text
+          .tobytes   function to render a value in a compact binary form
+          .frombytes function to compute a value from the binary form
+    '''
+
+    def __init__(self,
+                   t, scheme,
+                   totext, fromtext,
+                   tobytes, frombytes):
+      '''
+      '''
       self.type = t
       self.scheme = scheme
-      self.serialise = serialise
-      self.deserialise = deserialise
+      self.totext = totext
+      self.fromtext = fromtext
+      self.tobytes = tobytes
+      self.frombytes = tobytes
 
-  def register_type(self, t, scheme, serialise, deserialise):
+  def register_type(self,
+                      t, scheme,
+                      totext, fromtext,
+                      tobytes=None, frombytes=None):
+    ''' Register a type for storage and retrieval in this NodeDB.
+        Parameters:
+          `t`, the type to register
+          `scheme`, the scheme label to use for the type
+          `totext`, a function to render a value as text
+          `fromtext`, a function to compute a value from text
+          `tobytes`, a function to render a value in a compact binary form
+          `frombytes`, a function to compute a value from the binary form
+        If `tobytes` is None or unspecified, `totext` is used.
+        If `frombytes` is None or unspecified, `fromtext` is used.
+    '''
     reg = self.__type_registry
     assert t not in reg, "type %s already registered" % (t,)
     sch = self.__scheme_registry
     assert scheme not in sch, "scheme '%s' already registered" % (scheme,)
-    R = NodeDB.__TypeRegistration(t, scheme, serialise, deserialise)
+    if tobytes is None:
+      tobytes = totext
+    if frombytes is None:
+      frombytes = fromtext
+    R = NodeDB.__TypeRegistration(t, scheme,
+                                  totext, fromtext,
+                                  tobytes, frombytes)
     reg[t] = R
     sch[scheme] = R
 
