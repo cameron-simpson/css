@@ -321,7 +321,7 @@ def main(argv):
     with S:
       if op == "pack":
         if len(args) == 0 or args[0] != '-o':
-          S.writeonly = True
+          ## WTF? ## S.writeonly = True
           from cs.venti.file import storeFile
           from cs.venti.dir import storeDir
           for path in args:

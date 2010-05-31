@@ -74,6 +74,9 @@ class _Block(object):
     hashclass = S.hashclass
     _hashcode = self._hashcode
     if _hashcode is None or type(_hashcode) is not hashclass:
+      print >>sys.stderr, "block %s: _hashcode=%s, hashclass=%s" % (id(self), _hashcode, hashclass)
+      print >>sys.stderr, `self.__dict__`
+      assert self._data is not None
       data = self.blockdata()
       _hashcode = self._hashcode = S.add(data)
     return _hashcode
@@ -151,10 +154,11 @@ class Block(_Block):
     '''
     S = defaults.S
     if self._hashcode is None:
-      assert self._data is not None
       self._hashcode = S.add(self.blockdata())
+      assert self._hashcode is not None
     elif self._hashcode not in S:
       self._hashcode = S.add(self.blockdata())
+      assert self._hashcode is not None
     if discard:
       self._data = None
     return self._hashcode

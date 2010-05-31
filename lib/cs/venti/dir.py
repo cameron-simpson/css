@@ -5,7 +5,7 @@ from cs.logutils import debug, error, info, warn
 from cs.venti.block import decodeBlock
 from cs.venti.blockify import blockFromString
 from cs.venti.meta import Meta
-from cs.venti import totext
+from cs.venti import totext, fromtext
 from cs.lex import unctrl, hexify
 from cs.misc import seq
 from cs.serialise import toBS, fromBS, fromBSfp
@@ -233,12 +233,12 @@ def resolve(path, domkdir=False):
   '''
   slashpos = path.find('/')
   if slashpos < 0:
-    D = decodeDirent(fromtext(path, justone=True))
+    D = decodeDirent(fromtext(path), justone=True)
     subpath = []
   else:
     Dtext, subpath = path.split('/', 1)
     D = decodeDirent(fromtext(Dtext, justone=True))
-  subpath = [s for s in subpath.split('/') if len(s) > 0]
+    subpath = [s for s in subpath.split('/') if len(s) > 0]
   if len(subpath) == 0:
     return D, None
   while len(subpath) > 1:

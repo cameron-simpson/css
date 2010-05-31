@@ -62,8 +62,10 @@ class CacheStore(BasicStore):
     return self.backend[h]
     
   def add(self, data):
-    self.cache.add(data)
-    self.backend.add(data)
+    h = self.cache.add(data)
+    h2 = self.backend.add(data)
+    assert h == h2
+    return h
 
   def prefetch(self,hs):
     ''' Request from the backend those hashes from 'hs'

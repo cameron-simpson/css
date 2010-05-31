@@ -15,6 +15,7 @@
 
 import re
 import threading
+from cs.lex import texthexify, untexthexify
 
 class _ventiDefaults(threading.local):
   ''' Per-thread default store stack.
