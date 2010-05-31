@@ -142,8 +142,9 @@ def hexify(s, sep=''):
   return sep.join( '%02x' % ord(c) for c in s )
 _texthexify_white_re = re.compile(r'[a-zA-Z0-9_\-+.,/]+')
 
-def texthexify(s, shiftin='[', shiftout=']', modein=False, whitelist_re=None):
+def texthexify(s, shiftin='[', shiftout=']', whitelist_re=None):
   ''' Transcribe the byte string `s` to text.
+      TODO: add and implement modein parameter, for starting in text mode.
   '''
   if whitelist_re is None:
     whitelist_re = _texthexify_white_re
