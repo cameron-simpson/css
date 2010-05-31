@@ -139,7 +139,15 @@ def dict2js(d):
   return cs.json.json(d)
 
 def hexify(s, sep=''):
+  ''' Return raw byte string from hexadecimal string
+  '''
   return sep.join( '%02x' % ord(c) for c in s )
+
+def fromhex(hexstr):
+  ''' Return raw byte array from hexadecimal string.
+  '''
+  return "".join([chr(int(hexstr[i:i+2],16)) for i in range(0,len(hexstr),2)])
+
 _texthexify_white_re = re.compile(r'[a-zA-Z0-9_\-+.,/]+')
 
 def texthexify(s, shiftin='[', shiftout=']', whitelist_re=None):
@@ -148,6 +156,8 @@ def texthexify(s, shiftin='[', shiftout=']', whitelist_re=None):
   '''
   if whitelist_re is None:
     whitelist_re = _texthexify_white_re
+  elif type(whitelist_re) is str:
+    whitelist_re = re.compile(whitelist_re)
   inout_len = len(shiftin) + len(shiftout)
   chunks = []
   sofar = 0
@@ -168,4 +178,24 @@ def texthexify(s, shiftin='[', shiftout=']', whitelist_re=None):
   if sofar < len(s):
     chunks.append(hexify(s[sofar:]))
 
+  return ''.join(chunks)
+
+def untexthexify(s, shiftin='[', shiftout=']'):
+  chunks = []
+  while len(s) > 0:
+    hexlen = s.find(shiftin)
+    if hexlen < 0:
+      break
+    if hexlen > 0:
+      hextext = s[:hexlen]
+      assert hexlen % 2 == 0, "uneven hex sequence \"%s\"" % (hextext,)
+      chunks.append(fromhex(s[:hexlen]))
+    s = s[hexlen+len(shiftin):]
+    textlen = s.find(shiftout)
+    assert textlen >= 0, "missing shift out marker \"%s\"" % (shiftout,)
+    chunks.append(s[:textlen])
+    s = s[textlen+len(shiftout):]
+  if len(s) > 0:
+    assert len(s) % 2 == 0, "uneven hex sequence \"%s\"" % (s,)
+    chunks.append(fromhex(s))
   return ''.join(chunks)
