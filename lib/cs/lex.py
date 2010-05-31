@@ -143,7 +143,7 @@ def hexify(s, sep=''):
   '''
   return sep.join( '%02x' % ord(c) for c in s )
 
-def fromhex(hexstr):
+def unhexify(hexstr):
   ''' Return raw byte array from hexadecimal string.
   '''
   return "".join([chr(int(hexstr[i:i+2],16)) for i in range(0,len(hexstr),2)])
@@ -189,7 +189,7 @@ def untexthexify(s, shiftin='[', shiftout=']'):
     if hexlen > 0:
       hextext = s[:hexlen]
       assert hexlen % 2 == 0, "uneven hex sequence \"%s\"" % (hextext,)
-      chunks.append(fromhex(s[:hexlen]))
+      chunks.append(unhexify(s[:hexlen]))
     s = s[hexlen+len(shiftin):]
     textlen = s.find(shiftout)
     assert textlen >= 0, "missing shift out marker \"%s\"" % (shiftout,)
@@ -197,5 +197,5 @@ def untexthexify(s, shiftin='[', shiftout=']'):
     s = s[textlen+len(shiftout):]
   if len(s) > 0:
     assert len(s) % 2 == 0, "uneven hex sequence \"%s\"" % (s,)
-    chunks.append(fromhex(s))
+    chunks.append(unhexify(s))
   return ''.join(chunks)
