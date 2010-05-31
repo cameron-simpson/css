@@ -137,3 +137,34 @@ def jsquote(s):
 def dict2js(d):
   import cs.json
   return cs.json.json(d)
+
+def hexify(s, sep=''):
+  return sep.join( '%02x' % ord(c) for c in s )
+_texthexify_white_re = re.compile(r'[a-zA-Z0-9_\-+.,/]+')
+
+def texthexify(s, shiftin='[', shiftout=']', modein=False, whitelist_re=None):
+  ''' Transcribe the byte string `s` to text.
+  '''
+  if whitelist_re is None:
+    whitelist_re = _texthexify_white_re
+  inout_len = len(shiftin) + len(shiftout)
+  chunks = []
+  sofar = 0
+  pos = 0
+  while pos < len(s):
+    m = whitelist_re.search(s, pos)
+    if not m:
+      break
+    offset = m.start(0)
+    text = m.group(0)
+    if len(text) >= inout_len:
+      if offset > pos:
+        chunks.append(hexify(s[sofar:offset]))
+      chunks.append(shiftin + text + shiftout)
+      sofar = m.end(0)
+    pos = m.end(0)
+
+  if sofar < len(s):
+    chunks.append(hexify(s[sofar:]))
+
+  return ''.join(chunks)
