@@ -2,6 +2,7 @@
 
 import unittest
 import sys
+from cs.logutils import D
 from cs.serialise import toBS, fromBS
 from cs.venti import defaults, totext
 from cs.venti.hash import Hash_SHA1, HASH_SHA1_T
@@ -74,8 +75,8 @@ class _Block(object):
     hashclass = S.hashclass
     _hashcode = self._hashcode
     if _hashcode is None or type(_hashcode) is not hashclass:
-      print >>sys.stderr, "block %s: _hashcode=%s, hashclass=%s" % (id(self), _hashcode, hashclass)
-      print >>sys.stderr, `self.__dict__`
+      D("block %s: _hashcode=%s, hashclass=%s", id(self), _hashcode, hashclass)
+      D("  block: %s", `self.__dict__`)
       assert self._data is not None
       data = self.blockdata()
       _hashcode = self._hashcode = S.add(data)
@@ -390,9 +391,9 @@ class TestAll(unittest.TestCase):
       assert len(IB) == 1000
       IBH = IB.hashcode()
       IBdata = IB.data()
-      print >>sys.stderr, "IBdata = %s:%d:%s" % (type(IBdata), len(IBdata), `IBdata`,)
+      D("IBdata = %s:%d:%s", type(IBdata), len(IBdata), `IBdata`,)
       IB2data = IndirectBlock(hashcode=IBH, span=len(IBdata)).data()
-      print >>sys.stderr, "IB2data = %s:%d:%s" % (type(IB2data), len(IB2data), `IB2data`,)
+      D("IB2data = %s:%d:%s", type(IB2data), len(IB2data), `IB2data`,)
       assert IBdata == IB2data, "IB:  %s\nIB2: %s" % (totext(IBdata), totext(IB2data))
 
 if __name__ == '__main__':

@@ -4,6 +4,7 @@
 #       - Cameron Simpson <cs@zip.com.au>
 #
 
+from cs.logutils import D
 from fuse import Fuse, FuseArgs   ## Direntry
 from errno import ENOSYS
 import sys
@@ -13,7 +14,7 @@ def fusemount(mnt,D,S):
   ''' Run a FUSE filesystem with Dirent and backing Store.
   '''
   FS=FuseStore(mnt,D,E)
-  sys.stderr.write("calling FS.main...\n")
+  D("calling FS.main...")
   FS.main()
 
 # Horrible hack because the Fuse class doesn't seem to tell fuse file
@@ -61,8 +62,8 @@ class FuseStore(Fuse):
       self.__out=open("/dev/pts/39","w")
       sys.stdout=self.__out
       sys.stderr=self.__out
-      if len(args):
-        sys.stderr.write(" ".join([str(x) for x in args])+"\n")
+    if len(args):
+      D(" ".join([str(x) for x in args])+"\n")
 
   def __abs(self, path):
     assert path[0] == '/'

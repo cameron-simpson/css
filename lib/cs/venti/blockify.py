@@ -8,7 +8,7 @@
 import sys
 from struct import unpack_from
 from threading import Thread
-from cs.logutils import debug
+from cs.logutils import debug, D
 from cs.threads import IterableQueue
 from cs.misc import D, eachOf
 from cs.lex import unctrl
@@ -48,7 +48,7 @@ def topIndirectBlock(blockSource):
       return topblock
 
     # add a layer of indirection and repeat
-    print >>sys.stderr, "push new fullIndirectBlocks()"
+    D("push new fullIndirectBlocks()")
     blockSource = fullIndirectBlocks(eachOf(([topblock,
                                               nexttopblock
                                              ], blockSource)))
@@ -115,7 +115,6 @@ def blocksOf(dataSource, vocab=None):
   # invariant: all the bytes in buf[]
   # have been fed to the rolling hash
   for data in dataSource:
-    ##print >>sys.stderr, "blockOf(data = %d bytes), buflen=%d" % (len(data),buflen)
     while len(data) > 0:
       # if buflen < MIN_BLOCKSIZE pad with stuff from data
       skip = MIN_BLOCKSIZE - buflen
