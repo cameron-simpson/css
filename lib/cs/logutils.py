@@ -13,6 +13,14 @@ import threading
 import traceback
 import cs.misc
 
+def D(fmt, *args):
+  ''' Print formatted debug string straight to sys.stderr,
+      bypassing logging modules entirely.
+      A quick'n'dirty debug tool.
+  '''
+  sys.stderr.write(fmt % args)
+  sys.stderr.write("\n")
+
 class NullHandler(logging.Handler):
   def emit(self, record):
     pass
