@@ -91,7 +91,7 @@ class BasicStore(NestingOpenClose):
     self.logfp=None
     self.__funcQ=FuncMultiQueue(capacity)
     self.hashclass = Hash_SHA1
-    self.lock = allocate_lock()
+    self._lock = allocate_lock()
     self.readonly = False
     self.writeonly = False
 
@@ -305,8 +305,6 @@ def pullFrom(S1,S2):
   fetcher.join()
   out('')
 
-F_COMPRESSED = 0x01
-
 class IndexedFileStore(BasicStore):
   ''' A file-based Store which keeps data in flat files, compressed.
       Subclasses must implement the method ._getIndex() to obtain the
@@ -319,22 +317,20 @@ class IndexedFileStore(BasicStore):
     debug("IndexedStore.__init__...")
     BasicStore.__init__(self, dir, capacity=capacity)
     self.dir = dir
-    self.savefile = None
-    self._index = _getIndex()
-    self.readfiles = {}
+    self._n = None
+    self._index = self._getIndex()
     self._storeMap = self.__loadStoreMap()
-    self.added = 0
 
   @property
   def n(self):
     with self._lock:
       if self._n is None:
         self._n = self.__anotherDataFile()
+    return self._n
 
   def _getIndex(self):
     raise NotImplementedError
 
-  @property
   def __loadStoreMap(self):
     ''' Load a mapping from existing store data file ordinals to store data
         filenames, thus:

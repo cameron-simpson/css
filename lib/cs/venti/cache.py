@@ -128,15 +128,15 @@ class MemCacheStore(BasicStore):
     hlist[high]=h
 
   def __contains__(self, h):
-    with self.lock:
+    with self._lock:
       return h in self.hmap
 
   def __getitem__(self, h):
-    with self.lock:
+    with self._lock:
       return self.hmap[h][1]
 
   def add(self, data):
-    with self.lock:
+    with self._lock:
       H = self.hash(data)
       self._hit(H, data)
     return H

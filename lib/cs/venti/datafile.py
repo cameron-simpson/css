@@ -5,6 +5,8 @@ from thread import allocate_lock
 from cs.serialise import toBS, fromBSfp
 from cs.venti import defaults
 
+F_COMPRESSED = 0x01
+
 class DataFile(object):
   ''' A cs.venti data file, storing data chunks in compressed form.
   '''
@@ -73,14 +75,14 @@ class DataFile(object):
       assert dsize > 0, "expected dsize > 0, got dsize=%s" % (dsize,)
       data = fp.read(dsize)
     assert len(data) == dsize
-    return data
+    return flags, data
 
   def saveData(self, data, noCompress=False):
     ''' Append a chunk of data to the file, return the store offset.
     '''
     flags = 0
     if not noCompress:
-      zdata = compress(block)
+      zdata = compress(data)
       if len(zdata) < len(data):
         data = zdata
         flags |= F_COMPRESSED
