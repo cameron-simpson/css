@@ -14,7 +14,6 @@ from cs.logutils import debug
 from cs.cache import LRU
 from cs.serialise import toBS, fromBS, fromBSfp
 from cs.venti.store import IndexedFileStore
-from cs.venti.datafile import scanFile, getBlock, addBlock
 
 class GDBMStore(IndexedFileStore):
   ''' An IndexedFileStore attached to a GDBM index.
