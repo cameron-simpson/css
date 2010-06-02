@@ -22,12 +22,13 @@ import threading
 from Queue import Queue
 from zlib import compress, decompress
 from cs.lex import hexify
-from cs.logutils import debug
+from cs.logutils import debug, warn, Pfx
 from cs.misc import out, tb, seq
 from cs.serialise import toBS, fromBS, fromBSfp
 from cs.threads import FuncMultiQueue, Q1, DictMonitor, NestingOpenClose
 from cs.venti import defaults
 from cs.venti.block import Block
+from cs.venti.datafile import DataFile
 from cs.venti.hash import Hash_SHA1
 from cs.upd import out, nl
 
@@ -95,6 +96,8 @@ class BasicStore(NestingOpenClose):
     self.writeonly = False
 
   def hash(self, data):
+    ''' Return a Hash object from data bytes.
+    '''
     return self.hashclass.fromData(data)
 
   def __contains__(self, h):
@@ -102,14 +105,16 @@ class BasicStore(NestingOpenClose):
     '''
     raise NotImplementedError
   def __getitem__(self, h):
-    ''' Return the data block associated with the supplied hashcode.
+    ''' Return the data bytes associated with the supplied hashcode.
         Raise KeyError if the hashcode is not present.
     '''
     raise NotImplementedError
+
   def add(self, data):
-    ''' Add the supplied data block to the store.
+    ''' Add the supplied data bytes to the store.
     '''
     raise NotImplementedError
+
   def flush(self):
     ''' Flush outstanding I/O operations on the store.
         This is generally discouraged because it causes less efficient
@@ -155,7 +160,7 @@ class BasicStore(NestingOpenClose):
     return tag, ch
 
   def get(self, h):
-    ''' Return the data block associated with the supplied hashcode.
+    ''' Return the data bytes associated with the supplied hashcode.
         Return None if the hashcode is not present.
     '''
     try:
@@ -302,38 +307,10 @@ def pullFrom(S1,S2):
 
 F_COMPRESSED = 0x01
 
-def blockdataFromFileStoreFP(fp):
-  ''' Read a block of data from a store file.
-  '''
-  flags = fromBSfp(fp)
-  dsize = fromBSfp(fp)
-  if dsize == 0:
-    data = ''
-  else:
-    assert dsize > 0, "expected dsize > 0, got dsize=%s" % (dsize,)
-    data = fp.read(dsize)
-  assert len(data) == dsize
-  if flags & F_COMPRESSED:
-    data = decompress(data)
-  assert (flags & ~F_COMPRESSED) == 0
-  return data
-
-def saveBlockData(fp, data):
-  ''' Write a data block to a store file.
-  '''
-  flags = 0
-  zdata = compress(data)
-  if len(zdata) < len(data):
-    flags |= F_COMPRESSED
-    data = zdata
-  fp.write(toBS(flags))
-  fp.write(toBS(len(data)))
-  fp.write(data)
-
 class IndexedFileStore(BasicStore):
-  ''' A file-based Store which keeps data blocks in flat files, compressed.
+  ''' A file-based Store which keeps data in flat files, compressed.
       Subclasses must implement the method ._getIndex() to obtain the
-      associated index object (for examine, gdbm files) to the object.
+      associated index object (for example, a gdbm file) to the data files.
   '''
   def __init__(self, dir, capacity=None):
     ''' Initialise this IndexedFileStore.
@@ -343,113 +320,104 @@ class IndexedFileStore(BasicStore):
     BasicStore.__init__(self, dir, capacity=capacity)
     self.dir = dir
     self.savefile = None
-    self.index = self._getIndex()
+    self._index = _getIndex()
     self.readfiles = {}
-    self.storeData = self.__loadStoreMap()
+    self._storeMap = self.__loadStoreMap()
     self.added = 0
 
-  def _getIndex(self): raise NotImplementedError
+  @property
+  def n(self):
+    with self._lock:
+      if self._n is None:
+        self._n = self.__anotherDataFile()
 
+  def _getIndex(self):
+    raise NotImplementedError
+
+  @property
   def __loadStoreMap(self):
+    ''' Load a mapping from existing store data file ordinals to store data
+        filenames, thus:
+          0 => 0.vtd
+        etc.
+    '''
     M = {}
-    for name in os.listdir(self.dir):
-      if name.endswith('.vtd'):
-        pfx = name[:-4]
-        if pfx.isdigit():
-          pfxn = int(pfx)
-          if str(pfxn) == pfx:
-            M[pfxn] = name
+    with Pfx(self.dir):
+      for name in os.listdir(self.dir):
+        if name.endswith('.vtd'):
+          pfx = name[:-4]
+          if pfx.isdigit():
+            pfxn = int(pfx)
+            if str(pfxn) == pfx:
+              # valid number.vtd store name
+              M[pfxn] = DataFile(os.path.join(self.dir, name))
+              continue
+          warn("ignoring bad .vtd file name: %s" % (name,))
     return M
 
-  def __makeNewFile(self):
-    mapkeys = self.storeData.keys()
+  def __anotherDataFile(self):
+    ''' Create a new, empty data file and return its index.
+    '''
+    mapkeys = self._storeMap.keys()
     if mapkeys:
       n = max(mapkeys)
     else:
       n = 0
-    n += 1
     while True:
-      pathname = os.path.join(self.dir, "%d.vtd" % (n,))
-      if not os.path.exists(pathname):
-        open(os.path.join(self.dir, pathname), "ab").close()
-        self.storeData[n] = pathname
-        return n
       n += 1
-
-  def _open_n(self, n, mode):
-    ''' Open the data file numbered 'n' in the specified mode.
-    '''
-    pathname = os.path.join(self.dir, "%d.vtd" % (n,))
-    debug("open(%s, %s)", pathname, mode)
-    return open(pathname, mode)
-
-  def _savefile(self):
-    with self.lock:
-      if self.savefile is None:
-        mapkeys = self.storeData.keys()
-        if mapkeys:
-          n = max(mapkeys)
-        else:
-          n = self.__makeNewFile()
-        self.savefile = self._open_n(n, "a+b")
-        self.savefile_n = n
-    return self.savefile
-
-  def _readfile(self, n):
-    with self.lock:
-      if n not in self.readfiles:
-        self.readfiles[n] = self._open_n(n, "rb")
-      return self.readfiles[n]
+      if n in self._storeMap:
+        # shouldn't happen?
+        continue
+      pathname = os.path.join(self.dir, "%d.vtd" % (n,))
+      if os.path.exists(pathname):
+        continue
+      self._storeMap[n] = DataFile(pathname)
+      return n
 
   def __contains__(self, h):
-    with self.lock:
-      return h in self.index
+    ''' Check if the specified hash is present in the store.
+    '''
+    with self._lock:
+      return h in self._index
 
   def __getitem__(self, h):
-    n, offset = self.decodeIndexEntry(self.index[h])
+    ''' Fetch the data bytes associated with the specified hash from the store.
+    '''
+    n, offset = self.decodeIndexEntry(self._index[h])
     assert n >= 0
     assert offset >= 0
-    rf = self._readfile(n)
-    with self.lock:
-      rf.seek(offset)
-      data = blockdataFromFileStoreFP(rf)
-    return data
-
-  def addBlock(self, block, noFlush=False):
-    return self.add(block.blockdata(), noFlush=noFlush)
+    return self._storeMap[n].readData(offset)
 
   def add(self, data, noFlush=False):
+    ''' Add data bytes to the store, return the hashcode.
+    '''
     assert type(data) is str, "expected str, got %s" % (`data`,)
     assert not self.readonly
-    h = self.hash(data)
-    sf = self._savefile()
-    if h not in self:
-      with self.lock:
-        sf.seek(0, 2)
-        offset = sf.tell()
-        saveBlockData(sf, data)
-        if not noFlush:
-          pass ## sf.flush()
-      self.index[h] = self.encodeIndexEntry(self.savefile_n, offset)
-      self.added += 1
-    return h
+    datafile = self._storeMap[self.n]
+    datafile.saveData(data)
+    if not noFlush:
+      datafile.flush()
+    return self.hash(data)
 
   def flush(self):
-    if self.savefile:
-      self.savefile.flush()
-      self.index.flush()
+    for datafile in self._storeMap.values():
+      datafile.flush()
 
   def sync(self):
     self.flush()
-    self.index.sync()
+    self._index.sync()
 
-  def decodeIndexEntry(self, noz):
-    n, noz = fromBS(noz)
-    offset, noz = fromBS(noz)
-    assert len(noz) == 0
+  def decodeIndexEntry(self, entry):
+    ''' Parse an index entry into n (data file index) and offset.
+    '''
+    n, entry = fromBS(entry)
+    offset, entry = fromBS(entry)
+    assert len(entry) == 0
     return n, offset
 
   def encodeIndexEntry(self, n, offset):
+    ''' Prepare an index entry from data file index and offset.
+    '''
     return toBS(n) + toBS(offset)
 
 def _pullWatcher(S1,S2,ch,pending,fetch_ch):
