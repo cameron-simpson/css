@@ -1,53 +1,98 @@
 #!/usr/bin/python -tt
 
 from zlib import compress, decompress
+from thread import allocate_lock
 from cs.serialise import toBS, fromBSfp
 from cs.venti import defaults
 
-def scanFile(fp):
-  ''' A generator that reads a file storing data blocks.
-      These files contain byte sequences of the form:
-        BS(zlength)
-        zblock
-      where zblock is the zlib.compress()ed form of the stored block
-      and zlength is the byte length of the zblock.
-      The cs.misc.toBS() function is used to represent the length
-      as a byte sequence.
+class DataFile(object):
+  ''' A cs.venti data file, storing data chunks in compressed form.
   '''
-  S = defaults.S
-  while True:
-    zsize=fromBSfp(fp)
-    if zsize is None:
-      break
-    offset=fp.tell()
-    zblock=fp.read(zsize)
-    try:
-      block=decompress(zblock)
-    except:
-      continue
-    h=S.hashFromData(block)
-    yield h, offset, zsize
 
-def getBlock(fp,offset,zsize):
-  ''' Read the zblock from a file at the specified offset.
-      Return the decompressed block.
-  '''
-  fp.seek(offset)
-  zblock=fp.read(zsize)
-  assert len(zblock) == zsize
-  return decompress(zblock)
+  def __init__(self, pathname):
+    self.pathname = pathname
+    self.__fpsave = None
+    self.__fpload = None
+    self._lock = allocate_lock()
 
-def addBlock(fp,block,compressed=False):
-    ''' Append a block to the specified file.
-        If 'compressed' is True, the block is already a zblock.
-        Return the offset and size of the zblock.
+  @property
+  def _fpsave(self):
+    with self._lock:
+      if self.__fpsave is None:
+        self.__fpsave = open(self.pathname, "a+b")
+    return self.__fpsave
+
+  @property
+  def _fpload(self):
+    with self._lock:
+      if self.__fpload is None:
+        self.__fpload = open(self.pathname, "rb")
+    return self.__fpload
+
+  def scanHashes(self):
+    ''' Scan the data file and yield (offset, hash) tuples.
     '''
-    if compressed:
-      zblock=block
+    S = defaults.S
+    for offset, data in self.scanData():
+      yield offset, S.hashFromData(data)
+
+  def scanData(self):
+    ''' Scan the data file and yield (offset, data) tuples.
+    '''
+    fp = self._fpload()
+    with self._lock:
+      fp.seek(0)
+      while True:
+        offset = fp.tell()
+        flags, data = self._readRawDataHere(fp)
+        if flags & F_COMPRESSED:
+          data = decompress(data)
+        assert (flags & ~F_COMPRESSED) == 0
+        yield offset, data
+
+  def readData(self, offset):
+    ''' Read data bytes from the supplied offset.
+    '''
+    fp = self._fpload
+    with self._lock:
+      fp.seek(offset)
+      flags, data = self._readRawDataHere(fp)
+    if flags & F_COMPRESSED:
+      data = decompress(data)
+    assert (flags & ~F_COMPRESSED) == 0
+    return data
+
+  def _readRawDataHere(self, fp):
+    ''' Retrieve the data bytes stored at `offset`.
+    '''
+    flags = fromBSfp(fp)
+    dsize = fromBSfp(fp)
+    if dsize == 0:
+      data = ''
     else:
-      zblock=compress(block)
-    fp.seek(0,2)
-    fp.write(toBS(len(zblock)))
-    offset=fp.tell()
-    fp.write(zblock)
-    return offset, len(zblock)
+      assert dsize > 0, "expected dsize > 0, got dsize=%s" % (dsize,)
+      data = fp.read(dsize)
+    assert len(data) == dsize
+    return data
+
+  def saveData(self, data, noCompress=False):
+    ''' Append a chunk of data to the file, return the store offset.
+    '''
+    flags = 0
+    if not noCompress:
+      zdata = compress(block)
+      if len(zdata) < len(data):
+        data = zdata
+        flags |= F_COMPRESSED
+    fp = self._fpsave
+    with self._lock:
+      fp.seek(0,2)
+      offset = fp.tell()
+      fp.write(toBS(flags))
+      fp.write(toBS(len(data)))
+      fp.write(data)
+    return offset
+
+  def flush(self):
+    if self.__fpsave:
+      self.__fpsave.flush()
