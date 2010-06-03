@@ -3,7 +3,6 @@
 from zlib import compress, decompress
 from thread import allocate_lock
 from cs.serialise import toBS, fromBSfp
-from cs.venti import defaults
 
 F_COMPRESSED = 0x01
 
@@ -13,35 +12,20 @@ class DataFile(object):
 
   def __init__(self, pathname):
     self.pathname = pathname
-    self.__fpsave = None
-    self.__fpload = None
+    self._fp = None
     self._lock = allocate_lock()
 
   @property
-  def _fpsave(self):
+  def fp(self):
     with self._lock:
-      if self.__fpsave is None:
-        self.__fpsave = open(self.pathname, "a+b")
-    return self.__fpsave
-
-  @property
-  def _fpload(self):
-    with self._lock:
-      if self.__fpload is None:
-        self.__fpload = open(self.pathname, "rb")
-    return self.__fpload
-
-  def scanHashes(self):
-    ''' Scan the data file and yield (offset, hash) tuples.
-    '''
-    S = defaults.S
-    for offset, data in self.scanData():
-      yield offset, S.hashFromData(data)
+      if self._fp is None:
+        self._fp = open(self.pathname, "a+b")
+    return self._fp
 
   def scanData(self):
     ''' Scan the data file and yield (offset, data) tuples.
     '''
-    fp = self._fpload()
+    fp = self.fp
     with self._lock:
       fp.seek(0)
       while True:
@@ -55,7 +39,7 @@ class DataFile(object):
   def readData(self, offset):
     ''' Read data bytes from the supplied offset.
     '''
-    fp = self._fpload
+    fp = self.fp
     with self._lock:
       fp.seek(offset)
       flags, data = self._readRawDataHere(fp)
@@ -86,7 +70,7 @@ class DataFile(object):
       if len(zdata) < len(data):
         data = zdata
         flags |= F_COMPRESSED
-    fp = self._fpsave
+    fp = self.fp
     with self._lock:
       fp.seek(0,2)
       offset = fp.tell()
@@ -96,5 +80,5 @@ class DataFile(object):
     return offset
 
   def flush(self):
-    if self.__fpsave:
-      self.__fpsave.flush()
+    if self._fp:
+      self._fp.flush()
