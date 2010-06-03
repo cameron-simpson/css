@@ -1,7 +1,8 @@
 #!/usr/bin/python -tt
 
-from zlib import compress, decompress
 from thread import allocate_lock
+from zlib import compress, decompress
+import unittest
 from cs.serialise import toBS, fromBSfp
 
 F_COMPRESSED = 0x01
@@ -82,3 +83,58 @@ class DataFile(object):
   def flush(self):
     if self._fp:
       self._fp.flush()
+
+  def close(self):
+    with self._lock:
+      if self._fp:
+        self._fp.close()
+        self._fp = None
+
+class TestAll(unittest.TestCase):
+
+  def setUp(self):
+    import os
+    import random
+    import tempfile
+    tfd, pathname = tempfile.mkstemp(prefix="cs.venti.datafile.test", suffix=".vtd", dir='.')
+    os.close(tfd)
+    self.pathname = pathname
+    self.data = DataFile(pathname)
+    random.seed()
+
+  def tearDown(self):
+    import os
+    self.data.close()
+    os.remove(self.pathname)
+
+  # TODO: tests:
+  #   scan datafile
+
+  def _genblock(self, maxsize=16383):
+    import os
+    import random
+    return os.urandom(random.randint(0, maxsize))
+
+  def test00store1(self):
+    self.data.saveData(self._genblock())
+
+  def test01fetch1(self):
+    self.data.saveData(self._genblock())
+    self.data.close()
+    self.data.readData(0)
+
+  def test02randomblocks(self):
+    import random
+    blocks = {}
+    for i in range(100):
+      data = self._genblock()
+      offset = self.data.saveData(data)
+      blocks[offset] = data
+    offsets = blocks.keys()
+    random.shuffle(offsets)
+    for offset in offsets:
+      data = self.data.readData(offset)
+      self.assertTrue(data == blocks[offset])
+
+if __name__ == '__main__':
+  unittest.main()
