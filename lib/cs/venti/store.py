@@ -314,7 +314,7 @@ class IndexedFileStore(BasicStore):
     ''' Initialise this IndexedFileStore.
         'dir' specifies the directory in which the files and their index live.
     '''
-    debug("IndexedStore.__init__...")
+    D("IndexedStore.__init__(%s)..." % (dir,))
     BasicStore.__init__(self, dir, capacity=capacity)
     self.dir = dir
     self._n = None
