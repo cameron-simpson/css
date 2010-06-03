@@ -116,20 +116,27 @@ class TestAll(unittest.TestCase):
     return os.urandom(random.randint(0, maxsize))
 
   def test00store1(self):
+    ''' Save a single block.
+    '''
     self.data.saveData(self._genblock())
 
   def test01fetch1(self):
+    ''' Save and the retrieve a single block.
+    '''
     self.data.saveData(self._genblock())
     self.data.close()
     self.data.readData(0)
 
   def test02randomblocks(self):
+    ''' Save 100 random blocks, close, retrieve in random order.
+    '''
     import random
     blocks = {}
     for i in range(100):
       data = self._genblock()
       offset = self.data.saveData(data)
       blocks[offset] = data
+    self.data.close()
     offsets = blocks.keys()
     random.shuffle(offsets)
     for offset in offsets:
