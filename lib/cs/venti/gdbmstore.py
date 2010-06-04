@@ -5,21 +5,14 @@
 #
 
 from __future__ import with_statement
-import sys
 import os.path
-import time
-from zlib import compress
 from thread import allocate_lock
-from cs.logutils import debug
-from cs.cache import LRU
-from cs.serialise import toBS, fromBS, fromBSfp
 from cs.venti.store import IndexedFileStore
 
 class GDBMStore(IndexedFileStore):
   ''' An IndexedFileStore attached to a GDBM index.
   '''
   def __init__(self, dir, capacity=None):
-    debug("GDBMStore.__init__...")
     IndexedFileStore.__init__(self, dir, capacity=capacity)
 
   def _getIndex(self):
@@ -28,27 +21,26 @@ class GDBMStore(IndexedFileStore):
 class GDBMIndex(object):
   ''' A GDBM index for a GDBMStore.
   '''
-  def __init__(self, gdbmpath):
+  def __init__(self, tcpath):
     import gdbm
-    self.lock=allocate_lock()
-    self.__db=gdbm.open(gdbmpath,"cf")
+    self._lock=allocate_lock()
+    self._db=gdbm.open(tc,"cf")
 
   def flush(self):
     pass
 
   def sync(self):
-    debug("GDBMIndex.__db.sync()")
-    self.__db.sync()
+    self._db.sync()
 
-  def __setitem__(self,h,noz):
-    with self.lock:
-      self.__db[h]=noz
+  def __setitem__(self, h, entry):
+    with self._lock:
+      self._db[h] = entry
 
-  def __getitem__(self,h):
+  def __getitem__(self, h):
     # fetch and decode
-    with self.lock:
-      return self.__db[h]
+    with self._lock:
+      return self._db[h]
 
-  def __contains__(self,h):
-    with self.lock:
-      return h in self.__db
+  def __contains__(self, h):
+    with self._lock:
+      return h in self._db
