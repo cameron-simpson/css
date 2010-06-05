@@ -6,14 +6,17 @@
 
 cmd=$0
 usage="Usage: $cmd [-l {log|logfile}] [remark...]"
+trace=  ##set-x
 
 : ${LOGDIR:=$HOME/var/log}
 : ${DLOG_WHEN:=`date`}
 
+[ -t 0 ] && exec </dev/null
+
 if [ "x$HOST" != "x$HOMEHOST" ]
 then
   qcmd=`shqstr ./bin/with-login-env dlog ${1+"$@"}`
-  exec pfx "dlog@$HOMEHOST" ssh "$HOMEHOST" "$qcmd"
+  exec $trace ssh "$HOMEHOST" "$qcmd"
 fi
 
 logname=dlog-quick
