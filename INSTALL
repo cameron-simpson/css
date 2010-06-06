@@ -28,10 +28,10 @@ Installing my scripts:
     It mostly does this:
 
 	PATH=$PATH:/opt/css/bin
-	PERL5LIB=$PERL5LIB:/opt/css/lib
+	PERL5LIB=$PERL5LIB:/opt/css/lib/perl
 	MANPATH=$MANPATH:/opt/css/man
-        CLASSPATH=$CLASSPATH:/opt/css/lib/au.com.zip.cs.jar
-        PYTHONPATH=$PYTHONPATH:/opt/css/lib
+        CLASSPATH=$CLASSPATH:/opt/css/lib/java/au.com.zip.cs.jar
+        PYTHONPATH=$PYTHONPATH:/opt/css/lib/python
 	export PATH PERL5LIB MANPATH CLASSPATH PYTHONPATH
 
     Several of the scripts expect the following shell environment variables:
@@ -57,7 +57,10 @@ Licence:
     You're free to use, modify and redistribute these scripts provided that:
 
 	- you leave my code marked as mine and your modifications (if any)
-	  marked as yours
+	  marked as yours; it's enough to prefix your code with a terse
+	  comment like:
+
+              # change text - reason text - yourname <youremail> - date
 
 	- you make recipients aware that the scripts can be obtained for
 	  free from my own web page
