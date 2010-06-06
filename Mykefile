@@ -67,7 +67,7 @@ _home:
                 $$libskip \\
                 --exclude=*.pyc \\
                 --exclude=*.swp \\
-                lib/cs/. $(HOME)/lib/cs/.
+                lib/. $(HOME)/lib/.
 
 # squid_redirect
 _all: 1INDEX.txt _submakes _man
