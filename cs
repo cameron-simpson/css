@@ -1,1 +1,1 @@
-lib/cs
+lib/python/cs
