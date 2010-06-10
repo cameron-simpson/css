@@ -155,8 +155,9 @@ class Channel(object):
 ##  return result
 
 class IterableQueue(Queue): 
-  ''' A Queue obeying the iterator protocol.
+  ''' A Queue implementing the iterator protocol.
       Note: Iteration stops when a None comes off the Queue.
+      TODO: supply sentinel item, default None.
   '''
 
   def __init__(self, *args, **kw):
@@ -192,6 +193,48 @@ class IterableQueue(Queue):
     item=self.get()
     if item is None:
       Queue.put(self,None)      # for another iterator
+      raise StopIteration
+    return item
+
+class IterablePriorityQueue(PriorityQueue): 
+  ''' A PriorityQueue implementing the iterator protocol.
+      Note: Iteration stops when a None comes off the Queue.
+      TODO: supply sentinel item, default None.
+  '''
+
+  def __init__(self, *args, **kw):
+    ''' Initialise the queue.
+    '''
+    PriorityQueue.__init__(self, *args, **kw)
+    self.closed=False
+
+  def put(self, item, *args, **kw):
+    ''' Put an item on the queue.
+    '''
+    assert not self.closed, "put() on closed IterableQueue"
+    assert item is not None, "put(None) on IterableQueue"
+    return PriorityQueue.put(self, item, *args, **kw)
+
+  def _closeAtExit(self):
+    if not self.closed:
+      self.close()
+
+  def close(self):
+    if self.closed:
+      error("close() on closed IterableQueue")
+    else:
+      self.closed=True
+      PriorityQueue.put(self,None)
+
+  def __iter__(self):
+    ''' Iterable interface for the queue.
+    '''
+    return self
+
+  def next(self):
+    item=self.get()
+    if item is None:
+      PriorityQueue.put(self,None)      # for another iterator
       raise StopIteration
     return item
 
