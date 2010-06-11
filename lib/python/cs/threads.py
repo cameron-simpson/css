@@ -765,17 +765,23 @@ class FuncMultiQueue(object):
     self.__sem.release()
     self.__main.join()
 
-  def qbgcall(self, func, Q):
+  def qbgcall(self, func, retq, priority=None):
     ''' Queue a call to func(), typically the result of functools.partial.
         A tag value is allocated and returned.
-        The (tag, result) will be .put() on the supplied Q on completion of
-        the function. If Q is None the function result is discarded.
+        The (tag, result) will be .put() on the supplied retq on completion of
+        the function. If retq is None the function result is discarded.
     '''
     tag = seq()
-    self.__Q.put( (func, Q, tag) )
+    # TODO: HANDLE PRIORITY MODE
+    rq = (func, retq, tag)
+    if self._priority:
+      rq = list(priority) + rq
+    else:
+      assert priority is None, "qbgcall: not in priority mode, but supplied priority is not None: %s" % (priority,)
+    self.__Q.put(rq)
     return tag
 
-  def bgcall(self, func, retq=None):
+  def bgcall(self, func, retq=None, priority=None):
     ''' Queue a call to func(), typically the result of functools.partial.
         Return an object whose .get() method will return
         the tuple (tag, result) on function completion.
@@ -783,15 +789,15 @@ class FuncMultiQueue(object):
     '''
     if retq is None:
       retq = Q1()
-    self.qbgcall(func, retq)
+    self.qbgcall(func, retq=retq, priority=priority)
     return retq
 
-  def call(self, func):
+  def call(self, func, priority=None):
     ''' Call func() via the queue.
         func is typically the result of functools.partial.
         Return the function result.
     '''
-    return self.bgcall(func).get()[1]
+    return self.bgcall(func, retq=None, priority=priority).get()[1]
 
 class TimerQueue(object):
   ''' Class to run a lot of "in the future" jobs without using a bazillion
