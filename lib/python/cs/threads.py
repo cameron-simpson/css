@@ -646,9 +646,20 @@ class FuncMultiQueue(object):
       resource such as an HTTP or database server.  
   '''
 
-  def __init__(self, capacity, synchronous=False):
+  def __init__(self, capacity, priority=False, synchronous=False):
     ''' Initialise the FuncMultiQueue.
+
         `capacity` is the maximum number of active calls permitted at a time.
+
+        `priority` causes the internal queue to be a PriorityQueue.
+        In the default mode, requests are dispatched in FIFO order as
+        capacity becomes available. If `priority` is true, requests come
+        in as sequences whose last element is the request callable;
+        the sequences are kept in a PriorityQueue for dispatch.
+        The priority mode is intended as a convenient provision of
+        the PriorityQueue use case in the synchronous example below.
+        The priority takes precedence over the synchronous mode.
+
         `synchronous` causes function submission to be synchronous; by default
         this is False.
         In the default asynchronous mode, an arbitrary number of functions may
@@ -656,8 +667,9 @@ class FuncMultiQueue(object):
         In synchronous mode, the bgcall() and qbgcall() methods will block if
         the maximum number of active functions are already in use.
         
-        The synchronous mode exists to permit the use of a FuncMultiQueue to
-        process requests from a PriorityQueue like this:
+        The synchronous mode exists to permit the use of a FuncMultiQueue
+        to process requests in a controlled order, for example from a
+        PriorityQueue like this:
 
           PQ = PriorityQueue()
           MFQ = MultiFuncQueue(4, synchronous=True)
@@ -666,16 +678,19 @@ class FuncMultiQueue(object):
             MFQ.qbgcall(func, None)
 
         In asynchronous mode this loop would always keep the PQ empty, and
-        thus the PriorityQueue wi=ould act like a FIFO.
+        thus the PriorityQueue would act like a FIFO.
         In synchronous mode the MFQ.qbgcall() will block if the MFQ is busy. 
         During that state multiple requests can accumulate in the PQ, ready for
         choice according to their priority when capacity is available again on MFQ.
     '''
     assert capacity > 0
     self._capacity = capacity
+    self._priority = priority
     self.closed = False
     self.cancelPending = False  # True ==> discard pending calls after close
-    if synchronous:
+    if priority:
+      self.__Q = IterablePriorityQueue()
+    elif synchronous:
       self.__Q = Channel()
     else:
       self.__Q = IterableQueue()
@@ -701,6 +716,8 @@ class FuncMultiQueue(object):
       if self.closed and self.cancelPending:
         # drain queue
         continue
+      if self._priority:
+        rq = rq[-1]
       if len(hs) == 0:
         # no available threads - make one
         hch = Channel()
