@@ -775,7 +775,7 @@ class FuncMultiQueue(object):
     # TODO: HANDLE PRIORITY MODE
     rq = (func, retq, tag)
     if self._priority:
-      rq = list(priority) + rq
+      rq = list(priority) + [rq]
     else:
       assert priority is None, "qbgcall: not in priority mode, but supplied priority is not None: %s" % (priority,)
     self.__Q.put(rq)
