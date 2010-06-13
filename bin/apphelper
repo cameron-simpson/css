@@ -298,7 +298,7 @@ fi
 #
 
 # default to "v" for the command
-[ $# = 0 ] && set v '%s'
+[ $# = 0 ] && set -- view-unknown '%s'
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
