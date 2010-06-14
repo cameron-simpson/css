@@ -394,7 +394,7 @@ class TestAll(unittest.TestCase):
       D("IBdata = %s:%d:%s", type(IBdata), len(IBdata), `IBdata`,)
       IB2data = IndirectBlock(hashcode=IBH, span=len(IBdata)).data()
       D("IB2data = %s:%d:%s", type(IB2data), len(IB2data), `IB2data`,)
-      assert IBdata == IB2data, "IB:  %s\nIB2: %s" % (totext(IBdata), totext(IB2data))
+      self.assertEqual(IBdata,IB2data, "IB:  %s\nIB2: %s" % (totext(IBdata), totext(IB2data)))
 
 if __name__ == '__main__':
   unittest.main()
