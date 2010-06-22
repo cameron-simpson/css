@@ -38,8 +38,8 @@ then
   . "$ENV_DEV_DIR/.env.sh"
 else
   wd=`pwd`
-  PYTHONPATH=$wd/lib:$PYTHONPATH
-  PERL5LIB=$wd/lib:$PERL5LIB
+  PYTHONPATH=$wd/lib/python:$wd/lib:$PYTHONPATH
+  PERL5LIB=$wd/lib/perl5:$wd/lib:$PERL5LIB
   MANPATH=$wd/man:$MANPATH
   LD_LIBRARY_PATH=$wd/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}
   PATH=$wd/bin:$PATH
