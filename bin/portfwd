@@ -7,6 +7,7 @@
 : ${VARRUN:=$HOME/var/run}
 : ${LOGDIR:=$HOME/var/log}
 : ${PORTFWD_TARGETS:-''}
+: ${USER:=`id -un`}
 
 trace=set-x
 once=
@@ -110,6 +111,11 @@ fi
 
 target=$1
 shift
+case "$target" in
+  *-ALL|*-pf)
+    target_short=`expr "x$target" : 'x\(.*\)-.*'` ;;
+  *)target_short=$target ;;
+esac
 
 xit=0
 monpid=
@@ -136,6 +142,7 @@ do
   cfg_command=:
   cfg_outlog=portfwd-$target    # /dev/null
   cfg_monitor=
+  cfg_control=$HOME/.sshctrl-$USER@$target_short.22
   if [ -s "$fwdcfg" ]
   then
     wcv=`winclausevars "$fwdcfg" "$target" cfg`
@@ -160,8 +167,12 @@ do
 
   [ $stop ] && exit 0
 
+  rm -f -- "$cfg_control"
   $trace \
-    sshto ServerAliveInterval=37 -n -F "$sshcfg" "$target" \
+    sshto \
+      "ServerAliveInterval=37" \
+      "ControlPath=$cfg_control" \
+      -n -F "$sshcfg" "$target" \
       "( $cfg_command ) </dev/null &
      "'exec 1>&2
        while sleep 61 && printf " "; do :; done
