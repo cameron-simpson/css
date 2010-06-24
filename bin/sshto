@@ -13,6 +13,7 @@
 oldstyle=
 cf=$SSHTO_CONFIG
 trace=  ##set-x
+pfxstderr=
 sshopts=        # options for each ssh invocation
 lsshopts=       # options for the outermost ssh invocation
                 # this will include $sshopts
@@ -72,6 +73,7 @@ do
     -[bceiIlmopFLRD]?*)
         sshopts=$sshopts\ `shqstr "$1"`
 	;;
+    -P) pfxstderr=1 ;;
     -z)	sshopts="$sshopts -o 'Compression yes'" ;;
     +z)	sshopts="$sshopts -o 'Compression no'" ;;
     [a-zA-Z]*=?*)
@@ -173,6 +175,11 @@ expand_hostpath()
   printf '%s\n' "$_xphp_out"
 }
 
+# Take a here!there!... path emit the last host and, if needed, the
+# ProxyCommand to use to tunnel to where it will be used.
+# For example, the path foo!bah!zot will emit something like:
+#  zot ssh foo ssh bah nc %h %p
+#
 split_target()
 {
   set -- `printf "%s\n" "$1" | tr '!' ' '`
@@ -186,11 +193,12 @@ split_target()
       else  _st_pcmd="$_st_pcmd ssh"
       fi
       _st_pcmd="${_st_pcmd} -A -T -x -e none -o batchmode=yes -o compression=no $1"
+      if [ $pfxstderr ]; then _st_pcmd="${_st_pcmd} ./bin/with-opt-css tag_fd 2 $1"; fi
       shift
     done
     _st_pcmd="$_st_pcmd nc %h %p"
   fi
-  printf "%s %s\n" "$1" "$_st_pcmd"
+  printf "%s %s\n" "$1" "set-x $_st_pcmd"
 }
 
 hostpath=`expand_hostpath "$host"`
