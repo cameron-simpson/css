@@ -6,12 +6,17 @@
 #	- Cameron Simpson <cs@zip.com.au> 28may2004
 #
 
+set -ue
+
+: ${OPTCSS:=/opt/css}
+: ${SSHTO_OPTCSS:=$OPTCSS}
 : ${SSHTO_OPTS:=''}
 : ${SSHTO_CONFIG:=$HOME/.sshtorc}
 : ${SSHTO_PREFIX:=''}
 
 oldstyle=
 cf=$SSHTO_CONFIG
+needoptcss=
 trace=  ##set-x
 pfxstderr=
 sshopts=        # options for each ssh invocation
@@ -55,7 +60,9 @@ do
     +t)	topt= ;;
     -f) fopt=-f ;;
     -E)	presh=$env_presh ;;
-    -v) trace=set-x
+    -v) needoptcss=1
+        dotrace=1
+        trace=set-x
         setx='set -x'
 	sshopts="$sshopts $1"
 	;;
@@ -73,7 +80,7 @@ do
     -[bceiIlmopFLRD]?*)
         sshopts=$sshopts\ `shqstr "$1"`
 	;;
-    -P) pfxstderr=1 ;;
+    -P) needoptcss=1 pfxstderr=1 ;;
     -z)	sshopts="$sshopts -o 'Compression yes'" ;;
     +z)	sshopts="$sshopts -o 'Compression no'" ;;
     [a-zA-Z]*=?*)
@@ -193,7 +200,9 @@ split_target()
       else  _st_pcmd="$_st_pcmd ssh"    # following ones just get ssh appended
       fi
       _st_pcmd="${_st_pcmd} -A -T -x -e none -o batchmode=yes -o compression=no $1"
-      if [ $pfxstderr ]; then _st_pcmd="${_st_pcmd} ./bin/with-opt-css tag_fd 2 $1"; fi
+      if [ $needoptcss ]; then _st_pcmd="${_st_pcmd} $SSHTO_OPTCSS/bin/with-opt-css $1"; fi
+      if [ $pfxstderr ];  then _st_pcmd="${_st_pcmd} tag_fd 2 $1"; fi
+      if [ $dotrace ];    then _st_pcmd="${_st_pcmd} $trace $1"; fi
       shift
     done
     _st_pcmd="$_st_pcmd nc %h %p"
