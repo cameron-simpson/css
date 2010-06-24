@@ -79,6 +79,7 @@ hg-apply-manifest-dates -r "$rev" "$dstdir"
   rsync -aHL --ignore-existing bin/synonyms/ bin/
   rm -rf bin/synonyms bos csiro defunct hacks make-into-shell-functions misc stubs unsw
 
+  mkdir -p lib/java
   cp $HOME/lib/java/au.com.zip.cs.jar lib/java/
 
   if false
