@@ -189,8 +189,8 @@ split_target()
     while [ $# -gt 1 ]
     do
       if [ -z "$_st_pcmd" ]
-      then  _st_pcmd="ssh $lsshopts"
-      else  _st_pcmd="$_st_pcmd ssh"
+      then  _st_pcmd="ssh $lsshopts"    # first ssh gets the local ssh opts
+      else  _st_pcmd="$_st_pcmd ssh"    # following ones just get ssh appended
       fi
       _st_pcmd="${_st_pcmd} -A -T -x -e none -o batchmode=yes -o compression=no $1"
       if [ $pfxstderr ]; then _st_pcmd="${_st_pcmd} ./bin/with-opt-css tag_fd 2 $1"; fi
@@ -198,7 +198,8 @@ split_target()
     done
     _st_pcmd="$_st_pcmd nc %h %p"
   fi
-  printf "%s %s\n" "$1" "set-x $_st_pcmd"
+  [ -z "$_st_pcmd" ] || _st_pcmd="set-x $_st_pcmd"      # DEBUG
+  printf "%s %s\n" "$1" "$_st_pcmd"
 }
 
 hostpath=`expand_hostpath "$host"`
@@ -226,6 +227,7 @@ else
   shift
   if [ $# -gt 0 ]
   then
+    # quote the ProxyCommand for use in $lsshopts
     qpc=`shqstr "ProxyCommand $*"`
     lsshopts="$lsshopts -o $qpc -o StrictHostKeyChecking=no"
   fi
