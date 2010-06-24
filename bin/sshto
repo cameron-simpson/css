@@ -200,9 +200,9 @@ split_target()
       else  _st_pcmd="$_st_pcmd ssh"    # following ones just get ssh appended
       fi
       _st_pcmd="${_st_pcmd} -A -T -x -e none -o batchmode=yes -o compression=no $1"
-      if [ $needoptcss ]; then _st_pcmd="${_st_pcmd} $SSHTO_OPTCSS/bin/with-opt-css $1"; fi
+      if [ $needoptcss ]; then _st_pcmd="${_st_pcmd} $SSHTO_OPTCSS/bin/with-opt-css"; fi
       if [ $pfxstderr ];  then _st_pcmd="${_st_pcmd} tag_fd 2 $1"; fi
-      if [ $dotrace ];    then _st_pcmd="${_st_pcmd} $trace $1"; fi
+      if [ $dotrace ];    then _st_pcmd="${_st_pcmd} $trace"; fi
       shift
     done
     _st_pcmd="$_st_pcmd nc %h %p"
