@@ -17,6 +17,11 @@ then
   OPTCSS=`dirname "$bindir"`
 fi
 
+# turn $OPTCSS into full path
+case "$OPTCSS" in
+  /*) ;; *) OPTCSS=`cd "$OPTCSS"; pwd` ;;
+esac
+
 if [ ! -s "$OPTCSS/env.sh" ]
 then
   echo "$0: no $OPTCSS/env.sh, aborting" >&2
