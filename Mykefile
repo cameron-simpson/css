@@ -15,7 +15,7 @@ html	= $('*.html' G)
 
 htdocs	= $(HOME)/@/ezos/html/cs
 htmandir = $(htdocs)/css/manuals
-pmsets	= lib/cs
+pmsets	= lib/perl/cs
 pmset(set) = $('$(set)/*.pm' EG?) \
 	     $('$(set)/*/*.pm' EG?) \
 	     $('$(set)/*/*/*.pm' EG?)
