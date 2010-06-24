@@ -17,6 +17,7 @@ set -ue
 oldstyle=
 cf=$SSHTO_CONFIG
 needoptcss=
+dotrace=
 trace=  ##set-x
 pfxstderr=
 sshopts=        # options for each ssh invocation
