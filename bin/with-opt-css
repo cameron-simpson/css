@@ -4,6 +4,8 @@
 #       - Cameron Simpson <cs@zip.com.au> 22may2009
 #
 
+set -ue
+
 : ${OPTCSS:=''}
 
 [ $# -gt 0 ] || set -- env
@@ -13,15 +15,12 @@ then
   bindir=`dirname "$0"`
   bindir=`cd "$bindir"; pwd`
   OPTCSS=`dirname "$bindir"`
-  if [ ! -s "$OPTCSS/env.sh" ]
-  then
-    if [ -s /opt/css/env.sh ]
-    then
-      OPTCSS=/opt/css
-    else
-      exec $bindir/with-prefix "$OPTCSS" "$@"
-    fi
-  fi
+fi
+
+if [ ! -s "$OPTCSS/env.sh" ]
+then
+  echo "$0: no $OPTCSS/env.sh, aborting" >&2
+  exit 1
 fi
 
 export OPTCSS
