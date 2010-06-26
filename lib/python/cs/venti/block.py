@@ -77,7 +77,6 @@ class _Block(object):
     if _hashcode is None or type(_hashcode) is not hashclass:
       D("block %s: _hashcode=%s, hashclass=%s", id(self), _hashcode, hashclass)
       D("  block: %s", `self.__dict__`)
-      assert self._data is not None
       data = self.blockdata()
       _hashcode = self._hashcode = S.add(data)
     return _hashcode

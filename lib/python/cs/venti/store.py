@@ -22,11 +22,11 @@ import threading
 from Queue import Queue
 from zlib import compress, decompress
 from cs.lex import hexify
-from cs.logutils import debug, warn, Pfx
+from cs.logutils import debug, warn, Pfx, D
 from cs.misc import out, tb, seq
 from cs.serialise import toBS, fromBS, fromBSfp
 from cs.threads import FuncMultiQueue, Q1, DictMonitor, NestingOpenClose
-from cs.venti import defaults
+from cs.venti import defaults, totext
 from cs.venti.block import Block
 from cs.venti.datafile import DataFile
 from cs.venti.hash import Hash_SHA1
@@ -104,6 +104,7 @@ class BasicStore(NestingOpenClose):
     ''' Test if the supplied hashcode is present in the store.
     '''
     raise NotImplementedError
+
   def __getitem__(self, h):
     ''' Return the data bytes associated with the supplied hashcode.
         Raise KeyError if the hashcode is not present.
@@ -314,7 +315,7 @@ class IndexedFileStore(BasicStore):
     ''' Initialise this IndexedFileStore.
         'dir' specifies the directory in which the files and their index live.
     '''
-    D("IndexedStore.__init__(%s)..." % (dir,))
+    ##D("IndexedFileStore.__init__(%s)..." % (dir,))
     BasicStore.__init__(self, dir, capacity=capacity)
     self.dir = dir
     self._n = None
@@ -389,11 +390,17 @@ class IndexedFileStore(BasicStore):
     '''
     assert type(data) is str, "expected str, got %s" % (`data`,)
     assert not self.readonly
-    datafile = self._storeMap[self.n]
-    datafile.saveData(data)
-    if not noFlush:
-      datafile.flush()
-    return self.hash(data)
+    h = self.hash(data)
+    if h not in self._index:
+      n = self.n
+      datafile = self._storeMap[n]
+      offset = datafile.saveData(data)
+      if not noFlush:
+        datafile.flush()
+      self._index[h] = self.encodeIndexEntry(n, offset)
+      D("save %d bytes as %s: %s" % (len(data), `h`, totext(data)))
+      ##assert len(data) > 40
+    return h
 
   def flush(self):
     for datafile in self._storeMap.values():

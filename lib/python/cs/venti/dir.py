@@ -237,7 +237,7 @@ def resolve(path, domkdir=False):
     subpath = []
   else:
     Dtext, subpath = path.split('/', 1)
-    D = decodeDirent(fromtext(Dtext, justone=True))
+    D = decodeDirent(fromtext(Dtext), justone=True)
     subpath = [s for s in subpath.split('/') if len(s) > 0]
   if len(subpath) == 0:
     return D, None
@@ -250,7 +250,15 @@ def resolve(path, domkdir=False):
   return D, subpath[0]
 
 class Dir(Dirent):
+  ''' A directory.
+  '''
+
   def __init__(self, name, meta=None, parent=None, content=None):
+    ''' Initialise this directory.
+        `meta`: meta information
+        `parent`: parent Dir
+        `content`: pre-existing Block with intial Dir content
+    '''
     if meta is None:
       meta=Meta()
     Dirent.__init__(self, D_DIR_T, name, meta)
