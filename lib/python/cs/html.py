@@ -8,11 +8,33 @@ import re
 import sys
 import urllib
 from types import StringTypes, IntType, LongType, FloatType
+import cStringIO
 
 # Characters safe to transcribe unescaped.
 textSafeRe = re.compile(r'[^<>&]+')
 # Characters safe to use inside "" in tag attribute values.
 dqAttrValSafeRe = re.compile(r'[-=. \w:@/?~#+&]+')
+
+BR = ('BR',)
+
+def tokens2s(tokens):
+  ''' Return transcription of the supplied tokens in HTML form.
+  '''
+  fp = cStringIO.StringIO()
+  for tok in tokens:
+    puttok(fp, tok)
+  s = fp.getvalue()
+  fp.close()
+  return s
+
+def tok2s(tok):
+  ''' Return transcription of token `tok` in HTML form.
+  '''
+  fp = cStringIO.StringIO()
+  puttok(fp, tok)
+  s = fp.getvalue()
+  fp.close()
+  return s
 
 def puttok(fp, tok):
   ''' Transcribe a token to HTML text.
@@ -72,6 +94,15 @@ def puttok(fp, tok):
   fp.write('</')
   fp.write(tag)
   fp.write('>')
+
+def text2s(s, safeRe=None):
+  ''' Return transcription of string in HTML safe form.
+  '''
+  fp = cStringIO.StringIO()
+  puttext(fp, s, safeRe=safeRe)
+  s = fp.getvalue()
+  fp.close()
+  return s
 
 def puttext(fp, s, safeRe=None):
   ''' Transcribe plain text in HTML safe form.
