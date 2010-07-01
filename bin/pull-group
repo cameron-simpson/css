@@ -91,7 +91,7 @@ fi
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
 getgid()
-{ awk -F: -v "group=$1" '$1 == group { print $3 }' "$2"
+{ awk -F: -v "group=$1" '$1 == group { print $3 }' "$2" | sort -un
 }
 getmembers()
 { awk -F: -v "group=$1" '$1 == group { print $4 }' "$2" | tr , ' '
