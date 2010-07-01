@@ -435,10 +435,12 @@ class Dir(Dirent):
       for dir in dirs:
         if dir in D:
           if not D[dir].isdir():
+            # old name is not a dir - toss it and make a dir
             del D[dir]
             D.mkdir(dir)
 
       for subfile in files:
+        E = None
         filepath=os.path.join(dirpath, subfile)
         try:
           st=os.stat(filepath)
@@ -448,25 +450,33 @@ class Dir(Dirent):
         except IOError, e:
           error("%s: stat: %s" % (filepath, e))
           continue
-        if subfile in D:
-          if not overWrite:
-            warn("%s: not overwriting" % filepath)
-            continue
-          if ignoreTimes:
-            info("%s: IGNORETIMES=True" % filepath)
-          else:
-            E=D[subfile]
-            if st.st_size == E.size() and int(st.st_mtime) == int(E.mtime):
-              info("%s: same size and mtime, skipping" % filepath)
-              continue
-            info("%s: differing size(%s:%s)/mtime(%s:%s)" % (filepath, st.st_size, E.size(), int(st.st_mtime), int(E.mtime)))
-        else:
+        if subfile not in D:
           info("%s not in dir"%subfile)
+        else:
+          E=D[subfile]
+          if not E.isfile():
+            E = None
+          else:
+            if not overWrite:
+              warn("%s: not overwriting" % filepath)
+              continue
+            if ignoreTimes:
+              info("%s: IGNORETIMES=True" % filepath)
+            else:
+              if st.st_size == E.size() and int(st.st_mtime) == int(E.mtime):
+                info("%s: same size and mtime, skipping" % filepath)
+                continue
+              info("%s: differing size(%s:%s)/mtime(%s:%s)" % (filepath, st.st_size, E.size(), int(st.st_mtime), int(E.mtime)))
 
         warn("store %s" % subfile)
         M=Meta()
         M.mtime = st.st_mtime
-        stored=storeFile(open(filepath))
+        if E:
+          matchBlocks = E.leaves()
+        else:
+          matchBlocks = None
+        with open(filepath) as ifp:
+          stored=storeFile(ifp, matchBlocks=matchBlocks)
         stored.name=subfile
         stored.meta=M
         if subfile in D:
