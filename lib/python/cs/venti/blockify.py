@@ -5,6 +5,7 @@
 #       - Cameron Simpson <cs@zip.com.au>
 #
 
+from itertools import chain
 import sys
 from struct import unpack_from
 from threading import Thread
@@ -59,11 +60,45 @@ def topIndirectBlock(blockSource):
 def blockFromString(s):
   return topIndirectBlock(blocksOf([s]))
 
-def blockFromFile(fp):
-  return topIndirectBlock(blocksOf(filedata(fp)))
+def blockFromFile(fp, rsize=None, matchBlocks=None):
+  return topIndirectBlock(fileBlocks(fp, rsize=rsize, matchBlocks=matchBlocks))
+
+def fileBlocks(fp, rsize=None, matchBlocks=None):
+  ''' Yield Blocks containing the content of this file.
+      If rsize is not None, specifies the preferred read() size.
+      If matchBlocks is not None, specifies a source of Blocks for comparison.
+      This lets us store a file with reference to its previous version
+      without playing the "look for edges" game.
+  '''
+  data = None
+  if matchBlocks:
+    # fetch Blocks from the comparison file until a mismatch
+    for B in matchBlocks:
+      blen = len(B)
+      if blen == 0:
+        continue
+      data = fp.read(blen)
+      if len(data) == 0:
+        return
+      # compare hashcodes to avoid fetching data for B if we have its hash
+      if defaults.S.hashcode(data) == B.hashcode():
+        D("MATCH %d bytes" % (len(data),))
+        yield B
+        data = None
+        continue
+      break
+
+  # blockify the remaining data
+  datachunks = filedata(fp, rsize=rsize)
+  if data:
+    datachunks = chain([data], datachunks)
+  for B in blocksOf(datachunks):
+    yield B
 
 def filedata(fp, rsize=None):
   ''' A generator to yield chunks of data from a file.
+      These chunks don't need to be preferred-edge aligned;
+      blocksOf() does that.
   '''
   if rsize is None:
     rsize=8192

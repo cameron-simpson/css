@@ -12,12 +12,12 @@ from cs.threads import IterableQueue
 from cs.misc import debug, TODO, FIXME, tb
 import __main__
 
-def storeFile(ifp, rsize=None):
+def storeFile(ifp, rsize=None, matchBlocks=None):
   ''' Store the data from ifp, return Dirent.
       TODO: set M.mtime from ifp.fstat().
   '''
   M=Meta()
-  B=blockFromFile(ifp)
+  B=blockFromFile(ifp, rsize=rsize, matchBlocks=matchBlocks)
   B.store()
   return FileDirent(None,M,B)
 

@@ -320,6 +320,7 @@ def main(argv):
 
     with S:
       if op == "pack":
+        # no -o option - just store stuff
         if len(args) == 0 or args[0] != '-o':
           ## WTF? ## S.writeonly = True
           from cs.venti.file import storeFile
@@ -329,9 +330,10 @@ def main(argv):
               E=storeDir(path)
             else:
               E=storeFile(open(path))
-            archiveAppend(sys.stdout,E,None,path)
+            archiveAppend(sys.stdout, E, None, path)
             sys.stdout.flush()
         else:
+          # -o archive.vt; get old version from archive and compare during store
           archive=args[1]
           path=args[2]
           assert os.path.isdir(path)
@@ -343,7 +345,7 @@ def main(argv):
                        ignoreTimes=False,
                        deleteMissing=True,
                        overWrite=True)
-          archiveAppend(archive,D,None,path)
+          archiveAppend(archive, D, None, path)
 
       elif op == "cat":
         for path in args:
