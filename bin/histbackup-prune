@@ -6,6 +6,8 @@
 #
 
 trace=eecho
+qecho=echo
+vecho=:
 pcnt=5
 onepass=
 keepn=7
@@ -21,10 +23,11 @@ usage="Usage: $cmd [-% pcnt] [-1rfnx] [-k keep] dirs...
         -D dfdir Directory to use for df information; cease prune when ok.
                 This lets us df a single place once; otherwise we must
                 do a df for every candidate directory.
-        -k n    Keep at least 'n' backups (default: $keepn.
+        -k n    Keep at least 'n' backups. Default: $keepn.
 	-r	Repeat - remove backups until free threshold reached.
 	-n	No action (default). Report proposed actions to stdout.
 	-q	Quiet: remove directories but don't trace execution.
+        -v      Verbose: report even when not pruning.
 	-x	Trace execution. Show actions as dispatched."
 
 badopts=
@@ -43,8 +46,9 @@ do
 	shift
 	;;
     -r)	onepass= ;;
-    -n) trace=echo ;;
-    -q) trace= ;;
+    -n) trace=echo qecho=echo vecho=echo ;;
+    -q) trace= vecho=: qecho=: ;;
+    -v) qecho=echo vecho=echo ;;
     -x) trace=set-x ;;
     --) shift; break ;;
     -?*)echo "$cmd: unrecognised option: $1" >&2; badopts=1 ;;
@@ -68,59 +72,45 @@ fi
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
-if [ -n "$dfdir" ]
-then
-  dfdirpcnt=`dfree -% "$dfdir/."` || exit 1
-  if [ "$dfdirpcnt" -ge "$pcnt" ]
-  then
-    echo "$cmd: $dfdirpcnt% free on $dfdir already, not pruning"
-    exit 0
-  fi
-fi
-
 for dir
 do
-  # list backup dirs in reverse chronological time (ls|grep),
-  # strip the most recent and up to $keepn for security,
-  # append the source directory
+  # List backup dirs in reverse chronological time (ls|grep),
+  # Strip the most recent and up to $keepn for security,
+  # Append the source directory.
   ls -r "$dir/." \
   | grep '^[12][0-9][0-9][0-9]-[01][0-9]-[0123][0-9]' \
   | sed "1,${keepn}d; s|\$| $dir|"
 done \
-| { # resort so to oldest-to-youngest
+| { # re-sort into oldest-to-youngest
     sort
   } \
 | \
-{ # then start removing directories until we have enough space or there are no more candi
+{ # Start removing directories until we have enough space or there are
+  # no more candidates.
   xit=0
   while read date dir
   do
     subdir=$dir/$date
 
-    if [ -z "$dfdir" ]
-    then
-      # check free space where the subdir is - abort if this fails
-      free=`dfree -% "$subdir/."` || exit 1
-
-      # skip if there's enough space
-      # we don't abort because this stuff may be on multiple filesystems
-      [ "$free" -lt "$pcnt" ] || continue
-    fi
-
-    # remove a tree
-    [ -n "$myperms" ] \
-      && $trace find "$subdir" -type d ! -perm -700 -exec $trace chmod "$myperms+rwx" {} ';'
-    set-x rm -r "$subdir" || xit=1
-
     if [ -n "$dfdir" ]
+    then  statdir=$dfdir
+    else  statdir=$subdir
+    fi
+    free=`dfree -% "$statdir/."` || exit 1
+    if [ "$free" -ge "$pcnt" ]
     then
-      dfdirpcnt=`dfree -% "$dfdir/."` || exit 1
-      if [ "$dfdirpcnt" -ge "$pcnt" ]
-      then
-        echo "$cmd: $dfdirpcnt% now free on $dfdir already, not pruning"
-        exit 0
+      $vecho "$cmd: $free% now free on $statdir already, not pruning"
+      if [ -n "$dfdir" ]
+      then  exit 0
+      else  continue
       fi
     fi
+
+    # remove a tree - first make writable for the remove
+    [ -n "$myperms" ] \
+      && $trace find "$subdir" -type d ! -perm -700 -exec $trace chmod "$myperms+rwx" {} ';'
+
+    $trace rm -r "$subdir" || xit=1
 
     # abort if only trying once
     [ $onepass ] && break
