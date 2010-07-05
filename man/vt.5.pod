@@ -26,13 +26,20 @@ and as each byte is gathered from the sequence
 the value is right shifted 7 places (a multiplication of 128)
 and the 7 low order bits of the new byte are added to the value.
 
-=head2 Hex Encoding
+=head2 Hex/Text Encoding
 
-Raw byte sequences are sometimes encoded as hexadecimal sequences
-where textual representation is required,
+Raw byte sequences are sometimes encoded as mix of text and hexadecimal
+sequences where textual representation is required,
 such as on the command line or in B<.vt> archive files.
 These sequences represent each byte as a pair of hexadecimal characters
-as would be printed by the B<%02x> printf(3) format specifier.
+as would be printed by the B<%02x> printf(3) format specifier,
+except between pairs of square brackets;
+between a '[' and a ']' a range of byte values
+which correspond to a limited set of printable ASCII codes
+are presented as is.
+This enhances the readablity of several transcriptions
+that contain text portions,
+notably directory entries.
 
 =head1 DATA STORAGE FORMATS
 
