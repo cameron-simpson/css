@@ -28,10 +28,12 @@ re_INT = re.compile(r'-?[0-9]+')
 re_BAREURL = re.compile(r'[a-z]+://[-a-z0-9.]+/[-a-z0-9_.]+')
 
 class _AttrList(list):
+  ''' An _AttrList is a list subtype that understands Nodes
+      and .ATTR[s] attribute access and drives a backend.
+  '''
   
   def __init__(self, node, key):
-    ''' Initialise an _AttrList, a list subtype that understands Nodes
-        and .ATTR[s] attribute access and drives a backend.
+    ''' Initialise an _AttrList.
         `node` is the node to which this _AttrList is attached.
         `key` is the _singular_ form of the attribute name.
 
@@ -137,6 +139,15 @@ class _AttrList(list):
     list.__setitem__(self, index, value)
 
   def __getattr__(self, attr):
+    ''' Using a .ATTR[s] attribute on an _AttrList indirects through
+        the list members:
+          .Xs Return a list of all the .Xs attributes of the list members.
+              All members must support the .Xs attribution.
+          .X  Return .Xs[0]. Requires len(.Xs) == 1.
+
+	TODO: .Xs to return an anonymous static _AttrList for
+            subsequent .Xs use.
+    '''
     k, plural = parseUC_sAttr(attr)
     if k:
       ks = k+'s'
