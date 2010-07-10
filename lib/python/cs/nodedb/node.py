@@ -10,6 +10,7 @@ else:
   import json
 import itertools
 from thread import allocate_lock
+from threading import Thread
 import unittest
 from cs.lex import str1
 from cs.misc import the
@@ -796,36 +797,28 @@ class _QBackend(Backend):
       assert maxq > 0
     self.backend = backend
     self._Q = IterableQueue(maxq)
+    self._T = Thread(target=self._drain)
+    self._T.start()
 
   def close(self):
     self._Q.close()
+    self._T.join()
+    self._T = None
 
   def _drain(self):
-    B =  self.backend
     for what, args in self._Q:
-      if what == 'newNode':
-        B.newNode(*args)
-      elif what == 'delNode':
-        B.delNode(*args)
-      elif what == 'delAttr':
-        B.delAttr(*args)
-      elif what == 'extendAttr':
-        B.extendAttr(*args)
-      elif what == 'set1Attr':
-        B.set1Attr(*args)
-      else:
-        error("unsupported backend request \"%s\"(%s)" % (what, args))
+      what(*args)
 
   def newNode(self, N):
-    self._Q.put( ('newNode', (N,)) )
+    self._Q.put( (self.backend.newNode, (N,)) )
   def delNode(self, N):
-    self._Q.put( ('delNode', (N,)) )
+    self._Q.put( (self.backend.delNode, (N,)) )
   def extendAttr(self, N, attr, values):
-    self._Q.put( ('extendAttr', (N, attr, values)) )
+    self._Q.put( (self.backend.extendAttr, (N, attr, values)) )
   def set1Attr(self, N, attr, value):
-    self._Q.put( ('set1Attr', (N, attr, value)) )
+    self._Q.put( (self.backend.set1Attr, (N, attr, value)) )
   def delAttr(self, N, attr):
-    self._Q.put( ('delAttr', (N, attr)) )
+    self._Q.put( (self.backend.delAttr, (N, attr)) )
 
 class TestAll(unittest.TestCase):
 
