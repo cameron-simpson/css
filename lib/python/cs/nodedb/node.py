@@ -677,8 +677,6 @@ def NodeDBFromURL(url, readonly=False):
       return NodeDBFromURL('file-tch://'+url, readonly=readonly)
     if ext == '.sqlite':
       return NodeDBFromURL('sqlite://'+url, readonly=readonly)
-    import sys
-    print >>sys.stderr, "ext =", ext
     raise ValueError, "unsupported NodeDB URL: "+url
 
   if url.startswith('file-tch://'):
