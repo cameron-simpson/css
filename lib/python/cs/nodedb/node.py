@@ -546,6 +546,9 @@ class NodeDB(dict):
     self._noteNode(N)
 
   def newNode(self, *args):
+    ''' Create and register a new Node.
+        Subclasses of NodeDB should override _newNode, not this method.
+    '''
     t, name = nodekey(*args)
     N = self._makeNode(t, name)
     self._backend.newNode(N)
@@ -553,6 +556,10 @@ class NodeDB(dict):
     return N
 
   def _makeNode(self, t, name):
+    ''' Wrapper for _createNode with collision detection and registration of
+        the new Node.
+        Subclasses of NodeDB should override _newNode, not this method.
+    '''
     assert (t, name) not in self, 'newNode(%s, %s): already exists' % (t, name)
     N = self[t, name] = self._createNode(t, name)
     return N
@@ -606,8 +613,14 @@ class NodeDB(dict):
 
     raise ValueError, "unknown DB sequence number: %s; _.DBs = %s" % (s, N_.DBs)
 
-  def serialise(self, value):
+  def totext(self, value):
     ''' Convert a value for external string storage.
+          text        The string "text" for strings not commencing with a colon.
+          ::text      The string ":text" for strings commencing with a colon.
+          :TYPE:name  Node of specified name and TYPE in local NodeDB.
+          :\+[0-9]+:TYPE:name Node of specified name and TYPE in other NodeDB.
+          :[0-9]+     A non-negative integer.
+          :scheme:text Encoding of value as "text" using its registered scheme.
     '''
     if isinstance(value, Node):
       assert value.type.find(':') < 0, \
@@ -632,45 +645,51 @@ class NodeDB(dict):
       scheme = R.scheme
       assert scheme[0].islower() and scheme.find(':',1) < 0, \
              "illegal scheme name: \"%s\"" % (scheme,)
-      return ':'+scheme+':'+R.serialise(value)
-    raise ValueError, "can't serialise(%s)" % (repr(value),)
+      return ':'+scheme+':'+R.totext(value)
+    raise ValueError, "can't totext(%s)" % (repr(value),)
 
-  def deserialise(self, value):
+  def fromtext(self, text):
     ''' Convert a stored string into a value.
+          text        The string "text" for strings not commencing with a colon.
+          ::text      The string ":text" for strings commencing with a colon.
+          :TYPE:name  Node of specified name and TYPE in local NodeDB.
+          :\+[0-9]+:TYPE:name Node of specified name and TYPE in other NodeDB.
+          :[0-9]+     A non-negative integer.
+          :scheme:text Encoding of value as "text" using its registered scheme.
     '''
-    if not value.startswith(':'):
+    if not text.startswith(':'):
       # plain string
-      return value
-    if len(value) < 2:
-      raise ValueError, "unparsable value \"%s\"" % (value,)
-    v = value[1:]
-    if value.startswith('::'):
+      return text
+    if len(text) < 2:
+      raise ValueError, "unparsable text \"%s\"" % (text,)
+    t1 = text[1:]
+    if text.startswith('::'):
       # :string-with-leading-colon
-      return v
-    if v[0].isdigit():
+      return t1
+    if t1[0].isdigit():
       # :int
-      return int(v)
-    if v[0].isupper():
+      return int(t1)
+    if t1[0].isupper():
       # TYPE:NAME
-      if v.find(':', 1) < 0:
-        raise ValueError, "bad :TYPE:NAME \"%s\"" % (value,)
-      t, name = v.split(':', 1)
+      if t1.find(':', 1) < 0:
+        raise ValueError, "bad :TYPE:NAME \"%s\"" % (text,)
+      t, name = t1.split(':', 1)
       return self.nodeByTypeName(t, name)
-    if v[0].islower():
+    if t1[0].islower():
       # scheme:info
-      if v.find(':', 1) < 0:
-        raise ValueError, "bad :scheme:info \"%s\"" % (value,)
-      scheme, info = v.split(':', 1)
+      if t1.find(':', 1) < 0:
+        raise ValueError, "bad :scheme:info \"%s\"" % (text,)
+      scheme, info = t1.split(':', 1)
       R = self.__scheme_registry.get(scheme, None)
       if R:
-        return R.deserialise(info)
-      raise ValueError, "unsupported :scheme:info \"%s\"" % (value,)
-    if v[0] == '+':
+        return R.fromtext(info)
+      raise ValueError, "unsupported :scheme:info \"%s\"" % (text,)
+    if t1[0] == '+':
       # :+seq:TYPE:NAME
       # obtain foreign Node from other NodeDB
-      seqnum, t, name = v[1:].split(':', 2)
+      seqnum, t, name = t1[1:].split(':', 2)
       return self.otherDB(int(seqnum))[t, name]
-    raise ValueError, "unparsable value \"%s\"" % (value,)
+    raise ValueError, "unparsable text \"%s\"" % (text,)
 
 _NodeDBsByURL = {}
 
@@ -730,17 +749,17 @@ class Backend(object):
   def _preload(self):
     raise NotImplementedError
 
-  def serialise(self, value):
+  def totext(self, value):
     ''' Hook for subclasses that might do special encoding for their backend.
         Discouraged.
     '''
-    return self.db.serialise(value)
+    return self.nodedb.totext(value)
 
-  def deserialise(self, value):
+  def fromtext(self, value):
     ''' Hook for subclasses that might do special decoding for their backend.
         Discouraged.
     '''
-    return self.db.deserialise(value)
+    return self.nodedb.fromtext(value)
 
   def close(self):
     raise NotImplementedError
@@ -841,10 +860,10 @@ class TestAll(unittest.TestCase):
     H = self.db.newNode('HOST', 'foo')
     for value in 1, 'str1', ':str2', '::', H:
       sys.stderr.flush()
-      s = self.db.serialise(value)
+      s = self.db.totext(value)
       sys.stderr.flush()
       assert type(s) is str
-      self.assert_(value == self.db.deserialise(s))
+      self.assert_(value == self.db.fromtext(s))
 
   def test10newNode(self):
     H = self.db.newNode('HOST', 'foo')

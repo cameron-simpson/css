@@ -11,7 +11,7 @@ from sqlalchemy import create_engine, \
 from sqlalchemy.orm import mapper, sessionmaker
 from sqlalchemy.sql import and_, or_, not_
 from sqlalchemy.sql.expression import distinct
-from cs.logutils import error
+from cs.logutils import error, warn
 from . import NodeDB, Backend
 from .node import TestAll as NodeTestAll
 
@@ -102,14 +102,14 @@ class Backend_SQLAlchemy(Backend):
         error("invalid NODE_ID(%s): ignore %s=%s" % (nodeid, attr, value))
         continue
       N = byID[nodeid]
-      value = self.deserialise(value)
+      value = self.fromtext(value)
       N[attr+'s'].append(value, noBackend=True )
 
-  def deserialise(self, value):
-    if value.startswith(':#'):
-      # deprecated :#node_id serialisation
-      return self.__nodesByID[int(value[2:])]
-    return Backend.deserialise(self, value)
+  def fromtext(self, text):
+    if text.startswith(':#'):
+      warn("deprecated :#node_id serialisation: %s" % (text,))
+      return self.__nodesByID[int(text[2:])]
+    return Backend.fromtext(self, text)
 
   def close(self):
     raise NotImplementedError
@@ -131,7 +131,7 @@ class Backend_SQLAlchemy(Backend):
     nodeid = self.__IDbyTypeName[N.type, N.name]
     ins_values = [ { 'NODE_ID': nodeid,
                      'ATTR':    attr,
-                     'VALUE':   self.serialise(value),
+                     'VALUE':   self.totext(value),
                    } for value in values ]
     self.attrs.insert().execute(ins_values)
 
