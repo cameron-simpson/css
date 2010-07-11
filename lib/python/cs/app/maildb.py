@@ -5,14 +5,14 @@ from cs.nodedb import NodeDB, Node
 from cs.mail import ismaildir, ismbox, messagesFromPath
 from cs.misc import the
 from email.utils import getaddresses, formataddr
-from contextlib import closing
-from types import StringTypes
 import sys
 import os
 
 AddressNode=Node
 PersonNode=Node
+
 class MessageNode(Node):
+
   def references(self):
     return [ N for N in self.parentsByAttr('FOLLOWUPS') if N.TYPE == 'MESSAGE' ]
   def followups(self):
@@ -38,11 +38,10 @@ class MailDB(NodeDB):
     print >>sys.stderr, "engine=%s" % (engine,)
     NodeDB.__init__(self,engine,nodes,attrs)
 
-  def _newNode(self, _node, attrs):
-    t = _node.TYPE
+  def _createNode(self, t, name):
     if t not in TypeFactory:
-      raise ValueError("MailDB: unsupported type \"%s\"" % (t,))
-    return TypeFactory[t](_node, self, attrs)
+      raise ValueError("unsupported type \"%s\"" % (t,))
+    return TypeFactory[t](t, name, self)
 
   def getAddrNode(self, addr):
     return self.nodeByNameAndType(addr, 'ADDRESS', doCreate=True)
