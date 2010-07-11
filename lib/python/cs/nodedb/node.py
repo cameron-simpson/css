@@ -33,19 +33,31 @@ class _AttrList(list):
       and .ATTR[s] attribute access and drives a backend.
   '''
   
-  def __init__(self, node, key):
+  def __init__(self, node, key, _items=None):
     ''' Initialise an _AttrList.
         `node` is the node to which this _AttrList is attached.
         `key` is the _singular_ form of the attribute name.
+        `_items` is a private paramater for populating an _AttrList which is
+            not attached to a Node, derived from the .Xs notation.
 
         TODO: we currently do not rely on the backend to preserve ordering so
               lots of operations just ask the backend to totally resave the
               attribute list.
     '''
-    list.__init__(self)
+    if _items:
+      assert node is None
+      list.__init__(self, _items)
+    else:
+      list.__init__(self)
     self.node = node
     self.key = key
-    self.nodedb = node.nodedb
+    if node is not None:
+      self.nodedb = node.nodedb
+
+  def __str__(self):
+    if self.node is None:
+      return ".%ss[...]" % (self.key,)
+    return "%s.%ss" % (str(self.node), self.key)
 
   def _detach(self, noBackend=False):
     assert False, "SURPRISE! call to _detach()"
@@ -145,18 +157,19 @@ class _AttrList(list):
           .Xs Return a list of all the .Xs attributes of the list members.
               All members must support the .Xs attribution.
           .X  Return .Xs[0]. Requires len(.Xs) == 1.
-
-	TODO: .Xs to return an anonymous static _AttrList for
-            subsequent .Xs use.
     '''
     k, plural = parseUC_sAttr(attr)
     if k:
       ks = k+'s'
       hits = itertools.chain(*[ N[ks] for N in self ])
       if plural:
-        return list(hits)
-      return the(hits)
-    raise AttributeError, str(self)+'.'+repr(attr)
+        return _AttrList(node=None, key=k, _items=hits)
+      try:
+        hit = the(hits)
+      except IndexError, e:
+        raise AttributeError, "%s.%s: %s" % (self, attr, e)
+      return hit
+    raise AttributeError, str(self)
 
 class Node(dict):
   ''' A Node dictionary.
@@ -848,6 +861,18 @@ class TestAll(unittest.TestCase):
     H = self.db.newNode('HOST', 'foo')
     H.Y = 1
     H.Y = 2
+
+  def testAttrXsNotation(self):
+    H = self.db.newNode('HOST', 'foo')
+    NIC0 = self.db.newNode('NIC', 'eth0')
+    NIC0.IPADDR = '1.2.3.4'
+    NIC1 = self.db.newNode('NIC', 'eth1')
+    NIC1.IPADDR = '5.6.7.8'
+    H.NICs = (NIC0, NIC1)
+    ipaddrs = H.NICs.IPADDRs
+    self.assertEqual(ipaddrs, ['1.2.3.4', '5.6.7.8'])
+    nics = H.NICs
+    self.assertRaises(AttributeError, getattr, nics, 'IPADDR')
 
 if __name__ == '__main__':
   unittest.main()
