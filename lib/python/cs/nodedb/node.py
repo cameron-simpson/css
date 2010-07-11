@@ -417,8 +417,8 @@ class NodeDB(dict):
 
   def __init__(self, backend=None, readonly=False):
     dict.__init__(self)
-    self.__type_registry = {}
-    self.__scheme_registry = {}
+    self.__attr_type_registry = {}
+    self.__attr_scheme_registry = {}
     if backend is None:
       backend = _NoBackend(self)
     self._backend = backend
@@ -427,8 +427,9 @@ class NodeDB(dict):
     self.readonly = readonly
     self._lock = allocate_lock()
 
-  class __TypeRegistration(object):
-    ''' An object to hold a type registration, with the following attributes:
+  class __AttrTypeRegistration(object):
+    ''' An object to hold an attribute value type registration, with the
+        following attributes:
           .type      the registered type
           .scheme    the scheme label to use for the type
           .totext    function to render a value as text
@@ -450,13 +451,15 @@ class NodeDB(dict):
       self.tobytes = tobytes
       self.frombytes = tobytes
 
-  def register_type(self,
-                      t, scheme,
-                      totext, fromtext,
-                      tobytes=None, frombytes=None):
-    ''' Register a type for storage and retrieval in this NodeDB.
+  def register_attr_type(self,
+                         t, scheme,
+                         totext, fromtext,
+                         tobytes=None, frombytes=None):
+    ''' Register an attribute value type for storage and retrieval in this
+        NodeDB. This permits the storage of values that are not the basic
+        string, non-negative integer and Node types.
         Parameters:
-          `t`, the type to register
+          `t`, the value type to register
           `scheme`, the scheme label to use for the type
           `totext`, a function to render a value as text
           `fromtext`, a function to compute a value from text
@@ -465,15 +468,15 @@ class NodeDB(dict):
         If `tobytes` is None or unspecified, `totext` is used.
         If `frombytes` is None or unspecified, `fromtext` is used.
     '''
-    reg = self.__type_registry
-    sch = self.__scheme_registry
+    reg = self.__attr_type_registry
+    sch = self.__attr_scheme_registry
     assert t not in reg, "type %s already registered" % (t,)
     assert scheme not in sch, "scheme '%s' already registered" % (scheme,)
     if tobytes is None:
       tobytes = totext
     if frombytes is None:
       frombytes = fromtext
-    R = NodeDB.__TypeRegistration(t, scheme,
+    R = NodeDB.__AttrTypeRegistration(t, scheme,
                                   totext, fromtext,
                                   tobytes, frombytes)
     reg[t] = R
@@ -640,7 +643,7 @@ class NodeDB(dict):
       s = str(value)
       assert s[0].isdigit()
       return ':' + s
-    R = self.__type_registry.get(t, None)
+    R = self.__attr_type_registry.get(t, None)
     if R:
       scheme = R.scheme
       assert scheme[0].islower() and scheme.find(':',1) < 0, \
