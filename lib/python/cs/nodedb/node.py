@@ -466,8 +466,8 @@ class NodeDB(dict):
         If `frombytes` is None or unspecified, `fromtext` is used.
     '''
     reg = self.__type_registry
-    assert t not in reg, "type %s already registered" % (t,)
     sch = self.__scheme_registry
+    assert t not in reg, "type %s already registered" % (t,)
     assert scheme not in sch, "scheme '%s' already registered" % (scheme,)
     if tobytes is None:
       tobytes = totext
@@ -547,7 +547,7 @@ class NodeDB(dict):
 
   def newNode(self, *args):
     ''' Create and register a new Node.
-        Subclasses of NodeDB should override _newNode, not this method.
+        Subclasses of NodeDB should override _createNode, not this method.
     '''
     t, name = nodekey(*args)
     N = self._makeNode(t, name)
@@ -558,7 +558,7 @@ class NodeDB(dict):
   def _makeNode(self, t, name):
     ''' Wrapper for _createNode with collision detection and registration of
         the new Node.
-        Subclasses of NodeDB should override _newNode, not this method.
+        Subclasses of NodeDB should override _createNode, not this method.
     '''
     assert (t, name) not in self, 'newNode(%s, %s): already exists' % (t, name)
     N = self[t, name] = self._createNode(t, name)
