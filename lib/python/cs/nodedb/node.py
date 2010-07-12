@@ -408,7 +408,7 @@ def nodekey(*args):
     k, plural = parseUC_sAttr(t)
     assert k is not None and not plural
   else:
-    raise TypeError, "newNode() takes (TYPE, NAME) args or a single arg: args=%s" % ( args, )
+    raise TypeError, "nodekey() takes (TYPE, NAME) args or a single arg: args=%s" % ( args, )
   return t, name
 
 class NodeDB(dict):
@@ -532,6 +532,13 @@ class NodeDB(dict):
         assert default is None, "doCreate is True but default=%s" % (default,)
         return self.newNode(item)
       return default
+
+  def __getattr__(self, attr):
+    k, plural = parseUC_sAttr(attr)
+    if k:
+      if plural:
+        return self.__nodesByType.get(k, ())
+    return super(NodeDB, self).__getattr__(attr)
 
   def __getitem__(self, item):
     key = nodekey(item)
