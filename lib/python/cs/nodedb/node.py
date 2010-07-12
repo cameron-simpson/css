@@ -415,12 +415,12 @@ class NodeDB(dict):
 
   _key = ('_', '_')     # index of metadata node
 
-  def __init__(self, backend=None, readonly=False):
+  def __init__(self, backend, readonly=False):
     dict.__init__(self)
     self.__attr_type_registry = {}
     self.__attr_scheme_registry = {}
     if backend is None:
-      backend = _NoBackend(self)
+      backend = _NoBackend()
     self._backend = backend
     self.__nodesByType = {}
     backend.set_nodedb(self)
@@ -524,10 +524,13 @@ class NodeDB(dict):
     key = nodekey(item)
     return dict.__contains__(self, key)
 
-  def get(self, item, default=None):
+  def get(self, item, default=None, doCreate=False):
     try:
       return self[item]
     except KeyError:
+      if doCreate:
+        assert default is None, "doCreate is True but default=%s" % (default,)
+        return self.newNode(item)
       return default
 
   def __getitem__(self, item):
@@ -696,9 +699,12 @@ class NodeDB(dict):
 
 _NodeDBsByURL = {}
 
-def NodeDBFromURL(url, readonly=False):
+def NodeDBFromURL(url, readonly=False, klass=None):
   ''' Factory method to return singleton NodeDB instances.
   '''
+  if klass is None:
+    klass = NodeDB
+
   if url in _NodeDBsByURL:
     return _NodeDBsByURL[url]
 
@@ -718,7 +724,7 @@ def NodeDBFromURL(url, readonly=False):
     from cs.nodedb.tokcab import Backend_TokyoCabinet
     dbpath = url[11:]
     backend = Backend_TokyoCabinet(dbpath, readonly=readonly)
-    db = NodeDB(backend, readonly=readonly)
+    db = klass(backend, readonly=readonly)
     _NodeDBsByURL[url] = db
     return db
 
@@ -730,7 +736,7 @@ def NodeDBFromURL(url, readonly=False):
     from cs.nodedb.sqla import Backend_SQLAlchemy
     dbpath = url
     backend = Backend_SQLAlchemy(dbpath, readonly=readonly)
-    db = NodeDB(backend, readonly=readonly)
+    db = klass(backend, readonly=readonly)
     _NodeDBsByURL[url] = db
     db.url = url
     return db
@@ -856,8 +862,7 @@ class _QBackend(Backend):
 class TestAll(unittest.TestCase):
 
   def setUp(self):
-    self.backend=_NoBackend()   # Backend_SQLAlchemy('sqlite:///:memory:')
-    self.db=NodeDB(backend=self.backend)
+    self.db = NodeDB(backend=None)
 
   def test01serialise(self):
     H = self.db.newNode('HOST', 'foo')
@@ -867,6 +872,12 @@ class TestAll(unittest.TestCase):
       sys.stderr.flush()
       assert type(s) is str
       self.assert_(value == self.db.fromtext(s))
+
+  def test02get(self):
+    H = self.db.get( 'HOST:foo', doCreate=True )
+    self.assert_(type(H) is Node)
+    self.assert_(H.type == 'HOST')
+    self.assert_(H.name == 'foo')
 
   def test10newNode(self):
     H = self.db.newNode('HOST', 'foo')

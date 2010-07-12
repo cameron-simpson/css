@@ -1,12 +1,14 @@
 #!/usr/bin/python -tt
 
 from __future__ import with_statement
-from cs.nodedb import NodeDB, Node
+from cs.logutils import Pfx, info
 from cs.mail import ismaildir, ismbox, messagesFromPath
+from cs.nodedb import NodeDB, Node
 from cs.misc import the
 from email.utils import getaddresses, formataddr
 import sys
 import os
+import unittest
 
 AddressNode=Node
 PersonNode=Node
@@ -27,34 +29,35 @@ class MailDB(NodeDB):
   ''' Extend NodeDB for email.
   '''
 
-  def __init__(self, engine=None, nodes=None, attrs=None):
-    if engine is None:
-      HOME=os.environ['HOME']
-      MAILDIR=os.environ.get('MAILDIR',
-                             os.path.join(HOME,'mail'))
-      DBPATH=os.environ.get('MAIL_NODEDB',
-                            os.path.join(MAILDIR,'.nodedb.sqlite'))
-      engine="sqlite:///"+DBPATH
-    print >>sys.stderr, "engine=%s" % (engine,)
-    NodeDB.__init__(self,engine,nodes,attrs)
-
   def _createNode(self, t, name):
+    ''' Create a new Node of the specified type.
+    '''
     if t not in TypeFactory:
       raise ValueError("unsupported type \"%s\"" % (t,))
     return TypeFactory[t](t, name, self)
 
   def getAddrNode(self, addr):
-    return self.nodeByNameAndType(addr, 'ADDRESS', doCreate=True)
+    ''' Obtain the Node for the specified address `addr`.
+    '''
+    return self.get( ('ADDRESS', addr), doCreate=True)
 
   def getMessageNode(self, message_id):
-    return self.nodeByNameAndType(message_id, 'MESSAGE', doCreate=True)
+    ''' Obtain the Node for the specified Message-ID `message_id`.
+    '''
+    return self.get( ('MESSAGE', message_id), doCreate=True)
 
   def importPath(self, path):
-    for M in messagesFromPath(path):
-      self.importMessage(M)
+    ''' Import all the messages stored at `path`.
+    '''
+    with Pfx(path):
+      for M in messagesFromPath(path):
+        self.importMessage(M)
 
-  def importMessage(self,M):
-    print >>sys.stderr, "import %s->%s: %s" % (M['from'], M['to'], M['subject'])
+  def importMessage(self, M):
+    ''' Import the message `M`.
+        Returns the MessageNode.
+    '''
+    info("import %s->%s: %s" % (M['from'], M['to'], M['subject']))
     N = self.getMessageNode(M['message-id'])
     N.SUBJECT = M['subject']
     if 'date' in M:
@@ -74,3 +77,16 @@ class MailDB(NodeDB):
           if len(name) > 0 and not hasattr(A, 'REALNAME'):
             A.REALNAME = name
     N.RECIPIENTs = [ addrs[addr] for addr in addrs.keys() ]
+    return N
+
+class TestAll(unittest.TestCase):
+
+  def setUp(self):
+    self.db = MailDB(backend=None)
+
+  def test01makeNodes(self):
+    A = self.db.newNode('ADDRESS', 'cs@zip.com.au')
+    print >>sys.stderr, "A =", `A`
+
+if __name__ == '__main__':
+  unittest.main()
