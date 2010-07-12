@@ -87,6 +87,7 @@ class TestAll(unittest.TestCase):
   def test01makeNodes(self):
     A = self.db.newNode('ADDRESS', 'cs@zip.com.au')
     print >>sys.stderr, "A =", `A`
+    print >>sys.stderr, "ADDRESSes =", `self.db.ADDRESSes`
 
 if __name__ == '__main__':
   unittest.main()
