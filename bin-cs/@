@@ -79,12 +79,11 @@ do
   shift
 done
 
-[ $allscreens ] \
- && { [ $# = 0 ] \
-   || { echo "$cmd: a command may not be supplied with -A option" >&2
-	badopts=1
-      }
-    }
+if [ $allscreens ] && [ $# -gt 0 ]
+then
+  echo "$cmd: a command may not be supplied with -A option" >&2
+  badopts=1
+fi
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
