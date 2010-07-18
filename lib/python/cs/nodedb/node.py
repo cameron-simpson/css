@@ -10,6 +10,7 @@ else:
   import json
 import itertools
 from thread import allocate_lock
+from threading import Thread
 import unittest
 from cs.lex import str1
 from cs.misc import the
@@ -28,21 +29,35 @@ re_INT = re.compile(r'-?[0-9]+')
 re_BAREURL = re.compile(r'[a-z]+://[-a-z0-9.]+/[-a-z0-9_.]+')
 
 class _AttrList(list):
+  ''' An _AttrList is a list subtype that understands Nodes
+      and .ATTR[s] attribute access and drives a backend.
+  '''
   
-  def __init__(self, node, key):
-    ''' Initialise an _AttrList, a list subtype that understands Nodes
-        and .ATTR[s] attribute access and drives a backend.
+  def __init__(self, node, key, _items=None):
+    ''' Initialise an _AttrList.
         `node` is the node to which this _AttrList is attached.
         `key` is the _singular_ form of the attribute name.
+        `_items` is a private paramater for populating an _AttrList which is
+            not attached to a Node, derived from the .Xs notation.
 
         TODO: we currently do not rely on the backend to preserve ordering so
               lots of operations just ask the backend to totally resave the
               attribute list.
     '''
-    list.__init__(self)
+    if _items:
+      assert node is None
+      list.__init__(self, _items)
+    else:
+      list.__init__(self)
     self.node = node
     self.key = key
-    self.nodedb = node.nodedb
+    if node is not None:
+      self.nodedb = node.nodedb
+
+  def __str__(self):
+    if self.node is None:
+      return ".%ss[...]" % (self.key,)
+    return "%s.%ss" % (str(self.node), self.key)
 
   def _detach(self, noBackend=False):
     assert False, "SURPRISE! call to _detach()"
@@ -137,14 +152,24 @@ class _AttrList(list):
     list.__setitem__(self, index, value)
 
   def __getattr__(self, attr):
+    ''' Using a .ATTR[s] attribute on an _AttrList indirects through
+        the list members:
+          .Xs Return a list of all the .Xs attributes of the list members.
+              All members must support the .Xs attribution.
+          .X  Return .Xs[0]. Requires len(.Xs) == 1.
+    '''
     k, plural = parseUC_sAttr(attr)
     if k:
       ks = k+'s'
       hits = itertools.chain(*[ N[ks] for N in self ])
       if plural:
-        return list(hits)
-      return the(hits)
-    raise AttributeError, str(self)+'.'+repr(attr)
+        return _AttrList(node=None, key=k, _items=hits)
+      try:
+        hit = the(hits)
+      except IndexError, e:
+        raise AttributeError, "%s.%s: %s" % (self, attr, e)
+      return hit
+    raise AttributeError, str(self)
 
 class Node(dict):
   ''' A Node dictionary.
@@ -383,27 +408,28 @@ def nodekey(*args):
     k, plural = parseUC_sAttr(t)
     assert k is not None and not plural
   else:
-    raise TypeError, "newNode() takes (TYPE, NAME) args or a single arg: args=%s" % ( args, )
+    raise TypeError, "nodekey() takes (TYPE, NAME) args or a single arg: args=%s" % ( args, )
   return t, name
 
 class NodeDB(dict):
 
   _key = ('_', '_')     # index of metadata node
 
-  def __init__(self, backend=None, readonly=False):
+  def __init__(self, backend, readonly=False):
     dict.__init__(self)
-    self.__type_registry = {}
-    self.__scheme_registry = {}
+    self.__attr_type_registry = {}
+    self.__attr_scheme_registry = {}
     if backend is None:
-      backend = _NoBackend(self)
+      backend = _NoBackend()
     self._backend = backend
     self.__nodesByType = {}
     backend.set_nodedb(self)
     self.readonly = readonly
     self._lock = allocate_lock()
 
-  class __TypeRegistration(object):
-    ''' An object to hold a type registration, with the following attributes:
+  class __AttrTypeRegistration(object):
+    ''' An object to hold an attribute value type registration, with the
+        following attributes:
           .type      the registered type
           .scheme    the scheme label to use for the type
           .totext    function to render a value as text
@@ -425,13 +451,15 @@ class NodeDB(dict):
       self.tobytes = tobytes
       self.frombytes = tobytes
 
-  def register_type(self,
-                      t, scheme,
-                      totext, fromtext,
-                      tobytes=None, frombytes=None):
-    ''' Register a type for storage and retrieval in this NodeDB.
+  def register_attr_type(self,
+                         t, scheme,
+                         totext, fromtext,
+                         tobytes=None, frombytes=None):
+    ''' Register an attribute value type for storage and retrieval in this
+        NodeDB. This permits the storage of values that are not the basic
+        string, non-negative integer and Node types.
         Parameters:
-          `t`, the type to register
+          `t`, the value type to register
           `scheme`, the scheme label to use for the type
           `totext`, a function to render a value as text
           `fromtext`, a function to compute a value from text
@@ -440,15 +468,15 @@ class NodeDB(dict):
         If `tobytes` is None or unspecified, `totext` is used.
         If `frombytes` is None or unspecified, `fromtext` is used.
     '''
-    reg = self.__type_registry
+    reg = self.__attr_type_registry
+    sch = self.__attr_scheme_registry
     assert t not in reg, "type %s already registered" % (t,)
-    sch = self.__scheme_registry
     assert scheme not in sch, "scheme '%s' already registered" % (scheme,)
     if tobytes is None:
       tobytes = totext
     if frombytes is None:
       frombytes = fromtext
-    R = NodeDB.__TypeRegistration(t, scheme,
+    R = NodeDB.__AttrTypeRegistration(t, scheme,
                                   totext, fromtext,
                                   tobytes, frombytes)
     reg[t] = R
@@ -496,11 +524,21 @@ class NodeDB(dict):
     key = nodekey(item)
     return dict.__contains__(self, key)
 
-  def get(self, item, default=None):
+  def get(self, item, default=None, doCreate=False):
     try:
       return self[item]
     except KeyError:
+      if doCreate:
+        assert default is None, "doCreate is True but default=%s" % (default,)
+        return self.newNode(item)
       return default
+
+  def __getattr__(self, attr):
+    k, plural = parseUC_sAttr(attr)
+    if k:
+      if plural:
+        return self.__nodesByType.get(k, ())
+    return super(NodeDB, self).__getattr__(attr)
 
   def __getitem__(self, item):
     key = nodekey(item)
@@ -521,6 +559,9 @@ class NodeDB(dict):
     self._noteNode(N)
 
   def newNode(self, *args):
+    ''' Create and register a new Node.
+        Subclasses of NodeDB should override _createNode, not this method.
+    '''
     t, name = nodekey(*args)
     N = self._makeNode(t, name)
     self._backend.newNode(N)
@@ -528,6 +569,10 @@ class NodeDB(dict):
     return N
 
   def _makeNode(self, t, name):
+    ''' Wrapper for _createNode with collision detection and registration of
+        the new Node.
+        Subclasses of NodeDB should override _createNode, not this method.
+    '''
     assert (t, name) not in self, 'newNode(%s, %s): already exists' % (t, name)
     N = self[t, name] = self._createNode(t, name)
     return N
@@ -581,8 +626,14 @@ class NodeDB(dict):
 
     raise ValueError, "unknown DB sequence number: %s; _.DBs = %s" % (s, N_.DBs)
 
-  def serialise(self, value):
+  def totext(self, value):
     ''' Convert a value for external string storage.
+          text        The string "text" for strings not commencing with a colon.
+          ::text      The string ":text" for strings commencing with a colon.
+          :TYPE:name  Node of specified name and TYPE in local NodeDB.
+          :\+[0-9]+:TYPE:name Node of specified name and TYPE in other NodeDB.
+          :[0-9]+     A non-negative integer.
+          :scheme:text Encoding of value as "text" using its registered scheme.
     '''
     if isinstance(value, Node):
       assert value.type.find(':') < 0, \
@@ -602,56 +653,65 @@ class NodeDB(dict):
       s = str(value)
       assert s[0].isdigit()
       return ':' + s
-    R = self.__type_registry.get(t, None)
+    R = self.__attr_type_registry.get(t, None)
     if R:
       scheme = R.scheme
       assert scheme[0].islower() and scheme.find(':',1) < 0, \
              "illegal scheme name: \"%s\"" % (scheme,)
-      return ':'+scheme+':'+R.serialise(value)
-    raise ValueError, "can't serialise(%s)" % (repr(value),)
+      return ':'+scheme+':'+R.totext(value)
+    raise ValueError, "can't totext(%s)" % (repr(value),)
 
-  def deserialise(self, value):
+  def fromtext(self, text):
     ''' Convert a stored string into a value.
+          text        The string "text" for strings not commencing with a colon.
+          ::text      The string ":text" for strings commencing with a colon.
+          :TYPE:name  Node of specified name and TYPE in local NodeDB.
+          :\+[0-9]+:TYPE:name Node of specified name and TYPE in other NodeDB.
+          :[0-9]+     A non-negative integer.
+          :scheme:text Encoding of value as "text" using its registered scheme.
     '''
-    if not value.startswith(':'):
+    if not text.startswith(':'):
       # plain string
-      return value
-    if len(value) < 2:
-      raise ValueError, "unparsable value \"%s\"" % (value,)
-    v = value[1:]
-    if value.startswith('::'):
+      return text
+    if len(text) < 2:
+      raise ValueError, "unparsable text \"%s\"" % (text,)
+    t1 = text[1:]
+    if text.startswith('::'):
       # :string-with-leading-colon
-      return v
-    if v[0].isdigit():
+      return t1
+    if t1[0].isdigit():
       # :int
-      return int(v)
-    if v[0].isupper():
+      return int(t1)
+    if t1[0].isupper():
       # TYPE:NAME
-      if v.find(':', 1) < 0:
-        raise ValueError, "bad :TYPE:NAME \"%s\"" % (value,)
-      t, name = v.split(':', 1)
+      if t1.find(':', 1) < 0:
+        raise ValueError, "bad :TYPE:NAME \"%s\"" % (text,)
+      t, name = t1.split(':', 1)
       return self.nodeByTypeName(t, name)
-    if v[0].islower():
+    if t1[0].islower():
       # scheme:info
-      if v.find(':', 1) < 0:
-        raise ValueError, "bad :scheme:info \"%s\"" % (value,)
-      scheme, info = v.split(':', 1)
+      if t1.find(':', 1) < 0:
+        raise ValueError, "bad :scheme:info \"%s\"" % (text,)
+      scheme, info = t1.split(':', 1)
       R = self.__scheme_registry.get(scheme, None)
       if R:
-        return R.deserialise(info)
-      raise ValueError, "unsupported :scheme:info \"%s\"" % (value,)
-    if v[0] == '+':
+        return R.fromtext(info)
+      raise ValueError, "unsupported :scheme:info \"%s\"" % (text,)
+    if t1[0] == '+':
       # :+seq:TYPE:NAME
       # obtain foreign Node from other NodeDB
-      seqnum, t, name = v[1:].split(':', 2)
+      seqnum, t, name = t1[1:].split(':', 2)
       return self.otherDB(int(seqnum))[t, name]
-    raise ValueError, "unparsable value \"%s\"" % (value,)
+    raise ValueError, "unparsable text \"%s\"" % (text,)
 
 _NodeDBsByURL = {}
 
-def NodeDBFromURL(url, readonly=False):
+def NodeDBFromURL(url, readonly=False, klass=None):
   ''' Factory method to return singleton NodeDB instances.
   '''
+  if klass is None:
+    klass = NodeDB
+
   if url in _NodeDBsByURL:
     return _NodeDBsByURL[url]
 
@@ -665,15 +725,13 @@ def NodeDBFromURL(url, readonly=False):
       return NodeDBFromURL('file-tch://'+url, readonly=readonly)
     if ext == '.sqlite':
       return NodeDBFromURL('sqlite://'+url, readonly=readonly)
-    import sys
-    print >>sys.stderr, "ext =", ext
     raise ValueError, "unsupported NodeDB URL: "+url
 
   if url.startswith('file-tch://'):
     from cs.nodedb.tokcab import Backend_TokyoCabinet
     dbpath = url[11:]
     backend = Backend_TokyoCabinet(dbpath, readonly=readonly)
-    db = NodeDB(backend, readonly=readonly)
+    db = klass(backend, readonly=readonly)
     _NodeDBsByURL[url] = db
     return db
 
@@ -685,7 +743,7 @@ def NodeDBFromURL(url, readonly=False):
     from cs.nodedb.sqla import Backend_SQLAlchemy
     dbpath = url
     backend = Backend_SQLAlchemy(dbpath, readonly=readonly)
-    db = NodeDB(backend, readonly=readonly)
+    db = klass(backend, readonly=readonly)
     _NodeDBsByURL[url] = db
     db.url = url
     return db
@@ -707,17 +765,17 @@ class Backend(object):
   def _preload(self):
     raise NotImplementedError
 
-  def serialise(self, value):
+  def totext(self, value):
     ''' Hook for subclasses that might do special encoding for their backend.
         Discouraged.
     '''
-    return self.db.serialise(value)
+    return self.nodedb.totext(value)
 
-  def deserialise(self, value):
+  def fromtext(self, value):
     ''' Hook for subclasses that might do special decoding for their backend.
         Discouraged.
     '''
-    return self.db.deserialise(value)
+    return self.nodedb.fromtext(value)
 
   def close(self):
     raise NotImplementedError
@@ -785,51 +843,48 @@ class _QBackend(Backend):
       assert maxq > 0
     self.backend = backend
     self._Q = IterableQueue(maxq)
+    self._T = Thread(target=self._drain)
+    self._T.start()
 
   def close(self):
     self._Q.close()
+    self._T.join()
+    self._T = None
 
   def _drain(self):
-    B =  self.backend
     for what, args in self._Q:
-      if what == 'newNode':
-        B.newNode(*args)
-      elif what == 'delNode':
-        B.delNode(*args)
-      elif what == 'delAttr':
-        B.delAttr(*args)
-      elif what == 'extendAttr':
-        B.extendAttr(*args)
-      elif what == 'set1Attr':
-        B.set1Attr(*args)
-      else:
-        error("unsupported backend request \"%s\"(%s)" % (what, args))
+      what(*args)
 
   def newNode(self, N):
-    self._Q.put( ('newNode', (N,)) )
+    self._Q.put( (self.backend.newNode, (N,)) )
   def delNode(self, N):
-    self._Q.put( ('delNode', (N,)) )
+    self._Q.put( (self.backend.delNode, (N,)) )
   def extendAttr(self, N, attr, values):
-    self._Q.put( ('extendAttr', (N, attr, values)) )
+    self._Q.put( (self.backend.extendAttr, (N, attr, values)) )
   def set1Attr(self, N, attr, value):
-    self._Q.put( ('set1Attr', (N, attr, value)) )
+    self._Q.put( (self.backend.set1Attr, (N, attr, value)) )
   def delAttr(self, N, attr):
-    self._Q.put( ('delAttr', (N, attr)) )
+    self._Q.put( (self.backend.delAttr, (N, attr)) )
 
 class TestAll(unittest.TestCase):
 
   def setUp(self):
-    self.backend=_NoBackend()   # Backend_SQLAlchemy('sqlite:///:memory:')
-    self.db=NodeDB(backend=self.backend)
+    self.db = NodeDB(backend=None)
 
   def test01serialise(self):
     H = self.db.newNode('HOST', 'foo')
     for value in 1, 'str1', ':str2', '::', H:
       sys.stderr.flush()
-      s = self.db.serialise(value)
+      s = self.db.totext(value)
       sys.stderr.flush()
       assert type(s) is str
-      self.assert_(value == self.db.deserialise(s))
+      self.assert_(value == self.db.fromtext(s))
+
+  def test02get(self):
+    H = self.db.get( 'HOST:foo', doCreate=True )
+    self.assert_(type(H) is Node)
+    self.assert_(H.type == 'HOST')
+    self.assert_(H.name == 'foo')
 
   def test10newNode(self):
     H = self.db.newNode('HOST', 'foo')
@@ -846,6 +901,18 @@ class TestAll(unittest.TestCase):
     H = self.db.newNode('HOST', 'foo')
     H.Y = 1
     H.Y = 2
+
+  def testAttrXsNotation(self):
+    H = self.db.newNode('HOST', 'foo')
+    NIC0 = self.db.newNode('NIC', 'eth0')
+    NIC0.IPADDR = '1.2.3.4'
+    NIC1 = self.db.newNode('NIC', 'eth1')
+    NIC1.IPADDR = '5.6.7.8'
+    H.NICs = (NIC0, NIC1)
+    ipaddrs = H.NICs.IPADDRs
+    self.assertEqual(ipaddrs, ['1.2.3.4', '5.6.7.8'])
+    nics = H.NICs
+    self.assertRaises(AttributeError, getattr, nics, 'IPADDR')
 
 if __name__ == '__main__':
   unittest.main()

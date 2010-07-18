@@ -81,17 +81,19 @@ class CacheStore(BasicStore):
     Q.get()
 
 class MemCacheStore(BasicStore):
-  ''' A lossy store that keeps an in-memory cache of recent blocks.  It may
-      discard older blocks if new ones come in when full and would normally
+  ''' A lossy store that keeps an in-memory cache of recent chunks.  It may
+      discard older chunks if new ones come in when full and would normally
       be used as the cache part of a CacheStore pair.
+      The optional parameter `max` specifies the maximum number of
+      chunks to keep in memory; it defaults to 1024. Specifying 0 keeps
+      all chunks in memory.
   '''
   def __init__(self, max=1024):
     BasicStore.__init__(self, "MemCacheStore")
-    assert max > 1
     self.hashlist=[None for i in range(max)]
     self.low=0                    # offset to oldest hash
     self.used=0
-    self.hmap={}                  # cached h->(count,block) tuples
+    self.hmap={}                  # cached h->(count,chunk) tuples
 
   def flush(self):
     pass

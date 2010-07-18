@@ -19,9 +19,15 @@ class Backend_TokyoCabinet(Backend):
   def __init__(self, dbpath, readonly=False):
     self.readonly = readonly
     self.dbpath = dbpath
-    self.hdb = tc.HDB()
-    self.hdb.open(dbpath,
-                  (tc.HDBOREADER if readonly else tc.HDBOWRITER | tc.HDBOCREAT))
+    self.tcdb = tc.HDB()
+    self.tcdb.open(dbpath,
+                   ( tc.HDBOREADER
+                     if readonly
+                     else tc.HDBOWRITER | tc.HDBOCREAT
+                   ))
+
+  def close(self):
+    self.tcdb.close()
 
   def _attrtag(self, N, attr):
     return ':'.join( (attr, N.type, N.name) )
@@ -30,17 +36,14 @@ class Backend_TokyoCabinet(Backend):
     ''' Prepopulate the NodeDB from the database.
     '''
     # load Nodes
-    for attrtag, attrvalue in self.hdb.iteritems():
+    for attrtag, attrtexts in self.tcdb.iteritems():
       attr, t, name = attrtag.split(':', 2)
       try:
         N = self.nodedb[t, name]
       except KeyError:
         N = self.nodedb._makeNode(t, name)
-      values = [ self.deserialise(value) for value in attrvalue.split('\0') ]
+      values = [ self.fromtext(text) for text in attrtexts.split('\0') ]
       N[attr+'s'].extend(values, noBackend=True )
-
-  def close(self):
-    self.hdb.close()
 
   def newNode(self, N):
     assert not self.nodedb.readonly
@@ -48,28 +51,28 @@ class Backend_TokyoCabinet(Backend):
   def delNode(self, N):
     assert not self.nodedb.readonly
     for ks in N.keys():
-      del self.hdb[self._attrtag(N, ks[:-1])]
+      del self.tcdb[self._attrtag(N, ks[:-1])]
 
   def extendAttr(self, N, attr, values):
     assert len(values) > 0
     assert not self.nodedb.readonly
     attrtag = self._attrtag(N, attr)
-    attrvalue = '\0'.join( self.serialise(_) for _ in values )
+    attrtexts = '\0'.join( self.totext(_) for _ in values )
     if N[attr+'s']:
-      self.hdb.putcat(attrtag, '\0'+attrvalue)
+      self.tcdb.putcat(attrtag, '\0'+attrtexts)
     else:
-      self.hdb.put(attrtag, attrvalue)
+      self.tcdb.put(attrtag, attrtexts)
 
   def set1Attr(self, N, attr, value):
     assert not self.nodedb.readonly
     attrtag = self._attrtag(N, attr)
-    attrvalue = self.serialise(value)
-    self.hdb.put(attrtag, attrvalue)
+    attrtexts = self.totext(value)
+    self.tcdb.put(attrtag, attrtexts)
 
   def delAttr(self, N, attr):
     assert not self.nodedb.readonly
     attrtag = self._attrtag(N, attr)
-    del self.hdb[attrtag]
+    del self.tcdb[attrtag]
 
 class TestAll(NodeTestAll):
 
@@ -87,11 +90,9 @@ class TestAll(NodeTestAll):
     N2 = self.db.newNode('SWITCH:sw1')
     N2.Ys=(9,8,7)
     dbstate = str(self.db)
-    print >>sys.stderr, "test22 1:", dbstate
     self.db.close()
     self.db=NodeDB(backend=Backend_TokyoCabinet(self.dbpath))
     dbstate2 = str(self.db)
-    print >>sys.stderr, "test22 2:", dbstate2
     self.assert_(dbstate == dbstate2, "db state differs:\n\t%s\n\t%s" % (dbstate, dbstate2))
 
   def tearDown(self):

@@ -1,6 +1,7 @@
 #!/usr/bin/python -tt
 
 from cs.misc import the
+from functools import partial
 from types import StringTypes
 import sys
 
@@ -122,3 +123,94 @@ class UC_Sequence(list):
     for N in self.__nodes:
       for v in getattr(N, attr):
         yield v
+
+class AttributableList(list):
+  ''' An AttributableList maps unimplemented attributes onto the list members
+      and returns you a new AttributableList with the results, ready for a
+      further dereference.
+
+      Example:
+        >>> class O(object):
+        >>>   def __init__(self, i):
+        >>>     self.i = i
+        >>> Os = [ O(1), O(2), O(3) ]
+        >>> AL = AttributableList( Os )
+        >>> print AL.i
+        [1, 2, 3]
+        >>> print type(AL.i)
+        <class 'cs.mappings.AttributableList'>
+  '''
+
+  def __init__(self,  initlist=None, strict=False):
+    ''' Initialise the list.
+        The optional parameter `initlist` initialises the list
+        as for a normal list.
+        The optional parameter `strict`, if true, causes list elements
+        lacking the attribute to raise an AttributeError. If false,
+        list elements without the attribute are omitted from the results.
+    '''
+    if initlist:
+      list.__init__(self, initlist)
+    else:
+      list.__init__(self)
+    self.strict = strict
+
+  def __getattr__(self, attr):
+    if self.strict:
+      result = [ getattr(item, attr) for item in self ]
+    else:
+      result = []
+      for item in self:
+        try:
+          r = getattr(item, attr)
+        except AttributeError:
+          pass
+        else:
+          result.append(r)
+    return AttributableList(result)
+
+class MethodicalList(AttributableList):
+  ''' A MethodicalList subclasses a list and maps unimplemented attributes
+      into a callable which calls the corresponding method on each list members
+      and returns you a new MethodicalList with the results, ready for a
+      further dereference.
+
+      Example:
+        >>> class O(object):
+        ...   def x(self):
+        ...     return id(self)
+        ... 
+        >>> Os=[ O(), O(), O() ]
+        >>> ML = MethodicalList( Os )
+        >>> print ML.x()
+        [4300801872, 4300801936, 4300802000]
+        >>> print type(ML.x())
+        <class 'cs.mappings.MethodicalList'>
+  '''
+
+  def __init__(self,  initlist=None, strict=False):
+    ''' Initialise the list.
+        The optional parameter `initlist` initialises the list
+        as for a normal list.
+        The optional parameter `strict`, if true, causes list elements
+        lacking the attribute to raise an AttributeError. If false,
+        list elements without the attribute are omitted from the results.
+    '''
+    AttributableList.__init__(self, initlist=initlist, strict=strict)
+
+  def __getattr__(self, attr):
+    return partial(self.__call_attr, attr)
+
+  def __call_attr(self, attr):
+    if self.strict:
+      submethods = [ getattr(item, attr) for item in self ]
+    else:
+      submethods = []
+      for item in self:
+        try:
+          submethod = getattr(item, attr)
+        except AttributeError:
+          pass
+        else:
+          submethods.append(submethod)
+    return MethodicalList( method() for method in submethods )
