@@ -22,7 +22,9 @@ MAX_BLOCKSIZE=16383                             # fits in 2 octets BS-encoded
 
 class Blockifier(object):
   ''' A Blockifier accepts data or Blocks and stores them sequentially.
-      Its .close() method returns the top Block representing the
+      Data chunks are presumed to be as desired, and are not reblocked;
+      each is stored directly.
+      The .close() method returns the top Block representing the
       stored sequence.
   '''
 
