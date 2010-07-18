@@ -177,15 +177,15 @@ class MethodicalList(AttributableList):
 
       Example:
         >>> class O(object):
-        ...   def __init__(self, i):
-        ...     self.i = i
-        ...
-        >>> Os = [ O(1), O(2), O(3) ]
-        >>> AL = AttributableList( Os )
-        >>> print AL.i
-        [1, 2, 3]
-        >>> print type(AL.i)
-        <class 'cs.mappings.AttributableList'>
+        ...   def x(self):
+        ...     return id(self)
+        ... 
+        >>> Os=[ O(), O(), O() ]
+        >>> ML = MethodicalList( Os )
+        >>> print ML.x()
+        [4300801872, 4300801936, 4300802000]
+        >>> print type(ML.x())
+        <class 'cs.mappings.MethodicalList'>
   '''
 
   def __init__(self,  initlist=None, strict=False):
@@ -195,18 +195,6 @@ class MethodicalList(AttributableList):
         The optional parameter `strict`, if true, causes list elements
         lacking the attribute to raise an AttributeError. If false,
         list elements without the attribute are omitted from the results.
-
-        Example:
-          >>> class O(object):
-          ...   def x(self):
-          ...     return id(self)
-          ... 
-          >>> Os=[ O(), O(), O() ]
-          >>> ML = MethodicalList( Os )
-          >>> print ML.x()
-          [4300801872, 4300801936, 4300802000]
-          >>> print type(ML.x())
-          <class 'cs.mappings.MethodicalList'>
     '''
     AttributableList.__init__(self, initlist=initlist, strict=strict)
 
