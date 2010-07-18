@@ -355,7 +355,7 @@ class IndirectBlock(_Block):
     stop = index.stop or sys.maxint
     if stop > mylen:
       stop = mylen
-    step = index.step or mylen
+    step = index.step or 1
     assert step != 0, "step == 0"
 
     if step == 1:
