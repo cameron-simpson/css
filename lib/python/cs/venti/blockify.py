@@ -19,6 +19,36 @@ from cs.venti.block import Block, IndirectBlock
 
 MIN_BLOCKSIZE=80                                # less than this seems silly
 MAX_BLOCKSIZE=16383                             # fits in 2 octets BS-encoded
+
+class Blockifier(object):
+  ''' A Blockifier accepts data or Blocks and stores them sequentially.
+      Its .close() method returns the top Block representing the
+      stored sequence.
+  '''
+
+  def __init__(self):
+    self.S = defaults.S
+    self.Q = IterableQueue()
+    self.T = Thread(target=self._storeBlocks)
+    self.T.start()
+
+  def _storeBlocks(self):
+    with self.S:
+      self.topBlock = topIndirectBlock(self.Q)
+
+  def add(self, data):
+    self.Q.put(Block(data=data))
+    B = self.S.add(data)
+
+  def addBlock(self, B):
+    self.Q.put(B)
+  
+  def close(self):
+    self.Q.close()
+    self.T.join()
+    self.T = None
+    self.Q = None
+    return self.topBlock
  
 def topIndirectBlock(blockSource):
   ''' Return a top Block for a stream of Blocks.
@@ -35,7 +65,7 @@ def topIndirectBlock(blockSource):
   #    
   while True:
     try:
-      topblock=blockSource.next()
+      topblock = blockSource.next()
     except StopIteration:
       # no blocks - return the empty block - no data
       return Block(data="")
@@ -343,13 +373,26 @@ class TestAll(unittest.TestCase):
   def tearDown(self):
     self.fp.close()
 
-  def test00(self):
+  def test00blockifyAndRetrieve(self):
     data = self.fp.read()
     blocks = list(blocksOf([data]))
     data2 = "".join( b.data() for b in blocks )
     self.assertEqual(len(data), len(data2), "data mismatch: len(data)=%d, len(data2)=%d" % (len(data), len(data2)))
     self.assertEqual(data, data2, "data mismatch: data and data2 same length but contents differ")
     ##for b in blocks: print "[", b.data(), "]"
+
+  def test01blockifier(self):
+    from cs.venti.cache import MemCacheStore
+    with MemCacheStore():
+      BL = Blockifier()
+      alldata = []
+      for data in self.fp:
+        BL.add(data)
+        alldata.append(data)
+      top = BL.close()
+      alldata = ''.join(alldata)
+      stored = top[:]
+      self.assertEqual( ''.join(alldata), top[:] )
 
 if __name__ == '__main__':
   unittest.main()
