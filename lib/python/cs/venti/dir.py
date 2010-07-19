@@ -472,7 +472,7 @@ class Dir(Dirent):
         M=Meta()
         M.mtime = st.st_mtime
         if E:
-          matchBlocks = E.leaves()
+          matchBlocks = E.getBlock().leaves()
         else:
           matchBlocks = None
         with open(filepath) as ifp:
