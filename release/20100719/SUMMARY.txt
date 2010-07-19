@@ -1,0 +1,13 @@
+Many changes, bugfixes and some new stuff.
+TokyoCabinet backend for NodeDB. Move some more of the less general purpose
+stuff to the bin-cs directory and clean out a few dead scripts. Update
+the "set -- ..." incantations in a bunch of scripts. Start on NodeDB URLs.
+cs.threads.Channel.close() bugfix. Logging changes in a bunch of modules.
+cs.threads.TimerQueue: various improvements. Some venti support in NodeDB.
+New plaintext/hexcode transcription for venti. Many other updates to venti.
+log-hg-commit: log to dlog using category from .hg-cs-category file.
+Split perl, python and java code into separate lib subdirs.
+New cs.threads.IterablePriorityQueue. Apphelper view-unknown fix.
+with-opt-css wrapper script updates. sshto: -P option for tracing error
+source hosts. Start on cs.app.maildb somewhat. New AttributableList and
+MethodicalList in cs.mappings.

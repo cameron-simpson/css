@@ -1,0 +1,1142 @@
+changeset:   7667:9185eec23af7
+tag:         release-20100430
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Fri Apr 30 21:15:25 2010 +1000
+files:       release/20100430/CHANGES.txt release/20100430/SUMMARY.txt release/20100430/release-tag.txt
+description:
+Release information for release-20100430.
+Summary:
+cs.nodedb cleaned up, cdrip now defaults to mp3, clean up cs.logutils.Pfx, assorted other changes
+
+
+changeset:   7668:6f7e134b1330
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Fri Apr 30 21:15:25 2010 +1000
+files:       .hgtags
+description:
+Added tag release-20100430 for changeset 9185eec23af7
+
+
+changeset:   7669:d42d7c04c3cc
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sun May 02 20:55:00 2010 +1000
+files:       lib/cs/nodedb/tokcab.py
+description:
+cs.nodedb.tokcab: tokyocabinet backend
+
+
+changeset:   7670:3fec80aab512
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Mon May 03 11:48:53 2010 +1000
+files:       lib/cs/nodedb/tokcab.py
+description:
+cs.nodedb.tokcab: reorder tc keys to attr:type:name, supporting names containing colons
+
+
+changeset:   7671:3b04f6249349
+branch:      nodedb-typed-strings
+parent:      7453:43f63f08c863
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Mon May 03 11:58:28 2010 +1000
+description:
+nodedb-typed-strings: close dead end branch
+
+
+changeset:   7672:c4c55fe19975
+parent:      7670:3fec80aab512
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Mon May 03 12:20:54 2010 +1000
+files:       lib/cs/nodedb/tokcab.py
+description:
+cs.nodedb.tokcab: bugfix db import
+
+
+changeset:   7673:3f1e8d5a6432
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Mon May 03 14:36:16 2010 +1000
+files:       lib/cs/nodedb/tokcab.py
+description:
+cs.nodedb.tokcab: tests: database persistence across close/open
+
+
+changeset:   7674:3a118d219088
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Mon May 03 14:36:39 2010 +1000
+files:       lib/cs/nodedb/node.py
+description:
+cs.nodedb.node: NodeDB._makeNode(): fix assertion
+
+
+changeset:   7675:07796283f166
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Tue May 04 13:37:46 2010 +1000
+files:       bin-cs/pushcss bin-cs/putcss bin-cs/updcss bin/pushcss bin/putcss bin/updcss
+description:
+move updcss, putcss, pushcss into bin-cs
+
+
+changeset:   7676:661ad49d74ea
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Tue May 04 13:39:43 2010 +1000
+files:       bin-cs/mycvs bin-cs/mygcc bin-cs/myzipfat bin-cs/myzipfs bin/mycvs bin/mygcc bin/myzipfat bin/myzipfs
+description:
+move some my* scripts to bin-cs
+
+
+changeset:   7677:2bead04479c5
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Tue May 04 13:53:55 2010 +1000
+files:       bin/cs-release
+description:
+cs-release: add export mode, based on updcss export phase
+
+
+changeset:   7678:da88f9f182df
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Tue May 04 14:04:13 2010 +1000
+files:       bin/cs-release
+description:
+cs-release: support the initial release, with no preceeding one for reference
+
+
+changeset:   7679:8ebf6ce992b6
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Thu May 06 09:31:17 2010 +1000
+files:       bin/cs-release
+description:
+cs-release export: don't remove the export on clean exit
+
+
+changeset:   7680:7e95f812fc15
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Thu May 06 09:35:36 2010 +1000
+files:       bin/dir2html
+description:
+dir2html: toss incomplete and pointless script
+
+
+changeset:   7681:38ca377e4057
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Thu May 06 09:38:24 2010 +1000
+files:       bin/faxspool cisra/faxspool
+description:
+faxspool: obsolete site specific script
+
+
+changeset:   7682:883469a61f8a
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Thu May 06 09:44:08 2010 +1000
+files:       bin/nsdlfix
+description:
+nsdlfix: remove obsolete and incomplete script
+
+
+changeset:   7683:7aed9db1bf84
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Thu May 06 09:54:01 2010 +1000
+files:       bin/1970 bin/anonftp bin/bfilt bin/bglist bin/bsed bin/c2man bin/chkaliases bin/con bin/cs-x bin/ding bin/dumpuser bin/evndx bin/foreach bin/foreach2 bin/gif2jpg bin/grepall bin/grepwideimg bin/hotlist2pndx bin/html2txt bin/htnisauth bin/hzp bin/localldpath bin/lockedit bin/lockinfo bin/maildrop bin/manpp bin/mfiles bin/mkmydb bin/mkpatch bin/mkrd bin/mydb bin/noldpath bin/noteurl bin/pman bin/prat bin/ps2ascii bin/que bin/rfiles bin/rigfilemail bin/rigloadmeters bin/rigslideshowdir bin/rm-small.gif bin/rslaves bin/runoff bin/spu bin/stdenv bin/syncstuff bin/ttyexec bin/unhtml bin/urlshow bin/vmfw bin/vvnc bin/watchweblogsets bin/winsnap bin/xwdtops bin/ypm
+description:
+replace clunky old "set x ...; shift" incantation with shiny new "set -- ..." incantation
+
+
+changeset:   7684:c7bd0cdc54ab
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Thu May 06 14:01:05 2010 +1000
+files:       lib/cs/misc.py
+description:
+cs.misc.WithUC_Attrs: bugfix lexical test
+
+
+changeset:   7685:db548d9b8fdc
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Fri May 07 12:48:45 2010 +1000
+files:       lib/cs/nodedb/__init__.py
+description:
+cs.nodedb: add NodeDBFromURL factory method
+
+
+changeset:   7686:026358679344
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sat May 08 18:36:05 2010 +1000
+files:       lib/cs/nodedb/__init__.py lib/cs/nodedb/node.py
+description:
+cs.nodedb: add _:_ metadata reserved node, add seq() method, add external node references and the otherDB method, add NodeDBFromURL NodeDB factory
+
+
+changeset:   7687:b3445fdd7087
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sat May 08 19:32:34 2010 +1000
+files:       lib/cs/nodedb/node.py lib/cs/nodedb/sqla.py lib/cs/nodedb/tokcab.py
+description:
+cs.nodedb: add special purpose Backend set1Attr method for the common single-value attribute setting case
+
+
+changeset:   7688:43d4fb534040
+parent:      7684:c7bd0cdc54ab
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Thu May 13 16:14:23 2010 +1000
+files:       lib/cs/threads.py
+description:
+cs.threads: docstrings for FuncMultiQueue
+
+
+changeset:   7689:03e18815c65b
+parent:      7688:43d4fb534040
+parent:      7687:b3445fdd7087
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Thu May 13 16:16:34 2010 +1000
+description:
+merge with recent cs.nodedb changes
+
+
+changeset:   7690:be5969828502
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Fri May 14 15:50:18 2010 +1000
+files:       lib/cs/threads.py
+description:
+cs.threads: fix Channel.close(), revoke Channel.{call,call_s}(), FuncMultiQueue.close() - add cancel parameter, minor docstring changes and other tweaks
+
+
+changeset:   7691:cdfbe983bc22
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Fri May 14 17:56:13 2010 +1000
+files:       lib/cs/threads.py
+description:
+cs.threads.Channel: notice self.closed in iterator
+
+
+changeset:   7692:0070e9d1f213
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Fri May 14 17:56:42 2010 +1000
+files:       lib/cs/logutils.py
+description:
+cs.logutils.LogTime: add the word "ELAPSED" to log message to make it easier to see
+
+
+changeset:   7693:03ba7086f808
+parent:      7687:b3445fdd7087
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Mon May 10 15:02:08 2010 +1000
+files:       lib/cs/nodedb/node.py
+description:
+cs.nodedb: tweak external db URL lookup/use
+
+
+changeset:   7694:9c89f07814f1
+parent:      7689:03e18815c65b
+parent:      7693:03ba7086f808
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Fri May 14 09:21:43 2010 +1000
+description:
+Automated merge with ssh://j/hg/css
+
+
+changeset:   7695:4fc9b8a47cda
+branch:      nodedb-splitbackend
+parent:      7372:f9dcf1752abe
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sat May 15 15:29:48 2010 +1000
+description:
+nodedb-splitbackend: close dead end branch
+
+
+changeset:   7696:30dcc9ddbd4f
+parent:      7692:0070e9d1f213
+parent:      7694:9c89f07814f1
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sat May 15 15:31:54 2010 +1000
+description:
+Automated merge with ssh://j/hg/css
+
+
+changeset:   7697:83dbc066cef3
+parent:      7631:037fbfb7adcc
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sat Apr 10 12:49:47 2010 +1000
+files:       lib/cs/venti/blockify.py lib/cs/venti/dir.py lib/cs/venti/gdbmstore.py lib/cs/venti/store.py
+description:
+cs.venti.*: get debug etc from cs.logutils instead of logging
+
+
+changeset:   7698:c129389784d4
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sat Apr 10 12:55:37 2010 +1000
+files:       lib/cs/venti/store.py
+description:
+cs.venti.store: remove Loggable class, add a little doco
+
+
+changeset:   7699:003d5b7457a9
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sat Apr 10 14:50:33 2010 +1000
+files:       bin/vt lib/cs/venti/archive.py lib/cs/venti/dir.py lib/cs/venti/meta.py
+description:
+cs.venti: make Meta.mtime and Direct.mtime properties
+
+
+changeset:   7700:f8a85f648613
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sat Apr 10 14:51:56 2010 +1000
+files:       lib/cs/venti/meta.py
+description:
+cs.venti.meta: syntax fix
+
+
+changeset:   7701:e0068ee2f158
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sat May 15 15:55:21 2010 +1000
+files:       lib/cs/venti/cache.py
+description:
+cs.venti.cache: docstring tweak
+
+
+changeset:   7702:b2a3ba644407
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sat May 15 15:56:18 2010 +1000
+files:       bin/vt
+description:
+bin/vt: import fix
+
+
+changeset:   7703:1d9281bbc018
+parent:      7696:30dcc9ddbd4f
+parent:      7702:b2a3ba644407
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sat May 15 15:56:32 2010 +1000
+description:
+Automated merge with file:///app1tb/home/cameron/hg/css
+
+
+changeset:   7704:c69a0242d424
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Tue May 18 13:27:56 2010 +1000
+files:       lib/cs/threads.py
+description:
+cs.threads.TimerQueue: add start() method, remove "until empty" main loop behaviour
+
+
+changeset:   7705:9f731217ac9a
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Tue May 18 13:33:27 2010 +1000
+files:       lib/cs/threads.py
+description:
+cs.threads.TimerQueue: add .join() method, matching .start(); TODO: does not wait for the pending Timer job
+
+
+changeset:   7706:de3571be5488
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Tue May 18 13:35:43 2010 +1000
+files:       lib/cs/tktest.pl
+description:
+Toss junk tktest.pl file.
+
+
+changeset:   7707:9cce1a745ffa
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Tue May 18 13:37:20 2010 +1000
+files:       lib/cs/Tk.pm lib/cs/Tk/Clock.pm lib/cs/Tk/FetchURL.pm lib/cs/Tk/JobQueue.pm lib/cs/Tk/WebPage.pm
+description:
+toss obsolete never used incomplete personal perl Tk stuff
+
+
+changeset:   7708:cce13b5f0bd9
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Tue May 18 14:51:47 2010 +1000
+files:       lib/cs/cherryhttpsrv.py
+description:
+cs.cherryhttpsrv: rework login check - no semantic changes
+
+
+changeset:   7709:c077fba56b5b
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Tue May 18 14:53:03 2010 +1000
+files:       hacks/cs::Layout::FixedText-test.pl lib/cs/test.pl
+description:
+move test hack sideways
+
+
+changeset:   7710:12516cafa925
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Tue May 18 14:55:02 2010 +1000
+files:       defunct/acc.pl lib/cs/acc.pl
+description:
+move defunctness
+
+
+changeset:   7711:2f03d6adfb0b
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Tue May 18 20:15:26 2010 +1000
+files:       lib/cs/nodedb/node.py lib/cs/venti/block.py
+description:
+cs.nodedb: basic support for storing cs.venti Blocks
+
+
+changeset:   7712:e5480006dcd8
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Fri May 21 14:53:30 2010 +1000
+files:       lib/cs/nodedb/node.py
+description:
+cs.nodedb: move serialise methods into NodeDB, leave hooks in Backend classes
+
+
+changeset:   7713:ca2e3b09c4b4
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Thu May 27 17:13:07 2010 +1000
+files:       lib/cs/nodedb/node.py
+description:
+cs.nodedb/node: better name for other db sequence number
+
+
+changeset:   7714:62ca400815b2
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Fri May 28 14:46:45 2010 +1000
+files:       lib/cs/nodedb/node.py
+description:
+cs.nodedb.node.Node: add type registry for serialisation hooks
+
+
+changeset:   7715:f0a946df8d46
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Fri May 28 14:49:35 2010 +1000
+files:       bin/vt lib/cs/venti/dir.py lib/cs/venti/nodedb.py
+description:
+cs.venti: add cs.venti.nodedb to support registry with a cs.nodedb
+
+
+changeset:   7716:4f04eddb6ef4
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sat May 29 14:23:22 2010 +1000
+files:       lib/cs/venti/__init__.py
+description:
+cs.venti: discard unused functions
+
+
+changeset:   7717:68899f73c34f
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Mon May 31 15:11:46 2010 +1000
+files:       lib/cs/lex.py
+description:
+cs.lex: add texthexify, my hybrid hex/plaintext transcription
+
+
+changeset:   7718:c93f3ba0890a
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Mon May 31 15:12:53 2010 +1000
+files:       lib/cs/lex.py
+description:
+cs.lex.texthexify: pull unimplemented modein parameter
+
+
+changeset:   7719:ff9f7a750af3
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Mon May 31 15:33:26 2010 +1000
+files:       lib/cs/lex.py
+description:
+cs.lex: pull fromhex from cs.venti, add untexthexify() which reverses texthexify(), allow plain regexp string for whitelist_re in texthexify()
+
+
+changeset:   7720:640de1a1179e
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Mon May 31 15:44:48 2010 +1000
+files:       lib/cs/nodedb/node.py
+description:
+cs.nodedb.node: extend type registration to have text and binary modes
+
+
+changeset:   7721:e208babbacb4
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Mon May 31 15:54:46 2010 +1000
+files:       lib/cs/lex.py
+description:
+cs.lex: fromhex -> hexify to match unhexify
+
+
+changeset:   7722:a1d759af19ec
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Mon May 31 15:55:07 2010 +1000
+files:       bin/vt lib/cs/venti/__init__.py lib/cs/venti/archive.py lib/cs/venti/block.py lib/cs/venti/cache.py lib/cs/venti/debug.py lib/cs/venti/dir.py lib/cs/venti/file.py lib/cs/venti/gdbmstore.py lib/cs/venti/hash.py lib/cs/venti/nodedb.py lib/cs/venti/store.py lib/cs/venti/stream.py
+description:
+cs.venti: move to totext/fromtext and hexify from tohex/fromhex
+
+
+changeset:   7723:f70381f9ccca
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Mon May 31 20:39:32 2010 +1000
+files:       lib/cs/venti/block.py lib/cs/venti/dir.py
+description:
+cs.venti: textEncode for Blocks and Dirents
+
+
+changeset:   7724:c81a9402dd48
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Mon May 31 22:18:56 2010 +1000
+files:       lib/cs/venti/cache.py lib/cs/venti/store.py
+description:
+cs.venti: fix shutdown order in cache, adjust to new calling protocol in FuncMultiQueue
+
+
+changeset:   7725:655e99d0da5a
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Mon May 31 22:51:31 2010 +1000
+files:       bin/vt lib/cs/venti/__init__.py lib/cs/venti/block.py lib/cs/venti/cache.py lib/cs/venti/dir.py
+description:
+cs.venti: cache.add() bugfix, other minor fixes
+
+
+changeset:   7726:bf3ee6bfa55d
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Tue Jun 01 11:54:38 2010 +1000
+files:       lib/cs/logutils.py
+description:
+cs.logutils: add D(), debug-to-stderr debugging aid.
+
+
+changeset:   7727:401d9254a2f9
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Tue Jun 01 12:32:13 2010 +1000
+files:       lib/cs/venti/archive.py lib/cs/venti/block.py lib/cs/venti/blockify.py lib/cs/venti/vtfuse.py
+description:
+cs.venti: move sys.stderr prints to cs.logutils.D
+
+
+changeset:   7728:dc152cbe76e6
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Wed Jun 02 21:17:44 2010 +1000
+files:       lib/cs/venti/gdbmstore.py
+description:
+cs.venti.gdbmstore: remove redundant import
+
+
+changeset:   7729:1e47622e7064
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Wed Jun 02 21:18:48 2010 +1000
+files:       lib/cs/venti/datafile.py
+description:
+cs.venti.datafile: roll everything into a DataFile class with on-demand open()
+
+
+changeset:   7730:5fdd0a6b7689
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Wed Jun 02 21:19:44 2010 +1000
+files:       lib/cs/venti/store.py
+description:
+cs.venti.store: IndexedFileStore: move data storage I/O into cs.venti.datafile
+
+
+changeset:   7731:20b3266870f1
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Wed Jun 02 21:29:55 2010 +1000
+files:       lib/cs/venti/cache.py lib/cs/venti/datafile.py lib/cs/venti/store.py
+description:
+cs.venti: bugfix recent changes
+
+
+changeset:   7732:607bdce5ecfb
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Thu Jun 03 11:11:39 2010 +1000
+files:       lib/cs/venti/datafile.py
+description:
+cs.venti.datafile: just use one file handle for both read and write
+
+
+changeset:   7733:fccdea79ec98
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Thu Jun 03 11:40:43 2010 +1000
+files:       lib/cs/venti/datafile.py
+description:
+cs.venti.datafile: unit tests
+
+
+changeset:   7734:1a8c98a0cf48
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Thu Jun 03 11:42:27 2010 +1000
+files:       lib/cs/venti/datafile.py
+description:
+cs.venti.datafile: unit test docstrings, add close() to test02randomblocks
+
+
+changeset:   7735:dae0e40edf7e
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Thu Jun 03 21:07:37 2010 +1000
+files:       lib/cs/venti/store.py
+description:
+cs.venti: trite debugging tweak
+
+
+changeset:   7736:da2db2a7a924
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Fri Jun 04 15:14:38 2010 +1000
+files:       bin/vt
+description:
+bin/vt: use the "env python" #! trick
+
+
+changeset:   7737:3f189867ce27
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Fri Jun 04 15:24:19 2010 +1000
+files:       lib/cs/venti/gdbmstore.py
+description:
+cs.venti.gdbmstore: rename some class internal variables
+
+
+changeset:   7738:b8525f4063c1
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sat Jun 05 16:40:27 2010 +1000
+files:       .hg-cs-category
+description:
+add tracking category
+
+
+changeset:   7739:7c70aeb78d3c
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sat Jun 05 16:43:01 2010 +1000
+files:       bin/dlog
+description:
+dlog: use dlog-quick consistently
+
+
+changeset:   7740:ba4360017175
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sat Jun 05 16:43:31 2010 +1000
+files:       bin/log-hg-commit
+description:
+log-hg-commit: log commit headline via dlog is .hg-cs-category file present
+
+
+changeset:   7741:b050ab9d3148
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sat Jun 05 17:25:58 2010 +1000
+files:       bin/log-hg-commit
+description:
+log-hg-commit: use --template to simplify things
+
+
+changeset:   7742:b231d6bee290
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sat Jun 05 17:32:12 2010 +1000
+files:       bin/dlog
+description:
+dlog: close stdin if input is a tty
+
+
+changeset:   7743:5f3450d87aba
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sun Jun 06 11:32:41 2010 +1000
+files:       INSTALL bin-cs/updcss env.sh
+description:
+prep for splitting perl, python and java code into separate libs
+
+
+changeset:   7744:5fbff018d7a1
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sun Jun 06 12:39:32 2010 +1000
+files:       defunct/cs/dbi/__init__.py defunct/cs/dbi/mysql.py lib/cs/AB2HTML.pm lib/cs/ALL.pm lib/cs/BaseClass.pm lib/cs/Browse.pm lib/cs/Browse/History.pm lib/cs/Browse/MBox.pm lib/cs/Browse/URL.pm lib/cs/BudTool.pm lib/cs/BudTool/Client.pm lib/cs/BudTool/Dump.pm lib/cs/BudTool/Tape.pm lib/cs/Buffer.pm lib/cs/ByteRangeSource.pm lib/cs/CBrowse.pm lib/cs/CDDB.pm lib/cs/CGI.pm lib/cs/CGI/ImageMap.pm lib/cs/CGI/OTP.pm lib/cs/CSV.pm lib/cs/CSW/Cache.pm lib/cs/CSW/History.pm lib/cs/CSW/Page.pm lib/cs/CSW/PageView.pm lib/cs/CSW/Url.pm lib/cs/CacheHash.pm lib/cs/CacheSource.pm lib/cs/CachedFile.pm lib/cs/Cisco.pm lib/cs/Complete.pm lib/cs/DB.pm lib/cs/DB/Meta.pm lib/cs/DB/Wiring.pm lib/cs/DBI.pm lib/cs/DBI/DatedTable.pm lib/cs/DBI/Table/Array.pm lib/cs/DBI/Table/Hash.pm lib/cs/DBI/Table/Row.pm lib/cs/DBI/Table/RowObject.pm lib/cs/DEBUG.pm lib/cs/DMY.pm lib/cs/DPP.pm lib/cs/DataDictionary.pm lib/cs/Date.pm lib/cs/Day.pm lib/cs/Decode.pm lib/cs/DeepIndex.pm lib/cs/DirBrowse.pm lib/cs/EPS.pm lib/cs/Encode.pm lib/cs/Env.pm lib/cs/Extractor.pm lib/cs/FS.pm lib/cs/FVWM.pm lib/cs/FileDB.pm lib/cs/FileIndex.pm lib/cs/FlaggedObject.pm lib/cs/Flags.pm lib/cs/FlatHash.pm lib/cs/GIF.pm lib/cs/GNUInfo.pm lib/cs/GNUInfo/Node.pm lib/cs/Geog.pm lib/cs/Geometry.pm lib/cs/Geometry/Point.pm lib/cs/Geometry/Rectangle.pm lib/cs/Glob.pm lib/cs/GreppedHash.pm lib/cs/HASH.pm lib/cs/HTML.pm lib/cs/HTML/Doc.pm lib/cs/HTML/Form.pm lib/cs/HTTP.pm lib/cs/HTTP/Auth.pm lib/cs/HTTP/Cookies.pm lib/cs/HTTPD.pm lib/cs/HTTPD/Proxy.pm lib/cs/HTTPS.pm lib/cs/Hier.pm lib/cs/IFMSink.pm lib/cs/IM2HTML.pm lib/cs/IO.pm lib/cs/Image.pm lib/cs/Image/DB.pm lib/cs/Image/Mapped.pm lib/cs/ImageMap.pm lib/cs/Index.pm lib/cs/JavaScript.pm lib/cs/LDAP.pm lib/cs/LDAP/Zone.pm lib/cs/LDIF.pm lib/cs/Layout.pm lib/cs/Layout/FixedText.pm lib/cs/Layout/Font.pm lib/cs/Layout/ProportionalText.pm lib/cs/Legato/Networker.pm lib/cs/Legato/Networker/Client.pm lib/cs/Legato/Networker/Dump.pm lib/cs/Legato/Networker/Resource.pm lib/cs/Legato/Networker/Tape.pm lib/cs/LinedSource.pm lib/cs/List.pm lib/cs/Lock.pm lib/cs/Log.pm lib/cs/LogMap.pm lib/cs/MD5.pm lib/cs/MD5Index.pm lib/cs/MIME.pm lib/cs/MIME/Base64.pm lib/cs/MIME/Decode.pm lib/cs/MIME/File.pm lib/cs/MIME/Partial.pm lib/cs/MIME/QuotedPrintable.pm lib/cs/MIME/Source.pm lib/cs/Mail/Aliases.pm lib/cs/Mail/CP_MLRU.pm lib/cs/Mail/Categories.pm lib/cs/Mail/DB.pm lib/cs/Mail/Folder.pm lib/cs/Mail/Misc.pm lib/cs/Mail/Profile.pm lib/cs/Mail/Rc.pm lib/cs/Math.pm lib/cs/Misc.pm lib/cs/Monitor.pm lib/cs/MsgidIndex.pm lib/cs/Multio.pm lib/cs/MyDB.pm lib/cs/MyDB/File.pm lib/cs/Myke.pm lib/cs/Myke/Action.pm lib/cs/Myke/Context.pm lib/cs/Myke/Expr.pm lib/cs/Myke/File.pm lib/cs/Myke/Macro.pm lib/cs/Myke/Process.pm lib/cs/Myke/Target.pm lib/cs/NFlatHash.pm lib/cs/NNTP.pm lib/cs/Net.pm lib/cs/Net/TCP.pm lib/cs/Net/UDP.pm lib/cs/Netscape.pm lib/cs/News.pm lib/cs/News/NNTP.pm lib/cs/Newsrc.pm lib/cs/OTP.pm lib/cs/OTP/CGI.pm lib/cs/Object.pm lib/cs/PGP.pm lib/cs/Packages.pm lib/cs/Packet.pm lib/cs/Page.pm lib/cs/Palm.pm lib/cs/Palm/App/Address.pm lib/cs/Palm/App/PalmPix.pm lib/cs/Palm/PDB.pm lib/cs/Palm/PDB/Record.pm lib/cs/Pathname.pm lib/cs/Persist.pm lib/cs/Persist/Dir.pm lib/cs/Persist/File.pm lib/cs/PfxIndex.pm lib/cs/PhoneDB.pm lib/cs/PipeDecode.pm lib/cs/PodWiki.pm lib/cs/Port.pm lib/cs/Proc.pm lib/cs/Progress.pm lib/cs/RFC822.pm lib/cs/RStat.pm lib/cs/RTF.pm lib/cs/Range.pm lib/cs/RemappedHash.pm lib/cs/SGML.pm lib/cs/SOCKS.pm lib/cs/Secret.pm lib/cs/Shell.pm lib/cs/Sink.pm lib/cs/Source.pm lib/cs/Stat.pm lib/cs/StatWindow.pm lib/cs/Stats.pm lib/cs/Stats/Slots.pm lib/cs/SubSource.pm lib/cs/SubVDis.pm lib/cs/SystemPort.pm lib/cs/TM.pm lib/cs/TSF.pm lib/cs/TextView.pm lib/cs/Tokenise.pm lib/cs/UNIX/DumpDates.pm lib/cs/UNIX/Group.pm lib/cs/UNIX/Tar.pm lib/cs/URL.pm lib/cs/Units.pm lib/cs/Upd.pm lib/cs/User.pm lib/cs/VDis.pm lib/cs/VRML.pm lib/cs/WWW.pm lib/cs/WWW/Log.pm lib/cs/Web/Bookmarks.pm lib/cs/Web/Browse.pm lib/cs/Web/Scour.pm lib/cs/Who.pm lib/cs/Win.pm lib/cs/WordIndex.pm lib/cs/XRef.pm lib/cs/XYTable.pm lib/cs/YP.pm lib/cs/__init__.py lib/cs/app/__init__.py lib/cs/app/analog.py lib/cs/app/maildb.py lib/cs/app/mysql.py lib/cs/app/webalizer.py lib/cs/attrdbm.pl lib/cs/cache.py lib/cs/cherryhttpsrv.py lib/cs/chunkyString.py lib/cs/comsat.pl lib/cs/configutils.py lib/cs/cpp.pl lib/cs/creditcard.pl lib/cs/cs_json.py lib/cs/csbug.py lib/cs/date.pl lib/cs/db.py lib/cs/dbdigraph.py lib/cs/dbi-DEFUNCT/__init__.py lib/cs/dbi-DEFUNCT/mysql.py lib/cs/dir.pl lib/cs/dpp.pl lib/cs/env.py lib/cs/excutils.py lib/cs/filemail.pl lib/cs/flickr.py lib/cs/fs.pl lib/cs/fsp.pl lib/cs/getopt.pl lib/cs/glob.pl lib/cs/gopher.pl lib/cs/gzindex.py lib/cs/hier.py lib/cs/html.pl lib/cs/html.py lib/cs/http.pl lib/cs/httpd.pl lib/cs/httpsrv.py lib/cs/idset.py lib/cs/index.pl lib/cs/io.pl lib/cs/io.py lib/cs/less.pl lib/cs/lex.py lib/cs/lib.js lib/cs/logmap.pl lib/cs/logutils.py lib/cs/macosx.py lib/cs/mail.py lib/cs/mailAddresses.py lib/cs/mappings.py lib/cs/metaNNTP.pm lib/cs/misc.py lib/cs/msgid.pl lib/cs/myke.pl lib/cs/net.pl lib/cs/net.py lib/cs/nio.pl lib/cs/nntp.pl lib/cs/nodedb/__init__.py lib/cs/nodedb/node.py lib/cs/nodedb/sqla.py lib/cs/nodedb/text.py lib/cs/nodedb/tokcab.py lib/cs/open.pl lib/cs/pa.pl lib/cs/package.pl lib/cs/pathname.pl lib/cs/perlproc.pl lib/cs/ptx.pl lib/cs/random.pl lib/cs/secret.py lib/cs/seq.py lib/cs/serialise.py lib/cs/sh.py lib/cs/sitehack.py lib/cs/sparse.py lib/cs/stty.pl lib/cs/tail.py lib/cs/tcl.pl lib/cs/tcp.pl lib/cs/testform.pl lib/cs/testmd5.pl lib/cs/testmeta.pl lib/cs/testxr.pl lib/cs/threads.py lib/cs/tieFS.pm lib/cs/timeutils.py lib/cs/tm.pl lib/cs/tty.pl lib/cs/udbadmin.pl lib/cs/udp.pl lib/cs/upd.py lib/cs/varlist.pl lib/cs/vdis.pl lib/cs/venti/__init__.py lib/cs/venti/archive.py lib/cs/venti/block.py lib/cs/venti/blockify.py lib/cs/venti/blocks.py-OBSOLETE lib/cs/venti/cache.py lib/cs/venti/datafile.py lib/cs/venti/debug.py lib/cs/venti/dir.py lib/cs/venti/edgeDetect.c lib/cs/venti/file.py lib/cs/venti/gdbmstore.py lib/cs/venti/hash.py lib/cs/venti/meta.py lib/cs/venti/metadata.py.SIDEWAYS lib/cs/venti/nodedb.py lib/cs/venti/store.py lib/cs/venti/stream.py lib/cs/venti/tcp.py lib/cs/venti/vtfuse.py lib/cs/webservice.py lib/cs/wini.py lib/cs/www.py lib/cs/x11.py lib/js/cs/lib.js lib/perl/cs/AB2HTML.pm lib/perl/cs/ALL.pm lib/perl/cs/BaseClass.pm lib/perl/cs/Browse.pm lib/perl/cs/Browse/History.pm lib/perl/cs/Browse/MBox.pm lib/perl/cs/Browse/URL.pm lib/perl/cs/BudTool.pm lib/perl/cs/BudTool/Client.pm lib/perl/cs/BudTool/Dump.pm lib/perl/cs/BudTool/Tape.pm lib/perl/cs/Buffer.pm lib/perl/cs/ByteRangeSource.pm lib/perl/cs/CBrowse.pm lib/perl/cs/CDDB.pm lib/perl/cs/CGI.pm lib/perl/cs/CGI/ImageMap.pm lib/perl/cs/CGI/OTP.pm lib/perl/cs/CSV.pm lib/perl/cs/CSW/Cache.pm lib/perl/cs/CSW/History.pm lib/perl/cs/CSW/Page.pm lib/perl/cs/CSW/PageView.pm lib/perl/cs/CSW/Url.pm lib/perl/cs/CacheHash.pm lib/perl/cs/CacheSource.pm lib/perl/cs/CachedFile.pm lib/perl/cs/Cisco.pm lib/perl/cs/Complete.pm lib/perl/cs/DB.pm lib/perl/cs/DB/Meta.pm lib/perl/cs/DB/Wiring.pm lib/perl/cs/DBI.pm lib/perl/cs/DBI/DatedTable.pm lib/perl/cs/DBI/Table/Array.pm lib/perl/cs/DBI/Table/Hash.pm lib/perl/cs/DBI/Table/Row.pm lib/perl/cs/DBI/Table/RowObject.pm lib/perl/cs/DEBUG.pm lib/perl/cs/DMY.pm lib/perl/cs/DPP.pm lib/perl/cs/DataDictionary.pm lib/perl/cs/Date.pm lib/perl/cs/Day.pm lib/perl/cs/Decode.pm lib/perl/cs/DeepIndex.pm lib/perl/cs/DirBrowse.pm lib/perl/cs/EPS.pm lib/perl/cs/Encode.pm lib/perl/cs/Env.pm lib/perl/cs/Extractor.pm lib/perl/cs/FS.pm lib/perl/cs/FVWM.pm lib/perl/cs/FileDB.pm lib/perl/cs/FileIndex.pm lib/perl/cs/FlaggedObject.pm lib/perl/cs/Flags.pm lib/perl/cs/FlatHash.pm lib/perl/cs/GIF.pm lib/perl/cs/GNUInfo.pm lib/perl/cs/GNUInfo/Node.pm lib/perl/cs/Geog.pm lib/perl/cs/Geometry.pm lib/perl/cs/Geometry/Point.pm lib/perl/cs/Geometry/Rectangle.pm lib/perl/cs/Glob.pm lib/perl/cs/GreppedHash.pm lib/perl/cs/HASH.pm lib/perl/cs/HTML.pm lib/perl/cs/HTML/Doc.pm lib/perl/cs/HTML/Form.pm lib/perl/cs/HTTP.pm lib/perl/cs/HTTP/Auth.pm lib/perl/cs/HTTP/Cookies.pm lib/perl/cs/HTTPD.pm lib/perl/cs/HTTPD/Proxy.pm lib/perl/cs/HTTPS.pm lib/perl/cs/Hier.pm lib/perl/cs/IFMSink.pm lib/perl/cs/IM2HTML.pm lib/perl/cs/IO.pm lib/perl/cs/Image.pm lib/perl/cs/Image/DB.pm lib/perl/cs/Image/Mapped.pm lib/perl/cs/ImageMap.pm lib/perl/cs/Index.pm lib/perl/cs/JavaScript.pm lib/perl/cs/LDAP.pm lib/perl/cs/LDAP/Zone.pm lib/perl/cs/LDIF.pm lib/perl/cs/Layout.pm lib/perl/cs/Layout/FixedText.pm lib/perl/cs/Layout/Font.pm lib/perl/cs/Layout/ProportionalText.pm lib/perl/cs/Legato/Networker.pm lib/perl/cs/Legato/Networker/Client.pm lib/perl/cs/Legato/Networker/Dump.pm lib/perl/cs/Legato/Networker/Resource.pm lib/perl/cs/Legato/Networker/Tape.pm lib/perl/cs/LinedSource.pm lib/perl/cs/List.pm lib/perl/cs/Lock.pm lib/perl/cs/Log.pm lib/perl/cs/LogMap.pm lib/perl/cs/MD5.pm lib/perl/cs/MD5Index.pm lib/perl/cs/MIME.pm lib/perl/cs/MIME/Base64.pm lib/perl/cs/MIME/Decode.pm lib/perl/cs/MIME/File.pm lib/perl/cs/MIME/Partial.pm lib/perl/cs/MIME/QuotedPrintable.pm lib/perl/cs/MIME/Source.pm lib/perl/cs/Mail/Aliases.pm lib/perl/cs/Mail/CP_MLRU.pm lib/perl/cs/Mail/Categories.pm lib/perl/cs/Mail/DB.pm lib/perl/cs/Mail/Folder.pm lib/perl/cs/Mail/Misc.pm lib/perl/cs/Mail/Profile.pm lib/perl/cs/Mail/Rc.pm lib/perl/cs/Math.pm lib/perl/cs/Misc.pm lib/perl/cs/Monitor.pm lib/perl/cs/MsgidIndex.pm lib/perl/cs/Multio.pm lib/perl/cs/MyDB.pm lib/perl/cs/MyDB/File.pm lib/perl/cs/Myke.pm lib/perl/cs/Myke/Action.pm lib/perl/cs/Myke/Context.pm lib/perl/cs/Myke/Expr.pm lib/perl/cs/Myke/File.pm lib/perl/cs/Myke/Macro.pm lib/perl/cs/Myke/Process.pm lib/perl/cs/Myke/Target.pm lib/perl/cs/NFlatHash.pm lib/perl/cs/NNTP.pm lib/perl/cs/Net.pm lib/perl/cs/Net/TCP.pm lib/perl/cs/Net/UDP.pm lib/perl/cs/Netscape.pm lib/perl/cs/News.pm lib/perl/cs/News/NNTP.pm lib/perl/cs/Newsrc.pm lib/perl/cs/OTP.pm lib/perl/cs/OTP/CGI.pm lib/perl/cs/Object.pm lib/perl/cs/PGP.pm lib/perl/cs/Packages.pm lib/perl/cs/Packet.pm lib/perl/cs/Page.pm lib/perl/cs/Palm.pm lib/perl/cs/Palm/App/Address.pm lib/perl/cs/Palm/App/PalmPix.pm lib/perl/cs/Palm/PDB.pm lib/perl/cs/Palm/PDB/Record.pm lib/perl/cs/Pathname.pm lib/perl/cs/Persist.pm lib/perl/cs/Persist/Dir.pm lib/perl/cs/Persist/File.pm lib/perl/cs/PfxIndex.pm lib/perl/cs/PhoneDB.pm lib/perl/cs/PipeDecode.pm lib/perl/cs/PodWiki.pm lib/perl/cs/Port.pm lib/perl/cs/Proc.pm lib/perl/cs/Progress.pm lib/perl/cs/RFC822.pm lib/perl/cs/RStat.pm lib/perl/cs/RTF.pm lib/perl/cs/Range.pm lib/perl/cs/RemappedHash.pm lib/perl/cs/SGML.pm lib/perl/cs/SOCKS.pm lib/perl/cs/Secret.pm lib/perl/cs/Shell.pm lib/perl/cs/Sink.pm lib/perl/cs/Source.pm lib/perl/cs/Stat.pm lib/perl/cs/StatWindow.pm lib/perl/cs/Stats.pm lib/perl/cs/Stats/Slots.pm lib/perl/cs/SubSource.pm lib/perl/cs/SubVDis.pm lib/perl/cs/SystemPort.pm lib/perl/cs/TM.pm lib/perl/cs/TSF.pm lib/perl/cs/TextView.pm lib/perl/cs/Tokenise.pm lib/perl/cs/UNIX/DumpDates.pm lib/perl/cs/UNIX/Group.pm lib/perl/cs/UNIX/Tar.pm lib/perl/cs/URL.pm lib/perl/cs/Units.pm lib/perl/cs/Upd.pm lib/perl/cs/User.pm lib/perl/cs/VDis.pm lib/perl/cs/VRML.pm lib/perl/cs/WWW.pm lib/perl/cs/WWW/Log.pm lib/perl/cs/Web/Bookmarks.pm lib/perl/cs/Web/Browse.pm lib/perl/cs/Web/Scour.pm lib/perl/cs/Who.pm lib/perl/cs/Win.pm lib/perl/cs/WordIndex.pm lib/perl/cs/XRef.pm lib/perl/cs/XYTable.pm lib/perl/cs/YP.pm lib/perl/cs/attrdbm.pl lib/perl/cs/comsat.pl lib/perl/cs/cpp.pl lib/perl/cs/creditcard.pl lib/perl/cs/date.pl lib/perl/cs/dir.pl lib/perl/cs/dpp.pl lib/perl/cs/filemail.pl lib/perl/cs/fs.pl lib/perl/cs/fsp.pl lib/perl/cs/getopt.pl lib/perl/cs/glob.pl lib/perl/cs/gopher.pl lib/perl/cs/html.pl lib/perl/cs/http.pl lib/perl/cs/httpd.pl lib/perl/cs/index.pl lib/perl/cs/io.pl lib/perl/cs/less.pl lib/perl/cs/logmap.pl lib/perl/cs/metaNNTP.pm lib/perl/cs/msgid.pl lib/perl/cs/myke.pl lib/perl/cs/net.pl lib/perl/cs/nio.pl lib/perl/cs/nntp.pl lib/perl/cs/open.pl lib/perl/cs/pa.pl lib/perl/cs/package.pl lib/perl/cs/pathname.pl lib/perl/cs/perlproc.pl lib/perl/cs/ptx.pl lib/perl/cs/random.pl lib/perl/cs/stty.pl lib/perl/cs/tcl.pl lib/perl/cs/tcp.pl lib/perl/cs/testform.pl lib/perl/cs/testmd5.pl lib/perl/cs/testmeta.pl lib/perl/cs/testxr.pl lib/perl/cs/tieFS.pm lib/perl/cs/tm.pl lib/perl/cs/tty.pl lib/perl/cs/udbadmin.pl lib/perl/cs/udp.pl lib/perl/cs/varlist.pl lib/perl/cs/vdis.pl lib/python/cs/__init__.py lib/python/cs/app/__init__.py lib/python/cs/app/analog.py lib/python/cs/app/maildb.py lib/python/cs/app/mysql.py lib/python/cs/app/webalizer.py lib/python/cs/cache.py lib/python/cs/cherryhttpsrv.py lib/python/cs/chunkyString.py lib/python/cs/configutils.py lib/python/cs/cs_json.py lib/python/cs/csbug.py lib/python/cs/db.py lib/python/cs/dbdigraph.py lib/python/cs/env.py lib/python/cs/excutils.py lib/python/cs/flickr.py lib/python/cs/gzindex.py lib/python/cs/hier.py lib/python/cs/html.py lib/python/cs/httpsrv.py lib/python/cs/idset.py lib/python/cs/io.py lib/python/cs/lex.py lib/python/cs/logutils.py lib/python/cs/macosx.py lib/python/cs/mail.py lib/python/cs/mailAddresses.py lib/python/cs/mappings.py lib/python/cs/misc.py lib/python/cs/net.py lib/python/cs/nodedb/__init__.py lib/python/cs/nodedb/node.py lib/python/cs/nodedb/sqla.py lib/python/cs/nodedb/text.py lib/python/cs/nodedb/tokcab.py lib/python/cs/secret.py lib/python/cs/seq.py lib/python/cs/serialise.py lib/python/cs/sh.py lib/python/cs/sitehack.py lib/python/cs/sparse.py lib/python/cs/tail.py lib/python/cs/threads.py lib/python/cs/timeutils.py lib/python/cs/upd.py lib/python/cs/venti/__init__.py lib/python/cs/venti/archive.py lib/python/cs/venti/block.py lib/python/cs/venti/blockify.py lib/python/cs/venti/blocks.py-OBSOLETE lib/python/cs/venti/cache.py lib/python/cs/venti/datafile.py lib/python/cs/venti/debug.py lib/python/cs/venti/dir.py lib/python/cs/venti/edgeDetect.c lib/python/cs/venti/file.py lib/python/cs/venti/gdbmstore.py lib/python/cs/venti/hash.py lib/python/cs/venti/meta.py lib/python/cs/venti/metadata.py.SIDEWAYS lib/python/cs/venti/nodedb.py lib/python/cs/venti/store.py lib/python/cs/venti/stream.py lib/python/cs/venti/tcp.py lib/python/cs/venti/vtfuse.py lib/python/cs/webservice.py lib/python/cs/wini.py lib/python/cs/www.py lib/python/cs/x11.py
+description:
+split lib/cs into distinct perl, python and js parts
+
+
+changeset:   7745:d386342fcd79
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sun Jun 06 12:46:32 2010 +1000
+files:       bin/vt
+description:
+bin/vt: more conservation env #! incanation
+
+
+changeset:   7746:3eb9ba468847
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sun Jun 06 12:47:09 2010 +1000
+files:       Mykefile
+description:
+Mykefile: _home tweak for new lib layout
+
+
+changeset:   7747:75b122fca3ae
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Mon Jun 07 14:30:00 2010 +1000
+files:       lib/cs
+description:
+add lib/cs -> lib/python/cs conevnience link to ease transition for /opt/css
+
+
+changeset:   7748:808149929359
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Tue Jun 08 17:33:35 2010 +1000
+files:       release/20090410/SUMMARY.txt release/20090410/release-tag.txt
+description:
+add a couple of old release files
+
+
+changeset:   7749:71d62cd446c6
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Tue Jun 08 17:33:48 2010 +1000
+files:       cs
+description:
+cs: point convenience symlink at python libs
+
+
+changeset:   7750:6c14140bdfb9
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Thu Jun 10 13:15:44 2010 +1000
+files:       lib/python/cs/threads.py
+description:
+cs.threads: add IterablePriorityQueue; TODO: write generic QueueIterator wrapper
+
+
+changeset:   7751:cf46683050fd
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Fri Jun 11 12:48:30 2010 +1000
+files:       lib/python/cs/threads.py
+description:
+cs.threads.MultiFuncQueue: add priority queue mode
+
+
+changeset:   7752:0f1710628595
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Fri Jun 11 13:09:06 2010 +1000
+files:       lib/python/cs/threads.py
+description:
+cs.threads.FuncMultiQueue: add priority mode to call methods
+
+
+changeset:   7753:4503d977f87b
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Fri Jun 11 13:47:48 2010 +1000
+files:       lib/python/cs/threads.py
+description:
+cs.threads: FuncMultiQueue: bugfix priority queue item assembly in qbgcall()
+
+
+changeset:   7754:0bbfb06d65b6
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sun Jun 13 21:41:09 2010 +1000
+files:       bin/apphelper bin/cs-v
+description:
+apphelper: use view-unknown (I normally alias v=view-unknown)
+
+
+changeset:   7755:0a22ea7a324f
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Mon Jun 14 22:23:23 2010 +1000
+files:       lib/python/cs/venti/block.py
+description:
+cs.venti.block: tweak assertion in unit test
+
+
+changeset:   7756:63bd732ff651
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Mon Jun 14 22:24:16 2010 +1000
+files:       lib/python/cs/venti/blockify.py
+description:
+cs.venti.blockify: recode data blocking edge detector for greater speed
+
+
+changeset:   7757:ba8f07bf5f09
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Fri Jun 18 20:16:46 2010 +1000
+files:       bin/log-tsline
+description:
+log-tsline: emit usage message even in the face of a bare -? option
+
+
+changeset:   7758:2c4fd1eee89e
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Tue Jun 22 16:33:45 2010 +1000
+files:       bin/portfwd
+description:
+portfwd: force creation of control socket
+
+
+changeset:   7759:40ac086c2445
+parent:      7756:63bd732ff651
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Mon Jun 14 22:30:25 2010 +1000
+files:       lib/python/cs/venti/blocks.py-OBSOLETE
+description:
+remove old code
+
+
+changeset:   7760:d5ebb1165f93
+parent:      7757:ba8f07bf5f09
+parent:      7759:40ac086c2445
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Tue Jun 22 16:31:25 2010 +1000
+files:       lib/python/cs/venti/blocks.py-OBSOLETE
+description:
+Automated merge with file:///app1tb/home/cameron/hg/css
+
+
+changeset:   7761:557fe02f77c3
+parent:      7760:d5ebb1165f93
+parent:      7758:2c4fd1eee89e
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Tue Jun 22 16:33:52 2010 +1000
+description:
+Automated merge with file:///app1tb/home/cameron/dev/css-venti
+
+
+changeset:   7762:53032bba2baf
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Wed Jun 23 08:33:38 2010 +1000
+files:       bin/env-dev
+description:
+env-dev: support perl and python in separate subdirs of lib
+
+
+changeset:   7763:d8149602bcc5
+parent:      7756:63bd732ff651
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Tue Jun 22 16:28:40 2010 +1000
+files:       bin/with-opt-css
+description:
+with-opt-css: do not guess if env.sh missing
+
+
+changeset:   7764:87bcd710cbec
+parent:      7757:ba8f07bf5f09
+parent:      7763:d8149602bcc5
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Tue Jun 22 16:28:50 2010 +1000
+description:
+Automated merge with ssh://j/hg/css
+
+
+changeset:   7765:fe2fe0ead648
+parent:      7761:557fe02f77c3
+parent:      7764:87bcd710cbec
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Tue Jun 22 16:34:34 2010 +1000
+description:
+Automated merge with ssh://j/hg/css
+
+
+changeset:   7766:59ac745e558f
+parent:      7762:53032bba2baf
+parent:      7765:fe2fe0ead648
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Thu Jun 24 11:58:45 2010 +1000
+description:
+Automated merge with ssh://home/hg/css
+
+
+changeset:   7767:e0982b37d849
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Thu Jun 24 12:11:10 2010 +1000
+files:       bin/with-opt-css
+description:
+with-opt-css: make sure $OPTCSS is a full path
+
+
+changeset:   7768:f151b665fcb8
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Thu Jun 24 12:28:46 2010 +1000
+files:       bin/sshto
+description:
+sshto: add -P to prefix inner command errors with the host in which they run
+
+
+changeset:   7769:12b60a266ea9
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Thu Jun 24 12:39:36 2010 +1000
+files:       bin/sshto
+description:
+sshto: fix up debug to not break simple case
+
+
+changeset:   7770:f6e3ef408793
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Thu Jun 24 12:48:30 2010 +1000
+files:       bin/sshto
+description:
+sshto: embed tracing in proxy command, permit tuning of remote opt css dir
+
+
+changeset:   7771:8e331ed62063
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Thu Jun 24 12:54:25 2010 +1000
+files:       bin/sshto
+description:
+sshto: fix up tracing invocations
+
+
+changeset:   7772:df65de98c308
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Thu Jun 24 13:09:42 2010 +1000
+files:       bin-cs/updcss
+description:
+updcss: make java lib dir
+
+
+changeset:   7773:a7c521bee39e
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Thu Jun 24 13:12:21 2010 +1000
+files:       bin/sshto
+description:
+sshto: fix $dotrace initialisation
+
+
+changeset:   7774:1934a67fe51a
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Thu Jun 24 13:14:24 2010 +1000
+files:       Mykefile
+description:
+Mykefile: adjust path to perl files
+
+
+changeset:   7775:051b5d0016f4
+parent:      7765:fe2fe0ead648
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sat Jun 26 14:44:40 2010 +1000
+files:       lib/python/cs/venti/__init__.py lib/python/cs/venti/block.py lib/python/cs/venti/dir.py lib/python/cs/venti/gdbmstore.py lib/python/cs/venti/store.py
+description:
+cs.venti: minor bugfixes, don't restore stored data:-(
+
+
+changeset:   7776:a0a49be5c27e
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sat Jun 26 14:45:45 2010 +1000
+files:       lib/python/cs/html.py lib/python/cs/venti/httpd.py
+description:
+cs.venti: start on httpd mode, not yet working
+
+
+changeset:   7777:9e3e695f94bf
+parent:      7774:1934a67fe51a
+parent:      7776:a0a49be5c27e
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sat Jun 26 14:46:39 2010 +1000
+description:
+Automated merge with ssh://home/hg/css
+
+
+changeset:   7778:e6ddc613f310
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Thu Jul 01 12:56:15 2010 +1000
+files:       bin/pull-group
+description:
+pull-group: getgid(): strip dups
+
+
+changeset:   7779:3add7176de16
+parent:      7777:9e3e695f94bf
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Thu Jul 01 12:57:09 2010 +1000
+files:       bin/vt lib/python/cs/venti/blockify.py lib/python/cs/venti/dir.py lib/python/cs/venti/file.py
+description:
+cs.venti: archiving: compare with in-store file block by blcok
+
+
+changeset:   7780:8cda94e430db
+parent:      7778:e6ddc613f310
+parent:      7779:3add7176de16
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Thu Jul 01 12:57:25 2010 +1000
+description:
+Automated merge with ssh://j/hg/css
+
+
+changeset:   7781:0e4c8397c548
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Mon Jul 05 14:10:37 2010 +1000
+files:       bin/histbackup-prune
+description:
+histbackup-prune: logic streamline, make -q and -v options more meaningful
+
+
+changeset:   7782:6ecfe737eb28
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Mon Jul 05 18:53:37 2010 +1000
+files:       man/vt.5.pod
+description:
+man/vt.5: describe the new mixed hex/text transcription format
+
+
+changeset:   7783:8732c0cda8cf
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Fri Jul 09 16:28:48 2010 +1000
+files:       bin-cs/@-all bin/@-all
+description:
+move @-all into bin-cs
+
+
+changeset:   7784:08de8eaca37e
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Thu Jul 15 08:48:17 2010 +1000
+files:       bin/xml-pprint
+description:
+xml-pprint: pretty print xml from stdin
+
+
+changeset:   7785:ebae85b0fb71
+parent:      7783:8732c0cda8cf
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sat Jul 10 07:50:58 2010 +1000
+files:       lib/python/cs/nodedb/node.py
+description:
+cs.nodedb._AttrList docstring update
+
+
+changeset:   7786:2dc8538c5180
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sat Jul 10 22:04:10 2010 +1000
+files:       lib/python/cs/nodedb/node.py
+description:
+cs.nodedb/node._QBackend: simplify wrappers, start _drain thread, join on close
+
+
+changeset:   7787:7dcfd43ccf27
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sun Jul 11 14:35:48 2010 +1000
+files:       lib/python/cs/nodedb/node.py
+description:
+remove debug statement
+
+
+changeset:   7788:94fad5b53a2b
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sun Jul 11 15:42:16 2010 +1000
+files:       lib/python/cs/nodedb/node.py
+description:
+cs.nodedb.node: _AttrList: .Xs returns an anonymous _AttrList for subsequent .Xs use
+
+
+changeset:   7789:77135f0e3c1c
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sun Jul 11 20:43:50 2010 +1000
+files:       lib/python/cs/nodedb/node.py lib/python/cs/nodedb/sqla.py lib/python/cs/nodedb/tokcab.py
+description:
+cs.nodedb: move from serialise/deserialise to totext/fromtext
+
+
+changeset:   7790:d880f505efc7
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Mon Jul 12 09:11:10 2010 +1000
+files:       lib/python/cs/nodedb/node.py
+description:
+cs.nodedb.node: docstring fixes
+
+
+changeset:   7791:febd7afe32f6
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Mon Jul 12 09:26:01 2010 +1000
+files:       lib/python/cs/nodedb/node.py
+description:
+cs.nodedb: rename the type registry to make it clear it is for attribute types
+
+
+changeset:   7792:bd72ad59c58e
+parent:      7790:d880f505efc7
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Mon Jul 12 09:26:48 2010 +1000
+files:       lib/python/cs/app/maildb.py
+description:
+cs.app.maildb: replace _newNode with modern _createNode
+
+
+changeset:   7793:16abda09b173
+parent:      7791:febd7afe32f6
+parent:      7792:bd72ad59c58e
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Mon Jul 12 09:26:50 2010 +1000
+description:
+Automated merge with file:///Users/cameron/dev/css-fleet
+
+
+changeset:   7794:410f2b448421
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Mon Jul 12 14:50:44 2010 +1000
+files:       lib/python/cs/app/maildb.py lib/python/cs/nodedb/node.py
+description:
+cs.nodedb: add doCreate= to NodeDB.get(), add NodeDB class parameter to NodeDBFromURL
+
+
+changeset:   7795:c9510b2ae70a
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Mon Jul 12 15:11:08 2010 +1000
+files:       lib/python/cs/nodedb/node.py
+description:
+cs.nodedb: implement NodeDB.TYPEs => nodesByType(TYPE)
+
+
+changeset:   7796:772c216a5100
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Mon Jul 12 15:11:26 2010 +1000
+files:       lib/python/cs/app/maildb.py
+description:
+test MailDB.ADDRESSes
+
+
+changeset:   7797:991ef9940157
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Fri Jul 16 18:51:56 2010 +1000
+files:       lib/python/cs/app/maildb.py
+description:
+cs.app.maildb: add self test command line mode, redo message import
+
+
+changeset:   7798:90a286aa841a
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Fri Jul 16 19:28:53 2010 +1000
+files:       lib/python/cs/mappings.py
+description:
+cs.mappings: new AttributableList to map an attribute over the list members
+
+
+changeset:   7799:f5476cc07062
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sun Jul 18 10:29:56 2010 +1000
+files:       lib/python/cs/mappings.py
+description:
+cs.mappings: rename AttributableList to MethodicalList since it calls member methods and make new AttributableList that fetchs member attributes
+
+
+changeset:   7800:648ae61219d6
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sun Jul 18 10:31:30 2010 +1000
+files:       lib/python/cs/mappings.py
+description:
+cs.mappings.MethodicalList: docstring fix
+
+
+changeset:   7801:281f7b7ac5fb
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sun Jul 18 11:09:34 2010 +1000
+files:       lib/python/cs/venti/cache.py
+description:
+cs.venti.cache.MemCacheStore: document max=0 mode (keep everything); TODO: max isn' used!
+
+
+changeset:   7802:b0e4cdaf6482
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sun Jul 18 11:11:07 2010 +1000
+files:       lib/python/cs/venti/block.py
+description:
+cs.venti.block: bugfix IndirectBlock.__getitem__(slice): default step to 1
+
+
+changeset:   7803:121ccca29889
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sun Jul 18 11:11:48 2010 +1000
+files:       lib/python/cs/venti/blockify.py
+description:
+cs.venti.blockify: add Blockifer object for direct storage of block/data sequence
+
+
+changeset:   7804:651c549b922c
+parent:      7784:08de8eaca37e
+parent:      7803:121ccca29889
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sun Jul 18 11:34:20 2010 +1000
+description:
+Automated merge with ssh://home/hg/css
+
+
+changeset:   7805:6370b747ef2e
+tag:         tip
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sun Jul 18 11:36:33 2010 +1000
+files:       bin-cs/@
+description:
+bin-cs/@: redo -A versus command check
+
+
