@@ -208,7 +208,7 @@ split_target()
     done
     _st_pcmd="$_st_pcmd nc %h %p"
   fi
-  [ -z "$_st_pcmd" ] || _st_pcmd="set-x $_st_pcmd"      # DEBUG
+  ##DEBUG##[ -z "$_st_pcmd" ] || _st_pcmd="set-x $_st_pcmd"      # DEBUG
   printf "%s %s\n" "$1" "$_st_pcmd"
 }
 
