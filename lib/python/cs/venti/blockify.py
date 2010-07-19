@@ -367,6 +367,112 @@ DFLT_VOCAB = Vocabulary({
                   ],
               })
 
+_mp3_audio_ids = [ 2.5, None, 2, 1 ]
+_mp3_layer     = [ None, 3, 2, 1 ]
+_mp3_crc       = [ True, False ]
+_mp3_br_v1_l1  = [ None, 32, 64, 96, 128, 160, 192, 224,
+                   256, 288, 320, 352, 384, 416, 448, None ]
+_mp3_br_v1_l2  = [ None, 32, 48, 56, 64, 80, 96, 112,
+                   128, 160, 192, 224, 256, 320, 384, None ]
+_mp3_br_v1_l3  = [ None, 32, 40, 48, 56, 64, 80, 96,
+                   112, 128, 160, 192, 224, 256, 320, None ]
+_mp3_br_v2_l1  = [ None, 32, 48, 56, 64, 80, 96, 112,
+                   128, 144, 160, 176, 192, 224, 256, None ]
+_mp3_br_v2_l23 = [ None, 8, 16, 24, 32, 40, 48, 56,
+                   64, 80, 96, 112, 128, 144, 160, None ]
+_mp3_sr_m1     = [ 44100, 48000, 32000, None ]
+_mp3_sr_m2     = [ 22050, 24000, 16000, None ]
+_mp3_sr_m25    = [ 11025, 12000, 8000, None ]
+
+def mp3frames(fp):
+  ''' Read MP3 data from `fp` and yield frame data chunks.
+      Based on:
+        http://www.mp3-tech.org/programmer/frame_header.html
+  '''
+  chunk = ''
+  while True:
+    while len(chunk) < 4:
+      s = fp.read(4-len(chunk))
+      if len(s) == 0:
+        break
+      chunk += s
+    if len(chunk) == 0:
+      return
+    assert len(chunk) >= 4, "short data at end of fp"
+
+    if chunk.startswith("TAG"):
+      frame_len = 128
+    elif chunk.startswith("ID3"):
+      print >>sys.stderr, "ID3"
+      # TODO: suck up a few more bytes and compute length
+      return
+    else:
+      hdr_bytes = map(ord, chunk[:4])
+      ##print >>sys.stderr, hdr_bytes
+
+      assert hdr_bytes[0] == 255 and (hdr_bytes[1]&224) == 224, "not a frame header: %s" % (chunk,)
+      audio_vid = _mp3_audio_ids[ (hdr_bytes[1]&24) >> 3 ]
+      layer = _mp3_layer[ (hdr_bytes[1]&6) >> 1 ]
+
+      has_crc = not _mp3_crc[ hdr_bytes[1]&1 ]
+
+      bri = (hdr_bytes[2]&240) >> 4
+      if audio_vid == 1:
+        if layer == 1:
+          bitrate = _mp3_br_v1_l1[bri]
+        elif layer == 2:
+          bitrate = _mp3_br_v1_l2[bri]
+        elif layer == 3:
+          bitrate = _mp3_br_v1_l3[bri]
+        else:
+          assert False, "bogus layer (%s)" % (layer,)
+      elif audio_vid == 2 or audio_vid == 2.5:
+        if layer == 1:
+          bitrate = _mp3_br_v2_l1[bri]
+        elif layer == 2 or layer == 3:
+          bitrate = _mp3_br_v2_l23[bri]
+        else:
+          assert False, "bogus layer (%s)" % (layer,)
+      else:
+        assert False, "bogus audio_vid (%s)" % (audio_vid,)
+
+      sri = (hdr_bytes[2]&12) >> 2
+      if audio_vid == 1:
+        samplingrate = _mp3_sr_m1[sri]
+      elif audio_vid == 2:
+        samplingrate = _mp3_sr_m2[sri]
+      elif audio_vid == 2.5:
+        samplingrate = _mp3_sr_m25[sri]
+      else:
+        assert False, "unsupported id (%s)" % (audio_vid,)
+
+      padding = (hdr_bytes[2]&2) >> 1
+
+      if layer == 1:
+        data_len = (12 * bitrate * 1000 / samplingrate + padding) * 4
+      elif layer == 2 or layer == 3:
+        data_len = 144 * bitrate * 1000 / samplingrate + padding
+      else:
+        assert False, "layer=%s" % (layer,)
+
+      # TODO: surely this is wrong? no CRC 
+      frame_len = data_len
+      ##frame_len = 4 + crc_len + data_len
+      ##frame_len = 4 + data_len
+      if has_crc:
+        frame_len += 2
+
+    ##print >>sys.stderr, "vid =", audio_vid, "layer =", layer, "has_crc =", has_crc, "frame_len =", frame_len, "bitrate =", bitrate, "samplingrate =", samplingrate, "padding =", padding
+    while len(chunk) < frame_len:
+      s = fp.read(frame_len - len(chunk))
+      if len(s) == 0:
+        break
+      chunk += s
+    assert len(chunk) >= frame_len
+
+    yield chunk[:frame_len]
+    chunk = chunk[frame_len:]
+
 class TestAll(unittest.TestCase):
 
   def setUp(self):
