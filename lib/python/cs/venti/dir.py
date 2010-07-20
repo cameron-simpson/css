@@ -1,3 +1,4 @@
+import os
 import stat
 import sys
 if sys.hexversion < 0x02060000: from sets import Set as set
@@ -410,7 +411,6 @@ class Dir(Dirent):
         Return the top Dir (target).
     '''
     from cs.venti.file import storeFile
-    import os
     debug("osdir=%s" % (osdir, ))
     osdirpfx=os.path.join(osdir, '')
     for dirpath, dirs, files in os.walk(osdir, topdown=False):

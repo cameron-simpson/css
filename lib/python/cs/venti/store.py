@@ -398,8 +398,6 @@ class IndexedFileStore(BasicStore):
       if not noFlush:
         datafile.flush()
       self._index[h] = self.encodeIndexEntry(n, offset)
-      D("save %d bytes as %s: %s" % (len(data), `h`, totext(data)))
-      ##assert len(data) > 40
     return h
 
   def flush(self):
