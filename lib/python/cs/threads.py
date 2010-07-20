@@ -651,14 +651,15 @@ class FuncMultiQueue(object):
 
         `capacity` is the maximum number of active calls permitted at a time.
 
-        `priority` causes the internal queue to be a PriorityQueue.
+	`priority` causes the internal queue to be a PriorityQueue;
+	by default this is False.
         In the default mode, requests are dispatched in FIFO order as
         capacity becomes available. If `priority` is true, requests come
         in as sequences whose last element is the request callable;
         the sequences are kept in a PriorityQueue for dispatch.
         The priority mode is intended as a convenient provision of
         the PriorityQueue use case in the synchronous example below.
-        The priority takes precedence over the synchronous mode.
+        The priority mode takes precedence over the synchronous mode.
 
         `synchronous` causes function submission to be synchronous; by default
         this is False.
@@ -674,7 +675,7 @@ class FuncMultiQueue(object):
           PQ = PriorityQueue()
           MFQ = MultiFuncQueue(4, synchronous=True)
           while True:
-            pri, func = PQ.ghet()
+            pri, func = PQ.get()
             MFQ.qbgcall(func, None)
 
         In asynchronous mode this loop would always keep the PQ empty, and
