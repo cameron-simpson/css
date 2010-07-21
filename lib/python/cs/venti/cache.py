@@ -5,7 +5,6 @@
 #
 
 from __future__ import with_statement
-import sys
 from Queue import Queue
 from cs.lex import hexify
 from cs.venti.store import BasicStore
@@ -23,11 +22,11 @@ class CacheStore(BasicStore):
   def __init__(self, backend, cache):
     BasicStore.__init__(self, "Cache(cache=%s, backend=%s)" % (cache, backend))
     backend.open()
-    self.backend=backend
+    self.backend = backend
     cache.open()
-    self.cache=cache
+    self.cache = cache
     # secondary queue to process background self.backend operations
-    self.__closing=False
+    self.__closing = False
 
   def shutdown(self):
     BasicStore.shutdown(self)
@@ -38,12 +37,9 @@ class CacheStore(BasicStore):
     self.cache.flush()
     self.backend.flush()
 
-  def sync(self):
-    self.cache.sync()
-    self.backend.sync()
-
   def keys(self):
-    for h in self.cache.keys():
+    cache = self.cache
+    for h in cache.keys():
       yield h
     for h in self.backend.keys():
       if h not in cache:
@@ -60,23 +56,23 @@ class CacheStore(BasicStore):
     if h in self.cache:
       return self.cache[h]
     return self.backend[h]
-    
-  def add(self, data):
-    h = self.cache.add(data)
-    h2 = self.backend.add(data)
+
+  def add(self, data, noFlush=False):
+    h = self.cache.add(data, noFlush=noFlush)
+    h2 = self.backend.add(data, noFlush=noFlush)
     assert h == h2
     return h
 
-  def prefetch(self,hs):
+  def prefetch(self, hs):
     ''' Request from the backend those hashes from 'hs'
         which do not occur in the cache.
     '''
     self.backend.prefetch(self.missing(hs))
 
   def sync(self):
-    Q=Queue(2)
-    tag, ch = self.cache.sync_bg(ch=Q)
-    tag, ch = self.backend.sync_bg(ch=Q)
+    Q = Queue(2)
+    self.cache.sync_bg(ch=Q)
+    self.backend.sync_bg(ch=Q)
     Q.get()
     Q.get()
 
@@ -84,16 +80,18 @@ class MemCacheStore(BasicStore):
   ''' A lossy store that keeps an in-memory cache of recent chunks.  It may
       discard older chunks if new ones come in when full and would normally
       be used as the cache part of a CacheStore pair.
-      The optional parameter `max` specifies the maximum number of
+      The optional parameter `maxchunks` specifies the maximum number of
       chunks to keep in memory; it defaults to 1024. Specifying 0 keeps
       all chunks in memory.
   '''
-  def __init__(self, max=1024):
+  def __init__(self, maxchunks=1024):
     BasicStore.__init__(self, "MemCacheStore")
-    self.hashlist=[None for i in range(max)]
-    self.low=0                    # offset to oldest hash
-    self.used=0
-    self.hmap={}                  # cached h->(count,chunk) tuples
+    # TODO: fails if maxchunks == 0
+    assert maxchunks > 0
+    self.hashlist = [None for _ in range(maxchunks)]
+    self.low = 0                    # offset to oldest hash
+    self.used = 0
+    self.hmap = {}                  # cached h->(count, chunk) tuples
 
   def flush(self):
     pass
@@ -105,29 +103,29 @@ class MemCacheStore(BasicStore):
 
   def _hit(self, h, data):
     #assert type(h) is str, "_hit(%s) - not a string" % h
-    hmap=self.hmap
-    hlist=self.hashlist
-    hlen=len(hlist)
+    hmap = self.hmap
+    hlist = self.hashlist
+    hlen = len(hlist)
 
     if self.used >= hlen:
       # empty a slot
-      oldh=self.hashlist[self.low]
+      oldh = self.hashlist[self.low]
       assert oldh in hmap, "%s not in hmap" % hexify(h)
-      hits=hmap[oldh][0]
+      hits = hmap[oldh][0]
       if hits <= 1:
         del hmap[oldh]
       else:
-        hmap[oldh][0]-=1
-      self.low=(self.low+1)%len(hlist)
-      self.used-=1
+        hmap[oldh][0] -= 1
+      self.low = (self.low+1)%len(hlist)
+      self.used -= 1
 
     if h in self.hmap:
-      self.hmap[h][0]+=1
+      self.hmap[h][0] += 1
     else:
-      self.hmap[h]=[1, data]
-    self.used+=1
-    high=(self.low+self.used)%hlen
-    hlist[high]=h
+      self.hmap[h] = [1, data]
+    self.used += 1
+    high = (self.low + self.used) % hlen
+    hlist[high] = h
 
   def __contains__(self, h):
     with self._lock:
@@ -137,7 +135,7 @@ class MemCacheStore(BasicStore):
     with self._lock:
       return self.hmap[h][1]
 
-  def add(self, data):
+  def add(self, data, noFlush=False):
     with self._lock:
       H = self.hash(data)
       self._hit(H, data)

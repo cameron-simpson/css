@@ -73,7 +73,7 @@ class DataFile(object):
         flags |= F_COMPRESSED
     fp = self.fp
     with self._lock:
-      fp.seek(0,2)
+      fp.seek(0, 2)
       offset = fp.tell()
       fp.write(toBS(flags))
       fp.write(toBS(len(data)))
@@ -132,7 +132,7 @@ class TestAll(unittest.TestCase):
     '''
     import random
     blocks = {}
-    for i in range(100):
+    for _ in range(100):
       data = self._genblock()
       offset = self.data.saveData(data)
       blocks[offset] = data

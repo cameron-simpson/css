@@ -11,24 +11,24 @@ from cs.venti.stream import StreamDaemon, StreamStore
 from cs.misc import debug
 from cs.threads import NestingOpenClose
 
-class Server(ThreadingTCPServer,NestingOpenClose):
+class Server(ThreadingTCPServer, NestingOpenClose):
   ''' A ThreadingTCPServer that accepts connections by StreamStore clients.
   '''
-  def __init__(self,bindaddr,S):
-    ThreadingTCPServer.__init__(self,bindaddr,_RequestHandler)
+  def __init__(self, bindaddr, S):
+    ThreadingTCPServer.__init__(self, bindaddr, _RequestHandler)
     S.open()
-    self.S=S
+    self.S = S
 
   def shutdown(self):
     self.S.close()
 
 class _RequestHandler(StreamRequestHandler):
   def __init__(self, request, client_address, server):
-    self.S=server.S
+    self.S = server.S
     StreamRequestHandler.__init__(self, request, client_address, server)
 
   def handle(self):
-    SD=StreamDaemon(self.S,self.rfile,self.wfile)
+    SD = StreamDaemon(self.S, self.rfile, self.wfile)
     SD.start()
     debug("tcp.handle: waiting for StreamDaemon.resultsThread")
     SD.join()
@@ -40,12 +40,12 @@ class _RequestHandler(StreamRequestHandler):
 class TCPStore(StreamStore):
   ''' A Store attached to a StreamDaemon served on the specified 'bindaddr'.
   '''
-  def __init__(self,bindaddr):
-    self.sock=socket()
+  def __init__(self, bindaddr):
+    self.sock = socket()
     self.sock.connect(bindaddr)
-    self.fd=self.sock.fileno()
-    self.fd2=os.dup(self.fd)
+    self.fd = self.sock.fileno()
+    self.fd2 = os.dup(self.fd)
     StreamStore.__init__(self,
                          "TCPStore(%s)"%(bindaddr,),
-                         os.fdopen(self.fd,'wb'),
-                         os.fdopen(self.fd2,'rb'))
+                         os.fdopen(self.fd, 'wb'),
+                         os.fdopen(self.fd2, 'rb'))

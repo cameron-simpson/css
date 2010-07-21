@@ -7,18 +7,16 @@
 
 from itertools import chain
 import sys
-from struct import unpack_from
 from threading import Thread
 import unittest
 from cs.logutils import debug, D
 from cs.threads import IterableQueue
 from cs.misc import D, eachOf
-from cs.lex import unctrl
 from cs.venti import defaults
 from cs.venti.block import Block, IndirectBlock
 
-MIN_BLOCKSIZE=80                                # less than this seems silly
-MAX_BLOCKSIZE=16383                             # fits in 2 octets BS-encoded
+MIN_BLOCKSIZE = 80      # less than this seems silly
+MAX_BLOCKSIZE = 16383   # fits in 2 octets BS-encoded
 
 class Blockifier(object):
   ''' A Blockifier accepts data or Blocks and stores them sequentially.
@@ -29,6 +27,7 @@ class Blockifier(object):
   '''
 
   def __init__(self):
+    self.topBlock = None
     self.S = defaults.S
     self.Q = IterableQueue()
     self.T = Thread(target=self._storeBlocks)
@@ -40,7 +39,7 @@ class Blockifier(object):
 
   def add(self, data):
     self.Q.put(Block(data=data))
-    B = self.S.add(data)
+    return self.S.add(data)
 
   def addBlock(self, B):
     self.Q.put(B)
@@ -133,11 +132,11 @@ def filedata(fp, rsize=None):
       blocksOf() does that.
   '''
   if rsize is None:
-    rsize=8192
+    rsize = 8192
   else:
     assert rsize > 0
   while True:
-    s=fp.read(rsize)
+    s = fp.read(rsize)
     if len(s) == 0:
       break
     yield s
@@ -155,7 +154,7 @@ def fullIndirectBlocks(blockSource):
     if len(iblock.subblocks()) >= max_subblocks:
       # overflow
       yield iblock
-      iblock=IndirectBlock()
+      iblock = IndirectBlock()
     block.store(discard=True)
     iblock.append(block)
 
@@ -163,9 +162,9 @@ def fullIndirectBlocks(blockSource):
   if len(iblock) > 0:
     if len(iblock) == 1:
       # one block unyielded - don't bother wrapping into an iblock
-      block=iblock[0]
+      block = iblock[0]
     else:
-      block=iblock
+      block = iblock
     yield block
 
 def blocksOf(dataSource, vocab=None):
@@ -173,7 +172,6 @@ def blocksOf(dataSource, vocab=None):
       and yield data blocks with desirable boundaries.
   '''
   if vocab is None:
-    global DFLT_VOCAB
     vocab = DFLT_VOCAB
 
   buf = []      # list of strings-to-collate-into-a-block
@@ -188,8 +186,10 @@ def blocksOf(dataSource, vocab=None):
       if skip > 0:
         if skip > len(data):
           skip = len(data)
-        left = data[:skip]; data = data[skip:]
-        buf.append(left); buflen += len(left)
+        left = data[:skip]
+        data = data[skip:]
+        buf.append(left)
+        buflen += len(left)
         continue
 
       # we don't like to make blocks bigger than MAX_BLOCKSIZE
@@ -203,7 +203,7 @@ def blocksOf(dataSource, vocab=None):
       # look for a vocabulary word
       m = vocab.match(data, 0, probe_len)
       if m:
-        edgepos, word, offset, subVocab = m
+        edgepos, _, _, subVocab = m
         if subVocab:
           vocab = subVocab
         buf.append(data[:edgepos])
@@ -214,7 +214,8 @@ def blocksOf(dataSource, vocab=None):
         continue
 
       # no vocabulary words seen - append data to buf
-      buf.append(data); buflen += len(data)
+      buf.append(data)
+      buflen += len(data)
       data = ''
 
       # if buf gets too big, scan it with the rolling hash
@@ -246,6 +247,7 @@ class RollingHash:
       TODO: this is a lousy algorithm!
   '''
   def __init__(self):
+    self.n = None
     self.reset()
 
   def reset(self):
@@ -263,33 +265,33 @@ class RollingHash:
     '''
     D("H")
     assert probe_len > 0
-    probe_len=min(probe_len,len(data))
-    n=self.n
+    probe_len = min(probe_len, len(data))
+    n = self.n
     for i in range(probe_len):
       self.addcode(ord(data[i]))
-      if self.n%4093 == 1:
+      if n % 4093 == 1:
         debug("edge found, returning (hashcode=%d, offset=%d)", self.value(), i+1)
         return i+1
     debug("no edge found, hash now %d, returning (None, %d)", self.value(), probe_len)
     return -1
 
-  def addcode(self,oc):
-    self.n=( ( ( self.n&0x001fffff ) << 7
+  def addcode(self, oc):
+    self.n = ( ( ( self.n&0x001fffff ) << 7
+               )
+             | ( ( oc&0x7f )^( (oc&0x80)>>7 )
+               )
              )
-           | ( ( oc&0x7f )^( (oc&0x80)>>7 )
-             )
-           )
 
-  def addString(self,s):
-    n=self.n
+  def addString(self, s):
+    n = self.n
     for c in s:
-      oc=ord(c)
-      n=( ( ( self.n&0x001fffff ) << 7
+      oc = ord(c)
+      n = ( ( ( self.n&0x001fffff ) << 7
+            )
+          | ( ( oc&0x7f )^( (oc&0x80)>>7 )
+            )
           )
-        | ( ( oc&0x7f )^( (oc&0x80)>>7 )
-          )
-        )
-    self.n=n
+    self.n = n
 
 class Vocabulary(dict):
   ''' A class for representing match vocabuaries.
@@ -448,6 +450,7 @@ def mp3frames(fp):
 
       padding = (hdr_bytes[2]&2) >> 1
 
+      # TODO: surely this is wrong? seems to include header in audio sample
       if layer == 1:
         data_len = (12 * bitrate * 1000 / samplingrate + padding) * 4
       elif layer == 2 or layer == 3:
@@ -455,10 +458,7 @@ def mp3frames(fp):
       else:
         assert False, "layer=%s" % (layer,)
 
-      # TODO: surely this is wrong? no CRC 
       frame_len = data_len
-      ##frame_len = 4 + crc_len + data_len
-      ##frame_len = 4 + data_len
       if has_crc:
         frame_len += 2
 
@@ -500,7 +500,7 @@ class TestAll(unittest.TestCase):
       top = BL.close()
       alldata = ''.join(alldata)
       stored = top[:]
-      self.assertEqual( ''.join(alldata), top[:] )
+      self.assertEqual( ''.join(alldata), stored )
 
 if __name__ == '__main__':
   unittest.main()

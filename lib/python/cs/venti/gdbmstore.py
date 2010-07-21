@@ -7,25 +7,24 @@
 from __future__ import with_statement
 import os.path
 from thread import allocate_lock
-from cs.logutils import D
 from cs.venti.store import IndexedFileStore
 
 class GDBMStore(IndexedFileStore):
   ''' An IndexedFileStore attached to a GDBM index.
   '''
-  def __init__(self, dir, capacity=None):
-    IndexedFileStore.__init__(self, dir, capacity=capacity)
+  def __init__(self, dirpath, capacity=None):
+    IndexedFileStore.__init__(self, dirpath, capacity=capacity)
 
   def _getIndex(self):
-    return GDBMIndex(os.path.join(self.dir, "index.gdbm"))
+    return GDBMIndex(os.path.join(self.dirpath, "index.gdbm"))
 
 class GDBMIndex(object):
   ''' A GDBM index for a GDBMStore.
   '''
   def __init__(self, gdbmpath):
     import gdbm
-    self._lock=allocate_lock()
-    self._db=gdbm.open(gdbmpath,"cf")
+    self._lock = allocate_lock()
+    self._db = gdbm.open(gdbmpath,"cf")
 
   def flush(self):
     pass
