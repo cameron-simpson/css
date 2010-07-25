@@ -13,24 +13,18 @@
 '''
 
 from __future__ import with_statement
-import sys
+from functools import partial
 import os
 import os.path
-import time
 from thread import allocate_lock
-import threading
+from threading import Thread
 from Queue import Queue
-from zlib import compress, decompress
-from cs.lex import hexify
-from cs.logutils import debug, warn, Pfx, D
-from cs.misc import out, tb, seq
-from cs.serialise import toBS, fromBS, fromBSfp
-from cs.threads import FuncMultiQueue, Q1, DictMonitor, NestingOpenClose
+from cs.logutils import info, debug, warn, Pfx
+from cs.serialise import toBS, fromBS
+from cs.threads import FuncMultiQueue, Q1, Get1, NestingOpenClose
 from cs.venti import defaults, totext
-from cs.venti.block import Block
 from cs.venti.datafile import DataFile
 from cs.venti.hash import Hash_SHA1
-from cs.upd import out, nl
 
 class BasicStore(NestingOpenClose):
   ''' Core functions provided by all Stores.
@@ -62,8 +56,8 @@ class BasicStore(NestingOpenClose):
       The non-_bg forms are equivalent to __contains__, __getitem__ and add()
       and are provided for consistency with the _bg forms.
 
-      The _bg forms accept an optional 'ch' parameter and return a (tag, ch)
-      pair. If 'ch' is not provided or None, a single use Channel is obtained.
+      The _bg forms accept an optional `ch` parameter and return a (tag, ch)
+      pair. If `ch` is not provided or None, a single use Channel is obtained.
       A .get() from the returned channel returns the tag and the function result.
 
       In normal use the caller will care only about the channel or the tag,
@@ -74,6 +68,7 @@ class BasicStore(NestingOpenClose):
       arbitrary order, so the tag is needed to identify the response with the
       calling request; however the caller already knows the channel.
 
+      [ TODO: NO LONGER IMPLEMENTED< BUT IT SHOULD BE ]
       The hint noFlush, if specified and True, suggests that streaming
       store connections need not flush the request stream because another
       request will follow very soon after this request. This allows
@@ -87,9 +82,9 @@ class BasicStore(NestingOpenClose):
     if capacity is None:
       capacity = 1
     NestingOpenClose.__init__(self)
-    self.name=name
-    self.logfp=None
-    self.__funcQ=FuncMultiQueue(capacity)
+    self.name = name
+    self.logfp = None
+    self.__funcQ = FuncMultiQueue(capacity)
     self.hashclass = Hash_SHA1
     self._lock = allocate_lock()
     self.readonly = False
@@ -111,7 +106,7 @@ class BasicStore(NestingOpenClose):
     '''
     raise NotImplementedError
 
-  def add(self, data):
+  def add(self, data, noFlush=False):
     ''' Add the supplied data bytes to the store.
     '''
     raise NotImplementedError
@@ -156,7 +151,8 @@ class BasicStore(NestingOpenClose):
     return self.__contains__(h)
 
   def contains_bg(self, h, ch=None):
-    if ch is None: ch = Q1()
+    if ch is None:
+      ch = Q1()
     tag = self.__funcQ.qbgcall(partial(self.contains, h), ch)
     return tag, ch
 
@@ -171,17 +167,20 @@ class BasicStore(NestingOpenClose):
     return data
 
   def get_bg(self, h, ch=None):
-    if ch is None: ch = Q1()
+    if ch is None:
+      ch = Q1()
     tag = self.__funcQ.qbgcall(partial(self.get, h), ch)
     return tag, ch
 
-  def add_bg(self, data, ch=None):
-    if ch is None: ch = Q1()
-    tag = self.__funcQ.qbgcall(partial(self.add, data), ch)
+  def add_bg(self, data, ch=None, noFlush=False):
+    if ch is None:
+      ch = Q1()
+    tag = self.__funcQ.qbgcall(partial(self.add, data, noFlush=noFlush), ch)
     return tag, ch
 
   def sync_bg(self, ch=None):
-    if ch is None: ch = Q1()
+    if ch is None:
+      ch = Q1()
     tag = self.__funcQ.qbgcall(self.sync, ch)
     return tag, ch
 
@@ -203,18 +202,18 @@ class BasicStore(NestingOpenClose):
     '''
     pass
 
-  def multifetch(self,hs):
+  def multifetch(self, hs):
     ''' Generator returning a bunch of blocks in sequence corresponding to
         the iterable hashes.
-        TODO: record to just use the normal funcQ and a heap of (index, data).
+        TODO: recode to just use the normal funcQ and a heap of (index, data).
     '''
     # dispatch a thread to request the blocks
-    tagQ=Queue(0)       # the thread echoes tags for eash hash in hs
-    FQ=Queue(0)         # and returns (tag,block) on FQ, possibly out of order
-    Thread(target=self.__multifetch_rq,args=(hs,tagQ,FQ)).start()
+    tagQ = Queue(0)       # the thread echoes tags for each hash in hs
+    FQ = Queue(0)         # and returns (tag, block) on FQ, possibly out of order
+    Thread(target=self.__multifetch_rq, args=(hs, tagQ, FQ)).start()
 
-    waiting={}  # map of blocks that arrived out of order
-    frontTag=None
+    waiting = {}  # map of blocks that arrived out of order
+    frontTag = None
     while True:
       if frontTag is not None:
         # we're waiting for a particular tag
@@ -225,7 +224,7 @@ class BasicStore(NestingOpenClose):
           frontTag = None
         else:
           # not what we wanted - save it for later
-          waiting[tag]=block
+          waiting[tag] = block
       # get the next desired tag whose block has not yet arrived
       while frontTag is None:
         # get the next desired tag
@@ -239,16 +238,15 @@ class BasicStore(NestingOpenClose):
           frontTag = None
     assert len(waiting.keys()) == 0
 
-  def __multifetch_rq(self,hs,tagQ,FQ):
-    h0=None
+  def __multifetch_rq(self, hs, tagQ, FQ):
+    h0 = None
     for h in hs:
-      tag, ch = self._tagch(FQ)
-      self.fetch_bg(h,noFlush=True,ch=FQ)
+      tag, _ = self.get_bg(h, ch=FQ)
       tagQ.put(tag)
-      h0=h
+      h0 = h
     if h0 is not None:
       # dummy request to flush stream
-      self.haveyou_bg(h0,ch=Get1())
+      self.contains_bg(h0, ch=Get1())
     tagQ.put(None)
 
 def Store(S):
@@ -267,10 +265,10 @@ def Store(S):
     # TODO: recode to use the subprocess module
     toChild, fromChild = os.popen2(S[1:])
     from cs.venti.stream import StreamStore
-    return StreamStore(S,toChild,fromChild)
+    return StreamStore(S, toChild, fromChild)
   if S.startswith("tcp:"):
     from cs.venti.tcp import TCPStore
-    host, port = S[4:].rsplit(':',1)
+    host, port = S[4:].rsplit(':', 1)
     if len(host) == 0:
       host = '127.0.0.1'
     return TCPStore((host, int(port)))
@@ -279,45 +277,24 @@ def Store(S):
 def pullFromSerial(S1, S2):
   asked = 0
   for h in S2.keys():
-    asked+=1
-    out("%d %s" % (asked, totext(h)))
-    if not S1.haveyou(h):
+    asked += 1
+    info("%d %s" % (asked, totext(h)))
+    if not S1.contains(h):
       S1.store(S2.fetch(h))
-
-def pullFrom(S1,S2):
-  haveyou_ch = Queue(size=256)
-  fetch_ch = Queue(size=256)
-  pending = DictMonitor()
-  watcher = Thread(target=_pullWatcher,args=(S1,S2,haveyou_ch,pending,fetch_ch))
-  watcher.start()
-  fetcher = Thread(target=_pullFetcher,args=(S1,fetch_ch))
-  fetcher.start()
-  asked = 0
-  for h in S2.keys():
-    asked+=1
-    out("%d %s" % (asked, hexify(h)))
-    tag = seq()
-    pending[tag] = h
-    S1.haveyou_ch(h,haveyou_ch,tag)
-  nl('draining haveyou queue...')
-  haveyou_ch.put((None,asked))
-  watcher.join()
-  nl('draining fetch queue...')
-  fetcher.join()
-  out('')
 
 class IndexedFileStore(BasicStore):
   ''' A file-based Store which keeps data in flat files, compressed.
       Subclasses must implement the method ._getIndex() to obtain the
       associated index object (for example, a gdbm file) to the data files.
   '''
-  def __init__(self, dir, capacity=None):
+
+  def __init__(self, dirpath, capacity=None):
     ''' Initialise this IndexedFileStore.
-        'dir' specifies the directory in which the files and their index live.
+        'dirpath' specifies the directory in which the files and their index live.
     '''
-    ##D("IndexedFileStore.__init__(%s)..." % (dir,))
-    BasicStore.__init__(self, dir, capacity=capacity)
-    self.dir = dir
+    ##D("IndexedFileStore.__init__(%s)..." % (dirpath,))
+    BasicStore.__init__(self, dirpath, capacity=capacity)
+    self.dirpath = dirpath
     self._n = None
     self._index = self._getIndex()
     self._storeMap = self.__loadStoreMap()
@@ -339,17 +316,17 @@ class IndexedFileStore(BasicStore):
         etc.
     '''
     M = {}
-    with Pfx(self.dir):
-      for name in os.listdir(self.dir):
+    with Pfx(self.dirpath):
+      for name in os.listdir(self.dirpath):
         if name.endswith('.vtd'):
           pfx = name[:-4]
           if pfx.isdigit():
             pfxn = int(pfx)
             if str(pfxn) == pfx:
               # valid number.vtd store name
-              M[pfxn] = DataFile(os.path.join(self.dir, name))
+              M[pfxn] = DataFile(os.path.join(self.dirpath, name))
               continue
-          warn("ignoring bad .vtd file name: %s" % (name,))
+          warn("ignoring bad .vtd file name: %s" % (name, ))
     return M
 
   def __anotherDataFile(self):
@@ -365,7 +342,7 @@ class IndexedFileStore(BasicStore):
       if n in self._storeMap:
         # shouldn't happen?
         continue
-      pathname = os.path.join(self.dir, "%d.vtd" % (n,))
+      pathname = os.path.join(self.dirpath, "%d.vtd" % (n,))
       if os.path.exists(pathname):
         continue
       self._storeMap[n] = DataFile(pathname)
@@ -388,7 +365,7 @@ class IndexedFileStore(BasicStore):
   def add(self, data, noFlush=False):
     ''' Add data bytes to the store, return the hashcode.
     '''
-    assert type(data) is str, "expected str, got %s" % (`data`,)
+    assert type(data) is str, "expected str, got %s" % (repr(data),)
     assert not self.readonly
     h = self.hash(data)
     if h not in self._index:
@@ -420,41 +397,3 @@ class IndexedFileStore(BasicStore):
     ''' Prepare an index entry from data file index and offset.
     '''
     return toBS(n) + toBS(offset)
-
-def _pullWatcher(S1,S2,ch,pending,fetch_ch):
-  closing = False
-  answered = 0
-  fetches = 0
-  while not closing or asked > answered:
-    tag, yesno = ch.get()
-    if tag is None:
-      asked = yesno
-      closing = True
-      continue
-    answered+=1
-    if closing:
-      left = asked-answered
-      if left % 10 == 0:
-        out(str(left))
-    h = pending[tag]
-    if not yesno:
-      fetches+=1
-      S2.fetch_ch(h,fetch_ch)
-    del pending[tag]
-  fetch_ch.put((None,fetches))
-
-def _pullFetcher(S1,ch):
-  closing = False
-  fetched = 0
-  while not closing or fetches > fetched:
-    tag, block = ch.get()
-    if tag is None:
-      fetches = block
-      closing = True
-      continue
-    if closing:
-      left = fetches-fetched
-      if left % 10 == 0:
-        out(str(left))
-    fetched+=1
-    h = S1.store(block)

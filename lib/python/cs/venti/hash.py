@@ -58,8 +58,8 @@ class TestAll(unittest.TestCase):
     random.seed()
   def testSHA1(self):
     import random
-    for i in range(10):
-      rs = ''.join( chr(random.randint(0,255)) for x in range(100) )
+    for _ in range(10):
+      rs = ''.join( chr(random.randint(0, 255)) for _ in range(100) )
       H = Hash_SHA1.fromData(rs)
       self.assertEqual( sha1(rs).digest(), H )
       Hencode = H.encode()

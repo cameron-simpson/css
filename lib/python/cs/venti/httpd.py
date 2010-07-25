@@ -5,7 +5,7 @@
 #
 
 import cherrypy
-from cs.html import tokens2s, BR
+from cs.html import tokens2s
 
 class DirView(object):
   ''' An object exposing a Dir as an HTML tree.
@@ -19,8 +19,8 @@ class DirView(object):
   def index(self):
     html = []
 
-    if path:
-      html.append(['H1', path])
+    if self.path:
+      html.append(['H1', self.path])
 
     namelist = []
     for name in sorted(self.D.keys()):
@@ -29,7 +29,7 @@ class DirView(object):
         namelist.append([ 'LI', [ 'A', { 'HREF': name+'/', }, name+'/' ] ])
       else:
         namelist.append([ 'LI', [ 'A', { 'HREF': name, }, name ] ])
-    html.append([UL]+namelist)
+    html.append(['UL'] + namelist)
 
     return tokens2s(html)
 

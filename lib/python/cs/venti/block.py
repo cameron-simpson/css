@@ -6,7 +6,6 @@ from cs.logutils import D
 from cs.serialise import toBS, fromBS
 from cs.venti import defaults, totext
 from cs.venti.hash import Hash_SHA1, HASH_SHA1_T
-from cs.venti.debug import dumpBlock
 
 F_BLOCK_INDIRECT = 0x01 # indirect block
 F_BLOCK_HASHTYPE = 0x02 # hash type explicit
@@ -30,7 +29,7 @@ def decodeBlock(s, justone=False):
       If the optional paramater 'justone' is true, check the tail is
       empty and return just the Block.
   '''
-  s0=s
+  s0 = s
   flags, s = fromBS(s)
   unknown_flags = flags & ~(F_BLOCK_INDIRECT|F_BLOCK_HASHTYPE)
   assert unknown_flags == 0, \
@@ -63,6 +62,13 @@ def isBlock(o):
 class _Block(object):
   # TODO: hashcode(), data(), blockdata() should use __getattr__
 
+  def __init__(self):
+    self.indirect = None
+    self._hashcode = None
+
+  def blockdata(self):
+    raise NotImplementedError
+
   def hashcode(self):
     ''' Return the hashcode for this block.
         Compute the hashcode if unknown or if it does not match the default
@@ -76,7 +82,7 @@ class _Block(object):
     _hashcode = self._hashcode
     if _hashcode is None or type(_hashcode) is not hashclass:
       D("block %s: _hashcode=%s, hashclass=%s", id(self), _hashcode, hashclass)
-      D("  block: %s", `self.__dict__`)
+      D("  block: %s", repr(self.__dict__))
       data = self.blockdata()
       _hashcode = self._hashcode = S.add(data)
     return _hashcode
@@ -91,7 +97,7 @@ class _Block(object):
           [BS(hashtype)]
           hashcode.encode()     # may include hashlen prefix for some hash types
     '''
-    flags=0
+    flags = 0
     if self.indirect:
       flags |= F_BLOCK_INDIRECT
     hashcode = self.hashcode()
@@ -111,6 +117,7 @@ class Block(_Block):
     ''' Initialise a direct block, supplying data bytes or hashcode,
         but not both.
     '''
+    _Block.__init__(self)
     assert (data is None) ^ (hashcode is None)
     self.indirect = False
     if data is None:
@@ -124,7 +131,7 @@ class Block(_Block):
       if span is None:
         span = len(data)
       else:
-        assert type(span) is int, "excepted int, got %s" % (`span`,)
+        assert type(span) is int, "expected int, got %s" % (repr(span),)
         assert span == len(data)
       self._data = data
       self._hashcode = None
@@ -140,17 +147,18 @@ class Block(_Block):
       data = self._data = S[self.hashcode()]
     return data
 
-  ''' Return the direct content of this block.
-      For a direct Block this is the same as data().
-      For an IndirectBlock this is the encoded data that refers to the
-      subblocks.
-  '''
-  blockdata = data
+  def blockdata(self):
+    ''' Return the direct content of this block.
+        For a direct Block this is the same as data().
+        For an IndirectBlock this is the encoded data that refers to the
+        subblocks.
+    '''
+    return self.data()
 
   def store(self, discard=False):
     ''' Ensure this block is stored.
         Return the block's hashcode.
-        If discard is true, release the block's data.
+        If `discard` is true, release the block's data.
     '''
     S = defaults.S
     if self._hashcode is None:
@@ -195,7 +203,9 @@ class IndirectBlock(_Block):
 
       TODO: allow data= initialisation, to decode raw iblock data
   '''
+
   def __init__(self, hashcode=None, span=None):
+    _Block.__init__(self)
     self.indirect = True
     self._hashcode = hashcode
     if hashcode is None:
@@ -381,7 +391,7 @@ class TestAll(unittest.TestCase):
     with S:
       IB = IndirectBlock()
       for i in range(10):
-        rs = ''.join( chr(random.randint(0,255)) for x in range(100) )
+        rs = ''.join( chr(random.randint(0, 255)) for x in range(100) )
         B = Block(data = rs)
         assert len(B) == 100
         IB.append(B)
@@ -390,10 +400,10 @@ class TestAll(unittest.TestCase):
       assert len(IB) == 1000
       IBH = IB.hashcode()
       IBdata = IB.data()
-      D("IBdata = %s:%d:%s", type(IBdata), len(IBdata), `IBdata`,)
+      D("IBdata = %s:%d:%s", type(IBdata), len(IBdata), repr(IBdata),)
       IB2data = IndirectBlock(hashcode=IBH, span=len(IBdata)).data()
-      D("IB2data = %s:%d:%s", type(IB2data), len(IB2data), `IB2data`,)
-      self.assertEqual(IBdata,IB2data, "IB:  %s\nIB2: %s" % (totext(IBdata), totext(IB2data)))
+      D("IB2data = %s:%d:%s", type(IB2data), len(IB2data), repr(IB2data),)
+      self.assertEqual(IBdata, IB2data, "IB:  %s\nIB2: %s" % (totext(IBdata), totext(IB2data)))
 
 if __name__ == '__main__':
   unittest.main()

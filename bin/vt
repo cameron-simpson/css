@@ -35,20 +35,20 @@ import os.path
 from getopt import getopt, GetoptError
 import datetime
 import logging
-from cs.logutils import Pfx, error, warn, debug
-from cs.venti import defaults, totext, fromtext
+from cs.logutils import Pfx, error, debug
+from cs.venti import totext, fromtext
 from cs.venti.block import IndirectBlock, decodeBlocks
 from cs.venti.debug import dumpBlock
-from cs.venti.store import Store, pullFrom
+from cs.venti.store import Store
 from cs.venti.cache import CacheStore, MemCacheStore
 from cs.venti.archive import archive2dir, archiveAppend
 from cs.venti.dir import Dir, resolve
-from cs.misc import progress, logTo, reportElapsedTime
+from cs.misc import logTo
 
 def main(argv):
   cmd = os.path.basename(argv[0])
   logging.basicConfig(format=cmd.replace("%", "%%") + ": %(levelname)s: %(message)s")
-  usage='''Usage:
+  usage = '''Usage:
     %s [options...] cat filerefs...
     %s [options...] catblock [-i] hashcodes...
     %s [options...] listen port
@@ -67,22 +67,22 @@ def main(argv):
                     /path/to/dir  GDBMStore
                     tcp:[host]:port TCPStore
                     |sh-command   StreamStore via sh-command
-''' % (cmd,cmd,cmd,cmd,cmd,cmd,cmd,cmd,cmd,cmd)
+''' % (cmd, cmd, cmd, cmd, cmd, cmd, cmd, cmd, cmd, cmd)
 
   with Pfx("", absolute=True):
-    badopts=False
+    badopts = False
 
-    dflt_cache=os.environ.get('VT_STORE_CACHE')
-    dflt_vt_store=os.environ.get('VT_STORE')
-    dflt_log=os.environ.get('VT_LOGFILE')
-    useMemCache=True
+    dflt_cache = os.environ.get('VT_STORE_CACHE')
+    dflt_vt_store = os.environ.get('VT_STORE')
+    dflt_log = os.environ.get('VT_LOGFILE')
+    useMemCache = True
 
     try:
-      opts, args = getopt(argv[1:],'C:MS:')
+      opts, args = getopt(argv[1:], 'C:MS:')
     except GetoptError, e:
       error("unrecognised option: %s: %s"% (e.opt, e.msg))
-      badopts=True
-      opts, args = (), ()
+      badopts = True
+      opts, args = [], []
 
     # =head1 OPTIONS
     #
@@ -98,16 +98,16 @@ def main(argv):
       #
       if opt == '-C':
         if val == '-':
-          dflt_cache=None
+          dflt_cache = None
         else:
-          dflt_cache=val
+          dflt_cache = val
       # =item B<-M>
       #
       # Do not use the in-memory caching store.
       # Default is to place an in-memory cache ahead of the other stores.
       #
       elif opt == '-M':
-        useMemCache=False
+        useMemCache = False
       # =item B<-S> I<store>
       #
       # Use the specified I<store>.
@@ -115,7 +115,7 @@ def main(argv):
       # the environment variable B<VT_STORE> specifies the store.
       #
       elif opt == '-S':
-        dflt_vt_store=val
+        dflt_vt_store = val
       else:
         assert False, "unsupported option: %s" % (opt,)
 
@@ -156,10 +156,10 @@ def main(argv):
 
     if len(args) < 1:
       error("missing command")
-      badopts=True
-      op=None
+      badopts = True
+      op = None
     else:
-      op=args.pop(0)
+      op = args.pop(0)
       with Pfx(op):
         # =head1 COMMANDS
         #
@@ -172,7 +172,7 @@ def main(argv):
           #
           if len(args) < 1:
             error("missing filerefs")
-            badopts=True
+            badopts = True
         elif op == "catblock":
           # =item B<catblock> [B<-i>] I<hashcodes...>
           #
@@ -181,13 +181,13 @@ def main(argv):
           # consider the hashcode to specify an indirect block and emit
           # the data content of the leaf blocks.
           #
-          indirect=False
+          indirect = False
           if len(args) > 0 and args[0] == "-i":
-            indirect=True
+            indirect = True
             args.pop(0)
           if len(args) < 1:
             error("missing hashcodes")
-            badopts=True
+            badopts = True
         elif op == "listen":
           # =item B<listen> {B<->|[I<host>]B<:>I<port>}
           #
@@ -203,20 +203,20 @@ def main(argv):
           #
           if len(args) != 1:
             error("expected a port")
-            badopts=True
+            badopts = True
         elif op == "ls":
           # =item B<ls> [B<-R>] I<dirrefs...>
           #
           # Do a directory listing of the specified I<dirrefs>.
           # The B<-R> (recursive) option requests a recurive directory listing.
           #
-          recurse=False
+          recurse = False
           if len(args) > 0 and args[0] == "-R":
-            recurse=True
+            recurse = True
             args.pop(0)
           if len(args) < 1:
             error("missing dirrefs")
-            badopts=True
+            badopts = True
         elif op == "mount":
           # =item B<mount> I<dirref> I<mountpoint>
           #
@@ -226,7 +226,7 @@ def main(argv):
           #
           if len(args) != 2:
             error("expected dirref and mountpoint")
-            badopts=True
+            badopts = True
         elif op == "pack":
           # =item B<pack> {B<-o> I<file.vt> I<pathname> | I<pathnames...>}
           #
@@ -246,16 +246,16 @@ def main(argv):
           if len(args) > 0 and args[0] == "-o":
             if len(args) < 2:
               error("-o: missing file.vt")
-              badopts=True
+              badopts = True
             elif len(args) < 3:
               error("missing path")
-              badopts=True
+              badopts = True
             elif len(args) > 3:
               error("extra arguments after path: %s" % " ".join(args[3:]))
-              badopts=True
+              badopts = True
           elif len(args) < 1:
             error("missing paths")
-            badopts=True
+            badopts = True
         elif op == "pull":
           # =item B<pull> I<stores...>
           #
@@ -265,7 +265,7 @@ def main(argv):
           #
           if len(args) < 1:
             error("missing stores")
-            badopts=True
+            badopts = True
         elif op == "scan":
           # =item B<scan> I<datafile>
           #
@@ -276,7 +276,7 @@ def main(argv):
           #
           if len(args) != 1:
             error("missing datafile")
-            badopts=True
+            badopts = True
         elif op == "unpack":
           # =item B<unpack> I<dirrefs...>
           #
@@ -288,17 +288,17 @@ def main(argv):
           #
           if len(args) < 1:
             error("missing dirrefs")
-            badopts=True
+            badopts = True
         else:
           error("unrecognised command")
-          badopts=True
+          badopts = True
         # =back
         #
 
       if dflt_vt_store is None:
         if op != "scan":
           error("no $VT_STORE and no -S option")
-          badopts=True
+          badopts = True
 
     if badopts:
       sys.stderr.write(usage)
@@ -307,16 +307,16 @@ def main(argv):
     if dflt_log is not None:
       logTo(dflt_log)
 
-    S=Store(dflt_vt_store)
+    S = Store(dflt_vt_store)
     if dflt_cache is not None:
-      C=Store(dflt_cache)
-      S=CacheStore(S,C)
+      C = Store(dflt_cache)
+      S = CacheStore(S, C)
 
     # put an in-memory cache in front of the main cache
     if useMemCache:
-      S=CacheStore(S,MemCacheStore())
+      S = CacheStore(S, MemCacheStore())
 
-    xit=0
+    xit = 0
 
     with S:
       if op == "pack":
@@ -327,20 +327,20 @@ def main(argv):
           from cs.venti.dir import storeDir
           for path in args:
             if os.path.isdir(path):
-              E=storeDir(path)
+              E = storeDir(path)
             else:
-              E=storeFile(open(path))
+              E = storeFile(open(path))
             archiveAppend(sys.stdout, E, None, path)
             sys.stdout.flush()
         else:
           # -o archive.vt; get old version from archive and compare during store
-          archive=args[1]
-          path=args[2]
+          archive = args[1]
+          path = args[2]
           assert os.path.isdir(path)
-          D=archive2dir(archive)
+          D = archive2dir(archive)
           if D is None:
-            D=Dir(path)
-          ##print "archive=%s, D=%s" % (archive,D)
+            D = Dir(path)
+          ##print "archive=%s, D=%s" % (archive, D)
           D.updateFrom(path,
                        ignoreTimes=False,
                        deleteMissing=True,
@@ -366,63 +366,63 @@ def main(argv):
         for h, offset, zsize in scanFile(open(args[0])):
           print totext(h), offset, zsize
 
-      elif op == "pull":
-        for arg in args:
-          pullFrom(S,Store(arg))
+##      elif op == "pull":
+##        for arg in args:
+##          pullFrom(S, Store(arg))
 
       elif op == "listen":
         assert len(args) == 1
-        arg=args[0]
+        arg = args[0]
         if arg == '-':
           from cs.venti.stream import StreamDaemon
-          daemon=StreamDaemon(S,sys.stdin,sys.stdout)
+          daemon = StreamDaemon(S, sys.stdin, sys.stdout)
           daemon.start()
           daemon.join()
         else:
-          cpos=arg.rfind(':')
+          cpos = arg.rfind(':')
           if cpos >= 0:
-            host=arg[:cpos]
-            port=arg[cpos+1:]
+            host = arg[:cpos]
+            port = arg[cpos+1:]
             if len(host) == 0:
-              host='127.0.0.1'
-            port=int(port)
+              host = '127.0.0.1'
+            port = int(port)
             import cs.venti.tcp
-            with cs.venti.tcp.Server((host,port),S) as srv:
+            with cs.venti.tcp.Server((host, port), S) as srv:
               srv.serve_forever()
           else:
             error("invalid listen argument, I expect \"-\" or \"[host]:port\", got \"%s\"" % arg)
             exit(1)
 
       elif op == "ls":
-        first=True
+        first = True
         for path in args:
           if first:
-            first=False
+            first = False
           else:
             print
           ##print "ls", path, "..."
           D, name = resolve(path)
           ##print "resolve(%s) -> %s, %s" % (path, D, name)
           if name is not None:
-            D=D.chdir1(name)
-          ls(path,D,recurse,sys.stdout)
+            D = D.chdir1(name)
+          ls(path, D, recurse, sys.stdout)
 
       elif op == "mount":
         print "mount", args[0], args[1], "..."
         if not os.path.isdir(args[1]):
           error("%s: mountpoint is not a directory" % args[1])
           exit(1)
-        E=S.namei(args[0]+'/')
+        E = S.namei(args[0]+'/')
         assert E.isdir, "%s: expected directory, not file" % (args[0],)
         import cs.venti.vtfuse
-        cs.venti.vtfuse.fusemount(args[1],S,E)
+        cs.venti.vtfuse.fusemount(args[1], S, E)
 
       elif op == "unpack":
         for path in args:
           D, name = resolve(path)
           if len(name) > 0:
-            D=D.chdir1(name)
-          for subD, dirs, files in D.walk(topdown=True):
+            D = D.chdir1(name)
+          for subD, _, files in D.walk(topdown=True):
             if len(subD.path) > 0 and not os.path.isdir(subD.path):
               print "mkdir", subD.path
               os.makedirs(subD.path)
@@ -430,67 +430,68 @@ def main(argv):
             for fname in files:
               assert len(fname) > 0 and fname != '.' and fname != '..' and fname.find('/') < 0, \
                 "%s: unpack: %s: illegal filename \"%s\"" % (cmd, subD.path, fname)
-              fpath=os.path.join(subD.path,fname)
+              fpath = os.path.join(subD.path, fname)
               print "extract", fpath
-              outfp=open(fpath,mode='w')
+              outfp = open(fpath, mode='w')
               for b in subD[fname].getBlock().leaves(S):
                 outfp.write(b)
               outfp.close()
 
       else:
         error("unsupported command")
-        xit=2
+        xit = 2
 
     debug("%s: exit main command"%cmd)
     exit(xit)
 
-def lsDirent(fp,E,name):
-  B=E.getBlock()
-  st=E.stat()
+def lsDirent(fp, E, name):
+  B = E.getBlock()
+  st = E.stat()
   ##print "st=%s" % (st,)
   st_mode, st_ino, st_dev, st_nlink, st_uid, st_gid, st_size, \
     st_atime, st_mtime, st_ctime = st
   ##print "st_mtime=%s" % `st_mtime`
   ##print "st_size=%s" % `st_size`
   ##print "name=%s" % `name`
-  t=datetime.datetime.fromtimestamp(int(st_mtime))
+  t = datetime.datetime.fromtimestamp(int(st_mtime))
   fp.write("%c %-41s %s %-6d %s\n" \
            % (('d' if E.isdir() else 'f'),
               B, t, st_size, name))
 
-def ls(path,D,recurse,fp=None):
+def ls(path, D, recurse, fp=None):
   if fp is None:
-    fp=sys.stdout
+    fp = sys.stdout
   fp.write(path)
   fp.write(":\n")
   if not recurse:
     debug("ls(): getting dirs and files...")
-    names=D.dirs()+D.files()
+    names = D.dirs()+D.files()
     debug("ls(): got dirs and files = %s" % (names,))
     names.sort()
     for name in names:
-      debug("ls(): D=%s (%s), name=%s" % (D,type(D),name))
-      E=D[name]
-      lsDirent(fp,E,name)
+      debug("ls(): D=%s (%s), name=%s" % (D, type(D), name))
+      E = D[name]
+      lsDirent(fp, E, name)
   else:
-    dirs=D.dirs(); dirs.sort()
-    files=D.files(); files.sort()
+    dirs = D.dirs()
+    dirs.sort()
+    files = D.files()
+    files.sort()
     for name in files:
-      E=D[name]
-      lsDirent(fp,E,name)
+      E = D[name]
+      lsDirent(fp, E, name)
       assert not E.isdir(), name+" should not be a directory!"
     for name in dirs:
       ##fp.write("\n")
       ls(os.path.join(path, name), D.chdir1(name), recurse, fp)
 
 def cat(path, fp=None):
-  S=defaults.S
   if fp is None:
-    fp=sys.stdout
+    fp = sys.stdout
   D, name = resolve(path)
   if name is not None:
-    D=D[name]
-  block=D.getBlock()
+    D = D[name]
+  block = D.getBlock()
   for B in block.leaves():
     fp.write(B.blockdata())
 

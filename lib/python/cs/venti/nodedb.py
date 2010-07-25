@@ -1,9 +1,8 @@
-from cs.venti.block import Block, IndirectBlock
 import cs.venti.dir
-from cs.venti import totext
+import cs.venti
 
 def totext(D):
-  return totext(D.encode())
+  return cs.venti.totext(D.encode())
 
 def fromtext(value):
   D, name = cs.venti.dir.resolve(value)
@@ -15,7 +14,8 @@ def tobytes(D):
   return D.encode()
 
 def frombytes(value):
-  return decodeDirect(value, justone=True)
+  return cs.venti.dir.decodeDirent(value, justone=True)
 
 def register_with(nodedb, scheme='cs.venti'):
-  nodedb.register_type(Dirent, scheme, totext, fromtext, tobytes, frombytes)
+  nodedb.register_type(cs.venti.dir.Dirent, scheme,
+                       totext, fromtext, tobytes, frombytes)

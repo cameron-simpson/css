@@ -4,23 +4,22 @@
 #       - Cameron Simpson <cs@zip.com.au>
 #
 
-from cs.logutils import D
 from fuse import Fuse, FuseArgs   ## Direntry
 from errno import ENOSYS
 import sys
 import os
 
-def fusemount(mnt,D,S):
+def fusemount(mnt, D, S):
   ''' Run a FUSE filesystem with Dirent and backing Store.
   '''
-  FS=FuseStore(mnt,D,E)
+  FS = FuseStore(mnt, D, E)
   D("calling FS.main...")
   FS.main()
 
 # Horrible hack because the Fuse class doesn't seem to tell fuse file
 # objects which class instantiation they belong to.
 # I guess There Can Be Only One.
-mainFuseStore=None
+mainFuseStore = None
 
 class FuseStore(Fuse):
   def __init__(self, mnt, D, S, *args, **kw):
@@ -32,36 +31,36 @@ class FuseStore(Fuse):
     # HACK: record fuse class object for use by files :-(
     global mainFuseStore
     assert mainFuseStore is None, "multiple instantiations of FuseStore forbidden"
-    mainFuseStore=self
+    mainFuseStore = self
 
-    fargs=FuseArgs()
-    fargs.mountpoint=mnt
-    ##fargs=fargs.assemble()
-    kw['prog']=sys.argv[0]
-    kw['usage']="Usage Message";
+    fargs = FuseArgs()
+    fargs.mountpoint = mnt
+    ##fargs = fargs.assemble()
+    kw['prog'] = sys.argv[0]
+    kw['usage'] = "Usage Message";
 
     print "FuseStore:"
     print "  args =", repr(args)
     print "  kw =", repr(kw)
     print "  fargs =", repr(fargs)
     Fuse.__init__(self, fuse_args=fargs, **kw)
-    self.flags=0
-    self.multithreaded=0
+    self.flags = 0
+    self.multithreaded = 0
     ''' Keep a mapping of blockref (raw) to nlinks.
         We will preserve the ones with nlinks > 1 or file permissions.
     '''
-    self.__inodes={}
-    self.__mountpoint=mnt
-    self.__store=store
-    self.__root=D
-    self.file_class=self.__File
-    self.__out=None
+    self.__inodes = {}
+    self.__mountpoint = mnt
+    self.__store = store
+    self.__root = D
+    self.file_class = self.__File
+    self.__out = None
 
-  def __OUT(self,*args):
+  def __OUT(self, *args):
     if self.__out is None:
-      self.__out=open("/dev/pts/39","w")
-      sys.stdout=self.__out
-      sys.stderr=self.__out
+      self.__out = open("/dev/pts/39", "w")
+      sys.stdout = self.__out
+      sys.stderr = self.__out
     if len(args):
       D(" ".join([str(x) for x in args])+"\n")
 
@@ -69,12 +68,12 @@ class FuseStore(Fuse):
     assert path[0] == '/'
     return os.path.join('/u/cameron/tmp', path[1:])
 
-  def __namei(self,path):
-    return self.__store.namei(path,self.__root.bref)
+  def __namei(self, path):
+    return self.__store.namei(path, self.__root.bref)
 
-  def getattr(self,path):
+  def getattr(self, path):
     self.__OUT("getattr", path)
-    E=self.__namei(path)
+    E = self.__namei(path)
     if E is None:
       return None
     return os.lstat(self.__abs(path))
@@ -104,10 +103,10 @@ class FuseStore(Fuse):
     self.__OUT("link", path, path1)
     os.link(self.__abs(path), self.__abs(path1))
   def chmod(self, path, mode):
-    self.__OUT("chmod 0%03o %s" % (mode,path))
+    self.__OUT("chmod 0%03o %s" % (mode, path))
     os.chmod(self.__abs(path), mode)
   def chown(self, path, user, group):
-    self.__OUT("chown %d:%d %s" % (user,group,path))
+    self.__OUT("chown %d:%d %s" % (user, group, path))
     os.chown(self.__abs(path), user, group)
   def truncate(self, path, len):
     self.__OUT("truncate", path, len)
@@ -116,7 +115,7 @@ class FuseStore(Fuse):
     self.__OUT("mknod", path, mode, dev)
     os.mknod(self.__abs(path), mode, dev)
   def mkdir(self, path, mode):
-    self.__OUT("mkdir 0%03o %s" % (mode,path))
+    self.__OUT("mkdir 0%03o %s" % (mode, path))
     os.mkdir(self.__abs(path), mode)
   def utime(self, path, times):
     self.__OUT("utime", path)
@@ -133,7 +132,7 @@ class FuseStore(Fuse):
     def __init__(self, path, flags, *mode):
       global mainFuseStore
       assert mainFuseStore is not None
-      self.__Fuse=mainFuseStore
+      self.__Fuse = mainFuseStore
       print "new __File: path =", path, "flags =", repr(flags), "mode =", repr(mode)
       self.file = os.fdopen(os.open("." + path, flags, *mode),
                             flag2mode(flags))
@@ -153,9 +152,9 @@ class FuseStore(Fuse):
 
     def fsync(self, isfsyncfile):
       if isfsyncfile and hasattr(os, 'fdatasync'):
-          os.fdatasync(self.fd)
+        os.fdatasync(self.fd)
       else:
-          os.fsync(self.fd)
+        os.fsync(self.fd)
 
     def flush(self):
       self.file.flush()
