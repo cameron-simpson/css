@@ -22,3 +22,20 @@ def dirent_tobytes(D):
 
 def dirent_frombytes(value):
   return cs.venti.dir.decodeDirent(value, justone=True)
+
+def storeFile(fp, name=None, oldBlock=None):
+  ''' Store a file, return the Dirent.
+      TODO: get some metadata using stat(). Merge with cs.venti.dir.storeFile?
+  '''
+  if type(fp) is str:
+    if name is None:
+      name = fp
+    with open(fp, "rb") as fp2:
+      stored = storeFile(fp2, name=name, oldBlock=oldBlock)
+  else:
+    if oldBlock is None:
+      matchBlocks = None
+    else:
+      matchBlocks = oldBlock.leaves()
+    stored = storeFile(fp, name=name, matchBlocks=matchBlocks)
+  return stored
