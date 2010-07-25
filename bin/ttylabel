@@ -4,16 +4,40 @@
 #	- Cameron Simpson <cs@zip.com.au>
 #
 
-[ -n "$TTYLABEL_SUPPRESS" ] && exit 0
+set -ue
 
+cmd=$0
+usage="Usage: $cmd [-n] [--] [label...]"
+
+: ${TTYLABEL:=''}
+: ${TTYLABEL_SUPPRESS:=''}
+
+[ -z "$TTYLABEL_SUPPRESS" ] || exit 0
+
+esc=""
 report=
-xclip=
-case $1 in
-    -n) report=1; shift ;;
-esac
+
+badopts=
+
+while [ $# -gt 0 ]
+do
+  case $1 in
+    -n) report=1 ;;
+    --) shift; break ;;
+    -?*)echo "$cmd: unrecognised option: $1" >&2
+        badopts=1
+        ;;
+    *)  break ;;
+  esac
+  shift
+done
+
+# default label
+[ $# -gt 0 ] || set -- "$TTYLABEL"
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
 
 # [ -n "$tty_yellow" ] && echo "$tty_yellow$label$tty_normal"
-esc=""
 case "$TERM" in
   rxvt*|xterm*)
     _start_title="${esc}]0;"  _end_title=""
@@ -57,14 +81,11 @@ esac
 # bail out if no escape sequences
 [ -n "$_start_title$_start_icon" ] || exit 0
 
-# default label
-[ $# = 0 ] && set -- "$TTYLABEL"
-
 # clean the string up a bit
 label=`printf "%s" "$*" | tr -s ' \011\012\015\033' '    \['`
 
 ttylabel=
 [ -n "$_start_title" ] && ttylabel=$ttylabel$_start_title$label$_end_title
-[ -n "$_start_icon" ] && ttylabel=$ttylabel$_start_icon$label$_end_icon
+[ -n "$_start_icon"  ] && ttylabel=$ttylabel$_start_icon$label$_end_icon
 
 exec necho "$ttylabel"
