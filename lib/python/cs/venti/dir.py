@@ -3,7 +3,7 @@ import stat
 import sys
 if sys.hexversion < 0x02060000:
   from sets import Set as set
-from cs.logutils import debug, error, info, warn
+from cs.logutils import Pfx, debug, error, info, warn
 from cs.venti.block import decodeBlock
 from cs.venti.blockify import blockFromString
 from cs.venti.meta import Meta
@@ -17,17 +17,14 @@ gid_nogroup = -1
 
 # Directories (Dir, a subclass of dict) and directory entries (Dirent).
 
-def storeDir(path, aspath=None):
+def storeDir(path, aspath=None, trust_size_mtime=False):
   ''' Store a real directory into a Store, return the new Dir.
   '''
   if aspath is None:
     aspath = path
   D = Dir(aspath)
   debug("path=%s"%(path, ))
-  D.updateFrom(path,
-               ignoreTimes=False,
-               deleteMissing=True,
-               overWrite=True)
+  D.updateFrom(path, trust_size_mtime=trust_size_mtime)
   return D
 
 D_FILE_T = 0
@@ -345,6 +342,8 @@ class Dir(Dirent):
     return self.__needContent()[name]
 
   def __setitem__(self, name, E):
+    ''' Store a Dirent in the specified name slot.
+    '''
     ##debug("<%s>[%s]=%s" % (self.name, name, E))
     assert self.__validname(name)
     assert name not in self
@@ -416,81 +415,94 @@ class Dir(Dirent):
 
   def updateFrom(self,
                  osdir,
-                 ignoreTimes=False,
-                 deleteMissing=False,
-                 overWrite=False):
+                 trust_size_mtime=False,
+                 keep_missing=False,
+                 ignore_existing=False):
     ''' Update the target from the real file tree at source.
-        Return the top Dir (target).
+        Return True if no errors occurred.
     '''
-    from cs.venti.file import storeFile
-    debug("osdir=%s" % (osdir, ))
-    osdirpfx = os.path.join(osdir, '')
-    for dirpath, dirnames, filenames in os.walk(osdir, topdown=False):
-      debug("dirpath=%s" % dirpath)
-      if dirpath == osdir:
-        D = self
-      else:
-        assert dirpath.startswith(osdirpfx), \
-                "dirpath=%s, osdirpfx=%s" % (dirpath, osdirpfx)
-        subdirpath = dirpath[len(osdirpfx):]
-        D = self.makedirs(subdirpath)
-
-      if deleteMissing:
-        names = set(dirnames)
-        names.update(filenames)
-        Dnames = list(D.keys())
-        for name in Dnames:
-          if name not in names:
-            warn("delete %s" % (name))
-            del D[name]
-
-      for dirname in dirnames:
-        if dirname in D:
-          if not D[dirname].isdir():
-            # old name is not a dir - toss it and make a dir
-            del D[dirname]
-            D.mkdir(dirname)
-
-      for filename in filenames:
-        E = None
-        filepath = os.path.join(dirpath, filename)
-        try:
-          st = os.stat(filepath)
-        except OSError, e:
-          error("%s: stat: %s" % (filepath, e))
-          continue
-        except IOError, e:
-          error("%s: stat: %s" % (filepath, e))
-          continue
-        if filename not in D:
-          info("%s not in dir"%(filename,))
-        else:
-          E = D[filename]
-          if not E.isfile():
-            E = None
+    ok = True
+    with Pfx("updateFrom(%s,...)" % (osdir,)):
+      assert os.path.isdir(osdir), "not a directory"
+      from cs.venti.file import storeFile
+      osdirpfx = os.path.join(osdir, '')
+      for dirpath, dirnames, filenames in os.walk(osdir, topdown=False):
+        with Pfx(dirpath):
+          if dirpath == osdir:
+            D = self
           else:
-            if not overWrite:
-              warn("%s: not overwriting" % filepath)
-              continue
-            if ignoreTimes:
-              info("%s: IGNORETIMES=True" % filepath)
-            else:
-              if st.st_size == E.size() and int(st.st_mtime) == int(E.mtime):
-                info("%s: same size and mtime, skipping" % filepath)
-                continue
-              info("%s: differing size(%s:%s)/mtime(%s:%s)" % (filepath, st.st_size, E.size(), int(st.st_mtime), int(E.mtime)))
+            assert dirpath.startswith(osdirpfx), \
+                    "dirpath=%s, osdirpfx=%s" % (dirpath, osdirpfx)
+            subdirpath = dirpath[len(osdirpfx):]
+            D = self.makedirs(subdirpath)
 
-        warn("store %s" % (filename,))
-        M = Meta()
-        M.mtime = st.st_mtime
-        if E:
-          matchBlocks = E.getBlock().leaves()
-        else:
-          matchBlocks = None
-        with open(filepath) as ifp:
-          stored = storeFile(ifp, matchBlocks=matchBlocks)
-        stored.name = filename
-        stored.meta = M
-        if filename in D:
-          del D[filename]
-        D[filename] = stored
+          if not keep_missing:
+            allnames = set(dirnames)
+            allnames.update(filenames)
+            Dnames = list(D.keys())
+            for name in Dnames:
+              if name not in allnames:
+                info("delete %s" % (name,))
+                del D[name]
+
+          for dirname in dirnames:
+            if dirname in D:
+              if not D[dirname].isdir():
+                # old name is not a dir - toss it and make a dir
+                del D[dirname]
+                D.mkdir(dirname)
+
+          for filename in filenames:
+            with Pfx(filename):
+              filepath = os.path.join(dirpath, filename)
+              try:
+                self.storeFile(filename, filepath,
+                               trust_size_mtime=trust_size_mtime,
+                               ignore_existing=ignore_existing)
+              except OSError, e:
+                error("stat: %s" % (e,))
+                ok = False
+                continue
+              except IOError, e:
+                error("stat: %s" % (e,))
+                ok = False
+                continue
+    return ok
+
+  def storeFile(self, filename, filepath,
+                trust_size_mtime=False, ignore_existing=False):
+    with Pfx("%s.storeFile(%s, %s, trust_size_mtime=%s, ignore_existing=%s"
+             % (self, filename, filepath, trust_size_mtime, ignore_existing)):
+      if ignore_existing and filename in self:
+        info("already exists, skipping")
+        return
+      E = None
+      st = os.stat(filepath)
+      E = self[filename]
+      if not E.isfile():
+        # not a file, no blocks to match
+        E = None
+      else:
+        if trust_size_mtime \
+           and st.st_size == E.size() \
+           and int(st.st_mtime) == int(E.mtime):
+          info("same size and mtime, skipping")
+          return
+        info("differing size(%s:%s)/mtime(%s:%s)"
+              % (st.st_size, E.size(),
+                 int(st.st_mtime), int(E.mtime)))
+
+      info("storing")
+      # TODO: M.updateFromStat(st)
+      M = Meta()
+      M.mtime = st.st_mtime
+      if E:
+        matchBlocks = E.getBlock().leaves()
+      else:
+        matchBlocks = None
+      with open(filepath) as ifp:
+        stored = storeFile(ifp, name=filename, meta=M,
+                           matchBlocks=matchBlocks)
+      if filename in self:
+        del self[filename]
+      self[filename] = stored
