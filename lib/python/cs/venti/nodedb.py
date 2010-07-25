@@ -1,21 +1,24 @@
-from cs.venti.block import Block, IndirectBlock
+from cs.venti import texthexify, untexthexify
 import cs.venti.dir
-from cs.venti import totext
 
-def totext(D):
-  return totext(D.encode())
+def register_with(nodedb, scheme='cs.venti'):
+  ''' Register the cs.venti transcriptions with the supplied NodeDB.
+  '''
+  nodedb.register_attr_type(cs.venti.dir.Dirent, scheme+'.Dirent',
+                            dirent_totext, dirent_fromtext,
+                            dirent_tobytes, dirent_frombytes)
 
-def fromtext(value):
+def dirent_totext(D):
+  return texthexify(dirent_tobytes(D))
+
+def dirent_fromtext(value):
   D, name = cs.venti.dir.resolve(value)
   if name is not None:
     D = D[name]
   return D
 
-def tobytes(D):
+def dirent_tobytes(D):
   return D.encode()
 
-def frombytes(value):
-  return decodeDirect(value, justone=True)
-
-def register_with(nodedb, scheme='cs.venti'):
-  nodedb.register_type(Dirent, scheme, totext, fromtext, tobytes, frombytes)
+def dirent_frombytes(value):
+  return cs.venti.dir.decodeDirent(value, justone=True)
