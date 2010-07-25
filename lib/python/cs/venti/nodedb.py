@@ -1,21 +1,24 @@
+from cs.venti import texthexify, untexthexify
 import cs.venti.dir
-import cs.venti
 
-def totext(D):
-  return cs.venti.totext(D.encode())
+def register_with(nodedb, scheme='cs.venti'):
+  ''' Register the cs.venti transcriptions with the supplied NodeDB.
+  '''
+  nodedb.register_attr_type(cs.venti.dir.Dirent, scheme+'.Dirent',
+                            dirent_totext, dirent_fromtext,
+                            dirent_tobytes, dirent_frombytes)
 
-def fromtext(value):
+def dirent_totext(D):
+  return D.textEncode()
+
+def dirent_fromtext(value):
   D, name = cs.venti.dir.resolve(value)
   if name is not None:
     D = D[name]
   return D
 
-def tobytes(D):
+def dirent_tobytes(D):
   return D.encode()
 
-def frombytes(value):
+def dirent_frombytes(value):
   return cs.venti.dir.decodeDirent(value, justone=True)
-
-def register_with(nodedb, scheme='cs.venti'):
-  nodedb.register_type(cs.venti.dir.Dirent, scheme,
-                       totext, fromtext, tobytes, frombytes)

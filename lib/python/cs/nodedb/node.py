@@ -59,14 +59,6 @@ class _AttrList(list):
       return ".%ss[...]" % (self.key,)
     return "%s.%ss" % (str(self.node), self.key)
 
-  def _detach(self, noBackend=False):
-    assert False, "SURPRISE! call to _detach()"
-    assert self.node is not None, "_detach() of unattached _AttrList: %s" % (self,)
-    if not noBackend:
-      N = self.node
-      self.nodedb._backend.delAttr(N, self.key)
-    self.node = None
-
   def __delitem__(self, *args):
     value = list.__delitem__(self, *args)
     self.nodedb._backend.saveAttrs(self)
@@ -456,8 +448,8 @@ class NodeDB(dict):
                          totext, fromtext,
                          tobytes=None, frombytes=None):
     ''' Register an attribute value type for storage and retrieval in this
-        NodeDB. This permits the storage of values that are not the basic
-        string, non-negative integer and Node types.
+        NodeDB. This permits the storage of values that are not the
+        presupported string, non-negative integer and Node types.
         Parameters:
           `t`, the value type to register
           `scheme`, the scheme label to use for the type
@@ -768,13 +760,18 @@ class Backend(object):
   def totext(self, value):
     ''' Hook for subclasses that might do special encoding for their backend.
         Discouraged.
+        Instead, subtypes of NodeDB should register extra types they store
+        using using NodeDB.register_attr_type().
+        See cs/venti/nodedb.py for an example.
     '''
+    assert False, "OBSOLETE"
     return self.nodedb.totext(value)
 
   def fromtext(self, value):
     ''' Hook for subclasses that might do special decoding for their backend.
         Discouraged.
     '''
+    assert False, "OBSOLETE"
     return self.nodedb.fromtext(value)
 
   def close(self):

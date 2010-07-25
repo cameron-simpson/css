@@ -12,14 +12,15 @@ from cs.threads import IterableQueue
 from cs.misc import debug, TODO, FIXME, tb
 import __main__
 
-def storeFile(ifp, rsize=None, matchBlocks=None):
+def storeFile(ifp, rsize=None, matchBlocks=None, meta=None):
   ''' Store the data from ifp, return Dirent.
       TODO: set M.mtime from ifp.fstat().
   '''
-  M=Meta()
-  B=blockFromFile(ifp, rsize=rsize, matchBlocks=matchBlocks)
+  if meta is None:
+    meta = Meta()
+  B = blockFromFile(ifp, rsize=rsize, matchBlocks=matchBlocks)
   B.store()
-  return FileDirent(None,M,B)
+  return FileDirent(None, meta, B)
 
 class ReadFile:
   ''' A read-only file interface supporting seek(), read(), readline(),
