@@ -180,7 +180,8 @@ class Node(dict):
     return self.type+":"+self.name
 
   def __eq__(self, other):
-    return self.name == other.name and self.type == other.type
+    return hasattr(other, 'name') and self.name == other.name \
+       and hasattr(other, 'type') and self.type == other.type
 
   def __hash__(self):
     return hash(self.name)^hash(self.type)^id(self.nodedb)
