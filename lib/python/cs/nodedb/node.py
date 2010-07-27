@@ -764,7 +764,6 @@ class Backend(object):
         using using NodeDB.register_attr_type().
         See cs/venti/nodedb.py for an example.
     '''
-    assert False, "OBSOLETE"
     return self.nodedb.totext(value)
 
   def fromtext(self, value):
