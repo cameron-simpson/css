@@ -108,7 +108,11 @@ class Backend_SQLAlchemy(Backend):
   def fromtext(self, text):
     if text.startswith(':#'):
       warn("deprecated :#node_id serialisation: %s" % (text,))
-      return self.__nodesByID[int(text[2:])]
+      node_id = int(text[2:])
+      N = self.__nodesByID[int(text[2:])]
+      warn("  UPDATE %s SET VALUE=\"%s\" WHERE VALUE=\"%s\""
+           % (self.attrs, ":%s:%s" % (N.type, N.name), text))
+      return N
     return Backend.fromtext(self, text)
 
   def close(self):
