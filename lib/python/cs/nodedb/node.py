@@ -281,7 +281,7 @@ class Node(dict):
     ''' Return all "parent" Nodes P where P."attr"s contains self.
         If `t` is supplied and not None, select only parents of type `t`.
     '''
-    with Pfx("%s.parentsByAttr(attr=%s, t=%s)" % (self, attr, t):
+    with Pfx("%s.parentsByAttr(attr=%s, t=%s)" % (self, attr, t)):
       # TODO: make this efficient - it's currently brute force
       k, plural = parseUC_sAttr(attr)
       assert k and not plural, "bad attribute name \"%s\"" % (attr,)
