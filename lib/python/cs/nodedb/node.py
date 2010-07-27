@@ -281,15 +281,16 @@ class Node(dict):
     ''' Return all "parent" Nodes P where P."attr"s contains self.
         If `t` is supplied and not None, select only parents of type `t`.
     '''
-    # TODO: make this efficient - it's currently brute force
-    k, plural = parseUC_sAttr(attr)
-    assert k and not plural, "bad attribute name \"%s\"" % (attr,)
-    ks = k + 's'
-    if t:
-      Ps = self.nodedb.nodesByType(t)
-    else:
-      Ps = self.nodedb.values()
-    return [ P for P in Ps if self in P[ks] ]
+    with Pfx("%s.parentsByAttr(attr=%s, t=%s)" % (self, attr, t):
+      # TODO: make this efficient - it's currently brute force
+      k, plural = parseUC_sAttr(attr)
+      assert k and not plural, "bad attribute name \"%s\"" % (attr,)
+      ks = k + 's'
+      if t:
+        Ps = self.nodedb.nodesByType(t)
+      else:
+        Ps = self.nodedb.values()
+      return [ P for P in Ps if self in P[ks] ]
 
   def gettoken(self, attr, valuetxt, createSubNodes=False):
     ''' Method to extract a token from the start of a string.
