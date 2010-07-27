@@ -685,7 +685,7 @@ class NodeDB(dict):
       if t1.find(':', 1) < 0:
         raise ValueError, "bad :scheme:info \"%s\"" % (text,)
       scheme, info = t1.split(':', 1)
-      R = self.__scheme_registry.get(scheme, None)
+      R = self.__attr_scheme_registry.get(scheme, None)
       if R:
         return R.fromtext(info)
       raise ValueError, "unsupported :scheme:info \"%s\"" % (text,)
@@ -771,7 +771,7 @@ class Backend(object):
     ''' Hook for subclasses that might do special decoding for their backend.
         Discouraged.
     '''
-    assert False, "OBSOLETE"
+    ##assert False, "OBSOLETE"
     return self.nodedb.fromtext(value)
 
   def close(self):
