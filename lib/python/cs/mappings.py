@@ -1,6 +1,7 @@
 #!/usr/bin/python -tt
 
 from cs.misc import the
+from collections import defaultdict
 from functools import partial
 from types import StringTypes
 import sys
@@ -214,3 +215,19 @@ class MethodicalList(AttributableList):
         else:
           submethods.append(submethod)
     return MethodicalList( method() for method in submethods )
+
+class FallbackDict(defaultdict):
+  ''' A dictlike object that inherits from another dictlike object;
+      this is a convenience subclass of defaultdict.
+  '''
+
+  def __init__(self, otherdict):
+    ''' 
+    '''
+    defaultdict.__init__(self)
+    self.__otherdict = otherdict
+
+  def __missing__(self, key):
+    if key not in self:
+      return self.__otherdict[key]
+    raise KeyError(key)
