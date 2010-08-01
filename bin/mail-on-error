@@ -7,20 +7,27 @@
 : ${TMPDIR:=/tmp}
 
 cmd=`basename "$0"`
-usage="Usage: $cmd [-x] [-s subject] addresses command [args...]
+usage="Usage: $cmd [-x] [-s subject] [-S status] addresses command [args...]
   -x    Trace execution of command.
   -s    Specify subject line for email. Default:
-          FAIL: command args..."
+          FAIL: command args...
+  -S status
+        Specify status file.
+        In this mode, a successful run creates a status file.
+        An unsuccessful run removes the file.
+        Only send email on an error run after a successful run
+        i.e. on a state change to error status."
 
 subj=
 trace=
+statusfile=
 
 badopts=
 
 while [ $# -gt 0 ]
 do
   case $1 in
-    -S) subj=; echo "$0: OBSOLETE use of -S option" >&2 ;;
+    -S) statusfile=$2; shift ;;
     -s) subj=$2; shift ;;
     -x) trace=set-x ;;
     --) shift; break ;;
@@ -57,6 +64,21 @@ trap 'rm -f "$tmp"' 0 1 2 3 15
 xit=0
 $trace "$@" 2>"$tmp" || xit=$?
 cat "$tmp" >&2
-[ $xit = 0 ] && exit 0
-$trace mailsubj -s "$subj" "$addrs" <"$tmp"
+
+if [ $xit = 0 ]
+then
+  [ -n "$statusfile" ] && >>"$statusfile"
+else
+  if [ -n "$statusfile" ]
+  then
+    if [ -f "$statusfile" ]
+    then
+      rm -f -- "$statusfile"
+      $trace mailsubj -s "$subj" "$addrs" <"$tmp"
+    fi
+  else
+    $trace mailsubj -s "$subj" "$addrs" <"$tmp"
+  fi
+fi
+
 exit $xit
