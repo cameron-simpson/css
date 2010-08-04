@@ -1,4 +1,4 @@
-#!/usr/bin/env python2.5
+#!/usr/bin/env python2.6
 #
 # Read lines from the standard input. On a periodic basis, pipe them to
 # a subsidiary command.
@@ -10,7 +10,7 @@ import sys
 import time
 from thread import allocate_lock
 from threading import Thread
-from cs.misc import NoExceptions
+from cs.excutils import NoExceptions
 from cs.sh import vpopen
 
 delay=300
