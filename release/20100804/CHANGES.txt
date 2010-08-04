@@ -1,0 +1,259 @@
+changeset:   7806:4c1ed651831d
+tag:         release-20100719
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Mon Jul 19 11:15:09 2010 +1000
+files:       release/20100719/CHANGES.txt release/20100719/SUMMARY.txt release/20100719/release-tag.txt
+description:
+Release information for release-20100719.
+Summary:
+Many changes, bugfixes and some new stuff.
+TokyoCabinet backend for NodeDB. Move some more of the less general purpose
+stuff to the bin-cs directory and clean out a few dead scripts. Update
+the "set -- ..." incantations in a bunch of scripts. Start on NodeDB URLs.
+cs.threads.Channel.close() bugfix. Logging changes in a bunch of modules.
+cs.threads.TimerQueue: various improvements. Some venti support in NodeDB.
+New plaintext/hexcode transcription for venti. Many other updates to venti.
+log-hg-commit: log to dlog using category from .hg-cs-category file.
+Split perl, python and java code into separate lib subdirs.
+New cs.threads.IterablePriorityQueue. Apphelper view-unknown fix.
+with-opt-css wrapper script updates. sshto: -P option for tracing error
+source hosts. Start on cs.app.maildb somewhat. New AttributableList and
+MethodicalList in cs.mappings.
+
+
+changeset:   7807:6f1d55a4e101
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Mon Jul 19 11:15:10 2010 +1000
+files:       .hgtags
+description:
+Added tag release-20100719 for changeset 4c1ed651831d
+
+
+changeset:   7808:4b282c296d8f
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Mon Jul 19 12:42:29 2010 +1000
+files:       bin/sshto
+description:
+sshto: remove annoying debug tracing
+
+
+changeset:   7809:dd22411ea667
+parent:      7803:121ccca29889
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sun Jul 18 12:47:48 2010 +1000
+files:       lib/python/cs/venti/blockify.py
+description:
+cs.venti.blockify: clarify Blockifer doc string
+
+
+changeset:   7810:90a285caf263
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Mon Jul 19 15:46:50 2010 +1000
+files:       lib/python/cs/venti/blockify.py
+description:
+cs.venti.blockify: add mp3frame, to yield MP3 frame chunks from an MP3 file
+
+
+changeset:   7811:364e2896aa32
+parent:      7804:651c549b922c
+parent:      7810:90a285caf263
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Mon Jul 19 15:47:28 2010 +1000
+description:
+Automated merge with file:///Users/cameron/dev/css-fleet
+
+
+changeset:   7812:ed6421d11979
+parent:      7808:4b282c296d8f
+parent:      7811:364e2896aa32
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Mon Jul 19 15:47:41 2010 +1000
+description:
+Automated merge with file:///Users/cameron/dev/css-fleet
+
+
+changeset:   7813:49580f597c5e
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Mon Jul 19 16:16:35 2010 +1000
+files:       lib/python/cs/venti/dir.py lib/python/cs/venti/store.py
+description:
+remove some debug
+
+
+changeset:   7814:069ce6357f91
+parent:      7808:4b282c296d8f
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Tue Jul 20 15:36:03 2010 +1000
+files:       lib/python/cs/threads.py
+description:
+cs.threads: docstrings fixes
+
+
+changeset:   7815:0f2029c331f2
+parent:      7814:069ce6357f91
+parent:      7813:49580f597c5e
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Tue Jul 20 15:36:47 2010 +1000
+description:
+merge with venti blockifier branch
+
+
+changeset:   7816:c29889004dea
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sun Jul 25 17:45:46 2010 +1000
+files:       bin/ttylabel
+description:
+ttylabel: redo option/cmdline handling, no semantic changes
+
+
+changeset:   7817:74bbc6e3fe78
+parent:      7813:49580f597c5e
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Mon Jul 19 20:32:22 2010 +1000
+files:       lib/python/cs/venti/blockify.py lib/python/cs/venti/dir.py
+description:
+cs.venti: minor fixes
+
+
+changeset:   7818:c161b775226c
+parent:      7815:0f2029c331f2
+parent:      7817:74bbc6e3fe78
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Wed Jul 21 14:07:55 2010 +1000
+description:
+Automated merge with file:///Users/cameron/dev/css-fleet
+
+
+changeset:   7819:5df2beefdef4
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Wed Jul 21 20:42:14 2010 +1000
+files:       bin/vt lib/python/cs/venti/archive.py lib/python/cs/venti/block.py lib/python/cs/venti/blockify.py lib/python/cs/venti/cache.py lib/python/cs/venti/datafile.py lib/python/cs/venti/dir.py lib/python/cs/venti/gdbmstore.py lib/python/cs/venti/hash.py lib/python/cs/venti/httpd.py lib/python/cs/venti/meta.py lib/python/cs/venti/nodedb.py lib/python/cs/venti/store.py lib/python/cs/venti/stream.py lib/python/cs/venti/tcp.py lib/python/cs/venti/vtfuse.py
+description:
+cs.venti: lots of cleanups to make pylint happier, a few bugs found as a result
+
+
+changeset:   7820:97fba0bc559f
+parent:      7816:c29889004dea
+parent:      7819:5df2beefdef4
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sun Jul 25 19:39:33 2010 +1000
+description:
+Automated merge with file:///Users/cameron/dev/css-fleet
+
+
+changeset:   7821:41eb232a58ca
+parent:      7815:0f2029c331f2
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Mon Jul 26 06:59:22 2010 +1000
+files:       lib/python/cs/nodedb/node.py lib/python/cs/venti/dir.py lib/python/cs/venti/file.py lib/python/cs/venti/nodedb.py
+description:
+cs.nodedb: type registration docstring, repair cs.venti nodedb type registration, tweak storeFile signature
+
+
+changeset:   7822:d4af5d54fac9
+parent:      7820:97fba0bc559f
+parent:      7821:41eb232a58ca
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Mon Jul 26 07:16:48 2010 +1000
+files:       lib/python/cs/venti/dir.py lib/python/cs/venti/nodedb.py
+description:
+merge
+
+
+changeset:   7823:56e06fb4ea3b
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Mon Jul 26 07:56:24 2010 +1000
+files:       lib/python/cs/venti/dir.py lib/python/cs/venti/file.py
+description:
+cs.venti: redo file/dir storing functions, adjuts parametr names, add name to storeFile()
+
+
+changeset:   7824:2b94d459eb78
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Mon Jul 26 08:04:23 2010 +1000
+files:       lib/python/cs/venti/nodedb.py
+description:
+cs.venti.nodedb: add convenience file storage function
+
+
+changeset:   7825:98e6506bfb66
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Tue Jul 27 14:08:54 2010 +1000
+files:       lib/python/cs/mappings.py
+description:
+cs.mappings: add FallbackDict, intended for use with configparser
+
+
+changeset:   7826:fadaa847e781
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Tue Jul 27 14:19:18 2010 +1000
+files:       lib/python/cs/nodedb/node.py
+description:
+cs.nodedb: fix up fromtext stuff
+
+
+changeset:   7827:810619768978
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Tue Jul 27 15:28:32 2010 +1000
+files:       lib/python/cs/nodedb/sqla.py
+description:
+cs.nodedb.sqla: recite repair UPDATE for deprecated serialisation
+
+
+changeset:   7828:0306fa9c5374
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Tue Jul 27 16:28:43 2010 +1000
+files:       lib/python/cs/nodedb/node.py
+description:
+cs.nodedb: rebless .totext()
+
+
+changeset:   7829:08f02e463328
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Tue Jul 27 17:24:58 2010 +1000
+files:       lib/python/cs/nodedb/node.py
+description:
+cs.nodedb: a little context in .parentsByAttr()
+
+
+changeset:   7830:4a7f3f402966
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Tue Jul 27 17:26:36 2010 +1000
+files:       lib/python/cs/nodedb/node.py
+description:
+cs.nodedb: typo
+
+
+changeset:   7831:5a6a3d493adf
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Tue Jul 27 17:30:07 2010 +1000
+files:       lib/python/cs/nodedb/node.py
+description:
+cs.nodedb.Node.__eq__: cope if other does not have .name or .type
+
+
+changeset:   7832:1fe88af4f2f4
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Thu Jul 29 13:06:20 2010 +1000
+files:       lib/python/cs/nodedb/httpd.py
+description:
+cs.nodedb.httpd: web browser interface to a NodeDB
+
+
+changeset:   7833:9847797141ce
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sun Aug 01 19:33:46 2010 +1000
+files:       bin/mail-on-error
+description:
+mail-on-error: add -S statusfile and mail-on-state-change side effect
+
+
+changeset:   7834:8f204b947c56
+tag:         tip
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Wed Aug 04 20:58:23 2010 +1000
+files:       bin/periodic-report
+description:
+periodic-report: require python2.6, update to more recent cs.excutils.NoExceptions
+
+
