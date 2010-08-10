@@ -37,7 +37,7 @@ class _AttrList(list):
     ''' Initialise an _AttrList.
         `node` is the node to which this _AttrList is attached.
         `key` is the _singular_ form of the attribute name.
-        `_items` is a private paramater for populating an _AttrList which is
+        `_items` is a private parameter for populating an _AttrList which is
             not attached to a Node, derived from the .Xs notation.
 
         TODO: we currently do not rely on the backend to preserve ordering so
@@ -54,46 +54,89 @@ class _AttrList(list):
     if node is not None:
       self.nodedb = node.nodedb
 
+  def __delitemrefs(self, nodes):
+    ''' Remove the reverse references of this attribute.
+    '''
+    if self.node is None:
+      return
+    for N in nodes:
+      try:
+        delref = N._delReference
+      except AttributeError:
+        continue
+      if hasattr(N, 'name') and hasattr(N, 'type') and hasattr(N, 'nodedb'):
+        delref(N, key)
+
+  def __additemrefs(self, nodes):
+    ''' Add the reverse references of this attribute.
+    '''
+    if self.node is None:
+      return
+    for N in nodes:
+      try:
+        addref = N._addReference
+      except AttributeError:
+        continue
+      if hasattr(N, 'name') and hasattr(N, 'type') and hasattr(N, 'nodedb'):
+        addref(N, self.key)
+
   def __str__(self):
     if self.node is None:
       return ".%ss[...]" % (self.key,)
     return "%s.%ss" % (str(self.node), self.key)
 
-  def __delitem__(self, *args):
-    value = list.__delitem__(self, *args)
+  def __delitem__(self, index):
+    if type(index) is int:
+      items = (self[index],)
+    else:
+      items = itertools.islice(self, index)
+    value = list.__delitem__(self, index)
+    self.__delitemrefs(items)
     self.nodedb._backend.saveAttrs(self)
     return value
 
-  def __delslice__(self, *args):
-    value = list.__delslice__(self, *args)
+  def __delslice__(self, i, j):
+    del self[max(0, i):max(0, j):]
+
+  def __iadd__(self, other):
+    self.__additemrefs(other)
+    value = list.__iadd__(self, other)
     self.nodedb._backend.saveAttrs(self)
     return value
 
-  def __iadd__(self, *args):
-    value = list.__iadd__(self, *args)
+  def __imul__(self, other):
+    oitems = list(self)
+    value = list.__imul__(self, other)
+    self.__additemrefs(self)
+    self.__delitemrefs(oitems)
     self.nodedb._backend.saveAttrs(self)
     return value
 
-  def __imul__(self, *args):
-    value = list.__imul__(self, *args)
+  def __setitem__(self, index, value):
+    if type(index) is int:
+      items = (self[index],)
+    else:
+      items = itertools.islice(self, index)
+      value = list(value)       # we will use this twice
+    self.__delitemrefs(items)
+    value = list.__setitem__(self, index, value)
+    if type(index) is int:
+      items = (value,)
+    else:
+      items = value
+    self.__additemrefs(items)
     self.nodedb._backend.saveAttrs(self)
     return value
 
-  def __setitem__(self, *args):
-    value = list.__setitem__(self, *args)
-    self.nodedb._backend.saveAttrs(self)
-    return value
-
-  def __setslice__(self, *args):
-    value = list.__setslice__(self, *args)
-    self.nodedb._backend.saveAttrs(self)
-    return value
+  def __setslice__(self, i, j, values):
+    self[max(0, i):max(0, j):] = values
 
   def append(self, value, noBackend=False):
     if not noBackend:
       N = self.node
       self.nodedb._backend.extendAttr(N, self.key, (value,))
     list.append(self, value)
+    self.__additemrefs((value,))
 
   def extend(self, values, noBackend=False):
     # turn iterator into tuple
@@ -103,21 +146,24 @@ class _AttrList(list):
       N = self.node
       self.nodedb._backend.extendAttr(N, self.key, values)
     list.extend(self, values)
+    self.__additemrefs(values)
 
-  def insert(self, *args):
-    value = list.insert(self, *args)
+  def insert(self, index, value):
+    value = list.insert(self, index, value)
     self.nodedb._backend.saveAttrs(self)
+    self.__additemrefs((value,))
     return value
 
-  def pop(self, *args):
-    value = list.pop(self, *args)
+  def pop(self, index=-1):
+    value = list.pop(self, index)
     self.nodedb._backend.saveAttrs(self)
+    self.__delitemrefs((value,))
     return value
 
-  def remove(self, *args):
-    value = list.remove(self, *args)
+  def remove(self, value):
+    list.remove(self, value)
     self.nodedb._backend.saveAttrs(self)
-    return value
+    self.__delitemrefs(value)
 
   def reverse(self, *args):
     value = list.reverse(self, *args)
@@ -130,18 +176,6 @@ class _AttrList(list):
     if self:
       self.nodedb._backend.saveAttrs(self)
     return value
-
-##def __getitem__(self, index):
-##  assert type(index) is int, "non-int indices not yet supported: "+repr(index)
-##  return list.__getitem__(self, index)
-
-  def __setitem__(self, index, value, noBackend=False):
-    assert type(index) is int, "non-int indices not yet supported: "+repr(index)
-    if not noBackend:
-      N = self.node
-      self.nodedb._backend.delAttr(N, self.key)
-      self.nodedb._backend.extendAttr(N, self.key, self)
-    list.__setitem__(self, index, value)
 
   def __getattr__(self, attr):
     ''' Using a .ATTR[s] attribute on an _AttrList indirects through
@@ -172,6 +206,43 @@ class Node(dict):
     self.type = str1(t)
     self.name = name
     self.nodedb = nodedb
+    self._reverse = {}  # maps (OtherNode, ATTR) => count
+
+  def _addReference(self, onode, oattr):
+    ''' Add a reference to this Node.
+    '''
+    key = (onode, str1(oattr))
+    if key in self._reverse:
+      self._reverse[key] += 1
+    else:
+      self._reverse[key] = 1
+
+  def _delReference(self, onode, oattr):
+    ''' Remove a reference to this Node.
+    '''
+    key = (onode, str1(oattr))
+    if self._reverse[key] == 1:
+      del self._reverse[key]
+    else:
+      self._reverse[key] -= 1
+
+  def references(self, attr=None, type=None):
+    ''' Generator to yield:
+          onode, oattr, count
+        for every other Node referring to this Node.
+        The parameter `attr`, if supplied and not None,
+        constrains the result to attributes matching that name.
+        The parameter `type`, if supplied and not None,
+        constrains the result to nodes of that type.
+        `onode` is the other Node.
+        `oattr` is the attribute containing the reference.
+        `count` is the number of references to this Node in the attribute.
+    '''
+    for key, count in list(self._reverse.items()):
+      onode, oattr = key
+      if attr is None or oattr == attr:
+        if type is None or onode.type == type:
+          yield onode, oattr, count
 
   def __repr__(self):
     return "%s:%s:%s" % (self.type, self.name, dict.__repr__(self))
@@ -277,21 +348,6 @@ class Node(dict):
       dict.__setattr__(self, attr, value)
     else:
       self[attr] = value
-
-  def parentsByAttr(self, attr, t=None):
-    ''' Return all "parent" Nodes P where P."attr"s contains self.
-        If `t` is supplied and not None, select only parents of type `t`.
-    '''
-    with Pfx("%s.parentsByAttr(attr=%s, t=%s)" % (self, attr, t)):
-      # TODO: make this efficient - it's currently brute force
-      k, plural = parseUC_sAttr(attr)
-      assert k and not plural, "bad attribute name \"%s\"" % (attr,)
-      ks = k + 's'
-      if t:
-        Ps = self.nodedb.nodesByType(t)
-      else:
-        Ps = self.nodedb.values()
-      return [ P for P in Ps if self in P[ks] ]
 
   def gettoken(self, attr, valuetxt, createSubNodes=False):
     ''' Method to extract a token from the start of a string.
