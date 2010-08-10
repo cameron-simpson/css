@@ -65,7 +65,7 @@ class _AttrList(list):
       except AttributeError:
         continue
       if hasattr(N, 'name') and hasattr(N, 'type') and hasattr(N, 'nodedb'):
-        delref(N, key)
+        delref(self.node, self.key)
 
   def __additemrefs(self, nodes):
     ''' Add the reverse references of this attribute.
@@ -78,7 +78,7 @@ class _AttrList(list):
       except AttributeError:
         continue
       if hasattr(N, 'name') and hasattr(N, 'type') and hasattr(N, 'nodedb'):
-        addref(N, self.key)
+        addref(self.node, self.key)
 
   def __str__(self):
     if self.node is None:
@@ -967,6 +967,18 @@ class TestAll(unittest.TestCase):
     self.assertEqual(ipaddrs, ['1.2.3.4', '5.6.7.8'])
     nics = H.NICs
     self.assertRaises(AttributeError, getattr, nics, 'IPADDR')
+
+  def testReverseMap(self):
+    H = self.db.newNode('HOST', 'foo')
+    NIC0 = self.db.newNode('NIC', 'eth0')
+    NIC0.IPADDR = '1.2.3.4'
+    NIC1 = self.db.newNode('NIC', 'eth1')
+    NIC1.IPADDR = '5.6.7.8'
+    H.NICs = (NIC0, NIC1)
+    NIC0refs = list(NIC0.references())
+    self.assert_(H in [ N for N, a, c in NIC0.references() ])
+    self.assert_(H in [ N for N, a, c in NIC1.references() ])
+    self.assert_(H not in [ N for N, a, c in H.references() ])
 
 if __name__ == '__main__':
   unittest.main()
