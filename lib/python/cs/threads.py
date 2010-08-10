@@ -611,34 +611,6 @@ class DictMonitor(dict):
       ks = dict.keys(self)
     return ks
 
-##def bgCall(func,args,ch=None):
-##  ''' Spawn a thread to call the supplied function with the supplied
-##      args. Return a channel on which the function return value may be read. 
-##      A channel may be supplied by the caller; if not then the returned
-##      channel must be released with returnChannel().
-##  '''
-##  if ch is None:
-##    ch=getChannel()
-##  bg=Thread(target=_bgFunc,args=(func,args,ch))
-##  ##bg.setDaemon(True)
-##  bg.setName("bgCall(func=%s, args=%s)" % (func, args))
-##  bg.start()
-##  return ch
-##def _bgFunc(func,args,ch):
-##  result=func(*args)
-##  ch.put(result)
-##def _bgReturn(args,ch):
-##  ch.put(args)
-##def bgReturn(result,ch=None):
-##  ''' Return an asynchronous result.
-##      Takes the result, returns a channel from which to read it back.
-##      A channel may be supplied by the caller; if not then the returned
-##      channel must be release with returnChannel().
-##  '''
-##  return bgCall(_bgReturn,(result,))
-
-# TODO: synchronous mode for synchronous call() so we can feed from
-# a PriorityQueue
 class FuncMultiQueue(object):
   ''' A FuncMultiQueue is a mechanism for processing function calls
       asynchronously with a certain number (the `capacity`) active at any one
@@ -773,7 +745,6 @@ class FuncMultiQueue(object):
         the function. If retq is None the function result is discarded.
     '''
     tag = seq()
-    # TODO: HANDLE PRIORITY MODE
     rq = (func, retq, tag)
     if self._priority:
       rq = list(priority) + [rq]

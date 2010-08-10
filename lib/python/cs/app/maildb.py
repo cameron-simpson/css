@@ -46,7 +46,7 @@ PersonNode=Node
 class MessageNode(Node):
 
   def referers(self):
-    return [ N for N in self.parentsByAttr('FOLLOWUPs') if N.TYPE == 'MESSAGE' ]
+    return set( N for N, attr, count in self.references(attr='FOLLOWUP', type='MESSAGE') )
 
   def followups(self):
     return self.FOLLOWUPs

@@ -194,7 +194,7 @@ class NodeDB_RQHandler(BaseHTTPRequestHandler):
         heading.append(")")
       self._puttok(heading)
 
-      parents = list(N.parentsByAttr(N.type))
+      parents = set( rN for rN, rAttr, rCount in N.references() )
       if parents:
         def bylabel(a, b): return cmp(str(a), str(b))
         parents.sort(bylabel)
