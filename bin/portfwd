@@ -88,7 +88,7 @@ synckill()
 if [ "x$*" = xALL ]
 then
   if [ $stop ]
-  then  set -- `ls "$VARRUN/." | sed -n 's/^portfwd\.//p'`
+  then  set -- `ls "$VARRUN/." | sed -n 's/\.pid$//; s/^portfwd\.//p'`
   else  set -- `sed -n 'y/	/ /
                         s/$/ /
                         s/^  *//
@@ -193,8 +193,8 @@ do
   fi
 
   # wait for tunnel to exit or tunnel permission to expire
-  while pfx "ssh-$target" kill -0 "$sshpid" && ok2portfwd
-  do  sleep 2
+  while kill -0 "$sshpid" && ok2portfwd
+  do  sleep 31
   done
   if synckill "$sshpid"
   then
