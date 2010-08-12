@@ -28,6 +28,9 @@ re_INT = re.compile(r'-?[0-9]+')
 # "bare" URL
 re_BAREURL = re.compile(r'[a-z]+://[-a-z0-9.]+/[-a-z0-9_.]+')
 
+def _byname(a, b):
+  return cmp(a.name, b.name)
+
 class _AttrList(list):
   ''' An _AttrList is a list subtype that understands Nodes
       and .ATTR[s] attribute access and drives a backend.
@@ -465,6 +468,7 @@ class NodeDB(dict):
 
   def __init__(self, backend, readonly=False):
     dict.__init__(self)
+    self.readonly = readonly
     self.__attr_type_registry = {}
     self.__attr_scheme_registry = {}
     if backend is None:
@@ -472,7 +476,6 @@ class NodeDB(dict):
     self._backend = backend
     self.__nodesByType = {}
     backend.set_nodedb(self)
-    self.readonly = readonly
     self._lock = allocate_lock()
 
   class __AttrTypeRegistration(object):
@@ -586,7 +589,7 @@ class NodeDB(dict):
     if k:
       if plural:
         return self.__nodesByType.get(k, ())
-    return super(NodeDB, self).__getattr__(attr)
+    return getattr(super(NodeDB, self), attr)
 
   def __getitem__(self, item):
     key = nodekey(item)
@@ -751,6 +754,65 @@ class NodeDB(dict):
       seqnum, t, name = t1[1:].split(':', 2)
       return self.otherDB(int(seqnum))[t, name]
     raise ValueError, "unparsable text \"%s\"" % (text,)
+
+  def dump(self, fp, fmt='csv'):
+    if fmt == 'csv':
+      import csv
+      w = csv.writer(fp)
+      w.writerow( ('TYPE', 'NAME', 'ATTR', 'VALUE') )
+      typenames = list(self.types())
+      typenames.sort()
+      otype = None
+      for t in typenames:
+        nodes = list(getattr(self, t+'s'))
+        nodes.sort(_byname)
+        oname = None
+        for N in nodes:
+          attrs = N.keys()
+          attrs.sort()
+          oattr = None
+          for attr in attrs:
+            for value in N[attr]:
+              ct = t if otype is None or t != otype else ''
+              cn = N.name if oname is None or N.name != oname else ''
+              ca = attr if oattr is None or attr != oattr else ''
+              row = (ct, cn, ca, self.totext(value))
+              w.writerow(row)
+              otype, oname, oattr = t, N.name, attr
+      fp.flush()
+      return
+
+    raise ValueError, "unsupported format '%s'" % (fmt,)
+
+  def load(self, fp, fmt='csv', skipHeaders=False, noHeaders=False):
+    if fmt == 'csv':
+      import csv
+      r = csv.reader(fp)
+      if not noHeaders:
+        hdrrow = r.next()
+        if not skipHeaders:
+          assert hdrrow == ['TYPE', 'NAME', 'ATTR', 'VALUE'], \
+                 "bad header row, expected TYPE, NAME, ATTR, VALUE but got: %s" % (hdrrow,)
+      otype = None
+      oname = None
+      oattr = None
+      for row in r:
+        t, n, attr, value = row
+        if t == "":
+          assert otype is not None
+          t = otype
+        if n == "":
+          assert oname is not None
+          n = oname
+        if attr == "":
+          assert oattr is not None
+          attr = oattr
+        N = self.get( (t, n), doCreate=True )
+        N[attr].append(self.fromtext(value))
+        otype, oname, oattr = t, N.name, attr
+      return
+
+    raise ValueError, "unsupported format '%s'" % (fmt,)
 
 _NodeDBsByURL = {}
 
