@@ -199,6 +199,19 @@ class _AttrList(list):
       return hit
     raise AttributeError, str(self)
 
+  def where(self, **kw):
+    hits = []
+    keys = kw.keys()
+    for N in self:
+      ok = True
+      for k in keys:
+        if getattr(N, k) != kw[k]:
+          ok = False
+          break
+      if ok:
+        hits.append(N)
+    return _AttrList(node=None, key=self.key, _items=hits)
+
 class Node(dict):
   ''' A Node dictionary.
       Entries are _AttrLists, keyed by attribute name in plural form.
@@ -1050,6 +1063,16 @@ class TestAll(unittest.TestCase):
     self.assert_(H in [ N for N, a, c in NIC0.references() ])
     self.assert_(H in [ N for N, a, c in NIC1.references() ])
     self.assert_(H not in [ N for N, a, c in H.references() ])
+
+  def testWhere(self):
+    H = self.db.newNode('HOST', 'foo')
+    NIC0 = self.db.newNode('NIC', 'eth0')
+    NIC0.IPADDR = '1.2.3.4'
+    NIC1 = self.db.newNode('NIC', 'eth1')
+    NIC1.IPADDR = '5.6.7.8'
+    H.NICs = (NIC0, NIC1)
+    subnics = H.NICs.where(IPADDR='1.2.3.4')
+    self.assert_(subnics == [NIC0])
 
 if __name__ == '__main__':
   unittest.main()
