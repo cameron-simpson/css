@@ -166,16 +166,14 @@ class _AttrList(list):
     self.__delitemrefs(value)
 
   def reverse(self, *args):
-    value = list.reverse(self, *args)
+    list.reverse(self, *args)
     if self:
       self.nodedb._backend.saveAttrs(self)
-    return value
 
   def sort(self, *args):
-    value = list.sort(self, *args)
+    list.sort(self, *args)
     if self:
       self.nodedb._backend.saveAttrs(self)
-    return value
 
   def __getattr__(self, attr):
     ''' Using a .ATTR[s] attribute on an _AttrList indirects through
