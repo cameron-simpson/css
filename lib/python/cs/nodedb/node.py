@@ -296,7 +296,7 @@ class Node(dict):
       raise KeyError, repr(item)
     assert k not in ('NAME', 'TYPE'), "forbidden ATTR \"%s\"" % (item,)
     ks = k+'s'
-    row = _AttrList(self, k)
+    row = _AttrList(self, ks)
     if plural:
       if value:
         row.extend(value)
