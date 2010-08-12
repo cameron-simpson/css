@@ -1,6 +1,7 @@
 #!/usr/bin/python
 #
 
+import os.path
 import re
 import sys
 if sys.hexversion < 0x02060000:
@@ -712,7 +713,7 @@ class NodeDB(dict):
       return ':'+scheme+':'+R.totext(value)
     raise ValueError, "can't totext(%s)" % (repr(value),)
 
-  def fromtext(self, text):
+  def fromtext(self, text, doCreate=True):
     ''' Convert a stored string into a value.
           text        The string "text" for strings not commencing with a colon.
           ::text      The string ":text" for strings commencing with a colon.
@@ -738,7 +739,7 @@ class NodeDB(dict):
       if t1.find(':', 1) < 0:
         raise ValueError, "bad :TYPE:NAME \"%s\"" % (text,)
       t, name = t1.split(':', 1)
-      return self.nodeByTypeName(t, name)
+      return self.nodeByTypeName(t, name, doCreate=doCreate)
     if t1[0].islower():
       # scheme:info
       if t1.find(':', 1) < 0:
@@ -808,7 +809,7 @@ class NodeDB(dict):
           assert oattr is not None
           attr = oattr
         N = self.get( (t, n), doCreate=True )
-        N[attr].append(self.fromtext(value))
+        N[attr].append(self.fromtext(value, doCreate=True))
         otype, oname, oattr = t, N.name, attr
       return
 
@@ -831,11 +832,21 @@ def NodeDBFromURL(url, readonly=False, klass=None):
     # otherwise reject
     base = os.path.basename(url)
     _, ext = os.path.splitext(base)
+    if ext == '.csv':
+      return NodeDBFromURL('file-csv://'+url, readonly=readonly)
     if ext == '.tch':
       return NodeDBFromURL('file-tch://'+url, readonly=readonly)
     if ext == '.sqlite':
       return NodeDBFromURL('sqlite://'+url, readonly=readonly)
     raise ValueError, "unsupported NodeDB URL: "+url
+
+  if url.startswith('file-csv://'):
+    from cs.nodedb.csvdb import Backend_CSVFile
+    dbpath = url[11:]
+    backend = Backend_CSVFile(dbpath, readonly=readonly)
+    db = klass(backend, readonly=readonly)
+    _NodeDBsByURL[url] = db
+    return db
 
   if url.startswith('file-tch://'):
     from cs.nodedb.tokcab import Backend_TokyoCabinet
