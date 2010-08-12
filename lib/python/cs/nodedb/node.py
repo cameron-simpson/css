@@ -349,12 +349,21 @@ class Node(dict):
     return dict.__hasattr__(self, attr)
 
   def __getattr__(self, attr):
+    # .inTYPE() -> referring nodes if this TYPE
+    if attr.startswith('in') and len(attr) > 2:
+      k, plural = parseUC_sAttr(attr[2:])
+      if k and not plural:
+        return _AttrList(node=None, key=None,
+                         _items=[ N for N, a, c in self.references(type=k) ]
+                        )
+    # .ATTR and .ATTRs
     k, plural = parseUC_sAttr(attr)
     if k:
       value = self.__get(k, plural)
       if value is None:
         raise AttributeError, str(self)+'.'+repr(attr)
       return value
+
     raise AttributeError, str(self)+'.'+repr(attr)
 
   def __setattr__(self, attr, value):
@@ -1073,6 +1082,16 @@ class TestAll(unittest.TestCase):
     H.NICs = (NIC0, NIC1)
     subnics = H.NICs.where(IPADDR='1.2.3.4')
     self.assert_(subnics == [NIC0])
+
+  def testInTYPE(self):
+    H = self.db.newNode('HOST', 'foo')
+    NIC0 = self.db.newNode('NIC', 'eth0')
+    NIC0.IPADDR = '1.2.3.4'
+    NIC1 = self.db.newNode('NIC', 'eth1')
+    NIC1.IPADDR = '5.6.7.8'
+    H.NICs = (NIC0, NIC1)
+    self.assert_(NIC0.inHOST == [H])
+    self.assert_(NIC0.inNIC == [])
 
 if __name__ == '__main__':
   unittest.main()
