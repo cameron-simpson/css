@@ -26,6 +26,9 @@ class Backend_TokyoCabinet(Backend):
                      else tc.HDBOWRITER | tc.HDBOCREAT
                    ))
 
+  def sync(self):
+    raise NotImplementedError
+
   def close(self):
     self.tcdb.close()
 

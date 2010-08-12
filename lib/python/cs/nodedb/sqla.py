@@ -115,6 +115,9 @@ class Backend_SQLAlchemy(Backend):
       return N
     return Backend.fromtext(self, text)
 
+  def sync(self):
+    raise NotImplementedError
+
   def close(self):
     raise NotImplementedError
 

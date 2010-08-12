@@ -20,6 +20,9 @@ class Backend_CSVFile(Backend):
     self.csvpath = csvpath
 
   def close(self):
+    self.sync()
+
+  def sync(self):
     if not self.nodedb.readonly:
       with open(self.csvpath, "wb") as fp:
         self.nodedb.dump(fp, fmt='csv')

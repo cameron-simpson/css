@@ -993,6 +993,9 @@ class _QBackend(Backend):
     self._T = Thread(target=self._drain)
     self._T.start()
 
+  def sync(self):
+    raise NotImplementedError
+
   def close(self):
     self._Q.close()
     self._T.join()
