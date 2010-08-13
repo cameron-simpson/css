@@ -3,6 +3,7 @@
 import os.path
 import sys
 from cs.nodedb.node import Node, NodeDB, Backend, NodeDBFromURL
+from cs.logutils import error
 
 def main(argv):
   import logging

@@ -862,34 +862,44 @@ def NodeDBFromURL(url, readonly=False, klass=None):
       return NodeDBFromURL('sqlite://'+url, readonly=readonly)
     raise ValueError, "unsupported NodeDB URL: "+url
 
-  if url.startswith('file-csv://'):
-    from cs.nodedb.csvdb import Backend_CSVFile
-    dbpath = url[11:]
-    backend = Backend_CSVFile(dbpath, readonly=readonly)
-    db = klass(backend, readonly=readonly)
-    _NodeDBsByURL[url] = db
-    return db
+  markpos = url.find('://')
+  if markpos > 0:
+    markend = markpos + 3
+    scheme = url[:markpos]
+    if scheme == 'file-csv':
+      from cs.nodedb.csvdb import Backend_CSVFile
+      dbpath = url[markend:]
+      backend = Backend_CSVFile(dbpath, readonly=readonly)
+      db = klass(backend, readonly=readonly)
+      _NodeDBsByURL[url] = db
+      return db
 
-  if url.startswith('file-tch://'):
-    from cs.nodedb.tokcab import Backend_TokyoCabinet
-    dbpath = url[11:]
-    backend = Backend_TokyoCabinet(dbpath, readonly=readonly)
-    db = klass(backend, readonly=readonly)
-    _NodeDBsByURL[url] = db
-    return db
+    if scheme == 'file-tch':
+      from cs.nodedb.tokcab import Backend_TokyoCabinet
+      dbpath = url[markend:]
+      backend = Backend_TokyoCabinet(dbpath, readonly=readonly)
+      db = klass(backend, readonly=readonly)
+      _NodeDBsByURL[url] = db
+      return db
 
-  if url.startswith('sqlite:') or url.startswith('mysql:'):
-    # TODO: direct sqlite support, skipping SQLAlchemy?
-    # TODO: mysql: URLs will leak user and password - strip first for key
-    assert not url.startswith('sqlite:///:memory:'), \
-           "sorry, \"%s\" isn't a singleton URL" % (url,)
-    from cs.nodedb.sqla import Backend_SQLAlchemy
-    dbpath = url
-    backend = Backend_SQLAlchemy(dbpath, readonly=readonly)
-    db = klass(backend, readonly=readonly)
-    _NodeDBsByURL[url] = db
-    db.url = url
-    return db
+    if scheme == 'sqlite' or scheme == 'mysql':
+      # TODO: direct sqlite support, skipping SQLAlchemy?
+      # TODO: mysql: URLs will leak user and password - strip first for key
+      assert not url.startswith('sqlite:///:memory:'), \
+             "sorry, \"%s\" isn't a singleton URL" % (url,)
+      from cs.nodedb.sqla import Backend_SQLAlchemy
+      dbpath = url
+      backend = Backend_SQLAlchemy(dbpath, readonly=readonly)
+      db = klass(backend, readonly=readonly)
+      _NodeDBsByURL[url] = db
+      db.url = url
+      return db
+
+  if os.path.isfile(url):
+    if url.endswith('.csv'):
+      return NodeDBFromURL('file-csv://'+os.path.abspath(url), readonly=readonly)
+    if url.endswith('.tch'):
+      return NodeDBFromURL('file-tch://'+os.path.abspath(url), readonly=readonly)
 
   raise ValueError, "unsupported NodeDB URL: "+url
 
