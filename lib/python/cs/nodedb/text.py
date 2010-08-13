@@ -132,7 +132,7 @@ def editNode(N, editor=None, createSubNodes=False):
   ##print >>sys.stderr, "new_attrs:"
   ##for attr in sorted(new_attrs.keys()):
   ##  print >>sys.stderr, "%s %s" % (attr, new_attrs[attr])
-  N.update(new_attrs)       # , delete_missing=True
+  N.update(new_attrs, delete_missing=True)
 
 def assign(N, assignment, createSubNodes=False):
   ''' Take a string of the form ATTR=values and apply it.
