@@ -855,11 +855,11 @@ def NodeDBFromURL(url, readonly=False, klass=None):
     base = os.path.basename(url)
     _, ext = os.path.splitext(base)
     if ext == '.csv':
-      return NodeDBFromURL('file-csv://'+url, readonly=readonly)
+      return NodeDBFromURL('file-csv://'+url, readonly=readonly, klass=klass)
     if ext == '.tch':
-      return NodeDBFromURL('file-tch://'+url, readonly=readonly)
+      return NodeDBFromURL('file-tch://'+url, readonly=readonly, klass=klass)
     if ext == '.sqlite':
-      return NodeDBFromURL('sqlite://'+url, readonly=readonly)
+      return NodeDBFromURL('sqlite://'+url, readonly=readonly, klass=klass)
     raise ValueError, "unsupported NodeDB URL: "+url
 
   markpos = url.find('://')
@@ -897,9 +897,9 @@ def NodeDBFromURL(url, readonly=False, klass=None):
 
   if os.path.isfile(url):
     if url.endswith('.csv'):
-      return NodeDBFromURL('file-csv://'+os.path.abspath(url), readonly=readonly)
+      return NodeDBFromURL('file-csv://'+os.path.abspath(url), readonly=readonly, klass=klass)
     if url.endswith('.tch'):
-      return NodeDBFromURL('file-tch://'+os.path.abspath(url), readonly=readonly)
+      return NodeDBFromURL('file-tch://'+os.path.abspath(url), readonly=readonly, klass=klass)
 
   raise ValueError, "unsupported NodeDB URL: "+url
 
