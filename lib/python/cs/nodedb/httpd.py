@@ -197,6 +197,7 @@ class NodeDB_RQHandler(BaseHTTPRequestHandler):
       parents = set( rN for rN, rAttr, rCount in N.references() )
       if parents:
         def bylabel(a, b): return cmp(str(a), str(b))
+        parents = list(parents)
         parents.sort(bylabel)
         self._puttok("Attached to:")
         sep = " "
