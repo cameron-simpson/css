@@ -12,6 +12,7 @@ else:
 import itertools
 from thread import allocate_lock
 from threading import Thread
+from types import StringTypes
 import unittest
 from cs.lex import str1
 from cs.misc import the
@@ -719,7 +720,7 @@ class NodeDB(dict):
       odb, seqnum = self.nodedb.otherDB(value.nodedb.url)
       return ":+%d:%s:%s" % (seqnum, value.type, value.name)
     t = type(value)
-    if t is str:
+    if t in StringTypes:
       if value.startswith(':'):
         return ':'+value
       return value
