@@ -121,7 +121,7 @@ class NodeDB_RQHandler(BaseHTTPRequestHandler):
 
     top = parts.pop(0)
     warn("top=[%s]" % (top,))
-    ext = None
+    ext = ''
     dotpos = top.rfind('.')
     if dotpos > 0:
       key = top[:dotpos]
