@@ -192,7 +192,7 @@ do
     # Do not honour the .hbinclude file in the backup directory.
     # 
     --no-hbinclude)
-      usehbinclude=1
+      usehbinclude=
       ;;
 
     # =item --rsync-path rrsync
