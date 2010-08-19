@@ -121,7 +121,7 @@ class NodeDB_RQHandler(BaseHTTPRequestHandler):
 
     top = parts.pop(0)
     warn("top=[%s]" % (top,))
-    ext = None
+    ext = ''
     dotpos = top.rfind('.')
     if dotpos > 0:
       key = top[:dotpos]
@@ -197,6 +197,7 @@ class NodeDB_RQHandler(BaseHTTPRequestHandler):
       parents = set( rN for rN, rAttr, rCount in N.references() )
       if parents:
         def bylabel(a, b): return cmp(str(a), str(b))
+        parents = list(parents)
         parents.sort(bylabel)
         self._puttok("Attached to:")
         sep = " "
