@@ -1,0 +1,224 @@
+changeset:   7835:c8c30984752d
+tag:         release-20100804
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Wed Aug 04 21:01:49 2010 +1000
+files:       release/20100804/CHANGES.txt release/20100804/SUMMARY.txt release/20100804/release-tag.txt
+description:
+Release information for release-20100804.
+Summary:
+Various cs.venti and cs.nodedb updates, state change mode for mail-on-error, other minor changes.
+
+
+changeset:   7836:27725de684b6
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Wed Aug 04 21:01:50 2010 +1000
+files:       .hgtags
+description:
+Added tag release-20100804 for changeset c8c30984752d
+
+
+changeset:   7837:7ffae4223fc2
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Thu Aug 05 08:19:26 2010 +1000
+files:       bin-cs/updcss
+description:
+updcss: don't distribute bin-bos
+
+
+changeset:   7838:91ef18ce2fb0
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Thu Aug 05 08:35:00 2010 +1000
+files:       bin-cs/updcss
+description:
+updcss: prune the cisra tree too
+
+
+changeset:   7839:6e228fbcf177
+parent:      7836:27725de684b6
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Tue Aug 10 12:27:33 2010 +1000
+files:       lib/python/cs/app/maildb.py lib/python/cs/nodedb/httpd.py lib/python/cs/nodedb/node.py
+description:
+cs.nodedb: implement in-Node reverse reference tracking
+
+
+changeset:   7840:5042df7ffa0c
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Tue Aug 10 12:43:25 2010 +1000
+files:       lib/python/cs/nodedb/node.py
+description:
+cs.nodedb.node: add reverse ref test, bugfix reference tracking
+
+
+changeset:   7841:da9871d91996
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Tue Aug 10 12:46:50 2010 +1000
+files:       lib/python/cs/threads.py
+description:
+cs.threads: remove some old commented out stuff
+
+
+changeset:   7842:e3226c72ba61
+parent:      7838:91ef18ce2fb0
+parent:      7841:da9871d91996
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Tue Aug 10 12:46:54 2010 +1000
+description:
+Automated merge with ssh://home/hg/css
+
+
+changeset:   7843:2afd8472dc76
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Wed Aug 11 15:23:10 2010 +1000
+files:       bin/loginenv defunct/loginenv
+description:
+loginenv: defunct - use with-login-env for self and not support other users at present
+
+
+changeset:   7844:ae9003d5cdb3
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Wed Aug 11 15:23:55 2010 +1000
+files:       bin/portfwd
+description:
+portfwd: fix targets-from-.pid-files and back off the stay-up probe interval
+
+
+changeset:   7845:f5db44befe26
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Thu Aug 12 10:00:19 2010 +1000
+files:       lib/python/cs/nodedb/node.py
+description:
+cs.nodedb.node: _AttrList: sort() and reverse() don't return values
+
+
+changeset:   7846:764e2285eff8
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Thu Aug 12 14:05:06 2010 +1000
+files:       lib/python/cs/nodedb/__init__.py
+description:
+cs.nodedb: main program
+
+
+changeset:   7847:e264c954e552
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Thu Aug 12 14:05:23 2010 +1000
+files:       lib/python/cs/nodedb/csvdb.py lib/python/cs/nodedb/node.py
+description:
+cs.nodedb: CSV file support
+
+
+changeset:   7848:43b7fd09d9de
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Thu Aug 12 14:11:28 2010 +1000
+files:       lib/python/cs/nodedb/node.py
+description:
+cs.nodedb: support opening a csv file
+
+
+changeset:   7849:a0d9f1b2648e
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Fri Aug 13 09:06:50 2010 +1000
+files:       lib/python/cs/nodedb/node.py
+description:
+cs.nodedb.node.Node: fix internal key plurality
+
+
+changeset:   7850:b9ef558639be
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Fri Aug 13 09:17:03 2010 +1000
+files:       lib/python/cs/nodedb/node.py
+description:
+cs.nodedb: add .where(ATTR[s]=value[s],..) to _AttrList class
+
+
+changeset:   7851:a1e99aed90c6
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Fri Aug 13 09:26:19 2010 +1000
+files:       lib/python/cs/nodedb/node.py
+description:
+cs.nodedb: add .where(ATTR[s]=value[s],..) to _AttrList class
+
+
+changeset:   7852:548718c4482d
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Fri Aug 13 09:34:57 2010 +1000
+files:       lib/python/cs/nodedb/csvdb.py lib/python/cs/nodedb/node.py lib/python/cs/nodedb/sqla.py lib/python/cs/nodedb/tokcab.py
+description:
+cs.nodedb: add .sync() method to backends, only works on CSV files at present
+
+
+changeset:   7853:4ca71299aafd
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Fri Aug 13 14:47:11 2010 +1000
+files:       lib/python/cs/nodedb/__init__.py lib/python/cs/nodedb/node.py
+description:
+cs.nodedb: NodeDBFromURL supports relative pathnames to .csv and .tch files
+
+
+changeset:   7854:7592f750ab2a
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Fri Aug 13 15:03:00 2010 +1000
+files:       lib/python/cs/nodedb/node.py
+description:
+cs.nodedb: NodeDBFromURL(): preserve klass in recursion
+
+
+changeset:   7855:f5e2f4be1f3e
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Fri Aug 13 19:05:42 2010 +1000
+files:       lib/python/cs/nodedb/node.py
+description:
+cs.nodedb: cope with unicode in totext; needs more thought perhaps
+
+
+changeset:   7856:09a539b9844f
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Fri Aug 13 20:28:02 2010 +1000
+files:       lib/python/cs/nodedb/text.py
+description:
+cs.nodedb.text: use delete_missing=True in edit()
+
+
+changeset:   7857:4d3db0d66cbf
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Fri Aug 13 20:39:50 2010 +1000
+files:       lib/python/cs/nodedb/node.py
+description:
+cs.nodedb: write singular attribute names to CSV dumps, cope with plurals on load
+
+
+changeset:   7858:5983eca54c7f
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Fri Aug 20 09:39:07 2010 +1000
+files:       bin/histbackup
+description:
+histbackup: fix --no-hbinclude option
+
+
+changeset:   7859:01e2dab9cd74
+parent:      7857:4d3db0d66cbf
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Fri Aug 13 21:15:53 2010 +1000
+files:       lib/python/cs/nodedb/httpd.py
+description:
+cs.nodedb.httpd: fix up "attached to"
+
+
+changeset:   7860:442c11d6c186
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Fri Aug 20 09:40:23 2010 +1000
+files:       lib/python/cs/nodedb/httpd.py
+description:
+cs.nodedb.httpd: set ext="" instead of None - feels like a bandaid instead of a fix
+
+
+changeset:   7861:263f0abe1b58
+tag:         tip
+parent:      7858:5983eca54c7f
+parent:      7860:442c11d6c186
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Fri Aug 20 09:40:28 2010 +1000
+description:
+Automated merge with ssh://home/hg/css
+
+
