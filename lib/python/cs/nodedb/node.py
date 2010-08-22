@@ -773,11 +773,11 @@ class NodeDB(dict):
           attrs.sort()
           oattr = None
           for attr in attrs:
-            assert attr.endswith('s'), "bogus node attribute: %s" % (attr,)
+            assert not attr.endswith('s'), "bogus plural node attribute: %s" % (attr,)
             for value in N[attr]:
               ct = t if otype is None or t != otype else ''
               cn = N.name if oname is None or N.name != oname else ''
-              ca = attr[:-1] if oattr is None or attr != oattr else ''
+              ca = attr if oattr is None or attr != oattr else ''
               row = (ct, cn, ca, self.totext(value))
               w.writerow(row)
               otype, oname, oattr = t, N.name, attr
@@ -802,6 +802,7 @@ class NodeDB(dict):
         t, n, attr, value = row
         if attr.endswith('s'):
           # revert older plural dump format
+          warn("loading old plural attribute: %s" % (attr,))
           k, plural = parseUC_sAttr(attr)
           assert k is not None, "failed to parse attribute name: %s" % (attr,)
           attr = k
@@ -815,7 +816,11 @@ class NodeDB(dict):
           assert oattr is not None
           attr = oattr
         N = self.get( (t, n), doCreate=True )
-        N[attr+'s'].append(self.fromtext(value, doCreate=True))
+        value = self.fromtext(value, doCreate=True)
+        if attr in N:
+          N[attr].append(value)
+        else:
+          N[attr] = (value,)
         otype, oname, oattr = t, N.name, attr
       return
 
