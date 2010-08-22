@@ -119,19 +119,17 @@ class _AttrList(list):
 
   def __setitem__(self, index, value):
     if type(index) is int:
-      items = (self[index],)
+      ovalues = (self[index],)
+      values = (value,)
+      index = slice(index, index+1)
     else:
-      items = itertools.islice(self, index)
-      value = list(value)       # we will use this twice
-    self.__delitemrefs(items)
-    value = list.__setitem__(self, index, value)
-    if type(index) is int:
-      items = (value,)
-    else:
-      items = value
-    self.__additemrefs(items)
+      assert type(index) is slice
+      ovalues = itertools.islice(self, index.start, index.stop, index.step)
+      values = list(value)
+    self.__delitemrefs(ovalues)
+    list.__setitem__(self, index, values)
+    self.__additemrefs(values)
     self.nodedb._backend.saveAttrs(self)
-    return value
 
   def __setslice__(self, i, j, values):
     self[max(0, i):max(0, j):] = values
@@ -189,8 +187,7 @@ class _AttrList(list):
     '''
     k, plural = parseUC_sAttr(attr)
     if k:
-      ks = k+'s'
-      hits = itertools.chain(*[ N[ks] for N in self ])
+      hits = itertools.chain(*[ N[k] for N in self ])
       if plural:
         return _AttrList(node=None, key=k, _items=hits)
       try:
@@ -214,8 +211,14 @@ class _AttrList(list):
     return _AttrList(node=None, key=self.key, _items=hits)
 
 class Node(dict):
-  ''' A Node dictionary.
-      Entries are _AttrLists, keyed by attribute name in plural form.
+  ''' A Node is a subclass of dict, mapping an attribute name to a list
+      of values.
+      It also supports object attributes of the form .ATTR and .ATTR[[e]s],
+      meaning the single value of the attribute named "ATTR" or the _AttrList
+      associated with that ATTR respectively. Use of the singular form
+      requires that len(Node["ATTR"]) == 1. Use of the plural form may return
+      an empty list; in this case hasattr(Node, "ATTR") will be false and
+      Node["ATTR"] will raise a KeyError.
   '''
 
   def __init__(self, t, name, nodedb):
@@ -273,106 +276,86 @@ class Node(dict):
   def __hash__(self):
     return hash(self.name)^hash(self.type)^id(self.nodedb)
 
-  def __get(self, k, plural):
-    assert k is not None
-    ks = k+'s'
-    if ks not in self:
-      row = _AttrList(self, ks)
-      dict.__setitem__(self, ks, row)
-    else:
-      row = dict.__getitem__(self, ks)
-    if plural:
-      return row
-    if len(row) == 1:
-      return row[0]
-    return None
+  # __getitem__ goes directly to the dict implementation
 
-  def get(self, item, default=None):
-    try:
-      return self[item]
-    except KeyError:
-      return default
-
-  def __getitem__(self, item):
-    if item in self:
-      # fast track direct access to plural members
-      return dict.__getitem__(self, item)
-    k, plural = parseUC_sAttr(item)
-    if k:
-      value = self.__get(k, plural)
-      if value is not None:
-        return value
-    raise KeyError, repr(item)
-
-  def __setitem__(self, item, value):
+  def __setitem__(self, item, values):
+    ''' Set Node[item] = values.
+        Unlike a normal dictionary, a shallow copy of values is stored, not
+        values itself.
+    '''
     k, plural = parseUC_sAttr(item)
     if k is None:
       raise KeyError, repr(item)
-    assert k not in ('NAME', 'TYPE'), "forbidden ATTR \"%s\"" % (item,)
-    ks = k+'s'
-    row = _AttrList(self, ks)
-    if plural:
-      if value:
-        row.extend(value)
-    else:
-      row.append(value)
-
-    # update the backend
-    if len(row) == 1 and hasattr(self, ks) and len(self[ks]) == 1:
-      # special case the common single value case
-      self.nodedb._backend.set1Attr(self, k, row[0])
-    else:
-      if hasattr(self, ks):
-        self.nodedb._backend.delAttr(self, k)
-      if row:
-        self.nodedb._backend.extendAttr(self, k, row)
-
-    # update the front end
-    dict.__setitem__(self, ks, row)
+    assert not plural and k not in ('NAME', 'TYPE'), \
+           "forbidden index %s" % (repr(item),)
+    # TODO:
+    #  discard old values, if any, to clean up reverse references
+    #  if new values empty, delete entry in dict
+    if k in self:
+      ovalues = dict.__getitem__(self, k)
+      ovalues[:]=[]
+      dict.__delitem__(self, k)
+    values = list(values)
+    if len(values):
+      row = _AttrList(self, k)
+      row.extend(values)
+      dict.__setitem__(self, k, row)
 
   def __delitem__(self, item):
     k, plural = parseUC_sAttr(item)
     if k is None:
       raise KeyError, repr(item)
-    ks = k+'s'
-    if not plural:
-      if len(self[ks]) != 1:
-        raise KeyError, repr(item)
-    dict.__delitem__(self, ks)
+    assert not plural, "forbidden plural index: %s" % (item,)
+    dict.__setitem__(self, k, ())
+    dict.__delitem__(self, k)
 
   def __hasattr__(self, attr):
     k, plural = parseUC_sAttr(item)
     if k:
-      ks = k+'s'
-      if ks not in self:
+      if k not in self:
         return False
-      return len(self[ks]) > 0
+      return len(self[k]) > 0
     return dict.__hasattr__(self, attr)
 
   def __getattr__(self, attr):
-    # .inTYPE() -> referring nodes if this TYPE
+    # .inTYPE -> referring nodes if this TYPE
     if attr.startswith('in') and len(attr) > 2:
       k, plural = parseUC_sAttr(attr[2:])
       if k and not plural:
         return _AttrList(node=None, key=None,
                          _items=[ N for N, a, c in self.references(type=k) ]
                         )
+
     # .ATTR and .ATTRs
     k, plural = parseUC_sAttr(attr)
     if k:
-      value = self.__get(k, plural)
-      if value is None:
-        raise AttributeError, str(self)+'.'+repr(attr)
-      return value
+      try:
+        row = self[k]
+      except KeyError:
+        row = _AttrList(self, k)
+      if plural:
+        return row
+      if len(row) == 1:
+        return row[0]
+      raise AttributeError, "%s.%s" % (self, attr)
 
     raise AttributeError, str(self)+'.'+repr(attr)
 
   def __setattr__(self, attr, value):
+    # forbid .inTYPE attribute setting
+    if attr.startswith('in') and len(attr) > 2:
+      k, plural = parseUC_sAttr(attr[2:])
+      if k:
+        raise ValueError, "setting .%s is forbidden" % (attr,)
+
     k, plural = parseUC_sAttr(attr)
-    if k is None:
-      dict.__setattr__(self, attr, value)
+    if k:
+      # .ATTR[s] = value
+      if not plural:
+        value = (value,)
+      self[k] = value
     else:
-      self[attr] = value
+      dict.__setattr__(self, attr, value)
 
   def gettoken(self, attr, valuetxt, createSubNodes=False):
     ''' Method to extract a token from the start of a string.
@@ -430,10 +413,9 @@ class Node(dict):
         if not k:
           error("%s.applyAttrs: ignore non-ATTRs: %s" % (self, attr))
           continue
-        ks = k+'s'
-        if ks not in self:
-          info("new .%s=%s" % (ks, new_attrs[attr]))
-          self[ks] = new_attrs[attr]
+        if k not in self:
+          info("new .%s=%s" % (k+'s', new_attrs[attr]))
+          self[k] = new_attrs[attr]
 
       # change or possibly remove old attributes
       old_attr_names = self.keys()
@@ -446,18 +428,13 @@ class Node(dict):
         if k.endswith('_ID'):
           error("%s.applyAttrs: ignoring bad old ATTR_ID: %s" % (self, attr))
           continue
-        ks = k+'s'
-        if ks in new_attrs:
-          if self[ks] != new_attrs[ks]:
-            info("set .%s=%s" % (ks, new_attrs[attr]))
-            ##print >>sys.stderr, "OLD:"
-            ##for v in self[ks]: print >>sys.stderr, repr(v)
-            ##print >>sys.stderr, "NEW:"
-            ##for v in new_attrs[attr]: print >>sys.stderr, repr(v)
-            self[ks] = new_attrs[attr]
+        if k in new_attrs:
+          if self[k] != new_attrs[k]:
+            info("set .%s=%s" % (k, new_attrs[attr]))
+            self[k] = new_attrs[attr]
         elif delete_missing:
-          info("del .%s=%s" % (ks, new_attrs[attr]))
-          del self[ks]
+          info("del .%s=%s" % (k+'s', new_attrs[attr]))
+          del self[k]
 
 def nodekey(*args):
   ''' Convert some sort of key to a (TYPE, NAME) tuple.
