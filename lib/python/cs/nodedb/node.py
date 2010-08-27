@@ -276,12 +276,23 @@ class Node(dict):
   def __hash__(self):
     return hash(self.name)^hash(self.type)^id(self.nodedb)
 
+  def __get(self, k):
+    ''' Fetch the item specified.
+        Create an empty list if necessary.
+    '''
+    try:
+      values = self[k]
+    except KeyError:
+      values = _AttrList(self, k)
+      dict.__setitem__(self, k, values) # ensure this gets used later
+    return values
+
   # __getitem__ goes directly to the dict implementation
 
-  def __setitem__(self, item, values):
-    ''' Set Node[item] = values.
-        Unlike a normal dictionary, a shallow copy of values is stored, not
-        values itself.
+  def __setitem__(self, item, new_values):
+    ''' Set Node[item] = new_values.
+        Unlike a normal dictionary, a shallow copy of new_values is stored,
+        not new_values itself.
     '''
     k, plural = parseUC_sAttr(item)
     if k is None:
@@ -291,21 +302,19 @@ class Node(dict):
     # TODO:
     #  discard old values, if any, to clean up reverse references
     #  if new values empty, delete entry in dict
-    if k in self:
-      ovalues = dict.__getitem__(self, k)
-      ovalues[:]=[]
-      dict.__delitem__(self, k)
-    values = list(values)
+
+    values = self.__get(k)
     if len(values):
-      row = _AttrList(self, k)
-      row.extend(values)
-      dict.__setitem__(self, k, row)
+      # discard old values (removes reverse map)
+      values[:]=[]
+    new_values = list(new_values)
+    if len(new_values):
+      values.extend(new_values)
 
   def __delitem__(self, item):
     k, plural = parseUC_sAttr(item)
-    if k is None:
+    if k is None or plural:
       raise KeyError, repr(item)
-    assert not plural, "forbidden plural index: %s" % (item,)
     dict.__setitem__(self, k, ())
     dict.__delitem__(self, k)
 
@@ -321,14 +330,11 @@ class Node(dict):
     # .ATTR and .ATTRs
     k, plural = parseUC_sAttr(attr)
     if k:
-      try:
-        row = self[k]
-      except KeyError:
-        row = _AttrList(self, k)
+      values = self.__get(k)
       if plural:
-        return row
-      if len(row) == 1:
-        return row[0]
+        return values
+      if len(values) == 1:
+        return values[0]
       raise AttributeError, "%s.%s" % (self, attr)
 
     raise AttributeError, str(self)+'.'+repr(attr)
