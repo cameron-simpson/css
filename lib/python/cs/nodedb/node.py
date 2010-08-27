@@ -309,14 +309,6 @@ class Node(dict):
     dict.__setitem__(self, k, ())
     dict.__delitem__(self, k)
 
-  def __hasattr__(self, attr):
-    k, plural = parseUC_sAttr(item)
-    if k:
-      if k not in self:
-        return False
-      return len(self[k]) > 0
-    return dict.__hasattr__(self, attr)
-
   def __getattr__(self, attr):
     # .inTYPE -> referring nodes if this TYPE
     if attr.startswith('in') and len(attr) > 2:
