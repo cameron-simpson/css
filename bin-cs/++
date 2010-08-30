@@ -67,7 +67,7 @@ then
                         continue
                         ;;
       esac
-      [ -d "$dir/." ] || $trace mkdir -p "$dir" || { xit=1; continue; }
+      [ -d "$dbdir/." ] || $trace mkdir -p "$dbdir" || { xit=1; continue; }
       dbpath=$dbdir/mairix.db
       [ -s "$rc" ] || mkmairixrc -d "$dir" --db "$dbpath" >"$rc" || { xit=1; continue; }
       $trace mairix $vflag -f "$rc" || xit=1

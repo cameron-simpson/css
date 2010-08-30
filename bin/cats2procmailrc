@@ -292,6 +292,7 @@ import string
 from cStringIO import StringIO
 import re
 if sys.hexversion < 0x02060000: from sets import Set as set
+from cs.mailAddresses import loadAddresses, addrsRegexp
 
 trackRules=True         # add X-Cats2Procmailrc line to show rule
 useXLabel=False         # put tag in X-Label header instead of subject
@@ -348,7 +349,6 @@ for opt, arg in opts:
   if opt == '-a':
     alertCommand=arg
   elif opt == '-A':
-    from cs.mailAddresses import loadAddresses, addrsRegexp
     catmap, addrmap = loadAddresses(arg)
     for cat in catmap.keys():
       addrs=catmap[cat].keys()
