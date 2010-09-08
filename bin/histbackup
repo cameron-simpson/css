@@ -363,7 +363,7 @@ then
           echo "$dest/$thisbackup" >&3
       else
           $echo "updating $thisbackup from $src ..."
-          $trace rsync $rsopts -aH $rsdelete --rsync-path "$rrsync" ${1+"$@"} "$src/." "$dest/$thisbackup/."
+          $trace rsync $rsopts -aH $rsdelete --rsync-path "$rrsync" ${1+"$@"} "$src/" "$dest/$thisbackup/"
       fi
     }
 else
@@ -386,7 +386,7 @@ else
         if [ $use_rsync ]
         then
             $trace mkdir "$dest/$thisbackup" \
-            && $trace rsync $rsopts -aH --rsync-path "$rrsync" ${1+"$@"} "$src/." "$dest/$thisbackup/."
+            && $trace rsync $rsopts -aH --rsync-path "$rrsync" ${1+"$@"} "$src/" "$dest/$thisbackup/"
         else
             cpr "$src" "$dest/$thisbackup"
         fi
