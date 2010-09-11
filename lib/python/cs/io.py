@@ -24,6 +24,24 @@ def lastline(fp):
 def loadfile(path):
   return file(path).read()
 
+def contlines(fp):
+  ''' Generator that reads continued lines from a file.
+      Continued lines have leading whitespace on following lines.
+      `fp` is an iterable that yields lines, such as an open file.
+  '''
+  lastline = None
+  for line in fp:
+    if len(line) == 0:
+      break
+    if line.startswith(' ') or line.startswith('\t'):
+      lastline += line
+      continue
+    if lastline is not None:
+      yield lastline
+    lastline = line
+  if lastline is not None:
+    yield lastline
+
 def readcontline(fp):
   """ read a line which may be continued with leading whitespace """
   line=fp.readline()
@@ -144,3 +162,17 @@ class IndentedFile(OFileWrapper):
         off=nl+1
         nl=s.find('\n',off)
       OFileWrapper.write(self,s[off:])
+
+if __name__ == '__main__':
+  import unittest
+  from StringIO import StringIO
+  class Tests(unittest.TestCase):
+    def _testContlines(self, text, lines):
+      self.assertEquals( list( contlines(StringIO(text)) ), lines )
+
+    def test00contlines(self):
+      self._testContlines("", [])
+      self._testContlines("line 1\nline 2\n", ["line 1\n", "line 2\n"])
+      self._testContlines("line 1\n  line 1b\n", ["line 1\n  line 1b\n"])
+      self._testContlines("line 0\nline 1\n  line 1b\nline 2\n", ["line 0\n", "line 1\n  line 1b\n", "line 2\n"])
+  unittest.main()
