@@ -42,35 +42,6 @@ def contlines(fp):
   if lastline is not None:
     yield lastline
 
-def readcontline(fp):
-  """ read a line which may be continued with leading whitespace """
-  line=fp.readline()
-  if len(line) == 0:
-    return line
-  assert line[-1] == '\n', "%s: unterminated line"%fp
-
-  lines=[line]
-  while True:
-    oldpos=fp.tell()
-    line=fp.readline()
-    if len(line) == 0:
-      break
-    assert line[-1] == '\n', "%s: unterminated line"%fp
-    if line[0] != ' ' and line[0] != '\t':
-      fp.seek(oldpos)
-      break
-    lines.append(line)
-
-  return "".join(lines)
-
-class ContLineFile(file):
-  """ a file object whose iterator returns contlines """
-  def next(self):
-    line=readcontline(self)
-    if len(line) == 0:
-      raise StopIteration
-    return line
-
 def pread(f,size,pos,whence=0,norestore=False):
   ''' Read a chunk of data from an arbitrary position in a file.
       Restores the file pointer after the read unless norestore is True.
@@ -174,5 +145,6 @@ if __name__ == '__main__':
       self._testContlines("", [])
       self._testContlines("line 1\nline 2\n", ["line 1\n", "line 2\n"])
       self._testContlines("line 1\n  line 1b\n", ["line 1\n  line 1b\n"])
-      self._testContlines("line 0\nline 1\n  line 1b\nline 2\n", ["line 0\n", "line 1\n  line 1b\n", "line 2\n"])
+      self._testContlines("line 0\nline 1\n  line 1b\nline 2\n",
+                          ["line 0\n", "line 1\n  line 1b\n", "line 2\n"])
   unittest.main()

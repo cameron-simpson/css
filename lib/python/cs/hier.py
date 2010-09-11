@@ -236,14 +236,11 @@ class HierInput(_Hier):
   def loadfile(self,filename,charset=None):
     """ Read Hier data from the named file.
     """
-    fp=cs.io.ContLineFile(filename)
     D=DictUC_Attrs()
-
-    for line in fp:
-      kv=self.kvline(line,charset=charset)
-      D[kv[0]]=kv[1]
-    fp.close()
-
+    with open(filename) as fp:
+      for line in cs.io.contlines(fp):
+        kv=self.kvline(line,charset=charset)
+        D[kv[0]]=kv[1]
     return D
 
   def savefile(self,dict,filename):
