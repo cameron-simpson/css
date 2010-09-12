@@ -20,6 +20,77 @@ from cs.misc import seq
 from cs.logutils import LogTime, error, warn
 from cs.misc import seq
 
+class WorkerThreadPool(object):
+  ''' A pool of worker threads to run functions.
+  '''
+
+  def __init__(self):
+    self.closed = False
+    self.idle = deque()
+    self.all = []
+
+  def close(self):
+    ''' Close the pool.
+        Close all the request queues.
+        Join all the worker threads.
+        It is an error to call close() more than once.
+    '''
+    assert not self.closed
+    self.closed = True
+    for H, HQ in self.all:
+      HQ.close()
+    for H, HQ in self.all:
+      H.join()
+
+  def dispatch(self, func, retq=None, deliver=None):
+    ''' Dispatch the callable `func` in a separate thread.
+        On completion the result is the sequence:
+          func_result, None, None, None
+        On an exception the result is the sequence:
+          None, exec_type, exc_value, exc_traceback
+        If retq is not None, the result is .put() on retq.
+        If deliver is not None, deliver(result) is called.
+    '''
+    assert not self.closed
+    idle = self.idle
+    if idle:
+      # use an idle thread
+      Hdesc = idle.pop()
+    else:
+      # no available threads - make one
+      args = []
+      H = Thread(target=self._handler, args=args)
+      H.daemon = True
+      Hdesc = (H, Channel())
+      self.all.append(Hdesc)
+      args.append(Hdesc)
+      H.start()
+    Hdesc[1].put( (func, retq, deliver) )
+
+  def _handler(self, Hdesc):
+    ''' The code run by each handler thread.
+	Read a function `func`, return queue `retq` and delivery
+	function `deliver` from the function queue,
+        Run func().
+        On completion the result is the sequence:
+          func_result, None, None, None
+        On an exception the result is the sequence:
+          None, exec_type, exc_value, exc_traceback
+        If retq is not None, the result is .put() on retq.
+        If deliver is not None, deliver(result) is called.
+    '''
+    FQ = Hdesc[1]
+    for func, retq, deliver in FQ:
+      try:
+        result = func(), None, None, None
+      except:
+        result = (None,) + sys.exc_info()
+      if retq is not None:
+        retq.put(result)
+      if deliver is not None:
+        deliver(result)
+      self.idle.append( Hdesc )
+
 class AdjustableSemaphore(object):
   ''' A semaphore whose value may be tuned after instantiation.
   '''
