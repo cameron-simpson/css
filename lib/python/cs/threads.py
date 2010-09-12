@@ -23,20 +23,25 @@ from cs.misc import seq
 class AdjustableSemaphore(object):
   ''' A semaphore whose value may be tuned after instantiation.
   '''
+
   def __init__(self, value=1, name="AdjustableSemaphore"):
-    self.__sem=Semaphore(value)
-    self.__value=value
-    self.__name=name
-    self.__lock=allocate_lock()
+    self.__sem = Semaphore(value)
+    self.__value = value
+    self.__name = name
+    self.__lock = allocate_lock()
+
   def __enter__(self):
-    with LogTime("%s(%d).__enter__: acquire" % (self.__name,self.__value)):
+    with LogTime("%s(%d).__enter__: acquire" % (self.__name, self.__value)):
       self.acquire()
+
   def __exit__(self,exc_type,exc_value,traceback):
     self.release()
     return False
+
   def release(self):
     self.__sem.release()
-  def acquire(self,blocking=True):
+
+  def acquire(self, blocking=True):
     ''' The acquire() method calls the base acquire() method if not blocking.
         If blocking is true, the base acquire() is called inside a lock to
         avoid competing with a reducing adjust().
@@ -46,7 +51,8 @@ class AdjustableSemaphore(object):
     with self.__lock:
       self.__sem.acquire(blocking)
     return True
-  def adjust(self,newvalue):
+
+  def adjust(self, newvalue):
     ''' The adjust(newvalue) method calls release() or acquire() an
         appropriate number of times.  If newvalue lowers the semaphore
         capacity then adjust() may block until the overcapacity is
@@ -54,17 +60,17 @@ class AdjustableSemaphore(object):
     '''
     assert newvalue > 0
     with self.__lock:
-      delta=newvalue-self.__value
+      delta = newvalue-self.__value
       if delta > 0:
         while delta > 0:
           self.__sem.release()
-          delta-=1
+          delta -= 1
       else:
         while delta < 0:
           with LogTime("AdjustableSemaphore(%s): acquire excess capacity" % (self.__name,)):
             self.__sem.acquire(True)
-          delta+=1
-      self.__value=newvalue
+          delta += 1
+      self.__value = newvalue
 
 class Channel(object):
   ''' A zero-storage data passage.
