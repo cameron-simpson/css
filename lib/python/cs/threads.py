@@ -20,23 +20,99 @@ from cs.misc import seq
 from cs.logutils import LogTime, error, warn
 from cs.misc import seq
 
+class WorkerThreadPool(object):
+  ''' A pool of worker threads to run functions.
+  '''
+
+  def __init__(self):
+    self.closed = False
+    self.idle = deque()
+    self.all = []
+
+  def close(self):
+    ''' Close the pool.
+        Close all the request queues.
+        Join all the worker threads.
+        It is an error to call close() more than once.
+    '''
+    assert not self.closed
+    self.closed = True
+    for H, HQ in self.all:
+      HQ.close()
+    for H, HQ in self.all:
+      H.join()
+
+  def dispatch(self, func, retq=None, deliver=None):
+    ''' Dispatch the callable `func` in a separate thread.
+        On completion the result is the sequence:
+          func_result, None, None, None
+        On an exception the result is the sequence:
+          None, exec_type, exc_value, exc_traceback
+        If retq is not None, the result is .put() on retq.
+        If deliver is not None, deliver(result) is called.
+    '''
+    assert not self.closed
+    idle = self.idle
+    if idle:
+      # use an idle thread
+      Hdesc = idle.pop()
+    else:
+      # no available threads - make one
+      args = []
+      H = Thread(target=self._handler, args=args)
+      H.daemon = True
+      Hdesc = (H, Channel())
+      self.all.append(Hdesc)
+      args.append(Hdesc)
+      H.start()
+    Hdesc[1].put( (func, retq, deliver) )
+
+  def _handler(self, Hdesc):
+    ''' The code run by each handler thread.
+	Read a function `func`, return queue `retq` and delivery
+	function `deliver` from the function queue,
+        Run func().
+        On completion the result is the sequence:
+          func_result, None, None, None
+        On an exception the result is the sequence:
+          None, exec_type, exc_value, exc_traceback
+        If retq is not None, the result is .put() on retq.
+        If deliver is not None, deliver(result) is called.
+    '''
+    FQ = Hdesc[1]
+    for func, retq, deliver in FQ:
+      try:
+        result = func(), None, None, None
+      except:
+        result = (None,) + sys.exc_info()
+      if retq is not None:
+        retq.put(result)
+      if deliver is not None:
+        deliver(result)
+      self.idle.append( Hdesc )
+
 class AdjustableSemaphore(object):
   ''' A semaphore whose value may be tuned after instantiation.
   '''
+
   def __init__(self, value=1, name="AdjustableSemaphore"):
-    self.__sem=Semaphore(value)
-    self.__value=value
-    self.__name=name
-    self.__lock=allocate_lock()
+    self.__sem = Semaphore(value)
+    self.__value = value
+    self.__name = name
+    self.__lock = allocate_lock()
+
   def __enter__(self):
-    with LogTime("%s(%d).__enter__: acquire" % (self.__name,self.__value)):
+    with LogTime("%s(%d).__enter__: acquire" % (self.__name, self.__value)):
       self.acquire()
+
   def __exit__(self,exc_type,exc_value,traceback):
     self.release()
     return False
+
   def release(self):
     self.__sem.release()
-  def acquire(self,blocking=True):
+
+  def acquire(self, blocking=True):
     ''' The acquire() method calls the base acquire() method if not blocking.
         If blocking is true, the base acquire() is called inside a lock to
         avoid competing with a reducing adjust().
@@ -46,7 +122,8 @@ class AdjustableSemaphore(object):
     with self.__lock:
       self.__sem.acquire(blocking)
     return True
-  def adjust(self,newvalue):
+
+  def adjust(self, newvalue):
     ''' The adjust(newvalue) method calls release() or acquire() an
         appropriate number of times.  If newvalue lowers the semaphore
         capacity then adjust() may block until the overcapacity is
@@ -54,17 +131,17 @@ class AdjustableSemaphore(object):
     '''
     assert newvalue > 0
     with self.__lock:
-      delta=newvalue-self.__value
+      delta = newvalue-self.__value
       if delta > 0:
         while delta > 0:
           self.__sem.release()
-          delta-=1
+          delta -= 1
       else:
         while delta < 0:
           with LogTime("AdjustableSemaphore(%s): acquire excess capacity" % (self.__name,)):
             self.__sem.acquire(True)
-          delta+=1
-      self.__value=newvalue
+          delta += 1
+      self.__value = newvalue
 
 class Channel(object):
   ''' A zero-storage data passage.
