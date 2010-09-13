@@ -78,15 +78,25 @@ def lastlinelen(s):
   """
   return len(s)-string.rfind(s,'\n')-1
 
-dq_re=re.compile(r'"(([^\\"]|\\[\\"])*)"')
+DQ_RE=re.compile(r'"(([^\\"]|\\[\\"])*)"')
 nq_re=re.compile(r'\S+')
  
+def get_dqstring(s):
+  ''' Read a double quoted string from the start of `s`.
+      Return the decoded string and the remainder of `s`.
+      Returns None for the decoded string on no match.
+  '''
+  m = DQ_RE.match(s)
+  if not m:
+    return None, s
+  return undq(m.group(1)), s[m.end():]
+
 # parse a line consisting of words or "quoted strings"
 def parseline(line):
   words=[]
   line=string.lstrip(line)
   while len(line) > 0:
-    m=dq_re.match(line)
+    m=DQ_RE.match(line)
     if m is not None:
       words.append(undq(m.group(1)))
       line=line[m.end():]
