@@ -19,7 +19,7 @@ case "$syncset" in
 esac
 
 cd || exit 1
-qrsync -rlptHC --delete --exclude=CVS/ --exclude=\*.swp --exclude=\*~ \
+rsync -rlptHCi --delete --exclude=CVS/ --exclude=\*.swp --exclude=\*~ \
       "--include-from=$syncset" \
       ${1+"$@"} \
       "$from." "$to."
