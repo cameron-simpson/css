@@ -167,17 +167,25 @@ class Later(object):
             L.partial(f,3)  # queue f(3) with priority 2
 	This is most useful with the .partial() method, which has
 	no priority parameter.
+        WARNING: this is NOT thread safe!
+        TODO: is a thread safe version even a sane idea?
     '''
     oldpri = self._priority
     self._priority = pri
     yield
     self._priority = oldpri
 
+  def ppartial(self, priority, func, *args, **kwargs):
+    ''' Queue a function for later dispatch using the specified priority.
+        Return the correspnding LateFunction for result collection.
+    '''
+    return self.defer(partial(func, *args, **kwargs), priority)
+
   def partial(self, func, *args, **kwargs):
     ''' Queue a function for later dispatch using the default priority.
         Return the correspnding LateFunction for result collection.
     '''
-    return self.defer(partial(func, *args, **kwargs))
+    return self.ppartial(None, func, *args, **kwargs)
 
 class TestLater(unittest.TestCase):
 
