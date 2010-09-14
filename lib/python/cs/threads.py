@@ -73,18 +73,18 @@ class WorkerThreadPool(object):
 	function `deliver` from the function queue,
         Run func().
         On completion the result is the sequence:
-          func_result, None, None, None
+          func_result, None
         On an exception the result is the sequence:
-          None, exec_type, exc_value, exc_traceback
+          None, exc_info
         If retq is not None, the result is .put() on retq.
         If deliver is not None, deliver(result) is called.
     '''
     FQ = Hdesc[1]
     for func, retq, deliver in FQ:
       try:
-        result = func(), None, None, None
+        result = func(), None
       except:
-        result = (None,) + sys.exc_info()
+        result = (None, sys.exc_info())
       if retq is not None:
         retq.put(result)
       if deliver is not None:
