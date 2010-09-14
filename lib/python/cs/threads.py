@@ -689,7 +689,9 @@ class DictMonitor(dict):
     return ks
 
 class FuncMultiQueue(object):
-  ''' A FuncMultiQueue is a mechanism for processing function calls
+  ''' OBSOLETE: it is recommended to use cs.later.Later for this.
+  
+      A FuncMultiQueue is a mechanism for processing function calls
       asynchronously with a certain number (the `capacity`) active at any one
       time. It can be used to perform constrained parallel use of a server
       resource such as an HTTP or database server.  
