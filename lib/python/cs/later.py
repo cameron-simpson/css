@@ -36,11 +36,13 @@ class LateFunction(object):
       method should be used:
 
         LF = L.defer()
-        x, exc_type, exc_value, exc_traceback = LF.wait()
-        if exc_type is not None:
+        x, exc_info = LF.wait()
+        if exc_info:
           # handle exception
+          exc_type, exc_value, exc_traceback = exc_info
+          ...
         else:
-          # use `x`
+          # use `x`, the function result
 
       TODO: .cancel()
             timeout for wait()
@@ -76,8 +78,9 @@ class LateFunction(object):
     '''
     assert not args
     assert not kwargs
-    result, exc_type, exc_value, exc_traceback = self.wait()
-    if exc_type is not None:
+    result, exc_info = self.wait()
+    if exc_info:
+      exc_type, exc_value, exc_traceback = exc_info
       raise exc_type, exc_value, exc_traceback
     return result
 
