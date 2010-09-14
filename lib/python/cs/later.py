@@ -162,6 +162,18 @@ class Later(object):
     '''
     return self.pdefer(None, func)
 
+  def ppartial(self, priority, func, *args, **kwargs):
+    ''' Queue a function for later dispatch using the specified priority.
+        Return the corresponding LateFunction for result collection.
+    '''
+    return self.pdefer(priority, partial(func, *args, **kwargs))
+
+  def partial(self, func, *args, **kwargs):
+    ''' Queue a function for later dispatch using the default priority.
+        Return the corresponding LateFunction for result collection.
+    '''
+    return self.ppartial(None, func, *args, **kwargs)
+
   @contextmanager
   def priority(self, pri):
     ''' A context manager to temporarily set the default priority.
@@ -180,18 +192,6 @@ class Later(object):
     self._priority = pri
     yield
     self._priority = oldpri
-
-  def ppartial(self, priority, func, *args, **kwargs):
-    ''' Queue a function for later dispatch using the specified priority.
-        Return the corresponding LateFunction for result collection.
-    '''
-    return self.pdefer(priority, partial(func, *args, **kwargs))
-
-  def partial(self, func, *args, **kwargs):
-    ''' Queue a function for later dispatch using the default priority.
-        Return the corresponding LateFunction for result collection.
-    '''
-    return self.ppartial(None, func, *args, **kwargs)
 
 class TestLater(unittest.TestCase):
 
