@@ -4,9 +4,29 @@
 #       - Cameron Simpson <cs@zip.com.au>
 #
 
+import sys
 import logging
 import traceback
+import unittest
 from cs.logutils import log, warn, exception, error
+
+def return_exception(func):
+  ''' Decorator function to wrap functions whose exceptions should be caught,
+      such as inside event loops or worker threads.
+      It causes a function to return:
+        func_return, None
+      in the case of successful operation and:
+        None, exc_info
+      in the case of an exception. `exc_info` is a 3-tuple of
+      exc_type, exc_value, exc_traceback as returned by sys.exc_info().
+  '''
+  def wrapper(*args, **kwargs):
+    try:
+      result = func(*args, **kwargs), None
+    except:
+      result = (None, tuple(sys.exc_info()))
+    return result
+  return wrapper
 
 class NoExceptions(object):
   ''' A context manager to catch _all_ exceptions and log them.
@@ -50,3 +70,19 @@ class NoExceptions(object):
     return True
   # backward compatible static method arrangement
   simpleExceptionReport = staticmethod(simpleExceptionReport)
+
+class TestExcUtils(unittest.TestCase):
+
+  def test00return_exception(self):
+    @return_exception
+    def divfunc(a, b):
+      return a/b
+    retval, exc_info = divfunc(4, 2)
+    self.assertEquals(retval, 2)
+    self.assertTrue(exc_info is None)
+    retval, exc_info = divfunc(4, 0)
+    self.assertTrue(retval is None)
+    self.assertTrue(exc_info[0] is ZeroDivisionError)
+
+if __name__ == '__main__':
+  unittest.main()
