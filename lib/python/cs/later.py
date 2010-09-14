@@ -139,11 +139,11 @@ class Later(object):
       latefunc = pri_entry[-1]
       latefunc._dispatch()
 
-  def defer(self, func, priority=None):
+  def pdefer(self, priority, func):
     ''' Queue a function for later dispatch.
-        Return the correspnding LateFunction for result collection.
-	If the parameter `priority` is supplied and not None, use
-	it as the priority otherwise use the default priority.
+        Return the corresponding LateFunction for result collection.
+	If the parameter `priority` not None then use it as the priority
+        otherwise use the default priority.
     '''
     if priority is None:
       priority = self._priority
@@ -155,6 +155,12 @@ class Later(object):
     pri_entry.append(LF)
     self._LFPQ.put( pri_entry )
     return LF
+
+  def defer(self, func):
+    ''' Queue a function for later dispatch using the default priority.
+        Return the corresponding LateFunction for result collection.
+    '''
+    return self.pdefer(None, func)
 
   @contextmanager
   def priority(self, pri):
@@ -177,13 +183,13 @@ class Later(object):
 
   def ppartial(self, priority, func, *args, **kwargs):
     ''' Queue a function for later dispatch using the specified priority.
-        Return the correspnding LateFunction for result collection.
+        Return the corresponding LateFunction for result collection.
     '''
-    return self.defer(partial(func, *args, **kwargs), priority)
+    return self.pdefer(priority, partial(func, *args, **kwargs))
 
   def partial(self, func, *args, **kwargs):
     ''' Queue a function for later dispatch using the default priority.
-        Return the correspnding LateFunction for result collection.
+        Return the corresponding LateFunction for result collection.
     '''
     return self.ppartial(None, func, *args, **kwargs)
 
