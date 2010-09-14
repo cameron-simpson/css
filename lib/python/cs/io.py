@@ -138,6 +138,7 @@ if __name__ == '__main__':
   import unittest
   from StringIO import StringIO
   class Tests(unittest.TestCase):
+
     def _testContlines(self, text, lines):
       self.assertEquals( list( contlines(StringIO(text)) ), lines )
 

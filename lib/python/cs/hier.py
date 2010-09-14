@@ -4,6 +4,7 @@ import re
 import os
 import os.path
 from cStringIO import StringIO
+import unittest
 from cs.lex import lastlinelen
 import cs.io
 from cs.misc import out, cmderr, debug, ifdebug, warn, DictUC_Attrs, \
@@ -12,7 +13,7 @@ from cs.misc import out, cmderr, debug, ifdebug, warn, DictUC_Attrs, \
 DEFAULT_OPTS={'dictSep': ' =>',
               'bareWords': True,
               'inputEncoding': 'latin1',
-              'nullToken': "\"\"",
+              'nullToken': '""',
               'quoteChar': '"',
              }
 
@@ -25,8 +26,11 @@ integerRe    = re.compile('^-?[0-9]+$')
 def h2a(obj,i=None,opts=None):
   return HierOutput(opts).h2a(obj,i=i)
 
-def load(path,opts=None):
+def load(path, opts=None):
   return HierInput(opts).load(path)
+
+def loadfp(fp, opts=None):
+  return HierInput(opts).loadfp(fp)
 
 def tok(s,opts=None):
   return HierInput(opts).tok(s)
@@ -236,11 +240,17 @@ class HierInput(_Hier):
   def loadfile(self,filename,charset=None):
     """ Read Hier data from the named file.
     """
-    D=DictUC_Attrs()
     with open(filename) as fp:
-      for line in cs.io.contlines(fp):
-        kv=self.kvline(line,charset=charset)
-        D[kv[0]]=kv[1]
+      D = self.loadfp(fp, charset=charset)
+    return D
+
+  def loadfp(self, fp, charset=None):
+    """ Read Hier data from the supplied file object.
+    """
+    D=DictUC_Attrs()
+    for line in cs.io.contlines(fp):
+      kv=self.kvline(line,charset=charset)
+      D[kv[0]]=kv[1]
     return D
 
   def savefile(self,dict,filename):
@@ -386,3 +396,21 @@ class HierInput(_Hier):
       s=s.lstrip()
 
     return (dict,s[1:])
+
+class TestHier(unittest.TestCase):
+
+  def setUp(self):
+    pass
+
+  def tearDown(self):
+    pass
+
+  def _testLoad(self, text, D):
+    H = loadfp( StringIO(text) )
+    self.assertEquals(H, D)
+
+  def test01load(self):
+    self._testLoad( "A 1\nB 2\n", { "A": 1, "B": 2} )
+
+if __name__ == '__main__':
+  unittest.main()
