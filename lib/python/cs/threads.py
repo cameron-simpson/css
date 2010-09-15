@@ -78,12 +78,19 @@ class WorkerThreadPool(object):
           None, exc_info
         If retq is not None, the result is .put() on retq.
         If deliver is not None, deliver(result) is called.
+        If both are None and an exception occurred, it gets raised.
     '''
     FQ = Hdesc[1]
     for func, retq, deliver in FQ:
       try:
         result = func(), None
       except:
+        # don't let exceptions go unhandled
+        # if nobody is watching, raise the exception and don't return
+        # this handler to the pool
+        if retq is None and deliver is None:
+          t, v, tb = sys.exc_info()
+          raise t, v, tb
         result = (None, sys.exc_info())
       if retq is not None:
         retq.put(result)
