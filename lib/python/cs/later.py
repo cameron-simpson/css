@@ -7,6 +7,7 @@ import sys
 from collections import deque
 from thread import allocate_lock
 from threading import Thread, Condition
+from Queue import Queue
 import time
 import unittest
 from cs.threads import AdjustableSemaphore, IterablePriorityQueue, \
@@ -109,6 +110,21 @@ class LateFunction(object):
       self._join_cond.wait()
       assert self.done
 
+  def report(self, Q):
+    ''' After the function completes, run Q.put(self).
+        If the function has already completed this will happen immediately.
+    '''
+    with self._join_lock:
+      if self.done:
+        Q.put(self)
+      else:
+        T = Thread(target=self._wait_report, args=(Q,))
+        T.start()
+
+  def _wait_report(self, Q):
+    self.join()
+    Q.put(self)
+
 class Later(object):
   ''' A management class to queue function calls for later execution.
   '''
@@ -117,15 +133,30 @@ class Later(object):
     if type(capacity) is int:
       capacity = AdjustableSemaphore(capacity)
     self.capacity = capacity
+    self.closed = False
     self._priority = (0,)
     self._LFPQ = IterablePriorityQueue()   # inbound requests queue
     self._workers = WorkerThreadPool()
     self._dispatchThread = Thread(target=self._dispatcher)
     self._dispatchThread.start()
 
+  def __del__(self):
+    if not self.closed:
+      self.close()
+
+  def __enter__(self):
+    return self
+
+  def __exit__(self, exc_type, exc_value, traceback):
+    self.close()
+    return False
+
   def close(self):
+    assert not self.closed
+    self.closed = True
     self._LFPQ.close()
     self._dispatchThread.join()
+    self._workers.close()
 
   def _dispatcher(self):
     ''' Read LateFunctions from the inbound queue as capacity is available
@@ -195,6 +226,20 @@ class Later(object):
     self._priority = pri
     yield
     self._priority = oldpri
+
+  def report(self, LFs):
+    ''' Report completed LateFunctions.
+        This is a generator that yields LateFunctions as they complete,
+        useful for waiting for a set of LateFunctions that may complete in
+        an arbitrary order.
+    '''
+    Q = Queue()
+    n = 0
+    for LF in LFs:
+      n += 1
+      LF.report(Q)
+    for i in range(n):
+      yield Q.get()
 
 class TestLater(unittest.TestCase):
 
@@ -277,6 +322,14 @@ class TestLater(unittest.TestCase):
     LF = self.L.partial(self._f, 7)
     x = LF()
     self.assertEquals(x, 14)
+
+  def test07report(self):
+    with Later(3) as L3:
+      LF1 = L3.partial(self._delay, 3)
+      LF2 = L3.partial(self._delay, 2)
+      LF3 = L3.partial(self._delay, 1)
+      results = [ LF() for LF in self.L.report( (LF1, LF2, LF3) ) ]
+      self.assertEquals(results, [1, 2, 3])
 
 if __name__ == '__main__':
   unittest.main()
