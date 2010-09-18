@@ -10,6 +10,7 @@
 cmd=`basename "$0"`
 usage="Usage: $cmd [options...] [--] filename [command args...]
 	-0	Rewrite the file even if the input is empty.
+        -C      Require the file to change; error if the new file is the same.
 	-d	Do a diff of the file changes.
         -n      No action. Recite underlying commands.
         -N      Make a new file if the content is different.
@@ -25,6 +26,7 @@ dodiff=
 verbose=
 diff=diff
 newfile=
+mustchange=
 
 badopts=
 
@@ -32,6 +34,7 @@ while [ $# -gt 0 ]
 do
   case "$1" in
     -0)	rw0=1 ;;
+    -C) mustchange=1 ;;
     -d)	dodiff=1 ;;
     -n) trace=eecho doit= dodiff= ;;
     -N) newfile=1 ;;
@@ -76,7 +79,15 @@ trap 'rm "$tmp"' 1 2 13 15
 			       exit 1
 			     }
 
-$trace cmp -s "$tmp" "$file" && { $trace rm "$tmp"; exit 0; }
+if $trace cmp -s "$tmp" "$file"
+then
+  if [ $mustchange ]
+  then  echo "$cmd: file unchanged!" >&2
+        exit 1
+  else  $trace rm "$tmp"
+        exit 0
+  fi
+fi
 
 [ $verbose ] && echo "rewrite $file"
 [ $dodiff  ] && $diff $DIFFOPTS "$file" "$tmp"
