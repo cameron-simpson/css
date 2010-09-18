@@ -6,11 +6,14 @@
 
 [ $# = 0 ] && { echo "Usage: $0 command [args...]" >&2; exit 2; }
 
-if "$@"
+"$@"
+xit=$?
+
+if [ "$xit" = 0 ]
 then
   alert -c white "OK: $*"
   exit 0
 fi
 
 alert -c red "FAILED: $*"
-exit 1
+exit "$xit"
