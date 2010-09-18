@@ -142,10 +142,10 @@ do
   cfg_command=:
   cfg_outlog=portfwd-$target    # /dev/null
   cfg_monitor=
-  cfg_control=$HOME/.sshctrl-$USER@$target_short.22
+  cfg_control=$HOME/.sshctrl-$USER@$target_short-pf.22
   if [ -s "$fwdcfg" ]
   then
-    wcv=`winclausevars "$fwdcfg" "$target" cfg`
+    wcv=`winclausevars "$fwdcfg" "$target_short" cfg`
     eval "$wcv"
   fi
   case $cfg_pidfile in
