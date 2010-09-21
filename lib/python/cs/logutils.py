@@ -13,6 +13,16 @@ import threading
 import traceback
 import cs.misc
 
+def setup_logging(cmd, format=None, level=None):
+  ''' Arrange basic logging setup for conventional UNIX command
+      line error messaging.
+  '''
+  if format is None:
+    format = cs.misc.cmd.replace('%','%%')+': %(levelname)s: %(message)s'
+  if level is None:
+    level = logging.WARN
+  logging.basicConfig(level=level, format=format)
+
 def D(fmt, *args):
   ''' Print formatted debug string straight to sys.stderr,
       bypassing logging modules entirely.
@@ -77,12 +87,18 @@ class Pfx(object):
       The function current_prefix() returns the current prefix value.
   '''
   def __init__(self, mark, absolute=False, loggers=None):
-    self.mark = str(mark)
+    self._mark = str(mark)
     self.absolute = absolute
     if loggers is not None:
       if not hasattr(loggers, '__getitem__'):
         loggers = (loggers, )
     self.logto(loggers)
+
+  @property
+  def mark(self):
+    if self.absolute or len(_prefix.cur.prefix) == 0:
+      return self._mark
+    return _prefix.cur.prefix + ': ' + self._mark
 
   def logto(self, newLoggers):
     ''' Define the Loggers anew.
@@ -108,10 +124,7 @@ class Pfx(object):
   def __enter__(self):
     global _prefix
     # compute the new message prefix
-    mark = self.mark
-    if not self.absolute and len(_prefix.cur.prefix) > 0:
-      mark = _prefix.cur.prefix + ': ' + mark
-    self.prefix = mark
+    self.prefix = self.mark
     ##print >>sys.stderr, "PFX.__enter__: self.prefix = %s" % (self.prefix,)
 
     _prefix.old.append(_prefix.cur)
