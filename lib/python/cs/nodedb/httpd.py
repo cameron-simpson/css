@@ -32,7 +32,7 @@ def SPAN(*elements):
   span = ['SPAN']
   span.extend(elements)
   return span
-def A(N, label=None, ext='.html', prefix=None):
+def A(N, label=None, ext='/', prefix=None):
   ''' Return an anchor HTML token.
       N: the Node to which to link.
       label: visible text for the link, default N.name.
@@ -41,10 +41,18 @@ def A(N, label=None, ext='.html', prefix=None):
   '''
   if label is None:
     label = N.name
-  rhref, label = N.relhref(label=label)
+  rhref, label = relhref(N, label=label)
   if prefix is not None:
     rhref = prefix + rhref
   return ['A', {'HREF': rhref+ext}, label]
+
+def relhref(N, label=None, context=None):
+  if label is None:
+    if context is None:
+      label = str(N)
+    else:
+      label = attrValueText(context[0], context[1], N)
+  return str(N), label
 
 def by_name(a, b):
   ''' Compare to objects by their .name attributes.
@@ -152,7 +160,11 @@ class NodeDBView(CherryPyNode):
         raise cherrypy.HTTPError(404, "%s: %s" % (spec, e))
       if view == '':
         if hasattr(N, 'report'):
-          return N.report()
+          fp = StringIO()
+          N.report(fp, prefix='/node/')
+          out = fp.getvalue()
+          fp.close()
+          return out
         return self._basic_html_tokens(N)
       if view == 'basic.html':
         return self._basic_html_tokens(N)
