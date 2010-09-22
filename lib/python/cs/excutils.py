@@ -10,7 +10,16 @@ import traceback
 import unittest
 from cs.logutils import log, warn, exception, error
 
-def return_exception(func):
+def return_excinfo(func, *args, **kwargs):
+  ''' Run the supplied function and arguments.
+      Return:
+        func_return, None
+      in the case of successful operation and:
+        None, exc_info
+      in the case of an exception. `exc_info` is a 3-tuple of
+      exc_type, exc_value, exc_traceback as returned by sys.exc_info().
+  '''
+def returns_excinfo(func):
   ''' Decorator function to wrap functions whose exceptions should be caught,
       such as inside event loops or worker threads.
       It causes a function to return:
@@ -21,11 +30,7 @@ def return_exception(func):
       exc_type, exc_value, exc_traceback as returned by sys.exc_info().
   '''
   def wrapper(*args, **kwargs):
-    try:
-      result = func(*args, **kwargs), None
-    except:
-      result = (None, tuple(sys.exc_info()))
-    return result
+    return return_excinfo(func, *args, **kwargs)
   return wrapper
 
 class NoExceptions(object):
@@ -73,8 +78,18 @@ class NoExceptions(object):
 
 class TestExcUtils(unittest.TestCase):
 
-  def test00return_exception(self):
-    @return_exception
+  def test00return_excinfo(self):
+    def divfunc(a, b):
+      return a/b
+    retval, exc_info = return_excinfo(divfunc, 4, 2)
+    self.assertEquals(retval, 2)
+    self.assertTrue(exc_info is None)
+    retval, exc_info = return_excinfo(divfunc, 4, 0)
+    self.assertTrue(retval is None)
+    self.assertTrue(exc_info[0] is ZeroDivisionError)
+
+  def test00returns_excinfo(self):
+    @returns_excinfo
     def divfunc(a, b):
       return a/b
     retval, exc_info = divfunc(4, 2)
