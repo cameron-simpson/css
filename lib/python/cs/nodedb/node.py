@@ -754,7 +754,19 @@ class NodeDB(dict):
       return self.otherDB(int(seqnum))[t, name]
     raise ValueError, "unparsable text \"%s\"" % (text,)
 
-  def dump(self, fp, fmt='csv'):
+  def _dump_nodes(self, typenames=None):
+    if typenames is None:
+      typename = list(self.types())
+      typenames.sort()
+    for t in typenames:
+      nodes = list(getattr(self, t+'s'))
+      nodes.sort(_byname)
+      for N in nodes:
+        yield N
+
+  def dump(self, fp, fmt='csv', nodes=None):
+    if nodes is None:
+      nodes = self._dump_nodes()
     if fmt == 'csv':
       import csv
       w = csv.writer(fp)
@@ -762,25 +774,23 @@ class NodeDB(dict):
       typenames = list(self.types())
       typenames.sort()
       otype = None
-      for t in typenames:
-        nodes = list(getattr(self, t+'s'))
-        nodes.sort(_byname)
-        oname = None
-        for N in nodes:
-          attrs = N.keys()
-          attrs.sort()
-          oattr = None
-          for attr in attrs:
-            assert not attr.endswith('s'), "bogus plural node attribute: %s" % (attr,)
-            for value in N[attr]:
-              ct = t if otype is None or t != otype else ''
-              cn = N.name if oname is None or N.name != oname else ''
-              ca = attr if oattr is None or attr != oattr else ''
-              row = (ct, cn, ca, self.totext(value))
-              w.writerow(row)
-              otype, oname, oattr = t, N.name, attr
-      fp.flush()
-      return
+      oname = None
+      for N in nodes:
+        t, n = N.type, N.name
+        attrs = N.keys()
+        attrs.sort()
+        oattr = None
+        for attr in attrs:
+          assert not attr.endswith('s'), "bogus plural node attribute: %s" % (attr,)
+          for value in N[attr]:
+            ct = t if otype is None or t != otype else ''
+            cn = n if oname is None or n != oname else ''
+            ca = attr if oattr is None or attr != oattr else ''
+            row = (ct, cn, ca, self.totext(value))
+            w.writerow(row)
+            otype, oname, oattr = t, n, attr
+    fp.flush()
+    return
 
     raise ValueError, "unsupported format '%s'" % (fmt,)
 
