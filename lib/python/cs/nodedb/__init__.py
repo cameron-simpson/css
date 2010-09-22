@@ -3,14 +3,11 @@
 import os.path
 import sys
 from cs.nodedb.node import Node, NodeDB, Backend, NodeDBFromURL
-from cs.logutils import error
+from cs.logutils import setup_logging, Pfx, error
 
 def main(argv):
-  import logging
-  from cs.logutils import Pfx, error
   xit = 0
-  cmd = os.path.basename(argv.pop(0))
-  logging.basicConfig(format=cmd.replace("%", "%%") + ": %(levelname)s: %(message)s")
+  cmd = 'cs.nodedb'
   usage = '''Usage:
     %s dburl create
       Create a database.
@@ -19,38 +16,37 @@ def main(argv):
     %s dburl load <dump.csv
       Load information from a CSV formatted file.
 '''
+  setup_logging(cmd)
 
-  badopts = False
+  with Pfx(cmd, absolute=True):
+    badopts = False
 
-  if badopts:
-    print >>sys.stderr, usage % (cmd, cmd, cmd)
+    if len(argv) < 1:
+      error("missing dburl")
+      badopts=True
+    else:
+      dburl = argv.pop(0)
 
-  if len(argv) < 1:
-    error("missing dburl")
-    badopts=True
-  else:
-    dburl = argv.pop(0)
+    if len(argv) < 1:
+      error("missing op")
+      badopts = True
+    else:
+      op = argv.pop(0)
+      ops = { "create": _create,
+              "dump":   _dump,
+              "load":   _load,
+            }
+      with Pfx(op):
+        if op in ops:
+          xit = ops[op](dburl, argv)
+        else:
+          error("unsupported op")
+          badopts = True
 
-  if len(argv) < 1:
-    error("missing op")
-    badopts = True
-  else:
-    op = argv.pop(0)
-    ops = { "create": _create,
-            "dump":   _dump,
-            "load":   _load,
-          }
-    with Pfx(op):
-      if op in ops:
-        xit = ops[op](dburl, argv)
-      else:
-        error("unsupported op")
-        badopts = True
+    if badopts or xit == 2:
+      print >>sys.stderr, usage % (cmd, cmd, cmd)
 
-  if badopts or xit == 2:
-    print >>sys.stderr, usage % (cmd, cmd, cmd)
-
-  return xit
+    return xit
 
 def _create(dburl, argv):
   xit = 0
