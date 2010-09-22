@@ -299,10 +299,6 @@ class Node(dict):
       raise KeyError, repr(item)
     assert not plural and k not in ('NAME', 'TYPE'), \
            "forbidden index %s" % (repr(item),)
-    # TODO:
-    #  discard old values, if any, to clean up reverse references
-    #  if new values empty, delete entry in dict
-
     values = self.__get(k)
     if len(values):
       # discard old values (removes reverse map)
