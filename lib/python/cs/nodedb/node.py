@@ -13,9 +13,10 @@ import itertools
 from thread import allocate_lock
 from threading import Thread
 from types import StringTypes
+from collections import namedtuple
 import unittest
 from cs.lex import str1
-from cs.misc import the
+from cs.misc import the, get0
 from cs.mappings import parseUC_sAttr
 from cs.logutils import Pfx, error, warn, info
 
@@ -195,7 +196,7 @@ class _AttrList(list):
       except IndexError, e:
         raise AttributeError, "%s.%s: %s" % (self, attr, e)
       return hit
-    raise AttributeError, str(self)
+    raise AttributeError, '.'.join([str(self), attr])
 
   def where(self, **kw):
     hits = []
@@ -209,6 +210,9 @@ class _AttrList(list):
       if ok:
         hits.append(N)
     return _AttrList(node=None, key=self.key, _items=hits)
+
+# we return a namedtuple from Node.references()
+RefTuple = namedtuple('RefTuple', 'node attr nrefs')
 
 class Node(dict):
   ''' A Node is a subclass of dict, mapping an attribute name to a list
@@ -261,7 +265,7 @@ class Node(dict):
       onode, oattr = key
       if attr is None or oattr == attr:
         if type is None or onode.type == type:
-          yield onode, oattr, count
+          yield RefTuple(onode, oattr, count)
 
   def __repr__(self):
     return "%s:%s:%s" % (self.type, self.name, dict.__repr__(self))
@@ -350,6 +354,9 @@ class Node(dict):
       self[k] = value
     else:
       dict.__setattr__(self, attr, value)
+
+  def get0(self, attr, default=None):
+    return get0(self.get(attr, ()), default=default)
 
   def gettoken(self, attr, valuetxt, createSubNodes=False):
     ''' Method to extract a token from the start of a string.
@@ -752,7 +759,7 @@ class NodeDB(dict):
 
   def _dump_nodes(self, typenames=None):
     if typenames is None:
-      typename = list(self.types())
+      typenames = list(self.types())
       typenames.sort()
     for t in typenames:
       nodes = list(getattr(self, t+'s'))
