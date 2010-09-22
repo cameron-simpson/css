@@ -18,6 +18,8 @@ def return_exc_info(func, *args, **kwargs):
         None, exc_info
       in the case of an exception. `exc_info` is a 3-tuple of
       exc_type, exc_value, exc_traceback as returned by sys.exc_info().
+      If you need to protect a whole suite and would rather not move it
+      into its own function, consider the NoExceptions context manager.
   '''
   try:
     result = func(*args, **kwargs)
@@ -43,6 +45,7 @@ class NoExceptions(object):
   ''' A context manager to catch _all_ exceptions and log them.
       Arguably this should be a bare try...except but that's syntacticly
       noisy and separates the catch from the top.
+      For simple function calls return_exc_info() is preferred.
   '''
 
   def __init__(self, handleException):
