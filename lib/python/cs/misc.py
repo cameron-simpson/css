@@ -392,12 +392,12 @@ def eachOf(gs):
     for i in g:
       yield i
 
-def get0(seq, dflt=None):
+def get0(seq, default=None):
   ''' Return first element of a sequence, or the default.
   '''
   for i in seq:
     return i
-  return dflt
+  return default
 
 def winsize(f):
   '''   Return a (rows, columns) tuple or None for the specified file object.
