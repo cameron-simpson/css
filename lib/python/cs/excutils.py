@@ -19,6 +19,12 @@ def return_excinfo(func, *args, **kwargs):
       in the case of an exception. `exc_info` is a 3-tuple of
       exc_type, exc_value, exc_traceback as returned by sys.exc_info().
   '''
+  try:
+    result = func(*args, **kwargs)
+  except Exception:
+    return None, tuple(sys.exc_info)
+  return result, None
+
 def returns_excinfo(func):
   ''' Decorator function to wrap functions whose exceptions should be caught,
       such as inside event loops or worker threads.
