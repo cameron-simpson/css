@@ -8,6 +8,7 @@ from cs.logutils import setup_logging, Pfx, error
 def main(argv):
   xit = 0
   cmd = 'cs.nodedb'
+  argv.pop(0)
   usage = '''Usage:
     %s dburl create
       Create a database.
@@ -15,6 +16,8 @@ def main(argv):
       Dump a database in CSV format.
     %s dburl load <dump.csv
       Load information from a CSV formatted file.
+    %s dburl httpd bindhost:bindport
+      Present the db via a web interface.
 '''
   setup_logging(cmd)
 
@@ -35,6 +38,7 @@ def main(argv):
       ops = { "create": _create,
               "dump":   _dump,
               "load":   _load,
+              "httpd":  _httpd,
             }
       with Pfx(op):
         if op in ops:
@@ -44,7 +48,7 @@ def main(argv):
           badopts = True
 
     if badopts or xit == 2:
-      print >>sys.stderr, usage % (cmd, cmd, cmd)
+      print >>sys.stderr, usage % (cmd, cmd, cmd, cmd)
 
     return xit
 
@@ -72,6 +76,16 @@ def _load(dburl, argv):
     DB.load(sys.stdin)
   return xit
 
+def _httpd(dburl, argv):
+  xit = 0
+  if len(argv) == 0:
+    error("missing bindhost:bindport")
+    return 2
+  bindhost, bindport = argv.pop(0).rsplit(':', 1)
+  import cs.nodedb.httpd
+  DB = NodeDBFromURL(dburl, readonly=True)
+  cs.nodedb.httpd.serve(DB, bindhost, bindport)
+  return xit
 
 if __name__ == '__main__':
   main(sys.argv)
