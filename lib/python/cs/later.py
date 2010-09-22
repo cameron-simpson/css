@@ -55,6 +55,7 @@ class LateFunction(object):
     self.done = False
     self._join_lock = allocate_lock()
     self._join_cond = Condition()
+    self._join_notifiers = []
 
   def _dispatch(self):
     ''' ._dispatch() is called by the Later's class instance's worker thread.
@@ -68,7 +69,10 @@ class LateFunction(object):
     with self._join_lock:
       self.result = result
       self.done = True
+      notifiers = list(self._join_notifiers)
     self.later.capacity.release()
+    for notify in notifiers:
+      notify(self)
     with self._join_cond:
       self._join_cond.notify_all()
 
@@ -110,20 +114,17 @@ class LateFunction(object):
       self._join_cond.wait()
       assert self.done
 
-  def report(self, Q):
-    ''' After the function completes, run Q.put(self).
+  def report(self, notify):
+    ''' After the function completes, run notify(self).
         If the function has already completed this will happen immediately.
+        Note: if you'd rather `self` got put on some Queue `Q`, supply `Q.put`.
     '''
     with self._join_lock:
-      if self.done:
-        Q.put(self)
-      else:
-        T = Thread(target=self._wait_report, args=(Q,))
-        T.start()
-
-  def _wait_report(self, Q):
-    self.join()
-    Q.put(self)
+      if not self.done:
+        self._join_notifiers.append(notify)
+        notify = None
+    if notify is not None:
+      notify(self)
 
 class Later(object):
   ''' A management class to queue function calls for later execution.
@@ -235,9 +236,10 @@ class Later(object):
     '''
     Q = Queue()
     n = 0
+    notify = Q.put
     for LF in LFs:
       n += 1
-      LF.report(Q)
+      LF.report(notify)
     for i in range(n):
       yield Q.get()
 
