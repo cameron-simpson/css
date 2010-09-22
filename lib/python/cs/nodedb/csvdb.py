@@ -31,7 +31,10 @@ class Backend_CSVFile(Backend):
     ''' Prepopulate the NodeDB from the database.
     '''
     with open(self.csvpath, "rb") as fp:
+      ro = self.nodedb.readonly
+      self.nodedb.readonly = False
       self.nodedb.load(fp, fmt='csv')
+      self.nodedb.readonly = ro
 
   def _attrtag(self, N, attr):
     return ':'.join( (attr, N.type, N.name) )
