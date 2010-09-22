@@ -58,7 +58,7 @@ class LateFunction(object):
     self._join_notifiers = []
 
   def _dispatch(self):
-    ''' ._dispatch() is called by the Later's class instance's worker thread.
+    ''' ._dispatch() is called by the Later class instance's worker thread.
         It causes the function to be handed to a thread for execution.
     '''
     assert not self.done
