@@ -88,14 +88,14 @@ class NodeDBView(CherryPyNode):
 
   def __init__(self, nodedb, basepath):
     CherryPyNode.__init__(self, nodedb, basepath)
-    self.nodes = NodeDBView._Nodes(self)
+    self.node = NodeDBView._Nodes(self)
 
   def _nodeLink(self, N, label=None, context=None, view=''):
     ''' Return an 'A' token linking to the specified Node `N`.
     '''
     rhref, label = node_href(N, label=label, context=context)
     return ['A',
-            {'HREF': "%snodes/%s/%s" % (self.basepath, rhref, view)},
+            {'HREF': "%snode/%s/%s" % (self.basepath, rhref, view)},
             label]
 
   @cherrypy.expose
@@ -135,11 +135,10 @@ class NodeDBView(CherryPyNode):
 
   class _Nodes(CherryPyNode):
     ''' View of individual Nodes.
-        /nodes -> /node/
-        /nodes/                  Nice report or basic table HTML.
-        /nodes/basic.html        Basic table HTML.
-        /nodes/csv               CSV as text/csv.
-        /nodes/txt               CSV as plain text.
+        /node/nodespec/           Nice report or basic table HTML.
+        /node/nodespec/basic.html Basic table HTML.
+        /node/nodespec/csv        CSV as text/csv.
+        /node/nodespec/txt        CSV as plain text.
     '''
 
     def __init__(self, top):
@@ -147,11 +146,29 @@ class NodeDBView(CherryPyNode):
 
     @cherrypy.expose
     def default(self, spec, view=''):
-      N = self.top.nodedb[spec]
+      try:
+        N = self.top.nodedb[spec]
+      except KeyError, e:
+        raise cherrypy.HTTPError(404, "%s: %s" % (spec, e))
       if view == '':
         if hasattr(N, 'report'):
           return N.report()
-      return self._basic_html_tokens(N)
+        return self._basic_html_tokens(N)
+      if view == 'basic.html':
+        return self._basic_html_tokens(N)
+      if view == 'csv':
+        return self._csv_dump(N, 'text/csv')
+      if view == 'txt':
+        return self._csv_dump(N, 'text/plain')
+      raise cherrypy.HTTPError(404, spec)
+
+    def _csv_dump(self, N, content_type):
+      cherrypy.response.headers['content-type'] = content_type
+      fp = StringIO()
+      N.nodedb.dump(fp, fmt='csv', nodes=(N,))
+      out = fp.getvalue()
+      fp.close()
+      return out
 
     def _basic_html_tokens(self, N):
       self._start()
