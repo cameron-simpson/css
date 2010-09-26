@@ -12,6 +12,7 @@ from StringIO import StringIO
 from thread import allocate_lock
 if sys.hexversion < 0x02060000: from sets import Set as set
 from cs.lex import parseline, strlist
+from cs.fileutils import saferename
 
 def setcmd(ncmd):
   ''' Set the cs.misc.cmd string and friends.
@@ -869,24 +870,3 @@ class HasFlags:
       if type(self[self.__flagfield]) is str:
         flagv=",".join(flagv)
       self[self.__flagfield]=flagv
-
-def saferename(oldpath, newpath):
-  ''' Rename a path using os.rename(), but raise an exception if the target
-      path already exists. Slightly racey.
-  '''
-  try:
-    os.lstat(newpath)
-    raise OSError(errno.EEXIST)
-  except OSError, e:
-    if e.errno != errno.ENOENT:
-      raise e
-    os.rename(oldpath, newpath)
-
-def trysaferename(oldpath, newpath):
-  ''' A saferename() that returns True on success, False on failure.
-  '''
-  try:
-    saferename(oldpath, newpath)
-  except:
-    return False
-  return True
