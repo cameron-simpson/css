@@ -16,12 +16,18 @@ import cs.misc
 def setup_logging(cmd, format=None, level=None):
   ''' Arrange basic logging setup for conventional UNIX command
       line error messaging.
+      Sets cs.misc.cmd to `cmd`.
+      If `level` is omitted or None, calls cs.misc.setDebug() to
+      infer a logging level from the process environment.
+      Returns the logging level.
   '''
+  cs.misc.cmd = cmd
   if format is None:
-    format = cs.misc.cmd.replace('%','%%')+': %(levelname)s: %(message)s'
+    format = cmd.replace('%','%%')+': %(levelname)s: %(message)s'
   if level is None:
     level = cs.misc.setDebug()
   logging.basicConfig(level=level, format=format)
+  return level
 
 def D(fmt, *args):
   ''' Unconditionally print formatted debug string straight to sys.stderr,
