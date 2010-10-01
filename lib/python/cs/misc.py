@@ -54,13 +54,33 @@ def warn(*args):
   _defaultUpd.without(warning, " ".join([str(s) for s in args]))
 
 # debug_level:
-#   0 - quiet
-#   1 - progress reporting
-#   2 - verbose progress reporting
-#   3 or more - more verbose, and activates the debug() function
 #
 def setDebug(newlevel):
-  ''' Set the debug level and associated flags.
+  ''' Set the variable debug_level and associated flags.
+      Return the implied logging level suitable for the logging module.
+      The convenience function cs.logutils.setup_logging() calls setDebug()
+      to obtain a logging level if it is passed a `level` of None.
+
+      If `newlevel` is None, infer a level from the process environment:
+        If the envvar $DEBUG_LEVEL is set and numeric, parse it as the level.
+        Otherwise, if the envvar $DEBUG is set and non-empty and not the
+        string "0", set the level to 3. Otherwise, if sys.stderr is a
+        terminal set the level to 1. Otherwise, set the level to 0.
+      If `newlevel` is not None, use its value.
+
+      The meaning of the debug_levels is as follows:
+        0 - quiet
+            isdebug=False, isverbose=False, isprogress=False
+            Returned logging level = logging.ERROR.
+        1 - progress reporting
+            isdebug=False, isverbose=False, isprogress=True
+            Returned logging level = logging.WARNING.
+        2 - verbose progress reporting
+            isdebug=False, isverbose=True, isprogress=True
+            Returned logging level = logging.INFO.
+        3 or more - more verbose, and activates the debug() function
+            isdebug=True, isverbose=True, isprogress=True
+            Returned logging level = logging.DEBUG.
   '''
   if newlevel is None:
     newlevel = 0
@@ -87,19 +107,10 @@ def setDebug(newlevel):
     logging_level = logging.INFO
   elif debug_level >= 1:
     logging_level = logging.WARNING
-  ##logging.getLogger().setLevel(logging_level)
+  
+  return logging_level
 
 setDebug(None)
-if isdebug:
-  def D(fmt, *args):
-    ''' Print formatted debug string.
-    '''
-    sys.stderr.write(fmt % args)
-else:
-  def D(*args):
-    ''' No-op debug hook.
-    '''
-    pass
 
 debug_level_stack = []
 def pushDebug(newlevel):
