@@ -64,17 +64,42 @@ def logException(exc_type, exc_value, exc_tb):
       exception("EXCEPTION> "+line)
     sys.excepthook = curhook
 
-class _PrefixState(threading.local):
+class _PfxThreadState(threading.local):
   def __init__(self):
-    self.raise_prefix = None
-    self.cur = Pfx(cs.misc.cmd)
-    self.cur.prefix = cs.misc.cmd
+    self.raise_needs_prefix = False
     self.old = []
+
+  @property
+  def cur(self):
+    if not self.old:
+      self.push(Pfx(cs.misc.cmd))
+    return self.old[-1]
+
+  @property
+  def prefix(self):
+    ''' Return the prevailing message prefix.
+    '''
+    stack = list(self.old)
+    stack.reverse()
+    marks = []
+    for P in stack:
+      marks.append(P._mark)
+      if P.absolute:
+        break
+    marks.reverse()
+    return ': '.join(marks)
+
+  def push(self, P):
+    self.old.append(P)
+
+  def pop(self):
+    return self.old.pop()
 
 class Pfx_LoggerAdapter(logging.LoggerAdapter):
   def process(self, msg, kwargs):
-    if len(_prefix.cur.prefix) > 0:
-      msg = _prefix.cur.prefix + ": " + msg
+    prefix = _prefix.prefix
+    if len(prefix) > 0:
+      msg = prefix + ": " + msg
     return msg, kwargs
 
 def pfx(tag, loggers=None):
@@ -90,7 +115,6 @@ def pfx(tag, loggers=None):
 
 class Pfx(object):
   ''' A context manager to maintain a per-thread stack of message prefices.
-      The function current_prefix() returns the current prefix value.
   '''
   def __init__(self, mark, absolute=False, loggers=None):
     self._mark = str(mark)
@@ -102,9 +126,15 @@ class Pfx(object):
 
   @property
   def mark(self):
-    if self.absolute or len(_prefix.cur.prefix) == 0:
+    ''' Return the message prefix for use with this Pfx.
+    '''
+    if self.absolute:
       return self._mark
-    return _prefix.cur.prefix + ': ' + self._mark
+    global _prefix
+    mark = _prefix.mark
+    if _prefix.cur is not self:
+      mark = mark + ': ' + self._mark
+    return mark
 
   def logto(self, newLoggers):
     ''' Define the Loggers anew.
@@ -129,30 +159,25 @@ class Pfx(object):
 
   def __enter__(self):
     global _prefix
-    # compute the new message prefix
-    self.prefix = self.mark
-    ##print >>sys.stderr, "PFX.__enter__: self.prefix = %s" % (self.prefix,)
-
-    _prefix.old.append(_prefix.cur)
-    _prefix.cur = self
-    _prefix.raise_prefix = self.prefix
+    _prefix.push(self)
+    _prefix.raise_needs_prefix = True
 
   def __exit__(self, exc_type, exc_value, traceback):
     global _prefix
-    ##print >>sys.stderr, "1: raise_prefix=%s, exc_value=%s" % (_prefix.raise_prefix, exc_value)
     if exc_value is not None:
       if exc_type is not SystemExit:
-        ##print >>sys.stderr, "2: raise_prefix=%s, exc_value=%s" % (_prefix.raise_prefix, exc_value)
-        if _prefix.raise_prefix is not None:
+        if _prefix.raise_needs_prefix:
+          prefix = self.mark
           if hasattr(exc_value, 'args') and len(exc_value.args) > 0:
-            exc_value.args = [_prefix.raise_prefix + ": " + str(exc_value.args[0])] \
-                           + list(exc_value.args[1:])
+            exc_value.args = [ prefix + ": " + str(exc_value.args[0]) ] \
+                             + list(exc_value.args[1:])
           else:
             # we can't modify this - at least report the current prefix state
-            sys.stderr.write("%s: Pfx.__exit__: exc_value = %s\n" % (_prefix.raise_prefix, repr(exc_value),))
+            sys.stderr.write("%s: Pfx.__exit__: exc_value = %s\n" \
+                             % (prefix, repr(exc_value),))
           # prevent outer Pfx wrappers from hacking stuff as well
-        _prefix.raise_prefix = None
-    _prefix.cur = _prefix.old.pop()
+          _prefix.raise_needs_prefix = False
+    _prefix.pop()
     return False
 
   enter = __enter__
@@ -177,13 +202,8 @@ class Pfx(object):
   def critical(self, msg, *args, **kwargs):
     self.log(logging.CRITICAL, msg, *args, **kwargs)
 
-_prefix = _PrefixState()
-
-def current_prefix():
-  ''' Return the current prefix value as used by the Pfx class.
-  '''
-  global _prefix
-  return _prefix.cur.prefix
+# instantiate the thread-local state object
+_prefix = _PfxThreadState()
 
 # Logger public functions
 def exception(msg, *args):
