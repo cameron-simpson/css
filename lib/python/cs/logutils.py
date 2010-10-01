@@ -20,12 +20,12 @@ def setup_logging(cmd, format=None, level=None):
   if format is None:
     format = cs.misc.cmd.replace('%','%%')+': %(levelname)s: %(message)s'
   if level is None:
-    level = logging.WARN
+    level = cs.misc.setDebug()
   logging.basicConfig(level=level, format=format)
 
 def D(fmt, *args):
-  ''' Print formatted debug string straight to sys.stderr,
-      bypassing logging modules entirely.
+  ''' Unconditionally print formatted debug string straight to sys.stderr,
+      bypassing the logging modules entirely.
       A quick'n'dirty debug tool.
   '''
   sys.stderr.write(fmt % args)
