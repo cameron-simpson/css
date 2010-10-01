@@ -25,7 +25,7 @@ def setup_logging(cmd, format=None, level=None):
   if format is None:
     format = cmd.replace('%','%%')+': %(levelname)s: %(message)s'
   if level is None:
-    level = cs.misc.setDebug()
+    level = cs.misc.setDebug(None)
   logging.basicConfig(level=level, format=format)
   return level
 
