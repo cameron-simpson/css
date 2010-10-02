@@ -131,7 +131,7 @@ class Pfx(object):
     if self.absolute:
       return self._mark
     global _prefix
-    mark = _prefix.mark
+    mark = _prefix.prefix
     if _prefix.cur is not self:
       mark = mark + ': ' + self._mark
     return mark
