@@ -695,168 +695,6 @@ class DictMonitor(dict):
       ks = dict.keys(self)
     return ks
 
-class FuncMultiQueue(object):
-  ''' OBSOLETE: it is recommended to use cs.later.Later for this.
-  
-      A FuncMultiQueue is a mechanism for processing function calls
-      asynchronously with a certain number (the `capacity`) active at any one
-      time. It can be used to perform constrained parallel use of a server
-      resource such as an HTTP or database server.  
-  '''
-
-  def __init__(self, capacity, priority=False, synchronous=False):
-    ''' Initialise the FuncMultiQueue.
-
-        `capacity` is the maximum number of active calls permitted at a time.
-
-	`priority` causes the internal queue to be a PriorityQueue;
-	by default this is False.
-        In the default mode, requests are dispatched in FIFO order as
-        capacity becomes available. If `priority` is true, requests come
-        in as sequences whose last element is the request callable;
-        the sequences are kept in a PriorityQueue for dispatch.
-        The priority mode is intended as a convenient provision of
-        the PriorityQueue use case in the synchronous example below.
-        The priority mode takes precedence over the synchronous mode.
-
-        `synchronous` causes function submission to be synchronous; by default
-        this is False.
-        In the default asynchronous mode, an arbitrary number of functions may
-        be queued for dispatch.
-        In synchronous mode, the bgcall() and qbgcall() methods will block if
-        the maximum number of active functions are already in use.
-        
-        The synchronous mode exists to permit the use of a FuncMultiQueue
-        to process requests in a controlled order, for example from a
-        PriorityQueue like this:
-
-          PQ = PriorityQueue()
-          MFQ = MultiFuncQueue(4, synchronous=True)
-          while True:
-            pri, func = PQ.get()
-            MFQ.qbgcall(func, None)
-
-        In asynchronous mode this loop would always keep the PQ empty, and
-        thus the PriorityQueue would act like a FIFO.
-        In synchronous mode the MFQ.qbgcall() will block if the MFQ is busy. 
-        During that state multiple requests can accumulate in the PQ, ready for
-        choice according to their priority when capacity is available again on MFQ.
-    '''
-    assert capacity > 0
-    self._capacity = capacity
-    self._priority = priority
-    self.closed = False
-    self.cancelPending = False  # True ==> discard pending calls after close
-    if priority:
-      self.__Q = IterablePriorityQueue()
-    elif synchronous:
-      self.__Q = Channel()
-    else:
-      self.__Q = IterableQueue()
-    self.__handlers = deque()   # pool of available handlers
-    self.__allHandlers = []
-    self.__main = Thread(target=self._mainloop)
-    self.__main.daemon = True
-    self.__main.start()
-
-  def _mainloop(self):
-    ''' The main loop that retrieves function calls from the queue and
-        dispatches them to available handlers.
-    '''
-    Q = self.__Q
-    hs = self.__handlers        # pool of available handlers
-    self.__sem = sem = Semaphore(self._capacity)
-    sem.acquire()               # delay .get() until there is capacity
-    while not Q.closed:
-      rq = Q.get()
-      if rq is None:
-        sem.release()
-        break
-      if self.closed and self.cancelPending:
-        # drain queue
-        continue
-      if self._priority:
-        rq = rq[-1]
-      if len(hs) == 0:
-        # no available threads - make one
-        hch = Channel()
-        hargs = [None, hch]
-        self.__allHandlers.append(hargs)
-        T = Thread(target=self._handler, args=hargs)
-        T.daemon = True
-        hargs[0] = T
-        T.start()
-      else:
-        T, hch = hs.pop()
-      # dispatch request
-      hch.put(rq)
-      sem.acquire()             # delay .get() as at top of loop
-
-  def _handler(self, T, ch):
-    ''' The handler for a single thread of function call processing.
-    '''
-    n = seq()
-    assert ch is not None
-    sem = self.__sem
-    hs = self.__handlers
-    for rq in ch:
-      func, retQ, tag = rq
-      ret = func()
-      if retQ is not None:
-        retQ.put( (tag, ret) )
-      # put this Thread and Channel back on the list
-      hs.append( (T, ch) )
-      sem.release()
-
-  def close(self, cancel=False):
-    ''' Close the queue, preventing further requests.
-        Returns when all pending functions have completed unless `cancel` is
-        true, in which case the pending functions will not be called; the
-        active functions will still complete.
-    '''
-    assert not self.closed
-    self.cancelPending = cancel
-    self.closed = True
-    self.__Q.close()
-    for T, hch in self.__allHandlers:
-      hch.close()
-      T.join()
-    self.__sem.release()
-    self.__main.join()
-
-  def qbgcall(self, func, retq, priority=None):
-    ''' Queue a call to func(), typically the result of functools.partial.
-        A tag value is allocated and returned.
-        The (tag, result) will be .put() on the supplied retq on completion of
-        the function. If retq is None the function result is discarded.
-    '''
-    tag = seq()
-    rq = (func, retq, tag)
-    if self._priority:
-      rq = list(priority) + [rq]
-    else:
-      assert priority is None, "qbgcall: not in priority mode, but supplied priority is not None: %s" % (priority,)
-    self.__Q.put(rq)
-    return tag
-
-  def bgcall(self, func, retq=None, priority=None):
-    ''' Queue a call to func(), typically the result of functools.partial.
-        Return an object whose .get() method will return
-        the tuple (tag, result) on function completion.
-        This may be prespecified by the retq parameter.
-    '''
-    if retq is None:
-      retq = Q1()
-    self.qbgcall(func, retq=retq, priority=priority)
-    return retq
-
-  def call(self, func, priority=None):
-    ''' Call func() via the queue.
-        func is typically the result of functools.partial.
-        Return the function result.
-    '''
-    return self.bgcall(func, retq=None, priority=priority).get()[1]
-
 class TimerQueue(object):
   ''' Class to run a lot of "in the future" jobs without using a bazillion
       Timer threads.
@@ -984,34 +822,13 @@ class TimerQueue(object):
             T.start()
       self.mainRunning = False
 
+class FuncMultiQueue(object):
+  def __init__(self, *a, **kw):
+    raise Error, "FuncMultiQueue OBSOLETE, use cs.later.Later instead"
+
 if __name__ == '__main__':
   import unittest
   import time
-  from functools import partial
-  def f(x):
-    return x*2
-  def delay(n):
-    time.sleep(n)
-    return n
-
-  class TestFuncMultiQueue(unittest.TestCase):
-    def test00Call(self):
-      FQ = FuncMultiQueue(3, synchronous=True)
-      f3 = partial(f, 3)
-      z = FQ.call(f3)
-      self.assertEquals(z, 6)
-      ##FQ.close()
-    def test01BGCall(self):
-      cap = 3
-      FQ = FuncMultiQueue(cap, synchronous=True)
-      retq = Queue()
-      for i in range(cap+1):
-        d1 = partial(delay, 1)
-        ch = FQ.bgcall(d1, retq)
-      for i in range(cap+1):
-        tag, x = retq.get()
-        self.assertEquals(x, 1)
-      ##FQ.close()
 
   class TestTimerQueue(unittest.TestCase):
     def setUp(self):
