@@ -11,7 +11,7 @@ from Queue import Queue
 import time
 import unittest
 from cs.threads import AdjustableSemaphore, IterablePriorityQueue, \
-                       Channel, WorkerThreadPool
+                       Channel, WorkerThreadPool, TimerQueue
 from cs.misc import seq
 
 class LateFunction(object):
@@ -136,9 +136,11 @@ class Later(object):
     self.capacity = capacity
     self.closed = False
     self._priority = (0,)
+    self._timerQ = None                    # queue for delayed requests
     self._LFPQ = IterablePriorityQueue()   # inbound requests queue
     self._workers = WorkerThreadPool()
     self._dispatchThread = Thread(target=self._dispatcher)
+    self._lock = allocate_lock()
     self._dispatchThread.start()
 
   def __del__(self):
@@ -155,6 +157,8 @@ class Later(object):
   def close(self):
     assert not self.closed
     self.closed = True
+    if self._timerQ:
+      self._timerQ.close()
     self._LFPQ.close()
     self._dispatchThread.join()
     self._workers.close()
@@ -174,12 +178,19 @@ class Later(object):
       latefunc = pri_entry[-1]
       latefunc._dispatch()
 
-  def pdefer(self, priority, func):
+  def pdefer(self, priority, func, delay=None, when=None):
     ''' Queue a function for later dispatch.
         Return the corresponding LateFunction for result collection.
 	If the parameter `priority` not None then use it as the priority
         otherwise use the default priority.
+        If the parameter `delay` is not None, delay consideration of
+        this function until `delay` seconds from now.
+        If the parameter `when` is not None, delay consideration of
+        this function until the time `when`.
+        It is an error to specify both `when` and `delay`.
     '''
+    assert delay is None or when is None, \
+           "you can't specify both delay= and when= (%s, %s)" % (delay, when)
     if priority is None:
       priority = self._priority
     elif type(priority) is int:
@@ -188,14 +199,29 @@ class Later(object):
     pri_entry = list(priority)
     pri_entry.append(seq())     # ensure FIFO servicing of equal priorities
     pri_entry.append(LF)
-    self._LFPQ.put( pri_entry )
+
+    now = time.time()
+    if delay is not None:
+      when = now + delay
+    if when is None or when <= now:
+      # queue the request now
+      self._LFPQ.put( pri_entry )
+    else:
+      # queue the request at a later time
+      def queueFunc(func):
+        self._LFPQ.put( pri_entry )
+      with self._lock:
+        if self._timerQ is None:
+          self._timerQ = TimerQueue()
+      self._timerQ.add(when, partial(queueFunc, func))
+
     return LF
 
-  def defer(self, func):
+  def defer(self, func, delay=None, when=None):
     ''' Queue a function for later dispatch using the default priority.
         Return the corresponding LateFunction for result collection.
     '''
-    return self.pdefer(None, func)
+    return self.pdefer(None, func, delay=delay, when=when)
 
   def ppartial(self, priority, func, *args, **kwargs):
     ''' Queue a function for later dispatch using the specified priority.
@@ -332,6 +358,10 @@ class TestLater(unittest.TestCase):
       LF3 = L3.partial(self._delay, 1)
       results = [ LF() for LF in self.L.report( (LF1, LF2, LF3) ) ]
       self.assertEquals(results, [1, 2, 3])
+
+  def test08delay(self):
+    with Later(3) as L3:
+      LF1 = L3
 
 if __name__ == '__main__':
   unittest.main()
