@@ -61,7 +61,7 @@ class WorkerThreadPool(object):
       args = []
       H = Thread(target=self._handler, args=args)
       H.daemon = True
-      Hdesc = (H, Channel())
+      Hdesc = (H, IterableQueue())
       self.all.append(Hdesc)
       args.append(Hdesc)
       H.start()
@@ -80,8 +80,8 @@ class WorkerThreadPool(object):
         If deliver is not None, deliver(result) is called.
         If both are None and an exception occurred, it gets raised.
     '''
-    FQ = Hdesc[1]
-    for func, retq, deliver in FQ:
+    reqQ = Hdesc[1]
+    for func, retq, deliver in reqQ:
       try:
         result = func(), None
       except:
