@@ -130,10 +130,13 @@ class Later(object):
   ''' A management class to queue function calls for later execution.
   '''
 
-  def __init__(self, capacity):
+  def __init__(self, capacity, name=None):
     if type(capacity) is int:
       capacity = AdjustableSemaphore(capacity)
+    if name is None:
+      name = "Later-%d" % (seq(),)
     self.capacity = capacity
+    self.name = name
     self.closed = False
     self._priority = (0,)
     self._timerQ = None                    # queue for delayed requests
@@ -142,6 +145,9 @@ class Later(object):
     self._dispatchThread = Thread(target=self._dispatcher)
     self._lock = allocate_lock()
     self._dispatchThread.start()
+
+  def __str__(self):
+    return self.name
 
   def __del__(self):
     if not self.closed:
@@ -178,8 +184,8 @@ class Later(object):
       latefunc = pri_entry[-1]
       latefunc._dispatch()
 
-  def pdefer(self, priority, func, delay=None, when=None):
-    ''' Queue a function for later dispatch.
+  def submit(self, func, priority=None, delay=None, when=None):
+    ''' Submit a function for later dispatch.
         Return the corresponding LateFunction for result collection.
 	If the parameter `priority` not None then use it as the priority
         otherwise use the default priority.
@@ -212,28 +218,53 @@ class Later(object):
         self._LFPQ.put( pri_entry )
       with self._lock:
         if self._timerQ is None:
-          self._timerQ = TimerQueue()
+          self._timerQ = TimerQueue(name="<TimerQueue %s._timerQ>"%(self.name))
       self._timerQ.add(when, partial(queueFunc, func))
 
     return LF
 
-  def defer(self, func, delay=None, when=None):
+  def submitargs(self, d, func, *args, **kwargs):
+    ''' Submit a function with arguments for later dispatch.
+        Return the corresponding LateFunction for result collection.
+        The `d` parameter is a dictionary whose members correspond to the
+        `priority`, `delay`, `when` parameters of submit().
+        For example:
+          LF = L.submitargs( {'priority': 2, 'delay': 3},
+                             func, 1, 2, 3, d=4, e=5 )
+        is equivalent to:
+          LF = L.submit(partial(func, 1, 2, 3, d=4, e=5),
+                        priority=2, delay=3)
+        Each results in a call to:
+          func(1, 2, 3, d=4, e=5)
+        at least 3 seconds from now.
+    '''
+    return self.submit(partial(func, *args, **kwargs), **d)
+
+  def pdefer(self, priority, func):
+    ''' Queue a function for later dispatch.
+        Return the corresponding LateFunction for result collection.
+        Equivalent to:
+          submit(func, priority=priority)
+    '''
+    return self.submit(func, priority=priority)
+
+  def defer(self, func):
     ''' Queue a function for later dispatch using the default priority.
         Return the corresponding LateFunction for result collection.
     '''
-    return self.pdefer(None, func, delay=delay, when=when)
+    return self.submit(func)
 
   def ppartial(self, priority, func, *args, **kwargs):
     ''' Queue a function for later dispatch using the specified priority.
         Return the corresponding LateFunction for result collection.
     '''
-    return self.pdefer(priority, partial(func, *args, **kwargs))
+    return self.submit(partial(func, *args, **kwargs), priority=priority)
 
   def partial(self, func, *args, **kwargs):
     ''' Queue a function for later dispatch using the default priority.
         Return the corresponding LateFunction for result collection.
     '''
-    return self.ppartial(None, func, *args, **kwargs)
+    return self.submit(partial(func, *args, **kwargs))
 
   @contextmanager
   def priority(self, pri):
@@ -247,7 +278,8 @@ class Later(object):
 	This is most useful with the .partial() method, which has
 	no priority parameter.
         WARNING: this is NOT thread safe!
-        TODO: is a thread safe version even a sane idea?
+        TODO: is a thread safe version even a sane idea without a
+              per-thrad priority stack?
     '''
     oldpri = self._priority
     self._priority = pri
