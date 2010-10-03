@@ -699,7 +699,10 @@ class TimerQueue(object):
   ''' Class to run a lot of "in the future" jobs without using a bazillion
       Timer threads.
   '''
-  def __init__(self):
+  def __init__(self, name=None):
+    if name is None:
+      name = 'TimerQueue-%d' % (seq(),)
+    self.name = name
     self.Q = PriorityQueue()    # queue of waiting jobs
     self.pending = None         # or (Timer, when, func)
     self.closed = False
@@ -707,6 +710,9 @@ class TimerQueue(object):
     self.mainRunning = False
     self.mainThread = Thread(target=self._main)
     self.mainThread.start()
+
+  def __str__(self):
+    return self.name
 
   def close(self, cancel=False):
     ''' Close the TimerQueue. This forbids further job submissions.
