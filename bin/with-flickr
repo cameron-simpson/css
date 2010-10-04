@@ -5,7 +5,7 @@
 #
 
 from cs.flickr import FlickrURL
-from cs.misc import cmd, cmderr
+from cs.misc import cmd
 import sys
 
 usage="Usage: %s imurl photo-page-URLs\n" % cmd
@@ -14,16 +14,16 @@ badopts=False
 
 args=sys.argv[1:]
 if len(args) == 0:
-  cmderr("missing operator")
+  error("missing operator")
   badopts=True
 else:
   op=args.pop(0)
   if op == "imurl":
     if len(args) == 0:
-      cmderr("%s: missing photo-page-URLs" % op)
+      error("%s: missing photo-page-URLs" % op)
       badopts=True
   else:
-    cmderr("unsupported operator: %s" % op)
+    error("unsupported operator: %s" % op)
     badopts=True
 
 if badopts:
