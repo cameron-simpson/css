@@ -292,11 +292,8 @@ def cleanpath(*vars):
       if len(path) > 0 and os.path.exists(path):
         if path not in keep:
           keep.append(path)
-      else:
-        debug("%s: discard %s", var, path)
     nval=":".join(keep)
     if oval != nval:
-      debug("%s\n  %s\n  %s", var, oval, nval)
       os.environ[var]=nval
 
 opts, args = getopt(sys.argv[1:], 'fn')
