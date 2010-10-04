@@ -56,6 +56,11 @@ fi
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
+ssh-add -l >/dev/null \
+|| { echo "$cmd: no ssh-agent, aborting" >&2
+     exit 1
+   }
+
 not()
 { "$@" || return 0
   return 1
