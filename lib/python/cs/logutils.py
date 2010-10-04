@@ -6,6 +6,7 @@
 
 from __future__ import with_statement
 import logging
+import os
 import sys
 import time
 from thread import allocate_lock
@@ -13,7 +14,7 @@ import threading
 import traceback
 import cs.misc
 
-def setup_logging(cmd, format=None, level=None):
+def setup_logging(cmd=None, format=None, level=None):
   ''' Arrange basic logging setup for conventional UNIX command
       line error messaging.
       Sets cs.misc.cmd to `cmd`.
@@ -21,16 +22,24 @@ def setup_logging(cmd, format=None, level=None):
       infer_logging_level().
       Returns the logging level.
   '''
+  if cmd is None:
+    import os.path
+    cmd = os.path.basename(sys.argv[0])
   cs.misc.cmd = cmd
   if format is None:
     format = cmd.replace('%','%%')+': %(levelname)s: %(message)s'
   if level is None:
-    level = infer_logging_level
-  logging.basicConfig(level=level, format=format)
+    level = infer_logging_level()
   # TODO: if sys.sderr.isatty: setupUpd(), set main handler to UpdHandler
   if sys.stderr.isatty():
     from cs.upd import UpdHandler
-    logging.getLogger().addHandler(UpdHandler(sys.stderr, logging.WARNING))
+    rootLogger = logging.getLogger()
+    rootLogger.setLevel(level)
+    upd = UpdHandler(sys.stderr, logging.WARNING)
+    upd.setFormatter(logging.Formatter(format))
+    rootLogger.addHandler(upd)
+  else:
+    logging.basicConfig(level=level, format=format)
   return level
 
 def infer_logging_level():
