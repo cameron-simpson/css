@@ -106,7 +106,7 @@ def parseline(line):
         words.append(m.group(0))
         line=line[m.end():]
       else:
-        cmderr("aborting parseline at:",line)
+        error("aborting parseline at: %s", line)
         return None
   
     line=string.lstrip(line)

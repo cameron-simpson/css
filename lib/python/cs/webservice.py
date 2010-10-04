@@ -1,6 +1,7 @@
 #!/usr/bin/python -tt
 #
 # Convenience routines for web services.
+# Requires ZSI. I'm using Suds these days instead.
 #       - Cameron Simpson <cs@zip.com.au> 25mar2008
 #
 
@@ -9,7 +10,7 @@ from ZSI import SoapWriter, ParsedSoap, TC
 import ZSI.wstools.Utility
 from StringIO import StringIO
 import urllib2
-from cs.misc import cmd, cmderr, isdebug, ifdebug, debug, objFlavour, T_MAP, T_SEQ, logLine
+from cs.misc import cmd, objFlavour, T_MAP, T_SEQ, logLine
 from cs.logutils import LogTime
 
 def lather(obj,tc=None):

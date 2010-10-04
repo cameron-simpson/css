@@ -19,8 +19,9 @@ from formatter import NullFormatter
 import cs.hier
 from cs.hier import T_SEQ, T_MAP, T_SCALAR
 from cs.html import puttok, puttext
-from cs.misc import warn, debug, ifdebug
+from cs.logutils import warn
 
+# TODO: this shouldn't happen unconditionally!
 cookieHandler = HTTPCookieProcessor()
 if 'COOKIE_FILE' in os.environ:
   cookieHandler.cookiejar=MozillaCookieJar()
@@ -63,9 +64,9 @@ if 'COOKIE_FILE' in os.environ:
                  None,
                  {})
       if c.is_expired(now):
-        if ifdebug(): warn("skip expired cookie: name=%s, host=%s, path=%s" % (name,host,path))
+        warn("skip expired cookie: name=%s, host=%s, path=%s", name,host,path)
         continue
-      if ifdebug(): warn("add cookie: name=%s, host=%s, path=%s" % (name,host,path))
+      warn("add cookie: name=%s, host=%s, path=%s", name,host,path)
       cookieHandler.cookiejar.set_cookie(c)
 install_opener(build_opener(cookieHandler))
 

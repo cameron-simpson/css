@@ -11,7 +11,7 @@ import string
 import StringIO
 import re
 from contextlib import closing
-from cs.misc import cmderr, progress, verbose, seq, saferename
+from cs.misc import seq, saferename
 
 def ismhdir(path):
   ''' Test if 'path' points at an MH directory.
@@ -141,7 +141,7 @@ def readMbox(path, gzipped=None):
       from_=mboxline
       msgStart=preline
     elif parser is None:
-      cmderr(path+": skipping pre-message line:", mboxline)
+      error(path+": skipping pre-message line:", mboxline)
     else:
       parser.feed(mboxline)
 
@@ -231,7 +231,7 @@ class Maildir:
       info=m.group(1)
 
     newname=self.fullpath(self.mkname(info))
-    progress(path, '=>', newname)
+    info(path, '=>', newname)
     saferename(path,newname)
 
 class MaildirNewItem:
@@ -255,6 +255,6 @@ class MaildirNewItem:
 _maildirs={}
 def openMaildir(path):
   if path not in _maildirs:
-    verbose("open new Maildir", path)
+    info("open new Maildir", path)
     _maildirs[path]=Maildir(path)
   return _maildirs[path]

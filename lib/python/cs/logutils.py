@@ -17,16 +17,50 @@ def setup_logging(cmd, format=None, level=None):
   ''' Arrange basic logging setup for conventional UNIX command
       line error messaging.
       Sets cs.misc.cmd to `cmd`.
-      If `level` is omitted or None, calls cs.misc.setDebug() to
-      infer a logging level from the process environment.
+      If level is None, infer a level from the environment using
+      infer_logging_level().
       Returns the logging level.
   '''
   cs.misc.cmd = cmd
   if format is None:
     format = cmd.replace('%','%%')+': %(levelname)s: %(message)s'
   if level is None:
-    level = cs.misc.setDebug(None)
+    level = infer_logging_level
   logging.basicConfig(level=level, format=format)
+  # TODO: if sys.sderr.isatty: setupUpd(), set main handler to UpdHandler
+  if sys.stderr.isatty():
+    from cs.upd import UpdHandler
+    logging.getLogger().addHandler(UpdHandler(sys.stderr, logging.WARNING))
+  return level
+
+def infer_logging_level():
+  ''' Infer a logging level from the environment.
+      Default to logging.WARNING.
+      If sys.stderr is a terminal, default to logging.INFO.
+      If the environment variable DEBUG is set:
+        "" or "0" => same as unset; leave default as above.
+        numeric non-zero => logging.DEBUG
+        "DEBUG" => logging.DEBUG
+        "INFO"  => logging.INFO
+        "WARNING" => logging.WARNING
+        "ERROR" => logging.ERROR
+      Return the inferred logging level.
+  '''
+  level = logging.WARNING
+  if sys.stderr.isatty():
+    level = logging.INFO
+  env = os.environ.get('DEBUG', '')
+  if env != "0":
+    level = logging.DEBUG
+    env = env.upper()
+    if env == 'DEBUG':
+      level = logging.DEBUG
+    elif env == 'INFO':
+      level = logging.INFO
+    elif env == 'WARN' or env == 'WARNING':
+      level = logging.WARNING
+    elif env == 'ERROR':
+      level = logging.ERROR
   return level
 
 def D(fmt, *args):

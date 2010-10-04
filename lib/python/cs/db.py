@@ -3,6 +3,8 @@
 # Assorted database routines and classes.
 #       - Cameron Simpson <cs@zip.com.au> 23dec2005
 #
+# OBSOLETE: I pretty much use SQLalchemy for all this these days.
+#
 
 from __future__ import with_statement
 import sys
@@ -12,7 +14,8 @@ import datetime
 if sys.hexversion < 0x02060000: from sets import Set as set
 import cs.secret
 import cs.cache
-from cs.misc import cmderr, debug, ifdebug, warn, isodate, the, WithUC_Attrs
+from cs.logging import error, warn
+from cs.misc import isodate, the, WithUC_Attrs
 from thread import allocate_lock
 
 def today():
@@ -76,7 +79,7 @@ def mysql(secret,db=None):
   else:
     global _warned_MYSQL_NO_UTF8
     if not _warned_MYSQL_NO_UTF8:
-      cmderr("mysql: no UTF8 support")
+      warn("mysql: no UTF8 support")
       _warned_MYSQL_NO_UTF8=True
 
   return conn
@@ -168,16 +171,16 @@ class SQLQuery:
     self.__conn=conn
     self.__query=query
     self.__params=params
-    if ifdebug():
-      warn('SQLQuery:', query)
-      if len(params) > 0: warn("SQLQuery: params =", repr(params))
+    debug('SQLQuery:', query)
+    if len(params) > 0:
+      debug("SQLQuery: params =", repr(params))
 
     with conn.lock:
       self.__cursor=conn.conn.cursor()
       try:
         self.__cursor.execute(query,params)
       except:
-        cmderr("SQL failure for: %s (params=%s)" % (query,params))
+        error("SQL failure for: %s (params=%s)", query, params)
         warn("\tRetry with new db connection...")
         conn.attachConn()
         self.__cursor=conn.conn.cursor()
@@ -271,7 +274,7 @@ def mergeDatedRecordsSQL(table,keyFields,idField=None,constraint=None,cropOverla
       or oldrow.END_DATE > start:
         # crop earlier record to start of later record
         if start is None:
-          cmderr("warning: START_DATE is NULL, can't fix overlap\n\tOLD: %s\n\tNEW: %s" % (oldrow, row))
+          warn("warning: START_DATE is NULL, can't fix overlap\n\tOLD: %s\n\tNEW: %s", oldrow, row)
         else:
           yield 'UPDATE %s SET END_DATE = %s WHERE %s = %s' \
                  % (table.name, sqlise(start), idField, sqlise(oldrow[idField]))
@@ -593,7 +596,6 @@ class SingleKeyTableView(KeyedTableView):
       yield self[k]
 
   def __getitem__(self,key):
-    ##debug("SingleKeyTableView.__getitem__: key =", repr(key))
     return KeyedTableView.__getitem__(self,(key,))
 
   def __contains__(self,key):

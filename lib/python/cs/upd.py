@@ -2,30 +2,12 @@ from __future__ import with_statement
 import threading
 from contextlib import contextmanager
 import atexit
-from cs.lex import unctrl       ##, tabpadding
+import logging
+from logging import StreamHandler
 from cs.logutils import Pfx
+from cs.lex import unctrl       ##, tabpadding
 
 active=False
-
-_defaultUpd=None
-
-def default():
-  global _defaultUpd
-  if _defaultUpd is None:
-    import sys
-    _defaultUpd=Upd(sys.stderr)
-    import cs.misc
-    cs.misc._defaultUpd=_defaultUpd
-  return _defaultUpd
-
-def nl(line):    return default().nl(line)
-def out(line):   return default().out(line)
-def close(line): return default().close(line)
-def state():     return default().state()
-def without(func,*args,**kw):
-                 if _defaultUpd is None:
-                   return func(*args,**kw)
-                 return _defaultUpd.without(func,*args,**kw)
 
 instances=[]
 
@@ -37,31 +19,54 @@ def cleanupAtExit():
 
 atexit.register(cleanupAtExit)
 
-class Upd:
-  def __init__(self,backend,mode=None):
+class UpdHandler(StreamHandler):
+
+  def __init__(self, strm=None, nlLevel=None):
+    if strm is None:
+      strm = sys.stderr
+    if nlLevel is None:
+      nlLevel = logging.WARNING
+    StreamHandler.__init__(self, strm)
+    self.__upd = Upd(strm)
+    self.__nlLevel = nlLevel
+
+  def emit(self, logrec):
+    if logrec.lvl >= self.__nlLevel:
+      with self.__upd._withoutContext():
+        StreamHandler.emit(self, logrec)
+    else:
+      self.__upd.out(logrec.msg % args)
+
+  def flush(self):
+    self.__upd._backend.flush()
+
+class Upd(object):
+
+  def __init__(self, backend, mode=None):
     assert backend is not None
-    self.__lock=threading.RLock()
-    self.__backend=backend
-    self.__buf=''
+    self._lock=threading.RLock()
+    self._backend=backend
+    self._state=''
     global active, instances
     instances.append(self)
     active=True
 
+  @property
   def state(self):
-    return self.__buf
+    return self._state
 
-  def out(self,txt,noStrip=False):
-    with self.__lock:
-      old=self.__buf
+  def out(self, txt, noStrip=False):
+    with self._lock:
+      old=self._state
       if not noStrip:
         txt=txt.rstrip()
       txt=unctrl(txt)
 
       txtlen=len(txt)
-      buflen=len(self.__buf)
-      pfxlen=min(txtlen,buflen)
+      buflen=len(self._state)
+      pfxlen=min(txtlen, buflen)
       for i in range(pfxlen):
-        if txt[i] != self.__buf[i]:
+        if txt[i] != self._state[i]:
           pfxlen=i
           break
 
@@ -72,54 +77,53 @@ class Upd:
       #    string, erase trailing extent if any.
       # Therefore compare backspaces against cr+pfxlen.
       #
-      patch=''
       if buflen-pfxlen < 1+pfxlen:
-        for i in range(buflen-pfxlen):
-          patch+='\b'
-        patch+=txt[pfxlen:]
+        # backspace and partial overwrite
+        self._backend.write( '\b' * (buflen-pfxlen) )
+        self._backend.write( txt[pfxlen:] )
       else:
-        patch='\r'+txt
+        # carriage return and complete overwrite
+        self._backend.write('\r')
+        self._backend.write(txt)
 
-      extlen=buflen-txtlen
+      extlen = buflen-txtlen
       if extlen > 0:
         ##patch+=tabpadding(extlen,offset=txtlen)
-        patch+="%*s" % (extlen, ' ')
-        for i in range(extlen):
-          patch+='\b'
+        self._backend.write( ' ' * extlen )
+        self._backend.write( '\b' * extlen )
 
-      self.__backend.write(patch)
-      self.__backend.flush()
-      self.__buf=txt
+      self._backend.flush()
+      self._state = txt
 
     return old
 
-  def nl(self,txt,noStrip=False):
-    self.without(self.__backend.write,txt+'\n',noStrip=noStrip)
+  def nl(self, txt, noStrip=False):
+    self.without(self._backend.write, txt+'\n', noStrip=noStrip)
 
   def close(self):
-    if self.__backend is not None:
+    if self._backend is not None:
       self.out('')
-      self.__backend=None
+      self._backend=None
 
   def closed(self):
-    return self.__backend == None
+    return self._backend == None
 
-  def without(self,func,*args,**kw):
+  def without(self, func, *args, **kw):
     if 'noStrip' in kw:
       noStrip=kw['noStrip']
       del kw['noStrip']
     else:
       noStrip=False
     with self._withoutContext(noStrip):
-      ret=func(*args,**kw)
+      ret=func(*args, **kw)
     return ret
 
   @contextmanager
   def _withoutContext(self,noStrip=False):
-    with self.__lock:
-      old=self.out('',noStrip=noStrip)
+    with self._lock:
+      old=self.out('', noStrip=noStrip)
       yield
-      self.out(old,noStrip=True)
+      self.out(old, noStrip=True)
 
 @contextmanager
 def __dummyNoUpd():

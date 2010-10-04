@@ -1,5 +1,3 @@
-from cs.misc import warn, debug, ifdebug
-
 _caches=[]
 def overallHitRatio():
   if len(_caches) == 0:

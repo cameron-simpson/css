@@ -1,6 +1,6 @@
 import sys
 from email.utils import parseaddr, getaddresses, formataddr
-from cs.misc import cmderr, verbose
+from cs.logutils import Pfx, error, warn, info
 
 def addressKey(addr):
   ''' Return the key value for an RFC2822 address.
@@ -11,60 +11,64 @@ def addressKey(addr):
   return core.lower()
 
 def addrsRegexp(addrkeys):
-  addrkeys=list(addrkeys)
+  ''' Return the text of a regular expression to match the supplied
+      address keys `addrkeys`.
+  '''
+  addrkeys = list(addrkeys)
   addrkeys.sort()
-  retext='|'.join(addrkey.replace('.', '\\.').replace('+','\\+')
-                  for addrkey in addrkeys)
+  retext = '|'.join( addrkey.replace('.', '\\.').replace('+','\\+')
+                     for addrkey in addrkeys )
   return retext
 
-def loadAddresses(addresses,catmap=None,addrmap=None):
-  ''' Load an address list file, return maps by category and address key.
+def loadAddresses(addresses, catmap=None, addrmap=None):
+  ''' Load an address list file.
+      Return return ok (True/False) and maps by category and address key.
       Existing category and address key maps may be supplied.
   '''
   if catmap is None:
     catmap={}
   if addrmap is None:
     addrmap={}
+  ok = True
+  with Pfx(addresses):
+    lineno=0
+    with open(addresses) as addrfp:
+      for line in addrfp:
+        lineno+=1
+        if not line.endswith('\n'):
+          error("line %d: missing newline (unexpected EOF)", lineno)
+          ok = False
+          break
 
-  lineno=0
-  for line in open(addresses):
-    lineno+=1
-    if line[-1] != '\n':
-      cmderr("%s, line %d: missing newline (unexpected EOF)"
-             % (addresses, lineno))
-      xit=1
-      break
+        line=line.strip()
+        if len(line) == 0 or line[0] == '#':
+          continue
 
-    line=line.strip()
-    if len(line) == 0 or line[0] == '#':
-      continue
+        try:
+          cats, addr = line.split(None,1)
+        except ValueError:
+          warn("line %d: bad syntax: %s", lineno, line)
+          continue
 
-    try:
-      cats, addr = line.split(None,1)
-    except ValueError:
-      print >>sys.stderr, "%s: %s: %d: bad syntax: %s" % (sys.argv[0], addresses, lineno, line)
-      continue
+        if addr.startswith('mailto:'):
+          addr=addr[7:]
+        cats=cats.split(',')
+        addrkey=addressKey(addr)
+        if addrkey is None:
+          warn("line %d: can't parse address \"%s\"", lineno, addr)
+          continue
 
-    if addr.startswith('mailto:'):
-      addr=addr[7:]
-    cats=cats.split(',')
-    addrkey=addressKey(addr)
-    if addrkey is None:
-      verbose("%s, line %d: can't parse address \"%s\""
-             % (addresses, lineno, addr))
-      xit=1
-      continue
+        if addrkey in addrmap:
+          warn("line %d: repeated address \"%s\" (%s)", lineno, addr, addrKey)
+          continue
 
-    if addrkey in addrmap:
-      verbose("%s, line %d: repeated address \"%s\" (%s)"
-              % (addresses, lineno, addr, addrkey))
-      continue
+        if "@" not in addrkey:
+          warn("line %d: no \"@\" in \"%s\"", lineno, addrkey)
 
-    assert addrkey.find("@") > 0, "%s, line %d: no \"@\" in \"%s\"" % (addresses, lineno, addrkey)
-    cats.sort()
-    addrmap[addrkey]=(addr,addrkey,cats)
+        cats.sort()
+        addrmap[addrkey]=(addr,addrkey,cats)
 
-    for cat in cats:
-      catmap.setdefault(cat,{})[addrkey]=addr
+        for cat in cats:
+          catmap.setdefault(cat,{})[addrkey]=addr
 
-  return catmap, addrmap
+  return ok, catmap, addrmap

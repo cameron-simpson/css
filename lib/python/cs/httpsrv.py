@@ -2,7 +2,6 @@ from BaseHTTPServer import HTTPServer, BaseHTTPRequestHandler
 import cs.hier
 import json
 import cs.www
-from cs.misc import cmderr, debug
 import base64
 import re
 import sys
@@ -72,7 +71,6 @@ class JSONRPCHandler(RequestHandler):
                      % (code,complaint,code,complaint))
 
   def do_GET(self):
-    cmderr("path =", repr(self.path))
     path=self.path
     root=self.server.rpcBaseURL
     if not path.startswith(root):
@@ -88,15 +86,11 @@ class JSONRPCHandler(RequestHandler):
     seq=int(path[:slndx])
     self.headers['Content-Type']="application/x-javascript\r\n"
     jsontxt=path[slndx+1:]
-    cmderr("jsontxt0 =", repr(jsontxt))
     jsontxt=cs.www.unhexify(jsontxt)
-    cmderr("jsontxt1 =", repr(jsontxt))
     (args,unparsed)=cs.hier.tok(jsontxt)
-    cmderr("args =", repr(args), "unparsed =", repr(unparsed))
     rpcres=self.server.rpc(self,args)
     if rpcres is None:
       return
     cb, result = rpcres
     jscode="%s(%d,%s);\r\n" % (cb,seq,dumps(result,4));
-    debug("JSCODE:\n"+jscode);
     self.wfile.write(jscode);

@@ -1,7 +1,9 @@
 import os
 import os.path
 import cs.hier
-from cs.misc import debug, ifdebug, progress, verbose, warn, DictUC_Attrs
+from cs.misc import DictUC_Attrs
+import logging
+import cs.logutils
 
 def get(secret,path=None):
   return Secret(secret,path=path)
@@ -77,9 +79,9 @@ def sqlAlchemy(secret,scheme,login,password,host,database):
                                  secret.PASSWORD,
                                  secret.HOST,
                                  secret.DATABASE),
-           echo=ifdebug())
+           echo=(lcs.logutils.logging_level <= logging.DEBUG))
 
-def mssql(secret,db=None):
+def mssql(secret, db=None):
   import pymssql
   if type(secret) is str or not(hasattr(secret,'__keys__') or hasattr(secret,'keys')):
     # transmute secret name into structure
@@ -95,7 +97,7 @@ def mssql(secret,db=None):
   from os import environ as env
   ohost=env.get('TDSHOST'); env['TDSHOST']=host
   oport=env.get('TDSPORT'); env['TDSPORT']=str(port)
-  conn=pymssql.connect(user=user,password=passwd,database=database)
+  conn=pymssql.connect(user=user, password=passwd, database=database)
   if ohost is None:
     del env['TDSHOST']
   else:
@@ -107,14 +109,12 @@ def mssql(secret,db=None):
 
   return conn
 
-def ldap(secret,host=None,binddn=None,bindpw=None):
+def ldap(secret, host=None, binddn=None, bindpw=None):
   # transmute secret name into structure
   if not(hasattr(secret,'__keys__') or hasattr(secret,'keys')):
     import cs.secret
-    verbose("lookup secret:", secret)
     secret=cs.secret.get(secret)
 
-  debug("LDAP secret =", repr(secret))
   ldap_host=secret['HOST']
   if host is not None:   ldap_host=host
   ldap_binddn=secret['BINDDN']
@@ -123,9 +123,6 @@ def ldap(secret,host=None,binddn=None,bindpw=None):
   if bindpw is not None: ldap_bindpw=bindpw
 
   import ldap
-  debug("ldap_host =", repr(ldap_host))
-  debug("ldap_binddn =", repr(ldap_binddn))
-  debug("ldap_bindpw =", repr(ldap_bindpw))
   L=ldap.open(ldap_host)
   L.simple_bind_s(ldap_binddn,ldap_bindpw)
   return L

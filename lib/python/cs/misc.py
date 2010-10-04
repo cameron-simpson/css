@@ -47,140 +47,6 @@ class _NullUpd:
     return func(*args, **kw)
 _defaultUpd = _NullUpd()
 
-# print to stderr
-def warn(*args):
-  ''' "Complaint" error message.
-  '''
-  global _defaultUpd
-  _defaultUpd.without(warning, " ".join([str(s) for s in args]))
-
-# debug_level:
-#
-def setDebug(newlevel):
-  ''' Set the variable debug_level and associated flags.
-      Return the implied logging level suitable for the logging module.
-      The convenience function cs.logutils.setup_logging() calls setDebug()
-      to obtain a logging level if it is passed a `level` of None.
-
-      If `newlevel` is None, infer a level from the process environment:
-        If the envvar $DEBUG_LEVEL is set and numeric, parse it as the level.
-        Otherwise, if the envvar $DEBUG is set and non-empty and not the
-        string "0", set the level to 3. Otherwise, if sys.stderr is a
-        terminal set the level to 1. Otherwise, set the level to 0.
-      If `newlevel` is not None, use its value.
-
-      The meaning of the debug_levels is as follows:
-        0 - quiet
-            isdebug=False, isverbose=False, isprogress=False
-            Returned logging level = logging.ERROR.
-        1 - progress reporting
-            isdebug=False, isverbose=False, isprogress=True
-            Returned logging level = logging.WARNING.
-        2 - verbose progress reporting
-            isdebug=False, isverbose=True, isprogress=True
-            Returned logging level = logging.INFO.
-        3 or more - more verbose, and activates the debug() function
-            isdebug=True, isverbose=True, isprogress=True
-            Returned logging level = logging.DEBUG.
-  '''
-  if newlevel is None:
-    newlevel = 0
-    if sys.stderr.isatty():
-      newlevel = 1
-    env = os.environ.get('DEBUG_LEVEL', '')
-    if len(env) > 0 and env.isdigit():
-      newlevel = int(env)
-    else:
-      env = os.environ.get('DEBUG', '')
-      if len(env) > 0 and env != "0":
-        newlevel = 3
-
-  global debug_level, isdebug, isverbose, isprogress, logging_level
-  debug_level = newlevel
-  isdebug = (debug_level >= 3)
-  isverbose = (debug_level >= 2)
-  isprogress = (debug_level >= 1)
-
-  logging_level = logging.ERROR
-  if debug_level >= 3:
-    logging_level = logging.DEBUG
-  elif debug_level >= 2:
-    logging_level = logging.INFO
-  elif debug_level >= 1:
-    logging_level = logging.WARNING
-  
-  return logging_level
-
-setDebug(None)
-
-debug_level_stack = []
-def pushDebug(newlevel):
-  ''' Push the current debug level onto a stack, set a new one.
-  '''
-  global debug_level, debug_level_stack
-  debug_level_stack.append(debug_level)
-  setDebug(newlevel)
-
-def popDebug():
-  ''' Restore the previous debug level from the stack.
-  '''
-  global debug_level, debug_level_stack
-  setDebug(debug_level_stack.pop())
-
-class DebugLevel:
-  ''' A context manager for debug levels.
-  '''
-  def __init__(self, level=None):
-    global debug_level
-    if level is None:
-      level = debug_level
-    self.level = level
-  def __enter__(self):
-    pushDebug(self.level)
-  def __exit__(self, exc_type, exc_value, traceback):
-    popDebug()
-    return False
-
-def ifdebug(level=3):
-  ''' Tests if the debug_level is above the specified threshold.
-  '''
-  return debug_level >= level
-
-def debugif(level, *args):
-  ''' Emits the specified warning if the debug_level is above the specified
-      threshold.
-  '''
-  if debug_level >= level:
-    warn(*args)
-
-def ifprogress(): return ifdebug(1)
-def ifverbose():  return ifdebug(2)
-
-def progress(*args): debugif(1, *args)
-def verbose(*args):  debugif(2, *args)
-def debug(*args):    debugif(3, *args)
-def out(*args):
-  global _defaultUpd
-  if len(args) > 0 and ifdebug(1):
-    return _defaultUpd.out(" ".join(args))
-  return _defaultUpd.state()
-
-def cmderr(*args):
-  ''' Convenience function for printing error messages.
-  '''
-  global cmd_
-  warn(*[cmd_]+list(args))
-
-def TODO(msg):
-  ''' Marker for missing features.
-  '''
-  info("TODO: %s" % (msg,))
-
-def FIXME(msg):
-  ''' Marker for outstanding bugs.
-  '''
-  warn("WARNING: %s" % (msg,))
-
 def tb(limit=None):
   ''' Print a stack backtrace.
   '''
@@ -577,7 +443,7 @@ class CanonicalDict(dict):
       return key
 
     ckey=self.__canon(key)
-    debug("CanonicalDict: %s => %s" % (key, ckey))
+    debug("CanonicalDict: %s => %s", key, ckey)
     return ckey
 
   def __getitem__(self, key):
@@ -590,11 +456,8 @@ class CanonicalDict(dict):
     dict.__delitem__(self, self.__canonical(key))
 
   def __contains__(self, key):
-    ckey=self.__canonical(key)
-    yep=dict.__contains__(self, ckey)
-    if ifdebug():
-      warn("CanonicalDict: __contains__(%s(%s)) = %s" % (key, ckey, repr(yep)))
-    return yep
+    ckey = self.__canonical(key)
+    return dict.__contains__(self, ckey)
 
 class LCDict(CanonicalDict):
   def __init__(self, dict):
@@ -689,7 +552,7 @@ def mkdirn(path):
       if sys.exc_value[0] == errno.EEXIST:
         # taken, try new value
         continue
-      cmderr("mkdir(%s): %s" % (newpath, e))
+      error("mkdir(%s): %s", newpath, e)
       return None
     if len(opath) == 0:
       newpath=os.path.basename(newpath)
@@ -724,7 +587,8 @@ def runCommandPrompt(fnmap, prompt=None):
   ''' Accept a dict of the for key->(fn, help_string)
       and perform entered commands.
   '''
-  if prompt is None: promt=cmd+"> "
+  if prompt is None:
+    prompt = cmd+"> "
   ok=True
   while True:
     try:
@@ -742,7 +606,7 @@ def runCommandPrompt(fnmap, prompt=None):
     words=parseline(line)
     if words is None:
       xit=1
-      cmderr("syntax error in line:", line)
+      error("syntax error in line: %s", line)
       continue
    
     op=words[0]
@@ -753,11 +617,11 @@ def runCommandPrompt(fnmap, prompt=None):
       continue
    
     xit=1
-    cmderr("unsupported operation:", op)
+    error("unsupported operation: %s", op)
     ops=fnmap.keys()
     ops.sort()
     for op in ops:
-      warn("  %-7s %s" % (op, fnmap[op][1]))
+      warn("  %-7s %s", op, fnmap[op][1])
 
 # trivial wrapper for extension in subclasses
 class SeqWrapper:

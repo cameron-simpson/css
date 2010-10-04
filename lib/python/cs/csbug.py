@@ -11,8 +11,8 @@ import socket
 import mailbox
 import cs.env
 import cs.sh
-from cs.misc import chomp, progress, seq
-
+from cs.misc import chomp, seq
+from cs.logutils import info
 
 numericRe=re.compile('^(0|[1-9][0-9]*)$')
 scalarFieldNameRe=re.compile('^[a-z][a-z0-9_]*$')
@@ -62,7 +62,7 @@ class BugSet:
 
     if not os.path.isfile(sqldb):
       # no db? create it
-      progress("create SQLite database...")
+      info("create SQLite database...")
       os.system("set -x; sqlite '"+sqldb+"' 'create table bugfields (bugnum int, field varchar(64), value varchar(16384));'")
       # populate db from raw data
       sqlpipe=cs.sh.vpopen(("sqlite",sqldb),"w")
@@ -79,7 +79,7 @@ class BugSet:
       sqlpipe.close()
     else:
       # just update the db from the log file
-      progress("sync db from log...")
+      info("sync db from log...")
       if os.path.isfile(dblog):
         sqlpipe=cs.sh.vpopen(("sqlite",sqldb),"w")
         dblogfp=file(dblog)
@@ -103,7 +103,7 @@ class BugSet:
           sqlpipe.write("\");\n")
         sqlpipe.close()
 
-    progress("QUERY =", query)
+    info("QUERY = %s", query)
     sqlpipe=cs.sh.vpopen(("sqlite","-list",sqldb,query))
     for row in sqlpipe:
       yield string.split(chomp(row),'|')

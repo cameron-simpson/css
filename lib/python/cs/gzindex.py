@@ -18,7 +18,7 @@ def iter(path):
         break
 
       if key[-1] != "\n":
-        cmderr(path+": incomplete key line at EOF")
+        error(path+": incomplete key line at EOF")
         break
 
       key=key[:-1]
@@ -27,7 +27,7 @@ def iter(path):
       while True:
         line=fp.readline()
         if len(line) == 0 or line[-1] != "\n":
-          cmderr(path+": EOF during headers for key: "+key)
+          error(path+": EOF during headers for key: "+key)
           key=None
           break
 

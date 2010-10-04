@@ -7,8 +7,7 @@ from cStringIO import StringIO
 import unittest
 from cs.lex import lastlinelen
 import cs.io
-from cs.misc import out, cmderr, debug, ifdebug, warn, DictUC_Attrs, \
-                    T_SEQ, T_MAP, T_SCALAR, objFlavour as flavour
+from cs.misc import DictUC_Attrs, T_SEQ, T_MAP, T_SCALAR, objFlavour as flavour
 
 DEFAULT_OPTS={'dictSep': ' =>',
               'bareWords': True,
