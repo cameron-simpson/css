@@ -159,7 +159,6 @@ def setvar(var,val=None):
   if val is None:
     warn("failed to setvar(%s)", var)
   else:
-    info("%s=%s", var, val)
     os.environ[var]=val
     isset.add(var)
   return val
@@ -187,7 +186,6 @@ def paramsubst(val):
 
 def loadfilevars(path):
   global filevars
-  info("load %s", path)
   for line in open(path):
     assert line[-1:] == '\n', "%s: unexpected EOF" % path
     if line[0] == '#' or line[0] == '\n':
@@ -210,7 +208,6 @@ def listfilevars():
   return V
 
 def doCommand(argv):
-  debug("doCommand %s", argv)
   op=argv[0]
   argv=argv[1:]
   if op == "addprefix":
