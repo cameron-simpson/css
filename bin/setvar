@@ -19,7 +19,9 @@ import pwd
 import sys
 if sys.hexversion < 0x02060000: from sets import Set as set
 import cs.misc
-from cs.misc import debug, isdebug, cmderr
+from cs.logutils import error, warn, info, debug, Pfx, setup_logging
+
+setup_logging()
 
 force=False     # don't reset existing variables
 noAction=False  # don't exec command, recite var assignments on stdout
@@ -103,7 +105,7 @@ def bootvar(var):
       elif opsys == "openbsd":
         vendor="openbsd"
       else:
-        cmderr("unknown VENDOR for OS=%s" % opsys)
+        error("unknown VENDOR for OS=%s", opsys)
     val=vendor
   bootVal[var]=val
   return val
@@ -130,7 +132,7 @@ def filevarexts():
 
 def filevar(var):
   if var in doingFilevar:
-    if isdebug: cmderr("recursion in filevar(%s): %s" % (var, doingFilevar))
+    warn("recursion in filevar(%s): %s", var, doingFilevar)
     return None
   doingFilevar.add(var)
   global filevars
@@ -155,9 +157,9 @@ def setvar(var,val=None):
 
   val=env(var)
   if val is None:
-    debug("failed to setvar(%s)" % var)
+    warn("failed to setvar(%s)", var)
   else:
-    if isdebug: cmderr("%s=%s" % (var, val))
+    info("%s=%s", var, val)
     os.environ[var]=val
     isset.add(var)
   return val
@@ -175,7 +177,7 @@ def paramsubst(val):
 
     subval=env(subvar)
     if subval is None:
-      debug("can't look up $%s" % subvar)
+      warn("can't look up $%s", subvar)
     else:
       newval+=subval
 
@@ -185,7 +187,7 @@ def paramsubst(val):
 
 def loadfilevars(path):
   global filevars
-  debug("load %s" % path)
+  info("load %s", path)
   for line in open(path):
     assert line[-1:] == '\n', "%s: unexpected EOF" % path
     if line[0] == '#' or line[0] == '\n':
@@ -208,7 +210,7 @@ def listfilevars():
   return V
 
 def doCommand(argv):
-  debug("doCommand %s" % argv)
+  debug("doCommand %s", argv)
   op=argv[0]
   argv=argv[1:]
   if op == "addprefix":
@@ -252,40 +254,38 @@ def doCommand(argv):
         for var in paramsubst(arg).split(' '):
           setvar(var)
   else:
-    cmderr("unsupported operation: %s" % op)
+    error("unsupported operation: %s", op)
 
 def doFile(path):
-  ocmd=cs.misc.cmd
-  cs.misc.cmd="%s: %s" % (ocmd, path)
-  oline=""
-  for line in open(path):
-    if line[-1:] != '\n':
-      cmderr("unexpected EOF")
-      break
-    line=line[:-1]
-    if len(line) == 0 or line[-1] != '\\':
-      oline+=line
-      oline=oline.strip()
-      if len(oline) > 0 and oline[0] != '#':
-        eqpos=oline.find('=')
-        if eqpos > 0 \
-        and oline[0].isalpha() \
-        and sum([ c.isalnum() or c == '_' for c in oline[1:eqpos] ]) == eqpos-1:        # all() not available in 2.3
-          setvar(oline[:eqpos], paramsubst(oline[eqpos+1:]))
-        else:
-          doCommand(oline.split())
-      oline=""
-    else:
-      oline+=" "+line[:-2]
-  if len(oline) > 0:
-    cmderr("unterminated slosh line")
-  cs.misc.cmd=ocmd
+  with Pfx(path):
+    oline=""
+    for line in open(path):
+      if line[-1:] != '\n':
+        error("unexpected EOF")
+        break
+      line=line[:-1]
+      if len(line) == 0 or line[-1] != '\\':
+        oline+=line
+        oline=oline.strip()
+        if len(oline) > 0 and oline[0] != '#':
+          eqpos=oline.find('=')
+          if eqpos > 0 \
+          and oline[0].isalpha() \
+          and sum([ c.isalnum() or c == '_' for c in oline[1:eqpos] ]) == eqpos-1:        # all() not available in 2.3
+            setvar(oline[:eqpos], paramsubst(oline[eqpos+1:]))
+          else:
+            doCommand(oline.split())
+        oline=""
+      else:
+        oline+=" "+line[:-2]
+    if len(oline) > 0:
+      error("unterminated slosh line")
 
 def cleanpath(*vars):
   for var in vars:
     keep=[]
     if var not in os.environ:
-      cmderr("warning: cleanpath(%s): no such envvar" % var)
+      error("warning: cleanpath(%s): no such envvar", var)
       continue
     oval=os.environ[var]
     for path in oval.split(':'):
@@ -293,10 +293,10 @@ def cleanpath(*vars):
         if path not in keep:
           keep.append(path)
       else:
-        if isdebug: cmderr("%s: discard %s" % (var, path))
+        debug("%s: discard %s", var, path)
     nval=":".join(keep)
     if oval != nval:
-      if isdebug: cmderr("%s\n  %s\n  %s" % (var, oval, nval))
+      debug("%s\n  %s\n  %s", var, oval, nval)
       os.environ[var]=nval
 
 opts, args = getopt(sys.argv[1:], 'fn')
@@ -306,7 +306,7 @@ for opt, val in opts:
   elif opt == '-n':
     noAction=True
   else:
-    cmderr("unimplemented option: %s" % opt)
+    error("unimplemented option: %s", opt)
     sys.exit(2)
 
 envpath=os.environ.get('ENVPATH')
@@ -341,5 +341,5 @@ if noAction:
   for var in vars:
     print "%s=%s; export %s;" % (var, cs.sh.quotestr(os.environ[var]), var)
 else:
-  cmderr("action mode not supported")
+  error("action mode not supported")
   sys.exit(1)
