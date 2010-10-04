@@ -93,12 +93,15 @@ synckill()
 if [ "x$*" = xALL ]
 then
   if [ $stop ]
-  then  set -- `ls "$VARRUN/." | sed -n 's/\.pid$//; s/^portfwd\.//p'`
-  else  set -- `sed -n 'y/	/ /
-                        s/$/ /
-                        s/^  *//
-                        s/  */  /g
-                        s/^[Hh][Oo][Ss][Tt] .* \([^ ][^ ]*-ALL\) .*/\1/p' "$sshcfg"`
+  then
+    set -- `ls "$VARRUN/." | sed -n 's/\.pid$//; s/^portfwd\.//p'`
+  else
+    # local primary clause names of all clauses with a *-ALL name
+    set -- `sed -n 'y/	/ /
+                    s/$/ /
+                    s/^  *//
+                    s/  */  /g
+                    /^[Hh][Oo][Ss][Tt] .*[^ ]-ALL/s/^[^ ]*  *\([^ ][^ ]*\).*/\1/p' "$sshcfg"`
   fi
 fi
 
