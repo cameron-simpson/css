@@ -4,10 +4,10 @@ from contextlib import contextmanager
 import atexit
 import logging
 from logging import StreamHandler
+from subprocess import Popen, PIPE
+import cs.misc
 from cs.logutils import Pfx
-from cs.lex import unctrl       ##, tabpadding
-
-active=False
+from cs.lex import unctrl
 
 instances=[]
 
@@ -31,43 +31,55 @@ class UpdHandler(StreamHandler):
     self.__nlLevel = nlLevel
 
   def emit(self, logrec):
-    if logrec.lvl >= self.__nlLevel:
+    if logrec.levelno >= self.__nlLevel:
       with self.__upd._withoutContext():
         StreamHandler.emit(self, logrec)
     else:
-      self.__upd.out(logrec.msg % args)
+      self.__upd.out(logrec.getMessage())
 
   def flush(self):
-    self.__upd._backend.flush()
+    if self.__upd._backend:
+      self.__upd._backend.flush()
 
 class Upd(object):
 
-  def __init__(self, backend, mode=None):
+  def __init__(self, backend, columns=None):
     assert backend is not None
-    self._lock=threading.RLock()
+    if columns is None:
+      if backend.isatty():
+        P=Popen(['stty', '-a'], stdin=backend, stdout=PIPE)
+        stty=P.stdout.read()
+        P.wait()
+        P = None
+        fields = [ _.strip() for _ in stty.split('\n')[0].split(';') ]
+        for f in fields:
+          if f.endswith(' columns'):
+            columns = int(f[:-8])
     self._backend=backend
+    self.columns = columns
     self._state=''
-    global active, instances
+    self._lock=threading.RLock()
+    global instances
     instances.append(self)
-    active=True
 
   @property
   def state(self):
     return self._state
 
   def out(self, txt, noStrip=False):
+    if not noStrip:
+      txt = txt.rstrip()
+    txt = unctrl(txt)
+    if self.columns is not None:
+      txt = txt[:self.columns-1]
+    txtlen = len(txt)
     with self._lock:
-      old=self._state
-      if not noStrip:
-        txt=txt.rstrip()
-      txt=unctrl(txt)
-
-      txtlen=len(txt)
-      buflen=len(self._state)
-      pfxlen=min(txtlen, buflen)
+      old = self._state
+      buflen = len(old)
+      pfxlen = min(txtlen, buflen)
       for i in range(pfxlen):
-        if txt[i] != self._state[i]:
-          pfxlen=i
+        if txt[i] != old[i]:
+          pfxlen = i
           break
 
       # Rewrites take one of two forms:
@@ -85,12 +97,11 @@ class Upd(object):
         # carriage return and complete overwrite
         self._backend.write('\r')
         self._backend.write(txt)
-
-      extlen = buflen-txtlen
-      if extlen > 0:
-        ##patch+=tabpadding(extlen,offset=txtlen)
-        self._backend.write( ' ' * extlen )
-        self._backend.write( '\b' * extlen )
+        extlen = buflen-txtlen
+        if extlen > 0:
+          # old line was longer - write spaces over the old tail
+          self._backend.write( ' ' * extlen )
+          self._backend.write( '\b' * extlen )
 
       self._backend.flush()
       self._state = txt
@@ -110,12 +121,12 @@ class Upd(object):
 
   def without(self, func, *args, **kw):
     if 'noStrip' in kw:
-      noStrip=kw['noStrip']
+      noStrip = kw['noStrip']
       del kw['noStrip']
     else:
-      noStrip=False
+      noStrip = False
     with self._withoutContext(noStrip):
-      ret=func(*args, **kw)
+      ret = func(*args, **kw)
     return ret
 
   @contextmanager
