@@ -292,130 +292,135 @@ import string
 from cStringIO import StringIO
 import re
 if sys.hexversion < 0x02060000: from sets import Set as set
+import cs.misc
 from cs.mailAddresses import loadAddresses, addrsRegexp
-
-trackRules=True         # add X-Cats2Procmailrc line to show rule
-useXLabel=False         # put tag in X-Label header instead of subject
-alertComand=None        # command to display alerts
-dfltType='UNIX'         # UNIX mbox folders by default
-dfltDomains=()          # default email domain
-includePath=()          # where else to look for relative included files
-substitutions={}        # replace {{foo}} in rules
-syncRules=False         # let procmail be fork happy on continue/copy rules
-logline=None            # optional LOG= line for recipes
-
-cmd=os.path.basename(sys.argv[0])
-# cats2procmailrc [B<-a> I<alert>] [B<-d> I<dirpath>] [B<-D> I<subst>B<=>I<val>] [B<-L>] [B<-m> I<maildomains>] [-S] [B<-t> I<type>] [B<-T>] [LOG=value] [category-files...] E<gt>procmailrc
-usage='''Usage: %s [-a alert] [-d dir] [-D subst=val] [-L] [-m domains] [-S] \\
-                [-t {unix|mh|maildir}] -T [LOG=value] [category-files...] \\
-                >procmailrc
-        -a alert        Command line to generate the alert.
-                        The mail item is present on standard input.
-        -A addresses    Read address categories from file, make category macros.
-        -d dirpath      Look for relative included files in these directories.
-        -D subst=val    Add a macro definition just as $CATS2PROCMAILRC_subst=val does.
-        -L              Use X-Label: header instead of Subject: for tag.
-        -m domains      Select default mail domain(s).
-                        Default from $MAILDOMAIN.
-        -S              Synchronous. Use a lock on all continue/copy rules.
-        -t type         Select default mailbox type.
-                        Default: %s
-        -T              Don't track rule matches by inserting an
-                        X-Cats2Procmailrc-Matching-Rule header.
-''' % (cmd, dfltType)
+from cs.logutils import setup_logging, Pfx, error, info
 
 assign_re=re.compile(r'[a-z]\w+=', re.I)
 target_re=re.compile(r'("[^"]*"|[^",\s]+)')
 hdrlist_re=re.compile(r'([a-z][\-a-z0-9]*(,[a-z][\-a-z0-9]*)*):', re.I)
-alladdrs=set()
 
-badopts=False
+def main(argv):
+  setup_logging()
+  cmd = cs.misc.cmd
 
-def cmderr(*args):
-  sys.stderr.write("%s:"%cmd)
-  for arg in args:
-    sys.stderr.write(" %s"%str(arg))
-  sys.stderr.write("\n")
+  trackRules=True         # add X-Cats2Procmailrc line to show rule
+  useXLabel=False         # put tag in X-Label header instead of subject
+  alertComand=None        # command to display alerts
+  dfltType='UNIX'         # UNIX mbox folders by default
+  dfltDomains=()          # default email domain
+  includePath=()          # where else to look for relative included files
+  substitutions={}        # replace {{foo}} in rules
+  syncRules=False         # let procmail be fork happy on continue/copy rules
+  logline=None            # optional LOG= line for recipes
 
-opts=()
-argv=sys.argv[1:]
-try:
-  opts, argv = getopt(argv, 'a:A:d:D:Lm:St:T')
-except GetoptError, e:
-  cmderr("bad options:", str(e))
-  badopts=True
+  # cats2procmailrc [B<-a> I<alert>] [B<-d> I<dirpath>] [B<-D> I<subst>B<=>I<val>] [B<-L>] [B<-m> I<maildomains>] [-S] [B<-t> I<type>] [B<-T>] [LOG=value] [category-files...] E<gt>procmailrc
+  usage='''Usage: %s [-a alert] [-d dir] [-D subst=val] [-L] [-m domains] [-S] \\
+                  [-t {unix|mh|maildir}] -T [LOG=value] [category-files...] \\
+                  >procmailrc
+          -a alert        Command line to generate the alert.
+                          The mail item is present on standard input.
+          -A addresses    Read address categories from file, make category macros.
+          -d dirpath      Look for relative included files in these directories.
+          -D subst=val    Add a macro definition just as $CATS2PROCMAILRC_subst=val does.
+          -L              Use X-Label: header instead of Subject: for tag.
+          -m domains      Select default mail domain(s).
+                          Default from $MAILDOMAIN.
+          -S              Synchronous. Use a lock on all continue/copy rules.
+          -t type         Select default mailbox type.
+                          Default: %s
+          -T              Don't track rule matches by inserting an
+                          X-Cats2Procmailrc-Matching-Rule header.
+  ''' % (cmd, dfltType)
 
-for opt, arg in opts:
-  if opt == '-a':
-    alertCommand=arg
-  elif opt == '-A':
-    catmap, addrmap = loadAddresses(arg)
-    for cat in catmap.keys():
-      addrs=catmap[cat].keys()
-      assert all(addr.find('@') > 0 for addr in addrs), \
-             "bad address in %s" % addrs
-      alladdrs.update(addrs)
-      retext=addrsRegexp(addrs)
-      ##print >>sys.stderr, "re[%s]=%s" % (cat, retext)
-      assert not retext.startswith('\<') and not retext.endswith('\>')
-      substitutions["re_%s" % cat]='\\<('+retext+')\\>'
-  elif opt == '-d':
-    includePath=arg.split(':')
-  elif opt == '-D':
-    m=assign_re.match(arg)
-    if not m:
-      cmderr("invalid subst=val argument to -D:", arg)
-      badopts=True
-    else:
-      substitutions[arg[:m.end()-1]]=arg[m.end():]
-  elif opt == '-L':
-    useXLabel=True
-  elif opt == '-m':
-    dfltDomains=arg.split(',')
-  elif opt == '-S':
-    syncRules=True
-  elif opt == '-t':
-    dfltType=arg.upper()
-    if dfltType not in ('UNIX', 'MH', 'MAILDIR'):
-      cmderr("invalid mailbox type (%s), expected one of unix, mh or maildir" % arg)
-      badopts=True
-  elif opt == '-T':
-    trackRules=False
-  else:
-    cmderr("unhandled option:", opt)
+  alladdrs = set()
+  alertCommand = None
+
+  badopts=False
+
+  opts=()
+  argv=sys.argv[1:]
+  try:
+    opts, argv = getopt(argv, 'a:A:d:D:Lm:St:T')
+  except GetoptError, e:
+    error("bad options: %s", e)
     badopts=True
 
-if len(dfltDomains) == 0:
-  dfltDomains=(os.environ['MAILDOMAIN'],)
+  for opt, arg in opts:
+    if opt == '-a':
+      alertCommand=arg
+    elif opt == '-A':
+      catmap, addrmap = loadAddresses(arg)
+      for cat in catmap.keys():
+        addrs=catmap[cat].keys()
+        assert all(addr.find('@') > 0 for addr in addrs), \
+               "bad address in %s" % addrs
+        alladdrs.update(addrs)
+        retext=addrsRegexp(addrs)
+        ##print >>sys.stderr, "re[%s]=%s" % (cat, retext)
+        assert not retext.startswith('\<') and not retext.endswith('\>')
+        substitutions["re_%s" % cat]='\\<('+retext+')\\>'
+    elif opt == '-d':
+      includePath=arg.split(':')
+    elif opt == '-D':
+      m=assign_re.match(arg)
+      if not m:
+        error("invalid subst=val argument to -D: %s", arg)
+        badopts=True
+      else:
+        substitutions[arg[:m.end()-1]]=arg[m.end():]
+    elif opt == '-L':
+      useXLabel=True
+    elif opt == '-m':
+      dfltDomains=arg.split(',')
+    elif opt == '-S':
+      syncRules=True
+    elif opt == '-t':
+      dfltType=arg.upper()
+      if dfltType not in ('UNIX', 'MH', 'MAILDIR'):
+        error("invalid mailbox type (%s), expected one of unix, mh or maildir", arg)
+        badopts=True
+    elif opt == '-T':
+      trackRules=False
+    else:
+      error("unhandled option: %s", opt)
+      badopts=True
 
-if len(argv) > 0 and argv[0].startswith("LOG="):
-  logline=argv.pop(0)
+  if len(dfltDomains) == 0:
+    dfltDomains=(os.environ['MAILDOMAIN'],)
 
-if len(argv) == 0:
-  argv='-'
+  if len(argv) > 0 and argv[0].startswith("LOG="):
+    logline=argv.pop(0)
 
-if badopts:
-  sys.stderr.write(usage)
-  sys.exit(2)
+  if len(argv) == 0:
+    argv='-'
 
-for subname in [v[16:] for v in os.environ.keys() if v.startswith('CATS2PROCMAILRC_')]:
-  # -A and -D trump envvars
-  if subname not in substitutions:
-    substitutions[subname]=os.environ['CATS2PROCMAILRC_'+subname]
+  if badopts:
+    sys.stderr.write(usage)
+    return 2
 
-# uber category for all known categories
-substitutions["re_ALL"]='\\<('+addrsRegexp(alladdrs)+')\\>'
-##print >>sys.stderr, "ALL=%s" % substitutions["re_ALL"]
+  for subname in [v[16:] for v in os.environ.keys() if v.startswith('CATS2PROCMAILRC_')]:
+    # -A and -D trump envvars
+    if subname not in substitutions:
+      substitutions[subname]=os.environ['CATS2PROCMAILRC_'+subname]
 
-subnames=substitutions.keys()
-if len(subnames) == 0:
-  curly_re=None
-else:
-  subnames.sort()
-  curly=r'\{\{(%s)\}\}' % '|'.join(subnames)
-  curly_re=re.compile(curly)
+  # uber category for all known categories
+  substitutions["re_ALL"]='\\<('+addrsRegexp(alladdrs)+')\\>'
 
-def resolveTarget(target):
+  xit=0
+
+  conv = C2P(logline, trackRules, useXLabel, dfltType, alertCommand, syncRules, dfltDomains, substitutions)
+  for arg in argv:
+    if arg == '-':
+      if not conv.c2p(sys.stdin, sys.stdout):
+        xit = 1
+    else:
+      if not conv.c2p(open(arg), sys.stdout):
+        xit = 1
+
+  return xit
+
+def resolveTarget(target, dfltType):
   if target[0] == '"':
     target=target[1:-1]
   if target[0] != '|':
@@ -442,7 +447,8 @@ def resolveTarget(target):
       elif ftype == 'MH':
         target+='/.'
       else:
-        assert False, '%s: %d: unsupported folder type: %s'%(ifp.name,lineno,ftype)
+        error('unsupported folder type: %s', ftype)
+        target = None
 
   return target
 
@@ -458,250 +464,270 @@ def quotestr(s):
   qs.write("'")
   return qs.getvalue()
 
-def c2p(ifp,ofp):
-  global xit, assign_re, target_re, hdrlist_re, curly_re
-  lineno=0
-  oline=None
-  while True:
-    line=ifp.readline()
-    if len(line) == 0:
-      break
+class C2P(object):
 
-    lineno+=1
-    if line[-1:] != '\n':
-      cmderr("%s: %d: unexpected EOF (no newline)"%(ifp.name,lineno))
-      xit=1
-      return
+  def __init__(self, logline, trackRules, useXLabel, dfltType, alertCommand, syncRules, dfltDomains, substitutions):
+    self.logline = logline
+    self.trackRules = trackRules
+    self.useXLabel = useXLabel
+    self.dfltType = dfltType
+    self.alertCommand = alertCommand
+    self.syncRules = syncRules
+    self.dfltDomains = dfltDomains
+    self.substitutions = substitutions
+    subnames = substitutions.keys()
+    if len(subnames) == 0:
+      curly_re=None
+    else:
+      subnames.sort()
+      curly=r'\{\{(%s)\}\}' % '|'.join(subnames)
+      curly_re=re.compile(curly)
+    self.curly_re = curly_re
 
-    if oline is not None:
-      line=oline+'\n'+line
+  def c2p(self, ifp, ofp):
+    global assign_re, target_re, hdrlist_re
+    ok = True
+    with Pfx(ifp.name):
+      info(ifp.name)
+      lineno=0
       oline=None
-
-    line=line[:-1]
-    if line[-1:] == '\\':
-      oline=line[:-1]
-      continue
-
-    line=line.strip()
-    if len(line) == 0 or line[0] == '#':
-      continue
-
-    line0=line
-    ruledesc="%s: %s" % (ifp.name, line.replace('\n','; '))
-    if len(ruledesc) > 200:
-      ruledesc=ruledesc[:197]+'...'
-
-    if curly_re:
-      curlies=[m for m in curly_re.finditer(line)]
-      if curlies:
-        curlies.reverse()
-        for m in curlies:
-          line=line[:m.start()]+substitutions[m.group()[2:-2]]+line[m.end():]
-
-    # assignments
-    m=assign_re.match(line)
-    if m:
-     ofp.write(line)
-     ofp.write('\n')
-     continue
-
-    ofp.write('# %s\n' % ruledesc)
-
-    # inclusions
-    if line[0] == '<':
-      for filename in line[1:].split():
-        if not os.path.isabs(filename):
-          inc=[i for i in includePath]
-          if ifp.name[0] != '<':        # <stdin> etc
-            here=os.path.dirname(ifp.name)
-          else:
-            here='.'
-          inc.insert(0,here)
-          for path in inc:
-            nfilename=os.path.join(path,filename)
-            if os.path.isfile(nfilename):
-              filename=nfilename
-              break
-        try:
-          fp=open(filename)
-        except IOError, e:
-          cmderr("%s: %d: %s: cannot open: %s"%(ifp.name, lineno, filename, str(e)))
-          xit=1
-          continue
-        c2p(fp,ofp)
-      continue
-
-    # recipes - copy from ^: until ^}
-    if line[0] == ':':
-      ofp.write(line)
-      ofp.write('\n')
       while True:
         line=ifp.readline()
+        if len(line) == 0:
+          break
         lineno+=1
-        if line[-1:] != '\n':
-          cmderr("%s: %d: unexpected EOF (no newline)"%(ifp.name,lineno))
-          xit=1
-          break
 
-        ofp.write(line)
-        if line[0] == '}':
-          break
-      continue
+        with Pfx("line %d" % lineno):
+          if line[-1:] != '\n':
+            error("%d: unexpected EOF (no newline)", lineno)
+            ok = False
+            break
 
-    # a cats2procmailrc rule!
-    doAlert=False
-    doContinue=False
-    while line[0] in ('!','+'):
-      if line[0] == '!':
-        doAlert=True
-      elif line[0] == '+':
-        doContinue=True
-      else:
-        assert "unhandled !/+ flag: "+line[0]
-      line=line[1:]
+          if oline is not None:
+            line=oline+'\n'+line
+            oline=None
 
-    if len(line) == 0 or line[0] in string.whitespace:
-      cmderr("%s: %d: missing targets"%(ifp.name,lineno))
-      xit=1
-      continue
+          line=line[:-1]
+          if line[-1:] == '\\':
+            oline=line[:-1]
+            continue
 
-    targets=[]
-    m=target_re.match(line)
-    while m is not None:
-      target=m.group(0)
-      line=line[len(target):]
-      targets.append(target)
-      if line[:1] != ',':
-        break
-      line=line[1:]
-      m=target_re.match(line)
+          line=line.strip()
+          if len(line) == 0 or line[0] == '#':
+            continue
 
-    if len(targets) == 0:
-      cmderr("%s: %d: no targets!"%(ifp.name,lineno))
-      xit=1
-      continue
+          info(line)
+          line0=line
+          ruledesc="%s: %s" % (ifp.name, line.replace('\n','; '))
+          if len(ruledesc) > 200:
+            ruledesc=ruledesc[:197]+'...'
 
-    if len(line) == 0 or line[0] not in string.whitespace:
-      cmderr("%s: %d: missing tag"%(ifp.name,lineno))
-      xit=1
-      continue
+          if self.curly_re:
+            curlies=[m for m in self.curly_re.finditer(line)]
+            if curlies:
+              curlies.reverse()
+              for m in curlies:
+                line=line[:m.start()]+self.substitutions[m.group()[2:-2]]+line[m.end():]
 
-    try:
-      tag, patterns = line.lstrip().split(None,1)
-    except ValueError:
-      cmderr("%s: %d: missing patterns"%(ifp.name,lineno))
-      xit=1
-      continue
-    if tag == '.':
-      tag=None
+          # assignments
+          m=assign_re.match(line)
+          if m:
+           ofp.write(line)
+           ofp.write('\n')
+           continue
 
-    ofp.write(':0\n')
+          ofp.write('# %s\n' % ruledesc)
 
-    for pattern in [p.lstrip() for p in patterns.split('\n')]:
-      if pattern == '.':
-        continue
+          # inclusions
+          if line[0] == '<':
+            for filename in line[1:].split():
+              if not os.path.isabs(filename):
+                inc=[i for i in includePath]
+                if ifp.name[0] != '<':        # <stdin> etc
+                  here=os.path.dirname(ifp.name)
+                else:
+                  here='.'
+                inc.insert(0,here)
+                for path in inc:
+                  nfilename=os.path.join(path,filename)
+                  if os.path.isfile(nfilename):
+                    filename=nfilename
+                    break
+              try:
+                fp=open(filename)
+              except IOError, e:
+                error("%s: cannot open: %s", filename, str(e))
+                ok = False
+                continue
+              self.c2p(fp, ofp)
+            continue
 
-      m=hdrlist_re.match(pattern)
-      if not m:
-        hdrs=('to','cc','bcc')
-      else:
-        hdrs=[h.lower() for h in m.group(1).split(',')]
-        pattern=pattern[m.end():]
+          # recipes - copy from ^: until ^}
+          if line[0] == ':':
+            ofp.write(line)
+            ofp.write('\n')
+            while True:
+              line=ifp.readline()
+              lineno+=1
+              with Pfx("line %d" % (lineno,)):
+                if line[-1:] != '\n':
+                  error("unexpected EOF (no newline)")
+                  ok = False
+                  break
 
-      if pattern[0] == '/':
-        # pure regexp
-        pattern=pattern[1:]
-        if pattern[0] == '^':
-          pattern=' *'+pattern[1:]
-        else:
-          pattern='.*'+pattern
-      else:
-        # email addresses
-        pattern=pattern.strip()
-        if pattern.find('@') < 0:
-          # no "@" - permute across dfltDomains
-          pattern='%s@(%s)' % (pattern, '|'.join(dfltDomains))
-        # skip replace('.','\\.')
-        pattern='.*\\<('+pattern.replace('+','\\+')+')\\>'
+              ofp.write(line)
+              if line[0] == '}':
+                break
+            continue
 
-      if len(hdrs) == 1:
-        hdrs=hdrs[0]
-      else:
-        hdrs='('+'|'.join(hdrs)+')'
-      pattern='^'+hdrs+':'+pattern
+          # a cats2procmailrc rule!
+          doAlert=False
+          doContinue=False
+          while line[0] in ('!','+'):
+            if line[0] == '!':
+              doAlert=True
+            elif line[0] == '+':
+              doContinue=True
+            else:
+              assert "unhandled !/+ flag: "+line[0]
+            line=line[1:]
 
-      ofp.write('* %s\n'%pattern)
+          if len(line) == 0 or line[0] in string.whitespace:
+            error("missing targets")
+            ok = False
+            continue
 
-    needBrackets=( doContinue
-                or len(targets) > 1
-                or tag is not None
-                or logline is not None
-                or trackRules
-                or doAlert
-                 )
+          targets=[]
+          m=target_re.match(line)
+          while m is not None:
+            target=m.group(0)
+            line=line[len(target):]
+            targets.append(target)
+            if line[:1] != ',':
+              break
+            line=line[1:]
+            m=target_re.match(line)
 
-    if not needBrackets:
-      ofp.write('%s\n' % resolveTarget(targets[0]))
-    else:
-      ofp.write('{\n');
+          if len(targets) == 0:
+            error("no targets!")
+            ok = False
+            continue
 
-      if doContinue:
-        ofp.write(' :0c')
-        if syncRules:
-          ofp.write(':.lock-global-procmail')
-        ofp.write('\n {\n')
+          if len(line) == 0 or line[0] not in string.whitespace:
+            error("missing tag")
+            ok = False
+            continue
 
-      if logline is not None:
-        ofp.write("  %s\n" % logline)
+          try:
+            tag, patterns = line.lstrip().split(None,1)
+          except ValueError:
+            error("missing patterns")
+            ok = False
+            continue
+          if tag == '.':
+            tag=None
 
-      if trackRules:
-        ofp.write('  :0whf\n  | formail -f -A %s\n' % quotestr('X-Cats2Procmailrc-Rule: '+ruledesc))
+          ofp.write(':0\n')
 
-      if tag is not None:
-        if useXLabel:
-          pipe='formail -f -A %s' % quotestr('X-Label: '+tag)
-        else:
-          sedtag=tag.replace('/','\\/')
-          pipe="sed -e %s" % quotestr('s/^[Ss][Uu][Bb][Jj][Ee][Cc][Tt]: */& ['+sedtag+'] /')
-        ofp.write('  :0whf\n  | %s\n' % pipe)
+          for pattern in [p.lstrip() for p in patterns.split('\n')]:
+            if pattern == '.':
+              continue
 
-      if doAlert:
-        if alertCommand is None:
-          cmderr("%s: %d: alert rule found but no alert command - see -a option")
-          xit=1
-        else:
-          ofp.write('  :0hwc\n  | %s\n' % alertCommand.replace('%',','.join(targets)))
+            m=hdrlist_re.match(pattern)
+            if not m:
+              hdrs=('to','cc','bcc')
+            else:
+              hdrs=[h.lower() for h in m.group(1).split(',')]
+              pattern=pattern[m.end():]
 
-      while len(targets) > 0:
-        target0=targets.pop(0)
-        target=resolveTarget(target0)
-        ofp.write('  :0')
-        if len(targets) > 0:
-          ofp.write('c')
-        if syncRules and target0.startswith('|'):
-          ofp.write(':.lock-global-procmail-pipe')
-        ofp.write('\n')
-        ofp.write('  %s\n'%target)
+            if pattern[0] == '/':
+              # pure regexp
+              pattern=pattern[1:]
+              if pattern[0] == '^':
+                pattern=' *'+pattern[1:]
+              else:
+                pattern='.*'+pattern
+            else:
+              # email addresses
+              pattern=pattern.strip()
+              if pattern.find('@') < 0:
+                # no "@" - permute across dfltDomains
+                pattern='%s@(%s)' % (pattern, '|'.join(self.dfltDomains))
+              # skip replace('.','\\.')
+              pattern='.*\\<('+pattern.replace('+','\\+')+')\\>'
 
-      if doContinue:
-        ofp.write(' }\n')
+            if len(hdrs) == 1:
+              hdrs=hdrs[0]
+            else:
+              hdrs='('+'|'.join(hdrs)+')'
+            pattern='^'+hdrs+':'+pattern
 
-      ofp.write('}\n');
+            ofp.write('* %s\n'%pattern)
 
-    ofp.write('\n')
+          needBrackets=( doContinue
+                      or len(targets) > 1
+                      or tag is not None
+                      or self.logline is not None
+                      or self.trackRules
+                      or doAlert
+                       )
 
-  if oline is not None:
-    cmderr("%s: %d: unexpected EOF in slosh-extended line"%(ifp.name,lineno))
-    xit=1
+          if not needBrackets:
+            ofp.write('%s\n' % resolveTarget(targets[0], self.dfltType))
+          else:
+            ofp.write('{\n');
 
-  return
+            if doContinue:
+              ofp.write(' :0c')
+              if self.syncRules:
+                ofp.write(':.lock-global-procmail')
+              ofp.write('\n {\n')
 
-xit=0
+            if self.logline is not None:
+              ofp.write("  %s\n" % (self.logline,))
 
-for arg in argv:
-  if arg == '-':
-    c2p(sys.stdin, sys.stdout)
-  else:
-    c2p(open(arg), sys.stdout)
+            if self.trackRules:
+              ofp.write('  :0whf\n  | formail -f -A %s\n' % quotestr('X-Cats2Procmailrc-Rule: '+ruledesc))
 
-sys.exit(xit)
+            if tag is not None:
+              if self.useXLabel:
+                pipe='formail -f -A %s' % quotestr('X-Label: '+tag)
+              else:
+                sedtag=tag.replace('/','\\/')
+                pipe="sed -e %s" % quotestr('s/^[Ss][Uu][Bb][Jj][Ee][Cc][Tt]: */& ['+sedtag+'] /')
+              ofp.write('  :0whf\n  | %s\n' % pipe)
+
+            if doAlert:
+              if self.alertCommand is None:
+                error("alert rule found but no alert command - see -a option")
+                ok = False
+              else:
+                ofp.write('  :0hwc\n  | %s\n' % (self.alertCommand.replace('%',','.join(targets)),))
+
+            while len(targets) > 0:
+              target0=targets.pop(0)
+              target=resolveTarget(target0, self.dfltType)
+              assert target is not None
+              ofp.write('  :0')
+              if len(targets) > 0:
+                ofp.write('c')
+              if self.syncRules and target0.startswith('|'):
+                ofp.write(':.lock-global-procmail-pipe')
+              ofp.write('\n')
+              ofp.write('  %s\n'% (target,))
+
+            if doContinue:
+              ofp.write(' }\n')
+
+            ofp.write('}\n');
+
+          ofp.write('\n')
+
+      if oline is not None:
+        error("unexpected EOF in slosh-extended line")
+        ok = False
+
+    return ok
+
+if __name__ == '__main__':
+  sys.exit(main(sys.argv))
