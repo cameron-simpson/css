@@ -59,7 +59,7 @@ def loadAddresses(addresses, catmap=None, addrmap=None):
           continue
 
         if addrkey in addrmap:
-          warn("line %d: repeated address \"%s\" (%s)", lineno, addr, addrKey)
+          warn("line %d: repeated address \"%s\" (%s)", lineno, addr, addrkey)
           continue
 
         if "@" not in addrkey:

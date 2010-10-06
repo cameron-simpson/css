@@ -350,7 +350,9 @@ def main(argv):
     if opt == '-a':
       alertCommand=arg
     elif opt == '-A':
-      catmap, addrmap = loadAddresses(arg)
+      ok, catmap, addrmap = loadAddresses(arg)
+      if not ok:
+        xit = 1
       for cat in catmap.keys():
         addrs=catmap[cat].keys()
         assert all(addr.find('@') > 0 for addr in addrs), \
@@ -409,7 +411,7 @@ def main(argv):
 
   xit=0
 
-  conv = C2P(logline, trackRules, useXLabel, dfltType, alertCommand, syncRules, dfltDomains, substitutions)
+  conv = C2P(logline, trackRules, useXLabel, dfltType, alertCommand, syncRules, dfltDomains, substitutions, includePath)
   for arg in argv:
     if arg == '-':
       if not conv.c2p(sys.stdin, sys.stdout):
@@ -466,7 +468,7 @@ def quotestr(s):
 
 class C2P(object):
 
-  def __init__(self, logline, trackRules, useXLabel, dfltType, alertCommand, syncRules, dfltDomains, substitutions):
+  def __init__(self, logline, trackRules, useXLabel, dfltType, alertCommand, syncRules, dfltDomains, substitutions, includePath):
     self.logline = logline
     self.trackRules = trackRules
     self.useXLabel = useXLabel
@@ -483,6 +485,7 @@ class C2P(object):
       curly=r'\{\{(%s)\}\}' % '|'.join(subnames)
       curly_re=re.compile(curly)
     self.curly_re = curly_re
+    self.includePath = includePath
 
   def c2p(self, ifp, ofp):
     global assign_re, target_re, hdrlist_re
@@ -542,7 +545,7 @@ class C2P(object):
           if line[0] == '<':
             for filename in line[1:].split():
               if not os.path.isabs(filename):
-                inc=[i for i in includePath]
+                inc=[i for i in self.includePath]
                 if ifp.name[0] != '<':        # <stdin> etc
                   here=os.path.dirname(ifp.name)
                 else:
