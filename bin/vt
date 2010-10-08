@@ -27,6 +27,10 @@
 # A store is a content addressed pool of blocks
 # with a filesystem abstraction layered on top of it.
 #
+#
+# Command script for venti-ish implementation.
+#       - Cameron Simpson <cs@zip.com.au> 01may2007
+#
 
 from __future__ import with_statement
 import sys
@@ -34,8 +38,7 @@ import os
 import os.path
 from getopt import getopt, GetoptError
 import datetime
-import logging
-from cs.logutils import Pfx, error, debug
+from cs.logutils import Pfx, error, debug, setup_logging, logTo, D
 from cs.venti import totext, fromtext
 from cs.venti.block import IndirectBlock, decodeBlocks
 from cs.venti.debug import dumpBlock
@@ -43,11 +46,11 @@ from cs.venti.store import Store
 from cs.venti.cache import CacheStore, MemCacheStore
 from cs.venti.archive import archive2dir, archiveAppend
 from cs.venti.dir import Dir, resolve
-from cs.misc import logTo
 
 def main(argv):
-  cmd = os.path.basename(argv[0])
-  logging.basicConfig(format=cmd.replace("%", "%%") + ": %(levelname)s: %(message)s")
+  import cs.misc
+  setup_logging()
+  cmd = cs.misc.cmd
   usage = '''Usage:
     %s [options...] cat filerefs...
     %s [options...] catblock [-i] hashcodes...
@@ -302,7 +305,7 @@ def main(argv):
 
     if badopts:
       sys.stderr.write(usage)
-      sys.exit(2)
+      return 2
 
     if dflt_log is not None:
       logTo(dflt_log)
@@ -391,7 +394,7 @@ def main(argv):
               srv.serve_forever()
           else:
             error("invalid listen argument, I expect \"-\" or \"[host]:port\", got \"%s\"" % arg)
-            exit(1)
+            return 1
 
       elif op == "ls":
         first = True
@@ -411,7 +414,7 @@ def main(argv):
         print "mount", args[0], args[1], "..."
         if not os.path.isdir(args[1]):
           error("%s: mountpoint is not a directory" % args[1])
-          exit(1)
+          return 1
         E = S.namei(args[0]+'/')
         assert E.isdir, "%s: expected directory, not file" % (args[0],)
         import cs.venti.vtfuse
@@ -441,8 +444,9 @@ def main(argv):
         error("unsupported command")
         xit = 2
 
-    debug("%s: exit main command"%cmd)
-    exit(xit)
+      debug("exit main command")
+
+    return xit
 
 def lsDirent(fp, E, name):
   B = E.getBlock()
@@ -496,7 +500,7 @@ def cat(path, fp=None):
     fp.write(B.blockdata())
 
 if __name__ == '__main__':
-  main(sys.argv)
+  sys.exit(main(sys.argv))
 
 # =head1 EXAMPLES
 #
