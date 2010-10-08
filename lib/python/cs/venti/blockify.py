@@ -9,9 +9,9 @@ from itertools import chain
 import sys
 from threading import Thread
 import unittest
-from cs.logutils import debug, D
+from cs.logutils import debug
 from cs.threads import IterableQueue
-from cs.misc import D, eachOf
+from cs.misc import eachOf
 from cs.venti import defaults
 from cs.venti.block import Block, IndirectBlock
 
@@ -81,7 +81,7 @@ def topIndirectBlock(blockSource):
       return topblock
 
     # add a layer of indirection and repeat
-    D("push new fullIndirectBlocks()")
+    debug("push new fullIndirectBlocks()")
     blockSource = fullIndirectBlocks(eachOf(([topblock,
                                               nexttopblock
                                              ], blockSource)))
