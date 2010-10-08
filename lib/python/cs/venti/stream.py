@@ -1,4 +1,3 @@
-#!/usr/bin/python -tt
 #
 # Stream protocol for vt stores.
 #       - Cameron Simpson <cs@zip.com.au> 06dec2007
@@ -10,6 +9,8 @@ from __future__ import with_statement
 from thread import allocate_lock
 from threading import Thread
 from Queue import Queue
+import sys
+if sys.hexversion < 0x02060000: from sets import Set as set
 from cs.misc import seq
 from cs.logutils import Pfx, info, debug, warn
 from cs.serialise import toBS, fromBSfp
@@ -22,56 +23,71 @@ class RqType(int):
   ''' Debugging wrapper for int, reporting symbolic names of op codes.
   '''
   def __str__(self):
-    if self == T_STORE:
-      s = "T_STORE"
+    if self == T_ADD:
+      s = "T_ADD"
     elif self == T_GET:
       s = "T_GET"
     elif self == T_CONTAINS:
       s = "T_CONTAINS"
-    elif self == T_SYNC:
-      s = "T_SYNC"
-    elif self == T_QUIT:
-      s = "T_QUIT"
     else:
       s = "UNKNOWN"
     return "%s(%d)" % (s, self)
 
-T_STORE = RqType(0)       # block->hash
+T_ADD = RqType(0)       # block->hash
 T_GET = RqType(1)       # hash->block
 T_CONTAINS = RqType(2)     # hash->boolean
-T_SYNC = RqType(3)        # no args
-T_QUIT = RqType(4)        # put to put queues into drain-and-quit mode
+
 # encode tokens once for performance
-enc_STORE = toBS(T_STORE)
+enc_STORE = toBS(T_ADD)
 env_GET = toBS(T_GET)
 enc_CONTAINS = toBS(T_CONTAINS)
-enc_SYNC = toBS(T_SYNC)
-enc_QUIT = toBS(T_QUIT)
 
-def dbgfp(fp, context=None):
-  fd = fp.fileno()
-  msg = "fp=%s[%d]" % (fp, fp.fileno())
-  if context is not None:
-    msg = "%s: %s" % (context, msg)
-  debug(msg)
-  import os
-  os.system("set -x; lsof -p %d | awk '$4 ~ /^%d/ { print }' >&2" % (os.getpid(), fd))
-
-def decodeStream(fp):
-  ''' Generator that yields (rqTag, rqType, arg) from the request stream.
+def encodeAdd(block):
+  ''' Accept a block to be added, return the request tag and the request packet.
   '''
-  with Pfx("decodeStream(%s)" % (fp,)):
-    debug("reading first tag...")
-    rqTag = fromBSfp(fp)
-    while rqTag is not None:
-      debug("reading rqType...")
+  assert len(block) > 0
+  tag = seq()
+  return tag, toBS(tag) + enc_STORE + toBS(len(block)) + block
+
+def encodeGet(rqTag, h):
+  ''' Accept a hash to be fetched, return the request tag and the request packet.
+  '''
+  tag = seq()
+  return tag, toBS(tag) + env_GET + toBS(len(h)) + h
+
+def encodeContains(rqTag, h):
+  ''' Accept a hash to check for, return the request tag and the request packet.
+  '''
+  tag = seq()
+  return tag, toBS(tag) + enc_CONTAINS + toBS(len(h)) + h
+
+def encodeAddResult(tag, h):
+  return toBS(tag) + enc_STORE + toBS(len(h)) + h
+
+def encodeGetResult(tag, block):
+  assert len(block) > 0
+  if block is None:
+    return toBS(tag) + enc_GET + toBS(0)
+  return toBS(tag) + enc_GET + toBS(len(block)) + block 
+
+def encodeContainsResult(tag, yesno):
+  return toBS(tag) + enc_CONTAINS + toBS(1 if yesno else 0)
+
+def decodeRequestStream(fp):
+  ''' Generator that yields (rqTag, rqType, info) from the request stream.
+  '''
+  with Pfx("decodeRequestStream(%s)" % (fp,)):
+    while True:
+      rqTag = fromBSfp(fp)
+      if rqTag is None:
+        # end of stream
+        break
       rqType = RqType(fromBSfp(fp))
-      debug("read request: rqTag=%d, rqType=%s" % (rqTag, rqType))
-      if rqType == T_STORE:
+      if rqType == T_ADD:
         size = fromBSfp(fp)
-        assert size >= 0, "negative size(%d) for T_STORE" % size
+        assert size >= 0, "negative size(%d) for T_ADD" % size
         if size == 0:
-          block = ''
+          block = None
         else:
           block = fp.read(size)
           assert len(block) == size
@@ -84,181 +100,97 @@ def decodeStream(fp):
         assert len(h) == hlen, \
                "short read(%d) for rqType=%s, expected %d bytes" % (len(h), rqType, hlen)
         yield rqTag, rqType, h
-      elif rqType == T_SYNC or rqType == T_QUIT:
-        debug("rqType=%s" % rqType)
-        yield rqTag, rqType, None
       else:
-        assert False, "unsupported request type (%s)" % rqType
-      debug("reading next tag...")
-      rqTag = fromBSfp(fp)
-    debug("tag was None, exiting generator")
+        assert False, "unsupported request type (%s)" % (rqType,)
 
-class StreamDaemon:
+def decodeResultStream(self):
+  ''' Generator that yields (rqTag, rqType, result) from the result stream.
+  '''
+  with Pfx("decodeResultStream(%s)" % (fp,)):
+    while True:
+      rqTag = fromBSfp(fp)
+      if rqTag is None:
+        break
+      rqType = fromBSfp(fp)
+      if rqType == T_ADD:
+        hlen = fromBSfp(fp)
+        assert hlen > 0
+        h = fp.read(hlen)
+        assert len(h) == hlen, "read %d bytes, expected %d" \
+                                 % (len(h), hlen)
+        yield rqTag, rqType, h
+      elif rqType == T_GET:
+        blen = fromBSfp(fp)
+        assert blen >= 0
+        if blen == 0:
+          block = None
+        else:
+          block = fp.read(blen)
+          assert len(block) == blen
+        yield rqTag, rqType, block
+      elif rqType == T_CONTAINS:
+        yesno = bool(fromBSfp(fp))
+        yield rqTag, rqType, yesno
+      else:
+        assert False, "unhandled reply type %s" % rqType
+
+class StreamDaemon(object):
   ''' A daemon to handle requests from a stream and apply them to a backend
       store.
   '''
-  def __init__(self, S, recvRequestFP, sendReplyFP):
-    ''' Read Store requests from 'recvRequestFP', apply to the Store 'S',
-        report results upstream via 'sendReplyFP'.
+  def __init__(self, S, recvRequestFP, sendResultsFP, inBoundCapacity=None):
+    ''' Read Store requests from `recvRequestFP`, apply to the Store `S`,
+        report results upstream via `sendResultsFP`.
     '''
+    if inBoundCapacity is None:
+      inBoundCapacity = 128
     self.S = S
+    self._streamQ = Later(128, inboundCapacity=inboundCapacity)
     self.recvRequestFP = recvRequestFP
-    self.sendReplyFP = sendReplyFP
-    self.jobs = {}
-    self.jobsLock = allocate_lock()
-    self.njobs = 0
-    self.jobsClosing = False
-    self.resultsCH = Queue(size=256)
-    self.readerThread = Thread(target=self._request_reader, name="requestReader")
-    self.resultsThread = Thread(target=self._result_sender, name="resultSender")
-
-  def start(self):
-    ''' Start the control threads that read from recvRequestFP and write
-        to sendReplyFP.
-    '''
+    self.sendResultsFP = sendResultsFP
+    self._resultsQ = IterableQueue(128)
+    self.readerThread = Thread(target=self._process_request_stream,
+                               name="%s._process_request_stream" % (self,))
+    self.resultsThread = Thread(target=self._result_sender,
+                                name="%s._process_results" % (self,))
     self.readerThread.start()
     self.resultsThread.start()
+
+  def _process_request_stream(self, fp):
+    SQ = self._streamQ
+    with Pfx("%s._process_requests" % (self,)):
+      for rqTag, rqType, rqData in decodeRequestStream(fp):
+        # submit request - will 
+        SQ.partial(self._process_request, rqTag, rqType, rqData)
+
+  def _process_request(self, rqTag, rqType, rqData):
+    if rqType == T_ADD:
+      result = S.add(rqData)
+    elif rqType == T_GET:
+      result = S.get(rqData)
+    elif rqType == T_CONTAINS:
+      result = rqData in S
+    self._resultsQ.put(rqTag, rqType, result)
+
+  def _process_results(self, Q):
+    for rqTag, rqType, result in Q:
+      if rqType == T_ADD:
+        packet = encodeAddResult(rqTag, result)
+      elif rqType == T_GET:
+        packet = encodeGetResult(rqTag, result)
+      elif rqType == T_CONTAINS:
+        packet = encodeContainsResult(rqTag, result)
+      else:
+        assert "unimplemented result type %s" % (rqType,)
+      self.sendResultsFP.write(packet)
+      if self.Q.empty():
+        self.sendResultsFP.flush()
 
   def join(self):
     ''' Wait for the control threads to terminate.
     '''
     self.readerThread.join()    # wait for requests to cease
     self.resultsThread.join()   # wait for results to drain
-
-  def _request_reader(self):
-    debug("RUN _request_reader")
-    jobs = self.jobs
-    jobsLock = self.jobsLock
-    resultsCH = self.resultsCH
-    S = self.S
-    for n, rqType, arg in decodeStream(self.recvRequestFP):
-      if isdebug:
-        if arg is None:
-          varg = None
-        elif rqType == T_CONTAINS or rqType == T_GET:
-          varg = hexify(arg)
-        else:
-          varg = unctrl(arg)
-        warn("StreamDaemon: rq=(%d, %s, %s)" % (n, rqType, varg))
-      with jobsLock:
-        assert n not in jobs, "token %d already in jobs" % n
-        jobs[n] = rqType
-        self.njobs += 1
-      if rqType == T_QUIT:
-        debug("_StreamDaemonRequestReader: T_QUIT")
-        resultsCH.put((n, None))
-        break
-      if rqType == T_STORE:
-        debug("_StreamDaemonRequestReader: T_STORE")
-        S.store_ch(arg, resultsCH, n)
-      elif rqType == T_GET:
-        debug("_StreamDaemonRequestReader: T_GET")
-        S.get_bg(arg, resultsCH, n)
-      elif rqType == T_CONTAINS:
-        debug("_StreamDaemonRequestReader: T_CONTAINS")
-        S.contains_bg(arg, resultsCH, n)
-      elif rqType == T_SYNC:
-        debug("_StreamDaemonRequestReader: T_SYNC")
-        S.sync_ch(resultsCH, n)
-      else:
-        assert False, "unhandled rqType(%s) for request #%d" % (rqType, n)
-    debug("END _StreamDaemonRequestReader")
-
-  def _result_sender(self):
-    ''' Collect results from asynchronous Store calls, report upstream.
-    '''
-    debug("RUN _StreamDaemonResultsSender")
-    jobs = self.jobs
-    jobsLock = self.jobsLock
-    sendReplyFP = self.sendReplyFP
-    draining = False
-    written = 0
-    while True:
-      if self.resultsCH.empty():
-        info("flush sendReplyFP after %d requests" % written)
-        sendReplyFP.flush()
-        written = 0
-      rqTag, result = self.resultsCH.get()
-      debug("StreamDaemon: return result (%s, %s)" % (rqTag, result))
-      with jobsLock:
-        rqType = jobs[rqTag]
-      if isdebug:
-        if result is None:
-          vresult = None
-        elif rqType == T_STORE:
-          vresult = hexify(result)
-        elif type(result) is str:
-          vresult = unctrl(result)
-        else:
-          vresult = result
-        warn("report result upstream: rqTag=%s rqType=%s results=%s" % (rqTag, rqType, vresult))
-      sendReplyFP.write(toBS(rqTag))
-      sendReplyFP.write(toBS(rqType))
-      if rqType == T_QUIT:
-        debug("T_QUIT received, draining...")
-        assert not draining
-        draining = True
-      elif rqType == T_STORE or rqType == T_GET:
-        sendReplyFP.write(toBS(len(result)))
-        sendReplyFP.write(result)
-      elif rqType == T_CONTAINS:
-        sendReplyFP.write(toBS(1 if result else 0))
-      elif rqType == T_SYNC:
-        pass
-      else:
-        assert False, "unhandled rqType(%s)" % rqType
-      written += 1
-      debug("_StreamDaemonResultsSender: dequeue job %d" % rqTag)
-      with jobsLock:
-        del jobs[rqTag]
-        self.njobs -= 1
-      if draining:
-        debug("draining: %d jobs still in play" % self.njobs)
-        with jobsLock:
-          if self.njobs == 0:
-            break
-          jobTags = jobs.keys()
-          jobTags.sort()
-          for tag in jobTags:
-            debug("  jobs[%d]=%s" % (tag, jobs[tag]))
-    info("flush sendReplyFP")
-    sendReplyFP.flush()
-    debug("END _StreamDaemonResultsSender")
-
-def encodeAdd(rqTag, block):
-  ''' Write add(block) to stream.
-      Does not .flush() the stream.
-  '''
-  debug("encodeStore(rqTag=%d, %d bytes)" % (rqTag, len(block)))
-  return toBS(rqTag) + enc_STORE + toBS(len(block)) + block
-
-def encodeGet(rqTag, h):
-  ''' Write get(h) to stream.
-      Does not .flush() the stream.
-  '''
-  debug("encodeGet(rqTag=%d, h=%s" % (rqTag, hexify(h)))
-  return toBS(rqTag) + env_GET + toBS(len(h)) + h
-
-def encodeContains(rqTag, h):
-  ''' Write contains(h) to stream.
-      Does not .flush() the stream.
-  '''
-  debug("encodeContains(rqTag=%d, h=%s" % (rqTag, hexify(h)))
-  return toBS(rqTag) + enc_CONTAINS + toBS(len(h)) + h
-
-def encodeSync(rqTag):
-  ''' Write sync() to stream.
-      Does not .flush() the stream.
-  '''
-  debug("encodeSync(rqTag=%d)" % rqTag)
-  return toBS(rqTag) + enc_SYNC
-
-def encodeQuit(rqTag):
-  ''' Write T_QUIT to stream.
-      Does not .flush() the stream.
-  '''
-  debug("encodeQuit(rqTag=%d" % rqTag)
-  return toBS(rqTag) + enc_QUIT
 
 class StreamStore(BasicStore):
   ''' A Store connected to a StreamDaemon backend.
@@ -269,11 +201,49 @@ class StreamStore(BasicStore):
     BasicStore.__init__(self, "StreamStore:%s"%name)
     self.sendRequestFP = sendRequestFP
     self.recvReplyFP = recvReplyFP
-    self.__sendLock = allocate_lock()
-    self.__tagmapLock = allocate_lock()
-    self.__tagmap = {}
-    self.reader = Thread(target=self.readReplies)
+    self._requestQ = IterableQueue(128)
+    self._pendingLock = allocate_lock()
+    self._pending = {}
+    self.writer = Thread(target=self._process_requests)
+    self.writer.start()
+    self.reader = Thread(target=self._process_results_stream)
     self.reader.start()
+
+  def add(self, block):
+    assert len(block) > 0
+    tag, packet = encodeAdd(block)
+    return self._sendPacket(tag, packet).get()
+
+  def get(self, h, default=None):
+    tag, packet = encodeGet(h)
+    block = self._sendPacket(tag, packet).get()
+    if block is None:
+      return default
+    return block
+
+  def contains(self, h):
+    tag, packet = encodeContains(h)
+    return self._sendPacket(tag, packet).get()
+
+  def _sendPacket(self, tag, packet):
+    retQ = Q1()
+    self._requestQ.put(tag, packet, retQ)
+    return retQ
+
+  def _process_requests(self):
+    for tag, packet, retQ in self._requestQ:
+      with self._pendingLock:
+        assert tag not in self._pending
+        self._pending[tag] = retQ
+      self.sendRequestFP.write(packet)
+      if self._requestQ.empty():
+        self.sendRequestFP.flush()
+
+  def _process_results_stream(self, fp):
+    for rqTag, rqType, result in decodeRequestStream(fp):
+      with self._pendingLock:
+        self._pending[tag].put(result)
+        del self._pending[tag]
 
   def flush(self):
     with self.__sendLock:
@@ -296,108 +266,3 @@ class StreamStore(BasicStore):
     if isdebug:
       info("got result from channel: %s" % (x,), "close")
     BasicStore.shutdown(self)
-
-  def _respond(self, tag, result):
-    with self.__tagmapLock:
-      retQ = self.__tagmap[tag]
-      del self.__tagmap[tag]
-    retQ.put(result)
-
-  def _sendPacket(self, packet, tag, retQ, noFlush=False):
-    with self.__tagmapLock:
-      assert tag not in self.__tagmap
-      self.__tagmap[tag] = retQ
-    with self.__sendLock:
-      self.sendRequestFP.write(packet)
-      if not noFlush:
-        self.sendRequestFP.flush()
-
-  def contains(self, h):
-    _, ch = self.contains_bg(h)
-    return ch.get()
-  def contains_bg(self, h, ch=None, noFlush=False):
-    if ch is None:
-      ch = Q1()
-    tag = seq()
-    packet = encodeContains(tag, h)
-    self._sendPacket(packet, tag, ch, noFlush)
-    return tag, ch
-  __contains__ = contains
-
-  def get(self, h):
-    _, ch = self.get_bg(h)
-    return ch.get()
-  def get_bg(self, h, ch=None, noFlush=False):
-    if ch is None:
-      ch = Q1()
-    tag = seq()
-    packet = encodeGet(tag, h)
-    self._sendPacket(packet, tag, ch, noFlush)
-    return tag, ch
-
-  def add(self, data, noFlush=False):
-    _, ch = self.add_bg(data, noFlush=noFlush)
-    return ch.get()
-  def add_bg(self, data, noFlush=False, ch=None):
-    if ch is None:
-      ch = Q1()
-    tag = seq()
-    packet = encodeAdd(tag, data)
-    self._sendPacket(packet, tag, ch, noFlush)
-    return tag, ch
-
-  def sync(self):
-    _, ch = self.sync_bg()
-    return ch.get()
-  def sync_bg(self, ch=None, noFlush=False):
-    if ch is None:
-      ch = Q1()
-    tag = seq()
-    packet = encodeSync(tag)
-    self._sendPacket(packet, tag, ch, noFlush)
-    return tag, ch
-
-  def readReplies(self):
-    debug("RUN _StreamClientReader")
-    recvReplyFP = self.recvReplyFP
-    respond = self._respond
-    debug("_StreamClientReader: recvReplyFP=%s" % (recvReplyFP,))
-    rqTag = fromBSfp(recvReplyFP)
-    while rqTag is not None:
-      rqType = fromBSfp(recvReplyFP)
-      debug("_StreamClientReader: result header: tag=%d, type=%s" % (rqTag, rqType))
-      if rqType == T_QUIT:
-        debug("received T_QUIT from daemon")
-        respond(rqTag, None)
-        break
-      if rqType == T_STORE:
-        hlen = fromBSfp(recvReplyFP)
-        assert hlen > 0
-        h = recvReplyFP.read(hlen)
-        assert len(h) == hlen, "%s: read %d bytes, expected %d" \
-                                 % (recvReplyFP, len(h), hlen)
-        respond(rqTag, h)
-        continue
-      if rqType == T_GET:
-        blen = fromBSfp(recvReplyFP)
-        assert blen >= 0
-        if blen == 0:
-          block = ''
-        else:
-          block = recvReplyFP.read(blen)
-          assert len(block) == blen
-        respond(rqTag, block)
-        continue
-      if rqType == T_CONTAINS:
-        yesno = bool(fromBSfp(recvReplyFP))
-        respond(rqTag, yesno)
-        continue
-      if rqType == T_SYNC:
-        respond(rqTag, None)
-        continue
-      assert False, "unhandled reply type %s" % rqType
-
-      # fetch next result
-      rqTag = fromBSfp(recvReplyFP)
-
-    debug("END _StreamClientReader")
