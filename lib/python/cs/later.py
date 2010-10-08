@@ -127,15 +127,24 @@ class LateFunction(object):
 
 class Later(object):
   ''' A management class to queue function calls for later execution.
+      If `capacity` is an int, it is used to size a Semaphore to constrain
+      the number of dispatched functions which may be in play at a time.
+      If `capacity` is not an int it is presumed to already be a
+      suitable Semaphore-like object.
+      `inboundCapacity` can be specified to limit the number of undispatched
+      functions that may be queued up; the default is 0 (no limit).
+      Calls to submit functions when the inbound limit is reached block
+      until some functions are dispatched.
   '''
-
-  def __init__(self, capacity):
+  def __init__(self, capacity, inboundCapacity=0):
     if type(capacity) is int:
       capacity = AdjustableSemaphore(capacity)
     self.capacity = capacity
+    self.inboundCapacity = inboundCapacity
     self.closed = False
     self._priority = (0,)
-    self._LFPQ = IterablePriorityQueue()   # inbound requests queue
+    # inbound requests queue
+    self._LFPQ = IterablePriorityQueue(inboundCapacity)
     self._workers = WorkerThreadPool()
     self._dispatchThread = Thread(target=self._dispatcher)
     self._dispatchThread.start()
