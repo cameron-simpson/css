@@ -19,9 +19,10 @@ import os.path
 from thread import allocate_lock
 from threading import Thread
 from Queue import Queue
+from cs.later import Later
 from cs.logutils import info, debug, warn, Pfx
 from cs.serialise import toBS, fromBS
-from cs.threads import FuncMultiQueue, Q1, Get1, NestingOpenClose
+from cs.threads import Q1, Get1, NestingOpenClose
 from cs.venti import defaults, totext
 from cs.venti.datafile import DataFile
 from cs.venti.hash import Hash_SHA1
@@ -44,31 +45,18 @@ class BasicStore(NestingOpenClose):
       The .writeonly attribute may be set to trap surprises when no blocks
       are expected to be fetched; it relies on asssert statements.
 
-      The following "op" operation methods are provided:
-        contains(hashcode) -> Boolean
-        contains_bg(hashcode[, ch]) -> (tag, ch)
-        get(hashcode) -> data
-          Unlike __getitem__, .get() returns None if the hashcode does not
-          resolve.
-        get_bg(hashcode[, ch]) -> (tag, ch)
-        add_bg(data[, ch]) -> (tag, ch)
+      Subclasses are expected to implement:
+        .add(block) -> hashcode
+        .get(hashcode, [default=None]) -> block (or default)
+        .contains(hashcode) -> boolean
 
-      The non-_bg forms are equivalent to __contains__, __getitem__ and add()
-      and are provided for consistency with the _bg forms.
+      The background (*_bg) functions return cs.later.LateFunction instances
+      for deferred collection of the operation result.
 
-      The _bg forms accept an optional `ch` parameter and return a (tag, ch)
-      pair. If `ch` is not provided or None, a single use Channel is obtained.
-      A .get() from the returned channel returns the tag and the function result.
+      The mapping special methods __getitem__ and __contains__ call
+      the implementation methods .get() and .contains().
 
-      In normal use the caller will care only about the channel or the tag,
-      rarely both. If no channel is presupplied then the return channel is
-      a single use channel on which only the relevant (tag, result) response
-      will be seen, so the tag is superfluous. In the case where a channel is
-      presupplied it is possible for responses to requests to arrive in
-      arbitrary order, so the tag is needed to identify the response with the
-      calling request; however the caller already knows the channel.
-
-      [ TODO: NO LONGER IMPLEMENTED< BUT IT SHOULD BE ]
+      [ TODO: NO LONGER IMPLEMENTED, BUT IT SHOULD BE ]
       The hint noFlush, if specified and True, suggests that streaming
       store connections need not flush the request stream because another
       request will follow very soon after this request. This allows
@@ -84,11 +72,37 @@ class BasicStore(NestingOpenClose):
     NestingOpenClose.__init__(self)
     self.name = name
     self.logfp = None
-    self.__funcQ = FuncMultiQueue(capacity)
+    self.__funcQ = Later(capacity)
     self.hashclass = Hash_SHA1
     self._lock = allocate_lock()
     self.readonly = False
     self.writeonly = False
+
+  def _partial(self, func, *args, **kwargs):
+    return self.__funcQ.partial(func, *args, **kwargs)
+
+  def add(self, data, noFlush=False):
+    ''' Add the supplied data bytes to the store.
+    '''
+    raise NotImplementedError
+
+  def get(self, h, default=None):
+    ''' Return the data bytes associated with the supplied hashcode.
+        Return None if the hashcode is not present.
+    '''
+    raise NotImplementedError
+
+  def contains(self, h):
+    raise NotImplementedError
+
+  def add_bg(self, data, noFlush=False):
+    return self._partial(self.add, data, noFlush=noFlush)
+
+  def get_bg(self, h):
+    return self._partial(self.get, h)
+
+  def contains_bg(self, h):
+    return self._partial(self.contains, h)
 
   def hash(self, data):
     ''' Return a Hash object from data bytes.
@@ -98,18 +112,16 @@ class BasicStore(NestingOpenClose):
   def __contains__(self, h):
     ''' Test if the supplied hashcode is present in the store.
     '''
-    raise NotImplementedError
+    return self.contains(h)
 
   def __getitem__(self, h):
     ''' Return the data bytes associated with the supplied hashcode.
         Raise KeyError if the hashcode is not present.
     '''
-    raise NotImplementedError
-
-  def add(self, data, noFlush=False):
-    ''' Add the supplied data bytes to the store.
-    '''
-    raise NotImplementedError
+    block = self.get(h)
+    if block is None:
+      raise KeyError
+    return block
 
   def flush(self):
     ''' Flush outstanding I/O operations on the store.
@@ -147,42 +159,8 @@ class BasicStore(NestingOpenClose):
     self.sync()
     self.__funcQ.close()
 
-  def contains(self, h):
-    return self.__contains__(h)
-
-  def contains_bg(self, h, ch=None):
-    if ch is None:
-      ch = Q1()
-    tag = self.__funcQ.qbgcall(partial(self.contains, h), ch)
-    return tag, ch
-
-  def get(self, h):
-    ''' Return the data bytes associated with the supplied hashcode.
-        Return None if the hashcode is not present.
-    '''
-    try:
-      data = self[h]
-    except KeyError:
-      return None
-    return data
-
-  def get_bg(self, h, ch=None):
-    if ch is None:
-      ch = Q1()
-    tag = self.__funcQ.qbgcall(partial(self.get, h), ch)
-    return tag, ch
-
-  def add_bg(self, data, ch=None, noFlush=False):
-    if ch is None:
-      ch = Q1()
-    tag = self.__funcQ.qbgcall(partial(self.add, data, noFlush=noFlush), ch)
-    return tag, ch
-
-  def sync_bg(self, ch=None):
-    if ch is None:
-      ch = Q1()
-    tag = self.__funcQ.qbgcall(self.sync, ch)
-    return tag, ch
+  def sync_bg(self):
+    return self._partial(self.sync)
 
   def missing(self, hashes):
     ''' Yield hashcodes that are not in the store from an iterable hash
@@ -205,49 +183,12 @@ class BasicStore(NestingOpenClose):
   def multifetch(self, hs):
     ''' Generator returning a bunch of blocks in sequence corresponding to
         the iterable hashes.
-        TODO: recode to just use the normal funcQ and a heap of (index, data).
     '''
-    # dispatch a thread to request the blocks
-    tagQ = Queue(0)       # the thread echoes tags for each hash in hs
-    FQ = Queue(0)         # and returns (tag, block) on FQ, possibly out of order
-    Thread(target=self.__multifetch_rq, args=(hs, tagQ, FQ)).start()
-
-    waiting = {}  # map of blocks that arrived out of order
-    frontTag = None
-    while True:
-      if frontTag is not None:
-        # we're waiting for a particular tag
-        tag, block = FQ.get()
-        if tag == frontTag:
-          # it is the one desired, return it
-          yield block
-          frontTag = None
-        else:
-          # not what we wanted - save it for later
-          waiting[tag] = block
-      # get the next desired tag whose block has not yet arrived
-      while frontTag is None:
-        # get the next desired tag
-        frontTag = tagQ.get()
-        if frontTag is None:
-          # end of tag stream
-          break
-        if frontTag in waiting:
-          # has this tag already arrived?
-          yield waiting.pop(frontTag)
-          frontTag = None
-    assert len(waiting.keys()) == 0
-
-  def __multifetch_rq(self, hs, tagQ, FQ):
-    h0 = None
+    LFs = []
     for h in hs:
-      tag, _ = self.get_bg(h, ch=FQ)
-      tagQ.put(tag)
-      h0 = h
-    if h0 is not None:
-      # dummy request to flush stream
-      self.contains_bg(h0, ch=Get1())
-    tagQ.put(None)
+      LFs.append(self.fetch_bg(h))
+    for LF in LFs:
+      yield LF()
 
 def Store(S):
   ''' Factory function to return an appropriate BasicStore subclass
@@ -255,6 +196,8 @@ def Store(S):
         /path/to/store  A GDBMStore directory (later, tokyocabinet etc)
         |command        A subprocess implementing the streaming protocol.
         tcp:[host]:port Connect to a daemon implementing the streaming protocol.
+      TODO:
+        ssh://host/[store-designator-as-above]
   '''
   assert type(S) is str, "expected a str, got %s" % (S,)
   if S[0] == '/':
@@ -348,20 +291,6 @@ class IndexedFileStore(BasicStore):
       self._storeMap[n] = DataFile(pathname)
       return n
 
-  def __contains__(self, h):
-    ''' Check if the specified hash is present in the store.
-    '''
-    with self._lock:
-      return h in self._index
-
-  def __getitem__(self, h):
-    ''' Fetch the data bytes associated with the specified hash from the store.
-    '''
-    n, offset = self.decodeIndexEntry(self._index[h])
-    assert n >= 0
-    assert offset >= 0
-    return self._storeMap[n].readData(offset)
-
   def add(self, data, noFlush=False):
     ''' Add data bytes to the store, return the hashcode.
     '''
@@ -376,6 +305,21 @@ class IndexedFileStore(BasicStore):
         datafile.flush()
       self._index[h] = self.encodeIndexEntry(n, offset)
     return h
+
+  def get(h, default=None):
+    I = self._index.get(h)
+    if I is None:
+      return default
+    n, offset = self.decodeIndexEntry(I)
+    assert n >= 0
+    assert offset >= 0
+    return self._storeMap[n].readData(offset)
+
+  def contains(self, h):
+    ''' Check if the specified hash is present in the store.
+    '''
+    with self._lock:
+      return h in self._index
 
   def flush(self):
     for datafile in self._storeMap.values():
