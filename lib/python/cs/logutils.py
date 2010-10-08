@@ -80,6 +80,16 @@ def D(fmt, *args):
   sys.stderr.write(fmt % args)
   sys.stderr.write("\n")
 
+def logTo(filename, logger=None):
+  ''' Log to the specified filename.
+      If `logger` is supplied and not None, add the FileHandler to that
+      Logger, otherwise to the root Logger.
+  '''
+  import logging.handlers
+  if logger is None:
+    logger = logging.getLogger
+  logger.addHandler(logging.handlers.FileHandler(filename))
+
 class NullHandler(logging.Handler):
   def emit(self, record):
     pass
