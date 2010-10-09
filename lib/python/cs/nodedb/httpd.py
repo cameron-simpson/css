@@ -7,6 +7,7 @@
 import urllib
 from BaseHTTPServer import HTTPServer, BaseHTTPRequestHandler
 import csv
+import os.path
 import socket
 import sys
 from types import StringTypes
@@ -16,7 +17,7 @@ import cs.html
 from cs.mappings import parseUC_sAttr
 from cs.nodedb import Node
 from cs.nodedb.text import attrValueText
-from cs.logutils import info, warn, error, debug
+from cs.logutils import info, warn, error, debug, D
 
 # HTML token convenience functions
 def TD(*elements):
@@ -78,7 +79,13 @@ class CherryPyNode(object):
     self.basepath = basepath
 
   def _start(self):
-    self._tokens = []
+    self._tokens = [ ['SCRIPT', {'LANGUAGE': 'javascript',
+                                 'SRC': os.path.join(self.basepath, 'lib-css.js'),
+                                }],
+                     ['SCRIPT', {'LANGUAGE': 'javascript',
+                                 'SRC': os.path.join(self.basepath, 'lib.js'),
+                                }]
+                   ]
 
   def _flushtokens(self):
     ''' Transcribe the pending HTML tokens to text,
@@ -94,9 +101,10 @@ class CherryPyNode(object):
 
 class NodeDBView(CherryPyNode):
 
-  def __init__(self, nodedb, basepath):
+  def __init__(self, nodedb, basepath, readwrite=False):
     CherryPyNode.__init__(self, nodedb, basepath)
     self.node = NodeDBView._Nodes(self)
+    self.readwrite = readwrite
 
   def _nodeLink(self, N, label=None, context=None, view=''):
     ''' Return an 'A' token linking to the specified Node `N`.
@@ -140,6 +148,15 @@ class NodeDBView(CherryPyNode):
         first=False
       self._tokens.append("\n")
     return self._flushtokens()
+
+  @cherrypy.expose
+  def default(self, basename):
+    if basename in ("lib.js", "lib-css.js"):
+      cherrypy.response.headers['content-type'] = 'text/javascript'
+      with open(os.path.join(os.path.dirname(__file__), basename)) as jsfp:
+        js = jsfp.read()
+      return js
+    raise cherrypy.HTTPError(404, basename)
 
   class _Nodes(CherryPyNode):
     ''' View of individual Nodes.
@@ -239,10 +256,10 @@ class NodeDBView(CherryPyNode):
       self._tokens.append("\n")
       return self._flushtokens()
 
-def serve(nodedb, host, port, basepath='/'):
+def serve(nodedb, host, port, basepath='/', readwrite=False):
   if type(port) in StringTypes:
     port = int(port)
-  V = NodeDBView(nodedb, basepath)
+  V = NodeDBView(nodedb, basepath, readwrite=readwrite)
   S = cherrypy.server
   S.socket_host = host
   S.socket_port = port
