@@ -407,9 +407,13 @@ def cmd_pull(args):
 def cmd_scan(args):
   if len(args) != 1:
     raise GetoptError, "missing datafile"
-  from cs.venti.datafile import scanFile
-  for h, offset, zsize in scanFile(open(args[0])):
-    print totext(h), offset, zsize
+  datafile = args[0]
+  from cs.venti.datafile import DataFile
+  with Pfx(datafile):
+    dfp = DataFile(datafile)
+    for offset, flags, data in dfp.scanData():
+      print totext(defaults.S.hash(data)), offset, "0x%02x" % (flags,), len(data)
+    dfp.close()
   return 0
 
 # =item B<unpack> I<dirrefs...>

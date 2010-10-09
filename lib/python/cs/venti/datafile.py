@@ -23,8 +23,9 @@ class DataFile(object):
         self._fp = open(self.pathname, "a+b")
     return self._fp
 
-  def scanData(self):
-    ''' Scan the data file and yield (offset, data) tuples.
+  def scanData(self, uncompress=False):
+    ''' Scan the data file and yield (offset, flags, zdata) tuples.
+        If `uncompress` is true, decompress the data and strip that flag value.
     '''
     fp = self.fp
     with self._lock:
@@ -32,10 +33,13 @@ class DataFile(object):
       while True:
         offset = fp.tell()
         flags, data = self._readRawDataHere(fp)
-        if flags & F_COMPRESSED:
-          data = decompress(data)
-        assert (flags & ~F_COMPRESSED) == 0
-        yield offset, data
+        if flags is None:
+          break
+        if uncompress:
+          if flags & F_COMPRESSED:
+            data = decompress(data)
+          flags &= ~F_COMPRESSED
+        yield offset, flags, data
 
   def readData(self, offset):
     ''' Read data bytes from the supplied offset.
@@ -44,15 +48,18 @@ class DataFile(object):
     with self._lock:
       fp.seek(offset)
       flags, data = self._readRawDataHere(fp)
+    assert flags is not None, "no data read from offset %d" % (offset,)
     if flags & F_COMPRESSED:
       data = decompress(data)
-    assert (flags & ~F_COMPRESSED) == 0
     return data
 
   def _readRawDataHere(self, fp):
     ''' Retrieve the data bytes stored at `offset`.
     '''
     flags = fromBSfp(fp)
+    if flags is None:
+      return None, None
+    assert (flags & ~F_COMPRESSED) == 0, "flags other than F_COMPRESSED: 0x%02x" % ((flags & ~F_COMPRESSED),)
     dsize = fromBSfp(fp)
     if dsize == 0:
       data = ''
