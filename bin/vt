@@ -38,7 +38,7 @@ import os
 import os.path
 from getopt import getopt, GetoptError
 import datetime
-from cs.logutils import Pfx, error, debug, setup_logging, logTo, D
+from cs.logutils import Pfx, exception, error, debug, setup_logging, logTo, D
 from cs.venti import totext, fromtext
 from cs.venti.block import IndirectBlock, decodeBlocks
 from cs.venti.debug import dumpBlock
@@ -160,6 +160,7 @@ def main(argv):
     logTo(dflt_log, delay=True)
 
   xit = None
+  S = None
 
   if len(args) < 1:
     error("missing command")
@@ -185,19 +186,33 @@ def main(argv):
             error("no $VT_STORE and no -S option")
             badopts = True
           else:
-            S = Store(dflt_vt_store)
-            if dflt_cache is not None:
-              C = Store(dflt_cache)
-              S = CacheStore(S, C)
-            # put an in-memory cache in front of the main cache
-            if useMemCache:
-              S = CacheStore(S, MemCacheStore())
-            with S:
-              try:
-                xit = op_func(args)
-              except GetoptError, e:
-                error("%s", e)
-                badopts = True
+            try:
+              S = Store(dflt_vt_store)
+            except:
+              exception("can't open store \"%s\"", dflt_vt_store)
+              badopts = True
+            else:
+              if dflt_cache is not None:
+                try:
+                  C = Store(dflt_cache)
+                except:
+                  exception("can't open cache store \"%s\"", dflt_cache)
+                  badopts = True
+                else:
+                  S = CacheStore(S, C)
+              if not badopts:
+                # put an in-memory cache in front of the main cache
+                if useMemCache:
+                  S = CacheStore(S, MemCacheStore())
+                with S:
+                  try:
+                    xit = op_func(args)
+                  except GetoptError, e:
+                    error("%s", e)
+                    badopts = True
+
+  if S:
+    S.close()
 
   if badopts:
     sys.stderr.write(usage)

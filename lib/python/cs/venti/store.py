@@ -66,17 +66,17 @@ class BasicStore(NestingOpenClose):
       deadlocks may ensue.
   '''
   def __init__(self, name, capacity=None):
-    debug("BasicStore.__init__...")
-    if capacity is None:
-      capacity = 1
-    NestingOpenClose.__init__(self)
-    self.name = name
-    self.logfp = None
-    self.__funcQ = Later(capacity)
-    self.hashclass = Hash_SHA1
-    self._lock = allocate_lock()
-    self.readonly = False
-    self.writeonly = False
+    with Pfx("BasicStore(%s,..)" % (name,)):
+      if capacity is None:
+        capacity = 1
+      NestingOpenClose.__init__(self)
+      self.name = name
+      self.logfp = None
+      self.__funcQ = Later(capacity)
+      self.hashclass = Hash_SHA1
+      self._lock = allocate_lock()
+      self.readonly = False
+      self.writeonly = False
 
   def _partial(self, func, *args, **kwargs):
     return self.__funcQ.partial(func, *args, **kwargs)
@@ -189,42 +189,58 @@ class BasicStore(NestingOpenClose):
     for LF in LFs:
       yield LF()
 
-def Store(S):
+def Store(storespec):
   ''' Factory function to return an appropriate BasicStore subclass
       based on its argument:
         /path/to/store  A GDBMStore directory (later, tokyocabinet etc)
         |command        A subprocess implementing the streaming protocol.
         tcp:[host]:port Connect to a daemon implementing the streaming protocol.
         ssh://host/[store-designator-as-above]
+        relative/path/to/store
+                        If the string doesn't start with /, | or foo:
+                        and specifies a directory then treat like
+                        /cwd/relative/path/to/store.
   '''
-  assert type(S) is str, "expected a str, got %s" % (S,)
-  if S[0] == '/':
+  assert type(storespec) is str, "expected a str, got %s" % (storespec,)
+  if storespec.startswith('/'):
+    return Store("file:"+storespec)
+  if storespec.startswith('|'):
+    return Store("exec:"+storespec)
+  if ':' not in storespec:
+    return Store("file:"+storespec)
+  scheme = storespec[:storespec.index(':')]
+  if not scheme.isalpha():
+    return Store("file:"+storespec)
+  spec = storespec[len(scheme)+1:]
+  if scheme == "file":
     # TODO: after tokyocabinet available, probe for index file name
     from cs.venti.gdbmstore import GDBMStore
-    return GDBMStore(S)
-  if S[0] == '|':
+    return GDBMStore(os.path.abspath(spec))
+  if scheme == "exec":
     from cs.venti.stream import StreamStore
     from subprocess import Popen, PIPE
-    P = Popen(S[1:], shell=True, stdin=PIPE, stdout=PIPE)
-    return StreamStore(S, P.stdin, P.stdout)
-  if S.startswith("tcp:"):
+    P = Popen(spec, shell=True, stdin=PIPE, stdout=PIPE)
+    return StreamStore("exec:"+spec, P.stdin, P.stdout)
+  if scheme == "tcp":
     from cs.venti.tcp import TCPStore
-    host, port = S[4:].rsplit(':', 1)
+    host, port = spec.rsplit(':', 1)
     if len(host) == 0:
       host = '127.0.0.1'
     return TCPStore((host, int(port)))
-  if S.startswith('ssh://'):
+  if sheme == "ssh":
     # TODO: path to remote vt command
     # TODO: $VT_SSH envvar
     import cs.sh
     from cs.venti.stream import StreamStore
     from subprocess import Popen, PIPE
-    sshto, remotespec = S[6:].split('/', 1)
+    assert spec.startswith('//') and not spec.startswith('///'), \
+           "bad spec ssh:%s, expect ssh://target/remote-spec" % (spec,)
+    sshto, remotespec = spec[2:].split('/', 1)
     rcmd = './bin/vt -S %s listen -' % cs.sh.quotestr(remotespec)
     P = Popen( ['set-x', 'ssh', sshto, 'set -x; '+rcmd],
                shell=False, stdin=PIPE, stdout=PIPE)
-    return StreamStore(S, P.stdin, P.stdout)
-  assert False, "unhandled Store name \"%s\"" % (S,)
+    return StreamStore("ssh:"+spec, P.stdin, P.stdout)
+  assert False, "unknown scheme \"%s:\"" % (scheme,)
 
 def pullFromSerial(S1, S2):
   asked = 0
@@ -242,14 +258,14 @@ class IndexedFileStore(BasicStore):
 
   def __init__(self, dirpath, capacity=None):
     ''' Initialise this IndexedFileStore.
-        'dirpath' specifies the directory in which the files and their index live.
+        `dirpath` specifies the directory in which the files and their index live.
     '''
-    ##D("IndexedFileStore.__init__(%s)..." % (dirpath,))
     BasicStore.__init__(self, dirpath, capacity=capacity)
-    self.dirpath = dirpath
-    self._n = None
-    self._index = self._getIndex()
-    self._storeMap = self.__loadStoreMap()
+    with Pfx("IndexedFileStore(%s)" % (dirpath,)):
+      self.dirpath = dirpath
+      self._n = None
+      self._index = self._getIndex()
+      self._storeMap = self.__loadStoreMap()
 
   @property
   def n(self):
