@@ -113,7 +113,7 @@ def fileBlocks(fp, rsize=None, matchBlocks=None):
         return
       # compare hashcodes to avoid fetching data for B if we have its hash
       if defaults.S.hash(data) == B.hashcode():
-        D("MATCH %d bytes" % (len(data),))
+        debug("MATCH %d bytes", len(data))
         yield B
         data = None
         continue
