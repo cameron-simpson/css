@@ -6,6 +6,7 @@
 
 from __future__ import with_statement
 from Queue import Queue
+import cs.later
 from cs.lex import hexify
 from cs.venti.store import BasicStore
 
@@ -70,11 +71,8 @@ class CacheStore(BasicStore):
     self.backend.prefetch(self.missing(hs))
 
   def sync(self):
-    Q = Queue(2)
-    self.cache.sync_bg(ch=Q)
-    self.backend.sync_bg(ch=Q)
-    Q.get()
-    Q.get()
+    for _ in cs.later.report([ self.cache.sync_bg(), self.backend.sync_bg() ]):
+      pass
 
 class MemCacheStore(BasicStore):
   ''' A lossy store that keeps an in-memory cache of recent chunks.  It may
