@@ -261,6 +261,23 @@ def cmd_catblock(args):
       sys.stdout.write(data)
   return 0
 
+# =item B<init> <dirpath>
+#
+# Initialise a directory for use as a store, using the GDBM backend.
+#
+def cmd_init(args):
+  if not args:
+    raise GetoptError, "missing dirpath"
+  dirpath = args.pop(0)
+  if args:
+    raise GetoptError, "extra arguments after dirpath: %s" % (' '.join(args),)
+  with Pfx(dirpath):
+    if not os.path.isdir(dirpath):
+      raise GetoptError, "not a directory"
+    with Store("file:"+dirpath):
+      pass
+  return 0
+
 # =item B<listen> {B<->|[I<host>]B<:>I<port>}
 #
 # Start a vt daemon.
