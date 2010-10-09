@@ -15,7 +15,7 @@ from cs.misc import seq
 from cs.logutils import Pfx, info, debug, warn
 from cs.serialise import toBS, fromBSfp
 from cs.lex import unctrl
-from cs.threads import Q1
+from cs.threads import Q1, IterableQueue
 from cs.lex import hexify
 from cs.venti.store import BasicStore
 
@@ -195,12 +195,12 @@ class StreamDaemon(object):
 class StreamStore(BasicStore):
   ''' A Store connected to a StreamDaemon backend.
   '''
-  def __init__(self, name, sendRequestFP, recvReplyFP):
-    ''' Connect to a StreamDaemon via sendRequestFP and recvReplyFP.
+  def __init__(self, name, sendRequestFP, recvResultsFP):
+    ''' Connect to a StreamDaemon via sendRequestFP and recvResultsFP.
     '''
     BasicStore.__init__(self, "StreamStore:%s"%name)
     self.sendRequestFP = sendRequestFP
-    self.recvReplyFP = recvReplyFP
+    self.recvResultsFP = recvResultsFP
     self._requestQ = IterableQueue(128)
     self._pendingLock = allocate_lock()
     self._pending = {}
@@ -239,8 +239,8 @@ class StreamStore(BasicStore):
       if self._requestQ.empty():
         self.sendRequestFP.flush()
 
-  def _process_results_stream(self, fp):
-    for rqTag, rqType, result in decodeRequestStream(fp):
+  def _process_results_stream(self):
+    for rqTag, rqType, result in decodeRequestStream(self.recvResultsFP):
       with self._pendingLock:
         self._pending[tag].put(result)
         del self._pending[tag]
@@ -252,17 +252,16 @@ class StreamStore(BasicStore):
   def shutdown(self):
     ''' Close the StreamStore.
     '''
-    tag, ch = self._tagch()
-    self.__maptag(tag, ch)
-    with self.__sendLock:
-      if isdebug:
-        info("sending T_QUIT...", "close")
-      packet = encodeQuit(tag)
-      self.sendRequestFP.write(packet)
-      self.sendRequestFP.flush()
-      if isdebug:
-        info("sent T_QUIT", "close")
-    x = ch.get()
-    if isdebug:
-      info("got result from channel: %s" % (x,), "close")
+    debug("%s.shutdown...", self)
+    self._requestQ.close()
+    self.writer.join()
+    self.writer = None
+    self.sendRequestsFP.close()
+    self.sendRequestsFP = None
+
+    self.reader.join()
+    self.reader = None
+    self.recvResultsFP.close()
+    self.recvReqestsFP = None
+
     BasicStore.shutdown(self)
