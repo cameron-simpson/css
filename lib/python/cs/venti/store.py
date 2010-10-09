@@ -156,7 +156,6 @@ class BasicStore(NestingOpenClose):
   def shutdown(self):
     ''' Called by final NestingOpenClose.close().
     '''
-    self.sync()
     self.__funcQ.close()
 
   def sync_bg(self):
@@ -196,7 +195,6 @@ def Store(S):
         /path/to/store  A GDBMStore directory (later, tokyocabinet etc)
         |command        A subprocess implementing the streaming protocol.
         tcp:[host]:port Connect to a daemon implementing the streaming protocol.
-      TODO:
         ssh://host/[store-designator-as-above]
   '''
   assert type(S) is str, "expected a str, got %s" % (S,)
@@ -205,16 +203,27 @@ def Store(S):
     from cs.venti.gdbmstore import GDBMStore
     return GDBMStore(S)
   if S[0] == '|':
-    # TODO: recode to use the subprocess module
-    toChild, fromChild = os.popen2(S[1:])
     from cs.venti.stream import StreamStore
-    return StreamStore(S, toChild, fromChild)
+    from subprocess import Popen, PIPE
+    P = Popen(S[1:], shell=True, stdin=PIPE, stdout=PIPE)
+    return StreamStore(S, P.stdin, P.stdout)
   if S.startswith("tcp:"):
     from cs.venti.tcp import TCPStore
     host, port = S[4:].rsplit(':', 1)
     if len(host) == 0:
       host = '127.0.0.1'
     return TCPStore((host, int(port)))
+  if S.startswith('ssh://'):
+    # TODO: path to remote vt command
+    # TODO: $VT_SSH envvar
+    import cs.sh
+    from cs.venti.stream import StreamStore
+    from subprocess import Popen, PIPE
+    sshto, remotespec = S[6:].split('/', 1)
+    rcmd = './bin/vt -S %s listen -' % cs.sh.quotestr(remotespec)
+    P = Popen( ['set-x', 'ssh', sshto, 'set -x; '+rcmd],
+               shell=False, stdin=PIPE, stdout=PIPE)
+    return StreamStore(S, P.stdin, P.stdout)
   assert False, "unhandled Store name \"%s\"" % (S,)
 
 def pullFromSerial(S1, S2):
