@@ -156,6 +156,9 @@ def main(argv):
   # =back
   #
 
+  if dflt_log is not None:
+    logTo(dflt_log, delay=True)
+
   xit = None
 
   if len(args) < 1:
@@ -170,27 +173,31 @@ def main(argv):
         error("unknown operation \"%s\"", op)
         badopts = True
       else:
-        if dflt_log is not None:
-          logTo(dflt_log, delay=True)
-        # TODO: ops not needing or wanting open Store come first, here
-        if dflt_vt_store is None:
-          if op != "scan":
-            error("no $VT_STORE and no -S option")
+        if op in ("scan", "init"):
+          # run without a context store
+          try:
+            xit = op_func(args)
+          except GetoptError, e:
+            error("%s", e)
             badopts = True
         else:
-          S = Store(dflt_vt_store)
-          if dflt_cache is not None:
-            C = Store(dflt_cache)
-            S = CacheStore(S, C)
-          # put an in-memory cache in front of the main cache
-          if useMemCache:
-            S = CacheStore(S, MemCacheStore())
-          with S:
-            try:
-              xit = op_func(args)
-            except GetoptError, e:
-              error("%s", e)
-              badopts = True
+          if dflt_vt_store is None:
+            error("no $VT_STORE and no -S option")
+            badopts = True
+          else:
+            S = Store(dflt_vt_store)
+            if dflt_cache is not None:
+              C = Store(dflt_cache)
+              S = CacheStore(S, C)
+            # put an in-memory cache in front of the main cache
+            if useMemCache:
+              S = CacheStore(S, MemCacheStore())
+            with S:
+              try:
+                xit = op_func(args)
+              except GetoptError, e:
+                error("%s", e)
+                badopts = True
 
   if badopts:
     sys.stderr.write(usage)
