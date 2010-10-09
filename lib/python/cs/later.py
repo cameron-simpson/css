@@ -114,7 +114,7 @@ class LateFunction(object):
       self._join_cond.wait()
       assert self.done
 
-  def report(self, notify):
+  def notify(self, notify):
     ''' After the function completes, run notify(self).
         If the function has already completed this will happen immediately.
         Note: if you'd rather `self` got put on some Queue `Q`, supply `Q.put`.
@@ -297,20 +297,20 @@ class Later(object):
     yield
     self._priority = oldpri
 
-  def report(self, LFs):
-    ''' Report completed LateFunctions.
-        This is a generator that yields LateFunctions as they complete,
-        useful for waiting for a set of LateFunctions that may complete in
-        an arbitrary order.
-    '''
-    Q = Queue()
-    n = 0
-    notify = Q.put
-    for LF in LFs:
-      n += 1
-      LF.report(notify)
-    for i in range(n):
-      yield Q.get()
+def report(LFs):
+  ''' Report completed LateFunctions.
+      This is a generator that yields LateFunctions as they complete, useful
+      for waiting for a sequence of LateFunctions that may complete in an
+      arbitrary order.
+  '''
+  Q = Queue()
+  n = 0
+  notify = Q.put
+  for LF in LFs:
+    n += 1
+    LF.notify(notify)
+  for i in range(n):
+    yield Q.get()
 
 class TestLater(unittest.TestCase):
 
@@ -399,7 +399,7 @@ class TestLater(unittest.TestCase):
       LF1 = L3.partial(self._delay, 3)
       LF2 = L3.partial(self._delay, 2)
       LF3 = L3.partial(self._delay, 1)
-      results = [ LF() for LF in self.L.report( (LF1, LF2, LF3) ) ]
+      results = [ LF() for LF in report( (LF1, LF2, LF3) ) ]
       self.assertEquals(results, [1, 2, 3])
 
   def test08delay(self):
