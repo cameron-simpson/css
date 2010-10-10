@@ -83,13 +83,16 @@ def D(fmt, *args):
 def logTo(filename, logger=None, mode='a', encoding=None, delay=False):
   ''' Log to the specified filename.
       If `logger` is supplied and not None, add the FileHandler to that
-      Logger, otherwise to the root Logger.
+      Logger, otherwise to the root Logger. If `logger` is a string, call
+      logging.getLogger(logger) to obtain the logger.
       `mode`, `encoding` and `delay` are passed to the
       logging.handlers.FileHandler initialiser.
   '''
   import logging.handlers
   if logger is None:
-    logger = logging.getLogger
+    logger = logging.getLogger()
+  elif type(logger) is str:
+    logger = logging.getLogger(logger)
   handler = logging.handlers.FileHandler(filename, mode, encoding, delay)
   logger.addHandler(handler)
 
