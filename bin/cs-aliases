@@ -13,100 +13,114 @@ from email.parser import Parser
 from email.utils import getaddresses, formataddr
 import cs.sh
 from cs.mailAddresses import addressKey, loadAddresses, addrsRegexp
-from cs.misc import cmd
-from cs.logutils import setup_logging, error
+from cs.logutils import setup_logging, error, Pfx, warn
+import cs.misc
 
-setup_logging()
-
-aliases = environ.get('CS_ALIASES')
-if aliases is None:
-  aliases = os.path.join(environ['HOME'],'rc','mail','aliases2')
+aliases = environ.get('CS_ALIASES',
+                      os.path.join(environ['HOME'], 'rc', 'mail', 'aliases2'))
 re_syntax = 'TEXT'
 re_prefix = 'cs_aliases'
 new_syntax = 'MAILITEM'
 
-usage = '''Usage:
-  %s [-f aliasfile]
+def main(argv):
+  global aliases, byCategory, byAddress
+  setup_logging()
+  cmd = cs.misc.cmd
+
+  usage = '''Usage:
+  %s [-f aliasfile] [list]
     Recite categories and core addresses.
   %s [-f aliasfile] new <addresses"
     Print new addresses.
   %s [-f aliasfile] re [-sh] [categories...]
     Print categories and regular expressions.
-      -sh               Use /bin/sh syntax.
-  Options:
-    -f aliasfile        Specify alias file. Default: %s, from $CS_ALIASES.''' \
-  % (cmd,cmd,cmd,aliases)
+      -sh        Use /bin/sh syntax.
+  Global options:
+    -f aliasfile Specify alias file. Default: %s, from $CS_ALIASES.''' \
+  % (cmd, cmd, cmd, aliases)
 
-xit = 0
+  xit = 0
 
-badopts = False
-argv = sys.argv[1:]
-if argv and argv[0] == '-f':
-  if len(argv) < 2:
-    error("missing 'aliases' argument to -f")
-    badopts = True
-    argv = argv[1:]
+  badopts = False
+  args = sys.argv[1:]
+  if args and args[0] == '-f':
+    with Pfx(args.pop(0)):
+      if not args:
+        error("missing 'aliases'")
+        badopts = True
+      else:
+        aliases = args.pop(0)
+
+  if not args:
+    op = "list"
   else:
-    aliases = argv[1]
-    argv = argv[2:]
+    op = args.pop(0)
 
-if len(argv) < 1:
-  op = None
-else:
-  op = argv[0]
-  argv = argv[1:]
-  if op == 'new':
-    if len(argv) > 0:
-      error("extra arguments after \"%s\" operation: %s", op, " ".join(argv))
+  with Pfx(op):
+    try:
+      op_func = getattr(sys.modules[__name__], "cmd_" + op)
+    except AttributeError:
+      error("unknown operation")
       badopts = True
-  elif op == 're':
-    # regular expressions
-    if len(argv) > 0 and argv[0] == '-sh':
-      re_syntax = 'SH'
-      argv = argv[1:]
-  else:
-    error("unsupported operation \"%s\", remaining arguments: %s", op, " ".join(argv))
-    badopts = True
 
-if badopts:
-  print >>sys.stderr, usage
-  sys.exit(2)
+    if not badopts:
+      with Pfx(aliases):
+        ok, byCategory, byAddress = loadAddresses(aliases)
+        if not ok:
+          warn("some aliases failed to load")
+          xit = 1
+      cats = byCategory.keys()
+      cats.sort()
+      try:
+        xit = op_func(args)
+      except GetoptError, e:
+        error("%s", e)
+        badopts = True
 
-byCategory = {}
-byAddress = {}
-loadAddresses(aliases, catmap=byCategory, addrmap=byAddress)
-cats = byCategory.keys()
-cats.sort()
+  if badopts:
+    print >>sys.stderr, usage
+    xit = 2
 
-if op is None:
-  addrlist = []
-  for addr in byAddress:
-    A = byAddress[addr]
-    addrlist.append( (A[2], A[0]) )
-  addrlist.sort()
-  for A in addrlist:
-    print "%-23s %s" % ( ",".join(A[0]), A[1] )
-elif op == "new":
+  return xit
+
+def cmd_list(args):
+  if not args:
+    args = byAddress.keys()
+    args.sort()
+  for addr in args:
+    info = byAddress[addr]
+    print "%-23s %s" % (','.join(info.categories), info.address)
+  return 0
+
+def cmd_new(args):
+  ''' Read address information from stdin, recite new addresses on stdout.
+  '''
+  if args:
+    raise GetoptError, "extra arguments: %s" % (" ".join(args),)
+  xit = 0
   if new_syntax == 'PLAIN':
     # Raw email addresses.
     lineno = 0
     for line in sys.stdin:
       lineno+=1
-      if line[-1] != '\n':
-        error("stdin: unexpected EOF")
-        sys.exit(1)
-      addr = line[:-1].strip()
-      if len(addr) == 0:
-        continue
-      addrkey = addressKey(addr)
-      if addrkey is None:
-        error("stdin, line %d: unparsed address: %s", lineno, addr)
-        xit = 1
-      elif addrkey not in byAddress:
-        print "%s %s" % (addr, parseaddr(addr))
+      with Pfx("stdin, line %d" % (lineno,)):
+        if not line.endswith('\n'):
+          error("unexpected EOF")
+          xit = 1
+          break
+        addr = line.strip()
+        if len(addr) == 0:
+          continue
+        with Pfx("addr"):
+          addrkey = addressKey(addr)
+          if addrkey is None:
+            error("unparsed")
+            xit = 1
+          elif addrkey not in byAddress:
+            print "%s %s" % (addr, parseaddr(addr))
   elif new_syntax == 'MAILITEM':
     # A mail message.
-    M = Parser().parse(sys.stdin,True)
+    M = Parser().parse(sys.stdin, True)
     seen = []
     for hdr in 'from', 'sender', 'to', 'cc', 'bcc', 'return-path':
       for name, coreaddr in getaddresses(M.get_all(hdr,[])):
@@ -114,13 +128,16 @@ elif op == "new":
         if addrkey not in byAddress and addrkey not in seen:
           seen.append(addrkey)
           print formataddr((name,coreaddr))
-  else:
-    error("unimplemented new input syntax \"%s\"", new_syntax)
-    sys.exit(1)
-elif op == "re":
-  if len(argv) > 0:
-    cats = argv
-  for cat in cats:
+  return xit
+
+def cmd_re(args):
+  if args and args[0] == '-sh':
+    args.pop(0)
+    re_syntax = 'SH'
+  if not args:
+    args = byCategory.keys()
+    args.sort()
+  for cat in args:
     re = '\\<('+addrsRegexp(byCategory[cat].keys())+')\\>'
     if re_syntax == 'TEXT':
       print cat, re
@@ -128,10 +145,9 @@ elif op == "re":
       print "%s_%s=%s; export %s_%s" \
             % (re_prefix, cat, cs.sh.quotestr(re), re_prefix, cat)
     else:
-      error("unimplemented re syntax \"%s\", aborting", re_syntax)
-      sys.exit(1)
-else:
-  error("unimplemented operation \"%s\"", op)
-  xit = 1
+      error("unimplemented re syntax \"%s\"")
+      return 1
+  return 0
 
-sys.exit(xit)
+if __name__ == '__main__':
+  sys.exit(main(sys.argv))

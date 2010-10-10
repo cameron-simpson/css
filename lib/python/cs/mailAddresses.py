@@ -1,6 +1,10 @@
 import sys
+if sys.hexversion < 0x02060000: from sets import Set as set
+from collections import namedtuple
 from email.utils import parseaddr, getaddresses, formataddr
 from cs.logutils import Pfx, error, warn, info
+
+AddressInfo = namedtuple('AddressInfo', 'key address categories')
 
 def addressKey(addr):
   ''' Return the key value for an RFC2822 address.
@@ -48,6 +52,7 @@ def loadAddresses(addresses, catmap=None, addrmap=None):
           cats, addr = line.split(None,1)
         except ValueError:
           warn("line %d: bad syntax: %s", lineno, line)
+          ok = False
           continue
 
         if addr.startswith('mailto:'):
@@ -56,19 +61,19 @@ def loadAddresses(addresses, catmap=None, addrmap=None):
         addrkey=addressKey(addr)
         if addrkey is None:
           warn("line %d: can't parse address \"%s\"", lineno, addr)
-          continue
-
-        if addrkey in addrmap:
-          warn("line %d: repeated address \"%s\" (%s)", lineno, addr, addrkey)
+          ok = False
           continue
 
         if "@" not in addrkey:
           warn("line %d: no \"@\" in \"%s\"", lineno, addrkey)
 
-        cats.sort()
-        addrmap[addrkey]=(addr,addrkey,cats)
+        if addrkey in addrmap:
+          info = addrmap[addrkey]
+        else:
+          info = addrmap[addrkey] = AddressInfo(addrkey, addr, set())
 
+        info.categories.update(cats)
         for cat in cats:
-          catmap.setdefault(cat,{})[addrkey]=addr
+          catmap.setdefault(cat,{})[addrkey]=info
 
   return ok, catmap, addrmap
