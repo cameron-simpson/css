@@ -1,0 +1,906 @@
+changeset:   7862:e84d5a765cce
+tag:         release-20100820
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Fri Aug 20 09:42:38 2010 +1000
+files:       release/20100820/CHANGES.txt release/20100820/SUMMARY.txt release/20100820/release-tag.txt
+description:
+Release information for release-20100820.
+Summary:
+Clean up the distro a little. Assorted cs.nodedb updates. Bugfix portfwd and histbackup.
+
+
+changeset:   7863:97a99e027393
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Fri Aug 20 09:42:38 2010 +1000
+files:       .hgtags
+description:
+Added tag release-20100820 for changeset e84d5a765cce
+
+
+changeset:   7864:c4cddcccc225
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Mon Aug 30 21:54:16 2010 +1000
+files:       bin-cs/++ bin-cs/+++ bin/+++ bin/cats2procmailrc
+description:
+mail stuff updates
+
+
+changeset:   7865:efd8c5dc624c
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Wed Sep 08 11:42:29 2010 +1000
+files:       bin/histbackup
+description:
+histbackup: use .../ instead of .../. for src and dest
+
+
+changeset:   7866:5447857507e3
+parent:      7857:4d3db0d66cbf
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sun Aug 22 20:24:56 2010 +1000
+files:       lib/python/cs/nodedb/node.py
+description:
+cs.nodedb: move to singular dict keys
+
+
+changeset:   7867:a93ea16c56e3
+parent:      7861:263f0abe1b58
+parent:      7866:5447857507e3
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sun Aug 22 20:25:22 2010 +1000
+description:
+Automated merge with file:///Users/cameron/dev/css-fleet
+
+
+changeset:   7868:3c55f05751e3
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sun Aug 22 20:58:54 2010 +1000
+files:       lib/python/cs/nodedb/node.py
+description:
+cs.nodedb: update CSV dump/load for singluar keys
+
+
+changeset:   7869:7c6696eec3d1
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sun Sep 12 17:07:42 2010 +1000
+files:       lib/python/cs/threads.py
+description:
+cs.threads: whitespace changes
+
+
+changeset:   7870:4bae788c3661
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sun Sep 12 17:13:49 2010 +1000
+files:       lib/python/cs/threads.py
+description:
+cs.threads: new WorkerThreadPool to execute functions in separate threads
+
+
+changeset:   7871:468fb0792998
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sun Sep 12 17:14:52 2010 +1000
+files:       lib/python/cs/later.py
+description:
+cs.later: Later class for capacity constrained prioritised execution of functions
+
+
+changeset:   7872:7fc005645bbb
+parent:      7865:efd8c5dc624c
+parent:      7871:468fb0792998
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Mon Sep 13 14:14:50 2010 +1000
+description:
+Automated merge with ssh://home/hg/css
+
+
+changeset:   7873:67c42eb64b95
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Mon Sep 13 15:07:12 2010 +1000
+files:       bin/syncacc
+description:
+syncacc: rsync: use -i option instead of -v
+
+
+changeset:   7874:39452f552658
+parent:      7836:27725de684b6
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sat Sep 11 13:47:23 2010 +1000
+files:       lib/python/cs/lex.py
+description:
+cs.lex: add get_dqstring(s)
+
+
+changeset:   7875:439f056484b6
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sat Sep 11 20:39:53 2010 +1000
+files:       lib/python/cs/io.py
+description:
+cs.io: add contlines() generator and unit test
+
+
+changeset:   7876:3cc73a4755f1
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sat Sep 11 20:52:01 2010 +1000
+files:       lib/python/cs/hier.py lib/python/cs/io.py
+description:
+cs.io, cs.hier: obsolete ContLineFile in favour of contlines generator
+
+
+changeset:   7877:95c8cf0ebea8
+parent:      7872:7fc005645bbb
+parent:      7876:3cc73a4755f1
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Mon Sep 13 15:24:28 2010 +1000
+description:
+Automated merge with file:///Users/cameron/dev/css-fleet
+
+
+changeset:   7878:366d234ad072
+parent:      7873:67c42eb64b95
+parent:      7877:95c8cf0ebea8
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Mon Sep 13 15:25:03 2010 +1000
+description:
+Automated merge with ssh://home/hg/css
+
+
+changeset:   7879:52d9475bed3a
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Tue Sep 14 11:43:25 2010 +1000
+files:       bin/syncacc
+description:
+syncacc: use rsync's -i option to report changes
+
+
+changeset:   7880:4007579919a8
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Tue Sep 14 11:54:43 2010 +1000
+files:       lib/python/cs/hier.py lib/python/cs/io.py
+description:
+cs.hier: add loadfp function and method, add first unittest
+
+
+changeset:   7881:fd8a7056b93e
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Tue Sep 14 14:22:58 2010 +1000
+files:       lib/python/cs/later.py
+description:
+cs.later: Later: add .ppartial method to supply priority with func-with-args
+
+
+changeset:   7882:d9b933aa1d4f
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Tue Sep 14 14:26:06 2010 +1000
+files:       lib/python/cs/later.py
+description:
+cs.later: Later: split defer into defer and pdefer, like partial and ppartial
+
+
+changeset:   7883:e8a4c89762cc
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Tue Sep 14 14:26:53 2010 +1000
+files:       lib/python/cs/later.py
+description:
+cs.later: move .priority() context manager to below core methods
+
+
+changeset:   7884:47fb68e9c5ec
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Tue Sep 14 14:35:09 2010 +1000
+files:       lib/python/cs/threads.py
+description:
+cs.threads: comment FuncMultiQueue as deprecated in favour of cs.later.Later
+
+
+changeset:   7885:eff4778fa899
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Wed Sep 15 07:59:32 2010 +1000
+files:       lib/python/cs/later.py
+description:
+cs.later: return (func_result, exc_info) instead of (func_result, exc_type, exc_value, exc_traceback)
+
+
+changeset:   7886:790ed9ef36fe
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Wed Sep 15 08:00:38 2010 +1000
+files:       lib/python/cs/threads.py
+description:
+cs.threads.WorkerThreadPool: return (func_result, exc_info) instead of (func_result, exc_type, exc_value, exc_traceback)
+
+
+changeset:   7887:448ade29fba9
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Wed Sep 15 08:22:16 2010 +1000
+files:       lib/python/cs/excutils.py
+description:
+cs.excutils: new return_exception function decorator to convert a function to return (func_result, exc_info)
+
+
+changeset:   7888:3a5190528eb8
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Wed Sep 15 15:12:12 2010 +1000
+files:       lib/python/cs/threads.py
+description:
+cs.threads: WorkerThreadPool: if a function has no return queue or delivery handler, raise any exception that occurs
+
+
+changeset:   7889:2f910c59b300
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Thu Sep 16 16:12:33 2010 +1000
+files:       bin/rewriteif
+description:
+rewriteif: new option -C to require a file content change, useful for batch edits
+
+
+changeset:   7890:4d3db695e6e6
+parent:      7888:3a5190528eb8
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sun Sep 19 07:29:08 2010 +1000
+files:       bin/doit
+description:
+doit: report correct exit status on failed commands
+
+
+changeset:   7891:0384565d7cc7
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sun Sep 19 07:29:53 2010 +1000
+files:       bin-cs/syncsf bin/syncsf
+description:
+syncsf: move to bin-cs
+
+
+changeset:   7892:34fdf3d937d8
+parent:      7891:0384565d7cc7
+parent:      7889:2f910c59b300
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sun Sep 19 07:30:50 2010 +1000
+description:
+rewriteif: merge from branch
+
+
+changeset:   7893:0af695dda221
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sun Sep 19 07:48:31 2010 +1000
+files:       bin/portfwd
+description:
+portfwd: adjust control socket, adjust config clause name
+
+
+changeset:   7894:3e99d14e274c
+parent:      7889:2f910c59b300
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Thu Sep 16 20:37:53 2010 +1000
+files:       lib/python/cs/later.py
+description:
+cs.later: add report() methods to Later and LateFunction, make Later a context manager for easy closing
+
+
+changeset:   7895:9fc63f83aa31
+parent:      7894:3e99d14e274c
+parent:      7893:0af695dda221
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sun Sep 19 07:56:53 2010 +1000
+files:       bin/syncsf
+description:
+Automated merge with ssh://fleet_local/dev/css-fleet
+
+
+changeset:   7896:32c94ea26363
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Tue Sep 21 18:05:57 2010 +1000
+files:       lib/python/cs/logutils.py
+description:
+cs.logutils: add setup-Logging() for standard unix cmd line log style, make Pfx.mark a property
+
+
+changeset:   7897:9622a5f97601
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Wed Sep 22 10:33:05 2010 +1000
+files:       lib/python/cs/excutils.py
+description:
+cs.excutils: rename return_exception decorator to returns_excinfo, add bare return_excinfo function
+
+
+changeset:   7898:b3870243220c
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Wed Sep 22 10:42:03 2010 +1000
+files:       lib/python/cs/excutils.py
+description:
+cs.excutils: return_excinfo: add missing function body:-(
+
+
+changeset:   7899:076d9a1b8485
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Wed Sep 22 10:49:53 2010 +1000
+files:       lib/python/cs/excutils.py
+description:
+cs.excutils: spell exc_info better, catch all exceptions in return_exc_info
+
+
+changeset:   7900:74a6e9dbc3e1
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Wed Sep 22 10:54:03 2010 +1000
+files:       lib/python/cs/excutils.py
+description:
+cs.excutils: docstring improvments comparing return_exc_info and NoExceptions
+
+
+changeset:   7901:eb97667bf17e
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Wed Sep 22 12:40:54 2010 +1000
+files:       lib/python/cs/excutils.py
+description:
+cs.excutils: bugfix return_exc_info
+
+
+changeset:   7902:04dca94f3d16
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Wed Sep 22 12:41:36 2010 +1000
+files:       lib/python/cs/later.py
+description:
+cs.later: implement un-Thread-happy .report() methods
+
+
+changeset:   7903:f35e1c7cb2a6
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Wed Sep 22 12:43:23 2010 +1000
+files:       lib/python/cs/later.py
+description:
+cs.later: docstring grammar fix
+
+
+changeset:   7904:c7d605f13871
+parent:      7868:3c55f05751e3
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Fri Aug 27 18:13:03 2010 +1000
+files:       lib/python/cs/nodedb/node.py
+description:
+cs.nodedb.node: there is no spoon!
+
+
+changeset:   7905:fe17b78c482e
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Fri Aug 27 19:25:02 2010 +1000
+files:       lib/python/cs/nodedb/node.py
+description:
+cs.nodedb.node: returns values lists persist sanely like normal dictionaries
+
+
+changeset:   7906:5ed8f61941a2
+parent:      7903:f35e1c7cb2a6
+parent:      7905:fe17b78c482e
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Wed Sep 22 13:18:53 2010 +1000
+description:
+Automated merge with file:///Users/cameron/dev/css-fleet
+
+
+changeset:   7907:b8e6b3e2ccfd
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Wed Sep 22 13:42:15 2010 +1000
+files:       lib/python/cs/nodedb/__init__.py
+description:
+cs.nodedb.__init__.main: rework errors/logging somewhat
+
+
+changeset:   7908:1422b6b5571c
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Wed Sep 22 14:20:57 2010 +1000
+files:       lib/python/cs/nodedb/csvdb.py
+description:
+cs.nodedb.csvdb: turn off self.nodedb.readonly during db load
+
+
+changeset:   7909:e0e409347827
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Wed Sep 22 14:21:33 2010 +1000
+files:       lib/python/cs/nodedb/__init__.py lib/python/cs/nodedb/httpd.py
+description:
+cs.nodedb: basic httpd implementation, very rough
+
+
+changeset:   7910:c2bfc23b4458
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Wed Sep 22 14:54:15 2010 +1000
+files:       lib/python/cs/nodedb/node.py
+description:
+cs.nodedb.node: support dumpong specific Nodes
+
+
+changeset:   7911:d55bf40e6d8b
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Wed Sep 22 14:54:46 2010 +1000
+files:       lib/python/cs/nodedb/httpd.py
+description:
+cs.nodedb.httpd: put Node views under /node instead of /nodes, implement CSV views
+
+
+changeset:   7912:743e64480d91
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Wed Sep 22 15:38:47 2010 +1000
+files:       lib/python/cs/nodedb/node.py
+description:
+cs.nodedb.node: remove a TODO comment that's done
+
+
+changeset:   7913:8bdbd28d45f2
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Wed Sep 22 16:48:45 2010 +1000
+files:       lib/python/cs/nodedb/node.py
+description:
+cs.nodedb.node: .references() returns namedtuples, add .get0() method usually prefeable to .get() on a Node, fix varname typo
+
+
+changeset:   7914:00686135fa5e
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Wed Sep 22 16:49:46 2010 +1000
+files:       lib/python/cs/misc.py
+description:
+cs.misc: change get() optional param name
+
+
+changeset:   7915:dbeaa297b049
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Wed Sep 22 16:50:55 2010 +1000
+files:       lib/python/cs/nodedb/httpd.py
+description:
+cs.nodedb.httpd: make relhref a standalone function, collect .report() output
+
+
+changeset:   7916:a4f8768272ed
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sun Sep 26 21:21:13 2010 +1000
+files:       .hg-cs-category
+description:
+log commits to work to track for-work coding
+
+
+changeset:   7917:72c287b6c361
+parent:      7915:dbeaa297b049
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Fri Oct 01 15:45:40 2010 +1000
+files:       lib/python/cs/misc.py
+description:
+cs.misc: proper docstring for setDebug(), add return value for use by cs.logutils.setup_logging(), remove D() function entirely in favour of cs.logutils.D
+
+
+changeset:   7918:b129ce1a7e8c
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Fri Oct 01 15:46:26 2010 +1000
+files:       lib/python/cs/logutils.py
+description:
+cs.logutils: setup_logging() now gets logging level from cs.misc.setDebug(None) if passwd level=None
+
+
+changeset:   7919:c556e1cee183
+parent:      7916:a4f8768272ed
+parent:      7918:b129ce1a7e8c
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Fri Oct 01 15:47:39 2010 +1000
+description:
+Automated merge with ssh://home/hg/css
+
+
+changeset:   7920:c4a2c569bc33
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Fri Oct 01 15:56:04 2010 +1000
+files:       lib/python/cs/logutils.py
+description:
+cs.logutils: setup_logging: set cs.misc.cmd from cmd, return logging level
+
+
+changeset:   7921:cc02b3c0b393
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Fri Oct 01 16:46:31 2010 +1000
+files:       lib/python/cs/logutils.py
+description:
+cs.logutils: setup_logging: pass None to cs.misc.setDebug
+
+
+changeset:   7922:169e7c79c4f2
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Fri Oct 01 17:39:31 2010 +1000
+files:       lib/python/cs/logutils.py
+description:
+cs.logutils: completely rework the Pfx state stack
+
+
+changeset:   7923:599e7ac8feb0
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sat Oct 02 20:45:52 2010 +1000
+files:       lib/python/cs/logutils.py
+description:
+cs.logutils: fix prefix use
+
+
+changeset:   7924:0c7f6683fe72
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sat Oct 02 20:46:13 2010 +1000
+files:       lib/python/cs/configutils.py
+description:
+cs.configutils: raise KeyError, not IndexError
+
+
+changeset:   7925:288de27171af
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sun Oct 03 11:42:29 2010 +1100
+files:       lib/python/cs/threads.py
+description:
+cs.threads: streamline TimerQueue somewhat, add unit tests
+
+
+changeset:   7926:36da22776294
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sun Oct 03 11:45:20 2010 +1100
+files:       lib/python/cs/threads.py
+description:
+cs.threads: obsolete FuncMultiQueue in favour of cs.later.Later
+
+
+changeset:   7927:ecdce2b6497d
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sun Oct 03 13:05:39 2010 +1100
+files:       lib/python/cs/threads.py
+description:
+cs.threads: use an IterableQueue instead of a Channel for WorkerThreadPool to avoid race condition in .close()
+
+
+changeset:   7928:9bffad5a84b5
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sun Oct 03 13:07:24 2010 +1100
+files:       lib/python/cs/later.py
+description:
+cs.later: Later: support delayed execution of functions
+
+
+changeset:   7929:d3586bded2ff
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sun Oct 03 13:44:48 2010 +1100
+files:       lib/python/cs/threads.py
+description:
+cs.threads: give TimerQueues names
+
+
+changeset:   7930:24bce31656ed
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sun Oct 03 13:45:53 2010 +1100
+files:       lib/python/cs/later.py
+description:
+cs.later: given Laters names, add submit() and submitargs() as core methods of function submission leaving the older methods as historic convenience methods
+
+
+changeset:   7931:8b29dc338bf0
+parent:      7915:dbeaa297b049
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sun Sep 26 21:51:40 2010 +1000
+files:       lib/python/cs/alg.py
+description:
+cs.alg: collate() function
+
+
+changeset:   7932:f583aff22a73
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sun Sep 26 21:52:59 2010 +1000
+files:       lib/python/cs/fileutils.py lib/python/cs/misc.py
+description:
+move saferename to cs.fileutils
+
+
+changeset:   7933:d6eba7d5c8c2
+parent:      7932:f583aff22a73
+parent:      7916:a4f8768272ed
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Mon Oct 04 11:07:55 2010 +1100
+description:
+merge: log commits to work to track for-work coding
+
+
+changeset:   7934:cd95256d82a0
+parent:      7930:24bce31656ed
+parent:      7933:d6eba7d5c8c2
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Mon Oct 04 11:08:08 2010 +1100
+files:       lib/python/cs/misc.py
+description:
+Automated merge with ssh://home/hg/css
+
+
+changeset:   7935:6516a9173d56
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Mon Oct 04 11:10:57 2010 +1100
+files:       bin/portfwd
+description:
+portfwd: abort if no ssh-agent available
+
+
+changeset:   7936:c754607c50c7
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Mon Oct 04 11:15:12 2010 +1100
+files:       bin/portfwd
+description:
+portfwd: when looking up *-ALL, return primary clause name instead of the -ALL name
+
+
+changeset:   7937:0c1f0fbc32df
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Mon Oct 04 16:12:51 2010 +1100
+files:       lib/python/cs/cache.py lib/python/cs/csbug.py lib/python/cs/db.py lib/python/cs/gzindex.py lib/python/cs/hier.py lib/python/cs/httpsrv.py lib/python/cs/io.py lib/python/cs/lex.py lib/python/cs/logutils.py lib/python/cs/mail.py lib/python/cs/mailAddresses.py lib/python/cs/misc.py lib/python/cs/secret.py lib/python/cs/upd.py lib/python/cs/webservice.py lib/python/cs/www.py
+description:
+cs.upd: add UpdHandler to present Upd as a logger handler; hack lots of pre-logging debug stuff from cs.misc and hack many modules to match the cs.misc pruning
+
+
+changeset:   7938:e22a9da43abb
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Mon Oct 04 16:13:25 2010 +1100
+files:       bin/with-flickr
+description:
+with-flickr: cmderr -> error
+
+
+changeset:   7939:6d032677d8d6
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Mon Oct 04 17:57:44 2010 +1100
+files:       lib/python/cs/upd.py
+description:
+cs.upd: bugfix line rewriting code, use stty to learn tty width, minor UpdHandler bugfix
+
+
+changeset:   7940:8843a0b42e81
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Mon Oct 04 17:58:48 2010 +1100
+files:       lib/python/cs/logutils.py
+description:
+cs.logutils: on a tty set up an UpdHandler logger; setup_lgging() - permit omitting cmd
+
+
+changeset:   7941:e812ff9bb6b6
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Mon Oct 04 17:59:41 2010 +1100
+files:       bin/cats2procmailrc
+description:
+cats2procmailrc: port to new logging scheme and make into class based implementation
+
+
+changeset:   7942:1a2783e365fd
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Mon Oct 04 19:14:41 2010 +1100
+files:       bin/cs-aliases
+description:
+cs-aliases: cmderr->error, some whitespace
+
+
+changeset:   7943:1b4eaa27bebb
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Mon Oct 04 20:04:22 2010 +1100
+files:       bin/setvar
+description:
+setvar: port for new logging stuff
+
+
+changeset:   7944:b72f76791a55
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Mon Oct 04 20:11:31 2010 +1100
+files:       bin/setvar
+description:
+setvar: toss some debugging
+
+
+changeset:   7945:6f5553efab25
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Mon Oct 04 20:34:41 2010 +1100
+files:       bin/setvar
+description:
+setvar: remove more debug
+
+
+changeset:   7946:fd5fadd404be
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Thu Oct 07 10:47:55 2010 +1100
+files:       bin/cats2procmailrc lib/python/cs/mailAddresses.py
+description:
+cats2procmailrc: assorted fixes
+
+
+changeset:   7947:d7460a660fb5
+parent:      7894:3e99d14e274c
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Fri Oct 08 18:27:49 2010 +1100
+files:       lib/python/cs/later.py
+description:
+cs.later: Later: document `capacity` parameter, add inboundCapacity parameter
+
+
+changeset:   7948:efe94d9c941c
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Fri Oct 08 18:29:05 2010 +1100
+files:       lib/python/cs/venti/store.py
+description:
+cs.venti.store: make add/get/contains the primary methods for subclasses to override, document same
+
+
+changeset:   7949:7d53fbe6496f
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Fri Oct 08 18:36:53 2010 +1100
+files:       lib/python/cs/venti/stream.py
+description:
+cs.venti.stream: complete recode to use Later and Queues to manage multiple requests
+
+
+changeset:   7950:8a34d40c8d96
+parent:      7946:fd5fadd404be
+parent:      7949:7d53fbe6496f
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Fri Oct 08 18:45:50 2010 +1100
+files:       lib/python/cs/later.py
+description:
+resolve merge conflict
+
+
+changeset:   7951:96333d549b1e
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Fri Oct 08 20:10:47 2010 +1100
+files:       bin/vt
+description:
+vt: logging adjustments, minor tweaks
+
+
+changeset:   7952:caa08f257544
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Fri Oct 08 20:12:23 2010 +1100
+files:       lib/python/cs/logutils.py
+description:
+cs.logutils: replace cs.misc.logTo with our own, adding a logging handler
+
+
+changeset:   7953:28f5fe2af4b8
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Fri Oct 08 20:13:18 2010 +1100
+files:       lib/python/cs/venti/blockify.py
+description:
+cs.venti.blockify: debug statement change
+
+
+changeset:   7954:7500def475bd
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sat Oct 09 12:03:02 2010 +1100
+files:       bin/vt
+description:
+bin/vt: restructure command line implementation completed - more readable, more scalable, more robust
+
+
+changeset:   7955:1ea056e0757a
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sat Oct 09 12:04:28 2010 +1100
+files:       lib/python/cs/later.py
+description:
+cs.later: rename LateFunction.report to LateFunction.notify, make Later.report a global function instead of a method
+
+
+changeset:   7956:d2fce31290f8
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sat Oct 09 12:05:23 2010 +1100
+files:       lib/python/cs/logutils.py
+description:
+cs.logutils: add all logging.handlers.FileHandler to logTo()
+
+
+changeset:   7957:8e9a1cae97c2
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sat Oct 09 12:05:57 2010 +1100
+files:       lib/python/cs/venti/cache.py
+description:
+cs.venti.cache: CacheStore.sync(): update for new sync_bg() returns
+
+
+changeset:   7958:a096050d10da
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sat Oct 09 12:25:34 2010 +1100
+files:       lib/python/cs/venti/stream.py
+description:
+cs.ventistream: fix shutdown, tweak startup
+
+
+changeset:   7959:e0780c10b4f1
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sat Oct 09 12:28:52 2010 +1100
+files:       lib/python/cs/venti/stream.py
+description:
+cs.ventistream: paramater name fix
+
+
+changeset:   7960:b6cba016b50a
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sat Oct 09 12:32:49 2010 +1100
+files:       lib/python/cs/venti/blockify.py
+description:
+cs.venti.blockify: debug tweak
+
+
+changeset:   7961:4114d121bca0
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sat Oct 09 12:33:16 2010 +1100
+files:       lib/python/cs/venti/store.py
+description:
+cs.venti.store: support shh:// store URIs
+
+
+changeset:   7962:2d24537397a0
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sat Oct 09 14:19:56 2010 +1100
+files:       bin/vt
+description:
+bin/vt: handle commands not needing a context store
+
+
+changeset:   7963:2c3055ef5847
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sat Oct 09 14:33:35 2010 +1100
+files:       bin/vt lib/python/cs/venti/datafile.py
+description:
+cs.venti: fix up data file scan facility
+
+
+changeset:   7964:bdde92111e94
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sat Oct 09 15:09:20 2010 +1100
+files:       bin/vt lib/python/cs/venti/store.py
+description:
+cs.venti: cleaner store scheme names in Store() factory, rework some other error handling
+
+
+changeset:   7965:6f184e822a73
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sat Oct 09 15:48:01 2010 +1100
+files:       lib/python/cs/logutils.py
+description:
+cs.logutils: debugging tweaks
+
+
+changeset:   7966:8315743dddf4
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sat Oct 09 15:48:16 2010 +1100
+files:       bin/vt
+description:
+bin/vt: "vt init" support
+
+
+changeset:   7967:14cf1831c527
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sat Oct 09 16:28:38 2010 +1100
+files:       lib/python/cs/nodedb/httpd.py lib/python/cs/nodedb/lib-css.js lib/python/cs/nodedb/lib.js
+description:
+cs.nodedb: import JS libs (empty so far) and add readwrite hook
+
+
+changeset:   7968:250fa648d847
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sat Oct 09 20:25:22 2010 +1100
+files:       lib/js/cs/lib.js
+description:
+lib.js: whitespace changes, remove long commented out function
+
+
+changeset:   7969:6162f0b18213
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sat Oct 09 20:29:35 2010 +1100
+files:       lib/js/cs/lib.js
+description:
+lib.js: more whitespace
+
+
+changeset:   7970:7c91c6c0662c
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sun Oct 10 11:46:59 2010 +1100
+files:       lib/python/cs/logutils.py
+description:
+cs.logutils: logTo(): support logger name as well as logger instance
+
+
+changeset:   7971:e8ba7395509f
+tag:         tip
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sun Oct 10 12:51:11 2010 +1100
+files:       bin/cs-aliases lib/python/cs/mailAddresses.py
+description:
+cs-aliases, cs.mailAddresses: big restructure
+
+

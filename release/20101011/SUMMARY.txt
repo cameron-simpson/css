@@ -1,0 +1,7 @@
+cs.later.Later: equivalent to proposed futures module, as replacement for
+clunky FuncMultiQueue; cs.nodedb: change key pluraity convention, httpd
+interface for browsing the db, assorted bugfixes; cs.venti: manage _bg calls
+using Later, recode StreamStore completely, add ssh:// store URIs; cs.misc:
+obsolete a lot of old debugging stuff in favour of cs.logutils and logging;
+cs.excutils: exception handling convenince functions; cs.htreads: WorkerThreadPool for handling parallel requests; scripts: many moinor changes following
+from cs.misc debug code obsoletion
