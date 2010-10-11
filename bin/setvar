@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python2.6
 #
 # Script to compute various environment parameters.
 # Must be sourced, and defines the shell function setvar() as a consequence.
@@ -13,6 +13,7 @@
 # Python recode, syntax change, bootstrap. - cameron 23mar2008
 #
 
+from __future__ import with_statement
 from getopt import getopt, GetoptError
 import os
 import pwd
