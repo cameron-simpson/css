@@ -154,7 +154,33 @@ class _PfxThreadState(threading.local):
   def pop(self):
     return self.old.pop()
 
-class Pfx_LoggerAdapter(logging.LoggerAdapter):
+if sys.hexversion >= 0x02060000:
+  myLoggerAdapter = logging.LoggerAdapter
+else:
+  class myLoggerAdapter(object):
+    def __init__(self, L, extra):
+      self.__L = L
+      self.__extra = extra
+    # Logger methods
+    def exception(self, msg, *args, **kwargs):
+      msg, kwargs = self.process(msg, kwargs)
+      self.__L.exception(msg, *args, **kwargs)
+    def log(self, level, msg, *args, **kwargs):
+      msg, kwargs = self.process(msg, kwargs)
+      self.__L.log(level, msg, *args, **kwargs)
+    def debug(self, msg, *args, **kwargs):
+      self.log(logging.DEBUG, msg, *args, **kwargs)
+    def info(self, msg, *args, **kwargs):
+      self.log(logging.INFO, msg, *args, **kwargs)
+    def warning(self, msg, *args, **kwargs):
+      self.log(logging.WARNING, msg, *args, **kwargs)
+    warn = warning
+    def error(self, msg, *args, **kwargs):
+      self.log(logging.ERROR, msg, *args, **kwargs)
+    def critical(self, msg, *args, **kwargs):
+      self.log(logging.CRITICAL, msg, *args, **kwargs)
+
+class Pfx_LoggerAdapter(myLoggerAdapter):
   def process(self, msg, kwargs):
     prefix = _prefix.prefix
     if len(prefix) > 0:
