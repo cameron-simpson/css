@@ -49,7 +49,7 @@ do
 
   ocfg=$TMPDIR/delif.$$
   case "$os" in
-    OpenBSD)
+    OpenBSD|FreeBSD)
       ifconfig -A >"$ocfg"
       $trace ifconfig "$iface" -alias "$ipaddr" || xit=1
       ifconfig -a | diff -u "$ocfg" -
