@@ -90,7 +90,7 @@ do
   for ipaddr
   do
     case "$os" in
-      OpenBSD|Darwin)
+      OpenBSD|Darwin|FreeBSD)
 	# no silly :n logical interfaces for BSD!
 	( set -x; $trace ifconfig "$baseif" alias "$ipaddr" netmask "$netmask" ) || xit=1
 	;;
