@@ -10,6 +10,7 @@ if sys.hexversion < 0x02060000:
 else:
   import json
 import itertools
+from getopt import GetoptError
 from thread import allocate_lock
 from threading import Thread
 from types import StringTypes
@@ -18,7 +19,7 @@ import unittest
 from cs.lex import str1
 from cs.misc import the, get0
 from cs.mappings import parseUC_sAttr
-from cs.logutils import Pfx, error, warn, info
+from cs.logutils import Pfx, error, warn, info, debug
 
 # regexp to match TYPE:name
 re_NODEREF = re.compile(r'([A-Z]+):([^:#]+)')
