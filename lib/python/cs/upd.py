@@ -1,4 +1,5 @@
 from __future__ import with_statement
+from thread import allocate_lock
 import threading
 from contextlib import contextmanager
 import atexit
@@ -35,13 +36,15 @@ class UpdHandler(StreamHandler):
     StreamHandler.__init__(self, strm)
     self.__upd = Upd(strm)
     self.__nlLevel = nlLevel
+    self.__lock = allocate_lock()
 
   def emit(self, logrec):
-    if logrec.levelno >= self.__nlLevel:
-      with self.__upd._withoutContext():
-        StreamHandler.emit(self, logrec)
-    else:
-      self.__upd.out(logrec.getMessage())
+    with self.__lock:
+      if logrec.levelno >= self.__nlLevel:
+        with self.__upd._withoutContext():
+          StreamHandler.emit(self, logrec)
+      else:
+        self.__upd.out(logrec.getMessage())
 
   def flush(self):
     if self.__upd._backend:
