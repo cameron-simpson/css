@@ -22,6 +22,12 @@ atexit.register(cleanupAtExit)
 class UpdHandler(StreamHandler):
 
   def __init__(self, strm=None, nlLevel=None):
+    ''' Initialise the UpdHandler.
+        `strm` is the output stream, default sys.stderr.
+        `nlLevel` is the logging level at which conventional line-of-text
+        output is written; log messages of a lower level go via the
+        update-the-current-line method. Default is logging.WARNING.
+    '''
     if strm is None:
       strm = sys.stderr
     if nlLevel is None:
