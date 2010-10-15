@@ -7,7 +7,7 @@
 prefix=$1; shift
 
 PATH=$prefix/bin:$PATH
-MANPATH=$prefix/man:$prefix/share/man:$MANPATH
+MANPATH=$prefix/man:$prefix/share/man:${MANPATH:-/usr/man:/usr/share/man}
 export PATH MANPATH
 
 exec "$@"
