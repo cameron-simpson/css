@@ -1,0 +1,66 @@
+#!/bin/sh
+#
+# Batch multitail: generate and run a multlitail to watch multiple logs
+# in multiple subwindows.
+#       - Cameron Simpson <cs@zip.com.au> 16oct2010
+# 
+
+cmd=$0
+usage="Usage: $cmd [multitail-args...] <logfiles
+  Example args:
+    -s 2        Split screen into 2 vertical columns."
+
+set -ue
+
+set -- multitail ${1+"$@"}
+
+ok=1
+files=
+ohost=
+
+# multitail -t FOO1 -l 'sshto j11 tail -F /var/log/messages' -t FOO2 -l 'sshto c1 tail -F /var/log/messages'
+while read line
+do
+  case "$line" in
+    '' | \#* )
+      ;;
+    [A-Z]*)
+      if [ -n "$files" ]
+      then
+        set -- "$@" -l "sshx '$host' tail -F $files"
+        ohost=
+        files=
+      fi
+      title=$line
+      set -- "$@" -t "$title"
+      ;;
+    [a-z]*:/*)
+      host=`expr "x$line" : 'x\([^:]*\):/.*'`
+      file=`expr "x$line" : 'x[^:]*:\(/.*\)'`
+      if [ -n "$files" -a "$host" != "$ohost" ]
+      then
+        set -- "$@" -l "sshx '$host' tail -F $files"
+        ohost=
+        files=
+      fi
+      files="$files $file"
+      ohost=$host
+      ;;
+    *)
+      echo "$cmd: unsupported config line: $line" >&2
+      ok=
+      ;;
+  esac
+done
+
+if [ -n "$files" ]
+then
+  set -- "$@" -l "sshx '$host' tail -F $files"
+  ohost=
+  files=
+fi
+
+[ $ok ] || exit 1
+
+set -x
+exec "$@"
