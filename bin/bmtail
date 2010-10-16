@@ -6,11 +6,32 @@
 # 
 
 cmd=$0
-usage="Usage: $cmd [multitail-args...] <logfiles
+usage="Usage: $cmd logfilelist [multitail-args...]
   Example args:
     -s 2        Split screen into 2 vertical columns."
 
 set -ue
+
+badopts=
+
+if [ $# = 0 ]
+then
+  echo "$cmd: missing logfilelist" >&2
+  badopts=1
+else
+  logfilelist=$1
+  shift
+  [ -s "$logfilelist" ] \
+  || { echo "$cmd: $logfilelist: expected non-empty file" >&2
+       badopts=1
+     }
+fi
+
+[ -t 0 ] || { echo "$cmd: multitail likes stdin to be a tty" >&2
+              badopts=1
+            }
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
 
 set -- multitail ${1+"$@"}
 
@@ -51,7 +72,7 @@ do
       ok=
       ;;
   esac
-done
+done <"$logfilelist"
 
 if [ -n "$files" ]
 then
