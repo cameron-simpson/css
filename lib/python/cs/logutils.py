@@ -59,7 +59,7 @@ def infer_logging_level():
   if sys.stderr.isatty():
     level = logging.INFO
   env = os.environ.get('DEBUG', '')
-  if env != "0":
+  if env != '' and env != '0':
     level = logging.DEBUG
     env = env.upper()
     if env == 'DEBUG':
