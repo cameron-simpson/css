@@ -11,7 +11,7 @@
 #
 # =head1 SYNOPSIS
 #
-# cats2procmailrc [B<-a> I<alert>] [B<-A> I<addresses>] [B<-d> I<dirpath>] [B<-D> I<subst>B<=>I<val>] [B<-L>] [B<-m> I<maildomains>] [-S] [B<-t> I<type>] [B<-T>] [LOG=value] [category-files...] E<gt>procmailrc
+# cats2procmailrc [B<-a> I<alert>] [B<-A> I<addresses>] [B<-C>] [B<-d> I<dirpath>] [B<-D> I<subst>B<=>I<val>] [B<-L>] [B<-m> I<maildomains>] [-S] [B<-t> I<type>] [B<-T>] [LOG=value] [category-files...] E<gt>procmailrc
 #
 # =head1 DESCRIPTION
 #
@@ -52,6 +52,13 @@
 #
 # and define macros named B<re_>I<cat> for each category
 # that contain regexps to match all the addresses in each category I<cat>.
+#
+# =item B<-C>
+#
+# Continue mode.
+# Alters the semantics of the generated rules.
+# Default mode is to stop filing when a matching rule is found unless it commences with a "+".
+# In continue mode, file continues after a rule match unless the rule commences with an "=".
 #
 # =item B<-d> I<dirpath>
 #
@@ -294,7 +301,7 @@ import re
 if sys.hexversion < 0x02060000: from sets import Set as set
 import cs.misc
 from cs.mailAddresses import loadAddresses, addrsRegexp
-from cs.logutils import setup_logging, Pfx, error, info
+from cs.logutils import setup_logging, Pfx, error, warn, info
 
 assign_re=re.compile(r'[a-z]\w+=', re.I)
 target_re=re.compile(r'("[^"]*"|[^",\s]+)')
@@ -304,15 +311,16 @@ def main(argv):
   setup_logging()
   cmd = cs.misc.cmd
 
-  trackRules=True         # add X-Cats2Procmailrc line to show rule
-  useXLabel=False         # put tag in X-Label header instead of subject
-  alertComand=None        # command to display alerts
-  dfltType='UNIX'         # UNIX mbox folders by default
-  dfltDomains=()          # default email domain
-  includePath=()          # where else to look for relative included files
-  substitutions={}        # replace {{foo}} in rules
-  syncRules=False         # let procmail be fork happy on continue/copy rules
-  logline=None            # optional LOG= line for recipes
+  trackRules=True       # add X-Cats2Procmailrc line to show rule
+  useXLabel=False       # put tag in X-Label header instead of subject
+  alertComand=None      # command to display alerts
+  dfltType='UNIX'       # UNIX mbox folders by default
+  dfltDomains=()        # default email domain
+  includePath=()        # where else to look for relative included files
+  substitutions={}      # replace {{foo}} in rules
+  syncRules=False       # let procmail be fork happy on continue/copy rules
+  logline=None          # optional LOG= line for recipes
+  modeContinue=False    # stop filing on rule match
 
   # cats2procmailrc [B<-a> I<alert>] [B<-d> I<dirpath>] [B<-D> I<subst>B<=>I<val>] [B<-L>] [B<-m> I<maildomains>] [-S] [B<-t> I<type>] [B<-T>] [LOG=value] [category-files...] E<gt>procmailrc
   usage='''Usage: %s [-a alert] [-d dir] [-D subst=val] [-L] [-m domains] [-S] \\
@@ -321,6 +329,7 @@ def main(argv):
           -a alert        Command line to generate the alert.
                           The mail item is present on standard input.
           -A addresses    Read address categories from file, make category macros.
+          -C              Continue mode: continue filing after matching rule.
           -d dirpath      Look for relative included files in these directories.
           -D subst=val    Add a macro definition just as $CATS2PROCMAILRC_subst=val does.
           -L              Use X-Label: header instead of Subject: for tag.
@@ -341,7 +350,7 @@ def main(argv):
   opts=()
   argv=sys.argv[1:]
   try:
-    opts, argv = getopt(argv, 'a:A:d:D:Lm:St:T')
+    opts, argv = getopt(argv, 'a:A:Cd:D:Lm:St:T')
   except GetoptError, e:
     error("bad options: %s", e)
     badopts=True
@@ -362,6 +371,8 @@ def main(argv):
         ##print >>sys.stderr, "re[%s]=%s" % (cat, retext)
         assert not retext.startswith('\<') and not retext.endswith('\>')
         substitutions["re_%s" % cat]='\\<('+retext+')\\>'
+    elif opt == '-C':
+      modeContinue=True
     elif opt == '-d':
       includePath=arg.split(':')
     elif opt == '-D':
@@ -411,7 +422,7 @@ def main(argv):
 
   xit=0
 
-  conv = C2P(logline, trackRules, useXLabel, dfltType, alertCommand, syncRules, dfltDomains, substitutions, includePath)
+  conv = C2P(logline, trackRules, useXLabel, dfltType, alertCommand, syncRules, dfltDomains, substitutions, includePath, modeContinue)
   for arg in argv:
     if arg == '-':
       if not conv.c2p(sys.stdin, sys.stdout):
@@ -468,7 +479,7 @@ def quotestr(s):
 
 class C2P(object):
 
-  def __init__(self, logline, trackRules, useXLabel, dfltType, alertCommand, syncRules, dfltDomains, substitutions, includePath):
+  def __init__(self, logline, trackRules, useXLabel, dfltType, alertCommand, syncRules, dfltDomains, substitutions, includePath, modeContinue):
     self.logline = logline
     self.trackRules = trackRules
     self.useXLabel = useXLabel
@@ -486,6 +497,7 @@ class C2P(object):
       curly_re=re.compile(curly)
     self.curly_re = curly_re
     self.includePath = includePath
+    self.modeContinue = modeContinue
 
   def c2p(self, ifp, ofp):
     global assign_re, target_re, hdrlist_re
@@ -585,12 +597,18 @@ class C2P(object):
 
           # a cats2procmailrc rule!
           doAlert=False
-          doContinue=False
-          while line[0] in ('!','+'):
+          doContinue=self.modeContinue
+          while line[0] in ('!','+','='):
             if line[0] == '!':
               doAlert=True
             elif line[0] == '+':
               doContinue=True
+              if self.modeContinue:
+                warn("redundant '+' in continue mode")
+            elif line[0] == '=':
+              doContinue=False
+              if not self.modeContinue:
+                warn("redundant '=' in first match mode")
             else:
               assert "unhandled !/+ flag: "+line[0]
             line=line[1:]
@@ -681,6 +699,7 @@ class C2P(object):
             ofp.write('{\n');
 
             if doContinue:
+              ofp.write(' DEFAULT=/dev/null\n')
               ofp.write(' :0c')
               if self.syncRules:
                 ofp.write(':.lock-global-procmail')
