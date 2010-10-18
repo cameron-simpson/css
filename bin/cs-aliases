@@ -11,6 +11,7 @@ from os import environ
 import os.path
 from email.parser import Parser
 from email.utils import getaddresses, formataddr
+from getopt import GetoptError
 import cs.sh
 from cs.mailAddresses import addressKey, loadAddresses, addrsRegexp
 from cs.logutils import setup_logging, error, Pfx, warn
@@ -131,6 +132,7 @@ def cmd_new(args):
   return xit
 
 def cmd_re(args):
+  global re_syntax
   if args and args[0] == '-sh':
     args.pop(0)
     re_syntax = 'SH'
