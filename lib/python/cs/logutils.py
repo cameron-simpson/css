@@ -14,6 +14,8 @@ import threading
 import traceback
 import cs.misc
 
+logging_level = logging.INFO
+
 def setup_logging(cmd=None, format=None, level=None):
   ''' Arrange basic logging setup for conventional UNIX command
       line error messaging.
@@ -40,6 +42,7 @@ def setup_logging(cmd=None, format=None, level=None):
     rootLogger.addHandler(upd)
   else:
     logging.basicConfig(level=level, format=format)
+  logging_level = level
   return level
 
 def infer_logging_level():
