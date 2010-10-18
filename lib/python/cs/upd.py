@@ -55,7 +55,7 @@ class Upd(object):
   def __init__(self, backend, columns=None):
     assert backend is not None
     if columns is None:
-      columns = 78
+      columns = 80
       if backend.isatty():
         P=Popen(['stty', '-a'], stdin=backend, stdout=PIPE)
         stty=P.stdout.read()
@@ -65,6 +65,8 @@ class Upd(object):
         for f in fields:
           if f.endswith(' columns'):
             columns = int(f[:-8])
+          elif f.startswith("columns "):
+            columns = int(f[8:])
     self._backend=backend
     self.columns = columns
     self._state=''
