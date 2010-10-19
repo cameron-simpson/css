@@ -194,7 +194,7 @@ $summary_text" "$reldir"
       echo
       printf "%s\n" "$summary"
     ) \
-    | $trace freshmeat-submit -V
+    | $trace freshmeat-submit
     ;;
 
   *)echo "$cmd: unimplemented op \"$op\"" >&2
