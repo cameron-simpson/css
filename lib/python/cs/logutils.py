@@ -16,12 +16,15 @@ import cs.misc
 
 logging_level = logging.INFO
 
-def setup_logging(cmd=None, format=None, level=None):
+def setup_logging(cmd=None, format=None, level=None, upd_mode=None):
   ''' Arrange basic logging setup for conventional UNIX command
       line error messaging.
       Sets cs.misc.cmd to `cmd`.
-      If level is None, infer a level from the environment using
+      If `format` is None, set format to "cmd: levelname: message".
+      If `level` is None, infer a level from the environment using
       infer_logging_level().
+      If `upd_mode` is None, set it from sys.stderr.isatty().
+      A true value causes the root logger to use cs.upd for logging.
       Returns the logging level.
   '''
   if cmd is None:
@@ -32,8 +35,9 @@ def setup_logging(cmd=None, format=None, level=None):
     format = cmd.replace('%','%%')+': %(levelname)s: %(message)s'
   if level is None:
     level = infer_logging_level()
-  # TODO: if sys.sderr.isatty: setupUpd(), set main handler to UpdHandler
-  if sys.stderr.isatty():
+  if upd_mode is None:
+    upd_mode = sys.stderr.isatty()
+  if upd_mode:
     from cs.upd import UpdHandler
     rootLogger = logging.getLogger()
     rootLogger.setLevel(level)
