@@ -120,12 +120,17 @@ def logException(exc_type, exc_value, exc_tb):
     sys.excepthook = curhook
 
 class _PfxThreadState(threading.local):
+  ''' _PfxThreadState is a thread local class to track Pfx stack state.
+  '''
+
   def __init__(self):
     self.raise_needs_prefix = False
     self.old = []
 
   @property
   def cur(self):
+    ''' .cur is the current/topmost Pfx instance.
+    '''
     if not self.old:
       self.push(Pfx(cs.misc.cmd))
     return self.old[-1]
@@ -145,15 +150,21 @@ class _PfxThreadState(threading.local):
     return ': '.join(marks)
 
   def push(self, P):
+    ''' Push a new Pfx instance onto the stack.
+    '''
     self.old.append(P)
 
   def pop(self):
+    ''' Pop a Pfx instance from the stack.
+    '''
     return self.old.pop()
 
 if sys.hexversion >= 0x02060000:
   myLoggerAdapter = logging.LoggerAdapter
 else:
   class myLoggerAdapter(object):
+    ''' A LoggerAdaptor implementation for pre-2.6 Pythons.
+    '''
     def __init__(self, L, extra):
       self.__L = L
       self.__extra = extra
