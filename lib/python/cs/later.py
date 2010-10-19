@@ -195,7 +195,7 @@ class Later(object):
       latefunc = pri_entry[-1]
       latefunc._dispatch()
 
-  def submit(self, func, priority=None, delay=None, when=None):
+  def submit(self, func, priority=None, delay=None, when=None, pfx=None):
     ''' Submit a function for later dispatch.
         Return the corresponding LateFunction for result collection.
 	If the parameter `priority` not None then use it as the priority
@@ -205,6 +205,8 @@ class Later(object):
         If the parameter `when` is not None, delay consideration of
         this function until the time `when`.
         It is an error to specify both `when` and `delay`.
+        If the parameter `pfx` is not None, submit pfx.func(func);
+          see cs.logutils.Pfx's .func method for details.
     '''
     assert delay is None or when is None, \
            "you can't specify both delay= and when= (%s, %s)" % (delay, when)
@@ -212,6 +214,8 @@ class Later(object):
       priority = self._priority
     elif type(priority) is int:
       priority = (priority,)
+    if pfx is not None:
+      func = pfx.func(func)
     LF = LateFunction(self, func)
     pri_entry = list(priority)
     pri_entry.append(seq())     # ensure FIFO servicing of equal priorities

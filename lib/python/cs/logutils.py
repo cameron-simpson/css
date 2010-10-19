@@ -234,6 +234,18 @@ class Pfx(object):
     self._loggers = newLoggers
     self._loggerAdapters = None
 
+  def func(self, func, *a, **kw):
+    ''' Return a function that will run the supplied function `func`
+        within a surrounding Pfx context with the current mark string.
+	This is intended for deferred call facilities like
+	WorkerThreadPool, Later, and futures.
+    '''
+    pfx2 = Pfx(self.mark, absolute=True, loggers=self.loggers)
+    def pfxfunc():
+      with pfx2:
+        return func(*a, **kw)
+    return pfxfunc
+
   @property
   def loggers(self):
     if self._loggerAdapters is None:
