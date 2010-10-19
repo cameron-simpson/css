@@ -114,17 +114,17 @@ class LateFunction(object):
       self._join_cond.wait()
       assert self.done
 
-  def notify(self, notify):
-    ''' After the function completes, run notify(self).
+  def notify(self, notifier):
+    ''' After the function completes, run notifier(self).
         If the function has already completed this will happen immediately.
         Note: if you'd rather `self` got put on some Queue `Q`, supply `Q.put`.
     '''
     with self._join_lock:
       if not self.done:
-        self._join_notifiers.append(notify)
-        notify = None
-    if notify is not None:
-      notify(self)
+        self._join_notifiers.append(notifier)
+        notifier = None
+    if notifier is not None:
+      notifier(self)
 
 class Later(object):
   ''' A management class to queue function calls for later execution.
