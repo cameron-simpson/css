@@ -180,17 +180,21 @@ $summary_text" "$reldir"
     eval `winclausevars "$cf" freshmeat fm`
     lastrelease=`$trace "$0" last`
     [ -n "$lastrelease" ] || exit 1
-    summary=`$trace cat release-$lastrelease/SUMMARY.txt`
+    summary=`$trace cat release/$lastrelease/SUMMARY.txt`
     [ -n "$summary" ] || exit 1
     printf "%s\n" "$summary"
     ask "Confirm freshmeat-submit of release $lastrelease to project $fm_project"
-    $trace freshmeat-submit \
-                         -p "$fm_project" -v "$lastrelease" \
-                         -x Y -c "$summary" -r 4 \
-                         -H "$fm_url_home" \
-                         -G "$fm_url_tarball" \
-                         -C "$fm_url_changelog" \
-           </dev/null
+    ( echo "Project: $fm_project"
+      echo "Version: $lastrelease"
+      echo "Release-Focus: Minor feature enhancements"
+      echo "Hide: N"
+      echo "Website-URL: $fm_url_home"
+      echo "Tar/GZ-URL: $fm_url_tarball"
+      echo "Changelog-URL: $fm_url_changelog"
+      echo
+      printf "%s\n" "$summary"
+    ) \
+    | $trace freshmeat-submit -V
     ;;
 
   *)echo "$cmd: unimplemented op \"$op\"" >&2
