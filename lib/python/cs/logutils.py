@@ -16,12 +16,15 @@ import cs.misc
 
 logging_level = logging.INFO
 
-def setup_logging(cmd=None, format=None, level=None):
+def setup_logging(cmd=None, format=None, level=None, upd_mode=None):
   ''' Arrange basic logging setup for conventional UNIX command
       line error messaging.
       Sets cs.misc.cmd to `cmd`.
-      If level is None, infer a level from the environment using
+      If `format` is None, set format to "cmd: levelname: message".
+      If `level` is None, infer a level from the environment using
       infer_logging_level().
+      If `upd_mode` is None, set it from sys.stderr.isatty().
+      A true value causes the root logger to use cs.upd for logging.
       Returns the logging level.
   '''
   if cmd is None:
@@ -32,8 +35,9 @@ def setup_logging(cmd=None, format=None, level=None):
     format = cmd.replace('%','%%')+': %(levelname)s: %(message)s'
   if level is None:
     level = infer_logging_level()
-  # TODO: if sys.sderr.isatty: setupUpd(), set main handler to UpdHandler
-  if sys.stderr.isatty():
+  if upd_mode is None:
+    upd_mode = sys.stderr.isatty()
+  if upd_mode:
     from cs.upd import UpdHandler
     rootLogger = logging.getLogger()
     rootLogger.setLevel(level)
@@ -88,8 +92,8 @@ def logTo(filename, logger=None, mode='a', encoding=None, delay=False):
       If `logger` is supplied and not None, add the FileHandler to that
       Logger, otherwise to the root Logger. If `logger` is a string, call
       logging.getLogger(logger) to obtain the logger.
-      `mode`, `encoding` and `delay` are passed to the
-      logging.FileHandler initialiser.
+      `mode`, `encoding` and `delay` are passed to the logging.FileHandler
+      initialiser.
   '''
   if logger is None:
     logger = logging.getLogger()
@@ -101,16 +105,6 @@ def logTo(filename, logger=None, mode='a', encoding=None, delay=False):
 class NullHandler(logging.Handler):
   def emit(self, record):
     pass
-
-##''' Convenience do-nothing logging handler as suggested by:
-##      http://docs.python.org/library/logging.html#configuring-logging-for-a-library
-##'''
-##nullHandler = NullHandler()
-##
-##''' Top level logger for the cs library. Presently unused!
-##'''
-##logger = logging.getLogger("cs")
-##logger.addHandler(nullHandler)
 
 __logExLock = allocate_lock()
 def logException(exc_type, exc_value, exc_tb):
@@ -126,12 +120,17 @@ def logException(exc_type, exc_value, exc_tb):
     sys.excepthook = curhook
 
 class _PfxThreadState(threading.local):
+  ''' _PfxThreadState is a thread local class to track Pfx stack state.
+  '''
+
   def __init__(self):
     self.raise_needs_prefix = False
     self.old = []
 
   @property
   def cur(self):
+    ''' .cur is the current/topmost Pfx instance.
+    '''
     if not self.old:
       self.push(Pfx(cs.misc.cmd))
     return self.old[-1]
@@ -151,15 +150,21 @@ class _PfxThreadState(threading.local):
     return ': '.join(marks)
 
   def push(self, P):
+    ''' Push a new Pfx instance onto the stack.
+    '''
     self.old.append(P)
 
   def pop(self):
+    ''' Pop a Pfx instance from the stack.
+    '''
     return self.old.pop()
 
 if sys.hexversion >= 0x02060000:
   myLoggerAdapter = logging.LoggerAdapter
 else:
   class myLoggerAdapter(object):
+    ''' A LoggerAdaptor implementation for pre-2.6 Pythons.
+    '''
     def __init__(self, L, extra):
       self.__L = L
       self.__extra = extra
@@ -228,6 +233,18 @@ class Pfx(object):
     '''
     self._loggers = newLoggers
     self._loggerAdapters = None
+
+  def func(self, func, *a, **kw):
+    ''' Return a function that will run the supplied function `func`
+        within a surrounding Pfx context with the current mark string.
+	This is intended for deferred call facilities like
+	WorkerThreadPool, Later, and futures.
+    '''
+    pfx2 = Pfx(self.mark, absolute=True, loggers=self.loggers)
+    def pfxfunc():
+      with pfx2:
+        return func(*a, **kw)
+    return pfxfunc
 
   @property
   def loggers(self):

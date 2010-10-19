@@ -42,16 +42,20 @@ class WorkerThreadPool(object):
     for H, HQ in self.all:
       H.join()
 
-  def dispatch(self, func, retq=None, deliver=None):
+  def dispatch(self, func, retq=None, deliver=None, pfx=None):
     ''' Dispatch the callable `func` in a separate thread.
         On completion the result is the sequence:
           func_result, None, None, None
         On an exception the result is the sequence:
           None, exec_type, exc_value, exc_traceback
-        If retq is not None, the result is .put() on retq.
-        If deliver is not None, deliver(result) is called.
+        If `retq` is not None, the result is .put() on retq.
+        If `deliver` is not None, deliver(result) is called.
+        If the parameter `pfx` is not None, submit pfx.func(func);
+          see cs.logutils.Pfx's .func method for details.
     '''
     assert not self.closed
+    if pfx is not None:
+      func = pfx.func(func)
     idle = self.idle
     if idle:
       # use an idle thread

@@ -114,17 +114,17 @@ class LateFunction(object):
       self._join_cond.wait()
       assert self.done
 
-  def notify(self, notify):
-    ''' After the function completes, run notify(self).
+  def notify(self, notifier):
+    ''' After the function completes, run notifier(self).
         If the function has already completed this will happen immediately.
         Note: if you'd rather `self` got put on some Queue `Q`, supply `Q.put`.
     '''
     with self._join_lock:
       if not self.done:
-        self._join_notifiers.append(notify)
-        notify = None
-    if notify is not None:
-      notify(self)
+        self._join_notifiers.append(notifier)
+        notifier = None
+    if notifier is not None:
+      notifier(self)
 
 class Later(object):
   ''' A management class to queue function calls for later execution.
@@ -195,7 +195,7 @@ class Later(object):
       latefunc = pri_entry[-1]
       latefunc._dispatch()
 
-  def submit(self, func, priority=None, delay=None, when=None):
+  def submit(self, func, priority=None, delay=None, when=None, pfx=None):
     ''' Submit a function for later dispatch.
         Return the corresponding LateFunction for result collection.
 	If the parameter `priority` not None then use it as the priority
@@ -205,6 +205,8 @@ class Later(object):
         If the parameter `when` is not None, delay consideration of
         this function until the time `when`.
         It is an error to specify both `when` and `delay`.
+        If the parameter `pfx` is not None, submit pfx.func(func);
+          see cs.logutils.Pfx's .func method for details.
     '''
     assert delay is None or when is None, \
            "you can't specify both delay= and when= (%s, %s)" % (delay, when)
@@ -212,6 +214,8 @@ class Later(object):
       priority = self._priority
     elif type(priority) is int:
       priority = (priority,)
+    if pfx is not None:
+      func = pfx.func(func)
     LF = LateFunction(self, func)
     pri_entry = list(priority)
     pri_entry.append(seq())     # ensure FIFO servicing of equal priorities
