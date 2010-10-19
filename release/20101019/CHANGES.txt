@@ -1,0 +1,265 @@
+changeset:   7972:18c69be16851
+tag:         release-20101011
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Mon Oct 11 19:27:30 2010 +1100
+files:       release/20101011/CHANGES.txt release/20101011/SUMMARY.txt release/20101011/release-tag.txt
+description:
+Release information for release-20101011.
+Summary:
+cs.later.Later: equivalent to proposed futures module, as replacement for
+clunky FuncMultiQueue; cs.nodedb: change key pluraity convention, httpd
+interface for browsing the db, assorted bugfixes; cs.venti: manage _bg calls
+using Later, recode StreamStore completely, add ssh:// store URIs; cs.misc:
+obsolete a lot of old debugging stuff in favour of cs.logutils and logging;
+cs.excutils: exception handling convenince functions; cs.htreads: WorkerThreadPool for handling parallel requests; scripts: many moinor changes following
+from cs.misc debug code obsoletion
+
+
+changeset:   7973:ebdffb246643
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Mon Oct 11 19:27:31 2010 +1100
+files:       .hgtags
+description:
+Added tag release-20101011 for changeset 18c69be16851
+
+
+changeset:   7974:e5286d0c2395
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Mon Oct 11 20:18:07 2010 +1100
+files:       bin/setvar
+description:
+setvar: use python2.6, add from __future__ import with_statement
+
+
+changeset:   7975:cbd8fb6f88c8
+parent:      7936:c754607c50c7
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Fri Oct 15 08:07:16 2010 +1100
+files:       lib/python/cs/logutils.py
+description:
+cs.logutils: roll my own LoggerAdaptor for pre-2.6 pythons
+
+
+changeset:   7976:c7fa70ecb633
+parent:      7974:e5286d0c2395
+parent:      7975:cbd8fb6f88c8
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Fri Oct 15 08:07:32 2010 +1100
+files:       lib/python/cs/logutils.py
+description:
+Automated merge with file:///Users/cameron/dev/css-fleet
+
+
+changeset:   7977:d4b32c6dae18
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Fri Oct 15 08:12:31 2010 +1100
+files:       bin/setvar
+description:
+setvar: needs only python2.5, not 2.6
+
+
+changeset:   7978:d6dafca13f2e
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Fri Oct 15 11:42:07 2010 +1100
+files:       bin/addif
+description:
+addif: FreeBSD support, just like OpenBSD
+
+
+changeset:   7979:d789ef405884
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Fri Oct 15 11:42:49 2010 +1100
+files:       bin/delif
+description:
+delif: treat FreeBSD as we treat OpenBSD
+
+
+changeset:   7980:91d9203c6787
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Fri Oct 15 15:37:58 2010 +1100
+files:       lib/python/cs/upd.py
+description:
+cs.upd: docstring
+
+
+changeset:   7981:cea4254385f9
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Fri Oct 15 16:15:58 2010 +1100
+files:       lib/python/cs/upd.py
+description:
+cs.upd: default to 78 column crop
+
+
+changeset:   7982:8f97bdf7ad80
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Fri Oct 15 16:25:12 2010 +1100
+files:       lib/python/cs/upd.py
+description:
+cs.upd: mutex for UpdHandler.emit() to cope with multiple threads
+
+
+changeset:   7983:e5f1b9889f5a
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Fri Oct 15 21:00:40 2010 +1100
+files:       bin/with-prefix
+description:
+with-prefix: cope with no $MANPATH
+
+
+changeset:   7984:a615574442ff
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sun Oct 17 09:16:54 2010 +1100
+files:       lib/python/cs/logutils.py
+description:
+cs.logutils: bugfix \$DEBUG envvar check
+
+
+changeset:   7985:7a848fbf0ad7
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sun Oct 17 10:25:13 2010 +1100
+files:       bin/bmtail
+description:
+bmtail: batch multitail - start a multitail based on a file specifying (remote) logfiles
+
+
+changeset:   7986:7655fe2d6011
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sun Oct 17 10:25:28 2010 +1100
+files:       bin/bmtail
+description:
+bin/bmtail: chmod 755
+
+
+changeset:   7987:ed87f0c7e0a4
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sun Oct 17 10:32:46 2010 +1100
+files:       bin/bmtail
+description:
+bmtail: get logfilelist from command line, make sure stdin is a tty
+
+
+changeset:   7988:426145be78ff
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Mon Oct 18 13:21:36 2010 +1100
+files:       bin-cs/imm
+description:
+imm: open IBM Integrated Management Module HTTP interface
+
+
+changeset:   7989:a7b92dc9a40a
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Mon Oct 18 16:18:25 2010 +1100
+files:       bin/cats2procmailrc
+description:
+cats2procmailrc: add -C for "continue mode"
+
+
+changeset:   7990:a670be8fe50b
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Mon Oct 18 16:24:45 2010 +1100
+files:       bin/cs-aliases
+description:
+cs-aliases: small bugfixes
+
+
+changeset:   7991:19897b2dc77e
+parent:      7987:ed87f0c7e0a4
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Mon Oct 18 17:13:17 2010 +1100
+files:       lib/python/cs/logutils.py
+description:
+cs.logutils: publish setup log level as cs.logutils.logging_level
+
+
+changeset:   7992:5b9c0f387b3a
+parent:      7990:a670be8fe50b
+parent:      7991:19897b2dc77e
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Mon Oct 18 17:13:37 2010 +1100
+description:
+Automated merge with ssh://home/hg/css
+
+
+changeset:   7993:0068c24569a3
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Mon Oct 18 17:24:07 2010 +1100
+files:       lib/python/cs/logutils.py
+description:
+cs.logutils: lotTo(): FileHandler comes from logging, not logging.handlers
+
+
+changeset:   7994:14d94c6828cd
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Mon Oct 18 18:43:48 2010 +1100
+files:       lib/python/cs/upd.py
+description:
+cs.upd: handle "stty -a" output on OSX and hopefully other BSDs
+
+
+changeset:   7995:563de66d8413
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Tue Oct 19 11:12:59 2010 +1100
+files:       bin/cs-release
+description:
+cs-release: update for freshmeat-submit-2.0 just released by ESR
+
+
+changeset:   7996:260ac838234d
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Tue Oct 19 13:20:29 2010 +1100
+files:       bin/haproxy-get-listen-ips
+description:
+haproxy-get-listen-ips: Read haproxy config files, emit IP addresses and clause names.
+
+
+changeset:   7997:28db0e93ac64
+parent:      7995:563de66d8413
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Tue Oct 19 17:31:41 2010 +1100
+files:       lib/python/cs/logutils.py
+description:
+cs.logutils: setup_logging(): add hook to control use of cs.upd for the root logger
+
+
+changeset:   7998:0da1df3e9a7a
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Tue Oct 19 17:37:47 2010 +1100
+files:       lib/python/cs/logutils.py
+description:
+cs.logutils: remove commented out dead code
+
+
+changeset:   7999:251b9c220d0f
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Tue Oct 19 17:42:42 2010 +1100
+files:       lib/python/cs/logutils.py
+description:
+cs.logutils: some docstrings
+
+
+changeset:   8000:ff3c74cc9aa3
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Tue Oct 19 18:32:33 2010 +1100
+files:       lib/python/cs/later.py
+description:
+cs.later: variable name fix
+
+
+changeset:   8001:72e70fce2728
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Tue Oct 19 19:53:10 2010 +1100
+files:       lib/python/cs/later.py lib/python/cs/logutils.py lib/python/cs/threads.py
+description:
+support Pfx context for deferred function calls
+
+
+changeset:   8002:03c2132028e4
+tag:         tip
+parent:      7996:260ac838234d
+parent:      8001:72e70fce2728
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Tue Oct 19 19:56:08 2010 +1100
+description:
+Automated merge with file:///Users/cameron/dev/css-fleet
+
+

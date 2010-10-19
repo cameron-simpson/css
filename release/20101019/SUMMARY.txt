@@ -1,0 +1,9 @@
+Scripts:
+  addif,delif: FreeBSD support; bmtail: batch multitail from file of
+  logfiles; haproxy-get-listen-ips: grab listen IPs and clauses names from
+  haproxy config file; cats2procmailrc: add -C (continue mode) option.
+Modules:
+  Incorporate cs.upd output mode into default logging in setup_logging(), and
+  several bugfixes and improvements to cs.logutils and cs.upd; support
+  passing Pfx context to deferred execution via cs.later.Later or
+  cs.threads.WorkerThreadPool; several minor fixes and improvements.
