@@ -92,8 +92,8 @@ def logTo(filename, logger=None, mode='a', encoding=None, delay=False):
       If `logger` is supplied and not None, add the FileHandler to that
       Logger, otherwise to the root Logger. If `logger` is a string, call
       logging.getLogger(logger) to obtain the logger.
-      `mode`, `encoding` and `delay` are passed to the
-      logging.FileHandler initialiser.
+      `mode`, `encoding` and `delay` are passed to the logging.FileHandler
+      initialiser.
   '''
   if logger is None:
     logger = logging.getLogger()
@@ -105,16 +105,6 @@ def logTo(filename, logger=None, mode='a', encoding=None, delay=False):
 class NullHandler(logging.Handler):
   def emit(self, record):
     pass
-
-##''' Convenience do-nothing logging handler as suggested by:
-##      http://docs.python.org/library/logging.html#configuring-logging-for-a-library
-##'''
-##nullHandler = NullHandler()
-##
-##''' Top level logger for the cs library. Presently unused!
-##'''
-##logger = logging.getLogger("cs")
-##logger.addHandler(nullHandler)
 
 __logExLock = allocate_lock()
 def logException(exc_type, exc_value, exc_tb):
