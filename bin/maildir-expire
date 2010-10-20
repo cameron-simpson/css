@@ -12,7 +12,10 @@ import os
 import stat
 import errno
 import cs.mail
-from cs.misc import cmd, cmderr, warn
+from cs.logutils import setup_logging, error, warn
+from cs.misc import cmd
+
+setup_logging()
 
 fmt='%Y'
 
@@ -26,22 +29,22 @@ if len(argv) > 0 and argv[0][:1] == '+':
   argv.pop(0)
 
 if len(argv) != 3:
-  cmderr("expected days maildir archivedir, found: %s" % " ".join(argv))
+  error("expected days maildir archivedir, found: %s", " ".join(argv))
   badopts=True
 else:
   daysarg, maildir, archivedir = argv
   try:
     days=int(daysarg)
   except ValueError:
-    cmderr("bad days value:", daysarg)
+    error("bad days value: %s", daysarg)
     badopts=True
 
   if not cs.mail.ismaildir(maildir):
-    cmderr(maildir+": not a maildir")
+    error"%s: not a maildir", maildir)
     badopts=True
 
   if not os.path.isdir(archivedir):
-    cmderr(archivedir+": not a directory")
+    error("%s: not a directory", archivedir)
     badopts=True
 
 if badopts:
@@ -66,14 +69,14 @@ for subpath in M.subpaths():
     try:
       when=time.mktime(tm)
     except ValueError, e:
-      cmderr(fullpath+":", `e`, "parsing Date:", date, "(tm="+`tm`+")")
+      error("%s: %s, parsing Date: %s (tm=%s)", fullpath, `e`, date, `tm`)
       continue
   else:
     S=os.stat(fullpath)
     if S[stat.ST_SIZE] == 0:
-      cmderr(fullpath+": empty file, skipping")
+      error("%s: empty file, skipping", fullpath)
       continue
-    cmderr(fullpath+": bad date:", date, "- using mtime")
+    error("%s: date date: %s - using mtime", fullpath, date)
     when=S[stat.ST_MTIME]
 
   if days > 0 and when >= keeptime:

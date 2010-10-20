@@ -7,9 +7,10 @@
 import sys
 import os.path
 import struct
-from cs.misc import cmd, cmderr, Loggable
+import cs.misc
+from cs.logutils import warn, error, setup_logging()
 
-usage="Usage: %s cat tvwizdirs..." % cmd
+usage="Usage: %s cat tvwizdirs..." % (cs.misc.cmd,)
 
 class Trunc:
   ''' A parser for the "trunc" file in a TVWiz directory.
@@ -81,25 +82,27 @@ class TVWiz(Loggable):
     for buf in self.data():
       fp.write(buf)
 
+setup_logging()
+
 badopts=False
 
 args=sys.argv[1:]
 if len(args) < 1:
-  cmderr("missing operation")
+  warn("missing operation")
   badopts=True
 else:
   op=sys.argv[1]
   args=sys.argv[2:]
   if op == "cat":
     if len(args) < 1:
-      cmderr("%s: missing tvwizdirs" % op)
+      warn("%s: missing tvwizdirs" % op)
       badopts=True
   elif op == "scan":
     if len(args) < 1:
-      cmderr("%s: missing tvwizdirs" % op)
+      warn("%s: missing tvwizdirs" % op)
       badopts=True
   else:
-    cmderr("unrecognised operation: %s" % op)
+    warn("unrecognised operation: %s" % op)
     badopts=True
 
 if badopts:
@@ -133,5 +136,5 @@ elif op == "scan":
       print "    final chunk of %d" % chunkSize
     print "  total %d" % total
 else:
-  cmderr("unsupported operation: %s" % op)
+  error("unsupported operation: %s" % op)
   sys.exit(1)

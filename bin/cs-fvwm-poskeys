@@ -4,7 +4,11 @@
 #       - Cameron Simpson <cs@zip.com.au> 20oct2007
 #
 
-from cs.misc import cmd, cmderr, DictUC_Attrs as UC_
+from cs.logutils import info, setup_logging
+from cs.misc import cmd, DictUC_Attrs as UC_
+
+setup_logging()
+
 X='X'
 DX='DX'
 SLOTS='SLOTS'
@@ -47,7 +51,7 @@ if dotpos >= 0:
 
 dx=D.SCREENS[screen].DX
 dy=D.SCREENS[screen].DY
-##cmderr("choose screen %d: %dx%d" % (screen,dx,dy))
+##info("choose screen %d: %dx%d" % (screen,dx,dy))
 
 if len(sys.argv) > 1:
   dx=int(sys.argv[1])

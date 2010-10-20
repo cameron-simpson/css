@@ -2,7 +2,8 @@
 
 import os
 import sys
-from cs.misc import cmd, cmderr, strlist
+from cs.logging import setup_logging, error
+from cs.misc import cmd, strlist
 import cs.csbug
 
 usage="Usage:\t"+cmd+'''\tReport this help message.
@@ -27,7 +28,7 @@ args=sys.argv[2:]
 if op == "addmsg":
   bugid=int(args[0])
   if len(args) > 1:
-    cmderr("extra arguments after bugid:", *args)
+    error("extra arguments after bugid:", *args)
     dieUsage()
   bug=bugs[bugid]
   bug.bugmail().addmsgFromFile(sys.stdin)
@@ -44,7 +45,7 @@ if op == "list":
 
 if op == "new":
   if len(args) == 0:
-    cmderr("no headline for new bug")
+    error("no headline for new bug")
     dieUsage()
 
   bug=bugs.newbug()
@@ -52,5 +53,5 @@ if op == "new":
   print bug.bugnum
   sys.exit(0)
 
-cmderr("unsupported operation:", op)
+error("unsupported operation:", op)
 dieUsage()

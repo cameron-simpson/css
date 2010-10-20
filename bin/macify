@@ -31,8 +31,11 @@ import os
 import os.path
 import sys
 import unicodedata
-from cs.misc import cmd, cmderr
+from cs.logutils import setup_logging, warn
+from cs.misc import cmd
 import cs.macosx
+
+setup_logging()
 
 SrcEncoding='iso8859-1'
 
@@ -69,7 +72,7 @@ def macifydir(srcdir,macdir,srcencoding='iso8859-1'):
     elif os.path.isdir(path):  dirs.append(name)
     elif os.path.isfile(path): files.append(name)
     else:
-      cmderr("warning: not file, dir or symlink:", path)
+      warn("not file, dir or symlink: %s", path)
 
   for name in files:
     path=os.path.join(srcdir,name)

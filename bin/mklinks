@@ -15,7 +15,8 @@ if sys.hexversion >= 0x02050000:
 else:
   from md5 import md5
   def hashobj(): return md5.new()
-from cs.misc import progress, warn, verbose, debug, chomp, tmpdirn, tmpfilename
+from cs.logutils import setup_logging, error, warn, info, debug
+from cs.misc import chomp, tmpdirn, tmpfilename
 
 sizeinfo={}
 identinfo={}
@@ -35,7 +36,7 @@ class FileInfo:
     self.mtime=st[stat.ST_MTIME]
     self.digestpfx=None
     self.addpath(path)
-    debug("new FileInfo ident =",self.ident,"size =",str(self.size),":",path)
+    debug("new FileInfo ident=%s, size=%s : %s", self.ident,self.size,path)
 
   def addpath(self,path):
     self.paths.append(path)
@@ -57,7 +58,7 @@ class FileInfo:
 
 # fetch digest hash of first 8192 bytes of the file
 def digestpfx(path,size=8192):
-  ##progress("digest", path)
+  ##info("digest %s", path)
   fp=open(path)
   H=hashobj()
   H.update(fp.read(size))
@@ -65,7 +66,7 @@ def digestpfx(path,size=8192):
   return H.digest()
 
 def linkto(srcpath,dstpath):
-  progress(srcpath,"=>",dstpath)
+  info("%s => %s", srcpath, dstpath)
   dstdir=os.path.dirname(dstpath)
   global noAction
   if not noAction:
@@ -95,11 +96,11 @@ def do(path):
         else
           o
   '''
-  ##progress("DO", path)
+  ##info("DO %s", path)
   try:
     st=os.lstat(path)
   except os.OSerr, e:
-    cmderr(path+": "+str(e))
+    warn("%s: %s", path, e)
     return
 
   if not stat.S_ISREG(st[stat.ST_MODE]):
@@ -108,51 +109,51 @@ def do(path):
   ident=st_ident(st)
   if ident in identinfo:
     # known file
-    info=identinfo[ident]
-    if type(info) is str:
+    idinfo=identinfo[ident]
+    if type(idinfo) is str:
       # known to be replaceable - replace
-      ##progress("know to replace",path,"by",info)
-      linkto(info,path)
+      ##debug("know to replace %s by %s", path, idinfo)
+      linkto(idinfo,path)
       return
 
     # just note new path for this file
-    debug("note new instance of",info.path,":",path)
-    info.addpath(path)
+    debug("note new instance of",idinfo.path,":",path)
+    idinfo.addpath(path)
     return
 
   # new file, note it
-  info=identinfo[ident]=FileInfo(path,st)
+  idinfo=identinfo[ident]=FileInfo(path,st)
 
   size=st[stat.ST_SIZE]
   if size not in sizeinfo:
     # new size, nothing to compare to; save and return
     debug("new size",size,"on file",path)
-    sizeinfo[size]=[info]
+    sizeinfo[size]=[idinfo]
     return
 
   # existing size - compare against files of same size
-  digest=info.getdigestpfx()
+  digest=idinfo.getdigestpfx()
   for other in sizeinfo[size]:
     ##warn("cmp", path, "vs", other.path)
     if digest == other.getdigestpfx() and filecmp.cmp(path,other.path):
       # same contents
       # keep newest file
-      if info.mtime >= other.mtime:
+      if idinfo.mtime >= other.mtime:
         # we are newer (or as new)
         # push us to the front of the comparison list
         # discard the older file
-        sizeinfo[size].insert(0,info)
-        info.subsume(other)
+        sizeinfo[size].insert(0,idinfo)
+        idinfo.subsume(other)
         return
 
       # we are older - keep newer file
-      ##progress("I am older, subsume", other.path)
-      other.subsume(info)
+      ##debug("I am older, subsume %s", other.path)
+      other.subsume(idinfo)
       return
 
   # no other file matches - add this file to the size list
   debug("no matches, size",size,"+",path)
-  sizeinfo[size].append(info)
+  sizeinfo[size].append(idinfo)
 
 def slotfile(size):
   slot=0
@@ -200,7 +201,7 @@ for path in sys.argv[1:]:
         do(line)
   else:
     for dirpath, dirnames, filenames in os.walk(path):
-      progress(dirpath)
+      info(dirpath)
       filenames.sort()
       for name in filenames:
         subpath=os.path.join(dirpath,name)
@@ -218,7 +219,7 @@ if splitMode:
   slotpaths.reverse()   # do big files first
   for path in slotpaths:
     if path:
-      progress("mklinks - <"+path)
+      info("mklinks - <%s", path)
       os.system("exec <"+path+"; rm "+path+"; exec "+sys.argv[0]+" -")
 
 if slotdir:

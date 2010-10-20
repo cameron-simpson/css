@@ -7,14 +7,15 @@
 
 import sys
 import os.path
-from cs.misc import cmd, cmderr, warn
+from cs.logutils import setup_logging, error, warn
+from cs.misc import cmd
 
 usage="Usage: "+cmd+" topdir [subpaths...]\n"
 
 badopts=False
 
 if len(sys.argv) < 2:
-  cmderr("missing topdir")
+  error("missing topdir")
   badopts=True
 else:
   topdir=sys.argv[1]
@@ -40,7 +41,7 @@ def splitdir(dir,topdir):
   try:
     dirents=os.listdir(dir)
   except OSError, e:
-    cmderr("listdir("+dir+"):", str(e))
+    error("listdir(%s): %s", dir, e)
     return
 
   dirents.sort()
@@ -50,12 +51,12 @@ def splitdir(dir,topdir):
     if len(up):
       splitdir(up,topdir)
 
-  ##warn("block", dir)
+  ##warn("block %s", dir)
   dirs[dir]=False
   for peer in dirents:
     peerpath=os.path.join(dir,peer)
     if peerpath not in dirs:
-      ##warn("add  ", peerpath)
+      ##warn("add  %s", peerpath)
       dirs[peerpath]=True
 
 while len(subpaths) > 0:

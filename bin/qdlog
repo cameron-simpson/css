@@ -11,7 +11,8 @@ import re
 import string
 from getopt import getopt, GetoptError
 import cs.lex
-from cs.misc import warn,cmd,cmderr,chomp
+from cs.logutils import setup_logging, error
+from cs.misc import warn,cmd,chomp
 
 if 'LOGDIR' in os.environ:
   logdir=os.environ['LOGDIR']
@@ -33,7 +34,7 @@ print "argv =", `sys.argv`
 try:
   (opts,argv)=getopt(sys.argv[1:],'i:e:')
 except GetoptError, e:
-  cmderr("unrecognised option: "+e.opt+": "+e.msg)
+  error("unrecognised option: %s: %s", e.opt, e.msg)
   badopts=True
 
 for (opt,val) in opts:
@@ -46,12 +47,12 @@ for (opt,val) in opts:
     lastremode=False
 
 if len(argv) == 0:
-  cmderr("missing prefix")
+  error("missing prefix")
   badopts=True
 else:
   prefix=argv[0]
   if len(argv) > 1:
-    cmderr("extra arguments after prefix:", argv[1:])
+    error("extra arguments after prefix: %s", argv[1:])
     badopts=True
 
 if badopts:
