@@ -96,10 +96,15 @@ class WorkerThreadPool(object):
           t, v, tb = sys.exc_info()
           raise t, v, tb
         result = (None, sys.exc_info())
+      finally:
+        func = None     # release func+args
       if retq is not None:
         retq.put(result)
+        retq = None
       if deliver is not None:
         deliver(result)
+        deliver = None
+      result = None
       self.idle.append( Hdesc )
 
 class AdjustableSemaphore(object):
@@ -189,7 +194,7 @@ class Channel(object):
       self._nreaders += 1
     self.__writable.release()   # allow someone to write
     self.__readable.acquire()   # await writer and prevent other readers
-    value=self._value
+    value = self._value
     delattr(self,'_value')
     with self.__lock:
       self._nreaders -= 1
@@ -204,7 +209,7 @@ class Channel(object):
     else:
       assert value is not None, "%s.put(None) on unclosed Channel" % (self,)
     self.__writable.acquire()   # prevent other writers
-    self._value=value
+    self._value = value
     self.__readable.release()   # allow a reader
 
   def close(self):
