@@ -69,6 +69,7 @@ class LateFunction(object):
     with self._join_lock:
       self.result = result
       self.done = True
+      self.func = None  # release func+args
       notifiers = list(self._join_notifiers)
     self.later.capacity.release()
     for notify in notifiers:
