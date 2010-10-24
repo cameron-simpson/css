@@ -194,20 +194,24 @@ class Pfx_LoggerAdapter(myLoggerAdapter):
       msg = prefix + ": " + msg
     return msg, kwargs
 
-def pfx(loggers=None):
+def pfx(func):
   ''' Decorator for functions that should run inside:
-        with Pfx(func_name, loggers=loggers):
+        with Pfx(func_name):
+      Use:
+        @pfx
+        def f(...):
   '''
-  def wrap(func):
-    def wrapped(*args, **kwargs):
-      with Pfx(func.func_name, loggers=loggers):
-        return func(*args, **kwargs)
-    return wrapped
-  return wrap
+  def wrapped(*args, **kwargs):
+    with Pfx(func.func_name, loggers=loggers):
+      return func(*args, **kwargs)
+  return wrapped
 
 def pfxtag(tag, loggers=None):
   ''' Decorator for functions that should run inside:
         with Pfx(tag, loggers=loggers):
+      Use:
+        @pfxtag(tag)
+        def f(...):
   '''
   def wrap(func):
     def wrapped(*args, **kwargs):
@@ -215,6 +219,21 @@ def pfxtag(tag, loggers=None):
         return func(*args, **kwargs)
     return wrapped
   return wrap
+
+def OBSOLETE(func):
+  ''' Decorator for obsolete functions.
+      Use:
+        @OBSOLETE
+        def f(...):
+  '''
+  def wrapped(*args, **kwargs):
+    import traceback
+    frame = traceback.extract_stack(None, 2)[0]
+    warn("OBSOLETE call to %s:%d %s(), called from %s:%d %s",
+         func.func_code.co_filename, func.func_code.co_firstlineno,
+         func.func_name, frame[0], frame[1], frame[2])
+    return func(*args, **kwargs)
+  return wrapped
 
 class Pfx(object):
   ''' A context manager to maintain a per-thread stack of message prefices.
