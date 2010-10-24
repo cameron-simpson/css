@@ -202,7 +202,7 @@ def pfx(func):
         def f(...):
   '''
   def wrapped(*args, **kwargs):
-    with Pfx(func.func_name, loggers=loggers):
+    with Pfx(func.func_name):
       return func(*args, **kwargs)
   return wrapped
 
