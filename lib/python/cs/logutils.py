@@ -204,6 +204,7 @@ def pfx(loggers=None):
         func(*args, **kwargs)
     return wrapped
   return wrap
+
 def pfxtag(tag, loggers=None):
   ''' Decorator for functions that should run inside:
         with Pfx(tag, loggers=loggers):
