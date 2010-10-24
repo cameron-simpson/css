@@ -665,25 +665,6 @@ class PreQueue(Queue):
     while True:
       yield self.get()
 
-## OBSOLETE: never used this /dev/null Queue-like object
-##__nullCH=None
-##__nullCHlock=allocate_lock()
-##def nullCH():
-##  with __nullCHlock:
-##    if __nullCH is None:
-##      __nullCH=NullCH()
-##  return __nullCH
-##class NullCH(Queue):
-##  def __init__(self):
-##    Queue.__init__(self,8)
-##    self.__closing=False
-##    sink=Thread(target=self.__runQueue)
-##    sink.setDaemon(True)
-##    sink.start()
-##  def __runQueue(self):
-##    while True:
-##      self.get()
-
 class DictMonitor(dict):
   def __init__(self,I={}):
     dict.__init__(self,I)
