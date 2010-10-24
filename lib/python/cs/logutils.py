@@ -201,7 +201,7 @@ def pfx(loggers=None):
   def wrap(func):
     def wrapped(*args, **kwargs):
       with Pfx(func.func_name, loggers=loggers):
-        func(*args, **kwargs)
+        return func(*args, **kwargs)
     return wrapped
   return wrap
 
@@ -212,7 +212,7 @@ def pfxtag(tag, loggers=None):
   def wrap(func):
     def wrapped(*args, **kwargs):
       with Pfx(tag, loggers=loggers):
-        func(*args, **kwargs)
+        return func(*args, **kwargs)
     return wrapped
   return wrap
 
