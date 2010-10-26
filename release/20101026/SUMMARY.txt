@@ -1,0 +1,6 @@
+Scripts: remove more obsolete cmderr uses.
+Modules:
+  cs.later: release memory promptly, add named LateFunctions and logging
+  support.
+  cs.logutils: update for @pfx decorator, improvements to LogTime,
+  assorted smaller changes.

@@ -1,0 +1,140 @@
+changeset:   8003:4c32e06eaf11
+tag:         release-20101019
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Tue Oct 19 20:25:38 2010 +1100
+files:       release/20101019/CHANGES.txt release/20101019/SUMMARY.txt release/20101019/release-tag.txt
+description:
+Release information for release-20101019.
+Summary:
+Scripts:
+  addif,delif: FreeBSD support; bmtail: batch multitail from file of
+  logfiles; haproxy-get-listen-ips: grab listen IPs and clauses names from
+  haproxy config file; cats2procmailrc: add -C (continue mode) option.
+Modules:
+  Incorporate cs.upd output mode into default logging in setup_logging(), and
+  several bugfixes and improvements to cs.logutils and cs.upd; support
+  passing Pfx context to deferred execution via cs.later.Later or
+  cs.threads.WorkerThreadPool; several minor fixes and improvements.
+
+
+changeset:   8004:ea00edabf583
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Tue Oct 19 20:25:38 2010 +1100
+files:       .hgtags
+description:
+Added tag release-20101019 for changeset 4c32e06eaf11
+
+
+changeset:   8005:433a71e97975
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Wed Oct 20 09:45:59 2010 +1100
+files:       bin/cs-release
+description:
+cs-release: turn of freshmeat-submit verbosity
+
+
+changeset:   8006:97bf2e3bf939
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Thu Oct 21 08:03:17 2010 +1100
+files:       bin/beyonwiz bin/cs-fvwm-poskeys bin/csb bin/macify bin/maildir-expire bin/merge-apache-logs bin/mklinks bin/qdlog bin/secret bin/subdirs-disjoint
+description:
+remove cmderr in several scripts, replace with warn/error etc
+
+
+changeset:   8007:ae317d2b3059
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sat Oct 23 20:43:13 2010 +1100
+files:       lib/python/cs/later.py
+description:
+cs.later: LateFunction: forget func+args after execution to release memory
+
+
+changeset:   8008:169633bef4a6
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sat Oct 23 20:45:15 2010 +1100
+files:       lib/python/cs/threads.py
+description:
+cs.threads: WorkerThreadPool: forget func+args and result as early as possible to release memory
+
+
+changeset:   8009:30cacb22d268
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sun Oct 24 11:49:05 2010 +1100
+files:       lib/python/cs/logutils.py
+description:
+cs.logutils: @pfx now knows function name, @pfxtag for old decorator
+
+
+changeset:   8010:5dfaafefb71f
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sun Oct 24 11:51:02 2010 +1100
+files:       lib/python/cs/logutils.py
+description:
+cs.logutils: whitespace
+
+
+changeset:   8011:f49cd115b565
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sun Oct 24 11:52:04 2010 +1100
+files:       lib/python/cs/logutils.py
+description:
+cs.logutils: @pfx, @pfxtag: actually return the function result!
+
+
+changeset:   8012:05c3bbba0836
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sun Oct 24 12:17:53 2010 +1100
+files:       lib/python/cs/logutils.py
+description:
+cs.logutils: fix @pfx decorator - not indirect; add @OBSOLETE decorator
+
+
+changeset:   8013:6d50aa2b6148
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sun Oct 24 12:25:32 2010 +1100
+files:       lib/python/cs/logutils.py
+description:
+cs.logutils: @pfx: no loggers!
+
+
+changeset:   8014:01791607552a
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sun Oct 24 15:48:27 2010 +1100
+files:       lib/python/cs/threads.py
+description:
+cs.threads: discard long commented out class
+
+
+changeset:   8015:cef7244e5eac
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Tue Oct 26 12:34:10 2010 +1100
+files:       lib/python/cs/later.py
+description:
+cs.later: logging support, named LateFUnctions, track pending/rnning etc
+
+
+changeset:   8016:2b37ae04462d
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Tue Oct 26 12:35:28 2010 +1100
+files:       lib/python/cs/logutils.py
+description:
+cs.logutils: logTo() now returns logger and handler
+
+
+changeset:   8017:101a6553e5ed
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Tue Oct 26 16:30:03 2010 +1100
+files:       lib/python/cs/logutils.py
+description:
+cs.logutils: D() - flush stderr; LogTime: always log over 1s, add warning threshold too
+
+
+changeset:   8018:8b3735af9f91
+tag:         tip
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Tue Oct 26 16:50:06 2010 +1100
+files:       lib/python/cs/logutils.py
+description:
+cs.logutils: bugfix LogTime warning parameters
+
+
