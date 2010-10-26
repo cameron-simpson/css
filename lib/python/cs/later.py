@@ -49,13 +49,19 @@ class LateFunction(object):
             timeout for wait()
   '''
 
-  def __init__(self, later, func):
+  def __init__(self, later, func, name=None):
     self.later = later
     self.func = func
+    if name is None:
+      name = "LateFunction-%d" % (seq(),)
+    self.name = name
     self.done = False
     self._join_lock = allocate_lock()
     self._join_cond = Condition()
     self._join_notifiers = []
+
+  def __str__(self):
+    return "<LateFunction %s>" % (self.name,)
 
   def _dispatch(self):
     ''' ._dispatch() is called by the Later class instance's worker thread.
@@ -72,6 +78,8 @@ class LateFunction(object):
       self.func = None  # release func+args
       notifiers = list(self._join_notifiers)
     self.later.capacity.release()
+    self.later.running.remove(self)
+    self.later.info("completed %s", self)
     for notify in notifiers:
       notify(self)
     with self._join_cond:
@@ -148,6 +156,10 @@ class Later(object):
     if name is None:
       name = "Later-%d" % (seq(),)
     self.name = name
+    self.delayed = set()        # unqueued, delayed until specific time
+    self.pending = set()        # undispatched LateFunctions
+    self.running = set()        # running LateFunctions
+    self.logger = None          # reporting; see logTo() method
     self.closed = False
     self._priority = (0,)
     self._timerQ = None                    # queue for delayed requests
@@ -158,8 +170,35 @@ class Later(object):
     self._lock = allocate_lock()
     self._dispatchThread.start()
 
+  def logTo(self, filename, logger=None):
+    import logging
+    import cs.logutils
+    if logger is None:
+      logger = self.__module__
+    logger, handler = cs.logutils.logTo(filename, logger=logger)
+    handler.setFormatter(logging.Formatter("%(asctime)-15s %(later_name)s %(message)s"))
+    logger.setLevel(logging.INFO)
+    self.logger = logger
+
+  def error(self, *a, **kw):
+    if self.logger:
+      kw.setdefault('extra', {}).update(later_name = str(self))
+      self.logger.error(*a, **kw)
+
+  def warn(self, *a, **kw):
+    if self.logger:
+      kw.setdefault('extra', {}).update(later_name = str(self))
+      self.logger.warn(*a, **kw)
+
+  def info(self, *a, **kw):
+    if self.logger:
+      kw.setdefault('extra', {}).update(later_name = str(self))
+      self.logger.info(*a, **kw)
+
   def __str__(self):
-    return self.name
+    return "<%s pending=%d running=%d delayed=%d>" \
+           % (self.name,
+              len(self.pending), len(self.running), len(self.delayed))
 
   def __del__(self):
     if not self.closed:
@@ -193,10 +232,13 @@ class Later(object):
       except StopIteration:
         self.capacity.release() # end of queue, not calling the handler
         break
-      latefunc = pri_entry[-1]
-      latefunc._dispatch()
+      LF = pri_entry[-1]
+      self.pending.remove(LF)
+      self.running.add(LF)
+      self.info("dispatched %s", LF)
+      LF._dispatch()
 
-  def submit(self, func, priority=None, delay=None, when=None, pfx=None):
+  def submit(self, func, priority=None, delay=None, when=None, name=None, pfx=None):
     ''' Submit a function for later dispatch.
         Return the corresponding LateFunction for result collection.
 	If the parameter `priority` not None then use it as the priority
@@ -206,6 +248,7 @@ class Later(object):
         If the parameter `when` is not None, delay consideration of
         this function until the time `when`.
         It is an error to specify both `when` and `delay`.
+        If the parameter `name` is not None, use it to name the LateFunction.
         If the parameter `pfx` is not None, submit pfx.func(func);
           see cs.logutils.Pfx's .func method for details.
     '''
@@ -217,7 +260,7 @@ class Later(object):
       priority = (priority,)
     if pfx is not None:
       func = pfx.func(func)
-    LF = LateFunction(self, func)
+    LF = LateFunction(self, func, name=name)
     pri_entry = list(priority)
     pri_entry.append(seq())     # ensure FIFO servicing of equal priorities
     pri_entry.append(LF)
@@ -227,15 +270,23 @@ class Later(object):
       when = now + delay
     if when is None or when <= now:
       # queue the request now
+      self.pending.add(LF)
+      self.info("queuing %s", LF)
       self._LFPQ.put( pri_entry )
     else:
       # queue the request at a later time
-      def queueFunc(func):
+      def queueFunc():
+        LF = pri_entry[-1]
+        self.delayed.remove(LF)
+        self.pending.add(LF)
+        self.info("queuing %s after delay", LF)
         self._LFPQ.put( pri_entry )
       with self._lock:
         if self._timerQ is None:
           self._timerQ = TimerQueue(name="<TimerQueue %s._timerQ>"%(self.name))
-      self._timerQ.add(when, partial(queueFunc, func))
+      self.delayed.add(LF)
+      self.info("delay %s until %s", LF, when)
+      self._timerQ.add(when, queueFunc)
 
     return LF
 
@@ -334,6 +385,7 @@ class TestLater(unittest.TestCase):
 
   def setUp(self):
     self.L = Later(2)
+    self.L.logTo("/dev/tty")
 
   def tearDown(self):
     self.L.close()
