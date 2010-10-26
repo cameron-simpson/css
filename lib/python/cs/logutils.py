@@ -390,8 +390,10 @@ class LogTime(object):
     if warnLevel is None:
       warnLevel = logging.WARNING
     self.tag = tag
-    self.level = level
     self.threshold = threshold
+    self.level = level
+    self.warnThreshold = warnThreshold
+    self.warnLevel = warnLevel
   def __enter__(self):
     self.start = time.time()
   def __exit__(self, exc_type, exc_value, traceback):
