@@ -451,7 +451,7 @@ exit $xit
 #
 # CDRIP_ENC, a comma separated list of encoding formats to produce.
 # Default: B<ogg>.
-# Known: B<ogg> and <mp3>.
+# Known: B<ogg> and B<mp3>.
 #
 # CDRIP_LOCK, the base name for the lock to use between encoders.
 #
