@@ -86,6 +86,7 @@ def D(fmt, *args):
   '''
   sys.stderr.write(fmt % args)
   sys.stderr.write("\n")
+  sys.stderr.flush()
 
 def logTo(filename, logger=None, mode='a', encoding=None, delay=False):
   ''' Log to the specified filename.
@@ -381,9 +382,13 @@ class LogTime(object):
       code. After the run, the field .elapsed contains the elapsed time in
       seconds.
   '''
-  def __init__(self, tag, level=None, threshold=None):
+  def __init__(self, tag, threshold=None, level=None, warnThreshold=None, warnLevel=None):
+    if threshold is None:
+      threshold = 1.0
     if level is None:
       level = logging.INFO
+    if warnLevel is None:
+      warnLevel = logging.WARNING
     self.tag = tag
     self.level = level
     self.threshold = threshold
@@ -393,6 +398,9 @@ class LogTime(object):
     now = time.time()
     elapsed = now - self.start
     if self.threshold is not None and elapsed >= self.threshold:
-      log(self.level, "%s: ELAPSED %5.3fs" % (self.tag, elapsed))
+      level = self.level
+      if self.warnThreshold is not None and elapsed >= self.warnThreshold:
+        level = self.warnLevel
+      log(level, "%s: ELAPSED %5.3fs" % (self.tag, elapsed))
     self.elapsed = elapsed
     return False
