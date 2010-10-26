@@ -94,6 +94,7 @@ def logTo(filename, logger=None, mode='a', encoding=None, delay=False):
       logging.getLogger(logger) to obtain the logger.
       `mode`, `encoding` and `delay` are passed to the logging.FileHandler
       initialiser.
+      Returns the logger and handler.
   '''
   if logger is None:
     logger = logging.getLogger()
@@ -101,6 +102,7 @@ def logTo(filename, logger=None, mode='a', encoding=None, delay=False):
     logger = logging.getLogger(logger)
   handler = logging.FileHandler(filename, mode, encoding, delay)
   logger.addHandler(handler)
+  return logger, handler
 
 class NullHandler(logging.Handler):
   def emit(self, record):
