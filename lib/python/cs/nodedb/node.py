@@ -10,6 +10,7 @@ if sys.hexversion < 0x02060000:
 else:
   import json
 import itertools
+from getopt import GetoptError
 from thread import allocate_lock
 from threading import Thread
 from types import StringTypes
@@ -18,7 +19,7 @@ import unittest
 from cs.lex import str1
 from cs.misc import the, get0
 from cs.mappings import parseUC_sAttr
-from cs.logutils import Pfx, error, warn, info
+from cs.logutils import Pfx, error, warn, info, debug
 
 # regexp to match TYPE:name
 re_NODEREF = re.compile(r'([A-Z]+):([^:#]+)')
@@ -836,6 +837,114 @@ class NodeDB(dict):
       return
 
     raise ValueError, "unsupported format '%s'" % (fmt,)
+
+  def do_command(self, args):
+    op = args.pop(0)
+    with Pfx(op):
+      try:
+        op_func = getattr(self, "cmd_" + op)
+      except AttributeError:
+        raise GetoptError, "unknown operation"
+      return op_func(args)
+
+  def cmd_dump(self, args):
+    xit = 0
+    if fp is None:
+      fp = sys.stdout
+    first = True
+    for arg in args:
+      with Pfx(arg):
+        if not first:
+          fp.write('\n')
+        self[arg].textdump(fp)
+        first=False
+    return xit
+
+  def cmd_edit(self, args):
+    if len(args) != 1:
+      raise GetoptError("expected a single TYPE:key")
+    N = self[args[0]]
+    from cs.nodedb.text import editNode
+    editNode(N, createSubNodes=True)
+    return 0
+
+  def cmd_httpd(self, args):
+    xit = 0
+    import cs.nodedb.httpd
+    if len(args) == 0:
+      raise GetoptError("missing ipaddr:port")
+    ipaddr, port = args.pop(0).rsplit(':', 1)
+    port = int(port)
+    if len(args) > 0:
+      raise GetoptError("extra arguments after %s:%s" % (ipaddr, port))
+    self.readonly = True
+    cs.nodedb.httpd.serve(self, ipaddr, port)
+    return xit
+
+  def cmd_list(self, args):
+    xit = 0
+    if not args:
+      raise GetoptError("expected TYPE:* arguments")
+    for arg in args:
+      with Pfx('"%s"' % (arg,)):
+        if arg.endswith(":*"):
+          nodetype = arg[:-2]
+          for N in self.nodesByType(nodetype):
+            print str(N)
+#           attrnames = N.attrs.keys()
+#           attrnames.sort()
+#           fields = {}
+#           for attrname in attrnames:
+#             F = [ str(v) for v in getattr(N, attrname+'s') ]
+#             if len(F) == 1:
+#               fields[attrname] = F[0]
+#             else:
+#               fields[attrname+'s'] = F
+#           print str(N), fields
+        else:
+          raise GetoptError("unsupported argument; expected TYPE:*")
+    return xit
+
+  def cmd_new(self, args, createSubNodes=True):
+    if len(args) == 0:
+      raise GetoptError("missing TYPE:key")
+    key=args.pop(0)
+    with Pfx(key):
+      if ':' not in key:
+        raise GetoptError("bad key")
+      nodetype, name = key.split(':',1)
+      if not nodetype.isupper():
+        raise GetoptError("bad key type \"%s\"" % nodetype)
+      N = self.newNode(nodetype, name)
+      for assignment in args:
+        N.assign(assignment, createSubNodes=createSubNodes)
+    return 0
+
+  def cmd_print(self, attrs):
+    N = self[attrs.pop(0)]
+    for attr in attrs:
+      print N.get0(attr, '')
+    return 0
+
+  def cmd_report(self, args):
+    if len(args) != 1:
+      raise GetoptError("expected a single TYPE:key")
+    with Pfx(args[0]):
+      self[args[0]].report(sys.stdout)
+    return 0
+
+  def cmd_set(self, args, createSubNodes=True):
+    if len(args) == 0:
+      raise GetoptError("missing TYPE:key")
+    key=args.pop(0)
+    with Pfx(key):
+      if key not in self:
+        raise GetoptError("unknown key")
+      N=self[key]
+      for assignment in args:
+        with Pfx(assignment):
+          N.assign(assignment, createSubNodes=createSubNodes)
+    return 0
 
 _NodeDBsByURL = {}
 
