@@ -88,20 +88,26 @@ def D(fmt, *args):
   sys.stderr.write("\n")
   sys.stderr.flush()
 
-def logTo(filename, logger=None, mode='a', encoding=None, delay=False):
+def logTo(filename, logger=None, mode='a', encoding=None, delay=False, format=None):
   ''' Log to the specified filename.
       If `logger` is supplied and not None, add the FileHandler to that
       Logger, otherwise to the root Logger. If `logger` is a string, call
       logging.getLogger(logger) to obtain the logger.
       `mode`, `encoding` and `delay` are passed to the logging.FileHandler
       initialiser.
+      `format` is used to set the handler's formatter. It defaults to:
+        %(asctime)s %(levelname)s %(message)
       Returns the logger and handler.
   '''
   if logger is None:
     logger = logging.getLogger()
   elif type(logger) is str:
     logger = logging.getLogger(logger)
+  if format is None:
+    format = '%(asctime)s %(levelname)s %(message)'
   handler = logging.FileHandler(filename, mode, encoding, delay)
+  formatter = logging.Formatter(format)
+  handler.setFormatter(formatter)
   logger.addHandler(handler)
   return logger, handler
 
