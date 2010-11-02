@@ -96,7 +96,7 @@ def logTo(filename, logger=None, mode='a', encoding=None, delay=False, format=No
       `mode`, `encoding` and `delay` are passed to the logging.FileHandler
       initialiser.
       `format` is used to set the handler's formatter. It defaults to:
-        %(asctime)s %(levelname)s %(message)
+        %(asctime)s %(levelname)s %(message)s
       Returns the logger and handler.
   '''
   if logger is None:
