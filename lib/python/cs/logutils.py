@@ -104,7 +104,7 @@ def logTo(filename, logger=None, mode='a', encoding=None, delay=False, format=No
   elif type(logger) is str:
     logger = logging.getLogger(logger)
   if format is None:
-    format = '%(asctime)s %(levelname)s %(message)'
+    format = '%(asctime)s %(levelname)s %(message)s'
   handler = logging.FileHandler(filename, mode, encoding, delay)
   formatter = logging.Formatter(format)
   handler.setFormatter(formatter)
