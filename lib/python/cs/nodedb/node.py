@@ -438,6 +438,9 @@ class Node(dict):
           info("del .%s=%s" % (k+'s', new_attrs[attr]))
           del self[k]
 
+  def textdump(self, fp):
+    self.nodedb.dump(fp, nodes=(self,))
+
 def nodekey(*args):
   ''' Convert some sort of key to a (TYPE, NAME) tuple.
       Sanity check the values.
@@ -793,6 +796,8 @@ class NodeDB(dict):
             row = (ct, cn, ca, self.totext(value))
             w.writerow(row)
             otype, oname, oattr = t, n, attr
+    else:
+      assert False, "dump: unsupported format: %s" % (fmt,)
     fp.flush()
     return
 
@@ -847,7 +852,7 @@ class NodeDB(dict):
         raise GetoptError, "unknown operation"
       return op_func(args)
 
-  def cmd_dump(self, args):
+  def cmd_dump(self, args, fp=None):
     xit = 0
     if fp is None:
       fp = sys.stdout
