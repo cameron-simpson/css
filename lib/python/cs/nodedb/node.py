@@ -279,7 +279,7 @@ class Node(dict):
        and hasattr(other, 'type') and self.type == other.type
 
   def __hash__(self):
-    return hash(self.name)^hash(self.type)^id(self.nodedb)
+    return hash(self.name)^hash(self.type)      ##^id(self.nodedb)
 
   def __get(self, k):
     ''' Fetch the item specified.
@@ -857,6 +857,31 @@ class NodeDB(dict):
       except AttributeError:
         raise GetoptError, "unknown operation"
       return op_func(args)
+
+  def cmd_update(self, args, fp=None):
+    xit = 0
+    if fp is None:
+      fp = sys.stdout
+    if len(args) == 0:
+      raise GetoptError("missing dburl")
+    dburl = args.pop(0)
+    if len(args) > 0:
+      raise GetoptError("extra arguments after dburl '%s': %s" % (dburl, " ".join(args)))
+    DB2 = NodeDBFromURL(dburl, readonly=True)
+    nodes1 = list(self._dump_nodes())
+    for N in nodes1:
+      t, name = N.type, N.name
+      N2 = DB2.get( (t, name), {} )
+      attrs = N.keys()
+      attrs.sort()
+      for attr in attrs:
+        v1 = set( N[attr] )
+        v2 = N2.get(attr, ())
+        v1.difference_update(v2)
+        extra = sorted(v1)
+        for e in extra:
+          fp.write("set %s:%s %s=%s\n" % (t, name, attr, e))
+    return xit
 
   def cmd_dump(self, args, fp=None):
     xit = 0
