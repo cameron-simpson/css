@@ -336,7 +336,7 @@ class Node(dict):
         return values
       if len(values) == 1:
         return values[0]
-      raise AttributeError, "%s.%s" % (self, attr)
+      raise AttributeError, "%s.%s (values=%s %s, len=%s)" % (self, attr, type(values), values, len(values))
 
     raise AttributeError, str(self)+'.'+repr(attr)
 
