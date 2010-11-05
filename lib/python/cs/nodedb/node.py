@@ -24,7 +24,7 @@ from cs.logutils import Pfx, D, error, warn, info, debug
 # regexp to match TYPE:name
 re_NODEREF = re.compile(r'([A-Z]+):([^:#]+)')
 # regexp to match a bareword name
-re_NAME = re.compile(r'[a-z][a-z0-9]*(?![a-zA-Z0-9_])')
+re_NAME = re.compile(r'[a-z][a-z_0-9]*(?![a-zA-Z0-9_])')
 # JSON string expression, lenient
 re_STRING = re.compile(r'"([^"\\]|\\.)*"')
 # JSON simple integer
