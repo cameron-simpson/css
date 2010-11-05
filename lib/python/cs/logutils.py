@@ -34,7 +34,9 @@ def setup_logging(cmd=None, format=None, level=None, upd_mode=None):
   if format is None:
     format = cmd.replace('%','%%')+': %(levelname)s: %(message)s'
   if level is None:
-    level = infer_logging_level()
+    level, flags = infer_logging_level()
+    if upd_mode is None and 'NOUPD' in flags:
+      upd_mode = False
   if upd_mode is None:
     upd_mode = sys.stderr.isatty()
   if upd_mode:
@@ -66,6 +68,11 @@ def infer_logging_level():
   if sys.stderr.isatty():
     level = logging.INFO
   env = os.environ.get('DEBUG', '')
+  if ',' in env:
+    env, flags = env.split(',', 1)
+  else:
+    flags = ''
+  flags = [ F.upper() for F in flags.split(',') if len(F) ]
   if env != '' and env != '0':
     level = logging.DEBUG
     env = env.upper()
@@ -77,7 +84,7 @@ def infer_logging_level():
       level = logging.WARNING
     elif env == 'ERROR':
       level = logging.ERROR
-  return level
+  return level, flags
 
 def D(fmt, *args):
   ''' Unconditionally print formatted debug string straight to sys.stderr,
