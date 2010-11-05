@@ -275,11 +275,17 @@ class Node(dict):
     return self.type+":"+self.name
 
   def __eq__(self, other):
+    ''' Two Nodes are equal if their name and type are equal and their
+        dictness is equal.
+    '''
     return hasattr(other, 'name') and self.name == other.name \
-       and hasattr(other, 'type') and self.type == other.type
+       and hasattr(other, 'type') and self.type == other.type \
+       and dict.__eq__(self, other)
 
   def __hash__(self):
-    return hash(self.name)^hash(self.type)      ##^id(self.nodedb)
+    ''' Hash function, based on name, type and nodedb id.
+    '''
+    return hash(self.name)^hash(self.type)^id(self.nodedb)
 
   def __get(self, k):
     ''' Fetch the item specified.
@@ -406,6 +412,12 @@ class Node(dict):
     raise ValueError, "can't gettoken: %s" % (valuetxt,)
 
   def update(self, new_attrs, delete_missing=False):
+    ''' Update this Node with new attributues, optionally removing
+        extraneous attributes.
+        `new_attrs` is a mapping from an attribute name to a value list.
+	If `delete_missing` is supplied true, remove attribute not
+	specified in `new_attrs`.
+    '''
     with Pfx("%s.update" % (self,)):
       # add new attributes
       new_attr_names = new_attrs.keys()
@@ -416,7 +428,7 @@ class Node(dict):
           error("%s.applyAttrs: ignore non-ATTRs: %s" % (self, attr))
           continue
         if k not in self:
-          info("new .%s=%s" % (k+'s', new_attrs[attr]))
+          info("new .%s=%s", k+'s', new_attrs[attr])
           self[k] = new_attrs[attr]
 
       # change or possibly remove old attributes
@@ -425,17 +437,18 @@ class Node(dict):
       for attr in old_attr_names:
         k, plural = parseUC_sAttr(attr)
         if not k or not plural:
-          info("%s.applyAttrs: ignore non-ATTRs old attr: %s" % (self, attr))
+          warn("%s.applyAttrs: ignore non-ATTRs old attr: %s", self, attr)
           continue
         if k.endswith('_ID'):
-          error("%s.applyAttrs: ignoring bad old ATTR_ID: %s" % (self, attr))
+          error("%s.applyAttrs: ignoring bad old ATTR_ID: %s", self, attr)
           continue
         if k in new_attrs:
-          if self[k] != new_attrs[k]:
-            info("set .%s=%s" % (k, new_attrs[attr]))
-            self[k] = new_attrs[attr]
+          nattrs = new_attrs[k]
+          if self[k] != nattrs:
+            info("set .%ss=%s", k, nattrs)
+            self[k] = nattrs
         elif delete_missing:
-          info("del .%s=%s" % (k+'s', new_attrs[attr]))
+          info("del .%ss", k)
           del self[k]
 
   def textdump(self, fp):
