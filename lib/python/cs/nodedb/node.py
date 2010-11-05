@@ -19,7 +19,7 @@ import unittest
 from cs.lex import str1
 from cs.misc import the, get0
 from cs.mappings import parseUC_sAttr
-from cs.logutils import Pfx, error, warn, info, debug
+from cs.logutils import Pfx, D, error, warn, info, debug
 
 # regexp to match TYPE:name
 re_NODEREF = re.compile(r'([A-Z]+):([^:#]+)')
@@ -484,6 +484,9 @@ class NodeDB(dict):
     backend.set_nodedb(self)
     self._lock = allocate_lock()
 
+  def __str__(self):
+    return "%s[_backend=%s]" % (type(self), self._backend)
+
   class __AttrTypeRegistration(object):
     ''' An object to hold an attribute value type registration, with the
         following attributes:
@@ -629,6 +632,7 @@ class NodeDB(dict):
     ''' Wrapper for _createNode with collision detection and registration of
         the new Node.
         Subclasses of NodeDB should override _createNode, not this method.
+        Returns the new Node.
     '''
     assert (t, name) not in self, 'newNode(%s, %s): already exists' % (t, name)
     N = self[t, name] = self._createNode(t, name)
@@ -785,6 +789,8 @@ class NodeDB(dict):
       for N in nodes:
         t, n = N.type, N.name
         attrs = N.keys()
+        if len(attrs) == 0:
+          warn("%s: dropping node %s, no attributes!" % (self, N))
         attrs.sort()
         oattr = None
         for attr in attrs:
@@ -939,13 +945,22 @@ class NodeDB(dict):
     return 0
 
   def cmd_set(self, args, createSubNodes=True):
+    # -C: create node if missing
+    doCreate = False
+    if args and args[0] == '-C':
+      args.pop(0)
+      doCreate = True
     if len(args) == 0:
       raise GetoptError("missing TYPE:key")
-    key=args.pop(0)
+    key = args.pop(0)
     with Pfx(key):
       if key not in self:
-        raise GetoptError("unknown key")
-      N=self[key]
+        if not doCreate:
+          raise GetoptError("unknown key: %s" % (key,))
+        t, name = nodekey(key)
+        N = self._makeNode(t, name)
+      else:
+        N=self[key]
       for assignment in args:
         with Pfx(assignment):
           N.assign(assignment, createSubNodes=createSubNodes)
