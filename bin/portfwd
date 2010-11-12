@@ -125,6 +125,8 @@ case "$target" in
   *)target_short=$target ;;
 esac
 
+target_disable_flag=PORTFWD_DISABLE_`echo "$target_short" | tr '[a-z-]' '[A-Z_]'`
+
 xit=0
 monpid=
 sshpid=
@@ -175,6 +177,13 @@ do
 
   [ $stop ] && exit 0
 
+  # if tunnel disabled, skip and check again in a bit
+  if flag "$target_disable_flag"
+  then
+    sleep 10
+    continue
+  fi
+
   rm -f -- "$cfg_control"
   $trace \
     sshto \
@@ -202,7 +211,9 @@ do
 
   # wait for tunnel to exit or tunnel permission to expire
   while kill -0 "$sshpid" && ok2portfwd
-  do  sleep 31
+  do
+    flag "$target_disable_flag" && break
+    sleep 31
   done
   if synckill "$sshpid"
   then
