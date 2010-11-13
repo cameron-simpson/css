@@ -59,7 +59,10 @@ _home:
         bosskip=`hg status | sed -n 's:^? bin-bos/\(.*\):--exclude=/\1:p'` \
         set-x qrsync -a $$bosskip bin-bos/. $(HOME)/bin-bos/. \
         csskip=`hg status | sed -n 's:^? bin-cs/\(.*\):--exclude=/\1:p'` \
-        set-x qrsync -a $$csskip bin-cs/. $(HOME)/bin-cs/. \
+        set-x qrsync -a $$csskip \\
+                --exclude=/testzap \\
+                --exclude=/testpageurls \\
+                bin-cs/. $(HOME)/bin-cs/. \
         libskip=`hg status | sed -n 's:^? lib/\(.*\):--exclude=/\1:p'` \
         set-x \\
         qrsync -a --delete \\
