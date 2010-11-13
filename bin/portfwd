@@ -4,6 +4,8 @@
 #       - Cameron Simpson <cs@zip.com.au> 08jul2008
 #
 
+set -ue
+
 : ${VARRUN:=$HOME/var/run}
 : ${LOGDIR:=$HOME/var/log}
 : ${PORTFWD_TARGETS:-''}
@@ -68,8 +70,8 @@ not()
 
 ok2portfwd()
 {
-  flag PORTFWD_ANYWAY && return 0
-  flag PORTFWD_DISABLE && return 1
+  flag -w PORTFWD_ANYWAY && return 0
+  flag -w PORTFWD_DISABLE && return 1
   ssh-add -l >/dev/null || return 1
   netstat -rn | egrep '^(default|0\.0\.0\.0) +[1-9]' >/dev/null || return 1
   [ -x "$HOME/bin-local/do-portfwd" ] || return 0
@@ -77,17 +79,54 @@ ok2portfwd()
 }
 
 # send SIGTERM to a process and wait for it to exit
+# synckill [-v] [-s sig] [--] pids...
 synckill()
-{ _synckill_verbose=
-  if [ "x$1" = x-v ]
-  then  shift
-        _synckill_verbose=1
-  fi
-  kill "$1" || return 1
-  while kill -0 "$1" 2>/dev/null && sleep 1
-  do  [ -z "$_synckill_verbose" ] || printf .
-  done
-  [ -z "$_synckill_verbose" ] || echo
+{ ( subprocs=
+    verbose=
+    sig=TERM
+    max=5
+    xit=0
+    while [ $# -gt 0 ]
+    do
+      case $1 in
+        -v)       verbose=1 ;;
+        -s)       sig=$2; shift ;;
+        --)       shift; break ;;
+        -?)       echo "$cmd: synckill: unrecognised option: $1" >&2
+                  xit=2
+                  ;;
+        *)        break ;;
+      esac
+      shift
+    done
+    pids=$*
+    [ $verbose ] && printf "%s" "$cmd: synckill $pids"
+    $trace kill -s "$sig" $pids || xit=1
+    pollsig=0
+    while [ -n "$pids" ]
+    do
+      npids=
+      for pid in $pids
+      do  $trace kill -s "$pollsig" "$pid" 2>/dev/null && npids="$npids $pid"
+      done
+      pids=$npids
+      if [ -n "$pids" ]
+      then
+        sleep 1
+        [ $verbose ] && printf .
+        case $max in
+          0)    pollsig=KILL ;;
+          1|2)  pollsig=TERM ;;
+          *)    pollsig=0
+                max=`expr $max - 1` || :
+                ;;
+        esac
+      fi
+    done
+    [ $verbose ] && echo
+    exit $xit
+  )
+  return $?
 }
 
 if [ "x$*" = xALL ]
@@ -105,15 +144,26 @@ then
   fi
 fi
 
+subprocs=
+
+for sig in HUP INT TERM
+do
+  trap "sig=$sig
+        echo \"\$cmd: received SIG\$sig\"
+        [ -n \"\$subprocs\" ] && synckill -v -s \"\$sig\" \$subprocs
+        exit 1
+       " "$sig"
+done
+
 if [ $# -gt 1 ]
 then
-  ( set -x
-    for target
-    do
-      "$0" $opts -- "$target" &
-    done
-    wait
-  )
+  set -x
+  for target
+  do
+    "$0" $opts -- "$target" &
+    subprocs="$subprocs $!"
+  done
+  wait
   exit $?
 fi
 
@@ -125,25 +175,10 @@ case "$target" in
   *)target_short=$target ;;
 esac
 
+cmd="$cmd $target_short"
 target_disable_flag=PORTFWD_DISABLE_`echo "$target_short" | tr '[a-z-]' '[A-Z_]'`
 
 xit=0
-monpid=
-sshpid=
-trap ': trap on 1 2 and 15 ...
-      if [ -n "$sshpid" ]
-      then
-        printf "%s" "$cmd: $target: SIGTERM received, killing ssh ($sshpid) "
-        synckill -v "$sshpid"
-        if [ -n "$monpid" ]
-        then
-          printf "%s" "$cmd: $target: SIGTERM received, also killing monitor ($monpid) "
-          synckill -v "$monpid"
-        fi
-      fi
-      exit 1
-     ' 1 2 15
-
 first=1
 while :
 do
@@ -177,12 +212,11 @@ do
 
   [ $stop ] && exit 0
 
+  echo "$$" >"$cfg_pidfile"
+
   # if tunnel disabled, skip and check again in a bit
-  if flag "$target_disable_flag"
-  then
-    sleep 10
-    continue
-  fi
+  flag -w "$target_disable_flag" && { sleep 10; continue; }
+  ok2portfwd                  || { sleep 10; continue; }
 
   rm -f -- "$cfg_control"
   $trace \
@@ -195,37 +229,26 @@ do
        while sleep 61 && printf " "; do :; done
       ' \
     >>"$cfg_outlog" </dev/null &
+  subprocs="$subprocs $!"
   sshpid=$!
-  echo "$sshpid" >"$cfg_pidfile"
-  echo "$target: $cfg_pidfile: $sshpid"
   [ $first ] || alert "RESTARTED: sshpf $target" &
 
   # start monitor
   if [ -n "$cfg_monitor" ]
   then
     sh -c "$cfg_monitor" &
-    monpid=$!
-  else
-    monpid=
+    subprocs="$subprocs $!"
   fi
 
   # wait for tunnel to exit or tunnel permission to expire
   while kill -0 "$sshpid" && ok2portfwd
   do
-    flag "$target_disable_flag" && break
+    flag -w "$target_disable_flag" && break
     sleep 31
   done
-  if synckill "$sshpid"
-  then
-    sshpid=
-    alert "KILLED: sshpf $target" &
-  else
-    sshpid=
-    alert "EXITED: sshpf $target" &
-  fi
-
-  # stop monitor
-  [ -z "$monpid" ] || kill "$monpid" 2>/dev/null
+  alert "EXITED: sshpf $target, pid $sshpid" &
+  synckill -v $subprocs
+  subprocs=
 
   [ $once ] && break
 
