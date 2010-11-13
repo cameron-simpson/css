@@ -6,13 +6,29 @@
 
 flagdir=$HOME/var/flags
 invert=
+makemissing=
 
 cmd=$0
-usage="Usage: $0 [-d flagdir] [!] flagname [true|false|0|1]"
+usage="Usage: $0 [-d flagdir] [-w] [--] [!] [flagname [true|false|0|1]]
+  -d flagdir    Specify directory to hold flag files.
+  -w            Update the flag file with the derived flag if missing."
 
 badopts=
 
-[ $# -gt 0 ] && [ "x$1" = x-d ] && { flagdir=$2; shift; shift; }
+while [ $# -gt 0 ]
+do
+  case $1 in
+    -d) flagdir=$2; shift ;;
+    -w) makemissing=1 ;;
+    --) shift; break ;;
+    -?*)echo "$cmd: unrecognised option: $1" >&2
+        badopts=1
+        ;;
+    *)  break ;;
+  esac
+  shift
+done
+
 [ $# -gt 0 ] && [ "x$1" = x!  ] && { invert=1; shift; }
 
 if [ $# = 0 ]
@@ -77,6 +93,7 @@ fi
 if [ -s "$flagfile" ]
 then  [ $invert ] && exit 1
       exit 0
-else  [ $invert ] && exit 0
+else  [ $makemissing ] && [ ! -f "$flagfile" ] && : >"$flagfile"
+      [ $invert ] && exit 0
       exit 1
 fi
