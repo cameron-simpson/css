@@ -14,7 +14,7 @@ usage="Usage: $cmd [-stdin] [-end] [-n] [--] arg command [command-args...]
 		This is the default.
 	-n	Put arg after the first n command-args.
 		-0 and -1 are the common examples.
-	-x	trace execution of command."
+	-x	Trace execution of command."
 
 badopts=
 
