@@ -9,7 +9,7 @@ import os.path
 from types import StringTypes
 import unittest
 import sys
-from cs.logutils import error
+from cs.logutils import Pfx, error, warn , info
 from . import NodeDB, Backend
 from .node import TestAll as NodeTestAll
 
@@ -19,13 +19,18 @@ class Backend_CSVFile(Backend):
     self.readonly = readonly
     self.csvpath = csvpath
 
+  def __str__(self):
+    return "Backend_CSVFile[%s]" % (self.csvpath,)
+
   def close(self):
     self.sync()
 
   def sync(self):
-    if not self.nodedb.readonly:
-      with open(self.csvpath, "wb") as fp:
-        self.nodedb.dump(fp, fmt='csv')
+    with Pfx("sync %s" % (self,)):
+      if not self.nodedb.readonly:
+        with open(self.csvpath, "wb") as fp:
+          info("rewrite(%s)" % (self.csvpath,))
+          self.nodedb.dump(fp, fmt='csv')
 
   def _preload(self):
     ''' Prepopulate the NodeDB from the database.
