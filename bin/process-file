@@ -1,0 +1,131 @@
+#!/bin/sh
+#
+# Process one file to produce another.
+# Create a subdirectory and work in there.
+# Useful to run multiple processes which make scratch files in their
+# working directory and also carries out a bunch of fairly standard safety
+# checks (dstfile already exists, etc).
+#       - Cameron Simpson <cs@zip.com.au> 15nov2010
+#
+
+set -ue
+
+trace=set-x     ##eecho
+lnopts=
+srcarg1opt=
+dstarg1opt=
+
+cmd=`basename "$0"`
+usage="Usage: $cmd [-s] [--] [arg1opt] srcfile [arg1opt] {.ext|dstfile} command [args...]
+  -s            Symlink srcfile into work directory instead of hard link.
+  arg1opt       Passed to arg1 to position srcfile and dstfile."
+
+badopts=
+
+while [ $# -gt 0 ]
+do
+  case $1 in
+    -s) lnopts="$lnopts -s" ;;
+    --) shift; break ;;
+    -?*)echo "$cmd: unrecognised option: $1" >&2
+        badopts=1
+        ;;
+    *)  break ;;
+  esac
+  shift
+done
+
+if [ $# -gt 0 ]
+then
+  case $1 in
+    -stdin|-discard|-end|-[0-9]*)
+      srcarg1opt=$1
+      shift
+      ;;
+  esac
+fi
+
+if [ $# = 0 ]
+then
+  echo "$cmd: missing srcfile: $src" >&2
+  badopts=1
+else
+  src=$1
+  shift
+  [ -f "$src" ] || { echo "$cmd: missing srcfile: $src" >&2
+                     badopts=1
+                   }
+
+  if [ $# -gt 0 ]
+  then
+    case $1 in
+      -stdin|-discard|-end|-[0-9]*)
+        dstarg1opt=$1
+        shift
+        ;;
+    esac
+  fi
+
+  if [ $# = 0 ]
+  then
+    echo "$cmd: missing .ext or dstfile" >&2
+    badopts=1
+  else
+
+    dst=$1
+    shift
+    case $dst in
+      /* | ./* | ../* )
+        ;;
+      *)
+        case $src in
+          *.?*)
+            set -x
+            srcsfx=`expr "x$src" : 'x.*\(\...*\)'`
+            srcpfx=`expr "x$src" : 'x\(.*\)\...*'`
+            case "$srcsfx" in
+              */*)  echo "$cmd: srcfile has no .ext extension, rejecting .ext dstfile: $dst" >&2
+                    badopts=1
+                    ;;
+              *)    dst=$srcpfx$dst
+                    ;;
+            esac
+            ;;
+          *)echo "$cmd: srcfile has no .ext extension, rejecting .ext dstfile: $dst" >&2
+            badopts=1
+            ;;
+        esac
+        ;;
+    esac
+    [ -f "$dst" ] && { echo "$cmd: pre-existing dstfile: $dst" >&2
+                       badopts=1
+                     }
+  fi
+fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+tmpdir=$cmd.$$
+case "$src" in
+  /*) abssrc=$src ;;
+  *)  abssrc=`pwd`/$src ;;
+esac
+basesrc=`basename "$src"`
+basedst=`basename "$dst"`
+
+trap 'rm -rf -- "$tmpdir"; exit 1' 1 3 15
+
+set -x
+mkdir "$tmpdir"
+ln $lnopts -- "$abssrc" "$tmpdir/."
+
+( cd "$tmpdir"
+  exec \
+    arg1 $srcarg1opt "$basesrc" \
+      arg1 -x $dstarg1opt "$basedst" \
+        $trace "$@"
+) || xit=0
+
+mv -i -- "$tmpdir/$basedst" "$dst" || xit=1
+rm -r "$tmpdir" || xit=1
+exit $xit
