@@ -171,30 +171,3 @@ def NoUpd(U=None):
       return __dummyNoUpd()
     U=_defaultUpd
   return U._withoutContext()
-
-def _summarise_exception(exc_value):
-  summary = str(exc_value)
-  if len(summary) == 0:
-    summary = repr(exc_value)
-  return summary
-
-class ShortExceptions(object):
-  ''' Wrapper to catch exceptions and abort with a short error message.
-      This is really only intended for use as an outermost wrapper for a main
-      program to produce more user friendly messages.
-      Setting cs.misc.debug passes exceptions out unharmed, eg:
-        DEBUG=1 the-program ...
-  '''
-  def __enter__(self):
-    pass
-  def __exit__(self, exc_type, exc_value, tb):
-    if exc_type is None \
-    or exc_type is SystemExit \
-    or exc_type is AssertionError:
-      return False
-    import cs.misc
-    if cs.misc.debug:
-      return False
-    import sys
-    print >>sys.stderr, _summarise_exception(exc_value)
-    sys.exit(1)
