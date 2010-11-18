@@ -1,5 +1,6 @@
 #!/usr/bin/python
 
+from getopt import GetoptError
 import os.path
 import sys
 from cs.nodedb.node import Node, NodeDB, Backend, NodeDBFromURL
@@ -38,13 +39,16 @@ def main(argv):
       ops = { "create": _create,
               "dump":   _dump,
               "load":   _load,
-              "httpd":  _httpd,
             }
-      with Pfx(op):
-        if op in ops:
+      if op in ops:
+        with Pfx(op):
           xit = ops[op](dburl, argv)
-        else:
-          error("unsupported op")
+      else:
+        DB = NodeDBFromURL(dburl)
+        try:
+          xit = DB.do_command([op] + argv)
+        except GetoptError, e:
+          error("%s: %s", op, e)
           badopts = True
 
     if badopts or xit == 2:
@@ -74,17 +78,6 @@ def _load(dburl, argv):
   else:
     DB = NodeDBFromURL(dburl)
     DB.load(sys.stdin)
-  return xit
-
-def _httpd(dburl, argv):
-  xit = 0
-  if len(argv) == 0:
-    error("missing bindhost:bindport")
-    return 2
-  bindhost, bindport = argv.pop(0).rsplit(':', 1)
-  import cs.nodedb.httpd
-  DB = NodeDBFromURL(dburl, readonly=True)
-  cs.nodedb.httpd.serve(DB, bindhost, bindport)
   return xit
 
 if __name__ == '__main__':

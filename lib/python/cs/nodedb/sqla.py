@@ -103,7 +103,7 @@ class Backend_SQLAlchemy(Backend):
         continue
       N = byID[nodeid]
       value = self.fromtext(value)
-      N[attr+'s'].append(value, noBackend=True )
+      getattr(N, attr+'s').append(value, noBackend=True )
 
   def fromtext(self, text):
     if text.startswith(':#'):

@@ -167,6 +167,7 @@ class NodeDBView(CherryPyNode):
     '''
 
     def __init__(self, top):
+      CherryPyNode.__init__(self, top.basepath)
       self.top = top
 
     @cherrypy.expose

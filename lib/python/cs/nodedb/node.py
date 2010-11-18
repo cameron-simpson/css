@@ -10,6 +10,7 @@ if sys.hexversion < 0x02060000:
 else:
   import json
 import itertools
+from getopt import GetoptError
 from thread import allocate_lock
 from threading import Thread
 from types import StringTypes
@@ -18,12 +19,12 @@ import unittest
 from cs.lex import str1
 from cs.misc import the, get0
 from cs.mappings import parseUC_sAttr
-from cs.logutils import Pfx, error, warn, info
+from cs.logutils import Pfx, D, error, warn, info, debug
 
 # regexp to match TYPE:name
 re_NODEREF = re.compile(r'([A-Z]+):([^:#]+)')
 # regexp to match a bareword name
-re_NAME = re.compile(r'[a-z][a-z0-9]*(?![a-zA-Z0-9_])')
+re_NAME = re.compile(r'[a-z][a-z_0-9]*(?![a-zA-Z0-9_])')
 # JSON string expression, lenient
 re_STRING = re.compile(r'"([^"\\]|\\.)*"')
 # JSON simple integer
@@ -274,10 +275,16 @@ class Node(dict):
     return self.type+":"+self.name
 
   def __eq__(self, other):
+    ''' Two Nodes are equal if their name and type are equal and their
+        dictness is equal.
+    '''
     return hasattr(other, 'name') and self.name == other.name \
-       and hasattr(other, 'type') and self.type == other.type
+       and hasattr(other, 'type') and self.type == other.type \
+       and dict.__eq__(self, other)
 
   def __hash__(self):
+    ''' Hash function, based on name, type and nodedb id.
+    '''
     return hash(self.name)^hash(self.type)^id(self.nodedb)
 
   def __get(self, k):
@@ -335,7 +342,7 @@ class Node(dict):
         return values
       if len(values) == 1:
         return values[0]
-      raise AttributeError, "%s.%s" % (self, attr)
+      raise AttributeError, "%s.%s (values=%s %s, len=%s)" % (self, attr, type(values), values, len(values))
 
     raise AttributeError, str(self)+'.'+repr(attr)
 
@@ -405,6 +412,12 @@ class Node(dict):
     raise ValueError, "can't gettoken: %s" % (valuetxt,)
 
   def update(self, new_attrs, delete_missing=False):
+    ''' Update this Node with new attributues, optionally removing
+        extraneous attributes.
+        `new_attrs` is a mapping from an attribute name to a value list.
+	If `delete_missing` is supplied true, remove attribute not
+	specified in `new_attrs`.
+    '''
     with Pfx("%s.update" % (self,)):
       # add new attributes
       new_attr_names = new_attrs.keys()
@@ -415,7 +428,7 @@ class Node(dict):
           error("%s.applyAttrs: ignore non-ATTRs: %s" % (self, attr))
           continue
         if k not in self:
-          info("new .%s=%s" % (k+'s', new_attrs[attr]))
+          info("new .%s=%s", k+'s', new_attrs[attr])
           self[k] = new_attrs[attr]
 
       # change or possibly remove old attributes
@@ -424,18 +437,22 @@ class Node(dict):
       for attr in old_attr_names:
         k, plural = parseUC_sAttr(attr)
         if not k or not plural:
-          info("%s.applyAttrs: ignore non-ATTRs old attr: %s" % (self, attr))
+          warn("%s.applyAttrs: ignore non-ATTRs old attr: %s", self, attr)
           continue
         if k.endswith('_ID'):
-          error("%s.applyAttrs: ignoring bad old ATTR_ID: %s" % (self, attr))
+          error("%s.applyAttrs: ignoring bad old ATTR_ID: %s", self, attr)
           continue
         if k in new_attrs:
-          if self[k] != new_attrs[k]:
-            info("set .%s=%s" % (k, new_attrs[attr]))
-            self[k] = new_attrs[attr]
+          nattrs = new_attrs[k]
+          if self[k] != nattrs:
+            info("set .%ss=%s", k, nattrs)
+            self[k] = nattrs
         elif delete_missing:
-          info("del .%s=%s" % (k+'s', new_attrs[attr]))
+          info("del .%ss", k)
           del self[k]
+
+  def textdump(self, fp):
+    self.nodedb.dump(fp, nodes=(self,))
 
 def nodekey(*args):
   ''' Convert some sort of key to a (TYPE, NAME) tuple.
@@ -479,6 +496,9 @@ class NodeDB(dict):
     self.__nodesByType = {}
     backend.set_nodedb(self)
     self._lock = allocate_lock()
+
+  def __str__(self):
+    return "%s[_backend=%s]" % (type(self), self._backend)
 
   class __AttrTypeRegistration(object):
     ''' An object to hold an attribute value type registration, with the
@@ -625,6 +645,7 @@ class NodeDB(dict):
     ''' Wrapper for _createNode with collision detection and registration of
         the new Node.
         Subclasses of NodeDB should override _createNode, not this method.
+        Returns the new Node.
     '''
     assert (t, name) not in self, 'newNode(%s, %s): already exists' % (t, name)
     N = self[t, name] = self._createNode(t, name)
@@ -781,6 +802,8 @@ class NodeDB(dict):
       for N in nodes:
         t, n = N.type, N.name
         attrs = N.keys()
+        if len(attrs) == 0:
+          warn("%s: dropping node %s, no attributes!" % (self, N))
         attrs.sort()
         oattr = None
         for attr in attrs:
@@ -792,6 +815,8 @@ class NodeDB(dict):
             row = (ct, cn, ca, self.totext(value))
             w.writerow(row)
             otype, oname, oattr = t, n, attr
+    else:
+      assert False, "dump: unsupported format: %s" % (fmt,)
     fp.flush()
     return
 
@@ -836,6 +861,148 @@ class NodeDB(dict):
       return
 
     raise ValueError, "unsupported format '%s'" % (fmt,)
+
+  def do_command(self, args):
+    op = args.pop(0)
+    with Pfx(op):
+      try:
+        op_func = getattr(self, "cmd_" + op)
+      except AttributeError:
+        raise GetoptError, "unknown operation"
+      return op_func(args)
+
+  def cmd_update(self, args, fp=None):
+    xit = 0
+    if fp is None:
+      fp = sys.stdout
+    if len(args) == 0:
+      raise GetoptError("missing dburl")
+    dburl = args.pop(0)
+    if len(args) > 0:
+      raise GetoptError("extra arguments after dburl '%s': %s" % (dburl, " ".join(args)))
+    DB2 = NodeDBFromURL(dburl, readonly=True)
+    nodes1 = list(self._dump_nodes())
+    for N in nodes1:
+      t, name = N.type, N.name
+      N2 = DB2.get( (t, name), {} )
+      attrs = N.keys()
+      attrs.sort()
+      for attr in attrs:
+        v1 = set( N[attr] )
+        v2 = N2.get(attr, ())
+        v1.difference_update(v2)
+        extra = sorted(v1)
+        for e in extra:
+          fp.write("set %s:%s %s=%s\n" % (t, name, attr, e))
+    return xit
+
+  def cmd_dump(self, args, fp=None):
+    xit = 0
+    if fp is None:
+      fp = sys.stdout
+    first = True
+    for arg in args:
+      with Pfx(arg):
+        if not first:
+          fp.write('\n')
+        self[arg].textdump(fp)
+        first=False
+    return xit
+
+  def cmd_edit(self, args):
+    if len(args) != 1:
+      raise GetoptError("expected a single TYPE:key")
+    N = self[args[0]]
+    from cs.nodedb.text import editNode
+    editNode(N, createSubNodes=True)
+    return 0
+
+  def cmd_httpd(self, args):
+    xit = 0
+    import cs.nodedb.httpd
+    if len(args) == 0:
+      raise GetoptError("missing ipaddr:port")
+    ipaddr, port = args.pop(0).rsplit(':', 1)
+    port = int(port)
+    if len(args) > 0:
+      raise GetoptError("extra arguments after %s:%s" % (ipaddr, port))
+    self.readonly = True
+    cs.nodedb.httpd.serve(self, ipaddr, port)
+    return xit
+
+  def cmd_list(self, args):
+    xit = 0
+    if not args:
+      raise GetoptError("expected TYPE:* arguments")
+    for arg in args:
+      with Pfx('"%s"' % (arg,)):
+        if arg.endswith(":*"):
+          nodetype = arg[:-2]
+          for N in self.nodesByType(nodetype):
+            print str(N)
+#           attrnames = N.attrs.keys()
+#           attrnames.sort()
+#           fields = {}
+#           for attrname in attrnames:
+#             F = [ str(v) for v in getattr(N, attrname+'s') ]
+#             if len(F) == 1:
+#               fields[attrname] = F[0]
+#             else:
+#               fields[attrname+'s'] = F
+#           print str(N), fields
+        else:
+          raise GetoptError("unsupported argument; expected TYPE:*")
+    return xit
+
+  def cmd_new(self, args, createSubNodes=True):
+    if len(args) == 0:
+      raise GetoptError("missing TYPE:key")
+    key=args.pop(0)
+    with Pfx(key):
+      if ':' not in key:
+        raise GetoptError("bad key")
+      nodetype, name = key.split(':',1)
+      if not nodetype.isupper():
+        raise GetoptError("bad key type \"%s\"" % nodetype)
+      N = self.newNode(nodetype, name)
+      for assignment in args:
+        N.assign(assignment, createSubNodes=createSubNodes)
+    return 0
+
+  def cmd_print(self, attrs):
+    N = self[attrs.pop(0)]
+    for attr in attrs:
+      print N.get0(attr, '')
+    return 0
+
+  def cmd_report(self, args):
+    if len(args) != 1:
+      raise GetoptError("expected a single TYPE:key")
+    with Pfx(args[0]):
+      self[args[0]].report(sys.stdout)
+    return 0
+
+  def cmd_set(self, args, createSubNodes=True):
+    # -C: create node if missing
+    doCreate = False
+    if args and args[0] == '-C':
+      args.pop(0)
+      doCreate = True
+    if len(args) == 0:
+      raise GetoptError("missing TYPE:key")
+    key = args.pop(0)
+    with Pfx(key):
+      if key not in self:
+        if not doCreate:
+          raise GetoptError("unknown key: %s" % (key,))
+        t, name = nodekey(key)
+        N = self._makeNode(t, name)
+      else:
+        N=self[key]
+      for assignment in args:
+        with Pfx(assignment):
+          N.assign(assignment, createSubNodes=createSubNodes)
+    return 0
 
 _NodeDBsByURL = {}
 
