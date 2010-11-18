@@ -7,7 +7,7 @@ import logging
 from logging import StreamHandler
 from subprocess import Popen, PIPE
 import cs.misc
-from cs.ansi_colour import colourise, colours
+from cs.ansi_colour import colourise
 from cs.logutils import Pfx
 from cs.lex import unctrl
 
@@ -50,9 +50,9 @@ class UpdHandler(StreamHandler):
       if logrec.levelno >= self.__nlLevel:
         with self.__upd._withoutContext():
           if logrec.levelno >= logging.ERROR:
-            logrec.msg = colourise(logrec.msg, colours['red'])
+            logrec.msg = colourise(logrec.msg, 'red')
           elif logrec.levelno >= logging.WARN:
-            logrec.msg = colourise(logrec.msg, colours['yellow'])
+            logrec.msg = colourise(logrec.msg, 'yellow')
           StreamHandler.emit(self, logrec)
       else:
         self.__upd.out(logrec.getMessage())
