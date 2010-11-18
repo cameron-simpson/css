@@ -16,7 +16,7 @@ import cs.misc
 
 logging_level = logging.INFO
 
-def setup_logging(cmd=None, format=None, level=None, upd_mode=None):
+def setup_logging(cmd=None, format=None, level=None, upd_mode=None, ansi_mode=None):
   ''' Arrange basic logging setup for conventional UNIX command
       line error messaging.
       Sets cs.misc.cmd to `cmd`.
@@ -25,6 +25,9 @@ def setup_logging(cmd=None, format=None, level=None, upd_mode=None):
       infer_logging_level().
       If `upd_mode` is None, set it from sys.stderr.isatty().
       A true value causes the root logger to use cs.upd for logging.
+      If `ansi_mode` is None, set it from sys.stderr.isatty().
+      A true value causes the root logger to colour certain logging levels
+      using ANSI terminal sequences (currently only if cs.upd is used).
       Returns the logging level.
   '''
   if cmd is None:
@@ -39,11 +42,13 @@ def setup_logging(cmd=None, format=None, level=None, upd_mode=None):
       upd_mode = False
   if upd_mode is None:
     upd_mode = sys.stderr.isatty()
+  if ansi_mode is None:
+    ansi_mode = sys.stderr.isatty()
   if upd_mode:
     from cs.upd import UpdHandler
     rootLogger = logging.getLogger()
     rootLogger.setLevel(level)
-    upd = UpdHandler(sys.stderr, logging.WARNING)
+    upd = UpdHandler(sys.stderr, logging.WARNING, ansi_mode=ansi_mode)
     upd.setFormatter(logging.Formatter(format))
     rootLogger.addHandler(upd)
   else:
@@ -207,7 +212,7 @@ class Pfx_LoggerAdapter(myLoggerAdapter):
   def process(self, msg, kwargs):
     prefix = _prefix.prefix
     if len(prefix) > 0:
-      msg = prefix + ": " + msg
+      msg = prefix.replace('%', '%%') + ": " + msg
     return msg, kwargs
 
 def pfx(func):
