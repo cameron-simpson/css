@@ -1,0 +1,82 @@
+#!/bin/sh
+#
+# Run command.
+# Report OK or FAIL on stdout.
+# If --count-regexp specified, count and strip matching lines and report
+#   {OK|FAIL} <count> words...
+# - Cameron Simpson <cs@zip.com.au> 24nov2010
+#
+
+set -ue
+
+: ${TMPDIR:=/tmp}
+
+cmd=`basename "$0"`
+usage="Usage: $cmd [--count-regexp re words...] -- command [args...]"
+
+trace=  ##set-x
+count_re=
+words=
+
+badopts=
+
+while [ $# -gt 0 ]
+do
+  case $1 in
+    --count-regexp)
+      count_re=$2; shift; shift
+      while [ $# -gt 0 ]
+      do
+        case $1 in
+          --) break ;;
+        esac
+        words="$words $1"
+        shift
+      done
+      ;;
+    --)
+      shift; break ;;
+    -?*)
+      echo "$cmd: unrecognised option: $1" >&2
+      badopts=1
+      ;;
+    *)break ;;
+  esac
+  shift
+done
+
+if [ $# = 0 ]
+then
+  echo "$cmd: missing command" >&2
+  badopts=1
+fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+if [ -n "$count_re" ]
+then
+  matchlog=$TMPDIR/$cmd$$matches
+  sedprog="\|$count_re|{ w $matchlog
+          d;}"
+  sedcmd=`shqstr sed "$sedprog"`
+  set -- filter_fd 1 "$sedcmd" "$@"
+fi
+
+xit=0
+$trace "$@" || xit=$?
+
+if [ -n "$count_re" ]
+then
+  set -- `wc -l <"$matchlog"`
+  words=" $1$words"
+  rm -f "$matchlog"
+fi
+
+if [ $xit = 0 ]
+then
+  echo "OK$words"
+else
+  echo "FAIL$words"
+fi
+
+exit $xit
