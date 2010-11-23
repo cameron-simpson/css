@@ -8,7 +8,7 @@
 
 : ${TMPDIR:=/tmp}
 
-cmd=$0	## `basename "$0"` ## perhaps a bit much overhead for this one
+cmd=`basename "$0"`
 usage="Usage: $cmd fd[,fd...] filter command [args...]"
 
 badopts=
