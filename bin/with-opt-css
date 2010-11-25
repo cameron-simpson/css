@@ -1,12 +1,17 @@
 #!/bin/sh -ue
 #
 # Try to set up the css env, then run a command.
+# If no command, run "env".
 #       - Cameron Simpson <cs@zip.com.au> 22may2009
 #
 
 set -ue
 
+usage="Usage: $0 [-d optcssdir] [command [args...]]"
+
 : ${OPTCSS:=''}
+
+[ $# -gt 0 ] && [ "x$1" = x-d ] && { OPTCSS=$2; shift; shift; }
 
 [ $# -gt 0 ] || set -- env
 
