@@ -11,12 +11,23 @@ set -ue
 
 : ${TMPDIR:=/tmp}
 
-cmd=`basename "$0"`
-usage="Usage: $cmd [--count-regexp re] words... -- command [args...]"
-
 trace=  ##set-x
 count_re=
 words=
+OK=OK:
+FAIL=FAIL:
+
+cmd=`basename "$0"`
+usage="Usage: $cmd [options...] [--] command [args...]
+  --count-regexp regexp
+        Regexp for output lines to count, report and discard.
+  -:    Suppress colon in OK/FAIL prefix.
+  --ok okpfx
+        Use okpfx instead of $OK.
+  --fail failpfx
+        Use failpfx instead of $FAIL.
+  --label label
+        Recite label after OK/FAIL. Defaults to command."
 
 badopts=
 
@@ -24,7 +35,18 @@ while [ $# -gt 0 ]
 do
   case $1 in
     --count-regexp)
-      count_re=$2; shift; shift
+      count_re=$2; shift
+      ;;
+    -:)
+      OK=OK
+      FAIL=FAIL
+      ;;
+    --ok)
+      OK=$2; shift ;;
+    --fail)
+      FAIL=$2; shift ;;
+    --label)
+      words="$words $2"; shift
       ;;
     --)
       shift; break ;;
@@ -32,7 +54,7 @@ do
       echo "$cmd: unrecognised option: $1" >&2
       badopts=1
       ;;
-    *)words="$words $1"
+    *)break
       ;;
   esac
   shift
@@ -69,9 +91,9 @@ fi
 
 if [ $xit = 0 ]
 then
-  echo "OK$words"
+  echo "$OK$words"
 else
-  echo "FAIL$words"
+  echo "$FAIL$words"
 fi
 
 exit $xit
