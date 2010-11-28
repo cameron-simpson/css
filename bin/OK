@@ -12,7 +12,7 @@ set -ue
 : ${TMPDIR:=/tmp}
 
 cmd=`basename "$0"`
-usage="Usage: $cmd [--count-regexp re words...] -- command [args...]"
+usage="Usage: $cmd [--count-regexp re] words... -- command [args...]"
 
 trace=  ##set-x
 count_re=
@@ -25,14 +25,6 @@ do
   case $1 in
     --count-regexp)
       count_re=$2; shift; shift
-      while [ $# -gt 0 ]
-      do
-        case $1 in
-          --) break ;;
-        esac
-        words="$words $1"
-        shift
-      done
       ;;
     --)
       shift; break ;;
@@ -40,7 +32,8 @@ do
       echo "$cmd: unrecognised option: $1" >&2
       badopts=1
       ;;
-    *)break ;;
+    *)words="$words $1"
+      ;;
   esac
   shift
 done
@@ -52,6 +45,8 @@ then
 fi
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+[ -n "$words" ] || words=" $*"
 
 if [ -n "$count_re" ]
 then
