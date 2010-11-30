@@ -116,7 +116,9 @@ synckill()
         [ $verbose ] && printf .
         case $max in
           0)    pollsig=KILL ;;
-          1|2)  pollsig=TERM ;;
+          1|2)  pollsig=TERM
+                max=`expr $max - 1` || :
+                ;;
           *)    pollsig=0
                 max=`expr $max - 1` || :
                 ;;
