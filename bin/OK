@@ -26,14 +26,14 @@ usage="Usage: $cmd [options...] [--] command [args...]
         Regexp for output lines to count, report and discard.
   -:    Suppress colon in OK/FAIL prefix.
   --ok okpfx
-        Use okpfx instead of $OK.
+        Use \"okpfx\" instead of $OK.
   --fail failpfx
-        Use failpfx instead of $FAIL.
+        Use \"failpfx\" instead of $FAIL.
   --label label
-        Recite label after OK/FAIL. Defaults to command.
+        Recite \"label\" after OK/FAIL. Defaults to command.
   -P    Prefix output with the label.
-  --pfx prefix
-        Prefix output with \"prefix\"."
+  --prefix pfx
+        Prefix output with \"pfx\"."
 
 badopts=
 
@@ -49,7 +49,7 @@ do
       ;;
     -P)
       dopfx=1 ;;
-    --pfx)
+    --prefix)
       dopfx=1 pfx=$2; shift ;;
     --ok)
       OK=$2; shift ;;
