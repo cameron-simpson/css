@@ -11,9 +11,12 @@ set -ue
 
 : ${TMPDIR:=/tmp}
 
+dopfx=
+pfx=
 trace=  ##set-x
 count_re=
 words=
+wordsep=
 OK=OK:
 FAIL=FAIL:
 
@@ -27,7 +30,10 @@ usage="Usage: $cmd [options...] [--] command [args...]
   --fail failpfx
         Use failpfx instead of $FAIL.
   --label label
-        Recite label after OK/FAIL. Defaults to command."
+        Recite label after OK/FAIL. Defaults to command.
+  -P    Prefix output with the label.
+  --pfx prefix
+        Prefix output with \"prefix\"."
 
 badopts=
 
@@ -41,13 +47,16 @@ do
       OK=OK
       FAIL=FAIL
       ;;
+    -P)
+      dopfx=1 ;;
+    --pfx)
+      dopfx=1 pfx=$2; shift ;;
     --ok)
       OK=$2; shift ;;
     --fail)
       FAIL=$2; shift ;;
     --label)
-      words="$words $2"; shift
-      ;;
+      words="$words$wordsep$2"; wordsep=' '; shift ;;
     --)
       shift; break ;;
     -?*)
@@ -68,7 +77,12 @@ fi
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
-[ -n "$words" ] || words=" $*"
+[ -n "$words" ] || words=$*
+if [ $dopfx ]
+then
+  [ -n "$pfx" ] || pfx=$words
+  set -- pfx "$pfx" "$@"
+fi
 
 if [ -n "$count_re" ]
 then
@@ -85,15 +99,15 @@ $trace "$@" || xit=$?
 if [ -n "$count_re" ]
 then
   set -- `wc -l <"$matchlog"`
-  words=" $1$words"
+  words="$1$wordsep$words"
   rm -f "$matchlog"
 fi
 
 if [ $xit = 0 ]
 then
-  echo "$OK$words"
+  echo "$OK $words"
 else
-  echo "$FAIL$words"
+  echo "$FAIL $words"
 fi
 
 exit $xit
