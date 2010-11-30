@@ -6,8 +6,15 @@
 #
 
 cmd=$0
-usage="Usage: $cmd [-stdin] [-end] [-n] [--] arg command [command-args...]
-	-stdin	Treat arg as a filename and attach stdin to the file.
+usage="Usage: $cmd [-stdin] [-stdout] [-end] [-n] [--] arg \\
+                        command [command-args...]
+	-stdin	Treat arg as a filename and attach standard in to the file.
+		Implies -discard; add a -n or -end to also use the arg.
+	-stdout Treat arg as a filename and attach standard out to the file.
+		Implies -discard; add a -n or -end to also use the arg.
+	-stdout-append
+                As -stdout, but append to the file instead of rewriting it.
+                Treat arg as a filename and attach standard out to the file.
 		Implies -discard; add a -n or -end to also use the arg.
 	-discard Discard the arg.
 	-end	Put arg after all the command-args.
@@ -19,6 +26,8 @@ usage="Usage: $cmd [-stdin] [-end] [-n] [--] arg command [command-args...]
 badopts=
 
 dostdin=
+dostdout=
+doappend=
 pos=end
 trace=
 
@@ -26,6 +35,9 @@ while [ $# -gt 0 ]
 do
   case "$1" in
     -stdin)	dostdin=1 pos= ;;
+    -stdout)    dostdout=1 doappend= pos= ;;
+    -stdout-append)
+                dostdout=1 doappend=1 pos= ;;
     -discard)	pos= ;;
     -end)	pos=end ;;
     -[0-9]*)	pos=`expr "x$1" : 'x-\([0-9]*\)'` ;;
@@ -72,6 +84,16 @@ case "$pos" in
 	;;
 esac
 
-[ $dostdin ] && exec <"$arg"
+if [ $dostdin ]
+then  exec <"$arg"
+fi
+
+if [ $dostdout ]
+then
+  if [ $doappend ]
+  then  exec >>"$arg"
+  else  exec >"$arg"
+  fi
+fi
 
 exec $trace "$command" ${1+"$@"}
