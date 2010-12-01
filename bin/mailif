@@ -3,9 +3,35 @@
 # Send mail only if input is not empty.
 #	- Cameron Simpson <cs@zip.com.au>
 #
-# Usage: mailif [-s subject] addresses...
-#
-# Break into execif and mailsubj. - cameron, 23jun1998
-#
 
-execif mailsubj ${1+"$@"}
+set -ue
+
+usage="Usage: $0 -s subject addresses..."
+
+badopts=
+
+if [ $# = 0 ]
+then
+  echo "$0: missing -s subject" >&2
+  badopts=1
+else
+  shift
+  if [ $# = 0 ]
+  then
+    echo "$0: -s: missing subject" >&2
+    badopts=1
+  else
+    subj=$1
+    shift
+  fi
+fi
+
+if [ $# = 0 ]
+then
+  echo "$0: missing addresses" >&2
+  badopts=1
+fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+execif mailsubj -s "$subj" "$@"
