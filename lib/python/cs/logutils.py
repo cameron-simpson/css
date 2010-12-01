@@ -16,10 +16,14 @@ import cs.misc
 
 logging_level = logging.INFO
 
-def setup_logging(cmd=None, format=None, level=None, upd_mode=None, ansi_mode=None):
+def setup_logging(cmd=None, main_log=None, format=None, level=None, upd_mode=None, ansi_mode=None):
   ''' Arrange basic logging setup for conventional UNIX command
       line error messaging.
       Sets cs.misc.cmd to `cmd`.
+      If `main_log` is None, the main log will go to sys.stderr; if
+      `main_log` is a string, is it used as a filename to open in append
+      mode; otherwise main_log should be a stream suitable for use
+      with logging.StreamHandler().
       If `format` is None, set format to "cmd: levelname: message".
       If `level` is None, infer a level from the environment using
       infer_logging_level().
@@ -34,6 +38,10 @@ def setup_logging(cmd=None, format=None, level=None, upd_mode=None, ansi_mode=No
     import os.path
     cmd = os.path.basename(sys.argv[0])
   cs.misc.cmd = cmd
+  if main_log is None:
+    main_log = sys.stderr
+  elif type(main_log) is str:
+    main_log = open(main_log, "a")
   if format is None:
     format = cmd.replace('%','%%')+': %(levelname)s: %(message)s'
   if level is None:
@@ -41,18 +49,19 @@ def setup_logging(cmd=None, format=None, level=None, upd_mode=None, ansi_mode=No
     if upd_mode is None and 'NOUPD' in flags:
       upd_mode = False
   if upd_mode is None:
-    upd_mode = sys.stderr.isatty()
+    upd_mode = main_log.isatty()
   if ansi_mode is None:
-    ansi_mode = sys.stderr.isatty()
+    ansi_mode = main_log.isatty()
   if upd_mode:
     from cs.upd import UpdHandler
-    rootLogger = logging.getLogger()
-    rootLogger.setLevel(level)
-    upd = UpdHandler(sys.stderr, logging.WARNING, ansi_mode=ansi_mode)
-    upd.setFormatter(logging.Formatter(format))
-    rootLogger.addHandler(upd)
+    main_handler = UpdHandler(main_log, logging.WARNING, ansi_mode=ansi_mode)
   else:
-    logging.basicConfig(level=level, format=format)
+    from logging.handlers import StreamHandler
+    main_handler = StreamHandler(main_log)
+  rootLogger = logging.getLogger()
+  rootLogger.setLevel(level)
+  main_handler.setFormatter(logging.Formatter(format))
+  rootLogger.addHandler(main_handler)
   logging_level = level
   return level
 
