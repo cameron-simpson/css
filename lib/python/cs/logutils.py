@@ -56,8 +56,7 @@ def setup_logging(cmd=None, main_log=None, format=None, level=None, upd_mode=Non
     from cs.upd import UpdHandler
     main_handler = UpdHandler(main_log, logging.WARNING, ansi_mode=ansi_mode)
   else:
-    from logging.handlers import StreamHandler
-    main_handler = StreamHandler(main_log)
+    main_handler = logging.StreamHandler(main_log)
   rootLogger = logging.getLogger()
   rootLogger.setLevel(level)
   main_handler.setFormatter(logging.Formatter(format))
