@@ -101,13 +101,16 @@ synckill()
     done
     pids=$*
     [ $verbose ] && printf "%s" "$cmd: synckill $pids"
-    $trace kill -s "$sig" $pids || xit=1
+    $trace kill -s "$sig" $pids || :
     pollsig=0
     while [ -n "$pids" ]
     do
       npids=
       for pid in $pids
-      do  $trace kill -s "$pollsig" "$pid" 2>/dev/null && npids="$npids $pid"
+      do
+        if $trace kill -s "$pollsig" "$pid" 2>/dev/null
+        then  npids="$npids $pid"
+        fi
       done
       pids=$npids
       if [ -n "$pids" ]
