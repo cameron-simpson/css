@@ -123,9 +123,7 @@ badopts=
 # have "cp -rpl"? otherwise rely on my linktree script
 if [ "x`cp --help 2>&1 | grep ' -[rpl][, ]' | wc -l`" = x3 ]
 then  mklinktree(){ $trace cp -rpl "$1" "$2"; }
-      cpr(){ $trace cp -rp "$1" "$2"; }
 else  mklinktree(){ $trace linktree "$1" "$2"; }
-      cpr(){ $trace cpdir "$1" "$2"; }
 fi
 daycode(){ date '+%Y-%m-%d'; }
 datecode(){ date '+%Y-%m-%d-%H:%M:%S'; }
@@ -346,7 +344,7 @@ then
     fi
 fi
 
-xit=0
+ok=
 
 dolink=1
 if [ -n "$lastbackup" -a -d "$dest/$lastbackup/." ]
@@ -361,9 +359,11 @@ then
       if [ $linkonly ]
       then
           echo "$dest/$thisbackup" >&3
+          ok=1
       else
           $echo "updating $thisbackup from $src ..."
-          $trace rsync $rsopts -aH $rsdelete --rsync-path "$rrsync" ${1+"$@"} "$src/" "$dest/$thisbackup/"
+          $trace rsync $rsopts -aH $rsdelete --rsync-path "$rrsync" ${1+"$@"} "$src/" "$dest/$thisbackup/" \
+          && ok=1
       fi
     }
 else
@@ -374,40 +374,28 @@ else
         false
     else
         $echo "fresh backup, just copying source ..."
-        use_rsync=
-        case "$src" in
-            *:*) # probably remote directory - use rsync
-                 use_rsync=1
-                 ;;
-            *)   # check if they supplied rsync options
-                 [ $# = 0 ] || use_rsync=1
-                 ;;
-        esac
-        if [ $use_rsync ]
-        then
-            $trace mkdir "$dest/$thisbackup" \
-            && $trace rsync $rsopts -aH --rsync-path "$rrsync" ${1+"$@"} "$src/" "$dest/$thisbackup/"
-        else
-            cpr "$src" "$dest/$thisbackup"
-        fi
+        $trace mkdir "$dest/$thisbackup" \
+        && $trace rsync $rsopts -aH --rsync-path "$rrsync" ${1+"$@"} "$src/" "$dest/$thisbackup/" \
+        && ok=1
     fi
-fi || xit=1
+fi
 
-if [ -n "$symlink" -a -d "$dest/$thisbackup/." ]
+if [ $ok ] && [ -n "$symlink" -a -d "$dest/$thisbackup/." ]
 then
   if [ $dolink ]
   then
     ( cd "$dest" || exit 1
       rm -f "$symlink"
       $trace ln -s "$thisbackup" "$symlink"
-    ) || xit=1
+    ) || ok=
   else
     echo "$cmd: new directory worse than old, symlink \"$symlink\" not made" >&2
-    xit=1
+    ok=
   fi
 fi
 
-exit $xit
+[ $ok ]
+exit
 
 # =head1 AUTHOR
 #
