@@ -210,18 +210,20 @@ do
   case $cfg_outlog in
     /*) ;; *) cfg_outlog=$LOGDIR/$cfg_outlog ;;
   esac
-  if opid=`ifpid -q -v "$cfg_pidfile"`
+
+  if [ "$stop" ]
   then
-    printf "%s" "$cmd: stopping $target, pid $opid "
-    synckill -v "$opid" || :
-    >"$cfg_pidfile"
-  else
-    if [ "$stop" ]
-    then  echo "$cmd: no valid pid to kill in $cfg_pidfile" >&2
+    if opid=`ifpid -q -v "$cfg_pidfile"`
+    then
+      printf "%s" "$cmd: stopping $target, pid $opid "
+      synckill -v "$opid" || :
+      >"$cfg_pidfile"
+      exit 0
+    else
+      echo "$cmd: no valid pid to kill in $cfg_pidfile" >&2
+      exit 1
     fi
   fi
-
-  [ $stop ] && exit 0
 
   echo "$$" >"$cfg_pidfile"
 
@@ -231,6 +233,7 @@ do
 
   rm -f -- "$cfg_control"
   $trace \
+    tag_fd 2 "$target" \
     sshto \
       "ServerAliveInterval=37" \
       "ControlPath=$cfg_control" \
