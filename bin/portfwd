@@ -81,7 +81,8 @@ ok2portfwd()
 # send SIGTERM to a process and wait for it to exit
 # synckill [-v] [-s sig] [--] pids...
 synckill()
-{ ( subprocs=
+{ _sk_me=$$
+  ( subprocs=
     verbose=
     sig=TERM
     max=5
@@ -108,8 +109,13 @@ synckill()
       npids=
       for pid in $pids
       do
-        if $trace kill -s "$pollsig" "$pid" 2>/dev/null
-        then  npids="$npids $pid"
+        if [ "x$pid" = "x$_sk_me" ]
+        then
+          echo "ERROR: trying to kill myself! pi=$pid" >&2
+        else
+          if $trace kill -s "$pollsig" "$pid" 2>/dev/null
+          then  npids="$npids $pid"
+          fi
         fi
       done
       pids=$npids
@@ -155,7 +161,7 @@ for sig in HUP INT TERM
 do
   trap "sig=$sig
         echo \"\$cmd: received SIG\$sig\"
-        [ -n \"\$subprocs\" ] && synckill -v -s \"\$sig\" \$subprocs
+        [ -z \"\$subprocs\" ] || synckill -v -s \"\$sig\" \$subprocs
         exit 1
        " "$sig"
 done
@@ -252,6 +258,7 @@ do
     sleep 31
   done
   alert "EXITED: sshpf $target, pid $sshpid" &
+  >"$cfg_pidfile"
   synckill -v $subprocs
   subprocs=
 
