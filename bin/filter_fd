@@ -6,6 +6,8 @@
 # Multiple fds. - cameron, 23may1999
 #
 
+set -ue
+
 : ${TMPDIR:=/tmp}
 
 cmd=`basename "$0"`
@@ -13,17 +15,36 @@ usage="Usage: $cmd fd[,fd...] filter command [args...]"
 
 badopts=
 
+fd=1
+if [ $# = 0 ]
+then
+  echo "$cmd: missing fd" >&2
+  badopts=1
+else
+  fd=$1
+  shift
+fi
+
+if [ $# = 0 ]
+then
+  echo "$cmd: missing filter" >&2
+  badopts=1
+else
+  filter=$1
+  shift
+fi
+
+if [ $# = 0 ]
+then
+  echo "$cmd: missing command" >&2
+  badopts=1
+fi
+
 # unfold multiple fds into separate invocations
-case $1 in
+case "$fd" in
   *,*)
-    [ $# -gt 1 ] || { echo "$cmd: missing filter\n" >&2
-                      echo "$usage" >&2
-                      exit 2
-                    }
-    fds=$1 filter=$2
-    shift; shift
     # rewrite the command line
-    for fd in `echo "$fds" | tr , ' '`
+    for fd in `echo "$fd" | tr , ' '`
     do set -- "$0" "$fd" "$filter" ${1+"$@"}
     done
     # rerun
@@ -31,94 +52,24 @@ case $1 in
     ;;
 esac
 
-fd=
-filter=
-case $1 in
-  [0-7])fd=$1; shift ;;
-  8|9)	echo "$cmd: sorry, fds 8 and 9 are trashed by $0" >&2
-        badopts=1
-        ;;
-  *)	echo "$cmd: bad fd - should be numeric" >&2
-        badopts=1
-        ;;
+case $fd in
+  [0-9]) ;;
+  *)	echo "$cmd: bad fd - should be numeric: $fd" >&2
+      badopts=1
+      ;;
 esac
-
-if [ -n "$fd" ]
-then
-    if [ $# = 0 ]
-    then
-	echo "$cmd: missing filter" >&2
-	badopts=1
-    else
-	filter=$1; shift
-	[ $# = 0 ] && { echo "$cmd: missing command" >&2
-			badopts=1
-		      }
-    fi
-fi
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
-## echo "$cmd:: fd=$fd, filter=[$filter], *=[$*]" >&2
+fifo=$TMPDIR/pipe$$
 
-# 9 goes to the original stdout
-# 8 goes to the fd to filter
-eval "exec 9>&1 8>&$fd"
+mkfifo -m 600 "$fifo"
 
-# Find a free exit status file
-# This is a bit racey, except that there should be no other
-# clients with our pid while we do our polling.
-xitbase=$TMPDIR/xit.$$
-n=0
-while xitcode=$xitbase.$n
-      [ -f "$xitcode" ]
-do
-  n=`expr $n + 1` || exit 1
-done
+( eval "exec <$fifo"
+  [ "x$fd" = x1 ] || eval "exec >&$fd"
+  eval "$filter"
+) &
 
-# empty the xit code file
->"$xitcode"
-
-(
-  # here we have stdout connected to the pipe
-  exec 8>&-	# we don't need 8 in this half
-  # If we're filtering something other than stdout,
-  # point the something at the pipe, and point our
-  # stdout at the original stdout.
-  [ $fd = 1 ] || eval "exec $fd>&1 1>&9"
-  # ok, don't need fd 9 now either
-  exec 9>&-
-  "$@"
-  echo $? >$xitcode
-) \
-| \
-(
-  # here we have stdin attached to the pipe
-  # we want to filter this
-  # However, if the subprogram forks we want to wait only for the main
-  # program, but still keep filtering the output of the fork. So we
-  # background the filter so as not to wait for it.
-  exec 3>&0         # save stdin because bg closes it
-  ( exec 0<&3 3<&-  # restore stdin
-    exec 9>&-	    # we don't need 9 in this half
-    exec 1>&8 8>&-  # send filter's stdout to where $fd went
-    eval "$filter"
-  ) &
-)
-
-# close stdout, repoint to stderr just in case
-exec 1>&2
-
-# collect exit status
-# wait for the sub process to write the exit status to the file
-# hope it's atomic
-# if the xitcode file gets removed, exit non-zero
-while [ ! -s "$xitcode" ]; do [ -f "$xitcode" ] || exit 1; sleep 1; done
-xit=`cat "$xitcode"` || xit=1
-rm -f "$xitcode"
-
-[ -n "$xit" ] || { echo "$cmd: can't get exit code for $*" >&2
-		   xit=1
-		 }
-
-exit "$xit"
+eval "exec $fd>$fifo"
+rm -f "$fifo"
+exec "$@"
