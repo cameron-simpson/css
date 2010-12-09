@@ -1,0 +1,20 @@
+#!bin/sh
+#
+# Shell-only shqstr.
+# Relies on printf and a sed that copes with no trailing newline.
+# Requested by Zoong Do Dung PHAM.
+#       - Cameron Simpson <cs@zip.com.au> 09dec2010
+#
+
+first=1
+for arg
+do
+  if [ $first ]
+  then printf "'"
+  else printf " '"
+  fi
+  printf "%s" "$arg" | sed 's/[\\'\'']/'\''\\&'\''/g'
+  printf "'"
+  first=
+done
+echo
