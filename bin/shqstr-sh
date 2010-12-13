@@ -1,4 +1,4 @@
-#!bin/sh
+#!/bin/sh
 #
 # Shell-only shqstr.
 # Relies on printf and a sed that copes with no trailing newline.
@@ -6,15 +6,18 @@
 #       - Cameron Simpson <cs@zip.com.au> 09dec2010
 #
 
-first=1
+set -ue
+
+subst="s/'/'\\\\''/g; s/^./'/; s/.\$/'/"
+
+sep=
 for arg
 do
-  if [ $first ]
-  then printf "'"
-  else printf " '"
-  fi
-  printf "%s" "$arg" | sed 's/[\\'\'']/'\''\\&'\''/g'
-  printf "'"
-  first=
+  case "$arg" in
+    *\'*) qarg=`printf ".%s.\n" "$arg" | sed "$subst"` ;;
+    *)    qarg="'$arg'" ;;
+  esac
+  printf "$sep%s" "$qarg"
+  sep=' '
 done
 echo
