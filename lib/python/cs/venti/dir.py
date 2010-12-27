@@ -29,6 +29,12 @@ def storeDir(path, aspath=None, trust_size_mtime=False):
 
 D_FILE_T = 0
 D_DIR_T = 1
+def D_type2str(type_):
+  if type_ == D_FILE_T:
+    return "D_FILE_T"
+  if type_ == D_DIR_T:
+    return "D_DIR_T"
+  return str(type_)
 
 F_HASMETA = 0x01
 F_HASNAME = 0x02
@@ -47,12 +53,10 @@ class Dirent:
     assert meta is not None
 
   def __str__(self):
-    return "<%s:%s:%s>" \
-           % ( self.name,
-               "D_DIR_T" if self.type == D_DIR_T
-               else "D_FILE_T" if self.type == D_FILE_T else str(self.type),
-               self.meta,
-             )
+    return totext(E.encode())
+
+  def __repr__(self):
+    return "Dirent(%s, %s, %s)" % (D_type2str, self.name, self.meta)
 
   def isfile(self):
     ''' Is this a file Dirent?
