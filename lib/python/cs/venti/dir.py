@@ -103,7 +103,7 @@ class Dirent(object):
          + block.encode()
 
   def textEncode(self, noname=False):
-    ''' Serialise the dirent.
+    ''' Serialise the dirent as text.
         Output format: bs(type)bs(flags)[bs(metalen)meta][bs(namelen)name]block
     '''
     flags = 0
@@ -409,6 +409,11 @@ class Dir(Dirent):
     D = self
     for name in path.split('/'):
       if len(name) == 0:
+        continue
+      if name == '.':
+        continue
+      if name == '..':
+        D = D.parent
         continue
       E = D.get(name)
       if E is None:
