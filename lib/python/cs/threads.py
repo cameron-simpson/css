@@ -479,11 +479,11 @@ class NestingOpenClose(object):
     '''
     with self.__lock:
       count=self.__count
-      assert count > 0, "self.count (%s) <= 0" % count
-      count-=1
+      assert count > 0, "self.count (%s) <= 0" % (count,)
+      count -= 1
       if count == 0:
         self.shutdown()
-      self.__count=count
+      self.__count = count
 
   def __exit__(self, exc_type, exc_value, traceback):
     self.close()
