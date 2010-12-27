@@ -9,14 +9,13 @@
 #
 # =head1 SYNOPSIS
 #
+#   vt [options...] ar tar-options paths...
 #   vt [options...] cat filerefs...
 #   vt [options...] catblock [-i] hashcodes...
 #   vt [options...] listen port
 #   vt [options...] ls [-R] dirrefs...
 #   vt [options...] mount dirref mountpoint
 #   vt [options...] scan datafile
-#   vt [options...] pack paths...
-#   vt [options...] pack -o file.vt path
 #   vt [options...] pull stores...
 #   vt [options...] unpack dirrefs...
 #
@@ -44,7 +43,6 @@ from cs.venti.block import IndirectBlock, decodeBlocks
 from cs.venti.debug import dumpBlock
 from cs.venti.store import Store
 from cs.venti.cache import CacheStore, MemCacheStore
-from cs.venti.archive import archive2dir, archiveAppend
 from cs.venti.dir import Dir, resolve
 
 def main(argv):
@@ -226,6 +224,65 @@ def main(argv):
 # =over 4
 #
 
+# =item B<ar> tar-like-options I<pathnames...>
+#
+# Archive or retrieve files.
+#
+def cmd_ar(args):
+  if len(args) < 1:
+    raise GetoptError, "missing options"
+  opts = args.pop(0)
+  if len(opts) == 0:
+    raise GetoptError, "empty options"
+
+  badopts = False
+  verbose = False
+  arfile = None
+  mode = opts[0]
+  for opt in opts[1:]:
+    if opt == 'f':
+      arfile = args.pop(0)
+    elif opt == 'v':
+      verbose = True
+    else:
+      error("%s: unsupported option", opt)
+      badopts = True
+
+  if len(args) < 1:
+    error("missing pathnames")
+    badopts = true
+
+  if badopts:
+    raise GetoptError, "bad options"
+
+  xit = 0
+
+  import cs.venti.archive
+  if arfile is not None and arfile == '-':
+    arfile = None
+
+  if mode == 'u':
+    for path in args:
+      try:
+        cs.venti.archive.archive(arfile, path, verbose)
+      except IOError, e:
+        error("archive %s: %s" % (path, e))
+        xit = 1
+  elif mode == 'x':
+    if arfile is None:
+      raise GetoptError, "missing arfile: stdin mode not yet implemented"
+    with Pfx("xf %s" % (arfile,)):
+      for path, E in cs.venti.archive.retrieve(arfile, args, verbose):
+        if E is None:
+          error("retrieve %s: not found" % (path,))
+          xit = 1
+        else:
+          print "X - %s - %s" % (E.name, E)
+  else:
+    raise GetoptError, "%s: unsupported mode" % (mode,)
+
+  return xit
+
 # =item B<cat> I<filerefs...>
 #
 # Emit the data content of the supplied I<filerefs> on the standard output.
@@ -360,63 +417,6 @@ def cmd_mount(args):
   cs.venti.vtfuse.fusemount(args[1], S, E)
   return 0
 
-# =item B<pack> {B<-o> I<file.vt> I<pathname> | I<pathnames...>}
-#
-# Store each specified I<pathname> in the store.
-#
-# With the B<-o> (output) option, store a single pathname
-# in the store and record the resulting I<dirref> in the file I<file.vt>.
-# If the file I<file.vt> already exists,
-# do an incremental store against the last I<dirref> currently stored in the
-# I<file.vt>; files with the same size and mtime in I<pathname> as in their
-# copies in the store are not opened - they are presumed to be unchanged.
-# This is similar to the vac(1) command in the Venti system.
-#
-# Without the B<-o> option,
-# each I<pathname> is stored and the resulting I<dirref> reported on the
-# standard output.
-#
-def cmd_pack(args):
-  if args and args[0] == "-o":
-    if len(args) < 2:
-      raise GetoptError, "-o: missing file.vt"
-    if len(args) < 3:
-      raise GetoptError, "-o: missing pathname"
-    if len(args) > 3:
-      raise GetoptError, "extra arguments after path: %s" % (" ".join(args[3:]),)
-    _, vtfile, pathname = args
-  else:
-    if not args:
-      raise GetoptError, "missing pathnames"
-    vtfile = None
-
-  if not vtfile:
-    # no -o option - just store stuff
-    ## WTF? ## S.writeonly = True
-    from cs.venti.file import storeFile
-    from cs.venti.dir import storeDir
-    for path in args:
-      if os.path.isdir(path):
-        E = storeDir(path)
-      else:
-        E = storeFile(open(path))
-      archiveAppend(sys.stdout, E, None, path)
-      sys.stdout.flush()
-  else:
-    # -o archive.vt; get old version from archive and compare during store
-    path = args[2]
-    assert os.path.isdir(pathname)
-    D = archive2dir(vtfile)
-    if D is None:
-      D = Dir(pathname)
-    D.updateFrom(pathname,
-                 ignoreTimes=False,
-                 deleteMissing=True,
-                 overWrite=True)
-    archiveAppend(vtfile, D, None, pathname)
-
-  return 0
-
 # =item B<pull> I<stores...>
 #
 # Update our store with all the available content from the specified I<stores>.
@@ -447,25 +447,6 @@ def cmd_scan(args):
       print totext(defaults.S.hash(data)), offset, "0x%02x" % (flags,), len(data)
     dfp.close()
   return 0
-
-# =item B<store> I<pathnames...>
-#
-# Store the specified pathnames in the store.
-# Recite the filerefs to standard output.
-#
-def cmd_store(args):
-  if len(args) < 1:
-    raise GetoptError, "missing pathnames"
-  xit = 0
-  for path in args:
-    with Pfx(path):
-      if os.path.isdir(path):
-        E = storeDir(path)
-      else:
-        E = storeFile(open(path))
-      archiveAppend(sys.stdout, E, None, path)
-      sys.stdout.flush()
-  return xit
 
 # =item B<unpack> I<dirrefs...>
 #
