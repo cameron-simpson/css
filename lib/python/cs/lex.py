@@ -162,7 +162,8 @@ _texthexify_white_re = re.compile(r'[a-zA-Z0-9_\-+.,/]+')
 
 def texthexify(s, shiftin='[', shiftout=']', whitelist_re=None):
   ''' Transcribe the byte string `s` to text.
-      TODO: add and implement modein parameter, for starting in text mode.
+      hexify() and texthexify() output strings may be freely
+      concatenated and decoded with untexthexify().
   '''
   if whitelist_re is None:
     whitelist_re = _texthexify_white_re
