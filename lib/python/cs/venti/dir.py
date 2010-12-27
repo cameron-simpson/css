@@ -39,9 +39,10 @@ def D_type2str(type_):
 F_HASMETA = 0x01
 F_HASNAME = 0x02
 
-class Dirent:
+class Dirent(object):
   ''' Incomplete base class for Dirent objects.
   '''
+
   def __init__(self, type_, name, meta):
     assert isinstance(type_, int), "type=%s"%(type_, )
     self.type = type_
@@ -53,7 +54,7 @@ class Dirent:
     assert meta is not None
 
   def __str__(self):
-    return totext(E.encode())
+    return self.textEncode()
 
   def __repr__(self):
     return "Dirent(%s, %s, %s)" % (D_type2str, self.name, self.meta)
@@ -112,7 +113,7 @@ class Dirent:
       assert isinstance(meta, Meta)
       metatxt = meta.encode()
       if len(metatxt) > 0:
-        metatxt = hexify(toBS(len(metatxt)))+totext(metatxt)
+        metatxt = hexify(toBS(len(metatxt))) + totext(metatxt)
         flags |= F_HASMETA
     else:
       metatxt = ""
@@ -121,7 +122,7 @@ class Dirent:
     if noname:
       nametxt = ""
     elif name is not None and len(name) > 0:
-      nametxt = hexify(toBS(len(name)))+totext(name)
+      nametxt = hexify(toBS(len(name))) + totext(name)
       flags |= F_HASNAME
     else:
       name = ""
