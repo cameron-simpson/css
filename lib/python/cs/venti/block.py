@@ -66,6 +66,9 @@ class _Block(object):
     self.indirect = None
     self._hashcode = None
 
+  def __str__(self):
+    return self.textEncode()
+
   def blockdata(self):
     raise NotImplementedError
 
