@@ -143,8 +143,8 @@ def main(argv):
   # =item B<unix:/>I<pathname>
   #
   # B<UNIMPLEMENTED>.
-  # A name commencing with B<unix:> specifies the pathname of a UNIX domain socket
-  # on which a vt daemon is listening.
+  # A name commencing with B<unix:> specifies the pathname of a UNIX domain
+  # socket on which a vt daemon is listening.
   #
   # =item B<|>I<shell-command>
   #
@@ -447,6 +447,25 @@ def cmd_scan(args):
       print totext(defaults.S.hash(data)), offset, "0x%02x" % (flags,), len(data)
     dfp.close()
   return 0
+
+# =item B<store> I<pathnames...>
+#
+# Store the specified pathnames in the store.
+# Recite the filerefs to standard output.
+#
+def cmd_store(args):
+  if len(args) < 1:
+    raise GetoptError, "missing pathnames"
+  xit = 0
+  for path in args:
+    with Pfx(path):
+      if os.path.isdir(path):
+        E = storeDir(path)
+      else:
+        E = storeFile(open(path))
+      archiveAppend(sys.stdout, E, None, path)
+      sys.stdout.flush()
+  return xit
 
 # =item B<unpack> I<dirrefs...>
 #
