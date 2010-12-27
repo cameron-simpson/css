@@ -9,7 +9,6 @@ from cs.venti.blockify import blockFromFile
 from threading import Thread
 import sys
 from cs.threads import IterableQueue
-from cs.misc import debug, TODO, FIXME, tb
 import __main__
 
 def storeFile(ifp, rsize=None, matchBlocks=None, name=None, meta=None):
@@ -140,7 +139,7 @@ class WriteNewFile:
     self.__sink.put(data)
 
   def flush(self):
-    TODO("flush unimplemented, should get an intermediate topblockref")
+    # TODO: flush unimplemented, should get an intermediate topblockref
     return None
 
   def close(self):
@@ -156,5 +155,4 @@ class WriteOverFile:
   ''' A File-like class that overwrites an existing 
   '''
   def __init__(self):
-    FIXME("WriteOverFile() UNIMPLEMENTED")
-    tb()
+    raise NotImplementedError
