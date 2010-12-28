@@ -29,8 +29,6 @@ muttopts=
 anyhost=
 use_term=	## 1; case "$DISPLAY" in localhost:[1-9]*) use_term= ;; esac
 use_screen=
-preshcmd=:
-postshcmd=:
 termopts='-g M'
 
 badopts=
@@ -44,8 +42,6 @@ do
     -f)		anyhost=1 ;;
     -[nR])	muttopts="$muttopts $1" ;;
     -[em])	muttopts="$muttopts $1 "`shqstr "$2"`; shift ;;
-    --pre=*)	preshcmd=`expr "x$1" : 'x--pre=\(.*\)'` ;;
-    --post=*)	postshcmd=`expr "x$1" : 'x--post=\(.*\)'` ;;
     --)		shift; break ;;
     -?*|+?*)	echo "$cmd: unrecognised option: $1" >&2; badopts=1 ;;
     *)		break ;;
@@ -90,15 +86,6 @@ else
   || { echo "$cmd: $fpath: not Maildir or MH folder" >&2
        exit 1
      }
-
-  fmuttrc=$fpath/.muttrc
-  [ ! -s "$fmuttrc" ] || muttcmd="$muttcmd -e 'source $fmuttrc'"
-
-  fpremutt=$fpath/.preshcmd
-  [ ! -s "$fpremutt" ] || preshcmd="$preshcmd; . $fpremutt"
-
-  fpostmutt=$fpath/.postshcmd
-  [ ! -s "$fpostmutt" ] || postshcmd="$postshcmd; . $fpostmutt"
 fi
 
 CURRENT_FOLDER=$fpath
@@ -111,9 +98,4 @@ set -- sh -c "exec $muttcmd"
 [ $use_screen ] && set -- scr "MUTT_$mfolder" "$@"
 [ $use_term   ] && set -- term -j email $termopts -n "mutt $mfolder" "$@"
 
-[ -z "$preshcmd" ] || eval "$preshcmd"
-"$@"
-xit=$?
-[ -z "$postshcmd" ] || eval "$postshcmd" || xit=1
-
-exit $xit
+exec "$@"
