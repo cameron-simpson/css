@@ -16,8 +16,8 @@ case "$folder" in
   $HOME/*)
     rpath=`expr "x$folder" : 'x$HOME/\(.*\)'`
     ;;
-  =?*)
-    rpath=`expr "x$folder" : 'x=\(.*\)'`
+  +?* | =?*)
+    rpath=`expr "x$folder" : 'x.\(.*\)'`
     ;;
   imap://* | imaps://* )
     rpath=`expr "x$folder" : 'ximaps*://[^/]*//*\(.*\)'`
