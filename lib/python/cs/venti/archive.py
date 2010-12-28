@@ -34,7 +34,8 @@ def archive(arfile, path, verbose):
           writeDirent(fp, D)
 
 def retrieve(arfile, paths, verbose):
-  ''' Retrieve Dirents for the named file paths.
+  ''' Retrieve Dirents for the named file paths, or None if a
+      path does not resolve.
   '''
   with Pfx(arfile):
     found = {}
