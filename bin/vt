@@ -445,7 +445,7 @@ def cmd_scan(args):
   with Pfx(datafile):
     dfp = DataFile(datafile)
     for offset, flags, data in dfp.scanData():
-      print Hash_SHA1.fromData(data), offset, "0x%02x" % (flags,), len(data)
+      print Hash_SHA1.fromData(data), offset, flags, len(data)
     dfp.close()
   return 0
 
