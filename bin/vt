@@ -38,7 +38,7 @@ import os.path
 from getopt import getopt, GetoptError
 import datetime
 from cs.logutils import Pfx, exception, error, debug, setup_logging, logTo, D
-from cs.venti import totext, fromtext
+from cs.venti import totext, fromtext, defaults
 from cs.venti.block import IndirectBlock, decodeBlocks
 from cs.venti.debug import dumpBlock
 from cs.venti.store import Store
@@ -441,10 +441,11 @@ def cmd_scan(args):
     raise GetoptError, "missing datafile"
   datafile = args[0]
   from cs.venti.datafile import DataFile
+  from cs.venti.hash import Hash_SHA1
   with Pfx(datafile):
     dfp = DataFile(datafile)
     for offset, flags, data in dfp.scanData():
-      print totext(defaults.S.hash(data)), offset, "0x%02x" % (flags,), len(data)
+      print Hash_SHA1.fromData(data), offset, "0x%02x" % (flags,), len(data)
     dfp.close()
   return 0
 
