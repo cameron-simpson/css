@@ -13,6 +13,7 @@
 
 import os
 import sys
+import time
 from datetime import datetime
 from cs.venti import totext, fromtext
 from cs.venti.dir import Dir, decodeDirent, storeDir
@@ -27,11 +28,12 @@ def archive(arfile, path, verbose):
         E = storeDir(path)
       else:
         E = storeFile(open(path, "rb"))
+      E.name = path
       if arfile is None:
-        writeDirent(sys.stdout, D)
+        writeDirent(sys.stdout, E)
       else:
         with open(arfile, "a") as fp:
-          writeDirent(fp, D)
+          writeDirent(fp, E)
 
 def retrieve(arfile, paths, verbose):
   ''' Retrieve Dirents for the named file paths, or None if a
@@ -40,9 +42,9 @@ def retrieve(arfile, paths, verbose):
   with Pfx(arfile):
     found = {}
     with open(arfile) as fp:
-      for unixtime, D in getDirents(fp):
-        if D.name in paths:
-          found[D.name] = D
+      for unixtime, E in getDirents(fp):
+        if E.name in paths:
+          found[E.name] = E
     return [ (path, found.get(path)) for path in paths ]
 
 def getDirents(fp):
@@ -52,17 +54,17 @@ def getDirents(fp):
     assert line.endswith('\n'), "%s: unexpected EOF" % (fp,)
     unixtime, dent = line.split(None, 1)
     when = float(unixtime)
-    D, etc = decodeDirent(dent)
+    E, etc = decodeDirent(dent)
     assert len(etc) == 0 or etc[0].iswhite(), \
       "failed to decode dent %s: unparsed: %s" % (`dent`, `etc`)
-    yield when, D
+    yield when, E
 
-def writeDirent(fp, D, when=None):
+def writeDirent(fp, E, when=None):
   ''' Write a Dirent to an archive file.
   '''
   if when is None:
     when = time.time()
   fp.write(str(when))
   fp.write(' ')
-  fp.write(str(D))
+  fp.write(str(E))
   fp.write('\n')
