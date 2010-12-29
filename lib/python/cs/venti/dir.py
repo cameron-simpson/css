@@ -102,7 +102,7 @@ class Dirent(object):
          + name \
          + block.encode()
 
-  def textEncode(self, noname=False):
+  def textEncode(self):
     ''' Serialise the dirent as text.
         Output format: bs(type)bs(flags)[bs(metalen)meta][bs(namelen)name]block
     '''
@@ -119,20 +119,19 @@ class Dirent(object):
       metatxt = ""
 
     name = self.name
-    if noname:
+    if name is None or len(name) == 0:
       nametxt = ""
-    elif name is not None and len(name) > 0:
+    else:
       nametxt = hexify(toBS(len(name))) + totext(name)
       flags |= F_HASNAME
-    else:
-      name = ""
 
     block = self.getBlock()
-    return hexify(toBS(self.type)) \
-         + hexify(toBS(flags)) \
-         + metatxt \
-         + nametxt \
-         + block.textEncode()
+    return ( hexify(toBS(self.type))
+           + hexify(toBS(flags))
+           + metatxt
+           + nametxt
+           + block.textEncode()
+           )
 
   # TODO: make size a property?
   def size(self):
