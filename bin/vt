@@ -250,7 +250,7 @@ def cmd_ar(args):
 
   if len(args) < 1:
     error("missing pathnames")
-    badopts = true
+    badopts = True
 
   if badopts:
     raise GetoptError, "bad options"
