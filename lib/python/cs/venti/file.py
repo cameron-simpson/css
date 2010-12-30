@@ -21,14 +21,14 @@ def storeFile(ifp, rsize=None, matchBlocks=None, name=None, meta=None):
   B.store()
   return FileDirent(name, meta, B)
 
-class ReadFile:
+class ReadFile(object):
   ''' A read-only file interface supporting seek(), read(), readline(),
       readlines() and tell() methods.
   '''
   def __init__(self, block):
-    self.isdir=False
+    self.isdir = False
     self.block = block
-    self.__pos=0
+    self.__pos = 0
 
   def __len__(self):
     return len(self.block)
