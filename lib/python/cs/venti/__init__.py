@@ -48,7 +48,7 @@ def fromtext(s):
   '''
   return untexthexify(s)
 
-_totext_white_re = re.compile(r'[-a-zA-Z0-9_+.,=]+')
+_totext_white_re = re.compile(r'[-a-zA-Z0-9_+.,=/]+')
 
 def totext(data):
   ''' Represent a byte sequence as a hex/text string.
