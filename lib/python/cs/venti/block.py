@@ -84,8 +84,6 @@ class _Block(object):
     hashclass = S.hashclass
     _hashcode = self._hashcode
     if _hashcode is None or type(_hashcode) is not hashclass:
-      D("block %s: _hashcode=%s, hashclass=%s", id(self), _hashcode, hashclass)
-      D("  block: %s", repr(self.__dict__))
       data = self.blockdata()
       _hashcode = self._hashcode = S.add(data)
     return _hashcode
@@ -112,6 +110,13 @@ class _Block(object):
 
   def textEncode(self):
     return totext(self.encode())
+
+  def open(self, mode="rb"):
+    ''' Open the block as a file.
+    '''
+    assert mode == "rb"
+    from cs.ventifile import ReadFile
+    return ReadFile(self)
 
 class Block(_Block):
   ''' A direct block.
