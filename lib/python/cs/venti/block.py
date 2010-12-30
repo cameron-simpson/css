@@ -2,6 +2,7 @@
 
 import unittest
 import sys
+from thread import allocate_lock
 from cs.logutils import D
 from cs.serialise import toBS, fromBS
 from cs.venti import defaults, totext
@@ -65,6 +66,7 @@ class _Block(object):
   def __init__(self):
     self.indirect = None
     self._hashcode = None
+    self._hashcode_lock = allocate_lock()
 
   def __str__(self):
     return self.textEncode()
@@ -72,6 +74,7 @@ class _Block(object):
   def blockdata(self):
     raise NotImplementedError
 
+  @property
   def hashcode(self):
     ''' Return the hashcode for this block.
         Compute the hashcode if unknown or if it does not match the default
@@ -82,10 +85,11 @@ class _Block(object):
     '''
     S = defaults.S
     hashclass = S.hashclass
-    _hashcode = self._hashcode
-    if _hashcode is None or type(_hashcode) is not hashclass:
-      data = self.blockdata()
-      _hashcode = self._hashcode = S.add(data)
+    with self._hashcode_lock:
+      _hashcode = self._hashcode
+      if _hashcode is None or type(_hashcode) is not hashclass:
+        data = self.blockdata()
+        _hashcode = self._hashcode = S.add(data)
     return _hashcode
 
   def encode(self):
@@ -101,7 +105,7 @@ class _Block(object):
     flags = 0
     if self.indirect:
       flags |= F_BLOCK_INDIRECT
-    hashcode = self.hashcode()
+    hashcode = self.hashcode
     if hashcode.hashenum != HASH_SHA1_T:
       flags |= F_BLOCK_HASHTYPE
     enc = "".join([toBS(flags), toBS(len(self)), hashcode.encode()])
@@ -154,7 +158,7 @@ class Block(_Block):
     if data is None:
       S = defaults.S
       assert not S.writeonly
-      data = self._data = S[self.hashcode()]
+      data = self._data = S[self.hashcode]
     return data
 
   def blockdata(self):
@@ -409,7 +413,7 @@ class TestAll(unittest.TestCase):
         assert len(IB) == (i+1) * 100
       IB.store()
       assert len(IB) == 1000
-      IBH = IB.hashcode()
+      IBH = IB.hashcode
       IBdata = IB.data
       D("IBdata = %s:%d:%s", type(IBdata), len(IBdata), repr(IBdata),)
       IB2data = IndirectBlock(hashcode=IBH, span=len(IBdata)).data
