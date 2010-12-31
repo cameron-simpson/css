@@ -20,6 +20,9 @@ class Hash_SHA1(bytes):
   hashlen = 20
   hashenum = HASH_SHA1_T
 
+  def __str__(self):
+    return hexify(self)
+
   def __repr__(self):
     return "Hash_SHA1:"+hexify(self)
 
@@ -34,7 +37,7 @@ class Hash_SHA1(bytes):
   def fromHashcode(cls, hashcode):
     assert len(hashcode) == cls.hashlen
     return cls(hashcode)
-    
+
   def encode(self):
     ''' Return the serialised form of this hash object.
         This presumes the reader will know the hash type,
@@ -64,8 +67,8 @@ class TestAll(unittest.TestCase):
       self.assertEqual( sha1(rs).digest(), H )
       Hencode = H.encode()
       H2, etc = Hash_SHA1.decode(Hencode)
-      assert len(etc) == 0
-      assert H == H2
+      self.assertEqual(len(etc), 0)
+      self.assertEqual(H, H2)
 
 if __name__ == '__main__':
   unittest.main()

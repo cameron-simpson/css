@@ -331,7 +331,7 @@ class IndexedFileStore(BasicStore):
       self._index[h] = self.encodeIndexEntry(n, offset)
     return h
 
-  def get(h, default=None):
+  def get(self, h, default=None):
     I = self._index.get(h)
     if I is None:
       return default

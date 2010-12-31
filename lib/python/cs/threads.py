@@ -477,13 +477,14 @@ class NestingOpenClose(object):
     ''' Decrement the open count.
         If the count goes to zero, call self.shutdown().
     '''
-    with self.__lock:
-      count=self.__count
-      assert count > 0, "self.count (%s) <= 0" % count
-      count-=1
-      if count == 0:
-        self.shutdown()
-      self.__count=count
+    if self.__count != 0:
+      with self.__lock:
+        count = self.__count
+        assert count > 0, "self.count (%s) <= 0" % (count,)
+        count -= 1
+        if count == 0:
+          self.shutdown()
+        self.__count = count
 
   def __exit__(self, exc_type, exc_value, traceback):
     self.close()

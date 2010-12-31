@@ -3,6 +3,7 @@ import stat
 import sys
 if sys.hexversion < 0x02060000:
   from sets import Set as set
+from thread import allocate_lock
 from cs.logutils import Pfx, debug, error, info, warn
 from cs.venti.block import decodeBlock
 from cs.venti.blockify import blockFromString
@@ -23,19 +24,25 @@ def storeDir(path, aspath=None, trust_size_mtime=False):
   if aspath is None:
     aspath = path
   D = Dir(aspath)
-  debug("path=%s"%(path, ))
   D.updateFrom(path, trust_size_mtime=trust_size_mtime)
   return D
 
 D_FILE_T = 0
 D_DIR_T = 1
+def D_type2str(type_):
+  if type_ == D_FILE_T:
+    return "D_FILE_T"
+  if type_ == D_DIR_T:
+    return "D_DIR_T"
+  return str(type_)
 
 F_HASMETA = 0x01
 F_HASNAME = 0x02
 
-class Dirent:
+class Dirent(object):
   ''' Incomplete base class for Dirent objects.
   '''
+
   def __init__(self, type_, name, meta):
     assert isinstance(type_, int), "type=%s"%(type_, )
     self.type = type_
@@ -47,22 +54,21 @@ class Dirent:
     assert meta is not None
 
   def __str__(self):
-    return "<%s:%s:%s>" \
-           % ( self.name,
-               "D_DIR_T" if self.type == D_DIR_T
-               else "D_FILE_T" if self.type == D_FILE_T else str(self.type),
-               self.meta,
-             )
+    return self.textEncode()
 
+  def __repr__(self):
+    return "Dirent(%s, %s, %s)" % (D_type2str, self.name, self.meta)
+
+  @property
   def isfile(self):
     ''' Is this a file Dirent?
     '''
     return self.type == D_FILE_T
 
-  def isdir(self, name=None):
+  @property
+  def isdir(self):
     ''' Is this a directory Dirent?
     '''
-    assert name is None
     return self.type == D_DIR_T
 
   def encode(self, noname=False):
@@ -97,8 +103,8 @@ class Dirent:
          + name \
          + block.encode()
 
-  def textEncode(self, noname=False):
-    ''' Serialise the dirent.
+  def textEncode(self):
+    ''' Serialise the dirent as text.
         Output format: bs(type)bs(flags)[bs(metalen)meta][bs(namelen)name]block
     '''
     flags = 0
@@ -108,26 +114,25 @@ class Dirent:
       assert isinstance(meta, Meta)
       metatxt = meta.encode()
       if len(metatxt) > 0:
-        metatxt = hexify(toBS(len(metatxt)))+totext(metatxt)
+        metatxt = hexify(toBS(len(metatxt))) + totext(metatxt)
         flags |= F_HASMETA
     else:
       metatxt = ""
 
     name = self.name
-    if noname:
+    if name is None or len(name) == 0:
       nametxt = ""
-    elif name is not None and len(name) > 0:
-      nametxt = hexify(toBS(len(name)))+totext(name)
-      flags |= F_HASNAME
     else:
-      name = ""
+      nametxt = hexify(toBS(len(name))) + totext(name)
+      flags |= F_HASNAME
 
     block = self.getBlock()
-    return hexify(toBS(self.type)) \
-         + hexify(toBS(flags)) \
-         + metatxt \
-         + nametxt \
-         + block.textEncode()
+    return ( hexify(toBS(self.type))
+           + hexify(toBS(flags))
+           + metatxt
+           + nametxt
+           + block.textEncode()
+           )
 
   # TODO: make size a property?
   def size(self):
@@ -189,7 +194,7 @@ class _BasicDirent(Dirent):
     return self.__block
 
   def __getitem__(self, name):
-    if self.isdir():
+    if self.isdir:
       return self.asdir()[name]
     raise KeyError, "\"%s\" not in %s" % (name, self)
 
@@ -235,11 +240,11 @@ def decodeDirent(s, justone=False):
   return E, s
 
 def resolve(path, domkdir=False):
-  ''' Take a path composed of a Direct text representation with an optional
+  ''' Take a path composed of a Dirent text representation with an optional
       "/sub/path/..." suffix.
-      Decode the Direct and walk down the remaining path, except for the last
-      component. Return the final Dirent and the last path componenet, or
-      None if there was no final path component.
+      Decode the Dirent path and walk down the remaining path, except for the
+      last component. Return the final Dirent and the last path componenet,
+      or None if there was no final path component.
   '''
   slashpos = path.find('/')
   if slashpos < 0:
@@ -267,69 +272,70 @@ class Dir(Dirent):
     ''' Initialise this directory.
         `meta`: meta information
         `parent`: parent Dir
-        `content`: pre-existing Block with intial Dir content
+        `content`: pre-existing Block with initial Dir content
     '''
+    self._lock = allocate_lock()
     if meta is None:
       meta = Meta()
     Dirent.__init__(self, D_DIR_T, name, meta)
     self.parent = parent
-    self.__content = {}
-    self.__contentBlock = content
+    self._precontent = content
+    self._entries = None
+    self._entries_lock = allocate_lock()
 
-  def isdir(self, name=None):
-    if name is None:
-      return Dirent.isdir(self)
-    return self[name].isdir()
+  @property
+  def entries(self):
+    with self._entries_lock:
+      entries = self._entries
+      if entries is None:
+        entries = self._entries = {}
+        precontent = self._precontent
+        if precontent is not None:
+          self._precontent = None
+          self._loadDir(precontent.data)
+    return entries
 
   def dirs(self):
-    return [ name for name in self.keys() if self[name].isdir() ]
+    return [ name for name in self.keys() if self[name].isdir ]
 
   def files(self):
-    return [ name for name in self.keys() if self[name].isfile() ]
+    return [ name for name in self.keys() if self[name].isfile ]
 
-  def overlayBlockRef(self, block):
-    from cs.venti.file import ReadFile
-    iblock = ReadFile(block).read()
-    while len(iblock) > 0:
-      oiblock = iblock
-      E, iblock = decodeDirent(iblock)
-      assert len(iblock) < len(oiblock) and oiblock.endswith(iblock)
+  def _loadDir(self, dirdata):
+    ''' Load Dirents from the supplied file-like object `fp`,
+        incorporate all the dirents into our mapping.
+    '''
+    while len(dirdata) > 0:
+      odirdata = dirdata
+      E, dirdata = decodeDirent(dirdata)
+      assert len(dirdata) < len(odirdata) and odirdata.endswith(dirdata)
       if E.name is None or len(E.name) == 0:
         # FIXME: skip unnamed dirent
         continue
       if E.name == '.' or E.name == '..':
         # FIXME: skip E.name
         continue
-      if E.isdir():
+      if E.isdir:
         E.parent = self
-      self.__content[E.name] = E
+      self._entries[E.name] = E
 
   def __validname(self, name):
     return len(name) > 0 and name.find('/') < 0
 
-  def __needContent(self):
-    if self.__contentBlock is not None:
-      block = self.__contentBlock
-      self.__contentBlock = None
-      self.overlayBlockRef(block)
-    return self.__content
-
   def get(self, name, dflt=None):
-    self.__needContent()
     if name not in self:
       return dflt
     return self[name]
 
   def keys(self):
-    return self.__needContent().keys()
+    return self.entries.keys()
 
   def __contains__(self, name):
     if name == '.':
       return True
     if name == '..':
       return self.parent is not None
-    self.__needContent()
-    return name in self.__content
+    return name in self.entries
 
   def __iter__(self):
     return self.keys()
@@ -339,7 +345,7 @@ class Dir(Dirent):
       return self
     if name == '..':
       return self.parent
-    return self.__needContent()[name]
+    return self.entries[name]
 
   def __setitem__(self, name, E):
     ''' Store a Dirent in the specified name slot.
@@ -348,13 +354,12 @@ class Dir(Dirent):
     assert self.__validname(name)
     assert name not in self
     assert isinstance(E, Dirent)
-    self.__needContent()[name] = E
+    self.entries[name] = E
 
   def __delitem__(self, name):
     assert self.__validname(name)
     assert name != '.' and name != '..'
-    self.__needContent()
-    del self.__content[name]
+    del self.entries[name]
 
   def getBlock(self):
     ''' Return the top Block referring to an encoding of this Dir.
@@ -384,7 +389,7 @@ class Dir(Dirent):
 
   def chdir1(self, name):
     D = self[name]
-    assert D.isdir()
+    assert D.isdir
     if not isinstance(D, Dir):
       D = self[name] = Dir(D.name, parent=self)
     return D
@@ -405,6 +410,11 @@ class Dir(Dirent):
     for name in path.split('/'):
       if len(name) == 0:
         continue
+      if name == '.':
+        continue
+      if name == '..':
+        D = D.parent
+        continue
       E = D.get(name)
       if E is None:
         E = D.mkdir(name)
@@ -418,13 +428,12 @@ class Dir(Dirent):
                  trust_size_mtime=False,
                  keep_missing=False,
                  ignore_existing=False):
-    ''' Update the target from the real file tree at source.
+    ''' Update this Dir from the real file tree at `osdir`.
         Return True if no errors occurred.
     '''
     ok = True
     with Pfx("updateFrom(%s,...)" % (osdir,)):
       assert os.path.isdir(osdir), "not a directory"
-      from cs.venti.file import storeFile
       osdirpfx = os.path.join(osdir, '')
       for dirpath, dirnames, filenames in os.walk(osdir, topdown=False):
         with Pfx(dirpath):
@@ -447,7 +456,7 @@ class Dir(Dirent):
 
           for dirname in dirnames:
             if dirname in D:
-              if not D[dirname].isdir():
+              if not D[dirname].isdir:
                 # old name is not a dir - toss it and make a dir
                 del D[dirname]
                 D.mkdir(dirname)
@@ -456,7 +465,7 @@ class Dir(Dirent):
             with Pfx(filename):
               filepath = os.path.join(dirpath, filename)
               try:
-                self.storeFile(filename, filepath,
+                D.storeFile(filename, filepath,
                                trust_size_mtime=trust_size_mtime,
                                ignore_existing=ignore_existing)
               except OSError, e:
@@ -471,38 +480,41 @@ class Dir(Dirent):
 
   def storeFile(self, filename, filepath,
                 trust_size_mtime=False, ignore_existing=False):
+    ''' Store as `filename` to file named by `filepath`.
+    '''
+    import  cs.venti.file
     with Pfx("%s.storeFile(%s, %s, trust_size_mtime=%s, ignore_existing=%s"
              % (self, filename, filepath, trust_size_mtime, ignore_existing)):
       if ignore_existing and filename in self:
         info("already exists, skipping")
         return
-      E = None
       st = os.stat(filepath)
-      E = self[filename]
-      if not E.isfile():
-        # not a file, no blocks to match
-        E = None
-      else:
-        if trust_size_mtime \
-           and st.st_size == E.size() \
-           and int(st.st_mtime) == int(E.mtime):
-          info("same size and mtime, skipping")
-          return
-        info("differing size(%s:%s)/mtime(%s:%s)"
-              % (st.st_size, E.size(),
-                 int(st.st_mtime), int(E.mtime)))
+      E = self.get(filename)
+      if E is not None:
+        if not E.isfile:
+          # not a file, no blocks to match
+          E = None
+        else:
+          if trust_size_mtime \
+             and st.st_size == E.size() \
+             and int(st.st_mtime) == int(E.mtime):
+            info("same size and mtime, skipping")
+            return
+          info("differing size(%s:%s)/mtime(%s:%s)"
+                % (st.st_size, E.size(),
+                   int(st.st_mtime), int(E.mtime)))
 
       info("storing")
       # TODO: M.updateFromStat(st)
       M = Meta()
       M.mtime = st.st_mtime
-      if E:
-        matchBlocks = E.getBlock().leaves()
-      else:
+      if E is None:
         matchBlocks = None
+      else:
+        matchBlocks = E.getBlock().leaves()
       with open(filepath) as ifp:
-        stored = storeFile(ifp, name=filename, meta=M,
-                           matchBlocks=matchBlocks)
+        stored = cs.venti.file.storeFile(ifp, name=filename, meta=M,
+                                         matchBlocks=matchBlocks)
       if filename in self:
         del self[filename]
       self[filename] = stored
