@@ -264,8 +264,12 @@ def cmd_ar(args):
   if mode == 't':
     if arfile is None:
       raise GetoptError, "missing arfile: stdin mode not yet implemented"
+    if args:
+      paths = args
+    else:
+      paths = None
     with Pfx("tf %s" % (arfile,)):
-      cs.venti.archive.walk(arfile, args, verbose)
+      cs.venti.archive.toc(arfile, paths, verbose)
   elif mode == 'u':
     for path in args:
       try:
@@ -276,8 +280,14 @@ def cmd_ar(args):
   elif mode == 'x':
     if arfile is None:
       raise GetoptError, "missing arfile: stdin mode not yet implemented"
+    if args:
+      paths = args
+    else:
+      paths = None
     with Pfx("xf %s" % (arfile,)):
-      for path, E in cs.venti.archive.retrieve(arfile, args, verbose):
+      for path, E in cs.venti.archive.retrieve(arfile, paths):
+        if verbose:
+          print path
         if E is None:
           error("retrieve %s: not found" % (path,))
           xit = 1
