@@ -1,8 +1,14 @@
 #!/usr/bin/python
 
-''' A data store after the style of the Venti scheme:
+''' A data store after the style of the Venti scheme.
+
+    The Plan 9 Venti system is decribed here:
       http://library.pantek.com/general/plan9.documents/venti/venti.html
-    but supporting variable sized blocks and arbitrary sizes.
+
+    cs.venti implements a similar scheme that supports variable
+    sized blocks and arbitrary data sizes, with some domain knowledge
+    to aid efficient block boundary selection.
+
     Man page:
       http://www.cskk.ezoshosting.com/cs/css/manuals/vt.1.html
     See also the Plan 9 Venti support manual pages:
@@ -42,7 +48,7 @@ def fromtext(s):
   '''
   return untexthexify(s)
 
-_totext_white_re = re.compile(r'[-a-zA-Z0-9_+.,=]+')
+_totext_white_re = re.compile(r'[-a-zA-Z0-9_+.,=/]+')
 
 def totext(data):
   ''' Represent a byte sequence as a hex/text string.

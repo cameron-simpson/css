@@ -263,9 +263,13 @@ class IndexedFileStore(BasicStore):
     BasicStore.__init__(self, dirpath, capacity=capacity)
     with Pfx("IndexedFileStore(%s)" % (dirpath,)):
       self.dirpath = dirpath
-      self._n = None
       self._index = self._getIndex()
       self._storeMap = self.__loadStoreMap()
+      mapkeys = self._storeMap.keys()
+      if mapkeys:
+        self._n = max(mapkeys)
+      else:
+        self._n = None
 
   @property
   def n(self):
@@ -331,7 +335,7 @@ class IndexedFileStore(BasicStore):
       self._index[h] = self.encodeIndexEntry(n, offset)
     return h
 
-  def get(h, default=None):
+  def get(self, h, default=None):
     I = self._index.get(h)
     if I is None:
       return default

@@ -112,7 +112,7 @@ def fileBlocks(fp, rsize=None, matchBlocks=None):
       if len(data) == 0:
         return
       # compare hashcodes to avoid fetching data for B if we have its hash
-      if defaults.S.hash(data) == B.hashcode():
+      if defaults.S.hash(data) == B.hashcode:
         debug("MATCH %d bytes", len(data))
         yield B
         data = None
@@ -242,7 +242,7 @@ def blocksOf(dataSource, vocab=None):
   if buflen > 0:
     yield Block("".join(buf))
 
-class RollingHash:
+class RollingHash(object):
   ''' Compute a rolling hash over 4 bytes of data.
       TODO: this is a lousy algorithm!
   '''
@@ -263,35 +263,23 @@ class RollingHash:
         POST: -1: probe_len characters added to the hash.
               >=0: offset characters added to the hash
     '''
-    D("H")
     assert probe_len > 0
     probe_len = min(probe_len, len(data))
     n = self.n
     for i in range(probe_len):
-      self.addcode(ord(data[i]))
-      if n % 4093 == 1:
-        debug("edge found, returning (hashcode=%d, offset=%d)", self.value(), i+1)
-        return i+1
-    debug("no edge found, hash now %d, returning (None, %d)", self.value(), probe_len)
-    return -1
-
-  def addcode(self, oc):
-    self.n = ( ( ( self.n&0x001fffff ) << 7
-               )
-             | ( ( oc&0x7f )^( (oc&0x80)>>7 )
-               )
-             )
-
-  def addString(self, s):
-    n = self.n
-    for c in s:
-      oc = ord(c)
-      n = ( ( ( self.n&0x001fffff ) << 7
+      o = ord(data[i])
+      n = ( ( ( n & 0x001fffff ) << 7
             )
-          | ( ( oc&0x7f )^( (oc&0x80)>>7 )
+          | ( ( o & 0x7f )^( (o & 0x80)>>7 )
             )
           )
+      if n % 4093 == 1:
+        debug("edge found, returning (hashcode=%d, offset=%d)", self.value(), i+1)
+        self.n = n
+        return i+1
     self.n = n
+    debug("no edge found, hash now %d, returning (None, %d)", self.value(), probe_len)
+    return -1
 
 class Vocabulary(dict):
   ''' A class for representing match vocabuaries.

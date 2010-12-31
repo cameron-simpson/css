@@ -3,33 +3,34 @@
 # File interfaces.      - Cameron Simpson <cs@zip.com.au>
 #
 
+from cs.logutils import info
 from cs.venti.dir import FileDirent
 from cs.venti.meta import Meta
 from cs.venti.blockify import blockFromFile
 from threading import Thread
 import sys
 from cs.threads import IterableQueue
-from cs.misc import debug, TODO, FIXME, tb
 import __main__
 
 def storeFile(ifp, rsize=None, matchBlocks=None, name=None, meta=None):
   ''' Store the data from ifp, return Dirent.
       TODO: set M.mtime from ifp.fstat().
   '''
+  info("storeFile(%s)", ifp)
   if meta is None:
     meta = Meta()
   B = blockFromFile(ifp, rsize=rsize, matchBlocks=matchBlocks)
   B.store()
   return FileDirent(name, meta, B)
 
-class ReadFile:
+class ReadFile(object):
   ''' A read-only file interface supporting seek(), read(), readline(),
       readlines() and tell() methods.
   '''
   def __init__(self, block):
-    self.isdir=False
+    self.isdir = False
     self.block = block
-    self.__pos=0
+    self.__pos = 0
 
   def __len__(self):
     return len(self.block)
@@ -140,7 +141,7 @@ class WriteNewFile:
     self.__sink.put(data)
 
   def flush(self):
-    TODO("flush unimplemented, should get an intermediate topblockref")
+    # TODO: flush unimplemented, should get an intermediate topblockref
     return None
 
   def close(self):
@@ -156,5 +157,4 @@ class WriteOverFile:
   ''' A File-like class that overwrites an existing 
   '''
   def __init__(self):
-    FIXME("WriteOverFile() UNIMPLEMENTED")
-    tb()
+    raise NotImplementedError

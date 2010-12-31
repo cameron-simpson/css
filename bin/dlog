@@ -15,6 +15,7 @@ trace=  ##set-x
 
 if [ "x$HOST" != "x$HOMEHOST" ]
 then
+  flag DLOG_REMOTE_DISABLE && { echo "SKIP ssh $HOMEHOST dlog $*" >&2; exit 0; }
   qcmd=`shqstr ./bin/with-login-env dlog ${1+"$@"}`
   exec $trace ssh "$HOMEHOST" "$qcmd"
 fi

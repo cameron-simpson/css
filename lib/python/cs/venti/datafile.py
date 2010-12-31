@@ -7,6 +7,22 @@ from cs.serialise import toBS, fromBSfp
 
 F_COMPRESSED = 0x01
 
+class DataFlags(int):
+
+  def __repr__(self):
+    return "<DataFlags %d>" % (self,)
+
+  def __str__(self):
+    if self == 0:
+      return '_'
+    flags = self
+    s = ''
+    if flags & F_COMPRESSED:
+      s += 'Z'
+      flags &= ~F_COMPRESSED
+    assert flags == 0
+    return s
+
 class DataFile(object):
   ''' A cs.venti data file, storing data chunks in compressed form.
   '''
@@ -60,6 +76,7 @@ class DataFile(object):
     if flags is None:
       return None, None
     assert (flags & ~F_COMPRESSED) == 0, "flags other than F_COMPRESSED: 0x%02x" % ((flags & ~F_COMPRESSED),)
+    flags = DataFlags(flags)
     dsize = fromBSfp(fp)
     if dsize == 0:
       data = ''

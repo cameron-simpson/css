@@ -25,7 +25,7 @@ class DirView(object):
     namelist = []
     for name in sorted(self.D.keys()):
       E = self.D[name]
-      if E.isdir():
+      if E.isdir:
         namelist.append([ 'LI', [ 'A', { 'HREF': name+'/', }, name+'/' ] ])
       else:
         namelist.append([ 'LI', [ 'A', { 'HREF': name, }, name ] ])
