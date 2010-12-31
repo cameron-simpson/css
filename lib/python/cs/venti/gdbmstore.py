@@ -45,3 +45,9 @@ class GDBMIndex(object):
   def __contains__(self, h):
     with self._lock:
       return h in self._db
+
+  def get(self, h, default=None):
+    try:
+      return self[h]
+    except KeyError:
+      return default
