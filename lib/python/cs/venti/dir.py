@@ -24,7 +24,6 @@ def storeDir(path, aspath=None, trust_size_mtime=False):
   if aspath is None:
     aspath = path
   D = Dir(aspath)
-  debug("path=%s"%(path, ))
   D.updateFrom(path, trust_size_mtime=trust_size_mtime)
   return D
 
@@ -322,7 +321,7 @@ class Dir(Dirent):
         continue
       if E.isdir():
         E.parent = self
-      self.entries[E.name] = E
+      self._entries[E.name] = E
 
   def __validname(self, name):
     return len(name) > 0 and name.find('/') < 0
