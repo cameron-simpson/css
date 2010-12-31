@@ -20,24 +20,47 @@ from cs.venti.dir import Dir, decodeDirent, storeDir
 from cs.venti.file import storeFile
 from cs.logutils import Pfx
 
-def archive(arfile, path, verbose=False, fp=None):
+def archive(arfile, path, verbose=False, fp=None,
+            trust_size_mtime=False,
+            keep_missing=False,
+            ignore_existing=False):
     ''' Archive the named file path.
     '''
     if fp is None:
       fp = sys.stdout
+
+    # look for existing archive for comparison
+    oldtime, oldE = None, None
+    try:
+      arfp = open(arfile)
+    except IOError:
+      pass
+    else:
+      for unixtime, E in getDirents(arfp):
+        if E.name == path and (oldtime is None or unixtime >= oldtime):
+          oldtime, oldE = unixtime, E
+      arfp.close()
+
     with Pfx("archive(%s)" % (path,)):
       if verbose:
         print >>fp, path
       if os.path.isdir(path):
-        E = storeDir(path)
+        if oldE is not None and oldE.isdir:
+          oldE.updateFrom(path,
+                 trust_size_mtime=trust_size_mtime,
+                 keep_missing=keep_missing,
+                 ignore_existing=ignore_existing)
+          E = oldE
+        else:
+          E = storeDir(path)
       else:
         E = storeFile(open(path, "rb"))
       E.name = path
       if arfile is None:
         writeDirent(sys.stdout, E)
       else:
-        with open(arfile, "a") as fp:
-          writeDirent(fp, E)
+        with open(arfile, "a") as arfp:
+          writeDirent(arfp, E)
 
 def retrieve(arfile, paths=None):
   ''' Retrieve Dirents for the named file paths, or None if a
@@ -47,8 +70,8 @@ def retrieve(arfile, paths=None):
   '''
   with Pfx(arfile):
     found = {}
-    with open(arfile) as fp:
-      for unixtime, E in getDirents(fp):
+    with open(arfile) as arfp:
+      for unixtime, E in getDirents(arfp):
         if paths is None or E.name in paths:
           found[E.name] = E
     if paths is None:

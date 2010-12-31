@@ -3,6 +3,7 @@
 # File interfaces.      - Cameron Simpson <cs@zip.com.au>
 #
 
+from cs.logutils import info
 from cs.venti.dir import FileDirent
 from cs.venti.meta import Meta
 from cs.venti.blockify import blockFromFile
@@ -15,6 +16,7 @@ def storeFile(ifp, rsize=None, matchBlocks=None, name=None, meta=None):
   ''' Store the data from ifp, return Dirent.
       TODO: set M.mtime from ifp.fstat().
   '''
+  info("storeFile(%s)", ifp)
   if meta is None:
     meta = Meta()
   B = blockFromFile(ifp, rsize=rsize, matchBlocks=matchBlocks)

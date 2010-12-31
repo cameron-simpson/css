@@ -469,11 +469,11 @@ class Dir(Dirent):
                                trust_size_mtime=trust_size_mtime,
                                ignore_existing=ignore_existing)
               except OSError, e:
-                error("stat: %s" % (e,))
+                error("%s", e)
                 ok = False
                 continue
               except IOError, e:
-                error("stat: %s" % (e,))
+                error("%s", e)
                 ok = False
                 continue
     return ok
@@ -486,7 +486,7 @@ class Dir(Dirent):
     with Pfx("%s.storeFile(%s, %s, trust_size_mtime=%s, ignore_existing=%s"
              % (self, filename, filepath, trust_size_mtime, ignore_existing)):
       if ignore_existing and filename in self:
-        info("already exists, skipping")
+        debug("already exists, skipping")
         return
       st = os.stat(filepath)
       E = self.get(filename)
@@ -498,13 +498,12 @@ class Dir(Dirent):
           if trust_size_mtime \
              and st.st_size == E.size() \
              and int(st.st_mtime) == int(E.mtime):
-            info("same size and mtime, skipping")
+            debug("same size and mtime, skipping")
             return
-          info("differing size(%s:%s)/mtime(%s:%s)"
+          debug("differing size(%s:%s)/mtime(%s:%s)"
                 % (st.st_size, E.size(),
                    int(st.st_mtime), int(E.mtime)))
 
-      info("storing")
       # TODO: M.updateFromStat(st)
       M = Meta()
       M.mtime = st.st_mtime

@@ -273,7 +273,7 @@ def cmd_ar(args):
   elif mode == 'u':
     for path in args:
       try:
-        cs.venti.archive.archive(arfile, path, verbose)
+        cs.venti.archive.archive(arfile, path, verbose, trust_size_mtime=True)
       except IOError, e:
         error("archive %s: %s" % (path, e))
         xit = 1
