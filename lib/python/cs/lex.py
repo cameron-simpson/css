@@ -1,6 +1,7 @@
 import string
 from StringIO import StringIO
 import re
+from binascii import hexlify as hexify, unhexlify as unhexify
 
 ord_space=ord(' ')
 
@@ -147,16 +148,6 @@ def jsquote(s):
 def dict2js(d):
   import cs.json
   return cs.json.json(d)
-
-def hexify(s, sep=''):
-  ''' Return raw byte string from hexadecimal string
-  '''
-  return sep.join( '%02x' % ord(c) for c in s )
-
-def unhexify(hexstr):
-  ''' Return raw byte array from hexadecimal string.
-  '''
-  return "".join([chr(int(hexstr[i:i+2],16)) for i in range(0,len(hexstr),2)])
 
 _texthexify_white_re = re.compile(r'[a-zA-Z0-9_\-+.,/]+')
 
