@@ -240,11 +240,11 @@ def decodeDirent(s, justone=False):
   return E, s
 
 def resolve(path, domkdir=False):
-  ''' Take a path composed of a Direct text representation with an optional
+  ''' Take a path composed of a Dirent text representation with an optional
       "/sub/path/..." suffix.
-      Decode the Direct and walk down the remaining path, except for the last
-      component. Return the final Dirent and the last path componenet, or
-      None if there was no final path component.
+      Decode the Dirent path and walk down the remaining path, except for the
+      last component. Return the final Dirent and the last path componenet,
+      or None if there was no final path component.
   '''
   slashpos = path.find('/')
   if slashpos < 0:
@@ -465,7 +465,7 @@ class Dir(Dirent):
             with Pfx(filename):
               filepath = os.path.join(dirpath, filename)
               try:
-                self.storeFile(filename, filepath,
+                D.storeFile(filename, filepath,
                                trust_size_mtime=trust_size_mtime,
                                ignore_existing=ignore_existing)
               except OSError, e:
