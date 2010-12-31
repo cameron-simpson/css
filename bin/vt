@@ -248,7 +248,7 @@ def cmd_ar(args):
       error("%s: unsupported option", opt)
       badopts = True
 
-  if len(args) < 1:
+  if mode == 'u' and len(args) < 1:
     error("missing pathnames")
     badopts = True
 
@@ -261,7 +261,12 @@ def cmd_ar(args):
   if arfile is not None and arfile == '-':
     arfile = None
 
-  if mode == 'u':
+  if mode == 't':
+    if arfile is None:
+      raise GetoptError, "missing arfile: stdin mode not yet implemented"
+    with Pfx("tf %s" % (arfile,)):
+      cs.venti.archive.walk(arfile, args, verbose)
+  elif mode == 'u':
     for path in args:
       try:
         cs.venti.archive.archive(arfile, path, verbose)

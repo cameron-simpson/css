@@ -20,7 +20,7 @@ from cs.venti.dir import Dir, decodeDirent, storeDir
 from cs.venti.file import storeFile
 from cs.logutils import Pfx
 
-def archive(arfile, path, verbose):
+def archive(arfile, path, verbose=False):
     ''' Archive the named file path.
     '''
     with Pfx("archive(%s)" % (path,)):
@@ -35,26 +35,41 @@ def archive(arfile, path, verbose):
         with open(arfile, "a") as fp:
           writeDirent(fp, E)
 
-def retrieve(arfile, paths, verbose):
+def retrieve(arfile, paths=None, verbose=False):
   ''' Retrieve Dirents for the named file paths, or None if a
       path does not resolve.
+      If `paths` if missing or None, retrieve the latest Dirents
+      for all paths named in the archive file.
   '''
   with Pfx(arfile):
     found = {}
     with open(arfile) as fp:
       for unixtime, E in getDirents(fp):
-        if E.name in paths:
+        if paths is None or E.name in paths:
           found[E.name] = E
+    if paths is None:
+      paths = found.keys()
     return [ (path, found.get(path)) for path in paths ]
+
+def walk_report(path, E):
+  print path
+  if E.isdir():
+    entries = sorted(E.keys())
+    for subpath in entries:
+      walk_report(os.path.join(path, subpath), E[subpath])
+
+def walk(arfile, paths=None, verbose=False):
+  for path, E in retrieve(arfile, paths, verbose):
+    walk_report(path, E)
 
 def getDirents(fp):
   ''' Generator to yield (unixtime, Dirent) from archive file.
   '''
   for line in fp:
     assert line.endswith('\n'), "%s: unexpected EOF" % (fp,)
-    unixtime, dent = line.split(None, 1)
+    unixtime, dent = line.strip().split(None, 1)
     when = float(unixtime)
-    E, etc = decodeDirent(dent)
+    E, etc = decodeDirent(fromtext(dent))
     assert len(etc) == 0 or etc[0].iswhite(), \
       "failed to decode dent %s: unparsed: %s" % (`dent`, `etc`)
     yield when, E
