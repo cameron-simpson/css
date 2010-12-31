@@ -59,15 +59,16 @@ class Dirent(object):
   def __repr__(self):
     return "Dirent(%s, %s, %s)" % (D_type2str, self.name, self.meta)
 
+  @property
   def isfile(self):
     ''' Is this a file Dirent?
     '''
     return self.type == D_FILE_T
 
-  def isdir(self, name=None):
+  @property
+  def isdir(self):
     ''' Is this a directory Dirent?
     '''
-    assert name is None
     return self.type == D_DIR_T
 
   def encode(self, noname=False):
@@ -193,7 +194,7 @@ class _BasicDirent(Dirent):
     return self.__block
 
   def __getitem__(self, name):
-    if self.isdir():
+    if self.isdir:
       return self.asdir()[name]
     raise KeyError, "\"%s\" not in %s" % (name, self)
 
@@ -294,16 +295,11 @@ class Dir(Dirent):
           self._loadDir(precontent.data)
     return entries
 
-  def isdir(self, name=None):
-    if name is None:
-      return Dirent.isdir(self)
-    return self[name].isdir()
-
   def dirs(self):
-    return [ name for name in self.keys() if self[name].isdir() ]
+    return [ name for name in self.keys() if self[name].isdir ]
 
   def files(self):
-    return [ name for name in self.keys() if self[name].isfile() ]
+    return [ name for name in self.keys() if self[name].isfile ]
 
   def _loadDir(self, dirdata):
     ''' Load Dirents from the supplied file-like object `fp`,
@@ -319,7 +315,7 @@ class Dir(Dirent):
       if E.name == '.' or E.name == '..':
         # FIXME: skip E.name
         continue
-      if E.isdir():
+      if E.isdir:
         E.parent = self
       self._entries[E.name] = E
 
@@ -393,7 +389,7 @@ class Dir(Dirent):
 
   def chdir1(self, name):
     D = self[name]
-    assert D.isdir()
+    assert D.isdir
     if not isinstance(D, Dir):
       D = self[name] = Dir(D.name, parent=self)
     return D
@@ -460,7 +456,7 @@ class Dir(Dirent):
 
           for dirname in dirnames:
             if dirname in D:
-              if not D[dirname].isdir():
+              if not D[dirname].isdir:
                 # old name is not a dir - toss it and make a dir
                 del D[dirname]
                 D.mkdir(dirname)
@@ -495,7 +491,7 @@ class Dir(Dirent):
       st = os.stat(filepath)
       E = self.get(filename)
       if E is not None:
-        if not E.isfile():
+        if not E.isfile:
           # not a file, no blocks to match
           E = None
         else:

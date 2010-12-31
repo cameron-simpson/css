@@ -57,7 +57,7 @@ def retrieve(arfile, paths=None):
 
 def toc_report(fp, path, E, verbose):
   print >>fp, path
-  if E.isdir():
+  if E.isdir:
     entries = sorted(E.keys())
     for subpath in entries:
       toc_report(fp, os.path.join(path, subpath), E[subpath], verbose)
