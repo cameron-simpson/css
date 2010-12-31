@@ -24,8 +24,8 @@ def storeDir(path, aspath=None, trust_size_mtime=False):
   if aspath is None:
     aspath = path
   D = Dir(aspath)
-  D.updateFrom(path, trust_size_mtime=trust_size_mtime)
-  return D
+  ok = D.updateFrom(path, trust_size_mtime=trust_size_mtime)
+  return D, ok
 
 D_FILE_T = 0
 D_DIR_T = 1
@@ -464,6 +464,9 @@ class Dir(Dirent):
           for filename in filenames:
             with Pfx(filename):
               filepath = os.path.join(dirpath, filename)
+              if not os.path.isfile(filepath):
+                warn("not a regular file, skipping")
+                continue
               try:
                 D.storeFile(filename, filepath,
                                trust_size_mtime=trust_size_mtime,
@@ -500,9 +503,9 @@ class Dir(Dirent):
              and int(st.st_mtime) == int(E.mtime):
             debug("same size and mtime, skipping")
             return
-          debug("differing size(%s:%s)/mtime(%s:%s)"
-                % (st.st_size, E.size(),
-                   int(st.st_mtime), int(E.mtime)))
+          debug("differing size(%s:%s)/mtime(%s:%s)",
+                st.st_size, E.size(),
+                int(st.st_mtime), int(E.mtime))
 
       # TODO: M.updateFromStat(st)
       M = Meta()
@@ -511,7 +514,7 @@ class Dir(Dirent):
         matchBlocks = None
       else:
         matchBlocks = E.getBlock().leaves()
-      with open(filepath) as ifp:
+      with open(filepath, "rb") as ifp:
         stored = cs.venti.file.storeFile(ifp, name=filename, meta=M,
                                          matchBlocks=matchBlocks)
       if filename in self:

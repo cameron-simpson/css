@@ -273,10 +273,13 @@ def cmd_ar(args):
   elif mode == 'u':
     for path in args:
       try:
-        cs.venti.archive.archive(arfile, path, verbose, trust_size_mtime=True)
+        ok = cs.venti.archive.archive(arfile, path, verbose, trust_size_mtime=True)
       except IOError, e:
         error("archive %s: %s" % (path, e))
         xit = 1
+      else:
+        if not ok:
+          xit = 1
   elif mode == 'x':
     if arfile is None:
       raise GetoptError, "missing arfile: stdin mode not yet implemented"

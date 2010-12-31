@@ -1,0 +1,42 @@
+#!/bin/sh
+#
+# Archive items, replace with .vt files.
+#       - Cameron Simpson <cs@zip.com.au> 01jan2011
+#
+
+set -ue
+
+trace=set-x
+
+cmd=`basename "$0"`
+usage="Usage: $cmd paths..."
+
+badopts=
+
+while [ $# -gt 0 ]
+do
+  case $1 in
+    --) shift; break ;;
+    -?*)echo "$cmd: unrecognised option: $1" >&2
+        badopts=1
+        ;;
+    *)  break ;;
+  esac
+  shift
+done
+
+if [ $# = 0 ]
+then
+  echo "$cmd: missing paths" >&2
+  badopts=1
+fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+for path
+do
+  arfile=$path.vt
+  $trace vt ar uf "$arfile" "$path" \
+  && [ -s "$arfile" ] \
+  && $trace rm -rf "$path"
+done
