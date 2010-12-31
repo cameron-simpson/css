@@ -484,6 +484,8 @@ class Dir(Dirent):
 
   def storeFile(self, filename, filepath,
                 trust_size_mtime=False, ignore_existing=False):
+    ''' Store as `filename` to file named by `filepath`.
+    '''
     import  cs.venti.file
     with Pfx("%s.storeFile(%s, %s, trust_size_mtime=%s, ignore_existing=%s"
              % (self, filename, filepath, trust_size_mtime, ignore_existing)):
