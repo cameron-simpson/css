@@ -1,6 +1,21 @@
 #!/usr/bin/python
 
 from cs.logutils import error
+from pwd import getpwuid
+from grp import getgrgid
+
+def permbits_to_acl(bits):
+  ''' Take a UNIX 3-bit permission value and return the ACL add-sub string.
+      Example: 6 (110) => "rw-x"
+  '''
+  add = ''
+  sub = ''
+  for c, bit in ('r', 0x04), ('w', 0x02), ('x', 0x01):
+    if bits&bit:
+      add += c
+    else:
+      sub += c
+  return add+'-'+sub
 
 class Meta(dict):
   ''' Metadata:
@@ -20,7 +35,7 @@ class Meta(dict):
     if s is not None:
       for line in s.split('\n'):
         line = line.strip()
-        if len(line) == 0 or line[0] == '#':
+        if len(line) == 0 or line.startswith('#'):
           continue
         if line.find(':') < 1:
           error("bad metadata line (no colon): %s" % (line,))
@@ -29,9 +44,7 @@ class Meta(dict):
           self[k] = v
 
   def encode(self):
-    ks = self.keys()
-    ks.sort()
-    return "".join("%s:%s\n" % (k, self[k]) for k in ks)
+    return "".join("%s:%s\n" % (k, self[k]) for k in sorted(self.keys()))
 
   @property
   def mtime(self):
@@ -41,8 +54,27 @@ class Meta(dict):
   def mtime(self, when):
     self['m'] = float(when)
 
+  @property
+  def acl(self):
+    return [ ac for ac in self.get('a', '').split(',') if len(ac) ]
+
+  @acl.setter
+  def acl(self, acl):
+    self['a'] = ','.join(acl)
+
+  def updateFromStat(self, st):
+    self.mtime = st.st_mtime
+    user = getpwuid(st.st_uid)[0]
+    group = getgrgid(st.st_gid)[0]
+    uid = st.st_uid
+    gid = st.st_gid
+    self.acl = ( "u:"+user+":"+permbits_to_acl( (st.st_mode>>6)&7 ),
+                 "g:"+group+":"+permbits_to_acl( (st.st_mode>>3)&7 ),
+                 "*:"+permbits_to_acl( (st.st_mode)&7 ),
+               )
+
   def unixPerms(self):
-    ''' Return (user,group,unix-mode-bits).
+    ''' Return (user, group, unix-mode-bits).
         The user and group are strings, not uid/gid.
         For ACLs with more than one user or group this is only an approximation,
         keeping the permissions for the frontmost user and group.
@@ -52,9 +84,7 @@ class Meta(dict):
     group = None
     gperms = 0
     operms = 0
-    acl = [ ac for ac in self.get('a', '').split(',') if len(ac) > 0 ]
-    acl.reverse()
-    for ac in acl:
+    for ac in reversed(self.acl):
       if len(ac) > 0:
         if ac.startswith('u:'):
           login, perms = ac[2:].split(':', 1)
@@ -111,3 +141,7 @@ class Meta(dict):
             elif s == 'x': operms &= ~1
             elif s == 't': operms &= ~512
     return (user, group, (uperms<<6)+(gperms<<3)+operms)
+
+if __name__ == '__main__':
+  import os
+  print MetaFromStat(os.stat(__file__))
