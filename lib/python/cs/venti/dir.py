@@ -43,12 +43,15 @@ class Dirent(object):
   ''' Incomplete base class for Dirent objects.
   '''
 
-  def __init__(self, type_, name, meta):
+  def __init__(self, type_, name, meta=None):
     assert isinstance(type_, int), "type=%s"%(type_, )
     self.type = type_
     assert name is None or isinstance(name, str), "name=%s"%(name, )
     self.name = name
-    assert isinstance(meta, Meta), "meta=%s"%(meta, )
+    if meta is None:
+      meta = Meta()
+    else:
+      assert isinstance(meta, Meta), "meta=%s"%(meta, )
     self.meta = meta
     self.d_ino = None
     assert meta is not None
@@ -70,6 +73,9 @@ class Dirent(object):
     ''' Is this a directory Dirent?
     '''
     return self.type == D_DIR_T
+
+  def updateFromStat(self, st):
+    self.meta.updateFromStat(st)
 
   def encode(self, noname=False):
     ''' Serialise the dirent.
@@ -202,7 +208,7 @@ def FileDirent(name, meta, block):
   ''' Factory function to return a Dirent for a file.
       Parameters:
         `name`: the file name to store in the Dirent.
-        `meta`: the file meta data.
+        `meta`: the file meta data; may be None.
         `block`: the top block of the file content.
   '''
   return _BasicDirent(D_FILE_T, name, meta, block)
@@ -373,28 +379,37 @@ class Dir(Dirent):
                    ))
 
   def rename(self, oldname, newname):
+    ''' Rename entry `oldname` to entry `newname`.
+    '''
     E = self[oldname]
     del E[oldname]
     E.name = newname
     self[newname] = E
 
   def open(self, name):
+    ''' Open the entry named `name` as a readable file-like object.
+    '''
     from cs.venti.file import ReadFile
     return ReadFile(self[name].getBlock())
 
   def mkdir(self, name):
+    ''' Create a subdirectory named `name`, return the Dirent.
+    '''
     debug("<%s>.mkdir(%s)..." % (self.name, name))
     D = self[name] = Dir(name, parent=self)
     return D
 
   def chdir1(self, name):
+    ''' Change directory to the immediate entry `name`.
+        Return the entry.
+    '''
     D = self[name]
     assert D.isdir
-    if not isinstance(D, Dir):
-      D = self[name] = Dir(D.name, parent=self)
     return D
 
   def chdir(self, path):
+    ''' Change directory to `path`, return the ending directory.
+    '''
     D = self
     for name in path.split('/'):
       if len(name) == 0:
@@ -455,11 +470,22 @@ class Dir(Dirent):
                 del D[name]
 
           for dirname in dirnames:
-            if dirname in D:
-              if not D[dirname].isdir:
+            if dirname not in D:
+              E = D.mkdir(dirname)
+            else:
+              E = D[dirname]
+              if not E.isdir:
                 # old name is not a dir - toss it and make a dir
                 del D[dirname]
-                D.mkdir(dirname)
+                E = D.mkdir(dirname)
+            full_dirname = os.path.join(dirpath, dirname)
+            try:
+              st = os.stat(full_dirname)
+            except OSError, e:
+              warn("stat: %s", e)
+              ok = False
+            else:
+              E.updateFromStat(st)
 
           for filename in filenames:
             with Pfx(filename):
@@ -467,18 +493,26 @@ class Dir(Dirent):
               if not os.path.isfile(filepath):
                 warn("not a regular file, skipping")
                 continue
+
               try:
-                D.storeFile(filename, filepath,
-                               trust_size_mtime=trust_size_mtime,
-                               ignore_existing=ignore_existing)
+                E = D.storeFile(filename, filepath,
+                                trust_size_mtime=trust_size_mtime,
+                                ignore_existing=ignore_existing)
               except OSError, e:
                 error("%s", e)
                 ok = False
-                continue
               except IOError, e:
                 error("%s", e)
                 ok = False
-                continue
+              else:
+                try:
+                  st = os.stat(filepath)
+                except OSError, e:
+                  warn("stat: %s", e)
+                  ok = False
+                else:
+                  E.updateFromStat(st)
+
     return ok
 
   def storeFile(self, filename, filepath,
@@ -488,11 +522,11 @@ class Dir(Dirent):
     import  cs.venti.file
     with Pfx("%s.storeFile(%s, %s, trust_size_mtime=%s, ignore_existing=%s"
              % (self, filename, filepath, trust_size_mtime, ignore_existing)):
-      if ignore_existing and filename in self:
-        debug("already exists, skipping")
-        return
-      st = os.stat(filepath)
       E = self.get(filename)
+      if ignore_existing and E is not None:
+        debug("already exists, skipping")
+        return E
+      st = os.stat(filepath)
       if E is not None:
         if not E.isfile:
           # not a file, no blocks to match
@@ -502,21 +536,20 @@ class Dir(Dirent):
              and st.st_size == E.size() \
              and int(st.st_mtime) == int(E.mtime):
             debug("same size and mtime, skipping")
-            return
+            return E
           debug("differing size(%s:%s)/mtime(%s:%s)",
                 st.st_size, E.size(),
                 int(st.st_mtime), int(E.mtime))
 
-      # TODO: M.updateFromStat(st)
-      M = Meta()
-      M.mtime = st.st_mtime
       if E is None:
         matchBlocks = None
       else:
         matchBlocks = E.getBlock().leaves()
       with open(filepath, "rb") as ifp:
-        stored = cs.venti.file.storeFile(ifp, name=filename, meta=M,
+        E = cs.venti.file.storeFile(ifp, name=filename,
                                          matchBlocks=matchBlocks)
+        E.updateFromStat(st)
       if filename in self:
         del self[filename]
-      self[filename] = stored
+      self[filename] = E
+      return E

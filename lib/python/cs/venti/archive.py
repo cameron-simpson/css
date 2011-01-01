@@ -18,7 +18,7 @@ from datetime import datetime
 from cs.venti import totext, fromtext
 from cs.venti.dir import Dir, decodeDirent, storeDir
 from cs.venti.file import storeFile
-from cs.logutils import Pfx
+from cs.logutils import Pfx, error
 
 def archive(arfile, path, verbose=False, fp=None,
           trust_size_mtime=False,
@@ -55,6 +55,15 @@ def archive(arfile, path, verbose=False, fp=None,
         E, ok = storeDir(path)
     else:
       E = storeFile(open(path, "rb"))
+      ok = True
+      try:
+        st = os.stat(path)
+      except OSError, e:
+        warn("stat: %s", e)
+        ok = False
+      else:
+        E.updateFromStat(st)
+
     E.name = path
     if arfile is None:
       writeDirent(sys.stdout, E)
@@ -90,7 +99,10 @@ def toc(arfile, paths=None, verbose=False, fp=None):
   if fp is None:
     fp = sys.stdout
   for path, E in retrieve(arfile, paths):
-    toc_report(fp, path, E, verbose)
+    if E is None:
+      error("no entry for %s", path)
+    else:
+      toc_report(fp, path, E, verbose)
 
 def getDirents(fp):
   ''' Generator to yield (unixtime, Dirent) from archive file.
