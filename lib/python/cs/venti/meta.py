@@ -17,19 +17,6 @@ def permbits_to_acl(bits):
       sub += c
   return add+'-'+sub
 
-def MetaFromStat(st):
-  M = Meta()
-  M['m'] = st.st_mtime
-  user = getpwuid(st.st_uid)[0]
-  group = getgrgid(st.st_gid)[0]
-  uid = st.st_uid
-  gid = st.st_gid
-  M['a'] = [ "u:"+user+":"+permbits_to_acl( (st.st_mode>>6)&7 ),
-             "g:"+group+":"+permbits_to_acl( (st.st_mode>>3)&7 ),
-             "*:"+permbits_to_acl( (st.st_mode)&7 ),
-           ]
-  return M
-
 class Meta(dict):
   ''' Metadata:
         Modification time:
@@ -57,8 +44,7 @@ class Meta(dict):
           self[k] = v
 
   def encode(self):
-    ks = sorted(self.keys())
-    return "".join("%s:%s\n" % kv for kv in ks.items())
+    return "".join("%s:%s\n" % (k, self[k]) for k in sorted(self.keys()))
 
   @property
   def mtime(self):
@@ -67,6 +53,25 @@ class Meta(dict):
   @mtime.setter
   def mtime(self, when):
     self['m'] = float(when)
+
+  @property
+  def acl(self):
+    return [ ac for ac in self.get('a', '').split(',') if len(ac) ]
+
+  @acl.setter
+  def acl(self, acl):
+    self['a'] = ','.join(acl)
+
+  def updateFromStat(self, st):
+    self.mtime = st.st_mtime
+    user = getpwuid(st.st_uid)[0]
+    group = getgrgid(st.st_gid)[0]
+    uid = st.st_uid
+    gid = st.st_gid
+    self.acl = ( "u:"+user+":"+permbits_to_acl( (st.st_mode>>6)&7 ),
+                 "g:"+group+":"+permbits_to_acl( (st.st_mode>>3)&7 ),
+                 "*:"+permbits_to_acl( (st.st_mode)&7 ),
+               )
 
   def unixPerms(self):
     ''' Return (user, group, unix-mode-bits).
@@ -79,9 +84,7 @@ class Meta(dict):
     group = None
     gperms = 0
     operms = 0
-    acl = [ ac for ac in self.get('a', '').split(',') if len(ac) > 0 ]
-    acl.reverse()
-    for ac in acl:
+    for ac in reversed(self.acl):
       if len(ac) > 0:
         if ac.startswith('u:'):
           login, perms = ac[2:].split(':', 1)
