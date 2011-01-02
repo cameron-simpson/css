@@ -240,7 +240,7 @@ class FileDirent(_BasicDirent):
         verbosefp.write(path)
         verbosefp.write('\n')
       dirpath = os.path.dirname(path)
-      if not os.path.isdir(dirpath):
+      if len(dirpath) and not os.path.isdir(dirpath):
         if makedirs:
           os.makedirs(dirpath)
       with open(path, "wb") as ofp:
@@ -597,7 +597,7 @@ class Dir(Dirent):
       if verbosefp is not None:
         verbosefp.write(path)
         verbosefp.write('\n')
-      if not os.path.isdir(path):
+      if len(dirpath) and not os.path.isdir(path):
         if makedirs:
           os.makedirs(path)
         else:

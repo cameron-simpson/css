@@ -296,7 +296,10 @@ def cmd_ar(args):
           error("retrieve %s: not found" % (path,))
           xit = 1
         else:
-          E.restore(path, makedirs=True, recurse=True, verbosefp=verbosefp)
+          if E.isdir:
+            E.restore(path, makedirs=True, recurse=True, verbosefp=verbosefp)
+          else:
+            E.restore(path, makedirs=True, verbosefp=verbosefp)
   else:
     raise GetoptError, "%s: unsupported mode" % (mode,)
 

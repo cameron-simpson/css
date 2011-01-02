@@ -220,23 +220,17 @@ def blocksOf(dataSource, vocab=None):
 
       # if buf gets too big, scan it with the rolling hash
       # we may have to rescan after finding an edge
-      while buflen >= MAX_BLOCKSIZE:
-        buf2 = []
+      if buflen >= MAX_BLOCKSIZE:
+        data2 = "".join(buf)
         RH = RollingHash()
-        for b in buf:
-          while len(b):
-            edgepos = RH.findEdge(b, len(b))
-            if edgepos >= 0:
-              buf2.append(b[:edgepos])
-              yield Block("".join(buf2))
-              buf2 = []
-              b = b[edgepos:]
-              RH.reset()
-            else:
-              buf2.append(b)
-              break
-        buf = buf2
-        buflen = sum( len(b) for b in buf )
+        while len(data2) >= MAX_BLOCKSIZE:
+          edgepos = RH.findEdge(data2, len(data2))
+          if edgepos < 0:
+            yield Block(data2[:MAX_BLOCKSIZE])
+            data2 = data2[MAX_BLOCKSIZE:]
+            RH.reset()
+        buf = [data2]
+        buflen = len(data2)
 
   # no more data - yield remaining buffer
   if buflen > 0:
