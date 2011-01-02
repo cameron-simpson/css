@@ -12,22 +12,26 @@ from cs.venti.meta import Meta
 from cs.venti.blockify import blockFromFile
 from cs.threads import IterableQueue
 
-def storeFilename(filename, name, rsize=None, matchBlocks=None):
+def storeFilename(filename, name, rsize=None, matchBlocks=None, verbosefp=None):
   ''' Store the file named `filename`.
       Return 
   '''
   with Pfx(filename):
+    if verbosefp:
+      print >>verbosefp, filename
     with open(filename, "rb") as ifp:
       E = storeFile(ifp, name=name, rsize=rsize, matchBlocks=matchBlocks)
       st = os.fstat(ifp.fileno())
     E.meta.updateFromStat(st)
   return E
 
-def storeFile(ifp, name, rsize=None, matchBlocks=None):
+def storeFile(ifp, name, rsize=None, matchBlocks=None, verbosefp=None):
   ''' Store the data from ifp, return Dirent.
       TODO: set M.mtime from ifp.fstat().
   '''
   info("storeFile(%s)", ifp)
+  if verbosefp:
+    print >>verbosefp, ifp
   B = blockFromFile(ifp, rsize=rsize, matchBlocks=matchBlocks)
   B.store()
   return FileDirent(name, None, B)

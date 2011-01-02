@@ -21,13 +21,13 @@ gid_nogroup = -1
 
 # Directories (Dir, a subclass of dict) and directory entries (Dirent).
 
-def storeDir(path, aspath=None, trust_size_mtime=False):
+def storeDir(path, aspath=None, trust_size_mtime=False, verbosefp=None):
   ''' Store a real directory into a Store, return the new Dir.
   '''
   if aspath is None:
     aspath = path
   D = Dir(aspath)
-  ok = D.updateFrom(path, trust_size_mtime=trust_size_mtime)
+  ok = D.updateFrom(path, trust_size_mtime=trust_size_mtime, verbosefp=verbosefp)
   if ok:
     ok = D.tryUpdateStat(path)
   return D, ok
@@ -499,13 +499,16 @@ class Dir(Dirent):
                  osdir,
                  trust_size_mtime=False,
                  keep_missing=False,
-                 ignore_existing=False):
+                 ignore_existing=False,
+                 verbosefp=None):
     ''' Update this Dir from the real file tree at `osdir`.
         Return True if no errors occurred.
     '''
-    ok = True
     with Pfx("updateFrom(%s,...)" % (osdir,)):
-      assert os.path.isdir(osdir), "not a directory"
+      if verbosefp:
+        print >>verbosefp, osdir+'/'
+      assert os.path.isdir(osdir), "not a directory: %s" % (osdir,)
+      ok = self.tryUpdateStat(osdir)
       osdirpfx = os.path.join(osdir, '')
       for dirpath, dirnames, filenames in os.walk(osdir, topdown=False):
         with Pfx(dirpath):
@@ -523,10 +526,15 @@ class Dir(Dirent):
             Dnames = list(D.keys())
             for name in Dnames:
               if name not in allnames:
-                info("delete %s" % (name,))
+                info("delete %s", name)
+                if verbosefp:
+                  print >>verbosefp, "delete", os.path.join(dirpath, name)
                 del D[name]
 
-          for dirname in dirnames:
+          for dirname in sorted(dirnames):
+            subdirpath = os.path.join(dirpath, dirname)
+            if verbosefp:
+              print >>verbosefp, subdirpath+'/'
             if dirname not in D:
               E = D.mkdir(dirname)
             else:
@@ -535,12 +543,14 @@ class Dir(Dirent):
                 # old name is not a dir - toss it and make a dir
                 del D[dirname]
                 E = D.mkdir(dirname)
-            if not E.tryUpdateStat(os.path.join(dirpath, dirname)):
+            if not E.tryUpdateStat(subdirpath):
               ok = False
 
-          for filename in filenames:
+          for filename in sorted(filenames):
             with Pfx(filename):
               filepath = os.path.join(dirpath, filename)
+              if verbosefp:
+                print >>verbosefp, filepath
               if not os.path.isfile(filepath):
                 warn("not a regular file, skipping")
                 continue

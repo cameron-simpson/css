@@ -236,7 +236,7 @@ def cmd_ar(args):
 
   badopts = False
   verbose = False
-  arfile = None
+  arfile = '-'
   mode = opts[0]
   for opt in opts[1:]:
     if opt == 'f':
@@ -257,22 +257,26 @@ def cmd_ar(args):
   xit = 0
 
   import cs.venti.archive
-  if arfile is not None and arfile == '-':
-    arfile = None
+  
+  if verbose:
+    if arfile == '-':
+      verbosefp = sys.stderr
+    else:
+      verbosefp = sys.stdout
+  else:
+    verbosefp = None
 
   if mode == 't':
-    if arfile is None:
-      raise GetoptError, "missing arfile: stdin mode not yet implemented"
     if args:
       paths = args
     else:
       paths = None
     with Pfx("tf %s" % (arfile,)):
-      cs.venti.archive.toc(arfile, paths, verbose)
+      cs.venti.archive.toc(arfile, paths, verbosefp)
   elif mode == 'u':
     for path in args:
       try:
-        ok = cs.venti.archive.archive(arfile, path, verbose, trust_size_mtime=True)
+        ok = cs.venti.archive.archive(arfile, path, verbosefp, trust_size_mtime=True)
       except IOError, e:
         error("archive %s: %s" % (path, e))
         xit = 1
@@ -280,16 +284,10 @@ def cmd_ar(args):
         if not ok:
           xit = 1
   elif mode == 'x':
-    if arfile is None:
-      raise GetoptError, "missing arfile: stdin mode not yet implemented"
     if args:
       paths = args
     else:
       paths = None
-    if verbose:
-      verbosefp = sys.stdout
-    else:
-      verbosefp = None
     with Pfx("xf %s" % (arfile,)):
       for path, E in cs.venti.archive.retrieve(arfile, paths):
         if E is None:

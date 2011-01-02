@@ -21,51 +21,54 @@ from cs.venti.dir import Dir, decodeDirent, storeDir
 from cs.venti.file import storeFilename
 from cs.logutils import Pfx, error
 
-def archive(arfile, path, verbose=False, fp=None,
+def archive(arfile, path, verbosefp=None,
           trust_size_mtime=False,
           keep_missing=False,
           ignore_existing=False):
   ''' Archive the named file path.
   '''
-  if fp is None:
-    fp = sys.stdout
-
   # look for existing archive for comparison
   oldtime, oldE = None, None
-  try:
-    arfp = open(arfile)
-  except IOError:
-    pass
+  if arfile == '-':
+    arfp = sys.stdin
+    if arfp.isatty():
+      arfp = None
   else:
+    try:
+      arfp = open(arfile)
+    except IOError:
+      arfp = None
+  if arfp is not None:
     for unixtime, E in getDirents(arfp):
       if E.name == path and (oldtime is None or unixtime >= oldtime):
         oldtime, oldE = unixtime, E
-    arfp.close()
+    if arfile != '-':
+      arfp.close()
 
   with Pfx("archive(%s)" % (path,)):
-    if verbose:
-      print >>fp, path
     if os.path.isdir(path):
       if oldE is not None and oldE.isdir:
         ok = oldE.updateFrom(path,
                      trust_size_mtime=trust_size_mtime,
                      keep_missing=keep_missing,
-                     ignore_existing=ignore_existing)
+                     ignore_existing=ignore_existing,
+                     verbosefp=verbosefp)
         E = oldE
       else:
-        E, ok = storeDir(path)
-      if ok:
-        ok = E.tryUpdateStat(path)
+        E, ok = storeDir(path, trust_size_mtime=trust_size_mtime, verbosefp=verbosefp)
     else:
-      E = storeFilename(path, path)
+      E = storeFilename(path, path,verbosefp=verbosefp)
       ok = True
 
     E.name = path
     if arfile is None:
       writeDirent(sys.stdout, E)
     else:
-      with open(arfile, "a") as arfp:
-        writeDirent(arfp, E)
+      if arfile == '-':
+        writeDirent(sys.stdout, E)
+      else:
+        with open(arfile, "a") as arfp:
+          writeDirent(arfp, E)
   return ok
 
 def retrieve(arfile, paths=None):
@@ -76,19 +79,27 @@ def retrieve(arfile, paths=None):
   '''
   with Pfx(arfile):
     found = {}
-    with open(arfile) as arfp:
-      for unixtime, E in getDirents(arfp):
-        if paths is None or E.name in paths:
-          found[E.name] = E
+    if arfile == '-':
+      arfp = sys.stdin
+      assert not arfp.isatty(), "stdin may not be a tty"
+    else:
+      arfp = open(arfile)
+    for unixtime, E in getDirents(arfp):
+      if paths is None or E.name in paths:
+        found[E.name] = E
+    if arfile != '-':
+      arfile.close()
     if paths is None:
       paths = found.keys()
     return [ (path, found.get(path)) for path in paths ]
 
 def toc_report(fp, path, E, verbose):
-  print >>fp, path
+  if verbose:
+    print >>fp, path
+  else:
+    print >>fp, E.meta, path
   if E.isdir:
-    entries = sorted(E.keys())
-    for subpath in entries:
+    for subpath in sorted(E.keys()):
       toc_report(fp, os.path.join(path, subpath), E[subpath], verbose)
 
 def toc(arfile, paths=None, verbose=False, fp=None):
