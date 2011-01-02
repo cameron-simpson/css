@@ -226,9 +226,10 @@ def blocksOf(dataSource, vocab=None):
         while len(data2) >= MAX_BLOCKSIZE:
           edgepos = RH.findEdge(data2, len(data2))
           if edgepos < 0:
-            yield Block(data2[:MAX_BLOCKSIZE])
-            data2 = data2[MAX_BLOCKSIZE:]
-            RH.reset()
+            edgepos = MAX_BLOCKSIZE
+          yield Block(data2[:MAX_BLOCKSIZE])
+          data2 = data2[MAX_BLOCKSIZE:]
+          RH.reset()
         buf = [data2]
         buflen = len(data2)
 
