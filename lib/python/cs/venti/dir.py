@@ -1,4 +1,7 @@
 import os
+import os.path
+import pwd
+import grp
 import stat
 import sys
 if sys.hexversion < 0x02060000:
@@ -224,6 +227,47 @@ def FileDirent(name, meta, block):
   '''
   return _BasicDirent(D_FILE_T, name, meta, block)
 
+class FileDirent(_BasicDirent):
+
+  def __init__(self, name, meta, block):
+    _BasicDirent.__init__(self, D_FILE_T, name, meta, block)
+
+  def restore(self, path, makedirs=False, verbosefp=None):
+    ''' Restore this Dirent's file content to the name `path`.
+    '''
+    with Pfx("FileDirent.restore(%s)"):
+      if verbosefp is not None:
+        verbosefp.write(path)
+        verbosefp.write('\n')
+      dirpath = os.path.dirname(path)
+      if not os.path.isdir(dirpath):
+        if makedirs:
+          os.makedirs(dirpath)
+      with open(path, "wb") as ofp:
+        for B in self.getBlock().leaves():
+          ofp.write(B.blockdata())
+        fd = ofp.fileno()
+        st = os.fstat(fd)
+        user, group, perms = self.meta.unixPerms()
+        if user is not None or group is not None:
+          os.fchmod(fd, perms)
+        if user is None:
+          uid = -1
+        else:
+          uid = pwd.getpwnam(user)[2]
+          if uid == st.st_uid:
+            uid = -1
+        if group is None:
+          gid = -1
+        else:
+          gid = grp.getgrnam(group)[2]
+          if gid == st.st_gid:
+            gid = -1
+        if uid != -1 or gid != -1:
+          os.fchown(fd, uid, gid)
+      if self.meta.mtime is not None:
+        os.utime(path, (st.st_atime, self.meta.mtime))
+
 def decodeDirent(s, justone=False):
   ''' Unserialise a dirent, return object.
       Input format: bs(type)bs(flags)[bs(metalen)meta][bs(namelen)name]block
@@ -248,6 +292,8 @@ def decodeDirent(s, justone=False):
   block, s = decodeBlock(s)
   if type_ == D_DIR_T:
     E = Dir(name, meta=meta, parent=None, content=block)
+  elif type_ == D_FILE_T:
+    E = FileDirent(name, meta=meta, block=block)
   else:
     E = _BasicDirent(type_, name, meta, block)
   if justone:
@@ -543,3 +589,46 @@ class Dir(Dirent):
         del self[filename]
       self[filename] = E
       return E
+
+  def restore(self, path, makedirs=False, recurse=False, verbosefp=None):
+    ''' Restore this Dir as `path`.
+    '''
+    with Pfx("Dir.restore(%s)"):
+      if verbosefp is not None:
+        verbosefp.write(path)
+        verbosefp.write('\n')
+      if not os.path.isdir(path):
+        if makedirs:
+          os.makedirs(path)
+        else:
+          os.mkdir(path)
+      st = os.stat(path)
+      user, group, perms = self.meta.unixPerms()
+      if user is not None or group is not None:
+        os.chmod(path, perms)
+      if user is None:
+        uid = -1
+      else:
+        uid = pwd.getpwnam(user)[2]
+        if uid == st.st_uid:
+          uid = -1
+      if group is None:
+        gid = -1
+      else:
+        gid = grp.getgrnam(group)[2]
+        if gid == st.st_gid:
+          gid = -1
+      if uid != -1 or gid != -1:
+        os.chown(path, uid, gid)
+      if self.meta.mtime is not None:
+        os.utime(path, (st.st_atime, self.meta.mtime))
+    if recurse:
+      for filename in sorted(self.files()):
+        self[filename].restore(os.path.join(path, filename),
+                               makedirs=makedirs,
+                               verbosefp=verbosefp)
+      for dirname in sorted(self.dirs()):
+        self[dirname].restore(os.path.join(path, dirname),
+                              makedirs=makedirs,
+                              recurse=True,
+                              verbosefp=verbosefp)

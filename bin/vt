@@ -287,15 +287,17 @@ def cmd_ar(args):
       paths = args
     else:
       paths = None
+    if verbose:
+      verbosefp = sys.stdout
+    else:
+      verbosefp = None
     with Pfx("xf %s" % (arfile,)):
       for path, E in cs.venti.archive.retrieve(arfile, paths):
-        if verbose:
-          print path
         if E is None:
           error("retrieve %s: not found" % (path,))
           xit = 1
         else:
-          print "X - %s - %s" % (E.name, E)
+          E.restore(path, makedirs=True, recurse=True, verbosefp=verbosefp)
   else:
     raise GetoptError, "%s: unsupported mode" % (mode,)
 
