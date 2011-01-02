@@ -25,6 +25,8 @@ def storeDir(path, aspath=None, trust_size_mtime=False):
     aspath = path
   D = Dir(aspath)
   ok = D.updateFrom(path, trust_size_mtime=trust_size_mtime)
+  if ok:
+    ok = D.tryUpdateStat(path)
   return D, ok
 
 D_FILE_T = 0
@@ -76,6 +78,15 @@ class Dirent(object):
 
   def updateFromStat(self, st):
     self.meta.updateFromStat(st)
+
+  def tryUpdateStat(self, statpath):
+    try:
+      st = os.stat(statpath)
+    except OSError, e:
+      error("stat(%s): %s", statpath, e)
+      return False
+    self.updateFromStat(st)
+    return True
 
   def encode(self, noname=False):
     ''' Serialise the dirent.
@@ -478,14 +489,8 @@ class Dir(Dirent):
                 # old name is not a dir - toss it and make a dir
                 del D[dirname]
                 E = D.mkdir(dirname)
-            full_dirname = os.path.join(dirpath, dirname)
-            try:
-              st = os.stat(full_dirname)
-            except OSError, e:
-              warn("stat: %s", e)
+            if not E.tryUpdateStat(os.path.join(dirpath, dirname)):
               ok = False
-            else:
-              E.updateFromStat(st)
 
           for filename in filenames:
             with Pfx(filename):
@@ -495,7 +500,7 @@ class Dir(Dirent):
                 continue
 
               try:
-                E = D.storeFile(filename, filepath,
+                E = D.storeFilename(filepath, filename,
                                 trust_size_mtime=trust_size_mtime,
                                 ignore_existing=ignore_existing)
               except OSError, e:
@@ -504,18 +509,10 @@ class Dir(Dirent):
               except IOError, e:
                 error("%s", e)
                 ok = False
-              else:
-                try:
-                  st = os.stat(filepath)
-                except OSError, e:
-                  warn("stat: %s", e)
-                  ok = False
-                else:
-                  E.updateFromStat(st)
 
     return ok
 
-  def storeFile(self, filename, filepath,
+  def storeFilename(self, filepath, filename,
                 trust_size_mtime=False, ignore_existing=False):
     ''' Store as `filename` to file named by `filepath`.
     '''
@@ -526,29 +523,22 @@ class Dir(Dirent):
       if ignore_existing and E is not None:
         debug("already exists, skipping")
         return E
-      st = os.stat(filepath)
-      if E is not None:
-        if not E.isfile:
-          # not a file, no blocks to match
-          E = None
-        else:
-          if trust_size_mtime \
-             and st.st_size == E.size() \
-             and int(st.st_mtime) == int(E.mtime):
-            debug("same size and mtime, skipping")
-            return E
-          debug("differing size(%s:%s)/mtime(%s:%s)",
-                st.st_size, E.size(),
-                int(st.st_mtime), int(E.mtime))
 
-      if E is None:
+      if trust_size_mtime and E is not None and E.isfile:
+        st = os.stat(filepath)
+        if st.st_size == E.size() and int(st.st_mtime) == int(E.mtime):
+          debug("same size and mtime, skipping")
+          return E
+        debug("differing size(%s:%s)/mtime(%s:%s)",
+              st.st_size, E.size(),
+              int(st.st_mtime), int(E.mtime))
+
+      if E is None or not E.isfile:
         matchBlocks = None
       else:
         matchBlocks = E.getBlock().leaves()
-      with open(filepath, "rb") as ifp:
-        E = cs.venti.file.storeFile(ifp, name=filename,
-                                         matchBlocks=matchBlocks)
-        E.updateFromStat(st)
+
+      E = cs.venti.file.storeFilename(filepath, filename, matchBlocks=matchBlocks)
       if filename in self:
         del self[filename]
       self[filename] = E

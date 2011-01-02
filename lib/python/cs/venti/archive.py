@@ -15,9 +15,10 @@ import os
 import sys
 import time
 from datetime import datetime
+from cs.lex import unctrl
 from cs.venti import totext, fromtext
 from cs.venti.dir import Dir, decodeDirent, storeDir
-from cs.venti.file import storeFile
+from cs.venti.file import storeFilename
 from cs.logutils import Pfx, error
 
 def archive(arfile, path, verbose=False, fp=None,
@@ -53,16 +54,11 @@ def archive(arfile, path, verbose=False, fp=None,
         E = oldE
       else:
         E, ok = storeDir(path)
+      if ok:
+        ok = E.tryUpdateStat(path)
     else:
-      E = storeFile(open(path, "rb"))
+      E = storeFilename(path, path)
       ok = True
-      try:
-        st = os.stat(path)
-      except OSError, e:
-        warn("stat: %s", e)
-        ok = False
-      else:
-        E.updateFromStat(st)
 
     E.name = path
     if arfile is None:
@@ -109,7 +105,7 @@ def getDirents(fp):
   '''
   for line in fp:
     assert line.endswith('\n'), "%s: unexpected EOF" % (fp,)
-    unixtime, dent = line.strip().split(None, 1)
+    isodate, unixtime, dent = line.split(None, 3)[:3]
     when = float(unixtime)
     E, etc = decodeDirent(fromtext(dent))
     assert len(etc) == 0 or etc[0].iswhite(), \
@@ -121,7 +117,11 @@ def writeDirent(fp, E, when=None):
   '''
   if when is None:
     when = time.time()
+  fp.write(datetime.fromtimestamp(when).isoformat())
+  fp.write(' ')
   fp.write(str(when))
   fp.write(' ')
   fp.write(str(E))
+  fp.write(' ')
+  fp.write(unctrl(E.name))
   fp.write('\n')

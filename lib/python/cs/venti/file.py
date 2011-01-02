@@ -3,16 +3,27 @@
 # File interfaces.      - Cameron Simpson <cs@zip.com.au>
 #
 
-from cs.logutils import info
+import os
+import sys
+from threading import Thread
+from cs.logutils import Pfx, info
 from cs.venti.dir import FileDirent
 from cs.venti.meta import Meta
 from cs.venti.blockify import blockFromFile
-from threading import Thread
-import sys
 from cs.threads import IterableQueue
-import __main__
 
-def storeFile(ifp, rsize=None, matchBlocks=None, name=None):
+def storeFilename(filename, name, rsize=None, matchBlocks=None):
+  ''' Store the file named `filename`.
+      Return 
+  '''
+  with Pfx(filename):
+    with open(filename, "rb") as ifp:
+      E = storeFile(ifp, name=name, rsize=rsize, matchBlocks=matchBlocks)
+      st = os.fstat(ifp.fileno())
+    E.meta.updateFromStat(st)
+  return E
+
+def storeFile(ifp, name, rsize=None, matchBlocks=None):
   ''' Store the data from ifp, return Dirent.
       TODO: set M.mtime from ifp.fstat().
   '''
