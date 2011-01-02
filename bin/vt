@@ -50,14 +50,13 @@ def main(argv):
   setup_logging()
   cmd = cs.misc.cmd
   usage = '''Usage:
+    %s [options...] ar tar-options paths..
     %s [options...] cat filerefs...
     %s [options...] catblock [-i] hashcodes...
     %s [options...] listen port
     %s [options...] ls [-R] dirrefs...
     %s [options...] mount dirref mountpoint
     %s [options...] scan datafile
-    %s [options...] pack paths...
-    %s [options...] pack -o file.vt path
     %s [options...] pull stores...
     %s [options...] unpack dirrefs...
     Options:
@@ -68,7 +67,7 @@ def main(argv):
                     /path/to/dir  GDBMStore
                     tcp:[host]:port TCPStore
                     |sh-command   StreamStore via sh-command
-''' % (cmd, cmd, cmd, cmd, cmd, cmd, cmd, cmd, cmd, cmd)
+''' % (cmd, cmd, cmd, cmd, cmd, cmd, cmd, cmd, cmd)
 
   badopts = False
 
