@@ -47,7 +47,7 @@ from cs.venti.dir import Dir, resolve
 
 def main(argv):
   import cs.misc
-  setup_logging()
+  setup_logging(upd_mode=False)
   cmd = cs.misc.cmd
   usage = '''Usage:
     %s [options...] ar tar-options paths..
