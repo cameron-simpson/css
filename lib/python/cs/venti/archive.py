@@ -88,7 +88,7 @@ def retrieve(arfile, paths=None):
       if paths is None or E.name in paths:
         found[E.name] = E
     if arfile != '-':
-      arfile.close()
+      arfp.close()
     if paths is None:
       paths = found.keys()
     return [ (path, found.get(path)) for path in paths ]
