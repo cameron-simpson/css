@@ -10,10 +10,11 @@ set -ue
 : ${SQUID_CONFIG:=/etc/squid/squid.conf}
 
 cmd=`basename "$0"`
-usage="Usage: $cmd [-f config] [-S squid] [-x] {flushall|start|stop|restart}"
+usage="Usage: $cmd [-D] [-f config] [-S squid] [-x] {flushall|start|stop|restart}"
 
 trace=eecho     ##set-x
 xopt=
+squidopts=
 
 badopts=
 
@@ -22,6 +23,7 @@ do
   case $1 in
     -f) SQUID_CONFIG=$2; shift ;;
     -S) SQUID_BINARY=$2; shift ;;
+    -D) squidopts="$squidopts $1" ;;
     -x) trace=set-x xopt=-x ;;
     --) shift; break ;;
     -?*)echo "$cmd: unrecognised option: $1" >&2
@@ -61,19 +63,19 @@ case $op in
         echo "$cmd: $op: no cache_dir: $cache_dir" >&2
         exit 1
       fi
-      $trace "$0" $xopt -S "$SQUID_BINARY" -f "$SQUID_CONFIG" stop || :
+      $trace "$0" $xopt -S "$SQUID_BINARY" -f "$SQUID_CONFIG" $squidopts stop || :
       $trace rmr "$cache_dir"
       $trace mkdir "$cache_dir"
       $trace chown squid:squid "$cache_dir"
       $trace "$SQUID_BINARY" -f "$SQUID_CONFIG" -z
-      $trace "$0" $xopt -S "$SQUID_BINARY" -f "$SQUID_CONFIG" start
+      $trace "$0" $xopt -S "$SQUID_BINARY" -f "$SQUID_CONFIG" $squidopts start
       ;;
   restart)
-      $trace "$0" $xopt -S "$SQUID_BINARY" -f "$SQUID_CONFIG" stop || :
-      $trace "$0" $xopt -S "$SQUID_BINARY" -f "$SQUID_CONFIG" start
+      $trace "$0" $xopt -S "$SQUID_BINARY" -f "$SQUID_CONFIG" $squidopts stop || :
+      $trace "$0" $xopt -S "$SQUID_BINARY" -f "$SQUID_CONFIG" $squidopts start
       ;;
   start)
-      $trace "$SQUID_BINARY" -f "$SQUID_CONFIG"
+      $trace "$SQUID_BINARY" -f "$SQUID_CONFIG" $squidopts
       ;;
   stop)
       pid_filename=`awk '$1 == "pid_filename" { print $2 }' "$SQUID_CONFIG"`
