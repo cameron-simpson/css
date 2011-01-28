@@ -95,6 +95,7 @@ usehbfiles=1
 rsopts=
 rsdelete=--delete
 verbose=
+imode=
 ##[ -t 1 ] && verbose=1
 
 cmd=`basename "$0"`
@@ -102,8 +103,9 @@ usage="Usage:
 	$cmd [options...] [host:]source backupdir [rsyncopts...]
 	$cmd [options...] --no-rsync parent
 
-	-x		Trace execution. Recite linktree and rsync invocations.
+        -i, itemize-changes Passed to rsync, result slightly filtered by histbackup.
 	-v, --verbose	Verbose. Also passed to rsync.
+	-x		Trace execution. Recite linktree and rsync invocations.
 	--no-delete     Don't pass --delete to rsync.
         --delete        Pass --delete to rsync.
 	--delete-excluded
@@ -212,6 +214,15 @@ do
     --symlink)
       symlink=$2; shift ;;
 
+    # =item -i, --itemize-changes
+    #
+    # Itemise changes. Passed to rsync, but histbackup strips a few noisy outputs.
+    #
+    -i|--itemize-changes)
+      imode=1
+      rsopts="$rsopts -i"
+      ;;
+
     # =item -v, --verbose
     #
     # Turn on verbose mode;
@@ -293,6 +304,11 @@ then  echo=echo
 else  echo=:
 fi
 
+if [ $imode ]
+then
+  filteroutput=`shqstr sed '/\/$/d; /^\.L\.\.[Tt]\.\.\.\.\.\. .* -> /d'`
+fi
+
 # =head1 CUSTOMISATION FILES
 #
 # If the file I<backupdir>/F<.hfiles> is present
@@ -350,34 +366,36 @@ dolink=1
 if [ -n "$lastbackup" -a -d "$dest/$lastbackup/." ]
 then
     $echo "existing backup: linking $lastbackup to $thisbackup ..."
-    ( cd "$dest" || exit 1
-      mklinktree "$lastbackup" "$thisbackup" \
-      || { dolink=; $trace rm -rf "$thisbackup"; false; }
-    ) \
-    && \
-    {
+    if ( cd "$dest" || exit 1
+         mklinktree "$lastbackup" "$thisbackup" \
+         || { dolink=; $trace rm -rf "$thisbackup"; false; }
+       )
+    then
+      ok=1
       if [ $linkonly ]
-      then
-          echo "$dest/$thisbackup" >&3
-          ok=1
-      else
-          $echo "updating $thisbackup from $src ..."
-          $trace rsync $rsopts -aH $rsdelete --rsync-path "$rrsync" ${1+"$@"} "$src/" "$dest/$thisbackup/" \
-          && ok=1
+      then  echo "$dest/$thisbackup" >&3
+      else  $echo "updating $thisbackup from $src ..."
       fi
-    }
+    fi
 else
     if [ $linkonly ]
     then
         echo "$cmd: $dest: no subdirectory to link from" >&2
         ls -la "$dest" >&2
-        false
     else
         $echo "fresh backup, just copying source ..."
-        $trace mkdir "$dest/$thisbackup" \
-        && $trace rsync $rsopts -aH --rsync-path "$rrsync" ${1+"$@"} "$src/" "$dest/$thisbackup/" \
-        && ok=1
+        $trace mkdir "$dest/$thisbackup" && ok=1
     fi
+fi
+
+if [ $ok ]
+then
+  set -- rsync $rsopts -aH $rsdelete --rsync-path "$rrsync" ${1+"$@"} "$src/" "$dest/$thisbackup/"
+  if [ $imode ]
+  then
+    set -- filter_fd 1 "$filteroutput" "$@"
+  fi
+  $trace "$@" || ok=
 fi
 
 if [ $ok ] && [ -n "$symlink" -a -d "$dest/$thisbackup/." ]
