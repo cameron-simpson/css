@@ -306,7 +306,8 @@ fi
 
 if [ $imode ]
 then
-  filteroutput=`shqstr sed '/\/$/d; /^\.L\.\.[Tt]\.\.\.\.\.\. .* -> /d'`
+  # filter out mention of directories, symlink times and hard links
+  filteroutput=`shqstr sed '/\/$/d; /^\.L\.\.[Tt]\.\.\.\.\.\. .* -> /d; /^hf/d'`
 fi
 
 # =head1 CUSTOMISATION FILES
