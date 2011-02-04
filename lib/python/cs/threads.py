@@ -17,7 +17,7 @@ else:
 from collections import deque
 if sys.hexversion < 0x02060000: from sets import Set as set
 from cs.misc import seq
-from cs.logutils import Pfx, LogTime, error, warn, debug, exception
+from cs.logutils import Pfx, LogTime, error, warn, debug, exception, OBSOLETE
 from cs.misc import seq
 
 class WorkerThreadPool(object):
@@ -335,6 +335,7 @@ class Cato9:
   ''' A cat-o-nine-tails Queue-like object, fanning out put() items
       to an arbitrary number of handlers.
   '''
+  @OBSOLETE
   def __init__(self,*args,**kwargs):
     self.__qs={}
     self.__q=IterableQueue(maxsize)
