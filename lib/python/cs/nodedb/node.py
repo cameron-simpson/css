@@ -274,13 +274,34 @@ class Node(dict):
   def __str__(self):
     return self.type+":"+self.name
 
-  def __eq__(self, other):
-    ''' Two Nodes are equal if their name and type are equal and their
-        dictness is equal.
+  def __cmp__(self, other):
+    ''' Nodes compare by type and then name and then id(Node).
+        Note that two Nodes that compare equal can thus still return non-zero
+        from cmp().
     '''
-    return hasattr(other, 'name') and self.name == other.name \
-       and hasattr(other, 'type') and self.type == other.type \
-       and dict.__eq__(self, other)
+    try:
+      c = cmp(self.type, other.type)
+      if c != 0:
+        return c
+      c = cmp(self.name, other.name)
+      if c != 0:
+        return c
+    except AttributeError:
+      return 1
+    return cmp( id(self), id(other) )
+
+  def __eq__(self, other):
+    ''' Two Nodes are equal if their name and type are equal.
+        Attributes are not compared.
+    '''
+    if self is other:
+      return True
+    try:
+      if self.name != other.name or self.type != other.type:
+        return False
+    except AttributeError:
+      return False
+    return True
 
   def __hash__(self):
     ''' Hash function, based on name, type and nodedb id.
@@ -872,6 +893,10 @@ class NodeDB(dict):
       return op_func(args)
 
   def cmd_update(self, args, fp=None):
+    ''' update otherdb: emit set commands to update otherdb with
+        attributes and nodes in this db.
+    '''
+    from .text import attrValueText
     xit = 0
     if fp is None:
       fp = sys.stdout
@@ -888,12 +913,10 @@ class NodeDB(dict):
       attrs = N.keys()
       attrs.sort()
       for attr in attrs:
-        v1 = set( N[attr] )
-        v2 = N2.get(attr, ())
-        v1.difference_update(v2)
-        extra = sorted(v1)
-        for e in extra:
-          fp.write("set %s:%s %s=%s\n" % (t, name, attr, e))
+        values = N[attr]
+        ovalues = N2.get(attr, ())
+        if values != ovalues:
+          fp.write("set %s:%s %s=%s\n" % (t, name, attr, ",".join( [ attrValueText(N2, attr, V) for V in values ] )))
     return xit
 
   def cmd_dump(self, args, fp=None):
