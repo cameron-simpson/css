@@ -264,8 +264,7 @@ def serve(nodedb, host, port, basepath='/', readwrite=False):
   S = cherrypy.server
   S.socket_host = host
   S.socket_port = port
-  cherrypy.tree.mount(V, script_name='/')
-  S.start()
+  cherrypy.quickstart(V)
 
 def OLDdo_GET(self):
     ''' Handle a GET request.

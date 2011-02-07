@@ -119,7 +119,7 @@ class Backend_SQLAlchemy(Backend):
     raise NotImplementedError
 
   def close(self):
-    raise NotImplementedError
+    warn("cs.nodedb.sqla.Backend_SQLAlchemy.close() unimplemented")
 
   def newNode(self, N):
     assert not self.nodedb.readonly
