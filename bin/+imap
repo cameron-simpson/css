@@ -39,6 +39,4 @@ export IMAP_FOLDERROOT
 
 exec $trace + +s +t \
 	-e "set imap_pass=\"$fm_pass\"" \
-	--pre='set-x gmprod -STOP' \
-	--post='set-x gmprod -CONT' \
 	imaps://$fm_user@$fm_host/INBOX
