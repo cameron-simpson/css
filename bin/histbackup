@@ -253,6 +253,17 @@ done
 #
 # =back
 #
+# =head1 Post Option Arguments
+#
+# If the B<--no-rsync> option has been used, only the destination
+# directory appears after the options. It will be initialised for use.
+#
+# Otherwise, the source and destination appear.
+# These may be followed by I<otherbackupdirs>, the full paths of other directories like the one B<histbackup> is copying;
+# these will be handed to rsync(1) as B<--link-dest> options.
+# After the I<otherbackupdirs>, other rsync(1) options may be supplied;
+# these will be passed to rsync.
+#
 
 if [ $linkonly ]
 then
@@ -270,6 +281,7 @@ else
         echo "$cmd: missing source or backupdir" >&2
         badopts=1
     else
+        # =head
         src=$1 dest=$2
         shift; shift
         # gather other backup dirs, turn into --link-dest= options
@@ -278,7 +290,7 @@ else
           case "x$1" in
             x/*)
               obackup=$1; shift
-              set -- "$@" "--link-dest=$obackup"
+              set -- ${1+"$@"} "--link-dest=$obackup"
               ;;
             *)break
               ;;
