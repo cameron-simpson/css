@@ -1,0 +1,7 @@
+histbackup: easy use of --link-dest, -i summary mode, assorted minor changes.
+vt, vtpack, cs.venti: tar-like command line mode, assorted updates.
+filter_fd: drastic simplification, and rearrangement to arrange inner command is the base process instead of a child.
+cs.logutils: ANSI colours, many other updates.
+portfwd: bugfixes and improvements.
+OK: new prefix script to report OK/FAIL for commands.
+Many other minor updates.

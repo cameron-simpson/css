@@ -1,0 +1,1093 @@
+changeset:   8019:6b541cac3e8c
+tag:         release-20101026
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Tue Oct 26 16:59:18 2010 +1100
+files:       release/20101026/CHANGES.txt release/20101026/SUMMARY.txt release/20101026/release-tag.txt
+description:
+Release information for release-20101026.
+Summary:
+Scripts: remove more obsolete cmderr uses.
+Modules:
+  cs.later: release memory promptly, add named LateFunctions and logging
+  support.
+  cs.logutils: update for @pfx decorator, improvements to LogTime,
+  assorted smaller changes.
+
+
+changeset:   8020:785548c2d16e
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Tue Oct 26 16:59:18 2010 +1100
+files:       .hgtags
+description:
+Added tag release-20101026 for changeset 6b541cac3e8c
+
+
+changeset:   8021:6ffa756a0c9c
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Tue Oct 26 17:47:58 2010 +1100
+files:       bin/cdrip
+description:
+cdrip: manpage typo fix
+
+
+changeset:   8022:9edb9410a27d
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Mon Nov 01 15:25:05 2010 +1100
+files:       bin/secret
+description:
+secret: require python2.6
+
+
+changeset:   8023:5abb13df96dd
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Wed Nov 03 10:42:37 2010 +1100
+files:       lib/python/cs/logutils.py
+description:
+cs.logutils: logTo: add format parameter, defaulting to %(asctime)s %(levelname)s %(message)
+
+
+changeset:   8024:bfcd28773e19
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Wed Nov 03 10:46:08 2010 +1100
+files:       lib/python/cs/logutils.py
+description:
+cs.logutils: logTo(): repair default format string
+
+
+changeset:   8025:fdbcf2adca91
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Wed Nov 03 10:47:56 2010 +1100
+files:       lib/python/cs/logutils.py
+description:
+cs.logutils: docstring fix
+
+
+changeset:   8026:fa5338afa252
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Thu Nov 04 11:22:19 2010 +1100
+files:       lib/python/cs/tail.py
+description:
+cs.tail: remove obsolete TODO import
+
+
+changeset:   8027:628c2d3ebe8b
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Fri Nov 12 14:31:06 2010 +1100
+files:       bin/portfwd
+description:
+portfwd: use PORTFWD_DISABLED_host flag to disable specific portforwards
+
+
+changeset:   8028:d2efb73e2af0
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sat Nov 13 12:48:38 2010 +1100
+files:       bin/flag
+description:
+flag: add -w (write file if missing) option, update usage message
+
+
+changeset:   8029:d873bce446f4
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sat Nov 13 12:49:08 2010 +1100
+files:       bin/portfwd
+description:
+portfwd: rework signal and subprocess handling
+
+
+changeset:   8030:502b7467fb78
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sat Nov 13 12:49:39 2010 +1100
+files:       Mykefile
+description:
+Mykefile: exclude testzap and testpageurls from bin-cs update
+
+
+changeset:   8031:9925388fa8a5
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Mon Nov 15 20:31:15 2010 +1100
+files:       bin/arg1
+description:
+arg1: typo fix
+
+
+changeset:   8032:533488f7b42c
+parent:      7971:e8ba7395509f
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Thu Oct 14 22:29:22 2010 +1100
+files:       lib/python/cs/nodedb/node.py
+description:
+cs.nodedb.node: add cmd_* methods for command line ops
+
+
+changeset:   8033:e4dca71eb45b
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Thu Oct 14 22:33:30 2010 +1100
+files:       lib/python/cs/nodedb/node.py
+description:
+cs.nodedb.node: move do_command and cmd_* methods from _AttrList to NodeDB (whoops!)
+
+
+changeset:   8034:2a29e3b50e68
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Thu Oct 14 22:35:30 2010 +1100
+files:       lib/python/cs/nodedb/node.py
+description:
+cs.nodedb.node: move do_command and cmd_* methods from Node to NodeDB (whoops again - must be tired)
+
+
+changeset:   8035:04720442b19f
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sat Oct 16 09:41:02 2010 +1100
+files:       lib/python/cs/nodedb/node.py
+description:
+cs.nodedb.node: import fixes
+
+
+changeset:   8036:c2ebde90d181
+parent:      8005:433a71e97975
+parent:      8035:04720442b19f
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Wed Oct 20 18:22:52 2010 +1100
+description:
+Automated merge with file:///Users/cameron/dev/css-fleet
+
+
+changeset:   8037:188f773a000d
+parent:      8021:6ffa756a0c9c
+parent:      8036:c2ebde90d181
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Thu Oct 28 13:54:24 2010 +1100
+description:
+Automated merge with file:///Users/cameron/dev/css-fleet
+
+
+changeset:   8038:cc3b20882b46
+parent:      8025:fdbcf2adca91
+parent:      8037:188f773a000d
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Wed Nov 03 10:52:40 2010 +1100
+description:
+Automated merge with file:///Users/cameron/dev/css-fleet
+
+
+changeset:   8039:a4ce6c409c36
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Wed Nov 03 13:10:15 2010 +1100
+files:       lib/python/cs/nodedb/sqla.py
+description:
+cs.nodedb.sqla: fix db import now that N[attr] does not autocreate
+
+
+changeset:   8040:b9dce385dcd5
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Wed Nov 03 13:31:25 2010 +1100
+files:       lib/python/cs/nodedb/__init__.py
+description:
+cs.nodedb.__init__.main: pass non-special commands through to NodeDB.do_command()
+
+
+changeset:   8041:f45b13fd8a1a
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Wed Nov 03 13:31:49 2010 +1100
+files:       lib/python/cs/nodedb/httpd.py
+description:
+cs.nodedb.httpd: fix _Nodes initialiser
+
+
+changeset:   8042:f6698fa8271d
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Wed Nov 03 14:01:06 2010 +1100
+files:       lib/python/cs/nodedb/node.py
+description:
+cs.nodedb: add Node.textdump, calls NodeDB.dump()
+
+
+changeset:   8043:8f47210b91ea
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Fri Nov 05 15:13:53 2010 +1100
+files:       lib/python/cs/nodedb/node.py
+description:
+cs.nodedb.node: better warning on AttributeError
+
+
+changeset:   8044:81250f531ff5
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Fri Nov 05 15:14:11 2010 +1100
+files:       lib/python/cs/logutils.py
+description:
+cs.logutils: support flags in $DEBUG envvar
+
+
+changeset:   8045:0a4f9380e77d
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Fri Nov 05 16:34:33 2010 +1100
+files:       lib/python/cs/nodedb/node.py
+description:
+cs.nodedb.node: add -C (create) option to cmd_set(), warn on dropping nodes with no attrs in CSV dumps, short NodeDB.__str__
+
+
+changeset:   8046:e9456c358159
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Fri Nov 05 16:37:02 2010 +1100
+files:       lib/python/cs/nodedb/csvdb.py
+description:
+cs.nodedb.csvdb: short __str__, put some debug into sync() method
+
+
+changeset:   8047:22bb2b159f95
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Fri Nov 05 16:46:49 2010 +1100
+files:       lib/python/cs/nodedb/node.py
+description:
+cs.nodedb.node: permit underscores in node name tokeniser
+
+
+changeset:   8048:000670ba2ad7
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Fri Nov 05 18:09:06 2010 +1100
+files:       lib/python/cs/nodedb/node.py
+description:
+cs.nodedb.node: Node.__hash__ now hashes just name and type; it is folloy to hash more. Add cmd_update, to emit "new" and "set" commands to update another db
+
+
+changeset:   8049:8fc74884e6a2
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sat Nov 06 08:52:02 2010 +1100
+files:       lib/python/cs/nodedb/node.py
+description:
+cs.nodedb.node: Node equality now more like dict equality, hash function again includes id(nodedb), docstring and tweak Node.update()
+
+
+changeset:   8050:b557e1cd8e32
+parent:      8031:9925388fa8a5
+parent:      8049:8fc74884e6a2
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Tue Nov 16 14:22:35 2010 +1100
+description:
+Automated merge with ssh://home/hg/css
+
+
+changeset:   8051:b08fc8588dbe
+parent:      8031:9925388fa8a5
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Thu Nov 18 12:36:26 2010 +1100
+files:       bin/process-file
+description:
+process-file: general wrapper to run a file conversion tool in a subdirectory with itdyup and safety checks
+
+
+changeset:   8052:4b902d57b739
+parent:      8051:b08fc8588dbe
+parent:      8050:b557e1cd8e32
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Thu Nov 18 12:36:59 2010 +1100
+description:
+merge
+
+
+changeset:   8053:c224e38b0b41
+parent:      8050:b557e1cd8e32
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Thu Nov 18 13:02:13 2010 +1100
+files:       lib/python/cs/ansi_colour.py
+description:
+cs.ansi_colour: basic text colourisation for ANSI terminals
+
+
+changeset:   8054:e6b2d1b1c9e8
+parent:      8052:4b902d57b739
+parent:      8053:c224e38b0b41
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Thu Nov 18 13:02:15 2010 +1100
+description:
+Automated merge with file:///Users/cameron/dev/css-fleet-logging
+
+
+changeset:   8055:b26816660290
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Thu Nov 18 13:28:00 2010 +1100
+files:       lib/python/cs/logutils.py lib/python/cs/upd.py
+description:
+cs.logutils, cs.upd: basic and untested ANSI terminal colour support
+
+
+changeset:   8056:4f9e717e78ec
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Thu Nov 18 13:29:32 2010 +1100
+files:       lib/python/cs/upd.py
+description:
+cs.upd: remove obsolete ShortExceptions class
+
+
+changeset:   8057:e7ba7f2311a9
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Thu Nov 18 13:34:16 2010 +1100
+files:       lib/python/cs/upd.py
+description:
+cs.upd: fix colourise call
+
+
+changeset:   8058:527d2b69fdc9
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Tue Nov 23 11:26:48 2010 +1100
+files:       bin/filter_fd
+description:
+filter_fd: basename of cmd for usage message
+
+
+changeset:   8059:bafe6dbfe6ff
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Wed Nov 24 09:39:02 2010 +1100
+files:       bin/OK
+description:
+bin/OK: report OK or FAIL for command, optionally summarise count of certain output lines
+
+
+changeset:   8060:fdeccccba2a6
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Mon Nov 29 10:05:50 2010 +1100
+files:       bin/OK
+description:
+OK: default words from command, permit words without regexp
+
+
+changeset:   8061:e2987a559a8b
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Mon Nov 29 10:59:02 2010 +1100
+files:       bin/OK
+description:
+OK: add -:, --ok, --fail, --label options, simplify command/label simple use case
+
+
+changeset:   8062:d2650c21a46e
+parent:      8059:bafe6dbfe6ff
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Thu Nov 25 20:44:30 2010 +1100
+files:       bin/arg1
+description:
+arg1: add -stdout and -stdout-append options
+
+
+changeset:   8063:ef6d007bfbc3
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Thu Nov 25 20:47:12 2010 +1100
+files:       bin/with-opt-css
+description:
+with-opt-css: add "-d optcssdir" option
+
+
+changeset:   8064:7e8caf7b6ab7
+parent:      8061:e2987a559a8b
+parent:      8063:ef6d007bfbc3
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Tue Nov 30 20:46:29 2010 +1100
+description:
+Automated merge with ssh://home/hg/css
+
+
+changeset:   8065:816058e37a23
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Tue Nov 30 20:58:21 2010 +1100
+files:       bin/OK
+description:
+OK: add --prefix and -P options to do easy output prefixing
+
+
+changeset:   8066:69054765df76
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Tue Nov 30 21:10:56 2010 +1100
+files:       bin/OK
+description:
+OK: change --pfx to --prefix, make usage more consistent
+
+
+changeset:   8067:67e9b7b94035
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Tue Nov 30 21:45:11 2010 +1100
+files:       bin/OK
+description:
+OK: fix prefix filter ordering
+
+
+changeset:   8068:e715692878b2
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Tue Nov 30 21:45:46 2010 +1100
+files:       bin/portfwd
+description:
+portfwd: fix signal counter
+
+
+changeset:   8069:ecbf799f72c7
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Wed Dec 01 11:43:23 2010 +1100
+files:       bin/mailif
+description:
+mailif: do argument sanity checking in advance instead of post execif
+
+
+changeset:   8070:41b322415dc3
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Wed Dec 01 17:59:45 2010 +1100
+files:       lib/python/cs/logutils.py
+description:
+cs.logutils: setup_logging(): optional parameter main_log to divert root logger from sys.stderr
+
+
+changeset:   8071:00800b8dc1ea
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Wed Dec 01 18:09:33 2010 +1100
+files:       lib/python/cs/logutils.py
+description:
+cs.logutils.setup_logging(): fix import
+
+
+changeset:   8072:fbe0466af8a9
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sat Dec 04 08:38:27 2010 +1100
+files:       bin/histbackup
+description:
+histbackup: logical cleanup, use rsync instead of special cp/cpdir incantations
+
+
+changeset:   8073:02f6f824cc5d
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sat Dec 04 08:39:02 2010 +1100
+files:       bin/portfwd
+description:
+portfwd: make robust against some kill(1) errors
+
+
+changeset:   8074:83ef59b4d4e6
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sat Dec 04 11:40:33 2010 +1100
+files:       bin/portfwd
+description:
+portfwd: sanity check against killing self, avoid killing self by truncing pidfile
+
+
+changeset:   8075:82123c926313
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sun Dec 05 07:38:47 2010 +1100
+files:       bin/filter_fd
+description:
+filter_fd: drastic simplification, and rearrangement to arrange inner command is the base process instead of a child
+
+
+changeset:   8076:3f5f8d4c44c9
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sun Dec 05 09:43:23 2010 +1100
+files:       bin/portfwd
+description:
+portfwd: clean up -stop code, avoid shooting self, tag ssh stderr output
+
+
+changeset:   8077:61ce8a3cb75f
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Thu Dec 09 22:53:10 2010 +1100
+files:       bin/shqstr-sh
+description:
+shqstr-sh: shell-only implementation of shqstr requested by Zoong Do Dung PHAM
+
+
+changeset:   8078:63d589b60ec0
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Mon Dec 13 22:08:06 2010 +1100
+files:       bin/shqstr-sh
+description:
+shqstr-sh: various fixes based on feedback from Zoong Do Dung PHAM
+
+
+changeset:   8079:91ebf2993914
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sun Dec 26 15:05:43 2010 +1100
+files:       bin/mhdrs
+description:
+mhdrs: fix quote quoter
+
+
+changeset:   8080:1ba921ba9a6d
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Wed Dec 29 08:26:49 2010 +1100
+files:       bin-cs/+
+description:
+bin-cs/+: remove per-folder .muttrc, .preshcmd, .postshcmd - not used
+
+
+changeset:   8081:3acef7ead45f
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Wed Dec 29 09:56:54 2010 +1100
+files:       bin/cs-mutt-per-folder
+description:
+cs-mutt-per-folder: handle +folder as synonym for =folder
+
+
+changeset:   8082:b1ac559378d9
+parent:      8078:63d589b60ec0
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Mon Dec 27 11:27:15 2010 +1100
+files:       lib/python/cs/venti/dir.py
+description:
+cs.venti.dir: printable FILE/DIR type enums, change Dirent.__str__ and __repr__
+
+
+changeset:   8083:8a43f3228b25
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Mon Dec 27 11:30:28 2010 +1100
+files:       bin/vt
+description:
+vt: add store command, probably rename and adjust to "ar" command
+
+
+changeset:   8084:2c060efa3d59
+parent:      8078:63d589b60ec0
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Thu Dec 30 14:10:02 2010 +1100
+files:       bin/dlog
+description:
+dlog: don't do remote dlog if flag DLOG_REMOTE_DISABLE
+
+
+changeset:   8085:6a1aac62727d
+parent:      8083:8a43f3228b25
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Tue Dec 28 08:47:24 2010 +1100
+files:       lib/python/cs/lex.py
+description:
+cs.lex: texthexify: update docstring to document concatenation behaviour, reject modein idea
+
+
+changeset:   8086:d28e40b14574
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Tue Dec 28 08:47:53 2010 +1100
+files:       lib/python/cs/venti/__init__.py
+description:
+cs.venti: docstring update
+
+
+changeset:   8087:0f6912cc1016
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Tue Dec 28 08:49:06 2010 +1100
+files:       lib/python/cs/venti/dir.py
+description:
+cs.venti.dir: make Dirent a new style class, formally make str(Dirent) return Dirent.textEncode()
+
+
+changeset:   8088:661f93b15ebb
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Tue Dec 28 08:55:43 2010 +1100
+files:       lib/python/cs/venti/block.py
+description:
+cs.venti.block: formally make str(_Block) return _Block.textEncode()
+
+
+changeset:   8089:17dc8088708c
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Tue Dec 28 09:30:19 2010 +1100
+files:       lib/python/cs/timeutils.py
+description:
+cs.timeutils: tmFromISO() and timeFromISO(): parse ISO8601 time format - UNTESTED
+
+
+changeset:   8090:2b7965f5bf6e
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Tue Dec 28 10:04:20 2010 +1100
+files:       lib/python/cs/threads.py
+description:
+cs.threads: trivial format changes
+
+
+changeset:   8091:8e563e9bb7b2
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Tue Dec 28 10:11:28 2010 +1100
+files:       lib/python/cs/threads.py
+description:
+cs.threads: permit .close() if never opened
+
+
+changeset:   8092:19b15d7bb092
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Tue Dec 28 10:14:41 2010 +1100
+files:       lib/python/cs/venti/file.py
+description:
+cs.venti.file: remove obsolete debug hooks
+
+
+changeset:   8093:d7647df02a78
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Tue Dec 28 10:35:34 2010 +1100
+files:       bin/vt
+description:
+vt: remove "pack" and "store" commands, replace with "ar"
+
+
+changeset:   8094:4c9c3178e33f
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Tue Dec 28 10:36:27 2010 +1100
+files:       lib/python/cs/venti/dir.py
+description:
+cs.venti.dir: Dir.makedirs(): support . and .. names
+
+
+changeset:   8095:d0775c1dde0b
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Tue Dec 28 10:37:29 2010 +1100
+files:       lib/python/cs/venti/archive.py
+description:
+cs.venti.archive: rewrite, cleaner and simpler
+
+
+changeset:   8096:d4538da1ea84
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Tue Dec 28 15:22:32 2010 +1100
+files:       lib/python/cs/venti/archive.py
+description:
+cs.venti.archive: docstring update
+
+
+changeset:   8097:639360601283
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Tue Dec 28 15:45:49 2010 +1100
+files:       lib/python/cs/venti/hash.py
+description:
+cs.venti.hash: str(Hash_SHA1) returns hexify(hashcode)
+
+
+changeset:   8098:0dea4cdaff5b
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Tue Dec 28 15:46:10 2010 +1100
+files:       bin/vt
+description:
+vt: scan: print SHA1 hashcode of scanned data
+
+
+changeset:   8099:4fee5f6c9e9c
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Tue Dec 28 15:58:18 2010 +1100
+files:       bin/vt lib/python/cs/venti/datafile.py
+description:
+cs.venti: make data flags printable, adjust "vt scan" to use it
+
+
+changeset:   8100:ce35026ea676
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Wed Dec 29 14:38:51 2010 +1100
+files:       lib/python/cs/venti/dir.py
+description:
+cs.venti.dir: Dirent: remove noname parameter from textEncode()
+
+
+changeset:   8101:268266e6b57c
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Wed Dec 29 14:41:07 2010 +1100
+files:       lib/python/cs/venti/archive.py
+description:
+cs.venti.archive: use E throughout for dirent
+
+
+changeset:   8102:b8d94f00f1b1
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Wed Dec 29 18:54:40 2010 +1100
+files:       lib/python/cs/venti/block.py
+description:
+cs.venti.block: make Block.data a property
+
+
+changeset:   8103:bb538335373c
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Thu Dec 30 14:31:14 2010 +1100
+files:       lib/python/cs/venti/blockify.py
+description:
+cs.venti.blockify: inline rolling hash computation
+
+
+changeset:   8104:3570854496ec
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Thu Dec 30 14:32:46 2010 +1100
+files:       lib/python/cs/venti/__init__.py
+description:
+cs.venti: include slash in texthexify clear char range
+
+
+changeset:   8105:30ec5f02d76a
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Thu Dec 30 15:02:18 2010 +1100
+files:       lib/python/cs/venti/file.py
+description:
+cs.venti.file: whitespace
+
+
+changeset:   8106:726383d2a97c
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Thu Dec 30 15:02:55 2010 +1100
+files:       lib/python/cs/venti/block.py
+description:
+cs.venti.block: remove debugging, add .open() method
+
+
+changeset:   8107:46f2a5de0fcd
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Thu Dec 30 15:21:04 2010 +1100
+files:       bin/vt
+description:
+vt: fix typo
+
+
+changeset:   8108:8835f6d16020
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Thu Dec 30 15:21:42 2010 +1100
+files:       lib/python/cs/venti/block.py
+description:
+cs.venti.block: make hashcode a property
+
+
+changeset:   8109:7ecab26589cb
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Thu Dec 30 15:22:01 2010 +1100
+files:       lib/python/cs/venti/blockify.py
+description:
+cs.ventiblockify: hashcode is a property
+
+
+changeset:   8110:b125325f79d4
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Thu Dec 30 15:23:14 2010 +1100
+files:       lib/python/cs/venti/dir.py
+description:
+cs.venti.dir: make Dir.entries a property, adjust Dir.storeFile()
+
+
+changeset:   8111:50cb1687acee
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Fri Dec 31 20:31:21 2010 +1100
+files:       bin/vt lib/python/cs/venti/archive.py
+description:
+vt, cs.venti.archive: add "ar t" mode, do a little debugging
+
+
+changeset:   8112:2a74d738973a
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Fri Dec 31 21:07:25 2010 +1100
+files:       lib/python/cs/venti/store.py
+description:
+cs.venti.store: fix Store.get() params
+
+
+changeset:   8113:dac838004d57
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Fri Dec 31 21:07:49 2010 +1100
+files:       lib/python/cs/venti/gdbmstore.py
+description:
+cs.venti.gdbmstore: add .get() method
+
+
+changeset:   8114:67193f9b2e99
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Fri Dec 31 21:09:23 2010 +1100
+files:       lib/python/cs/venti/dir.py
+description:
+cs.venti.dir: fix recursion in Dir.entries property
+
+
+changeset:   8115:edd684d848ca
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Fri Dec 31 21:14:17 2010 +1100
+files:       lib/python/cs/venti/archive.py
+description:
+cs.venti.archive: TOC mode, minor changes
+
+
+changeset:   8116:6680648698d6
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Fri Dec 31 21:15:13 2010 +1100
+files:       bin/vt
+description:
+vt: fix up "no paths" modes for "ar t" and "ar x"
+
+
+changeset:   8117:4b45aa76530a
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Fri Dec 31 21:27:45 2010 +1100
+files:       lib/python/cs/venti/dir.py
+description:
+cs.venti.dir: a docstring
+
+
+changeset:   8118:5355372704b2
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Fri Dec 31 21:32:49 2010 +1100
+files:       lib/python/cs/venti/archive.py lib/python/cs/venti/dir.py lib/python/cs/venti/httpd.py
+description:
+cs.venti: make Dirent.isdir and Dirent.isfile properties
+
+
+changeset:   8119:7e8b47b64adb
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Fri Dec 31 22:22:50 2010 +1100
+files:       lib/python/cs/venti/dir.py
+description:
+cs.venti.dir: bugfix Dir.updateFrom()
+
+
+changeset:   8120:6fedafd80de2
+parent:      8084:2c060efa3d59
+parent:      8119:7e8b47b64adb
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Fri Dec 31 22:27:11 2010 +1100
+description:
+Automated merge with file:///Users/cameron/dev/css-fleet
+
+
+changeset:   8121:0449f8e8a717
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Fri Dec 31 22:39:03 2010 +1100
+files:       lib/python/cs/lex.py
+description:
+cs.lex: replace hexify and unhexify with binascii equivalents
+
+
+changeset:   8122:4afd157e5ad2
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Fri Dec 31 22:57:47 2010 +1100
+files:       lib/python/cs/venti/store.py
+description:
+cs.venti.store: don't map a new data file every time :-(
+
+
+changeset:   8123:17877add19c5
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sat Jan 01 10:01:27 2011 +1100
+files:       bin/vt lib/python/cs/venti/archive.py lib/python/cs/venti/dir.py lib/python/cs/venti/file.py
+description:
+vt: archive using trust_size_mtime=True; cs.venti: archive now uses Dir.updateFrom if the path is known, various debug message changes
+
+
+changeset:   8124:38233d86ad4c
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sat Jan 01 10:52:40 2011 +1100
+files:       bin/vt bin/vtpack lib/python/cs/venti/archive.py lib/python/cs/venti/dir.py
+description:
+vtpack: "vt ar" and then remove original; cs.venti: updates to skip not dir/file in archive, no-zero exit on archive fail, other minor changes
+
+
+changeset:   8125:4d1c1b53e2ac
+parent:      8081:3acef7ead45f
+parent:      8124:38233d86ad4c
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sat Jan 01 10:53:04 2011 +1100
+description:
+Automated merge with ssh://home/hg/css
+
+
+changeset:   8126:d3278b92f950
+parent:      8124:38233d86ad4c
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sat Jan 01 12:57:51 2011 +1100
+files:       lib/python/cs/venti/meta.py
+description:
+cs.venti.meta: MetaFromStat() fatory function
+
+
+changeset:   8127:7cbac3928f33
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sat Jan 01 19:13:23 2011 +1100
+files:       lib/python/cs/venti/meta.py
+description:
+cs.venti.meta: make .acl a property mapped to self["a"], other minor tweaks
+
+
+changeset:   8128:d89e972e4e24
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sat Jan 01 19:14:02 2011 +1100
+files:       lib/python/cs/venti/file.py
+description:
+cs.venti.file: remove meta parameter from storeFile()
+
+
+changeset:   8129:9d19cb918f48
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sat Jan 01 19:20:44 2011 +1100
+files:       lib/python/cs/venti/__init__.py lib/python/cs/venti/archive.py lib/python/cs/venti/dir.py
+description:
+cs.venti: store metadata (permissions, ownership) in archives
+
+
+changeset:   8130:35b22dab94e5
+parent:      8125:4d1c1b53e2ac
+parent:      8129:9d19cb918f48
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sat Jan 01 19:20:55 2011 +1100
+description:
+Automated merge with file:///Users/cameron/dev/css-fleet
+
+
+changeset:   8131:8f4f3d5ee3cb
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sun Jan 02 13:40:38 2011 +1100
+files:       lib/python/cs/venti/nodedb.py
+description:
+cs.venti.nodedb: remove junk, add docstring
+
+
+changeset:   8132:129c3a143726
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sun Jan 02 13:41:38 2011 +1100
+files:       lib/python/cs/venti/archive.py lib/python/cs/venti/dir.py lib/python/cs/venti/file.py
+description:
+cs.venti: extend the format of a .vt archive file slightly, record os.stat info in archives etc consistently
+
+
+changeset:   8133:0bbc3fefc095
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sun Jan 02 13:45:38 2011 +1100
+files:       lib/python/cs/venti/metadata.py.SIDEWAYS
+description:
+cs.venti: discard of metadata code
+
+
+changeset:   8134:0426b3a24200
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sun Jan 02 14:31:27 2011 +1100
+files:       bin/vt lib/python/cs/venti/dir.py
+description:
+cs.venti: implement ar's "x" mode
+
+
+changeset:   8135:210e76dc7d33
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sun Jan 02 14:35:47 2011 +1100
+files:       bin/vt
+description:
+vt: adjust usage message for new "ar" subcommand
+
+
+changeset:   8136:84d4c165d645
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sun Jan 02 14:57:00 2011 +1100
+files:       bin/vt lib/python/cs/venti/blockify.py lib/python/cs/venti/dir.py
+description:
+vt: minor bugix; cs.venti.blockify: findEdge() bugfix
+
+
+changeset:   8137:badfc0865c55
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sun Jan 02 15:01:50 2011 +1100
+files:       lib/python/cs/venti/blockify.py
+description:
+cs.venti.blockify: bugfix the bugfix
+
+
+changeset:   8138:14c7b55acdb6
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Mon Jan 03 09:57:34 2011 +1100
+files:       bin/vt lib/python/cs/venti/archive.py lib/python/cs/venti/dir.py lib/python/cs/venti/file.py
+description:
+vt ar, cs.venti: support "-" stdin/stdout mode
+
+
+changeset:   8139:1914b1655731
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Mon Jan 03 20:39:29 2011 +1100
+files:       bin/vt
+description:
+vt: turn off upd_mode in logging - too noisy for this app
+
+
+changeset:   8140:7446888b914d
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Mon Jan 03 20:42:42 2011 +1100
+files:       lib/python/cs/venti/archive.py
+description:
+cs.venti.archive: fix close
+
+
+changeset:   8141:5d715a326486
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Tue Jan 25 17:32:35 2011 +1100
+files:       bin/runsquid
+description:
+runsquid: pass -D option to squid
+
+
+changeset:   8142:98c9eb15a10e
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Fri Jan 28 18:19:42 2011 +1100
+files:       bin/histbackup
+description:
+histbackup: add -i mode
+
+
+changeset:   8143:2e7ae454e5bb
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Mon Jan 31 13:30:15 2011 +1100
+files:       bin/histbackup
+description:
+histbackup: -i mode: filter out hard links too
+
+
+changeset:   8144:64b23f4b530c
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Fri Feb 04 14:10:53 2011 +1100
+files:       lib/python/cs/threads.py
+description:
+cs.threads: boolete Cato9, never used and poorly formed
+
+
+changeset:   8145:21c8b70e174a
+parent:      8049:8fc74884e6a2
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Mon Feb 07 13:40:14 2011 +1100
+files:       lib/python/cs/nodedb/node.py
+description:
+cs.nodedb.node: update node comparison, update cmd_update()
+
+
+changeset:   8146:23113414350a
+parent:      8144:64b23f4b530c
+parent:      8145:21c8b70e174a
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Mon Feb 07 13:40:18 2011 +1100
+description:
+Automated merge with file:///Users/cameron/dev/css-fleet
+
+
+changeset:   8147:88ae0fce9c4b
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Mon Feb 07 14:15:58 2011 +1100
+files:       lib/python/cs/nodedb/httpd.py lib/python/cs/nodedb/sqla.py
+description:
+cs.nodedb.httpd: update for cherrypy 3.1.2
+
+
+changeset:   8148:21102449198e
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Wed Feb 16 11:58:27 2011 +1100
+files:       bin/histbackup
+description:
+histbackup: tweak usage message, add optional otherbackupdirs for use with --link-dest
+
+
+changeset:   8149:47fa7d57ba75
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Wed Feb 16 11:59:07 2011 +1100
+files:       bin/+imap
+description:
++imap: remove unused --pre and --post options
+
+
+changeset:   8150:ab2c658ee6a5
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Wed Feb 16 12:00:06 2011 +1100
+files:       bin/patch-config
+description:
+patch-config: whitespace and style code changes
+
+
+changeset:   8151:319e22d1c336
+tag:         tip
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Wed Feb 16 12:00:44 2011 +1100
+files:       bin/rigsquid_redirect
+description:
+bin/rigsquid_redirect: more thorough patch-config usage when generating new squid.conf
+
+
