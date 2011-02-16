@@ -11,81 +11,83 @@ import sys
 import os.path
 import getopt
 
-cmd=os.path.basename(sys.argv[0])
+cmd = os.path.basename(sys.argv[0])
 
-usage='''Usage: %s [options...] configfile [patchfile]
-  -#    Comment out old keyword lines.
-  -A    Append new keywords to the end of the file.
-  -D    Delete old keyword lines.
+usage = '''Usage: %s [options...] configfile [patchfile]
+  -#    Comment out old keyword lines (default).
+  -A    Append new keywords to the end of the file (default).
+  -D    Delete old keyword lines instead of commenting.
   -I    Insert new keywords at the start of the file.
-  -i    Match keywords on a case-insensitive basis.''' % cmd
+  -i    Match keywords on a case-insensitive basis.''' % (cmd,)
 
-badopts=False
+badopts = False
 
-insert=False
-commentOut=True
-useRewriteif=False
-caseSensitive=True
+insert = False
+commentOut = True
+useRewriteif = False
+caseSensitive = True
+configFile = None
 
 opts, args = getopt.getopt(sys.argv[1:],'#ADIRi')
 
 for opt, val in opts:
   if opt == '-#':
-    commentOut=True
+    commentOut = True
   elif opt == '-A':
-    insert=False
+    insert = False
   elif opt == '-D':
-    commentOut=False
+    commentOut = False
   elif opt == '-I':
-    insert=True
+    insert = True
   elif opt == '-R':
-    useRewriteif=True
+    useRewriteif = True
   elif opt == '-i':
-    caseSensitive=True
+    caseSensitive = True
   else:
     print >>sys.stderr, "%s: unimplemented option: %s" % (cmd, opt)
-    badopts=True
+    badopts = True
 
 if len(args) < 1:
-  print >>sys.stderr, "%s: missing configfile" % cmd
-  badopts=True
+  print >>sys.stderr, "%s: missing configfile" % (cmd,)
+  badopts = True
 else:
-  configFile=args.pop(0)
+  configFile = args.pop(0)
   if len(args) == 0:
     patchFile='-'
   else:
-    patchFile=args.pop(0)
+    patchFile = args.pop(0)
     if len(args) > 0:
       print >>sys.stderr, \
             "%s: extra arguments after patchfile: %s" % (cmd, args)
-      badopts=True
+      badopts = True
 
 if configFile == '-' and patchFile == '-':
   print >>sys.stderr, \
-        "%s: configfile and patchfile cannot both be standard input"
-  badopts=True
+        "%s: configfile and patchfile cannot both be standard input" \
+        % (cmd,)
+  badopts = True
 
 if badopts:
   print >>sys.stderr, usage
   sys.exit(2)
 
 if patchFile == '-':
-  patchData=sys.stdin
+  patchData = sys.stdin
 else:
-  patchData=open(patchFile)
+  patchData = open(patchFile)
 
 patchLines=[]
 keywords={}
 for line in patchData:
-  assert line[-1] == '\n'
+  assert line.endswith('\n')
   patchLines.append(line)
-  line=line[:-1].strip()
+  line = line.strip()
   if len(line) == 0 or line[0] == '#':
     continue
-  keyword=line.split()[0]
+  keyword = line.split()[0]
   if not caseSensitive:
-    keyword=keyword.lower()
-  keywords[keyword]=None
+    keyword = keyword.lower()
+  keywords[keyword] = None
 
 patchData.close()
 
@@ -96,17 +98,17 @@ if insert:
   outLines.extend(patchLines)
 
 if configFile == '-':
-  configData=sys.stdin
+  configData = sys.stdin
 else:
-  configData=open(configFile)
+  configData = open(configFile)
 
 for line in configData:
-  assert line[-1] == '\n'
-  words=line[:-1].strip().split()
+  assert line.endswith('\n')
+  words = line.strip().split()
   if len(words) > 0:
-    word1=words[0]
+    word1 = words[0]
     if not caseSensitive:
-      word1=word1.lower()
+      word1 = word1.lower()
     if word1 in keywords:
       if commentOut:
         line='#'+line
