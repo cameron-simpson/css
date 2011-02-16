@@ -8,7 +8,7 @@
 #
 # =head1 SYNOPSIS
 #
-# histbackup [options...] [host:]source backupdir [rsyncopts...]
+# histbackup [options...] [host:]source backupdir [otherbackupdirs...] [rsyncopts...]
 #
 # histbackup [options...] --no-rsync parent
 #
@@ -100,10 +100,11 @@ imode=
 
 cmd=`basename "$0"`
 usage="Usage:
-	$cmd [options...] [host:]source backupdir [rsyncopts...]
+	$cmd [options...] [host:]source backupdir [otherbackupdirs...] [rsyncopts...]
 	$cmd [options...] --no-rsync parent
 
-        -i, itemize-changes Passed to rsync, result slightly filtered by histbackup.
+        -i, --itemize-changes
+                        Passed to rsync, result slightly filtered by histbackup.
 	-v, --verbose	Verbose. Also passed to rsync.
 	-x		Trace execution. Recite linktree and rsync invocations.
 	--no-delete     Don't pass --delete to rsync.
@@ -130,14 +131,14 @@ fi
 daycode(){ date '+%Y-%m-%d'; }
 datecode(){ date '+%Y-%m-%d-%H:%M:%S'; }
 
-# rsync capabilities at local end
-rsync_has_link_dest=
-rsv=`rsync --version | sed -n 's/^rsync *version \([1-9]\)\.\([0-9][0-9]*\)\.\([0-9][0-9]*\) .*/\1 \2 \3/p'`
-if [ -n "$rsv" ] && rsvn=`set -- $rsv; printf "%d%03d%03d\n" "$@"`
-then
-  [ "$rsvn" -ge 2005006 ] && rsync_has_link_dest=1
-  ## other end needs proto 29 also ## [ "$rsvn" -ge 2006004 ] && rsopts="$rsopts --fuzzy"
-fi
+### rsync capabilities at local end
+##rsync_has_link_dest=
+##rsv=`rsync --version | sed -n 's/^rsync *version \([1-9]\)\.\([0-9][0-9]*\)\.\([0-9][0-9]*\) .*/\1 \2 \3/p'`
+##if [ -n "$rsv" ] && rsvn=`set -- $rsv; printf "%d%03d%03d\n" "$@"`
+##then
+##  [ "$rsvn" -ge 2005006 ] && rsync_has_link_dest=1
+##  ## other end needs proto 29 also ## [ "$rsvn" -ge 2006004 ] && rsopts="$rsopts --fuzzy"
+##fi
 
 # =head1 OPTIONS
 #
@@ -271,6 +272,18 @@ else
     else
         src=$1 dest=$2
         shift; shift
+        # gather other backup dirs, turn into --link-dest= options
+        while [ $# -gt 0 ]
+        do
+          case "x$1" in
+            x/*)
+              obackup=$1; shift
+              set -- "$@" "--link-dest=$obackup"
+              ;;
+            *)break
+              ;;
+          esac
+        done
     fi
 fi
 
