@@ -27,15 +27,15 @@ $trace killpidfile -w "$pidf"
 ## old proxy-mode standalone redirector
 ##exec alog squid_redirect squid_redirect -P "8080:$SQUID"
 
-( grep '^acl ' <"$dfltrc"
-  env SQUID_PIDFILE=$pidf envsub -p '\{\{([A-Z]\w*)\}\}' <"$tplt" \
-  | patch-config -i "$dfltrc"
-) \
+( ##grep '^acl ' <"$dfltrc"
+  env SQUID_PIDFILE=$pidf envsub -p '\{\{([A-Z]\w*)\}\}' <"$tplt"
+  mksquidpeers
+  echo url_rewrite_program $HOME/bin/squid_redirect
+  echo redirect_program $HOME/bin/squid_redirect
+  echo url_rewrite_children 2
+) | patch-config -I -i "$dfltrc" \
 > "$rc"
-mksquidpeers >>"$rc"
-echo url_rewrite_program $HOME/bin/squid_redirect >>"$rc"
-echo url_rewrite_children 2 >>"$rc"
 
 bsed -s '/^$/d; /^#/d' "$rc"
 cat "$rc"
-exec $trace alog squid/cache.log squid -f "$rc" -D
+exec $trace alog squid/cache.log squid -f "$rc"
