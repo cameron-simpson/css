@@ -408,13 +408,14 @@ else
     then
         echo "$cmd: $dest: no subdirectory to link from" >&2
         ls -la "$dest" >&2
+        exit 1
     else
         $echo "fresh backup, just copying source ..."
         $trace mkdir "$dest/$thisbackup" && ok=1
     fi
 fi
 
-if [ $ok ]
+if [ $ok ] && [ -z "$linkonly" ]
 then
   set -- rsync $rsopts -aH $rsdelete --rsync-path "$rrsync" ${1+"$@"} "$src/" "$dest/$thisbackup/"
   if [ $imode ]
