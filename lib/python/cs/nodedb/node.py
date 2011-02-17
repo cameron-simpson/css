@@ -232,7 +232,7 @@ class Node(dict):
     self.nodedb = nodedb
     self._reverse = {}  # maps (OtherNode, ATTR) => count
 
-  def __bool__(self):
+  def __nonzero__(self):
     ''' bool(Node) returns True, unlike a dict.
         Conversely, the NoNode singleton returns False from bool().
     '''
@@ -493,7 +493,7 @@ class _NoNode(Node):
   def __init__(self, nodedb):
     Node.__init__(self, None, None, nodedb)
 
-  def __bool__(self):
+  def __nonzero__(self):
     ''' A NodeDB's NoNode returns False from bool().
         Other Nodes return True.
     '''
@@ -1339,12 +1339,15 @@ class TestAll(unittest.TestCase):
 
   def testNoNode(self):
     H = self.db.newNode('HOST', 'foo')
+    self.assert_(bool(H), "bool(H) not True")
     self.assertRaises(AttributeError, getattr, H, 'NOATTR')
     self.db.useNoNode()
     N = H.NOATTR
     self.assert_(N is self.db.noNode)
+    self.assert_(not bool(N), "bool(H.NOATTR) not False")
     N2 = N.NOATTR
     self.assert_(N2 is self.db.noNode)
+    self.assert_(not bool(N2), "bool(H.NOATTR.NOATTR) not False")
 
 if __name__ == '__main__':
   unittest.main()
