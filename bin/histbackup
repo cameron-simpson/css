@@ -281,7 +281,6 @@ else
         echo "$cmd: missing source or backupdir" >&2
         badopts=1
     else
-        # =head
         src=$1 dest=$2
         shift; shift
         # gather other backup dirs, turn into --link-dest= options
