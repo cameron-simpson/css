@@ -227,10 +227,16 @@ class Node(dict):
   '''
 
   def __init__(self, t, name, nodedb):
-    self.type = str1(t)
+    self.type = str1(t) if t is not None else None
     self.name = name
     self.nodedb = nodedb
     self._reverse = {}  # maps (OtherNode, ATTR) => count
+
+  def __bool__(self):
+    ''' bool(Node) returns True, unlike a dict.
+        Conversely, the NoNode singleton returns False from bool().
+    '''
+    return True
 
   def _addReference(self, onode, oattr):
     ''' Add a reference to this Node.
@@ -363,7 +369,9 @@ class Node(dict):
         return values
       if len(values) == 1:
         return values[0]
-      raise AttributeError, "%s.%s (values=%s %s, len=%s)" % (self, attr, type(values), values, len(values))
+      if self.nodedb.noNode is None:
+        raise AttributeError, "%s.%s (values=%s %s, len=%s)" % (self, attr, type(values), values, len(values))
+      return self.nodedb.noNode
 
     raise AttributeError, str(self)+'.'+repr(attr)
 
@@ -475,6 +483,34 @@ class Node(dict):
   def textdump(self, fp):
     self.nodedb.dump(fp, nodes=(self,))
 
+class _NoNode(Node):
+  ''' If a NodeDB has a non-None .noNode attribute, normally it
+      will be a singleton (per-class) instance of _NoNode, a dummy Node
+      that permits .ATTR deferences for easy use.
+      The distinguishing feature of a _NoNode is that bool(noNode) is False.
+  '''
+
+  def __init__(self, nodedb):
+    Node.__init__(self, None, None, nodedb)
+
+  def __bool__(self):
+    ''' A NodeDB's NoNode returns False from bool().
+        Other Nodes return True.
+    '''
+    return False
+
+  def __str__(self):
+    return "<NoNode>"
+
+  def __getattr__(self, attr):
+    ''' Return ourself (NoNode) from .ATTR.
+        Otherwise behave like an empty Node.
+    '''
+    k, plural = parseUC_sAttr(attr)
+    if not k or plural:
+      return Node.__getattr__(self, attr)
+    return self
+
 def nodekey(*args):
   ''' Convert some sort of key to a (TYPE, NAME) tuple.
       Sanity check the values.
@@ -509,6 +545,7 @@ class NodeDB(dict):
   def __init__(self, backend, readonly=False):
     dict.__init__(self)
     self.readonly = readonly
+    self.noNode = None
     self.__attr_type_registry = {}
     self.__attr_scheme_registry = {}
     if backend is None:
@@ -520,6 +557,10 @@ class NodeDB(dict):
 
   def __str__(self):
     return "%s[_backend=%s]" % (type(self), self._backend)
+
+  def useNoNode(self):
+    if self.noNode is None:
+      self.noNode = _NoNode(self)
 
   class __AttrTypeRegistration(object):
     ''' An object to hold an attribute value type registration, with the
@@ -1295,6 +1336,15 @@ class TestAll(unittest.TestCase):
     H.NICs = (NIC0, NIC1)
     self.assert_(NIC0.inHOST == [H])
     self.assert_(NIC0.inNIC == [])
+
+  def testNoNode(self):
+    H = self.db.newNode('HOST', 'foo')
+    self.assertRaises(AttributeError, getattr, H, 'NOATTR')
+    self.db.useNoNode()
+    N = H.NOATTR
+    self.assert_(N is self.db.noNode)
+    N2 = N.NOATTR
+    self.assert_(N2 is self.db.noNode)
 
 if __name__ == '__main__':
   unittest.main()
