@@ -491,7 +491,7 @@ class _NoNode(Node):
   '''
 
   def __init__(self, nodedb):
-    Node.__init__(self, None, None, nodedb)
+    Node.__init__(self, '_NoNode', '<_NoNode>', nodedb)
 
   def __nonzero__(self):
     ''' A NodeDB's NoNode returns False from bool().
