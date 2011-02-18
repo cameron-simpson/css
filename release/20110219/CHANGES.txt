@@ -1,0 +1,100 @@
+changeset:   8152:a72664a890dd
+tag:         release-20110216
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Wed Feb 16 12:17:49 2011 +1100
+files:       release/20110216/CHANGES.txt release/20110216/SUMMARY.txt release/20110216/release-tag.txt
+description:
+Release information for release-20110216.
+Summary:
+histbackup: easy use of --link-dest, -i summary mode, assorted minor changes.
+vt, vtpack, cs.venti: tar-like command line mode, assorted updates.
+filter_fd: drastic simplification, and rearrangement to arrange inner command is the base process instead of a child.
+cs.logutils: ANSI colours, many other updates.
+portfwd: bugfixes and improvements.
+OK: new prefix script to report OK/FAIL for commands.
+Many other minor updates.
+
+
+changeset:   8153:5853a47f7bdc
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Wed Feb 16 12:17:50 2011 +1100
+files:       .hgtags
+description:
+Added tag release-20110216 for changeset a72664a890dd
+
+
+changeset:   8154:17225e984daf
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Wed Feb 16 16:05:11 2011 +1100
+files:       bin/histbackup
+description:
+histbackup: minor bugfix for trailing arguments, more doco in the manual page
+
+
+changeset:   8155:0ece6f7e2261
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Thu Feb 17 19:42:39 2011 +1100
+files:       lib/python/cs/nodedb/node.py
+description:
+cs.nodedb.node: new method NodeDB.noNode() that causes Node.ATTR to return a singleton NoNode object instead of raising an AttributeError
+
+
+changeset:   8156:914667b6d8c6
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Thu Feb 17 19:56:17 2011 +1100
+files:       lib/python/cs/nodedb/node.py
+description:
+cs.nodedb.node: replace __bool__ bogus method with correct __nonzero__, add test
+
+
+changeset:   8157:ec3781742093
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Fri Feb 18 10:18:13 2011 +1100
+files:       bin/histbackup
+description:
+histbackup: do not rsync if --no-rsync; behaviour lost in recent changes
+
+
+changeset:   8158:77e258d58423
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Fri Feb 18 10:31:07 2011 +1100
+files:       bin/histbackup
+description:
+histbackup: remove bad POD markup
+
+
+changeset:   8159:e1fad3de097b
+parent:      8156:914667b6d8c6
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Fri Feb 18 15:09:01 2011 +1100
+files:       lib/python/cs/nodedb/node.py
+description:
+cs.nodedb.node: give _NoNode .name and .type
+
+
+changeset:   8160:8b6feddf66bb
+parent:      8158:77e258d58423
+parent:      8159:e1fad3de097b
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Fri Feb 18 15:10:31 2011 +1100
+description:
+Automated merge with ssh://home/hg/css
+
+
+changeset:   8161:0bfeb0db4599
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Fri Feb 18 16:07:06 2011 +1100
+files:       lib/python/cs/nodedb/text.py
+description:
+cs.nodedb.text: fix plurality of index lookup
+
+
+changeset:   8162:5eef6144d6dd
+tag:         tip
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Fri Feb 18 16:12:28 2011 +1100
+files:       lib/python/cs/nodedb/node.py
+description:
+cs.nodedb.node: edit node - cope with singular and plural attrs
+
+

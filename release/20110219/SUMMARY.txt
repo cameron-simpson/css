@@ -1,0 +1,2 @@
+Important bugfix to histbackup's --no-rsync mode.
+Minor updates to cs.nodedb.
