@@ -465,7 +465,7 @@ class Node(dict):
       old_attr_names.sort()
       for attr in old_attr_names:
         k, plural = parseUC_sAttr(attr)
-        if not k or not plural:
+        if not k:
           warn("%s.applyAttrs: ignore non-ATTRs old attr: %s", self, attr)
           continue
         if k.endswith('_ID'):
