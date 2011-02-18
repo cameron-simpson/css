@@ -56,8 +56,7 @@ def dumpNodeAttrs(N, ofp):
     if not k:
       continue
     pattr = k
-    ks = k+'s'
-    values = N[ks]
+    values = N[k]
     if not values:
       continue
     for value in values:
