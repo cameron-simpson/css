@@ -109,11 +109,12 @@ fi
 
 # addline tsfile when line...
 addline()
-{ _al_tsfile=$1
+{ ##set -x
+  _al_tsfile=$1
   _al_when=$2
   shift; shift
   _al_date2printf=`date -d "$_al_when" "+$TSDATEFMT_DAYHEADER"`
-  _al_dayheader=`printf "$_al_date2printf" | sed -n '$p'`
+  _al_dayheader=`printf "$_al_date2printf" | sed -n '/^$/!{p;q}'`
   _al_date2printf=`date -d "$_al_when" "+$TSDATEFMT_DAYINDENT"`
   _al_line=`printf "$_al_date2printf%s" "$*"`
   _al_sedf="/^$_al_dayheader\$/{
@@ -122,6 +123,7 @@ addline()
   i\\
 $_al_line
 }"
+  ##printf "%s\n" "$_al_sedf" >$HOME/ZZZZ.txt
   bsed -s "$_al_sedf" "$_al_tsfile"
 }
 
