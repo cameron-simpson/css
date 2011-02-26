@@ -42,17 +42,18 @@ class UpdHandler(StreamHandler):
     StreamHandler.__init__(self, strm)
     self.__upd = Upd(strm)
     self.__nlLevel = nlLevel
-    self.__ansiMode = ansi_mode
+    self.__ansi_mode = ansi_mode
     self.__lock = allocate_lock()
 
   def emit(self, logrec):
     with self.__lock:
       if logrec.levelno >= self.__nlLevel:
         with self.__upd._withoutContext():
-          if logrec.levelno >= logging.ERROR:
-            logrec.msg = colourise(logrec.msg, 'red')
-          elif logrec.levelno >= logging.WARN:
-            logrec.msg = colourise(logrec.msg, 'yellow')
+          if self.__ansi_mode:
+            if logrec.levelno >= logging.ERROR:
+              logrec.msg = colourise(logrec.msg, 'red')
+            elif logrec.levelno >= logging.WARN:
+              logrec.msg = colourise(logrec.msg, 'yellow')
           StreamHandler.emit(self, logrec)
       else:
         self.__upd.out(logrec.getMessage())
