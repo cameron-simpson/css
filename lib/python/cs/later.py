@@ -49,14 +49,24 @@ class LateFunction(object):
             timeout for wait()
   '''
 
+  _PENDING = 0
+  _RUNNING = 1
+  _DONE = 2
+  _CANCELLED = 3
+
   def __init__(self, later, func, name=None):
+    ''' Initialise a LateFunction.
+        `later` is the controlling Later instance.
+        `func` is the callable for later execution.
+        `name`, if supplied, specifies an identifying name for the LateFunction.
+    '''
     self.later = later
     self.func = func
     if name is None:
       name = "LateFunction-%d" % (seq(),)
     self.name = name
-    self.done = False
-    self.cancelled = False
+    self.state = LateFunction._PENDING
+    self._lock = allocate_lock()
     self._join_lock = allocate_lock()
     self._join_cond = Condition()
     self._join_notifiers = []
@@ -64,26 +74,33 @@ class LateFunction(object):
   def __str__(self):
     return "<LateFunction %s>" % (self.name,)
 
+  @property
+  def done(self):
+    return self.state == LateFunction._DONE or self.state == LateFunction._CANCELLED
+
+  @property
+  def cancelled(self):
+    return self.state == LateFunction._CANCELLED
+
   def _dispatch(self):
     ''' ._dispatch() is called by the Later class instance's worker thread.
         It causes the function to be handed to a thread for execution.
     '''
-    assert not self.done
-    self.later._workers.dispatch(self.func, deliver=self.__getResult)
+    with self._lock:
+      assert self.state == LateFunction._PENDING
+      self.later._workers.dispatch(self.func, deliver=self.__getResult)
+      self.func = None
 
   def cancel(self):
     ''' Cancel this LateFunction.
     '''
-    if not self.cancelled:
-      self.cancelled = True
-      if not self.done:
-        self.func = self.__cancelled
-        self._dispatch()
+    with self._lock:
+      if self.state == LateFunction._PENDING:
+        self.__getResult( (None, None, None, None), newstate=LateFunction._CANCELLED )
+      else:
+        info("%s.cancel(), but state=%s" % (self, self.state))
 
-  def __cancelled(self):
-    return None
-
-  def __getResult(self, result):
+  def __getResult(self, result, newstate=None):
     ''' __getResult() is called by a worker thread to report
         completion of the function.
         The argument `result` is a 4-tuple as produced by cs.threads.WorkerThreadPool:
@@ -91,11 +108,12 @@ class LateFunction(object):
         or:
           None, exec_type, exc_value, exc_traceback
     '''
+    if newstate is None:
+      newstate = LateFunction._DONE
     # collect the result and release the capacity
     with self._join_lock:
       self.result = result
-      self.done = True
-      self.func = None  # release func+args
+      self.state = newstate
       notifiers = list(self._join_notifiers)
     self.later.capacity.release()
     self.later.running.remove(self)
