@@ -27,9 +27,9 @@ def setup_logging(cmd=None, main_log=None, format=None, level=None, upd_mode=Non
       If `format` is None, set format to "cmd: levelname: message".
       If `level` is None, infer a level from the environment using
       infer_logging_level().
-      If `upd_mode` is None, set it from sys.stderr.isatty().
+      If `upd_mode` is None, set it from main_log.isatty().
       A true value causes the root logger to use cs.upd for logging.
-      If `ansi_mode` is None, set it from sys.stderr.isatty().
+      If `ansi_mode` is None, set it from main_log.isatty().
       A true value causes the root logger to colour certain logging levels
       using ANSI terminal sequences (currently only if cs.upd is used).
       Returns the logging level.
