@@ -56,6 +56,7 @@ class LateFunction(object):
       name = "LateFunction-%d" % (seq(),)
     self.name = name
     self.done = False
+    self.cancelled = False
     self._join_lock = allocate_lock()
     self._join_cond = Condition()
     self._join_notifiers = []
@@ -70,7 +71,26 @@ class LateFunction(object):
     assert not self.done
     self.later._workers.dispatch(self.func, deliver=self.__getResult)
 
+  def cancel(self):
+    ''' Cancel this LateFunction.
+    '''
+    if not self.cancelled:
+      self.cancelled = True
+      if not self.done:
+        self.func = self.__cancelled
+        self._dispatch()
+
+  def __cancelled(self):
+    return None
+
   def __getResult(self, result):
+    ''' __getResult() is called by a worker thread to report
+        completion of the function.
+        The argument `result` is a 4-tuple as produced by cs.threads.WorkerThreadPool:
+          func_result, None, None, None
+        or:
+          None, exec_type, exc_value, exc_traceback
+    '''
     # collect the result and release the capacity
     with self._join_lock:
       self.result = result
@@ -241,7 +261,7 @@ class Later(object):
   def submit(self, func, priority=None, delay=None, when=None, name=None, pfx=None):
     ''' Submit a function for later dispatch.
         Return the corresponding LateFunction for result collection.
-	If the parameter `priority` not None then use it as the priority
+	If the parameter `priority` is not None then use it as the priority
         otherwise use the default priority.
         If the parameter `delay` is not None, delay consideration of
         this function until `delay` seconds from now.
@@ -346,7 +366,7 @@ class Later(object):
 	no priority parameter.
         WARNING: this is NOT thread safe!
         TODO: is a thread safe version even a sane idea without a
-              per-thrad priority stack?
+              per-thread priority stack?
     '''
     oldpri = self._priority
     self._priority = pri
