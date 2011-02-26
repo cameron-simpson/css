@@ -32,8 +32,9 @@ fi
 # direct methods for known shells
 bshell=`basename "$SHELL"`
 case "$bshell" in
-  bash)         exec    "${SHELL}" --login -c 'exec "${@}"' - "${@}" ;;
-  ksh|sh|zsh)   exec -l "${SHELL}" -c 'exec "${@}"' - "${@}" ;;
+  bash)         exec    "${SHELL}" --login -c 'exec "${@}"' -- "${@}" ;;
+  zsh)          exec -l "${SHELL}" -l -c 'exec "${@}"' -- "${@}" ;;
+  ksh|sh)       exec -l "${SHELL}" -c 'exec "${@}"' - "${@}" ;;
   csh|tcsh)     exec -l "${SHELL}" -c 'exec $argv:q' "${@}" ;;
   es|rc)        exec -l "${SHELL}" -c 'exec $*' "${@}" ;;
 esac
