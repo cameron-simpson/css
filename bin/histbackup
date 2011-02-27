@@ -123,9 +123,9 @@ usage="Usage:
 
 badopts=
 
-# have "cp -rpl"? otherwise rely on my linktree script
-if [ "x`cp --help 2>&1 | grep ' -[rpl][, ]' | wc -l`" = x3 ]
-then  mklinktree(){ $trace cp -rpl "$1" "$2"; }
+# have "cp -ral"? otherwise rely on my linktree script
+if [ "x`cp --help 2>&1 | grep ' -[ral][, ]' | wc -l`" = x3 ]
+then  mklinktree(){ $trace cp -ral "$1" "$2"; }
 else  mklinktree(){ $trace linktree "$1" "$2"; }
 fi
 daycode(){ date '+%Y-%m-%d'; }
