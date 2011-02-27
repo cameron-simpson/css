@@ -4,6 +4,8 @@
 #	- Cameron Simpson <cs@zip.com.au> 26dec2004
 #
 
+set -ue
+
 : ${MKSQUIDPEERS_OPTS:=''}
 : ${SQUID_PEERS:=''}
 
