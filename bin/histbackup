@@ -416,7 +416,7 @@ fi
 
 if [ $ok ] && [ -z "$linkonly" ]
 then
-  set -- rsync $rsopts -aHAX $rsdelete --rsync-path "$rrsync" ${1+"$@"} "$src/" "$dest/$thisbackup/"
+  set -- rsync $rsopts -aH $rsdelete --rsync-path "$rrsync" ${1+"$@"} "$src/" "$dest/$thisbackup/"
   if [ $imode ]
   then
     set -- filter_fd 1 "$filteroutput" "$@"
