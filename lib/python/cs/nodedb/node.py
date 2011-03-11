@@ -454,7 +454,7 @@ class Node(dict):
       for attr in new_attr_names:
         k, plural = parseUC_sAttr(attr)
         if not k:
-          error("%s.applyAttrs: ignore non-ATTRs: %s" % (self, attr))
+          error("ignore non-ATTRs: %s", attr)
           continue
         if k not in self:
           info("new .%s=%s", k+'s', new_attrs[attr])
@@ -466,10 +466,10 @@ class Node(dict):
       for attr in old_attr_names:
         k, plural = parseUC_sAttr(attr)
         if not k:
-          warn("%s.applyAttrs: ignore non-ATTRs old attr: %s", self, attr)
+          warn("ignore non-ATTRs old attr: %s", attr)
           continue
         if k.endswith('_ID'):
-          error("%s.applyAttrs: ignoring bad old ATTR_ID: %s", self, attr)
+          error("ignoring bad old ATTR_ID: %s", attr)
           continue
         if k in new_attrs:
           nattrs = new_attrs[k]
