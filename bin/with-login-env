@@ -33,8 +33,7 @@ fi
 bshell=`basename "$SHELL"`
 case "$bshell" in
   bash)         exec    "${SHELL}" --login -c 'exec "${@}"' -- "${@}" ;;
-  zsh)          exec -l "${SHELL}" -l -c 'exec "${@}"' -- "${@}" ;;
-  ksh|sh)       exec -l "${SHELL}" -c 'exec "${@}"' - "${@}" ;;
+  zsh|ksh|sh)   exec -l "${SHELL}" -c 'exec "${@}"' - "${@}" ;;
   csh|tcsh)     exec -l "${SHELL}" -c 'exec $argv:q' "${@}" ;;
   es|rc)        exec -l "${SHELL}" -c 'exec $*' "${@}" ;;
 esac
