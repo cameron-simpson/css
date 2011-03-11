@@ -82,32 +82,42 @@ def dumpNodeAttrs(N, ofp):
       ofp.write('%-15s %s\n' % (pattr, pvalue))
 
 def loadNodeAttrs(N, ifp, createSubNodes=False):
+  ''' Read input of the form:
+        ATTR    value
+                value
+                ...
+      and return a mapping of ATTR->[values...].
+  '''
   new_attrs = {}
   prev_attr = None
   for line in ifp:
-    assert line[-1] == '\n', "%s: unexpected EOF" % (str(ifp),)
-    line = line[:-1].rstrip()
+    assert line.endswith('\n'), "%s: unexpected EOF" % (str(ifp),)
+    line = line.rstrip()
     if len(line) == 0:
+      # skip blank lines
       continue
     ch1 = line[0]
     if ch1 == '#':
+      # skip comments
       continue
     if ch1.isspace():
+      # indented ==> continuation line, get attribute name from previous line
       assert prev_attr is not None, "%s: unexpected indented line" % (str(ifp),)
       attr = prev_attr
       value = line.lstrip()
     else:
+      # split into attribute name and value
       attr, value = line.split(None, 1)
       k, plural = parseUC_sAttr(attr)
       assert k, "%s: invalid attribute name \"%s\"" % (str(ifp), attr)
-      attr = k+'s'
-      assert not attr.endswith('_ID'), \
+      ks = k+'s'
+      assert not k.endswith('_ID'), \
              "%s: invalid attribute name \"%s\" - FOO_ID forbidden" \
                % (str(ifp), attr)
       prev_attr = attr
     new_attrs \
-      .setdefault(attr, []) \
-      .extend(tokenise(N, attr, value, createSubNodes=createSubNodes))
+      .setdefault(k, []) \
+      .extend(tokenise(N, k, value, createSubNodes=createSubNodes))
   return new_attrs
 
 def editNode(N, editor=None, createSubNodes=False):
