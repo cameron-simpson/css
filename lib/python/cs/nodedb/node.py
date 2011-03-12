@@ -2,6 +2,7 @@
 #
 
 import os.path
+import csv
 import re
 import sys
 if sys.hexversion < 0x02060000:
@@ -24,11 +25,7 @@ from cs.logutils import Pfx, D, error, warn, info, debug
 # regexp to match TYPE:name
 re_NODEREF = re.compile(r'([A-Z]+):([^:#]+)')
 # regexp to match a bareword name
-re_NAME = re.compile(r'[a-z][a-z_0-9]*(?![a-zA-Z0-9_])')
-# JSON string expression, lenient
-re_STRING = re.compile(r'"([^"\\]|\\.)*"')
-# JSON simple integer
-re_INT = re.compile(r'-?[0-9]+')
+re_NAME = re.compile(r'[a-z][-a-z_0-9]*(?![a-zA-Z0-9_])')
 # "bare" URL
 re_BAREURL = re.compile(r'[a-z]+://[-a-z0-9.]+/[-a-z0-9_.]+')
 
@@ -394,51 +391,32 @@ class Node(dict):
   def get0(self, attr, default=None):
     return get0(self.get(attr, ()), default=default)
 
-  def gettoken(self, attr, valuetxt, createSubNodes=False):
+  def gettoken(self, valuetxt, attr, doCreate=False):
     ''' Method to extract a token from the start of a string.
         It is intended to be overridden by subclasses to add recognition for
         domain specific things such as IP addresses.
     '''
-    # "foo"
-    m = re_STRING.match(valuetxt)
-    if m:
-      value = json.loads(m.group())
-      return value, valuetxt[m.end():]
+    try:
+      # try TYPE:NAME
+      return self.nodedb.gettoken(valuetxt, doCreate=doCreate)
+    except ValueError:
+      pass
 
-    # int
-    m = re_INT.match(valuetxt)
-    if m:
-      value = int(m.group())
-      return value, valuetxt[m.end():]
-
-    # http://foo/bah etc
-    m = re_BAREURL.match(valuetxt)
-    if m:
-      value = m.group()
-      return value, valuetxt[m.end():]
-
-    # TYPE:NAME
-    m = re_NODEREF.match(valuetxt)
-    if m:
-      value = self.nodedb.nodeByTypeName(m.group(1),
-                                         m.group(2),
-                                         doCreate=createSubNodes)
-      return value, valuetxt[m.end():]
-
-    # NAME
+    # NAME with implied TYPE
     m = re_NAME.match(valuetxt)
     if m:
       if attr == "SUB"+self.type:
         value = self.nodedb.nodeByTypeName(self.type,
                                            m.group(),
-                                           doCreate=createSubNodes)
+                                           doCreate=doCreate)
       else:
         value = self.nodedb.nodeByTypeName(attr,
                                            m.group(),
-                                           doCreate=createSubNodes)
+                                           doCreate=doCreate)
       return value, valuetxt[m.end():]
 
-    raise ValueError, "can't gettoken: %s" % (valuetxt,)
+    import cs.nodedb.text
+    return cs.nodedb.text.gettoken(valuetxt)
 
   def update(self, new_attrs, delete_missing=False):
     ''' Update this Node with new attributues, optionally removing
@@ -559,6 +537,13 @@ class NodeDB(dict):
     return "%s[_backend=%s]" % (type(self), self._backend)
 
   def useNoNode(self):
+    ''' Enable "no node" mode.
+	After this call, a reference to a missing .ATTR will return
+	a dummy Node that can itself be deferenced further. This
+	permits casual use of expressions like: someNode.THIS.THAT.
+	The "no node" dummy node returns false in boolean contexts,
+	unlike regular Nodes which are true.
+    '''
     if self.noNode is None:
       self.noNode = _NoNode(self)
 
@@ -762,6 +747,21 @@ class NodeDB(dict):
 
     raise ValueError, "unknown DB sequence number: %s; _.DBs = %s" % (s, N_.DBs)
 
+  def gettoken(self, valuetxt, doCreate=False):
+    ''' Extract a token from the start of a string,
+        return the token's value and the tail of the string.
+        Used by Node.gettoken().
+        This is to be used to parse human friendly value lists.
+        Conversely, totext and fromtext below are for external data storage.
+    '''
+    # TYPE:NAME
+    m = re_NODEREF.match(valuetxt)
+    if m:
+      value = self.nodeByTypeName(m.group(1), m.group(2), doCreate=doCreate)
+      return value, valuetxt[m.end():]
+
+    raise ValueError, "not a TYPE:NAME token: %s" % (valuetxt,)
+
   def totext(self, value):
     ''' Convert a value for external string storage.
           text        The string "text" for strings not commencing with a colon.
@@ -840,21 +840,24 @@ class NodeDB(dict):
       return self.otherDB(int(seqnum))[t, name]
     raise ValueError, "unparsable text \"%s\"" % (text,)
 
-  def _dump_nodes(self, typenames=None):
+  def _default_dump_nodes(self, typenames=None):
+    ''' Yield the default sequence of Nodes to dump.
+    '''
     if typenames is None:
-      typenames = list(self.types())
+      typenames = sorted(self.types())
       typenames.sort()
     for t in typenames:
-      nodes = list(getattr(self, t+'s'))
-      nodes.sort(_byname)
+      nodes = sorted(getattr(self, t+'s'), _byname)
       for N in nodes:
         yield N
 
   def dump(self, fp, fmt='csv', nodes=None):
+    ''' Write database nodes to the file `fp` in the archival
+        "vertical" format.
+    '''
     if nodes is None:
-      nodes = self._dump_nodes()
+      nodes = self._default_dump_nodes()
     if fmt == 'csv':
-      import csv
       w = csv.writer(fp)
       w.writerow( ('TYPE', 'NAME', 'ATTR', 'VALUE') )
       typenames = list(self.types())
@@ -881,8 +884,6 @@ class NodeDB(dict):
       assert False, "dump: unsupported format: %s" % (fmt,)
     fp.flush()
     return
-
-    raise ValueError, "unsupported format '%s'" % (fmt,)
 
   def load(self, fp, fmt='csv', skipHeaders=False, noHeaders=False):
     if fmt == 'csv':
@@ -937,7 +938,7 @@ class NodeDB(dict):
     ''' update otherdb: emit set commands to update otherdb with
         attributes and nodes in this db.
     '''
-    from .text import attrValueText
+    from .text import attr_value_to_text
     xit = 0
     if fp is None:
       fp = sys.stdout
@@ -947,7 +948,7 @@ class NodeDB(dict):
     if len(args) > 0:
       raise GetoptError("extra arguments after dburl '%s': %s" % (dburl, " ".join(args)))
     DB2 = NodeDBFromURL(dburl, readonly=True)
-    nodes1 = list(self._dump_nodes())
+    nodes1 = list(self._default_dump_nodes())
     for N in nodes1:
       t, name = N.type, N.name
       N2 = DB2.get( (t, name), {} )
@@ -957,7 +958,7 @@ class NodeDB(dict):
         values = N[attr]
         ovalues = N2.get(attr, ())
         if values != ovalues:
-          fp.write("set %s:%s %s=%s\n" % (t, name, attr, ",".join( [ attrValueText(N2, attr, V) for V in values ] )))
+          fp.write("set %s:%s %s=%s\n" % (t, name, attr, ",".join( [ attr_value_to_text(N2, attr, V) for V in values ] )))
     return xit
 
   def cmd_dump(self, args, fp=None):
@@ -973,13 +974,69 @@ class NodeDB(dict):
         first=False
     return xit
 
+  def cmd_dumpwide(self, args, fp=None):
+    from .text import dump_horizontal
+    args = list(args)
+    xit = 0
+    if fp is None:
+      fp = sys.stdout
+    if not args:
+      nodes = self._default_dump_nodes()
+    else:
+      nodes = []
+      for nodetxt in args.pop(0).split(','):
+        if nodetxt.endswith(":*"):
+          nodetype = nodetxt[:-2]
+          nodes.extend(self.nodesByType(nodetype))
+        else:
+          N, nodetxt = self.gettoken(nodetxt)
+          assert len(nodetxt) == 0, "extra junk after node: %s" % (nodetxt,)
+          nodes.append(N)
+    if not args:
+      attrs = None
+    else:
+      attrtxt = args.pop(0)
+      attrs = attrtxt.split(',')
+    if args:
+      raise GetoptError, "extra arguments after nodes and attrs: %s" % (args,)
+    dump_horizontal(fp, nodes, attrs=attrs)
+    return xit
+
   def cmd_edit(self, args):
+    ''' Usage: edit TYPE:key
+    '''
     if len(args) != 1:
       raise GetoptError("expected a single TYPE:key")
     N = self[args[0]]
     from cs.nodedb.text import editNode
-    editNode(N, createSubNodes=True)
+    editNode(N, doCreate=True)
     return 0
+
+  def cmd_editwide(self, args, editfile=None):
+    from .text import editNodes
+    args = list(args)
+    xit = 0
+    if not args:
+      nodes = self._default_dump_args()
+    else:
+      nodes = []
+      for nodetxt in args.pop(0).split(','):
+        if nodetxt.endswith(":*"):
+          nodetype = nodetxt[:-2]
+          nodes.extend(self.nodesByType(nodetype))
+        else:
+          N, nodetxt = self.gettoken(nodetxt)
+          assert len(nodetxt) == 0, "extra junk after node: %s" % (nodetxt,)
+          nodes.append(N)
+    if not args:
+      attrs = None
+    else:
+      attrtxt = args.pop(0)
+      attrs = attrtxt.split(',')
+    if args:
+      raise GetoptError, "extra arguments after nodes and attrs: %s" % (args,)
+    editNodes(self, nodes, attrs, doCreate=False)
+    return xit
 
   def cmd_httpd(self, args):
     xit = 0
@@ -1018,7 +1075,7 @@ class NodeDB(dict):
           raise GetoptError("unsupported argument; expected TYPE:*")
     return xit
 
-  def cmd_new(self, args, createSubNodes=True):
+  def cmd_new(self, args, doCreate=True):
     if len(args) == 0:
       raise GetoptError("missing TYPE:key")
     key=args.pop(0)
@@ -1030,7 +1087,7 @@ class NodeDB(dict):
         raise GetoptError("bad key type \"%s\"" % nodetype)
       N = self.newNode(nodetype, name)
       for assignment in args:
-        N.assign(assignment, createSubNodes=createSubNodes)
+        N.assign(assignment, doCreate=doCreate)
     return 0
 
   def cmd_print(self, attrs):
@@ -1046,7 +1103,7 @@ class NodeDB(dict):
       self[args[0]].report(sys.stdout)
     return 0
 
-  def cmd_set(self, args, createSubNodes=True):
+  def cmd_set(self, args, doCreate=True):
     # -C: create node if missing
     doCreate = False
     if args and args[0] == '-C':
@@ -1065,7 +1122,7 @@ class NodeDB(dict):
         N=self[key]
       for assignment in args:
         with Pfx(assignment):
-          N.assign(assignment, createSubNodes=createSubNodes)
+          N.assign(assignment, doCreate=doCreate)
     return 0
 
 _NodeDBsByURL = {}
