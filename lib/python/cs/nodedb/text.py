@@ -18,7 +18,7 @@ else:
 from cs.logutils import Pfx, error, info
 from cs.mappings import parseUC_sAttr
 import cs.sh
-from .node import re_BAREURL, Node
+from .node import Node
 
 ## NOT USED ? ## # regexp to match name(, name)*
 ## NOT USED ? ## re_NAMELIST = re.compile(r'([a-z][a-z0-9]+)(\s*,\s*([a-z][a-z0-9]+))*')
@@ -29,6 +29,8 @@ from .node import re_BAREURL, Node
 re_STRING = re.compile(r'"([^"\\]|\\.)*"')
 # JSON simple integer
 re_INT = re.compile(r'-?[0-9]+')
+# "bare" URL
+re_BAREURL = re.compile(r'[a-z]+://[-a-z0-9.]+/[-a-z0-9_.]+')
 
 def attr_value_to_text(N, attr, value, common=None):
   ''' Return "printable" form of an attribute value.
@@ -123,19 +125,14 @@ def editNode(N, editor=None, doCreate=False):
   '''
   if editor is None:
     editor = os.environ.get('EDITOR', 'vi')
-  if sys.hexversion < 0x02060000:
-    T = tempfile.NamedTemporaryFile()
-  else:
-    T = tempfile.NamedTemporaryFile(delete=False)
-  dumpNodeAttrs(N, T)
-  T.flush()
-  qname = cs.sh.quotestr(T.name)
-  os.system("%s %s" % (editor, qname))
-  with closing(open(T.name)) as ifp:
-    new_attrs = loadNodeAttrs(N, ifp, doCreate=doCreate)
-  T.close()
-  if os.path.exists(T.name):
-    os.remove(T.name)
+  with tempfile.NamedTemporaryFile(suffix='.csv') as T:
+    with Pfx(T.name):
+      dumpNodeAttrs(N, T)
+      T.flush()
+      qname = cs.sh.quotestr(T.name)
+      os.system("%s %s" % (editor, qname))
+      with closing(open(T.name)) as ifp:
+        new_attrs = loadNodeAttrs(N, ifp, doCreate=doCreate)
   N.update(new_attrs, delete_missing=True)
 
 def editNodes(nodedb, nodes, attrs, editor=None, doCreate=False):
@@ -145,19 +142,14 @@ def editNodes(nodedb, nodes, attrs, editor=None, doCreate=False):
     nodedb = nodes[0].nodedb
   if editor is None:
     editor = os.environ.get('EDITOR', 'vi')
-  if sys.hexversion < 0x02060000:
-    T = tempfile.NamedTemporaryFile()
-  else:
-    T = tempfile.NamedTemporaryFile(delete=False)
-  nodes, attrs = dump_horizontal(T, nodes=nodes, attrs=attrs)
-  T.flush()
-  qname = cs.sh.quotestr(T.name)
-  os.system("%s %s" % (editor, qname))
-  with closing(open(T.name)) as ifp:
-    new_nodes = list(load_horizontal(ifp, nodedb, doCreate=doCreate))
-  T.close()
-  if os.path.exists(T.name):
-    os.remove(T.name)
+  with tempfile.NamedTemporaryFile(suffix='.csv') as T:
+    with Pfx(T.name):
+      nodes, attrs = dump_horizontal(T, nodes=nodes, attrs=attrs)
+      T.flush()
+      qname = cs.sh.quotestr(T.name)
+      os.system("%s %s" % (editor, qname))
+      with closing(open(T.name)) as ifp:
+        new_nodes = list(load_horizontal(ifp, nodedb, doCreate=doCreate))
   # map from (name, type) to old_node
   nodeMap = dict( [ ((N.name, N.type), N) for N in nodes ] )
   for N, A in new_nodes:

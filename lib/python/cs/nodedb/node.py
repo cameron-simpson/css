@@ -26,8 +26,6 @@ from cs.logutils import Pfx, D, error, warn, info, debug
 re_NODEREF = re.compile(r'([A-Z]+):([^:#]+)')
 # regexp to match a bareword name
 re_NAME = re.compile(r'[a-z][-a-z_0-9]*(?![a-zA-Z0-9_])')
-# "bare" URL
-re_BAREURL = re.compile(r'[a-z]+://[-a-z0-9.]+/[-a-z0-9_.]+')
 
 def _byname(a, b):
   return cmp(a.name, b.name)
