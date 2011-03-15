@@ -16,7 +16,7 @@ from cStringIO import StringIO
 import cs.html
 from cs.mappings import parseUC_sAttr
 from cs.nodedb import Node
-from cs.nodedb.text import attrValueText
+from cs.nodedb.text import attr_value_to_text
 from cs.logutils import info, warn, error, debug, D
 
 # HTML token convenience functions
@@ -52,7 +52,7 @@ def relhref(N, label=None, context=None):
     if context is None:
       label = str(N)
     else:
-      label = attrValueText(context[0], context[1], N)
+      label = attr_value_to_text(context[0], context[1], N)
   return str(N), label
 
 def by_name(a, b):
@@ -69,7 +69,7 @@ def node_href(N, label=None, context=None):
     if context is None:
       label = str(N)
     else:
-      label = attrValueText(context[0], context[1], N)
+      label = attr_value_to_text(context[0], context[1], N)
   return str(N), label
 
 class CherryPyNode(object):
@@ -243,7 +243,7 @@ class NodeDBView(CherryPyNode):
           continue
         vtags = []
         for V in values:
-          vlabel = attrValueText(N, attr, V)
+          vlabel = attr_value_to_text(N, attr, V)
           if isinstance(V, Node):
             vtag = self.top._nodeLink(V, label=vlabel, context=(N, attr))
           else:
@@ -421,7 +421,7 @@ def OLDdo_GET(self):
           continue
         vtags = []
         for V in values:
-          vlabel = attrValueText(N, attr, V)
+          vlabel = attr_value_to_text(N, attr, V)
           if isinstance(V, Node):
             vtag = self.__nodeLink(V, label=vlabel, context=(N, attr), ext=ext)
           else:
@@ -500,7 +500,7 @@ def OLD_table_of_nodes(self, nodes, format):
       csvw.writerow(['TYPE','NAME']+fields)
       for N in nodes:
         csvw.writerow([ N.type, N.name ]
-                      + [ ",".join(str(attrValueText(N, F, A))
+                      + [ ",".join(str(attr_value_to_text(N, F, A))
                                    for A in N[F]
                                   )
                           for F in fields
@@ -514,7 +514,7 @@ def OLD_table_of_nodes(self, nodes, format):
       for N in nodes:
         celltext = [ N.type, N.name ]
         for F in fields:
-          celltext.append( ", ".join( str(attrValueText(N, F, value))
+          celltext.append( ", ".join( str(attr_value_to_text(N, F, value))
                                       for value in N[F]
                                     ) )
         data_rows.append( TR( *celltext ) )

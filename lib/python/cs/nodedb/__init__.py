@@ -36,6 +36,7 @@ def main(argv):
       badopts = True
     else:
       op = argv.pop(0)
+      # special commands that happen before opening the dburl
       ops = { "create": _create,
               "dump":   _dump,
               "load":   _load,
@@ -50,6 +51,8 @@ def main(argv):
         except GetoptError, e:
           error("%s: %s", op, e)
           badopts = True
+        else:
+          DB.close()
 
     if badopts or xit == 2:
       print >>sys.stderr, usage % (cmd, cmd, cmd, cmd)
