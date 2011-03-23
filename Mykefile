@@ -1,5 +1,6 @@
 PREFIX          = /opt/css
 weblocal        = $(HOME)/@/ezos/html/cs/css
+hg_bitbucket    = https://bitbucket.org/cameron_simpson/css
 
 target  = bin
 
@@ -80,8 +81,15 @@ _deploy:
         OPTCSS=$(PREFIX) updcss
 
 _publish:
+        :make _publish_bitbucket
+        :make _publish_ezos
+
+_publish_ezos:
         :make _deploy
         syncezos
+
+_publish_bitbucket:
+        hg push $(hg_bitbucket)
 
 # mark the tip as a new release
 _release:
