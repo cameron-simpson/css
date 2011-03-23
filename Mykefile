@@ -1,6 +1,7 @@
 PREFIX          = /opt/css
 weblocal        = $(HOME)/@/ezos/html/cs/css
-hg_bitbucket    = https://bitbucket.org/cameron_simpson/css
+##hg_bitbucket    = https://bitbucket.org/cameron_simpson/css
+hg_bitbucket    = ssh://hg@bitbucket.org/cameron_simpson/css
 
 target  = bin
 
