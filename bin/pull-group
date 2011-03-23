@@ -21,6 +21,7 @@ usage="Usage: $cmd [-x] [-G group-override] [-R] {/path/to/group|[user]@host} gr
   -x    Trace execution. Default is to recent planned actions."
 
 trace=eecho
+trace2=set-x
 lgroup=/etc/group
 groupoverride=
 addmembers=
@@ -99,13 +100,16 @@ getmembers()
 rcmd()
 { $trace sshx -o stricthostkeychecking=no "$remote" "$@"
 }
+rcmd2()
+{ $trace2 sshx -o stricthostkeychecking=no "$remote" "$@"
+}
 
 if [ -z "$rgroup" ]
 then
   rgroup=$TMPDIR/$cmd.$$
   trap 'rm -f "$rgroup"' 0
   trap 'rm -f "$rgroup"; exit 1' 1 2 13 15
-  rcmd cat /etc/group >"$rgroup"
+  rcmd2 cat /etc/group >"$rgroup"
 fi
 
 modgroups=
