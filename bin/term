@@ -14,7 +14,7 @@
 : ${TERMOPTIONS:=''}
 : ${WINJOB:=''}
 : ${XAUTHORITY:=''}
-: ${PREFTERM:=xterm}
+: ${PREFTERM:=''}
 : ${DISPLAY:=''}
 : ${X11_COMPOSITE:=''}
 : ${TERM:=dumb}
@@ -23,6 +23,16 @@
 : ${TERMOPTIONS:=''}
 : ${RXVT_SOCKET:=/tmp/urxvtd-socket-$USER}
 : ${OS:=`uname -s | tr '[A-Z]' '[a-z]'`}
+case "$OS,$PREFTERM,${TERM_PROGRAM:-''}" in
+  darwin,*,Apple_Terminal)
+    PREFTERM=Terminal
+    ;;
+  darwin,*,iTerm.app)
+    PREFTERM=iTerm.app
+    ;;
+  *,,*)PREFTERM=xterm
+    ;;
+esac
 export RXVT_SOCKET TMPDIR
 
 cmd=`basename "$0"`
