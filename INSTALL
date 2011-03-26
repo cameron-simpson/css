@@ -14,8 +14,8 @@ Installing my scripts:
 
 	http://www.cskk.ezoshosting.com/cs/css/css.tar.gz
 
-    into a suitable directory (eg "/opt/css", which I will assume for the
-    sake of example below).
+    into a suitable directory eg "/opt/css", which I will assume for the
+    sake of example below.
 
     Configure your environment to use the scripts:
 
@@ -28,11 +28,11 @@ Installing my scripts:
     It mostly does this:
 
 	PATH=$PATH:/opt/css/bin
-	PERL5LIB=$PERL5LIB:/opt/css/lib/perl
 	MANPATH=$MANPATH:/opt/css/man
-        CLASSPATH=$CLASSPATH:/opt/css/lib/java/au.com.zip.cs.jar
         PYTHONPATH=$PYTHONPATH:/opt/css/lib/python
-	export PATH PERL5LIB MANPATH CLASSPATH PYTHONPATH
+        CLASSPATH=$CLASSPATH:/opt/css/lib/java/au.com.zip.cs.jar
+	PERL5LIB=$PERL5LIB:/opt/css/lib/perl
+	export PATH MANPATH PYTHONPATH CLASSPATH PERL5LIB
 
     Several of the scripts expect the following shell environment variables:
 
