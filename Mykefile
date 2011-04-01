@@ -39,12 +39,14 @@ scriptmans = $(scriptmandir)/$((allscripts)).1
 scriptfromman(manf) = $(manf FP)
 
 _help:
-        @echo '_home      - deploy scripts to ~/bin etc'
-        @echo '_deploy    - deploy current release to /opt/css'
-        @echo '_publish   - deploy current release to /opt/css and ezos'
-        @echo '_pending   - report unreleased changelog and [M]odified files'
-        @echo '_release   - mark tip as new release'
-        @echo '_freshmeat - announce current release to freshmeat'
+        @echo '_home              - deploy scripts to ~/bin etc'
+        @echo '_deploy            - deploy current release to /opt/css'
+        @echo '_publish_ezos      - deploy current release to /opt/css, ezos'
+        @echo '_publish_bitbucket - deploy tip to bitbucket'
+        @echo '_publish           - deploy current release to /opt/css, ezos and tip to bitbucket'
+        @echo '_pending           - report unreleased changelog and [M]odified files'
+        @echo '_release           - mark tip as new release'
+        @echo '_freshmeat         - announce current release to freshmeat'
 
 _home:
         skip=`hg status | sed -n 's:^? \(.*\):--exclude=/\1:p'` \
