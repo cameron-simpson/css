@@ -1,0 +1,56 @@
+#!/bin/sh
+#
+# Report interface I/O stats.
+# Output format:
+#  ifname in-bytes out-bytes
+#       - Cameron Simpson <cs@zip.com.au> 01apr2011
+#
+
+set -ue
+
+: ${OS:=`uname -s | tr '[A-Z]' '[a-z]'`}
+
+case "$OS" in
+  darwin)
+    netstat -ibn \
+    | awk 'NR > 1 && $3 !~ /^</ { print $1, $7, $10 }'
+    ;;
+  linux)
+    ifconfig -a \
+    | awk '/^[a-z]/ \
+                { ifname=$1; ibytes=""; obytes="" }
+           match($0, /RX bytes: */) \
+                { RXnstart=RSTART+RLENGTH;
+                  ibytes=int(substr($0, RXnstart))
+                }
+           match($0, /TX bytes: */) \
+                { TXnstart=RSTART+RLENGTH;
+                  obytes=int(substr($0, TXnstart))
+                }
+           length == 0 \
+                { if (length(ifname) && length(ibytes) && length(obytes)) {
+                    print ifname, ibytes, obytes
+                    ifname=""
+                  }
+                }'
+    ;;
+  *)echo "$cmd: unsupported OS: \$OS=\"$OS\"" >&2
+    exit 1
+    ;;
+esac \
+| awk '
+      { ifname=$1; ibytes=$2; obytes=$3
+        if (substr(ifname, length(ifname), 1) == "*") {
+          ifname=substr(ifname, 1, length(ifname)-1)
+        }
+        if (!seen[ifname]) {
+          seen[ifname]=1
+          iflist_in[ifname]=ibytes
+          iflist_out[ifname]=obytes
+        }
+      }
+     END \
+      { for (ifname in seen) {
+          print ifname, iflist_in[ifname], iflist_out[ifname]
+        }
+      }'
