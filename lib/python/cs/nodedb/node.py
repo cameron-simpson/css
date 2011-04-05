@@ -885,6 +885,10 @@ class NodeDB(dict):
 
   def load(self, fp, fmt='csv', skipHeaders=False, noHeaders=False):
     if fmt == 'csv':
+      return self.load_csv(fp, skipHeaders=skipHeaders, noHeaders=noHeaders)
+    raise ValueError, "unsupported format '%s'" % (fmt,)
+
+  def load_csv(self, fp, skipHeaders=False, noHeaders=False):
       import csv
       r = csv.reader(fp)
       if not noHeaders:
@@ -921,7 +925,47 @@ class NodeDB(dict):
         otype, oname, oattr = t, N.name, attr
       return
 
-    raise ValueError, "unsupported format '%s'" % (fmt,)
+  def load_csv_wide(self, fp):
+      ''' Load a wide format CSV.
+          Layout is:
+            TYPE, NAME, attr1, attr2, ...
+            t1, n1, v1, v2, ...
+              ,   ,   , v2a, ...
+          etc.
+      '''
+      import csv
+      r = csv.reader(fp)
+      hdrrow = r.next()
+      assert hdrrow[0] == 'TYPE' and hdrrow[1] == 'NAME', \
+             "bad header row, expected TYPE, NAME, attrs... but got %s" \
+             % (`hdrrow`,)
+      otype = None
+      oname = None
+      N = None
+      valuemap = None
+      for row in r:
+        t, n = row[:2]
+        if t == "":
+          t = otype
+        if n == "":
+          n = oname
+        if t != otype or n != oname:
+          # save old values to node
+          if valuemap:
+            for attr, values in valuemap.items():
+              print >>sys.stderr, "%s[%s].extend(%s)" % (N, attr, values)
+              N[attr].extend(values)
+          valuemap = {}
+          N = self.get( (t, n), doCreate=True )
+        for i in range(2, len(row)):
+          v = row[i]
+          if len(v):
+            valuemap.setdefault(hdrrow[i], []).append(v)
+      # save old values to node
+      if valuemap:
+        for attr, values in valuemap.items():
+          print >>sys.stderr, "%s[%s].extend(%s)" % (N, attr, values)
+          N[attr].extend(values)
 
   def do_command(self, args):
     op = args.pop(0)
