@@ -50,6 +50,8 @@ def attr_value_to_text(N, attr, value, common=None):
     #   just write the value Node name
     elif attr == value.type:
       pvalue = value.name
+    else:
+      pvalue = ":".join((value.type, value.name))
   elif type(value) in StringTypes:
     m = re_BAREURL.match(value)
     if m is not None and m.end() == len(value):
@@ -59,6 +61,7 @@ def attr_value_to_text(N, attr, value, common=None):
         pvalue = str(int(value))
 
   if pvalue is None:
+    ##print >>sys.stderr, "pvalue is None, value =", `value`
     pvalue = common(value)
 
   return pvalue
