@@ -19,6 +19,7 @@ words=
 wordsep=
 OK=OK:
 FAIL=FAIL:
+notifyaddr=
 
 cmd=`basename "$0"`
 usage="Usage: $cmd [options...] [--] command [args...]
@@ -31,6 +32,8 @@ usage="Usage: $cmd [options...] [--] command [args...]
         Use \"failpfx\" instead of $FAIL.
   --label label
         Recite \"label\" after OK/FAIL. Defaults to command.
+  -N, --notify-on-error notifyaddr
+        Email error output to notifyaddr on failure; uses mail-on-error.
   -P    Prefix output with the label.
   --prefix pfx
         Prefix output with \"pfx\"."
@@ -47,6 +50,8 @@ do
       OK=OK
       FAIL=FAIL
       ;;
+    -N|--notify-on-error)
+      notifyaddr=$2; shift ;;
     -P)
       dopfx=1 ;;
     --prefix)
@@ -86,6 +91,11 @@ then
           d;}"
   sedcmd=`shqstr sed "$sedprog"`
   set -- filter_fd 1 "$sedcmd" "$@"
+fi
+
+if [ -n "$notifyaddr" ]
+then
+  set -- mail-on-error -s "$FAIL $words" -- "$notifyaddr" "$@"
 fi
 
 if [ $dopfx ]
