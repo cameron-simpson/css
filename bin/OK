@@ -10,7 +10,6 @@
 set -ue
 
 : ${TMPDIR:=/tmp}
-: ${CS_OK_NOTIFY:=''}
 
 dopfx=
 pfx=
@@ -20,6 +19,7 @@ words=
 wordsep=
 OK=OK:
 FAIL=FAIL:
+notifyaddr=${NOTIFY:-}
 
 cmd=`basename "$0"`
 usage="Usage: $cmd [options...] [--] command [args...]
@@ -34,7 +34,7 @@ usage="Usage: $cmd [options...] [--] command [args...]
         Recite \"label\" after OK/FAIL. Defaults to command.
   -N, --notify-on-error notifyaddr
         Email error output to notifyaddr on failure; uses mail-on-error.
-        Default from \$CS_OK_NOTIFY: $CS_OK_NOTIFY
+        Default from \$NOTIFY: $NOTIFY
   -P    Prefix output with the label.
   --prefix pfx
         Prefix output with \"pfx\"."
@@ -52,7 +52,7 @@ do
       FAIL=FAIL
       ;;
     -N|--notify-on-error)
-      CS_OK_NOTIFY=$2; shift ;;
+      notifyaddr=$2; shift ;;
     -P)
       dopfx=1 ;;
     --prefix)
@@ -94,9 +94,9 @@ then
   set -- filter_fd 1 "$sedcmd" "$@"
 fi
 
-if [ -n "$CS_OK_NOTIFY" ]
+if [ -n "$notifyaddr" ]
 then
-  set -- mail-on-error -s "$FAIL $words" -- "$CS_OK_NOTIFY" "$@"
+  set -- mail-on-error -s "$FAIL $words" -- "$notifyaddr" "$@"
 fi
 
 if [ $dopfx ]
