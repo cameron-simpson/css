@@ -862,27 +862,6 @@ class NodeDB(dict):
       for N in nodes:
         yield N
 
-  def tocsv(self, value):
-    from .text import re_BAREWORD, re_BAREURL
-    if isinstance(value, Node):
-      return ":".join(value.type, value.name)
-    if type(value) in StringTypes:
-      m = re_BAREWORD.match(value)
-      if m is not None and m.end() == len(value):
-        return value
-      m = re_BAREURL.match(value)
-      if m is not None and m.end() == len(value):
-        return value
-      if value.isdigit() and str(int(value)) == value:
-        return str(int(value))
-    return str(value)
-
-  def fromcsv(self, csvalue):
-    m = re_NODEREF.match(csvalue)
-    if m and m.end() == len(csvalue):
-      return self.nodeByTypeName(m.group(1), m.group(2), doCreate=doCreate)
-    return csvalue
-
   def dump(self, fp, fmt='csv', nodes=None):
     ''' Write database nodes to the file `fp` in the archival
         "vertical" format.
@@ -915,7 +894,7 @@ class NodeDB(dict):
           ct = t if otype is None or t != otype else ''
           cn = n if oname is None or n != oname else ''
           ca = attr if oattr is None or attr != oattr else ''
-          row = (ct, cn, ca, self.totext(value))
+          row = (ct, cn, ca, self.totoken(value, node=N, attr=attr))
           w.writerow(row)
           otype, oname, oattr = t, n, attr
     fp.flush()
@@ -931,7 +910,6 @@ class NodeDB(dict):
     w = csv.writer(fp)
     w.writerow( ['TYPE', 'NAME'] + attrs )
     for N in nodes:
-      print >>sys.stderr, "%s.keys: %s" % (N, N.keys())
       maxlen = max( len(N.get(attr, ())) for attr in attrs )
       for i in range(maxlen):
         if i == 0:
@@ -941,7 +919,8 @@ class NodeDB(dict):
         for attr in attrs:
           values = N.get(attr, ())
           if len(values) > i:
-            row.append(self.tocsv(values[i]))
+            token = self.totoken(values[i], node=N, attr=attr)
+            row.append(token)
           else:
             row.append("")
         w.writerow(row)
@@ -984,6 +963,7 @@ class NodeDB(dict):
           assert oattr is not None
           attr = oattr
         N = self.get( (t, n), doCreate=True )
+        ovalue = value
         value = self.fromtext(value, doCreate=True)
         if attr in N:
           N[attr].append(value)
@@ -1029,7 +1009,7 @@ class NodeDB(dict):
           value = row[i]
           if len(value):
             attr = hdrrow[i]
-            value = self.fromcsv(value)
+            value, etc = self.fromtoken(value, node=N, attr=attr, doCreate=True)
             valuemap.setdefault(attr, []).append(value)
       # save old values to node
       if valuemap:
