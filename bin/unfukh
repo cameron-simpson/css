@@ -5,11 +5,19 @@
 # Wrapper for vile programs that use the "make new file then rename onto old"
 # form of edit, which breaks symlinks, hardlinks and permissions/ownership
 # and of course any other metadata file may have.
+#
+# Procedure: copy filename to temp file, edit temp file, if ok then
+# copy temp file back over filename. With lots of checking.
 #	- Cameron Simpson <cs@zip.com.au> 27apr2005
 #
 
 cmd=`basename "$0"` || exit 1
-usage="Usage: $cmd [-f] [arg1opts...] filename editcmd [editargs...]"
+usage="Usage: $cmd [-f] [arg1opts...] filename editcmd [editargs...]
+  -f            Force. Rewrite filename even if editcmd exits non-zero.
+                Some bogus programs do that.
+  arg1opts      Options for the arg1 command to control how the temp file
+                name is passed to editcmd. Default is to place the temp file
+                name after the editargs."
 
 arg1opts=
 fixfail=1	# restore file if editor fails
@@ -22,8 +30,8 @@ do
     --)	shift; break ;;
     -f)	fixfail=
 	;;
-    --stdin)
-	echo "$cmd: the arg1 -stdin option is not supported" >&2
+    -stdin)
+	echo "$cmd: the arg1 $1 option is not supported" >&2
 	badopts=1
 	;;
     -discard|-end|-[0-9]*)
