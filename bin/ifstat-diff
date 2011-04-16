@@ -1,0 +1,85 @@
+#!/bin/sh
+#
+# Run ifstat, run command, run ifstat again and report byte in/out.
+# Handy as a crude measure of the network I/O a command generates on an
+# otherwise fairly idle system.
+#       - Cameron Simpson <cs@zip.com.au> 16apr2011
+#
+
+set -ue
+
+: ${TMPDIR:=/tmp}
+
+ifname=
+output=/dev/tty
+
+cmd=`basename "$0"`
+usage="Usage:
+  $cmd [-i ifname] [-o output] command [args...]
+  $cmd [-i ifname] [-o output] < previous-ifstat-data
+    -i ifname   Restrict report to the interface named \"ifname\".
+    -o output   Output report to the file named \"output\" or to
+                a file descriptor if \"output\" is a digit.
+                Default: $output"
+
+badopts=
+
+while [ $# -gt 0 ]
+do
+  case $1 in
+    -i) ifname=$2; shift ;;
+    -o) output=$2; shift ;;
+    --) shift; break ;;
+    -?*)echo "$cmd: unrecognised option: $1" >&2
+        badopts=1
+        ;;
+    *)  break ;;
+  esac
+  shift
+done
+
+if [ $# = 0 ]
+then
+  if [ -t 0 ]
+  then
+    echo "$cmd: no command: expected ifstat data on stdin but found a terminal" >&2
+    badopts=1
+  fi
+fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+xit=0
+
+if [ $# -gt 0 ]
+then
+  tmpf=$TMPDIR/$cmd.$$
+  trap 'rm -f -- "$tmpf"; exit 1' 1 2 13 15
+  ifstat >"$tmpf"
+  "$@" || xit=$?
+  "$0" -i "$ifname" -o "$output" <"$tmpf" || xit=1
+  exit $xit
+fi
+
+case "$output" in
+  [0-9]) exec >&$output ;;
+  *)     exec >"$output" ;;
+esac
+
+( cat
+  echo NEW
+  exec ifstat
+) \
+| awk -v "oifname=$ifname" \
+        ' BEGIN   { new=0 }
+          /^NEW$/ { new=1; next; }
+                  { data_in[$1] = $2-data_in[$1]
+                    data_out[$1] = $3-data_out[$1]
+                  }
+          END     { for (ifname in data_in) {
+                      if (oifname == "" || oifname == ifname) {
+                        print ifname, data_in[ifname], data_out[ifname]
+                      }
+                    }
+                  }
+        '
