@@ -11,6 +11,7 @@ import re
 import tempfile
 import sys
 from types import StringTypes
+import unittest
 if sys.hexversion < 0x02060000:
   import simplejson as json
 else:
@@ -30,8 +31,8 @@ re_STRING = re.compile(r'"([^"\\]|\\.)*"')
 # JSON simple integer
 re_INT = re.compile(r'-?[0-9]+')
 # "bare" URL
-re_BAREURL = re.compile(r'[a-z]+://[-a-z0-9.]+/[-a-z0-9_.]+')
-re_BAREWORD = re.compile(r'[a-z][a-z0-9]*')
+re_BAREURL = re.compile(r'[a-z]+://[-a-z0-9.]+/[-a-z0-9_.]*')
+## barewords only for node names ## re_BAREWORD = re.compile(r'[a-z][a-z0-9]*')
 
 def dumpNodeAttrs(N, ofp):
   # TODO: use attr_value_to_text() somehow
@@ -196,13 +197,38 @@ def totoken(value):
       This is intended to be human friendly but reversible.
   '''
   if type(value) in StringTypes:
-    m = re_BAREWORD.match(value)
-    if m is not None and m.end() == len(value):
-      return value
+    ##m = re_BAREWORD.match(value)
+    ##if m is not None and m.end() == len(value):
+    ##  return value
     m = re_BAREURL.match(value)
     if m is not None and m.end() == len(value):
       return value
-    if value.isdigit() and str(int(value)) == value:
-      return str(int(value))
+    return '"'+value.replace('"', r'\"')+'"'
+
+  if type(value) is int:
+    return str(value)
 
   raise ValueError, "can't turn into token: %s" % (`value`,)
+
+class TestAll(unittest.TestCase):
+
+  def setUp(self):
+    ##self.db = NodeDB(backend=None)
+    pass
+
+  def test01tokenise(self):
+    self.assert_(totoken(0) == "0")
+    self.assert_(totoken(1) == "1")
+    self.assert_(totoken("abc") == "\"abc\"")
+    self.assert_(totoken("http://foo.example.com/") == "http://foo.example.com/")
+
+  def test02roundtrip(self):
+    for value in 0, 1, "abc", "http://foo.example.com/":
+      token = totoken(value)
+      value2, _ = fromtoken(token)
+      self.assert_(value == value2 and _ == '',
+                   "round trip %s -> %s -> (%s, %s) fails"
+                   % (`value`, `token`, `value2`, `_`))
+
+if __name__ == '__main__':
+  unittest.main()
