@@ -1,7 +1,7 @@
 #!/usr/bin/python -tt
 
 from __future__ import with_statement
-from cs.logutils import Pfx, info, warn, error
+from cs.logutils import setup_logging, Pfx, info, warn, error
 from cs.mail import ismaildir, ismbox, messagesFromPath
 from cs.nodedb import NodeDB, Node
 from cs.misc import the
@@ -15,8 +15,11 @@ import unittest
 def main(argv):
   cmd = os.path.basename(argv.pop(0))
   usage = '''Usage:
-    %s test Run selftests.''' \
+    %s [dburl] op [op-args...]
+    Ops:
+      test Run selftests.''' \
     % (cmd,)
+  setup_logging(cmd)
 
   xit = 1
   badopts = False
@@ -28,8 +31,11 @@ def main(argv):
     op = argv.pop(0)
     with Pfx(op):
       if op == 'test':
-        tests = TestAll('test01makeNodes')
-        tests()
+        if len(argv) > 0:
+          error("unexpected arguments after \"%s\": %s" % (op, argv))
+          badopts = True
+        else:
+          unittest.main(argv=[cmd]+argv)
       else:
         error("unsupported op")
         badopts = True
@@ -54,6 +60,7 @@ class MessageNode(Node):
 TypeFactory = { 'MESSAGE':      MessageNode,
                 'PERSON':       PersonNode,
                 'ADDRESS':      AddressNode,
+                'ADDRESS_GROUP':AddressGroup,
               }
 
 class MailDB(NodeDB):
@@ -123,9 +130,8 @@ class TestAll(unittest.TestCase):
 
   def test01makeNodes(self):
     A = self.db.newNode('ADDRESS', 'cs@zip.com.au')
-    print >>sys.stderr, "A =", `A`
-    print >>sys.stderr, "ADDRESSes =", `self.db.ADDRESSes`
+    ##print >>sys.stderr, "A =", `A`
+    ##print >>sys.stderr, "ADDRESSes =", `self.db.ADDRESSes`
 
 if __name__ == '__main__':
-  logging.basicConfig(format="%(message)s")
   sys.exit(main(list(sys.argv)))
