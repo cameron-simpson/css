@@ -7,26 +7,58 @@
 
 s/^  *//
 s/  *$//
-/^$/d
 
-/^#*# Logwatch [0-9].* ##*#$/,/^#*#$/{
+/^#*# Log[Ww]atch [0-9].* ##*#$/,/^#*#$/{
   d
 }
 /^#*# Logwatch End #*#$/d
+
+/^-*- Sudo .* Begin -*-$/,/^-*- Sudo .* End -*-$/{
+  /^--/d
+  /^==/d
+  /^$/d
+  s/^/sudo: /
+  p
+  d
+}
 
 /^-*- Named Begin -*-$/,/^-*- Named End -*-$/{
   /^--/d
   /^\*\*Unmatched Entries\*\*/d
   /^network unreachable resolving '/d
   /^client .* query .* denied/d
+  /^$/d
   s/^/named: /
   p
   d
 }
 
-/^-*- postfix Begin -*-$/,/^-*- postfix End -*-$/{
+/^-*- pam_unix Begin -*-$/,/^-*- pam_unix End -*-$/{
   /^--/d
+  /[a-z][a-z0-9]* -> /!d
+  /^$/d
+  s/^/pam_unix: /
+  p
+  d
+}
+
+/^-*- Cron Begin -*-$/,/^-*- Cron End -*-$/{
+  /^--/d
+  /^$/d
+  s/^/cron: /
+  p
+  d
+}
+
+/^-*- [Pp]ostfix Begin -*-$/,/^-*- [Pp]ostfix End -*-$/{
+  /^--/d
+  /^==/d
   /^[0-9][0-9]* messages removed from queue/d
+  /^Unrecognized warning:$/,/^$/{
+    /^Unrecognized warning:$/d
+  }
+  /^\*\*Unmatched Entries\*\*$/d
+  /^$/d
   s/^/postfix: /
   p
   d
@@ -34,22 +66,27 @@ s/  *$//
 
 /^-*- SSHD Begin -*-$/,/^-*- SSHD End -*-$/{
   /^--/d
-  /^Postponed authentication:/,/^Users logging in through sshd:/{
-    /^Users logging in/!{
-      d
-    }
+  /^Illegal users from these:/,/^$/{
+    /^Illegal users from these:/d
+    s/^./illegal user: &/
   }
-  /^Users logging in through sshd:/,/^Received disconnect:/{
-    /^Received disconnect:/!{
-      s/^[0-9]/  &/
-    }
+  /^Postponed authentication:/,/^$/{
+    /^Postponed authentication:/d
+    d
   }
-  /^Received disconnect:/,/^\*\*Unmatched Entries\*\*$/{
-    /^\*\*Unmatched Entries\*\*$/!d
+  /^Users logging in through sshd:/,/^$/{
+    /^Users logging in through sshd:/d
+    / times$/s/^/  /
   }
-  /^Users logging in through sshd:/d
-  /^Received disconnect:/d
-  /^\*\*Unmatched Entries\*\*$/d
+  /^Received disconnect:/,/^$/{
+    d
+  }
+  /^\*\*Unmatched Entries\*\*$/,/^$/{
+    /^\*\*Unmatched Entries\*\*$/d
+    /^Found matching DSA key: /d
+    /^Read error from remote host /d
+  }
+  /^$/d
   s/^/sshd: /
   p
   d
@@ -59,9 +96,30 @@ s/  *$//
   /^--/d
   /^Filesystem  *Size  *Used  *Avail  *Use%  *Mounted on/d
   / 100% /!{ / 9[6789]% /!d; }
+  /^$/d
   s/^/df: /
   p
   d
 }
 
+/^-*- Disk Space -*-$/,/^-*- Disk Space -*-$/{
+  /^--/d
+  /^Filesystem  *Size  *Used  *Avail  *Use%  *Mounted on/d
+  / 100% /!{ / 9[6789]% /!d; }
+  /^$/d
+  s/^/df: /
+  p
+  d
+}
+
+/^-*- XNTPD Begin -*-$/,/^-*- XNTPD End -*-$/{
+  /^--/d
+  /^Total synchronizations /d
+  /^$/d
+  s/^/xntpd: /
+  p
+  d
+}
+
+/^$/d
 s/^/UNMATCHED: /
