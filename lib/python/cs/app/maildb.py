@@ -3,7 +3,7 @@
 from __future__ import with_statement
 from cs.logutils import setup_logging, Pfx, info, warn, error
 from cs.mail import ismaildir, ismbox, messagesFromPath
-from cs.nodedb import NodeDB, Node
+from cs.nodedb import NodeDB, Node, NodeDBFromURL
 from cs.misc import the
 from email.utils import getaddresses, formataddr
 from itertools import chain
@@ -46,8 +46,9 @@ def main(argv):
 
   return xit
 
-AddressNode=Node
-PersonNode=Node
+AddressNode = Node
+AddressGroupNode = Node
+PersonNode = Node
 
 class MessageNode(Node):
 
@@ -60,10 +61,15 @@ class MessageNode(Node):
 TypeFactory = { 'MESSAGE':      MessageNode,
                 'PERSON':       PersonNode,
                 'ADDRESS':      AddressNode,
-                'ADDRESS_GROUP':AddressGroup,
+                'ADDRESS_GROUP':AddressGroupNode,
               }
 
-class MailDB(NodeDB):
+def MailDB(mdburl, readonly=True, klass=None):
+  if klass is None:
+    klass = _MailDB
+  return NodeDBFromURL(mdburl, readonly=readonly, klass=klass)
+
+class _MailDB(NodeDB):
   ''' Extend NodeDB for email.
   '''
 
