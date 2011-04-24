@@ -309,14 +309,16 @@ class Node(dict):
     '''
     return hash(self.name)^hash(self.type)^id(self.nodedb)
 
-  def __get(self, k):
+  def get(self, k, default=None):
     ''' Fetch the item specified.
         Create an empty list if necessary.
     '''
     try:
       values = self[k]
     except KeyError:
-      values = _AttrList(self, k)
+      if default is None:
+        default = ()
+      values = _AttrList(self, k, _items=default)
       dict.__setitem__(self, k, values) # ensure this gets used later
     return values
 
@@ -332,7 +334,7 @@ class Node(dict):
       raise KeyError, repr(item)
     assert not plural and k not in ('NAME', 'TYPE'), \
            "forbidden index %s" % (repr(item),)
-    values = self.__get(k)
+    values = self.get(k)
     if len(values):
       # discard old values (removes reverse map)
       values[:]=[]
@@ -359,7 +361,7 @@ class Node(dict):
     # .ATTR and .ATTRs
     k, plural = parseUC_sAttr(attr)
     if k:
-      values = self.__get(k)
+      values = self.get(k)
       if plural:
         return values
       if len(values) == 1:

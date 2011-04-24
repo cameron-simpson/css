@@ -46,7 +46,7 @@ class Backend_TokyoCabinet(Backend):
       except KeyError:
         N = self.nodedb._makeNode(t, name)
       values = [ self.fromtext(text) for text in attrtexts.split('\0') ]
-      N[attr].extend(values, noBackend=True )
+      N.get(attr).extend(values, noBackend=True )
 
   def newNode(self, N):
     assert not self.nodedb.readonly
