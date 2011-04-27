@@ -1,0 +1,7 @@
+#!/bin/sh
+#
+# Operate on my maildb.
+#       - Cameron Simpson <cs@zip.com.au> 27apr2011
+#
+
+exec python -m cs.app.maildb ${1+"$@"}

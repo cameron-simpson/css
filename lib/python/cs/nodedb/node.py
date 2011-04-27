@@ -195,6 +195,9 @@ class _AttrList(list):
     raise AttributeError, '.'.join([str(self), attr])
 
   def where(self, **kw):
+    ''' Return a new _AttrList consisting of elements from this list where
+        the attribute values equal the supplied keyword arguments.
+    '''
     hits = []
     keys = kw.keys()
     for N in self:
@@ -206,6 +209,20 @@ class _AttrList(list):
       if ok:
         hits.append(N)
     return _AttrList(node=None, key=self.key, _items=hits)
+
+  def add(self, element):
+    if element not in self:
+      self.append(element)
+
+  def update(self, *others):
+    extras = []
+    S = set(self)
+    for o in others:
+      for element in o:
+        if element not in S:
+          S.add(element)
+          extras.append(element)
+    self.extend(extras)
 
 # we return a namedtuple from Node.references()
 RefTuple = namedtuple('RefTuple', 'node attr nrefs')
@@ -309,14 +326,16 @@ class Node(dict):
     '''
     return hash(self.name)^hash(self.type)^id(self.nodedb)
 
-  def __get(self, k):
+  def get(self, k, default=None):
     ''' Fetch the item specified.
         Create an empty list if necessary.
     '''
     try:
       values = self[k]
     except KeyError:
-      values = _AttrList(self, k)
+      if default is None:
+        default = ()
+      values = _AttrList(self, k, _items=default)
       dict.__setitem__(self, k, values) # ensure this gets used later
     return values
 
@@ -332,7 +351,7 @@ class Node(dict):
       raise KeyError, repr(item)
     assert not plural and k not in ('NAME', 'TYPE'), \
            "forbidden index %s" % (repr(item),)
-    values = self.__get(k)
+    values = self.get(k)
     if len(values):
       # discard old values (removes reverse map)
       values[:]=[]
@@ -359,7 +378,7 @@ class Node(dict):
     # .ATTR and .ATTRs
     k, plural = parseUC_sAttr(attr)
     if k:
-      values = self.__get(k)
+      values = self.get(k)
       if plural:
         return values
       if len(values) == 1:
