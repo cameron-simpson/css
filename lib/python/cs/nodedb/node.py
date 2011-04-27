@@ -633,9 +633,10 @@ class NodeDB(dict):
     return self.__nodesByType.get(t, ())
 
   def nodeByTypeName(self, t, name, doCreate=False):
-    if doCreate and (t, name) not in self:
-      return self.newNode(t, name)
-    return self[t, name]
+    N = self.get( (t, name), doCreate=doCreate )
+    if N is None:
+      raise KeyError, "no Node with key (%s,%s)" % (t, name)
+    return N
 
   def _noteNode(self, N):
     ''' Update the cross reference tables for a new Node.
@@ -666,7 +667,7 @@ class NodeDB(dict):
       return self[item]
     except KeyError:
       if doCreate:
-        assert default is None, "doCreate is True but default=%s" % (default,)
+        assert default is None, "doCreate is True but default=%s" % (`default`,)
         return self.newNode(item)
       return default
 
