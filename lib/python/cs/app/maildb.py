@@ -5,7 +5,8 @@ from cs.logutils import setup_logging, Pfx, info, warn, error
 from cs.mail import ismaildir, ismbox, messagesFromPath
 from cs.nodedb import NodeDB, Node, NodeDBFromURL
 from cs.misc import the
-from email.utils import getaddresses, formataddr
+from getopt import getopt, GetoptError
+from email.utils import getaddresses, parseaddr, formataddr
 from itertools import chain
 import logging
 import sys
@@ -15,27 +16,58 @@ import unittest
 def main(argv):
   cmd = os.path.basename(argv.pop(0))
   usage = '''Usage:
-    %s [dburl] op [op-args...]
+    %s [-m mdburl] op [op-args...]
     Ops:
-      test Run selftests.''' \
+      import-addresses < addresses.txt
+      list-groups [groups...]''' \
     % (cmd,)
   setup_logging(cmd)
 
-  xit = 1
+  xit = 0
   badopts = False
+  mdburl = None
+
+  try:
+    opts, args = getopt(argv[1:], 'm:')
+  except GetoptError, e:
+    error("unrecognised option: %s: %s"% (e.opt, e.msg))
+    badopts = True
+    opts, args = [], []
+
+  for opt, val in opts:
+    if opt == '-m':
+      mdburl = val
+    else:
+      raise GetoptError("unrecognised option: %s", opt)
+
+  if mdburl is None:
+    mdburl = os.environ['MAILDB']
 
   if len(argv) == 0:
     error("missing op")
     badopts = True
   else:
+    mdb = MailDB(mdburl, readonly=False)
     op = argv.pop(0)
     with Pfx(op):
-      if op == 'test':
-        if len(argv) > 0:
-          error("unexpected arguments after \"%s\": %s" % (op, argv))
-          badopts = True
+      if op == 'import-addresses':
+        if sys.stdin.isatty():
+          error("stdin is a tty, file expected")
+          xit=2
         else:
-          unittest.main(argv=[cmd]+argv)
+          mdb.importAddresses(sys.stdin)
+      elif op == 'list-groups':
+        if len(argv):
+          groups = argv
+        else:
+          groups = sorted([ G.name for G in mdb.nodesByType('ADDRESS_GROUP') ])
+        for group in groups:
+          G = mdb.getAddressGroupNode(group)
+          if not G:
+            error("no such group: %s", group)
+            xit = 1
+            continue
+          print group, ", ".join(A.formatted for A in G.ADDRESSes)
       else:
         error("unsupported op")
         badopts = True
@@ -50,8 +82,19 @@ AddressNode = Node
 AddressGroupNode = Node
 PersonNode = Node
 
+class AddressNode(Node):
+
+  @property
+  def formatted(self):
+    return formataddr( (self.REALNAME, self.name) )
+
+  @property
+  def realname(self):
+    return self.REALNAME
+
 class MessageNode(Node):
 
+  @property
   def referers(self):
     return set( N for N, attr, count in self.references(attr='FOLLOWUP', type='MESSAGE') )
 
@@ -80,15 +123,25 @@ class _MailDB(NodeDB):
       raise ValueError("unsupported type \"%s\"" % (t,))
     return TypeFactory[t](t, name, self)
 
-  def getAddrNode(self, addr, name=None):
+  def getAddressNode(self, addr):
     ''' Obtain the AddressNode for the specified address `addr`.
         If the optional parameter `name` is specified and
         the Node has no .REALNAME attribute, sets .REALNAME to `name`.
     '''
-    A = self.get( ('ADDRESS', addr), doCreate=True)
-    if name and 'REALNAME' not in A:
-      A.NAME = name
+    if type(addr) is str:
+      realname, coreaddr = parseaddr(addr)
+    else:
+      realname, coreaddr = addr
+    coreaddr = coreaddr.lower()
+    if  len(coreaddr) == 0:
+      raise ValueError("core(%s) => %s" % (`addr`, `coreaddr`))
+    A = self.get( ('ADDRESS', coreaddr), doCreate=True)
+    if 'REALNAME' not in A or not len(A.REALNAME):
+      A.REALNAME = realname
     return A
+
+  def getAddressGroupNode(self, group, default=None):
+    return self.get(('ADDRESS_GROUP', group), default)
 
   def getMessageNode(self, message_id):
     ''' Obtain the Node for the specified Message-ID `message_id`.
@@ -103,8 +156,8 @@ class _MailDB(NodeDB):
         self.importMessage(M)
 
   def addrtexts_to_AddressNodes(self, addrtexts):
-    return [ self.getAddrNode(addr.lower(), name)
-             for name, addr
+    return [ self.getAddressNode( (realname, addr), doCreate=True)
+             for realname, addr
              in getaddresses(addrtexts)
            ]
 
@@ -129,15 +182,29 @@ class _MailDB(NodeDB):
                      )
     return M
 
-class TestAll(unittest.TestCase):
-
-  def setUp(self):
-    self.db = MailDB(backend=None)
-
-  def test01makeNodes(self):
-    A = self.db.newNode('ADDRESS', 'cs@zip.com.au')
-    ##print >>sys.stderr, "A =", `A`
-    ##print >>sys.stderr, "ADDRESSes =", `self.db.ADDRESSes`
+  def importAddresses(self, fp):
+    ''' Import addresses into groups from the file `fp`.
+        Import lines are of the form:
+          group[,...] email address
+    '''
+    with Pfx(str(fp)):
+      lineno = 0
+      for line in fp:
+        lineno += 1
+        with Pfx(str(lineno)):
+          assert line.endswith('\n'), "unexpected EOF" % (lineno,)
+          groups, addr = line.strip().split(None, 1)
+          if not len(addr):
+            info("SKIP - no address")
+          ##print groups, addr
+          try:
+            A = self.getAddressNode(addr)
+          except ValueError, e:
+            error("bad address: %s: %s", addr, e)
+            continue
+          for group in groups.split(','):
+            G = self.get("ADDRESS_GROUP:"+group, doCreate=True)
+            G.ADDRESSes.add(A)
 
 if __name__ == '__main__':
   sys.exit(main(list(sys.argv)))
