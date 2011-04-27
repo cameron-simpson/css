@@ -195,6 +195,9 @@ class _AttrList(list):
     raise AttributeError, '.'.join([str(self), attr])
 
   def where(self, **kw):
+    ''' Return a new _AttrList consisting of elements from this list where
+        the attribute values equal the supplied keyword arguments.
+    '''
     hits = []
     keys = kw.keys()
     for N in self:
@@ -206,6 +209,20 @@ class _AttrList(list):
       if ok:
         hits.append(N)
     return _AttrList(node=None, key=self.key, _items=hits)
+
+  def add(self, element):
+    if element not in self:
+      self.append(element)
+
+  def update(self, *others):
+    extras = []
+    S = set(self)
+    for o in others:
+      for element in o:
+        if element not in S:
+          S.add(element)
+          extras.append(element)
+    self.extend(extras)
 
 # we return a namedtuple from Node.references()
 RefTuple = namedtuple('RefTuple', 'node attr nrefs')
