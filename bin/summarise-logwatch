@@ -121,5 +121,15 @@ s/  *$//
   d
 }
 
+/^-*- Connections (secure-log) Begin -*-$/,/^-*- Connections (secure-log) End -*-$/{
+  /^--/d
+  /^start .* from .* wd=/d
+  /^end .* exit=0$/d
+  /^$/d
+  s/^/xntpd: /
+  p
+  d
+}
+
 /^$/d
 s/^/UNMATCHED: /
