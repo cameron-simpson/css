@@ -7,9 +7,6 @@ import re
 import sys
 if sys.hexversion < 0x02060000:
   from sets import Set as set
-  import simplejson as json
-else:
-  import json
 import itertools
 from getopt import GetoptError
 from thread import allocate_lock
