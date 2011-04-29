@@ -123,10 +123,10 @@ s/  *$//
 
 /^-*- Connections (secure-log) Begin -*-$/,/^-*- Connections (secure-log) End -*-$/{
   /^--/d
-  /^start .* from .* wd=/d
-  /^end .* exit=0$/d
+  /^vsftp: start .* from .*, wd=/d
+  /^vsftp: end .* exit=0$/d
   /^$/d
-  s/^/xntpd: /
+  s/^/secure-log: /
   p
   d
 }
