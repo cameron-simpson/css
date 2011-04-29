@@ -210,19 +210,21 @@ def totoken(value):
 
   raise ValueError, "can't turn into token: %s" % (`value`,)
 
-class TestAll(unittest.TestCase):
+class TestTokeniser(unittest.TestCase):
 
   def setUp(self):
     ##self.db = NodeDB(backend=None)
     pass
 
   def test01tokenise(self):
+    ''' Test totoken(). '''
     self.assert_(totoken(0) == "0")
     self.assert_(totoken(1) == "1")
     self.assert_(totoken("abc") == "\"abc\"")
     self.assert_(totoken("http://foo.example.com/") == "http://foo.example.com/")
 
   def test02roundtrip(self):
+    ''' Test totoken()/fromtoken() round trip. '''
     for value in 0, 1, "abc", "http://foo.example.com/":
       token = totoken(value)
       value2, _ = fromtoken(token)
