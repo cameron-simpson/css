@@ -1,4 +1,4 @@
-#,!/usr/bin/python
+#!/usr/bin/python
 #
 # Basic web browser interface to a NodeDB.
 #       - Cameron Simpson <cs@zip.com.au>
@@ -16,7 +16,6 @@ from cStringIO import StringIO
 import cs.html
 from cs.mappings import parseUC_sAttr
 from cs.nodedb import Node
-from cs.nodedb.text import attr_value_to_text
 from cs.logutils import info, warn, error, debug, D
 
 # HTML token convenience functions
@@ -47,12 +46,9 @@ def A(N, label=None, ext='/', prefix=None):
     rhref = prefix + rhref
   return ['A', {'HREF': rhref+ext}, label]
 
-def relhref(N, label=None, context=None):
+def relhref(N, label=None):
   if label is None:
-    if context is None:
-      label = str(N)
-    else:
-      label = attr_value_to_text(context[0], context[1], N)
+    label = str(N)
   return str(N), label
 
 def by_name(a, b):
@@ -60,16 +56,15 @@ def by_name(a, b):
   '''
   return cmp(a.name, b.name)
 
-def node_href(N, label=None, context=None):
+def node_href(N, label=None, node=None, attr=None):
   ''' Return (nodespec, label) given the Node `N`, an optional `label`
-      and an optional context (cNode, cAttr) specifying a context Node and
-      Node attribute name.
+      and an optional context Node and attribute name.
   '''
   if label is None:
-    if context is None:
+    if not node:
       label = str(N)
     else:
-      label = attr_value_to_text(context[0], context[1], N)
+      label = node.nodedb.totoken(N, node=node, attr=attr)
   return str(N), label
 
 class CherryPyNode(object):
@@ -243,7 +238,7 @@ class NodeDBView(CherryPyNode):
           continue
         vtags = []
         for V in values:
-          vlabel = attr_value_to_text(N, attr, V)
+          vlabel = N.nodedb.totoken(V, node=N, attr=attr)
           if isinstance(V, Node):
             vtag = self.top._nodeLink(V, label=vlabel, context=(N, attr))
           else:
@@ -421,7 +416,7 @@ def OLDdo_GET(self):
           continue
         vtags = []
         for V in values:
-          vlabel = attr_value_to_text(N, attr, V)
+          vlabel = N.nodedb.totoken(V, node=N, attr=attr)
           if isinstance(V, Node):
             vtag = self.__nodeLink(V, label=vlabel, context=(N, attr), ext=ext)
           else:
@@ -500,7 +495,7 @@ def OLD_table_of_nodes(self, nodes, format):
       csvw.writerow(['TYPE','NAME']+fields)
       for N in nodes:
         csvw.writerow([ N.type, N.name ]
-                      + [ ",".join(str(attr_value_to_text(N, F, A))
+                      + [ ",".join(N.nodedb.totoken(A, node=N, attr=F)
                                    for A in N[F]
                                   )
                           for F in fields
@@ -514,7 +509,7 @@ def OLD_table_of_nodes(self, nodes, format):
       for N in nodes:
         celltext = [ N.type, N.name ]
         for F in fields:
-          celltext.append( ", ".join( str(attr_value_to_text(N, F, value))
+          celltext.append( ", ".join( N.nodedb.totoken(value, node-N, attr=F)
                                       for value in N[F]
                                     ) )
         data_rows.append( TR( *celltext ) )

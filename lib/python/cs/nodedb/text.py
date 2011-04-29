@@ -11,6 +11,7 @@ import re
 import tempfile
 import sys
 from types import StringTypes
+import unittest
 if sys.hexversion < 0x02060000:
   import simplejson as json
 else:
@@ -30,38 +31,8 @@ re_STRING = re.compile(r'"([^"\\]|\\.)*"')
 # JSON simple integer
 re_INT = re.compile(r'-?[0-9]+')
 # "bare" URL
-re_BAREURL = re.compile(r'[a-z]+://[-a-z0-9.]+/[-a-z0-9_.]+')
-
-def attr_value_to_text(N, attr, value, common=None):
-  ''' Return "printable" form of an attribute value.
-      This is intended to be human friendly but reversible.
-  '''
-  if common is None:
-    common = json.dumps
-
-  pvalue = None
-  if isinstance(value, Node):
-    # Node representation:
-    # If value.type == FOO, Node is of type FOO and attr is SUBFOO,
-    #   just write the value Node name
-    if attr == "SUB"+N.type and value.type == N.type:
-      pvalue = value.name
-    # If value.type == FOO and attr == FOO,
-    #   just write the value Node name
-    elif attr == value.type:
-      pvalue = value.name
-  elif type(value) in StringTypes:
-    m = re_BAREURL.match(value)
-    if m is not None and m.end() == len(value):
-      pvalue = value
-    else:
-      if value.isdigit() and str(int(value)) == value:
-        pvalue = str(int(value))
-
-  if pvalue is None:
-    pvalue = common(value)
-
-  return pvalue
+re_BAREURL = re.compile(r'[a-z]+://[-a-z0-9.]+/[-a-z0-9_.]*')
+## barewords only for node names ## re_BAREWORD = re.compile(r'[a-z][a-z0-9]*')
 
 def dumpNodeAttrs(N, ofp):
   # TODO: use attr_value_to_text() somehow
@@ -74,7 +45,8 @@ def dumpNodeAttrs(N, ofp):
     for value in N[attr]:
       ofp.write('%-15s %s\n'
                 % ( (attr if first_value else ''),
-                    attr_value_to_text(N, attr, value) )
+                    N.nodedb.totoken(value, node=N, attr=attr)
+                  )
                )
       first_value = False
 
@@ -144,64 +116,11 @@ def editNodes(nodedb, nodes, attrs, editor=None, doCreate=False):
     editor = os.environ.get('EDITOR', 'vi')
   with tempfile.NamedTemporaryFile(suffix='.csv') as T:
     with Pfx(T.name):
-      nodes, attrs = dump_horizontal(T, nodes=nodes, attrs=attrs)
-      T.flush()
+      nodedb.dump_csv_wide(T, nodes=nodes, attrs=attrs)
       qname = cs.sh.quotestr(T.name)
       os.system("%s %s" % (editor, qname))
       with closing(open(T.name)) as ifp:
-        new_nodes = list(load_horizontal(ifp, nodedb, doCreate=doCreate))
-  # map from (name, type) to old_node
-  nodeMap = dict( [ ((N.name, N.type), N) for N in nodes ] )
-  for N, A in new_nodes:
-    for attr, values in A.items():
-      print >>sys.stderr, "%s.%s = %s" % (N, attr, values)
-      N[attr] = values
-
-def dump_horizontal(fp, nodes, attrs=None):
-  ''' Write Nodes to the file `fp` in the horizontal format.
-      This is intended for easy editing if specific nodes' specific attributes.
-  '''
-  nodes = list(nodes)
-  if attrs is None:
-    attrs = set()
-    for N in nodes:
-      attrs.update(N.keys())
-    attrs = sorted(attrs)
-  else:
-    attrs = list(attrs)
-  w = csv.writer(fp)
-  w.writerow( ['TYPE', 'NAME'] + attrs )
-  for N in nodes:
-    w.writerow( [ N.type, N.name ]
-              + [ ','.join( attr_value_to_text(N, attr, v)
-                            for v in N.get(attr, ())
-                          ) for attr in attrs ] )
-  fp.flush()
-  return nodes, attrs
-
-def load_horizontal(fp, nodedb, doCreate=False):
-  ''' Read horizontal CSV data from `fp` for `nodedb`.
-      Return sequence of:
-        Node, dict(attr => values)
-      where the dict contains new attribute values not yet applied to Node.
-  '''
-  r = csv.reader(fp)
-  first = True
-  for row in r:
-    print >>sys.stderr, "row =", `row`
-    if first:
-      assert row[0] == 'TYPE'
-      assert row[1] == 'NAME'
-      attrs = row[2:]
-      first = False
-    else:
-      t = row.pop(0)
-      name = row.pop(0)
-      N = nodedb.get( (t, name), None, doCreate=doCreate)
-      A = {}
-      for attr, valuetxt in zip(attrs, row):
-        A[attr] = text_to_values(valuetxt, N, attr, doCreate=doCreate)
-      yield N, A
+        nodedb.load_csv_wide(ifp, doAppend=False)
 
 def assign(N, assignment, doCreate=False):
   ''' Take a string of the form ATTR=values and apply it.
@@ -230,13 +149,13 @@ def text_to_values(valuetxt, N, attr, nodedb=None, doCreate=False):
   valuetxt = valuetxt.strip()
   while len(valuetxt) > 0:
     if N:
-      value, valuetxt = N.gettoken(valuetxt,
+      value, valuetxt = N.fromtoken(valuetxt,
                                    attr,
                                    doCreate=doCreate)
     elif nodedb:
-      value, valuetxt = nodedb.gettoken(valuetxt, doCreate=doCreate)
+      value, valuetxt = nodedb.fromtoken(valuetxt, doCreate=doCreate)
     else:
-      value, valuetxt = gettoken(valuetxt, doCreate=doCreate)
+      value, valuetxt = fromtoken(valuetxt, doCreate=doCreate)
     values.append(value)
     valuetxt = valuetxt.lstrip()
     assert len(valuetxt) == 0 or valuetxt.startswith(','), \
@@ -247,10 +166,10 @@ def text_to_values(valuetxt, N, attr, nodedb=None, doCreate=False):
       "unexpected second comma at \"%s\"" % (valuetxt,)
   return values
 
-def gettoken(valuetxt):
+def fromtoken(valuetxt):
   ''' Extract a token from the start of a string.
-      This is the fallback method used by Node.gettoken() if none of the Node
-      specific formats match, or in non-Node contexts.
+      This is the fallback method used by NodeDB.fromtoken() if none of the Node
+      or NodeDB specific formats match, or in non-Node contexts.
       Return the parsed value and the remaining text or raise ValueError.
   '''
   # "foo"
@@ -272,3 +191,46 @@ def gettoken(valuetxt):
     return value, valuetxt[m.end():]
 
   raise ValueError, "not a JSON string or an int or a BAREURL: %s" % (valuetxt,)
+
+def totoken(value):
+  ''' Return "printable" form of an attribute value.
+      This is intended to be human friendly but reversible.
+  '''
+  if type(value) in StringTypes:
+    ##m = re_BAREWORD.match(value)
+    ##if m is not None and m.end() == len(value):
+    ##  return value
+    m = re_BAREURL.match(value)
+    if m is not None and m.end() == len(value):
+      return value
+    return '"'+value.replace('"', r'\"')+'"'
+
+  if type(value) is int:
+    return str(value)
+
+  raise ValueError, "can't turn into token: %s" % (`value`,)
+
+class TestTokeniser(unittest.TestCase):
+
+  def setUp(self):
+    ##self.db = NodeDB(backend=None)
+    pass
+
+  def test01tokenise(self):
+    ''' Test totoken(). '''
+    self.assert_(totoken(0) == "0")
+    self.assert_(totoken(1) == "1")
+    self.assert_(totoken("abc") == "\"abc\"")
+    self.assert_(totoken("http://foo.example.com/") == "http://foo.example.com/")
+
+  def test02roundtrip(self):
+    ''' Test totoken()/fromtoken() round trip. '''
+    for value in 0, 1, "abc", "http://foo.example.com/":
+      token = totoken(value)
+      value2, _ = fromtoken(token)
+      self.assert_(value == value2 and _ == '',
+                   "round trip %s -> %s -> (%s, %s) fails"
+                   % (`value`, `token`, `value2`, `_`))
+
+if __name__ == '__main__':
+  unittest.main()

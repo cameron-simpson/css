@@ -32,10 +32,10 @@ class _AttrList(list):
       and .ATTR[s] attribute access and drives a backend.
   '''
   
-  def __init__(self, node, key, _items=None):
+  def __init__(self, node, attr, _items=None):
     ''' Initialise an _AttrList.
         `node` is the node to which this _AttrList is attached.
-        `key` is the _singular_ form of the attribute name.
+        `attr` is the _singular_ form of the attribute name.
         `_items` is a private parameter for populating an _AttrList which is
             not attached to a Node, derived from the .Xs notation.
 
@@ -49,7 +49,7 @@ class _AttrList(list):
     else:
       list.__init__(self)
     self.node = node
-    self.key = key
+    self.attr = attr
     if node is not None:
       self.nodedb = node.nodedb
 
@@ -64,7 +64,7 @@ class _AttrList(list):
       except AttributeError:
         continue
       if hasattr(N, 'name') and hasattr(N, 'type') and hasattr(N, 'nodedb'):
-        delref(self.node, self.key)
+        delref(self.node, self.attr)
 
   def __additemrefs(self, nodes):
     ''' Add the reverse references of this attribute.
@@ -77,12 +77,12 @@ class _AttrList(list):
       except AttributeError:
         continue
       if hasattr(N, 'name') and hasattr(N, 'type') and hasattr(N, 'nodedb'):
-        addref(self.node, self.key)
+        addref(self.node, self.attr)
 
   def __str__(self):
     if self.node is None:
-      return ".%ss[...]" % (self.key,)
-    return "%s.%ss" % (str(self.node), self.key)
+      return ".%ss[...]" % (self.attr,)
+    return "%s.%ss" % (str(self.node), self.attr)
 
   def __delitem__(self, index):
     if type(index) is int:
@@ -131,7 +131,7 @@ class _AttrList(list):
   def append(self, value, noBackend=False):
     if not noBackend:
       N = self.node
-      self.nodedb._backend.extendAttr(N, self.key, (value,))
+      self.nodedb._backend.extendAttr(N, self.attr, (value,))
     list.append(self, value)
     self.__additemrefs((value,))
 
@@ -141,7 +141,7 @@ class _AttrList(list):
       values = tuple(values)
     if not noBackend:
       N = self.node
-      self.nodedb._backend.extendAttr(N, self.key, values)
+      self.nodedb._backend.extendAttr(N, self.attr, values)
     list.extend(self, values)
     self.__additemrefs(values)
 
@@ -183,7 +183,7 @@ class _AttrList(list):
     if k:
       hits = itertools.chain(*[ N[k] for N in self ])
       if plural:
-        return _AttrList(node=None, key=k, _items=hits)
+        return _AttrList(node=None, attr=k, _items=hits)
       try:
         hit = the(hits)
       except IndexError, e:
@@ -205,7 +205,7 @@ class _AttrList(list):
           break
       if ok:
         hits.append(N)
-    return _AttrList(node=None, key=self.key, _items=hits)
+    return _AttrList(node=None, attr=self.attr, _items=hits)
 
   def add(self, element):
     if element not in self:
@@ -364,11 +364,13 @@ class Node(dict):
     dict.__delitem__(self, k)
 
   def __getattr__(self, attr):
+    ''' Support .ATTR[s] and .inTYPE.
+    '''
     # .inTYPE -> referring nodes if this TYPE
     if attr.startswith('in') and len(attr) > 2:
       k, plural = parseUC_sAttr(attr[2:])
       if k and not plural:
-        return _AttrList(node=None, key=None,
+        return _AttrList(node=None, attr=None,
                          _items=[ N for N, a, c in self.references(type=k) ]
                         )
 
@@ -387,6 +389,8 @@ class Node(dict):
     raise AttributeError, str(self)+'.'+repr(attr)
 
   def __setattr__(self, attr, value):
+    ''' Support .ATTR[s] = value[s].
+    '''
     # forbid .inTYPE attribute setting
     if attr.startswith('in') and len(attr) > 2:
       k, plural = parseUC_sAttr(attr[2:])
@@ -403,37 +407,13 @@ class Node(dict):
       dict.__setattr__(self, attr, value)
 
   def get0(self, attr, default=None):
+    ''' Return the first item in self[attr], or `default`.
+        `default` defaults to None.
+    '''
     return get0(self.get(attr, ()), default=default)
 
-  def gettoken(self, valuetxt, attr, doCreate=False):
-    ''' Method to extract a token from the start of a string.
-        It is intended to be overridden by subclasses to add recognition for
-        domain specific things such as IP addresses.
-    '''
-    try:
-      # try TYPE:NAME
-      return self.nodedb.gettoken(valuetxt, doCreate=doCreate)
-    except ValueError:
-      pass
-
-    # NAME with implied TYPE
-    m = re_NAME.match(valuetxt)
-    if m:
-      if attr == "SUB"+self.type:
-        value = self.nodedb.nodeByTypeName(self.type,
-                                           m.group(),
-                                           doCreate=doCreate)
-      else:
-        value = self.nodedb.nodeByTypeName(attr,
-                                           m.group(),
-                                           doCreate=doCreate)
-      return value, valuetxt[m.end():]
-
-    import cs.nodedb.text
-    return cs.nodedb.text.gettoken(valuetxt)
-
   def update(self, new_attrs, delete_missing=False):
-    ''' Update this Node with new attributues, optionally removing
+    ''' Update this Node with new attributes, optionally removing
         extraneous attributes.
         `new_attrs` is a mapping from an attribute name to a value list.
 	If `delete_missing` is supplied true, remove attribute not
@@ -762,20 +742,53 @@ class NodeDB(dict):
 
     raise ValueError, "unknown DB sequence number: %s; _.DBs = %s" % (s, N_.DBs)
 
-  def gettoken(self, valuetxt, doCreate=False):
-    ''' Extract a token from the start of a string,
-        return the token's value and the tail of the string.
-        Used by Node.gettoken().
+  def fromtoken(self, valuetxt, node=None, attr=None, doCreate=False):
+    ''' Method to extract a token from the start of a string, for use
+        in the named attribute `attr`.
+	It is intended to be overridden by subclasses to add
+	recognition for domain specific things such as IP addresses.
+	overrides should fall back to this method if they do not
+	recognise their special syntaxes.
         This is to be used to parse human friendly value lists.
-        Conversely, totext and fromtext below are for external data storage.
+        Conversely, totext() and fromtext() below are for external data storage.
     '''
+    # NAME with implied TYPE
+    if attr:
+      m = re_NAME.match(valuetxt)
+      if m:
+        if attr == "SUB"+node.type:
+          value = self.nodeByTypeName(node.type, m.group(), doCreate=doCreate)
+        else:
+          value = self.nodeByTypeName(attr, m.group(), doCreate=doCreate)
+        return value, valuetxt[m.end():]
+
     # TYPE:NAME
     m = re_NODEREF.match(valuetxt)
     if m:
       value = self.nodeByTypeName(m.group(1), m.group(2), doCreate=doCreate)
       return value, valuetxt[m.end():]
 
-    raise ValueError, "not a TYPE:NAME token: %s" % (valuetxt,)
+    import cs.nodedb.text
+    return cs.nodedb.text.fromtoken(valuetxt)
+
+  def totoken(self, value, node=None, attr=None):
+    ''' Convert a value to human friendly token.
+    '''
+    if isinstance(value, Node):
+      # Node representation:
+      # If value.type == FOO, Node is of type FOO and attr is SUBFOO,
+      #   just write the value Node name
+      if attr:
+        if attr == "SUB"+node.type and value.type == node.type:
+          return value.name
+        # If value.type == FOO and attr == FOO,
+        #   just write the value Node name
+        if attr == value.type:
+          return value.name
+      return ":".join((value.type, value.name))
+
+    import cs.nodedb.text
+    return cs.nodedb.text.totoken(value)
 
   def totext(self, value):
     ''' Convert a value for external string storage.
@@ -855,7 +868,7 @@ class NodeDB(dict):
       return self.otherDB(int(seqnum))[t, name]
     raise ValueError, "unparsable text \"%s\"" % (text,)
 
-  def _default_dump_nodes(self, typenames=None):
+  def default_dump_nodes(self, typenames=None):
     ''' Yield the default sequence of Nodes to dump.
     '''
     if typenames is None:
@@ -871,38 +884,75 @@ class NodeDB(dict):
         "vertical" format.
     '''
     if nodes is None:
-      nodes = self._default_dump_nodes()
+      nodes = self.default_dump_nodes()
     if fmt == 'csv':
-      w = csv.writer(fp)
-      w.writerow( ('TYPE', 'NAME', 'ATTR', 'VALUE') )
-      typenames = list(self.types())
-      typenames.sort()
-      otype = None
-      oname = None
+      return self.dump_csv(fp, nodes)
+    if fmt == 'csv_wide':
+      return self.dump_csv_wide(fp, nodes)
+    raise ValueError, "unsupported format '%s'" % (fmt,)
+
+  def dump_csv(self, fp, nodes):
+    w = csv.writer(fp)
+    w.writerow( ('TYPE', 'NAME', 'ATTR', 'VALUE') )
+    typenames = list(self.types())
+    typenames.sort()
+    otype = None
+    oname = None
+    for N in nodes:
+      t, n = N.type, N.name
+      attrs = N.keys()
+      if len(attrs) == 0:
+        warn("%s: dropping node %s, no attributes!" % (self, N))
+      attrs.sort()
+      oattr = None
+      for attr in attrs:
+        assert not attr.endswith('s'), "bogus plural node attribute: %s" % (attr,)
+        for value in N[attr]:
+          ct = t if otype is None or t != otype else ''
+          cn = n if oname is None or n != oname else ''
+          ca = attr if oattr is None or attr != oattr else ''
+          row = (ct, cn, ca, self.totoken(value, node=N, attr=attr))
+          w.writerow(row)
+          otype, oname, oattr = t, n, attr
+    fp.flush()
+    return
+
+  def dump_csv_wide(self, fp, nodes, attrs=None):
+    if attrs is None:
+      nodes = tuple(nodes)
+      attrs = set()
       for N in nodes:
-        t, n = N.type, N.name
-        attrs = N.keys()
-        if len(attrs) == 0:
-          warn("%s: dropping node %s, no attributes!" % (self, N))
-        attrs.sort()
-        oattr = None
+        attrs.update(N.keys())
+      attrs = sorted(attrs)
+    w = csv.writer(fp)
+    w.writerow( ['TYPE', 'NAME'] + attrs )
+    for N in nodes:
+      maxlen = max( len(N.get(attr, ())) for attr in attrs )
+      for i in range(maxlen):
+        if i == 0:
+          row = [N.type, N.name]
+        else:
+          row = ["", ""]
         for attr in attrs:
-          assert not attr.endswith('s'), "bogus plural node attribute: %s" % (attr,)
-          for value in N[attr]:
-            ct = t if otype is None or t != otype else ''
-            cn = n if oname is None or n != oname else ''
-            ca = attr if oattr is None or attr != oattr else ''
-            row = (ct, cn, ca, self.totext(value))
-            w.writerow(row)
-            otype, oname, oattr = t, n, attr
-    else:
-      assert False, "dump: unsupported format: %s" % (fmt,)
+          values = N.get(attr, ())
+          if len(values) > i:
+            token = self.totoken(values[i], node=N, attr=attr)
+            row.append(token)
+          else:
+            row.append("")
+        w.writerow(row)
+        fp.flush()      # DEBUG
     fp.flush()
     return
 
   def load(self, fp, fmt='csv', skipHeaders=False, noHeaders=False):
     if fmt == 'csv':
-      import csv
+      return self.load_csv(fp, skipHeaders=skipHeaders, noHeaders=noHeaders)
+    if fmt == 'csv_wide':
+      return self.load_csv_wide(fp)
+    raise ValueError, "unsupported format '%s'" % (fmt,)
+
+  def load_csv(self, fp, skipHeaders=False, noHeaders=False):
       r = csv.reader(fp)
       if not noHeaders:
         hdrrow = r.next()
@@ -930,6 +980,7 @@ class NodeDB(dict):
           assert oattr is not None
           attr = oattr
         N = self.get( (t, n), doCreate=True )
+        ovalue = value
         value = self.fromtext(value, doCreate=True)
         if attr in N:
           N[attr].append(value)
@@ -938,7 +989,52 @@ class NodeDB(dict):
         otype, oname, oattr = t, N.name, attr
       return
 
-    raise ValueError, "unsupported format '%s'" % (fmt,)
+  def load_csv_wide(self, fp, doAppend=False):
+      ''' Load a wide format CSV.
+          Layout is:
+            TYPE, NAME, attr1, attr2, ...
+            t1, n1, v1, v2, ...
+              ,   ,   , v2a, ...
+          etc.
+      '''
+      r = csv.reader(fp)
+      hdrrow = r.next()
+      assert hdrrow[0] == 'TYPE' and hdrrow[1] == 'NAME', \
+             "bad header row, expected TYPE, NAME, attrs... but got %s" \
+             % (`hdrrow`,)
+      otype = None
+      oname = None
+      N = None
+      valuemap = None
+      for row in r:
+        t, n = row[:2]
+        if t == "":
+          t = otype
+        if n == "":
+          n = oname
+        if t != otype or n != oname:
+          # save old values to node
+          if valuemap:
+            for attr, values in valuemap.items():
+              if doAppend:
+                N[attr].extend(values)
+              else:
+                N[attr] = values
+          valuemap = {}
+          N = self.get( (t, n), doCreate=True )
+        for i in range(2, len(row)):
+          value = row[i]
+          if len(value):
+            attr = hdrrow[i]
+            value, etc = self.fromtoken(value, node=N, attr=attr, doCreate=True)
+            valuemap.setdefault(attr, []).append(value)
+      # save old values to node
+      if valuemap:
+        for attr, values in valuemap.items():
+          if doAppend:
+            N[attr].extend(values)
+          else:
+            N[attr] = values
 
   def do_command(self, args):
     op = args.pop(0)
@@ -953,7 +1049,6 @@ class NodeDB(dict):
     ''' update otherdb: emit set commands to update otherdb with
         attributes and nodes in this db.
     '''
-    from .text import attr_value_to_text
     xit = 0
     if fp is None:
       fp = sys.stdout
@@ -963,7 +1058,7 @@ class NodeDB(dict):
     if len(args) > 0:
       raise GetoptError("extra arguments after dburl '%s': %s" % (dburl, " ".join(args)))
     DB2 = NodeDBFromURL(dburl, readonly=True)
-    nodes1 = list(self._default_dump_nodes())
+    nodes1 = list(self.default_dump_nodes())
     for N in nodes1:
       t, name = N.type, N.name
       N2 = DB2.get( (t, name), {} )
@@ -973,7 +1068,8 @@ class NodeDB(dict):
         values = N[attr]
         ovalues = N2.get(attr, ())
         if values != ovalues:
-          fp.write("set %s:%s %s=%s\n" % (t, name, attr, ",".join( [ attr_value_to_text(N2, attr, V) for V in values ] )))
+          fp.write("set %s:%s %s=%s\n" % (t, name, attr, 
+                                          ",".join( [ self.totoken(V, node=N2, attr=attr) for V in values ] )))
     return xit
 
   def cmd_dump(self, args, fp=None):
@@ -990,13 +1086,12 @@ class NodeDB(dict):
     return xit
 
   def cmd_dumpwide(self, args, fp=None):
-    from .text import dump_horizontal
     args = list(args)
     xit = 0
     if fp is None:
       fp = sys.stdout
     if not args:
-      nodes = self._default_dump_nodes()
+      nodes = self.default_dump_nodes()
     else:
       nodes = []
       for nodetxt in args.pop(0).split(','):
@@ -1004,7 +1099,7 @@ class NodeDB(dict):
           nodetype = nodetxt[:-2]
           nodes.extend(self.nodesByType(nodetype))
         else:
-          N, nodetxt = self.gettoken(nodetxt)
+          N, nodetxt = self.fromtoken(nodetxt)
           assert len(nodetxt) == 0, "extra junk after node: %s" % (nodetxt,)
           nodes.append(N)
     if not args:
@@ -1014,7 +1109,7 @@ class NodeDB(dict):
       attrs = attrtxt.split(',')
     if args:
       raise GetoptError, "extra arguments after nodes and attrs: %s" % (args,)
-    dump_horizontal(fp, nodes, attrs=attrs)
+    self.dump_csv_wide(fp, nodes, attrs=attrs)
     return xit
 
   def cmd_edit(self, args):
@@ -1032,7 +1127,7 @@ class NodeDB(dict):
     args = list(args)
     xit = 0
     if not args:
-      nodes = self._default_dump_args()
+      nodes = self.default_dump_nodes()
     else:
       nodes = []
       for nodetxt in args.pop(0).split(','):
@@ -1040,7 +1135,7 @@ class NodeDB(dict):
           nodetype = nodetxt[:-2]
           nodes.extend(self.nodesByType(nodetype))
         else:
-          N, nodetxt = self.gettoken(nodetxt)
+          N, nodetxt = self.fromtoken(nodetxt)
           assert len(nodetxt) == 0, "extra junk after node: %s" % (nodetxt,)
           nodes.append(N)
     if not args:
@@ -1255,7 +1350,7 @@ class Backend(object):
     ''' Save the full contents of this attribute list.
     '''
     N = attrs.node
-    attr = attrs.key
+    attr = attrs.attr
     self.delAttr(N, attr)
     if attrs:
       self.extendAttr(N, attr, attrs)

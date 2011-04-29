@@ -1,0 +1,42 @@
+#!/bin/sh
+#
+# Convenience wrapper for wroking with NodeDBs.
+#       - Cameron Simpson <cs@zip.com.au> 05apr2011
+#
+
+set -ue
+
+: ${CS_NODEDB_URL:=''}
+
+cmd=$0
+usage="Usage: $cmd [-N nodedb-url] op [args...]
+  -N nodedb-url URL of NodeDB, default from \$CS_NODEDB_URL ($CS_NODEDB_URL)."
+
+badopts=
+
+while [ $# -gt 0 ]
+do
+  case "$1" in
+    -N) CS_NODEDB_URL=$2; shift ;;
+    --) shift; break ;;
+    -?*)echo "$cmd: unrecognised option: $1" >&2
+        badopts=1
+        ;;
+    *)  break ;;
+  esac
+  shift
+done
+
+if [ $# = 0 ]
+then
+  echo "$cmd: missing op" >&2
+  badopts=1
+else
+  op=$1
+  shift
+fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+set -x
+exec python -m cs.nodedb.__init__ "$CS_NODEDB_URL" "$op" ${1+"$@"}
