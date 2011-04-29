@@ -83,7 +83,7 @@ s/  *$//
   }
   /^\*\*Unmatched Entries\*\*$/,/^$/{
     /^\*\*Unmatched Entries\*\*$/d
-    /^Found matching DSA key: /d
+    /^Found matching [DR]SA key: /d
     /^Read error from remote host /d
   }
   /^$/d
