@@ -71,6 +71,61 @@ def export_rows_wide(nodes, attrs=None, all_attrs=False, tokenised=False, all_no
           row.append(blank)
       yield row
 
+def import_rows_wide(rows):
+    ''' Read "wide" format rows and yield:
+          type, name, {attr1:values1, attr2:values2, ...}
+        Input row layout is:
+          TYPE, NAME, attr1, attr2, ...
+          t1, n1, v1, v2, ...
+            ,   ,   , v2a, ...
+        etc.
+    '''
+    otype = None
+    oname = None
+    valuemap = None
+    nrows = 0
+    for row in rows:
+      nrows += 1
+
+      if nrows == 1:
+        hdrrow = row
+        if len(hdrrow) < 2:
+          raise ValueError, "header row too short, expected at least TYPE and NAME: %s" % (hdrrow,)
+        if hdrrow[0] != 'TYPE':
+          raise ValueError, "header row: element 0 should be 'TYPE', got: %s" % (`hdrrow[0]`,)
+        if hdrrow[1] != 'NAME':
+          raise ValueError, "header row: element 1 should be 'NAME', got: %s" % (`hdrrow[1]`,)
+        continue
+
+      if len(row) > len(hdrrow):
+        raise ValueError, "row %d: too many columns - expected %d, got %d" \
+                          (nrows, len(hdrrow), len(row))
+      if len(row) < len(hdrrow):
+        # rows may come from human made CSV data - accept and pad short rows
+        row.extend( [ None for i in range(len(hdrrow)-len(row)) ] )
+
+      t, n = row[:2]
+      if t is None:
+        t = otype
+      if n is None:
+        n = oname
+      if t != otype or n != oname:
+        # new Node, yield previous Node data
+        if valuemap:
+          yield otype, oname, valuemap
+        valuemap = {}
+        otype = t
+        oname = n
+      for i in range(2, len(row)):
+        value = row[i]
+        if value is not None:
+          attr = hdrrow[i]
+          value = row[i]
+          valuemap.setdefault(attr, []).append(value)
+    # yield gathers Node data
+    if valuemap:
+      yield otype, oname, valuemap
+
 class TestAll(unittest.TestCase):
 
   def setUp(self):
@@ -106,6 +161,18 @@ class TestAll(unittest.TestCase):
                       [ N2.type, N2.name, None,    ],
                     )
     self.assert_(rows == expected_rows)
+
+  def test02import_rows_wide_01(self):
+    input_rows = ( [ 'TYPE', 'NAME', 'ATTR1', 'ATTR2' ],
+                   [ 'HOST', 'host1', 1, None ],
+                   [ 'HOST', 'host2', None, 2 ],
+                   [ None,   None,    None, 3 ],
+                 )
+    data = tuple( import_rows_wide( input_rows ) )
+    expected_data = ( ( 'HOST', 'host1', {'ATTR1': [1]} ),
+                      ( 'HOST', 'host2', {'ATTR2': [2,3]} ),
+                    )
+    self.assert_(data == expected_data)
 
 if __name__ == '__main__':
   unittest.main()
