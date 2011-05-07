@@ -18,6 +18,7 @@ from cs.lex import str1
 from cs.misc import the, get0
 from cs.mappings import parseUC_sAttr
 from cs.logutils import Pfx, D, error, warn, info, debug
+from .export import export_rows_wide
 
 # regexp to match TYPE:name
 re_NODEREF = re.compile(r'([A-Z]+):([^:#]+)')
@@ -917,33 +918,14 @@ class NodeDB(dict):
     fp.flush()
     return
 
-  def dump_csv_wide(self, fp, nodes, attrs=None):
-    if attrs is None:
-      nodes = tuple(nodes)
-      attrs = set()
-      for N in nodes:
-        attrs.update(N.keys())
-      attrs = sorted(attrs)
+  def dump_csv_wide(self, fp, nodes, attrs=None, all_attrs=False):
     w = csv.writer(fp)
-    w.writerow( ['TYPE', 'NAME'] + attrs )
-    for N in nodes:
-      maxlen = max( len(N.get(attr, ())) for attr in attrs )
-      for i in range(maxlen):
-        if i == 0:
-          row = [N.type, N.name]
-        else:
-          row = ["", ""]
-        for attr in attrs:
-          values = N.get(attr, ())
-          if len(values) > i:
-            token = self.totoken(values[i], node=N, attr=attr)
-            row.append(token)
-          else:
-            row.append("")
-        w.writerow(row)
-        fp.flush()      # DEBUG
+    for row in export_rows_wide(nodes,
+                                attrs=attrs,
+                                all_attrs=all_attrs,
+                                tokenised=True):
+      w.writerow(row)
     fp.flush()
-    return
 
   def load(self, fp, fmt='csv', skipHeaders=False, noHeaders=False):
     if fmt == 'csv':
