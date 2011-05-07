@@ -65,7 +65,7 @@ def export_rows_wide(nodes, attrs=None, all_attrs=False, tokenised=False, all_no
         if len(values) > i:
           elem = values[i]
           if tokenised:
-            elem = N.totoken(elem, attr=attr)
+            elem = N.nodedb.totoken(elem, node=N, attr=attr)
           row.append(elem)
         else:
           row.append(blank)

@@ -18,7 +18,7 @@ from cs.lex import str1
 from cs.misc import the, get0
 from cs.mappings import parseUC_sAttr
 from cs.logutils import Pfx, D, error, warn, info, debug
-from .export import export_rows_wide
+from .export import export_rows_wide, import_rows_wide
 
 # regexp to match TYPE:name
 re_NODEREF = re.compile(r'([A-Z]+):([^:#]+)')
@@ -979,44 +979,20 @@ class NodeDB(dict):
               ,   ,   , v2a, ...
           etc.
       '''
-      r = csv.reader(fp)
-      hdrrow = r.next()
-      assert hdrrow[0] == 'TYPE' and hdrrow[1] == 'NAME', \
-             "bad header row, expected TYPE, NAME, attrs... but got %s" \
-             % (`hdrrow`,)
-      otype = None
-      oname = None
-      N = None
-      valuemap = None
-      for row in r:
-        t, n = row[:2]
-        if t == "":
-          t = otype
-        if n == "":
-          n = oname
-        if t != otype or n != oname:
-          # save old values to node
-          if valuemap:
-            for attr, values in valuemap.items():
-              if doAppend:
-                N[attr].extend(values)
-              else:
-                N[attr] = values
-          valuemap = {}
-          N = self.get( (t, n), doCreate=True )
-        for i in range(2, len(row)):
-          value = row[i]
-          if len(value):
-            attr = hdrrow[i]
-            value, etc = self.fromtoken(value, node=N, attr=attr, doCreate=True)
-            valuemap.setdefault(attr, []).append(value)
-      # save old values to node
-      if valuemap:
+      for t, n, valuemap in import_rows_wide(csv.reader(fp)):
+        N = self.get( (t, n), doCreate=True )
         for attr, values in valuemap.items():
+          parsed = []
+          for value in values:
+            if len(value):
+              ovalue = value
+              value, etc = self.fromtoken(value, node=N, attr=attr, doCreate=True)
+              assert len(etc) == 0, "unparsed data from %s: %s" % (`ovalue`, `etc`)
+              parsed.append(value)
           if doAppend:
-            N[attr].extend(values)
+            N[attr].extend(parsed)
           else:
-            N[attr] = values
+            N[attr] = parsed
 
   def do_command(self, args):
     op = args.pop(0)
@@ -1497,6 +1473,28 @@ class TestAll(unittest.TestCase):
     N2 = N.NOATTR
     self.assert_(N2 is self.db.noNode)
     self.assert_(not bool(N2), "bool(H.NOATTR.NOATTR) not False")
+
+  def testTokenisation(self):
+    H = self.db.newNode('HOST', 'foo')
+    NIC0 = self.db.newNode('NIC', 'eth0')
+    NIC0.IPADDR = '1.2.3.4'
+    NIC1 = self.db.newNode('NIC', 'eth1')
+    NIC1.IPADDR = '5.6.7.8'
+    H.NICs = (NIC0, NIC1)
+
+    for value, attr, expected_token in (
+        (1, 'NIC', '1'),
+        ("foo", 'NIC', '"foo"'),
+        (":foo", 'NIC', '":foo"'),
+        ('"foo"', 'NIC', r'"\"foo\""'),
+        (NIC0, 'NIC', 'eth0'),
+        (H, 'NIC', 'HOST:foo'),
+        (H, 'SUBHOST', 'foo'),
+      ):
+      token = self.db.totoken(value, H, attr=attr)
+      self.assertEquals(token, expected_token, "wrong tokenisation, expected %s but got %s" % (expected_token, token))
+      value2, etc = self.db.fromtoken(token, node=H, attr=attr, doCreate=True)
+      self.assertEquals(value2, value, "round trip fails: %s -> %s -> %s" % (value, token, value2))
 
 if __name__ == '__main__':
   unittest.main()
