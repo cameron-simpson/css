@@ -32,10 +32,14 @@ fi
 for url
 do
   pageurls "$url" \
-  | grep '\.gz$' \
-  | while read gzurl
+  | egrep '\.(txt|gz)$' \
+  | while read url
     do
-      $trace wget -O - "$gzurl" | gunzip
+      case "$url" in
+        *.gz) $trace wget -O - "$url" | gunzip ;;
+        *.txt) $trace wget -O - "$url" ;;
+        *) echo "$cmd: skipping unexpected URL: $url" >&2 ;;
+      esac
     done
 done \
 | fix-mail-dates --mbox \
