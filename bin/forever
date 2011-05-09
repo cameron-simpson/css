@@ -77,6 +77,8 @@ then
   echo $$ >"$pidfile"
 fi
 
+trap '[ -z "$subpid" ] || { kill "$subpid"; wait; }' 15
+
 subpid=
 n=0
 while :
