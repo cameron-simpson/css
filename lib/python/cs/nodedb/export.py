@@ -167,7 +167,8 @@ def import_csv_wide(nodedb, csvfile, doAppend=False):
           if len(value):
             ovalue = value
             value, etc = nodedb.fromtoken(value, node=N, attr=attr, doCreate=True)
-            assert len(etc) == 0, "unparsed data from %s: %s" % (`ovalue`, `etc`)
+            if len(etc) > 0:
+              raise ValueError, "unparsed data from %s: %s" % (`ovalue`, `etc`)
             parsed.append(value)
         if doAppend:
           N[attr].extend(parsed)
@@ -176,7 +177,7 @@ def import_csv_wide(nodedb, csvfile, doAppend=False):
 
 def edit_csv_wide(nodedb, nodes=None, attrs=None, all_attrs=False, all_nodes=False, editor=None):
   if editor is None:
-    editor = os.environ.get('EDITOR', 'vi')
+    editor = os.environ.get('CSV_EDITOR', os.environ.get('EDITOR', 'vi'))
   with tempfile.NamedTemporaryFile(suffix='.csv') as T:
     with Pfx(T.name):
       export_csv_wide(T.name, nodes, attrs=attrs, all_attrs=all_attrs)
