@@ -71,6 +71,21 @@ def export_rows_wide(nodes, attrs=None, all_attrs=False, tokenised=False, all_no
           row.append(blank)
       yield row
 
+def export_csv_wide(csvfile, nodes, attrs=None, all_attrs=False):
+  if type(csvfile) is str:
+    with Pfx(csvfile):
+      with open(csvfile, "w") as csvfp:
+        export_csv_wide(csvfp, nodes, attrs=attrs, all_attrs=all_attrs)
+    return
+
+  w = csv.writer(fp)
+  for row in export_rows_wide(nodes,
+                              attrs=attrs,
+                              all_attrs=all_attrs,
+                              tokenised=True):
+    w.writerow(row)
+  fp.flush()
+
 def import_rows_wide(rows):
     ''' Read "wide" format rows and yield:
           type, name, {attr1:values1, attr2:values2, ...}
@@ -125,6 +140,45 @@ def import_rows_wide(rows):
     # yield gathers Node data
     if valuemap:
       yield otype, oname, valuemap
+
+def import_csv_wide(nodedb, csvfile, doAppend=False):
+    ''' Load a wide format CSV.
+        Layout is:
+          TYPE, NAME, attr1, attr2, ...
+          t1, n1, v1, v2, ...
+            ,   ,   , v2a, ...
+        etc.
+    '''
+    if type(csvfile) is str:
+      with Pfx(csvfile):
+        with open(csvfile) as csvfp:
+          import_csv_wide(nodedb, csvfp, doAppend=doAppend)
+      return
+
+    for t, n, valuemap in import_rows_wide(csv.reader(fp)):
+      N = nodedb.get( (t, n), doCreate=True )
+      for attr, values in valuemap.items():
+        parsed = []
+        for value in values:
+          if len(value):
+            ovalue = value
+            value, etc = nodedb.fromtoken(value, node=N, attr=attr, doCreate=True)
+            assert len(etc) == 0, "unparsed data from %s: %s" % (`ovalue`, `etc`)
+            parsed.append(value)
+        if doAppend:
+          N[attr].extend(parsed)
+        else:
+          N[attr] = parsed
+
+def edit_csv_wide(nodedb, nodes=None, attrs=None, all_attrs=False, all_nodes=False, editor=None):
+  if editor is None:
+    editor = os.environ.get('EDITOR', 'vi')
+  with tempfile.NamedTemporaryFile(suffix='.csv') as T:
+    with Pfx(T.name):
+      export_csv_wide(T.name, nodes, attrs=None, all_attrs=False)
+      qname = cs.sh.quotestr(T.name)
+      os.system("%s %s" % (editor, qname))
+      import_csv_wide(nodedb, T.name, doAppend=False)
 
 class TestAll(unittest.TestCase):
 

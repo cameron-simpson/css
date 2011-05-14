@@ -20,6 +20,7 @@ from cs.logutils import Pfx, error, info
 from cs.mappings import parseUC_sAttr
 import cs.sh
 from .node import Node
+from .export import import_csv_wide
 
 ## NOT USED ? ## # regexp to match name(, name)*
 ## NOT USED ? ## re_NAMELIST = re.compile(r'([a-z][a-z0-9]+)(\s*,\s*([a-z][a-z0-9]+))*')
@@ -119,8 +120,7 @@ def editNodes(nodedb, nodes, attrs, editor=None, doCreate=False):
       nodedb.dump_csv_wide(T, nodes=nodes, attrs=attrs)
       qname = cs.sh.quotestr(T.name)
       os.system("%s %s" % (editor, qname))
-      with closing(open(T.name)) as ifp:
-        nodedb.load_csv_wide(ifp, doAppend=False)
+      import_csv_wide(nodedb, T.name, doAppend=False)
 
 def assign(N, assignment, doCreate=False):
   ''' Take a string of the form ATTR=values and apply it.

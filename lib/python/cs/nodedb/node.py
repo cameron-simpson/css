@@ -18,7 +18,7 @@ from cs.lex import str1
 from cs.misc import the, get0
 from cs.mappings import parseUC_sAttr
 from cs.logutils import Pfx, D, error, warn, info, debug
-from .export import export_rows_wide, import_rows_wide
+from .export import edit_csv_wide
 
 # regexp to match TYPE:name
 re_NODEREF = re.compile(r'([A-Z]+):([^:#]+)')
@@ -881,15 +881,17 @@ class NodeDB(dict):
         yield N
 
   def dump(self, fp, fmt='csv', nodes=None):
-    ''' Write database nodes to the file `fp` in the archival
-        "vertical" format.
+    ''' Write database nodes to the file `fp`.
+        If `fmt` is "csv" (the default) use the archival "vertical"
+        format.
+        If `fmt` is "csv_wide" use the human friendly "wide" format.
     '''
     if nodes is None:
       nodes = self.default_dump_nodes()
     if fmt == 'csv':
       return self.dump_csv(fp, nodes)
     if fmt == 'csv_wide':
-      return self.dump_csv_wide(fp, nodes)
+      return export_csv_wide(fp, nodes)
     raise ValueError, "unsupported format '%s'" % (fmt,)
 
   def dump_csv(self, fp, nodes):
@@ -918,20 +920,11 @@ class NodeDB(dict):
     fp.flush()
     return
 
-  def dump_csv_wide(self, fp, nodes, attrs=None, all_attrs=False):
-    w = csv.writer(fp)
-    for row in export_rows_wide(nodes,
-                                attrs=attrs,
-                                all_attrs=all_attrs,
-                                tokenised=True):
-      w.writerow(row)
-    fp.flush()
-
   def load(self, fp, fmt='csv', skipHeaders=False, noHeaders=False):
     if fmt == 'csv':
       return self.load_csv(fp, skipHeaders=skipHeaders, noHeaders=noHeaders)
     if fmt == 'csv_wide':
-      return self.load_csv_wide(fp)
+      return import_csv_wide(self, fp)
     raise ValueError, "unsupported format '%s'" % (fmt,)
 
   def load_csv(self, fp, skipHeaders=False, noHeaders=False):
@@ -970,29 +963,6 @@ class NodeDB(dict):
           N[attr] = (value,)
         otype, oname, oattr = t, N.name, attr
       return
-
-  def load_csv_wide(self, fp, doAppend=False):
-      ''' Load a wide format CSV.
-          Layout is:
-            TYPE, NAME, attr1, attr2, ...
-            t1, n1, v1, v2, ...
-              ,   ,   , v2a, ...
-          etc.
-      '''
-      for t, n, valuemap in import_rows_wide(csv.reader(fp)):
-        N = self.get( (t, n), doCreate=True )
-        for attr, values in valuemap.items():
-          parsed = []
-          for value in values:
-            if len(value):
-              ovalue = value
-              value, etc = self.fromtoken(value, node=N, attr=attr, doCreate=True)
-              assert len(etc) == 0, "unparsed data from %s: %s" % (`ovalue`, `etc`)
-              parsed.append(value)
-          if doAppend:
-            N[attr].extend(parsed)
-          else:
-            N[attr] = parsed
 
   def do_command(self, args):
     op = args.pop(0)
@@ -1103,7 +1073,7 @@ class NodeDB(dict):
       attrs = attrtxt.split(',')
     if args:
       raise GetoptError, "extra arguments after nodes and attrs: %s" % (args,)
-    editNodes(self, nodes, attrs, doCreate=False)
+    edit_csv_wide(self, nodes=nodes, attrs=attrs, all_nodes=True)
     return xit
 
   def cmd_httpd(self, args):
