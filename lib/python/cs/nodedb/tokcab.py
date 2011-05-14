@@ -53,8 +53,8 @@ class Backend_TokyoCabinet(Backend):
 
   def delNode(self, N):
     assert not self.nodedb.readonly
-    for ks in N.keys():
-      del self.tcdb[self._attrtag(N, ks[:-1])]
+    for k in N.keys():
+      del self.tcdb[self._attrtag(N, k)]
 
   def extendAttr(self, N, attr, values):
     assert len(values) > 0

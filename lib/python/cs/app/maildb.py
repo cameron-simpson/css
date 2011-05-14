@@ -5,6 +5,7 @@ from cs.logutils import setup_logging, Pfx, info, warn, error
 from cs.mail import ismaildir, ismbox, messagesFromPath
 from cs.nodedb import NodeDB, Node, NodeDBFromURL
 from cs.misc import the
+from collections import deque
 from getopt import getopt, GetoptError
 from email.utils import getaddresses, parseaddr, formataddr
 from itertools import chain
@@ -78,7 +79,6 @@ def main(argv):
 
   return xit
 
-AddressNode = Node
 AddressGroupNode = Node
 PersonNode = Node
 
@@ -95,11 +95,42 @@ class AddressNode(Node):
 class MessageNode(Node):
 
   @property
-  def referers(self):
-    return set( N for N, attr, count in self.references(attr='FOLLOWUP', type='MESSAGE') )
+  def references(self):
+    return self.REFERENCEs
 
+  @property
   def followups(self):
-    return self.FOLLOWUPs
+    return set( N for N, attr, count in self.references(attr='PARENT', type='MESSAGE') )
+
+  def thread_root(self):
+    M = self
+    while True:
+      ps = M.PARENTs
+      if not ps:
+        return M
+      M = ps[0]
+      if M is self:
+        raise ValueError, "%s: recursive PARENTs" % (M,)
+
+  def thread_walk(self, depthFirst=False):
+    ''' Walk the threads from this message yielding MessageNodes.
+        By default messages are returned in breadthfirst order
+        unless the optional parameter `depthFirst` is true.
+    '''
+    seen = set()
+    msgq = deque()
+    msgq.append(self)
+    while msgq:
+      M = msgq.popleft()
+      if M in seen:
+        continue
+      yield M
+      seen.add(M)
+      for M2 in M.followups:
+        if depthFirst:
+          msgq.appendleft(M2)
+        else:
+          msgq.append(M2)
 
 TypeFactory = { 'MESSAGE':      MessageNode,
                 'PERSON':       PersonNode,
@@ -166,7 +197,14 @@ class _MailDB(NodeDB):
         Returns the MessageNode.
     '''
     info("import %s->%s: %s" % (msg['from'], msg['to'], msg['subject']))
+
     msgid = msg['message-id'].strip()
+    if ( not msgid.startswith('<')
+      or not msgid.endswith('>')
+      or msgid.find("@") < 0
+       ):
+      raise ValueError, "invalid Message-ID: %s" % (msgid,)
+
     M = self.getMessageNode(msgid)
     M.MESSAGE = msg
     M.SUBJECT = msg['subject']
@@ -180,6 +218,19 @@ class _MailDB(NodeDB):
                               in ('to', 'cc', 'bcc', 'resent-to', 'resent-cc')
                             )
                      )
+    refhdr = None
+    try:
+      refhdr = msg['in-reply-to']
+    except KeyError:
+      try:
+        refhdr = msg['references']
+      except KeyError:
+        pass
+    if refhdr:
+      refids = [ msgid for msgid in refhdr.split() if len(msgid) ]
+      if refids:
+        M.PARENT = self.getMessageNode(refids[-1])
+
     return M
 
   def importAddresses(self, fp):
@@ -205,6 +256,7 @@ class _MailDB(NodeDB):
           for group in groups.split(','):
             G = self.get("ADDRESS_GROUP:"+group, doCreate=True)
             G.ADDRESSes.add(A)
+
 
 if __name__ == '__main__':
   sys.exit(main(list(sys.argv)))
