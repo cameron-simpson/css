@@ -914,7 +914,7 @@ class NodeDB(dict):
           ct = t if otype is None or t != otype else ''
           cn = n if oname is None or n != oname else ''
           ca = attr if oattr is None or attr != oattr else ''
-          row = (ct, cn, ca, self.totoken(value, node=N, attr=attr))
+          row = (ct, cn, ca, self.totext(value))
           w.writerow(row)
           otype, oname, oattr = t, n, attr
     fp.flush()

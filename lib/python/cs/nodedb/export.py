@@ -4,8 +4,12 @@
 #       - Cameron Simpson <cs@zip.com.au> 07may2011
 #
 
+import os
 import sys
+import tempfile
 import unittest
+import csv
+import cs.sh
 from cs.logutils import Pfx
 
 def export_rows_wide(nodes, attrs=None, all_attrs=False, tokenised=False, all_nodes=False):
@@ -78,13 +82,13 @@ def export_csv_wide(csvfile, nodes, attrs=None, all_attrs=False):
         export_csv_wide(csvfp, nodes, attrs=attrs, all_attrs=all_attrs)
     return
 
-  w = csv.writer(fp)
+  w = csv.writer(csvfile)
   for row in export_rows_wide(nodes,
                               attrs=attrs,
                               all_attrs=all_attrs,
                               tokenised=True):
     w.writerow(row)
-  fp.flush()
+  csvfile.flush()
 
 def import_rows_wide(rows):
     ''' Read "wide" format rows and yield:
@@ -120,9 +124,9 @@ def import_rows_wide(rows):
         row.extend( [ None for i in range(len(hdrrow)-len(row)) ] )
 
       t, n = row[:2]
-      if t is None:
+      if t == "":
         t = otype
-      if n is None:
+      if n == "":
         n = oname
       if t != otype or n != oname:
         # new Node, yield previous Node data
@@ -155,7 +159,7 @@ def import_csv_wide(nodedb, csvfile, doAppend=False):
           import_csv_wide(nodedb, csvfp, doAppend=doAppend)
       return
 
-    for t, n, valuemap in import_rows_wide(csv.reader(fp)):
+    for t, n, valuemap in import_rows_wide(csv.reader(csvfile)):
       N = nodedb.get( (t, n), doCreate=True )
       for attr, values in valuemap.items():
         parsed = []
