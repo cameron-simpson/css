@@ -801,7 +801,7 @@ class NodeDB(dict):
           :scheme:text Encoding of value as "text" using its registered scheme.
     '''
     if isinstance(value, Node):
-      assert value.type.find(':') < 0, \
+      assert ':' not in value.type, \
              "illegal colon in TYPE \"%s\"" % (value.type,)
       if value.nodedb is self:
         # Node from local NodeDB
