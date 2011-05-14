@@ -179,7 +179,7 @@ def edit_csv_wide(nodedb, nodes=None, attrs=None, all_attrs=False, all_nodes=Fal
     editor = os.environ.get('EDITOR', 'vi')
   with tempfile.NamedTemporaryFile(suffix='.csv') as T:
     with Pfx(T.name):
-      export_csv_wide(T.name, nodes, attrs=None, all_attrs=False)
+      export_csv_wide(T.name, nodes, attrs=attrs, all_attrs=all_attrs)
       qname = cs.sh.quotestr(T.name)
       os.system("%s %s" % (editor, qname))
       import_csv_wide(nodedb, T.name, doAppend=False)
