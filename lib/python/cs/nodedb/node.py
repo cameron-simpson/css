@@ -1168,6 +1168,7 @@ _NodeDBsByURL = {}
 def NodeDBFromURL(url, readonly=False, klass=None):
   ''' Factory method to return singleton NodeDB instances.
   '''
+  ##print >>sys.stderr, "NodeDBFromURL: url =", url
   if klass is None:
     klass = NodeDB
 
@@ -1211,8 +1212,8 @@ def NodeDBFromURL(url, readonly=False, klass=None):
     if scheme == 'sqlite' or scheme == 'mysql':
       # TODO: direct sqlite support, skipping SQLAlchemy?
       # TODO: mysql: URLs will leak user and password - strip first for key
-      assert not url.startswith('sqlite:///:memory:'), \
-             "sorry, \"%s\" isn't a singleton URL" % (url,)
+      ####assert not url.startswith('sqlite:///:memory:'), \
+      ####       "sorry, \"%s\" isn't a singleton URL" % (url,)
       from cs.nodedb.sqla import Backend_SQLAlchemy
       dbpath = url
       backend = Backend_SQLAlchemy(dbpath, readonly=readonly)
