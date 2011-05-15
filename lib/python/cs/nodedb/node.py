@@ -758,9 +758,15 @@ class NodeDB(dict):
       m = re_NAME.match(valuetxt)
       if m:
         if attr == "SUB"+node.type:
-          value = self.nodeByTypeName(node.type, m.group(), doCreate=doCreate)
+          try:
+            value = self.nodeByTypeName(node.type, m.group(), doCreate=doCreate)
+          except ValueError:
+            value = m.group()
         else:
-          value = self.nodeByTypeName(attr, m.group(), doCreate=doCreate)
+          try:
+            value = self.nodeByTypeName(attr, m.group(), doCreate=doCreate)
+          except ValueError:
+            value = m.group()
         return value, valuetxt[m.end():]
 
     # TYPE:NAME
