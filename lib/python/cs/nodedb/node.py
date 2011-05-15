@@ -3,6 +3,7 @@
 
 import os.path
 import csv
+import fnmatch
 import re
 import sys
 if sys.hexversion < 0x02060000:
@@ -970,6 +971,38 @@ class NodeDB(dict):
         otype, oname, oattr = t, N.name, attr
       return
 
+  def nodespec(self, spec, doCreate=False):
+    ''' Generator that reads a parses a separated string specifying
+        Nodes and yields a sequence of Nodes.
+    '''
+    lasttype = None
+    for word in spec.split(','):
+      word = word.strip()
+      if len(word) == 0:
+        continue
+      with Pfx(word):
+        if ':' in word:
+          t, n = word.split(':', 1)
+          lasttype = t
+        else:
+          if lasttype is None:
+            raise ValueError, "no TYPE: for word"
+          t, n = lasttype, word
+        if '*' in t:
+          typelist = [ _ for _ in self.types() if fnmatch.fnmatch(_, t) ]
+        else:
+          typelist = (t, )
+        for t in typelist:
+          if '*' in n:
+            namelist = [ N.name for N in self.nodesByType(t) if fnmatch.fnmatch(N.name, n) ]
+          else:
+            namelist = (n, )
+          for n in namelist:
+            N = self.get( (t, n), doCreate=doCreate )
+            if N is None:
+              raise ValueError, "node not found: %s:%s" % (t, n)
+            yield N
+
   def do_command(self, args):
     op = args.pop(0)
     with Pfx(op):
@@ -1063,15 +1096,8 @@ class NodeDB(dict):
     if not args:
       nodes = self.default_dump_nodes()
     else:
-      nodes = []
-      for nodetxt in args.pop(0).split(','):
-        if nodetxt.endswith(":*"):
-          nodetype = nodetxt[:-2]
-          nodes.extend(self.nodesByType(nodetype))
-        else:
-          N, nodetxt = self.fromtoken(nodetxt)
-          assert len(nodetxt) == 0, "extra junk after node: %s" % (nodetxt,)
-          nodes.append(N)
+      lasttype = None
+      nodes = self.nodespec(args.pop(0))
     if not args:
       attrs = None
     else:
