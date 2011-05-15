@@ -56,7 +56,9 @@ def export_rows_wide(nodes, attrs=None, all_attrs=False, tokenised=False, all_no
   # data
   blank = "" if tokenised else None
   for N in nodes:
+    print >>sys.stderr, "N = %s" % (N,)
     maxlen = max( len(N.get(attr, ())) for attr in attrs )
+    print >>sys.stderr, "maxlen =", maxlen, "all_nodes =", all_nodes
     if maxlen == 0 and all_nodes:
       maxlen = 1
     for i in range(maxlen):
@@ -73,19 +75,23 @@ def export_rows_wide(nodes, attrs=None, all_attrs=False, tokenised=False, all_no
           row.append(elem)
         else:
           row.append(blank)
+      print >>sys.stderr, "yield row", `row`
       yield row
 
-def export_csv_wide(csvfile, nodes, attrs=None, all_attrs=False):
+def export_csv_wide(csvfile, nodes, attrs=None, all_attrs=False, all_nodes=False):
+  print >>sys.stderr, "export_csv_wide: all_nodes =", all_nodes
   if type(csvfile) is str:
     with Pfx(csvfile):
       with open(csvfile, "w") as csvfp:
-        export_csv_wide(csvfp, nodes, attrs=attrs, all_attrs=all_attrs)
+        export_csv_wide(csvfp, nodes, attrs=attrs, all_attrs=all_attrs, all_nodes=all_nodes)
     return
 
+  # csv.QUOTE_NONNUMERIC
   w = csv.writer(csvfile)
   for row in export_rows_wide(nodes,
                               attrs=attrs,
                               all_attrs=all_attrs,
+                              all_nodes=all_nodes,
                               tokenised=True):
     w.writerow(row)
   csvfile.flush()
@@ -176,13 +182,14 @@ def import_csv_wide(nodedb, csvfile, doAppend=False):
           N[attr] = parsed
 
 def edit_csv_wide(nodedb, nodes=None, attrs=None, all_attrs=False, all_nodes=False, editor=None):
+  print >>sys.stderr, "edit_csv_wide: all_nodes =", all_nodes
   if editor is None:
     editor = os.environ.get('CSV_EDITOR', os.environ.get('EDITOR', 'vi'))
   with tempfile.NamedTemporaryFile(suffix='.csv') as T:
     with Pfx(T.name):
-      export_csv_wide(T.name, nodes, attrs=attrs, all_attrs=all_attrs)
+      export_csv_wide(T.name, nodes, attrs=attrs, all_attrs=all_attrs, all_nodes=all_nodes)
       qname = cs.sh.quotestr(T.name)
-      os.system("%s %s" % (editor, qname))
+      os.system("set -x; cat %s >/dev/tty; %s %s" % (qname, editor, qname))
       import_csv_wide(nodedb, T.name, doAppend=False)
 
 class TestAll(unittest.TestCase):
