@@ -744,6 +744,13 @@ class NodeDB(dict):
 
     raise ValueError, "unknown DB sequence number: %s; _.DBs = %s" % (s, N_.DBs)
 
+  def wordToNode(self, word, doCreate=False):
+    ''' Convert a word to a Node.
+        Subclasses may override this to recognise a variety of bareword forms.
+    '''
+    item = nodekey(word)
+    return self.get( item, doCreate=doCreate )
+
   def fromtoken(self, valuetxt, node=None, attr=None, doCreate=False):
     ''' Method to extract a token from the start of a string, for use
         in the named attribute `attr`.
@@ -981,6 +988,11 @@ class NodeDB(dict):
       if len(word) == 0:
         continue
       with Pfx(word):
+        N = self.wordToNode(word, doCreate=doCreate)
+        if N is not None:
+          yield N
+          lasttype = N.type
+          continue
         if ':' in word:
           t, n = word.split(':', 1)
           lasttype = t
@@ -988,13 +1000,13 @@ class NodeDB(dict):
           if lasttype is None:
             raise ValueError, "no TYPE: for word"
           t, n = lasttype, word
-        if '*' in t:
-          typelist = [ _ for _ in self.types() if fnmatch.fnmatch(_, t) ]
+        if '*' in t or '?' in t:
+          typelist = sorted([ _ for _ in self.types() if fnmatch.fnmatch(_, t) ])
         else:
           typelist = (t, )
         for t in typelist:
-          if '*' in n:
-            namelist = [ N.name for N in self.nodesByType(t) if fnmatch.fnmatch(N.name, n) ]
+          if '*' in n or '?' in n:
+            namelist = sorted([ N.name for N in self.nodesByType(t) if fnmatch.fnmatch(N.name, n) ])
           else:
             namelist = (n, )
           for n in namelist:
@@ -1097,7 +1109,7 @@ class NodeDB(dict):
       nodes = self.default_dump_nodes()
     else:
       lasttype = None
-      nodes = self.nodespec(args.pop(0))
+      nodes = self.nodespec(args.pop(0), doCreate=True)
     if not args:
       attrs = None
     else:
