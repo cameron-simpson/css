@@ -3,6 +3,7 @@
 
 import os.path
 import csv
+import fnmatch
 import re
 import sys
 if sys.hexversion < 0x02060000:
@@ -743,6 +744,13 @@ class NodeDB(dict):
 
     raise ValueError, "unknown DB sequence number: %s; _.DBs = %s" % (s, N_.DBs)
 
+  def wordToNode(self, word, doCreate=False):
+    ''' Convert a word to a Node.
+        Subclasses may override this to recognise a variety of bareword forms.
+    '''
+    item = nodekey(word)
+    return self.get( item, doCreate=doCreate )
+
   def fromtoken(self, valuetxt, node=None, attr=None, doCreate=False):
     ''' Method to extract a token from the start of a string, for use
         in the named attribute `attr`.
@@ -758,9 +766,15 @@ class NodeDB(dict):
       m = re_NAME.match(valuetxt)
       if m:
         if attr == "SUB"+node.type:
-          value = self.nodeByTypeName(node.type, m.group(), doCreate=doCreate)
+          try:
+            value = self.nodeByTypeName(node.type, m.group(), doCreate=doCreate)
+          except ValueError:
+            value = m.group()
         else:
-          value = self.nodeByTypeName(attr, m.group(), doCreate=doCreate)
+          try:
+            value = self.nodeByTypeName(attr, m.group(), doCreate=doCreate)
+          except ValueError:
+            value = m.group()
         return value, valuetxt[m.end():]
 
     # TYPE:NAME
@@ -964,6 +978,43 @@ class NodeDB(dict):
         otype, oname, oattr = t, N.name, attr
       return
 
+  def nodespec(self, spec, doCreate=False):
+    ''' Generator that reads a parses a separated string specifying
+        Nodes and yields a sequence of Nodes.
+    '''
+    lasttype = None
+    for word in spec.split(','):
+      word = word.strip()
+      if len(word) == 0:
+        continue
+      with Pfx(word):
+        N = self.wordToNode(word, doCreate=doCreate)
+        if N is not None:
+          yield N
+          lasttype = N.type
+          continue
+        if ':' in word:
+          t, n = word.split(':', 1)
+          lasttype = t
+        else:
+          if lasttype is None:
+            raise ValueError, "no TYPE: for word"
+          t, n = lasttype, word
+        if '*' in t or '?' in t:
+          typelist = sorted([ _ for _ in self.types() if fnmatch.fnmatch(_, t) ])
+        else:
+          typelist = (t, )
+        for t in typelist:
+          if '*' in n or '?' in n:
+            namelist = sorted([ N.name for N in self.nodesByType(t) if fnmatch.fnmatch(N.name, n) ])
+          else:
+            namelist = (n, )
+          for n in namelist:
+            N = self.get( (t, n), doCreate=doCreate )
+            if N is None:
+              raise ValueError, "node not found: %s:%s" % (t, n)
+            yield N
+
   def do_command(self, args):
     op = args.pop(0)
     with Pfx(op):
@@ -1057,15 +1108,8 @@ class NodeDB(dict):
     if not args:
       nodes = self.default_dump_nodes()
     else:
-      nodes = []
-      for nodetxt in args.pop(0).split(','):
-        if nodetxt.endswith(":*"):
-          nodetype = nodetxt[:-2]
-          nodes.extend(self.nodesByType(nodetype))
-        else:
-          N, nodetxt = self.fromtoken(nodetxt)
-          assert len(nodetxt) == 0, "extra junk after node: %s" % (nodetxt,)
-          nodes.append(N)
+      lasttype = None
+      nodes = self.nodespec(args.pop(0), doCreate=True)
     if not args:
       attrs = None
     else:
@@ -1168,6 +1212,7 @@ _NodeDBsByURL = {}
 def NodeDBFromURL(url, readonly=False, klass=None):
   ''' Factory method to return singleton NodeDB instances.
   '''
+  ##print >>sys.stderr, "NodeDBFromURL: url =", url
   if klass is None:
     klass = NodeDB
 
@@ -1211,8 +1256,8 @@ def NodeDBFromURL(url, readonly=False, klass=None):
     if scheme == 'sqlite' or scheme == 'mysql':
       # TODO: direct sqlite support, skipping SQLAlchemy?
       # TODO: mysql: URLs will leak user and password - strip first for key
-      assert not url.startswith('sqlite:///:memory:'), \
-             "sorry, \"%s\" isn't a singleton URL" % (url,)
+      ####assert not url.startswith('sqlite:///:memory:'), \
+      ####       "sorry, \"%s\" isn't a singleton URL" % (url,)
       from cs.nodedb.sqla import Backend_SQLAlchemy
       dbpath = url
       backend = Backend_SQLAlchemy(dbpath, readonly=readonly)

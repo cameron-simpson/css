@@ -174,23 +174,26 @@ def fromtoken(valuetxt):
   '''
   # "foo"
   m = re_STRING.match(valuetxt)
-  if m:
+  if m and m.group() == valuetxt:
     value = json.loads(m.group())
     return value, valuetxt[m.end():]
 
   # int
   m = re_INT.match(valuetxt)
-  if m:
+  if m and m.group() == valuetxt:
     value = int(m.group())
     return value, valuetxt[m.end():]
 
   # http://foo/bah etc
   m = re_BAREURL.match(valuetxt)
-  if m:
+  if m and m.group() == valuetxt:
     value = m.group()
     return value, valuetxt[m.end():]
 
-  raise ValueError, "not a JSON string or an int or a BAREURL: %s" % (valuetxt,)
+  if ',' in valuetxt:
+    return valuetxt.split(',', 1)
+  return valuetxt, ''
+  ##raise ValueError, "not a JSON string or an int or a BAREURL: %s" % (valuetxt,)
 
 def totoken(value):
   ''' Return "printable" form of an attribute value.
