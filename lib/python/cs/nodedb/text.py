@@ -150,21 +150,20 @@ def commatext_to_tokens(text):
         text = text[1:]
         continue
       # "foo"
-      m = re_JSON_STRING.match(valuetxt)
+      m = re_JSON_STRING.match(text)
       if m:
         qstring = m.group()
         yield qstring
         text = text[len(qstring):]
       else:
-        try:
-          word, text = text.split(None, 1)
-        except ValueError:
+        if ',' in text:
+          word, text = text.split(',', 1)
+        else:
           word, text = text, ''
+        word = word.strip()
         yield word
-      if len(text) and not text.startswith(','):
-        raise ValueError, "missing comma at: %s" % (text,)
   
-def commatext_to_values(valuetxt, nodedb=None, doCreate=False):
+def commatext_to_values(text, nodedb, doCreate=False):
   ''' Parse a comma separated list of human friendly values and yield values.
      `nodedb` os the context nodedb, or None.
      `N` is the context node, or None.
@@ -173,8 +172,8 @@ def commatext_to_values(valuetxt, nodedb=None, doCreate=False):
      If `doCreate` is true, nonexistent nodes will be created as needed.
      Return the list of values.
   '''
-  for token in commatext_to_tokens(valuetxt):
-    yield fromtoken(token, nodedb=nodedb)
+  for token in commatext_to_tokens(text):
+    yield fromtoken(token, nodedb, doCreate=doCreate)
 
 def fromtoken(token, nodedb, doCreate=False):
   ''' Extract a token from the start of a string.

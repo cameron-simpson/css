@@ -457,6 +457,13 @@ class Node(dict):
   def textdump(self, fp):
     self.nodedb.dump(fp, nodes=(self,))
 
+  def assign(self, assignment):
+    from .text import commatext_to_values
+    lvalue, rvalue = assignment.split('=', 1)
+    k, plural = parseUC_sAttr(lvalue)
+    assert k, "invalid lvalue: %s" % (lvalue,)
+    self[k] = list(commatext_to_values(rvalue, self.nodedb))
+
 class _NoNode(Node):
   ''' If a NodeDB has a non-None .noNode attribute, normally it
       will be a singleton (per-class) instance of _NoNode, a dummy Node
@@ -930,8 +937,8 @@ class NodeDB(dict):
     for N in nodes:
       t, n = N.type, N.name
       attrs = N.keys()
-      if len(attrs) == 0:
-        warn("%s: dropping node %s, no attributes!" % (self, N))
+      ##if len(attrs) == 0:
+      ##  warn("%s: dropping node %s, no attributes!" % (self, N))
       attrs.sort()
       oattr = None
       for attr in attrs:
@@ -994,16 +1001,13 @@ class NodeDB(dict):
     ''' Generator that parses a comma separated string specifying
         Nodes and yields a sequence of Nodes.
     '''
-    lasttype = None
+    from .text import commatext_to_tokens
     for word in commatext_to_tokens(spec):
       with Pfx(word):
         if ':' in word:
-          t, n = word.split(word, ':', 1)
-          lasttype = t
+          t, n = word.split(':', 1)
         else:
-          if lasttype is None:
-            raise ValueError, "no TYPE: for word"
-          t, n = lasttype, word
+          t, n = self.nodekey(word)
         if '*' in t or '?' in t:
           typelist = sorted([ _ for _ in self.types() if fnmatch.fnmatch(_, t) ])
         else:
@@ -1112,7 +1116,6 @@ class NodeDB(dict):
     if not args:
       nodes = self.default_dump_nodes()
     else:
-      lasttype = None
       nodes = self.nodespec(args.pop(0), doCreate=True)
     if not args:
       attrs = None
@@ -1189,26 +1192,24 @@ class NodeDB(dict):
       self[args[0]].report(sys.stdout)
     return 0
 
-  def cmd_set(self, args, doCreate=True):
+  def cmd_set(self, args):
+    # set [-C] nodes attr=values,...
     # -C: create node if missing
     doCreate = False
     if args and args[0] == '-C':
       args.pop(0)
       doCreate = True
     if len(args) == 0:
-      raise GetoptError("missing TYPE:key")
-    key = args.pop(0)
-    with Pfx(key):
-      if key not in self:
-        if not doCreate:
-          raise GetoptError("unknown key: %s" % (key,))
-        t, name = self.nodekey(key)
-        N = self._makeNode(t, name)
-      else:
-        N=self[key]
-      for assignment in args:
-        with Pfx(assignment):
-          N.assign(assignment, doCreate=doCreate)
+      raise GetoptError("missing node spec")
+    nodes = args.pop(0)
+    if len(args) == 0:
+      raise GetoptError("missing assignment")
+    assignment = args.pop(0)
+    if len(args) > 0:
+      raise GetoptError("extra arguments after assignment: %s" % (args,))
+    for N in self.nodespec(nodes, doCreate=doCreate):
+      with Pfx(N):
+        N.assign(assignment)
     return 0
 
 _NodeDBsByURL = {}
