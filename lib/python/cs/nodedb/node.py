@@ -1204,12 +1204,10 @@ class NodeDB(dict):
     nodes = args.pop(0)
     if len(args) == 0:
       raise GetoptError("missing assignment")
-    assignment = args.pop(0)
-    if len(args) > 0:
-      raise GetoptError("extra arguments after assignment: %s" % (args,))
-    for N in self.nodespec(nodes, doCreate=doCreate):
-      with Pfx(N):
-        N.assign(assignment)
+    for assignment in args:
+      for N in self.nodespec(nodes, doCreate=doCreate):
+        with Pfx(N):
+          N.assign(assignment)
     return 0
 
 _NodeDBsByURL = {}
