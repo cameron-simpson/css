@@ -28,7 +28,7 @@ from .export import import_csv_wide
 ## NOT USED ? ## re_COMMASEP = re.compile(r'\s*,\s*')
 
 # JSON string expression, lenient
-re_STRING = re.compile(r'"([^"\\]|\\.)*"')
+re_JSON_STRING = re.compile(r'"([^"\\]|\\.)*"')
 # JSON simple integer
 re_INT = re.compile(r'-?[0-9]+')
 # "bare" URL
@@ -126,18 +126,46 @@ def assign(N, assignment, doCreate=False):
   ''' Take a string of the form ATTR=values and apply it.
   '''
   with Pfx(assignment):
-    attr, valuetxt = assignment.split('=', 1)
+    attr, commatxt = assignment.split('=', 1)
+    values = list(commatext_to_values(commatxt, N.nodedb, doCreate=doCreate))
     if attr.islower():
       # "computed" convenience attributes
-      N.set_lcattr(attr, valuetxt)
+      N.set_lcattr(attr, values)
     else:
       k, plural = parse_UC_sAttr(attr)
       assert k, "invalid attribute name \"%s\"" % (attr, )
-      values = tokenise(N, k, valuetxt, doCreate=doCreate)
-      N[k]=values
+      N[k] = values
 
-def text_to_values(valuetxt, N, attr, nodedb=None, doCreate=False):
-  ''' Parse a comma separated list of human friendly values.
+def commatext_to_tokens(text):
+  ''' Parse a comma separated list of human friendly value tokens,
+      yield the token strings.
+      Tokens are either quoted strings or chunks of non-comma non-whitespace.
+  '''
+  with Pfx("commatext_to_tokens(%s)" % (text,)):
+    while len(text) > 0:
+      if text[0].iswhite():
+        text = text.lstrip()
+        continue
+      if text[0] == ',':
+        text = text[1:]
+        continue
+      # "foo"
+      m = re_JSON_STRING.match(valuetxt)
+      if m:
+        qstring = m.group()
+        yield qstring
+        text = text[len(qstring):]
+      else:
+        try:
+          word, text = text.split(None, 1)
+        except ValueError:
+          word, text = text, ''
+        yield word
+      if len(text) and not text.startswith(','):
+        raise ValueError, "missing comma at: %s" % (text,)
+  
+def commatext_to_values(valuetxt, nodedb=None, doCreate=False):
+  ''' Parse a comma separated list of human friendly values and yield values.
      `nodedb` os the context nodedb, or None.
      `N` is the context node, or None.
      `attr` is the context attribute name, or None.
@@ -145,55 +173,41 @@ def text_to_values(valuetxt, N, attr, nodedb=None, doCreate=False):
      If `doCreate` is true, nonexistent nodes will be created as needed.
      Return the list of values.
   '''
-  values = []
-  valuetxt = valuetxt.strip()
-  while len(valuetxt) > 0:
-    if N:
-      value, valuetxt = N.fromtoken(valuetxt,
-                                   attr,
-                                   doCreate=doCreate)
-    elif nodedb:
-      value, valuetxt = nodedb.fromtoken(valuetxt, doCreate=doCreate)
-    else:
-      value, valuetxt = fromtoken(valuetxt, doCreate=doCreate)
-    values.append(value)
-    valuetxt = valuetxt.lstrip()
-    assert len(valuetxt) == 0 or valuetxt.startswith(','), \
-      "expected comma, got \"%s\"" % (valuetxt,)
-    if valuetxt.startswith(','):
-      valuetxt = valuetxt[1:].lstrip()
-    assert len(valuetxt) == 0 or not valuetxt.startswith(','), \
-      "unexpected second comma at \"%s\"" % (valuetxt,)
-  return values
+  for token in commatext_to_tokens(valuetxt):
+    yield fromtoken(token, nodedb=nodedb)
 
-def fromtoken(valuetxt):
+def fromtoken(token, nodedb, doCreate=False):
   ''' Extract a token from the start of a string.
       This is the fallback method used by NodeDB.fromtoken() if none of the Node
       or NodeDB specific formats match, or in non-Node contexts.
       Return the parsed value and the remaining text or raise ValueError.
   '''
   # "foo"
-  m = re_STRING.match(valuetxt)
-  if m and m.group() == valuetxt:
-    value = json.loads(m.group())
-    return value, valuetxt[m.end():]
+  m = re_JSON_STRING.match(token)
+  if m and m.group() == token:
+    return json.loads(m.group())
 
   # int
-  m = re_INT.match(valuetxt)
-  if m and m.group() == valuetxt:
-    value = int(m.group())
-    return value, valuetxt[m.end():]
+  m = re_INT.match(token)
+  if m and m.group() == token:
+    return int(m.group())
 
   # http://foo/bah etc
-  m = re_BAREURL.match(valuetxt)
-  if m and m.group() == valuetxt:
-    value = m.group()
-    return value, valuetxt[m.end():]
+  m = re_BAREURL.match(token)
+  if m and m.group() == token:
+    return token
 
-  if ',' in valuetxt:
-    return valuetxt.split(',', 1)
-  return valuetxt, ''
-  ##raise ValueError, "not a JSON string or an int or a BAREURL: %s" % (valuetxt,)
+  try:
+    t, name = nodedb.nodekey(token)
+  except ValueError:
+    warn("can't infer Node from \"%s\", returning string" % (token,))
+    return token
+
+  N = nodedb.get( (t, name), doCreate=doCreate )
+  if N is None:
+    raise ValueError, "no Node with key (%s, %s)" % (t, name)
+
+  return N
 
 def totoken(value):
   ''' Return "printable" form of an attribute value.

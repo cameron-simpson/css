@@ -485,33 +485,6 @@ class _NoNode(Node):
       return Node.__getattr__(self, attr)
     return self
 
-def nodekey(*args):
-  ''' Convert some sort of key to a (TYPE, NAME) tuple.
-      Sanity check the values.
-      Return (TYPE, NAME).
-  '''
-  if len(args) == 2:
-    t, name = args
-    assert type(t) is str
-    assert type(name) is str
-  elif len(args) == 1:
-    item = args[0]
-    if type(item) is str:
-      # TYPE:NAME
-      t, name = item.split(':', 1)
-    else:
-      # (TYPE, NAME)
-      t, name = item
-      assert type(t) is str
-      assert type(name) is str
-    assert t.isupper(), "TYPE should be upper case, got \"%s\"" % (t,)
-    assert len(name) > 0
-    k, plural = parseUC_sAttr(t)
-    assert k is not None and not plural
-  else:
-    raise TypeError, "nodekey() takes (TYPE, NAME) args or a single arg: args=%s" % ( args, )
-  return t, name
-
 class NodeDB(dict):
 
   _key = ('_', '_')     # index of metadata node
@@ -637,8 +610,40 @@ class NodeDB(dict):
     byType = self.__nodesByType
     return [ t for t in byType.keys() if byType[t] ]
 
+  def nodekey(self, *args):
+    ''' Convert some sort of key to a (TYPE, NAME) tuple.
+        Sanity check the values.
+        Return (TYPE, NAME).
+        Raises ValueError if the arguments cannot be recognised.
+        Subclasses can override this to parse special forms such as
+        "hostname-ifname", which might return ('NIC', "hostname-ifname").
+    '''
+    with Pfx("nodekey(%s)" % (args,)):
+      if len(args) == 2:
+        t, name = args
+      elif len(args) == 1:
+        item = args[0]
+        if type(item) is str:
+          # TYPE:NAME
+          t, name = item.split(':', 1)
+        else:
+          # (TYPE, NAME)
+          t, name = item
+      else:
+        raise ValueError, "nodekey() takes (TYPE, NAME) args or a single arg: args=%s" % ( args, )
+
+      if type(t) is not str:
+        raise ValueError, "expected TYPE to be a string"
+      if type(name) is not str:
+        raise ValueError, "expected NAME to be a string"
+      if not t.isupper():
+        raise ValueError, "invalid TYPE, not upper case"
+      if not len(name):
+        raise ValueError, "empty NAME"
+      return t, name
+
   def __contains__(self, item):
-    key = nodekey(item)
+    key = self.nodekey(item)
     return dict.__contains__(self, key)
 
   def get(self, item, default=None, doCreate=False):
@@ -654,11 +659,20 @@ class NodeDB(dict):
     k, plural = parseUC_sAttr(attr)
     if k:
       if plural:
+        # .TYPEs
+        # return Nodes of this type
         return self.__nodesByType.get(k, ())
+      else:
+        # .TYPE(key)
+        # return at-need constructor for a node
+        return lambda item: self.get(item, doCreate=True)
     return getattr(super(NodeDB, self), attr)
 
   def __getitem__(self, item):
-    key = nodekey(item)
+    try:
+      key = self.nodekey(item)
+    except ValueError, e:
+      raise KeyError, "can't get key %s: %s" % (item, e)
     N = dict.__getitem__(self, key)
     assert isinstance(N, Node), "__getitem(%s) got non-Node: %s" % (item, repr(N))
     return N
@@ -666,7 +680,7 @@ class NodeDB(dict):
   def __setitem__(self, item, N):
     assert isinstance(N, Node), "tried to store non-Node: %s" % (repr(N),)
     assert N.nodedb is self, "tried to store foreign Node: %s" % (repr(N),)
-    key = nodekey(item)
+    key = self.nodekey(item)
     assert key == (N.type, N.name), \
            "tried to store Node(%s:%s) as key (%s:%s)" \
              % (N.type, N.name, key[0], key[1])
@@ -679,7 +693,7 @@ class NodeDB(dict):
     ''' Create and register a new Node.
         Subclasses of NodeDB should override _createNode, not this method.
     '''
-    t, name = nodekey(*args)
+    t, name = self.nodekey(*args)
     N = self._makeNode(t, name)
     self._backend.newNode(N)
     self[t, name] = N
@@ -743,13 +757,6 @@ class NodeDB(dict):
         return NodeDBFromURL(Ndb.URL)
 
     raise ValueError, "unknown DB sequence number: %s; _.DBs = %s" % (s, N_.DBs)
-
-  def wordToNode(self, word, doCreate=False):
-    ''' Convert a word to a Node.
-        Subclasses may override this to recognise a variety of bareword forms.
-    '''
-    item = nodekey(word)
-    return self.get( item, doCreate=doCreate )
 
   def fromtoken(self, valuetxt, node=None, attr=None, doCreate=False):
     ''' Method to extract a token from the start of a string, for use
@@ -979,22 +986,14 @@ class NodeDB(dict):
       return
 
   def nodespec(self, spec, doCreate=False):
-    ''' Generator that reads a parses a separated string specifying
+    ''' Generator that parses a comma separated string specifying
         Nodes and yields a sequence of Nodes.
     '''
     lasttype = None
-    for word in spec.split(','):
-      word = word.strip()
-      if len(word) == 0:
-        continue
+    for word in commatext_to_tokens(spec):
       with Pfx(word):
-        N = self.wordToNode(word, doCreate=doCreate)
-        if N is not None:
-          yield N
-          lasttype = N.type
-          continue
         if ':' in word:
-          t, n = word.split(':', 1)
+          t, n = word.split(word, ':', 1)
           lasttype = t
         else:
           if lasttype is None:
@@ -1198,7 +1197,7 @@ class NodeDB(dict):
       if key not in self:
         if not doCreate:
           raise GetoptError("unknown key: %s" % (key,))
-        t, name = nodekey(key)
+        t, name = self.nodekey(key)
         N = self._makeNode(t, name)
       else:
         N=self[key]
