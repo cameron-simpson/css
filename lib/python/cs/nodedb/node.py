@@ -655,6 +655,11 @@ class NodeDB(dict):
         return self.newNode(item)
       return default
 
+  def make(self, item):
+    ''' make(item) does get(item, doCreate=True)
+    '''
+    return self.get(item, doCreate=True)
+
   def __getattr__(self, attr):
     k, plural = parseUC_sAttr(attr)
     if k:
@@ -665,7 +670,7 @@ class NodeDB(dict):
       else:
         # .TYPE(key)
         # return at-need constructor for a node
-        return lambda item: self.get(item, doCreate=True)
+        return lambda item: self.make(item)
     return getattr(super(NodeDB, self), attr)
 
   def __getitem__(self, item):
@@ -975,7 +980,7 @@ class NodeDB(dict):
         if attr == "":
           assert oattr is not None
           attr = oattr
-        N = self.get( (t, n), doCreate=True )
+        N = self.make( (t, n) )
         ovalue = value
         value = self.fromtext(value, doCreate=True)
         if attr in N:
@@ -1411,7 +1416,7 @@ class TestAll(unittest.TestCase):
       self.assert_(value == self.db.fromtext(s))
 
   def test02get(self):
-    H = self.db.get( 'HOST:foo', doCreate=True )
+    H = self.db.make('HOST:foo')
     self.assert_(type(H) is Node)
     self.assert_(H.type == 'HOST')
     self.assert_(H.name == 'foo')
