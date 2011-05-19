@@ -143,7 +143,7 @@ def commatext_to_tokens(text):
   '''
   with Pfx("commatext_to_tokens(%s)" % (text,)):
     while len(text) > 0:
-      if text[0].iswhite():
+      if text[0].isspace():
         text = text.lstrip()
         continue
       if text[0] == ',':
