@@ -52,11 +52,11 @@ def puttok(fp, tok):
     return puttext(fp, str(tok))
 
   # token
-  if hasattr(tok, 'tag'):
-    # Tag class item
+  try:
     tag = tok.tag
     attrs = tok.attrs
-  else:
+  except AttributeError:
+    # not a dict
     # [ "&ent;" ] is an HTML character entity
     if len(tok) == 1 and tok[0].startswith('&'):
       fp.write(tok[0])
@@ -67,7 +67,7 @@ def puttok(fp, tok):
     if len(tok) > 0 and hasattr(tok[0], 'keys'):
       attrs = tok.pop(0)
     else:
-      attrs={}
+      attrs = {}
 
   isSCRIPT=(tag.upper() == 'SCRIPT')
   if isSCRIPT:
@@ -76,10 +76,9 @@ def puttok(fp, tok):
 
   fp.write('<')
   fp.write(tag)
-  for k in attrs:
+  for k, v in attrs.items():
     fp.write(' ')
     fp.write(k)
-    v=attrs[k]
     if v is not None:
       fp.write('="')
       fp.write(urllib.quote(str(v), '/#:'))
