@@ -104,7 +104,7 @@ class NodeDBView(CherryPyNode):
   def _nodeLink(self, N, label=None, context=None, view=''):
     ''' Return an 'A' token linking to the specified Node `N`.
     '''
-    rhref, label = node_href(N, label=label, context=context)
+    rhref, label = node_href(N, label=label, node=context)
     return ['A',
             {'HREF': "%snode/%s/%s" % (self.basepath, rhref, view)},
             label]
@@ -116,8 +116,7 @@ class NodeDBView(CherryPyNode):
     self._start()
     nodedb = self.nodedb
     self._tokens.append(['H1', 'Database Top Level'])
-    nodetypes = nodedb.types()
-    nodetypes.sort()
+    nodetypes = sorted(nodedb.types)
     self._tokens.append("Types:")
     sep = " "
     for nodetype in nodetypes:
@@ -453,8 +452,7 @@ def OLD_overview(self):
     self.send_header('Content-Type', 'text/html')
     self.end_headers()
     self._puttok(['H1', 'Database Top Level'])
-    nodetypes = nodedb.types()
-    nodetypes.sort()
+    nodetypes = sorted(nodedb.types)
     self._puttok("Types:")
     sep = " "
     for nodetype in nodetypes:

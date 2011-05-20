@@ -611,6 +611,7 @@ class NodeDB(dict):
     '''
     self.__nodesByType[N.type].remove(N)
 
+  @property
   def types(self):
     ''' Return a list of the types in use.
     '''
@@ -906,8 +907,7 @@ class NodeDB(dict):
     ''' Yield the default sequence of Nodes to dump.
     '''
     if typenames is None:
-      typenames = sorted(self.types())
-      typenames.sort()
+      typenames = sorted(self.types)
     for t in typenames:
       nodes = sorted(getattr(self, t+'s'), _byname)
       for N in nodes:
@@ -930,8 +930,7 @@ class NodeDB(dict):
   def dump_csv(self, fp, nodes):
     w = csv.writer(fp)
     w.writerow( ('TYPE', 'NAME', 'ATTR', 'VALUE') )
-    typenames = list(self.types())
-    typenames.sort()
+    typenames = sorted(self.types)
     otype = None
     oname = None
     for N in nodes:
