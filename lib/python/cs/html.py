@@ -90,9 +90,10 @@ def puttok(fp, tok):
     puttok(fp, t)
   if isSCRIPT:
     fp.write("\n-->")
-  fp.write('</')
-  fp.write(tag)
-  fp.write('>')
+  if tag not in ('BR',):
+    fp.write('</')
+    fp.write(tag)
+    fp.write('>')
 
 def text2s(s, safeRe=None):
   ''' Return transcription of string in HTML safe form.
