@@ -131,7 +131,7 @@ class NodeDBView(CherryPyNode):
                             ['A', {'HREF': nodetype+"s.txt"}, "CSV as text"],
                             ")"]) )
       self._tokens.append("\n")
-      nodes = nodedb.nodesByType(nodetype)
+      nodes = nodedb.type(nodetype)
       nodes=list(nodes)
       nodes.sort(by_name)
       first = True
@@ -336,14 +336,14 @@ def OLDdo_GET(self):
           self.send_response(200, "TYPE %s as CSV" % key)
           self.send_header('Content-Type', 'text/csv')
           self.end_headers()
-          self._table_of_nodes(nodedb.nodesByType(k), 'csv')
+          self._table_of_nodes(nodedb.type(k), 'csv')
           return
         if ext == 'txt':
           warn("3txt")
           self.send_response(200, "TYPE %s as CSV plain text" % key)
           self.send_header('Content-Type', 'text/plain')
           self.end_headers()
-          self._table_of_nodes(nodedb.nodesByType(k), 'csv')
+          self._table_of_nodes(nodedb.type(k), 'csv')
           return
         if ext == 'html':
           warn("3html")
@@ -351,7 +351,7 @@ def OLDdo_GET(self):
           self.send_header('Content-Type', 'text/html')
           self.end_headers()
           self._puttok( ['H1', "Nodes of type %s" % (k,)] )
-          self._table_of_nodes(nodedb.nodesByType(k), 'html')
+          self._table_of_nodes(nodedb.type(k), 'html')
           return
         warn("3other")
         self.send_response(503, "unsupported TYPEs.ext \".%s\", expected .csv, .txt or .html" % (ext,))
@@ -467,7 +467,7 @@ def OLD_overview(self):
                          ['A', {'HREF': nodetype+"s.txt"}, "CSV as text"],
                          ")"])
       self.wfile.write("\n")
-      nodes = nodedb.nodesByType(nodetype)
+      nodes = nodedb.type(nodetype)
       nodes=list(nodes)
       nodes.sort(by_name)
       first = True

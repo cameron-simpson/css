@@ -588,7 +588,9 @@ class NodeDB(dict):
   def close(self):
     self._backend.close()
 
-  def nodesByType(self, t):
+  def type(self, t):
+    ''' Return the Nodes of the specified type `t`.
+    '''
     return self.__nodesByType.get(t, ())
 
   def nodeByTypeName(self, t, name, doCreate=False):
@@ -1013,7 +1015,7 @@ class NodeDB(dict):
           typelist = (t, )
         for t in typelist:
           if '*' in n or '?' in n:
-            namelist = sorted([ N.name for N in self.nodesByType(t) if fnmatch.fnmatch(N.name, n) ])
+            namelist = sorted([ N.name for N in self.type(t) if fnmatch.fnmatch(N.name, n) ])
           else:
             namelist = (n, )
           for n in namelist:
@@ -1083,7 +1085,7 @@ class NodeDB(dict):
       for nodetxt in args.pop(0).split(','):
         if nodetxt.endswith(":*"):
           nodetype = nodetxt[:-2]
-          nodes.extend(self.nodesByType(nodetype))
+          nodes.extend(self.type(nodetype))
         else:
           N, nodetxt = self.fromtoken(nodetxt)
           assert len(nodetxt) == 0, "extra junk after node: %s" % (nodetxt,)
@@ -1147,7 +1149,7 @@ class NodeDB(dict):
       with Pfx('"%s"' % (arg,)):
         if arg.endswith(":*"):
           nodetype = arg[:-2]
-          for N in self.nodesByType(nodetype):
+          for N in self.type(nodetype):
             print str(N)
 #           attrnames = N.attrs.keys()
 #           attrnames.sort()
