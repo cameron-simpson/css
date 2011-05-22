@@ -252,6 +252,8 @@ class NodeDBView(CherryPyNode):
       return self._flushtokens()
 
 def serve(nodedb, host, port, basepath='/', readwrite=False):
+  ''' Dispatch an HTTP server serving the content of `nodedb`.
+  '''
   if type(port) in StringTypes:
     port = int(port)
   V = NodeDBView(nodedb, basepath, readwrite=readwrite)
