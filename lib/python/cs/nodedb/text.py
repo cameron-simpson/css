@@ -136,6 +136,44 @@ def assign(N, assignment, doCreate=False):
       assert k, "invalid attribute name \"%s\"" % (attr, )
       N[k] = values
 
+def get_commatext(text, pos=0):
+  ''' Fetch a "word" from the supplied `text`, starting at `pos` (default 0).
+      Words consist of consecutive sequences of double quoted strings
+      or nonwhitespace.
+      Returns the end bound of the word.
+      Raises ValueError for a malformed double quoted string.
+  '''
+  opos = pos
+  while len(text) > pos and not text[pos].isspace():
+    if text[pos] == '"':
+      m = re_JSON_STRING.match(text, pos)
+      if not m:
+        raise ValueError, "invalid quoted string at: %s" % (text[pos:],)
+      pos = m.end()
+    else:
+      pos += 1
+  return pos
+
+def get_commatexts(line, pos=0):
+  ''' Parse a line containing commatexts as defined by get_commatext() above.
+      Yield the words on the line.
+  '''
+  line = line[pos:].lstrip()
+  while len(line) > 0:
+    end = get_commatext(line)
+    if end == 0:
+      break
+    yield line[:end]
+    line = line[end:].lstrip()
+
+def test_get_commatext(self):
+  self.assert_(get_commatext('') == 0)
+  self.assert_(get_commatext('abc') == 3)
+  self.assert_(get_commatext('abc', 1) == 3)
+  self.assert_(get_commatext(' abc') == 0)
+  self.assert_(get_commatext(' abc', 1) == 4)
+  self.assert_(get_commatext('ab"c d"ef') == 9)
+
 def commatext_to_tokens(text):
   ''' Parse a comma separated list of human friendly value tokens,
       yield the token strings.
@@ -229,8 +267,8 @@ def totoken(value):
 class TestTokeniser(unittest.TestCase):
 
   def setUp(self):
-    ##self.db = NodeDB(backend=None)
-    pass
+    from .node import NodeDB
+    self.db = NodeDB(backend=None)
 
   def test01tokenise(self):
     ''' Test totoken(). '''
@@ -243,10 +281,14 @@ class TestTokeniser(unittest.TestCase):
     ''' Test totoken()/fromtoken() round trip. '''
     for value in 0, 1, "abc", "http://foo.example.com/":
       token = totoken(value)
-      value2, _ = fromtoken(token)
-      self.assert_(value == value2 and _ == '',
-                   "round trip %s -> %s -> (%s, %s) fails"
-                   % (`value`, `token`, `value2`, `_`))
+      value2 = fromtoken(token, self.db)
+      self.assert_(value == value2,
+                   "round trip %s -> %s -> %s fails"
+                   % (`value`, `token`, `value2`))
+
+  def test03get_commatext(self):
+    ''' Test get_commatext word parser. '''
+    return test_get_commatext(self)
 
 if __name__ == '__main__':
   unittest.main()
