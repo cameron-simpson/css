@@ -2,6 +2,7 @@
 #
 
 import os.path
+from cmd import Cmd
 import csv
 import fnmatch
 import re
@@ -1210,6 +1211,56 @@ class NodeDB(dict):
         with Pfx(N):
           N.assign(assignment)
     return 0
+
+  def interactive(self, prompt):
+    return NodeDB.Interactive(self, prompt)
+
+  class Interactive(Cmd):
+
+    def __init__(self, nodedb, prompt):
+      Cmd.__init__(self)
+      self.prompt = prompt
+      self._nodedb = nodedb
+
+    def get_names(self):
+      names = Cmd.get_names(self)
+      print >>sys.stderr, "get_names -> %s" % (names,)
+      return names
+
+    def __getattr__(self, attr):
+      if attr.startswith('do_'):
+        print >>sys.stderr, "__getattr__(..,%s)" % (attr,)
+        op = attr[3:]
+        try:
+          fn = getattr(self._nodedb, 'cmd_'+op)
+        except AttributeError:
+          # fall back to superclass
+          pass
+        else:
+          from .text import get_commatexts
+          def do_op(argline):
+            try:
+              args = list(get_commatexts(argline))
+            except ValueError, e:
+              error(str(e))
+            else:
+              print >>sys.stderr, "args =", `args`
+              with Pfx(op):
+                try:
+                  fn(args)
+                except GetoptError, e:
+                  error(str(e))
+                except ValueError, e:
+                  error(str(e))
+            return False
+          return do_op
+      return Cmd.__getattr__(self, attr)
+
+    def do_exit(self, line):
+      return True
+
+    def do_quit(self, line):
+      return True
 
 _NodeDBsByURL = {}
 
