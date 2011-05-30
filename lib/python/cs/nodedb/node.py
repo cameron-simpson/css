@@ -787,7 +787,7 @@ class NodeDB(dict):
     # NAME with implied TYPE
     if attr:
       m = re_NAME.match(valuetxt)
-      if m:
+      if m and m.group() == valuetxt:
         if attr == "SUB"+node.type:
           try:
             value = self.nodeByTypeName(node.type, m.group(), doCreate=doCreate)
@@ -798,13 +798,13 @@ class NodeDB(dict):
             value = self.nodeByTypeName(attr, m.group(), doCreate=doCreate)
           except ValueError:
             value = m.group()
-        return value, valuetxt[m.end():]
+        return value
 
     # TYPE:NAME
     m = re_NODEREF.match(valuetxt)
-    if m:
+    if m and m.group() == valuetxt:
       value = self.nodeByTypeName(m.group(1), m.group(2), doCreate=doCreate)
-      return value, valuetxt[m.end():]
+      return value
 
     import cs.nodedb.text
     return cs.nodedb.text.fromtoken(valuetxt, self, doCreate=doCreate)
@@ -861,7 +861,7 @@ class NodeDB(dict):
       assert scheme[0].islower() and scheme.find(':',1) < 0, \
              "illegal scheme name: \"%s\"" % (scheme,)
       return ':'+scheme+':'+R.totext(value)
-    raise ValueError, "can't totext(%s)" % (repr(value),)
+    raise ValueError, "can't totext( <%s> %s )" % (type(value),value)
 
   def fromtext(self, text, doCreate=True):
     ''' Convert a stored string into a value.
@@ -1011,7 +1011,7 @@ class NodeDB(dict):
         else:
           t, n = self.nodekey(word)
         if '*' in t or '?' in t:
-          typelist = sorted([ _ for _ in self.types() if fnmatch.fnmatch(_, t) ])
+          typelist = sorted([ _ for _ in self.types if fnmatch.fnmatch(_, t) ])
         else:
           typelist = (t, )
         for t in typelist:
@@ -1089,15 +1089,7 @@ class NodeDB(dict):
     if not args:
       nodes = self.default_dump_nodes()
     else:
-      nodes = []
-      for nodetxt in args.pop(0).split(','):
-        if nodetxt.endswith(":*"):
-          nodetype = nodetxt[:-2]
-          nodes.extend(self.type(nodetype))
-        else:
-          N, nodetxt = self.fromtoken(nodetxt)
-          assert len(nodetxt) == 0, "extra junk after node: %s" % (nodetxt,)
-          nodes.append(N)
+      nodes = nodespec(args.pop(0))
     if not args:
       attrs = None
     else:
@@ -1108,8 +1100,8 @@ class NodeDB(dict):
     self.dump_csv_wide(fp, nodes, attrs=attrs)
     return xit
 
-  def cmd_edit(self, args):
-    ''' edit TYPE:key
+  def cmd_editnode(self, args):
+    ''' editnode TYPE:key
     '''
     if len(args) != 1:
       raise GetoptError("expected a single TYPE:key")
@@ -1118,8 +1110,8 @@ class NodeDB(dict):
     editNode(N, doCreate=True)
     return 0
 
-  def cmd_editwide(self, args, editfile=None):
-    ''' editwide nodes...
+  def cmd_edit(self, args, editfile=None):
+    ''' edit nodespec [attrs...]
           Edit the specified nodes as a CSV file in "wide" mode.
     '''
     args = list(args)
@@ -1131,10 +1123,7 @@ class NodeDB(dict):
     if not args:
       attrs = None
     else:
-      attrtxt = args.pop(0)
-      attrs = attrtxt.split(',')
-    if args:
-      raise GetoptError, "extra arguments after nodes and attrs: %s" % (args,)
+      attrs = args
     edit_csv_wide(self, nodes=nodes, attrs=attrs, all_nodes=True)
     return xit
 

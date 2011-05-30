@@ -56,9 +56,7 @@ def export_rows_wide(nodes, attrs=None, all_attrs=False, tokenised=False, all_no
   # data
   blank = "" if tokenised else None
   for N in nodes:
-    print >>sys.stderr, "N = %s" % (N,)
     maxlen = max( len(N.get(attr, ())) for attr in attrs )
-    print >>sys.stderr, "maxlen =", maxlen, "all_nodes =", all_nodes
     if maxlen == 0 and all_nodes:
       maxlen = 1
     for i in range(maxlen):
@@ -75,11 +73,9 @@ def export_rows_wide(nodes, attrs=None, all_attrs=False, tokenised=False, all_no
           row.append(elem)
         else:
           row.append(blank)
-      print >>sys.stderr, "yield row", `row`
       yield row
 
 def export_csv_wide(csvfile, nodes, attrs=None, all_attrs=False, all_nodes=False):
-  print >>sys.stderr, "export_csv_wide: all_nodes =", all_nodes
   if type(csvfile) is str:
     with Pfx(csvfile):
       with open(csvfile, "w") as csvfp:
@@ -143,7 +139,7 @@ def import_rows_wide(rows):
         oname = n
       for i in range(2, len(row)):
         value = row[i]
-        if value is not None:
+        if value is not None and type(value) is not str and value != '':
           attr = hdrrow[i]
           value = row[i]
           valuemap.setdefault(attr, []).append(value)
@@ -178,7 +174,6 @@ def import_csv_wide(nodedb, csvfile, doAppend=False):
           N[attr] = parsed
 
 def edit_csv_wide(nodedb, nodes=None, attrs=None, all_attrs=False, all_nodes=False, editor=None):
-  print >>sys.stderr, "edit_csv_wide: all_nodes =", all_nodes
   if editor is None:
     editor = os.environ.get('CSV_EDITOR', os.environ.get('EDITOR', 'vi'))
   with tempfile.NamedTemporaryFile(suffix='.csv') as T:
