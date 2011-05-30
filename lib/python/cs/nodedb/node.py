@@ -1035,7 +1035,7 @@ class NodeDB(dict):
       return op_func(args)
 
   def cmd_update(self, args, fp=None):
-    ''' Usage: update otherdb
+    ''' update otherdb
           emit set commands to update otherdb with attributes and nodes in
           this db.
     '''
@@ -1063,7 +1063,7 @@ class NodeDB(dict):
     return xit
 
   def cmd_dump(self, args, fp=None):
-    ''' Usage: dump nodes...
+    ''' dump nodes...
           Textdump the named nodes.
     '''
     xit = 0
@@ -1079,7 +1079,7 @@ class NodeDB(dict):
     return xit
 
   def cmd_dumpwide(self, args, fp=None):
-    ''' Usage: dumpwide nodes...
+    ''' dumpwide nodes...
           CSV dump the specified nodes in "wide" mode.
     '''
     args = list(args)
@@ -1109,7 +1109,7 @@ class NodeDB(dict):
     return xit
 
   def cmd_edit(self, args):
-    ''' Usage: edit TYPE:key
+    ''' edit TYPE:key
     '''
     if len(args) != 1:
       raise GetoptError("expected a single TYPE:key")
@@ -1119,7 +1119,7 @@ class NodeDB(dict):
     return 0
 
   def cmd_editwide(self, args, editfile=None):
-    ''' Usage: editwide nodes...
+    ''' editwide nodes...
           Edit the specified nodes as a CSV file in "wide" mode.
     '''
     from .text import editNodes
@@ -1140,7 +1140,7 @@ class NodeDB(dict):
     return xit
 
   def cmd_httpd(self, args):
-    ''' Usage: httpd ipaddr:port
+    ''' httpd ipaddr:port
           Run an HTTP daemon on the specified address and port.
     '''
     xit = 0
@@ -1156,7 +1156,7 @@ class NodeDB(dict):
     return xit
 
   def cmd_list(self, args):
-    ''' Usage: list TYPE:*...
+    ''' list TYPE:*...
           Recite the extant nodes of the specified TYPE.
     '''
     xit = 0
@@ -1183,7 +1183,7 @@ class NodeDB(dict):
     return xit
 
   def cmd_new(self, args, doCreate=True):
-    ''' Usage: new TYPE:name [attr=values...]...
+    ''' new TYPE:name [attr=values...]...
           Create the specified node and set attribute values.
     '''
     if len(args) == 0:
@@ -1214,7 +1214,7 @@ class NodeDB(dict):
     return 0
 
   def cmd_set(self, args):
-    ''' Usage: set [-C] TYPE:name [attr=values...]...
+    ''' set [-C] TYPE:name [attr=values...]...
           Set attribute values.
           If -C is specified, create the node if missing.
     '''
@@ -1242,6 +1242,21 @@ class NodeDB(dict):
       Cmd.__init__(self)
       self.prompt = prompt
       self._nodedb = nodedb
+
+    @property
+    def usage(self):
+      usage="Usage:"
+      for command in sorted([ command[3:] for command in set(self.get_names())
+                                          if command.startswith('do_')
+                            ]):
+        fn = getattr(self, 'do_'+command)
+        fndoc = fn.__doc__
+        if fndoc:
+          fndoc = fndoc.rstrip()
+        else:
+          fndoc = " " + command + " [?ARGS?]"
+        usage += "\n" + fndoc
+      return usage
 
     def get_names(self):
       names = Cmd.get_names(self)
