@@ -1229,7 +1229,6 @@ class NodeDB(dict):
 
     def __getattr__(self, attr):
       if attr.startswith('do_'):
-        print >>sys.stderr, "__getattr__(..,%s)" % (attr,)
         op = attr[3:]
         try:
           fn = getattr(self._nodedb, 'cmd_'+op)
@@ -1244,7 +1243,6 @@ class NodeDB(dict):
             except ValueError, e:
               error(str(e))
             else:
-              print >>sys.stderr, "args =", `args`
               with Pfx(op):
                 try:
                   fn(args)
