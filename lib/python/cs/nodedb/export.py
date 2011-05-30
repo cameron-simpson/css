@@ -126,9 +126,9 @@ def import_rows_wide(rows):
         row.extend( [ None for i in range(len(hdrrow)-len(row)) ] )
 
       t, n = row[:2]
-      if t == "":
+      if t is None:
         t = otype
-      if n == "":
+      if n is None:
         n = oname
       if t != otype or n != oname:
         # new Node, yield previous Node data
@@ -139,13 +139,19 @@ def import_rows_wide(rows):
         oname = n
       for i in range(2, len(row)):
         value = row[i]
-        if value is not None and type(value) is not str and value != '':
+        if value is not None:
           attr = hdrrow[i]
           value = row[i]
           valuemap.setdefault(attr, []).append(value)
     # yield gathers Node data
     if valuemap:
       yield otype, oname, valuemap
+
+def csv2rows(csv):
+  ''' Transmute CSV rows (rows of strings) to rows with None for "".
+  '''
+  for row in csv:
+    yield [ (None if len(cell) == 0 else cell) for cell in row ]
 
 def import_csv_wide(nodedb, csvfile, doAppend=False):
     ''' Load a wide format CSV.
@@ -161,7 +167,7 @@ def import_csv_wide(nodedb, csvfile, doAppend=False):
           import_csv_wide(nodedb, csvfp, doAppend=doAppend)
       return
 
-    for t, n, valuemap in import_rows_wide(csv.reader(csvfile)):
+    for t, n, valuemap in import_rows_wide(csv2rows(csv.reader(csvfile))):
       N = nodedb.get( (t, n), doCreate=True )
       for attr, values in valuemap.items():
         parsed = []
