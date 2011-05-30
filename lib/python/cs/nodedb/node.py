@@ -807,7 +807,7 @@ class NodeDB(dict):
       return value, valuetxt[m.end():]
 
     import cs.nodedb.text
-    return cs.nodedb.text.fromtoken(valuetxt)
+    return cs.nodedb.text.fromtoken(valuetxt, self, doCreate=doCreate)
 
   def totoken(self, value, node=None, attr=None):
     ''' Convert a value to human friendly token.
