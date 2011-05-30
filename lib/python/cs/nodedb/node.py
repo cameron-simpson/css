@@ -1035,8 +1035,9 @@ class NodeDB(dict):
       return op_func(args)
 
   def cmd_update(self, args, fp=None):
-    ''' update otherdb: emit set commands to update otherdb with
-        attributes and nodes in this db.
+    ''' Usage: update otherdb
+          emit set commands to update otherdb with attributes and nodes in
+          this db.
     '''
     xit = 0
     if fp is None:
@@ -1062,6 +1063,9 @@ class NodeDB(dict):
     return xit
 
   def cmd_dump(self, args, fp=None):
+    ''' Usage: dump nodes...
+          Textdump the named nodes.
+    '''
     xit = 0
     if fp is None:
       fp = sys.stdout
@@ -1075,6 +1079,9 @@ class NodeDB(dict):
     return xit
 
   def cmd_dumpwide(self, args, fp=None):
+    ''' Usage: dumpwide nodes...
+          CSV dump the specified nodes in "wide" mode.
+    '''
     args = list(args)
     xit = 0
     if fp is None:
@@ -1112,6 +1119,9 @@ class NodeDB(dict):
     return 0
 
   def cmd_editwide(self, args, editfile=None):
+    ''' Usage: editwide nodes...
+          Edit the specified nodes as a CSV file in "wide" mode.
+    '''
     from .text import editNodes
     args = list(args)
     xit = 0
@@ -1130,6 +1140,9 @@ class NodeDB(dict):
     return xit
 
   def cmd_httpd(self, args):
+    ''' Usage: httpd ipaddr:port
+          Run an HTTP daemon on the specified address and port.
+    '''
     xit = 0
     import cs.nodedb.httpd
     if len(args) == 0:
@@ -1143,6 +1156,9 @@ class NodeDB(dict):
     return xit
 
   def cmd_list(self, args):
+    ''' Usage: list TYPE:*...
+          Recite the extant nodes of the specified TYPE.
+    '''
     xit = 0
     if not args:
       raise GetoptError("expected TYPE:* arguments")
@@ -1167,6 +1183,9 @@ class NodeDB(dict):
     return xit
 
   def cmd_new(self, args, doCreate=True):
+    ''' Usage: new TYPE:name [attr=values...]...
+          Create the specified node and set attribute values.
+    '''
     if len(args) == 0:
       raise GetoptError("missing TYPE:key")
     key=args.pop(0)
@@ -1195,8 +1214,10 @@ class NodeDB(dict):
     return 0
 
   def cmd_set(self, args):
-    # set [-C] nodes attr=values,...
-    # -C: create node if missing
+    ''' Usage: set [-C] TYPE:name [attr=values...]...
+          Set attribute values.
+          If -C is specified, create the node if missing.
+    '''
     doCreate = False
     if args and args[0] == '-C':
       args.pop(0)
@@ -1224,7 +1245,8 @@ class NodeDB(dict):
 
     def get_names(self):
       names = Cmd.get_names(self)
-      print >>sys.stderr, "get_names -> %s" % (names,)
+      # add do_* for cmd_* names in nodedb
+      names.extend( 'do_'+name[4:] for name in dir(self._nodedb) if name.startswith('cmd_') )
       return names
 
     def __getattr__(self, attr):
@@ -1251,6 +1273,7 @@ class NodeDB(dict):
                 except ValueError, e:
                   error(str(e))
             return False
+          do_op.__doc__ = fn.__doc__
           return do_op
       return Cmd.__getattr__(self, attr)
 
