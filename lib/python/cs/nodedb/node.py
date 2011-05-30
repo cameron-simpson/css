@@ -19,7 +19,7 @@ import unittest
 from cs.lex import str1
 from cs.misc import the, get0
 from cs.mappings import parseUC_sAttr
-from cs.logutils import Pfx, D, error, warn, info, debug
+from cs.logutils import Pfx, D, error, warn, info, debug, exception
 from .export import edit_csv_wide
 
 # regexp to match TYPE:name
@@ -1122,7 +1122,6 @@ class NodeDB(dict):
     ''' editwide nodes...
           Edit the specified nodes as a CSV file in "wide" mode.
     '''
-    from .text import editNodes
     args = list(args)
     xit = 0
     if not args:
@@ -1286,7 +1285,7 @@ class NodeDB(dict):
                 except GetoptError, e:
                   error(str(e))
                 except ValueError, e:
-                  error(str(e))
+                  exception(str(e))
             return False
           do_op.__doc__ = fn.__doc__
           return do_op

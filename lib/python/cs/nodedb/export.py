@@ -171,11 +171,7 @@ def import_csv_wide(nodedb, csvfile, doAppend=False):
         parsed = []
         for value in values:
           if len(value):
-            ovalue = value
-            value, etc = nodedb.fromtoken(value, node=N, attr=attr, doCreate=True)
-            if len(etc) > 0:
-              raise ValueError, "unparsed data from %s: %s" % (`ovalue`, `etc`)
-            parsed.append(value)
+            parsed.append(nodedb.fromtoken(value, node=N, attr=attr, doCreate=True))
         if doAppend:
           N[attr].extend(parsed)
         else:
