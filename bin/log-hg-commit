@@ -6,7 +6,7 @@
 
 hg log -r "$HG_NODE" --template='{desc}\n' --limit 1 \
 | { read -r headline
-    if [ -n .hg-cs-category ]
+    if [ -s .hg-cs-category ]
     then
       cat=`cat .hg-cs-category`
       wd=`pwd`
