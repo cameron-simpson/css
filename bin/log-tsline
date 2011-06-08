@@ -119,11 +119,14 @@ addline()
   _al_line=`printf "$_al_date2printf%s" "$*"`
   _al_sedf="/^$_al_dayheader\$/{
   :inday
-  /^$/!{ n; b inday; }
+  /^$/!{
+    n
+    b inday
+  }
   i\\
-$_al_line
-}"
-  ##printf "%s\n" "$_al_sedf" >$HOME/ZZZZ.txt
+  $_al_line
+}
+"
   bsed -s "$_al_sedf" "$_al_tsfile"
 }
 
