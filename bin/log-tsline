@@ -124,7 +124,7 @@ addline()
     b inday
   }
   i\\
-  $_al_line
+$_al_line
 }
 "
   bsed -s "$_al_sedf" "$_al_tsfile"
