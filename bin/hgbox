@@ -23,6 +23,7 @@ usage="Usage: $cmd [-L local] [-R master] sync"
 hgmaster=$HGBOX_MASTER
 hglocal=$HGBOX_LOCAL
 trace=set-x
+rsopts=-ptgolH
 
 badopts=
 
@@ -97,23 +98,26 @@ sync_in()
   sync_in_inside=$1
   sync_in_outside=$2
   shift; shift
-  first=1
-  for arg
+  if [ $# -gt 0 ]
+  then
+    echo "sync_in: extra arguments: $*" >&2
+    return 2
+  fi
+  for arg in $hgmap_args
   do
-    [ $first ] && { set --; first=; }
     case "$arg" in
       -*) rsexl=`expr "x$arg" : 'x-\(.*\)'`
           set -- "$@" "--exclude=$rsexcl"
           ;;
       +*) rsinl=`expr "x$arg" : 'x+\(.*\)'`
-          set -- "$@" "--include=$rsexcl"
+          set -- "$@" "--include=$rsincl"
           ;;
       *)  echo "$cmd: sync_in: unsupported include/exclude shorthand: $arg" >&2
           return 2
           ;;
     esac
   done
-  $trace rsync -aH --delete "$@" "$sync_in_outside/" "$sync_in_inside/" >&2
+  $trace rsync -r --delete $rsopts "$@" "$sync_in_outside/" "$sync_in_inside/" >&2
 }
 
 sync_out()
@@ -122,23 +126,27 @@ sync_out()
   sync_in_inside=$1
   sync_in_outside=$2
   shift; shift
-  first=1
-  for arg
+  if [ $# -gt 0 ]
+  then
+    echo "sync_out: extra arguments: $*" >&2
+    return 2
+  fi
+  set --
+  for arg in $hgmap_args
   do
-    [ $first ] && { set --; first=; }
     case "$arg" in
       -*) rsexl=`expr "x$arg" : 'x-\(.*\)'`
           set -- "$@" "--exclude=$rsexcl"
           ;;
       +*) rsinl=`expr "x$arg" : 'x+\(.*\)'`
-          set -- "$@" "--include=$rsexcl"
+          set -- "$@" "--include=$rsincl"
           ;;
       *)  echo "$cmd: sync_out: unsupported include/exclude shorthand: $arg" >&2
           return 2
           ;;
     esac
   done
-  $trace rsync -aH --delete "$@" "$sync_in_inside/" "$sync_in_outside/" >&2
+  $trace rsync -r --delete $rsopts "$@" "$sync_in_inside/" "$sync_in_outside/" >&2
 }
 
 # usage: withhgoutmap command-accepting-inside-then-outside-then-args
@@ -146,10 +154,12 @@ withhgoutmap()
 {
   ok=1
   hgoutmap=.hgbox-outside
+  hgoutcmd=$1
+  shift
   if [ -s "$hgoutmap" ]
   then
     lineno=0
-    while read -r inside outside
+    while read -r inside outside hgmap_args
     do
       lineno=`expr $lineno + 1`
       case "$inside" in
@@ -169,10 +179,9 @@ withhgoutmap()
         ok=
         continue
       fi
-      hgoutcmd=$1
-      shift
       "$hgoutcmd" "$inside" "$outside" ${1+"$@"} || return 1
     done <"$hgoutmap"
+    unset hgmap_args
   fi
   [ $ok ] || { echo "$cmd: ABORTING" >&2; return 1; }
 }
