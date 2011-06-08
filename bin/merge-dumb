@@ -1,0 +1,54 @@
+#!/usr/bin/python
+#
+# Dumbly merge two related files.
+#
+# This is aimed at merging files that accrue lines independently in at
+# multiple sites, generally a common log file updated at multiple sites and
+# synched using systems like my hgbox script.
+# The motivating case on my part is timesheet files, where lines are
+# inserted independently on multiple hosts and merged at synch time.
+#
+# 
+#       - Cameron Simpson <cs@zip.com.au> 08jun2011
+# 
+
+from difflib import SequenceMatcher
+import sys
+
+def main(argv):
+  xit = 0
+
+  cmd = argv.pop(0)
+  usage = "Usage: %s localfile otherfile\n" % (cmd,)
+  if len(argv) != 2:
+    sys.stderr.write(usage)
+    return 2
+
+  localfile = argv.pop(0)
+  otherfile = argv.pop(0)
+
+  with open(localfile) as localfp:
+    locallines = localfp.readlines()
+  with open(otherfile) as otherfp:
+    otherlines = otherfp.readlines()
+  localupto = 0
+  otherupto = 0
+  S = SequenceMatcher(None, locallines, otherlines)
+  for localstart, otherstart, length in S.get_matching_blocks():
+    for line in locallines[localupto:localstart]:
+      sys.stdout.write(line)
+
+    for line in locallines[localstart:localstart+length]:
+      sys.stdout.write(line)
+
+    localupto = localstart+length
+    for line in otherlines[otherupto:otherstart]:
+      sys.stdout.write(line)
+
+    otherupto = otherstart+length
+  sys.stdout.flush()
+
+  return xit
+
+if __name__ == '__main__':
+  sys.exit(main(sys.argv))
