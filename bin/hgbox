@@ -1,0 +1,196 @@
+#!/bin/sh
+#
+# hg-based dropbox-like sync script.
+# Inspired by the GIT based scheme describe here:
+#
+#  DVCS-Autosync: A personal Dropbox replacement based on Git
+#  http://www.mayrhofer.eu.org/dvcs-autosync
+#
+# but more clunky - doesn't poll with inotify or kqueue yet.
+# On the upside, it will support cloning out-of-tree content
+# via an "rsync in, sync, rsync out" scheme.
+#       - Cameron Simpson <cs@zip.com.au> 03jun2011
+#
+
+set -ue
+
+: ${HGBOX_MASTER:=ssh://home/var/hgbox}
+: ${HGBOX_LOCAL:=$HOME/var/hgbox}
+
+cmd=`basename "$0"`
+usage="Usage: $cmd [-L local] [-R master] sync"
+
+hgmaster=$HGBOX_MASTER
+hglocal=$HGBOX_LOCAL
+trace=set-x
+
+badopts=
+
+while [ $# -gt 0 ]
+do
+  case $1 in
+    -L) hglocal=$2; shift ;;
+    -R) hgmaster=$2; shift ;;
+    --) shift; break ;;
+    -?*)echo "$cmd: unrecognised option: $1" >&2
+        badopts=1
+        ;;
+    *)  break ;;
+  esac
+  shift
+done
+
+if [ $# = 0 ]
+then
+  echo "$cmd: missing op" >&2
+  badopts=1
+else
+  op=$1
+  shift
+  case "$op" in
+    sync)
+        [ $# = 0 ] || { echo "$cmd: extra arguments after $op: $*" >&2
+                        badopts=1
+                      }
+        ;;
+    *)  echo "$cmd: unsupported op: $op" >&2
+        badopts=1
+        ;;
+  esac
+fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+hg="$trace hg"
+
+# Usage: inhg hgurl command
+inhg()
+{
+  inhg_usage='inhg hgurl command'
+  [ $# -ge 2 ] || { echo "$inhg_usage" >&2; return 2; }
+  inhg_hgurl=$1; shift
+  case "$inhg_hgurl" in
+    ssh://?*/*)
+      inhg_host=`expr "x$inhg_hgurl" : 'xssh://\([^/]*\)/.*'`
+      inhg_path=`expr "x$inhg_hgurl" : 'xssh://[^/]*/\(.*\)'`
+      ;;
+    /*)
+      inhg_host=
+      inhg_path=$inhg_hgurl
+      ;;
+    *)
+      echo "$inhg: unsupported hg url: $inhg_hgurl" >&2
+      return 1
+      ;;
+  esac
+  set -- incd "$inhg_path" "$@"
+  if [ -n "$inhg_host" ]
+  then
+    set -- sshx "$inhg_host" /opt/css/bin/with-opt-css "$@"
+  fi
+  set-x "$@"
+}
+
+sync_in()
+{
+  [ $# = 2 ] || return 2
+  sync_in_inside=$1
+  sync_in_outside=$2
+  shift; shift
+  first=1
+  for arg
+  do
+    [ $first ] && { set --; first=; }
+    case "$arg" in
+      -*) rsexl=`expr "x$arg" : 'x-\(.*\)'`
+          set -- "$@" "--exclude=$rsexcl"
+          ;;
+      +*) rsinl=`expr "x$arg" : 'x+\(.*\)'`
+          set -- "$@" "--include=$rsexcl"
+          ;;
+      *)  echo "$cmd: sync_in: unsupported include/exclude shorthand: $arg" >&2
+          return 2
+          ;;
+    esac
+  done
+  $trace rsync -aH --delete "$@" "$sync_in_outside/" "$sync_in_inside/" >&2
+}
+
+sync_out()
+{
+  [ $# = 2 ] || return 2
+  sync_in_inside=$1
+  sync_in_outside=$2
+  shift; shift
+  first=1
+  for arg
+  do
+    [ $first ] && { set --; first=; }
+    case "$arg" in
+      -*) rsexl=`expr "x$arg" : 'x-\(.*\)'`
+          set -- "$@" "--exclude=$rsexcl"
+          ;;
+      +*) rsinl=`expr "x$arg" : 'x+\(.*\)'`
+          set -- "$@" "--include=$rsexcl"
+          ;;
+      *)  echo "$cmd: sync_out: unsupported include/exclude shorthand: $arg" >&2
+          return 2
+          ;;
+    esac
+  done
+  $trace rsync -aH --delete "$@" "$sync_in_inside/" "$sync_in_outside/" >&2
+}
+
+# usage: withhgoutmap command-accepting-inside-then-outside-then-args
+withhgoutmap()
+{
+  ok=1
+  hgoutmap=.hgbox-outside
+  if [ -s "$hgoutmap" ]
+  then
+    lineno=0
+    while read -r inside outside
+    do
+      lineno=`expr $lineno + 1`
+      case "$inside" in
+        /* | .* | */ | */. | */.. | */./* | */../* )
+          echo "$cmd: $hgoutmap:$lineno: invalid inside path: $inside" >&2
+          ok=
+          continue
+      esac
+      case "$outside" in
+        '~/'*)
+          outside=$HOME/`expr "x$outside" : 'x..\(.*\)'`
+          ;;
+      esac
+      if [ ! -d "$outside/." ]
+      then
+        echo "$cmd: $hgoutmap:$lineno: outside path missing: $outside" >&2
+        ok=
+        continue
+      fi
+      hgoutcmd=$1
+      shift
+      "$hgoutcmd" "$inside" "$outside" ${1+"$@"} || return 1
+    done <"$hgoutmap"
+  fi
+  [ $ok ] || { echo "$cmd: ABORTING" >&2; return 1; }
+}
+
+cd "$hglocal" || exit 1
+
+withhgoutmap sync_in
+
+hgstat=`$hg stat`
+if [ -n "$hgstat" ]
+then
+  $hg addremove
+  $hg commit -m "sync in `hostname`:`pwd`"
+fi
+
+HGMERGE=false $hg fetch "$hgmaster"
+
+withhgoutmap sync_out
+
+$hg push "$hgmaster"
+inhg "$hgmaster" $hg up
