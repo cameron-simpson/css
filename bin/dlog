@@ -13,11 +13,15 @@ trace=  ##set-x
 
 [ -t 0 ] && exec </dev/null
 
-if [ "x$HOST" != "x$HOMEHOST" ]
+if not flag DLOG_LOCAL && [ "x$HOST" != "x$HOMEHOST" ]
 then
-  flag DLOG_REMOTE_DISABLE && { echo "SKIP ssh $HOMEHOST dlog $*" >&2; exit 0; }
-  qcmd=`shqstr ./bin/with-login-env dlog ${1+"$@"}`
-  exec $trace ssh "$HOMEHOST" "$qcmd"
+  if flag DLOG_REMOTE_DISABLE
+  then
+    echo "flag DLOG_REMOTE_DISABLE: logging locally"
+  else
+    qcmd=`shqstr ./bin/with-login-env dlog ${1+"$@"}`
+    exec $trace ssh "$HOMEHOST" "$qcmd"
+  fi
 fi
 
 logname=dlog-quick
