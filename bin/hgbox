@@ -7,8 +7,8 @@
 #  http://www.mayrhofer.eu.org/dvcs-autosync
 #
 # but more clunky - doesn't poll with inotify or kqueue yet.
-# On the upside, it will support cloning out-of-tree content
-# via an "rsync in, sync, rsync out" scheme.
+# On the upside, it supports cloning out-of-tree content via an "rsync in,
+# sync, rsync out" scheme.
 #       - Cameron Simpson <cs@zip.com.au> 03jun2011
 #
 
@@ -197,7 +197,7 @@ then
   $hg commit -m "sync in `hostname`:`pwd`"
 fi
 
-HGMERGE=false $hg fetch "$hgmaster"
+$hg fetch "$hgmaster"
 
 withhgoutmap sync_out
 
