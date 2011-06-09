@@ -106,10 +106,10 @@ sync_in()
   for arg in $hgmap_args
   do
     case "$arg" in
-      -*) rsexl=`expr "x$arg" : 'x-\(.*\)'`
+      -*) rsexcl=`expr "x$arg" : 'x-\(.*\)'`
           set -- "$@" "--exclude=$rsexcl"
           ;;
-      +*) rsinl=`expr "x$arg" : 'x+\(.*\)'`
+      +*) rsincl=`expr "x$arg" : 'x+\(.*\)'`
           set -- "$@" "--include=$rsincl"
           ;;
       *)  echo "$cmd: sync_in: unsupported include/exclude shorthand: $arg" >&2
@@ -135,10 +135,10 @@ sync_out()
   for arg in $hgmap_args
   do
     case "$arg" in
-      -*) rsexl=`expr "x$arg" : 'x-\(.*\)'`
+      -*) rsexcl=`expr "x$arg" : 'x-\(.*\)'`
           set -- "$@" "--exclude=$rsexcl"
           ;;
-      +*) rsinl=`expr "x$arg" : 'x+\(.*\)'`
+      +*) rsincl=`expr "x$arg" : 'x+\(.*\)'`
           set -- "$@" "--include=$rsincl"
           ;;
       *)  echo "$cmd: sync_out: unsupported include/exclude shorthand: $arg" >&2
