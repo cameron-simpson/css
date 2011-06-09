@@ -87,7 +87,7 @@ inhg()
   set -- incd "$inhg_path" "$@"
   if [ -n "$inhg_host" ]
   then
-    set -- sshx "$inhg_host" /opt/css/bin/with-opt-css "$@"
+    set -- sshx -n "$inhg_host" /opt/css/bin/with-opt-css "$@"
   fi
   set-x "$@"
 }
