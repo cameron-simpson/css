@@ -189,7 +189,7 @@ class BasicStore(NestingOpenClose):
     for LF in LFs:
       yield LF()
 
-def Store(storespec):
+def Store(store_spec):
   ''' Factory function to return an appropriate BasicStore subclass
       based on its argument:
         /path/to/store  A GDBMStore directory (later, tokyocabinet etc)
@@ -201,17 +201,17 @@ def Store(storespec):
                         and specifies a directory then treat like
                         /cwd/relative/path/to/store.
   '''
-  assert type(storespec) is str, "expected a str, got %s" % (storespec,)
-  if storespec.startswith('/'):
-    return Store("file:"+storespec)
-  if storespec.startswith('|'):
-    return Store("exec:"+storespec)
-  if ':' not in storespec:
-    return Store("file:"+storespec)
-  scheme = storespec[:storespec.index(':')]
+  assert type(store_spec) is str, "expected a str, got %s" % (store_spec,)
+  if store_spec.startswith('/'):
+    return Store("file:"+store_spec)
+  if store_spec.startswith('|'):
+    return Store("exec:"+store_spec)
+  if ':' not in store_spec:
+    return Store("file:"+store_spec)
+  scheme = store_spec[:store_spec.index(':')]
   if not scheme.isalpha():
-    return Store("file:"+storespec)
-  spec = storespec[len(scheme)+1:]
+    return Store("file:"+store_spec)
+  spec = store_spec[len(scheme)+1:]
   if scheme == "file":
     # TODO: after tokyocabinet available, probe for index file name
     from cs.venti.gdbmstore import GDBMStore
