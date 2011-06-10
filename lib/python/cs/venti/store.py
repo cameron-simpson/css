@@ -14,10 +14,12 @@
 
 from __future__ import with_statement
 from functools import partial
+from binascii import hexlify
 import os
 import os.path
 from thread import allocate_lock
 from threading import Thread
+import unittest
 from Queue import Queue
 from cs.later import Later
 from cs.logutils import info, debug, warn, Pfx
@@ -254,6 +256,8 @@ class IndexedFileStore(BasicStore):
   ''' A file-based Store which keeps data in flat files, compressed.
       Subclasses must implement the method ._getIndex() to obtain the
       associated index object (for example, a gdbm file) to the data files.
+
+      The flat files are named n.vtd, and contain (usually) compressed blocks.
   '''
 
   def __init__(self, dirpath, capacity=None):
@@ -273,6 +277,8 @@ class IndexedFileStore(BasicStore):
 
   @property
   def n(self):
+    ''' The ordinal of the currently open data file.
+    '''
     with self._lock:
       if self._n is None:
         self._n = self.__anotherDataFile()
@@ -332,14 +338,14 @@ class IndexedFileStore(BasicStore):
       offset = datafile.saveData(data)
       if not noFlush:
         datafile.flush()
-      self._index[h] = self.encodeIndexEntry(n, offset)
+      self._index[h] = encodeIndexEntry(n, offset)
     return h
 
   def get(self, h, default=None):
     I = self._index.get(h)
     if I is None:
       return default
-    n, offset = self.decodeIndexEntry(I)
+    n, offset = decodeIndexEntry(I)
     assert n >= 0
     assert offset >= 0
     return self._storeMap[n].readData(offset)
@@ -358,15 +364,32 @@ class IndexedFileStore(BasicStore):
     self.flush()
     self._index.sync()
 
-  def decodeIndexEntry(self, entry):
-    ''' Parse an index entry into n (data file index) and offset.
-    '''
-    n, entry = fromBS(entry)
-    offset, entry = fromBS(entry)
-    assert len(entry) == 0
-    return n, offset
+def decodeIndexEntry(entry):
+  ''' Parse an index entry into n (data file index) and offset.
+  '''
+  n, _ = fromBS(entry)
+  offset, _ = fromBS(_)
+  if len(_) > 0:
+    raise ValueError, "can't decode index entry: %s" % (hexlify(entry),)
+  return n, offset
 
-  def encodeIndexEntry(self, n, offset):
-    ''' Prepare an index entry from data file index and offset.
-    '''
-    return toBS(n) + toBS(offset)
+def encodeIndexEntry(n, offset):
+  ''' Prepare an index entry from data file index and offset.
+  '''
+  return toBS(n) + toBS(offset)
+
+class TestAll(unittest.TestCase):
+  def setUp(self):
+    import random
+    random.seed()
+  def testIndexEntry(self):
+    import random
+    for count in range(100):
+      rand_n = random.randint(0, 65536)
+      rand_offset = random.randint(0, 65536)
+      n, offset = decodeIndexEntry(encodeIndexEntry(rand_n, rand_offset))
+      self.assertEqual(rand_n, n)
+      self.assertEqual(rand_offset, offset)
+
+if __name__ == '__main__':
+  unittest.main()
