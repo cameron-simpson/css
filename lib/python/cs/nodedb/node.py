@@ -30,6 +30,38 @@ re_NAME = re.compile(r'[a-z][-a-z_0-9]*(?![a-zA-Z0-9_])')
 def _byname(a, b):
   return cmp(a.name, b.name)
 
+def nodekey(*args):
+  ''' Convert some sort of key to a (TYPE, NAME) tuple.
+      Sanity check the values.
+      Return (TYPE, NAME).
+      Raises ValueError if the arguments cannot be recognised.
+      Subclasses can override this to parse special forms such as
+      "hostname-ifname", which might return ('NIC', "hostname-ifname").
+  '''
+  with Pfx("nodekey(%s)" % (args,)):
+    if len(args) == 2:
+      t, name = args
+    elif len(args) == 1:
+      item = args[0]
+      if type(item) is str:
+        # TYPE:NAME
+        t, name = item.split(':', 1)
+      else:
+        # (TYPE, NAME)
+        t, name = item
+    else:
+      raise ValueError, "nodekey() takes (TYPE, NAME) args or a single arg: args=%s" % ( args, )
+
+    if type(t) is not str:
+      raise ValueError, "expected TYPE to be a string"
+    if type(name) is not str:
+      raise ValueError, "expected NAME to be a string"
+    if not t.isupper():
+      raise ValueError, "invalid TYPE, not upper case"
+    if not len(name):
+      raise ValueError, "empty NAME"
+    return t, name
+
 class _AttrList(list):
   ''' An _AttrList is a list subtype that understands Nodes
       and .ATTR[s] attribute access and drives a backend.
@@ -134,7 +166,7 @@ class _AttrList(list):
   def append(self, value, noBackend=False):
     if not noBackend:
       N = self.node
-      self.nodedb._backend.extendAttr(N, self.attr, (value,))
+      self.nodedb._backend.extendAttr(N.type, N.name, self.attr, (value,))
     list.append(self, value)
     self.__additemrefs((value,))
 
@@ -144,7 +176,7 @@ class _AttrList(list):
       values = tuple(values)
     if not noBackend:
       N = self.node
-      self.nodedb._backend.extendAttr(N, self.attr, values)
+      self.nodedb._backend.extendAttr(N.type, N.name, self.attr, values)
     list.extend(self, values)
     self.__additemrefs(values)
 
@@ -508,6 +540,7 @@ class NodeDB(dict):
     self._backend = backend
     self.__nodesByType = {}
     backend.set_nodedb(self)
+    backend.apply(self)
     self._lock = allocate_lock()
 
   def __str__(self):
@@ -621,40 +654,8 @@ class NodeDB(dict):
     byType = self.__nodesByType
     return [ t for t in byType.keys() if byType[t] ]
 
-  def nodekey(self, *args):
-    ''' Convert some sort of key to a (TYPE, NAME) tuple.
-        Sanity check the values.
-        Return (TYPE, NAME).
-        Raises ValueError if the arguments cannot be recognised.
-        Subclasses can override this to parse special forms such as
-        "hostname-ifname", which might return ('NIC', "hostname-ifname").
-    '''
-    with Pfx("nodekey(%s)" % (args,)):
-      if len(args) == 2:
-        t, name = args
-      elif len(args) == 1:
-        item = args[0]
-        if type(item) is str:
-          # TYPE:NAME
-          t, name = item.split(':', 1)
-        else:
-          # (TYPE, NAME)
-          t, name = item
-      else:
-        raise ValueError, "nodekey() takes (TYPE, NAME) args or a single arg: args=%s" % ( args, )
-
-      if type(t) is not str:
-        raise ValueError, "expected TYPE to be a string"
-      if type(name) is not str:
-        raise ValueError, "expected NAME to be a string"
-      if not t.isupper():
-        raise ValueError, "invalid TYPE, not upper case"
-      if not len(name):
-        raise ValueError, "empty NAME"
-      return t, name
-
   def __contains__(self, item):
-    key = self.nodekey(item)
+    key = nodekey(item)
     return dict.__contains__(self, key)
 
   def get(self, item, default=None, doCreate=False):
@@ -686,7 +687,7 @@ class NodeDB(dict):
 
   def __getitem__(self, item):
     try:
-      key = self.nodekey(item)
+      key = nodekey(item)
     except ValueError, e:
       raise KeyError, "can't get key %s: %s" % (item, e)
     N = dict.__getitem__(self, key)
@@ -696,7 +697,7 @@ class NodeDB(dict):
   def __setitem__(self, item, N):
     assert isinstance(N, Node), "tried to store non-Node: %s" % (repr(N),)
     assert N.nodedb is self, "tried to store foreign Node: %s" % (repr(N),)
-    key = self.nodekey(item)
+    key = nodekey(item)
     assert key == (N.type, N.name), \
            "tried to store Node(%s:%s) as key (%s:%s)" \
              % (N.type, N.name, key[0], key[1])
@@ -709,9 +710,9 @@ class NodeDB(dict):
     ''' Create and register a new Node.
         Subclasses of NodeDB should override _createNode, not this method.
     '''
-    t, name = self.nodekey(*args)
+    t, name = nodekey(*args)
     N = self._makeNode(t, name)
-    self._backend.newNode(N)
+    self._backend[t, name] = N
     self[t, name] = N
     return N
 
@@ -1009,7 +1010,7 @@ class NodeDB(dict):
         if ':' in word:
           t, n = word.split(':', 1)
         else:
-          t, n = self.nodekey(word)
+          t, n = nodekey(word)
         if '*' in t or '?' in t:
           typelist = sorted([ _ for _ in self.types if fnmatch.fnmatch(_, t) ])
         else:
@@ -1353,7 +1354,78 @@ def NodeDBFromURL(url, readonly=False, klass=None):
 
   raise ValueError, "unsupported NodeDB URL: "+url
 
-class Backend(object):
+class _BackendMappingMixin(object):
+  ''' A mapping interface to be presented by all Backends.
+  '''
+
+  def len(self):
+    return len(self.keys())
+
+  def keys(self):
+    keylist = list(self.iterkeys())
+    error("keylist = %s", `keylist`)
+    return keylist
+
+  def iterkeys(self):
+    ''' Yield (type, name) tuples for all nodes in the backend database.
+    '''
+    raise NotImplementedError
+
+  def items(self):
+    return list(self.iteritems())
+
+  def iteritems(self):
+    ''' Yield ( (type, name), node_dict ) tuples for all nodes in
+        the backend database.
+    '''
+    for key in self.iterkeys():
+      yield key, self[key]
+
+  def values(self):
+    return list(self.itervalues())
+
+  def itervalues(self):
+    ''' Yield node_dict for all nodes in the backend database.
+    '''
+    for key in self.iterkeys():
+      yield self[key]
+
+  def __getitem__(self, key):
+    ''' Return a dict with a mapping of attr => values for the
+        specified node key.
+    '''
+    raise NotImplementedError
+
+  def get(self, key, default):
+    try:
+      value = self[key]
+    except KeyError:
+      return default
+    return value
+
+  def __setitem__(self, key, node_dict):
+    raise NotImplementedError
+
+  def __delitem__(self, key):
+    raise NotImplementedError
+
+  def __eq__(self, other):
+    keys = set(self.keys())
+    okeys = set(other.keys())
+    if keys != okeys:
+      raise Error
+      ##print >>sys.stderr, "1: keys[%s] != okeys[%s]" % (keys, okeys)
+      ##sys.stderr.flush()
+      return False
+    for k in keys:
+      if self[k] != other[k]:
+        raise Error
+        ##print >>sys.stderr, "2: %s != %s" % (self[k], other[k])
+        ##sys.stderr.flush()
+        return False
+    return True
+
+class Backend(_BackendMappingMixin):
   ''' Base class for NodeDB backends.
   '''
 
@@ -1363,9 +1435,8 @@ class Backend(object):
     '''
     assert not hasattr(self, 'nodedb')
     self.nodedb = nodedb
-    self._preload()
 
-  def _preload(self):
+  def apply(self, nodedb):
     raise NotImplementedError
 
   def totext(self, value):
@@ -1387,25 +1458,14 @@ class Backend(object):
   def close(self):
     raise NotImplementedError
 
-  def nodeByTypeName(self, t, name):
-    ''' Map (type,name) to Node.
-    '''
-    return self.nodedb[t, name]
-
-  def newNode(self, N):
-    raise NotImplementedError
-
-  def delNode(self, N):
-    raise NotImplementedError
-
   def saveAttrs(self, attrs):
     ''' Save the full contents of this attribute list.
     '''
     N = attrs.node
     attr = attrs.attr
-    self.delAttr(N, attr)
+    self.delAttr(N.type, N.name, attr)
     if attrs:
-      self.extendAttr(N, attr, attrs)
+      self.extendAttr(N.type, N.name, attr, attrs)
 
   def extendAttr(self, N, attr, values):
     ''' Append values to the named attribute.
@@ -1423,19 +1483,21 @@ class Backend(object):
 class _NoBackend(Backend):
   ''' Dummy backend for emphemeral in-memory NodeDBs.
   '''
-  def _preload(self):
+  def apply(self, nodedb):
     pass
   def close(self):
     pass
-  def newNode(self, N):
+  def extendAttr(self, type, name, attr, values):
     pass
-  def delNode(self, N):
+  def delAttr(self, type, name, attr):
     pass
-  def extendAttr(self, N, attr, values):
+  def set1Attr(self, type, name, attr, value):
     pass
-  def delAttr(self, N, attr):
+  def __getitem__(self, key):
+    raise KeyError
+  def __setitem__(self, key, N):
     pass
-  def set1Attr(self, N, attr, value):
+  def __delitem__(self, key):
     pass
 
 class _QBackend(Backend):
@@ -1587,7 +1649,7 @@ class TestAll(unittest.TestCase):
       ):
       token = self.db.totoken(value, H, attr=attr)
       self.assertEquals(token, expected_token, "wrong tokenisation, expected %s but got %s" % (expected_token, token))
-      value2, etc = self.db.fromtoken(token, node=H, attr=attr, doCreate=True)
+      value2 = self.db.fromtoken(token, node=H, attr=attr, doCreate=True)
       self.assertEquals(value2, value, "round trip fails: %s -> %s -> %s" % (value, token, value2))
 
 if __name__ == '__main__':
