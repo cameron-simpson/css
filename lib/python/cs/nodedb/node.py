@@ -20,7 +20,7 @@ from cs.lex import str1
 from cs.misc import the, get0
 from cs.mappings import parseUC_sAttr
 from cs.logutils import Pfx, D, error, warn, info, debug, exception
-from .export import edit_csv_wide
+from .export import edit_csv_wide, export_csv_wide
 
 # regexp to match TYPE:name
 re_NODEREF = re.compile(r'([A-Z]+):([^:#]+)')
@@ -1097,7 +1097,7 @@ class NodeDB(dict):
       attrs = attrtxt.split(',')
     if args:
       raise GetoptError, "extra arguments after nodes and attrs: %s" % (args,)
-    self.dump_csv_wide(fp, nodes, attrs=attrs)
+    export_csv_wide(fp, nodes, attrs=attrs, all_nodes=True)
     return xit
 
   def cmd_editnode(self, args):
