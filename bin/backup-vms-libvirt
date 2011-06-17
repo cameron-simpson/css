@@ -1,0 +1,78 @@
+#!/bin/sh
+#
+# Backup libvirt VM XML and IMG files.
+#       - Cameron Simpson <cs@zip.com.au> 17jun2011
+#
+
+set -ue
+
+backup_root=/backup/vms
+vmcfdir=/etc/libvirt/qemu
+sshcf=$HOME/.ssh/config
+trace=
+progress=
+[ -t 2 ] && { progress=--progress; trace=set-x; }
+
+cmd=`basename "$0"`
+usage="Usage: $cmd [-B backup_root] [-F ssh_config_file] [hosts...]
+  -B backup_root        Root of backup tree. Default: $backup_root
+  -F ssh_config_file    SSH configuration file. Default: $sshcf"
+
+badopts=
+
+while [ $# -gt 0 ]
+do
+  case $1 in
+    -B) backup_root=$2; shift ;;
+    -F) sshcf=$2; shift ;;
+    --) shift; break ;;
+    -?*)echo "$cmd: unrecognised option: $1" >&2
+        badopts=1
+        ;;
+    *)  break ;;
+  esac
+  shift
+done
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+[ $# -gt 0 ] || set -- "$HOST"
+
+ssh="ssh -F '$sshcf'"
+RSYNC_RSH=$ssh
+export RSYNC_RSH
+
+for host
+do
+  (
+    case "$host" in
+      "$HOST")
+        rhost=
+        set -- "$vmcfdir"/*.xml
+        [ "x$*" = "x$vmcfdir/*.xml" ] && set --
+        ;;
+      *)set -- `$ssh "$host" "ls -d '$vmcfdir'/*.xml"`
+        rhost=$host:
+        ;;
+    esac
+    if [ $# = 0 ]
+    then
+      echo "$cmd: $host: no XML files in $vmcfdir" >&2
+      exit 0
+    fi
+
+    for xmlfile
+    do
+      xmlfile_base=`basename "$xmlfile"`
+      vmname=`expr "x$xmlfile_base" : 'x\(.*\).xml'`
+      bakdir=$backup_root/$host/$vmname
+      [ -d "$bakdir/." ] || $trace mkdir "$bakdir"
+      xmlfile_backup=$bakdir/$xmlfile_base
+      $trace rsync -aL "$rhost$xmlfile" "$xmlfile_backup"
+      imgfile=$(sed -n 's:.*< *source *file='\''\(/[^'\'']*\.img\)'\'' */ *>.*:\1:p' "$xmlfile_backup")
+      imgfile_base=`basename "$imgfile"`
+      imgfile_backup=$bakdir/$imgfile_base
+      $trace rsync -aLS $progress "$rhost$imgfile" "$imgfile_backup"
+    done
+  )
+done
