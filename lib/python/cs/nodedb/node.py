@@ -1089,7 +1089,7 @@ class NodeDB(dict):
     if not args:
       nodes = self.default_dump_nodes()
     else:
-      nodes = nodespec(args.pop(0))
+      nodes = self.nodespec(args.pop(0))
     if not args:
       attrs = None
     else:
