@@ -1,3 +1,5 @@
+- .hg-cs-category
+- .job
 - pod2htm*.tmp
 - /cgi-bin
 - /cs
