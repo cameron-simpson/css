@@ -1587,7 +1587,7 @@ class TestAll(unittest.TestCase):
       ):
       token = self.db.totoken(value, H, attr=attr)
       self.assertEquals(token, expected_token, "wrong tokenisation, expected %s but got %s" % (expected_token, token))
-      value2, etc = self.db.fromtoken(token, node=H, attr=attr, doCreate=True)
+      value2 = self.db.fromtoken(token, node=H, attr=attr, doCreate=True)
       self.assertEquals(value2, value, "round trip fails: %s -> %s -> %s" % (value, token, value2))
 
 if __name__ == '__main__':
