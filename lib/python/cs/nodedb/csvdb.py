@@ -4,6 +4,7 @@
 #       - Cameron Simpson <cs@zip.com.au> 02may2010
 #
 
+import csv
 import os
 import os.path
 from types import StringTypes
@@ -12,6 +13,95 @@ import sys
 from cs.logutils import Pfx, error, warn , info
 from . import NodeDB, Backend
 from .node import TestAll as NodeTestAll
+
+def read_csv_file(fp, skipHeaders=False, noHeaders=False):
+  ''' Read a CSV file in vertical format (TYPE,NAME,ATTR,VALUE),
+      yield TYPE, NAME, {ATTR: UNPARSED_VALUES}
+  '''
+  if type(fp) is str:
+    with Pfx("read_csv_file(%s)" % (fp,)):
+      with open(fp, "rb") as csvfp:
+        for csvnode in read_csv_file(csvfp,
+                                     skipHeaders=skipHeaders,
+                                     noHeaders=noHeaders):
+          yield csvnode
+    return
+  csvnode = None
+  r = csv.reader(fp)
+  if not noHeaders:
+    hdrrow = r.next()
+    if not skipHeaders:
+      if hdrrow != ['TYPE', 'NAME', 'ATTR', 'VALUE']:
+        raise ValueError, \
+              "bad header row, expected TYPE, NAME, ATTR, VALUE but got: %s" \
+              % (hdrrow,)
+  attrmap = None
+  otype = None
+  oname = None
+  oattr = None
+  for row in r:
+    t, n, attr, value = row
+    if attr.endswith('s'):
+      # revert older plural dump format
+      warn("loading old plural attribute: %s" % (attr,))
+      k, plural = parseUC_sAttr(attr)
+      if k is None:
+        raise ValueError, "failed to parse attribute name: %s" % (attr,)
+      attr = k
+    if t == "":
+      assert otype is not None
+      t = otype
+    if n == "":
+      assert oname is not None
+      n = oname
+    if t != otype or n != oname:
+      if attrmap is not None:
+        yield otype, oname, attrmap
+      attrmap = {}
+    if attr == "":
+      assert oattr is not None
+      attr = oattr
+      attrmap[attr].append(value)
+    else:
+      attrmap[attr]=[value]
+    otype, oname, oattr = t, n, attr
+  if attrmap is not None:
+    yield otype, oname, attrmap
+  return
+
+def write_csv_file(fp, nodedata, noHeaders=False):
+  ''' Iterate over the supplied `nodedata`, a sequence of:
+        type, name, attrmap
+      and write to the file-like object `fp` in the vertical" CSV
+      style. `fp` may also be a string in which case the named file
+      is truncated and rewritten.
+      `attrmap` maps attribute names to sequences of serialised values.
+  '''
+  if type(fp) is str:
+    with Pfx("write_csv_file(%s)" % (fp,)):
+      with open(fp, "wb") as csvfp:
+        write_csv_file(csvfp, nodedata, noHeaders=noHeaders)
+    return
+
+  w = csv.writer(fp)
+  if not noHeaders:
+    w.writerow( ('TYPE', 'NAME', 'ATTR', 'VALUE') )
+  otype = None
+  oname = None
+  for t, name, attrmap in nodedata:
+    attrs = sorted(attrmap.keys())
+    oattr = None
+    for attr in attrs:
+      for value in attrmap[attr]:
+        if otype is None or otype != t:
+          otype = t
+        else:
+          t = ""
+          if oname is None or oname != name:
+            oname = name
+          else:
+            name = ""
+        w.writerow( (t, name, attr, value) )
 
 class Backend_CSVFile(Backend):
 
@@ -26,39 +116,35 @@ class Backend_CSVFile(Backend):
     self.sync()
 
   def sync(self):
-    with Pfx("sync %s" % (self,)):
-      if not self.nodedb.readonly:
-        with open(self.csvpath, "wb") as fp:
-          info("rewrite(%s)" % (self.csvpath,))
-          self.nodedb.dump(fp, fmt='csv')
-
-  def _preload(self):
-    ''' Prepopulate the NodeDB from the database.
+    ''' Update the CSV file.
     '''
-    with open(self.csvpath, "rb") as fp:
-      ro = self.nodedb.readonly
-      self.nodedb.readonly = False
-      self.nodedb.load(fp, fmt='csv')
-      self.nodedb.readonly = ro
+    if not self.nodedb.readonly:
+      write_csv_file(self.csvpath, self.nodedb.nodedata())
 
-  def _attrtag(self, N, attr):
-    return ':'.join( (attr, N.type, N.name) )
+  def apply(self, nodedb):
+    nodedb.load_nodedata(read_csv_file(self.csvpath), doCreate=True)
 
-  def newNode(self, N):
+##  def _attrtag(self, t, name, attr):
+##    return ':'.join( (attr, t, name) )
+
+  def newNode(self, t, name):
     assert not self.nodedb.readonly
 
-  def delNode(self, N):
+  def delNode(self, t, name):
     assert not self.nodedb.readonly
 
-  def extendAttr(self, N, attr, values):
+  def extendAttr(self, t, name, attr, values):
     assert len(values) > 0
     assert not self.nodedb.readonly
 
-  def set1Attr(self, N, attr, value):
+  def set1Attr(self, t, name, attr, value):
     assert not self.nodedb.readonly
 
-  def delAttr(self, N, attr):
+  def delAttr(self, t, name, attr):
     assert not self.nodedb.readonly
+
+  def __setitem__(self, key, value):
+    pass
 
 class TestAll(NodeTestAll):
 

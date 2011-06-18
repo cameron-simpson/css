@@ -488,6 +488,8 @@ class Node(dict):
           del self[k]
 
   def textdump(self, fp):
+    ''' Write a vertical CSV dump of this node.
+    '''
     self.nodedb.dump(fp, nodes=(self,))
 
   def assign(self, assignment):
@@ -932,73 +934,36 @@ class NodeDB(dict):
     raise ValueError, "unsupported format '%s'" % (fmt,)
 
   def dump_csv(self, fp, nodes):
-    w = csv.writer(fp)
-    w.writerow( ('TYPE', 'NAME', 'ATTR', 'VALUE') )
-    typenames = sorted(self.types)
-    otype = None
-    oname = None
-    for N in nodes:
-      t, n = N.type, N.name
-      attrs = N.keys()
-      ##if len(attrs) == 0:
-      ##  warn("%s: dropping node %s, no attributes!" % (self, N))
-      attrs.sort()
-      oattr = None
-      for attr in attrs:
-        assert not attr.endswith('s'), "bogus plural node attribute: %s" % (attr,)
-        for value in N[attr]:
-          ct = t if otype is None or t != otype else ''
-          cn = n if oname is None or n != oname else ''
-          ca = attr if oattr is None or attr != oattr else ''
-          row = (ct, cn, ca, self.totext(value))
-          w.writerow(row)
-          otype, oname, oattr = t, n, attr
+    from .csvdb import write_csv_file
+    write_csv_file(fp, self.nodedata(nodes))
     fp.flush()
-    return
 
-  def load(self, fp, fmt='csv', skipHeaders=False, noHeaders=False):
-    if fmt == 'csv':
-      return self.load_csv(fp, skipHeaders=skipHeaders, noHeaders=noHeaders)
-    if fmt == 'csv_wide':
-      return import_csv_wide(self, fp)
-    raise ValueError, "unsupported format '%s'" % (fmt,)
+  def nodedata(self, nodes=None):
+    ''' Generator to yield:
+          type, name, attrmap
+        ready to be written to external storage such as a CSV file.
+    '''
+    if nodes is None:
+      nodes = self.default_dump_nodes()
+    for N in nodes:
+      attrmap = {}
+      for attr, values in N.iteritems():
+        attrmap[attr] = [ self.totext(value) for value in values ]
+      yield N.type, N.name, attrmap
 
-  def load_csv(self, fp, skipHeaders=False, noHeaders=False):
-      r = csv.reader(fp)
-      if not noHeaders:
-        hdrrow = r.next()
-        if not skipHeaders:
-          assert hdrrow == ['TYPE', 'NAME', 'ATTR', 'VALUE'], \
-                 "bad header row, expected TYPE, NAME, ATTR, VALUE but got: %s" % (hdrrow,)
-      otype = None
-      oname = None
-      oattr = None
-      for row in r:
-        t, n, attr, value = row
-        if attr.endswith('s'):
-          # revert older plural dump format
-          warn("loading old plural attribute: %s" % (attr,))
-          k, plural = parseUC_sAttr(attr)
-          assert k is not None, "failed to parse attribute name: %s" % (attr,)
-          attr = k
-        if t == "":
-          assert otype is not None
-          t = otype
-        if n == "":
-          assert oname is not None
-          n = oname
-        if attr == "":
-          assert oattr is not None
-          attr = oattr
-        N = self.make( (t, n) )
-        ovalue = value
-        value = self.fromtext(value, doCreate=True)
-        if attr in N:
-          N[attr].append(value)
-        else:
-          N[attr] = (value,)
-        otype, oname, oattr = t, N.name, attr
-      return
+  def load_nodedata(self, nodedata, doCreate=True):
+    ''' Load `nodedata`, a sequence of:
+          type, name, attrmap
+        into this NodeDB.
+    '''
+    for t, name, attrmap in nodedata:
+      if doCreate:
+        N = self.make( (t, name) )
+      else:
+        N = self[t, name]
+      for attr, values in attrmap.items():
+        values = [ self.fromtext(value) for value in values ]
+        N.get(attr).extend(values)
 
   def nodespec(self, spec, doCreate=False):
     ''' Generator that parses a comma separated string specifying
@@ -1437,7 +1402,12 @@ class Backend(_BackendMappingMixin):
     self.nodedb = nodedb
 
   def apply(self, nodedb):
-    raise NotImplementedError
+    ''' Can be overridden by subclasses to provide some backend
+        specific efficient implementation.
+    '''
+    for k, N in self.iteritems():
+      for attr in N.keys():
+        nodedb[k].get(attr).extend(N[attr])
 
   def totext(self, value):
     ''' Hook for subclasses that might do special encoding for their backend.
