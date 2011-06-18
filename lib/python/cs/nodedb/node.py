@@ -30,6 +30,38 @@ re_NAME = re.compile(r'[a-z][-a-z_0-9]*(?![a-zA-Z0-9_])')
 def _byname(a, b):
   return cmp(a.name, b.name)
 
+def nodekey(*args):
+  ''' Convert some sort of key to a (TYPE, NAME) tuple.
+      Sanity check the values.
+      Return (TYPE, NAME).
+      Raises ValueError if the arguments cannot be recognised.
+      Subclasses can override this to parse special forms such as
+      "hostname-ifname", which might return ('NIC', "hostname-ifname").
+  '''
+  with Pfx("nodekey(%s)" % (args,)):
+    if len(args) == 2:
+      t, name = args
+    elif len(args) == 1:
+      item = args[0]
+      if type(item) is str:
+        # TYPE:NAME
+        t, name = item.split(':', 1)
+      else:
+        # (TYPE, NAME)
+        t, name = item
+    else:
+      raise ValueError, "nodekey() takes (TYPE, NAME) args or a single arg: args=%s" % ( args, )
+
+    if type(t) is not str:
+      raise ValueError, "expected TYPE to be a string"
+    if type(name) is not str:
+      raise ValueError, "expected NAME to be a string"
+    if not t.isupper():
+      raise ValueError, "invalid TYPE, not upper case"
+    if not len(name):
+      raise ValueError, "empty NAME"
+    return t, name
+
 class _AttrList(list):
   ''' An _AttrList is a list subtype that understands Nodes
       and .ATTR[s] attribute access and drives a backend.
@@ -134,7 +166,7 @@ class _AttrList(list):
   def append(self, value, noBackend=False):
     if not noBackend:
       N = self.node
-      self.nodedb._backend.extendAttr(N, self.attr, (value,))
+      self.nodedb._backend.extendAttr(N.type, N.name, self.attr, (value,))
     list.append(self, value)
     self.__additemrefs((value,))
 
@@ -144,7 +176,7 @@ class _AttrList(list):
       values = tuple(values)
     if not noBackend:
       N = self.node
-      self.nodedb._backend.extendAttr(N, self.attr, values)
+      self.nodedb._backend.extendAttr(N.type, N.name, self.attr, values)
     list.extend(self, values)
     self.__additemrefs(values)
 
@@ -456,6 +488,8 @@ class Node(dict):
           del self[k]
 
   def textdump(self, fp):
+    ''' Write a vertical CSV dump of this node.
+    '''
     self.nodedb.dump(fp, nodes=(self,))
 
   def assign(self, assignment):
@@ -508,6 +542,7 @@ class NodeDB(dict):
     self._backend = backend
     self.__nodesByType = {}
     backend.set_nodedb(self)
+    backend.apply(self)
     self._lock = allocate_lock()
 
   def __str__(self):
@@ -621,40 +656,8 @@ class NodeDB(dict):
     byType = self.__nodesByType
     return [ t for t in byType.keys() if byType[t] ]
 
-  def nodekey(self, *args):
-    ''' Convert some sort of key to a (TYPE, NAME) tuple.
-        Sanity check the values.
-        Return (TYPE, NAME).
-        Raises ValueError if the arguments cannot be recognised.
-        Subclasses can override this to parse special forms such as
-        "hostname-ifname", which might return ('NIC', "hostname-ifname").
-    '''
-    with Pfx("nodekey(%s)" % (args,)):
-      if len(args) == 2:
-        t, name = args
-      elif len(args) == 1:
-        item = args[0]
-        if type(item) is str:
-          # TYPE:NAME
-          t, name = item.split(':', 1)
-        else:
-          # (TYPE, NAME)
-          t, name = item
-      else:
-        raise ValueError, "nodekey() takes (TYPE, NAME) args or a single arg: args=%s" % ( args, )
-
-      if type(t) is not str:
-        raise ValueError, "expected TYPE to be a string"
-      if type(name) is not str:
-        raise ValueError, "expected NAME to be a string"
-      if not t.isupper():
-        raise ValueError, "invalid TYPE, not upper case"
-      if not len(name):
-        raise ValueError, "empty NAME"
-      return t, name
-
   def __contains__(self, item):
-    key = self.nodekey(item)
+    key = nodekey(item)
     return dict.__contains__(self, key)
 
   def get(self, item, default=None, doCreate=False):
@@ -686,7 +689,7 @@ class NodeDB(dict):
 
   def __getitem__(self, item):
     try:
-      key = self.nodekey(item)
+      key = nodekey(item)
     except ValueError, e:
       raise KeyError, "can't get key %s: %s" % (item, e)
     N = dict.__getitem__(self, key)
@@ -696,7 +699,7 @@ class NodeDB(dict):
   def __setitem__(self, item, N):
     assert isinstance(N, Node), "tried to store non-Node: %s" % (repr(N),)
     assert N.nodedb is self, "tried to store foreign Node: %s" % (repr(N),)
-    key = self.nodekey(item)
+    key = nodekey(item)
     assert key == (N.type, N.name), \
            "tried to store Node(%s:%s) as key (%s:%s)" \
              % (N.type, N.name, key[0], key[1])
@@ -709,9 +712,9 @@ class NodeDB(dict):
     ''' Create and register a new Node.
         Subclasses of NodeDB should override _createNode, not this method.
     '''
-    t, name = self.nodekey(*args)
+    t, name = nodekey(*args)
     N = self._makeNode(t, name)
-    self._backend.newNode(N)
+    self._backend[t, name] = N
     self[t, name] = N
     return N
 
@@ -931,73 +934,36 @@ class NodeDB(dict):
     raise ValueError, "unsupported format '%s'" % (fmt,)
 
   def dump_csv(self, fp, nodes):
-    w = csv.writer(fp)
-    w.writerow( ('TYPE', 'NAME', 'ATTR', 'VALUE') )
-    typenames = sorted(self.types)
-    otype = None
-    oname = None
-    for N in nodes:
-      t, n = N.type, N.name
-      attrs = N.keys()
-      ##if len(attrs) == 0:
-      ##  warn("%s: dropping node %s, no attributes!" % (self, N))
-      attrs.sort()
-      oattr = None
-      for attr in attrs:
-        assert not attr.endswith('s'), "bogus plural node attribute: %s" % (attr,)
-        for value in N[attr]:
-          ct = t if otype is None or t != otype else ''
-          cn = n if oname is None or n != oname else ''
-          ca = attr if oattr is None or attr != oattr else ''
-          row = (ct, cn, ca, self.totext(value))
-          w.writerow(row)
-          otype, oname, oattr = t, n, attr
+    from .csvdb import write_csv_file
+    write_csv_file(fp, self.nodedata(nodes))
     fp.flush()
-    return
 
-  def load(self, fp, fmt='csv', skipHeaders=False, noHeaders=False):
-    if fmt == 'csv':
-      return self.load_csv(fp, skipHeaders=skipHeaders, noHeaders=noHeaders)
-    if fmt == 'csv_wide':
-      return import_csv_wide(self, fp)
-    raise ValueError, "unsupported format '%s'" % (fmt,)
+  def nodedata(self, nodes=None):
+    ''' Generator to yield:
+          type, name, attrmap
+        ready to be written to external storage such as a CSV file.
+    '''
+    if nodes is None:
+      nodes = self.default_dump_nodes()
+    for N in nodes:
+      attrmap = {}
+      for attr, values in N.iteritems():
+        attrmap[attr] = [ self.totext(value) for value in values ]
+      yield N.type, N.name, attrmap
 
-  def load_csv(self, fp, skipHeaders=False, noHeaders=False):
-      r = csv.reader(fp)
-      if not noHeaders:
-        hdrrow = r.next()
-        if not skipHeaders:
-          assert hdrrow == ['TYPE', 'NAME', 'ATTR', 'VALUE'], \
-                 "bad header row, expected TYPE, NAME, ATTR, VALUE but got: %s" % (hdrrow,)
-      otype = None
-      oname = None
-      oattr = None
-      for row in r:
-        t, n, attr, value = row
-        if attr.endswith('s'):
-          # revert older plural dump format
-          warn("loading old plural attribute: %s" % (attr,))
-          k, plural = parseUC_sAttr(attr)
-          assert k is not None, "failed to parse attribute name: %s" % (attr,)
-          attr = k
-        if t == "":
-          assert otype is not None
-          t = otype
-        if n == "":
-          assert oname is not None
-          n = oname
-        if attr == "":
-          assert oattr is not None
-          attr = oattr
-        N = self.make( (t, n) )
-        ovalue = value
-        value = self.fromtext(value, doCreate=True)
-        if attr in N:
-          N[attr].append(value)
-        else:
-          N[attr] = (value,)
-        otype, oname, oattr = t, N.name, attr
-      return
+  def load_nodedata(self, nodedata, doCreate=True):
+    ''' Load `nodedata`, a sequence of:
+          type, name, attrmap
+        into this NodeDB.
+    '''
+    for t, name, attrmap in nodedata:
+      if doCreate:
+        N = self.make( (t, name) )
+      else:
+        N = self[t, name]
+      for attr, values in attrmap.items():
+        values = [ self.fromtext(value) for value in values ]
+        N.get(attr).extend(values)
 
   def nodespec(self, spec, doCreate=False):
     ''' Generator that parses a comma separated string specifying
@@ -1009,7 +975,7 @@ class NodeDB(dict):
         if ':' in word:
           t, n = word.split(':', 1)
         else:
-          t, n = self.nodekey(word)
+          t, n = nodekey(word)
         if '*' in t or '?' in t:
           typelist = sorted([ _ for _ in self.types if fnmatch.fnmatch(_, t) ])
         else:
@@ -1353,7 +1319,78 @@ def NodeDBFromURL(url, readonly=False, klass=None):
 
   raise ValueError, "unsupported NodeDB URL: "+url
 
-class Backend(object):
+class _BackendMappingMixin(object):
+  ''' A mapping interface to be presented by all Backends.
+  '''
+
+  def len(self):
+    return len(self.keys())
+
+  def keys(self):
+    keylist = list(self.iterkeys())
+    error("keylist = %s", `keylist`)
+    return keylist
+
+  def iterkeys(self):
+    ''' Yield (type, name) tuples for all nodes in the backend database.
+    '''
+    raise NotImplementedError
+
+  def items(self):
+    return list(self.iteritems())
+
+  def iteritems(self):
+    ''' Yield ( (type, name), node_dict ) tuples for all nodes in
+        the backend database.
+    '''
+    for key in self.iterkeys():
+      yield key, self[key]
+
+  def values(self):
+    return list(self.itervalues())
+
+  def itervalues(self):
+    ''' Yield node_dict for all nodes in the backend database.
+    '''
+    for key in self.iterkeys():
+      yield self[key]
+
+  def __getitem__(self, key):
+    ''' Return a dict with a mapping of attr => values for the
+        specified node key.
+    '''
+    raise NotImplementedError
+
+  def get(self, key, default):
+    try:
+      value = self[key]
+    except KeyError:
+      return default
+    return value
+
+  def __setitem__(self, key, node_dict):
+    raise NotImplementedError
+
+  def __delitem__(self, key):
+    raise NotImplementedError
+
+  def __eq__(self, other):
+    keys = set(self.keys())
+    okeys = set(other.keys())
+    if keys != okeys:
+      raise Error
+      ##print >>sys.stderr, "1: keys[%s] != okeys[%s]" % (keys, okeys)
+      ##sys.stderr.flush()
+      return False
+    for k in keys:
+      if self[k] != other[k]:
+        raise Error
+        ##print >>sys.stderr, "2: %s != %s" % (self[k], other[k])
+        ##sys.stderr.flush()
+        return False
+    return True
+
+class Backend(_BackendMappingMixin):
   ''' Base class for NodeDB backends.
   '''
 
@@ -1363,10 +1400,14 @@ class Backend(object):
     '''
     assert not hasattr(self, 'nodedb')
     self.nodedb = nodedb
-    self._preload()
 
-  def _preload(self):
-    raise NotImplementedError
+  def apply(self, nodedb):
+    ''' Can be overridden by subclasses to provide some backend
+        specific efficient implementation.
+    '''
+    for k, N in self.iteritems():
+      for attr in N.keys():
+        nodedb[k].get(attr).extend(N[attr])
 
   def totext(self, value):
     ''' Hook for subclasses that might do special encoding for their backend.
@@ -1387,25 +1428,14 @@ class Backend(object):
   def close(self):
     raise NotImplementedError
 
-  def nodeByTypeName(self, t, name):
-    ''' Map (type,name) to Node.
-    '''
-    return self.nodedb[t, name]
-
-  def newNode(self, N):
-    raise NotImplementedError
-
-  def delNode(self, N):
-    raise NotImplementedError
-
   def saveAttrs(self, attrs):
     ''' Save the full contents of this attribute list.
     '''
     N = attrs.node
     attr = attrs.attr
-    self.delAttr(N, attr)
+    self.delAttr(N.type, N.name, attr)
     if attrs:
-      self.extendAttr(N, attr, attrs)
+      self.extendAttr(N.type, N.name, attr, attrs)
 
   def extendAttr(self, N, attr, values):
     ''' Append values to the named attribute.
@@ -1423,19 +1453,21 @@ class Backend(object):
 class _NoBackend(Backend):
   ''' Dummy backend for emphemeral in-memory NodeDBs.
   '''
-  def _preload(self):
+  def apply(self, nodedb):
     pass
   def close(self):
     pass
-  def newNode(self, N):
+  def extendAttr(self, type, name, attr, values):
     pass
-  def delNode(self, N):
+  def delAttr(self, type, name, attr):
     pass
-  def extendAttr(self, N, attr, values):
+  def set1Attr(self, type, name, attr, value):
     pass
-  def delAttr(self, N, attr):
+  def __getitem__(self, key):
+    raise KeyError
+  def __setitem__(self, key, N):
     pass
-  def set1Attr(self, N, attr, value):
+  def __delitem__(self, key):
     pass
 
 class _QBackend(Backend):

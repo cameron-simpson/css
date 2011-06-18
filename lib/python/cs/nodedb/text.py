@@ -19,7 +19,7 @@ else:
 from cs.logutils import Pfx, error, info
 from cs.mappings import parseUC_sAttr
 import cs.sh
-from .node import Node
+from .node import Node, nodekey
 from .export import import_csv_wide
 
 ## NOT USED ? ## # regexp to match name(, name)*
@@ -235,7 +235,7 @@ def fromtoken(token, nodedb, doCreate=False):
     return token
 
   try:
-    t, name = nodedb.nodekey(token)
+    t, name = nodekey(token)
   except ValueError:
     warn("can't infer Node from \"%s\", returning string" % (token,))
     return token
