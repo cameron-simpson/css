@@ -62,58 +62,90 @@ class Backend_SQLAlchemy(Backend):
     self.engine=engine
     metadata.create_all()
 
-    self.__nodesByID = {}
+    # forward and reverse (type, name) <=> node_id mappings
+    self.__nodekeysByID = {}
     self.__IDbyTypeName = {}
 
   def nodeByTypeName(self, t, name):
     ''' Map (type,name) to Node.
     '''
-    return self.__nodesByID[self.__IDbyTypeName[t, name]]
+    return self.__nodekeysByID[self.__IDbyTypeName[t, name]]
 
-  def _noteNode(self, N, nodeid):
-    self.__nodesByID[nodeid] = N
-    self.__IDbyTypeName[N.type, N.name] = nodeid
+  def _noteNodeKey(self, t, name, node_id):
+    nodekey = (t, name)
+    self.__nodekeysByID[node_id] = nodekey
+    self.__IDbyTypeName[nodekey] = node_id
 
-  def _forgetNode(self, N, nodeid):
-    del self.__nodesByID[nodeid]
-    del self.__IDbyTypeName[N.type, N.name]
+  def _node_id(self, t, name):
+    if (t, name) not in self.__IDbyTypeName:
+      assert not self.nodedb.readonly
+      ins = self.nodes.insert().values(TYPE=t, NAME=name).execute()
+      node_id = ins.lastrowid
+      self._noteNodeKey(t, name, node_id)
+    return node_id
 
-  def _preload(self):
-    ''' Prepopulate the NodeDB from the database.
+  def _forgetNode(self, t, name, node_id):
+    del self.__nodekeysByID[node_id]
+    del self.__IDbyTypeName[t, name]
+
+  def nodedata(self):
+    ''' Pull all node data from the database.
     '''
     nodes = self.nodes
     attrs = self.attrs
-    byID = self.__nodesByID
-    # load Nodes
-    for nodeid, t, name in select( [ nodes.c.ID,
-                                     nodes.c.TYPE,
-                                     nodes.c.NAME
-                                   ] ).execute():
-      N = self.nodedb._makeNode(t, name)
-      self._noteNode(N, nodeid)
+    byID = self.__nodekeysByID
+    # load node data
+    for node_id, t, name in select( [ nodes.c.ID,
+                                      nodes.c.TYPE,
+                                      nodes.c.NAME
+                                    ] ).execute():
+      self._noteNodeKey(t, name, node_id)
     # load Node attributes
     # TODO: order by NODE_ID, ATTR and use .extend in batches
-    for attrid, nodeid, attr, value in select( [ attrs.c.ID,
-                                                 attrs.c.NODE_ID,
-                                                 attrs.c.ATTR,
-                                                 attrs.c.VALUE,
-                                               ] ).execute():
-      if nodeid not in byID:
-        error("invalid NODE_ID(%s): ignore %s=%s" % (nodeid, attr, value))
+    onode_id = None
+    for attrid, node_id, attr, value in select( [ attrs.c.ID,
+                                                  attrs.c.NODE_ID,
+                                                  attrs.c.ATTR,
+                                                  attrs.c.VALUE,
+                                                ] ) \
+                                        .order_by(asc(attrs.c.NODE_ID)) \
+                                        .execute():
+      if node_id not in byID:
+        error("invalid NODE_ID(%s): ignore %s=%s" % (node_id, attr, value))
         continue
-      N = byID[nodeid]
-      value = self.fromtext(value)
-      getattr(N, attr+'s').append(value, noBackend=True )
+      t, name = byID[node_id]
+      if onode_id is None or onode_id == node_id:
+        if onode_id is not None:
+          ot, oname = byID[onode_id]
+          yield ot, oname, attrmap
+        onode_id = node_id
+        attrmap = {}
+      attrmap.set_default(attr, []).append(value)
+    if onode_id is not None:
+      ot, oname = byID[onode_id]
+      yield ot, oname, attrmap
 
-  def fromtext(self, text):
-    if text.startswith(':#'):
-      warn("deprecated :#node_id serialisation: %s" % (text,))
-      node_id = int(text[2:])
-      N = self.__nodesByID[int(text[2:])]
-      warn("  UPDATE %s SET VALUE=\"%s\" WHERE VALUE=\"%s\""
-           % (self.attrs, ":%s:%s" % (N.type, N.name), text))
-      return N
-    return Backend.fromtext(self, text)
+  def iteritems(self):
+    for t, name, attrmap in self.nodedata():
+      yield (t, name), attrmap
+
+  def iterkeys(self):
+    nodes = self.nodes
+    # load node keys
+    for node_id, t, name in select( [ nodes.c.TYPE,
+                                      nodes.c.NAME
+                                    ] ).execute():
+      yield t, name
+
+##  def fromtext(self, text):
+##    if text.startswith(':#'):
+##      warn("deprecated :#node_id serialisation: %s" % (text,))
+##      node_id = int(text[2:])
+##      N = self.__nodekeysByID[int(text[2:])]
+##      warn("  UPDATE %s SET VALUE=\"%s\" WHERE VALUE=\"%s\""
+##           % (self.attrs, ":%s:%s" % (N.type, N.name), text))
+##      return N
+##    return Backend.fromtext(self, text)
 
   def sync(self):
     raise NotImplementedError
@@ -121,40 +153,36 @@ class Backend_SQLAlchemy(Backend):
   def close(self):
     warn("cs.nodedb.sqla.Backend_SQLAlchemy.close() unimplemented")
 
-  def newNode(self, N):
+  def __delitem__(self, nodekey):
     assert not self.nodedb.readonly
-    ins = self.nodes.insert().values(TYPE=N.type, NAME=N.name).execute()
-    self._noteNode(N, ins.lastrowid)
+    t, name = nodekey
+    node_id = self.__IDbyTypeName[t, name]
+    self.attrs.delete(self.attrs.c.NODE_ID == node_id).execute()
+    self.nodes.delete(self.nodes.c.NODE_ID == node_id).execute()
+    self._forgetNode(t, name, node_id)
 
-  def delNode(self, N):
+  def extendAttr(self, t, name, attr, values):
     assert not self.nodedb.readonly
-    nodeid = self.__IDbyTypeName[N.type, N.name]
-    self.attrs.delete(self.attrs.c.NODE_ID == nodeid).execute()
-    self.nodes.delete(self.nodes.c.NODE_ID == nodeid).execute()
-    self._forgetNode(N, nodeid)
-
-  def extendAttr(self, N, attr, values):
-    assert not self.nodedb.readonly
-    nodeid = self.__IDbyTypeName[N.type, N.name]
-    ins_values = [ { 'NODE_ID': nodeid,
+    node_id = self.__IDbyTypeName[t, name]
+    ins_values = [ { 'NODE_ID': node_id,
                      'ATTR':    attr,
                      'VALUE':   self.totext(value),
                    } for value in values ]
     self.attrs.insert().execute(ins_values)
 
-  def set1Attr(self, N, attr, value):
+  def set1Attr(self, t, name, attr, value):
     # special case, presumes there's only one VALUE
     assert not self.nodedb.readonly
-    nodeid = self.__IDbyTypeName[N.type, N.name]
-    self.attrs.update().where(and_(self.attrs.c.NODE_ID == nodeid,
+    node_id = self.__IDbyTypeName[t, name]
+    self.attrs.update().where(and_(self.attrs.c.NODE_ID == node_id,
                                    self.attrs.c.ATTR == attr)) \
                        .values(VALUE=value) \
                        .execute()
 
-  def delAttr(self, N, attr):
+  def delAttr(self, t, name, attr):
     assert not self.nodedb.readonly
-    nodeid = self.__IDbyTypeName[N.type, N.name]
-    self.attrs.delete(and_(self.attrs.c.NODE_ID == nodeid,
+    node_id = self.__IDbyTypeName[t, name]
+    self.attrs.delete(and_(self.attrs.c.NODE_ID == node_id,
                            self.attrs.c.ATTR == attr)).execute()
 
 class TestAll(NodeTestAll):

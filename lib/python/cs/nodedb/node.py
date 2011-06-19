@@ -1404,14 +1404,20 @@ class Backend(_BackendMappingMixin):
     assert not hasattr(self, 'nodedb')
     self.nodedb = nodedb
 
+  def nodedata(self):
+    ''' Yield node data in:
+          type, name, attrmap
+        form.
+    '''
+    for k, attrmap in self.iteritems():
+      yield k[0], k[1], attrmap
+
   def apply(self, nodedb):
     ''' Apply the nodedata from this backend to a NodeDB.
         Can be overridden by subclasses to provide some backend
         specific efficient implementation.
     '''
-    for k, attrmap in self.iteritems():
-      t, name = k
-      nodedb.apply_nodedata( ((t, name, attrmap),) )
+    nodedb.apply_nodedata(self.nodedata())
 
   def totext(self, value):
     ''' Hook for subclasses that might do special encoding for their backend.
