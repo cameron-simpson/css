@@ -53,26 +53,6 @@ class Backend_TokyoCabinet(Backend):
     with self.tclock:
       return self.tcdb.fwmkeys(':'.join( (t, name) ))
 
-  def apply(self, nodedb):
-    ''' Apply this database to the specified nodedb.
-	We take the lock briefly many times in case the nodedb ops
-	are expensive.
-    '''
-    isMyDB = (nodedb is self.nodedb)
-    db = self.tcdb
-    lock = self.tclock
-    for attrtag in self.attrtags():
-      with lock:
-        attrtexts = db[attrtag]
-      attr, t, name = attrtag.split(':', 2)
-      try:
-        N = nodedb[t, name]
-      except KeyError:
-        N = nodedb._makeNode(t, name)
-      values = [ self.fromtext(text) for text in attrtexts.split('\0') ]
-      # add they values; don't 
-      N.get(attr).extend( values, noBackend=isMyDB )
-
   def attrtags(self):
     with self.tclock:
       allattrtags = self.tcdb.fwmkeys('')
