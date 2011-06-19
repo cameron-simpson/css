@@ -121,17 +121,17 @@ class Backend_CSVFile(Backend):
     if not self.nodedb.readonly:
       write_csv_file(self.csvpath, self.nodedb.nodedata())
 
-  def apply(self, nodedb):
-    nodedb.load_nodedata(read_csv_file(self.csvpath), doCreate=True)
+  def iteritems(self):
+    for t, name, attrmap in read_csv_file(self.csvpath):
+      yield (t, name), attrmap
 
-##  def _attrtag(self, t, name, attr):
-##    return ':'.join( (attr, t, name) )
+  def iterkeys(self):
+    for item in self.iteritems():
+      yield item[0]
 
-  def newNode(self, t, name):
-    assert not self.nodedb.readonly
-
-  def delNode(self, t, name):
-    assert not self.nodedb.readonly
+  def itervalues(self):
+    for item in self.iteritems():
+      yield item[1]
 
   def extendAttr(self, t, name, attr, values):
     assert len(values) > 0
@@ -144,7 +144,10 @@ class Backend_CSVFile(Backend):
     assert not self.nodedb.readonly
 
   def __setitem__(self, key, value):
-    pass
+    assert not self.nodedb.readonly
+
+  def __delitem(self, key):
+    assert not self.nodedb.readonly
 
 class TestAll(NodeTestAll):
 
