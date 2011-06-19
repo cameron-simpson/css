@@ -87,21 +87,20 @@ def write_csv_file(fp, nodedata, noHeaders=False):
   if not noHeaders:
     w.writerow( ('TYPE', 'NAME', 'ATTR', 'VALUE') )
   otype = None
-  oname = None
   for t, name, attrmap in nodedata:
     attrs = sorted(attrmap.keys())
-    oattr = None
     for attr in attrs:
       for value in attrmap[attr]:
         if otype is None or otype != t:
+          # new type
           otype = t
+          wt = t
         else:
-          t = ""
-          if oname is None or oname != name:
-            oname = name
-          else:
-            name = ""
-        w.writerow( (t, name, attr, value) )
+          # same type
+          wt = ""
+        w.writerow( (wt, name, attr, value) )
+        attr = ""
+        name = ""
 
 class Backend_CSVFile(Backend):
 
