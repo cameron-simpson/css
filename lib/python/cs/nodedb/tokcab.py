@@ -34,10 +34,13 @@ class Backend_TokyoCabinet(Backend):
     raise NotImplementedError
 
   def close(self):
+    if self.tcdb is None:
+      raise ValueError, "%s.tcdb is None, .lcose() already called" % (self,)
     with open("/dev/tty","w") as tty:
       tty.write("CLOSE TC\n")
     with self.tclock:
       self.tcdb.close()
+      self.tcdb = None
 
   def _attrtag(self, type, name, attr):
     return ':'.join( (attr, type, name) )
