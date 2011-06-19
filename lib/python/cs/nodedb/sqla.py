@@ -66,11 +66,6 @@ class Backend_SQLAlchemy(Backend):
     self.__nodekeysByID = {}
     self.__IDbyTypeName = {}
 
-  def nodeByTypeName(self, t, name):
-    ''' Map (type,name) to Node.
-    '''
-    return self.__nodekeysByID[self.__IDbyTypeName[t, name]]
-
   def _noteNodeKey(self, t, name, node_id):
     nodekey = (t, name)
     self.__nodekeysByID[node_id] = nodekey
