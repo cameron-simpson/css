@@ -98,13 +98,12 @@ class Backend_SQLAlchemy(Backend):
     # load Node attributes
     # TODO: order by NODE_ID, ATTR and use .extend in batches
     onode_id = None
-    for attrid, node_id, attr, value in select( [ attrs.c.ID,
-                                                  attrs.c.NODE_ID,
-                                                  attrs.c.ATTR,
-                                                  attrs.c.VALUE,
-                                                ] ) \
-                                        .order_by(asc(attrs.c.NODE_ID)) \
-                                        .execute():
+    for node_id, attr, value in select( [ attrs.c.NODE_ID,
+                                          attrs.c.ATTR,
+                                          attrs.c.VALUE,
+                                        ] ) \
+                                .order_by(asc(attrs.c.NODE_ID)) \
+                                .execute():
       if node_id not in byID:
         error("invalid NODE_ID(%s): ignore %s=%s" % (node_id, attr, value))
         continue
