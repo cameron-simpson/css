@@ -447,6 +447,12 @@ class Node(dict):
     '''
     return get0(self.get(attr, ()), default=default)
 
+  def apply(self, mapping):
+    ''' Extend a Node's attributes with the values in mapping.
+    '''
+    for attr, values in mapping.items():
+      self.get(attr).extend(values)
+
   def update(self, new_attrs, delete_missing=False):
     ''' Update this Node with new attributes, optionally removing
         extraneous attributes.
@@ -456,9 +462,7 @@ class Node(dict):
     '''
     with Pfx("%s.update" % (self,)):
       # add new attributes
-      new_attr_names = new_attrs.keys()
-      new_attr_names.sort()
-      for attr in new_attr_names:
+      for attr in sorted(new_attrs.keys()):
         k, plural = parseUC_sAttr(attr)
         if not k:
           error("ignore non-ATTRs: %s", attr)
@@ -951,7 +955,7 @@ class NodeDB(dict):
         attrmap[attr] = [ self.totext(value) for value in values ]
       yield N.type, N.name, attrmap
 
-  def load_nodedata(self, nodedata, doCreate=True):
+  def apply_nodedata(self, nodedata, doCreate=True):
     ''' Load `nodedata`, a sequence of:
           type, name, attrmap
         into this NodeDB.
@@ -961,9 +965,10 @@ class NodeDB(dict):
         N = self.make( (t, name) )
       else:
         N = self[t, name]
+      mapping = {}
       for attr, values in attrmap.items():
-        values = [ self.fromtext(value) for value in values ]
-        N.get(attr).extend(values)
+        mapping[attr] = [ self.fromtext(value) for value in values ]
+      N.apply(mapping)
 
   def nodespec(self, spec, doCreate=False):
     ''' Generator that parses a comma separated string specifying
@@ -1327,9 +1332,7 @@ class _BackendMappingMixin(object):
     return len(self.keys())
 
   def keys(self):
-    keylist = list(self.iterkeys())
-    error("keylist = %s", `keylist`)
-    return keylist
+    return list(self.iterkeys())
 
   def iterkeys(self):
     ''' Yield (type, name) tuples for all nodes in the backend database.
@@ -1402,12 +1405,13 @@ class Backend(_BackendMappingMixin):
     self.nodedb = nodedb
 
   def apply(self, nodedb):
-    ''' Can be overridden by subclasses to provide some backend
+    ''' Apply the nodedata from this backend to a NodeDB.
+        Can be overridden by subclasses to provide some backend
         specific efficient implementation.
     '''
-    for k, N in self.iteritems():
-      for attr in N.keys():
-        nodedb[k].get(attr).extend(N[attr])
+    for k, attrmap in self.iteritems():
+      t, name = k
+      nodedb.apply_nodedata( ((t, name, attrmap),) )
 
   def totext(self, value):
     ''' Hook for subclasses that might do special encoding for their backend.
@@ -1453,8 +1457,6 @@ class Backend(_BackendMappingMixin):
 class _NoBackend(Backend):
   ''' Dummy backend for emphemeral in-memory NodeDBs.
   '''
-  def apply(self, nodedb):
-    pass
   def close(self):
     pass
   def extendAttr(self, type, name, attr, values):
@@ -1463,6 +1465,10 @@ class _NoBackend(Backend):
     pass
   def set1Attr(self, type, name, attr, value):
     pass
+  def iterkeys(self):
+    if False:
+      yield None
+
   def __getitem__(self, key):
     raise KeyError
   def __setitem__(self, key, N):
