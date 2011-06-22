@@ -35,17 +35,40 @@ def main(argv):
   otherupto = 0
   S = SequenceMatcher(None, locallines, otherlines)
   for localstart, otherstart, length in S.get_matching_blocks():
+    # recite the local gap
     for line in locallines[localupto:localstart]:
       sys.stdout.write(line)
+    localupto = localstart
 
-    for line in locallines[localstart:localstart+length]:
-      sys.stdout.write(line)
-
-    localupto = localstart+length
+    # recite the other gap
     for line in otherlines[otherupto:otherstart]:
       sys.stdout.write(line)
+    otherupto = otherstart
 
-    otherupto = otherstart+length
+    # check that the match section really matches
+    if locallines[localstart:localstart+length] != otherlines[otherstart:otherstart+length]:
+      sys.stderr.write("%s: error: %s[%d:%d] does not match %s[%d:%d]\n"
+                       % (cmd,
+                          localfile, localstart+1, localstart+length+1,
+                          otherfile, otherstart+1, otherstart+length+1))
+      for line in locallines[localstart:localstart+length]:
+        sys.stderr.write("LOCAL: "+line)
+      for line in otherlines[otherstart:otherstart+length]:
+        sys.stderr.write("OTHER: "+line)
+      raise ValueError, "match section does not match"
+
+    # recite the matching section
+    for line in locallines[localstart:localstart+length]:
+      sys.stdout.write(line)
+    localupto += length
+    otherupto += length
+
+  # recite tail sections, if any
+  for line in locallines[localupto:]:
+    sys.stdout.write(line)
+  for line in otherlines[otherupto:]:
+    sys.stdout.write(line)
+
   sys.stdout.flush()
 
   return xit
