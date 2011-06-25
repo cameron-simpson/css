@@ -1,0 +1,87 @@
+#!/bin/sh
+#
+# Mount partition from disc image, run command, tidy up.
+#       - Cameron Simpson <cs@zip.com.au> 25jun2011
+#
+
+set -ue
+
+trace=set-x
+partition=1
+fstype=ext3
+rwmode=ro
+mapperdir=/dev/mapper
+mountdir=/mnt
+
+cmd=`basename "$0"`
+usage="Usage: $cmd imgfile [partition#] command [args...]"
+
+badopts=
+
+if [ $# = 0 ]
+then
+  echo "$cmd: missing imgfile" >&2
+  badopts=1
+else
+  imgfile=$1
+  shift
+  if [ ! -s "$imgfile" ]
+  then
+    echo "$cmd: imgfile $imgfile: missing" >&2
+    badopts=1
+  else
+    case "$imgfile" in
+      *.img) ;;
+      *)  echo "$cmd: warning: imgfile $imgfile: does not end in .img" >&2
+          ;;
+    esac
+  fi
+  if [ $# -gt 0 ]
+  then
+    case "$1" in
+      0)  echo "$cmd: partition# $1: partitions count from 1" >&2
+          badopts=1
+          shift
+          ;;
+      [1-9]*)
+          partition=$1
+          shift
+          ;;
+    esac
+  fi
+  if [ $# = 0 ]
+  then
+    echo "$cmd: missing command" >&2
+    badopts=1
+  fi
+fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+xit=0
+
+loopdev=`$trace losetup -f`
+loopbase=`basename "$loopdev"`
+looppartbase=${loopbase}p${partition}
+looppart=$mapperdir/$looppartbase
+mountpoint=$mountdir/$looppartbase
+if $trace losetup "$loopdev" "$imgfile"
+then
+  fdisk -l "$loopdev"
+  if $trace kpartx -av "$loopdev"
+  then
+    if $trace mkdir "$mountpoint"
+    then
+      if $trace mount -t "$fstype" -o "$rwmode" "$looppart" "$mountpoint"
+      then
+        $trace "$@" || xit=$?
+        $trace umount "$mountpoint" || xit=1
+      fi
+      $trace rmdir "$mountpoint" || xit=1
+    fi
+    $trace kpartx -dv "$loopdev" || xit=1
+  fi
+  $trace losetup -d "$loopdev" || xit=1
+fi
+
+exit $xit
