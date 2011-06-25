@@ -18,7 +18,8 @@ usage = '''Usage: %s [options...] configfile [patchfile]
   -A    Append new keywords to the end of the file (default).
   -D    Delete old keyword lines instead of commenting.
   -I    Insert new keywords at the start of the file.
-  -i    Match keywords on a case-insensitive basis.''' % (cmd,)
+  -i    Match keywords on a case-insensitive basis.
+  -/sep Keywords separated from rest of line by sep instead of whitespace.''' % (cmd,)
 
 badopts = False
 
@@ -27,9 +28,10 @@ commentOut = True
 useRewriteif = False
 caseSensitive = True
 configFile = None
+sep = None
 
 try:
-  opts, args = getopt.getopt(sys.argv[1:],'#ADIRi')
+  opts, args = getopt.getopt(sys.argv[1:],'#ADIRi/:')
 except getopt.GetoptError, e:
   print >>sys.stderr, "%s: %s" % (cmd, e)
   badopts = True
@@ -48,6 +50,8 @@ else:
       useRewriteif = True
     elif opt == '-i':
       caseSensitive = True
+    elif opt == '-/':
+      sep = val
     else:
       print >>sys.stderr, "%s: unimplemented option: %s" % (cmd, opt)
       badopts = True
@@ -89,7 +93,7 @@ for line in patchData:
   line = line.strip()
   if len(line) == 0 or line[0] == '#':
     continue
-  keyword = line.split()[0]
+  keyword = line.split(sep)[0]
   if not caseSensitive:
     keyword = keyword.lower()
   keywords[keyword] = None
@@ -109,7 +113,7 @@ else:
 
 for line in configData:
   assert line.endswith('\n')
-  words = line.strip().split()
+  words = line.strip().split(sep)
   if len(words) > 0:
     word1 = words[0]
     if not caseSensitive:
