@@ -28,24 +28,29 @@ useRewriteif = False
 caseSensitive = True
 configFile = None
 
-opts, args = getopt.getopt(sys.argv[1:],'#ADIRi')
-
-for opt, val in opts:
-  if opt == '-#':
-    commentOut = True
-  elif opt == '-A':
-    insert = False
-  elif opt == '-D':
-    commentOut = False
-  elif opt == '-I':
-    insert = True
-  elif opt == '-R':
-    useRewriteif = True
-  elif opt == '-i':
-    caseSensitive = True
-  else:
-    print >>sys.stderr, "%s: unimplemented option: %s" % (cmd, opt)
-    badopts = True
+try:
+  opts, args = getopt.getopt(sys.argv[1:],'#ADIRi')
+except getopt.GetoptError, e:
+  print >>sys.stderr, "%s: %s" % (cmd, e)
+  badopts = True
+  args = []
+else:
+  for opt, val in opts:
+    if opt == '-#':
+      commentOut = True
+    elif opt == '-A':
+      insert = False
+    elif opt == '-D':
+      commentOut = False
+    elif opt == '-I':
+      insert = True
+    elif opt == '-R':
+      useRewriteif = True
+    elif opt == '-i':
+      caseSensitive = True
+    else:
+      print >>sys.stderr, "%s: unimplemented option: %s" % (cmd, opt)
+      badopts = True
 
 if len(args) < 1:
   print >>sys.stderr, "%s: missing configfile" % (cmd,)
