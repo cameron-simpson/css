@@ -11,12 +11,14 @@ vmcfdir=/etc/libvirt/qemu
 sshcf=$HOME/.ssh/config
 trace=
 progress=
-[ -t 2 ] && { progress=--progress; trace=set-x; }
+[ -t 2 ] && { progress=--progress; trace='time set-x'; }
 
 cmd=`basename "$0"`
 usage="Usage: $cmd [-B backup_root] [-F ssh_config_file] [hosts...]
+  -x                    Trace execution of main actions.
   -B backup_root        Root of backup tree. Default: $backup_root
-  -F ssh_config_file    SSH configuration file. Default: $sshcf"
+  -F ssh_config_file    SSH configuration file. Default: $sshcf
+  --progress            Passed to rsync."
 
 badopts=
 
@@ -25,6 +27,9 @@ do
   case $1 in
     -B) backup_root=$2; shift ;;
     -F) sshcf=$2; shift ;;
+    -x) trace='time set-x' ;;
+    --progress)
+        progress=$1 ;;
     --) shift; break ;;
     -?*)echo "$cmd: unrecognised option: $1" >&2
         badopts=1
