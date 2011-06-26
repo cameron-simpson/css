@@ -1,4 +1,4 @@
-#!/bin/sh
+a!/bin/sh
 #
 # Mount partition from disc image, run command, tidy up.
 #       - Cameron Simpson <cs@zip.com.au> 25jun2011
@@ -12,11 +12,25 @@ fstype=ext3
 rwmode=ro
 mapperdir=/dev/mapper
 mountdir=/mnt
+docd=
 
 cmd=`basename "$0"`
-usage="Usage: $cmd imgfile [partition#] command [args...]"
+usage="Usage: $cmd [--cd] imgfile [partition#] command [args...]"
 
 badopts=
+
+while [ $# -gt 0 ]
+do
+  case "$1" in
+    --cd) docd=1 ;;
+    --)   shift; break ;;
+    -?*)  echo "$cmd: unrecognised option: $1" >&2
+          badopts=1
+          ;;
+    *)    break ;;
+  esac
+  shift
+done
 
 if [ $# = 0 ]
 then
@@ -74,7 +88,14 @@ then
     then
       if $trace mount -t "$fstype" -o "$rwmode" "$looppart" "$mountpoint"
       then
-        $trace "$@" || xit=$?
+        if [ $docd ]
+        then
+          ( cd "$mountpoint"
+            $trace "$@" || xit=$?
+          )
+        else
+          $trace "$@" || xit=$?
+        fi
         $trace umount "$mountpoint" || xit=1
       fi
       $trace rmdir "$mountpoint" || xit=1
