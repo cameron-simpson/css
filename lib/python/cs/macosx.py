@@ -11,10 +11,6 @@ if sys.hexversion < 0x02060000: from sets import Set as set
 PLIST_IPHONE_SPRINGBOARD = \
         '/private/var/mobile/Library/Preferences/com.apple.springboard.plist'
 
-def is_iphone():
-  import os
-  return os.uname()[4].startswith('iPhone')
-
 def readPlist(path, binary=False):
   import plistlib
   if not binary:
