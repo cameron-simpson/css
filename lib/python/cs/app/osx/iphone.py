@@ -1,72 +1,12 @@
-#!/usr/bin/python
-#
-# MacOSX related facilities.
-#       - Cameron Simpson <cs@zip.com.au> 09may2006
-#
-
-import unicodedata
-import sys
-if sys.hexversion < 0x02060000: from sets import Set as set
+import os
 
 PLIST_IPHONE_SPRINGBOARD = \
         '/private/var/mobile/Library/Preferences/com.apple.springboard.plist'
 
-def readPlist(path, binary=False):
-  import plistlib
-  if not binary:
-    return plistlib.readPlist(path)
-  import tempfile
-  import cs.sh
-  import os
-  tfd, tpath = tempfile.mkstemp()
-  os.close(tfd)
-  if is_iphone():
-    import shutil
-    shutil.copyfile(path,tpath)
-    plargv=('plutil',
-            '-c',
-            'xml1',
-            tpath)
-  else:
-    plargv=('plutil',
-            '-convert',
-            'xml1',
-            '-o',
-            tpath,
-            path)
-  os.system("set -x; exec "+" ".join(cs.sh.quote(plargv)))
-  pl = plistlib.readPlist(tpath)
-  os.unlink(tpath)
-  return pl
-
-def writePlist(rootObj, path, binary=False):
-  import plistlib
-  if not binary:
-    return plistlib.writePlist(rootObj, path)
-  import tempfile
-  import cs.sh
-  import os
-  tfd, tpath = tempfile.mkstemp()
-  os.close(tfd)
-  plistlib.writePlist(rootObj, tpath)
-  if is_iphone():
-    import shutil
-    shutil.copyfile(path,tpath)
-    plargv=('plutil',
-            '-c',
-            'binary1',
-            tpath)
-  else:
-    plargv=('plutil',
-            '-convert',
-            'binary1',
-            '-o',
-            path,
-            tpath)
-  os.system("set -x; exec "+" ".join(cs.sh.quote(plargv)))
-  if is_iphone():
-    shutil.copyfile(tpath,path)
-  os.unlink(tpath)
+def is_iphone():
+  ''' Test if we're on an iPhone.
+  '''
+  return os.uname()[4].startswith('iPhone')
 
 class IPhoneIconList(list):
   ''' A model of the desktop icons.
@@ -133,6 +73,7 @@ class IPhoneIconList(list):
 
 class IPhonePrefsSpringboard(object):
   def __init__(self, plist = None):
+    from .plist import readPlist
     if plist is None:
       plist = PLIST_IPHONE_SPRINGBOARD
     self.plist = plist
