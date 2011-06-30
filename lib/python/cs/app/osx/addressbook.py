@@ -29,9 +29,6 @@ def addressBookPeople():
   a List of Dictionaries, with each person represented by a single record
   in the list.
   """
-  # get the shared addressbook and the list of
-  # people from the book.
-  # convert the ABPerson to a hash
   for abPerson in ABAddressBook.sharedAddressBook().people():
     yield dict( [ (k, convertObjCtype(abPerson.valueForProperty_(k)))
                   for k in abPerson.allProperties()
