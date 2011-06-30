@@ -19,9 +19,8 @@ def main(argv):
   AB = AddressBookWrapper()
   print "dir(AB.address_book) =",
   pprint.pprint(dir(AB.address_book))
-  for P in AB.people:
-    ##pprint.pprint(P)
-    pass
+  for G in AB.groups:
+    pprint.pprint(G)
 
 class AddressBookWrapper(object):
   ''' Wrapper class for Mac OSX AddressBook with more pythonic facilities.
@@ -48,10 +47,10 @@ class AddressBookWrapper(object):
     ''' Return an iterator that yields people from the addressbook
         converted to pure python types.
     '''
-    for abPerson in ABAddressBook.sharedAddressBook().people():
-      yield dict( [ (k, convertObjCtype(abPerson.valueForProperty_(k)))
-                    for k in abPerson.allProperties()
-                    if k not in ('com.apple.ABPersonMeProperty','com.apple.ABImageData',)
+    for abGroup in ABAddressBook.sharedAddressBook().groups():
+      yield dict( [ (k, convertObjCtype(abGroup.valueForProperty_(k)))
+                    for k in abGroup.allProperties()
+                    if k not in ()
                   ] )
 
 if __name__ == '__main__':
