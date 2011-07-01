@@ -4,7 +4,7 @@
 #       - Cameron Simpson <cs@zip.com.au> 29jun2011
 # 
 
-from datetime import datetime, tzinfo
+from datetime import datetime, tzinfo, timedelta
 from AddressBook import objc, NSDate, ABMultiValueCoreDataWrapper, NSCFDictionary
 
 def convertObjCtype(o):
@@ -41,10 +41,17 @@ class _offsetTZInfo(tzinfo):
     elif sign == '-':
       sign = -1
     else:
-      raise ValueError, "invalid sign '%s', should be '+' or '-'" % (sign,)
+      raise ValueError, "%s: invalid sign '%s', should be '+' or '-'" % (shhmm, sign,)
+    self._tzname = shhmm
     self.sign = sign
     self.hour = hour
     self.minute = minute
 
   def utcoffset(self, dt):
     return self.hour*60 + self.minute
+
+  def dst(self, dt):
+    return timedelta(0)
+
+  def tzname(self, dt):
+    return self._tzname
