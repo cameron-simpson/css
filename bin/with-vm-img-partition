@@ -15,7 +15,7 @@ mountdir=/mnt
 docd=
 
 cmd=`basename "$0"`
-usage="Usage: $cmd [--cd] imgfile [partition#] command [args...]"
+usage="Usage: $cmd [--cd] [--ro] [--rw] imgfile [partition#] command [args...]"
 
 badopts=
 
@@ -23,6 +23,8 @@ while [ $# -gt 0 ]
 do
   case "$1" in
     --cd) docd=1 ;;
+    --ro) rwmode=ro ;;
+    --rw) rwmode=rw ;;
     --)   shift; break ;;
     -?*)  echo "$cmd: unrecognised option: $1" >&2
           badopts=1
