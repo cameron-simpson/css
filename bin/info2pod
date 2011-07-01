@@ -7,6 +7,7 @@
 #
 #	- I want my ordinary "man" command to find info files and
 #	  do the right thing.
+#         See also: http://xkcd.com/912/
 #
 #	- the GNU people are arrogant scum, and produce farces of
 #	  manual entries, each prefaced with "we like info, so we don't

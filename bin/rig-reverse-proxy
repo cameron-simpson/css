@@ -1,0 +1,169 @@
+#!/bin/sh
+#
+# Prepare a reverse proxy.
+#       - Cameron Simpson <cs@zip.com.au> 25feb2011
+#
+
+set -ue
+
+: ${HOSTNAME:=`hostname`}
+
+trace=set-x ##eecho
+user=squid
+group=squid
+cache_all=
+force=
+revroot=/app/reverse-proxy
+revdir=
+vhost=
+origsquidconf=/etc/squid/squid.conf
+logdir=
+
+cmd=$0
+oargs=$*
+usage="Usage: $cmd [-A] [-d revdir] [-f] vhost my-ip:my-port siblings origins
+  -A            Cache all: cache everything, including CGIs and queries,
+                very aggressively.
+  -d revdir     Set up in revdir instead of $revroot/{vhost}
+  -f            Force: do setup even if the directory already exists.
+  -F squidconf  Use squidconf as master squid.conf. Default: $origsquidconf
+  -l logdir     Use logdir for logs."
+
+badopts=
+
+while [ $# -gt 0 ]
+do
+  case "$1" in
+    -A) cache_all=1 ;;
+    -d) revdir=$2; shift ;;
+    -f) force=1 ;;
+    -F) origsquidconf=$2; shift ;;
+    -l) logdir=$2; shift ;;
+    --) shift; break ;;
+    -?*)echo "$cmd: unrecognised option: $1" >&2
+        badopts=1
+        ;;
+    *)  break ;;
+  esac
+  shift
+done
+
+if [ $# -lt 4 ]
+then
+  echo "$cmd: missing arguments" >&2
+  badopts=1
+else
+  vhost=$1
+  me=$2
+  siblings=$3
+  origins=$4
+  shift; shift; shift; shift
+  [ $# = 0 ] || { echo "$cmd: extra arguments: $*" >&2
+                  badopts=1
+                }
+  case "$me" in
+    *:*)  myip=`expr "x$me" : 'x\([^:]*\):.*'`
+          myport=`expr "x$me" : 'x[^:]*:\(.*\)'`
+          ;;
+    *)    echo "$cmd: missing port in my-ip:my-port: $me" >&2
+          badopts=1
+          ;;
+  esac
+fi
+
+if [ ! -s "$origsquidconf" ]
+then
+  echo "$cmd: missing original squid conf: $origsquidconf" >&2
+  badopts=1
+fi
+
+[ -n "$revdir" ] || revdir=$revroot/$vhost
+[ -n "$logdir" ] || logdir=/var/log/vhosts/$vhost
+
+[ $force ] || [ ! -d "$revdir/." ] || { echo "$cmd: already exists: $revdir" >&2
+                                        badopts=1
+                                      }
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+cachedir=$revdir/cache
+
+conf=$revdir/squid.conf
+
+[ -d "$revdir/." ] || $trace mkdir "$revdir"
+[ -d "$cachedir/." ] || $trace mkdir "$cachedir"
+$trace chown "$user:$group" "$cachedir" || xit=1
+[ -d "$logdir/." ] || $trace mkdir "$logdir"
+$trace chown "$user:$group" "$logdir" || xit=1
+$trace rm -f "$revdir/logs"
+$trace ln -s "$logdir" "$revdir/logs"
+
+>>"$conf"
+(
+  echo "# Generated on `date`."
+  echo "# $0 $oargs"
+  echo
+  (
+    echo "visible_hostname squid-$HOSTNAME-$vhost"
+    echo "cache_effective_user $user"
+    echo "cache_effective_group $group"
+    echo "pid_filename $revdir/squid.pid"
+    echo "cache_dir ufs $cachedir 2000 16 256"
+    echo "coredump_dir none"
+    echo "logformat combined %>a %ui %un [%tl] \"%rm %ru HTTP/%rv\" %Hs %<st \"%{Referer}>h\" \"%{User-Agent}>h\" %Ss:%Sh"
+    echo "logformat haproxy %{X-Forwarded-For}>h %ui %un [%tl] \"%rm %ru HTTP/%rv\" %Hs %<st \"%{Referer}>h\" \"%{User-Agent}>h\" %Ss:%Sh"
+    echo "access_log $logdir/access.log haproxy"
+    echo "cache_log $logdir/cache.log"
+    echo "cache_store_log none"
+    if [ $cache_all ]
+    then
+      echo "refresh_pattern . 40320 20% 40320 override-expire override-lastmod ignore-reload"
+    else
+      echo "acl QUERY urlpath_regex cgi-bin \?"
+      echo "cache deny QUERY"
+    fi
+    echo "acl all src 0.0.0.0/0.0.0.0"
+    echo "acl for_$vhost dstdomain $vhost"
+    echo "acl apache rep_header Server ^Apache"
+    echo "broken_vary_encoding allow apache"
+    echo "httpd_suppress_version_string on"
+    echo "http_access allow for_$vhost"
+    echo "http_access deny all"
+    echo "icp_access allow all"
+    echo "maximum_object_size 256000 KB"
+    echo "quick_abort_min -1 KB"
+    echo "icp_port $myport"
+    echo "http_port $me accel defaultsite=$vhost"
+    for sibling in `echo "$siblings" | tr , ' '`
+    do
+      if [ "x$sibling" != "x$me" ]
+      then
+        sibip=`expr "x$sibling" : 'x\([^:]*\):.*'` \
+        || { echo "$cmd: WARNING: sibling $sibling: failed split on colon, skipping" >&2
+             continue
+           }
+        sibport=`expr "x$sibling" : 'x[^:]*:\(.*\)'`
+        echo "cache_peer $sibip sibling $sibport $sibport"
+      fi
+    done
+    for origin in `echo "$origins" | tr , ' '`
+    do
+      case "$origin" in
+        *:*)    origip=`expr "x$origin" : 'x\([^:]*\):.*'`
+                origport=`expr "x$origin" : 'x[^:]*:\(.*\)'`
+                ;;
+        *)      origip=$origin
+                origport=80
+                ;;
+      esac
+      echo "cache_peer $origip parent $origport 0 no-query round-robin originserver"
+    done
+  ) \
+  | $trace patch-config -# -I "$origsquidconf" - \
+  | grep '^[^#]'
+) \
+| $trace rewriteif -d "$conf"
+
+$trace squid -f "$conf" -z || xit=1
+
+exit $xit
