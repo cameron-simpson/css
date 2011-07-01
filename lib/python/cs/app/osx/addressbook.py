@@ -12,6 +12,7 @@
 
 import pprint
 import sys
+from thread import allocate_lock
 from AddressBook import ABAddressBook
 from .objc import convertObjCtype
 
@@ -19,7 +20,7 @@ def main(argv):
   AB = AddressBookWrapper()
   print "dir(AB.address_book) =",
   pprint.pprint(dir(AB.address_book))
-  for G in AB.groups:
+  for G in AB.people:
     pprint.pprint(G)
 
 class AddressBookWrapper(object):
@@ -30,9 +31,21 @@ class AddressBookWrapper(object):
     if address_book is None:
       address_book = ABAddressBook.sharedAddressBook()
     self.address_book = address_book
+    self._people = None
+    self._groups = None
+    self._lock = allocate_lock()
 
   @property
   def people(self):
+    ''' Return the cached list of decoded people.
+    '''
+    if self._people is None:
+      with self._lock:
+        if self._people is None:
+          self._people = list(self.iterpeople())
+    return self._people
+
+  def iterpeople(self):
     ''' Return an iterator that yields people from the addressbook
         converted to pure python types.
     '''
@@ -44,6 +57,15 @@ class AddressBookWrapper(object):
 
   @property
   def groups(self):
+    ''' Return the cached list of decoded groups.
+    '''
+    if self._groups is None:
+      with self._lock:
+        if self._groups is None:
+          self._groups = list(self.itergroups())
+    return self._groups
+
+  def itergroups(self):
     ''' Return an iterator that yields people from the addressbook
         converted to pure python types.
     '''
