@@ -18,12 +18,15 @@ revdir=
 vhost=
 origsquidconf=/etc/squid/squid.conf
 logdir=
+access_log=access.log
 
 cmd=$0
 oargs=$*
 usage="Usage: $cmd [-A] [-d revdir] [-f] vhost my-ip:my-port siblings origins
   -A            Cache all: cache everything, including CGIs and queries,
                 very aggressively.
+  --access_log access_log
+                Name the access_log. Default: $access_log
   -d revdir     Set up in revdir instead of $revroot/{vhost}
   -f            Force: do setup even if the directory already exists.
   -F squidconf  Use squidconf as master squid.conf. Default: $origsquidconf
@@ -79,6 +82,9 @@ fi
 
 [ -n "$revdir" ] || revdir=$revroot/$vhost
 [ -n "$logdir" ] || logdir=/var/log/vhosts/$vhost
+case "$access_log" in
+  /*)   access_log=$logdir/$access_log ;;
+esac
 
 [ $force ] || [ ! -d "$revdir/." ] || { echo "$cmd: already exists: $revdir" >&2
                                         badopts=1
@@ -112,7 +118,7 @@ $trace ln -s "$logdir" "$revdir/logs"
     echo "coredump_dir none"
     echo "logformat combined %>a %ui %un [%tl] \"%rm %ru HTTP/%rv\" %Hs %<st \"%{Referer}>h\" \"%{User-Agent}>h\" %Ss:%Sh"
     echo "logformat haproxy %{X-Forwarded-For}>h %ui %un [%tl] \"%rm %ru HTTP/%rv\" %Hs %<st \"%{Referer}>h\" \"%{User-Agent}>h\" %Ss:%Sh"
-    echo "access_log $logdir/access.log haproxy"
+    echo "access_log $logdir/$vhost-$HOST-access_log haproxy"
     echo "cache_log $logdir/cache.log"
     echo "cache_store_log none"
     if [ $cache_all ]
