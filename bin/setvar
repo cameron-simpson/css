@@ -105,6 +105,8 @@ def bootvar(var):
         vendor="apple"
       elif opsys == "openbsd":
         vendor="openbsd"
+      elif opsys == "freebsd":
+        vendor="freebsd"
       else:
         error("unknown VENDOR for OS=%s", opsys)
     val=vendor
