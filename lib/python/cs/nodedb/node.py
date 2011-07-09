@@ -722,7 +722,6 @@ class NodeDB(dict):
     t, name = nodekey(*args)
     N = self._makeNode(t, name)
     self._backend[t, name] = N
-    self[t, name] = N
     return N
 
   def _makeNode(self, t, name):
