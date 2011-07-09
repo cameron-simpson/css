@@ -22,8 +22,10 @@ usage="Usage: $cmd [-L local] [-R master] sync"
 
 hgmaster=$HGBOX_MASTER
 hglocal=$HGBOX_LOCAL
-trace=set-x
 rsopts=-ptgolH
+trace=  ##set-x
+verbose=
+silent=
 
 badopts=
 
@@ -32,6 +34,9 @@ do
   case $1 in
     -L) hglocal=$2; shift ;;
     -R) hgmaster=$2; shift ;;
+    -x) trace=set-x ;;
+    -v) silent= verbose=1 ;;
+    -q) silent=1 verbose= ;;
     --) shift; break ;;
     -?*)echo "$cmd: unrecognised option: $1" >&2
         badopts=1
@@ -89,7 +94,7 @@ inhg()
   then
     set -- sshx -n "$inhg_host" /opt/css/bin/with-opt-css "$@"
   fi
-  set-x "$@"
+  $trace "$@"
 }
 
 sync_in()
@@ -117,14 +122,15 @@ sync_in()
           ;;
     esac
   done
+  [ $silent ] || echo "import from $sync_in_outside"
   $trace rsync -r --delete $rsopts "$@" "$sync_in_outside/" "$sync_in_inside/" >&2
 }
 
 sync_out()
 {
   [ $# = 2 ] || return 2
-  sync_in_inside=$1
-  sync_in_outside=$2
+  sync_out_inside=$1
+  sync_out_outside=$2
   shift; shift
   if [ $# -gt 0 ]
   then
@@ -146,7 +152,8 @@ sync_out()
           ;;
     esac
   done
-  $trace rsync -r --delete $rsopts "$@" "$sync_in_inside/" "$sync_in_outside/" >&2
+  [ $silent ] || echo "export to $sync_out_outside"
+  $trace rsync -r --delete $rsopts "$@" "$sync_out_inside/" "$sync_out_outside/" >&2
 }
 
 # usage: withhgoutmap command-accepting-inside-then-outside-then-args
@@ -197,9 +204,11 @@ then
   $hg commit -m "sync in `hostname`:`pwd`"
 fi
 
+[ $silent ] || echo "import from $hgmaster"
 $hg fetch "$hgmaster"
 
 withhgoutmap sync_out
 
+[ $silent ] || echo "export to $hgmaster"
 $hg push "$hgmaster"
 inhg "$hgmaster" $hg up
