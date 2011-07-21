@@ -243,8 +243,12 @@ def pfxtag(tag, loggers=None):
         def f(...):
   '''
   def wrap(func):
+    if tag is None:
+      wraptag = func.func_name
+    else:
+      wraptag = tag
     def wrapped(*args, **kwargs):
-      with Pfx(tag, loggers=loggers):
+      with Pfx(wraptag, loggers=loggers):
         return func(*args, **kwargs)
     return wrapped
   return wrap
