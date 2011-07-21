@@ -61,13 +61,21 @@ class Pfx_LoggerAdapter(logging.LoggerAdapter):
       msg = _prefix.cur.prefix + ": " + msg
     return msg, kwargs
 
-def pfx(tag, loggers=None):
-  ''' Decorator for functions that should run inside:
+def pfx(tag=None, loggers=None):
+  ''' Decorator for functions to wrap them in:
         with Pfx(tag, loggers=loggers):
+      The tag defaults to the function name.
+      Thus:
+        @pfx([tag])
+        def func(...):
   '''
   def wrap(func):
+    if tag is None:
+      wraptag = func.func_name
+    else:
+      wraptag = tag
     def wrapped(*args, **kwargs):
-      with Pfx(tag, loggers=loggers):
+      with Pfx(wraptag, loggers=loggers):
         func(*args, **kwargs)
     return wrapped
   return wrap
