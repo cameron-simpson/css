@@ -6,7 +6,9 @@
 #	- Cameron Simpson <cs@zip.com.au> 31mar2006
 # 
 
+: ${EDITOR=vi}
 : ${TMPDIR:=/tmp}
+export EDITOR
 
 cmd=$0
 usage="Usage: $cmd filename"
