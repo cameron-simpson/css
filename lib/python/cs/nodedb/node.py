@@ -717,19 +717,12 @@ class NodeDB(dict):
         Subclasses of NodeDB should override _createNode, not this method.
     '''
     t, name = nodekey(*args)
-    N = self._makeNode(t, name)
-    self._backend[t, name] = N
-    self[t, name] = N
-    return N
-
-  def _makeNode(self, t, name):
-    ''' Wrapper for _createNode with collision detection and registration of
-        the new Node.
-        Subclasses of NodeDB should override _createNode, not this method.
-        Returns the new Node.
-    '''
-    assert (t, name) not in self, 'newNode(%s, %s): already exists' % (t, name)
-    N = self[t, name] = self._createNode(t, name)
+    with self._lock:
+      if (t, name) in self:
+        raise KeyError, 'newNode(%s, %s): already exists' % (t, name)
+      N = self[t, name] = self._createNode(t, name)
+      self._backend[t, name] = N
+      self[t, name] = N
     return N
 
   @property
