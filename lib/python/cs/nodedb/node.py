@@ -56,8 +56,8 @@ def nodekey(*args):
       raise ValueError, "expected TYPE to be a string"
     if type(name) is not str:
       raise ValueError, "expected NAME to be a string"
-    if not t.isupper():
-      raise ValueError, "invalid TYPE, not upper case"
+    if not t.isupper() and t != '_':
+      raise ValueError, "invalid TYPE, not upper case or _"
     if not len(name):
       raise ValueError, "empty NAME"
     return t, name
@@ -71,15 +71,15 @@ class _AttrList(list):
     ''' Initialise an _AttrList.
         `node` is the node to which this _AttrList is attached.
         `attr` is the _singular_ form of the attribute name.
-        `_items` is a private parameter for populating an _AttrList which is
-            not attached to a Node, derived from the .Xs notation.
+        `_items` is a private parameter for prepopulating an _AttrList.
+	  Usually this is one not attached to a Node, such as one
+	  derived from the .Xs notation.
 
         TODO: we currently do not rely on the backend to preserve ordering so
               lots of operations just ask the backend to totally resave the
               attribute list.
     '''
     if _items:
-      assert node is None
       list.__init__(self, _items)
     else:
       list.__init__(self)
@@ -717,19 +717,12 @@ class NodeDB(dict):
         Subclasses of NodeDB should override _createNode, not this method.
     '''
     t, name = nodekey(*args)
-    N = self._makeNode(t, name)
-    self._backend[t, name] = N
-    self[t, name] = N
-    return N
-
-  def _makeNode(self, t, name):
-    ''' Wrapper for _createNode with collision detection and registration of
-        the new Node.
-        Subclasses of NodeDB should override _createNode, not this method.
-        Returns the new Node.
-    '''
-    assert (t, name) not in self, 'newNode(%s, %s): already exists' % (t, name)
-    N = self[t, name] = self._createNode(t, name)
+    with self._lock:
+      if (t, name) in self:
+        raise KeyError, 'newNode(%s, %s): already exists' % (t, name)
+      N = self[t, name] = self._createNode(t, name)
+      self._backend[t, name] = N
+      self[t, name] = N
     return N
 
   @property
@@ -740,17 +733,25 @@ class NodeDB(dict):
     try:
       return self[key]
     except KeyError:
-      return newNode(key)
+      return self.newNode(key)
 
   def seq(self):
     ''' Obtain a new sequence number for this NodeDB.
     '''
     N_ = self._
     with self._lock:
-      i = N_.get('SEQ', 0)
-      i += 1
-      N_['SEQ'] = i
+      seqs = N_.get('SEQ', (0,))
+      i = seqs[0] + 1
+      seqs[0] = i
     return i
+
+  def seqNode(self, t=None):
+    ''' Obtain a new Node of type `t` whose name is a db-unique decimal
+        number. If `t` is missing or None, the type defaults to '_'.
+    '''
+    if t is None:
+      t = '_'
+    return self.newNode(t, str(self.seq()))
 
   def otherDB(self, dburl):
     ''' Take a database URL or sequence number and return:
@@ -1633,6 +1634,10 @@ class TestAll(unittest.TestCase):
       self.assertEquals(token, expected_token, "wrong tokenisation, expected %s but got %s" % (expected_token, token))
       value2 = self.db.fromtoken(token, node=H, attr=attr, doCreate=True)
       self.assertEquals(value2, value, "round trip fails: %s -> %s -> %s" % (value, token, value2))
+
+  def testSeqNode(self):
+    N1 = self.db.seqNode()
+    N2 = self.db.seqNode()
 
 if __name__ == '__main__':
   unittest.main()
