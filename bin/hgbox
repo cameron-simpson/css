@@ -18,7 +18,7 @@ set -ue
 : ${HGBOX_LOCAL:=$HOME/var/hgbox}
 
 cmd=`basename "$0"`
-usage="Usage: $cmd [-L local] [-R master] sync"
+usage="Usage: $cmd [-L local] [-R master] sync [-q]"
 
 hgmaster=$HGBOX_MASTER
 hglocal=$HGBOX_LOCAL
@@ -55,6 +55,12 @@ else
   shift
   case "$op" in
     sync)
+        sync_quick=
+        if [ $# -gt 0 ] && [ "x$1" = x-q ]
+        then
+          shift
+          sync_quick=1
+        fi
         [ $# = 0 ] || { echo "$cmd: extra arguments after $op: $*" >&2
                         badopts=1
                       }
@@ -204,11 +210,13 @@ then
   $hg commit -m "sync in `hostname`:`pwd`"
 fi
 
-[ $silent ] || echo "import from $hgmaster"
-$hg fetch "$hgmaster"
+if not [ $sync_quick ]
+then
+  [ $silent ] || echo "import from $hgmaster"
+  $hg fetch "$hgmaster"
+  withhgoutmap sync_out
 
-withhgoutmap sync_out
-
-[ $silent ] || echo "export to $hgmaster"
-$hg push "$hgmaster"
-inhg "$hgmaster" $hg up
+  [ $silent ] || echo "export to $hgmaster"
+  $hg push "$hgmaster"
+  inhg "$hgmaster" $hg up
+fi
