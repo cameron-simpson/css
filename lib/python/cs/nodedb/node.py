@@ -282,6 +282,25 @@ class Node(dict):
     '''
     return True
 
+  def __call__(self, name):
+    if self.name == '_':
+      # this Node it the "type" metanode
+      # .TYPE(key) is the at-need factory for a node
+      return self.nodedb.make( (self.type, name) )
+    raise TypeError, "only the NodeDB.TYPE metanode is callable"
+
+  def seq(self):
+    seqs = self.get('SEQ', (0,))
+    i = seqs[0] + 1
+    seqs[0] = i
+    return i
+
+  def seqNode(self):
+    while True:
+      key = (self.type, str(self.seq()))
+      if key not in self.nodedb:
+        return self.nodedb.make(key)
+
   def _addReference(self, onode, oattr):
     ''' Add a reference to this Node.
     '''
@@ -686,9 +705,7 @@ class NodeDB(dict):
         # return Nodes of this type
         return self.__nodesByType.get(k, ())
       else:
-        # .TYPE(key)
-        # return at-need constructor for a node
-        return lambda item: self.make(item)
+        return self.make( (k, '_') )
     return getattr(super(NodeDB, self), attr)
 
   def __getitem__(self, item):
@@ -738,12 +755,7 @@ class NodeDB(dict):
   def seq(self):
     ''' Obtain a new sequence number for this NodeDB.
     '''
-    N_ = self._
-    with self._lock:
-      seqs = N_.get('SEQ', (0,))
-      i = seqs[0] + 1
-      seqs[0] = i
-    return i
+    return self._.seq()
 
   def seqNode(self, t=None):
     ''' Obtain a new Node of type `t` whose name is a db-unique decimal
@@ -751,7 +763,7 @@ class NodeDB(dict):
     '''
     if t is None:
       t = '_'
-    return self.newNode(t, str(self.seq()))
+    return self.make( (t, '_') ).seqNode()
 
   def otherDB(self, dburl):
     ''' Take a database URL or sequence number and return:
@@ -1635,9 +1647,16 @@ class TestAll(unittest.TestCase):
       value2 = self.db.fromtoken(token, node=H, attr=attr, doCreate=True)
       self.assertEquals(value2, value, "round trip fails: %s -> %s -> %s" % (value, token, value2))
 
+  def testTYPENode(self):
+    T = self.db.TESTTYPE
+    N1 = T.seqNode()
+    N2 = T.seqNode()
+    self.assert_(int(N1.name) < int(N2.name))
+
   def testSeqNode(self):
     N1 = self.db.seqNode()
     N2 = self.db.seqNode()
+    self.assert_(int(N1.name) < int(N2.name))
 
 if __name__ == '__main__':
   unittest.main()
