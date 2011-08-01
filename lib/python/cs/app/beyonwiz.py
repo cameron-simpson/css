@@ -4,6 +4,8 @@
 ''' Classes to support access to Beyonwiz TVWiz data structures.
 '''
 
+import os.path
+import struct
 from cs.logutils import Pfx, error, setup_logging
 
 class Trunc(object):
@@ -71,4 +73,4 @@ class TVWiz(object):
         self.copyto(out)
     else:
       for buf in self.data():
-        fp.write(buf)
+        output.write(buf)
