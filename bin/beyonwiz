@@ -21,7 +21,7 @@ def main(argv):
   badopts = False
 
   if not args:
-    warn("missing operation")
+    error("missing operation")
     badopts = True
   else:
     op = args.pop(0)
