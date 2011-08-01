@@ -8,133 +8,73 @@ import sys
 import os.path
 import struct
 import cs.misc
-from cs.logutils import warn, error, setup_logging()
+from cs.logutils import Pfx, error, setup_logging
+from cs.app.beyonwiz import TVWiz
 
-usage="Usage: %s cat tvwizdirs..." % (cs.misc.cmd,)
+def main(argv):
+  args = list(argv)
+  cmd = os.path.basename(args.pop(0))
+  setup_logging(cmd)
+  usage = '''Usage:  %s cat tvwizdirs...
+        %s scan tvwizdirs...''' % (cmd, cmd)
 
-class Trunc:
-  ''' A parser for the "trunc" file in a TVWiz directory.
-      It is iterable, yielding tuples:
-        wizOffset, fileNum, flags, offset, size
-      as described at:
-        http://openwiz.org/wiki/Recorded_Files#trunc_file
-  '''
-  def __init__(self,path):
-    self.__path=path
+  badopts = False
 
-  def __iter__(self):
-    ''' The iterator to yield record tuples.
-    '''
-    fp=open(self.__path)
-    while True:
-      buf=fp.read(24)
-      if len(buf) == 0:
-        break
-      assert len(buf) == 24
-      yield struct.unpack("<QHHQL", buf)
-
-class TVWiz(Loggable):
-  def __init__(self,wizdir):
-    Loggable.__init__(self,"TVWiz(%s)"%wizdir)
-    self.__dir=wizdir
-
-  def trunc(self):
-    ''' Obtain a Trunc object for this TVWiz dir.
-    '''
-    return Trunc(os.path.join(self.__dir,"trunc"))
-
-  def data(self):
-    ''' Return a generator that yields MPEG2 data from the stream.
-    '''
-    T=self.trunc()
-    lastFileNum=None
-    for wizOffset, fileNum, flags, offset, size in T:
-      if lastFileNum is None or lastFileNum != fileNum:
-        if lastFileNum is not None:
-          fp.close()
-        fp=open(os.path.join(self.__dir,"%04d"%fileNum))
-        filePos=0
-        lastFileNum=fileNum
-      if filePos != offset:
-        fp.seek(offset)
-      while size > 0:
-        rsize=min(size,8192)
-        buf=fp.read(rsize)
-        assert len(buf) <= rsize
-        if len(buf) == 0:
-          self.logfn("unexpected EOF on %s" % fp)
-          break
-        yield buf
-        size-=len(buf)
-    if lastFileNum is not None:
-      fp.close()
-
-  def copyto(self,output):
-    ''' Transcribe the uncropped content to a file named by output.
-    '''
-    out=open(output,"w")
-    self.catto(out)
-    out.close()
-
-  def catto(self,fp):
-    ''' Transcribe the uncropped content to a file.
-    '''
-    for buf in self.data():
-      fp.write(buf)
-
-setup_logging()
-
-badopts=False
-
-args=sys.argv[1:]
-if len(args) < 1:
-  warn("missing operation")
-  badopts=True
-else:
-  op=sys.argv[1]
-  args=sys.argv[2:]
-  if op == "cat":
-    if len(args) < 1:
-      warn("%s: missing tvwizdirs" % op)
-      badopts=True
-  elif op == "scan":
-    if len(args) < 1:
-      warn("%s: missing tvwizdirs" % op)
-      badopts=True
+  if not args:
+    warn("missing operation")
+    badopts = True
   else:
-    warn("unrecognised operation: %s" % op)
-    badopts=True
+    op = args.pop(0)
+    with Pfx(op):
+      if op == "cat":
+        if len(args) < 1:
+          error("missing tvwizdirs")
+          badopts = True
+      elif op == "scan":
+        if len(args) < 1:
+          error("missing tvwizdirs")
+          badopts = True
+      else:
+        error("unrecognised operation")
+        badopts = True
 
-if badopts:
-  print >>sys.stderr, usage
-  sys.exit(2)
+  if badopts:
+    print >>sys.stderr, usage
+    return 2
 
-if op == "cat":
-  for arg in args:
-    TVWiz(arg).catto(sys.stdout)
-elif op == "scan":
-  for arg in args:
-    print arg
-    total=0
-    chunkSize=0
-    chunkOff=0
-    for wizOffset, fileNum, flags, offset, size in TVWiz(arg).trunc():
-      print "  wizOffset=%d, fileNum=%d, flags=%02x, offset=%d, size=%d" \
-            % ( wizOffset, fileNum, flags, offset, size )
-      total+=size
-      if chunkOff != wizOffset:
-        skip=wizOffset-chunkOff
-        if chunkSize == 0:
-          print "    %d skipped" % skip
-        else:
-          print "    %d skipped, after a chunk of %d" % (skip, chunkSize)
-        chunkOff=wizOffset
-        chunkSize=0
-      chunkOff+=size
-      chunkSize+=size
-    if chunkOff > 0:
-      print "    final chunk of %d" % chunkSize
-    print "  total %d" % total
-else:
-  error("unsupported operation: %s" % op)
-  sys.exit(1)
+  xit = 0
+
+  if op == "cat":
+    for arg in args:
+      TVWiz(arg).copyto(sys.stdout)
+  elif op == "scan":
+    for arg in args:
+      print arg
+      total = 0
+      chunkSize = 0
+      chunkOff = 0
+      for wizOffset, fileNum, flags, offset, size in TVWiz(arg).trunc():
+        print "  wizOffset=%d, fileNum=%d, flags=%02x, offset=%d, size=%d" \
+              % ( wizOffset, fileNum, flags, offset, size )
+        total += size
+        if chunkOff != wizOffset:
+          skip = wizOffset - chunkOff
+          if chunkSize == 0:
+            print "    %d skipped" % skip
+          else:
+            print "    %d skipped, after a chunk of %d" % (skip, chunkSize)
+          chunkOff = wizOffset
+          chunkSize = 0
+        chunkOff += size
+        chunkSize += size
+      if chunkOff > 0:
+        print "    final chunk of %d" % chunkSize
+      print "  total %d" % total
+  else:
+    error("unsupported operation: %s" % op)
+    xit = 2
+
+  return xit
+
+if __name__ == '__main__':
+  sys.exit(main(sys.argv))
