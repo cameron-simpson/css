@@ -8,6 +8,7 @@
 set -ue
 
 : ${TMPDIR:=/tmp}
+: ${HOST:=`hostname | sed 's/\..*//'`}
 
 rpmformat='%{NAME}.%{ARCH}\n'
 
@@ -55,4 +56,4 @@ set -- rpm -qa --qf "$rpmformat"
 rcmd=`shqstr "$@"`
 
 tag_fd 2 "$otherhost" sshto "$otherhost" "$rcmd" | sort >"$tmpf"
-"$@" | sort | diff -u - "$tmpf" | sed -n "1,2d; s/^-/$otherhost: /p; s/^+/local: /p"
+"$@" | sort | diff -u - "$tmpf" | sed -n "1,2d; s/^-/$otherhost: /p; s/^+/$HOST: /p"
