@@ -43,7 +43,7 @@ usage="Usage: $cmd [-v] [-w width] [-h height] [-x x-pos] [-y y-pos]
 		[{-c shellcmd}/{-e exec-list}/{-- raw-args}]"
 
 windowmode=tab
-trace=
+trace=${DEBUG:+set-x}
 termopts=
 xrmopts=
 dotrans=
@@ -106,7 +106,7 @@ do
     -y)		y=$2 ; shift ;;
     -n|-T)	title=$2 ; shift ;;
     -f)		f=$2 ; shift ;;
-    -env)	exec genv TERMOPTIONS TERMTINT TERMSHADE ;;
+    -env)	exec $trace genv TERMOPTIONS TERMTINT TERMSHADE ;;
     -keepio)	detach= ;;
     -xauthhack)	xauthhack=1 ;;
     -tab)       windowmode=tab ;;
@@ -143,7 +143,7 @@ case "$OS,$TERM,$DISPLAY" in
       dumpenv -f -sh
       printf "%s\n" ": set -x; rm -f $qrunme; cd $qwd; exec $qcmd"
     ) >"$runme"
-    chmod u+rx "$runme"
+    $trace chmod u+rx "$runme"
     case $windowmode in
       tab)    itermterm='current terminal' ;;
       window) itermterm='make new terminal' ;;
@@ -170,7 +170,7 @@ case "$OS,$TERM,$DISPLAY" in
     if [ -n "$X11_COMPOSITE" ]
     then
       qcmd=`shqstr "$@"`
-      set -- sh -c "( exec >/dev/null; sleep 2; xwin-transset \"\$WINDOWID\" ) & exec $qcmd"
+      set -- sh -c "( exec >/dev/null; sleep 2; $trace xwin-transset \"\$WINDOWID\" ) & exec $trace $qcmd"
     fi
     case "$PREFTERM" in
       gnome-terminal) termopts="$termopts --title \"\$title\" $xrmopts" ;;
@@ -277,4 +277,4 @@ then
   ##exec 2>>$HOME/var/log/alert
   set -- bgproc -p - -- "$@"
 fi
-exec "$@"
+exec $trace "$@"

@@ -19,7 +19,7 @@ usage="Usage: $cmd [options...] [--] filename [command args...]
 	-v	Verbose.
         -x      Trace execution of underlying commands."
 
-trace=
+trace=${DEBUG:+set-x}
 rw0=
 doit=1
 dodiff=

@@ -17,6 +17,7 @@ silent=
 
 badopts=
 
+trace=${DEBUG:+set-x}
 diff=diff
 arg1opts=
 
@@ -52,30 +53,30 @@ fi
 
 tmp=$TMPDIR/filter$$
 bak=$TMPDIR/bak$$
-trap 'rm -f "$tmp" "$bak"' 0
-trap 'rm -f "$tmp" "$bak"; exit 1' 1 2 13 15
+trap '$trace rm -f "$tmp" "$bak"' 0
+trap '$trace rm -f "$tmp" "$bak"; exit 1' 1 2 13 15
 
-arg1 $arg1opts -- "$file" "$@" <"$file" >"$tmp" || exit 1
+$trace arg1 $arg1opts -- "$file" "$@" <"$file" >"$tmp" || exit 1
 
 [ -s "$tmp" ] || { echo "$cmd: empty result, aborting" >&2
 		   exit 1
 		 }
 
 xit=0
-if cmp -s "$tmp" "$file"
+if $trace cmp -s "$tmp" "$file"
 then
   :
 else
   # changed; backup then overwrite
-  [ $silent ] || $diff $DIFFOPTS "$file" "$tmp"
-  if cp "$file" "$bak"
+  [ $silent ] || $trace $diff $DIFFOPTS "$file" "$tmp"
+  if $trace cp "$file" "$bak"
   then
-    if cat <"$tmp" >"$file"
+    if $trace cat <"$tmp" >"$file"
     then
-	rm "$bak"
+	$trace rm "$bak"
     else
       echo "$cmd: couldn't copy new content back onto $file" >&2
-      if cat <"$bak" >"$file"
+      if $trace cat <"$bak" >"$file"
       then
 	echo "$cmd: restored original content from backup" >&2
 	exit 1

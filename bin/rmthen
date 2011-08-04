@@ -4,10 +4,13 @@
 #	- Cameron Simpson <cs@zip.com.au> 01feb2004
 #
 
+set -ue
+
 cmd=$0
 usage="Usage: $cmd [-f] file command [args...]"
 
 fflag=
+trace=${DEBUG:+set-x}
 
 badopts=
 
@@ -28,5 +31,5 @@ fi
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
-rm $fflag "$file" || exit 1
-exec "$@"
+$trace rm $fflag "$file" || exit 1
+exec $trace "$@"

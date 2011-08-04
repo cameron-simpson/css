@@ -8,16 +8,16 @@
 : ${TMPDIR:=/tmp}
 : ${PAGER:=less}
 : ${SAVEDIR:=$HOME/dl}
+: ${APPHELPER_DOVIEW:=''}
+: ${APPHELPER_EXTRACT_GLOBS:=''}
+: ${APPHELPER_IDSET:=$HOME/var/apphelper}
+: ${APPHELPER_LASTVALUE:=savedir}
+: ${APPHELPER_OPTS:=''}
+: ${APPHELPER_PREOPTS:=''}
 : ${APPHELPER_REMAPFILE:=$HOME/rc/remap}
 : ${APPHELPER_SAVEMAP:="remap \"\$APPHELPER_REMAPFILE\" | tr '[A-Z_]' '[a-z-]'"}
 : ${APPHELPER_SAVEMODE:=auto}
 : ${APPHELPER_SAVEPOST:=''}
-: ${APPHELPER_IDSET:=$HOME/var/apphelper}
-: ${APPHELPER_DOVIEW:=''}
-: ${APPHELPER_EXTRACT_GLOBS:=''}
-: ${APPHELPER_OPTS:=''}
-: ${APPHELPER_PREOPTS:=''}
-: ${APPHELPER_LASTVALUE:=savedir}
 
 cmd=`basename "$0"`
 
@@ -31,7 +31,7 @@ extract_globs=$APPHELPER_EXTRACT_GLOBS
 termname=
 pager=$PAGER
 savepost=$APPHELPER_SAVEPOST
-trace=	##set-x
+trace=${DEBUG:+set-x}
 arg1opts=
 
 # =head1 SYNOPSIS
@@ -54,7 +54,7 @@ usage="Usage: $cmd [{-t|+t|-T title}] file [{-n|-y}] [-d savedir] [-i type] [-p 
 	-Y		Save the file without asking questions.
 	-A		Auto-notsave if file already present.
 	-X		Extract archive and run apphelper for each entry.
-	-x		trace execution of subcommands.
+	-x		Trace execution of subcommands.
 	-i type		Specify MIME type of file.
 	-d savedir	Save directory (from \$SAVEDIR: $savedir).
 	-p pager	Pager (default viewer, from \$PAGER: $pager).
@@ -100,9 +100,12 @@ badopts=
 # Specify the title of the fresh terminal in which to run apphelper.
 # Implies the B<-t> option.
 #
-set -x
-set -- $APPHELPER_PREOPTS ${1+"$@"}
-set +x
+if [ -n "$APPHELPER_PREOPTS" ]
+then
+  set -x
+  set -- $APPHELPER_PREOPTS ${1+"$@"}
+  set +x
+fi
 ttyopts=
 doterm=; [ -t 0 -a -t 1 ] || doterm=1
 while [ $# -gt 0 ]
@@ -645,7 +648,7 @@ exit $xit
 #	image/jpeg; apphelper %s -y xv
 #
 # which causes mutt(1),
-# on pressing enter on a JPEG attachment,
+# on pressing Enter on a JPEG attachment,
 # to hand JPEG files to apphelper
 # which runs xv(1) immediately
 # and then offers a save option.

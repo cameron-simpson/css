@@ -29,7 +29,7 @@ dostdin=
 dostdout=
 doappend=
 pos=end
-trace=
+trace=${DEBUG:+set-x}
 
 while [ $# -gt 0 ]
 do
