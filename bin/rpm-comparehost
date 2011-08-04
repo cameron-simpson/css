@@ -10,16 +10,25 @@ set -ue
 : ${TMPDIR:=/tmp}
 : ${HOST:=`hostname | sed 's/\..*//'`}
 
+trace=${DEBUG:+set-x}
 rpmformat='%{NAME}.%{ARCH}\n'
 
 cmd=`basename "$0"`
-usage="Usage: $cmd [-qf rpm-format] other-host"
+usage="Usage: $cmd [{-missing|-extra}] [-qf rpm-format] other-host
+  -missing      Report RPMs missing on this (local) host.
+  -extra        Report RPMs extra on this (local) host.
+  -qf           Specify RPM query output format. Default: $rpmformat"
 
 badopts=
+mode=diff
 
 while [ $# -gt 0 ]
 do
   case $1 in
+    -missing)
+        mode=missing ;;
+    -extra)
+        mode=extra ;;
     -qf)rpmformat=$2; shift ;;
     --) shift; break ;;
     -?*)echo "$cmd: unrecognised option: $1" >&2
@@ -55,5 +64,23 @@ trap 'rm -f "$tmpf"; exit 1' 1 3 15
 set -- rpm -qa --qf "$rpmformat"
 rcmd=`shqstr "$@"`
 
-tag_fd 2 "$otherhost" sshto "$otherhost" "$rcmd" | sort >"$tmpf"
-"$@" | sort | diff -u - "$tmpf" | sed -n "1,2d; s/^-/$otherhost: /p; s/^+/$HOST: /p"
+$trace tag_fd 2 "$otherhost" sshto "$otherhost" "$rcmd" | sort -u >"$tmpf"
+$trace "$@" | sort -u \
+| case "$mode" in
+    diff)
+      $trace diff -u - "$tmpf" | sed -n "1,2d; s/^-/$HOST: /p; s/^+/$otherhost: /p"
+      ;;
+    missing)
+      $trace comm -13 - "$tmpf"
+      ;;
+    extra)
+      $trace comm -23 - "$tmpf"
+      ;;
+    common)
+      $trace comm -12 - "$tmpf"
+      ;;
+    *)
+      echo "$cmd: unimplemented mode: $mode" >&2
+      exit 1
+      ;;
+  esac
