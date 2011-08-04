@@ -1,8 +1,10 @@
-#!/bin/sh -u
+#!/bin/sh
 #
 # Attach to specified screen or make new one of specified name.
 #	- Cameron Simpson <cs@zip.com.au> 18may2002
 #
+
+set -ue
 
 : ${TMPDIR:=/tmp}
 : ${SHELL:=/bin/sh}
@@ -77,7 +79,7 @@ then
   xit=0
   for scr in `eval "$choose" | awk '{print $1}'`
   do
-    term -iconic -e "$0" "$scr" || xit=1
+    $trace term -iconic -e $trace "$0" "$scr" || xit=1
   done
   exit $xit
 fi
