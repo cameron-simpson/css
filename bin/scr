@@ -9,6 +9,7 @@
 : ${SCR_PREARGV='ssh-agent'}
 : ${LANG:=en_US.UTF-8}
 
+trace=${DEBUG:+set-x}
 new=
 detached=
 rcfile=$HOME/.screenrc
@@ -25,12 +26,13 @@ usage="Usage:
     $cmd
 	List sessions.
     $cmd -A [[!]regexp...]
-	Put up terms for all matching screen sessions.
+	Put up term(1cs) instances for all matching screen sessions.
     $cmd [-c scrcmd]... [-l logfile] [-dm] -e cmd [args...]
 	Start new session running the supplied command.
-    $cmd [-c scrcmd]... [-l logfile] [-dm] session [cmd [args...]]
+    $cmd [-c scrcmd]... [-l logfile] [-dm] [-N] session [cmd [args...]]
 	Join named session, creating it if missing.
-        -dm         Start the session detached.
+        -N         Make a new session, even if one exists.
+        -dm        Start the session detached.
 	-c scrcmd  Run the supplied screen command in addition to the .screenrc
 	-l logfile Log session to the named file.
 		   You still need to turn logging on _in_ the session:-("
@@ -38,7 +40,7 @@ usage="Usage:
 # nothing? list active sessions
 if [ $# = 0 ]
 then
-  $screen -ls \
+  $trace $screen -ls \
   | tr -s '	' ' ' \
   | sed '/^ /!d; s/^ \([^ .]*\)\.\([^ ]*\).*/\1 \2/' \
   | sort -k 2 \
@@ -111,6 +113,7 @@ do
         break
         ;;
     -l) addscrcmds "logfile $2" "logfile flush 1" "log on"; shift ;;
+    -N) new=1; shift ;;
     --) shift; break ;;
     -?*)echo "$cmd: unrecognised option: $1" >&2
         badopts=1
@@ -133,10 +136,10 @@ fi
 which screen >/dev/null \
 || { [ $detached ] && set -- acon "$@"
      echo "$cmd: no screen command? just running: $*" >&2
-     set -x
-     exec "$@"
+     exec $trace "$@"
    }
 
+# TODO: not sure this is necessary still?
 case "$TERM" in
   rxvt-*) TERM=rxvt ;;
 esac
@@ -146,27 +149,35 @@ esac
 
 (
   # look for matching session if supplied
-  if [ -n "$sess" ]
+  case "$sess" in
+    [1-9]|[1-9][0-9]|[1-9][0-9][0-9])
+      # numeric - pull name from listing
+      if [ $new ]
+      then
+        echo "$cmd: can't specify -N (new) with numeric session indicator" >&2
+        exit 2
+      fi
+      nsess=`"$0" | sed -n "s/^ *$sess  *//p"`
+      [ -n "$nsess" ] || { echo "$cmd: no screen numbered $sess" >&2
+                           exit 1
+                         }
+      # matched - join the session unless -dm (detached) option supplied
+      [ $detached ] && exit 0
+      exec $trace $screen -c "$rcfile" -Aax "$nsess"
+      ;;
+
+    '')
+      sess=$*
+      new=1
+      ;;
+  esac
+
+  # slashes forbidden in session name - triggers multiuser mode
+  case "$sess" in */*) sess=`printf "%s" "$sess" | tr / _` ;; esac
+
+  if [ -z "$new" ]
   then
-    # otherwise convert $sess into session name to join
-    case "$sess" in
-      [1-9]|[1-9][0-9]|[1-9][0-9][0-9])
-        # numeric - pull name from listing
-        nsess=`"$0" | sed -n "s/^ *$sess  *//p"`
-        [ -n "$nsess" ] || { echo "$cmd: no screen numbered $sess" >&2
-                             exit 1
-                           }
-        # matched - join the session unless -dm (detached) option supplied
-        [ $detached ] && exit 0
-        exec $screen -c "$rcfile" -Aax "$nsess"
-        ;;
-    esac
-
-    # not numeric - look up in listing
-
-    # slashes forbidden in session - triggers multiuser mode
-    case "$sess" in */*) sess=`printf "%s" "$sess" | tr / _` ;; esac
-
+    # see if session already running - use it if so
     case "$sess" in
       *[\\.]*)
         sessre=`printf "%s" "$sess" | sed 's/[\\.]/\\&/g'`
@@ -180,15 +191,12 @@ esac
     if [ -n "$match" ]
     then
       [ $detached ] && exit 0
-      exec $screen -c "$rcfile" -Aax "$sess"
+      exec $trace $screen -c "$rcfile" -Aax "$sess"
     fi
-  else
-    sess=$*
-    case "$sess" in */*) sess=`printf "%s" "$sess" | tr / _` ;; esac
   fi
 
   # start new session
-  exec $screen -a -S "$sess" -c "$rcfile" -- "$@"
+  exec $trace $screen -a -S "$sess" -c "$rcfile" -- "$@"
 )
 xit=$?
 
