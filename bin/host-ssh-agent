@@ -4,13 +4,17 @@
 #	- Cameron Simpson <cs@zip.com.au> 13jun2006
 #
 
+set -ue
+
 cmd=$0
 usage="Usage: $cmd [command [args...]]"
 
-have-ssh-agent -h || rig-ssh-agent || exit 1
-eval `get-ssh-agent -h` || exit 1
+trace=${DEBUG:+set-x}
 
-[ $# = 0 ] && exec get-ssh-agent -h
+$trace have-ssh-agent -h || $trace rig-ssh-agent || exit 1
+eval `$trace get-ssh-agent` || exit 1
 
-eval `get-ssh-agent -h` || exit 1
-exec "$@"
+[ $# = 0 ] && exec $trace get-ssh-agent
+
+eval `$trace get-ssh-agent` || exit 1
+exec $trace "$@"

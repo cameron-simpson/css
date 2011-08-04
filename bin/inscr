@@ -39,4 +39,4 @@ fi
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
-exec scr -N -dm "$scrname" -e "$@"
+exec scr -N -dm "$scrname" "$@"

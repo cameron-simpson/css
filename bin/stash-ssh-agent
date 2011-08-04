@@ -1,20 +1,23 @@
-#!/bin/sh -u
+#!/bin/sh
 #
 # Stash the SSH environment state variables.
 #	- Cameron Simpson <cs@zip.com.au> 01feb2004
 #
 
+set -ue
+
 cmd=$0
 usage="Usage: $cmd [-h] [{-|statefile}]"
 
 statefile=
+trace=${DEBUG:+set-x}
 
 badopts=
 
 if [ $# -gt 0 ] && [ "x$1" = x-h ]
 then
   shift
-  statefile=`ssh-agent-statefile` || exit 1
+  statefile=`$trace ssh-agent-statefile` || exit 1
   [ -f "$statefile" -a -s "$statefile" ] || exit 1
   . "$statefile"
 fi
@@ -25,13 +28,13 @@ fi
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
-[ -n "$statefile" ] || statefile=`ssh-agent-statefile` || exit 1
+[ -n "$statefile" ] || statefile=`$trace ssh-agent-statefile` || exit 1
 
 [ "x$statefile" = x- ] || exec >"$statefile"
 
-env \
+$trace env \
 | sed -n 's/^\(SSH_[_A-Z]*\)=\(.*\)/\1='\''\2'\''; export \1;/p' \
-|| { [ "x$statefile" = x- ] || rm -f "$statefile"; exit 1; }
+|| { [ "x$statefile" = x- ] || $trace rm -f "$statefile"; exit 1; }
 
 [ "x$statefile" = x- ] && exit 0
-exec chmod a+rx "$statefile"
+exec $trace chmod a+rx "$statefile"

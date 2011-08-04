@@ -5,6 +5,8 @@
 #	- Cameron Simpson <cs@zip.com.au> 03jul2004
 #
 
+set -ue
+
 cmd=$0
 usage="Usage: $cmd [-h] [-0]
 	-h	Test per-host agent instead of envvar agent.
@@ -12,6 +14,7 @@ usage="Usage: $cmd [-h] [-0]
 
 perhost=
 needkeys=1
+trace=${DEBUG:+set-x}
 
 while [ $# -gt 0 ]
 do
@@ -25,7 +28,7 @@ done
 
 if [ $perhost ]
 then
-  statefile=`ssh-agent-statefile` || exit 1
+  statefile=`$trace ssh-agent-statefile` || exit 1
   [ -f "$statefile" -a -s "$statefile" ] || exit 1
   . "$statefile"
 fi
@@ -33,7 +36,7 @@ fi
 # no agent? failure
 [ -n "${SSH_AUTH_SOCK:-''}" ] || exit 2
 
-ssh-add -l >/dev/null 2>&1
+$trace ssh-add -l >/dev/null 2>&1
 case $? in
   0)	# agent with keys
 	exit 0

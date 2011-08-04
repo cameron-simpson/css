@@ -4,23 +4,34 @@
 #	- Cameron Simpson <cs@zip.com.au> 30jul2001
 #
 
+set -ue
+
 cmd=$0
 usage="Usage: $cmd [statefile]"
 
+trace=${DEBUG:+set-x}
+
 badopts=
-statefile=
-[ $# = 0 ] || { statefile=$1; shift; }
+
+if [ $# = 0 ]
+then
+  statefile=`ssh-agent-statefile`
+else
+  statefile=$1; shift
+fi
+
 [ $# = 0 ] || { echo "$cmd: extra arguments: $*" >&2; badopts=1; }
+
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
-have-ssh-agent -h -0 || exit 1
-
-# protect against rogue output
-exec 3>&1 1>/dev/null
-
-[ -n "$statefile" ] || statefile=`ssh-agent-statefile` || exit 1
-
-[ -s "$statefile" ] \
-&& . "$statefile" \
-&& have-ssh-agent -0 \
-&& echo ". '$statefile'" >&3
+if $trace [ -s "$statefile" ]
+then
+  # protect against rogue output
+  exec 3>&1 1>/dev/null
+  . "$statefile" \
+  && $trace have-ssh-agent -0 \
+  && echo ". '$statefile'" >&3
+else
+  echo "$cmd: missing statefile: $statefile" >&2
+  exit 1
+fi

@@ -1,12 +1,15 @@
-#!/bin/sh -u
+#!/bin/sh
 #
 # Set up a per-host ssh-agent in daemon mode if needed.
 #	- Cameron Simpson <cs@zip.com.au> 30jul2001
 #
 
+set -ue
+
 cmd=$0
 usage="Usage: $cmd [statefile]"
 
+trace=${DEBUG:+set-x}
 statefile=
 badopts=
 
@@ -27,18 +30,17 @@ done
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
-[ -n "$statefile" ] || statefile=`ssh-agent-statefile` || exit 1
-eval `get-ssh-agent "$statefile" || echo false` && exit 0
+[ -n "$statefile" ] || statefile=`$trace ssh-agent-statefile` || exit 1
+eval `$trace get-ssh-agent "$statefile" || echo false` && exit 0
 
 # some machines don't have an ssh-agent:-(
-agent=`which ssh-agent` || exit 1
+agent=`$trace which ssh-agent` || exit 1
 [ -x "$agent" ] || exit 1
 
 export statefile
-exec bgproc \
+exec $trace bgproc \
   rmthen -f "$statefile" \
-  no-ssh-agent \
-  set-x \
-  ssh-agent \
-  sh -c 'stash-ssh-agent "$statefile"; exec pause' \
+  $trace no-ssh-agent \
+  $trace ssh-agent \
+  $trace sh -c 'stash-ssh-agent "$statefile"; exec pause' \
   </dev/null

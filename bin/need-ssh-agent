@@ -7,25 +7,29 @@
 #	- Cameron Simpson <cs@zip.com.au> 22aug2000
 #
 
+set -ue
+
 usage="Usage: $0 [-f] [-n] [command [args...]]
 	-f	Flush - ignore any current agent.
 	-n	Test only - don't execute command."
 
+trace=${DEBUG:+set-x}
 testonly=
 flush=
 
 badopts=
-while :
-do  case $1 in
-	-f)	flush=1 ;;
-	-n)	testonly=1 ;;
-	--)	shift; break ;;
-	-?*)	echo "$cmd: unrecognised option: $1" >&2
-		badopts=1
-		;;
-	*)	break ;;
-    esac
-    shift
+while [ $# -gt 0 ]
+do
+  case $1 in
+    -f)	flush=1 ;;
+    -n)	testonly=1 ;;
+    --)	shift; break ;;
+    -?*)echo "$cmd: unrecognised option: $1" >&2
+        badopts=1
+        ;;
+    *)	break ;;
+  esac
+  shift
 done
 
 if [ $# = 0 ];	then shell=${SHELL-/bin/sh}
@@ -37,18 +41,18 @@ fi
 		  then
 		      exit 2
 		  else
-		      exec "$shell" ${1+"$@"}
+		      exec $trace "$shell" ${1+"$@"}
 		  fi
 		}
 
 [ $flush ] && unset SSH_AUTH_SOCK SSH_AGENT_PID SSH_AUTHENTICATION_IGNORE
 
-v=`get-ssh-agent`
+v=`$trace get-ssh-agent`
 
 if [ -n "$SSH_AUTHENTICATION_IGNORE" ]
 then  :	loop protection
 else
-  if ssh-add -l >/dev/null 2>&1
+  if $trace ssh-add -l >/dev/null 2>&1
   then  : we have a socket available
   else
     if [ -s "$stashed" -a -r "$stashed" ]
@@ -57,7 +61,7 @@ else
     fi
     if [ -n "$SSH_AUTH_SOCK" ] \
     && exists "$SSH_AUTH_SOCK" \
-    && ssh-add -l >/dev/null 2>&1
+    && $trace ssh-add -l >/dev/null 2>&1
     then
       : we have an usable inherited socket available
     else
@@ -68,8 +72,8 @@ else
       SSH_AUTHENTICATION_IGNORE=1; export SSH_AUTHENTICATION_IGNORE
 
       [ -t 1 ] && echo "starting ssh-agent ..."
-      eval `ssh-agent -s`
-      rm -f "$stashed"
+      eval `$trace ssh-agent -s`
+      $trace rm -f "$stashed"
     fi
   fi
 fi
@@ -77,7 +81,7 @@ fi
 [ $testonly ] && exit 1		# false ==> we don't need it
 
 [ -s "$stashed" ] \
-|| not ssh-add -l >/dev/null \
-|| stash-ssh-agent "$stashed"
+|| $trace not ssh-add -l >/dev/null \
+|| $trace stash-ssh-agent "$stashed"
 
-exec "$shell" ${1+"$@"}
+exec $trace "$shell" ${1+"$@"}
