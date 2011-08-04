@@ -1,4 +1,10 @@
 #!/bin/sh
 [ $# = 0 ] && { echo "Usage: $0 command [args...]" >&2; exit 2; }
+if [ "x$1" = 'x--no-tag_fd-2' ]
+then
+  shift
+else
+  [ ${DEBUG:-} ] && exec tag_fd 2 "$1" "$0" --no-tag_fd-2 "$@"
+fi
 set -x
 exec "$@"
