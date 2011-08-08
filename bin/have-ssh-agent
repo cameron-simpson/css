@@ -7,6 +7,8 @@
 
 set -ue
 
+: ${DEBUG:=}
+
 cmd=$0
 usage="Usage: $cmd [-h] [-0]
 	-h	Test per-host agent instead of envvar agent.
@@ -36,16 +38,19 @@ fi
 # no agent? failure
 [ -n "${SSH_AUTH_SOCK:-''}" ] || exit 2
 
-$trace ssh-add -l >/dev/null 2>&1
-case $? in
-  0)	# agent with keys
-	exit 0
-	;;
-  1)	# agent without keys
+if if [ $DEBUG ]
+   then $trace ssh-add -l
+   else $trace ssh-add -l >/dev/null 2>&1
+   fi
+then
+  # agent with keys
+  exit 0
+else
+  case $? in
+    1)	# agent without keys
 	[ $needkeys ] && exit 1
 	exit 0
 	;;
-esac
-
-# no agent
-exit 2
+    *)  exit 2 ;;
+  esac
+fi
