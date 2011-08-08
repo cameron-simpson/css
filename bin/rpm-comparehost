@@ -30,6 +30,8 @@ do
     -extra)
         mode=extra ;;
     -qf)rpmformat=$2; shift ;;
+    -yum)
+        mode=yum-install ;;
     --) shift; break ;;
     -?*)echo "$cmd: unrecognised option: $1" >&2
         badopts=1
@@ -58,29 +60,44 @@ fi
 xit=0
 
 tmpf=$TMPDIR/$cmd.$$
-trap 'rm -f "$tmpf"; exit $xit' 0
-trap 'rm -f "$tmpf"; exit 1' 1 3 15
+tmpf1=$tmpf.a
+tmpf2=$tmpf.b
+trap 'rm -f "$tmpf".*' 0
+trap 'rm -f "$tmpf".*; exit 1' 1 3 15
 
 set -- rpm -qa --qf "$rpmformat"
 rcmd=`shqstr "$@"`
 
-$trace tag_fd 2 "$otherhost" sshto "$otherhost" "$rcmd" | sort -u >"$tmpf"
-$trace "$@" | sort -u \
-| case "$mode" in
+( 
+  $trace tag_fd 2 "$otherhost" sshto "$otherhost" "$rcmd" | sort -u >"$tmpf1" &
+  $trace "$@" | sort -u >"$tmpf2" &
+  wait
+  case "$mode" in
     diff)
-      $trace diff -u - "$tmpf" | sed -n "1,2d; s/^-/$HOST: /p; s/^+/$otherhost: /p"
+      $trace diff -u "$tmpf2" "$tmpf1" | sed -n "1,2d; s/^-/$HOST: /p; s/^+/$otherhost: /p"
       ;;
     missing)
-      $trace comm -13 - "$tmpf"
+      $trace comm -13 "$tmpf2" "$tmpf1"
       ;;
     extra)
-      $trace comm -23 - "$tmpf"
+      $trace comm -23 "$tmpf2" "$tmpf1"
       ;;
     common)
-      $trace comm -12 - "$tmpf"
+      $trace comm -12 "$tmpf2" "$tmpf1"
+      ;;
+    yum-install)
+      missing=$($trace "$0" -missing -qf "$rpmformat" "$otherhost")
+      if [ -n "$missing" ]
+      then
+        ( set -- $missing
+          set -x
+          exec su - -c "set -x; yum install $*"
+        )
+      fi
       ;;
     *)
       echo "$cmd: unimplemented mode: $mode" >&2
       exit 1
       ;;
   esac
+)
