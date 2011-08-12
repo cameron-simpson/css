@@ -487,33 +487,6 @@ class _NoNode(Node):
       return Node.__getattr__(self, attr)
     return self
 
-def nodekey(*args):
-  ''' Convert some sort of key to a (TYPE, NAME) tuple.
-      Sanity check the values.
-      Return (TYPE, NAME).
-  '''
-  if len(args) == 2:
-    t, name = args
-    assert type(t) is str
-    assert type(name) is str
-  elif len(args) == 1:
-    item = args[0]
-    if type(item) is str:
-      # TYPE:NAME
-      t, name = item.split(':', 1)
-    else:
-      # (TYPE, NAME)
-      t, name = item
-      assert type(t) is str
-      assert type(name) is str
-    assert t.isupper(), "TYPE should be upper case, got \"%s\"" % (t,)
-    assert len(name) > 0
-    k, plural = parseUC_sAttr(t)
-    assert k is not None and not plural
-  else:
-    raise TypeError, "nodekey() takes (TYPE, NAME) args or a single arg: args=%s" % ( args, )
-  return t, name
-
 class NodeDB(dict):
 
   _key = ('_', '_')     # index of metadata node
@@ -639,7 +612,7 @@ class NodeDB(dict):
     return [ t for t in byType.keys() if byType[t] ]
 
   def __contains__(self, item):
-    key = nodekey(item)
+    key = self.nodekey(item)
     return dict.__contains__(self, key)
 
   def get(self, item, default=None, doCreate=False):
@@ -659,7 +632,7 @@ class NodeDB(dict):
     return getattr(super(NodeDB, self), attr)
 
   def __getitem__(self, item):
-    key = nodekey(item)
+    key = self.nodekey(item)
     N = dict.__getitem__(self, key)
     assert isinstance(N, Node), "__getitem(%s) got non-Node: %s" % (item, repr(N))
     return N
@@ -667,7 +640,7 @@ class NodeDB(dict):
   def __setitem__(self, item, N):
     assert isinstance(N, Node), "tried to store non-Node: %s" % (repr(N),)
     assert N.nodedb is self, "tried to store foreign Node: %s" % (repr(N),)
-    key = nodekey(item)
+    key = self.nodekey(item)
     assert key == (N.type, N.name), \
            "tried to store Node(%s:%s) as key (%s:%s)" \
              % (N.type, N.name, key[0], key[1])
@@ -676,11 +649,38 @@ class NodeDB(dict):
     dict.__setitem__(self, key, N)
     self._noteNode(N)
 
+  def nodekey(self, *args):
+    ''' Convert some sort of key to a (TYPE, NAME) tuple.
+        Sanity check the values.
+        Return (TYPE, NAME).
+    '''
+    if len(args) == 2:
+      t, name = args
+      assert type(t) is str
+      assert type(name) is str
+    elif len(args) == 1:
+      item = args[0]
+      if type(item) is str:
+        # TYPE:NAME
+        t, name = item.split(':', 1)
+      else:
+        # (TYPE, NAME)
+        t, name = item
+        assert type(t) is str
+        assert type(name) is str
+      assert t.isupper(), "TYPE should be upper case, got \"%s\"" % (t,)
+      assert len(name) > 0
+      k, plural = parseUC_sAttr(t)
+      assert k is not None and not plural
+    else:
+      raise TypeError, "nodekey() takes (TYPE, NAME) args or a single arg: args=%s" % ( args, )
+    return t, name
+
   def newNode(self, *args):
     ''' Create and register a new Node.
         Subclasses of NodeDB should override _createNode, not this method.
     '''
-    t, name = nodekey(*args)
+    t, name = self.nodekey(*args)
     N = self._makeNode(t, name)
     self._backend.newNode(N)
     self[t, name] = N
@@ -1114,7 +1114,7 @@ class NodeDB(dict):
       if key not in self:
         if not doCreate:
           raise GetoptError("unknown key: %s" % (key,))
-        t, name = nodekey(key)
+        t, name = self.nodekey(key)
         N = self._makeNode(t, name)
       else:
         N=self[key]
