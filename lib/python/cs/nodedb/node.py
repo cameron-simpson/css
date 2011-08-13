@@ -556,6 +556,7 @@ class NodeDB(dict):
 
   def __init__(self, backend, readonly=False):
     dict.__init__(self)
+    self._lock = allocate_lock()
     self.readonly = readonly
     self.noNode = None
     self.__attr_type_registry = {}
@@ -566,7 +567,6 @@ class NodeDB(dict):
     self.__nodesByType = {}
     backend.set_nodedb(self)
     backend.apply(self)
-    self._lock = allocate_lock()
 
   def __str__(self):
     return "%s[_backend=%s]" % (type(self), self._backend)
