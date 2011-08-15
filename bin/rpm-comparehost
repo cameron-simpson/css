@@ -17,6 +17,7 @@ cmd=`basename "$0"`
 usage="Usage: $cmd [{-missing|-extra}] [--qf rpm-format] other-host...
   -missing      Report RPMs missing on this (local) host.
   -extra        Report RPMs extra on this (local) host.
+  -yum          Run \"yum install\" with the \"missing\" list.
   --qf          Specify RPM query output format. Default: $rpmformat"
 
 badopts=
