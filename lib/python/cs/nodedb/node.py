@@ -115,6 +115,9 @@ class _AttrList(list):
         addref(self.node, self.attr)
 
   def __str__(self):
+    return str(list(self))
+
+  def __repr__(self):
     if self.node is None:
       return ".%ss[...]" % (self.attr,)
     return "%s.%ss" % (str(self.node), self.attr)
@@ -521,6 +524,16 @@ class Node(dict):
     k, plural = parseUC_sAttr(lvalue)
     assert k, "invalid lvalue: %s" % (lvalue,)
     self[k] = list(commatext_to_values(rvalue, self.nodedb))
+
+  def safe_substitute(self, s):
+    ''' Construct a CurlyTemplate for the supplied string `s`
+        and return the result of it .safe_substitute() method
+        with this Node as 'self' in an EvalMapping.
+    '''
+    from cs.curlytplt import CurlyTemplate, EvalMapping
+    T = CurlyTemplate(s)
+    M = EvalMapping(locals={ 'self': self })
+    return T.safe_substitute(M)
 
 class _NoNode(Node):
   ''' If a NodeDB has a non-None .noNode attribute, normally it
@@ -1657,6 +1670,18 @@ class TestAll(unittest.TestCase):
     N1 = self.db.seqNode()
     N2 = self.db.seqNode()
     self.assert_(int(N1.name) < int(N2.name))
+
+  def testTemplate(self):
+    N = self.db.seqNode()
+    N.A = 1
+    N.Bs = (2,3,4)
+    self.assertEquals(N.safe_substitute('tplt 0 {self}'), 'tplt 0 _:1')
+    self.assertEquals(N.safe_substitute('tplt 0a { self }'), 'tplt 0a { self }')
+    self.assertEquals(N.safe_substitute('tplt 1 {self.A}'), 'tplt 1 1')
+    self.assertEquals(N.safe_substitute('tplt 2 {self.As}'), 'tplt 2 [1]')
+    self.assertEquals(N.safe_substitute('tplt 3 {self.Bs}'), 'tplt 3 [2, 3, 4]')
+    self.assertEquals(N.safe_substitute('tplt 4 {self.Cs}'), 'tplt 4 []')
+    self.assertEquals(N.safe_substitute('tplt 5 {self.C}'), 'tplt 5 {self.C}')
 
 if __name__ == '__main__':
   unittest.main()
