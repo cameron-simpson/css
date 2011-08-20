@@ -85,6 +85,8 @@ s/  *$//
     /^\*\*Unmatched Entries\*\*$/d
     /^Found matching [DR]SA key: /d
     /^Read error from remote host /d
+    /^User root not allowed because not listed in AllowUsers/d
+    /^User root from [^ ][^ ]* not allowed because not listed in AllowUsers : [1-9]/d
   }
   /^$/d
   s/^/sshd: /
