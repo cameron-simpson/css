@@ -530,10 +530,17 @@ class Node(dict):
         and return the result of it .safe_substitute() method
         with this Node as 'self' in an EvalMapping.
     '''
-    from cs.curlytplt import CurlyTemplate, EvalMapping
-    T = CurlyTemplate(s)
+    if False:
+      # string.Template is buggy for custom patterns
+      # so we use curly_substitute below
+      from cs.curlytplt import CurlyTemplate, EvalMapping
+      T = CurlyTemplate(s)
+      M = EvalMapping(locals={ 'self': self })
+      return T.safe_substitute(M)
+
+    from cs.curlytplt import curly_substitute, EvalMapping
     M = EvalMapping(locals={ 'self': self })
-    return T.safe_substitute(M)
+    return curly_substitute(s, mapfn = lambda foo: M[foo], safe=True)
 
 class _NoNode(Node):
   ''' If a NodeDB has a non-None .noNode attribute, normally it

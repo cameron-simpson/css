@@ -30,6 +30,30 @@ CURLY      = re_alt( ( r'\{(?P<braced>' + DOTTED + r')\}',
                      )
                    )
 re_CURLY   = re.compile(CURLY)
+re_CURLY_SIMPLE = re.compile(r'\{(?P<braced>' + DOTTED + r')\}')
+
+def curly_substitute(s, mapfn, safe=False):
+  ''' Replace '{foo}' patterns in `s` according to `mapfn(foo)`.
+      If `safe`, values of 'foo' that throw an exception from mapfn
+      are replaced by '{foo}'. Otherwise the exception is rethrown.
+      Return the string with the replacements made.
+  '''
+  sofar = 0
+  strings = []
+  for M in re_CURLY_SIMPLE.finditer(s):
+    strings.append(s[sofar:M.start()])
+    try:
+      repl = str(mapfn(M.group('braced')))
+    except Exception, e:
+      if not safe:
+        raise
+      repl = M.group()
+    strings.append(repl)
+    sofar = M.end()
+  if sofar < len(s):
+    strings.append(s[sofar:])
+  subst = ''.join(strings)
+  return subst
 
 class CurlyTemplate(string.Template):
   ''' A CurlyTemplate is a subclass of string.Template that supports a
