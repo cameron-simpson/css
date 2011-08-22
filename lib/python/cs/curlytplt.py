@@ -20,7 +20,10 @@ CONST_VALUE = re_alt( (r'\d+',
                        r"'[^\\']*'",
                       ) )
 CONST_VALUES = re_opt( CONST_VALUE + '(\s*,\s*' + CONST_VALUE + ')*' )
-CALLISH    = IDENTIFIER + re_opt( '\(\s*' + CONST_VALUES + '\s*\)' )
+CALLISH    = IDENTIFIER + re_opt( re_alt( ( '\(\s*' + CONST_VALUES + '\s*\)',
+                                            '\[\s*' + CONST_VALUE + '\s*\]',
+                                          ) )
+                                )
 DOTTED     = CALLISH + '(\.' + CALLISH + ')*'
 
 CURLY      = re_alt( ( r'\{(?P<braced>' + DOTTED + r')\}',
