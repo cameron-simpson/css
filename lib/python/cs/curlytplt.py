@@ -8,6 +8,7 @@
 import sys
 import re
 import string
+from cs.logutils import Pfx
 
 def re_alt(res, name=None):
   return '(' + '|'.join(res) + ')'
@@ -45,12 +46,14 @@ def curly_substitute(s, mapfn, safe=False):
   strings = []
   for M in re_CURLY_SIMPLE.finditer(s):
     strings.append(s[sofar:M.start()])
-    try:
-      repl = str(mapfn(M.group('braced')))
-    except Exception, e:
-      if not safe:
-        raise
-      repl = M.group()
+    key = M.group('braced')
+    with Pfx(M.group()):
+      try:
+        repl = str(mapfn(M.group('braced')))
+      except Exception, e:
+        if not safe:
+          raise
+        repl = M.group()
     strings.append(repl)
     sofar = M.end()
   if sofar < len(s):
