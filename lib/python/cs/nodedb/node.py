@@ -1158,25 +1158,11 @@ class NodeDB(dict):
     '''
     xit = 0
     if not args:
-      raise GetoptError("expected TYPE:* arguments")
+      raise GetoptError("missing arguments")
     for arg in args:
       with Pfx('"%s"' % (arg,)):
-        if arg.endswith(":*"):
-          nodetype = arg[:-2]
-          for N in self.type(nodetype):
-            print str(N)
-#           attrnames = N.attrs.keys()
-#           attrnames.sort()
-#           fields = {}
-#           for attrname in attrnames:
-#             F = [ str(v) for v in getattr(N, attrname+'s') ]
-#             if len(F) == 1:
-#               fields[attrname] = F[0]
-#             else:
-#               fields[attrname+'s'] = F
-#           print str(N), fields
-        else:
-          raise GetoptError("unsupported argument; expected TYPE:*")
+        for N in self.nodespec(arg):
+          print str(N)
     return xit
 
   def cmd_new(self, args, doCreate=True):
