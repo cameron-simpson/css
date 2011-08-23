@@ -525,9 +525,9 @@ class Node(dict):
     assert k, "invalid lvalue: %s" % (lvalue,)
     self[k] = list(commatext_to_values(rvalue, self.nodedb))
 
-  def safe_substitute(self, s):
+  def substitute(self, s, safe=False):
     ''' Construct a CurlyTemplate for the supplied string `s`
-        and return the result of it .safe_substitute() method
+        and return the result of its .substitute() method
         with this Node as 'self' in an EvalMapping.
     '''
     if False:
@@ -536,11 +536,14 @@ class Node(dict):
       from cs.curlytplt import CurlyTemplate, EvalMapping
       T = CurlyTemplate(s)
       M = EvalMapping(locals={ 'self': self })
-      return T.safe_substitute(M)
+      return T.safe_substitute(M) if safe else T.substitute(M)
 
     from cs.curlytplt import curly_substitute, EvalMapping
     M = EvalMapping(locals={ 'self': self })
-    return curly_substitute(s, mapfn = lambda foo: M[foo], safe=True)
+    return curly_substitute(s, mapfn = lambda foo: M[foo], safe=safe)
+
+  def safe_substitute(self, s):
+    return self.substitute(s, safe=True)
 
 class _NoNode(Node):
   ''' If a NodeDB has a non-None .noNode attribute, normally it
