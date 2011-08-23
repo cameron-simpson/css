@@ -1023,6 +1023,8 @@ class NodeDB(dict):
             namelist = sorted([ N.name for N in self.type(t) if fnmatch.fnmatch(N.name, n) ])
           else:
             namelist = (n, )
+          if not namelist:
+            warn("no Nodes of type \"%s\"", t)
           for n in namelist:
             N = self.get( (t, n), doCreate=doCreate )
             if N is None:
