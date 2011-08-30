@@ -535,13 +535,20 @@ class Node(dict):
       # so we use curly_substitute below
       from cs.curlytplt import CurlyTemplate, EvalMapping
       T = CurlyTemplate(s)
-      M = EvalMapping(locals={ 'self': self })
+      M = EvalMapping(locals={ 'self': self, 'NL': "\n" })
       return T.safe_substitute(M) if safe else T.substitute(M)
 
     from cs.curlytplt import curly_substitute, EvalMapping
     M = EvalMapping(locals={ 'self': self })
     with Pfx(str(self)):
-      return curly_substitute(s, mapfn = lambda foo: M[foo], safe=safe)
+      mapfn = lambda foo: M[foo]
+      return ''.join( [ curly_substitute(line,
+                                         mapfn = lambda foo: M[foo],
+                                         safe=safe,
+                                         permute=True)
+                        for line in s.splitlines(True)
+                      ]
+                    )
 
   def safe_substitute(self, s):
     return self.substitute(s, safe=True)
@@ -1679,6 +1686,7 @@ class TestAll(unittest.TestCase):
     self.assertEquals(N.safe_substitute('tplt 1 {self.A}'), 'tplt 1 1')
     self.assertEquals(N.safe_substitute('tplt 2 {self.As}'), 'tplt 2 [1]')
     self.assertEquals(N.safe_substitute('tplt 3 {self.Bs}'), 'tplt 3 [2, 3, 4]')
+    self.assertEquals(N.safe_substitute('tplt 3 {{self.Bs}}'), 'tplt 3 2tplt 3 3tplt 3 4')
     self.assertEquals(N.safe_substitute('tplt 4 {self.Cs}'), 'tplt 4 []')
     self.assertEquals(N.safe_substitute('tplt 5 {self.C}'), 'tplt 5 {self.C}')
 
