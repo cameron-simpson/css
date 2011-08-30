@@ -10,6 +10,7 @@ import re
 import string
 import unittest
 from itertools import product
+from cs.logutils import Pfx
 
 def re_alt(res, name=None):
   return '(' + '|'.join(res) + ')'
@@ -64,11 +65,13 @@ def curly_substitute(s, mapfn, safe=False, permute=False):
   strings = []
   for M in re_CURLY_SIMPLE.finditer(s):
     strings.append(s[sofar:M.start()])
+    foo = M.group('braced')
     try:
-      repl = str(mapfn(M.group('braced')))
+      repl = str(mapfn(foo))
     except Exception, e:
       if not safe:
-        raise
+        with Pfx(foo):
+          raise
       repl = M.group()
     strings.append(repl)
     sofar = M.end()
