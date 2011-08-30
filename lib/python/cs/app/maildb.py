@@ -1,7 +1,7 @@
 #!/usr/bin/python -tt
 
 from __future__ import with_statement
-from cs.logutils import setup_logging, Pfx, info, warn, error
+from cs.logutils import setup_logging, Pfx, info, warn, error, D
 from cs.mail import ismaildir, ismbox, messagesFromPath
 from cs.nodedb import NodeDB, Node, NodeDBFromURL
 from cs.misc import the
@@ -57,6 +57,7 @@ def main(argv):
           xit=2
         else:
           mdb.importAddresses(sys.stdin)
+          mdb.close()
       elif op == 'list-groups':
         if len(argv):
           groups = argv
@@ -243,8 +244,14 @@ class _MailDB(NodeDB):
       for line in fp:
         lineno += 1
         with Pfx(str(lineno)):
-          assert line.endswith('\n'), "unexpected EOF" % (lineno,)
-          groups, addr = line.strip().split(None, 1)
+          if not line.endswith('\n'):
+            error("unexpected EOF")
+            break
+          try:
+            groups, addr = line.strip().split(None, 1)
+          except ValueError:
+            error("no addresses")
+            continue
           if not len(addr):
             info("SKIP - no address")
           ##print groups, addr
