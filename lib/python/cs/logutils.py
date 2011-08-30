@@ -34,6 +34,7 @@ def setup_logging(cmd=None, main_log=None, format=None, level=None, upd_mode=Non
       using ANSI terminal sequences (currently only if cs.upd is used).
       Returns the logging level.
   '''
+  global logging_level
   if cmd is None:
     import os.path
     cmd = os.path.basename(sys.argv[0])
@@ -54,7 +55,7 @@ def setup_logging(cmd=None, main_log=None, format=None, level=None, upd_mode=Non
     ansi_mode = main_log.isatty()
   if upd_mode:
     from cs.upd import UpdHandler
-    main_handler = UpdHandler(main_log, logging.WARNING, ansi_mode=ansi_mode)
+    main_handler = UpdHandler(main_log, level, ansi_mode=ansi_mode)
   else:
     main_handler = logging.StreamHandler(main_log)
   rootLogger = logging.getLogger()
@@ -66,8 +67,8 @@ def setup_logging(cmd=None, main_log=None, format=None, level=None, upd_mode=Non
 
 def infer_logging_level():
   ''' Infer a logging level from the environment.
-      Default to logging.WARNING.
-      If sys.stderr is a terminal, default to logging.INFO.
+      Usually default to logging.WARNING, but if sys.stderr is a terminal,
+      default to logging.INFO.
       If the environment variable DEBUG is set:
         "" or "0" => same as unset; leave default as above.
         numeric non-zero => logging.DEBUG
