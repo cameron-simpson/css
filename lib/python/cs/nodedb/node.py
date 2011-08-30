@@ -423,7 +423,7 @@ class Node(dict):
   def __getattr__(self, attr):
     ''' Support .ATTR[s] and .inTYPE.
     '''
-    # .inTYPE -> referring nodes if this TYPE
+    # .inTYPE -> referring nodes of type TYPE
     if attr.startswith('in') and len(attr) > 2:
       k, plural = parseUC_sAttr(attr[2:])
       if k and not plural:
@@ -518,12 +518,12 @@ class Node(dict):
     '''
     self.nodedb.dump(fp, nodes=(self,))
 
-  def assign(self, assignment):
+  def assign(self, assignment, doCreate=False):
     from .text import commatext_to_values
     lvalue, rvalue = assignment.split('=', 1)
     k, plural = parseUC_sAttr(lvalue)
     assert k, "invalid lvalue: %s" % (lvalue,)
-    self[k] = list(commatext_to_values(rvalue, self.nodedb))
+    self[k] = list(commatext_to_values(rvalue, self.nodedb, doCreate=doCreate))
 
   def substitute(self, s, safe=False):
     ''' Construct a CurlyTemplate for the supplied string `s`
@@ -540,7 +540,8 @@ class Node(dict):
 
     from cs.curlytplt import curly_substitute, EvalMapping
     M = EvalMapping(locals={ 'self': self })
-    return curly_substitute(s, mapfn = lambda foo: M[foo], safe=safe)
+    with Pfx(str(self)):
+      return curly_substitute(s, mapfn = lambda foo: M[foo], safe=safe)
 
   def safe_substitute(self, s):
     return self.substitute(s, safe=True)
