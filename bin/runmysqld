@@ -1,0 +1,11 @@
+#!/bin/sh
+#
+# Invoke the cs.app.mysql {start|stop|status} command line mode.
+# The mysql start/stop scripts that ship with mysql itself are a
+# horrifying exercise in loose parsing and guesswork, and fill me with
+# terror as a mechanism for invoking mysql.
+#       - Cameron Simpson <cs@zip.com.au> 31aug2011
+#
+
+set -ue
+exec py27+ cs.app.mysql ${1+"$@"}
