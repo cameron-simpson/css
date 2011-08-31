@@ -2,11 +2,159 @@
 #
 #       - Cameron Simpson <cs@zip.com.au> 01may2009
 #
-#       
+#
 
 from datetime import datetime
+import os.path
 import re
 import sys
+from getopt import getopt, GetoptError
+from cs.logutils import setup_logging, Pfx, warn, error
+
+ETC_MYCNF = '/etc/my.cnf'
+PID_FILE = '/var/run/mysqld.pid'
+
+def main(argv):
+  argv = list(argv)
+  xit = 2
+  cmd = os.path.basename(argv.pop(0))
+  setup_logging(cmd = cmd)
+  usage = r'''Usage:
+    %s [-F mycnf] start [/path/to/mysqld] [mysqld-options...]
+    %s [-F mycnf] stop
+    %s [-F mycnf] status
+'''
+  badopts = False
+
+  mycnf = ETC_MYCNF
+  pid_file = PID_FILE
+
+  try:
+    opts, argv = getopt(argv, 'F:')
+  except GetoptError, e:
+    error(e)
+    badopts = True
+  else:
+    for opt, arg in opts:
+      with Pfx(opt):
+        if opt == '-F':
+          mycnf = arg
+        else:
+          error("unimplemented option")
+          badopts = True
+
+  if len(argv) == 0:
+    warn("missing op, expected {start,stop,status}")
+    badopts = True
+  else:
+    op = argv.pop(0)
+    with Pfx(op):
+      try:
+        if op == 'start':
+          xit = mysqld_start(mycnf, pid_file, argv)
+        elif op == 'stop':
+          xit = mysqld_stop(mycnf, pid_file, argv)
+        elif op == 'status':
+          xit = mysqld_status(mycnf, pid_file, argv)
+        else:
+          warn("unrecognised operation")
+          badopts = True
+      except GetoptError, e:
+        warn(e)
+        badopts = True
+
+  return xit
+
+def mycnf_read(mycnf, section):
+  ''' Read a my.cnf file and yield (option, value) tuples from the named
+      `section`. We're not using ConfigParser because you can have repeated
+      options in a my.cnf.
+  '''
+  with Pfx(mycnf):
+    with open(mycnf) as mfp:
+      in_section = False
+      lineno = 0
+      for line in mfp:
+        lineno += 1
+        if not line.endswith("\n"):
+          warn("line %d: unexpected EOF", lineno)
+        if line.startswith('#'):
+          continue
+        line = line.strip()
+        if len(line) == 0:
+          continue
+        if line.startswith('['):
+          in_section = False
+          if not line.endswith(']'):
+            warn("line %d: %s: missing ']'", lineno, line)
+          else:
+            line = line[1:-1].strip()
+            in_section = (line == section)
+          continue
+        if not in_section:
+          continue
+        try:
+          option, value = line.split('=', 1)
+        except ValueError:
+          option = line
+          value = None
+          #warn("line %d: %s: missing '='", lineno, option)
+        else:
+          option = option.rstrip()
+          value = value.lstrip()
+        yield option.strip(), value
+
+def mycnf_options(mycnf, section, optmap=None):
+  ''' Read a my.cnf file and return a map from option to values.
+      Failure to open the my.cnf file returns an empty map.
+  '''
+  if optmap is None:
+    optmap = {}
+  try:
+    options = mycnf_read(mycnf, section)
+    for opt, value in options:
+      optmap.setdefault(opt, []).append(value)
+  except IOError, e:
+    options = ()
+  return optmap
+
+def mycnf_argv(argv, optmap=None):
+  ''' Apply a list of "--option=value" string to `optmap`.
+  '''
+  if optmap is None:
+    optmap = {}
+  for arg in argv:
+    if not arg.startswith('--'):
+      raise ValueError, "bad option, no leading --: "+arg
+    try:
+      option, value = arg[2:].split('=', 1)
+    except ValueError:
+      option = arg[2:]
+      value = None
+    optmap.setdefault(option, []).append(value)
+  return optmap
+
+def mysqld_start(mycnf, pid_file, argv):
+  mysqld = 'mysqld'
+  if len(argv) > 0 and argv[0].startswith('/'):
+    mysqld = argv.pop(0)
+  optmap = {'pid-file': [pid_file]}
+  optmap = mycnf_options(mycnf, 'mysqld', optmap)
+  optmap = mycnf_argv(argv, optmap)
+  pid_file = optmap['pid-file'][-1]
+  optmap['pid-file'] = [pid_file]
+  mysqld_argv = [ mysqld, '--no-defaults' ]
+  for opt, values in optmap.iteritems():
+    for value in values:
+      if value is None:
+        mysqld_argv.append('--' + opt)
+      else:
+        mysqld_argv.append('--' + opt + '=' + value)
+  mysqld_argv.extend(argv)
+  print mysqld_argv
+  with open(pid_file, "w") as pfp:
+    pfp.write("%d\n" % (os.getpid(),))
+  os.execvp(mysqld_argv[0], mysqld_argv)
 
 class BinLogParser(object):
   ''' Read mysqlbinlog(1) output and report.
@@ -135,3 +283,6 @@ class BinLogParser(object):
     dbnames.sort()
     for dbname in dbnames:
       print "%-16s %d queries" % (dbname, len(by_dbname[dbname]))
+
+if __name__ == '__main__':
+  sys.exit(main(sys.argv))
