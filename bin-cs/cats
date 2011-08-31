@@ -1,4 +1,9 @@
 #!/bin/sh
+#
+# Regenerate my procmailrc files from my cats2procmailrc categories files.
+#       - Cameron Simpson <cs@zip.com.au>
+#
+
 cd $HOME/rc/mail || exit 1
 [ -d cats ] || exit 1
 case $# in
@@ -7,4 +12,5 @@ case $# in
   *)	echo "Usage: $0 [subfile]" >&2; exit 1;;
 esac
 touch cats.*
-exec myke _all
+exec env NL='
+' myke _all
