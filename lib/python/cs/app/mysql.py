@@ -188,26 +188,26 @@ class BinLogParser(object):
     self.db_threads = {}
     self.db_queries = []
 
-  class DBThread(object):
-    ''' A BDThread tracks a database thread state.
+  class DBThread(list):
+    ''' A DBThread tracks a database thread state.
+        The list contains DBQueries associated with the thread.
     '''
     def __init__(self, thread_id):
       self.thread_id = thread_id
-      self.queries = []
-
-    def append_query(self, query):
-      self.queries.append(query)
 
   class DBQuery(object):
+    ''' An object representing an SQL query from the binlog.
+    '''
+
     def __init__(self, dbname, when, server_id, log_pos, thread, exec_time, error_code):
       self.dbname = dbname
       self.when = when
       self.server_id = server_id
       self.log_pos = log_pos
-      self.thread = thread
       self.exec_time = exec_time
       self.error_code = error_code
-      thread.append_query(self)
+      self.thread = thread
+      thread.append(self)
 
   def thread_by_id(self, thread_id):
     thread = self.db_threads.get(thread_id, None)
@@ -282,7 +282,7 @@ class BinLogParser(object):
     by_dbname = {}
     for tid in self.db_threads.keys():
       T = self.thread_by_id(tid)
-      for Q in T.queries:
+      for Q in T:
         by_time.setdefault(Q.timestamp, []).append(Q)
         by_dbname.setdefault(Q.dbname, []).append(Q)
         if Q.exec_time > 0:
