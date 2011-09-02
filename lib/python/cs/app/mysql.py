@@ -20,10 +20,11 @@ def main(argv):
   cmd = os.path.basename(argv.pop(0))
   setup_logging(cmd = cmd)
   usage = r'''Usage:
+    %s [-F mycnf] run [/path/to/mysqld] [mysqld-options...]
     %s [-F mycnf] start [/path/to/mysqld] [mysqld-options...]
     %s [-F mycnf] stop
     %s [-F mycnf] status
-'''
+''' % (cmd, cmd, cmd, cmd)
   badopts = False
 
   mycnf = ETC_MYCNF
