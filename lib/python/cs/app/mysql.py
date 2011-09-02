@@ -45,13 +45,15 @@ def main(argv):
           badopts = True
 
   if len(argv) == 0:
-    warn("missing op, expected {start,stop,status}")
+    warn("missing op, expected {run,start,stop,status}")
     badopts = True
   else:
     op = argv.pop(0)
     with Pfx(op):
       try:
-        if op == 'start':
+        if op == 'run':
+          xit = mysqld_start(mycnf, pid_file, argv)
+        elif op == 'start':
           xit = mysqld_start(mycnf, pid_file, argv)
         elif op == 'stop':
           xit = mysqld_stop(mycnf, pid_file, argv)
@@ -63,6 +65,10 @@ def main(argv):
       except GetoptError, e:
         warn(e)
         badopts = True
+
+  if badopts:
+    sys.stderr.write(usage)
+    xit = 2
 
   return xit
 
@@ -135,7 +141,10 @@ def mycnf_argv(argv, optmap=None):
     optmap.setdefault(option, []).append(value)
   return optmap
 
-def mysqld_start(mycnf, pid_file, argv):
+def mysqld_run(mycnf, pid_file, argv, dofork=False):
+  ''' Exec a mysqld process. Write our process id to `pid_file`.
+      If `do_fork` then fork first and return the child process id.
+  '''
   mysqld = 'mysqld'
   if len(argv) > 0 and argv[0].startswith('/'):
     mysqld = argv.pop(0)
@@ -153,9 +162,19 @@ def mysqld_start(mycnf, pid_file, argv):
         mysqld_argv.append('--' + opt + '=' + value)
   mysqld_argv.extend(argv)
   print mysqld_argv
-  with open(pid_file, "w") as pfp:
-    pfp.write("%d\n" % (os.getpid(),))
+  if dofork:
+    pid = os.fork()
+    if pid > 0:
+      with open(pid_file, "w") as pfp:
+        pfp.write("%d\n" % (os.getpid(),))
+    return pid
   os.execvp(mysqld_argv[0], mysqld_argv)
+  raise RuntimeError, "NOTREACHED"
+
+def mysqld_start(mycnf, pid_file, argv):
+  ''' Start a mysqld process. Write its process id to `pid_file`. Return the process id.
+  '''
+  return mysqld_run(mycnf, pid_file, argv, dofork=True)
 
 class BinLogParser(object):
   ''' Read mysqlbinlog(1) output and report.
