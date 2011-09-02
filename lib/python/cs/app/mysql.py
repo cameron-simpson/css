@@ -10,6 +10,7 @@ import re
 import sys
 from getopt import getopt, GetoptError
 from cs.logutils import setup_logging, Pfx, warn, error
+from cs.psutils import stop
 
 ETC_MYCNF = '/etc/my.cnf'
 PID_FILE = '/var/run/mysqld.pid'
@@ -141,6 +142,13 @@ def mycnf_argv(argv, optmap=None):
     optmap.setdefault(option, []).append(value)
   return optmap
 
+def load_config(mycnf, section, argv, optmap=None):
+  if optmap is None:
+    optmap = {}
+  optmap = mycnf_options(mycnf, section, optmap)
+  optmap = mycnf_argv(argv, optmap)
+  return optmap
+
 def mysqld_run(mycnf, pid_file, argv, dofork=False):
   ''' Exec a mysqld process. Write our process id to `pid_file`.
       If `do_fork` then fork first and return the child process id.
@@ -148,9 +156,7 @@ def mysqld_run(mycnf, pid_file, argv, dofork=False):
   mysqld = 'mysqld'
   if len(argv) > 0 and argv[0].startswith('/'):
     mysqld = argv.pop(0)
-  optmap = {'pid-file': [pid_file]}
-  optmap = mycnf_options(mycnf, 'mysqld', optmap)
-  optmap = mycnf_argv(argv, optmap)
+  optmap = load_config(mycnf, 'mysqld', argv, {'pid-file': [pid_file]})
   pid_file = optmap['pid-file'][-1]
   optmap['pid-file'] = [pid_file]
   mysqld_argv = [ mysqld, '--no-defaults' ]
@@ -175,6 +181,21 @@ def mysqld_start(mycnf, pid_file, argv):
   ''' Start a mysqld process. Write its process id to `pid_file`. Return the process id.
   '''
   return mysqld_run(mycnf, pid_file, argv, dofork=True)
+
+def mysqld_status(mycnf, pid_file, argv):
+  optmap = load_config(mycnf, 'mysqld', argv, {'pid-file': [pid_file]})
+  pid_file = optmap['pid-file'][-1]
+  optmap['pid-file'] = [pid_file]
+  if stop(pid_file, signum=0):
+    info("%s: running", pid_file)
+  else:
+    info("%s: not running", pid_file)
+
+def mysqld_stop(mycnf, pid_file, argv):
+  optmap = load_config(mycnf, 'mysqld', argv, {'pid-file': [pid_file]})
+  pid_file = optmap['pid-file'][-1]
+  optmap['pid-file'] = [pid_file]
+  stop(pid_file, wait=10, do_SIGKILL=True)
 
 class BinLogParser(object):
   ''' Read mysqlbinlog(1) output and report.
