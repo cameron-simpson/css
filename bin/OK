@@ -13,6 +13,8 @@ set -ue
 : ${USER:=`id -un`}
 : ${EMAIL:=$USER}
 : ${NOTIFY:=$EMAIL}
+: ${OK:=OK:}
+: ${FAIL:=FAIL:}
 
 dopfx=
 pfx=
@@ -20,8 +22,6 @@ trace=  ##set-x
 count_re=
 words=
 wordsep=
-OK=OK:
-FAIL=FAIL:
 notifyaddr=${NOTIFY:-}
 
 cmd=`basename "$0"`
