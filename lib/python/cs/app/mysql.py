@@ -257,12 +257,12 @@ class BinLogParser(object):
         ts = query.timestamp = int(m.group(1))
         continue
 
-      if line.startswith('#') \
-      or (line.startswith('/*') and line.endswith('*/;')) \
-      or line.startswith('SET ') \
-      or line.startswith('DELIMITER ') \
-      or line.startswith('ROLLBACK') \
-      :
+      if ( line.startswith('#')
+         or ( line.startswith('/*') and line.endswith('*/;') )
+         or line.startswith('SET ')
+         or line.startswith('DELIMITER ')
+         or line.startswith('ROLLBACK')
+         ):
         ##print >>sys.stderr, "SKIP", line
         continue
 
