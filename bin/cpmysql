@@ -279,7 +279,13 @@ pull_table()
       $trace gzip -dc "$src/$_pull_table_srcdb.$_pull_table.sql.gz"
       ;;
     *)
-      mysqlcmd_src mysqldump --opt "$_pull_table_srcdb" "$_pull_table"
+      _pull_table_dumpopts=--opt
+      case "$_pull_table_srcdb.$_pull_table" in
+        mysql.*_log)
+          _pull_table_dumpopts="$_pull_table_dumpopts --skip-lock-tables"
+          ;;
+      esac
+      mysqlcmd_src mysqldump $_pull_table_dumpopts "$_pull_table_srcdb" "$_pull_table"
       ;;
   esac \
   | if [ $doit ]
