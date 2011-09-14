@@ -9,8 +9,8 @@ set -ue
 backup_root=/backup/vms
 vmcfdir=/etc/libvirt/qemu
 sshcf=$HOME/.ssh/config
-trace=
-progress=
+trace=${DEBUG:+'time set-x'}
+progress=${DEBUG:+'--progress'}
 [ -t 2 ] && { progress=--progress; trace='time set-x'; }
 
 cmd=`basename "$0"`
