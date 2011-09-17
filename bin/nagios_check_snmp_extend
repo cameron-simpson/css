@@ -1,0 +1,95 @@
+#!/bin/sh
+#
+# Nagios wrapper for snmpget that fetches nagios check strings from
+# snmpd.conf lines of the form:
+#
+#  extend {name} command...
+#
+# Cameron Simpson <cs@zip.com.au> 17sep2011
+# 
+
+set -ue
+
+trace=${DEBUG:+set-x}
+snmp_community=
+snmp_version=
+
+cmd=$0
+usage="Usage: $cmd -c community target name"
+
+badopts=
+
+while [ $# -gt 0 ]
+do
+  case $1 in
+    -c) snmp_community=$2 snmp_version=1; shift ;;
+    --) shift; break ;;
+    -?*)echo "$cmd: unrecognised option: $1" >&2
+        badopts=1
+        ;;
+    *)  break ;;
+  esac
+  shift
+done
+
+if [ -z "$snmp_community" ]
+then
+  echo "$cmd: missing SNMP community" >&2
+  badopts=1
+fi
+
+if [ $# = 0 ]
+then
+  echo "$cmd: missing target" >&2
+  badopts=1
+else
+  target=$1
+  shift
+  if [ $# = 0 ]
+  then
+    echo "$cmd: missing name" >&2
+    badopts=1
+  else
+    name=$1
+    shift
+    if [ $# -gt 0 ]
+    then
+      echo "$cmd: extra arguments: $*" >&2
+      badopts=1
+    fi
+  fi
+fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+oid=NET-SNMP-EXTEND-MIB::nsExtendOutputFull.\"$name\"
+$trace snmpget -v "$snmp_version" -c "$snmp_community" -t 1 -r 5 -m ALL "$target" "$oid" \
+| tee /dev/tty \
+| \
+{ read rt_oid rt_eq rt_string rt_output || exit 1
+  ok=1
+  [ "x$rt_oid" = "x$oid" ] \
+  || { echo "$cmd: unexpected OID return; expected '$oid' but got '$rt_oid'" >&2
+       ok=
+     }
+  [ "x$rt_eq" = x= ] \
+  || { echo "$cmd: expected '=' but got '$rt_eq'" >&2
+       ok=
+     }
+  [ "x$rt_string" = xSTRING: ] \
+  || { echo "$cmd: expected 'STRING:' but got '$rt_string'" >&2
+       ok=
+     }
+  [ $ok ] || exit 1
+  ok=
+  case "$rt_output" in
+    OK|*\ OK*)                  ok=1 xit=0 ;;
+    WARNING|*\ WARNING*)        ok=1 xit=1 ;;
+    CRITICAL|*\ CRITICAL*)      ok=1 xit=2 ;;
+    UNKNOWN|*\ UNKNOWN*)        ok=1 xit=3 ;;
+    *)  echo "$cmd: unexpected output, got '$rt_output'" >&2 ;;
+  esac
+  [ $ok ] || exit 1
+  printf '%s\n' "$rt_output"
+  exit $xit
+}
