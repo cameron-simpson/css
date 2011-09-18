@@ -64,7 +64,6 @@ fi
 
 oid=NET-SNMP-EXTEND-MIB::nsExtendOutputFull.\"$name\"
 $trace snmpget -v "$snmp_version" -c "$snmp_community" -t 1 -r 5 -m ALL "$target" "$oid" \
-| tee /dev/tty \
 | \
 { read rt_oid rt_eq rt_string rt_output || exit 1
   ok=1
@@ -83,10 +82,10 @@ $trace snmpget -v "$snmp_version" -c "$snmp_community" -t 1 -r 5 -m ALL "$target
   [ $ok ] || exit 1
   ok=
   case "$rt_output" in
-    OK|*\ OK*)                  ok=1 xit=0 ;;
-    WARNING|*\ WARNING*)        ok=1 xit=1 ;;
-    CRITICAL|*\ CRITICAL*)      ok=1 xit=2 ;;
-    UNKNOWN|*\ UNKNOWN*)        ok=1 xit=3 ;;
+    OK* | *\ OK*)                  ok=1 xit=0 ;;
+    WARNING* | *\ WARNING*)        ok=1 xit=1 ;;
+    CRITICAL* | *\ CRITICAL*)      ok=1 xit=2 ;;
+    UNKNOWN* | *\ UNKNOWN*)        ok=1 xit=3 ;;
     *)  echo "$cmd: unexpected output, got '$rt_output'" >&2 ;;
   esac
   [ $ok ] || exit 1
