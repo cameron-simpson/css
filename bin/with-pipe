@@ -1,0 +1,72 @@
+#!/bin/sh
+#
+# Create a named pipe, run chosen command with it as input, remove pipe.
+#       - Cameron Simpson <cs@zip.com.au> 01oct2011
+#
+
+set -ue
+
+: ${TMPDIR:=/tmp}
+
+trace=${DEBUG:+set-x}
+groupmode=0660
+mode=
+group=
+pipe=
+
+cmd=`basename "$0"`
+usage="Usage: $cmd [-g group] [-m mode] [-p pipename] command [args...]
+  -g group      Chgrp the pipe to the named group.
+                Implies a mode of $groupmode unless specified by -m.
+  -m mode       Chmod the pipe to the specified mode, otherwise the
+                process umask is honoured.
+  -p pipename   Specify the pipe pathname, otherwise a name is
+                chosen within \$TMPDIR ($TMPDIR).
+  The created pipe is placed in the \$PIPE envvar."
+
+badopts=
+
+while [ $# -gt 0 ]
+do
+  case $1 in
+    -g) group=$2; shift ;;
+    -m) mode=$2; shift ;;
+    -p) pipe=$2; shift ;;
+    --) shift; break ;;
+    -?*)echo "$cmd: unrecognised option: $1" >&2
+        badopts=1
+        ;;
+    *)  break ;;
+  esac
+  shift
+done
+
+if [ -z "$mode" ]
+then
+  [ -z "$group" ] || mode=0660
+fi
+
+[ -n "$pipe" ] || pipe=$TMPDIR/$cmd.$$.pipe
+
+if [ $# = 0 ]
+then
+  echo "$cmd: missing command" >&2
+  badopts=1
+fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+trap 'rm -f "$pipe"; exit 1' 1 3 15
+
+$trace mkfifo -- "$pipe"
+[ -z "$mode" ] || $trace chmod "$mode" -- "$pipe"
+
+PIPE=$pipe
+export PIPE
+
+$trace "$@"
+xit=$?
+
+$trace rm "$pipe" || xit=1
+
+exit $xit
