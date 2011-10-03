@@ -1,0 +1,41 @@
+#!/bin/sh
+#
+# Run a command via su, quoted to preserve the argument list.
+# Unfortunate conflict with "sux", the "su with X11 $DISPLAY".
+# Which I don't use! Yay!
+#       - Cameron Simpson <cs@zip.com.au> 03soct2011
+#
+
+cmd=$0
+usage="Usage: $cmd [-] [-u user] command [args...]"
+
+suargs=
+user=root
+
+badopts=
+
+while [ $# -gt 0 ]
+do
+  case $1 in
+    -)  suargs="$suargs $1" ;;
+    -u) user=$2; shift ;;
+    --) shift; break ;;
+    -?*)echo "$cmd: unrecognised option: $1" >&2
+        badopts=1
+        ;;
+    *)  break ;;
+  esac
+  shift
+done
+
+if [ $# = 0 ]
+then
+  echo "$cmd: missing command" >&2
+  badopts=1
+fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+shcmd=`shqstr "$@"`
+set -x
+exec su $suargs "$user" -c "$shcmd"
