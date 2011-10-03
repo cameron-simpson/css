@@ -3,7 +3,7 @@ import re
 import string
 from cStringIO import StringIO
 
-sh_unsafe_re=re.compile(r'[^\-a-z0-9.]');
+sh_unsafe_re=re.compile(r'[^\-a-z0-9./]');
 
 def quote(args):
   quoted=[]
