@@ -1,0 +1,107 @@
+#!/bin/sh
+#
+# Monitor an IP target using ping.
+# Run commands on "up" and "down".
+#       - Cameron Simpson <cs@zip.com.au>
+#
+
+set -ue
+
+trace=set-x setx='set -x'
+ping_count=5
+sleep_time=30
+
+cmd=`basename "$0"`
+usage="Usage: $cmd [-c count] [-s sleep] target down-shcmd up-shcmd"
+
+badopts=
+
+while [ $# -gt 0 ]
+do
+  case $1 in
+    -c) ping_count=$2; shift ;;
+    -s) sleep_time=$2; shift ;;
+    --) shift; break ;;
+    -?*)echo "$cmd: unrecognised option: $1" >&2
+        badopts=1
+        ;;
+    *)  break ;;
+  esac
+  shift
+done
+
+if [ $# = 0 ]
+then
+  echo "$cmd: missing target" >&2
+  badopts=1
+else
+  target=$1
+  shift
+  if [ $# = 0 ]
+  then
+    echo "$cmd: missing down-shcmd" >&2
+    badopts=1
+  else
+    downcmd=$1
+    shift
+    if [ $# = 0 ]
+    then
+      echo "$cmd: missing up-shcmd" >&2
+      badopts=1
+    else
+      upcmd=$1
+      shift
+      if [ $# -gt 0 ]
+      then
+        echo "$cmd: extra arguments after up-shcmd: $*" >&2
+        badopts=1
+      fi
+    fi
+  fi
+fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+up=1
+retry_upcmd=
+retry_downcmd=
+
+while :
+do
+  if $trace ping -c "$ping_count" "$target"
+  then
+    # up!
+    if [ $up ]
+    then
+      # already up - retry cmd if still pending
+      if [ $retry_upcmd ]
+      then $trace sh -c "$setx; $upcmd" && retry_upcmd=
+      fi
+    else
+      # newly up - note new state and run upcmd
+      up=1
+      if $trace sh -c "$setx; $upcmd"
+      then retry_upcmd=
+      else retry_upcmd=1
+      fi
+    fi
+  else
+    # down:-(
+    if [ $up ]
+    then
+      # newly down - note new state and run downcmd
+      up=
+      if $trace sh -c "$setx; $downcmd"
+      then retry_downcmd=
+      else retry_downcmd=1
+      fi
+    else
+      # still down - retyr cmd if still pending
+      if [ $retry_downcmd ]
+      then $trace sh -c "$setx; $downcmd" && retry_downcmd=
+      fi
+    fi
+  fi
+  $trace sleep "$sleep_time"
+done
+
