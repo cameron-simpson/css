@@ -35,7 +35,8 @@ class WorkerThreadPool(object):
         Join all the worker threads.
         It is an error to call close() more than once.
     '''
-    assert not self.closed
+    if self.closed:
+      warn("%s: repeated close", self)
     self.closed = True
     for H, HQ in self.all:
       HQ.close()
@@ -53,7 +54,8 @@ class WorkerThreadPool(object):
         If the parameter `pfx` is not None, submit pfx.func(func);
           see cs.logutils.Pfx's .func method for details.
     '''
-    assert not self.closed
+    if self.closed:
+      raise ValueError, "%s: closed, but dispatch() called" % (self,)
     if pfx is not None:
       func = pfx.func(func)
     idle = self.idle
@@ -145,7 +147,8 @@ class AdjustableSemaphore(object):
         capacity then adjust() may block until the overcapacity is
         released.
     '''
-    assert newvalue > 0
+    if newvalue <= 0:
+      raise ValueError, "invalid newvalue, should be > 0, got %s" % (newvalue,)
     with self.__lock:
       delta = newvalue-self.__value
       if delta > 0:
@@ -164,10 +167,12 @@ class Channel(object):
       Unlike a Queue(1), put() blocks waiting for the matching get().
   '''
   def __init__(self):
-    self.__readable=allocate_lock()
+    self.__readable = allocate_lock()
     self.__readable.acquire()
-    self.__writable=allocate_lock()
+    self.__writable = allocate_lock()
     self.__writable.acquire()
+    self.__get_lock = allocate_lock()
+    self.__put_lock = allocate_lock()
     self.closed = False
     self.__lock = allocate_lock()
     self._nreaders = 0
@@ -189,15 +194,17 @@ class Channel(object):
     ''' Read a value from the Channel.
         Blocks until someone put()s to the Channel.
     '''
-    assert not self.closed, "%s.get() on closed Channel" % (self,)
-    with self.__lock:
-      self._nreaders += 1
-    self.__writable.release()   # allow someone to write
-    self.__readable.acquire()   # await writer and prevent other readers
-    value = self._value
-    delattr(self,'_value')
-    with self.__lock:
-      self._nreaders -= 1
+    if self.closed:
+      raise ValueError, "%s.get() on closed Channel" % (self,)
+    with self.__get_lock:
+      with self.__lock:
+        self._nreaders += 1
+      self.__writable.release()   # allow someone to write
+      self.__readable.acquire()   # await writer and prevent other readers
+      value = self._value
+      delattr(self,'_value')
+      with self.__lock:
+        self._nreaders -= 1
     return value
 
   def put(self, value):
@@ -205,12 +212,11 @@ class Channel(object):
         Blocks until a corresponding get() occurs.
     '''
     if self.closed:
-      assert value is None, "%s.put(%s) on closed Channel" % (self, value, )
-    else:
-      assert value is not None, "%s.put(None) on unclosed Channel" % (self,)
-    self.__writable.acquire()   # prevent other writers
-    self._value = value
-    self.__readable.release()   # allow a reader
+      raise ValueError, "%s: closed, but put(%s)" % (self, value)
+    with self.__put_lock:
+      self.__writable.acquire()   # prevent other writers
+      self._value = value
+      self.__readable.release()   # allow a reader
 
   def close(self):
     with self.__lock:
@@ -262,7 +268,8 @@ class IterableQueue(Queue):
   def put(self, item, *args, **kw):
     ''' Put an item on the queue.
     '''
-    assert not self.closed, "put() on closed IterableQueue"
+    if self.closed:
+      raise ValueError, "put() on closed IterableQueue"
     assert item is not None, "put(None) on IterableQueue"
     return Queue.put(self, item, *args, **kw)
 
