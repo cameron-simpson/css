@@ -14,6 +14,40 @@ from cs.threads import AdjustableSemaphore, IterablePriorityQueue, \
                        Channel, WorkerThreadPool, TimerQueue
 from cs.misc import seq
 
+def _contextmanager_inner():
+  yield
+
+class _Late_context_manager(object):
+  def __init__(self, L, priority=None, delay=None, when=None, name=None, pfx=None):
+    self.later = L
+    self.parameters = { 'priority': priority,
+                        'delay': delay,
+                        'when': when,
+                        'name': name,
+                        'pfx': pfx,
+                      }
+    self.channel = Channel()
+
+  def __enter__(self):
+    def run():
+      self.channel.put("run started")
+      value = self.channel.get()
+      return "run done"
+    self.latefunc = self.later.submit(run, **self.parameters)
+    value = self.channel.get()
+    return self
+
+  def __exit__(self, exc_type, exc_val, exc_tb):
+    self.channel.put("tell run() that __exit__ has been entered")
+    if exc_type is not None:
+      return False
+    W = self.latefunc.wait()
+    self.latefunc = None
+    lf_ret, lf_exc_info = W
+    if lf_exc_info is not None:
+      raise lf_exc_type, lf_exc_info
+    return True
+
 class LateFunction(object):
   ''' State information about a pending function.
       A LateFunction is callable, so a synchronous call can be done like this:
@@ -64,7 +98,7 @@ class LateFunction(object):
     self.func = func
     if name is None:
       name = "LateFunction-%d" % (seq(),)
-    self.name = name
+    self.__name__ = name
     self.state = LateFunction._PENDING
     self._lock = allocate_lock()
     self._join_lock = allocate_lock()
@@ -73,6 +107,10 @@ class LateFunction(object):
 
   def __str__(self):
     return "<LateFunction %s>" % (self.name,)
+
+  @property
+  def name(self):
+    return self.__name__
 
   @property
   def done(self):
@@ -106,7 +144,7 @@ class LateFunction(object):
         The argument `result` is a 4-tuple as produced by cs.threads.WorkerThreadPool:
           func_result, None, None, None
         or:
-          None, exec_type, exc_value, exc_traceback
+          None, exc_type, exc_value, exc_traceback
     '''
     if newstate is None:
       newstate = LateFunction._DONE
@@ -118,8 +156,8 @@ class LateFunction(object):
     self.later.capacity.release()
     self.later.running.remove(self)
     self.later.info("completed %s", self)
-    for notify in notifiers:
-      notify(self)
+    for notifier in notifiers:
+      notifier(self)
     with self._join_cond:
       self._join_cond.notify_all()
 
@@ -208,6 +246,20 @@ class Later(object):
     self._lock = allocate_lock()
     self._dispatchThread.start()
 
+  def __repr__(self):
+    return '<%s "%s" running=%d pending=%d delayed=%d closed=%s>' \
+           % ( self.__class__, self.name,
+               len(self.running),
+               len(self.pending),
+               len(self.delayed),
+               self.closed
+             )
+
+  def __str__(self):
+    return "<%s pending=%d running=%d delayed=%d>" \
+           % (self.name,
+              len(self.pending), len(self.running), len(self.delayed))
+
   def logTo(self, filename, logger=None):
     import logging
     import cs.logutils
@@ -232,11 +284,6 @@ class Later(object):
     if self.logger:
       kw.setdefault('extra', {}).update(later_name = str(self))
       self.logger.info(*a, **kw)
-
-  def __str__(self):
-    return "<%s pending=%d running=%d delayed=%d>" \
-           % (self.name,
-              len(self.pending), len(self.running), len(self.delayed))
 
   def __del__(self):
     if not self.closed:
@@ -276,8 +323,14 @@ class Later(object):
       self.info("dispatched %s", LF)
       LF._dispatch()
 
+  def ready(self, **kwargs):
+    ''' Awful name.
+        Return a context manager to block until the Later provides a timeslot.
+    '''
+    return _Late_context_manager(self)
+
   def submit(self, func, priority=None, delay=None, when=None, name=None, pfx=None):
-    ''' Submit a function for later dispatch.
+    ''' Submit the callable `func` for later dispatch.
         Return the corresponding LateFunction for result collection.
 	If the parameter `priority` is not None then use it as the priority
         otherwise use the default priority.
