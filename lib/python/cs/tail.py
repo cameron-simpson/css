@@ -1,43 +1,70 @@
 #!/usr/bin/python -tt
 #
+# Tail text files.
+#       - Cameron Simpson <cs@zip.com.au>
+#
 
 import os
 import sys
 import time
 
-class Tail:
-  def __init__(self,fp,bsize=8192,polltime=1):
-    assert bsize > 0
-    self.__bsize=bsize
-    self.__polltime=polltime
-    if type(fp) is str:
-      fp=open(fp)
-      fp.seek(0,os.SEEK_END)
-    self.__fp=fp
-    self.__pos=fp.tell()
-  def __iter__(self):
-    ''' Yield whole lines from the file.
-    '''
-    partline=''
-    while True:
-      size=os.fstat(self.__fp.fileno())[6]
-      busy=False
-      while size > self.__pos:
-        rsize=min(size-self.__pos, self.__bsize)
-        s=self.__fp.read(rsize)
-        if len(s) == 0:
-          print >>sys.stderr, "%s: size=%d, self.__pos=%s, read(%d) got 0 bytes" % (fp, size, self.__pos, rsize)
+from cs.logutils import D
+
+def tail(fp,
+         readsize=8192, polltime=1,
+         seekoffset=0, seekwhence=os.SEEK_END,
+         quit_at_eof=False):
+  ''' Yield whole lines from a file.
+  '''
+  fp.seek(seekoffset, seekwhence)
+  partline = ''
+  while True:
+    pos = fp.tell()
+    size = os.fstat(fp.fileno())[6]
+    busy = False
+    while size > pos:
+      rsize = min(size - pos, readsize)
+      data = fp.read(rsize)
+      if len(data) == 0:
+        break
+      pos = fp.tell()
+      busy = True
+      fpos = 0
+      while True:
+        nlpos = data.find('\n', fpos)
+        if nlpos < fpos:
           break
-        self.__pos=self.__fp.tell()
-        busy=True
-        nlpos=s.find('\n')
-        while nlpos >= 0:
-          line=s[:nlpos+1]
-          s=s[nlpos+1:]
-          if len(partline) > 0:
-            line=partline+line
-            partline=''
+        nlpos += 1
+        line = data[fpos:nlpos]
+        if len(partline):
+          yield partline+line
+          partline = ''
+        else:
           yield line
-          nlpos=s.find('\n')
-      if not busy:
-        time.sleep(self.__polltime)
+        fpos = nlpos
+      partline = data[fpos:]
+    if quit_at_eof:
+      if len(partline):
+        yield partline
+      return
+    if not busy:
+      time.sleep(polltime)
+
+if __name__ == '__main__':
+  import unittest
+  from cStringIO import StringIO
+
+  class TestTail(unittest.TestCase):
+
+    def setUp(self):
+      pass
+
+    def tearDown(self):
+      pass
+
+    def test01selfread(self):
+      lines = open(__file__).readlines()
+      tlines = [ _ for _ in tail(open(__file__), seekwhence=os.SEEK_SET, quit_at_eof=True) ]
+      self.assertEquals(lines, tlines)
+
+  unittest.main()
