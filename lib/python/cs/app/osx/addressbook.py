@@ -125,7 +125,7 @@ def updateNodeDB(maildb, people):
       C = maildb.newNode('CONTACT', maildb.seq())
       C.OSX_AB_UID = uid
     lastUpdate = C.get('OSX_AB_LAST_UPDATE', 0)
-    abMTime = mtime(abperson, 0)
+    abMTime = mtime(person, 0)
     if abMTime > lastUpdate:
       print "UPDATE USER %s" % (C,)
       ## C.OSX_AB_LAST_UPDATE = abMTime

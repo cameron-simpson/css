@@ -55,7 +55,9 @@ def nodekey(*args):
 
     if type(t) is not str:
       raise ValueError, "expected TYPE to be a string"
-    if type(name) is not str:
+    if type(name) is int:
+      name = str(name)
+    elif type(name) is not str:
       raise ValueError, "expected NAME to be a string"
     if not t.isupper() and t != '_':
       raise ValueError, "invalid TYPE, not upper case or _"
