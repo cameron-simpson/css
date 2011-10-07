@@ -180,11 +180,12 @@ class _AttrList(list):
     # turn iterator into tuple
     if not noBackend and type(values) not in (list, tuple):
       values = tuple(values)
-    if not noBackend:
-      N = self.node
-      self.nodedb._backend.extendAttr(N.type, N.name, self.attr, values)
-    list.extend(self, values)
-    self.__additemrefs(values)
+    if len(values) > 0:
+      if not noBackend:
+        N = self.node
+        self.nodedb._backend.extendAttr(N.type, N.name, self.attr, values)
+      list.extend(self, values)
+      self.__additemrefs(values)
 
   def insert(self, index, value):
     value = list.insert(self, index, value)
