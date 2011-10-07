@@ -12,16 +12,26 @@
 
 import pprint
 import sys
+import time
 from thread import allocate_lock
 from AddressBook import ABAddressBook
 from .objc import convertObjCtype
 
 def main(argv):
+  from cs.app.maildb import MailDB
+  import os.path
   AB = AddressBookWrapper()
-  print "dir(AB.address_book) =",
-  pprint.pprint(dir(AB.address_book))
+  MDB = MailDB(os.path.abspath('maildb.csv'), readonly=False)
+  ##print "dir(AB.address_book) =",
+  ##pprint.pprint(dir(AB.address_book))
+  for P in AB.people:
+    pprint.pprint(P)
+    updateNodeDB(MDB, [P])
+    break
   for G in AB.people:
     pprint.pprint(G)
+    break
+  ##pprint.pprint(dir(AB.address_book.people()[0]))
 
 class AddressBookWrapper(object):
   ''' Wrapper class for Mac OSX AddressBook with more pythonic facilities.
@@ -74,6 +84,51 @@ class AddressBookWrapper(object):
                     for k in abGroup.allProperties()
                     if k not in ()
                   ] )
+
+def epoch(abperson, field='Modification', default=None):
+  ''' Return the Creation timestamp of the address book person
+      as seconds since the epoch, or `default` if there is no Creation
+      field.
+  '''
+  dt = abperson.get(field)
+  if dt is None:
+    return None
+  return time.mktime(dt.timetuple())
+
+def ctime(abperson, default=None):
+  ''' Return the Creation timestamp of the address book person
+      as seconds since the epoch, or `default` if there is no Creation
+      field.
+  '''
+  return epoch(abperson, 'Creation', default)
+
+def mtime(abperson, default=None):
+  ''' Return the Modification timestamp of the address book person
+      as seconds since the epoch, or `default` if there is no Modification
+      field.
+  '''
+  return epoch(abperson, 'Modification', default)
+
+def contactByOSXUID(maildb, uid):
+  for contact in maildb.CONTACTs:
+    if contact.OSX_AB_UID == uid:
+      return contact
+  return None
+
+def updateNodeDB(maildb, people):
+  ''' Update the specified `maildb` with the addressbook `people`.
+  '''
+  for person in people:
+    uid = person['UID']
+    C = contactByOSXUID(maildb, uid)
+    if not C:
+      C = maildb.newNode('CONTACT', maildb.seq())
+      C.OSX_AB_UID = uid
+    lastUpdate = C.get('OSX_AB_LAST_UPDATE', 0)
+    abMTime = mtime(abperson, 0)
+    if abMTime > lastUpdate:
+      print "UPDATE USER %s" % (C,)
+      ## C.OSX_AB_LAST_UPDATE = abMTime
 
 if __name__ == '__main__':
   sys.exit(main(sys.argv))
