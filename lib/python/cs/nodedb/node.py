@@ -742,7 +742,7 @@ class NodeDB(dict):
     try:
       return self[key]
     except KeyError:
-      return newNode(key)
+      return self.newNode(key)
 
   def seq(self):
     ''' Obtain a new sequence number for this NodeDB.
