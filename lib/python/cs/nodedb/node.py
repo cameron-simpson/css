@@ -423,6 +423,10 @@ class Node(dict):
 
   def __getattr__(self, attr):
     ''' Support .ATTR[s] and .inTYPE.
+
+        .inTYPE returns Nodes of type TYPE which refer to this Node.
+        .ATTR returns the value of ATTR. There must be exactly one.
+        .ATTRs returns the values of ATTR.
     '''
     # .inTYPE -> referring nodes of type TYPE
     if attr.startswith('in') and len(attr) > 2:
