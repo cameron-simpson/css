@@ -129,6 +129,8 @@ def updateNodeDB(maildb, people):
     if abMTime > lastUpdate:
       print "UPDATE USER %s" % (C,)
       ## C.OSX_AB_LAST_UPDATE = abMTime
+    else:
+      print "SKIP USER %s: abMTime=%s, lastUpdate=%s" % (C,abMTime,lastUpdate)
 
 if __name__ == '__main__':
   sys.exit(main(sys.argv))
