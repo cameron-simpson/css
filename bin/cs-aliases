@@ -13,6 +13,7 @@ from email.parser import Parser
 from email.utils import getaddresses, formataddr
 from getopt import GetoptError
 import cs.sh
+from cs.mail import unrfc2047
 from cs.mailAddresses import addressKey, loadAddresses, addrsRegexp
 from cs.logutils import setup_logging, error, Pfx, warn
 import cs.misc
@@ -124,7 +125,13 @@ def cmd_new(args):
     M = Parser().parse(sys.stdin, True)
     seen = []
     for hdr in 'from', 'sender', 'to', 'cc', 'bcc', 'return-path':
-      for name, coreaddr in getaddresses(M.get_all(hdr,[])):
+      hdr_values = []
+      for value in M.get_all(hdr, []):
+        try:
+          hdr_values.append(unrfc2047(value))
+        except ValueError:
+          hdr_value.append(value)
+      for name, coreaddr in getaddresses(hdr_values):
         addrkey = coreaddr.lower()
         if addrkey not in byAddress and addrkey not in seen:
           seen.append(addrkey)
