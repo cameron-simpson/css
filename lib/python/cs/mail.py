@@ -258,3 +258,26 @@ def openMaildir(path):
     info("open new Maildir", path)
     _maildirs[path]=Maildir(path)
   return _maildirs[path]
+
+re_rfc2407 = re.compile( r'=\?([^?]+)\?([^?]+)\?([^?]*)\?=' )
+
+def unrfc2047(s):
+  clean = []
+  sofar = 0
+  for m in re_rfc2407.findall(s):
+    pos = m.start()
+    if pos > sofar:
+      clean.append(s[sofar:pos])
+    charset, charencoding, text = m.groups()
+    if charencoding == 'Q':
+      text = unqp(text)
+    elif charencoding == 'B':
+      text = unb64(text)
+    else:
+      raise ValueError, "invalid rfc2047 encoding: %s" % (charencoding,)
+    clean.append(text.decode(text.decode(charset)))
+    sofar = m.end()
+  if sofar < len(s):
+    clean.append(s[sofar:])
+  return ''.join(clean)
+
