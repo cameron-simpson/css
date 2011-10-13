@@ -11,13 +11,21 @@ from Queue import Queue
 import time
 import unittest
 from cs.threads import AdjustableSemaphore, IterablePriorityQueue, \
-                       Channel, WorkerThreadPool, TimerQueue
+                       WorkerThreadPool, TimerQueue
 from cs.misc import seq
 
-def _contextmanager_inner():
-  yield
-
 class _Late_context_manager(object):
+  ''' The _Late_context_manager is a context manager to run a suite via the
+      Later object. Typical usage:
+
+        L = Later(4)    # a 4 thread Later
+        ...
+        with L.ready( ... optional Later.submit() args ... ):
+          ... do stuff when L queues us ...
+
+      This permits easy inline scheduled code.
+  '''
+
   def __init__(self, L, priority=None, delay=None, when=None, name=None, pfx=None):
     self.later = L
     self.parameters = { 'priority': priority,
@@ -26,19 +34,39 @@ class _Late_context_manager(object):
                         'name': name,
                         'pfx': pfx,
                       }
-    self.channel = Channel()
+    self.commence = allocate_lock()
+    self.commence.acquire()
+    self.complete = allocate_lock()
+    self.commence.acquire()
 
   def __enter__(self):
+    ''' Entry handler: submit a placeholder function to the queue,
+        acquire the "commence" lock, which will be made available
+        when the placeholder gets to run.
+    '''
+
     def run():
-      self.channel.put("run started")
-      value = self.channel.get()
+      ''' This is the placeholder function dispatcher by the Later instance.
+          It releases the "commence" lock for __enter__ to acquire,
+          permitting to with-suite to commence.
+          It then blocks waiting to acquire the "complete" lock;
+          __exit__ releases that lock permitting the placeholder to return
+          and release the Later resource.
+      '''
+      self.commence.release()
+      self.complete.acquire()
       return "run done"
+
+    # queue the placeholder function and wait for it to execute
     self.latefunc = self.later.submit(run, **self.parameters)
-    value = self.channel.get()
+    self.commence.acquire()
     return self
 
   def __exit__(self, exc_type, exc_val, exc_tb):
-    self.channel.put("tell run() that __exit__ has been entered")
+    ''' Exit handler: release the "complete" lock; the placeholder
+        function is blocking on this, and will return on its release.
+    '''
+    self.complete.release()
     if exc_type is not None:
       return False
     W = self.latefunc.wait()
