@@ -8,6 +8,7 @@ import socket
 from tempfile import NamedTemporaryFile
 from StringIO import StringIO
 from thread import allocate_lock
+import unittest
 
 def ismaildir(path):
   ''' Test if 'path' points at a Maildir directory.
@@ -33,12 +34,12 @@ class Maildir(mailbox.Maildir):
     self._lock = allocate_lock
     self.scan()
 
-  def scan():
+  def scan(self):
     ''' Rescan the maildir to rebuild the index.
     '''
     msgmap = {}
     for subdir in 'new', 'cur':
-      subdirpath = os.path.join(dir, subdir)
+      subdirpath = os.path.join(self.dir, subdir)
       for msgbase in os.listdir(subdirpath):
         if msgbase.startswith('.'):
           continue
@@ -246,3 +247,12 @@ class Maildir(mailbox.Maildir):
 
   def close(self):
     pass
+
+class TestMaildir(unittest.TestCase):
+
+  def test00basic(self):
+    M = Maildir(os.path.join(os.environ['HOME'], 'ZZM'))
+    print M.keys()
+
+if __name__ == '__main__':
+  unittest.main()
