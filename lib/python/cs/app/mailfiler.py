@@ -20,7 +20,7 @@ def main(argv, stdin=None):
   argv = list(argv)
   cmd = argv.pop(0)
   setup_logging(cmd)
-  usage = 'usage: %s rulefile < message' % (cmd,)
+  usage = 'Usage: %s rulefile < message' % (cmd,)
   badopts = False
 
   if len(argv) == 0:
