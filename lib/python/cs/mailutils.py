@@ -11,6 +11,9 @@ from StringIO import StringIO
 from thread import allocate_lock
 import unittest
 
+def read_message(mfp, headeronly=False):
+  return email.parser.Parser().parse(mfp, headersonly=True)
+
 def ismaildir(path):
   ''' Test if 'path' points at a Maildir directory.
   '''
@@ -207,7 +210,7 @@ class Maildir(mailbox.Maildir):
     ''' Return the headers of the specified message as 
     '''
     with self.open(key) as mfp:
-      return email.parser.Parser().parse(mfp, headersonly=True)
+      return read_message(mfp, headersonly=True)
 
   def get_string(self, key):
     return self[key].as_string()
