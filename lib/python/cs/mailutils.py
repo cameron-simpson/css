@@ -1,6 +1,7 @@
 #!/usr/bin/python
 
 import email.message
+import email.parser
 import mailbox
 import os
 import os.path
@@ -202,6 +203,12 @@ class Maildir(mailbox.Maildir):
       return mailbox.Message(mfp)
   get_message = __getitem__
 
+  def get_headers(self, key):
+    ''' Return the headers of the specified message as 
+    '''
+    with self.open(key) as mfp:
+      return email.parser.Parser().parse(mfp, headersonly=True)
+
   def get_string(self, key):
     return self[key].as_string()
 
@@ -236,6 +243,12 @@ class Maildir(mailbox.Maildir):
   def items(self):
     return list(self.iteritems())
 
+  def iterheaders(self):
+    ''' Yield (key, headers) from the Maildir.
+    '''
+    for key in self.iterkeys():
+      return key, self.get_headers(key)
+
   def flush(self):
     pass
 
@@ -251,8 +264,23 @@ class Maildir(mailbox.Maildir):
 class TestMaildir(unittest.TestCase):
 
   def test00basic(self):
+    import sys
+    import time
+    t0 = time.time()
     M = Maildir(os.path.join(os.environ['HOME'], 'ZZM'))
-    print M.keys()
+    t1 = time.time()
+    print >>sys.stderr, "Maildir(ZZM): %gs" % (t1-t0,)
+    keys = M.keys()
+    t2 = time.time()
+    print >>sys.stderr, "Maildir(ZZM).keys(): %gs, %d keys" % (t2-t1,len(keys))
+    for key in keys[:100]:
+      msg = M[key]
+    t3 = time.time()
+    print >>sys.stderr, "Maildir(ZZM): scan 100 msgs %gs" % (t3-t2,)
+    for key in keys[100:200]:
+      hdr = M.get_headers(key)
+    t4 = time.time()
+    print >>sys.stderr, "Maildir(ZZM): scan 100 hdrs %gs" % (t4-t3,)
 
 if __name__ == '__main__':
   unittest.main()
