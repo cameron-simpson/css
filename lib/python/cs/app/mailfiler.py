@@ -20,7 +20,7 @@ def main(argv, stdin=None):
   argv = list(argv)
   cmd = argv.pop(0)
   setup_logging(cmd)
-  usage = 'Usage: %s rulefile < message' % (cmd,)
+  usage = 'Usage: %s rulefile maildb < message' % (cmd,)
   badopts = False
 
   if len(argv) == 0:
@@ -31,9 +31,14 @@ def main(argv, stdin=None):
     if not os.path.isfile(rulefile):
       warn("rulefile: not a file: %s", rulefile)
       badopts = True
-    if len(argv) > 0:
-      warn("extra arguments after rulefile: %s" % (' '.join(argv),))
-      badopts = True
+  if len(argv) == 0:
+    warn("missing maildb")
+    badopts = True
+  else:
+    maildb = argv.pop(0)
+  if len(argv) > 0:
+    warn("extra arguments: %s" % (' '.join(argv),))
+    badopts = True
 
   if badopts:
     print >>sys.stderr, usage
