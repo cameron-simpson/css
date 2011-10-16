@@ -5,11 +5,15 @@ import email.parser
 import mailbox
 import os
 import os.path
+import sys
 import socket
+import shutil
 from tempfile import NamedTemporaryFile
 from StringIO import StringIO
 from thread import allocate_lock
+import time
 import unittest
+from cs.misc import seq
 
 def read_message(mfp, headeronly=False):
   return email.parser.Parser().parse(mfp, headersonly=True)
@@ -86,9 +90,9 @@ class Maildir(mailbox.Maildir):
   def newkey(self):
     ''' Allocate a new key.
     '''
-    now=time.time()
-    secs=int(now)
-    subsecs=now-secs
+    now = time.time()
+    secs = int(now)
+    subsecs = now-secs
     while True:
       key = '%d.#%dM%dP%d' % (secs, seq(), subsecs * 1e6, self._pid)
       if key not in self.msgmap:
@@ -120,9 +124,9 @@ class Maildir(mailbox.Maildir):
       try:
         os.link(filepath, tmppath)
       except OSError:
-        shutils.copyfile(filepath, tmppath)
+        shutil.copyfile(filepath, tmppath)
     else:
-      shutils.copyfile(filepath, tmppath)
+      shutil.copyfile(filepath, tmppath)
     newpath = os.path.join(self.dir, 'new', key)
     try:
       os.rename(tmppath, newpath)
@@ -155,8 +159,8 @@ class Maildir(mailbox.Maildir):
     if isinstance(message, email.message.Message):
       with NamedTemporaryFile('w', dir=os.path.join(self.dir, 'tmp')) as T:
         T.write(message.as_string())
-      key = self.save_filepath(T.name, key=key)
-      os.remove(T.name)
+        T.flush()
+        key = self.save_filepath(T.name, key=key)
       return key
     raise ValueError, "unsupported message type: %s" % (type(message),)
 
@@ -267,8 +271,6 @@ class Maildir(mailbox.Maildir):
 class TestMaildir(unittest.TestCase):
 
   def test00basic(self):
-    import sys
-    import time
     t0 = time.time()
     M = Maildir(os.path.join(os.environ['HOME'], 'ZZM'))
     t1 = time.time()
