@@ -62,7 +62,7 @@ def main(argv):
         if len(argv):
           groups = argv
         else:
-          groups = sorted([ G.name for G in mdb.nodesByType('ADDRESS_GROUP') ])
+          groups = sorted(mdb.groups.keys())
         for group in groups:
           G = mdb.getAddressGroupNode(group)
           if not G:
@@ -80,7 +80,6 @@ def main(argv):
 
   return xit
 
-AddressGroupNode = Node
 PersonNode = Node
 
 class AddressNode(Node):
@@ -136,7 +135,6 @@ class MessageNode(Node):
 TypeFactory = { 'MESSAGE':      MessageNode,
                 'PERSON':       PersonNode,
                 'ADDRESS':      AddressNode,
-                'ADDRESS_GROUP':AddressGroupNode,
               }
 
 def MailDB(mdburl, readonly=True, klass=None):
@@ -147,6 +145,11 @@ def MailDB(mdburl, readonly=True, klass=None):
 class _MailDB(NodeDB):
   ''' Extend NodeDB for email.
   '''
+
+  def __init__(self, backend, readonly=False):
+    NodeDB.__init__(self, backend, readonly=readonly)
+    self.groups = {}    # map of groupname to set of addresses
+    self.scan_groups()
 
   def _createNode(self, t, name):
     ''' Create a new Node of the specified type.
@@ -172,8 +175,16 @@ class _MailDB(NodeDB):
       A.REALNAME = realname
     return A
 
-  def getAddressGroupNode(self, group, default=None):
-    return self.get(('ADDRESS_GROUP', group), default)
+  def scan_groups(self, addrs=None):
+    if addrs is None:
+      addrs = self.ADDRESSes
+    for A in addrs:
+      for group in A.GROUPs:
+        if group in self.groups:
+          G = self.groups[group]
+        else:
+          G = self.groups[group] = set()
+        G.add(A.name)
 
   def getMessageNode(self, message_id):
     ''' Obtain the Node for the specified Message-ID `message_id`.
@@ -260,10 +271,8 @@ class _MailDB(NodeDB):
           except ValueError, e:
             error("bad address: %s: %s", addr, e)
             continue
-          for group in groups.split(','):
-            G = self.get("ADDRESS_GROUP:"+group, doCreate=True)
-            G.ADDRESSes.add(A)
-
+          A.GROUPs.update(groups.split(','))
+          self.scan_groups([A])
 
 if __name__ == '__main__':
   sys.exit(main(list(sys.argv)))
