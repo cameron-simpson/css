@@ -13,6 +13,7 @@ import mailbox
 if sys.hexversion < 0x02060000: from sets import Set as set
 from cs.logutils import Pfx, setup_logging, info, warn, error
 from cs.mailutils import Maildir, read_message
+from cs.app.maildb import MailDB
 
 def main(argv, stdin=None):
   if stdin is None:
@@ -21,6 +22,7 @@ def main(argv, stdin=None):
   cmd = argv.pop(0)
   setup_logging(cmd)
   usage = 'Usage: %s rulefile maildb < message' % (cmd,)
+  mdburl = None
   badopts = False
 
   if len(argv) == 0:
@@ -31,11 +33,8 @@ def main(argv, stdin=None):
     if not os.path.isfile(rulefile):
       warn("rulefile: not a file: %s", rulefile)
       badopts = True
-  if len(argv) == 0:
-    warn("missing maildb")
-    badopts = True
-  else:
-    maildb = argv.pop(0)
+  if len(argv) > 0:
+    mdburl = argv.pop(0)
   if len(argv) > 0:
     warn("extra arguments: %s" % (' '.join(argv),))
     badopts = True
@@ -48,9 +47,13 @@ def main(argv, stdin=None):
   with open(rulefile) as rfp:
     rules.load(rfp)
 
+  if mdburl is None:
+    mdburl = os.environ['MAILDB']
+  MDB = MailDB(mdburl, readonly=True)
+
   M = email.parser.Parser().parse(stdin)
   state = State()
-  state.groups = {}
+  state.groups = MDB.groups
   state.vars = {}
   filed = list(rules.file_message(M, state))
   return 0 if filed else 1
@@ -136,9 +139,9 @@ class Condition_AddressMatch(_Condition):
     for realname, address in message_addresses(M, self.headernames):
       for key in self.addrkeys:
         if key.startswith('{{') and key.endswith('}}'):
-          key = key[2:-2]
+          key = key[2:-2].lower()
           if key not in state.groups:
-            warn("%s: unknown group {{%s}}", self, key)
+            warn("%s: unknown group {{%s}}, I know: %s", self, key, state.groups.keys())
             continue
           if address in state.groups[key]:
             return True
