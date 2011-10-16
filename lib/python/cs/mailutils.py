@@ -15,8 +15,8 @@ import time
 import unittest
 from cs.misc import seq
 
-def read_message(mfp, headeronly=False):
-  return email.parser.Parser().parse(mfp, headersonly=True)
+def read_message(mfp, headersonly=False):
+  return email.parser.Parser().parse(mfp, headersonly=headersonly)
 
 def ismaildir(path):
   ''' Test if 'path' points at a Maildir directory.
@@ -40,10 +40,16 @@ class Maildir(mailbox.Maildir):
                           .replace(':', '_')
     self._pid = os.getpid()
     self._lock = allocate_lock
-    self.scan()
+    self._msgmap = None
 
-  def scan(self):
-    ''' Rescan the maildir to rebuild the index.
+  @property
+  def msgmap(self):
+    if self._msgmap is None:
+      self._msgmap = self._scan()
+    return self._msgmap
+
+  def _scan(self):
+    ''' Scan the maildir, return key->message-info mapping.
     '''
     msgmap = {}
     for subdir in 'new', 'cur':
@@ -56,7 +62,7 @@ class Maildir(mailbox.Maildir):
         except ValueError:
           key, info = msgbase, ''
         msgmap[key] = (subdir, msgbase)
-    self.msgmap = msgmap
+    return msgmap
 
   def list_folders(self):
     for fbase in os.listdir(self.dir):
@@ -93,10 +99,7 @@ class Maildir(mailbox.Maildir):
     now = time.time()
     secs = int(now)
     subsecs = now-secs
-    while True:
-      key = '%d.#%dM%dP%d' % (secs, seq(), subsecs * 1e6, self._pid)
-      if key not in self.msgmap:
-        break
+    key = '%d.#%dM%dP%d' % (secs, seq(), subsecs * 1e6, self._pid)
     assert self.validkey(key), "invalid new key: %s" % (key,)
     return key
 
@@ -113,10 +116,10 @@ class Maildir(mailbox.Maildir):
     '''
     if key is None:
       key = self.newkey()
-    if not self.validkey(key):
+    elif not self.validkey(key):
       raise ValueError, "invalid key: %s" % (key,)
-    if key in self.msgmap:
-      raise ValueError, "key already in Maildir: %s" % (key,)
+      if key in self.msgmap:
+        raise ValueError, "key already in Maildir: %s" % (key,)
     tmppath = os.path.join(self.dir, 'tmp', key)
     if os.path.exists(tmppath):
       raise ValueError, "temp file already in Maildir: %s" % (tmppath,)
@@ -133,7 +136,6 @@ class Maildir(mailbox.Maildir):
     except:
       os.unlink(tmppath)
       raise
-    self.msgmap[key] = ('new', key)
     return key
 
   def save_file(self, fp, key=None):
