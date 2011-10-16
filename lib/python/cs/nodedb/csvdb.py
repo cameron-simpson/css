@@ -117,6 +117,7 @@ class Backend_CSVFile(Backend):
   def sync(self):
     ''' Update the CSV file.
     '''
+    assert not self.nodedb.readonly
     if not self.nodedb.readonly:
       write_csv_file(self.csvpath, self.nodedb.nodedata())
 
@@ -134,19 +135,19 @@ class Backend_CSVFile(Backend):
 
   def extendAttr(self, t, name, attr, values):
     assert len(values) > 0
-    assert not self.nodedb.readonly
+    pass
 
   def set1Attr(self, t, name, attr, value):
-    assert not self.nodedb.readonly
+    pass
 
   def delAttr(self, t, name, attr):
-    assert not self.nodedb.readonly
+    pass
 
   def __setitem__(self, key, value):
-    assert not self.nodedb.readonly
+    pass
 
   def __delitem(self, key):
-    assert not self.nodedb.readonly
+    pass
 
 class TestAll(NodeTestAll):
 
