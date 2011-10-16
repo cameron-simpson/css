@@ -224,7 +224,10 @@ def parserules(fp):
           # advance to condition
           line = line.lstrip()
         else:
-          tag, line = line.split(None, 1)
+          try:
+            tag, line = line.split(None, 1)
+          except ValueError:
+            raise ValueError, "missing tag"
         R.tag = tag
 
       # condition
@@ -260,7 +263,7 @@ def parserules(fp):
     yield R
 
 class Rules(list):
-  ''' Simple subclass of list storing rules, with ethod to load
+  ''' Simple subclass of list storing rules, with methods to load
       rules and file a message using the rules.
   '''
 
@@ -271,8 +274,8 @@ class Rules(list):
   def load(self, fp):
     self.extend(list(parserules(fp)))
 
-  def file_message(M, rules):
-    ''' File message `M` according to the `rules`.
+  def file_message(self, M):
+    ''' File message `M` according to the rules.
         Yield (R, filed) for each rule that matches; `filed` is the
         filing locations from each fired action.
     '''
@@ -280,8 +283,14 @@ class Rules(list):
     for R in self:
       if R.match(M):
         filed = []
-        for A in R.actions:
-          filed.extend(A.act_on(M))
+        for action, arg in R.actions:
+          print >>sys.stderr, "action =", `action`, "arg =", `arg`
+          if action == 'SAVE':
+            savepath = None
+            mdir = Maildir(os.path.join(os.environ['MAILDIR'], arg))
+            print >>sys.stderr, "SAVE to %s" % (mdir.dir,)
+            mdir.add(savepath if savepath is not None else M)
+          filed.append( (action, arg) )
         yield R, filed
         if R.flags & F_HALT:
           break
