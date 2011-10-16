@@ -89,12 +89,13 @@ class Condition_Regexp(_Condition):
     self.headernames = headernames
     self.atstart = atstart
     self.regexp = re.compile(regexp)
+    self.regexptxt = regexp
 
   def __str__(self):
-    return "<%s:atstart=%s:%s>" \
-           % ( self.headernames,
+    return "<C_RE:%s:atstart=%s:%s>" \
+           % ( ','.join(self.headernames),
                self.atstart,
-               self.regexp
+               self.regexptxt
              )
   
   def match(self, M):
@@ -115,9 +116,9 @@ class Condition_AddressMatch(_Condition):
     self.addrkeys = [ k for k in addrkeys if len(k) > 0 ]
 
   def __str__(self):
-    return "<%s:%s>" \
-           % ( self.headernames,
-               self.addrkeys
+    return "<C_ADDR:%s:%s>" \
+           % ( ','.join(self.headernames),
+               '|'.join(self.addrkeys)
              )
 
   def match(self, M):
@@ -135,8 +136,8 @@ class Rule(object):
     self.flags = 0
 
   def __str__(self):
-    return "<%s:flags=%s:...>" \
-           % ([str(C) for C in self.conditions], self.flags)
+    return "<RULE:%s:flags=%s:...>" \
+           % (', '.join([str(C) for C in self.conditions]), self.flags)
 
   def match(self, M):
     for C in self.conditions:
@@ -281,6 +282,7 @@ class Rules(list):
     '''
     applied = []
     for R in self:
+      print >>sys.stderr, "try rule:", R
       if R.match(M):
         filed = []
         for action, arg in R.actions:
