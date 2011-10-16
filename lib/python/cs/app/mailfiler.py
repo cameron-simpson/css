@@ -44,8 +44,14 @@ def main(argv, stdin=None):
     rules.load(rfp)
 
   M = email.parser.Parser().parse(stdin)
-  filed = list(rules.file_message(M))
+  state = State()
+  state.groups = {}
+  state.vars = {}
+  filed = list(rules.file_message(M, state))
   return 0 if filed else 1
+
+class State(object):
+  pass
 
 F_HALT = 0x01   # halt rule processing if this rule matches
 F_ALERT = 0x02  # issue an alert if this rule matches
@@ -98,7 +104,7 @@ class Condition_Regexp(_Condition):
                self.regexptxt
              )
   
-  def match(self, M):
+  def match(self, M, state):
     for hdr in self.headernames:
       for value in M.get_all(hdr, ()):
         if self.atstart:
@@ -121,10 +127,17 @@ class Condition_AddressMatch(_Condition):
                '|'.join(self.addrkeys)
              )
 
-  def match(self, M):
+  def match(self, M, state):
     for realname, address in message_addresses(M, self.headernames):
       for key in self.addrkeys:
-        if address.lower() == key.lower():
+        if key.startswith('{{') and key.endswith('}}'):
+          key = key[2:-2]
+          if key not in state.groups:
+            warn("%s: unknown group {{%s}}", self, key)
+            continue
+          if address in state.groups[key]:
+            return True
+        elif address.lower() == key.lower():
           return True
     return False
 
@@ -139,9 +152,9 @@ class Rule(object):
     return "<RULE:%s:flags=%s:...>" \
            % (', '.join([str(C) for C in self.conditions]), self.flags)
 
-  def match(self, M):
+  def match(self, M, state):
     for C in self.conditions:
-      if not C.match(M):
+      if not C.match(M, state):
         return False
     return True
 
@@ -275,7 +288,7 @@ class Rules(list):
   def load(self, fp):
     self.extend(list(parserules(fp)))
 
-  def file_message(self, M):
+  def file_message(self, M, state):
     ''' File message `M` according to the rules.
         Yield (R, filed) for each rule that matches; `filed` is the
         filing locations from each fired action.
@@ -283,7 +296,7 @@ class Rules(list):
     applied = []
     for R in self:
       print >>sys.stderr, "try rule:", R
-      if R.match(M):
+      if R.match(M, state):
         filed = []
         for action, arg in R.actions:
           print >>sys.stderr, "action =", `action`, "arg =", `arg`
