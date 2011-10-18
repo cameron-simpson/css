@@ -7,6 +7,7 @@
 # - Cameron Simpson <cs@zip.com.au> 18sep2008
 #
 
+from __future__ import with_statement
 import sys
 import os.path
 import getopt
