@@ -21,6 +21,8 @@ def main(argv):
     -D    Delete old keyword lines instead of commenting.
     -I    Insert new keywords at the start of the file.
     -i    Match keywords on a case-insensitive basis.
+    -o output
+          Write output to specified file. This can be the same as configfile.
     -/sep Keywords separated from rest of line by sep instead of whitespace.''' % (cmd,)
 
   setup_logging(cmd)
@@ -31,10 +33,11 @@ def main(argv):
   commentOut = True
   caseSensitive = True
   configFile = None
+  outputFile = None
   sep = None
 
   try:
-    opts, args = getopt.getopt(sys.argv[1:],'#ADIi/:')
+    opts, args = getopt.getopt(sys.argv[1:],'#ADIio:/:')
   except getopt.GetoptError, e:
     error("%s", e)
     badopts = True
@@ -51,6 +54,8 @@ def main(argv):
         insert = True
       elif opt == '-i':
         caseSensitive = True
+      elif opt == '-o':
+        outputFile = val
       elif opt == '-/':
         sep = val
       else:
@@ -79,24 +84,9 @@ def main(argv):
     return 2
 
   if patchFile == '-':
-    patchData = sys.stdin
+    patchLines, keywords = readPatchData(sys.stdin)
   else:
-    patchData = open(patchFile)
-
-  patchLines=[]
-  keywords={}
-  for line in patchData:
-    assert line.endswith('\n')
-    patchLines.append(line)
-    line = line.strip()
-    if len(line) == 0 or line[0] == '#':
-      continue
-    keyword = line.split(sep)[0]
-    if not caseSensitive:
-      keyword = keyword.lower()
-    keywords[keyword] = None
-
-  patchData.close()
+    patchLines, keywords = readPatchData(patchFile)
 
   # prepare resulting data
   outLines=[]
@@ -132,6 +122,28 @@ def main(argv):
   sys.stdout.close()
 
   return 0
+
+def readPatchData(fp):
+  if type(fp) is str:
+    with Pfx(fp):
+      with open(fp) as pfp:
+        return readPatchData(pfp)
+
+  patchLines=[]
+  keywords={}
+  for line in fp:
+    if not line.endswith('\n'):
+      raise ValueError, "missing EOF"
+    patchLines.append(line)
+    line = line.strip()
+    if len(line) == 0 or line[0] == '#':
+      continue
+    keyword = line.split(sep)[0]
+    if not caseSensitive:
+      keyword = keyword.lower()
+    keywords[keyword] = None
+
+  return patchLines, keywords
 
 if __name__ == '__main__':
   sys.exit(main(sys.argv))
