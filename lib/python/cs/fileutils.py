@@ -107,5 +107,16 @@ class Test(unittest.TestCase):
         self.assertEquals( open(T2.name).read(), data, "bad data in %s" % (T2.name,) )
         self.assert_(compare(T1.name, T2.name), "mismatched data in %s and %s" % (T1.name, T2.name))
 
+  def test02rewrite(self):
+    from StringIO import StringIO
+    olddata = "old data\n"
+    newdata = "new data\n"
+    with NamedTemporaryFile() as T1:
+      T1.write(olddata)
+      T1.flush()
+      self.assertEquals( open(T1.name).read(), olddata, "bad old data in %s" % (T1.name,) )
+      rewrite(T1.name, StringIO(newdata))
+      self.assertEquals( open(T1.name).read(), newdata, "bad new data in %s" % (T1.name,) )
+
 if __name__ == '__main__':
   unittest.main()
