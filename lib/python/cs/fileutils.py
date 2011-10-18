@@ -3,6 +3,7 @@
 import os
 import shutil
 from tempfile import NamedTemporaryFile
+import unittest
 
 def saferename(oldpath, newpath):
   ''' Rename a path using os.rename(), but raise an exception if the target
@@ -60,7 +61,7 @@ def rewrite(filepath, data,
   '''
   with NamedTemporaryFile() as T:
     T.write(data.read())
-    T.close()
+    T.flush()
     if not empty_ok:
       s = os.stat(T.name)
       if st.st_size == 0:
@@ -85,3 +86,26 @@ def rewrite(filepath, data,
       if backup_ext:
         shutil.copy2(filepath, filepath + backup_ext)
       shutil.copy(T.name, filepath)
+
+class Test(unittest.TestCase):
+
+  def setUp(self):
+    pass
+
+  def tearDown(self):
+    pass
+
+  def test01compare(self):
+    data = "here are some data\n"
+    with NamedTemporaryFile() as T1:
+      T1.write(data)
+      T1.flush()
+      with NamedTemporaryFile() as T2:
+        T2.write(data)
+        T2.flush()
+        self.assertEquals( open(T1.name).read(), data, "bad data in %s" % (T1.name,) )
+        self.assertEquals( open(T2.name).read(), data, "bad data in %s" % (T2.name,) )
+        self.assert_(compare(T1.name, T2.name), "mismatched data in %s and %s" % (T1.name, T2.name))
+
+if __name__ == '__main__':
+  unittest.main()
