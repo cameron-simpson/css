@@ -10,7 +10,7 @@
 import sys
 import os.path
 import getopt
-from cs.logutils import setup_logging
+from cs.logutils import setup_logging, error
 
 def main(argv):
   argv = list(argv)
@@ -29,15 +29,14 @@ def main(argv):
 
   insert = False
   commentOut = True
-  useRewriteif = False
   caseSensitive = True
   configFile = None
   sep = None
 
   try:
-    opts, args = getopt.getopt(sys.argv[1:],'#ADIRi/:')
+    opts, args = getopt.getopt(sys.argv[1:],'#ADIi/:')
   except getopt.GetoptError, e:
-    print >>sys.stderr, "%s: %s" % (cmd, e)
+    error("%s", e)
     badopts = True
     args = []
   else:
@@ -50,18 +49,16 @@ def main(argv):
         commentOut = False
       elif opt == '-I':
         insert = True
-      elif opt == '-R':
-        useRewriteif = True
       elif opt == '-i':
         caseSensitive = True
       elif opt == '-/':
         sep = val
       else:
-        print >>sys.stderr, "%s: unimplemented option: %s" % (cmd, opt)
+        error("unimplemented option: %s", opt)
         badopts = True
 
-  if len(args) < 1:
-    print >>sys.stderr, "%s: missing configfile" % (cmd,)
+  if not args:
+    error("missing configfile")
     badopts = True
   else:
     configFile = args.pop(0)
@@ -69,15 +66,12 @@ def main(argv):
       patchFile='-'
     else:
       patchFile = args.pop(0)
-      if len(args) > 0:
-        print >>sys.stderr, \
-              "%s: extra arguments after patchfile: %s" % (cmd, args)
+      if args:
+        error("extra arguments after patchfile: %s", args)
         badopts = True
 
   if configFile == '-' and patchFile == '-':
-    print >>sys.stderr, \
-          "%s: configfile and patchfile cannot both be standard input" \
-          % (cmd,)
+    error("configfile and patchfile cannot both be standard input")
     badopts = True
 
   if badopts:
