@@ -3,7 +3,8 @@
 from getopt import GetoptError
 import os.path
 import sys
-from cs.nodedb.node import Node, NodeDB, Backend, NodeDBFromURL
+from cs.nodedb.backend import Backend
+from cs.nodedb.node import Node, NodeDB, NodeDBFromURL
 from cs.logutils import setup_logging, Pfx, error
 
 def main(argv):
