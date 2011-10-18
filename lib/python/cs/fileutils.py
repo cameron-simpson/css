@@ -19,6 +19,8 @@ def trysaferename(oldpath, newpath):
   '''
   try:
     saferename(oldpath, newpath)
-  except:
+  except OSError:
     return False
+  except:
+    raise
   return True
