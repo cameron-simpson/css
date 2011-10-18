@@ -10,7 +10,9 @@
 import sys
 import os.path
 import getopt
-from cs.logutils import setup_logging, error
+from StringIO import StringIO
+from cs.fileutils import rewrite
+from cs.logutils import setup_logging, error, Pfx
 
 def main(argv):
   argv = list(argv)
@@ -29,12 +31,14 @@ def main(argv):
 
   badopts = False
 
-  insert = False
-  commentOut = True
-  caseSensitive = True
+  settings = Settings()
+  settings.insert = False
+  settings.commentOut = True
+  settings.caseSensitive = True
+  settings.sep = None
+
   configFile = None
   outputFile = None
-  sep = None
 
   try:
     opts, args = getopt.getopt(sys.argv[1:],'#ADIio:/:')
@@ -45,19 +49,19 @@ def main(argv):
   else:
     for opt, val in opts:
       if opt == '-#':
-        commentOut = True
+        settings.commentOut = True
       elif opt == '-A':
-        insert = False
+        settings.insert = False
       elif opt == '-D':
-        commentOut = False
+        settings.commentOut = False
       elif opt == '-I':
-        insert = True
+        settings.insert = True
       elif opt == '-i':
-        caseSensitive = True
+        settings.caseSensitive = True
       elif opt == '-o':
         outputFile = val
       elif opt == '-/':
-        sep = val
+        settings.sep = val
       else:
         error("unimplemented option: %s", opt)
         badopts = True
@@ -84,46 +88,63 @@ def main(argv):
     return 2
 
   if patchFile == '-':
-    patchLines, keywords = readPatchData(sys.stdin)
+    patchLines, keywords = readPatchData(sys.stdin, settings)
   else:
-    patchLines, keywords = readPatchData(patchFile)
+    patchLines, keywords = readPatchData(patchFile, settings)
 
-  # prepare resulting data
-  outLines=[]
-
-  if insert:
-    outLines.extend(patchLines)
-
+  output = StringIO()
   if configFile == '-':
-    configData = sys.stdin
+    writeConfigData(output, sys.stdin, patchLines, keywords, settings)
   else:
-    configData = open(configFile)
+    writeConfigData(output, configFile, patchLines, keywords, settings)
 
-  for line in configData:
-    assert line.endswith('\n')
-    words = line.strip().split(sep)
+  output.seek(0)
+  if outputFile is None:
+    sys.stdout.write(output.getvalue())
+    sys.stdout.close()
+  else:
+    if os.path.exists(outputFile):
+      rewrite(outputFile, output)
+    else:
+      with open(outputFile, "w") as ofp:
+        ofp.write(output.getvalue())
+
+  return 0
+
+class Settings(object):
+  pass
+
+def writeConfigData(output, configFile, patchLines, keywords, settings):
+  if type(configFile) is str:
+    with Pfx(configFile):
+      with open(configFile) as cfp:
+        return writeConfigData(output, cfp, patchLines, keywords, settings)
+
+  if settings.insert:
+    for line in patchLines:
+      output.write(line)
+
+  for line in configFile:
+    if not line.endswith('\n'):
+      raise ValueError, "unexpected EOF"
+    words = line.strip().split(settings.sep)
     if len(words) > 0:
       word1 = words[0]
-      if not caseSensitive:
+      if not settings.caseSensitive:
         word1 = word1.lower()
       if word1 in keywords:
-        if commentOut:
+        if settings.commentOut:
           line='#'+line
         else:
           # discard line
           continue
-    outLines.append(line)
+    output.write(line)
 
-  if not insert:
-    outLines.extend(patchLines)
+  if not settings.insert:
+    for line in patchLines:
+      output.write(line)
 
-  for line in outLines:
-    sys.stdout.write(line)
-  sys.stdout.close()
-
-  return 0
-
-def readPatchData(fp):
+def readPatchData(fp, settings):
   if type(fp) is str:
     with Pfx(fp):
       with open(fp) as pfp:
@@ -138,8 +159,8 @@ def readPatchData(fp):
     line = line.strip()
     if len(line) == 0 or line[0] == '#':
       continue
-    keyword = line.split(sep)[0]
-    if not caseSensitive:
+    keyword = line.split(settings.sep)[0]
+    if not settings.caseSensitive:
       keyword = keyword.lower()
     keywords[keyword] = None
 
