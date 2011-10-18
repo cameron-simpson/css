@@ -63,7 +63,7 @@ def rewrite(filepath, data,
     T.write(data.read())
     T.flush()
     if not empty_ok:
-      s = os.stat(T.name)
+      st = os.stat(T.name)
       if st.st_size == 0:
         raise ValueError, "no data in temp file"
     if do_diff or not overwrite_anyway:
