@@ -294,6 +294,8 @@ class Rules(list):
     self.vars = {}
 
   def load(self, fp):
+    ''' Import an open rule file.
+    '''
     self.extend(list(parserules(fp)))
 
   def file_message(self, M, state):
