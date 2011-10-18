@@ -1,4 +1,4 @@
-#!/usr/bin/python -tt
+#!/usr/bin/env py25+
 #
 # Apply a configuration patch to a file, writing the patched config
 # to the standard output.
