@@ -52,6 +52,7 @@ set -- $SSHTO_OPTS ${1+"$@"}
 badopts=
 
 host=
+loginpart=
 havehost=
 first=1
 while [ $# -gt 0 ]
@@ -67,6 +68,9 @@ do
         setx='set -x'
 	sshopts="$sshopts $1"
 	;;
+    -l) loginpart=$2
+        shift
+        ;;
     -[Fil]) lsshopts="$lsshopts $1 "`shqstr "$2"`
         shift
         ##echo "lsshopts=[$lsshopts]" >&2
@@ -108,6 +112,12 @@ then
   else
     host=$1; shift
   fi
+fi
+
+# workaround for rsync mangling my u1@h1!u2@h2 invocation
+if [ -n "$loginpart" ]
+then
+  host=$loginpart@$host
 fi
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
