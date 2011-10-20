@@ -149,7 +149,7 @@ def readPatchData(fp, settings):
   if type(fp) is str:
     with Pfx(fp):
       with open(fp) as pfp:
-        return readPatchData(pfp)
+        return readPatchData(pfp, settings)
 
   patchLines=[]
   keywords={}
