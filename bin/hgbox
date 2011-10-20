@@ -207,7 +207,7 @@ hgstat=`$hg stat`
 if [ -n "$hgstat" ]
 then
   $hg addremove
-  $hg commit -m "sync in `hostname`:`pwd`"
+  $hg commit -m "sync in `hostname`:`pwd` `date +'%Y-%m-%d-%H:%M:%S'`"
 fi
 
 if not [ $sync_quick ]
