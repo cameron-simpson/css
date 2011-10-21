@@ -90,6 +90,8 @@ then
     then
       if $trace mount -t "$fstype" -o "$rwmode" "$looppart" "$mountpoint"
       then
+        VM_IMG_MOUNT=$mountpoint
+        export VM_IMG_MOUNT
         if [ $docd ]
         then
           ( cd "$mountpoint"
