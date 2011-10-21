@@ -103,7 +103,9 @@ then
         $trace umount "$mountpoint" || xit=1
       fi
       $trace rmdir "$mountpoint" || xit=1
+      $trace sync
     fi
+    $trace sleep 1      # this seems to need a delay :-(
     $trace kpartx -dv "$loopdev" || xit=1
   fi
   $trace losetup -d "$loopdev" || xit=1
