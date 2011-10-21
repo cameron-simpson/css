@@ -26,6 +26,7 @@ def main(argv):
     -i    Match keywords on a case-insensitive basis.
     -o output
           Write output to specified file. This can be the same as configfile.
+    -O    Write output back to the input configfile.
     -/sep Keywords separated from rest of line by sep instead of whitespace.''' % (cmd,)
 
   setup_logging(cmd)
@@ -39,10 +40,10 @@ def main(argv):
   settings.sep = None
 
   configFile = None
-  outputFile = None
+  outputFile = '-'
 
   try:
-    opts, args = getopt.getopt(sys.argv[1:],'#ADIio:/:')
+    opts, args = getopt.getopt(sys.argv[1:],'#ADIio:O/:')
   except getopt.GetoptError, e:
     error("%s", e)
     badopts = True
@@ -61,6 +62,8 @@ def main(argv):
         settings.caseSensitive = True
       elif opt == '-o':
         outputFile = val
+      elif opt == '-O':
+        outputFile = None
       elif opt == '-/':
         settings.sep = val
       else:
@@ -84,6 +87,9 @@ def main(argv):
     error("configfile and patchfile cannot both be standard input")
     badopts = True
 
+  if outputFile is None:
+    outputFile = configFile
+
   if badopts:
     print >>sys.stderr, usage
     return 2
@@ -100,7 +106,7 @@ def main(argv):
     writeConfigData(output, configFile, patchLines, keywords, settings)
 
   output.seek(0)
-  if outputFile is None:
+  if outputFile == '-':
     sys.stdout.write(output.getvalue())
     sys.stdout.close()
   else:
