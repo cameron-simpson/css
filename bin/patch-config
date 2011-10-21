@@ -104,8 +104,8 @@ def main(argv):
     writeConfigData(output, sys.stdin, patchLines, keywords, settings)
   else:
     writeConfigData(output, configFile, patchLines, keywords, settings)
-
   output.seek(0)
+
   if outputFile == '-':
     sys.stdout.write(output.getvalue())
     sys.stdout.close()
