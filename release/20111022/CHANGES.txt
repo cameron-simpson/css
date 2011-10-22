@@ -1,0 +1,2608 @@
+changeset:   8163:2acd0cbdc121
+tag:         release-20110219
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sat Feb 19 07:02:32 2011 +1100
+files:       release/20110219/CHANGES.txt release/20110219/SUMMARY.txt release/20110219/release-tag.txt
+description:
+Release information for release-20110219.
+Summary:
+Important bugfix to histbackup's --no-rsync mode.
+Minor updates to cs.nodedb.
+
+
+changeset:   8164:e627a30b135a
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sat Feb 19 07:02:33 2011 +1100
+files:       .hgtags
+description:
+Added tag release-20110219 for changeset 2acd0cbdc121
+
+
+changeset:   8165:4cb3f9eb4538
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sat Feb 19 10:39:51 2011 +1100
+files:       bin/histbackup
+description:
+histbackup: bump freshmeat release
+
+
+changeset:   8166:189a33a885bf
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sat Feb 19 10:50:10 2011 +1100
+files:       bin/cats2procmailrc
+description:
+cats2procmailrc: update release number for freshmeat publication
+
+
+changeset:   8167:64dbcba5dd7d
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Wed Feb 23 15:04:08 2011 +1100
+files:       bin/log-tsline
+description:
+log-tsline: bugfix - look for first notblank line  in template instead of last line in dayheader
+
+
+changeset:   8168:f513e3329559
+parent:      8162:5eef6144d6dd
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sat Feb 26 20:18:51 2011 +1100
+files:       lib/python/cs/logutils.py lib/python/cs/upd.py
+description:
+cs.logutils: for doc for ansi_mode; cs.upd: fix over application of ansi_mode
+
+
+changeset:   8169:9ac747ed9bd2
+parent:      8167:64dbcba5dd7d
+parent:      8168:f513e3329559
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sat Feb 26 20:26:54 2011 +1100
+description:
+Automated merge with ssh://home/hg/css
+
+
+changeset:   8170:7c304e51d060
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sat Feb 26 21:00:42 2011 +1100
+files:       lib/python/cs/later.py
+description:
+cs.later: add .cancel() method, .cancelled attribute, minor docstring fixes
+
+
+changeset:   8171:9363fdd80f59
+parent:      8169:9ac747ed9bd2
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sun Feb 27 10:11:22 2011 +1100
+files:       bin/histbackup
+description:
+histbackup: add -AX to -aH rsync options
+
+
+changeset:   8172:6ae7cc93aec2
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sun Feb 27 10:12:29 2011 +1100
+files:       bin/with-login-env
+description:
+with-login-env: special incantation for zsh, giving trouble
+
+
+changeset:   8173:db56c8f61d37
+parent:      8172:6ae7cc93aec2
+parent:      8170:7c304e51d060
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sun Feb 27 10:13:29 2011 +1100
+description:
+cs.later: merge changes from branch
+
+
+changeset:   8174:bf6c483778a9
+parent:      8170:7c304e51d060
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sun Feb 27 10:32:48 2011 +1100
+files:       lib/python/cs/later.py
+description:
+cs.later: followup to .cancel method: .state attribute, better tracking etc
+
+
+changeset:   8175:1ae05c0f28d9
+parent:      8173:db56c8f61d37
+parent:      8174:bf6c483778a9
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sun Feb 27 10:33:47 2011 +1100
+description:
+Automated merge with file:///Users/cameron/dev/css-fleet
+
+
+changeset:   8176:9a4db0acb76f
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sun Feb 27 11:56:23 2011 +1100
+files:       bin/histbackup
+description:
+histbackup: use "cp -ral" instead of "cp -rpl" in hopes of getting acls etc
+
+
+changeset:   8177:9053778da0ba
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Mon Feb 28 06:57:06 2011 +1100
+files:       bin/histbackup
+description:
+histbackup: remove -AX form default rsync args - fails badly if not supported
+
+
+changeset:   8178:9353a35ee5a3
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Mon Feb 28 06:57:50 2011 +1100
+files:       bin/rigsquid_redirect
+description:
+rigsquid_redirect: simplification, remove mksquidpeers
+
+
+changeset:   8179:46cf93ae660d
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Mon Feb 28 06:58:08 2011 +1100
+files:       bin/mksquidpeers
+description:
+mksquidpeers: set -ue
+
+
+changeset:   8180:d04a662aceb3
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Thu Mar 03 15:55:23 2011 +1100
+files:       bin/py25+ bin/py26+ bin/setvar
+description:
+setvar: exec pythion via py25+, add py25+ and py26+
+
+
+changeset:   8181:2df1a456f380
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Fri Mar 11 11:45:13 2011 +1100
+files:       bin/with-login-env
+description:
+with-login-env: revert zsh behaviour - somethig odd in my environment misleading me
+
+
+changeset:   8182:6775a4793614
+parent:      8162:5eef6144d6dd
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Fri Mar 11 11:30:44 2011 +1100
+files:       lib/python/cs/nodedb/node.py
+description:
+cs.nodedb.node: tweak error messages
+
+
+changeset:   8183:84860e82bbc2
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Fri Mar 11 17:16:00 2011 +1100
+files:       lib/python/cs/nodedb/text.py
+description:
+cs.nodedb.text: use singular node attr name in text dump data
+
+
+changeset:   8184:346e82f848e7
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sat Mar 12 20:02:44 2011 +1100
+files:       lib/python/cs/nodedb/__init__.py lib/python/cs/nodedb/httpd.py lib/python/cs/nodedb/node.py lib/python/cs/nodedb/text.py
+description:
+cs.nodedb: add editwide and dumpwide commands for more convenient bulk editing of attributes, precursor to editing in a spreadsheet; rationalise a bunch of the tokenisation stuff
+
+
+changeset:   8185:0338b726648d
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Tue Mar 15 15:10:21 2011 +1100
+files:       lib/python/cs/nodedb/node.py lib/python/cs/nodedb/text.py
+description:
+cs.nodedb: cleaner tempfile creation/tidyup, parser tweak
+
+
+changeset:   8186:0f022151ab14
+parent:      8180:d04a662aceb3
+parent:      8185:0338b726648d
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Tue Mar 15 15:10:41 2011 +1100
+description:
+Automated merge with file:///Users/cameron/dev/css-fleet
+
+
+changeset:   8187:0d5c2533782b
+parent:      8181:2df1a456f380
+parent:      8186:0f022151ab14
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Tue Mar 15 15:12:17 2011 +1100
+description:
+Automated merge with ssh://home/hg/css
+
+
+changeset:   8188:deaecc81a6cb
+parent:      8181:2df1a456f380
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Wed Mar 23 11:06:36 2011 +1100
+files:       Mykefile
+description:
+Mykefile: add deployment to bitbicket.org
+
+
+changeset:   8189:aed0c227c020
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Wed Mar 23 11:07:25 2011 +1100
+files:       bin/pull-group
+description:
+pull-group: some commands must function even in test mode
+
+
+changeset:   8190:e1af3fdfb489
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Wed Mar 23 11:08:04 2011 +1100
+files:       bin/term
+description:
+term: try to choose suitable native Mac terminal
+
+
+changeset:   8191:4f5f397248af
+parent:      8190:e1af3fdfb489
+parent:      8187:0d5c2533782b
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Wed Mar 23 11:08:23 2011 +1100
+description:
+merge
+
+
+changeset:   8192:4b88d0d541c5
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Wed Mar 23 11:17:31 2011 +1100
+files:       Mykefile
+description:
+Mykefile: use ssh to push to bitbucket.org
+
+
+changeset:   8193:6f6df7d0a2da
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Wed Mar 23 11:20:09 2011 +1100
+files:       html/index.html
+description:
+html/index.html: add link to bitbucket.org mercurial repository
+
+
+changeset:   8194:9fc97ce21ba9
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sat Mar 26 16:28:47 2011 +1100
+files:       html/index.html
+description:
+index.html: update quick link list
+
+
+changeset:   8195:a60ad358ec78
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sat Mar 26 17:06:36 2011 +1100
+files:       html/index.html
+description:
+index.html: more quick link tweaking, remove an obsolete link
+
+
+changeset:   8196:2e6308eeb1a3
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sat Mar 26 18:10:40 2011 +1100
+files:       INSTALL
+description:
+INSTALL: minor wording tweaks
+
+
+changeset:   8197:4f0a39593b40
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Fri Apr 01 17:21:35 2011 +1100
+files:       bin/ifstat
+description:
+ifstat: report network interface byte counts
+
+
+changeset:   8198:f21c66164228
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Fri Apr 01 17:27:30 2011 +1100
+files:       bin/ifstat
+description:
+ifstat: openbsd and freebsd support, set missing $cmd
+
+
+changeset:   8199:6b27807871fc
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Fri Apr 01 19:45:42 2011 +1100
+files:       Mykefile
+description:
+Mykefile: update _help target
+
+
+changeset:   8200:00aa8cc07498
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sun Apr 10 09:31:34 2011 +1000
+files:       bin/OK
+description:
+OK: add -N option to autoinvoke mail-on-error
+
+
+changeset:   8201:117481c27b1a
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sun Apr 10 09:36:19 2011 +1000
+files:       bin/OK
+description:
+OK: default notification from \$CS_OK_NOTIFY if set and not null
+
+
+changeset:   8202:d402befc277d
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sun Apr 10 10:30:52 2011 +1000
+files:       bin/OK
+description:
+OK: use \$NOTIFY for mail-on-error, but don't set or export it
+
+
+changeset:   8203:ecd034bd3c4b
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sat Apr 16 12:07:49 2011 +1000
+files:       bin/unfukh
+description:
+unfukh: fix argument parsing typo, add text to comments and usage message
+
+
+changeset:   8204:8d3be78375b6
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sat Apr 16 12:42:18 2011 +1000
+files:       bin/ifstat-diff
+description:
+ifstat-diff: report network interface stats changes around a command
+
+
+changeset:   8205:e8e2f522713f
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sat Apr 23 18:41:15 2011 +1000
+files:       bin/summarise-logwatch
+description:
+summarise-logwatch: strip irrelevant cruft from logwatch reports, summarise the rest
+
+
+changeset:   8206:340ab915a192
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sat Apr 23 20:30:27 2011 +1000
+files:       bin/summarise-logwatch
+description:
+summarise-logwatch: additional cruft recognition, better state management
+
+
+changeset:   8207:14560240a000
+parent:      8204:8d3be78375b6
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Fri Apr 22 20:13:48 2011 +1000
+files:       lib/python/cs/app/maildb.py
+description:
+cs.app.maildb: fix up test mode
+
+
+changeset:   8208:fe6dbddfcfe5
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sun Apr 24 19:19:33 2011 +1000
+files:       lib/python/cs/nodedb/tokcab.py
+description:
+cs.nodedb.tokcab: plurality fix
+
+
+changeset:   8209:8288ffc69e8d
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sun Apr 24 19:20:28 2011 +1000
+files:       lib/python/cs/nodedb/tokcab.py
+description:
+cs.nodedb.tokcab: plurality fix
+
+
+changeset:   8210:963683798f25
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sun Apr 24 19:51:10 2011 +1000
+files:       lib/python/cs/app/maildb.py
+description:
+cs.app.maildb: make MailDB a factory, minor changes
+
+
+changeset:   8211:1e8352259675
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sun Apr 24 19:51:48 2011 +1000
+files:       lib/python/cs/nodedb/node.py lib/python/cs/nodedb/tokcab.py
+description:
+cs.nodedb: replace NodeDB dict .get, use in .tokcab
+
+
+changeset:   8212:434c07ac1447
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Wed Apr 27 21:41:51 2011 +1000
+files:       bin/cs-maildb
+description:
+cs-maildb: invoke maildb command line
+
+
+changeset:   8213:59719f31aea0
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Wed Apr 27 21:42:42 2011 +1000
+files:       lib/python/cs/nodedb/node.py
+description:
+cs.nodedb.node: add add() and update() set-like methods to _AttrList
+
+
+changeset:   8214:2182ce9d763d
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Wed Apr 27 21:43:41 2011 +1000
+files:       lib/python/cs/app/maildb.py
+description:
+cs.app.maildb: address and address group import, command line cleanup
+
+
+changeset:   8215:5e269d2f8600
+parent:      8206:340ab915a192
+parent:      8214:2182ce9d763d
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Wed Apr 27 21:46:02 2011 +1000
+description:
+Automated merge with ssh://home/hg/css
+
+
+changeset:   8216:46eea83229c4
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Thu Apr 28 17:57:41 2011 +1000
+files:       bin/vsftp-server
+description:
+vsftp-server: an empty config file is not an error
+
+
+changeset:   8217:457d1528dee0
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Thu Apr 28 18:06:01 2011 +1000
+files:       bin/summarise-logwatch
+description:
+summarise-logwatch: recognise normal vsftp-server messages
+
+
+changeset:   8218:201f1945ec27
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sat Apr 30 08:04:14 2011 +1000
+files:       bin/summarise-logwatch
+description:
+summarise-logwatch: sshd update
+
+
+changeset:   8219:f173f5b3ec1b
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sat Apr 30 08:29:33 2011 +1000
+files:       bin/summarise-logwatch
+description:
+summarise-logwatch: fix vsftp patterns
+
+
+changeset:   8220:a5f5b56ccff0
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sun May 08 19:09:13 2011 +1000
+files:       bin/get-mailman-archive
+description:
+get-mailman-archive: cope with archives that are not compressed
+
+
+changeset:   8221:07d81f922fec
+parent:      8006:97bf2e3bf939
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Mon May 09 10:37:53 2011 +1000
+files:       bin/forever
+description:
+forever: catch SIGTERM and pass through
+
+
+changeset:   8222:05e5db55ea77
+parent:      8220:a5f5b56ccff0
+parent:      8221:07d81f922fec
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Mon May 09 10:38:11 2011 +1000
+description:
+Automated merge with file:///app1tb/home/cameron/hg/css
+
+
+changeset:   8223:cce04d8c86d0
+parent:      8215:5e269d2f8600
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Thu Apr 28 08:28:48 2011 +1000
+files:       lib/python/cs/nodedb/node.py
+description:
+cs.nodedb.node: NodeDB.nodeByTypeName now uses .get()
+
+
+changeset:   8224:09fb489de68e
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Thu Apr 28 10:52:55 2011 +1000
+files:       lib/python/cs/nodedb/node.py
+description:
+cs.nodedb.node: no longer use json module
+
+
+changeset:   8225:e31c72ab0390
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Fri Apr 29 19:39:20 2011 +1000
+files:       lib/python/cs/nodedb/tokcab.py
+description:
+cs.nodedb.tokcab: plurality fix
+
+
+changeset:   8226:289a91099a16
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Fri Apr 29 20:16:54 2011 +1000
+files:       lib/python/cs/app/maildb.py
+description:
+cs.app.maildb: threading support, untested
+
+
+changeset:   8227:118e98e5b7ce
+parent:      8194:9fc97ce21ba9
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Tue Apr 05 09:18:18 2011 +1000
+files:       bin/nodedb
+description:
+nodedb: convenience command line wrapper for cs.nodedb use
+
+
+changeset:   8228:bd375f69befc
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Tue Apr 05 10:07:31 2011 +1000
+files:       lib/python/cs/nodedb/text.py
+description:
+cs.nodedb.text: attr_value_to_text: fix needless recursion
+
+
+changeset:   8229:b976f0b7c275
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Tue Apr 05 10:07:58 2011 +1000
+files:       lib/python/cs/nodedb/node.py
+description:
+cs.nodedb.node: add load_csv_wide to import wide CSV dumps
+
+
+changeset:   8230:e07f8677bbcb
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sat Apr 16 16:13:31 2011 +1000
+files:       lib/python/cs/nodedb/httpd.py lib/python/cs/nodedb/node.py lib/python/cs/nodedb/text.py
+description:
+cs.nodedb: rework human friendly tokenisation stuff, prepping for better CSV edit modes
+
+
+changeset:   8231:9e3c4c0615cd
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sun Apr 17 08:29:32 2011 +1000
+files:       lib/python/cs/nodedb/text.py
+description:
+cs.nodedb.text: unit tests for totoken/fromtoken
+
+
+changeset:   8232:92fe3a144c04
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sun Apr 17 08:36:58 2011 +1000
+files:       lib/python/cs/nodedb/node.py
+description:
+cs.nodedb.node: remove tocsv/fromcsv, use totoken/fromtoken for wide csv format
+
+
+changeset:   8233:a1b6f023cb3e
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Fri Apr 29 20:33:44 2011 +1000
+files:       lib/python/cs/nodedb/text.py
+description:
+cs.nodedb.text: docstring tweak
+
+
+changeset:   8234:d798cdbd221a
+parent:      8226:289a91099a16
+parent:      8233:a1b6f023cb3e
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Fri Apr 29 20:33:50 2011 +1000
+files:       lib/python/cs/nodedb/node.py
+description:
+Automated merge with file:///Users/cameron/dev/css-fleet
+
+
+changeset:   8235:8bfc452b4869
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sat May 07 18:43:13 2011 +1000
+files:       lib/python/cs/nodedb/export.py lib/python/cs/nodedb/node.py
+description:
+cs.nodedb.export: start of export and import utility functions; cs.nodedb.node: use the cs.nodedb.export.export_rows_wide function in NodeDB.dump_csv_wide
+
+
+changeset:   8236:332d6f8031b9
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sat May 07 20:28:43 2011 +1000
+files:       lib/python/cs/nodedb/export.py
+description:
+cs.node.export: added import rows wide
+
+
+changeset:   8237:66ed60ff60cd
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sat May 07 21:43:56 2011 +1000
+files:       lib/python/cs/nodedb/export.py lib/python/cs/nodedb/node.py
+description:
+cs.nodedb: update NodeDB.load_csv_wide to use import_rows_wide, add tokeniser selftest
+
+
+changeset:   8238:cadcd8453c2c
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sat May 14 18:33:27 2011 +1000
+files:       lib/python/cs/nodedb/export.py lib/python/cs/nodedb/node.py lib/python/cs/nodedb/text.py
+description:
+cs.nodedb: use cs.nodedb.export functions for various things
+
+
+changeset:   8239:398303280d88
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sat May 14 19:06:30 2011 +1000
+files:       lib/python/cs/nodedb/export.py lib/python/cs/nodedb/node.py
+description:
+cs.nodedb: assorted fixes for CSV format data in-out
+
+
+changeset:   8240:aeaa0342f8ce
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sat May 14 19:17:02 2011 +1000
+files:       lib/python/cs/nodedb/export.py
+description:
+cs.nodedb.export: edit_csv_wide: honour attrs and all_attrs parameters
+
+
+changeset:   8241:1a74571ba0e6
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sat May 14 19:27:52 2011 +1000
+files:       lib/python/cs/nodedb/node.py
+description:
+cs.nodedb.node: rephrase assertion check
+
+
+changeset:   8242:2a6ec3d72322
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sat May 14 20:19:30 2011 +1000
+files:       lib/python/cs/nodedb/export.py
+description:
+cs.nodedb: don't use asserts for parse fails, prefer $CSV_EDITOR over $EDITOR for CSV editing
+
+
+changeset:   8243:5e07d40e2dc1
+parent:      8222:05e5db55ea77
+parent:      8242:2a6ec3d72322
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sat May 14 20:20:50 2011 +1000
+description:
+Automated merge with ssh://home/hg/css
+
+
+changeset:   8244:a648bddb2d9a
+parent:      8242:2a6ec3d72322
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sun May 15 15:00:37 2011 +1000
+files:       lib/python/cs/nodedb/node.py
+description:
+cs.nodedb.node: remove barring of sqlite:///:memory: URL
+
+
+changeset:   8245:af3be4069bff
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sun May 15 15:24:26 2011 +1000
+files:       lib/python/cs/nodedb/node.py
+description:
+cs.nodedb.node: fromtoken: barewords that fail the create turn into strings
+
+
+changeset:   8246:a9c49a32235e
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sun May 15 19:00:10 2011 +1000
+files:       lib/python/cs/nodedb/node.py
+description:
+cs.nodedb.node: better multinode command line parser
+
+
+changeset:   8247:f6f8f3fdbed8
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sun May 15 19:58:44 2011 +1000
+files:       lib/python/cs/nodedb/text.py
+description:
+cs.nodedb.text: fromtoken requires a complete string match
+
+
+changeset:   8248:b21cd8df8951
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sun May 15 19:59:14 2011 +1000
+files:       lib/python/cs/nodedb/export.py
+description:
+cs.nodedb.export: pass all_nodes through calls
+
+
+changeset:   8249:365e4f56e88c
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Mon May 16 12:54:11 2011 +1000
+files:       lib/python/cs/nodedb/node.py
+description:
+cs.nodedb.node: add wordToNode, use in fromtoken; recognise "?" in wildcards
+
+
+changeset:   8250:0f74512b1cb1
+parent:      8243:5e07d40e2dc1
+parent:      8249:365e4f56e88c
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Mon May 16 20:31:02 2011 +1000
+description:
+Automated merge with file:///Users/cameron/dev/css-fleet
+
+
+changeset:   8251:3a5d98481a73
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Thu May 19 14:21:32 2011 +1000
+files:       lib/python/cs/nodedb/node.py lib/python/cs/nodedb/text.py
+description:
+cs.nodedb: redo the tokenisation stuff, removing the context and cleaning up the commalist parsing, make nodekey() a NodeDB class method, autocreate more freely and don't discard misparses but return strings
+
+
+changeset:   8252:77f7cb5ead9f
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Thu May 19 14:50:52 2011 +1000
+files:       lib/python/cs/nodedb/node.py
+description:
+cs.nodedb.node: add NodeDB.make() autocreation convenience method
+
+
+changeset:   8253:9b91fc609eb1
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Thu May 19 15:05:47 2011 +1000
+files:       lib/python/cs/nodedb/text.py
+description:
+cs.nodedb.text: isspace() is not spelt iswhite()
+
+
+changeset:   8254:2f3db0c1be04
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Thu May 19 15:53:29 2011 +1000
+files:       lib/python/cs/nodedb/node.py lib/python/cs/nodedb/text.py
+description:
+cs.nodedb: fix commalist parser, sort out assignment code
+
+
+changeset:   8255:e2173044aba0
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Thu May 19 18:05:31 2011 +1000
+files:       lib/python/cs/nodedb/node.py
+description:
+cs.nodedb.node: set now takes multiple assignments
+
+
+changeset:   8256:740732110ec1
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Fri May 20 18:27:50 2011 +1000
+files:       lib/python/cs/nodedb/httpd.py lib/python/cs/nodedb/node.py
+description:
+cs.nodedb: NodeDB.types is now a property
+
+
+changeset:   8257:21c36c2c6dc5
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Fri May 20 22:05:25 2011 +1000
+files:       lib/python/cs/html.py
+description:
+cs.html: minor idiom changes
+
+
+changeset:   8258:470981999c9e
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sat May 21 12:21:21 2011 +1000
+files:       lib/python/cs/html.py
+description:
+cs.html: avoid emitting closing </BR> - produced doubel BRs in Safari and perhaps elsewhere
+
+
+changeset:   8259:61e74e08bcd4
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sat May 21 17:41:09 2011 +1000
+files:       lib/python/cs/nodedb/httpd.py lib/python/cs/nodedb/node.py
+description:
+cs.nodedb: rename NodeDB.nodesByType to .type
+
+
+changeset:   8260:0fb6b6b3e3ca
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sun May 22 13:12:15 2011 +1000
+files:       lib/python/cs/nodedb/httpd.py
+description:
+cs.nodedb.httpd: a docstring
+
+
+changeset:   8261:fedd08feec90
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sun May 29 21:13:23 2011 +1000
+files:       lib/python/cs/nodedb/text.py
+description:
+cs.nodedb.text: add get_commatext and get_commatexts for parsing command lines, update some unit tests
+
+
+changeset:   8262:e35baca31556
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sun May 29 21:13:58 2011 +1000
+files:       lib/python/cs/nodedb/node.py
+description:
+cs.nodedb.node: add NodeDB.interactive() method
+
+
+changeset:   8263:65eca01755f8
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Mon May 30 14:40:28 2011 +1000
+files:       lib/python/cs/nodedb/node.py
+description:
+cs.nodedb.node: remove debug prints
+
+
+changeset:   8264:9ef16605677a
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Mon May 30 14:55:48 2011 +1000
+files:       lib/python/cs/nodedb/node.py
+description:
+cs.nodedb: usage messages for several commands
+
+
+changeset:   8265:5a187441b625
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Mon May 30 15:23:04 2011 +1000
+files:       lib/python/cs/nodedb/node.py
+description:
+cs.nodedb.node: NodeDB.Interactive: add .usage property and tweak cmd_* docstrings
+
+
+changeset:   8266:147370ca2d74
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Mon May 30 16:52:17 2011 +1000
+files:       lib/python/cs/nodedb/node.py
+description:
+cs.nodedb.node: fix call to .text.fromtoken
+
+
+changeset:   8267:4ef06e613064
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Mon May 30 20:17:47 2011 +1000
+files:       lib/python/cs/nodedb/export.py lib/python/cs/nodedb/node.py
+description:
+cs.nodedb: update import_csv_wide for newer fromtoken returns, better exception handling in command loop
+
+
+changeset:   8268:c0f02dd334d8
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Mon May 30 21:22:48 2011 +1000
+files:       lib/python/cs/nodedb/export.py lib/python/cs/nodedb/node.py
+description:
+cs.nodedb: make "edit" do former "editwide", fix dump nodelist parse, sort some more fromtoken returns, remove a few more debug messages, fix import_csv_wide
+
+
+changeset:   8269:742e080723a0
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Thu Jun 02 19:39:25 2011 +1000
+files:       bin-cs/+gmail bin-cs/+imap bin/+gmail bin/+imap
+description:
+move +imap and +gmail into bin-cs
+
+
+changeset:   8270:891acd4937fe
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Fri Jun 03 15:01:25 2011 +1000
+files:       bin/log-hg-commit
+description:
+log-hg-commit: fix .hg-cs-category file check
+
+
+changeset:   8271:3c0a43a65ae7
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Fri Jun 03 15:07:08 2011 +1000
+files:       bin/OK
+description:
+OK: defaults for $NOTIFY envvar
+
+
+changeset:   8272:bdd82ec832e0
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Wed Jun 08 19:47:31 2011 +1000
+files:       bin/hgbox
+description:
+hgbox: dropbox-ish sync tool based on mercurial
+
+
+changeset:   8273:0be28e964cf4
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Wed Jun 08 19:48:29 2011 +1000
+files:       bin/merge-dumb
+description:
+merge-dumb: dumb tool aimed at merging files that accrue lines independently, like timehseets
+
+
+changeset:   8274:d8abe5bc6a41
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Wed Jun 08 20:02:54 2011 +1000
+files:       bin/dlog
+description:
+dlog: flag DLOG_LOCAL forces local logging - moving to hgbox syncing and always local logging
+
+
+changeset:   8275:c471c95254e0
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Thu Jun 09 08:59:27 2011 +1000
+files:       bin/hgbox
+description:
+hgbox: pass .hgbox-outside map file args to map command in envvar, fix some parsing, break out the rsync options instead of using -a
+
+
+changeset:   8276:c4ecde0f4d13
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Thu Jun 09 09:01:08 2011 +1000
+files:       bin/log-tsline
+description:
+log-tsline: portability fix for sed syntax
+
+
+changeset:   8277:eb26e69e6997
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Thu Jun 09 09:11:53 2011 +1000
+files:       bin/log-tsline
+description:
+log-tsline: more sed portability fixes, but not enough for MacOSX sed - restreated to GNU sed :-(
+
+
+changeset:   8278:3b994409734d
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Thu Jun 09 09:20:51 2011 +1000
+files:       bin/log-tsline
+description:
+log-tsline: another sed tweak - undoing tweak for MacOSX sed :-(
+
+
+changeset:   8279:991fee8020d1
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Thu Jun 09 13:09:32 2011 +1000
+files:       bin/hgbox
+description:
+hgbox: tweak comment, remove HGMERGE= from hg fetch line
+
+
+changeset:   8280:d06888df929d
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Thu Jun 09 13:13:41 2011 +1000
+files:       bin/hgbox
+description:
+hgbox: use "ssh -n" for remote action
+
+
+changeset:   8281:50f7aeb4b3d3
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Thu Jun 09 13:17:27 2011 +1000
+files:       bin/hgbox
+description:
+hgbox: fix up rsync include/exclude stuff
+
+
+changeset:   8282:1474355c4b8b
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Fri Jun 17 16:39:22 2011 +1000
+files:       bin/backup-vms-libvirt
+description:
+backup-vms-libvirt: backup VM config and image files
+
+
+changeset:   8283:a06d6382a723
+parent:      8281:50f7aeb4b3d3
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Mon Jun 13 13:36:07 2011 +1000
+files:       README.txt
+description:
+README.txt: synlink to INSTALL to adhere to the convention
+
+
+changeset:   8284:ccfe1c9f2dcd
+parent:      8268:c0f02dd334d8
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Tue May 31 09:20:22 2011 +1000
+files:       lib/python/cs/nodedb/export.py
+description:
+cs.nodedb.export: clean up CSV import code
+
+
+changeset:   8285:d458b9b814e9
+parent:      8281:50f7aeb4b3d3
+parent:      8284:ccfe1c9f2dcd
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Thu Jun 09 17:13:04 2011 +1000
+description:
+Automated merge with file:///Users/cameron/dev/css-fleet
+
+
+changeset:   8286:27ce4148729d
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Fri Jun 17 16:45:04 2011 +1000
+files:       lib/python/cs/nodedb/node.py
+description:
+cs.nodedb.csvdb: fix self test for changes fromtoken signature
+
+
+changeset:   8287:3289ff357a3e
+parent:      8283:a06d6382a723
+parent:      8286:27ce4148729d
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Fri Jun 17 16:45:12 2011 +1000
+description:
+Automated merge with file:///Users/cameron/dev/css-fleet
+
+
+changeset:   8288:6f3e06da81f2
+parent:      8282:1474355c4b8b
+parent:      8287:3289ff357a3e
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Fri Jun 17 16:45:35 2011 +1000
+description:
+Automated merge with ssh://home/hg/css
+
+
+changeset:   8289:2a1495d9e3b8
+parent:      8287:3289ff357a3e
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Fri Jun 17 16:57:59 2011 +1000
+files:       lib/python/cs/nodedb/node.py
+description:
+cs.nodedb.node: nodespec is a NodeDB method
+
+
+changeset:   8290:7e8c5e1320b9
+parent:      8288:6f3e06da81f2
+parent:      8289:2a1495d9e3b8
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Fri Jun 17 16:58:10 2011 +1000
+description:
+Automated merge with file:///Users/cameron/dev/css-fleet
+
+
+changeset:   8291:4b1d5580a5f3
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Fri Jun 17 17:05:10 2011 +1000
+files:       lib/python/cs/nodedb/node.py
+description:
+cs.nodedb.node: dumpwide: use export_csv_wide
+
+
+changeset:   8292:a4bb3cc0d7c5
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Fri Jun 17 17:21:56 2011 +1000
+files:       deploy.rsync-include
+description:
+exclude a few things from the deployment kit
+
+
+changeset:   8293:d7af103d21ce
+parent:      8285:d458b9b814e9
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Mon Jun 13 18:20:40 2011 +1000
+files:       lib/python/cs/nodedb/text.py
+description:
+cs.nodedb.text: nodekey no longer a NodeDB method
+
+
+changeset:   8294:2c1653811adc
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Mon Jun 13 18:22:54 2011 +1000
+files:       lib/python/cs/nodedb/node.py lib/python/cs/nodedb/tokcab.py
+description:
+cs.nodedb: move to a dict-based API for backends, prototyping in the tokyocabinet backend, move to python-tokyocabinet module for TC backend, some function signature changes
+
+
+changeset:   8295:dd90d5ace573
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sat Jun 18 18:51:53 2011 +1000
+files:       lib/python/cs/nodedb/csvdb.py lib/python/cs/nodedb/node.py
+description:
+cs.nodedb: initial update of csvdb to dict interface, and move of vertical CSV format I/O into csvdb
+
+
+changeset:   8296:867d6895e82e
+parent:      8291:4b1d5580a5f3
+parent:      8295:dd90d5ace573
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sat Jun 18 18:52:01 2011 +1000
+files:       lib/python/cs/nodedb/node.py
+description:
+Automated merge with file:///Users/cameron/dev/css-fleet-nodedb
+
+
+changeset:   8297:0785aa1ae712
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sun Jun 19 12:26:51 2011 +1000
+files:       lib/python/cs/nodedb/node.py
+description:
+cs.nodedb.node: Backend.apply now works in nodedata, add NodeDB.apply_nodedata and Node.apply
+
+
+changeset:   8298:70495c9d3f16
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sun Jun 19 12:27:34 2011 +1000
+files:       lib/python/cs/nodedb/csvdb.py
+description:
+cs.nodedb.csvdb: define iteritems, iterkeys, itervalues, make __setitem__ and __delitem__ check not readonly
+
+
+changeset:   8299:f60c555b38fc
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sun Jun 19 12:29:35 2011 +1000
+files:       lib/python/cs/nodedb/tokcab.py
+description:
+cs.nodedb.tokcab: remove .apply, superclass has it
+
+
+changeset:   8300:92926c84f213
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sun Jun 19 12:31:21 2011 +1000
+files:       lib/python/cs/nodedb/tokcab.py
+description:
+cs.nodedb.tokcab: check against multiple .close calls
+
+
+changeset:   8301:110600246f95
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sun Jun 19 15:33:23 2011 +1000
+files:       lib/python/cs/nodedb/node.py lib/python/cs/nodedb/sqla.py
+description:
+cs.nodedb.sqla: initial move of SQLAlchemy backend to dict API
+
+
+changeset:   8302:241a17cf8cf7
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sun Jun 19 15:43:14 2011 +1000
+files:       lib/python/cs/nodedb/sqla.py
+description:
+cs.nodedb.sqla: remove .nodeByTypeName
+
+
+changeset:   8303:c9286c44dc56
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sun Jun 19 15:45:20 2011 +1000
+files:       lib/python/cs/nodedb/sqla.py
+description:
+cs.nodedb.sqla: simplify nodedata SQL SELECT
+
+
+changeset:   8304:8f5dd371b354
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sun Jun 19 15:58:32 2011 +1000
+files:       lib/python/cs/nodedb/csvdb.py
+description:
+cs.nodedb.csvdb: fix up write_csv_file repetition detector
+
+
+changeset:   8305:22a75a534bb8
+parent:      8292:a4bb3cc0d7c5
+parent:      8304:8f5dd371b354
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sun Jun 19 16:00:02 2011 +1000
+description:
+Automated merge with ssh://home/hg/css
+
+
+changeset:   8306:0f108dff5450
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Wed Jun 22 18:10:09 2011 +1000
+files:       bin/merge-dumb
+description:
+merge-dumb: fix serious data losing error and add sanity check to abort if difflib surprises us
+
+
+changeset:   8307:78e107e79e14
+parent:      8305:22a75a534bb8
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sat Jun 25 17:25:08 2011 +1000
+files:       bin/patch-config
+description:
+patch-config: handle bad options better
+
+
+changeset:   8308:aa6c44895e3d
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sat Jun 25 17:44:55 2011 +1000
+files:       bin/patch-config
+description:
+patch-config: add -/sep option so we can patch shell style configs using -/=
+
+
+changeset:   8309:380188dcc63d
+parent:      8306:0f108dff5450
+parent:      8308:aa6c44895e3d
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sat Jun 25 17:45:17 2011 +1000
+description:
+Automated merge with ssh://home/hg/css
+
+
+changeset:   8310:8d29ccf9520f
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sat Jun 25 18:27:09 2011 +1000
+files:       bin/with-vm-img-partition
+description:
+with-vm-img-partition: mount partition from disc image, run command, tidy up
+
+
+changeset:   8311:91e989225023
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sun Jun 26 14:26:57 2011 +1000
+files:       bin/backup-vms-libvirt
+description:
+backup-vms-libvirt: add -x and --progress options
+
+
+changeset:   8312:8b00e7580f83
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sun Jun 26 20:57:25 2011 +1000
+files:       bin/with-vm-img-partition
+description:
+with-vm-img-partition: add --cd option to run command in mounted partition
+
+
+changeset:   8313:102d31fea6e1
+parent:      8309:380188dcc63d
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Wed Jun 29 08:44:47 2011 +1000
+files:       bin/info2pod
+description:
+info2pod: add xkcd citation
+
+
+changeset:   8314:18ce0472383a
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Fri Jul 01 14:22:58 2011 +1000
+files:       bin/rig-reverse-proxy
+description:
+rig-reverse-proxy: prepare a reverse proxy squid
+
+
+changeset:   8315:324b6a3b23b5
+parent:      8312:8b00e7580f83
+parent:      8314:18ce0472383a
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Fri Jul 01 14:23:15 2011 +1000
+description:
+Automated merge with ssh://home/hg/css
+
+
+changeset:   8316:db5804066b21
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Fri Jul 01 15:31:31 2011 +1000
+files:       bin/with-vm-img-partition
+description:
+with-vm-img-partition: add --ro and --rw for mount modes
+
+
+changeset:   8317:b320fd8896f7
+parent:      8315:324b6a3b23b5
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Fri Jul 01 22:54:55 2011 +1000
+files:       bin/rig-reverse-proxy
+description:
+rig-reverse-proxy: tweak access_log name, add --access_log option
+
+
+changeset:   8318:986846e04b6a
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Thu Jul 07 14:08:10 2011 +1000
+files:       bin/setvar
+description:
+setvar: know about freebsd
+
+
+changeset:   8319:0f829e355b13
+parent:      8316:db5804066b21
+parent:      8318:986846e04b6a
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Thu Jul 07 14:08:16 2011 +1000
+description:
+Automated merge with ssh://home/hg/css
+
+
+changeset:   8320:ffb3e9da5f48
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sat Jul 09 14:21:50 2011 +1000
+files:       bin/sha1index lib/python/cs/hashutils.py
+description:
+sha1index: swap hash and pathname, use new cshashutils module
+
+
+changeset:   8321:e95f35a086a1
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sat Jul 09 14:26:34 2011 +1000
+files:       bin/sha1index
+description:
+sha1index: require python 2.5 since cs.hashutils uses a with statement
+
+
+changeset:   8322:2b1ed727c494
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sat Jul 09 18:17:58 2011 +1000
+files:       bin/hgbox
+description:
+hgbox: add -x, -v, -q options, make actions more clear and run less noisy
+
+
+changeset:   8323:1f3538d42533
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sun Jul 17 18:45:03 2011 +1000
+files:       bin/with-vm-img-partition
+description:
+with-vm-img-partition: fix shebang line
+
+
+changeset:   8324:1d941a7d9981
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Tue Jul 26 14:18:14 2011 +1000
+files:       bin/rpm-comparehost
+description:
+rpm-comparehost: compare RPM package list of this host with another
+
+
+changeset:   8325:885485d0b413
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Tue Jul 26 17:26:42 2011 +1000
+files:       bin/muttedit
+description:
+muttedit: set $EDITOR if missing, report from Marcelo Luiz de Laia
+
+
+changeset:   8326:ff1c01d0e4cf
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Tue Jul 26 17:33:39 2011 +1000
+files:       bin/muttedit
+description:
+muttedit: use default .muttrc path, bug reported by Marcelo Luiz de Laia
+
+
+changeset:   8327:54c9ac6f57f5
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Thu Jul 28 14:50:58 2011 +1000
+files:       bin/hgbox
+description:
+hgbox: add -q (quick) option to hgbox sync; do not push/pull remote hgbox
+
+
+changeset:   8328:7a3629e1b7b2
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Thu Jul 28 15:16:58 2011 +1000
+files:       bin/rpm-comparehost
+description:
+rpm-comparehost: strip leading two header lines of diff output
+
+
+changeset:   8329:baec75ac1865
+parent:      8304:8f5dd371b354
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Thu Jun 30 09:48:12 2011 +1000
+files:       bin/macify lib/python/cs/app/osx/__init__.py lib/python/cs/app/osx/fs.py lib/python/cs/macosx.py
+description:
+move macOSX stuff into cs.app.osx module/package
+
+
+changeset:   8330:e387f841dd4f
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Thu Jun 30 09:50:12 2011 +1000
+files:       lib/python/cs/app/osx/addressbook.py lib/python/cs/app/osx/objc.py
+description:
+cs.app.osx: add addressbook and objc modules, based on article at http://www.programmish.com/?p=26
+
+
+changeset:   8331:bba822fc9111
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Thu Jun 30 09:52:02 2011 +1000
+files:       lib/python/cs/app/osx/__init__.py lib/python/cs/macosx.py
+description:
+cs.app.osx: pull is_iphone from cs.macosx
+
+
+changeset:   8332:c899d5bae7c4
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Thu Jun 30 10:01:33 2011 +1000
+files:       lib/python/cs/app/osx/__init__.py lib/python/cs/app/osx/iphone.py lib/python/cs/app/osx/plist.py lib/python/cs/macosx.py
+description:
+obsolete cs.macosx for cs.app.osx; cs.app.osx: add iphone and plist modules from cs.macosx
+
+
+changeset:   8333:115d8da209f5
+parent:      8313:102d31fea6e1
+parent:      8332:c899d5bae7c4
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Thu Jun 30 10:05:54 2011 +1000
+files:       lib/python/cs/macosx.py
+description:
+Automated merge with file:///Users/cameron/dev/css-fleet
+
+
+changeset:   8334:d52597c41e63
+parent:      7824:2b94d459eb78
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Thu Jul 21 18:07:31 2011 +1000
+files:       lib/python/cs/logutils.py
+description:
+cs.logutils: pfx decorator: update docstring, fix tag default
+
+
+changeset:   8335:957d5ae9a5fb
+parent:      8333:115d8da209f5
+parent:      8334:d52597c41e63
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Thu Jul 21 18:26:26 2011 +1000
+files:       lib/python/cs/logutils.py
+description:
+cs.logutils: fix up default tag value
+
+
+changeset:   8336:21aa98223b1d
+parent:      8322:2b1ed727c494
+parent:      8335:957d5ae9a5fb
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Thu Jul 21 18:28:31 2011 +1000
+files:       lib/python/cs/macosx.py
+description:
+Automated merge with file:///Users/cameron/dev/css-fleet
+
+
+changeset:   8337:9d698853756f
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Thu Jul 28 20:52:51 2011 +1000
+files:       lib/python/cs/nodedb/node.py
+description:
+cs.nodedb.node: fold _makeNode into newNode
+
+
+changeset:   8338:9487a4d17bf3
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Thu Jul 28 21:31:42 2011 +1000
+files:       lib/python/cs/nodedb/node.py
+description:
+cs.nodedb.node: add NodeDB.seqNode(), bugfix NodeDB.seq() and NodeDB._
+
+
+changeset:   8339:c172c8581220
+parent:      8328:7a3629e1b7b2
+parent:      8338:9487a4d17bf3
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Thu Jul 28 21:33:42 2011 +1000
+files:       lib/python/cs/macosx.py
+description:
+Automated merge with ssh://home/hg/css
+
+
+changeset:   8340:001c9c59d6c6
+parent:      8338:9487a4d17bf3
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sun Jul 31 21:23:54 2011 +1000
+files:       lib/python/cs/nodedb/node.py
+description:
+cs.nodedb.node: NodeDB.TYPE now accesses the type metanode, move .seq() and .seqNode() into the Node class and leave hooks behind
+
+
+changeset:   8341:90094d818432
+parent:      8339:c172c8581220
+parent:      8340:001c9c59d6c6
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sun Jul 31 21:28:36 2011 +1000
+description:
+Automated merge with file:///Users/cameron/dev/css-fleet
+
+
+changeset:   8342:ba9fe2f7549f
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Mon Aug 01 16:00:35 2011 +1000
+files:       bin/beyonwiz lib/python/cs/app/beyonwiz.py
+description:
+beyonwiz: move data file parse into cs.app.beyonwiz, assorted modernisations and trivial bugfixes
+
+
+changeset:   8343:b25cf18288fc
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Mon Aug 01 16:36:57 2011 +1000
+files:       bin/rpm-comparehost
+description:
+rpm-comparehost: write our own hostname into the report, not "local"
+
+
+changeset:   8344:c01e9972b3e7
+parent:      8342:ba9fe2f7549f
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Mon Aug 01 16:42:11 2011 +1000
+files:       bin/beyonwiz
+description:
+beyonwiz: turn warning into error
+
+
+changeset:   8345:e9c20a551f17
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Mon Aug 01 16:43:37 2011 +1000
+files:       lib/python/cs/app/beyonwiz.py
+description:
+cs.app.beyonwiz: fix var name typo
+
+
+changeset:   8346:00d58dad1a2e
+parent:      8343:b25cf18288fc
+parent:      8345:e9c20a551f17
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Mon Aug 01 16:43:56 2011 +1000
+description:
+Automated merge with ssh://home/hg/css
+
+
+changeset:   8347:c70a40cf7f42
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Mon Aug 01 16:46:10 2011 +1000
+files:       lib/python/cs/app/beyonwiz.py
+description:
+cs.app.beyonwiz: add imports, fix typo
+
+
+changeset:   8348:0bbd973e400f
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Thu Aug 04 11:29:38 2011 +1000
+files:       bin/inscr bin/scr
+description:
+inscr: run command in new named screen session via scr; scr: logic cleanup/shuffle, add -N (new) option
+
+
+changeset:   8349:6ea340799299
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Thu Aug 04 12:33:20 2011 +1000
+files:       bin/scr
+description:
+scr: tweak set -ue mode, trace term invocations in /* mode
+
+
+changeset:   8350:c76b203c4e68
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Thu Aug 04 12:35:24 2011 +1000
+files:       bin/get-ssh-agent bin/have-ssh-agent bin/host-ssh-agent bin/inscr bin/need-ssh-agent bin/no-ssh-agent bin/rig-ssh-agent bin/stash-ssh-agent
+description:
+*-ssh-agent: add $DEBUG tracing, fix obsolete -h option use host-ssh-agent
+
+
+changeset:   8351:701d6abdaac0
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Thu Aug 04 12:46:55 2011 +1000
+files:       bin/set-x
+description:
+set-x: $DEBUG prefixes stderr tracing with command name
+
+
+changeset:   8352:9af3a0911988
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Thu Aug 04 12:54:24 2011 +1000
+files:       bin/respam defunct/respam
+description:
+respam: junk it
+
+
+changeset:   8353:3b23ed8048a3
+parent:      8351:701d6abdaac0
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Thu Aug 04 13:03:10 2011 +1000
+files:       bin/term
+description:
+term: $DEBUG tracing
+
+
+changeset:   8354:531640bb6e76
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Thu Aug 04 13:03:20 2011 +1000
+files:       bin/rmthen
+description:
+rmthen: $DEBUG tracing
+
+
+changeset:   8355:facbfc1ce245
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Thu Aug 04 13:15:29 2011 +1000
+files:       bin/apphelper bin/arg1 bin/filteredit bin/rewriteif
+description:
+apphelper, arg1, filteredit, rewriteif: more $DEBUG tracing
+
+
+changeset:   8356:cc4302ed3f0d
+parent:      8352:9af3a0911988
+parent:      8355:facbfc1ce245
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Thu Aug 04 13:16:26 2011 +1000
+description:
+Automated merge with ssh://home/hg/css
+
+
+changeset:   8357:d8db0d26dbe3
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Thu Aug 04 19:42:52 2011 +1000
+files:       bin/rpm-comparehost
+description:
+rpm-comparehost: add -missing and -extra modes to get bare rpm lists for further use
+
+
+changeset:   8358:a0a93a40542e
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Mon Aug 08 11:41:35 2011 +1000
+files:       bin/have-ssh-agent
+description:
+have-ssh-agent: fix ssh-add test
+
+
+changeset:   8359:826151971773
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Mon Aug 08 11:47:54 2011 +1000
+files:       bin/rpm-comparehost
+description:
+rpm-comparehost: add -yum mode to do a "yum install" of missing pakages
+
+
+changeset:   8360:aa994114015e
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Tue Aug 09 16:47:58 2011 +1000
+files:       bin/rpm-comparehost
+description:
+rpm-comparehost: add multiple other host support
+
+
+changeset:   8361:e50ed7b8f158
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Mon Aug 15 14:57:44 2011 +1000
+files:       bin/rpm-comparehost
+description:
+rpm-comparehost: update usage message for -yum option
+
+
+changeset:   8362:4209da3c67f4
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sat Aug 20 18:53:47 2011 +1000
+files:       bin/summarise-logwatch
+description:
+summarise-logwatch: discard expected root ssh login rejections
+
+
+changeset:   8363:4354d54bbd78
+parent:      8361:e50ed7b8f158
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Fri Aug 19 21:19:39 2011 +1000
+files:       lib/python/cs/curlytplt.py lib/python/cs/nodedb/node.py
+description:
+new module cs.curlytplt, supporting templates with {a.b.c} macros, hook into cs.nodedb, wait on cpython issue 1686 which has a required bugfix in stringTemplate :-(
+
+
+changeset:   8364:c98116cd5dca
+parent:      8362:4209da3c67f4
+parent:      8363:4354d54bbd78
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sat Aug 20 19:00:31 2011 +1000
+description:
+Automated merge with ssh://home/hg/css
+
+
+changeset:   8365:aad73aee9327
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sun Aug 21 15:56:29 2011 +1000
+files:       lib/python/cs/curlytplt.py lib/python/cs/nodedb/node.py
+description:
+cs.curlytplt: add curly_substitute since issue 1686 seems not to be in py2.7; make cs.nodedb.node.Node.safe_substitute() use the new function
+
+
+changeset:   8366:aabffb5f9062
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Mon Aug 22 12:16:57 2011 +1000
+files:       bin/execif
+description:
+execif: add diff mode
+
+
+changeset:   8367:f7b8d6c635e2
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Mon Aug 22 12:47:13 2011 +1000
+files:       html/index.html
+description:
+index.html: add RSS feed from bitbucket
+
+
+changeset:   8368:dc14fae135ed
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Mon Aug 22 13:06:37 2011 +1000
+files:       lib/python/cs/nodedb/node.py
+description:
+cs.nodedb.node: move NodeDB lock creation to top of __init__()
+
+
+changeset:   8369:aaaac2b5aa94
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Mon Aug 22 13:25:45 2011 +1000
+files:       lib/python/cs/curlytplt.py
+description:
+cs.curly_tplt: allow [index] in expressions
+
+
+changeset:   8370:5101a7eb2e9c
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Tue Aug 30 11:05:30 2011 +1000
+files:       lib/python/cs/curlytplt.py
+description:
+cs.curlytplt: add permute= mode switch and unit tests
+
+
+changeset:   8371:fd3dfee34d5a
+parent:      8369:aaaac2b5aa94
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Tue Aug 23 15:48:08 2011 +1000
+files:       lib/python/cs/nodedb/node.py
+description:
+cs.nodedb.node.NodeDB.nodespec(): warn if no Nodes are found for a type
+
+
+changeset:   8372:92a618f60273
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Tue Aug 23 16:07:36 2011 +1000
+files:       lib/python/cs/curlytplt.py
+description:
+cs.curlytplt: wrap substitution exceptions in Pfx({foo})
+
+
+changeset:   8373:59b6864d4bec
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Tue Aug 23 16:08:30 2011 +1000
+files:       lib/python/cs/nodedb/node.py
+description:
+cs.nodedb.node: add NodeDB.substitute(), a by default unsafe version of safe_substitute()
+
+
+changeset:   8374:0be199d1f8bd
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Tue Aug 23 16:17:29 2011 +1000
+files:       lib/python/cs/nodedb/node.py
+description:
+cs.nodedb.node: cmd_list: accept nodespecs
+
+
+changeset:   8375:f1a9c45a5a34
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Tue Aug 30 11:09:05 2011 +1000
+files:       lib/python/cs/nodedb/text.py
+description:
+cs.nodedb.text: import cs.logutils.warn
+
+
+changeset:   8376:50a2f754c148
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Tue Aug 30 11:09:56 2011 +1000
+files:       lib/python/cs/nodedb/node.py
+description:
+cs.nodedb.node: add doCreate to assign(), add Pfx context to substitute()
+
+
+changeset:   8377:4e7e93a162e6
+parent:      8370:5101a7eb2e9c
+parent:      8376:50a2f754c148
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Tue Aug 30 11:17:44 2011 +1000
+files:       lib/python/cs/curlytplt.py
+description:
+cs.curlytplt: merge conflicts, make Pfx context use more efficient
+
+
+changeset:   8378:4d58d00cce91
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Tue Aug 30 11:38:48 2011 +1000
+files:       lib/python/cs/nodedb/node.py
+description:
+cs.nodedb.node: substitute(): add .NL convenience name for a newline, split string into lines and permute using {{foo}} syntax
+
+
+changeset:   8379:bd33bab187a5
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Wed Aug 31 12:29:00 2011 +1000
+files:       bin-cs/cats bin/cats
+description:
+cats: move to bin-cs, add comment, set $NL in environment
+
+
+changeset:   8380:51766d358021
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Wed Aug 31 13:25:33 2011 +1000
+files:       bin/py27+
+description:
+py27+: require Python 2.x where x>=7 (eg for OrderedDict support).
+
+
+changeset:   8381:9b850756afff
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Wed Aug 31 13:28:19 2011 +1000
+files:       bin/runmysqld
+description:
+runmysqld: wrapper to invoke cs.app.mysql.main()
+
+
+changeset:   8382:7f51b49c2c22
+parent:      8378:4d58d00cce91
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Wed Aug 31 22:07:25 2011 +1000
+files:       lib/python/cs/app/mysql.py
+description:
+cs.app.mysql: start on runmysql support - start mode for now
+
+
+changeset:   8383:fbe14a635d47
+parent:      8381:9b850756afff
+parent:      8382:7f51b49c2c22
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Wed Aug 31 22:07:42 2011 +1000
+description:
+Automated merge with ssh://home/hg/css
+
+
+changeset:   8384:7d35ac4d08af
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Fri Sep 02 11:33:41 2011 +1000
+files:       bin/OK
+description:
+OK: allow $OK and $FAIL to provide default message prefixes
+
+
+changeset:   8385:f572cc2f6a3f
+parent:      8382:7f51b49c2c22
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Fri Sep 02 11:38:53 2011 +1000
+files:       lib/python/cs/app/mysql.py
+description:
+cs.app.mysql: format usage message
+
+
+changeset:   8386:4126e8316043
+parent:      8384:7d35ac4d08af
+parent:      8385:f572cc2f6a3f
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Fri Sep 02 11:38:56 2011 +1000
+description:
+Automated merge with file:///Users/cameron/dev/css-fleet
+
+
+changeset:   8387:3781848a197e
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Fri Sep 02 11:50:06 2011 +1000
+files:       lib/python/cs/app/mysql.py
+description:
+cs.app.mysql: main(): split start into run and start
+
+
+changeset:   8388:0b7d84fbe1a8
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Fri Sep 02 11:51:11 2011 +1000
+files:       lib/python/cs/app/mysql.py
+description:
+cs.app.mysql: reformat a condition, no semantic change
+
+
+changeset:   8389:a84311a35270
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Fri Sep 02 11:59:27 2011 +1000
+files:       lib/python/cs/app/mysql.py
+description:
+cs.app.mysql: man DBThread a subclass of list, tweak some docstrings
+
+
+changeset:   8390:717e309d9800
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Fri Sep 02 12:55:04 2011 +1000
+files:       lib/python/cs/psutils.py
+description:
+cs.psutils: new module, supplying stop() to kill a process and optionally wait for its exit
+
+
+changeset:   8391:5c5ed1f4aaf9
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Fri Sep 02 13:05:25 2011 +1000
+files:       lib/python/cs/app/mysql.py
+description:
+cs.app.mysql: add status and stop, merge config parsing
+
+
+changeset:   8392:6dce81dd847e
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Fri Sep 09 10:27:51 2011 +1000
+files:       bin/histbackup
+description:
+histbackup: prune directory modtime changes in -i mode
+
+
+changeset:   8393:d7b4fc1c2d7c
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sun Sep 11 07:50:58 2011 +1000
+files:       bin/cpmysql
+description:
+cpmysql: special case - use --skip-lock-tables with mysqldump for mysql.*_log tables; see mysql bug 37748, which they blithely label "not a bug"
+
+
+changeset:   8394:f21d43495118
+parent:      8391:5c5ed1f4aaf9
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Wed Sep 14 10:50:13 2011 +1000
+files:       bin/backup-vms-libvirt
+description:
+backup-vms-libvirt: turn on tracing if $DEBUG
+
+
+changeset:   8395:47be815d3deb
+parent:      8393:d7b4fc1c2d7c
+parent:      8394:f21d43495118
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Wed Sep 14 10:50:17 2011 +1000
+description:
+Automated merge with ssh://home/hg/css
+
+
+changeset:   8396:a4dafa4fd5b4
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sat Sep 17 15:13:04 2011 +1000
+files:       bin/nagios_check_snmp_extend
+description:
+nagios_check_snmp_extend: hackish nagios SNMP checker for SNMP extend lines
+
+
+changeset:   8397:827e0134b477
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Mon Sep 19 09:38:42 2011 +1000
+files:       bin/nagios_check_snmp_extend
+description:
+nagios_check_snmp_extend: readability change
+
+
+changeset:   8398:41a298597996
+parent:      8396:a4dafa4fd5b4
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sat Oct 01 10:48:58 2011 +1000
+files:       bin/nagios_check_snmp_extend
+description:
+nagios_check_snmp_extend: remove debug, minor whitespace change
+
+
+changeset:   8399:1de5e880d2bb
+parent:      8397:827e0134b477
+parent:      8398:41a298597996
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sat Oct 01 10:52:09 2011 +1000
+files:       bin/nagios_check_snmp_extend
+description:
+nagios_check_snmp_extend: resolve merge conflict
+
+
+changeset:   8400:2af262f5d02a
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sat Oct 01 11:16:43 2011 +1000
+files:       bin/with-pipe
+description:
+with-pipe: run command with a named pipe available
+
+
+changeset:   8401:eb109a4cdf60
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sat Oct 01 12:49:11 2011 +1000
+files:       bin/with-pipe
+description:
+with-pipe: add arg1-options, implement -g option
+
+
+changeset:   8402:2340fe575be1
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sat Oct 01 12:50:02 2011 +1000
+files:       bin/run-stdin-shcmds
+description:
+run-stdin-shcmds: run commands read line by line from stdin
+
+
+changeset:   8403:c4793a7e2112
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Mon Oct 03 12:48:59 2011 +1100
+files:       bin/ping-monitor
+description:
+ping-monitor: ping a host, act on ping up/down state changes
+
+
+changeset:   8404:d7da76f38f59
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Mon Oct 03 14:52:24 2011 +1100
+files:       bin/sux
+description:
+sux: Run a command via su, quoted to preserve the argument list.
+
+
+changeset:   8405:d8dea7719d95
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Mon Oct 03 15:03:06 2011 +1100
+files:       lib/python/cs/sh.py
+description:
+cs.sh: allow slashes in shell safe words
+
+
+changeset:   8406:80558fde8c99
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Wed Oct 05 18:27:56 2011 +1100
+files:       lib/python/cs/threads.py
+description:
+cs.threads: put locks around put and get innards, turn a bunch of asserts into if/raise
+
+
+changeset:   8407:59ab734e9f4e
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Wed Oct 05 19:59:10 2011 +1100
+files:       lib/python/cs/later.py
+description:
+cs.later: Later.ready() method that returns a context manager to queue a with-suite, add __repr__ and other minor things
+
+
+changeset:   8408:51f9c9d19852
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Thu Oct 13 14:13:59 2011 +1100
+files:       lib/python/cs/mail.py
+description:
+cs.mail: add unrfc2047 decoder
+
+
+changeset:   8409:25198fe67c37
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Thu Oct 13 14:14:29 2011 +1100
+files:       bin/cs-aliases
+description:
+cs-aliases: decode rfc2047 sequences in mail headers
+
+
+changeset:   8410:3466b80074b2
+parent:      8407:59ab734e9f4e
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Thu Oct 13 19:50:14 2011 +1100
+files:       lib/python/cs/later.py
+description:
+cs.later: redo Later.ready() to just use a pair of locks instead of a cs.threads.Channel, add docstrings
+Still, using a Channel found a deadlock bug, now fixed:-)
+
+
+changeset:   8411:0b608f476575
+parent:      8409:25198fe67c37
+parent:      8410:3466b80074b2
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Thu Oct 13 19:50:20 2011 +1100
+description:
+Automated merge with ssh://home/hg/css
+
+
+changeset:   8412:b8761a930b32
+parent:      8322:2b1ed727c494
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Fri Jul 22 18:41:54 2011 +1000
+files:       lib/python/cs/logutils.py
+description:
+cs.logutils: setup_logging(): pass chosen log level to UpdHandler; improve docstring for infer_logging_level()
+
+
+changeset:   8413:d4571d17545b
+parent:      8342:ba9fe2f7549f
+parent:      8412:b8761a930b32
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Mon Aug 01 16:01:23 2011 +1000
+files:       lib/python/cs/logutils.py
+description:
+Automated merge with file:///Users/cameron/dev/css-fleet
+
+
+changeset:   8414:b6f4cc4b82da
+parent:      8356:cc4302ed3f0d
+parent:      8413:d4571d17545b
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Thu Aug 04 18:57:17 2011 +1000
+description:
+Automated merge with file:///Users/cameron/dev/css-fleet
+
+
+changeset:   8415:b3269005f29d
+parent:      8361:e50ed7b8f158
+parent:      8414:b6f4cc4b82da
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Thu Aug 18 21:20:31 2011 +1000
+description:
+Automated merge with file:///Users/cameron/dev/css-fleet
+
+
+changeset:   8416:7fc5bf75c437
+parent:      8364:c98116cd5dca
+parent:      8415:b3269005f29d
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sat Aug 20 19:00:41 2011 +1000
+description:
+Automated merge with file:///Users/cameron/dev/css-fleet
+
+
+changeset:   8417:3a6ed81da760
+parent:      8370:5101a7eb2e9c
+parent:      8416:7fc5bf75c437
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Tue Aug 30 11:08:02 2011 +1000
+description:
+Automated merge with file:///Users/cameron/dev/css-fleet
+
+
+changeset:   8418:4b6a7201b2c7
+parent:      8377:4e7e93a162e6
+parent:      8417:3a6ed81da760
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Tue Aug 30 11:18:32 2011 +1000
+description:
+Automated merge with file:///Users/cameron/dev/css-fleet
+
+
+changeset:   8419:35683f47f611
+parent:      8378:4d58d00cce91
+parent:      8418:4b6a7201b2c7
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Tue Aug 30 11:39:58 2011 +1000
+description:
+Automated merge with file:///Users/cameron/dev/css-fleet
+
+
+changeset:   8420:52ccc3d4ab2c
+parent:      8407:59ab734e9f4e
+parent:      8419:35683f47f611
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Fri Oct 07 08:45:48 2011 +1100
+description:
+Automated merge with file:///Users/cameron/dev/css-fleet
+
+
+changeset:   8421:23f3d31637fd
+parent:      8411:0b608f476575
+parent:      8420:52ccc3d4ab2c
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Thu Oct 13 20:28:16 2011 +1100
+description:
+Automated merge with file:///Users/cameron/dev/css-fleet
+
+
+changeset:   8422:83b37af0ffe7
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sat Oct 15 18:06:29 2011 +1100
+files:       lib/python/cs/mailutils.py
+description:
+cs.mailutils: new module, starting with faster Maildir class
+
+
+changeset:   8423:5ad10f847a4f
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sat Oct 15 18:22:29 2011 +1100
+files:       lib/python/cs/mailutils.py
+description:
+cs.mailutils: start on unittests
+
+
+changeset:   8424:d94f6cc70ca0
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sat Oct 15 18:50:04 2011 +1100
+files:       lib/python/cs/mailutils.py
+description:
+cs.mailutils: add get_headers and iterheaders methods, extend unit test
+
+
+changeset:   8425:dc8810bef11a
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sun Oct 16 10:14:27 2011 +1100
+files:       lib/python/cs/mailutils.py
+description:
+cs.mailutils: add read_message(file) convenience Message factory
+
+
+changeset:   8426:9ba393b1830d
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sun Oct 16 10:15:10 2011 +1100
+files:       lib/python/cs/app/mailfiler.py
+description:
+cs.app.mailfiler: first cut at mail filer
+
+
+changeset:   8427:683a507179af
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sun Oct 16 10:18:37 2011 +1100
+files:       lib/python/cs/app/mailfiler.py
+description:
+cs.app.mailfiler: tweak usage message
+
+
+changeset:   8428:b3fd1d0af139
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sun Oct 16 13:14:00 2011 +1100
+files:       lib/python/cs/mailutils.py
+description:
+cs.mailutils: minor bugfixes
+
+
+changeset:   8429:c559361e21a1
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sun Oct 16 13:14:48 2011 +1100
+files:       lib/python/cs/app/mailfiler.py
+description:
+cs.app.mailfiler: parsing fix, implement SAVE action
+
+
+changeset:   8430:6fea02614490
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sun Oct 16 13:29:29 2011 +1100
+files:       lib/python/cs/app/mailfiler.py
+description:
+cs.app.mailfiler: pretty up Condition and Rule str() output
+
+
+changeset:   8431:10f9bc55a819
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sun Oct 16 13:44:03 2011 +1100
+files:       lib/python/cs/app/mailfiler.py
+description:
+cs.app.mailfiler: support {{group}} in address matches, pass state object to rule matching code
+
+
+changeset:   8432:e14458650cf5
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sun Oct 16 13:49:59 2011 +1100
+files:       lib/python/cs/app/mailfiler.py
+description:
+cs.app.mailfiler: expect maildb command line arg
+
+
+changeset:   8433:b23ecd766d77
+parent:      8360:aa994114015e
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sat Aug 13 21:30:48 2011 +1000
+files:       lib/python/cs/nodedb/node.py
+description:
+cs.nodedb.node.NodeDB: allocate_lock before loading any Node data
+
+
+changeset:   8434:93b8bac5792f
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sat Aug 13 21:32:10 2011 +1000
+files:       lib/python/cs/app/maildb.py
+description:
+cs.app.maildb: close db after importing addresses, handle incomplete address data lines
+
+
+changeset:   8435:777c93258f12
+parent:      8364:c98116cd5dca
+parent:      8434:93b8bac5792f
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sat Aug 20 19:00:39 2011 +1000
+files:       lib/python/cs/nodedb/node.py
+description:
+Automated merge with file:///Users/cameron/dev/css-fleet
+
+
+changeset:   8436:f979e2681770
+parent:      8370:5101a7eb2e9c
+parent:      8435:777c93258f12
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Tue Aug 30 11:07:57 2011 +1000
+files:       lib/python/cs/nodedb/node.py
+description:
+Automated merge with file:///Users/cameron/dev/css-fleet
+
+
+changeset:   8437:63df1dc484c9
+parent:      8377:4e7e93a162e6
+parent:      8436:f979e2681770
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Tue Aug 30 11:18:29 2011 +1000
+files:       lib/python/cs/nodedb/node.py
+description:
+Automated merge with file:///Users/cameron/dev/css-fleet
+
+
+changeset:   8438:39c6dbe0545a
+parent:      8378:4d58d00cce91
+parent:      8437:63df1dc484c9
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Tue Aug 30 11:39:56 2011 +1000
+files:       lib/python/cs/nodedb/node.py
+description:
+Automated merge with file:///Users/cameron/dev/css-fleet
+
+
+changeset:   8439:beb0bd7e176a
+parent:      8407:59ab734e9f4e
+parent:      8438:39c6dbe0545a
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Fri Oct 07 08:45:46 2011 +1100
+description:
+Automated merge with file:///Users/cameron/dev/css-fleet
+
+
+changeset:   8440:5843feaaa451
+parent:      8424:d94f6cc70ca0
+parent:      8439:beb0bd7e176a
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sat Oct 15 19:00:06 2011 +1100
+description:
+Automated merge with file:///Users/cameron/dev/css-fleet
+
+
+changeset:   8441:3325533af98d
+parent:      8432:e14458650cf5
+parent:      8440:5843feaaa451
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sun Oct 16 13:50:13 2011 +1100
+description:
+Automated merge with ssh://home/hg/css
+
+
+changeset:   8442:404d027b7c50
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sun Oct 16 14:22:58 2011 +1100
+files:       lib/python/cs/nodedb/csvdb.py
+description:
+cs.nodedb.csvdb: remove readonly asserts from backend update, but place on sync() method
+
+
+changeset:   8443:c18b125973b0
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sun Oct 16 14:24:41 2011 +1100
+files:       lib/python/cs/app/maildb.py
+description:
+cs.app.maildb: remove ADDRESS_GROUP type, make groups a computed mapping
+
+
+changeset:   8444:5fe86b953bad
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sun Oct 16 14:25:25 2011 +1100
+files:       lib/python/cs/app/mailfiler.py
+description:
+cs.app.mailfiler: make maildb command line arg optional, default to $MAILDB, get groups from maildb
+
+
+changeset:   8445:a221d8e2429a
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Mon Oct 17 10:45:03 2011 +1100
+files:       lib/python/cs/mailutils.py
+description:
+cs.mailutils: bugfix read_message(), make Maildir.msgmap a property - load only at need, streamline other code to aid this
+
+
+changeset:   8446:8fbf37b8f6a5
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Mon Oct 17 12:12:14 2011 +1100
+files:       bin-cs/gmail bin/gmail
+description:
+move "gmail" into bin-cs; even I don't use it:-(
+
+
+changeset:   8447:3523a46e870f
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Tue Oct 18 10:34:30 2011 +1100
+files:       bin-cs/@
+description:
+bin-cs/@: do not hardwire now inappropriate ssh ControlMaster options
+
+
+changeset:   8448:97b6baaf4806
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Tue Oct 18 11:11:40 2011 +1100
+files:       lib/python/cs/app/mailfiler.py
+description:
+cs.app.mailfiler: tiny docstring
+
+
+changeset:   8449:cba6eda01a37
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Tue Oct 18 11:18:01 2011 +1100
+files:       lib/python/cs/fileutils.py
+description:
+cs.fileutils: saferename(): catch OSError only, raise others
+
+
+changeset:   8450:829e25e1d4a5
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Tue Oct 18 12:41:51 2011 +1100
+files:       lib/python/cs/fileutils.py
+description:
+cs.fileutils: add compare() to compare two files, add rewrite() to replace content of a file
+
+
+changeset:   8451:b62c8bf08bb0
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Tue Oct 18 12:50:49 2011 +1100
+files:       lib/python/cs/fileutils.py
+description:
+cs.fileutils: use .flush instead of .close with NamedTemporaryFile; add unit test for compare()
+
+
+changeset:   8452:ad2bf4b3084a
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Tue Oct 18 12:55:20 2011 +1100
+files:       lib/python/cs/fileutils.py
+description:
+cs.fileutils: use .flush instead of .close with NamedTemporaryFile; add unit test for compare()
+
+
+changeset:   8453:d38bcff3552b
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Tue Oct 18 12:56:11 2011 +1100
+files:       lib/python/cs/fileutils.py
+description:
+cs.fileutils: previous commit adds unittest, this commit fixes small bug
+
+
+changeset:   8454:3db4b45601a6
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Tue Oct 18 13:01:25 2011 +1100
+files:       bin/patch-config
+description:
+patch-config: move main program into function, add cs.logutils, prep for more flexible behaviour
+
+
+changeset:   8455:b6c7e5752752
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Tue Oct 18 13:39:54 2011 +1100
+files:       bin/patch-config
+description:
+patch-config: use error() instead of print>>sys.stderr, pull old partial -R option
+
+
+changeset:   8456:6248c4e9ed0f
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Tue Oct 18 13:53:36 2011 +1100
+files:       bin/patch-config
+description:
+patch-config: add as yet unimplemented -o option, move patch data read into function
+
+
+changeset:   8457:6f98fa6b9f8a
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Tue Oct 18 14:22:07 2011 +1100
+files:       bin/patch-config
+description:
+patch-config: implement -o outputfile mode, fix a bunch of minor errors from earlier changes
+
+
+changeset:   8458:90216f1f2759
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Tue Oct 18 14:38:59 2011 +1100
+files:       bin/patch-config lib/python/cs/fileutils.py
+description:
+patch-config, cs.fileutils: from __future__ import with_statement
+
+
+changeset:   8459:c9d32a4771e4
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Tue Oct 18 14:51:24 2011 +1100
+files:       bin/patch-config
+description:
+patch-config: divert through py25+
+
+
+changeset:   8460:d7a70296bb63
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Thu Oct 20 11:27:02 2011 +1100
+files:       bin/sshto
+description:
+sshto: handle -l specially as workaround for rsync mangling u1@h1!u2@h2 into "sshto -l u1@h1!u2 h2"
+
+
+changeset:   8461:b3977c989b64
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Thu Oct 20 11:32:57 2011 +1100
+files:       bin/hgbox
+description:
+hgbox: tweak addremove commit message to prevent repetition, which trips my pretxncommit hook
+
+
+changeset:   8462:7577eae1a226
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Thu Oct 20 14:10:04 2011 +1100
+files:       bin/patch-config
+description:
+patch-config: fix internal recursive call
+
+
+changeset:   8463:68e6c58bb061
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Thu Oct 20 14:45:07 2011 +1100
+files:       bin/pull-user
+description:
+pull-user: cope with repeated group mentions, provided they are the same
+
+
+changeset:   8464:02c0f22a654c
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Fri Oct 21 17:02:46 2011 +1100
+files:       bin/patch-config
+description:
+patch-config: add -O option, shorthand for -o configfile
+
+
+changeset:   8465:40c1c69589f5
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Fri Oct 21 17:03:18 2011 +1100
+files:       bin/with-vm-img-partition
+description:
+with-vm-img-partition: export mountpoint as $VM_IMG_MOUNT to subprocess
+
+
+changeset:   8466:a90d10073f1d
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Fri Oct 21 17:19:14 2011 +1100
+files:       bin/with-vm-img-partition
+description:
+with-vm-img-partition: sync and delay before undoing kpartx stuff
+
+
+changeset:   8467:f959e56e3bc5
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Fri Oct 21 18:00:08 2011 +1100
+files:       lib/python/cs/fileutils.py
+description:
+cs.fileutils: fix calls to shutil copy facilities
+
+
+changeset:   8468:b908f11f3e00
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Fri Oct 21 18:00:30 2011 +1100
+files:       bin/patch-config
+description:
+patch-config: whitespace change
+
+
+changeset:   8469:7177a402fcc0
+parent:      8461:b3977c989b64
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sat Oct 22 12:24:39 2011 +1100
+files:       bin/cache-transform
+description:
+cache-transform: cache mapping of input to output
+
+
+changeset:   8470:a38d03e97ccb
+parent:      8468:b908f11f3e00
+parent:      8469:7177a402fcc0
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sat Oct 22 12:25:01 2011 +1100
+description:
+Automated merge with ssh://home/hg/css
+
+
+changeset:   8471:6dc91516f9fe
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sat Oct 22 12:28:17 2011 +1100
+files:       bin/cache-transform
+description:
+cache-transform: remove css dependencies - toss set-x, use sha1sum instead of sha1index
+
+
+changeset:   8472:c5b6caa262a6
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sat Oct 22 12:29:08 2011 +1100
+files:       bin/cache-transform
+description:
+cache-transform: restore tracing to mkdir
+
+
+changeset:   8473:64313b67810a
+parent:      8470:a38d03e97ccb
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sat Oct 22 14:01:59 2011 +1100
+files:       bin/patch-config
+description:
+bin/patch-config: tiny docstring
+
+
+changeset:   8474:ca0f189e0d3d
+parent:      8472:c5b6caa262a6
+parent:      8473:64313b67810a
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sat Oct 22 14:02:41 2011 +1100
+description:
+Automated merge with ssh://home/hg/css
+
+
+changeset:   8475:8f7ff7920f8d
+tag:         tip
+user:        Cameron Simpson <cs@zip.com.au>
+date:        Sat Oct 22 14:17:28 2011 +1100
+files:       Mykefile
+description:
+Mykefile: tweak _pending output
+
+

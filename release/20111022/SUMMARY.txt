@@ -1,0 +1,30 @@
+New scripts:
+cache-transform - cache results of data transformation,
+hgbox - dropbox-ish syncing based on mercurial,
+ifstat, ifstat-diff - report network interface stats and their changes,
+inscr - dispatch a command in a new screen session,
+merge-dumb - trivial merge command for accruing files (like timesheets),
+nagios_check_snmp_extend - yet another SNMP checker,
+nodedb - convenience command line wrapper for cs.nodedb,
+ping-monitor - watch connectivity to a host and act on changes,
+py25+, py26+, py27+ - find and exec a sufficiently recent python,
+rpm-comparehost - compare the RPM packages of this host with others and
+optionally update to match,
+sux - run command via su with correct argument quoting,
+with-vm-img-partition - mount partition from disc image and run command.
+
+Many script updates, notably:
+OK, mail-on-error, execif - improve these reporting commands,
+cpmysql - mysql bug workaround,
+patch-config - add -O and -o modes to do its own file rewriting,
+sshto - workaround for rsync excess user@host parsing.
+
+Many library updates, notably:
+cs.curlytplt - templating library for {foo} and {{foo}} macros,
+cs.fileutils - compare() and rewrite() functions,
+cs.later - add .ready() method to provide context manager mode,
+cs.mailutils - high speed Maildir class,
+cs.nodedb - wide CSV format for human editors, make Backends look like maps,
+add metanodes for db and type info and state, support for "unnamed" nodes with
+sequential ids, many parsing improvements and fixes,
+cs.threads - bugfix Channel put/get methods.
