@@ -152,6 +152,8 @@ def writeConfigData(output, configFile, patchLines, keywords, settings):
       output.write(line)
 
 def readPatchData(fp, settings):
+  ''' Read patch lines, return patchLines and keywords map.
+  '''
   if type(fp) is str:
     with Pfx(fp):
       with open(fp) as pfp:
