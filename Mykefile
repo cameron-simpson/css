@@ -99,7 +99,7 @@ _release:
         cs-release add
 
 _pending:
-        cs-release log
+        cs-release log | grep '^[^:]'; :
         hg status | grep '^[^?]'; :
 
 _freshmeat:
