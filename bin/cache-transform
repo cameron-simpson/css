@@ -37,7 +37,7 @@ fi
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
-[ -d "$cachedir/." ] || $trace mkdir -p "$cachedir"
+[ -d "$cachedir/." ] || ( set -x; exec mkdir -p "$cachedir" )
 
 tmppfx=$cachedir/.tmp.$$
 input=$tmppfx.input
