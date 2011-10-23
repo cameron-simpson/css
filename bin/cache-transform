@@ -10,9 +10,25 @@ set -ue
 : ${CACHEDIR=$HOME/var/cache/transforms}
 
 cmd=$0
-usage="Usage: $cmd cachedir command [args...]"
+usage="Usage: $cmd [-l] cachedir command [args...]
+  -l    List filename of cached output instead of emitting the output."
+
+listmode=
 
 badopts=
+
+while [ $# -gt 0 ]
+do
+  case $1 in
+    -l) listmode=1 ;;
+    --) shift; break ;;
+    -?*)echo "$cmd: unrecognised option: $1" ?&2
+        badopts=1
+        ;;
+    *)  break ;;
+  esac
+  shift
+done
 
 if [ $# = 0 ]
 then
@@ -52,14 +68,20 @@ cachefile=$cachedir/$sha1
 
 if [ -s "$cachefile" ]
 then
-  cat "$cachefile"
+  if [ $listmode ]
+  then printf '%s\n' "$cachefile"
+  else cat "$cachefile"
+  fi
 else
   if "$@" <"$input" >"$output"
   then
     mv "$output" "$cachefile"
-    cat "$cachefile"
+    if [ $listmode ]
+    then printf '%s\n' "$cachefile"
+    else cat "$cachefile"
+    fi
   else
     xit=$?
-    cat "$output"       # user should still see the output
+    [ $listmode ] || cat "$output"       # user should still see the output
   fi
 fi
