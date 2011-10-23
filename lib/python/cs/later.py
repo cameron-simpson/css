@@ -303,10 +303,10 @@ class Later(object):
       kw.setdefault('extra', {}).update(later_name = str(self))
       self.logger.error(*a, **kw)
 
-  def warn(self, *a, **kw):
+  def warning(self, *a, **kw):
     if self.logger:
       kw.setdefault('extra', {}).update(later_name = str(self))
-      self.logger.warn(*a, **kw)
+      self.logger.warning(*a, **kw)
 
   def info(self, *a, **kw):
     if self.logger:

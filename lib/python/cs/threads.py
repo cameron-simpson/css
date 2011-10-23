@@ -36,7 +36,7 @@ class WorkerThreadPool(object):
         It is an error to call close() more than once.
     '''
     if self.closed:
-      warn("%s: repeated close", self)
+      warning("%s: repeated close", self)
     self.closed = True
     for H, HQ in self.all:
       HQ.close()
@@ -221,7 +221,7 @@ class Channel(object):
   def close(self):
     with self.__lock:
       if self.closed:
-        warn("%s: .close() of closed Channel" % (self,))
+        warning("%s: .close() of closed Channel" % (self,))
       else:
         self.closed = True
     with self.__lock:

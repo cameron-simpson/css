@@ -298,7 +298,7 @@ class IndexedFileStore(BasicStore):
               # valid number.vtd store name
               M[pfxn] = DataFile(os.path.join(self.dirpath, name))
               continue
-          warn("ignoring bad .vtd file name: %s" % (name, ))
+          warning("ignoring bad .vtd file name: %s" % (name, ))
     return M
 
   def __anotherDataFile(self):

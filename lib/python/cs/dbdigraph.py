@@ -113,7 +113,7 @@ class DBDiGraph:
 
   def __delitem__(self,nodeid):
     refids=self[nodeid].referringNodeids()
-    warn("refids =", repr(refids))
+    warning("refids =", repr(refids))
     if len(refids) > 0:
       node=self[nodeid]
       raise IndexError, "node %s has referring nodes: %s" % (node, ", ".join(self[id] for id in refids))
@@ -306,7 +306,7 @@ class DBDiGraphNode:
     self.digraph.attrs[self.id].delValue(attr,value)
 
   def getAttr(self,attr):
-    ##warn(str(self)+": getAttr("+repr(attr)+")")
+    ##warning(str(self)+": getAttr("+repr(attr)+")")
     if type(attr) is not str:
       raise IndexError, "non-string attr: "+repr(attr)
     values=self.digraph.attrs[self.id]
@@ -380,7 +380,7 @@ class DBDiGraphNode:
     elif type(edge) is str:
       edge=self.digraph.createNode(edge,'EDGE')
 
-    ##warn("addEdge "+str(self)+"->"+str(toNode),"via",str(edge))
+    ##warning("addEdge "+str(self)+"->"+str(toNode),"via",str(edge))
     self.addAttr('EDGES',edge)
     edge.addAttr('EDGES',toNode)
 
@@ -490,7 +490,7 @@ class AttrSet:
   def deleteAll(self):
     import inspect
     for frame in inspect.stack():
-      warn("stack:", frame[1]+":"+str(frame[2]))
+      warning("stack:", frame[1]+":"+str(frame[2]))
     self.attrs.table.deleteRows('ID_REF = '+sqlise(self.nodeid))
     self.__values={}
 

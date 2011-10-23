@@ -263,7 +263,7 @@ def OBSOLETE(func):
   def wrapped(*args, **kwargs):
     import traceback
     frame = traceback.extract_stack(None, 2)[0]
-    warn("OBSOLETE call to %s:%d %s(), called from %s:%d %s",
+    warning("OBSOLETE call to %s:%d %s(), called from %s:%d %s",
          func.func_code.co_filename, func.func_code.co_firstlineno,
          func.func_name, frame[0], frame[1], frame[2])
     return func(*args, **kwargs)

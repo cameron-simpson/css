@@ -51,7 +51,7 @@ def loadAddresses(addresses, catmap=None, addrmap=None):
         try:
           cats, addr = line.split(None,1)
         except ValueError:
-          warn("line %d: bad syntax: %s", lineno, line)
+          warning("line %d: bad syntax: %s", lineno, line)
           ok = False
           continue
 
@@ -60,12 +60,12 @@ def loadAddresses(addresses, catmap=None, addrmap=None):
         cats=cats.split(',')
         addrkey=addressKey(addr)
         if addrkey is None:
-          warn("line %d: can't parse address \"%s\"", lineno, addr)
+          warning("line %d: can't parse address \"%s\"", lineno, addr)
           ok = False
           continue
 
         if "@" not in addrkey:
-          warn("line %d: no \"@\" in \"%s\"", lineno, addrkey)
+          warning("line %d: no \"@\" in \"%s\"", lineno, addrkey)
 
         if addrkey in addrmap:
           info = addrmap[addrkey]

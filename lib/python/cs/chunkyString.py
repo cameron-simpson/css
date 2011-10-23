@@ -77,7 +77,7 @@ class ChunkyString(str):
 
   def __str__(self):
     if isdebug:
-      warn("ChunkyString.__str__: %d bytes in %d strings" % (self.__len, len(self.__strs)))
+      warning("ChunkyString.__str__: %d bytes in %d strings" % (self.__len, len(self.__strs)))
     t0=time()
     s=''.join(self.__strs)
     assert len(s) == self.__len

@@ -104,7 +104,7 @@ class IdSetEntry:
       if is_entryKey(key):
         yield key
       else:
-        warn("reject %s"%key)
+        warning("reject %s"%key)
 
   def _keypath(self,key):
     assert is_entryKey(key), "invalid key \"%s\"" % key

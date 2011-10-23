@@ -133,10 +133,10 @@ class Backend_SQLAlchemy(Backend):
 
 ##  def fromtext(self, text):
 ##    if text.startswith(':#'):
-##      warn("deprecated :#node_id serialisation: %s" % (text,))
+##      warning("deprecated :#node_id serialisation: %s" % (text,))
 ##      node_id = int(text[2:])
 ##      N = self.__nodekeysByID[int(text[2:])]
-##      warn("  UPDATE %s SET VALUE=\"%s\" WHERE VALUE=\"%s\""
+##      warning("  UPDATE %s SET VALUE=\"%s\" WHERE VALUE=\"%s\""
 ##           % (self.attrs, ":%s:%s" % (N.type, N.name), text))
 ##      return N
 ##    return Backend.fromtext(self, text)
@@ -145,7 +145,7 @@ class Backend_SQLAlchemy(Backend):
     raise NotImplementedError
 
   def close(self):
-    warn("cs.nodedb.sqla.Backend_SQLAlchemy.close() unimplemented")
+    warning("cs.nodedb.sqla.Backend_SQLAlchemy.close() unimplemented")
 
   def __delitem__(self, nodekey):
     assert not self.nodedb.readonly

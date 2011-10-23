@@ -79,7 +79,7 @@ def mysql(secret,db=None):
   else:
     global _warned_MYSQL_NO_UTF8
     if not _warned_MYSQL_NO_UTF8:
-      warn("mysql: no UTF8 support")
+      warning("mysql: no UTF8 support")
       _warned_MYSQL_NO_UTF8=True
 
   return conn
@@ -181,7 +181,7 @@ class SQLQuery:
         self.__cursor.execute(query,params)
       except:
         error("SQL failure for: %s (params=%s)", query, params)
-        warn("\tRetry with new db connection...")
+        warning("\tRetry with new db connection...")
         conn.attachConn()
         self.__cursor=conn.conn.cursor()
         self.__cursor.execute(query,params)
@@ -274,7 +274,7 @@ def mergeDatedRecordsSQL(table,keyFields,idField=None,constraint=None,cropOverla
       or oldrow.END_DATE > start:
         # crop earlier record to start of later record
         if start is None:
-          warn("warning: START_DATE is NULL, can't fix overlap\n\tOLD: %s\n\tNEW: %s", oldrow, row)
+          warning("warning: START_DATE is NULL, can't fix overlap\n\tOLD: %s\n\tNEW: %s", oldrow, row)
         else:
           yield 'UPDATE %s SET END_DATE = %s WHERE %s = %s' \
                  % (table.name, sqlise(start), idField, sqlise(oldrow[idField]))
@@ -429,7 +429,7 @@ class DirectKeyedTableView:
     if len(rows) == 0:
       return None
     if len(rows) > 1:
-      warn("multiple hits WHERE", where, "in", self.name, "- choosing the first one:",repr(rows[0]))
+      warning("multiple hits WHERE", where, "in", self.name, "- choosing the first one:",repr(rows[0]))
 
     return rows[0]
 

@@ -46,7 +46,7 @@ def main(argv):
           badopts = True
 
   if len(argv) == 0:
-    warn("missing op, expected {run,start,stop,status}")
+    warning("missing op, expected {run,start,stop,status}")
     badopts = True
   else:
     op = argv.pop(0)
@@ -61,10 +61,10 @@ def main(argv):
         elif op == 'status':
           xit = mysqld_status(mycnf, pid_file, argv)
         else:
-          warn("unrecognised operation")
+          warning("unrecognised operation")
           badopts = True
       except GetoptError, e:
-        warn(e)
+        warning(e)
         badopts = True
 
   if badopts:
@@ -85,7 +85,7 @@ def mycnf_read(mycnf, section):
       for line in mfp:
         lineno += 1
         if not line.endswith("\n"):
-          warn("line %d: unexpected EOF", lineno)
+          warning("line %d: unexpected EOF", lineno)
         if line.startswith('#'):
           continue
         line = line.strip()
@@ -94,7 +94,7 @@ def mycnf_read(mycnf, section):
         if line.startswith('['):
           in_section = False
           if not line.endswith(']'):
-            warn("line %d: %s: missing ']'", lineno, line)
+            warning("line %d: %s: missing ']'", lineno, line)
           else:
             line = line[1:-1].strip()
             in_section = (line == section)
@@ -106,7 +106,7 @@ def mycnf_read(mycnf, section):
         except ValueError:
           option = line
           value = None
-          #warn("line %d: %s: missing '='", lineno, option)
+          #warning("line %d: %s: missing '='", lineno, option)
         else:
           option = option.rstrip()
           value = value.lstrip()

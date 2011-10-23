@@ -302,7 +302,7 @@ def OLDdo_GET(self):
       return
 
     top = parts.pop(0)
-    warn("top=[%s]" % (top,))
+    warning("top=[%s]" % (top,))
     ext = ''
     dotpos = top.rfind('.')
     if dotpos > 0:
@@ -326,40 +326,40 @@ def OLDdo_GET(self):
 
       typespec = parts.pop(0)
 
-    warn("1")
+    warning("1")
     if not parts and not isdir and ext:
-      warn("2")
+      warning("2")
       k, plural = parseUC_sAttr(key)
       if k is not None and plural:
-        warn("3")
+        warning("3")
         # TYPEs.{csv,txt,html} - dump of nodes of that type.
         if ext == 'csv':
-          warn("3csv")
+          warning("3csv")
           self.send_response(200, "TYPE %s as CSV" % key)
           self.send_header('Content-Type', 'text/csv')
           self.end_headers()
           self._table_of_nodes(nodedb.type(k), 'csv')
           return
         if ext == 'txt':
-          warn("3txt")
+          warning("3txt")
           self.send_response(200, "TYPE %s as CSV plain text" % key)
           self.send_header('Content-Type', 'text/plain')
           self.end_headers()
           self._table_of_nodes(nodedb.type(k), 'csv')
           return
         if ext == 'html':
-          warn("3html")
+          warning("3html")
           self.send_response(200, "TYPE %s as an HTML table" % (key,))
           self.send_header('Content-Type', 'text/html')
           self.end_headers()
           self._puttok( ['H1', "Nodes of type %s" % (k,)] )
           self._table_of_nodes(nodedb.type(k), 'html')
           return
-        warn("3other")
+        warning("3other")
         self.send_response(503, "unsupported TYPEs.ext \".%s\", expected .csv, .txt or .html" % (ext,))
         return
 
-    warn("4")
+    warning("4")
     if top.endswith('.html'):
       key, ext = top.rsplit('.', 1)
       ext = '.' + ext

@@ -237,7 +237,7 @@ def fromtoken(token, nodedb, doCreate=False):
   try:
     t, name = nodekey(token)
   except ValueError:
-    warn("can't infer Node from \"%s\", returning string" % (token,))
+    warning("can't infer Node from \"%s\", returning string" % (token,))
     return token
 
   N = nodedb.get( (t, name), doCreate=doCreate )

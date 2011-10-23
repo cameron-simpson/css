@@ -499,7 +499,7 @@ class Node(dict):
       for attr in old_attr_names:
         k, plural = parseUC_sAttr(attr)
         if not k:
-          warn("ignore non-ATTRs old attr: %s", attr)
+          warning("ignore non-ATTRs old attr: %s", attr)
           continue
         if k.endswith('_ID'):
           error("ignoring bad old ATTR_ID: %s", attr)
@@ -1035,7 +1035,7 @@ class NodeDB(dict):
           else:
             namelist = (n, )
           if not namelist:
-            warn("no Nodes of type \"%s\"", t)
+            warning("no Nodes of type \"%s\"", t)
           for n in namelist:
             N = self.get( (t, n), doCreate=doCreate )
             if N is None:

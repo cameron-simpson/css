@@ -297,12 +297,12 @@ def chomp(s):
   return s[:-1]
 
 def extend(arr, items):
-  warn("replace use of cs.misc.extend with array extend builtin")
+  warning("replace use of cs.misc.extend with array extend builtin")
   for i in items:
     arr.append(i)
 
 def index(seq, val):
-  warn("replace use of cs.misc.index with array index/find builtin")
+  warning("replace use of cs.misc.index with array index/find builtin")
   for i in xrange(len(seq)-1):
     if val == seq[i]:
       return i
@@ -621,7 +621,7 @@ def runCommandPrompt(fnmap, prompt=None):
     ops=fnmap.keys()
     ops.sort()
     for op in ops:
-      warn("  %-7s %s", op, fnmap[op][1])
+      warning("  %-7s %s", op, fnmap[op][1])
 
 # trivial wrapper for extension in subclasses
 class SeqWrapper:

@@ -552,7 +552,7 @@ class Dir(Dirent):
               if verbosefp:
                 print >>verbosefp, filepath
               if not os.path.isfile(filepath):
-                warn("not a regular file, skipping")
+                warning("not a regular file, skipping")
                 continue
 
               try:

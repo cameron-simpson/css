@@ -43,7 +43,7 @@ def read_csv_file(fp, skipHeaders=False, noHeaders=False):
     t, n, attr, value = row
     if attr.endswith('s'):
       # revert older plural dump format
-      warn("loading old plural attribute: %s" % (attr,))
+      warning("loading old plural attribute: %s" % (attr,))
       k, plural = parseUC_sAttr(attr)
       if k is None:
         raise ValueError, "failed to parse attribute name: %s" % (attr,)

@@ -64,9 +64,9 @@ if 'COOKIE_FILE' in os.environ:
                  None,
                  {})
       if c.is_expired(now):
-        warn("skip expired cookie: name=%s, host=%s, path=%s", name,host,path)
+        warning("skip expired cookie: name=%s, host=%s, path=%s", name,host,path)
         continue
-      warn("add cookie: name=%s, host=%s, path=%s", name,host,path)
+      warning("add cookie: name=%s, host=%s, path=%s", name,host,path)
       cookieHandler.cookiejar.set_cookie(c)
 install_opener(build_opener(cookieHandler))
 
@@ -97,7 +97,7 @@ def ht_form(action,method,*tokens):
   """ Make a <FORM> token, ready for content. """
   form=['FORM',{'ACTION': action, 'METHOD': method}]
   form.extend(tokens)
-  warn("NEW FORM =", cs.hier.h2a(form))
+  warning("NEW FORM =", cs.hier.h2a(form))
   return form
 
 def cgihtnisauth(stdout=None):
@@ -244,7 +244,7 @@ class JSRPCCGI(CGI):
     else:
       (self.arg,etc)=cs.hier.tok(path_info)
       etc=etc.lstrip()
-      if len(etc): warn("unparsed arg: "+etc)
+      if len(etc): warning("unparsed arg: "+etc)
 
   def flush(self):
     from cs.lex import dict2js

@@ -26,17 +26,17 @@ def main(argv, stdin=None):
   badopts = False
 
   if len(argv) == 0:
-    warn("missing rulefile")
+    warning("missing rulefile")
     badopts = True
   else:
     rulefile = argv.pop(0)
     if not os.path.isfile(rulefile):
-      warn("rulefile: not a file: %s", rulefile)
+      warning("rulefile: not a file: %s", rulefile)
       badopts = True
   if len(argv) > 0:
     mdburl = argv.pop(0)
   if len(argv) > 0:
-    warn("extra arguments: %s" % (' '.join(argv),))
+    warning("extra arguments: %s" % (' '.join(argv),))
     badopts = True
 
   if badopts:
@@ -141,7 +141,7 @@ class Condition_AddressMatch(_Condition):
         if key.startswith('{{') and key.endswith('}}'):
           key = key[2:-2].lower()
           if key not in state.groups:
-            warn("%s: unknown group {{%s}}, I know: %s", self, key, state.groups.keys())
+            warning("%s: unknown group {{%s}}, I know: %s", self, key, state.groups.keys())
             continue
           if address in state.groups[key]:
             return True
