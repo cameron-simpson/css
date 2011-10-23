@@ -11,7 +11,7 @@ from sqlalchemy import create_engine, \
 from sqlalchemy.orm import mapper, sessionmaker
 from sqlalchemy.sql import and_, or_, not_
 from sqlalchemy.sql.expression import distinct
-from cs.logutils import error, warn
+from cs.logutils import error, warning
 from . import NodeDB, Backend
 from .node import TestAll as NodeTestAll
 

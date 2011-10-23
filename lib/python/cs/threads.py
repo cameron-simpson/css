@@ -17,7 +17,7 @@ else:
 from collections import deque
 if sys.hexversion < 0x02060000: from sets import Set as set
 from cs.misc import seq
-from cs.logutils import Pfx, LogTime, error, warn, debug, exception, OBSOLETE
+from cs.logutils import Pfx, LogTime, error, warning, debug, exception, OBSOLETE
 from cs.misc import seq
 
 class WorkerThreadPool(object):

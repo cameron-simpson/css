@@ -16,7 +16,7 @@ from cStringIO import StringIO
 import cs.html
 from cs.mappings import parseUC_sAttr
 from cs.nodedb import Node
-from cs.logutils import info, warn, error, debug, D
+from cs.logutils import info, warning, error, debug, D
 
 # HTML token convenience functions
 def TD(*elements):

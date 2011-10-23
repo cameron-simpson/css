@@ -1,7 +1,7 @@
 #!/usr/bin/python -tt
 
 from __future__ import with_statement
-from cs.logutils import setup_logging, Pfx, info, warn, error, D
+from cs.logutils import setup_logging, Pfx, info, warning, error, D
 from cs.mail import ismaildir, ismbox, messagesFromPath
 from cs.nodedb import NodeDB, Node, NodeDBFromURL
 from cs.misc import the

@@ -11,7 +11,7 @@ import re
 import sys
 import mailbox
 if sys.hexversion < 0x02060000: from sets import Set as set
-from cs.logutils import Pfx, setup_logging, info, warn, error
+from cs.logutils import Pfx, setup_logging, info, warning, error
 from cs.mailutils import Maildir, read_message
 from cs.app.maildb import MailDB
 

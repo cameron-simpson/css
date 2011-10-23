@@ -12,7 +12,7 @@ from Queue import Queue
 import sys
 if sys.hexversion < 0x02060000: from sets import Set as set
 from cs.misc import seq
-from cs.logutils import Pfx, info, debug, warn
+from cs.logutils import Pfx, info, debug, warning
 from cs.serialise import toBS, fromBSfp
 from cs.lex import unctrl
 from cs.threads import Q1, IterableQueue

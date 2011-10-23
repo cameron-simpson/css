@@ -19,7 +19,7 @@ import unittest
 from cs.lex import str1
 from cs.misc import the, get0
 from cs.mappings import parseUC_sAttr
-from cs.logutils import Pfx, D, error, warn, info, debug, exception
+from cs.logutils import Pfx, D, error, warning, info, debug, exception
 from .export import edit_csv_wide, export_csv_wide
 
 # regexp to match TYPE:name

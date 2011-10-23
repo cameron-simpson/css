@@ -9,7 +9,7 @@ import os.path
 import re
 import sys
 from getopt import getopt, GetoptError
-from cs.logutils import setup_logging, Pfx, warn, error
+from cs.logutils import setup_logging, Pfx, warning, error
 from cs.psutils import stop
 
 ETC_MYCNF = '/etc/my.cnf'

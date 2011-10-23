@@ -16,7 +16,7 @@ if sys.hexversion < 0x02060000:
   import simplejson as json
 else:
   import json
-from cs.logutils import Pfx, error, info, warn
+from cs.logutils import Pfx, error, info, warning
 from cs.mappings import parseUC_sAttr
 import cs.sh
 from .node import Node, nodekey

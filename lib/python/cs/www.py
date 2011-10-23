@@ -19,7 +19,7 @@ from formatter import NullFormatter
 import cs.hier
 from cs.hier import T_SEQ, T_MAP, T_SCALAR
 from cs.html import puttok, puttext
-from cs.logutils import warn
+from cs.logutils import warning
 
 # TODO: this shouldn't happen unconditionally!
 cookieHandler = HTTPCookieProcessor()

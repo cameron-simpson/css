@@ -211,7 +211,9 @@ else:
       self.log(logging.INFO, msg, *args, **kwargs)
     def warning(self, msg, *args, **kwargs):
       self.log(logging.WARNING, msg, *args, **kwargs)
-    warn = warning
+    @OBSOLETE
+    def warn(self, *args, **kwargs):
+      self.warning(*args, **kwargs)
     def error(self, msg, *args, **kwargs):
       self.log(logging.ERROR, msg, *args, **kwargs)
     def critical(self, msg, *args, **kwargs):
@@ -368,7 +370,9 @@ class Pfx(object):
     self.log(logging.INFO, msg, *args, **kwargs)
   def warning(self, msg, *args, **kwargs):
     self.log(logging.WARNING, msg, *args, **kwargs)
-  warn = warning
+  @OBSOLETE
+  def warn(self, *args, **kwargs):
+    self.warning(*args, **kwargs)
   def error(self, msg, *args, **kwargs):
     self.log(logging.ERROR, msg, *args, **kwargs)
   def critical(self, msg, *args, **kwargs):
@@ -388,7 +392,9 @@ def info(msg, *args, **kwargs):
   log(logging.INFO, msg, *args, **kwargs)
 def warning(msg, *args, **kwargs):
   log(logging.WARNING, msg, *args, **kwargs)
-warn = warning
+@OBSOLETE
+def warn(*args, **kwargs):
+  warning(*args, **kwargs)
 def error(msg, *args, **kwargs):
   log(logging.ERROR, msg, *args, **kwargs)
 def critical(msg, *args, **kwargs):

@@ -7,7 +7,7 @@ import sys
 if sys.hexversion < 0x02060000:
   from sets import Set as set
 from thread import allocate_lock
-from cs.logutils import Pfx, debug, error, info, warn
+from cs.logutils import Pfx, debug, error, info, warning
 from cs.venti.block import decodeBlock
 from cs.venti.blockify import blockFromString
 from cs.venti.meta import Meta

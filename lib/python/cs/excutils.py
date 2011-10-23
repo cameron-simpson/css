@@ -8,7 +8,7 @@ import sys
 import logging
 import traceback
 import unittest
-from cs.logutils import log, warn, exception, error
+from cs.logutils import log, warning, exception, error
 
 def return_exc_info(func, *args, **kwargs):
   ''' Run the supplied function and arguments.

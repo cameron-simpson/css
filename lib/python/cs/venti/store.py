@@ -20,7 +20,7 @@ from thread import allocate_lock
 from threading import Thread
 from Queue import Queue
 from cs.later import Later
-from cs.logutils import info, debug, warn, Pfx
+from cs.logutils import info, debug, warning, Pfx
 from cs.serialise import toBS, fromBS
 from cs.threads import Q1, Get1, NestingOpenClose
 from cs.venti import defaults, totext
