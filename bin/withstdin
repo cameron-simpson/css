@@ -4,17 +4,39 @@
 #	- Cameron Simpson <cs@zip.com.au> 14jul2004
 #
 
+set -ue
+
 : ${TMPDIR:=/tmp}
 
+keeptmp=
+ext=
+
 cmd=$0
-usage="Usage: $cmd command [args...]"
+usage="Usage: $cmd [--keep] [--ext=.blah] command [args...]"
+
+badopts=
+
+while [ $# -gt 0 ]
+do
+  case $1 in
+    --keep)     keep=1 ;;
+    --ext)      ext=$2; shift ;;
+    --ext=*)    ext=`expr "x$1" : 'x--ext=\(.*\)'` ;;
+    --)         shift; break ;;
+    -?*)        echo "$cmd: unrecognised option: $1" >&2
+                badopts=1
+                ;;
+    *)          break ;;
+  esac
+  shift
+done
 
 [ $# = 0 ] && { echo "$usage" >&2; exit 2; }
 
-tmpf=$TMPDIR/withstdin$$
+tmpf=$TMPDIR/withstdin$$$ext
 
-trap 'rm -f "$tmpf"' 0
-trap 'rm -f "$tmpf"; exit 1' 1 2 13 15
+trap '[ $keep ] || rm -f "$tmpf"' 0
+trap '[ $keep ] || rm -f "$tmpf"; exit 1' 1 2 13 15
 
 cat >"$tmpf" || exit 1
 
