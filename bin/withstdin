@@ -8,7 +8,7 @@ set -ue
 
 : ${TMPDIR:=/tmp}
 
-keeptmp=
+keep=
 ext=
 
 cmd=$0
@@ -31,7 +31,13 @@ do
   shift
 done
 
-[ $# = 0 ] && { echo "$usage" >&2; exit 2; }
+if [ $# = 0 ]
+then
+  echo "$cmd: missing command" >&2
+  badopts=1
+fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
 
 tmpf=$TMPDIR/withstdin$$$ext
 
