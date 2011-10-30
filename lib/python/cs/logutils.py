@@ -189,6 +189,21 @@ class _PfxThreadState(threading.local):
     '''
     return self.old.pop()
 
+def OBSOLETE(func):
+  ''' Decorator for obsolete functions.
+      Use:
+        @OBSOLETE
+        def f(...):
+  '''
+  def wrapped(*args, **kwargs):
+    import traceback
+    frame = traceback.extract_stack(None, 2)[0]
+    warning("OBSOLETE call to %s:%d %s(), called from %s:%d %s",
+         func.func_code.co_filename, func.func_code.co_firstlineno,
+         func.func_name, frame[0], frame[1], frame[2])
+    return func(*args, **kwargs)
+  return wrapped
+
 if sys.hexversion >= 0x02060000:
   myLoggerAdapter = logging.LoggerAdapter
 else:
@@ -255,21 +270,6 @@ def pfxtag(tag, loggers=None):
         return func(*args, **kwargs)
     return wrapped
   return wrap
-
-def OBSOLETE(func):
-  ''' Decorator for obsolete functions.
-      Use:
-        @OBSOLETE
-        def f(...):
-  '''
-  def wrapped(*args, **kwargs):
-    import traceback
-    frame = traceback.extract_stack(None, 2)[0]
-    warning("OBSOLETE call to %s:%d %s(), called from %s:%d %s",
-         func.func_code.co_filename, func.func_code.co_firstlineno,
-         func.func_name, frame[0], frame[1], frame[2])
-    return func(*args, **kwargs)
-  return wrapped
 
 class Pfx(object):
   ''' A context manager to maintain a per-thread stack of message prefices.
