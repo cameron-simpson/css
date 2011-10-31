@@ -9,16 +9,25 @@ set -ue
 : ${TMPDIR:=/tmp}
 
 keep=
+cleanafter=
 ext=
 
 cmd=$0
-usage="Usage: $cmd [--keep] [--ext=.blah] command [args...]"
+usage="Usage: $cmd [{--keepfor=seconds|--keep}] [--ext=.blah] command [args...]"
 
 badopts=
 
 while [ $# -gt 0 ]
 do
   case $1 in
+    --keepfor)  keep=1
+                cleanafter=$2
+                shift
+                ;;
+    --keepfor=[1-9]*)
+                keep=1
+                cleanafter=`expr "x$1" : 'x--keepfor=\(.*\)'`
+                ;;
     --keep)     keep=1 ;;
     --ext)      ext=$2; shift ;;
     --ext=*)    ext=`expr "x$1" : 'x--ext=\(.*\)'` ;;
@@ -45,6 +54,14 @@ trap '[ $keep ] || rm -f "$tmpf"' 0
 trap '[ $keep ] || rm -f "$tmpf"; exit 1' 1 2 13 15
 
 cat >"$tmpf" || exit 1
+
+if [ -n "$cleanafter" ]
+then
+  ( ( sleep "$cleanafter"
+      rm -f "$tmpf"
+    ) &
+  )
+fi
 
 # no exec because the trap must run
 "$@" "$tmpf"
