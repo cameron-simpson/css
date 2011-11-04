@@ -4,6 +4,8 @@
 #       - Cameron Simpson <cs@zip.com.au> 29jan2009
 # 
 
+set -ue
+
 cmd=`basename "$0"`
 usage="Usage: $cmd [-F notify] [-[vx]] [--symlink linkname] remote-top remote-glob
   -e ssh-cmd
@@ -81,7 +83,6 @@ fi
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
-qrsync_ssh=`sh -c "shqstr $rsync_ssh"`
 qremote_top=`shqstr "$remote_top"`
 qremote_path=`shqstr "$remote_path"`
 qsymlink=`shqstr "$symlink"`
