@@ -57,6 +57,8 @@ export TAPE
 
 xit=1
 
+exec 3>&1 1>&2
+
 [ -z "$logfile" ] || label=`[ -z "$jukeslot" ] || tapelabel "$jukeslot"`
 
 if [ -z "$jukeslot" ] || $trace mover mv "s$jukeslot" d0
@@ -64,7 +66,7 @@ then
   if $trace mt rewind \
   && { [ -z "$filenum" ] || [ "$filenum" -le 0 ] || $trace mt fsf "$filenum"; }
   then
-    $trace "$@"
+    $trace "$@" >&3 3>&-
     xit=$?
     [ -z "$logfile" ] || $echo "`date --iso` jukeslot $jukeslot ($label) tape $TAPE file $filenum: $*" >>"$logfile"
     $trace mt rewind || xit=1
