@@ -85,6 +85,7 @@
 #
 
 trace=
+vecho=:
 symlink=LATEST
 src=
 dest=
@@ -231,6 +232,7 @@ do
     #
     -v|--verbose)
       verbose=1
+      vecho=echo
       ;;
 
     # =item -x
@@ -295,7 +297,7 @@ else
                 set -- ${1+"$@"} "--link-dest=$obackup"
                 obackup_count=`expr $obackup_count + 1`
               else
-                echo "$cmd: warning: ignoring --link-dest=$obackup due to arbitrary rsync limit of 20 such" >&2
+                $vecho "$cmd: warning: ignoring --link-dest=$obackup due to arbitrary rsync limit of 20 such" >&2
               fi
               ;;
             *)break
