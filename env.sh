@@ -18,11 +18,17 @@
 : ${CLASSPATH:=/usr/lib/jre/lib}
 
 : ${OS:=''}
-case "`uname -sr`" in
-  SunOS\ [56789].\*)  OS=solaris ;;
-  SunOS\ \*)          OS=sunos ;;
-  Linux\ \*)          OS=linux ;;
-esac
+if [ -z "$OS" ]
+then
+  OS=`uname -s | tr '[A-Z]' '[a-z]'`
+  case "$OS" in
+    sunos)
+      case "`uname -r`" in
+        5.\*)   OS=solaris ;;
+      esac
+      ;;
+  esac
+fi
 
 PATH=$PATH:$OPTCSS/bin:/sbin:/usr/sbin
 MANPATH=$MANPATH:$OPTCSS/man
