@@ -284,12 +284,19 @@ else
         src=$1 dest=$2
         shift; shift
         # gather other backup dirs, turn into --link-dest= options
+        obackup_count=0
         while [ $# -gt 0 ]
         do
           case "x$1" in
             x/*)
               obackup=$1; shift
-              set -- ${1+"$@"} "--link-dest=$obackup"
+              if [ "$obackup_count" -lt 20 ]
+              then
+                set -- ${1+"$@"} "--link-dest=$obackup"
+                obackup_count=`expr $obackup_count + 1`
+              else
+                echo "$cmd: warning: ignoring --link-dest=$obackup due to arbitrary rsync limit of 20 such" >&2
+              fi
               ;;
             *)break
               ;;
