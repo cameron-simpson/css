@@ -1,0 +1,50 @@
+#!/bin/sh
+#
+# Accept incoming ssh connection, connection out to specified rsyncd target.
+# We expect to put:
+#   command="ssh-to-rsyncd target:port"
+# in a special purpose authorized_keys file line.
+#       - Cameron Simpson <cs@zip.com.au> 14nov2011
+#
+
+set -ue
+
+cmd=$0
+usage="Usage: $cmd rsynd-target"
+
+##env | sort >&2
+
+badopts=
+
+if [ "x$SSH_ORIGINAL_COMMAND" != 'xrsync --server --daemon .' ]
+then
+  echo "$cmd: unexpected \$SSH_ORIGINAL_COMMAND: $SSH_ORIGINAL_COMMAND" >&2
+  badopts=1
+fi
+
+if [ $# = 0 ]
+then
+  echo "$cmd: missing rsyncd-target" >&2
+  badopts=1
+else
+  target=$1
+  shift
+  case "$target" in
+    *:*)        port=`expr "x$target" : 'x.*:\(.*\)'`
+                target=`expr "x$target" : 'x\(.*\):.*'`
+                ;;
+    *)          port=873
+                ;;
+  esac
+fi
+
+if [ $# -gt 0 ]
+then
+  echo "$cmd: extra arguments after rsyncd-target: $*" >&2
+  badopts=1
+fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+##set -x
+exec nc -- "$target" "$port"
