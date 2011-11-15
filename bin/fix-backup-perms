@@ -1,0 +1,82 @@
+#!/bin/sh
+#
+# Add backup read permission if needed.
+#       - Cameron Simpson <cs@zip.com.au> 03apr2011
+#
+
+set -ue
+
+recurse=
+users=${BACKUP_USERS:-backup}
+trace=set-x
+
+cmd=$0
+usage="Usage: $cmd [-r] [-U user,...] pathnames...
+  -r            Recursive.
+  -U user,...   Specify user[s] to have read access.
+                Default, from \$BACKUP_USERS: $users"
+
+. /opt/css/env.sh
+
+badopts=
+
+while [ $# -gt 0 ]
+do
+  case $1 in
+    -r) recurse=1 ;;
+    -U) users=$2; shift ;;
+    --) shift; break ;;
+    -?*)echo "$cmd: unrecognised option: $1" >&2
+        badopts=1
+        ;;
+    *)  break ;;
+  esac
+  shift
+done
+
+if [ $# = 0 ]
+then
+  echo "$cmd: missing pathnames" >&2
+  badopts=1
+fi
+
+users=`printf '%s\n' "$users" | tr , ' '`
+[ -n "$users" ] || { echo "$cmd: no users to check" >&2; badopts=1; }
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+if [ $recurse ]
+then
+  xit=0
+  for user in $users
+  do
+    $trace find "$@" \
+                \( ! -perm -4 -o -type d ! -perm -1 \) \
+                ! -user "$user" \
+                ! -group "$user" \
+                -print \
+    | $trace xxargs "$0" -U "$user" -- \
+    || xit=$?
+  done
+  exit $xit
+fi
+
+xit=0
+
+for user in $users
+do
+  for pathname
+  do
+    [ -d "$pathname" -o -f "$pathname" ] || continue
+    if [ -d "$pathname" ]
+    then  aclmode=r-x
+    else  aclmode=r
+    fi
+    getfacl --absolute-names -- "$pathname" \
+    | egrep "^(user:$user:$aclmode|other::$aclmode)" >/dev/null \
+    && continue
+    $trace setfacl -m "user:$user:$aclmode" -- "$pathname" || xit=1
+  done
+done
+
+exit $xit
