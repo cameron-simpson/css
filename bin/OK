@@ -108,6 +108,7 @@ then
   set -- pfx "$pfx" "$@"
 fi
 
+[ -t 2 ] && necho "$words" >&2
 xit=0
 $trace "$@" || xit=$?
 
