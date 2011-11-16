@@ -355,7 +355,7 @@ class Later(object):
     ''' Awful name.
         Return a context manager to block until the Later provides a timeslot.
     '''
-    return _Late_context_manager(self)
+    return _Late_context_manager(self, **kwargs)
 
   def submit(self, func, priority=None, delay=None, when=None, name=None, pfx=None):
     ''' Submit the callable `func` for later dispatch.
