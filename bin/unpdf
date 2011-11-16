@@ -32,7 +32,7 @@ do
   else  echo '<HR>\n'
   fi
 
-  /opt/pdftohtml/bin/pdftohtml -stdout -noframes "$tmpf" \
+  pdftohtml -stdout -noframes "$tmpf" \
   || { xit=1; continue; }
 done \
 | sed -e 's/^ *<br>$/<P>/' \
