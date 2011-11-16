@@ -1,12 +1,12 @@
 #!/bin/sh
 #
-# Backup libvirt VM XML and IMG files.
+# Backup libvirt qemu VM XML and IMG files.
 #       - Cameron Simpson <cs@zip.com.au> 17jun2011
 #
 
 set -ue
 
-backup_root=/backup/vms
+backup_root=${BACKUP_VMS:-/backup/vms}
 vmcfdir=/etc/libvirt/qemu
 sshcf=$HOME/.ssh/config
 trace=${DEBUG:+'time set-x'}
