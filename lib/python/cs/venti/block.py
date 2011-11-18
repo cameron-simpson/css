@@ -407,12 +407,12 @@ class TestAll(unittest.TestCase):
       IB = IndirectBlock()
       for i in range(10):
         rs = ''.join( chr(random.randint(0, 255)) for x in range(100) )
-        B = Block(data = rs)
-        assert len(B) == 100
+        B = Block(data=rs)
+        self.assertEqual(len(B), 100)
         IB.append(B)
-        assert len(IB) == (i+1) * 100
+        self.assertEqual(len(IB), (i+1)*100)
       IB.store()
-      assert len(IB) == 1000
+      self.assertEqual(len(IB), 1000)
       IBH = IB.hashcode
       IBdata = IB.data
       D("IBdata = %s:%d:%s", type(IBdata), len(IBdata), repr(IBdata),)
