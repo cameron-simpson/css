@@ -21,7 +21,6 @@ def spans(items):
   '''
   if type(items) is Range:
     # quick version for a Range
-    items._check()
     for span in items._spans:
       yield span
     return
@@ -187,7 +186,6 @@ class Range(object):
     return R2
 
   def update(self, start, end=None):
-    self._check()
     if end is None:
       # conventional iterable single argument
       for span in spans(start):
@@ -210,9 +208,7 @@ class Range(object):
       end = _spans[hindx][1]
       hindx += 1
     # replace overlapped spans with new span
-    self._check()
     _spans[londx:hindx] = [ [start, end] ]
-    self._check()
 
 class TestAll(unittest.TestCase):
   def setUp(self):
@@ -220,6 +216,8 @@ class TestAll(unittest.TestCase):
     self.spans1 = [ [1,4], [5,6], [7,9], [11,12] ]
     self.items2 = [3,5,6,8,9,10,15,16,19]
     self.spans2 = [ [3,4], [5,7], [8,11], [15,17], [19,20] ]
+    self.items1plus2 = [1,2,3,5,6,7,8,9,10,11,15,16,19]
+    self.spans1plus2 = [ [1,4], [5,12], [15,17], [19,20] ]
 
   def test00spans(self):
     self.assertNotEqual(list(spans(self.items1)), self.spans1)
@@ -263,6 +261,8 @@ class TestAll(unittest.TestCase):
     R2._check()
     R3 = R1.union(R2)
     R3._check()
+    self.assertEqual(list(R3), self.items1plus2)
+    self.assertEqual(list(R3.spans()), self.spans1plus2)
 
 if __name__ == '__main__':
   unittest.main()
