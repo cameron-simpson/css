@@ -29,7 +29,7 @@ class Range(list):
 
     ndx=bisect.bisect_left(self,(lo,))
     if ndx > 0 and self[ndx-1][1] >= lo:
-      # incorparate left hand range
+      # incorporate left hand range
       ndx-=1
       R=self[ndx]
       lo=min(R[0],lo)
