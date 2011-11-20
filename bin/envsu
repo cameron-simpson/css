@@ -6,10 +6,60 @@
 # Huge simplification. - cameron 20nov2011
 #
 
-[ $# -gt 0 ] || set -- "$SHELL"
+set -ue
+
+cmd=$0
+usage="Usage: $cmd [-] [-u user] [--] [user] [command [args...]]"
+
+su_user=
+su_opts=
+shcmd=
+
+badopts=
+
+while [ $# -gt 0 ]
+do
+  case "$1" in
+    -)  su_opts="$su_$opts -" ;;
+    -c) shcmd=${2:-":"}; shift ;;
+    -u) su_user=$2; shift ;;
+    --) shift; break ;;
+    -?*)echo "$cmd: unrecognised option: $1" >&2
+        badopts=1
+        ;;
+    *)  break ;;
+  esac
+  shift
+done
+
+if [ -z "$su_user" ]
+then
+  if [ $# = 0 ]
+  then
+    su_user=root
+  else
+    su_user=$1
+    shift
+  fi
+fi
+
+if [ -n "$shcmd" ]
+then
+  if [ $# = 0 ]
+  then
+    set -- "$SHELL" -c "$shcmd"
+  else
+    echo "$cmd: cannot supply both -c shcmd and command-args: $*" >&2
+    badopts=1
+  fi
+else
+  [ $# -gt 0 ] || set -- "$SHELL"
+fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
 
 # preserve environment, with small changes
-set -- "USER=$su" "PS1=" "PS2=" "$@"
+set -- "USER=$su_user" "PS1=" "PS2=" "$@"
 for envvar in `env | sed -n 's/^\([a-zA-Z_][a-zA-Z0-9_]*\)=.*/\1/p'| sort -r`
 do
   eval "set -- \"$envvar=\$$envvar\" \"\$@\""
@@ -17,4 +67,4 @@ done
 set -- env "$@"
 
 ##set -x
-exec sux $suargs -u "$su" -- "$@"
+exec sux $su_opts -u "$su_user" -- "$@"
