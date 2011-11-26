@@ -132,7 +132,9 @@ class Range(object):
         raise ValueError, "__contains__ requires a Range, int or pair of ints, got %s" % (x,)
     _spans = self._spans
     ndx = bisect_left(self._spans, x)
-    if ndx >= len(_spans):
+    if ndx > 0 and x[0] < _spans[ndx][0]:
+      ndx -= 1
+    elif ndx >= len(_spans):
       return False
     span = _spans[ndx]
     if x[0] < span[0]:
@@ -151,18 +153,26 @@ class Range(object):
     raise NotImplementedError
 
   def issubset(self, other):
+    ''' Test that self is a subset of other.
+    '''
     # TODO: handle ranges specially
     for x in self:
       if x not in other:
         return False
     return True
 
+  __le__ = issubset
+
   def issuperset(self, other):
+    ''' Test that self is a superset of other.
+    '''
     # TODO: handle ranges specially
     for x in other:
       if x not in self:
         return False
     return True
+
+  __ge__ = issuperset
 
   def copy(self):
     ''' Return a copy of this Range.
@@ -416,7 +426,7 @@ class TestAll(unittest.TestCase):
     self.assertRaises(KeyError, R1.remove, 3)
     R1._check()
 
-  def test17difference(self):
+  def test17difference_subset_superset(self):
     R1 = Range(self.items1)
     R1._check()
     R2 = Range(self.items2)
@@ -425,6 +435,14 @@ class TestAll(unittest.TestCase):
     R3._check()
     self.assertEqual(list(R3), self.items1minus2)
     self.assertEqual(list(list(R3.spans())), self.spans1minus2)
+    self.assert_(R1.issuperset(R3))
+    self.assert_(R3.issubset(R1))
+    R4 = R1 - R2
+    R4._check()
+    self.assertEqual(list(R4), self.items1minus2)
+    self.assertEqual(list(list(R4.spans())), self.spans1minus2)
+    self.assert_(R1.issuperset(R4))
+    self.assert_(R4.issubset(R1))
 
   def test17symmetric_difference(self):
     R1 = Range(self.items1)
