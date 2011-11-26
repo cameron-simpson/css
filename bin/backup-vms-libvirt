@@ -66,6 +66,7 @@ do
       exit 0
     fi
 
+    xit=0
     for xmlfile
     do
       xmlfile_base=`basename "$xmlfile"`
@@ -74,10 +75,22 @@ do
       [ -d "$bakdir/." ] || $trace mkdir "$bakdir"
       xmlfile_backup=$bakdir/$xmlfile_base
       $trace rsync -aL "$rhost$xmlfile" "$xmlfile_backup"
-      imgfile=$(sed -n 's:.*< *source *file='\''\(/[^'\'']*\.img\)'\'' */ *>.*:\1:p' "$xmlfile_backup")
-      imgfile_base=`basename "$imgfile"`
-      imgfile_backup=$bakdir/$imgfile_base
-      $trace rsync -aLS $progress "$rhost$imgfile" "$imgfile_backup"
+      imgfiles_seen=
+      for imgfile in $(sed -n 's:.*< *source *file='\''\(/[^'\'']*\.img\)'\'' */ *>.*:\1:p' "$xmlfile_backup")
+      do
+        imgfile_base=`basename "$imgfile"`
+        case " $imgfiles_seen " in
+          *" $imgfile_base "*)
+            echo "$cmd: $host: multiple images with basename \"$imgfile_base\", repeat found at: $imgfile" >&2
+            xit=1
+            continue
+            ;;
+        esac
+        imgfiles_seen="$imgfiles_seen $imgfile_base"
+        imgfile_backup=$bakdir/$imgfile_base
+        $trace rsync -aLS $progress "$rhost$imgfile" "$imgfile_backup"
+      done
     done
+    exit $xit
   )
 done

@@ -1,92 +1,70 @@
 #!/bin/sh
 #
-# Wrapper for su. If the first option begins with a dash, or there are arguments
-# after the login name, run a vanilla su. Otherwise pass much of our environment
-# through the su and exec the shell of our choice.
+# Wrapper for su to preserve environment.
 #	- Cameron Simpson, January 1992
 #
+# Huge simplification. - cameron 20nov2011
+#
 
-: ${DISPLAY:=''}
-: ${PREFTERM:=xterm}
-
-if [ -f /usr/bin/opiesu ]
-then realsu=/usr/bin/opiesu
-else if [ -f /usr/bin/su ]
-     then realsu=/usr/bin/su
-     else realsu=/bin/su
-     fi
-fi
+set -ue
 
 cmd=$0
-usage="Usage: $cmd [-] [-a authtype] [loginname] [-c shcmd]"
+usage="Usage: $cmd [-] [-u user] [--] [user] [command [args...]]"
 
-sush=/bin/sh
-case $ARCH in
-    *.*.solaris)	sush=/usr/bin/ksh ;; # bug workaround
-esac
+su_user=
+su_opts=
+shcmd=
 
 badopts=
 
-login=
-su=root
-suargs=
 while [ $# -gt 0 ]
-do  case $1 in
-      -)	login=- ;;
-      -a)	suargs="-a $2"; shift ;;
-      --)	shift; break ;;
-      -*)	echo "$0: unrecognised argument: $1" >&2; badopts=1 ;;
-      *)	break ;;
-    esac
-    shift
+do
+  case "$1" in
+    -)  su_opts="$su_$opts -" ;;
+    -c) shcmd=${2:-":"}; shift ;;
+    -u) su_user=$2; shift ;;
+    --) shift; break ;;
+    -?*)echo "$cmd: unrecognised option: $1" >&2
+        badopts=1
+        ;;
+    *)  break ;;
+  esac
+  shift
 done
 
-[ "x$1" = x- ] && { login=-; shift; }
-case $1 in
-   ''|-*)	;;
-   *)		su=$1; shift ;;
-esac
+if [ -z "$su_user" ]
+then
+  if [ $# = 0 ]
+  then
+    su_user=root
+  else
+    su_user=$1
+    shift
+  fi
+fi
+
+if [ -n "$shcmd" ]
+then
+  if [ $# = 0 ]
+  then
+    set -- "$SHELL" -c "$shcmd"
+  else
+    echo "$cmd: cannot supply both -c shcmd and command-args: $*" >&2
+    badopts=1
+  fi
+else
+  [ $# -gt 0 ] || set -- "$SHELL"
+fi
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
-[ -n "$login" -o $# -gt 0 ] \
-	&& exec "$realsu" $suargs $login "$su" "$@"
+# preserve environment, with small changes
+set -- "USER=$su_user" "PS1=" "PS2=" "$@"
+for envvar in `env | sed -n 's/^\([a-zA-Z_][a-zA-Z0-9_]*\)=.*/\1/p'| sort -r`
+do
+  eval "set -- \"$envvar=\$$envvar\" \"\$@\""
+done
+set -- env "$@"
 
-case "$DISPLAY" in
-  localhost:[1-9]*)
-    unset DISPLAY
-    ;;
-esac
-case "$PREFTERM" in
-  urxvtc)
-    PREFTERM=urxvt ;;
-esac
-
-# If some dickheads didn't use csh for root this would be much simpler.
-tmp=/tmp/su.$$
-
-cat >$tmp <<SU
-SHELL=$SHELL
-PS1= PS2=
-HOME=$HOME PATH=$PATH
-export SHELL PS1 PS2 HOME PATH
-##test -r $env && . $env
-USER=$su
-EMAIL=$EMAIL
-DISPLAY=$DISPLAY
-PREFTERM=$PREFTERM
-PERL5LIB=$HOME/rc/perl:$PERL5LIB:/opt/perl/lib
-SCREENDIR=/tmp/screen-\$USER
-TMPDIR=/tmp
-export USER EMAIL DISPLAY PERL5LIB SCREENDIR TMPDIR
-[ -n "\$DISPLAY" ] || unset DISPLAY
-rm -f $tmp ##$env
-exec term -n '$su@$HOST'
-##exec pushttylabel -exec '$su@$HOST' term -n '$su@$HOST'
-SU
-
-chmod 755 $tmp
-echo exec $sush $tmp
-unset DISPLAY
 ##set -x
-exec "$realsu" $suargs "$su" -c "exec $sush -x $tmp"
+exec sux $su_opts -u "$su_user" -- "$@"

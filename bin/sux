@@ -6,9 +6,15 @@
 #       - Cameron Simpson <cs@zip.com.au> 03soct2011
 #
 
-cmd=$0
-usage="Usage: $cmd [-] [-u user] command [args...]"
+set -ue
 
+: ${DEBUG:=}
+
+cmd=$0
+usage="Usage: $cmd [-] [-u user] [-x] [--] command [args...]"
+
+trace=
+setx=:
 suargs=
 user=root
 
@@ -19,6 +25,7 @@ do
   case $1 in
     -)  suargs="$suargs $1" ;;
     -u) user=$2; shift ;;
+    -x) trace=set-x setx='set -x' ;;
     --) shift; break ;;
     -?*)echo "$cmd: unrecognised option: $1" >&2
         badopts=1
@@ -37,5 +44,5 @@ fi
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
 shcmd=`shqstr "$@"`
-set -x
-exec su $suargs "$user" -c "$shcmd"
+##set -x
+exec $trace su $suargs "$user" -c "$setx; exec $shcmd"
