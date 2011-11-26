@@ -8,7 +8,6 @@ set -ue
 
 : ${VARRUN:=$HOME/var/run}
 : ${LOGDIR:=$HOME/var/log}
-: ${PORTFWD_TARGETS:-''}
 : ${PORTFWD_CONFIG:=$HOME/rc/ssh/portfwd}
 : ${PORTFWD_SSH_CONFIG:=$HOME/rc/ssh/config-pf}
 : ${USER:=`id -un`}
@@ -25,8 +24,9 @@ usage="Usage: $cmd [-1] [-F ssh_config] [-stop] targets...
   -stop Stop named port forwards instead of starting them.
   -F    Ssh configuration file with clause for target.
         Default from \$PORTFWD_SSH_CONFIG: $sshcfg
-If targets is \"ALL\" then if -stop it means all running portforwards
-otherwise it means all clauses named *-ALL in the ssh configuration file."
+If a target starts with an upper case letter it is taken to be a group name,
+and the targets are found by finding the first hostname in Host clauses with
+the group name appended. Example: \"Host home ALL\""
 
 opts=
 badopts=
@@ -49,14 +49,8 @@ done
 
 if [ $# = 0 ]
 then
-  set -- $PORTFWD_TARGETS
-  if [ $# -gt 0 ]
-  then
-    echo "$cmd: no targets, using \$PORTFWD_TARGETS: $*" >&2
-  else
-    echo "$cmd: missing targets and missing/empty \$PORTFWD_TARGETS" >&2
-    badopts=1
-  fi
+  echo "$cmd: no targets" >&2
+  badopts=1
 fi
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
@@ -65,6 +59,50 @@ ssh-add -l >/dev/null \
 || { echo "$cmd: no ssh-agent, aborting" >&2
      exit 1
    }
+
+subprocs=
+
+# catch some signals and propagate to children
+for sig in HUP INT TERM
+do
+  trap "sig=$sig
+        echo \"\$cmd: received SIG\$sig\"
+        set -vx
+        [ -z \"\$subprocs\" ] || synckill -v -s \"\$sig\" \$subprocs
+        exit 1
+       " "$sig"
+done
+
+if [ $# -gt 1 ]
+then
+  set -x
+  for target
+  do
+    "$0" $opts -- "$target" &
+    subprocs="$subprocs $!"
+  done
+  wait
+  exit $?
+fi
+
+target=$1
+shift
+
+case "$target" in
+  [A-Z]*)
+    set -- `sed -n 'y/	/ /
+                    s/$/ /
+                    s/^  *//
+                    s/  */  /g
+                    /^[Hh][Oo][Ss][Tt] .*"$target" /s/^[^ ]*  *\([^ ][^ ]*\).*/\1/p' "$sshcfg"`
+    if [ $# = 0 ]
+    then
+      echo "$cmd: group \"$target\" not applied to any Hosts" >&2
+      exit 1
+    fi
+    [ $# = 1 ] || exec "$0" $opts -- "$@"
+    ;;
+esac
 
 not()
 { "$@" || return 0
@@ -143,55 +181,8 @@ synckill()
   return $?
 }
 
-if [ "x$*" = xALL ]
-then
-  if [ $stop ]
-  then
-    set -- `ls "$VARRUN/." | sed -n 's/\.pid$//; s/^portfwd\.//p'`
-  else
-    # local primary clause names of all clauses with a *-ALL name
-    set -- `sed -n 'y/	/ /
-                    s/$/ /
-                    s/^  *//
-                    s/  */  /g
-                    /^[Hh][Oo][Ss][Tt] .*[^ ]-ALL/s/^[^ ]*  *\([^ ][^ ]*\).*/\1/p' "$sshcfg"`
-  fi
-fi
-
-subprocs=
-
-for sig in HUP INT TERM
-do
-  trap "sig=$sig
-        echo \"\$cmd: received SIG\$sig\"
-        set -vx
-        [ -z \"\$subprocs\" ] || synckill -v -s \"\$sig\" \$subprocs
-        exit 1
-       " "$sig"
-done
-
-if [ $# -gt 1 ]
-then
-  set -x
-  for target
-  do
-    "$0" $opts -- "$target" &
-    subprocs="$subprocs $!"
-  done
-  wait
-  exit $?
-fi
-
-target=$1
-shift
-case "$target" in
-  *-ALL|*-pf)
-    target_short=`expr "x$target" : 'x\(.*\)-.*'` ;;
-  *)target_short=$target ;;
-esac
-
-cmd="$cmd $target_short"
-target_disable_flag=PORTFWD_DISABLE_`echo "$target_short" | tr '[a-z-]' '[A-Z_]'`
+cmd="$cmd $target"
+target_disable_flag=PORTFWD_DISABLE_`echo "$target" | tr '[a-z-]' '[A-Z_]'`
 
 xit=0
 first=1
@@ -204,7 +195,7 @@ do
   cfg_monitor=
   if [ -s "$fwdcfg" ]
   then
-    wcv=`winclausevars "$fwdcfg" "$target_short" cfg`
+    wcv=`winclausevars "$fwdcfg" "$target" cfg`
     eval "$wcv"
   fi
   case $cfg_pidfile in
