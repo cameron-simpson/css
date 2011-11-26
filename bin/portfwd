@@ -202,7 +202,6 @@ do
   cfg_command=:
   cfg_outlog=portfwd-$target    # /dev/null
   cfg_monitor=
-  cfg_control=$HOME/.sshctrl-$USER@$target_short-pf.22
   if [ -s "$fwdcfg" ]
   then
     wcv=`winclausevars "$fwdcfg" "$target_short" cfg`
@@ -235,11 +234,9 @@ do
   flag -w "$target_disable_flag" && { sleep 10; continue; }
   ok2portfwd                  || { sleep 10; continue; }
 
-  rm -f -- "$cfg_control"
   $trace \
     tag_fd 2 "$target" \
     sshto \
-      "ControlPath=$cfg_control" \
       -n -F "$sshcfg" "$target" \
       "( $cfg_command ) </dev/null &
      "'exec 1>&2
