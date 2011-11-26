@@ -208,6 +208,20 @@ class Range(object):
     # replace overlapped spans with new span
     _spans[londx:hindx] = [ [start, end] ]
 
+  def __ior__(self, other):
+    self.update(other)
+    return self
+
+  def intersection_update(self, other):
+    # TODO: more efficient way to do this? probably not, actually
+    R2 = self.intersection(other)
+    self._spans = R2._spans
+    R2._spans = []
+  
+  def __iand__(self, other):
+    self.intersection_update(other)
+    return self
+
   def union(self, other):
     R2 = self.copy()
     R2.update(other)
@@ -274,6 +288,10 @@ class Range(object):
         _spans[hindx][0] = end
       # remove swallowed spans
       del _spans[londx:hindx]
+
+  def __isub__(self, other):
+    self.discard(other)
+    return self
 
   def remove(self, start, end=None):
     ''' Remove [start,end] from Range.
