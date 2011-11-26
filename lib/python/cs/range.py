@@ -321,6 +321,8 @@ class TestAll(unittest.TestCase):
     self.spans1plus2 = [ [1,4], [5,12], [15,17], [19,20] ]
     self.items1minus2 = [1,2,7,11]
     self.spans1minus2 = [ [1,3], [7,8], [11,12] ]
+    self.items1xor2 = [1,2,6,7,9,10,11,15,16,19]
+    self.spans1xor2 = [ [1,3], [6,8], [9,12], [15,17], [19,20] ]
 
   def test00spans(self):
     self.assertNotEqual(list(spans(self.items1)), self.spans1)
@@ -423,6 +425,22 @@ class TestAll(unittest.TestCase):
     R3._check()
     self.assertEqual(list(R3), self.items1minus2)
     self.assertEqual(list(list(R3.spans())), self.spans1minus2)
+
+  def test17symmetric_difference(self):
+    R1 = Range(self.items1)
+    R1._check()
+    R2 = Range(self.items2)
+    R2._check()
+    R3 = R1.symmetric_difference(R2)
+    R3._check()
+    self.assertEqual(list(R3), self.items1xor2)
+    self.assertEqual(list(list(R3.spans())), self.spans1xor2)
+    R4 = R1 ^ R2
+    R4._check()
+    self.assertEqual(list(R4), self.items1xor2)
+    self.assertEqual(list(list(R4.spans())), self.spans1xor2)
+    self.assertEqual(R4, R3)
+    self.assertIsNot(R4, R3)
 
 if __name__ == '__main__':
   unittest.main()
