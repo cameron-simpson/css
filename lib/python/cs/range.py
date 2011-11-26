@@ -59,7 +59,10 @@ class Range(object):
         self.update(start, end)
 
   def __str__(self):
-    return str(self._spans)
+    spans = [ "%d"%(start,) if start == end-1
+              else "%d,%d"%(start,end-1) if start == end-2
+              else "%d..%d"%(start,end-1) for start, end in self._spans ]
+    return "[%s]" % (",".join(spans))
 
   def __eq__(self, other):
     if type(other) is Range:
@@ -109,11 +112,20 @@ class Range(object):
     return sum( [ end-start for start, end in self._spans ] )
 
   def __contains__(self, x):
-    _spans = self._spans
-    if type(x) is int:
+    ''' Test `x` to see if it is wholly contained in this Range.
+	`x` may be another Range, a single int or an iterable
+	yielding a pair of ints.
+    '''
+    t = type(x)
+    if t is Range:
+      return self.issuperset(x)
+    if t is int:
       x = [x, x+1]
     else:
       x = list(x)
+      if len(x) != 2:
+        raise ValueError, "__contains__ requires a Range, int or pair of ints, got %s" % (x,)
+    _spans = self._spans
     ndx = bisect_left(self._spans, x)
     if ndx >= len(_spans):
       return False
@@ -124,13 +136,24 @@ class Range(object):
       return False
     return True
 
+  def dual(self, start=None, end=None):
+    ''' Return an iterable of the spans not in this range.
+	If `start` is omitted, start at the minimum of 0 and the
+	lowest span in the Range.
+        If `end` is omitted, use the maximum span in the Range.
+    '''
+    # TODO: implement this!
+    raise NotImplementedError
+
   def issubset(self, other):
+    # TODO: handle ranges specially
     for x in self:
       if x not in other:
         return False
     return True
 
   def issuperset(self, other):
+    # TODO: handle ranges specially
     for x in other:
       if x not in self:
         return False
@@ -140,6 +163,31 @@ class Range(object):
     R2 = Range()
     R2._spans = list(self._spans)
     return R2
+
+  def update(self, start, end=None):
+    if end is None:
+      # conventional iterable single argument
+      for span in spans(start):
+        self.update( *span )
+      return
+    if start >= end:
+      return
+    _spans = self._spans
+    londx = bisect_left(_spans, [start, end])
+    # find list of spans to replace
+    # i.e. those overlapping the new span
+    hindx = londx
+    if londx > 0 and _spans[londx-1][1] >= start:
+      londx -= 1
+      start = _spans[londx][0]
+    while hindx < len(_spans) and end >= _spans[hindx][1]:
+      hindx += 1
+    # merge final span if overlapping
+    if hindx < len(_spans) and _spans[hindx][0] <= end:
+      end = _spans[hindx][1]
+      hindx += 1
+    # replace overlapped spans with new span
+    _spans[londx:hindx] = [ [start, end] ]
 
   def union(self, other):
     R2 = self.copy()
@@ -170,45 +218,80 @@ class Range(object):
         R2.add(x)
     return R2
 
-  def difference(self, other):
-    R2 = Range()
-    # TODO: if type(other) is Range, do fast ordered difference
-    for x in self:
-      if x not in other:
-        R2.add(x)
+  def difference(self, start, end=None):
+    R2 = self.copy()
+    R2.discard(start, end)
     return R2
 
+  def discard(self, start, end=None):
+    if end is None:
+      if type(start) is int:
+        end = start+1
+      else:
+        # start is a Range or iterable
+        for span in ( start.spans() if type(start) is Range
+                                    else spans(sorted(start)) ):
+          self.discard( *span )
+        return
+    if start < end:
+      _spans = self._spans
+      londx = bisect_left(_spans, [start, end])
+      hindx = londx
+      # crop preceeding block if overlapping
+      if londx > 0:
+        prev_span = _spans[londx-1]
+        if prev_span[1] > start:
+          prev_span[1] = start
+          # remove preceeding block if now empty
+          if prev_span[0] == prev_span[1]:
+            londx -= 1
+      # locate spans to delete
+      while hindx < len(_spans) and _spans[hindx][1] <= end:
+        hindx += 1
+      # crop following block if overlapping
+      if hindx < len(_spans) and _spans[hindx][0] < end:
+        _spans[hindx][0] = end
+      # remove swallowed spans
+      del _spans[londx:hindx]
+
+  def remove(self, start, end=None):
+    if end is None:
+      if type(start) is int:
+        end = start+1
+      else:
+        # start is a Range or iterable
+        for span in ( start.spans() if type(start) is Range
+                                    else spans(sorted(start)) ):
+          self.remove( *span )
+        return
+    if start < end:
+      _spans = self._spans
+      ndx = bisect_left(_spans, [start, end])
+      if ndx > 0 and _spans[ndx-1][1] > start:
+        ndx -= 1
+      span = _spans[ndx]
+      if start < span[0] or end > span[1]:
+        raise KeyError, "[%s:%s] not a subset of %s" % (start, end, self)
+      if start == span[0]:
+        if end == span[1]:
+          print >>sys.stderr, "remove %s:%s from %s: delete span" % (start,end,span)
+          del _spans[ndx]
+        else:
+          span[0] = end
+      else:
+        if end == span[1]:
+          span[1] = start
+        else:
+          _spans[ndx:ndx+1] = [ [span[0], start], [end, span[1]] ]
+    self._check()
+
   def symmetric_difference(self, other):
-    R2 = self.difference(other)
+    R1 = self.difference(other)
+    R1 = self.difference(other)
     for x in other:
       if x not in self:
         R2.add(x)
     return R2
-
-  def update(self, start, end=None):
-    if end is None:
-      # conventional iterable single argument
-      for span in spans(start):
-        self.update( *span )
-      return
-    if start >= end:
-      return
-    _spans = self._spans
-    londx = bisect_left(_spans, [start, end])
-    # find list of spans to replace
-    # i.e. those overlapping the new span
-    hindx = londx
-    if londx > 0 and _spans[londx-1][1] >= start:
-      londx -= 1
-      start = _spans[londx][0]
-    while hindx < len(_spans) and end >= _spans[hindx][1]:
-      hindx += 1
-    # merge final span if overlapping
-    if hindx < len(_spans) and _spans[hindx][0] <= end:
-      end = _spans[hindx][1]
-      hindx += 1
-    # replace overlapped spans with new span
-    _spans[londx:hindx] = [ [start, end] ]
 
 class TestAll(unittest.TestCase):
   def setUp(self):
@@ -218,6 +301,8 @@ class TestAll(unittest.TestCase):
     self.spans2 = [ [3,4], [5,7], [8,11], [15,17], [19,20] ]
     self.items1plus2 = [1,2,3,5,6,7,8,9,10,11,15,16,19]
     self.spans1plus2 = [ [1,4], [5,12], [15,17], [19,20] ]
+    self.items1minus2 = [1,2,7,11]
+    self.spans1minus2 = [ [1,3], [7,8], [11,12] ]
 
   def test00spans(self):
     self.assertNotEqual(list(spans(self.items1)), self.spans1)
@@ -237,6 +322,7 @@ class TestAll(unittest.TestCase):
     R1 = Range(self.items1)
     R1._check()
     self.assertEqual(list(R1.spans()), self.spans1)
+    self.assertEqual(R0, R1)
     R2 = Range(self.items2)
     R2._check()
     self.assertEqual(list(R2.spans()), self.spans2)
@@ -250,11 +336,39 @@ class TestAll(unittest.TestCase):
     R1 = Range(self.items1)
     R2 = R1.copy()
     R2._check()
+    self.assertIsNot(R1, R2)
     self.assertEqual(R1, R2)
     self.assertEqual(R1._spans, R2._spans)
     self.assertEqual(list(R1.spans()), list(R2.spans()))
 
-  def test13union(self):
+  def test13update00fromItems(self):
+    R1 = Range(self.items1)
+    R1._check()
+    R1.update(self.items2)
+    R1._check()
+    self.assertEqual(list(R1), self.items1plus2)
+    self.assertEqual(list(R1.spans()), self.spans1plus2)
+
+  def test13update01fromSpans(self):
+    R1 = Range(self.items1)
+    R1._check()
+    for span in self.spans2:
+      R1.update(span[0], span[1])
+      R1._check()
+    self.assertEqual(list(R1), self.items1plus2)
+    self.assertEqual(list(R1.spans()), self.spans1plus2)
+
+  def test13update02fromRange(self):
+    R1 = Range(self.items1)
+    R1._check()
+    R2 = Range(self.items2)
+    R2._check()
+    R1.update(R2)
+    R1._check()
+    self.assertEqual(list(R1), self.items1plus2)
+    self.assertEqual(list(R1.spans()), self.spans1plus2)
+
+  def test14union(self):
     R1 = Range(self.items1)
     R1._check()
     R2 = Range(self.items2)
@@ -262,7 +376,35 @@ class TestAll(unittest.TestCase):
     R3 = R1.union(R2)
     R3._check()
     self.assertEqual(list(R3), self.items1plus2)
-    self.assertEqual(list(R3.spans()), self.spans1plus2)
+    self.assertEqual(list(list(R3.spans())), self.spans1plus2)
+
+  def test15discard(self):
+    R1 = Range(self.items1)
+    R1._check()
+    R2 = Range(self.items2)
+    R2._check()
+    R1.discard(R2)
+    R1._check()
+    self.assertEqual(list(R1), self.items1minus2)
+    self.assertEqual(list(list(R1.spans())), self.spans1minus2)
+
+  def test16remove(self):
+    R1 = Range(self.items1)
+    R1._check()
+    R1.remove(3)
+    R1._check()
+    self.assertRaises(KeyError, R1.remove, 3)
+    R1._check()
+
+  def test17difference(self):
+    R1 = Range(self.items1)
+    R1._check()
+    R2 = Range(self.items2)
+    R2._check()
+    R3 = R1.difference(R2)
+    R3._check()
+    self.assertEqual(list(R3), self.items1minus2)
+    self.assertEqual(list(list(R3.spans())), self.spans1minus2)
 
 if __name__ == '__main__':
   unittest.main()
