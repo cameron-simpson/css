@@ -9,19 +9,22 @@ set -ue
 : ${VARRUN:=$HOME/var/run}
 : ${LOGDIR:=$HOME/var/log}
 : ${PORTFWD_TARGETS:-''}
+: ${PORTFWD_CONFIG:=$HOME/rc/ssh/portfwd}
+: ${PORTFWD_SSH_CONFIG:=$HOME/rc/ssh/config-pf}
 : ${USER:=`id -un`}
 
 trace=set-x
 once=
 stop=
-sshcfg=$HOME/rc/ssh/config-pf
-fwdcfg=$HOME/rc/ssh/portfwd
+sshcfg=$PORTFWD_SSH_CONFIG
+fwdcfg=$PORTFWD_CONFIG
 
 cmd=`basename "$0"`
-usage="Usage: $cmd [-1] [-stop] targets...
+usage="Usage: $cmd [-1] [-F ssh_config] [-stop] targets...
   -1    Once. Do not restart the tunnel if it dies.
   -stop Stop named port forwards instead of starting them.
   -F    Ssh configuration file with clause for target.
+        Default from \$PORTFWD_SSH_CONFIG: $sshcfg
 If targets is \"ALL\" then if -stop it means all running portforwards
 otherwise it means all clauses named *-ALL in the ssh configuration file."
 
@@ -235,7 +238,6 @@ do
   $trace \
     tag_fd 2 "$target" \
     sshto \
-      "ServerAliveInterval=37" \
       "ControlPath=$cfg_control" \
       -n -F "$sshcfg" "$target" \
       "( $cfg_command ) </dev/null &
@@ -243,9 +245,9 @@ do
        while sleep 61 && printf " "; do :; done
       ' \
     >>"$cfg_outlog" </dev/null &
-  subprocs="$subprocs $!"
   sshpid=$!
-  [ $first ] || alert "RESTARTED: sshpf $target" &
+  subprocs="$subprocs $sshpid"
+  [ $first ] || alert "RESTARTED: sshpf $target [pid $sshpid]" &
 
   # start monitor
   if [ -n "$cfg_monitor" ]
@@ -258,9 +260,9 @@ do
   while kill -0 "$sshpid" && ok2portfwd
   do
     flag -w "$target_disable_flag" && break
-    sleep 31
+    sleep 11
   done
-  alert "EXITED: sshpf $target, pid $sshpid" &
+  alert "EXITED: sshpf $target [pid $sshpid]" &
   >"$cfg_pidfile"
   synckill -v $subprocs
   subprocs=
