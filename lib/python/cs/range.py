@@ -74,6 +74,9 @@ class Range(object):
       return self._spans == other._spans
     return list(self) == list(other)
 
+  def clear(self):
+    self._spans = []
+
   def spans(self):
     ''' Return an interable of (start, end) tuples.
     '''
@@ -289,6 +292,8 @@ class Range(object):
       # remove swallowed spans
       del _spans[londx:hindx]
 
+  difference_update = discard
+
   def __isub__(self, other):
     self.discard(other)
     return self
@@ -327,6 +332,22 @@ class Range(object):
           _spans[ndx:ndx+1] = [ [span[0], start], [end, span[1]] ]
     self._check()
 
+  def pop(self):
+    ''' Remove and return an arbitrary element.
+        Raise KeyError if the Range is empty.
+    '''
+    _spans = self._spans
+    if len(_spans) == 0:
+      raise KeyError, "pop() from empty Range"
+    span = _spans[-1]
+    start, end = _spans[-1]
+    end -= 1
+    if end > start:
+      span[1] = end
+    else:
+      del spans[-1]
+    return end
+
   def symmetric_difference(self, other):
     ''' Return a new Range with elements in self or other but not both.
     '''
@@ -338,6 +359,15 @@ class Range(object):
     return R2
 
   __xor__ = symmetric_difference
+
+  def symmetric_difference_update(self, other):
+    R2 = self.symmetric_difference(other)
+    self._spans = R2._spans
+    R2._spans = []
+
+  def __ixor__(self, other):
+    self.symmetric_difference_update(other)
+    return self
 
 class TestAll(unittest.TestCase):
   def setUp(self):
