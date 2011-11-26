@@ -1,4 +1,9 @@
 #!/usr/bin/python
+#
+# A Range in an object resembling a set but optimised for contiguous
+# ranges of int members.
+#       - Cameron Simpson <cs@zip.com.au>
+#
 
 import sys
 from bisect import bisect_left
@@ -160,11 +165,15 @@ class Range(object):
     return True
 
   def copy(self):
+    ''' Return a copy of this Range.
+    '''
     R2 = Range()
-    R2._spans = list(self._spans)
+    R2._spans = list( [span[0], span[1]] for span in self._spans )
     return R2
 
   def update(self, start, end=None):
+    ''' Update self with [start,end].
+    '''
     if end is None:
       # conventional iterable single argument
       for span in spans(start):
@@ -194,6 +203,8 @@ class Range(object):
     R2.update(other)
     return R2
 
+  __or__ = union
+
   def intersection(self, other):
     R2 = Range()
     if type(other) is Range:
@@ -212,18 +223,18 @@ class Range(object):
         ndx += 1
     return R2
 
-    # TODO: if type(other) is Range, do fast ordered merge
-    for x in other:
-      if x in self:
-        R2.add(x)
-    return R2
+  __and__ = intersection
 
   def difference(self, start, end=None):
     R2 = self.copy()
     R2.discard(start, end)
     return R2
 
+  __sub__ = difference
+
   def discard(self, start, end=None):
+    ''' Remove [start,end] from Range if present.
+    '''
     if end is None:
       if type(start) is int:
         end = start+1
@@ -255,6 +266,9 @@ class Range(object):
       del _spans[londx:hindx]
 
   def remove(self, start, end=None):
+    ''' Remove [start,end] from Range.
+        Raise KeyError if [start,end] not a subset of Range.
+    '''
     if end is None:
       if type(start) is int:
         end = start+1
@@ -286,12 +300,16 @@ class Range(object):
     self._check()
 
   def symmetric_difference(self, other):
+    ''' Return a new Range with elements in self or other but not both.
+    '''
+    if type(other) is not Range:
+      other = Range(other)
     R1 = self.difference(other)
-    R1 = self.difference(other)
-    for x in other:
-      if x not in self:
-        R2.add(x)
+    R2 = other.difference(self)
+    R2.update(R1)
     return R2
+
+  __xor__ = symmetric_difference
 
 class TestAll(unittest.TestCase):
   def setUp(self):
