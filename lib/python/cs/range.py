@@ -4,6 +4,8 @@
 # ranges of int members.
 #       - Cameron Simpson <cs@zip.com.au>
 #
+# TODO: add __getitem__, __getslice__, __delitem__, __delslice__ methods.
+#
 
 import sys
 from bisect import bisect_left
