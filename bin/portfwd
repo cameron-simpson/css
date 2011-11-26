@@ -164,6 +164,7 @@ for sig in HUP INT TERM
 do
   trap "sig=$sig
         echo \"\$cmd: received SIG\$sig\"
+        set -vx
         [ -z \"\$subprocs\" ] || synckill -v -s \"\$sig\" \$subprocs
         exit 1
        " "$sig"
