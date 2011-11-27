@@ -17,6 +17,8 @@ once=
 stop=
 sshcfg=$PORTFWD_SSH_CONFIG
 fwdcfg=$PORTFWD_CONFIG
+polltime=11
+retrytime=2
 
 cmd=`basename "$0"`
 usage="Usage: $cmd [-1] [-F ssh_config] [-stop] targets...
@@ -145,14 +147,24 @@ synckill()
     [ $verbose ] && printf "%s" "$cmd: synckill $pids"
     $trace kill -s "$sig" $pids || :
     pollsig=0
-    while [ -n "$pids" ]
+    while [ -n "$pids" ] && sleep 1
     do
+      [ $verbose ] && printf .
+      case $max in
+        0)    pollsig=KILL ;;
+        1|2)  pollsig=TERM
+              max=`expr $max - 1` || :
+              ;;
+        *)    pollsig=0
+              max=`expr $max - 1` || :
+              ;;
+      esac
       npids=
       for pid in $pids
       do
         if [ "x$pid" = "x$_sk_me" ]
         then
-          echo "ERROR: trying to kill myself! pi=$pid" >&2
+          echo "ERROR: trying to kill myself! [pid=$pid]" >&2
         else
           if $trace kill -s "$pollsig" "$pid" 2>/dev/null
           then  npids="$npids $pid"
@@ -160,20 +172,6 @@ synckill()
         fi
       done
       pids=$npids
-      if [ -n "$pids" ]
-      then
-        sleep 1
-        [ $verbose ] && printf .
-        case $max in
-          0)    pollsig=KILL ;;
-          1|2)  pollsig=TERM
-                max=`expr $max - 1` || :
-                ;;
-          *)    pollsig=0
-                max=`expr $max - 1` || :
-                ;;
-        esac
-      fi
     done
     [ $verbose ] && echo
     exit $xit
@@ -222,8 +220,8 @@ do
   echo "$$" >"$cfg_pidfile"
 
   # if tunnel disabled, skip and check again in a bit
-  flag -w "$target_disable_flag" && { sleep 10; continue; }
-  ok2portfwd                  || { sleep 10; continue; }
+  flag -w "$target_disable_flag" && { sleep "$polltime"; continue; }
+  ok2portfwd                  || { sleep "$polltime"; continue; }
 
   $trace \
     tag_fd 2 "$target" \
@@ -249,7 +247,7 @@ do
   while kill -0 "$sshpid" && ok2portfwd
   do
     flag -w "$target_disable_flag" && break
-    sleep 11
+    sleep "$polltime"
   done
   alert "EXITED: sshpf $target [pid $sshpid]" &
   >"$cfg_pidfile"
@@ -261,7 +259,7 @@ do
   # pause before restart, and indefinitely if no tunnel permission
   while :
   do
-    sleep 2
+    sleep "$retrytime"
     ok2portfwd && break
   done
 
