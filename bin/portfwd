@@ -96,7 +96,7 @@ case "$target" in
                     s/$/ /
                     s/^  *//
                     s/  */  /g
-                    /^[Hh][Oo][Ss][Tt] .*"$target" /s/^[^ ]*  *\([^ ][^ ]*\).*/\1/p' "$sshcfg"`
+                    /^[Hh][Oo][Ss][Tt] .*'"$target"' /s/^[^ ]*  *\([^ ][^ ]*\).*/\1/p' "$sshcfg"`
     if [ $# = 0 ]
     then
       echo "$cmd: group \"$target\" not applied to any Hosts" >&2
