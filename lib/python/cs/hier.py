@@ -248,6 +248,8 @@ class HierInput(_Hier):
     """
     D=DictUC_Attrs()
     for line in cs.io.contlines(fp):
+      if line.startswith('#'):
+        continue
       kv=self.kvline(line,charset=charset)
       D[kv[0]]=kv[1]
     return D
