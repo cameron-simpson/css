@@ -1,0 +1,70 @@
+#!/bin/sh
+#
+# Run a command in the specified Mercurial repository.
+# Code adapted from hgbox script.
+#       - Cameron Simpson <cs@zip.com.au> 07dec2011
+#
+
+set -ue
+
+: ${OPTCSS:=/opt/css}
+
+cmd=`basename "$0"`
+Usage="Usage: $cmd [-x] hgurl command [args...]"
+
+badopts=
+
+trace=${DEBUG:+set-x}
+roptcss=$OPTCSS
+
+while [ $# -gt 0 ]
+do
+  case $1 in
+    -x) trace=set-x ;;
+    --) shift; break ;;
+    -?*)echo "$cmd: unrecognised option $1" >&2
+        badopts=1
+        ;;
+    *)  break ;;
+  esac
+  shift
+done
+
+if [ $# = 0 ]
+then
+  echo "$cmd: missing hgurl" >&2
+  badopts=1
+else
+  hgurl=$1
+  shift
+  case "$hgurl" in
+    ssh://?*/*)
+      host=`expr "x$hgurl" : 'xssh://\([^/]*\)/.*'`
+      path=`expr "x$hgurl" : 'xssh://[^/]*/\(.*\)'`
+      ;;
+    /*)
+      host=
+      path=$hgurl
+      ;;
+    *)
+      echo "$inhg: unsupported hg url: $hgurl" >&2
+      badopts=1
+      ;;
+  esac
+
+  if [ $# = 0 ]
+  then
+    echo "$cmd: missing command" >&2
+    badopts=1
+  fi
+fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+set -- incd "$path" "$@"
+if [ -n "$host" ]
+then
+  set -- sshx -n "$host" "$roptcss/bin/with-opt-css" -- "$@"
+fi
+
+$trace "$@"
