@@ -7,11 +7,27 @@
 
 set -ue
 
-usage="Usage: $0 [-d optcssdir] [command [args...]]"
+cmd=$0
+usage="Usage: $cmd [-d optcssdir] [command [args...]]"
 
 : ${OPTCSS:=''}
 
-[ $# -gt 0 ] && [ "x$1" = x-d ] && { OPTCSS=$2; shift; shift; }
+badopts=
+
+while [ $# -gt 0 ]
+do
+  case $1 in
+    -d) OPTCSS=$2; shift ;;
+    --) shift; break ;;
+    -?) echo "$cmd: unrecognised option: $1" >&2
+        badopts=1
+        ;;
+    *)  break ;;
+  esac
+  shift
+done
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
 
 [ $# -gt 0 ] || set -- env
 
@@ -29,7 +45,7 @@ esac
 
 if [ ! -s "$OPTCSS/env.sh" ]
 then
-  echo "$0: no $OPTCSS/env.sh, aborting" >&2
+  echo "$cmd: no $OPTCSS/env.sh, aborting" >&2
   exit 1
 fi
 
