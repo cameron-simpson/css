@@ -75,34 +75,6 @@ fi
 
 hg="$trace hg"
 
-# Usage: inhg hgurl command
-inhg()
-{
-  inhg_usage='inhg hgurl command'
-  [ $# -ge 2 ] || { echo "$inhg_usage" >&2; return 2; }
-  inhg_hgurl=$1; shift
-  case "$inhg_hgurl" in
-    ssh://?*/*)
-      inhg_host=`expr "x$inhg_hgurl" : 'xssh://\([^/]*\)/.*'`
-      inhg_path=`expr "x$inhg_hgurl" : 'xssh://[^/]*/\(.*\)'`
-      ;;
-    /*)
-      inhg_host=
-      inhg_path=$inhg_hgurl
-      ;;
-    *)
-      echo "$inhg: unsupported hg url: $inhg_hgurl" >&2
-      return 1
-      ;;
-  esac
-  set -- incd "$inhg_path" "$@"
-  if [ -n "$inhg_host" ]
-  then
-    set -- sshx -n "$inhg_host" /opt/css/bin/with-opt-css "$@"
-  fi
-  $trace "$@"
-}
-
 sync_in()
 {
   [ $# = 2 ] || return 2
