@@ -20,7 +20,7 @@ badopts=
 while [ $# -gt 0 ]
 do
   case "$1" in
-    -)  su_opts="$su_$opts -" ;;
+    -)  su_opts="$su_opts -" ;;
     -c) shcmd=${2:-":"}; shift ;;
     -u) su_user=$2; shift ;;
     --) shift; break ;;
