@@ -7,15 +7,24 @@
 set -ue
 
 cmd=`basename "$0"`
-usage="Usage: $cmd [--python pylibdir pysubtree]..."
 
 main()
 {
+  usage="Usage: $cmd [-v] [-x] [--python pylibdir pysubtree]..."
+
+  trace=${DEBUG:+set-x}
+  vecho=:
+  [ -t 1 ] && vecho=echo
+
   badopts=
 
   while [ $# -gt 0 ]
   do
     case $1 in
+      -x)
+        trace=set-x ;;
+      -v)
+        vecho=echo ;;
       --python)
         pylibdir=$2
         pysubdir=$3
@@ -46,19 +55,27 @@ test_python()
     pylibdir=$1
     pysubdir=$2
 
+    $vecho "syntax check $pylibdir/$pysubdir ..."
     find "$pylibdir/$pysubdir" -type f -name \*.py -print \
     | sort \
     | \
     { xit=0 
       while read -r py 
       do 
-        pfx "$py" env-dev \
-          python -tt -B -m py_compile "$py" \
-        || xit=1 
+        pyc=${py}c
+        if [ "$pyc" -nt "$py" ]
+        then  $vecho "SKIP $py - .pyc newer"
+        else
+          if $trace pfx "$py" env-dev python -tt -m py_compile "$py"
+          then  $vecho "OK $py"
+          else  echo "FAIL $py - bad syntax" >&2; xit=1
+          fi
+        fi
       done 
       return $xit 
     }
 
+    $vecho "unit test $pylibdir/$pysubdir ..."
     find "$pylibdir/$pysubdir" -type f -name \*.py -print \
     | sort \
     | \
@@ -68,8 +85,10 @@ test_python()
         unitest=`sed -n '${/^ *unittest\.main/p;}' "$py"` 
         [ -n "$unitest" ] || continue 
         pym=`expr "x$py" : "x$pylibdir"'/\(.*\).py' | tr / .` 
-        env-dev -x python -tt -B -m "$pym" \
-        || { echo "FAIL: unitest $py" >&2; return 1; } 
+        if $trace env-dev -x python -tt -B -m "$pym"
+        then  $vecho "OK unit test $py"
+        else  echo "FAIL: unitest $py" >&2; return 1
+        fi
       done 
       return $xit 
     }
