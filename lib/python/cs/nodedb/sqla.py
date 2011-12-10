@@ -9,7 +9,7 @@ from sqlalchemy import create_engine, \
                        MetaData, Table, Column, Index, Integer, String, \
                        select
 from sqlalchemy.orm import mapper, sessionmaker
-from sqlalchemy.sql import and_, or_, not_
+from sqlalchemy.sql import and_, or_, not_, asc
 from sqlalchemy.sql.expression import distinct
 from cs.logutils import error, warning
 from . import NodeDB, Backend
