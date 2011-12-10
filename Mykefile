@@ -51,7 +51,17 @@ _help:
 
 _test:
         find lib/python/cs -type f -name \*.py -print \\
-        | env-dev -d '$.' python -tt -B -m py_compile -
+        | sort \\
+        | \\
+        { xit=0 \
+          while read -r py \
+          do \
+            pfx "$$py" env-dev -d '$.' \\
+              python -tt -B -m py_compile "$$py" \\
+            || xit=1 \
+          done \
+          exit $$xit \
+        }
 
 _home:
         skip=`hg status | sed -n 's:^? \(.*\):--exclude=/\1:p'` \
@@ -119,9 +129,6 @@ CHANGELOG.html:	_always
 1INDEX.txt: $(allscripts)
 	@echo make $@ \
          ( cat INSTALL; mkscriptndx `ls -d $(allscripts) | sort` ) >$@
-
-_test:
-	echo $(pmmans)
 
 _man:
         :make _podmans
