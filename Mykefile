@@ -39,6 +39,7 @@ scriptmans = $(scriptmandir)/$((allscripts)).1
 scriptfromman(manf) = $(manf FP)
 
 _help:
+        @echo '_test              - do syntax checks and self tests'
         @echo '_home              - deploy scripts to ~/bin etc'
         @echo '_deploy            - deploy current release to /opt/css'
         @echo '_publish_ezos      - deploy current release to /opt/css, ezos'
@@ -47,6 +48,10 @@ _help:
         @echo '_pending           - report unreleased changelog and [M]odified files'
         @echo '_release           - mark tip as new release'
         @echo '_freshmeat         - announce current release to freshmeat'
+
+_test:
+        find lib/python/cs -type f -name \*.py -print \\
+        | env-dev -d '$.' python -tt -B -m py_compile -
 
 _home:
         skip=`hg status | sed -n 's:^? \(.*\):--exclude=/\1:p'` \
