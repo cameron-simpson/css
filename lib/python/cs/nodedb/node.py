@@ -1476,14 +1476,15 @@ class Backend(_BackendMappingMixin):
   def close(self):
     raise NotImplementedError
 
-  def saveAttrs(self, attrs):
+  def saveAttrs(self, attrlist):
     ''' Save the full contents of this attribute list.
+        (An attrlist knows its source Node).
     '''
-    N = attrs.node
-    attr = attrs.attr
+    N = attrlist.node
+    attr = attrlist.attr
     self.delAttr(N.type, N.name, attr)
-    if attrs:
-      self.extendAttr(N.type, N.name, attr, attrs)
+    if attrlist:
+      self.extendAttr(N.type, N.name, attr, attrlist)
 
   def extendAttr(self, N, attr, values):
     ''' Append values to the named attribute.
