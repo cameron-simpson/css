@@ -11,8 +11,8 @@ from types import StringTypes
 import unittest
 import sys
 from cs.logutils import Pfx, error, warn , info
-from . import NodeDB, Backend
-from .node import TestAll as NodeTestAll
+from . import NodeDB
+from .node import TestAll as NodeTestAll, _NoBackend
 
 def read_csv_file(fp, skipHeaders=False, noHeaders=False):
   ''' Read a CSV file in vertical format (TYPE,NAME,ATTR,VALUE),
@@ -102,7 +102,7 @@ def write_csv_file(fp, nodedata, noHeaders=False):
         attr = ""
         name = ""
 
-class Backend_CSVFile(Backend):
+class Backend_CSVFile(_NoBackend):
 
   def __init__(self, csvpath, readonly=False):
     self.readonly = readonly
@@ -132,22 +132,6 @@ class Backend_CSVFile(Backend):
   def itervalues(self):
     for item in self.iteritems():
       yield item[1]
-
-  def extendAttr(self, t, name, attr, values):
-    assert len(values) > 0
-    pass
-
-  def set1Attr(self, t, name, attr, value):
-    pass
-
-  def delAttr(self, t, name, attr):
-    pass
-
-  def __setitem__(self, key, value):
-    pass
-
-  def __delitem(self, key):
-    pass
 
 class TestAll(NodeTestAll):
 
