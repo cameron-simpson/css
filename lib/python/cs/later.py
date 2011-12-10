@@ -526,8 +526,9 @@ class TestLater(unittest.TestCase):
     now = time.time()
     x = LF1()
     y = LF2()
-    elapsed = time.time() - now
-    self.assert_(elapsed < 3)
+    again = time.time()
+    elapsed = again - now
+    self.assert_(elapsed < 3, "elapsed (%s) >= 3, now = %s, again = %s" % (elapsed, now, again))
 
   def test02three(self):
     # three sleep(2), two in parallel, one delayed
