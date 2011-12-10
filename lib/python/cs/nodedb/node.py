@@ -783,6 +783,12 @@ class NodeDB(dict):
     except KeyError:
       return self.newNode(key)
 
+  @property
+  def _s(self):
+    ''' Return Nodes of type _.
+    '''
+    return self.__nodesByType.get('_', ())
+
   def seq(self):
     ''' Obtain a new sequence number for this NodeDB.
     '''
