@@ -1,0 +1,81 @@
+#!/bin/sh
+#
+# Run self tests.
+#       - Cameron Simpson <cs@zip.com.au> 10dec2011
+#
+
+set -ue
+
+cmd=`basename "$0"`
+usage="Usage: $cmd [--python pylibdir pysubtree]..."
+
+main()
+{
+  badopts=
+
+  while [ $# -gt 0 ]
+  do
+    case $1 in
+      --python)
+        pylibdir=$2
+        pysubdir=$3
+        shift; shift
+        test_python "$pylibdir" "$pysubdir" || return $?
+        ;;
+      --)
+        shift; break ;;
+      -?*)
+        echo "$cmd: unrecognised option: $1" >&2
+        badopts=1
+        ;;
+    esac
+    shift
+  done
+
+  [ $# = 0 ] || { echo "$cmd: extra arguments: $*" >&2; badopts=1; }
+
+  [ $badopts ] && { echo "$usage" >&2; return 2; }
+
+  return 0
+}
+
+test_python()
+{
+  [ $# = 2 ] || { echo "$cmd: Usage: test_python pylibdir pysubdir" >&2; return 2; }
+  (
+    pylibdir=$1
+    pysubdir=$2
+
+    find "$pylibdir/$pysubdir" -type f -name \*.py -print \
+    | sort \
+    | \
+    { xit=0 
+      while read -r py 
+      do 
+        pfx "$py" env-dev \
+          python -tt -B -m py_compile "$py" \
+        || xit=1 
+      done 
+      return $xit 
+    }
+
+    find "$pylibdir/$pysubdir" -type f -name \*.py -print \
+    | sort \
+    | \
+    { xit=0 
+      while read -r py 
+      do 
+        unitest=`sed -n '${/^ *unittest\.main/p;}' "$py"` 
+        [ -n "$unitest" ] || continue 
+        pym=`expr "x$py" : "x$pylibdir"'/\(.*\).py' | tr / .` 
+        env-dev -x python -tt -B -m "$pym" \
+        || { echo "FAIL: unitest $py" >&2; return 1; } 
+      done 
+      return $xit 
+    }
+  )
+
+  return $?
+}
+
+main ${1+"$@"}
