@@ -467,10 +467,10 @@ class TestAll(unittest.TestCase):
   def test00blockifyAndRetrieve(self):
     data = self.fp.read()
     blocks = list(blocksOf([data]))
-    data2 = "".join( b.data() for b in blocks )
+    data2 = "".join( b.data for b in blocks )
     self.assertEqual(len(data), len(data2), "data mismatch: len(data)=%d, len(data2)=%d" % (len(data), len(data2)))
     self.assertEqual(data, data2, "data mismatch: data and data2 same length but contents differ")
-    ##for b in blocks: print "[", b.data(), "]"
+    ##for b in blocks: print "[", b.data, "]"
 
   def test01blockifier(self):
     from cs.venti.cache import MemCacheStore
