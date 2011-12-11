@@ -75,7 +75,7 @@ test_python()
         fi
       done 
       exit $xit 
-    ) || return $?
+    ) || exit $?
 
     $vecho "unit test $pylibdir/$pysubdir ..."
     find "$pylibdir/$pysubdir" -type f -name \*.py -print \
@@ -101,7 +101,7 @@ test_python()
         fi
       done 
       exit $xit 
-    }
+    ) || exit $?
   ) || return $?
 
   return 0
