@@ -62,12 +62,13 @@ test_python()
     { xit=0 
       while read -r py 
       do 
-        pyc=${py}c
-        if [ "$pyc" -nt "$py" ]
-        then  $vecho "SKIP $py - .pyc newer"
+        pyc_state=state/pyc/${py}c
+        if [ "$pyc_state" -nt "$py" ]
+        then  $vecho "SKIP $py - $pyc_state newer"
         else
+          rm -f -- "$pyc_state"
           if $trace pfx "$py" env-dev python -tt -m py_compile "$py"
-          then  $vecho "OK $py"
+          then  $vecho "OK $py"; d=`dirname "$pyc_state"`; mkdir -p "$d"; >>"$pyc_state"
           else  echo "FAIL $py - bad syntax" >&2; xit=1
           fi
         fi
