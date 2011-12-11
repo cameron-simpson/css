@@ -51,6 +51,7 @@ main()
 test_python()
 {
   [ $# = 2 ] || { echo "$cmd: Usage: test_python pylibdir pysubdir" >&2; return 2; }
+
   (
     pylibdir=$1
     pysubdir=$2
@@ -59,7 +60,7 @@ test_python()
     find "$pylibdir/$pysubdir" -type f -name \*.py -print \
     | sort \
     | \
-    { xit=0 
+    ( xit=0 
       while read -r py 
       do 
         pyc_state=state/pyc/$py
@@ -73,14 +74,14 @@ test_python()
           fi
         fi
       done 
-      return $xit 
-    }
+      exit $xit 
+    ) || return $?
 
     $vecho "unit test $pylibdir/$pysubdir ..."
     find "$pylibdir/$pysubdir" -type f -name \*.py -print \
     | sort \
     | \
-    { xit=0 
+    ( xit=0 
       while read -r py 
       do 
         pyu_state=state/pyu/$py
@@ -95,15 +96,15 @@ test_python()
           pym=`expr "x$py" : "x$pylibdir"'/\(.*\).py' | tr / .` 
           if $trace env-dev -x python -tt -B -m "$pym"
           then  $vecho "OK unit test $py"; >>"$pyu_state"
-          else  echo "FAIL: unitest $py" >&2; return 1
+          else  echo "FAIL: unitest $py" >&2; exit 1
           fi
         fi
       done 
-      return $xit 
+      exit $xit 
     }
-  )
+  ) || return $?
 
-  return $?
+  return 0
 }
 
 main ${1+"$@"}
