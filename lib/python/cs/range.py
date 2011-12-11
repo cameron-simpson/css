@@ -416,7 +416,7 @@ class TestAll(unittest.TestCase):
     R1 = Range(self.items1)
     R2 = R1.copy()
     R2._check()
-    self.assertIsNot(R1, R2)
+    self.assert_(R1 is not R2, "R1 is R2")
     self.assertEqual(R1, R2)
     self.assertEqual(R1._spans, R2._spans)
     self.assertEqual(list(R1.spans()), list(R2.spans()))
@@ -508,7 +508,7 @@ class TestAll(unittest.TestCase):
     self.assertEqual(list(R4), self.items1xor2)
     self.assertEqual(list(list(R4.spans())), self.spans1xor2)
     self.assertEqual(R4, R3)
-    self.assertIsNot(R4, R3)
+    self.assert_(R4 is not R3, "R4 is R3")
 
 if __name__ == '__main__':
   unittest.main()
