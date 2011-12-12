@@ -1,15 +1,120 @@
 #!/usr/bin/python
 #
-# Parse the $x and $(x) syntaxes.
-#       - Cameron Simpson <cs@zip.com.au> 12dec2011
-#
 
+from collections import namedtuple
 import re
 import unittest
-from .lex import ParseError, FileContext
+from cs.logutils import error, Pfx
+
+# match
+#  identifier =
+# or
+#  identifier(param[,param...]) =
+#
+RE_ASSIGNMENT = re.compile( r'^\s*([A-Za-z_]\w*)(\([A-Za-z_]\w*(\s*,\s*[A-Za-z_]\w*)*\s*\))?\s*=' )
+
+RE_COMMASEP = re.compile( r'\s*,\s*' )
 
 RE_WHITESPACE = re.compile( r'\s+' )
+
+# text that isn't whitespace or a macro
+# in target definitions RE_PLAINTEXT_NOCOLON is used
 RE_PLAINTEXT = re.compile( r'[^\s$]+' )
+RE_PLAINTEXT_NO_COLON = re.compile( r'[^\s$:]+' )
+
+FileContext = namedtuple('FileContext', 'filename lineno text parent')
+
+class ParseError(SyntaxError):
+  ''' A ParseError subclasses SyntaxError in order to change the initialiser.
+      This object has an additional attribute .context for the relevant FileContext
+      (which has a .parent attribute).
+  '''
+
+  def __init__(self, context, offset, message):
+    ''' Initialise a ParseError given a FileContext and the offset into `context.text`.
+    '''
+    self.msg = message
+    self.filename = context.filename
+    self.lineno = context.lineno
+    self.text = context.text
+    self.offset = offset
+    self.context = context
+
+def parseMakefile(fp, parent_context=None):
+  ''' Read a Mykefile and yield MacroDefinitions and Targets.
+  '''
+  if type(fp) is str:
+    # open file, yield contents
+    filename = fp
+    with open(filename) as fp:
+      for O in parseMakefile(fp, parent_context):
+        yield O
+    return
+
+  try:
+    filename = fp.name
+  except AttributeError:
+    filename = str(fp)
+
+  with Pfx(filename):
+    ok = True
+    target = None       # not in a target
+    ifStack = []        # active ifStates (state, firstbranch)
+    ifState = None      # ifStack[-1]
+    context = None      # FileContext(filename, lineno, line)
+
+    lineno = 0
+    prevline = None
+    for line in fp:
+      lineno += 1
+      if prevline is not None:
+        # prepend previous continuation line if any
+        line = prevline + '\n' + line
+        prevline = None
+      else:
+        # start of line - new context
+        context = FileContext(filename, lineno, line, parent_context)
+
+      if not line.endswith('\n'):
+        raise ParseError(context, len(line), 'unexpected EOF (missing final newline)')
+
+      if line.endswith('\\\n'):
+        # continuation line - gather next line before parse
+        prevline = line[:-2]
+        continue
+
+      if line.startswith(':'):
+        raise NotImplementedError, "directives unimplemented"
+
+      if target:
+        if not line[0].isspace():
+          # new target or unindented assignment etc - fall through
+          yield target
+          target = None
+        else:
+          line = line.strip()
+          if line.startswith(':'):
+            # in-target directive like ":make"
+            raise NotImplementedError, "in-target directives unimplemented"
+          else:
+            target.addAction(context, line)
+          continue
+
+      assert not target, "expected target is None, but target = %s" % (target,)
+
+      m = RE_ASSIGNMENT.match(line)
+      if m:
+        yield MacroDefinition(context, name=m.group(1), params=RE_COMMASEP.split(m.group(1)))
+        continue
+
+      raise ParseError(context, 0, 'unparsed line')
+
+    if prevline is not None:
+      # incomplete continuation line
+      error("unexpected EOF: unterminated slosh continued line")
+
+  if target:
+    yield target
 
 # mapping of special macro names to evaluation functions
 SPECIAL_MACROS = { '.':         None,
@@ -127,18 +232,18 @@ def parseMacro(context, offset=0):
       else:
         offset += 1
 
-    return Macro(context, mtext, modifiers, mpermute), offset
+    return MacroTerm(context, mtext, modifiers, mpermute), offset
 
   # $x
   ch = s[offset]
   if ch == '_' or ch.isalnum() or ch in SPECIAL_MACROS:
     offset += 1
-    return Macro(context, ch), offset
+    return MacroTerm(context, ch), offset
 
   raise ParseError(context, offset, 'unknown special macro name "%s"' % (ch,))
 
-class Macro(object):
-  ''' A macro.
+class MacroTerm(object):
+  ''' A macro use.
   '''
 
   def __init__(self, context, text, modifiers=(), permute=False):
@@ -169,8 +274,7 @@ class Macro(object):
 class TestAll(unittest.TestCase):
 
   def setUp(self):
-    from .lex import FileContext
-    self.context = FileContext('<unittest>', 1, None, '<dummy-text>')
+    pass
 
   def tearDown(self):
     pass
@@ -183,12 +287,16 @@ class TestAll(unittest.TestCase):
     self.assertEqual(offset, 2)
     self.assertEqual(str(M), '$.')
 
-  def test10parsePlainText(self):
+  def test10parseMacroExpr_PlainText(self):
     self.assertEquals(parseMacroExpression(''),  ([], 0))
     self.assertEquals(parseMacroExpression('x'), (['x'], 1))
     self.assertEquals(parseMacroExpression(' '), ([' '], 1))
     self.assertEquals(parseMacroExpression('x y'), (['x', ' ', 'y'], 3))
     self.assertEquals(parseMacroExpression('abc  xyz'), (['abc', '  ', 'xyz'], 8))
+
+  def test20parseMakeLines(self):
+    from StringIO import StringIO
+    assert False, str(list(parseMakefile(StringIO("abc = def\n"))))
 
 if __name__ == '__main__':
   unittest.main()
