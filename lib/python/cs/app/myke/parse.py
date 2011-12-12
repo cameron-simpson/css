@@ -40,8 +40,23 @@ class ParseError(SyntaxError):
     self.offset = offset
     self.context = context
 
+class Macro(object):
+  ''' A macro definition.
+  '''
+
+  def __init__(self, context, name, params, text):
+    self.context = context
+    self.name = name
+    self.params = params
+    self.text = text
+
+  def __str__(self):
+    if self.params:
+      return "<Macro %s(%s) = %s>" % (self.name, ", ".join(self.params), self.text)
+    return "<Macro %s = %s>" % (self.name, self.text)
+
 def parseMakefile(fp, parent_context=None):
-  ''' Read a Mykefile and yield MacroDefinitions and Targets.
+  ''' Read a Mykefile and yield Macros and Targets.
   '''
   if type(fp) is str:
     # open file, yield contents
@@ -104,7 +119,7 @@ def parseMakefile(fp, parent_context=None):
 
       m = RE_ASSIGNMENT.match(line)
       if m:
-        yield MacroDefinition(context, name=m.group(1), params=RE_COMMASEP.split(m.group(1)))
+        yield Macro(context, m.group(1), RE_COMMASEP.split(m.group(1)), line[m.end():])
         continue
 
       raise ParseError(context, 0, 'unparsed line')
@@ -267,7 +282,7 @@ class MacroTerm(object):
     return '$%s%s%s%s%s' % ( ( '((' if self.permute else '(' ),
                              text,
                              ( ' ' if modifiers else '' ),
-                             ''.join(modifiers)
+                             ''.join(modifiers),
                              ( '))' if self.permute else ')' ),
                            )
 
