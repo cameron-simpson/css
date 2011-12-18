@@ -5,7 +5,6 @@ else:
   from sha import new as sha1
 if sys.hexversion < 0x02060000:
   bytes = str
-import unittest
 from cs.lex import hexify
 
 # enums for hash types, used in encode/decode
@@ -55,20 +54,6 @@ class Hash_SHA1(bytes):
     assert len(hashcode) == cls.hashlen, "encdata (%d bytes) too short" % (len(encdata),)
     return cls.fromHashcode(hashcode), encdata[cls.hashlen:]
 
-class TestAll(unittest.TestCase):
-  def setUp(self):
-    import random
-    random.seed()
-  def testSHA1(self):
-    import random
-    for _ in range(10):
-      rs = ''.join( chr(random.randint(0, 255)) for _ in range(100) )
-      H = Hash_SHA1.fromData(rs)
-      self.assertEqual( sha1(rs).digest(), H )
-      Hencode = H.encode()
-      H2, etc = Hash_SHA1.decode(Hencode)
-      self.assertEqual(len(etc), 0)
-      self.assertEqual(H, H2)
-
 if __name__ == '__main__':
-  unittest.main()
+  import cs.venti.hash_tests
+  cs.venti.hash_tests.selftest(sys.argv)
