@@ -69,8 +69,8 @@ test_python()
         else
           rm -f -- "$pyc_state"
           if $trace pfx "$py" env-dev python -tt -m py_compile "$py"
-          then  $vecho "OK $py"; d=`dirname "$pyc_state"`; mkdir -p "$d"; >>"$pyc_state"
-          else  echo "FAIL $py - bad syntax" >&2; xit=1
+          then  $vecho "OK syntax $py"; d=`dirname "$pyc_state"`; mkdir -p "$d"; >>"$pyc_state"
+          else  echo "FAIL syntax $py" >&2; xit=1
           fi
         fi
       done 
@@ -95,7 +95,7 @@ test_python()
           rm -f "$pyu_state"
           pym=`expr "x$py" : "x$pylibdir"'/\(.*\).py' | tr / .` 
           if $trace env-dev -x python -tt -B -m "$pym"
-          then  $vecho "OK unit test $py"; >>"$pyu_state"
+          then  $vecho "OK unittest $py"; >>"$pyu_state"
           else  echo "FAIL: unitest $py" >&2; exit 1
           fi
         fi
