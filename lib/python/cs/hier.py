@@ -4,7 +4,7 @@ import re
 import os
 import os.path
 from cStringIO import StringIO
-import unittest
+import sys
 from cs.lex import lastlinelen
 import cs.io
 from cs.misc import DictUC_Attrs, T_SEQ, T_MAP, T_SCALAR, objFlavour as flavour
@@ -398,20 +398,6 @@ class HierInput(_Hier):
 
     return (dict,s[1:])
 
-class TestHier(unittest.TestCase):
-
-  def setUp(self):
-    pass
-
-  def tearDown(self):
-    pass
-
-  def _testLoad(self, text, D):
-    H = loadfp( StringIO(text) )
-    self.assertEquals(H, D)
-
-  def test01load(self):
-    self._testLoad( "A 1\nB 2\n", { "A": 1, "B": 2} )
-
 if __name__ == '__main__':
-  unittest.main()
+  import cs.hier_tests
+  cs.hier_tests.selftest(sys.argv)
