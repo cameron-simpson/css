@@ -7,7 +7,6 @@
 import sys
 import logging
 import traceback
-import unittest
 from cs.logutils import log, warning, exception, error
 
 def return_exc_info(func, *args, **kwargs):
@@ -85,28 +84,6 @@ class NoExceptions(object):
   # backward compatible static method arrangement
   simpleExceptionReport = staticmethod(simpleExceptionReport)
 
-class TestExcUtils(unittest.TestCase):
-
-  def test00return_exc_info(self):
-    def divfunc(a, b):
-      return a/b
-    retval, exc_info = return_exc_info(divfunc, 4, 2)
-    self.assertEquals(retval, 2)
-    self.assertTrue(exc_info is None)
-    retval, exc_info = return_exc_info(divfunc, 4, 0)
-    self.assertTrue(retval is None)
-    self.assertTrue(exc_info[0] is ZeroDivisionError)
-
-  def test00returns_exc_info(self):
-    @returns_exc_info
-    def divfunc(a, b):
-      return a/b
-    retval, exc_info = divfunc(4, 2)
-    self.assertEquals(retval, 2)
-    self.assertTrue(exc_info is None)
-    retval, exc_info = divfunc(4, 0)
-    self.assertTrue(retval is None)
-    self.assertTrue(exc_info[0] is ZeroDivisionError)
-
 if __name__ == '__main__':
-  unittest.main()
+  import cs.excutils_tests
+  cs.excutils_tests.selftest(sys.argv)
