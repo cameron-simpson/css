@@ -90,7 +90,7 @@ test_python()
         else
           d=`dirname "$pyu_state"`; [ -d "$d" ] || mkdir -p "$d"
           >>"$pyu_state"
-          unitest=`sed -n '${/^ *unittest\.main/p;}' "$py"` 
+          unitest=`sed -n '${/^ *unittest\.main(/p;/^ *selftest(/p;}' "$py"` 
           [ -n "$unitest" ] || continue 
           rm -f "$pyu_state"
           pym=`expr "x$py" : "x$pylibdir"'/\(.*\).py' | tr / .` 
