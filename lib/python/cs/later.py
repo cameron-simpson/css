@@ -183,7 +183,7 @@ class LateFunction(object):
       notifiers = list(self._join_notifiers)
     self.later.capacity.release()
     self.later.running.remove(self)
-    self.later.info("completed %s", self)
+    self.later.debug("completed %s", self)
     for notifier in notifiers:
       notifier(self)
     with self._join_cond:
@@ -288,14 +288,20 @@ class Later(object):
            % (self.name,
               len(self.pending), len(self.running), len(self.delayed))
 
-  def logTo(self, filename, logger=None):
+  def logTo(self, filename, logger=None, log_level=None):
+    ''' Log to the file specified by `filename` using the specified
+        logger named `logger` (default the module name, cs.later) at the
+        specified log level `log_level` (default logging.INFO).
+    '''
     import logging
     import cs.logutils
     if logger is None:
       logger = self.__module__
+    if log_level is None:
+      log_level = logging.INFO
     logger, handler = cs.logutils.logTo(filename, logger=logger)
     handler.setFormatter(logging.Formatter("%(asctime)-15s %(later_name)s %(message)s"))
-    logger.setLevel(logging.INFO)
+    logger.setLevel(log_level)
     self.logger = logger
 
   def error(self, *a, **kw):
@@ -312,6 +318,11 @@ class Later(object):
     if self.logger:
       kw.setdefault('extra', {}).update(later_name = str(self))
       self.logger.info(*a, **kw)
+
+  def debug(self, *a, **kw):
+    if self.logger:
+      kw.setdefault('extra', {}).update(later_name = str(self))
+      self.logger.debug(*a, **kw)
 
   def __del__(self):
     if not self.closed:
@@ -348,7 +359,7 @@ class Later(object):
       LF = pri_entry[-1]
       self.pending.remove(LF)
       self.running.add(LF)
-      self.info("dispatched %s", LF)
+      self.debug("dispatched %s", LF)
       LF._dispatch()
 
   def ready(self, **kwargs):
@@ -390,7 +401,7 @@ class Later(object):
     if when is None or when <= now:
       # queue the request now
       self.pending.add(LF)
-      self.info("queuing %s", LF)
+      self.debug("queuing %s", LF)
       self._LFPQ.put( pri_entry )
     else:
       # queue the request at a later time
@@ -398,13 +409,13 @@ class Later(object):
         LF = pri_entry[-1]
         self.delayed.remove(LF)
         self.pending.add(LF)
-        self.info("queuing %s after delay", LF)
+        self.debug("queuing %s after delay", LF)
         self._LFPQ.put( pri_entry )
       with self._lock:
         if self._timerQ is None:
           self._timerQ = TimerQueue(name="<TimerQueue %s._timerQ>"%(self.name))
       self.delayed.add(LF)
-      self.info("delay %s until %s", LF, when)
+      self.debug("delay %s until %s", LF, when)
       self._timerQ.add(when, queueFunc)
 
     return LF
