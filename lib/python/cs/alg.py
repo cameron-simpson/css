@@ -5,7 +5,6 @@
 #
 
 from types import StringTypes
-import unittest
 
 def collate(seq, attr, select=None):
   ''' Collate members of a sequence by some attribute.
@@ -27,29 +26,7 @@ def collate(seq, attr, select=None):
 
   return collation
 
-class TestExcUtils(unittest.TestCase):
-
-  class Klass(object):
-    def __init__(self, a, b):
-      self.a = a
-      self.b = b
-
-  def test00nothing(self):
-    self.assertEqual(collate( (), 'foo' ), {})
-
-  def test01badAttr(self):
-    O = self.Klass(1,2)
-    self.assertRaises(AttributeError, collate, (O,), 'foo' )
-
-  def test02basic(self):
-    O1 = self.Klass(1,2)
-    O2 = self.Klass(3,4)
-    self.assertEqual( collate((O1, O2), 'a'), {1: [O1], 3: [O2]} )
-
-  def test02basic(self):
-    O1 = self.Klass(1,2)
-    O2 = self.Klass(3,4)
-    self.assertEqual( collate((O1, O2), 'a'), {1: [O1], 3: [O2]} )
-
 if __name__ == '__main__':
-  unittest.main()
+  import sys
+  import cs.alg_tests
+  cs.alg_tests.selftest(sys.argv)
