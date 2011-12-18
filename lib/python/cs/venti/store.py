@@ -17,9 +17,9 @@ from functools import partial
 from binascii import hexlify
 import os
 import os.path
+import sys
 from thread import allocate_lock
 from threading import Thread
-import unittest
 from Queue import Queue
 from cs.later import Later
 from cs.logutils import info, debug, warning, Pfx
@@ -378,18 +378,6 @@ def encodeIndexEntry(n, offset):
   '''
   return toBS(n) + toBS(offset)
 
-class TestAll(unittest.TestCase):
-  def setUp(self):
-    import random
-    random.seed()
-  def testIndexEntry(self):
-    import random
-    for count in range(100):
-      rand_n = random.randint(0, 65536)
-      rand_offset = random.randint(0, 65536)
-      n, offset = decodeIndexEntry(encodeIndexEntry(rand_n, rand_offset))
-      self.assertEqual(rand_n, n)
-      self.assertEqual(rand_offset, offset)
-
 if __name__ == '__main__':
-  unittest.main()
+  import cs.venti.store_tests
+  cs.venti.store_tests.selftest(sys.argv)
