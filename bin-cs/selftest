@@ -14,7 +14,7 @@ main()
 
   trace=${DEBUG:+set-x}
   vecho=:
-  [ -t 1 ] && vecho=echo
+  ##[ -t 1 ] && vecho=echo
 
   badopts=
 
