@@ -9,7 +9,6 @@ from thread import allocate_lock
 from threading import Thread, Condition
 from Queue import Queue
 import time
-import unittest
 from cs.threads import AdjustableSemaphore, IterablePriorityQueue, \
                        WorkerThreadPool, TimerQueue
 from cs.misc import seq
@@ -183,7 +182,7 @@ class LateFunction(object):
       notifiers = list(self._join_notifiers)
     self.later.capacity.release()
     self.later.running.remove(self)
-    self.later.info("completed %s", self)
+    self.later.debug("completed %s", self)
     for notifier in notifiers:
       notifier(self)
     with self._join_cond:
@@ -288,14 +287,20 @@ class Later(object):
            % (self.name,
               len(self.pending), len(self.running), len(self.delayed))
 
-  def logTo(self, filename, logger=None):
+  def logTo(self, filename, logger=None, log_level=None):
+    ''' Log to the file specified by `filename` using the specified
+        logger named `logger` (default the module name, cs.later) at the
+        specified log level `log_level` (default logging.INFO).
+    '''
     import logging
     import cs.logutils
     if logger is None:
       logger = self.__module__
+    if log_level is None:
+      log_level = logging.INFO
     logger, handler = cs.logutils.logTo(filename, logger=logger)
     handler.setFormatter(logging.Formatter("%(asctime)-15s %(later_name)s %(message)s"))
-    logger.setLevel(logging.INFO)
+    logger.setLevel(log_level)
     self.logger = logger
 
   def error(self, *a, **kw):
@@ -312,6 +317,11 @@ class Later(object):
     if self.logger:
       kw.setdefault('extra', {}).update(later_name = str(self))
       self.logger.info(*a, **kw)
+
+  def debug(self, *a, **kw):
+    if self.logger:
+      kw.setdefault('extra', {}).update(later_name = str(self))
+      self.logger.debug(*a, **kw)
 
   def __del__(self):
     if not self.closed:
@@ -348,7 +358,7 @@ class Later(object):
       LF = pri_entry[-1]
       self.pending.remove(LF)
       self.running.add(LF)
-      self.info("dispatched %s", LF)
+      self.debug("dispatched %s", LF)
       LF._dispatch()
 
   def ready(self, **kwargs):
@@ -390,7 +400,7 @@ class Later(object):
     if when is None or when <= now:
       # queue the request now
       self.pending.add(LF)
-      self.info("queuing %s", LF)
+      self.debug("queuing %s", LF)
       self._LFPQ.put( pri_entry )
     else:
       # queue the request at a later time
@@ -398,13 +408,13 @@ class Later(object):
         LF = pri_entry[-1]
         self.delayed.remove(LF)
         self.pending.add(LF)
-        self.info("queuing %s after delay", LF)
+        self.debug("queuing %s after delay", LF)
         self._LFPQ.put( pri_entry )
       with self._lock:
         if self._timerQ is None:
           self._timerQ = TimerQueue(name="<TimerQueue %s._timerQ>"%(self.name))
       self.delayed.add(LF)
-      self.info("delay %s until %s", LF, when)
+      self.debug("delay %s until %s", LF, when)
       self._timerQ.add(when, queueFunc)
 
     return LF
@@ -487,101 +497,6 @@ def report(LFs):
   for i in range(n):
     yield Q.get()
 
-class TestLater(unittest.TestCase):
-
-  @staticmethod
-  def _f(x):
-    return x*2
-  @staticmethod
-  def _delay(n):
-    time.sleep(n)
-    return n
-  class _Bang(BaseException):
-    pass
-  @staticmethod
-  def _bang():
-    raise TestLater._Bang()
-
-  def setUp(self):
-    self.L = Later(2)
-    self.L.logTo("/dev/tty")
-
-  def tearDown(self):
-    self.L.close()
-
-  def test00one(self):
-    # compute 3*2
-    L = self.L
-    F = partial(self._f, 3)
-    LF = L.defer(F)
-    x = LF()
-    self.assertEquals(x, 6)
-
-  def test01two(self):
-    # two sleep(2) in parallel
-    L = self.L
-    F = partial(self._delay, 2)
-    LF1 = L.defer(F)
-    LF2 = L.defer(F)
-    now = time.time()
-    x = LF1()
-    y = LF2()
-    again = time.time()
-    elapsed = again - now
-    self.assert_(elapsed < 3, "elapsed (%s) >= 3, now = %s, again = %s" % (elapsed, now, again))
-
-  def test02three(self):
-    # three sleep(2), two in parallel, one delayed
-    L = self.L
-    F = partial(self._delay, 2)
-    LF1 = L.defer(F)
-    LF2 = L.defer(F)
-    LF3 = L.defer(F)
-    now = time.time()
-    x = LF1()
-    y = LF2()
-    z = LF3()
-    elapsed = time.time() - now
-    self.assert_(elapsed >= 4)
-
-  def test03calltwice(self):
-    # compute once, get result twice
-    L = self.L
-    F = partial(self._f, 5)
-    LF = L.defer(F)
-    x = LF()
-    self.assertEquals(x, 10)
-    y = LF()
-    self.assertEquals(y, 10)
-
-  def test04raise(self):
-    # raise exception
-    LF = self.L.defer(self._bang)
-    self.assertRaises(TestLater._Bang, LF)
-
-  def test05raiseTwice(self):
-    # raise exception again
-    LF = self.L.defer(self._bang)
-    self.assertRaises(TestLater._Bang, LF)
-    self.assertRaises(TestLater._Bang, LF)
-
-  def test06partial(self):
-    # compute 7*2 using .partial()
-    LF = self.L.partial(self._f, 7)
-    x = LF()
-    self.assertEquals(x, 14)
-
-  def test07report(self):
-    with Later(3) as L3:
-      LF1 = L3.partial(self._delay, 3)
-      LF2 = L3.partial(self._delay, 2)
-      LF3 = L3.partial(self._delay, 1)
-      results = [ LF() for LF in report( (LF1, LF2, LF3) ) ]
-      self.assertEquals(results, [1, 2, 3])
-
-  def test08delay(self):
-    with Later(3) as L3:
-      LF1 = L3
-
 if __name__ == '__main__':
-  unittest.main()
+  import cs.later_tests
+  cs.later_tests.selftest(sys.argv)
