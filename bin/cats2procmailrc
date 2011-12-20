@@ -23,7 +23,8 @@
 #
 #       folder  tag     pattern
 #
-# Raw procmailrc(5) clauses are also supported for less trivial rules and also an inclusion syntax.
+# Raw procmailrc(5) clauses are also supported for less trivial rules
+# and also an inclusion syntax.
 #
 # I build my B<.procmailrc> like this:
 #
@@ -57,8 +58,10 @@
 #
 # Continue mode.
 # Alters the semantics of the generated rules.
-# Default mode is to stop filing when a matching rule is found unless it commences with a "+".
-# In continue mode, file continues after a rule match unless the rule commences with an "=".
+# Default mode is to stop filing when a matching rule is found unless
+# it commences with a "+".
+# In continue mode, file continues after a rule match unless the rule
+# commences with an "=".
 #
 # =item B<-d> I<dirpath>
 #
@@ -78,7 +81,8 @@
 #
 # =item B<-m> I<maildomains>
 #
-# A comma separated list of default mail domain for rule addresses lacking an B<@I<domain>>.
+# A comma separated list of default mail domain for rule addresses
+# lacking an B<@I<domain>>.
 # The default comes from the environment variable B<$MAILDOMAIN>.
 #
 # =item B<-S>
@@ -109,7 +113,8 @@
 #
 # =back
 #
-# The optional argument B<LOG=>I<value> will be prepended to the start of recipe actions.
+# The optional argument B<LOG=>I<value> will be prepended to the start
+# of recipe actions.
 # This can be a useful adjunct to the LOGABSTRACT facility in procmail.
 #
 # If no I<category-files> are supplied, standard input is used.
@@ -121,7 +126,8 @@
 # Lines ending in a slosh ('\\') are continued to the next line,
 # keeping the newline and discarding the slosh.
 #
-# Blank lines and lines beginning with an octothorpe ('#') are passed through unchanged.
+# Blank lines and lines beginning with an octothorpe ('#') are passed
+# through unchanged.
 #
 # Lines of the form:
 #
@@ -130,8 +136,8 @@
 # are passed through unchanged.
 #
 # Lines beginning with a colon (':') introduce a raw procmail recipe,
-# and this line through to the first line commencing with a closing curly bracket ('}')
-# are passed through unchanged.
+# and this line through to the first line commencing with a closing curly
+# bracket ('}') are passed through unchanged.
 #
 # Lines of the form:
 #
@@ -180,8 +186,10 @@
 # Otherwise the I<target> names a mail folder in which to place the mail item.
 # Normal UNIX mail files,
 # MH style directories and Maildir style directories are autodetetected.
-# If the folder does not yet exist, the folder type specified by the B<-m> option is used.
-# Relative folder names are considered to be in the directory specified by the B<$MAILDIR> environment variable.
+# If the folder does not yet exist, the folder type specified by the B<-m>
+# option is used.
+# Relative folder names are considered to be in the directory specified
+# by the B<$MAILDIR> environment variable.
 #
 # The I<tag> is placed at the start of the message's B<Subject> line for ready recognition in mixed folders
 # unless the B<-L> option is used,
@@ -192,15 +200,16 @@
 # All the patterns in a rule must match the mail item for the rule to apply.
 # The special pattern "B<.>" always matches.
 #
-# The I<folder> or I<who@where> or I<|shell-command> may be enclosed in double quotes
-# if desired,
+# The I<folder> or I<who@where> or I<|shell-command> may be enclosed in
+# double quotes if desired,
 # for example if the folder name or program invocation contains whitespace.
 # Note that the quotes must not enclose the leading "B<+>" or "B<!>".
 #
 # Substrings of the form "B<{{I<WORD>}}>" are replaced
 # with macro values of the same name if defined.
 # Any environment variable of the form B<$CATS2PROCMAILRC_>I<WORD>
-# prepopulates the macros a macro called I<WORD> containing the value of the environment variable.
+# prepopulates the macros a macro called I<WORD> containing the value
+# of the environment variable.
 # I<WORD> must match the regexp B<^[A-Z][A-Z_0-9]*$>.
 # Further or overriding macros may be specified with the B<-D> option.
 #
@@ -221,7 +230,8 @@
 #       crypto  AUCrypto        aucrypto@suburbia.net
 #
 # matching B<cs@zip.com.au>, B<cameron@cskk.homeip.net>, B<cafe-news@eff.org>
-# and B<aucrypto@suburbia.net> respectively. The "Personal" items generate an alert.
+# and B<aucrypto@suburbia.net> respectively. The "Personal" items generate
+# an alert.
 #
 # It is also possible to select on a different header line
 # by prefixing the I<pattern> string with a header name, viz:
@@ -246,7 +256,8 @@
 #       +fred@that.isp.com . fred@this.isp.com
 #       fredmail Fred fred@this.isp.com
 #
-# to accept mail aimed at B<fred@this.isp.com> and also copy it to B<fred@that.isp.com>.
+# to accept mail aimed at B<fred@this.isp.com> and also copy it to
+# B<fred@that.isp.com>.
 # This could also be written:
 #
 #       +fred@that.isp.com,fredmail . fred@this.isp.com
@@ -262,9 +273,9 @@
 #                                 from:{{KNOWN}}
 #
 # This rule matches email to me from people I know, filing it with an alert action.
-# The variables B<$CATS2PROCMAILRC_ME> and B<$CATS2PROCMAILRC_KNOWN> are constructed
-# in advance to match these addresses; the former from my mutt B<alternates> line
-# and the latter from my mail alias file.
+# The variables B<$CATS2PROCMAILRC_ME> and B<$CATS2PROCMAILRC_KNOWN> are
+# constructed in advance to match these addresses; the former from my mutt
+# B<alternates> line and the latter from my mail alias file.
 #
 # A pattern that always fires:
 #
@@ -301,7 +312,7 @@ import re
 if sys.hexversion < 0x02060000: from sets import Set as set
 import cs.misc
 from cs.mailAddresses import loadAddresses, addrsRegexp
-from cs.logutils import setup_logging, Pfx, error, warn, info
+from cs.logutils import setup_logging, Pfx, error, warning, info, debug
 
 assign_re=re.compile(r'[a-z]\w+=', re.I)
 target_re=re.compile(r'("[^"]*"|[^",\s]+)')
@@ -503,7 +514,7 @@ class C2P(object):
     global assign_re, target_re, hdrlist_re
     ok = True
     with Pfx(ifp.name):
-      info(ifp.name)
+      info("%s ...", ifp.name)
       lineno=0
       oline=None
       while True:
@@ -531,7 +542,7 @@ class C2P(object):
           if len(line) == 0 or line[0] == '#':
             continue
 
-          info(line)
+          debug("%s", line)
           line0=line
           ruledesc="%s: %s" % (ifp.name, line.replace('\n','; '))
           if len(ruledesc) > 200:
@@ -604,11 +615,11 @@ class C2P(object):
             elif line[0] == '+':
               doContinue=True
               if self.modeContinue:
-                warn("redundant '+' in continue mode")
+                warning("redundant '+' in continue mode")
             elif line[0] == '=':
               doContinue=False
               if not self.modeContinue:
-                warn("redundant '=' in first match mode")
+                warning("redundant '=' in first match mode")
             else:
               assert "unhandled !/+ flag: "+line[0]
             line=line[1:]
