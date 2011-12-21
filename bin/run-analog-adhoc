@@ -1,0 +1,176 @@
+#!/bin/sh
+#
+# Run an ad hoc analog report in the current directory for the specified
+# logs.
+#       - Cameron Simpson <cs@zip.com.au> 21dec2011
+#
+
+set -ue
+
+trace=set-x
+
+cmd=`basename "$0"`
+usage="Usage: $cmd base-analog.conf vhostname [/regexp/...] [[user@]host:]logfiles... PARAM=..."
+
+tmpbase=./.$cmd.$$
+trap 'rm -f "$tmpbase".*; exit 1' 1 3 15
+trap 'rm -f "$tmpbase".*' 0
+
+cfg=$tmpbase.cfg
+params_patch=$tmpbase.params
+reportdir=report
+# logs/hostname/path/files
+logs=logs/*/*/*
+imagesdir=$reportdir/images
+grepped=$tmpbase.grepped
+
+badopts=
+
+base_config=
+if [ $# = 0 ]
+then
+  echo "$cmd: missing base-analog.conf" >&2
+  badopts=1
+else
+  base_config=$1
+  shift
+  if [ ! -f "$base_config" ]
+  then
+    echo "$cmd: missing base analog.conf: $base_config" >&2
+    badopts=1
+  fi
+fi
+
+vhostname=
+if [ $# = 0 ]
+then
+  echo "$cmd: missing vhostname" >&2
+  badopts=1
+else
+  case $1 in
+    *.*)  vhostname=$1 ;;
+    *)    echo "$cmd: bad vhostname: $1" >&2; badopts=1 ;;
+  esac
+  shift
+fi
+
+[ -d "$reportdir" ] || set-x mkdir "$reportdir"
+
+egrep=
+egrepsep=
+while [ $# -gt 0 ]
+do
+  case $1 in
+    /*/)
+      regexp=`expr "x$1" : 'x/\(.*\)/'`
+      egrep=$egrep$egrepsep$regexp
+      egrepsep='|'
+      ;;
+    *)break ;;
+  esac
+  shift
+done
+
+{
+  echo "HOSTNAME \"$vhostname\""
+  echo "OUTFILE $reportdir/index.html"
+  echo "IMAGEDIR $imagesdir"
+  echo "REQFLOOR 1r"
+  echo "DNS LOOKUP"
+  echo "DNSBADHOURS 2000"
+} >"$params_patch"
+
+# gather log files
+echo "at logfiles: $*" >&2
+while [ $# -gt 0 ]
+do
+  case $1 in
+    [A-Z]*=*)
+      echo "$1" | sed 's/=/ /' >>"$params_patch"
+      ;;
+    /*)
+      logptn=$1
+      loghost=localhost
+      logptnbase=`basename "$logptn"`
+      logpathdir=`dirname "$logptn"`
+      logpathdir__=`echo "$logpathdir" | tr / _`
+      if [ -n "$egrep" ]
+      then
+        for logfile in $logptn
+        do
+          [ -s "$logfile" ] || { echo "$cmd: skip missing $logfile" >&2
+                                 continue
+                               }
+          case "$logfile" in
+            *.gz)       gunzip <"$logfile" | egrep "$egrep" ;;
+            *)          egrep "$egrep" <"$logfile" ;;
+          esac
+        done \
+        | tee -a "$reportdir/grepped-$logpathdir__@$loghost.log" \
+        >>"$grepped"
+      else
+        logdir=logs/$loghost/$logpathdir__
+        [ ! -d "$logdir" ] || set-x rmr "$logdir"
+        set-x mkdir -p "$logdir"
+        $trace ln -s $logptn "$logdir/."
+        echo "LOGFILE \"$logdir/$logptnbase\"" >>"$params_patch"
+      fi
+      ;;
+    [a-z]*:/* )
+      loghost=`expr "x$1" : 'x\([^:]*\):/.*'`
+      logptn=`expr "x$1" : 'x[^:]*:\(/.*\)'`
+      logsubdir=$loghost
+      logptnbase=`basename "$logptn"`
+      logpathdir=`dirname "$logptn"`
+      logpathdir__=`echo "$logpathdir" | tr / _`
+      if [ -n "$egrep" ]
+      then
+        ssh "$loghost" "
+          exec 3>&1 1>&2
+          for logfile in $logptn
+          do
+            [ -s \"\$logfile\" ] || { echo \"$cmd: skip missing \$logfile\" >&2
+                                      continue
+                                    }
+            echo \"$loghost: \$logfile...\" >&2
+            case \"\$logfile\" in
+              *.gz)       gunzip <\"\$logfile\" | egrep '$egrep' >&3 ;;
+              *)          egrep '$egrep' <\"\$logfile\" >&3 ;;
+            esac
+          done
+         " \
+         | tee -a "$reportdir/grepped-$logpathdir__@$loghost.log" \
+         >>"$grepped" || :
+      else
+        logdir=logs/$loghost/$logpathdir__
+        [ -d "$logdir" ] || set-x mkdir -p "$logdir"
+        pfx "$loghost" $trace rsync -ia "$loghost:$logptn" "$logdir/." || :
+        echo "LOGFILE \"$logdir/$logptnbase\"" >>"$params_patch"
+      fi
+      ;;
+    *)break ;;
+  esac
+  shift
+done
+[ -n "$egrep" ] && echo "LOGFILE $grepped" >>"$params_patch"
+
+if [ $# -gt 0 ]
+then
+  echo "$cmd: extra arguments after logfiles and params: $*" >&2
+  badopts=1
+fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+cat "$params_patch"
+$trace patch-config -o "$cfg" "$base_config" "$params_patch"
+if [ -n "$egrep" ]
+then
+  $trace ln "$grepped" "$reportdir/grepped.log" \
+  || $trace cp "$grepped" "$reportdir/grepped.log"
+fi
+[ -d "$imagesdir" ] || set-x mkdir "$imagesdir"
+$trace analog "+g$cfg"
+$trace wc -l "$grepped"
+diff -u "$base_config" "$cfg" || :
+sed 40q "$grepped"
