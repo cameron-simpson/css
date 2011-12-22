@@ -8,7 +8,6 @@ import csv
 import os
 import os.path
 from types import StringTypes
-import unittest
 import sys
 from cs.logutils import Pfx, error, warn , info
 from . import NodeDB
@@ -133,31 +132,6 @@ class Backend_CSVFile(_NoBackend):
     for item in self.iteritems():
       yield item[1]
 
-class TestAll(NodeTestAll):
-
-  def setUp(self):
-    dbpath = 'test.csv'
-    self.dbpath = dbpath
-    if os.path.exists(dbpath):
-      os.remove(dbpath)
-    with open(dbpath, "wb") as fp:
-      fp.write("TYPE,NAME,ATTR,VALUE\n")
-    self.backend=Backend_CSVFile(dbpath)
-    self.db=NodeDB(backend=self.backend)
-
-  def test22persist(self):
-    N = self.db.newNode('HOST:foo1')
-    N.X=1
-    N2 = self.db.newNode('SWITCH:sw1')
-    N2.Ys=(9,8,7)
-    dbstate = str(self.db)
-    self.db.close()
-    self.db=NodeDB(backend=Backend_CSVFile(self.dbpath))
-    dbstate2 = str(self.db)
-    self.assert_(dbstate == dbstate2, "db state differs:\n\t%s\n\t%s" % (dbstate, dbstate2))
-
-  def tearDown(self):
-    self.db.close()
-
 if __name__ == '__main__':
-  unittest.main()
+  import cs.nodedb.csvdb_tests
+  cs.nodedb.csvdb_tests.selftest(sys.argv)
