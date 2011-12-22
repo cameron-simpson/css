@@ -11,7 +11,7 @@ from types import StringTypes
 import sys
 from cs.logutils import Pfx, error, warn , info
 from . import NodeDB
-from .node import TestAll as NodeTestAll, _NoBackend
+from .node import _NoBackend
 
 def read_csv_file(fp, skipHeaders=False, noHeaders=False):
   ''' Read a CSV file in vertical format (TYPE,NAME,ATTR,VALUE),

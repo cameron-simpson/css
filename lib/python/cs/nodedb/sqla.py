@@ -13,7 +13,6 @@ from sqlalchemy.sql import and_, or_, not_, asc
 from sqlalchemy.sql.expression import distinct
 from cs.logutils import error, warning
 from . import NodeDB, Backend
-from .node import TestAll as NodeTestAll
 
 def NODESTable(metadata, name=None):
   ''' Set up an SQLAlchemy Table for the nodes.

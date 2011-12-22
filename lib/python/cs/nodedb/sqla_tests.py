@@ -7,7 +7,7 @@
 import sys
 import unittest
 from . import NodeDB
-from .node import TestAll as NodeTestAll
+from .node_tests import TestAll as NodeTestAll
 from .sqla import Backend_SQLAlchemy
 
 class TestAll(NodeTestAll):

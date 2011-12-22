@@ -9,7 +9,7 @@ import sys
 import unittest
 from . import NodeDB
 from .csvdb import Backend_CSVFile
-from .node import TestAll as NodeTestAll
+from .node_tests import TestAll as NodeTestAll
 
 class TestAll(NodeTestAll):
 
