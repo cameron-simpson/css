@@ -127,10 +127,13 @@ def imerge(*seqs):
       seqs.pop(choice)
 
 class TestAll(unittest.TestCase):
+
   def testIMerge(self):
     self.assertEqual( list(imerge([1,2,3],[1,4,7],[2,5,6])),
                       [1,1,2,2,3,4,5,6,7]
                     )
  
 if __name__ == '__main__':
-  unittest.main()
+  import sys
+  import cs.seq_tests
+  cs.seq_tests.selftest(sys.argv)
