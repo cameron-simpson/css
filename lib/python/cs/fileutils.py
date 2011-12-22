@@ -1,7 +1,12 @@
 #!/usr/bin/python
+#
+# Assorted convenience functions for files.
+#       - Cameron Simpson <cs@zip.com.au>
+#
 
 from __future__ import with_statement
 import os
+import sys
 import shutil
 from tempfile import NamedTemporaryFile
 import unittest
@@ -88,36 +93,6 @@ def rewrite(filepath, data,
         shutil.copy2(filepath, filepath + backup_ext)
       shutil.copyfile(T.name, filepath)
 
-class Test(unittest.TestCase):
-
-  def setUp(self):
-    pass
-
-  def tearDown(self):
-    pass
-
-  def test01compare(self):
-    data = "here are some data\n"
-    with NamedTemporaryFile() as T1:
-      T1.write(data)
-      T1.flush()
-      with NamedTemporaryFile() as T2:
-        T2.write(data)
-        T2.flush()
-        self.assertEquals( open(T1.name).read(), data, "bad data in %s" % (T1.name,) )
-        self.assertEquals( open(T2.name).read(), data, "bad data in %s" % (T2.name,) )
-        self.assert_(compare(T1.name, T2.name), "mismatched data in %s and %s" % (T1.name, T2.name))
-
-  def test02rewrite(self):
-    from StringIO import StringIO
-    olddata = "old data\n"
-    newdata = "new data\n"
-    with NamedTemporaryFile() as T1:
-      T1.write(olddata)
-      T1.flush()
-      self.assertEquals( open(T1.name).read(), olddata, "bad old data in %s" % (T1.name,) )
-      rewrite(T1.name, StringIO(newdata))
-      self.assertEquals( open(T1.name).read(), newdata, "bad new data in %s" % (T1.name,) )
-
 if __name__ == '__main__':
-  unittest.main()
+  import cs.fileutils_tests
+  cs.fileutils_tests.selftest(sys.argv)
