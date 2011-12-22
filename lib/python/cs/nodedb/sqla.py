@@ -3,7 +3,6 @@
 import os
 from thread import allocate_lock
 from types import StringTypes
-import unittest
 import sys
 import sqlalchemy
 from sqlalchemy import create_engine, \
@@ -198,13 +197,6 @@ class Backend_SQLAlchemy(Backend):
     self.attrs.delete(and_(self.attrs.c.NODE_ID == node_id,
                            self.attrs.c.ATTR == attr)).execute()
 
-class TestAll(NodeTestAll):
-
-  def setUp(self):
-    self.backend=Backend_SQLAlchemy('sqlite:///:memory:')
-    self.db=NodeDB(backend=self.backend)
-
 if __name__ == '__main__':
-  import sqlalchemy
-  print 'SQLAlchemy version =', sqlalchemy.__version__
-  unittest.main()
+  import cs.nodedb.sqla_tests
+  cs.nodedb.sqla_tests.selftest(sys.argv)

@@ -1,9 +1,7 @@
 #!/usr/bin/python
 
-import unittest
 import sys
 from thread import allocate_lock
-from cs.logutils import D
 from cs.serialise import toBS, fromBS
 from cs.venti import defaults, totext
 from cs.venti.hash import Hash_SHA1, HASH_SHA1_T
@@ -395,30 +393,6 @@ class IndirectBlock(_Block):
 
     return ''.join( self[i] for i in xrange(start, stop, step) )
 
-class TestAll(unittest.TestCase):
-  def setUp(self):
-    import random
-    random.seed()
-  def testSHA1(self):
-    import random
-    from cs.venti.cache import MemCacheStore
-    S = MemCacheStore()
-    with S:
-      IB = IndirectBlock()
-      for i in range(10):
-        rs = ''.join( chr(random.randint(0, 255)) for x in range(100) )
-        B = Block(data=rs)
-        self.assertEqual(len(B), 100)
-        IB.append(B)
-        self.assertEqual(len(IB), (i+1)*100)
-      IB.store()
-      self.assertEqual(len(IB), 1000)
-      IBH = IB.hashcode
-      IBdata = IB.data
-      D("IBdata = %s:%d:%s", type(IBdata), len(IBdata), repr(IBdata),)
-      IB2data = IndirectBlock(hashcode=IBH, span=len(IBdata)).data
-      D("IB2data = %s:%d:%s", type(IB2data), len(IB2data), repr(IB2data),)
-      self.assertEqual(IBdata, IB2data, "IB:  %s\nIB2: %s" % (totext(IBdata), totext(IB2data)))
-
 if __name__ == '__main__':
-  unittest.main()
+  import cs.venti.block_tests
+  cs.venti.block_tests.selftest(sys.argv)

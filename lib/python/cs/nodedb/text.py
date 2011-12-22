@@ -11,7 +11,6 @@ import re
 import tempfile
 import sys
 from types import StringTypes
-import unittest
 if sys.hexversion < 0x02060000:
   import simplejson as json
 else:
@@ -166,14 +165,6 @@ def get_commatexts(line, pos=0):
     yield line[:end]
     line = line[end:].lstrip()
 
-def test_get_commatext(self):
-  self.assert_(get_commatext('') == 0)
-  self.assert_(get_commatext('abc') == 3)
-  self.assert_(get_commatext('abc', 1) == 3)
-  self.assert_(get_commatext(' abc') == 0)
-  self.assert_(get_commatext(' abc', 1) == 4)
-  self.assert_(get_commatext('ab"c d"ef') == 9)
-
 def commatext_to_tokens(text):
   ''' Parse a comma separated list of human friendly value tokens,
       yield the token strings.
@@ -264,31 +255,6 @@ def totoken(value):
 
   raise ValueError, "can't turn into token: %s" % (`value`,)
 
-class TestTokeniser(unittest.TestCase):
-
-  def setUp(self):
-    from .node import NodeDB
-    self.db = NodeDB(backend=None)
-
-  def test01tokenise(self):
-    ''' Test totoken(). '''
-    self.assert_(totoken(0) == "0")
-    self.assert_(totoken(1) == "1")
-    self.assert_(totoken("abc") == "\"abc\"")
-    self.assert_(totoken("http://foo.example.com/") == "http://foo.example.com/")
-
-  def test02roundtrip(self):
-    ''' Test totoken()/fromtoken() round trip. '''
-    for value in 0, 1, "abc", "http://foo.example.com/":
-      token = totoken(value)
-      value2 = fromtoken(token, self.db)
-      self.assert_(value == value2,
-                   "round trip %s -> %s -> %s fails"
-                   % (`value`, `token`, `value2`))
-
-  def test03get_commatext(self):
-    ''' Test get_commatext word parser. '''
-    return test_get_commatext(self)
-
 if __name__ == '__main__':
-  unittest.main()
+  import cs.nodedb.text_tests
+  cs.nodedb.text_tests.selftest(sys.argv)
