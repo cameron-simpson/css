@@ -19,11 +19,13 @@ sshcfg=$PORTFWD_SSH_CONFIG
 fwdcfg=$PORTFWD_CONFIG
 polltime=11
 retrytime=2
+polling_default_route=
 
 cmd=`basename "$0"`
 usage="Usage: $cmd [-1] [-F ssh_config] [-stop] targets...
   -1    Once. Do not restart the tunnel if it dies.
   -stop Stop named port forwards instead of starting them.
+  --polling-route Default route poller already running.
   -F    Ssh configuration file with clause for target.
         Default from \$PORTFWD_SSH_CONFIG: $sshcfg
 If a target starts with an upper case letter it is taken to be a group name,
@@ -40,6 +42,8 @@ do
     -F) sshcfg=$2 opts="$opts $1 $2"; shift ;;
     -stop)
         stop=1 opts="$opts $1" ;;
+    --polling-route)
+        polling_default_route=1 ;;
     --) shift; break ;;
     -?*)echo "$cmd: unrecognised option: $1" >&2
         badopts=1
@@ -62,66 +66,7 @@ ssh-add -l >/dev/null \
      exit 1
    }
 
-subprocs=
-
-# catch some signals and propagate to children
-for sig in HUP INT TERM
-do
-  trap "sig=$sig
-        echo \"\$cmd: received SIG\$sig\"
-        set -vx
-        [ -z \"\$subprocs\" ] || synckill -v -s \"\$sig\" \$subprocs
-        exit 1
-       " "$sig"
-done
-
-if [ $# -gt 1 ]
-then
-  set -x
-  for target
-  do
-    "$0" $opts -- "$target" &
-    subprocs="$subprocs $!"
-  done
-  wait
-  exit $?
-fi
-
-target=$1
-shift
-
-case "$target" in
-  [A-Z]*)
-    set -- `sed -n 'y/	/ /
-                    s/$/ /
-                    s/^  *//
-                    s/  */  /g
-                    /^[Hh][Oo][Ss][Tt] .*'"$target"' /s/^[^ ]*  *\([^ ][^ ]*\).*/\1/p' "$sshcfg"`
-    if [ $# = 0 ]
-    then
-      echo "$cmd: group \"$target\" not applied to any Hosts" >&2
-      exit 1
-    fi
-    [ $# = 1 ] || exec "$0" $opts -- "$@"
-    ;;
-esac
-
-not()
-{ "$@" || return 0
-  return 1
-}
-
-ok2portfwd()
-{
-  flag -w PORTFWD_ANYWAY && return 0
-  flag -w PORTFWD_DISABLE && return 1
-  ssh-add -l >/dev/null || return 1
-  netstat -rn | egrep '^(default|0\.0\.0\.0) +[1-9]' >/dev/null || return 1
-  [ -x "$HOME/bin-local/do-portfwd" ] || return 0
-  "$HOME/bin-local/do-portfwd"
-}
-
-# send SIGTERM to a process and wait for it to exit
+# function to send SIGTERM (default) to a process and wait for it to exit
 # synckill [-v] [-s sig] [--] pids...
 synckill()
 { _sk_me=$$
@@ -177,6 +122,83 @@ synckill()
     exit $xit
   )
   return $?
+}
+
+subprocs=
+
+# catch some signals and propagate to children
+for sig in HUP INT TERM
+do
+  trap "sig=$sig
+        echo \"\$cmd: received SIG\$sig\"
+        set -vx
+        [ -z \"\$subprocs\" ] || synckill -v -s \"\$sig\" \$subprocs
+        exit 1
+       " "$sig"
+done
+
+not()
+{ "$@" || return 0
+  return 1
+}
+
+poll_default_route()
+{ if netstat -rn | egrep '^(default|0\.0\.0\.0) +[1-9]' >/dev/null
+  then  flag PORTFWD_DEFAULT_ROUTE 1
+  else  flag PORTFWD_DEFAULT_ROUTE 0
+  fi
+}
+
+if not [ $polling_default_route ]
+then
+  while :
+  do
+    poll_default_route
+    sleep "$polltime"
+  done &
+  subprocs="$subprocs $!"
+  polling_default_route=1
+fi
+
+if [ $# -gt 1 ]
+then
+  set -x
+  for target
+  do
+    "$0" --polling-route $opts -- "$target" &
+    subprocs="$subprocs $!"
+  done
+  wait
+  exit $?
+fi
+
+target=$1
+shift
+
+case "$target" in
+  [A-Z]*)
+    set -- `sed -n 'y/	/ /
+                    s/$/ /
+                    s/^  *//
+                    s/  */  /g
+                    /^[Hh][Oo][Ss][Tt] .*'"$target"' /s/^[^ ]*  *\([^ ][^ ]*\).*/\1/p' "$sshcfg"`
+    if [ $# = 0 ]
+    then
+      echo "$cmd: group \"$target\" not applied to any Hosts" >&2
+      exit 1
+    fi
+    [ $# = 1 ] || exec "$0" $opts -- "$@"
+    ;;
+esac
+
+ok2portfwd()
+{
+  flag -w PORTFWD_ANYWAY && return 0
+  flag -w PORTFWD_DISABLE && return 1
+  flag -w PORTFWD_DEFAULT_ROUTE || return 1
+  ssh-add -l >/dev/null || return 1
+  [ -x "$HOME/bin-local/do-portfwd" ] || return 0
+  "$HOME/bin-local/do-portfwd"
 }
 
 cmd="$cmd $target"
