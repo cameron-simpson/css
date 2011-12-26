@@ -6,12 +6,22 @@
 
 set -ue
 
-usage="Usage: $0 url [pilfer-url-pre-actions...]"
+usage="Usage: $0 url [selector] [pilfer-url-pre-actions...]"
+
+selector=samedomain
 
 [ $# -gt 0 ] || { echo "$usage" >&2; exit 2; }
 
 url=$1
 shift
 
+if [ $# -gt 0 ]
+then
+  case $1 in
+    samedomain | is\* )
+      selector=$1; shift ;;
+  esac
+fi
+
 set -x
-exec pilfer url "$url" hrefs ${1+"$@"} samescheme samedomain unique save
+exec pilfer url "$url" hrefs samescheme $selector ${1+"$@"} unique save
