@@ -4,8 +4,9 @@
 #       - Cameron Simpson <cs@zip.com.au> 26dec2011
 #
 
+from __future__ import with_statement
 from BeautifulSoup import BeautifulSoup, Tag, BeautifulStoneSoup
-from urllib2 import urlopen
+from urllib2 import urlopen, Request
 from urlparse import urlparse, urljoin
 from HTMLParser import HTMLParseError
 from cs.logutils import Pfx, debug, error, warning
@@ -42,11 +43,16 @@ class _URL(str):
     ''' Fetch the URL content.
     '''
     with Pfx("_fetch(%s)" % (self,)):
-      debug("urlopen(%s)", self)
-      U = urlopen(self)
-      H = U.info()
+      hdrs = {}
+      if self.referer:
+        debug("referer = %s", self.referer)
+        hdrs['Referer'] = self.referer
+      rq = Request(self, None, hdrs)
+      debug("urlopen(%s[%s])", self, rq)
+      rsp = urlopen(rq)
+      H = rsp.info()
       self._content_type = H.gettype()
-      self._content = U.read()
+      self._content = rsp.read()
       self._parsed = None
 
   @property
