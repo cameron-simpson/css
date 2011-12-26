@@ -14,6 +14,9 @@ if sys.hexversion < 0x02060000: from sets import Set as set
 from cs.logutils import setup_logging, Pfx, debug, error, warning
 from cs.urlutils import URL
 
+IMAGE_SUFFIXES = ( 'png', 'jpg', 'jpeg', 'gif', 'ico', )
+VIDEO_SUFFIXES = ( 'mp2', 'mp4', 'avi', 'wmv', )
+
 usage = '''Usage: %s op [args...]
   %s url URL actions...'''
 
@@ -153,22 +156,36 @@ def url_action(action, U):
 def action_get_hrefs(U):
   ''' Return an iterable of the HREFs.
   '''
-  return U.hrefs(absolute=True)
+  return [ URL(H) for H in U.hrefs(absolute=True) ]
 
-def action_get_images(U, suffixes=('png', 'jpg', 'jpeg')):
+def action_get_hrefs_samehost(U):
+  ''' Return an iterable of the HREFs.
+  '''
+  U = URL(U)
+  return [ H for H in action_get_hrefs(U) if H.hostname == U.hostname ]
+
+def action_get_images(U, suffixes=IMAGE_SUFFIXES):
   U = URL(U)
   for href in U.hrefs(absolute=True):
     ok = False
     for sfx in suffixes:
       if href.endswith('.'+sfx):
-        yield href
+        yield URL(href)
         ok = True
         break
     if not ok:
       debug("ignore href: %s", href)
 
-def action_get_inline_images(U, suffixes=('png', 'jpg', 'jpeg')):
-  return URL(U).srcs('img', absolute=True)
+def action_get_images_samehost(U, suffixes=IMAGE_SUFFIXES):
+  U = URL(U)
+  return [ I for I in action_get_images(U, suffixes=suffixes) if I.hostname == U.hostname ]
+
+def action_get_inline_images(U, suffixes=IMAGE_SUFFIXES):
+  return [ URL(S) for S in URL(U).srcs('img', absolute=True) ]
+
+def action_get_inline_images_samehost(U, suffixes=IMAGE_SUFFIXES):
+  U = URL(U)
+  return [ I for I in action_get_inline_images(U, suffixes=suffixes) if I.hostname == U.hostname ]
 
 def action_print(U):
   print U
@@ -188,8 +205,11 @@ def action_select_re(U, re):
 
 actions = {
             'hrefs':    action_get_hrefs,
+            'hrefs_samehost':    action_get_hrefs_samehost,
             'images':   action_get_images,
+            'images_samehost':   action_get_images_samehost,
             'iimages':  action_get_inline_images,
+            'iimages_samehost':  action_get_inline_images_samehost,
             'print':    action_print,
             'save':     action_save,
             'type':     action_print_type,
