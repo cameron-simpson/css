@@ -73,15 +73,15 @@ def apply_actions(urls, actions):
   '''
   for action in actions:
     with Pfx(action):
-      debug("start urls = %s", `urls`)
       if action.startswith('/'):
         if action.endswith('/'):
           regexp = action[1:-1]
         else:
           regexp = action[1:]
-        debug("regexp = /%s/", regexp)
+        debug("regexp = [%s]", regexp)
         regexp = re.compile(regexp)
-        urls = chain( *[ action_select_re(U, regexp) for U in urls ] )
+        urls = list(urls)
+        urls = list( chain( *[ action_select_re(U, regexp) for U in urls ] ) )
       elif action == 'sort':
         urls = sorted(list(urls))
       elif action == 'unique':
@@ -149,6 +149,7 @@ def url_save(U, dir=None, full_path=False, require_dir=False, overwrite_dir=Fals
       savefp.write(content)
       savefp.close()
     except e:
+      exception("exception writing content: %s", e)
       os.remove(savepath)
       savefp.close()
       raise e
@@ -161,7 +162,7 @@ def url_action(action, U):
     action_func = actions.get(action)
     if action_func is None:
       raise ValueError("unknown action")
-    return list(action_func(U))
+    return action_func(U)
 
 def url_hrefs(U, *a, **kw):
   with Pfx("hrefs(%s)" % (U,)):
@@ -223,9 +224,13 @@ def action_samehostname(U):
   if U.hostname == U.referer.hostname:
     yield U
 
+def action_samescheme(U):
+  if U.scheme == U.referer.scheme:
+    yield U
+
 def action_save(U):
   try:
-    url_save(U, overwrite_dir=True)
+    url_save(U, dir=U.hostname+'-'+os.path.dirname(U.path).replace('/', '-'), overwrite_dir=True)
   except HTTPError, e:
     error("%s", e)
     return
@@ -234,8 +239,9 @@ def action_save(U):
     return
   yield U
 
-def action_select_re(U, re):
-  if re.match(U):
+def action_select_re(U, regexp):
+  m = regexp.search("x"+str(U))
+  if m:
     yield U
 
 actions = {
@@ -245,6 +251,7 @@ actions = {
             'print':    action_print,
             'samedomain': action_samedomain,
             'samehostname': action_samehostname,
+            'samescheme': action_samescheme,
             'save':     action_save,
             'type':     action_print_type,
           }
