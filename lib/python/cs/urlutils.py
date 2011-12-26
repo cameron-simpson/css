@@ -10,21 +10,24 @@ from urlparse import urlparse, urljoin
 from HTMLParser import HTMLParseError
 from cs.logutils import Pfx, debug, error, warning
 
-def URL(U):
+def URL(U, referer):
   ''' Factory function to return a _URL object from a URL string.
       Handing it a _URL object returns the object.
   '''
   t = type(U)
-  if t is _URL:
-    return U
-  return _URL(U)
+  if t is not _URL:
+    U = _URL(U)
+  if referer:
+    U.referer = URL(referer, None)
+  return U
 
 class _URL(str):
   ''' Utility class to do simple stuff to URLs.
       Subclasses str.
   '''
 
-  def __init__(self, s):
+  def __init__(self, s, referer=None):
+    self.referer = URL(referer) if referer else referer
     self._parts = None
     self.flush()
 
@@ -61,6 +64,12 @@ class _URL(str):
     if self._content is None:
       self._fetch()
     return self._content_type
+
+  @property
+  def domain(self):
+    ''' The URL domain - the hostname with the firsy dotted component removed.
+    '''
+    return self.hostname.split('.', 1)[1]
 
   @property
   def parsed(self):
@@ -159,7 +168,7 @@ class _URL(str):
       except KeyError:
         debug("no href, skip %s", A)
         continue
-      yield urljoin(self, href) if absolute else href
+      yield URL( (urljoin(self, href) if absolute else href), self )
 
   def srcs(self, *a, **kw):
     ''' All 'src=' values from the content HTML.
@@ -176,4 +185,4 @@ class _URL(str):
       except KeyError:
         debug("no src, skip %s", A)
         continue
-      yield urljoin(self, src) if absolute else src
+      yield URL( (urljoin(self, src) if absolute else src), self )
