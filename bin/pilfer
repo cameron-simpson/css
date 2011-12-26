@@ -11,7 +11,8 @@ import os.path
 from itertools import chain
 import re
 if sys.hexversion < 0x02060000: from sets import Set as set
-from cs.logutils import setup_logging, Pfx, debug, error, warning
+from urllib2 import HTTPError, URLError
+from cs.logutils import setup_logging, Pfx, debug, error, warning, exception
 from cs.urlutils import URL
 
 IMAGE_SUFFIXES = ( 'png', 'jpg', 'jpeg', 'gif', 'ico', )
@@ -132,10 +133,11 @@ def url_save(U, dir=None, full_path=False, require_dir=False, overwrite_dir=Fals
           break
         n += 1
     debug("save to %s", savepath)
+    content = U.content
     savefp = open(savepath, "wb")
     ok = False
     try:
-      savefp.write(U.content)
+      savefp.write(content)
       savefp.close()
     except e:
       os.remove(savepath)
@@ -151,7 +153,7 @@ def url_action(action, U):
     action_func = actions.get(action)
     if action_func is None:
       raise ValueError("unknown action")
-    return action_func(U)
+    return list(action_func(U))
 
 def action_get_hrefs(U):
   ''' Return an iterable of the HREFs.
@@ -196,7 +198,14 @@ def action_print_type(U):
   yield U
 
 def action_save(U):
-  url_save(U, overwrite_dir=True)
+  try:
+    url_save(U, overwrite_dir=True)
+  except HTTPError, e:
+    error("%s", e)
+    return
+  except URLError, e:
+    error("%s", e)
+    return
   yield U
 
 def action_select_re(U, re):
