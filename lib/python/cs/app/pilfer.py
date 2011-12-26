@@ -95,14 +95,21 @@ class Pilfer(object):
     for action in actions:
       with Pfx(action):
         if action.startswith('/'):
+          # select URLs matching regexp
           if action.endswith('/'):
             regexp = action[1:-1]
           else:
             regexp = action[1:]
           debug("regexp = [%s]", regexp)
           regexp = re.compile(regexp)
-          urls = list(urls)
           urls = list( chain( *[ select_by_re(U, regexp) for U in urls ] ) )
+        elif action.startswith('.'):
+          # select URLs endsing in suffix
+          if action.endswith('/i'):
+            ext, case = action[1:-2], False
+          else:
+            ext, case = action[1:], True
+          urls = list( self.with_exts( urls, suffixes=[ext], case_sensitive=case) )
         elif action == 'sort':
           urls = sorted(list(urls))
         elif action == 'unique':
