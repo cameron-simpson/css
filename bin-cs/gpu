@@ -1,0 +1,17 @@
+#!/bin/sh
+#
+# Convenience script for using pilfer.
+#       - Cameron Simpson <cs@zip.com.au> 26dec2011
+#
+
+set -ue
+
+usage="Usage: $0 url [pilfer-url-pre-actions...]"
+
+[ $# -gt 0 ] || { echo "$usage" >&2; exit 2; }
+
+url=$1
+shift
+
+set -x
+exec pilfer url "$url" ${1+"$@"} hrefs_samehost unique sort save
