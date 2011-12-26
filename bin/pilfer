@@ -155,10 +155,34 @@ def url_action(action, U):
       raise ValueError("unknown action")
     return list(action_func(U))
 
+def url_hrefs(U, *a, **kw):
+  with Pfx("hrefs(%s)" % (U,)):
+    U = URL(U)
+    hrefs = ()
+    try:
+      hrefs = U.hrefs(*a, **kw)
+    except HTTPError, e:
+      error("%s", e)
+    except URLError, e:
+      error("%s", e)
+    return hrefs
+
+def url_srcs(U, *a, **kw):
+  with Pfx("srcs(%s)" % (U,)):
+    U = URL(U)
+    hrefs = ()
+    try:
+      hrefs = U.srcs(*a, **kw)
+    except HTTPError, e:
+      error("%s", e)
+    except URLError, e:
+      error("%s", e)
+    return hrefs
+
 def action_get_hrefs(U):
   ''' Return an iterable of the HREFs.
   '''
-  return [ URL(H) for H in U.hrefs(absolute=True) ]
+  return [ URL(H) for H in url_hrefs(U, absolute=True) ]
 
 def action_get_hrefs_samehost(U):
   ''' Return an iterable of the HREFs.
@@ -168,7 +192,7 @@ def action_get_hrefs_samehost(U):
 
 def action_get_images(U, suffixes=IMAGE_SUFFIXES):
   U = URL(U)
-  for href in U.hrefs(absolute=True):
+  for href in url_hrefs(U, absolute=True):
     ok = False
     for sfx in suffixes:
       if href.endswith('.'+sfx):
@@ -183,7 +207,7 @@ def action_get_images_samehost(U, suffixes=IMAGE_SUFFIXES):
   return [ I for I in action_get_images(U, suffixes=suffixes) if I.hostname == U.hostname ]
 
 def action_get_inline_images(U, suffixes=IMAGE_SUFFIXES):
-  return [ URL(S) for S in URL(U).srcs('img', absolute=True) ]
+  return [ URL(S) for S in url_srcs(U, 'img', absolute=True) ]
 
 def action_get_inline_images_samehost(U, suffixes=IMAGE_SUFFIXES):
   U = URL(U)
