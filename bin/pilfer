@@ -58,6 +58,16 @@ def main(argv):
 
   return xit
 
+def unique(items, seen=None):
+  ''' A generator that yields unseen items.
+  '''
+  if seen is None:
+    seen = set()
+  for I in items:
+    if I not in seen:
+      yield I
+      seen.add(I)
+
 def apply_actions(urls, actions):
   ''' Return an iterable of the results of the actions applied to the URLs.
   '''
@@ -75,7 +85,7 @@ def apply_actions(urls, actions):
       elif action == 'sort':
         urls = sorted(list(urls))
       elif action == 'unique':
-        urls = set(urls)
+        urls = unique(urls)
       elif '=' in action:
         param, value = action.split('=', 1)
         if param in ('scheme', 'netloc', 'path', 'params', 'query', 'fragment', 'username', 'password', 'hostname', 'port'):
