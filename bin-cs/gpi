@@ -1,0 +1,4 @@
+#!/bin/sh
+set -ue
+url=$1; shift
+exec gpu "$url" isimage ${1+"$@"}

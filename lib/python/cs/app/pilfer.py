@@ -176,11 +176,10 @@ class Pilfer(object):
       debug("save to %s", savepath)
       content = U.content
       savefp = open(savepath, "wb")
-      ok = False
       try:
         savefp.write(content)
         savefp.close()
-      except e:
+      except Exception, e:
         exception("exception writing content: %s", e)
         os.remove(savepath)
         savefp.close()
@@ -224,16 +223,21 @@ class Pilfer(object):
         error("%s", e)
       return hrefs
 
-  def with_exts(self, urls, suffixes):
-    for url in urls:
+  def with_exts(self, urls, suffixes, case_sensitive=False):
+    for U in urls:
       ok = False
-      for sfx in suffixes:
-        if url.endswith('.'+sfx):
-          yield url
-          ok = True
-          break
-      if not ok:
-        debug("with_exts: discard %s", url)
+      path = U.path
+      if not path.endswith('/'):
+        base = os.path.basename(path)
+        if '.' in base:
+          __, ext = base.rsplit('.', 1)
+          if not case_sensitive:
+            ext = ext.lower()
+          ok = ext in suffixes
+      if ok:
+        yield U
+      else:
+        debug("with_exts: discard %s", U)
 
   def url_images(self, U):
     return self.with_exts( self.url_hrefs(U, absolute=True), IMAGE_SUFFIXES )
