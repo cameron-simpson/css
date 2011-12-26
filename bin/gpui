@@ -1,9 +1,0 @@
-#!/bin/sh
-
-pfx=
-case "$1" in
-    -*|'')	;;
-    *)		pfx=$1; shift ;;
-esac
-
-exec gpu $pfx -d 1 -i ${1+"$@"}

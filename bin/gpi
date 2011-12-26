@@ -1,5 +1,0 @@
-#!/bin/sh
-async=1
-[ "x$1" = x-s ] && { shift; async=; }
-exec getpageims ${1+"$@"} &
-[ $async ] || wait
