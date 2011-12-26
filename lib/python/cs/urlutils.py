@@ -67,9 +67,13 @@ class _URL(str):
 
   @property
   def domain(self):
-    ''' The URL domain - the hostname with the firsy dotted component removed.
+    ''' The URL domain - the hostname with the first dotted component removed.
     '''
-    return self.hostname.split('.', 1)[1]
+    hostname = self.hostname
+    if not hostname or '.' not in hostname:
+      warning("%s: no domain in hostname: %s", self, hostname)
+      return ''
+    return hostname.split('.', 1)[1]
 
   @property
   def parsed(self):
