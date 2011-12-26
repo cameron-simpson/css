@@ -14,4 +14,4 @@ url=$1
 shift
 
 set -x
-exec pilfer url "$url" ${1+"$@"} hrefs_samehost unique save
+exec pilfer url "$url" ${1+"$@"} hrefs samedomain unique save
