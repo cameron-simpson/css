@@ -1,117 +1,200 @@
-#!/bin/sh
+#!/usr/bin/env python
 #
-# Rummage through a web page pulling out the items of interest.
-#	- Cameron Simpson <cs@zip.com.au> 19jun99
-#
-# Input format:
-#	TITLE title	Output TITLE tag. Should come early.
-#	URL [-i] title	Page to pilfer. -i gets inline refs.
-#			Make an H1 heading with the title.
-#	Hn heading	Category heading.
-#	LI ptn		Rexgexp for URLs, implicitly anchored at ^.
-#	! command	Run shell command with the current page URL
-#			appended and with the page URLs on stdin;
-#			replace URL list with output.
+# Web page utility.
+#       - Cameron Simpson <cs@zip.com.au> 07jul2010
 #
 
-: ${TMPDIR:=/tmp}
+import sys
+import os
+import errno
+import os.path
+from itertools import chain
+import re
+if sys.hexversion < 0x02060000: from sets import Set as set
+from cs.logutils import setup_logging, Pfx, debug, error, warning
+from cs.urlutils import URL
 
-verbose=
-[ -t 2 ] && verbose=1
+usage = '''Usage: %s op [args...]
+  %s url URL actions...'''
 
-tmp=$TMPDIR/pilfer.$$
+def main(argv):
+  argv = list(argv)
+  xit = 0
+  argv0 = argv.pop(0)
+  cmd = os.path.basename(argv0)
+  setup_logging(cmd)
 
-xit=0
+  badopts = False
+  if not argv:
+    error("missing op")
+    badopts = True
+  else:
+    op = argv.pop(0)
+    with Pfx(op):
+      if op == 'url':
+        if not argv:
+          error("missing URL")
+          badopts = True
+        else:
+          url = argv.pop(0)
+          if url == '-':
+            urls = [ line.strip() for line in sys.stdin ]
+          else:
+            urls = [ url ]
+          urls = apply_actions(urls, argv)
+          for url in urls:
+            print url
+      else:
+        error("unsupported op")
+        badopts = True
+      
+    if badopts:
+      print >>sys.stderr, usage % (cmd, cmd,)
+      xit = 2
 
-sed -e 's/^#.*//' -e 's/^[ 	]*//' -e '/^$/d' ${1+"$@"} \
-| ( xit=0
-    url=
-    n=0
-    while read tag etc
-    do
-	pipe=cat
-	case "$etc" in
-	    *\ \|*) pipe=`sedstrs 's/^[^|]* | *//' "$etc"`
-		    etc=`sedstrs 's/  *|.*//' "$etc"`
-		    ;;
-	esac
-	case "$tag" in
-	    TITLE)
-		echo "<TITLE>$etc</TITLE>" | eval "$pipe" ;;
-	    http://*)
-		mainurl=$tag
-		mainhost=`expr "x$mainurl" : 'xhttp://\([^/]*\).*'`
-		## echo "mainurl=$mainurl"
-		## echo "mainhost=$mainhost"
+  return xit
 
-		case "$etc" in
-		    "")		iflag= etc=$mainurl ;;
-		    -i)		iflag=-i etc=$mainurl ;;
-		    -i\ *)	iflag=-i etc=`sedstrs 's/^-i  *//' "$etc"` ;;
-		    *)		iflag= ;;
-		esac
-		echo "<H1><A NAME=\"$n\" HREF=\"$mainurl\">$etc</A></H1>"
-		[ $n -gt 0 ] && necho "<A HREF=\"#$on\">^- Up</A> | "
-		on=$n
-		n=`expr $n + 1`
-		echo "<A HREF=\"#$n\">Down -v</A><BR>"
+def apply_actions(urls, actions):
+  ''' Return an iterable of the results of the actions applied to the URLs.
+  '''
+  for action in actions:
+    with Pfx(action):
+      debug("start urls = %s", `urls`)
+      if action.startswith('/'):
+        if action.endswith('/'):
+          regexp = action[1:-1]
+        else:
+          regexp = action[1:]
+        debug("regexp = /%s/", regexp)
+        regexp = re.compile(regexp)
+        urls = chain( *[ action_select_re(U, regexp) for U in urls ] )
+      elif action == 'sort':
+        urls = sorted(list(urls))
+      elif action == 'unique':
+        urls = set(urls)
+      elif '=' in action:
+        param, value = action.split('=', 1)
+        if param in ('scheme', 'netloc', 'path', 'params', 'query', 'fragment', 'username', 'password', 'hostname', 'port'):
+          urls = [ U for U in urls if getattr(URL(U), param) == value ]
+        else:
+          raise ValueError("unknown paramater test: %s=%s" % (param, value))
+      else:
+        urls = chain( *[ url_action(action, U) for U in urls ] )
+  return urls
 
-		[ $verbose ] && echo "fetching $mainurl..." >&2
-		wcat "$mainurl" \
-		    | urls -u $iflag -t \
-		    | absurl "$mainurl" \
-		    | eval "$pipe" \
-		    > "$tmp"
-		[ -s "$tmp" ] || { echo "$0: no content from $mainurl" >&2
-				   xit=1
-				 }
-		sed 's/^/urls: /' "$tmp" >&2
-		;;
-	    H[1-6])
-		echo "<$tag>$etc</$tag>" | eval "$pipe"
-		;;
-	    LI) regexp=$etc
-		case "$regexp" in
-		    http://*)	;;
-		    /*)		regexp="http://$mainhost$regexp" ;;
-		    *)		regexp="http://$mainhost/$regexp" ;;
-		esac
+def url_save(U, dir=None, full_path=False, require_dir=False, overwrite_dir=False, overwrite_file=False):
+  with Pfx("save(%s)" % (U,)):
+    U = URL(U)
+    if dir is None:
+      if full_path:
+        dir = os.path.join( '.', U.hostname, U.path, )
+      else:
+        ##print >>sys.stderr, "U =", `U`, str(U), "U.hostname =", U.hostname, "U.path =", U.path
+        dir = os.path.join( '.', U.hostname, os.path.basename(os.path.dirname(U.path)) )
+    if require_dir:
+      if not os.path.isdir(dir):
+        raise ValueError("not a directory: %s" % (dir,))
+    else:
+      try:
+        os.makedirs(dir)
+      except OSError, e:
+        if e.errno != errno.EEXIST:
+          raise
+        if not overwrite_dir:
+          n = 2
+          while True:
+            ndir = "%s-%d" % (dir, n)
+            try:
+              os.makedirs(ndir)
+            except OSError, e:
+              if e.errno != errno.EEXIST:
+                raise
+              n += 1
+              continue
+            dir = ndir
+            break
+    filename = os.path.basename(U.path)
+    savepath = os.path.join(dir, filename)
+    if os.path.exists(savepath) and not overwrite_file:
+      n = 2
+      if '.' in filename:
+        filebase, fileext = filename.split('.', 1)
+        fileext = '.' + fileext
+      else:
+        filebase, fileext = filename, ''
+      while True:
+        nsavepath = os.path.join(dir, "%s-%d%s" % (filebase, n, fileext))
+        if not os.path.exists(nsavepath):
+          savepath = nsavepath
+          break
+        n += 1
+    debug("save to %s", savepath)
+    savefp = open(savepath, "wb")
+    ok = False
+    try:
+      savefp.write(U.content)
+      savefp.close()
+    except e:
+      os.remove(savepath)
+      savefp.close()
+      raise e
 
-		grep "^$regexp" <"$tmp" \
-		| absurl "$mainurl" \
-		| while read ref title
-		  do  [ -n "$title" ] || title=$ref
-		      echo "- <A HREF=$ref>$title</A><BR>"
-		  done \
-		| eval "$pipe"
-		;;
-	    IMG)regexp=$etc
-		case "$regexp" in
-		    http://*)	;;
-		    /*)		regexp="http://$mainhost$regexp" ;;
-		    *)		regexp="http://$mainhost/$regexp" ;;
-		esac
+def url_action(action, U):
+  ''' Accept `action` and URL `U`, yield results of action applied to URL.
+  '''
+  U = URL(U)
+  global actions
+  with Pfx("%s(%s)" % (action, U)):
+    action_func = actions.get(action)
+    if action_func is None:
+      raise ValueError("unknown action")
+    return action_func(U)
 
-		grep "^$regexp" <"$tmp" \
-		| absurl "$mainurl" \
-		| while read ref title
-		  do  # [ -n "$title" ] || title=$ref
-		      echo "<IMG SRC=\"$ref\"><BR>"
-		  done \
-		| eval "$pipe"
-		;;
-	    !)  sh -xc "$etc $mainurl | $pipe" <"$tmp"
-		;;
-	    *)  echo "$0: can't parse: $tag $etc" >&2
-		xit=1
-		;;
-	esac
-    done
-    exit $xit
-  )
+def action_get_hrefs(U):
+  ''' Return an iterable of the HREFs.
+  '''
+  return U.hrefs(absolute=True)
 
-xit=$?
+def action_get_images(U, suffixes=('png', 'jpg', 'jpeg')):
+  U = URL(U)
+  for href in U.hrefs(absolute=True):
+    ok = False
+    for sfx in suffixes:
+      if href.endswith('.'+sfx):
+        yield href
+        ok = True
+        break
+    if not ok:
+      debug("ignore href: %s", href)
 
-rm -f "$tmp"
+def action_get_inline_images(U, suffixes=('png', 'jpg', 'jpeg')):
+  return URL(U).srcs('img', absolute=True)
 
-exit $xit
+def action_print(U):
+  print U
+  yield U
+
+def action_print_type(U):
+  print U, U.content_type
+  yield U
+
+def action_save(U):
+  url_save(U, overwrite_dir=True)
+  yield U
+
+def action_select_re(U, re):
+  if re.match(U):
+    yield U
+
+actions = {
+            'hrefs':    action_get_hrefs,
+            'images':   action_get_images,
+            'iimages':  action_get_inline_images,
+            'print':    action_print,
+            'save':     action_save,
+            'type':     action_print_type,
+          }
+
+if __name__ == '__main__':
+  import sys
+  sys.exit(main(sys.argv))
