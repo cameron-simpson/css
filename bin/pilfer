@@ -42,9 +42,9 @@ def main(argv):
         else:
           url = argv.pop(0)
           if url == '-':
-            urls = [ line.strip() for line in sys.stdin ]
+            urls = [ URL(line.strip(), None) for line in sys.stdin ]
           else:
-            urls = [ url ]
+            urls = [ URL(url, None) ]
           urls = apply_actions(urls, argv)
           for url in urls:
             print url
@@ -79,7 +79,7 @@ def apply_actions(urls, actions):
       elif '=' in action:
         param, value = action.split('=', 1)
         if param in ('scheme', 'netloc', 'path', 'params', 'query', 'fragment', 'username', 'password', 'hostname', 'port'):
-          urls = [ U for U in urls if getattr(URL(U), param) == value ]
+          urls = [ U for U in urls if getattr(U, param) == value ]
         else:
           raise ValueError("unknown paramater test: %s=%s" % (param, value))
       else:
@@ -88,7 +88,6 @@ def apply_actions(urls, actions):
 
 def url_save(U, dir=None, full_path=False, require_dir=False, overwrite_dir=False, overwrite_file=False):
   with Pfx("save(%s)" % (U,)):
-    U = URL(U)
     if dir is None:
       if full_path:
         dir = os.path.join( '.', U.hostname, U.path, )
@@ -147,7 +146,6 @@ def url_save(U, dir=None, full_path=False, require_dir=False, overwrite_dir=Fals
 def url_action(action, U):
   ''' Accept `action` and URL `U`, yield results of action applied to URL.
   '''
-  U = URL(U)
   global actions
   with Pfx("%s(%s)" % (action, U)):
     action_func = actions.get(action)
@@ -157,7 +155,6 @@ def url_action(action, U):
 
 def url_hrefs(U, *a, **kw):
   with Pfx("hrefs(%s)" % (U,)):
-    U = URL(U)
     hrefs = ()
     try:
       hrefs = list(U.hrefs(*a, **kw))
@@ -169,7 +166,6 @@ def url_hrefs(U, *a, **kw):
 
 def url_srcs(U, *a, **kw):
   with Pfx("srcs(%s)" % (U,)):
-    U = URL(U)
     hrefs = ()
     try:
       hrefs = list(U.srcs(*a, **kw))
@@ -182,36 +178,24 @@ def url_srcs(U, *a, **kw):
 def action_get_hrefs(U):
   ''' Return an iterable of the HREFs.
   '''
-  return [ URL(H) for H in url_hrefs(U, absolute=True) ]
+  return url_hrefs(U, absolute=True)
 
-def action_get_hrefs_samehost(U):
-  ''' Return an iterable of the HREFs.
-  '''
-  U = URL(U)
-  return [ H for H in action_get_hrefs(U) if H.hostname == U.hostname ]
-
-def action_get_images(U, suffixes=IMAGE_SUFFIXES):
-  U = URL(U)
-  for href in url_hrefs(U, absolute=True):
+def with_exts(urls, suffixes):
+  for url in urls:
     ok = False
     for sfx in suffixes:
-      if href.endswith('.'+sfx):
-        yield URL(href)
+      if url.endswith('.'+sfx):
+        yield url
         ok = True
         break
     if not ok:
-      debug("ignore href: %s", href)
+      debug("with_exts: discard %s", url)
 
-def action_get_images_samehost(U, suffixes=IMAGE_SUFFIXES):
-  U = URL(U)
-  return [ I for I in action_get_images(U, suffixes=suffixes) if I.hostname == U.hostname ]
+def action_get_images(U, suffixes=IMAGE_SUFFIXES):
+  return with_exts( url_hrefs(U, absolute=True) )
 
 def action_get_inline_images(U, suffixes=IMAGE_SUFFIXES):
-  return [ URL(S) for S in url_srcs(U, 'img', absolute=True) ]
-
-def action_get_inline_images_samehost(U, suffixes=IMAGE_SUFFIXES):
-  U = URL(U)
-  return [ I for I in action_get_inline_images(U, suffixes=suffixes) if I.hostname == U.hostname ]
+  return with_exts( url_srcs(U, 'img', absolute=True), suffixes)
 
 def action_print(U):
   print U
@@ -220,6 +204,14 @@ def action_print(U):
 def action_print_type(U):
   print U, U.content_type
   yield U
+
+def action_samedomain(U):
+  if U.domain == U.referer.domain:
+    yield U
+
+def action_samehostname(U):
+  if U.hostname == U.referer.hostname:
+    yield U
 
 def action_save(U):
   try:
@@ -238,12 +230,11 @@ def action_select_re(U, re):
 
 actions = {
             'hrefs':    action_get_hrefs,
-            'hrefs_samehost':    action_get_hrefs_samehost,
             'images':   action_get_images,
-            'images_samehost':   action_get_images_samehost,
             'iimages':  action_get_inline_images,
-            'iimages_samehost':  action_get_inline_images_samehost,
             'print':    action_print,
+            'samedomain': action_samedomain,
+            'samehostname': action_samehostname,
             'save':     action_save,
             'type':     action_print_type,
           }
