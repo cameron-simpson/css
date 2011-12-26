@@ -18,7 +18,7 @@ shift
 if [ $# -gt 0 ]
 then
   case $1 in
-    samedomain | is\* )
+    samedomain | is* )
       selector=$1; shift ;;
   esac
 fi
