@@ -160,7 +160,7 @@ def url_hrefs(U, *a, **kw):
     U = URL(U)
     hrefs = ()
     try:
-      hrefs = U.hrefs(*a, **kw)
+      hrefs = list(U.hrefs(*a, **kw))
     except HTTPError, e:
       error("%s", e)
     except URLError, e:
@@ -172,7 +172,7 @@ def url_srcs(U, *a, **kw):
     U = URL(U)
     hrefs = ()
     try:
-      hrefs = U.srcs(*a, **kw)
+      hrefs = list(U.srcs(*a, **kw))
     except HTTPError, e:
       error("%s", e)
     except URLError, e:
