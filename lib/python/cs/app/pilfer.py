@@ -136,7 +136,7 @@ class Pilfer(object):
             error("invalid optional 'g' part, found: %s", parts[3])
             continue
           regexp = re.compile(parts[1])
-          urls = [ regexp.sub(parts[2], U, ( 0 if do_all else 1 )) for U in urls ]
+          urls = [ URL(regexp.sub(parts[2], U, ( 0 if do_all else 1 ))) for U in urls ]
           continue
         if action == 'sort':
           urls = sorted(list(urls))
