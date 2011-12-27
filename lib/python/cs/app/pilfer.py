@@ -120,7 +120,7 @@ class Pilfer(object):
           if param in ('scheme', 'netloc', 'path', 'params', 'query', 'fragment', 'username', 'password', 'hostname', 'port'):
             urls = [ U for U in urls if getattr(U, param) == value ]
           elif param in ('save_dir',):
-            self.setattr(param, value)
+            setattr(self, param, value)
           else:
             raise ValueError("unknown paramater test: %s=%s" % (param, value))
         else:
