@@ -28,7 +28,7 @@ def URL(U, referer, user_agent=None):
     U.referer = URL(referer, None, user_agent=user_agent)
   return U
 
-class _URL(str):
+class _URL(unicode):
   ''' Utility class to do simple stuff to URLs.
       Subclasses str.
   '''
