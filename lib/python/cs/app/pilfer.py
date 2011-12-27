@@ -106,9 +106,17 @@ class Pilfer(object):
             regexp = action[1:-1]
           else:
             regexp = action[1:]
-          debug("regexp = [%s]", regexp)
           regexp = re.compile(regexp)
-          urls = list( chain( *[ select_by_re(U, regexp) for U in urls ] ) )
+          urls = list( chain( *[ self.select_by_re(U, regexp) for U in urls ] ) )
+          continue
+        if action.startswith('-/'):
+          # select URLs matching regexp
+          if action.endswith('/'):
+            regexp = action[2:-1]
+          else:
+            regexp = action[2:]
+          regexp = re.compile(regexp)
+          urls = list( chain( *[ self.deselect_by_re(U, regexp) for U in urls ] ) )
           continue
         if action.startswith('.'):
           # select URLs endsing in suffix
@@ -363,6 +371,11 @@ class Pilfer(object):
   def select_by_re(self, U, regexp):
     m = regexp.search(U)
     if m:
+      yield U
+
+  def deselect_by_re(self, U, regexp):
+    m = regexp.search(U)
+    if not m:
       yield U
 
   action_map = {
