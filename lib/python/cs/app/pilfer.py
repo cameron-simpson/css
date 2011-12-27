@@ -157,19 +157,20 @@ class Pilfer(object):
     return urls
 
   def url_save(self, U):
-    if self.save_dir:
-      dir = self.save_dir
-    else:
-      dir = U.hostname+'-'+os.path.dirname(U.path).replace('/', '-')
-    try:
-      self.url_save_full(U, dir, overwrite_dir=True)
-    except HTTPError, e:
-      error("%s", e)
-      return
-    except URLError, e:
-      error("%s", e)
-      return
-    yield U
+    with Pfx(U):
+      if self.save_dir:
+        dir = self.save_dir
+      else:
+        dir = U.hostname+'-'+os.path.dirname(U.path).replace('/', '-')
+      try:
+        self.url_save_full(U, dir, overwrite_dir=True)
+      except HTTPError, e:
+        error("%s", e)
+        return
+      except URLError, e:
+        error("%s", e)
+        return
+      yield U
 
   def url_save_full(self, U, dir=None, full_path=False, require_dir=False, overwrite_dir=False, overwrite_file=False):
     with Pfx("save(%s)" % (U,)):
