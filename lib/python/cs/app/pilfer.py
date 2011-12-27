@@ -87,7 +87,7 @@ class Pilfer(object):
   '''
 
   def __init__(self):
-    pass
+    self.save_dir = None
 
   def act(self, urls, actions):
     ''' Return an iterable of the results of the actions applied to the URLs.
@@ -128,8 +128,12 @@ class Pilfer(object):
     return urls
 
   def url_save(self, U):
+    if self.save_dir:
+      dir = self.save_dir
+    else:
+      dir = U.hostname+'-'+os.path.dirname(U.path).replace('/', '-')
     try:
-      self.url_save_full(U, dir=U.hostname+'-'+os.path.dirname(U.path).replace('/', '-'), overwrite_dir=True)
+      self.url_save_full(U, dir, overwrite_dir=True)
     except HTTPError, e:
       error("%s", e)
       return
