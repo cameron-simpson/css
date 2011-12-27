@@ -237,12 +237,13 @@ class Pilfer(object):
       path = U.path
       if not path.endswith('/'):
         base = os.path.basename(path)
-        if '.' in base:
-          __, ext = base.rsplit('.', 1)
-          if not case_sensitive:
-            ext = ext.lower()
-            suffixes = [ sfx.lower() for sfx in suffixes ]
-          ok = ext in suffixes
+        if not case_sensitive:
+          base = base.lower()
+          suffixes = [ sfx.lower() for sfx in suffixes ]
+        for sfx in suffixes:
+          if base.endswith('.'+sfx):
+            ok = True
+            break
       if ok:
         yield U
       else:
