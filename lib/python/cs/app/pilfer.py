@@ -119,6 +119,8 @@ class Pilfer(object):
           param, value = action.split('=', 1)
           if param in ('scheme', 'netloc', 'path', 'params', 'query', 'fragment', 'username', 'password', 'hostname', 'port'):
             urls = [ U for U in urls if getattr(U, param) == value ]
+          elif param in ('save_dir',):
+            self.setattr(param, value)
           else:
             raise ValueError("unknown paramater test: %s=%s" % (param, value))
         else:
@@ -139,7 +141,9 @@ class Pilfer(object):
   def url_save_full(self, U, dir=None, full_path=False, require_dir=False, overwrite_dir=False, overwrite_file=False):
     with Pfx("save(%s)" % (U,)):
       if dir is None:
-        if full_path:
+        if self.save_dir:
+          dir = self.save_dir
+        elif full_path:
           dir = os.path.join( '.', U.hostname, os.path.dirname(U.path), )
         else:
           ##print >>sys.stderr, "U =", `U`, str(U), "U.hostname =", U.hostname, "U.path =", U.path
