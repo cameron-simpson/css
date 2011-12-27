@@ -11,15 +11,17 @@ from urlparse import urlparse, urljoin
 from HTMLParser import HTMLParseError
 from cs.logutils import Pfx, debug, error, warning
 
-def URL(U, referer):
+def URL(U, referer, user_agent=None):
   ''' Factory function to return a _URL object from a URL string.
       Handing it a _URL object returns the object.
   '''
   t = type(U)
   if t is not _URL:
     U = _URL(U)
+  if user_agent:
+    U.user_agent = user_agent
   if referer:
-    U.referer = URL(referer, None)
+    U.referer = URL(referer, None, user_agent=user_agent)
   return U
 
 class _URL(str):
@@ -48,9 +50,9 @@ class _URL(str):
       if self.referer:
         debug("referer = %s", self.referer)
         hdrs['Referer'] = self.referer
-      hdrs['user-Agent'] = self.user_agent if self.user_agent else 'css'
+      hdrs['User-Agent'] = self.user_agent if self.user_agent else 'css'
       rq = Request(self, None, hdrs)
-      debug("urlopen(%s[%s])", self, rq)
+      debug("urlopen(%s[%s])", self, hdrs)
       rsp = urlopen(rq)
       H = rsp.info()
       self._content_type = H.gettype()
