@@ -107,7 +107,8 @@ class Pilfer(object):
           debug("regexp = [%s]", regexp)
           regexp = re.compile(regexp)
           urls = list( chain( *[ select_by_re(U, regexp) for U in urls ] ) )
-        elif action.startswith('.'):
+          continue
+        if action.startswith('.'):
           # select URLs endsing in suffix
           if action.endswith('/i'):
             exts, case = action[1:-2], False
@@ -115,11 +116,35 @@ class Pilfer(object):
             exts, case = action[1:], True
           exts = exts.split(',')
           urls = list( self.with_exts( urls, suffixes=exts, case_sensitive=case) )
-        elif action == 'sort':
+          continue
+        if len(action) > 4 and action.startswith('s') and not action[1].isalnum() and action[1] != '_':
+          marker = action[1]
+          parts = action.split(marker)
+          if len(parts) < 3:
+            error("unsufficient parts in s%s: %s", marker, action)
+            continue
+          elif len(parts) == 3:
+            parts = parts + ['']
+          elif len(parts) > 4:
+            error("too many parts in s%s: %s", marker, action)
+            continue
+          if parts[3] == '':
+            do_all = False
+          elif parts[3] == 'g':
+            do_all = True
+          else:
+            error("invalid optional 'g' part, found: %s", parts[3])
+            continue
+          regexp = re.compile(parts[1])
+          urls = [ regexp.sub(parts[2], U, ( 0 if do_all else 1 )) for U in urls ]
+          continue
+        if action == 'sort':
           urls = sorted(list(urls))
-        elif action == 'unique':
+          continue
+        if action == 'unique':
           urls = unique(urls)
-        elif '=' in action:
+          continue
+        if '=' in action:
           param, value = action.split('=', 1)
           if param in ('scheme', 'netloc', 'path', 'params', 'query', 'fragment', 'username', 'password', 'hostname', 'port'):
             urls = [ U for U in urls if getattr(U, param) == value ]
@@ -127,8 +152,8 @@ class Pilfer(object):
             setattr(self, param, value)
           else:
             raise ValueError("unknown paramater test: %s=%s" % (param, value))
-        else:
-          urls = chain( *[ self.url_action(action, U) for U in urls ] )
+          continue
+        urls = chain( *[ self.url_action(action, U) for U in urls ] )
     return urls
 
   def url_save(self, U):
