@@ -5,6 +5,7 @@
 #
 
 from __future__ import with_statement
+import sys
 from BeautifulSoup import BeautifulSoup, Tag, BeautifulStoneSoup
 from urllib2 import urlopen, Request
 from urlparse import urlparse, urljoin
@@ -18,6 +19,9 @@ def URL(U, referer, user_agent=None):
   t = type(U)
   if t is not _URL:
     U = _URL(U)
+  if user_agent is None:
+    if referer and isinstance(referer, _URL):
+      user_agent = referer.user_agent
   if user_agent:
     U.user_agent = user_agent
   if referer:

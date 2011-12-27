@@ -185,7 +185,6 @@ class Pilfer(object):
         elif full_path:
           dir = os.path.join( '.', U.hostname, os.path.dirname(U.path), )
         else:
-          ##print >>sys.stderr, "U =", `U`, str(U), "U.hostname =", U.hostname, "U.path =", U.path
           dir = os.path.join( '.', U.hostname, os.path.basename(os.path.dirname(U.path)) )
       if require_dir:
         if not os.path.isdir(dir):
