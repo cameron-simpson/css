@@ -60,9 +60,9 @@ def main(argv):
                 if not line or line.startswith('#'):
                   debug("SKIP: %s", line)
                   continue
-                urls.extend(P.act( [ URL(line, None) ], argv ))
+                urls.extend(P.act( [ URL(line, None, P.user_agent) ], argv ))
           else:
-            urls = P.act( [ URL(url, None) ], argv)
+            urls = P.act( [ URL(url, None, P.user_agent) ], argv)
           for url in urls:
             print url
       else:
@@ -137,7 +137,7 @@ class Pilfer(object):
             error("invalid optional 'g' part, found: %s", parts[3])
             continue
           regexp = re.compile(parts[1])
-          urls = [ URL(regexp.sub(parts[2], U, ( 0 if do_all else 1 )), U) for U in urls ]
+          urls = [ URL(regexp.sub(parts[2], U, ( 0 if do_all else 1 )), U, user_agent=P.user_agent) for U in urls ]
           continue
         if action == 'sort':
           urls = sorted(list(urls))
@@ -149,11 +149,12 @@ class Pilfer(object):
           param, value = action.split('==', 1)
           if param in ('scheme', 'netloc', 'path', 'params', 'query', 'fragment', 'username', 'password', 'hostname', 'port'):
             urls = [ U for U in urls if getattr(U, param) == value ]
-          elif param in ('save_dir', 'user_agent'):
+            continue
+        if '=' in action:
+          param, value = action.split('=', 1)
+          if param in ('save_dir', 'user_agent'):
             setattr(self, param, value)
-          else:
-            raise ValueError("unknown paramater test: %s=%s" % (param, value))
-          continue
+            continue
         urls = chain( *[ self.url_action(action, U) for U in urls ] )
     return urls
 
