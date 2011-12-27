@@ -145,6 +145,13 @@ class Pilfer(object):
         if action == 'unique':
           urls = unique(urls)
           continue
+        if action == 'new_dir':
+          urls = list(urls)
+          if not urls:
+            error("no URLs in play, not making a directory")
+          else:
+            self.save_dir = self.new_save_dir(self.url_save_dir(urls[0]))
+          continue
         if '==' in action:
           param, value = action.split('==', 1)
           if param in ('scheme', 'netloc', 'path', 'params', 'query', 'fragment', 'username', 'password', 'hostname', 'port'):
@@ -160,6 +167,35 @@ class Pilfer(object):
             continue
         urls = chain( *[ self.url_action(action, U) for U in urls ] )
     return urls
+
+  def new_save_dir(self, dir):
+    try:
+      os.makedirs(dir)
+    except OSError, e:
+      if e.errno != errno.EEXIST:
+        raise
+      n = 2
+      while True:
+        ndir = "%s-%d" % (dir, n)
+        try:
+          os.makedirs(ndir)
+        except OSError, e:
+          if e.errno != errno.EEXIST:
+            raise
+          n += 1
+          continue
+        dir = ndir
+        break
+    return dir
+
+  def url_save_dir(self, U):
+    ''' Return save directory for supplied URL.
+    '''
+    if self.save_dir:
+      dir = self.save_dir
+    else:
+      dir = U.hostname+'-'+os.path.dirname(U.path).replace('/', '-')
+    return dir
 
   def url_save(self, U):
     with Pfx(U):
