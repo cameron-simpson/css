@@ -27,8 +27,9 @@ class _URL(str):
       Subclasses str.
   '''
 
-  def __init__(self, s, referer=None):
+  def __init__(self, s, referer=None, user_agent=None):
     self.referer = URL(referer) if referer else referer
+    self.user_agent = user_agent if user_agent else self.referer.user_agent if self.referer else None
     self._parts = None
     self.flush()
 
@@ -47,6 +48,7 @@ class _URL(str):
       if self.referer:
         debug("referer = %s", self.referer)
         hdrs['Referer'] = self.referer
+      hdrs['user-Agent'] = self.user_agent if self.user_agent else 'css'
       rq = Request(self, None, hdrs)
       debug("urlopen(%s[%s])", self, rq)
       rsp = urlopen(rq)
