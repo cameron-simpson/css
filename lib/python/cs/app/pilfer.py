@@ -37,7 +37,7 @@ def main(argv):
     badopts = True
   else:
     op = argv.pop(0)
-    if op.startswith('http://'):
+    if op.startswith('http://') or op.startswith('https://') :
       # infer missing "url" op word
       argv.insert(0, op)
       op ='url'
