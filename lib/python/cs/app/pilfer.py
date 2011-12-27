@@ -106,10 +106,11 @@ class Pilfer(object):
         elif action.startswith('.'):
           # select URLs endsing in suffix
           if action.endswith('/i'):
-            ext, case = action[1:-2], False
+            exts, case = action[1:-2], False
           else:
-            ext, case = action[1:], True
-          urls = list( self.with_exts( urls, suffixes=[ext], case_sensitive=case) )
+            exts, case = action[1:], True
+          exts = exts.split(',')
+          urls = list( self.with_exts( urls, suffixes=exts, case_sensitive=case) )
         elif action == 'sort':
           urls = sorted(list(urls))
         elif action == 'unique':
