@@ -154,6 +154,9 @@ class Pilfer(object):
           param, value = action.split('=', 1)
           if param in ('save_dir', 'user_agent'):
             setattr(self, param, value)
+            if param == 'user_agent':
+              for U in urls:
+                U.user_agent = value
             continue
         urls = chain( *[ self.url_action(action, U) for U in urls ] )
     return urls
