@@ -144,8 +144,8 @@ class Pilfer(object):
         if action == 'unique':
           urls = unique(urls)
           continue
-        if '=' in action:
-          param, value = action.split('=', 1)
+        if '==' in action:
+          param, value = action.split('==', 1)
           if param in ('scheme', 'netloc', 'path', 'params', 'query', 'fragment', 'username', 'password', 'hostname', 'port'):
             urls = [ U for U in urls if getattr(U, param) == value ]
           elif param in ('save_dir',):
