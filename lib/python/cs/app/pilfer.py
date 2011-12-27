@@ -140,7 +140,7 @@ class Pilfer(object):
     with Pfx("save(%s)" % (U,)):
       if dir is None:
         if full_path:
-          dir = os.path.join( '.', U.hostname, U.path, )
+          dir = os.path.join( '.', U.hostname, os.path.dirname(U.path), )
         else:
           ##print >>sys.stderr, "U =", `U`, str(U), "U.hostname =", U.hostname, "U.path =", U.path
           dir = os.path.join( '.', U.hostname, os.path.basename(os.path.dirname(U.path)) )
