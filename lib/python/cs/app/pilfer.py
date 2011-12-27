@@ -60,9 +60,10 @@ def main(argv):
                 if not line or line.startswith('#'):
                   debug("SKIP: %s", line)
                   continue
-                urls.extend(P.act( [ URL(line, None, P.user_agent) ], argv ))
+                urls.append(URL(line, None, P.user_agent))
           else:
-            urls = P.act( [ URL(url, None, P.user_agent) ], argv)
+            urls = [ URL(url, None, P.user_agent) ]
+          urls = P.act( urls, argv)
           for url in urls:
             print url
       else:
