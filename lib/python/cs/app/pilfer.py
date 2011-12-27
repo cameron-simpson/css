@@ -94,6 +94,7 @@ class Pilfer(object):
   def __init__(self):
     self.save_dir = None
     self.user_agent = None
+    self.user_vars = {}
 
   def act(self, urls, actions):
     ''' Return an iterable of the results of the actions applied to the URLs.
@@ -168,6 +169,9 @@ class Pilfer(object):
             continue
         if '=' in action:
           param, value = action.split('=', 1)
+          if len(param) == 1 and param.isalpha():
+            self.user_vars[param] = value
+            continue
           if param in ('save_dir', 'user_agent'):
             setattr(self, param, value)
             if param == 'user_agent':
