@@ -92,6 +92,7 @@ class Pilfer(object):
 
   def __init__(self):
     self.save_dir = None
+    self.user_agent = None
 
   def act(self, urls, actions):
     ''' Return an iterable of the results of the actions applied to the URLs.
@@ -148,7 +149,7 @@ class Pilfer(object):
           param, value = action.split('==', 1)
           if param in ('scheme', 'netloc', 'path', 'params', 'query', 'fragment', 'username', 'password', 'hostname', 'port'):
             urls = [ U for U in urls if getattr(U, param) == value ]
-          elif param in ('save_dir',):
+          elif param in ('save_dir', 'user_agent'):
             setattr(self, param, value)
           else:
             raise ValueError("unknown paramater test: %s=%s" % (param, value))
