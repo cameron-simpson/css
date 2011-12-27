@@ -241,6 +241,7 @@ class Pilfer(object):
           __, ext = base.rsplit('.', 1)
           if not case_sensitive:
             ext = ext.lower()
+            suffixes = [ sfx.lower() for sfx in suffixes ]
           ok = ext in suffixes
       if ok:
         yield U
