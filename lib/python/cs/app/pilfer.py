@@ -278,7 +278,9 @@ class Pilfer(object):
       try:
         savefp.write(content)
         savefp.close()
+        U.flush()
       except Exception, e:
+        U.flush()
         exception("exception writing content: %s", e)
         os.remove(savepath)
         savefp.close()
