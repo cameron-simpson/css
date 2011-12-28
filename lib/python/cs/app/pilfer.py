@@ -106,7 +106,7 @@ class Pilfer(object):
     '''
     action = list(actions)      # in case it's an iterator
     while actions:
-      action = action.pop(0)
+      action = actions.pop(0)
       with Pfx(action):
         if action == 'per':
           # depth first step at this point
