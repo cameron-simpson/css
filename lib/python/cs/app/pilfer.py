@@ -104,13 +104,14 @@ class Pilfer(object):
         off a breadth first action sequence for each current URL (this is important
         for some actions like "new_dir" etc).
     '''
-    action = list(actions)      # in case it's an iterator
+    if not isinstance(action, list):
+      action = list(actions)
     while actions:
       action = actions.pop(0)
       with Pfx(action):
         if action == 'per':
           # depth first step at this point
-          urls = chain( *[ self.act([U], actions) for U in urls ] )
+          urls = chain( *[ self.act([U], list(actions)) for U in urls ] )
           break
         if action.startswith('/'):
           # select URLs matching regexp
@@ -131,7 +132,7 @@ class Pilfer(object):
           urls = list( chain( *[ self.deselect_by_re(U, regexp) for U in urls ] ) )
           continue
         if action.startswith('.'):
-          # select URLs endsing in suffix
+          # select URLs ending in suffix
           if action.endswith('/i'):
             exts, case = action[1:-2], False
           else:
