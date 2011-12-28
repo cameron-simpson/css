@@ -71,7 +71,7 @@ def main(argv):
       else:
         error("unsupported op")
         badopts = True
-      
+
     if badopts:
       print >>sys.stderr, usage % (cmd, cmd,)
       xit = 2
@@ -100,9 +100,18 @@ class Pilfer(object):
 
   def act(self, urls, actions):
     ''' Return an iterable of the results of the actions applied to the URLs.
+        Actions apply breadth first, except at the "per" action, which kicks
+        off a breadth first action sequence for each current URL (this is important
+        for some actions like "new_dir" etc).
     '''
-    for action in actions:
+    action = list(actions)      # in case it's an iterator
+    while actions:
+      action = action.pop(0)
       with Pfx(action):
+        if action == 'per':
+          # depth first step at this point
+          urls = chain( *[ self.act([U], actions) for U in urls ] )
+          break
         if action.startswith('/'):
           # select URLs matching regexp
           if action.endswith('/'):
