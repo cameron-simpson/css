@@ -95,7 +95,7 @@ class _URL(unicode):
     '''
     if self._parsed is None:
       try:
-        self._parsed = BeautifulSoup(self.content)
+        self._parsed = BeautifulSoup(unicode(self.content))
       except HTMLParseError, e:
         with open("BS.html", "w") as bs:
           bs.write(self.content)
