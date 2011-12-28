@@ -203,7 +203,7 @@ class _URL(unicode):
       except KeyError:
         debug("no href, skip %s", A)
         continue
-      yield URL( (urljoin(self.base, href) if absolute else href), self )
+      yield URL( (urljoin(self.baseurl, href) if absolute else href), self )
 
   def srcs(self, *a, **kw):
     ''' All 'src=' values from the content HTML.
@@ -219,4 +219,4 @@ class _URL(unicode):
       except KeyError:
         debug("no src, skip %s", A)
         continue
-      yield URL( (urljoin(self.base, src) if absolute else src), self )
+      yield URL( (urljoin(self.baseurl, src) if absolute else src), self )
