@@ -175,13 +175,16 @@ class _URL(unicode):
   def findAll(self, *a, **kw):
     ''' Convenience routine to call BeautifulSoup's .findAll() method.
     '''
-    return self.parsed.findAll(*a, **kw)
+    parsed = self.parsed
+    if not parsed:
+      error("%s: parse fails", self)
+      return ()
+    return parsed.findAll(*a, **kw)
 
   def hrefs(self, absolute=False):
     ''' All 'href=' values from the content HTML 'A' tags.
         If `absolute`, resolve the sources with respect to our URL.
     '''
-    P = self.parsed
     for A in self.findAll('a'):
       try:
         href = A['href']
@@ -198,7 +201,6 @@ class _URL(unicode):
     if 'absolute' in kw:
       absolute = kw['absolute']
       del kw['absolute']
-    P = self.parsed
     for A in self.findAll(*a, **kw):
       try:
         src = A['src']
