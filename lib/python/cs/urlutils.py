@@ -10,7 +10,7 @@ from BeautifulSoup import BeautifulSoup, Tag, BeautifulStoneSoup
 from urllib2 import urlopen, Request
 from urlparse import urlparse, urljoin
 from HTMLParser import HTMLParseError
-from cs.logutils import Pfx, debug, error, warning
+from cs.logutils import Pfx, debug, error, warning, exception
 
 def URL(U, referer, user_agent=None):
   ''' Factory function to return a _URL object from a URL string.
