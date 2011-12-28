@@ -181,6 +181,18 @@ class _URL(unicode):
       return ()
     return parsed.findAll(*a, **kw)
 
+  @property
+  def baseurl(self):
+    for B in self.findAll('base'):
+      try:
+        base = B['href']
+      except KeyError:
+        pass
+      else:
+        if base:
+          return URL(base, self)
+    return self
+
   def hrefs(self, absolute=False):
     ''' All 'href=' values from the content HTML 'A' tags.
         If `absolute`, resolve the sources with respect to our URL.
@@ -191,7 +203,7 @@ class _URL(unicode):
       except KeyError:
         debug("no href, skip %s", A)
         continue
-      yield URL( (urljoin(self, href) if absolute else href), self )
+      yield URL( (urljoin(self.base, href) if absolute else href), self )
 
   def srcs(self, *a, **kw):
     ''' All 'src=' values from the content HTML.
@@ -207,4 +219,4 @@ class _URL(unicode):
       except KeyError:
         debug("no src, skip %s", A)
         continue
-      yield URL( (urljoin(self, src) if absolute else src), self )
+      yield URL( (urljoin(self.base, src) if absolute else src), self )
