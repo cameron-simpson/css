@@ -104,7 +104,7 @@ class Pilfer(object):
         off a breadth first action sequence for each current URL (this is important
         for some actions like "new_dir" etc).
     '''
-    if not isinstance(action, list):
+    if not isinstance(actions, list):
       action = list(actions)
     while actions:
       action = actions.pop(0)
