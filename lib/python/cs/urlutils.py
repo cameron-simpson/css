@@ -94,12 +94,14 @@ class _URL(unicode):
     ''' The URL content parsed as HTML by BeautifulSoup.
     '''
     if self._parsed is None:
+      content = self.content
       try:
-        self._parsed = BeautifulSoup(unicode(self.content))
-      except HTMLParseError, e:
-        with open("BS.html", "w") as bs:
+        self._parsed = BeautifulSoup(unicode(content))
+      except Exception, e:
+        exception("%s: .parsed: BeautifulSoup(unicode(content)) fails: %s", self, e)
+        with open("cs.urlutils-unparsed.html", "w") as bs:
           bs.write(self.content)
-        raise
+        self._parsed = None
     return self._parsed
 
   @property
