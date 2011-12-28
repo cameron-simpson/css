@@ -24,4 +24,4 @@ then
 fi
 
 set -x
-exec pilfer url "$url" per new_dir hrefs samescheme $selector ${1+"$@"} unique save
+exec pilfer url "$url" per save_dir= new_dir hrefs samescheme $selector ${1+"$@"} unique save
