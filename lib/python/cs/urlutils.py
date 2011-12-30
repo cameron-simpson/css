@@ -5,6 +5,7 @@
 #
 
 from __future__ import with_statement
+import os.path
 import sys
 from BeautifulSoup import BeautifulSoup, Tag, BeautifulStoneSoup
 from urllib2 import urlopen, Request
@@ -172,14 +173,17 @@ class _URL(unicode):
     '''
     return self.parts.port
 
-  def find(self, *a, **kw):
-    ''' Convenience routine to call BeautifulSoup's .find() method.
-    '''
-    parsed = self.parsed
-    if not parsed:
-      error("%s: parse fails", self)
-      return ()
-    return parsed.find(*a, **kw)
+  @property
+  def dirname(self, absolute=False):
+    return os.path.dirname(self.path)
+
+  @property
+  def parent(self):
+    return URL(urljoin(self, self.dirname), self)
+
+  @property
+  def basename(self):
+    return os.path.basename(self.path)
 
   def findAll(self, *a, **kw):
     ''' Convenience routine to call BeautifulSoup's .findAll() method.
@@ -204,10 +208,10 @@ class _URL(unicode):
 
   @property
   def title(self):
-    T = self.find('title')
-    if T is None:
+    Ts = self.findAll('title')
+    if not Ts:
       return ""
-    return T.string
+    return Ts[0].string
 
   def hrefs(self, absolute=False):
     ''' All 'href=' values from the content HTML 'A' tags.
