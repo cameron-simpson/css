@@ -17,6 +17,7 @@ from urllib2 import HTTPError, URLError
 from cs.logutils import setup_logging, Pfx, debug, error, warning, exception
 from cs.urlutils import URL
 
+ARCHIVE_SUFFIXES = ( 'tar', 'tgz', 'tar.gz', 'tar.bz2', 'cpio', 'rar', 'zip', 'dmg' )
 IMAGE_SUFFIXES = ( 'png', 'jpg', 'jpeg', 'gif', 'ico', )
 VIDEO_SUFFIXES = ( 'mp2', 'mp4', 'avi', 'wmv', )
 
@@ -380,6 +381,9 @@ class Pilfer(object):
     if U.scheme == U.referer.scheme:
       yield U
 
+  def url_isarchive(self, U):
+    return self.with_exts([U], ARCHIVE_SUFFIXES)
+
   def url_isimage(self, U):
     return self.with_exts([U], IMAGE_SUFFIXES)
 
@@ -396,10 +400,15 @@ class Pilfer(object):
     if not m:
       yield U
 
+  def url_print_title(self, U):
+    print U.title
+    yield U
+
   action_map = {
         'hrefs':    url_hrefs,
         'images':   url_images,
         'iimages':  url_inline_images,
+        'isarchive': url_isarchive,
         'isimage':  url_isimage,
         'isvideo':  url_isvideo,
         'print':    url_print,
@@ -407,6 +416,7 @@ class Pilfer(object):
         'samehostname': url_samehostname,
         'samescheme': url_samescheme,
         'save':     url_save,
+        'title':    url_print_title,
         'type':     url_print_type,
       }
 
