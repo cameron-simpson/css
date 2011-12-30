@@ -172,6 +172,15 @@ class _URL(unicode):
     '''
     return self.parts.port
 
+  def find(self, *a, **kw):
+    ''' Convenience routine to call BeautifulSoup's .find() method.
+    '''
+    parsed = self.parsed
+    if not parsed:
+      error("%s: parse fails", self)
+      return ()
+    return parsed.find(*a, **kw)
+
   def findAll(self, *a, **kw):
     ''' Convenience routine to call BeautifulSoup's .findAll() method.
     '''
@@ -192,6 +201,13 @@ class _URL(unicode):
         if base:
           return URL(base, self)
     return self
+
+  @property
+  def title(self):
+    T = self.find('title')
+    if T is None:
+      return ""
+    return T.string
 
   def hrefs(self, absolute=False):
     ''' All 'href=' values from the content HTML 'A' tags.
