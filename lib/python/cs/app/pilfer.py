@@ -175,9 +175,11 @@ class Pilfer(object):
         if action == 'new_dir':
           urls = list(urls)
           if not urls:
-            error("no URLs in play, not making a directory")
-          else:
-            self.save_dir = self.new_save_dir(self.url_save_dir(urls[0]))
+            return ()
+          if len(urls) > 1:
+            actions = [ 'per', action ] + actions
+            continue
+          self.save_dir = self.new_save_dir(self.url_save_dir(urls[0]))
           continue
         if '==' in action:
           param, value = action.split('==', 1)
@@ -187,7 +189,13 @@ class Pilfer(object):
         if '=' in action:
           param, value = action.split('=', 1)
           if len(param) == 1 and param.isalpha():
-            self.user_vars[param] = value
+            urls = list(urls)
+            if not urls:
+              return ()
+            if len(urls) > 1:
+              actions = ['per', action ] + actions
+              continue
+            self.user_vars[param] = self.format_string(value, urls[0])
             continue
           if param in ('save_dir', 'user_agent'):
             setattr(self, param, value)
