@@ -241,6 +241,13 @@ class Pfx_LoggerAdapter(myLoggerAdapter):
       msg = prefix.replace('%', '%%') + ": " + msg
     return msg, kwargs
 
+def pfx_iter(tag, iter):
+  ''' Wrapper for iterators to prefix exceptions with `tag`.
+  '''
+  with Pfx(tag):
+    for i in iter:
+      yield i
+
 def pfx(func):
   ''' Decorator for functions that should run inside:
         with Pfx(func_name):
