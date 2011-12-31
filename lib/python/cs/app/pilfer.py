@@ -266,7 +266,7 @@ class Pilfer(object):
     if self.save_dir:
       dir = self.save_dir
     else:
-      dir = U.hostname+'-'+os.path.dirname(U.path).replace('/', '-')
+      dir = "%s-%s--%s" % (U.hostname, os.path.dirname(U.path).replace('/', '-'), '-'.join(U.title.split()))
     return dir
 
   def url_save(self, U):
