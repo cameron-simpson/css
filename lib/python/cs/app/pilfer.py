@@ -276,6 +276,7 @@ class Pilfer(object):
   def url_save_dir(self, U):
     ''' Return save directory for supplied URL.
     '''
+    U = URL(U)
     if self.save_dir:
       dir = self.save_dir
     else:
