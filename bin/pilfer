@@ -1,2 +1,2 @@
 #!/bin/sh
-exec py25+ -m cs.app.pilfer ${1+"$@"}
+exec py26+ -m cs.app.pilfer ${1+"$@"}
