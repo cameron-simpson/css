@@ -271,10 +271,7 @@ class Pilfer(object):
 
   def url_save(self, U):
     with Pfx(U):
-      if self.save_dir:
-        dir = self.save_dir
-      else:
-        dir = U.hostname+'-'+os.path.dirname(U.path).replace('/', '-')
+      dir = self.url_save_dir(U)
       try:
         self.url_save_full(U, dir, overwrite_dir=True)
       except HTTPError, e:
