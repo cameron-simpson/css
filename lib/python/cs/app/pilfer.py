@@ -200,7 +200,7 @@ class Pilfer(object):
             if len(urls) > 1:
               actions = ['per', action ] + actions
               continue
-            self.user_vars[param] = self.format_string(value, urls[0])
+            self.user_vars[param] = self.format_string(value, URL(urls[0]))
             continue
           if param in ('save_dir', 'user_agent'):
             setattr(self, param, value)
