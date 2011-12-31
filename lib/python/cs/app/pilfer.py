@@ -426,6 +426,12 @@ class Pilfer(object):
     print ",".join( self.format_string(arg, U) for arg in args )
     yield U
 
+  def url_quote(self, U):
+    yield quote(U)
+
+  def url_unquote(self, U):
+    yield unquote(U)
+
   def url_print_type(self, U):
     print U, U.content_type
     yield U
@@ -473,6 +479,8 @@ class Pilfer(object):
         'isimage':  url_isimage,
         'isvideo':  url_isvideo,
         'print':    url_print,
+        'quote':    url_quote,
+        'unquote':    url_unquote,
         'samedomain': url_samedomain,
         'samehostname': url_samehostname,
         'samescheme': url_samescheme,
