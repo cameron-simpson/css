@@ -15,7 +15,7 @@ import re
 if sys.hexversion < 0x02060000: from sets import Set as set
 from string import Formatter
 from urllib2 import HTTPError, URLError
-from cs.logutils import setup_logging, Pfx, debug, error, warning, exception
+from cs.logutils import setup_logging, Pfx, debug, error, warning, exception, pfx_iter
 from cs.urlutils import URL
 
 ARCHIVE_SUFFIXES = ( 'tar', 'tgz', 'tar.gz', 'tar.bz2', 'cpio', 'rar', 'zip', 'dmg' )
@@ -113,7 +113,7 @@ class Pilfer(object):
       with Pfx(action):
         if action == 'per':
           # depth first step at this point
-          urls = chain( *[ self.act([U], list(actions)) for U in urls ] )
+          urls = pfx_iter(action, chain( *[ self.act([U], list(actions)) for U in urls ] ) )
           break
         if action.startswith('/'):
           # select URLs matching regexp
@@ -122,7 +122,7 @@ class Pilfer(object):
           else:
             regexp = action[1:]
           regexp = re.compile(regexp)
-          urls = chain( *[ self.select_by_re(U, regexp) for U in urls ] )
+          urls = pfx_iter(action, chain( *[ self.select_by_re(U, regexp) for U in urls ] ) )
           continue
         if action.startswith('-/'):
           # select URLs matching regexp
@@ -131,10 +131,11 @@ class Pilfer(object):
           else:
             regexp = action[2:]
           regexp = re.compile(regexp)
-          urls = chain( *[ self.deselect_by_re(U, regexp) for U in urls ] )
+          urls = pfx_iter(action, chain( *[ self.deselect_by_re(U, regexp) for U in urls ] ) )
           continue
         if action == '..':
-          urls = [ U.parent for U in urls ]
+          # URL parent dir
+          urls = pfx_iter(action, [ U.parent for U in urls ] )
           continue
         if action.startswith('.'):
           # select URLs ending in suffix
@@ -143,9 +144,10 @@ class Pilfer(object):
           else:
             exts, case = action[1:], True
           exts = exts.split(',')
-          urls = self.with_exts(urls, suffixes=exts, case_sensitive=case)
+          urls = pfx_iter(action, self.with_exts(urls, suffixes=exts, case_sensitive=case) )
           continue
         if len(action) > 4 and action.startswith('s') and not action[1].isalnum() and action[1] != '_':
+          # s/this/that/g
           marker = action[1]
           parts = action.split(marker)
           if len(parts) < 3:
@@ -164,10 +166,12 @@ class Pilfer(object):
             error("invalid optional 'g' part, found: %s", parts[3])
             continue
           regexp = re.compile(parts[1])
-          urls = [ URL(regexp.sub(parts[2], U, ( 0 if do_all else 1 )), U, user_agent=self.user_agent) for U in urls ]
+          urls = pfx_iter(action,
+                          [ URL(regexp.sub(parts[2], U, ( 0 if do_all else 1 )), U, user_agent=self.user_agent)
+                            for U in urls ] )
           continue
         if action == 'sort':
-          urls = sorted(list(urls))
+          urls = sorted(urls)
           continue
         if action == 'unique':
           urls = unique(urls)
@@ -184,7 +188,7 @@ class Pilfer(object):
         if '==' in action:
           param, value = action.split('==', 1)
           if param in ('scheme', 'netloc', 'path', 'params', 'query', 'fragment', 'username', 'password', 'hostname', 'port'):
-            urls = [ U for U in urls if getattr(U, param) == value ]
+            urls = pfx_iter(action,  [ U for U in urls if getattr(U, param) == value ] )
             continue
         if '=' in action:
           param, value = action.split('=', 1)
@@ -203,7 +207,7 @@ class Pilfer(object):
               for U in urls:
                 U.user_agent = value
             continue
-        urls = chain( *[ self.url_action(action, U) for U in urls ] )
+        urls = pfx_iter(action, chain( *[ self.url_action(action, U) for U in urls ] ) )
     return urls
 
   class URLkeywords(object):
