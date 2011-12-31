@@ -426,6 +426,12 @@ class Pilfer(object):
     print ",".join( self.format_string(arg, U) for arg in args )
     yield U
 
+  def url_query(self, U, *a):
+    if not a:
+      yield U.query
+    qsmap = dict( [ ( qsp.split('=', 1) if '=' in qsp else (qsp, '') ) for qsp in U.query.split('&') ] )
+    yield ','.join( [ unquote(qsmap.get(qparam, '')) for qparam in a ] )
+
   def url_quote(self, U):
     yield quote(U)
 
@@ -479,6 +485,7 @@ class Pilfer(object):
         'isimage':  url_isimage,
         'isvideo':  url_isvideo,
         'print':    url_print,
+        'query':    url_query,
         'quote':    url_quote,
         'unquote':    url_unquote,
         'samedomain': url_samedomain,
