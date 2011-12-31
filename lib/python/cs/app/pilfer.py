@@ -14,6 +14,7 @@ from itertools import chain
 import re
 if sys.hexversion < 0x02060000: from sets import Set as set
 from string import Formatter
+from urllib import quote, unquote
 from urllib2 import HTTPError, URLError
 from cs.logutils import setup_logging, Pfx, debug, error, warning, exception, pfx_iter
 from cs.urlutils import URL
