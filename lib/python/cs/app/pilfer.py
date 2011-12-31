@@ -13,6 +13,7 @@ import os.path
 from itertools import chain
 import re
 if sys.hexversion < 0x02060000: from sets import Set as set
+from string import Formatter
 from urllib2 import HTTPError, URLError
 from cs.logutils import setup_logging, Pfx, debug, error, warning, exception
 from cs.urlutils import URL
@@ -142,7 +143,7 @@ class Pilfer(object):
           else:
             exts, case = action[1:], True
           exts = exts.split(',')
-          urls = self.with_exts( urls, suffixes=exts, case_sensitive=case)
+          urls = self.with_exts(urls, suffixes=exts, case_sensitive=case)
           continue
         if len(action) > 4 and action.startswith('s') and not action[1].isalnum() and action[1] != '_':
           marker = action[1]
@@ -196,6 +197,48 @@ class Pilfer(object):
             continue
         urls = chain( *[ self.url_action(action, U) for U in urls ] )
     return urls
+
+  class URLkeywords(object):
+    ''' A proxy object to fetch approved attributes from a URL.
+    '''
+
+    _approved = (
+                  'archives',
+                  'dirname',
+                  'hrefs',
+                  'images',
+                  'parent',
+                  'path',
+                  'referer',
+                  'srcs',
+                  'title',
+                  'url',
+                  'videos',
+                )
+
+    def __init__(self, U):
+      self.url = U
+
+    def keys(self):
+      return Pilfer.URLkeywords._approved
+
+    def __getitem__(self, k):
+      url = self.url
+      with Pfx(url):
+        if k not in Pilfer.URLkeywords._approved:
+          raise KeyError(k)
+        if k == 'url':
+          return url
+        try:
+          return getattr(url, k)
+        except AttributeError:
+          raise KeyError("no such attribute: .%s" % (k,))
+
+  def format_string(self, s, U):
+    ''' Format a string using the URL as context.
+    '''
+    F = Formatter()
+    return F.vformat(s, (), Pilfer.URLkeywords(U))
 
   def new_save_dir(self, dir):
     try:
@@ -306,11 +349,15 @@ class Pilfer(object):
     ''' Accept `action` and URL `U`, yield results of action applied to URL.
     '''
     global actions
-    with Pfx("%s(%s)" % (action, U)):
+    if ':' in action:
+      action, arg_string = action.split(':', 1)
+    else:
+      arg_string = ""
+    with Pfx("%s(%s)%s" % (action, U, arg_string)):
       url_func = self.action_map.get(action)
       if url_func is None:
         raise ValueError("unknown action")
-      return url_func(self, U)
+      return url_func(self, U, *( arg_string.split(',') if len(arg_string) else () ))
 
   def url_hrefs(self, U, *a, **kw):
     with Pfx("hrefs(%s)" % (U,)):
@@ -364,8 +411,10 @@ class Pilfer(object):
   def url_inline_images(self, U):
     return self.with_exts( self.url_srcs(U, 'img', absolute=True), IMAGE_SUFFIXES)
 
-  def url_print(self, U):
-    print U
+  def url_print(self, U, *args):
+    if not args:
+      args = (U,)
+    print ",".join( self.format_string(arg, U) for arg in args )
     yield U
 
   def url_print_type(self, U):
