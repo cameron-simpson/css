@@ -186,7 +186,12 @@ class Pilfer(object):
             continue
           # HACK
           self.save_dir = None
-          self.save_dir = self.new_save_dir(self.url_save_dir(urls[0]))
+          try:
+            save_dir = self.url_save_dir(urls[0])
+          except HTTPError, e:
+            error("%s: %s", urls[0], e)
+            return ()
+          self.save_dir = self.new_save_dir(save_dir)
           continue
         if '==' in action:
           param, value = action.split('==', 1)

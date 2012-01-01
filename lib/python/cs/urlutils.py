@@ -8,7 +8,7 @@ from __future__ import with_statement
 import os.path
 import sys
 from BeautifulSoup import BeautifulSoup, Tag, BeautifulStoneSoup
-from urllib2 import urlopen, Request
+from urllib2 import urlopen, Request, HTTPError, URLError
 from urlparse import urlparse, urljoin
 from HTMLParser import HTMLParseError
 from cs.logutils import Pfx, debug, error, warning, exception
@@ -63,6 +63,18 @@ class _URL(unicode):
       self._content_type = H.gettype()
       self._content = rsp.read()
       self._parsed = None
+
+  def get_content(self, onerror=None):
+    ''' Probe URL for content to avoid exceptions later.
+        Use, and save as .content, `onerror` in the case of HTTPError.
+    '''
+    try:
+      content = self.content
+    except (HTTPError, URLError), e:
+      error("%s.get_content: %s", self, e)
+      content = onerror
+    self._content = content
+    return content
 
   @property
   def content(self):
