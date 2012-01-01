@@ -284,6 +284,7 @@ class Pilfer(object):
     ''' Return save directory for supplied URL.
     '''
     U = URL(U, None)
+    U.get_content("")   # probe content
     if self.save_dir:
       dir = self.save_dir
     else:
