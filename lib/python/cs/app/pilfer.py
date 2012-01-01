@@ -184,6 +184,8 @@ class Pilfer(object):
           if len(urls) > 1:
             actions = [ 'per', action ] + actions
             continue
+          # HACK
+          self.save_dir = None
           self.save_dir = self.new_save_dir(self.url_save_dir(urls[0]))
           continue
         if '==' in action:
