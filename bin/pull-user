@@ -62,7 +62,7 @@ else
         fi
         ;;
     *@?*);;
-    *)  echo "$cmd: invalue user@host: $remote" >&2
+    *)  echo "$cmd: invalid user@host: $remote" >&2
         badopts=1
         ;;
   esac
