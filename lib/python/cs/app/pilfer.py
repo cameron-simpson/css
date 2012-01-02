@@ -382,29 +382,15 @@ class Pilfer(object):
     with Pfx("hrefs(%s)" % (U,)):
       if 'absolute' not in kw:
         kw['absolute'] = True
-      hrefs = ()
-      try:
-        # using list() to run now instead of deferred
-        hrefs = list(U.hrefs(*a, **kw))
-      except HTTPError, e:
-        error("%s", e)
-      except URLError, e:
-        error("%s", e)
-      return hrefs
+      U.get_content("")
+      return list(U.hrefs(*a, **kw))
 
   def url_srcs(self, U, *a, **kw):
     with Pfx("srcs(%s)" % (U,)):
       if 'absolute' not in kw:
         kw['absolute'] = True
-      hrefs = ()
-      try:
-        # using list() to run now instead of deferred
-        hrefs = list(U.srcs(*a, **kw))
-      except HTTPError, e:
-        error("%s", e)
-      except URLError, e:
-        error("%s", e)
-      return hrefs
+      U.get_content("")
+      return list(U.srcs(*a, **kw))
 
   def with_exts(self, urls, suffixes, case_sensitive=False):
     for U in urls:
@@ -502,6 +488,7 @@ class Pilfer(object):
         'samehostname': url_samehostname,
         'samescheme': url_samescheme,
         'save':     url_save,
+        'srcs':     url_srcs,
         'title':    url_print_title,
         'type':     url_print_type,
       }
