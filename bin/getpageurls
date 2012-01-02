@@ -1,3 +1,0 @@
-#!/bin/sh
-set -x
-exec httpget -v -I 1 ${1+"$@"}

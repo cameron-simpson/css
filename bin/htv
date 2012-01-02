@@ -1,9 +1,0 @@
-#!/bin/sh
-#
-# Look at the results of an HTTP fetch.
-#	- Cameron Simpson <cs@zip.com.au>
-#
-
-[ $# = 1 ] || { echo "Usage: $0 url" >&2; exit 2; }
-
-exec pageif httpget -v -h -o - "$1"

@@ -1,2 +1,0 @@
-#!/bin/sh
-exec httpget $vflag -o - ${1+"$@"}

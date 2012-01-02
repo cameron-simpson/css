@@ -1,7 +1,0 @@
-#!/bin/sh
-#
-# Extract URLs from web pages. Recode after "urls" recode :-(
-#	- Cameron Simpson <cs@zip.com.au> 25aug2000
-#
-
-exec httpget -I 1 -n ${1+"$@"}
