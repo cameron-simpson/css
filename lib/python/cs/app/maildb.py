@@ -169,7 +169,7 @@ class _MailDB(NodeDB):
       realname, coreaddr = addr
     coreaddr = coreaddr.lower()
     if  len(coreaddr) == 0:
-      raise ValueError("core(%s) => %s" % (`addr`, `coreaddr`))
+      raise ValueError("core(%s) => %s" % (repr(addr), repr(coreaddr)))
     A = self.get( ('ADDRESS', coreaddr), doCreate=True)
     if 'REALNAME' not in A or not len(A.REALNAME):
       A.REALNAME = realname

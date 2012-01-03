@@ -253,7 +253,7 @@ def totoken(value):
   if type(value) is int:
     return str(value)
 
-  raise ValueError, "can't turn into token: %s" % (`value`,)
+  raise ValueError, "can't turn into token: %s" % (repr(value),)
 
 if __name__ == '__main__':
   import cs.nodedb.text_tests

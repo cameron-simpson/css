@@ -309,7 +309,7 @@ class Rules(list):
       if R.match(M, state):
         filed = []
         for action, arg in R.actions:
-          print >>sys.stderr, "action =", `action`, "arg =", `arg`
+          print >>sys.stderr, "action =", repr(action), "arg =", repr(arg)
           if action == 'SAVE':
             savepath = None
             mdir = Maildir(os.path.join(os.environ['MAILDIR'], arg))

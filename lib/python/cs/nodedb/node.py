@@ -718,7 +718,8 @@ class NodeDB(dict):
       return self[item]
     except KeyError:
       if doCreate:
-        assert default is None, "doCreate is True but default=%s" % (`default`,)
+        if default is not None:
+          raise ValueError, "doCreate is True but default is %s" % (repr(default),)
         return self.newNode(item)
       return default
 

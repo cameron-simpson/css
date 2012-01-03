@@ -28,7 +28,7 @@ class TestTokeniser(unittest.TestCase):
       value2 = fromtoken(token, self.db)
       self.assert_(value == value2,
                    "round trip %s -> %s -> %s fails"
-                   % (`value`, `token`, `value2`))
+                   % (repr(value), repr(token), repr(value2)))
 
   def test03get_commatext(self):
     ''' Test get_commatext word parser. '''
