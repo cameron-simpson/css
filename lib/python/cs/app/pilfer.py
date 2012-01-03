@@ -299,6 +299,7 @@ class Pilfer(object):
         error("%s", e)
         return
       if a:
+        a = list(a)
         saveas = a.pop(0)
         if a:
           raise ValueError, "extra arguments to 'save': "+", ".join(a)
