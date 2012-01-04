@@ -115,6 +115,11 @@ def parseMakefile(fp, parent_context=None):
             target.addAction(context, line)
           continue
 
+      line = line.strip()
+      if not line or line.startswith('#'):
+        # skip blank lines and comments
+        continue
+
       assert not target, "expected target is None, but target = %s" % (target,)
 
       m = RE_ASSIGNMENT.match(line)
