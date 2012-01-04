@@ -68,7 +68,7 @@ class Maker(object):
     if makefile is None:
       makefile = self.makefile
     with Pfx("load %s" % (makefile,)):
-      for O in parseMakefile(makefile):
+      for O in parseMakefile(makefile, [self._macros]):
         if isinstance(O, Target):
           info("add target %s", O)
           self._targets[O.name] = O
@@ -76,26 +76,29 @@ class Maker(object):
           info("add macro %s", O)
           self._macros[O.name] = O
         else:
-          raise ValueError, "unsupported parse item of type {} form parseMakefile({})".format(type(O), makefile)
+          raise ValueError, "unsupported parse item of type {} form parseMakefile({}): {}".format(type(O), makefile, repr(O))
 
 class Target(object):
 
-  def __init__(self, context, name, prereqs=()):
+  def __init__(self, name, context, prereqs, postprereqs, actions):
     ''' Initialise a new target.
         `context`: the file context, for citations.
-        `target`: the name of the target.
+        `name`: the name of the target.
+        `prereqs`: macro expression to produce prereqs.
+        `postprereqs`: macro expression to produce post prereqs.
     '''
     self.context = context
-    self.name = target
+    self.name = name
+    self._prereqs = prereqs
+    self._postprereqs = postprereqs
     self.maker = None
-    self.prereqs = set(prereqs)
     self.actions = []
     self.state = "unmade"
     self._statusLF = None
     self._lock = allocate_lock()
 
   def __str__(self):
-    return "{}[{}]".format(self.name, self.state)
+    return "{}[{}]:{}:{}".format(self.name, self.state, self._prereqs, self._postprereqs)
 
   def make(self, maker):
     ''' Request that this target be made.
@@ -112,6 +115,16 @@ class Target(object):
       if self._statusLF is None:
         self._statusLF = self.maker._makeQ.submit(self._make, name="make "+self.name, priority=PRI_MAKE)
     return self._statusLF
+
+  @property
+  def prereqs(self):
+    ''' Return the prerequisites target names.
+    '''
+    with self._lock:
+      prereqs = self._prereqs
+      if isinstance(_prereqs, MacroExpression):
+        self._prereqs = prereqs.eval().split()
+    return self._prereqs
 
   @property
   def status(self):
@@ -142,8 +155,9 @@ class Target(object):
 
 class Action(object):
 
-  def __init__(self, maker):
-    self.maker = maker
+  def __init__(self, context, line):
+    self.context = context
+    self.line = line
     self._lock = allocate_lock()
 
   @property
