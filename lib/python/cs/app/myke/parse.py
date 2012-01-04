@@ -98,6 +98,11 @@ def parseMakefile(fp, parent_context=None):
         prevline = line[:-2]
         continue
 
+      line = line.rstrip()
+      if not line or line.lstrip().startswith('#'):
+        # skip blank lines and comments
+        continue
+
       if line.startswith(':'):
         raise NotImplementedError, "directives unimplemented"
 
@@ -114,11 +119,6 @@ def parseMakefile(fp, parent_context=None):
           else:
             target.addAction(context, line)
           continue
-
-      line = line.strip()
-      if not line or line.startswith('#'):
-        # skip blank lines and comments
-        continue
 
       assert not target, "expected target is None, but target = %s" % (target,)
 
