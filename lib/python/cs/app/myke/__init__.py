@@ -3,6 +3,8 @@
 from cs.logutils import setup_logging, warning, error
 from cs.app.myke.make import Maker
 
+default_cmd = 'myke'
+
 usage="Usage: %s [options...] [targets...]"
 
 def main(argv):
@@ -15,6 +17,8 @@ def main(argv):
   if badopts:
     print >>sys.stderr, usage % (cmd,)
     return 2
+
+  M.loadMakefile()
 
   xit = M.make(args)
   return xit
