@@ -1,7 +1,11 @@
 #!/usr/bin/python
 #
 
+import sys
+import os.path
 from thread import allocate_lock
+from cs.logutils import Pfx, info, error
+from .parse import parseMakefile, Macro
 
 # actions come first, to keep the queue narrower
 PRI_ACTION = 0
@@ -16,17 +20,42 @@ class Maker(object):
     ''' Initialise a Maker.
     '''
     self.failFast = True
+    self._makefile = None
     self._targets = {}
     self._targets_lock = allocate_lock()
+    self._macros = {}
+    self._macros_lock = allocate_lock()
+
+  @property
+  def makefile(self):
+    if self._makefile is None:
+      import cs.misc
+      self._makefile = os.path.basename(cs.misc.cmd).title() + 'file'
+    return self._makefile
 
   def make(self, targets):
     ''' Make a bunch of targets.
     '''
-    ok = False
+    Tlist = []
     for target in targets:
-      T = self.T
+      if type(target) is str:
+        T = self.targets.get(target)
+        if not target:
+          error("don't know how to make %s", target)
+      else:
+        T = target
+      T.make(self)
+      Tlist.append(T)
+    ok = True
+    for T in Tlist:
+      if not T.status:
+        error("make %s fails", T)
+        ok = False
+    return ok
 
   def __getitem__(self, target):
+    ''' Return the specified Target.
+    '''
     targets = self._targets
     with self._targets_lock:
       if target in targets:
@@ -35,19 +64,54 @@ class Maker(object):
         T = targets[target] = Target(target, self)
     return T
 
+  def loadMakefile(self, makefile=None):
+    if makefile is None:
+      makefile = self.makefile
+    with Pfx("load %s" % (makefile,)):
+      for O in parseMakefile(makefile):
+        if isinstance(O, Target):
+          info("add target %s", O)
+          self._targets[O.name] = O
+        elif isinstance(O, Macro):
+          info("add macro %s", O)
+          self._macros[O.name] = O
+        else:
+          raise ValueError, "unsupported parse item of type {} form parseMakefile({})".format(type(O), makefile)
+
 class Target(object):
 
-  def __init__(self, target, maker):
+  def __init__(self, context, name, prereqs=()):
     ''' Initialise a new target.
+        `context`: the file context, for citations.
         `target`: the name of the target.
-        `maker`: the context Maker.
     '''
+    self.context = context
     self.name = target
-    self.maker = maker
-    self.prereqs = set()
+    self.maker = None
+    self.prereqs = set(prereqs)
     self.actions = []
+    self.state = "unmade"
     self._statusLF = None
     self._lock = allocate_lock()
+
+  def __str__(self):
+    return "{}[{}]".format(self.name, self.state)
+
+  def make(self, maker):
+    ''' Request that this target be made.
+        Check the status property to find out how things went; it will block if necessary.
+    '''
+    with self._lock:
+      if self.maker is None:
+        self.maker = maker
+    return self._status_func
+
+  @property
+  def _status_func(self):
+    with self._lock:
+      if self._statusLF is None:
+        self._statusLF = self.maker._makeQ.submit(self._make, name="make "+self.name, priority=PRI_MAKE)
+    return self._statusLF
 
   @property
   def status(self):
@@ -56,10 +120,7 @@ class Target(object):
         Internally it dispatches a LateFunction to make the target
         at need.
     '''
-    with self._lock:
-      if self._statusLF is None:
-        self._statusLF = self.maker._makeQ.submit(self._make, name="make "+self.name, priority=PRI_MAKE)
-    return self._statusLF()
+    return self._status_LF()
 
   def _make(self):
     ''' Make the target.
@@ -67,6 +128,7 @@ class Target(object):
     with Pfx(self.name):
       ok = True
       for dep in self.prereqs:
+        dep.make(self.maker)    # request item
         if not dep.status:
           ok = False
           if self.maker.failFast:
@@ -93,3 +155,9 @@ class Action(object):
 
   def _run(self):
     raise NotImplementedError
+
+if __name__ == '__main__':
+  from . import main, default_cmd
+  print >>sys.stderr, "argv =", repr(sys.argv)
+  sys.stderr.flush()
+  sys.exit(main([default_cmd]+sys.argv[1:]))
