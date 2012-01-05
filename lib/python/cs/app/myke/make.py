@@ -3,9 +3,11 @@
 
 import sys
 import os.path
+from subprocess import Popen
 from thread import allocate_lock
+from cs.later import Later
 from cs.logutils import Pfx, info, error
-from .parse import parseMakefile, Macro
+from .parse import parseMakefile, Macro, parseMacroExpression
 
 # actions come first, to keep the queue narrower
 PRI_ACTION = 0
@@ -16,10 +18,13 @@ class Maker(object):
   ''' Main class representing a set of dependencies to make.
   '''
 
-  def __init__(self):
+  def __init__(self, parallel=None):
     ''' Initialise a Maker.
     '''
+    if parallel is None:
+      parallel = 1
     self.failFast = True
+    self._makeQ = Later(parallel)
     self._makefile = None
     self._targets = {}
     self._targets_lock = allocate_lock()
@@ -110,6 +115,15 @@ class Target(object):
     return self._status_func
 
   @property
+  def status(self):
+    ''' Return the madeness of this target, True for successfully
+        made, False for failure to make.
+        Internally it dispatches a LateFunction to make the target
+        at need.
+    '''
+    return self._status_func()
+
+  @property
   def _status_func(self):
     with self._lock:
       if self._statusLF is None:
@@ -118,7 +132,7 @@ class Target(object):
 
   @property
   def prereqs(self):
-    ''' Return the prerequisites target names.
+    ''' Return the prerequisite target names.
     '''
     with self._lock:
       prereqs = self._prereqs
@@ -126,17 +140,8 @@ class Target(object):
         self._prereqs = prereqs.eval().split()
     return self._prereqs
 
-  @property
-  def status(self):
-    ''' Return the madeness of this target, True for successfully
-        made, False for failure to make.
-        Internally it dispatches a LateFunction to make the target
-        at need.
-    '''
-    return self._status_LF()
-
   def _make(self):
-    ''' Make the target.
+    ''' Make the target. Private function submtted to the make queue.
     '''
     with Pfx(self.name):
       ok = True
@@ -149,16 +154,45 @@ class Target(object):
       if not ok:
         return False
       for action in self.actions:
-        if not action.status:
+        LF = action._submit(self.maker, self)
+        if not LF:
           return False
       return True
 
 class Action(object):
 
-  def __init__(self, context, line):
+  def __init__(self, context, variant, line):
     self.context = context
+    self.variant = variant
     self.line = line
+    self.mexpr = parseMacroExpression(context, line)
     self._lock = allocate_lock()
+
+  def _submit(self, maker, target):
+    ''' Submit instance of this action for a specific target.
+        Should really only be called by Target._make().
+    '''
+    return self.maker._makeQ.submit(partial(self._act, target), name="{}: {}: {}".format(target.name, self.variant, self.line), priority=PRI_ACTION)
+
+  def _act(self, target):
+    v = self.variant
+    if v == 'shell':
+      shcmd = self.mexpr.eval()
+      argv = (target.shell, '-c', shcmd)
+      P = Popen(argv, close_fds=True)
+      retcode = P.wait()
+      return retcode == 0
+
+    if v == 'make':
+      subtargets = self.mexpr.eval().split()
+      for submake in subtargets:
+        self.maker[submake].make()
+      for submake in submakes:
+        if not self.maker[submake].status:
+          return False
+      return True
+
+    raise NotImplementedError, "unsupported variant: %s" % (self.variant,)
 
   @property
   def status(self):

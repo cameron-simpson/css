@@ -8,12 +8,18 @@ import re
 import unittest
 from cs.logutils import error, Pfx
 
+re_identifier = r'[A-Za-z]\w*'
+RE_IDENTIFIER = re.compile(re_identifier)
+
+# macro assignment, including leading whitespace
+#
 # match
 #  identifier =
 # or
 #  identifier(param[,param...]) =
 #
-RE_ASSIGNMENT = re.compile( r'^\s*([A-Za-z_]\w*)(\([A-Za-z_]\w*(\s*,\s*[A-Za-z_]\w*)*\s*\))?\s*=' )
+re_assignment = r'^\s*(' + re_identifier + ')(\(' + re_identifier + '(\s*,\s*' + re_identifier + ')*\s*\))?\s*='
+RE_ASSIGNMENT = re.compile( re_assignment )
 
 RE_COMMASEP = re.compile( r'\s*,\s*' )
 
@@ -121,9 +127,16 @@ def parseMakefile(fp, namespaces, parent_context=None):
             line = line.strip()
             if line.startswith(':'):
               # in-target directive like ":make"
-              raise NotImplementedError, "in-target directives unimplemented"
+              line = line[1:].lstrip()
+              offset = 0
+              m = RE_IDENTIFIER.match(line)
+              if not m:
+                error("invalid in-target directive")
+                continue
+              id = m.group()
+              action_list.append(Action(context, id, line[m.end():].lstrip()))
             else:
-              action_list.append(Action(context, line))
+              action_list.append(Action(context, 'shell', line))
             continue
 
         m = RE_ASSIGNMENT.match(line)
@@ -161,37 +174,44 @@ def parseMakefile(fp, namespaces, parent_context=None):
 
 # mapping of special macro names to evaluation functions
 SPECIAL_MACROS = { '.':         None,
+                   '@':         None,
+                   '?':         None,
+                   '/':         None,
+                   '$':         lambda x: '$',
                  }
 
-def parseMacroExpression(context, offset=0, re_plaintext=None):
+def parseMacroExpression(context, text=None, offset=0, re_plaintext=None):
   ''' A macro expression is a concatenation of permutations.
   '''
   if type(context) is str:
     context = FileContext('<string>', 1, context, None)
 
+  if text is None:
+    text = context.text
+
   if re_plaintext is None:
     re_plaintext = RE_PLAINTEXT
 
-  s = context.text
+  text = context.text
   permutations = []
-  while offset < len(s):
-    ch = s[offset]
+  while offset < len(text):
+    ch = text[offset]
     if ch == '$':
       # macro
-      M, offset = parseMacro(context, offset)
+      M, offset = parseMacro(context, offset=offset)
       permutations.append(M)
     elif ch.isspace():
       # whitespace
       wh_offset = offset
       offset += 1
-      while offset < len(s) and s[offset].isspace():
+      while offset < len(text) and text[offset].isspace():
         offset += 1
       # skip leading whitespace
       if permutations:
-        permutations.append(s[wh_offset:offset])
+        permutations.append(text[wh_offset:offset])
     else:
       # non-white, non-macro
-      m = re_plaintext.match(s, offset)
+      m = re_plaintext.match(text, offset)
       if m:
         permutations.append(m.group())
         offset = m.end()
@@ -268,49 +288,58 @@ class MacroExpression(object):
     result = ''.join(strs)
     return result
 
-def parseMacro(context, offset=0):
+def parseMacro(context, text=None, offset=0):
   if type(context) is str:
     context = FileContext('<string>', 1, context, None)
+
+  if text is None:
+    text = context.text
 
   mmark = None
   mtext = None
   mpermute = False
   modifiers = []
 
-  s = context.text
-  if s[offset] != '$':
+  text = context.text
+  if text[offset] != '$':
     raise ParseError(context, offset, 'expected "$" at start of macro')
 
   offset += 1
-  s2 = s[offset]
+  s2 = text[offset]
 
   if s2 == '(' or s2 == '{':
     # $(foo)
     offset += 1
     mmark = s2
-    s3 = s[offset]
+    if s2 == '(':
+      mmark2 = ')'
+    elif s2 == '{':
+      mmark2 = '}'
+    else:
+      raise ValueError, 'unsupported mmark "%s"' % (mmark,)
+    s3 = text[offset]
     if s3 == mmark:
       # $((foo))
       offset += 1
       mpermute = True
-    while s[offset].isspace():
+    while text[offset].isspace():
       offset += 1
-    q = s[offset]
+    q = text[offset]
     if q == '"' or q == "'":
       # $('qstr')
       offset += 1
       text_offset = offset
-      while s[offset] != q:
+      while text[offset] != q:
         offset += 1
-      mtext = s[text_offset:offset]
+      mtext = text[text_offset:offset]
       offset += 1
     elif q == '_' or q.isalpha():
       # $(macro_name)
       name_offset = offset
       offset += 1
-      while s[offset] == '_' or s[offset].isalnum():
+      while text[offset] == '_' or text[offset].isalnum():
         offset += 1
-      mtext = s[name_offset:offset]
+      mtext = text[name_offset:offset]
       modifiers.append('v')
     elif q in SPECIAL_MACROS:
       mtext = q
@@ -319,13 +348,13 @@ def parseMacro(context, offset=0):
       raise ParseError(context, offset, 'unknown special macro name "%s"' % (q,))
 
     # skip past whitespace
-    while s[offset].isspace():
+    while text[offset].isspace():
       offset += 1
 
     # collect modifiers
     while True:
-      ch = s[offset]
-      if ch == mmark:
+      ch = text[offset]
+      if ch == mmark2:
         break
       if ch.isspace():
         pass
@@ -334,19 +363,19 @@ def parseMacro(context, offset=0):
         modifiers.append(ch)
       elif ch in 'Gv':
         # modifiers with optional '?'
-        if s[offset+1] == '?':
-          modifiers.append(s[offset:offset+2])
+        if text[offset+1] == '?':
+          modifiers.append(text[offset:offset+2])
           offset += 1
         else:
           modifiers.append(ch)
       else:
-        raise ParseError(context, offset, 'unknown macro modifier "%s"' % (ch,))
+        raise ParseError(context, offset, 'unknown macro modifier "%s": "%s"' % (ch, text[offset:]))
       offset += 1
 
-    assert ch == mmark, "should be at \"%s\", but am at: %s" % (mmark, s[offset:])
+    assert ch == mmark2, "should be at \"%s\", but am at: %s" % (mmark, text[offset:])
     offset += 1
     if mpermute:
-      if s[offset] != mmark:
+      if text[offset] != mmark2:
         raise ParseError(context, offset, 'incomplete macro closing brackets')
       else:
         offset += 1
@@ -354,7 +383,7 @@ def parseMacro(context, offset=0):
     return MacroTerm(context, mtext, modifiers, mpermute), offset
 
   # $x
-  ch = s[offset]
+  ch = text[offset]
   if ch == '_' or ch.isalnum() or ch in SPECIAL_MACROS:
     offset += 1
     return MacroTerm(context, ch), offset
