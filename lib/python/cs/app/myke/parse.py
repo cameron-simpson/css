@@ -86,70 +86,71 @@ def parseMakefile(fp, namespaces, parent_context=None):
     prevline = None
     for line in fp:
       lineno += 1
-      if prevline is not None:
-        # prepend previous continuation line if any
-        line = prevline + '\n' + line
-        prevline = None
-      else:
-        # start of line - new context
-        context = FileContext(filename, lineno, line, parent_context)
-
-      if not line.endswith('\n'):
-        raise ParseError(context, len(line), 'unexpected EOF (missing final newline)')
-
-      if line.endswith('\\\n'):
-        # continuation line - gather next line before parse
-        prevline = line[:-2]
-        continue
-
-      line = line.rstrip()
-      if not line or line.lstrip().startswith('#'):
-        # skip blank lines and comments
-        continue
-
-      if line.startswith(':'):
-        raise NotImplementedError, "directives unimplemented"
-
-      if action_list is not None:
-        if not line[0].isspace():
-          # new target or unindented assignment etc - fall through
-          # action_list is already attached to targets,
-          # so simply reset it to None to keep state
-          action_list = None
+      with Pfx("%d" % (lineno,)):
+        if prevline is not None:
+          # prepend previous continuation line if any
+          line = prevline + '\n' + line
+          prevline = None
         else:
-          line = line.strip()
-          if line.startswith(':'):
-            # in-target directive like ":make"
-            raise NotImplementedError, "in-target directives unimplemented"
-          else:
-            action_list.append(Action(context, line))
+          # start of line - new context
+          context = FileContext(filename, lineno, line, parent_context)
+
+        if not line.endswith('\n'):
+          raise ParseError(context, len(line), 'unexpected EOF (missing final newline)')
+
+        if line.endswith('\\\n'):
+          # continuation line - gather next line before parse
+          prevline = line[:-2]
           continue
 
-      m = RE_ASSIGNMENT.match(line)
-      if m:
-        yield Macro(context, m.group(1), RE_COMMASEP.split(m.group(1)), line[m.end():])
+        line = line.rstrip()
+        if not line or line.lstrip().startswith('#'):
+          # skip blank lines and comments
+          continue
+
+        if line.startswith(':'):
+          raise NotImplementedError, "directives unimplemented"
+
+        if action_list is not None:
+          if not line[0].isspace():
+            # new target or unindented assignment etc - fall through
+            # action_list is already attached to targets,
+            # so simply reset it to None to keep state
+            action_list = None
+          else:
+            line = line.strip()
+            if line.startswith(':'):
+              # in-target directive like ":make"
+              raise NotImplementedError, "in-target directives unimplemented"
+            else:
+              action_list.append(Action(context, line))
+            continue
+
+        m = RE_ASSIGNMENT.match(line)
+        if m:
+          yield Macro(context, m.group(1), RE_COMMASEP.split(m.group(1)), line[m.end():])
+          continue
+
+        # presumably a target definition
+        # gather up the target as a macro expression
+        target_mexpr, offset = parseMacroExpression(context, re_plaintext=RE_PLAINTEXT_NO_COLON)
+        print >>sys.stderr, "targets_mexpr =", repr(target_mexpr), "offset =", offset
+        if context.text[offset] != ':':
+          raise ParseError(context, offset, "no colon in target definition")
+        prereqs_mexpr, offset = parseMacroExpression(context, re_plaintext=RE_PLAINTEXT_NO_COLON, offset=offset+1)
+        print >>sys.stderr, "prereqs_mexpr =", repr(prereqs_mexpr), "offset =", offset
+        if offset < len(context.text) and context.text[offset] == ':':
+          postprereqs_mexpr, offset = parseMacroExpression(context, re_plaintext=RE_PLAINTEXT_NO_COLON, offset=offset+1)
+        else:
+          postprereqs_mexpr = []
+        print >>sys.stderr, "postprereqs_mexpr =", repr(postprereqs_mexpr), "offset =", offset, "etc =", repr(context.text[offset:])
+
+        action_list = []
+        for target in target_mexpr.eval(namespaces).split():
+          yield Target(target, context, prereqs=prereqs_mexpr, postprereqs=postprereqs_mexpr, actions=action_list)
         continue
 
-      # presumably a target definition
-      # gather up the target as a macro expression
-      target_mexpr, offset = parseMacroExpression(context, re_plaintext=RE_PLAINTEXT_NO_COLON)
-      print >>sys.stderr, "targets_mexpr =", repr(target_mexpr), "offset =", offset
-      if context.text[offset] != ':':
-        raise ParseError(context, offset, "no colon in target definition")
-      prereqs_mexpr, offset = parseMacroExpression(context, re_plaintext=RE_PLAINTEXT_NO_COLON, offset=offset+1)
-      print >>sys.stderr, "prereqs_mexpr =", repr(prereqs_mexpr), "offset =", offset
-      if offset < len(context.text) and context.text[offset] == ':':
-        postprereqs_mexpr, offset = parseMacroExpression(context, re_plaintext=RE_PLAINTEXT_NO_COLON, offset=offset+1)
-      else:
-        postprereqs_mexpr = []
-      print >>sys.stderr, "postprereqs_mexpr =", repr(postprereqs_mexpr), "offset =", offset, "etc =", repr(context.text[offset:])
-
-      action_list = []
-      for target in target_mexpr.eval(namespaces).split():
-        yield Target(target, context, prereqs=prereqs_mexpr, postprereqs=postprereqs_mexpr, actions=action_list)
-      continue
-
-      raise ParseError(context, 0, 'unparsed line')
+        raise ParseError(context, 0, 'unparsed line')
 
     if prevline is not None:
       # incomplete continuation line
