@@ -33,7 +33,8 @@ def main(argv):
   argv0 = argv.pop(0)
   cmd = os.path.basename(argv0)
   setup_logging(cmd)
-  sys.stdout = codecs.getwriter("utf-8")(sys.stdout)
+  if sys.stdout.encoding is None:
+    sys.stdout = codecs.getwriter("utf-8")(sys.stdout)
 
   P = Pilfer()
 
