@@ -445,7 +445,7 @@ class Pilfer(object):
     yield U
 
   def url_query(self, U, *a):
-    U = URL(U)
+    U = URL(U, None)
     if not a:
       yield U.query
     qsmap = dict( [ ( qsp.split('=', 1) if '=' in qsp else (qsp, '') ) for qsp in U.query.split('&') ] )
