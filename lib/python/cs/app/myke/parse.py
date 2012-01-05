@@ -29,6 +29,7 @@ RE_WHITESPACE = re.compile( r'\s+' )
 # in target definitions RE_PLAINTEXT_NOCOLON is used
 RE_PLAINTEXT = re.compile( r'[^\s$]+' )
 RE_PLAINTEXT_NO_COLON = re.compile( r'[^\s$:]+' )
+RE_PLAINTEXT_NO_COMMA = re.compile( r'[^\s$,]+' )
 
 FileContext = namedtuple('FileContext', 'filename lineno text parent')
 
@@ -182,6 +183,7 @@ SPECIAL_MACROS = { '.':         None,
 
 def parseMacroExpression(context, text=None, offset=0, re_plaintext=None):
   ''' A macro expression is a concatenation of permutations.
+      Return (MacroExpression, offset).
   '''
   if type(context) is str:
     context = FileContext('<string>', 1, context, None)
@@ -298,32 +300,50 @@ def parseMacro(context, text=None, offset=0):
   mmark = None
   mtext = None
   mpermute = False
+  param_mexprs = []
   modifiers = []
 
   text = context.text
-  if text[offset] != '$':
-    raise ParseError(context, offset, 'expected "$" at start of macro')
 
-  offset += 1
-  s2 = text[offset]
+  try:
 
-  if s2 == '(' or s2 == '{':
-    # $(foo)
+    if text[offset] != '$':
+      raise ParseError(context, offset, 'expected "$" at start of macro')
+
     offset += 1
-    mmark = s2
-    if s2 == '(':
-      mmark2 = ')'
-    elif s2 == '{':
-      mmark2 = '}'
-    else:
-      raise ValueError, 'unsupported mmark "%s"' % (mmark,)
-    s3 = text[offset]
-    if s3 == mmark:
-      # $((foo))
+    ch = text[offset]
+
+    # $x
+    if ch == '_' or ch.isalnum() or ch in SPECIAL_MACROS:
       offset += 1
+      return MacroTerm(context, ch), offset
+
+    # $(foo) or ${foo}
+    if ch == '(':
+      mmark = ch
+      mmark2 = ')'
+      offset += 1
+      ch = text[offset]
+      if ch == mmark:
+        mpermute = True
+        offset += 1
+    elif ch == '{':
+      mmark = ch
+      mmark2 = '}'
+      offset += 1
+    else:
+      raise ParseError(context, offset, 'invalid special macro "%s"' % (ch,))
+
+    # $((foo)) or ${{foo}}
+    ch = text[offset]
+    if ch == mmark:
       mpermute = True
+      offset += 1
+
+    # advance to macro name or quoted string
     while text[offset].isspace():
       offset += 1
+
     q = text[offset]
     if q == '"' or q == "'":
       # $('qstr')
@@ -341,13 +361,33 @@ def parseMacro(context, text=None, offset=0):
         offset += 1
       mtext = text[name_offset:offset]
       modifiers.append('v')
+      # check for macro parameters
+      while text[offset].isspace():
+        offset += 1
+      if text[offset] == '(':
+        offset += 1
+        while text[offset].isspace():
+          offset += 1
+
+        while text[offset] != ')':
+          mexpr, offset = parseMacroExpression(context, text=text, offset=offset, re_plaintext=RE_PLAINTEXT_NO_COMMA)
+          param_mexprs.append(mexpr)
+          while text[offset].isspace():
+            offset += 1
+          if text[offset] == ',':
+            offset += 1
+            while text[offset].isspace():
+              offset += 1
+            continue
+          if text[offset] != ')':
+            raise ParseError(context, offset, 'macro paramaters: expected comma or closing parenthesis, found: '+text[offset:])
+        offset += 1
     elif q in SPECIAL_MACROS:
       mtext = q
       offset += 1
     else:
       raise ParseError(context, offset, 'unknown special macro name "%s"' % (q,))
 
-    # skip past whitespace
     while text[offset].isspace():
       offset += 1
 
@@ -382,13 +422,10 @@ def parseMacro(context, text=None, offset=0):
 
     return MacroTerm(context, mtext, modifiers, mpermute), offset
 
-  # $x
-  ch = text[offset]
-  if ch == '_' or ch.isalnum() or ch in SPECIAL_MACROS:
-    offset += 1
-    return MacroTerm(context, ch), offset
+  except IndexError, e:
+    raise ParseError(context, offset, 'parse incomplete, offset=%d, remainder: %s' % (offset, text[offset:]))
 
-  raise ParseError(context, offset, 'unknown special macro name "%s"' % (ch,))
+  raise ParseError(context, offset, 'unhandled parse failure at offset %d: %s' % (offset, text[offset:]))
 
 class MacroTerm(object):
   ''' A macro use.
