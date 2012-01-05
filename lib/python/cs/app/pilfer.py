@@ -14,6 +14,7 @@ from itertools import chain
 import re
 if sys.hexversion < 0x02060000: from sets import Set as set
 from string import Formatter
+from time import sleep
 from urllib import quote, unquote
 from urllib2 import HTTPError, URLError
 from cs.logutils import setup_logging, Pfx, debug, error, warning, exception, pfx_iter
@@ -395,6 +396,10 @@ class Pilfer(object):
         raise ValueError("unknown action")
       return url_func(self, U, *( arg_string.split(',') if len(arg_string) else () ))
 
+  def url_delay(self, U, delay, *a):
+    sleep(float(delay))
+    yield U
+
   def url_hrefs(self, U, *a, **kw):
     with Pfx("hrefs(%s)" % (U,)):
       if 'absolute' not in kw:
@@ -440,6 +445,7 @@ class Pilfer(object):
     yield U
 
   def url_query(self, U, *a):
+    U = URL(U)
     if not a:
       yield U.query
     qsmap = dict( [ ( qsp.split('=', 1) if '=' in qsp else (qsp, '') ) for qsp in U.query.split('&') ] )
@@ -491,6 +497,7 @@ class Pilfer(object):
     yield U
 
   action_map = {
+        'delay':    url_delay,
         'hrefs':    url_hrefs,
         'images':   url_images,
         'iimages':  url_inline_images,
