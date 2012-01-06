@@ -179,9 +179,11 @@ class Action(object):
     if v == 'shell':
       shcmd = self.mexpr.eval()
       argv = (target.shell, '-c', shcmd)
-      P = Popen(argv, close_fds=True)
-      retcode = P.wait()
-      return retcode == 0
+      info("Popen(%s,..)", argv)
+      return True
+      ##P = Popen(argv, close_fds=True)
+      ##retcode = P.wait()
+      ##return retcode == 0
 
     if v == 'make':
       subtargets = self.mexpr.eval().split()

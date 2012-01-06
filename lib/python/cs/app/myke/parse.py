@@ -243,7 +243,7 @@ class MacroExpression(object):
             wordlists = [ [item] ]
           else:
             if len(wordlists) > 0:
-              wordlists.append([word])
+              wordlists.append([item])
       else:
         # should be a MacroTerm
         if wordlists is not None and len(wordlists) == 0:
@@ -274,6 +274,8 @@ class MacroExpression(object):
     result = ''.join(strs)
     return result
 
+SIMPLE_MODIFIERS = 'DEG?FPpSsv?<?'
+
 def parseMacro(context, text=None, offset=0):
   if type(context) is str:
     context = FileContext('<string>', 1, context, None)
@@ -299,7 +301,7 @@ def parseMacro(context, text=None, offset=0):
     ch = text[offset]
 
     # $x
-    if ch == '_' or ch.isalnum() or ch in SPECIAL_MACROS:
+    if ch == '_' or ch.isalpha() or ch in SPECIAL_MACROS:
       offset += 1
       M = MacroTerm(context, ch), offset
       info('parseMacro("%s") -> %s' % (text[offset:], M))
@@ -322,7 +324,6 @@ def parseMacro(context, text=None, offset=0):
       mpermute = True
       offset += 1
 
-    info("PM: mmark = %s, mmark2 = %s, permute = %s", mmark, mmark2, mpermute)
     _, offset = get_white(text, offset)
 
     mtext, offset = get_identifier(text, offset)
@@ -333,23 +334,19 @@ def parseMacro(context, text=None, offset=0):
       _, offset = get_white(text, offset)
       if text[offset] == '(':
         # $(macro_name(param,...))
-        info("PM: macro paramaters...")
         offset += 1
         _, offset = get_white(text, offset)
         while text[offset] != ')':
           mexpr, offset = parseMacroExpression(context, text=text, offset=offset, stopchars=',)')
-          info("PM: macro paramater: %s, at: %s", mexpr, text[offset:])
           param_mexprs.append(mexpr)
           _, offset = get_white(text, offset)
           if text[offset] == ',':
             # gather comma and following whitespace
             _, offset = get_white(text, offset+1)
             continue
-          info("PM: no comma, expect close at: %s", text[offset:])
           if text[offset] != ')':
             raise ParseError(context, offset, 'macro paramaters: expected comma or closing parenthesis, found: '+text[offset:])
         offset += 1
-        info("PM: after params: %s", text[offset:])
     else:
       q = text[offset]
       if q == '"' or q == "'":
@@ -372,24 +369,31 @@ def parseMacro(context, text=None, offset=0):
 
     # collect modifiers
     while True:
-      ch = text[offset]
-      if ch == mmark2:
-        break
-      if ch.isspace():
-        pass
-      elif ch in 'DF':
-        # simple modifiers
-        modifiers.append(ch)
-      elif ch in 'Gv':
-        # modifiers with optional '?'
-        if text[offset+1] == '?':
-          modifiers.append(text[offset:offset+2])
+      try:
+        ch = text[offset]
+        if ch == mmark2:
+          # macro closing bracket
+          break
+        if ch.isspace():
+          # whitespace
           offset += 1
-        else:
+          continue
+        if ch == '?':
+          raise ParseError(context, offset, 'bare query "?" found in modifiers at: %s' % (text[offset:],))
+        pos = SIMPLE_MODIFIERS.find(ch)
+        if pos >= 0:
           modifiers.append(ch)
-      else:
-        raise ParseError(context, offset, 'unknown macro modifier "%s": "%s"' % (ch, text[offset:]))
-      offset += 1
+          offset += 1
+          if offset < len(text) and text[offset] == '?':
+            if pos >= len(SIMPLE_MODIFIERS) or SIMPLE_MODIFIERS[pos+1] != '?':
+              raise ParseError(context, offset, 'modifier "%s" does not accept a query "?"' % (ch,))
+            modifiers.append('?')
+            offset += 1
+        else:
+          raise ParseError(context, offset, 'unknown macro modifier "%s": "%s"' % (ch, text[offset:]))
+      except ParseError, e:
+        error("%s", e)
+        offset += 1
 
     assert ch == mmark2, "should be at \"%s\", but am at: %s" % (mmark, text[offset:])
     offset += 1
@@ -427,9 +431,9 @@ class MacroTerm(object):
 
     # otherwise $(x) notation
     return '$%s%s%s%s%s' % ( ( '((' if self.permute else '(' ),
-                             ('"%s"' % (text,) if self.literal else text),
-                             ( ' ' if modifiers else '' ),
-                             ''.join(modifiers),
+                             ('"%s"' % (self.text,) if self.literal else self.text),
+                             ( ' ' if self.modifiers else '' ),
+                             ''.join(self.modifiers),
                              ( '))' if self.permute else ')' ),
                            )
 

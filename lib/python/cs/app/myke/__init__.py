@@ -1,6 +1,6 @@
 #!/usr/bin/python
 
-from cs.logutils import setup_logging, warning, error
+from cs.logutils import setup_logging, warning, error, info
 from cs.app.myke.make import Maker
 
 default_cmd = 'myke'
@@ -19,6 +19,7 @@ def main(argv):
     return 2
 
   M.loadMakefile()
+  info("PARSED MAKEFILE")
 
   xit = M.make(args)
   return xit
