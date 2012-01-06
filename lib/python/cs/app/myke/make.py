@@ -81,7 +81,7 @@ class Maker(object):
           info("add macro %s", O)
           self._macros[O.name] = O
         else:
-          raise ValueError, "unsupported parse item of type {} form parseMakefile({}): {}".format(type(O), makefile, repr(O))
+          raise ValueError, "parseMakefile({}): unsupported parse item received: {}{}".format(makefile, type(O), repr(O))
 
 class Target(object):
 

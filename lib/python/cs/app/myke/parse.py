@@ -63,7 +63,7 @@ def parseMakefile(fp, namespaces, parent_context=None):
     # open file, yield contents
     filename = fp
     with open(filename) as fp:
-      for O in parseMakefile(fp, parent_context):
+      for O in parseMakefile(fp, namespaces, parent_context):
         yield O
     return
 
@@ -155,14 +155,11 @@ def parseMakefile(fp, namespaces, parent_context=None):
 
           raise ParseError(context, 0, 'unparsed line')
         except ParseError, e:
-          error(e)
+          error("%s", e)
 
     if prevline is not None:
       # incomplete continuation line
       error("unexpected EOF: unterminated slosh continued line")
-
-  if target:
-    yield target
 
 # mapping of special macro names to evaluation functions
 SPECIAL_MACROS = { '.':         None,
@@ -265,7 +262,10 @@ class MacroExpression(object):
               else:
                 wordlists.append(textwords)
           else:
-            wordlists.append([text])
+            if wordlists is None:
+              wordlists = [ [text] ]
+            else:
+              wordlists.append([text])
 
     if wordlists:
       # non-empty word accruing - flatten it and store
