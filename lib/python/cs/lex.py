@@ -210,7 +210,7 @@ def get_chars(s, gochars, offset=0):
   ooffset = offset
   while offset < len(s) and s[offset] in gochars:
     offset += 1
-  return s[offset:offset], offset
+  return s[ooffset:offset], offset
 
 def get_white(s, offset=0):
   ''' Scan the string `s` for characters in string.whitespace starting at
@@ -241,4 +241,4 @@ def get_other_chars(s, stopchars, offset=0):
   ooffset = offset
   while offset < len(s) and s[offset] not in stopchars:
     offset += 1
-  return s[offset:offset], offset
+  return s[ooffset:offset], offset
