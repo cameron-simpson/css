@@ -5,11 +5,10 @@ import sys
 from collections import namedtuple
 from itertools import product
 import re
+from string import whitespace, letters, digits
 import unittest
-from cs.logutils import error, Pfx
-
-re_identifier = r'[A-Za-z]\w*'
-RE_IDENTIFIER = re.compile(re_identifier)
+from cs.lex import get_chars, get_other_chars, get_white, get_identifier
+from cs.logutils import Pfx, error, info
 
 # macro assignment, including leading whitespace
 #
@@ -18,18 +17,11 @@ RE_IDENTIFIER = re.compile(re_identifier)
 # or
 #  identifier(param[,param...]) =
 #
+re_identifier = r'[A-Za-z]\w*'
 re_assignment = r'^\s*(' + re_identifier + ')(\(' + re_identifier + '(\s*,\s*' + re_identifier + ')*\s*\))?\s*='
 RE_ASSIGNMENT = re.compile( re_assignment )
 
 RE_COMMASEP = re.compile( r'\s*,\s*' )
-
-RE_WHITESPACE = re.compile( r'\s+' )
-
-# text that isn't whitespace or a macro
-# in target definitions RE_PLAINTEXT_NOCOLON is used
-RE_PLAINTEXT = re.compile( r'[^\s$]+' )
-RE_PLAINTEXT_NO_COLON = re.compile( r'[^\s$:]+' )
-RE_PLAINTEXT_NO_COMMA = re.compile( r'[^\s$,]+' )
 
 FileContext = namedtuple('FileContext', 'filename lineno text parent')
 
@@ -100,71 +92,70 @@ def parseMakefile(fp, namespaces, parent_context=None):
           prevline = None
         else:
           # start of line - new context
-          context = FileContext(filename, lineno, line, parent_context)
+          context = FileContext(filename, lineno, line.rstrip(), parent_context)
 
-        if not line.endswith('\n'):
-          raise ParseError(context, len(line), 'unexpected EOF (missing final newline)')
+        try:
+          if not line.endswith('\n'):
+            raise ParseError(context, len(line), 'unexpected EOF (missing final newline)')
 
-        if line.endswith('\\\n'):
-          # continuation line - gather next line before parse
-          prevline = line[:-2]
-          continue
-
-        line = line.rstrip()
-        if not line or line.lstrip().startswith('#'):
-          # skip blank lines and comments
-          continue
-
-        if line.startswith(':'):
-          raise NotImplementedError, "directives unimplemented"
-
-        if action_list is not None:
-          if not line[0].isspace():
-            # new target or unindented assignment etc - fall through
-            # action_list is already attached to targets,
-            # so simply reset it to None to keep state
-            action_list = None
-          else:
-            line = line.strip()
-            if line.startswith(':'):
-              # in-target directive like ":make"
-              line = line[1:].lstrip()
-              offset = 0
-              m = RE_IDENTIFIER.match(line)
-              if not m:
-                error("invalid in-target directive")
-                continue
-              id = m.group()
-              action_list.append(Action(context, id, line[m.end():].lstrip()))
-            else:
-              action_list.append(Action(context, 'shell', line))
+          if line.endswith('\\\n'):
+            # continuation line - gather next line before parse
+            prevline = line[:-2]
             continue
 
-        m = RE_ASSIGNMENT.match(line)
-        if m:
-          yield Macro(context, m.group(1), RE_COMMASEP.split(m.group(1)), line[m.end():])
+          line = line.rstrip()
+          if not line or line.lstrip().startswith('#'):
+            # skip blank lines and comments
+            continue
+
+          if line.startswith(':'):
+            raise NotImplementedError, "directives unimplemented"
+
+          if action_list is not None:
+            if not line[0].isspace():
+              # new target or unindented assignment etc - fall through
+              # action_list is already attached to targets,
+              # so simply reset it to None to keep state
+              action_list = None
+            else:
+              # action line
+              _, offset = get_white(line)
+              if offset >= len(line) or line[offset] != ':':
+                # ordinary shell action
+                action_list.append(Action(context, 'shell', line))
+                continue
+              # in-target directive like ":make"
+              _, offset = get_white(line, offset+1)
+              directive, offset = get_identifier(line, offset)
+              if not directive:
+                raise ParseError(context, offset, "missing in-target directive after leading colon")
+              action_list.append(Action(context, directive, line[offset:].lstrip()))
+              continue
+
+          m = RE_ASSIGNMENT.match(line)
+          if m:
+            yield Macro(context, m.group(1), RE_COMMASEP.split(m.group(1)), line[m.end():])
+            continue
+
+          # presumably a target definition
+          # gather up the target as a macro expression
+          target_mexpr, offset = parseMacroExpression(context, stopchars=':')
+          if context.text[offset] != ':':
+            raise ParseError(context, offset, "no colon in target definition")
+          prereqs_mexpr, offset = parseMacroExpression(context, offset=offset+1, stopchars=':')
+          if offset < len(context.text) and context.text[offset] == ':':
+            postprereqs_mexpr, offset = parseMacroExpression(context, offset=offset+1)
+          else:
+            postprereqs_mexpr = []
+
+          action_list = []
+          for target in target_mexpr.eval(context, namespaces).split():
+            yield Target(target, context, prereqs=prereqs_mexpr, postprereqs=postprereqs_mexpr, actions=action_list)
           continue
 
-        # presumably a target definition
-        # gather up the target as a macro expression
-        target_mexpr, offset = parseMacroExpression(context, re_plaintext=RE_PLAINTEXT_NO_COLON)
-        print >>sys.stderr, "targets_mexpr =", repr(target_mexpr), "offset =", offset
-        if context.text[offset] != ':':
-          raise ParseError(context, offset, "no colon in target definition")
-        prereqs_mexpr, offset = parseMacroExpression(context, re_plaintext=RE_PLAINTEXT_NO_COLON, offset=offset+1)
-        print >>sys.stderr, "prereqs_mexpr =", repr(prereqs_mexpr), "offset =", offset
-        if offset < len(context.text) and context.text[offset] == ':':
-          postprereqs_mexpr, offset = parseMacroExpression(context, re_plaintext=RE_PLAINTEXT_NO_COLON, offset=offset+1)
-        else:
-          postprereqs_mexpr = []
-        print >>sys.stderr, "postprereqs_mexpr =", repr(postprereqs_mexpr), "offset =", offset, "etc =", repr(context.text[offset:])
-
-        action_list = []
-        for target in target_mexpr.eval(namespaces).split():
-          yield Target(target, context, prereqs=prereqs_mexpr, postprereqs=postprereqs_mexpr, actions=action_list)
-        continue
-
-        raise ParseError(context, 0, 'unparsed line')
+          raise ParseError(context, 0, 'unparsed line')
+        except ParseError, e:
+          error(e)
 
     if prevline is not None:
       # incomplete continuation line
@@ -181,7 +172,7 @@ SPECIAL_MACROS = { '.':         None,
                    '$':         lambda x: '$',
                  }
 
-def parseMacroExpression(context, text=None, offset=0, re_plaintext=None):
+def parseMacroExpression(context, text=None, offset=0, stopchars=''):
   ''' A macro expression is a concatenation of permutations.
       Return (MacroExpression, offset).
   '''
@@ -190,9 +181,6 @@ def parseMacroExpression(context, text=None, offset=0, re_plaintext=None):
 
   if text is None:
     text = context.text
-
-  if re_plaintext is None:
-    re_plaintext = RE_PLAINTEXT
 
   text = context.text
   permutations = []
@@ -204,19 +192,15 @@ def parseMacroExpression(context, text=None, offset=0, re_plaintext=None):
       permutations.append(M)
     elif ch.isspace():
       # whitespace
-      wh_offset = offset
-      offset += 1
-      while offset < len(text) and text[offset].isspace():
-        offset += 1
-      # skip leading whitespace
+      wh, offset = get_white(text, offset)
+      # keep non-leading whitespace
       if permutations:
-        permutations.append(text[wh_offset:offset])
+        permutations.append(wh)
     else:
       # non-white, non-macro
-      m = re_plaintext.match(text, offset)
-      if m:
-        permutations.append(m.group())
-        offset = m.end()
+      plain, offset = get_other_chars(text, stopchars+'$'+whitespace, offset)
+      if plain:
+        permutations.append(plain)
       else:
         # end of parsable string
         break
@@ -241,7 +225,7 @@ class MacroExpression(object):
 
   __repr__ = __str__
 
-  def eval(self, namespaces):
+  def eval(self, context, namespaces):
     if self._result is not None:
       return self._result
     strs = []           # strings to collate
@@ -264,12 +248,12 @@ class MacroExpression(object):
             if len(wordlists) > 0:
               wordlists.append([word])
       else:
-        # MacroTerm
+        # should be a MacroTerm
         if wordlists is not None and len(wordlists) == 0:
           # word already short circuited - skip evaluating the MacroTerm
           pass
         else:
-          text = item.eval(namespaces)
+          text = item.eval(context, namespaces)
           if item.permute:
             textwords = text.split()
             if len(textwords) == 0:
@@ -297,13 +281,14 @@ def parseMacro(context, text=None, offset=0):
   if text is None:
     text = context.text
 
+  info('parseMacro("%s")...' % (text[offset:],))
+
   mmark = None
   mtext = None
-  mpermute = False
   param_mexprs = []
   modifiers = []
-
-  text = context.text
+  mpermute = False
+  mliteral = False
 
   try:
 
@@ -316,80 +301,74 @@ def parseMacro(context, text=None, offset=0):
     # $x
     if ch == '_' or ch.isalnum() or ch in SPECIAL_MACROS:
       offset += 1
-      return MacroTerm(context, ch), offset
+      M = MacroTerm(context, ch), offset
+      info('parseMacro("%s") -> %s' % (text[offset:], M))
+      return M
 
     # $(foo) or ${foo}
     if ch == '(':
       mmark = ch
       mmark2 = ')'
-      offset += 1
-      ch = text[offset]
-      if ch == mmark:
-        mpermute = True
-        offset += 1
     elif ch == '{':
       mmark = ch
       mmark2 = '}'
-      offset += 1
     else:
       raise ParseError(context, offset, 'invalid special macro "%s"' % (ch,))
 
-    # $((foo)) or ${{foo}}
+    # $((foo)) or ${{foo}} ?
+    offset += 1
     ch = text[offset]
     if ch == mmark:
       mpermute = True
       offset += 1
 
-    # advance to macro name or quoted string
-    while text[offset].isspace():
-      offset += 1
+    info("PM: mmark = %s, mmark2 = %s, permute = %s", mmark, mmark2, mpermute)
+    _, offset = get_white(text, offset)
 
-    q = text[offset]
-    if q == '"' or q == "'":
-      # $('qstr')
-      offset += 1
-      text_offset = offset
-      while text[offset] != q:
-        offset += 1
-      mtext = text[text_offset:offset]
-      offset += 1
-    elif q == '_' or q.isalpha():
+    mtext, offset = get_identifier(text, offset)
+    if mtext:
       # $(macro_name)
-      name_offset = offset
-      offset += 1
-      while text[offset] == '_' or text[offset].isalnum():
-        offset += 1
-      mtext = text[name_offset:offset]
       modifiers.append('v')
       # check for macro parameters
-      while text[offset].isspace():
-        offset += 1
+      _, offset = get_white(text, offset)
       if text[offset] == '(':
+        # $(macro_name(param,...))
+        info("PM: macro paramaters...")
         offset += 1
-        while text[offset].isspace():
-          offset += 1
-
+        _, offset = get_white(text, offset)
         while text[offset] != ')':
-          mexpr, offset = parseMacroExpression(context, text=text, offset=offset, re_plaintext=RE_PLAINTEXT_NO_COMMA)
+          mexpr, offset = parseMacroExpression(context, text=text, offset=offset, stopchars=',)')
+          info("PM: macro paramater: %s, at: %s", mexpr, text[offset:])
           param_mexprs.append(mexpr)
-          while text[offset].isspace():
-            offset += 1
+          _, offset = get_white(text, offset)
           if text[offset] == ',':
-            offset += 1
-            while text[offset].isspace():
-              offset += 1
+            # gather comma and following whitespace
+            _, offset = get_white(text, offset+1)
             continue
+          info("PM: no comma, expect close at: %s", text[offset:])
           if text[offset] != ')':
             raise ParseError(context, offset, 'macro paramaters: expected comma or closing parenthesis, found: '+text[offset:])
         offset += 1
-    elif q in SPECIAL_MACROS:
-      mtext = q
-      offset += 1
+        info("PM: after params: %s", text[offset:])
     else:
-      raise ParseError(context, offset, 'unknown special macro name "%s"' % (q,))
+      q = text[offset]
+      if q == '"' or q == "'":
+        # $('qstr')
+        mliteral = True
+        offset += 1
+        text_offset = offset
+        while text[offset] != q:
+          offset += 1
+        mtext = text[text_offset:offset]
+        offset += 1
+      elif q in SPECIAL_MACROS:
+        # $(@ ...) etc
+        mtext = q
+        offset += 1
+      else:
+        raise ParseError(context, offset, 'unknown special macro name "%s"' % (q,))
 
-    while text[offset].isspace():
-      offset += 1
+    _, offset = get_white(text, offset)
 
     # collect modifiers
     while True:
@@ -420,7 +399,9 @@ def parseMacro(context, text=None, offset=0):
       else:
         offset += 1
 
-    return MacroTerm(context, mtext, modifiers, mpermute), offset
+    M = MacroTerm(context, mtext, modifiers, param_mexprs, permute=mpermute), offset
+    info('parseMacro("%s") -> %s' % (text[offset:], M))
+    return M
 
   except IndexError, e:
     raise ParseError(context, offset, 'parse incomplete, offset=%d, remainder: %s' % (offset, text[offset:]))
@@ -428,33 +409,56 @@ def parseMacro(context, text=None, offset=0):
   raise ParseError(context, offset, 'unhandled parse failure at offset %d: %s' % (offset, text[offset:]))
 
 class MacroTerm(object):
-  ''' A macro use.
+  ''' A macro reference such as $x or $(foo(a,b,c) xyz).
   '''
 
-  def __init__(self, context, text, modifiers=(), permute=False):
+  def __init__(self, context, text, modifiers='', params=(), permute=False, literal=False):
     self.context = context
     self.text = text
     self.modifiers = modifiers
+    self.params = params
     self.permute = permute
+    self.literal = literal
 
   def __str__(self):
     # return $x for simplest macro
-    if len(self.text) == 1 and not self.permute and not self.modifiers:
+    if len(self.text) == 1 and not self.permute and not self.literal:
       return '$' + self.text
 
     # otherwise $(x) notation
-    if self.modifiers and self.modifiers[0] == 'v':
-      text = self.text
-      modifiers = self.modifiers[1:]
-    else:
-      text = '"%s"' % self.text
-      modifiers = self.modifiers
     return '$%s%s%s%s%s' % ( ( '((' if self.permute else '(' ),
-                             text,
+                             ('"%s"' % (text,) if self.literal else text),
                              ( ' ' if modifiers else '' ),
                              ''.join(modifiers),
                              ( '))' if self.permute else ')' ),
                            )
+
+  __repr__ = __str__
+
+  def eval(self, context, namespaces, params=[]):
+    with Pfx(context):
+      text = self.text
+      modifiers = self.modifiers
+
+      if len(self.params) != len(params):
+        raise ValueError("parameter count mismatch, expected %d, received %d" % (len(self.params), len(params)))
+
+      # assemble paramaters for namespace use
+      param_map = {}
+      for param, mexpr in zip(self.params, params):
+        param_map[param] = Macro(context, param, (), mexpr)
+      namespaces = [param_map] + namespaces
+
+      modifiers = list(modifiers)
+      while modifiers:
+        m = modifiers.pop(0)
+        if m == 'v':
+          # TODO: accept lax?
+          text = ' '.join( MacroTerm(context, word).eval(context, namespaces) for word in text.split() )
+        else:
+          raise NotImplementedError('unimplemented macro modifier "%s"' % (m,))
+
+      return text
 
 class TestAll(unittest.TestCase):
 
