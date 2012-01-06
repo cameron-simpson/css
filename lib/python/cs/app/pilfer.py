@@ -402,6 +402,7 @@ class Pilfer(object):
     yield U
 
   def url_hrefs(self, U, *a, **kw):
+    U = URL(U)
     with Pfx("hrefs(%s)" % (U,)):
       if 'absolute' not in kw:
         kw['absolute'] = True
@@ -409,6 +410,7 @@ class Pilfer(object):
       return list(U.hrefs(*a, **kw))
 
   def url_srcs(self, U, *a, **kw):
+    U = URL(U)
     with Pfx("srcs(%s)" % (U,)):
       if 'absolute' not in kw:
         kw['absolute'] = True
