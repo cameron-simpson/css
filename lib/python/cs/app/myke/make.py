@@ -130,6 +130,7 @@ class Target(object):
   def _status_func(self):
     with self._lock:
       if self._statusLF is None:
+        info("queue make(%s)", self.name)
         self._statusLF = self.maker._makeQ.submit(self._make, name="make "+self.name, priority=PRI_MAKE)
     return self._statusLF
 
@@ -147,6 +148,7 @@ class Target(object):
     ''' Make the target. Private function submtted to the make queue.
     '''
     with Pfx(self.name):
+      info("commance make")
       ok = True
       for dep in self.prereqs:
         dep.make(self.maker)    # request item
@@ -157,6 +159,7 @@ class Target(object):
       if not ok:
         return False
       for action in self.actions:
+        info("queue action: %s", action)
         LF = action._submit(self.maker, self)
         if not LF:
           return False
@@ -175,7 +178,9 @@ class Action(object):
     ''' Submit instance of this action for a specific target.
         Should really only be called by Target._make().
     '''
-    return self.maker._makeQ.submit(partial(self._act, target), name="{}: {}: {}".format(target.name, self.variant, self.line), priority=PRI_ACTION)
+    return self.maker._makeQ.submit(partial(self._act, target),
+                                    name="{}: {}: {}".format(target.name, self.variant, self.line),
+                                    priority=PRI_ACTION)
 
   def _act(self, target):
     v = self.variant
