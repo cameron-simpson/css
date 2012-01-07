@@ -8,7 +8,7 @@ from thread import allocate_lock
 import cs.misc
 from cs.later import Later
 from cs.logutils import Pfx, info, error
-from .parse import parseMakefile, Macro, parseMacroExpression
+from .parse import parseMakefile, Macro, parseMacroExpression, MacroExpression
 
 # actions come first, to keep the queue narrower
 PRI_ACTION = 0
@@ -44,22 +44,23 @@ class Maker(object):
   def make(self, targets):
     ''' Make a bunch of targets.
     '''
-    Tlist = []
-    for target in targets:
-      if type(target) is str:
-        T = self.targets.get(target)
-        if not target:
-          error("don't know how to make %s", target)
-      else:
-        T = target
-      T.make(self)
-      Tlist.append(T)
-    ok = True
-    for T in Tlist:
-      if not T.status:
-        error("make %s fails", T)
-        ok = False
-    return ok
+    with Pfx("%s.make(%s)" % (self, targets)):
+      Tlist = []
+      for target in targets:
+        if type(target) is str:
+          T = self._targets.get(target)
+          if not target:
+            error("don't know how to make %s", target)
+        else:
+          T = target
+        T.make(self)
+        Tlist.append(T)
+      ok = True
+      for T in Tlist:
+        if not T.status:
+          error("make %s fails", T)
+          ok = False
+      return ok
 
   def __getitem__(self, target):
     ''' Return the specified Target.
@@ -140,7 +141,7 @@ class Target(object):
     '''
     with self._lock:
       prereqs = self._prereqs
-      if isinstance(_prereqs, MacroExpression):
+      if isinstance(prereqs, MacroExpression):
         self._prereqs = prereqs.eval().split()
     return self._prereqs
 
@@ -148,7 +149,7 @@ class Target(object):
     ''' Make the target. Private function submtted to the make queue.
     '''
     with Pfx(self.name):
-      info("commance make")
+      info("commence make")
       ok = True
       for dep in self.prereqs:
         dep.make(self.maker)    # request item
