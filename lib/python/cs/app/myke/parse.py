@@ -329,7 +329,6 @@ def parseMacro(context, text=None, offset=0):
     mtext, offset = get_identifier(text, offset)
     if mtext:
       # $(macro_name)
-      modifiers.append('v')
       # check for macro parameters
       _, offset = get_white(text, offset)
       if text[offset] == '(':
