@@ -5,6 +5,7 @@ import sys
 import os.path
 from subprocess import Popen
 from thread import allocate_lock
+import cs.misc
 from cs.later import Later
 from cs.logutils import Pfx, info, error
 from .parse import parseMakefile, Macro, parseMacroExpression
@@ -24,17 +25,19 @@ class Maker(object):
     if parallel is None:
       parallel = 1
     self.failFast = True
-    self._makeQ = Later(parallel)
+    self._makeQ = Later(parallel, name=cs.misc.cmd)
     self._makefile = None
     self._targets = {}
     self._targets_lock = allocate_lock()
     self._macros = {}
     self._macros_lock = allocate_lock()
 
+  def close(self):
+    self._makeQ.close()
+
   @property
   def makefile(self):
     if self._makefile is None:
-      import cs.misc
       self._makefile = os.path.basename(cs.misc.cmd).title() + 'file'
     return self._makefile
 
