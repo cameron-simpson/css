@@ -12,6 +12,7 @@ import time
 from cs.threads import AdjustableSemaphore, IterablePriorityQueue, \
                        WorkerThreadPool, TimerQueue
 from cs.misc import seq
+from cs.logutils import Pfx, info, debug
 
 class _Late_context_manager(object):
   ''' The _Late_context_manager is a context manager to run a suite via the
@@ -335,13 +336,15 @@ class Later(object):
     return False
 
   def close(self):
-    assert not self.closed
-    self.closed = True
-    if self._timerQ:
-      self._timerQ.close()
-    self._LFPQ.close()
-    self._dispatchThread.join()
-    self._workers.close()
+    with Pfx("%s.close()" % (self,)):
+      info("close")
+      assert not self.closed
+      self.closed = True
+      if self._timerQ:
+        self._timerQ.close()
+      self._LFPQ.close()
+      self._dispatchThread.join()
+      self._workers.close()
 
   def _dispatcher(self):
     ''' Read LateFunctions from the inbound queue as capacity is available
