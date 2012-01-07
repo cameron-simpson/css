@@ -201,3 +201,44 @@ def untexthexify(s, shiftin='[', shiftout=']'):
     assert len(s) % 2 == 0, "uneven hex sequence \"%s\"" % (s,)
     chunks.append(unhexify(s))
   return ''.join(chunks)
+
+def get_chars(s, gochars, offset=0):
+  ''' Scan the string `s` for characters in `gochars` starting at `offset`
+      (default 0).
+      Return (match, new_offset).
+  '''
+  ooffset = offset
+  while offset < len(s) and s[offset] in gochars:
+    offset += 1
+  return s[ooffset:offset], offset
+
+def get_white(s, offset=0):
+  ''' Scan the string `s` for characters in string.whitespace starting at
+      `offset` (default 0).
+      Return (match, new_offset).
+  '''
+  return get_chars(s, string.whitespace, offset=offset)
+
+def get_identifier(s, offset=0):
+  ''' Scan the string `s` for an identifier (letter or underscore followed by
+      letters, digits or underscores) starting at `offset` (default 0).
+      Return (match, new_offset).
+      The empty string and an unchanged offset will be returned if
+      there is no leading letter/underscore.
+  '''
+  ch = s[offset]
+  if ch != '_' and not ch.isalpha():
+    return '', offset
+  # NB: compute letters+digits now in case locale gets changed at runtime
+  idtail, offset = get_chars(s, string.letters + string.digits + '_', offset+1)
+  return ch + idtail, offset
+
+def get_other_chars(s, stopchars, offset=0):
+  ''' Scan the string `s` for characters not in `stopchars` starting
+      at `offset` (default 0).
+      Return (match, new_offset).
+  '''
+  ooffset = offset
+  while offset < len(s) and s[offset] not in stopchars:
+    offset += 1
+  return s[ooffset:offset], offset

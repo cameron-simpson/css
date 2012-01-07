@@ -282,7 +282,7 @@ class Pfx(object):
   ''' A context manager to maintain a per-thread stack of message prefices.
   '''
   def __init__(self, mark, absolute=False, loggers=None):
-    self._mark = str(mark)
+    self._mark = unicode(mark)
     self.absolute = absolute
     if loggers is not None:
       if not hasattr(loggers, '__getitem__'):
@@ -349,7 +349,7 @@ class Pfx(object):
           if hasattr(exc_value, 'args'):
             ##sys.stderr.write("Pfx: [exc_value.args is = %s]\n" % (`exc_value.args`,))
             if len(exc_value.args) > 0:
-              exc_value.args = [ prefix + ": " + str(exc_value.args[0]) ] \
+              exc_value.args = [ prefix + ": " + unicode(exc_value.args[0]) ] \
                                + list(exc_value.args[1:])
               ##sys.stderr.write("Pfx: [exc_value.args now = %s]\n" % (`exc_value.args`,))
           elif hasattr(exc_value, 'msg'):
@@ -416,7 +416,7 @@ def listargs(args, kwargs, tostr=None):
       strings representing them for printing.
   '''
   if tostr is None:
-    tostr = str
+    tostr = unicode
   arglist = [ tostr(A) for A in args ]
   kw=kwargs.keys()
   if kw:
