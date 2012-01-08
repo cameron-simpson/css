@@ -36,9 +36,6 @@ class Maker(object):
     self._macros = {}
     self._macros_lock = allocate_lock()
 
-  def close(self):
-    self._makeQ.close()
-
   def _queue(self, func, name, priority):
     return self._makeQ.submit(func, name=name, priority=priority)
 

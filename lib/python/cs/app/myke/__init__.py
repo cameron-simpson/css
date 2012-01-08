@@ -22,7 +22,6 @@ def main(argv):
   info("PARSED MAKEFILE")
 
   xit = M.make(args)
-  M.close()
 
   return xit
 
