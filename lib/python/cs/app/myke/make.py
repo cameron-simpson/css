@@ -8,7 +8,7 @@ from subprocess import Popen
 from thread import allocate_lock
 import cs.misc
 from cs.later import Later
-from cs.logutils import Pfx, info, error
+from cs.logutils import Pfx, info, error, debug
 from .parse import parseMakefile, Macro, parseMacroExpression, MacroExpression
 
 SHELL = '/bin/sh'
@@ -167,23 +167,23 @@ class Target(object):
       info("commence make: %d actions, prereqs = %s", len(self.actions), self.prereqs)
       ok = True
       for dep in self.prereqs:
-        info("queue prereq %s", dep)
+        debug("queue prereq %s", dep)
         dep.make(self.maker)    # request item
-        info("%s: wait for status...", dep)
+        debug("%s: wait for status...", dep)
         T_ok = dep.status
-        info("%s: status = %s", dep, T_ok)
+        debug("%s: status = %s", dep, T_ok)
         if not T_ok:
-          info("%s: fail")
+          debug("%s: fail")
           ok = False
           if self.maker.failFast:
             break
       if not ok:
-        info("prereqs bad, skip actions")
+        debug("prereqs bad, skip actions")
         return False
       for action in self.actions:
-        info("wait for action: %s...", action)
+        debug("wait for action: %s...", action)
         A_ok = action.act(self)
-        info("action status = %s", A_ok)
+        debug("action status = %s", A_ok)
         if not A_ok:
           return False
       return True
@@ -203,12 +203,12 @@ class Action(object):
     return "<Action %s %s>" % (self.variant, self.line)
 
   def act(self, target):
-    info("start _act...")
+    debug("start _act...")
     v = self.variant
     if v == 'shell':
       shcmd = self.mexpr.eval(target.namespaces)
       argv = (target.shell, '-c', shcmd)
-      info("Popen(%s,..)", argv)
+      debug("Popen(%s,..)", argv)
       P = Popen(argv, close_fds=True)
       retcode = P.wait()
       return retcode == 0
