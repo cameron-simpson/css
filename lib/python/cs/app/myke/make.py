@@ -11,6 +11,8 @@ from cs.later import Later
 from cs.logutils import Pfx, info, error
 from .parse import parseMakefile, Macro, parseMacroExpression, MacroExpression
 
+SHELL = '/bin/sh'
+
 # actions come first, to keep the queue narrower
 PRI_ACTION = 0
 PRI_MAKE   = 1
@@ -112,6 +114,7 @@ class Target(object):
     self.context = context
     self.name = name
     self.namespaces = None
+    self.shell = SHELL
     self._prereqs = prereqs
     self._postprereqs = postprereqs
     self.maker = None
