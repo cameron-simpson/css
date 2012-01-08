@@ -8,7 +8,7 @@ import re
 from string import whitespace, letters, digits
 import unittest
 from cs.lex import get_chars, get_other_chars, get_white, get_identifier
-from cs.logutils import Pfx, error, info
+from cs.logutils import Pfx, error, info, debug
 
 # macro assignment, including leading whitespace
 #
@@ -122,14 +122,22 @@ def parseMakefile(fp, namespaces, parent_context=None):
               _, offset = get_white(line)
               if offset >= len(line) or line[offset] != ':':
                 # ordinary shell action
-                action_list.append(Action(context, 'shell', line))
+                action_silent = False
+                if offset < len(line) and line[offset] == '@':
+                  action_silent = True
+                  offset += 1
+                A = Action(context, 'shell', line[offset:], silent=action_silent)
+                info("add action: %s", A)
+                action_list.append(A)
                 continue
               # in-target directive like ":make"
               _, offset = get_white(line, offset+1)
               directive, offset = get_identifier(line, offset)
               if not directive:
                 raise ParseError(context, offset, "missing in-target directive after leading colon")
-              action_list.append(Action(context, directive, line[offset:].lstrip()))
+              A = Action(context, directive, line[offset:].lstrip())
+              info("add action: %s", A)
+              action_list.append(A)
               continue
 
           m = RE_ASSIGNMENT.match(line)
@@ -149,7 +157,7 @@ def parseMakefile(fp, namespaces, parent_context=None):
             postprereqs_mexpr = []
 
           action_list = []
-          for target in target_mexpr.eval(context, namespaces).split():
+          for target in target_mexpr.eval(namespaces).split():
             yield Target(target, context, prereqs=prereqs_mexpr, postprereqs=postprereqs_mexpr, actions=action_list)
           continue
 
@@ -222,11 +230,11 @@ class MacroExpression(object):
 
   __repr__ = __str__
 
-  def eval(self, context, namespaces):
+  def eval(self, namespaces):
     if self._result is not None:
       return self._result
     strs = []           # strings to collate
-    wordlists = None        # accruing word permutations
+    wordlists = None    # accruing word permutations
     for item in self.permutations:
       if type(item) is str:
         if item.isspace():
@@ -234,7 +242,8 @@ class MacroExpression(object):
           # stash existing word if any
           if wordlists:
             # non-empty word accruing
-            strs.append(" ".join( [ ''.join(wordlists) for wordlists in product(wordlists) ] ))
+            words = [ ''.join(wordlists) for wordlists in product( *wordlists ) ]
+            strs.append(" ".join(words))
             wordlists = None
           strs.append(item)
         else:
@@ -250,7 +259,7 @@ class MacroExpression(object):
           # word already short circuited - skip evaluating the MacroTerm
           pass
         else:
-          text = item.eval(context, namespaces)
+          text = item.eval(namespaces)
           if item.permute:
             textwords = text.split()
             if len(textwords) == 0:
@@ -272,6 +281,7 @@ class MacroExpression(object):
       strs.append(" ".join( [ ''.join(wordlist) for wordlist in product(*wordlists) ] ))
 
     result = ''.join(strs)
+    debug("eval returns %s", result)
     return result
 
 SIMPLE_MODIFIERS = 'DEG?FPpSsv?<?'
@@ -283,7 +293,7 @@ def parseMacro(context, text=None, offset=0):
   if text is None:
     text = context.text
 
-  info('parseMacro("%s")...' % (text[offset:],))
+  ##info('parseMacro("%s")...' % (text[offset:],))
 
   mmark = None
   mtext = None
@@ -304,7 +314,7 @@ def parseMacro(context, text=None, offset=0):
     if ch == '_' or ch.isalpha() or ch in SPECIAL_MACROS:
       offset += 1
       M = MacroTerm(context, ch), offset
-      info('parseMacro("%s") -> %s' % (text[offset:], M))
+      ##info('parseMacro("%s") -> %s' % (text[offset:], M))
       return M
 
     # $(foo) or ${foo}
@@ -403,7 +413,7 @@ def parseMacro(context, text=None, offset=0):
         offset += 1
 
     M = MacroTerm(context, mtext, modifiers, param_mexprs, permute=mpermute), offset
-    info('parseMacro("%s") -> %s' % (text[offset:], M))
+    ##info('parseMacro("%s") -> %s' % (text[offset:], M))
     return M
 
   except IndexError, e:
@@ -438,8 +448,8 @@ class MacroTerm(object):
 
   __repr__ = __str__
 
-  def eval(self, context, namespaces, params=[]):
-    with Pfx(context):
+  def eval(self, namespaces, params=[]):
+    with Pfx(self.context):
       text = self.text
       modifiers = self.modifiers
 

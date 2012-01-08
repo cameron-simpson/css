@@ -3,6 +3,7 @@
 
 import sys
 import os.path
+from functools import partial
 from subprocess import Popen
 from thread import allocate_lock
 import cs.misc
@@ -24,8 +25,9 @@ class Maker(object):
     '''
     if parallel is None:
       parallel = 1
+    self.parallel = parallel
     self.failFast = True
-    self._makeQ = Later(parallel, name=cs.misc.cmd)
+    self._makeQ = None
     self._makefile = None
     self._targets = {}
     self._targets_lock = allocate_lock()
@@ -34,6 +36,9 @@ class Maker(object):
 
   def close(self):
     self._makeQ.close()
+
+  def _queue(self, func, name, priority):
+    return self._makeQ.submit(func, name=name, priority=priority)
 
   @property
   def makefile(self):
@@ -45,21 +50,28 @@ class Maker(object):
     ''' Make a bunch of targets.
     '''
     with Pfx("%s.make(%s)" % (self, targets)):
-      Tlist = []
-      for target in targets:
-        if type(target) is str:
-          T = self._targets.get(target)
-          if not target:
-            error("don't know how to make %s", target)
-        else:
-          T = target
-        T.make(self)
-        Tlist.append(T)
-      ok = True
-      for T in Tlist:
-        if not T.status:
-          error("make %s fails", T)
-          ok = False
+      with Later(self.parallel, name=cs.misc.cmd) as MQ:
+        self._makeQ = MQ
+        Tlist = []
+        for target in targets:
+          if type(target) is str:
+            T = self._targets.get(target)
+            if not target:
+              error("don't know how to make %s", target)
+          else:
+            T = target
+          T.make(self)
+          Tlist.append(T)
+        info("targets queued")
+        ok = True
+        for T in Tlist:
+          info("%s: collect status...", T)
+          T_ok = T.status
+          info("%s: status = %s", T, T_ok)
+          if not T_ok:
+            error("make %s fails", T)
+            ok = False
+      self._makeQ = None
       return ok
 
   def __getitem__(self, target):
@@ -81,6 +93,7 @@ class Maker(object):
         if isinstance(O, Target):
           info("add target %s", O)
           self._targets[O.name] = O
+          O.namespaces = self._macros
         elif isinstance(O, Macro):
           info("add macro %s", O)
           self._macros[O.name] = O
@@ -98,10 +111,11 @@ class Target(object):
     '''
     self.context = context
     self.name = name
+    self.namespaces = None
     self._prereqs = prereqs
     self._postprereqs = postprereqs
     self.maker = None
-    self.actions = []
+    self.actions = actions
     self.state = "unmade"
     self._statusLF = None
     self._lock = allocate_lock()
@@ -119,21 +133,22 @@ class Target(object):
     return self._status_func
 
   @property
+  def _status_func(self):
+    with self._lock:
+      if self._statusLF is None:
+        info("queue make(%s)", self.name)
+        self._statusLF = self.maker._queue(self._make, name="make "+self.name, priority=PRI_MAKE)
+    return self._statusLF
+
+  @property
   def status(self):
     ''' Return the madeness of this target, True for successfully
         made, False for failure to make.
         Internally it dispatches a LateFunction to make the target
         at need.
     '''
+    info("%s: wait for status...", self)
     return self._status_func()
-
-  @property
-  def _status_func(self):
-    with self._lock:
-      if self._statusLF is None:
-        info("queue make(%s)", self.name)
-        self._statusLF = self.maker._makeQ.submit(self._make, name="make "+self.name, priority=PRI_MAKE)
-    return self._statusLF
 
   @property
   def prereqs(self):
@@ -142,51 +157,56 @@ class Target(object):
     with self._lock:
       prereqs = self._prereqs
       if isinstance(prereqs, MacroExpression):
-        self._prereqs = prereqs.eval().split()
+        self._prereqs = prereqs.eval(self.namespaces).split()
     return self._prereqs
 
   def _make(self):
     ''' Make the target. Private function submtted to the make queue.
     '''
     with Pfx(self.name):
-      info("commence make")
+      info("commence make: %d actions, prereqs = %s", len(self.actions), self.prereqs)
       ok = True
       for dep in self.prereqs:
+        info("queue prereq %s", dep)
         dep.make(self.maker)    # request item
-        if not dep.status:
+        info("%s: wait for status...", dep)
+        T_ok = dep.status
+        info("%s: status = %s", dep, T_ok)
+        if not T_ok:
+          info("%s: fail")
           ok = False
           if self.maker.failFast:
             break
       if not ok:
+        info("prereqs bad, skip actions")
         return False
       for action in self.actions:
-        info("queue action: %s", action)
-        LF = action._submit(self.maker, self)
-        if not LF:
+        info("wait for action: %s...", action)
+        A_ok = action.act(self)
+        info("action status = %s", A_ok)
+        if not A_ok:
           return False
       return True
 
 class Action(object):
 
-  def __init__(self, context, variant, line):
+  def __init__(self, context, variant, line, silent=False):
     self.context = context
     self.variant = variant
     self.line = line
-    self.mexpr = parseMacroExpression(context, line)
+    self.mexpr, _ = parseMacroExpression(context, line)
+    self.silent = silent
+    self._statusLF = None
     self._lock = allocate_lock()
 
-  def _submit(self, maker, target):
-    ''' Submit instance of this action for a specific target.
-        Should really only be called by Target._make().
-    '''
-    return self.maker._makeQ.submit(partial(self._act, target),
-                                    name="{}: {}: {}".format(target.name, self.variant, self.line),
-                                    priority=PRI_ACTION)
+  def __str__(self):
+    return "<Action %s %s>" % (self.variant, self.line)
 
-  def _act(self, target):
+  def act(self, target):
+    info("start _act...")
     v = self.variant
     if v == 'shell':
-      shcmd = self.mexpr.eval()
+      shcmd = self.mexpr.eval(target.namespaces)
       argv = (target.shell, '-c', shcmd)
       info("Popen(%s,..)", argv)
       return True
@@ -204,16 +224,6 @@ class Action(object):
       return True
 
     raise NotImplementedError, "unsupported variant: %s" % (self.variant,)
-
-  @property
-  def status(self):
-    with self._lock:
-      if self._statusLF is None:
-        self._statusLF = self.maker._makeQ.submit(self._run, name="action: "+self.name, priority=PRI_ACTION)
-    return self._statusLF()
-
-  def _run(self):
-    raise NotImplementedError
 
 if __name__ == '__main__':
   from . import main, default_cmd
