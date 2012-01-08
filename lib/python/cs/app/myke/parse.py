@@ -8,7 +8,7 @@ import re
 from string import whitespace, letters, digits
 import unittest
 from cs.lex import get_chars, get_other_chars, get_white, get_identifier
-from cs.logutils import Pfx, error, info, debug
+from cs.logutils import Pfx, error, info, debug, exception
 
 # macro assignment, including leading whitespace
 #
@@ -163,7 +163,7 @@ def parseMakefile(fp, namespaces, parent_context=None):
 
           raise ParseError(context, 0, 'unparsed line')
         except ParseError, e:
-          error("%s", e)
+          exception("%s", e)
 
     if prevline is not None:
       # incomplete continuation line
@@ -192,7 +192,7 @@ def parseMacroExpression(context, text=None, offset=0, stopchars=''):
     ch = text[offset]
     if ch == '$':
       # macro
-      M, offset = parseMacro(context, offset=offset)
+      M, offset = parseMacro(context, text=text, offset=offset)
       permutations.append(M)
     elif ch.isspace():
       # whitespace
