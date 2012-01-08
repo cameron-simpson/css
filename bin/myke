@@ -1,0 +1,7 @@
+#!/bin/sh
+#
+# myke - my make programme.
+#       - Cameron Simpson <cs@zip.com.au>
+#
+
+exec py27+ -m cs.app.myke.make ${1+"$@"}
