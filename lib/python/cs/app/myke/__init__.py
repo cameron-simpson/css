@@ -21,8 +21,7 @@ def main(argv):
   M.loadMakefile()
   info("PARSED MAKEFILE")
 
-  xit = M.make(args)
-
+  xit = 0 if M.make(args) else 1
   return xit
 
 if __name__ == '__main__':
