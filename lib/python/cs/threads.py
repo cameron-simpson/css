@@ -24,10 +24,20 @@ class WorkerThreadPool(object):
   ''' A pool of worker threads to run functions.
   '''
 
-  def __init__(self):
+  def __init__(self, name=None):
+    if name is None:
+      name = "WorkerThreadPool-%d" % (seq(),)
+    debug("WorkerThreadPool.__init__(name=%s)", name)
+    self.name = name
     self.closed = False
     self.idle = deque()
     self.all = []
+
+  def __str__(self):
+    return self.name
+
+  def __repr__(self):
+    return '<WorkerThreadPool "%s">' % (self.name,)
 
   def close(self):
     ''' Close the pool.
@@ -70,6 +80,7 @@ class WorkerThreadPool(object):
       Hdesc = (H, IterableQueue())
       self.all.append(Hdesc)
       args.append(Hdesc)
+      debug("%s: start new worker thread", self)
       H.start()
     Hdesc[1].put( (func, retq, deliver) )
 
@@ -86,11 +97,16 @@ class WorkerThreadPool(object):
         If deliver is not None, deliver(result) is called.
         If both are None and an exception occurred, it gets raised.
     '''
+    debug("%s: worker thread starting", self)
     reqQ = Hdesc[1]
     for func, retq, deliver in reqQ:
+      debug("%s: worker thread: received task", self)
       try:
+        debug("%s: worker thread: running task...", self)
         result = func(), None
+        debug("%s: worker thread: ran task: result = %s", self, result)
       except:
+        debug("%s: worker thread: ran task: exception!", self)
         # don't let exceptions go unhandled
         # if nobody is watching, raise the exception and don't return
         # this handler to the pool
