@@ -253,12 +253,13 @@ class Later(object):
       for this instance.
   '''
   def __init__(self, capacity, inboundCapacity=0, name=None):
+    if name is None:
+      name = "Later-%d" % (seq(),)
+    debug("Later.__init__(capacity=%s, inboundCapacity=%s, name=%s)", capacity, inboundCapacity, name)
     if type(capacity) is int:
       capacity = AdjustableSemaphore(capacity)
     self.capacity = capacity
     self.inboundCapacity = inboundCapacity
-    if name is None:
-      name = "Later-%d" % (seq(),)
     self.name = name
     self.delayed = set()        # unqueued, delayed until specific time
     self.pending = set()        # undispatched LateFunctions
