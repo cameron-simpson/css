@@ -187,7 +187,6 @@ def parseMacroExpression(context, text=None, offset=0, stopchars=''):
   if text is None:
     text = context.text
 
-  text = context.text
   permutations = []
   while offset < len(text):
     ch = text[offset]
