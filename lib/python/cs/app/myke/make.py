@@ -209,10 +209,9 @@ class Action(object):
       shcmd = self.mexpr.eval(target.namespaces)
       argv = (target.shell, '-c', shcmd)
       info("Popen(%s,..)", argv)
-      return True
-      ##P = Popen(argv, close_fds=True)
-      ##retcode = P.wait()
-      ##return retcode == 0
+      P = Popen(argv, close_fds=True)
+      retcode = P.wait()
+      return retcode == 0
 
     if v == 'make':
       subtargets = self.mexpr.eval().split()
