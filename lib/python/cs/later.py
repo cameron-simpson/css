@@ -15,8 +15,8 @@ from cs.misc import seq
 from cs.logutils import Pfx, info, debug
 
 class _Late_context_manager(object):
-  ''' The _Late_context_manager is a context manager to run a suite via the
-      Later object. Typical usage:
+  ''' The _Late_context_manager is a context manager to run a suite via an
+      existing Later object. Example usage:
 
         L = Later(4)    # a 4 thread Later
         ...
@@ -288,6 +288,17 @@ class Later(object):
     return "<%s pending=%d running=%d delayed=%d>" \
            % (self.name,
               len(self.pending), len(self.running), len(self.delayed))
+
+  def __enter__(self):
+    debug("%s: __enter__", self)
+
+  def __exit__(self, exc_type, exc_val, exc_tb):
+    ''' Exit handler: release the "complete" lock; the placeholder
+        function is blocking on this, and will return on its release.
+    '''
+    debug("%s: __exit__: exc_type=%s", self, exc_type)
+    self.close()
+    return False
 
   def logTo(self, filename, logger=None, log_level=None):
     ''' Log to the file specified by `filename` using the specified
