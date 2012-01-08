@@ -200,7 +200,8 @@ class Action(object):
     self._lock = allocate_lock()
 
   def __str__(self):
-    return "<Action %s %s>" % (self.variant, self.line)
+    prline = self.line.replace('\n', '\\n')
+    return "<Action %s %s>" % (self.variant, prline)
 
   def act(self, target):
     debug("start _act...")
