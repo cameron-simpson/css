@@ -3,7 +3,9 @@
 
 import sys
 import os.path
+import getopt
 from functools import partial
+import logging
 from subprocess import Popen
 from thread import allocate_lock
 import cs.misc
@@ -83,6 +85,18 @@ class Maker(object):
       else:
         T = targets[target] = Target(target, self)
     return T
+
+  def getopt(self, args, options=None):
+    '''
+    '''
+    opts, args = getopt.getopt(args, 'deikmnpqrstuvxENRj:D:S:f:')
+    for opt, value in opts:
+      if opt == '-d':
+        # debug mode
+        logging.getLogger().setLevel(logging.DEBUG)
+      else:
+        raise NotImplementedError(str(opt))
+    return args
 
   def loadMakefile(self, makefile=None):
     if makefile is None:

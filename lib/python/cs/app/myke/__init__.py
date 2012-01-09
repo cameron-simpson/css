@@ -1,5 +1,6 @@
 #!/usr/bin/python
 
+from getopt import GetoptError
 from cs.logutils import setup_logging, warning, error, info
 from cs.app.myke.make import Maker
 
@@ -13,7 +14,11 @@ def main(argv):
 
   M = Maker()
   badopts = False
-  warning("MISSING OPTION PARSING")
+  try:
+    args = M.getopt(args)
+  except GetoptError, e:
+    warning("bad options: %s", e)
+    badopts = True
   if badopts:
     print >>sys.stderr, usage % (cmd,)
     return 2
