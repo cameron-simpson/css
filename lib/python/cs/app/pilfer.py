@@ -116,7 +116,7 @@ class Pilfer(object):
       with Pfx(action):
         if action == 'per':
           # depth first step at this point
-          urls = pfx_iter(action, chain( *[ self.act([U], list(actions)) for U in urls ] ) )
+          urls = pfx_iter(action, chain( *[ list(self.act([U], list(actions))) for U in urls ] ) )
           break
         if action.startswith('/'):
           # select URLs matching regexp
