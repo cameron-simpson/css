@@ -345,7 +345,6 @@ class Pfx(object):
       if exc_type is not SystemExit:
         if _prefix.raise_needs_prefix:
           prefix = self.mark
-          ##sys.stderr.write("Pfx: [prefix=%s]\n" % (prefix,))
           if hasattr(exc_value, 'args'):
             ##sys.stderr.write("Pfx: [exc_value.args is = %s]\n" % (`exc_value.args`,))
             if len(exc_value.args) > 0:
@@ -353,9 +352,9 @@ class Pfx(object):
                                + list(exc_value.args[1:])
               ##sys.stderr.write("Pfx: [exc_value.args now = %s]\n" % (`exc_value.args`,))
           elif hasattr(exc_value, 'msg'):
-            exc_value.msg = ": ".join(prefix, exc_value.msg)
+            exc_value.msg = prefix + ": " + exc_value.msg
           elif hasattr(exc_value, 'message'):
-            exc_value.message = ": ".join(prefix, exc_value.message)
+            exc_value.message = prefix + ": " + exc_value.message
           else:
             # we can't modify this - at least report the current prefix state
             sys.stderr.write("%s: Pfx.__exit__: exc_value = %s\n" \
