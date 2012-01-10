@@ -20,6 +20,9 @@ PRI_ACTION = 0
 PRI_MAKE   = 1
 PRI_PREREQ = 2
 
+class Flags(object):
+  pass
+
 class Maker(object):
   ''' Main class representing a set of dependencies to make.
   '''
@@ -30,6 +33,10 @@ class Maker(object):
     if parallel is None:
       parallel = 1
     self.parallel = parallel
+    self.debug = Flags()
+    self.debug.debug = False    # logging.DEBUG noise
+    self.debug.flags = False    # watch debug flag settings
+    self.debug.make = False     # watch make decisions
     self.failFast = True
     self._makeQ = None
     self._makefile = None
@@ -86,17 +93,58 @@ class Maker(object):
         T = targets[target] = Target(target, self)
     return T
 
+  def setDebug(self, flag, value):
+    ''' Set or clear the named debug option.
+    '''
+    with Pfx("setDebug(%s, %s)" % (repr(flag), repr(value))):
+      if not flag.isalpha() or not hasattr(self.debug, flag):
+        raise AttributeError, "invalid debug flag"
+      if self.debug.flags:
+        info("debug.%s = %s", flag, value)
+      setattr(self.debug, flag, value)
+      if flag == 'debug':
+       # tweak global logging level also
+       logger = logging.getLogger()
+       log_level = logger.getEffectiveLevel()
+       if value:
+         if log_level > logging.DEBUG:
+           logger.setLevel(logging.DEBUG)
+         else:
+           if log_level < logging.INFO:
+             logger.setLevel(logging.INFO)
+
   def getopt(self, args, options=None):
+    ''' Parse command line options.
+	Returns (args, badopts) being remaining command line arguments
+	and the error state (unparsed or invalid options encountered).
     '''
-    '''
+    badopts = False
     opts, args = getopt.getopt(args, 'deikmnpqrstuvxENRj:D:S:f:')
     for opt, value in opts:
-      if opt == '-d':
-        # debug mode
-        logging.getLogger().setLevel(logging.DEBUG)
-      else:
-        raise NotImplementedError(str(opt))
-    return args
+      with Pfx("%s" % (opt,)):
+        if opt == '-d':
+          # debug mode
+          self.setDebug('make', True)
+        elif opt == '-D':
+          self.debug.make = True
+          for flag in [ w.strip().lower() for w in value.split(',') ]:
+            if len(w) == 0:
+              # silently skip empty flag items
+              continue
+            if flag.startswith('-'):
+              value = False
+              flag = flag[1:]
+            else:
+              value = True
+            try:
+              self.setDebug(flag, value)
+            except AttributeError, e:
+              error("bad flag %s: %s", repr(flag), e)
+              badopts = True
+        else:
+          error("unimplemented")
+          badopts = True
+    return args, badopts
 
   def loadMakefile(self, makefile=None):
     if makefile is None:
@@ -241,6 +289,5 @@ class Action(object):
 
 if __name__ == '__main__':
   from . import main, default_cmd
-  print >>sys.stderr, "argv =", repr(sys.argv)
   sys.stderr.flush()
   sys.exit(main([default_cmd]+sys.argv[1:]))

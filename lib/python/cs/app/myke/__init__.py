@@ -1,6 +1,7 @@
 #!/usr/bin/python
 
 from getopt import GetoptError
+import sys
 from cs.logutils import setup_logging, warning, error, info
 from cs.app.myke.make import Maker
 
@@ -13,9 +14,8 @@ def main(argv):
   setup_logging(cmd)
 
   M = Maker()
-  badopts = False
   try:
-    args = M.getopt(args)
+    args, badopts = M.getopt(args)
   except GetoptError, e:
     warning("bad options: %s", e)
     badopts = True
@@ -30,5 +30,4 @@ def main(argv):
   return xit
 
 if __name__ == '__main__':
-  import sys
   sys.exit(main(sys.argv))
