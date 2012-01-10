@@ -56,14 +56,14 @@ class Macro(object):
       return "<Macro %s(%s) = %s>" % (self.name, ", ".join(self.params), self.text)
     return "<Macro %s = %s>" % (self.name, self.text)
 
-def parseMakefile(fp, namespaces, parent_context=None):
+def parseMakefile(M, fp, namespaces, parent_context=None):
   ''' Read a Mykefile and yield Macros and Targets.
   '''
   if type(fp) is str:
     # open file, yield contents
     filename = fp
     with open(filename) as fp:
-      for O in parseMakefile(fp, namespaces, parent_context):
+      for O in parseMakefile(M, fp, namespaces, parent_context):
         yield O
     return
 
@@ -75,6 +75,7 @@ def parseMakefile(fp, namespaces, parent_context=None):
     filename = str(fp)
 
   with Pfx(filename):
+    M.debug_parse("begin parse")
     ok = True
     action_list = None       # not in a target
     ifStack = []        # active ifStates (state, firstbranch)
@@ -127,7 +128,7 @@ def parseMakefile(fp, namespaces, parent_context=None):
                   action_silent = True
                   offset += 1
                 A = Action(context, 'shell', line[offset:], silent=action_silent)
-                info("add action: %s", A)
+                M.debug_parse("add action: %s", A)
                 action_list.append(A)
                 continue
               # in-target directive like ":make"
@@ -136,7 +137,7 @@ def parseMakefile(fp, namespaces, parent_context=None):
               if not directive:
                 raise ParseError(context, offset, "missing in-target directive after leading colon")
               A = Action(context, directive, line[offset:].lstrip())
-              info("add action: %s", A)
+              M.debug_parse("add action: %s", A)
               action_list.append(A)
               continue
 
@@ -168,6 +169,8 @@ def parseMakefile(fp, namespaces, parent_context=None):
     if prevline is not None:
       # incomplete continuation line
       error("unexpected EOF: unterminated slosh continued line")
+
+    M.debug_parse("finish parse")
 
 # mapping of special macro names to evaluation functions
 SPECIAL_MACROS = { '.':         None,
@@ -292,8 +295,6 @@ def parseMacro(context, text=None, offset=0):
   if text is None:
     text = context.text
 
-  ##info('parseMacro("%s")...' % (text[offset:],))
-
   mmark = None
   mtext = None
   param_mexprs = []
@@ -313,7 +314,6 @@ def parseMacro(context, text=None, offset=0):
     if ch == '_' or ch.isalpha() or ch in SPECIAL_MACROS:
       offset += 1
       M = MacroTerm(context, ch), offset
-      ##info('parseMacro("%s") -> %s' % (text[offset:], M))
       return M
 
     # $(foo) or ${foo}
@@ -412,7 +412,6 @@ def parseMacro(context, text=None, offset=0):
         offset += 1
 
     M = MacroTerm(context, mtext, modifiers, param_mexprs, permute=mpermute), offset
-    ##info('parseMacro("%s") -> %s' % (text[offset:], M))
     return M
 
   except IndexError, e:

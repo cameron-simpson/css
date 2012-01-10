@@ -37,6 +37,7 @@ class Maker(object):
     self.debug.debug = False    # logging.DEBUG noise
     self.debug.flags = False    # watch debug flag settings
     self.debug.make = False     # watch make decisions
+    self.debug.parse = False    # watch Makefile parsing
     self.failFast = True
     self._makeQ = None
     self._makefile = None
@@ -54,6 +55,14 @@ class Maker(object):
       self._makefile = os.path.basename(cs.misc.cmd).title() + 'file'
     return self._makefile
 
+  def debug_make(self, msg, *a, **kw):
+    if self.debug.make:
+      info(msg, *a, **kw)
+
+  def debug_parse(self, msg, *a, **kw):
+    if self.debug.parse:
+      info(msg, *a, **kw)
+
   def make(self, targets):
     ''' Make a bunch of targets.
     '''
@@ -70,12 +79,11 @@ class Maker(object):
             T = target
           T.make(self)
           Tlist.append(T)
-        info("targets queued")
         ok = True
         for T in Tlist:
-          info("%s: collect status...", T)
+          debug("%s: collect status...", T)
           T_ok = T.status
-          info("%s: status = %s", T, T_ok)
+          self.debug_make("%s: status = %s", T, T_ok)
           if not T_ok:
             error("make %s fails", T)
             ok = False
@@ -149,17 +157,16 @@ class Maker(object):
   def loadMakefile(self, makefile=None):
     if makefile is None:
       makefile = self.makefile
-    with Pfx("load %s" % (makefile,)):
-      for O in parseMakefile(makefile, [self._macros]):
-        if isinstance(O, Target):
-          info("add target %s", O)
-          self._targets[O.name] = O
-          O.namespaces = self._macros
-        elif isinstance(O, Macro):
-          info("add macro %s", O)
-          self._macros[O.name] = O
-        else:
-          raise ValueError, "parseMakefile({}): unsupported parse item received: {}{}".format(makefile, type(O), repr(O))
+    for O in parseMakefile(self, makefile, [self._macros]):
+      if isinstance(O, Target):
+        self.debug_parse("add target %s", O)
+        self._targets[O.name] = O
+        O.namespaces = self._macros
+      elif isinstance(O, Macro):
+        self.debug_parse("add macro %s", O)
+        self._macros[O.name] = O
+      else:
+        raise ValueError, "parseMakefile({}): unsupported parse item received: {}{}".format(makefile, type(O), repr(O))
 
 class Target(object):
 
@@ -198,7 +205,7 @@ class Target(object):
   def _status_func(self):
     with self._lock:
       if self._statusLF is None:
-        info("queue make(%s)", self.name)
+        self.debug_make("queue make(%s)", self.name)
         self._statusLF = self.maker._queue(self._make, name="make "+self.name, priority=PRI_MAKE)
     return self._statusLF
 
@@ -209,7 +216,7 @@ class Target(object):
         Internally it dispatches a LateFunction to make the target
         at need.
     '''
-    info("%s: wait for status...", self)
+    debug("%s: wait for status...", self)
     return self._status_func()
 
   @property
@@ -226,26 +233,25 @@ class Target(object):
     ''' Make the target. Private function submtted to the make queue.
     '''
     with Pfx(self.name):
-      info("commence make: %d actions, prereqs = %s", len(self.actions), self.prereqs)
+      self.debug_make("commence make: %d actions, prereqs = %s", len(self.actions), self.prereqs)
       ok = True
       for dep in self.prereqs:
-        debug("queue prereq %s", dep)
         dep.make(self.maker)    # request item
-        debug("%s: wait for status...", dep)
+        self.debug_make("wait for status of %s", dep)
         T_ok = dep.status
-        debug("%s: status = %s", dep, T_ok)
+        self.debug_make("status of %s is %s", dep, T_ok)
         if not T_ok:
-          debug("%s: fail")
           ok = False
           if self.maker.failFast:
+            self.debug_make("abort")
             break
       if not ok:
-        debug("prereqs bad, skip actions")
+        self.debug_make("prereqs bad, skip actions")
         return False
       for action in self.actions:
-        debug("wait for action: %s...", action)
+        self.debug_make("dispatch action: %s", action)
         A_ok = action.act(self)
-        debug("action status = %s", A_ok)
+        self.debug_make("action status = %s", A_ok)
         if not A_ok:
           return False
       return True

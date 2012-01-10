@@ -24,7 +24,6 @@ def main(argv):
     return 2
 
   M.loadMakefile()
-  info("PARSED MAKEFILE")
 
   xit = 0 if M.make(args) else 1
   return xit
