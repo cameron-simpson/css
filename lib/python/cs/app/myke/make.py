@@ -39,6 +39,7 @@ class Maker(object):
     self.debug.make = False     # watch make decisions
     self.debug.parse = False    # watch Makefile parsing
     self.failFast = True
+    self.default_target = None
     self._makeQ = None
     self._makefile = None
     self._targets = {}
@@ -134,7 +135,6 @@ class Maker(object):
           # debug mode
           self.setDebug('make', True)
         elif opt == '-D':
-          self.debug.make = True
           for flag in [ w.strip().lower() for w in value.split(',') ]:
             if len(w) == 0:
               # silently skip empty flag items
@@ -157,16 +157,21 @@ class Maker(object):
   def loadMakefile(self, makefile=None):
     if makefile is None:
       makefile = self.makefile
+    first_target = None
     for O in parseMakefile(self, makefile, [self._macros]):
       if isinstance(O, Target):
         self.debug_parse("add target %s", O)
         self._targets[O.name] = O
+        if first_target is None:
+          first_target = O
         O.namespaces = self._macros
       elif isinstance(O, Macro):
         self.debug_parse("add macro %s", O)
         self._macros[O.name] = O
       else:
         raise ValueError, "parseMakefile({}): unsupported parse item received: {}{}".format(makefile, type(O), repr(O))
+    if first_target is not None:
+      self.default_target = first_target
 
 class Target(object):
 
@@ -205,7 +210,7 @@ class Target(object):
   def _status_func(self):
     with self._lock:
       if self._statusLF is None:
-        self.debug_make("queue make(%s)", self.name)
+        self.maker.debug_make("queue make(%s)", self.name)
         self._statusLF = self.maker._queue(self._make, name="make "+self.name, priority=PRI_MAKE)
     return self._statusLF
 
@@ -233,25 +238,25 @@ class Target(object):
     ''' Make the target. Private function submtted to the make queue.
     '''
     with Pfx(self.name):
-      self.debug_make("commence make: %d actions, prereqs = %s", len(self.actions), self.prereqs)
+      self.maker.debug_make("commence make: %d actions, prereqs = %s", len(self.actions), self.prereqs)
       ok = True
       for dep in self.prereqs:
         dep.make(self.maker)    # request item
-        self.debug_make("wait for status of %s", dep)
+        self.maker.debug_make("wait for status of %s", dep)
         T_ok = dep.status
-        self.debug_make("status of %s is %s", dep, T_ok)
+        self.maker.debug_make("status of %s is %s", dep, T_ok)
         if not T_ok:
           ok = False
           if self.maker.failFast:
-            self.debug_make("abort")
+            self.maker.debug_make("abort")
             break
       if not ok:
-        self.debug_make("prereqs bad, skip actions")
+        self.maker.debug_make("prereqs bad, skip actions")
         return False
       for action in self.actions:
-        self.debug_make("dispatch action: %s", action)
+        self.maker.debug_make("dispatch action: %s", action)
         A_ok = action.act(self)
-        self.debug_make("action status = %s", A_ok)
+        self.maker.debug_make("action status = %s", A_ok)
         if not A_ok:
           return False
       return True

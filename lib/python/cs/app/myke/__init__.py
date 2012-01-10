@@ -25,7 +25,21 @@ def main(argv):
 
   M.loadMakefile()
 
-  xit = 0 if M.make(args) else 1
+  if args:
+    targets = args
+  else:
+    target = M.default_target
+    if target is None:
+      targets = ()
+    else:
+      targets = (M.default_target,)
+
+  if not targets:
+    error("no default target")
+    xit = 1
+  else:
+    xit = 0 if M.make(targets) else 1
+
   return xit
 
 if __name__ == '__main__':
