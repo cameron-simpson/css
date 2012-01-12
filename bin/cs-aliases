@@ -15,7 +15,7 @@ from getopt import GetoptError
 import cs.sh
 from cs.mail import unrfc2047
 from cs.mailAddresses import addressKey, loadAddresses, addrsRegexp
-from cs.logutils import setup_logging, error, Pfx, warn
+from cs.logutils import setup_logging, error, Pfx, warning
 import cs.misc
 
 aliases = environ.get('CS_ALIASES',
@@ -69,7 +69,7 @@ def main(argv):
       with Pfx(aliases):
         ok, byCategory, byAddress = loadAddresses(aliases)
         if not ok:
-          warn("some aliases failed to load")
+          warning("some aliases failed to load")
           xit = 1
       cats = byCategory.keys()
       cats.sort()
