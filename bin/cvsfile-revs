@@ -13,9 +13,9 @@
   y/	/ /
   /^$/{
     x
-    s/\n/\t/g
+    s/\n/	/g
     p
-    /\t$/q
+    /	$/q
     b endrev
   }
   /^date /{
