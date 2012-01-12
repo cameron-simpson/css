@@ -5,6 +5,8 @@
 #       - Cameron Simpson <cs@zip.com.au> 20apr2007
 #
 
+set -ue
+
 dotrace=1
 perfile=
 
@@ -100,8 +102,10 @@ _hg init
 | sed -n 's|^\./||; s/,v$//p' \
 | while read -r cvsfile
   do
-    cvsfile-revs < "$CVSROOT/$subdir/$cvsfile,v" | sed "s;^;$cvsfile	;"
+    cvsfile-revs < "$CVSROOT/$subdir/$cvsfile,v" \
+    | sed "s;^;$cvsfile	;"
   done \
+| tee $HOME/tmp/cvs2hg-revs \
 | if [ $perfile ]
   then
     sort '-t	' -k 3 -k 1 \
@@ -149,8 +153,10 @@ _hg init
       done
     }
   else
-    awk '{print$2}' \
-    | sed 's/_/ /; s/$/ UTC/' \
+    awk '{ print $3 }' \
+    | tee $HOME/tmp/cvs2hg-awk2 \
+    | sed 's/\(....\)\(..\)\(..\)T\(..\)\(..\)\(..\)/\1-\2-\3 \4:\5:\6/; s/$/ UTC/' \
+    | tee $HOME/tmp/cvs2hg-cleaned \
     | sort -u \
     | \
     {
@@ -174,15 +180,33 @@ _hg init
               daterange="$odate1<=$date"
         fi
         _cvs -q log -S -N "-d$daterange" \
-        | sed '/^Working file:/,/^---------------------------/d
-               /^=============================================================================/d
-               /^ *$/d' \
+        | tee -a ~/tmp/cvs2hg-cvslog \
+        | sed -n '/^Working file:/,/^=============================================================================/{
+                    /^Working file:/d
+                    /^head:/d
+                    /^branch:/d
+                    /^branches:/d
+                    /^locks:/d
+                    /^access list:/d
+                    /^keyword substitution:/d
+                    /^total revisions:/d
+                    /^description:/d
+                    /^Initial revision/d
+                    /^----------------------------/d
+                    /^revision [0-9]/d
+                    /^date:/d
+                    /^=============================================================================/d
+                    p
+                  }' \
+        | keepfirst \
         > "$logf"
 
         ls -ld "$logf"
         [ -s "$logf" ]
         cat "$logf"
-        _hg commit -A -d "$date" -l "$logf" </dev/null
+        nchanged=`_hg stat | wc -l`
+        [ $nchanged = 0 ] \
+        || _hg commit -A -d "$date" -l "$logf" </dev/null
 
         first=
         odate=$date
