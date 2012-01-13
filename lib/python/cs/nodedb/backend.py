@@ -79,6 +79,9 @@ class Backend(_BackendMappingMixin):
   ''' Base class for NodeDB backends.
   '''
 
+  def __str__(self):
+    return type(self).__name__
+
   def set_nodedb(self, nodedb):
     ''' Set the nodedb controlling this backend.
         Called by NodeDB.__init__().
@@ -94,7 +97,7 @@ class Backend(_BackendMappingMixin):
     for k, attrmap in self.iteritems():
       yield k[0], k[1], attrmap
 
-  def apply(self, nodedb):
+  def apply_to(self, nodedb):
     ''' Apply the nodedata from this backend to a NodeDB.
         This can be overridden by subclasses to provide some backend specific
         efficient implementation.

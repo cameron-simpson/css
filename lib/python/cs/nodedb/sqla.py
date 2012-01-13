@@ -11,7 +11,7 @@ from sqlalchemy import create_engine, \
 from sqlalchemy.orm import mapper, sessionmaker
 from sqlalchemy.sql import and_, or_, not_, asc
 from sqlalchemy.sql.expression import distinct
-from cs.logutils import error, warning
+from cs.logutils import Pfx, error, warning, debug
 from . import NodeDB, Backend
 
 def NODESTable(metadata, name=None):
@@ -111,38 +111,42 @@ class Backend_SQLAlchemy(Backend):
   def nodedata(self):
     ''' Pull all node data from the database.
     '''
-    nodes = self.nodes
-    attrs = self.attrs
-    byID = self.__nodekeysByID
-    # load node data
-    for node_id, t, name in select( [ nodes.c.ID,
-                                      nodes.c.TYPE,
-                                      nodes.c.NAME
-                                    ] ).execute():
-      self._noteNodeKey(t, name, node_id)
-    # load Node attributes
-    # TODO: order by NODE_ID, ATTR and use .extend in batches
-    onode_id = None
-    for node_id, attr, value in select( [ attrs.c.NODE_ID,
-                                          attrs.c.ATTR,
-                                          attrs.c.VALUE,
-                                        ] ) \
-                                .order_by(asc(attrs.c.NODE_ID)) \
-                                .execute():
-      if node_id not in byID:
-        error("invalid NODE_ID(%s): ignore %s=%s" % (node_id, attr, value))
-        continue
-      t, name = byID[node_id]
-      if onode_id is None or onode_id == node_id:
-        if onode_id is not None:
-          ot, oname = byID[onode_id]
-          yield ot, oname, attrmap
-        onode_id = node_id
-        attrmap = {}
-      attrmap.setdefault(attr, []).append(value)
-    if onode_id is not None:
-      ot, oname = byID[onode_id]
-      yield ot, oname, attrmap
+    with Pfx("%s.nodedata()..." % (self,)):
+      nodes = self.nodes
+      attrs = self.attrs
+      byID = self.__nodekeysByID
+      # load node data
+      for node_id, t, name in select( [ nodes.c.ID,
+                                        nodes.c.TYPE,
+                                        nodes.c.NAME
+                                      ] ).execute():
+        self._noteNodeKey(t, name, node_id)
+      # load Node attributes
+      # TODO: order by NODE_ID, ATTR and use .extend in batches
+      onode_id = None
+      for node_id, attr, value in select( [ attrs.c.NODE_ID,
+                                            attrs.c.ATTR,
+                                            attrs.c.VALUE,
+                                          ] ) \
+                                  .order_by(asc(attrs.c.NODE_ID)) \
+                                  .execute():
+        if node_id not in byID:
+          error("invalid NODE_ID(%s): ignore %s=%s" % (node_id, attr, value))
+          continue
+        t, name = byID[node_id]
+        if onode_id is None or onode_id != node_id:
+          # yield previous node
+          if onode_id is not None:
+            ot, oname = byID[onode_id]
+            yield ot, oname, attrmap
+          # commence new node
+          onode_id = node_id
+          attrmap = {}
+        attrmap.setdefault(attr, []).append(value)
+      # yield final node
+      if onode_id is not None:
+        ot, oname = byID[onode_id]
+        yield ot, oname, attrmap
 
   def iteritems(self):
     for t, name, attrmap in self.nodedata():

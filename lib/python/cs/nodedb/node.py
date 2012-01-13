@@ -592,15 +592,18 @@ class NodeDB(dict):
     self.noNode = None
     self.__attr_type_registry = {}
     self.__attr_scheme_registry = {}
-    if backend is None:
-      backend = _NoBackend()
-    self._backend = backend
+    # run initially with no backend
+    # load data from backend
+    # attach backend to collect updates
+    self._backend = _NoBackend()
     self.__nodesByType = {}
     backend.set_nodedb(self)
-    backend.apply(self)
+    backend.apply_to(self)
+    if backend is not None:
+      self._backend = backend
 
   def __str__(self):
-    return "%s[_backend=%s]" % (type(self), self._backend)
+    return "%s[_backend=%s]" % (type(self).__name__, self._backend)
 
   def useNoNode(self):
     ''' Enable "no node" mode.
@@ -1017,15 +1020,19 @@ class NodeDB(dict):
           type, name, attrmap
         into this NodeDB.
     '''
-    for t, name, attrmap in nodedata:
-      if doCreate:
-        N = self.make( (t, name) )
-      else:
-        N = self[t, name]
-      mapping = {}
-      for attr, values in attrmap.items():
-        mapping[attr] = [ self.fromtext(value) for value in values ]
-      N.apply(mapping)
+    with Pfx(self):
+      debug("apply_nodedata(..,doCreate=%s)...", doCreate)
+      for t, name, attrmap in nodedata:
+        debug("%s:%s", t, name)
+        if doCreate:
+          N = self.make( (t, name) )
+        else:
+          N = self[t, name]
+        mapping = {}
+        for attr, values in attrmap.items():
+          debug("set %s:%s.%s", t, name, attr)
+          mapping[attr] = [ self.fromtext(value) for value in values ]
+        N.apply(mapping)
 
   def nodespec(self, spec, doCreate=False):
     ''' Generator that parses a comma separated string specifying
