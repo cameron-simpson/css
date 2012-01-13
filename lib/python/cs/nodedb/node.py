@@ -1005,7 +1005,8 @@ class NodeDB(dict):
   def nodedata(self, nodes=None):
     ''' Generator to yield:
           type, name, attrmap
-        ready to be written to external storage such as a CSV file.
+        ready to be written to external storage such as a CSV file
+        or to be applied to another NodeDB.
     '''
     if nodes is None:
       nodes = self.default_dump_nodes()
@@ -1178,6 +1179,20 @@ class NodeDB(dict):
       raise GetoptError("extra arguments after %s:%s" % (ipaddr, port))
     self.readonly = True
     cs.nodedb.httpd.serve(self, ipaddr, port)
+    return xit
+
+  def cmd_import(self, args):
+    ''' import other-db...
+          Import node data from another NodeDB.
+    '''
+    debug("cmd_import(%s)", args)
+    xit = 0
+    if not args:
+      raise GetoptError("missing arguments")
+    for arg in args:
+      debug("import %s...", arg)
+      db = NodeDBFromURL(arg)
+      self.apply_nodedata(db.nodedata())
     return xit
 
   def cmd_list(self, args):
