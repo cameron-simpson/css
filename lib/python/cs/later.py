@@ -349,7 +349,6 @@ class Later(object):
 
   def close(self):
     with Pfx("%s.close()" % (self,)):
-      info("close")
       assert not self.closed
       self.closed = True
       if self._timerQ:

@@ -20,6 +20,9 @@ PRI_ACTION = 0
 PRI_MAKE   = 1
 PRI_PREREQ = 2
 
+class Flags(object):
+  pass
+
 class Maker(object):
   ''' Main class representing a set of dependencies to make.
   '''
@@ -30,7 +33,13 @@ class Maker(object):
     if parallel is None:
       parallel = 1
     self.parallel = parallel
+    self.debug = Flags()
+    self.debug.debug = False    # logging.DEBUG noise
+    self.debug.flags = False    # watch debug flag settings
+    self.debug.make = False     # watch make decisions
+    self.debug.parse = False    # watch Makefile parsing
     self.failFast = True
+    self.default_target = None
     self._makeQ = None
     self._makefile = None
     self._targets = {}
@@ -46,6 +55,14 @@ class Maker(object):
     if self._makefile is None:
       self._makefile = os.path.basename(cs.misc.cmd).title() + 'file'
     return self._makefile
+
+  def debug_make(self, msg, *a, **kw):
+    if self.debug.make:
+      info(msg, *a, **kw)
+
+  def debug_parse(self, msg, *a, **kw):
+    if self.debug.parse:
+      info(msg, *a, **kw)
 
   def make(self, targets):
     ''' Make a bunch of targets.
@@ -63,12 +80,11 @@ class Maker(object):
             T = target
           T.make(self)
           Tlist.append(T)
-        info("targets queued")
         ok = True
         for T in Tlist:
-          info("%s: collect status...", T)
+          debug("%s: collect status...", T)
           T_ok = T.status
-          info("%s: status = %s", T, T_ok)
+          self.debug_make("%s: status = %s", T, T_ok)
           if not T_ok:
             error("make %s fails", T)
             ok = False
@@ -86,32 +102,76 @@ class Maker(object):
         T = targets[target] = Target(target, self)
     return T
 
+  def setDebug(self, flag, value):
+    ''' Set or clear the named debug option.
+    '''
+    with Pfx("setDebug(%s, %s)" % (repr(flag), repr(value))):
+      if not flag.isalpha() or not hasattr(self.debug, flag):
+        raise AttributeError, "invalid debug flag"
+      if self.debug.flags:
+        info("debug.%s = %s", flag, value)
+      setattr(self.debug, flag, value)
+      if flag == 'debug':
+       # tweak global logging level also
+       logger = logging.getLogger()
+       log_level = logger.getEffectiveLevel()
+       if value:
+         if log_level > logging.DEBUG:
+           logger.setLevel(logging.DEBUG)
+         else:
+           if log_level < logging.INFO:
+             logger.setLevel(logging.INFO)
+
   def getopt(self, args, options=None):
+    ''' Parse command line options.
+	Returns (args, badopts) being remaining command line arguments
+	and the error state (unparsed or invalid options encountered).
     '''
-    '''
+    badopts = False
     opts, args = getopt.getopt(args, 'deikmnpqrstuvxENRj:D:S:f:')
     for opt, value in opts:
-      if opt == '-d':
-        # debug mode
-        logging.getLogger().setLevel(logging.DEBUG)
-      else:
-        raise NotImplementedError(str(opt))
-    return args
+      with Pfx("%s" % (opt,)):
+        if opt == '-d':
+          # debug mode
+          self.setDebug('make', True)
+        elif opt == '-D':
+          for flag in [ w.strip().lower() for w in value.split(',') ]:
+            if len(w) == 0:
+              # silently skip empty flag items
+              continue
+            if flag.startswith('-'):
+              value = False
+              flag = flag[1:]
+            else:
+              value = True
+            try:
+              self.setDebug(flag, value)
+            except AttributeError, e:
+              error("bad flag %s: %s", repr(flag), e)
+              badopts = True
+        else:
+          error("unimplemented")
+          badopts = True
+    return args, badopts
 
   def loadMakefile(self, makefile=None):
     if makefile is None:
       makefile = self.makefile
-    with Pfx("load %s" % (makefile,)):
-      for O in parseMakefile(makefile, [self._macros]):
-        if isinstance(O, Target):
-          info("add target %s", O)
-          self._targets[O.name] = O
-          O.namespaces = self._macros
-        elif isinstance(O, Macro):
-          info("add macro %s", O)
-          self._macros[O.name] = O
-        else:
-          raise ValueError, "parseMakefile({}): unsupported parse item received: {}{}".format(makefile, type(O), repr(O))
+    first_target = None
+    for O in parseMakefile(self, makefile, [self._macros]):
+      if isinstance(O, Target):
+        self.debug_parse("add target %s", O)
+        self._targets[O.name] = O
+        if first_target is None:
+          first_target = O
+        O.namespaces = self._macros
+      elif isinstance(O, Macro):
+        self.debug_parse("add macro %s", O)
+        self._macros[O.name] = O
+      else:
+        raise ValueError, "parseMakefile({}): unsupported parse item received: {}{}".format(makefile, type(O), repr(O))
+    if first_target is not None:
+      self.default_target = first_target
 
 class Target(object):
 
@@ -150,7 +210,7 @@ class Target(object):
   def _status_func(self):
     with self._lock:
       if self._statusLF is None:
-        info("queue make(%s)", self.name)
+        self.maker.debug_make("queue make(%s)", self.name)
         self._statusLF = self.maker._queue(self._make, name="make "+self.name, priority=PRI_MAKE)
     return self._statusLF
 
@@ -161,7 +221,7 @@ class Target(object):
         Internally it dispatches a LateFunction to make the target
         at need.
     '''
-    info("%s: wait for status...", self)
+    debug("%s: wait for status...", self)
     return self._status_func()
 
   @property
@@ -178,26 +238,25 @@ class Target(object):
     ''' Make the target. Private function submtted to the make queue.
     '''
     with Pfx(self.name):
-      info("commence make: %d actions, prereqs = %s", len(self.actions), self.prereqs)
+      self.maker.debug_make("commence make: %d actions, prereqs = %s", len(self.actions), self.prereqs)
       ok = True
       for dep in self.prereqs:
-        debug("queue prereq %s", dep)
         dep.make(self.maker)    # request item
-        debug("%s: wait for status...", dep)
+        self.maker.debug_make("wait for status of %s", dep)
         T_ok = dep.status
-        debug("%s: status = %s", dep, T_ok)
+        self.maker.debug_make("status of %s is %s", dep, T_ok)
         if not T_ok:
-          debug("%s: fail")
           ok = False
           if self.maker.failFast:
+            self.maker.debug_make("abort")
             break
       if not ok:
-        debug("prereqs bad, skip actions")
+        self.maker.debug_make("prereqs bad, skip actions")
         return False
       for action in self.actions:
-        debug("wait for action: %s...", action)
+        self.maker.debug_make("dispatch action: %s", action)
         A_ok = action.act(self)
-        debug("action status = %s", A_ok)
+        self.maker.debug_make("action status = %s", A_ok)
         if not A_ok:
           return False
       return True
@@ -241,6 +300,5 @@ class Action(object):
 
 if __name__ == '__main__':
   from . import main, default_cmd
-  print >>sys.stderr, "argv =", repr(sys.argv)
   sys.stderr.flush()
   sys.exit(main([default_cmd]+sys.argv[1:]))
