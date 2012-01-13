@@ -232,6 +232,9 @@ class MacroExpression(object):
 
   __repr__ = __str__
 
+  def __eq__(self, other):
+    return other == self.permutations
+
   def eval(self, namespaces):
     if self._result is not None:
       return self._result
@@ -490,13 +493,17 @@ class TestAll(unittest.TestCase):
   def test10parseMacroExpr_PlainText(self):
     self.assertEquals(parseMacroExpression(''),  ([], 0))
     self.assertEquals(parseMacroExpression('x'), (['x'], 1))
-    self.assertEquals(parseMacroExpression(' '), ([' '], 1))
+    self.assertEquals(parseMacroExpression(' '), ([], 1))
     self.assertEquals(parseMacroExpression('x y'), (['x', ' ', 'y'], 3))
     self.assertEquals(parseMacroExpression('abc  xyz'), (['abc', '  ', 'xyz'], 8))
 
   def test20parseMakeLines(self):
     from StringIO import StringIO
-    assert False, str(list(parseMakefile(StringIO("abc = def\n"))))
+    from .make import Maker
+    M = Maker()
+    parsed = list(parseMakefile(M, StringIO("abc = def\n"), []))
+    self.assertEquals(len(parsed), 1)
+    self.assertEquals([ type(O) for O in parsed ], [ Macro ])
 
 if __name__ == '__main__':
   unittest.main()
