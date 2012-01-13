@@ -1047,9 +1047,12 @@ class NodeDB(dict):
         else:
           t, n = nodekey(word)
         if '*' in t or '?' in t:
+          debug("fnmatch(..,%s) against %s", t, list(self.types))
           typelist = sorted([ _ for _ in self.types if fnmatch.fnmatch(_, t) ])
         else:
+          debug("literal \"%s\"", t)
           typelist = (t, )
+        debug("type list = %s", typelist)
         for t in typelist:
           if '*' in n or '?' in n:
             namelist = sorted([ N.name for N in self.type(t) if fnmatch.fnmatch(N.name, n) ])
@@ -1057,11 +1060,12 @@ class NodeDB(dict):
             namelist = (n, )
           if not namelist:
             warning("no Nodes of type \"%s\"", t)
-          for n in namelist:
-            N = self.get( (t, n), doCreate=doCreate )
+          for name in namelist:
+            N = self.get( (t, name), doCreate=doCreate )
             if N is None:
-              raise ValueError, "node not found: %s:%s" % (t, n)
-            yield N
+              warning("%s:%s: skip missing node (probably has no attributes)", t, name)
+            else:
+              yield N
 
   def do_command(self, args):
     op = args.pop(0)
