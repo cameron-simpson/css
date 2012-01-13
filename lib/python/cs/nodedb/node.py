@@ -597,9 +597,9 @@ class NodeDB(dict):
     # attach backend to collect updates
     self._backend = _NoBackend()
     self.__nodesByType = {}
-    backend.set_nodedb(self)
-    backend.apply_to(self)
     if backend is not None:
+      backend.set_nodedb(self)
+      backend.apply_to(self)
       self._backend = backend
 
   def __str__(self):
