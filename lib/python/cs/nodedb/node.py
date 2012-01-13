@@ -1111,12 +1111,16 @@ class NodeDB(dict):
     xit = 0
     if fp is None:
       fp = sys.stdout
+    if not args:
+      nodes = self.default_dump_nodes()
+    else:
+      nodes = self.nodespec(args.pop(0))
     first = True
-    for arg in args:
-      with Pfx(arg):
+    for node in nodes:
+      with Pfx(node):
         if not first:
           fp.write('\n')
-        self[arg].textdump(fp)
+        node.textdump(fp)
         first=False
     return xit
 
