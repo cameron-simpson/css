@@ -139,7 +139,7 @@ class Backend_SQLAlchemy(Backend):
           yield ot, oname, attrmap
         onode_id = node_id
         attrmap = {}
-      attrmap.set_default(attr, []).append(value)
+      attrmap.setdefault(attr, []).append(value)
     if onode_id is not None:
       ot, oname = byID[onode_id]
       yield ot, oname, attrmap
