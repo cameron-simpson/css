@@ -38,7 +38,8 @@ class Maker(object):
     self.debug.flags = False    # watch debug flag settings
     self.debug.make = False     # watch make decisions
     self.debug.parse = False    # watch Makefile parsing
-    self.failFast = True
+    self.fail_fast = True
+    self.no_action = False
     self.default_target = None
     self._makeQ = None
     self._makefiles = []
@@ -157,6 +158,8 @@ class Maker(object):
               badopts = True
         elif opt == '-f':
           self._makefiles.append(value)
+        elif opt == '-n':
+          self.no_action = True
         else:
           error("unimplemented")
           badopts = True
@@ -255,7 +258,7 @@ class Target(object):
         self.maker.debug_make("status of %s is %s", dep, T_ok)
         if not T_ok:
           ok = False
-          if self.maker.failFast:
+          if self.maker.fail_fast:
             self.maker.debug_make("abort")
             break
       if not ok:
@@ -289,6 +292,9 @@ class Action(object):
     v = self.variant
     if v == 'shell':
       shcmd = self.mexpr.eval(target.namespaces)
+      debug_make("shell command: %s", shcmd)
+      if self.no_action:
+        return True
       argv = (target.shell, '-c', shcmd)
       debug("Popen(%s,..)", argv)
       P = Popen(argv, close_fds=True)
