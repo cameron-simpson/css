@@ -1178,7 +1178,7 @@ class NodeDB(dict):
           Run an HTTP daemon on the specified address and port.
     '''
     xit = 0
-    import cs.nodedb.httpd
+    from .httpd import serve
     if len(args) == 0:
       raise GetoptError("missing ipaddr:port")
     ipaddr, port = args.pop(0).rsplit(':', 1)
@@ -1186,7 +1186,7 @@ class NodeDB(dict):
     if len(args) > 0:
       raise GetoptError("extra arguments after %s:%s" % (ipaddr, port))
     self.readonly = True
-    cs.nodedb.httpd.serve(self, ipaddr, port)
+    serve(self, ipaddr, port)
     return xit
 
   def cmd_import(self, args):
