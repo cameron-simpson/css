@@ -76,18 +76,23 @@ class Maker(object):
     '''
     with Pfx("%s.make(%s)" % (self, targets)):
       with Later(self.parallel, name=cs.misc.cmd) as MQ:
+        ok = True
         self._makeQ = MQ
         Tlist = []
         for target in targets:
           if type(target) is str:
             T = self._targets.get(target)
-            if not target:
+            if not T:
               error("don't know how to make %s", target)
+              ok = False
+              if self.fail_fast:
+                break
+              else:
+                continue
           else:
             T = target
           T.make(self)
           Tlist.append(T)
-        ok = True
         for T in Tlist:
           debug("%s: collect status...", T)
           T_ok = T.status
@@ -95,6 +100,8 @@ class Maker(object):
           if not T_ok:
             error("make %s fails", T)
             ok = False
+            if self.fail_fast:
+              break
       self._makeQ = None
       return ok
 
