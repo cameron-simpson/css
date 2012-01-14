@@ -48,6 +48,8 @@ class Maker(object):
     self._macros = {}
     self._macros_lock = allocate_lock()
 
+  def __str__(self):
+    return '%s<Maker>' % (cs.misc.cmd,)
   def _queue(self, func, name, priority):
     return self._makeQ.submit(func, name=name, priority=priority)
 
