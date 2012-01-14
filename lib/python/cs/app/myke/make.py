@@ -41,7 +41,7 @@ class Maker(object):
     self.failFast = True
     self.default_target = None
     self._makeQ = None
-    self._makefile = None
+    self._makefiles = []
     self._targets = {}
     self._targets_lock = allocate_lock()
     self._macros = {}
@@ -51,10 +51,16 @@ class Maker(object):
     return self._makeQ.submit(func, name=name, priority=priority)
 
   @property
-  def makefile(self):
-    if self._makefile is None:
-      self._makefile = os.path.basename(cs.misc.cmd).title() + 'file'
-    return self._makefile
+  def makefiles(self):
+    ''' The list of makefiles to consult, a tuple.
+        It is not possible to add more makefiles are accessing this property.
+    '''
+    _makefiles = self._makefiles
+    if not _makefiles:
+      self._makefiles = _makefiles = ( os.path.basename(cs.misc.cmd).title() + 'file', )
+    elif type(_makefiles) is not tuple:
+      self._makefiles = _makefiles = tuple(_makefiles)
+    return _makefiles
 
   def debug_make(self, msg, *a, **kw):
     if self.debug.make:
@@ -149,29 +155,31 @@ class Maker(object):
             except AttributeError, e:
               error("bad flag %s: %s", repr(flag), e)
               badopts = True
+        elif opt == '-f':
+          self._makefiles.append(value)
         else:
           error("unimplemented")
           badopts = True
     return args, badopts
 
-  def loadMakefile(self, makefile=None):
-    if makefile is None:
-      makefile = self.makefile
-    first_target = None
-    for O in parseMakefile(self, makefile, [self._macros]):
-      if isinstance(O, Target):
-        self.debug_parse("add target %s", O)
-        self._targets[O.name] = O
-        if first_target is None:
-          first_target = O
-        O.namespaces = self._macros
-      elif isinstance(O, Macro):
-        self.debug_parse("add macro %s", O)
-        self._macros[O.name] = O
-      else:
-        raise ValueError, "parseMakefile({}): unsupported parse item received: {}{}".format(makefile, type(O), repr(O))
-    if first_target is not None:
-      self.default_target = first_target
+  def loadMakefiles(self):
+    for makefile in self.makefiles:
+      with Pfx(makefile):
+        first_target = None
+        for O in parseMakefile(self, makefile, [self._macros]):
+          if isinstance(O, Target):
+            self.debug_parse("add target %s", O)
+            self._targets[O.name] = O
+            if first_target is None:
+              first_target = O
+            O.namespaces = self._macros
+          elif isinstance(O, Macro):
+            self.debug_parse("add macro %s", O)
+            self._macros[O.name] = O
+          else:
+            raise ValueError, "parseMakefile({}): unsupported parse item received: {}{}".format(makefile, type(O), repr(O))
+        if first_target is not None:
+          self.default_target = first_target
 
 class Target(object):
 
