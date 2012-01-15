@@ -145,11 +145,33 @@ class NodeDBView(CherryPyNode):
 
   @cherrypy.expose
   def default(self, basename):
+    # lib.js, lib-css.js
     if basename in ("lib.js", "lib-css.js"):
       cherrypy.response.headers['content-type'] = 'text/javascript'
       with open(os.path.join(os.path.dirname(__file__), basename)) as jsfp:
         js = jsfp.read()
       return js
+
+    if '.' in basename:
+      # TYPEs.{csv,txt}
+      prefix, suffix = basename.rsplit('.', 1)
+      if suffix == 'csv':
+        content_type = 'text/csv'
+      elif suffix == 'txt':
+        content_type = 'text/plain'
+      else:
+        content_type = None
+      k, plural = parseUC_sAttr(prefix)
+      if k is not None and plural:
+        # TYPEs.{txt,csv}
+        if content_type not in ('text/csv', 'text/plain'):
+          raise cherrypy.HTTPError(501, basename)
+        fp = StringIO()
+        export_csv_wide(fp, nodes)
+        out = fp.getvalue()
+        fp.close()
+        return out
+
     raise cherrypy.HTTPError(404, basename)
 
   class _Nodes(CherryPyNode):
