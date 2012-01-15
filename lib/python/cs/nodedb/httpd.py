@@ -168,7 +168,7 @@ class NodeDBView(CherryPyNode):
         if content_type not in ('text/csv', 'text/plain'):
           raise cherrypy.HTTPError(501, basename)
         fp = StringIO()
-        export_csv_wide(fp, nodes)
+        export_csv_wide(fp, self.nodedb.type(k))
         out = fp.getvalue()
         fp.close()
         return out
