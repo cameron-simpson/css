@@ -205,7 +205,7 @@ class NodeDBView(CherryPyNode):
         return self._csv_dump(N, 'text/csv')
       if view == 'txt':
         return self._csv_dump(N, 'text/plain')
-      raise cherrypy.HTTPError(404, spec)
+      raise cherrypy.HTTPError(404, "%s: unsupported view: %s" % (spec, view))
 
     def _csv_dump(self, N, content_type):
       cherrypy.response.headers['content-type'] = content_type
