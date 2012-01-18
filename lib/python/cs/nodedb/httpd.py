@@ -13,26 +13,13 @@ import sys
 from types import StringTypes
 import cherrypy
 from cStringIO import StringIO
+from cs.logutils import info, warning, error, debug, D
 import cs.html
 from cs.mappings import parseUC_sAttr
 from cs.nodedb import Node
-from cs.nodedb.export import export_csv_wide
-from cs.logutils import info, warning, error, debug, D
+from .export import export_csv_wide
+from .html import TABLE_from_Node, TABLE_from_Nodes_wide, by_type_then_name
 
-# HTML token convenience functions
-def TD(*elements):
-  return ['TD', {'align': 'left', 'valign': 'top'}] + list(elements)
-def TH(*elements):
-  return ['TH', {'align': 'left', 'valign': 'top'}] + list(elements)
-def TR(*TDs):
-  tr = ['TR']
-  for td in TDs:
-    tr.append(TD(td))
-  return tr
-def SPAN(*elements):
-  span = ['SPAN']
-  span.extend(elements)
-  return span
 def A(N, label=None, ext='/', prefix=None):
   ''' Return an anchor HTML token.
       N: the Node to which to link.
@@ -129,7 +116,8 @@ class NodeDBView(CherryPyNode):
       self._tokens.append( (['H2', ['A', {'NAME': "type-"+nodetype}, "Type "+nodetype],
                             " (",
                             ['A', {'HREF': nodetype+"s.csv"}, "CSV"], ", ",
-                            ['A', {'HREF': nodetype+"s.txt"}, "CSV as text"],
+                            ['A', {'HREF': nodetype+"s.txt"}, "CSV as text"], ", "
+                            ['A', {'HREF': nodetype+"s.html"}, "HTML"],
                             ")"]) )
       self._tokens.append("\n")
       nodes = nodedb.type(nodetype)
@@ -154,29 +142,36 @@ class NodeDBView(CherryPyNode):
       return js
 
     if '.' in basename:
-      # TYPEs.{csv,txt}
+      # TYPEs.{csv,txt,html}
       prefix, suffix = basename.rsplit('.', 1)
       if suffix == 'csv':
         content_type = 'text/csv'
       elif suffix == 'txt':
         content_type = 'text/plain'
+      elif suffix == 'html':
+        content_type = 'text/html'
       else:
         content_type = None
       k, plural = parseUC_sAttr(prefix)
       if k is not None and plural:
         # TYPEs.{txt,csv}
-        if content_type not in ('text/csv', 'text/plain'):
-          raise cherrypy.HTTPError(501, basename)
-        fp = StringIO()
-        export_csv_wide(fp, self.nodedb.type(k))
-        out = fp.getvalue()
-        fp.close()
-        return out
+        if content_type in ('text/csv', 'text/plain'):
+          fp = StringIO()
+          export_csv_wide(fp, self.nodedb.type(k))
+          out = fp.getvalue()
+          fp.close()
+          return out
+        # TYPEs.html
+        if content_type == 'text/html':
+          self._start()
+          self._tokens.append(TABLE_from_Nodes_wide(sorted(self.nodedb.type(k), by_type_then_name), leadattrs=['TYPE', 'NAME', 'MODEL', 'SERIAL', 'ASSET', 'BASE_OFFSET', 'COMMENT']))
+          return self._flushtokens()
+        raise cherrypy.HTTPError(501, basename)
 
     raise cherrypy.HTTPError(404, basename)
 
   class _Nodes(CherryPyNode):
-    ''' View of individual Nodes.
+    ''' View of individual Nodes, at /nodes/.
         /node/nodespec/           Nice report or basic table HTML.
         /node/nodespec/basic.html Basic table HTML.
         /node/nodespec/csv        CSV as text/csv.
@@ -235,6 +230,7 @@ class NodeDBView(CherryPyNode):
         heading.append(")")
       self._tokens.append(heading)
 
+      # locate parent/referring Nodes
       parents = set( rN for rN, rAttr, rCount in N.references() )
       if parents:
         def bylabel(a, b): return cmp(str(a), str(b))
@@ -247,31 +243,11 @@ class NodeDBView(CherryPyNode):
           sep = ", "
           self._tokens.append(self.top._nodeLink(P))
         self._tokens.append(".")
-        self._tokens.append(['BR'])
+        self._tokens.append(['BR'], "\n")
 
-      rows = []
-      table = ['TABLE', {"border": 1}]
-      attrs = N.keys()
-      attrs.sort()
-      for attr in attrs:
-        assert not attr.endswith('s'), "plural attr \"%s\"" % (attr,)
-        values = N[attr]
-        if not values:
-          continue
-        vtags = []
-        for V in values:
-          vlabel = N.nodedb.totoken(V, node=N, attr=attr)
-          if isinstance(V, Node):
-            vtag = self.top._nodeLink(V, label=vlabel, context=(N, attr))
-          else:
-            vtag = vlabel
-          if vtags:
-            vtags.append(", ")
-          vtags.append(vtag)
-        table.append(TR(attr, SPAN(*vtags)))
-      self._tokens.append(table)
-
+      self._tokens.append( TABLE_from_Node(N) )
       self._tokens.append("\n")
+
       return self._flushtokens()
 
 def serve(nodedb, host, port, basepath='/', readwrite=False):
