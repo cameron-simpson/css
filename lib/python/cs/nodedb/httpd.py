@@ -116,7 +116,7 @@ class NodeDBView(CherryPyNode):
       self._tokens.append( (['H2', ['A', {'NAME': "type-"+nodetype}, "Type "+nodetype],
                             " (",
                             ['A', {'HREF': nodetype+"s.csv"}, "CSV"], ", ",
-                            ['A', {'HREF': nodetype+"s.txt"}, "CSV as text"], ", "
+                            ['A', {'HREF': nodetype+"s.txt"}, "CSV as text"], ", ",
                             ['A', {'HREF': nodetype+"s.html"}, "HTML"],
                             ")"]) )
       self._tokens.append("\n")
