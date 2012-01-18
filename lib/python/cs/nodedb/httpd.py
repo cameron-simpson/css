@@ -186,7 +186,12 @@ class NodeDBView(CherryPyNode):
       self.top = top
 
     @cherrypy.expose
-    def default(self, spec, view=''):
+    def default(self, spec, *subpath):
+      if subpath:
+        subpath = list(subpath)
+      view = ''
+      if subpath:
+        view = subpath.pop(0)
       try:
         N = self.top.nodedb[spec]
       except KeyError, e:
@@ -246,7 +251,7 @@ class NodeDBView(CherryPyNode):
           sep = ", "
           self._tokens.append(self.top._nodeLink(P))
         self._tokens.append(".")
-        self._tokens.append(['BR'], "\n")
+        self._tokens.extend( (['BR'], "\n") )
 
       self._tokens.append( TABLE_from_Node(N) )
       self._tokens.append("\n")
