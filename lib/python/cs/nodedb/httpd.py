@@ -84,10 +84,13 @@ class CherryPyNode(object):
 
 class NodeDBView(CherryPyNode):
 
+  NODELIST_LEADATTRS = [ 'TYPE', 'NAME', 'COMMENT' ]
+
   def __init__(self, nodedb, basepath, readwrite=False):
     CherryPyNode.__init__(self, nodedb, basepath)
     self.node = NodeDBView._Nodes(self)
     self.readwrite = readwrite
+    self.nodelist_leadattrs = NodeDBView.NODELIST_LEADATTRS
 
   def _nodeLink(self, N, label=None, context=None, view=''):
     ''' Return an 'A' token linking to the specified Node `N`.
@@ -164,7 +167,7 @@ class NodeDBView(CherryPyNode):
         # TYPEs.html
         if content_type == 'text/html':
           self._start()
-          self._tokens.append(TABLE_from_Nodes_wide(sorted(self.nodedb.type(k), by_type_then_name), leadattrs=['TYPE', 'NAME', 'MODEL', 'SERIAL', 'ASSET', 'BASE_OFFSET', 'COMMENT']))
+          self._tokens.append(TABLE_from_Nodes_wide(sorted(self.nodedb.type(k), by_type_then_name), leadattrs=self.nodelist_leadattrs))
           return self._flushtokens()
         raise cherrypy.HTTPError(501, basename)
 
@@ -250,12 +253,14 @@ class NodeDBView(CherryPyNode):
 
       return self._flushtokens()
 
-def serve(nodedb, host, port, basepath='/', readwrite=False):
+def serve(nodedb, host, port, basepath='/', readwrite=False, DBView=None):
   ''' Dispatch an HTTP server serving the content of `nodedb`.
   '''
   if type(port) in StringTypes:
     port = int(port)
-  V = NodeDBView(nodedb, basepath, readwrite=readwrite)
+  if DBView is None:
+    DBView = NodeDBView
+  V = DBView(nodedb, basepath, readwrite=readwrite)
   S = cherrypy.server
   S.socket_host = host
   S.socket_port = port

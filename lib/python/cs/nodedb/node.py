@@ -1173,7 +1173,7 @@ class NodeDB(dict):
     edit_csv_wide(self, nodes=nodes, attrs=attrs, all_nodes=True)
     return xit
 
-  def cmd_httpd(self, args):
+  def cmd_httpd(self, args, DBView=None):
     ''' httpd ipaddr:port
           Run an HTTP daemon on the specified address and port.
     '''
@@ -1186,7 +1186,7 @@ class NodeDB(dict):
     if len(args) > 0:
       raise GetoptError("extra arguments after %s:%s" % (ipaddr, port))
     self.readonly = True
-    serve(self, ipaddr, port)
+    serve(self, ipaddr, port, DBView=DBView)
     return xit
 
   def cmd_import(self, args):
