@@ -4,8 +4,12 @@
 #       - Cameron Simpson <cs@zip.com.au> 23jan2009
 #
 
+set -ue
+
+: ${TMPDIR:=/tmp}
+
 trace=set-x     ##eecho
-poll=300
+poll=${APCRRD_POLL:-30}
 
 cmd=$0
 usage="Usage:
@@ -61,7 +65,7 @@ hb=`expr $poll \* 2`
 
 case $rrdmode in
   create)
-    [ -s "$rrdfile" ] && { echo "$cmd: RRD file alredy exists: $rrdfile" >&2; exit 1; }
+    [ -s "$rrdfile" ] && { echo "$cmd: RRD file already exists: $rrdfile" >&2; exit 1; }
     dslist=
     for field in `apcaccess | awk '{print $1}'`
     do
@@ -120,7 +124,7 @@ case $rrdmode in
       case $1 in
         BATTV)          title='Battery Voltage (min)' mode=MIN ;;
         LINEV)          title='Line Voltage (min)' mode=MIN ;;
-        OUTPUTV)        title='Output Voltage (min)' mode=min ;;
+        OUTPUTV)        title='Output Voltage (min)' mode=MIN ;;
         LOADPCT)        title='Percent Load Capacity (max)' mode=MAX ;;
         ITEMP)          title='Internal Temperature (max)' mode=MAX ;;
         CUMONBATT)      title='Cumulative Time on Battery' mode=AVERAGE ;;
@@ -128,7 +132,7 @@ case $rrdmode in
         *)              break ;;
       esac
       nlines=`expr $nlines + 1`
-      graph="$graph DEF:$1=$rrdfile:$1:$mode \"LINE$nlines:$1#000080:\$title\""
+      graph="$graph "`shqstr "DEF:$1=$rrdfile:$1:$mode" "LINE$nlines:$1#000080:$title"`
       shift
     done
     eval "\$trace rrdtool graph - -a PNG -l 0 -w $w -h $h $jopt \${1+\"\$@\"} --title=\"\$title\" $graph"
