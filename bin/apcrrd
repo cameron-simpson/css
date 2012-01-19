@@ -10,12 +10,13 @@ set -ue
 
 trace=set-x     ##eecho
 poll=${APCRRD_POLL:-30}
+colors="00ff00 0000ff ff0000"
 
 cmd=$0
 usage="Usage:
   $cmd [-n] create rrdfile [rrdtool-create-options...]
   $cmd [-n] update rrdfile
-  $cmd [-n] {graph|sparkline} rrdfile fields... [rrdtool-graph-options...] >output.png"
+  $cmd [-n] {graph|sparkline} rrdfile [form:]field[#color]... [rrdtool-graph-options...] >output.png"
 
 mod=
 
@@ -118,22 +119,45 @@ case $rrdmode in
                 ;;
     esac
     graph=
-    nlines=0
     while [ $# -gt 0 ]
     do
       case $1 in
+        [A-Z]*) ;; *) break ;;
+      esac
+      field=$1
+      shift
+
+      form=LINE1
+      case "$field" in
+        LINE[1-9]:* | LINE[1-9][0-9]:* | AREA:* )
+          form=`expr "$field" : '\([^:]*\):.*'`
+          field=`expr "$field" : '[^:]*:\(.*\)'`
+          ;;
+      esac
+
+      case "$field" in
+        *#*)
+          color=`expr "$field" : '.*#\(.*\)'`
+          field=`expr "$field" : '\(.*\)#.*'`
+          ;;
+        *)color=$( set -- $colors; echo "$1" )
+          colors=$(set -- $colors; c=$1; shift; echo "$* $c" )
+          ;;
+        *)break ;;
+      esac
+
+      title=$field
+      mode=AVERAGE
+      case $field in
         BATTV)          title='Battery Voltage (min)' mode=MIN ;;
         LINEV)          title='Line Voltage (min)' mode=MIN ;;
         OUTPUTV)        title='Output Voltage (min)' mode=MIN ;;
         LOADPCT)        title='Percent Load Capacity (max)' mode=MAX ;;
         ITEMP)          title='Internal Temperature (max)' mode=MAX ;;
         CUMONBATT)      title='Cumulative Time on Battery' mode=AVERAGE ;;
-        [A-Z]*)         title=$1 mode=AVERAGE ;;
-        *)              break ;;
       esac
-      nlines=`expr $nlines + 1`
-      graph="$graph "`shqstr "DEF:$1=$rrdfile:$1:$mode" "LINE$nlines:$1#000080:$title"`
-      shift
+
+      graph="$graph "`shqstr "DEF:$field=$rrdfile:$field:$mode" "$form:$field#$color:$title"`
     done
     eval "\$trace rrdtool graph - -a PNG -l 0 -w $w -h $h $jopt \${1+\"\$@\"} --title=\"\$title\" $graph"
     ;;
