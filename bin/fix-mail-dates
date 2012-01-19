@@ -5,7 +5,7 @@
 #       - Cameron Simpson <cs@zip.com.au> 20jan2009
 #
 
-trace=set-x     ##eecho
+trace=  ##set-x     ##eecho
 start=1
 zone=`date +%z`
 inplace=
