@@ -38,7 +38,8 @@ class Maker(object):
     self.debug.flags = False    # watch debug flag settings
     self.debug.make = False     # watch make decisions
     self.debug.parse = False    # watch Makefile parsing
-    self.failFast = True
+    self.fail_fast = True
+    self.no_action = False
     self.default_target = None
     self._makeQ = None
     self._makefiles = []
@@ -47,6 +48,8 @@ class Maker(object):
     self._macros = {}
     self._macros_lock = allocate_lock()
 
+  def __str__(self):
+    return '%s<Maker>' % (cs.misc.cmd,)
   def _queue(self, func, name, priority):
     return self._makeQ.submit(func, name=name, priority=priority)
 
@@ -75,18 +78,23 @@ class Maker(object):
     '''
     with Pfx("%s.make(%s)" % (self, targets)):
       with Later(self.parallel, name=cs.misc.cmd) as MQ:
+        ok = True
         self._makeQ = MQ
         Tlist = []
         for target in targets:
           if type(target) is str:
             T = self._targets.get(target)
-            if not target:
+            if not T:
               error("don't know how to make %s", target)
+              ok = False
+              if self.fail_fast:
+                break
+              else:
+                continue
           else:
             T = target
           T.make(self)
           Tlist.append(T)
-        ok = True
         for T in Tlist:
           debug("%s: collect status...", T)
           T_ok = T.status
@@ -94,6 +102,8 @@ class Maker(object):
           if not T_ok:
             error("make %s fails", T)
             ok = False
+            if self.fail_fast:
+              break
       self._makeQ = None
       return ok
 
@@ -157,6 +167,8 @@ class Maker(object):
               badopts = True
         elif opt == '-f':
           self._makefiles.append(value)
+        elif opt == '-n':
+          self.no_action = True
         else:
           error("unimplemented")
           badopts = True
@@ -255,7 +267,7 @@ class Target(object):
         self.maker.debug_make("status of %s is %s", dep, T_ok)
         if not T_ok:
           ok = False
-          if self.maker.failFast:
+          if self.maker.fail_fast:
             self.maker.debug_make("abort")
             break
       if not ok:
@@ -289,6 +301,9 @@ class Action(object):
     v = self.variant
     if v == 'shell':
       shcmd = self.mexpr.eval(target.namespaces)
+      debug_make("shell command: %s", shcmd)
+      if self.no_action:
+        return True
       argv = (target.shell, '-c', shcmd)
       debug("Popen(%s,..)", argv)
       P = Popen(argv, close_fds=True)
