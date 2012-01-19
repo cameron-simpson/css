@@ -5,6 +5,7 @@
 #
 
 from __future__ import with_statement
+import codecs
 import logging
 import os
 import sys
@@ -43,6 +44,8 @@ def setup_logging(cmd=None, main_log=None, format=None, level=None, upd_mode=Non
     main_log = sys.stderr
   elif type(main_log) is str:
     main_log = open(main_log, "a")
+  if main_log.encoding is None:
+    main_log = codecs.getwriter("utf-8")(main_log)
   if format is None:
     format = cmd.replace('%','%%')+': %(levelname)s: %(message)s'
   if level is None:
