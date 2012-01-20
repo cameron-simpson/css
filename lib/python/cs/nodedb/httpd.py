@@ -20,25 +20,6 @@ from cs.nodedb import Node
 from .export import export_csv_wide
 from .html import TABLE_from_Node, TABLE_from_Nodes_wide, by_type_then_name
 
-def A(N, label=None, ext='/', prefix=None):
-  ''' Return an anchor HTML token.
-      N: the Node to which to link.
-      label: visible text for the link, default N.name.
-      ext: suffix for the link URL, default '.html'.
-      prefix: URL base prefix to prepend.
-  '''
-  if label is None:
-    label = N.name
-  rhref, label = relhref(N, label=label)
-  if prefix is not None:
-    rhref = prefix + rhref
-  return ['A', {'HREF': rhref+ext}, label]
-
-def relhref(N, label=None):
-  if label is None:
-    label = str(N)
-  return str(N), label
-
 def by_name(a, b):
   ''' Compare to objects by their .name attributes.
   '''
