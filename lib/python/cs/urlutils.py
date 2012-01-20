@@ -43,6 +43,8 @@ class _URL(unicode):
   def flush(self):
     ''' Forget all cached content.
     '''
+    # Note: _content is the raw bytes returns from the URL read()
+    #       _parsed is a BeautifulSoup parse of the _contet decoded as utf-8.
     self._content = None
     self._content_type = None
     self._parsed = None
@@ -112,7 +114,7 @@ class _URL(unicode):
         self._parsed = BeautifulSoup(content.decode('utf-8', 'replace'))
       except Exception, e:
         exception("%s: .parsed: BeautifulSoup(unicode(content)) fails: %s", self, e)
-        with open("cs.urlutils-unparsed.html", "w") as bs:
+        with open("cs.urlutils-unparsed.html", "wb") as bs:
           bs.write(self.content)
         self._parsed = None
     return self._parsed

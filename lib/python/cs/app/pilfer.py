@@ -111,12 +111,12 @@ class Pilfer(object):
     while actions:
       action = actions.pop(0)
       with Pfx(action):
+        # depth first step at this point
         if action == 'per':
-          # depth first step at this point
           urls = pfx_iter(action, chain( *[ list(self.act([U], list(actions))) for U in urls ] ) )
           break
+        # select URLs matching regexp
         if action.startswith('/'):
-          # select URLs matching regexp
           if action.endswith('/'):
             regexp = action[1:-1]
           else:
@@ -124,8 +124,8 @@ class Pilfer(object):
           regexp = re.compile(regexp)
           urls = pfx_iter(action, chain( *[ self.select_by_re(U, regexp) for U in urls ] ) )
           continue
+        # select URLs not matching regexp
         if action.startswith('-/'):
-          # select URLs matching regexp
           if action.endswith('/'):
             regexp = action[2:-1]
           else:
@@ -133,12 +133,12 @@ class Pilfer(object):
           regexp = re.compile(regexp)
           urls = pfx_iter(action, chain( *[ self.deselect_by_re(U, regexp) for U in urls ] ) )
           continue
+        # URL parent dir
         if action == '..':
-          # URL parent dir
           urls = pfx_iter(action, [ U.parent for U in urls ] )
           continue
+        # select URLs ending in suffix
         if action.startswith('.'):
-          # select URLs ending in suffix
           if action.endswith('/i'):
             exts, case = action[1:-2], False
           else:
@@ -146,8 +146,8 @@ class Pilfer(object):
           exts = exts.split(',')
           urls = pfx_iter(action, self.with_exts(urls, suffixes=exts, case_sensitive=case) )
           continue
+        # s/this/that/g
         if len(action) > 4 and action.startswith('s') and not action[1].isalnum() and action[1] != '_':
-          # s/this/that/g
           marker = action[1]
           parts = action.split(marker)
           if len(parts) < 3:
@@ -192,11 +192,13 @@ class Pilfer(object):
             return ()
           self.save_dir = self.new_save_dir(save_dir)
           continue
+        # attr==value
         if '==' in action:
           param, value = action.split('==', 1)
           if param in ('scheme', 'netloc', 'path', 'params', 'query', 'fragment', 'username', 'password', 'hostname', 'port'):
             urls = pfx_iter(action,  [ U for U in urls if getattr(U, param) == value ] )
             continue
+        # save_dir=value, user_agent=value
         if '=' in action:
           param, value = action.split('=', 1)
           if len(param) == 1 and param.isalpha():
@@ -214,6 +216,7 @@ class Pilfer(object):
               for U in urls:
                 U.user_agent = value
             continue
+        # arbitrary other action, call url_action(blah)
         urls = pfx_iter(action, chain( *[ self.url_action(action, U) for U in urls ] ) )
     return urls
 
@@ -287,7 +290,11 @@ class Pilfer(object):
     if self.save_dir:
       dir = self.save_dir
     else:
-      dir = ("%s-%s--%s" % (U.hostname, os.path.dirname(U.path).replace('/', '-'), '-'.join(U.title.split())))[:os.statvfs('.').f_namemax-6]
+      dir = ( ("%s-%s--%s" % (U.hostname,
+                              os.path.dirname(U.path),
+                              '-'.join(U.title.split())))
+              .replace('/', '-')
+            )[:os.statvfs('.').f_namemax-6]
     return dir
 
   def url_save(self, U, *a):
