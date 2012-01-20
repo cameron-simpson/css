@@ -137,7 +137,7 @@ class NodeDBView(CherryPyNode):
         # TYPEs.{txt,csv}
         if content_type in ('text/csv', 'text/plain'):
           fp = StringIO()
-          export_csv_wide(fp, self.nodedb.type(k))
+          export_csv_wide(fp, sorted(self.nodedb.type(k), by_name))
           out = fp.getvalue()
           fp.close()
           return out
