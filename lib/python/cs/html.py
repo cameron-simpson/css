@@ -17,27 +17,17 @@ dqAttrValSafeRe = re.compile(r'[-=. \w:@/?~#+&]+')
 
 BR = ('BR',)
 
-def tokens2s(tokens):
-  ''' Return transcription of the supplied tokens in HTML form.
-  '''
-  fp = cStringIO.StringIO()
-  for tok in tokens:
-    puttok(fp, tok)
-  s = fp.getvalue()
-  fp.close()
-  return s
-
-def tok2s(tok):
+def tok2s(*tokens):
   ''' Return transcription of token `tok` in HTML form.
   '''
   fp = cStringIO.StringIO()
-  puttok(fp, tok)
+  puttok(fp, *tokens)
   s = fp.getvalue()
   fp.close()
   return s
 
-def puttok(fp, tok):
-  ''' Transcribe a token to HTML text.
+def puttok(fp, *tokens):
+  ''' Transcribe tokens to HTML text.
       A token is a string, a sequence or a Tag object.
       A string is safely transcribed as flat text.
       A sequence has:
@@ -45,55 +35,56 @@ def puttok(fp, tok):
         [1] optionally a mapping of attribute values
         Further elements are tokens contained within this token.
   '''
-  toktype = type(tok)
-  if toktype in StringTypes:
-    return puttext(fp, tok)
-  if toktype in (IntType, LongType, FloatType):
-    return puttext(fp, str(tok))
+  for tok in tokens:
+    toktype = type(tok)
+    if toktype in StringTypes:
+      return puttext(fp, tok)
+    if toktype in (IntType, LongType, FloatType):
+      return puttext(fp, str(tok))
 
-  # token
-  try:
-    tag = tok.tag
-    attrs = tok.attrs
-  except AttributeError:
-    # not a dict
-    # [ "&ent;" ] is an HTML character entity
-    if len(tok) == 1 and tok[0].startswith('&'):
-      fp.write(tok[0])
-      return
-    # raw array [ tag[, attrs][, tokens...] ]
-    tok = list(tok)
-    tag = tok.pop(0)
-    if len(tok) > 0 and hasattr(tok[0], 'keys'):
-      attrs = tok.pop(0)
-    else:
-      attrs = {}
+    # token
+    try:
+      tag = tok.tag
+      attrs = tok.attrs
+    except AttributeError:
+      # not a dict
+      # [ "&ent;" ] is an HTML character entity
+      if len(tok) == 1 and tok[0].startswith('&'):
+        fp.write(tok[0])
+        return
+      # raw array [ tag[, attrs][, tokens...] ]
+      tok = list(tok)
+      tag = tok.pop(0)
+      if len(tok) > 0 and hasattr(tok[0], 'keys'):
+        attrs = tok.pop(0)
+      else:
+        attrs = {}
 
-  isSCRIPT=(tag.upper() == 'SCRIPT')
-  if isSCRIPT:
-    if 'LANGUAGE' not in [a.upper() for a in attrs.keys()]:
-      attrs['language']='JavaScript'
+    isSCRIPT=(tag.upper() == 'SCRIPT')
+    if isSCRIPT:
+      if 'LANGUAGE' not in [a.upper() for a in attrs.keys()]:
+        attrs['language']='JavaScript'
 
-  fp.write('<')
-  fp.write(tag)
-  for k, v in attrs.items():
-    fp.write(' ')
-    fp.write(k)
-    if v is not None:
-      fp.write('="')
-      fp.write(urllib.quote(str(v), '/#:'))
-      fp.write('"')
-  fp.write('>')
-  if isSCRIPT:
-    fp.write("<!--\n")
-  for t in tok:
-    puttok(fp, t)
-  if isSCRIPT:
-    fp.write("\n-->")
-  if tag not in ('BR',):
-    fp.write('</')
+    fp.write('<')
     fp.write(tag)
+    for k, v in attrs.items():
+      fp.write(' ')
+      fp.write(k)
+      if v is not None:
+        fp.write('="')
+        fp.write(urllib.quote(str(v), '/#:'))
+        fp.write('"')
     fp.write('>')
+    if isSCRIPT:
+      fp.write("<!--\n")
+    for t in tok:
+      puttok(fp, t)
+    if isSCRIPT:
+      fp.write("\n-->")
+    if tag not in ('BR',):
+      fp.write('</')
+      fp.write(tag)
+      fp.write('>')
 
 def text2s(s, safeRe=None):
   ''' Return transcription of string in HTML safe form.
