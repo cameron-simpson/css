@@ -14,30 +14,11 @@ from types import StringTypes
 import cherrypy
 from cStringIO import StringIO
 from cs.logutils import info, warning, error, debug, D
-import cs.html
+from cs.html import tok2s
 from cs.mappings import parseUC_sAttr
 from cs.nodedb import Node
 from .export import export_csv_wide
 from .html import TABLE_from_Node, TABLE_from_Nodes_wide, by_type_then_name
-
-def A(N, label=None, ext='/', prefix=None):
-  ''' Return an anchor HTML token.
-      N: the Node to which to link.
-      label: visible text for the link, default N.name.
-      ext: suffix for the link URL, default '.html'.
-      prefix: URL base prefix to prepend.
-  '''
-  if label is None:
-    label = N.name
-  rhref, label = relhref(N, label=label)
-  if prefix is not None:
-    rhref = prefix + rhref
-  return ['A', {'HREF': rhref+ext}, label]
-
-def relhref(N, label=None):
-  if label is None:
-    label = str(N)
-  return str(N), label
 
 def by_name(a, b):
   ''' Compare to objects by their .name attributes.
@@ -74,11 +55,7 @@ class CherryPyNode(object):
     ''' Transcribe the pending HTML tokens to text,
         flush the pending token list, return the text.
     '''
-    out = StringIO()
-    for tok in self._tokens:
-      cs.html.puttok(out, tok)
-    html = out.getvalue()
-    out.close()
+    html = tok2s(*self._tokens)
     self._tokens = []
     return html
 
@@ -160,7 +137,7 @@ class NodeDBView(CherryPyNode):
         # TYPEs.{txt,csv}
         if content_type in ('text/csv', 'text/plain'):
           fp = StringIO()
-          export_csv_wide(fp, self.nodedb.type(k))
+          export_csv_wide(fp, sorted(self.nodedb.type(k), by_name))
           out = fp.getvalue()
           fp.close()
           return out
@@ -198,11 +175,7 @@ class NodeDBView(CherryPyNode):
         raise cherrypy.HTTPError(404, "%s: %s" % (spec, e))
       if view == '':
         if hasattr(N, 'report'):
-          fp = StringIO()
-          N.report(fp, prefix='/node/')
-          out = fp.getvalue()
-          fp.close()
-          return out
+          return tok2s( *N.report() )
         return self._basic_html_tokens(N)
       if view == 'basic.html':
         return self._basic_html_tokens(N)
@@ -270,261 +243,3 @@ def serve(nodedb, host, port, basepath='/', readwrite=False, DBView=None):
   S.socket_host = host
   S.socket_port = port
   cherrypy.quickstart(V)
-
-def OLDdo_GET(self):
-    ''' Handle a GET request.
-        The layout is as follows:
-          /     DB overview.
-          /types/TYPE[.ext]     Report on nodes of type TYPE.
-          /nodes/node-ref/...   Report on node.
-    '''
-    srv = self.server
-    nodedb = srv.nodedb
-    prefix = srv.prefix
-    path = urllib.unquote(self.path)
-    if not path.startswith(prefix):
-      self.send_error(503, "path does not start with prefix (\"%s\"): %s" % (prefix, path))
-      return
-
-    # strip prefix, get path components
-    path = path[len(prefix):]
-    isdir = self.path.endswith('/')
-    parts = [ part for part in path.split('/') if len(part) > 0 ]
-
-    # handle . and ..
-    i = 0
-    while i < len(parts):
-      part = parts[i]
-      if part == '.':
-        del parts[i]
-      elif part == '..':
-        del parts[i]
-        if i > 0:
-          i -= 1
-          del parts[i]
-      else:
-        i += 1
-
-    if len(parts) == 0:
-      self.send_response(200, "overview follows")
-      self._overview()
-      return
-
-    top = parts.pop(0)
-    warning("top=[%s]" % (top,))
-    ext = ''
-    dotpos = top.rfind('.')
-    if dotpos > 0:
-      key = top[:dotpos]
-      ext = top[dotpos+1:]
-    else:
-      key = top
-
-    if top == "types":
-      if len(parts) == 0:
-        self.send_response(400, "no TYPE specification")
-        return
-      typebase = parts.pop(0)
-      if len(parts) > 0 or isdir:
-        self.send_response(400, "extra parts after type")
-      if '.' in typebase:
-        typename, ext = typebase.split('.', 1)
-      else:
-        typename, ext = typebase
-      type
-
-      typespec = parts.pop(0)
-
-    warning("1")
-    if not parts and not isdir and ext:
-      warning("2")
-      k, plural = parseUC_sAttr(key)
-      if k is not None and plural:
-        warning("3")
-        # TYPEs.{csv,txt,html} - dump of nodes of that type.
-        if ext == 'csv':
-          warning("3csv")
-          self.send_response(200, "TYPE %s as CSV" % key)
-          self.send_header('Content-Type', 'text/csv')
-          self.end_headers()
-          self._table_of_nodes(nodedb.type(k), 'csv')
-          return
-        if ext == 'txt':
-          warning("3txt")
-          self.send_response(200, "TYPE %s as CSV plain text" % key)
-          self.send_header('Content-Type', 'text/plain')
-          self.end_headers()
-          self._table_of_nodes(nodedb.type(k), 'csv')
-          return
-        if ext == 'html':
-          warning("3html")
-          self.send_response(200, "TYPE %s as an HTML table" % (key,))
-          self.send_header('Content-Type', 'text/html')
-          self.end_headers()
-          self._puttok( ['H1', "Nodes of type %s" % (k,)] )
-          self._table_of_nodes(nodedb.type(k), 'html')
-          return
-        warning("3other")
-        self.send_response(503, "unsupported TYPEs.ext \".%s\", expected .csv, .txt or .html" % (ext,))
-        return
-
-    warning("4")
-    if top.endswith('.html'):
-      key, ext = top.rsplit('.', 1)
-      ext = '.' + ext
-      N = nodedb[key]
-      if hasattr(N, 'report'):
-        # pretty HTML report
-        self.send_response(200, "accepted")
-        # headers - just HTML content
-        self.send_header('Content-Type', 'text/html')
-        self.end_headers()
-        N.report(self.wfile, fmt='html', prefix=srv.prefix)
-        return
-      # otherwise use "raw mode"
-    else:
-      N = nodedb[top]
-
-    if len(parts) == 0:
-      # raw dump HTML report for node
-      self.send_response(200, "accepted")
-      # headers - just HTML content
-      self.send_header('Content-Type', 'text/html')
-      self.end_headers()
-      heading = ['H1', str(N)]
-      if hasattr(N, 'report'):
-        heading.extend([" (", A(N, label="pretty report", prefix=prefix)])
-        if hasattr(N, 'nagios_cfg'):
-          heading.extend([ ", ",
-                           A(N, label="nagios.cfg", ext="/nagios.cfg", prefix=prefix)])
-        heading.append(")")
-      self._puttok(heading)
-
-      parents = set( rN for rN, rAttr, rCount in N.references() )
-      if parents:
-        def bylabel(a, b): return cmp(str(a), str(b))
-        parents = list(parents)
-        parents.sort(bylabel)
-        self._puttok("Attached to:")
-        sep = " "
-        for P in parents:
-          self._puttok(sep)
-          sep = ", "
-          self._puttok(self.__nodeLink(P, ext=ext))
-        self._puttok(".")
-        self._puttok(['BR'])
-
-      rows = []
-      table = ['TABLE', {"border": 1}]
-      attrs = N.keys()
-      attrs.sort()
-      for attr in attrs:
-        assert attr.endswith('s'), "non-plural attr \"%s\"" % (attr,)
-        attr1 = attr[:-1]
-        values = N[attr]
-        if not values:
-          continue
-        vtags = []
-        for V in values:
-          vlabel = N.nodedb.totoken(V, node=N, attr=attr)
-          if isinstance(V, Node):
-            vtag = self.__nodeLink(V, label=vlabel, context=(N, attr), ext=ext)
-          else:
-            vtag = vlabel
-          if vtags:
-            vtags.append(", ")
-          vtags.append(vtag)
-        table.append(TR(attr1, SPAN(*vtags)))
-      self._puttok(table)
-
-      self.wfile.write("\n")
-      return
-
-    subpart = parts.pop(0)
-    if subpart == 'nagios.cfg':
-      if not hasattr(N, 'nagios_cfg'):
-        self.send_error(503, "can't generate nagios config for %s" % (N,))
-        return
-      self.send_response(200, "accepted")
-      # headers - just HTML content
-      self.send_header('Content-Type', 'text/plain')
-      self.end_headers()
-      N.nagios_cfg(self.wfile)
-      return
-
-    self.send_error(503, "unhandled URL")
-
-def OLD_overview(self):
-    ''' NodeDB overview partitioned by TYPE.
-    '''
-    srv = self.server
-    nodedb = srv.nodedb
-    # headers - just HTML content
-    self.send_header('Content-Type', 'text/html')
-    self.end_headers()
-    self._puttok(['H1', 'Database Top Level'])
-    nodetypes = sorted(nodedb.types)
-    self._puttok("Types:")
-    sep = " "
-    for nodetype in nodetypes:
-      self._puttok(sep, ['A', {'HREF': "#type-"+nodetype}, nodetype])
-      sep = ", "
-    self._puttok(['BR'])
-    self.wfile.write("\n")
-    for nodetype in nodetypes:
-      self._puttok(['H2', ['A', {'NAME': "type-"+nodetype}, "Type "+nodetype],
-                         " (",
-                         ['A', {'HREF': nodetype+"s.csv"}, "CSV"], ", ",
-                         ['A', {'HREF': nodetype+"s.txt"}, "CSV as text"],
-                         ")"])
-      self.wfile.write("\n")
-      nodes = nodedb.type(nodetype)
-      nodes=list(nodes)
-      nodes.sort(by_name)
-      first = True
-      for N in nodes:
-        if not first:
-          self._puttok(", ")
-        self._puttok(self.__nodeLink(N, ext=".html", label=N.name))
-        first=False
-      self.wfile.write("\n")
-    return
-
-def OLD_table_of_nodes(self, nodes, format):
-    nodes=list(nodes)
-    nodes.sort(by_name)
-    fields = set()
-    for N in nodes:
-      fields.update(N.keys())
-    fields = list(fields)
-    fields.sort()
-
-    if format == 'csv':
-      csvw = csv.writer(self.wfile)
-      csvw.writerow(['TYPE','NAME']+fields)
-      for N in nodes:
-        csvw.writerow([ N.type, N.name ]
-                      + [ ",".join(N.nodedb.totoken(A, node=N, attr=F)
-                                   for A in N[F]
-                                  )
-                          for F in fields
-                        ]
-                     )
-      return
-
-    if format == 'html':
-      head_rows = [ TR( *( [ 'TYPE', 'NAME' ] + fields ) ) ]
-      data_rows = []
-      for N in nodes:
-        celltext = [ N.type, N.name ]
-        for F in fields:
-          celltext.append( ", ".join( N.nodedb.totoken(value, node-N, attr=F)
-                                      for value in N[F]
-                                    ) )
-        data_rows.append( TR( *celltext ) )
-      self._puttok( ['TABLE', {'border': 1},
-                      ['THEAD']+head_rows,
-                      ['TBODY']+data_rows ] )
-      return
-
-    raise ValueError, "unsupported format: " + format

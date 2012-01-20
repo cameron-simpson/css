@@ -346,6 +346,12 @@ class Node(dict):
   def __str__(self):
     return self.type+":"+self.name
 
+  def html(self, label=None, ext=None, prefix=None):
+    ''' An HTML token to transcribe for this Node.
+    '''
+    from .html import noderef
+    return noderef(self, label=label, ext=ext, prefix=prefix)
+
   def __cmp__(self, other):
     ''' Nodes compare by type and then name and then id(Node).
         Note that two Nodes that compare equal can thus still return non-zero

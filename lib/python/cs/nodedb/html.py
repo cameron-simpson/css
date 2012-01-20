@@ -20,8 +20,8 @@ def SPAN(*elements):
   span.extend(elements)
   return span
 
-def A(N, label=None, ext='/', prefix=None):
-  ''' Return an anchor HTML token.
+def noderef(N, label=None, ext=None, prefix=None):
+  ''' Return an anchor HTML token referring to a Node view.
       N: the Node to which to link.
       label: visible text for the link, default N.name.
       ext: suffix for the link URL, default '.html'.
@@ -29,7 +29,9 @@ def A(N, label=None, ext='/', prefix=None):
   '''
   if label is None:
     label = N.name
-  rhref, label = relhref(N, label=label)
+  if ext is None:
+    ext = '/'
+  rhref = '/node/'+str(N)
   if prefix is not None:
     rhref = prefix + rhref
   return ['A', {'HREF': rhref+ext}, label]
@@ -65,7 +67,7 @@ def tag_from_value(value):
   ''' Convert a value to an HTML token.
   '''
   if isinstance(value, Node):
-    tag = A(value)
+    tag = value.html()
   elif type(value) in StringTypes:
     lines = [ line.rstrip() for line in value.rstrip().split('\n') ]
     taglist = []
@@ -124,15 +126,10 @@ def rows_from_Nodes_wide(nodes, leadattrs=None):
   yield attrs
   for N in nodes:
     yield [ ( N.type if attr == 'TYPE'
-              else N.name if attr == 'NAME'
+              else N if attr == 'NAME'
               else N.get(attr, ())
             ) for attr in attrs
           ]
-
-def relhref(N, label=None):
-  if label is None:
-    label = str(N)
-  return str(N), label
 
 def by_name(a, b):
   ''' Compare two objects by their .name attributes.
