@@ -31,7 +31,7 @@ def noderef(N, label=None, ext=None, prefix=None):
     label = N.name
   if ext is None:
     ext = '/'
-  rhref = 'node/'+str(N)
+  rhref = '/node/'+str(N)
   if prefix is not None:
     rhref = prefix + rhref
   return ['A', {'HREF': rhref+ext}, label]
