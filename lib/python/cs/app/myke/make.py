@@ -298,11 +298,12 @@ class Action(object):
 
   def act(self, target):
     debug("start _act...")
+    M = target.maker
     v = self.variant
     if v == 'shell':
       shcmd = self.mexpr.eval(target.namespaces)
-      debug_make("shell command: %s", shcmd)
-      if self.no_action:
+      M.debug_make("shell command: %s", shcmd)
+      if M.no_action:
         return True
       argv = (target.shell, '-c', shcmd)
       debug("Popen(%s,..)", argv)
