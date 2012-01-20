@@ -82,7 +82,7 @@ def main(argv):
 
 def unique(items, seen=None):
   ''' A generator that yields unseen items, as opposed to just
-      stuffing them all into a set.
+      stuffing them all into a set and returning the set.
   '''
   if seen is None:
     seen = set()
@@ -114,7 +114,9 @@ class Pilfer(object):
         # depth first step at this point
         if action == 'per':
           urls = pfx_iter(action, chain( *[ list(self.act([U], list(actions))) for U in urls ] ) )
-          break
+          actions = ()
+          continue
+
         # select URLs matching regexp
         if action.startswith('/'):
           if action.endswith('/'):
@@ -124,6 +126,7 @@ class Pilfer(object):
           regexp = re.compile(regexp)
           urls = pfx_iter(action, chain( *[ self.select_by_re(U, regexp) for U in urls ] ) )
           continue
+
         # select URLs not matching regexp
         if action.startswith('-/'):
           if action.endswith('/'):
@@ -133,10 +136,12 @@ class Pilfer(object):
           regexp = re.compile(regexp)
           urls = pfx_iter(action, chain( *[ self.deselect_by_re(U, regexp) for U in urls ] ) )
           continue
+
         # URL parent dir
         if action == '..':
           urls = pfx_iter(action, [ U.parent for U in urls ] )
           continue
+
         # select URLs ending in suffix
         if action.startswith('.'):
           if action.endswith('/i'):
@@ -146,6 +151,7 @@ class Pilfer(object):
           exts = exts.split(',')
           urls = pfx_iter(action, self.with_exts(urls, suffixes=exts, case_sensitive=case) )
           continue
+
         # s/this/that/g
         if len(action) > 4 and action.startswith('s') and not action[1].isalnum() and action[1] != '_':
           marker = action[1]
@@ -170,34 +176,36 @@ class Pilfer(object):
                           [ URL(regexp.sub(parts[2], U, ( 0 if do_all else 1 )), U, user_agent=self.user_agent)
                             for U in urls ] )
           continue
+
         if action == 'sort':
           urls = sorted(urls)
           continue
+
         if action == 'unique':
           urls = unique(urls)
           continue
+
+        # compute and create a new save dir based on the first URL
         if action == 'new_dir':
           urls = list(urls)
           if not urls:
-            return ()
-          if len(urls) > 1:
-            actions = [ 'per', action ] + actions
+            # no URLs - do nothing
             continue
-          # HACK
-          self.save_dir = None
           try:
-            save_dir = self.url_save_dir(urls[0])
+            save_dir = self.url_save_dir(urls[0], ignore_save_dir=True)
           except HTTPError, e:
             error("%s: %s", urls[0], e)
             return ()
           self.save_dir = self.new_save_dir(save_dir)
           continue
-        # attr==value
+
+        # select URLs where attr==value
         if '==' in action:
           param, value = action.split('==', 1)
           if param in ('scheme', 'netloc', 'path', 'params', 'query', 'fragment', 'username', 'password', 'hostname', 'port'):
             urls = pfx_iter(action,  [ U for U in urls if getattr(U, param) == value ] )
             continue
+
         # save_dir=value, user_agent=value
         if '=' in action:
           param, value = action.split('=', 1)
@@ -282,12 +290,12 @@ class Pilfer(object):
         break
     return dir
 
-  def url_save_dir(self, U):
+  def url_save_dir(self, U, ignore_save_dir=False):
     ''' Return save directory for supplied URL.
     '''
     U = URL(U, None)
     U.get_content("")   # probe content
-    if self.save_dir:
+    if not ignore_save_dir and self.save_dir:
       dir = self.save_dir
     else:
       dir = ( ("%s-%s--%s" % (U.hostname,
