@@ -178,14 +178,6 @@ class Pilfer(object):
                             for U in urls ] )
           continue
 
-        if action == 'sort':
-          urls = sorted(urls)
-          continue
-
-        if action == 'unique':
-          urls = unique(urls)
-          continue
-
         # compute and create a new save dir based on the first URL
         if action == 'new_dir':
           urls = list(urls)
@@ -225,8 +217,12 @@ class Pilfer(object):
               for U in urls:
                 U.user_agent = value
             continue
+
         # arbitrary other action, call url_action(blah)
-        urls = pfx_iter(action, chain( *[ self.url_action(action, U) for U in urls ] ) )
+        if action in self.action_map_all:
+          urls = pfx_iter(action, self.url_action_all(action, urls))
+        else:
+          urls = pfx_iter(action, chain( *[ self.url_action(action, U) for U in urls ] ) )
     return urls
 
   class URLkeywords(object):
@@ -396,21 +392,6 @@ class Pilfer(object):
         savefp.close()
         raise e
 
-  def url_action(self, action, U):
-    ''' Accept `action` and URL `U`, yield results of action applied to URL.
-    '''
-    global actions
-    # gather arguments if any
-    if ':' in action:
-      action, arg_string = action.split(':', 1)
-    else:
-      arg_string = ""
-    with Pfx("%s(%s)%s" % (action, U, arg_string)):
-      url_func = self.action_map.get(action)
-      if url_func is None:
-        raise ValueError("unknown action")
-      return url_func(self, U, *( arg_string.split(',') if len(arg_string) else () ))
-
   @property
   def urlsfile(self):
     if self._urlsfile is None:
@@ -506,6 +487,43 @@ class Pilfer(object):
     print U.title
     yield U
 
+  def url_action_all(self, action, urls):
+    ''' Accept `action` and URL `urls`, yield results of action applied to all URLs.
+    '''
+    global actions
+    # gather arguments if any
+    if ':' in action:
+      action, arg_string = action.split(':', 1)
+    else:
+      arg_string = ""
+    with Pfx("%s(URLs...)%s" % (action, arg_string)):
+      url_func = self.action_map_all.get(action)
+      if url_func is None:
+        raise ValueError("unknown action")
+      return url_func(self, urls, *( arg_string.split(',') if len(arg_string) else () ))
+        
+  def url_action(self, action, U):
+    ''' Accept `action` and URL `U`, yield results of action applied to URL.
+    '''
+    global actions
+    # gather arguments if any
+    if ':' in action:
+      action, arg_string = action.split(':', 1)
+    else:
+      arg_string = ""
+    with Pfx("%s(%s)%s" % (action, U, arg_string)):
+      url_func = self.action_map.get(action)
+      if url_func is None:
+        raise ValueError("unknown action")
+      return url_func(self, U, *( arg_string.split(',') if len(arg_string) else () ))
+
+  # actions that work on the whole list of in-play URLs
+  action_map_all = {
+        'sort':         lambda P, Us, *a, **kw: sorted(Us, *a, **kw),
+        'unique':       lambda P, Us: unique(Us),
+      }
+
+  # actions that work on individual URLs
   action_map = {
         'delay':        url_delay,
         'domain':       lambda P, U: (URL(U, None).domain,),
