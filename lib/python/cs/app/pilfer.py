@@ -399,6 +399,7 @@ class Pilfer(object):
     ''' Accept `action` and URL `U`, yield results of action applied to URL.
     '''
     global actions
+    # gather arguments if any
     if ':' in action:
       action, arg_string = action.split(':', 1)
     else:
@@ -412,22 +413,6 @@ class Pilfer(object):
   def url_delay(self, U, delay, *a):
     sleep(float(delay))
     yield U
-
-  def url_hrefs(self, U, *a, **kw):
-    U = URL(U, None)
-    with Pfx("hrefs(%s)" % (U,)):
-      if 'absolute' not in kw:
-        kw['absolute'] = True
-      U.get_content("")
-      return list(U.hrefs(*a, **kw))
-
-  def url_srcs(self, U, *a, **kw):
-    U = URL(U, None)
-    with Pfx("srcs(%s)" % (U,)):
-      if 'absolute' not in kw:
-        kw['absolute'] = True
-      U.get_content("")
-      return list(U.srcs(*a, **kw))
 
   def with_exts(self, urls, suffixes, case_sensitive=False):
     for U in urls:
@@ -447,12 +432,6 @@ class Pilfer(object):
       else:
         debug("with_exts: discard %s", U)
 
-  def url_images(self, U):
-    return self.with_exts( self.url_hrefs(U, absolute=True), IMAGE_SUFFIXES )
-
-  def url_inline_images(self, U):
-    return self.with_exts( self.url_srcs(U, 'img', absolute=True), IMAGE_SUFFIXES)
-
   def url_print(self, U, *args):
     if not args:
       args = (U,)
@@ -466,36 +445,9 @@ class Pilfer(object):
     qsmap = dict( [ ( qsp.split('=', 1) if '=' in qsp else (qsp, '') ) for qsp in U.query.split('&') ] )
     yield ','.join( [ unquote(qsmap.get(qparam, '')) for qparam in a ] )
 
-  def url_quote(self, U):
-    yield quote(U)
-
-  def url_unquote(self, U):
-    yield unquote(U)
-
   def url_print_type(self, U):
     print U, U.content_type
     yield U
-
-  def url_samedomain(self, U):
-    if U.domain == U.referer.domain:
-      yield U
-
-  def url_samehostname(self, U):
-    if U.hostname == U.referer.hostname:
-      yield U
-
-  def url_samescheme(self, U):
-    if U.scheme == U.referer.scheme:
-      yield U
-
-  def url_isarchive(self, U):
-    return self.with_exts([U], ARCHIVE_SUFFIXES)
-
-  def url_isimage(self, U):
-    return self.with_exts([U], IMAGE_SUFFIXES)
-
-  def url_isvideo(self, U):
-    return self.with_exts([U], VIDEO_SUFFIXES)
 
   def select_by_re(self, U, regexp):
     m = regexp.search(U)
@@ -512,24 +464,27 @@ class Pilfer(object):
     yield U
 
   action_map = {
-        'delay':    url_delay,
-        'hrefs':    url_hrefs,
-        'images':   url_images,
-        'iimages':  url_inline_images,
-        'isarchive': url_isarchive,
-        'isimage':  url_isimage,
-        'isvideo':  url_isvideo,
-        'print':    url_print,
-        'query':    url_query,
-        'quote':    url_quote,
-        'unquote':    url_unquote,
-        'samedomain': url_samedomain,
-        'samehostname': url_samehostname,
-        'samescheme': url_samescheme,
-        'save':     url_save,
-        'srcs':     url_srcs,
-        'title':    url_print_title,
-        'type':     url_print_type,
+        'delay':        url_delay,
+        'domain':       lambda P, U: (URL(U, None).domain,),
+        'hostname':     lambda P, U: (URL(U, None).hostname,),
+        'hrefs':        lambda P, U, *a: URL(U, None).hrefs(*a, absolute=True),
+        'images':       lambda P, U, *a: P.with_exts( URL(U, None).hrefs(*a, absolute=True), IMAGE_SUFFIXES ),
+        'iimages':      lambda P, U, *a: P.with_exts( URL(U, None).srcs(*a, absolute=True), IMAGE_SUFFIXES ),
+        'isarchive':    lambda P, U: P.with_exts( [U], ARCHIVE_SUFFIXES ),
+        'isarchive':    lambda P, U: P.with_exts( [U], ARCHIVE_SUFFIXES ),
+        'isimage':      lambda P, U: P.with_exts( [U], IMAGE_SUFFIXES ),
+        'isvideo':      lambda P, U: P.with_exts( [U], VIDEO_SUFFIXES ),
+        'print':        url_print,
+        'query':        url_query,
+        'quote':        lambda P, U: (quote(U),),
+        'unquote':      lambda P, U: (unquote(U),),
+        'samedomain':   lambda P, U: (U,) if U.domain == U.referer.domain else (),
+        'samehostname': lambda P, U: (U,) if U.hostname == U.referer.hostname else (),
+        'samescheme':   lambda P, U: (U,) if U.scheme == U.referer.scheme else (),
+        'save':         url_save,
+        'srcs':         lambda P, U, *a: URL(U, None).srcs(*a, absolute=True),
+        'title':        url_print_title,
+        'type':         url_print_type,
       }
 
 if __name__ == '__main__':
