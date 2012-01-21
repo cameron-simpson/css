@@ -99,6 +99,7 @@ class Pilfer(object):
     self.save_dir = None
     self.user_agent = None
     self.user_vars = {}
+    self._urlsfile = None
 
   def act(self, urls, actions):
     ''' Return an iterable of the results of the actions applied to the URLs.
@@ -410,6 +411,48 @@ class Pilfer(object):
         raise ValueError("unknown action")
       return url_func(self, U, *( arg_string.split(',') if len(arg_string) else () ))
 
+  @property
+  def urlsfile(self):
+    if self._urlsfile is None:
+      self._urlsfile = '.urls-seen'
+    return self._urlsfile
+
+  def url_see(self, U, urlsfile=None):
+    ''' Add URL to urlsfile.
+    '''
+    if urlsfile is None:
+      urlsfile = self.urlsfile
+    with open(urlsfile, "a") as ufp:
+      ufp.write(U)
+      ufp.write("\n")
+    yield U
+
+  def url_seen(self, U, urlsfile=None):
+    ''' Scan urlsfile, yield U if present.
+    '''
+    if urlsfile is None:
+      urlsfile = self.urlsfile
+    if os.path.exists(urlsfile):
+      with open(urlsfile) as ufp:
+        for line in ufp:
+          url = line.strip()
+          if url == U:
+            yield U
+            return
+
+  def url_unseen(self, U, urlsfile=None):
+    ''' Scan urlsfile, yield U if not present.
+    '''
+    if urlsfile is None:
+      urlsfile = self.urlsfile
+    if os.path.exists(urlsfile):
+      with open(urlsfile) as ufp:
+        for line in ufp:
+          url = line.strip()
+          if url == U:
+            return
+    yield U
+
   def url_delay(self, U, delay, *a):
     sleep(float(delay))
     yield U
@@ -482,9 +525,12 @@ class Pilfer(object):
         'samehostname': lambda P, U: (U,) if U.hostname == U.referer.hostname else (),
         'samescheme':   lambda P, U: (U,) if U.scheme == U.referer.scheme else (),
         'save':         url_save,
+        'see':          url_see,
+        'seen':         url_seen,
         'srcs':         lambda P, U, *a: URL(U, None).srcs(*a, absolute=True),
         'title':        url_print_title,
         'type':         url_print_type,
+        'unseen':       url_unseen,
       }
 
 if __name__ == '__main__':
