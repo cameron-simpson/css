@@ -80,6 +80,11 @@ def main(argv):
 
   return xit
 
+def notNone(v, name="value"):
+  if v is None:
+    raise ValueError("%s is None" % (name,))
+  return True
+
 def unique(items, seen=None):
   ''' A generator that yields unseen items, as opposed to just
       stuffing them all into a set and returning the set.
@@ -539,9 +544,9 @@ class Pilfer(object):
         'query':        url_query,
         'quote':        lambda P, U: (quote(U),),
         'unquote':      lambda P, U: (unquote(U),),
-        'samedomain':   lambda P, U: (U,) if U.domain == U.referer.domain else (),
-        'samehostname': lambda P, U: (U,) if U.hostname == U.referer.hostname else (),
-        'samescheme':   lambda P, U: (U,) if U.scheme == U.referer.scheme else (),
+        'samedomain':   lambda P, U: (U,) if notNone(U.referer, "U.referer") and U.domain == U.referer.domain else (),
+        'samehostname': lambda P, U: (U,) if notNone(U.referer, "U.referer") and U.hostname == U.referer.hostname else (),
+        'samescheme':   lambda P, U: (U,) if notNone(U.referer, "U.referer") and U.scheme == U.referer.scheme else (),
         'save':         url_save,
         'see':          url_see,
         'seen':         url_seen,
