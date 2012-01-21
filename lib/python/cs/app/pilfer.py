@@ -12,6 +12,7 @@ import os.path
 from itertools import chain
 import re
 if sys.hexversion < 0x02060000: from sets import Set as set
+from getopt import getopt, GetoptError
 from string import Formatter
 from time import sleep
 from urllib import quote, unquote
@@ -23,8 +24,11 @@ ARCHIVE_SUFFIXES = ( 'tar', 'tgz', 'tar.gz', 'tar.bz2', 'cpio', 'rar', 'zip', 'd
 IMAGE_SUFFIXES = ( 'png', 'jpg', 'jpeg', 'gif', 'ico', )
 VIDEO_SUFFIXES = ( 'mp2', 'mp4', 'avi', 'wmv', )
 
-usage = '''Usage: %s op [args...]
-  %s url URL actions...'''
+usage = '''Usage: %s [options...] op [args...]
+  %s url URL actions...
+  Options:
+    -q  Quiet. Don't recite surviving URLs at the end.
+    -u  Unbuffered. Flush print actions as they occur.'''
 
 def main(argv):
   argv = list(argv)
@@ -34,8 +38,25 @@ def main(argv):
   setup_logging(cmd)
 
   P = Pilfer()
+  quiet = False
 
   badopts = False
+
+  try:
+    opts, argv = getopt(argv, 'qu')
+  except GetoptError, e:
+    warn("%s", e)
+    batops = true
+    opts = ()
+
+  for opt, val in opts:
+    if opt == '-q':
+      quiet = True
+    elif opt == '-u':
+      P.flush_print = True
+    else:
+      raise NotImplementedError("%s: unimplemented option" % (opt,))
+
   if not argv:
     error("missing op")
     badopts = True
@@ -68,8 +89,9 @@ def main(argv):
           else:
             urls = [ URL(url, None, P.user_agent) ]
           urls = P.act( urls, argv)
-          for url in urls:
-            print url
+          if not quiet:
+            for url in urls:
+              print url
       else:
         error("unsupported op")
         badopts = True
@@ -101,6 +123,7 @@ class Pilfer(object):
   '''
 
   def __init__(self):
+    self.flush_print = False
     self.save_dir = None
     self.user_agent = None
     self.user_vars = {}
@@ -465,6 +488,8 @@ class Pilfer(object):
     if not args:
       args = (U,)
     print ",".join( self.format_string(arg, U) for arg in args )
+    if self.flush_print:
+      sys.stdout.flush()
     yield U
 
   def url_query(self, U, *a):
@@ -476,6 +501,8 @@ class Pilfer(object):
 
   def url_print_type(self, U):
     print U, U.content_type
+    if self.flush_print:
+      sys.stdout.flush()
     yield U
 
   def select_by_re(self, U, regexp):
@@ -490,6 +517,8 @@ class Pilfer(object):
 
   def url_print_title(self, U):
     print U.title
+    if self.flush_print:
+      sys.stdout.flush()
     yield U
 
   def url_action_all(self, action, urls):
