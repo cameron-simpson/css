@@ -37,10 +37,14 @@ def puttok(fp, *tokens):
   '''
   for tok in tokens:
     toktype = type(tok)
+
     if toktype in StringTypes:
-      return puttext(fp, tok)
+      puttext(fp, tok)
+      continue
+
     if toktype in (IntType, LongType, FloatType):
-      return puttext(fp, str(tok))
+      puttext(fp, str(tok))
+      continue
 
     # token
     try:
@@ -51,7 +55,7 @@ def puttok(fp, *tokens):
       # [ "&ent;" ] is an HTML character entity
       if len(tok) == 1 and tok[0].startswith('&'):
         fp.write(tok[0])
-        return
+        continue
       # raw array [ tag[, attrs][, tokens...] ]
       tok = list(tok)
       tag = tok.pop(0)
