@@ -535,7 +535,7 @@ class Pilfer(object):
       if url_func is None:
         raise ValueError("unknown action")
       try:
-        urls = url_func(self, U, *( arg_string.split(',') if len(arg_string) else () ))
+        urls = url_func(self, urls, *( arg_string.split(',') if len(arg_string) else () ))
       except HTTPError, e:
         error("%s", e)
         urls = ()
