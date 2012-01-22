@@ -534,8 +534,13 @@ class Pilfer(object):
       url_func = self.action_map_all.get(action)
       if url_func is None:
         raise ValueError("unknown action")
-      return url_func(self, urls, *( arg_string.split(',') if len(arg_string) else () ))
-        
+      try:
+        urls = url_func(self, U, *( arg_string.split(',') if len(arg_string) else () ))
+      except HTTPError, e:
+        error("%s", e)
+        urls = ()
+      return urls
+
   def url_action(self, action, U):
     ''' Accept `action` and URL `U`, yield results of action applied to URL.
     '''
@@ -549,7 +554,12 @@ class Pilfer(object):
       url_func = self.action_map.get(action)
       if url_func is None:
         raise ValueError("unknown action")
-      return url_func(self, U, *( arg_string.split(',') if len(arg_string) else () ))
+      try:
+        urls = url_func(self, U, *( arg_string.split(',') if len(arg_string) else () ))
+      except HTTPError, e:
+        error("%s", e)
+        urls = ()
+      return urls
 
   # actions that work on the whole list of in-play URLs
   action_map_all = {
