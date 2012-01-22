@@ -18,32 +18,22 @@ from cs.html import tok2s
 from cs.mappings import parseUC_sAttr
 from cs.nodedb import Node
 from .export import export_csv_wide
-from .html import TABLE_from_Node, TABLE_from_Nodes_wide, by_type_then_name
-
-def by_name(a, b):
-  ''' Compare to objects by their .name attributes.
-  '''
-  return cmp(a.name, b.name)
-
-def node_href(N, label=None, node=None, attr=None):
-  ''' Return (nodespec, label) given the Node `N`, an optional `label`
-      and an optional context Node and attribute name.
-  '''
-  if label is None:
-    if not node:
-      label = str(N)
-    else:
-      label = node.nodedb.totoken(N, node=node, attr=attr)
-  return str(N), label
+from .html import TABLE_from_Node, TABLE_from_Nodes_wide, _noderef
+from .node import by_name, by_type_then_name
 
 class CherryPyNode(object):
 
-  def __init__(self, nodedb, basepath='/'):
-    self.nodedb = nodedb
-    self.basepath = basepath
+  def __init__(self, top):
+    if not top.basepath.endswith('/'):
+      raise ValueError("top.basepath does not end in a slash: %s" % (top.basepath,))
+    self.top = top
+    self.nodedb = top.nodedb
+    self.basepath = top.basepath
+    self.nodes_prefix = "%snodes/" % (self.basepath,)
 
   def _start(self):
-    self._tokens = [ ['SCRIPT', {'LANGUAGE': 'javascript',
+    self._tokens = [ ['BASE', {'HREF': self.basepath}],
+                     ['SCRIPT', {'LANGUAGE': 'javascript',
                                  'SRC': os.path.join(self.basepath, 'lib-css.js'),
                                 }],
                      ['SCRIPT', {'LANGUAGE': 'javascript',
@@ -59,23 +49,23 @@ class CherryPyNode(object):
     self._tokens = []
     return html
 
+  def noderef(self, N, label=None, ext=None):
+    return _noderef(N, prefix=self.nodes_prefix, label=label, ext=ext)
+
 class NodeDBView(CherryPyNode):
 
   NODELIST_LEADATTRS = [ 'TYPE', 'NAME', 'COMMENT' ]
 
   def __init__(self, nodedb, basepath, readwrite=False):
-    CherryPyNode.__init__(self, nodedb, basepath)
-    self.node = NodeDBView._Nodes(self)
+    if not basepath.endswith('/'):
+      raise ValueError("basepath must end with a slash, got: %s" % (basepath,))
+    self.basepath = basepath
+    self.nodedb = nodedb
+    CherryPyNode.__init__(self, self)
     self.readwrite = readwrite
     self.nodelist_leadattrs = NodeDBView.NODELIST_LEADATTRS
 
-  def _nodeLink(self, N, label=None, context=None, view=''):
-    ''' Return an 'A' token linking to the specified Node `N`.
-    '''
-    rhref, label = node_href(N, label=label, node=context)
-    return ['A',
-            {'HREF': "%snode/%s/%s" % (self.basepath, rhref, view)},
-            label]
+    self.nodes = NodesView(self)
 
   @cherrypy.expose
   def index(self):
@@ -107,7 +97,7 @@ class NodeDBView(CherryPyNode):
       for N in nodes:
         if not first:
           self._tokens.append(", ")
-        self._tokens.append(self._nodeLink(N, label=N.name))
+        self._tokens.append(N.html(prefix=self.nodes_prefix))
         first=False
       self._tokens.append("\n")
     return self._flushtokens()
@@ -144,102 +134,105 @@ class NodeDBView(CherryPyNode):
         # TYPEs.html
         if content_type == 'text/html':
           self._start()
-          self._tokens.append(TABLE_from_Nodes_wide(sorted(self.nodedb.type(k), by_type_then_name), leadattrs=self.nodelist_leadattrs))
+          self._tokens.append(TABLE_from_Nodes_wide(sorted(self.nodedb.type(k), by_type_then_name),
+                                                    self,
+                                                    leadattrs=self.nodelist_leadattrs))
           return self._flushtokens()
         raise cherrypy.HTTPError(501, basename)
 
     raise cherrypy.HTTPError(404, basename)
 
-  class _Nodes(CherryPyNode):
-    ''' View of individual Nodes, at /nodes/.
-        /node/nodespec/           Nice report or basic table HTML.
-        /node/nodespec/basic.html Basic table HTML.
-        /node/nodespec/csv        CSV as text/csv.
-        /node/nodespec/txt        CSV as plain text.
-    '''
+class NodesView(CherryPyNode):
+  ''' View of individual Nodes, at /nodes/.
+      /nodes/nodespec/           Nice report or basic table HTML.
+      /nodes/nodespec/basic.html Basic table HTML.
+      /nodes/nodespec/csv        CSV as text/csv.
+      /nodes/nodespec/txt        CSV as plain text.
+  '''
 
-    def __init__(self, top):
-      CherryPyNode.__init__(self, top.basepath)
-      self.top = top
+  def __init__(self, top):
+    CherryPyNode.__init__(self, top)
 
-    @cherrypy.expose
-    def default(self, spec, *subpath):
-      if subpath:
-        subpath = list(subpath)
-      view = ''
-      if subpath:
-        view = subpath.pop(0)
-      try:
-        N = self.top.nodedb[spec]
-      except KeyError, e:
-        raise cherrypy.HTTPError(404, "%s: %s" % (spec, e))
-      if view == '':
-        if hasattr(N, 'report'):
-          return tok2s( *N.report() )
-        return self._basic_html_tokens(N)
-      if view == 'basic.html':
-        return self._basic_html_tokens(N)
-      if view == 'csv':
-        return self._csv_dump(N, 'text/csv')
-      if view == 'txt':
-        return self._csv_dump(N, 'text/plain')
-      raise cherrypy.HTTPError(404, "%s: unsupported view: %s" % (spec, view))
-
-    def _csv_dump(self, N, content_type):
-      cherrypy.response.headers['content-type'] = content_type
-      fp = StringIO()
-      N.nodedb.dump(fp, fmt='csv', nodes=(N,))
-      out = fp.getvalue()
-      fp.close()
-      return out
-
-    def _basic_html_tokens(self, N):
-      self._start()
-
-      heading = ['H1', str(N)]
-      alts = []
+  @cherrypy.expose
+  def default(self, spec, *subpath):
+    if subpath:
+      subpath = list(subpath)
+    view = ''
+    if subpath:
+      view = subpath.pop(0)
+    try:
+      N = self.top.nodedb[spec]
+    except KeyError, e:
+      raise cherrypy.HTTPError(404, "%s: %s" % (spec, e))
+    if view == '':
       if hasattr(N, 'report'):
-        alts.append(self.top._nodeLink(N, label="pretty report"))
-      if hasattr(N, 'nagios_cfg'):
-        alts.append(self.top._nodeLink(N, label="nagios.cfg", view="nagios.cfg"))
-      if alts:
-        sep = " ("
-        for alt in alts:
-          heading.append(sep)
-          heading.append(alt)
-          sep = ", "
-        heading.append(")")
-      self._tokens.append(heading)
+        return tok2s( *N.report(self) )
+      return self._basic_html_tokens(N)
+    if view == 'basic.html':
+      return self._basic_html_tokens(N)
+    if view == 'csv':
+      return self._csv_dump(N, 'text/csv')
+    if view == 'txt':
+      return self._csv_dump(N, 'text/plain')
+    raise cherrypy.HTTPError(404, "%s: unsupported view: %s" % (spec, view))
 
-      # locate parent/referring Nodes
-      parents = set( rN for rN, rAttr, rCount in N.references() )
-      if parents:
-        def bylabel(a, b): return cmp(str(a), str(b))
-        parents = list(parents)
-        parents.sort(bylabel)
-        self._tokens.append("Attached to:")
-        sep = " "
-        for P in parents:
-          self._tokens.append(sep)
-          sep = ", "
-          self._tokens.append(self.top._nodeLink(P))
-        self._tokens.append(".")
-        self._tokens.extend( (['BR'], "\n") )
+  def _csv_dump(self, N, content_type):
+    cherrypy.response.headers['content-type'] = content_type
+    fp = StringIO()
+    N.nodedb.dump(fp, fmt='csv', nodes=(N,))
+    out = fp.getvalue()
+    fp.close()
+    return out
 
-      self._tokens.append( TABLE_from_Node(N) )
-      self._tokens.append("\n")
+  def _basic_html_tokens(self, N):
+    self._start()
 
-      return self._flushtokens()
+    heading = ['H1', str(N)]
+    alts = []
+    if hasattr(N, 'report'):
+      alts.append(N.html(label="pretty report"))
+    if hasattr(N, 'nagios_cfg'):
+      alts.append(N.html(label="nagios.cfg", ext="/nagios.cfg"))
+    if alts:
+      sep = " ("
+      for alt in alts:
+        heading.append(sep)
+        heading.append(alt)
+        sep = ", "
+      heading.append(")")
+    self._tokens.append(heading)
 
-def serve(nodedb, host, port, basepath='/', readwrite=False, DBView=None):
+    # locate parent/referring Nodes
+    parents = set( rN for rN, rAttr, rCount in N.references() )
+    if parents:
+      def bylabel(a, b): return cmp(str(a), str(b))
+      parents = list(parents)
+      parents.sort(bylabel)
+      self._tokens.append("Attached to:")
+      sep = " "
+      for P in parents:
+        self._tokens.append(sep)
+        sep = ", "
+        self._tokens.append(self.noderef(P))
+      self._tokens.append(".")
+      self._tokens.extend( (['BR'], "\n") )
+
+    self._tokens.append( TABLE_from_Node(N, self) )
+    self._tokens.append("\n")
+
+    return self._flushtokens()
+
+def serve(nodedb, host, port, basepath='/db/', readwrite=False, DBView=None):
   ''' Dispatch an HTTP server serving the content of `nodedb`.
   '''
   if type(port) in StringTypes:
     port = int(port)
   if DBView is None:
     DBView = NodeDBView
+  if not basepath.endswith('/'):
+    raise ValueError("basepath should end in a slash, got: %s" % (basepath,))
   V = DBView(nodedb, basepath, readwrite=readwrite)
   S = cherrypy.server
   S.socket_host = host
   S.socket_port = port
-  cherrypy.quickstart(V)
+  cherrypy.quickstart(V, script_name=basepath[:-1])

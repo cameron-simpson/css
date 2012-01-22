@@ -20,21 +20,21 @@ def SPAN(*elements):
   span.extend(elements)
   return span
 
-def noderef(N, label=None, ext=None, prefix=None):
+def _noderef(N, prefix, label=None, ext=None):
   ''' Return an anchor HTML token referring to a Node view.
       N: the Node to which to link.
+      prefix: URL base prefix to prepend.
       label: visible text for the link, default N.name.
       ext: suffix for the link URL, default '.html'.
-      prefix: URL base prefix to prepend.
   '''
+  if not prefix.endswith('/'):
+    raise ValueError("noderef(N=%s,...): prefix does not end in a slash: %s" % (N, prefix))
+  if prefix == '/': raise ValueError("bad prefix: %s" % (prefix,))
   if label is None:
     label = N.name
   if ext is None:
     ext = '/'
-  rhref = '/node/'+str(N)
-  if prefix is not None:
-    rhref = prefix + rhref
-  return ['A', {'HREF': rhref+ext}, label]
+  return ['A', {'HREF': '%s%s:%s%s' % (prefix, N.type, N.name, ext)}, label]
 
 def TD(*elements):
   return ['TD', {'align': 'left', 'valign': 'top'}] + list(elements)
@@ -63,11 +63,12 @@ def TABLE(*rows):
     trows.append(TR(attr, SPAN(*vtags)))
   return ['TABLE', {'BORDER': 1}] + trows
 
-def tag_from_value(value):
-  ''' Convert a value to an HTML token.
+def tag_from_value(value, CP):
+  ''' Convert the supplied `value` to an HTML token using the CherrypyNode
+      object `CP` for context as needed.
   '''
   if isinstance(value, Node):
-    tag = value.html()
+    tag = value.html(prefix=CP.nodes_prefix)
   elif type(value) in StringTypes:
     lines = [ line.rstrip() for line in value.rstrip().split('\n') ]
     taglist = []
@@ -86,27 +87,27 @@ def tag_from_value(value):
     for v in value:
       if taglist:
         taglist.append(['BR'])
-      taglist.append(tag_from_value(v))
+      taglist.append(tag_from_value(v, CP))
     tag = SPAN(*taglist)
   else:
     tag = str(value)
   return tag
 
-def TABLE_from_rows(rows):
-  trows = [ TR( *[ TD(tag_from_value(v)) for v in row ] )
+def TABLE_from_rows(rows, CP):
+  trows = [ TR( *[ TD(tag_from_value(v, CP)) for v in row ] )
             for row in rows
           ]
   return ['TABLE', {'BORDER': 1}] + trows
 
-def TABLE_from_Node(node):
-  return TABLE_from_rows( [ [attr, node[attr]] for attr in sorted(node.keys()) ] )
+def TABLE_from_Node(node, CP):
+  return TABLE_from_rows( [ [attr, node[attr]] for attr in sorted(node.keys()) ], CP )
 
 def rows_from_Node(node):
   for attr in sorted(node.keys()):
     yield attr, node[attr]
 
-def TABLE_from_Nodes_wide(nodes, leadattrs=None):
-  return TABLE_from_rows( rows_from_Nodes_wide(nodes, leadattrs=leadattrs) )
+def TABLE_from_Nodes_wide(nodes, CP, leadattrs=None):
+  return TABLE_from_rows( rows_from_Nodes_wide(nodes, leadattrs=leadattrs), CP )
 
 def rows_from_Nodes_wide(nodes, leadattrs=None):
   ''' A generator to yield lists of values for table rows.
@@ -130,27 +131,3 @@ def rows_from_Nodes_wide(nodes, leadattrs=None):
               else N.get(attr, ())
             ) for attr in attrs
           ]
-
-def by_name(a, b):
-  ''' Compare two objects by their .name attributes.
-  '''
-  return cmp(a.name, b.name)
-
-def by_type_then_name(a, b):
-  ''' Compare two objects by their .type and then .name attributes.
-  '''
-  c = cmp(a.type, b.type)
-  if c != 0:
-    return c
-  return cmp(a.name, b.name)
-
-def node_href(N, label=None, node=None, attr=None):
-  ''' Return (nodespec, label) given the Node `N`, an optional `label`
-      and an optional context Node and attribute name.
-  '''
-  if label is None:
-    if not node:
-      label = str(N)
-    else:
-      label = node.nodedb.totoken(N, node=node, attr=attr)
-  return str(N), label
