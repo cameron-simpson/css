@@ -118,9 +118,10 @@ def rows_from_Nodes_wide(nodes, leadattrs=None):
     leadattrs = ('TYPE', 'NAME')
 
   # compute list of attributes
-  attrs = set(leadattrs)
+  attrs = set()
   for N in nodes:
     attrs.update(N.keys())
+  leadattrs = [ attr for attr in leadattrs if attr in attrs ]
   attrs.difference_update(leadattrs)
   attrs = list(leadattrs) + sorted(attrs)
 
