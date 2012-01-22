@@ -121,7 +121,7 @@ def rows_from_Nodes_wide(nodes, leadattrs=None):
   attrs = set()
   for N in nodes:
     attrs.update(N.keys())
-  leadattrs = [ attr for attr in leadattrs if attr in attrs ]
+  leadattrs = [ attr for attr in leadattrs if attr == 'TYPE' or attr == 'NAME' or attr in attrs ]
   attrs.difference_update(leadattrs)
   attrs = list(leadattrs) + sorted(attrs)
 
