@@ -27,7 +27,17 @@ re_NODEREF = re.compile(r'([A-Z]+):([^:#]+)')
 # regexp to match a bareword name
 re_NAME = re.compile(r'[a-z][-a-z_0-9]*(?![a-zA-Z0-9_])')
 
-def _byname(a, b):
+def by_name(a, b):
+  ''' Compare two objects by their .name attributes.
+  '''
+  return cmp(a.name, b.name)
+
+def by_type_then_name(a, b):
+  ''' Compare two objects by their .type and then .name attributes.
+  '''
+  c = cmp(a.type, b.type)
+  if c != 0:
+    return c
   return cmp(a.name, b.name)
 
 def nodekey(*args):
@@ -346,11 +356,11 @@ class Node(dict):
   def __str__(self):
     return self.type+":"+self.name
 
-  def html(self, label=None, ext=None, prefix=None):
+  def html(self, prefix, label=None, ext=None):
     ''' An HTML token to transcribe for this Node.
     '''
-    from .html import noderef
-    return noderef(self, label=label, ext=ext, prefix=prefix)
+    from .html import _noderef
+    return _noderef(self, prefix=prefix, label=label, ext=ext)
 
   def __cmp__(self, other):
     ''' Nodes compare by type and then name and then id(Node).
@@ -985,7 +995,7 @@ class NodeDB(dict):
     if typenames is None:
       typenames = sorted(self.types)
     for t in typenames:
-      nodes = sorted(getattr(self, t+'s'), _byname)
+      nodes = sorted(getattr(self, t+'s'), by_name)
       for N in nodes:
         yield N
 
@@ -1037,7 +1047,7 @@ class NodeDB(dict):
           N = self[t, name]
         mapping = {}
         for attr, values in attrmap.items():
-          debug("set %s:%s.%s", t, name, attr)
+          ##debug("set %s:%s.%s", t, name, attr)
           mapping[attr] = [ self.fromtext(value) for value in values ]
         N.apply(mapping)
 
