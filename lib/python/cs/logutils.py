@@ -10,6 +10,7 @@ import logging
 import os
 import sys
 import time
+from types import StringTypes
 from thread import allocate_lock
 import threading
 import traceback
@@ -345,25 +346,37 @@ class Pfx(object):
   def __exit__(self, exc_type, exc_value, traceback):
     global _prefix
     if exc_value is not None:
-      if exc_type is not SystemExit:
-        if _prefix.raise_needs_prefix:
-          prefix = self.mark
-          if hasattr(exc_value, 'args'):
-            ##sys.stderr.write("Pfx: [exc_value.args is = %s]\n" % (`exc_value.args`,))
-            if len(exc_value.args) > 0:
-              exc_value.args = [ prefix + ": " + unicode(exc_value.args[0]) ] \
-                               + list(exc_value.args[1:])
-              ##sys.stderr.write("Pfx: [exc_value.args now = %s]\n" % (`exc_value.args`,))
-          elif hasattr(exc_value, 'msg'):
-            exc_value.msg = prefix + ": " + exc_value.msg
-          elif hasattr(exc_value, 'message'):
-            exc_value.message = prefix + ": " + exc_value.message
+      ##debug("Pfx.__exit__: exc_value = %s", `exc_value`)
+      if _prefix.raise_needs_prefix:
+        prefix = self.mark
+        if hasattr(exc_value, 'msg'):
+          exc_value.msg = prefix + ": " + exc_value.msg
+          ##debug("set msg = %s", exc_value.msg)
+        elif hasattr(exc_value, 'message'):
+          exc_value.message = prefix + ": " + exc_value.message
+          ##debug("set message = %s", exc_value.message)
+        elif hasattr(exc_value, 'args'):
+          ##sys.stderr.write("Pfx: [exc_value.args is = %s]\n" % (`exc_value.args`,))
+          args = exc_value.args
+          if isinstance(args, StringTypes):
+            args = prefix + ": " + args
           else:
-            # we can't modify this - at least report the current prefix state
-            sys.stderr.write("%s: Pfx.__exit__: exc_value = %s\n" \
-                             % (prefix, repr(exc_value),))
-          # prevent outer Pfx wrappers from hacking stuff as well
-          _prefix.raise_needs_prefix = False
+            ##debug("type(args) = %s %s", type(args), `args`)
+            args = list(args)
+            if len(exc_value.args) == 0:
+              args = prefix
+            else:
+              args = [ prefix + ": " + unicode(exc_value.args[0]) ] \
+                               + list(exc_value.args[1:])
+          exc_value.args = args
+          ##debug("set args = %s", exc_value.args)
+        else:
+          # we can't modify this - at least report the current prefix state
+          sys.stderr.write("%s: Pfx.__exit__: exc_value = %s %s\n" \
+                           % (prefix, repr(exc_value), dir(exc_value)))
+          sys.stderr.flush()
+        # prevent outer Pfx wrappers from hacking stuff as well
+        _prefix.raise_needs_prefix = False
     _prefix.pop()
     return False
 
