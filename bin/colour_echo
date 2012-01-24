@@ -1,12 +1,39 @@
-#!/bin/sh -ue
+#!/bin/sh
 #
 # Echo in colour.       - Cameron Simpson <cs@zip.com.au>
 #
 
-case $1 in
+set -ue
+
+cmd=$0
+usage="Usage: $cmd [-n] colour message..."
+
+badopts=
+
+echo=echo
+
+while [ $# -gt 0 ]
+do
+  case $1 in
     -n)	echo=necho; shift ;;
-    *)	echo=echo ;;
-esac
-colour=$1
-shift
+    --) shift; break ;;
+    -?*)echo "$cmd: unrecognised option: $1" >&2
+        badopts=1
+        ;;
+    *)	break ;;
+  esac
+  shift
+done
+
+if [ $# = 0 ]
+then
+  echo "$cmd: missing colour" >&2
+  badopts=1
+else
+  colour=$1
+  shift
+fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
 exec with-colour "$colour" "$echo" ${1+"$@"}
