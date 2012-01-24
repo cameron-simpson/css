@@ -133,10 +133,10 @@ def url_io_iter(iter):
       yield i
 
 def url_hrefs(U, referrer=None):
-  return url_io_iter(URL(U, referrer).hrefs)
+  return url_io_iter(URL(U, referrer).hrefs(absolute=True))
 
 def url_srcs(U, referrer=None):
-  return url_io_iter(URL(U, referrer).srcs)
+  return url_io_iter(URL(U, referrer).srcs(absolute=True))
 
 def unique(items, seen=None):
   ''' A generator that yields unseen items, as opposed to just
@@ -595,9 +595,9 @@ class Pilfer(object):
         'delay':        url_delay,
         'domain':       lambda P, U: (URL(U, None).domain,),
         'hostname':     lambda P, U: (URL(U, None).hostname,),
-        'hrefs':        lambda P, U, *a: url_hrefs(U, *a, absolute=True),
-        'images':       lambda P, U, *a: P.with_exts(url_hrefs(U, *a, absolute=True), IMAGE_SUFFIXES ),
-        'iimages':      lambda P, U, *a: P.with_exts(url_srcs(U, *a, absolute=True), IMAGE_SUFFIXES ),
+        'hrefs':        lambda P, U, *a: url_hrefs(U, *a),
+        'images':       lambda P, U, *a: P.with_exts(url_hrefs(U, *a), IMAGE_SUFFIXES ),
+        'iimages':      lambda P, U, *a: P.with_exts(url_srcs(U, *a), IMAGE_SUFFIXES ),
         'isarchive':    lambda P, U: P.with_exts( [U], ARCHIVE_SUFFIXES ),
         'isarchive':    lambda P, U: P.with_exts( [U], ARCHIVE_SUFFIXES ),
         'isimage':      lambda P, U: P.with_exts( [U], IMAGE_SUFFIXES ),
@@ -612,7 +612,7 @@ class Pilfer(object):
         'save':         lambda P, U, *a: url_io(P.url_save, (), U, *a),
         'see':          url_see,
         'seen':         url_seen,
-        'srcs':         lambda P, U, *a: url_srcs(U, *a, absolute=True),
+        'srcs':         lambda P, U, *a: url_srcs(U, *a),
         'title':        url_print_title,
         'type':         lambda P, U: url_io(P.url_print_type, "", U),
         'unseen':       url_unseen,
