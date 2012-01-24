@@ -45,7 +45,7 @@ def main(argv):
   try:
     opts, argv = getopt(argv, 'qu')
   except GetoptError, e:
-    warn("%s", e)
+    warning("%s", e)
     batops = true
     opts = ()
 
@@ -88,7 +88,7 @@ def main(argv):
                 urls.append(URL(line, None, P.user_agent))
           else:
             urls = [ URL(url, None, P.user_agent) ]
-          urls = P.act( urls, argv)
+          urls = P.act(urls, argv)
           if not quiet:
             for url in urls:
               print url
@@ -106,6 +106,37 @@ def notNone(v, name="value"):
   if v is None:
     raise ValueError("%s is None" % (name,))
   return True
+
+def url_io(func, onerror, *a, **kw):
+  ''' Call `func` and return its result.
+      If it raises URLError or HTTPError, report the error and return `onerror`.
+  '''
+  debug("url_io(%s, %s, %s, %s)...", func, onerror, a, kw)
+  try:
+    return func(*a, **kw)
+  except (URLError, HTTPError), e:
+    warning("%s", e)
+    return onerror
+
+def url_io_iter(iter):
+  ''' Iterator over `iter` and yield its values.
+      If it raises URLError or HTTPError, report the error.
+  '''
+  while 1:
+    try:
+      i = iter.next()
+    except StopIteration:
+      break
+    except (URLError, HTTPError), e:
+      warning("%s", e)
+    else:
+      yield i
+
+def url_hrefs(U, referrer=None):
+  return url_io_iter(URL(U, referrer).hrefs)
+
+def url_srcs(U, referrer=None):
+  return url_io_iter(URL(U, referrer).srcs)
 
 def unique(items, seen=None):
   ''' A generator that yields unseen items, as opposed to just
@@ -214,7 +245,7 @@ class Pilfer(object):
             continue
           try:
             save_dir = self.url_save_dir(urls[0], ignore_save_dir=True)
-          except HTTPError, e:
+          except (HTTPError, URLError), e:
             error("%s: %s", urls[0], e)
             return ()
           self.save_dir = self.new_save_dir(save_dir)
@@ -524,6 +555,7 @@ class Pilfer(object):
   def url_action_all(self, action, urls):
     ''' Accept `action` and URL `urls`, yield results of action applied to all URLs.
     '''
+    debug("url_action_all(%s, %s)", action, urls)
     global actions
     # gather arguments if any
     if ':' in action:
@@ -534,16 +566,12 @@ class Pilfer(object):
       url_func = self.action_map_all.get(action)
       if url_func is None:
         raise ValueError("unknown action")
-      try:
-        urls = url_func(self, urls, *( arg_string.split(',') if len(arg_string) else () ))
-      except HTTPError, e:
-        error("%s", e)
-        urls = ()
-      return urls
+      return url_io(url_func, (), self, urls, *( arg_string.split(',') if len(arg_string) else () ))
 
   def url_action(self, action, U):
     ''' Accept `action` and URL `U`, yield results of action applied to URL.
     '''
+    debug("url_action(%s, %s)", action, U)
     global actions
     # gather arguments if any
     if ':' in action:
@@ -554,12 +582,7 @@ class Pilfer(object):
       url_func = self.action_map.get(action)
       if url_func is None:
         raise ValueError("unknown action")
-      try:
-        urls = url_func(self, U, *( arg_string.split(',') if len(arg_string) else () ))
-      except HTTPError, e:
-        error("%s", e)
-        urls = ()
-      return urls
+      return url_io(url_func, (), self, U, *( arg_string.split(',') if len(arg_string) else () ))
 
   # actions that work on the whole list of in-play URLs
   action_map_all = {
@@ -572,9 +595,9 @@ class Pilfer(object):
         'delay':        url_delay,
         'domain':       lambda P, U: (URL(U, None).domain,),
         'hostname':     lambda P, U: (URL(U, None).hostname,),
-        'hrefs':        lambda P, U, *a: URL(U, None).hrefs(*a, absolute=True),
-        'images':       lambda P, U, *a: P.with_exts( URL(U, None).hrefs(*a, absolute=True), IMAGE_SUFFIXES ),
-        'iimages':      lambda P, U, *a: P.with_exts( URL(U, None).srcs(*a, absolute=True), IMAGE_SUFFIXES ),
+        'hrefs':        lambda P, U, *a: url_hrefs(U, *a, absolute=True),
+        'images':       lambda P, U, *a: P.with_exts(url_hrefs(U, *a, absolute=True), IMAGE_SUFFIXES ),
+        'iimages':      lambda P, U, *a: P.with_exts(url_srcs(U, *a, absolute=True), IMAGE_SUFFIXES ),
         'isarchive':    lambda P, U: P.with_exts( [U], ARCHIVE_SUFFIXES ),
         'isarchive':    lambda P, U: P.with_exts( [U], ARCHIVE_SUFFIXES ),
         'isimage':      lambda P, U: P.with_exts( [U], IMAGE_SUFFIXES ),
@@ -586,12 +609,12 @@ class Pilfer(object):
         'samedomain':   lambda P, U: (U,) if notNone(U.referer, "U.referer") and U.domain == U.referer.domain else (),
         'samehostname': lambda P, U: (U,) if notNone(U.referer, "U.referer") and U.hostname == U.referer.hostname else (),
         'samescheme':   lambda P, U: (U,) if notNone(U.referer, "U.referer") and U.scheme == U.referer.scheme else (),
-        'save':         url_save,
+        'save':         lambda P, U, *a: url_io(P.url_save, (), U, *a),
         'see':          url_see,
         'seen':         url_seen,
-        'srcs':         lambda P, U, *a: URL(U, None).srcs(*a, absolute=True),
+        'srcs':         lambda P, U, *a: url_srcs(U, *a, absolute=True),
         'title':        url_print_title,
-        'type':         url_print_type,
+        'type':         lambda P, U: url_io(P.url_print_type, "", U),
         'unseen':       url_unseen,
       }
 
