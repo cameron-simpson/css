@@ -351,7 +351,7 @@ class Pfx(object):
         ##debug("Pfx.__exit__: exc_value = %s .[%s] %s, PREFIX = %s", `exc_value`, sorted(dir(exc_value)), ", ".join([ "%s = %s" % (a, `getattr(exc_value, a)`) for a in sorted(dir(exc_value)) ]), prefix)
         if hasattr(exc_value, 'message'):
           exc_value.message = prefix + ": " + exc_value.message
-        if hasattr(exc_value, 'reason'):
+        if hasattr(exc_value, 'reason') and isinstance(exc_value.reason, StringTypes):
           exc_value.reason = prefix + ": " + exc_value.reason
         if hasattr(exc_value, 'msg'):
           exc_value.msg = prefix + ": " + exc_value.msg
