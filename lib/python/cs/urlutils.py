@@ -307,6 +307,12 @@ class URLs(object):
   def __iter__(self):
     return iter(self.urls)
 
+  def __getitem__(self, key):
+    return self.context[key]
+
+  def __setitem__(self, key, value):
+    self.context[key] = value
+
   @property
   def multi(self):
     ''' Prepare this URLs object for reuse by converting its urls
