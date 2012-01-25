@@ -346,22 +346,20 @@ class Pfx(object):
   def __exit__(self, exc_type, exc_value, traceback):
     global _prefix
     if exc_value is not None:
-      ##debug("Pfx.__exit__: exc_value = %s", `exc_value`)
       if _prefix.raise_needs_prefix:
         prefix = self.mark
+        ##debug("Pfx.__exit__: exc_value = %s .[%s] %s, PREFIX = %s", `exc_value`, sorted(dir(exc_value)), ", ".join([ "%s = %s" % (a, `getattr(exc_value, a)`) for a in sorted(dir(exc_value)) ]), prefix)
+        if hasattr(exc_value, 'message'):
+          exc_value.message = prefix + ": " + exc_value.message
+        if hasattr(exc_value, 'reason'):
+          exc_value.reason = prefix + ": " + exc_value.reason
         if hasattr(exc_value, 'msg'):
           exc_value.msg = prefix + ": " + exc_value.msg
-          ##debug("set msg = %s", exc_value.msg)
-        elif hasattr(exc_value, 'message'):
-          exc_value.message = prefix + ": " + exc_value.message
-          ##debug("set message = %s", exc_value.message)
-        elif hasattr(exc_value, 'args'):
-          ##sys.stderr.write("Pfx: [exc_value.args is = %s]\n" % (`exc_value.args`,))
+        if hasattr(exc_value, 'args'):
           args = exc_value.args
           if isinstance(args, StringTypes):
             args = prefix + ": " + args
           else:
-            ##debug("type(args) = %s %s", type(args), `args`)
             args = list(args)
             if len(exc_value.args) == 0:
               args = prefix
@@ -369,7 +367,6 @@ class Pfx(object):
               args = [ prefix + ": " + unicode(exc_value.args[0]) ] \
                                + list(exc_value.args[1:])
           exc_value.args = args
-          ##debug("set args = %s", exc_value.args)
         else:
           # we can't modify this - at least report the current prefix state
           sys.stderr.write("%s: Pfx.__exit__: exc_value = %s %s\n" \
