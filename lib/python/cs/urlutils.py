@@ -7,11 +7,12 @@
 from __future__ import with_statement
 import os.path
 import sys
+from itertools import chain
 from BeautifulSoup import BeautifulSoup, Tag, BeautifulStoneSoup
 from urllib2 import urlopen, Request, HTTPError, URLError
 from urlparse import urlparse, urljoin
 from HTMLParser import HTMLParseError
-from cs.logutils import Pfx, debug, error, warning, exception
+from cs.logutils import Pfx, pfx_iter, debug, error, warning, exception
 
 def URL(U, referer, user_agent=None):
   ''' Factory function to return a _URL object from a URL string.
@@ -254,3 +255,80 @@ class _URL(unicode):
         debug("no src, skip %s", A)
         continue
       yield URL( (urljoin(self.baseurl, src) if absolute else src), self )
+
+def skip_errs(iterable):
+  ''' Iterate over `iterable` and yield its values.
+      If it raises URLError or HTTPError, report the error and skip the result.
+  '''
+  debug("skip_errs...")
+  I = iter(iterable)
+  while True:
+    try:
+      i = I.next()
+    except StopIteration:
+      break
+    except (URLError, HTTPError), e:
+      warning("%s", e)
+    else:
+      debug("skip_errs: yield %s", `i`)
+      yield i
+
+def can_skip_urlerrs(func):
+  def wrapped(self, *args, **kwargs):
+    mode = kwargs.pop('mode', self.mode)
+    if mode == URLs.MODE_SKIP:
+      return URLs( skip_errs(func(self, *args, mode=URLs.MODE_RAISE, **kwargs)),
+                   self.context,
+                   self.mode
+                 )
+    return func(self, *args, mode=mode, **kwargs)
+  return wrapped
+
+class URLs(object):
+
+  MODE_RAISE = 0
+  MODE_SKIP = 1
+
+  def __init__(self, urls, context=None, mode=None):
+    ''' Set up a URLs object with the iterable `urls` and the `context`
+        object, which implements the mapping interface to store key value
+        pairs.
+        The iterable `urls` is kept as is, making this object a single use
+        iterable unless the .multi property is accessed.
+    '''
+    if context is None:
+      context = {}
+    if mode is None:
+      mode = URLs.MODE_RAISE
+    self.urls = urls
+    self.context = context
+    self.mode = mode
+
+  def __iter__(self):
+    return iter(self.urls)
+
+  @property
+  def multi(self):
+    ''' Prepare this URLs object for reuse by converting its urls
+        iterable to a list if not already a list or tuple.
+        Returns self.
+    '''
+    if not isinstance(self.urls, (list, tuple)):
+      self.urls = list(self.urls)
+    return self
+
+  @can_skip_urlerrs
+  def hrefs(self, absolute=True, mode=None):
+    return URLs( chain( *[ pfx_iter( url,
+                                     URL(url, None).hrefs(absolute=absolute)
+                                   )
+                           for url in self.urls
+                         ]),
+                 self.context,
+                 self.mode)
+
+if __name__ == '__main__':
+  import cs.logutils
+  cs.logutils.setup_logging()
+  UU = URLs( [ 'http://www.mirror.aarnet.edu.au/' ], mode=URLs.MODE_SKIP )
+  print list(UU.hrefs().hrefs())
