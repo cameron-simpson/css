@@ -17,7 +17,7 @@ from string import Formatter
 from time import sleep
 from urllib import quote, unquote
 from urllib2 import HTTPError, URLError
-from cs.logutils import setup_logging, Pfx, debug, error, warning, exception, pfx_iter
+from cs.logutils import setup_logging, logTo, Pfx, debug, error, warning, exception, pfx_iter
 from cs.urlutils import URL
 
 ARCHIVE_SUFFIXES = ( 'tar', 'tgz', 'tar.gz', 'tar.bz2', 'cpio', 'rar', 'zip', 'dmg' )
@@ -36,6 +36,7 @@ def main(argv):
   argv0 = argv.pop(0)
   cmd = os.path.basename(argv0)
   setup_logging(cmd)
+  logTo('.pilfer.log')
 
   P = Pilfer()
   quiet = False
