@@ -288,9 +288,6 @@ def can_skip_urlerrs(func):
     return func(self, *args, mode=mode, **kwargs)
   return wrapped
 
-def usemode(func):
-  def wrapped(self, *args, **kwargs):
-
 class URLs(object):
 
   MODE_RAISE = 0
