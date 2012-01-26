@@ -355,7 +355,7 @@ class Pfx(object):
           if isinstance(exc_value.reason, StringTypes):
             exc_value.reason = prefix + ": " + exc_value.reason
           else:
-            warn("Pfx.__exit__: exc_value.reason is not a string: %s", `exc_value.reason`)
+            warning("Pfx.__exit__: exc_value.reason is not a string: %s", `exc_value.reason`)
         if hasattr(exc_value, 'msg'):
           exc_value.msg = prefix + ": " + exc_value.msg
         if hasattr(exc_value, 'args'):
