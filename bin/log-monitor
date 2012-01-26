@@ -14,7 +14,7 @@ import syslog
 from thread import allocate_lock
 from threading import Thread
 import cs.wini
-from cs.tail import Tail
+from cs.tail import tail
 from cs.misc import cmd, DictUC_Attrs
 
 usage="Usage: %s configuration-file" % cmd
@@ -99,7 +99,6 @@ class Monitor(object):
       class pathObj:
         pass
       pathObj.PATH=path
-      pathObj.TAIL=Tail(path)
 
       # make a map of tests indexed by regexp name
       pathObj.TESTS={}
@@ -150,8 +149,8 @@ class Monitor(object):
     global cmd
     global ioLock
     tests=self.paths[path].TESTS
-    for line in Tail(path):
-      assert line[-1] == '\n'
+    for line in tail(open(path)):
+      assert line.endswith('\n')
       line=line[:-1]
       for regexpName in tests.keys():
         reLock, reObj = self.regexps[regexpName]
