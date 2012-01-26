@@ -120,7 +120,7 @@ def getDirents(fp):
     when = float(unixtime)
     E, etc = decodeDirent(fromtext(dent))
     assert len(etc) == 0 or etc[0].iswhite(), \
-      "failed to decode dent %s: unparsed: %s" % (repr(dent), repr(etc))
+      "failed to decode dent %r: unparsed: %r" % (dent, etc)
     yield when, E
 
 def writeDirent(fp, E, when=None):

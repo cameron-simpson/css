@@ -69,7 +69,7 @@ class Backend_TokyoCabinet(Backend):
       try:
         t, name, attr = attrtag.split(':', 2)
       except ValueError, e:
-        raise ValueError("attrtag = %s: %s" % (repr(attrtag), e))
+        raise ValueError("attrtag = %r: %s" % (attrtag, e))
       if (t, name) in seen:
         continue
       yield t, name
@@ -85,7 +85,7 @@ class Backend_TokyoCabinet(Backend):
         del db[attrtag]
 
   def __getitem__(self, key):
-    with Pfx("tc __getitem__(%s)" % (repr(key),)):
+    with Pfx("tc __getitem__(%r)" % (key,)):
       d = {}
       db = self.tcdb
       with self.tclock:

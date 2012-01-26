@@ -329,7 +329,7 @@ class IndexedFileStore(BasicStore):
   def add(self, data, noFlush=False):
     ''' Add data bytes to the store, return the hashcode.
     '''
-    assert type(data) is str, "expected str, got %s" % (repr(data),)
+    assert type(data) is str, "expected str, got: %r" % (data,)
     assert not self.readonly
     h = self.hash(data)
     if h not in self._index:

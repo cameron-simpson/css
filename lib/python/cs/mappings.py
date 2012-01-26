@@ -60,7 +60,7 @@ class SeqMapUC_Attrs(object):
         else:
           value=value[0]
       kv.append((k,value))
-    return '{%s}' % (", ".join([ "%s: %s" % (k, repr(value)) for k, value in kv ]))
+    return '{%s}' % (", ".join([ "%s: %r" % (k, value) for k, value in kv ]))
 
   def __hasattr__(self,attr):
     k, plural = parseUC_sAttr(attr)
@@ -85,7 +85,7 @@ class SeqMapUC_Attrs(object):
       return
     if plural:
       if type(value) in StringTypes:
-        raise ValueError("invalid string %s assigned to plural attribute \"%s\"" % (repr(value), attr))
+        raise ValueError("invalid string %r assigned to plural attribute %r" % (value, attr))
       T=tuple(value)
       if len(T) == 0 and not self.keepEmpty:
         if k in self.__M:

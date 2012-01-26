@@ -141,7 +141,7 @@ class Block(_Block):
       if span is None:
         span = len(data)
       else:
-        assert type(span) is int, "expected int, got %s" % (repr(span),)
+        assert type(span) is int, "expected int, got: %r" % (span,)
         assert span == len(data)
       self._data = data
       self._hashcode = None

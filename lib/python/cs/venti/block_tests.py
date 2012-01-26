@@ -32,9 +32,9 @@ class TestAll(unittest.TestCase):
       self.assertEqual(len(IB), 1000)
       IBH = IB.hashcode
       IBdata = IB.data
-      ##D("IBdata = %s:%d:%s", type(IBdata), len(IBdata), repr(IBdata),)
+      ##D("IBdata = %s:%d:%r", type(IBdata), len(IBdata), IBdata,)
       IB2data = IndirectBlock(hashcode=IBH, span=len(IBdata)).data
-      ##D("IB2data = %s:%d:%s", type(IB2data), len(IB2data), repr(IB2data),)
+      ##D("IB2data = %s:%d:%r", type(IB2data), len(IB2data), IB2data,)
       self.assertEqual(IBdata, IB2data, "IB:  %s\nIB2: %s" % (totext(IBdata), totext(IB2data)))
 
 def selftest(argv):

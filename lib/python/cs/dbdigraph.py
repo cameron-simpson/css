@@ -124,7 +124,7 @@ class DBDiGraph:
   def need(self,name,type):
     nodes=self.nodesByNameAndType(name,type)
     if len(nodes) > 1:
-      raise IndexError, "multiple nodes with index %s: %s" % (repr((name,type)), ", ".join(str(n) for n in nodes))
+      raise IndexError, "multiple nodes with index %r: %s" % ( ((name,type)), ", ".join(str(n) for n in nodes) )
     if len(nodes) == 0:
       node=self.createNode(name,type)
     else:

@@ -66,7 +66,7 @@ class ConfigSectionWatcher(object):
     self.configwatcher.poll()
 
   def __str__(self):
-    return "%s[%s]%s" % (self.cfgpath, self.section, repr(self))
+    return "%s[%s]%r" % (self.cfgpath, self.section, self)
 
   def __repr__(self):
     d = {}

@@ -85,7 +85,7 @@ class FuseStore(Fuse):
     yield Direntry('.')
     yield Direntry('..')
     for e in os.listdir(self.__abs(path)):
-      self.__OUT("readdir yield %s" % repr(e))
+      self.__OUT("readdir yield %r" % (e,))
       yield Direntry(e)
   def unlink(self, path):
     self.__OUT("unlink", path)

@@ -420,7 +420,7 @@ class Node(dict):
     if k is None:
       raise KeyError, repr(item)
     assert not plural and k not in ('NAME', 'TYPE'), \
-           "forbidden index %s" % (repr(item),)
+           "forbidden index: %r" % (item,)
     values = self.get(k)
     if len(values):
       # discard old values (removes reverse map)
@@ -739,7 +739,7 @@ class NodeDB(dict):
     except KeyError:
       if doCreate:
         if default is not None:
-          raise ValueError, "doCreate is True but default is %s" % (repr(default),)
+          raise ValueError, "doCreate is True but default is %r" % (default,)
         return self.newNode(item)
       return default
 
@@ -765,12 +765,12 @@ class NodeDB(dict):
     except ValueError, e:
       raise KeyError, "can't get key %s: %s" % (item, e)
     N = dict.__getitem__(self, key)
-    assert isinstance(N, Node), "__getitem(%s) got non-Node: %s" % (item, repr(N))
+    assert isinstance(N, Node), "__getitem(%s) got non-Node: %r" % (item, N)
     return N
 
   def __setitem__(self, item, N):
-    assert isinstance(N, Node), "tried to store non-Node: %s" % (repr(N),)
-    assert N.nodedb is self, "tried to store foreign Node: %s" % (repr(N),)
+    assert isinstance(N, Node), "tried to store non-Node: %r" % (N,)
+    assert N.nodedb is self, "tried to store foreign Node: %r" % (N,)
     key = nodekey(item)
     assert key == (N.type, N.name), \
            "tried to store Node(%s:%s) as key (%s:%s)" \

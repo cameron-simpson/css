@@ -407,7 +407,7 @@ class DirectKeyedTableView:
     if type(key) is not tuple:
       key=(key,)
     if type(key[0]) is tuple:
-      raise IndexError, "key is tuple of tuple: %s" % repr(key)
+      raise IndexError, "key is tuple of tuple: %r" % (key,)
     return " AND ".join(self.__allColumns[i]+' = '+sqlise(key[i]) for i in range(len(key)))
 
   def rowWhere(self,row):
