@@ -1,5 +1,0 @@
-#!/bin/sh
-set -ue
-[ $# -gt 0 ] || { echo "$0: missing url" >&2; echo "Usage: $0 url [pilfer-url-actions...]" >&2; exit 2; }
-url=$1; shift
-exec gpu "$url" isimage ${1+"$@"}
