@@ -348,14 +348,14 @@ class Pfx(object):
     if exc_value is not None:
       if _prefix.raise_needs_prefix:
         prefix = self.mark
-        ##debug("Pfx.__exit__: exc_value = %s .[%s] %s, PREFIX = %s", `exc_value`, sorted(dir(exc_value)), ", ".join([ "%s = %s" % (a, `getattr(exc_value, a)`) for a in sorted(dir(exc_value)) ]), prefix)
+        ##debug("Pfx.__exit__: exc_value = %r .[%s] %s, PREFIX = %s", exc_value, sorted(dir(exc_value)), ", ".join([ "%s = %r" % (a, `getattr(exc_value, a)`) for a in sorted(dir(exc_value)) ]), prefix)
         if hasattr(exc_value, 'message'):
           exc_value.message = prefix + ": " + exc_value.message
         if hasattr(exc_value, 'reason'):
           if isinstance(exc_value.reason, StringTypes):
             exc_value.reason = prefix + ": " + exc_value.reason
           else:
-            warning("Pfx.__exit__: exc_value.reason is not a string: %s", `exc_value.reason`)
+            warning("Pfx.__exit__: exc_value.reason is not a string: %r", exc_value.reason)
         if hasattr(exc_value, 'msg'):
           exc_value.msg = prefix + ": " + exc_value.msg
         if hasattr(exc_value, 'args'):
@@ -372,8 +372,8 @@ class Pfx(object):
           exc_value.args = args
         else:
           # we can't modify this - at least report the current prefix state
-          sys.stderr.write("%s: Pfx.__exit__: exc_value = %s %s\n" \
-                           % (prefix, repr(exc_value), dir(exc_value)))
+          sys.stderr.write("%s: Pfx.__exit__: exc_value = %r %s\n" \
+                           % (prefix, exc_value, dir(exc_value)))
           sys.stderr.flush()
         # prevent outer Pfx wrappers from hacking stuff as well
         _prefix.raise_needs_prefix = False

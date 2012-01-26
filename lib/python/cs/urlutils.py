@@ -61,7 +61,7 @@ class _URL(unicode):
         hdrs['Referer'] = self.referer
       hdrs['User-Agent'] = self.user_agent if self.user_agent else 'css'
       rq = Request(self, None, hdrs)
-      debug("urlopen(%s[%s])", self, hdrs)
+      debug("urlopen(%s[%r])", self, hdrs)
       rsp = urlopen(rq)
       H = rsp.info()
       self._content_type = H.gettype()
@@ -237,7 +237,7 @@ class _URL(unicode):
       try:
         href = A['href']
       except KeyError:
-        debug("no href, skip %s", A)
+        debug("no href, skip %r", A)
         continue
       yield URL( (urljoin(self.baseurl, href) if absolute else href), self )
 
@@ -253,7 +253,7 @@ class _URL(unicode):
       try:
         src = A['src']
       except KeyError:
-        debug("no src, skip %s", A)
+        debug("no src, skip %r", A)
         continue
       yield URL( (urljoin(self.baseurl, src) if absolute else src), self )
 
@@ -271,7 +271,7 @@ def skip_errs(iterable):
     except (URLError, HTTPError), e:
       warning("%s", e)
     else:
-      debug("skip_errs: yield %s", `i`)
+      debug("skip_errs: yield %r", i)
       yield i
 
 def can_skip_urlerrs(func):
