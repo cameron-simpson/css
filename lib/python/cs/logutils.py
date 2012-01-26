@@ -375,6 +375,7 @@ class Pfx(object):
           sys.stderr.write("%s: Pfx.__exit__: exc_value = %r %s\n" \
                            % (prefix, exc_value, dir(exc_value)))
           sys.stderr.flush()
+          error("%s: %s", prefix, exc_value)
         # prevent outer Pfx wrappers from hacking stuff as well
         _prefix.raise_needs_prefix = False
     _prefix.pop()
