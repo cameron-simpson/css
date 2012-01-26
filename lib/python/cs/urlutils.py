@@ -9,6 +9,7 @@ import os.path
 import sys
 from itertools import chain
 from BeautifulSoup import BeautifulSoup, Tag, BeautifulStoneSoup
+import socket
 from urllib2 import urlopen, Request, HTTPError, URLError
 from urlparse import urlparse, urljoin
 from HTMLParser import HTMLParseError
@@ -73,7 +74,7 @@ class _URL(unicode):
     '''
     try:
       content = self.content
-    except (HTTPError, URLError), e:
+    except (HTTPError, URLError, socket.error), e:
       error("%s.get_content: %s", self, e)
       content = onerror
     self._content = content
