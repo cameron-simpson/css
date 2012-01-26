@@ -227,7 +227,10 @@ class _URL(unicode):
     Ts = self.findAll('title')
     if not Ts:
       return ""
-    return Ts[0].string
+    s = Ts[0].string
+    if s is None:
+      return ""
+    return s
 
   def hrefs(self, absolute=False):
     ''' All 'href=' values from the content HTML 'A' tags.
@@ -285,6 +288,9 @@ def can_skip_urlerrs(func):
     return func(self, *args, mode=mode, **kwargs)
   return wrapped
 
+def usemode(func):
+  def wrapped(self, *args, **kwargs):
+
 class URLs(object):
 
   MODE_RAISE = 0
@@ -324,15 +330,37 @@ class URLs(object):
       self.urls = list(self.urls)
     return self
 
+  @can_skip_url_errs
+  def map(self, func, mode=None):
+    if mode
+    return URLS( [ func(url) for url in self.urls ],
+                 self.context,
+                 mode
+               )
+
   @can_skip_urlerrs
   def hrefs(self, absolute=True, mode=None):
+    if mode is None:
+      mde = self.mode
     return URLs( chain( *[ pfx_iter( url,
                                      URL(url, None).hrefs(absolute=absolute)
                                    )
                            for url in self.urls
                          ]),
                  self.context,
-                 self.mode)
+                 mode)
+
+  @can_skip_urlerrs
+  def srcs(self, absolute=True, mode=None):
+    if mode is None:
+      mde = self.mode
+    return URLs( chain( *[ pfx_iter( url,
+                                     URL(url, None).srcs(absolute=absolute)
+                                   )
+                           for url in self.urls
+                         ]),
+                 self.context,
+                 mode)
 
 if __name__ == '__main__':
   import cs.logutils
