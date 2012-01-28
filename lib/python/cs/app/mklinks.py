@@ -8,14 +8,17 @@
 import sys
 import os
 import os.path
-from stat import S_ISREG
 import filecmp
+from stat import S_ISREG
+from collections import namedtuple
+import filecmp
+from tempfile import NamedTemporaryFile
 if sys.hexversion >= 0x02050000:
   from hashlib import md5 as hashobj
 else:
   from md5 import md5
   def hashobj(): return md5.new()
-from cs.logutils import setup_logging, error, warn, info, debug
+from cs.logutils import setup_logging, Pfx, error, warn, info, debug
 
 # amount of file to read and checksum before trying whole file compare
 HASH_PREFIX_SIZE = 8192
@@ -31,8 +34,11 @@ def main(argv, stdin=None):
   if not argv:
     argv = ['-']
 
-  for names in argv:
-    if name == '-':
+  xit = 0
+
+  FDB = FileInfoDB()
+  for arg in argv:
+    if arg == '-':
       if not hasattr(stdin, 'isatty') or not stdin.isatty():
         error("refusing to read filenames from a terminal")
         return 1
@@ -43,242 +49,212 @@ def main(argv, stdin=None):
           error("stdin:%d: unexpected EOF", lineno)
           return 1
         path = line[:-1]
-        l
+        xit |= process(path, FDB)
+    else:
+      xit |= process(arg, FDB)
+  return xit
+
+def process(path, FDB):
+  info("process %s" % (path,))
+  xit = 0
+  with Pfx("process(%s)" % (path,)):
+    if os.path.isdir(path):
+      for dirpath, dirnames, filenames in os.walk(path):
+        for filename in sorted(filenames):
+          xit |= process(os.path.join(dirpath, filename), FDB)
+        dirnames[:] = sorted(dirnames)
+    else:
+      fi = FDB[path]
+      if fi is None:
+        xit = 1
+      else:
+        if fi.isfile:
+          fi.resolve(doit=False)
+        else:
+          info("skip, not a regular file")
+  return xit
+
+IKey = namedtuple('IKey', 'ino dev')
+
+class FileInfoDB(dict):
+
+  def __init__(self):
+    dict.__init__(self)
+    # set of FileInfos with a given ikey
+    self._fis_by_ikey = {}
+    # set of primary FileInfos of a given size
+    self._primes_by_size = {}
+    # primary FileInfo by ikey
+    # either the primary FileInfo for that ikey,
+    # or the FileInfo to which this ikey should be hardlinked
+    self._prime_by_ikey = {}
+
+  def __getitem__(self, path):
+    if path in self:
+      fi = dict.__getitem__(self, path)
+    else:
+      fi = FileInfo(path, self)
+      try:
+        fi.lstat
+      except OSError, e:
+        error("%s: %s" % (path, e))
+        return None
+      self.learn(fi)
+    return fi
+
+  def learn(self, fi):
+    dict.__setitem__(self, fi.path, fi)
+    ikey = fi.ikey
+    _by_ikey = self._fis_by_ikey
+    if ikey not in _by_ikey:
+      _by_ikey[ikey] = set((fi,))
+    else:
+      _by_ikey[ikey].add(fi)
+
+  def relearn(self, fi):
+    oikey = fi.ikey
+    osize = fi.size
+    assert oikey not in self._prime_by_ikey
+    assert ( osize not in self._primes_by_size
+          or fi not in self._primes_by_size[osize]
+           )
+    dict.__delitem__(self, path)
+    self._fis_by_ikey[ikey].remove(fi)
+    fi.reset()
+    self.learn(fi)
+    assert fi.size == oszie
+
+  def __setitem__(self, k, v):
+    raise NotImplementedError, "populated by __getitem__"
+
+  def __delitem__(self, k, v):
+    raise NotImplementedError, "populated by __getitem__"
+
+  def find_primary(self, fi):
+    ''' Locate the primary for `fi`.
+        If there is a designated primary for `fi.ikey`, return it.
+	If not, look for an identical file. If found, designate it
+	as the primary for that ikey and return it. Otherwise
+	designate `fi` as the primary and return it.
+    '''
+    ikey = fi.ikey
+    try:
+      return self._prime_by_ikey[ikey]
+    except KeyError:
+      pass
+    prime = None
+    samesize = self._primes_by_size.setdefault(fi.size, [])
+    for other in samesize:
+      oikey = other.ikey
+      assert oikey != ikey
+      if ikey.dev != oikey.dev:
+        # on another device - can't hardlink - skip it
+        continue
+      if fi == other:
+        prime = other
+        break
+    if not prime:
+      prime = fi
+    self._prime_by_ikey[ikey] = fi
+    return prime
 
 class FileInfo(object):
 
-  def __init__(self, path):
+  def __init__(self, path, db):
     self.path = path
-    self._inode = None
-  
-  def __getattr__(self, attr):
-    if attr == 'pfx_csum':
-      with open(self.path, "rb") as fp:
-        csum = md5(fp.read(HASH_PREFIX_SIZE)).digest()
-      self.pfx_csum = csum
-      return csum
-    if attr == '_lstat':
-      S = os.lstat(self.path)
-      self._lstat = S
-      return S
-    if attr == 'size':
-      if not S_ISREG(self._lstat):
-        size = None
-      else:
-        size = self._lstat.st_size
-      self.size = size
-      return size
-    raise AttributeError("'%s' object has no attribute '%s'" % (self.__class__.__name__, attr))
+    self.db = db
+    self.reset()
+
+  def reset(self):
+    self._lstat = None
+    self._prefix_hash = None
+
+  def __hash__(self):
+    return id(self)
 
   def __eq__(self, other):
-    if 
+    ''' Compare this FileInfo with another file for equality of file contents.
+    '''
+    if isinstance(other, StringTypes):
+      other = self.db[other]
+    if self.samefile(other):
+      return True
+    if self.size != other.size:
+      return False
+    if self.prefix_hash != other.prefix_hash:
+      return False
+    return filecmp.cmp(self.path, other.path)
 
-sizeinfo={}
-identinfo={}
-pathinfo={}
+  def samefile(self, other):
+    if isinstance(other, StringTypes):
+      other = self.db[other]
+    return self is other or self.ikey == other.ikey
 
-noAction=False
+  @property
+  def lstat(self):
+    _lstat = self._lstat
+    if _lstat is None:
+      _lstat = os.lstat(self.path)
+      self._lstat = _lstat
+    return _lstat
 
-def st_ident(st):
-  return str(st[stat.ST_DEV])+":"+str(st[stat.ST_INO])
+  @property
+  def isfile(self):
+    return S_ISREG(self.lstat.st_mode)
 
-class FileInfo:
-  def __init__(self,path,st):
-    self.path=path
-    self.paths=[]
-    self.ident=st_ident(st)
-    self.size=st[stat.ST_SIZE]
-    self.mtime=st[stat.ST_MTIME]
-    self.digestpfx=None
-    self.addpath(path)
-    debug("new FileInfo ident=%s, size=%s : %s", self.ident,self.size,path)
+  @property 
+  def ikey(self):
+    S = self.lstat
+    return IKey(S.st_ino, S.st_dev)
 
-  def addpath(self,path):
-    self.paths.append(path)
-    pathinfo[path]=self
+  @property
+  def size(self):
+    return self.lstat.st_size
 
-  def getdigestpfx(self):
-    if self.digestpfx is None:
-      self.digestpfx=digestpfx(self.path)
-    return self.digestpfx
+  @property
+  def prefix_hash(self):
+    _hash = self._prefix_hash
+    if _hash is None:
+      with open(self.path, "rb") as fp:
+        _hash = md5(fp.read(HASH_PREFIX_SIZE)).digest()
+      self._prefix_hash = _hash
+    return _hash
 
-  def subsume(self,other):
-    for path in other.paths:
-      other.paths.remove(path)
-      linkto(self.path,path)
+  @property
+  def primary(self):
+    ''' Return the primary file that matches this one, possibly self.
+        It will be:
+          - the primary of an other inode to which this should link
+          - the primary of this inode, possibly self
+    '''
+    return self.db.find_primary(self)
 
-    # discard mention of other
-    if other in sizeinfo[self.size]: sizeinfo[self.size].remove(other)
-    identinfo[other.ident]=self.path
-
-# fetch digest hash of first 8192 bytes of the file
-def digestpfx(path,size=8192):
-  ##info("digest %s", path)
-  fp=open(path)
-  H=hashobj()
-  H.update(fp.read(size))
-  fp.close()
-  return H.digest()
-
-def linkto(srcpath,dstpath):
-  info("%s => %s", srcpath, dstpath)
-  dstdir=os.path.dirname(dstpath)
-  global noAction
-  if not noAction:
-    tmpf=os.path.join(dstdir,tmpfilename(dstdir))
-    ##assert not os.path.lexists(tmpf) # not in python 2.3 :-)
-    try:
-      os.lstat(tmpf)
-    except OSError:
-      pass
-    else:
-      assert False, "%s: already exists!" % tmpf
-    os.link(srcpath,tmpf)
-    os.rename(tmpf,dstpath)
-  pathinfo[srcpath].addpath(dstpath)
-
-def do(path):
-  ''' Process each file in the directory tree.
-      If a file is known by dev:ino,
-        if another file is preferred,
-          replace with other file
-          add this path to other file list
-        else
-          add this path to this file list
-      else
-        if this is the first file of this size
-          stash it, but don't open it for prefix digest
-        else
-          o
-  '''
-  ##info("DO %s", path)
-  try:
-    st=os.lstat(path)
-  except os.OSerr, e:
-    warn("%s: %s", path, e)
-    return
-
-  if not stat.S_ISREG(st[stat.ST_MODE]):
-    return
-
-  ident=st_ident(st)
-  if ident in identinfo:
-    # known file
-    idinfo=identinfo[ident]
-    if type(idinfo) is str:
-      # known to be replaceable - replace
-      ##debug("know to replace %s by %s", path, idinfo)
-      linkto(idinfo,path)
-      return
-
-    # just note new path for this file
-    debug("note new instance of",idinfo.path,":",path)
-    idinfo.addpath(path)
-    return
-
-  # new file, note it
-  idinfo=identinfo[ident]=FileInfo(path,st)
-
-  size=st[stat.ST_SIZE]
-  if size not in sizeinfo:
-    # new size, nothing to compare to; save and return
-    debug("new size",size,"on file",path)
-    sizeinfo[size]=[idinfo]
-    return
-
-  # existing size - compare against files of same size
-  digest=idinfo.getdigestpfx()
-  for other in sizeinfo[size]:
-    ##warn("cmp", path, "vs", other.path)
-    if digest == other.getdigestpfx() and filecmp.cmp(path,other.path):
-      # same contents
-      # keep newest file
-      if idinfo.mtime >= other.mtime:
-        # we are newer (or as new)
-        # push us to the front of the comparison list
-        # discard the older file
-        sizeinfo[size].insert(0,idinfo)
-        idinfo.subsume(other)
+  def resolve(self, doit=False):
+    ''' Become one with our primary.
+        If we are our primary or our primary has the same inode, do nothing.
+        If another is our primary, hardlink and update maps.
+        If the hardlink fails, become our own primary.
+    '''
+    assert self.isfile
+    with Pfx("resolve(%s)" % (self.path,)):
+      prime = self.primary
+      if prime is self or prime.ikey == self.ikey:
         return
+      assert self.ikey.dev == prime.ikey.dev
+      rpath = os.path.realpath(self.path)
+      rdir = os.path.dirname(rpath)
+      info("%s => %s" % (rpath, prime.path))
+      if doit:
+        with NamedTemporaryFile(dir=rdir) as tfp:
+          with Pfx("unlink(%s)" % (tfp.name,)):
+            os.unlink(tfp.name)
+          with Pfx("rename(%s, %s)" % (rpath, tfp.name)):
+            os.rename(rpath, tfp.name)
+          with Pfx("link(%s, %s)" % (prime.path, rpath)):
+            os.link(prime.path, rpath)
+      self.db.relearn(self)
 
-      # we are older - keep newer file
-      ##debug("I am older, subsume %s", other.path)
-      other.subsume(idinfo)
-      return
-
-  # no other file matches - add this file to the size list
-  debug("no matches, size",size,"+",path)
-  sizeinfo[size].append(idinfo)
-
-def slotfile(size):
-  slot=0
-  while size > 0:
-    size/=16
-    slot+=1
-
-  global slotfiles
-  global slotpaths
-  while slot >= len(slotfiles):
-    slotfiles.append(None)
-    slotpaths.append(None)
-
-  ##print "slot =", slot, "len(slotfiles) =", len(slotfiles)
-  if slotfiles[slot] is None:
-    slotpaths[slot]=os.path.join(slotdir,str(slot))
-    slotfiles[slot]=file(slotpaths[slot],'w')
-
-  return slotfiles[slot]
-
-def scatter(path):
-  st=os.lstat(path)
-  if not stat.S_ISREG(st[stat.ST_MODE]):
-    return
-  f=slotfile(st[stat.ST_SIZE])
-  f.write(path)
-  f.write('\n')
-
-splitMode=False
-slotdir=None
-if sys.argv[1] == "--split":
-  splitMode=True
-  del sys.argv[1]
-  slotfiles=[]
-  slotpaths=[]
-  slotdir=tmpdirn()
-
-for path in sys.argv[1:]:
-  if path == "-":
-    for line in sys.stdin:
-      line=chomp(line)
-      if splitMode:
-        scatter(line)
-      else:
-        do(line)
-  else:
-    for dirpath, dirnames, filenames in os.walk(path):
-      info(dirpath)
-      filenames.sort()
-      for name in filenames:
-        subpath=os.path.join(dirpath,name)
-        if splitMode:
-          scatter(subpath)
-        else:
-          do(subpath)
-      dirnames.sort()
-
-if splitMode:
-  for slotfile in slotfiles:
-    if slotfile:
-      slotfile.close()
-
-  slotpaths.reverse()   # do big files first
-  for path in slotpaths:
-    if path:
-      info("mklinks - <%s", path)
-      os.system("exec <"+path+"; rm "+path+"; exec "+sys.argv[0]+" -")
-
-if slotdir:
-  os.rmdir(slotdir)
+# TODO: subsume: promote self to primary, eg if link limit hit
 
 if __name__ == '__main__':
   sys.exit(main(sys.argv))
