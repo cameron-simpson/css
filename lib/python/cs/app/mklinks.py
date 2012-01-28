@@ -239,6 +239,7 @@ class FileInfo(object):
     with Pfx("resolve(%s)" % (self.path,)):
       prime = self.primary
       if prime is self or prime.ikey == self.ikey:
+        info("primary => %s", prime.path)
         return
       assert self.ikey.dev == prime.ikey.dev
       rpath = os.path.realpath(self.path)
