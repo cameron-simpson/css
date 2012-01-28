@@ -286,7 +286,11 @@ class Pfx(object):
   ''' A context manager to maintain a per-thread stack of message prefices.
   '''
   def __init__(self, mark, absolute=False, loggers=None):
-    self._mark = unicode(mark)
+    try:
+      self._mark = unicode(mark, 'utf-8', 'error')
+    except UnicodeDecodeError, e:
+      warning("%s: mark = %s %r", e, type(mark), mark)
+      self._mark = unicode(mark, 'utf-8', 'replace')
     self.absolute = absolute
     if loggers is not None:
       if not hasattr(loggers, '__getitem__'):
