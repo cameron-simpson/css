@@ -13,11 +13,11 @@ from stat import S_ISREG
 from collections import namedtuple
 import filecmp
 from tempfile import NamedTemporaryFile
+from types import StringTypes
 if sys.hexversion >= 0x02050000:
-  from hashlib import md5 as hashobj
+  from hashlib import md5
 else:
   from md5 import md5
-  def hashobj(): return md5.new()
 from cs.logutils import setup_logging, Pfx, error, warn, info, debug
 
 # amount of file to read and checksum before trying whole file compare
@@ -30,6 +30,12 @@ def main(argv, stdin=None):
 
   cmd = os.path.basename(argv.pop(0))
   setup_logging(cmd)
+
+  doit = True
+
+  if argv and argv[0] == '-n':
+    doit = False
+    argv.pop(0)
 
   if not argv:
     argv = ['-']
@@ -49,19 +55,18 @@ def main(argv, stdin=None):
           error("stdin:%d: unexpected EOF", lineno)
           return 1
         path = line[:-1]
-        xit |= process(path, FDB)
+        xit |= process(path, FDB, doit)
     else:
-      xit |= process(arg, FDB)
+      xit |= process(arg, FDB, doit)
   return xit
 
-def process(path, FDB):
-  info("process %s" % (path,))
+def process(path, FDB, doit):
   xit = 0
   with Pfx("process(%s)" % (path,)):
     if os.path.isdir(path):
       for dirpath, dirnames, filenames in os.walk(path):
         for filename in sorted(filenames):
-          xit |= process(os.path.join(dirpath, filename), FDB)
+          xit |= process(os.path.join(dirpath, filename), FDB, doit)
         dirnames[:] = sorted(dirnames)
     else:
       fi = FDB[path]
@@ -69,9 +74,10 @@ def process(path, FDB):
         xit = 1
       else:
         if fi.isfile:
-          fi.resolve(doit=False)
+          fi.resolve(doit=doit)
         else:
-          info("skip, not a regular file")
+          ##info("skip, not a regular file")
+          pass
   return xit
 
 IKey = namedtuple('IKey', 'ino dev')
@@ -114,15 +120,14 @@ class FileInfoDB(dict):
   def relearn(self, fi):
     oikey = fi.ikey
     osize = fi.size
-    assert oikey not in self._prime_by_ikey
-    assert ( osize not in self._primes_by_size
-          or fi not in self._primes_by_size[osize]
-           )
-    dict.__delitem__(self, path)
-    self._fis_by_ikey[ikey].remove(fi)
+    if oikey in self._prime_by_ikey:
+      del self._prime_by_ikey[oikey]
+    self._primes_by_size[osize].discard(fi)
+    dict.__delitem__(self, fi.path)
+    self._fis_by_ikey[oikey].remove(fi)
     fi.reset()
     self.learn(fi)
-    assert fi.size == oszie
+    assert fi.size == osize
 
   def __setitem__(self, k, v):
     raise NotImplementedError, "populated by __getitem__"
@@ -139,11 +144,13 @@ class FileInfoDB(dict):
     '''
     ikey = fi.ikey
     try:
-      return self._prime_by_ikey[ikey]
+      prime = self._prime_by_ikey[ikey]
+      ##info("prime[ikey=%r] = %s", ikey, prime.path)
+      return prime
     except KeyError:
       pass
     prime = None
-    samesize = self._primes_by_size.setdefault(fi.size, [])
+    samesize = self._primes_by_size.setdefault(fi.size, set())
     for other in samesize:
       oikey = other.ikey
       assert oikey != ikey
@@ -155,7 +162,8 @@ class FileInfoDB(dict):
         break
     if not prime:
       prime = fi
-    self._prime_by_ikey[ikey] = fi
+      self._primes_by_size[fi.size].add(fi)
+    self._prime_by_ikey[ikey] = prime
     return prime
 
 class FileInfo(object):
@@ -229,7 +237,7 @@ class FileInfo(object):
     '''
     return self.db.find_primary(self)
 
-  def resolve(self, doit=False):
+  def resolve(self, doit):
     ''' Become one with our primary.
         If we are our primary or our primary has the same inode, do nothing.
         If another is our primary, hardlink and update maps.
@@ -239,12 +247,11 @@ class FileInfo(object):
     with Pfx("resolve(%s)" % (self.path,)):
       prime = self.primary
       if prime is self or prime.ikey == self.ikey:
-        info("primary => %s", prime.path)
         return
       assert self.ikey.dev == prime.ikey.dev
       rpath = os.path.realpath(self.path)
       rdir = os.path.dirname(rpath)
-      info("%s => %s" % (rpath, prime.path))
+      print("%s => %s" % (self.path, prime.path))
       if doit:
         with NamedTemporaryFile(dir=rdir) as tfp:
           with Pfx("unlink(%s)" % (tfp.name,)):
