@@ -329,7 +329,8 @@ class URLs(object):
 
   @can_skip_url_errs
   def map(self, func, mode=None):
-    if mode
+    if mode is None:
+      mode = self.mode
     return URLS( [ func(url) for url in self.urls ],
                  self.context,
                  mode
