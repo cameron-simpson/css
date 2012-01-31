@@ -1,0 +1,108 @@
+#!/bin/sh
+#
+# Patch an OS as specified.
+#       - Cameron Simpson <cs@zip.com.au> 31jan2012
+#
+
+set -ue
+
+trace=set-x
+ostype=
+
+cmd=`basename "$0"`
+usage="Usage: $cmd [--type=ostype] {/path/to/root|/path/to/idisc.img[#n]} cfg..."
+case $0 in
+  /*)   self=$0 ;;
+  *)    self=`pwd`/$0 ;;
+esac
+
+badopts=
+
+while [ $# -gt 0 ]
+do
+  case $1 in
+    --type)
+      ostype=$2; shift
+      ;;
+    --type=*)
+      ostype=`expr "x$1" : 'x--type=\(.*\)'`
+      ;;
+    --) shift; break ;;
+    -?*)echo "$cmd: unrecognised option: $1" >&2
+        badopts=1
+        ;;
+  esac
+  shift
+done
+
+if [ $# = 0 ]
+then
+  echo "$cmd: missing root specification" >&2
+  badopts=1
+else
+  root=$1
+  shift
+  case $root in
+    /*.img )
+      img=$1 part=1
+      exec $trace with-vm-img-partition --rw --cd "$img" "$part" "$self" . ${1+"$@"}
+      ;;
+    /*.img#[1-9])
+      part=`expr "x$root" : 'x.*#\([1-9]\)'`
+      img=`expr "x$root" : 'x\(.*\)#[1-9]'`
+      exec $trace with-vm-img-partition --rw --cd "$img" "$part" "$self" . ${1+"$@"}
+      ;;
+    *)if [ ! -d "$root" ]
+      then
+        echo "$cmd: root: not a directory: $root" >&2
+        badopts=1
+      fi
+      ;;
+  esac
+fi
+
+if [ $# = 0 ]
+then
+  echo "$cmd: missing cfgs" >&2
+  badopts=1
+fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+xit=0
+
+for cfg
+do
+  case "$cfg" in
+    eth[0-9]:*)
+      ifname=`expr "x$cfg" : 'x\(eth[0-9]\):.*'`
+      ifparams=`expr "x$cfg" : 'xeth[0-9]:\(.*\)'`
+      ifcfg=etc/sysconfig/network-scripts/ifcfg-$ifname
+      if [ ! -f "$ifcfg" ]
+      then
+        echo "$cmd: $cfg: missing config file: $ifcfg" >&2
+        xit=1
+      else
+        for ifparam in `printf '%s\n' "$ifparams" | tr , ' '`
+        do
+          case "$ifparam" in
+            [A-Z]*=*)
+              printf '%s\n' "$ifparam" \
+              | pfx "$ifname:$ifparam" $trace patch-config -# -/= -O "$ifcfg" || xit=1
+              ;;
+            *)echo "$cmd: $cfg: unsupported param: $ifparam" >&2
+              xit=1
+              ;;
+          esac
+        done
+        $trace cat "$ifcfg"
+      fi
+      ;;
+    *)
+      echo "$cmd: unsupported cfg: $cfg" >&2
+      xit=1
+      ;;
+  esac
+done
+
+exit $xit
