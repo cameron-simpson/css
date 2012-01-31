@@ -228,11 +228,7 @@ class _URL(unicode):
   def xmlFindall(self, match):
     ''' Convenience routine to call ElementTree.XML's .findall() method.
     '''
-    print >>sys.stderr, "xmlFindAll(match=%r)\n" % (match,)
-    print >>sys.stderr, "xmlFindAll: xml=%r\n" % (self.xml,)
-    print >>sys.stderr, "xmlFindAll: xml=%s\n" % (self.xml,)
     for found in self.xml.findall(match):
-      print >>sys.stderr, "xmlFindAll: found=%r\n" % (found,)
       yield ElementTree.tostring(found, encoding='utf-8')
 
   @property
