@@ -13,6 +13,10 @@ import socket
 from urllib2 import urlopen, Request, HTTPError, URLError
 from urlparse import urlparse, urljoin
 from HTMLParser import HTMLParseError
+try:
+  import xml.etree.cElementTree as ElementTree
+except ImportError:
+  import xml.etree.ElementTree as ElementTree
 from cs.logutils import Pfx, pfx_iter, debug, error, warning, exception
 
 def URL(U, referer, user_agent=None):
@@ -45,11 +49,13 @@ class _URL(unicode):
   def flush(self):
     ''' Forget all cached content.
     '''
-    # Note: _content is the raw bytes returns from the URL read()
-    #       _parsed is a BeautifulSoup parse of the _contet decoded as utf-8.
+    # Note: _content is the raw bytes returns from the URL read().
+    #       _parsed is a BeautifulSoup parse of the _content decoded as utf-8.
+    #       _xml is an Elementtree parse of the _content decoded as utf-8.
     self._content = None
     self._content_type = None
     self._parsed = None
+    self._xml = None
 
   def _fetch(self):
     ''' Fetch the URL content.
@@ -60,8 +66,9 @@ class _URL(unicode):
         debug("referer = %s", self.referer)
         hdrs['Referer'] = self.referer
       hdrs['User-Agent'] = self.user_agent if self.user_agent else 'css'
-      rq = Request(self, None, hdrs)
-      debug("urlopen(%s[%r])", self, hdrs)
+      url = 'file://'+self if self.startswith('/') else self
+      rq = Request(url, None, hdrs)
+      debug("urlopen(%s[%r])", url, hdrs)
       rsp = urlopen(rq)
       H = rsp.info()
       self._content_type = H.gettype()
@@ -120,6 +127,13 @@ class _URL(unicode):
           bs.write(self.content)
         self._parsed = None
     return self._parsed
+
+  @property
+  def xml(self):
+    if self._xml is None:
+      content = self.content
+      self._xml = ElementTree.XML(content.decode('utf-8', 'replace'))
+    return self._xml
 
   @property
   def parts(self):
@@ -210,6 +224,13 @@ class _URL(unicode):
       return ()
     return parsed.findAll(*a, **kw)
 
+  def xmlFindAll(self, match):
+    ''' Convenience routine to call ElementTree.XML's .findAll() method.
+    '''
+    print >>sys.stderr, "xmlFindAll(match=%r)\n" % (match,)
+    print >>sys.stderr, "xmlFindAll: xml=%r\n" % (self.xml,)
+    return self.xml.findAll(match)
+
   @property
   def baseurl(self):
     for B in self.findAll('base'):
@@ -277,7 +298,7 @@ def skip_errs(iterable):
       debug("skip_errs: yield %r", i)
       yield i
 
-def can_skip_urlerrs(func):
+def can_skip_url_errs(func):
   def wrapped(self, *args, **kwargs):
     mode = kwargs.pop('mode', self.mode)
     if mode == URLs.MODE_SKIP:
@@ -334,7 +355,7 @@ class URLs(object):
                  mode
                )
 
-  @can_skip_urlerrs
+  @can_skip_url_errs
   def hrefs(self, absolute=True, mode=None):
     return URLs( chain( *[ pfx_iter( url,
                                      URL(url, None).hrefs(absolute=absolute)
@@ -344,7 +365,7 @@ class URLs(object):
                  self.context,
                  mode)
 
-  @can_skip_urlerrs
+  @can_skip_url_errs
   def srcs(self, absolute=True, mode=None):
     return URLs( chain( *[ pfx_iter( url,
                                      URL(url, None).srcs(absolute=absolute)
