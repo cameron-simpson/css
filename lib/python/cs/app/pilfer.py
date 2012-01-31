@@ -617,6 +617,7 @@ class Pilfer(object):
         'title':        url_print_title,
         'type':         lambda P, U: url_io(P.url_print_type, "", U),
         'unseen':       url_unseen,
+        'xml':          lambda P, U, *a: (url_io(URL(U, None).xmlFindAll, (), *a),)
       }
 
 if __name__ == '__main__':
