@@ -50,7 +50,8 @@ _help:
         @echo '_freshmeat         - announce current release to freshmeat'
 
 _test:
-        ./bin-cs/selftest --python lib/python cs
+        find lib/python -type f -name '*.py[co]' -exec rm {} \;
+        ./bin-cs/selftest -v --python lib/python cs
 
 _home:
         skip=`hg status | sed -n 's:^? \(.*\):--exclude=/\1:p'` \

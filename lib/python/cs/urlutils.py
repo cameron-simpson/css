@@ -329,8 +329,6 @@ class URLs(object):
 
   @can_skip_url_errs
   def map(self, func, mode=None):
-    if mode is None:
-      mode = self.mode
     return URLS( [ func(url) for url in self.urls ],
                  self.context,
                  mode
@@ -338,8 +336,6 @@ class URLs(object):
 
   @can_skip_urlerrs
   def hrefs(self, absolute=True, mode=None):
-    if mode is None:
-      mde = self.mode
     return URLs( chain( *[ pfx_iter( url,
                                      URL(url, None).hrefs(absolute=absolute)
                                    )
@@ -350,8 +346,6 @@ class URLs(object):
 
   @can_skip_urlerrs
   def srcs(self, absolute=True, mode=None):
-    if mode is None:
-      mde = self.mode
     return URLs( chain( *[ pfx_iter( url,
                                      URL(url, None).srcs(absolute=absolute)
                                    )

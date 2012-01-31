@@ -14,6 +14,7 @@ main()
 
   trace=${DEBUG:+set-x}
   vecho=:
+  vvecho=:
   ##[ -t 1 ] && vecho=echo
 
   badopts=
@@ -25,6 +26,10 @@ main()
         trace=set-x ;;
       -v)
         vecho=echo ;;
+      -vv)
+        vecho=echo
+        vvecho=echo
+        ;;
       --python)
         pylibdir=$2
         pysubdir=$3
@@ -65,7 +70,7 @@ test_python()
       do 
         pyc_state=state/pyc/$py
         if [ "$pyc_state" -nt "$py" ]
-        then  $vecho "SKIP syntax $py - newer $pyc_state"
+        then  $vvecho "SKIP syntax $py - newer $pyc_state"
         else
           rm -f -- "$pyc_state"
           if $trace pfx "$py" env-dev python -3 -tt -m py_compile "$py"
@@ -88,7 +93,7 @@ test_python()
         [ -n "$unitest" ] || continue 
         pyu_state=state/pyu/$py
         if [ "$pyu_state" -nt "$py" ]
-        then  $vecho "SKIP unittest $py - newer $pyu_state"
+        then  $vvecho "SKIP unittest $py - newer $pyu_state"
         else
           d=`dirname "$pyu_state"`; [ -d "$d" ] || mkdir -p "$d"
           >>"$pyu_state"
