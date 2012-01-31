@@ -17,6 +17,10 @@ from string import Formatter
 from time import sleep
 from urllib import quote, unquote
 from urllib2 import HTTPError, URLError
+try:
+  from xml.etree.cElementTree import XML
+except ImportError:
+  from xml.etree.ElementTree import XML
 from cs.logutils import setup_logging, logTo, Pfx, debug, error, warning, exception, pfx_iter
 from cs.urlutils import URL
 
@@ -138,6 +142,10 @@ def url_hrefs(U, referrer=None):
 
 def url_srcs(U, referrer=None):
   return url_io_iter(URL(U, referrer).srcs(absolute=True))
+
+def url_xml_find(U, match):
+  for found in url_io(URL(U, None).xmlFindall, (), match):
+    yield found
 
 def unique(items, seen=None):
   ''' A generator that yields unseen items, as opposed to just
@@ -617,8 +625,12 @@ class Pilfer(object):
         'title':        url_print_title,
         'type':         lambda P, U: url_io(P.url_print_type, "", U),
         'unseen':       url_unseen,
-        'xml':          lambda P, U, *a: (url_io(URL(U, None).xmlFindAll, (), *a),)
+        'xml':          lambda P, U, match: url_xml_find(U, match),
+        'xmlattr':      lambda P, U, attr: [ A for A in (XML(U).get(attr),) if A is not None ],
+        'xmltext':      lambda P, U, match: XML(U).findall(match),
       }
+
+
 
 if __name__ == '__main__':
   import sys
