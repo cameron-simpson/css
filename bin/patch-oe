@@ -31,6 +31,7 @@ do
     -?*)echo "$cmd: unrecognised option: $1" >&2
         badopts=1
         ;;
+    *)  break ;;
   esac
   shift
 done
