@@ -450,7 +450,7 @@ class MacroTerm(object):
   __repr__ = __str__
 
   def eval(self, namespaces, params=[]):
-    with Pfx(self.context):
+    with Pfx(str(self.context)):
       text = self.text
       modifiers = self.modifiers
 
