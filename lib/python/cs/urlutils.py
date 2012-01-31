@@ -9,6 +9,7 @@ import os.path
 import sys
 from itertools import chain
 from BeautifulSoup import BeautifulSoup, Tag, BeautifulStoneSoup
+from StringIO import StringIO
 import socket
 from urllib2 import urlopen, Request, HTTPError, URLError
 from urlparse import urlparse, urljoin
@@ -224,12 +225,15 @@ class _URL(unicode):
       return ()
     return parsed.findAll(*a, **kw)
 
-  def xmlFindAll(self, match):
-    ''' Convenience routine to call ElementTree.XML's .findAll() method.
+  def xmlFindall(self, match):
+    ''' Convenience routine to call ElementTree.XML's .findall() method.
     '''
     print >>sys.stderr, "xmlFindAll(match=%r)\n" % (match,)
     print >>sys.stderr, "xmlFindAll: xml=%r\n" % (self.xml,)
-    return self.xml.findAll(match)
+    print >>sys.stderr, "xmlFindAll: xml=%s\n" % (self.xml,)
+    for found in self.xml.findall(match):
+      print >>sys.stderr, "xmlFindAll: found=%r\n" % (found,)
+      yield ElementTree.tostring(found, encoding='utf-8')
 
   @property
   def baseurl(self):
