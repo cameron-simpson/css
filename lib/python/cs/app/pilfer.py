@@ -18,9 +18,9 @@ from time import sleep
 from urllib import quote, unquote
 from urllib2 import HTTPError, URLError
 try:
-  from xml.etree.cElementTree import XML
+  import xml.etree.cElementTree as ElementTree
 except ImportError:
-  from xml.etree.ElementTree import XML
+  import xml.etree.ElementTree as ElementTree
 from cs.logutils import setup_logging, logTo, Pfx, debug, error, warning, exception, pfx_iter
 from cs.urlutils import URL
 
@@ -145,7 +145,7 @@ def url_srcs(U, referrer=None):
 
 def url_xml_find(U, match):
   for found in url_io(URL(U, None).xmlFindall, (), match):
-    yield found
+    yield ElementTree.tostring(found, encoding='utf-8')
 
 def unique(items, seen=None):
   ''' A generator that yields unseen items, as opposed to just
@@ -591,7 +591,8 @@ class Pilfer(object):
       url_func = self.action_map.get(action)
       if url_func is None:
         raise ValueError("unknown action")
-      return url_io(url_func, (), self, U, *( arg_string.split(',') if len(arg_string) else () ))
+        L = url_io(url_func, (), self, U, *( arg_string.split(',') if len(arg_string) else () ))
+      return L
 
   # actions that work on the whole list of in-play URLs
   action_map_all = {
@@ -626,7 +627,7 @@ class Pilfer(object):
         'type':         lambda P, U: url_io(P.url_print_type, "", U),
         'unseen':       url_unseen,
         'xml':          lambda P, U, match: url_xml_find(U, match),
-        'xmlattr':      lambda P, U, attr: [ A for A in (XML(U).get(attr),) if A is not None ],
+        'xmlattr':      lambda P, U, attr: [ A for A in (ElementTree.XML(U).get(attr),) if A is not None ],
         'xmltext':      lambda P, U, match: XML(U).findall(match),
       }
 
