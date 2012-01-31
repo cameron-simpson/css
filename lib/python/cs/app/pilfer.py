@@ -4,7 +4,7 @@
 #       - Cameron Simpson <cs@zip.com.au> 07jul2010
 #
 
-from __future__ import with_statement
+from __future__ import with_statement, print_function
 import sys
 import os
 import errno
@@ -96,7 +96,7 @@ def main(argv):
           urls = P.act(urls, argv)
           if not quiet:
             for url in urls:
-              print url
+              P.print(url)
       else:
         error("unsupported op")
         badopts = True
@@ -164,10 +164,22 @@ class Pilfer(object):
 
   def __init__(self):
     self.flush_print = False
+    self._print_to = None
     self.save_dir = None
     self.user_agent = None
     self.user_vars = {}
     self._urlsfile = None
+
+  def print(self, *a, **kw):
+    print_to = kw.get('file', None)
+    if print_to is None:
+      print_to = self._print_to
+      if print_to is None:
+        print_to = sys.stdout
+    kw['file'] = print_to
+    print(*a, **kw)
+    if self.flush_print:
+      print_to.flush()
 
   def act(self, urls, actions):
     ''' Return an iterable of the results of the actions applied to the URLs.
@@ -527,9 +539,7 @@ class Pilfer(object):
   def url_print(self, U, *args):
     if not args:
       args = (U,)
-    print ",".join( self.format_string(arg, U) for arg in args )
-    if self.flush_print:
-      sys.stdout.flush()
+    self.print(",".join( self.format_string(arg, U) for arg in args ))
     yield U
 
   def url_query(self, U, *a):
@@ -540,9 +550,7 @@ class Pilfer(object):
     yield ','.join( [ unquote(qsmap.get(qparam, '')) for qparam in a ] )
 
   def url_print_type(self, U):
-    print U, U.content_type
-    if self.flush_print:
-      sys.stdout.flush()
+    self.print(U, U.content_type)
     yield U
 
   def select_by_re(self, U, regexp):
@@ -556,9 +564,7 @@ class Pilfer(object):
       yield U
 
   def url_print_title(self, U):
-    print U.title
-    if self.flush_print:
-      sys.stdout.flush()
+    self.print(U.title)
     yield U
 
   def url_action_all(self, action, urls):
