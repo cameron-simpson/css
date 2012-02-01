@@ -1,0 +1,45 @@
+#!/bin/sh -ue
+#
+# 
+
+set -ue
+
+cmd=`basename "$0"`
+usage="Usage: $cmd -S secret"
+
+unset secret
+
+badopts=
+
+while [ $# -gt 0 ]
+do
+  case "$1" in
+    -S) secret=$2; shift ;;
+    --) shift; break ;;
+    -?*)echo "$cmd: unrecognised option: $1" >&2; badopts=1 ;;
+    *)  break ;;
+  esac
+  shift
+done
+
+if [ $# -gt 0 ]
+then
+  echo "$cmd: extra arguments: $*" >&2
+  badopts=1
+fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+unset secretLOGIN secretPASSWORD secretSOCKET
+secret_eval=`secret "$secret"` || exit 1
+eval "$secret_eval"
+
+echo 'select User, Host from user' \
+| mysql -N -S "$secretSOCKET" "-u$secretLOGIN" "-p$secretPASSWORD" mysql \
+| while read u h
+  do  [ -z "$u" ] && continue
+      [ -z "$h" ] && continue
+      echo "SHOW GRANTS FOR \`$u\`@\`$h\`;"
+  done \
+| mysql -N -S "$secretSOCKET" "-u$secretLOGIN" "-p$secretPASSWORD" \
+| sed 's/[^;]$/&;/'
