@@ -1,5 +1,7 @@
 #!/bin/sh -ue
 #
+# Dump MySQL GRANTs in SQL form for easy reuse in another database instance.
+#       - Cameron Simpson <cs@zip.com.au> 01feb2012
 # 
 
 set -ue
