@@ -38,6 +38,7 @@ eval "$secret_eval"
 
 echo 'select User, Host from user' \
 | mysql -N -S "$secretSOCKET" "-u$secretLOGIN" "-p$secretPASSWORD" mysql \
+| sort -u \
 | while read u h
   do  [ -z "$u" ] && continue
       [ -z "$h" ] && continue
