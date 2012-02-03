@@ -99,6 +99,8 @@ def bootvar(var):
       vendor='gentoo'
     elif os.path.isfile('/etc/debian_version'):
       vendor='debian'
+    elif os.path.isfile('/etc/system-release'):
+      vendor=open('/etc/system-release').read().split()[0]
     else:
       opsys=env("OS")
       if opsys == "darwin":
