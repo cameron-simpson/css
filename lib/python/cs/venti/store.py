@@ -34,7 +34,8 @@ class BasicStore(NestingOpenClose):
 
       A subclass should provide thread-safe implementations of the following
       methods:
-        __contains__(sel, hashcode) -> Boolean
+
+        __contains__(self, hashcode) -> Boolean
         __getitem__(self, hashcode) -> data
         add(self, data) -> hashcode
         sync(self)
@@ -48,6 +49,7 @@ class BasicStore(NestingOpenClose):
       are expected to be fetched; it relies on asssert statements.
 
       Subclasses are expected to implement:
+
         .add(block) -> hashcode
         .get(hashcode, [default=None]) -> block (or default)
         .contains(hashcode) -> boolean
