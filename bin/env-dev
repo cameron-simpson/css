@@ -1,6 +1,9 @@
 #!/bin/sh -ue
 #
 # Run command in development environment.
+# This means using the current directory as $prefix,
+# prefixing lots of $fooPATH vars with it approriately,
+# sourcing .env.sh if present, then running command.
 #       - Cameron Simpson <cs@zip.com.au> 25apr2007
 #
 
@@ -8,11 +11,11 @@ set -ue
 
 trace=${DEBUG:+set-x}
 
-: ${ENV_DEV_DIR:=$HOME/dev}
+devdir=.
 
 cmd=`basename "$0"`
 usage="Usage: $cmd [-d develdir] [-x] [command [args...]]
-        -d develdir     Development source dir. Default from \$ENV_DEV_DIR.
+        -d develdir     Development source dir. Default: current directory.
         -x              Trace invocation of command."
 
 badopts=
@@ -20,7 +23,7 @@ badopts=
 while [ $# -gt 0 ]
 do
   case $1 in
-    -d) ENV_DEV_DIR=$2; shift ;;
+    -d) devdir=$2; shift ;;
     -x) trace=set-x ;;
     --) shift; break ;;
     -?*)echo "$cmd: unrecognised option: $1" >&2
@@ -31,26 +34,21 @@ do
   shift
 done
 
-[ -d "$ENV_DEV_DIR/." ] || { echo "$cmd: not a directory: $ENV_DEV_DIR" >&2
-                             badopts=1
-                           }
+[ -d "$devdir/." ] || { echo "$cmd: not a directory: $devdir" >&2
+                        badopts=1
+                      }
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
-export ENV_DEV_DIR
+case "$devdir" in /*) ;; *) devdir=`cd "$devdir" && pwd` ;; esac
 
-if [ -f "$ENV_DEV_DIR/.env.sh" ]
-then
-  . "$ENV_DEV_DIR/.env.sh"
-else
-  wd=`pwd`
-  PYTHONPATH=$wd/lib/python:$wd/lib:$PYTHONPATH
-  PERL5LIB=$wd/lib/perl5:$wd/lib:$PERL5LIB
-  MANPATH=$wd/man:$MANPATH
-  LD_LIBRARY_PATH=$wd/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}
-  PATH=$wd/bin:$PATH
-  export PYTHONPATH PERL5LIB MANPATH LD_LIBRARY_PATH PATH
-fi
+PYTHONPATH=$devdir/lib/python:$devdir/lib:$PYTHONPATH
+PERL5LIB=$devdir/lib/perl5:$devdir/lib:$PERL5LIB
+MANPATH=$devdir/man:$MANPATH
+LD_LIBRARY_PATH=$devdir/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}
+PATH=$devdir/bin:$PATH
+export PYTHONPATH PERL5LIB MANPATH LD_LIBRARY_PATH PATH
+[ ! -f "$devdir/.env.sh" ] || . "$devdir/.env.sh"
 
 if [ $# = 0 ]
 then
