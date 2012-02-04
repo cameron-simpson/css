@@ -1037,7 +1037,7 @@ class NodeDB(dict):
           type, name, attrmap
         into this NodeDB.
     '''
-    with Pfx(self):
+    with Pfx(str(self)):
       debug("apply_nodedata(..,doCreate=%s)...", doCreate)
       for t, name, attrmap in nodedata:
         debug("%s:%s", t, name)
