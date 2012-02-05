@@ -1,7 +1,6 @@
 import os
 import string
 import types
-from cs.misc import warn
 
 def getLogin(uid=None):
   import pwd
@@ -20,8 +19,12 @@ baseEnv={
   'TMPDIR':     '/tmp',
 }
 
-class Env:
-  def __init__(self,environ=os.environ,base=baseEnv):
+class Env(object):
+  def __init__(self,environ=None,base=None):
+    if environ is None:
+      environ = os.environ
+    if base is None:
+      base = baseEnv
     self.__environ=environ
     self.__base={}
     for k in base.keys():
@@ -44,7 +47,7 @@ class Env:
         elif t is types.FunctionType:
           val=base()
         else:
-          assert False, "unsupported baseEnv type "+str(t)+": "+repr(base)
+          assert False, "unsupported baseEnv type %s: %r" % (t, base)
       else:
         raise IndexError
 
