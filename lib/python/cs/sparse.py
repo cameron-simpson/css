@@ -1,4 +1,4 @@
-from cs.misc import debug, warn
+from cs.logutils import debug, warning
 
 # An on-demand sparse cache over an existing sequence.
 class SparseSeq:
