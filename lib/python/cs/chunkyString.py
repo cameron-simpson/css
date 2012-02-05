@@ -3,7 +3,8 @@
 
 import sys
 from time import time
-from cs.misc import isdebug, warn, reportElapsedTime
+from cs.misc import reportElapsedTime
+from cs.logutils import debug, warning
 
 class ChunkyString(str):
   ''' An object that looks like a char array with eough string functionality
@@ -49,8 +50,7 @@ class ChunkyString(str):
         nskip=0
         break
 
-    if isdebug:
-      print >>sys.stderr, "__rskipto(%d)@pos=%d took %d hops" % (rpos, self.__offset, hops)
+    debug("__rskipto(%d)@pos=%d took %d hops", rpos, self.__offset, hops)
 
     self.__offset+=rpos
     self.__ndx=ndx
@@ -76,8 +76,7 @@ class ChunkyString(str):
     return rs
 
   def __str__(self):
-    if isdebug:
-      warning("ChunkyString.__str__: %d bytes in %d strings" % (self.__len, len(self.__strs)))
+    warning("ChunkyString.__str__: %d bytes in %d strings", self.__len, len(self.__strs))
     t0=time()
     s=''.join(self.__strs)
     assert len(s) == self.__len
@@ -90,7 +89,6 @@ class ChunkyString(str):
     return self.__len > 0
 
   def write(self,s):
-    ##if isdebug: print >>sys.stderr, "ChunkyString.write(%s)" % s
     if self.__minChunk is not None \
     and len(s) < self.__minChunk \
     and len(self.__strs) > 0 \
