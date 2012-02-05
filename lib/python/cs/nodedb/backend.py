@@ -59,6 +59,8 @@ class _BackendMappingMixin(object):
   def __delitem__(self, key):
     raise NotImplementedError
 
+  __hash__ = None
+
   def __eq__(self, other):
     keys = set(self.keys())
     okeys = set(other.keys())
@@ -74,6 +76,9 @@ class _BackendMappingMixin(object):
         ##sys.stderr.flush()
         return False
     return True
+
+  def __ne__(self, other):
+    return not self == other
 
 class Backend(_BackendMappingMixin):
   ''' Base class for NodeDB backends.
