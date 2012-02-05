@@ -53,11 +53,44 @@ main()
   return 0
 }
 
+stateful()
+{
+  [ $# -gt 2 ] \
+  || { echo "$cmd: Usage: stateful type srcfile command [args...]" >&2
+       return 2
+     }
+  _s_type=$1
+  _s_srcfile=$2
+  shift; shift
+  _s_statefile=state/$_s_type/$_s_srcfile
+  if [ "$_s_statefile" -nt "$_s_srcfile" ]
+  then
+    $vvecho "SKIP $_s_type $_s_srcfile - newer $_s_statefile"
+  else
+    [ ! -e "$_s_statefile" ] || rm -f -- "$_s_statefile"
+    _s_statedir=`dirname "$_s_statefile"`
+    [ -d "$_s_statedir" ] || mkdir -p "$_s_statedir"
+    if $trace pfx "$_s_srcfile" env-dev "$@"
+    then
+      $vecho "OK $_s_type $_s_srcfile"
+      echo 1 >"$_s_statefile"
+    else
+      echo "FAIL $_s_type $_s_srcfile" >&2
+      >"$_s_statefile"
+    fi
+  fi
+  [ -s "$_s_statefile" ]
+}
+
 test_python()
 {
-  [ $# = 2 ] || { echo "$cmd: Usage: test_python pylibdir pysubdir" >&2; return 2; }
+  [ $# = 2 ] \
+  || { echo "$cmd: Usage: test_python pylibdir pysubdir" >&2
+       return 2
+     }
 
   (
+    set -ue
     pylibdir=$1
     pysubdir=$2
 
@@ -68,16 +101,8 @@ test_python()
     ( xit=0 
       while read -r py 
       do 
-        pyc_state=state/pyc/$py
-        if [ "$pyc_state" -nt "$py" ]
-        then  $vvecho "SKIP syntax $py - newer $pyc_state"
-        else
-          rm -f -- "$pyc_state"
-          if $trace pfx "$py" env-dev python -3 -tt -m py_compile "$py"
-          then  $vecho "OK syntax $py"; d=`dirname "$pyc_state"`; mkdir -p "$d"; >>"$pyc_state"
-          else  echo "FAIL syntax $py" >&2; xit=1
-          fi
-        fi
+        stateful syntax "$py" python -3 -tt -m py_compile "$py" \
+        || xit=1
       done 
       exit $xit 
     ) || exit $?
@@ -89,17 +114,9 @@ test_python()
     ( xit=0 
       while read -r py 
       do 
-        pyc_state=state/pyi/$py
-        if [ "$pyc_state" -nt "$py" ]
-        then  $vvecho "SKIP import $py - newer $pyc_state"
-        else
-          rm -f -- "$pyc_state"
-          pym=`expr "x$py" : "x$pylibdir"'/\(.*\).py' | tr / .` 
-          if $trace pfx "$py" env-dev python -3 -tt -c "import $pym"
-          then  $vecho "OK import $py"; d=`dirname "$pyc_state"`; mkdir -p "$d"; >>"$pyc_state"
-          else  echo "FAIL syntax $py" >&2; xit=1
-          fi
-        fi
+        pym=`expr "x$py" : "x$pylibdir"'/\(.*\).py' | tr / .` 
+        stateful import "$py" python -3 -tt -c "import $pym" \
+        || xit=1
       done 
       exit $xit 
     ) || exit $?
@@ -113,19 +130,9 @@ test_python()
       do 
         unitest=`sed -n '${/^ *unittest\.main(/p;/^ *selftest(/p;}' "$py"` 
         [ -n "$unitest" ] || continue 
-        pyu_state=state/pyu/$py
-        if [ "$pyu_state" -nt "$py" ]
-        then  $vvecho "SKIP unittest $py - newer $pyu_state"
-        else
-          d=`dirname "$pyu_state"`; [ -d "$d" ] || mkdir -p "$d"
-          >>"$pyu_state"
-          rm -f "$pyu_state"
-          pym=`expr "x$py" : "x$pylibdir"'/\(.*\).py' | tr / .` 
-          if $trace env-dev -x python -tt -u -B -m "$pym"
-          then  $vecho "OK unittest $py"; >>"$pyu_state"
-          else  echo "FAIL: unitest $py" >&2; exit 1
-          fi
-        fi
+        pym=`expr "x$py" : "x$pylibdir"'/\(.*\).py' | tr / .` 
+        stateful unittest "$py" python -tt -u -B -m "$pym" \
+        || xit=1
       done 
       exit $xit 
     ) || exit $?
