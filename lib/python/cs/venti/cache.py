@@ -58,9 +58,9 @@ class CacheStore(BasicStore):
       return self.cache[h]
     return self.backend[h]
 
-  def add(self, data, noFlush=False):
-    h = self.cache.add(data, noFlush=noFlush)
-    h2 = self.backend.add(data, noFlush=noFlush)
+  def add(self, data):
+    h = self.cache.add(data)
+    h2 = self.backend.add(data)
     assert h == h2
     return h
 
@@ -133,7 +133,7 @@ class MemCacheStore(BasicStore):
     with self._lock:
       return self.hmap[h][1]
 
-  def add(self, data, noFlush=False):
+  def add(self, data):
     with self._lock:
       H = self.hash(data)
       self._hit(H, data)
