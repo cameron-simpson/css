@@ -161,7 +161,7 @@ class StreamDaemon(object):
     with Pfx("%s._process_requests" % (self,)):
       for rqTag, rqType, rqData in decodeRequestStream(fp):
         # submit request - will 
-        SQ.partial(self._process_request, rqTag, rqType, rqData)
+        SQ.defer(self._process_request, rqTag, rqType, rqData)
 
   def _process_request(self, rqTag, rqType, rqData):
     if rqType == T_ADD:
