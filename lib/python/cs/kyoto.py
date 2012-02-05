@@ -80,6 +80,9 @@ class KyotoCabinet(object):
   def values(self):
     return list(self.itervalues())
 
+  def sync(self, hard=False):
+    self.db.synchroize(hard=hard)
+
   def close(self):
     if not self.db.close():
       raise IOError("%s.close(): %s" % (self, self.db.error()))
