@@ -13,7 +13,6 @@
 '''
 
 from __future__ import with_statement
-from functools import partial
 from binascii import hexlify
 import os
 import os.path
@@ -21,7 +20,7 @@ import sys
 from thread import allocate_lock
 from threading import Thread
 from Queue import Queue
-from cs.later import Later, reportLFs
+from cs.later import Later, report as reportLFs
 from cs.logutils import info, debug, warning, Pfx
 from cs.serialise import toBS, fromBS
 from cs.threads import Q1, Get1, NestingOpenClose
