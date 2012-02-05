@@ -65,7 +65,10 @@ stateful()
   _s_statefile=state/$_s_type/$_s_srcfile
   if [ "$_s_statefile" -nt "$_s_srcfile" ]
   then
-    $vvecho "SKIP $_s_type $_s_srcfile - newer $_s_statefile"
+    if [ -s "$_s_statefile" ]
+    then $vvecho "SKIP $_s_type $_s_srcfile - newer $_s_statefile"
+    else $vecho "FAIL $_s_type $_s_srcfile (cached)" >&2
+    fi
   else
     [ ! -e "$_s_statefile" ] || rm -f -- "$_s_statefile"
     _s_statedir=`dirname "$_s_statefile"`
