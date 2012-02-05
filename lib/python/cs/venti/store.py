@@ -268,6 +268,29 @@ def pullFromSerial(S1, S2):
     if not S1.contains(h):
       S1.store(S2.fetch(h))
 
+class MappingStore(BasicStore):
+  ''' A Store built on an arbitrary mapping object.
+  '''
+
+  def __init__(self, M, name=None, capacity=None):
+    if name is None:
+      name = "MappingStore(%s)" % (M,)
+    BasicStore.__init__(self, name, capacity=capacity)
+    self.mapping = M
+
+  def add(self, block):
+    h = self.hash(block)
+    self.mapping[h] = block
+
+  def get(h, default=None):
+    return self.mapping.get(h, default)
+
+  def contains(self, h):
+    return h in self.mapping
+
+  def sync(self):
+    debug("%s: sync() is a no-op", self)
+
 class IndexedFileStore(BasicStore):
   ''' A file-based Store which keeps data in flat files, compressed.
       Subclasses must implement the method ._getIndex() to obtain the
