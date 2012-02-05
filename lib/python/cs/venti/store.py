@@ -21,7 +21,7 @@ import sys
 from thread import allocate_lock
 from threading import Thread
 from Queue import Queue
-from cs.later import Later
+from cs.later import Later, reportLFs
 from cs.logutils import info, debug, warning, Pfx
 from cs.serialise import toBS, fromBS
 from cs.threads import Q1, Get1, NestingOpenClose
@@ -121,13 +121,15 @@ class BasicStore(NestingOpenClose):
   def contains_bg(self, h):
     return self._partial(self.contains, h)
 
+  def sync_bg(self):
+    return self._partial(self.sync)
+
   def _partial(self, func, *args, **kwargs):
     return self.__funcQ.partial(func, *args, **kwargs)
 
-  def hash(self, data):
-    ''' Return a Hash object from data bytes.
-    '''
-    return self.hashclass.fromData(data)
+  ###################
+  ## Special methods.
+  ##
 
   def __contains__(self, h):
     ''' Test if the supplied hashcode is present in the store.
@@ -154,6 +156,11 @@ class BasicStore(NestingOpenClose):
   def __str__(self):
     return "Store(%s)" % self.name
 
+  def hash(self, data):
+    ''' Return a Hash object from data bytes.
+    '''
+    return self.hashclass.fromData(data)
+
   def keys(self):
     ''' For a big store this is almost certainly unreasonable.
     '''
@@ -163,9 +170,6 @@ class BasicStore(NestingOpenClose):
     ''' Called by final NestingOpenClose.close().
     '''
     self.__funcQ.close()
-
-  def sync_bg(self):
-    return self._partial(self.sync)
 
   def missing(self, hashes):
     ''' Yield hashcodes that are not in the store from an iterable hash
@@ -185,15 +189,24 @@ class BasicStore(NestingOpenClose):
     '''
     pass
 
-  def multifetch(self, hs):
-    ''' Generator returning a bunch of blocks in sequence corresponding to
-        the iterable hashes.
+  def multifetch(self, hs, ordered=False):
+    ''' Generator yielding:
+          hash, data
+        for each hash in `hs`.
+        If `ordered` is true, yield data in the order of `hs`
+        otherwise yield data as it arrives from the Store.
     '''
     LFs = []
     for h in hs:
-      LFs.append(self.fetch_bg(h))
-    for LF in LFs:
-      yield LF()
+      LF = self.fetch_bg(h)
+      h2LF[h] = self.fetch_bg(h)
+      LF2h[LF] = h
+    if ordered:
+      for h in hs:
+        yield h, h2LF[h]()
+    else:
+      for LF in reportLFs(LF2h.keys()):
+        yield LF2h[LF], LF()
 
 def Store(store_spec):
   ''' Factory function to return an appropriate BasicStore subclass
