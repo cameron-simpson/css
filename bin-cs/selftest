@@ -94,11 +94,14 @@ test_python()
 
   (
     set -ue
-    pylibdir=$1
-    pysubdir=$2
+    _tpy_pylibdir=$1
+    _tpy_pysubdir=$2
+    shift; shift
 
-    $vecho "syntax check $pylibdir/$pysubdir ..."
-    find "$pylibdir/$pysubdir" -type f -name \*.py -print \
+    _tpy_xit=0
+
+    $vecho "syntax check $_tpy_pylibdir/$_tpy_pysubdir ..."
+    find "$_tpy_pylibdir/$_tpy_pysubdir" -type f -name \*.py -print \
     | sort \
     | \
     ( xit=0 
@@ -108,24 +111,24 @@ test_python()
         || xit=1
       done 
       exit $xit 
-    ) || exit $?
+    ) || _tpy_xit=1
 
-    $vecho "import check $pylibdir/$pysubdir ..."
-    find "$pylibdir/$pysubdir" -type f -name \*.py -print \
+    $vecho "import check $_tpy_pylibdir/$_tpy_pysubdir ..."
+    find "$_tpy_pylibdir/$_tpy_pysubdir" -type f -name \*.py -print \
     | sort \
     | \
     ( xit=0 
       while read -r py 
       do 
-        pym=`expr "x$py" : "x$pylibdir"'/\(.*\).py' | tr / .` 
+        pym=`expr "x$py" : "x$_tpy_pylibdir"'/\(.*\).py' | tr / .` 
         stateful import "$py" python -3 -tt -c "import $pym" \
         || xit=1
       done 
       exit $xit 
-    ) || exit $?
+    ) || _tpy_xit=1
 
-    $vecho "unit test $pylibdir/$pysubdir ..."
-    find "$pylibdir/$pysubdir" -type f -name \*.py -print \
+    $vecho "unit test $_tpy_pylibdir/$_tpy_pysubdir ..."
+    find "$_tpy_pylibdir/$_tpy_pysubdir" -type f -name \*.py -print \
     | sort \
     | \
     ( xit=0 
@@ -133,12 +136,14 @@ test_python()
       do 
         unitest=`sed -n '${/^ *unittest\.main(/p;/^ *selftest(/p;}' "$py"` 
         [ -n "$unitest" ] || continue 
-        pym=`expr "x$py" : "x$pylibdir"'/\(.*\).py' | tr / .` 
+        pym=`expr "x$py" : "x$_tpy_pylibdir"'/\(.*\).py' | tr / .` 
         stateful unittest "$py" python -tt -u -B -m "$pym" \
         || xit=1
       done 
       exit $xit 
-    ) || exit $?
+    ) || _tpy_xit=1
+
+    exit $_tpy_xit
   ) || return $?
 
   return 0
