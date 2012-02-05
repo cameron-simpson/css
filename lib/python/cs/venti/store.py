@@ -21,7 +21,7 @@ import sys
 from thread import allocate_lock
 from threading import Thread
 from Queue import Queue
-from cs.later import Later
+from cs.later import Later, reportLFs
 from cs.logutils import info, debug, warning, Pfx
 from cs.serialise import toBS, fromBS
 from cs.threads import Q1, Get1, NestingOpenClose
@@ -35,10 +35,10 @@ class BasicStore(NestingOpenClose):
       A subclass should provide thread-safe implementations of the following
       methods:
 
-        __contains__(self, hashcode) -> Boolean
-        __getitem__(self, hashcode) -> data
-        add(self, data) -> hashcode
-        sync(self)
+        .add(block) -> hashcode
+        .get(hashcode, [default=None]) -> block (or default)
+        .contains(hashcode) -> boolean
+        .sync()
 
       A convenience .lock attribute is provided for simple mutex use.
 
@@ -48,11 +48,6 @@ class BasicStore(NestingOpenClose):
       The .writeonly attribute may be set to trap surprises when no blocks
       are expected to be fetched; it relies on asssert statements.
 
-      Subclasses are expected to implement:
-
-        .add(block) -> hashcode
-        .get(hashcode, [default=None]) -> block (or default)
-        .contains(hashcode) -> boolean
 
       The background (*_bg) functions return cs.later.LateFunction instances
       for deferred collection of the operation result.
@@ -82,9 +77,6 @@ class BasicStore(NestingOpenClose):
       self.readonly = False
       self.writeonly = False
 
-  def _partial(self, func, *args, **kwargs):
-    return self.__funcQ.partial(func, *args, **kwargs)
-
   def add(self, data, noFlush=False):
     ''' Add the supplied data bytes to the store.
     '''
@@ -99,6 +91,27 @@ class BasicStore(NestingOpenClose):
   def contains(self, h):
     raise NotImplementedError
 
+  def flush(self):
+    ''' Flush outstanding I/O operations on the store.
+        This is generally discouraged because it causes less efficient
+        operation but it is sometimes necessary, for example at shutdown or
+        after *_bg() calls with the noFlush=True hint.
+        This does not imply that outstanding transactions have completed,
+        merely that they have been dispatched, for example sent down the
+        stream of a StreamStore.
+        See the sync() call for transaction completion.
+    '''
+    raise NotImplementedError
+
+  def sync(self):
+    ''' Flush outstanding I/O operations on the store and wait for completion.
+    '''
+    raise NotImplementedError
+
+  #####################################
+  ## Background versions of operations.
+  ##
+
   def add_bg(self, data, noFlush=False):
     return self._partial(self.add, data, noFlush=noFlush)
 
@@ -108,10 +121,15 @@ class BasicStore(NestingOpenClose):
   def contains_bg(self, h):
     return self._partial(self.contains, h)
 
-  def hash(self, data):
-    ''' Return a Hash object from data bytes.
-    '''
-    return self.hashclass.fromData(data)
+  def sync_bg(self):
+    return self._partial(self.sync)
+
+  def _partial(self, func, *args, **kwargs):
+    return self.__funcQ.partial(func, *args, **kwargs)
+
+  ###################
+  ## Special methods.
+  ##
 
   def __contains__(self, h):
     ''' Test if the supplied hashcode is present in the store.
@@ -127,22 +145,6 @@ class BasicStore(NestingOpenClose):
       raise KeyError
     return block
 
-  def flush(self):
-    ''' Flush outstanding I/O operations on the store.
-        This is generally discouraged because it causes less efficient
-        operation but it is sometimes necessary, for example at shutdown or
-        after *_bg() calls with the noFlush=True hint.
-        This does not imply that outstanding transactions have completed,
-        merely that they have been dispatched, for example sent down the
-        stream of a StreamStore.
-        See the sync() call for transaction completion.
-    '''
-    raise NotImplementedError
-  def sync(self):
-    ''' Flush outstanding I/O operations on the store and wait for completion.
-    '''
-    raise NotImplementedError
-
   def __enter__(self):
     NestingOpenClose.__enter__(self)
     defaults.pushStore(self)
@@ -154,16 +156,20 @@ class BasicStore(NestingOpenClose):
   def __str__(self):
     return "Store(%s)" % self.name
 
+  def hash(self, data):
+    ''' Return a Hash object from data bytes.
+    '''
+    return self.hashclass.fromData(data)
+
   def keys(self):
-    return ()
+    ''' For a big store this is almost certainly unreasonable.
+    '''
+    raise NotImplementedError
 
   def shutdown(self):
     ''' Called by final NestingOpenClose.close().
     '''
     self.__funcQ.close()
-
-  def sync_bg(self):
-    return self._partial(self.sync)
 
   def missing(self, hashes):
     ''' Yield hashcodes that are not in the store from an iterable hash
@@ -183,15 +189,24 @@ class BasicStore(NestingOpenClose):
     '''
     pass
 
-  def multifetch(self, hs):
-    ''' Generator returning a bunch of blocks in sequence corresponding to
-        the iterable hashes.
+  def multifetch(self, hs, ordered=False):
+    ''' Generator yielding:
+          hash, data
+        for each hash in `hs`.
+        If `ordered` is true, yield data in the order of `hs`
+        otherwise yield data as it arrives from the Store.
     '''
     LFs = []
     for h in hs:
-      LFs.append(self.fetch_bg(h))
-    for LF in LFs:
-      yield LF()
+      LF = self.fetch_bg(h)
+      h2LF[h] = self.fetch_bg(h)
+      LF2h[LF] = h
+    if ordered:
+      for h in hs:
+        yield h, h2LF[h]()
+    else:
+      for LF in reportLFs(LF2h.keys()):
+        yield LF2h[LF], LF()
 
 def Store(store_spec):
   ''' Factory function to return an appropriate BasicStore subclass

@@ -88,17 +88,17 @@ class TestLater(unittest.TestCase):
     self.assertRaises(TestLater._Bang, LF)
     self.assertRaises(TestLater._Bang, LF)
 
-  def test06partial(self):
-    # compute 7*2 using .partial()
-    LF = self.L.partial(self._f, 7)
+  def test06defer_with_args(self):
+    # compute 7*2 using .defer_with_args()
+    LF = self.L.defer(self._f, 7)
     x = LF()
     self.assertEquals(x, 14)
 
   def test07report(self):
     with Later(3) as L3:
-      LF1 = L3.partial(self._delay, 3)
-      LF2 = L3.partial(self._delay, 2)
-      LF3 = L3.partial(self._delay, 1)
+      LF1 = L3.defer(self._delay, 3)
+      LF2 = L3.defer(self._delay, 2)
+      LF3 = L3.defer(self._delay, 1)
       results = [ LF() for LF in report( (LF1, LF2, LF3) ) ]
       self.assertEquals(results, [1, 2, 3])
 
