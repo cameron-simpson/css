@@ -21,11 +21,14 @@ from cs.hier import T_SEQ, T_MAP, T_SCALAR
 from cs.html import puttok, puttext
 from cs.logutils import warning
 
-# TODO: this shouldn't happen unconditionally!
-cookieHandler = HTTPCookieProcessor()
-if 'COOKIE_FILE' in os.environ:
+def init(cookieFile=None):
+  if cookieFile is None:
+    if 'COOKIE_FILE' not in os.environ:
+      warning("cs.www.init(): no \$COOKIE_FILE")
+      return
+    cookieFile = os.environ['COOKIE_FILE']
+  cookieHandler = HTTPCookieProcessor()
   cookieHandler.cookiejar=MozillaCookieJar()
-  cookieFile=os.environ['COOKIE_FILE']
   if not cookieFile.endswith('.sqlite'):
     # presume older mozilla cookie file
     cookieHandler.cookiejar.load(cookieFile)
@@ -68,7 +71,7 @@ if 'COOKIE_FILE' in os.environ:
         continue
       warning("add cookie: name=%s, host=%s, path=%s", name,host,path)
       cookieHandler.cookiejar.set_cookie(c)
-install_opener(build_opener(cookieHandler))
+  install_opener(build_opener(cookieHandler))
 
 cookie_sepRe=re.compile(r'\s*;\s*')
 cookie_valRe=re.compile(r'([a-z][a-z0-9_]*)=([^;,\s]*)',re.I)
