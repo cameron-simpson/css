@@ -302,9 +302,11 @@ class Action(object):
     v = self.variant
     if v == 'shell':
       shcmd = self.mexpr.eval(target.namespaces)
-      M.debug_make("shell command: %s", shcmd)
+      if not self.silent:
+        print shcmd
       if M.no_action:
         return True
+      M.debug_make("shell command: %s", shcmd)
       argv = (target.shell, '-c', shcmd)
       debug("Popen(%s,..)", argv)
       P = Popen(argv, close_fds=True)
