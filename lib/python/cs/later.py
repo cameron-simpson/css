@@ -464,31 +464,25 @@ class Later(object):
     '''
     return self.submit(partial(func, *args, **kwargs), **params)
 
-  def pdefer(self, priority, func):
-    ''' Queue a function for later dispatch.
+  def pdefer(self, priority, func, *a, **kw):
+    ''' Queue the function `func` for later dispatch using the
+        specified `priority` with the spcified arguments `*a` and `**kw`.
         Return the corresponding LateFunction for result collection.
-        Equivalent to:
-          submit(func, priority=priority)
     '''
+    if a or kw:
+      func = partial(func, *a, **kw)
     return self.submit(func, priority=priority)
 
-  def defer(self, func):
-    ''' Queue a function for later dispatch using the default priority.
+  def defer(self, func, *a, **kw):
+    ''' Queue the function `func` for later dispatch using the
+        default priority with the spcified arguments `*a` and `**kw`.
         Return the corresponding LateFunction for result collection.
+        Equivalent to:
+          submit(partial(func, *a, **kw))
     '''
+    if a or kw:
+      func = partial(func, *a, **kw)
     return self.submit(func)
-
-  def ppartial(self, priority, func, *args, **kwargs):
-    ''' Queue a function for later dispatch using the specified priority.
-        Return the corresponding LateFunction for result collection.
-    '''
-    return self.submit(partial(func, *args, **kwargs), priority=priority)
-
-  def partial(self, func, *args, **kwargs):
-    ''' Queue a function for later dispatch using the default priority.
-        Return the corresponding LateFunction for result collection.
-    '''
-    return self.submit(partial(func, *args, **kwargs))
 
   @contextmanager
   def priority(self, pri):
