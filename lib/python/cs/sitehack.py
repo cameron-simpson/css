@@ -5,7 +5,7 @@
 #       - Cameron Simpson <cs@zip.com.au> 18dec2007
 #
 
-from cs.misc import debug
+from cs.logutils import debug
 import cs.www
 import urllib
 
