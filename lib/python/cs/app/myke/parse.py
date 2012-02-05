@@ -235,6 +235,11 @@ class MacroExpression(object):
   def __eq__(self, other):
     return other == self.permutations
 
+  def __ne__(self, other):
+    return not self == other
+
+  __hash__ = None
+
   def eval(self, namespaces):
     if self._result is not None:
       return self._result

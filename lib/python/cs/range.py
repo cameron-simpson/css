@@ -75,6 +75,11 @@ class Range(object):
       return self._spans == other._spans
     return list(self) == list(other)
 
+  def __ne__(self, other):
+    return not self == other
+
+  __hash__ = None
+
   def clear(self):
     self._spans = []
 
