@@ -82,6 +82,28 @@ test_python()
       exit $xit 
     ) || exit $?
 
+    $vecho "import check $pylibdir/$pysubdir ..."
+    find "$pylibdir/$pysubdir" -type f -name \*.py -print \
+    | sort \
+    | \
+    ( xit=0 
+      while read -r py 
+      do 
+        pyc_state=state/pyi/$py
+        if [ "$pyc_state" -nt "$py" ]
+        then  $vvecho "SKIP import $py - newer $pyc_state"
+        else
+          rm -f -- "$pyc_state"
+          pym=`expr "x$py" : "x$pylibdir"'/\(.*\).py' | tr / .` 
+          if $trace pfx "$py" env-dev python -3 -tt -c "import $pym"
+          then  $vecho "OK import $py"; d=`dirname "$pyc_state"`; mkdir -p "$d"; >>"$pyc_state"
+          else  echo "FAIL syntax $py" >&2; xit=1
+          fi
+        fi
+      done 
+      exit $xit 
+    ) || exit $?
+
     $vecho "unit test $pylibdir/$pysubdir ..."
     find "$pylibdir/$pysubdir" -type f -name \*.py -print \
     | sort \
