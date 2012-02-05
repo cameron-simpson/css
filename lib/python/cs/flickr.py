@@ -6,7 +6,7 @@
 
 import urllib
 from cs.sitehack import SiteHack
-from cs.misc import debug
+from cs.logutils import debug
 
 flickrPrefix=('http://www.flickr.com/', 'http://flickr.com/')
 
