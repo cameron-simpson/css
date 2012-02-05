@@ -478,7 +478,7 @@ class Later(object):
         default priority with the spcified arguments `*a` and `**kw`.
         Return the corresponding LateFunction for result collection.
         Equivalent to:
-          submit(partial(func, *a, **kw))
+          submit(functools.partial(func, *a, **kw))
     '''
     if a or kw:
       func = partial(func, *a, **kw)
@@ -492,9 +492,7 @@ class Later(object):
           with L.priority(1):
             L.defer(f)  # queue f() with priority 1
           with L.priority(2):
-            L.partial(f,3)  # queue f(3) with priority 2
-	This is most useful with the .partial() method, which has
-	no priority parameter.
+            L.defer(f, 3)  # queue f(3) with priority 2
         WARNING: this is NOT thread safe!
         TODO: is a thread safe version even a sane idea without a
               per-thread priority stack?
