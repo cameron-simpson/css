@@ -8,7 +8,7 @@ import os
 from socket import socket, SHUT_WR, SHUT_RD
 from SocketServer import ThreadingTCPServer, StreamRequestHandler
 from cs.venti.stream import StreamDaemon, StreamStore
-from cs.misc import debug
+from cs.logutils import debug
 from cs.threads import NestingOpenClose
 
 class Server(ThreadingTCPServer, NestingOpenClose):
