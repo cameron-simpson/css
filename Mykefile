@@ -51,7 +51,7 @@ _help:
 
 _test:
         find lib/python -type f -name '*.py[co]' -exec rm {} \;
-        ./bin/env-dev ./bin-cs/selftest -v --python lib/python cs
+        ./bin-cs/selftest -v --python lib/python cs
 
 _home:
         skip=`hg status | sed -n 's:^? \(.*\):--exclude=/\1:p'` \
