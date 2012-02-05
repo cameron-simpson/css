@@ -113,19 +113,19 @@ class BasicStore(NestingOpenClose):
   ##
 
   def add_bg(self, data, noFlush=False):
-    return self._partial(self.add, data, noFlush=noFlush)
+    return self._defer(self.add, data, noFlush=noFlush)
 
   def get_bg(self, h):
-    return self._partial(self.get, h)
+    return self._defer(self.get, h)
 
   def contains_bg(self, h):
-    return self._partial(self.contains, h)
+    return self._defer(self.contains, h)
 
   def sync_bg(self):
-    return self._partial(self.sync)
+    return self._defer(self.sync)
 
-  def _partial(self, func, *args, **kwargs):
-    return self.__funcQ.partial(func, *args, **kwargs)
+  def _defer(self, func, *args, **kwargs):
+    return self.__funcQ.defer(func, *args, **kwargs)
 
   ###################
   ## Special methods.
