@@ -15,7 +15,7 @@ from tokyocabinet.hash import Hash as TCHash, HDBOREADER, HDBOWRITER, HDBOCREAT
 from cs.misc import seq
 from cs.logutils import error, Pfx
 from . import NodeDB, Backend
-from .node import TestAll as NodeTestAll, nodekey
+from .node import nodekey
 
 class Backend_TokyoCabinet(Backend):
 
@@ -128,31 +128,6 @@ class Backend_TokyoCabinet(Backend):
     with self.tclock:
       del self.tcdb[attrtag]
 
-class TestAll(NodeTestAll):
-
-  def setUp(self):
-    dbpath = 'test-%d.tch' % (seq(),)
-    self.dbpath = dbpath
-    if os.path.exists(dbpath):
-      os.remove(dbpath)
-    with open("/dev/tty","w") as tty:
-      tty.write("SETUP test %s\n" % (self,))
-    self.backend=Backend_TokyoCabinet(dbpath)
-    self.db=NodeDB(backend=self.backend)
-
-  def tearDown(self):
-    self.db.close()
-
-  def test22persist(self):
-    N = self.db.newNode('HOST:foo1')
-    N.X=1
-    N2 = self.db.newNode('SWITCH:sw1')
-    N2.Ys=(9,8,7)
-    dbstate = dict(self.db._backend)
-    self.db._backend.close()
-    dbstate2 = dict(Backend_TokyoCabinet(self.dbpath))
-    self.assert_(dbstate == dbstate2, "db state differs:\n\t%s\n\t%s" % (dbstate, dbstate2))
-
 if __name__ == '__main__':
-  ##unittest.main()
-  print "skipping TC unittests - multiple open/closes break it somehow"
+  import cs.nodedb.node_tests
+  cs.nodedb.node_tests.selftest(sys.argv)
