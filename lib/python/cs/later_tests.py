@@ -1,6 +1,6 @@
 #!/usr/bin/python
 #
-# Self tests to cs.ater.
+# Self tests for cs.later.
 #       - Cameron Simpson <cs@zip.com.au>
 #
 
