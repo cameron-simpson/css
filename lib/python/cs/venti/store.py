@@ -21,7 +21,7 @@ from thread import allocate_lock
 from threading import Thread
 from Queue import Queue
 from cs.later import Later, report as reportLFs
-from cs.logutils import info, debug, warning, Pfx
+from cs.logutils import info, debug, warning, Pfx, D
 from cs.serialise import toBS, fromBS
 from cs.threads import Q1, Get1, NestingOpenClose
 from cs.venti import defaults, totext
@@ -76,7 +76,7 @@ class BasicStore(NestingOpenClose):
       self.readonly = False
       self.writeonly = False
 
-  def add(self, data, noFlush=False):
+  def add(self, data):
     ''' Add the supplied data bytes to the store.
     '''
     raise NotImplementedError
@@ -111,8 +111,8 @@ class BasicStore(NestingOpenClose):
   ## Background versions of operations.
   ##
 
-  def add_bg(self, data, noFlush=False):
-    return self._defer(self.add, data, noFlush=noFlush)
+  def add_bg(self, data):
+    return self._defer(self.add, data)
 
   def get_bg(self, h):
     return self._defer(self.get, h)
@@ -232,8 +232,14 @@ def Store(store_spec):
   spec = store_spec[len(scheme)+1:]
   if scheme == "file":
     # TODO: after tokyocabinet available, probe for index file name
-    from cs.venti.gdbmstore import GDBMStore
-    return GDBMStore(os.path.abspath(spec))
+    storepath = os.path.abspath(spec)
+    if os.path.isdir(storepath):
+      from .gdbmstore import GDBMStore
+      return GDBMStore(os.path.abspath(spec))
+    if storepath.endswith('.kch'):
+      from .kyotostore import KyotoCabinetStore
+      return KyotoCabinetStore(storepath)
+    raise ValueError("unsupported file store: %s" % (storepath,))
   if scheme == "exec":
     from cs.venti.stream import StreamStore
     from subprocess import Popen, PIPE
@@ -258,7 +264,7 @@ def Store(store_spec):
     P = Popen( ['set-x', 'ssh', sshto, 'set -x; '+rcmd],
                shell=False, stdin=PIPE, stdout=PIPE)
     return StreamStore("ssh:"+spec, P.stdin, P.stdout)
-  assert False, "unknown scheme \"%s:\"" % (scheme,)
+  raise ValueError("unsupported store scheme: %s" % (scheme,))
 
 def pullFromSerial(S1, S2):
   asked = 0
@@ -365,7 +371,7 @@ class IndexedFileStore(BasicStore):
       self._storeMap[n] = DataFile(pathname)
       return n
 
-  def add(self, data, noFlush=False):
+  def add(self, data):
     ''' Add data bytes to the store, return the hashcode.
     '''
     assert type(data) is str, "expected str, got: %r" % (data,)
@@ -375,8 +381,8 @@ class IndexedFileStore(BasicStore):
       n = self.n
       datafile = self._storeMap[n]
       offset = datafile.saveData(data)
-      if not noFlush:
-        datafile.flush()
+      ## TODO: infer noFlish somehow? if not noFlush:
+      datafile.flush()
       self._index[h] = encodeIndexEntry(n, offset)
     return h
 
