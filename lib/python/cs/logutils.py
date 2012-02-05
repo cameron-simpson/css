@@ -367,16 +367,17 @@ class Pfx(object):
           exc_value.msg = prefix + ": " + exc_value.msg
         if hasattr(exc_value, 'args'):
           args = exc_value.args
-          if isinstance(args, StringTypes):
-            args = prefix + ": " + args
-          else:
-            args = list(args)
-            if len(exc_value.args) == 0:
-              args = prefix
+          if args:
+            if isinstance(args, StringTypes):
+              args = prefix + ": " + args
             else:
-              args = [ prefix + ": " + unicode(exc_value.args[0]) ] \
-                               + list(exc_value.args[1:])
-          exc_value.args = args
+              args = list(args)
+              if len(exc_value.args) == 0:
+                args = prefix
+              else:
+                args = [ prefix + ": " + unicode(exc_value.args[0]) ] \
+                                 + list(exc_value.args[1:])
+            exc_value.args = args
         else:
           # we can't modify this - at least report the current prefix state
           sys.stderr.write("%s: Pfx.__exit__: exc_value = %r %s\n" \
