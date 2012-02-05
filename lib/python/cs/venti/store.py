@@ -287,6 +287,7 @@ class MappingStore(BasicStore):
   def add(self, block):
     h = self.hash(block)
     self.mapping[h] = block
+    return h
 
   def get(h, default=None):
     return self.mapping.get(h, default)
