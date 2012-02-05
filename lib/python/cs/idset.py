@@ -1,7 +1,7 @@
 import os
 import os.path
 import re
-from cs.misc import warn, mkdirn, WithUCAttrs
+from cs.misc import mkdirn, WithUCAttrs
 
 numeric_re = re.compile(r'^(0|[1-9][0-9]*)$')
 def is_idnum(s):
@@ -104,16 +104,16 @@ class IdSetEntry:
       if is_entryKey(key):
         yield key
       else:
-        warning("reject %s"%key)
+        warning("reject %r", key)
 
   def _keypath(self,key):
-    assert is_entryKey(key), "invalid key \"%s\"" % key
+    assert is_entryKey(key), "invalid key %r" % (key,)
     return os.path.join(self.path,key)
 
   def __getitem__(self,key):
     if key in self.__values:
       return self.__values[key]
-    assert is_entryKey(key), "invalid key \"%s\"" % key
+    assert is_entryKey(key), "invalid key %r" % (key,)
     path=self._keypath(key)
     if not os.access(path,os.F_OK):
       return None
@@ -126,14 +126,14 @@ class IdSetEntry:
       "%s: incomplete last line" % (cmd, path)
     return lastline[:-1]
 
-  def __setitem(self,key,value):
-    assert is_entryKey(key), "invalid key \"%s\"" % key
+  def __setitem__(self,key,value):
+    assert is_entryKey(key), "invalid key %r" % (key,)
     if type(value) in (int, float):
       value=str(value)
     assert value.find('\n') < 0, "newlines not allowed in entry values"
 
     if key == "name":
-      assert is_name(name), "illegal name \"%s\"" % name
+      assert is_name(name), "illegal name %r" % (name,)
       if "name" in self:
         del self["name"]
     else:
@@ -148,7 +148,7 @@ class IdSetEntry:
     self.__values[key]=value
 
   def __delitem__(self,key):
-    assert is_entryKey(key), "invalid key \"%s\"" % key
+    assert is_entryKey(key), "invalid key %r" % (key,)
     if key == "name":
       value=self["name"]
       if is_name(value):
