@@ -49,17 +49,19 @@ class Dirent(object):
   '''
 
   def __init__(self, type_, name, meta=None):
-    assert isinstance(type_, int), "type=%s"%(type_, )
-    self.type = type_
-    assert name is None or isinstance(name, str), "name=%s"%(name, )
-    self.name = name
+    if not isinstance(type_, int):
+      raise TypeError("type_ is not an int: <%s>%r" % (type(type_), type_))
+    if name is not None and not isinstance(name, str):
+      raise TypeError("name is neither None nor str: <%s>%r" % (type(name), name))
     if meta is None:
       meta = Meta()
     else:
-      assert isinstance(meta, Meta), "meta=%s"%(meta, )
+      if not isinstance(meta, Meta):
+        raise TypeError("meta is not a Meta: <%s>%r" % (type(meta), meta))
+    self.type = type_
+    self.name = name
     self.meta = meta
     self.d_ino = None
-    assert meta is not None
 
   def __str__(self):
     return self.textEncode()
@@ -99,7 +101,8 @@ class Dirent(object):
 
     meta = self.meta
     if meta:
-      assert isinstance(meta, Meta)
+      if not isinstance(meta, Meta):
+        raise TypeError("self.meta is not a Meta: <%s>%r" % (type(meta), meta))
       metatxt = meta.encode()
       if len(metatxt) > 0:
         metatxt = toBS(len(metatxt))+metatxt
@@ -131,7 +134,8 @@ class Dirent(object):
 
     meta = self.meta
     if meta:
-      assert isinstance(meta, Meta)
+      if not isinstance(meta, Meta):
+        raise TypeError("self.meta is not a Meta: <%s>%r" % (type(meta), meta))
       metatxt = meta.encode()
       if len(metatxt) > 0:
         metatxt = hexify(toBS(len(metatxt))) + totext(metatxt)
@@ -278,13 +282,15 @@ def decodeDirent(s, justone=False):
   meta = None
   if flags & F_HASMETA:
     metalen, s = fromBS(s)
-    assert metalen < len(s)
+    if metalen >= len(s):
+      raise ValueError("metalen %d >= len(s) %d" % (metalen, len(s)))
     meta = s[:metalen]
     s = s[metalen:]
   meta = Meta(meta)
   if flags & F_HASNAME:
     namelen, s = fromBS(s)
-    assert namelen < len(s)
+    if namelen >= len(s):
+      raise ValueError("namelen %d >= len(s) %d" % (namelen, len(s)))
     name = s[:namelen]
     s = s[namelen:]
   else:
@@ -297,8 +303,8 @@ def decodeDirent(s, justone=False):
   else:
     E = _BasicDirent(type_, name, meta, block)
   if justone:
-    assert len(s) == 0, \
-           "unparsed stuff after decoding %s: %s" % (totext(s0), totext(s))
+    if len(s):
+      raise ValueError("unparsed stuff after decoding %s: %s" % (totext(s0), totext(s)))
     return E
   return E, s
 
@@ -371,7 +377,10 @@ class Dir(Dirent):
     while len(dirdata) > 0:
       odirdata = dirdata
       E, dirdata = decodeDirent(dirdata)
-      assert len(dirdata) < len(odirdata) and odirdata.endswith(dirdata)
+      if len(dirdata) >= len(odirdata):
+        raise ValueError("dirdata did not shrink")
+      if not odirdata.endswith(dirdata):
+        raise ValueError("dirdata not a suffix of odirdata")
       if E.name is None or len(E.name) == 0:
         # FIXME: skip unnamed dirent
         continue
@@ -414,14 +423,19 @@ class Dir(Dirent):
     ''' Store a Dirent in the specified name slot.
     '''
     ##debug("<%s>[%s]=%s" % (self.name, name, E))
-    assert self.__validname(name)
-    assert name not in self
-    assert isinstance(E, Dirent)
+    if not self.__validname(name):
+      raise KeyError("invalid name: %s" % (name,))
+    if name in self:
+      raise KeyError("name already present: %s" % (name,))
+    if not isinstance(E, Dirent):
+      raise ValueError("E is not a Dirent: <%s>%r" % (type(E), E))
     self.entries[name] = E
 
   def __delitem__(self, name):
-    assert self.__validname(name)
-    assert name != '.' and name != '..'
+    if not self.__validname(name):
+      raise KeyError("invalid name: %s" % (name,))
+    if name == '.' or name == '..':
+      raise KeyError("refusing to delete . or ..: name=%s" % (name,))
     del self.entries[name]
 
   def getBlock(self):
@@ -461,7 +475,8 @@ class Dir(Dirent):
         Return the entry.
     '''
     D = self[name]
-    assert D.isdir
+    if not D.isdir:
+      raise ValueError("%s[name=%s]: not a directory" % (self, name))
     return D
 
   def chdir(self, path):
@@ -491,7 +506,8 @@ class Dir(Dirent):
       if E is None:
         E = D.mkdir(name)
       else:
-        assert E.isdir
+        if not E.isdir:
+          raise ValueError("%s[name=%s] is not a directory" % (D, name))
       D = E
     return D
 
@@ -507,7 +523,8 @@ class Dir(Dirent):
     with Pfx("updateFrom(%s,...)" % (osdir,)):
       if verbosefp:
         print >>verbosefp, osdir+'/'
-      assert os.path.isdir(osdir), "not a directory: %s" % (osdir,)
+      if not os.path.isdir(osdir):
+        raise ValueError("not a directory: %s" % (osdir,))
       ok = self.tryUpdateStat(osdir)
       osdirpfx = os.path.join(osdir, '')
       for dirpath, dirnames, filenames in os.walk(osdir, topdown=False):
@@ -515,8 +532,8 @@ class Dir(Dirent):
           if dirpath == osdir:
             D = self
           else:
-            assert dirpath.startswith(osdirpfx), \
-                    "dirpath=%s, osdirpfx=%s" % (dirpath, osdirpfx)
+            if not dirpath.startswith(osdirpfx):
+              raise ValueError("dirpath=%s, osdirpfx=%s" % (dirpath, osdirpfx))
             subdirpath = dirpath[len(osdirpfx):]
             D = self.makedirs(subdirpath)
 
