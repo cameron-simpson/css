@@ -2,7 +2,8 @@ import string
 import re
 import sys
 if sys.hexversion < 0x02060000: from sets import Set as set
-from cs.misc import warn, the, DictUC_Attrs
+from cs.misc import the, DictUC_Attrs
+from cs.logutils import warning
 from cs.hier import flavour, T_SEQ, T_MAP
 from cs.db import dosql, SQLQuery, sqlise, today
 import cs.cache

@@ -14,7 +14,7 @@ import datetime
 if sys.hexversion < 0x02060000: from sets import Set as set
 import cs.secret
 import cs.cache
-from cs.logging import error, warn
+from cs.logutils import error, warning
 from cs.misc import isodate, the, WithUC_Attrs
 from thread import allocate_lock
 
