@@ -1,0 +1,36 @@
+#!/bin/sh
+#
+# Run "hg fetch" with better message.
+#       - Cameron Simpson <cs@zip.com.au> 06feb2012
+#
+
+set -ue
+
+cmd=`basename "$0"`
+usage="Usage: $cmd [other-repo]"
+
+badopts=
+
+if [ $# -gt 0 ]
+then
+  other=$1
+  shift
+else
+  other=`hg paths | sed -n '/^default *=/s/^default *= *//p'`
+  if [ -z "$other" ]
+  then
+    echo "$cmd: no default repo path" >&2
+    badopts=1
+  fi
+fi
+
+if [ $# -gt 0 ]
+then
+  echo "$cmd: extra arguments after other-repo: $*" >&2
+  badopts=1
+fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+set -x
+exec hg fetch -m "merge from $other" -- "$other"
