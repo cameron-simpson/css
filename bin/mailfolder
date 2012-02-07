@@ -58,22 +58,23 @@ else
   maildir=$MAILDIR/$foldername
   omaildir=$MAILDIR/$old/$foldername
 
-  ismaildir "$maildir" || { echo "$cmd: $maildir: not a Maildir" >&2
-                            badopts=1
-                          }
-
-  case "$runlocal" in
-    '') needhost "$MAILHOMEHOST@$SYSTEMID" && runlocal=
-        ismaildir "$maildir" && runlocal=1
-        ;;
-    0)  runlocal=
-        ;;
-  esac
+  if ismaildir "$maildir"
+  then
+    case "$runlocal" in
+      '') needhost "$MAILHOMEHOST@$SYSTEMID" && runlocal=
+          ismaildir "$maildir" && runlocal=1
+          ;;
+      0)  runlocal=
+          ;;
+    esac
+  else
+    runlocal=
+  fi
 fi
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
-[ $runlocal ] || exec $trace sshx -E -t "$rhost" mailfolder -l -- "$mailfolder"
+[ $runlocal ] || exec $trace sshx -E -t "$rhost" mailfolder -l -- "$foldername"
 
 ismaildir "$omaildir" || $trace maildir "$omaildir"
 
