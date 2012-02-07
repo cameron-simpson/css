@@ -1,0 +1,124 @@
+#!/bin/sh
+#
+# On the fly offlineimap invoker.
+#       - Cameron Simpson <cs@zip.com.au> 06feb2012
+#
+
+set -ue
+
+: ${TMPDIR:=/tmp}
+: ${OFFLINEIMAP_META:=$HOME/.offlineimap}
+: ${USER:=`id -un`}
+: ${LOGDIR:=$HOME/var/log}
+
+cmd=`basename "$0"`
+usage="Usage: $cmd here there folders...
+  here  A directory containing maildir folders.
+  there An IMAP server reference of the form:
+          [username[:password]@]hostname[:port][/prepath]"
+
+badopts=
+
+logdir=$LOGDIR/offlineimap
+
+if [ $# = 0 ]
+then
+  echo "$cmd: missing here" >&2
+  badopts=1
+else
+  here=$1
+  shift
+  [ -d "$here/." ] || { echo "$cmd: here: not a directory: $here" >&2
+                        badopts=1
+                      }
+  here=`cd "$here" && pwd`
+fi
+
+if [ $# = 0 ]
+then
+  echo "$cmd: missing there" >&2
+  badopts=1
+else
+  there=$1
+  shift
+fi
+
+if [ $# = 0 ]
+then
+  echo "$cmd: missing folders" >&2
+  badopts=1
+fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+[ -d "$logdir/." ] || set-x mkdir -p "$logdir"
+
+tmppfx=$TMPDIR/$cmd.$$
+trap 'rm -f "$tmppfx".*' 0
+trap 'rm -f "$tmppfx".*; exit 1' 1 3 15
+
+case "$there" in
+  */*)  prepath=`expr "x$there" : 'x[^/]*/\(.*\)'`/
+        there=`expr "x$there" : 'x\([^/]*\)/.*'`
+        ;;
+  *)    prepath= ;;
+esac
+case "$there" in
+  *@*)  username=`expr "x$there" : 'x\(.*\)@.*'`
+        there=`expr "x$there" : 'x.*@\(.*\)'`
+        ;;
+  *)    username=$USER ;;
+esac
+case "$username" in
+  *:*)  password=`expr "x$username" : 'x[^:]*:\(.*\)'`
+        username=`expr "x$username" : 'x\([^:]*\):.*'`
+        pwfile=
+        ;;
+  *)    password= ;;
+esac
+case "$there" in
+  *:[1-9]*)
+        port=`expr "x$there" : 'x.*:\([1-9][0-9]*\)$'`
+        there=`expr "x$there" : 'x\(.*\):[1-9][0-9]*$'`
+        ;;
+  *)    port=143 ;;
+esac
+
+rep_here=`printf '%s\n' "$here" | tr -s / _`
+rep_there=$username@$there:$port
+account=$rep_here::$rep_there
+folders=`for f; do echo "$prepath$f"; done | tr '\012' ,`
+
+cfg=$tmppfx.cfg
+exec 3>"$cfg"
+cat <<X >&3
+[general]
+accounts = $account
+metadata = $OFFLINEIMAP_META
+##ui = TTYUI
+ui = Blinkenlights
+fsync = false
+
+[Account $account]
+localrepository = $rep_here
+remoterepository = $rep_there
+
+[Repository $rep_here]
+type = Maildir
+localfolders = $here
+nametrans = lambda foldername: '$prepath' + foldername
+
+[Repository $rep_there]
+type = IMAP
+nametrans = lambda foldername: foldername[len('$prepath'):] if foldername.startswith('$prepath') else foldername
+remotehost = $there
+remoteuser = $username
+##remotepassword = $password
+remotepassfile = ~/private/passwd.$rep_there
+X
+
+exec 3>&-
+cat "$cfg"
+
+set -x
+exec offlineimap -c "$cfg" -f "$folders" -l "$logdir/$account-`date '+%Y%m%dT%H%M%S'`-$$"
