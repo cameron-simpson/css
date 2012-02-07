@@ -1,0 +1,87 @@
+#!/bin/sh
+#
+# Read a mail folder.
+# Sync with remote copies first.
+# Run self remotely if no local folder.
+#       - Cameron Simpson <cs@zip.com.au>
+#
+
+set -ue
+
+: ${MAILDIR:=$HOME/mail}
+: ${MAIL_EXPIRE_FORMAT:='%Y'}           # versus, say, %Y-%m
+: ${MAIL_IMAPSYNC:=}
+
+cmd=`basename "$0"`
+usage="Usage: $cmd [-f] [-I imapsync] [-q] foldername
+  -l    Run locally. Default is to run remote if not on home machine
+        and no local folder.
+  -I imapsync
+        Specify remote IMAP for use with imap-sync(1cs).
+        Default from \$MAIL_IMAPSYNC: $MAIL_IMAPSYNC
+        Supply empty string to prevent sync.
+  -q    Quick imap-sync."
+
+badopts=
+
+trace=set-x
+runlocal=
+rhost=$SYSTEMID
+imapsyncopts=
+
+while [ $# -gt 0 ]
+do
+  case "$1" in
+    -I) MAIL_IMAPSYNC=$2; export MAIL_IMAPSYNC; shift ;;
+    -l) runlocal=1 ;;
+    -r) runlocal=0 rhost=$2 ;;
+    -q) imapsyncopts="$imapsyncopts $1" ;;
+    --) shift; break ;;
+    -?*)echo "$cmd: unrecognised option: $1" >&2; badopts=1 ;;
+    *)  break ;;
+  esac
+  shift
+done
+
+if [ $# = 0 ]
+then
+  echo "$cmd: missing foldername" >&2
+  badopts=1
+else
+  foldername=$1
+  shift
+  [ $# = 0 ] || { echo "$cmd: extra arguments after foldername: $*" >&2
+                  badopts=1
+                }
+
+  old=OLD/`date "+$MAIL_EXPIRE_FORMAT"`
+  maildir=$MAILDIR/$foldername
+  omaildir=$MAILDIR/$old/$foldername
+
+  ismaildir "$maildir" || { echo "$cmd: $maildir: not a Maildir" >&2
+                            badopts=1
+                          }
+
+  case "$runlocal" in
+    '') needhost "$MAILHOMEHOST@$SYSTEMID" && runlocal=
+        ismaildir "$maildir" && runlocal=1
+        ;;
+    0)  runlocal=
+        ;;
+  esac
+fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+[ $runlocal ] || exec $trace sshx -E -t "$rhost" mailfolder -l -- "$mailfolder"
+
+ismaildir "$omaildir" || $trace maildir "$omaildir"
+
+[ -n "$MAIL_IMAPSYNC" ] \
+&& $trace imap-sync $imapsyncopts "$MAILDIR" "$MAIL_IMAPSYNC" "$foldername" "$old/$foldername"
+
+# where to take copies - presumes sendmail=sendmesg-fcc in muttrc
+SENDMESG_FCC="$maildir +spool-out"
+export SENDMESG_FCC
+
+$trace mutt -f "$maildir" -e 'fcc-hook . $maildir'
