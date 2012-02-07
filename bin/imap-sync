@@ -88,6 +88,7 @@ rep_here=`printf '%s\n' "$here" | tr -s / _`
 rep_there=$username@$there:$port
 account=$rep_here::$rep_there
 folders=`for f; do echo "$prepath$f"; done | tr '\012' ,`
+logfile=$logdir/$account-`date '+%Y%m%dT%H%M%S'`-$$
 
 cfg=$tmppfx.cfg
 exec 3>"$cfg"
@@ -95,8 +96,8 @@ cat <<X >&3
 [general]
 accounts = $account
 metadata = $OFFLINEIMAP_META
-##ui = TTYUI
-ui = Blinkenlights
+ui = TTYUI
+##ui = Blinkenlights
 fsync = false
 
 [Account $account]
@@ -118,7 +119,7 @@ remotepassfile = ~/private/passwd.$rep_there
 X
 
 exec 3>&-
-cat "$cfg"
+##cat "$cfg"
 
 set -x
-exec offlineimap -c "$cfg" -f "$folders" -l "$logdir/$account-`date '+%Y%m%dT%H%M%S'`-$$"
+exec offlineimap -c "$cfg" -f "$folders" -l "$logfile"
