@@ -58,18 +58,24 @@ else
   maildir=$MAILDIR/$foldername
   omaildir=$MAILDIR/$old/$foldername
 
-  if ismaildir "$maildir"
-  then
-    case "$runlocal" in
-      '') needhost "$MAILHOMEHOST@$SYSTEMID" && runlocal=
-          ismaildir "$maildir" && runlocal=1
-          ;;
-      0)  runlocal=
-          ;;
-    esac
-  else
-    runlocal=
-  fi
+  case "$runlocal" in
+    '') # not set - infer from environment
+        # not at home? run remote, unless local folder present
+        if needhost "$MAILHOMEHOST@$SYSTEMID"
+        then  runlocal=1
+        else  runlocal=
+              ismaildir "$maildir" && runlocal=1
+        fi
+        ;;
+    0)  runlocal=
+        ;;
+  esac
+fi
+
+if [ $runlocal ] && not ismaildir "$maildir"
+then
+  echo "$cmd: not a maildir: $maildir" >&2
+  badopts=1
 fi
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
