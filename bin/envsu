@@ -3,10 +3,12 @@
 # Wrapper for su to preserve environment.
 #	- Cameron Simpson, January 1992
 #
-# Huge simplification. - cameron 20nov2011
+# Huge simplification and support for command+args. - cameron 20nov2011
 #
 
 set -ue
+
+: ${TMPDIR:=/tmp}
 
 cmd=$0
 usage="Usage: $cmd [-] [-u user] [--] [user] [command [args...]]"
@@ -59,6 +61,7 @@ fi
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
 # preserve environment, with small changes
+# construct an env command and put it into a shell command
 set -- "USER=$su_user" "PS1=" "PS2=" "$@"
 for envvar in `env | sed -n 's/^\([a-zA-Z_][a-zA-Z0-9_]*\)=.*/\1/p'| sort -r`
 do
@@ -66,5 +69,12 @@ do
 done
 set -- env "$@"
 
-##set -x
-exec sux $su_opts -u "$su_user" -- "$@"
+tmpf=$TMPDIR/su.$$.sh
+trap 'rm -f "$tmpf"' 0 1 2 3 15
+echo '#!/bin/sh' >"$tmpf"
+echo "rm -f '$tmpf'"
+chmod 600 "$tmpf"
+shqstr exec "$@" >>"$tmpf"
+
+set -x
+sux $su_opts -u "$su_user" -- /bin/sh "$tmpf"
