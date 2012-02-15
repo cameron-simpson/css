@@ -18,7 +18,9 @@ set -ue
 : ${HGBOX_LOCAL:=$HOME/var/hgbox}
 
 cmd=`basename "$0"`
-usage="Usage: $cmd [-L local] [-R master] sync [-q]"
+usage="Usage:
+  $cmd [-L local] [-R master] export [-f]
+  $cmd [-L local] [-R master] sync [-q]"
 
 hgmaster=$HGBOX_MASTER
 hglocal=$HGBOX_LOCAL
@@ -54,6 +56,17 @@ else
   op=$1
   shift
   case "$op" in
+    export)
+        force_export=
+        if [ $# -gt 0 ] && [ "x$1" = x-f ]
+        then
+          shift
+          force_export=1
+        fi
+        [ $# = 0 ] || { echo "$cmd: extra arguments after $op: $*" >&2
+                        badopts=1
+                      }
+        ;;
     sync)
         sync_quick=
         if [ $# -gt 0 ] && [ "x$1" = x-q ]
@@ -173,22 +186,37 @@ withhgoutmap()
 
 cd "$hglocal" || exit 1
 
-withhgoutmap sync_in
+case "$op" in
+  export)
+    if [ $force_export ] \
+    || { [ -t 0 ] && ask "really export from hgbox to exterior directories"; }
+    then
+      withhgoutmap sync_out
+    else
+      echo "$cmd: aborting export" >&2
+      exit 1
+    fi
+    ;;
+  sync)
 
-hgstat=`$hg stat`
-if [ -n "$hgstat" ]
-then
-  $hg addremove
-  $hg commit -m "sync in `hostname`:`pwd` `date +'%Y-%m-%d-%H:%M:%S'`"
-fi
+    withhgoutmap sync_in
 
-if not [ $sync_quick ]
-then
-  [ $silent ] || echo "import from $hgmaster"
-  $hg fetch "$hgmaster"
-  withhgoutmap sync_out
+    hgstat=`$hg stat`
+    if [ -n "$hgstat" ]
+    then
+      $hg addremove
+      $hg commit -m "sync in `hostname`:`pwd` `date +'%Y-%m-%d-%H:%M:%S'`"
+    fi
 
-  [ $silent ] || echo "export to $hgmaster"
-  $hg push "$hgmaster"
-  inhg "$hgmaster" $hg up
-fi
+    if not [ $sync_quick ]
+    then
+      [ $silent ] || echo "import from $hgmaster"
+      $hg fetch "$hgmaster"
+      withhgoutmap sync_out
+
+      [ $silent ] || echo "export to $hgmaster"
+      $hg push "$hgmaster"
+      inhg "$hgmaster" $hg up
+    fi
+    ;;
+esac
