@@ -184,7 +184,7 @@ class Maker(object):
             self._targets[O.name] = O
             if first_target is None:
               first_target = O
-            O.namespaces = self._macros
+            O.namespaces = [self._macros]
           elif isinstance(O, Macro):
             self.debug_parse("add macro %s", O)
             self._macros[O.name] = O
