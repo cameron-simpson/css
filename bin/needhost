@@ -14,9 +14,9 @@ quiet=1
 for target
 do
   case "$target" in
-    $HOST|$HOSTNAME|$HOST@$SYSTEMID|$HOSTNAME@$SYSTEMID|@$SYSTEMID)
-	exit 0
-	;;
+    $HOST|$HOSTNAME|$HOST@$SYSTEMID|$HOSTNAME@$SYSTEMID)
+      exit 0
+      ;;
   esac
 done
 
