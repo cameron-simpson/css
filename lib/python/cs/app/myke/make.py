@@ -11,7 +11,8 @@ from thread import allocate_lock
 import cs.misc
 from cs.later import Later
 from cs.logutils import Pfx, info, error, debug
-from .parse import parseMakefile, Macro, parseMacroExpression, MacroExpression
+from .parse import SPECIAL_MACROS, Macro, MacroExpression, \
+                   parseMakefile, parseMacroExpression
 
 SHELL = '/bin/sh'
 
@@ -52,6 +53,10 @@ class Maker(object):
     return '%s<Maker>' % (cs.misc.cmd,)
   def _queue(self, func, name, priority):
     return self._makeQ.submit(func, name=name, priority=priority)
+
+  @property
+  def namespaces(self):
+    return [ self._macros ]
 
   @property
   def makefiles(self):
@@ -123,7 +128,9 @@ class Maker(object):
     '''
     with Pfx("setDebug(%s, %s)" % (repr(flag), repr(value))):
       if not flag.isalpha() or not hasattr(self.debug, flag):
-        raise AttributeError, "invalid debug flag"
+        raise AttributeError(
+                "invalid debug flag, know: %s"
+                % (",".join( sorted( [F for F in dir(self.debug) if F.isalpha() ] ) ),))
       if self.debug.flags:
         info("debug.%s = %s", flag, value)
       setattr(self.debug, flag, value)
@@ -180,11 +187,11 @@ class Maker(object):
         first_target = None
         for O in parseMakefile(self, makefile, [self._macros]):
           if isinstance(O, Target):
-            self.debug_parse("add target %s", O)
-            self._targets[O.name] = O
+            T = O
+            self.debug_parse("add target %s", T)
+            self._targets[T.name] = T
             if first_target is None:
-              first_target = O
-            O.namespaces = [self._macros]
+              first_target = T
           elif isinstance(O, Macro):
             self.debug_parse("add macro %s", O)
             self._macros[O.name] = O
@@ -204,7 +211,6 @@ class Target(object):
     '''
     self.context = context
     self.name = name
-    self.namespaces = None
     self.shell = SHELL
     self._prereqs = prereqs
     self._postprereqs = postprereqs
@@ -216,6 +222,20 @@ class Target(object):
 
   def __str__(self):
     return "{}[{}]:{}:{}".format(self.name, self.state, self._prereqs, self._postprereqs)
+
+  @property
+  def namespaces(self):
+    return ( [ { '@':     lambda c, ns: self.name,
+                 '/':     lambda c, ns: [ P.name for P in self.prereqs ],
+                 # TODO: $? et al
+               },
+             ]
+           + self.maker.namespaces
+           + [
+               self.maker.macros,
+               SPECIAL_MACROS,
+             ]
+           )
 
   def make(self, maker):
     ''' Request that this target be made.
@@ -301,7 +321,7 @@ class Action(object):
     M = target.maker
     v = self.variant
     if v == 'shell':
-      shcmd = self.mexpr.eval(target.namespaces)
+      shcmd = self.mexpr(target.namespaces)
       if not self.silent:
         print shcmd
       if M.no_action:

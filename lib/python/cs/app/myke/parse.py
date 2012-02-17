@@ -10,6 +10,13 @@ import unittest
 from cs.lex import get_chars, get_other_chars, get_white, get_identifier
 from cs.logutils import Pfx, error, info, debug, exception
 
+# mapping of special macro names to evaluation functions
+SPECIAL_MACROS = { '.':         lambda c, ns: os.getcwd(),       # TODO: cache
+                   '$':         lambda c, ns: '$',
+                 }
+
+TARGET_MACROS = "@?/"
+
 # macro assignment, including leading whitespace
 #
 # match
@@ -46,15 +53,40 @@ class Macro(object):
   '''
 
   def __init__(self, context, name, params, text):
+    ''' Initialise macro definition.
+        `context`: source context.
+        `name`: macro name.
+        `params`: list of paramater names.
+        `text`: replacement text, unparsed.
+    '''
     self.context = context
     self.name = name
     self.params = params
     self.text = text
+    self._mexpr = None
 
   def __str__(self):
     if self.params:
-      return "<Macro %s(%s) = %s>" % (self.name, ", ".join(self.params), self.text)
+      return "<Macro %s(%s) = %s>" % (self.name, ",".join(self.params), self.text)
     return "<Macro %s = %s>" % (self.name, self.text)
+
+  __repr__ = __str__
+
+  @property
+  def mexpr(self):
+    if self._mexpr is None:
+      self._mexpr, offset = parseMacroExpression(self.context, self.text)
+      assert offset == len(self.text)
+    return self._mexpr
+
+  def __call__(self, context, namespaces, param_mexprs):
+    if len(param_mexprs) != len(self.params):
+      raise ValueError(
+              "mismatched Macro parameters: self.params = %r (%d items) but got %d param_mexprs: %r"
+              % (self.params, len(self.params), len(param_mexprs), param_mexprs))
+    if self.params:
+      namespaces = [ dict(zip(self.params, param_mexprs)) ] + namespaces
+    return self.mexpr(context, namespaces)
 
 def parseMakefile(M, fp, namespaces, parent_context=None):
   ''' Read a Mykefile and yield Macros and Targets.
@@ -143,7 +175,11 @@ def parseMakefile(M, fp, namespaces, parent_context=None):
 
           m = RE_ASSIGNMENT.match(line)
           if m:
-            yield Macro(context, m.group(1), RE_COMMASEP.split(m.group(1)), line[m.end():])
+            macro_name = m.group(1)
+            params_text = m.group(2)
+            param_names = RE_COMMASEP.split(params_text) if params_text else ()
+            macro_text = line[m.end():]
+            yield Macro(context, macro_name, param_names, macro_text)
             continue
 
           # presumably a target definition
@@ -158,7 +194,7 @@ def parseMakefile(M, fp, namespaces, parent_context=None):
             postprereqs_mexpr = []
 
           action_list = []
-          for target in target_mexpr.eval(namespaces).split():
+          for target in target_mexpr(context, namespaces).split():
             yield Target(target, context, prereqs=prereqs_mexpr, postprereqs=postprereqs_mexpr, actions=action_list)
           continue
 
@@ -171,14 +207,6 @@ def parseMakefile(M, fp, namespaces, parent_context=None):
       error("unexpected EOF: unterminated slosh continued line")
 
     M.debug_parse("finish parse")
-
-# mapping of special macro names to evaluation functions
-SPECIAL_MACROS = { '.':         None,
-                   '@':         None,
-                   '?':         None,
-                   '/':         None,
-                   '$':         lambda x: '$',
-                 }
 
 def parseMacroExpression(context, text=None, offset=0, stopchars=''):
   ''' A macro expression is a concatenation of permutations.
@@ -221,6 +249,9 @@ def parseMacroExpression(context, text=None, offset=0, stopchars=''):
   return MacroExpression(context, permutations), offset
 
 class MacroExpression(object):
+  ''' A MacroExpression represents a piece of text into which macro
+      substitution is to occur.
+  '''
 
   def __init__(self, context, permutations):
     self.context = context
@@ -240,7 +271,7 @@ class MacroExpression(object):
 
   __hash__ = None
 
-  def eval(self, namespaces):
+  def __call__(self, context, namespaces):
     if self._result is not None:
       return self._result
     strs = []           # strings to collate
@@ -265,12 +296,14 @@ class MacroExpression(object):
               wordlists.append([item])
       else:
         # should be a MacroTerm
+        mterm = item
+        assert isinstance(mterm, MacroTerm), "expected MacroTerm, got %r" % (mterm,)
         if wordlists is not None and len(wordlists) == 0:
           # word already short circuited - skip evaluating the MacroTerm
           pass
         else:
-          text = item.eval(namespaces)
-          if item.permute:
+          text = mterm(context, namespaces, mterm.params)
+          if mterm.permute:
             textwords = text.split()
             if len(textwords) == 0:
               # short circuit
@@ -319,7 +352,7 @@ def parseMacro(context, text=None, offset=0):
     ch = text[offset]
 
     # $x
-    if ch == '_' or ch.isalpha() or ch in SPECIAL_MACROS:
+    if ch == '_' or ch.isalpha() or ch in SPECIAL_MACROS or ch in TARGET_MACROS:
       offset += 1
       M = MacroTerm(context, ch), offset
       return M
@@ -364,6 +397,7 @@ def parseMacro(context, text=None, offset=0):
             raise ParseError(context, offset, 'macro paramaters: expected comma or closing parenthesis, found: '+text[offset:])
         offset += 1
     else:
+      # must be "qtext" or a special macro name
       q = text[offset]
       if q == '"' or q == "'":
         # $('qstr')
@@ -419,7 +453,8 @@ def parseMacro(context, text=None, offset=0):
       else:
         offset += 1
 
-    M = MacroTerm(context, mtext, modifiers, param_mexprs, permute=mpermute), offset
+    print >>sys.stderr, "new MacroTerm: mtext=<%s>" % (mtext,)
+    M = MacroTerm(context, mtext, modifiers, param_mexprs, permute=mpermute, literal=mliteral), offset
     return M
 
   except IndexError, e:
@@ -432,6 +467,19 @@ class MacroTerm(object):
   '''
 
   def __init__(self, context, text, modifiers='', params=(), permute=False, literal=False):
+    ''' Initialise a MacroTerm.
+        `context`: source context.
+        `text`: macro name.
+        `modifiers`: list of modifier terms eg: ['P', 'G?',]
+        `params`: list of parameter MacroExpressions.
+        `permute`: whether inside $((...)).
+        `literal`: if true, text is just text, not a macro name.
+    '''
+    if literal:
+      if params:
+        raise ValueError(
+              "no paramaters permitted with a literal MacroTerm: params=%r"
+                % (params,))
     self.context = context
     self.text = text
     self.modifiers = modifiers
@@ -454,26 +502,31 @@ class MacroTerm(object):
 
   __repr__ = __str__
 
-  def eval(self, namespaces, params=[]):
+  def __call__(self, context, namespaces, param_mexprs):
     with Pfx(str(self.context)):
       text = self.text
+      if not self.literal:
+        macro = None
+        for ns in namespaces:
+          if text in ns:
+            macro = ns[text]
+            break
+        if macro is None:
+          raise ValueError("unknown macro name \"%s\" in %r: namespaces=%r" % (text, self, namespaces))
+        text = macro(context, namespaces, param_mexprs)
+
       modifiers = self.modifiers
-
-      if len(self.params) != len(params):
-        raise ValueError("parameter count mismatch, expected %d, received %d" % (len(self.params), len(params)))
-
-      # assemble paramaters for namespace use
-      param_map = {}
-      for param, mexpr in zip(self.params, params):
-        param_map[param] = Macro(context, param, (), mexpr)
-      namespaces = [param_map] + namespaces
 
       modifiers = list(modifiers)
       while modifiers:
         m = modifiers.pop(0)
         if m == 'v':
           # TODO: accept lax?
-          text = ' '.join( MacroTerm(context, word).eval(context, namespaces) for word in text.split() )
+          text = ' '.join( MacroTerm(context, word)(context, namespaces) for word in text.split() )
+        elif m == 'E':
+          mexpr, offset = parseMacroExpression(self.context, text)
+          assert offset == len(text)
+          text = mexpr(context, namespaces)
         else:
           raise NotImplementedError('unimplemented macro modifier "%s"' % (m,))
 
