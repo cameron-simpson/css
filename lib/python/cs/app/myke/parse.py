@@ -5,6 +5,7 @@ import sys
 import glob
 from collections import namedtuple
 from itertools import chain, product
+import os
 import re
 from string import whitespace, letters, digits
 import unittest
@@ -143,7 +144,25 @@ def parseMakefile(M, fp, namespaces, parent_context=None):
             continue
 
           if line.startswith(':'):
-            raise NotImplementedError, "directives unimplemented"
+            _, offset = get_white(line, 1)
+            word, offset = get_identifier(line, offset)
+            if not word:
+              raise SyntaxError("missing directive name")
+            with Pfx(word):
+              if word == 'import':
+                ok = True
+                for envvar in line[offset:].split():
+                  if envvar:
+                    envvalue = os.environ.get(envvar)
+                    if envvalue is None:
+                      error("no $%s" % (envvar,))
+                      ok = False
+                    else:
+                      yield Macro(context, envvar, (), envvalue.replace('$', '$$'))
+                if not ok:
+                  raise ValueError("missing environment variables")
+                continue
+              raise SyntaxError("unrecognised directive")
 
           if action_list is not None:
             if not line[0].isspace():

@@ -2,6 +2,7 @@
 #
 
 import sys
+import os
 import os.path
 import getopt
 from functools import partial
@@ -64,8 +65,14 @@ class Maker(object):
     '''
     _makefiles = self._makefiles
     if not _makefiles:
-      self._makefiles = _makefiles = ( os.path.basename(cs.misc.cmd).title() + 'file', )
-    elif type(_makefiles) is not tuple:
+      _makefiles = []
+      makerc = os.environ.get( (cs.misc.cmd+'rc').upper() )
+      if makerc and os.path.exists(makerc):
+        _makefiles.append(makerc)
+      makefile = os.path.basename(cs.misc.cmd).title() + 'file'
+      _makefiles.append(makefile)
+      self._makefiles = _makefiles
+    if type(_makefiles) is not tuple:
       self._makefiles = _makefiles = tuple(_makefiles)
     return _makefiles
 
