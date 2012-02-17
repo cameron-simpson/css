@@ -6,6 +6,8 @@ import glob
 from collections import namedtuple
 from itertools import chain, product
 import os
+import os.path
+from os.path import dirname, realpath, isabs
 import re
 from string import whitespace, letters, digits
 import unittest
@@ -149,6 +151,15 @@ def parseMakefile(M, fp, namespaces, parent_context=None):
             if not word:
               raise SyntaxError("missing directive name")
             with Pfx(word):
+              if word == 'append':
+                mexpr, offset = parseMacroExpression(context, line, offset)
+                assert offset == len(line)
+                for include_file in mexpr(context, M.namespaces).split():
+                  if include_file:
+                    if not os.path.isabs(include_file):
+                      include_file = os.path.join( realpath(dirname(filename)), include_file )
+                    M.add_appendfile(include_file)
+                continue
               if word == 'import':
                 ok = True
                 for envvar in line[offset:].split():

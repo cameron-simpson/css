@@ -45,6 +45,7 @@ class Maker(object):
     self.default_target = None
     self._makeQ = None
     self._makefiles = []
+    self.appendfiles = []
     self._targets = {}
     self._targets_lock = allocate_lock()
     self._namespaces = []
@@ -75,6 +76,9 @@ class Maker(object):
     if type(_makefiles) is not tuple:
       self._makefiles = _makefiles = tuple(_makefiles)
     return _makefiles
+
+  def add_appendfile(self, filename):
+    self.appendfiles.append(filename)
 
   def debug_make(self, msg, *a, **kw):
     if self.debug.make:
@@ -187,8 +191,8 @@ class Maker(object):
           badopts = True
     return args, badopts
 
-  def loadMakefiles(self):
-    for makefile in self.makefiles:
+  def loadMakefiles(self, makefiles):
+    for makefile in makefiles:
       with Pfx(makefile):
         first_target = None
         ns = {}

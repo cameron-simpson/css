@@ -23,7 +23,8 @@ def main(argv):
     print >>sys.stderr, usage % (cmd,)
     return 2
 
-  M.loadMakefiles()
+  M.loadMakefiles(M.makefiles)
+  M.loadMakefiles(M.appendfiles)
 
   if args:
     targets = args
