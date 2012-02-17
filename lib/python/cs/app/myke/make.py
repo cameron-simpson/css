@@ -46,8 +46,7 @@ class Maker(object):
     self._makefiles = []
     self._targets = {}
     self._targets_lock = allocate_lock()
-    self._macros = {}
-    self._macros_lock = allocate_lock()
+    self._namespaces = []
 
   def __str__(self):
     return '%s<Maker>' % (cs.misc.cmd,)
@@ -56,12 +55,12 @@ class Maker(object):
 
   @property
   def namespaces(self):
-    return [ self._macros ]
+    return self._namespaces + [ SPECIAL_MACROS ]
 
   @property
   def makefiles(self):
     ''' The list of makefiles to consult, a tuple.
-        It is not possible to add more makefiles are accessing this property.
+        It is not possible to add more makefiles after accessing this property.
     '''
     _makefiles = self._makefiles
     if not _makefiles:
@@ -185,7 +184,9 @@ class Maker(object):
     for makefile in self.makefiles:
       with Pfx(makefile):
         first_target = None
-        for O in parseMakefile(self, makefile, [self._macros]):
+        ns = {}
+        self._namespaces.insert(0, ns)
+        for O in parseMakefile(self, makefile, self.namespaces):
           if isinstance(O, Target):
             T = O
             self.debug_parse("add target %s", T)
@@ -194,7 +195,7 @@ class Maker(object):
               first_target = T
           elif isinstance(O, Macro):
             self.debug_parse("add macro %s", O)
-            self._macros[O.name] = O
+            ns[O.name] = O
           else:
             raise ValueError, "parseMakefile({}): unsupported parse item received: {}{}".format(makefile, type(O), repr(O))
         if first_target is not None:

@@ -2,8 +2,9 @@
 #
 
 import sys
+import glob
 from collections import namedtuple
-from itertools import product
+from itertools import chain, product
 import re
 from string import whitespace, letters, digits
 import unittest
@@ -79,7 +80,7 @@ class Macro(object):
       assert offset == len(self.text)
     return self._mexpr
 
-  def __call__(self, context, namespaces, param_mexprs):
+  def __call__(self, context, namespaces, *param_mexprs):
     if len(param_mexprs) != len(self.params):
       raise ValueError(
               "mismatched Macro parameters: self.params = %r (%d items) but got %d param_mexprs: %r"
@@ -513,20 +514,33 @@ class MacroTerm(object):
             break
         if macro is None:
           raise ValueError("unknown macro name \"%s\" in %r: namespaces=%r" % (text, self, namespaces))
-        text = macro(context, namespaces, param_mexprs)
+        text = macro(context, namespaces, *param_mexprs)
 
       modifiers = self.modifiers
 
       modifiers = list(modifiers)
       while modifiers:
         m = modifiers.pop(0)
-        if m == 'v':
-          # TODO: accept lax?
-          text = ' '.join( MacroTerm(context, word)(context, namespaces) for word in text.split() )
-        elif m == 'E':
+        if m == 'E':
           mexpr, offset = parseMacroExpression(self.context, text)
           assert offset == len(text)
           text = mexpr(context, namespaces)
+        elif m == 'G' or m == 'G?':
+          lax = m == 'G?'
+          globs = []
+          for ptn in text.split():
+            if len(ptn):
+              with Pfx("glob(\"%s\")" % (ptn,)):
+                globbed = glob.glob(ptn)
+                if globbed:
+                  globs.append(globbed)
+                else:
+                  if not lax:
+                    raise ValueError("no matches")
+          text = " ".join(chain(*globbed))
+        elif m == 'v':
+          # TODO: accept lax?
+          text = ' '.join( MacroTerm(context, word)(context, namespaces) for word in text.split() )
         else:
           raise NotImplementedError('unimplemented macro modifier "%s"' % (m,))
 
