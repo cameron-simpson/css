@@ -92,14 +92,85 @@ class Macro(object):
       namespaces = [ dict(zip(self.params, param_mexprs)) ] + namespaces
     return self.mexpr(context, namespaces)
 
-def parseMakefile(M, fp, namespaces, parent_context=None):
+def readMakefileLines(M, fp, parent_context=None):
+  ''' Read a Mykefile and yield text lines.
+      This generator parses slosh extensions and
+      :if/ifdef/ifndef/else/endif directives.
+
+  '''
+  if type(fp) is str:
+    # open file, yield contents
+    filename = fp
+    with open(filename) as fp:
+      for O in readMakefileLines(M, fp, parent_context):
+        yield O
+    return
+
+  try:
+    filename = fp.name
+  except AttributeError:
+    filename = str(fp)
+
+  with Pfx(filename):
+    M.debug_parse("begin parse")
+    ifStack = []        # active ifStates (state, in-first-branch)
+    ifState = None      # ifStack[-1]
+    context = None      # FileContext(filename, lineno, line)
+
+    lineno = 0
+    prevline = None
+    for line in fp:
+      lineno += 1
+      with Pfx(str(lineno)):
+        if prevline is not None:
+          # prepend previous continuation line if any
+          line = prevline + '\n' + line
+          prevline = None
+        else:
+          # start of line - new context
+          context = FileContext(filename, lineno, line.rstrip(), parent_context)
+
+        try:
+          if not line.endswith('\n'):
+            raise ParseError(context, len(line), 'unexpected EOF (missing final newline)')
+
+          if line.endswith('\\\n'):
+            # continuation line - gather next line before parse
+            prevline = line[:-2]
+            continue
+
+          line = line.rstrip()
+          if not line or line.lstrip().startswith('#'):
+            # skip blank lines and comments
+            continue
+
+        # look for :if etc
+        if line.startswith(':'):
+          # top level directive
+          _, offset = get_white(line, 1)
+          word, offset = get_identifier(line, offset)
+          if not word:
+            raise SyntaxError("missing directive name")
+          with Pfx(word):
+            if word == 'ifdef':
+              _, offset = get_white(line, offset)
+              mname, offset = get_identifier(line, offset)
+              
+        
+        if ifState and not ifState[0]:
+          # in false branch of "if"; skip line
+          continue
+
+        yield line
+
+def parseMakefile(M, fp, parent_context=None):
   ''' Read a Mykefile and yield Macros and Targets.
   '''
   if type(fp) is str:
     # open file, yield contents
     filename = fp
     with open(filename) as fp:
-      for O in parseMakefile(M, fp, namespaces, parent_context):
+      for O in parseMakefile(M, fp, parent_context):
         yield O
     return
 
@@ -114,7 +185,7 @@ def parseMakefile(M, fp, namespaces, parent_context=None):
     M.debug_parse("begin parse")
     ok = True
     action_list = None       # not in a target
-    ifStack = []        # active ifStates (state, firstbranch)
+    ifStack = []        # active ifStates (state, in-first-branch)
     ifState = None      # ifStack[-1]
     context = None      # FileContext(filename, lineno, line)
 
@@ -146,11 +217,15 @@ def parseMakefile(M, fp, namespaces, parent_context=None):
             continue
 
           if line.startswith(':'):
+            # top level directive
             _, offset = get_white(line, 1)
             word, offset = get_identifier(line, offset)
             if not word:
               raise SyntaxError("missing directive name")
             with Pfx(word):
+              if ifState and not ifState[0]:
+                # we are in the False part of an ":if" directive
+                continue
               if word == 'append':
                 mexpr, offset = parseMacroExpression(context, line, offset)
                 assert offset == len(line)
@@ -175,7 +250,12 @@ def parseMakefile(M, fp, namespaces, parent_context=None):
                 continue
               raise SyntaxError("unrecognised directive")
 
+          if ifState and not ifState[0]:
+            # we are in the False part of an ":if" directive
+            continue
+
           if action_list is not None:
+            # currently collating a Target
             if not line[0].isspace():
               # new target or unindented assignment etc - fall through
               # action_list is already attached to targets,
@@ -225,7 +305,7 @@ def parseMakefile(M, fp, namespaces, parent_context=None):
             postprereqs_mexpr = []
 
           action_list = []
-          for target in target_mexpr(context, namespaces).split():
+          for target in target_mexpr(context, M.namespaces).split():
             yield Target(target, context, prereqs=prereqs_mexpr, postprereqs=postprereqs_mexpr, actions=action_list)
           continue
 
