@@ -34,7 +34,13 @@ RE_ASSIGNMENT = re.compile( re_assignment )
 
 RE_COMMASEP = re.compile( r'\s*,\s*' )
 
-FileContext = namedtuple('FileContext', 'filename lineno text parent')
+class FileContext(namedtuple('FileContext', 'filename lineno text parent')):
+
+  def __str__(self):
+    tag = "%s:%d" % (self.filename, self.lineno)
+    if self.parent:
+      tag = str(self.parent) + ": " + tag
+    return tag
 
 class ParseError(SyntaxError):
   ''' A ParseError subclasses SyntaxError in order to change the initialiser.
@@ -290,7 +296,7 @@ def parseMakefile(M, fp, parent_context=None):
             macro_name = m.group(1)
             params_text = m.group(2)
             param_names = RE_COMMASEP.split(params_text) if params_text else ()
-            macro_text = line[m.end():]
+            macro_text = line[m.end():].rstrip()
             yield Macro(context, macro_name, param_names, macro_text)
             continue
 
