@@ -136,7 +136,7 @@ class Maker(object):
   def setDebug(self, flag, value):
     ''' Set or clear the named debug option.
     '''
-    with Pfx("setDebug(%s, %s)" % (repr(flag), repr(value))):
+    with Pfx("setDebug(%r, %r)" % (flag, value)):
       if not flag.isalpha() or not hasattr(self.debug, flag):
         raise AttributeError(
                 "invalid debug flag, know: %s"
@@ -180,7 +180,7 @@ class Maker(object):
             try:
               self.setDebug(flag, value)
             except AttributeError, e:
-              error("bad flag %s: %s", repr(flag), e)
+              error("bad flag %r: %s", flag, e)
               badopts = True
         elif opt == '-f':
           self._makefiles.append(value)
