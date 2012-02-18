@@ -92,14 +92,120 @@ class Macro(object):
       namespaces = [ dict(zip(self.params, param_mexprs)) ] + namespaces
     return self.mexpr(context, namespaces)
 
-def parseMakefile(M, fp, namespaces, parent_context=None):
+def readMakefileLines(M, fp, parent_context=None):
+  ''' Read a Mykefile and yield text lines.
+      This generator parses slosh extensions and
+      :if/ifdef/ifndef/else/endif directives.
+
+  '''
+  if type(fp) is str:
+    # open file, yield contents
+    filename = fp
+    with open(filename) as fp:
+      for O in readMakefileLines(M, fp, parent_context):
+        yield O
+    return
+
+  try:
+    filename = fp.name
+  except AttributeError:
+    filename = str(fp)
+
+  with Pfx(filename):
+    M.debug_parse("begin parse")
+    ifStack = []        # active ifStates (state, in-first-branch)
+    ifState = None      # ifStack[-1]
+    context = None      # FileContext(filename, lineno, line)
+
+    lineno = 0
+    prevline = None
+    for line in fp:
+      lineno += 1
+      with Pfx(str(lineno)):
+        if not line.endswith('\n'):
+          raise ParseError(context, len(line), 'unexpected EOF (missing final newline)')
+
+        if prevline is not None:
+          # prepend previous continuation line if any
+          line = prevline + '\n' + line
+          prevline = None
+        else:
+          # start of line - new context
+          context = FileContext(filename, lineno, line.rstrip(), parent_context)
+
+        if line.endswith('\\\n'):
+          # continuation line - gather next line before parse
+          prevline = line[:-2]
+          continue
+
+        # skip blank lines and comments
+        w1 = line.lstrip()
+        if not w1 or w1.startswith('#'):
+          continue
+
+        try:
+          # look for :if etc
+          if line.startswith(':'):
+            # top level directive
+            _, offset = get_white(line, 1)
+            word, offset = get_identifier(line, offset)
+            if not word:
+              raise SyntaxError("missing directive name")
+            with Pfx(word):
+              if word == 'ifdef':
+                _, offset = get_white(line, offset)
+                mname, offset = get_identifier(line, offset)
+                if not mname:
+                  raise ParseError(context, offset, "missing macro name")
+                _, offset = get_white(line, offset)
+                if offset < len(line):
+                  raise ParseError(context, offset, "extra arguments after macro name: %s" % (line[offset:],))
+                newIfState = [ False, True ]
+                if all( [ item[0] for item in ifStack ] ):
+                  for ns in M.namespaces:
+                    if mname in ns:
+                      newIfState[0] = True
+                      break
+                ifStack.append(newIfState)
+                continue
+              if word == "ifndef":
+                _, offset = get_white(line, offset)
+                mname, offset = get_identifier(line, offset)
+                if not mname:
+                  raise ParseError(context, offset, "missing macro name")
+                _, offset = get_white(line, offset)
+                if offset < len(line):
+                  raise ParseError(context, offset, "extra arguments after macro name: %s" % (line[offset:],))
+                newIfState = [ True, True ]
+                if all( [ item[0] for item in ifStack ] ):
+                  for ns in M.namespaces:
+                    if mname in ns:
+                      newIfState[0] = False
+                      break
+                ifStack.append(newIfState)
+                continue
+              if word == "if":
+                raise ParseError(context, offset, "\":if\" not yet implemented")
+                continue
+
+          if not all( [ item[0] for item in ifStack ] ):
+            # in false branch of "if"; skip line
+            continue
+
+        except SyntaxError, e:
+          error(e)
+          continue
+
+        yield context, line
+
+def parseMakefile(M, fp, parent_context=None):
   ''' Read a Mykefile and yield Macros and Targets.
   '''
   if type(fp) is str:
     # open file, yield contents
     filename = fp
     with open(filename) as fp:
-      for O in parseMakefile(M, fp, namespaces, parent_context):
+      for O in parseMakefile(M, fp, parent_context):
         yield O
     return
 
@@ -114,42 +220,16 @@ def parseMakefile(M, fp, namespaces, parent_context=None):
     M.debug_parse("begin parse")
     ok = True
     action_list = None       # not in a target
-    ifStack = []        # active ifStates (state, firstbranch)
-    ifState = None      # ifStack[-1]
-    context = None      # FileContext(filename, lineno, line)
 
-    lineno = 0
-    prevline = None
-    for line in fp:
-      lineno += 1
-      with Pfx("%d" % (lineno,)):
-        if prevline is not None:
-          # prepend previous continuation line if any
-          line = prevline + '\n' + line
-          prevline = None
-        else:
-          # start of line - new context
-          context = FileContext(filename, lineno, line.rstrip(), parent_context)
-
+    for context, line in readMakefileLines(M, fp, parent_context=parent_context):
+      with Pfx(str(context)):
         try:
-          if not line.endswith('\n'):
-            raise ParseError(context, len(line), 'unexpected EOF (missing final newline)')
-
-          if line.endswith('\\\n'):
-            # continuation line - gather next line before parse
-            prevline = line[:-2]
-            continue
-
-          line = line.rstrip()
-          if not line or line.lstrip().startswith('#'):
-            # skip blank lines and comments
-            continue
-
           if line.startswith(':'):
-            _, offset = get_white(line, 1)
-            word, offset = get_identifier(line, offset)
+            # top level directive
+            _, doffset = get_white(line, 1)
+            word, offset = get_identifier(line, doffset)
             if not word:
-              raise SyntaxError("missing directive name")
+              raise ParseError("missing directive name")
             with Pfx(word):
               if word == 'append':
                 mexpr, offset = parseMacroExpression(context, line, offset)
@@ -173,9 +253,10 @@ def parseMakefile(M, fp, namespaces, parent_context=None):
                 if not ok:
                   raise ValueError("missing environment variables")
                 continue
-              raise SyntaxError("unrecognised directive")
+              raise ParseError(context, doffset, "unrecognised directive")
 
           if action_list is not None:
+            # currently collating a Target
             if not line[0].isspace():
               # new target or unindented assignment etc - fall through
               # action_list is already attached to targets,
@@ -216,6 +297,8 @@ def parseMakefile(M, fp, namespaces, parent_context=None):
           # presumably a target definition
           # gather up the target as a macro expression
           target_mexpr, offset = parseMacroExpression(context, stopchars=':')
+          if offset >= len(context.text):
+            print >>sys.stderr, "\n\noffset = %d\ncontext.text = [%s]\n\n" % (offset, context.text)
           if context.text[offset] != ':':
             raise ParseError(context, offset, "no colon in target definition")
           prereqs_mexpr, offset = parseMacroExpression(context, offset=offset+1, stopchars=':')
@@ -225,7 +308,7 @@ def parseMakefile(M, fp, namespaces, parent_context=None):
             postprereqs_mexpr = []
 
           action_list = []
-          for target in target_mexpr(context, namespaces).split():
+          for target in target_mexpr(context, M.namespaces).split():
             yield Target(target, context, prereqs=prereqs_mexpr, postprereqs=postprereqs_mexpr, actions=action_list)
           continue
 
@@ -439,7 +522,7 @@ def parseMacro(context, text=None, offset=0):
           offset += 1
         mtext = text[text_offset:offset]
         offset += 1
-      elif q in SPECIAL_MACROS:
+      elif q in SPECIAL_MACROS or q in TARGET_MACROS:
         # $(@ ...) etc
         mtext = q
         offset += 1
@@ -555,6 +638,10 @@ class MacroTerm(object):
           mexpr, offset = parseMacroExpression(self.context, text)
           assert offset == len(text)
           text = mexpr(context, namespaces)
+        elif m == 'D':
+          text = " ".join( os.path.dirname(s) for s in text.split() if len(s) )
+        elif m == 'F':
+          text = " ".join( os.path.basename(s) for s in text.split() if len(s) )
         elif m == 'G' or m == 'G?':
           lax = m == 'G?'
           globs = []
