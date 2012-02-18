@@ -255,10 +255,6 @@ def parseMakefile(M, fp, parent_context=None):
                 continue
               raise ParseError(context, doffset, "unrecognised directive")
 
-          if ifState and not ifState[0]:
-            # we are in the False part of an ":if" directive
-            continue
-
           if action_list is not None:
             # currently collating a Target
             if not line[0].isspace():
