@@ -29,7 +29,7 @@ TARGET_MACROS = "@?/"
 #  identifier(param[,param...]) =
 #
 re_identifier = r'[A-Za-z]\w*'
-re_assignment = r'^\s*(' + re_identifier + ')(\(' + re_identifier + '(\s*,\s*' + re_identifier + ')*\s*\))?\s*='
+re_assignment = r'^\s*(' + re_identifier + r')(\(' + re_identifier + r'(\s*,\s*' + re_identifier + r')*\s*\))?\s*='
 RE_ASSIGNMENT = re.compile( re_assignment )
 
 RE_COMMASEP = re.compile( r'\s*,\s*' )
@@ -77,8 +77,8 @@ class Macro(object):
 
   def __str__(self):
     if self.params:
-      return "<Macro %s(%s) = %s>" % (self.name, ",".join(self.params), self.text)
-    return "<Macro %s = %s>" % (self.name, self.text)
+      return "<Macro %s(%s)>" % (self.name, ",".join(self.params), )
+    return "<Macro %s>" % (self.name, )
 
   __repr__ = __str__
 
@@ -207,126 +207,108 @@ def readMakefileLines(M, fp, parent_context=None):
 def parseMakefile(M, fp, parent_context=None):
   ''' Read a Mykefile and yield Macros and Targets.
   '''
-  if type(fp) is str:
-    # open file, yield contents
-    filename = fp
-    with open(filename) as fp:
-      for O in parseMakefile(M, fp, parent_context):
-        yield O
-    return
-
   from .make import Target, Action
+  action_list = None       # not in a target
+  for context, line in readMakefileLines(M, fp, parent_context=parent_context):
+    with Pfx(str(context)):
+      try:
+        if line.startswith(':'):
+          # top level directive
+          _, doffset = get_white(line, 1)
+          word, offset = get_identifier(line, doffset)
+          if not word:
+            raise ParseError("missing directive name")
+          with Pfx(word):
+            if word == 'append':
+              mexpr, offset = parseMacroExpression(context, line, offset)
+              assert offset == len(line)
+              for include_file in mexpr(context, M.namespaces).split():
+                if include_file:
+                  if not os.path.isabs(include_file):
+                    include_file = os.path.join( realpath(dirname(filename)), include_file )
+                  M.add_appendfile(include_file)
+              continue
+            if word == 'import':
+              ok = True
+              for envvar in line[offset:].split():
+                if envvar:
+                  envvalue = os.environ.get(envvar)
+                  if envvalue is None:
+                    error("no $%s" % (envvar,))
+                    ok = False
+                  else:
+                    yield Macro(context, envvar, (), envvalue.replace('$', '$$'))
+              if not ok:
+                raise ValueError("missing environment variables")
+              continue
+            raise ParseError(context, doffset, "unrecognised directive")
 
-  try:
-    filename = fp.name
-  except AttributeError:
-    filename = str(fp)
-
-  with Pfx(filename):
-    M.debug_parse("begin parse")
-    ok = True
-    action_list = None       # not in a target
-
-    for context, line in readMakefileLines(M, fp, parent_context=parent_context):
-      with Pfx(str(context)):
-        try:
-          if line.startswith(':'):
-            # top level directive
-            _, doffset = get_white(line, 1)
-            word, offset = get_identifier(line, doffset)
-            if not word:
-              raise ParseError("missing directive name")
-            with Pfx(word):
-              if word == 'append':
-                mexpr, offset = parseMacroExpression(context, line, offset)
-                assert offset == len(line)
-                for include_file in mexpr(context, M.namespaces).split():
-                  if include_file:
-                    if not os.path.isabs(include_file):
-                      include_file = os.path.join( realpath(dirname(filename)), include_file )
-                    M.add_appendfile(include_file)
-                continue
-              if word == 'import':
-                ok = True
-                for envvar in line[offset:].split():
-                  if envvar:
-                    envvalue = os.environ.get(envvar)
-                    if envvalue is None:
-                      error("no $%s" % (envvar,))
-                      ok = False
-                    else:
-                      yield Macro(context, envvar, (), envvalue.replace('$', '$$'))
-                if not ok:
-                  raise ValueError("missing environment variables")
-                continue
-              raise ParseError(context, doffset, "unrecognised directive")
-
-          if action_list is not None:
-            # currently collating a Target
-            if not line[0].isspace():
-              # new target or unindented assignment etc - fall through
-              # action_list is already attached to targets,
-              # so simply reset it to None to keep state
-              action_list = None
-            else:
-              # action line
-              _, offset = get_white(line)
-              if offset >= len(line) or line[offset] != ':':
-                # ordinary shell action
-                action_silent = False
-                if offset < len(line) and line[offset] == '@':
-                  action_silent = True
-                  offset += 1
-                A = Action(context, 'shell', line[offset:], silent=action_silent)
-                M.debug_parse("add action: %s", A)
-                action_list.append(A)
-                continue
-              # in-target directive like ":make"
-              _, offset = get_white(line, offset+1)
-              directive, offset = get_identifier(line, offset)
-              if not directive:
-                raise ParseError(context, offset, "missing in-target directive after leading colon")
-              A = Action(context, directive, line[offset:].lstrip())
+        if action_list is not None:
+          # currently collating a Target
+          if not line[0].isspace():
+            # new target or unindented assignment etc - fall through
+            # action_list is already attached to targets,
+            # so simply reset it to None to keep state
+            action_list = None
+          else:
+            # action line
+            _, offset = get_white(line)
+            if offset >= len(line) or line[offset] != ':':
+              # ordinary shell action
+              action_silent = False
+              if offset < len(line) and line[offset] == '@':
+                action_silent = True
+                offset += 1
+              A = Action(context, 'shell', line[offset:], silent=action_silent)
               M.debug_parse("add action: %s", A)
               action_list.append(A)
               continue
-
-          m = RE_ASSIGNMENT.match(line)
-          if m:
-            macro_name = m.group(1)
-            params_text = m.group(2)
-            param_names = RE_COMMASEP.split(params_text) if params_text else ()
-            macro_text = line[m.end():].rstrip()
-            yield Macro(context, macro_name, param_names, macro_text)
+            # in-target directive like ":make"
+            _, offset = get_white(line, offset+1)
+            directive, offset = get_identifier(line, offset)
+            if not directive:
+              raise ParseError(context, offset, "missing in-target directive after leading colon")
+            A = Action(context, directive, line[offset:].lstrip())
+            M.debug_parse("add action: %s", A)
+            action_list.append(A)
             continue
 
-          # presumably a target definition
-          # gather up the target as a macro expression
-          target_mexpr, offset = parseMacroExpression(context, stopchars=':')
-          if offset >= len(context.text):
-            print >>sys.stderr, "\n\noffset = %d\ncontext.text = [%s]\n\n" % (offset, context.text)
-          if context.text[offset] != ':':
-            raise ParseError(context, offset, "no colon in target definition")
-          prereqs_mexpr, offset = parseMacroExpression(context, offset=offset+1, stopchars=':')
-          if offset < len(context.text) and context.text[offset] == ':':
-            postprereqs_mexpr, offset = parseMacroExpression(context, offset=offset+1)
-          else:
-            postprereqs_mexpr = []
-
-          action_list = []
-          for target in target_mexpr(context, M.namespaces).split():
-            yield Target(target, context, prereqs=prereqs_mexpr, postprereqs=postprereqs_mexpr, actions=action_list)
+        m = RE_ASSIGNMENT.match(line)
+        if m:
+          macro_name = m.group(1)
+          params_text = m.group(2)
+          param_names = RE_COMMASEP.split(params_text) if params_text else ()
+          macro_text = line[m.end():].rstrip()
+          yield Macro(context, macro_name, param_names, macro_text)
           continue
 
-          raise ParseError(context, 0, 'unparsed line')
-        except ParseError, e:
-          exception("%s", e)
+        # presumably a target definition
+        # gather up the target as a macro expression
+        target_mexpr, offset = parseMacroExpression(context, stopchars=':')
+        if offset >= len(context.text):
+          print >>sys.stderr, "\n\noffset = %d\ncontext.text = [%s]\n\n" % (offset, context.text)
+        if context.text[offset] != ':':
+          raise ParseError(context, offset, "no colon in target definition")
+        prereqs_mexpr, offset = parseMacroExpression(context, offset=offset+1, stopchars=':')
+        if offset < len(context.text) and context.text[offset] == ':':
+          postprereqs_mexpr, offset = parseMacroExpression(context, offset=offset+1)
+        else:
+          postprereqs_mexpr = []
 
-    if prevline is not None:
-      # incomplete continuation line
-      error("unexpected EOF: unterminated slosh continued line")
+        action_list = []
+        for target in target_mexpr(context, M.namespaces).split():
+          yield Target(target, context, prereqs=prereqs_mexpr, postprereqs=postprereqs_mexpr, actions=action_list)
+        continue
 
-    M.debug_parse("finish parse")
+        raise ParseError(context, 0, 'unparsed line')
+      except ParseError, e:
+        exception("%s", e)
+
+  if prevline is not None:
+    # incomplete continuation line
+    error("unexpected EOF: unterminated slosh continued line")
+
+  M.debug_parse("finish parse")
 
 def parseMacroExpression(context, text=None, offset=0, stopchars=''):
   ''' A macro expression is a concatenation of permutations.
@@ -623,6 +605,8 @@ class MacroTerm(object):
   __repr__ = __str__
 
   def __call__(self, context, namespaces, param_mexprs):
+    ''' Evaluate a macro expression.
+    '''
     with Pfx(str(self.context)):
       text = self.text
       if not self.literal:
@@ -635,37 +619,34 @@ class MacroTerm(object):
           raise ValueError("unknown macro name \"%s\" in %r: namespaces=%r" % (text, self, namespaces))
         text = macro(context, namespaces, *param_mexprs)
 
-      modifiers = self.modifiers
-
-      modifiers = list(modifiers)
-      while modifiers:
-        m = modifiers.pop(0)
-        if m == 'E':
-          mexpr, offset = parseMacroExpression(self.context, text)
-          assert offset == len(text)
-          text = mexpr(context, namespaces)
-        elif m == 'D':
-          text = " ".join( os.path.dirname(s) for s in text.split() if len(s) )
-        elif m == 'F':
-          text = " ".join( os.path.basename(s) for s in text.split() if len(s) )
-        elif m == 'G' or m == 'G?':
-          lax = m == 'G?'
-          globs = []
-          for ptn in text.split():
-            if len(ptn):
-              with Pfx("glob(\"%s\")" % (ptn,)):
-                globbed = glob.glob(ptn)
-                if globbed:
-                  globs.append(globbed)
-                else:
-                  if not lax:
-                    raise ValueError("no matches")
-          text = " ".join(chain(*globbed))
-        elif m == 'v':
-          # TODO: accept lax?
-          text = ' '.join( MacroTerm(context, word)(context, namespaces) for word in text.split() )
-        else:
-          raise NotImplementedError('unimplemented macro modifier "%s"' % (m,))
+      for modifier in self.modifiers:
+        with Pfx(modifier):
+          if modifier == 'E':
+            mexpr, offset = parseMacroExpression(self.context, text)
+            assert offset == len(text)
+            text = mexpr(context, namespaces)
+          elif modifier == 'D':
+            text = " ".join( os.path.dirname(s) for s in text.split() if len(s) )
+          elif modifier == 'F':
+            text = " ".join( os.path.basename(s) for s in text.split() if len(s) )
+          elif modifier == 'G' or modifier == 'G?':
+            lax = modifier == 'G?'
+            globs = []
+            for ptn in text.split():
+              if len(ptn):
+                with Pfx("glob(\"%s\")" % (ptn,)):
+                  globbed = glob.glob(ptn)
+                  if globbed:
+                    globs.append(globbed)
+                  else:
+                    if not lax:
+                      raise ValueError("no matches")
+            text = " ".join(chain(*globbed))
+          elif modifier == 'v':
+            # TODO: accept lax?
+            text = ' '.join( MacroTerm(context, word)(context, namespaces) for word in text.split() )
+          else:
+            raise NotImplementedError('unimplemented macro modifier')
 
       return text
 
