@@ -575,6 +575,23 @@ def parseMacro(context, text=None, offset=0):
           modifiers.append(modifier)
           continue
 
+        if ch in 'PpSs':
+          modifier = ch
+          offset += 1
+          sep = '.'
+          if offset < len(text) and text[offset] == '[':
+            # [x] separator specification
+            offset += 1
+            if offset >= len(text):
+              raise ParseError(context, offset, 'incomplete %s[sep] modifier - missing separator' % (modifier,))
+            sep = text[offset]
+            offset += 1
+            if offset >= len(text) or text[offset] != ']':
+              raise ParseError(context, offset, 'incomplete %s[sep] modifier - missing ]' % (modifier,))
+            offset += 1
+          modifiers.append(modifier + sep)
+          continue
+
         if ch == '-':
           modifier = '-'
           moffset = offset
