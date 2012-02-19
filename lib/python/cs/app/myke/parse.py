@@ -67,12 +67,20 @@ class ParseError(SyntaxError):
     self.context = context
 
 def nsget(namespaces, mname):
-  print >>sys.stderr, "namespaces = %r" % (namespaces,)
   for ns in namespaces:
     M = ns.get(mname)
     if M:
       return M
+  print >>sys.stderr, "not found: %s\nnamespaces =\n  %s" % (mname, nsstr(namespaces),)
   return None
+
+def nsstr(namespaces):
+  return \
+    "\n  ".join( "{ %s\n  }" % ( ",\n    ".join( "%s: %s" % (k, ns[k])
+                                                 for k in sorted(ns.keys())
+                                               ), )
+                 for ns in namespaces
+               )
 
 class Macro(object):
   ''' A macro definition.
@@ -649,7 +657,7 @@ class MacroTerm(object):
       if not self.literal:
         macro = nsget(namespaces, text)
         if macro is None:
-          raise ValueError("unknown macro name \"%s\" in %r: namespaces=%r" % (text, self, namespaces))
+          raise ValueError("unknown macro: $(%s)" % (text,))
         text = macro(context, namespaces, *param_mexprs)
 
       for modifier in self.modifiers:
