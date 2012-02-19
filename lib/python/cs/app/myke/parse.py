@@ -66,6 +66,14 @@ class ParseError(SyntaxError):
     self.offset = offset
     self.context = context
 
+def nsget(namespaces, mname):
+  print >>sys.stderr, "namespaces = %r" % (namespaces,)
+  for ns in namespaces:
+    M = ns.get(mname)
+    if M:
+      return M
+  return None
+
 class Macro(object):
   ''' A macro definition.
   '''
@@ -98,6 +106,7 @@ class Macro(object):
     return self._mexpr
 
   def __call__(self, context, namespaces, *param_mexprs):
+    assert type(namespaces) is list, "namespaces = %r" % (namespaces,)
     if len(param_mexprs) != len(self.params):
       raise ValueError(
               "mismatched Macro parameters: self.params = %r (%d items) but got %d param_mexprs: %r"
@@ -173,10 +182,7 @@ def readMakefileLines(M, fp, parent_context=None):
                 raise ParseError(context, offset, "extra arguments after macro name: %s" % (line[offset:],))
               newIfState = [ False, True ]
               if all( [ item[0] for item in ifStack ] ):
-                for ns in M.namespaces:
-                  if mname in ns:
-                    newIfState[0] = True
-                    break
+                newIfState[0] = nsget(M.namespaces, mname) is not None
               ifStack.append(newIfState)
               continue
             if word == "ifndef":
@@ -189,10 +195,7 @@ def readMakefileLines(M, fp, parent_context=None):
                 raise ParseError(context, offset, "extra arguments after macro name: %s" % (line[offset:],))
               newIfState = [ True, True ]
               if all( [ item[0] for item in ifStack ] ):
-                for ns in M.namespaces:
-                  if mname in ns:
-                    newIfState[0] = False
-                    break
+                newIfState[0] = nsget(M.namespaces, mname) is None
               ifStack.append(newIfState)
               continue
             if word == "if":
@@ -218,6 +221,10 @@ def readMakefileLines(M, fp, parent_context=None):
         continue
 
       yield context, line
+
+  if prevline is not None:
+    # incomplete continuation line
+    error("unexpected EOF: unterminated slosh continued line")
 
   if ifStack:
     raise SyntaxError("%s: EOF with open :if directives" % (filename,))
@@ -322,10 +329,6 @@ def parseMakefile(M, fp, parent_context=None):
       except ParseError, e:
         exception("%s", e)
 
-  if prevline is not None:
-    # incomplete continuation line
-    error("unexpected EOF: unterminated slosh continued line")
-
   M.debug_parse("finish parse")
 
 def parseMacroExpression(context, text=None, offset=0, stopchars=''):
@@ -392,6 +395,7 @@ class MacroExpression(object):
   __hash__ = None
 
   def __call__(self, context, namespaces):
+    assert type(namespaces) is list, "namespaces = %r" % (namespaces,)
     if self._result is not None:
       return self._result
     strs = []           # strings to collate
@@ -639,14 +643,11 @@ class MacroTerm(object):
   def __call__(self, context, namespaces, param_mexprs):
     ''' Evaluate a macro expression.
     '''
+    assert type(namespaces) is list, "namespaces = %r" % (namespaces,)
     with Pfx(str(self.context)):
       text = self.text
       if not self.literal:
-        macro = None
-        for ns in namespaces:
-          if text in ns:
-            macro = ns[text]
-            break
+        macro = nsget(namespaces, text)
         if macro is None:
           raise ValueError("unknown macro name \"%s\" in %r: namespaces=%r" % (text, self, namespaces))
         text = macro(context, namespaces, *param_mexprs)
@@ -677,6 +678,13 @@ class MacroTerm(object):
           elif modifier == 'v':
             # TODO: accept lax?
             text = ' '.join( MacroTerm(context, word)(context, namespaces) for word in text.split() )
+          elif modifier.startswith('-'):
+            submname = modifier[1:]
+            M = nsget(namespaces, submname)
+            if not M:
+              raise ValueError("no macro $(%s)" % (submname,))
+            subwords = set( subword for subword in M(context, namespaces).split() if subword )
+            text = " ".join( word for word in text.split() if word and word not in subwords )
           else:
             raise NotImplementedError('unimplemented macro modifier')
 
