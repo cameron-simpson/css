@@ -548,6 +548,7 @@ def parseMacro(context, text=None, offset=0):
           # whitespace
           offset += 1
           continue
+
         if ch == '?':
           raise ParseError(context, offset, 'bare query "?" found in modifiers at: %s' % (text[offset:],))
         pos = SIMPLE_MODIFIERS.find(ch)
@@ -560,8 +561,20 @@ def parseMacro(context, text=None, offset=0):
             modifier += '?'
             offset += 1
           modifiers.append(modifier)
-        else:
-          raise ParseError(context, offset, 'unknown macro modifier "%s": "%s"' % (ch, text[offset:]))
+          continue
+
+        if ch == '-':
+          modifier = '-'
+          moffset = offset
+          _, offset = get_white(text, offset+1)
+          submname, offset = get_identifier(text, offset)
+          if not submname:
+            raise ParseError(context, moffset, 'missing macro name after "-" modifier')
+          modifiers.append(modifier+submname)
+          continue
+
+        raise ParseError(context, offset, 'unknown macro modifier "%s": "%s"' % (ch, text[offset:]))
+
       except ParseError, e:
         error("%s", e)
         offset += 1
