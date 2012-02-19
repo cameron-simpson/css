@@ -77,8 +77,8 @@ class Macro(object):
 
   def __str__(self):
     if self.params:
-      return "<Macro %s(%s)>" % (self.name, ",".join(self.params), )
-    return "<Macro %s>" % (self.name, )
+      return "$(%s(%s))" % (self.name, ",".join(self.params), )
+    return ( "$(%s)" if len(self.name) > 1 else "$%s" ) % (self.name,)
 
   __repr__ = __str__
 
@@ -117,92 +117,90 @@ def readMakefileLines(M, fp, parent_context=None):
   except AttributeError:
     filename = str(fp)
 
-  with Pfx(filename):
-    M.debug_parse("begin parse")
-    ifStack = []        # active ifStates (state, in-first-branch)
-    ifState = None      # ifStack[-1]
-    context = None      # FileContext(filename, lineno, line)
+  ifStack = []        # active ifStates (state, in-first-branch)
+  ifState = None      # ifStack[-1]
+  context = None      # FileContext(filename, lineno, line)
 
-    lineno = 0
-    prevline = None
-    for line in fp:
-      lineno += 1
-      with Pfx(str(lineno)):
-        if not line.endswith('\n'):
-          raise ParseError(context, len(line), 'unexpected EOF (missing final newline)')
+  lineno = 0
+  prevline = None
+  for line in fp:
+    lineno += 1
+    if not line.endswith('\n'):
+      raise ParseError(context, len(line), '%s:%d: unexpected EOF (missing final newline)' % (filename, lineno))
 
-        if prevline is not None:
-          # prepend previous continuation line if any
-          line = prevline + '\n' + line
-          prevline = None
-        else:
-          # start of line - new context
-          context = FileContext(filename, lineno, line.rstrip(), parent_context)
+    if prevline is not None:
+      # prepend previous continuation line if any
+      line = prevline + '\n' + line
+      prevline = None
+    else:
+      # start of line - new context
+      context = FileContext(filename, lineno, line.rstrip(), parent_context)
 
-        if line.endswith('\\\n'):
-          # continuation line - gather next line before parse
-          prevline = line[:-2]
+    with Pfx(str(context)):
+      if line.endswith('\\\n'):
+        # continuation line - gather next line before parse
+        prevline = line[:-2]
+        continue
+
+      # skip blank lines and comments
+      w1 = line.lstrip()
+      if not w1 or w1.startswith('#'):
+        continue
+
+      try:
+        # look for :if etc
+        if line.startswith(':'):
+          # top level directive
+          _, offset = get_white(line, 1)
+          word, offset = get_identifier(line, offset)
+          if not word:
+            raise SyntaxError("missing directive name")
+          with Pfx(word):
+            if word == 'ifdef':
+              _, offset = get_white(line, offset)
+              mname, offset = get_identifier(line, offset)
+              if not mname:
+                raise ParseError(context, offset, "missing macro name")
+              _, offset = get_white(line, offset)
+              if offset < len(line):
+                raise ParseError(context, offset, "extra arguments after macro name: %s" % (line[offset:],))
+              newIfState = [ False, True ]
+              if all( [ item[0] for item in ifStack ] ):
+                for ns in M.namespaces:
+                  if mname in ns:
+                    newIfState[0] = True
+                    break
+              ifStack.append(newIfState)
+              continue
+            if word == "ifndef":
+              _, offset = get_white(line, offset)
+              mname, offset = get_identifier(line, offset)
+              if not mname:
+                raise ParseError(context, offset, "missing macro name")
+              _, offset = get_white(line, offset)
+              if offset < len(line):
+                raise ParseError(context, offset, "extra arguments after macro name: %s" % (line[offset:],))
+              newIfState = [ True, True ]
+              if all( [ item[0] for item in ifStack ] ):
+                for ns in M.namespaces:
+                  if mname in ns:
+                    newIfState[0] = False
+                    break
+              ifStack.append(newIfState)
+              continue
+            if word == "if":
+              raise ParseError(context, offset, "\":if\" not yet implemented")
+              continue
+
+        if not all( [ item[0] for item in ifStack ] ):
+          # in false branch of "if"; skip line
           continue
 
-        # skip blank lines and comments
-        w1 = line.lstrip()
-        if not w1 or w1.startswith('#'):
-          continue
+      except SyntaxError, e:
+        error(e)
+        continue
 
-        try:
-          # look for :if etc
-          if line.startswith(':'):
-            # top level directive
-            _, offset = get_white(line, 1)
-            word, offset = get_identifier(line, offset)
-            if not word:
-              raise SyntaxError("missing directive name")
-            with Pfx(word):
-              if word == 'ifdef':
-                _, offset = get_white(line, offset)
-                mname, offset = get_identifier(line, offset)
-                if not mname:
-                  raise ParseError(context, offset, "missing macro name")
-                _, offset = get_white(line, offset)
-                if offset < len(line):
-                  raise ParseError(context, offset, "extra arguments after macro name: %s" % (line[offset:],))
-                newIfState = [ False, True ]
-                if all( [ item[0] for item in ifStack ] ):
-                  for ns in M.namespaces:
-                    if mname in ns:
-                      newIfState[0] = True
-                      break
-                ifStack.append(newIfState)
-                continue
-              if word == "ifndef":
-                _, offset = get_white(line, offset)
-                mname, offset = get_identifier(line, offset)
-                if not mname:
-                  raise ParseError(context, offset, "missing macro name")
-                _, offset = get_white(line, offset)
-                if offset < len(line):
-                  raise ParseError(context, offset, "extra arguments after macro name: %s" % (line[offset:],))
-                newIfState = [ True, True ]
-                if all( [ item[0] for item in ifStack ] ):
-                  for ns in M.namespaces:
-                    if mname in ns:
-                      newIfState[0] = False
-                      break
-                ifStack.append(newIfState)
-                continue
-              if word == "if":
-                raise ParseError(context, offset, "\":if\" not yet implemented")
-                continue
-
-          if not all( [ item[0] for item in ifStack ] ):
-            # in false branch of "if"; skip line
-            continue
-
-        except SyntaxError, e:
-          error(e)
-          continue
-
-        yield context, line
+      yield context, line
 
 def parseMakefile(M, fp, parent_context=None):
   ''' Read a Mykefile and yield Macros and Targets.

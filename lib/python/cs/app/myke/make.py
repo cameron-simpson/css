@@ -193,24 +193,24 @@ class Maker(object):
 
   def loadMakefiles(self, makefiles):
     for makefile in makefiles:
-      with Pfx(makefile):
-        first_target = None
-        ns = {}
-        self._namespaces.insert(0, ns)
-        for O in parseMakefile(self, makefile, self.namespaces):
-          if isinstance(O, Target):
-            T = O
-            self.debug_parse("add target %s", T)
-            self._targets[T.name] = T
-            if first_target is None:
-              first_target = T
-          elif isinstance(O, Macro):
-            self.debug_parse("add macro %s", O)
-            ns[O.name] = O
-          else:
-            raise ValueError, "parseMakefile({}): unsupported parse item received: {}{}".format(makefile, type(O), repr(O))
-        if first_target is not None:
-          self.default_target = first_target
+      self.debug_parse("load makefile: %s", makefile)
+      first_target = None
+      ns = {}
+      self._namespaces.insert(0, ns)
+      for O in parseMakefile(self, makefile, self.namespaces):
+        if isinstance(O, Target):
+          T = O
+          self.debug_parse("add target %s", T)
+          self._targets[T.name] = T
+          if first_target is None:
+            first_target = T
+        elif isinstance(O, Macro):
+          self.debug_parse("add macro %s", O)
+          ns[O.name] = O
+        else:
+          raise ValueError, "parseMakefile({}): unsupported parse item received: {}{}".format(makefile, type(O), repr(O))
+      if first_target is not None:
+        self.default_target = first_target
 
 class Target(object):
 
