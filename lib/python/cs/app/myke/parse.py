@@ -29,7 +29,7 @@ TARGET_MACROS = "@?/"
 #  identifier(param[,param...]) =
 #
 re_identifier = r'[A-Za-z]\w*'
-re_assignment = r'^\s*(' + re_identifier + r')(\(' + re_identifier + r'(\s*,\s*' + re_identifier + r')*\s*\))?\s*='
+re_assignment = r'^\s*(' + re_identifier + r')\s*(\(\s*(' + re_identifier + r'(\s*,\s*' + re_identifier + r')*)\s*\)\s*)?='
 RE_ASSIGNMENT = re.compile( re_assignment )
 
 RE_COMMASEP = re.compile( r'\s*,\s*' )
@@ -309,7 +309,7 @@ def parseMakefile(M, fp, parent_context=None):
         m = RE_ASSIGNMENT.match(line)
         if m:
           macro_name = m.group(1)
-          params_text = m.group(2)
+          params_text = m.group(3)
           param_names = RE_COMMASEP.split(params_text) if params_text else ()
           macro_text = line[m.end():].rstrip()
           yield Macro(context, macro_name, param_names, macro_text)
