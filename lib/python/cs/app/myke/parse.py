@@ -552,13 +552,14 @@ def parseMacro(context, text=None, offset=0):
           raise ParseError(context, offset, 'bare query "?" found in modifiers at: %s' % (text[offset:],))
         pos = SIMPLE_MODIFIERS.find(ch)
         if pos >= 0:
-          modifiers.append(ch)
+          modifier = ch
           offset += 1
           if offset < len(text) and text[offset] == '?':
             if pos >= len(SIMPLE_MODIFIERS) or SIMPLE_MODIFIERS[pos+1] != '?':
               raise ParseError(context, offset, 'modifier "%s" does not accept a query "?"' % (ch,))
-            modifiers.append('?')
+            modifier += '?'
             offset += 1
+          modifiers.append(modifier)
         else:
           raise ParseError(context, offset, 'unknown macro modifier "%s": "%s"' % (ch, text[offset:]))
       except ParseError, e:
