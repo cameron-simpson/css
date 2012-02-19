@@ -34,12 +34,20 @@ RE_ASSIGNMENT = re.compile( re_assignment )
 
 RE_COMMASEP = re.compile( r'\s*,\s*' )
 
-class FileContext(namedtuple('FileContext', 'filename lineno text parent')):
-
+_FileContext = namedtuple('FileContext', 'filename lineno text parent')
+class FileContext(_FileContext):
+  def __init__(self, filename, lineno, text, parent):
+    assert type(filename) is str, "filename should be str, got %s" % (type(filename),)
+    assert type(lineno) is int, "lineno should be int, got %s" % (type(lineno),)
+    assert type(text) is str, "text should be str, got %s" % (type(text),)
+    if parent is not None:
+      assert type(parent) is FileContext, "parent should be FileContext, got %s" % (type(parent),)
+    _FileContext.__init__(self, filename, lineno, text, parent)
+    
   def __str__(self):
     tag = "%s:%d" % (self.filename, self.lineno)
     if self.parent:
-      tag = str(self.parent) + ": " + tag
+      tag = str(parent) + ": " + tag
     return tag
 
 class ParseError(SyntaxError):
@@ -118,7 +126,6 @@ def readMakefileLines(M, fp, parent_context=None):
     filename = str(fp)
 
   ifStack = []        # active ifStates (state, in-first-branch)
-  ifState = None      # ifStack[-1]
   context = None      # FileContext(filename, lineno, line)
 
   lineno = 0
@@ -191,6 +198,16 @@ def readMakefileLines(M, fp, parent_context=None):
             if word == "if":
               raise ParseError(context, offset, "\":if\" not yet implemented")
               continue
+            if word == "else":
+              if not ifStack[-1][1]:
+                raise ParseError(context, 0, ":else inside :else")
+              else:
+                ifStack[-1][1] = False
+            if word == "endif":
+              if not ifStack:
+                raise ParseError(context, 0, ":endif: no active :if directives in this file")
+              ifStack.pop()
+              continue
 
         if not all( [ item[0] for item in ifStack ] ):
           # in false branch of "if"; skip line
@@ -201,6 +218,9 @@ def readMakefileLines(M, fp, parent_context=None):
         continue
 
       yield context, line
+
+  if ifStack:
+    raise SyntaxError("%s: EOF with open :if directives" % (filename,))
 
 def parseMakefile(M, fp, parent_context=None):
   ''' Read a Mykefile and yield Macros and Targets.

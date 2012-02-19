@@ -191,13 +191,13 @@ class Maker(object):
           badopts = True
     return args, badopts
 
-  def loadMakefiles(self, makefiles):
+  def loadMakefiles(self, makefiles, parent_context=None):
     for makefile in makefiles:
       self.debug_parse("load makefile: %s", makefile)
       first_target = None
       ns = {}
       self._namespaces.insert(0, ns)
-      for O in parseMakefile(self, makefile, self.namespaces):
+      for O in parseMakefile(self, makefile, parent_context):
         if isinstance(O, Target):
           T = O
           self.debug_parse("add target %s", T)
