@@ -294,6 +294,8 @@ class Pfx(object):
       except UnicodeDecodeError, e:
         warning("%s: mark = %s %r", e, type(mark), mark)
         self._mark = unicode(mark, 'utf-8', 'replace')
+    ##import traceback
+    ##print >>sys.stderr, ":\n    ".join([ "PFX: %s" % (self._mark,) ] + [ repr(s) for s in traceback.extract_stack(None, 2) ])
     self.absolute = absolute
     if loggers is not None:
       if not hasattr(loggers, '__getitem__'):
