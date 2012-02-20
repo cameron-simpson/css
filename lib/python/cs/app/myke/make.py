@@ -46,6 +46,7 @@ class Maker(object):
     self._makeQ = None
     self._makefiles = []
     self.appendfiles = []
+    self.macros = {}
     self._targets = {}
     self._targets_lock = allocate_lock()
     self._namespaces = []
@@ -283,7 +284,7 @@ class Target(object):
     with self._lock:
       prereqs = self._prereqs
       if isinstance(prereqs, MacroExpression):
-        self._prereqs = prereqs.eval(self.namespaces).split()
+        self._prereqs = prereqs(self.context, self.namespaces).split()
     return self._prereqs
 
   def _make(self):
@@ -333,7 +334,7 @@ class Action(object):
     M = target.maker
     v = self.variant
     if v == 'shell':
-      shcmd = self.mexpr(target.namespaces)
+      shcmd = self.mexpr(self.context, target.namespaces)
       if not self.silent:
         print shcmd
       if M.no_action:
