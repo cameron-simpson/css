@@ -70,6 +70,8 @@ def nsget(namespaces, mname):
   for ns in namespaces:
     M = ns.get(mname)
     if M:
+      if type(M) is str:
+        return lambda c, ns: M
       return M
   print >>sys.stderr, "not found: %s\nnamespaces =\n  %s" % (mname, nsstr(namespaces),)
   return None
@@ -113,14 +115,14 @@ class Macro(object):
       assert offset == len(self.text)
     return self._mexpr
 
-  def __call__(self, context, namespaces, *param_mexprs):
+  def __call__(self, context, namespaces, *param_values):
     assert type(namespaces) is list, "namespaces = %r" % (namespaces,)
-    if len(param_mexprs) != len(self.params):
+    if len(param_values) != len(self.params):
       raise ValueError(
-              "mismatched Macro parameters: self.params = %r (%d items) but got %d param_mexprs: %r"
-              % (self.params, len(self.params), len(param_mexprs), param_mexprs))
+              "mismatched Macro parameters: self.params = %r (%d items) but got %d param_values: %r"
+              % (self.params, len(self.params), len(param_values), param_values))
     if self.params:
-      namespaces = [ dict(zip(self.params, param_mexprs)) ] + namespaces
+      namespaces = [ dict(zip(self.params, param_values)) ] + namespaces
     return self.mexpr(context, namespaces)
 
 def readMakefileLines(M, fp, parent_context=None):
@@ -459,7 +461,7 @@ class MacroExpression(object):
     debug("eval returns %s", result)
     return result
 
-SIMPLE_MODIFIERS = 'DEG?FPpSsv?<?'
+SIMPLE_MODIFIERS = 'DEG?Fv?<?'
 
 def parseMacro(context, text=None, offset=0):
   if type(context) is str:
@@ -675,7 +677,8 @@ class MacroTerm(object):
         macro = nsget(namespaces, text)
         if macro is None:
           raise ValueError("unknown macro: $(%s)" % (text,))
-        text = macro(context, namespaces, *param_mexprs)
+        param_values = [ mexpr(context, namespaces) for mexpr in param_mexprs ]
+        text = macro(context, namespaces, *param_values)
 
       for modifier in self.modifiers:
         with Pfx(modifier):
@@ -699,7 +702,20 @@ class MacroTerm(object):
                   else:
                     if not lax:
                       raise ValueError("no matches")
-            text = " ".join(chain(*globbed))
+            text = " ".join(chain(globbed))
+          elif modifier[0] in 'PpSs':
+            mode, sep = modifier
+            with Pfx("\"%s\"" % (text,)):
+              if mode == 'P':
+                text, _ = text.rsplit(sep, 1)
+              elif mode == 'p':
+                text, _ = text.split(sep, 1)
+              elif mode == 'S':
+                _, text = text.rsplit(sep, 1)
+              elif mode == 's':
+                _, text = text.split(sep, 1)
+              else:
+                raise NotImplementedError('unimplemented macro modifier')
           elif modifier == 'v':
             # TODO: accept lax?
             text = ' '.join( MacroTerm(context, word)(context, namespaces) for word in text.split() )
