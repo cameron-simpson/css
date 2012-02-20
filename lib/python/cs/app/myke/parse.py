@@ -233,6 +233,7 @@ def readMakefileLines(M, fp, parent_context=None):
                     include_file = os.path.join( dirname(filename), include_file )
                   for context, line in readMakefileLines(M, include_file, parent_context=context):
                     yield context, line
+              continue
 
         if not all( ifState[0] for ifState in ifStack ):
           # in false branch of "if"; skip line
