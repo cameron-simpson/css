@@ -220,8 +220,21 @@ def readMakefileLines(M, fp, parent_context=None):
                 raise ParseError(context, 0, ":endif: no active :if directives in this file")
               ifStack.pop()
               continue
+            if word == "include":
+              if all( ifState[0] for ifState in ifStack ):
+                _, ioffset = get_white(line, offset)
+                if ioffset == len(line):
+                  raise ParseError(context, ioffset, ":include: no include files specified")
+                include_mexpr, _ = parseMacroExpression(context, offset=ioffset)
+                for include_file in include_mexpr(context, M.namespaces).split():
+                  if len(include_file) == 0:
+                    continue
+                  if isabs(include_file):
+                    include_file = os.path.join( dirname(filename), include_file )
+                  for context, line in readMakefileLines(M, include_file, parent_context=context):
+                    yield context, line
 
-        if not all( [ item[0] for item in ifStack ] ):
+        if not all( ifState[0] for ifState in ifStack ):
           # in false branch of "if"; skip line
           continue
 
@@ -700,7 +713,7 @@ class MacroTerm(object):
                   else:
                     if not lax:
                       raise ValueError("no matches")
-            text = " ".join(chain(globbed))
+            text = " ".join(chain(*globs))
           elif modifier[0] in 'PpSs':
             mode, sep = modifier
             with Pfx("\"%s\"" % (text,)):
