@@ -73,7 +73,6 @@ def nsget(namespaces, mname):
       if type(M) is str:
         return lambda c, ns: M
       return M
-  print >>sys.stderr, "not found: %s\nnamespaces =\n  %s" % (mname, nsstr(namespaces),)
   return None
 
 def nsstr(namespaces):
@@ -618,7 +617,6 @@ def parseMacro(context, text=None, offset=0):
       else:
         offset += 1
 
-    print >>sys.stderr, "new MacroTerm: mtext=<%s>" % (mtext,)
     M = MacroTerm(context, mtext, modifiers, param_mexprs, permute=mpermute, literal=mliteral), offset
     return M
 
