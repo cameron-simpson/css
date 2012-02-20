@@ -2,6 +2,7 @@
 #
 
 import sys
+if sys.hexversion < 0x02060000: from sets import Set as set
 import os
 import os.path
 import getopt
@@ -49,6 +50,7 @@ class Maker(object):
     self.macros = {}
     self._targets = {}
     self._targets_lock = allocate_lock()
+    self.precious = set()
     self._namespaces = []
 
   def __str__(self):

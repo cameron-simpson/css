@@ -180,9 +180,9 @@ def readMakefileLines(M, fp, parent_context=None):
           word, offset = get_identifier(line, offset)
           if not word:
             raise SyntaxError("missing directive name")
+          _, offset = get_white(line, offset)
           with Pfx(word):
             if word == 'ifdef':
-              _, offset = get_white(line, offset)
               mname, offset = get_identifier(line, offset)
               if not mname:
                 raise ParseError(context, offset, "missing macro name")
@@ -195,7 +195,6 @@ def readMakefileLines(M, fp, parent_context=None):
               ifStack.append(newIfState)
               continue
             if word == "ifndef":
-              _, offset = get_white(line, offset)
               mname, offset = get_identifier(line, offset)
               if not mname:
                 raise ParseError(context, offset, "missing macro name")
@@ -211,21 +210,24 @@ def readMakefileLines(M, fp, parent_context=None):
               raise ParseError(context, offset, "\":if\" not yet implemented")
               continue
             if word == "else":
+              # extra text permitted
+              if not ifStack:
+                raise ParseError(context, 0, ":else: no active :if directives in this file")
               if not ifStack[-1][1]:
                 raise ParseError(context, 0, ":else inside :else")
               else:
                 ifStack[-1][1] = False
             if word == "endif":
+              # extra text permitted
               if not ifStack:
                 raise ParseError(context, 0, ":endif: no active :if directives in this file")
               ifStack.pop()
               continue
             if word == "include":
               if all( ifState[0] for ifState in ifStack ):
-                _, ioffset = get_white(line, offset)
-                if ioffset == len(line):
-                  raise ParseError(context, ioffset, ":include: no include files specified")
-                include_mexpr, _ = parseMacroExpression(context, offset=ioffset)
+                if offset == len(line):
+                  raise ParseError(context, offset, ":include: no include files specified")
+                include_mexpr, _ = parseMacroExpression(context, offset=offset)
                 for include_file in include_mexpr(context, M.namespaces).split():
                   if len(include_file) == 0:
                     continue
@@ -265,9 +267,12 @@ def parseMakefile(M, fp, parent_context=None):
           _, doffset = get_white(line, 1)
           word, offset = get_identifier(line, doffset)
           if not word:
-            raise ParseError("missing directive name")
+            raise ParseError(context, doffset, "missing directive name")
+          _, offset = get_white(line, offset)
           with Pfx(word):
             if word == 'append':
+              if offset == len(line):
+                raise ParseError(context, offset, "nothing to append")
               mexpr, offset = parseMacroExpression(context, line, offset)
               assert offset == len(line)
               for include_file in mexpr(context, M.namespaces).split():
@@ -277,6 +282,8 @@ def parseMakefile(M, fp, parent_context=None):
                   M.add_appendfile(include_file)
               continue
             if word == 'import':
+              if offset == len(line):
+                raise ParseError(context, offset, "nothing to import")
               ok = True
               for envvar in line[offset:].split():
                 if envvar:
@@ -288,6 +295,12 @@ def parseMakefile(M, fp, parent_context=None):
                     yield Macro(context, envvar, (), envvalue.replace('$', '$$'))
               if not ok:
                 raise ValueError("missing environment variables")
+              continue
+            if word == 'precious':
+              if offset == len(line):
+                raise ParseError(context, offset, "nothing to mark as precious")
+              mexpr, offset = parseMacroExpression(context, line, offset)
+              M.precious.update( word for word in mexpr(context, M.namespaces).split() if word )
               continue
             raise ParseError(context, doffset, "unrecognised directive")
 
