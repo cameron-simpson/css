@@ -5,13 +5,14 @@ import sys
 if sys.hexversion < 0x02060000: from sets import Set as set
 import os
 import os.path
+import errno
 import getopt
 from functools import partial
 import logging
 from subprocess import Popen
 from thread import allocate_lock
 import cs.misc
-from cs.later import Later
+from cs.later import Later, report as report_LFs
 from cs.logutils import Pfx, info, error, debug
 from .parse import SPECIAL_MACROS, Macro, MacroExpression, \
                    parseMakefile, parseMacroExpression
@@ -51,6 +52,8 @@ class Maker(object):
     self._targets = {}
     self._targets_lock = allocate_lock()
     self.precious = set()
+    self.active = set()
+    self.active_lock = allocate_lock()
     self._namespaces = []
 
   def __str__(self):
@@ -90,6 +93,20 @@ class Maker(object):
   def debug_parse(self, msg, *a, **kw):
     if self.debug.parse:
       info(msg, *a, **kw)
+
+  def making(self, target):
+    with self.active_lock:
+      self.active.add(target)
+
+  def made(self, target, status):
+    with self.active_lock:
+      self.active.remove(target)
+
+  def cancel_all(self):
+    with self._active_lock:
+      Ts = list(self.active)
+    for T in Ts:
+      T.cancel()
 
   def make(self, targets):
     ''' Make a bunch of targets.
@@ -229,6 +246,7 @@ class Target(object):
     self.shell = SHELL
     self._prereqs = prereqs
     self._postprereqs = postprereqs
+    self.cancelled = False
     self.maker = None
     self.actions = actions
     self.state = "unmade"
@@ -252,9 +270,15 @@ class Target(object):
              ]
            )
 
+  def cancel(self):
+    self.maker.debug_make("CANCEL %s", self)
+    self.cancelled = True
+
   def make(self, maker):
     ''' Request that this target be made.
-        Check the status property to find out how things went; it will block if necessary.
+        Return the LateFunc that will report the madeness.
+        Check the .status property to find out how things went;
+        it will block if necessary.
     '''
     with self._lock:
       if self.maker is None:
@@ -292,29 +316,61 @@ class Target(object):
   def _make(self):
     ''' Make the target. Private function submtted to the make queue.
     '''
-    with Pfx(self.name):
+    self.maker.making(self)
+    made = False
+    with Pfx("make %s" % (self.name,)):
       self.maker.debug_make("commence make: %d actions, prereqs = %s", len(self.actions), self.prereqs)
-      ok = True
+      dep_status_LFs = []
       for dep in self.prereqs:
-        dep.make(self.maker)    # request item
-        self.maker.debug_make("wait for status of %s", dep)
-        T_ok = dep.status
-        self.maker.debug_make("status of %s is %s", dep, T_ok)
-        if not T_ok:
-          ok = False
-          if self.maker.fail_fast:
-            self.maker.debug_make("abort")
+        if self.cancelled:
+          break
+        self.make.debug_make("request dependency: %s", dep)
+        dep_status_LFs.append(dep.make(self.maker))
+      if self.cancelled:
+        D_ok = False
+      else:
+        D_ok = True
+        self.maker.debug_make("wait for dependencies...")
+        for LF in report_LFs(dep_status_LFs):
+          dep, status = LF()
+          if not LF():
+            d_ok = False
+            self.maker.debug_make("%s FAILED", dep)
             break
-      if not ok:
-        self.maker.debug_make("prereqs bad, skip actions")
-        return False
-      for action in self.actions:
-        self.maker.debug_make("dispatch action: %s", action)
-        A_ok = action.act(self)
-        self.maker.debug_make("action status = %s", A_ok)
-        if not A_ok:
-          return False
-      return True
+          if self.cancelled:
+            break
+        if self.cancelled:
+          D_ok = False
+        if not D_ok:
+          self.maker.debug_make("prerequisites FAILED, skip actions")
+          if self.maker.fail_fast:
+            self.maker.cancel_all()
+        else:
+          A_ok = True
+          for action in self.actions:
+            self.maker.debug_make("dispatch action: %s", action)
+            A_status = action.act(self)
+            self.maker.debug_make("action status = %s: %s", A_status, action)
+            if not A_status:
+              A_ok = False
+              break
+            if self.cancelled:
+              break
+          if self.cancelled:
+            A_ok = False
+          if A_ok:
+            made = True
+      self.maker.debug_make("OK" if made else "FAILED")
+      if not made and self.name not in self.maker.precious:
+          try:
+            os.remove(self.name)
+          except OSError, e:
+            if e.errno != errno.ENOENT:
+              error("%s", e)
+          else:
+            self.make.debug_make("removed %s")
+      self.maker.made(self, made)
+      return self, made
 
 class Action(object):
 
