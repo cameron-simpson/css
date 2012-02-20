@@ -758,7 +758,7 @@ class TestAll(unittest.TestCase):
     from StringIO import StringIO
     from .make import Maker
     M = Maker()
-    parsed = list(parseMakefile(M, StringIO("abc = def\n"), []))
+    parsed = list(parseMakefile(M, StringIO("abc = def\n")))
     self.assertEquals(len(parsed), 1)
     self.assertEquals([ type(O) for O in parsed ], [ Macro ])
 
