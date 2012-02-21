@@ -620,8 +620,8 @@ def parseMacro(context, text=None, offset=0):
           modifiers.append(modifier + sep)
           continue
 
-        if ch == '-':
-          modifier = '-'
+        if ch in '-+*':
+          modifier = ch
           moffset = offset
           _, offset = get_white(text, offset+1)
           submname, offset = get_identifier(text, offset)
@@ -707,6 +707,7 @@ class MacroTerm(object):
 
       for modifier in self.modifiers:
         with Pfx(modifier):
+          mod0 = modifier[0]
           if modifier == 'E':
             mexpr, offset = parseMacroExpression(self.context, text)
             assert offset == len(text)
@@ -728,7 +729,7 @@ class MacroTerm(object):
                     if not lax:
                       raise ValueError("no matches")
             text = " ".join(chain(*globs))
-          elif modifier[0] in 'PpSs':
+          elif mod0 in 'PpSs':
             mode, sep = modifier
             with Pfx("\"%s\"" % (text,)):
               if mode == 'P':
@@ -744,13 +745,22 @@ class MacroTerm(object):
           elif modifier == 'v':
             # TODO: accept lax?
             text = ' '.join( MacroTerm(context, word)(context, namespaces) for word in text.split() )
-          elif modifier.startswith('-'):
-            submname = modifier[1:]
-            M = nsget(namespaces, submname)
+          elif mod0 in '-+*':
+            mod1 = modifier[1:]
+            words = set( word for word in text.split() if word )
+            M = nsget(namespaces, mod1)
             if not M:
-              raise ValueError("no macro $(%s)" % (submname,))
+              raise ValueError("no macro $(%s)" % (mod1,))
             subwords = set( subword for subword in M(context, namespaces).split() if subword )
-            text = " ".join( word for word in text.split() if word and word not in subwords )
+            if mod0 == '-':
+              words -= subwords
+            elif mod0 == '+':
+              words += subwords
+            elif mod0 == '*':
+              words &= subwords
+            else:
+              raise NotImplementedError('unimplemented set modifier \"%s\"' % (mod0,))
+            text = " ".join(words)
           else:
             raise NotImplementedError('unimplemented macro modifier')
 
