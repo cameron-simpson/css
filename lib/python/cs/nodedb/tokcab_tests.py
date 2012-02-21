@@ -5,6 +5,9 @@
 #
 
 import sys
+print >>sys.stderr, "cs.nodedb.tokcab deprecated in favor of KyotoCabinet"
+sys.exit(0)
+
 import os
 import os.path
 import unittest
