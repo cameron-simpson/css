@@ -5,15 +5,12 @@
 #   Python and Apple AddressBook
 #   http://www.programmish.com/?p=26
 #
-# The Objective C stuff from MacOSX is in:
-#   /System/Library/Frameworks/Python.framework/Versions/2.6/Extras/lib/python/PyObjC
-# so I may need to add that to sys.path in for other python installs.
-#
 
-from AddressBook import ABAddressBook
-from .objc import convertObjCtype
-import pprint
 import sys
+import pprint
+# need to import .objc first to tweak sys.path if necessary
+from .objc import convertObjCtype
+from AddressBook import ABAddressBook
 
 def main(argv):
   for P in addressBookPeople():

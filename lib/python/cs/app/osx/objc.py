@@ -1,9 +1,15 @@
 #!/usr/bin/python
 #
-# MacOSX Objective C type conversion.
+# MacOSX Objective C facilities.
+# Tweaks sys.path if necessary.
+# Includes some type conversion.
 #       - Cameron Simpson <cs@zip.com.au> 29jun2011
 # 
 
+import sys
+objc_path = '/System/Library/Frameworks/Python.framework/Versions/Current/Extras/lib/python/PyObjC'
+if objc_path not in sys.path:
+  sys.path.append(objc_path)
 from datetime import datetime, tzinfo
 from AddressBook import objc, NSDate, ABMultiValueCoreDataWrapper, NSCFDictionary
 
