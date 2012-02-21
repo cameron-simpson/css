@@ -6,12 +6,17 @@
 
 hg log -r "$HG_NODE" --template='{desc}\n' --limit 1 \
 | { read -r headline
-    if [ -s .hg-cs-category ]
-    then
-      cat=`cat .hg-cs-category`
-      wd=`pwd`
-      wdbase=`basename "$wd"`
-      dlog "$cat: $wdbase: $headline" </dev/null
-    fi
+    for d in . .. ../.. ../../.. ../../../..
+    do
+      f=$d/.hg-cs-category
+      if [ -s "$f" ]
+      then
+        cat=`cat "$f"`
+        wd=`pwd`
+        wdbase=`basename "$wd"`
+        dlog "$cat: $wdbase: $headline" </dev/null
+        break
+      fi
+    done
     exec buglog "commit $HG_NODE: $headline"
   }
