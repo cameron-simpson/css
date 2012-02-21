@@ -2,6 +2,7 @@
 #
 
 import sys
+import os
 import os.path
 import getopt
 from functools import partial
@@ -11,7 +12,8 @@ from thread import allocate_lock
 import cs.misc
 from cs.later import Later
 from cs.logutils import Pfx, info, error, debug
-from .parse import parseMakefile, Macro, parseMacroExpression, MacroExpression
+from .parse import SPECIAL_MACROS, Macro, MacroExpression, \
+                   parseMakefile, parseMacroExpression
 
 SHELL = '/bin/sh'
 
@@ -43,10 +45,10 @@ class Maker(object):
     self.default_target = None
     self._makeQ = None
     self._makefiles = []
+    self.appendfiles = []
     self._targets = {}
     self._targets_lock = allocate_lock()
-    self._macros = {}
-    self._macros_lock = allocate_lock()
+    self._namespaces = []
 
   def __str__(self):
     return '%s<Maker>' % (cs.misc.cmd,)
@@ -54,16 +56,29 @@ class Maker(object):
     return self._makeQ.submit(func, name=name, priority=priority)
 
   @property
+  def namespaces(self):
+    return self._namespaces + [ SPECIAL_MACROS ]
+
+  @property
   def makefiles(self):
     ''' The list of makefiles to consult, a tuple.
-        It is not possible to add more makefiles are accessing this property.
+        It is not possible to add more makefiles after accessing this property.
     '''
     _makefiles = self._makefiles
     if not _makefiles:
-      self._makefiles = _makefiles = ( os.path.basename(cs.misc.cmd).title() + 'file', )
-    elif type(_makefiles) is not tuple:
+      _makefiles = []
+      makerc = os.environ.get( (cs.misc.cmd+'rc').upper() )
+      if makerc and os.path.exists(makerc):
+        _makefiles.append(makerc)
+      makefile = os.path.basename(cs.misc.cmd).title() + 'file'
+      _makefiles.append(makefile)
+      self._makefiles = _makefiles
+    if type(_makefiles) is not tuple:
       self._makefiles = _makefiles = tuple(_makefiles)
     return _makefiles
+
+  def add_appendfile(self, filename):
+    self.appendfiles.append(filename)
 
   def debug_make(self, msg, *a, **kw):
     if self.debug.make:
@@ -123,7 +138,9 @@ class Maker(object):
     '''
     with Pfx("setDebug(%s, %s)" % (repr(flag), repr(value))):
       if not flag.isalpha() or not hasattr(self.debug, flag):
-        raise AttributeError, "invalid debug flag"
+        raise AttributeError(
+                "invalid debug flag, know: %s"
+                % (",".join( sorted( [F for F in dir(self.debug) if F.isalpha() ] ) ),))
       if self.debug.flags:
         info("debug.%s = %s", flag, value)
       setattr(self.debug, flag, value)
@@ -174,20 +191,22 @@ class Maker(object):
           badopts = True
     return args, badopts
 
-  def loadMakefiles(self):
-    for makefile in self.makefiles:
+  def loadMakefiles(self, makefiles):
+    for makefile in makefiles:
       with Pfx(makefile):
         first_target = None
-        for O in parseMakefile(self, makefile, [self._macros]):
+        ns = {}
+        self._namespaces.insert(0, ns)
+        for O in parseMakefile(self, makefile, self.namespaces):
           if isinstance(O, Target):
-            self.debug_parse("add target %s", O)
-            self._targets[O.name] = O
+            T = O
+            self.debug_parse("add target %s", T)
+            self._targets[T.name] = T
             if first_target is None:
-              first_target = O
-            O.namespaces = [self._macros]
+              first_target = T
           elif isinstance(O, Macro):
             self.debug_parse("add macro %s", O)
-            self._macros[O.name] = O
+            ns[O.name] = O
           else:
             raise ValueError, "parseMakefile({}): unsupported parse item received: {}{}".format(makefile, type(O), repr(O))
         if first_target is not None:
@@ -204,7 +223,6 @@ class Target(object):
     '''
     self.context = context
     self.name = name
-    self.namespaces = None
     self.shell = SHELL
     self._prereqs = prereqs
     self._postprereqs = postprereqs
@@ -216,6 +234,20 @@ class Target(object):
 
   def __str__(self):
     return "{}[{}]:{}:{}".format(self.name, self.state, self._prereqs, self._postprereqs)
+
+  @property
+  def namespaces(self):
+    return ( [ { '@':     lambda c, ns: self.name,
+                 '/':     lambda c, ns: [ P.name for P in self.prereqs ],
+                 # TODO: $? et al
+               },
+             ]
+           + self.maker.namespaces
+           + [
+               self.maker.macros,
+               SPECIAL_MACROS,
+             ]
+           )
 
   def make(self, maker):
     ''' Request that this target be made.
@@ -301,7 +333,7 @@ class Action(object):
     M = target.maker
     v = self.variant
     if v == 'shell':
-      shcmd = self.mexpr.eval(target.namespaces)
+      shcmd = self.mexpr(target.namespaces)
       if not self.silent:
         print shcmd
       if M.no_action:
