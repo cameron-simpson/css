@@ -17,7 +17,7 @@ if not flag DLOG_LOCAL && [ "x$HOST" != "x$HOMEHOST" ]
 then
   if flag DLOG_REMOTE_DISABLE
   then
-    echo "flag DLOG_REMOTE_DISABLE: logging locally"
+    : echo "flag DLOG_REMOTE_DISABLE: logging locally"
   else
     qcmd=`shqstr ./bin/with-login-env dlog ${1+"$@"}`
     exec $trace ssh "$HOMEHOST" "$qcmd"
