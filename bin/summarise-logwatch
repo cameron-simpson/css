@@ -123,6 +123,14 @@ s/  *$//
   d
 }
 
+/^-*- yum Begin -*-$/,/^-*- yum End -*-$/{
+  /^--/d
+  /^$/d
+  s/^/yum: /
+  p
+  d
+}
+
 /^-*- Connections (secure-log) Begin -*-$/,/^-*- Connections (secure-log) End -*-$/{
   /^--/d
   /^vsftp: start .* from .*, wd=/d

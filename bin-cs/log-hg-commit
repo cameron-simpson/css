@@ -1,0 +1,22 @@
+#!/bin/sh -ue
+#
+# Record a Mercurial commit.
+#       - Cameron Simpson <cs@zip.com.au> 25apr2007
+#
+
+hg log -r "$HG_NODE" --template='{desc}\n' --limit 1 \
+| { read -r headline
+    for d in . .. ../.. ../../.. ../../../..
+    do
+      f=$d/.hg-cs-category
+      if [ -s "$f" ]
+      then
+        cat=`cat "$f"`
+        wd=`pwd`
+        wdbase=`basename "$wd"`
+        dlog "$cat: $wdbase: $headline" </dev/null
+        break
+      fi
+    done
+    exec buglog "commit $HG_NODE: $headline"
+  }
