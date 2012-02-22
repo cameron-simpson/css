@@ -780,6 +780,15 @@ class MacroTerm(object):
             else:
               raise NotImplementedError('unimplemented set modifier \"%s\"' % (mod0,))
             text = " ".join(words)
+          elif mod0 == ':':
+            delim = modifier[1]
+            if not isalnum(delim):
+              ptn, rep, _ = modifier[2:].split(delim, 2)
+              assert len(_) == 0, 'bad :,ptn,rep, modifier'
+              mexpr, _ = parseMacroExpression(self.context, ptn)
+              text = re.sub(mexpr(context, namespaces), rep, text)
+            else:
+              raise NotImplementedError('unimplemented ":" modifier')
           else:
             raise NotImplementedError('unimplemented macro modifier')
 
