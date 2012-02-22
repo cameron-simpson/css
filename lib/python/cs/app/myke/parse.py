@@ -662,10 +662,11 @@ def parseMacro(context, text=None, offset=0):
         if ch == '/':
           modifier = ch
           offset += 1
-          end = text.find('/', offset)
-          if end < 0:
+          mexpr, end = parseMacroExpression(context, text=text, offset=offset, stopchars='/')
+          if end == len(text):
             raise ParseError(context, offset, 'incomplete /regexp/')
           modifiers.append( modifier + ("!" if has_not else ".") + text[offset:end] )
+          offset = end+1
           continue
 
         raise ParseError(context, offset, 'unknown macro modifier "%s": "%s"' % (ch, text[offset:]))
@@ -823,6 +824,11 @@ class MacroTerm(object):
                     else:
                       warning("%s", e)
             text = " ".join(newwords)
+          elif mod0 == '/':
+            has_not = modifier[1] == '!'
+            regexp_mexpr, _ = parseMacroExpression(context, text=modifier[2:])
+            regexp = re.compile(regexp_mexpr(context, namespaces))
+            text = " ".join( [ word for word in text.split() if regexp.search(word) ] )
           else:
             raise NotImplementedError('unimplemented macro modifier')
 
