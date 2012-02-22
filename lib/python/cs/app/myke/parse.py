@@ -649,6 +649,25 @@ def parseMacro(context, text=None, offset=0):
           modifiers.append("%s%s%s%s" % (delim, ptn, delim, repl))
           continue
 
+        has_not = False
+        if ch == '!':
+          has_not = True
+          # !/regexp/ or !{commalist}?
+          _, offset2 = get_white(text, offset+1)
+          if offset2 == len(text) or text[offset2] not in '/{':
+            raise ParseError(context, offset2, '"!" not followed by /regexp/ or {comma-list}')
+          offset = offset2
+          ch = text[offset]
+
+        if ch == '/':
+          modifier = ch
+          offset += 1
+          end = text.find('/', offset)
+          if end < 0:
+            raise ParseError(context, offset, 'incomplete /regexp/')
+          modifiers.append( modifier + ("!" if has_not else ".") + text[offset:end] )
+          continue
+
         raise ParseError(context, offset, 'unknown macro modifier "%s": "%s"' % (ch, text[offset:]))
 
       except ParseError, e:
