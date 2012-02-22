@@ -828,7 +828,7 @@ class MacroTerm(object):
             has_not = modifier[1] == '!'
             regexp_mexpr, _ = parseMacroExpression(context, text=modifier[2:])
             regexp = re.compile(regexp_mexpr(context, namespaces))
-            text = " ".join( [ word for word in text.split() if regexp.search(word) ] )
+            text = " ".join( [ word for word in text.split() if has_not ^ bool(regexp.search(word)) ] )
           else:
             raise NotImplementedError('unimplemented macro modifier')
 
